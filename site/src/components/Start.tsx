@@ -23,6 +23,7 @@ export default function Start({ copy, commands, readme, icons }: Props) {
           <div>
             <h3 className="mb-1.5 text-2xl text-berry">{copy.safety.title}</h3>
             <p className="text-base">{copy.safety.text}</p>
+            <p className="mt-2 text-base">{copy.safety.wip}</p>
           </div>
         </div>
         <div className="mt-7 grid grid-cols-1 items-start gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">

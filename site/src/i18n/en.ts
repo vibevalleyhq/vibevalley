@@ -61,7 +61,7 @@ export const en: Copy = {
       { icon: 'icon-board', title: 'One chat for the farm', text: 'You, the manager and the helpers talk in one chat. Every job gets its own thread, where the helper confirms, asks and reports, and you can step in any time. Channels keep projects apart.' },
       { icon: 'icon-plan', title: 'Planting plans', text: 'A long job is first split into a graph of steps, and you look over the draft before work starts. A bug fix starts with an acceptance test that fails, and no later step may touch it.' },
       { icon: 'button-mic', title: 'Talk, and it is done', text: 'Hold the button and talk: the voice manager hears you out and hands your words to the same manager, who sends the work off.' },
-      { icon: 'icon-tasks', title: 'A ticket board', text: 'Every planting is a ticket: to do, in progress, waiting for you, closed. When every plot is busy, tickets queue and start as soon as one frees up.' },
+      { icon: 'icon-tasks', title: 'A ticket board and a map', text: 'Every planting is a ticket: to do, in progress, waiting for you, closed. When every plot is busy, tickets queue and start as soon as one frees up. On the map every project is an island: see which plots are at work and how many more it can take.' },
       { icon: 'icon-clock', title: 'Schedules and rounds', text: '"Run the tests every day at nine." A round that calls no model reminds you of questions left unanswered, helpers gone quiet and harvests left in the field.' },
       { icon: 'icon-pigeon', title: 'Work from anywhere', text: 'Connect the farm chat to WeChat, Feishu or QQ; only your own account gets in. A phone or another computer can come in through the yard gate.' },
       { icon: 'icon-coin', title: 'Spending in sight', text: 'Every machine’s quota, what today cost, a daily budget. You are warned before a quota runs out, and nothing is sent once it has.' },
@@ -93,6 +93,7 @@ export const en: Copy = {
   safety: {
     title: 'Before you start',
     text: 'Helpers run with no permission prompts and no sandbox: they can run any command on this machine. The server listens on 127.0.0.1 only; never expose it to a network. Put in the work folder only projects you are willing to hand to a coding agent.',
+    wip: 'The code is changing fast: its concepts, interfaces and saved data will all still move, and there will be bugs. Back up the farm\u2019s data before you upgrade, and tell us on GitHub when something breaks.',
   },
   start: {
     title: 'Get started',
