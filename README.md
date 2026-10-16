@@ -1,6 +1,9 @@
-# VibeValley · 码农场物语
+<h1 align="center">VibeValley · 码农场物语</h1>
 
 > A team of coding agents you direct by voice or chat, drawn as a pixel farm. Runs on your own machine.
+
+> [!NOTE]
+> 仓库正在密集调整：概念、接口和存盘格式都还会变，可能会有 bug，升级后旧数据也可能要迁移。升级前先备份农场的数据（`~/Library/Application Support/vibevalley`，单独跑的服务端是 `~/.vibevalley`）。遇到问题欢迎提 issue。
 
 **VibeValley**（码农场物语）是一个用语音或打字指挥的编码 agent 团队，画成一座像素农场。
 
