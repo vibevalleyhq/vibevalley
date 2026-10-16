@@ -1,6 +1,3 @@
-// The title screen over the farm (web/src/title/TitleScreen.tsx): the menu, its keys, the settings panel, and the
-// frame around it (AppFrame): over the farm only, and the debug console's hotkey.
-
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -78,7 +75,6 @@ void main() {
     expect(find.text('继续游戏'), findsOneWidget);
     expect(find.text('设置'), findsOneWidget);
     expect(find.text('还没有农场可以继续：先开始游戏。'), findsOneWidget);
-    // Not there yet: 继续游戏 does nothing.
     await tester.tap(find.text('继续游戏'));
     await tester.pump();
     expect(container.read(titleOpenProvider), isTrue);
@@ -120,7 +116,6 @@ void main() {
   testWidgets('the arrow keys move between what can be chosen; Escape closes 设置', (tester) async {
     await open(tester);
     await loadSettings(tester);
-    // From 开始游戏, down skips the closed 继续游戏 and lands on 设置.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
@@ -129,7 +124,6 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pump();
     expect(find.text('DeepSeek API Key'), findsNothing);
-    // Down from 设置 goes round to 开始游戏.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
@@ -227,7 +221,6 @@ void main() {
     );
     expect(find.text('连上农场（服务端没答应，在重试）…'), findsOneWidget);
     expect(find.text('60%'), findsOneWidget);
-    // The list leaves out the bracketed why.
     expect(find.text('连上农场'), findsOneWidget);
     expect(find.text('像素村'), findsOneWidget);
   });

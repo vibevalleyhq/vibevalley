@@ -12,17 +12,12 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// The farm's ledger (ported from the TypeScript server's ledger.ts, removed): the things worth remembering (work harvested, turns failed,
-// conflicts, the person's words for a helper, …), kept in the ledger table in order. Coins, streaks and achievements
-// are what it folds into (protocol progress.go): the whole ledger at start, into the core state's progress, then one
-// entry at a time, each a progress fact with what it brought. Entries the farm's facts tell of are recorded here,
-// watching them (protocol.EntriesFor); the rest where they happen (a harvest, words on the chat, a voice call).
-// Rationale: .agents/notes/implemented/feature/2026-10-11-achievements.md.
+// Entries the farm's facts tell of are recorded here, watching them (protocol.EntriesFor); the rest where they happen.
 
 type Ledger struct {
 	db   *sql.DB
 	site *base.Site
-	// mu: one entry at a time, so the order in the table is the order of the fold.
+	// One entry at a time, so the order in the table is the order of the fold.
 	mu     sync.Mutex
 	folded protocol.Folded
 	stop   func()
@@ -39,7 +34,7 @@ func newLedger(db *sql.DB, site *base.Site) (*Ledger, error) {
 	return l, nil
 }
 
-// entries is the ledger in order; a row this code cannot read any more is left out of the fold.
+// A row this code cannot read any more is left out of the fold.
 func (l *Ledger) entries() ([]protocol.LedgerEntry, error) {
 	rows, err := l.db.Query("select kind, at, payload from ledger order by seq")
 	if err != nil {
@@ -68,8 +63,7 @@ func (l *Ledger) entries() ([]protocol.LedgerEntry, error) {
 	return out, rows.Err()
 }
 
-// start follows the farm's facts, against a copy of the core state folded from the same events, to see each fact
-// against what was before it.
+// Against a copy of the core state folded from the same events, to see each fact against what was before it.
 func (l *Ledger) OnStart(ctx context.Context) error {
 	snapshot, events, stop := l.site.Events()
 	l.stop = stop
@@ -111,7 +105,6 @@ func (l *Ledger) OnStop() {
 	}
 }
 
-// planEntryAt is an entry with its time set: every ledger entry has an At field.
 func planEntryAt(entry protocol.LedgerEntryValue, at int64) protocol.LedgerEntryValue {
 	v := reflect.New(reflect.TypeOf(entry)).Elem()
 	v.Set(reflect.ValueOf(entry))
@@ -119,7 +112,7 @@ func planEntryAt(entry protocol.LedgerEntryValue, at int64) protocol.LedgerEntry
 	return v.Interface().(protocol.LedgerEntryValue)
 }
 
-// write keeps an entry and folds it in. Called with mu held.
+// Called with mu held.
 func (l *Ledger) write(input protocol.LedgerEntryValue) error {
 	at := base.NowMs()
 	entry := protocol.LedgerEntry{Value: planEntryAt(input, at)}
@@ -148,8 +141,7 @@ func (l *Ledger) write(input protocol.LedgerEntryValue) error {
 	return nil
 }
 
-// Record writes an entry on the ledger (its At is now) and folds the progress. The ledger must never stop the farm:
-// an entry that cannot be written is logged, and the farm goes on.
+// The ledger must never stop the farm: an entry that cannot be written is logged, and the farm goes on.
 func (l *Ledger) Record(entry protocol.LedgerEntryValue) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -158,7 +150,6 @@ func (l *Ledger) Record(entry protocol.LedgerEntryValue) {
 	}
 }
 
-// Carry brings coins over from a page's old progress, once; whether it did.
 func (l *Ledger) Carry(coins int64) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()

@@ -1,10 +1,7 @@
 package ai
 
-// Anthropic's Messages API, streamed, as pi-ai speaks it. Thinking is adaptive (an effort level) for models whose
-// compat says ForceAdaptiveThinking, a budget of tokens otherwise, and off when no level is asked; the thinking's
-// signature (or redacted thinking's data) is sent back with it, as the API requires. Tool results go back as
-// `tool_result` blocks in a user turn; turns of the same side are joined, so the conversation alternates. The
-// request itself (retries, cancelling) is http.go.
+// The thinking's signature (or redacted thinking's data) is sent back with it, as the API requires. Turns of the same side are joined, so the
+// conversation alternates.
 
 import (
 	"context"
@@ -16,7 +13,7 @@ import (
 
 const ANTHROPIC_VERSION = "2023-06-01"
 
-// AnthropicBlock is a block of Anthropic's content, told apart by Type; only its type's fields are written.
+// Only its type's fields are written.
 type AnthropicBlock struct {
 	Type string
 	// text
@@ -76,7 +73,6 @@ type AnthropicMessage struct {
 	Content []AnthropicBlock `json:"content"`
 }
 
-// ToAnthropicMessages is the system prompt and the conversation as Anthropic's: system messages join the system prompt.
 func ToAnthropicMessages(model Model, c Context) (string, []AnthropicMessage) {
 	system := []string{c.SystemPrompt}
 	out := []AnthropicMessage{}
@@ -179,10 +175,8 @@ func ToAnthropicMessages(model Model, c Context) (string, []AnthropicMessage) {
 	return strings.Join(kept, "\n\n"), out
 }
 
-// THINKING_BUDGET is thinking tokens per level, when the model thinks on a budget.
 var THINKING_BUDGET = map[string]int{ThinkingMinimal: 1024, ThinkingLow: 2048, ThinkingMedium: 8192, ThinkingHigh: 16384, ThinkingXHigh: 24576, ThinkingMax: 32000}
 
-// effortOf is an adaptive model's effort for a level: the model's own name for it, else pi's mapping.
 func effortOf(model Model, level ThinkingLevel) string {
 	if v, ok := model.ThinkingLevelMap[level]; ok && v != nil {
 		return *v
@@ -196,7 +190,6 @@ func effortOf(model Model, level ThinkingLevel) string {
 	return "high"
 }
 
-// AnthropicRequestBody is the Messages request body.
 func AnthropicRequestBody(model Model, c Context, options StreamOptions) map[string]any {
 	system, messages := ToAnthropicMessages(model, c)
 	compat := model.compat()
@@ -252,8 +245,7 @@ func AnthropicRequestBody(model Model, c Context, options StreamOptions) map[str
 	return body
 }
 
-// AnthropicEvent is an event of Anthropic's stream, the fields that matter here (content_block_delta's and
-// message_delta's deltas share Delta).
+// content_block_delta's and message_delta's deltas share Delta.
 type AnthropicEvent struct {
 	Type         string                 `json:"type"`
 	Message      *AnthropicEventMessage `json:"message,omitempty"`
@@ -304,7 +296,6 @@ type AnthropicUsage struct {
 	CacheCreationInputTokens *int `json:"cache_creation_input_tokens,omitempty"`
 }
 
-// AnthropicAnswerEvents is the events of one answer as pi's.
 func AnthropicAnswerEvents(model Model, events iter.Seq2[AnthropicEvent, error]) iter.Seq[AssistantMessageEvent] {
 	return func(yield func(AssistantMessageEvent) bool) {
 		emit := func(events []AssistantMessageEvent) bool {
@@ -453,5 +444,4 @@ func streamAnthropicMessages(ctx context.Context, model Model, c Context, option
 	})
 }
 
-// AnthropicMessages is the provider of `anthropic-messages`.
 var AnthropicMessages = ApiProvider{API: "anthropic-messages", Stream: streamAnthropicMessages}

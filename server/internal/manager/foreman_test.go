@@ -21,24 +21,15 @@ import (
 	"vibevalley/pkg/smith/oartest"
 )
 
-// The manager on vibevalley's own agent (foreman.test.ts), with the real farm (chat, crew, SQLite), pi played by smith's
-// scripted runtime, and a scripted model through ai.FauxProvider: told something on 田头, it is given the farm's
-// situation, dispatches a helper with its tool and says so on 田头; a line heard by voice is acted on in silence; a
-// helper's report waits and comes in as farm news; a call's words stream back; a schedule that comes due is said in
-// its channel and wakes it, or sends its helper straight off; the heartbeat's findings wake it once. The situation is
-// in the system prompt, never in the saved conversation. Offline.
-
 type foremanWorld struct {
 	f    *world
 	faux *ai.FauxProviderHandle
 	ctx  context.Context
 
-	mu sync.Mutex
-	// tokens: the bearer token each helper session was handed for the farm's MCP server, by its folder.
+	mu     sync.Mutex
 	tokens map[string]string
 }
 
-// foremanUserText is the words of a user's message (the person's, or the farm's news) as the model got them.
 func foremanUserText(m ai.Message) (string, bool) {
 	u, ok := m.(ai.UserMessage)
 	if !ok {
@@ -47,7 +38,6 @@ func foremanUserText(m ai.Message) (string, bool) {
 	return u.Content.Words("\n"), true
 }
 
-// foremanLastLine is the last thing said to the model in a request: the line the manager is answering.
 func foremanLastLine(c ai.Context) string {
 	for i := len(c.Messages) - 1; i >= 0; i-- {
 		if text, ok := foremanUserText(c.Messages[i]); ok {
@@ -67,7 +57,6 @@ func foremanAnsweredCtx(c ai.Context) (string, bool) {
 	return "", false
 }
 
-// foremanSinceAnswer is everything said to the model since it last spoke: the line, and farm news that came with it.
 func foremanSinceAnswer(c ai.Context) string {
 	from := 0
 	for i, m := range c.Messages {
@@ -86,7 +75,6 @@ func foremanSinceAnswer(c ai.Context) string {
 
 var foremanAsked = regexp.MustCompile(`(?m)加个 (README|CHANGELOG)$`)
 
-// foremanRespond is the manager's model: dispatches when asked to, says what came back, answers anything else in a word.
 func foremanRespond(c ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ ai.Model) ai.AssistantMessage {
 	if result, ok := foremanAnsweredCtx(c); ok {
 		return ai.FauxAssistantMessage("好，" + base.Head(result, 2) + "了")
@@ -104,7 +92,6 @@ func foremanRespond(c ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ 
 	return ai.FauxAssistantMessage("收到")
 }
 
-// foremanOpen is a started farm whose manager talks to the scripted model and whose pi helpers are scripted.
 func foremanOpen(t *testing.T) *foremanWorld {
 	t.Helper()
 	t.Setenv("VIBEVALLEY_SCHEDULE_TICK_MS", "50")
@@ -156,7 +143,6 @@ func foremanOpen(t *testing.T) *foremanWorld {
 
 func (w *foremanWorld) seen() []ai.Context { return w.faux.State().Contexts }
 
-// managerSaid is the manager's finished words on 田头, once there are count of them.
 func (w *foremanWorld) managerSaid(t *testing.T, count int) []string {
 	t.Helper()
 	return farmtest.Await(t, "the manager's words", func() ([]string, bool) {
@@ -190,14 +176,12 @@ func TestForemanDispatchesAndHearsVoiceInSilence(t *testing.T) {
 		t.Fatalf("said %q", said)
 	}
 	first := w.seen()[0]
-	// The farm's situation is in the system prompt; the line is the line.
 	if !regexp.MustCompile(`【农场现状】[\s\S]*可以派的帮工：\n- `).MatchString(first.SystemPrompt) {
 		t.Fatalf("system prompt: %s", first.SystemPrompt)
 	}
 	if line := foremanLastLine(first); line != "主人说：帮我在 demo 里加个 README" {
 		t.Fatalf("line %q", line)
 	}
-	// Its trajectory: the line, the tool it called with what came back, what it said.
 	trail := farmtest.Await(t, "its trajectory", func() (*protocol.Trajectory, bool) {
 		tr := f.Trajectories.Get(memory.ManagerAgent)
 		return tr, tr != nil && len(tr.Steps) >= 3 && tr.Steps[len(tr.Steps)-1].Kind == protocol.StepKindSaid
@@ -221,7 +205,6 @@ func TestForemanDispatchesAndHearsVoiceInSilence(t *testing.T) {
 	if len(roster) != 1 || roster[0].Place.Project != "demo" {
 		t.Fatalf("roster %+v", roster)
 	}
-	// The helper's report does not wake the manager: it waits, and comes with the next line as farm news.
 	farmtest.Await(t, "its report", func() (bool, bool) {
 		all := f.Crew.Roster()
 		return true, len(all) == 1 && all[0].Helper.Last != nil
@@ -264,7 +247,6 @@ func TestForemanCallStreamsItsWords(t *testing.T) {
 	if !regexp.MustCompile(`主人在电话里说的[\s\S]*主人说：现在地里怎么样`).MatchString(foremanLastLine(seen[len(seen)-1])) || len(seen) != before+1 {
 		t.Fatalf("asked %d times; last %q", len(seen)-before, foremanLastLine(seen[len(seen)-1]))
 	}
-	// Answering calls itself, the manager does not also take the hosted voice's relay of the same words.
 	if _, err := f.Settings.Save(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{LLM: protocol.VoiceLLM{Value: protocol.VoiceLLMVibeValley{}}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -300,13 +282,10 @@ func TestForemanSchedulesComeDue(t *testing.T) {
 		!strings.Contains(c.SystemPrompt, "【农场现状】") {
 		t.Fatalf("woken with %q", foremanLastLine(c))
 	}
-	// A once is done after it ran.
 	if i := slices.IndexFunc(f.Schedules.List(), func(s protocol.FarmSchedule) bool { return s.ID == made.ID }); i < 0 || f.Schedules.List()[i].Enabled {
 		t.Fatal("still enabled")
 	}
 
-	// Naming a helper: a recurring issue. An issue is written from it and started, in the schedule's channel, without
-	// the manager.
 	w.enableLab(t)
 	asked := len(w.seen())
 	ops, err := f.Chat.OpenChannel("ops", "", "demo")
@@ -345,7 +324,6 @@ func TestForemanHeartbeatWakesItOnce(t *testing.T) {
 	w := foremanOpen(t)
 	f := w.f
 	w.enableLab(t)
-	// Work done and left: the helper from a dispatch, three hours on.
 	if err := f.Foreman.Say(w.ctx, "帮我在 notes 里加个 CHANGELOG", "", nil); err != nil {
 		t.Fatal(err)
 	}

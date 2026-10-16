@@ -1,6 +1,3 @@
-// Who a helper is on the farm, ported from packages/core/src/farm.ts (SPECIES_LABEL, OUTFIT_LABEL, Cast, castOf),
-// web/src/farm/cast.ts (CROP_SPRITE) and web/src/farm/managers.ts (MANAGER_LOOKS).
-
 import '../gen/vibevalley.dart';
 
 const speciesLabel = <Species, String>{
@@ -15,7 +12,6 @@ const speciesLabel = <Species, String>{
 
 const outfitLabel = <Outfit, String>{Outfit.farmer: '农夫', Outfit.gardener: '园丁', Outfit.rain: '雨衣', Outfit.winter: '冬装'};
 
-/// The agent's animal and clothes.
 typedef Cast = ({Species species, Outfit outfit});
 
 int _hash(String s) {
@@ -28,15 +24,12 @@ int _hash(String s) {
   return h;
 }
 
-/// The agent's animal and clothes. Agents saved before the farm get an animal picked from their id, the same one every
-/// time (core farm.ts castOf; pass the agent's look, null for an unknown agent).
+/// Agents saved before the farm get an animal picked from their id, the same one every time.
 Cast castOf(Look? look, String agentId) =>
     (species: look?.species ?? Species.values[_hash(agentId) % Species.values.length], outfit: look?.outfit ?? Outfit.farmer);
 
-/// What grows in a bed, by its sprite (cast.ts CROP_SPRITE).
 String cropSprite(Crop crop) => 'plot-${crop.wire}';
 
-/// One of the manager's looks (managers.ts ManagerLook).
 class ManagerLook {
   const ManagerLook(this.id, this.name, this.blurb);
   final String id;
@@ -44,7 +37,6 @@ class ManagerLook {
   final String blurb;
 }
 
-/// The manager's looks, the young farmer first (managers.ts MANAGER_LOOKS).
 const managerLooks = [
   ManagerLook('farmer', '青年农夫', '草帽、背带裤，爱笑的年轻人。'),
   ManagerLook('foreman', '包工头', '安全帽、反光背心，对讲机不离身，一喊就到。'),

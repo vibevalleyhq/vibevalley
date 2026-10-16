@@ -1,6 +1,4 @@
-// The chat app's dialogs (web/src/desk/dialogs.tsx): making a channel (a name, what it is for, a default project) and
-// changing one. Raft's form with vibevalley's fields: a channel has no members to pick (helpers are in the channel their
-// job was arranged in), and may carry the project its jobs go to.
+// A channel has no members to pick: helpers are in the channel their job was arranged in.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,10 +10,8 @@ import '../../ui/kit/kit.dart';
 import 'chat_state.dart';
 import '../../rules/chat.dart';
 
-/// Opens the 创建频道 dialog.
 Future<void> showNewChannelDialog(BuildContext context) => showPxDialog<void>(context, title: const Text('创建频道'), builder: (_) => const NewChannelForm());
 
-/// Opens a channel's settings.
 Future<void> showChannelSettingsDialog(BuildContext context, Conversation channel) => showPxDialog<void>(
   context,
   title: Text('${channel.kind == ConversationKind.square ? '# $squareName' : '# ${channel.name ?? ''}'} 的设置'),

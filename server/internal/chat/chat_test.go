@@ -17,12 +17,6 @@ import (
 	"vibevalley/internal/runs"
 )
 
-// The group chat (ported from the service's part of the TypeScript server's chat.test.ts, removed): jobs open threads, the person's words wake
-// helpers, busy helpers get one notice, deliveries count as seen only once a turn speaks, brakes hold, a restart
-// gives back what was handed but never seen. The crew is a stand-in that runs each turn the way the scripted
-// runtime in the TypeScript tests does; the farm's MCP tools are FarmTools' to test.
-
-// chatFakeCrew runs a helper's turns: it says 「结论：收到了（…）」; 必败 fails before a word; 慢慢做 takes its time.
 type chatFakeCrew struct {
 	f     *world
 	hub   *base.Hub[base.SessionActivity]
@@ -123,8 +117,6 @@ func (x *chatFakeCrew) steersOf(id string) []string {
 	return slices.Clone(x.steers[id])
 }
 
-// chatTestFarm is a started farm on home whose chat has the stand-in crew; dbPath "" keeps the database in home. It
-// stops when the test ends, or at x.close.
 func chatTestFarm(t *testing.T, home, dbPath string) (*world, *chatFakeCrew) {
 	t.Helper()
 	f, err := newWorld(base.Config{Home: home, WorkRoot: t.TempDir(), DBPath: dbPath})
@@ -191,8 +183,6 @@ func chatDeliveryOf(t *testing.T, f *world, recipient string, seq int64) *chatTe
 	return nil
 }
 
-// hire puts a helper on the farm and runs its first turn, as the crew does; then waits for its first report in its
-// job thread. Its job thread.
 func (x *chatFakeCrew) hire(t *testing.T, id, task, project string, channel *int64) protocol.Conversation {
 	t.Helper()
 	x.f.Site.Apply(protocol.FactHired{Helper: protocol.Helper{
@@ -217,7 +207,6 @@ func (x *chatFakeCrew) hire(t *testing.T, id, task, project string, channel *int
 	return thread
 }
 
-// chatNews waits for the manager's news with message seq on it.
 func chatNews(t *testing.T, news <-chan base.ForemanNews, seq int64) base.ForemanNews {
 	t.Helper()
 	timeout := time.After(5 * time.Second)
@@ -344,7 +333,6 @@ func TestChatChannels(t *testing.T) {
 	if !slices.Equal(names, []string{"田头", "clock-in"}) {
 		t.Fatalf("channels: %v", names)
 	}
-	// One helper's job in the channel, one's on the square.
 	thread := x.hire(t, "w4", "写 hello", "chat-ch", &channel.ID)
 	if thread.Channel == nil || *thread.Channel != channel.ID {
 		t.Fatalf("thread's channel: %v", thread.Channel)
@@ -356,7 +344,6 @@ func TestChatChannels(t *testing.T) {
 		t.Fatal("the dispatch is not in the channel, or the thread not under it")
 	}
 	x.hire(t, "w5", "写 hello", "chat-sq", nil)
-	// The person in the channel: the manager hears it there; only the channel's helper is told.
 	news, stop := f.Chat.ForForeman().Subscribe()
 	defer stop()
 	said, err := f.Chat.Say("打卡页今天能好吗", &channel.ID)
@@ -373,7 +360,6 @@ func TestChatChannels(t *testing.T) {
 	if d := chatDeliveryOf(t, f, "w5", said.Seq); d != nil {
 		t.Fatalf("the square's helper: %+v", d)
 	}
-	// Addresses name the channel; helpers can speak there by name.
 	read, err := f.Chat.Read("w4", base.ReadOptions{Target: "#clock-in"})
 	if err != nil || read.Target != "#clock-in" {
 		t.Fatalf("read: %+v %v", read, err)
@@ -388,7 +374,6 @@ func TestChatChannels(t *testing.T) {
 	if got := f.Chat.ChannelOf(thread.ID); got.Name != "clock-in" {
 		t.Fatalf("ChannelOf: %+v", got)
 	}
-	// Its settings change.
 	empty := ""
 	if err := f.Chat.UpdateChannel(channel.ID, nil, &empty); err != nil {
 		t.Fatal(err)
@@ -439,7 +424,6 @@ func TestChatBusyHelperGetsOneNotice(t *testing.T) {
 	if !strings.Contains(notices[0], "2 条") || strings.Contains(notices[0], "写测试") {
 		t.Fatalf("notice: %q", notices[0])
 	}
-	// Told but never read during the slow turn: the next turn is handed the words.
 	next := x.turnsOf("w6")[1]
 	if !strings.Contains(next, "补充：顺便写测试") || !strings.Contains(next, "还有：写 README") {
 		t.Fatalf("next turn: %q", next)
@@ -449,7 +433,7 @@ func TestChatBusyHelperGetsOneNotice(t *testing.T) {
 func TestChatHopLimit(t *testing.T) {
 	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
 	thread := x.hire(t, "w7", "写 hello", "chat-e", nil)
-	// The helper calls the manager five times; the manager is never cooled down, so only the hop limit holds.
+	// The manager is never cooled down, so only the hop limit holds.
 	for i := 1; i <= 5; i++ {
 		spoken, err := f.Chat.Speak("w7", fmt.Sprintf("@管家 第 %d 次问", i), base.SpeakOptions{Anyway: true})
 		if err != nil || spoken.Kind != "sent" {
@@ -491,7 +475,6 @@ func TestChatWakeBreaker(t *testing.T) {
 	if n := len(x.turnsOf("w8")); n != 1+protocol.WakeBreaker {
 		t.Fatalf("turns: %d", n)
 	}
-	// What failed is given back, not lost.
 	for _, d := range chatDeliveries(t, f, "w8") {
 		if d.Reason == "mention" && d.State != "pending" {
 			t.Fatalf("not given back: %+v", d)
@@ -505,7 +488,6 @@ func TestChatWakeBreaker(t *testing.T) {
 	if last := ds[len(ds)-1]; last.HeldBy != "wake_breaker" {
 		t.Fatalf("from w9: %+v", last)
 	}
-	// The person speaking wakes it again.
 	if _, err := f.Chat.Say("@w8 再试一次", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -556,7 +538,6 @@ func TestChatSpeaking(t *testing.T) {
 	if _, err := f.Chat.Speak("w10", "hi", base.SpeakOptions{Target: "#田头:999999"}); err == nil || !strings.Contains(err.Error(), "没有 999999 这条消息") {
 		t.Fatalf("a thread under nothing: %v", err)
 	}
-	// A thread's message has no thread under it; a reply to a channel's message with no thread starts one.
 	if _, err := f.Chat.Speak("w10", "接着说", base.SpeakOptions{Target: fmt.Sprintf("#田头:%d", absent.Message.Seq), Anyway: true}); err == nil {
 		t.Fatal("a thread under a thread's message")
 	}
@@ -605,7 +586,6 @@ func TestChatForemanSaysGrowsThenDelivers(t *testing.T) {
 		turns := x.turnsOf("w11")
 		return true, len(turns) >= 2 && strings.Contains(turns[1], "我叫 @w11 去看看")
 	})
-	// A notice wakes no one.
 	f.Chat.Notice(square, "定时到了", "schedule")
 	time.Sleep(200 * time.Millisecond)
 	ms := chatMessagesIn(f, square)
@@ -639,7 +619,6 @@ func TestChatHistoryAndMarkRead(t *testing.T) {
 	if err := f.Chat.MarkRead(9999, 1); err == nil {
 		t.Fatal("marked a conversation that is not there")
 	}
-	// The read position never goes back.
 	sq := protocol.SquareOf(f.Site.State().Chat)
 	if sq == nil || sq.Read == nil || *sq.Read != seqs[4] {
 		t.Fatalf("read: %+v", sq)
@@ -655,7 +634,6 @@ func TestChatHistoryAndMarkRead(t *testing.T) {
 func TestChatInboxAndDigest(t *testing.T) {
 	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
 	thread := x.hire(t, "w12", "写 hello", "chat-l", nil)
-	// The report reached the manager without waking it: in its digest, once.
 	digest := f.Chat.ForemanDigest()
 	if len(digest) != 1 || digest[0].From != "w12" || digest[0].Target != fmt.Sprintf("#田头:%d", *thread.Parent) {
 		t.Fatalf("digest: %+v", digest)
@@ -667,7 +645,6 @@ func TestChatInboxAndDigest(t *testing.T) {
 	if _, err := f.Chat.Say("大家看一下", &square); err != nil {
 		t.Fatal(err)
 	}
-	// Unread on the square: its own dispatch (which names it) and the person's words.
 	inbox := f.Chat.Inbox("w12")
 	if len(inbox) != 1 || inbox[0].Target != "#田头" || inbox[0].Unread != 2 || inbox[0].Latest != "主人" || !inbox[0].MentionsYou {
 		t.Fatalf("inbox: %+v", inbox)
@@ -707,7 +684,6 @@ func TestChatRestartGivesHandedWordsAgain(t *testing.T) {
 	db := filepath.Join(home, "farm.db")
 	f, x := chatTestFarm(t, home, db)
 	thread := x.hire(t, "w14", "写 hello", "chat-i", nil)
-	// The next turn takes its time before a word: the server stops meanwhile.
 	x.slow = time.Minute
 	said, err := f.Chat.Say("慢慢做：再加一个文件", &thread.ID)
 	if err != nil {
@@ -719,8 +695,6 @@ func TestChatRestartGivesHandedWordsAgain(t *testing.T) {
 	})
 	x.close()
 
-	// What farm.json kept has the helper working: the crew's restart puts it at rest. The crew brings back only
-	// helpers it kept in crew.json, in a folder that is still there.
 	crewJSON := `{"hired":14,"hands":[{"id":"w14","place":{"project":"chat-i","cwd":"` + t.TempDir() + `"}}]}`
 	if err := os.WriteFile(filepath.Join(home, "crew.json"), []byte(crewJSON), 0o644); err != nil {
 		t.Fatal(err)
@@ -739,7 +713,6 @@ func TestChatRestartGivesHandedWordsAgain(t *testing.T) {
 	if len(turns) == 0 || !strings.Contains(turns[len(turns)-1], "再加一个文件") {
 		t.Fatalf("turns: %q", turns)
 	}
-	// The core state's chat came back from the database.
 	if c := protocol.JobThreadOf(g.Site.State().Chat, "w14"); c == nil || c.ID != thread.ID {
 		t.Fatalf("job thread after restart: %+v", c)
 	}

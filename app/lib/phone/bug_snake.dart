@@ -1,9 +1,4 @@
-// 贪吃虫: the farm phone's snake (packages/core/src/bugsnake.ts). A caterpillar crawls a 16×14 field a cell a tick; it
-// eats the seeds lying there to grow a segment, and now and then a farm bug lands: eaten before it flies off it is
-// worth more the sooner, and two segments. The wall or its own body ends the run. Pure, like blocks.dart: a run is a
-// value, `crawlBugSnake` moves it a tick and `steerBugSnake` queues a turn; the phone runs the clock and draws it
-// (bug_snake_game.dart). Cells are y * width + x; seeds and bugs land on free cells drawn with the run's own seeded
-// generator, so a seed replays the web page's run.
+// Pure, like blocks.dart. Cells are y * width + x; seeds and bugs land on free cells drawn with the run's own seeded generator, so a seed replays.
 
 import 'dart:math' as math;
 
@@ -16,7 +11,6 @@ const bugSnakeHeight = 14;
 
 enum SnakeHeading { up, down, left, right }
 
-/// How a run ended: into the wall, into itself, or no room left for a seed.
 enum BugSnakeEnd { wall, self, full }
 
 class BugSnake {
@@ -35,29 +29,25 @@ class BugSnake {
     required this.over,
   });
 
-  /// The caterpillar's cells, head first.
   final List<int> body;
   final SnakeHeading heading;
 
-  /// Turns pressed but not yet crawled, at most two, so a quick double turn is not lost between ticks.
+  /// At most two, so a quick double turn is not lost between ticks.
   final List<SnakeHeading> turns;
 
-  /// Segments still to grow: the tail stays put a tick for each.
+  /// The tail stays put a tick for each.
   final int grow;
 
-  /// The seed's cell.
   final int food;
 
-  /// The bug's cell while one is on the field, and the ticks before it flies off.
+  /// With the ticks before it flies off.
   final int? bug;
   final int bugLeft;
 
-  /// Seeds and bugs eaten.
   final int eaten;
   final int bugs;
   final int score;
 
-  /// The generator's state.
   final int seed;
   final BugSnakeEnd? over;
 
@@ -98,13 +88,11 @@ class BugSnake {
 
 const seedPoints = 10;
 
-/// A bug is worth this plus the ticks it had left.
+/// Plus the ticks it had left.
 const bugPoints = 20;
 
-/// Ticks a bug stays on the field.
 const bugTicks = 40;
 
-/// A bug lands with every this many seeds eaten.
 const _bugEvery = 5;
 const _maxTurns = 2;
 
@@ -122,7 +110,7 @@ SnakeHeading _opposite(SnakeHeading h) => switch (h) {
   SnakeHeading.right => SnakeHeading.left,
 };
 
-/// A free cell (none of `taken`), drawn evenly from the free cells in order; -1 when there is none.
+/// -1 when there is none.
 (int, int) _place(List<int> taken, int seed) {
   final free = [
     for (var c = 0; c < bugSnakeWidth * bugSnakeHeight; c++)
@@ -133,7 +121,6 @@ SnakeHeading _opposite(SnakeHeading h) => switch (h) {
   return (free[(r * free.length).floor()], s);
 }
 
-/// A new run: three segments in the middle of the left half, heading right, and a seed somewhere.
 BugSnake newBugSnake(int seed) {
   const row = bugSnakeHeight ~/ 2 * bugSnakeWidth;
   const body = [row + 5, row + 4, row + 3];
@@ -154,19 +141,15 @@ BugSnake newBugSnake(int seed) {
   );
 }
 
-/// Milliseconds a tick: quicker as the caterpillar grows.
 int bugSnakeStepMs(BugSnake g) => math.max(80, 200 - (g.body.length - 3) * 4);
 
-/// Queues a turn. Turning back onto itself, or the way it already goes, is ignored.
+/// Turning back onto itself, or the way it already goes, is ignored.
 BugSnake steerBugSnake(BugSnake g, SnakeHeading to) {
   if (g.over != null || g.turns.length >= _maxTurns) return g;
   final last = g.turns.isEmpty ? g.heading : g.turns.last;
   return to == last || to == _opposite(last) ? g : g._with(turns: [...g.turns, to]);
 }
 
-/// One tick: the next turn is taken, the head moves a cell, and the tail follows unless it is growing. A seed or a bug
-/// under the head is eaten; the wall or the body under it ends the run. The tail's cell is free to move into, since it
-/// moves away the same tick.
 BugSnake crawlBugSnake(BugSnake g) {
   if (g.over != null) return g;
   final heading = g.turns.isEmpty ? g.heading : g.turns.first;

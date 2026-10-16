@@ -1,11 +1,5 @@
 package oarruntime
 
-// vibevalley's own agent as an oar runtime, driven the way the crew drives any runtime, against the faux model: a prompt
-// runs tools in the session's folder and ends `completed` with usage; what it says and runs comes as oar's events;
-// steer joins the turn, a queued input waits and can be withdrawn; abort ends the turn `aborted`; a resumed session
-// goes on with its conversation; the session's MCP servers' tools reach the model; a model that fails fails the
-// turn. Offline. Ported from the TypeScript server's vibevalley-runtime.test.ts (removed).
-
 import (
 	"context"
 	"errors"
@@ -69,7 +63,6 @@ type openOptions struct {
 	append string
 }
 
-// open is a session on the runtime with a faux model answering steps.
 func open(t *testing.T, steps []ai.FauxResponseStep, extra openOptions) *rig {
 	t.Helper()
 	faux := extra.faux
@@ -204,7 +197,6 @@ func TestAPromptRunsToolsAndEndsCompleted(t *testing.T) {
 	}
 	eq(t, ended(r.all())[0].Outcome.Kind, "completed")
 	eq(t, r.text(), "我来写写好了 hello.txt")
-	// Who it is: the helper's instructions, the farm's persona after them.
 	prompt := r.faux.State().Contexts[0].SystemPrompt
 	if !strings.HasPrefix(prompt, HELPER_INSTRUCTIONS) || !strings.Contains(prompt, "你是后端老周。") {
 		t.Fatal(prompt)
@@ -334,7 +326,6 @@ func TestTheRuntimeListsDeepSeeksModels(t *testing.T) {
 	models, _ := runtime.ListModels(context.Background(), oar.AvailableInstallation{Via: "bundled"}, oar.ListModelsOptions{})
 	found := false
 	for _, m := range models.Models {
-		// deepseek-flash is the one used when an agent names none: said, so a wrong effort shows before a session.
 		if m.ID == "deepseek-flash" && strings.Join(m.EffortLevels, ",") == "high,max" && m.Default {
 			found = true
 		}

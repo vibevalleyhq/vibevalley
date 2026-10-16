@@ -1,19 +1,15 @@
-// Ported from packages/protocol/src/schedules.ts: a schedule in words (whenText), when it is next due (nextRun) and that
-// in words (nextText).
-
 import '../gen/vibevalley.dart';
 
 const _weekdays = ['日', '一', '二', '三', '四', '五', '六'];
 String _two(int n) => n.toString().padLeft(2, '0');
 
-/// 10/13 09:00. The schedule's time zone is read as this machine's: Dart has no time-zone database, and the server
-/// runs on the same machine, so the two agree unless a schedule was made for another zone.
+/// The schedule's time zone is read as this machine's: Dart has no time-zone database, and the server runs on the same machine, so the two agree unless a
+/// schedule was made for another zone.
 String _clock(double at) {
   final d = DateTime.fromMillisecondsSinceEpoch(at.round());
   return '${d.month}/${d.day} ${_two(d.hour)}:${_two(d.minute)}';
 }
 
-/// When, in words: 每天 09:00, 每周一、三 09:00, 每 30 分钟, 10/13 09:00 一次 (protocol whenText).
 String whenText(ScheduleWhen when, String tz) => switch (when) {
   ScheduleWhenOnce(:final at) => '${_clock(at)} 一次',
   ScheduleWhenEvery(:final minutes) => minutes % 60 == 0 ? '每 ${_n(minutes / 60)} 小时' : '每 ${_n(minutes)} 分钟',
@@ -24,8 +20,7 @@ String whenText(ScheduleWhen when, String tz) => switch (when) {
 
 final _time = RegExp(r'^([01]?\d|2[0-3]):([0-5]\d)$');
 
-/// The first minute after `from` at `time` on one of `days` (0 is Sunday; all when null), in local time: Effect's
-/// Cron.next for `m h * * days`.
+/// 0 is Sunday; all when days is null. Effect's Cron.next for `m h * * days`.
 double? _cronNext(String time, List<double>? days, double from) {
   final m = _time.firstMatch(time);
   if (m == null) return null;
@@ -41,7 +36,6 @@ double? _cronNext(String time, List<double>? days, double from) {
   return null;
 }
 
-/// When it is next due, from its last run (or its making); null when it is off or done (protocol nextRun).
 double? nextRun(FarmSchedule s) {
   if (!s.enabled) return null;
   final from = s.lastRun ?? s.created;
@@ -53,7 +47,6 @@ double? nextRun(FarmSchedule s) {
   };
 }
 
-/// The next run in words, or why there is none (protocol nextText).
 String nextText(FarmSchedule s) {
   final next = nextRun(s);
   if (next != null) return _clock(next);
@@ -61,5 +54,5 @@ String nextText(FarmSchedule s) {
   return s.when is ScheduleWhenOnce && s.lastRun != null ? '做过了' : '关着';
 }
 
-/// A number as the page writes it: 7, not 7.0.
+/// 7, not 7.0.
 String _n(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();

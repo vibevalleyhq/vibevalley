@@ -1,6 +1,3 @@
-// What deskB's widget tests share: a fake server whose VibeValleyApi answers from a MockClient, and a host that puts a desk
-// page on a wide screen with the providers it reads overridden (no network, no SSE).
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -16,10 +13,8 @@ import 'package:vibevalley/ui/kit/kit.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-/// A request the fake server got: its method, path and JSON body.
 typedef Call = ({String method, String path, Object? body});
 
-/// Answers by method and path ('GET /api/runtimes'); anything else is a 404.
 class FakeBackend {
   FakeBackend(this.routes);
   final Map<String, Object? Function(Call call)> routes;
@@ -53,7 +48,6 @@ class FakeServer implements VibeValleyServer {
 
 final atlas = SpriteAtlas.parse(File('assets/pixel/sprites.json').readAsStringSync());
 
-/// Hosts `page` 1400 × 1000 with the server faked, the side events from `events` and the farm state `farm`.
 Future<ProviderContainer> pumpPage(WidgetTester t, Widget page, FakeBackend backend, {Stream<SiteEvent>? events, FarmState? farm}) async {
   t.view.physicalSize = const Size(1400, 1000);
   t.view.devicePixelRatio = 1;
@@ -80,7 +74,7 @@ Future<ProviderContainer> pumpPage(WidgetTester t, Widget page, FakeBackend back
   return container;
 }
 
-/// Lets the fake answers and the frames after them through (no pumpAndSettle: some pages poll on a timer).
+/// No pumpAndSettle: some pages poll on a timer.
 Future<void> settle(WidgetTester t) async {
   for (var i = 0; i < 6; i++) {
     await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 5)));

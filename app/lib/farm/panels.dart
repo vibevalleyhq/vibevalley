@@ -1,8 +1,3 @@
-// The farm's panels (web/src/farm/Panels.tsx): a bed's details with its work steps, the seed bag, the watering can,
-// the harvest review, and what things in the yard open: the warehouse, the tasks, the log, the shop, the manager's
-// looks and the plan board; and the game menu. Each is open while its state says so (game/state.dart), as on the web
-// page, and drawn over the farm in the farm dialog's frame.
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,7 +31,6 @@ import '../rules/looks.dart';
 import '../rules/playbook.dart';
 import '../rules/seeds.dart';
 
-/// Every panel and dialog of the farm, each over the farm while open.
 class FarmPanels extends ConsumerWidget {
   const FarmPanels({super.key});
 
@@ -130,7 +124,7 @@ const _panelTitle = {
   FarmPanel.plans: ('种植计划', 'machine-seeder'),
 };
 
-/// A farm dialog over the farm: the backdrop (bark at 30%, a click on it closes), the card fading and growing in.
+/// A click on the backdrop closes it.
 class FarmLayer extends StatefulWidget {
   const FarmLayer({super.key, required this.title, required this.size, required this.onClose, required this.child, this.icon});
   final String title;
@@ -144,7 +138,7 @@ class FarmLayer extends StatefulWidget {
 }
 
 class _FarmLayerState extends State<FarmLayer> {
-  // The dialog takes the keyboard as it opens, so Esc reaches it (a modal route's focus, as the web page's dialog).
+  // The dialog takes the keyboard as it opens, so Esc reaches it.
   final _scope = FocusScopeNode(debugLabel: 'farm dialog');
 
   @override
@@ -167,7 +161,7 @@ class _FarmLayerState extends State<FarmLayer> {
       bindings: {const SingleActivator(LogicalKeyboardKey.escape): widget.onClose},
       child: FocusScope(
         node: _scope,
-        // The backdrop fades in; the card fades and grows from 95% (only the card: the backdrop always covers the farm).
+        // Only the card grows: the backdrop always covers the farm.
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0, end: 1),
           duration: const Duration(milliseconds: 150),
@@ -204,8 +198,6 @@ class _FarmLayerState extends State<FarmLayer> {
     ),
   );
 }
-
-// ── 田地详情 ──────────────────────────────────────────────────────────────────
 
 class PlotDetail extends ConsumerStatefulWidget {
   const PlotDetail({super.key, required this.worker, required this.onDone});
@@ -436,7 +428,6 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                 '收获…',
                 tone: PxTone.primary,
                 onPressed: () {
-                  // Look at what it would merge first.
                   ref.read(reviewingProvider.notifier).set(worker.id);
                   widget.onDone();
                 },
@@ -446,7 +437,6 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
               PxButton.text(
                 '看工单串',
                 onPressed: () {
-                  // In the farm's chat window, opened.
                   fire(ref.read(chatActionsProvider).showJobThread(worker.id));
                   ref.read(chatOpenProvider.notifier).set(true);
                   widget.onDone();
@@ -582,7 +572,6 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
 
 List<String> _last(List<String> all, int n) => all.length > n ? all.sublist(all.length - n) : all;
 
-/// A sprite at a width or a height, crisp.
 class _Sprite extends StatelessWidget {
   const _Sprite(this.sprite, {this.width, this.height});
   final SpriteInfo sprite;
@@ -614,7 +603,6 @@ class _Link extends StatelessWidget {
   );
 }
 
-/// A playbook's helper: which playbook, which step, and the way to its board.
 class PlanLine extends ConsumerWidget {
   const PlanLine({super.key, required this.worker, required this.onDone});
   final Helper worker;
@@ -662,8 +650,6 @@ class PlanLine extends ConsumerWidget {
   }
 }
 
-// ── 播种袋 ────────────────────────────────────────────────────────────────────
-
 class SeedForm extends ConsumerStatefulWidget {
   const SeedForm({super.key, required this.station, required this.onDone});
   final int station;
@@ -682,7 +668,6 @@ class _SeedFormState extends ConsumerState<SeedForm> {
     final agents = (ref.watch(agentsProvider).value ?? const <String, AgentProfile>{}).values.where((a) => a.enabled).toList();
     final pick = ref.watch(prefsProvider.select((p) => p.pick));
     final who = _who ?? (agents.any((a) => a.id == pick) ? pick : 'auto');
-    // What you sent before (newest first), then jobs for your projects (core farm.ts seedsFor).
     final asked = askedOf(ref.watch(farmProvider));
     final seeds = seedsFor(asked, ref.watch(projectNamesProvider).value ?? const []);
     void sow() {
@@ -786,8 +771,6 @@ class _WhoTile extends StatelessWidget {
   );
 }
 
-// ── 浇水 ──────────────────────────────────────────────────────────────────────
-
 const _dropsOfAdvice = ['改动小一点', '先别动测试', '做完跟我说一声', '顺便补个测试'];
 
 class WaterForm extends ConsumerStatefulWidget {
@@ -855,9 +838,6 @@ class _WaterFormState extends ConsumerState<WaterForm> {
   }
 }
 
-// ── 管家和宠物 ─────────────────────────────────────────────────────────────────
-
-/// Who the manager is: pick a look, and the pet by the door; the farm, the chat and the title screen follow at once.
 class ManagerLooks extends ConsumerWidget {
   const ManagerLooks({super.key});
 
@@ -941,10 +921,6 @@ class ManagerLooks extends ConsumerWidget {
   }
 }
 
-// ── 仓库、日志、商店 ───────────────────────────────────────────────────────────
-
-/// The warehouse: what was harvested into the main branch, a job or a whole playbook, the latest first. A job opens
-/// its ticket on the desk; a playbook, the plan board.
 class Warehouse extends ConsumerWidget {
   const Warehouse({super.key});
 
@@ -1019,7 +995,6 @@ const _outcomeTag = {
   Outcome.interrupted: ('叫停', Palette.cream200, Palette.bark600),
 };
 
-/// One row of the farm log: something said on the square, or a job that ended.
 sealed class _Row {
   const _Row(this.at);
   final double at;
@@ -1039,8 +1014,7 @@ final class _ReportRow extends _Row {
   double get at => report.at;
 }
 
-/// 农场日志: you and the manager on the square, and every turn a helper reported (its report in the chat), newest first. The web page weaves in the
-/// lines of voice calls too; this client's captions carry no times, so the log keeps to the typed ones.
+/// Voice captions carry no times, so the log keeps to the typed lines.
 class FarmLog extends ConsumerWidget {
   const FarmLog({super.key});
 

@@ -1,11 +1,7 @@
-// Package agent is vibevalley's own agent, after pi-coding-agent and nanobot, on agentcore: its conversation saved
-// and folded, skills, a memory, helpers it sends off, MCP servers' tools, schedules, coding tools. Ported
-// from the TypeScript @heybro/agent (removed); session files are the TS ones, line for line.
 package agent
 
-// This agent's own kinds of message, named as pi-coding-agent names them: `custom` (something a host or a schedule
-// puts into the conversation) and `compactionSummary` (what the older conversation was folded into). Both are kept
-// in the transcript; the model reads them as a user's words (ConvertToLlm).
+// Named as pi-coding-agent names them: `custom` and `compactionSummary`. Both are kept in the transcript; the model reads them as a user's words
+// (ConvertToLlm).
 
 import (
 	"context"
@@ -19,22 +15,20 @@ import (
 )
 
 type CustomMessage struct {
-	// What kind: `schedule`, a host's own (`farmNews`)...
 	CustomType string
 	Content    ai.UserContent
-	// Whether a host shows it to people.
-	Display   bool
-	Details   any
-	Timestamp int64
+	Display    bool
+	Details    any
+	Timestamp  int64
 }
 
 type CompactionSummaryMessage struct {
 	Summary      string
 	TokensBefore int
 	Timestamp    int64
-	// The folded conversation, word for word ("" when not archived).
+	// "" when not archived.
 	Archive string
-	// How many messages before it in the session file stay after it (the recent ones, kept as they were).
+	// How many messages before it in the session file stay after it, as they were.
 	Kept int
 }
 
@@ -97,7 +91,6 @@ func (m *CompactionSummaryMessage) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// DecodeMessage reads a transcript line: this agent's kinds, the model's, or (kept as it is) any other role.
 func DecodeMessage(data []byte) (agentcore.AgentMessage, error) {
 	var head struct {
 		Role      string `json:"role"`
@@ -121,13 +114,12 @@ func DecodeMessage(data []byte) (agentcore.AgentMessage, error) {
 	return agentcore.UnknownMessage{RoleName: head.Role, Timestamp: head.Timestamp, Raw: append(json.RawMessage(nil), data...)}, nil
 }
 
-// CustomMessageOptions: Hidden is TS's display: false.
+// Hidden is pi's display: false.
 type CustomMessageOptions struct {
 	Hidden  bool
 	Details any
 }
 
-// NewCustomMessage is something a host or a schedule puts into the conversation.
 func NewCustomMessage(customType string, content ai.UserContent, options ...CustomMessageOptions) CustomMessage {
 	var o CustomMessageOptions
 	if len(options) > 0 {
@@ -136,12 +128,10 @@ func NewCustomMessage(customType string, content ai.UserContent, options ...Cust
 	return CustomMessage{CustomType: customType, Content: content, Display: !o.Hidden, Details: o.Details, Timestamp: time.Now().UnixMilli()}
 }
 
-// UserMessage is a person's words.
 func UserMessage(text string) agentcore.AgentMessage {
 	return ai.UserMessage{Content: ai.StringContent(text), Timestamp: time.Now().UnixMilli()}
 }
 
-// SummaryText is how a summary reads to the model.
 func SummaryText(m CompactionSummaryMessage) string {
 	where := ""
 	if m.Archive != "" {
@@ -150,7 +140,6 @@ func SummaryText(m CompactionSummaryMessage) string {
 	return "【之前的对话压成了下面的摘要" + where + "】\n<summary>\n" + m.Summary + "\n</summary>"
 }
 
-// ConvertToLlm is the transcript as the model reads it.
 func ConvertToLlm(_ context.Context, messages []agentcore.AgentMessage) []ai.Message {
 	out := []ai.Message{}
 	for _, m := range messages {
@@ -186,7 +175,6 @@ func contentWords(c ai.UserContent) string {
 	return blocksText(c.Blocks)
 }
 
-// MessageText is the words of a message, for a person or a transcript.
 func MessageText(m agentcore.AgentMessage) string {
 	switch m := m.(type) {
 	case CompactionSummaryMessage:
@@ -205,7 +193,6 @@ func MessageText(m agentcore.AgentMessage) string {
 	return ""
 }
 
-// LastWords is the last thing the model said in words (since the last user's or host's message).
 func LastWords(messages []agentcore.AgentMessage) string {
 	for i := len(messages) - 1; i >= 0; i-- {
 		m := messages[i]
@@ -221,7 +208,6 @@ func LastWords(messages []agentcore.AgentMessage) string {
 	return ""
 }
 
-// Transcript is a conversation as plain text, for the archive and for the summary.
 func Transcript(messages []agentcore.AgentMessage) string {
 	var out []string
 	for _, m := range messages {
@@ -255,7 +241,7 @@ func Transcript(messages []agentcore.AgentMessage) string {
 // jsLength is a string's length as JavaScript counts it (UTF-16 code units).
 func jsLength(s string) int { return len(utf16.Encode([]rune(s))) }
 
-// jsSlice is s[from:to] in runes, clamped (JS slice on text without surrogate pairs).
+// Clamped; JS slice on text without surrogate pairs.
 func runeSlice(s string, from, to int) string {
 	r := []rune(s)
 	from = max(0, min(from, len(r)))

@@ -11,9 +11,6 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// importTestDump is a small dump as tool/dump-pglite.ts writes it: a square and a thread under message 3, two
-// messages (seq 4 was handed out and deleted, so the sequence stands at 10), a read cursor, a delivery, the ledger,
-// a memory, a schedule and a connector.
 const importTestDump = `{
   "format": "heybro-pglite-dump", "version": 1, "source": "/old/home", "dumpedAt": 1791000000000,
   "sequences": {"conversations.id": 7, "messages.seq": 10, "ledger.seq": 2, "memories.id": 1, "schedules.id": 3, "connector_outbox.id": 0, "playbook_events.seq": 0},
@@ -57,7 +54,6 @@ const importTestDump = `{
   }
 }`
 
-// importTestHome is a TypeScript server's home: the files, and a database folder only the dump can read.
 func importTestHome(t *testing.T) (home, dump string) {
 	t.Helper()
 	home = t.TempDir()
@@ -91,7 +87,6 @@ func TestImportAFarmFromTheTypeScriptServer(t *testing.T) {
 	from, dump := importTestHome(t)
 	into := filepath.Join(t.TempDir(), "go-home")
 
-	// A home with a database wants its dump, and says how to make one.
 	if _, err := Import(ImportOptions{From: from, Into: into}); err == nil || !strings.Contains(err.Error(), "dump-pglite.ts") {
 		t.Fatalf("no dump: %v", err)
 	}
@@ -102,7 +97,6 @@ func TestImportAFarmFromTheTypeScriptServer(t *testing.T) {
 	if strings.Join(report.Skipped, ",") != "effect_sql_migrations" {
 		t.Fatalf("skipped %v", report.Skipped)
 	}
-	// The TypeScript server's own runtime was "heybro": it comes in as "vibevalley".
 	if config, _ := os.ReadFile(filepath.Join(into, "config.json")); !strings.Contains(string(config), `"runtime":"vibevalley"`) || strings.Contains(string(config), `"heybro"`) {
 		t.Fatalf("config.json: %s", config)
 	}
@@ -118,7 +112,6 @@ func TestImportAFarmFromTheTypeScriptServer(t *testing.T) {
 		t.Fatalf("settings.json: %v %v", info, err)
 	}
 
-	// As it was in PostgreSQL, before a start finishes what was half said.
 	raw, err := base.OpenDB(filepath.Join(into, "farm.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +123,6 @@ func TestImportAFarmFromTheTypeScriptServer(t *testing.T) {
 		t.Fatalf("final %d", final)
 	}
 
-	// The Go farm on the imported home: the same chat, ledger, memories, schedules, agents and runtime settings.
 	f, err := New(base.Config{Home: into, WorkRoot: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +165,6 @@ func TestImportAFarmFromTheTypeScriptServer(t *testing.T) {
 		t.Fatalf("runtime settings: %+v", s)
 	}
 
-	// New rows go on after the old ones: seq 4 to 10 were handed out once, and are not handed out again.
 	var seq int64
 	err = f.DB.QueryRow(`insert into messages (conversation_id, sender_id, kind, body, final, meta, created_at) values (1, 'user', 'chat', '接着说', 1, null, ?) returning seq`, base.NowMs()).Scan(&seq)
 	if err != nil || seq != 11 {
@@ -185,7 +176,6 @@ func TestImportAFarmFromTheTypeScriptServer(t *testing.T) {
 	}
 	f.Close()
 
-	// A farm already there is not imported over, unless asked.
 	if _, err := Import(ImportOptions{From: from, Into: into, Dump: dump}); err == nil || !strings.Contains(err.Error(), "--force") {
 		t.Fatalf("over a farm: %v", err)
 	}

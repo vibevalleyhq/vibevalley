@@ -2,8 +2,7 @@ package protocol
 
 // The golden files the protocol package keeps: compared on every run, written again with -update (go test
 // ./internal/protocol -update) when a rule or a shape changed on purpose. testdata/*.jsonl.gz are the rules' cases,
-// seeded random inputs with what the rules make of them (first written by the TypeScript rules, which the Go ones were
-// ported from). Two files are the client's: site-frame.sample.json, a frame as this encoder writes it, for the Flutter
+// seeded random inputs with what the rules make of them. Two files are the client's: site-frame.sample.json, a frame as this encoder writes it, for the Flutter
 // client's decoding test, and recall.sample.json, Pick's cases for the client's port of it (recall_sample_test.go).
 
 import (
@@ -18,7 +17,6 @@ import (
 
 var update = flag.Bool("update", false, "write the golden files again from what the Go rules make now")
 
-// golden compares body with the file at path, or writes it there with -update.
 func golden(t *testing.T, path string, body []byte) {
 	t.Helper()
 	if *update {
@@ -36,7 +34,6 @@ func golden(t *testing.T, path string, body []byte) {
 	}
 }
 
-// indented is v as JSON with two-space indents and a final newline, without HTML escapes.
 func indented(t *testing.T, v any) []byte {
 	t.Helper()
 	var out bytes.Buffer
@@ -49,8 +46,7 @@ func indented(t *testing.T, v any) []byte {
 	return out.Bytes()
 }
 
-// goldenCases is a gzipped JSON-lines file of cases. Each case's expected parts are compared with what the Go rules
-// make; with -update, set replaces them with it, and close writes the file back.
+// Each case's expected parts are compared with what the Go rules make; with -update, set replaces them, and close writes the file back.
 type goldenCases struct {
 	t     *testing.T
 	path  string
@@ -59,7 +55,6 @@ type goldenCases struct {
 	cur   any
 }
 
-// recording is the file whose cases the comparisons in this test record into, with -update.
 var recording *goldenCases
 
 func readCases(t *testing.T, path string) *goldenCases {
@@ -95,14 +90,12 @@ func decodeLoose(body []byte) any {
 	return v
 }
 
-// begin starts case line (from 1).
 func (g *goldenCases) begin(line int) {
 	if *update {
 		g.cur = decodeLoose(g.lines[line-1])
 	}
 }
 
-// end finishes the case begun last.
 func (g *goldenCases) end() {
 	if *update {
 		body, err := json.Marshal(g.cur)
@@ -113,7 +106,6 @@ func (g *goldenCases) end() {
 	}
 }
 
-// set puts got at path (object keys and array indexes) in the current case.
 func (g *goldenCases) set(got any, path ...any) {
 	body, err := json.Marshal(got)
 	if err != nil {
@@ -152,7 +144,6 @@ func (g *goldenCases) set(got any, path ...any) {
 	}
 }
 
-// close writes the cases back, with -update.
 func (g *goldenCases) close() {
 	if !*update {
 		return
@@ -171,7 +162,6 @@ func (g *goldenCases) close() {
 	}
 }
 
-// recorded is whether the comparison at path is to be recorded instead (with -update): then it is.
 func recorded(got any, path ...any) bool {
 	if !*update || recording == nil {
 		return false

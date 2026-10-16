@@ -1,7 +1,3 @@
-// Finding a way across the ground (a port of @heybro/engine/nav, line for line). The world is a grid of small
-// cells, each walkable or not; A* finds the cheapest way, walkers keep off the edges where there is room, and the
-// corners are then cut wherever a straight line is just as cheap.
-
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -19,7 +15,7 @@ class NavMap {
     for (var i = 0; i < n; i++) {
       _free[i] = walkable(_centre(i)) ? 1 : 0;
     }
-    // How many cells to the nearest blocked one (a two-pass chamfer distance), for keeping off the edges.
+    // A two-pass chamfer distance.
     final far = Float32List(n);
     for (var i = 0; i < n; i++) {
       far[i] = _free[i] == 1 ? 1e9 : 0;
@@ -50,7 +46,6 @@ class NavMap {
         }
       }
     }
-    // The price of standing on each cell: a little more the closer it is to an edge.
     final room = clearance / cell;
     _weight = Float32List(n);
     for (var i = 0; i < n; i++) {
@@ -81,7 +76,6 @@ class NavMap {
 
   bool walkable(Pt p) => _free[_index(p)] == 1;
 
-  /// The nearest walkable cell, searching outwards ring by ring.
   int _nearestFree(int i) {
     if (_free[i] == 1) return i;
     final c0 = i % _cols;
@@ -157,7 +151,6 @@ class NavMap {
     return null;
   }
 
-  /// What walking a straight line costs (cells crossed times their price), or infinity if it leaves the ground.
   double _lineCost(Pt a, Pt b) {
     final length = math.sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
     final steps = math.max(1, (length / (_cell * 0.5)).ceil());
@@ -170,20 +163,19 @@ class NavMap {
     return (sum / (steps + 1)) * (length / _cell);
   }
 
-  /// A grid step's cost; the ends may sit off the grid's walkable cells (they were snapped there), so never infinity.
+  /// The ends may sit off the grid's walkable cells (they were snapped there), so never infinity.
   double _stepCost(Pt a, Pt b) {
     final c = _lineCost(a, b);
     return c.isFinite ? c : math.sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y)) / _cell;
   }
 
-  /// A way from `from` to `to` as waypoints, both ends included. Unreachable: straight there.
+  /// Unreachable: straight there.
   List<Pt> route(Pt from, Pt to) {
     final cells = _search(_nearestFree(_index(from)), _nearestFree(_index(to)));
     if (cells == null) return [from, to];
     final points = cells.map(_centre).toList();
     points[0] = from;
     points[points.length - 1] = to;
-    // What the grid way costs up to each point, to judge shortcuts against.
     final spent = [0.0];
     for (var k = 1; k < points.length; k++) {
       spent.add(spent[k - 1] + _stepCost(points[k - 1], points[k]));
@@ -206,7 +198,6 @@ class NavMap {
   }
 }
 
-/// A binary heap of cell indices by priority, smallest first.
 class _MinHeap {
   final _items = <int>[];
   final _keys = <double>[];
@@ -233,7 +224,7 @@ class _MinHeap {
     _keys[i] = key;
   }
 
-  /// The smallest item; -1 when empty.
+  /// -1 when empty.
   int pop() {
     if (_items.isEmpty) return -1;
     final top = _items[0];
@@ -258,7 +249,6 @@ class _MinHeap {
   }
 }
 
-/// One who walks: along a route at a steady speed, facing the way it goes (engine/pixi's Walker).
 class Walker {
   Walker(Pt from, this.speed, this._route) : x = from.x, y = from.y, _target = from;
 
@@ -278,7 +268,6 @@ class Walker {
     _path = _route(Pt(x, y), to).skip(1).toList();
   }
 
-  /// Moves on by `dt` seconds.
   void step(double dt) {
     var left = speed * dt;
     while (left > 0 && _path.isNotEmpty) {
@@ -301,5 +290,4 @@ class Walker {
   }
 }
 
-/// Which frame of a looping animation shows at `t` seconds.
 int frameAt(double t, int frames, double fps) => (t * fps).floor() % frames;

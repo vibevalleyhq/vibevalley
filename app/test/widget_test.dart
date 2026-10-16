@@ -18,7 +18,6 @@ void main() {
     expect((phase as PhaseWorking).doing.label, '改 checkin.ts');
     expect(state.chat!.messages.map((m) => m.text), ['让 Pi 实验员写打卡', '好，派给 Pi 实验员了']);
     expect(state.chat!.messages.last.final_, isFalse);
-    // The play reduce folds on the server: the bed and what it did.
     expect(state.helpers.single.play?.station, 2);
     expect(state.helpers.single.play?.files, ['src/checkin.ts']);
     expect(frame.view.level.level, greaterThanOrEqualTo(1));

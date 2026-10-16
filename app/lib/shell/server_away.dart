@@ -1,7 +1,4 @@
-// Said across the top while the vibevalley server does not answer (web/src/ui/ServerAway.tsx, with game.ts's health
-// check): the app shows only what is real, so without the server there is nothing to show. It goes away by itself
-// once the server is back. The web page's hint about `?mock` is left out: this client has no mock. Using another
-// machine's farm (data/farm_choice.dart), it names that farm; either way it offers 院门, to get into one.
+// The app shows only what is real, so without the server there is nothing to show.
 
 import 'dart:async';
 
@@ -14,10 +11,9 @@ import '../data/providers.dart';
 import '../desk/runtimes/layout.dart' show TextLink;
 import '../ui/kit/kit.dart';
 
-/// How often the app checks the server is still there.
 const healthEvery = Duration(seconds: 4);
 
-/// Whether the server answered its last health check; true until the first one says otherwise.
+/// true until the first check says otherwise.
 final serverReachableProvider = StreamProvider<bool>((ref) async* {
   final server = ref.watch(serverProvider);
   while (true) {

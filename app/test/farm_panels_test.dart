@@ -1,7 +1,3 @@
-// The farm's panels (lib/farm/panels.dart) on fake farms: a bed's details with its work steps and its buttons, the
-// seed bag, the watering can, the warehouse, the log, the shop, the tasks, the manager's looks and the game menu; each
-// opened by its state and sending what the web page sends.
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,7 +20,6 @@ void main() {
     phase: const PhaseFailed(),
     last: const LastTurn(outcome: Outcome.failed, summary: '测试挂了', at: 0),
   );
-  // 老李's job, harvested into the main branch, and its report in its job thread.
   final harvested = Issue(
     id: 't9',
     title: '给 README 补上怎么启动',
@@ -105,7 +100,6 @@ void main() {
     await tester.tap(find.text('叫停'));
     await settle(tester);
     expect(calls.paths, contains('POST /api/workers/w1/stop'));
-    // Watering from the panel: the word goes to the helper.
     await tester.enterText(find.byType(EditableText).first, '先别动测试');
     await tester.pump();
     await tester.tap(find.text('浇水').last);
@@ -138,7 +132,6 @@ void main() {
     c.read(sowingProvider.notifier).set(3);
     await settle(tester);
     expect(find.text('播种 · 第 4 块地'), findsOneWidget);
-    // The last job sent comes first in the bag.
     await tester.tap(find.text('给 README 补上怎么启动'));
     await tester.pump();
     await tester.tap(find.text('前端阿郑'));

@@ -1,9 +1,5 @@
 package channels
 
-// Feishu (and Lark) as a connector (ported from the TypeScript server's feishu.ts, removed), over pkg/feishu: scanning
-// creates the owner's bot; the owner is whoever sends it the pairing code; replies go to the owner's open_id, with no
-// reply window. Outbound only, so the server keeps listening on 127.0.0.1 alone.
-
 import (
 	"context"
 	"errors"
@@ -11,15 +7,8 @@ import (
 	"time"
 
 	"vibevalley/internal/base"
-	"vibevalley/pkg/feishu"
-
-	// Feishu (and Lark) as a connector (ported from the TypeScript server's feishu.ts, removed). Logging in is Feishu's scan-to-create flow: the owner
-	// scans a code with the Feishu app and Feishu creates a personal bot app for them, handing back its app id and secret
-	// (the device-code flow nanobot uses: accounts.feishu.cn/oauth/v1/app/registration). Messages come over the official
-	// SDK's long connection, outbound only, so the server keeps listening on 127.0.0.1 alone; replies go through the
-	// message API to the owner's open_id, with no reply window. The owner is whoever sends the bot the pairing code.
-
 	"vibevalley/internal/protocol"
+	"vibevalley/pkg/feishu"
 )
 
 func voiceFeishuAppOf(secrets map[string]string) feishu.App {
@@ -30,7 +19,6 @@ func voiceFeishuAppOf(secrets map[string]string) feishu.App {
 	return feishu.App{AppID: secrets["appId"], AppSecret: secrets["appSecret"], Domain: domain}
 }
 
-// voiceFeishuAdapter is Feishu as a connector: scanning creates the bot; the owner pairs by sending the code.
 type voiceFeishuAdapter struct{ c *Connectors }
 
 func (voiceFeishuAdapter) ID() protocol.ConnectorID { return protocol.ConnectorIDFeishu }
@@ -60,9 +48,8 @@ func (a voiceFeishuAdapter) Login(ctx context.Context, _ protocol.ConnectorLogin
 	return voiceLinked{}, errors.New("等太久没扫，二维码过期了。")
 }
 
-// Receive hands what comes in to the bridge one at a time, in the order it arrived. The SDK calls its handler on a
-// goroutine per message and acknowledges a message only once the handler returns, so the handler only queues: Feishu
-// is answered at once, and a message Feishu sends again is still taken once.
+// The SDK acknowledges a message only once its handler returns, so the handler only queues: Feishu is answered at once, and a message Feishu sends
+// again is still taken once.
 func (a voiceFeishuAdapter) Receive(ctx context.Context, secrets map[string]string, io voiceReceiving) *voiceFailure {
 	var (
 		mu     sync.Mutex

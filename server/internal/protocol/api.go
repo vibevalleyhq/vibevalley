@@ -1,12 +1,9 @@
 package protocol
 
-// The API: every endpoint, as a method of Handlers (farm/api.go answers them). tool/shapegen writes Mount, which
-// routes requests to them, and the Flutter client's VibeValleyApi from the same methods.
-
 import "context"
 
-// Handlers answers every VibeValleyApi endpoint: one method each, so a new endpoint fails the build until it is answered.
-// Each method's vibevalley:route is its operation (group.name, the Flutter client's api.group.name), method and path.
+// One method each, so a new endpoint fails the build until it is answered. vibevalley:route is the operation (group.name, the Flutter client's
+// api.group.name), method and path.
 type Handlers interface {
 	//vibevalley:route farm.health GET /api/health
 	FarmHealth(ctx context.Context) (Health, error)

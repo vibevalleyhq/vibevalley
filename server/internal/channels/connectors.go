@@ -22,17 +22,10 @@ import (
 	"vibevalley/pkg/weixin"
 )
 
-// The connectors (ported from the TypeScript server's connectors.ts and bridge.ts, removed; the rules are protocol/connectors.go): WeChat, Feishu and
-// QQ, each a bridge over its adapter (ilink.go, feishu.go, qq.go). Connectors follows the farm's
-// chat once for all of them and hands each message to every bridge, which keeps what is its owner's.
-//
-// A bridge is everything the apps share: the account, letting only the owner in, pairing, the outbox and the digest
-// of what waited. An adapter only logs in, receives and sends. Some apps let a bot answer only on the context of the
-// owner's latest message, and only so many times on it: what an app will not take waits in connector_outbox and goes
-// out when the owner next says something, several as one digest. The accounts and the outbox live in the database;
-// the bots' secrets never leave it.
+// Some apps let a bot answer only on the context of the owner's latest message, and only so many times on it: what an app will not take waits in
+// connector_outbox and goes out when the owner next says something, several as one digest. The bots' secrets never leave the database.
 
-// voiceStalePause: the app said the login went stale; rest this long (WeChat's official client does).
+// WeChat's official client rests this long too.
 const voiceStalePause = time.Hour
 
 // Held messages are tried again after voiceRetryFirst, then twice as long after each try that fails, up to
@@ -43,8 +36,6 @@ var (
 	voiceRetryMost  = 30 * time.Minute
 )
 
-// voiceRetryAfter is how long to wait before trying held messages again, after waiting `wait`: back to the first
-// wait once nothing is held, else twice as long, at most voiceRetryMost.
 func voiceRetryAfter(wait time.Duration, clear bool) time.Duration {
 	if clear {
 		return voiceRetryFirst
@@ -52,21 +43,16 @@ func voiceRetryAfter(wait time.Duration, clear bool) time.Duration {
 	return min(2*wait, voiceRetryMost)
 }
 
-// voiceInbound is what came in from an app.
 type voiceInbound struct {
-	// ID is the app's id for it: each is taken once.
-	ID string
-	// From is who sent it, as the app names them.
+	// Each is taken once.
+	ID   string
 	From string
 	Text string
-	// Reply is what a reply to it rides on (WeChat's context token, QQ's message id).
-	Reply string
-	// Quoted is the app's id of the message it quotes, if it quotes one.
+	// WeChat's context token, QQ's message id.
+	Reply  string
 	Quoted string
 }
 
-// voiceFailure is why a send or receiving did not go on: restricted (the app would not take a send now; held),
-// stale (the login went stale) or failed.
 type voiceFailure struct {
 	Kind   string // restricted, stale, failed
 	Reason string
@@ -74,37 +60,29 @@ type voiceFailure struct {
 
 func (f *voiceFailure) Error() string { return f.Reason }
 
-// voiceLinked is a finished login: the bot's credentials, and its owner when the app says who logged in.
 type voiceLinked struct {
 	Secrets map[string]string
 	Owner   string
 }
 
-// voiceProgress is a login under way, as the page shows it: waiting, scanned or verify, with the code to scan.
 type voiceProgress struct {
 	State protocol.ConnectorState
 	Qr    string
 }
 
-// voiceReceiving is what receiving is given: where it left off, how to save that, and where messages go.
 type voiceReceiving struct {
 	Cursor     string
 	SaveCursor func(cursor string)
 	Got        func(m voiceInbound)
 }
 
-// voiceAdapter is one app as a connector.
 type voiceAdapter interface {
 	ID() protocol.ConnectorID
-	// Login logs in. progress puts what to show on the page; verifyCode is the number the owner typed, when asked.
 	Login(ctx context.Context, in protocol.ConnectorLogin, progress func(voiceProgress), verifyCode func() string) (voiceLinked, error)
-	// Receive receives until it fails, or ctx ends (nil then).
 	Receive(ctx context.Context, secrets map[string]string, io voiceReceiving) *voiceFailure
-	// Send sends a text to the owner, on reply when there is one. Its answer is the app's id for it.
 	Send(ctx context.Context, secrets map[string]string, to, text, reply string) (string, *voiceFailure)
 }
 
-// voiceAccount is a connector_accounts row.
 type voiceAccount struct {
 	secrets      map[string]string
 	owner        string
@@ -123,12 +101,10 @@ type Connectors struct {
 	db   *sql.DB
 	site *base.Site
 
-	// The apps; the real ones unless a test says otherwise before start.
 	ilink  weixin.API
 	feishu feishu.API
 	qq     qq.API
 
-	// What the bridges ask the rest of the farm; f's services unless a test says otherwise before start.
 	say           func(ctx context.Context, text string, conversation *int64) error
 	channelByName func(name string) *base.ChannelInfo
 	square        func() int64
@@ -165,7 +141,6 @@ func newConnectors(db *sql.DB, site *base.Site, chat *chat.Chat, foreman *manage
 	return c, nil
 }
 
-// start follows the farm's chat for what the owners should see.
 func (c *Connectors) OnStart(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	snapshot, events, stop := c.site.Events()
@@ -204,7 +179,6 @@ func (c *Connectors) OnStart(ctx context.Context) error {
 	return nil
 }
 
-// ready connects the accounts kept, once every service has started: what comes in goes to the chat at once.
 func (c *Connectors) OnReady(context.Context) {
 	for _, id := range c.order {
 		if b := c.bridges[id]; b.accountNow() != nil {
@@ -260,7 +234,6 @@ func (c *Connectors) Logout(id protocol.ConnectorID) protocol.ConnectorStatus {
 	return protocol.ConnectorStatus{ID: id, State: protocol.ConnectorStateOff}
 }
 
-// SetChannel connects it to a channel, by name; the square is no channel of its own.
 func (c *Connectors) SetChannel(id protocol.ConnectorID, name string) (protocol.ConnectorStatus, error) {
 	b := c.bridge(id)
 	if b == nil {
@@ -277,8 +250,6 @@ func (c *Connectors) SetChannel(id protocol.ConnectorID, name string) (protocol.
 	return b.setChannel(to)
 }
 
-// ── A bridge ─────────────────────────────────────────────────────────────────
-
 type voiceBridge struct {
 	c       *Connectors
 	adapter voiceAdapter
@@ -289,15 +260,13 @@ type voiceBridge struct {
 	account    *voiceAccount
 	progress   *voiceProgress
 	verifyCode string
-	// attempt counts logins: a login stopped by a newer one leaves the newer one's progress alone.
-	attempt int
-	// progressed is signalled when a login's progress changes or it ends.
+	// A login stopped by a newer one leaves the newer one's progress alone.
+	attempt    int
 	progressed chan struct{}
 	err        string
-	// fibers is the bridge's background work by name (login, receive, retry), each stopped by its cancel.
-	fibers map[string]context.CancelFunc
+	fibers     map[string]context.CancelFunc
 
-	// sending is one at a time: the outbox goes out in order.
+	// The outbox goes out in order.
 	sending sync.Mutex
 }
 
@@ -308,7 +277,6 @@ func voiceNullable(s string) any {
 	return s
 }
 
-// reload reads the account from the database.
 func (b *voiceBridge) reload() error {
 	var (
 		secrets                           string
@@ -351,7 +319,6 @@ func (b *voiceBridge) mustReload() {
 	}
 }
 
-// accountNow is the account as it is now (a copy), nil when there is none.
 func (b *voiceBridge) accountNow() *voiceAccount {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -430,15 +397,12 @@ func (b *voiceBridge) pause() {
 	b.setErr("登录过期了，一小时后再试；也可以断开重新连。")
 }
 
-// ── Out: what the farm says to the owner ─────────────────────────────
-
 type voiceOutRow struct {
 	id   int64
 	body string
 }
 
-// drain sends what is waiting, in order; it stops at the first the app will not take. late: it waited, so many go as
-// one digest. Reports whether nothing is held any more (true too when there is no one to send to).
+// Stops at the first the app will not take. late: it waited, so many go as one digest.
 func (b *voiceBridge) drain(ctx context.Context, late bool) bool {
 	b.sending.Lock()
 	defer b.sending.Unlock()
@@ -500,7 +464,6 @@ func (b *voiceBridge) drain(ctx context.Context, late bool) bool {
 			// next message.
 			b.setErr("")
 		default:
-			// Failed: try again later.
 			b.setErr(failure.Reason)
 		}
 		return false
@@ -508,8 +471,6 @@ func (b *voiceBridge) drain(ctx context.Context, late bool) bool {
 	return true
 }
 
-// offer is a message on the farm's chat, for the owner if it is theirs and in its channel (or under it): another
-// channel's talk is not this door's.
 func (b *voiceBridge) offer(m protocol.ChatMessage, state *protocol.FarmState) {
 	a := b.accountNow()
 	if a == nil || a.owner == "" || !protocol.ForOwner(m) {
@@ -539,9 +500,6 @@ func (b *voiceBridge) offer(m protocol.ChatMessage, state *protocol.FarmState) {
 	b.drain(ctx, false)
 }
 
-// ── In: what the owner says ──────────────────────────────────────────
-
-// quotedConversation is the farm conversation a quoted message belongs to: the thread the owner is answering in.
 func (b *voiceBridge) quotedConversation(ext string) *int64 {
 	if ext == "" {
 		return nil
@@ -611,7 +569,6 @@ func (b *voiceBridge) got(ctx context.Context, m voiceInbound) {
 			conversation = now.channel
 		}
 	}
-	// As on the page: talking starts the day.
 	if b.c.site.Call() != protocol.CallStateLive {
 		b.c.site.SetCall(protocol.CallStateLive, "")
 	}
@@ -655,7 +612,6 @@ func (b *voiceBridge) receiving(ctx context.Context) {
 			continue
 		}
 		b.setErr(stopped.Reason)
-		// A few quick retries, then back off.
 		failures++
 		wait := 2 * time.Second
 		if failures >= 3 {
@@ -667,7 +623,6 @@ func (b *voiceBridge) receiving(ctx context.Context) {
 	}
 }
 
-// run starts work under name, stopping the work there was under it.
 func (b *voiceBridge) run(name string, work func(ctx context.Context)) {
 	b.mu.Lock()
 	if stop := b.fibers[name]; stop != nil {
@@ -709,8 +664,6 @@ func (b *voiceBridge) connect() {
 		}
 	})
 }
-
-// ── Logging in ───────────────────────────────────────────────────────
 
 func voicePairCode() string {
 	n, err := rand.Int(rand.Reader, big.NewInt(900_000))
@@ -778,11 +731,9 @@ func (b *voiceBridge) login(in protocol.ConnectorLogin) protocol.ConnectorStatus
 	b.err = ""
 	b.attempt++
 	attempt := b.attempt
-	// Shown at once while the adapter fetches its first code.
 	b.progress = &voiceProgress{State: protocol.ConnectorStateWaiting}
 	b.mu.Unlock()
 	b.run("login", func(ctx context.Context) { b.loggingIn(ctx, attempt, in) })
-	// Give a quick login (a code fetched, QQ's credentials checked) the chance to show in this answer.
 	wait := time.NewTimer(1500 * time.Millisecond)
 	defer wait.Stop()
 	for {

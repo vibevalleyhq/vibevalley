@@ -1,15 +1,3 @@
-// The farm screen (web/src/pixel/PixelFarm.tsx): the pixel village at a whole-number scale in the middle of the window,
-// covering it with a little cut off the edges when the window's shape is not the village's (village/framing.dart), or
-// on the village dimmed when it cannot; the words over it, the HUD at the edges of what shows of it, the chat window
-// at the lower right, the FX and the farm's panels over all of it. A click on a plot uses the tool in hand there (aimTool says what it would do, applyTool does
-// it) and opens what it asks for; a click on a thing in the yard opens its panel or page. Over the village the cursor
-// is the tool in hand. ⌥ held shows every thing's name; the first visit shows them for a while by itself. The number
-// keys pick a tool, Esc puts it down and then opens the menu. The phone and the desktop app send the screen to a
-// helper's bed, the plan board or the achievements.
-//
-// The screen may stay mounted, hidden, under the desk's pages (its tickers off), and the title screen may lie over it:
-// it takes keys only while it is what is on screen.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -47,10 +35,8 @@ import '../village/framing.dart';
 import '../village/village_view.dart';
 import '../voice/voice.dart';
 
-/// Remembers that the yard's names were shown once, so the first visit shows them and later ones do not.
 const namesSeenKey = 'vibevalley.pixel.names-seen';
 
-/// How long the first visit shows every name.
 const firstNamesTime = Duration(milliseconds: 6000);
 
 class FarmPage extends ConsumerStatefulWidget {
@@ -61,7 +47,7 @@ class FarmPage extends ConsumerStatefulWidget {
 }
 
 class _FarmPageState extends ConsumerState<FarmPage> {
-  /// The voice call, made the first time it is needed (never in dispose: ref is gone by then).
+  /// Made the first time it is needed, never in dispose: ref is gone by then.
   VoiceCall? _call;
   VoiceCall get call => _call ??= VoiceCall(
     ref.read(serverProvider),
@@ -74,7 +60,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
   final _subs = <StreamSubscription<Object?>>[];
   late final AppLifecycleListener _life;
 
-  /// Where the pointer is over the village (for the drawn cursor), null when it is not.
   final _pointer = ValueNotifier<Offset?>(null);
   Timer? _namesTimer;
   var _namesChecked = false;
@@ -84,7 +69,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     super.initState();
     installTurnSteps();
     HardwareKeyboard.instance.addHandler(_onKey);
-    // Leave the window and the names hide (the web page's blur).
     _life = AppLifecycleListener(onInactive: _hideNames, onHide: _hideNames);
     _subs
       ..add(
@@ -116,12 +100,8 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     _game?.voiceLive.value = call.phase == CallPhase.live;
   }
 
-  /// Whether the farm is what is on screen: not hidden under a desk page, not under the title screen.
   bool get _active => mounted && TickerMode.valuesOf(context).enabled && !ref.read(titleOpenProvider);
 
-  // ── Clicks in the village ──────────────────────────────────────────────────
-
-  /// A click on a plot (or on the helper working it): use the tool in hand there, then open what it asks for.
   Future<void> _clickPlot(int index) async {
     final bed = beds[index];
     final state = ref.read(farmProvider);
@@ -152,7 +132,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     }
   }
 
-  /// A click on a thing in the yard: the panel or page it stands for.
   void _openSpot(String spot) {
     Sfx.play('open');
     switch (spot) {
@@ -177,8 +156,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     }
   }
 
-  // ── Where the phone and the desktop app send the screen ────────────────────
-
   void _openHelper(String id) => ref.read(selectedProvider.notifier).set(id);
 
   void _openPlans(String? playbook) {
@@ -186,8 +163,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     ref.read(panelProvider.notifier).set(FarmPanel.plans);
   }
 
-  /// What a notification opens is on the farm: the farm is brought in front first (from a desk page, from the title
-  /// screen), else it would open where nobody sees it.
+  /// The farm is brought in front first (from a desk page, from the title screen), else it would open where nobody sees it.
   void _toFarm() {
     ref.read(titleOpenProvider.notifier).enterFarm(start: false);
     final router = GoRouter.maybeOf(context);
@@ -212,8 +188,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     }
   }
 
-  // ── Keys ───────────────────────────────────────────────────────────────────
-
   bool get _anyLayer =>
       ref.read(menuOpenProvider) ||
       ref.read(panelProvider) != null ||
@@ -225,7 +199,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
   bool _onKey(KeyEvent e) {
     if (!_active) return false;
     final keys = HardwareKeyboard.instance;
-    // Every thing in the yard says its name while ⌥ is held.
     if (e.logicalKey == LogicalKeyboardKey.altLeft || e.logicalKey == LogicalKeyboardKey.altRight || e.logicalKey == LogicalKeyboardKey.alt) {
       _game?.revealNames.value = keys.isAltPressed;
       return false;
@@ -250,7 +223,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
 
   void _hideNames() => _game?.revealNames.value = false;
 
-  /// On the first visit every name shows for a few seconds by itself, with a toast saying so.
   Future<void> _firstVisit() async {
     _namesChecked = true;
     var seen = true;
@@ -272,7 +244,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     game
       ..onPlot = ((bed) => unawaited(_clickPlot(bed)))
       ..onSpot = _openSpot;
-    // The debug console's clock and 打开帮工, once this build is done (no provider changes while building).
+    // Once this build is done: no provider changes while building.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref
@@ -317,7 +289,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
           break;
       }
     });
-    // Steps come as events for every helper; kept from the start, so a panel opened later has the newest.
+    // Kept from the start, so a panel opened later has the newest.
     ref.listen(workStepsProvider, (_, _) {});
 
     if (atlas == null || village == null || state == null || view == null) {
@@ -380,7 +352,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     );
   }
 
-  /// The village filling box, its HUD and panels over it, and the chat in its corner.
   Widget _farm(
     BoxConstraints box,
     VillageGame game,
@@ -398,7 +369,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     final bars = shown.size != box.biggest;
     return Stack(
       children: [
-        // Where the village leaves the window bare: the village itself, larger and dimmed.
         if (bars) Positioned.fill(child: _Surroundings(asset: atlas['map'].asset)),
         Positioned.fromRect(
           rect: framing.box,
@@ -440,12 +410,10 @@ class _FarmPageState extends ConsumerState<FarmPage> {
             ],
           ),
         ),
-        // The HUD at the edges of what shows of the village, inside the window.
         Positioned.fromRect(
           rect: shown,
           child: VillageHud(game: game, call: call),
         ),
-        // The chat keeps its own corner of the window.
         Positioned(right: 12, bottom: 12, child: chat),
         Positioned.fill(
           child: FxLayer(call: call, effects: ref.watch(farmEffectsProvider), notices: ref.watch(farmNoticesProvider)),
@@ -455,7 +423,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     );
   }
 
-  /// The cursor over the village, by name (PixelFarm.tsx useStageCursor).
   String _cursorName(VillageGame game, FarmState state, FarmView view, Tool tool) {
     final index = game.hoverBed.value;
     final bed = index == null || index < 0 || index >= beds.length ? null : beds[index];
@@ -469,8 +436,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
   }
 }
 
-/// Around a village that cannot cover the window: the village's own picture spread over the window, dimmed into the
-/// ground's colour, so the bars read as more of the land rather than a frame.
+/// So the bars read as more of the land rather than a frame.
 class _Surroundings extends StatelessWidget {
   const _Surroundings({required this.asset});
   final String asset;

@@ -9,8 +9,6 @@ import (
 	"vibevalley/migrations"
 )
 
-// A database made before issues had titles: its issues are split into a title and a description, and a copy of it as
-// it was stays beside it.
 func TestDBMigratesIssueTitles(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "farm.db")
 	old, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path))

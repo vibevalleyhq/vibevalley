@@ -1,9 +1,7 @@
 package agent
 
-// A conversation on disk: `<name>.jsonl`, one message per line, appended as each is said. A compaction is a line
-// too: reading the file back, a `compactionSummary` stands in for everything before it except its `kept` most
-// recent messages. A session from before this format (`<name>.json`, effect/ai's Prompt) is converted the first
-// time it is read and kept beside as `<name>.json.bak`.
+// A compaction is a line too: reading the file back, a `compactionSummary` stands in for everything before it except its `kept` most recent messages.
+// A session from before this format (`<name>.json`, effect/ai's Prompt) is converted the first time it is read and kept beside as `<name>.json.bak`.
 
 import (
 	"encoding/json"
@@ -17,7 +15,6 @@ import (
 	"vibevalley/pkg/ai"
 )
 
-// Replay is the transcript a session file amounts to, compactions applied.
 func Replay(lines []agentcore.AgentMessage) []agentcore.AgentMessage {
 	out := []agentcore.AgentMessage{}
 	for _, m := range lines {
@@ -56,7 +53,6 @@ func parseLines(text string) []agentcore.AgentMessage {
 	return out
 }
 
-// OldPart is a part of an effect/ai Prompt message.
 type OldPart struct {
 	Type      string `json:"type"`
 	Text      string `json:"text,omitempty"`
@@ -67,7 +63,6 @@ type OldPart struct {
 	IsFailure bool   `json:"isFailure,omitempty"`
 }
 
-// OldPrompt is an effect/ai Prompt as the old session files hold it.
 type OldPrompt struct {
 	Content []struct {
 		Role    string          `json:"role"`
@@ -75,7 +70,6 @@ type OldPrompt struct {
 	} `json:"content"`
 }
 
-// FromOldPrompt is an effect/ai Prompt as messages.
 func FromOldPrompt(prompt OldPrompt) []agentcore.AgentMessage {
 	out := []agentcore.AgentMessage{}
 	at := time.Now().UnixMilli()
@@ -131,12 +125,9 @@ func FromOldPrompt(prompt OldPrompt) []agentcore.AgentMessage {
 	return out
 }
 
-// Session is a conversation on disk.
 type Session interface {
-	// Load is the transcript to go on with.
 	Load() []agentcore.AgentMessage
 	Append(message agentcore.AgentMessage) error
-	// Clear forgets it all.
 	Clear() error
 }
 
@@ -145,7 +136,6 @@ type fileSession struct {
 	mu   sync.Mutex
 }
 
-// SessionAt is the session at file (`.jsonl`).
 func SessionAt(file string) Session { return &fileSession{file: file} }
 
 func (s *fileSession) Load() []agentcore.AgentMessage {

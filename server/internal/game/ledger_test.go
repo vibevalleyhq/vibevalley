@@ -12,11 +12,6 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// The ledger, a playbook's history, schedules and the heartbeat as services (ported from the parts of the TypeScript server's test/crew,
-// foreman and playbooks tests about them): entries fold into the progress and back after a restart, facts tell of
-// entries, coins carry once; schedules come due on their channel, once, late when missed, and keep through a restart;
-// the heartbeat speaks of work left hanging once past its grace.
-
 func planOpen(t *testing.T, home string) *world {
 	t.Helper()
 	f, err := newWorld(base.Config{Home: home, WorkRoot: t.TempDir()})
@@ -72,7 +67,6 @@ func TestPlanLedger(t *testing.T) {
 		t.Fatalf("progress: %+v", progress)
 	}
 
-	// The farm's facts tell of entries: a hire, a failed turn, a level reached.
 	f.Site.Apply(protocol.FactHired{Helper: protocol.Helper{ID: "w2", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "试试", Phase: protocol.Phase{Value: protocol.PhaseWorking{}}}})
 	f.Site.Apply(protocol.FactReport{ID: "w2", Outcome: protocol.OutcomeFailed, Summary: "坏了", Turns: 1})
 	f.Site.Apply(protocol.FactCommits{Commits: protocol.CommitCount{Total: 1000}})
@@ -94,7 +88,6 @@ func TestPlanLedger(t *testing.T) {
 	if after := again.Site.State().Progress; after == nil || !reflect.DeepEqual(*after, before) {
 		t.Fatalf("the ledger folds back to the same progress:\n%+v\n%+v", after, before)
 	}
-	// A level reached before the ledger knew of it is caught up at start, once.
 	if err := again.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +104,6 @@ func TestPlanPlaybookLog(t *testing.T) {
 	next := pb
 	next.State = protocol.PlaybookStateAbandoned
 	f.PlaybookLog.Record(&pb, next, protocol.PlaybookActorFarm, "重启了")
-	// A row this code no longer reads is left out.
 	if _, err := f.DB.Exec("insert into playbook_events (playbook_id, kind, actor, created_at) values ('p1', 'gone', 'farm', 1)"); err != nil {
 		t.Fatal(err)
 	}
@@ -173,13 +165,11 @@ func TestPlanSchedules(t *testing.T) {
 	if last := history[len(history)-1]; last.Kind != protocol.MessageKindNotice || last.Text != "⏰ 定时「看进度」到点了：看看帮工们的进度" {
 		t.Fatalf("notice: %+v", last)
 	}
-	// A once is done after it ran.
 	if f.Schedules.List()[0].Enabled {
 		t.Fatal("a once is done after it ran")
 	}
 	f.Schedules.Tick()
 
-	// Naming a helper wants a project; one nobody has is refused.
 	lab := "lab"
 	if _, err := f.Schedules.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Agent: &lab, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}); err == nil || !strings.Contains(err.Error(), "默认项目") {
 		t.Fatal(err)
@@ -202,7 +192,6 @@ func TestPlanSchedules(t *testing.T) {
 	}
 	f.Close()
 
-	// Back after a restart, and switched on again: it counts from now, not from runs it skipped while off.
 	f = planOpen(t, home)
 	defer f.Close()
 	f.Schedules.Now = clock.Load
@@ -217,7 +206,6 @@ func TestPlanSchedules(t *testing.T) {
 		t.Fatal(on, err)
 	}
 	f.Schedules.Tick()
-	// The server was off past a run: it runs once, late, and says so.
 	clock.Add(60 * 60_000)
 	f.Schedules.Tick()
 	select {
@@ -254,7 +242,6 @@ func TestPlanHeartbeat(t *testing.T) {
 	clock.Store(start)
 	f.Heartbeat.Now = clock.Load
 
-	// Work done and left.
 	f.Site.Apply(protocol.FactHired{Helper: protocol.Helper{ID: "w7", Name: "实验员", Agent: "lab", Runtime: "pi", Task: "加个 CHANGELOG", HiredAt: start, Phase: protocol.Phase{Value: protocol.PhaseWorking{Since: start}}}})
 	f.Site.Apply(protocol.FactReport{ID: "w7", Outcome: protocol.OutcomeCompleted, Summary: "加好了", Turns: 1})
 	quiet := func(why string) {

@@ -1,8 +1,3 @@
-// 任务与成就 (web/src/farm/Achievements.tsx): the level, the coins and the title, the starter tasks, the beds to clear,
-// the walls of achievements and the secrets. All of it reads the server's progress (FarmState.progress) and level
-// (the view); the rules are the protocol's (game/rules.dart), the catalogue shell/achievements.dart's. A medal is a
-// frame for the tier with the achievement's emblem laid in it.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,8 +10,6 @@ import 'bits.dart';
 import 'popover.dart';
 import '../rules/progress.dart';
 
-/// An achievement's medal: its emblem in the frame of the tier reached (one-offs are gold); before any, a wooden one
-/// with the emblem greyed.
 class Medal extends StatelessWidget {
   const Medal({super.key, required this.achievement, required this.tier, required this.size});
   final AchievementDef achievement;
@@ -63,7 +56,6 @@ class Medal extends StatelessWidget {
 
 const _grey = ColorFilter.matrix([0.2126, 0.7152, 0.0722, 0, 0, 0.2126, 0.7152, 0.0722, 0, 0, 0.2126, 0.7152, 0.0722, 0, 0, 0, 0, 0, 1, 0]);
 
-/// A pixel progress bar: a cream track, leaf green filled `value` of the way.
 class FarmBar extends StatelessWidget {
   const FarmBar({super.key, required this.value, required this.max, this.height = 8, this.label});
   final double value;
@@ -97,7 +89,6 @@ String _day(double at) {
   return '${d.month}月${d.day}日';
 }
 
-/// When a tier of an achievement was reached.
 double? _reachedAt(Progress p, String id, int tier) => p.unlocked.where((u) => u.id == id && u.tier == tier).firstOrNull?.at;
 
 const _tierText = {1: '铜', 2: '银', 3: '金'};
@@ -165,7 +156,6 @@ class _Heading extends StatelessWidget {
   );
 }
 
-/// The level, the coins and the title.
 class _Standing extends ConsumerWidget {
   const _Standing();
 
@@ -225,10 +215,9 @@ class _Standing extends ConsumerWidget {
   }
 }
 
-/// 1,234 (toLocaleString).
 String _thousands(int n) => n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
 
-/// The title on the farm card: any tier reached can be worn (not a starter task's).
+/// Any tier reached can be worn, not a starter task's.
 class _TitlePicker extends ConsumerWidget {
   const _TitlePicker({required this.p});
   final Progress p;
@@ -343,7 +332,6 @@ class _TitlePicker extends ConsumerWidget {
   }
 }
 
-/// The first things to try, ticked off as they are done; one line once all are.
 class _Starter extends StatelessWidget {
   const _Starter({required this.list, required this.p});
   final List<AchievementDef> list;
@@ -438,7 +426,6 @@ class _Starter extends StatelessWidget {
   }
 }
 
-/// Two columns when there is room (sm:grid-cols-2), one otherwise.
 class _Grid extends StatelessWidget {
   const _Grid({required this.children, this.spacing = 8});
   final List<Widget> children;
@@ -564,7 +551,6 @@ class AchievementCard extends StatelessWidget {
   }
 }
 
-/// Secrets show only once found; the rest are counted.
 class _Secrets extends StatelessWidget {
   const _Secrets({required this.list, required this.p});
   final List<AchievementDef> list;

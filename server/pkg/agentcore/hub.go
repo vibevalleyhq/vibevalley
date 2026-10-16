@@ -1,7 +1,6 @@
 package agentcore
 
-// Hub is an unbounded publish/subscribe (TS PubSub.unbounded): publishing never waits for a subscriber, each
-// subscriber gets every value published after it subscribed, in order, on its own channel.
+// Hub never makes a publisher wait: each subscriber gets every value published after it subscribed, in order, on its own channel.
 
 import "sync"
 
@@ -13,8 +12,7 @@ type Hub[T any] struct {
 
 func NewHub[T any]() *Hub[T] { return &Hub[T]{subs: map[*Subscription[T]]struct{}{}} }
 
-// Subscription is one subscriber. C is closed after Close (of it or of the hub), once what was published before
-// the hub closed is delivered.
+// C is closed after Close (of it or of the hub), once what was published before the hub closed is delivered.
 type Subscription[T any] struct {
 	C <-chan T
 
@@ -28,7 +26,6 @@ type Subscription[T any] struct {
 	once  sync.Once
 }
 
-// Subscribe starts a subscription; values published from now on reach it.
 func (h *Hub[T]) Subscribe() *Subscription[T] {
 	out := make(chan T)
 	s := &Subscription[T]{C: out, hub: h, out: out, wake: make(chan struct{}, 1), stop: make(chan struct{})}
@@ -43,7 +40,6 @@ func (h *Hub[T]) Subscribe() *Subscription[T] {
 	return s
 }
 
-// Publish hands v to every subscriber; it never blocks.
 func (h *Hub[T]) Publish(v T) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -55,7 +51,6 @@ func (h *Hub[T]) Publish(v T) {
 	}
 }
 
-// Close ends every subscription after what they were given.
 func (h *Hub[T]) Close() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -119,7 +114,7 @@ func (s *Subscription[T]) pump() {
 	}
 }
 
-// Close stops the subscription; what was not taken is dropped.
+// What was not taken is dropped.
 func (s *Subscription[T]) Close() {
 	s.once.Do(func() {
 		s.hub.mu.Lock()

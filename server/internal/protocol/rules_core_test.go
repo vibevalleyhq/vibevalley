@@ -1,8 +1,5 @@
 package protocol
 
-// Connectors, recall, settings, voice and phase rules, as the removed TypeScript server's connector-rules.test.ts, recall.test.ts,
-// settings.test.ts and farm.test.ts tested the TypeScript ones (their pure parts).
-
 import (
 	"fmt"
 	"slices"
@@ -65,8 +62,6 @@ func TestIsPairing(t *testing.T) {
 	coreEqual(t, ShortID("o9cq80wWj3kD8bq"), "o9cq…D8bq")
 	coreEqual(t, ShortID("short"), "short")
 }
-
-// ── Recall ───────────────────────────────────────────────────────────────────
 
 const (
 	coreNow = 1_800_000_000_000
@@ -162,8 +157,6 @@ func TestNextForgotten(t *testing.T) {
 	coreEqual(t, NextForgotten(recalled, 3), []string{fmt.Sprintf("n%d", MemoryKeep-3), fmt.Sprintf("n%d", MemoryKeep-4)})
 }
 
-// ── Settings and voice ───────────────────────────────────────────────────────
-
 func TestSettingsProblem(t *testing.T) {
 	coreMatches(t, SettingsProblem(SettingsUpdate{DeepseekAPIKey: corePtr("sk has spaces")}), "DeepSeek")
 	coreMatches(t, SettingsProblem(SettingsUpdate{AgoraAppCertificate: corePtr("123")}), "Certificate")
@@ -195,8 +188,6 @@ func TestVoiceOverrides(t *testing.T) {
 	coreEqual(t, NeedsLLMKey(VoiceLLM{VoiceLLMOpenai{URL: "https://x", Model: "m"}}), true)
 }
 
-// ── Phase ────────────────────────────────────────────────────────────────────
-
 func TestPhaseText(t *testing.T) {
 	working := Helper{ID: "w1", Phase: Phase{PhaseWorking{Since: 2, Doing: Doing{Action: WorkerActionRunCommand, Label: "pnpm test"}}}}
 	coreEqual(t, PhaseText(working, 4), "在跑命令：pnpm test")
@@ -214,8 +205,6 @@ func TestPhaseText(t *testing.T) {
 	coreEqual(t, CanHarvest(resting), true)
 	coreEqual(t, DoingOf(resting), Doing{Action: WorkerActionNone})
 }
-
-// ── Money and quota ──────────────────────────────────────────────────────────
 
 func TestMoneyWords(t *testing.T) {
 	coreEqual(t, SpentText(Spent{Tokens: 26_000, CNY: corePtr(0.03)}), "约 ¥0.03 · 2.6 万 token")

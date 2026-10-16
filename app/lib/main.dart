@@ -1,7 +1,3 @@
-// vibevalley's client: the farm and the desk, over the server's HTTP API and its folded state (server). See README.md.
-// The desktop app's half starts before the first frame (desktop/desktop.dart); AppFrame (shell/app_frame.dart) is the
-// frame around every route: the title bar, the title screen, toasts, the server banner, the debug console, startup.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -20,12 +16,10 @@ Future<void> main() async {
   await loadFarmChoice();
   await startDesktop();
   await PhoneNotices.instance.start();
-  // Links in markdown and the settings open in the browser.
   kitOpenLink = (uri) => unawaited(launchUrl(uri));
   runApp(const _OnChosenFarm());
 }
 
-/// The app on the farm it uses: moving to another farm (data/farm_choice.dart) starts every provider afresh on it.
 class _OnChosenFarm extends StatelessWidget {
   const _OnChosenFarm();
 
@@ -39,7 +33,6 @@ class _OnChosenFarm extends StatelessWidget {
   );
 }
 
-/// Whether the router is on the farm: / and anything that is not a place at the desk (unknown paths are the farm).
 bool _onFarm() => Place.of(router.routerDelegate.currentConfiguration.uri.path) == null;
 
 class VibeValleyApp extends StatelessWidget {

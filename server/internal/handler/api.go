@@ -14,9 +14,6 @@ import (
 	"vibevalley/internal/runs"
 )
 
-// VibeValleyApi, answered (ported from the TypeScript server's main.ts's handlers, removed): each forwards to the service that owns the rule, and turns
-// a refusal into FarmRefused, a missing thing into FarmMissing.
-
 type api struct{ f *farm.Farm }
 
 var _ protocol.Handlers = api{}
@@ -60,7 +57,6 @@ func str(s *string) string {
 	return *s
 }
 
-// open starts the day when it has not started: typing before 开工, as on the mock.
 func (a api) open() {
 	if a.f.Site.Call() != protocol.CallStateLive {
 		a.f.Site.SetCall(protocol.CallStateLive, "")
@@ -145,7 +141,6 @@ func (a api) FarmDispatch(_ context.Context, body protocol.SayRequest) error {
 	return nil
 }
 
-// FarmTell: watering, 杀虫, resolving a conflict: said in the helper's job thread, which wakes it.
 func (a api) FarmTell(_ context.Context, id string, body protocol.TellRequest) error {
 	if err := a.worker(id); err != nil {
 		return err
@@ -187,7 +182,6 @@ func (a api) FarmHarvest(_ context.Context, id string) error {
 	return nil
 }
 
-// FarmChanges: the person looking over a harvest before saying yes, on the ledger (验收).
 func (a api) FarmChanges(_ context.Context, id string) (protocol.Changes, error) {
 	changes, err := a.f.Merges.Changes(id)
 	if err != nil {

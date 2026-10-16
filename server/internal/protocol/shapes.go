@@ -1,9 +1,7 @@
 package protocol
 
-// The shapes the server and its client share: the farm's core state and the facts that change it, the site events,
-// the frame the client reads, and every request and answer of the API (api.go). They are the one source: tool/shapegen
-// writes what follows from them, the Go glue in gen.go and the Flutter client's lib/gen/vibevalley.dart (go run
-// ./tool/shapegen). Its doc says what the vibevalley: directives and the vibevalley:"null" tag mean.
+// The shapes are the one source: tool/shapegen writes gen.go and the Flutter client's lib/gen/vibevalley.dart from them; its doc says what the
+// vibevalley: directives and the vibevalley:"null" tag mean.
 
 type CallState string
 
@@ -179,8 +177,7 @@ type Helper struct {
 	Playbook *HelperPlaybook `json:"playbook,omitzero"`
 	Channel  *int64          `json:"channel,omitzero"`
 	Play     *HelperPlay     `json:"play,omitzero"`
-	// Issue is the issue this helper's run works.
-	Issue *string `json:"issue,omitzero"`
+	Issue    *string         `json:"issue,omitzero"`
 }
 
 type CommitCount struct {
@@ -226,7 +223,7 @@ type PlaybookNode struct {
 	Commits    []string  `json:"commits,omitzero"`
 	Spent      *Spent    `json:"spent,omitzero"`
 	Tries      int64     `json:"tries"`
-	// Failures counts the times the step failed; a retry starts Tries over, not this. Each failure is its own call.
+	// A retry starts Tries over, not this.
 	Failures int64 `json:"failures,omitzero"`
 }
 
@@ -302,8 +299,7 @@ type FarmState struct {
 	Commits    *CommitCount   `json:"commits,omitzero"`
 	Progress   *Progress      `json:"progress,omitzero"`
 	Schedules  []FarmSchedule `json:"schedules,omitzero"`
-	// Issues is the open issues and the latest closed ones (KeepClosedIssues), the board's order (IssueOrder); the
-	// database keeps them all.
+	// The open issues and the latest closed (KeepClosedIssues); the database keeps them all.
 	Issues []Issue `json:"issues,omitzero"`
 }
 
@@ -434,8 +430,7 @@ type InboxFrom struct{ Value InboxFromValue }
 //vibevalley:union kind
 type InboxTarget struct{ Value InboxTargetValue }
 
-// InboxItem is something that needs the person now (inbox.go): work to look at, a failure, a conflict, a helper gone
-// quiet, a playbook waiting, a message naming them. The id stays while the same thing stands.
+// The id stays while the same thing stands.
 type InboxItem struct {
 	ID     string      `json:"id"`
 	Kind   InboxKind   `json:"kind"`
@@ -485,10 +480,8 @@ type FarmView struct {
 type GameEffect struct{ Value GameEffectValue }
 
 type SiteFrame struct {
-	State FarmState `json:"state"`
-	// Inbox is what needs the person now, newest first.
-	Inbox []InboxItem `json:"inbox"`
-	// Plans is the issues with a plan, each read as a playbook with its sub-issues as the steps, oldest first.
+	State   FarmState    `json:"state"`
+	Inbox   []InboxItem  `json:"inbox"`
 	Plans   []Playbook   `json:"plans"`
 	View    FarmView     `json:"view"`
 	Effects []GameEffect `json:"effects"`
@@ -663,11 +656,10 @@ type LanguageCount struct {
 
 type ProjectSummary struct {
 	Name string `json:"name"`
-	// Path is where it is on this machine: its folder under the work directory.
 	Path string `json:"path"`
 	Git  bool   `json:"git"`
 	Last *int64 `json:"last,omitzero"`
-	// Slots is how many helpers may work in it at once: its own limit, never more than the farm's beds.
+	// Never more than the farm's beds.
 	Slots int64 `json:"slots"`
 }
 
@@ -867,37 +859,28 @@ type Dispatched struct {
 	Queued *string `json:"queued,omitzero"`
 }
 
-// An issue (the board's 工单) is a job from when it is written down until it closes, one id all along
-// (docs/concepts.md): what to do, in which project, by which agent, how soon. The helpers that worked it are its runs,
-// oldest first; while it is open the last one is at it. Reopened, it gets another run.
 type Issue struct {
-	ID string `json:"id"`
-	// Title is what the issue is in a line; Description the rest, maybe empty. A run is told both (IssueJob).
+	ID          string   `json:"id"`
 	Title       string   `json:"title"`
 	Description string   `json:"description,omitzero"`
 	Project     *string  `json:"project,omitzero"`
 	Agent       *string  `json:"agent,omitzero"`
 	Priority    Priority `json:"priority"`
-	// Rank is its place on the board while it is not sent yet, first lowest.
+	// First lowest.
 	Rank      int64       `json:"rank,omitzero"`
 	CreatedAt int64       `json:"createdAt"`
 	QueuedAt  *int64      `json:"queuedAt,omitzero"`
 	Runs      []string    `json:"runs"`
 	ClosedAt  *int64      `json:"closedAt,omitzero"`
 	Closed    *IssueClose `json:"closed,omitzero"`
-	// Parent is the issue this one is a sub-issue of; BlockedBy the sub-issues of the same parent it waits for.
-	Parent    *string  `json:"parent,omitzero"`
-	BlockedBy []string `json:"blockedBy,omitzero"`
-	// Plan makes it a playbook (种植计划): its sub-issues are the steps, each with its Step (plan_issues.go).
-	Plan *IssuePlan `json:"plan,omitzero"`
-	Step *IssueStep `json:"step,omitzero"`
-	// Schedule is the schedule this issue came from: an occurrence of a recurring issue.
-	Schedule *int64      `json:"schedule,omitzero"`
-	Status   IssueStatus `json:"status"`
+	Parent    *string     `json:"parent,omitzero"`
+	BlockedBy []string    `json:"blockedBy,omitzero"`
+	Plan      *IssuePlan  `json:"plan,omitzero"`
+	Step      *IssueStep  `json:"step,omitzero"`
+	Schedule  *int64      `json:"schedule,omitzero"`
+	Status    IssueStatus `json:"status"`
 }
 
-// IssuePlan is what a parent issue has as a playbook besides being an issue: where the plan stands, the branch its
-// steps merge into, how many steps work at once, a word about it now.
 type IssuePlan struct {
 	State    PlaybookState `json:"state"`
 	Branch   *string       `json:"branch,omitzero"`
@@ -905,8 +888,6 @@ type IssuePlan struct {
 	Note     *string       `json:"note,omitzero"`
 }
 
-// IssueStep is what a sub-issue has as a step of its parent's plan: its key in the plan, where it stands, how it is
-// checked, the helper at it now, what it came to.
 type IssueStep struct {
 	Key        string    `json:"key"`
 	State      NodeState `json:"state"`
@@ -971,7 +952,7 @@ type TrajectoryHead struct {
 	ReopenedFrom *string         `json:"reopenedFrom,omitzero"`
 	ReopenedAs   *string         `json:"reopenedAs,omitzero"`
 	Playbook     *HelperPlaybook `json:"playbook,omitzero"`
-	// Issue is the issue the run worked; ReopenedFrom and ReopenedAs are how runs told it before issues.
+	// ReopenedFrom and ReopenedAs are how runs told it before issues.
 	Issue *string `json:"issue,omitzero"`
 }
 
@@ -1549,10 +1530,8 @@ type FactForeman struct {
 type FactMessage struct {
 	At      int64       `json:"at"`
 	Message ChatMessage `json:"message"`
-	// Thread is the helper whose job thread the message went into, when it went into one.
-	Thread *string `json:"thread,omitzero"`
-	// Answers is the helper whose call the message answers: one that named its speaker in the conversation since the
-	// speaker last spoke there.
+	Thread  *string     `json:"thread,omitzero"`
+	// One that named its speaker in the conversation since the speaker last spoke there.
 	Answers *string `json:"answers,omitzero"`
 }
 
@@ -1635,9 +1614,8 @@ type FactConflict struct {
 //vibevalley:member Fact left
 //vibevalley:member SiteEvent left
 type FactLeft struct {
-	At int64  `json:"at"`
-	ID string `json:"id"`
-	// Closed is how its ticket closed; Merged is how many commits a harvest took into the main branch.
+	At     int64       `json:"at"`
+	ID     string      `json:"id"`
 	Closed *IssueClose `json:"closed,omitzero"`
 	Merged *int64      `json:"merged,omitzero"`
 }

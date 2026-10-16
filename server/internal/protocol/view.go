@@ -1,16 +1,11 @@
 package protocol
 
-// What the screens make of the core state (packages/protocol/src/view.ts): the farm's level, the calls the farm phone
-// rings with, each helper's bed, and the effects to play when something is earned or lost.
-
 import (
 	"unicode/utf16"
 )
 
-// XPToNext is the commits needed to go from level to level+1.
 func XPToNext(level int64) int64 { return 10 * level }
 
-// LevelForCommits is the level a commit count reaches, and the commits into that level.
 func LevelForCommits(total int64) (level, xp int64) {
 	level, rest := int64(1), max(0, total)
 	for rest >= XPToNext(level) {
@@ -29,7 +24,6 @@ func FarmLevelOf(state FarmState) FarmLevel {
 	return FarmLevel{Level: level, Xp: xp, Need: XPToNext(level)}
 }
 
-// Need is what the farm asks of you about a helper: the most pressing thing, if any.
 type Need struct {
 	Kind     string // conflict, harvest, fix, quiet, retrying
 	Conflict *Conflict
@@ -61,7 +55,7 @@ func NeedOf(h Helper) *Need {
 	return nil
 }
 
-// jsHash is view.ts's hash: over UTF-16 code units of each code point's first unit, wrapping at 32 bits.
+// Over each code point's first UTF-16 unit, wrapping at 32 bits: the client picks the same animal from the same id.
 func jsHash(s string) uint32 {
 	var h uint32
 	for _, r := range s {
@@ -115,7 +109,6 @@ var (
 
 func badge(b Badge) *Badge { return &b }
 
-// PlotOfHelper is what grows in a helper's bed, and the sign over it.
 func PlotOfHelper(h Helper) PlotView {
 	need := NeedOf(h)
 	conflict := need != nil && need.Kind == "conflict"
@@ -146,7 +139,6 @@ func PlotOfHelper(h Helper) PlotView {
 	return PlotView{Crop: CropEmpty}
 }
 
-// Clip cuts text to n UTF-16 units with an ellipsis, as JavaScript's length and slice count.
 func Clip(text string, n int) string {
 	units := utf16.Encode([]rune(text))
 	if len(units) <= n {
@@ -155,7 +147,7 @@ func Clip(text string, n int) string {
 	return string(utf16.Decode(units[:n])) + "…"
 }
 
-// LevelUps is each level gained between two commit counts; none on a farm's first count.
+// None on a farm's first count.
 func LevelUps(before *int64, after int64) []GameEffect {
 	if before == nil {
 		return nil
@@ -169,7 +161,6 @@ func LevelUps(before *int64, after int64) []GameEffect {
 	return out
 }
 
-// EffectsOf is the effects fact brings, given the state before it.
 func EffectsOf(before FarmState, fact Fact) []GameEffect {
 	switch f := fact.Value.(type) {
 	case FactCommits:

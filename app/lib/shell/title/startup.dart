@@ -1,10 +1,3 @@
-// Startup (web/src/title/Startup.tsx and loading.ts): what the app loads once, before anything is shown: the farm as
-// the server has it, the keys, the fonts, the title's picture, and the pixel village beneath it. Each is a step of the
-// loading bar; it is done when all are, as soon as the server does not answer (its own banner, ServerAway, says why and
-// leads to 院门), or after a while regardless. Then it fades and the title screen is there, its menu at once. The web
-// page's desktop client shows the steps on its own opening picture instead; this app draws them itself, in the
-// desktop app too.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -18,7 +11,6 @@ import '../server_away.dart';
 import 'scene.dart';
 import 'title_state.dart';
 
-/// Past this, the menu comes regardless of what is still loading.
 const giveUpAfter = Duration(seconds: 20);
 
 typedef LoadStep = ({String label, bool done});
@@ -28,7 +20,6 @@ class Loading {
   final List<LoadStep> steps;
   final bool gaveUp;
 
-  /// 0..1, by steps done.
   double get fraction => steps.where((s) => s.done).length / steps.length;
   bool get finished => fraction == 1 || gaveUp;
   LoadStep? get now => steps.where((s) => !s.done).firstOrNull;
@@ -52,7 +43,7 @@ class _StartupState extends ConsumerState<Startup> {
   @override
   void initState() {
     super.initState();
-    // Asked here, so the keys are known when the menu comes (开始游戏 checks them).
+    // So the keys are known when the menu comes (开始游戏 checks them).
     unawaited(ref.read(settingsProvider.notifier).load().then((_) {}, onError: (Object _) {}).whenComplete(() => _done(() => _keys = true)));
     _giveUp = Timer(giveUpAfter, () => _done(() => _gaveUp = true));
   }
@@ -83,11 +74,10 @@ class _StartupState extends ConsumerState<Startup> {
     return Loading([
       (label: reachable ? '连上农场' : '连上农场（服务端没答应，在重试）', done: farmIn),
       (label: '读钥匙', done: _keys),
-      // The font is bundled with the app: there when the first frame is.
       (label: '字体', done: true),
       (label: '画首页', done: _picture),
       (label: '像素村', done: village),
-      // A server that does not answer is not waited for: its banner says why and where to go (院门), under this.
+      // A server that does not answer is not waited for: its banner says why and where to go (院门).
     ], gaveUp: _gaveUp || !reachable);
   }
 
@@ -127,7 +117,6 @@ class _StartupState extends ConsumerState<Startup> {
 
 const _soft = [Shadow(color: Color(0xFF1A120B), offset: Offset(2, 2))];
 
-/// The loading bar: the farm's frame filling in steps, the step under way, how far, and each step ticked.
 class LoadingBar extends StatelessWidget {
   const LoadingBar({super.key, required this.loading});
   final Loading loading;
@@ -203,7 +192,6 @@ class LoadingBar extends StatelessWidget {
   }
 }
 
-/// .title-fill: wheat stripes, 8 px light and 2 px dark.
 class _Fill extends CustomPainter {
   const _Fill();
 

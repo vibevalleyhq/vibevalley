@@ -1,8 +1,4 @@
-// The group chat (田头) in the farm's lower-right corner (web/src/farm/Chat.tsx): the square where you, the manager and
-// the helpers talk, the channels, and the thread under each job. Messages are bubbles (markdown inside, @names
-// highlighted); typing @ offers whom to name. Folded, it is just its input row; open, it is a window of a fixed size
-// (or a larger one) drawn up over the picture from that row, so the farm never rescales. What it shows is the chat's
-// shown conversation, the desk's chat page's too (lib/desk/chat).
+// Open, it is a window of a fixed size drawn up over the picture from its input row, so the farm never rescales.
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -29,7 +25,6 @@ import '../rules/chat.dart';
 import '../rules/farm.dart';
 import '../rules/index.dart';
 
-/// Quick lines to send while the manager is waiting for one.
 const _suggestions = ['让前端阿郑把字幕面板做了', '让测试小吴跑一遍测试', '现在进度怎么样？', '大家收工'];
 
 const _greeting = '这里是田头，你、管家和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每个活下面挂着它的工单串。按右下角的麦克风，可以直接跟我说话。';
@@ -37,12 +32,9 @@ const _greeting = '这里是田头，你、管家和帮工都在这儿说话。�
 const _small = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, color: Palette.bark500);
 const _body = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 1.625, color: Palette.bark900);
 
-/// The input grows to this many pixels (about four lines), then scrolls.
+/// About four lines.
 const _composerMax = 96.0;
 
-// ── How the manager is doing ─────────────────────────────────────────────────
-
-/// The call and the manager, in one word (Chat.tsx usePhase): the voice call first, then the day's own call.
 enum ChatPhase { off, connecting, arriving, listening, thinking, speaking, leaving, error }
 
 ChatPhase chatPhaseOf(VoiceCall v, FarmState s) {
@@ -82,7 +74,6 @@ const chatPhaseText = {
   ChatPhase.error: '没接通，再试一次',
 };
 
-/// The ring around his face: green while listening, wheat while talking, berry when the call failed.
 const _phaseRing = {
   ChatPhase.off: Palette.cream300,
   ChatPhase.connecting: Palette.cream300,
@@ -94,15 +85,12 @@ const _phaseRing = {
   ChatPhase.error: Palette.berry,
 };
 
-// ── The window ───────────────────────────────────────────────────────────────
-
 class ChatWindow extends ConsumerStatefulWidget {
   const ChatWindow({super.key, required this.state, required this.atlas, required this.agents, required this.onSay, required this.call});
   final FarmState state;
   final SpriteAtlas atlas;
   final Map<String, AgentProfile> agents;
 
-  /// Says typed words on the square (the host's POST /api/say).
   final Future<void> Function(String text) onSay;
   final VoiceCall call;
 
@@ -125,7 +113,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
     _naming
       ..addListener(() => setState(() {}))
       ..onNaming = () {
-        // The menu is drawn inside the window: typing @ opens it.
         if (!ref.read(chatOpenProvider)) _setOpen(true);
       };
     widget.call.addListener(_syncLines);
@@ -159,7 +146,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
 
   void _show(double? id) => unawaited(ref.read(chatActionsProvider).showChat(id).catchError((Object _) {}));
 
-  /// A channel or a thread: said there. The square: through the host, once the day is on.
   void _send(Conversation? conversation, [String? line]) {
     final said = (line ?? _naming.text.text).trim();
     if (said.isEmpty) return;
@@ -275,10 +261,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
     );
   }
 
-  // ── Headers: where you are, and how the manager or the helper is ──────────
-
-  /// Double-click the header to enlarge or restore, as with a window. Read from raw pointer events: a double-tap
-  /// recognizer here would hold every tap on the header's buttons until it gave up.
+  /// Read from raw pointer events: a double-tap recognizer here would hold every tap on the header's buttons until it gave up.
   void _headerUp(PointerUpEvent e) {
     if (_skipHeaderTap) {
       _skipHeaderTap = false;
@@ -366,7 +349,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
     final channel = channelOf(chat, thread);
     final backTo = channel?.kind == ConversationKind.channel ? channel!.id : null;
     final helper = thread.subjectKind == SubjectKind.job ? widget.state.helpers.where((h) => h.id == thread.subjectId).firstOrNull : null;
-    // A helper that left is named as it was in its own thread.
     final said = messagesIn(chat, thread.id).where((m) => m.from == thread.subjectId).firstOrNull?.name;
     final title = thread.subjectKind == SubjectKind.job ? '${helper?.name ?? said ?? thread.subjectId ?? ''}的工单串' : '串';
     final status = helper != null
@@ -406,14 +388,11 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
     );
   }
 
-  // ── The conversation ─────────────────────────────────────────────────────
-
   Widget _messages(Chat? chat, Conversation? conversation, ChatPhase phase) {
     final lines = ref.watch(spokenProvider);
     final more = conversation == null ? null : ref.watch(chatLoadedProvider)[conversation.id];
     final items = itemsOf(chat, conversation, lines, more);
     final parent = conversation?.kind == ConversationKind.thread ? parentOf(chat, conversation!, more) : null;
-    // The manager is thinking about an answer on the square, and has not begun it.
     final thinking = phase == ChatPhase.thinking && conversation?.kind != ConversationKind.thread && (items.lastOrNull?.sender ?? '') != 'foreman';
     final unread = conversation == null ? 0 : unreadIn(chat, conversation);
     // What is on screen is read.
@@ -546,8 +525,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
     }
   }
 
-  // ── Quick lines ────────────────────────────────────────────────────────────
-
   Widget _suggestionRow(FarmState s, Conversation? shown) {
     final empty = (s.chat?.messages ?? const []).isEmpty;
     final live = s.call == CallState.live;
@@ -580,8 +557,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
     );
   }
 
-  // ── Typing ─────────────────────────────────────────────────────────────────
-
   Widget _composer(Conversation? conversation, Conversation? thread, ChatPhase phase, {required bool open, required bool unread}) {
     final voiceOn = widget.call.phase == CallPhase.live;
     final owner = thread?.subjectKind == SubjectKind.job ? widget.state.helpers.where((h) => h.id == thread!.subjectId).firstOrNull : null;
@@ -608,7 +583,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
             builder: (context, _) => Stack(
               clipBehavior: Clip.none,
               children: [
-                // The button's focus-visible:ring-2 is the skin's inner line, over the phase's 2 px ring.
                 Container(
                   padding: const EdgeInsets.all(2),
                   color: _phaseRing[phase],
@@ -630,7 +604,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
               constraints: const BoxConstraints(minHeight: 44),
               padding: const EdgeInsets.all(4),
               color: Palette.cream100,
-              // focus-within:ring-2, the skin's inner line, shown always.
               foregroundDecoration: pxRing,
               child: Row(
                 children: [
@@ -700,8 +673,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
         );
 }
 
-// ── Small parts ──────────────────────────────────────────────────────────────
-
 class _Pill extends StatelessWidget {
   const _Pill(this.text);
   final String text;
@@ -725,7 +696,6 @@ class _HeaderButton extends StatelessWidget {
     onTap: onTap,
     tooltip: label,
     semanticLabel: label,
-    // focus-visible:ring-2: the skin's inner cream-300 line.
     builder: (context, s) => Container(
       width: 32,
       height: 32,
@@ -737,7 +707,6 @@ class _HeaderButton extends StatelessWidget {
   );
 }
 
-/// New words in other conversations: a pill that takes you to the newest of them.
 class _NewElsewhere extends StatelessWidget {
   const _NewElsewhere({required this.chat, required this.except, required this.onShow});
   final Chat? chat;
@@ -768,7 +737,6 @@ class _NewElsewhere extends StatelessWidget {
   }
 }
 
-/// One message: others' on the left beside their face (named above the first of a run), yours on the right in green.
 class _Row extends StatelessWidget {
   const _Row({required this.mine, required this.first, required this.child, this.face, this.name, this.title});
   final bool mine;
@@ -797,8 +765,7 @@ class _Row extends StatelessWidget {
         child: child,
       ),
     );
-    // The page's title (the time, 语音) as the bubble's semantics: a Tooltip here would take the words offstage for finders
-    // and screen readers alike.
+    // A Tooltip here would take the words offstage for finders and screen readers alike.
     if (title != null) bubble = Semantics(hint: title, child: bubble);
     return Padding(
       padding: EdgeInsets.only(top: first ? 4 : 0),
@@ -850,11 +817,9 @@ class _Bubble extends StatelessWidget {
   final bool final_;
   final double? at;
 
-  /// Said aloud in a voice call.
   final bool aloud;
   final String? tag;
 
-  /// Under the words: the turn's steps, the thread chip.
   final Widget? after;
 
   @override
@@ -886,7 +851,6 @@ class _Bubble extends StatelessWidget {
   }
 }
 
-/// The message a thread hangs under, at its top.
 class _ParentMessage extends StatelessWidget {
   const _ParentMessage({required this.message, required this.face});
   final ChatMessage message;
@@ -935,7 +899,6 @@ const _outcomeTag = {
   Outcome.interrupted: ('叫停了', Palette.cream200, Palette.bark600),
 };
 
-/// A helper's report at the end of a turn, in its job thread.
 class _ReportMessage extends StatelessWidget {
   const _ReportMessage({required this.message, required this.first, required this.face, this.steps});
   final ChatMessage message;
@@ -985,7 +948,6 @@ class _ReportMessage extends StatelessWidget {
   }
 }
 
-/// The thread under a message: how many replies, how many new, and the way in.
 class _ThreadChip extends StatelessWidget {
   const _ThreadChip({required this.thread, required this.unread, required this.onTap});
   final Conversation thread;
@@ -1026,7 +988,6 @@ class _ThreadChip extends StatelessWidget {
   );
 }
 
-/// Who the next job goes to, when one was picked from the friends bar.
 class _PickChip extends ConsumerWidget {
   const _PickChip();
 
@@ -1074,11 +1035,8 @@ class _PickChip extends ConsumerWidget {
   }
 }
 
-// ── Voice ────────────────────────────────────────────────────────────────────
-
 const _mood = {'speaking': '在说话', 'listening': '在听', 'thinking': '在想', 'idle': '在听', 'silent': '在听'};
 
-/// The microphone: talk to the manager by voice (Agora). Press again to hang up.
 class _VoiceToggle extends ConsumerWidget {
   const _VoiceToggle({required this.call});
   final VoiceCall call;
@@ -1123,7 +1081,6 @@ class _VoiceToggle extends ConsumerWidget {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // A soft square around the microphone that grows with your voice.
               if (live)
                 Positioned.fill(
                   child: Transform.scale(
@@ -1146,7 +1103,6 @@ class _VoiceToggle extends ConsumerWidget {
   }
 }
 
-/// Five bars that follow one side's loudness (0 to 1).
 class _LevelBars extends StatelessWidget {
   const _LevelBars({required this.level, required this.tone});
   final double level;

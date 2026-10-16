@@ -1,8 +1,6 @@
 package channels
 
-// The manager's voice (ported from the TypeScript server's agora.ts, removed): the farm's voice settings made into an
-// Agora agent (pkg/agora), with the manager's persona and Chinese speech. The agent's request is checked against the
-// TypeScript factory's by voice_agora_test.go.
+// voice_agora_test.go checks the requests against testdata/voice-requests.json.
 
 import (
 	"context"
@@ -21,10 +19,8 @@ import (
 	"vibevalley/pkg/agora"
 )
 
-// voiceDeepseekChat is DeepSeek's OpenAI-compatible chat endpoint, for the voice manager on the farm's DeepSeek key.
 const voiceDeepseekChat = "https://api.deepseek.com/chat/completions"
 
-// voiceAreaOf is the REST region of each setting.
 func voiceAreaOf(area protocol.Area) option.Area {
 	switch area {
 	case protocol.AreaEU:
@@ -39,14 +35,11 @@ func voiceAreaOf(area protocol.Area) option.Area {
 	return option.AreaUS
 }
 
-// voiceUnknown ends the problem of a vendor this server cannot use yet: a member added to VoiceASR, VoiceLLM or VoiceTTS
-// and not to voiceVendorsFor, which TestVoiceVendorsKnowEveryVendor catches (Go does not check a type switch for every
-// member).
+// For a member added to VoiceASR, VoiceLLM or VoiceTTS and not to voiceVendorsFor; TestVoiceVendorsKnowEveryVendor catches it (Go does not check a
+// type switch for every member).
 const voiceUnknown = "服务端还不会用"
 
-// voiceVendorsFor is the three vendors the voice page chose (TypeScript's vendorsFor); or why they cannot be: a
-// vendor whose key is missing. Agora-hosted ones (ARES, the GPT presets, Deepgram, MiniMax, OpenAI tts-1) need no key
-// of their own. line is the call's voice line, for the manager answering itself (nil: none).
+// Agora-hosted vendors need no key of their own. line nil: the manager does not answer the call itself.
 func voiceVendorsFor(voice protocol.VoiceSettings, keys base.VoiceKeys, deepseekKey string, line *base.CallLine) (v agora.Vendors, problem string) {
 	// agentkit panics on a configuration it refuses; that is a problem with the settings, not the server's.
 	defer func() {
@@ -74,7 +67,6 @@ func voiceVendorsFor(voice protocol.VoiceSettings, keys base.VoiceKeys, deepseek
 	}
 	switch llm := voice.LLM.Value.(type) {
 	case protocol.VoiceLLMVibeValley:
-		// The farm's own manager, on the voice line: an OpenAI-compatible endpoint of ours, with this call's key.
 		if line == nil {
 			return agora.Vendors{}, "管家的语音线路没接通"
 		}
@@ -114,8 +106,7 @@ func voiceVendorsFor(voice protocol.VoiceSettings, keys base.VoiceKeys, deepseek
 	return v, ""
 }
 
-// voiceAgentFor is the voice agent the voice page's settings make (TypeScript's voiceAgentFor), read at each start:
-// a change takes effect on the next call. Empty captions is rtm.
+// Read at each start: a change takes effect on the next call. Empty captions is rtm.
 func voiceAgentFor(client *agentkit.AgoraClient, voice protocol.VoiceSettings, v agora.Vendors, captions protocol.VoiceCaptions) *agentkit.Agent {
 	return agora.NewAgent(client, agora.Agent{
 		Language: string(voice.Language), Persona: voice.Persona, InterruptMs: voice.InterruptMs, SilenceMs: voice.SilenceMs,
@@ -123,10 +114,7 @@ func voiceAgentFor(client *agentkit.AgoraClient, voice protocol.VoiceSettings, v
 	}, v)
 }
 
-// VoiceNative is the voice agent for one call as the farm's settings make it, for a client that starts the agent
-// itself (an embedding host with native voice; no caller since MyGo was removed): the credentials and region to build its agentkit.AgoraClient with, the agent for that
-// client, the idle timeout for its session, and Done to call when the call ends (it frees the call's voice line, when
-// the manager answers it himself).
+// No caller since the embedding host with native voice (MyGo) was removed.
 type VoiceNative struct {
 	Credentials agora.Credentials
 	Area        option.Area
@@ -138,11 +126,9 @@ type VoiceNative struct {
 type Voice struct {
 	settings  *base.Settings
 	voiceLine *VoiceLine
-	// http is the transport agentkit uses; nil: its own, with a timeout. Tests capture requests with it.
-	http sdkcore.HTTPClient
+	http      sdkcore.HTTPClient
 
-	mu sync.Mutex
-	// lines is the voice line each call of the manager's own holds, by the agent that answers it.
+	mu    sync.Mutex
 	lines map[string]string
 }
 
@@ -154,7 +140,7 @@ func (*Voice) OnStop()                       {}
 
 var voiceMissing = protocol.VoiceUnavailable{Reason: "还没有 Agora 的凭据：在首页的「设置」里填 App ID 和 App Certificate"}
 
-// creds is asked each time: credentials saved from the title screen work without a restart.
+// Asked each time: credentials saved from the title screen work without a restart.
 func (v *Voice) creds() (agora.Credentials, error) {
 	c := v.settings.Agora()
 	if c == nil {
@@ -175,12 +161,10 @@ func (v *Voice) issue(channel, uid string) (protocol.VoiceSession, error) {
 	return protocol.VoiceSession{AppID: c.AppID, Channel: channel, UID: uid, Token: token}, nil
 }
 
-// Session is a new channel and UID for the page, with their token.
 func (v *Voice) Session(ctx context.Context) (protocol.VoiceSession, error) {
 	return v.issue(agora.NewChannel("vibevalley"), agora.NewUID())
 }
 
-// Renew is a fresh token for the page's channel and UID.
 func (v *Voice) Renew(ctx context.Context, channel, uid string) (protocol.VoiceSession, error) {
 	return v.issue(channel, uid)
 }
@@ -189,8 +173,6 @@ func (v *Voice) client(c agora.Credentials, area protocol.Area) *agentkit.AgoraC
 	return agora.NewClient(c, voiceAreaOf(area), v.http)
 }
 
-// prepare is what a call needs before Agora is asked: the settings, the voice line when the manager answers himself,
-// and the vendors; missing vendor keys are found here, with what to fill in where.
 func (v *Voice) prepare() (protocol.VoiceSettings, *base.CallLine, agora.Vendors, error) {
 	voice := v.settings.Voice()
 	var line *base.CallLine
@@ -211,7 +193,6 @@ func (v *Voice) prepare() (protocol.VoiceSettings, *base.CallLine, agora.Vendors
 	return voice, line, vendors, nil
 }
 
-// Start asks the voice agent into the page's channel, listening to the page's user only.
 func (v *Voice) Start(ctx context.Context, channel, uid string, captions *protocol.VoiceCaptions) (protocol.VoiceAgent, error) {
 	c, err := v.creds()
 	if err != nil {
@@ -248,7 +229,7 @@ func (v *Voice) Start(ctx context.Context, channel, uid string, captions *protoc
 	return protocol.VoiceAgent{AgentID: id}, nil
 }
 
-// Stop asks the voice agent to leave; its voice line, if it had one, closes whatever Agora says.
+// Its voice line closes whatever Agora says.
 func (v *Voice) Stop(ctx context.Context, agentID string) error {
 	defer func() {
 		v.mu.Lock()
@@ -269,9 +250,7 @@ func (v *Voice) Stop(ctx context.Context, agentID string) error {
 	return nil
 }
 
-// Native is the voice agent for a call as the farm's settings make it, for an embedding host with native voice (MyGo's, removed), which
-// starts and stops the agent itself: what Start does, short of asking Agora. Refused like Start: no credentials, a vendor key
-// missing, the voice line down.
+// No caller since MyGo was removed.
 func (v *Voice) Native(captions protocol.VoiceCaptions) (VoiceNative, error) {
 	c, err := v.creds()
 	if err != nil {

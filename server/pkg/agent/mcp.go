@@ -1,8 +1,7 @@
 package agent
 
-// MCP servers' tools as the agent's tools, on the official Go SDK: Streamable HTTP or a child process's stdin and
-// stdout; initialize, tools/list (every page), tools/call, nothing else (no resources, prompts or sampling). A server
-// that cannot be reached is left out and said why, the others still come. The connections live until Close.
+// Only initialize, tools/list (every page) and tools/call: no resources, prompts or sampling. A server that cannot be reached is left out and said
+// why; the others still come.
 
 import (
 	"context"
@@ -21,10 +20,9 @@ import (
 	"vibevalley/pkg/agentcore"
 )
 
-// CALL_TIMEOUT is how long a tools/call (or connecting) may take.
+// Also for connecting.
 const CALL_TIMEOUT = 120 * time.Second
 
-// McpContent is a tools/call result's content block, the parts read here.
 type McpContent struct {
 	Type     string
 	Text     string
@@ -36,7 +34,6 @@ type McpResource struct {
 	Text string
 }
 
-// McpContentText is a tools/call result as text for the model.
 func McpContentText(content []McpContent) string {
 	parts := make([]string, 0, len(content))
 	for _, c := range content {
@@ -84,7 +81,7 @@ func contentOf(blocks []mcp.Content) []McpContent {
 
 var notFunctionName = regexp.MustCompile(`[^A-Za-z0-9_-]`)
 
-// McpToolName is a tool's name as the model sees it: the server's name first, only the characters function names allow.
+// The server's name first, only the characters function names allow.
 func McpToolName(server, tool string) string {
 	name := notFunctionName.ReplaceAllString(server+"__"+tool, "_")
 	if len(name) > 64 {
@@ -93,7 +90,6 @@ func McpToolName(server, tool string) string {
 	return name
 }
 
-// headerTransport adds a server's headers to each request.
 type headerTransport struct {
 	headers map[string]string
 	base    http.RoundTripper
@@ -107,7 +103,7 @@ func (t headerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return t.base.RoundTrip(r)
 }
 
-// lastLine keeps the end of a server's stderr, to say why it went.
+// Keeps the end of a server's stderr, to say why it went.
 type lastLine struct {
 	mu   sync.Mutex
 	text string
@@ -130,7 +126,6 @@ func (l *lastLine) last() string {
 	return lines[len(lines)-1]
 }
 
-// McpConnection is one server's tools and its connection.
 type McpConnection struct {
 	Tools   []agentcore.AgentTool
 	session *mcp.ClientSession
@@ -142,7 +137,6 @@ func (c *McpConnection) Close() {
 	}
 }
 
-// ConnectMcp is one server's tools, connected until Close.
 func ConnectMcp(ctx context.Context, server McpServer) (*McpConnection, error) {
 	fail := func(err error, stderr *lastLine) error {
 		why := err.Error()
@@ -232,21 +226,18 @@ func mcpTool(session *mcp.ClientSession, server string, t *mcp.Tool) agentcore.A
 	})
 }
 
-// McpConnections is every server's tools; the ones that could not be reached are in Failed, with why.
 type McpConnections struct {
 	Tools       []agentcore.AgentTool
 	Failed      []string
 	connections []*McpConnection
 }
 
-// Close ends every connection.
 func (c *McpConnections) Close() {
 	for _, connection := range c.connections {
 		connection.Close()
 	}
 }
 
-// ConnectAll connects to every server at once.
 func ConnectAll(ctx context.Context, servers []McpServer) *McpConnections {
 	type outcome struct {
 		connection *McpConnection

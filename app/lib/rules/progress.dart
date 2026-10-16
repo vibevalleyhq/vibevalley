@@ -1,6 +1,4 @@
-// Ported from packages/protocol/src/progress.ts: the achievements (ACHIEVEMENTS, achievementOf, tierTitle, tierCoins,
-// isTitle, tierOf, CATEGORY_TEXT), levels (xpToNext), streaks (streakMultiplier) and how far one is (standing). The
-// server folds the progress; these only read it.
+// The server folds the progress; these only read it.
 
 import 'dart:math' as math;
 
@@ -43,7 +41,6 @@ const achievements = <AchievementDef>[
   AchievementDef('full_house', AchievementCategory.secret, '满园春色', '六块地同时有帮工在干活', [1]),
 ];
 
-/// protocol achievementOf.
 AchievementDef? achievementOf(String id) {
   for (final a in achievements) {
     if (a.id == id) return a;
@@ -51,14 +48,12 @@ AchievementDef? achievementOf(String id) {
   return null;
 }
 
-/// protocol tierTitle: its own name, or the achievement's with 银牌 or 金牌 before it.
 String tierTitle(AchievementDef a, int tier) {
   final own = a.tierTitles;
   if (own != null && tier >= 1 && tier <= own.length) return own[tier - 1];
   return tier == 2 ? '银牌${a.title}' : (tier == 3 ? '金牌${a.title}' : a.title);
 }
 
-/// protocol tierCoins: a first task, a bronze, silver or gold, a secret.
 int tierCoins(AchievementDef a, int tier) {
   if (a.category == AchievementCategory.starter) return 20;
   if (a.category == AchievementCategory.secret) return 50;
@@ -66,7 +61,6 @@ int tierCoins(AchievementDef a, int tier) {
   return tier >= 0 && tier < coins.length ? coins[tier] : 0;
 }
 
-/// Commits needed to go from `level` to `level + 1`.
 int xpToNext(int level) => 10 * level;
 
 const categoryText = {
@@ -78,16 +72,14 @@ const categoryText = {
   AchievementCategory.secret: '彩蛋',
 };
 
-/// Whether an achievement can be worn as the farm's title: any but a starter task.
 bool isTitle(AchievementDef a) => a.category != AchievementCategory.starter;
 
-/// The highest tier of an achievement reached; 0: none yet.
+/// 0: none yet.
 int tierOf(Progress p, String id) => p.unlocked.fold(0, (t, u) => u.id == id && u.tier > t ? u.tier.round() : t);
 
-/// Streak multiplier: +10% per harvest in a row after the first, at most ×2.
 double streakMultiplier(double streak) => math.min(2, 1 + 0.1 * math.max(0, streak - 1));
 
-/// How far an achievement is: its tier, its count, and what the next tier needs (null once all are reached).
+/// The next tier is null once all are reached.
 ({int tier, int count, int? next}) standing(Progress p, AchievementDef a) {
   final tier = tierOf(p, a.id);
   return (tier: tier, count: (p.counts[a.id] ?? 0).round(), next: tier < a.tiers.length ? a.tiers[tier] : null);

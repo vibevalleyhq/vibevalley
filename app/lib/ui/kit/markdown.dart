@@ -1,11 +1,4 @@
-// Markdown as the farm shows it (web/src/ui/Markdown.tsx with index.css .md): GitHub-flavoured — headings, lists
-// (with task boxes), block quotes, fenced code, tables, rules, links, bare URLs, code spans, strikethrough — no raw
-// HTML. Colours follow the surrounding text colour, so the same rules read on cream paper and on a green bubble.
-//
-// The parser is a small one for that subset (react-markdown + remark-gfm on the page). Not covered: indented code
-// blocks, reference-style links, footnotes, HTML (the page drops it too), lazy continuation inside block quotes.
-// Images show their alt text. The pixel skin draws one weight and no synthesised italic, so ** and * read plain, as
-// on the page.
+// GitHub-flavoured, no raw HTML. Colours follow the surrounding text colour, so the same rules read on cream paper and on a green bubble.
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
@@ -13,13 +6,12 @@ import 'package:flutter/widgets.dart';
 import '../../app/theme.dart';
 import 'base.dart';
 
-/// Where a mention points: links there are drawn as a name chip, not a link.
 const _mentionHref = '#mention';
 
 final _codeParts = RegExp(r'(```[\s\S]*?```|`[^`\n]*`)');
 final _mention = RegExp(r'(^|[^\p{L}\p{N}_@])@(w\d+|管家|主人|所有人)', unicode: true);
 
-/// `@w3`, `@管家`… outside code, as the group chat reads them (protocol mentionsIn), turned into mention links.
+/// Outside code, as the group chat reads them (protocol MentionsIn).
 String withMentions(String text) {
   final out = StringBuffer();
   var at = 0;
@@ -35,8 +27,6 @@ String withMentions(String text) {
 
 String _mentionLinks(String s) => s.replaceAllMapped(_mention, (m) => '${m[1]}[@${m[2]}]($_mentionHref)');
 
-/// Markdown flattened to plain words on one line: for a speech bubble that has no room for formatting (Markdown.tsx
-/// plainText).
 String plainText(String markdown) => markdown
     .replaceAll(RegExp(r'```[\s\S]*?```'), ' ')
     .replaceAllMapped(RegExp(r'`([^`]*)`'), (m) => m[1]!)
@@ -46,9 +36,6 @@ String plainText(String markdown) => markdown
     .replaceAll('|', ' ')
     .replaceAll(RegExp(r'\s+'), ' ')
     .trim();
-
-// ---------------------------------------------------------------------------------------------------------------
-// Blocks
 
 sealed class MdBlock {
   const MdBlock();
@@ -80,7 +67,6 @@ final class MdItem {
   const MdItem(this.children, {this.checked});
   final List<MdBlock> children;
 
-  /// A task item's box: null when it is not one.
   final bool? checked;
 }
 
@@ -143,7 +129,6 @@ List<String> _cells(String row) {
 bool _tableAt(List<String> lines, int i) =>
     i + 1 < lines.length && lines[i].contains('|') && _delimiter.hasMatch(lines[i + 1]) && _cells(lines[i]).length == _cells(lines[i + 1]).length;
 
-/// Whether `line` starts a block that ends a paragraph.
 bool _interrupts(List<String> lines, int i) {
   final l = lines[i];
   if (_fence.hasMatch(l) || _heading.hasMatch(l) || _rule.hasMatch(l) || _quote.hasMatch(l) || _tableAt(lines, i)) return true;
@@ -153,7 +138,6 @@ bool _interrupts(List<String> lines, int i) {
   return o != null && o[2] == '1' && l.substring(o.end).trim().isNotEmpty;
 }
 
-/// Splits markdown into blocks.
 List<MdBlock> parseMarkdown(String text) => _blocks(text.replaceAll('\r\n', '\n').replaceAll('\t', '    ').split('\n'));
 
 List<MdBlock> _blocks(List<String> lines) {
@@ -253,7 +237,6 @@ List<MdBlock> _blocks(List<String> lines) {
   return out;
 }
 
-/// Reads a list starting at `start` into `out`; returns the line after it.
 int _list(List<String> lines, int start, List<MdBlock> out) {
   final first = lines[start];
   final bullet = _bullet.firstMatch(first);
@@ -326,9 +309,6 @@ int _list(List<String> lines, int start, List<MdBlock> out) {
   return i;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Inlines
-
 sealed class MdInline {
   const MdInline();
 }
@@ -346,7 +326,6 @@ final class MdCodeSpan extends MdInline {
 final class MdStyled extends MdInline {
   const MdStyled(this.kind, this.children);
 
-  /// strong, em or del.
   final String kind;
   final List<MdInline> children;
 }
@@ -365,7 +344,6 @@ const _punct = r'''!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~''';
 final _url = RegExp(r'''^(?:https?://|www\.)[^\s<]*''');
 final _wordChar = RegExp(r'[\p{L}\p{N}]', unicode: true);
 
-/// Splits a paragraph's text into inlines.
 List<MdInline> parseInline(String s) {
   final out = <MdInline>[];
   final text = StringBuffer();
@@ -438,7 +416,6 @@ List<MdInline> parseInline(String s) {
       if (link != null) {
         flush();
         final (label, href, end) = link;
-        // Images show their alt text.
         out.add(c == '!' ? MdText(label) : MdLink(href, parseInline(label)));
         i = end;
         continue;
@@ -502,7 +479,6 @@ List<MdInline> parseInline(String s) {
   return out;
 }
 
-/// `[label](href "title")` from `i` (at the '['): the label, the href and where it ends.
 (String, String, int)? _linkAt(String s, int i) {
   var depth = 0;
   var j = i;
@@ -539,7 +515,6 @@ List<MdInline> parseInline(String s) {
   return (s.substring(i + 1, j), dest, k + 1);
 }
 
-/// `**strong**`, `*em*`, `__strong__`, `_em_`, `~~del~~`, `~del~` from `i`.
 (MdInline, int)? _emphasisAt(String s, int i) {
   final c = s[i];
   var n = 0;
@@ -580,18 +555,12 @@ List<MdInline> parseInline(String s) {
 
 bool _insideCode(String s, int from, int at) => '`'.allMatches(s.substring(from, at)).length.isOdd;
 
-// ---------------------------------------------------------------------------------------------------------------
-// Drawing
-
-/// Replaces web/src/ui/Markdown.tsx Markdown: `text` drawn in the surrounding text style; `mentions` draws the chat's
-/// @names as chips. Links open through `onOpenLink`, or `kitOpenLink` when not given.
 class PxMarkdown extends StatefulWidget {
   const PxMarkdown(this.text, {super.key, this.mentions = false, this.onOpenLink, this.style});
   final String text;
   final bool mentions;
   final void Function(Uri uri)? onOpenLink;
 
-  /// Merged over the surrounding DefaultTextStyle.
   final TextStyle? style;
 
   @override
@@ -632,7 +601,7 @@ class _PxMarkdownState extends State<PxMarkdown> {
   }
 }
 
-/// Margins in em, top and bottom, as index.css .md gives each block (adjacent margins collapse to the larger).
+/// Adjacent margins collapse to the larger.
 (double, double) _margins(MdBlock b) => switch (b) {
   MdHeading(:final level) when level <= 4 => (.6, .25),
   MdHeading() => (0, 0),
@@ -650,9 +619,6 @@ class _Painter {
   Color get color => base.color ?? Palette.bark900;
   Color tint(double a) => color.withValues(alpha: color.a * a);
 
-  /// Blocks in a column, the gap between two the larger of their margins. The first one's top margin and the last
-  /// one's bottom are left out, as .md > :first-child and :last-child do (and inside list items and quotes, where they
-  /// would collapse into the item's own).
   Widget blocks(List<MdBlock> list) => Column(
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -833,7 +799,6 @@ class _Painter {
   }
 }
 
-/// The list's disc marker.
 class _Disc extends StatelessWidget {
   const _Disc({required this.size, required this.color});
   final double size;
@@ -847,7 +812,6 @@ class _Disc extends StatelessWidget {
   );
 }
 
-/// A task item's box: a disabled checkbox in leaf green (accent-color).
 class _TaskBox extends StatelessWidget {
   const _TaskBox({required this.checked});
   final bool checked;

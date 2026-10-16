@@ -1,17 +1,13 @@
-// What a helper's turn is reminded of from its agent's memory (server/internal/protocol/recall.go), ported to Dart: the
-// server picks it at the start of each turn, and the agent page shows the same pick ahead of time. Pure functions, kept
-// in step with the Go rule: test/recall_parity_test.dart checks pick against the cases Go writes to schema/recall.sample.json.
+// A port of server/internal/protocol/recall.go; app/test/recall_parity_test.dart holds it to Go's picks.
 
 import 'dart:math' as math;
 
 import '../../gen/vibevalley.dart';
 
-/// What a turn is reminded of: this many memories (this many of them jobs) in this many characters, at most.
 const recallCount = 8;
 const recallJobs = 3;
 const recallChars = 1600;
 
-/// Memories an agent keeps; past this, the ones longest unused go.
 const memoryKeep = 300;
 
 const _stop = {
@@ -23,7 +19,6 @@ const _stop = {
 final _latin = RegExp(r'[a-z0-9_][a-z0-9_.\-/]*');
 final _han = RegExp(r'[㐀-鿿]+');
 
-/// What a text is about, as terms: Latin words and numbers in lower case, and each pair of Chinese characters in a row.
 Set<String> termsOf(String text) {
   final terms = <String>{};
   // İ lowers to i and a combining dot, as in the Go rule (JavaScript's toLowerCase); the Dart VM's gives a bare i.
@@ -43,28 +38,23 @@ Set<String> termsOf(String text) {
 
 int termsInCommon(Set<String> a, Set<String> b) => a.where(b.contains).length;
 
-/// A turn about to start, as recall sees it.
 class Cue {
   const Cue({required this.helper, required this.project, required this.text, this.skip = const {}, required this.now});
 
-  /// The helper about to work: what it left itself is in its own session already.
+  /// What it left itself is in its own session already.
   final String helper;
   final String project;
 
-  /// What the turn is asked.
   final String text;
 
-  /// Memories already brought into its session.
   final Set<String> skip;
   final num now;
 }
 
 const _day = 86400000;
 
-/// Words in common that make another project's note worth bringing.
 const _elsewhere = 3;
 
-/// How much a memory bears on a turn; null when it does not.
 double? relevance(Memory m, Cue cue, Set<String> terms) {
   if (cue.skip.contains(m.id) || m.helper == cue.helper) return null;
   final shared = termsInCommon(termsOf(m.text), terms);
@@ -75,13 +65,11 @@ double? relevance(Memory m, Cue cue, Set<String> terms) {
   return (m.kind == MemoryKind.note ? 2 : 0.5) + (here ? 2 : (everywhere ? 1 : 0)) + math.min(shared, 8) * 0.4 + math.exp(-age / 30);
 }
 
-/// A memory as a line of the reminder.
 String lineOf(Memory m, String project) {
   final where = m.project == null ? '所有项目' : (m.project == project ? '这个项目' : '项目 ${m.project}');
   return m.kind == MemoryKind.job ? '- 做过（$where）：${m.text}' : '- （$where）${m.text}';
 }
 
-/// The memories a turn is reminded of: the most relevant first, within recallCount, recallJobs and recallChars.
 List<Memory> pick(List<Memory> memories, Cue cue) {
   final terms = termsOf(cue.text);
   final ranked = <({Memory m, double score, int i})>[];
@@ -110,8 +98,6 @@ List<Memory> pick(List<Memory> memories, Cue cue) {
   return picked;
 }
 
-/// The memories that go first when the agent keeps more than memoryKeep and its helpers add `coming` more: the
-/// longest unused (last recalled, else written).
 Set<String> nextForgotten(List<Memory> memories, int coming) {
   final over = memories.length + coming - memoryKeep;
   if (over <= 0) return {};

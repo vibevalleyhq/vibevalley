@@ -24,10 +24,8 @@ import (
 	"vibevalley/pkg/smith/oartest"
 )
 
-// The crew against smith's scripted runtime (crew.test.ts): a real Session (same records, same folds) with no binary,
-// login or model, real git repositories in temp folders. Offline.
+// No binary, login or model: smith's scripted runtime runs a real Session over real git repositories in temp folders.
 
-// crewHelperGit runs git as the scripted helper does, as a known user.
 func crewHelperGit(cwd string, args ...string) error {
 	cmd := exec.Command("git", append([]string{"-c", "user.name=helper", "-c", "user.email=helper@vibevalley.test"}, args...)...)
 	cmd.Dir = cwd
@@ -36,11 +34,8 @@ func crewHelperGit(cwd string, args ...string) error {
 
 var crewVersion = regexp.MustCompile(`写版本(\w)`)
 
-// crewScripted is pi, played by a script: it runs one command, then says what it was asked and which persona it got.
-// Asked to commit, it writes a file in its worktree and commits it, as the farm's rules tell real helpers to.
 func crewScripted() oar.Runtime {
 	return oartest.Runtime(oartest.Options{ID: "pi", Turn: func(turn *oartest.Turn) error {
-		// What it was asked, without what it was reminded of on top: as the work log shows it.
 		parts := strings.Split(turn.Input, runs.JobBreak)
 		input := parts[len(parts)-1]
 		if strings.Contains(input, "必败") {
@@ -54,7 +49,6 @@ func crewScripted() oar.Runtime {
 			}
 		}
 		cwd := turn.Options.Cwd
-		// 写版本X: puts its own version of same.ts on its branch, so two helpers conflict.
 		if m := crewVersion.FindStringSubmatch(input); m != nil {
 			turn.Tool("bash", `{"command":"git commit"}`, func() (any, error) {
 				os.WriteFile(filepath.Join(cwd, "same.ts"), []byte("export const v = '"+m[1]+"'\n"), 0o644)
@@ -62,7 +56,6 @@ func crewScripted() oar.Runtime {
 				return "", crewHelperGit(cwd, "commit", "-q", "-m", "版本 "+m[1])
 			})
 		}
-		// Told about a conflict: merges the main branch in and keeps both versions.
 		if strings.Contains(input, "有冲突") {
 			turn.Tool("bash", `{"command":"git merge main"}`, func() (any, error) {
 				crewHelperGit(cwd, "merge", "main")
@@ -92,8 +85,6 @@ func crewScripted() oar.Runtime {
 	}})
 }
 
-// crewWorld is a farm with the crew and what it needs running (not the chat or the manager: as crew.test.ts's
-// layers), pi played by the script, and every fact collected.
 type crewWorld struct {
 	f       *Farm
 	current protocol.RuntimeInfo
@@ -111,7 +102,6 @@ func crewOpen(t *testing.T, home, work string) *crewWorld {
 	return crewOpenAt(t, home, work, ":memory:")
 }
 
-// crewOpenAt is crewOpen with the farm's database at db: a file, for what has to outlive a restart.
 func crewOpenAt(t *testing.T, home, work, db string) *crewWorld {
 	t.Helper()
 	f, err := New(base.Config{Home: home, WorkRoot: work, DBPath: db})
@@ -188,7 +178,6 @@ type crewDone struct {
 	text    string
 }
 
-// nextReport is the next turn a helper finished (not one stopped halfway), in order: how it went, and what it said in full.
 func (w *crewWorld) nextReport(t *testing.T) crewDone {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
@@ -234,10 +223,8 @@ func TestCrewHiredHelperWorksReportsAndGoesHome(t *testing.T) {
 
 	farmtest.Eq(t, report.outcome, protocol.OutcomeCompleted, "outcome")
 	farmtest.Match(t, report.text, `做完了：写 hello\.py`, "text")
-	// The persona reaches the session as appendSystemPrompt, skills under it.
 	farmtest.Match(t, report.text, `原型`, "persona")
 
-	// Its life on the farm, as facts: hired, a turn, the command in its bubble, the report, gone.
 	facts := w.seen()
 	var mine []protocol.FactValue
 	for _, f := range facts {
@@ -263,11 +250,9 @@ func TestCrewHiredHelperWorksReportsAndGoesHome(t *testing.T) {
 	}) {
 		t.Fatal("the command shows in the bubble")
 	}
-	// The turn used some of the account: its usage is read again; it may have committed: the commits are counted again.
 	if w.f.Runtimes.UsageAsked("pi") == 0 {
 		t.Fatal("usage read again")
 	}
-	// The commit count follows the report itself, a moment later.
 	farmtest.Until(t, "commits recounted", func() bool { return w.f.Commits.Asked() > 0 })
 }
 
@@ -308,7 +293,6 @@ func TestCrewHarvestGoesInTheLedger(t *testing.T) {
 	helper := crewHired(t, w.f.Dispatch.Hire(context.Background(), farmtest.Lab(t), "写打卡并提交", "ledger", base.HireOptions{}))
 	w.nextReport(t)
 	w.f.Merges.Harvest(helper.ID)
-	// The ledger hears of it from the fact that the helper left with its commits in.
 	entries := func() int {
 		var n int
 		if err := w.f.DB.QueryRow(`select count(*) from ledger where kind = 'harvested' and payload like ?`, `%"helper":"`+helper.ID+`"%`).Scan(&n); err != nil {
@@ -348,7 +332,6 @@ func TestCrewIssueClosesAndReopens(t *testing.T) {
 	}
 	farmtest.Until(t, "the issue closed with its run", closedAs(protocol.IssueCloseHarvested))
 
-	// Reopened by the id of its run or its own: the same issue, another run.
 	again, err := w.f.Dispatch.Reopen(context.Background(), helper.ID, "打卡还要记下时区", 0)
 	if err != nil {
 		t.Fatal(err)
@@ -368,7 +351,6 @@ func TestCrewIssueClosesAndReopens(t *testing.T) {
 	if _, err := w.f.Dispatch.Reopen(context.Background(), "w404", "", 0); !errors.As(err, &missing) {
 		t.Fatalf("no such issue: %v", err)
 	}
-	// A playbook's step goes with its playbook.
 	w.f.Crew.Dismiss(again)
 	farmtest.Until(t, "sent home", closedAs(protocol.IssueCloseDismissed))
 	if err := generated.New(w.f.DB).CloseIssue(context.Background(), generated.CloseIssueParams{
@@ -463,7 +445,6 @@ func TestCrewIssueWaitsForAFreeBed(t *testing.T) {
 	w := crewOpen(t, home, work)
 	lab := farmtest.Lab(t)
 	w.f.Store.SaveAgent(lab)
-	// Someone already works in the project: its one bed is taken.
 	project, agent := "queue", lab.ID
 	w.f.Site.Apply(protocol.FactHired{Helper: protocol.Helper{
 		ID: "w90", Name: "占地的", Agent: lab.ID, Runtime: lab.Runtime, Task: "先干着", Project: &project,
@@ -479,10 +460,8 @@ func TestCrewIssueWaitsForAFreeBed(t *testing.T) {
 		return now.Status
 	}
 	farmtest.Eq(t, status(), protocol.IssueStatusQueued, "queued")
-	// No room yet: it waits.
 	w.f.Dispatch.TryQueued(context.Background())
 	farmtest.Eq(t, status(), protocol.IssueStatusQueued, "waits")
-	// The bed is free: it goes by itself.
 	w.f.Site.Apply(protocol.FactLeft{ID: "w90"})
 	w.f.Dispatch.TryQueued(context.Background())
 	w.nextReport(t)
@@ -490,7 +469,6 @@ func TestCrewIssueWaitsForAFreeBed(t *testing.T) {
 	if !slices.ContainsFunc(w.f.Trajectories.List(lab.ID), func(h protocol.TrajectoryHead) bool { return h.Job != nil && *h.Job == "等空地的活" }) {
 		t.Fatal("its run")
 	}
-	// Taken out of the queue by hand.
 	other, _ := w.f.Issues.Add(protocol.IssueRequest{Title: "别排了"})
 	queued, _ := w.f.Issues.Queue(other.ID, true)
 	unqueued, _ := w.f.Issues.Queue(other.ID, false)
@@ -501,7 +479,6 @@ func TestCrewIssueWaitsForAFreeBed(t *testing.T) {
 
 func TestCrewIssueAdoptsTheRunsOfBefore(t *testing.T) {
 	home, work := crewDirs(t)
-	// Runs from before issues: w1 harvested and reopened as w2, which still works; w3 sent home; w4 by no agent.
 	agent, harvested, dismissed := "lab", protocol.IssueCloseHarvested, protocol.IssueCloseDismissed
 	ended := int64(2000)
 	heads := []protocol.TrajectoryHead{
@@ -660,7 +637,7 @@ func TestCrewNobodySentWhenMoneyRunsOut(t *testing.T) {
 	w.setInfo(capped)
 	farmtest.Match(t, hire().Refused, `每日预算 ¥1\.00`, "budget")
 
-	// A runtime on a plan (claude, codex): a window used up would only fail with a quota error.
+	// A window used up would only fail with a quota error.
 	resets := time.Date(2026, 10, 14, 8, 0, 0, 0, time.Local).UnixMilli()
 	week := protocol.UsageWindow{Label: "Codex · 1 week", UsedPercent: 100, ResetsAt: &resets}
 	used := info
@@ -746,7 +723,6 @@ func TestCrewConflictingBranchStaysUntilResolved(t *testing.T) {
 		t.Fatal("the helper is still on the farm")
 	}
 	farmtest.Eq(t, *stayed.Helper.Conflict, protocol.Conflict{Base: "main", Files: []string{"same.ts"}}, "flag")
-	// Told what the harvest said to tell it, it merges main in on its branch.
 	w.f.Crew.Tell(b.ID, "合进 main 有冲突，请解决")
 	w.nextReport(t)
 	farmtest.Match(t, w.f.Merges.Harvest(b.ID), `合进了 clash 的 main`, "third")
@@ -761,12 +737,10 @@ func TestCrewLimitsOnProjectAndRuntime(t *testing.T) {
 	lab := farmtest.Lab(t)
 	ctx := context.Background()
 	var busy []protocol.Helper
-	// Three in one project fill it (VIBEVALLEY_MAX_PER_PROJECT defaults to 3).
 	for _, i := range []string{"1", "2", "3"} {
 		busy = append(busy, crewHired(t, w.f.Dispatch.Hire(ctx, lab, "发呆 "+i, "crowded", base.HireOptions{})))
 	}
 	farmtest.Match(t, w.f.Dispatch.Hire(ctx, lab, "发呆 4", "crowded", base.HireOptions{}).Refused, `项目 crowded 里已经有 3 个帮工在干活`, "project")
-	// pi allowed only 3 at once: another project is refused too.
 	three := protocol.DefaultSettings()
 	three.MaxWorking = farmtest.Ptr[int64](3)
 	w.f.Store.SaveSettings("pi", three)
@@ -775,7 +749,6 @@ func TestCrewLimitsOnProjectAndRuntime(t *testing.T) {
 	for range 3 {
 		w.nextReport(t)
 	}
-	// Once they are done there is room again.
 	later := crewHired(t, w.f.Dispatch.Hire(ctx, lab, "随便做点什么", "crowded", base.HireOptions{}))
 	w.nextReport(t)
 	for _, h := range append(busy, later) {
@@ -824,10 +797,8 @@ func TestCrewActivityAndTokens(t *testing.T) {
 		}
 	}
 	farmtest.Eq(t, kinds, []string{"spoke", "ended"}, "the turn spoke, then ended")
-	// While it is on the farm, its session's token says who it is.
 	issued := w.f.Tokens.Issue(helper.ID)
 	farmtest.Eq(t, w.f.Tokens.Who(issued), helper.ID, "who")
-	// Told something while resting between turns: a new turn on the same session.
 	delivered := w.f.Crew.Deliver(helper.ID, "再看看")
 	farmtest.Eq(t, delivered.Kind, "turn", "a new turn")
 	w.nextReport(t)

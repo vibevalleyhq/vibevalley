@@ -1,10 +1,3 @@
-// What an agent remembers, as its page shows it (web/src/pages/MemoryPanels.tsx).
-//   MemoryPanel         a helper agent's: the job each of its helpers has in hand, what the next turn in a project
-//                       would be reminded of (recall.dart pick, the same the server makes), and every note with whose
-//                       it is, which project, how often it was brought in and whether it goes next when memory is full
-//   ManagerMemoryPanel  the manager's MEMORY.md, all of it carried in its system prompt up to a length
-//   ArchivePanel        the manager's conversation that compaction folded away: search it, open a file
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,7 +18,6 @@ import '../../rules/playbook.dart';
 /// Notes its helpers could still add before the oldest are dropped: those are marked 快忘了.
 const _soon = 10;
 
-/// Which notes the list shows: all (''), those for every project, or one project's.
 const _everywhere = '*';
 
 double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
@@ -36,8 +28,6 @@ TextStyle get _meta => KitText.xs.copyWith(color: Palette.bark500);
 List<Widget> _gap(List<Widget> children, [double gap = 16]) => [
   for (var i = 0; i < children.length; i++) ...[if (i > 0) SizedBox(height: gap), children[i]],
 ];
-
-// ── A helper agent's ─────────────────────────────────────────────────────────
 
 class MemoryPanel extends ConsumerStatefulWidget {
   const MemoryPanel({super.key, required this.agent});
@@ -153,7 +143,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
   }
 }
 
-/// What a turn in a project would be reminded of now: the same pick the server makes, without counting it.
+/// The same pick the server makes, without counting it.
 class _RecallPreview extends ConsumerStatefulWidget {
   const _RecallPreview({required this.list});
   final List<Memory> list;
@@ -210,8 +200,6 @@ class _RecallPreviewState extends ConsumerState<_RecallPreview> {
     );
   }
 }
-
-// ── The manager's ────────────────────────────────────────────────────────────
 
 class ManagerMemoryPanel extends ConsumerStatefulWidget {
   const ManagerMemoryPanel({super.key});
@@ -275,7 +263,6 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
   }
 }
 
-/// The manager's conversation that compaction folded away, word for word: search it, open a file.
 class ArchivePanel extends ConsumerStatefulWidget {
   const ArchivePanel({super.key});
 
@@ -419,9 +406,6 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
   }
 }
 
-// ── Shared ───────────────────────────────────────────────────────────────────
-
-/// 替它记一条: a note written for an agent; with `withProject`, the project it is for (empty for every project).
 class WriteNote extends ConsumerStatefulWidget {
   const WriteNote({super.key, required this.onWrite, this.withProject = false});
   final Future<Answer> Function(String text, String? project) onWrite;
@@ -489,7 +473,6 @@ class _WriteNoteState extends ConsumerState<WriteNote> {
   }
 }
 
-/// One memory: its text, what is known of it in small words, and 忘掉 when hovered (or focused).
 class MemoryItem extends StatefulWidget {
   const MemoryItem({super.key, required this.memory, required this.onForget, required this.meta, this.faded = false, this.warning});
   final Memory memory;
@@ -497,7 +480,6 @@ class MemoryItem extends StatefulWidget {
   final List<String> meta;
   final bool faded;
 
-  /// In amber after the rest: why it is about to go.
   final String? warning;
 
   @override

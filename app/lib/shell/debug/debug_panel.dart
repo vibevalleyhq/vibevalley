@@ -1,8 +1,3 @@
-// The debug console (web/src/ui/DebugPanel.tsx). ` toggles it, unless you are typing. Every button calls a command of
-// debug_commands.dart, as the web page's buttons call `hb`. Its tabs: 控制 (the call, the manager, the farm's clock,
-// progress), 帮工 (each helper on the farm), 音效 (every sound, and their levels), 事件 (the frames and side events as
-// they come). The web page's 规则 and 场景 tabs drive its in-browser mock and are not here.
-
 import 'dart:async';
 import 'dart:convert';
 
@@ -19,7 +14,6 @@ import 'debug_commands.dart';
 import 'debug_log.dart';
 import '../../rules/clock.dart';
 
-/// Whether the debug console is open.
 final debugOpenProvider = NotifierProvider<DebugOpen, bool>(DebugOpen.new);
 
 class DebugOpen extends Notifier<bool> {
@@ -29,13 +23,12 @@ class DebugOpen extends Notifier<bool> {
   void set(bool open) => state = open;
 }
 
-/// Whether the keyboard is typing into a field just now (the hotkey leaves it alone then).
+/// The hotkey leaves it alone then.
 bool typing() {
   final context = FocusManager.instance.primaryFocus?.context;
   return context != null && (context.widget is EditableText || context.findAncestorStateOfType<EditableTextState>() != null);
 }
 
-/// The console's hotkey: ` opens and closes it.
 bool debugHotkey(KeyEvent e, void Function() toggle) {
   if (e is! KeyDownEvent || e.character != '`' || typing()) return false;
   toggle();
@@ -172,8 +165,6 @@ class _Scroll extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SingleChildScrollView(padding: const EdgeInsets.all(16), child: child);
 }
-
-// ── Building blocks ─────────────────────────────────────────────────────────
 
 class _Section extends StatelessWidget {
   const _Section({required this.title, this.aside, required this.child});
@@ -329,7 +320,6 @@ class _TextActionState extends State<_TextAction> {
   );
 }
 
-/// Runs a command; a refusal from the server goes into the console's own line instead of being lost.
 void _run(BuildContext context, Future<void> Function() command) {
   unawaited(
     command().catchError((Object e) {
@@ -337,8 +327,6 @@ void _run(BuildContext context, Future<void> Function() command) {
     }),
   );
 }
-
-// ── Tabs ────────────────────────────────────────────────────────────────────
 
 class _ControlTab extends ConsumerStatefulWidget {
   const _ControlTab();
@@ -646,7 +634,6 @@ class _SoundsTabState extends ConsumerState<_SoundsTab> {
   }
 }
 
-/// A sound's button: the pixel play mark and its name.
 class _PlayButton extends ConsumerWidget {
   const _PlayButton({required this.label, required this.onTap});
   final String label;

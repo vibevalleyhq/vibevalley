@@ -8,8 +8,7 @@ import (
 	"time"
 )
 
-// The playbook, progress, schedule and patrol rules against testdata/play.jsonl.gz, case by case (times of day read
-// in Asia/Shanghai).
+// Times of day are read in Asia/Shanghai.
 func TestPlayRulesGolden(t *testing.T) {
 	shanghai, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {
@@ -302,7 +301,6 @@ func mustJSON(v any) json.RawMessage {
 	return body
 }
 
-// playEdited is an Edited as the cases write it.
 func playEdited(e Edited) map[string]any {
 	if e.OK {
 		return map[string]any{"ok": true, "playbook": e.Playbook}
@@ -310,7 +308,6 @@ func playEdited(e Edited) map[string]any {
 	return map[string]any{"ok": false, "problem": e.Problem}
 }
 
-// playWithoutAt is entries as JSON objects without at, as the cases write them.
 func playWithoutAt(entries []LedgerEntry) []map[string]any {
 	out := []map[string]any{}
 	for _, e := range entries {
@@ -322,7 +319,6 @@ func playWithoutAt(entries []LedgerEntry) []map[string]any {
 	return out
 }
 
-// playSame compares got, as JSON, with want, the case's part at path (or records it there, with -update).
 func playSame(t *testing.T, line int, what string, got any, want json.RawMessage, path ...any) {
 	t.Helper()
 	if recorded(got, path...) {

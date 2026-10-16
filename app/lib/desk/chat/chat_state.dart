@@ -1,7 +1,4 @@
-// The chat as this client holds it (packages/core/src/chat.ts): the chat itself is the server's (FarmState.chat, folded
-// there); here is only what the client adds: which conversation is shown (the farm window and the desk show the same
-// one), older messages loaded for a conversation, the lines spoken in a voice call, whether the farm window is open
-// or enlarged, and the commands (say in a conversation, read cursors, channels, schedules) through VibeValleyApi.
+// The chat itself is the server's (FarmState.chat, folded there); here is only what the client adds.
 
 import 'dart:async';
 
@@ -17,13 +14,11 @@ import 'chat_rules.dart';
 import '../../rules/chat.dart';
 import '../../rules/session.dart';
 
-/// Messages asked for at a time when a conversation is opened or scrolled back.
 const chatPage = 50;
 
-/// The API the chat talks through; tests override it with a VibeValleyApi over a MockClient.
+/// Tests override it with a VibeValleyApi over a MockClient.
 final chatApiProvider = Provider<VibeValleyApi>((ref) => ref.watch(serverProvider).api);
 
-/// A value held for the app's life.
 class ChatValue<T> extends Notifier<T> {
   ChatValue(this._initial);
   final T _initial;
@@ -32,29 +27,23 @@ class ChatValue<T> extends Notifier<T> {
   void set(T value) => state = value;
 }
 
-/// The conversation shown, in the farm window and on the desk alike: a conversation's id, or null for the square.
+/// null: the square.
 final chatShownProvider = NotifierProvider<ChatValue<double?>, double?>(() => ChatValue(null));
 
-/// The farm's chat window is open (core farm/ui.ts chatOpen).
 final chatOpenProvider = NotifierProvider<ChatValue<bool>, bool>(() => ChatValue(true));
 
-/// The farm's chat window is enlarged (chatLarge).
 final chatLargeProvider = NotifierProvider<ChatValue<bool>, bool>(() => ChatValue(false));
 
-/// Messages loaded from the server for each conversation, beyond those the core state keeps; by conversation id.
 final chatLoadedProvider = NotifierProvider<ChatValue<Map<double, Loaded>>, Map<double, Loaded>>(() => ChatValue(const {}));
 
-/// The lines spoken in voice calls, oldest first (core spoken); kept after a call ends, as on the web page.
 final spokenProvider = NotifierProvider<SpokenLines, List<Line>>(SpokenLines.new);
 
-/// The conversation the chat shows, as the core state has it; null until the server sent the square.
 final shownConversationProvider = Provider<Conversation?>((ref) {
   final chat = ref.watch(farmProvider)?.chat;
   final id = ref.watch(chatShownProvider);
   return (id == null ? null : conversationOf(chat, id)) ?? squareOf(chat);
 });
 
-/// The work directory's projects, newest-worked first, for the channel forms' suggestions (web farm/projects.ts).
 final chatProjectNamesProvider = FutureProvider<List<String>>((ref) async {
   final all = await ref.watch(chatApiProvider).farm.projects();
   all.sort((a, b) {
@@ -64,11 +53,11 @@ final chatProjectNamesProvider = FutureProvider<List<String>>((ref) async {
   return [for (final p in all) p.name];
 });
 
-/// The turn behind a message (web farm/WorkLog.tsx TurnSteps): the work log's port sets this; until then nothing shows.
+/// The work log's port sets this; until then nothing shows.
 typedef TurnStepsBuilder = Widget? Function(BuildContext context, String id, double at, {required bool manager});
 TurnStepsBuilder? chatTurnSteps;
 
-/// The captions of a call as lines: each caption keeps one id and the time it was first seen.
+/// Each caption keeps one id and the time it was first seen.
 class SpokenLines extends Notifier<List<Line>> {
   final _ids = Expando<int>();
   final _seen = Expando<double>();
@@ -94,10 +83,8 @@ class SpokenLines extends Notifier<List<Line>> {
   }
 }
 
-/// Why a command failed, in the server's words.
 String problemOf(Object e) => e is VibeValleyApiError ? e.reason : '$e';
 
-/// The chat's commands (core chat.ts and session.ts).
 class ChatActions {
   ChatActions(this._ref);
   final Ref _ref;
@@ -105,13 +92,11 @@ class ChatActions {
   VibeValleyApi get _api => _ref.read(chatApiProvider);
   Chat? get _chat => _ref.read(farmProvider)?.chat;
 
-  /// Shows a conversation (null: the square); its messages are loaded as it opens.
   Future<void> showChat(double? conversation) async {
     _ref.read(chatShownProvider.notifier).set(conversation);
     if (conversation != null && !_ref.read(chatLoadedProvider).containsKey(conversation)) await _fetchPage(conversation);
   }
 
-  /// Shows a helper's job thread; false when it has none (yet).
   Future<bool> showJobThread(String helper) async {
     final thread = jobThreadOf(_chat, helper);
     if (thread == null) return false;
@@ -127,7 +112,6 @@ class ChatActions {
     loaded.set({...all, conversation: was.merge(page, complete: page.length < chatPage)});
   }
 
-  /// Loads the messages before the oldest one shown.
   Future<void> loadOlder(double conversation) async {
     final more = _ref.read(chatLoadedProvider)[conversation];
     if (more?.complete ?? false) return;
@@ -135,7 +119,6 @@ class ChatActions {
     await _fetchPage(conversation, oldest?.seq);
   }
 
-  /// The person has read a conversation up to its newest message.
   Future<void> markRead(double conversation) async {
     final chat = _chat;
     final c = conversationOf(chat, conversation);
@@ -147,7 +130,7 @@ class ChatActions {
     );
   }
 
-  /// Whether the day is on, starting it first if needed: you can type before you have said hello (core whenLive).
+  /// You can type before you have said hello.
   Future<bool> whenLive() async {
     final now = _ref.read(farmProvider)?.call;
     if (now == CallState.live) return true;
@@ -162,7 +145,6 @@ class ChatActions {
     return false;
   }
 
-  /// The agent picked on the friends bar for the next job, when it still exists (core pickedAgent).
   String? pickedAgent() {
     final pick = _ref.read(prefsProvider).pick;
     if (pick == 'auto') return null;
@@ -170,7 +152,6 @@ class ChatActions {
     return agents != null && agents.containsKey(pick) ? pick : null;
   }
 
-  /// Says something typed in a channel or a thread, starting the day first if needed (core sayIn).
   Future<void> sayIn(double conversation, String text) async {
     final said = text.trim();
     if (said.isEmpty || !await whenLive()) return;
@@ -179,7 +160,6 @@ class ChatActions {
     );
   }
 
-  /// Says something typed on the square (core talk while no voice call is on: sayWhenLive).
   Future<void> talk(String text) async {
     final said = text.trim();
     if (said.isEmpty || !await whenLive()) return;
@@ -188,7 +168,6 @@ class ChatActions {
     );
   }
 
-  /// Opens a channel and shows it once the server has it; throws with why not. The name may be written with its #.
   Future<void> openChannel(ChannelRequest req) async {
     final name = req.name.trim().replaceFirst(RegExp('^#'), '');
     await _api.farm.openChannel(
@@ -201,10 +180,8 @@ class ChatActions {
     }
   }
 
-  /// Changes what a channel is for, or its default project; throws with why not.
   Future<void> updateChannel(double id, ChannelUpdate update) => _api.farm.updateChannel(id: idText(id), body: update);
 
-  /// Switches a schedule on or off; it comes back in the core state.
   Future<void> setScheduleEnabled(double id, bool enabled) => _api.farm.toggleSchedule(
     id: idText(id),
     body: ToggleScheduleRequest(enabled: enabled),
@@ -212,7 +189,6 @@ class ChatActions {
 
   Future<void> removeSchedule(double id) => _api.farm.removeSchedule(id: idText(id));
 
-  /// Makes a schedule (the manager does this when asked; the pages only list them).
   Future<FarmSchedule> addSchedule(ScheduleRequest req) => _api.farm.addSchedule(body: req);
 }
 

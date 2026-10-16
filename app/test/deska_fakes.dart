@@ -1,6 +1,3 @@
-// A fake vibevalley server for the deskA pages' tests (agents, manager, skills): VibeValleyApi on a MockClient that answers
-// from in-memory lists and records every request, and a host that puts a page in a ProviderScope with no network.
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -79,7 +76,6 @@ VoiceSettings voice({String greeting = '来啦！今天想种点什么？'}) => 
   idleSeconds: 30,
 );
 
-/// One request the fake server got: method, path (with the query), and its JSON body.
 typedef Call = ({String method, String path, Object? body});
 
 class FakeServer {
@@ -114,7 +110,6 @@ class FakeServer {
 
   final calls = <Call>[];
 
-  /// The writes (anything but GET).
   List<Call> get writes => calls.where((c) => c.method != 'GET').toList();
 
   late final api = VibeValleyApi(Uri.parse('http://farm.test'), MockClient(_answer));
@@ -212,7 +207,6 @@ class FakeServer {
   }
 }
 
-/// A page in a ProviderScope wired to `server`, on a desk-sized screen, with no network and no state stream.
 Future<void> pumpPage(WidgetTester t, FakeServer server, Widget page, {FarmState? farm, Stream<SiteEvent>? events, Size size = const Size(1600, 1200)}) async {
   t.view.physicalSize = size;
   t.view.devicePixelRatio = 1;
@@ -221,7 +215,6 @@ Future<void> pumpPage(WidgetTester t, FakeServer server, Widget page, {FarmState
     ProviderScope(
       overrides: [
         deskApiProvider.overrideWithValue(server.api),
-        // The shell's settings (the voice form) ask through the server itself.
         serverProvider.overrideWithValue(_ApiOnly(server.api)),
         sideEventsProvider.overrideWith((ref) => events ?? const Stream<SiteEvent>.empty()),
         farmProvider.overrideWithValue(farm),
@@ -236,7 +229,7 @@ Future<void> pumpPage(WidgetTester t, FakeServer server, Widget page, {FarmState
   await settle(t);
 }
 
-/// Lets the fake server answer and the page rebuild (pumpAndSettle would wait on looping animations).
+/// pumpAndSettle would wait on looping animations.
 Future<void> settle(WidgetTester t) async {
   for (var i = 0; i < 6; i++) {
     await t.runAsync(() => Future<void>.delayed(Duration.zero));
@@ -244,16 +237,13 @@ Future<void> settle(WidgetTester t) async {
   }
 }
 
-/// Types into the text field labelled `label` (its semantics label).
 Future<void> typeInto(WidgetTester t, String label, String text) async {
   await t.enterText(find.descendant(of: labelled(label), matching: find.byType(EditableText)).first, text);
   await t.pump();
 }
 
-/// The widget whose Semantics label is `label` (inputs, buttons and tiles of the kit carry one).
 Finder labelled(String label) => find.byWidgetPredicate((w) => w is Semantics && w.properties.label == label);
 
-/// A server that is only its API: what the pages under test call.
 class _ApiOnly implements VibeValleyServer {
   _ApiOnly(this.api);
 

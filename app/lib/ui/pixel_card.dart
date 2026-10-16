@@ -1,6 +1,4 @@
-// The village's cards (@heybro/engine/pixi ui.ts card): a box with a 2 px outline and a hard drop, rows of words,
-// icons and bars in the pixel font, at screen pixels so the words stay sharp at any scale. The HUD, the signs over
-// the yard and the words over plots and helpers are all cards.
+// At screen pixels, so the words stay sharp at any scale.
 
 import 'package:flutter/widgets.dart';
 
@@ -8,7 +6,6 @@ import '../app/theme.dart';
 import '../sprites/atlas.dart';
 import 'px.dart';
 
-/// The village's card colours (web/src/pixel/words.ts THEME and friends).
 abstract final class CardColors {
   static const ink = Color(0xFF3A2A18);
   static const paper = Color(0xFFF3E2B8);
@@ -26,7 +23,6 @@ abstract final class CardColors {
   static const barTrack = Color(0xFFE2C995);
 }
 
-/// A part of a row: words, an icon this many pixels tall, or a bar filled `fill` of the way.
 sealed class Piece {
   const Piece();
 }
@@ -44,7 +40,6 @@ final class Icon extends Piece {
   final double px;
 }
 
-/// A drawing made of cells on a small grid (x, y, w, h, colour), `px` tall.
 final class Glyph extends Piece {
   const Glyph(this.cells, this.px, {this.grid = const Size(10, 16)});
   final List<(int, int, int, int, Color)> cells;
@@ -52,7 +47,6 @@ final class Glyph extends Piece {
   final Size grid;
 }
 
-/// Helpers' faces overlapping a little, the first on top (farm/Hud.tsx FriendsDock).
 final class Faces extends Piece {
   const Faces(this.looks, this.atlas, {this.px = 22});
   final List<String> looks;
@@ -94,12 +88,11 @@ class PixelCard extends StatelessWidget {
   final double padX;
   final double padY;
 
-  /// At least this wide and tall, pixels (border included): HUD parts of one row share a size.
+  /// Border included: HUD parts of one row share a size.
   final double? width;
   final double? height;
   final bool center;
 
-  /// A row of words wraps past this many pixels, and keeps `maxLines`.
   final double? maxWidth;
   final int? maxLines;
 
@@ -144,7 +137,6 @@ class PixelCard extends StatelessWidget {
         color: track,
         child: Align(
           alignment: Alignment.centerLeft,
-          // In steps of 5%, as on the web page.
           child: SizedBox(
             width: (w * ((fill.clamp(0, 1) * 20).round() / 20)).roundToDouble(),
             height: h,

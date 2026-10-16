@@ -1,14 +1,11 @@
 package protocol
 
-// What follows from a helper's phase (packages/protocol/src/farm.ts): is it busy, what is it doing, can its work be
-// taken in, and how to say it. NeedOf is in view.go.
-
 import (
 	"fmt"
 	"strings"
 )
 
-// IsBusy is whether a helper is arriving or working: it takes one of the places for those working at once.
+// It takes one of the places for those working at once.
 func IsBusy(h Helper) bool {
 	switch h.Phase.Value.(type) {
 	case PhaseArriving, PhaseWorking:
@@ -17,7 +14,6 @@ func IsBusy(h Helper) bool {
 	return false
 }
 
-// DoingOf is what a helper is doing this moment; nothing unless it is working.
 func DoingOf(h Helper) Doing {
 	if p, ok := h.Phase.Value.(PhaseWorking); ok {
 		return p.Doing
@@ -25,7 +21,7 @@ func DoingOf(h Helper) Doing {
 	return Doing{Action: WorkerActionNone, Label: ""}
 }
 
-// CanHarvest is whether its work can be looked over and taken in: its turn is over (a stopped one may have work too).
+// A stopped turn may have work too.
 func CanHarvest(h Helper) bool {
 	switch h.Phase.Value.(type) {
 	case PhaseRipe, PhaseResting:
@@ -34,7 +30,6 @@ func CanHarvest(h Helper) bool {
 	return false
 }
 
-// ActionText is what an action means for the code, in a word or two.
 var ActionText = map[WorkerAction]string{
 	WorkerActionRunCommand:   "跑命令",
 	WorkerActionReadFile:     "读文件",
@@ -49,7 +44,6 @@ var ActionText = map[WorkerAction]string{
 	WorkerActionNone:         "",
 }
 
-// coreSpan is a stretch of time in words: 12 秒, 4 分钟.
 func coreSpan(ms int64) string {
 	if ms < 60_000 {
 		return fmt.Sprintf("%d 秒", int64(max(1, coreRound(float64(ms)/1000))))
@@ -57,7 +51,6 @@ func coreSpan(ms int64) string {
 	return fmt.Sprintf("%d 分钟", int64(coreRound(float64(ms)/60_000)))
 }
 
-// PhaseText is its phase and what is asked of you, in a few words: for the manager and for tooltips.
 func PhaseText(h Helper, now int64) string {
 	need := NeedOf(h)
 	conflict := ""

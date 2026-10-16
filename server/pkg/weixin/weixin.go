@@ -1,7 +1,5 @@
-// Package weixin is Tencent's iLink bot API: how a WeChat user talks to a bot. Written from the official client
-// (@tencent-weixin/openclaw-weixin 2.4.10, MIT): log in by scanning a code, long-poll getupdates for what the user
-// sends, sendmessage to answer. JSON over HTTPS, outbound only. Only text: pictures, voice and files arrive as a word
-// in brackets (voice with WeChat's own transcript).
+// Package weixin is written from the official client (@tencent-weixin/openclaw-weixin 2.4.10, MIT). Only text: pictures, voice and files arrive as a
+// word in brackets (voice with WeChat's own transcript).
 package weixin
 
 import (
@@ -24,13 +22,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// BaseURL is where every login starts; a confirmed login may name another host for its account.
+// A confirmed login may name another host for its account.
 const BaseURL = "https://ilinkai.weixin.qq.com"
 
-// Version is the official client's version: its protocol is the one spoken here.
 const Version = "2.4.10"
 
-// Errors WeChat answers with.
 const (
 	StaleToken = -14
 	Restricted = -2
@@ -93,19 +89,16 @@ type Updates struct {
 	LongpollingTimeoutMs int64     `json:"longpolling_timeout_ms,omitempty"`
 }
 
-// API is WeChat's side; tests talk to a scripted one.
 type API interface {
-	// QrCode is a new login code: qrcode to ask about, url to show (it encodes the code, and opens it in a browser).
 	QrCode(ctx context.Context) (qrcode, url string, err error)
-	// QrStatus long-polls a login code's state. A network hiccup reads as wait.
+	// A network hiccup reads as wait.
 	QrStatus(ctx context.Context, baseURL, qrcode, verifyCode string) QrStatus
-	// GetUpdates long-polls for what came in since buf. Nothing within timeout reads as an empty answer.
+	// Nothing within timeout reads as an empty answer.
 	GetUpdates(ctx context.Context, account Account, buf string, timeout time.Duration) (Updates, error)
-	// SendText sends one text to a user, riding on the context of their latest message. Its answer is WeChat's id for it.
+	// Rides on the context of the user's latest message.
 	SendText(ctx context.Context, account Account, to, text, contextToken string) (string, error)
 }
 
-// Failed is the error code an answer carries, nil when none.
 func Failed(ret, errcode *int) *int {
 	if ret != nil && *ret != 0 {
 		return ret
@@ -116,7 +109,7 @@ func Failed(ret, errcode *int) *int {
 	return nil
 }
 
-// lossless keeps message ids (64-bit numbers) as text before they are decoded.
+// Message ids are 64-bit numbers: kept as text before they are decoded.
 var lossless = regexp.MustCompile(`"(message_id|msg_id|svr_id)"(\s*):(\s*)(-?\d+)`)
 
 type Client struct {
@@ -163,7 +156,6 @@ func endpointURL(baseURL, endpoint string) string {
 	return baseURL + endpoint
 }
 
-// request sends and decodes one call; label names it in errors.
 func (l *Client) request(ctx context.Context, label, method, target string, body any, token string, auth bool, out any) error {
 	var reader io.Reader
 	if body != nil {
@@ -282,8 +274,6 @@ func (l *Client) SendText(ctx context.Context, account Account, to, text, contex
 	return body.MessageID, nil
 }
 
-// Text is what an incoming message says, as text: its words, voice by WeChat's transcript, anything else as
-// a bracketed word.
 func Text(m Message) string {
 	var parts []string
 	for _, item := range m.ItemList {
@@ -315,7 +305,6 @@ func Text(m Message) string {
 	return strings.TrimSpace(strings.Join(parts, "\n"))
 }
 
-// Quoted is the message an incoming one quotes, by WeChat's id, if it quotes one.
 func Quoted(m Message) string {
 	for _, item := range m.ItemList {
 		if item.RefMsg != nil && item.RefMsg.SvrID != "" {

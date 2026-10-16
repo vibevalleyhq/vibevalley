@@ -25,7 +25,7 @@ func NewFileWriter(path string, mode os.FileMode) *FileWriter {
 	return &FileWriter{path: path, mode: mode}
 }
 
-// Write writes what body gives when this write's turn comes: the state as it is then.
+// body is asked when this write's turn comes: the state as it is then.
 func (w *FileWriter) Write(body func() ([]byte, error)) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()

@@ -1,6 +1,5 @@
-// Package qq is an official QQ bot (q.qq.com), written from Tencent's botpy (the official Python SDK): the bot's
-// AppID and AppSecret fetch its token; direct (C2C) messages come over QQ's WebSocket gateway, outbound only; a reply
-// is a passive one on the user's message id, which QQ honours only for a while.
+// Package qq is written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's message id, which QQ honours only for
+// a while.
 package qq
 
 import (
@@ -22,8 +21,7 @@ import (
 const (
 	apiBase  = "https://api.sgroup.qq.com"
 	tokenURL = "https://bots.qq.com/app/getAppAccessToken"
-	// intents: group and direct (C2C) messages; Listen hands over the direct ones.
-	intents = 1 << 25
+	intents  = 1 << 25
 )
 
 type App struct {
@@ -38,7 +36,6 @@ type Message struct {
 	Attachments int
 }
 
-// SendError is why QQ did not take a message: its HTTP status (0: none), and why.
 type SendError struct {
 	Status int
 	Reason string
@@ -46,13 +43,9 @@ type SendError struct {
 
 func (e *SendError) Error() string { return e.Reason }
 
-// API is QQ's side; tests talk to a scripted one.
 type API interface {
-	// Check checks the credentials by fetching a token.
 	Check(ctx context.Context, app App) error
-	// Listen opens the gateway and hands each direct message to got until it fails, or ctx ends (nil then).
 	Listen(ctx context.Context, app App, got func(Message)) error
-	// SendText sends a text to a user, as a reply to msgID when there is one. Its answer is QQ's id for it.
 	SendText(ctx context.Context, app App, openID, text, msgID string) (string, *SendError)
 }
 
@@ -68,9 +61,9 @@ type Client struct {
 	dialer   *websocket.Dialer
 
 	mu sync.Mutex
-	// tokens last about two hours; one per app, renewed a minute early.
+	// Tokens last about two hours: one per app, renewed a minute early.
 	tokens map[string]cachedToken
-	// replySeq is a reply's sequence number per message replied to: QQ refuses the same (msg_id, msg_seq) twice.
+	// QQ refuses the same (msg_id, msg_seq) twice.
 	replySeq map[string]int
 }
 
@@ -213,7 +206,6 @@ func (q *Client) Listen(ctx context.Context, app App, got func(Message)) error {
 		}
 		switch msg.Op {
 		case 10:
-			// Hello: say who this is, then keep the heartbeat.
 			send(map[string]any{"op": 2, "d": map[string]any{"token": "QQBot " + token, "intents": intents, "shard": []int{0, 1}, "properties": map[string]any{}}})
 			var hello struct {
 				HeartbeatInterval int64 `json:"heartbeat_interval"`

@@ -1,8 +1,5 @@
 package protocol
 
-// Connectors: doors into the farm from chat apps (packages/protocol/src/connectors.ts). The rules for which farm
-// messages go out to the owner and how they read in a chat app; the shapes are in gen.go.
-
 import (
 	"fmt"
 	"regexp"
@@ -14,15 +11,12 @@ import (
 
 var ConnectorLabel = map[ConnectorID]string{ConnectorIDWeixin: "微信", ConnectorIDFeishu: "飞书", ConnectorIDQq: "QQ"}
 
-// ConnectorMaxChars is how long a message each app takes (UTF-16 units); longer ones are cut.
+// In UTF-16 units; longer ones are cut.
 var ConnectorMaxChars = map[ConnectorID]int{ConnectorIDWeixin: 1800, ConnectorIDFeishu: 4000, ConnectorIDQq: 2000}
 
-// DigestOver: more held messages than this go out as one digest, not one by one.
 const DigestOver = 3
 
-// ForOwner is whether a message on the farm's chat is the owner's business in a chat app: the manager's answers,
-// what a helper asks or tells them (@主人), every report, every new job. Not the owner's own words (they wrote them),
-// notices, or helpers talking among themselves. Only once a message is final: the manager's grow while he speaks.
+// Only once a message is final: the manager's grow while he speaks.
 func ForOwner(m ChatMessage) bool {
 	if !m.Final || m.From == "user" {
 		return false
@@ -87,8 +81,6 @@ func coreReplaceLineStarts(s string, re *regexp.Regexp, repl string) string {
 	return b.String()
 }
 
-// PlainText is Markdown as plain text that reads in a chat bubble: no fences, no emphasis marks, links as
-// "text (url)".
 func PlainText(markdown string) string {
 	s := plainFence.ReplaceAllStringFunc(markdown, func(match string) string {
 		return coreTrimEnd(plainFence.FindStringSubmatch(match)[1])
@@ -104,8 +96,7 @@ func PlainText(markdown string) string {
 	return coreTrim(s)
 }
 
-// OwnerLine is who said it and where, in front of the words: the owner sees one chat, the farm has many threads.
-// where: the message's conversation, nil when not known.
+// The owner sees one chat, the farm has many threads.
 func OwnerLine(m ChatMessage, where *Conversation) string {
 	who := m.Name
 	if m.FromKind == SenderKindForeman {
@@ -134,8 +125,7 @@ func OwnerLine(m ChatMessage, where *Conversation) string {
 	return head + "\n" + PlainText(m.Text)
 }
 
-// coreUnitsTrimEnd and coreUnitsTrimStart are JavaScript's trimEnd and trimStart over UTF-16 units (every JS
-// whitespace is one unit).
+// Every JS whitespace is one unit.
 func coreUnitsTrimEnd(u []uint16) []uint16 {
 	for len(u) > 0 && coreIsSpace(rune(u[len(u)-1])) {
 		u = u[:len(u)-1]
@@ -160,8 +150,6 @@ func coreLastIndex(u []uint16, of string) int {
 	return -1
 }
 
-// SplitText is a long text cut into pieces an app takes (max UTF-16 units each), at paragraph or line breaks where
-// it can.
 func SplitText(text string, max int) []string {
 	pieces := []string{}
 	rest := utf16.Encode([]rune(text))
@@ -184,8 +172,6 @@ func SplitText(text string, max int) []string {
 	return pieces
 }
 
-// FlushText is held messages going out late: one by one when there are few, else one digest with the first lines
-// of each.
 func FlushText(lines []string) []string {
 	if len(lines) <= DigestOver {
 		return lines
@@ -208,12 +194,12 @@ func FlushText(lines []string) []string {
 
 var pairingSpace = regexp.MustCompile(`[` + coreSpaceClass + `]+`)
 
-// IsPairing is whether a message is the pairing code: the code alone, spaces and a 配对 in front allowed.
+// Spaces and a 配对 in front allowed.
 func IsPairing(text, code string) bool {
 	return strings.TrimPrefix(pairingSpace.ReplaceAllLiteralString(text, ""), "配对") == code
 }
 
-// ShortID is an id as the page shows it: enough to recognise, not to copy.
+// Enough to recognise, not to copy.
 func ShortID(id string) string {
 	if coreUnits(id) > 10 {
 		return coreSlice(id, 0, 4) + "…" + coreSlice(id, -4, coreUnits(id))

@@ -1,5 +1,4 @@
-// The synth renders what the retired web page's did: test/fixtures/sfx.json holds a few sounds its synth.ts rendered
-// from its sfx.ts recipes, and their levels by its measure.ts. The fixture is frozen: change it by hand with a sound.
+// test/fixtures/sfx.json: a few sounds rendered by a reference Web Audio synth, and their levels. The fixture is frozen: change it by hand with a sound.
 
 import 'dart:convert';
 import 'dart:io';
@@ -14,7 +13,7 @@ void main() {
   final expected = fixture['sounds'] as Map<String, dynamic>;
 
   for (final MapEntry(key: name, value: raw) in expected.entries) {
-    test('$name: the same samples and levels as the web page', () {
+    test('$name: the same samples and levels as the fixture', () {
       final want = raw as Map<String, dynamic>;
       final got = renderSound(name);
       expect(got.length, want['length']);
@@ -25,7 +24,7 @@ void main() {
         final d = (got[k * stride] - samples[k]).abs();
         if (d > worst) worst = d;
       }
-      expect(worst, lessThan(2e-5), reason: 'largest difference from the web page');
+      expect(worst, lessThan(2e-5), reason: 'largest difference from the fixture');
       final m = measure(got);
       final wm = want['measure'] as Map<String, dynamic>;
       expect(m.peak, closeTo(wm['peak'] as num, 0.11));

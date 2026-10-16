@@ -11,8 +11,6 @@ import (
 	"vibevalley/pkg/smith/oartest"
 )
 
-// Where helpers reach the farm: as the TypeScript server did (crew.ts's FarmUrl).
-
 func TestCrewSessionsReachTheFarmWhereItAnswers(t *testing.T) {
 	t.Setenv("HOST", "")
 	t.Setenv("PORT", "")
@@ -33,10 +31,8 @@ func TestCrewSessionsReachTheFarmWhereItAnswers(t *testing.T) {
 	}}))
 	w.f.Runtimes.Registry = registry
 
-	// HOST and PORT unset: the server's defaults, 127.0.0.1:8787.
 	first := crewHired(t, w.f.Dispatch.Hire(context.Background(), farmtest.Lab(t), "看看", "reach", base.HireOptions{}))
 	w.nextReport(t)
-	// A farm on a port of its own (PORT=0, or a host that picks a free one) says where it is.
 	w.f.Crew.SetAddress("127.0.0.1:54321")
 	crewHired(t, w.f.Dispatch.Hire(context.Background(), farmtest.Lab(t), "再看看", "reach", base.HireOptions{}))
 	w.nextReport(t)

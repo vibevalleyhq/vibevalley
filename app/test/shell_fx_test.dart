@@ -1,6 +1,3 @@
-// The server-away banner (web/src/ui/ServerAway.tsx) and the FX layer (web/src/ui/FxLayer.tsx): the level-up banner,
-// achievement toasts with their medal line, notices and a broken-off voice call as toasts, all from fake streams.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -88,7 +85,6 @@ void main() {
       effects.add(const GameEffectAchievement(achievement: 'harvests', tier: 2));
       effects.add(const GameEffectAchievement(achievement: 's_open', tier: 1));
       effects.add(const GameEffectAchievement(achievement: 'no_such', tier: 1));
-      // Rewards and penalties show nothing here (their coins and smoke are the village's).
       effects.add(const GameEffectReward(workerId: 'w1', coins: 30, streak: 1));
       await tester.pump();
       final list = manager.toasts;

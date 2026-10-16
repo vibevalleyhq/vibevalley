@@ -1,10 +1,5 @@
-// The farm's look, as the web page's pixel skin has it (web/src/index.css :root[data-skin='pixel']): dusty cream
-// paper, bark brown ink, leaf green and wheat gold, the Fusion Pixel font at 12 px, square corners, and frames drawn
-// with hard outlines and drops instead of soft shadows.
-
 import 'package:flutter/material.dart';
 
-/// The palette (the pixel skin's --color-* tokens).
 abstract final class Palette {
   static const ink950 = Color(0xFF14110E);
   static const ink900 = Color(0xFF1C1916);
@@ -39,34 +34,27 @@ abstract final class Palette {
   static const berry = Color(0xFFC84A3A);
   static const water = Color(0xFF4F8FBD);
 
-  /// The outline every frame is drawn with, its drop, and the light rim inside a frame.
   static const pxInk = Color(0xFF2F1F13);
   static const pxDrop = Color(0x731E140A);
   static const rim = Color(0xFFFFF4D8);
 
-  /// Around the farm screen (the page's body).
   static const ground = Color(0xFF2B3320);
 }
 
-/// The pixel font (Fusion Pixel 12px, proportional, Simplified Chinese), as on the web page.
 const pixelFont = 'FusionPixel';
 
-/// The page's --font-mono (ui-monospace, 'SF Mono', Menlo, Consolas, monospace): the pixel skin leaves it alone.
 const monoFont = 'Menlo';
 
-/// Chinese in code text (a path's placeholder, a session id's label) has no glyph in these; the page draws it in the
-/// pixel font, so that comes last.
+/// Chinese in code text has no glyph in these; it is drawn in the pixel font, so that comes last.
 const monoFallback = ['SF Mono', 'Consolas', 'Courier New', 'monospace', pixelFont];
 
-/// A pixel card: a 2px bark border and a hard shadow down and right (--shadow-pixel).
 BoxDecoration pixelBox({Color fill = Palette.cream100, Color border = Palette.bark900}) => BoxDecoration(
   color: fill,
   border: Border.all(color: border, width: 2),
   boxShadow: const [BoxShadow(color: Color(0x731E140A), offset: Offset(2, 2))],
 );
 
-/// Material's type scale spaces its letters (bodyMedium, the text every Text inherits, by 0.25 px); the page's text
-/// has no letter spacing, so a line of Chinese would run a pixel wider every four characters.
+/// Material's type scale spaces its letters (bodyMedium by 0.25 px), so a line of Chinese would run a pixel wider every four characters.
 TextTheme _unspaced(TextTheme t) {
   // This theme is merged over the one `fontFamily` has been applied to, so it names the font again.
   TextStyle? z(TextStyle? s) => s?.copyWith(letterSpacing: 0, fontFamily: pixelFont);

@@ -1,6 +1,4 @@
-// Package agora is what VibeValley asks of Agora, after the official agent quickstart: one RTC+RTM token per page,
-// and a Conversational AI agent built with Agora's Go SDK (agentkit), asked into a channel and out again. Which
-// vendors the agent uses, and what it is told, is the caller's.
+// Package agora follows Agora's official agent quickstart. Which vendors the agent uses, and what it is told, is the caller's.
 package agora
 
 import (
@@ -21,17 +19,15 @@ import (
 	"github.com/AgoraIO/agora-agents-go/v2/option"
 )
 
-// Credentials are a project's App ID and App Certificate: tokens are signed with them, and agentkit builds the REST
-// API's auth from them.
 type Credentials struct {
 	AppID          string
 	AppCertificate string
 }
 
-// TokenSeconds: tokens last an hour; a page renews them before they run out.
+// A page renews tokens before they run out.
 const TokenSeconds = 3600
 
-// Token is one token for RTC and RTM in channel; RTM must log in as uid (quickstart: generate-agora-token).
+// RTM must log in as uid (quickstart: generate-agora-token).
 func Token(c Credentials, channel, uid string) (string, error) {
 	return rtctokenbuilder2.BuildTokenWithRtm(c.AppID, c.AppCertificate, channel, uid, rtctokenbuilder2.RolePublisher, TokenSeconds, TokenSeconds)
 }
@@ -44,7 +40,7 @@ func random(n int64) int64 {
 	return x.Int64()
 }
 
-// NewChannel is a channel of our own, prefix-<ms>-<6 random>: the quickstart's timestamp-plus-random shape.
+// prefix-<ms>-<6 random>: the quickstart's timestamp-plus-random shape.
 func NewChannel(prefix string) string {
 	const digits = "0123456789abcdefghijklmnopqrstuvwxyz"
 	var b strings.Builder
@@ -54,23 +50,19 @@ func NewChannel(prefix string) string {
 	return fmt.Sprintf("%s-%d-%s", prefix, time.Now().UnixMilli(), b.String())
 }
 
-// NewUID is a random UID for a page, as the quickstart picks one.
 func NewUID() string { return fmt.Sprint(random(9_999_000) + 1000) }
 
-// NewClient is agentkit's client for the ConvoAI REST API in area; httpClient nil is agentkit's own.
+// httpClient nil is agentkit's own.
 func NewClient(c Credentials, area option.Area, httpClient sdkcore.HTTPClient) *agentkit.AgoraClient {
 	return agentkit.NewAgoraClient(agentkit.AgoraClientOptions{Area: area, AppID: c.AppID, AppCertificate: c.AppCertificate, HTTPClient: httpClient})
 }
 
-// Vendors are an agent's three stages: hearing, thinking, speaking.
 type Vendors struct {
 	STT agentcore.STTVendor
 	LLM agentcore.LLMVendor
 	TTS agentcore.TTSVendor
 }
 
-// SpeakingLLM is an OpenAI-compatible model answering in a call: it greets, says failure when it fails, remembers the
-// last 15 turns and answers short.
 func SpeakingLLM(o vendors.OpenAIOptions, greeting, failure string) *vendors.OpenAI {
 	maxHistory := 15
 	o.GreetingMessage, o.FailureMessage = greeting, failure
@@ -79,7 +71,6 @@ func SpeakingLLM(o vendors.OpenAIOptions, greeting, failure string) *vendors.Ope
 	return vendors.NewOpenAI(o)
 }
 
-// Captions is how the transcripts reach the page: over RTM, or the RTC data stream.
 type Captions string
 
 const (
@@ -87,19 +78,15 @@ const (
 	CaptionsDataStream Captions = "datastream"
 )
 
-// Agent is how the agent listens and who it is.
 type Agent struct {
-	// Language is what the recogniser listens for (docs: ASR), as BCP 47: zh-CN.
-	Language string
-	// Persona is the agent's instructions.
-	Persona string
-	// InterruptMs is how long the person speaks over the agent before it stops; SilenceMs how long a pause ends a turn.
+	// BCP 47: zh-CN.
+	Language               string
+	Persona                string
 	InterruptMs, SilenceMs int64
-	// Captions empty is RTM.
+	// Empty is RTM.
 	Captions Captions
 }
 
-// NewAgent is the agent a describes, on client, with v's stages.
 func NewAgent(client *agentkit.AgoraClient, a Agent, v Vendors) *agentkit.Agent {
 	captions := a.Captions
 	if captions == "" {
@@ -113,7 +100,7 @@ func NewAgent(client *agentkit.AgoraClient, a Agent, v Vendors) *agentkit.Agent 
 			"end_of_speech":    map[string]any{"mode": "vad", "vad_config": map[string]any{"silence_duration_ms": a.SilenceMs}},
 		},
 	})
-	// RTM carries transcripts, agent state, metrics and errors to the page; both flags are required. A client without
+	// RTM carries transcripts, agent state, metrics and errors to the client; both flags are required. A client without
 	// RTM asks for the RTC data stream instead, which carries the transcripts (chunked) but not the agent's state; RTM
 	// is then off, or the agent keeps sending to RTM and nothing reaches the data stream.
 	features := decode[agentkit.AdvancedFeatures](map[string]any{"enable_rtm": captions == CaptionsRTM, "enable_tools": true})
@@ -130,7 +117,7 @@ func NewAgent(client *agentkit.AgoraClient, a Agent, v Vendors) *agentkit.Agent 
 	return agent.WithStt(v.STT).WithLlm(v.LLM).WithTts(v.TTS)
 }
 
-// decode is v as agentkit's T: its shapes are the REST API's, so they are written here as the API's JSON.
+// agentkit's shapes are the REST API's, so they are written here as the API's JSON.
 func decode[T any](v any) *T {
 	body, err := json.Marshal(v)
 	if err != nil {
@@ -143,9 +130,8 @@ func decode[T any](v any) *T {
 	return &t
 }
 
-// AlreadyStopping is whether stopping failed only because the agent already left or is leaving: success, as the
-// quickstart treats it. agentkit answers 404 as success itself; the "already shutting down" text arrives in the
-// error's body.
+// Already left or leaving counts as success, as the quickstart treats it. agentkit answers 404 as success itself; the "already shutting down" text
+// arrives in the error's body.
 func AlreadyStopping(err error) bool {
 	var api *sdkcore.APIError
 	if errors.As(err, &api) && api.StatusCode == http.StatusNotFound {

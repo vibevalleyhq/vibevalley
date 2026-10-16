@@ -11,11 +11,8 @@ import (
 	"go.uber.org/fx"
 )
 
-// Layer is a package's services, each on the farm's lifecycle (Run with the Readies it is handed): every package of
-// services has one, its Module.
 type Layer func(r *Readies) fx.Option
 
-// Module is base's services: Site, Store, Settings. NewApp always has them, with the config and the database.
 func Module(r *Readies) fx.Option {
 	return fx.Module("base", fx.Provide(
 		func(cfg Config) *Site { return NewSite(cfg.Home) },
@@ -24,10 +21,8 @@ func Module(r *Readies) fx.Option {
 	))
 }
 
-// App is services on one lifecycle, assembled by fx (go.uber.org/fx): the config, the database, base's services and
-// the layers' services, each built after the services it is built from. Start starts them in that order and then
-// readies them in the same order; Close stops them in the reverse order. The farm is an App with every layer; a test
-// builds one with the layers below what it tests.
+// Each service is built after the services it is built from; Start starts them in that order and then readies them in the same order; Close stops
+// them in reverse.
 type App struct {
 	Config
 
@@ -38,8 +33,6 @@ type App struct {
 	cancel  context.CancelFunc
 }
 
-// NewApp builds the services; options go after the layers (an fx.Invoke taking the services, a test's fx.Decorate or
-// fx.Replace).
 func NewApp(cfg Config, layers []Layer, options ...fx.Option) (*App, error) {
 	if cfg.Home == "" || cfg.WorkRoot == "" {
 		return nil, errors.New("farm: Home and WorkRoot are required")
@@ -82,13 +75,11 @@ func NewApp(cfg Config, layers []Layer, options ...fx.Option) (*App, error) {
 	return a, nil
 }
 
-// Start starts every service's background work (watching helpers, timers, connectors) on a context Close cancels.
 func (a *App) Start(ctx context.Context) error {
 	ctx, a.cancel = context.WithCancel(ctx)
 	return a.app.Start(ctx)
 }
 
-// Close stops the services in the reverse order, saves the state and closes the database.
 func (a *App) Close() {
 	if a.cancel != nil {
 		a.cancel()
@@ -98,7 +89,6 @@ func (a *App) Close() {
 	a.db.Close()
 }
 
-// Readied is the services readied at Start, in the order they were.
 func (a *App) Readied() []Readier {
 	a.readies.mu.Lock()
 	defer a.readies.mu.Unlock()

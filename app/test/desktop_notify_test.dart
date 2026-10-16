@@ -1,6 +1,3 @@
-// The desktop app's words (lib/desktop/notify.dart): notifications for new calls, achievements and errors, the menu
-// bar's summary, and the commands' JSON (lib/desktop/command.dart).
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desktop/desktop.dart';
 import 'package:vibevalley/desktop/notify.dart';

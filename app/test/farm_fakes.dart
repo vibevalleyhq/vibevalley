@@ -1,6 +1,3 @@
-// Fake farms for the farm screen's tests: helpers in each phase, a frame of state and view, the server's commands
-// recorded through a MockClient, and the provider overrides that put them under a widget.
-
 import 'dart:async';
 import 'dart:convert';
 
@@ -97,13 +94,11 @@ FarmView view({Map<String, PlotView> plots = const {}, int level = 3, int xp = 4
   plots: plots,
 );
 
-/// What the fake server was asked: method, path, body.
 class Calls {
   final list = <({String method, String path, Object? body})>[];
   Iterable<String> get paths => list.map((c) => '${c.method} ${c.path}');
 }
 
-/// The server's answers by "METHOD /path" (JSON-encoded); 204 for anything else.
 VibeValleyApi fakeApi(Calls calls, [Map<String, Object?> answers = const {}]) => VibeValleyApi(
   Uri.parse('http://127.0.0.1:8787'),
   MockClient((r) async {
@@ -132,7 +127,6 @@ List<Override> overrides(FarmState state, FarmView v, VibeValleyApi api, {Map<St
   ];
 }
 
-/// `child` under the fakes, at a desktop size, in the farm's theme.
 Future<ProviderContainer> pumpFarm(WidgetTester tester, Widget child, {required List<Override> overrides}) async {
   tester.view.physicalSize = const Size(1440, 900);
   tester.view.devicePixelRatio = 1;
@@ -148,18 +142,15 @@ Future<ProviderContainer> pumpFarm(WidgetTester tester, Widget child, {required 
       ),
     ),
   );
-  // The frame, the agents.
   await tester.pump();
   await tester.pump();
   return container;
 }
 
-/// Lets the MockClient's answers come back and the widgets catch up.
 Future<void> settle(WidgetTester tester) async {
   for (var i = 0; i < 5; i++) {
     await tester.pump(const Duration(milliseconds: 20));
   }
 }
 
-/// Unawaited futures in a test: the fake server answers at once.
 void ignore(Future<Object?> f) => unawaited(f);

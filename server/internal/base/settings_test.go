@@ -1,10 +1,5 @@
 package base
 
-// The farm's keys (settings.go; ported from the TypeScript server's settings.test.ts, removed): saved to $VIBEVALLEY_HOME/settings.json for you
-// alone, over the environment's; pages see where each comes from and its last characters, never the key; a bad one
-// is refused; an empty one clears. The voice agent's settings sit beside them: only what differs from the defaults is
-// kept.
-
 import (
 	"encoding/json"
 	"os"
@@ -18,7 +13,6 @@ import (
 	"vibevalley/pkg/agora"
 )
 
-// The keys a test saves: the shape of Agora's, nobody's.
 const (
 	voiceTestAppID = "11111111111111111111111111111111"
 	voiceTestCert  = "22222222222222222222222222222222"
@@ -76,7 +70,6 @@ func TestSettingsKeysAreYoursAlone(t *testing.T) {
 	}
 	voiceSame(t, voiceReadSettings(file), voiceStored{DeepseekAPIKey: "sk-saved-in-settings-1234", AgoraAppID: voiceTestAppID, AgoraAppCertificate: voiceTestCert}, "the file")
 
-	// Missing leaves a key; empty clears it, and the environment's shows again.
 	cleared, err := s.Save(protocol.SettingsUpdate{DeepseekAPIKey: farmtest.Ptr("")})
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +81,6 @@ func TestSettingsKeysAreYoursAlone(t *testing.T) {
 	if body, _ := os.ReadFile(file); strings.Contains(string(body), "deepseekApiKey") {
 		t.Fatal("a cleared key leaves the file")
 	}
-	// A new server reads what was saved.
 	again := NewSettingsFrom(home, "", voiceEnv(nil))
 	if got := again.Agora(); got == nil || got.AppID != voiceTestAppID {
 		t.Fatalf("read back: %+v", got)
@@ -147,7 +139,6 @@ func TestSettingsVoiceKeepsOnlyWhatDiffers(t *testing.T) {
 	file := filepath.Join(home, "settings.json")
 	voiceSame(t, voiceReadSettings(file).Voice, map[string]any{"area": "CN", "silenceMs": 600, "greeting": "在呢。"}, "only what differs")
 
-	// Saving keys leaves the voice alone; {} goes back to the defaults and drops it from the file.
 	if _, err := s.Save(protocol.SettingsUpdate{AgoraAppID: farmtest.Ptr(voiceTestAppID)}); err != nil {
 		t.Fatal(err)
 	}

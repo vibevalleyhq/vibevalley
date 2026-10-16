@@ -1,6 +1,3 @@
-// The manager's page (memory, trajectory, archive, voice) and a helper agent's memory and trajectories, against a fake
-// server: what they show, and that writing, forgetting, searching and saving call the right endpoint.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -158,7 +155,6 @@ void main() {
       final server = _server();
       await pumpPage(t, server, const SingleChildScrollView(child: MemoryPanel(agent: 'backend')));
       expect(find.text('登录改到一半'), findsOneWidget);
-      // The pick for project clock: this project's note, then every project's.
       expect(find.text('- （这个项目）clock 的测试用 pnpm test\n- （所有项目）提交前跑 lint\n- 做过（这个项目）：登录改到一半'), findsOneWidget);
       await t.tap(find.text('所有项目').first);
       await t.pump();

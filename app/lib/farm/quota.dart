@@ -1,7 +1,3 @@
-// How much each runtime has left (web/src/farm/Quota.tsx): an energy potion in the HUD's top row (the tightest one),
-// and a card with every machine's potion and a stamina bar per plan window, or its pay-as-you-go balance. The card's
-// button asks the accounts again now.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,7 +12,6 @@ import '../rules/index.dart';
 import '../rules/quota.dart';
 import '../rules/seeds.dart';
 
-/// Number colour by how much is left.
 Color _textOf(double? left) => switch (levelOf(left)) {
   QuotaLevel.plenty => Palette.leaf700,
   QuotaLevel.low || QuotaLevel.gold => const Color(0xFFB8862A),
@@ -24,7 +19,6 @@ Color _textOf(double? left) => switch (levelOf(left)) {
   QuotaLevel.unknown => Palette.bark500,
 };
 
-/// The pill in the HUD's top row, `height` tall; nothing without a usable runtime.
 class QuotaPill extends ConsumerWidget {
   const QuotaPill({super.key, required this.height});
   final double height;
@@ -105,7 +99,6 @@ class QuotaPill extends ConsumerWidget {
   }
 }
 
-/// One machine: its icon, its plan's windows or balance, what it spent today, why nobody new goes to it.
 class Machine extends ConsumerWidget {
   const Machine({super.key, required this.info});
   final RuntimeInfo info;
@@ -256,7 +249,6 @@ class UsageLines extends StatelessWidget {
   }
 }
 
-/// The HUD's own card (.hud-card): parchment in a dark outline with a hard drop, a part of the game screen.
 class HudCard extends StatelessWidget {
   const HudCard({super.key, required this.child, this.height, this.bright = false, this.dim = false, this.padding = const EdgeInsets.symmetric(horizontal: 8)});
   final Widget child;

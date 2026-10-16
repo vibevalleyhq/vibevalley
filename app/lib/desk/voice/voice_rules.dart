@@ -1,20 +1,18 @@
-// The voice line's choices and rules, ported from packages/protocol (voice.ts, settings.ts): what each stage offers
-// (VOICE_LANGUAGES, VOICE_MODELS, …), the labels, the limits on the numbers, why settings cannot be saved
-// (voiceProblem, settingsProblem), the overrides that make settings out of the defaults (voiceOverrides) and how a key
-// is shown (keyHint). Change them there and here together.
+// The voice line's choices and rules, a port of server/internal/protocol/voice.go and settings.go: what each stage
+// offers, the limits on the numbers, why settings cannot be saved, the overrides over the defaults and how a key is
+// shown. Change them there and here together.
 
 import 'dart:convert';
 
 import '../../gen/vibevalley.dart';
 
-/// Agora-hosted Deepgram models, MiniMax models, OpenAI voices and LLMs: the generated enums, in protocol's order.
 const deepgramModels = Model.values;
 const voiceTtsModels = VoiceTtsMinimaxModel.values;
 const openaiVoices = Voice.values;
 const voiceModels = VoiceLlmAgoraModel.values;
 const voiceLanguages = Language.values;
 
-/// MiniMax system voices offered on the voice page (any other id can be typed).
+/// Any other id can be typed.
 const minimaxVoices = <({String id, String label})>[
   (id: 'Chinese (Mandarin)_Gentle_Youth', label: '温润青年'),
   (id: 'male-qn-qingse', label: '青涩青年'),
@@ -31,28 +29,23 @@ const minimaxVoices = <({String id, String label})>[
   (id: 'audiobook_female_1', label: '女性有声书'),
 ];
 
-/// Azure neural voices offered for Microsoft speech (any other name can be typed).
+/// Any other name can be typed.
 const microsoftVoices = ['zh-CN-XiaoxiaoNeural', 'zh-CN-YunxiNeural', 'zh-CN-XiaoyiNeural', 'zh-CN-YunjianNeural', 'en-US-JennyNeural', 'en-US-GuyNeural'];
 
-/// The default greeting, which every voice sample says (protocol DEFAULT_VOICE.greeting).
 const defaultGreeting = '来啦！今天想种点什么？';
 
-/// Which vendor in each stage needs a key of its own.
 bool needsAsrKey(VoiceAsr asr) => asr is VoiceAsrMicrosoft;
 bool needsLlmKey(VoiceLlm llm) => llm is VoiceLlmOpenai;
 bool needsTtsKey(VoiceTts tts) => tts is VoiceTtsMicrosoft;
 
-/// The numbers' fields.
 enum VoiceNumber { silenceMs, interruptMs, idleSeconds }
 
-/// The ranges the voice page allows for the numbers, in their units (protocol VOICE_LIMITS).
 const voiceLimits = <VoiceNumber, ({int min, int max})>{
   VoiceNumber.silenceMs: (min: 200, max: 2000),
   VoiceNumber.interruptMs: (min: 80, max: 1000),
   VoiceNumber.idleSeconds: (min: 10, max: 600),
 };
 
-/// protocol VOICE_FIELD_LABEL.
 abstract final class VoiceLabel {
   static const area = '区域';
   static const language = '语言';
@@ -75,7 +68,6 @@ double numberOf(VoiceSettings v, VoiceNumber k) => switch (k) {
   VoiceNumber.idleSeconds => v.idleSeconds,
 };
 
-/// A copy of `v` with some fields changed (the page's `{ ...draft, ...patch }`).
 VoiceSettings voiceWith(
   VoiceSettings v, {
   Area? area,
@@ -109,10 +101,8 @@ VoiceSettings withNumber(VoiceSettings v, VoiceNumber k, double n) => switch (k)
   VoiceNumber.idleSeconds => voiceWith(v, idleSeconds: n),
 };
 
-/// Whether two settings say the same (the page compares their JSON).
 bool sameVoice(VoiceSettings a, VoiceSettings b) => jsonEncode(a.toJson()) == jsonEncode(b.toJson());
 
-/// The overrides that give `settings` over `defaults`: only what differs (protocol voiceOverrides).
 SettingsUpdateVoice voiceOverrides(VoiceSettings defaults, VoiceSettings settings) {
   final d = defaults.toJson();
   final s = settings.toJson();
@@ -122,10 +112,8 @@ SettingsUpdateVoice voiceOverrides(VoiceSettings defaults, VoiceSettings setting
   });
 }
 
-/// All of `v`, as overrides.
 SettingsUpdateVoice asOverrides(VoiceSettings v) => SettingsUpdateVoice.fromJson(v.toJson());
 
-/// Why these overrides cannot be saved; null when they can (protocol voiceProblem).
 String? voiceProblem(SettingsUpdateVoice v) {
   final asr = v.asr;
   if (asr is VoiceAsrMicrosoft && asr.region.trim().isEmpty) return '微软识别要填区域，比如 eastasia';
@@ -150,12 +138,10 @@ String? voiceProblem(SettingsUpdateVoice v) {
   return null;
 }
 
-/// The last characters of a key, enough to tell which one it is: 「…f3a9」 (protocol keyHint).
 String keyHint(String key) => '…${key.length > 4 ? key.substring(key.length - 4) : key}';
 
 final _agora = RegExp(r'^[0-9a-f]{32}$', caseSensitive: false);
 
-/// Why an update cannot be saved; null when it can. Empty strings clear and are always fine (protocol settingsProblem).
 String? settingsProblem(SettingsUpdate u) {
   final deepseek = u.deepseekApiKey?.trim() ?? '';
   if (deepseek.isNotEmpty && (RegExp(r'\s').hasMatch(deepseek) || deepseek.length < 8)) return 'DeepSeek 的 API Key 看着不对：一串不带空格的字，通常以 sk- 开头';
@@ -169,8 +155,6 @@ String? settingsProblem(SettingsUpdate u) {
   return u.voice == null ? null : voiceProblem(u.voice!);
 }
 
-/// Where a key in use comes from.
 const keyFrom = <KeySource, String>{KeySource.settings: '存在设置里', KeySource.env: '来自环境变量', KeySource.pi: '用的是 pi 里配的'};
 
-/// What a key field says about the key in use (TitleScreen.tsx keyLine).
 String keyLine(KeyStatus k) => k.source != null ? '在用 ${k.hint ?? ''}（${keyFrom[k.source]}）' : '还没有';

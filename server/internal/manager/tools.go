@@ -18,12 +18,9 @@ import (
 	"vibevalley/pkg/ai"
 )
 
-// The manager's tools (ported from the TypeScript server's foreman-tools.ts, removed): hire, harvest, talk to and stop helpers, read the chat,
-// channels, schedules, playbooks. Every tool answers in a sentence, a refusal included: the manager passes it on.
-// And the manager's trajectory from its agent's events (manager-trace.ts): a tool call's step names it by its label
-// and what it was about.
+// Every tool answers in a sentence, a refusal included: the manager passes it on.
 
-// foremanTail is JS's s.slice(-n): the last n UTF-16 units, without splitting a character.
+// JS's s.slice(-n), without splitting a character.
 func foremanTail(s string, n int) string {
 	units := 0
 	runes := []rune(s)
@@ -38,7 +35,6 @@ func foremanTail(s string, n int) string {
 
 func foremanUnits(s string) int { return len(utf16.Encode([]rune(s))) }
 
-// foremanDescribeChanges is what a harvest would bring in, for the manager to read and pass on.
 func foremanDescribeChanges(c protocol.Changes) string {
 	paths := func(items []protocol.UncommittedItem) string {
 		out := make([]string, len(items))
@@ -83,7 +79,6 @@ func foremanDescribeChanges(c protocol.Changes) string {
 	return strings.Join(lines, "\n")
 }
 
-// foremanDescribeWorker is a helper as the manager reads it: who, where, its phase in words, its last turn, its cost.
 func foremanDescribeWorker(w base.Roster) string {
 	h := w.Helper
 	last := ""
@@ -118,7 +113,6 @@ func foremanDescribeWorker(w base.Roster) string {
 		base.Head(h.Task, 60), protocol.PhaseText(h, base.NowMs()), last, spent)
 }
 
-// foremanToolLabels is a label for each tool, as its trajectory step shows it.
 var foremanToolLabels = map[string]string{
 	"dispatch":         "派活",
 	"projects":         "项目",
@@ -141,16 +135,13 @@ var foremanToolLabels = map[string]string{
 	"plan_edit":        "改计划",
 	"plan_action":      "计划",
 	"node_action":      "计划的一步",
-	// vibevalley's own agent's tools about itself.
-	"remember":       "记一条",
-	"rewrite_memory": "整理记性",
-	"search_archive": "翻旧账",
+	"remember":         "记一条",
+	"rewrite_memory":   "整理记性",
+	"search_archive":   "翻旧账",
 }
 
-// foremanNamed are arguments worth naming in a tool call's step, the first one present.
 var foremanNamed = []string{"agent", "worker", "project", "name", "query", "note", "goal"}
 
-// foremanToolStart is a tool call as a step: its label, and what it was about when the arguments say.
 func foremanToolStart(name string, args json.RawMessage) base.ToolStart {
 	var fields map[string]any
 	_ = json.Unmarshal(args, &fields)
@@ -184,7 +175,6 @@ func foremanToolStart(name string, args json.RawMessage) base.ToolStart {
 	return base.ToolStart{Text: text, Action: protocol.ToolActionOther, Tool: name, Input: input}
 }
 
-// foremanThinkingOf is the reasoning in a finished assistant message (its thinking parts, unless redacted).
 func foremanThinkingOf(content []ai.Content) string {
 	var parts []string
 	for _, c := range content {
@@ -195,7 +185,6 @@ func foremanThinkingOf(content []ai.Content) string {
 	return strings.Join(parts, "\n\n")
 }
 
-// foremanScheduleLine is a schedule as the manager reads it.
 func foremanScheduleLine(s protocol.FarmSchedule, channel string) string {
 	direct := ""
 	if s.Agent != nil {
@@ -210,8 +199,6 @@ func foremanScheduleLine(s protocol.FarmSchedule, channel string) string {
 	}
 	return fmt.Sprintf("- %d 号「%s」#%s %s%s；%s\n  %s", s.ID, s.Name, channel, protocol.WhenText(s.When, s.TZ), direct, next, s.Text)
 }
-
-// ── Schemas ───────────────────────────────────────────────────────────────────
 
 func foremanStr(description string) map[string]any {
 	s := agentcore.StringSchema()
@@ -239,7 +226,6 @@ type foremanWorkerArgs struct {
 
 type foremanNone struct{}
 
-// foremanAnswered is a tool's refusal as its answer: what happened, or why not.
 func foremanAnswered(text string, err error) (string, error) {
 	if err != nil {
 		return "没成：" + err.Error(), nil
@@ -247,11 +233,8 @@ func foremanAnswered(text string, err error) (string, error) {
 	return text, nil
 }
 
-// ── The tools ─────────────────────────────────────────────────────────────────
-
-// tools is the manager's tools on this farm.
 func (fm *Foreman) tools() []agentcore.AgentTool {
-	// findWorker is a helper by id or by name (the manager may say either).
+	// The manager may say either.
 	findWorker := func(key string) *base.Roster {
 		all := fm.crew.Roster()
 		for _, pick := range []func(w base.Roster) bool{
@@ -753,7 +736,7 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 	}
 }
 
-// foremanParseTime reads an ISO time the way JS's Date does for the forms a model writes; milliseconds.
+// The way JS's Date reads the forms a model writes.
 func foremanParseTime(s string) (int64, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {

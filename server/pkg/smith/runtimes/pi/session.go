@@ -19,7 +19,8 @@ import (
 // pi's own agent_settled is the turn end; a prompt is accepted when pi
 // answers its `prompt` command; steer is pi's `steer`; abort is pi's `abort`;
 // the queue is adapter-held and drained one input per turn end. Where TS
-// runs pi in process, the Go port runs `pi --mode rpc` and records its exit.
+// runs pi in process, the Go port runs pi's SDK in a Node host (host.go)
+// that speaks the same frames, and records the host's exit.
 
 const (
 	openTimeout    = 30 * time.Second

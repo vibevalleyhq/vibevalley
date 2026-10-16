@@ -1,6 +1,3 @@
-// 工单: an issue's state (the server's status while open, how it closed after), what dragging between lanes does, and
-// the board: a card per issue in its lane, a 待办 dragged into 处理中 sent off, a closed one reopened from its card.
-
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -66,7 +63,6 @@ Issue _issue(
 final _closedIssue = _issue('t1', '写打卡', runs: ['w1'], status: IssueStatus.closed, closed: IssueClose.harvested);
 final _openIssue = _issue('t2', '改登录页', runs: ['w2'], status: IssueStatus.waiting);
 
-/// The issues the farm's state has, changed as the fake server takes requests.
 class _Issues extends Notifier<List<Issue>> {
   List<Issue> seed = const [];
   @override
@@ -82,7 +78,6 @@ void main() {
     expect(ticketState(_issue('t3', 'x', runs: ['w3'], status: IssueStatus.working)), TicketState.working);
     expect(ticketState(_closedIssue), TicketState.harvested);
     expect(ticketState(_issue('t0', 'x', runs: ['w0'], status: IssueStatus.closed)), TicketState.closed);
-    // A playbook's step, merged into its branch: titled with its playbook's title while the playbook is there.
     final step = _issue('p1.api', '写接口', runs: ['w4'], status: IssueStatus.closed, closed: IssueClose.merged, parent: 'p1');
     expect(ticketState(step), TicketState.merged);
     expect(ticketPlanned(step, null), isTrue);
@@ -90,7 +85,6 @@ void main() {
     expect(ticketTitle(step, [greet]), '加 greet · 写接口');
     expect(ticketTitle(step), '写接口');
     expect(ticketTitle(_closedIssue), '写打卡');
-    // Asked for by its own id or a run's.
     expect(ticketIs(_issue('t5', 'x', runs: ['w1', 'w6']), 'w1'), isTrue);
     expect(ticketIs(_issue('t5', 'x', runs: ['w1', 'w6']), 't5'), isTrue);
     expect(ticketIs(_issue('t5', 'x', runs: ['w1', 'w6']), 'w2'), isFalse);
@@ -111,7 +105,6 @@ void main() {
       expect(moveOf(from, to), isNull, reason: '$from → $to');
     }
     expect(laneOf(TicketState.dropped), Lane.closed);
-    // A playbook's step goes with its playbook.
     expect(moveOf(Lane.waiting, Lane.closed, planned: true), isNull);
     expect(moveOf(Lane.closed, Lane.working, planned: true), isNull);
     expect(ticketPlanned(_issue('t5', 'x', runs: ['w5'], status: IssueStatus.closed, closed: IssueClose.merged), null), isTrue);
@@ -126,7 +119,6 @@ void main() {
     final writes = <String>[];
     const conflicted = TrajectoryHead(id: 'w4', name: '省钱小工 2', agent: 'flash', project: 'demo', job: '改成 hey', startedAt: 0);
     const planner = TrajectoryHead(id: 'w5', name: '省钱小工', agent: 'flash', project: 'demo', job: '这一轮你是规划师：……', startedAt: 0, endedAt: 1);
-    // A playbook is its parent issue, the planner a run of it; a step no helper has worked yet is not a card.
     final issues = [
       _issue('t4', '改成 hey', runs: ['w4'], status: IssueStatus.waiting),
       _issue(
@@ -186,7 +178,6 @@ void main() {
     t.view.physicalSize = const Size(1600, 1000);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
-    // The agent and project last chosen: what a 待办 written in one line gets.
     SharedPreferences.setMockInitialValues({
       'vibevalley.board.pick': ['backend', 'clock'],
     });
@@ -198,7 +189,6 @@ void main() {
       _closedIssue,
     ];
     late ProviderContainer container;
-    // The server changes its issues and the farm's state follows.
     void changed() => container.read(_issuesNow.notifier).set(issues);
     final api = VibeValleyApi(
       Uri.parse('http://farm.test'),
@@ -239,7 +229,6 @@ void main() {
             changed();
             return _json([for (final i in issues) i.toJson()]);
           case ('POST', '/api/issues/a1/start'):
-            // Every bed busy: it waits in the queue.
             issues = [
               for (final i in issues) i.id == 'a1' ? Issue.fromJson({...i.toJson(), 'queuedAt': 3, 'status': 'queued'}) : i,
             ];
@@ -273,11 +262,9 @@ void main() {
     expect(find.text('加日志'), findsOneWidget);
     expect(find.text('紧急'), findsOneWidget);
     expect(find.text('0 / 6 块地'), findsOneWidget);
-    // The waiting ticket: its rounds and how long it has been open.
     expect(find.textContaining('0 轮 · 开了'), findsOneWidget);
     expect(find.text('2 轮 · 用了 1 分 · ¥0.42'), findsOneWidget);
 
-    // The search leaves what matches.
     await t.enterText(find.descendant(of: find.bySemanticsLabel('找工单'), matching: find.byType(EditableText)), '文案');
     await t.pump();
     expect(find.text('加日志'), findsNothing);
@@ -287,14 +274,12 @@ void main() {
     await t.pump();
     expect(find.text('加日志'), findsOneWidget);
 
-    // Written in the lane's own line, Enter.
     await t.enterText(find.descendant(of: find.bySemanticsLabel('写一张待办'), matching: find.byType(EditableText)), '补测试');
     await t.testTextInput.receiveAction(TextInputAction.done);
     await settle(t);
     expect(writes.last, 'POST /api/issues {"title":"补测试","project":"clock","agent":"backend"}');
     expect(find.text('补测试'), findsOneWidget);
 
-    // A 待办 dropped on another goes before it.
     Future<void> drag(Offset from, Offset to) async {
       final gesture = await t.startGesture(from);
       await gesture.moveBy(const Offset(10, 10));
@@ -307,30 +292,25 @@ void main() {
 
     await drag(t.getCenter(find.text('改文案')), t.getCenter(find.text('加日志')));
     expect(writes.last, 'PUT /api/issues/a2/place {"before":"a1"}');
-    // The closed ticket is open beside the board.
     expect(find.text('2 轮 · 1 分 · 花了 ¥0.42'), findsOneWidget);
     expect(find.text('打卡写好了，测试全过'), findsOneWidget);
 
-    // A 待办 without its agent does not go: its form opens to say who.
     final before = writes.length;
     await drag(t.getCenter(find.text('改文案')), t.getCenter(find.text('处理中')) + const Offset(0, 120));
     expect(writes.length, before);
     expect(toasts.toasts.first.title, '还差一点');
 
-    // 待办 → 处理中 with every bed busy: queued, said so, marked on its card.
     await drag(t.getCenter(find.text('加日志')), t.getCenter(find.text('处理中')) + const Offset(0, 120));
     expect(writes.last, 'POST /api/issues/a1/start ');
     expect(toasts.toasts.first.title, '排上队了');
     expect(find.text('排队中'), findsOneWidget);
 
-    // A closed one reopened from its card beside the board.
     await t.enterText(find.byType(EditableText).last, '打卡还要记时区');
     await t.pump();
     await t.tap(find.text('重开').last);
     await settle(t);
     expect(writes.last, 'POST /api/issues/t1/reopen {"text":"打卡还要记时区"}');
     await t.pumpWidget(const SizedBox.shrink());
-    // The toast's timeout.
     await t.pump(const Duration(seconds: 6));
   });
 }

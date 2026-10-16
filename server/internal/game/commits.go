@@ -13,23 +13,17 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// The farm's experience (ported from the TypeScript server's commits.ts, removed): your commits in the git repositories under the helpers' work
-// directory (VIBEVALLEY_WORK_ROOT), counted by git itself over every branch. A repository with several worktrees (each
-// helper gets one) counts once. "Yours" is by author email: git's global user.email, each repository's own
-// user.email, and any in VIBEVALLEY_GIT_EMAILS (comma-separated); helpers commit as you, so their commits count. Counted
-// at start, every couple of minutes, and soon after a helper's turn, which may have committed.
+// A repository with several worktrees counts once. "Yours" is by author email (git's global and each repository's user.email, and
+// VIBEVALLEY_GIT_EMAILS); helpers commit as you, so their commits count.
 
 const (
-	// crewRepoDepth is how deep under the work root repositories are looked for.
 	crewRepoDepth      = 3
 	crewCountEvery     = 2 * time.Minute
 	crewCountAfterTurn = 15 * time.Second
 )
 
-// crewSkipDirs are directories never worth walking into.
 var crewSkipDirs = map[string]bool{"node_modules": true, ".git": true, ".venv": true, "vendor": true, "dist": true, "build": true, "target": true, ".next": true}
 
-// crewRepoDirs is the directories under root that hold a .git (a repository, or a worktree's pointer file).
 func crewRepoDirs(root string, depth int) []string {
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -61,8 +55,7 @@ type Commits struct {
 	pending *time.Timer
 	closed  bool
 	stop    func()
-	// asked counts the recounts asked for with Soon (tests read it).
-	asked int
+	asked   int
 }
 
 func newCommits(cfg base.Config, site *base.Site) (*Commits, error) {
@@ -75,7 +68,6 @@ func newCommits(cfg base.Config, site *base.Site) (*Commits, error) {
 	return c, nil
 }
 
-// start follows the farm's facts: a turn that ended may have committed, so the commits are counted again shortly.
 func (c *Commits) OnStart(ctx context.Context) error {
 	_, events, stop := c.site.Events()
 	c.mu.Lock()
@@ -99,7 +91,6 @@ func (c *Commits) OnStart(ctx context.Context) error {
 	return nil
 }
 
-// ready counts once now, then every couple of minutes.
 func (c *Commits) OnReady(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(crewCountEvery)
@@ -173,14 +164,13 @@ func (c *Commits) Count(ctx context.Context) protocol.CommitCount {
 	return out
 }
 
-// Asked is how many recounts were asked for with Soon.
 func (c *Commits) Asked() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.asked
 }
 
-// Soon recounts the commits a little later (a helper committed, most likely); several turns share one count.
+// Several turns share one count.
 func (c *Commits) Soon() {
 	c.mu.Lock()
 	defer c.mu.Unlock()

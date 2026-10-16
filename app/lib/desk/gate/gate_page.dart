@@ -1,9 +1,3 @@
-// 院门 (the yard gate, server/internal/channels/lan.go): other devices on the local network using a farm. On the machine
-// whose farm the app uses: open or shut its gate, add a device (a QR code to scan, or its link to paste on a Mac;
-// then allow or refuse the device that asks) and remove devices. On any device: get into another machine's farm by
-// scanning its code (phones) or pasting its link, and go back. The page asks the server every 1.5 s while it is
-// open: a device asking waits for the owner here.
-
 import 'dart:async';
 import 'dart:io';
 
@@ -22,10 +16,8 @@ import '../shared/state.dart';
 import '../shared/widgets.dart';
 import 'scan_page.dart';
 
-/// How often the page asks while it is open.
 const _pollEvery = Duration(milliseconds: 1500);
 
-/// Whether this device can scan a code with its camera (phones); a Mac pastes the link.
 bool get canScan => Platform.isIOS || Platform.isAndroid;
 
 class GatePage extends ConsumerStatefulWidget {
@@ -172,7 +164,6 @@ class _GateCard extends StatelessWidget {
   }
 }
 
-/// A pairing under way: the code to scan or the link to paste; then the device that asks, to allow or refuse.
 class _Pairing extends StatelessWidget {
   const _Pairing({required this.pairing, required this.act});
   final LanPairing pairing;
@@ -297,7 +288,6 @@ class _DevicesCard extends StatelessWidget {
   );
 }
 
-/// Getting into another machine's farm, and back.
 class _OtherFarmCard extends StatefulWidget {
   const _OtherFarmCard();
 

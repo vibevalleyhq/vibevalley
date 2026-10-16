@@ -12,9 +12,6 @@ import (
 	"time"
 )
 
-// The client against a local server that answers as Feishu's registration and message APIs do: what is sent, and how answers and errors are
-// read. Nothing leaves the machine.
-
 func jsonBody(t *testing.T, r *http.Request) map[string]any {
 	t.Helper()
 	var body map[string]any

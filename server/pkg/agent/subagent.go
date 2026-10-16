@@ -1,7 +1,6 @@
 package agent
 
-// Sending a helper off with a task: a fresh agent with the same tools and model, its own short conversation, kept
-// nowhere; it does the one thing and reports. Several in one step run side by side. A helper cannot send helpers.
+// A helper cannot send helpers.
 
 import (
 	"context"
@@ -11,7 +10,6 @@ import (
 	"vibevalley/pkg/agentcore"
 )
 
-// SubagentTool is spawn_agent: spawn does the task (label names it) and returns the helper's report.
 func SubagentTool(spawn func(ctx context.Context, task, label string) (string, error)) agentcore.AgentTool {
 	type params struct {
 		Task  string  `json:"task"`
@@ -34,7 +32,6 @@ func SubagentTool(spawn func(ctx context.Context, task, label string) (string, e
 	})
 }
 
-// SUBAGENT_INSTRUCTIONS is who a helper sent off by parent is.
 func SUBAGENT_INSTRUCTIONS(parent string) string {
 	return "你是「" + parent + "」派出去的帮手，只做下面交代的这一件事，做完就停。\n" +
 		"- 不能问问题：信息不够就按最合理的理解去做，在汇报里说明你的理解。\n" +

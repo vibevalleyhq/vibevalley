@@ -23,11 +23,6 @@ import (
 	"vibevalley/internal/runs"
 )
 
-// Playbooks (ported from the service's part of the TypeScript server's playbooks.test.ts, removed): a planner that answers with a plan, steps that
-// finish, fail, fail their check or take their time; a diamond run with b and c at once; a restart. The crew and the
-// projects are stand-ins: a turn is a script, a merge gives back a commit, a check passes once its step wrote its
-// file. What the crew and git do themselves is theirs to test.
-
 func planStep(id string, needs ...string) map[string]any {
 	if needs == nil {
 		needs = []string{}
@@ -35,7 +30,6 @@ func planStep(id string, needs ...string) map[string]any {
 	return map[string]any{"id": id, "title": "步骤 " + id, "task": "写 steps/" + id + ".txt", "needs": needs, "agent": "lab", "check": "test -f steps/" + id + ".txt"}
 }
 
-// planPlans is the plan the scripted planner gives for each goal.
 var planPlans = map[string]any{
 	"菱形":   map[string]any{"title": "菱形", "nodes": []any{planStep("a"), planStep("b", "a"), planStep("c", "a"), planStep("d", "b", "c")}},
 	"有坏步":  map[string]any{"title": "有坏步", "nodes": []any{func() map[string]any { s := planStep("boom"); delete(s, "check"); return s }(), planStep("flaky"), planStep("after", "boom")}},
@@ -47,7 +41,6 @@ var planPlans = map[string]any{
 	}},
 }
 
-// planFakeCrew runs helpers' turns as a script, through the same facts the crew applies.
 type planFakeCrew struct {
 	f *world
 
@@ -57,10 +50,9 @@ type planFakeCrew struct {
 	attempts map[string]int
 	written  map[string]bool
 	started  map[string]bool
-	// touched is the files each step's work changed, by step; told what each helper was told after its job.
-	touched map[string][]string
-	told    map[string][]string
-	release chan struct{}
+	touched  map[string][]string
+	told     map[string][]string
+	release  chan struct{}
 }
 
 func newPlanFakeCrew(f *world, release chan struct{}) *planFakeCrew {
@@ -69,7 +61,6 @@ func newPlanFakeCrew(f *world, release chan struct{}) *planFakeCrew {
 
 var planGoal = regexp.MustCompile(`要做的事：(\S+)`)
 
-// turn is one turn of a helper: what it said, and how it ended.
 func (c *planFakeCrew) turn(h protocol.Helper, input string) (protocol.Outcome, string) {
 	if h.Playbook == nil || h.Playbook.Node == nil {
 		var plan any
@@ -104,7 +95,6 @@ func (c *planFakeCrew) turn(h protocol.Helper, input string) (protocol.Outcome, 
 			}
 		}
 	case id == "repro" && n == 1:
-		// It fixes the bug along with the test: its acceptance passes already, and it is sent back.
 		c.mu.Lock()
 		c.written["fix"], c.touched[id] = true, []string{"steps/fix.txt", "steps/repro_test.txt"}
 		c.mu.Unlock()
@@ -116,13 +106,11 @@ func (c *planFakeCrew) turn(h protocol.Helper, input string) (protocol.Outcome, 
 		c.mu.Unlock()
 		return protocol.OutcomeCompleted, "结论：steps/repro_test.txt 现在会失败"
 	case id == "fix" && n == 1:
-		// It loosens the frozen test instead of fixing the code: sent back.
 		c.mu.Lock()
 		c.touched[id] = []string{"steps/repro_test.txt"}
 		c.mu.Unlock()
 		return protocol.OutcomeCompleted, "结论：把测试改松了"
 	case id == "flaky" && n == 1:
-		// It says it is done without writing anything: its check fails and it is sent back.
 		return protocol.OutcomeCompleted, "结论：做完了"
 	}
 	c.mu.Lock()
@@ -199,7 +187,6 @@ func (c *planFakeCrew) HarvestInto(id, target string) ([]string, error) {
 	return []string{"c0ffee-" + id}, nil
 }
 
-// planFakeProjects: a check passes when the files it tests for were written; branches are only named.
 type planFakeProjects struct {
 	crew     *planFakeCrew
 	mu       sync.Mutex
@@ -219,7 +206,6 @@ func (p *planFakeProjects) Run(_ context.Context, cwd, command string) (bool, st
 	return true, ""
 }
 
-// ChangedFiles is what the step of the helper working in cwd (/wt/<id>) touched.
 func (p *planFakeProjects) ChangedFiles(cwd, _ string) ([]string, error) {
 	h := p.crew.f.Site.Helper(strings.TrimPrefix(cwd, "/wt/"))
 	if h == nil || h.Playbook == nil || h.Playbook.Node == nil {
@@ -263,10 +249,8 @@ type planTestFarm struct {
 
 func (tf *planTestFarm) Close() { tf.closing.Do(tf.world.Close) }
 
-// newPlanTestFarm starts a farm at home with the stand-ins; before runs after it is built, before it starts.
 func newPlanTestFarm(t *testing.T, home string, release chan struct{}, before func(*world)) *planTestFarm {
 	t.Helper()
-	// With the game's ledger, which the plans' coins go in.
 	f, err := newWorldWith(base.Config{Home: home, WorkRoot: t.TempDir()}, []base.Layer{game.Module}, fx.Invoke(func(*game.Ledger) {}))
 	if err != nil {
 		t.Fatal(err)
@@ -286,7 +270,6 @@ func newPlanTestFarm(t *testing.T, home string, release chan struct{}, before fu
 	_, events, stop := f.Site.Events()
 	go func() {
 		for e := range events {
-			// A playbook changes as its issues do: the parent, or one of its steps.
 			if fact, ok := e.Value.(protocol.FactIssue); ok && (fact.Issue.Plan != nil || fact.Issue.Parent != nil) {
 				id := fact.Issue.ID
 				if fact.Issue.Parent != nil {
@@ -405,7 +388,6 @@ func TestPlanDiamond(t *testing.T) {
 	}
 	tf.until(t, id, func(pb protocol.Playbook) bool { return pb.State == protocol.PlaybookStateDone })
 
-	// Its history: who did what, in order, each step's way from start to merge.
 	history := tf.Playbooks.Events(id)
 	var plan []string
 	for _, e := range history {
@@ -442,7 +424,6 @@ func TestPlanDiamond(t *testing.T) {
 			t.Fatal("not in order")
 		}
 	}
-	// A plan drafted and a playbook harvested are on the ledger.
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		kinds := planLedgerKinds(t, tf.world)
 		if slices.Contains(kinds, "planned") && slices.Contains(kinds, "playbook") {
@@ -454,9 +435,6 @@ func TestPlanDiamond(t *testing.T) {
 	}
 }
 
-// An acceptance step first: the farm, not the helpers, judges it. Fixed along with its test, it caught nothing and goes
-// back; failing, it is merged and its test frozen. The fix that loosens the frozen test goes back; the one that
-// fixes the code passes the acceptance and the playbook is ripe.
 func TestPlanAcceptanceFirst(t *testing.T) {
 	tf := newPlanTestFarm(t, t.TempDir(), nil, nil)
 	id := tf.planned(t, "验收先行", "bug")
@@ -482,7 +460,6 @@ func TestPlanAcceptanceFirst(t *testing.T) {
 				return strings.Join(tf.crew.told[h.ID], "\n")
 			}
 		}
-		// Merged helpers have left: their words are under their ids, w2 the first step's (w1 planned).
 		return strings.Join(tf.crew.told[map[string]string{"repro": "w2", "fix": "w3"}[step]], "\n")
 	}
 	if got := told("repro"); !strings.Contains(got, "现在就通过了") {
@@ -520,7 +497,6 @@ func TestPlanFailingStep(t *testing.T) {
 	if planNode(stuck, "boom").Failures != 1 {
 		t.Fatalf("boom failed once: %+v", planNode(stuck, "boom"))
 	}
-	// Retried, it fails again: its tries start over, its failures do not, and the second failure is a call of its own.
 	if _, err := tf.Playbooks.NodeAct(id, "boom", protocol.NodeActionRetry, protocol.PlaybookActorUser); err != nil {
 		t.Fatal(err)
 	}
@@ -538,7 +514,6 @@ func TestPlanFailingStep(t *testing.T) {
 	if after.State != protocol.NodeStateWaiting || fmt.Sprint(protocol.BlockedBy(stuck, after)) != "[boom]" || stuck.State != protocol.PlaybookStateRunning {
 		t.Fatalf("after: %+v, playbook %s", after, stuck.State)
 	}
-	// Skipping a working step is refused; a failed one may be.
 	if _, err := tf.Playbooks.NodeAct(id, "nope", protocol.NodeActionSkip, protocol.PlaybookActorUser); err == nil || !strings.Contains(err.Error(), "没有「nope」") {
 		t.Fatal(err)
 	}
@@ -554,7 +529,6 @@ func TestPlanFailingStep(t *testing.T) {
 	if strings.Join(states, " ") != "skipped merged merged" {
 		t.Fatal(states)
 	}
-	// Given up: its branch stays.
 	said := tf.act(t, id, protocol.PlaybookActionAbandon)
 	gone := tf.until(t, id, func(pb protocol.Playbook) bool { return pb.State == protocol.PlaybookStateAbandoned })
 	if gone.Branch == nil || !strings.Contains(said, "分支 "+*gone.Branch+" 留着") {
@@ -597,8 +571,6 @@ func TestPlanRestart(t *testing.T) {
 	helper := planStr(planNode(working, "slow").Helper)
 	first.Close()
 
-	// The crew brings back only helpers it kept in crew.json, in a folder that is still there; one that was working
-	// comes back resting, its turn over.
 	crewJSON := `{"hired":9,"hands":[{"id":"` + helper + `","place":{"project":"` + working.Project + `","cwd":"` + t.TempDir() + `"}}]}`
 	if err := os.WriteFile(filepath.Join(home, "crew.json"), []byte(crewJSON), 0o644); err != nil {
 		t.Fatal(err)
@@ -614,7 +586,6 @@ func TestPlanRestart(t *testing.T) {
 	if planState(ripe, "slow") != protocol.NodeStateMerged {
 		t.Fatal(ripe)
 	}
-	// The history came through the restart.
 	if events := second.Playbooks.Events(id); events[0].Kind != protocol.PlaybookEventKindPlanning {
 		t.Fatal(events)
 	}
@@ -647,14 +618,11 @@ func TestPlanChooseAgent(t *testing.T) {
 	if !strings.Contains(task, "要做的事：做个打卡") || !strings.Contains(task, `"agent": "lab"`) || !strings.Contains(task, "  - lab：名lab，适合：（实验）") {
 		t.Error(task)
 	}
-	// The example the planner is shown is a plan the farm takes, its acceptance step first.
 	if plan := protocol.ParsePlan(task); !plan.OK || !protocol.IsAcceptance(plan.Nodes[0]) {
 		t.Errorf("the example: %+v", plan)
 	}
 }
 
-// A playbook is a parent issue, its planner a run of it; each step a sub-issue blocked by the steps it needs, its
-// helpers runs of it. The board does not change them; they close as the playbook does.
 func TestPlanIsAParentIssue(t *testing.T) {
 	tf := newPlanTestFarm(t, t.TempDir(), nil, nil)
 	id := tf.planned(t, "菱形", "diamond")
@@ -699,8 +667,6 @@ func TestPlanIsAParentIssue(t *testing.T) {
 	})
 }
 
-// Playbooks from before they were issues come over from farm.json: their issues made, the runs of the issues their
-// planner and steps worked moved onto them, farm.json as it was kept beside it.
 func TestPlanAdoptsPlaybooksOfBefore(t *testing.T) {
 	home := t.TempDir()
 	pb := protocol.Playbook{
@@ -745,7 +711,6 @@ func TestPlanAdoptsPlaybooksOfBefore(t *testing.T) {
 	}
 }
 
-// planLedgerKinds is the kinds of what is on the ledger, in order.
 func planLedgerKinds(t *testing.T, f *world) []string {
 	t.Helper()
 	rows, err := f.DB.Query("select kind from ledger order by seq")

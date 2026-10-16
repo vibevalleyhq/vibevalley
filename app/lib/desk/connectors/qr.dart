@@ -1,13 +1,11 @@
-// A QR code encoder for the connectors' login codes (the page draws them with the qrcode package: byte mode, error
-// correction M, a one-module margin). A port of Project Nayuki's QR Code generator (MIT): byte segments only, versions
-// 1 to 40, the mask with the lowest penalty. And the widget that paints it.
+// A port of Project Nayuki's QR Code generator (MIT): byte segments only, versions 1 to 40, the mask with the lowest penalty. The connectors' pages draw the
+// codes as the qrcode package does: byte mode, error correction M, a one-module margin.
 
 import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
-/// Error correction level, with its format bits.
 enum QrEcc {
   low(1),
   medium(0),
@@ -221,7 +219,6 @@ int _dataCodewords(int ver, QrEcc ecl) => _rawModules(ver) ~/ 8 - _eccPerBlock[_
 
 bool _bit(int x, int i) => ((x >> i) & 1) != 0;
 
-/// A QR code: `size` × `size` modules, true for dark.
 class QrCode {
   QrCode._(this.version, this.size, this._modules);
   final int version;
@@ -230,7 +227,6 @@ class QrCode {
 
   bool dark(int x, int y) => x >= 0 && x < size && y >= 0 && y < size && _modules[y][x];
 
-  /// `text` as UTF-8 bytes, in the smallest version that holds it at `ecl`.
   factory QrCode.encode(String text, {QrEcc ecl = QrEcc.medium}) {
     final data = utf8.encode(text);
     var version = 1;
@@ -557,7 +553,6 @@ class _Builder {
   }
 }
 
-/// A QR code drawn dark on white, `margin` modules of white around it, scaled to the space it is given.
 class QrImage extends StatelessWidget {
   const QrImage(this.code, {super.key, this.margin = 1});
   final QrCode code;

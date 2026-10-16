@@ -1,6 +1,3 @@
-// 推箱子: the farm phone's warehouse puzzles (packages/core/src/sokoban.ts). Rules are pure; the phone owns drawing
-// and input (sokoban_game.dart).
-
 import 'package:flutter/foundation.dart';
 
 class Warehouse {
@@ -21,7 +18,7 @@ const warehouses = [
 
 enum WarehouseDirection { left, right, up, down }
 
-/// Where things stand: cells are indexes into the warehouse's rows joined.
+/// Cells are indexes into the warehouse's rows joined.
 class WarehousePosition {
   const WarehousePosition({required this.player, required this.boxes, required this.moves, required this.pushes});
   final int player;
@@ -83,7 +80,7 @@ bool warehouseDone(WarehouseGame g) {
   return g.boxes.every((box) => cells[box] == '.');
 }
 
-/// One step; a box ahead is pushed if the cell past it is free. Returns `g` itself when nothing moves.
+/// `g` itself when nothing moves.
 WarehouseGame moveWarehouse(WarehouseGame g, WarehouseDirection direction) {
   if (warehouseDone(g)) return g;
   final rows = warehouses[g.level].rows;

@@ -1,7 +1,5 @@
-// Package ai is messages, models and streaming calls to them, shaped and named as pi-ai 1.1.0 names them (role
-// `toolResult`, content `toolCall`, events `text_delta`, stop reason `toolUse`...), so a pi transcript and ours read
-// the same. Ported from the TypeScript @heybro/ai (removed): the JSON of every message is the TS one, field for field, so a
-// conversation saved by either reads back in the other.
+// Package ai is shaped and named as pi-ai 1.1.0 (role `toolResult`, content `toolCall`, events `text_delta`, stop reason `toolUse`...), so a pi
+// transcript and ours read the same.
 package ai
 
 import (
@@ -9,9 +7,6 @@ import (
 	"fmt"
 )
 
-// ── Content ─────────────────────────────────────────────────────────────
-
-// Content types.
 const (
 	TypeText     = "text"
 	TypeThinking = "thinking"
@@ -19,21 +14,18 @@ const (
 	TypeToolCall = "toolCall"
 )
 
-// Content is one block of a message: TS's TextContent | ThinkingContent | ImageContent | ToolCall, flat, told
-// apart by Type. Only the fields of its type are written to JSON.
+// Only the fields of its type are written to JSON.
 type Content struct {
 	Type string
 
-	// text
 	Text          string
 	TextSignature string
 
-	// thinking
 	Thinking          string
 	ThinkingSignature string
 	Redacted          bool
 
-	// image: Data is base64.
+	// Data is base64.
 	Data     string
 	MimeType string
 
@@ -43,23 +35,18 @@ type Content struct {
 	Arguments json.RawMessage
 }
 
-// NewText is a text block.
 func NewText(text string) Content { return Content{Type: TypeText, Text: text} }
 
-// NewThinking is a thinking block.
 func NewThinking(thinking string) Content { return Content{Type: TypeThinking, Thinking: thinking} }
 
-// NewImage is an image block (data in base64).
 func NewImage(data, mimeType string) Content {
 	return Content{Type: TypeImage, Data: data, MimeType: mimeType}
 }
 
-// NewToolCall is a tool call block; arguments is a JSON object.
 func NewToolCall(id, name string, arguments json.RawMessage) Content {
 	return Content{Type: TypeToolCall, ID: id, Name: name, Arguments: arguments}
 }
 
-// Args is the tool call's arguments, {} when there are none.
 func (c Content) Args() json.RawMessage {
 	if len(c.Arguments) == 0 {
 		return json.RawMessage("{}")
@@ -127,17 +114,14 @@ func (c *Content) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// UserContent is a system, user or custom message's content: a plain string (TS `string`), or blocks (text and
-// images). Blocks nil means the string form.
+// Blocks nil means the string form.
 type UserContent struct {
 	Text   string
 	Blocks []Content
 }
 
-// StringContent is content given as a string.
 func StringContent(text string) UserContent { return UserContent{Text: text} }
 
-// BlocksContent is content given as blocks.
 func BlocksContent(blocks ...Content) UserContent {
 	if blocks == nil {
 		blocks = []Content{}
@@ -145,7 +129,6 @@ func BlocksContent(blocks ...Content) UserContent {
 	return UserContent{Blocks: blocks}
 }
 
-// IsBlocks reports the block form.
 func (c UserContent) IsBlocks() bool { return c.Blocks != nil }
 
 func (c UserContent) MarshalJSON() ([]byte, error) {
@@ -172,9 +155,6 @@ func (c *UserContent) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ── Usage and why it stopped ────────────────────────────────────────────
-
-// StopReason is why an answer ended.
 type StopReason string
 
 const (
@@ -185,7 +165,7 @@ const (
 	StopAborted StopReason = "aborted"
 )
 
-// UsageCost is dollars, per part and in all.
+// In dollars.
 type UsageCost struct {
 	Input      float64 `json:"input"`
 	Output     float64 `json:"output"`
@@ -194,7 +174,6 @@ type UsageCost struct {
 	Total      float64 `json:"total"`
 }
 
-// Usage is the tokens an answer took.
 type Usage struct {
 	// Input tokens not read from the cache.
 	Input      int `json:"input"`
@@ -207,17 +186,11 @@ type Usage struct {
 	Cost        UsageCost `json:"cost"`
 }
 
-// EmptyUsage is no tokens at all.
 func EmptyUsage() Usage { return Usage{} }
 
-// ── Messages ────────────────────────────────────────────────────────────
-
-// Message is one of the model's messages: SystemMessage, UserMessage, AssistantMessage or ToolResultMessage. The
-// set is closed (an application's own kinds are agentcore's AgentMessage).
+// The set is closed: an application's own kinds are agentcore's AgentMessage.
 type Message interface {
-	// Role is the JSON `role`.
 	Role() string
-	// Time is the JSON `timestamp` (milliseconds since the epoch).
 	Time() int64
 	llmMessage()
 }
@@ -233,14 +206,13 @@ type UserMessage struct {
 }
 
 type AssistantMessage struct {
-	Content    []Content
-	API        string
-	Provider   string
-	Model      string
-	ResponseID string
-	Usage      Usage
-	StopReason StopReason
-	// Set when it failed or was stopped.
+	Content      []Content
+	API          string
+	Provider     string
+	Model        string
+	ResponseID   string
+	Usage        Usage
+	StopReason   StopReason
 	ErrorMessage string
 	Timestamp    int64
 	DurationMs   *int64
@@ -250,7 +222,6 @@ type ToolResultMessage struct {
 	ToolCallID string
 	ToolName   string
 	Content    []Content
-	// Anything the tool reports besides its content; nil leaves it out.
 	Details    any
 	IsError    bool
 	Timestamp  int64
@@ -272,7 +243,6 @@ func (UserMessage) llmMessage()       {}
 func (AssistantMessage) llmMessage()  {}
 func (ToolResultMessage) llmMessage() {}
 
-// ToolCalls is the answer's tool calls, in order.
 func (m AssistantMessage) ToolCalls() []Content {
 	var out []Content
 	for _, c := range m.Content {
@@ -413,7 +383,6 @@ func (m *ToolResultMessage) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// DecodeMessage reads one of the model's messages by its role.
 func DecodeMessage(data []byte) (Message, error) {
 	var head struct {
 		Role string `json:"role"`
@@ -442,12 +411,8 @@ func DecodeMessage(data []byte) (Message, error) {
 	return nil, fmt.Errorf("not a model message: role %q", head.Role)
 }
 
-// ── Models ──────────────────────────────────────────────────────────────
-
-// Api is how a provider is spoken to: "openai-completions", "anthropic-messages", or another a host adds.
 type Api = string
 
-// ThinkingLevel is how hard a model thinks: minimal, low, medium, high, xhigh, max. ModelThinkingLevel adds "off".
 type ThinkingLevel = string
 
 const (
@@ -460,12 +425,10 @@ const (
 	ThinkingMax     ThinkingLevel = "max"
 )
 
-// ThinkingLevelMap is what a level is called by the provider; a nil value (TS null): the model does not have it;
-// an absent key: called as it is.
+// A nil value: the model does not have the level; an absent key: called as it is.
 type ThinkingLevelMap map[string]*string
 
-// Compat is the endpoint's differences, named as pi names them: OpenAICompletionsCompat for `openai-completions`,
-// AnthropicMessagesCompat for `anthropic-messages`. A nil pointer is the TS `undefined`.
+// A nil pointer is unset.
 type Compat struct {
 	// Thinking models that want their earlier reasoning back (DeepSeek).
 	RequiresReasoningContentOnAssistantMessages bool
@@ -481,7 +444,7 @@ type Compat struct {
 	SupportsTemperature   *bool
 }
 
-// ModelCost is dollars per million tokens.
+// Dollars per million tokens.
 type ModelCost struct {
 	Input      float64
 	Output     float64
@@ -489,16 +452,13 @@ type ModelCost struct {
 	CacheWrite float64
 }
 
-// Model is a model to talk to: plain data, so a host may use one not listed in MODELS.
 type Model struct {
-	ID       string
-	Name     string
-	API      Api
-	Provider string
-	BaseURL  string
-	// Whether it thinks.
-	Reasoning bool
-	// "text", "image".
+	ID               string
+	Name             string
+	API              Api
+	Provider         string
+	BaseURL          string
+	Reasoning        bool
 	Input            []string
 	Cost             ModelCost
 	ContextWindow    int
@@ -524,26 +484,21 @@ func (m Model) takesImages() bool {
 	return false
 }
 
-// ── A request ───────────────────────────────────────────────────────────
-
-// Tool is a tool as the model sees it: its parameters are JSON Schema.
 type Tool struct {
 	Name        string
 	Description string
 	Parameters  map[string]any
 }
 
-// Context is a request: the system prompt ("" for none), the conversation, the tools.
 type Context struct {
 	SystemPrompt string
 	Messages     []Message
 	Tools        []Tool
 }
 
-// ToolChoice is "auto" or "none"; "" leaves it to the provider.
+// "" leaves it to the provider.
 type ToolChoice = string
 
-// StreamOptions are a request's options; zero values are TS's undefined.
 type StreamOptions struct {
 	// The key; else the provider's environment variable (DEEPSEEK_API_KEY...).
 	APIKey string
@@ -558,9 +513,6 @@ type StreamOptions struct {
 	Headers    map[string]string
 }
 
-// ── A streamed answer ───────────────────────────────────────────────────
-
-// Event types of a streamed answer.
 const (
 	EventStart         = "start"
 	EventTextStart     = "text_start"
@@ -576,8 +528,7 @@ const (
 	EventError         = "error"
 )
 
-// AssistantMessageEvent is one event of a streamed answer, TS's union flat: each but done and error carries
-// Partial, the answer so far. It ends with done (Message) or error (Error), never by failing.
+// Every event but done and error carries Partial. A stream ends with done or error, never by failing.
 type AssistantMessageEvent struct {
 	Type         string
 	ContentIndex int
@@ -594,7 +545,6 @@ type AssistantMessageEvent struct {
 	Error   AssistantMessage
 }
 
-// Final is the message a done or error event ends with.
 func (e AssistantMessageEvent) Final() (AssistantMessage, bool) {
 	switch e.Type {
 	case EventDone:
@@ -605,7 +555,6 @@ func (e AssistantMessageEvent) Final() (AssistantMessage, bool) {
 	return AssistantMessage{}, false
 }
 
-// Snapshot is the answer as it stands after the event.
 func (e AssistantMessageEvent) Snapshot() AssistantMessage {
 	if m, ok := e.Final(); ok {
 		return m

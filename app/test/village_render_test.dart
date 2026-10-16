@@ -1,8 +1,3 @@
-// The village draws and answers the pointer: the real atlas and level, a farm with a helper at every kind of work, a
-// few seconds of walking, by day and at night. The pictures go to build/village-*.png to look at (they are not
-// compared to anything: what they should look like is the web page's pixel village); clicks are checked against the
-// web page's hit regions (overlay.ts).
-
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -28,8 +23,6 @@ PhaseWorking _doing(WorkerAction action) => PhaseWorking(
   doing: Doing(action: action, label: 'a.ts'),
 );
 
-/// Six helpers: hands on at its plot, ripe, reading (library), running commands (workshop), on the web (mast),
-/// waiting (bench); and one failed, waiting in the queue.
 VillageData _farm() {
   final helpers = [
     _helper('w1', 'lab', _doing(WorkerAction.editFile), 0),
@@ -65,7 +58,6 @@ Future<VillageGame> _start(WidgetTester tester) async {
   final atlas = SpriteAtlas.parse(File('assets/pixel/sprites.json').readAsStringSync());
   final village = VillageWorld(Level.parse(File('assets/village.ldtk').readAsStringSync()));
   final game = VillageGame(atlas: atlas, village: village)..show(_farm());
-  // Three screen pixels to the art pixel, as the farm screen scales it.
   tester.view.physicalSize = Size(village.width * 3, village.height * 3);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -106,12 +98,10 @@ void main() {
     final game = await _start(tester);
     game.setTimeOfDay(0.45);
     await _run(tester, 12);
-    // Every helper walked in from the gate; those at the buildings stand there.
     expect(game.heads.keys.toSet(), {'w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7'});
     final library = game.village.places['library']!.at;
     final head = game.heads['w3']!;
     expect((head.x - library.x).abs() < 20 && (head.y + 31 - library.y).abs() < 6, isTrue, reason: 'w3 reads at the library: $head vs $library');
-    // The pointer on the first plot, then on the shop.
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: Offset.zero);
     addTearDown(mouse.removePointer);
@@ -147,22 +137,18 @@ void main() {
       ..onSpot = spots.add;
     await _run(tester, 12);
     final v = game.village;
-    // A plot with nobody on it: its bed.
     final locked = v.plotAt(8);
     await tester.tapAt(Offset(locked.x * 3, (locked.y - 3) * 3));
     await tester.pump(const Duration(milliseconds: 50));
     expect(plots, [8]);
-    // A thing in the yard: its spot.
     final warehouse = v.spotBoxes['warehouse']!;
     await tester.tapAt(Offset((warehouse.x0 + warehouse.x1) / 2 * 3, (warehouse.y1 - 2) * 3));
     await tester.pump(const Duration(milliseconds: 50));
     expect(spots, ['warehouse']);
-    // A helper standing at its plot: its bed, as if the plot were clicked.
     final head = game.heads['w2']!;
     await tester.tapAt(Offset(head.x * 3, (head.y + 18) * 3));
     await tester.pump(const Duration(milliseconds: 50));
     expect(plots, [8, 1]);
-    // The dog takes its pat; the yard takes the rest.
     await tester.tapAt(Offset(v.dog.x * 3, (v.dog.y - 4) * 3));
     await tester.tapAt(const Offset(30 * 3, 240 * 3));
     await tester.pump(const Duration(milliseconds: 50));

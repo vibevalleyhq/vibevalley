@@ -1,6 +1,3 @@
-// The config pages' composite inputs: free-form chips (web/src/components/forms/chips-input.tsx) and KEY=value rows
-// (key-value-editor.tsx).
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,9 +6,8 @@ import 'base.dart';
 import 'field.dart' show kitBare;
 import 'icons.dart';
 
-/// Replaces web/src/components/forms/chips-input.tsx ChipsInput: chips in a cream well, then a box to type in. Enter
-/// or a comma adds what is typed (split at , and ，, trimmed, without repeats), and so does leaving the box; Backspace
-/// in an empty box takes the last chip off; each chip's × takes it off.
+/// Enter or a comma adds what is typed (split at , and ，, trimmed, without repeats), and so does leaving the box; Backspace in an empty box takes the last chip
+/// off.
 class PxChipsInput extends StatefulWidget {
   const PxChipsInput({super.key, required this.value, required this.onChanged, required this.placeholder, this.enabled = true});
   final List<String> value;
@@ -98,7 +94,7 @@ class _PxChipsInputState extends State<PxChipsInput> {
                 ],
               ),
             ),
-          // flex-1 min-w-24: a Wrap cannot stretch its last child, so the box takes the whole row while there are no
+          // A Wrap cannot stretch its last child, so the box takes the whole row while there are no
           // chips (room for the placeholder) and 96 px after them.
           LayoutBuilder(
             builder: (context, c) => SizedBox(
@@ -142,7 +138,6 @@ class _PxChipsInputState extends State<PxChipsInput> {
   );
 }
 
-/// A slim 32 px mono input in a cream well, as the key-value rows use.
 class _SlimInput extends StatefulWidget {
   const _SlimInput({super.key, required this.value, required this.onChanged, required this.enabled, this.placeholder, this.onSubmitted});
   final String value;
@@ -200,8 +195,6 @@ class _SlimInputState extends State<_SlimInput> {
   );
 }
 
-/// Replaces web/src/components/forms/key-value-editor.tsx KeyValueEditor: one row per KEY=value (the key fixed, the
-/// value editable, 删除), then a row to add one (添加, or Enter in either box; an empty key adds nothing).
 class PxKeyValueEditor extends StatefulWidget {
   const PxKeyValueEditor({
     super.key,

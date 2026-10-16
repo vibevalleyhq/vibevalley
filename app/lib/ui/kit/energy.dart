@@ -1,12 +1,3 @@
-// Quota as the farm draws it (web/src/ui/Energy.tsx). Each runtime has an energy potion (精力瓶): the liquid is how much
-// is left of its tightest window, green while there is plenty, amber when it runs low, red near empty; gold for
-// pay-as-you-go (pi), where what is left is money, not a percentage. A stamina bar (体力条) of segments shows one
-// window, and sits under every helper of that runtime.
-//
-// quotaLeft, quotaText and QUOTA_LOW are ports of packages/protocol (src/index.ts): the frame's view does not carry
-// them. The page's useQuota(runtime) reads the client's config; here the caller finds the runtime's usage
-// (RuntimeInfo.usage) and calls quotaOf.
-
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
@@ -14,10 +5,10 @@ import 'package:flutter/widgets.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
 
-/// Below this much left, the farm warns and the manager sends someone else if it can (protocol QUOTA_LOW).
+/// Below this much left, the farm warns and the manager sends someone else if it can (protocol.QuotaLow).
 const quotaLow = 15;
 
-/// The tightest window's remaining percent, 0..100; null when the usage has no percentages (protocol quotaLeft).
+/// 0..100; null when the usage has no percentages.
 double? quotaLeft(AccountUsage? usage) {
   if (usage is! AccountUsageOk || usage.windows.isEmpty) return null;
   return math.max(0, usage.windows.map((w) => 100 - w.usedPercent).reduce(math.min));
@@ -30,10 +21,9 @@ String _money(String currency, double amount) =>
         ? r'$'
         : '$currency '}${amount.toStringAsFixed(2)}';
 
-/// The way JavaScript prints a number: no ".0" on whole ones.
+/// No ".0" on whole ones, as JavaScript prints a number.
 String _num(double n) => n == n.roundToDouble() ? n.toInt().toString() : n.toString();
 
-/// What is left, in a few words: for the manager and for tooltips (protocol quotaText).
 String quotaText(AccountUsage? usage) => switch (usage) {
   null => '不报额度',
   AccountUsageLoginRequired() => '没登录',
@@ -54,7 +44,6 @@ QuotaLevel levelOf(double? left) => left == null
     ? QuotaLevel.low
     : QuotaLevel.plenty;
 
-/// Light and dark of each liquid, top to bottom.
 const _liquid = <QuotaLevel, (Color, Color)>{
   QuotaLevel.plenty: (Color(0xFFA6DC7C), Color(0xFF5F9A35)),
   QuotaLevel.low: (Color(0xFFFFD978), Color(0xFFE39A32)),
@@ -72,8 +61,6 @@ String windowLabel(String label) {
   return label.replaceFirst(RegExp(r'·\s*1 week'), '· 一周');
 }
 
-/// What a runtime has left, for drawing: the level, how full (0..1), the short words ("89%", "¥470.88", or empty when
-/// unknown) and the long ones.
 class Quota {
   const Quota({required this.level, required this.fill, required this.short, required this.text});
   final QuotaLevel level;
@@ -99,7 +86,6 @@ Quota quotaOf(AccountUsage? usage) {
   return Quota(level: levelOf(left), fill: left == null ? 0 : left / 100, short: left == null ? '' : '${_num(left)}%', text: text);
 }
 
-/// The bottle for a quota: its level, and how full in steps.
 String bottleSprite(Quota q) => switch (q.level) {
   QuotaLevel.plenty =>
     q.fill >= 0.875
@@ -113,11 +99,9 @@ String bottleSprite(Quota q) => switch (q.level) {
   QuotaLevel.gold => 'energy-gold',
 };
 
-/// The pixel bottles are 24 art pixels tall: shown at a whole multiple of that, the nearest to `size`.
+/// Shown at a whole multiple of 24 art pixels, the nearest to `size`.
 const _pixelBottle = 24;
 
-/// Replaces web/src/ui/Energy.tsx EnergyBottle: a corked potion bottle filled to `quota.fill` in steps, at a whole
-/// scale; its words are the tooltip-ready `quota.text` (semantics).
 class EnergyBottle extends StatelessWidget {
   const EnergyBottle({super.key, required this.atlas, required this.quota, this.size = 28});
   final SpriteAtlas atlas;
@@ -136,8 +120,7 @@ class EnergyBottle extends StatelessWidget {
   }
 }
 
-/// Replaces web/src/ui/Energy.tsx StaminaBar: a segmented bar, `quota.fill` of the way lit (at least one segment when
-/// anything is left), in the level's liquid.
+/// At least one segment is lit when anything is left.
 class StaminaBar extends StatelessWidget {
   const StaminaBar({super.key, required this.quota, this.segments = 10, this.width = 64, this.height = 8});
   final Quota quota;
@@ -145,7 +128,6 @@ class StaminaBar extends StatelessWidget {
   final double width;
   final double height;
 
-  /// How many segments are lit.
   static int litOf(Quota q, int segments) => q.fill <= 0 ? 0 : math.max(1, (q.fill * segments).round());
 
   @override
@@ -170,7 +152,6 @@ class _BarPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     const pad = 1.5;
     const gap = 1.5;
-    // The skin turns the bar's soft shadow into a hard 2 px drop.
     canvas.drawRect(Rect.fromLTWH(2, 2, size.width, size.height), Paint()..color = const Color(0x731E140A));
     canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF46301D));
     final w = (size.width - 2 * pad - gap * (segments - 1)) / segments;

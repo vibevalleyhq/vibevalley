@@ -16,16 +16,10 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// Trajectories (ported from the TypeScript server's trajectories.ts, removed): every helper's work, step by step, from the moment it is hired,
-// kept after it leaves; and the manager's, which never ends. Each is two files in $VIBEVALLEY_HOME/steps: <id>.json, the
-// steps as a journal writes them (steps.go), and <id>.head.json, whose it is and what for. A helper's is kept
-// VIBEVALLEY_TRAJECTORY_DAYS (default 30) after it left, then dropped when the server starts. Rationale:
-// .agents/notes/implemented/feature/2026-10-13-trajectories.md.
-
-// crewKeepDays is how long a helper's trajectory is kept after it left, unless VIBEVALLEY_TRAJECTORY_DAYS says (0: for good).
+// VIBEVALLEY_TRAJECTORY_DAYS overrides it; 0 keeps them for good.
 const crewKeepDays = 30
 
-// crewKnownID is a helper's id or the manager's: nothing that leads out of the folder.
+// Nothing that leads out of the folder.
 var crewKnownID = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 type Trajectories struct {
@@ -35,13 +29,13 @@ type Trajectories struct {
 	mu      sync.Mutex
 	open    map[string]*crewJournal
 	writers map[string]*base.FileWriter
-	// marking: one head changed at a time, read to written.
+	// One head changed at a time, read to written.
 	marking sync.Mutex
 }
 
 func newTrajectories(cfg base.Config, site *base.Site) (*Trajectories, error) {
 	t := &Trajectories{site: site, dir: filepath.Join(cfg.Home, "steps"), open: map[string]*crewJournal{}, writers: map[string]*base.FileWriter{}}
-	// The steps of those that ended long ago go; their heads stay, small, so the board keeps every ticket.
+	// The steps of those that ended long ago go; their heads stay, small, so the board keeps every issue.
 	days := crewKeepDays
 	if v := os.Getenv("VIBEVALLEY_TRAJECTORY_DAYS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
@@ -61,7 +55,6 @@ func newTrajectories(cfg base.Config, site *base.Site) (*Trajectories, error) {
 
 func (*Trajectories) OnStart(context.Context) error { return nil }
 
-// close writes whatever is pending.
 func (t *Trajectories) OnStop() {
 	t.mu.Lock()
 	open := make([]*crewJournal, 0, len(t.open))
@@ -116,8 +109,7 @@ func (t *Trajectories) heads() []protocol.TrajectoryHead {
 	return out
 }
 
-// Open is the journal of a trajectory, over its steps so far; its head is written now unless it has one (a helper
-// back from a restart keeps its start). The steps go to the pages as step events as they come. keep: steps kept.
+// Its head is written now unless it has one: a helper back from a restart keeps its start.
 func (t *Trajectories) Open(head protocol.TrajectoryHead, keep int) base.Journal {
 	since := head
 	if had := t.readHead(head.ID); had != nil {
@@ -135,8 +127,6 @@ func (t *Trajectories) Open(head protocol.TrajectoryHead, keep int) base.Journal
 	return j
 }
 
-// Finish: the helper left; its journal written out and closed, its trajectory marked ended, with how its job
-// closed and its last turn (helper as it was when it left; nil when unknown).
 func (t *Trajectories) Finish(id string, closed protocol.IssueClose, helper *protocol.Helper) {
 	t.mu.Lock()
 	j := t.open[id]
@@ -164,7 +154,6 @@ func (t *Trajectories) Finish(id string, closed protocol.IssueClose, helper *pro
 	})
 }
 
-// mark changes a trajectory's head and writes it; nothing when there is none.
 func (t *Trajectories) mark(id string, change func(*protocol.TrajectoryHead)) {
 	t.marking.Lock()
 	defer t.marking.Unlock()
@@ -174,7 +163,6 @@ func (t *Trajectories) mark(id string, change func(*protocol.TrajectoryHead)) {
 	}
 }
 
-// List is whose trajectories there are, newest first; one agent's when agent is not empty.
 func (t *Trajectories) List(agent string) []protocol.TrajectoryHead {
 	out := []protocol.TrajectoryHead{}
 	for _, h := range t.heads() {

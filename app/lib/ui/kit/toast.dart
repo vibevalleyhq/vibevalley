@@ -1,7 +1,4 @@
-// Toasts (web/src/ui/FxLayer.tsx `toasts`, a Base UI toast manager, and its ToastList): `toasts.add(...)` from
-// anywhere, a ToastViewport once on the screen. The newest is in front; older ones stack behind it, each 0.6rem lower
-// and 5% smaller; past three they hide. Each closes after its timeout (5 s by default), held while the pointer is over
-// the stack; a swipe down or right closes one. What turns notices and effects into toasts is the farm's FX layer.
+// Each closes after its timeout (5 s by default), held while the pointer is over the stack; past three they hide.
 
 import 'dart:async';
 
@@ -11,7 +8,6 @@ import '../../app/theme.dart';
 import 'base.dart';
 import 'icons.dart';
 
-/// What a toast is about: a notice's level (info, warn, error), or 'achievement' (the FX layer gives it a medal).
 abstract final class ToastType {
   static const info = 'info';
   static const warn = 'warn';
@@ -19,7 +15,6 @@ abstract final class ToastType {
   static const achievement = 'achievement';
 }
 
-/// The titles the FX layer gives notices (FxLayer.tsx NOTICE_TITLE).
 const noticeTitle = {ToastType.info: '提示', ToastType.warn: '没派成', ToastType.error: '出错了'};
 
 class ToastData {
@@ -30,15 +25,13 @@ class ToastData {
   final String? description;
   final Duration timeout;
 
-  /// Whatever it was raised with (an achievement's id and tier).
   final Object? data;
 }
 
-/// The toast manager (Base UI Toast.createToastManager).
 class ToastManager extends ChangeNotifier {
   ToastManager({this.limit = 3});
 
-  /// How many show at once; the rest wait hidden behind.
+  /// The rest wait hidden behind.
   final int limit;
 
   final _list = <ToastData>[];
@@ -48,7 +41,6 @@ class ToastManager extends ChangeNotifier {
   var _next = 0;
   var _paused = false;
 
-  /// Newest first.
   List<ToastData> get toasts => List.unmodifiable(_list);
 
   int add({String type = ToastType.info, required String title, String? description, Duration timeout = const Duration(milliseconds: 5000), Object? data}) {
@@ -76,7 +68,6 @@ class ToastManager extends ChangeNotifier {
     _timers[id] = Timer(left, () => close(id));
   }
 
-  /// Holds every timer (the pointer is over the stack) until `resume`.
   void pause() {
     if (_paused) return;
     _paused = true;
@@ -106,19 +97,14 @@ class ToastManager extends ChangeNotifier {
   }
 }
 
-/// The app's toasts, as the page's `toasts`.
 final toasts = ToastManager();
 
-/// The background of a notice's bell square (FxLayer.tsx TOAST_TONE; its text colours colour nothing there).
 Color _tone(String type) => switch (type) {
   ToastType.warn => const Color(0x4DF3B07A),
   ToastType.error => Palette.berry.withValues(alpha: .15),
   _ => Palette.cream200,
 };
 
-/// Replaces FxLayer.tsx's Toast.Viewport and ToastList: the stack, 12 px under the top of what it is placed in,
-/// centred, 320 px wide (the width less 32 px at most). Put it over the screen (e.g. last in a Stack). `leading` replaces the bell
-/// (the FX layer draws an achievement's medal), `kicker` adds the small green line above the title.
 class ToastViewport extends StatefulWidget {
   ToastViewport({super.key, ToastManager? manager, this.leading, this.kicker, this.top = 12}) : manager = manager ?? toasts;
   final ToastManager manager;
@@ -204,7 +190,6 @@ class _ToastCardState extends State<_ToastCard> {
   @override
   void initState() {
     super.initState();
-    // Comes in from above (translateY(-120%)) on the next frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _shown = true);
     });

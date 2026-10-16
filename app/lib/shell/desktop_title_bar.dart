@@ -1,7 +1,4 @@
-// The window's title bar in the desktop app (web/src/ui/DesktopTitleBar.tsx), drawn in the farm's colours: the app
-// hides the system's (its traffic lights stay, on this bar), so the window is the game from top to bottom. Dragging
-// it moves the window (the Swift side does that natively). Its height and title are desktopProvider's; elsewhere
-// there is none.
+// Dragging it moves the window: the Swift side does that natively.
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

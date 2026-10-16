@@ -1,8 +1,5 @@
-// The words for states, in site language (web/src/ui/labels.ts).
-
 import '../../gen/vibevalley.dart';
 
-/// What the robot is doing, in site language. The real detail (path, command) is shown next to it.
 const actionLabel = <WorkerAction, String>{
   WorkerAction.runCommand: '打桩',
   WorkerAction.readFile: '看图纸',
@@ -17,7 +14,6 @@ const actionLabel = <WorkerAction, String>{
   WorkerAction.none: '',
 };
 
-/// What the action means for the code, for the roster and the detail dialog.
 const actionMeaning = <WorkerAction, String>{
   WorkerAction.runCommand: '跑命令',
   WorkerAction.readFile: '读文件',
@@ -32,7 +28,6 @@ const actionMeaning = <WorkerAction, String>{
   WorkerAction.none: '—',
 };
 
-/// A helper's phase, in a word (PHASE_LABEL).
 String phaseLabel(Phase phase) => switch (phase) {
   PhaseArriving() => '进场',
   PhaseWorking() => '干活中',
@@ -47,8 +42,6 @@ const outcomeLabel = <Outcome, String>{Outcome.completed: '完成', Outcome.fail
 
 const runtimeLabel = <String, String>{'claude': 'Claude', 'codex': 'Codex'};
 
-/// How long ago `at` was, at `now` (both epoch milliseconds): seconds, minutes, then hours and days (the web page,
-/// frozen, says minutes all the way).
 String ago(num at, num now) {
   final r = ((now - at) / 1000).round();
   final s = r < 0 ? 0 : r;

@@ -1,6 +1,3 @@
-// Small pieces the farm's panels share: the empty-panel note, a coloured tag, a tinted box, a line of what the server
-// answered, and a clock that ticks every second (web/src/farm/Panels.tsx Empty, Plans.tsx Tag and Said, useNow).
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -14,7 +11,6 @@ import '../ui/kit/kit.dart';
 import '../village/village_view.dart' show agentsProvider;
 import '../rules/playbook.dart';
 
-/// A panel with nothing in it yet.
 class FarmEmpty extends StatelessWidget {
   const FarmEmpty(this.text, {super.key});
   final String text;
@@ -32,17 +28,14 @@ class FarmEmpty extends StatelessWidget {
   );
 }
 
-/// A small coloured tag: a state in a word.
 class FarmTag extends StatelessWidget {
   const FarmTag(this.text, {super.key, this.fill = Palette.cream200, this.ink = Palette.bark800, this.icon, this.goes = false});
   final String text;
   final Color fill;
   final Color ink;
 
-  /// A sprite before the words.
   final String? icon;
 
-  /// It leads somewhere: the way-in chevron after the words (the page's ›).
   final bool goes;
 
   @override
@@ -60,7 +53,6 @@ class FarmTag extends StatelessWidget {
   );
 }
 
-/// A tinted box around some lines.
 class Tinted extends StatelessWidget {
   const Tinted({super.key, required this.child, this.color = Palette.cream100, this.padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 8)});
   final Widget child;
@@ -71,7 +63,6 @@ class Tinted extends StatelessWidget {
   Widget build(BuildContext context) => Container(color: color, padding: padding, child: child);
 }
 
-/// What the server answered, in green or red (Plans.tsx Said).
 class Said extends StatelessWidget {
   const Said(this.answer, {super.key});
   final Answer? answer;
@@ -87,7 +78,7 @@ class Said extends StatelessWidget {
   }
 }
 
-/// Rebuilds every second with the time in epoch milliseconds (Panels.tsx useNow).
+/// In epoch milliseconds.
 class Ticking extends StatefulWidget {
   const Ticking({super.key, required this.builder});
   final Widget Function(BuildContext context, double now) builder;
@@ -115,7 +106,6 @@ class _TickingState extends State<Ticking> {
   Widget build(BuildContext context) => widget.builder(context, DateTime.now().millisecondsSinceEpoch.toDouble());
 }
 
-/// A helper's (an agent's) face, from its agent's looks (the desk's AgentFace, found by the agent's id).
 class AgentFace extends ConsumerWidget {
   const AgentFace(this.agentId, {super.key, required this.size, this.muted = false});
   final String agentId;
@@ -129,7 +119,6 @@ class AgentFace extends ConsumerWidget {
   }
 }
 
-/// The manager's face in its current look.
 class ManagerFaceOf extends ConsumerWidget {
   const ManagerFaceOf({super.key, required this.size, required this.look});
   final double size;
@@ -144,11 +133,10 @@ class ManagerFaceOf extends ConsumerWidget {
   }
 }
 
-/// A clock time, 24 hours: 09:05.
 String clockOf(double at) {
   final d = DateTime.fromMillisecondsSinceEpoch(at.round());
   return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 }
 
-/// Tones of the farm's tags: a colour at a share of its strength over cream (Tailwind's bg-x/NN).
+/// A colour at a share of its strength over cream.
 Color tint(Color c, double alpha) => Color.alphaBlend(c.withValues(alpha: alpha), Palette.cream50);

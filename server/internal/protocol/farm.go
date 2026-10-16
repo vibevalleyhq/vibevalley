@@ -1,25 +1,22 @@
 package protocol
 
-// The farm's core state, in motion (packages/protocol/src/farm.ts): Reduce folds one fact into the state. The
-// TypeScript reduce stays the reference until the pages read folded frames; parity_test.go folds the same facts
-// through both and compares. Reduce never changes the state it is given: what it changes, it copies.
+// The farm's core state, in motion: Reduce folds one fact into the state; parity_test.go holds it to recorded
+// runs of facts. Reduce never changes the state it is given: what it changes, it copies.
 
 import (
 	"reflect"
 	"slices"
 )
 
-// MaxRunning is the subagents' running limit, and the number of beds on the farm.
+// Also the number of beds on the farm.
 const MaxRunning = 6
 
-// What a helper's play keeps.
 const (
 	HistoryLimit = 30
 	FileLimit    = 24
 	CommandLimit = 12
 )
 
-// EmptyFarm is a farm with nothing on it.
 func EmptyFarm() FarmState {
 	return FarmState{Call: CallStateIdle, Foreman: ForemanStateIdle, Helpers: []Helper{}}
 }
@@ -33,7 +30,7 @@ func HelperOf(state FarmState, id string) *Helper {
 	return nil
 }
 
-// withHelper changes one helper; the very same state when there is no such helper.
+// The very same state when there is no such helper.
 func withHelper(state FarmState, id string, change func(Helper) Helper) (FarmState, bool) {
 	i := slices.IndexFunc(state.Helpers, func(h Helper) bool { return h.ID == id })
 	if i < 0 {
@@ -45,7 +42,6 @@ func withHelper(state FarmState, id string, change func(Helper) Helper) (FarmSta
 	return state, true
 }
 
-// whileWorking changes a working helper's phase; any other phase stays.
 func whileWorking(state FarmState, id string, change func(PhaseWorking) PhaseWorking) (FarmState, bool) {
 	h := HelperOf(state, id)
 	if h == nil {
@@ -60,12 +56,11 @@ func whileWorking(state FarmState, id string, change func(PhaseWorking) PhaseWor
 	})
 }
 
-// IsOpen is whether a playbook is still going: not harvested, not given up.
 func IsOpen(pb Playbook) bool {
 	return pb.State != PlaybookStateDone && pb.State != PlaybookStateAbandoned
 }
 
-// PlayOf is a helper's play; one saved before plays were kept has an empty one, with no bed.
+// One saved before plays were kept has an empty one, with no bed.
 func PlayOf(h Helper) HelperPlay {
 	if h.Play != nil {
 		return *h.Play
@@ -73,7 +68,6 @@ func PlayOf(h Helper) HelperPlay {
 	return HelperPlay{Station: -1, History: []ActionStep{}, Counts: map[string]int64{}, Files: []string{}, Commands: []string{}}
 }
 
-// FreeStation is the bed a new helper takes: prefer when it is free, else the first free one, else -1.
 func FreeStation(helpers []Helper, prefer *int64) int64 {
 	taken := map[int64]bool{}
 	for _, h := range helpers {
@@ -90,7 +84,6 @@ func FreeStation(helpers []Helper, prefer *int64) int64 {
 	return -1
 }
 
-// WithStations gives every helper without a bed a free one.
 func WithStations(state FarmState) FarmState {
 	if !slices.ContainsFunc(state.Helpers, func(h Helper) bool { return PlayOf(h).Station < 0 }) {
 		return state
@@ -124,7 +117,6 @@ func WithStations(state FarmState) FarmState {
 	return state
 }
 
-// remember appends item, moving it to the end if present, and keeps the last limit.
 func remember(list []string, item string, limit int) []string {
 	out := slices.DeleteFunc(slices.Clone(list), func(x string) bool { return x == item })
 	out = append(out, item)
@@ -185,8 +177,7 @@ func ended(outcome Outcome) Phase {
 
 func same(a, b any) bool { return reflect.DeepEqual(a, b) }
 
-// Reduce is the state after fact, and whether it changed: facts about helpers not on the farm change nothing. The
-// issues' statuses follow whatever changed (their runs at work or done).
+// Facts about helpers not on the farm change nothing. The issues' statuses follow whatever changed.
 func Reduce(state FarmState, fact Fact) (FarmState, bool) {
 	next, changed := reduce(state, fact)
 	if changed && len(next.Issues) > 0 {
@@ -195,7 +186,6 @@ func Reduce(state FarmState, fact Fact) (FarmState, bool) {
 	return next, changed
 }
 
-// reduce is Reduce before the issues' statuses follow what changed.
 func reduce(state FarmState, fact Fact) (FarmState, bool) {
 	switch f := fact.Value.(type) {
 	case FactCall:

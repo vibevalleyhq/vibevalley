@@ -1,8 +1,3 @@
-// How much each runtime has left (web/src/farm/Quota.tsx, the popup under the energy pill): every machine helpers may
-// use, its potion and a stamina bar per plan window, or its pay-as-you-go balance, what it spent today and why it is
-// not sent new work. The server reads the accounts every few minutes and after helpers' turns and pushes the changes;
-// the refresh button asks for a fresh reading now. The pill itself is the village HUD's.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -17,7 +12,6 @@ import '../../rules/index.dart';
 import '../../rules/quota.dart';
 import '../../rules/seeds.dart';
 
-/// Number colour by how much is left (Quota.tsx `text`).
 Color quotaInk(double left) => switch (levelOf(left)) {
   QuotaLevel.plenty => Palette.leaf700,
   QuotaLevel.low || QuotaLevel.gold => const Color(0xFFB8862A),
@@ -25,7 +19,6 @@ Color quotaInk(double left) => switch (levelOf(left)) {
   QuotaLevel.unknown => Palette.bark500,
 };
 
-/// The popup's body: a 352 px card of machines; nothing when no runtime is usable.
 class QuotaPanel extends ConsumerWidget {
   const QuotaPanel({super.key});
 
@@ -80,7 +73,6 @@ class QuotaPanel extends ConsumerWidget {
   }
 }
 
-/// One machine: its icon, name and plan, its windows or balance, today's spending, and its potion.
 class QuotaMachine extends StatelessWidget {
   const QuotaMachine({super.key, required this.atlas, required this.info});
   final SpriteAtlas atlas;

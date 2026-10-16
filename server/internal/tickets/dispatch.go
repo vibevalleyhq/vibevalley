@@ -14,21 +14,7 @@ import (
 	"vibevalley/internal/runs"
 )
 
-// Sending helpers out (the tickets module, docs/concepts.md): whether an issue can go now and who takes it, then the
-// crew opens its run. An agent that is off or cannot run, no project, no room (the farm's, the runtime's, the
-// project's) all refuse; a full farm sends home whoever has been idle longest. Every run works an issue: the one it is
-// sent for, or one made from its job (the manager sending someone at once, a playbook's step).
-//
-// Starting an issue that was written down with every bed it could take busy queues it instead: every few seconds the
-// queued ones are tried in the board's order, each started as soon as there is room for it; one that can no longer go
-// (its agent gone, refused) leaves the queue with a notice. A closed issue can be opened again: another run from the
-// same agent, in the same project, told what to do now, the job and how its last run ended.
-//
-// A schedule naming an agent is a recurring issue: each time it comes due, a new issue is written from it (its name the
-// title, what it says the description, in its project or its channel's) and started there, queued when the farm is
-// full; one that cannot start stays written down, said in the channel. Schedules without an agent are the manager's.
-
-// dispatchTryEvery: how often the queued issues are tried; tests shorten it.
+// Tests shorten it.
 var dispatchTryEvery = 5 * time.Second
 
 type Dispatch struct {
@@ -41,7 +27,7 @@ type Dispatch struct {
 	chat         *chat.Chat
 	schedules    *Schedules
 	stop         func()
-	// trying: one round of the queue at a time.
+	// One round of the queue at a time.
 	trying sync.Mutex
 }
 
@@ -81,7 +67,6 @@ func (d *Dispatch) OnStop() {
 	}
 }
 
-// scheduled writes down and starts the issue a schedule naming an agent makes, come due.
 func (d *Dispatch) scheduled(ctx context.Context, s protocol.FarmSchedule) {
 	channel := d.chat.ChannelOf(s.Channel)
 	project := s.Project
@@ -97,8 +82,6 @@ func (d *Dispatch) scheduled(ctx context.Context, s protocol.FarmSchedule) {
 	}
 }
 
-// Hire sends a helper from agent to do task in project (the agent's own folder when none is named), on the issue opt
-// names or a new one; says why not.
 func (d *Dispatch) Hire(ctx context.Context, agent protocol.AgentProfile, task, project string, opt base.HireOptions) base.Hired {
 	if !agent.Enabled {
 		return base.Hired{Refused: agent.Name + " 被停用了"}
@@ -145,8 +128,6 @@ func (d *Dispatch) Hire(ctx context.Context, agent protocol.AgentProfile, task, 
 	return hired
 }
 
-// Start sends the helper of an issue written down, in channel; answers the helper's id. With no bed it could take, it
-// is queued instead, and the answer says why it waits.
 func (d *Dispatch) Start(ctx context.Context, id string, channel int64) (protocol.Dispatched, error) {
 	issue, agent, project, err := d.ready(id)
 	if err != nil {
@@ -166,8 +147,6 @@ func (d *Dispatch) Start(ctx context.Context, id string, channel int64) (protoco
 	return protocol.Dispatched{Helper: &helper}, nil
 }
 
-// ready is an issue written down with what starting it needs: its agent, and where (its project, else the agent's own
-// folder).
 func (d *Dispatch) ready(id string) (protocol.Issue, protocol.AgentProfile, string, error) {
 	issue, err := d.issues.unsent(id)
 	if err != nil {
@@ -195,8 +174,7 @@ func (d *Dispatch) send(ctx context.Context, issue protocol.Issue, agent protoco
 	return hired.Helper.ID, nil
 }
 
-// TryQueued starts the queued issues there is room for now, in the board's order; one that cannot go any more leaves
-// the queue, said in a notice.
+// In the board's order; one that cannot go any more leaves the queue, said in a notice.
 func (d *Dispatch) TryQueued(ctx context.Context) {
 	d.trying.Lock()
 	defer d.trying.Unlock()
@@ -227,11 +205,8 @@ func (d *Dispatch) TryQueued(ctx context.Context) {
 	}
 }
 
-// crewReopenDefault is what a reopened issue asks when the person says nothing more.
 const crewReopenDefault = "接着把这张工单做完"
 
-// Reopen sends a closed issue (named by its id or one of its runs') another run, in channel; answers the new helper's
-// id, or why not.
 func (d *Dispatch) Reopen(ctx context.Context, id, text string, channel int64) (string, error) {
 	issue, err := d.issues.Get(id)
 	if err != nil {
@@ -267,8 +242,6 @@ func (d *Dispatch) Reopen(ctx context.Context, id, text string, channel int64) (
 	return hired.Helper.ID, nil
 }
 
-// crewReopenTask is a reopened issue's next run's job: what to do now first (its title), then the job and how its
-// last run ended.
 func crewReopenTask(issue protocol.Issue, head protocol.TrajectoryHead, text string) string {
 	now := base.Trim(text)
 	if now == "" {

@@ -23,27 +23,23 @@ class Caption {
 }
 
 class LiveCaptions {
-  /// Oldest first; the call's last few turns.
   final turns = <Caption>[];
 
-  /// The agent's state as it last said it (message.state), null before it says one.
   String? agentState;
   final _chunks = <String, Map<int, String>>{};
 
-  /// A sentence of yours finished (its turn's final transcript): work for the farm, said once per turn.
+  /// Said once per turn.
   void Function(String text)? onHeard;
   final _heard = <int>{};
 
   static const keep = 8;
 
-  /// One packet off the data stream. Returns whether the captions changed.
   bool feed(String packet) {
     final message = _assemble(packet);
     if (message == null) return false;
     return apply(message);
   }
 
-  /// One whole message (as JSON). Returns whether the captions changed.
   bool apply(Map<String, dynamic> m) {
     final turn = (m['turn_id'] as num?)?.toInt() ?? 0;
     switch (m['object']) {

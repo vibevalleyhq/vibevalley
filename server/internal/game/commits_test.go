@@ -10,16 +10,12 @@ import (
 	"vibevalley/internal/farmtest"
 )
 
-// Commits on real git repositories in throwaway folders (commits.test.ts). Offline.
-
 func TestCrewCommitsCountedOncePerRepository(t *testing.T) {
 	root := t.TempDir()
 	farmtest.Repo(t, filepath.Join(root, "app"), 3, 2)
-	// A helper's worktree: one more commit of mine on its branch, in the same repository.
 	tree := filepath.Join(root, ".worktrees", "w1")
 	farmtest.Git(t, filepath.Join(root, "app"), "worktree", "add", "-q", "-b", "vibevalley/w1", tree)
 	farmtest.Git(t, tree, "commit", "-q", "--allow-empty", "-m", "helper work")
-	// Another repository, one level deeper.
 	farmtest.Repo(t, filepath.Join(root, "tools", "cli"), 1, 0)
 	c, _ := newCommits(base.Config{WorkRoot: root}, nil)
 	count := c.Count(context.Background())

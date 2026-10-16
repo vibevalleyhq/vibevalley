@@ -1,8 +1,6 @@
 package base
 
-// .env files: what cmd/vibevalley reads with --env-file and from
-// $VIBEVALLEY_HOME/.env (the voice credentials, a DeepSeek key). A variable already set in the environment wins over the
-// file, as with Node; nothing read here is ever logged.
+// A variable already set in the environment wins over the file, as with Node; nothing read here is ever logged.
 
 import (
 	"errors"
@@ -12,7 +10,7 @@ import (
 	"strings"
 )
 
-// LoadEnvFile sets the variables of the .env file at path that are not set yet. A missing file is not an error.
+// A missing file is not an error.
 func LoadEnvFile(path string) error {
 	body, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -31,9 +29,8 @@ func LoadEnvFile(path string) error {
 	return nil
 }
 
-// ParseEnv reads KEY=VALUE lines as Node's util.parseEnv does: blank lines and # comments skipped, an `export `
-// prefix dropped, values in single, double or back quotes taken as they are (double quotes turn \n into a newline,
-// and may span lines), an unquoted value cut at its first # and trimmed. Later lines win.
+// As Node's util.parseEnv: blank lines and # comments skipped, an `export ` prefix dropped, values in single, double or back quotes taken as they are
+// (double quotes turn \n into a newline, and may span lines), an unquoted value cut at its first # and trimmed. Later lines win.
 func ParseEnv(text string) [][2]string {
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	var out [][2]string

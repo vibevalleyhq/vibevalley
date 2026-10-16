@@ -1,8 +1,3 @@
-// The title screen the app opens on, over the farm (web/src/title/TitleScreen.tsx): the farm at the hour it is
-// (scene.dart), slowly moving, with seeds or fireflies drifting over it; the game's name; the menu on the left:
-// 开始游戏, 继续游戏 (when there is a farm to go back to), 设置 (the farm's keys). It comes up ready: loading is
-// startup's (startup.dart). Arrow keys and Enter work as in a game. The rules are title_state.dart; this only shows them.
-
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -40,8 +35,7 @@ class _TitleScreenState extends ConsumerState<TitleScreen> with SingleTickerProv
   String? _note;
   late final AnimationController _clock = AnimationController(vsync: this, duration: const Duration(days: 1))..forward();
 
-  /// The keys go through the title screen's own focus: what is focused under it (a menu button, a field) passes them
-  /// up here first, before the app's arrow-key traversal and Enter-to-activate could act on them.
+  /// What is focused under it passes the keys up here first, before the app's arrow-key traversal and Enter-to-activate could act on them.
   final _focus = FocusNode(debugLabel: 'title');
 
   @override
@@ -138,7 +132,6 @@ class _TitleScreenState extends ConsumerState<TitleScreen> with SingleTickerProv
             fit: StackFit.expand,
             children: [
               TitleStage(scene: startScene()),
-              // The shade behind the words, on the left.
               Positioned(
                 left: 0,
                 top: 0,
@@ -244,7 +237,6 @@ class _TitleScreenState extends ConsumerState<TitleScreen> with SingleTickerProv
   double get _seconds => (_clock.lastElapsedDuration?.inMicroseconds ?? 0) / 1e6;
 }
 
-/// A start menu button: a HUD card that slides in (title-in), steps right and lights up when picked.
 class _MenuButton extends StatelessWidget {
   const _MenuButton({
     required this.label,
@@ -289,7 +281,6 @@ class _MenuButton extends StatelessWidget {
                 foregroundDecoration: state.focused ? BoxDecoration(border: Border.all(color: Palette.leaf500, width: 2)) : null,
                 child: Row(
                   children: [
-                    // A berry ▶ in a 16 px column (w-4), at the button's 24 px, out past its column as on the page.
                     SizedBox(
                       width: 16,
                       child: Visibility.maintain(
@@ -315,7 +306,6 @@ class _MenuButton extends StatelessWidget {
         ),
       ),
     );
-    // title-in: from the left in five steps, one after another.
     return AnimatedBuilder(
       animation: clock,
       builder: (context, child) {
@@ -333,12 +323,10 @@ class _MenuButton extends StatelessWidget {
 
 const _from = {KeySource.settings: '存在设置里', KeySource.env: '来自环境变量', KeySource.pi: '用的是 pi 里配的'};
 
-/// What a key field says about the key in use.
 String _keyLine(KeyStatus k) => k.source != null ? '在用 ${k.hint ?? ''}（${_from[k.source]}）' : '还没有';
 
 enum _Key { deepseekApiKey, agoraAppId, agoraAppCertificate }
 
-/// The keys (DeepSeek, Agora), as the server has them: type a new one, clear one kept in settings, save.
 class SettingsPanel extends ConsumerStatefulWidget {
   const SettingsPanel({super.key, this.note, required this.onClose});
   final String? note;
@@ -371,7 +359,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
   });
 
   Future<void> _submit(SettingsStatus status) async {
-    // What was typed wins; a key cleared and not typed again goes as '' (the server forgets it).
+    // A key cleared and not typed again goes as '' (the server forgets it).
     String? value(_Key k, String typed) => typed.trim().isNotEmpty ? typed.trim() : (_cleared.contains(k) ? '' : null);
     final appId = _appId?.text.trim();
     final update = SettingsUpdate(
@@ -696,7 +684,6 @@ class _Input extends StatelessWidget {
   );
 }
 
-/// A key typed in hidden, with an eye to look at what was typed.
 class _SecretInput extends StatefulWidget {
   const _SecretInput({required this.controller, required this.placeholder, required this.label, required this.onChanged});
   final TextEditingController controller;

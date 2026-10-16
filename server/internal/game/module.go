@@ -6,7 +6,6 @@ import (
 	"vibevalley/internal/base"
 )
 
-// Module is the package's services, each on the farm's lifecycle.
 func Module(r *base.Readies) fx.Option {
 	return fx.Module("game", fx.Provide(
 		base.Run[*Ledger](r, newLedger),

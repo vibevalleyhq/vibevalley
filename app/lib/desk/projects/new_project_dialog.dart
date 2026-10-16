@@ -1,5 +1,4 @@
-// 新增项目 (web/src/pages/NewProjectDialog.tsx): open a new piece of land under the work directory, or download a public
-// GitHub repository into it. The name follows the repository's until it is typed by hand.
+// The name follows the repository's until it is typed by hand.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,7 +9,6 @@ import 'codebase.dart';
 import 'projects_state.dart';
 import '../shared/widgets.dart';
 
-/// Opens the dialog; on success it closes and the page goes to the new project.
 Future<void> showNewProjectDialog(BuildContext context) => showPxDialog<void>(
   context,
   title: const Text('新增项目'),
@@ -20,7 +18,6 @@ Future<void> showNewProjectDialog(BuildContext context) => showPxDialog<void>(
 class NewProjectForm extends ConsumerStatefulWidget {
   const NewProjectForm({super.key, required this.onDone});
 
-  /// After the dialog closed, with the new project's name.
   final ValueChanged<String> onDone;
 
   @override

@@ -1,19 +1,15 @@
 package protocol
 
-// The farm's keys, set from the title screen (packages/protocol/src/settings.ts): what a page may see of one, and
-// what is worth saving. The file is the server's.
-
 import (
 	"regexp"
 	"strings"
 )
 
-// KeyHint is the last characters of a key, enough to tell which one it is: 「…f3a9」.
 func KeyHint(key string) string { return "…" + coreSlice(key, -4, coreUnits(key)) }
 
 var settingsAgora = regexp.MustCompile(`^[0-9a-fA-F]{32}$`)
 
-// SettingsProblem is why an update cannot be saved; empty when it can. Empty strings clear and are always fine.
+// Empty strings clear and are always fine.
 func SettingsProblem(u SettingsUpdate) string {
 	trimmed := func(s *string) string {
 		if s == nil {

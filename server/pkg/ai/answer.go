@@ -1,9 +1,6 @@
 package ai
 
-// An answer being received, as pi's events: a provider tells it what came (thinking, words, a tool call and its
-// arguments, the end) and it says the events, each with the answer so far. Words and thinking end when another
-// block begins; a tool call ends when the answer does, its arguments whole (they are parsed as they grow, with
-// ParseStreamingJSON). Every provider goes through here, so the order of events is the same whoever answers.
+// Every provider goes through Answer, so the order of events is the same whoever answers.
 
 import (
 	"sort"
@@ -11,7 +8,6 @@ import (
 	"time"
 )
 
-// RawUsage is usage as a provider reports it; the total and the price are worked out here.
 type RawUsage struct {
 	Input      int
 	Output     int
@@ -25,24 +21,22 @@ type answerCall struct {
 	args  string
 }
 
-// Answer is one answer being received. Not safe for concurrent use.
+// Not safe for concurrent use.
 type Answer struct {
 	model      Model
 	responseID string
 	content    []Content
 	started    int64
-	// The words or thinking being said: their index; -1 for none.
+	// -1 for none.
 	open int
-	// Tool calls by the provider's slot (OpenAI numbers them): their index and arguments so far.
+	// By the provider's slot: OpenAI numbers them.
 	calls map[int]*answerCall
 }
 
-// NewAnswer starts an answer of model; responseID may be "".
 func NewAnswer(model Model, responseID string) *Answer {
 	return &Answer{model: model, responseID: responseID, started: time.Now().UnixMilli(), open: -1, calls: map[int]*answerCall{}}
 }
 
-// Partial is the answer so far.
 func (a *Answer) Partial() AssistantMessage {
 	return AssistantMessage{
 		Content:    append([]Content{}, a.content...),
@@ -64,11 +58,9 @@ func (a *Answer) Thinking(delta string) []AssistantMessageEvent { return a.grow(
 
 func (a *Answer) Text(delta string) []AssistantMessageEvent { return a.grow(TypeText, delta) }
 
-// Split ends the words or thinking being said, so what comes next is a block of its own (Anthropic's blocks).
 func (a *Answer) Split() []AssistantMessageEvent { return a.close() }
 
-// ThinkingSignature is the thinking's signature, which some providers want back (Anthropic): on the thinking being
-// said, or a new one.
+// Some providers want it back (Anthropic).
 func (a *Answer) ThinkingSignature(signature string) []AssistantMessageEvent {
 	var out []AssistantMessageEvent
 	if a.open < 0 || a.content[a.open].Type != TypeThinking {
@@ -81,7 +73,7 @@ func (a *Answer) ThinkingSignature(signature string) []AssistantMessageEvent {
 	return out
 }
 
-// RedactedThinking is thinking the provider keeps to itself: a block with nothing to read, its data kept as the signature.
+// Its data is kept as the signature.
 func (a *Answer) RedactedThinking(data string) []AssistantMessageEvent {
 	out := a.close()
 	a.content = append(a.content, Content{Type: TypeThinking, Redacted: true, ThinkingSignature: data})
@@ -93,14 +85,12 @@ func (a *Answer) RedactedThinking(data string) []AssistantMessageEvent {
 	return out
 }
 
-// ToolCallPiece is part of a tool call: its id and name when they come, more of its arguments.
 type ToolCallPiece struct {
 	ID   string
 	Name string
 	Args string
 }
 
-// ToolCall is part of a tool call; slot tells calls apart.
 func (a *Answer) ToolCall(slot int, piece ToolCallPiece) []AssistantMessageEvent {
 	var out []AssistantMessageEvent
 	call, ok := a.calls[slot]
@@ -125,7 +115,7 @@ func (a *Answer) ToolCall(slot int, piece ToolCallPiece) []AssistantMessageEvent
 	return out
 }
 
-// Done is the end: blocks close, usage is priced, and why it stopped (a tool call makes stop into toolUse).
+// A tool call makes stop into toolUse.
 func (a *Answer) Done(reason StopReason, usage RawUsage) []AssistantMessageEvent {
 	calls := len(a.calls)
 	out := a.closeAll()
@@ -136,7 +126,6 @@ func (a *Answer) Done(reason StopReason, usage RawUsage) []AssistantMessageEvent
 	return append(out, AssistantMessageEvent{Type: EventDone, Reason: stop, Message: a.final(stop, usage, "")})
 }
 
-// Error is it gone wrong, or stopped: what came so far, and why.
 func (a *Answer) Error(reason StopReason, message string, usage RawUsage) []AssistantMessageEvent {
 	out := a.closeAll()
 	return append(out, AssistantMessageEvent{Type: EventError, Reason: reason, Error: a.final(reason, usage, message)})
@@ -182,7 +171,6 @@ func (a *Answer) grow(kind, delta string) []AssistantMessageEvent {
 	return append(out, AssistantMessageEvent{Type: event, ContentIndex: index, Delta: delta, Partial: a.Partial()})
 }
 
-// close ends the words or thinking being said.
 func (a *Answer) close() []AssistantMessageEvent {
 	if a.open < 0 {
 		return nil
@@ -199,7 +187,7 @@ func (a *Answer) close() []AssistantMessageEvent {
 	return nil
 }
 
-// closeAll ends everything: the open words, then each tool call in the order it began.
+// The open words, then each tool call in the order it began.
 func (a *Answer) closeAll() []AssistantMessageEvent {
 	out := a.close()
 	calls := make([]*answerCall, 0, len(a.calls))

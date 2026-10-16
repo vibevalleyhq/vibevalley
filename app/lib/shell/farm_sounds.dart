@@ -1,9 +1,4 @@
-// Where the farm's sounds come from (web/src/farm/sounds.ts): changes in state, not clicks, so a sound plays whoever
-// caused the change (the player, a helper, the server, the debug console). Mute lives in prefs.
-//
-// The farm screen mounts FarmSounds around (or beside) the village and hands it what only it knows: the tool in hand,
-// the beds' effects, which panels and dialogs are open, the voice call. Helpers coming, ripening and failing, and the
-// effects (coins, level-ups, achievements), it reads itself.
+// Changes in state, not clicks, so a sound plays whoever caused the change.
 
 import 'dart:async';
 
@@ -17,7 +12,6 @@ import 'fx_layer.dart';
 import 'prefs.dart';
 import 'sfx.dart';
 
-/// A bed's effect (core bedFx): `kind` is water, spray, harvest, shovel or note.
 typedef BedFx = ({Object id, String kind});
 
 const _bedSound = {'water': 'water', 'spray': 'spray', 'harvest': 'harvest', 'shovel': 'shovel', 'note': 'nope'};
@@ -26,19 +20,14 @@ class FarmSounds extends ConsumerStatefulWidget {
   const FarmSounds({super.key, this.child = const SizedBox.shrink(), this.tool, this.bedFx = const [], this.open = const {}, this.call, this.effects});
   final Widget child;
 
-  /// The tool in hand: any change picks one up.
   final String? tool;
 
-  /// The beds' effects, as they stand; a new one sounds.
   final List<BedFx> bedFx;
 
-  /// Panels and dialogs by name (the bed panel, sowing, watering, the friends' dock, the chat…): a swish in, a swish out.
   final Map<String, bool> open;
 
-  /// The voice call: connecting, hanging up, failing.
   final VoiceCall? call;
 
-  /// The farm's effects; farmEffects when not given.
   final Stream<GameEffect>? effects;
 
   @override
@@ -119,8 +108,7 @@ class _FarmSoundsState extends ConsumerState<FarmSounds> {
   @override
   Widget build(BuildContext context) {
     Sfx.setMuted(ref.watch(prefsProvider.select((p) => p.muted)));
-    // The first state is the farm as it already was: nothing arrives in it (the page is still silent then, before
-    // the first click unlocks its audio).
+    // The first state is the farm as it already was: nothing arrives in it.
     ref.listen(farmProvider, (prev, next) {
       if (prev != null && next != null) _helpers(prev.helpers, next.helpers);
     });
@@ -128,7 +116,6 @@ class _FarmSoundsState extends ConsumerState<FarmSounds> {
   }
 }
 
-/// A helper walks on, ripens, fails.
 void _helpers(List<Helper> prev, List<Helper> next) {
   final before = {for (final h in prev) h.id: h};
   for (final h in next) {
@@ -143,8 +130,8 @@ void _helpers(List<Helper> prev, List<Helper> next) {
   }
 }
 
-/// Good news takes turns: a finished job ripens, pays and may earn an achievement in the same moment, and played
-/// together those are one muddy chord. Each waits for the one before, then holds the floor for `hold` ms.
+/// A finished job ripens, pays and may earn an achievement in the same moment, and played together those are one muddy chord: each waits for the one before,
+/// then holds the floor for `hold` ms.
 DateTime _floorFree = DateTime.fromMillisecondsSinceEpoch(0);
 
 void _inTurn(String name, int hold) {

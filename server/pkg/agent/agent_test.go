@@ -1,11 +1,5 @@
 package agent
 
-// The agent on agentcore against the faux model, offline: tools run and the model sees their results (and, for
-// DeepSeek, its reasoning); failures reach the model; Send steers a run, Later waits for it to stop; the step
-// limit; the session file, continued after a restart, an old one converted; a long conversation folded, in the
-// file too; skills; helpers side by side; a schedule that wakes it; the host's situation, never saved; stop.
-// Ported from the TypeScript @heybro/agent's agent.test.ts (removed).
-
 import (
 	"context"
 	"encoding/json"
@@ -49,7 +43,6 @@ func match(t *testing.T, pattern, s string) {
 	}
 }
 
-// lastUser is the last thing said to the model by a person (or a host), as it read it.
 func lastUser(c ai.Context) string {
 	for i := len(c.Messages) - 1; i >= 0; i-- {
 		if m, ok := c.Messages[i].(ai.UserMessage); ok {
@@ -127,7 +120,6 @@ func (r *rig) ask(text string) string {
 	return said
 }
 
-// withAgent is an agent in dir on a faux model answering steps; body runs with it.
 func withAgent(t *testing.T, dir string, steps []ai.FauxResponseStep, body func(r *rig), extra func(o *AgentOptions), faux ...*ai.FauxProviderHandle) {
 	t.Helper()
 	f := ai.FauxProvider(ai.FauxProviderOptions{})
@@ -199,7 +191,6 @@ func TestAToolIsRunAndItsResultGoesBack(t *testing.T) {
 			}
 		}
 		eq(t, tools, []string{"tool_execution_start:read_file", "tool_execution_end:read_file"})
-		// DeepSeek wants the reasoning back on the assistant's message: it is there on the second request.
 		flash, _ := ai.GetModel("deepseek", "deepseek-flash")
 		found := false
 		for _, m := range ai.ToChatMessages(flash, r.faux.State().Contexts[1]) {
@@ -343,7 +334,6 @@ func TestALongConversationIsFolded(t *testing.T) {
 			}
 			return false
 		})
-		// The model read the summary first, then the recent words.
 		contexts := r.faux.State().Contexts
 		var last ai.Context
 		for _, c := range contexts {

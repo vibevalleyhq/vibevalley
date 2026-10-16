@@ -1,15 +1,9 @@
-// The form pieces of the config pages (web/src/components/ui/{field,input,textarea}.tsx): a labelled field, the
-// one-line input and the text area. Inputs are controlled like the page's: give `value` and `onChanged`; the widget
-// keeps the text box in step when `value` changes from outside.
-
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import 'base.dart';
 import 'icons.dart';
 
-/// Replaces web/src/components/ui/field.tsx Field: a small label (with a leaf * when required, 可选 when optional) and
-/// `aside` at its right, the control, then the error in berry or the hint in brown.
 class PxField extends StatelessWidget {
   const PxField({super.key, required this.label, required this.child, this.hint, this.error, this.aside, this.required = false, this.optional = false});
   final String label;
@@ -75,7 +69,7 @@ class PxField extends StatelessWidget {
   }
 }
 
-/// A TextEditingController that follows a controlled `value` without moving the caret while the user types.
+/// Follows a controlled `value` without moving the caret while the user types.
 class _Synced {
   _Synced(String value) : controller = TextEditingController(text: value);
   final TextEditingController controller;
@@ -89,9 +83,6 @@ class _Synced {
   }
 }
 
-/// The page's inputClass: a 2 px bark outline (leaf while focused), the input cream with a 2 px cream-300 shade along
-/// its top and left inside the outline (shadow-pixel-inset, which wins over the skin's drop), 12 px words, the
-/// placeholder brown, half opacity when disabled.
 class _InputBox extends StatelessWidget {
   const _InputBox({required this.focused, required this.enabled, required this.child, this.height});
   final bool focused;
@@ -130,8 +121,7 @@ InputDecoration _bare(String? placeholder, TextStyle style) => kitBare(
   ),
 );
 
-/// A text field's decoration with nothing of its own: the kit draws the frame. The theme's borders for each state
-/// (enabled, focused…) would otherwise draw a second frame inside it, since a collapsed decoration only clears `border`.
+/// The theme's borders for each state would otherwise draw a second frame inside it, since a collapsed decoration only clears `border`.
 InputDecoration kitBare(InputDecoration d) => d.copyWith(
   filled: false,
   enabledBorder: InputBorder.none,
@@ -141,8 +131,6 @@ InputDecoration kitBare(InputDecoration d) => d.copyWith(
   focusedErrorBorder: InputBorder.none,
 );
 
-/// Replaces web/src/components/ui/input.tsx TextInput (and Input): a 36 px one-line input. `suggestions` are offered in
-/// a list under it as the page's <datalist> does: those containing what is typed.
 class PxTextInput extends StatefulWidget {
   const PxTextInput({
     super.key,
@@ -166,7 +154,6 @@ class PxTextInput extends StatefulWidget {
   final ValueChanged<String> onChanged;
   final String? placeholder;
 
-  /// A pixel glyph before the text (the search inputs' magnifier).
   final String? icon;
   final bool mono;
   final bool enabled;
@@ -178,8 +165,6 @@ class PxTextInput extends StatefulWidget {
   final bool obscure;
   final TextInputType? keyboardType;
 
-  /// A cream-100 well with the skin's inner cream-300 line instead of the input's outline (the voice page's key
-  /// inputs, which are not the shared inputClass).
   final bool well;
 
   @override
@@ -319,8 +304,6 @@ class _SuggestionList extends StatelessWidget {
   }
 }
 
-/// Replaces web/src/components/ui/textarea.tsx TextArea (and Textarea): the input's look, `rows` lines tall (6 by
-/// default) with relaxed line height, scrolling inside.
 class PxTextArea extends StatefulWidget {
   const PxTextArea({
     super.key,

@@ -1,9 +1,3 @@
-// A conversation as rows, Raft's way (web/src/desk/MessageList.tsx): a face, the name, who it is and when in grey,
-// then the words; a run from the same sender within a few minutes goes on without its header. Under a message with a
-// thread, a box with how many replies and the last one, which opens the thread. Days are marked; the top says where
-// the conversation began, or offers the older messages. What is on screen is read. Rows come from itemsOf, as in the
-// farm window.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -29,7 +23,6 @@ class MessageList extends ConsumerStatefulWidget {
   const MessageList({super.key, required this.conversation, this.filter, this.emptyText});
   final Conversation? conversation;
 
-  /// Only messages with these words (the header's search).
   final String? filter;
   final String? emptyText;
 
@@ -40,11 +33,10 @@ class MessageList extends ConsumerStatefulWidget {
 class _MessageListState extends ConsumerState<MessageList> {
   final _scroll = ScrollController();
 
-  /// The read position asked for last, so one unread run is marked once.
+  /// So one unread run is marked once.
   String? _marked;
 
-  /// The newest moment shown so far in this conversation: rows after it arrived while it was open. Null until the
-  /// first rows are shown, so the first page (and a page of older ones loaded above) just appears.
+  /// Null until the first rows are shown, so the first page (and a page of older ones loaded above) just appears.
   double? _shownUpTo;
 
   @override
@@ -56,7 +48,6 @@ class _MessageListState extends ConsumerState<MessageList> {
   @override
   void didUpdateWidget(MessageList old) {
     super.didUpdateWidget(old);
-    // A new conversation opens at its newest message, its rows already there.
     if (old.conversation?.id != widget.conversation?.id) {
       _shownUpTo = null;
       if (_scroll.hasClients) _scroll.jumpTo(0);
@@ -189,8 +180,7 @@ class _MessageListState extends ConsumerState<MessageList> {
   }
 }
 
-/// A row that arrived while the conversation was open rises 8 px into place and fades in, once, when it is first built
-/// (a whole pixel at a time); every other row just appears, as everything does when the system asks for less motion.
+/// Every other row just appears, as everything does when the system asks for less motion.
 class _Arrive extends StatefulWidget {
   const _Arrive({required super.key, required this.fresh, required this.child});
   final bool fresh;
@@ -279,10 +269,8 @@ class _Row extends StatelessWidget {
   };
 }
 
-/// A report's outcome, as a tag over its words.
 const _outcome = {Outcome.completed: ('做完了', Color(0xFFB4CB7C)), Outcome.failed: ('没做成', Color(0xFFE9A092)), Outcome.interrupted: ('叫停了', Color(0xFFE2C995))};
 
-/// A tag's words with its sprite before them.
 class _Tag extends StatelessWidget {
   const _Tag({required this.icon, required this.label, required this.fill});
   final String icon;
@@ -326,12 +314,10 @@ class _MessageRow extends ConsumerWidget {
         if (helper != null) runtimeLabel[helper.runtime] ?? helper.runtime,
         if (agent != null && agent.role.isNotEmpty) _roleShort(agent.role),
       ].where((s) => s.isNotEmpty).join(' '),
-      // The manager's name already says who it is.
       _ => '',
     };
     final outcome = m.outcome ?? Outcome.completed;
     final tag = switch (m.kind) {
-      // Sowing: a dispatched job is planted in a plot.
       MessageKind.dispatch => const _Tag(icon: 'icon-seeds', label: '派活', fill: Color(0xFFF3D38A)),
       MessageKind.report => _Tag(icon: outcomeIcon[outcome]!, label: _outcome[outcome]!.$1, fill: _outcome[outcome]!.$2),
       _ => null,
@@ -377,14 +363,12 @@ class _MessageRow extends ConsumerWidget {
     );
   }
 
-  /// The first clause of an agent's role, at most 18 characters.
   static String _roleShort(String role) {
     final first = role.split(RegExp('[，。,.]')).first;
     return first.length > 18 ? first.substring(0, 18) : first;
   }
 }
 
-/// A face, and beside it the header (unless it continues a run) and the body.
 class _Frame extends StatefulWidget {
   const _Frame({required this.face, required this.name, required this.meta, required this.child, this.dot, this.continues = false});
   final Widget face;
@@ -455,7 +439,6 @@ class _FrameState extends State<_Frame> {
   );
 }
 
-/// The thread under a message: how many replies, how many new, what its helper is doing, the last one; opens it.
 class ThreadPreview extends ConsumerWidget {
   const ThreadPreview({super.key, required this.thread});
   final Conversation thread;
@@ -479,7 +462,6 @@ class ThreadPreview extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // The farm window's thread chip, across the box: the bubble, the count, what is new, its helper, the way in.
             Row(
               children: [
                 const Glyph('button-thread'),

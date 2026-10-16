@@ -1,19 +1,13 @@
 package protocol
 
-// A playbook (种植计划) is a parent issue with a plan (Issue.Plan); its steps are its sub-issues, each with its Step,
-// waiting for the sub-issues it is blocked by (Issue.BlockedBy). The playbook rules (playbook.go) read a playbook as
-// one piece: PlaybooksOf puts it together from the issues, PlaybookIssues takes it apart again.
-
 import (
 	"cmp"
 	"slices"
 	"strings"
 )
 
-// StepIssueID is the id of the sub-issue that is step key of playbook plan.
 func StepIssueID(plan, key string) string { return plan + "." + key }
 
-// planClosed is how a playbook's issue closes in state s; nil while it is open.
 func planClosed(s PlaybookState) *IssueClose {
 	switch s {
 	case PlaybookStateDone:
@@ -24,8 +18,6 @@ func planClosed(s PlaybookState) *IssueClose {
 	return nil
 }
 
-// stepClosed is how a step's sub-issue closes: merged into the playbook's branch, skipped, or with its playbook given
-// up; nil while it is open.
 func stepClosed(plan PlaybookState, n PlaybookNode) *IssueClose {
 	switch {
 	case n.State == NodeStateMerged:
@@ -36,9 +28,7 @@ func stepClosed(plan PlaybookState, n PlaybookNode) *IssueClose {
 	return nil
 }
 
-// PlaybookIssues is pb as issues: its parent, then a sub-issue for each step in plan order. What only the issues know
-// (their runs, priority, when they were written down and when they closed) comes from before, the same issues as they
-// were; one closing now closes at now.
+// What only the issues know (their runs, priority, when they were written down and closed) comes from before; one closing now closes at now.
 func PlaybookIssues(pb Playbook, before []Issue, now int64) []Issue {
 	was := map[string]Issue{}
 	for _, t := range before {
@@ -84,7 +74,6 @@ func PlaybookIssues(pb Playbook, before []Issue, now int64) []Issue {
 	return out
 }
 
-// playbookFrom is the playbook parent is, with its steps among issues.
 func playbookFrom(parent Issue, issues []Issue) Playbook {
 	plan := parent.Plan
 	pb := Playbook{
@@ -116,7 +105,6 @@ func playbookFrom(parent Issue, issues []Issue) Playbook {
 	return pb
 }
 
-// PlaybooksOf is every playbook in the state, oldest first.
 func PlaybooksOf(state FarmState) []Playbook {
 	out := []Playbook{}
 	for _, t := range state.Issues {
@@ -128,7 +116,6 @@ func PlaybooksOf(state FarmState) []Playbook {
 	return out
 }
 
-// PlaybookOf is the playbook id in the state; nil when it is not there.
 func PlaybookOf(state FarmState, id string) *Playbook {
 	for _, t := range state.Issues {
 		if t.ID == id && t.Plan != nil {

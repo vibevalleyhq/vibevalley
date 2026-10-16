@@ -1,7 +1,5 @@
 package protocol
 
-// Schedules' rules (schedules.go), as the removed TypeScript server's schedule-rules.test.ts tested the TypeScript ones.
-
 import (
 	"regexp"
 	"testing"
@@ -10,7 +8,6 @@ import (
 
 const scheduleSH = "Asia/Shanghai"
 
-// scheduleAt is a moment in Shanghai (UTC+8).
 func scheduleAt(iso string) int64 {
 	t, err := time.Parse(time.RFC3339, iso+"+08:00")
 	if err != nil {
@@ -40,7 +37,6 @@ func TestScheduleDailyWeekly(t *testing.T) {
 	rulesEqual(t, scheduleNextOf(t, scheduleMake()), scheduleAt("2026-10-12T09:00:00"))
 	rulesEqual(t, scheduleNextOf(t, scheduleMake(func(s *FarmSchedule) { s.LastRun = rulesPtr(scheduleAt("2026-10-12T09:00:00")) })), scheduleAt("2026-10-13T09:00:00"))
 	rulesEqual(t, scheduleNextOf(t, scheduleMake(func(s *FarmSchedule) { s.TZ = "UTC" })), time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC).UnixMilli())
-	// 2026-10-12 is a Monday: next Wednesday or Friday.
 	rulesEqual(t, scheduleNextOf(t, scheduleMake(func(s *FarmSchedule) { s.When = ScheduleWhen{ScheduleWhenWeekly{Days: []int64{5, 3}, Time: "18:30"}} })), scheduleAt("2026-10-14T18:30:00"))
 	rulesEqual(t, scheduleNextOf(t, scheduleMake(func(s *FarmSchedule) { s.When = ScheduleWhen{ScheduleWhenWeekly{Days: []int64{0}, Time: "07:00"}} })), scheduleAt("2026-10-18T07:00:00"))
 }

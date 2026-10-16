@@ -13,9 +13,6 @@ import (
 	"time"
 )
 
-// The client against a local server that answers as WeChat's iLink do: what is sent, and how answers and errors are
-// read. Nothing leaves the machine.
-
 func jsonBody(t *testing.T, r *http.Request) map[string]any {
 	t.Helper()
 	var body map[string]any
@@ -95,7 +92,6 @@ func TestClientSpeaksWeChatsProtocol(t *testing.T) {
 	if got := Text(m); got != "看看\n语音的字\n[文件：a.txt]" {
 		t.Fatalf("text: %q", got)
 	}
-	// Nothing within the long poll's time is an empty answer, where it left off.
 	quiet, err := live.GetUpdates(ctx, account, "slow", 50*time.Millisecond)
 	if err != nil || len(quiet.Msgs) != 0 || quiet.GetUpdatesBuf != "slow" || Failed(quiet.Ret, quiet.Errcode) != nil {
 		t.Fatalf("quiet: %+v %v", quiet, err)

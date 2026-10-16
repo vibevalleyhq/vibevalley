@@ -1,7 +1,3 @@
-// 地图: the islands' rules (which plots are worktrees, free or shut, the order, where the plots stand, how big the
-// islands are drawn) and the page: islands with their helpers, free plots that start a ticket for the project, the
-// queue's sacks, and an island's worktrees opened beside the map.
-
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -79,16 +75,13 @@ void main() {
         plots: const {'w1': PlotView(crop: Crop.leafy)},
         issues: [_todo('b2', 'docs', queuedAt: 8), _todo('b1', 'docs', queuedAt: 3), _todo('b3', 'clock-in')],
       );
-      // Worked or waited on first, then the newest-worked.
       expect([for (final i in islands) i.project], ['clock-in', 'docs', 'pb-smoke']);
       final clock = islands.first;
-      // One of three working: two more may, and the farm has room.
       expect(_kinds(clock), ['w1', 'w2', 'w4', 'open', 'open']);
       expect((clock.working, clock.slots, clock.open), (1, 3, 2));
       expect((clock.spots.first as SpotTaken).plot.crop, Crop.leafy);
       expect((clock.spots[1] as SpotTaken).plot.crop, Crop.seeded, reason: 'no plot in the view yet');
       expect(islandText(clock), '在干 1/3');
-      // Only the queued ones wait at the gate, the first in line first.
       expect([for (final b in islands[1].queued) b.id], ['b1', 'b2']);
       expect(islandText(islands[1]), '在干 1/3 · 排队 2');
       expect(_kinds(islands[2]), ['open', 'open', 'open']);
@@ -261,7 +254,6 @@ void main() {
           ),
       ],
     );
-    // Tall enough for both rows of islands.
     t.view.physicalSize = const Size(1440, 1400);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);

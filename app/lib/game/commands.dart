@@ -1,6 +1,3 @@
-// The player's moves on the farm, as the client sends them (packages/core farm.ts water/cure/harvest/shovel/plant and
-// applyTool, session.ts say/whenLive, playbooks.ts): each is a server command, plus the effect over the bed it was for.
-
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,8 +25,7 @@ class FarmCommands {
     if (bed != null) burst(ref, bed.index, kind, text);
   }
 
-  /// 浇水: a word for the helper; a working one reads it before its next step, an idle one works another turn. `on`:
-  /// a comment on that step of its trajectory.
+  /// `on`: a comment on that step of its trajectory.
   Future<void> water(Helper w, String text, {int? on}) async {
     await _api.tell(
       id: w.id,
@@ -38,7 +34,6 @@ class FarmCommands {
     _burst(w, BedFxKind.water);
   }
 
-  /// 杀虫: the failed job again, with the error in mind.
   Future<void> cure(Helper w) async {
     await _api.tell(
       id: w.id,
@@ -47,13 +42,11 @@ class FarmCommands {
     _burst(w, BedFxKind.spray);
   }
 
-  /// 收获: keep what it made, and let it go home.
   Future<void> harvest(Helper w) async {
     await _api.harvest(id: w.id);
     _burst(w, BedFxKind.harvest, '收进仓库');
   }
 
-  /// 铲除: stop it if it is working, otherwise send it home.
   Future<void> shovel(Helper w) async {
     if (w.phase is PhaseWorking) {
       await _api.stop(id: w.id);
@@ -66,14 +59,13 @@ class FarmCommands {
   Future<void> stop(String id) => _api.stop(id: id);
   Future<void> dismiss(String id) => _api.dismiss(id: id);
 
-  /// The agent picked for the next job, if it still exists (core pickedAgent).
   String? get pickedAgent {
     final pick = ref.read(prefsProvider).pick;
     final agents = ref.read(agentsProvider).value ?? const {};
     return pick != 'auto' && agents.containsKey(pick) ? pick : null;
   }
 
-  /// Whether the call is live, starting it first if needed: you can plant before you have said hello (core whenLive).
+  /// You can plant before you have said hello.
   Future<bool> whenLive() async {
     final now = _farm?.call;
     if (now == CallState.live) return true;
@@ -88,7 +80,6 @@ class FarmCommands {
     return false;
   }
 
-  /// 播种: a job for this bed, to this agent (or the picked one, or the manager's pick); starts the call if needed.
   Future<void> plant(int station, String text, [String? agent]) async {
     if (!await whenLive()) return;
     await _api.say(
@@ -96,7 +87,7 @@ class FarmCommands {
     );
   }
 
-  /// Uses the tool in hand on `bed` (core applyTool): when it does not apply, the reason is said over the bed.
+  /// When the tool does not apply, the reason is said over the bed.
   Future<ToolResult> applyTool(Bed bed) async {
     final tool = ref.read(heldToolProvider);
     final state = _farm;
@@ -118,7 +109,6 @@ class FarmCommands {
         await cure(worker);
         return const ToolDone();
       case Tool.harvest:
-        // The server says what the harvest would merge: look before saying yes.
         return ToolReview(worker.id);
       case Tool.shovel:
         await shovel(worker);
@@ -155,14 +145,12 @@ class FarmCommands {
     ),
   );
 
-  /// Wears a tier of an achievement as the farm's title, or none (core chooseTitle).
   Future<void> chooseTitle([String? achievement, int? tier]) => _api.chooseTitle(
     body: ChooseTitleRequest(achievement: achievement, tier: tier?.toDouble()),
   );
 
-  /// Asks every usable runtime's account again (Quota.tsx 现在读一次).
   Future<void> refreshRuntime(String id) => _api.refreshRuntime(id: id);
 }
 
-/// Runs a command and forgets it: a refusal is the server's to tell (a notice), as the web page's `fire`.
+/// A refusal is the server's to tell (a notice).
 void fire(Future<Object?> command) => unawaited(command.then((_) {}, onError: (Object _) {}));

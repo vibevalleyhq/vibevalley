@@ -1,15 +1,3 @@
-// Small pieces the desk pages share, in the pixel skin (corners square, `ring-1` an inner cream-300 line, `shadow` a
-// hard drop):
-//   DeskSection   a titled block with a count and an aside (MemoryPanels.tsx Section)
-//   DeskEmpty     a quiet line on a cream well, for empty and loading states (Empty)
-//   DeskBadge     a small tag: 新的, 没保存, 已保存, 在场 (AgentCreator.tsx Badge)
-//   DeskTabs      a row of tabs over a panel (Base UI Tabs as the desk styles them)
-//   DeskPill      a round toggle: the stage's poses, the memory list's filter
-//   DeskChoice    a tile that is chosen or not (the creator's species, outfits, runtimes, skills)
-//   DeskLink      words that go somewhere, in leaf green (the page's text links)
-//   deskRun       runs a command from a click, and says it failed in a toast (the page's `run`, which only logs)
-//   deskGo        goes to a desk route
-
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
@@ -83,7 +71,6 @@ class DeskBadge extends StatelessWidget {
   const DeskBadge(this.text, {super.key, this.hat = false});
   final String text;
 
-  /// The green one (新的, 没保存, 在场); else cream.
   final bool hat;
 
   @override
@@ -100,7 +87,6 @@ class DeskTabs<T> extends StatelessWidget {
   final List<(T, String)> tabs;
   final ValueChanged<T> onChanged;
 
-  /// The manager page's tabs (px-3 text-sm); the creator's are tighter (px-2.5 text-xs).
   final bool big;
 
   @override
@@ -119,7 +105,6 @@ class DeskTabs<T> extends StatelessWidget {
                 height: 32,
                 padding: EdgeInsets.symmetric(horizontal: big ? 12 : 10),
                 alignment: Alignment.center,
-                // focus-visible:ring-2: the skin's inner cream-300 line, on every tab.
                 color: v == value ? Palette.cream300 : null,
                 foregroundDecoration: pxRing,
                 child: Text(label, style: KitText.xs.copyWith(color: v == value ? Palette.bark900 : (s.hovered ? Palette.bark800 : Palette.bark600))),
@@ -137,7 +122,6 @@ class DeskPill extends StatelessWidget {
   final bool on;
   final VoidCallback onTap;
 
-  /// The memory filter's (px-2 py-0.5 text-[11px]); else the stage's (px-3 py-1 text-xs).
   final bool small;
 
   @override
@@ -147,7 +131,6 @@ class DeskPill extends StatelessWidget {
     semanticLabel: label,
     builder: (context, s) => Container(
       padding: small ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2) : const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      // focus-visible:ring-2 makes the skin's inner cream-300 line, and wins over the chosen one's drop.
       color: on ? Palette.leaf500 : (s.hovered ? Palette.cream300 : Palette.cream200),
       foregroundDecoration: pxRing,
       child: Text(label, style: KitText.xs.copyWith(color: on ? Palette.cream50 : Palette.bark800)),
@@ -181,7 +164,6 @@ class DeskChoice extends StatelessWidget {
     builder: (context, s) => Container(
       padding: padding,
       color: active ? Palette.leaf300.withValues(alpha: .5) : (s.hovered ? Palette.cream200 : Palette.cream50),
-      // ring-1 / focus-visible:ring-2: the skin's inner cream-300 line, chosen or not.
       foregroundDecoration: pxRing,
       child: child,
     ),
@@ -205,7 +187,6 @@ class DeskLink extends StatelessWidget {
   );
 }
 
-/// Runs a command from a click; a failure is said in a toast (the web page only logs it).
 Future<T?> deskRun<T>(Future<T> Function() command) async {
   try {
     return await command();
@@ -215,5 +196,5 @@ Future<T?> deskRun<T>(Future<T> Function() command) async {
   }
 }
 
-/// Goes to a desk route (lib/app/router.dart); nothing without a router (a widget test without one).
+/// Nothing without a router (a widget test without one).
 void deskGo(BuildContext context, String path) => GoRouter.maybeOf(context)?.go(path);

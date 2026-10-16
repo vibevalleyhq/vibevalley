@@ -1,17 +1,7 @@
 package agentcore
 
-// The loop, as pi-agent-core runs it. A run is turns; a turn puts in what is waiting (the prompts, or steering),
-// asks the model once, runs the tools it asked for and gives back their results. Another turn follows while the
-// model asked for tools (unless every result said terminate), while steering waits, or when FinishTurn says
-// continue; when it would stop, follow-ups start it again. An answer that ends in an error or was aborted ends the
-// run. Cancelling the run's context ends it as pi's abort does (TS: interrupting the fiber): the answer so far is
-// kept with StopReason aborted, tools that were running get an error result, and turn_end and agent_end are still
-// said, so the transcript stays whole.
-//
-// Tools: each call in order is announced (tool_execution_start), its arguments checked, BeforeToolCall asked; the
-// ones allowed then run together (or one by one, when the config or one of the tools says sequential), each
-// finishing with tool_execution_end as it is done; their results go into the transcript in the model's order.
-// Running tools are waited for after a cancel (they get a cancelled context); what they return then is dropped.
+// Runs as pi-agent-core runs it: another turn follows while the model asked for tools (unless every result said terminate), while steering waits, or
+// when FinishTurn says continue; when it would stop, follow-ups start it again.
 
 import (
 	"context"
@@ -24,13 +14,11 @@ import (
 	"vibevalley/pkg/ai"
 )
 
-// AgentEventSink is where a run's events go. It may be called from several goroutines (tools in parallel) and
-// must not block for long.
+// Called from several goroutines (tools in parallel); must not block for long.
 type AgentEventSink func(event AgentEvent)
 
 var modelRoles = map[string]bool{"system": true, "user": true, "assistant": true, "toolResult": true}
 
-// DefaultConvertToLlm is the model's messages, as they are; the application's own are left out.
 func DefaultConvertToLlm(_ context.Context, messages []AgentMessage) []ai.Message {
 	out := []ai.Message{}
 	for _, m := range messages {
@@ -41,7 +29,6 @@ func DefaultConvertToLlm(_ context.Context, messages []AgentMessage) []ai.Messag
 	return out
 }
 
-// STOPPED is what an answer or a tool cut short by a stop says.
 const STOPPED = "已停下"
 
 func errorResult(text string) AgentToolResult {
@@ -50,7 +37,6 @@ func errorResult(text string) AgentToolResult {
 
 func now() int64 { return time.Now().UnixMilli() }
 
-// resultMessage is the thing a tool call amounts to in the transcript.
 func resultMessage(outcome AgentToolCallOutcome) ai.ToolResultMessage {
 	content := outcome.Result.Content
 	if content == nil {
@@ -62,7 +48,6 @@ func resultMessage(outcome AgentToolCallOutcome) ai.ToolResultMessage {
 	}
 }
 
-// RunToolCallOptions is what running a tool call needs.
 type RunToolCallOptions struct {
 	Tools            []AgentTool
 	AssistantMessage ai.AssistantMessage
@@ -71,7 +56,6 @@ type RunToolCallOptions struct {
 	Emit             AgentEventSink
 }
 
-// prepared is a call checked and allowed to run (Tool set), or already answered (no such tool, bad arguments, blocked).
 type prepared struct {
 	toolCall ai.Content
 	tool     *AgentTool
@@ -119,7 +103,6 @@ func prepare(ctx context.Context, toolCall ai.Content, options RunToolCallOption
 	return prepared{toolCall: toolCall, tool: tool, args: args}
 }
 
-// runTool runs a tool, a panic said as 工具出错.
 func runTool(ctx context.Context, tool *AgentTool, id string, args json.RawMessage, onUpdate AgentToolUpdateCallback) (result AgentToolResult, isError bool) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -140,7 +123,7 @@ func runTool(ctx context.Context, tool *AgentTool, id string, args json.RawMessa
 	return r, r.IsError
 }
 
-// execute runs a prepared call; false when the run was stopped meanwhile (nothing is said then: the stop answers it).
+// Nothing is said when the run was stopped meanwhile: the stop answers it.
 func execute(ctx context.Context, p prepared, options RunToolCallOptions) (AgentToolCallOutcome, bool) {
 	started := time.Now()
 	onUpdate := func(partial AgentToolResult) {
@@ -185,7 +168,6 @@ func execute(ctx context.Context, p prepared, options RunToolCallOptions) (Agent
 	return AgentToolCallOutcome{ToolCall: p.toolCall, Result: result, IsError: isError, DurationMs: &duration}, true
 }
 
-// RunToolCall is one tool call from start to end: announced, checked, run, reported. false when ctx was cancelled.
 func RunToolCall(ctx context.Context, toolCall ai.Content, options RunToolCallOptions) (AgentToolCallOutcome, bool) {
 	p := prepare(ctx, toolCall, options)
 	if p.tool == nil {
@@ -194,19 +176,16 @@ func RunToolCall(ctx context.Context, toolCall ai.Content, options RunToolCallOp
 	return execute(ctx, p, options)
 }
 
-// RunAgentLoop runs the agent from prompts on top of c until it stops or ctx is cancelled; it returns the
-// messages the run added.
 func RunAgentLoop(ctx context.Context, prompts []AgentMessage, c AgentContext, config AgentLoopConfig, emit AgentEventSink) []AgentMessage {
 	return newRun(ctx, c, config, emit).run(prompts, false)
 }
 
-// RunAgentLoopContinue goes on from the transcript as it is (its last message the user's or a tool's); steering
-// is taken first.
+// The last message must be the user's or a tool's; steering is taken first.
 func RunAgentLoopContinue(ctx context.Context, c AgentContext, config AgentLoopConfig, emit AgentEventSink) []AgentMessage {
 	return newRun(ctx, c, config, emit).run(nil, true)
 }
 
-// AgentLoop is the run as a stream of its events; the channel closes after agent_end.
+// The channel closes after agent_end.
 func AgentLoop(ctx context.Context, prompts []AgentMessage, c AgentContext, config AgentLoopConfig) <-chan AgentEvent {
 	return asStream(func(emit AgentEventSink) { RunAgentLoop(ctx, prompts, c, config, emit) })
 }
@@ -256,9 +235,8 @@ type loopRun struct {
 	// Where the run is, for a stop to end it properly.
 	answering     *answering
 	lastAssistant *ai.AssistantMessage
-	// The calls of the answer whose tools are running, and the ones already announced or finished.
-	toolsOf *toolsState
-	inTurn  bool
+	toolsOf       *toolsState
+	inTurn        bool
 }
 
 func newRun(ctx context.Context, c AgentContext, config AgentLoopConfig, emit AgentEventSink) *loopRun {
@@ -302,7 +280,6 @@ func emptyAnswer(model ai.Model) ai.AssistantMessage {
 	return ai.AssistantMessage{Content: []ai.Content{}, API: model.API, Provider: model.Provider, Model: model.ID, Usage: ai.EmptyUsage(), StopReason: ai.StopStop, Timestamp: now()}
 }
 
-// respond asks the model once, says its answer as it comes, and returns it whole; false when the run was stopped.
 func (r *loopRun) respond() (ai.AssistantMessage, bool) {
 	ctx := r.ctx
 	request := r.snapshot()
@@ -415,8 +392,7 @@ type ranTools struct {
 	terminate bool
 }
 
-// runTools runs the answer's tool calls; their results, in the model's order, are in the transcript. false when
-// the run was stopped.
+// Results go in the model's order.
 func (r *loopRun) runTools(assistantMessage ai.AssistantMessage, calls []ai.Content) (ranTools, bool) {
 	ctx := r.ctx
 	state := &toolsState{calls: calls, announced: map[string]bool{}, finished: map[string]AgentToolCallOutcome{}}
@@ -553,7 +529,6 @@ outer:
 	return r.freshCopy()
 }
 
-// stopped keeps what was said, answers the tools that were running, and closes the turn and the run.
 func (r *loopRun) stopped() []AgentMessage {
 	if r.answering != nil {
 		var message ai.AssistantMessage

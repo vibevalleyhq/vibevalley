@@ -1,19 +1,14 @@
-// Ported from packages/protocol/src/seeds.ts: the runtime presets (RUNTIME_PRESETS, presetOf) and a runtime's name on
-// the pages (runtimeLabel; the kit's `runtimeLabel` is web/src/ui/labels.ts's, a different, shorter table). Keep it in
-// step with the TypeScript.
+// Keep it in step with protocol/seeds.json.
 
 import '../gen/vibevalley.dart';
 
-/// The eye colour a look starts with.
 const defaultEye = '#a6f4ff';
 
-/// A runtime as the pages name it, and the look a new agent on it starts with.
 class RuntimePreset {
   const RuntimePreset(this.id, this.label, this.blurb, this.look);
   final String id;
   final String label;
 
-  /// One line for the runtime list.
   final String blurb;
   final Look look;
 }
@@ -41,5 +36,5 @@ RuntimePreset presetOf(String runtime) {
   return RuntimePreset(runtime, runtime, 'VibeValley 还没有专属外形的 runtime。', _fallbackLook);
 }
 
-/// A runtime's name on the pages (protocol runtimeLabel): Claude Code, Codex, Pi…; the id for one without a preset.
+/// The id for one without a preset.
 String runtimeName(String runtime) => presetOf(runtime).label;

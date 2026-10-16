@@ -1,8 +1,3 @@
-// The farm chat window's channel menu (web/src/farm/Channels.tsx): the channels (田头 first) with what is unread in
-// each, to switch to; a form to open a new one (a name, what it is for, a default project); the shown channel's own
-// settings; and the farm's schedules (made by the manager when asked), to switch off or delete. A channel is where
-// work is arranged: the manager answers and arranges jobs in the one it was spoken to in.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -23,7 +18,6 @@ enum _Mode { list, create, settings, schedules }
 
 const _grey = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, color: Palette.bark500);
 
-/// The channel's name in the chat window's header: opens the menu.
 class ChannelMenu extends ConsumerStatefulWidget {
   const ChannelMenu({super.key, required this.current});
   final Conversation? current;
@@ -90,7 +84,6 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
           child: KitTappable(
             onTap: _toggle,
             semanticLabel: '频道：${channelLabel(current)}，点开切换或开新频道',
-            // focus-visible:ring-2: the skin's inner cream-300 line.
             builder: (context, s) => Container(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               color: s.hovered ? Palette.cream200 : null,
@@ -221,7 +214,6 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
   }
 }
 
-/// A small text button in the menu's bottom row.
 class _Link extends StatelessWidget {
   const _Link({required this.onTap, required this.child, this.color = Palette.bark600});
   final VoidCallback onTap;
@@ -262,7 +254,6 @@ class _FormButtons extends StatelessWidget {
   );
 }
 
-/// Opening a channel from the menu.
 class NewChannelPanel extends ConsumerStatefulWidget {
   const NewChannelPanel({super.key, required this.onDone, required this.onBack});
   final VoidCallback onDone;
@@ -340,7 +331,6 @@ class _NewChannelPanelState extends ConsumerState<NewChannelPanel> {
   }
 }
 
-/// The shown channel's own settings from the menu.
 class ChannelSettingsPanel extends ConsumerStatefulWidget {
   const ChannelSettingsPanel({super.key, required this.channel, required this.onDone, required this.onBack});
   final Conversation channel;
@@ -400,7 +390,6 @@ class _ChannelSettingsPanelState extends ConsumerState<ChannelSettingsPanel> {
   }
 }
 
-/// The farm's schedules: when, where, what; switched on and off, or deleted (a second press to be sure).
 class ScheduleList extends ConsumerStatefulWidget {
   const ScheduleList({super.key, required this.schedules, required this.channels, required this.onBack});
   final List<FarmSchedule> schedules;

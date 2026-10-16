@@ -1,9 +1,5 @@
 package agent
 
-// The tools on their own: the coding tools in a scratch folder, skills' front matter, memory and the archive,
-// schedules (when due, a missed run caught up once), an MCP server over stdio. Offline.
-// Ported from the TypeScript @heybro/agent's tools.test.ts (removed).
-
 import (
 	"context"
 	"encoding/json"
@@ -165,7 +161,6 @@ func TestSchedulesAMissedJobRunsOnce(t *testing.T) {
 	time.Sleep(2 * time.Millisecond)
 	ok(t, call(t, s.Tools, "schedule", `{"name":"提醒","message":"开会","at":"`+isoTime(time.Now().Add(time.Minute))+`"}`))
 	match(t, `「巡检」每 10 分钟[\s\S]*「提醒」`, ok(t, call(t, s.Tools, "list_schedules", `{}`)))
-	// Away for an hour: six runs missed, one run.
 	later := time.Now().Add(time.Hour)
 	s.Tick(later)
 	eq(t, len(woke), 2)
@@ -234,7 +229,7 @@ func ai2json(v any) string {
 	return string(data)
 }
 
-// The forms of a moment `new Date` reads (checked against Node in Asia/Shanghai): the schedule tool takes them all.
+// Checked against Node in Asia/Shanghai.
 func TestScheduleAtReadsTheFormsJSDateReads(t *testing.T) {
 	shanghai, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {

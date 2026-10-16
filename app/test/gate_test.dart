@@ -1,6 +1,3 @@
-// 院门: the pairing link, the farm choice that survives a restart, getting into another machine's farm (pairWith),
-// and the page managing this machine's gate, against a fake server.
-
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -64,7 +61,6 @@ void main() {
   group('pairWith', () {
     final link = PairLink(Uri.parse(_gate), 'ABC234');
 
-    /// A farm that knows `known` keys; it lets in whoever asks when `allow`.
     (ApiFor, List<String>) farm({Set<String> known = const {}, bool allow = true}) {
       final calls = <String>[];
       VibeValleyApi apiFor(Uri url, String? key) => VibeValleyApi(

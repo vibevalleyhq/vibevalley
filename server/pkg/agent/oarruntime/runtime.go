@@ -1,10 +1,4 @@
-// Package oarruntime is vibevalley's own agent as an oar runtime (`vibevalley`), so a helper can be one: the agent package
-// with the coding tools in the helper's folder, the session's MCP servers (the farm's /mcp tools among them) and
-// DeepSeek, in this process. Ported from the TypeScript server's vibevalley-runtime.ts (removed), built on smith's runtime-author SPI the
-// way smith's scripted runtime (oartest) is: one turn is one run of the agent until it settles; what it says,
-// thinks and runs becomes the ordinary events (text_delta, reasoning, tool_call_*, turn_ended, usage). Steer joins
-// the run under way; queued inputs wait for the turn to end and can be withdrawn until then. The conversation is
-// kept as <home>/helpers/<session id>.jsonl, so a resumed session goes on.
+// Built on smith's runtime-author SPI the way smith's scripted runtime (oartest) is: one turn is one run of the agent until it settles.
 package oarruntime
 
 import (
@@ -27,10 +21,9 @@ import (
 
 const VIBEVALLEY_RUNTIME = "vibevalley"
 
-// EFFORTS is the levels of thinking a helper can be asked for: DeepSeek's two.
+// DeepSeek's two.
 var EFFORTS = []string{"high", "max"}
 
-// HELPER_INSTRUCTIONS is who a helper is, before the farm's persona (appended) or instead of it (a replaced system prompt).
 const HELPER_INSTRUCTIONS = `你是一个编码 agent，在主人电脑上的一个项目目录里干活：读写代码、跑命令、查资料。
 - 先弄清楚再动手：读相关的文件，看清现状；改完跑能跑的检查（lint、类型检查、测试）确认。
 - 能自己查到的不问；真正要拿主意的才问，一次问清。
@@ -38,12 +31,10 @@ const HELPER_INSTRUCTIONS = `你是一个编码 agent，在主人电脑上的一
 - 回答用中文，简短，先说结论。`
 
 type Options struct {
-	// vibevalley's folder: the conversations are under helpers/. Default $VIBEVALLEY_HOME, else ~/.vibevalley.
+	// Default $VIBEVALLEY_HOME, else ~/.vibevalley.
 	Home func() string
-	// The model and its key for a session ("" for the default); default DeepSeek (the session's model, else
-	// deepseek-flash) with the key saved in settings.json, else DeepSeek's own.
-	Llm func(ctx context.Context, model string) (agent.LLM, error)
-	// Providers besides the default ones (a test's faux).
+	// "" for the default: the session's model, else deepseek-flash, with the key saved in settings.json, else DeepSeek's own.
+	Llm       func(ctx context.Context, model string) (agent.LLM, error)
 	Providers []ai.ApiProvider
 }
 
@@ -55,8 +46,7 @@ func defaultHome() string {
 	return filepath.Join(dir, ".vibevalley")
 }
 
-// settingsKey is the DeepSeek key saved from the title screen (<home>/settings.json), read each session: a key
-// saved meanwhile is used.
+// Read each session: a key saved meanwhile is used.
 func settingsKey(home string) string {
 	data, err := os.ReadFile(filepath.Join(home, "settings.json"))
 	if err != nil {
@@ -81,10 +71,9 @@ var refused = oar.RefusedSessionOptions{
 	oar.OptionServiceTier: "DeepSeek 没有服务档位",
 }
 
-// refusedOrder is the order options are checked in (smith's internal/shared refusableOrder, for these two).
+// smith's internal/shared refusableOrder, for these two.
 var refusedOrder = []oar.RefusableSessionOption{oar.OptionServiceTier, oar.OptionLaunchArgs}
 
-// VibeValleyRuntime is the runtime.
 func VibeValleyRuntime(options Options) oar.Runtime {
 	home := options.Home
 	if home == nil {
@@ -177,7 +166,6 @@ func VibeValleyRuntime(options Options) oar.Runtime {
 		ID:                    VIBEVALLEY_RUNTIME,
 		Session:               start,
 		RefusedSessionOptions: refused,
-		// Nothing to install: it is in this process. Usable when there is a DeepSeek key (the environment, or pi's).
 		Installation: func(ctx context.Context) (oar.InstallationSnapshot, error) {
 			if _, err := llmOf(ctx, ""); err != nil {
 				return oar.InstallationSnapshot{Kind: "unsupported", Reason: err.Error()}, nil
@@ -194,10 +182,8 @@ func VibeValleyRuntime(options Options) oar.Runtime {
 	})
 }
 
-// VibeValley is the runtime vibevalley runs helpers on by default.
 var VibeValley = VibeValleyRuntime(Options{})
 
-// RuntimeOf is a runtime by id: vibevalley's own, or one of smith's.
 func RuntimeOf(id string) (oar.Runtime, bool) {
 	if id == VIBEVALLEY_RUNTIME {
 		return VibeValley, true
@@ -221,8 +207,7 @@ type queued struct {
 
 func (q queued) HeldInputID() string { return q.inputID }
 
-// session is one helper's session. mu guards everything below it; agent events are handled under it, one at a
-// time, on the subscription's goroutine.
+// mu guards everything below it; agent events are handled under it, one at a time, on the subscription's goroutine.
 type session struct {
 	kernel    *kernel.Kernel
 	llm       agent.LLM
@@ -232,8 +217,7 @@ type session struct {
 	cancel    context.CancelFunc
 	listening sync.WaitGroup
 
-	mu sync.Mutex
-	// A turn under way, and the inputs waiting for it to end.
+	mu       sync.Mutex
 	active   bool
 	disposed bool
 	queue    []queued
@@ -251,14 +235,14 @@ func (s *session) frame(kind string, native any, events ...oar.EventBody) {
 	s.kernel.Frame(oar.FrameBody{Type: kind, Native: raw, Events: events}, kernel.RecordAt{})
 }
 
-// begin starts a turn (s.mu held).
+// Called with s.mu held.
 func (s *session) begin(input string) {
 	s.active = true
 	s.failed = ""
 	s.agent.Send(agent.UserMessage(input))
 }
 
-// end ends the turn under way with outcome, then begins the next queued one (s.mu held).
+// Called with s.mu held.
 func (s *session) end(outcome oar.TurnOutcome) {
 	if !s.active {
 		return

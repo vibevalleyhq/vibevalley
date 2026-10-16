@@ -1,13 +1,4 @@
-// The pixel village in Flame (web/src/pixel/scene.ts, with overlay.ts's hit regions): the map, the plots and what
-// grows in them, the props, the manager and the dog (or cat), the helpers walking in from the gate to their beds and
-// to the buildings their work takes them to, the effects over the plots (fx.dart), the yard's own life (life.dart),
-// and the plants in front of the camera leaning with the pointer. What it shows comes from the server's folded state
-// (FarmState, its view); the village only adds what moves with the clock: walking, strolling, poses, breathing, the
-// dog's day. It is lit as the web page lights it (engine/pixi light.ts): the world is drawn once as painted and once
-// with every sprite's normal map, and shaders/light.frag lights each art pixel from the sky and the lamps; what shines,
-// the marks and the plants in front go over the lit picture. What can be clicked is worked out here, in the web
-// page's order (overlay.ts): the helpers over the dog, over the things in the yard, over the plots; a click nothing
-// takes pokes the yard.
+// What it shows comes from the server's folded state; the village only adds what moves with the clock.
 
 import 'dart:isolate';
 import 'dart:math' as math;
@@ -38,26 +29,23 @@ import '../rules/looks.dart';
 export 'critters.dart' show PointLight;
 export 'fx.dart' show BedFx;
 
-/// Art pixels a second, and frames of the walk cycle a second (scene.ts).
+/// Art pixels a second, and frames of the walk cycle a second.
 const _walkSpeed = 42.0;
 const _walkFps = 8.0;
 
-/// The plants in front of the camera lean this many art pixels towards the pointer; the yard itself stays still.
 const _nearLean = 3.0;
 
-/// Helpers fade out at the gate when they leave, and are gone for good this long after they left (core site.ts).
 const _fadeS = 0.8;
 const _goneS = 3.6;
 
-/// Helpers light their lanterns once it is this dark (night 0..1); the lamps' and the lanterns' colours.
+/// night is 0..1.
 const _lanternDark = 0.35;
 const _lampColor = Color(0xFFFFC46E);
 const _lanternColor = Color(0xFFFFD28C);
 
-/// At most this many point lights go to the shader, the strongest first (light.ts MAX_LIGHTS).
+/// The strongest first.
 const _maxLights = 32;
 
-/// What helpers do at each building (design/pixel pose-*), frame by frame, and how fast the frames go (scene.ts).
 const _placePose = {
   'bench': (['sit'], 1.0),
   'library': (['read'], 1.0),
@@ -65,27 +53,22 @@ const _placePose = {
   'mast': (['tinker-1', 'tinker-2'], 1.5),
 };
 
-/// A hop when clicked, pixel by pixel, over this many seconds.
 const _hop = [2.0, 4.0, 5.0, 4.0, 2.0, 1.0];
 const _hopS = 0.3;
 
-/// How often the core moves helpers between places and around their plots, seconds (village.ts, farm.ts TICK_MS).
+/// Seconds.
 const _whereTick = 0.3;
 const _strollTick = 0.6;
 
-/// One world day lasts ten real minutes and starts in the morning (core live.ts).
 const _daySeconds = 600.0;
 
-/// Rows of a shadow on the ground, and how dark the one right under the feet is.
 const _shadowH = 4;
 const _contactAlpha = 0.5;
 
-/// What a hovered thing in the yard looks like: a quarter brighter (scene.ts LIT).
 const _brighter = ColorFilter.matrix([1.25, 0, 0, 0, 0, 0, 1.25, 0, 0, 0, 0, 0, 1.25, 0, 0, 0, 0, 0, 1, 0]);
 
 final _random = math.Random();
 
-/// A sprite from the atlas, standing on its anchor (the point that touches the ground), crisp.
 class AtlasSprite extends SpriteComponent {
   AtlasSprite(this._game, String name, {this.fixedAnchor, this.near = false}) : super(paint: Paint()..filterQuality = FilterQuality.none) {
     show(name);
@@ -93,15 +76,12 @@ class AtlasSprite extends SpriteComponent {
 
   final VillageGame _game;
 
-  /// In front of the camera: out of the light's reach, drawn over the lit picture in the sky's colour.
   final bool near;
 
-  /// An anchor of its own (the plants in front of the camera are pinned by their corners), else the picture's.
   final Anchor? fixedAnchor;
   String? _shown;
   double _h = 1;
 
-  /// What it is drawn through as painted (a hovered thing in the yard is brighter; the plants in front are tinted).
   ColorFilter? filter;
 
   String? get shown => _shown;
@@ -113,15 +93,12 @@ class AtlasSprite extends SpriteComponent {
     sprite = Sprite(_game.images.fromCache(info.asset));
     size = Vector2(info.w, info.h);
     _h = info.h;
-    // The feet stand on the row under the anchor's pixel (sprites.ts anchorOf: (ay + 1) / h, in the drawing's pixels).
     anchor = fixedAnchor ?? Anchor(info.ax / info.w, (info.ay + 1 / _game.atlas.density) / info.h);
   }
 
-  /// Taller by `rows` art pixels (shorter, when negative) with its feet where they are: one row shows twice (or once
-  /// less). A breath that moved the whole picture would lift the feet off the ground (scene.ts rise).
+  /// One row shows twice (or once less): a breath that moved the whole picture would lift the feet off the ground.
   void rise(double rows) => scale.y = 1 + rows / _h;
 
-  /// Its picture's box in the world, as drawn now, given where its parent stands.
   Rect boxIn([Vector2? origin]) {
     final w = size.x * scale.x.abs();
     final h = size.y * scale.y;
@@ -139,7 +116,6 @@ class AtlasSprite extends SpriteComponent {
         paint.colorFilter = filter;
         super.render(canvas);
       case RenderPass.normals:
-        // Its normal map in place of its picture (the mirrored one when it is drawn flipped).
         final normals = near ? null : _game._normals[_shown];
         if (normals == null) return;
         final image = scale.x < 0 ? normals.$2 : normals.$1;
@@ -159,7 +135,6 @@ class AtlasSprite extends SpriteComponent {
   }
 }
 
-/// A shadow on the ground, centred where it is put (light.ts shadowTexture), drawn in the lit world.
 class _Shadow extends PositionComponent {
   _Shadow(int w, int h) : _look = groundShadow(w, h);
   final Picture _look;
@@ -171,14 +146,11 @@ class _Shadow extends PositionComponent {
   }
 }
 
-/// What grounds something standing (scene.ts Footing): a dark patch right under its feet, and a fainter shadow cast
-/// away from the sun, stretched from the feet sideways, never off them.
 class _Footing {
   _Footing(int w) : contact = _Shadow(w, _shadowH), cast = _Shadow(w + 4, _shadowH);
   final _Shadow contact;
   final _Shadow cast;
 
-  /// Lays the shadows of something standing at `at`.
   void fall(Pt at, _Lean lean, [double fade = 1]) {
     contact
       ..position = Vector2(at.x, at.y)
@@ -190,10 +162,8 @@ class _Footing {
   }
 }
 
-/// How the sky lays shadows: how far the cast one is pushed (whole pixels), how much longer it is, how dark.
 typedef _Lean = ({double x, double stretch, double cast});
 
-/// Away from the sun, longer the lower it stands; faint by moonlight (scene.ts shadowLean).
 _Lean _shadowLean(Sky sky) {
   final dx = sky.sunDir.$1;
   final dz = sky.sunDir.$3;
@@ -203,7 +173,6 @@ _Lean _shadowLean(Sky sky) {
   return (x: (reach / 2).roundToDouble(), stretch: 1 + reach.abs() / 8, cast: 0.3 * (0.35 + 0.65 * (1 - sky.night)));
 }
 
-/// The ring round a plot while it is pointed at (scene.ts ring).
 class _Ring extends PositionComponent {
   _Ring(Rect r) : _r = r;
   final Rect _r;
@@ -238,7 +207,6 @@ class _Prop {
   final double y;
 }
 
-/// A helper as drawn: its node stands at its feet, with its two shadows and its body (scene.ts Actor).
 class _Actor {
   _Actor(this.node, this.body, this.footing, this.walker, this.look, this.goal);
   final PositionComponent node;
@@ -246,26 +214,21 @@ class _Actor {
   final _Footing footing;
   final Walker walker;
 
-  /// Sprite name prefix: species and outfit, `<species>-<outfit>`.
   String look;
   Goal goal;
 
-  /// The plot it works, for clicks on it.
   Bed? bed;
   int station = -1;
 
-  /// When it left the farm (it walks to the gate, fades there, and is gone), and how long it has stood at the gate.
   double? leftAt;
   double goneFor = 0;
   double alpha = 1;
 
-  /// When it was last clicked: it hops.
   double hopAt = -10;
   Whereabouts? where;
   Stroll? stroll;
 }
 
-/// What the village shows, from the server: the state, its view, and the agents (for each helper's looks).
 class VillageData {
   const VillageData(this.state, this.view, this.agents);
   final FarmState state;
@@ -273,7 +236,6 @@ class VillageData {
   final Map<String, AgentProfile> agents;
 }
 
-/// What is under the pointer, in the order the web page stacks its hit regions (overlay.ts).
 sealed class _Hit {
   const _Hit();
 }
@@ -313,7 +275,6 @@ final class _HitPlot extends _Hit {
   int get hashCode => bed;
 }
 
-/// Takes taps anywhere on the world (in world coordinates) for the game's hit regions.
 class _Taps extends PositionComponent with TapCallbacks {
   _Taps(this._game, Vector2 size) : super(size: size, priority: -200000);
   final VillageGame _game;
@@ -338,53 +299,38 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
   final VillageWorld village;
   VillageData? _data;
 
-  /// The latest state from the server; the village catches up with it frame by frame.
   void show(VillageData data) => _data = data;
 
-  /// What a click on the village hits, set by the farm screen: a bed (by index, 0..8: its plot or the helper on it),
-  /// or a thing in the yard by its spot id (world.dart spotNames: shop, warehouse, tasks, log, plans, agents, manager,
-  /// runtimes, skills).
+  /// A bed by index (0..8: its plot or the helper on it), or a thing in the yard by its spot id (world.dart spotNames).
   void Function(int bed)? onPlot;
   void Function(String spot)? onSpot;
 
-  /// The bed and the spot under the pointer, for the cursor and the hover cards; null over neither (farm/ui.ts hover,
-  /// pixel/ui.ts spotHover).
   final hoverBed = ValueNotifier<int?>(null);
   final hoverSpot = ValueNotifier<String?>(null);
 
-  /// The pointer is pressed on a plot or the helper on one, for the cursor (farm/ui.ts pressing).
   final pressing = ValueNotifier<bool>(false);
 
-  /// Every thing in the yard shows its name (⌥ held, or the first visit), set by the farm screen; the overlay reads it.
   final revealNames = ValueNotifier<bool>(false);
 
-  /// The manager's look (prefs.managerLook: managerLooks) and the pet ('dog', 'ragdoll', 'bluecat': prefs.pet), set by
-  /// the farm screen.
   final managerLook = ValueNotifier<String>('farmer');
   final pet = ValueNotifier<String>('dog');
 
-  /// The voice is live: the dog sits up with you, as for a call.
   final voiceLive = ValueNotifier<bool>(false);
 
-  /// Seconds the village has run, for the overlay's little animations.
   double get t => _t;
 
-  /// The time of day, 0..1 (0.5 is noon): one world day lasts ten real minutes and starts in the morning (core
-  /// live.ts, engine core/clock.ts). The HUD's clock reads it.
+  /// 0..1, 0.5 is noon.
   double get tod => _tod;
   void setTimeOfDay(double tod) => _tod = ((tod % 1) + 1) % 1;
 
-  /// How many times faster than real time the day goes; 0 pauses it (clock.ts setDaySpeed).
+  /// 0 pauses it.
   double daySpeed = 1;
 
-  /// Each helper's head, in art pixels, as drawn this frame: the overlay pins words there.
   final heads = <String, Pt>{};
 
-  /// Ticks every frame, for what is drawn over the village.
   final frames = ValueNotifier<int>(0);
 
-  /// An effect from the server's frames: a reward's coins jump out of its helper's plot. Level-ups, achievements and
-  /// penalties are said over the page (web ui/FxLayer.tsx), not in the village.
+  /// Level-ups, achievements and penalties are said over the page, not in the village.
   void play(GameEffect effect) {
     switch (effect) {
       case GameEffectReward(:final workerId, :final coins):
@@ -396,10 +342,8 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     }
   }
 
-  /// What a tool did to a bed (by index): drops, a puff, dust, the crop popping up (core farm.ts bedFx).
   void burst(BedFx kind, int bed) => _fx.burst(kind, bed);
 
-  /// The pointer left the village: nothing is pointed at (village_view.dart VillageCanvas calls it).
   void pointerExit() {
     _pointer = null;
     _setHover(null);
@@ -421,7 +365,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
   double _whereAt = 0;
   double _strollAt = 0;
 
-  /// The light: the shader, each sprite's normal maps (as painted, and mirrored), the sky and the lights this frame.
   FragmentShader? _shader;
   final _normals = <String, (Image, Image)>{};
   bool _normalsReady = false;
@@ -429,17 +372,14 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
   Sky _sky = skyAt(0.42);
   final _lights = <PointLight>[];
 
-  /// The lamps' halos (alpha by the night and their flicker) and the lanterns helpers carry after dark, this frame.
   final _lampAlpha = <double>[];
   late final _lampHalos = [for (final l in village.lights) glow((l.r * 0.8).round(), _lampColor, add: true)];
   final _lanterns = <Pt>[];
   final _lanternHalo = glow(9, _lampColor, strength: 0.5, add: true);
 
-  /// Where the plants in front lean, -1..1 each way, and where the pointer aims them (engine/pixi leanToPointer).
   final _lean = Vector2.zero();
   final _aim = Vector2.zero();
 
-  /// The pointer over the world (art pixels), what it is on, and what it went down on.
   Vector2? _pointer;
   _Hit? _over;
   _Hit? _downOn;
@@ -447,7 +387,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
   @override
   Color backgroundColor() => const Color(0xFF2B3320);
 
-  /// Things further down the yard stand in front.
   static int _depth(double y) => (y * 10).round();
 
   Picture? _picture(String name, {double ax = 0.5, double ay = 0.5}) {
@@ -461,7 +400,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
   @override
   Future<void> onLoad() async {
     images.prefix = '';
-    // Every drawing, once: poses change every frame and must be at hand.
+    // Poses change every frame and must be at hand.
     await images.loadAll([for (final n in atlas.names) atlas[n].asset]);
     camera.viewfinder.anchor = Anchor.topLeft;
 
@@ -469,7 +408,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     world.add(AtlasSprite(this, 'map')..priority = -100000);
     world.add(_Taps(this, Vector2(village.width, village.height)));
 
-    // ── Plots ──
     for (final bed in beds) {
       final at = village.plotAt(bed.index);
       final sprite = AtlasSprite(this, 'plot-empty')
@@ -480,7 +418,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       _plots.add(_Plot(bed, sprite, ring));
     }
 
-    // ── The manager and the dog, their shadows under them, below everything standing ──
     _manager = AtlasSprite(this, 'manager')
       ..position = Vector2(village.manager.x, village.manager.y)
       ..priority = _depth(village.manager.y);
@@ -496,7 +433,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     }
     world.addAll([_manager, _dog]);
 
-    // ── Props: the things in the yard that open the farm's panels; each stands on a shadow right under it ──
     for (final p in village.props) {
       if (!atlas.has(p.sprite)) continue;
       final s = AtlasSprite(this, p.sprite)
@@ -509,18 +445,15 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       _props.add(_Prop(p.spot, s, p.at.y));
     }
 
-    // The light: its shader now, the normal maps in the background (until they are ready, the village is drawn as painted).
+    // Until the normal maps are ready, the village is drawn as painted.
     _shader = (await FragmentProgram.fromAsset('shaders/light.frag')).fragmentShader();
     _prepareNormals();
 
-    // The plots' effects, then the yard's life, over everything standing in it.
     _fx = PlotFx(village: village, picture: _picture, normals: _normalsOf, density: atlas.density)..priority = 900000;
     _life = VillageLife(village: village, picture: _picture, normals: _normalsOf, map: (await map.toByteData())!, mapWidth: map.width, density: atlas.density)
       ..priority = 910000;
     world.addAll([_fx, _life]);
 
-    // In front of the camera: plants framing the view, mostly out of the frame, so they frame the corners without
-    // hiding the well, the pond or the houses; past the edges by far more than they lean (scene.ts).
     void plant(String name, double x, double y, Anchor anchor) {
       if (!atlas.has(name)) return;
       final s = AtlasSprite(this, name, fixedAnchor: anchor, near: true)
@@ -542,8 +475,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
 
   int _stationOfHelper(String id) => (_data?.state.helpers.where((h) => h.id == id).firstOrNull?.play?.station ?? -1).toInt();
 
-  // ── The pointer ────────────────────────────────────────────────────────────
-
   @override
   void onPointerMove(PointerMoveEvent event) {
     final p = event.canvasPosition;
@@ -553,8 +484,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     _setHover(_hitAt(_pointer!));
   }
 
-  /// What is at `p` (world art pixels), the topmost first: helpers (the newest on top), the dog, the things in the
-  /// yard, the plots (overlay.ts adds its regions in the reverse order).
   _Hit? _hitAt(Vector2 p) {
     final at = Offset(p.x, p.y);
     final data = _data;
@@ -581,7 +510,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     _ => null,
   };
 
-  /// The pointer moved onto `hit` (or off everything): what it left is told it is out, what it is on that it is over.
   void _setHover(_Hit? hit) {
     if (hit == _over) return;
     switch (_over) {
@@ -634,7 +562,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     pressing.value = false;
     if (hit is _HitDog) _pup.press(false);
     if (hit == down) _tap(hit, p);
-    // A finger lifted is no longer over anything.
     if (touch) pointerExit();
   }
 
@@ -649,7 +576,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       case _HitPlot(:final bed):
         onPlot?.call(bed);
       case _HitHelper(:final id):
-        // Clicked, a helper hops; its plot answers as if clicked itself.
         final actor = _actors[id];
         if (actor == null) return;
         actor.hopAt = _t;
@@ -664,7 +590,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     }
   }
 
-  /// A pat: the dog does its next trick, a heart goes up, and it sounds like what it is (a cat purrs and meows).
   void _petDog() {
     final trick = _pup.pet(_t);
     final dog = village.dog;
@@ -685,8 +610,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     }
   }
 
-  // ── A frame ────────────────────────────────────────────────────────────────
-
   @override
   void update(double dt) {
     super.update(dt);
@@ -699,14 +622,12 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     final view = data.view;
     final level = view.level.level.round();
     final present = {for (final h in state.helpers) h.id: h};
-    // Like Pixi's ticker, what is under a still pointer is found again as things move under it.
+    // What is under a still pointer is found again as things move under it.
     if (_pointer != null && _downOn == null) _setHover(_hitAt(_pointer!));
     final hovered = hoverBed.value;
 
     Crop cropOf(Helper h) => view.plots[h.id]?.crop ?? Crop.sprout;
 
-    // Plots: what grows, from the helper on it (or the one just leaving it); hovered it lifts a pixel, worked with a
-    // tool it dips one.
     for (final p in _plots) {
       final bed = p.bed;
       final String crop;
@@ -726,7 +647,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       p.sprite.y = village.plotAt(bed.index).y + (pressed ? 1 : (on ? -1 : 0));
     }
 
-    // What a click would open lights up and lifts a pixel.
     final spot = hoverSpot.value;
     for (final p in _props) {
       p.sprite
@@ -735,13 +655,11 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     }
     _manager.filter = spot == 'manager' ? _brighter : null;
 
-    // The core's clocks: where each helper is among the buildings, and where it strolls around its plot.
     final moveOn = _t - _whereAt >= _whereTick;
     if (moveOn) _whereAt = _t;
     final stroll = _t - _strollAt >= _strollTick;
     if (stroll) _strollAt = _t;
 
-    // Helpers: everyone on the farm walks to where it belongs; those gone walk to the gate and fade.
     final counts = <String, int>{};
     int crowd(String key) => counts[key] ?? 0;
     var queued = 0;
@@ -754,13 +672,11 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       final look = lookOf(data.agents[h.agent], h.agent, atlas.has);
       var actor = _actors[h.id];
       if (actor != null && actor.leftAt != null) {
-        // Back before it was gone: it is here again.
         actor
           ..leftAt = null
           ..goneFor = 0;
       }
       if (station >= 0 && actor != null) {
-        // A newcomer walks in to its own plot first, whatever it is already busy with (village.ts moveOn).
         final where = actor.where ??= Whereabouts('plot', _t, _placeFor(h, crop), _t);
         if (moveOn) where.moveOn(_placeFor(h, crop), _t, urgent: calls);
         if (stroll) _strollOn(actor, h, crop, pose);
@@ -817,7 +733,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
 
     _fx.step(step);
 
-    // The manager talks and listens, bobbing as he talks and breathing slowly the rest of the time; his feet stay put.
     final mood = state.foreman;
     final chosen = managerLook.value;
     final base = chosen != 'farmer' && managerLooks.any((l) => l.id == chosen) && atlas.has('manager-$chosen') ? 'manager-$chosen' : 'manager';
@@ -829,7 +744,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     _manager.show(atlas.has(managerPose) ? managerPose : base);
     _manager.rise((mood == ForemanState.speaking ? frameAt(_t, 2, 4) : frameAt(_t, 2, 0.6)).toDouble());
 
-    // The dog (or the cat in its poses) keeps its own day; it sits up for a call or the voice.
     final dogLook = _pup.look(_t, state.call == CallState.live || voiceLive.value);
     final awake = dogLook.picture != 'dog-sleep';
     final petName = pet.value;
@@ -839,7 +753,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       ..y = village.dog.y - dogLook.lift
       ..rise(dogLook.grow);
 
-    // Light: the sky by the time of day; lamps flicker a little, in steps, their halo the glass.
     _sky = skyAt(_tod);
     final night = _sky.night;
     _lights.clear();
@@ -850,7 +763,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       _lampAlpha.add(night * flicker);
       _lights.add((x: l.at.x, y: l.at.y, z: 14, radius: l.r * 2.6, color: _lampColor, intensity: 1.3 * night * flicker));
     }
-    // Shadows fall away from the sun; helpers carry lanterns after dark.
     final lean = _shadowLean(_sky);
     _managerFooting.fall(village.manager, lean);
     _dogFooting.fall(village.dog, lean);
@@ -864,7 +776,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       _lights.add((x: a.node.x + side, y: a.node.y - 11, z: 10, radius: 34, color: _lanternColor, intensity: 0.6 * lit));
     }
 
-    // The yard's own life: what helpers are doing shows at the buildings they do it at.
     final busy = <String, int>{};
     final walkers = <Pt>[];
     for (final a in _actors.values) {
@@ -880,7 +791,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     ];
 
     // The plants in front of the camera are out of the light's reach: they take the sky's colour, a little darker.
-    // They lean towards the pointer, and drift a little on their own (leanToPointer: 70% the pointer, eased).
     final k = math.min(1.0, step * 2.5);
     _lean.x += (_aim.x * 0.7 + math.sin(_t * 0.13) * 0.3 - _lean.x) * k;
     _lean.y += (_aim.y * 0.7 + math.sin(_t * 0.09 + 1.3) * 0.3 - _lean.y) * k;
@@ -905,19 +815,17 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     frames.value++;
   }
 
-  /// Where a helper wants to be now (village.ts placeFor): back at its plot when it calls, else where its work is.
   String _placeFor(Helper h, Crop crop) {
     if (plotCalls(crop)) return 'plot';
     final phase = h.phase;
     return phase is PhaseWorking ? placeOfAction(phase.doing.action) : 'plot';
   }
 
-  /// Moves a helper on around its plot when what it does changes, and every few seconds anyway (farm.ts runStrolls).
   void _strollOn(_Actor actor, Helper h, Crop crop, String pose) {
     final allowed = spotsFor(h, crop, pose);
     final current = actor.stroll;
     if (current != null && allowed.contains(current.spot) && _t < current.until) return;
-    // Somewhere else if there is anywhere else; the lawn has several places, so 'rest' may repeat.
+    // The lawn has several places, so 'rest' may repeat.
     final options = current != null && allowed.length > 1 ? allowed.where((s) => s != current.spot || s == 'rest').toList() : allowed;
     final spot = options[_random.nextInt(options.length)];
     final (lo, hi) = strollDwell[h.phase is PhaseWorking ? 'working' : 'other']!;
@@ -931,7 +839,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     footing.cast.priority = 0;
     footing.contact.priority = 1;
     body.priority = 2;
-    // Everyone walks in from the gate.
     final walker = Walker(village.gate, _walkSpeed, village.nav.route)..go(goal.at);
     world.add(node);
     return _Actor(node, body, footing, walker, look, goal);
@@ -946,7 +853,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       ..priority = _depth(w.y);
     String name;
     var flip = false;
-    // Off the ground (a jump), and how much taller it stands with its feet where they are (a breath, a stroke).
     var lift = 0.0;
     var grow = 0.0;
     String side(String f) => f == 'left' || f == 'right' ? 'side' : f;
@@ -957,8 +863,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       name = '$look-${cycle[frameAt(_t, 4, _walkFps)]}';
       flip = w.facing == 'left';
     } else if (atBuilding && atlas.has('$look-${_placePose[goal.key]!.$1.first}')) {
-      // At a building it does what is done there, on what is there: sits on the bench, reads at the library, hammers
-      // at the anvil (from its side), works the radio's box at the mast. A pose of one frame breathes.
       final (frames, fps) = _placePose[goal.key]!;
       name = '$look-${frames[frameAt(_t, frames.length, fps)]}';
       flip = goal.facing == 'left';
@@ -967,21 +871,17 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       final facing = goal.facing ?? w.facing;
       switch (pose) {
         case 'work':
-          // It dips with every stroke: into the soil at its plot (the pose with the tool), at what is there at a
-          // building, facing it.
           name = atBuilding ? '$look-${side(facing)}' : '$look-work';
           flip = atBuilding && facing == 'left';
           grow = -frameAt(_t, 2, 3).toDouble();
         case 'cheer':
           name = '$look-cheer';
-          // It jumps for joy.
           lift = frameAt(_t, 2, 2) * 2.0;
         case 'worry':
           name = '$look-worry';
         default:
           name = '$look-${side(facing)}';
           flip = facing == 'left';
-          // A slow breath: one pixel, now and then.
           grow = frameAt(_t + station * 0.3, 2, 0.8).toDouble();
       }
     }
@@ -994,12 +894,9 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       ..rise(grow);
   }
 
-  // ── Drawing ────────────────────────────────────────────────────────────────
-
   @override
   void renderTree(Canvas canvas) {
     final shader = _shader;
-    // The canvas, in screen pixels (the game's `size` is the camera's art pixels).
     final w = canvasSize.x;
     final h = canvasSize.y;
     if (w <= 0 || h <= 0) return;
@@ -1008,7 +905,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     final k = w / ww;
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = backgroundColor());
     if (shader == null || !_normalsReady) {
-      // Until the light is ready, as painted.
       canvas.save();
       canvas.scale(k);
       renderPass = RenderPass.color;
@@ -1021,7 +917,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     final cw = (w * dpr).round();
     final ch = (h * dpr).round();
 
-    // The world as painted, at the screen's own pixels.
     renderPass = RenderPass.color;
     final paintedRec = PictureRecorder();
     final painted = Canvas(paintedRec)
@@ -1030,7 +925,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     _renderWorld(painted);
     final color = paintedRec.endRecording().toImageSync(cw, ch);
 
-    // The same with every sprite's normal map, at the drawings' density; what is not a sprite is lit as flat ground.
     renderPass = RenderPass.normals;
     final d = atlas.density;
     final normalsRec = PictureRecorder();
@@ -1040,7 +934,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     _renderWorld(facing);
     final normals = normalsRec.endRecording().toImageSync((ww * d).round(), (wh * d).round());
 
-    // The light (light.frag's uniforms, in its order).
+    // light.frag's uniforms, in its order.
     final sky = _sky;
     var i = 0;
     void put(double v) => shader.setFloat(i++, v);
@@ -1102,8 +996,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     normals.dispose();
   }
 
-  /// Over the lit picture, in art pixels (scene.ts's layers over the world): what shines (the yard's sparks and
-  /// fireflies, the lamps' glass, the lanterns), the marks, then the plants in front of the camera.
   void _drawOver(Canvas canvas) {
     renderPass = RenderPass.glows;
     _renderWorld(canvas);
@@ -1115,7 +1007,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     renderPass = RenderPass.color;
   }
 
-  /// The world drawn once into canvas, as the camera would: Flame's world expects its camera on the stack while it renders.
+  /// Flame's world expects its camera on the stack while it renders.
   void _renderWorld(Canvas canvas) {
     CameraComponent.currentCameras.add(camera);
     try {
@@ -1125,8 +1017,6 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     }
   }
 
-  /// The glow around each lamp's glass, and the lanterns helpers carry: a warm 2×3 speck with a brighter heart in a
-  /// soft glow, added.
   void _drawLamps(Canvas canvas) {
     for (var i = 0; i < village.lights.length && i < _lampAlpha.length; i++) {
       final l = village.lights[i];
@@ -1142,8 +1032,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
   }
 }
 
-/// Nothing where a picture is not: an image's pixels are drawn premultiplied, so a transparent one must be all zero, or
-/// its normal would be added onto the ground's.
+/// Pixels are drawn premultiplied, so a transparent one must be all zero, or its normal would be added onto the ground's.
 Uint8List _clear(Uint8List rgba) {
   for (var i = 0; i < rgba.length; i += 4) {
     if (rgba[i + 3] == 0) rgba.fillRange(i, i + 3, 0);
@@ -1152,8 +1041,6 @@ Uint8List _clear(Uint8List rgba) {
 }
 
 extension on VillageGame {
-  /// Every sprite's normal maps, worked out once from its pixels in the background (the ground, the plots and the
-  /// rest shaped as normals.dart says), then made into pictures.
   Future<void> _prepareNormals() async {
     final names = atlas.names.toList();
     final pixels = <String, (Uint8List, int, int)>{};

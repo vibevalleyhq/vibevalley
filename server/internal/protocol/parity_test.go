@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Reduce, effects, the view and the inbox, fact by fact, against testdata/parity.jsonl.gz: runs of facts, each from an empty farm.
+// Runs of facts, each from an empty farm.
 func TestReduceGolden(t *testing.T) {
 	cases := readCases(t, "testdata/parity.jsonl.gz")
 	run, line := -1, 0
@@ -50,7 +50,6 @@ func TestReduceGolden(t *testing.T) {
 	}
 }
 
-// sameJSON compares got, as JSON, with the case's part what (or records it there, with -update).
 func sameJSON(t *testing.T, line int, what string, got any, want json.RawMessage) {
 	t.Helper()
 	if recorded(got, what) {

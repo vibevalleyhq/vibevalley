@@ -19,42 +19,25 @@ import (
 	"vibevalley/pkg/agent"
 )
 
-// Each agent's memory (ported from the TypeScript server's memory.ts, recall.ts, removed) and the manager's (manager-memory.ts).
-//
-// Memories: the layer the crew asks at the start of every turn (Recall) and tells at its end (Keep). Every helper
-// hired from an agent shares the agent's memory, across projects and restarts; the page reads, writes and forgets
-// through the same service. They live in the memories table; which ones bear on a turn is protocol's Pick. A memory
-// that cannot be read or written never stops a turn: it is logged, and the turn goes on without it.
-// Rationale: .agents/notes/implemented/architecture/2026-10-11-agent-memory.md.
-//
-// ManagerMemory: the MEMORY.md vibevalley's own agent keeps in the manager's folder, a line per note, and the archive of
-// the conversation compaction folded away. The manager writes the file itself (remember, rewrite_memory); the page
-// lists it, writes a note for it, forgets a line, and searches the archive. A note the person writes starts with
-// 「主人交代：」, so the manager reading it knows whose it is.
-// Rationale: .agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md.
+// A memory that cannot be read or written never stops a turn: it is logged, and the turn goes on without it. A note the person writes for the manager
+// starts with 「主人交代：」, so the manager reading it knows whose it is.
 
 const (
-	// memoryNoteMax: a note this long at most (UTF-16 units); memoryNotesPerTurn: a turn leaves this many at most.
+	// In UTF-16 units.
 	memoryNoteMax      = 300
 	memoryNotesPerTurn = 5
-	// memoryFromPerson is how a note the person wrote starts in MEMORY.md.
-	memoryFromPerson = "主人交代："
-	// ManagerAgent is the manager's id wherever an agent id goes (MANAGER_AGENT): memories, trajectories.
-	ManagerAgent = "foreman"
+	memoryFromPerson   = "主人交代："
+	ManagerAgent       = "foreman"
 )
 
-// ── What a turn leaves (recall.ts) ───────────────────────────────────────────
-
-// memoryNoteLine is 「记住：……」, or 「记住（所有项目）：……」 for every project; a list mark or bold around it is fine.
+// A list mark or bold around it is fine.
 var memoryNoteLine = regexp.MustCompile(`^[\s\pZ]*(?:[-*•][\s\pZ]*)?(?:\*\*)?记住(（所有项目）|\(所有项目\))?(?:\*\*)?[\s\pZ]*[:：][\s\pZ]*(?:\*\*)?[\s\pZ]*(.+?)[\s\pZ]*$`)
 
 type memoryNote struct {
-	Text string
-	// Everywhere: for every project, not just the one it was written in.
+	Text       string
 	Everywhere bool
 }
 
-// memoryNotesOf is the notes in what a helper said at the end of a turn: its 「记住：」 lines, each once.
 func memoryNotesOf(said string) []memoryNote {
 	var notes []memoryNote
 	for _, line := range strings.Split(said, "\n") {
@@ -74,7 +57,6 @@ func memoryNotesOf(said string) []memoryNote {
 	return notes
 }
 
-// memoryJobText is a job as its agent remembers it: what it was, and how its last turn ended.
 func memoryJobText(job, summary string, outcome protocol.Outcome) string {
 	how := ""
 	if outcome != protocol.OutcomeCompleted {
@@ -83,7 +65,6 @@ func memoryJobText(job, summary string, outcome protocol.Outcome) string {
 	return base.ClipLine(job, 100) + " → " + how + base.ClipLine(summary, 200)
 }
 
-// memoryLikeness is how alike two texts' terms are: 0 (nothing in common) to 1 (the same).
 func memoryLikeness(a, b map[string]bool) float64 {
 	shared := protocol.TermsInCommon(a, b)
 	all := len(a) + len(b) - shared
@@ -93,7 +74,7 @@ func memoryLikeness(a, b map[string]bool) float64 {
 	return float64(shared) / float64(all)
 }
 
-// memoryIsNewNote: none of the agent's notes about the same project (nil: every project) says nearly the same.
+// project nil: every project.
 func memoryIsNewNote(memories []protocol.Memory, text string, project *string) bool {
 	terms := protocol.TermsOf(text)
 	same := func(a, b *string) bool { return (a == nil && b == nil) || (a != nil && b != nil && *a == *b) }
@@ -103,11 +84,8 @@ func memoryIsNewNote(memories []protocol.Memory, text string, project *string) b
 	})
 }
 
-// ── Memories ─────────────────────────────────────────────────────────────────
-
 type Memories struct {
-	db *sql.DB
-	// now is the clock; tests change it.
+	db  *sql.DB
 	now func() int64
 }
 
@@ -170,7 +148,6 @@ func (m *Memories) insertNote(agentID, body string, project, helper *string) (in
 	return id, at, err
 }
 
-// Recall is what the agent remembers that bears on a turn about to start, most relevant first; counted as brought in.
 func (m *Memories) Recall(cue base.RecallCue) []protocol.Memory {
 	all, err := m.list(cue.Agent)
 	if err != nil {
@@ -188,8 +165,7 @@ func (m *Memories) Recall(cue base.RecallCue) []protocol.Memory {
 	return picked
 }
 
-// Keep keeps what a finished turn leaves: its 「记住：」 notes that are news, and its job as it stands. A stopped turn
-// leaves nothing.
+// A stopped turn leaves nothing.
 func (m *Memories) Keep(turn base.FinishedTurn) {
 	if turn.Outcome == protocol.OutcomeInterrupted {
 		return
@@ -228,7 +204,6 @@ func (m *Memories) keep(turn base.FinishedTurn) error {
 	return err
 }
 
-// List is everything an agent remembers, newest first.
 func (m *Memories) List(agentID string) []protocol.Memory {
 	all, err := m.list(agentID)
 	if err != nil {
@@ -238,7 +213,6 @@ func (m *Memories) List(agentID string) []protocol.Memory {
 	return all
 }
 
-// Write is a note the person writes for an agent; an error says why not.
 func (m *Memories) Write(agentID, text, project string) (protocol.Memory, error) {
 	body := base.ClipLine(text, memoryNoteMax)
 	if body == "" {
@@ -256,7 +230,7 @@ func (m *Memories) Write(agentID, text, project string) (protocol.Memory, error)
 	return protocol.Memory{ID: strconv.FormatInt(id, 10), Agent: agentID, Kind: protocol.MemoryKindNote, Text: body, Project: where, At: at}, nil
 }
 
-// Forget drops one of an agent's memories; an id that is not a number is none.
+// An id that is not a number is none.
 func (m *Memories) Forget(agentID, id string) error {
 	n, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -266,9 +240,6 @@ func (m *Memories) Forget(agentID, id string) error {
 	return err
 }
 
-// ── The manager's memory ─────────────────────────────────────────────────────
-
-// ForemanRuntime is what the manager thinks with ($VIBEVALLEY_FOREMAN_RUNTIME): vibevalley (the default) or pi.
 func ForemanRuntime() protocol.Runtime {
 	if os.Getenv("VIBEVALLEY_FOREMAN_RUNTIME") == string(protocol.RuntimePi) {
 		return protocol.RuntimePi
@@ -276,10 +247,8 @@ func ForemanRuntime() protocol.Runtime {
 	return protocol.RuntimeVibeValley
 }
 
-// ForemanHome is the manager's folder: its conversation (manager.jsonl), MEMORY.md, the archive.
 func ForemanHome(home string) string { return filepath.Join(home, "foreman") }
 
-// memoryLineOf is a line of MEMORY.md as a memory: dated by its line, else by the file.
 func memoryLineOf(line agent.MemoryLine, fileTime int64) protocol.Memory {
 	person := strings.HasPrefix(line.Text, memoryFromPerson)
 	m := protocol.Memory{ID: line.ID, Agent: ManagerAgent, Kind: protocol.MemoryKindNote, Text: line.Text, At: fileTime}
@@ -335,7 +304,6 @@ func (mm *ManagerMemory) fileTime() int64 {
 	return base.NowMs()
 }
 
-// View is MEMORY.md as memories, newest first, and how many of them the system prompt carries.
 func (mm *ManagerMemory) View() protocol.ManagerMemory {
 	lines := agent.MemoryLines(mm.home)
 	at := mm.fileTime()
@@ -348,7 +316,6 @@ func (mm *ManagerMemory) View() protocol.ManagerMemory {
 
 var memoryNewlines = regexp.MustCompile(`\s*\n\s*`)
 
-// Write is a note the person writes for the manager; an error says why not.
 func (mm *ManagerMemory) Write(text string) (protocol.Memory, error) {
 	body := base.ClipLine(memoryNewlines.ReplaceAllString(text, " "), memoryNoteMax)
 	if body == "" {
@@ -366,7 +333,6 @@ func (mm *ManagerMemory) Write(text string) (protocol.Memory, error) {
 
 func (mm *ManagerMemory) Forget(id string) error { return agent.ForgetLine(mm.home, id) }
 
-// Archive is the archive, and the lines matching query when there is one.
 func (mm *ManagerMemory) Archive(query string) protocol.ArchiveListing {
 	listing := protocol.ArchiveListing{Files: []protocol.ArchiveFile{}, Hits: []protocol.ArchiveHit{}}
 	for _, f := range agent.ArchiveFiles(mm.home) {

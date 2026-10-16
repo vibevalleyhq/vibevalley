@@ -1,8 +1,3 @@
-// 技能书: the skills on this machine (web/src/pages/SkillsPage.tsx). First what the runtimes have installed (read from
-// them on the server, each runtime loading its own as it needs them; shown read-only), then vibevalley's own library:
-// instructions in the Agent Skills shape that an agent carries in its persona, whatever runtime it is on. Installed
-// skills are addressed as /skills/installed:<name>, the library's by their id, a new one as /skills/new.
-
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -19,13 +14,12 @@ const _installed = 'installed:';
 
 String _skillPath([String? id]) => id == null ? '/skills' : '/skills/${Uri.encodeComponent(id)}';
 
-/// Every word of the query appears somewhere in the texts, ignoring case.
 bool _matches(String query, List<String?> texts) {
   final hay = texts.whereType<String>().join('\n').toLowerCase();
   return query.toLowerCase().split(RegExp(r'\s+')).every(hay.contains);
 }
 
-/// A new skill's id from its name: lower-case ASCII words joined by '-', 'skill' when none, numbered when taken.
+/// Lower-case ASCII words joined by '-', 'skill' when none, numbered when taken.
 String slug(String name, Set<String> taken) {
   final words = name.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-|-$'), '');
   final base = words.isEmpty ? 'skill' : words;
@@ -80,7 +74,6 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
       builder: (context, s) => Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: vertical),
         color: on ? Palette.leaf300.withValues(alpha: .6) : (s.hovered ? Palette.cream200 : null),
-        // focus-visible:ring-2: the skin's inner cream-300 line on every row.
         foregroundDecoration: pxRing,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,7 +90,6 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
       ),
     );
 
-    // The title and the search stay put (sticky) while the rows scroll under them.
     final listColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -189,7 +181,6 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // self-start, at most the window less 7rem tall, scrolling inside.
                 SizedBox(
                   width: 288,
                   child: ConstrainedBox(
@@ -216,7 +207,6 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
   }
 }
 
-/// A page-wide card, 48rem at most, centred.
 Widget _sheet(Widget child) => Center(
   child: ConstrainedBox(
     constraints: const BoxConstraints(maxWidth: 768),
@@ -224,7 +214,7 @@ Widget _sheet(Widget child) => Center(
   ),
 );
 
-/// An installed skill: what it is for, and which runtimes load it from where. Read-only: it lives with the runtime.
+/// Read-only: it lives with the runtime.
 class _InstalledCard extends StatelessWidget {
   const _InstalledCard({required this.skill});
   final InstalledSkill skill;
@@ -276,7 +266,6 @@ class _InstalledCard extends StatelessWidget {
 class _SkillEditor extends ConsumerStatefulWidget {
   const _SkillEditor({super.key, this.skill});
 
-  /// The skill as saved; null for a new one.
   final Skill? skill;
 
   @override

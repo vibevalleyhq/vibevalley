@@ -1,7 +1,5 @@
 package agent
 
-// Where the model and the MCP servers come from. DeepSeek's key from the environment (DEEPSEEK_API_KEY), else the
-// one pi already has (~/.pi/agent/models.json), so a machine set up for vibevalley's manager needs nothing more.
 // MCP servers in the shape Claude Code and Cursor use: { "mcpServers": { name: { command, args, env } | { url } } }.
 
 import (
@@ -21,7 +19,6 @@ const DEFAULT_MODEL = "deepseek-flash"
 
 var envNamePattern = regexp.MustCompile(`^\$?\{?([A-Z][A-Z0-9_]*)\}?$`)
 
-// DefaultModelID is the model vibevalley's own agent runs on when none is named: VIBEVALLEY_AGENT_MODEL, else DEFAULT_MODEL.
 func DefaultModelID() string {
 	if name := os.Getenv("VIBEVALLEY_AGENT_MODEL"); name != "" {
 		return name
@@ -29,12 +26,9 @@ func DefaultModelID() string {
 	return DEFAULT_MODEL
 }
 
-// ErrNoDeepSeekKey: no DeepSeek key in settings, the environment or pi. Said for the command line; the farm says where
-// to put one in the app.
+// Said for the command line; the farm says where to put one in the app.
 var ErrNoDeepSeekKey = errors.New("没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者先在 pi 里配好 deepseek。")
 
-// EnvName is the environment variable a pi key names instead of being one: DEEPSEEK_API_KEY, $DEEPSEEK_API_KEY or
-// ${DEEPSEEK_API_KEY}; "" for a key itself.
 func EnvName(key string) string {
 	if m := envNamePattern.FindStringSubmatch(key); m != nil {
 		return m[1]
@@ -47,7 +41,6 @@ type piDeepseek struct {
 	key     string
 }
 
-// fromPi is pi's DeepSeek: its base URL and key (a key that names an environment variable is read from there).
 func fromPi() *piDeepseek {
 	home, _ := os.UserHomeDir()
 	data, err := os.ReadFile(filepath.Join(home, ".pi", "agent", "models.json"))
@@ -77,7 +70,6 @@ func fromPi() *piDeepseek {
 	return &piDeepseek{baseURL: p.BaseURL, key: key}
 }
 
-// PiDeepseekKey is pi's DeepSeek key, if pi has one: so a host can say where the key it will use comes from.
 func PiDeepseekKey() string {
 	if p := fromPi(); p != nil {
 		return p.key
@@ -85,7 +77,6 @@ func PiDeepseekKey() string {
 	return ""
 }
 
-// LLM is a model to talk to and the options for every request (the key).
 type LLM struct {
 	Model         ai.Model
 	StreamOptions ai.StreamOptions
@@ -93,8 +84,6 @@ type LLM struct {
 
 var trailingV1 = regexp.MustCompile(`/v1/?$`)
 
-// Deepseek is a DeepSeek model to talk to, and the key (given, else DEEPSEEK_API_KEY, else pi's): the model by id
-// (id "", then VIBEVALLEY_AGENT_MODEL, then deepseek-flash).
 func Deepseek(id, given string) (LLM, error) {
 	// A key the host was given (vibevalley's settings) first, then the environment's, then pi's.
 	key := given
@@ -117,7 +106,6 @@ func Deepseek(id, given string) (LLM, error) {
 	}
 	model, known := ai.GetModel("deepseek", name)
 	if !known {
-		// A model this package does not list: DeepSeek's defaults, its own id.
 		model, _ = ai.GetModel("deepseek", DEFAULT_MODEL)
 		model.ID = name
 		model.Name = name
@@ -133,7 +121,6 @@ func Deepseek(id, given string) (LLM, error) {
 	return LLM{Model: model, StreamOptions: ai.StreamOptions{APIKey: key}}, nil
 }
 
-// McpServer is an MCP server: a URL (Streamable HTTP) with headers, or a command (stdio).
 type McpServer struct {
 	Name    string
 	URL     string
@@ -144,7 +131,6 @@ type McpServer struct {
 	Cwd     string
 }
 
-// ReadMcpConfig is the MCP servers in a config file's `mcpServers`; a file that is not there has none.
 func ReadMcpConfig(path string) ([]McpServer, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

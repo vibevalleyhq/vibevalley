@@ -1,8 +1,4 @@
-// Small things that fly, fall, drift and fade, and rings that widen and fade (a port of @heybro/engine/pixi
-// particles.ts), with what they look like: a pixel, a little picture of '#' rows (glyph), a picture from the atlas,
-// or a picture painted point by point (light.ts glowTexture, shadowTexture). Positions round to whole pixels and
-// fading goes in steps, so it stays pixel art. Each one goes on a layer: the lit world, what shines over it, or the
-// marks over everything, and is drawn in that layer's pass (pass.dart).
+// Positions round to whole pixels and fading goes in steps, so it stays pixel art.
 
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -11,42 +7,33 @@ import 'pass.dart';
 
 final _random = math.Random();
 
-/// Where something small is drawn: in the lit world, over it (what shines), or over everything as painted.
 enum Layer { lit, shine, marks }
 
-/// The pass a layer is drawn in.
 RenderPass passOf(Layer l) => switch (l) {
   Layer.lit => RenderPass.color,
   Layer.shine => RenderPass.glows,
   Layer.marks => RenderPass.marks,
 };
 
-/// A picture's normal maps (as painted, and mirrored) by its atlas name; null when it has none.
 typedef NormalsOf = (ui.Image, ui.Image)? Function(String name);
-
-// ── What a bit looks like ────────────────────────────────────────────────────
 
 sealed class Look {
   const Look();
 }
 
-/// One square pixel, `size` pixels square, from its top left.
 final class Dot extends Look {
   const Dot(this.color, [this.size = 1]);
   final ui.Color color;
   final double size;
 }
 
-/// A little picture in pixels, one row per string: '#' is painted, from its top left (particles.ts glyph).
 final class Glyph extends Look {
   const Glyph(this.rows, this.color);
   final List<String> rows;
   final ui.Color color;
 }
 
-/// A picture `w` by `h` art pixels, its anchor (fractions of its size) where it is put. `name` is its atlas name (for
-/// its normal map in the lit world), null for a painted one. `add`: added onto what is under it. `tint` multiplies it
-/// (pictures drawn white take it). `dir` -1 draws it mirrored.
+/// `add`: added onto what is beneath, for what shines.
 final class Picture extends Look {
   const Picture(this.image, this.w, this.h, {this.name, this.ax = 0.5, this.ay = 0.5, this.dir = 1, this.tint, this.add = false});
   final ui.Image image;
@@ -60,8 +47,7 @@ final class Picture extends Look {
   final bool add;
 }
 
-/// Draws `look` at (`x`, `y`) in `pass`, `alpha` opaque, grown `scale` times about where it is put. In the normals
-/// pass only atlas pictures draw (their normal map); everything else is lit as the ground behind it (light.ts).
+/// In the normals pass only atlas pictures draw (their normal map); everything else is lit as the ground behind it.
 void drawLook(ui.Canvas canvas, Look look, double x, double y, {double alpha = 1, double scale = 1, RenderPass pass = RenderPass.color, NormalsOf? normals}) {
   if (alpha <= 0) return;
   final normalsPass = pass == RenderPass.normals;
@@ -104,11 +90,9 @@ void drawLook(ui.Canvas canvas, Look look, double x, double y, {double alpha = 1
   }
 }
 
-// ── Pictures painted point by point (light.ts painted) ───────────────────────
-
 final _paintedCache = <String, ui.Image>{};
 
-/// A pixel picture `w` by `h`, made point by point: `alpha(dx, dy)` with dx, dy from the middle in -1..1, in one colour.
+/// dx, dy from the middle in -1..1.
 ui.Image painted(String key, int w, int h, ui.Color color, double Function(double dx, double dy) alpha) => _paintedCache.putIfAbsent(key, () {
   final recorder = ui.PictureRecorder();
   final canvas = ui.Canvas(recorder);
@@ -123,8 +107,6 @@ ui.Image painted(String key, int w, int h, ui.Color color, double Function(doubl
   return recorder.endRecording().toImageSync(w, h);
 });
 
-/// A soft round glow, `radius` art pixels, centred: for what shines by itself (a lamp's glass, a lantern, a firefly,
-/// a puff of smoke). `add` it for what shines.
 Picture glow(int radius, ui.Color color, {double strength = 0.55, bool add = false}) => Picture(
   painted('glow:$radius:${color.toARGB32()}:$strength', radius * 2, radius * 2, color, (dx, dy) {
     final d = math.sqrt(dx * dx + dy * dy);
@@ -135,8 +117,7 @@ Picture glow(int radius, ui.Color color, {double strength = 0.55, bool add = fal
   add: add,
 );
 
-/// A shadow on the ground under something standing, `w` by `h`, centred: an ellipse in two hard steps, darker in the
-/// middle (a soft edge would read as haze beside the feet, not as ground under them).
+/// Two hard steps, darker in the middle: a soft edge would read as haze beside the feet, not as ground under them.
 Picture groundShadow(int w, int h) => Picture(
   painted('shadow:$w:$h', w, h, const ui.Color(0xFF1F160C), (dx, dy) {
     final d = math.sqrt(dx * dx + dy * dy);
@@ -146,9 +127,7 @@ Picture groundShadow(int w, int h) => Picture(
   h.toDouble(),
 );
 
-// ── Particles ────────────────────────────────────────────────────────────────
-
-/// Steps of fading: a quarter at a time; pixels a second the wind gives a drift of 1 at full strength.
+/// Fading goes a quarter at a time.
 const _steps = 4;
 const _wind = 2.0;
 
@@ -176,7 +155,7 @@ final class _Bit extends _Item {
   final double alpha;
   final double phase;
 
-  /// As drawn: where (whole pixels), how big, how opaque. Until its first step it shows where it was put, as it is.
+  /// Until its first step it shows where it was put, as it is.
   double px;
   double py;
   double scale = 1;
@@ -192,7 +171,6 @@ final class _Ring extends _Item {
   final double squash;
   final ui.Color color;
 
-  /// Its radius and alpha as drawn; null until its first step.
   double? radius;
   double alpha = 0;
 }
@@ -200,16 +178,12 @@ final class _Ring extends _Item {
 class Particles {
   Particles({required this.density});
 
-  /// The pictures' pixels per art pixel: a ring's line is one of them wide (pixelLine).
   final double density;
   final _items = <_Item>[];
 
-  /// How many are moving now.
   int get count => _items.length;
 
-  /// Puts `look` on `layer` at (`x`, `y`) and moves it on until its `life` (seconds) is over: `fall` pulls it down
-  /// (pixels a second squared), the wind carries it by `drift`, it swings side to side by `sway`, grows by `grow` a
-  /// second, starts `alpha` opaque.
+  /// `fall` in pixels a second squared.
   void add(
     Layer layer,
     Look look, {
@@ -225,7 +199,7 @@ class Particles {
     double alpha = 1,
   }) => _items.add(_Bit(layer, look, x, y, life, vx, vy, fall, drift, sway, grow, alpha));
 
-  /// A ring on `layer` widening from `from` to `to`, `squash` its height over its width (flat on water, 1 in the air).
+  /// `squash` is its height over its width: flat on water, 1 in the air.
   void ring(
     Layer layer, {
     required double x,
@@ -237,7 +211,7 @@ class Particles {
     required double life,
   }) => _items.add(_Ring(layer, x, y, from, to, squash, color, life));
 
-  /// Moves everything on by `dt` seconds; `wind` (0..1) carries what drifts.
+  /// `wind` is 0..1.
   void step(double dt, [double wind = 0]) {
     _items.removeWhere((i) {
       i.age += dt;
@@ -261,7 +235,6 @@ class Particles {
     });
   }
 
-  /// Draws what is on `layer`, in the order it was added.
   void render(ui.Canvas canvas, Layer layer, RenderPass pass, {NormalsOf? normals}) {
     final mine = passOf(layer) == pass || (layer == Layer.lit && pass == RenderPass.normals);
     if (!mine) return;

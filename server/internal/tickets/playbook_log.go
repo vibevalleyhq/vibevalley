@@ -11,15 +11,8 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// A playbook's history (ported from the TypeScript server's playbook-log.ts, removed). Every write of a playbook is compared with the version
-// before it (protocol.PlaybookChanges), and what changed is kept in playbook_events with who did it: the person, the
-// manager, or the farm itself. The plan board reads it to show how a step got where it is.
-// Rationale: .agents/notes/implemented/feature/2026-10-11-playbooks.md「对照 Raft 的任务」.
-
-// planReadLimit is the most events read back for one playbook.
 const planReadLimit = 1000
 
-// planPayload is what an event carries beside its kind, as stored.
 type planPayload struct {
 	Helper  *string                    `json:"helper,omitzero"`
 	Detail  *string                    `json:"detail,omitzero"`
@@ -33,7 +26,6 @@ func newPlaybookLog(db *sql.DB) (*PlaybookLog, error) { return &PlaybookLog{db: 
 func (*PlaybookLog) OnStart(context.Context) error    { return nil }
 func (*PlaybookLog) OnStop()                          {}
 
-// Record keeps what changed from before to after, done by actor; why explains a change that does not say itself.
 // The history must never stop the playbook itself: what cannot be written is logged.
 func (l *PlaybookLog) Record(before *protocol.Playbook, after protocol.Playbook, actor protocol.PlaybookActor, why string) {
 	at := base.NowMs()
@@ -57,7 +49,7 @@ func (l *PlaybookLog) Record(before *protocol.Playbook, after protocol.Playbook,
 	}
 }
 
-// List is a playbook's history, oldest first; a row this code no longer knows how to read is left out.
+// A row this code no longer knows how to read is left out.
 func (l *PlaybookLog) List(playbook string) []protocol.PlaybookEvent {
 	rows, err := l.db.Query(
 		"select seq, playbook_id, node_id, kind, actor, payload, created_at from playbook_events where playbook_id = ? order by seq limit ?",

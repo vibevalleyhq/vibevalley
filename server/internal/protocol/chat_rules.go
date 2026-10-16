@@ -1,9 +1,5 @@
 package protocol
 
-// The group chat's rules (田头) beyond the four the core state needs (chat.go), from packages/protocol/src/chat.ts:
-// who a message names, who it goes to and whether it wakes them (with the brakes on agents waking agents), what a
-// helper is handed when woken and told while busy, and how conversations are addressed and found.
-
 import (
 	"cmp"
 	"fmt"
@@ -14,22 +10,17 @@ import (
 )
 
 const (
-	// HopLimit is how many agents agents may wake in one conversation since the person last spoke.
-	HopLimit = 4
-	// AgentWakeCooldownMs is how often, at most, another agent may wake a helper.
+	// Counted since the person last spoke in the conversation.
+	HopLimit            = 4
 	AgentWakeCooldownMs = 60_000
-	// WakeBreaker is how many wakes in a row may end before the helper said anything; then only the person wakes it.
-	WakeBreaker = 3
-	// NoticeBatchMs is how long a busy helper's notices are gathered into one.
-	NoticeBatchMs = 3_000
-	// WakeMessages is how many messages a woken helper is handed whole; the rest are a summary.
-	WakeMessages = 3
-	// SummaryConversations is how many conversations a summary of unread lists, at most.
+	// Past this, only the person wakes the helper.
+	WakeBreaker          = 3
+	NoticeBatchMs        = 3_000
+	WakeMessages         = 3
 	SummaryConversations = 20
-	// RetryWindowMs: the same words from the same sender in the same place this soon again are a retry, not a new message.
+	// The same words from the same sender in the same place this soon again are a retry, not a new message.
 	RetryWindowMs = 60_000
-	// HeldShown is how many newer messages a held send shows, at most.
-	HeldShown = 3
+	HeldShown     = 3
 )
 
 const (
@@ -37,10 +28,8 @@ const (
 	Everyone   = "everyone"
 )
 
-// chatNamed are the names that are not a helper's id.
 var chatNamed = map[string]string{"管家": "foreman", "主人": "user", "所有人": Everyone}
 
-// MentionOf is how each of foreman, user and everyone is written.
 var MentionOf = map[string]string{"foreman": "@管家", "user": "@主人", Everyone: "@所有人"}
 
 var (
@@ -49,8 +38,7 @@ var (
 	chatMention = regexp.MustCompile(`(^|[^\p{L}\p{N}_@])@(w[0-9]+|管家|主人|所有人)`)
 )
 
-// MentionsIn is who a message names: helper ids, foreman, user, everyone — each once, in order. Code is not prose: a
-// mention inside backticks or a fence names no one. A name ends where its token ends, so `@w3你看` names w3.
+// Code is not prose: a mention inside backticks or a fence names no one. A name ends where its token ends, so `@w3你看` names w3.
 func MentionsIn(text string) []string {
 	prose := chatTick.ReplaceAllLiteralString(chatFence.ReplaceAllLiteralString(text, " "), " ")
 	found := []string{}
@@ -66,15 +54,11 @@ func MentionsIn(text string) []string {
 	return found
 }
 
-// ── Channels and addresses ───────────────────────────────────────────────────
-
-// ChannelName is what a channel may be called: letters, digits, - and _, at most 24; no #, : or spaces, so an
-// address reads back.
+// No #, : or spaces, so an address reads back.
 var ChannelName = regexp.MustCompile(`^[\p{L}\p{N}_-]{1,24}$`)
 
 var chatThreadTarget = regexp.MustCompile(`^[\p{L}\p{N}_-]{1,24}:([0-9]+)$`)
 
-// ChannelNameProblem is why a name cannot be a new channel's; empty when it can.
 func ChannelNameProblem(name string, taken []string) string {
 	if !ChannelName.MatchString(name) {
 		return "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字"
@@ -85,8 +69,7 @@ func ChannelNameProblem(name string, taken []string) string {
 	return ""
 }
 
-// TargetOf is how a conversation is addressed: a channel as #<name> (#田头), a thread as #<its channel>:<the seq of
-// the message it hangs under>. channelName: a thread's channel's name; the square's when nil.
+// A channel is #<name> (#田头), a thread #<its channel>:<the seq of the message it hangs under>. channelName nil: the square.
 func TargetOf(c Conversation, channelName *string) string {
 	if c.Kind == ConversationKindThread && c.Parent != nil {
 		name := SquareName
@@ -101,7 +84,6 @@ func TargetOf(c Conversation, channelName *string) string {
 	return "#" + SquareName
 }
 
-// TargetKind is what a target names: a channel or a thread.
 type TargetKind string
 
 const (
@@ -109,15 +91,13 @@ const (
 	TargetKindThread  TargetKind = "thread"
 )
 
-// ChatTarget is a target as written, read back: a channel by Name, or a thread by its message's number (Parent).
 type ChatTarget struct {
 	Kind   TargetKind `json:"kind"`
 	Name   string     `json:"name,omitzero"`
 	Parent int64      `json:"parent,omitzero"`
 }
 
-// ParseTarget is a target as written, read back; nil when it is not one. A thread is found by its message's number
-// alone. A number past int64 is not one (TypeScript would read it as an inexact float).
+// A number past int64 is not one.
 func ParseTarget(target string) *ChatTarget {
 	t := strings.TrimPrefix(coreTrim(target), "#")
 	if m := chatThreadTarget.FindStringSubmatch(t); m != nil {
@@ -133,9 +113,6 @@ func ParseTarget(target string) *ChatTarget {
 	return nil
 }
 
-// ── Who a message goes to ────────────────────────────────────────────────────
-
-// DeliveryReason is why a message is someone's: they were named, it is their job's thread, they follow it…
 type DeliveryReason string
 
 const (
@@ -149,7 +126,6 @@ const (
 	DeliveryReasonPlaybook  DeliveryReason = "playbook"
 )
 
-// HeldBy is why a message that should have woken someone did not; empty when nothing held it.
 type HeldBy string
 
 const (
@@ -161,10 +137,8 @@ const (
 type Delivery struct {
 	Recipient string         `json:"recipient"`
 	Reason    DeliveryReason `json:"reason"`
-	// Wakes an idle recipient (a new turn). Otherwise only a notice while busy, or a summary when next woken.
-	Wakes bool `json:"wakes"`
-	// HeldBy: it should have woken them, but a brake held it: recorded, not acted on.
-	HeldBy HeldBy `json:"heldBy,omitzero"`
+	Wakes     bool           `json:"wakes"`
+	HeldBy    HeldBy         `json:"heldBy,omitzero"`
 }
 
 type AudienceInput struct {
@@ -172,35 +146,19 @@ type AudienceInput struct {
 	FromKind SenderKind  `json:"fromKind"`
 	Kind     MessageKind `json:"kind"`
 	Mentions []string    `json:"mentions"`
-	// Conversation: only its Kind, SubjectKind and SubjectID are read.
+	// Only its Kind, SubjectKind and SubjectID are read.
 	Conversation Conversation `json:"conversation"`
-	// Helpers on the farm now: those of the message's channel when it is a channel's; anyone named must be one.
-	Helpers []string `json:"helpers"`
-	// OnFarm: helpers that may be named from here (on the farm, any channel); Helpers when nil.
-	OnFarm []string `json:"onFarm"`
-	// Followers: who follows this thread (helpers, the manager).
-	Followers []string `json:"followers"`
-	// Hops: agents woken by agents in this conversation since the person last spoke.
-	Hops int64 `json:"hops"`
-	// Cooling: helpers an agent woke less than AgentWakeCooldownMs ago.
-	Cooling []string `json:"cooling"`
-	// Broken: helpers whose wakes keep failing (WakeBreaker).
-	Broken []string `json:"broken"`
-	// Outcome: a report's, how the turn went.
-	Outcome *Outcome `json:"outcome,omitzero"`
-	// ForPlaybook: a report from a playbook's helper; the playbook hears it, not the manager.
-	ForPlaybook bool `json:"forPlaybook,omitzero"`
+	Helpers      []string     `json:"helpers"`
+	// Helpers when nil.
+	OnFarm      []string `json:"onFarm"`
+	Followers   []string `json:"followers"`
+	Hops        int64    `json:"hops"`
+	Cooling     []string `json:"cooling"`
+	Broken      []string `json:"broken"`
+	Outcome     *Outcome `json:"outcome,omitzero"`
+	ForPlaybook bool     `json:"forPlaybook,omitzero"`
 }
 
-// AudienceOf is who a message goes to, why, and whether it wakes them.
-//
-//   - The person: whoever they name wakes; in a thread, its job's helper and its followers wake; in a channel the
-//     manager answers (unless someone else was named) and the channel's helpers hear it without being woken.
-//   - An agent (the manager, a helper): whoever it names wakes; in a helper's job thread, that helper wakes.
-//   - Agents waking agents are braked: at most HopLimit since the person last spoke in the conversation, a helper at
-//     most once per AgentWakeCooldownMs, and none for a helper whose wakes keep failing (the person still can).
-//   - A report goes to the manager, waking it only when the turn failed; a playbook's helper reports to the playbook.
-//   - Dispatches, notices and the farm's own messages go to no one.
 func AudienceOf(i AudienceInput) []Delivery {
 	out := []Delivery{}
 	if i.Kind == MessageKindNotice || i.Kind == MessageKindDispatch || i.FromKind == SenderKindSystem {
@@ -279,15 +237,10 @@ func AudienceOf(i AudienceInput) []Delivery {
 	return out
 }
 
-// HopLimitText is what a held wake says on the thread, once per run of agents talking among themselves (limit:
-// HopLimit, usually).
 func HopLimitText(limit int) string {
 	return fmt.Sprintf("帮工之间已经来回 %d 次了，先停一停：等主人说一句再接着叫人。", limit)
 }
 
-// ── What a helper is told ────────────────────────────────────────────────────
-
-// InboxMessage is a message as an agent reads it: where to reply, its number, who said it, then the words.
 type InboxMessage struct {
 	Seq      int64      `json:"seq"`
 	Target   string     `json:"target"`
@@ -297,7 +250,7 @@ type InboxMessage struct {
 	Text     string     `json:"text"`
 }
 
-// MessageLine is one line per message; the words' own line breaks are marked, so no message can pass for a header.
+// The words' own line breaks are marked, so no message can pass for a header.
 func MessageLine(m InboxMessage) string {
 	from := m.Name
 	if m.FromKind == SenderKindHelper {
@@ -310,8 +263,7 @@ type UnreadRow struct {
 	Target      string `json:"target"`
 	Unread      int64  `json:"unread"`
 	MentionsYou bool   `json:"mentionsYou"`
-	// Latest: who said the newest of them; empty when not known.
-	Latest string `json:"latest,omitzero"`
+	Latest      string `json:"latest,omitzero"`
 }
 
 func chatRowText(r UnreadRow) string {
@@ -325,7 +277,6 @@ func chatRowText(r UnreadRow) string {
 	return s
 }
 
-// WakeInput is a turn for a helper woken by messages: the ones for it, in full; what else is unread, as a summary.
 func WakeInput(messages []InboxMessage, others []UnreadRow) string {
 	shown := lastN(messages, WakeMessages)
 	more := ""
@@ -346,8 +297,6 @@ func WakeInput(messages []InboxMessage, others []UnreadRow) string {
 	return strings.Join(lines, "\n")
 }
 
-// BusyNotice is a notice slipped into a busy helper's turn: where there is something new, no words; it reads when
-// it chooses.
 func BusyNotice(rows []UnreadRow) string {
 	texts := make([]string, 0, min(len(rows), SummaryConversations))
 	for _, r := range rows[:min(len(rows), SummaryConversations)] {
@@ -356,9 +305,6 @@ func BusyNotice(rows []UnreadRow) string {
 	return fmt.Sprintf("[%s提示] 有新消息还没读：%s。方便的时候用 farm_read 读；不读不代表没事。", SquareName, strings.Join(texts, "；"))
 }
 
-// ── The chat in the core state ───────────────────────────────────────────────
-
-// EmptyChat is a chat with nothing in it.
 func EmptyChat() Chat { return Chat{Conversations: []Conversation{}, Messages: []ChatMessage{}} }
 
 func SquareOf(chat *Chat) *Conversation {
@@ -373,7 +319,6 @@ func SquareOf(chat *Chat) *Conversation {
 	return nil
 }
 
-// ChannelsOf is the channels, the square first, then by when they were opened.
 func ChannelsOf(chat *Chat) []Conversation {
 	out := []Conversation{}
 	if chat == nil {
@@ -396,8 +341,6 @@ func ChannelsOf(chat *Chat) []Conversation {
 	return out
 }
 
-// ChannelOf is the channel a conversation is in: itself, or a thread's channel (the square when unknown, or when c
-// is nil).
 func ChannelOf(chat *Chat, c *Conversation) *Conversation {
 	if c == nil {
 		return SquareOf(chat)
@@ -415,7 +358,6 @@ func ChannelOf(chat *Chat, c *Conversation) *Conversation {
 	return SquareOf(chat)
 }
 
-// AddressOf is a conversation's address, its channel looked up in the chat.
 func AddressOf(chat *Chat, c Conversation) string {
 	var name *string
 	if channel := ChannelOf(chat, &c); channel != nil {
@@ -436,7 +378,6 @@ func ConversationOf(chat *Chat, id int64) *Conversation {
 	return nil
 }
 
-// ThreadUnder is the thread hanging under a message.
 func ThreadUnder(chat *Chat, seq int64) *Conversation {
 	if chat == nil {
 		return nil
@@ -450,7 +391,6 @@ func ThreadUnder(chat *Chat, seq int64) *Conversation {
 	return nil
 }
 
-// JobThreadOf is a helper's job thread: the newest one about it.
 func JobThreadOf(chat *Chat, helper string) *Conversation {
 	if chat == nil {
 		return nil
@@ -464,8 +404,6 @@ func JobThreadOf(chat *Chat, helper string) *Conversation {
 	return nil
 }
 
-// UnreadIn is what is unread for the person: messages in it after their read position, final, not their own, not
-// notices.
 func UnreadIn(chat *Chat, c Conversation) int {
 	read := int64(0)
 	if c.Read != nil {

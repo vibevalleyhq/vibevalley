@@ -1,10 +1,5 @@
 package agent
 
-// Tools that answer in words: most of this agent's (files, commands, memory, schedules, the farm's) do, so
-// TextTool makes an agentcore tool from a function that ends in text, or fails with a sentence for the model.
-// Long output is cut in the middle. For a runtime other than agentcore (pi), a tool's parameters as JSON Schema
-// and a call with the arguments checked first.
-
 import (
 	"context"
 	"encoding/json"
@@ -14,16 +9,14 @@ import (
 	"vibevalley/pkg/agentcore"
 )
 
-// ToolContext is what a tool run knows of its call.
 type ToolContext struct {
-	// The tool call's id.
 	CallID string
 }
 
-// MAX_RESULT_CHARS: a tool result longer than this is cut in the middle: the model gets the head and the tail, and a note.
+// The model gets the head and the tail, and a note.
 const MAX_RESULT_CHARS = 30_000
 
-// Clip cuts text longer than limit (MAX_RESULT_CHARS when 0) in the middle.
+// MAX_RESULT_CHARS when limit is 0.
 func Clip(text string, limit int) string {
 	if limit <= 0 {
 		limit = MAX_RESULT_CHARS
@@ -37,7 +30,6 @@ func Clip(text string, limit int) string {
 	return string(r[:head]) + fmt.Sprintf("\n\n…（省略了 %d 个字符）…\n\n", len(r)-limit) + string(r[len(r)-tail:])
 }
 
-// TextToolSpec is a tool with parameters decoded into P whose result is text.
 type TextToolSpec[P any] struct {
 	Name        string
 	Label       string
@@ -46,7 +38,6 @@ type TextToolSpec[P any] struct {
 	Run         func(ctx context.Context, params P, tc ToolContext) (string, error)
 }
 
-// TextTool is a tool with typed parameters whose result is text; an error is the model's sentence.
 func TextTool[P any](spec TextToolSpec[P]) agentcore.AgentTool {
 	return agentcore.DefineTool(agentcore.ToolSpec[P]{
 		Name: spec.Name, Label: spec.Label, Description: spec.Description, Parameters: spec.Parameters,
@@ -60,7 +51,6 @@ func TextTool[P any](spec TextToolSpec[P]) agentcore.AgentTool {
 	})
 }
 
-// JsonToolSpec is a tool found at run time (MCP's): JSON Schema parameters, taken as they come.
 type JsonToolSpec struct {
 	Name        string
 	Label       string
@@ -86,12 +76,11 @@ func JsonTool(spec JsonToolSpec) agentcore.AgentTool {
 	}
 }
 
-// ParametersJsonSchema is a tool's parameters as JSON Schema, for a runtime other than agentcore (pi).
 func ParametersJsonSchema(tool agentcore.AgentTool) agentcore.JsonSchemaObject {
 	return agentcore.ParametersSchema(tool)
 }
 
-// CallTool runs a tool on arguments nobody checked yet: checked first, a bad one said as an error; the result as text.
+// Arguments nobody checked yet are checked first; a bad one is said as an error.
 func CallTool(ctx context.Context, tool agentcore.AgentTool, params json.RawMessage, tc ToolContext) (string, error) {
 	args, err := agentcore.DecodeArguments(tool, params)
 	if err != nil {

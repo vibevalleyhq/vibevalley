@@ -1,6 +1,3 @@
-// Choosing: the segmented control (web/src/components/ui/segmented.tsx), the select (select.tsx Pick) and the switch
-// (switch.tsx SwitchField).
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -8,30 +5,24 @@ import '../../app/theme.dart';
 import 'base.dart';
 import 'icons.dart';
 
-/// One choice of a PxSegmented.
 class SegmentOption<T> {
   const SegmentOption({required this.value, required this.label, this.disabled = false, this.title});
   final T value;
   final String label;
   final bool disabled;
 
-  /// Shown as the button's tooltip, e.g. why it is disabled.
   final String? title;
 }
 
-/// Replaces web/src/components/ui/segmented.tsx Segmented: 28 px buttons on a cream-200 strip, wrapping; the chosen one
-/// leaf green with a hard drop. Every button carries the skin's inner cream-300 line (its ring-2 class).
 class PxSegmented<T> extends StatelessWidget {
   const PxSegmented({super.key, required this.value, required this.options, required this.onChanged, this.block = true});
   final T value;
   final List<SegmentOption<T>> options;
   final ValueChanged<T> onChanged;
 
-  /// As a block the strip spans the width it is given; false where the page sets it as a flex item beside others,
-  /// as wide as its buttons.
+  /// false where it sits as a flex item beside others, as wide as its buttons.
   final bool block;
 
-  // A block (flex, not inline-flex): the strip spans the width it is given, its buttons at the left.
   @override
   Widget build(BuildContext context) {
     final strip = Container(
@@ -51,7 +42,7 @@ class PxSegmented<T> extends StatelessWidget {
                 Widget b = Container(
                   height: 28,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  // The inset line wins over the chosen one's drop (both are box-shadows; the skin's inset rule is later).
+                  // The inset line wins over the chosen one's drop.
                   decoration: BoxDecoration(color: on ? Palette.leaf500 : (s.hovered ? Palette.cream300 : null)),
                   foregroundDecoration: pxRing,
                   child: Center(
@@ -70,7 +61,6 @@ class PxSegmented<T> extends StatelessWidget {
   }
 }
 
-/// One choice of a PxPick, with an optional detail at its right.
 class PickOption {
   const PickOption({required this.value, required this.label, this.detail});
   final String value;
@@ -78,9 +68,6 @@ class PickOption {
   final String? detail;
 }
 
-/// Replaces web/src/components/ui/select.tsx Pick: a 36 px trigger (the value, or the placeholder in brown, and a
-/// chevron) opening a framed list 6 px under it, at least as wide as the trigger. The placeholder is the first choice
-/// and picks ''. Arrow keys move, Enter or Space picks, Esc or a click outside closes.
 class PxPick extends StatefulWidget {
   const PxPick({
     super.key,
@@ -305,8 +292,6 @@ class _PickPopup extends StatelessWidget {
   );
 }
 
-/// Replaces web/src/components/ui/switch.tsx SwitchField: a 40 × 24 track (leaf when on) whose thumb slides 16 px, and
-/// the label with an optional hint under it; the whole row toggles it.
 class PxSwitchField extends StatelessWidget {
   const PxSwitchField({super.key, required this.label, required this.checked, required this.onChanged, this.hint, this.enabled = true});
   final String label;
@@ -329,7 +314,7 @@ class PxSwitchField extends StatelessWidget {
               duration: const Duration(milliseconds: 150),
               width: 40,
               height: 24,
-              // The ring-2 inner line takes the place of p-0.5: the 20 px thumb travels 16 px.
+              // The inner line is the padding: the 20 px thumb travels 16 px.
               decoration: BoxDecoration(
                 color: checked ? Palette.leaf500 : Palette.cream300.withValues(alpha: .7),
                 border: Border.all(color: Palette.cream300, width: 2),

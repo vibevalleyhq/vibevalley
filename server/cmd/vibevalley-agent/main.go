@@ -1,6 +1,6 @@
 // The agent on its own, in a terminal: a conversation on DeepSeek with the coding tools, skills, memory, helpers,
 // schedules and the MCP servers in a config file. What is typed while it works joins the turn; Ctrl+C stops the
-// turn, and again (idle) quits. Ported from the TypeScript @heybro/agent's cli.ts (removed).
+// turn, and again (idle) quits.
 //
 //	go run ./cmd/vibevalley-agent [--cwd DIR] [--name NAME] [--model ID] [--mcp FILE] [-p PROMPT]
 package main
@@ -38,7 +38,6 @@ func short(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// spent is what this run cost, added up as answers end.
 type spent struct{ input, cached, output int }
 
 func show(e agent.AgentEvent, total *spent, prompt func()) {
@@ -163,7 +162,6 @@ func run(cwdFlag, name, model, mcpFile, once string, asked bool) error {
 	}()
 
 	if asked {
-		// Done once its last line (what it cost) is printed.
 		printed := make(chan struct{}, 1)
 		mu.Lock()
 		prompt = func() { printed <- struct{}{} }

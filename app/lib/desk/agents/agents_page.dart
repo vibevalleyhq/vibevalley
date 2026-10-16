@@ -1,8 +1,3 @@
-// 帮工: every agent, as cards (web/src/pages/AgentsPage.tsx). The manager first (its own page), then the helpers (the
-// agent creator), then a card to make a new one. A helper's card says what it runs on, its skills, how often it was
-// hired and harvested (the core state's progress), how many of its helpers are on the farm now, and the first problem
-// that would stop it being sent (agentIssues); 停用/启用 shows on hover.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,7 +36,6 @@ class AgentsPage extends ConsumerWidget {
       const _NewCard(),
     ];
 
-    // mx-auto max-w-6xl px-6 pt-3 pb-8: the padding is inside the 1152 px.
     return PxScrollView(
       child: Center(
         child: ConstrainedBox(
@@ -117,8 +111,6 @@ class AgentsPage extends ConsumerWidget {
   }
 }
 
-/// 捏一个新帮工 at the header's right: a leaf green link, whose shadow and focus ring the skin turn into an inner
-/// cream-300 line.
 class _NewButton extends StatelessWidget {
   const _NewButton();
 
@@ -135,14 +127,12 @@ class _NewButton extends StatelessWidget {
   );
 }
 
-/// A card that lifts a little under the pointer and goes to `path` when clicked.
 class _Card extends StatefulWidget {
   const _Card({required this.path, required this.label, required this.child, this.corner, this.muted = false});
   final String path;
   final String label;
   final Widget child;
 
-  /// Shown at the top right on hover (and while focused).
   final Widget Function(bool shown)? corner;
   final bool muted;
 
@@ -169,7 +159,6 @@ class _CardState extends State<_Card> {
               KitTappable(
                 onTap: () => deskGo(context, widget.path),
                 semanticLabel: widget.label,
-                // The card's <a> carries focus-visible:ring-2: the skin's inner cream-300 line over the frame's rim.
                 builder: (context, s) => Container(padding: const EdgeInsets.all(16), foregroundDecoration: pxRing, child: widget.child),
               ),
               if (widget.corner != null) Positioned(top: 12, right: 12, child: widget.corner!(_hover)),
@@ -256,7 +245,7 @@ class _AgentCard extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // The tint over cream-200 (a gradient in a BoxDecoration takes the place of its colour).
+              // A gradient in a BoxDecoration takes the place of its colour.
               ColoredBox(
                 color: Palette.cream200,
                 child: Container(
@@ -380,7 +369,6 @@ class _AgentCard extends ConsumerWidget {
   }
 }
 
-/// 停用 / 启用: saves the agent with `enabled` flipped.
 class _Toggle extends ConsumerWidget {
   const _Toggle({required this.agent, required this.shown});
   final AgentProfile agent;
@@ -433,7 +421,6 @@ class _NewCard extends StatelessWidget {
   );
 }
 
-/// border-2 border-dashed.
 class _Dashed extends CustomPainter {
   _Dashed(this.color);
   final Color color;

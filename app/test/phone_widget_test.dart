@@ -1,7 +1,3 @@
-// The farm phone on screen, with a fake inbox instead of the server: what stands when the farm opens is already
-// missed; a new call rings and opens the phone; answering takes you where the call points; hanging up or letting it
-// ring out puts the phone back; the home screen opens the games, which take the keys and the pad.
-
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -20,7 +16,6 @@ import 'package:vibevalley/sprites/atlas.dart';
 import 'package:vibevalley/village/village_view.dart';
 import 'package:vibevalley/voice/voice.dart';
 
-/// The inbox the test hands the phone, frame by frame.
 class FakeInbox extends Notifier<List<InboxItem>> {
   @override
   List<InboxItem> build() => const [];
@@ -55,7 +50,6 @@ const draft = InboxItem(
 );
 const mention = InboxItem(id: 'm4', kind: InboxKind.mention, from: InboxFromManager(), text: '@主人 要不要收？', at: 50, target: InboxTargetChat(conversation: 3));
 
-/// The farm screen's corner as the farm page lays it out: the phone over its button.
 class Corner extends ConsumerWidget {
   const Corner({super.key, required this.call});
   final VoiceCall call;
@@ -139,7 +133,6 @@ void main() {
     expect(find.text('阿周'), findsOneWidget);
     expect(find.text('活没做成'), findsOneWidget);
     expect(find.text('来电'), findsOneWidget, reason: 'the button says a call is coming in');
-    // Answered: the phone goes away and the farm opens that helper.
     await tester.tap(find.text('接听'));
     await tester.pump();
     expect(container.read(phoneOpenProvider), isFalse);
@@ -153,7 +146,6 @@ void main() {
     await farm(tester);
     container.read(fakeInbox.notifier).calls([failed]);
     await tester.pump();
-    // The phone follows the view after the frame it changed in (calls.dart).
     await tester.pump();
     await tester.tap(find.text('挂断'));
     await tester.pump();
@@ -162,7 +154,6 @@ void main() {
     expect(targets, isEmpty);
     container.read(fakeInbox.notifier).calls([draft, failed]);
     await tester.pump();
-    // The phone follows the view after the frame it changed in (calls.dart).
     await tester.pump();
     expect(find.text('管家'), findsOneWidget);
     expect(find.text('计划拆好了'), findsOneWidget);
@@ -176,14 +167,12 @@ void main() {
     await farm(tester);
     container.read(fakeInbox.notifier).calls([mention]);
     await tester.pump();
-    // The phone follows the view after the frame it changed in (calls.dart).
     await tester.pump();
     expect(find.text('来电…'), findsOneWidget);
     await tester.pump(ringFor);
     await tester.pump();
     expect(container.read(phoneOpenProvider), isFalse);
     expect(container.read(phoneProvider).missed.single.id, 'm4');
-    // Out of the pocket: the home screen, the missed calls, answered there.
     await tester.tap(find.text('手机'));
     await tester.pump();
     expect(find.text('农场通'), findsOneWidget);
@@ -201,12 +190,10 @@ void main() {
     await farm(tester);
     container.read(fakeInbox.notifier).calls([ripe]);
     await tester.pump();
-    // The phone follows the view after the frame it changed in (calls.dart).
     await tester.pump();
     expect(find.text('来电…'), findsOneWidget);
     container.read(fakeInbox.notifier).calls([]);
     await tester.pump();
-    // The phone follows the view after the frame it changed in (calls.dart).
     await tester.pump();
     expect(container.read(phoneOpenProvider), isFalse);
     expect(container.read(phoneProvider).ringing, isNull);
@@ -227,15 +214,12 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     await tester.pump();
     expect(container.read(blocksGameProvider)!.piece.x, started.piece.x - 1);
-    // The piece falls on the clock.
     await tester.pump(const Duration(milliseconds: 850));
     await tester.pump(const Duration(milliseconds: 16));
     expect(container.read(blocksGameProvider)!.piece.y, greaterThan(0));
-    // The on-screen B pauses.
     await tester.tap(find.text('B'));
     await tester.pump();
     expect(find.text('按 A 继续'), findsOneWidget);
-    // Home, and the game is kept.
     await tester.tap(find.bySemanticsLabel('主屏'));
     await tester.pump();
     expect(find.text('小恐龙'), findsOneWidget);

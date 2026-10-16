@@ -1,9 +1,3 @@
-// 捏帮工: the agent creator (web/src/pages/AgentCreator.tsx). Left, which little animal it is on the farm and what it
-// wears; middle, its bed, where it shows each pose; right, what it is: runtime and model, persona, skills, tools,
-// environment, and (once saved) what it remembers and the trajectories of the helpers it sent. Problems that would
-// stop oar from opening a session (agentIssues) show up as you go. `id` 'new' makes a new one (on `runtime`, claude
-// by default).
-
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -23,7 +17,6 @@ import '../../rules/index.dart';
 import '../../rules/looks.dart';
 import '../../rules/seeds.dart';
 
-/// What the stage can show: each pose, with what would be growing in the bed meanwhile.
 const _stagePoses = [
   (pose: Pose.idle, label: '待命', crop: Crop.empty),
   (pose: Pose.walk, label: '走过来', crop: Crop.seeded),
@@ -33,7 +26,6 @@ const _stagePoses = [
   (pose: Pose.worry, label: '长虫了', crop: Crop.withered),
 ];
 
-/// A new agent on `runtime`, with the first free `agent-n` id. It starts as some animal in farm clothes.
 AgentProfile newAgent(String runtime, Set<String> taken, [Look? look]) {
   var n = 1;
   while (taken.contains('agent-$n')) {
@@ -76,7 +68,7 @@ class _AgentCreatorPageState extends ConsumerState<AgentCreatorPage> {
 
   bool get _isNew => widget.id == 'new';
 
-  /// Starts editing once the config has loaded; only the route decides what is being edited.
+  /// Only the route decides what is being edited.
   void _start(DeskConfig config) {
     if (!config.loaded) return;
     if (_isNew) {
@@ -176,10 +168,8 @@ class _CreatorState extends ConsumerState<_Creator> {
 
     final bar = PxWindow(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      // The buttons sit at the row's right end (ml-auto).
       child: Row(
         children: [
-          // The link's focus-visible:ring-2 is the skin's inner line, shown always.
           Container(
             foregroundDecoration: pxRing,
             child: DefaultTextStyle(
@@ -346,8 +336,6 @@ class _DeleteButtonState extends ConsumerState<_DeleteButton> {
   }
 }
 
-// ── Look ─────────────────────────────────────────────────────────────────────
-
 class _LookPanel extends ConsumerWidget {
   const _LookPanel({required this.look, required this.id, required this.onChange});
   final Look look;
@@ -475,7 +463,6 @@ class _Stage extends ConsumerWidget {
                 height: 288,
                 child: Stack(
                   children: [
-                    // The bed, 288 wide, its middle 62% of its width left of the stage's middle.
                     if (bed != null)
                       Positioned(
                         bottom: 24,
@@ -483,7 +470,6 @@ class _Stage extends ConsumerWidget {
                         width: 288,
                         child: Image.asset(bed.asset, width: 288, fit: BoxFit.fitWidth, filterQuality: FilterQuality.none),
                       ),
-                    // right-24 bottom-2: a point, where the sprite's anchor (its feet) stands.
                     if (atlas != null)
                       Builder(
                         builder: (context) {
@@ -546,8 +532,6 @@ class _Stage extends ConsumerWidget {
   }
 }
 
-// ── What the agent is ────────────────────────────────────────────────────────
-
 enum _Tab { who, runtime, persona, skills, tools, env, memory, trajectories }
 
 class _ConfigTabs extends StatefulWidget {
@@ -558,7 +542,6 @@ class _ConfigTabs extends StatefulWidget {
   final bool nameTaken;
   final bool isNew;
 
-  /// Fills the column's height and scrolls inside (the wide layout).
   final bool fill;
 
   @override
@@ -1171,7 +1154,6 @@ class _Inventory extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                // The name wraps where it must (the page's span has no truncate); the rest gives way.
                 Flexible(
                   child: Text(
                     e.name,

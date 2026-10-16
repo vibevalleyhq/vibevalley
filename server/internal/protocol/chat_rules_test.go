@@ -1,7 +1,5 @@
 package protocol
 
-// The group chat's rules (chat_rules.go), as the removed TypeScript server's chat-rules.test.ts tested the TypeScript ones.
-
 import (
 	"fmt"
 	"reflect"
@@ -158,13 +156,10 @@ func TestAgentsWakingAgents(t *testing.T) {
 	})
 	coreEqual(t, coreAudience(byHelper(func(i *AudienceInput) { i.Mentions, i.Cooling = []string{"w2"}, []string{"w2"} })), [][4]any{coreRow("w2", "mention", true, "cooldown")})
 	coreEqual(t, coreAudience(byHelper(func(i *AudienceInput) { i.Mentions, i.Broken = []string{"w2"}, []string{"w2"} })), [][4]any{coreRow("w2", "mention", true, "wake_breaker")})
-	// The person is not braked: their word wakes even a broken helper.
 	coreEqual(t, coreAudience(func(i *AudienceInput) {
 		i.Mentions, i.Broken, i.Hops, i.Cooling = []string{"w2"}, []string{"w2"}, 99, []string{"w2"}
 	})[0], coreRow("w2", "mention", true, ""))
-	// A helper cannot @所有人, and never wakes itself.
 	coreEqual(t, coreAudience(byHelper(func(i *AudienceInput) { i.Mentions = []string{"everyone", "w1"} })), [][4]any{})
-	// The manager in a helper's thread speaks to that helper.
 	coreEqual(t, coreAudience(func(i *AudienceInput) {
 		i.From, i.FromKind, i.Conversation = "foreman", SenderKindForeman, coreJobOf("w1")
 	}), [][4]any{coreRow("w1", "own_thread", true, "")})

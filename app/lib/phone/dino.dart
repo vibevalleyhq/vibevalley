@@ -1,7 +1,4 @@
-// 小恐龙: the farm phone's runner (packages/core/src/dino.ts). A little dinosaur runs along the ground; jump the
-// cacti, duck or jump the birds; it runs faster the further it goes. Pure, like blocks.dart: a run is a value and
-// `run` moves it on by some milliseconds; the phone runs the clock and draws it (dino_game.dart). Sizes are the game's
-// own pixels on a 104×40 strip, y down; obstacles come from the run's own seeded generator, so a seed replays.
+// Pure: a run is a value and `run` moves it on by some milliseconds. Sizes are the game's own pixels on a 104×40 strip, y down; a seed replays.
 
 import 'dart:math' as math;
 
@@ -12,7 +9,6 @@ import 'random.dart';
 const dinoWidth = 104;
 const dinoHeight = 40;
 
-/// The ground line: where feet stand.
 const dinoGround = 35;
 const _dinoX = 8;
 
@@ -25,10 +21,8 @@ class Obstacle {
   const Obstacle({required this.kind, required this.x, required this.y, required this.w, required this.h});
   final ObstacleKind kind;
 
-  /// Its left edge, moving left.
   final double x;
 
-  /// Its top.
   final double y;
   final double w;
   final double h;
@@ -56,24 +50,22 @@ class Dino {
     required this.time,
   });
 
-  /// The dinosaur's height above the ground (0 on it), and its speed upward, in pixels per millisecond.
+  /// In pixels per millisecond.
   final double lift;
   final double rise;
   final bool ducking;
   final List<Obstacle> obstacles;
 
-  /// How fast the ground moves, in pixels per millisecond.
+  /// Pixels per millisecond.
   final double speed;
 
-  /// Pixels run: the score is a tenth of it.
+  /// The score is a tenth of it.
   final double distance;
 
-  /// Ground to cover before the next obstacle.
   final double gap;
   final int seed;
   final bool over;
 
-  /// Milliseconds run, for the legs' and wings' frames.
   final double time;
 
   Dino copyWith({
@@ -118,20 +110,16 @@ class Dino {
   int get hashCode => Object.hash(lift, rise, ducking, Object.hashAll(obstacles), speed, distance, gap, seed, over, time);
 }
 
-// A floaty jump, about 27 pixels up and half a second in the air: long enough to clear the widest cacti at the
-// starting speed with room to spare (phone_games_test.dart checks it).
+// Long enough to clear the widest cacti at the starting speed with room to spare (phone_games_test.dart checks it).
 const _gravity = 0.0008;
 const _jump = 0.21;
 
-/// Holding down while in the air pulls it down faster.
 const _dive = 0.004;
 const _startSpeed = 0.08;
 const _topSpeed = 0.17;
 
-/// Speed gained per pixel run.
 const _speedUp = 0.000008;
 
-/// Birds only once it has run this far.
 const _birdsFrom = 2000;
 
 Dino newDino(int seed) =>
@@ -139,15 +127,12 @@ Dino newDino(int seed) =>
 
 int dinoScore(Dino d) => (d.distance / 10).floor();
 
-/// Jumps, from the ground only.
 Dino jump(Dino d) => d.over || d.lift > 0 ? d : d.copyWith(rise: _jump, ducking: false);
 
-/// Ducks on the ground; in the air it dives.
 Dino duck(Dino d, bool down) => d.over ? d : d.copyWith(ducking: down);
 
 typedef Box = ({double x, double y, double w, double h});
 
-/// The dinosaur's box now: lower and longer while it ducks on the ground.
 Box dinoBox(Dino d) {
   final size = d.ducking && d.lift == 0 ? dinoDuckSize : dinoRunSize;
   return (x: _dinoX.toDouble(), y: dinoGround - d.lift - size.h, w: size.w.toDouble(), h: size.h.toDouble());
@@ -169,11 +154,9 @@ Box dinoBox(Dino d) {
   return (Obstacle(kind: kind, x: dinoWidth.toDouble(), y: y.toDouble(), w: w.toDouble(), h: h.toDouble()), gap, s2);
 }
 
-/// Two boxes overlap, with grace (two pixels at the sides, where the pictures' corners are empty; one above and
-/// below): a graze is not a hit.
+/// With grace (two pixels at the sides, where the pictures' corners are empty; one above and below): a graze is not a hit.
 bool _hits(Box a, Obstacle b) => a.x + 2 < b.x + b.w - 2 && b.x + 2 < a.x + a.w - 2 && a.y + 1 < b.y + b.h - 1 && b.y + 1 < a.y + a.h - 1;
 
-/// The run `ms` milliseconds on: it falls or rises, the ground moves, obstacles come and go, a hit ends it.
 Dino run(Dino d, double ms) {
   if (d.over) return d;
   final dt = math.min(ms, 50.0);

@@ -1,7 +1,3 @@
-// 种田 2048 as values (packages/core/test/merge.test.ts ported): crops slide to the edge, two of a stage grow once a
-// slide and score the new stage's worth, a slide that moves nothing changes nothing, a full field with no pair ends the
-// run, one slide comes back; and the seeded generator plays exactly the games the web page plays from the same seeds.
-
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,12 +8,10 @@ import 'package:vibevalley/shell/sfx.dart';
 
 Merge on(List<int> board, [int seed = 1]) => newMerge(seed).copyWith(board: board);
 
-/// The field with the new seed taken off, to look at the slide alone.
 List<int> slid(Merge g) => [for (var i = 0; i < g.board.length; i++) i == g.sown ? 0 : g.board[i]];
 
 const _dirs = {'l': MergeDirection.left, 'u': MergeDirection.up, 'r': MergeDirection.right, 'd': MergeDirection.down};
 
-/// A game played from a seed through slides written as letters (l, u, r, d).
 Merge play(int seed, String path) {
   var g = newMerge(seed);
   for (final c in path.split('')) {
@@ -27,8 +21,7 @@ Merge play(int seed, String path) {
 }
 
 void main() {
-  test('the same games as the web page from the same seeds', () {
-    // From packages/core merge.ts with the same seeds and slides (node, mulberry32 in 32-bit JS arithmetic).
+  test('a seed replays the recorded games', () {
     final cases = [
       (42, 'lurdllurrdduuldr', '0000001001000000', -631835628, '0,0,0,0,0,1,2,1,0,1,2,1,0,0,2,4', 60, 16, -1391553692, [15], 5),
       (7, 'ddddllllrrrruuuu', '1100000000000000', -631835663, '2,1,2,3,0,0,1,1,0,0,2,1,0,0,0,0', 28, 12, -127882387, <int>[], 11),
@@ -145,7 +138,6 @@ void main() {
     await tester.pump();
     final started = container.read(mergeGameProvider)!;
     expect(find.text('按 A 开始'), findsNothing);
-    // Some way slides: two seeds on an empty field always leave a move.
     for (final b in [PadButton.left, PadButton.up, PadButton.right, PadButton.down]) {
       pad.press(b, true);
     }
@@ -155,7 +147,6 @@ void main() {
     pad.press(PadButton.b, true);
     await tester.pump();
     expect(container.read(mergeGameProvider)!.moves, slid.moves - 1);
-    // A swipe across the field slides too.
     final before = container.read(mergeGameProvider)!;
     for (final d in const [Offset(-80, 0), Offset(0, -80), Offset(80, 0), Offset(0, 80)]) {
       await tester.drag(find.bySemanticsLabel(RegExp('^田里')), d);

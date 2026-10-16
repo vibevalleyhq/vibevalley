@@ -1,8 +1,3 @@
-// A project as a piece of land (web/src/pages/ProjectsPage.tsx): its deed (a plot that grows while the project is
-// worked and dries out when it is left, when it was first broken, how much has been done), what is planted in it (the
-// languages, tokei's count, as rows in one bed), the year's tilling calendar (a plot a day that grows with the
-// commits), and who has worked it. The counting is the server's; the rules for showing it are in codebase.dart.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -30,7 +25,7 @@ class ProjectsPage extends ConsumerStatefulWidget {
 }
 
 class _ProjectsPageState extends ConsumerState<ProjectsPage> {
-  /// The time now, a minute at a time: enough for 「3 小时前」.
+  /// A minute at a time: enough for 「3 小时前」.
   DateTime _now = DateTime.now();
   Timer? _clock;
 
@@ -108,7 +103,6 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
   }
 }
 
-/// 「刚刚」「3 小时前」「5 天前」「2 个月前」.
 String since(double at, double now) {
   final minutes = (now - at) / 60000 < 0 ? 0.0 : (now - at) / 60000;
   if (minutes < 2) return '刚刚';
@@ -129,7 +123,7 @@ String _dateText(double at) {
 const _weekday = ['一', '二', '三', '四', '五', '六', '日'];
 String _dayText(DateTime d) => '${d.month} 月 ${d.day} 日 星期${_weekday[d.weekday - 1]}';
 
-/// A count as toLocaleString('zh-CN') writes it: 「12,345」.
+/// As toLocaleString('zh-CN') writes it: 「12,345」.
 String number(num n) {
   final whole = n.round().abs().toString();
   final out = StringBuffer(n < 0 ? '-' : '');
@@ -162,8 +156,6 @@ class _ProjectRow extends StatelessWidget {
     );
   }
 }
-
-// ── The deed ─────────────────────────────────────────────────────────────────
 
 class _Deed extends ConsumerWidget {
   const _Deed({required this.project, required this.survey, required this.now});
@@ -215,7 +207,6 @@ class _Deed extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // grid-cols-4 gap-x-6: the four facts share the width.
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -228,7 +219,6 @@ class _Deed extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                // Where it is on this machine.
                 Row(
                   children: [
                     const SpriteIcon('button-folder', size: 14),
@@ -293,9 +283,6 @@ class _Stat extends StatelessWidget {
   );
 }
 
-// ── What is planted ──────────────────────────────────────────────────────────
-
-/// A share this big shows its logo in the bed.
 const _logoInBed = 0.07;
 
 String percent(double share) => share >= 0.1 ? '${(share * 100).round()}%' : '${(share * 100).toStringAsFixed(1)}%';
@@ -320,14 +307,12 @@ class _Planted extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // One bed, the crops in rows across it, as wide as their share.
           Semantics(
             image: true,
             label: shares.map((s) => '${s.label} ${percent(s.share)}').join('，'),
             child: Container(
               height: 56,
               padding: const EdgeInsets.all(4),
-              // Its inset shadow is the skin's inner cream-300 line.
               color: const Color(0xFF7A5A3A),
               foregroundDecoration: pxRing,
               child: Row(
@@ -440,12 +425,9 @@ class _NotCounted extends StatelessWidget {
   }
 }
 
-// ── The tilling calendar ─────────────────────────────────────────────────────
-
-/// A day's plot by how grown it is (its tile is `day-<level>`).
+/// Its tile is `day-<level>`.
 const _levelName = ['空地', '撒了种', '发了芽', '长了叶', '开了花'];
 
-/// The space between the calendar's plots; the weekday names' column; a day's tile at its own size (12 art pixels).
 const _gap = 3.0;
 const _labels = 20.0;
 const _tile = 12.0;
@@ -499,7 +481,6 @@ class _TillingCalendarState extends State<_TillingCalendar> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // grid-cols-4 gap-x-6.
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -617,9 +598,6 @@ class _TillingCalendarState extends State<_TillingCalendar> {
   }
 }
 
-// ── Who worked it ────────────────────────────────────────────────────────────
-
-/// Authors shown; the rest are summed up.
 const _hands = 8;
 
 class _Hands extends ConsumerWidget {
@@ -650,7 +628,6 @@ class _Hands extends ConsumerWidget {
               for (final author in authors.take(_hands))
                 Row(
                   children: [
-                    // A helper of the farm by its name shows its face; anyone else, their first character.
                     if (agents.where((x) => x.name == author.name).firstOrNull case final agent?)
                       AgentFace(look: agent.look, id: agent.id, size: 32)
                     else

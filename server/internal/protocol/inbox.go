@@ -1,8 +1,6 @@
 package protocol
 
-// The inbox: what needs the person now, worked out from the state. The farm rings it on the phone and the desktop
-// bell; the patrol (patrol.go) tells the manager about what has waited past its grace. A playbook's own helpers leave
-// their finished, failed and conflicted work to the playbook, which asks in their place; a quiet one still asks.
+// A playbook's own helpers leave their finished, failed and conflicted work to the playbook, which asks in their place; a quiet one still asks.
 
 import (
 	"cmp"
@@ -11,8 +9,7 @@ import (
 	"strconv"
 )
 
-// inboxEntry is an item with what the patrol needs besides: the channel it belongs in (nil: the square), when it began
-// (nil: when the patrol first saw it), and how to tell the manager about it ({ago} is filled with how long).
+// channel nil: the square; began nil: when the patrol first saw it; {ago} is filled with how long.
 type inboxEntry struct {
 	item    InboxItem
 	channel *int64
@@ -20,8 +17,7 @@ type inboxEntry struct {
 	brief   string
 }
 
-// Inbox is every item standing now, newest first; items of the same moment in the order they are gathered: helpers as
-// the farm lists them, then playbooks oldest first and their steps, then messages by conversation.
+// Newest first; items of the same moment in the order they are gathered.
 func Inbox(state FarmState) []InboxItem {
 	items := []InboxItem{}
 	for _, e := range inboxEntries(state) {

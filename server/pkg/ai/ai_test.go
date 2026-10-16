@@ -1,10 +1,5 @@
 package ai
 
-// ai, offline: half-written tool arguments, an answer's events in pi's order, the chat request (DeepSeek's
-// reasoning sent back, calls without results left out, levels by their provider names), the real HTTP path against
-// a local server (tried again on 503, an error as a message, aborted when cancelled), the faux provider, prices.
-// Ported from the TypeScript @heybro/ai's ai.test.ts (removed).
-
 import (
 	"context"
 	"encoding/json"
@@ -126,7 +121,6 @@ func TestAnAnswersEventsComeInPisOrder(t *testing.T) {
 		"start", "thinking_start", "thinking_delta", "thinking_delta", "thinking_end", "text_start", "text_delta", "text_delta", "text_end",
 		"toolcall_start", "toolcall_delta", "toolcall_delta", "toolcall_start", "toolcall_delta", "toolcall_end", "toolcall_end", "done",
 	})
-	// Arguments are read as they come.
 	for _, e := range events {
 		if e.Type == EventToolCallDelta {
 			jsonEq(t, e.Partial.Content[2], `{"type":"toolCall","id":"c1","name":"read","arguments":{}}`)
@@ -202,7 +196,6 @@ func TestTheChatRequest(t *testing.T) {
 		{"role":"tool","tool_call_id":"c1","content":"export {}"},
 		{"role":"user","content":"看图\n[图片]"}
 	]`)
-	// A model that does not want reasoning back does not get it.
 	plain := flash()
 	plain.Compat = &Compat{}
 	eq(t, ToChatMessages(plain, c)[2].ReasoningContent, "")
@@ -247,7 +240,6 @@ func TestModelsPricesAndThinkingLevels(t *testing.T) {
 	eq(t, ClampThinkingLevel(flash(), ThinkingLow), ThinkingLow)
 }
 
-// endpoint is a chat completions endpoint on this machine: each request answered by reply; what it was asked is kept.
 type endpoint struct {
 	model  Model
 	mu     sync.Mutex

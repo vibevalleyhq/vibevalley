@@ -1,5 +1,3 @@
-// 图鉴: the almanac's rules over the real sprite manifest, and its three shelves.
-
 import 'dart:io';
 import 'dart:typed_data';
 

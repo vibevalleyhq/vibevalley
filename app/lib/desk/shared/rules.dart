@@ -1,10 +1,6 @@
-// The desk's edits of an agent profile. The protocol's runtime and agent rules the desk pages compute on the client
-// (runtimePresets, runtimeName, factsOf, moneyStop, yuan, agentIssues, managerAgent) are rules/seeds.dart's and
-// rules/index.dart's.
-
 import '../../gen/vibevalley.dart';
 
-/// An agent with some fields changed (the generated AgentProfile has no copyWith).
+/// The generated AgentProfile has no copyWith.
 extension AgentEdit on AgentProfile {
   AgentProfile copyWith({
     String? id,

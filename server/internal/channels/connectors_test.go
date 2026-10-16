@@ -19,12 +19,6 @@ import (
 	"vibevalley/pkg/weixin"
 )
 
-// The connectors (connectors.go; ported from the TypeScript server's connectors.test.ts, removed) against scripted WeChat, Feishu and QQ,
-// with the real chat and database. WeChat: scanning logs in and names the owner; their words are said on 田头 and the
-// answer goes back on their context; a stranger is not let in; what WeChat will not take waits and goes out with the
-// next message, many as one digest; logging out forgets it. Feishu and QQ: logging in leaves a pairing code; nobody is
-// heard until someone sends it, then only they are.
-
 const voiceOwner = "o9cq80wkM5NnOwnerOfThisFarm@im.wechat"
 
 type voiceSent struct {
@@ -34,7 +28,6 @@ type voiceSent struct {
 	Reply string
 }
 
-// voiceScript is the scripted apps: login answers in order, what people send each app, what the bots sent.
 type voiceScript struct {
 	mu          sync.Mutex
 	qr          []weixin.QrStatus
@@ -163,8 +156,6 @@ func (a voiceScriptedQQ) SendText(_ context.Context, _ qq.App, openID, text, msg
 	return fmt.Sprintf("qq%d", a.s.record(voiceSent{App: protocol.ConnectorIDQq, To: openID, Text: text, Reply: msgID})), nil
 }
 
-// voiceConnectorsFarm is a farm whose connectors talk to scripted apps, with a manager that answers everything on the
-// spot: what the person said, back in the same conversation.
 func voiceConnectorsFarm(t *testing.T) (*world, *voiceScript) {
 	t.Helper()
 	f := voiceTestFarm(t)
@@ -326,7 +317,6 @@ func TestConnectorsWeixinInAnotherChannel(t *testing.T) {
 	if _, err := f.Connectors.SetChannel(protocol.ConnectorIDWeixin, "#nowhere"); err == nil || !strings.Contains(err.Error(), "没有叫") {
 		t.Fatalf("nowhere: %v", err)
 	}
-	// The square's words are not this door's any more.
 	f.Chat.ForemanSays(f.Chat.Square(), "sq", "田头上的话", true)
 	s.weixin <- voiceWx(voiceOwner, "打卡页怎么样了", "ctx-c")
 	reply := voiceNth(t, s, protocol.ConnectorIDWeixin, 0, "the answer in WeChat")
@@ -402,7 +392,6 @@ func TestConnectorsWeixinHeldGoOutByThemselves(t *testing.T) {
 	s.restricted.Store(true)
 	s.weixin <- voiceWx(voiceOwner, "一", "ctx-1")
 	voiceUntil(t, "held", func() (bool, bool) { return true, voiceStatusOf(f, protocol.ConnectorIDWeixin).Pending == 1 })
-	// Tried again and again while WeChat says no; then it takes it, without the owner saying anything.
 	time.Sleep(200 * time.Millisecond)
 	s.restricted.Store(false)
 	held := voiceNth(t, s, protocol.ConnectorIDWeixin, 0, "the held answer")

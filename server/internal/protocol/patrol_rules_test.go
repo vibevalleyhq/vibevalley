@@ -1,7 +1,5 @@
 package protocol
 
-// The patrol's rules (patrol.go): which inbox items the manager hears of, when, and in what words.
-
 import (
 	"regexp"
 	"testing"
@@ -48,8 +46,6 @@ func patrolMatch(t *testing.T, text, pattern string) {
 	}
 }
 
-// patrolBriefs is what the patrol would tell the manager about each item, seen first at patrolT and still there a
-// day later.
 func patrolBriefs(state FarmState) []PatrolNote {
 	_, memory := PatrolStep(state, patrolT, EmptyPatrol())
 	notes, _ := PatrolStep(state, patrolT+24*60*patrolMin, memory)
@@ -85,7 +81,6 @@ func TestPatrolQuietRipeStep(t *testing.T) {
 			h.ID, h.Name, h.Channel, h.Phase = "w2", "前端小林", rulesPtr(int64(5)), Phase{PhaseRipe{}}
 			h.Last = &LastTurn{Outcome: OutcomeCompleted, Summary: "好了", At: patrolT}
 		}),
-		// A failed turn reaches the manager as it happens; the patrol leaves it.
 		patrolHelper(func(h *Helper) {
 			h.ID, h.Phase = "w3", Phase{PhaseFailed{}}
 			h.Last = &LastTurn{Outcome: OutcomeFailed, Summary: "测试没过", At: patrolT}

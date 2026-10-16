@@ -1,7 +1,3 @@
-// 贪吃虫 as values (packages/core/test/bugsnake.test.ts ported): it crawls a cell a tick and turns but never back on
-// itself, a seed grows it a segment, a bug lands every fifth seed and flies off unless eaten, the wall and its own
-// body end a run but its tail's cell does not, and the same seed and turns make the run the web page makes.
-
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,7 +24,6 @@ BugSnake make(BugSnake g, {List<int>? body, SnakeHeading? heading, List<SnakeHea
       over: g.over,
     );
 
-/// A fixed board: the caterpillar along row 7 heading right, the seed far away in a corner.
 BugSnake lined({List<int>? body, SnakeHeading? heading, List<SnakeHeading>? turns, int? grow, int? food, int? eaten}) =>
     make(newBugSnake(1), body: body, heading: heading, turns: turns, grow: grow, food: food ?? at(0, 0), eaten: eaten);
 
@@ -40,7 +35,7 @@ BugSnake crawl(BugSnake g, int n) {
   return x;
 }
 
-/// The test's pilot, the same as bugsnake.test.ts's: of the ways that do not end the run (up, right, down, left in that
+/// The pilot: of the ways that do not end the run (up, right, down, left in that
 /// order, never back), the first nearest the bug or else the seed.
 SnakeHeading pilot(BugSnake g) {
   final target = g.bug ?? g.food;
@@ -65,7 +60,6 @@ SnakeHeading pilot(BugSnake g) {
   return best;
 }
 
-/// Runs the pilot from a seed for at most `ticks`, or until the run ends.
 (int, BugSnake) piloted(int seed, int ticks) {
   var g = newBugSnake(seed);
   var t = 0;
@@ -140,9 +134,7 @@ void main() {
     expect(bugSnakeStepMs(lined(body: List.generate(100, (i) => i))), 80);
   });
 
-  test('a seed runs what the web page runs from it', () {
-    // From packages/core bugsnake.ts with the same seeds and pilot (node): ticks, end, score, seeds, bugs, length,
-    // the seed's cell, the bug's, and the generator's state.
+  test('a seed replays the recorded run', () {
     List<Object?> summary(int seed) {
       final (t, g) = piloted(seed, 3000);
       return [t, g.over?.name, g.score, g.eaten, g.bugs, g.body.length, g.food, g.bug, g.seed];
@@ -158,7 +150,6 @@ void main() {
   testWidgets('on the big phone\'s screen: A starts, the arrows steer, B pauses, the wall ends it and keeps the best', (tester) async {
     final pad = Pad();
     final container = ProviderContainer();
-    // The big handset's screen, under its status bar.
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,

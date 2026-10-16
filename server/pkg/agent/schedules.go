@@ -1,8 +1,6 @@
 package agent
 
-// Schedules: things the agent was asked to do later, or again and again. Kept in its folder (schedules.json), so
-// they outlive a restart. A schedule that comes due sends its message to the agent as if someone had said it; one
-// missed while the agent was away runs once when it is back, not once per miss. Cron in the machine's time zone.
+// One missed while the agent was away runs once when it is back, not once per miss. Cron is in the machine's time zone.
 
 import (
 	"context"
@@ -19,11 +17,9 @@ import (
 	"vibevalley/pkg/agentcore"
 )
 
-// Job is one schedule, as schedules.json holds it.
 type Job struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	// What it is told when the job comes due.
+	ID      string `json:"id"`
+	Name    string `json:"name"`
 	Message string `json:"message"`
 	// One of: a cron expression, a moment (ISO), every so many minutes.
 	Cron         string   `json:"cron,omitempty"`
@@ -33,12 +29,11 @@ type Job struct {
 	LastRun      string   `json:"lastRun,omitempty"`
 }
 
-// isoTime is Date.toISOString.
+// Date.toISOString.
 func isoTime(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000Z") }
 
-// parseDate reads a moment as `new Date(text)` does for the forms people (and models) write: ISO with a zone
-// (`+08:00`, `+0800` or `Z`; a space for the T; seconds optional) or without one (local time), a day with dashes
-// (UTC midnight, as JS reads it), or a day with slashes and an optional time (local).
+// As `new Date(text)` reads the forms people (and models) write: ISO with a zone (`+08:00`, `+0800` or `Z`; a space for the T; seconds optional) or
+// without one (local time), a day with dashes (UTC midnight, as JS reads it), or a day with slashes and an optional time (local).
 func parseDate(text string) (time.Time, bool) {
 	s := strings.TrimSpace(text)
 	for _, layout := range []string{
@@ -63,7 +58,6 @@ func parseDate(text string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// ParseCron is a cron expression in this machine's zone, or why it is not one.
 func ParseCron(expr string) (*Cron, error) {
 	c, err := ParseCronExpression(expr, time.Local)
 	if err != nil {
@@ -72,7 +66,6 @@ func ParseCron(expr string) (*Cron, error) {
 	return c, nil
 }
 
-// NextRun is when a job is next due, counting from its last run (or its creation); false when it never will be again.
 func NextRun(job Job) (time.Time, bool) {
 	fromText := job.LastRun
 	if fromText == "" {
@@ -100,7 +93,6 @@ func NextRun(job Job) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// DueJobs is the jobs due at now.
 func DueJobs(jobs []Job, now time.Time) []Job {
 	var out []Job
 	for _, j := range jobs {
@@ -111,12 +103,11 @@ func DueJobs(jobs []Job, now time.Time) []Job {
 	return out
 }
 
-// localeTime is toLocaleString('zh-CN', { hour12: false }).
+// toLocaleString('zh-CN', { hour12: false }).
 func localeTime(t time.Time) string { return t.Local().Format("2006/1/2 15:04:05") }
 
 func formatMinutes(n float64) string { return strconv.FormatFloat(n, 'f', -1, 64) }
 
-// DescribeJob is how a job reads to the model and in the list.
 func DescribeJob(j Job) string {
 	var when string
 	switch {
@@ -135,18 +126,16 @@ func DescribeJob(j Job) string {
 	return "- " + j.ID + "「" + j.Name + "」" + when + "；下次 " + next + "\n  " + j.Message
 }
 
-// DueMessage is what the agent is told when a job comes due.
 func DueMessage(j Job) string {
 	return "【定时任务「" + j.Name + "」到点了（" + j.ID + "）】\n" + j.Message
 }
 
-// Schedules is an agent's schedules.
 type Schedules struct {
 	Tools []agentcore.AgentTool
 	file  string
 	home  string
 	wake  func(text string)
-	// One change at a time: the ticker and the tools both write the file.
+	// The ticker and the tools both write the file.
 	lock sync.Mutex
 }
 
@@ -186,10 +175,9 @@ func (s *Schedules) change(f func(jobs []Job) ([]Job, error)) error {
 	return s.store(jobs)
 }
 
-// List is the jobs.
 func (s *Schedules) List() []Job { return s.load() }
 
-// Tick runs the jobs due now (at most once each), saving their runs; it tells wake for each.
+// At most once each.
 func (s *Schedules) Tick(now time.Time) {
 	var due []Job
 	_ = s.change(func(jobs []Job) ([]Job, error) {
@@ -216,7 +204,6 @@ func (s *Schedules) Tick(now time.Time) {
 	}
 }
 
-// MakeSchedules is the schedules in home; wake is told each due job's message.
 func MakeSchedules(home string, wake func(text string)) *Schedules {
 	s := &Schedules{file: filepath.Join(home, "schedules.json"), home: home, wake: wake}
 

@@ -1,5 +1,3 @@
-// Where the desktop app keeps the farm and where the helpers work: the defaults, or what the environment says.
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desktop/desktop.dart';
 

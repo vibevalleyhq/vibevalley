@@ -14,9 +14,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// The client against a local server that answers as QQ's bot API and gateway do: what is sent, and how answers and errors are
-// read. Nothing leaves the machine.
-
 func jsonBody(t *testing.T, r *http.Request) map[string]any {
 	t.Helper()
 	var body map[string]any
@@ -64,7 +61,6 @@ func TestClientSpeaksQQsProtocol(t *testing.T) {
 				t.Errorf("identify: %v", identify)
 			}
 			ws.WriteJSON(map[string]any{"op": 0, "s": 1, "t": "C2C_MESSAGE_CREATE", "d": map[string]any{"id": "m1", "content": " 你好 ", "author": map[string]any{"user_openid": "o1"}, "attachments": []any{map[string]any{}}}})
-			// A heartbeat carries the last sequence number.
 			var beat map[string]any
 			ws.ReadJSON(&beat)
 			if beat["op"] != float64(1) || beat["d"] != float64(1) {

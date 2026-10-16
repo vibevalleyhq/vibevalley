@@ -1,7 +1,3 @@
-// The plan board (lib/farm/plans.dart) and the harvest review (lib/farm/harvest.dart) on fake farms: asking for a plan,
-// a draft's steps in columns, starting it, changing a step, a step's history, harvesting a whole playbook after its
-// changes; a helper's harvest with its commits, files and diffs, or its conflicts.
-
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/farm/panels.dart';
@@ -91,15 +87,12 @@ void main() {
     expect(find.text('先做'), findsOneWidget);
     expect(find.text('第 2 批'), findsOneWidget);
     expect(find.text('等 接口'), findsOneWidget);
-    // The history: newest first, with what changed.
     expect(find.text('拆好了，3 步，等主人看'), findsOneWidget);
     expect(find.text('改了「接口」的工单'), findsOneWidget);
     await tester.tap(find.text('开工'));
     await settle(tester);
     expect(calls.list.where((x) => x.path == '/api/playbooks/p1/act').single.body, {'action': 'start'});
     expect(find.text('开工了'), findsOneWidget);
-    // Change the second column's step.
-    // The columns: 接口 and 文档 first, then 页面.
     await tester.tap(find.text('改').at(2));
     await settle(tester);
     expect(find.text('改好了'), findsOneWidget);

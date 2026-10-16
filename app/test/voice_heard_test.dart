@@ -1,5 +1,3 @@
-// What you say in a call is work for the farm: a finished sentence of yours is heard once, the manager's never.
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/voice/captions.dart';
 

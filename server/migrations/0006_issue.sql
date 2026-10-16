@@ -1,4 +1,4 @@
--- Issues (farm/issues.go; the board calls them 工单): a job from when it is written down until it closes, one id all
+-- Issues (tickets/issues.go; the board calls them 工单): a job from when it is written down until it closes, one id all
 -- along. The helpers that worked it are its runs, oldest first. The board's 待办 move here with their ids; the backlog
 -- table is left as it was.
 

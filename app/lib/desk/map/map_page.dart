@@ -1,10 +1,3 @@
-// 地图 (the desk's /map): every project as an island on an old map, the plots in its yard its worktrees and the room for
-// more (map_rules.dart). A helper stands in its plot as on the farm: at work, cheering a ripe crop, worried over a
-// failure; a free plot has a stake in it (a job sent there starts at once), a shut one is fenced off (the farm's beds
-// are all busy); jobs waiting for room are seed sacks by the gate. Clicking a helper opens its ticket, a free plot a new
-// ticket for the project, a sack its 待办, the island itself its worktrees beside the map (over it when narrow). The
-// helpers and the issues come with the farm's state; the project list is asked for now and then.
-
 import 'dart:async';
 
 import 'package:flutter/scheduler.dart';
@@ -29,22 +22,18 @@ import '../shared/looks.dart';
 import '../shared/widgets.dart';
 import 'map_rules.dart';
 
-/// How often the project list is asked for; the issues and helpers come with the farm's state.
+/// The issues and helpers come with the farm's state.
 const _pollEvery = Duration(seconds: 30);
 
-/// From this wide, an island's worktrees open beside the map; narrower, over it.
 const _sideBySide = 1100.0;
 
-/// Between islands on the map, screen pixels.
 const _gap = 24.0;
 
-/// The map's paper.
 const _parchment = Color(0xFFEBD9AE);
 
 class MapPage extends ConsumerStatefulWidget {
   const MapPage({super.key, this.project});
 
-  /// The island whose worktrees are open beside the map.
   final String? project;
 
   @override
@@ -115,8 +104,6 @@ class _MapPageState extends ConsumerState<MapPage> {
   }
 }
 
-// ── The map ──────────────────────────────────────────────────────────────────
-
 class _MapView extends StatelessWidget {
   const _MapView({required this.atlas, required this.islands, required this.homeless, required this.loading, required this.selected, required this.onOpen});
   final SpriteAtlas atlas;
@@ -128,7 +115,7 @@ class _MapView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Every island in a cell as big as the biggest picture, so they line up.
+    // So they line up.
     final looks = [
       for (final l in islandLooks)
         if (atlas.has(l)) atlas[l],
@@ -193,19 +180,16 @@ class _MapView extends StatelessWidget {
   }
 }
 
-/// The farm at a glance over the map, what its marks mean, and a new ticket; the marks on a line of their own when
-/// narrow.
 class _Toolbar extends StatelessWidget {
   const _Toolbar({required this.islands});
   final List<Island> islands;
 
-  /// Narrower than this, the marks go under the tally.
   static const _oneLine = 640.0;
 
   @override
   Widget build(BuildContext context) {
     final tally = mapTally(islands);
-    // A piece at a time, so a narrow line breaks between them.
+    // So a narrow line breaks between them.
     final pieces = ['${islands.length} 座岛', '${tally.peopled} 座有人', '在干 ${tally.working}/$workingBeds 块地', if (tally.queued > 0) '排队 ${tally.queued}'];
     final counts = Wrap(
       runSpacing: 2,
@@ -259,7 +243,6 @@ class _Toolbar extends StatelessWidget {
   }
 }
 
-/// The map's paper in the pixel frame: a faint grid, the compass in its corner, clouds drifting under the islands.
 class _Parchment extends StatefulWidget {
   const _Parchment({required this.atlas, required this.child});
   final SpriteAtlas atlas;
@@ -269,11 +252,10 @@ class _Parchment extends StatefulWidget {
   State<_Parchment> createState() => _ParchmentState();
 }
 
-/// Each cloud's height on the map (a share of it), how far along it starts, and how fast it goes, screen pixels a second.
 const _clouds = [(0.08, 0.1, 9.0), (0.46, 0.62, 6.0), (0.78, 0.35, 11.0)];
 
 class _ParchmentState extends State<_Parchment> with SingleTickerProviderStateMixin {
-  // Ten steps a second: the clouds are slow, and move a whole pixel or so at a time.
+  // The clouds are slow, and move a whole pixel or so at a time.
   late final Ticker _ticker = createTicker((elapsed) {
     final t = elapsed.inMilliseconds / 1000;
     if ((t * 10).floor() != (_t * 10).floor()) setState(() => _t = t);
@@ -283,7 +265,6 @@ class _ParchmentState extends State<_Parchment> with SingleTickerProviderStateMi
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Still for those who would rather nothing moved.
     final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     if (still && _ticker.isActive) _ticker.stop();
     if (!still && !_ticker.isActive) _ticker.start();
@@ -314,7 +295,6 @@ class _ParchmentState extends State<_Parchment> with SingleTickerProviderStateMi
                   top: (y * box.maxHeight).roundToDouble(),
                   child: Opacity(opacity: .55, child: PixelSprite(cloud, scale: 2)),
                 ),
-            // In the corner where the islands leave room for it: not on a map too narrow for that.
             if (compass != null && box.maxWidth >= 700) Positioned(right: 16, bottom: 16, child: Opacity(opacity: .8, child: PixelSprite(compass, scale: 1.5))),
             Positioned.fill(child: widget.child),
           ],
@@ -324,7 +304,6 @@ class _ParchmentState extends State<_Parchment> with SingleTickerProviderStateMi
   }
 }
 
-/// The old map's grid: dashed lines across the paper.
 class _GridPainter extends CustomPainter {
   const _GridPainter();
 
@@ -349,15 +328,13 @@ class _GridPainter extends CustomPainter {
   bool shouldRepaint(_GridPainter old) => false;
 }
 
-// ── An island ────────────────────────────────────────────────────────────────
-
 class _IslandView extends ConsumerWidget {
   const _IslandView({required this.island, required this.atlas, required this.scale, required this.cellHeight, required this.selected, required this.onOpen});
   final Island island;
   final SpriteAtlas atlas;
   final double scale;
 
-  /// The tallest island's height, art pixels: every island stands on the same line.
+  /// Art pixels: every island stands on the same line.
   final double cellHeight;
   final bool selected;
   final ValueChanged<String?> onOpen;
@@ -373,7 +350,6 @@ class _IslandView extends ConsumerWidget {
     void go(String path) => deskGo(context, path);
     final newTicket = '/tickets/new?project=${Uri.encodeQueryComponent(island.project)}';
 
-    /// A sprite with its anchor at `foot` (art pixels on the island), clickable when `onTap` is given.
     Widget place(SpriteInfo sp, Offset foot, {Widget? child, VoidCallback? onTap, String? tip, String? label}) {
       final picture = child ?? PixelSprite(sp, scale: s);
       return Positioned(
@@ -395,7 +371,6 @@ class _IslandView extends ConsumerWidget {
         ),
       ),
     ];
-    // The picture stands at the bottom of its cell, this far down.
     final down = cellHeight - pic.h;
     for (final (i, spot) in island.spots.indexed) {
       final foot = at[i] + Offset(0, down);
@@ -449,7 +424,6 @@ class _IslandView extends ConsumerWidget {
           layers.add(place(atlas['plot-locked'], foot, tip: tip, label: '等地'));
       }
     }
-    // Jobs waiting for room: a sack each by the gate, three at most, the rest counted on the last.
     final gate = Offset(yard.center.dx, yard.bottom + down);
     final sacks = island.queued.take(3).toList();
     for (final (i, item) in sacks.indexed) {
@@ -517,7 +491,6 @@ const _tone = {
   BadgeTone.rest: (CardColors.rest, CardColors.ink),
 };
 
-/// Helpers working in the work directory itself, on no island.
 class _Homeless extends StatelessWidget {
   const _Homeless({required this.helpers});
   final List<Helper> helpers;
@@ -568,8 +541,6 @@ class _NoProjects extends StatelessWidget {
     ),
   );
 }
-
-// ── An island's worktrees ────────────────────────────────────────────────────
 
 class _IslandDetail extends StatelessWidget {
   const _IslandDetail({required this.island});
@@ -676,7 +647,6 @@ class _IslandDetail extends StatelessWidget {
   );
 }
 
-/// A worktree: its helper, what it is doing, its branch, its crop; a click opens its ticket.
 class _WorktreeRow extends StatelessWidget {
   const _WorktreeRow({required this.spot, required this.now});
   final SpotTaken spot;

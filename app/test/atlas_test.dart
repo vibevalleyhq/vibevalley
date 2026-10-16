@@ -1,5 +1,3 @@
-// The sprite atlas reads the web page's manifest (assets/pixel/sprites.json): sizes and anchors in art pixels.
-
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';

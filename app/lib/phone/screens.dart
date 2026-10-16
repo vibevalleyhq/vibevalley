@@ -1,7 +1,3 @@
-// The farm phone's screens (web/src/phone/Phone.tsx): the home screen of apps, a call ringing, the missed calls and
-// the call log, the voice call with the manager; and the little pictures they use (the handset, the round keys, the
-// games' icons).
-
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -22,7 +18,6 @@ import '../rules/view.dart';
 import 'bug_snake_game.dart';
 import 'merge_game.dart';
 
-/// The phone's apps.
 enum PhoneApp { home, missed, log, blocks, dino, sokoban, bugs, merge }
 
 const _cream = Color(0xFFF7E8C4);
@@ -30,13 +25,11 @@ const _bark = Color(0xFF2F1F13);
 const _answer = Color(0xFF5A8234);
 const _decline = Color(0xFFC84A3A);
 
-/// A pale square with a 2 px dark line inside, for faces and icons.
 BoxDecoration _paleBox([Color fill = Lcd.pale]) => BoxDecoration(
   color: fill,
   border: Border.all(color: Lcd.dark, width: 2),
 );
 
-/// The little pixel handset: a body, a screen, a keypad, drawn on a 10×16 grid; its light on while `lit`.
 class PhoneGlyph extends StatelessWidget {
   const PhoneGlyph({super.key, required this.size, this.lit = false});
   final double size;
@@ -50,7 +43,6 @@ class PhoneGlyph extends StatelessWidget {
   );
 }
 
-/// The handset's cells (x, y, w, h, colour) on its 10×16 grid.
 List<(int, int, int, int, Color)> phoneCells(bool lit) => [
   (1, 0, 8, 16, const Color(0xFF2F1F13)),
   (2, 1, 6, 14, const Color(0xFF67482D)),
@@ -64,7 +56,6 @@ List<(int, int, int, int, Color)> phoneCells(bool lit) => [
   if (lit) (9, 0, 1, 1, const Color(0xFFC84A3A)),
 ];
 
-/// Cells on a small grid, scaled to fill the box; `origin` shifts the grid (an SVG viewBox's corner).
 class _CellsPainter extends CustomPainter {
   _CellsPainter(this.cells, this.grid, {this.origin = Offset.zero});
   final List<(num, num, num, num, Color)> cells;
@@ -88,7 +79,6 @@ class _CellsPainter extends CustomPainter {
   bool shouldRepaint(_CellsPainter old) => old.cells != cells;
 }
 
-/// A caller's face: a helper's animal, or the manager.
 class CallerFace extends ConsumerWidget {
   const CallerFace({super.key, required this.call, required this.size});
   final InboxItem call;
@@ -109,7 +99,6 @@ class CallerFace extends ConsumerWidget {
   }
 }
 
-/// The manager's face, when the atlas is in.
 class _Manager extends ConsumerWidget {
   const _Manager(this.size);
   final double size;
@@ -121,10 +110,8 @@ class _Manager extends ConsumerWidget {
   }
 }
 
-/// The face in its pale square on the call screens: 72 px around a 60 px face.
 Widget _bigFace(Widget face) => Container(width: 72, height: 72, decoration: _paleBox(), alignment: Alignment.center, child: face);
 
-/// The face in its pale square in the lists: 32 px around a 28 px face.
 Widget _smallFace(Widget face) => Container(
   width: 32,
   height: 32,
@@ -176,7 +163,6 @@ class RingingScreen extends StatelessWidget {
   );
 }
 
-/// A green key to answer, a red one to hang up: a handset's receiver, turned down to hang up.
 class RoundKey extends StatelessWidget {
   const RoundKey({super.key, required this.answer, required this.label, required this.onTap});
   final bool answer;
@@ -214,7 +200,6 @@ class RoundKey extends StatelessWidget {
   );
 }
 
-/// A key's face: its colour, a 2 px dark outline inside, and a 3 px shade along its bottom and right.
 class _KeyPainter extends CustomPainter {
   _KeyPainter(this.color);
   final Color color;
@@ -386,7 +371,6 @@ class ListScreen extends ConsumerWidget {
 
 const _mood = {'idle': '在等你说', 'listening': '在听', 'thinking': '在想', 'speaking': '在说', 'silent': '没说话'};
 
-/// The voice call with the manager, while it is on: who is talking, both voices' levels, the last words.
 class VoiceScreen extends StatefulWidget {
   const VoiceScreen({super.key, required this.call});
   final VoiceCall call;
@@ -473,7 +457,6 @@ class _Meter extends StatelessWidget {
   }
 }
 
-/// The home screen: the apps, each an icon and a name, three to a row.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key, required this.missed, required this.onOpen, required this.onCall, required this.onChannels, required this.onPlans});
   final int missed;
@@ -559,7 +542,6 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// A sprite fitted into a square, crisp.
 class _Sprite extends StatelessWidget {
   const _Sprite(this.sprite, this.size);
   final SpriteInfo sprite;

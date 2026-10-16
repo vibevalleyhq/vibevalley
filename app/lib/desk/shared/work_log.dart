@@ -1,14 +1,3 @@
-// A trajectory, round by round (web/src/farm/WorkLog.tsx WorkLog, web/src/pages/Trajectories.tsx):
-//   WorkLog         the rounds (rules/rounds.dart): what it was told (the job, a word, a comment on a step), a time bar
-//                   of what it did (a span per step, as long as it took; a tap shows the step), and its steps: what it
-//                   remembered and said, each tool it used (open one for its input and output), its reasoning,
-//                   retries and problems, a sub-agent's indented under the call that started it. Earlier rounds show
-//                   only their answer until opened. A step can be commented on while the helper is there: the comment
-//                   goes to it with the step, and shows under the step. Stays at the bottom while you are there.
-//   TrajectoryLog   one trajectory by id, loaded, then kept up by step events (workStepsProvider)
-//   TrajectoryList  the helpers an agent has sent, newest first, each opening to its trajectory
-// The farm's helper panel and the chat can use WorkLog with steps of their own.
-
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -27,12 +16,10 @@ import '../../ui/kit/markdown.dart';
 import 'state.dart';
 import 'widgets.dart';
 
-/// Within this many pixels of the bottom counts as being there.
 const _nearBottom = 48.0;
 
 double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
 
-/// What sends a comment on a step (its `n`) to the helper; it throws why not.
 typedef CommentOn = Future<void> Function(int step, String text);
 
 class WorkLog extends StatefulWidget {
@@ -40,16 +27,12 @@ class WorkLog extends StatefulWidget {
   final List<WorkStep> steps;
   final double now;
 
-  /// What a step it was told is called, when not 工单 (the first) and 带话 (the rest): the manager's are lines it heard.
   final String? asked;
 
-  /// 36rem high at most; else 22rem.
   final bool tall;
 
-  /// The last round is still going: its bar runs to now.
   final bool working;
 
-  /// Comments on a step, while the helper is there to read them; null: no commenting.
   final CommentOn? onComment;
 
   @override
@@ -61,11 +44,9 @@ class _WorkLogState extends State<WorkLog> {
   final _keys = <int, GlobalKey>{};
   bool _atBottom = true;
 
-  /// Rounds opened or closed by hand, by the `n` of what started them (-1: before the first); the last is open unless
-  /// closed.
+  /// By the `n` of what started each round (-1: before the first); the last is open unless closed.
   final _toggled = <int, bool>{};
 
-  /// The step a bar's span pointed at, shown marked for a moment.
   int? _marked;
 
   @override
@@ -117,7 +98,6 @@ class _WorkLogState extends State<WorkLog> {
   Widget build(BuildContext context) {
     final rounds = roundsOf(widget.steps);
     final comments = commentsOf(widget.steps);
-    // The first one is the job; later ones are what you (or the manager) told it.
     final firstAsked = widget.steps.where((s) => s.kind == StepKind.asked && s.under == null).firstOrNull?.n;
     return Container(
       constraints: BoxConstraints(maxHeight: widget.tall ? 576 : 352),
@@ -226,7 +206,6 @@ class _WorkLogState extends State<WorkLog> {
     );
   }
 
-  /// A step, indented under the call when a sub-agent took it, with the comments on it and a way to add one.
   Widget _withComments(WorkStep step, List<WorkStep>? on) {
     Widget item = _Step(step: step, now: widget.now, job: false, asked: widget.asked);
     if (step.under != null) {
@@ -245,11 +224,9 @@ class _WorkLogState extends State<WorkLog> {
   }
 }
 
-/// Whether there is no pointer that hovers: a phone, where 评论 always shows.
 bool get _touchOnly => defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android;
 
-/// A step with the comments on it beneath, and 评论 floating at its top right while the pointer is over it (on a phone,
-/// once the step is tapped): a long trajectory is not one 评论 line per step.
+/// 评论 floats over the step instead of a line per step: a long trajectory is not one 评论 line per step.
 class _Commentable extends StatefulWidget {
   const _Commentable({required this.step, required this.send, required this.comments, required this.child});
   final int step;
@@ -308,8 +285,6 @@ class _CommentableState extends State<_Commentable> {
   }
 }
 
-/// The round's time bar: a span per step, as long as it took (a sliver at least), coloured by what it was; a tap
-/// shows the step.
 class _TimeBar extends StatelessWidget {
   const _TimeBar({required this.spans, required this.onPick});
   final List<Span> spans;
@@ -343,7 +318,6 @@ class _TimeBar extends StatelessWidget {
   }
 }
 
-/// What a span on the bar was, in a word.
 String spanLabel(WorkStep step) => switch (step.kind) {
   StepKind.asked => '收到',
   StepKind.recalled => '想起',
@@ -354,8 +328,6 @@ String spanLabel(WorkStep step) => switch (step.kind) {
   StepKind.tool => farmToolText(step.text) != null ? '田头' : actionMeaning[WorkerAction.fromJson((step.action ?? ToolAction.other).wire)] ?? '工具',
 };
 
-/// A span's colour: reading and searching water-blue, editing leaf, commands bark, talking and thinking light, trouble
-/// berry.
 Color spanColor(WorkStep step) => switch (step.kind) {
   StepKind.asked => Palette.wheat,
   StepKind.recalled => Palette.leaf300,
@@ -373,13 +345,11 @@ Color spanColor(WorkStep step) => switch (step.kind) {
   },
 };
 
-/// 评论 under a step: a link that opens a line to write in; sending tells the helper, about this step.
 class _CommentBox extends StatefulWidget {
   const _CommentBox({required this.step, required this.send, required this.onDone});
   final int step;
   final CommentOn send;
 
-  /// Sent, or given up: the box goes.
   final VoidCallback onDone;
 
   @override
@@ -464,7 +434,6 @@ class _Step extends StatelessWidget {
           body: _Folded(text: step.text, lines: 4, markdown: false),
         );
       case StepKind.recalled:
-        // What its agent remembered, brought into the turn with what it was asked.
         return box(
           fill: Palette.leaf300.withValues(alpha: .15),
           border: Border.all(color: Palette.leaf500.withValues(alpha: .4)),
@@ -472,7 +441,6 @@ class _Step extends StatelessWidget {
           body: _Folded(text: step.text, lines: 3, markdown: false),
         );
       case StepKind.thought:
-        // Its reasoning, quieter than what it said and folded short.
         return box(
           fill: null,
           border: Border.all(color: Palette.cream300),
@@ -499,7 +467,6 @@ class _Step extends StatelessWidget {
 class _Line extends StatelessWidget {
   const _Line({required this.mark, required this.text, required this.at, required this.now, required this.fill, required this.ink});
 
-  /// The sprite before the words.
   final String mark;
   final String text;
   final double at;
@@ -550,7 +517,6 @@ class _Head extends StatelessWidget {
   );
 }
 
-/// Long text folded to a few lines, with a toggle.
 class _Folded extends StatefulWidget {
   const _Folded({required this.text, required this.lines, required this.markdown});
   final String text;
@@ -596,7 +562,6 @@ class _FoldedState extends State<_Folded> {
   }
 }
 
-/// What a helper's farm tool (the farm's MCP server, chat/farmtools.go) does, in words: null for any other tool.
 String? farmToolText(String text) => switch (RegExp(r'^farm__farm_(\w+)').firstMatch(text.trim())?.group(1)) {
   'say' => '在田头说话',
   'read' => '读田头的消息',
@@ -606,7 +571,6 @@ String? farmToolText(String text) => switch (RegExp(r'^farm__farm_(\w+)').firstM
   final other => '田头：$other',
 };
 
-/// A tool's input as a person reads it: the command for a shell, else its JSON laid out.
 String readableInput(WorkStep step) {
   final raw = step.input?.trim() ?? '';
   if (raw.isEmpty) return '';
@@ -728,9 +692,6 @@ class _Pre extends StatelessWidget {
   );
 }
 
-// ── Trajectories ─────────────────────────────────────────────────────────────
-
-/// One trajectory: its steps, loaded, then kept up as they come.
 class TrajectoryLog extends ConsumerStatefulWidget {
   const TrajectoryLog({super.key, required this.id, this.asked, this.empty = '还没有动静。'});
   final String id;
@@ -772,7 +733,6 @@ class _TrajectoryLogState extends ConsumerState<TrajectoryLog> {
   }
 }
 
-/// The helpers an agent has sent, newest first, each opening to its trajectory.
 class TrajectoryList extends ConsumerStatefulWidget {
   const TrajectoryList({super.key, required this.agent});
   final String agent;

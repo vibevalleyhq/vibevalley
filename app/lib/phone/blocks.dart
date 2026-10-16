@@ -1,6 +1,4 @@
-// 方块: the farm phone's falling blocks on a 10×18 well (packages/core/src/blocks.ts). Pure: a game is a value, each
-// move a function from one value to the next; the phone runs the clock and draws it (blocks_game.dart). Pieces come
-// from a seven-bag (every piece once per seven, shuffled) drawn with the game's own seeded generator, so a seed replays.
+// Pure: a game is a value, each move a function to the next. Pieces come from a seven-bag drawn with the game's own seeded generator, so a seed replays.
 
 import 'dart:math' as math;
 
@@ -15,7 +13,6 @@ const blocksHeight = 18;
 // ignore: constant_identifier_names
 enum PieceKind { I, O, T, S, Z, J, L }
 
-/// Each piece in its spawn rotation: its box's size, and the filled cells (x, y) in it.
 const Map<PieceKind, (int, List<(int, int)>)> _shapes = {
   PieceKind.I: (4, [(0, 1), (1, 1), (2, 1), (3, 1)]),
   PieceKind.O: (2, [(0, 0), (1, 0), (0, 1), (1, 1)]),
@@ -30,10 +27,9 @@ class Falling {
   const Falling({required this.kind, required this.turn, required this.x, required this.y});
   final PieceKind kind;
 
-  /// Quarter turns clockwise, 0..3.
+  /// 0..3.
   final int turn;
 
-  /// Its box's top-left in the well.
   final int x;
   final int y;
 
@@ -64,10 +60,8 @@ class Blocks {
   final Falling piece;
   final PieceKind next;
 
-  /// What is left of the current seven-bag.
   final List<PieceKind> bag;
 
-  /// The generator's state.
   final int seed;
   final int score;
   final int lines;
@@ -103,7 +97,6 @@ class Blocks {
   int get hashCode => Object.hash(Object.hashAll(well), piece, next, Object.hashAll(bag), seed, score, lines, level, over);
 }
 
-/// The cells a piece covers in the well.
 List<(int, int)> cellsOf(Falling p) {
   final (size, cells) = _shapes[p.kind]!;
   return [
@@ -118,7 +111,6 @@ List<(int, int)> cellsOf(Falling p) {
   ];
 }
 
-/// The next piece from the bag, refilling and shuffling it when it runs out.
 (PieceKind, List<PieceKind>, int) _draw(List<PieceKind> bag, int seed) {
   if (bag.isNotEmpty) return (bag[0], bag.sublist(1), seed);
   final fresh = [...PieceKind.values];
@@ -136,7 +128,7 @@ List<(int, int)> cellsOf(Falling p) {
 
 Falling _spawn(PieceKind kind) => Falling(kind: kind, turn: 0, x: (blocksWidth - _shapes[kind]!.$1) ~/ 2, y: 0);
 
-/// Whether a piece fits: inside the walls and the floor, on empty cells (above the top is fine).
+/// Above the top is fine.
 bool fits(List<int> well, Falling p) =>
     cellsOf(p).every((c) => c.$1 >= 0 && c.$1 < blocksWidth && c.$2 < blocksHeight && (c.$2 < 0 || well[c.$2 * blocksWidth + c.$1] == 0));
 
@@ -156,20 +148,18 @@ Blocks newBlocks(int seed) {
   );
 }
 
-/// Points for lines cleared at once, times the level.
 const _linePoints = [0, 100, 300, 500, 800];
 
-/// How long a piece takes to fall a row at a level, in milliseconds.
+/// In milliseconds.
 int fallMs(int level) => math.max(90, 800 - (level - 1) * 70);
 
-/// Moves the piece sideways when it fits.
 Blocks shift(Blocks g, int dx) {
   if (g.over) return g;
   final moved = g.piece.copyWith(x: g.piece.x + dx);
   return fits(g.well, moved) ? g.copyWith(piece: moved) : g;
 }
 
-/// Turns the piece clockwise, nudging it off a wall or a stack (one, then two cells either way) when it would not fit.
+/// Nudged off a wall or a stack (one, then two cells either way) when it would not fit.
 Blocks turn(Blocks g) {
   if (g.over) return g;
   final turned = g.piece.copyWith(turn: (g.piece.turn + 1) % 4);
@@ -180,14 +170,13 @@ Blocks turn(Blocks g) {
   return g;
 }
 
-/// One row down; a piece that cannot fall lands, full rows clear, and the next piece comes in.
 Blocks fall(Blocks g) {
   if (g.over) return g;
   final lower = g.piece.copyWith(y: g.piece.y + 1);
   return fits(g.well, lower) ? g.copyWith(piece: lower) : _land(g);
 }
 
-/// Straight down and landed, with two points for each row dropped.
+/// Two points for each row dropped.
 Blocks slam(Blocks g) {
   if (g.over) return g;
   var p = g.piece;
@@ -199,7 +188,6 @@ Blocks slam(Blocks g) {
   return _land(g.copyWith(piece: p, score: g.score + rows * 2));
 }
 
-/// Where the piece would land: for its shadow.
 Falling landingOf(Blocks g) {
   var p = g.piece;
   while (fits(g.well, p.copyWith(y: p.y + 1))) {
@@ -242,7 +230,6 @@ Blocks _land(Blocks g) {
     score: g.score + _linePoints[cleared] * g.level,
     lines: lines,
     level: 1 + lines ~/ 10,
-    // Landing above the top, or no room for the next piece, ends the game.
     over: above || !fits(settled, piece),
   );
 }

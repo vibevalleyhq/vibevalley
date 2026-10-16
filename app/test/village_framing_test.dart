@@ -1,5 +1,3 @@
-// Where the village goes in windows of a few shapes (lib/village/framing.dart).
-
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';

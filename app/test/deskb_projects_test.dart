@@ -1,6 +1,3 @@
-// 项目: the code base rules (languages, the commit calendar, streaks, growth, new projects) and the page with its
-// survey and the new-project dialog.
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desk/projects/codebase.dart';
 import 'package:vibevalley/desk/projects/projects_page.dart';
@@ -160,7 +157,7 @@ void main() {
     expect(find.text('42 次提交'), findsOneWidget);
     expect(find.text('2025 年 3 月 1 日'), findsOneWidget);
     expect(find.text('77%'), findsOneWidget);
-    // The detail scrolls on its own (a scroll view, no longer a ListView): drag from inside it.
+    // The detail scrolls on its own: drag from inside it.
     await t.drag(find.text('42 次提交'), const Offset(0, -3000));
     await t.pump();
     expect(find.text('Lucas'), findsOneWidget);

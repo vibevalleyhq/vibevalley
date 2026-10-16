@@ -1,6 +1,3 @@
-// The whole farm screen at 1440 × 900, with the pixel font, on data like the web page's mock farm (?mock): the
-// picture goes to build/screen.png, to set beside the web page's (it is not compared to anything).
-
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -70,7 +67,6 @@ void main() {
             farmEffectsProvider.overrideWithValue(const Stream<GameEffect>.empty()),
             farmNoticesProvider.overrideWithValue(const Stream<SiteEvent>.empty()),
             desktopProvider.overrideWithValue(Desktop.none),
-            // One runtime with 39% of its quota left, as on the web page's mock.
             runtimesProvider.overrideWith(
               (ref) => Stream.value([
                 RuntimeInfo(
@@ -112,7 +108,6 @@ void main() {
       File('build/screen.png').writeAsBytesSync(png!.buffer.asUint8List());
     });
 
-    // The hotbar and the keys: a slot picks its tool, a number key another, Esc puts it down, then opens the menu.
     final container = ProviderScope.containerOf(tester.element(find.byType(FarmPage)));
     container.read(titleOpenProvider.notifier).enterFarm(start: false);
     await tester.pump();
@@ -127,7 +122,6 @@ void main() {
     await tester.pump();
     expect(container.read(menuOpenProvider), isTrue);
     expect(find.text('院子里能点的'), findsOneWidget);
-    // The HUD's status opens the tasks.
     container.read(menuOpenProvider.notifier).set(false);
     await tester.pump();
     await tester.tap(find.bySemanticsLabel('任务与成就'));

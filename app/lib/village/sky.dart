@@ -1,7 +1,3 @@
-// The light from the sky at a time of day (a port of @heybro/engine/pixi sky.ts): the ambient light, the sun (by day)
-// or the moon (by night) from a direction, cloud shadows drifting over, the morning mist, and the grade the whole
-// picture gets. The look aims at Eastward's: every time of day has a colour, shadows are tinted, nothing goes black.
-
 import 'dart:math' as math;
 
 typedef Rgb = (double, double, double);
@@ -13,14 +9,11 @@ class Grade {
   /// 1 as painted; more is more colourful.
   final double saturation;
 
-  /// The haze: how far the blacks are lifted.
   final double lift;
 
-  /// Added to the dark parts and to the bright parts: the colours they lean to.
   final Rgb shadows;
   final Rgb highlights;
 
-  /// How much the corners darken.
   final double vignette;
 }
 
@@ -36,22 +29,19 @@ class Sky {
     required this.night,
   });
 
-  /// Light everywhere, whatever a pixel faces.
   final Rgb ambient;
 
-  /// Towards the sun or the moon: x right, y down the screen, z out of it; length 1.
+  /// x right, y down the screen, z out of it; length 1.
   final Rgb sunDir;
 
-  /// The sun's or the moon's light: its colour times its strength.
   final Rgb sun;
 
-  /// How much of the sun the shadows of passing clouds take away.
   final double clouds;
   final Rgb mist;
   final double mistAmount;
   final Grade grade;
 
-  /// How dark it is: 0 by day, 1 at night.
+  /// 0 by day, 1 at night.
   final double night;
 }
 
@@ -72,10 +62,9 @@ double _smooth(double a, double b, double x) {
   return k * k * (3 - 2 * k);
 }
 
-/// 1 at full day, 0 at night; sunrise around 06:00, sunset around 19:00 (engine/core clock.ts).
+/// 1 at full day, 0 at night; sunrise around 06:00, sunset around 19:00.
 double sunOf(double tod) => _smooth(0.22, 0.3, tod) * (1 - _smooth(0.76, 0.84, tod));
 
-/// Peaks at sunrise and sunset.
 double duskOf(double tod) {
   double at(double c) => math.max(0, 1 - (tod - c).abs() / 0.06);
   return math.max(at(0.26), at(0.8));
@@ -98,21 +87,18 @@ Grade _mixGrade(Grade a, Grade b, double k) => Grade(
   vignette: _lerp(a.vignette, b.vignette, k),
 );
 
-/// The moon stands high, over the right of the picture.
 final _moonDir = _normal((0.35, -0.55, 0.75));
 
-/// How bright flat ground is at midday before the grade: as painted.
 const _noon = 1.0;
 
 Sky skyAt(double tod) {
   final day = sunOf(tod);
   final dusk = duskOf(tod);
-  // From 6:00 to 18:00 the sun crosses from the left of the picture to the right, highest at noon, a little up the
-  // screen (the light falls from the top, as painted).
+  // The light falls from the top, as painted.
   final crossed = ((tod - 0.25) / 0.5).clamp(0.0, 1.0);
   final sunDir = _normal((-math.cos(math.pi * crossed), -0.5, 0.2 + 0.8 * math.sin(math.pi * crossed)));
   final dayAmbient = _mix(_dayAmbient, _duskAmbient, dusk);
-  // What the ambient leaves to reach NOON on flat ground, the sun gives; a low sun gives it at a slant.
+  // What the ambient leaves to reach _noon on flat ground, the sun gives; a low sun gives it at a slant.
   final gain = (_noon - (dayAmbient.$1 + dayAmbient.$2 + dayAmbient.$3) / 3) / math.max(sunDir.$3, 0.3);
   final sunColor = _scale(_mix(_sun, _lowSun, dusk), gain);
   return Sky(
@@ -120,7 +106,6 @@ Sky skyAt(double tod) {
     sunDir: _normal(_mix(_moonDir, sunDir, day)),
     sun: _mix(_scale(_moon, _moonlight), sunColor, day),
     clouds: 0.22 * day,
-    // Mist lies in the early morning and lifts as the sun climbs.
     mist: _mist,
     mistAmount: 0.3 * math.max(0, 1 - (tod - 0.29).abs() / 0.07),
     grade: _mixGrade(_nightGrade, _mixGrade(_dayGrade, _duskGrade, dusk), day),
@@ -128,5 +113,4 @@ Sky skyAt(double tod) {
   );
 }
 
-/// How bright flat ground comes out under a sky before the grade: the ambient and the sun straight on.
 Rgb flatLight(Sky s) => (s.ambient.$1 + s.sun.$1 * s.sunDir.$3, s.ambient.$2 + s.sun.$2 * s.sunDir.$3, s.ambient.$3 + s.sun.$3 * s.sunDir.$3);

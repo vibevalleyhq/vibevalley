@@ -1,5 +1,3 @@
-// 农具: the runtimes list and detail from the server, live updates, commands, settings; and the ported protocol rules.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -15,7 +13,6 @@ import 'package:vibevalley/rules/quota.dart';
 import 'package:vibevalley/rules/seeds.dart';
 
 FakeBackend backend() {
-  // The settings saved for claude: the server answers with them from then on.
   Object? saved;
   final b = FakeBackend({
     'GET /api/runtimes': (_) => [
@@ -113,10 +110,8 @@ void main() {
     for (final p in runtimePresets) {
       expect(find.text(p.label), findsWidgets);
     }
-    // claude is installed (version) with its agent counted; codex is not found.
     expect(find.text('1.2.3 · 1 个 agent'), findsOneWidget);
     expect(find.text('没找到'), findsWidgets);
-    // The detail: its blurb, account windows, models, inventory and agents.
     expect(find.text('Anthropic 的命令行编码 agent。'), findsOneWidget);
     expect(find.text('套餐：Max'), findsOneWidget);
     expect(find.text('剩 70%'), findsOneWidget);
@@ -124,7 +119,7 @@ void main() {
     expect(find.text('opus'), findsOneWidget);
     expect(find.text('low · high'), findsOneWidget);
     expect(find.text('升级到 1.3.0'), findsOneWidget);
-    // The detail scrolls on its own (a scroll view, no longer a ListView): drag from inside it.
+    // The detail scrolls on its own: drag from inside it.
     await t.drag(find.text('opus'), const Offset(0, -3000));
     await t.pump();
     expect(find.text('review'), findsOneWidget);
@@ -157,7 +152,6 @@ void main() {
     final put = b.named('PUT', '/api/runtimes/claude/settings');
     expect(put, hasLength(1));
     expect((put.single.body! as Map)['binPath'], '/opt/claude');
-    // The server's answer is the settings now: nothing left to save.
     expect(find.text('保存'), findsNothing);
   });
 

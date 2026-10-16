@@ -1,5 +1,3 @@
-// 连接器: the QR encoder against the qrcode package's output (byte mode, level M), the page's states and commands.
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desk/connectors/connectors_page.dart';
 import 'package:vibevalley/desk/connectors/qr.dart';
@@ -8,7 +6,7 @@ import 'package:vibevalley/gen/vibevalley.dart';
 import 'deskb_support.dart';
 import 'package:vibevalley/rules/chat.dart';
 
-// What `QRCode.create([{ data, mode: 'byte' }], { errorCorrectionLevel: 'M' })` draws (web/node_modules/qrcode 1.5.4).
+// What the qrcode package (1.5.4) draws for QRCode.create([{ data, mode: 'byte' }], { errorCorrectionLevel: 'M' }).
 const _hello = [
   '111111101101001111111',
   '100000100110101000001',

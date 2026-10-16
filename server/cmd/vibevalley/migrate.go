@@ -71,8 +71,7 @@ func runMigrate(args []string) int {
 	return 0
 }
 
-// farmServers are the farm servers running now, by their process names (the app's, under each name the project had,
-// and `go run ./cmd/vibevalley`), as "pid name"; this process is not one of them.
+// This process is not one of them.
 func farmServers() []string {
 	var running []string
 	for _, name := range []string{"heybro-server", "vibefarm-server", "vibevalley-server", "vibevalley"} {

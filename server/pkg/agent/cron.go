@@ -11,12 +11,10 @@ import (
 	"time"
 )
 
-// Cron is a parsed expression in a time zone.
 type Cron struct {
 	seconds, minutes, hours, days, months, weekdays map[int]bool
-	// Whether days / weekdays were restricted (not `*`).
-	daysSet, weekdaysSet bool
-	loc                  *time.Location
+	daysSet, weekdaysSet                            bool
+	loc                                             *time.Location
 }
 
 var monthNames = map[string]int{"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
@@ -80,7 +78,6 @@ func parseField(field string, low, high int, names map[string]int) (map[int]bool
 	return set, restricted, nil
 }
 
-// ParseCronExpression reads expr in loc.
 func ParseCronExpression(expr string, loc *time.Location) (*Cron, error) {
 	fields := strings.Fields(expr)
 	if len(fields) == 5 {
@@ -128,7 +125,7 @@ func (c *Cron) dayMatches(t time.Time) bool {
 	return true
 }
 
-// Next is the first moment after from that matches; zero when none in the next five years.
+// Zero when none in the next five years.
 func (c *Cron) Next(from time.Time) time.Time {
 	t := from.In(c.loc).Truncate(time.Second).Add(time.Second)
 	limit := t.AddDate(5, 0, 0)

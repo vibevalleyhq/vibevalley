@@ -1,8 +1,6 @@
 package agent
 
-// The agent's long-term memory, in its own folder: MEMORY.md, short notes it was told to keep, carried in every
-// session's system prompt; and archive/, the conversation that compaction folded away, kept word for word so a
-// summary that lost a detail can be looked up again.
+// archive/ keeps the folded-away conversation word for word, so a summary that lost a detail can be looked up again.
 
 import (
 	"crypto/sha1"
@@ -15,12 +13,11 @@ import (
 	"time"
 )
 
-// MEMORY_PROMPT_CHARS: MEMORY.md longer than this is cut from the top when the prompt carries it: the newest notes matter most.
+// Cut from the top when the prompt carries it: the newest notes matter most.
 const MEMORY_PROMPT_CHARS = 8_000
 
 func memoryFile(home string) string { return filepath.Join(home, "MEMORY.md") }
 
-// ReadMemory is what the agent remembers, for its system prompt; "" when it remembers nothing.
 func ReadMemory(home string) string {
 	data, _ := os.ReadFile(memoryFile(home))
 	t := strings.TrimSpace(string(data))
@@ -30,12 +27,11 @@ func ReadMemory(home string) string {
 	return t
 }
 
-// MemoryLine is a line of MEMORY.md as a page lists it: `- YYYY-MM-DD note`, or whatever the agent wrote when it tidied.
+// `- YYYY-MM-DD note`, or whatever the agent wrote when it tidied.
 type MemoryLine struct {
-	// A hash of the line: stable while the line is unchanged, so a page can forget the one it showed.
+	// Stable while the line is unchanged, so a page can forget the one it showed.
 	ID   string `json:"id"`
 	Text string `json:"text"`
-	// The day it was kept, when the line says.
 	Date string `json:"date,omitempty"`
 }
 
@@ -50,7 +46,6 @@ func lineID(line string) string {
 	return hex.EncodeToString(sum[:])[:12]
 }
 
-// MemoryLines is MEMORY.md line by line, in the file's order (oldest first); blank lines and headings left out.
 func MemoryLines(home string) []MemoryLine {
 	data, _ := os.ReadFile(memoryFile(home))
 	out := []MemoryLine{}
@@ -68,7 +63,6 @@ func MemoryLines(home string) []MemoryLine {
 	return out
 }
 
-// ForgetLine drops the line with this id from MEMORY.md; nothing when there is none.
 func ForgetLine(home, id string) error {
 	data, err := os.ReadFile(memoryFile(home))
 	if err != nil {
@@ -84,7 +78,6 @@ func ForgetLine(home, id string) error {
 	return nil
 }
 
-// Remember keeps a note: one dated line in MEMORY.md (the local day).
 func Remember(home, note string, now time.Time) error {
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		return err
@@ -98,7 +91,6 @@ func Remember(home, note string, now time.Time) error {
 	return err
 }
 
-// RewriteMemory rewrites MEMORY.md whole: for the agent tidying what it keeps.
 func RewriteMemory(home, text string) error {
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		return err
@@ -109,12 +101,11 @@ func RewriteMemory(home, text string) error {
 	return os.WriteFile(memoryFile(home), []byte(text), 0o644)
 }
 
-// isoStamp is Date.toISOString with its colons and dot made dashes.
+// Date.toISOString with its colons and dot made dashes.
 func isoStamp(now time.Time) string {
 	return strings.NewReplacer(":", "-", ".", "-").Replace(now.UTC().Format("2006-01-02T15:04:05.000Z"))
 }
 
-// Archive keeps a folded-away stretch of conversation word for word; it returns where.
 func Archive(home, session, text string, now time.Time) (string, error) {
 	dir := archiveDir(home)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -124,15 +115,12 @@ func Archive(home, session, text string, now time.Time) (string, error) {
 	return path, os.WriteFile(path, []byte(text), 0o644)
 }
 
-// ArchiveFile is a folded-away stretch of conversation in archive/.
 type ArchiveFile struct {
-	Name string `json:"name"`
-	// When it was folded away (the file's time, milliseconds).
-	At    int64 `json:"at"`
-	Chars int   `json:"chars"`
+	Name  string `json:"name"`
+	At    int64  `json:"at"`
+	Chars int    `json:"chars"`
 }
 
-// ArchiveHit is a line of the archive that matched, with two lines either side.
 type ArchiveHit struct {
 	File string `json:"file"`
 	Line int    `json:"line"`
@@ -152,7 +140,6 @@ func archiveNames(home string) []string {
 	return names
 }
 
-// ArchiveFiles is the archive, newest first.
 func ArchiveFiles(home string) []ArchiveFile {
 	out := []ArchiveFile{}
 	for _, name := range archiveNames(home) {
@@ -168,7 +155,7 @@ func ArchiveFiles(home string) []ArchiveFile {
 	return out
 }
 
-// ReadArchive is one archived file whole; false when there is no such file (a name with a path in it is none).
+// A name with a path in it is none.
 func ReadArchive(home, name string) (string, bool) {
 	if name != filepath.Base(name) || !strings.HasSuffix(name, ".md") {
 		return "", false
@@ -180,7 +167,7 @@ func ReadArchive(home, name string) (string, bool) {
 	return string(data), true
 }
 
-// SearchArchive is lines in the archive matching query (any case), newest file first; at most limit hits (20 when 0).
+// Any case; 20 hits when limit is 0.
 func SearchArchive(home, query string, limit int) []ArchiveHit {
 	if limit <= 0 {
 		limit = 20

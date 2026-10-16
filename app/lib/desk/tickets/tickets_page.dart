@@ -1,14 +1,3 @@
-// 工单 (rules/tickets.dart) as a board: four lanes, 待办 (issues not sent yet, in the order the person put them, each
-// with a priority), 处理中 (with how many of the beds are taken), 等你看 and 已关 (the latest first, older ones behind a
-// link), a card per issue. Above them, a search and filters by project and by agent.
-// Dragging a card is acting on it: 待办 → 处理中 sends its helper, 处理中 or 等你看 → 已关 harvests it (after the
-// harvest review) or sends the helper home, 已关 → 处理中 reopens it, and a 待办 dropped on another goes before it;
-// other drops are not taken. A card opens beside the board (over it when narrow): a ticket's actions for its state,
-// what harvesting it would bring, its last run's rounds (comments on a step while it is open), a word for its helper,
-// 重开 once closed; a 待办's title, description, project, agent and priority, and 开工. A card is found by the issue's id
-// or one of its runs' (a helper's). The issues come with the farm's state (the open ones and the latest closed; older
-// ones are asked for behind 「更早的」); the runs' trajectory heads are asked for again whenever the runs change.
-
 import 'dart:async';
 import 'dart:io';
 
@@ -47,7 +36,6 @@ Color ticketColor(TicketState s) => switch (s) {
 
 const priorityLabel = {Priority.urgent: '紧急', Priority.high: '高', Priority.normal: '普通', Priority.low: '低'};
 
-/// A 待办's priority as the stripe down its card's left edge; none for normal.
 Color? priorityColor(Priority p) => switch (p) {
   Priority.urgent => Palette.berry,
   Priority.high => Palette.wheat,
@@ -55,7 +43,6 @@ Color? priorityColor(Priority p) => switch (p) {
   Priority.low => Palette.cream300,
 };
 
-/// The agent and project last chosen for a 待办: what a new one gets unless the board is filtered on others.
 const _lastPickKey = 'vibevalley.board.pick';
 
 Future<(String, String)> lastPick() async {
@@ -77,7 +64,6 @@ Future<void> rememberPick(String agent, String project) async {
   }
 }
 
-/// A 待办 started: its card opened, now worked, or said that it waits for a free bed.
 void dispatchedNotice(Dispatched got, String issue, ValueChanged<String?> open) {
   if (got.helper != null) {
     open(issue);
@@ -86,10 +72,8 @@ void dispatchedNotice(Dispatched got, String issue, ValueChanged<String?> open) 
   }
 }
 
-/// The agents, for the 待办 form, the filter and the cards' faces.
 final _agentsProvider = FutureProvider<List<AgentProfile>>((ref) => ref.watch(deskApiProvider).farm.agents());
 
-/// A card on the board: an issue not sent yet, or one that has been.
 sealed class BoardCard {
   const BoardCard();
   String get id;
@@ -97,7 +81,6 @@ sealed class BoardCard {
   String? get project;
   String? get agent;
 
-  /// What the board's search looks in.
   List<String?> get words;
 }
 
@@ -120,12 +103,10 @@ class TicketCard extends BoardCard {
   const TicketCard(this.issue, this.runs, this.state, this.helper);
   final Issue issue;
 
-  /// The trajectory heads of its runs, oldest first.
   final List<TrajectoryHead> runs;
   final TicketState state;
   final Helper? helper;
 
-  /// Its last run's head.
   TrajectoryHead get head => runs.last;
   @override
   String get id => issue.id;
@@ -139,13 +120,10 @@ class TicketCard extends BoardCard {
   List<String?> get words => [issue.title, issue.description, head.name, issue.project, issue.id, head.summary];
 }
 
-/// The heads of an issue's runs, from the trajectories listed; a run whose head is not there yet, by its id.
 List<TrajectoryHead> runsOf(Issue issue, Map<String, TrajectoryHead> heads) => [
   for (final id in issue.runs) heads[id] ?? TrajectoryHead(id: id, name: id, agent: issue.agent, project: issue.project, startedAt: issue.createdAt),
 ];
 
-/// A playbook on the board while it is being split, worked or waits for you: it opens the farm's plan board, where
-/// its own actions are.
 class PlaybookCard extends BoardCard {
   const PlaybookCard(this.playbook, this.lane);
   final Playbook playbook;
@@ -167,7 +145,6 @@ Move? _moveOf(BoardCard card, Lane to) => switch (card) {
   TicketCard(:final issue, :final helper) => moveOf(card.lane, to, planned: ticketPlanned(issue, helper)),
 };
 
-/// What the board shows: the words searched for, a project, an agent (empty: all).
 class BoardFilter {
   const BoardFilter({this.query = '', this.project = '', this.agent = ''});
   final String query;
@@ -185,23 +162,19 @@ class BoardFilter {
 class TicketsPage extends ConsumerStatefulWidget {
   const TicketsPage({super.key, this.id, this.project});
 
-  /// The card open beside the board; `new` for a 待办 being written.
   final String? id;
 
-  /// The project a new 待办 is for (the map's free plots), before the one last chosen.
   final String? project;
 
   @override
   ConsumerState<TicketsPage> createState() => _TicketsPageState();
 }
 
-/// What changes the runs' heads: every issue's runs and whether it closed.
 String _runsKey(FarmState? farm) => [for (final i in farm?.issues ?? const <Issue>[]) '${i.id}:${i.runs.join(',')}:${i.closedAt}'].join(';');
 
 class _TicketsPageState extends ConsumerState<TicketsPage> {
   Map<String, TrajectoryHead>? _heads;
 
-  /// Every issue, asked for once 「更早的」 is open: the closed ones the farm's state no longer keeps.
   List<Issue>? _history;
   BoardFilter _filter = const BoardFilter();
   bool _older = false;
@@ -214,7 +187,6 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
 
   FarmApi get _farm => ref.read(deskApiProvider).farm;
 
-  /// The runs' trajectory heads: who worked an issue, how many rounds, what it cost, its last summary.
   Future<void> _load() async {
     try {
       final heads = await _farm.trajectories();
@@ -233,13 +205,11 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
 
   void _open(String? id) => deskGo(context, id == null ? '/tickets' : '/tickets/${Uri.encodeComponent(id)}');
 
-  /// A card dropped on a lane: what the move does, asked about first where it cannot be undone. A 待办 dropped back on
-  /// its own lane goes last.
+  /// Asked about first where it cannot be undone. A 待办 dropped back on its own lane goes last.
   Future<void> _drop(BoardCard card, Lane to) async {
     if (card is TodoCard && to == Lane.todo) return _place(card, null);
     switch ((_moveOf(card, to), card)) {
       case (Move.start, TodoCard(:final item)) when item.agent == null || item.project == null:
-        // Not ready to go: its form opens to say who does it and where.
         _open(item.id);
         toasts.add(type: ToastType.info, title: '还差一点', description: '选好派哪个帮工、在哪个项目里做，再点「开工」。');
       case (Move.start, TodoCard(:final item)):
@@ -275,7 +245,6 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
     }
   }
 
-  /// A 待办 put just before another (null: last).
   Future<void> _place(TodoCard card, String? before) async {
     if (card.id == before) return;
     await deskRun(
@@ -286,7 +255,6 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
     );
   }
 
-  /// A 待办 written in the lane's own line: for the project and agent filtered on, else the ones last chosen.
   Future<void> _add(String text) async {
     final f = _filter;
     final (lastAgent, lastProject) = await lastPick();
@@ -302,7 +270,6 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
   @override
   Widget build(BuildContext context) {
     final farm = ref.watch(farmProvider);
-    // A run started or an issue closed: its head is new or changed.
     ref.listen(farmProvider.select(_runsKey), (_, _) => unawaited(_load()));
     final heads = _heads;
     final kept = farm?.issues ?? const <Issue>[];
@@ -387,7 +354,6 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
   }
 }
 
-/// The search and the filters above the lanes; how many cards they leave.
 class _Toolbar extends ConsumerWidget {
   const _Toolbar({required this.filter, required this.cards, required this.shown, required this.onChanged});
   final BoardFilter filter;
@@ -455,8 +421,6 @@ class _Toolbar extends ConsumerWidget {
   }
 }
 
-/// The four lanes side by side, each as wide as a quarter (at least 200 px; the board scrolls sideways when narrower).
-/// On a phone, one lane at a time, picked along the top: cards go on with the buttons of the card they open.
 class _Board extends StatefulWidget {
   const _Board({
     required this.cards,
@@ -483,7 +447,6 @@ class _Board extends StatefulWidget {
   State<_Board> createState() => _BoardState();
 }
 
-/// Narrower than this, one lane at a time.
 const _oneLane = 700.0;
 
 class _BoardState extends State<_Board> {
@@ -568,7 +531,6 @@ class _LaneView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The closed lane: the latest first, older ones behind a link.
     var shown = cards;
     var hidden = 0;
     if (lane == Lane.closed) {
@@ -650,7 +612,6 @@ const _emptyText = {
   Lane.closed: '关了的工单；拖回「处理中」重开。',
 };
 
-/// A 待办 that another 待办 can be dropped on: that one goes just before it (a line above shows where).
 class _PlaceBefore extends StatelessWidget {
   const _PlaceBefore({required this.card, required this.onPlace, required this.child});
   final TodoCard card;
@@ -672,7 +633,6 @@ class _PlaceBefore extends StatelessWidget {
   );
 }
 
-/// A line at the top of 待办: type, Enter, and it is written down.
 class _QuickAdd extends StatefulWidget {
   const _QuickAdd({required this.onAdd});
   final Future<void> Function(String text) onAdd;
@@ -707,7 +667,6 @@ class _QuickAddState extends State<_QuickAdd> {
   );
 }
 
-/// A card: what the job is, who does it, where, how far, what needs you; dragged to act on it, tapped to open it.
 class _CardView extends ConsumerWidget {
   const _CardView({required this.card, required this.selected, required this.onOpen});
   final BoardCard card;
@@ -833,7 +792,6 @@ class _CardView extends ConsumerWidget {
         ),
       ),
     );
-    // A playbook opens on the farm's plan board; it is not dragged: its actions are there.
     if (card case PlaybookCard(:final playbook)) {
       return KitTappable(
         onTap: () {
@@ -871,8 +829,6 @@ class _Tag extends StatelessWidget {
   );
 }
 
-/// Closing a ticket: the harvest review (take it in) when it waits for you, or home without taking it; a working one
-/// is stopped first.
 class _CloseTicket extends ConsumerStatefulWidget {
   const _CloseTicket({required this.helper});
   final Helper helper;
@@ -920,7 +876,6 @@ class _CloseTicketState extends ConsumerState<_CloseTicket> {
   }
 }
 
-/// What a reopened ticket is to do now; popped with it (empty: carry on), or with nothing when not reopened.
 class _ReopenForm extends StatefulWidget {
   const _ReopenForm({required this.issue});
   final Issue issue;
@@ -960,12 +915,10 @@ class _ReopenFormState extends State<_ReopenForm> {
   );
 }
 
-/// A 待办: its job, project, agent and priority, saved; 开工 sends it. `item` null: a new one being written.
 class _Todo extends ConsumerStatefulWidget {
   const _Todo({super.key, required this.item, this.project, required this.reload, required this.onDone});
   final Issue? item;
 
-  /// A new one's project, when it was asked for one.
   final String? project;
   final Future<void> Function() reload;
   final ValueChanged<String?> onDone;
@@ -982,7 +935,6 @@ class _TodoState extends ConsumerState<_Todo> {
   late Priority _priority = widget.item?.priority ?? Priority.normal;
   bool _busy = false;
 
-  /// A new project, from the projects page's form; picked once it is there.
   Future<void> _newProject(BuildContext context) async {
     final before = {...?ref.read(projectNamesProvider).value};
     await showNewProjectDialog(context);
@@ -1175,7 +1127,6 @@ class _Ticket extends ConsumerStatefulWidget {
   const _Ticket({super.key, required this.issue, required this.runs, required this.state, required this.helper, required this.reload});
   final Issue issue;
 
-  /// The heads of its runs, oldest first: the last is the one shown.
   final List<TrajectoryHead> runs;
   final TicketState state;
   final Helper? helper;
@@ -1189,7 +1140,6 @@ class _TicketState extends ConsumerState<_Ticket> {
   String _word = '';
   bool _busy = false;
 
-  /// What harvesting would bring, asked for once a ticket waits for you.
   Future<Changes?>? _changes;
 
   @override
@@ -1205,7 +1155,7 @@ class _TicketState extends ConsumerState<_Ticket> {
     if (old.state != widget.state) _askChanges();
   }
 
-  /// Asks what harvesting would bring, once the ticket waits for you; `first` from initState, before any build.
+  /// `first` from initState, before any build.
   void _askChanges({bool first = false}) {
     if (widget.state != TicketState.waiting || widget.helper == null) return;
     final asked = ref.read(deskApiProvider).farm.changes(id: widget.runs.last.id).then<Changes?>((c) => c, onError: (Object _) => null);
@@ -1270,14 +1220,12 @@ class _TicketState extends ConsumerState<_Ticket> {
     await widget.reload();
   }
 
-  /// The helper's bed on the farm, opened (the farm brought in front).
   void _toBed(Helper helper) {
     ref.read(titleOpenProvider.notifier).enterFarm(start: false);
     ref.read(selectedProvider.notifier).set(helper.id);
     deskGo(context, '/');
   }
 
-  /// What can be done to the ticket in its state, as buttons along its top, and the way to its bed while it is open.
   /// A playbook's step has none of its own: it goes with its playbook.
   List<Widget> _actions(Helper? helper) {
     final busy = _busy;

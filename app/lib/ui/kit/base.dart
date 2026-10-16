@@ -1,71 +1,42 @@
-// What the kit's widgets share, as the page's pixel skin draws it (web/src/index.css :root[data-skin='pixel']):
-//   KitText      the type scale: the font is drawn on a 12-pixel grid, so text-xs/sm/base are 12 px and lg/xl 24 px;
-//                one weight (the skin forces 400 and turns synthesis off, so bold and italic draw plain)
-//   KitTappable  hover, press and keyboard focus (focus-visible) for anything clickable, Enter and Space included
-//   PxWindow     --px-frame on a box with an optional border: the light rim and the deeper bottom band inside, a 2 px
-//                outline with the corners left out and a hard drop (2, 4) outside
-//   DashedLine   a dashed rule (border-dashed)
-//   PxScrollView a scroll view that lets the frames at its edges show whole: their outlines and drops paint outside
-//                their boxes, where a plain scroll view would cut them
-//
-// Two quirks of the skin that the kit reproduces on purpose: every class with "shadow" in it becomes a hard 2 px drop,
-// and every class with "ring-2" (focus rings included, focused or not) becomes a 2 px cream-300 inner line, so focus
-// rings never show; only `outline` (the button's focus ring) and an input's border colour mark focus.
-
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../app/theme.dart';
 
-/// The type scale. Line heights are Tailwind's for each size (the skin changes the size, not the line height).
+/// Line heights are Tailwind's for each size: the skin changes the size, not the line height.
 abstract final class KitText {
-  /// text-xs (and text-[11px]): 12 px, line height 1rem/0.75rem.
   static const xs = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, fontWeight: FontWeight.w400, color: Palette.bark900);
 
-  /// text-[11px] and text-[10px] where no ancestor sets a size: 12 px, and the line height the page's body gives
-  /// (1.5), since an arbitrary size sets none of its own. Under a text-xs or text-sm parent they take its ratio.
   static const fine = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 1.5, fontWeight: FontWeight.w400, color: Palette.bark900);
 
-  /// text-sm: 12 px, line height 1.25rem/0.875rem.
   static const sm = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 20 / 14, fontWeight: FontWeight.w400, color: Palette.bark900);
 
-  /// text-base: 12 px, line height 1.5.
   static const base = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 1.5, fontWeight: FontWeight.w400, color: Palette.bark900);
 
-  /// text-lg: 24 px.
   static const lg = TextStyle(fontFamily: pixelFont, fontSize: 24, height: 28 / 18, fontWeight: FontWeight.w400, color: Palette.bark900);
 
-  /// text-xl: 24 px.
   static const xl = TextStyle(fontFamily: pixelFont, fontSize: 24, height: 28 / 20, fontWeight: FontWeight.w400, color: Palette.bark900);
 
-  /// text-2xl: 24 px.
   static const x2l = TextStyle(fontFamily: pixelFont, fontSize: 24, height: 32 / 24, fontWeight: FontWeight.w400, color: Palette.bark900);
 
-  /// font-mono at text-xs.
   static const mono = TextStyle(fontFamily: monoFont, fontFamilyFallback: monoFallback, fontSize: 12, height: 4 / 3, color: Palette.bark900);
 }
 
-/// How long a transition takes: `d`, or none when the system asks for less motion (macOS's Reduce motion).
 Duration kitMotion(BuildContext context, Duration d) => (MediaQuery.maybeDisableAnimationsOf(context) ?? false) ? Duration.zero : d;
 
-/// Whether looping motion (a bob, a blink) should run: not when the system asks for less motion.
 bool kitMoves(BuildContext context) => !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
 
-/// The hard drop under raised things (--px-drop, 2 px down and right).
 const kitDrop = [BoxShadow(color: Palette.pxDrop, offset: Offset(2, 2))];
 
-/// What a clickable thing is going through.
 class KitState {
   const KitState({required this.enabled, required this.hovered, required this.pressed, required this.focused});
   final bool enabled;
   final bool hovered;
   final bool pressed;
 
-  /// Focused from the keyboard (focus-visible), not by a click.
   final bool focused;
 }
 
-/// Anything clickable: hover, press, keyboard focus, Enter and Space, a tooltip (the page's `title`) and its semantics.
 /// `onTap` null is disabled: not focusable, no hover.
 class KitTappable extends StatefulWidget {
   const KitTappable({
@@ -129,8 +100,7 @@ class _KitTappableState extends State<KitTappable> {
   }
 }
 
-/// A box worn with --px-frame (role=dialog, .farm-card, popups): `border` (0 or 2) is a CSS border inside the frame,
-/// in bark-900, under which the inset rim and band are drawn.
+/// `border` (0 or 2) is a border inside the frame, under which the inset rim and band are drawn.
 class PxWindow extends StatelessWidget {
   const PxWindow({super.key, required this.child, this.paper = Palette.cream50, this.border = 0, this.padding = EdgeInsets.zero, this.clip = false});
   final Widget child;
@@ -138,7 +108,6 @@ class PxWindow extends StatelessWidget {
   final double border;
   final EdgeInsets padding;
 
-  /// overflow-hidden: children are clipped to the paper.
   final bool clip;
 
   @override
@@ -190,11 +159,9 @@ class _WindowPainter extends CustomPainter {
   bool shouldRepaint(_WindowPainter old) => old.paper != paper || old.border != border;
 }
 
-/// The skin's inner line (`ring-1`, `ring-2` and `shadow-[inset…]` all become it): 2 px of cream-300 inside the box,
-/// as a foreground decoration, since an inset box-shadow takes no room from what is inside.
+/// A foreground decoration, since an inset line takes no room from what is inside.
 const pxRing = BoxDecoration(border: Border.fromBorderSide(BorderSide(color: Palette.cream300, width: 2)));
 
-/// A block box: as wide as the width it is given when that is bounded (a div in a column), else as wide as its child.
 /// Unlike a LayoutBuilder it answers intrinsic sizes, so it may sit in an IntrinsicHeight.
 class FillWidth extends SingleChildRenderObjectWidget {
   const FillWidth({super.key, super.child});
@@ -217,9 +184,8 @@ class _RenderFillWidth extends RenderProxyBox {
   }
 }
 
-/// A scroll view whose clip reaches past its box by a frame's outline (2 px) above and at the left and by its drop
-/// (2, 4) at the right and below, so a PxWindow laid at its edge keeps its outline and drop, as on the page, where the
-/// frame's box-shadow is cut only by a scrolling ancestor.
+/// Its clip reaches past its box by a frame's outline (2 px) above and at the left and by its drop (2, 4) at the right and below, so a PxWindow laid at its
+/// edge keeps its outline and drop.
 class PxScrollView extends StatelessWidget {
   const PxScrollView({super.key, required this.child, this.padding, this.controller});
   final Widget child;
@@ -243,7 +209,6 @@ class _Bleed extends CustomClipper<Rect> {
   bool shouldReclip(_Bleed old) => false;
 }
 
-/// A dashed rule, `thickness` thick: dashes as long as twice the thickness, as browsers draw border-dashed.
 class DashedLine extends StatelessWidget {
   const DashedLine({super.key, this.color = Palette.cream200, this.thickness = 2, this.vertical = false});
   final Color color;
@@ -279,9 +244,7 @@ class _DashPainter extends CustomPainter {
   bool shouldRepaint(_DashPainter old) => old.color != color || old.thickness != thickness || old.vertical != vertical;
 }
 
-/// Where a link in markdown goes when tapped (the page opens it in a new tab). The app sets this once, e.g. to
-/// url_launcher's launchUrl; until then a tap does nothing.
+/// Until the app sets it, a tap does nothing.
 void Function(Uri uri)? kitOpenLink;
 
-/// The colour of the text around `context` (the page's currentColor).
 Color currentColor(BuildContext context) => DefaultTextStyle.of(context).style.color ?? Palette.bark900;

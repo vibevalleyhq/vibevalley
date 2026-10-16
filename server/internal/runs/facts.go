@@ -13,41 +13,31 @@ import (
 	"vibevalley/pkg/smith/observe"
 )
 
-// A helper's session, read for the farm (ported from the TypeScript server's session-facts.ts, removed): one smith event in (a turn began, it ran
-// a command, said something, spent tokens, its process exited…), what follows out: the facts to apply to the core
-// state, the steps for its detail panel, what it spent, the model whose price to look up. Pure: it reads the helper
-// as the core state has it and the session's own bookkeeping (crewTracking), and returns the next bookkeeping;
-// crew.go does what it says.
+// Pure: it reads the helper as the core state has it and the session's own bookkeeping, and changes nothing.
 
-// crewLabelMax: the bubble over a helper's head holds about this much.
+// The bubble over a helper's head holds about this much.
 const crewLabelMax = 40
 
-// crewShownCall is the tool call the bubble shows, so a later full input can fix up its label.
+// So a later full input can fix up the bubble's label.
 type crewShownCall struct{ ID, Tool string }
 
-// crewTracking is what the server keeps about an open session to read its next event.
 type crewTracking struct {
 	ShownCall *crewShownCall
-	// SessionTokens is the session's running token total, as last reported: the next report is counted from it.
+	// The next report is counted from it.
 	SessionTokens *oar.TokenTotals
-	// Price is the model's, once the session has said which model it runs.
-	Price *base.Price
-	// TurnFrom is what it had spent when the current turn began.
-	TurnFrom *protocol.Spent
-	// Quiet: a quiet spell was flagged; the next word from it ends it.
+	Price         *base.Price
+	TurnFrom      *protocol.Spent
+	// The next word from it ends the quiet spell.
 	Quiet bool
 }
 
 type crewSessionContext struct {
-	// ID is the helper's.
-	ID      string
-	Runtime string
-	// Cwd is where it works: paths and commands are shown from here.
+	ID        string
+	Runtime   string
 	Cwd       string
 	CnyPerUsd float64
 }
 
-// crewOp is one thing to write down in a journal, as data (steps.ts's JournalOp): Type names the Journal method.
 type crewOp struct {
 	Type   string // asked, said, thought, toolStarted, toolInput, toolEnded, note
 	Text   string
@@ -60,7 +50,6 @@ type crewOp struct {
 	From   base.From
 }
 
-// crewRecord writes op down in j.
 func crewRecord(j base.Journal, op crewOp) {
 	switch op.Type {
 	case "asked":
@@ -80,17 +69,13 @@ func crewRecord(j base.Journal, op crewOp) {
 	}
 }
 
-// crewReaction is what one event means for the farm.
 type crewReaction struct {
 	Tracking crewTracking
 	Facts    []protocol.FactValue
 	Journal  []crewOp
-	// SpentCny is yuan this event spent on the helper's runtime.
 	SpentCny float64
-	// Model: the session said which model it runs; its price is to be looked up.
-	Model string
-	// Warn is said on the farm as a warning.
-	Warn string
+	Model    string
+	Warn     string
 }
 
 var crewActions = map[observe.ToolActionKind]protocol.ToolAction{
@@ -111,13 +96,12 @@ func crewOr(p *int64) int64 {
 	return *p
 }
 
-// crewDollars is dollars for some tokens at a model's price (per million); input counts cache reads and writes too.
+// Per million tokens; input counts cache reads and writes too.
 func crewDollars(t oar.TokenTotals, p base.Price) float64 {
 	cacheRead, cacheWrite := float64(crewOr(t.CacheRead)), float64(crewOr(t.CacheWrite))
 	return (math.Max(0, float64(t.Input)-cacheRead-cacheWrite)*p.Input + float64(t.Output)*p.Output + cacheRead*p.CacheRead + cacheWrite*p.CacheWrite) / 1_000_000
 }
 
-// crewSince is what was spent from `from` to `now`; nil when there is no start to count from.
 func crewSince(now protocol.Spent, from *protocol.Spent) *protocol.Spent {
 	if from == nil {
 		return nil
@@ -133,8 +117,7 @@ func crewSince(now protocol.Spent, from *protocol.Spent) *protocol.Spent {
 	return &out
 }
 
-// crewNear is a path or command the helper names, shown from its own directory: the bubble has no room for the rest.
-// A command that starts by going there (`cd <worktree> && pnpm test`) is shown as what it runs.
+// The bubble has no room for the rest: `cd <worktree> && pnpm test` is shown as what it runs.
 func crewNear(cwd, detail string) string {
 	if strings.HasPrefix(detail, "/") && !strings.Contains(detail, " ") {
 		rel, err := filepath.Rel(cwd, detail)
@@ -162,8 +145,6 @@ func crewToolOutput(content []oar.ToolOutputPart) string {
 	return strings.Join(parts, "\n")
 }
 
-// crewSessionFacts is what one event of a helper's session means: helper is the helper as the core state has it now
-// (nil: not on the farm).
 func crewSessionFacts(event oar.Event, helper *protocol.Helper, tracking crewTracking, ctx crewSessionContext) crewReaction {
 	id := ctx.ID
 	var facts []protocol.FactValue
@@ -177,7 +158,7 @@ func crewSessionFacts(event oar.Event, helper *protocol.Helper, tracking crewTra
 		}
 	}
 
-	// doing is what it is doing now, changed: a fact only when something changed (the bubble says so).
+	// A fact only when something changed.
 	doing := func(action protocol.WorkerAction, label string) {
 		if working == nil || (working.Doing.Action == action && working.Doing.Label == label) {
 			return

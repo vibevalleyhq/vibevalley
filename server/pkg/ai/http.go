@@ -1,9 +1,7 @@
 package ai
 
-// A streamed answer over HTTP, the part every provider shares: the key, a POST tried again when it fails before any
-// answer comes (no connection, 408, 409, 429, 5xx, 529), the body read as the provider says, and the request bound
-// to the stream's context, so cancelling it ends a read waiting on the network at once. What goes wrong is an
-// `error` event, never a failed stream.
+// A POST is tried again when it fails before any answer comes (no connection, 408, 409, 429, 5xx, 529). The request is bound to the stream's context,
+// so cancelling it ends a read waiting on the network at once. What goes wrong is an `error` event, never a failed stream.
 
 import (
 	"bufio"
@@ -21,24 +19,21 @@ import (
 
 var retryStatus = map[int]bool{408: true, 409: true, 429: true, 500: true, 502: true, 503: true, 504: true, 529: true}
 
-// retryBase is the first wait before a retry; it doubles each time (Schedule.exponential('1 second')). Tests shorten it.
+// It doubles each time. Tests shorten it.
 var retryBase = time.Second
 
 var httpClient = &http.Client{}
 
-// failed is why a request failed, and whether trying again may help.
 type failed struct {
 	message string
 	retry   bool
 }
 
 type httpRequest struct {
-	url string
-	// The headers for a key (its own auth scheme).
+	url     string
 	headers func(key string) map[string]string
 	body    any
-	// The response body as the answer's events.
-	answer func(body io.Reader) iter.Seq[AssistantMessageEvent]
+	answer  func(body io.Reader) iter.Seq[AssistantMessageEvent]
 }
 
 func cut(s string, n int) string {
@@ -137,8 +132,7 @@ func streamHTTP(ctx context.Context, model Model, options StreamOptions, request
 	return out
 }
 
-// sseData is server-sent events' data, as JSON, until [DONE] or the end. A read that fails, or data that is not
-// JSON, is yielded as an error and ends it.
+// A read that fails, or data that is not JSON, is yielded as an error and ends it.
 func sseData[T any](body io.Reader) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
 		reader := bufio.NewReader(body)

@@ -1,14 +1,7 @@
 package agent
 
-// The agent, after pi-coding-agent: agentcore's loop with what a working agent needs around it. Its conversation
-// is saved as it goes and continued on start; past its budget the older part is folded into a summary (for a
-// request as soon as it is too long, in the file once the run is over). The system prompt is made fresh for every
-// request: who it is, where it works, its skills, its memory, what the host says is going on now. It has tools of
-// its own (skills, memory, the archive; helpers it sends off; schedules), a step limit per run, and two ways to be
-// told something while it works: Send steers the run, Later waits until the run would stop.
-//
-// Events are agentcore's, then `agent_settled` (the run is over and nothing is waiting) and `compaction_start` /
-// `compaction_end`, named as pi-coding-agent names them. A message is saved before its message_end is passed on.
+// A message is saved before its message_end is passed on. Past its budget the older part of the conversation is folded into a summary: for a request
+// as soon as it is too long, in the file once the run is over.
 
 import (
 	"context"
@@ -22,7 +15,6 @@ import (
 	"vibevalley/pkg/ai"
 )
 
-// This agent's own event types, besides agentcore's.
 const (
 	EventAgentSettled    = "agent_settled"
 	EventCompactionStart = "compaction_start"
@@ -35,55 +27,49 @@ type AgentEvent struct {
 	agentcore.AgentEvent
 	Aborted bool
 	Reason  string
-	// compaction_end: TS `result` (renamed: agentcore.AgentEvent has a Result of its own).
+	// Not Result: agentcore.AgentEvent has a Result of its own.
 	Compaction *CompactionSummaryMessage
 }
 
 type AgentOptions struct {
-	// What it is called; also the session file's name unless Session says otherwise.
-	Name string
-	// Who it is and how it works: the start of every system prompt.
-	Instructions string
-	Model        ai.Model
-	// The key and the like, for every request.
+	// Also the session file's name unless Session says otherwise.
+	Name          string
+	Instructions  string
+	Model         ai.Model
 	StreamOptions ai.StreamOptions
 	// The key, asked before each request (and each summary), so a key changed meanwhile is used at once.
 	GetApiKey     func(ctx context.Context, provider string) string
 	ThinkingLevel agentcore.ThinkingLevel
-	// Its own folder: the session, MEMORY.md, the archive, schedules.
-	Home string
-	// Where it works: relative paths and commands.
-	Cwd   string
-	Tools []agentcore.AgentTool
-	// Folders to find skills in; nil: the shared, Claude Code's and the work directory's. NoSkills for none.
+	Home          string
+	Cwd           string
+	Tools         []agentcore.AgentTool
+	// nil: the shared, Claude Code's and the work directory's. NoSkills for none.
 	Skills   []string
 	NoSkills bool
-	// Do not carry MEMORY.md in the system prompt, nor give it remember / rewrite_memory (TS memory: false).
 	NoMemory bool
-	// Turns per run before it is stopped (40 when 0).
+	// 40 when 0.
 	MaxSteps int
-	// Past this many (estimated) tokens of conversation, the older part is folded into a summary (120 000 when 0).
+	// Tokens (estimated) past which the older part is folded; 120 000 when 0.
 	ContextTokens int
-	// How many of the newest messages stay word for word when folding (12 when 0).
+	// 12 when 0.
 	KeepRecent int
-	// The session file, in Home: `<Session>.jsonl` ("": Name). NoSession keeps nothing on disk (a helper).
+	// "": Name. NoSession keeps nothing on disk (a helper).
 	Session   string
 	NoSession bool
-	// Added to the system prompt of every request: what a host wants it to know now (the farm's state). Not kept.
+	// Not kept.
 	Situation func(ctx context.Context) string
-	// Cannot send helpers off with tasks (spawn_agent). A helper never can.
+	// A helper never can.
 	NoSubagents bool
-	// Keeps schedules (schedules.json in Home) and wakes itself when they come due. nil: when it keeps a session.
+	// nil: when it keeps a session.
 	Schedules *bool
-	// How often due schedules are looked for (20 s when 0).
+	// 20 s when 0.
 	ScheduleTick time.Duration
-	// Where a due schedule's message goes: default Later.
+	// Default Later.
 	Wake func(text string)
 }
 
-// Agent is vibevalley's agent. Safe for concurrent use; Close (or the context it was made with ending) stops it.
+// Safe for concurrent use; Close (or the context it was made with ending) stops it.
 type Agent struct {
-	// Core is the agentcore agent underneath: its state, queues and operations.
 	Core *agentcore.Agent
 
 	options AgentOptions
@@ -95,19 +81,17 @@ type Agent struct {
 	events  *agentcore.Hub[AgentEvent]
 	done    sync.WaitGroup
 
-	mu sync.Mutex
-	// Background runs under way (TS's FiberSet).
-	runs int
-	// Those waiting for it to settle (Ask).
+	mu       sync.Mutex
+	runs     int
 	waiters  []chan struct{}
 	steps    int
 	stopping bool
-	// The summary for the conversation cut at a place: made once per place.
+	// Made once per place.
 	folds  map[string]CompactionSummaryMessage
 	foldMu sync.Mutex
 }
 
-// NewAgent makes the agent; ctx's values (ai.WithProviders) reach every request, and its end stops the agent.
+// ctx's values (ai.WithProviders) reach every request, and its end stops the agent.
 func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 	life, cancel := context.WithCancel(ctx)
 	a := &Agent{options: options, ctx: life, cancel: cancel, events: agentcore.NewHub[AgentEvent](), folds: map[string]CompactionSummaryMessage{}}
@@ -140,7 +124,6 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 	}
 	a.folding = CompactionOptions{Home: options.Home, Session: sessionName, Model: options.Model, StreamOptions: options.StreamOptions, Budget: budget, KeepRecent: keepRecent}
 
-	// ── Its own tools ───────────────────────────────────────────────────
 	own := SelfTools(SelfOptions{Home: options.Home, Skills: a.skills, Memory: !options.NoMemory})
 	if !options.NoSubagents {
 		own = append(own, SubagentTool(func(ctx context.Context, task, label string) (string, error) {
@@ -174,7 +157,6 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 		}))
 	}
 
-	// ── The core agent ──────────────────────────────────────────────────
 	var messages []agentcore.AgentMessage
 	if a.session != nil {
 		messages = a.session.Load()
@@ -271,8 +253,6 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 
 func (a *Agent) publish(e AgentEvent) { a.events.Publish(e) }
 
-// ── The system prompt, made for every request ──────────────────────────
-
 func (a *Agent) systemPrompt(ctx context.Context) string {
 	found := a.skills()
 	memory := ""
@@ -302,8 +282,6 @@ func (a *Agent) systemPrompt(ctx context.Context) string {
 	}
 	return strings.Join(kept, "\n\n")
 }
-
-// ── Folding: for a request at once, in the file when the run is over ──
 
 func foldKey(messages []agentcore.AgentMessage, cut int) string {
 	var at int64
@@ -346,7 +324,6 @@ func (a *Agent) fold(ctx context.Context, messages []agentcore.AgentMessage) (Co
 	return *summary, cut, true
 }
 
-// settleFold folds the transcript for good: in the state and in the file.
 func (a *Agent) settleFold() {
 	messages := a.Core.State().Messages
 	summary, cut, ok := a.fold(a.ctx, messages)
@@ -362,9 +339,6 @@ func (a *Agent) settleFold() {
 	}
 }
 
-// ── Runs ────────────────────────────────────────────────────────────────
-
-// run starts a run in the background.
 func (a *Agent) run(start func(ctx context.Context) error) {
 	a.mu.Lock()
 	a.runs++
@@ -380,7 +354,6 @@ func (a *Agent) run(start func(ctx context.Context) error) {
 	}()
 }
 
-// ended is a run's end: go on with what is waiting, or fold the conversation and say it settled.
 func (a *Agent) ended() {
 	_ = a.Core.WaitForIdle(a.ctx)
 	if a.ctx.Err() != nil {
@@ -416,7 +389,6 @@ func (a *Agent) busyRuns() int {
 	return a.runs
 }
 
-// deliver gives it message: a new run when idle, else into the queue steer says.
 func (a *Agent) deliver(message agentcore.AgentMessage, steer bool) {
 	queue := func() {
 		if steer {
@@ -442,13 +414,12 @@ func (a *Agent) deliver(message agentcore.AgentMessage, steer bool) {
 	})
 }
 
-// Send gives it a message: starts a run when idle, steers the one under way otherwise.
+// Starts a run when idle, steers the one under way otherwise.
 func (a *Agent) Send(message agentcore.AgentMessage) { a.deliver(message, true) }
 
-// Later gives it a message to take when it would stop (a follow-up); starts a run when idle.
+// Taken when the run would stop (a follow-up); starts a run when idle.
 func (a *Agent) Later(message agentcore.AgentMessage) { a.deliver(message, false) }
 
-// Ask sends and waits until it settles: its last words.
 func (a *Agent) Ask(ctx context.Context, message agentcore.AgentMessage) (string, error) {
 	settled := make(chan struct{})
 	a.mu.Lock()
@@ -465,13 +436,10 @@ func (a *Agent) Ask(ctx context.Context, message agentcore.AgentMessage) (string
 	}
 }
 
-// Subscribe is the events from now on; Close the subscription when done.
 func (a *Agent) Subscribe() *agentcore.Subscription[AgentEvent] { return a.events.Subscribe() }
 
-// Busy reports a run under way (or about to start).
 func (a *Agent) Busy() bool { return a.busyRuns() > 0 }
 
-// Stop stops the run under way and drops what was waiting.
 func (a *Agent) Stop() {
 	a.Core.ClearAllQueues()
 	if a.Core.State().IsStreaming {
@@ -482,10 +450,9 @@ func (a *Agent) Stop() {
 	a.Core.Abort()
 }
 
-// History is the conversation.
 func (a *Agent) History() []agentcore.AgentMessage { return a.Core.State().Messages }
 
-// Reset forgets the conversation (the memory stays).
+// The memory stays.
 func (a *Agent) Reset() error {
 	a.Core.Reset()
 	if a.session != nil {
@@ -494,10 +461,8 @@ func (a *Agent) Reset() error {
 	return nil
 }
 
-// Skills is the skills it has now.
 func (a *Agent) Skills() []SkillInfo { return a.skills() }
 
-// Close stops the run, the schedules and the subscriptions.
 func (a *Agent) Close() {
 	a.cancel()
 	a.Core.Close()

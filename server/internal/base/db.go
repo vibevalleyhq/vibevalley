@@ -1,8 +1,7 @@
 package base
 
-// The farm's database: SQLite (modernc, pure Go) in $VIBEVALLEY_HOME/farm.db. One connection, so one writer and seq
-// order is commit order (the group chat relies on it). The migrations in server/migrations run at start, in name order,
-// each once (PRAGMA user_version counts them).
+// One connection, so one writer and seq order is commit order (the group chat relies on it). Migrations run at start in name order, each once (PRAGMA
+// user_version counts them).
 
 import (
 	"database/sql"
@@ -17,7 +16,6 @@ import (
 	"vibevalley/migrations"
 )
 
-// OpenDB opens and migrates the database at path; ":memory:" for tests.
 func OpenDB(path string) (*sql.DB, error) {
 	dsn := path
 	if path != ":memory:" {
@@ -82,5 +80,4 @@ func migrate(db *sql.DB, path string) error {
 	return nil
 }
 
-// Placeholders is "?, ?, ?" for n values.
 func Placeholders(n int) string { return strings.TrimSuffix(strings.Repeat("?, ", n), ", ") }

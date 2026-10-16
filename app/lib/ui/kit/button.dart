@@ -1,20 +1,13 @@
-// The button (web/src/components/ui/button.tsx) and the card (card.tsx), in the pixel skin.
-
 import 'package:flutter/widgets.dart';
 
 import '../../app/theme.dart';
 import 'base.dart';
 import 'icons.dart';
 
-/// The button's colours (button.tsx `tones`).
 enum PxTone { plain, primary, danger, accent }
 
-/// The button's sizes (button.tsx `sizes`): md 36 px tall, sm 28, icon a 36 px square, custom sized by its content.
 enum PxSize { md, sm, icon, custom }
 
-/// Replaces web/src/components/ui/button.tsx Button (and `buttonClass` for links): a 2 px bark outline, a hard drop
-/// that goes away as it sinks 2 px when pressed, a 2 px leaf outline 1 px out on keyboard focus, 45% opacity when
-/// disabled (`onPressed` null).
 class PxButton extends StatelessWidget {
   const PxButton({
     super.key,
@@ -29,7 +22,6 @@ class PxButton extends StatelessWidget {
     this.autofocus = false,
   });
 
-  /// A button that says `label`, after the pixel glyph `icon` when it has one.
   PxButton.text(
     String label, {
     super.key,
@@ -49,13 +41,11 @@ class PxButton extends StatelessWidget {
   final PxTone tone;
   final PxSize size;
 
-  /// The page's `title`.
   final String? tooltip;
 
-  /// The page's `aria-label`, for icon buttons.
+  /// For icon buttons.
   final String? semanticLabel;
 
-  /// Only for PxSize.custom (the page's className padding).
   final EdgeInsets? padding;
   final FocusNode? focusNode;
   final bool autofocus;
@@ -63,7 +53,6 @@ class PxButton extends StatelessWidget {
   static (Color, Color, Color) _colors(PxTone tone) => switch (tone) {
     PxTone.plain => (Palette.cream50, Palette.creamHover, Palette.bark900),
     PxTone.primary => (Palette.leaf500, Palette.leafHover, Palette.cream50),
-    // hover: brightness-95
     PxTone.danger => (
       Palette.berry,
       Color.from(alpha: 1, red: Palette.berry.r * .95, green: Palette.berry.g * .95, blue: Palette.berry.b * .95),
@@ -119,7 +108,6 @@ class PxButton extends StatelessWidget {
   }
 }
 
-/// focus-visible: outline 2px leaf-500, offset 1px.
 class _FocusRing extends CustomPainter {
   const _FocusRing();
 
@@ -136,8 +124,6 @@ class _FocusRing extends CustomPainter {
   bool shouldRepaint(_FocusRing old) => false;
 }
 
-/// Replaces web/src/components/ui/card.tsx Card (.farm-card): cream paper in the pixel frame, 16 px in; an optional
-/// title row with `aside` at its right in small brown words.
 class PxCard extends StatelessWidget {
   const PxCard({super.key, required this.child, this.title, this.aside, this.padding = const EdgeInsets.all(16)});
   final Widget child;

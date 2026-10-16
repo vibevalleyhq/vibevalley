@@ -1,11 +1,3 @@
-// Faces and machines for the desk pages (web/src/farm/Face.tsx), reading the sprite atlas themselves:
-//   AgentFace       an agent's animal in its clothes, cut round its head (AgentFace); muted is greyed out
-//   DeskManagerFace the manager's portrait in the look the player chose (ManagerFace with useManagerLook)
-//   RuntimeIcon     a runtime as a farm machine with its agent's logo pinned to the lower right (RuntimeIcon)
-//   RuntimeLogo     a runtime's logo alone (RuntimeLogo)
-//   PoseSprite      a helper's full-body sprite in a pose, moving as the engine's motions do (SpriteImg + POSE_MOTION)
-// Each draws an empty box of its size until the atlas has loaded.
-
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -28,7 +20,6 @@ const _grey = ColorFilter.matrix([
   0, 0, 0, 1, 0,
 ]);
 
-/// opacity + grayscale, as the page's `muted`.
 Widget mutedBy(bool muted, double opacity, Widget child) => muted
     ? Opacity(
         opacity: opacity,
@@ -39,7 +30,7 @@ Widget mutedBy(bool muted, double opacity, Widget child) => muted
 class AgentFace extends ConsumerWidget {
   const AgentFace({super.key, required this.look, required this.id, required this.size, this.muted = false});
 
-  /// The agent's look; null for one without (an animal is picked from `id`).
+  /// null for one without: an animal is picked from `id`.
   final Look? look;
   final String id;
   final double size;
@@ -53,7 +44,6 @@ class AgentFace extends ConsumerWidget {
   }
 }
 
-/// A cast's face (the creator's species tiles).
 class CastFace extends ConsumerWidget {
   const CastFace({super.key, required this.cast, required this.size});
   final Cast cast;
@@ -80,7 +70,6 @@ class DeskManagerFace extends ConsumerWidget {
   }
 }
 
-/// The tool shed: each runtime is a farm machine.
 const _machine = {
   'claude': 'machine-tractor',
   'codex': 'machine-watercart',
@@ -149,10 +138,8 @@ class RuntimeIcon extends ConsumerWidget {
   }
 }
 
-/// How each pose moves (cast.ts POSE_MOTION, keyframes in packages/engine/src/engine.css), about the sprite's feet.
 Matrix4 _motion(Pose pose, double t) {
   double ease(double x) => (1 - math.cos(math.pi * x)) / 2;
-  // A loop from 0 to 1 and back, eased: the shape of the ease-in-out keyframes that peak at 50%.
   final tri = ease(t < .5 ? t * 2 : (1 - t) * 2);
   switch (pose) {
     case Pose.idle: // breathe 2.6 s: scale(1.012, 0.985) at 50%
@@ -189,8 +176,6 @@ const _period = {
   Pose.worry: Duration(milliseconds: 1600),
 };
 
-/// A helper standing in `pose`, `height` tall (or `scale` screen pixels to an art pixel, each pose at its own size),
-/// moving as it does on the page; walking plays the walk cycle on the spot.
 class PoseSprite extends ConsumerStatefulWidget {
   const PoseSprite({super.key, required this.cast, required this.pose, this.height, this.scale, this.animate = true})
     : assert((height == null) != (scale == null), 'a height or a scale');

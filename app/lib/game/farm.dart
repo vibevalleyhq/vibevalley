@@ -1,6 +1,4 @@
-// The farm's rules as the client keeps them (packages/core farm.ts): the tools and what each does to a bed (aimTool is
-// the rule; the screen shows it while pointing and follows it on a click), what grows in a bed (the server's view),
-// the seed bag. Who a helper is (castOf) is rules/looks.dart's; the beds themselves are village/world.dart's.
+// aimTool is the rule: the screen shows it while pointing and follows it on a click.
 
 import '../gen/vibevalley.dart';
 import '../village/world.dart';
@@ -8,9 +6,6 @@ import '../rules/farm.dart';
 
 export '../village/world.dart' show Bed, beds, bedOfStation, isRipe;
 
-// ── Tools ────────────────────────────────────────────────────────────────────
-
-/// The tools, in the hotbar's order (core farm.ts TOOLS; farm/cast.ts TOOL_ICON for the icons).
 enum Tool {
   hand('手', '点一块地看详情，点空地播种', 'icon-hand'),
   water('浇水', '给帮工带句话，正在干活的会中途收到', 'icon-water'),
@@ -25,14 +20,12 @@ enum Tool {
   final String icon;
 }
 
-/// What a tool would do to a bed: whether it applies, and a few words for the pointer's card.
 class Aim {
   const Aim(this.ok, this.text);
   final bool ok;
   final String text;
 }
 
-/// What the screen does after a tool was used on a bed: nothing more, or open a panel (core farm.ts ToolResult).
 sealed class ToolResult {
   const ToolResult();
 }
@@ -61,31 +54,22 @@ final class ToolWater extends ToolResult {
   final String workerId;
 }
 
-/// Harvest: look at what it would bring in first (a server can say).
 final class ToolReview extends ToolResult {
   const ToolReview(this.workerId);
   final String workerId;
 }
 
-/// What a tool did to a bed, as an effect over it (core farm.ts BedFxKind; the village draws water, spray, harvest,
-/// shovel; a note is said on the plot's rail).
 enum BedFxKind { water, spray, harvest, shovel, note }
 
-// ── Beds and helpers ─────────────────────────────────────────────────────────
-
-/// A helper's bed (Helper.play.station): 0..5, or -1 while every bed is taken.
+/// 0..5, or -1 while every bed is taken.
 int stationOfHelper(Helper h) => h.play?.station.round() ?? -1;
 
-/// The helper working a station's bed.
 Helper? stationOf(List<Helper> helpers, int station) => station < 0 ? null : helpers.where((h) => stationOfHelper(h) == station).firstOrNull;
 
-/// The next level that clears a locked bed, if any.
 int? nextClearing(int level) => beds.where((b) => b.unlockLevel != null && b.unlockLevel! > level).firstOrNull?.unlockLevel;
 
-/// What grows in a helper's bed and the sign over it: the server's view (protocol plotOfHelper), empty without a helper.
 PlotView plotOf(FarmView view, Helper? h) => h == null ? const PlotView(crop: Crop.empty) : (view.plots[h.id] ?? const PlotView(crop: Crop.empty));
 
-/// A locked bed shows as a flower bed once the farm reaches its level.
 PlotView lockedPlot(Bed bed, int level) => PlotView(crop: level >= (bed.unlockLevel ?? 1 << 30) ? Crop.flowering : Crop.locked);
 
 const cropLabel = {
@@ -103,9 +87,6 @@ const cropLabel = {
   Crop.locked: '没开垦',
 };
 
-// ── What each tool does ──────────────────────────────────────────────────────
-
-/// The rule behind every tool (core farm.ts aimTool): shown while the pointer is over a bed, followed on a click.
 Aim aimTool(Tool tool, Bed bed, Helper? worker, PlotView plot, int level) {
   final unlock = bed.unlockLevel;
   if (unlock != null) return Aim(false, level >= unlock ? '开垦好的花坛' : 'Lv.$unlock 开垦这块地');
@@ -128,13 +109,10 @@ Aim aimTool(Tool tool, Bed bed, Helper? worker, PlotView plot, int level) {
   }
 }
 
-/// What 杀虫 tells a worker whose job failed (core farm.ts bugText).
 String bugText(String task) {
   final original = task.replaceFirst(RegExp(r'^接着修：'), '').replaceFirst(RegExp(r'。看一下报错，修好再跑一遍测试$'), '');
   return '接着修：$original。看一下报错，修好再跑一遍测试';
 }
-
-// ── The seed bag ─────────────────────────────────────────────────────────────
 
 const seedCount = 8;
 
@@ -149,7 +127,6 @@ final _projectSeeds = <String Function(String)>[
 ];
 const _anySeeds = ['看看测试有没有挂，挂了就修', '给 README 补上怎么启动', '给最近改的地方补上测试', '把没用的代码和依赖清一清'];
 
-/// The seed bag: the short jobs sent before (newest first, each once), then jobs for your projects, then any.
 List<String> seedsFor(List<String> asked, List<String> projects, [int count = seedCount]) {
   final seeds = <String>[];
   void add(String text) {
@@ -165,12 +142,9 @@ List<String> seedsFor(List<String> asked, List<String> projects, [int count = se
   return seeds;
 }
 
-// ── The manager and the pet (farm/managers.ts, core session.ts) ──────────────
-
-/// The sprite for a look and pose ('', '-talk', '-listen', '-face'); the young farmer stands in for one not painted.
+/// The young farmer stands in for a look not painted.
 String managerSprite(String look, String suffix, bool Function(String) has) => has('manager-$look$suffix') ? 'manager-$look$suffix' : 'manager$suffix';
 
-/// Whether a look's sprites exist yet.
 bool lookReady(String look, bool Function(String) has) => look == 'farmer' || has('manager-$look');
 
 const petName = {'dog': '小狗', 'ragdoll': '重点色布偶猫', 'bluecat': '蓝猫'};

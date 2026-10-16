@@ -19,38 +19,23 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// Projects (ported from the TypeScript server's projects.ts, removed): every folder directly under the work directory (VIBEVALLEY_WORK_ROOT) is one,
-// and each is a git repository, made one (with a first commit) the first time a helper is sent there. A helper
-// works in a worktree of its own under <root>/.worktrees, on a branch of its own; harvest merges that branch into
-// the project's main branch. The house rules for every project are <root>/AGENTS.md: helpers get them whatever
-// runtime they run on.
-//
-// Before a harvest, Changes says what it would bring in (commits, files with their diffs, what is not committed) and
-// whether it merges cleanly: `git merge-tree` works that out without touching any checkout. A harvest that would
-// conflict is not attempted; the helper is asked to merge the main branch in and resolve it.
-//
-// A playbook has a branch of its own (OpenBranch): its steps' worktrees start from it, and each finished step is
-// merged into it (MergeInto) without checking it out anywhere: merge-tree writes the merged tree, commit-tree and
-// update-ref put it on the branch. Harvesting the playbook (HarvestBranch) merges it into the main branch.
+// A harvest that would conflict is not attempted: the helper is asked to merge the main branch in and resolve it. Merging into a playbook's branch
+// never checks it out: merge-tree writes the tree, commit-tree and update-ref put it on the branch.
 
 const (
-	// A check command gets this long, and keeps this much of what it printed (its end: a test run's verdict).
+	// The end of a check's output is kept: a test run's verdict is there.
 	crewCheckTimeout = 10 * time.Minute
 	crewCheckOutput  = 3000
-	// A file's diff in the preview keeps this many lines; the whole preview keeps diffs up to this many characters.
 	crewPatchLines   = 400
 	crewPatchesMax   = 400_000
 	crewCloneTimeout = 3 * time.Minute
 )
 
-// crewProjectName is a folder name a project can have: one plain name, no paths (protocol's PROJECT_NAME).
 var crewProjectName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`)
 
 var crewGithubURL = regexp.MustCompile(`^https://github\.com/([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+)/?$`)
 
-// crewGithubRepository is a public repository's home URL as the URL to clone, and the repository's name; only
-// repository home URLs, never credentials, arbitrary git transports or command-line options (protocol's
-// githubRepository). ok false when it is not one.
+// Only repository home URLs: never credentials, other git transports or command-line options.
 func crewGithubRepository(input string) (name, url string, ok bool) {
 	m := crewGithubURL.FindStringSubmatch(base.Trim(input))
 	if m == nil {
@@ -63,7 +48,6 @@ func crewGithubRepository(input string) (name, url string, ok bool) {
 	return name, "https://github.com/" + m[1] + "/" + name + ".git", true
 }
 
-// crewProjectProblem is what is wrong with a new project's request; "" when nothing (protocol's projectProblem).
 func crewProjectProblem(req protocol.NewProject) string {
 	if !crewProjectName.MatchString(req.Name) {
 		return "项目名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符"
@@ -83,7 +67,6 @@ const crewGitignore = "node_modules/\ndist/\nbuild/\n.env\n.env.*\n!.env.example
 // and installed packages a run leaves behind (pathspecs for git add).
 var crewNeverCommitted = []string{":(exclude,glob)**/__pycache__/**", ":(exclude,glob)**/*.pyc", ":(exclude,glob)**/.pytest_cache/**", ":(exclude,glob)**/node_modules/**", ":(exclude,glob)**/.DS_Store"}
 
-// crewGitError is git failing: its exit code and what it said.
 type crewGitError struct {
 	Code   int
 	Stderr string
@@ -97,7 +80,6 @@ func (e *crewGitError) Error() string {
 	return e.Err.Error()
 }
 
-// crewGitRun runs git in cwd: its output, and its exit code; err only when git could not run at all.
 func crewGitRun(ctx context.Context, cwd string, args ...string) (stdout string, code int, err error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = cwd
@@ -114,7 +96,6 @@ func crewGitRun(ctx context.Context, cwd string, args ...string) (stdout string,
 	return out.String(), 0, nil
 }
 
-// crewGit runs git; its trimmed output, or an error with git's own message.
 func crewGit(cwd string, args ...string) (string, error) {
 	out, _, err := crewGitRun(context.Background(), cwd, args...)
 	return strings.TrimSpace(out), err
@@ -125,7 +106,7 @@ func crewGitOk(cwd string, args ...string) bool {
 	return err == nil
 }
 
-// crewCommit commits as the machine's git user, or as vibevalley when there is none configured.
+// As vibevalley when the machine has no git user.
 func crewCommit(cwd, message string) error {
 	if _, err := crewGit(cwd, "commit", "-q", "-m", message); err == nil {
 		return nil
@@ -134,7 +115,6 @@ func crewCommit(cwd, message string) error {
 	return err
 }
 
-// crewMergeCommit is a merge commit of ours and theirs whose tree merge-tree worked out, made without a checkout.
 func crewMergeCommit(path, ours, theirs, message string) (string, error) {
 	out, err := crewGit(path, "merge-tree", "--write-tree", "--no-messages", ours, theirs)
 	if err != nil {
@@ -148,7 +128,6 @@ func crewMergeCommit(path, ours, theirs, message string) (string, error) {
 	return crewGit(path, append([]string{"-c", "user.name=vibevalley", "-c", "user.email=vibevalley@localhost"}, args...)...)
 }
 
-// crewConflictsOf is the files that would conflict merging branch into base, worked out without touching a checkout.
 func crewConflictsOf(path, baseBranch, branch string) ([]string, error) {
 	out, code, err := crewGitRun(context.Background(), path, "merge-tree", "--write-tree", "--name-only", "--no-messages", baseBranch, branch)
 	if code == 0 && err == nil {
@@ -170,7 +149,6 @@ func crewConflictsOf(path, baseBranch, branch string) ([]string, error) {
 	return files, nil
 }
 
-// crewReason is an error's first meaningful line, for the person.
 func crewReason(err error) string {
 	for _, line := range strings.Split(err.Error(), "\n") {
 		if strings.TrimSpace(line) != "" {
@@ -183,8 +161,7 @@ func crewReason(err error) string {
 type Projects struct {
 	root  string
 	trees string
-	// perProject is how many helpers may work in one project at once ($VIBEVALLEY_MAX_PER_PROJECT, 3): more than a few
-	// start changing the same files. 0: no limit of its own.
+	// More than a few helpers in one project start changing the same files.
 	perProject int
 
 	mu      sync.Mutex
@@ -206,11 +183,8 @@ func newProjects(cfg base.Config) (*Projects, error) {
 	}, nil
 }
 
-// Limit is how many helpers may work in one project at once; 0 when a project has no limit of its own.
 func (p *Projects) Limit() int { return p.perProject }
 
-// Slots is how many helpers may work in one project at once: its limit, or the farm's beds when there is none or it is
-// higher.
 func (p *Projects) Slots() int64 {
 	if p.perProject <= 0 || p.perProject > protocol.MaxRunning {
 		return protocol.MaxRunning
@@ -223,8 +197,7 @@ func (*Projects) OnStop()                       {}
 
 func (p *Projects) Root() string { return p.root }
 
-// serially runs one change to a project's repository at a time: two helpers sent to a new project at once must not
-// both run git init, and two harvests must not merge into the same branch together.
+// Two helpers sent to a new project at once must not both run git init, and two harvests must not merge into the same branch together.
 func (p *Projects) serially(project string) func() {
 	p.mu.Lock()
 	q, ok := p.queues[project]
@@ -237,7 +210,6 @@ func (p *Projects) serially(project string) func() {
 	return q.Unlock
 }
 
-// ensure is the project's folder as a repository with at least one commit.
 func (p *Projects) ensure(name string) (string, error) {
 	if !crewProjectName.MatchString(name) {
 		return "", fmt.Errorf("「%s」不能当项目名：用一个简单的英文文件夹名，比如 clock-in", name)
@@ -283,7 +255,6 @@ func (p *Projects) ensure(name string) (string, error) {
 	return path, nil
 }
 
-// Create makes a project: a new folder with a first commit, or a clone of a public GitHub repository.
 func (p *Projects) Create(req protocol.NewProject) (base.Project, error) {
 	defer p.serially(req.Name)()
 	if problem := crewProjectProblem(req); problem != "" {
@@ -325,7 +296,6 @@ func (p *Projects) Create(req protocol.NewProject) (base.Project, error) {
 	return base.Project{Name: req.Name, Path: path, Git: true}, nil
 }
 
-// List is the projects: every folder under the work directory but the hidden ones and those being made.
 func (p *Projects) List() []base.Project {
 	entries, err := os.ReadDir(p.root)
 	if err != nil {
@@ -352,7 +322,6 @@ func (p *Projects) List() []base.Project {
 	return out
 }
 
-// Workplace is a place for one helper in a project, making the project (folder, repository, first commit) if needed.
 func (p *Projects) Workplace(project, helper string, worktree bool, baseBranch string) (base.Workplace, error) {
 	defer p.serially(project)()
 	path, err := p.ensure(project)
@@ -377,8 +346,6 @@ func (p *Projects) Workplace(project, helper string, worktree bool, baseBranch s
 	return base.Workplace{Project: project, Cwd: cwd, Branch: branch}, nil
 }
 
-// describe is what merging the place's branch into the main branch would bring in; cwd is where uncommitted work
-// would be ("" for a branch with no worktree).
 func (p *Projects) describe(project, cwd, branch string) (protocol.Changes, error) {
 	path := filepath.Join(p.root, project)
 	baseBranch, err := crewGit(path, "symbolic-ref", "--short", "HEAD")
@@ -444,7 +411,6 @@ func (p *Projects) describe(project, cwd, branch string) (protocol.Changes, erro
 		}
 		counts[strings.Join(parts[2:], "\t")] = n
 	}
-	// The whole diff, cut at each file's header, then matched to its path.
 	var chunks []string
 	if patch != "" {
 		for i, c := range strings.Split(patch, "\ndiff --git ") {
@@ -505,13 +471,12 @@ func (p *Projects) describe(project, cwd, branch string) (protocol.Changes, erro
 	return changes, nil
 }
 
-// Changes is what harvesting would bring in, and whether it merges cleanly. Changes nothing.
+// Read-only.
 func (p *Projects) Changes(place base.Workplace) (protocol.Changes, error) {
 	return p.describe(place.Project, place.Cwd, place.Branch)
 }
 
-// ChangedFiles is what the work in cwd changed since it branched off base: committed or not, new files too, a
-// renamed file under both its names.
+// A renamed file counts under both its names.
 func (p *Projects) ChangedFiles(cwd, baseBranch string) ([]string, error) {
 	fork, err := crewGit(cwd, "merge-base", baseBranch, "HEAD")
 	if err != nil {
@@ -535,13 +500,10 @@ func (p *Projects) ChangedFiles(cwd, baseBranch string) ([]string, error) {
 	return out, nil
 }
 
-// BranchChanges is what merging branch (a playbook's, with no worktree) into the main branch would bring in.
 func (p *Projects) BranchChanges(project, branch string) (protocol.Changes, error) {
 	return p.describe(project, "", branch)
 }
 
-// Conflict is whether its branch would conflict with base (the main branch when "") now; nil when it merges
-// cleanly (or cannot tell).
 func (p *Projects) Conflict(place base.Workplace, baseBranch string) *protocol.Conflict {
 	if place.Branch == "" {
 		return nil
@@ -560,7 +522,6 @@ func (p *Projects) Conflict(place base.Workplace, baseBranch string) *protocol.C
 	return &protocol.Conflict{Base: baseBranch, Files: files}
 }
 
-// commitLeft commits what a helper did not: it is still its work.
 func crewCommitLeft(cwd, message string) error {
 	if status, _ := crewGit(cwd, "status", "--porcelain"); status == "" {
 		return nil
@@ -568,7 +529,6 @@ func crewCommitLeft(cwd, message string) error {
 	if _, err := crewGit(cwd, append([]string{"add", "-A", "--", "."}, crewNeverCommitted...)...); err != nil {
 		return err
 	}
-	// Only caches were left: nothing to commit.
 	if staged, _ := crewGit(cwd, "diff", "--cached", "--name-only"); staged == "" {
 		return nil
 	}
@@ -583,7 +543,6 @@ func crewFailed(err error) error {
 	return base.HarvestFailure{Kind: "error", Reason: crewReason(err)}
 }
 
-// mergeMain merges branch into the main branch checked out in path, when it has commits the main branch lacks.
 func (p *Projects) mergeMain(path, branch, kept string) (main string, ahead int64, err error) {
 	main, err = crewGit(path, "symbolic-ref", "--short", "HEAD")
 	if err != nil {
@@ -611,8 +570,6 @@ func (p *Projects) mergeMain(path, branch, kept string) (main string, ahead int6
 	return main, ahead, nil
 }
 
-// Harvest takes a helper's work in: commits what it left, merges its branch into the main branch, removes its
-// worktree and branch. A HarvestFailure when it cannot.
 func (p *Projects) Harvest(place base.Workplace) (base.Harvested, error) {
 	defer p.serially(place.Project)()
 	if place.Branch == "" {
@@ -639,7 +596,6 @@ func (p *Projects) Harvest(place base.Workplace) (base.Harvested, error) {
 	return base.Harvested{Text: "这一单没有新的提交"}, nil
 }
 
-// Release clears a helper's worktree away and keeps its branch, so nothing it did is lost: what was kept, in words.
 func (p *Projects) Release(place base.Workplace) string {
 	defer p.serially(place.Project)()
 	if place.Branch == "" {
@@ -666,7 +622,6 @@ func (p *Projects) Release(place base.Workplace) string {
 	return fmt.Sprintf("%s 上有 %d 个没合的提交，分支留着，worktree 清掉了", place.Branch, ahead)
 }
 
-// OpenBranch makes a new branch at the main branch's tip: a playbook's.
 func (p *Projects) OpenBranch(project, branch string) error {
 	defer p.serially(project)()
 	path, err := p.ensure(project)
@@ -679,8 +634,6 @@ func (p *Projects) OpenBranch(project, branch string) error {
 	return nil
 }
 
-// MergeInto merges the helper's branch into target, a branch checked out nowhere (a playbook's), then removes its
-// worktree and branch: the short hashes it brought, oldest first. A merge that would conflict is not tried.
 func (p *Projects) MergeInto(place base.Workplace, target string) ([]string, error) {
 	defer p.serially(place.Project)()
 	path := filepath.Join(p.root, place.Project)
@@ -711,7 +664,6 @@ func (p *Projects) MergeInto(place base.Workplace, target string) ([]string, err
 		if err != nil {
 			return nil, crewFailed(err)
 		}
-		// Nothing new on the target since the step branched off: it simply moves up.
 		next := theirs
 		if !crewGitOk(path, "merge-base", "--is-ancestor", ours, theirs) {
 			if next, err = crewMergeCommit(path, ours, theirs, "合并 "+place.Branch); err != nil {
@@ -732,7 +684,6 @@ func (p *Projects) MergeInto(place base.Workplace, target string) ([]string, err
 	return brought, nil
 }
 
-// HarvestBranch merges branch (a playbook's) into the main branch and deletes it.
 func (p *Projects) HarvestBranch(project, branch string) (string, error) {
 	defer p.serially(project)()
 	path := filepath.Join(p.root, project)
@@ -749,7 +700,6 @@ func (p *Projects) HarvestBranch(project, branch string) (string, error) {
 	return "计划分支上没有新的提交", nil
 }
 
-// Run runs command in a shell in cwd: whether it passed, and the end of what it printed.
 func (p *Projects) Run(ctx context.Context, cwd, command string) (bool, string) {
 	ctx, cancel := context.WithTimeout(ctx, crewCheckTimeout)
 	defer cancel()
@@ -765,7 +715,6 @@ func (p *Projects) Run(ctx context.Context, cwd, command string) (bool, string) 
 	return err == nil, output
 }
 
-// HouseRules is the house rules every helper gets: <root>/AGENTS.md, or empty.
 func (p *Projects) HouseRules() string {
 	body, err := os.ReadFile(filepath.Join(p.root, "AGENTS.md"))
 	if err != nil {

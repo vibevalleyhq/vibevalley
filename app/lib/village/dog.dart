@@ -1,19 +1,9 @@
-// The dog by the manager's door, as the page draws it (web/src/pixel/dog.ts; it is not the farm's state). It sleeps
-// most of the day and stirs now and then (lifts its head and yawns, or gets up to stretch and scratch); it sits up
-// with you while the farm is open or the voice is live, and keeps busy there (a wag, a scratch, a yawn, a lie-down, a
-// look around). It answers you: pointed at, it lifts its head (awake, it wags); pressed, it ducks; patted, it wakes,
-// and every pat after that gets its next trick: a wag, a bark, a jump, rolling over for a belly rub. Three quick pats
-// and it rolls over at once. A while after the last pat (with the farm closed) it yawns and lies down again.
-
 import 'dart:math' as math;
 
 import 'life.dart' show Cadence;
 
-/// What a pat gets.
 enum Trick { wake, wag, bark, jump, belly }
 
-/// What it shows: a picture ('dog-…'), how far off the ground (a jump), how much taller with its feet put (a breath, a
-/// duck).
 typedef DogLook = ({String picture, double lift, double grow});
 
 enum _Act { wake, wag, bark, jump, belly, stir, stretch, scratch, settle, yawn, rest, look }
@@ -22,10 +12,8 @@ typedef _Frame = ({String picture, double s, double lift, double grow});
 
 _Frame _f(String picture, double s, {double lift = 0, double grow = 0}) => (picture: 'dog-$picture', s: s, lift: lift, grow: grow);
 
-/// The tail going side to side for about `s` seconds.
 List<_Frame> _wagging(double s) => [for (var i = 0; i < (s / 0.12).round(); i++) _f(i.isOdd ? 'wag-2' : 'wag-1', 0.12)];
 
-/// A hind leg at an ear: it jiggles.
 List<_Frame> _scratching(double s) => [for (var i = 0; i < (s / 0.08).round(); i++) _f('scratch', 0.08, grow: i.isOdd ? -1 : 0)];
 
 final _acts = <_Act, List<_Frame>>{
@@ -48,7 +36,6 @@ final _acts = <_Act, List<_Frame>>{
   _Act.look: [_f('stand', 2.4)],
 };
 
-/// What it does now and then while it sits up, and how often each, of every ten.
 const _sitting = [(_Act.wag, 4), (_Act.scratch, 2), (_Act.yawn, 1), (_Act.rest, 2), (_Act.look, 1)];
 
 _Act _pickSitting(double r) {
@@ -60,10 +47,9 @@ _Act _pickSitting(double r) {
   return _Act.wag;
 }
 
-/// The tricks a pat gets, in turn, once it is awake.
 const _tricks = [Trick.wag, Trick.bark, Trick.jump, Trick.belly];
 
-/// How long it stays up after a pat, seconds; pats this close together count as quick ones, this many and it rolls over.
+/// Pats this close together count as quick ones; this many and it rolls over.
 const _awakeS = 7.0;
 const _quickS = 2.5;
 const _quickPats = 3;
@@ -82,7 +68,6 @@ class VillageDog {
   final Cadence _every;
   (_Act, double)? _act;
 
-  /// Sitting up: after a pat or with you on a call, until it settles again.
   bool _up = false;
   double _upUntil = double.negativeInfinity;
   bool _pointed = false;
@@ -101,8 +86,7 @@ class VillageDog {
 
   DogLook _show(String picture, [double lift = 0, double grow = 0]) => (picture: picture, lift: lift, grow: _pressed ? -1 : grow);
 
-  /// What it shows at `t` seconds (the village's clock). `listening`: the farm is open (its call is live) or the voice
-  /// is, so it sits up.
+  /// `listening`: the farm is open (its call is live) or the voice is, so it sits up.
   DogLook look(double t, bool listening) {
     final act = _act;
     if (act != null) {
@@ -113,7 +97,6 @@ class VillageDog {
     if (listening || t < _upUntil) {
       _up = true;
       if (_every.due('awake', 6, t)) _act = (_pickSitting(_random.nextDouble()), t);
-      // Pointed at, it is pleased you are there.
       return _pointed ? _show(t % 0.24 < 0.12 ? 'dog-wag-1' : 'dog-wag-2') : _show('dog-awake');
     }
     if (_up) {
@@ -122,11 +105,9 @@ class VillageDog {
       return _show('dog-yawn');
     }
     if (_every.due('stir', 40, t)) _act = (_random.nextDouble() < 0.6 ? _Act.stir : _Act.stretch, t);
-    // Pointed at, it lifts its head; asleep, it breathes.
     return _pointed ? _show('dog-lie') : _show('dog-sleep', 0, ((t / 1.6).floor() % 2).toDouble());
   }
 
-  /// A pat at `t`: what it does about it.
   Trick pet(double t) {
     _pats.add(t);
     while (_pats.isNotEmpty && t - _pats.first > _quickS) {
@@ -141,9 +122,7 @@ class VillageDog {
     return trick;
   }
 
-  /// The pointer or the keyboard is on it, or not.
   void point(bool on) => _pointed = on;
 
-  /// Pressed, it ducks until let go.
   void press(bool on) => _pressed = on;
 }

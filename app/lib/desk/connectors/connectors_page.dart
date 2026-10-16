@@ -1,8 +1,3 @@
-// 连接器 (web/src/pages/ConnectorsPage.tsx): doors into the farm from chat apps. WeChat and Feishu log in by scanning a
-// code with the phone; QQ takes its bot's AppID and AppSecret. Feishu and QQ then show a pairing code: whoever sends it
-// to the bot is the owner, the only one heard. What the owner sends is said in its channel (田头 unless moved); what
-// the farm says to them goes back. The page asks the server every 1.5 s while it is open: a login waits for the scan.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -18,13 +13,10 @@ import '../shared/widgets.dart';
 import '../shared/state.dart';
 import '../../rules/chat.dart';
 
-/// protocol CONNECTOR_LABEL.
 const connectorLabel = <ConnectorId, String>{ConnectorId.weixin: '微信', ConnectorId.feishu: '飞书', ConnectorId.qq: 'QQ'};
 
-/// How each logs in, under its name in the list.
 const _how = <ConnectorId, String>{ConnectorId.weixin: '扫码登录，私聊机器人', ConnectorId.feishu: '扫码自动建机器人', ConnectorId.qq: '填 QQ 机器人的 AppID'};
 
-/// What to know about each, under its card.
 const _notes = <ConnectorId, List<String>>{
   ConnectorId.weixin: [
     '只认扫码的那个微信：别人给这个机器人发的话进不了农场。',
@@ -49,10 +41,8 @@ String stateLabel(ConnectorState s) => switch (s) {
   ConnectorState.paused => '暂停中',
 };
 
-/// How often the page asks while it is open.
 const pollEvery = Duration(milliseconds: 1500);
 
-/// Each connector's state as the server last told it; null before the first answer (packages/core connectors.ts).
 final connectorsProvider = NotifierProvider<ConnectorsNotifier, Map<ConnectorId, ConnectorStatus>?>(ConnectorsNotifier.new);
 
 class ConnectorsNotifier extends Notifier<Map<ConnectorId, ConnectorStatus>?> {
@@ -63,7 +53,7 @@ class ConnectorsNotifier extends Notifier<Map<ConnectorId, ConnectorStatus>?> {
 
   void _keep(Iterable<ConnectorStatus> got) => state = {...?state, for (final s in got) s.id: s};
 
-  /// Asks how every connector is doing; a failure is left for the next poll.
+  /// A failure is left for the next poll.
   Future<void> refresh() async {
     try {
       _keep(await _api.list());
@@ -89,7 +79,6 @@ class ConnectorsNotifier extends Notifier<Map<ConnectorId, ConnectorStatus>?> {
     }
   }
 
-  /// Connects it to a channel, by name; throws why not.
   Future<void> setChannel(ConnectorId id, String channel) async => _keep([
     await _api.channel(
       id: id,
@@ -314,7 +303,6 @@ class _Row extends StatelessWidget {
   );
 }
 
-/// Which channel the owner's words go into, and whose words come back out.
 class _ChannelPick extends ConsumerStatefulWidget {
   const _ChannelPick({required this.id, required this.current});
   final ConnectorId id;
@@ -441,7 +429,6 @@ class _QqLoginState extends State<_QqLogin> {
   }
 }
 
-/// The login code, drawn here from what it encodes; and the number box when WeChat asks for it.
 class _LoginCode extends StatefulWidget {
   const _LoginCode({required this.status, required this.busy, required this.app, required this.onRefresh, required this.onVerify});
   final ConnectorStatus status;

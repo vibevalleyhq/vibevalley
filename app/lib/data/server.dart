@@ -1,8 +1,3 @@
-// The vibevalley server (server), as the Flutter client sees it: the folded core state from GET /api/site/state, and
-// the commands of VibeValleyApi through the generated client (gen/vibevalley.dart), and what happens beside the state from
-// GET /api/site/events (steps, notices, runtimes). The client never folds facts itself:
-// the server folds them and sends the whole state again when it changes (at most every 200 ms).
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -11,7 +6,6 @@ import 'package:http/http.dart' as http;
 
 import '../gen/vibevalley.dart';
 
-/// One frame off the stream (the folded state, its view, the effects since the last one), with what it cost to receive.
 class StateFrame {
   StateFrame(this.frame, {required this.bytes, required this.decodeMicros});
   final SiteFrame frame;
@@ -24,33 +18,29 @@ class StateFrame {
 class VibeValleyServer {
   VibeValleyServer(this.base, {this.key}) : api = VibeValleyApi(base, key == null ? null : _Keyed(key));
 
-  /// http://127.0.0.1:8787 by default: the server listens on loopback; another machine's farm through its yard gate.
+  /// The server listens on loopback; another machine's farm comes through its yard gate.
   final Uri base;
 
-  /// This device's key for another machine's yard gate (protocol LanPaired), sent with every request; null on loopback.
+  /// null on loopback.
   final String? key;
 
   bool _closed = false;
   HttpClient? _streaming;
 
-  /// Stops the streams and the commands' client: the app moved to another farm.
   void close() {
     _closed = true;
     _streaming?.close(force: true);
     api.close();
   }
 
-  /// Every command: `server.api.farm.say(body: SayRequest(text: …))`.
   final VibeValleyApi api;
 
-  /// Why the state stream is not coming through, each time an attempt fails for a reason other than "not up".
+  /// Each time an attempt fails for a reason other than "not up".
   final problems = StreamController<String>.broadcast();
 
-  /// The frames, one connection for every listener: the latest state, its view and the effects as they come.
   late final Stream<StateFrame> frames = states().asBroadcastStream();
 
-  /// What happens beside the core state, as it comes: a helper's steps (its detail panel), notices, runtimes' changes.
-  /// Facts are left out: the state stream already brings them folded.
+  /// Facts are left out: the state stream already brings them, folded.
   late final Stream<SiteEvent> sideEvents = _events().where((e) => e is! Fact && e is! SiteEventSnapshot).asBroadcastStream();
 
   Stream<SiteEvent> _events() async* {
@@ -63,7 +53,7 @@ class VibeValleyServer {
     }
   }
 
-  /// The folded state, again on every change; reconnects (and so starts from a fresh state) when the line drops.
+  /// Reconnects, and so starts from a fresh state, when the line drops.
   Stream<StateFrame> states() async* {
     await for (final text in _sse('/api/site/state')) {
       final watch = Stopwatch()..start();
@@ -72,7 +62,6 @@ class VibeValleyServer {
     }
   }
 
-  /// A server-sent event stream's data, one string per event; reconnects when the line drops.
   Stream<String> _sse(String path) async* {
     while (!_closed) {
       final client = _streaming = HttpClient();
@@ -116,10 +105,8 @@ class VibeValleyServer {
   }
 }
 
-/// What the farm says to a key it does not know (channels/lan.go), as the client says it.
 const keyRefused = '那台电脑不认这台设备了：回那台电脑上打开院门，重新扫码配对';
 
-/// Every command with this device's key on it.
 class _Keyed extends http.BaseClient {
   _Keyed(this.key);
   final String key;

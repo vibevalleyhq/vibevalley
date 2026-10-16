@@ -20,8 +20,6 @@ enum CallPhase { idle, connecting, live, ending }
 
 class VoiceCall extends ChangeNotifier {
   VoiceCall(this.server, {this.agentPick}) {
-    // What you say is work for the farm, as on the web page (core voice.ts): each finished sentence goes to the manager
-    // through /api/dispatch; the voice agent does the talking.
     captions.onHeard = (text) => server.api.farm
         .dispatch(
           body: SayRequest(text: text, agent: agentPick?.call()),
@@ -31,21 +29,17 @@ class VoiceCall extends ChangeNotifier {
 
   final VibeValleyServer server;
 
-  /// The agent the friends bar picked for new jobs; null: the manager's pick.
   final String? Function()? agentPick;
   CallPhase phase = CallPhase.idle;
   bool muted = false;
   bool agentHere = false;
   final captions = LiveCaptions();
 
-  /// The agent's own state (message.state): listening, thinking, speaking, silent, idle.
   String? get agentState => captions.agentState;
   String? problem;
 
-  /// From pressing 开工 to the agent joining the channel: the number to compare with the web client.
   Duration? connectTime;
 
-  // What reaches us, to tell a silent call apart from captions that do not decode.
   int packets = 0;
   int messages = 0;
   int micLevel = 0;
@@ -119,7 +113,6 @@ class VoiceCall extends ChangeNotifier {
             final was = captions.agentState;
             if (captions.feed(text)) messages++;
             if (captions.agentState != was) _note('agent: ${captions.agentState}');
-            // Every 20th packet: how many came and how many decoded, to tell silence from captions that do not decode.
             if (packets == 1 || packets % 20 == 0) _note('stream: $packets packets from $remoteUid/$streamId, $messages messages');
             notifyListeners();
           },
@@ -132,7 +125,7 @@ class VoiceCall extends ChangeNotifier {
           onJoinChannelSuccess: (connection, elapsed) => _note('rtc: joined ${connection.channelId} as ${connection.localUid} in $elapsed ms'),
           onConnectionStateChanged: (_, state, reason) => _note('rtc: connection $state ($reason)'),
           onLocalAudioStateChanged: (_, state, reason) => _note('rtc: microphone $state ($reason)'),
-          // The token lasts an hour: a fresh one for the same channel and uid before it runs out (agora.ts renewToken).
+          // The token lasts an hour: a fresh one for the same channel and uid before it runs out.
           onTokenPrivilegeWillExpire: (connection, _) async {
             try {
               final fresh = await server.api.voice.renew(
@@ -185,7 +178,7 @@ class VoiceCall extends ChangeNotifier {
         await engine.setParameters(p);
       }
       await engine.enableAudioVolumeIndication(interval: 300, smooth: 3, reportVad: true);
-      // Joined with the number the uid string holds, as the web client does (rtc.join(…, Number(uid))): the agent
+      // Joined with the number the uid string holds: the agent
       // listens to that uid only, and a user account would be given another number, so the agent never hears us.
       await engine.joinChannel(
         token: session.token,

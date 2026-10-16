@@ -1,7 +1,5 @@
-// Package feishu is Feishu (and Lark) for a bot: logging in by Feishu's scan-to-create flow, where the user scans a
-// code with the Feishu app and Feishu creates a personal bot app for them, handing back its app id and secret (the
-// device-code flow nanobot uses: accounts.feishu.cn/oauth/v1/app/registration); messages over the official SDK's
-// long connection, outbound only; replies through the message API to a user's open_id.
+// Package feishu logs in by Feishu's scan-to-create flow: Feishu creates a personal bot app for the user and hands back its app id and secret (the
+// device-code flow nanobot uses: accounts.feishu.cn/oauth/v1/app/registration).
 package feishu
 
 import (
@@ -29,13 +27,11 @@ type Domain = string // feishu, lark
 
 type Registration struct {
 	DeviceCode string
-	// URL is what the code encodes: opening it on a phone creates the app.
-	URL      string
-	Interval time.Duration
-	Expires  time.Duration
+	URL        string
+	Interval   time.Duration
+	Expires    time.Duration
 }
 
-// RegistrationPoll is a registration's state: pending (with the domain it is on), failed (Reason) or succeeded.
 type RegistrationPoll struct {
 	Status    string // pending, failed, succeeded
 	Domain    Domain
@@ -46,12 +42,11 @@ type RegistrationPoll struct {
 }
 
 type Message struct {
-	MessageID string
-	From      string
-	// ChatType is p2p for a direct chat.
+	MessageID   string
+	From        string
 	ChatType    string
 	MessageType string
-	// Content is the message's content, as Feishu sends it: JSON.
+	// JSON, as Feishu sends it.
 	Content  string
 	ParentID string
 }
@@ -62,17 +57,14 @@ type App struct {
 	Domain    Domain
 }
 
-// API is Feishu's side; tests talk to a scripted one.
 type API interface {
 	Register(ctx context.Context) (Registration, error)
 	Poll(ctx context.Context, deviceCode string, domain Domain) RegistrationPoll
-	// Listen opens the long connection and hands each message to got until it fails, or ctx ends (nil then).
 	Listen(ctx context.Context, app App, got func(Message)) error
 	SendText(ctx context.Context, app App, openID, text string) (string, error)
 }
 
 type Client struct {
-	// accounts and open are each domain's registration and API hosts.
 	accounts map[Domain]string
 	open     map[Domain]string
 	http     *http.Client
@@ -86,7 +78,7 @@ func NewClient() *Client {
 	}
 }
 
-// form posts to the registration endpoint, which answers JSON even with an error status (a pending poll is a 400).
+// The endpoint answers JSON even with an error status (a pending poll is a 400).
 func (l *Client) form(ctx context.Context, domain Domain, body url.Values) (map[string]any, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -238,7 +230,6 @@ func (l *Client) SendText(ctx context.Context, app App, openID, text string) (st
 	return "", nil
 }
 
-// Text is what a Feishu message says, as text: its words, anything else as a bracketed word.
 func Text(m Message) string {
 	if m.MessageType != "text" {
 		switch m.MessageType {

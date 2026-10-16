@@ -1,6 +1,3 @@
-// 推箱子 on the farm phone (web/src/phone/Sokoban.tsx). The warehouse is kept while the phone is away or a call
-// comes in.
-
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
@@ -141,7 +138,6 @@ class _Key extends StatelessWidget {
   );
 }
 
-/// The board as the web page's SVG draws it: 16 units a tile, scaled to the box.
 class _WarehousePainter extends CustomPainter {
   _WarehousePainter(this.g);
   final WarehouseGame g;

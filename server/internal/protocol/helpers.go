@@ -1,9 +1,6 @@
 package protocol
 
-// The protocol's small helpers (packages/protocol/src/index.ts): what work cost, in words; what a helper is told
-// about a conflict; what is left on a runtime's account; why nobody new goes to a runtime; what is wrong with an
-// agent. Also the JavaScript string and number semantics the ported rules measure by (UTF-16 lengths, JS
-// whitespace, Number#toString and toFixed), so their text is the TypeScript's to the character.
+// The JavaScript string and number semantics here are what the golden data holds the rules to.
 
 import (
 	"fmt"
@@ -15,8 +12,6 @@ import (
 	"time"
 	"unicode/utf16"
 )
-
-// ── JavaScript semantics ─────────────────────────────────────────────────────
 
 // coreSpaceClass is JavaScript's \s (WhiteSpace and LineTerminator), as the inside of a Go regexp class; Go's \s is
 // ASCII only and has no \v.
@@ -154,9 +149,6 @@ func coreFixed(x float64, digits int) string {
 	return sign + text[:len(text)-digits] + "." + text[len(text)-digits:]
 }
 
-// ── What work cost ───────────────────────────────────────────────────────────
-
-// wan is a token count in words: 2.6 万, 12 万, 950.
 func wan(n int64) string {
 	if n >= 10_000 {
 		digits := 1
@@ -168,7 +160,6 @@ func wan(n int64) string {
 	return strconv.FormatInt(n, 10)
 }
 
-// Yuan is the money, near enough: ¥0.03, or under ¥0.01 for a few tokens' worth.
 func Yuan(cny float64) string {
 	if cny > 0 && cny < 0.01 {
 		return "不到 ¥0.01"
@@ -176,7 +167,6 @@ func Yuan(cny float64) string {
 	return "¥" + coreFixed(cny, 2)
 }
 
-// SpentText is what it cost, in a few words: 约 ¥0.03 · 2.6 万 token.
 func SpentText(spent Spent) string {
 	tokens := wan(spent.Tokens) + " token"
 	if spent.CNY != nil {
@@ -185,15 +175,11 @@ func SpentText(spent Spent) string {
 	return tokens
 }
 
-// ConflictTask is what a helper is told when its branch conflicts with the project's main branch.
 func ConflictTask(base string, files []string) string {
 	return fmt.Sprintf("把 %s 合进你的分支时有冲突（%s）。请在你的分支上运行 git merge %s，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。", base, strings.Join(files, "、"), base)
 }
 
-// ── What is left on a runtime's account ──────────────────────────────────────
-
-// QuotaLeft is the tightest window's remaining percent, 0..100; false when the usage (a nil Value: null) has no
-// percentages.
+// A nil Value is null: no percentages.
 func QuotaLeft(usage AccountUsage) (float64, bool) {
 	ok, isOk := usage.Value.(AccountUsageOk)
 	if !isOk || len(ok.Windows) == 0 {
@@ -206,7 +192,6 @@ func QuotaLeft(usage AccountUsage) (float64, bool) {
 	return math.Max(0, least), true
 }
 
-// QuotaLow is how much left is too little: below it the farm warns and the manager sends someone else if it can.
 const QuotaLow = 15
 
 func coreMoney(b Balance) string {
@@ -220,8 +205,6 @@ func coreMoney(b Balance) string {
 	return symbol + coreFixed(b.Amount, 2)
 }
 
-// QuotaText is what is left, in a few words (a nil Value: the runtime does not report it): for the manager and for
-// tooltips.
 func QuotaText(usage AccountUsage) string {
 	switch u := usage.Value.(type) {
 	case nil:
@@ -259,14 +242,11 @@ func QuotaText(usage AccountUsage) string {
 	return ""
 }
 
-// whenText is a moment ahead, in the machine's local time (time.Local): 10 月 14 日 08:00.
 func whenText(at int64) string {
 	d := time.UnixMilli(at).In(time.Local)
 	return fmt.Sprintf("%d 月 %d 日 %02d:%02d", int(d.Month()), d.Day(), d.Hour(), d.Minute())
 }
 
-// MoneyStop is why nobody new should be sent to this runtime for its account: the balance ran out, today's budget
-// did, or one of its plan's usage windows is used up. Empty when nothing stops it.
 func MoneyStop(info *RuntimeInfo) string {
 	if info == nil {
 		return ""
@@ -309,18 +289,13 @@ func MoneyStop(info *RuntimeInfo) string {
 	return ""
 }
 
-// ── What is wrong with an agent ──────────────────────────────────────────────
-
-// AgentIssue is one thing that would go wrong opening a session with an agent. Field: runtime, persona, effort,
-// env, mcpServers, disallowedTools or model; Level: error (blocks dispatch) or warn.
 type AgentIssue struct {
 	Field string `json:"field"`
 	Level string `json:"level"`
 	Text  string `json:"text"`
 }
 
-// AgentIssues is what would go wrong opening a session with this agent on runtime (nil: one vibevalley does not know).
-// Errors block dispatch; warnings don't. Mirrors the checks oar makes when a session opens.
+// Mirrors the checks oar makes when a session opens.
 func AgentIssues(agent AgentProfile, runtime *RuntimeInfo) []AgentIssue {
 	issues := []AgentIssue{}
 	add := func(field, level, text string) {

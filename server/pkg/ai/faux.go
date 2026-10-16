@@ -1,8 +1,6 @@
 package ai
 
-// A provider that answers from a script, for tests: each request takes the next step, a message or a function of
-// the request. The message is said piece by piece through the same events a real provider gives, optionally slowly
-// (Delay between events) so a test can stop it halfway. Named as pi-ai's faux provider.
+// Named as pi-ai's faux provider. Delay lets a test stop an answer halfway.
 
 import (
 	"context"
@@ -20,8 +18,7 @@ func FauxThinking(thinking string) Content { return NewThinking(thinking) }
 
 var fauxCalls atomic.Int64
 
-// FauxToolCall is a tool call to script. arguments is JSON text (string, []byte, json.RawMessage), kept in its
-// order, or a value to marshal; id "" makes one up.
+// arguments is JSON text (string, []byte, json.RawMessage), kept in its order, or a value to marshal; id "" makes one up.
 func FauxToolCall(name string, arguments any, id string) Content {
 	if id == "" {
 		id = fmt.Sprintf("faux_call_%d", fauxCalls.Add(1))
@@ -45,13 +42,11 @@ func FauxToolCall(name string, arguments any, id string) Content {
 	return NewToolCall(id, name, raw)
 }
 
-// FauxOptions is how a scripted answer ends: StopReason error or aborted ends it so, with ErrorMessage.
 type FauxOptions struct {
 	StopReason   StopReason
 	ErrorMessage string
 }
 
-// FauxAssistantMessage is an answer to script: words (a string), a block, or blocks.
 func FauxAssistantMessage(content any, options ...FauxOptions) AssistantMessage {
 	var blocks []Content
 	switch c := content.(type) {
@@ -83,17 +78,14 @@ func FauxAssistantMessage(content any, options ...FauxOptions) AssistantMessage 
 	}
 }
 
-// FauxProviderState is what the script was asked.
 type FauxProviderState struct {
 	CallCount int
-	// What each request was given.
-	Contexts []Context
+	Contexts  []Context
 }
 
-// FauxResponseFactory answers a request by looking at it.
 type FauxResponseFactory func(c Context, options StreamOptions, state FauxProviderState, model Model) AssistantMessage
 
-// FauxResponseStep is an AssistantMessage or a FauxResponseFactory (or a func of that shape).
+// An AssistantMessage or a FauxResponseFactory (or a func of that shape).
 type FauxResponseStep = any
 
 type FauxModelDefinition struct {
@@ -108,13 +100,11 @@ type FauxProviderOptions struct {
 	API      string
 	Provider string
 	Models   []FauxModelDefinition
-	// Characters per text or thinking delta (default 4).
+	// 4 when 0.
 	ChunkSize int
-	// Time between events.
-	Delay time.Duration
+	Delay     time.Duration
 }
 
-// FauxProviderHandle is a faux provider and its script.
 type FauxProviderHandle struct {
 	API      string
 	Provider ApiProvider
@@ -134,7 +124,6 @@ func chunks(text string, size int) []string {
 	return out
 }
 
-// Replay is an answer said through the events, a few characters at a time.
 func Replay(model Model, message AssistantMessage, chunkSize int) []AssistantMessageEvent {
 	if chunkSize <= 0 {
 		chunkSize = 4
@@ -178,7 +167,6 @@ func Replay(model Model, message AssistantMessage, chunkSize int) []AssistantMes
 	return append(out, answer.Done(message.StopReason, usage)...)
 }
 
-// FauxProvider is a provider answering from a script.
 func FauxProvider(options FauxProviderOptions) *FauxProviderHandle {
 	api := options.API
 	if api == "" {
@@ -258,7 +246,6 @@ func FauxProvider(options FauxProviderOptions) *FauxProviderHandle {
 	return h
 }
 
-// GetModel is the first model, or the one with id; false when there is none.
 func (h *FauxProviderHandle) GetModel(id ...string) Model {
 	if len(id) == 0 {
 		return h.Models[0]
@@ -275,28 +262,24 @@ func (h *FauxProviderHandle) snapshotLocked() FauxProviderState {
 	return FauxProviderState{CallCount: h.state.CallCount, Contexts: append([]Context(nil), h.state.Contexts...)}
 }
 
-// State is what the script was asked so far.
 func (h *FauxProviderHandle) State() FauxProviderState {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.snapshotLocked()
 }
 
-// SetResponses replaces the script.
 func (h *FauxProviderHandle) SetResponses(responses ...FauxResponseStep) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.queue = append([]FauxResponseStep(nil), responses...)
 }
 
-// AppendResponses adds to the script.
 func (h *FauxProviderHandle) AppendResponses(responses ...FauxResponseStep) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.queue = append(h.queue, responses...)
 }
 
-// GetPendingResponseCount is the steps left.
 func (h *FauxProviderHandle) GetPendingResponseCount() int {
 	h.mu.Lock()
 	defer h.mu.Unlock()

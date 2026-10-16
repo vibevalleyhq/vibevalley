@@ -1,7 +1,3 @@
-// The game menu (web/src/pixel/Hud.tsx GameMenu, opened by Esc or the HUD's 菜单): go on, back to the title screen,
-// sound on or off, the debug console, the other pages, and what in the yard can be clicked. The web page's 自动演示
-// makes up requests on the mock only, so it is not here.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';

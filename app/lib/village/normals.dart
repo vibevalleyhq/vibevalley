@@ -1,7 +1,5 @@
-// Normal maps for pixel art, made from the pictures themselves (a port of @heybro/engine/pixi normals.ts): a sprite
-// is shaped like a pillow (it rises with the distance from its outline), with a little relief from how light each
-// painted pixel is; the slope of that height is the normal. Normals are in screen terms: x to the right, y down the
-// screen, z out of it. Stored as RGBA, each axis from -1..1 to 0..255 (128 is 0), the picture's own alpha kept.
+// Normals are in screen terms: x right, y down the screen, z out of it. Stored as RGBA, each axis from -1..1 to 0..255 (128 is 0), the picture's own alpha
+// kept.
 
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -9,34 +7,27 @@ import 'dart:typed_data';
 class NormalOptions {
   const NormalOptions({required this.bevel, required this.relief, required this.strength});
 
-  /// How far in from the outline, in pixels, a sprite keeps rising: how round it looks. 0: no rounding.
+  /// 0: no rounding.
   final double bevel;
 
-  /// How much a pixel's lightness lifts it: the relief of the painted detail.
   final double relief;
 
-  /// How steep the slopes come out: the higher, the stronger the shading.
   final double strength;
 }
 
-/// Things standing up: helpers, props, buildings drawn as sprites.
 const spriteNormals = NormalOptions(bevel: 3, relief: 0.35, strength: 1);
 
-/// Low things on the ground (plots): barely rounded.
 const lowNormals = NormalOptions(bevel: 1.5, relief: 0.3, strength: 0.8);
 
-/// The ground itself, a whole map: no outline to round, only the painted relief.
 const groundNormals = NormalOptions(bevel: 0, relief: 0.6, strength: 0.6);
 
-/// A pixel this transparent or more is outside the picture.
 const _solid = 128;
 
-/// The normal map of an RGBA picture `w` by `h`.
 Uint8List normalsOf(Uint8List rgba, int w, int h, NormalOptions o) {
   final n = w * h;
   bool solid(int x, int y) => x >= 0 && y >= 0 && x < w && y < h && rgba[(y * w + x) * 4 + 3] >= _solid;
 
-  // How far each solid pixel is from the outside (the picture's edge counts as outside): two chamfer passes.
+  // The picture's edge counts as outside: two chamfer passes.
   final far = Float32List(n);
   final cap = math.max(o.bevel, 0.0);
   if (cap > 0) {
@@ -64,7 +55,6 @@ Uint8List normalsOf(Uint8List rgba, int w, int h, NormalOptions o) {
     }
   }
 
-  // Height: the pillow, and the relief of the painting on it.
   final height = Float32List(n);
   for (var i = 0; i < n; i++) {
     if (!solid(i % w, i ~/ w)) continue;
@@ -74,7 +64,6 @@ Uint8List normalsOf(Uint8List rgba, int w, int h, NormalOptions o) {
   // Past the picture's edge the height goes on as at the edge: a map has no rim.
   double hAt(int x, int y) => height[y.clamp(0, h - 1) * w + x.clamp(0, w - 1)];
 
-  // The slope (Sobel), as a normal.
   final out = Uint8List(n * 4);
   for (var y = 0; y < h; y++) {
     for (var x = 0; x < w; x++) {
@@ -97,7 +86,7 @@ Uint8List normalsOf(Uint8List rgba, int w, int h, NormalOptions o) {
   return out;
 }
 
-/// The normal map for a sprite drawn mirrored: the sprite's flip mirrors the pixels; each one now faces the other way.
+/// The sprite's flip mirrors the pixels; each one now faces the other way.
 Uint8List mirrorNormals(Uint8List normals) {
   final out = Uint8List.fromList(normals);
   for (var i = 0; i < out.length; i += 4) {

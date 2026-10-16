@@ -1,9 +1,3 @@
-// 管家: the manager's own page, beside the helpers' (web/src/pages/ManagerPage.tsx). The manager is not a helper agent
-// (no runtime to pick, no skills, no bed): it sends the helpers, keeps a memory of its own and answers the phone. Tabs,
-// one route each (/manager/<tab>): what it remembers, its trajectory (every line it heard, tool it called and word it
-// said), the conversation it folded away, and how it sounds on a call (the agent's part of the voice settings; the
-// line's part is on 声音).
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

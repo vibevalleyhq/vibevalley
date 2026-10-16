@@ -1,6 +1,3 @@
-// The helpers' dock (lib/farm/friends.dart): opened, the crew floats above it as one row of faces, as tall as they
-// are, not the screen; a face opens its card.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/farm/friends.dart';

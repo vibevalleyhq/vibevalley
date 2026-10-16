@@ -1,7 +1,3 @@
-// The helpers' dock in the HUD's lower-left corner (web/src/farm/Hud.tsx FriendsDock, compact): a button with the first
-// few faces, how many are busy and whether one needs you; it opens the whole crew above it. Each face opens a card:
-// what it is doing, its runtime's stamina, and the way to send it the next job or to its file.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,7 +25,6 @@ const _status = {
   FriendStatus.away: (dot: Color(0x00000000), label: '没在农场'),
 };
 
-/// An agent's standing on the farm, from its helpers' plots (Hud.tsx statusOf).
 FriendStatus statusOf(List<Helper> mine, FarmView view) {
   final crops = [for (final w in mine) plotOf(view, w).crop];
   if (crops.contains(Crop.withered)) return FriendStatus.bug;
@@ -41,7 +36,6 @@ FriendStatus statusOf(List<Helper> mine, FarmView view) {
 class FriendsDock extends ConsumerStatefulWidget {
   const FriendsDock({super.key, required this.height});
 
-  /// As tall as a tool slot.
   final double height;
 
   @override
@@ -50,7 +44,7 @@ class FriendsDock extends ConsumerStatefulWidget {
 
 class _FriendsDockState extends ConsumerState<FriendsDock> {
   final _link = LayerLink();
-  // The crew's list stays in the overlay, faded out and not hit while closed, so it can fade both ways.
+  // Faded out and not hit while closed, so it can fade both ways.
   final _portal = OverlayPortalController()..show();
 
   @override
@@ -167,7 +161,6 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
                         ),
                       ],
                       const SizedBox(width: 6),
-                      // The chevron (the page's ›, turned): down while closed, up while open.
                       AnimatedRotation(
                         turns: open ? 0.5 : 0,
                         duration: const Duration(milliseconds: 200),
@@ -198,7 +191,6 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
   }
 }
 
-/// One of the crew: its face, its name, its stamina; a card above it.
 class Friend extends ConsumerWidget {
   const Friend({super.key, required this.agent, required this.status});
   final AgentProfile agent;

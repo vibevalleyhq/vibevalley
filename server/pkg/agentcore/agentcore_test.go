@@ -1,10 +1,6 @@
 package agentcore
 
-// agentcore against the faux model, offline: the order of events pi-agent-core's README gives (a plain answer;
-// tools over several turns), steering and follow-ups and their queue modes, the tool hooks, terminate, finishTurn,
-// parallel and sequential tools, abort (while answering, while a tool runs), tools that fail, an answer that fails,
-// the application's own messages, TransformContext, PrepareRequest, Continue and its refusals, GetApiKey.
-// Ported from the TypeScript @heybro/agent-core's agent-core.test.ts (removed).
+// The orders of events are the ones pi-agent-core's README gives.
 
 import (
 	"context"
@@ -22,7 +18,6 @@ import (
 	"vibevalley/pkg/ai"
 )
 
-// note is the application's own kind of message.
 type note struct {
 	Text      string
 	Timestamp int64
@@ -32,7 +27,6 @@ func (note) Role() string           { return "note" }
 func (n note) Time() int64          { return n.Timestamp }
 func user(text string) AgentMessage { return UserMessageOf(text) }
 
-// probe counts how many tools run at once.
 var probe struct {
 	running atomic.Int32
 	most    atomic.Int32
@@ -91,7 +85,6 @@ func (r *rig) all() []AgentEvent {
 	return append([]AgentEvent(nil), r.events...)
 }
 
-// settled is the events once the last run's agent_end has been heard and nothing more comes.
 func (r *rig) settled() []AgentEvent {
 	r.t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
@@ -258,7 +251,6 @@ func TestToolsOverTwoTurns(t *testing.T) {
 				break
 			}
 		}
-		// The model saw the tool, as JSON Schema, and its result on the second request.
 		state := r.faux.State()
 		eq(t, ai.Stringify(state.Contexts[0].Tools[0].Parameters), `{"additionalProperties":true,"properties":{"text":{"type":"string"}},"required":["text"],"type":"object"}`)
 		eq(t, state.Contexts[0].Tools[0].Description, "把 text 原样说回来")
@@ -284,7 +276,6 @@ func TestSteeringJoinsBeforeTheNextRequestAFollowUpWaits(t *testing.T) {
 			}),
 		)
 	}, func(r *rig) {
-		// Queued before the run: steering is taken after the first turn, the follow-up only at the end.
 		r.agent.FollowUp(user("然后呢"))
 		r.agent.Steer(user("顺便"))
 		_ = r.agent.PromptText(r.ctx, "开始")
@@ -442,7 +433,6 @@ func TestParallelAndSequentialTools(t *testing.T) {
 				eq(t, probe.most.Load(), want)
 			})
 	}
-	// One tool asking to run alone makes the batch sequential.
 	probe.most.Store(0)
 	withAgent(t, rigOptions{tools: []AgentTool{sleepy("slow", 30*time.Millisecond, "", ToolSequential), sleepy("fast", 5*time.Millisecond, "", "")}},
 		func(f *ai.FauxProviderHandle) {
@@ -635,9 +625,7 @@ func TestPromptWhileRunningIsRefusedContinue(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		eq(t, reason(r.agent.PromptText(r.ctx, "二")), "busy")
 		<-done
-		// The model spoke last and nothing is queued.
 		eq(t, reason(r.agent.Continue(r.ctx)), "nothing-to-continue")
-		// A user's message at the tail: continue answers it.
 		r.agent.SetMessages(append(r.agent.State().Messages, user("还在吗")))
 		if err := r.agent.Continue(r.ctx); err != nil {
 			t.Fatal(err)

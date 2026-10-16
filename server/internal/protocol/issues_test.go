@@ -45,25 +45,21 @@ func TestIssuesInTheState(t *testing.T) {
 		}
 		return out
 	}
-	// Not sent yet by rank, then the rest newest first.
 	apply(FactIssue{Issue: Issue{ID: "t1", Title: "一", Rank: 2, CreatedAt: 1, Runs: []string{}}})
 	apply(FactIssue{Issue: Issue{ID: "t2", Title: "二", Rank: 1, CreatedAt: 2, Runs: []string{}}})
 	apply(FactIssue{Issue: Issue{ID: "t3", Title: "三", CreatedAt: 3, Runs: []string{"w1"}}})
 	apply(FactIssue{Issue: Issue{ID: "t4", Title: "四", CreatedAt: 4, Runs: []string{"w2"}}})
 	rulesEqual(t, ids(), []string{"t2", "t1", "t4", "t3"})
-	// The statuses follow the runs on the farm.
 	rulesEqual(t, state.Issues[3].Status, IssueStatusClosed)
 	apply(FactHired{Helper: Helper{ID: "w1", Name: "w1", Agent: "lab", Runtime: "pi", Task: "三", Phase: Phase{PhaseWorking{Doing: Doing{Action: WorkerActionEditFile}}}}})
 	rulesEqual(t, state.Issues[3].Status, IssueStatusWorking)
 	apply(FactReport{ID: "w1", Outcome: OutcomeCompleted, Summary: "好了"})
 	rulesEqual(t, state.Issues[3].Status, IssueStatusWaiting)
-	// The same issue again changes nothing; one gone is gone.
 	if _, changed := Reduce(state, Fact{FactIssue{Issue: state.Issues[0]}}); changed {
 		t.Fatal("the same issue again")
 	}
 	apply(FactIssueGone{ID: "t1"})
 	rulesEqual(t, ids(), []string{"t2", "t4", "t3"})
-	// Only the latest closed ones stay.
 	for i := range KeepClosedIssues + 3 {
 		at := int64(100 + i)
 		apply(FactIssue{Issue: Issue{ID: fmt.Sprintf("c%d", i), Title: "关了", CreatedAt: at, Runs: []string{"w9"}, ClosedAt: &at}})

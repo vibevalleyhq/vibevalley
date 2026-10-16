@@ -1,17 +1,15 @@
 package protocol
 
-// The patrol: a look over the inbox (inbox.go) every so often, without a model, for what has been left there. Each
-// item waits out its kind's grace (a question may be answered in a minute), is reported once, and again only after a
-// long while if it still stands; only then is the manager woken.
+// No model: each item waits out its kind's grace (a question may be answered in a minute), is reported once, and again only after ReportAgainMS if it
+// still stands.
 
 import (
 	"strconv"
 	"strings"
 )
 
-// PatrolGrace is how long each kind of inbox item is left alone before the manager hears of it, in ms; kinds not here
-// it does not hear of from the patrol (a failed turn reaches it as it happens; a playbook waiting is the person's to
-// look at).
+// In ms. Kinds not here the manager does not hear of from the patrol: a failed turn reaches it as it happens, a playbook waiting is the person's to
+// look at.
 var PatrolGrace = map[InboxKind]int64{
 	InboxKindMention:    15 * 60_000,
 	InboxKindQuiet:      20 * 60_000,
@@ -20,17 +18,14 @@ var PatrolGrace = map[InboxKind]int64{
 	InboxKindPlanFailed: 30 * 60_000,
 }
 
-// PatrolNote is an inbox item the manager hears of: the channel it belongs in (nil: the square) and what it is told.
 type PatrolNote struct {
 	Key     string
 	Channel *int64
 	Text    string
 }
 
-// ReportAgainMS: an item still standing is reported again after this long.
 const ReportAgainMS = 4 * 60 * 60_000
 
-// PatrolMemory is what the patrol remembers between rounds: when it first saw each thing, and when it last reported it.
 type PatrolMemory struct {
 	FirstSeen map[string]int64
 	Reported  map[string]int64
@@ -55,7 +50,6 @@ func patrolID(c *Conversation) *int64 {
 	return &id
 }
 
-// patrolOneLine is text with each run of JavaScript whitespace made one space (replace(/\s+/g, ' ')).
 func patrolOneLine(text string) string {
 	var b strings.Builder
 	space := false
@@ -73,8 +67,7 @@ func patrolOneLine(text string) string {
 	return b.String()
 }
 
-// PatrolStep is one round: what to report now (past its grace, not reported lately), with {ago} filled in, and what
-// to remember for the next round. Things no longer hanging are forgotten, so if they come back they are new.
+// Things no longer hanging are forgotten, so if they come back they are new.
 func PatrolStep(state FarmState, now int64, memory PatrolMemory) ([]PatrolNote, PatrolMemory) {
 	next := EmptyPatrol()
 	report := []PatrolNote{}
@@ -109,7 +102,6 @@ func PatrolStep(state FarmState, now int64, memory PatrolMemory) ([]PatrolNote, 
 	return report, next
 }
 
-// PatrolText is what the manager is told about one channel's findings.
 func PatrolText(channelName string, found []PatrolNote) string {
 	lines := make([]string, len(found))
 	for i, f := range found {

@@ -13,10 +13,6 @@ import (
 	"vibevalley/pkg/agent"
 )
 
-// Memories (recall.test.ts's service rules, memory.ts against SQLite) and the manager's memory for its page
-// (manager-memory.test.ts): MEMORY.md line by line, newest first, the person's notes marked so the manager knows whose
-// they are, a line forgotten by its id, what the system prompt still carries, and the archive searched.
-
 func TestMemoryNotesOfATurn(t *testing.T) {
 	said := strings.Join([]string{
 		"改好了，测试也过了。",
@@ -82,7 +78,6 @@ func TestMemoriesKeepRecallWriteForget(t *testing.T) {
 	m := f.Memories
 	m.Keep(base.FinishedTurn{Agent: "lab", Helper: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeCompleted,
 		Said: "记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文\n结论：加好了", Summary: "加好了"})
-	// The same job again: one job per helper, its latest.
 	m.Keep(base.FinishedTurn{Agent: "lab", Helper: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeFailed,
 		Said: "记住：这个项目用 pnpm test 跑测试", Summary: "测试没过"})
 	m.Keep(base.FinishedTurn{Agent: "lab", Helper: "w2", Project: "clock", Job: "不算", Outcome: protocol.OutcomeInterrupted, Said: "记住：停下的不算"})

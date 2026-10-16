@@ -15,13 +15,9 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// An agent's work, step by step (ported from the TypeScript server's steps.ts, removed): what it was asked, what it said, every tool it used with
-// input and output, retries and problems. A journal writes one trajectory's steps to its file (trajectories.go
-// owns where, and how long they are kept). A step that grows (text still streaming in, a tool that has not returned)
-// is sent to the pages again under the same number; sends are batched a little.
+// A step that grows (text still streaming in, a tool that has not returned) is sent again under the same number; sends are batched a little.
 
 const (
-	// crewKeepSteps: steps a journal keeps unless told otherwise; older ones drop off.
 	crewKeepSteps = 240
 	crewTextMax   = 6000
 	AskedMax      = 2000
@@ -31,13 +27,10 @@ const (
 	// A tool's output keeps its start and its end: a test run's verdict is at the bottom.
 	crewOutputHead = 2000
 	crewOutputTail = 4000
-	// crewPushAfter: grown steps go out this often at most.
-	crewPushAfter = 300 * time.Millisecond
-	// crewSaveAfter: the file is written this long after the last change.
-	crewSaveAfter = 1500 * time.Millisecond
+	crewPushAfter  = 300 * time.Millisecond
+	crewSaveAfter  = 1500 * time.Millisecond
 )
 
-// Cut is text cut to max characters, with an ellipsis when it was longer.
 func Cut(text string, max int) string {
 	if base.Units(text) > max {
 		return base.Slice(text, 0, max) + "…"
@@ -45,7 +38,6 @@ func Cut(text string, max int) string {
 	return text
 }
 
-// crewClipOutput is a long output as its start and its end.
 func crewClipOutput(text string) string {
 	n := base.Units(text)
 	if n <= crewOutputHead+crewOutputTail+40 {
@@ -54,7 +46,6 @@ func crewClipOutput(text string) string {
 	return fmt.Sprintf("%s\n… 省略 %d 个字 …\n%s", base.Slice(text, 0, crewOutputHead), n-crewOutputHead-crewOutputTail, base.Slice(text, -crewOutputTail, n))
 }
 
-// crewReadJournal is the steps kept in file; none when there is none or it cannot be read.
 func crewReadJournal(file string) []protocol.WorkStep {
 	body, err := os.ReadFile(file)
 	if err != nil {
@@ -74,7 +65,7 @@ type crewRunOn struct {
 	from string
 }
 
-// crewJournal is a Journal over a file; push sends a step to the pages. All methods are safe for concurrent use.
+// All methods are safe for concurrent use.
 type crewJournal struct {
 	file string
 	push func(protocol.WorkStep)
@@ -94,7 +85,6 @@ type crewJournal struct {
 	closed             bool
 }
 
-// crewOpenJournal is a journal over initial, keeping the last keep steps (0: the default).
 func crewOpenJournal(file string, initial []protocol.WorkStep, push func(protocol.WorkStep), keep int) *crewJournal {
 	if keep <= 0 {
 		keep = crewKeepSteps
@@ -124,7 +114,6 @@ func (j *crewJournal) write() error {
 	})
 }
 
-// flush sends the steps that changed since the last send.
 func (j *crewJournal) flush() {
 	j.mu.Lock()
 	if j.pushing != nil {
@@ -221,18 +210,16 @@ func (j *crewJournal) Asked(text string, from base.From) {
 	j.addLocked(protocol.WorkStep{Kind: protocol.StepKindAsked, Text: Cut(base.Trim(text), AskedMax), On: crewCommentOn(text)}, from)
 }
 
-// A comment on a step (TellRequest.on) reaches the helper as one message: a mark naming the step, what the step was,
-// then the comment. The journal reads the mark back to tie the step it was asked to the step it comments on.
+// The journal reads the mark back to tie the step it was asked to the step it comments on.
 var crewCommentMark = regexp.MustCompile(`【评论第 (\d+) 步】`)
 
 const (
 	crewCommentAbout  = 300
 	crewCommentOutput = 800
-	// crewCommentSays heads the comment itself, after what the step was (the client shows what follows it).
+	// The client shows what follows it.
 	crewCommentSays = "我的评论："
 )
 
-// CommentText is what the helper is told for a comment on step: which step, what it was, the comment.
 func CommentText(step protocol.WorkStep, comment string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "【评论第 %d 步】", step.N)
@@ -263,7 +250,6 @@ func CommentText(step protocol.WorkStep, comment string) string {
 	return b.String()
 }
 
-// crewCommentOn is the step a message comments on, from its mark; nil when it is not a comment.
 func crewCommentOn(text string) *int64 {
 	m := crewCommentMark.FindStringSubmatch(text)
 	if m == nil {
@@ -276,7 +262,6 @@ func crewCommentOn(text string) *int64 {
 	return &n
 }
 
-// runOn adds text to the step its kind runs on into (the same agent's, nothing in between), or starts one.
 func (j *crewJournal) runOn(kind protocol.StepKind, text string, from base.From) {
 	if text == "" {
 		return
@@ -353,7 +338,6 @@ func (j *crewJournal) Note(kind protocol.StepKind, text string, from base.From) 
 	j.addLocked(protocol.WorkStep{Kind: kind, Text: text}, from)
 }
 
-// Close sends and writes what is pending, then stops.
 func (j *crewJournal) Close() {
 	j.flush()
 	j.mu.Lock()

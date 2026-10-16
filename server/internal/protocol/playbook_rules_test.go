@@ -1,7 +1,5 @@
 package protocol
 
-// The playbook rules (playbook.go), as the removed TypeScript server's playbook-rules.test.ts tested the TypeScript ones.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -151,13 +149,11 @@ func TestEditNode(t *testing.T) {
 	}
 	b := rulesWith(rulesNode("b", "a"), func(n *PlaybookNode) { n.Task = "换个做法" })
 	rulesEqual(t, edited.Playbook.Nodes[1], rulesWith(b, func(n *PlaybookNode) { n.Agent = rulesPtr("lab"); n.Check = rulesPtr("pnpm test") }))
-	// Empty means none again.
 	cleared := EditNode(edited.Playbook, "b", NodeEdit{Agent: rulesPtr(""), Check: rulesPtr("")})
 	if !cleared.OK {
 		t.Fatal(cleared.Problem)
 	}
 	rulesEqual(t, cleared.Playbook.Nodes[1], b)
-	// A new step, and one that would make a circle.
 	added := EditNode(draft, "docs", NodeEdit{Task: rulesPtr("补文档"), Needs: []string{"d"}})
 	if !added.OK {
 		t.Fatal(added.Problem)
@@ -169,7 +165,6 @@ func TestEditNode(t *testing.T) {
 		t.Fatal("circle")
 	}
 	rulesMatch(t, circle.Problem, `圈`)
-	// Removing a step takes it out of what others wait for.
 	removed := RemoveNode(draft, "c")
 	if !removed.OK {
 		t.Fatal(removed.Problem)
@@ -212,7 +207,6 @@ func TestNodeTask(t *testing.T) {
 }
 
 func TestPlaybookAsIssues(t *testing.T) {
-	// A playbook and its issues: the parent, then a sub-issue a step, blocked by the steps it needs; and back.
 	pb := rulesPlaybook(rulesDiamond(), func(pb *Playbook) {
 		pb.Branch, pb.Note = rulesPtr("vibevalley/pb-p1"), rulesPtr("在做")
 		pb.Nodes[0].State, pb.Nodes[0].Commits = NodeStateMerged, []string{"abc1234"}
@@ -232,13 +226,11 @@ func TestPlaybookAsIssues(t *testing.T) {
 	state := withPlaybooks(EmptyFarm(), pb)
 	rulesEqual(t, *PlaybookOf(state, "p1"), pb)
 	rulesEqual(t, PlaybooksOf(state), []Playbook{pb})
-	// The statuses: the playbook at work; a step merged, one at work (its helper gone: waiting on you), two waiting their turn.
 	statuses := []IssueStatus{}
 	for _, id := range ids {
 		statuses = append(statuses, issueIn(state, id).Status)
 	}
 	rulesEqual(t, statuses, []IssueStatus{IssueStatusWorking, IssueStatusClosed, IssueStatusWaiting, IssueStatusTodo, IssueStatusTodo})
-	// What only the issues know stays; a step closed before keeps when it closed.
 	before := slices.Clone(issues)
 	for i := range before {
 		if before[i].ID == "p1.b" {
@@ -248,7 +240,6 @@ func TestPlaybookAsIssues(t *testing.T) {
 	again := PlaybookIssues(pb, before, 90)
 	rulesEqual(t, again[2].Runs, []string{"w2"})
 	rulesEqual(t, *again[1].ClosedAt, int64(50))
-	// Given up: every step closes with it.
 	gone := pb
 	gone.State = PlaybookStateAbandoned
 	for _, x := range PlaybookIssues(gone, nil, 7) {
@@ -289,10 +280,8 @@ func TestPlaybookChanges(t *testing.T) {
 	}
 	planning := rulesPlaybook([]PlaybookNode{}, rulesState(PlaybookStatePlanning))
 	rulesEqual(t, PlaybookChanges(nil, planning), []PlaybookChange{{Playbook: "p1", Kind: PlaybookEventKindPlanning, Detail: rulesPtr("做一个菱形")}})
-	// A draft's steps come with it.
 	draft := rulesPlaybook(rulesDiamond(), rulesState(PlaybookStateDraft))
 	rulesEqual(t, kinds(&planning, draft), []string{"drafted"})
-	// Looked over: a step changed, one added, one taken out; each field before and after.
 	edited := rulesPlaybook(append(append([]PlaybookNode{node("a", func(n *PlaybookNode) { n.Task = "换个做法"; n.Check = rulesPtr("pnpm test") })}, rulesDiamond()[1:3]...), rulesNode("e", "a")), rulesState(PlaybookStateDraft))
 	rulesEqual(t, kinds(&draft, edited), []string{"a:node_edited", "e:node_added", "d:node_removed"})
 	rulesEqual(t, PlaybookChanges(&draft, edited)[0].Changes, []NodeFieldChange{{Field: "工单", From: "做 a", To: "换个做法"}, {Field: "检查", From: "", To: "pnpm test"}})
@@ -335,7 +324,6 @@ func TestPlaybookChanges(t *testing.T) {
 	rulesEqual(t, kinds(&running, change(running, rulesState(PlaybookStateRipe))), []string{"ripe"})
 	ripe := change(running, rulesState(PlaybookStateRipe))
 	rulesEqual(t, kinds(&ripe, change(running, rulesState(PlaybookStateDone))), []string{"harvested"})
-	// An abandoned playbook's steps stop with it.
 	rulesEqual(t, kinds(&aWorking, change(running, func(pb *Playbook) { pb.State = PlaybookStateAbandoned; pb.Note = rulesPtr("放弃了") })), []string{"abandoned"})
 	rulesEqual(t, kinds(&running, running), []string{})
 }

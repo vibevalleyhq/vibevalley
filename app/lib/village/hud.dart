@@ -1,10 +1,4 @@
-// What is drawn over the village, at screen pixels so the words stay sharp (web/src/pixel/overlay.ts, words.ts,
-// headsup.ts, Hud.tsx). The overlay: over a plot, what it is and what the tool in hand would do (while pointed at), the
-// coins it just earned, a note, its badge; over a helper, what it is doing (and its name as it arrives); over the
-// manager, his last words; over a thing in the yard, its name while pointed at (or while ⌥ is held), its wooden sign
-// otherwise, and how many things wait there. The HUD: the manager's face and the farm's status at the top left, the
-// map, the channels, the energy pill and the menu at the top right, the phone and the helpers at the bottom left, the
-// tools along the bottom. Words let clicks through to the village; the HUD's parts are buttons.
+// At screen pixels, so the words stay sharp. Words let clicks through to the village; the HUD's parts are buttons.
 
 import 'package:flutter/material.dart' hide Icon;
 import 'package:flutter/scheduler.dart';
@@ -34,23 +28,18 @@ import '../rules/farm.dart';
 import '../rules/playbook.dart';
 import '../rules/progress.dart';
 
-/// The HUD stands this far from the game screen's edges, and its parts this far apart (headsup.ts EDGE, GAP).
 const hudEdge = 8.0;
 const hudGap = 4.0;
 
-/// The top row's height (the status card's) and the bottom row's (a tool slot's).
 const hudTop = 52.0;
 const hudBottom = 36.0;
 
-/// A plot's badge stands this far below its frame's top, on its back rail (overlay.ts RAIL).
 const _rail = 5.0;
 
-/// A thing's sign hangs this far over its picture; one near the top of the map hangs inside it (overlay.ts).
 const _signGap = 3.0;
 const _topEdge = 20.0;
 const _signInside = 30.0;
 
-/// How long the manager's last sentence stays over his head (words.ts SPEECH_MS).
 const _speechMs = 9000;
 
 const _tone = {
@@ -60,7 +49,6 @@ const _tone = {
   BadgeTone.rest: (CardColors.rest, CardColors.ink),
 };
 
-/// The little wooden sign over each thing in the yard (words.ts SIGN); the manager has none: he talks.
 const _sign = {
   'shop': 'icon-shop',
   'warehouse': 'icon-crate',
@@ -72,7 +60,6 @@ const _sign = {
   'skills': 'icon-skillbook',
 };
 
-/// Puts `child` with its point (the middle, `ay` of its height) at (`x`, `y`) in the stack.
 class _Pin extends StatelessWidget {
   const _Pin(this.x, this.y, this.child, {this.ay = 1});
   final double x;
@@ -88,8 +75,7 @@ class _Pin extends StatelessWidget {
   );
 }
 
-/// Rebuilds with every frame the village draws. The village may tick while the screen is being laid out (its first
-/// resize), so a tick then waits for the end of that frame.
+/// The village may tick while the screen is being laid out (its first resize), so a tick then waits for the end of that frame.
 class FramesBuilder extends StatefulWidget {
   const FramesBuilder({super.key, required this.game, required this.builder});
   final VillageGame game;
@@ -140,17 +126,14 @@ class _FramesBuilderState extends State<FramesBuilder> {
   Widget build(BuildContext context) => widget.builder(context);
 }
 
-/// The words of a plot: where they go (above it while pointed at, on its back rail, or in its middle) and the card.
 typedef PlotWords = ({String at, PixelCard card});
 
-/// What a plot is, for screen readers and its title (words.ts plotTitle).
 String plotTitle(Bed bed, Helper? worker, Crop crop) {
   if (bed.unlockLevel != null) return crop == Crop.locked ? '没开垦的地' : '花坛';
   if (worker == null) return '第 ${bed.station + 1} 块地 · 空地';
   return '${worker.name} · ${cropLabel[crop]}';
 }
 
-/// The manager's last line, typed on the square or said aloud (core chat.ts lastForemanSaid).
 ({String key, String text, bool final_, double at})? lastForemanSaid(Chat? chat, List<Line> lines) {
   final square = squareOf(chat);
   final typed = square == null ? null : messagesIn(chat, square.id).where((m) => m.fromKind == SenderKind.foreman && m.kind == MessageKind.chat).lastOrNull;
@@ -162,8 +145,6 @@ String plotTitle(Bed bed, Helper? worker, Crop crop) {
   return a.at >= b.at ? a : b;
 }
 
-/// The words over the village: plots, helpers, the manager, the things in the yard. Redrawn every frame the game
-/// draws; never takes a click.
 class VillageOverlay extends ConsumerStatefulWidget {
   const VillageOverlay({super.key, required this.game, required this.scale});
   final VillageGame game;
@@ -174,7 +155,6 @@ class VillageOverlay extends ConsumerStatefulWidget {
 }
 
 class _VillageOverlayState extends ConsumerState<VillageOverlay> {
-  // The manager's line as last heard: its key, and when it was final (words.ts managerWords' `heard`).
   String? _heardKey;
   double? _finalAt;
 
@@ -207,7 +187,6 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     final back = <Widget>[];
     final front = <Widget>[];
 
-    // ── Plots ──
     for (final bed in beds) {
       final at = village.plotAt(bed.index);
       final worker = bed.unlockLevel == null ? stationOf(helpers, bed.station) : null;
@@ -222,7 +201,6 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
       (words.at == 'above' ? front : back).add(card);
     }
 
-    // ── Helpers: what each is doing over its head, and its name as it arrives ──
     for (final h in helpers) {
       final head = game.heads[h.id];
       if (head == null) continue;
@@ -245,7 +223,6 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
       );
     }
 
-    // ── The manager's words ──
     final said = _managerWords(state);
     if (said != null) {
       back.add(
@@ -263,7 +240,6 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
       );
     }
 
-    // ── Things in the yard: a sign (or the name), how many wait there ──
     final tips = <Widget>[];
     var i = 0;
     for (final MapEntry(key: spot, value: box) in village.spotBoxes.entries) {
@@ -300,7 +276,6 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
           ),
         );
       } else if (_sign[spot] case final icon? when atlas.has(icon)) {
-        // Now and then a sign gives a little hop, each at its own time, to say it can be clicked.
         final hop = ((game.t * 1000 / 350 + i * 2.3).floor() % 9 == 0) ? 1.0 : 0.0;
         back.add(
           _Pin(
@@ -346,8 +321,6 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     return [...back, ...front, ...tips];
   }
 
-  /// Over a plot (words.ts plotWords): what it is while pointed at; else the coins it just earned, a note, its badge,
-  /// when it opens.
   PlotWords? _plotWords(
     Bed bed,
     Helper? worker,
@@ -422,8 +395,6 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     return null;
   }
 
-  /// The manager's words (words.ts managerWords): his last sentence for a while, or a nudge on an empty farm; nothing
-  /// while the chat is open or the names show.
   String? _managerWords(FarmState state) {
     final line = lastForemanSaid(state.chat, ref.watch(spokenProvider));
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
@@ -439,12 +410,10 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
   }
 }
 
-/// The HUD inside the game screen (headsup.ts, Hud.tsx): each part a button.
 class VillageHud extends ConsumerWidget {
   const VillageHud({super.key, required this.game, required this.call});
   final VillageGame game;
 
-  /// The manager's voice call, for the phone.
   final VoiceCall call;
 
   @override
@@ -469,7 +438,6 @@ class VillageHud extends ConsumerWidget {
 
     return Stack(
       children: [
-        // The top left: the manager's face (his looks), the farm's status (the tasks).
         Positioned(
           left: hudEdge,
           top: hudEdge,
@@ -495,7 +463,6 @@ class VillageHud extends ConsumerWidget {
                 onTap: () => open(FarmPanel.tasks),
                 label: '任务与成就',
                 child: TweenAnimationBuilder<double>(
-                  // The coins as shown count up to the real number.
                   tween: Tween(end: coins),
                   duration: const Duration(milliseconds: 600),
                   curve: Curves.easeOut,
@@ -521,7 +488,6 @@ class VillageHud extends ConsumerWidget {
             ],
           ),
         ),
-        // The top right: the map (where there is room for it), the channels and the energy pill, left of the menu.
         Positioned(
           right: hudEdge,
           top: hudEdge,
@@ -594,7 +560,6 @@ class VillageHud extends ConsumerWidget {
             ],
           ),
         ),
-        // The lower-left corner: the phone (up over its button while out) over the helpers.
         Positioned(
           left: hudEdge,
           bottom: hudEdge,
@@ -609,7 +574,6 @@ class VillageHud extends ConsumerWidget {
             ],
           ),
         ),
-        // The tools, a hotbar along the bottom (click one or press its number).
         Positioned(
           left: 0,
           right: 0,
@@ -644,7 +608,6 @@ class VillageHud extends ConsumerWidget {
   }
 }
 
-/// 1,234 (toLocaleString).
 String _thousands(int n) => n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
 
 class _Tap extends StatelessWidget {
@@ -673,7 +636,6 @@ class _Tap extends StatelessWidget {
   );
 }
 
-/// The number keys pick a tool, as on the web page (engine useToolHotkeys); Esc puts it down (the farm screen).
 Tool? toolForKey(LogicalKeyboardKey key) {
   final n = LogicalKeyboardKey.digit1.keyId;
   final i = key.keyId - n;

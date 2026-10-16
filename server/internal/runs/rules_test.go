@@ -10,9 +10,6 @@ import (
 	"vibevalley/pkg/smith/oar"
 )
 
-// The crew's pure rules (session-facts.test.ts, report.test.ts, limits.test.ts): each case is an event, a helper and
-// the session's bookkeeping in, facts and steps out; a report read; the caps on helpers working at once.
-
 func crewEv(body oar.EventBody) oar.Event {
 	return oar.Event{Envelope: oar.Envelope{SessionID: "s", AgentPath: []string{}}, Body: body}
 }
@@ -58,7 +55,6 @@ func TestCrewCommandShowsFromItsFolder(t *testing.T) {
 	farmtest.Eq(t, started.Journal[0].Type, "toolStarted", "op")
 	farmtest.Eq(t, *started.Tracking.ShownCall, crewShownCall{ID: "c1", Tool: "bash"}, "shown")
 
-	// Already doing just that: no fact, the bubble does not change.
 	again := `{"command":"pnpm test"}`
 	same := crewSessionFacts(crewEv(oar.ToolCallStarted{CallID: "c2", Tool: "bash", Input: &again}), crewWorking(protocol.Doing{Action: protocol.WorkerActionRunCommand, Label: "pnpm test"}), crewTracking{}, crewCtx)
 	farmtest.Eq(t, len(same.Facts), 0, "again")
@@ -111,14 +107,12 @@ func TestCrewSpendingCountedFromTheLastTotal(t *testing.T) {
 	farmtest.Eq(t, first.SpentCny, 7.0, "first yuan")
 	farmtest.Eq(t, first.Facts, []protocol.FactValue{protocol.FactSpent{ID: "w1", Spent: protocol.Spent{Tokens: 1_000_000, CNY: crewF(7)}}}, "first")
 
-	// The next report is a running total: only what is new counts, on top of what the helper had spent.
 	h := crewWorking(crewThinking)
 	h.Spent = &protocol.Spent{Tokens: 1_000_000, CNY: crewF(7)}
 	second := crewSessionFacts(crewEv(usage(1_000_000, 500_000)), h, first.Tracking, crewCtx)
 	farmtest.Eq(t, second.SpentCny, 7.0, "second yuan")
 	farmtest.Eq(t, second.Facts, []protocol.FactValue{protocol.FactSpent{ID: "w1", Spent: protocol.Spent{Tokens: 1_500_000, CNY: crewF(14)}}}, "second")
 
-	// No price yet: tokens only.
 	unpriced := crewSessionFacts(crewEv(oar.Usage{Usage: oar.UsageReport{Tokens: &oar.TokenTotals{Input: 10, Output: 5}}}), crewWorking(crewThinking), crewTracking{}, crewCtx)
 	farmtest.Eq(t, unpriced.SpentCny, 0.0, "unpriced yuan")
 	farmtest.Eq(t, unpriced.Facts, []protocol.FactValue{protocol.FactSpent{ID: "w1", Spent: protocol.Spent{Tokens: 15}}}, "unpriced")
@@ -161,7 +155,6 @@ func TestCrewRetriesModelFailuresAndExitsAreSaid(t *testing.T) {
 	exited := crewSessionFacts(crewEv(oar.Exited{Code: &code}), h, crewTracking{}, crewCtx)
 	farmtest.Eq(t, exited.Facts, []protocol.FactValue{protocol.FactReport{ID: "w1", Outcome: protocol.OutcomeFailed, Summary: "pi 进程退出了（退出码 137）", Turns: 2}}, "exited")
 	farmtest.Eq(t, exited.Warn, "老周 的 pi 进程退出了（退出码 137）", "warn")
-	// Exiting between turns is no news.
 	ripe := crewBase()
 	ripe.Phase = protocol.Phase{Value: protocol.PhaseRipe{}}
 	zero := 0
@@ -175,8 +168,6 @@ func TestCrewNear(t *testing.T) {
 	farmtest.Eq(t, crewNear("/work/p", "cd /work/p && pnpm test"), "pnpm test", "cd")
 	farmtest.Eq(t, crewNear("/work/p", "cat /work/p/README.md"), "cat README.md", "inside a command")
 }
-
-// ── report.test.ts ───────────────────────────────────────────────────────────
 
 func TestCrewSummaryIsTheVerdict(t *testing.T) {
 	text := strings.Join([]string{"读了 src/http.ts。", "**结论：** 两个路由，POST /api/clock-in 和 POST /api/clock-out。", "（另外可选：README 第 3 行可以补个链接。）"}, "\n\n")
@@ -203,7 +194,6 @@ func TestCrewFailedTurnLeadsWithWhy(t *testing.T) {
 	farmtest.Match(t, billing.Failure, `^余额不够了（HTTP 402）：Insufficient Balance`, "failure")
 	farmtest.Eq(t, billing.Summary, crewClip(billing.Failure, 160), "summary")
 	farmtest.Eq(t, billing.Text, billing.Failure+"\n\n先看了看代码", "text")
-	// A busy provider is not for a person to fix.
 	farmtest.Eq(t, crewReadReport(oar.Failed(oar.FailureOverloaded, ""), "").NeedsYou, false, "overloaded")
 }
 
@@ -211,8 +201,6 @@ func TestCrewClip(t *testing.T) {
 	farmtest.Eq(t, crewClip("a\n  b", 10), "a b", "one line")
 	farmtest.Eq(t, crewClip("abcdefghij", 5), "abcd…", "cut")
 }
-
-// ── limits.test.ts ───────────────────────────────────────────────────────────
 
 func crewLimitHelper(id, runtime, project string, working bool) protocol.Helper {
 	phase := protocol.Phase{Value: protocol.PhaseRipe{}}

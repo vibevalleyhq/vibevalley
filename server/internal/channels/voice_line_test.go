@@ -1,9 +1,5 @@
 package channels
 
-// The voice line (voice_line.go; ported from the TypeScript server's voice-line.test.ts, removed): OpenAI's streamed chat completions over the
-// manager. Only this call's key gets in, only the newest thing said is taken, the words go out as server-sent chunks
-// ending in [DONE], and a request Agora drops stops its words. Opening and closing calls hands out and takes back keys.
-
 import (
 	"bufio"
 	"context"
@@ -182,7 +178,6 @@ func TestVoiceLineOpensAndClosesCalls(t *testing.T) {
 	if !strings.HasPrefix(line.URL, "https://line.example.com/llm/"+line.ID+"/") || line.Key == "" {
 		t.Fatalf("line: %+v", line)
 	}
-	// The line answers locally, on its own port, with this call's key.
 	local := "http://127.0.0.1:" + strconv.Itoa(f.VoiceLine.port)
 	res := voiceAsk(t, context.Background(), local, "/llm/"+line.ID+"/chat/completions", line.Key, []any{map[string]any{"role": "user", "content": "在吗"}})
 	if body, _ := io.ReadAll(res.Body); res.StatusCode != 200 || !strings.Contains(string(body), "在。") {
@@ -227,7 +222,6 @@ func TestVoiceLineQuickTunnelLingersAfterTheLastCall(t *testing.T) {
 	if !lingering || closed != 0 {
 		t.Fatal("the tunnel lingers after the last call")
 	}
-	// Calling again within the while keeps it.
 	if _, err := f.VoiceLine.Open(); err != nil || opened != 1 {
 		t.Fatalf("reopened: %d %v", opened, err)
 	}

@@ -1,6 +1,3 @@
-// The embedded server's launcher (lib/desktop/launcher.dart) against fake servers: small shell scripts that answer
-// GET /api/health on $PORT (python3's http.server), exit early, never answer, or ignore SIGTERM.
-
 @TestOn('mac-os || linux')
 library;
 
@@ -9,7 +6,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desktop/launcher.dart';
 
-/// A fake farm: answers /api/health with 200 on 127.0.0.1:$PORT, prints its environment's vibevalley home first.
 const _answering = r'''#!/bin/sh
 echo "fake farm: home=$VIBEVALLEY_HOME work=$VIBEVALLEY_WORK_ROOT port=$PORT"
 exec python3 -c '
@@ -74,7 +70,6 @@ void main() {
     final log = await File('${dir.path}/logs/server.log').readAsString();
     expect(log, contains('fake farm: home=${dir.path}/home work=${dir.path}/work port=${server.url.port}'));
     expect(log, contains('fake farm: listening'));
-    // Stopping twice is fine.
     await server.stop();
   });
 

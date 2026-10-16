@@ -1,12 +1,8 @@
-// LiveCaptions from the agent's data stream: chunks put back together in any order, a turn's text replaced as it grows,
-// and a manager's turn cut short when you talk over it.
-
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/voice/captions.dart';
 
-/// A message as the agent sends it: JSON, base64, cut into `parts` chunks.
 List<String> chunked(String id, Map<String, Object?> message, int parts) {
   final encoded = base64.encode(utf8.encode(jsonEncode(message)));
   final size = (encoded.length / parts).ceil();

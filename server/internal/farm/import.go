@@ -16,32 +16,20 @@ import (
 	"vibevalley/internal/base"
 )
 
-// Moving a farm from the TypeScript server (apps/server, removed) to this one. The TypeScript server kept the same
-// files in its home (farm.json, config.json, crew.json, spend.json, settings.json, .env, foreman/, steps/, logs/…),
-// which are copied as they are, and its database in PGlite (<home>/db), which only Node can open: tool/dump-pglite.ts
-// writes it out as JSON, and Import puts those rows into SQLite with the same ids and seq numbers, so threads, read
-// cursors, deliveries and the connectors' outbox stay pointed at the right messages. The tables are the same, column
-// for column (migrations/0001_farm.sql folds the PostgreSQL migrations); only the types change: timestamptz →
-// milliseconds, jsonb → JSON text, boolean → 0/1.
+// Moving a farm from the TypeScript server, whose database is PGlite: only Node opens it, so tool/dump-pglite.ts writes it out as JSON first.
 
-// ImportOptions is what to import and where.
 type ImportOptions struct {
-	// From is the TypeScript server's home (~/.heybro, ~/.heybro-beta, ~/.heybro-alpha).
 	From string
-	// Into is this server's home; created when missing.
 	Into string
-	// Dump is tool/dump-pglite.ts's JSON of From's database. Required when From has a database.
 	Dump string
-	// Force imports into a farm that already has things in it: its database is replaced, its files overwritten.
+	// Its database is replaced, its files overwritten.
 	Force bool
 }
 
-// ImportReport is what was imported: names and counts only, never what the files or rows say.
+// Names and counts only, never what the files or rows say.
 type ImportReport struct {
-	Files []string
-	// Tables is each table's rows in the dump and in farm.db after the import.
-	Tables []ImportTable
-	// Skipped is what the dump had that this server does not keep (the PostgreSQL migrator's own table).
+	Files   []string
+	Tables  []ImportTable
 	Skipped []string
 }
 
@@ -50,7 +38,6 @@ type ImportTable struct {
 	Dumped, Stored int
 }
 
-// importDump is tool/dump-pglite.ts's output.
 type importDump struct {
 	Format    string                     `json:"format"`
 	Version   int                        `json:"version"`
@@ -66,25 +53,21 @@ type importDumpTable struct {
 	Rows []map[string]json.RawMessage `json:"rows"`
 }
 
-// importTables is farm.db's tables in an order where what a row points at comes first (the foreign keys are also
-// deferred to the commit: conversations and messages point at each other).
+// What a row points at comes first; the foreign keys are also deferred to the commit, since conversations and messages point at each other.
 var importTables = []string{
 	"participants", "conversations", "messages", "mentions", "follows", "read_cursors", "seen_marks", "deliveries",
 	"playbook_events", "ledger", "memories", "connector_accounts", "connector_inbound", "connector_outbox", "schedules",
 }
 
-// importNotKept is what a dump may have that is not the farm's: the PostgreSQL migrator's bookkeeping.
 var importNotKept = []string{"effect_sql_migrations"}
 
-// importLeftBehind is what is not copied from the TypeScript home: its database (the dump carries it) and the dump.
 var importLeftBehind = []string{"db", "pglite-dump.json"}
 
-// DumpCommand is how to make the dump of a TypeScript home's database.
 func DumpCommand(from string) string {
 	return fmt.Sprintf("node server/tool/dump-pglite.ts %s %s", from, filepath.Join(from, "pglite-dump.json"))
 }
 
-// Import copies a TypeScript server's farm into this server's home. The server must not be running on Into.
+// The server must not be running on Into.
 func Import(opts ImportOptions) (ImportReport, error) {
 	var report ImportReport
 	if opts.From == "" || opts.Into == "" {
@@ -165,7 +148,6 @@ func importLooksLikeHome(dir string) bool {
 	return false
 }
 
-// importHasFarm says why `into` holds a farm worth keeping; "" when it is empty or only what a first start seeds.
 func importHasFarm(into string) string {
 	if body, err := os.ReadFile(filepath.Join(into, "farm.json")); err == nil {
 		var kept struct {
@@ -215,8 +197,7 @@ func importReadDump(path string) (*importDump, error) {
 	return &dump, nil
 }
 
-// importCopy copies the TypeScript home's files, all but its database, keeping each file's mode (settings.json and
-// .env stay readable by their owner only). It returns the top-level names copied.
+// settings.json and .env stay readable by their owner only.
 func importCopy(from, into string) ([]string, error) {
 	entries, err := os.ReadDir(from)
 	if err != nil {
@@ -255,7 +236,6 @@ func importCopyTree(src, dst string) error {
 		case info.Mode().IsRegular():
 			return importCopyFile(path, target, info.Mode().Perm())
 		default:
-			// Sockets, links: nothing the farm keeps.
 			return nil
 		}
 	})
@@ -284,14 +264,12 @@ func importCopyFile(src, dst string, mode fs.FileMode) error {
 	return os.Chmod(dst, mode)
 }
 
-// importColumn is a farm.db column as SQLite describes it.
 type importColumn struct {
 	name    string
 	notNull bool
 }
 
-// importRows puts the dump's rows into farm.db in one transaction, then sets each table's autoincrement to where the
-// PostgreSQL sequence stood: a seq handed out once (a message deleted since) is never handed out again.
+// Each autoincrement continues where the PostgreSQL sequence stood: a seq handed out once is never handed out again.
 func importRows(db *sql.DB, dump *importDump) ([]ImportTable, []string, error) {
 	var skipped []string
 	for name := range dump.Tables {
@@ -399,7 +377,6 @@ func importColumns(q interface {
 	return out, rows.Err()
 }
 
-// importValue is a dumped value as farm.db keeps it, by its PostgreSQL type.
 func importValue(raw json.RawMessage, pgType string, notNull bool) (any, error) {
 	isNull := len(raw) == 0 || string(raw) == "null"
 	switch pgType {

@@ -1,12 +1,6 @@
-// A tiny synthesizer for the farm's sound effects (packages/engine/src/audio/synth.ts and measure.ts): tones, filtered
-// noise and bells shaped by envelopes, rendered to PCM sample by sample. No audio files. A sound is a recipe of what
-// the pen draws; renderRecipe turns it into samples, toWav into a file to play.
-//
-// The web page plays the same recipes through Web Audio in Chromium; this renders what those nodes do: the biquads
-// (Web Audio's formulas, coefficients per sample), the exponential envelopes and glides, the oscillators (polyBLEP for
-// Chromium's band-limited tables, square and sawtooth scaled to Chromium's peak), the limiter (Chromium's compressor
-// kernel). tool/sfx_fixture.ts renders the web page's own synth.ts and sfx.ts on a reference with exactly this maths,
-// and test/shell_synth_test.dart holds this file to it sample for sample. Keep the two in step.
+// It renders what Chromium's Web Audio nodes would: the biquads (Web Audio's formulas, coefficients per sample), the exponential envelopes and glides, the
+// oscillators (polyBLEP for Chromium's band-limited tables, square and sawtooth scaled to Chromium's peak), the limiter (Chromium's compressor kernel).
+// test/shell_synth_test.dart holds it to the frozen renders in test/fixtures/sfx.json.
 
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -15,9 +9,8 @@ enum Wave { sine, square, sawtooth, triangle }
 
 enum FilterType { lowpass, highpass, bandpass }
 
-/// What a recipe draws with. Every call is relative to the moment the sound plays, in seconds.
+/// In seconds from the moment the sound plays.
 abstract class Pen {
-  /// A tone: `freq` gliding to `to` over `dur`, through a lowpass at `lowpass` when given.
   void tone({
     double at = 0,
     required double freq,
@@ -29,7 +22,7 @@ abstract class Pen {
     double? lowpass,
   });
 
-  /// White noise through a filter, its frequency sweeping to `to` when given. `gain` above 1 makes up for the filter.
+  /// `gain` above 1 makes up for the filter.
   void noise({
     double at = 0,
     required FilterType filter,
@@ -41,19 +34,17 @@ abstract class Pen {
     double attack = 0.005,
   });
 
-  /// A struck bell: a tone per partial ([ratio to freq, relative gain]), higher ones dying sooner.
   void bell({double at = 0, required double freq, required double dur, required double gain, List<(double, double)> partials = bellPartials});
 
-  /// A pseudo-random number in [0, 1), the same sequence for the same seed, so a sound is recognisable.
+  /// The same sequence for the same seed, so a sound is recognisable.
   double random();
 }
 
 typedef Recipe = void Function(Pen pen);
 
-/// A small, bright bell.
 const bellPartials = [(1.0, 1.0), (2.01, 0.42), (3.03, 0.18), (4.17, 0.09)];
 
-/// synth.ts seeded(): xorshift32, the seed changing per play to keep a little life in repeated sounds.
+/// xorshift32; the seed changes per play to keep a little life in repeated sounds.
 double Function() seeded(int seed) {
   var s = seed & 0xFFFFFFFF;
   if (s == 0) s = 1;
@@ -65,7 +56,7 @@ double Function() seeded(int seed) {
   };
 }
 
-/// The noise buffer's generator. The page fills its buffer from Math.random; this is fixed, so renders repeat.
+/// Fixed, so renders repeat.
 double Function() noiseRandom() {
   var s = 0x2545f491;
   return () {
@@ -76,7 +67,6 @@ double Function() noiseRandom() {
   };
 }
 
-/// Two seconds of white noise, as the page's makeNoise.
 Float32List makeNoise(int sampleRate) {
   final r = noiseRandom();
   final data = Float32List(sampleRate * 2);
@@ -85,8 +75,6 @@ Float32List makeNoise(int sampleRate) {
   }
   return data;
 }
-
-// ── Automation, as an AudioParam: setValueAtTime and exponentialRampToValueAtTime ──
 
 class _Param {
   _Param(this.value);
@@ -169,8 +157,6 @@ void _biquad(Float64List x, FilterType type, _Param frequency, double q, int sr,
   }
 }
 
-// ── What the pen draws: each voice a source, maybe a filter, and its envelope ──
-
 sealed class _Voice {
   _Voice(this.t0, this.dur, this.gain, this.attack);
   final double t0;
@@ -178,7 +164,6 @@ sealed class _Voice {
   final double gain;
   final double attack;
 
-  /// Until when its source plays.
   double get end;
 
   _Param envelope() {
@@ -256,7 +241,6 @@ class _RenderPen implements Pen {
   }
 }
 
-/// Renders one voice into `master`, adding.
 void _render(_Voice voice, Float64List master, Float32List noise, int sr) {
   final n = master.length;
   final out = Float64List(n);
@@ -293,11 +277,10 @@ void _render(_Voice voice, Float64List master, Float32List noise, int sr) {
   }
 }
 
-/// The limiter the page puts after everything (threshold -10 dB, knee 8, ratio 6, attack 3 ms, release 120 ms).
+/// Threshold -10 dB, knee 8, ratio 6, attack 3 ms, release 120 ms.
 const _limiter = (threshold: -10.0, knee: 8.0, ratio: 6.0, attack: 0.003, release: 0.12);
 
-/// Renders a recipe: `seconds` of mono samples. `settled` starts the limiter as after a while of silence, as when the
-/// page plays a sound; an offline render (the page's renderRecipe, for levels and WAV) starts it cold.
+/// `settled` starts the limiter as after a while of silence, as when a sound plays live; an offline render starts it cold.
 Float32List renderRecipe(Recipe recipe, {double seconds = 2, int sampleRate = 44100, double volume = 0.55, int seed = 1, bool settled = false}) {
   final noise = makeNoise(sampleRate);
   final pen = _RenderPen(seed);
@@ -312,7 +295,6 @@ Float32List renderRecipe(Recipe recipe, {double seconds = 2, int sampleRate = 44
   return Float32List.fromList(compress(master, sampleRate, settled: settled));
 }
 
-/// How long a recipe sounds before its tails: the end of its last voice.
 double recipeSeconds(Recipe recipe) {
   final pen = _RenderPen(1);
   recipe(pen);
@@ -403,7 +385,6 @@ Float64List compress(Float64List x, int sr, {required bool settled}) {
   return out;
 }
 
-/// 16-bit mono WAV bytes of rendered samples, cut `tail` seconds after the last audible one (synth.ts toWav).
 Uint8List toWav(Float32List all, {int sampleRate = 44100, double tail = 0.05}) {
   var last = 0;
   for (var i = 0; i < all.length; i++) {
@@ -431,13 +412,11 @@ Uint8List toWav(Float32List all, {int sampleRate = 44100, double tail = 0.05}) {
   text(36, 'data');
   bytes.setUint32(40, n * 2, Endian.little);
   for (var i = 0; i < n; i++) {
-    // As a DataView's setInt16 does: the scaled value truncated toward zero.
+    // The scaled value truncated toward zero.
     bytes.setInt16(44 + i * 2, (all[i].clamp(-1.0, 1.0) * 0x7fff).truncate(), Endian.little);
   }
   return bytes.buffer.asUint8List();
 }
-
-// ── Loudness (measure.ts) ──
 
 /// How loud a rendered sound is: the highest sample (dBFS), the K-weighted level of the loudest 100 ms (BS.1770, for
 /// sounds shorter than its 400 ms window), and until when it is above -60 dBFS.
@@ -503,7 +482,6 @@ Measure measure(Float32List x, {int sampleRate = 44100}) {
     if (v > 0.001) last = i;
   }
   final y = _kWeighting(fs).fold(x, _filter);
-  // Mean square over a sliding 100 ms window, every 10 ms; the loudest window wins.
   final window = _jsRound(fs * 0.1).toInt();
   final hop = _jsRound(fs * 0.01).toInt();
   var sum = 0.0;

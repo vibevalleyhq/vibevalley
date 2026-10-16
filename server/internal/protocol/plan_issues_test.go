@@ -1,6 +1,5 @@
 package protocol
 
-// withPlaybooks is state with the playbooks in it, as their issues.
 func withPlaybooks(state FarmState, playbooks ...Playbook) FarmState {
 	for _, pb := range playbooks {
 		for _, t := range PlaybookIssues(pb, nil, pb.CreatedAt) {

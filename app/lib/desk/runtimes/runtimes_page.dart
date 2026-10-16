@@ -1,7 +1,3 @@
-// 农具 (web/src/pages/RuntimesPage.tsx): what oar finds on the server's machine, what each runtime can and cannot take,
-// and the defaults vibevalley uses for it. The facts come from oar; only the settings card is editable. Runtimes change
-// live: the server pushes each new reading (runtimes_state.dart).
-
 import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
@@ -87,7 +83,6 @@ class _ListItem extends StatelessWidget {
   }
 }
 
-/// A runtime's stamina in the list: its bar and what is left, when its account reports it.
 class _ListStamina extends StatelessWidget {
   const _ListStamina({required this.usage});
   final AccountUsage? usage;
@@ -151,7 +146,6 @@ List<Widget> _detail(SpriteAtlas atlas, RuntimeInfo info, DeskConfig config, Run
   ];
 }
 
-/// A look's colour, '#rrggbb'.
 Color _hex(String css) => Color(int.parse('ff${css.replaceFirst('#', '')}', radix: 16));
 
 class _Header extends ConsumerWidget {
@@ -367,7 +361,7 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
   @override
   void didUpdateWidget(_SettingsCard old) {
     super.didUpdateWidget(old);
-    // The settings as the server has them now replace the draft (useEffect on info.settings).
+    // The settings as the server has them now replace the draft.
     if (_json(old.info.settings) != _json(widget.info.settings)) _draft = widget.info.settings;
   }
 
@@ -401,7 +395,6 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // A grid's cells are as tall as their row's tallest; the switch's label row centres in its own.
           Cols(
             columns: 2,
             stretch: true,
@@ -492,7 +485,7 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
   }
 }
 
-/// A limit, typed freely: the text is kept as typed, the number follows it (empty or 0 means none).
+/// The text is kept as typed, the number follows it (empty or 0 means none).
 class NumberInput extends StatefulWidget {
   const NumberInput({super.key, required this.value, required this.onChanged, required this.placeholder, required this.semanticLabel});
   final double? value;
@@ -529,7 +522,6 @@ class _NumberInputState extends State<NumberInput> {
   );
 }
 
-/// The account card's body: the potion and either the pay-as-you-go balance or a stamina bar per plan window.
 class RuntimeUsage extends StatelessWidget {
   const RuntimeUsage({super.key, required this.atlas, required this.info});
   final SpriteAtlas atlas;
@@ -590,7 +582,6 @@ class RuntimeUsage extends StatelessWidget {
 
 String _pct(double n) => n == n.roundToDouble() ? n.toInt().toString() : n.toString();
 
-/// One plan window: what is left of it, as a stamina bar, and when it resets.
 class _Window extends StatelessWidget {
   const _Window({required this.window});
   final UsageWindow window;
@@ -599,8 +590,6 @@ class _Window extends StatelessWidget {
   Widget build(BuildContext context) {
     final left = 100 - window.usedPercent;
     final label = windowLabel(window.label);
-    // The label line and the reset line are text-[11px] and text-[10px] under no size of their own: 18 px lines. The
-    // bar is an inline-flex box on a 24 px line, sitting on its baseline.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,

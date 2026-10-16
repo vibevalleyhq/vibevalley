@@ -21,7 +21,7 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// lanTestFarm is a farm whose gate answers the farm's API (handler.New hands it over), listens on loopback, on any port, and calls 127.0.0.1 its network address.
+// Its gate listens on loopback and calls 127.0.0.1 its network address.
 func lanTestFarm(t *testing.T, db string) *farm.Farm {
 	t.Helper()
 	t.Setenv("VIBEVALLEY_VOICE_LINE_PORT", "0")
@@ -71,7 +71,6 @@ func lanRequest(t *testing.T, method, url, key string, body any) (int, []byte) {
 	return res.StatusCode, out
 }
 
-// lanAsk sends the code from a device and returns what it gets once the owner answers.
 func lanAsk(t *testing.T, gate, code, name string) <-chan []byte {
 	t.Helper()
 	got := make(chan []byte, 1)
@@ -101,7 +100,6 @@ func lanWaitAsking(t *testing.T, f *farm.Farm, name string) {
 	t.Fatalf("%s never asked", name)
 }
 
-// lanPair pairs a device through the gate and returns its key.
 func lanPair(t *testing.T, f *farm.Farm, gate, name string) protocol.LanPaired {
 	t.Helper()
 	s, err := f.Lan.StartPairing()
@@ -161,7 +159,6 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 	if json.Unmarshal(body, &me); code != 200 || me.ID != paired.Device || me.LastSeen == nil {
 		t.Fatalf("me: %d %s", code, body)
 	}
-	// Not through the gate: the helpers' tools, the page, the gate's own settings.
 	for _, path := range []string{"/mcp", "/", "/index.html"} {
 		if code, _ := lanRequest(t, "GET", gate+path, paired.Key, nil); code != http.StatusNotFound {
 			t.Fatalf("%s: %d", path, code)
@@ -186,7 +183,6 @@ func TestLanOwnerRefuses(t *testing.T) {
 	s, _ := f.Lan.StartPairing()
 	got := lanAsk(t, gate, s.Pairing.Code, "陌生人")
 	lanWaitAsking(t, f, "陌生人")
-	// One device at a time.
 	if body := <-lanAsk(t, gate, s.Pairing.Code, "又一个"); !strings.Contains(string(body), "另一台设备") {
 		t.Fatalf("a second device: %s", body)
 	}

@@ -1,7 +1,3 @@
-// The chat app's input (web/src/desk/ChatComposer.tsx): a box across the bottom, a send button in its corner. Enter
-// sends, Shift+Enter starts a line; typing @ offers whom to name (the farm window's list: helpers on the farm, the
-// manager, everyone). In a channel or a thread the words are said there; on 田头 they go through talk.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';

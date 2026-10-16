@@ -11,10 +11,6 @@ import (
 	"vibevalley/internal/base"
 )
 
-// A farm kept under the old names, laid out as the heybro app left it: the app's home with its database, its logs, a
-// work folder with a project and a helper's worktree, an old .env, the app's preferences, and beside them the
-// TypeScript server's home and an older app's folder, which are not this server's and stay.
-
 type fakePrefs map[string][]byte
 
 func (p fakePrefs) Export(domain string) ([]byte, error) { return p[domain], nil }
@@ -41,7 +37,6 @@ func TestMigrateOldNames(t *testing.T) {
 	oldHome := filepath.Join(support, "heybro")
 	oldWork := filepath.Join(user, "heybro-work")
 
-	// The work folder: a project, and a helper's worktree under .worktrees.
 	project := filepath.Join(oldWork, "clock-in")
 	os.MkdirAll(project, 0o755)
 	oldGit(t, project, "init", "-q", "-b", "main")
@@ -49,7 +44,6 @@ func TestMigrateOldNames(t *testing.T) {
 	tree := filepath.Join(oldWork, ".worktrees", "clock-in-w1")
 	oldGit(t, project, "worktree", "add", "-q", "-b", "heybro/w1", tree)
 
-	// The app's farm: its database and files name the runtime "heybro" and hold the old paths.
 	os.MkdirAll(oldHome, 0o755)
 	db, err := base.OpenDB(filepath.Join(oldHome, "farm.db"))
 	if err != nil {
@@ -69,7 +63,6 @@ func TestMigrateOldNames(t *testing.T) {
 	os.MkdirAll(filepath.Join(user, "Library", "Logs", "heybro"), 0o755)
 	os.WriteFile(filepath.Join(user, "Library", "Logs", "heybro", "server.log"), []byte("log"), 0o644)
 
-	// Not this server's: the TypeScript server's home and an older app's folder.
 	os.MkdirAll(filepath.Join(user, ".heybro", "db"), 0o755)
 	os.MkdirAll(filepath.Join(support, "heybro Alpha", "Cache"), 0o755)
 
@@ -143,7 +136,6 @@ func TestMigrateOldNames(t *testing.T) {
 		t.Fatalf("database: %s, %s", runtime, payload)
 	}
 
-	// The project and its worktree know each other at their new places, and the helper's branch has the new prefix.
 	if got := oldGit(t, newTree, "rev-parse", "--abbrev-ref", "HEAD"); got != "vibevalley/w1" {
 		t.Fatalf("worktree: %s", got)
 	}
@@ -158,7 +150,6 @@ func TestMigrateOldNames(t *testing.T) {
 		t.Fatalf("preferences: %s", got)
 	}
 
-	// Everything that moved is in the backup, as it was.
 	if body, err := os.ReadFile(filepath.Join(backup, "0-heybro", "config.json")); err != nil || !strings.Contains(string(body), `"runtime":"heybro"`) {
 		t.Fatalf("backup: %s %v", body, err)
 	}
@@ -166,7 +157,6 @@ func TestMigrateOldNames(t *testing.T) {
 		t.Fatal("the preferences were not backed up")
 	}
 
-	// A second run finds nothing to do.
 	again, err := MigrateOldNames(MigrateOptions{UserHome: user, Backup: filepath.Join(user, "backup2"), Prefs: prefs})
 	if err != nil || len(again.Moves) != 0 || len(again.Prefs) != 0 {
 		t.Fatalf("second run: %+v %v", again, err)

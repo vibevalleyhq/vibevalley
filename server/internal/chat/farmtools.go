@@ -15,17 +15,14 @@ import (
 	"vibevalley/internal/runs"
 )
 
-// The farm's own tools for helpers (ported from the TypeScript server's farm-tools.ts, removed): talking on the group chat (田头) as themselves,
-// over MCP at /mcp on this server (127.0.0.1 only), with the official Go SDK's Streamable HTTP handler. Every helper
-// session is handed this server with a bearer token of its own (the crew, Tokens); the token says who is calling.
-// The rules are the chat's; here they are put in words a model acts on. Every tool answers in words, a refusal too.
+// The bearer token each helper session is handed (Tokens) only says who is calling. Every tool answers in words a model acts on, a refusal too.
 
 type FarmTools struct {
 	site    *base.Site
 	tokens  *runs.Tokens
 	chat    *Chat
 	handler http.Handler
-	// who is whose a bearer token is; nil: the farm's Tokens. Tests may put their own.
+	// nil: the farm's Tokens. Tests may put their own.
 	who func(token string) string
 }
 
@@ -40,10 +37,8 @@ func newFarmTools(site *base.Site, tokens *runs.Tokens, chat *Chat) (*FarmTools,
 func (*FarmTools) OnStart(context.Context) error { return nil }
 func (*FarmTools) OnStop()                       {}
 
-// Handler serves the tools (mounted at /mcp).
 func (t *FarmTools) Handler() http.Handler { return t.handler }
 
-// caller is the helper calling, from the bearer token its session was given; an error in words when there is none.
 func (t *FarmTools) caller(req *mcp.CallToolRequest) (string, error) {
 	token := ""
 	if req != nil && req.Extra != nil && req.Extra.Header != nil {
@@ -65,7 +60,6 @@ func (t *FarmTools) caller(req *mcp.CallToolRequest) (string, error) {
 	return who, nil
 }
 
-// foremanToolText is a tool's answer: what happened, or why not, in words.
 func foremanToolText(text string, err error) (*mcp.CallToolResult, any, error) {
 	if err != nil {
 		text = "没成：" + err.Error()

@@ -18,7 +18,6 @@ func coreNull(s string) any {
 	return s
 }
 
-// coreSame compares got, as JSON, with the case's output (or records it there, with -update).
 func coreSame(t *testing.T, line int, fn string, input json.RawMessage, got any, want json.RawMessage) bool {
 	t.Helper()
 	if recorded(got, "out") {
@@ -45,8 +44,7 @@ func coreDecode(t *testing.T, line int, raw json.RawMessage, v any) {
 	}
 }
 
-// The chat, recall, phase, quota, connector and settings rules against testdata/rules.jsonl.gz: seeded random calls
-// (times of day read in Asia/Shanghai).
+// Times of day are read in Asia/Shanghai.
 func TestRulesGolden(t *testing.T) {
 	zone, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {

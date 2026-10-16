@@ -18,11 +18,7 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// Projects and the code base on throwaway folders and real git repositories (project-create.test.ts,
-// codebase.test.ts). Offline; the test that runs
-// tokei itself is skipped on a machine without it.
-
-// ── Projects ─────────────────────────────────────────────────────────────────
+// The test that runs tokei itself is skipped on a machine without it.
 
 func crewProjects(t *testing.T, root string) *Projects {
 	t.Helper()
@@ -114,7 +110,6 @@ func TestCrewPlaybookBranchMerges(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(place.Cwd, "a.txt"), []byte("a\n"), 0o644)
-	// Left uncommitted: MergeInto commits it rather than lose it.
 	brought, err := p.MergeInto(place, "vibevalley/plan-1")
 	if err != nil || len(brought) != 1 {
 		t.Fatalf("merged: %v %v", brought, err)
@@ -132,7 +127,6 @@ func TestCrewPlaybookBranchMerges(t *testing.T) {
 	farmtest.Eq(t, []any{ok, out}, []any{false, "a"}, "run")
 }
 
-// ChangedFiles is a step's own work: committed or not, new files too, and not what reached the base after it forked.
 func TestCrewChangedFilesSinceTheBase(t *testing.T) {
 	root := t.TempDir()
 	p := crewProjects(t, root)
@@ -162,8 +156,6 @@ func TestCrewChangedFilesSinceTheBase(t *testing.T) {
 	got, err := p.ChangedFiles(mine.Cwd, "vibevalley/plan-1")
 	farmtest.Eq(t, []any{got, err}, []any{[]string{"a.txt", "b.txt", "c.txt", "new.txt"}, nil}, "changed")
 }
-
-// ── The code base ────────────────────────────────────────────────────────────
 
 func TestCrewTokeiOutput(t *testing.T) {
 	report := func(name string) map[string]any {
@@ -220,7 +212,6 @@ func TestCrewActivityOf(t *testing.T) {
 	farmtest.Eq(t, authors, []protocol.Author{{Name: "Me", Commits: 2}, {Name: "Colleague", Commits: 1}, {Name: "无名", Commits: 1}}, "authors")
 }
 
-// crewWorkRoot is a work directory with project app (two commits a day apart, one by someone else, and a merge) and folder notes.
 func crewWorkRoot(t *testing.T) string {
 	root := t.TempDir()
 	app := filepath.Join(root, "app")
@@ -324,7 +315,6 @@ func TestCrewLeftOversCommittedWithoutCaches(t *testing.T) {
 	farmtest.Repo(t, dir, 1, 0)
 	os.MkdirAll(filepath.Join(dir, "__pycache__"), 0o755)
 	os.WriteFile(filepath.Join(dir, "__pycache__", "greet.cpython-312.pyc"), []byte("cache"), 0o644)
-	// Only a cache left: nothing is committed.
 	if err := crewCommitLeft(dir, "补交"); err != nil {
 		t.Fatal(err)
 	}

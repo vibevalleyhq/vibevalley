@@ -8,7 +8,7 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// Text as JavaScript counts it: the rules ported from the TypeScript server cut text where it did, in UTF-16 units.
+// Text as the Dart client counts it: in UTF-16 units.
 
 // SpaceClass is JavaScript's \s (and what trim() drops); Go's \s is ASCII only.
 const SpaceClass = `\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}`
@@ -57,7 +57,6 @@ func Slice(s string, start, end int) string {
 	return string(utf16.Decode(u[start:end]))
 }
 
-// ClipLine is text on one line, cut to max UTF-16 units with an ellipsis (report.ts clip).
 func ClipLine(text string, max int) string {
 	flat := strings.Join(strings.Fields(text), " ")
 	units := utf16.Encode([]rune(flat))
@@ -79,7 +78,6 @@ func Head(s string, n int) string {
 	return s
 }
 
-// InboxLines is messages as an agent reads them, a line each.
 func InboxLines(messages []InboxMessage) string {
 	lines := make([]string, len(messages))
 	for i, m := range messages {

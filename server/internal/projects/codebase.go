@@ -18,24 +18,16 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// A project seen as a code base (ported from the TypeScript server's codebase.ts, removed), for the page that shows it: the projects with their
-// newest commit, what one is written in, and a year of its commits.
-//
-// What it is written in is counted by tokei (github.com/XAMPPRocky/tokei) when the page asks. tokei keeps to what git
-// keeps (it reads .gitignore) and tells code, comments and blank lines apart. Lock files, minified files and
-// dependency or build folders are left out. tokei has to be installed; without it the count is refused, saying how
-// to get it. Where it is is VIBEVALLEY_TOKEI, or tokei on the PATH.
-//
-// The commits are git's, on every branch (helpers' unharvested work counts too), merges left out, by local day.
+// tokei keeps to what git keeps (it reads .gitignore). Commits are counted on every branch (helpers' unharvested work counts too), merges left out,
+// by local day.
 
-// crewLeftOut is not what a project is written in (gitignore patterns, as tokei's --exclude takes them).
+// Not what a project is written in: gitignore patterns, as tokei's --exclude takes them.
 var crewLeftOut = []string{
 	"pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lock", "bun.lockb", "Cargo.lock", "go.sum", "poetry.lock", "uv.lock",
 	"Pipfile.lock", "Gemfile.lock", "composer.lock", "*.min.js", "*.min.css", "*.map", "node_modules/", "vendor/", "dist/", "build/",
 	"target/", ".venv/", "venv/", "__pycache__/", ".next/", "coverage/",
 }
 
-// crewTokeiArgs is tokei's arguments to count path, as JSON.
 func crewTokeiArgs(path string) []string {
 	args := []string{"--output", "json"}
 	for _, p := range crewLeftOut {
@@ -44,10 +36,9 @@ func crewTokeiArgs(path string) []string {
 	return append(args, path)
 }
 
-// crewNoTokei is how to get tokei, for when it is not there.
 const crewNoTokei = "统计代码要用 tokei，这台机器上没找到：装一个（brew install tokei，或 cargo install tokei）再点统计"
 
-// crewYearDays is the commit calendar's reach: 53 weeks, so a whole year of weeks shows whatever day it is.
+// 53 weeks, so a whole year of weeks shows whatever day it is.
 const crewYearDays = 53 * 7
 
 const (
@@ -55,8 +46,7 @@ const (
 	crewTokeiOutput  = 256 * 1024 * 1024
 )
 
-// crewCountsOf is tokei's JSON output as a count per language, most lines (code and comments) first; its total, and
-// languages with nothing but blank lines, left out. ok false when it is not tokei's output.
+// Its total, and languages with nothing but blank lines, left out. ok false when it is not tokei's output.
 func crewCountsOf(output string) ([]protocol.LanguageCount, bool) {
 	var raw map[string]json.RawMessage
 	if json.Unmarshal([]byte(output), &raw) != nil || raw == nil {
@@ -95,10 +85,8 @@ func crewLocaleCompare(a, b string) int {
 	return strings.Compare(a, b)
 }
 
-// crewLocalDay is a time's day on this machine's calendar, 'YYYY-MM-DD'.
 func crewLocalDay(ms int64) string { return time.UnixMilli(ms).Local().Format("2006-01-02") }
 
-// crewActivityOf is git log's `%at<tab>%aN` lines as commits per day (oldest first) and per author (most first).
 func crewActivityOf(log string, dayOf func(int64) string) (days []protocol.DayCount, authors []protocol.Author) {
 	byDay, byAuthor := map[string]int64{}, map[string]int64{}
 	for _, line := range strings.Split(log, "\n") {
@@ -134,7 +122,6 @@ func crewActivityOf(log string, dayOf func(int64) string) (days []protocol.DayCo
 	return days, authors
 }
 
-// GitQuiet is git's trimmed output, or empty when it fails (no commits yet, not a repository).
 func GitQuiet(cwd string, args ...string) string {
 	out, err := crewGit(cwd, args...)
 	if err != nil {
@@ -143,7 +130,6 @@ func GitQuiet(cwd string, args ...string) string {
 	return out
 }
 
-// crewSeconds is a time from git's `%at` (seconds) in milliseconds; 0 when there is none.
 func crewSeconds(text string) int64 {
 	n, err := strconv.ParseFloat(strings.TrimSpace(text), 64)
 	if err != nil || n <= 0 || math.IsInf(n, 0) {
@@ -168,7 +154,7 @@ func newCodebase(projects *Projects) (*Codebase, error) {
 func (*Codebase) OnStart(context.Context) error { return nil }
 func (*Codebase) OnStop()                       {}
 
-// find is only a folder the work directory has: a name is never a path of its own.
+// A name is never a path of its own.
 func (c *Codebase) find(name string) *base.Project {
 	for _, p := range c.projects.List() {
 		if p.Name == name {
@@ -178,7 +164,6 @@ func (c *Codebase) find(name string) *base.Project {
 	return nil
 }
 
-// List is the projects, each as Summary has it.
 func (c *Codebase) List(ctx context.Context) []protocol.ProjectSummary {
 	out := []protocol.ProjectSummary{}
 	for _, p := range c.projects.List() {
@@ -187,7 +172,6 @@ func (c *Codebase) List(ctx context.Context) []protocol.ProjectSummary {
 	return out
 }
 
-// Summary is a project with its newest commit's time and how many helpers may work in it at once.
 func (c *Codebase) Summary(p base.Project) protocol.ProjectSummary {
 	s := protocol.ProjectSummary{Name: p.Name, Path: p.Path, Git: p.Git, Slots: c.projects.Slots()}
 	if p.Git {
@@ -198,8 +182,6 @@ func (c *Codebase) Summary(p base.Project) protocol.ProjectSummary {
 	return s
 }
 
-// Languages is what project name is written in, counted now; nil, nil when there is no such project; an error saying
-// why it could not count.
 func (c *Codebase) Languages(ctx context.Context, name string) (*protocol.ProjectLanguages, error) {
 	project := c.find(name)
 	if project == nil {
@@ -226,7 +208,6 @@ func (c *Codebase) Languages(ctx context.Context, name string) (*protocol.Projec
 	return &protocol.ProjectLanguages{Project: name, At: base.NowMs(), Languages: languages}, nil
 }
 
-// Activity is a year of project name's commits; nil when there is no such project.
 func (c *Codebase) Activity(ctx context.Context, name string) *protocol.ProjectActivity {
 	project := c.find(name)
 	if project == nil {

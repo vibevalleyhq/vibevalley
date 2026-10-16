@@ -11,7 +11,6 @@ import (
 	"testing"
 )
 
-// recallSampleCase is a case of recall.sample.json: Pick's inputs, and the ids it picks in order.
 type recallSampleCase struct {
 	Name     string          `json:"name"`
 	Cue      recallSampleCue `json:"cue"`
@@ -19,7 +18,6 @@ type recallSampleCase struct {
 	Pick     []string        `json:"pick"`
 }
 
-// recallSampleCue is a Cue as the cases write it (and rules.jsonl.gz does): the memories to skip as a list.
 type recallSampleCue struct {
 	Helper  string   `json:"helper"`
 	Project string   `json:"project"`
@@ -28,7 +26,6 @@ type recallSampleCue struct {
 	Now     int64    `json:"now"`
 }
 
-// recallSampleGolden is how many of rules.jsonl.gz's recall cases the sample takes, the first ones.
 const recallSampleGolden = 20
 
 func TestRecallSample(t *testing.T) {
@@ -51,8 +48,6 @@ func TestRecallSample(t *testing.T) {
 	golden(t, "../../../app/schema/recall.sample.json", indented(t, cases))
 }
 
-// recallSampleGoldenCases are the first recallSampleGolden recall cases of testdata/rules.jsonl.gz (seeded random
-// memories and cues), named by their line.
 func recallSampleGoldenCases(t *testing.T) []recallSampleCase {
 	t.Helper()
 	var out []recallSampleCase
@@ -76,8 +71,6 @@ func recallSampleGoldenCases(t *testing.T) []recallSampleCase {
 	return nil
 }
 
-// recallSampleBranches are cases made for Pick's branches: what it leaves out, how it ranks, where it stops, and how
-// it reads words. The turn is helper w9's in project clock.
 func recallSampleBranches() []recallSampleCase {
 	const hour = coreDay / 24
 	cue := func(text string, skip ...string) recallSampleCue {
@@ -87,7 +80,6 @@ func recallSampleBranches() []recallSampleCase {
 		c.Helper = ""
 		return c
 	}
-	// memory is a note or a job of project ("" for every project), written ago before now.
 	memory := func(kind MemoryKind, id, project string, ago int64, text string, change ...func(*Memory)) Memory {
 		m := Memory{ID: id, Agent: "lab", Kind: kind, Text: text, At: coreNow - ago}
 		if project != "" {
@@ -110,7 +102,6 @@ func recallSampleBranches() []recallSampleCase {
 	recalled := func(ago int64) func(*Memory) {
 		return func(m *Memory) { m.Recalled, m.RecalledAt = 1, corePtr(coreNow-ago) }
 	}
-	// units is what ms take of RecallChars: their lines, a newline each.
 	units := func(ms ...Memory) int {
 		n := 0
 		for _, m := range ms {
@@ -118,7 +109,6 @@ func recallSampleBranches() []recallSampleCase {
 		}
 		return n
 	}
-	// padded is m with ~ (no word) added until it takes n units.
 	padded := func(m Memory, n int) Memory {
 		m.Text += strings.Repeat("~", n-units(m))
 		return m
@@ -132,7 +122,6 @@ func recallSampleBranches() []recallSampleCase {
 	for i := range 5 {
 		jobs = append(jobs, job(fmt.Sprintf("j%d", i), "clock", int64(i)*hour, fmt.Sprintf("打卡 接口 第 %d 件", i), by("w2")))
 	}
-	// A memory of each place and kind, ranked as listed; their lines come to RecallChars and over.
 	places := func(over int) []Memory {
 		ms := []Memory{
 			note("clock", "clock", hour, "迁移文件在 db/migrations"),

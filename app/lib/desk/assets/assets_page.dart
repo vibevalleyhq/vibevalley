@@ -1,7 +1,3 @@
-// 图鉴 (web/src/pages/AssetsPage.tsx), the asset browser as the farm's almanac: every picture on shelves by what it
-// is, each with its size, its anchor, the frames it moves with, the sheet it was cut from and the commands that make it
-// again; the mouse cursors; the sounds, to play. The rules are in assets_data.dart.
-
 import 'dart:async';
 import 'dart:convert';
 
@@ -14,7 +10,6 @@ import '../../ui/kit/kit.dart';
 import 'assets_data.dart';
 import '../shared/widgets.dart';
 
-/// What the pictures are shown on.
 enum Ground {
   check('格子'),
   grass('草地'),
@@ -24,7 +19,6 @@ enum Ground {
   final String label;
 }
 
-/// A ground behind a picture: a 12 px checker of two creams, grass green or the night's blue.
 class GroundBox extends StatelessWidget {
   const GroundBox({super.key, required this.ground, required this.child, this.padding = EdgeInsets.zero});
   final Ground ground;
@@ -73,7 +67,6 @@ const _shelfTabs = [('sprites', '图', '/assets'), ('cursors', '指针', '/asset
 class AssetsPage extends StatelessWidget {
   const AssetsPage({super.key, required this.shelf, this.id});
 
-  /// sprites, cursors or sounds.
   final String shelf;
   final String? id;
 
@@ -155,9 +148,7 @@ class AssetsPage extends StatelessWidget {
   }
 }
 
-// ── Pictures ─────────────────────────────────────────────────────────────────
-
-/// The scale a picture is shown at to fit `box` pixels: whole steps, so its pixels stay square.
+/// Whole steps, so its pixels stay square.
 double fitScale(Picture p, double box) {
   final k = box / (p.w > p.h ? p.w : p.h);
   return k >= 1 ? k.floorToDouble() : k;
@@ -197,7 +188,6 @@ class _SpritesShelfState extends ConsumerState<_SpritesShelf> {
   @override
   void didUpdateWidget(_SpritesShelf old) {
     super.didUpdateWidget(old);
-    // A link names a picture: show its shelf.
     if (widget.id != null && widget.id != old.id && _shelf != 'all' && _shelf != shelfOf(widget.id!)) _shelf = 'all';
   }
 
@@ -295,7 +285,6 @@ class _SpritesShelfState extends ConsumerState<_SpritesShelf> {
 
     return LayoutBuilder(
       builder: (context, box) {
-        // xl: list | tiles | detail; lg: list | tiles, detail under them; narrower: one column.
         final width = MediaQuery.sizeOf(context).width;
         if (width >= 1280) {
           return Row(
@@ -384,7 +373,7 @@ class _Tiles extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
-      // repeat(auto-fill, minmax(5.5rem, 1fr)) with 6 px between.
+      // As many 88 px columns as fit, 6 px between, sharing what is left.
       final columns = ((box.maxWidth + 6) / (88 + 6)).floor().clamp(1, 1000);
       final width = (box.maxWidth - 6 * (columns - 1)) / columns;
       return Wrap(
@@ -450,10 +439,8 @@ class _Tiles extends StatelessWidget {
   );
 }
 
-/// A number as the page prints it: no ".0" on whole ones.
 String _n(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
-/// One picture, large: at whole scales, its anchor and head marked, its frames played, and where it comes from.
 class _Detail extends StatefulWidget {
   const _Detail({super.key, required this.picture, required this.all, required this.ground});
   final Picture picture;
@@ -633,7 +620,6 @@ class _DetailState extends State<_Detail> {
   }
 }
 
-/// The anchor (where it stands) as a cross, the head as a ring.
 List<Widget> _markers(Picture p, double scale) => [
   Positioned(
     left: p.ax * scale - 6,
@@ -654,7 +640,6 @@ List<Widget> _markers(Picture p, double scale) => [
       child: Tooltip(
         message: '头',
         child: Container(
-          // rounded-full, squared by the skin.
           decoration: BoxDecoration(border: Border.all(color: const Color(0xFF0EA5E9), width: 2)),
         ),
       ),
@@ -754,7 +739,6 @@ class _Code extends StatelessWidget {
   );
 }
 
-/// 复制, then 复制了 for a moment.
 class CopyButton extends StatefulWidget {
   const CopyButton({super.key, required this.text});
   final String text;
@@ -799,10 +783,7 @@ class _CopyButtonState extends State<CopyButton> {
   );
 }
 
-// ── Cursors ──────────────────────────────────────────────────────────────────
-
-/// The cursors' manifest (web/src/pixel/cursors/cursors.json, bundled as assets/cursors/): each one's hotspot in its
-/// 1x picture's pixels. Null when the app was built without them.
+/// Null when the app was built without them.
 final cursorsProvider = FutureProvider<Map<String, ({double hx, double hy})>?>((ref) async {
   try {
     final raw = jsonDecode(await rootBundle.loadString('assets/cursors/cursors.json')) as Map<String, dynamic>;
@@ -873,7 +854,6 @@ class _CursorsShelfState extends ConsumerState<_CursorsShelf> {
   }
 }
 
-/// A cursor's picture shown 40 px tall, its hotspot as a red dot.
 class _CursorTile extends StatefulWidget {
   const _CursorTile({required this.name, required this.hx, required this.hy, required this.ground});
   final String name;
@@ -915,7 +895,6 @@ class _CursorTileState extends State<_CursorTile> {
   Widget build(BuildContext context) {
     const height = 40.0;
     final k = _natural == null ? null : height / _natural!;
-    // p-1, the picture's 64 px well, the name on its 18 px line.
     return Padding(
       padding: const EdgeInsets.all(4),
       child: Column(
@@ -943,11 +922,7 @@ class _CursorTileState extends State<_CursorTile> {
                           top: widget.hy * k - 4,
                           width: 8,
                           height: 8,
-                          child: Container(
-                            // Square under the skin, its ring-2 the skin's inner cream-300 line.
-                            color: Palette.berry,
-                            foregroundDecoration: pxRing,
-                          ),
+                          child: Container(color: Palette.berry, foregroundDecoration: pxRing),
                         ),
                     ],
                   ),
@@ -962,8 +937,6 @@ class _CursorTileState extends State<_CursorTile> {
     );
   }
 }
-
-// ── Sounds ───────────────────────────────────────────────────────────────────
 
 class _SoundsShelf extends StatelessWidget {
   const _SoundsShelf();
@@ -1008,7 +981,6 @@ class _SoundButton extends StatelessWidget {
     builder: (context, s) {
       Widget b = Container(
         padding: const EdgeInsets.fromLTRB(8, 6, 14, 6),
-        // The focus ring's inner line wins over the button's drop, as the skin has it.
         color: s.hovered ? Palette.cream300 : Palette.cream200,
         foregroundDecoration: pxRing,
         child: Row(

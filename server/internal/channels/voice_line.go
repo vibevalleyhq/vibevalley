@@ -25,28 +25,19 @@ import (
 	"vibevalley/internal/manager"
 )
 
-// The voice line (ported from the TypeScript server's voice-line.ts, removed): Agora's Conversational AI asks the farm's own manager instead of a
-// hosted LLM. A listener of its own (VIBEVALLEY_VOICE_LINE_PORT, default 8788, on 127.0.0.1) serves one thing only,
-// OpenAI's chat completions at /llm/<call>/chat/completions, streamed; nothing else of the farm is reachable through
-// it. Agora's cloud reaches it through a tunnel: VIBEVALLEY_VOICE_LINE_URL when you run your own, else a cloudflared quick
-// tunnel opened for the first call (waited for until it answers) and closed ten minutes after the last. Each call has
-// a key of its own, good until the call ends; a request without it is refused. Only the newest thing said is taken
-// from the request: the manager keeps the conversation itself.
-// Rationale: .agents/notes/implemented/feature/2026-10-10-voice-through-our-manager.md.
+// Only this one endpoint is reachable through the tunnel, and only with the call's own key. Only the newest thing said is taken from a request: the
+// manager keeps the conversation itself.
 
-// voiceLineModel is the model name the line answers as.
 const voiceLineModel = "vibevalley-manager"
 
 const (
-	// voiceLineReady: a new quick tunnel's address takes a while to answer (seen: about 25 s); this long at most is waited.
+	// A new quick tunnel's address takes a while to answer (seen: about 25 s).
 	voiceLineReady = 60 * time.Second
-	// voiceLineLinger: the tunnel stays up this long after the last call, so calling again does not wait for a new one.
-	voiceLineLinger = 10 * time.Minute
-	// voiceLineMisheard is said when a request carries nothing the person said.
+	// So calling again does not wait for a new tunnel.
+	voiceLineLinger   = 10 * time.Minute
 	voiceLineMisheard = "嗯？我没听清，你再说一遍？"
 )
 
-// voiceLastUserText is the newest thing the person said in an OpenAI chat request; empty when there is none.
 func voiceLastUserText(body any) string {
 	obj, _ := body.(map[string]any)
 	messages, ok := obj["messages"].([]any)
@@ -76,7 +67,6 @@ func voiceLastUserText(body any) string {
 	return ""
 }
 
-// voiceSSEChunk is one server-sent chunk of a streamed chat completion: some words, or the end (stop).
 func voiceSSEChunk(id string, created int64, content string, stop, first bool) string {
 	delta := map[string]any{}
 	var finish any
@@ -105,8 +95,7 @@ func voiceSSEChunk(id string, created int64, content string, stop, first bool) s
 
 var voiceLineRoute = regexp.MustCompile(`^/llm/([\w-]+)/chat/completions$`)
 
-// voiceLineAnswer is the line's one handler: who may ask, what was said, the manager's words streamed back. call's
-// words stop when its context ends: Agora hangs up on an answer when the person talks over it.
+// call's words stop when its context ends: Agora hangs up on an answer when the person talks over it.
 func voiceLineAnswer(keyOf func(call string) string, call func(ctx context.Context, text string) <-chan string, logf func(string, ...any)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		route := voiceLineRoute.FindStringSubmatch(r.URL.Path)
@@ -177,8 +166,6 @@ func voiceLineAnswer(keyOf func(call string) string, call func(ctx context.Conte
 	})
 }
 
-// ── The tunnel ──────────────────────────────────────────────────────────────
-
 var voiceQuickTunnel = regexp.MustCompile(`https://[a-z0-9-]+\.trycloudflare\.com`)
 
 type voiceTunnel struct {
@@ -186,7 +173,6 @@ type voiceTunnel struct {
 	close func()
 }
 
-// voiceOpenQuickTunnel is a cloudflared quick tunnel to port: its public address once cloudflared says it.
 func voiceOpenQuickTunnel(port int) (*voiceTunnel, error) {
 	cmd := exec.Command("cloudflared", "tunnel", "--no-autoupdate", "--url", fmt.Sprintf("http://127.0.0.1:%d", port))
 	// cloudflared says its address on either stream; both are read until it exits, so it never blocks on a write.
@@ -225,8 +211,7 @@ func voiceOpenQuickTunnel(port int) (*voiceTunnel, error) {
 	}
 }
 
-// voiceTunnelAnswers waits until the tunnel answers (the line refusing a keyless request is an answer), or
-// voiceLineReady runs out.
+// The line refusing a keyless request counts as an answer.
 func voiceTunnelAnswers(url string) bool {
 	client := &http.Client{Timeout: 5 * time.Second}
 	for deadline := time.Now().Add(voiceLineReady); time.Now().Before(deadline); {
@@ -242,25 +227,19 @@ func voiceTunnelAnswers(url string) bool {
 	return false
 }
 
-// ── The service ─────────────────────────────────────────────────────────────
-
 type VoiceLine struct {
-	// port is where the line listens on 127.0.0.1 (0: any); url is a tunnel of your own, empty for cloudflared's.
-	port int
-	url  string
-	// call is the manager answering; the Foreman's Call unless a test says otherwise.
-	call func(ctx context.Context, text string) <-chan string
-	// openTunnel opens the quick tunnel; tests replace it.
+	port       int
+	url        string
+	call       func(ctx context.Context, text string) <-chan string
 	openTunnel func(port int) (*voiceTunnel, error)
 
 	server   *http.Server
 	listener net.Listener
-	// problem is why the line is not listening, when it is not.
-	problem string
+	problem  string
 
 	mu   sync.Mutex
 	keys map[string]string
-	// tmu guards the tunnel apart from the keys: opening one waits for it to answer, through this very line.
+	// Apart from the keys: opening a tunnel waits for it to answer, through this very line.
 	tmu     sync.Mutex
 	tunnel  *voiceTunnel
 	closing *time.Timer
@@ -290,8 +269,7 @@ func newVoiceLine(foreman *manager.Foreman) (*VoiceLine, error) {
 	return l, nil
 }
 
-// start listens, local only like the farm: the tunnel is the one way in from outside. A port taken leaves the farm
-// running without the line; a call that wants it is told why.
+// Local only, like the farm: the tunnel is the one way in from outside.
 func (l *VoiceLine) OnStart(ctx context.Context) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", l.port))
 	if err != nil {
@@ -326,7 +304,6 @@ func (l *VoiceLine) OnStop() {
 	}
 }
 
-// base is where Agora reaches the line: your tunnel, else the quick tunnel, opened when there is none.
 func (l *VoiceLine) base() (string, error) {
 	if l.url != "" {
 		return l.url, nil
@@ -347,7 +324,6 @@ func (l *VoiceLine) base() (string, error) {
 	return l.tunnel.url, nil
 }
 
-// Open is a line for a new call: the tunnel up, a key of its own. Refused with why not.
 func (l *VoiceLine) Open() (base.CallLine, error) {
 	if l.problem != "" {
 		return base.CallLine{}, errors.New(l.problem)
@@ -371,7 +347,6 @@ func (l *VoiceLine) Open() (base.CallLine, error) {
 	return base.CallLine{ID: id, Key: key, URL: url + "/llm/" + id + "/chat/completions"}, nil
 }
 
-// Close: the call ended, its key no longer works; the tunnel closes a while after the last call.
 func (l *VoiceLine) Close(id string) {
 	l.mu.Lock()
 	delete(l.keys, id)

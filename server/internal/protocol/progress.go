@@ -1,10 +1,7 @@
 package protocol
 
-// Coins, streaks and achievements (packages/protocol/src/progress.ts): the farm's ledger, folded in order
-// (ProgressOf). Outcomes earn, not effort: what counts is work that went into the main branch, never commands run or
-// tokens spent. Levels follow the commit count (LevelForCommits, XPToNext in view.go). The design and why:
-// .agents/notes/implemented/feature/2026-10-11-achievements.md. Nothing here changes what it is given: what it
-// changes, it copies.
+// Outcomes earn, not effort: what counts is work that went into the main branch, never commands run or tokens spent
+// (.agents/notes/implemented/feature/2026-10-11-achievements.md). Nothing here changes what it is given: what it changes, it copies.
 
 import (
 	"maps"
@@ -13,9 +10,6 @@ import (
 	"time"
 )
 
-// ── Levels: the farm grows with your commits ─────────────────────────────────
-
-// CommitsForLevel is the commits a farm has at the start of level.
 func CommitsForLevel(level int64) int64 {
 	var total int64
 	for l := int64(1); l < level; l++ {
@@ -23,8 +17,6 @@ func CommitsForLevel(level int64) int64 {
 	}
 	return total
 }
-
-// ── The achievements ─────────────────────────────────────────────────────────
 
 type AchievementCategory string
 
@@ -49,19 +41,17 @@ var CategoryText = map[AchievementCategory]string{
 type AchievementDef struct {
 	ID       string              `json:"id"`
 	Category AchievementCategory `json:"category"`
-	// Title is its name; a tiered one may name each tier (TierTitles: none, or three).
+	// TierTitles: none, or three.
 	Title      string   `json:"title"`
 	TierTitles []string `json:"tierTitles,omitzero"`
-	// Detail is what counts, in a phrase: 「收进主分支的活」.
-	Detail string `json:"detail"`
-	// Tiers is the count each tier needs: three for bronze, silver and gold; one for a one-off.
+	Detail     string   `json:"detail"`
+	// Three for bronze, silver and gold; one for a one-off.
 	Tiers []int64 `json:"tiers"`
-	// Unit is what a count is in words, for progress bars: 「件」「步」「级」.
-	Unit string `json:"unit,omitzero"`
+	Unit  string  `json:"unit,omitzero"`
 }
 
 var Achievements = []AchievementDef{
-	// The first things to try on the farm: one each, in this order.
+	// One each, in this order.
 	{ID: "s_open", Category: AchievementCategoryStarter, Title: "开门", Detail: "开工", Tiers: []int64{1}},
 	{ID: "s_hire", Category: AchievementCategoryStarter, Title: "派活", Detail: "派出第一个帮工", Tiers: []int64{1}},
 	{ID: "s_tell", Category: AchievementCategoryStarter, Title: "带话", Detail: "给帮工带一句话：浇水，或者在它的工单串里说", Tiers: []int64{1}},
@@ -99,7 +89,6 @@ func AchievementOf(id string) *AchievementDef {
 	return nil
 }
 
-// TierTitle is what a tier is called: its own name, or the achievement's with 银牌 or 金牌 before it.
 func TierTitle(a AchievementDef, tier int64) string {
 	if tier >= 1 && tier <= int64(len(a.TierTitles)) {
 		return a.TierTitles[tier-1]
@@ -113,10 +102,8 @@ func TierTitle(a AchievementDef, tier int64) string {
 	return a.Title
 }
 
-// IsTitle is whether an achievement can be worn as the farm's title: any but a starter task.
 func IsTitle(a AchievementDef) bool { return a.Category != AchievementCategoryStarter }
 
-// TierOf is the highest tier of an achievement reached. 0: none yet.
 func TierOf(p Progress, id string) int64 {
 	var t int64
 	for _, u := range p.Unlocked {
@@ -127,7 +114,6 @@ func TierOf(p Progress, id string) int64 {
 	return t
 }
 
-// TierCoins is the coins for reaching a tier: a first task, a bronze, silver or gold, a secret.
 func TierCoins(a AchievementDef, tier int64) int64 {
 	switch a.Category {
 	case AchievementCategoryStarter:
@@ -141,19 +127,14 @@ func TierCoins(a AchievementDef, tier int64) int64 {
 	return 0
 }
 
-// ── Coins and streaks ────────────────────────────────────────────────────────
-
-// StreakMultiplier is +10% per harvest in a row after the first, at most ×2.
 func StreakMultiplier(streak int64) float64 {
 	return math.Min(2, 1+0.1*float64(max(0, streak-1)))
 }
 
-// HarvestCoins is a helper's work harvested: 30, and 5 for each commit up to 30 more, times the streak.
 func HarvestCoins(commits, streak int64) int64 {
 	return progressRound(float64(30+min(commits*5, 30)) * StreakMultiplier(streak))
 }
 
-// PlaybookCoins is a playbook harvested: 30, and 10 for each step merged.
 func PlaybookCoins(merged int64) int64 { return 30 + 10*merged }
 
 // cheapCNY: under this, a harvested job is cheap (一分钱一分货).
@@ -162,16 +143,12 @@ const cheapCNY = 0.05
 // progressRound is JavaScript's Math.round: halves go up.
 func progressRound(x float64) int64 { return int64(math.Floor(x + 0.5)) }
 
-// ── The fold ─────────────────────────────────────────────────────────────────
-
-// Seen is what the fold remembers beside the progress: what each helper went through before its harvest.
 type Seen struct {
 	Told       []string `json:"told"`
 	Failed     []string `json:"failed"`
 	Conflicted []string `json:"conflicted"`
 	Reviewed   []string `json:"reviewed"`
-	// Runtimes some work was harvested from.
-	Runtimes []string `json:"runtimes"`
+	Runtimes   []string `json:"runtimes"`
 }
 
 type Folded struct {
@@ -187,7 +164,7 @@ func EmptyFolded() Folded {
 	return Folded{Progress: EmptyProgress(), Seen: Seen{Told: []string{}, Failed: []string{}, Conflicted: []string{}, Reviewed: []string{}, Runtimes: []string{}}}
 }
 
-// progressAdd is list with item at the end, unless it is there already; never list's own array.
+// Never list's own array.
 func progressAdd(list []string, item string) []string {
 	if slices.Contains(list, item) {
 		return list
@@ -216,7 +193,6 @@ func progressAtLeast(counts map[string]int64, id string, value int64) map[string
 	return next
 }
 
-// progressTallied is an agent's record, one more of what e was: a helper sent, its work harvested, a turn failed.
 func progressTallied(p Progress, e LedgerEntryValue) Progress {
 	var agent *string
 	var bump func(*AgentTally)
@@ -274,8 +250,7 @@ func progressAtOf(e LedgerEntryValue) int64 {
 	return 0
 }
 
-// ProgressStep is one entry into the fold (progress.ts step): the progress after it, and what it brought. Night and
-// weekend are told in the server's own time zone (time.Local), as JavaScript's Date does.
+// Night and weekend are told in the server's own time zone (time.Local), as JavaScript's Date does.
 func ProgressStep(folded Folded, entry LedgerEntry) (Folded, ProgressNews) {
 	p, seen := folded.Progress, folded.Seen
 	counts := p.Counts
@@ -393,7 +368,6 @@ func ProgressStep(folded Folded, entry LedgerEntry) (Folded, ProgressNews) {
 	return Folded{Progress: next, Seen: seen}, news
 }
 
-// ProgressFold is the whole ledger folded, in order, from a fold so far (progress.ts fold).
 func ProgressFold(entries []LedgerEntry, from Folded) Folded {
 	for _, e := range entries {
 		from, _ = ProgressStep(from, e)
@@ -403,9 +377,6 @@ func ProgressFold(entries []LedgerEntry, from Folded) Folded {
 
 func ProgressOf(entries []LedgerEntry) Progress { return ProgressFold(entries, EmptyFolded()).Progress }
 
-// ── What the farm's facts tell of ────────────────────────────────────────────
-
-// fullHouse is every bed busy at once (满园春色).
 const fullHouse = 6
 
 func progressWorking(state FarmState) int {
@@ -418,8 +389,6 @@ func progressWorking(state FarmState) int {
 	return n
 }
 
-// progressPlaybookEntry is a playbook harvested: its merged steps, and whether a batch of them (one column of its
-// plan) was done at once.
 func progressPlaybookEntry(pb Playbook) LedgerEntry {
 	merged := map[string]bool{}
 	for _, n := range pb.Nodes {
@@ -439,9 +408,8 @@ func progressPlaybookEntry(pb Playbook) LedgerEntry {
 	return LedgerEntry{LedgerEntryPlaybook{Playbook: pb.ID, Merged: int64(len(merged)), Parallel: parallel}}
 }
 
-// EntriesFor is the entries a fact tells of, from the core state before and after it, with At left for whoever
-// records them (progress.ts LedgerInput). Only what the person does in the app (a voice call, a review, coins carried,
-// a title) is recorded where it happens: everything the farm does is told by its facts, which the ledger follows.
+// Only what the person does in the app (a voice call, a review, coins carried, a title) is recorded where it happens: everything the farm does is
+// told by its facts.
 func EntriesFor(before FarmState, fact Fact, after FarmState) []LedgerEntry {
 	out := []LedgerEntry{}
 	switch f := fact.Value.(type) {
@@ -470,7 +438,6 @@ func EntriesFor(before FarmState, fact Fact, after FarmState) []LedgerEntry {
 		agent := f.Helper.Agent
 		out = append(out, LedgerEntry{LedgerEntryHired{Helper: f.Helper.ID, Agent: &agent}})
 	case FactIssue:
-		// A playbook's issue: planned (a draft after the planning), harvested (done).
 		if f.Issue.Plan == nil {
 			break
 		}
@@ -508,7 +475,6 @@ func EntriesFor(before FarmState, fact Fact, after FarmState) []LedgerEntry {
 		}
 		switch f.Message.FromKind {
 		case SenderKindUser:
-			// The person's words in a helper's job thread are words for it; the helpers on the farm it names are called.
 			if f.Thread != nil {
 				out = append(out, LedgerEntry{LedgerEntryTold{Helper: *f.Thread}})
 			}
@@ -518,7 +484,6 @@ func EntriesFor(before FarmState, fact Fact, after FarmState) []LedgerEntry {
 				}
 			}
 		case SenderKindHelper:
-			// A helper answering another's call: a handoff.
 			if f.Answers != nil {
 				out = append(out, LedgerEntry{LedgerEntryHandoff{Helper: *f.Answers, To: f.Message.From}})
 			}
@@ -546,7 +511,6 @@ func progressNewMessage(state FarmState, seq int64) bool {
 	return state.Chat == nil || !slices.ContainsFunc(state.Chat.Messages, func(m ChatMessage) bool { return m.Seq == seq })
 }
 
-// CatchUp is, on start, a level the farm reached before the ledger knew of it.
 func CatchUp(state FarmState) []LedgerEntry {
 	var total int64
 	if state.Commits != nil {
@@ -565,8 +529,6 @@ func CatchUp(state FarmState) []LedgerEntry {
 	return []LedgerEntry{}
 }
 
-// AchievementStanding is how far an achievement is: its tier, its count, and what the next tier needs (nil once all
-// are reached).
 type AchievementStanding struct {
 	Tier  int64  `json:"tier"`
 	Count int64  `json:"count"`

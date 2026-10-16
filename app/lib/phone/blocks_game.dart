@@ -1,6 +1,3 @@
-// 方块 on the farm phone (web/src/phone/Blocks.tsx): the rules are blocks.dart's; here the clock, the pad and the
-// drawing, in the phone's four greens. Leaving the game (or putting the phone away) pauses it where it is.
-
 import 'dart:math' as math;
 
 import 'package:flutter/scheduler.dart';
@@ -13,15 +10,13 @@ import 'lcd.dart';
 import 'pad.dart';
 import 'widgets.dart';
 
-/// The game in progress, kept while the phone is away; and the best score this session.
 final blocksGameProvider = NotifierProvider<Kept<Blocks?>, Blocks?>(() => Kept(null));
 final blocksBestProvider = NotifierProvider<Kept<int>, int>(() => Kept(0));
 
-/// A cell's size on screen: the small phone's, and the big one's while the game is up.
 const _cellSmall = 9.0;
 const _cellBig = 14.0;
 
-/// Each piece a shade: the light ones get an inner square, so they read on the screen.
+/// The light ones get an inner square, so they read on the screen.
 const _shade = [Lcd.dark, Lcd.ink, Lcd.dark, Lcd.mid, Lcd.ink, Lcd.mid, Lcd.dark];
 
 class BlocksGame extends ConsumerStatefulWidget {
@@ -50,7 +45,6 @@ class _BlocksGameState extends ConsumerState<BlocksGame> with SingleTickerProvid
 
   Blocks? get _g => ref.read(blocksGameProvider);
 
-  /// Runs the clock while a game is on and not paused.
   void _sync() {
     final g = _g;
     final on = _playing && g != null && !g.over;
@@ -204,7 +198,6 @@ class _WellPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final p = Paint()..isAntiAlias = false;
     canvas.drawRect(Offset.zero & Size(blocksWidth * cell, blocksHeight * cell), p..color = Lcd.paper);
-    // A bevel of a pixel per seven of the cell: one on the small phone, two on the big.
     final b = math.max(1, (cell / 7).round()).toDouble();
     void block(int x, int y, Color? shade) {
       if (y < 0) return;
@@ -261,7 +254,6 @@ class _Next extends StatelessWidget {
   );
 }
 
-/// The next piece on a 4×2 grid, fitted into its box as the web page's SVG viewBox is (centred, uniform scale).
 class _NextPainter extends CustomPainter {
   _NextPainter(this.kind);
   final PieceKind? kind;

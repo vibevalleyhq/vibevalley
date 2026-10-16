@@ -1,9 +1,7 @@
 package chat
 
-// The group chat's queries (the TypeScript server's db/queries/chat.sql, removed, rewritten for SQLite against migrations/0001_farm.sql):
-// times are milliseconds passed in by the caller (SQLite has no now() in milliseconds that matches NowMs), booleans
-// are 0/1, meta is JSON text. A chatStore runs on the database or on an open transaction: with one connection, a
-// query outside the transaction while it is open would wait for ever.
+// Times are milliseconds passed in by the caller (SQLite has no now() in milliseconds that matches NowMs), booleans 0/1, meta JSON text. A chatStore
+// runs on the database or on an open transaction: with one connection, a query outside the transaction while it is open would wait for ever.
 
 import (
 	"database/sql"
@@ -13,7 +11,6 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// chatQ is what *sql.DB and *sql.Tx share.
 type chatQ interface {
 	Exec(query string, args ...any) (sql.Result, error)
 	Query(query string, args ...any) (*sql.Rows, error)
@@ -22,7 +19,6 @@ type chatQ interface {
 
 type chatStore struct{ q chatQ }
 
-// chatMeta is what a message row carries beside its words.
 type chatMeta struct {
 	Mentions    []string          `json:"mentions,omitempty"`
 	Helper      string            `json:"helper,omitempty"`
@@ -32,7 +28,7 @@ type chatMeta struct {
 	Code        string            `json:"code,omitempty"`
 }
 
-// chatMetaOf reads a row's meta; anything unreadable is no meta.
+// Anything unreadable is no meta.
 func chatMetaOf(raw *string) chatMeta {
 	var m chatMeta
 	if raw == nil || *raw == "" {
@@ -139,7 +135,7 @@ const (
 from messages m join participants p on p.id = m.sender_id`
 	chatConvCols = `id, kind, parent_seq, subject_kind, subject_id, last_seq, reply_count, created_at, name, description, project, channel_id
 from conversations`
-	// chatNoSeq is "before every message" where a query wants an upper bound.
+	// "Before every message" where a query wants an upper bound.
 	chatNoSeq = int64(1) << 62
 )
 
@@ -184,7 +180,6 @@ func chatFirst[T any](list []T, err error) (*T, error) {
 	return &list[0], nil
 }
 
-// chatOne is a single integer an aggregate answers.
 func (s chatStore) one(query string, args ...any) (int64, error) {
 	var n int64
 	err := s.q.QueryRow(query, args...).Scan(&n)
@@ -198,8 +193,6 @@ func (s chatStore) exec(query string, args ...any) error {
 	_, err := s.q.Exec(query, args...)
 	return err
 }
-
-// ── Participants and conversations ──────────────────────────────────────────
 
 func (s chatStore) upsertParticipant(id, kind, name string, agent, runtime *string, at int64) error {
 	return s.exec(`insert into participants (id, kind, name, agent_id, runtime, joined_at) values (?, ?, ?, ?, ?, ?)
@@ -280,8 +273,6 @@ set last_seq = max(coalesce(last_seq, 0), ?),
 where id = ?`, seq, id)
 }
 
-// ── Messages ────────────────────────────────────────────────────────────────
-
 func (s chatStore) insertMessage(conversation int64, sender, kind, body string, final bool, meta *chatMeta, at int64) (int64, error) {
 	m, err := chatMetaText(meta)
 	if err != nil {
@@ -313,7 +304,7 @@ func (s chatStore) recentMessages(limit int) ([]chatMsgRow, error) {
 	return chatRows(rows, err, chatScanMsg)
 }
 
-// messagesBefore is newest first.
+// Newest first.
 func (s chatStore) messagesBefore(conversation, before int64, limit int) ([]chatMsgRow, error) {
 	rows, err := s.q.Query(`select `+chatMsgCols+` where m.conversation_id = ? and m.seq < ? order by m.seq desc limit ?`, conversation, before, limit)
 	return chatRows(rows, err, chatScanMsg)
@@ -340,8 +331,6 @@ func (s chatStore) finalizeAll(at int64) error {
 	return s.exec(`update messages set final = 1, updated_at = ? where not final`, at)
 }
 
-// calledBy is the helper that named speaker in a conversation since speaker last spoke there (before message
-// before): the call speaker is now answering.
 func (s chatStore) calledBy(speaker string, conversation, before int64) (*string, error) {
 	rows, err := s.q.Query(`select m.sender_id
 from messages m
@@ -357,8 +346,6 @@ limit 1`, speaker, conversation, speaker, before, conversation, speaker, before)
 		return id, err
 	}))
 }
-
-// ── Mentions, follows, read cursors, seen marks ─────────────────────────────
 
 func (s chatStore) insertMention(seq int64, target, resolved string) error {
 	return s.exec(`insert into mentions (message_seq, target_id, resolved) values (?, ?, ?) on conflict do nothing`, seq, target, resolved)
@@ -398,7 +385,7 @@ func (s chatStore) pruneSeenMarks(participant string, conversation, upto int64) 
   and message_seq in (select seq from messages where conversation_id = ? and seq <= ?)`, participant, conversation, upto)
 }
 
-// unseenIn is newest first.
+// Newest first.
 func (s chatStore) unseenIn(conversation int64, participant string) ([]int64, error) {
 	rows, err := s.q.Query(`select m.seq from messages m
 where m.conversation_id = ? and m.sender_id <> ? and m.final
@@ -407,8 +394,6 @@ where m.conversation_id = ? and m.sender_id <> ? and m.final
 order by m.seq desc`, conversation, participant, participant, conversation, participant)
 	return chatRows(rows, err, chatScanInt)
 }
-
-// ── Deliveries ──────────────────────────────────────────────────────────────
 
 func (s chatStore) insertDelivery(d protocol.Delivery, seq, at int64) error {
 	var held *string
@@ -487,7 +472,6 @@ func (s chatStore) dropOpen(recipient, why string) error {
 where recipient_id = ? and state in ('pending', 'announced', 'handed')`, why, recipient)
 }
 
-// agentWakesSinceUser is how many agents agents woke in a conversation since the person last spoke there (hops).
 func (s chatStore) agentWakesSinceUser(conversation int64) (int64, error) {
 	return s.one(`select count(*) from deliveries d
 join messages m on m.seq = d.message_seq
@@ -504,7 +488,6 @@ where conversation_id = ? and sender_id = 'system' and json_extract(meta, '$.cod
   and seq > coalesce((select max(seq) from messages where conversation_id = ? and sender_id = 'user'), 0)`, conversation, conversation)
 }
 
-// lastAgentWake is when an agent last woke recipient (ms); 0 when never.
 func (s chatStore) lastAgentWake(recipient string) (int64, error) {
 	return s.one(`select coalesce(max(d.created_at), 0) from deliveries d
 join messages m on m.seq = d.message_seq
@@ -512,7 +495,6 @@ join participants s on s.id = m.sender_id
 where d.recipient_id = ? and s.kind in ('helper', 'foreman') and d.wakes and d.held_by is null`, recipient)
 }
 
-// inboxOf is what participant has not read, by conversation, newest first: its channel's, and the threads it follows.
 func (s chatStore) inboxOf(participant string, channel int64) ([]chatInboxRow, error) {
 	rows, err := s.q.Query(`select c.id, c.kind, c.parent_seq, c.subject_kind, c.subject_id, coalesce(ch.name, c.name),
        count(m.seq),

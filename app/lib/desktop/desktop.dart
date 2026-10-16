@@ -1,12 +1,3 @@
-// vibevalley's desktop app on macOS, the Dart half (the Swift half is macos/Runner: the window with its title bar hidden,
-// the menu bar icon, notifications, the global voice shortcut, single instance, opening at login). See docs/desktop.md:
-// the farm runs inside the app (launcher.dart), the menu bar says what goes on,
-// notifications tell what waits while the farm is not in front of you, and quitting stops the farm cleanly.
-//
-// main.dart awaits `startDesktop()` before runApp (the farm's address must be known before the first provider reads
-// it) and puts `DesktopHost` around the app. Screens read `desktopProvider`: the title bar to draw and the commands
-// to run (the voice shortcut, a notification clicked).
-
 import 'dart:async';
 import 'dart:io';
 
@@ -26,16 +17,13 @@ import 'notify.dart';
 export 'command.dart';
 export 'channel.dart' show DesktopChannel, desktopChannel;
 
-/// The title bar the farm draws (the system's is hidden; its traffic lights sit on this one).
 const desktopTitleBar = 28.0;
 
-/// The global shortcut that starts and ends a voice call with the manager, in Electron's accelerator notation.
+/// In Electron's accelerator notation, which the Swift side parses.
 const desktopVoiceShortcut = 'Alt+Shift+Space';
 
-/// Whether this is the macOS desktop app (the window's title bar is the farm's to draw).
 bool get isMacDesktop => !kIsWeb && Platform.isMacOS;
 
-/// The voice shortcut as a Mac writes it: Alt+Shift+Space → ⌥⇧Space (web/src/desktop.ts shortcutText).
 String shortcutText(String accelerator) => accelerator
     .split('+')
     .map(
@@ -49,7 +37,6 @@ String shortcutText(String accelerator) => accelerator
     )
     .join();
 
-/// What the screens need of the desktop app (protocol desktop.ts DesktopBridge, as Dart).
 class Desktop {
   const Desktop({
     required this.isDesktop,
@@ -61,7 +48,6 @@ class Desktop {
     required this.commands,
   });
 
-  /// Not the desktop app (a phone, a test): no title bar, no commands.
   static const none = Desktop(
     isDesktop: false,
     titleBarHeight: 0,
@@ -74,23 +60,17 @@ class Desktop {
 
   final bool isDesktop;
 
-  /// How tall the farm draws the window's title bar; 0: none to draw.
+  /// 0: none to draw.
   final double titleBarHeight;
 
-  /// The window's name, its channel after it: 「码农场物语 · Alpha」.
   final String title;
 
-  /// The global voice shortcut, in Electron's accelerator notation (shortcutText makes ⌥⇧Space of it).
   final String voiceShortcut;
 
-  /// The app captures and plays the call itself (the Agora SDK in lib/voice), not a web page.
   final bool nativeVoice;
 
-  /// Transcripts go to the manager to dispatch work.
   final bool voiceDispatch;
 
-  /// What the farm's screens run: the voice shortcut and the menu bar's 和管家说话 (DesktopVoice), a notification
-  /// clicked (open a bed, a conversation, a playbook, the achievements).
   final Stream<DesktopCommand> commands;
 }
 
@@ -105,7 +85,6 @@ final desktopProvider = Provider<Desktop>(
           voiceDispatch: true,
           commands: DesktopHostChannel.instance.commands,
         )
-      // A phone has no window to manage; its notifications open things the same way (mobile/notices.dart).
       : isPhone
       ? Desktop(
           isDesktop: false,
@@ -167,14 +146,10 @@ class DesktopHostChannel {
       _invoke('notify', {'title': notice.title, 'body': notice.body, if (notice.open != null) 'command': notice.open!.toJson()});
 }
 
-/// Where VibeValley keeps the farm on this Mac: VIBEVALLEY_HOME, else ~/Library/Application Support/vibevalley (a
-/// channel's own folder for alpha and beta).
 String desktopHome(Map<String, String> env) => env['VIBEVALLEY_HOME'] ?? '${env['HOME'] ?? ''}/Library/Application Support/${desktopChannel.productName}';
 
-/// Where the helpers work: VIBEVALLEY_WORK_ROOT, else ~/vibevalley-work.
 String desktopWorkRoot(Map<String, String> env) => env['VIBEVALLEY_WORK_ROOT'] ?? '${env['HOME'] ?? ''}/vibevalley-work';
 
-/// The server in the bundle (tool/build-macos.sh puts it beside the app's executable); VIBEVALLEY_SERVER_BIN instead.
 String? bundledServer(Map<String, String> env) {
   final given = env['VIBEVALLEY_SERVER_BIN'];
   if (given != null && given.isNotEmpty) return given;
@@ -182,10 +157,6 @@ String? bundledServer(Map<String, String> env) {
   return File(beside).existsSync() ? beside : null;
 }
 
-/// Starts the desktop app's half before the first frame: tells the window its title, and starts the farm inside the
-/// app unless the app uses another machine's farm (data/farm_choice.dart), --dart-define=VIBEVALLEY_SERVER names one, or
-/// the bundle has no server (a `flutter run` without it, which then uses VIBEVALLEY_SERVER's default). When the farm
-/// cannot start, says why and quits.
 Future<void> startDesktop() async {
   if (!isMacDesktop) return;
   final host = DesktopHostChannel.instance.._listen();
@@ -194,8 +165,6 @@ Future<void> startDesktop() async {
   await startLocalFarm();
 }
 
-/// Starts the farm inside the app when it is not running yet: at startup, or when the app goes back to this
-/// machine's farm from another's. The farm keeps running while the app uses another machine's.
 Future<void> startLocalFarm() async {
   if (!isMacDesktop || embeddedServerAddress != null) return;
   final host = DesktopHostChannel.instance.._listen();
@@ -212,7 +181,7 @@ Future<void> startLocalFarm() async {
   final path = await loginShellPath(env['PATH'] ?? '/usr/bin:/bin:/usr/sbin:/sbin');
   final launcher = ServerLauncher(
     binary: binary,
-    // The home .env under this process's environment (set values win), the login shell's PATH on top.
+    // Set values win over the home .env; the login shell's PATH goes on top.
     environment: {...fromHome, ...env, 'PATH': path, 'VIBEVALLEY_HOME': home, 'VIBEVALLEY_WORK_ROOT': desktopWorkRoot(env)},
     logFile: File('${env['HOME'] ?? ''}/Library/Logs/${desktopChannel.productName}/server.log'),
     workingDirectory: home,
@@ -235,9 +204,7 @@ Future<Map<String, String>> _readEnvFile(String path) async {
   }
 }
 
-/// Follows the farm for the menu bar and the notifications while the app runs: the summary from every frame, a
-/// notification for each new call, achievement and error. Swift shows a notification only while the farm's window
-/// is not in front (in front, the farm says it itself).
+/// Swift shows a notification only while the farm's window is not in front (in front, the farm says it itself).
 final desktopFollowProvider = Provider<void>((ref) {
   if (!ref.watch(desktopProvider).isDesktop) return;
   final host = DesktopHostChannel.instance;
@@ -266,7 +233,6 @@ final desktopFollowProvider = Provider<void>((ref) {
   });
 });
 
-/// Around the app in main.dart: keeps the menu bar and the notifications (the Mac's, a phone's) following the farm.
 class DesktopHost extends ConsumerWidget {
   const DesktopHost({super.key, required this.child});
   final Widget child;

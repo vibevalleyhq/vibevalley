@@ -1,7 +1,4 @@
-// What the desktop app tells the person while the farm is not in front of them (ported from the Electron client's
-// notify.ts, removed): system notifications, and the menu bar's summary. Pure: frames in, words out. It reads the
-// server's frame: a new item in its inbox (a helper's turn done or failed, a conflict, a quiet helper, a playbook
-// drafted, ripe or stuck, someone naming the person), an achievement effect, an error notice.
+// Pure: frames in, words out.
 
 import '../gen/vibevalley.dart';
 import '../rules/chat.dart';
@@ -9,7 +6,7 @@ import '../rules/progress.dart';
 import '../rules/view.dart';
 import 'command.dart';
 
-/// A system notification: what to say, and what clicking it opens (the farm itself when null).
+/// null opens the farm itself.
 class DesktopNotice {
   const DesktopNotice(this.title, this.body, [this.open]);
   final String title;
@@ -24,7 +21,6 @@ class DesktopNotice {
   String toString() => 'DesktopNotice($title, $body, ${open?.toJson()})';
 }
 
-/// Words for a notification's body: one line, not too long.
 String clipLine(String text, [int max = 140]) {
   final one = text.replaceAll(RegExp(r'\s+'), ' ').trim();
   return one.length > max ? '${one.substring(0, max - 1)}…' : one;
@@ -36,7 +32,6 @@ DesktopCommand openFor(InboxTarget target) => switch (target) {
   InboxTargetChat(:final conversation) => DesktopOpenChat(conversation),
 };
 
-/// A call as a notification, in the words the Electron client used.
 DesktopNotice noticeForCall(InboxItem call) {
   final who = callerName(call);
   final open = openFor(call.target);
@@ -53,13 +48,11 @@ DesktopNotice noticeForCall(InboxItem call) {
   };
 }
 
-/// Rings once for each call: the ones standing when the app starts are known, not rung; a call id seen once never
-/// rings again (a helper's next ripe turn has a new id).
+/// The calls standing when the app starts are known, not rung; a call id seen once never rings again (a helper's next ripe turn has a new id).
 class CallBell {
   final _seen = <String>{};
   bool _primed = false;
 
-  /// The calls among `calls` not seen before.
   List<InboxItem> ring(List<InboxItem> calls) {
     final fresh = [
       for (final c in calls)
@@ -73,7 +66,6 @@ class CallBell {
   }
 }
 
-/// An achievement effect as a notification: a tier reached, a starter task done, a secret found.
 DesktopNotice? noticeForEffect(GameEffect effect) {
   if (effect is! GameEffectAchievement) return null;
   final a = achievementOf(effect.achievement);
@@ -87,13 +79,11 @@ DesktopNotice? noticeForEffect(GameEffect effect) {
   return DesktopNotice('$what：${tierTitle(a, tier)}', clipLine(a.detail), const DesktopOpenAchievements());
 }
 
-/// The farm's errors (a red notice) as a notification that opens the farm.
 DesktopNotice? noticeForEvent(SiteEvent event) => switch (event) {
   SiteEventNotice(level: NoticeLevel.error, :final text) => DesktopNotice('码农场物语', clipLine(text)),
   _ => null,
 };
 
-/// What the menu bar shows: a short title beside the icon, and lines for its menu.
 class TraySummary {
   const TraySummary(this.title, this.lines);
   final String title;
@@ -107,7 +97,7 @@ class TraySummary {
   int get hashCode => Object.hash(title, lines.join('\n'));
 }
 
-/// One line of the menu for a call that waits for the person (a mention is counted with the unread instead).
+/// A mention is counted with the unread instead.
 String? waitingLine(InboxItem call) {
   final who = callerName(call);
   return switch (call.kind) {
@@ -122,7 +112,6 @@ String? waitingLine(InboxItem call) {
   };
 }
 
-/// The menu bar's summary (notify.ts traySummary), its waiting lines from the frame's inbox.
 TraySummary traySummary(FarmState state, List<InboxItem> inbox) {
   final working = state.helpers.where((h) => h.phase is PhaseWorking).length;
   final waiting = [for (final c in inbox) ?waitingLine(c)];

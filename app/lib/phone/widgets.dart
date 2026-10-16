@@ -1,9 +1,5 @@
-// The phone's small moving parts (web/src/index.css .phone-blink, .phone-ring): words that blink once a second, and
-// a shake in whole-pixel steps while the phone rings.
-
 import 'package:flutter/widgets.dart';
 
-/// Dims to 0.3 for the second half of each second (phone-blink, steps(1)).
 class Blink extends StatefulWidget {
   const Blink({super.key, required this.child});
   final Widget child;
@@ -29,7 +25,6 @@ class _BlinkState extends State<Blink> with SingleTickerProviderStateMixin {
   );
 }
 
-/// Shakes a pixel at a time, four steps in half a second (phone-ring); still when `on` is false.
 class Shake extends StatefulWidget {
   const Shake({super.key, required this.child, this.on = true});
   final Widget child;
@@ -76,7 +71,6 @@ class _ShakeState extends State<Shake> with SingleTickerProviderStateMixin {
   );
 }
 
-/// A tap target with a hover state: `builder` gets whether the pointer is over it.
 class Hover extends StatefulWidget {
   const Hover({super.key, required this.builder, this.onTap, this.label});
   final Widget Function(bool hovered) builder;

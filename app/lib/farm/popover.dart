@@ -1,6 +1,3 @@
-// A popover anchored to what opened it (web/src/farm/Hud.tsx FarmPopup, Base UI Popover): a framed cream card above
-// or below its trigger, closed by a click outside it, by Esc, or by what is in it.
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -21,14 +18,11 @@ class FarmPopover extends StatefulWidget {
     this.label,
   });
 
-  /// The trigger, given whether the popover is open and how to toggle it.
   final Widget Function(BuildContext context, bool open, VoidCallback toggle) trigger;
 
-  /// What the popover holds, given how to close it.
   final Widget Function(BuildContext context, VoidCallback close) popup;
   final PopSide side;
 
-  /// Its right edge on the trigger's (else its left edge).
   final bool alignEnd;
   final double offset;
   final double? width;

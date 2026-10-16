@@ -1,9 +1,6 @@
 package runs
 
-// Who is calling the farm's tools (ported from the TypeScript server's tokens.ts, removed): each helper session gets a token of its own, sent
-// back as a bearer token by the runtime's MCP client (the farm's /mcp tools). Tokens tell helpers apart; they guard
-// nothing (helpers already run unsandboxed on this machine), so they live in memory only and change with every
-// session.
+// Tokens tell helpers apart; they guard nothing (helpers already run unsandboxed on this machine), so they live in memory only.
 
 import (
 	"context"
@@ -21,7 +18,7 @@ func newTokens() (*Tokens, error)             { return &Tokens{byHelper: map[str
 func (*Tokens) OnStart(context.Context) error { return nil }
 func (*Tokens) OnStop()                       {}
 
-// Issue is a fresh token for the helper's new session; its old one stops working.
+// The helper's old token stops working.
 func (t *Tokens) Issue(helper string) string {
 	raw := make([]byte, 18)
 	_, _ = rand.Read(raw)
@@ -38,7 +35,6 @@ func (t *Tokens) Revoke(helper string) {
 	t.mu.Unlock()
 }
 
-// Who is the helper a token belongs to; "" when none.
 func (t *Tokens) Who(token string) string {
 	t.mu.Lock()
 	defer t.mu.Unlock()

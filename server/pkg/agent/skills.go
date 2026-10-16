@@ -1,8 +1,7 @@
 package agent
 
-// Skills, as Agent Skills lays them out: a folder with a SKILL.md whose front matter names it and says when to use
-// it. The agent's system prompt lists only names and when-to-use; the body is read when the model asks for it
-// (load_skill), so a hundred skills cost a hundred lines, not a hundred files.
+// The system prompt lists only names and when-to-use; the body is read when the model asks for it (load_skill), so a hundred skills cost a hundred
+// lines, not a hundred files.
 
 import (
 	"fmt"
@@ -16,11 +15,9 @@ import (
 type SkillInfo struct {
 	Name        string
 	Description string
-	// The SKILL.md it came from.
-	Path string
+	Path        string
 }
 
-// DefaultSkillDirs is where skills are looked for by default: the shared folder, Claude Code's, and the work directory's own.
 func DefaultSkillDirs(cwd string) []string {
 	home, _ := os.UserHomeDir()
 	return []string{filepath.Join(home, ".agents", "skills"), filepath.Join(home, ".claude", "skills"), filepath.Join(cwd, ".agents", "skills")}
@@ -35,7 +32,7 @@ var (
 	frontMatterHead  = regexp.MustCompile(`^---\r?\n[\s\S]*?\r?\n---\r?\n?`)
 )
 
-// FrontMatter is the front matter of a SKILL.md: YAML's simple `key: value` lines (quotes and folded `>` allowed).
+// YAML's simple `key: value` lines only (quotes and folded `>` allowed).
 func FrontMatter(text string) map[string]string {
 	out := map[string]string{}
 	m := frontMatterBlock.FindStringSubmatch(text)
@@ -49,7 +46,6 @@ func FrontMatter(text string) map[string]string {
 			continue
 		}
 		value := strings.TrimSpace(kv[2])
-		// A folded or literal block: the indented lines under it.
 		if value == ">" || value == "|" || value == ">-" || value == "|-" {
 			var block []string
 			for i+1 < len(lines) && indentedLine.MatchString(lines[i+1]) {
@@ -70,12 +66,11 @@ func FrontMatter(text string) map[string]string {
 	return out
 }
 
-// SkillBody is the body of a SKILL.md, without its front matter.
 func SkillBody(text string) string {
 	return strings.TrimSpace(frontMatterHead.ReplaceAllString(text, ""))
 }
 
-// ScanSkills is every skill in dirs, the first of a name wins, A to Z. Unreadable folders are skipped.
+// The first of a name wins. Unreadable folders are skipped.
 func ScanSkills(dirs []string) []SkillInfo {
 	found := map[string]SkillInfo{}
 	for _, dir := range dirs {
@@ -117,7 +112,6 @@ func ScanSkills(dirs []string) []SkillInfo {
 	return out
 }
 
-// SkillIndex is the skills as the system prompt lists them: one line each, the description cut short (160 when 0).
 func SkillIndex(skills []SkillInfo, max int) string {
 	if max <= 0 {
 		max = 160
@@ -133,7 +127,6 @@ func SkillIndex(skills []SkillInfo, max int) string {
 	return strings.Join(lines, "\n")
 }
 
-// ReadSkill is a skill's body, read when the model asks for it.
 func ReadSkill(skills []SkillInfo, name string) (string, error) {
 	for _, s := range skills {
 		if s.Name != name {

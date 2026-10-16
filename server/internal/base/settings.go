@@ -1,11 +1,7 @@
 package base
 
-// The farm's keys, set from the title screen (ported from the TypeScript server's settings.ts, removed): DeepSeek's API key (the manager, and
-// helpers on vibevalley's own agent) and Agora's App ID and Certificate (voice); and the voice agent's settings, set on
-// the voice page (#/voice), of which only what differs from the defaults is kept. Kept in $VIBEVALLEY_HOME/settings.json,
-// readable by you only (0600). A key saved here wins over the environment, which wins over pi's own configuration
-// (DeepSeek). The services ask for the key each time they use it, so a key saved is used at once, without a restart.
-// Pages see only where each key comes from and its last characters (protocol.KeyHint); keys are never logged.
+// settings.json is readable by you only (0600). A key saved here wins over the environment, which wins over pi's own configuration. Keys are asked
+// for each time they are used, so one saved is used at once; pages see only where each comes from and its last characters; keys are never logged.
 
 import (
 	"context"
@@ -22,7 +18,7 @@ import (
 	"vibevalley/pkg/agora"
 )
 
-// voiceStored is settings.json as saved; the field order is the file's.
+// The field order is the file's.
 type voiceStored struct {
 	DeepseekAPIKey      string                        `json:"deepseekApiKey,omitempty"`
 	AgoraAppID          string                        `json:"agoraAppId,omitempty"`
@@ -33,7 +29,6 @@ type voiceStored struct {
 	Voice               *protocol.SettingsUpdateVoice `json:"voice,omitempty"`
 }
 
-// voiceReadSettings is settings.json as saved; nothing when there is none (or it cannot be read).
 func voiceReadSettings(file string) voiceStored {
 	var s voiceStored
 	body, err := os.ReadFile(file)
@@ -46,12 +41,9 @@ func voiceReadSettings(file string) voiceStored {
 	return s
 }
 
-// voiceEnvName is an environment variable a pi key names instead of being one: DEEPSEEK_API_KEY, $DEEPSEEK_API_KEY or
-// ${DEEPSEEK_API_KEY} (the TypeScript @heybro/agent's config.ts envName, removed).
+// DEEPSEEK_API_KEY, $DEEPSEEK_API_KEY or ${DEEPSEEK_API_KEY}.
 var voiceEnvName = regexp.MustCompile(`^\$?\{?([A-Z][A-Z0-9_]*)\}?$`)
 
-// voicePiDeepseekKey is pi's DeepSeek key (~/.pi/agent/models.json, providers.deepseek.apiKey), if pi has one; a key
-// that names an environment variable is read from there (the TypeScript @heybro/agent's config.ts piDeepseekKey, removed).
 func voicePiDeepseekKey(file string, getenv func(string) string) string {
 	body, err := os.ReadFile(file)
 	if err != nil {
@@ -73,13 +65,12 @@ func voicePiDeepseekKey(file string, getenv func(string) string) string {
 }
 
 type Settings struct {
-	file string
-	// piFile is pi's models.json, where DeepSeek's key is looked for last.
+	file   string
 	piFile string
 	getenv func(string) string
 
 	env struct{ deepseek, appID, certificate string }
-	// voiceDefaults: the protocol's, with the environment's voice model and voice; 恢复默认 goes back to them.
+	// 恢复默认 goes back to these.
 	voiceDefaults protocol.VoiceSettings
 
 	mu     sync.Mutex
@@ -92,7 +83,6 @@ func newSettings(cfg Config) (*Settings, error) {
 	return NewSettingsFrom(cfg.Home, filepath.Join(home, ".pi", "agent", "models.json"), os.Getenv), nil
 }
 
-// NewSettingsFrom is the settings kept in home, over the environment getenv reads, over pi's piFile.
 func NewSettingsFrom(home, piFile string, getenv func(string) string) *Settings {
 	file := filepath.Join(home, "settings.json")
 	s := &Settings{file: file, piFile: piFile, getenv: getenv, disk: NewFileWriter(file, 0o600)}
@@ -118,7 +108,6 @@ func NewSettingsFrom(home, piFile string, getenv func(string) string) *Settings 
 func (*Settings) OnStart(context.Context) error { return nil }
 func (*Settings) OnStop()                       {}
 
-// pick is a key from settings, else from the environment.
 func (s *Settings) pick(stored, env string) (string, protocol.KeySource) {
 	if stored != "" {
 		return stored, protocol.KeySourceSettings
@@ -144,7 +133,6 @@ func (s *Settings) voiceOf(stored voiceStored) protocol.VoiceSettings {
 	return protocol.VoiceSettingsOver(s.voiceDefaults, *stored.Voice)
 }
 
-// Status is what a page may see: where each key comes from and its last characters, the voice settings in use.
 func (s *Settings) Status() protocol.SettingsStatus {
 	s.mu.Lock()
 	stored := s.stored
@@ -171,8 +159,8 @@ func (s *Settings) Status() protocol.SettingsStatus {
 	return status
 }
 
-// Save saves what changed: a key missing from the update is kept, an empty one cleared; the voice overrides replace
-// the saved ones ({} goes back to the defaults). Refused with why, and nothing saved, when something cannot be right.
+// A key missing from the update is kept, an empty one cleared; the voice overrides replace the saved ones ({} goes back to the defaults). Nothing is
+// saved when something cannot be right.
 func (s *Settings) Save(u protocol.SettingsUpdate) (protocol.SettingsStatus, error) {
 	if problem := protocol.SettingsProblem(u); problem != "" {
 		return protocol.SettingsStatus{}, fmt.Errorf("%s", problem)
@@ -212,7 +200,6 @@ func (s *Settings) Save(u protocol.SettingsUpdate) (protocol.SettingsStatus, err
 	return s.Status(), nil
 }
 
-// DeepseekAPIKey is DeepSeek's key from settings or the environment; empty leaves it to pi's.
 func (s *Settings) DeepseekAPIKey() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -220,7 +207,6 @@ func (s *Settings) DeepseekAPIKey() string {
 	return key
 }
 
-// VoiceDeepseekKey is the key the voice uses for DeepSeek: settings, the environment, else pi's.
 func (s *Settings) VoiceDeepseekKey() string {
 	if key := s.DeepseekAPIKey(); key != "" {
 		return key
@@ -228,7 +214,6 @@ func (s *Settings) VoiceDeepseekKey() string {
 	return voicePiDeepseekKey(s.piFile, s.getenv)
 }
 
-// Agora is Agora's credentials, each from settings or else the environment; nil unless both are there.
 func (s *Settings) Agora() *agora.Credentials {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -240,14 +225,13 @@ func (s *Settings) Agora() *agora.Credentials {
 	return &agora.Credentials{AppID: id, AppCertificate: cert}
 }
 
-// Voice is the voice agent's settings in use, asked for at each call.
 func (s *Settings) Voice() protocol.VoiceSettings {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.voiceOf(s.stored)
 }
 
-// VoiceKeys is the voice vendors' keys, for the vendors that need their own: only ever from settings.json.
+// Only ever from settings.json.
 func (s *Settings) VoiceKeys() VoiceKeys {
 	s.mu.Lock()
 	defer s.mu.Unlock()

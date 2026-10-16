@@ -1,9 +1,4 @@
-// What moves over the title's picture (web/src/title/layers.ts; design/pixel title-clouds, title-smoke,
-// title-dandelion, title-plants, cut by title_layers.py): clouds crossing the sky, smoke rising from the farmhouse
-// chimney, plants along the bottom swaying, seeds blowing off the dandelions. Everything is placed in the scene's own
-// pixels (1536 x 1024, as the pictures are drawn), so it stays put on the picture however the screen crops it. Each
-// scene tints them to its light: dawn's warmth, evening's glow, night's dark (the page's CSS filters, as colour
-// matrices).
+// Everything is placed in the scene's own pixels, so it stays put on the picture however the screen crops it.
 
 import 'dart:convert';
 import 'dart:math' as math;
@@ -14,10 +9,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'scene.dart';
 
-/// The scene's size: where things are placed is in these pixels.
+/// Where things are placed is in these pixels.
 const sceneW = 1536.0, sceneH = 1024.0;
 
-/// Each sprite's size in the scene's pixels (assets/title/sprites.json).
 typedef TitleSprites = Map<String, ({double w, double h})>;
 
 final titleSpritesProvider = FutureProvider<TitleSprites>((ref) async {
@@ -29,25 +23,24 @@ final titleSpritesProvider = FutureProvider<TitleSprites>((ref) async {
 
 String titleSpriteAsset(String name) => 'assets/title/$name.png';
 
-/// A sprite's size as a share of the scene (so it scales with it).
+/// So it scales with the scene.
 ({double w, double h}) spriteShare(TitleSprites sizes, String name, [double scale = 1]) {
   final s = sizes[name]!;
   return (w: s.w * scale / sceneW, h: s.h * scale / sceneH);
 }
 
-/// Where the farmhouse chimney's mouth is, the same in every scene.
 const chimney = (x: 1068 / sceneW, y: 330 / sceneH);
 
 typedef Cloud = ({String sprite, double y, double scale, double duration, double delay});
 
-/// High in the sky, above where the smoke thins out. Seconds to cross; a negative delay is how far across it starts.
+/// Above where the smoke thins out. Seconds to cross; a negative delay is how far across it starts.
 const clouds = <Cloud>[
   (sprite: 'cloud-big-1', y: -0.01, scale: 0.45, duration: 160, delay: -40),
   (sprite: 'cloud-wisp-1', y: 0.06, scale: 0.45, duration: 120, delay: -95),
   (sprite: 'cloud-mid-2', y: 0.015, scale: 0.38, duration: 190, delay: -150),
 ];
 
-/// A plant: its middle (a share of the width; it stands on the bottom edge), seconds per sway, degrees each way.
+/// x is the middle, a share of the width (it stands on the bottom edge); seconds per sway, degrees each way.
 typedef Plant = ({String sprite, double x, double scale, double sway, double lean});
 
 /// Left and middle only: the farmer and the dog stand at the right.
@@ -60,7 +53,6 @@ const plants = <Plant>[
   (sprite: 'grass-yellow', x: 0.985, scale: 0.4, sway: 4, lean: 2),
 ];
 
-/// Seeds blow off the dandelions (the plants' 3rd and 5th) up and to the right across the scene.
 const seeds = <({String sprite, double from, double duration, double delay})>[
   (sprite: 'seed-1', from: 0.2, duration: 16, delay: -2),
   (sprite: 'seed-2', from: 0.47, duration: 19, delay: -9),
@@ -69,7 +61,7 @@ const seeds = <({String sprite, double from, double duration, double delay})>[
   (sprite: 'seed-2', from: 0.2, duration: 25, delay: -20),
 ];
 
-/// The puffs, one after another out of the chimney: small and pale, close together, so they read as one plume.
+/// Small and pale, close together, so they read as one plume.
 const puffs = <({String sprite, double scale})>[
   (sprite: 'puff-1', scale: 0.3),
   (sprite: 'puff-2', scale: 0.26),
@@ -81,17 +73,13 @@ const puffs = <({String sprite, double scale})>[
 ];
 const puffSeconds = 8.0;
 
-/// Where the farmer and the pet stand (their feet's middle), and how big they are drawn: as they were painted.
 const manager = (x: 1327 / sceneW, bottom: 898 / sceneH, scale: 0.73);
 const petSpot = (x: 1212 / sceneW, bottom: 918 / sceneH);
 
-/// Each pet's frames drawn sitting about as tall as the dog was painted.
 const petScale = {'dog': 0.59, 'ragdoll': 0.69, 'bluecat': 0.55};
 
-/// The farmer's pose at each hour: stretching at dawn, shading his eyes at noon, at ease at dusk, a lantern at night.
 String managerPose(TitleScene scene) => 'manager-${scene.name}';
 
-/// Awake, a pet sits and swishes its tail a few times, then looks back at you for a moment; at night it sleeps.
 const petRound = <({String frame, int ms})>[
   (frame: 'sit', ms: 1400),
   (frame: 'tail', ms: 500),
@@ -174,7 +162,7 @@ final class Brightness extends Css {
   List<double> get m => [b, 0, 0, 0, b, 0, 0, 0, b];
 }
 
-/// A CSS filter list as one colour filter: the first function applies first. Null for `none`.
+/// The first function applies first. Null for `none`.
 ColorFilter? cssFilter(List<Css> list) {
   if (list.isEmpty) return null;
   var m = const <double>[1, 0, 0, 0, 1, 0, 0, 0, 1];
@@ -188,7 +176,6 @@ ColorFilter? cssFilter(List<Css> list) {
   return ColorFilter.matrix([m[0], m[1], m[2], 0, 0, m[3], m[4], m[5], 0, 0, m[6], m[7], m[8], 0, 0, 0, 0, 0, 1, 0]);
 }
 
-/// Each scene's light on what moves, and whether it has seeds blowing (none at night).
 typedef Light = ({List<Css> sky, List<Css> ground, List<Css> smoke, bool seeds});
 
 const lights = <TitleScene, Light>{

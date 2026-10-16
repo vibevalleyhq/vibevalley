@@ -1,7 +1,3 @@
-// The farm's rules as the client keeps them (game/farm.dart, rules/): what each tool would do to a bed, the
-// seed bag, the cursor's name, and the protocol functions ported to Dart (needs, phase words, playbook layers and
-// events, progress standing).
-
 import 'package:flutter_test/flutter_test.dart' hide Retry;
 import 'package:vibevalley/farm/cursors.dart';
 import 'package:vibevalley/game/farm.dart';
@@ -157,7 +153,6 @@ void main() {
   test('turnEndingAt: from the last line it was told up to the message', () {
     WorkStep s(int n, StepKind kind, double at) => WorkStep(n: n.toDouble(), at: at, kind: kind, text: '');
     final steps = [s(1, StepKind.asked, 0), s(2, StepKind.tool, 10), s(3, StepKind.asked, 10000), s(4, StepKind.tool, 10010), s(5, StepKind.said, 10020)];
-    // A message lands a moment after its last step: steps up to 3 s later still count.
     expect(turnEndingAt(steps, 50).map((x) => x.n), [1, 2]);
     expect(turnEndingAt(steps, 7500).map((x) => x.n), [3, 4, 5]);
   });

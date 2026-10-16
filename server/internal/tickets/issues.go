@@ -15,21 +15,9 @@ import (
 	"vibevalley/pkg/db/generated"
 )
 
-// The issue book (the tickets module, docs/concepts.md; the board calls an issue a 工单): every job from when it is
-// written down until it closes, one id all along, and the helpers that worked it (its runs), oldest first. An issue is
-// written down by the person (to do), or made as a helper is sent at once (by the manager, for a playbook's step);
-// Dispatch sends its runs. It closes when its last run leaves, as the fact that the helper left says how (harvested,
-// merged into a playbook, sent home, lost), and opens again with another run. Where it stands is read from its runs on
-// the farm (protocol.IssueStatusOf). Kept in the database (issue, issue_run; pkg/db/queries/issue.sql); the open ones
-// and the latest closed are in the core state too (issue facts), put there on start and after every change.
-//
-// A playbook (种植计划) is a parent issue with a plan, its steps the sub-issues (protocol/plan_issues.go): the
-// playbooks write theirs whole (PutPlaybook), and they open and close as the plan says, not as their runs leave.
-//
-// Before the book, an issue was a helper's trajectory, and a reopened one another trajectory naming it: on start, every
-// run the book does not know yet is put on its issue, a reopened one on the issue of the run it reopened. Before
-// playbooks were issues, they were in farm.json: on start, those become their issues, and the runs of their planners
-// and steps move onto them.
+// An issue closes when its last run leaves, as the fact that the helper left says how, and opens again with another run. A playbook's issues open and
+// close as the plan says, not as their runs leave. Runs from before the book (trajectory heads) and playbooks from before they were issues
+// (farm.json) are adopted on start.
 
 type Issues struct {
 	db           *sql.DB
@@ -53,7 +41,6 @@ func newIssues(db *sql.DB, site *base.Site, trajectories *runs.Trajectories) (*I
 	return is, nil
 }
 
-// restore puts the issues the core state keeps into it.
 func (is *Issues) restore(ctx context.Context) error {
 	rows, err := is.q.KeptIssues(ctx, protocol.KeepClosedIssues)
 	if err != nil {
@@ -74,7 +61,6 @@ func (is *Issues) restore(ctx context.Context) error {
 	return nil
 }
 
-// publish puts issue id as the database has it now into the core state.
 func (is *Issues) publish(id string) {
 	issue, err := is.Get(id)
 	if err != nil {
@@ -83,7 +69,6 @@ func (is *Issues) publish(id string) {
 	is.site.Apply(protocol.FactIssue{Issue: issue})
 }
 
-// start follows the helpers that leave: an issue closes with its last run, as the fact says.
 func (is *Issues) OnStart(ctx context.Context) error {
 	_, events, stop := is.site.Events()
 	is.stop = stop
@@ -111,7 +96,6 @@ func (is *Issues) OnStop() {
 	}
 }
 
-// left closes the issue whose last run just left; a playbook's issues close as the playbook says.
 func (is *Issues) left(ctx context.Context, f protocol.FactLeft) {
 	issue, err := is.q.IssueOfRun(ctx, f.ID)
 	if err != nil {
@@ -127,8 +111,6 @@ func (is *Issues) left(ctx context.Context, f protocol.FactLeft) {
 		is.publish(issue)
 	}
 }
-
-// ── Reading ──────────────────────────────────────────────────────────────────
 
 func issueOf(row generated.Issue, runs []string, state protocol.FarmState) protocol.Issue {
 	out := protocol.Issue{
@@ -181,7 +163,6 @@ func issueOf(row generated.Issue, runs []string, state protocol.FarmState) proto
 	return out
 }
 
-// List is every issue with where it stands: the ones not sent yet in the board's order first, then the newest first.
 func (is *Issues) List() ([]protocol.Issue, error) {
 	ctx := context.Background()
 	rows, err := is.q.ListIssues(ctx)
@@ -205,7 +186,6 @@ func (is *Issues) List() ([]protocol.Issue, error) {
 	return out, nil
 }
 
-// Get is the issue id, or the one run id worked; FarmMissing when there is none.
 func (is *Issues) Get(id string) (protocol.Issue, error) {
 	ctx := context.Background()
 	issue := id
@@ -226,7 +206,6 @@ func (is *Issues) Get(id string) (protocol.Issue, error) {
 	return issueOf(row, runs, is.site.State()), nil
 }
 
-// unsent is an issue that is still only written down (to do, or queued): what may be changed, moved or removed.
 func (is *Issues) unsent(id string) (protocol.Issue, error) {
 	issue, err := is.Get(id)
 	if err != nil {
@@ -241,12 +220,8 @@ func (is *Issues) unsent(id string) (protocol.Issue, error) {
 	return issue, nil
 }
 
-// ── Writing down ─────────────────────────────────────────────────────────────
-
-// Add writes a job down, last in the board's order.
 func (is *Issues) Add(in protocol.IssueRequest) (protocol.Issue, error) { return is.add(in, nil) }
 
-// AddScheduled writes down the job schedule made, come due: an occurrence of a recurring issue.
 func (is *Issues) AddScheduled(in protocol.IssueRequest, schedule int64) (protocol.Issue, error) {
 	return is.add(in, &schedule)
 }
@@ -267,7 +242,6 @@ func (is *Issues) add(in protocol.IssueRequest, schedule *int64) (protocol.Issue
 	return is.Get(id)
 }
 
-// Edit changes what an issue not sent yet says, where and by whom.
 func (is *Issues) Edit(id string, in protocol.IssueRequest) (protocol.Issue, error) {
 	if _, err := is.unsent(id); err != nil {
 		return protocol.Issue{}, err
@@ -285,7 +259,6 @@ func (is *Issues) Edit(id string, in protocol.IssueRequest) (protocol.Issue, err
 	return is.Get(id)
 }
 
-// Remove throws away an issue not sent yet.
 func (is *Issues) Remove(id string) error {
 	if _, err := is.unsent(id); err != nil {
 		return err
@@ -297,8 +270,6 @@ func (is *Issues) Remove(id string) error {
 	return nil
 }
 
-// Move puts an issue not sent yet just before another one (before), or last when before is empty or not there;
-// answers the list.
 func (is *Issues) Move(id, before string) ([]protocol.Issue, error) {
 	if _, err := is.unsent(id); err != nil {
 		return nil, err
@@ -338,7 +309,6 @@ func (is *Issues) Move(id, before string) ([]protocol.Issue, error) {
 	return is.List()
 }
 
-// Queue puts an issue not sent yet in the queue for a free bed, or takes it out.
 func (is *Issues) Queue(id string, queued bool) (protocol.Issue, error) {
 	if _, err := is.unsent(id); err != nil {
 		return protocol.Issue{}, err
@@ -357,8 +327,7 @@ func (is *Issues) Queue(id string, queued bool) (protocol.Issue, error) {
 	return is.Get(id)
 }
 
-// Ran puts the helper's run on issue id, which opens (again) and leaves the queue; an issue not written down first
-// (the manager sending someone at once, a playbook's step) is made from the helper's job.
+// An issue not written down first (the manager sending someone at once, a playbook's step) is made from the helper's job.
 func (is *Issues) Ran(id string, helper protocol.Helper) error {
 	tx, err := is.db.Begin()
 	if err != nil {
@@ -382,9 +351,6 @@ func (is *Issues) Ran(id string, helper protocol.Helper) error {
 	return nil
 }
 
-// ── Playbooks ────────────────────────────────────────────────────────────────
-
-// family is issue id and its sub-issues as the database has them.
 func (is *Issues) family(ctx context.Context, q *generated.Queries, id string) ([]protocol.Issue, error) {
 	rows, err := q.Family(ctx, id)
 	if err != nil {
@@ -406,8 +372,7 @@ func (is *Issues) family(ctx context.Context, q *generated.Queries, id string) (
 	return out, nil
 }
 
-// putFamily writes issues, a playbook's, over what before was of it; a sub-issue no longer there goes. Answers what
-// went. The caller commits.
+// The caller commits.
 func putFamily(ctx context.Context, q *generated.Queries, issues, before []protocol.Issue) ([]string, error) {
 	for _, t := range issues {
 		params := generated.PutIssueParams{
@@ -435,8 +400,7 @@ func putFamily(ctx context.Context, q *generated.Queries, issues, before []proto
 	return gone, nil
 }
 
-// PutPlaybook writes a playbook as its issues, and puts them into the core state: the steps first, so that the
-// playbook is whole when its parent issue changes.
+// The steps first, so that the playbook is whole when its parent issue changes.
 func (is *Issues) PutPlaybook(pb protocol.Playbook) error {
 	ctx := context.Background()
 	before, err := is.family(ctx, is.q, pb.ID)
@@ -465,7 +429,6 @@ func (is *Issues) PutPlaybook(pb protocol.Playbook) error {
 	return nil
 }
 
-// NextPlaybookID is the id the next playbook gets, after every one there has been.
 func (is *Issues) NextPlaybookID() (string, error) {
 	ids, err := is.q.PlanIDs(context.Background())
 	if err != nil {
@@ -474,8 +437,6 @@ func (is *Issues) NextPlaybookID() (string, error) {
 	return protocol.NextPlaybookID(ids), nil
 }
 
-// adoptPlaybooks makes the playbooks farm.json had into their issues, unless they are there already, and moves the
-// runs of the issues their planners and steps worked onto them.
 func (is *Issues) adoptPlaybooks(ctx context.Context, legacy []protocol.Playbook) error {
 	if len(legacy) == 0 {
 		return nil
@@ -518,10 +479,7 @@ func (is *Issues) adoptPlaybooks(ctx context.Context, legacy []protocol.Playbook
 	return tx.Commit()
 }
 
-// ── Before the book ──────────────────────────────────────────────────────────
-
-// adopt puts every run the book does not know yet on its issue, oldest first: the one its head names, the one of the
-// run it reopened, else an issue of its own with the run's id. An issue stands as its last run left it.
+// Oldest first: the issue its head names, the one of the run it reopened, else an issue of its own with the run's id.
 func (is *Issues) adopt(ctx context.Context) error {
 	heads := is.trajectories.List("")
 	slices.Reverse(heads)
@@ -578,12 +536,8 @@ func (is *Issues) adopt(ctx context.Context) error {
 	return tx.Commit()
 }
 
-// ── Small things ─────────────────────────────────────────────────────────────
-
-// issueTitle is an issue's title, short enough for a notice.
 func issueTitle(issue protocol.Issue) string { return runs.Cut(issue.Title, 40) }
 
-// issueWords is the title and description asked for, trimmed; a title is a line, and there must be one.
 func issueWords(in protocol.IssueRequest) (string, string, error) {
 	title, rest := protocol.SplitJob(in.Title)
 	if title == "" {
@@ -628,7 +582,6 @@ func issueClosed(how *protocol.IssueClose) sql.NullString {
 
 func issuePlaybook(pb *protocol.HelperPlaybook) sql.NullString { return issueJSON(pb, pb != nil) }
 
-// issueJSON is v as a JSON column, when there is one.
 func issueJSON(v any, there bool) sql.NullString {
 	if !there {
 		return sql.NullString{}

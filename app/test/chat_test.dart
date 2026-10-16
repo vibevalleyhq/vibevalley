@@ -1,8 +1,3 @@
-// The chat: the protocol's chat rules as ported (unread, channels, mentions, schedules in words), the desk's chat page
-// (channels with unread counts, a channel's messages, the read cursor, sending into a conversation) and the farm's
-// chat window (the square, a thread opened from its chip, history paging, sending), over a fake FarmState and a
-// VibeValleyApi on a MockClient.
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -70,7 +65,6 @@ const _helper = Helper(
   channel: 1,
 );
 
-/// The square (two unread from the manager), #clock-in (one unread), and w1's job thread under the dispatch.
 FarmState _state({CallState call = CallState.live, double squareRead = 0, List<ChatMessage> more = const []}) => FarmState(
   call: call,
   foreman: ForemanState.listening,
@@ -113,7 +107,6 @@ FarmState _state({CallState call = CallState.live, double squareRead = 0, List<C
   ],
 );
 
-/// The requests the fake server saw, and what it answers.
 class _Server {
   final seen = <http.Request>[];
   late final api = VibeValleyApi(
@@ -149,7 +142,6 @@ StateFrame _frame(FarmState state) => StateFrame(
   decodeMicros: 0,
 );
 
-/// `later`: the states after the first, as the server sends them; `still`: the system asks for less motion.
 Future<void> _pump(WidgetTester t, Widget child, _Server server, FarmState state, {Stream<FarmState>? later, bool still = false}) async {
   t.view.physicalSize = const Size(1440, 900);
   t.view.devicePixelRatio = 1;
@@ -270,13 +262,11 @@ void main() {
       await _pump(t, const ChatPage(), server, _state());
       expect(find.text('频道'), findsOneWidget);
       expect(find.text('clock-in'), findsOneWidget);
-      // 田头: two on the square and one in w1's thread; clock-in: one.
       expect(find.text('3'), findsOneWidget);
       expect(find.text('1'), findsWidgets);
       expect(_rich('农场开门了'), findsOneWidget);
       expect(_rich('1 条回复'), findsOneWidget);
       expect(find.text('派活'), findsOneWidget);
-      // What is on screen is read: the square up to its newest message.
       final read = server.to('POST', '/api/chat/1/read');
       expect(read, hasLength(1));
       expect(jsonDecode(read.single.body), {'seq': 2});
@@ -357,7 +347,6 @@ void main() {
       await t.tap(find.text('开着'));
       await t.pump(const Duration(milliseconds: 50));
       expect(jsonDecode(server.to('PUT', '/api/schedules/5').single.body), {'enabled': false});
-      // The trash glyph; a second press, on its words, deletes.
       await t.tap(find.byTooltip('删掉'));
       await t.pump();
       await t.tap(find.text('确定删？'));
@@ -386,7 +375,6 @@ void main() {
       await _pump(t, window(server, _state(), said), server, _state());
       expect(_rich('农场开门了'), findsOneWidget);
       expect(find.text('管家在听'), findsOneWidget);
-      // Elsewhere: clock-in and the thread have new words.
       expect(find.text('2 处有新话'), findsOneWidget);
 
       await t.enterText(find.byType(TextField), '现在进度怎么样？');
@@ -404,7 +392,6 @@ void main() {
       await t.pump(const Duration(milliseconds: 50));
       expect(jsonDecode(server.to('POST', '/api/say').single.body), {'text': '再跑一次', 'conversation': 3});
 
-      // Back to the square.
       await t.tap(find.bySemanticsLabel('回到田头').first);
       await t.pump(const Duration(milliseconds: 50));
       expect(find.text('测试小吴的工单串'), findsNothing);

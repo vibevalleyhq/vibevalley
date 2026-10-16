@@ -1,10 +1,5 @@
 package ai
 
-// The Anthropic provider, offline: the conversation as Anthropic wants it (system joined, signed thinking sent back,
-// unsigned left out, tool results in a user turn, turns of a side joined), thinking adaptive or on a budget, a
-// recorded stream read into pi's events, and the real HTTP request against a local server (its headers, a 529
-// tried again). Ported from the TypeScript @heybro/ai's anthropic.test.ts (removed).
-
 import (
 	"context"
 	"fmt"
@@ -113,7 +108,6 @@ func TestARecordedStreamBecomesPisEvents(t *testing.T) {
 	eq(t, done.Message.ResponseID, "msg_1")
 	u := done.Message.Usage
 	eq(t, []int{u.Input, u.Output, u.CacheRead, u.CacheWrite, u.TotalTokens}, []int{100, 42, 900, 10, 1052})
-	// And it goes back as Anthropic gave it.
 	_, back := ToAnthropicMessages(claude(), Context{Messages: []Message{user("读"), done.Message, result("toolu_1", "x")}})
 	jsonEq(t, back[1].Content[0], `{"type":"thinking","thinking":"先想","signature":"SIG"}`)
 

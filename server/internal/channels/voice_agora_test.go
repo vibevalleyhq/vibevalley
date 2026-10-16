@@ -19,17 +19,13 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// The voice agent (voice_agora.go): Go asks Agora for exactly what the TypeScript server did, for every kind of
-// vendor (testdata/voice-requests.json: written by the retired TypeScript server, now a frozen golden that changes by
-// hand with voice_agora.go); vendors that need a key say which is missing; tokens need credentials; starting and
-// stopping go through Agora's REST API (captured here, never sent).
+// Requests are checked against testdata/voice-requests.json, a frozen golden that changes by hand with voice_agora.go.
 
 const (
 	voiceTestAppID = "11111111111111111111111111111111"
 	voiceTestCert  = "22222222222222222222222222222222"
 )
 
-// voiceCapture answers Agora's REST API: every request kept, each answered with status and body.
 type voiceCapture struct {
 	mu       sync.Mutex
 	urls     []string
@@ -55,7 +51,6 @@ func (c *voiceCapture) Do(req *http.Request) (*http.Response, error) {
 	return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(answer))}, nil
 }
 
-// voiceJSONOf is v as plain JSON values, for comparing.
 func voiceJSONOf(t *testing.T, v any) any {
 	t.Helper()
 	body, err := json.Marshal(v)
@@ -67,7 +62,7 @@ func voiceJSONOf(t *testing.T, v any) any {
 	return out
 }
 
-func TestVoiceRequestsMatchTypeScript(t *testing.T) {
+func TestVoiceRequestsMatchGolden(t *testing.T) {
 	raw, err := os.ReadFile("testdata/voice-requests.json")
 	if err != nil {
 		t.Fatal(err)
@@ -105,10 +100,10 @@ func TestVoiceRequestsMatchTypeScript(t *testing.T) {
 				t.Fatalf("start: %q %v", id, err)
 			}
 			if got := capture.urls[0]; got != "POST "+c.RequestURL {
-				t.Fatalf("endpoint: %s, TypeScript's %s", got, c.RequestURL)
+				t.Fatalf("endpoint: %s, golden %s", got, c.RequestURL)
 			}
 			request := capture.requests[0]
-			// Go repeats the app ID in the body; Node puts it only in the URL. The token is signed with the time in it.
+			// The app ID is repeated in the body; the token is signed with the time in it.
 			if request["appid"] != voiceTestAppID {
 				t.Fatalf("app id: %v", request["appid"])
 			}
@@ -117,7 +112,7 @@ func TestVoiceRequestsMatchTypeScript(t *testing.T) {
 			if got, want := voiceJSONOf(t, request), voiceJSONOf(t, c.Request); !reflect.DeepEqual(got, want) {
 				a, _ := json.MarshalIndent(got, "", "  ")
 				b, _ := json.MarshalIndent(want, "", "  ")
-				t.Fatalf("Go's request differs from TypeScript's\nGo=%s\nTypeScript=%s", a, b)
+				t.Fatalf("request differs from the golden\ngot=%s\nwant=%s", a, b)
 			}
 		})
 	}
@@ -169,9 +164,7 @@ func TestVoiceVendorsSayWhichKeyIsMissing(t *testing.T) {
 	}
 }
 
-// Every vendor in the protocol is one voiceVendorsFor can use: a member added to VoiceASR, VoiceLLM or VoiceTTS fails
-// here until it is handled. With every key at hand, a problem may still come from the member's empty settings, never
-// from not knowing it.
+// Go does not check a type switch for every member: a member added to VoiceASR, VoiceLLM or VoiceTTS fails here until it is handled.
 func TestVoiceVendorsKnowEveryVendor(t *testing.T) {
 	keys := base.VoiceKeys{ASRKey: "k", LLMKey: "k", TTSKey: "k"}
 	line := &base.CallLine{ID: "l", URL: "http://127.0.0.1:1/v1/chat/completions", Key: "k"}
@@ -197,13 +190,11 @@ func TestVoiceVendorsKnowEveryVendor(t *testing.T) {
 	}
 }
 
-// voiceTestFarm is a farm with the voice group's services, its home fresh and the environment empty.
 func voiceTestFarm(t *testing.T) *world {
 	t.Helper()
 	t.Setenv("VIBEVALLEY_VOICE_LINE_PORT", "0")
 	t.Setenv("VIBEVALLEY_VOICE_LINE_URL", "https://line.example.com")
 	home := t.TempDir()
-	// Settings that read nothing of this machine's (its environment, pi's file), for every service that uses them.
 	settings := base.NewSettingsFrom(home, "", func(string) string { return "" })
 	f, err := newWorld(base.Config{Home: home, WorkRoot: t.TempDir(), DBPath: ":memory:"}, fx.Replace(settings))
 	if err != nil {
@@ -267,7 +258,6 @@ func TestVoiceStartAndStopTheManagerOnHisLine(t *testing.T) {
 	if n := len(f.VoiceLine.keys); n != 1 {
 		t.Fatalf("one line open, not %d", n)
 	}
-	// Stopping one already leaving is fine; its line closes either way.
 	capture.status, capture.body = 400, `{"detail":"Agent is already in the process of shutting down"}`
 	if err := f.Voice.Stop(ctx, agent.AgentID); err != nil {
 		t.Fatal(err)

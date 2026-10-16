@@ -1,7 +1,3 @@
-// 收成清单 (web/src/farm/Harvest.tsx): what harvesting a helper would merge into its project, looked at before saying
-// yes. Its commits, the files they change (open one for its diff), what it has not committed yet, and whether the
-// branch merges cleanly; when it would conflict, the helper is asked to resolve that on its own branch first.
-
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -14,7 +10,6 @@ import '../ui/kit/kit.dart';
 import 'bits.dart';
 import '../rules/index.dart';
 
-/// What was loaded: nothing yet, why not, or the changes.
 sealed class Loaded {
   const Loaded();
 }
@@ -43,11 +38,10 @@ Future<Loaded> loadChanges(Future<Changes> Function() fetch) async {
   }
 }
 
-/// Lines added and removed across the files (a binary file counts -1: not counted).
+/// A binary file counts -1: not counted.
 (int, int) lineCounts(Changes c) =>
     (c.files.fold(0, (n, f) => n + math.max(0, f.added.round())), c.files.fold(0, (n, f) => n + math.max(0, f.removed.round())));
 
-/// The review of a helper's harvest, in the HarvestDialog's frame (the farm screen opens it).
 class HarvestReview extends ConsumerStatefulWidget {
   const HarvestReview({super.key, required this.worker, required this.onDone});
   final Helper worker;
@@ -246,7 +240,6 @@ class _Ready extends ConsumerWidget {
   }
 }
 
-/// +12 −3, green and red.
 class PlusMinus extends StatelessWidget {
   const PlusMinus(this.added, this.removed, {super.key});
   final int added;
@@ -275,7 +268,6 @@ const _status = {
   'D': (mark: '删', label: '删除', fill: Color(0xFFEDCBA9), ink: Palette.berry),
 };
 
-/// One changed file: its status, its path, its line counts; opens to its diff.
 class FileRow extends StatefulWidget {
   const FileRow({super.key, required this.file, required this.conflict});
   final ChangedFile file;
@@ -342,7 +334,6 @@ class _FileRowState extends State<FileRow> {
   }
 }
 
-/// A file's diff, from its first hunk: added lines green, removed red.
 class Patch extends StatelessWidget {
   const Patch({super.key, required this.text});
   final String text;

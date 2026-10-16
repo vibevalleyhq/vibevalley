@@ -1,13 +1,8 @@
-// The phone's minigames as values (packages/core/test sokoban, blocks, dino ported): walls and pushes and undo in
-// the warehouse; seven-bags, wall kicks, cleared rows and the end in 方块; jumps, ducks and speed in 小恐龙; and the
-// seeded generator dealing exactly what the web page deals from the same seed.
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/phone/blocks.dart';
 import 'package:vibevalley/phone/dino.dart';
 import 'package:vibevalley/phone/sokoban.dart';
 
-/// The pieces a game deals, in order, from its seed.
 List<PieceKind> dealt(int seed, int n) {
   var g = newBlocks(seed);
   final out = <PieceKind>[];
@@ -88,8 +83,7 @@ void main() {
   });
 
   group('方块', () {
-    test('a seed deals what the web page deals from it', () {
-      // From packages/core blocks.ts with the same seeds (node, mulberry32 in 32-bit JS arithmetic).
+    test('a seed replays the recorded deal', () {
       expect(dealt(42, 14).map((k) => k.name).join(), 'SOIJLTZTJILZSO');
       expect(newBlocks(42).seed, -1895506968);
       expect(newBlocks(123456789).seed, -1772050221);
@@ -108,7 +102,6 @@ void main() {
         g = shift(g, -1);
       }
       expect(cellsOf(g.piece).map((c) => c.$1).reduce((a, b) => a < b ? a : b), 0);
-      // An upright I on the right wall turns flat by stepping left.
       final upright = g.copyWith(
         piece: const Falling(kind: PieceKind.I, turn: 1, x: blocksWidth - 3, y: 2),
       );
@@ -119,7 +112,6 @@ void main() {
 
     test('a full row clears, the rows above fall, and it scores by the level', () {
       final well = List.filled(blocksWidth * blocksHeight, 0);
-      // The bottom row full but for its last four cells, and one block above it.
       for (var x = 0; x < blocksWidth - 4; x++) {
         well[(blocksHeight - 1) * blocksWidth + x] = 1;
       }
@@ -151,7 +143,6 @@ void main() {
 
     test('a stack to the top ends the game, and nothing moves after', () {
       final well = List.filled(blocksWidth * blocksHeight, 0);
-      // A column in the middle up to the second row: the next piece has no room.
       for (var y = 1; y < blocksHeight; y++) {
         for (final x in [3, 4, 5, 6]) {
           well[y * blocksWidth + x] = 2;
@@ -201,8 +192,7 @@ void main() {
       expect(identical(run(ended, 100), ended), isTrue);
     });
 
-    test('a seed runs what the web page runs from it', () {
-      // From packages/core dino.ts with the same seed and steps (node).
+    test('a seed replays the recorded run', () {
       final d = runFor(newDino(4), 3000);
       expect(d.seed, -1263671336);
       expect(d.distance, closeTo(130.11089789109818, 1e-9));

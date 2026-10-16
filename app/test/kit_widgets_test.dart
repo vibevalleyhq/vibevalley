@@ -1,5 +1,3 @@
-// The kit's widgets: each renders, answers taps and typing, and stays still when disabled.
-
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -16,7 +14,6 @@ Widget host(Widget child) => MaterialApp(
   ),
 );
 
-/// A stateful host: `build` gets a setState to change what it shows.
 class Live extends StatefulWidget {
   const Live(this.build, {super.key});
   final Widget Function(StateSetter set) build;

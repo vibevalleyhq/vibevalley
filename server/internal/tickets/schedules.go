@@ -21,13 +21,8 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// Schedules (ported from the TypeScript server's schedules.ts, removed): things said in a channel at set times. They are kept in the schedules
-// table and mirrored into the core state as schedule facts, so every page lists them. Every tick, the ones due are
-// said in their channel as a notice everyone sees, then handed on (Due) for the manager to act on, or to send a helper
-// straight off. A run missed while the server was off happens once at the first tick, and says it is late. The rules
-// (when next, what can be asked) are protocol's schedules.go.
+// A run missed while the server was off happens once at the first tick, and says it is late.
 
-// planChat is what schedules and the heartbeat ask of the chat: Chat on the farm, a stand-in in tests.
 type planChat interface {
 	Channels() []base.ChannelInfo
 	Square() int64
@@ -35,8 +30,7 @@ type planChat interface {
 	ChannelOf(conversation int64) base.ChannelInfo
 }
 
-// planLocalZone is the machine's time zone as an IANA name (Intl's resolvedOptions().timeZone): $TZ, else where
-// /etc/localtime points, else the offset now.
+// As Intl's resolvedOptions().timeZone: $TZ, else where /etc/localtime points, else the offset now.
 func planLocalZone() string {
 	if tz := os.Getenv("TZ"); tz != "" {
 		if _, err := time.LoadLocation(tz); err == nil {
@@ -77,7 +71,6 @@ func planEnvNumber(name string, def float64) float64 {
 	return n
 }
 
-// planTickEvery is how often schedules tick: $VIBEVALLEY_SCHEDULE_TICK_MS, 20 s when unset or not a number.
 func planTickEvery() time.Duration {
 	ms := planEnvNumber("VIBEVALLEY_SCHEDULE_TICK_MS", 20_000)
 	if math.IsNaN(ms) || ms < 0 {
@@ -86,8 +79,6 @@ func planTickEvery() time.Duration {
 	return time.Duration(ms * float64(time.Millisecond))
 }
 
-// planHeartbeatEvery is how often the heartbeat looks: $VIBEVALLEY_HEARTBEAT_MINUTES (10); 0, blank or not a number
-// turns it off, as the TypeScript server's minutes > 0 did.
 func planHeartbeatEvery() time.Duration {
 	minutes := planEnvNumber("VIBEVALLEY_HEARTBEAT_MINUTES", 10)
 	if !(minutes > 0) {
@@ -100,15 +91,13 @@ type Schedules struct {
 	db    *sql.DB
 	site  *base.Site
 	store *base.Store
-	// mu: one change at a time; the ticker, the tools and the pages all change the list.
-	mu  sync.Mutex
-	all []protocol.FarmSchedule
-	due *base.Hub[base.Due]
-	// every is how often it ticks ($VIBEVALLEY_SCHEDULE_TICK_MS, 20 s).
+	// The ticker, the tools and the pages all change the list.
+	mu    sync.Mutex
+	all   []protocol.FarmSchedule
+	due   *base.Hub[base.Due]
 	every time.Duration
-	// Now is the clock and chat the chat; tests change them.
-	Now  func() int64
-	chat planChat
+	Now   func() int64
+	chat  planChat
 }
 
 func newSchedules(db *sql.DB, site *base.Site, store *base.Store, chat *chat.Chat) (*Schedules, error) {
@@ -155,11 +144,9 @@ func newSchedules(db *sql.DB, site *base.Site, store *base.Store, chat *chat.Cha
 	return s, nil
 }
 
-// start ticks: the first a moment after start (what was missed while the server was off), then every so often.
 func (*Schedules) OnStart(context.Context) error { return nil }
 
-// ready starts the ticks once every service has started, so what a first tick finds due (a run missed while the farm
-// was off) reaches the manager, which subscribes in its own start.
+// After every service has started, so what a first tick finds due reaches the manager, which subscribes in its own start.
 func (s *Schedules) OnReady(ctx context.Context) {
 	go func() {
 		s.Tick()
@@ -178,7 +165,7 @@ func (s *Schedules) OnReady(ctx context.Context) {
 
 func (*Schedules) OnStop() {}
 
-// put is a schedule changed or added, in the list and the core state. Called with mu held.
+// Called with mu held.
 func (s *Schedules) put(sc protocol.FarmSchedule) {
 	if i := slices.IndexFunc(s.all, func(x protocol.FarmSchedule) bool { return x.ID == sc.ID }); i >= 0 {
 		s.all = slices.Clone(s.all)
@@ -202,7 +189,6 @@ func (s *Schedules) List() []protocol.FarmSchedule {
 	return slices.Clone(s.all)
 }
 
-// Add makes one; the channel defaults to 田头, the agent is a profile's id or name, the time zone the machine's.
 func (s *Schedules) Add(req protocol.ScheduleRequest) (protocol.FarmSchedule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -322,7 +308,6 @@ func (s *Schedules) Remove(id int64) (protocol.FarmSchedule, error) {
 	return was, nil
 }
 
-// Tick runs what is due now: each said in its channel, then handed on. The ticker calls it.
 func (s *Schedules) Tick() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -339,21 +324,17 @@ func (s *Schedules) Tick() {
 	}
 }
 
-// Due is the schedules as they come due, after each one's notice is in its channel.
 func (s *Schedules) Due() *base.Hub[base.Due] { return s.due }
 
-// Heartbeat: every $VIBEVALLEY_HEARTBEAT_MINUTES (10; 0 turns it off) the farm looks over its inbox without a model
-// (protocol.PatrolStep): what has waited there past its grace and was not reported lately is news, once per channel,
-// for the manager. A round costs nothing; a wake is a run.
+// Without a model: a round costs nothing; a wake is a run.
 type Heartbeat struct {
 	site   *base.Site
 	mu     sync.Mutex
 	memory protocol.PatrolMemory
 	news   *base.Hub[base.PatrolNews]
 	every  time.Duration
-	// Now is the clock and chat the chat; tests change them.
-	Now  func() int64
-	chat planChat
+	Now    func() int64
+	chat   planChat
 }
 
 func newHeartbeat(site *base.Site, chat *chat.Chat) (*Heartbeat, error) {
@@ -363,7 +344,7 @@ func newHeartbeat(site *base.Site, chat *chat.Chat) (*Heartbeat, error) {
 	}, nil
 }
 
-// start: the first round waits one interval, since right after a start what looks hanging is mostly the restart.
+// The first round waits one interval: right after a start, what looks hanging is mostly the restart.
 func (h *Heartbeat) OnStart(ctx context.Context) error {
 	if h.every <= 0 {
 		return nil
@@ -385,7 +366,6 @@ func (h *Heartbeat) OnStart(ctx context.Context) error {
 
 func (*Heartbeat) OnStop() {}
 
-// Round looks over the farm once now.
 func (h *Heartbeat) Round() {
 	h.mu.Lock()
 	defer h.mu.Unlock()

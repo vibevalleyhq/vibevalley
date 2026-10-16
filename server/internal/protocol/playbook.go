@@ -1,8 +1,6 @@
 package protocol
 
-// The rules of playbooks (种植计划) (packages/protocol/src/playbook.ts): whether a plan holds together, which steps
-// may start, what a step's helper is told, how a plan is edited, how it is laid out, what changed between two
-// versions. Texts are measured as JavaScript does (UTF-16 units), and trimmed as its trim does.
+// Texts are measured as JavaScript does (UTF-16 units) and trimmed as its trim does.
 
 import (
 	"encoding/json"
@@ -15,13 +13,11 @@ import (
 	"unicode/utf16"
 )
 
-// MaxNodes is the most steps a playbook has: more means the job should be split into playbooks.
+// More steps than this means the job should be split into playbooks.
 const MaxNodes = 12
 
-// DefaultParallel is how many steps of one playbook work at once, unless it says otherwise.
 const DefaultParallel = 3
 
-// AutoRetries is how many times the farm sends a step back by itself before it waits for you.
 const AutoRetries = 2
 
 func NodeOf(pb Playbook, id string) *PlaybookNode {
@@ -33,8 +29,7 @@ func NodeOf(pb Playbook, id string) *PlaybookNode {
 	return nil
 }
 
-// NextPlaybookID is the next playbook's id after the ones there are: p1, p2, … (an id's number read as JavaScript's
-// Number reads it).
+// An id's number is read as JavaScript's Number reads it.
 func NextPlaybookID(ids []string) string {
 	top := 0.0
 	for _, id := range ids {
@@ -46,16 +41,13 @@ func NextPlaybookID(ids []string) string {
 	return "p" + playbookNumberText(top+1)
 }
 
-// IsSettled is whether a step's work is in, or you said to go on without it: the steps after it may start.
 func IsSettled(n PlaybookNode) bool { return n.State == NodeStateMerged || n.State == NodeStateSkipped }
 
-// AsksForYou is whether a playbook waits on you: a draft to look over, a step that failed, a whole playbook to harvest.
 func AsksForYou(pb Playbook) bool {
 	return pb.State == PlaybookStateDraft || pb.State == PlaybookStateRipe ||
 		(IsOpen(pb) && slices.ContainsFunc(pb.Nodes, func(n PlaybookNode) bool { return n.State == NodeStateFailed }))
 }
 
-// BlockedBy is the steps node waits for that are not settled yet.
 func BlockedBy(pb Playbook, node PlaybookNode) []string {
 	out := []string{}
 	for _, id := range node.Needs {
@@ -66,7 +58,6 @@ func BlockedBy(pb Playbook, node PlaybookNode) []string {
 	return out
 }
 
-// ReadyNodes is the steps that may start now: waiting, everything they need settled. None unless the playbook runs.
 func ReadyNodes(pb Playbook) []PlaybookNode {
 	out := []PlaybookNode{}
 	if pb.State != PlaybookStateRunning {
@@ -80,7 +71,7 @@ func ReadyNodes(pb Playbook) []PlaybookNode {
 	return out
 }
 
-// Startable is the ready steps that fit under the playbook's own limit, in plan order. The farm's limits come on top.
+// The farm's limits come on top.
 func Startable(pb Playbook) []PlaybookNode {
 	var working int64
 	for _, n := range pb.Nodes {
@@ -92,12 +83,10 @@ func Startable(pb Playbook) []PlaybookNode {
 	return ready[:min(int64(len(ready)), max(0, pb.Parallel-working))]
 }
 
-// AllSettled is whether every step is merged or skipped: ready to harvest.
 func AllSettled(pb Playbook) bool {
 	return len(pb.Nodes) > 0 && !slices.ContainsFunc(pb.Nodes, func(n PlaybookNode) bool { return !IsSettled(n) })
 }
 
-// WithNode is the playbook with every step of that id changed.
 func WithNode(pb Playbook, id string, change func(PlaybookNode) PlaybookNode) Playbook {
 	nodes := make([]PlaybookNode, len(pb.Nodes))
 	for i, n := range pb.Nodes {
@@ -110,7 +99,6 @@ func WithNode(pb Playbook, id string, change func(PlaybookNode) PlaybookNode) Pl
 	return pb
 }
 
-// PlaybookSpent is what its steps cost, added up; nil before any step spent anything.
 func PlaybookSpent(pb Playbook) *Spent {
 	var total Spent
 	spent, priced := false, false
@@ -153,12 +141,8 @@ var NodeStateText = map[NodeState]string{
 	NodeStateSkipped: "跳过了",
 }
 
-// ── Acceptance ───────────────────────────────────────────────────────────────
-
-// IsAcceptance is whether a step is an acceptance step (验收): it writes what must fail now, and fixes nothing.
 func IsAcceptance(n PlaybookNode) bool { return n.Acceptance != nil && *n.Acceptance }
 
-// AncestorsOf is every step node waits for, directly or through the steps it waits for, in plan order.
 func AncestorsOf(pb Playbook, node PlaybookNode) []PlaybookNode {
 	seen := map[string]bool{}
 	var visit func(id string)
@@ -185,7 +169,6 @@ func AncestorsOf(pb Playbook, node PlaybookNode) []PlaybookNode {
 	return out
 }
 
-// AcceptancesOf is the merged acceptance steps node comes after: their files are frozen for it.
 func AcceptancesOf(pb Playbook, node PlaybookNode) []PlaybookNode {
 	out := []PlaybookNode{}
 	for _, n := range AncestorsOf(pb, node) {
@@ -196,13 +179,10 @@ func AcceptancesOf(pb Playbook, node PlaybookNode) []PlaybookNode {
 	return out
 }
 
-// IsLast is whether no step waits for node: a last step, which must pass the checks of the acceptance steps before it.
 func IsLast(pb Playbook, node PlaybookNode) bool {
 	return !slices.ContainsFunc(pb.Nodes, func(n PlaybookNode) bool { return slices.Contains(n.Needs, node.ID) })
 }
 
-// AcceptanceChecks is the acceptance checks a finished step must pass, besides its own: those before it, when it is a
-// last step.
 func AcceptanceChecks(pb Playbook, node PlaybookNode) []string {
 	out := []string{}
 	if !IsLast(pb, node) {
@@ -216,7 +196,6 @@ func AcceptanceChecks(pb Playbook, node PlaybookNode) []string {
 	return out
 }
 
-// frozenOf is the files the acceptance steps before node froze, each once.
 func frozenOf(pb Playbook, node PlaybookNode) []string {
 	out := []string{}
 	for _, n := range AcceptancesOf(pb, node) {
@@ -229,7 +208,6 @@ func frozenOf(pb Playbook, node PlaybookNode) []string {
 	return out
 }
 
-// FrozenTouched is the files a step changed that an acceptance step before it froze.
 func FrozenTouched(pb Playbook, node PlaybookNode, changed []string) []string {
 	frozen := frozenOf(pb, node)
 	out := []string{}
@@ -241,22 +219,17 @@ func FrozenTouched(pb Playbook, node PlaybookNode, changed []string) []string {
 	return out
 }
 
-// ── A plan, checked ──────────────────────────────────────────────────────────
-
-// NodeDraft is one step as a planner writes it.
 type NodeDraft struct {
-	ID    string   `json:"id"`
-	Title *string  `json:"title,omitzero"`
-	Task  string   `json:"task"`
-	Needs []string `json:"needs,omitzero"`
-	Agent *string  `json:"agent,omitzero"`
-	Check *string  `json:"check,omitzero"`
-	Scope []string `json:"scope,omitzero"`
-	// Acceptance marks an acceptance step (验收).
-	Acceptance bool `json:"acceptance,omitzero"`
+	ID         string   `json:"id"`
+	Title      *string  `json:"title,omitzero"`
+	Task       string   `json:"task"`
+	Needs      []string `json:"needs,omitzero"`
+	Agent      *string  `json:"agent,omitzero"`
+	Check      *string  `json:"check,omitzero"`
+	Scope      []string `json:"scope,omitzero"`
+	Acceptance bool     `json:"acceptance,omitzero"`
 }
 
-// PlanDraft is a plan as a planner writes it, in a json code block at the end of its report.
 type PlanDraft struct {
 	Title *string     `json:"title,omitzero"`
 	Nodes []NodeDraft `json:"nodes"`
@@ -265,7 +238,6 @@ type PlanDraft struct {
 // Step ids are ASCII only: no case folding, so 'ſ' or the Kelvin sign is no 's' or 'k' here, as in JavaScript.
 var stepID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$`)
 
-// PlanProblems is what is wrong with a plan, in words; empty when it holds together.
 func PlanProblems(nodes []PlaybookNode) []string {
 	problems := []string{}
 	if len(nodes) == 0 {
@@ -319,8 +291,7 @@ func PlanProblems(nodes []PlaybookNode) []string {
 	return problems
 }
 
-// LayersOf is the steps in layers, each after every step it needs: the columns of the plan board. A step caught in a
-// circle is in no layer (PlanProblems says so).
+// A step caught in a circle is in no layer.
 func LayersOf(nodes []PlaybookNode) [][]string {
 	known := map[string]bool{}
 	for _, n := range nodes {
@@ -403,7 +374,6 @@ func freshNode(draft NodeDraft) PlaybookNode {
 	return n
 }
 
-// ParsedPlan is a planner's plan read: its steps when OK, else what is wrong with it.
 type ParsedPlan struct {
 	OK       bool
 	Title    *string
@@ -413,8 +383,7 @@ type ParsedPlan struct {
 
 var planBlock = regexp.MustCompile("```(?:json)?[^\\n]*\\n([\\s\\S]*?)```")
 
-// ParsePlan is the plan in a planner's report: its last json code block, read and checked. The words of a block
-// that is not JSON or not a plan are Go's, not JavaScript's.
+// The words for a block that is not JSON or not a plan are Go's, not JavaScript's.
 func ParsePlan(text string) ParsedPlan {
 	matches := planBlock.FindAllStringSubmatch(text, -1)
 	if len(matches) == 0 {
@@ -449,8 +418,7 @@ func ParsePlan(text string) ParsedPlan {
 	return ParsedPlan{Problems: []string{lastProblem}}
 }
 
-// decodePlanDraft checks parsed JSON as the PlanDraft schema does: optional fields may be missing but never null,
-// other keys are ignored. The error is the first thing wrong, with where.
+// Optional fields may be missing but never null; other keys are ignored.
 func decodePlanDraft(raw any) (PlanDraft, string) {
 	var plan PlanDraft
 	obj, ok := raw.(map[string]any)
@@ -546,16 +514,12 @@ func decodePlanDraft(raw any) (PlanDraft, string) {
 	return plan, ""
 }
 
-// ── Changing a plan ──────────────────────────────────────────────────────────
-
-// Edited is a playbook changed, when OK; else why it could not be.
 type Edited struct {
 	OK       bool
 	Playbook Playbook
 	Problem  string
 }
 
-// editable is whether node may still be changed: anything in a draft; a step not started (or failed) while it runs.
 func editable(pb Playbook, node *PlaybookNode) bool {
 	return pb.State == PlaybookStateDraft ||
 		((pb.State == PlaybookStateRunning || pb.State == PlaybookStatePaused) &&
@@ -569,8 +533,7 @@ func checkedPlaybook(pb Playbook) Edited {
 	return Edited{OK: true, Playbook: pb}
 }
 
-// EditNode is a step changed as edit says, or added when there is no such step. Needs and Scope count as given when
-// not nil, as an empty JSON array decodes.
+// Needs and Scope count as given when not nil, as an empty JSON array decodes.
 func EditNode(pb Playbook, id string, edit NodeEdit) Edited {
 	node := NodeOf(pb, id)
 	if !editable(pb, node) {
@@ -625,7 +588,6 @@ func EditNode(pb Playbook, id string, edit NodeEdit) Edited {
 	return checkedPlaybook(pb)
 }
 
-// RemoveNode is a step taken out of the plan, and out of every step that waited for it.
 func RemoveNode(pb Playbook, id string) Edited {
 	node := NodeOf(pb, id)
 	if node == nil {
@@ -649,9 +611,6 @@ func RemoveNode(pb Playbook, id string) Edited {
 	return checkedPlaybook(pb)
 }
 
-// ── What helpers are told ────────────────────────────────────────────────────
-
-// NodeTask is what a step's helper is told: the goal, its step, what came before it, where to work, how it is checked.
 func NodeTask(pb Playbook, node PlaybookNode) string {
 	index := slices.IndexFunc(pb.Nodes, func(n PlaybookNode) bool { return n.ID == node.ID }) + 1
 	lines := []string{
@@ -712,7 +671,6 @@ func NodeTask(pb Playbook, node PlaybookNode) string {
 	return strings.Join(lines, "\n")
 }
 
-// CheckFailedText is what a step's helper is told when its check failed: the command's output, and to fix it.
 func CheckFailedText(check, output string) string {
 	out := coreTrim(output)
 	if out == "" {
@@ -721,22 +679,18 @@ func CheckFailedText(check, output string) string {
 	return "做完以后跑 `" + check + "` 没通过，输出的结尾：\n" + out + "\n\n修好，再提交。"
 }
 
-// AcceptancePassedText is what an acceptance step's helper is told when its check passes already: it caught nothing.
 func AcceptancePassedText(check string) string {
 	return "验收写好了，可 `" + check + "` 现在就通过了：它没抓住要修的问题，或要做的事。改成现在会失败的验收，再提交；别去修问题本身。"
 }
 
-// FrozenTouchedText is what a step's helper is told when it changed files an acceptance step froze.
 func FrozenTouchedText(files []string) string {
 	return "你改了前面的验收留下的文件：" + strings.Join(files, "、") + "。验收是冻结的：把它们恢复成计划分支上的样子，从代码上修，再提交。"
 }
 
-// RetryText is what a step's helper is told when its turn failed and it goes again.
 func RetryText(node PlaybookNode) string {
 	return "上一轮没做成。看一下报错，接着把这一步做完：" + node.Title + "。"
 }
 
-// PlaybookText is a playbook in a few lines: for the manager, and for tooltips.
 func PlaybookText(pb Playbook) string {
 	merged := 0
 	for _, n := range pb.Nodes {
@@ -779,10 +733,6 @@ func PlaybookText(pb Playbook) string {
 	return strings.Join(lines, "\n")
 }
 
-// ── History ──────────────────────────────────────────────────────────────────
-
-// PlaybookChange is an event as a change makes it (PlaybookEvent without seq, actor and at): who did it and when are
-// added where it is recorded.
 type PlaybookChange struct {
 	Playbook string            `json:"playbook"`
 	Node     *string           `json:"node,omitzero"`
@@ -793,12 +743,10 @@ type PlaybookChange struct {
 	Commits  []string          `json:"commits,omitzero"`
 }
 
-// ChangeOf is a recorded event as the change it was.
 func ChangeOf(e PlaybookEvent) PlaybookChange {
 	return PlaybookChange{Playbook: e.Playbook, Node: e.Node, Kind: e.Kind, Helper: e.Helper, Detail: e.Detail, Changes: e.Changes, Commits: e.Commits}
 }
 
-// nodeFields are a step's fields an edit can change, by their names in words, in NodeEdit's order.
 var nodeFields = []struct {
 	field string
 	text  func(PlaybookNode) string
@@ -811,7 +759,6 @@ var nodeFields = []struct {
 	{"该改的地方", func(n PlaybookNode) string { return strings.Join(n.Scope, "、") }},
 }
 
-// NodeFieldChanges is what an edit changed in a step, field by field.
 func NodeFieldChanges(was, now PlaybookNode) []NodeFieldChange {
 	out := []NodeFieldChange{}
 	for _, f := range nodeFields {
@@ -822,10 +769,7 @@ func NodeFieldChanges(was, now PlaybookNode) []NodeFieldChange {
 	return out
 }
 
-// PlaybookChanges is what happened between two versions of a playbook, as events: its state, its note, and each
-// step's state and fields. Every write of a playbook goes through here, so its history misses nothing; who did it is
-// the writer's to say. A draft's steps come with the draft, and an abandoned playbook's steps stop with it, without
-// events of their own. before is nil for a new playbook.
+// Every write of a playbook goes through here, so its history misses nothing.
 func PlaybookChanges(before *Playbook, after Playbook) []PlaybookChange {
 	out := []PlaybookChange{}
 	plan := func(kind PlaybookEventKind, detail *string) {
@@ -941,8 +885,6 @@ func PlaybookChanges(before *Playbook, after Playbook) []PlaybookChange {
 
 var ActorText = map[PlaybookActor]string{PlaybookActorUser: "主人", PlaybookActorForeman: "管家", PlaybookActorFarm: "农场"}
 
-// PlaybookEventText is an event in words, for the plan board and the manager. titleOf names a step by its id; nil
-// names it by its id.
 func PlaybookEventText(e PlaybookChange, titleOf func(node string) string) string {
 	if titleOf == nil {
 		titleOf = func(id string) string { return id }
@@ -1021,8 +963,6 @@ func PlaybookEventText(e PlaybookChange, titleOf func(node string) string) strin
 	}
 	return ""
 }
-
-// ── JavaScript's string and number rules, as these files need them ───────────
 
 func playbookOr(s *string) string {
 	if s == nil {

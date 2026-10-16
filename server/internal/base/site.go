@@ -1,10 +1,7 @@
 package base
 
-// The farm's core state on the server (FarmState), and the stream of site events the pages read (ported from the TypeScript
-// server's site.ts, removed). The state changes in one place only: Apply folds a fact in with protocol.Reduce, then sends it. A page
-// that connects later starts from a snapshot. The state is kept in $VIBEVALLEY_HOME/farm.json; the chat's messages and
-// the schedules live in the database, which fill the state's copy of them at start. Beside the state go a helper's
-// steps, notices and runtime changes: sent, not kept.
+// The state changes in one place only: Apply folds a fact in with protocol.Reduce, then sends it. farm.json keeps the state but the chat, progress,
+// schedules and issues, whose home is the database.
 
 import (
 	"encoding/json"
@@ -19,11 +16,9 @@ import (
 )
 
 const (
-	// saveAfter: writes to farm.json wait this long, so a burst of facts is one write.
-	saveAfter = 500 * time.Millisecond
-	// stateEvery: the folded state goes out at most this often.
+	// A burst of facts is one write.
+	saveAfter  = 500 * time.Millisecond
 	stateEvery = 200 * time.Millisecond
-	// wantBedFor: how long a bed the person planted on waits for the helper the manager hires for it.
 	wantBedFor = 10 * time.Second
 )
 
@@ -44,22 +39,18 @@ type Site struct {
 
 func NowMs() int64 { return time.Now().UnixMilli() }
 
-// restored is what a restarted server starts from: what was kept, with no call on, and every helper on a bed.
 func restored(kept protocol.FarmState) protocol.FarmState {
 	kept.CallReason, kept.Chat, kept.Progress, kept.Schedules, kept.Issues = nil, nil, nil, nil, nil
 	kept.Call, kept.Foreman = protocol.CallStateIdle, protocol.ForemanStateIdle
 	return protocol.WithStations(kept)
 }
 
-// toKeep is what farm.json keeps: the state without the chat, the progress, the schedules and the issues, whose home is
-// the database.
 func toKeep(state protocol.FarmState) protocol.FarmState {
 	state.Chat, state.Progress, state.Schedules, state.Issues = nil, nil, nil, nil
 	return state
 }
 
-// siteLegacyPlaybooks is the playbooks farm.json had before they were issues (tickets/issues.go adoptPlaybooks takes
-// them); the first time, farm.json as it was is copied beside it.
+// The first time, farm.json as it was is copied beside it.
 func siteLegacyPlaybooks(file string, body []byte) []protocol.Playbook {
 	var old struct {
 		Playbooks []protocol.Playbook `json:"playbooks"`
@@ -76,7 +67,6 @@ func siteLegacyPlaybooks(file string, body []byte) []protocol.Playbook {
 	return old.Playbooks
 }
 
-// LegacyPlaybooks is the playbooks farm.json had before they were issues.
 func (s *Site) LegacyPlaybooks() []protocol.Playbook { return s.legacy }
 
 func NewSite(home string) *Site {
@@ -111,7 +101,7 @@ func (s *Site) body() ([]byte, error) {
 	return json.Marshal(keep)
 }
 
-// save writes the state a little later; a crash loses half a second at most. Called with mu held.
+// A crash loses half a second at most. Called with mu held.
 func (s *Site) save() {
 	if s.closed {
 		return
@@ -126,7 +116,6 @@ func (s *Site) save() {
 	})
 }
 
-// Close saves the state once more and stops saving.
 func (s *Site) Close() {
 	s.mu.Lock()
 	s.closed = true
@@ -139,7 +128,6 @@ func (s *Site) Close() {
 	}
 }
 
-// withAt is a fact with its time set: every fact has an At field.
 func withAt(fact protocol.FactValue, at int64) protocol.FactValue {
 	v := reflect.New(reflect.TypeOf(fact)).Elem()
 	v.Set(reflect.ValueOf(fact))
@@ -147,7 +135,7 @@ func withAt(fact protocol.FactValue, at int64) protocol.FactValue {
 	return v.Interface().(protocol.FactValue)
 }
 
-// Apply folds a fact into the state (its At is now) and sends it to the pages. A fact that changes nothing is not news.
+// A fact that changes nothing is not news.
 func (s *Site) Apply(fact protocol.FactValue) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -175,7 +163,6 @@ func (s *Site) Apply(fact protocol.FactValue) {
 	}
 }
 
-// Events is a snapshot of now, then every fact and everything beside the state; stop ends it.
 func (s *Site) Events() (snapshot protocol.SiteEvent, events <-chan protocol.SiteEvent, stop func()) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -195,8 +182,7 @@ func (s *Site) frame(effects []protocol.GameEffect) protocol.SiteFrame {
 	}
 }
 
-// States is the state now, then again after it changes, at most once per 200 ms, each with its view and the effects
-// since the last frame: for clients that do not fold facts. It ends when done closes.
+// For clients that do not fold facts. It ends when done closes.
 func (s *Site) States(done <-chan struct{}) <-chan protocol.SiteFrame {
 	s.mu.Lock()
 	facts, stopFacts := s.events.Subscribe()
@@ -220,7 +206,6 @@ func (s *Site) States(done <-chan struct{}) <-chan protocol.SiteFrame {
 		}
 		for {
 			var gathered []protocol.GameEffect
-			// Wait for the first change, then gather for a window.
 			select {
 			case <-done:
 				return
@@ -257,7 +242,6 @@ func isFact(e protocol.SiteEvent) bool {
 	return ok
 }
 
-// WantBed: the person planted on bed; the next helper hired in the next few seconds takes it, when free.
 func (s *Site) WantBed(bed int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -267,7 +251,6 @@ func (s *Site) WantBed(bed int64) {
 	}{bed, NowMs() + wantBedFor.Milliseconds()}
 }
 
-// State is the core state now.
 func (s *Site) State() protocol.FarmState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -305,7 +288,6 @@ func (s *Site) SetForeman(state protocol.ForemanState) {
 	s.Apply(protocol.FactForeman{State: state})
 }
 
-// SetCommits: the commit count (the farm's experience); a fact only when it changed.
 func (s *Site) SetCommits(count protocol.CommitCount) {
 	if was := s.State().Commits; was != nil && reflect.DeepEqual(*was, count) {
 		return
@@ -313,7 +295,6 @@ func (s *Site) SetCommits(count protocol.CommitCount) {
 	s.Apply(protocol.FactCommits{Commits: count})
 }
 
-// Step: a step of a helper's work, new or grown, for pages showing its detail.
 func (s *Site) Step(id string, step protocol.WorkStep) {
 	s.events.Publish(protocol.SiteEvent{Value: protocol.SiteEventStep{At: NowMs(), ID: id, Step: step}})
 }
@@ -322,7 +303,6 @@ func (s *Site) Notice(level protocol.NoticeLevel, text string) {
 	s.events.Publish(protocol.SiteEvent{Value: protocol.SiteEventNotice{At: NowMs(), Level: level, Text: text}})
 }
 
-// Runtime: a runtime's info changed (its account usage, mostly).
 func (s *Site) Runtime(info protocol.RuntimeInfo) {
 	s.events.Publish(protocol.SiteEvent{Value: protocol.SiteEventRuntime{At: NowMs(), Info: info}})
 }

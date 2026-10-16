@@ -14,17 +14,10 @@ import (
 	"vibevalley/pkg/smith/observe"
 )
 
-// The helpers' pure rules (ported from the TypeScript server's report.ts, limits.ts, briefing.ts, and the parts of recall.ts the crew
-// uses; removed): what a finished turn says in words, how many may work at once, who a helper is told it is. crew.go calls
-// them with what the core state and the store have. Lengths are counted as JavaScript does (UTF-16 units), so the
-// farm cuts text where the TypeScript server did.
+// Lengths are counted in UTF-16 units.
 
-// ── A finished turn, in words (report.ts) ────────────────────────────────────
-
-// crewSummaryMax: a report's summary on the farm is its conclusion, this long at most.
 const crewSummaryMax = 160
 
-// crewClip is text on one line, cut to max characters with an ellipsis.
 func crewClip(text string, max int) string {
 	flat := base.Trim(base.Spaces.ReplaceAllString(text, " "))
 	if base.Units(flat) > max {
@@ -47,7 +40,6 @@ var crewFailure = map[oar.FailureClass]string{
 	oar.FailureUnknown:          "出错了",
 }
 
-// crewFailureText is a failed turn in words: what kind of failure, the runtime's own reason, and what would help.
 func crewFailureText(f oar.TurnOutcome) string {
 	advice, _ := observe.FailureAdviceOf(f.Failure)
 	next := ""
@@ -84,7 +76,6 @@ var (
 	crewVerdict = regexp.MustCompile(`(?:^|\n)[` + base.SpaceClass + `>*#_-]*(?:\*\*)?结论(?:\*\*)?[` + base.SpaceClass + `]*[:：][` + base.SpaceClass + `]*(?:\*\*)?`)
 )
 
-// crewConclusion is the end of what a helper said in a turn: its last paragraphs, min characters at least.
 func crewConclusion(text string, min int) string {
 	blocks := crewBlocks.Split(base.Trim(text), -1)
 	tail := ""
@@ -98,7 +89,6 @@ func crewConclusion(text string, min int) string {
 	return tail
 }
 
-// SummaryOf is a report in a line or two: its 结论 when it wrote one, else its last paragraphs.
 func SummaryOf(text string) string {
 	if all := crewVerdict.FindAllStringIndex(text, -1); len(all) > 0 {
 		last := all[len(all)-1]
@@ -111,7 +101,7 @@ func SummaryOf(text string) string {
 	return crewConclusion(text, 80)
 }
 
-// crewNeedsYou are failures a person has to fix (sign in, top up): said out loud on the farm, not only in the report.
+// Said out loud on the farm, not only in the report.
 var crewNeedsYou = map[oar.FailureClass]bool{oar.FailureAuth: true, oar.FailureBilling: true, oar.FailureQuota: true, oar.FailureModelUnavailable: true}
 
 func crewOutcomeOf(o oar.TurnOutcome) protocol.Outcome {
@@ -124,15 +114,11 @@ func crewOutcomeOf(o oar.TurnOutcome) protocol.Outcome {
 	return protocol.OutcomeFailed
 }
 
-// crewRead is a finished turn, read: how it went, what to keep of what it said, the line for the farm.
 type crewRead struct {
-	Outcome protocol.Outcome
-	// Text is what it said, led by why it failed when it did.
-	Text    string
-	Summary string
-	// Failure is why it failed, in words; empty when it did not.
-	Failure string
-	// NeedsYou: it failed in a way a person has to fix (sign in, top up, pick a model).
+	Outcome  protocol.Outcome
+	Text     string
+	Summary  string
+	Failure  string
 	NeedsYou bool
 }
 
@@ -166,17 +152,13 @@ func crewReadReport(outcome oar.TurnOutcome, said string) crewRead {
 	return r
 }
 
-// ── How many may work at once (limits.ts) ────────────────────────────────────
-
-// crewLimits are the caps on helpers working at once: the farm's, the runtime asked for (0: none), the project (0: none).
 type crewLimits struct {
 	Farm       int
 	PerRuntime int
 	PerProject int
 }
 
-// crewNoRoom is why one more helper on runtime in project should not start working now, in words; "" when there is
-// room. except is a helper about to work again: it does not count against itself.
+// except is a helper about to work again: it does not count against itself.
 func crewNoRoom(helpers []protocol.Helper, runtime, project string, limits crewLimits, except string) string {
 	var busy []protocol.Helper
 	for _, h := range helpers {
@@ -205,7 +187,6 @@ func crewNoRoom(helpers []protocol.Helper, runtime, project string, limits crewL
 	return ""
 }
 
-// crewHelperName is a new helper's name: the agent's, numbered when more than one from the same agent is on the farm.
 func crewHelperName(helpers []protocol.Helper, agentID, agentName string) string {
 	same := 0
 	for _, h := range helpers {
@@ -219,15 +200,11 @@ func crewHelperName(helpers []protocol.Helper, agentID, agentName string) string
 	return fmt.Sprintf("%s %d", agentName, same+1)
 }
 
-// Candidate is an agent as the farm weighs it for a job: can it be sent now (enabled, nothing blocking).
 type Candidate struct {
 	Agent  protocol.AgentProfile
 	Usable bool
 }
 
-// ChooseAgent is who goes (docs/agents-and-runtimes.md「派给谁」): the agent named, by id or name, or the first
-// usable one on a runtime named; else the one picked in the chat; else the usable agent whose tags the job mentions
-// most, the first of equals. nil when nobody can.
 func ChooseAgent(candidates []Candidate, task, named, picked string) *protocol.AgentProfile {
 	if named != "" {
 		for _, c := range candidates {
@@ -269,10 +246,7 @@ func ChooseAgent(candidates []Candidate, task, named, picked string) *protocol.A
 	return best
 }
 
-// ── What a helper is told (briefing.ts) ──────────────────────────────────────
-
-// JobBreak is between a persona sent in prompt mode (or what a turn is reminded of) and the job under it: what
-// the detail panel shows starts after it.
+// What the detail panel shows starts after it.
 const JobBreak = "\n\n---\n\n"
 
 func crewToOarMcp(server protocol.MCPServer) oar.McpServer {
@@ -285,7 +259,6 @@ func crewToOarMcp(server protocol.MCPServer) oar.McpServer {
 	return oar.McpServer{}
 }
 
-// crewInstructions is the agent's persona with its skills under it, as one block of instructions.
 func crewInstructions(agent protocol.AgentProfile, library []protocol.Skill) string {
 	parts := []string{base.Trim(agent.Persona)}
 	for _, id := range agent.Skills {
@@ -296,8 +269,6 @@ func crewInstructions(agent protocol.AgentProfile, library []protocol.Skill) str
 	return strings.Join(slices.DeleteFunc(parts, func(p string) bool { return p == "" }), "\n\n")
 }
 
-// crewFarmRules is what every helper is told about working on the farm: its place, to commit what it does, and how to
-// talk on the group chat (田头) with the farm's tools. id is how others @ it.
 func crewFarmRules(place base.Workplace, house, id string) string {
 	where := fmt.Sprintf("你在项目「%s」的目录里干活（%s）。只改这个目录里的东西，不要 push。", place.Project, place.Cwd)
 	if place.Branch != "" {
@@ -329,8 +300,6 @@ func crewFarmRules(place base.Workplace, house, id string) string {
 	return strings.Join(lines, "\n")
 }
 
-// crewExtra are the session options an agent adds to what spawn gives (model, effort, env, cwd): its persona, MCP
-// servers and disallowed tools.
 type crewExtra struct {
 	SystemPrompt       *string
 	AppendSystemPrompt *string
@@ -338,8 +307,7 @@ type crewExtra struct {
 	DisallowedTools    []string
 }
 
-// crewWithOptions is the runtime with this agent's session options added. smith's spawn takes only model, effort,
-// env and cwd, so the rest rides on a runtime of this session's own.
+// smith's spawn takes only model, effort, env and cwd, so the rest rides on a runtime of this session's own.
 func crewWithOptions(base oar.Runtime, extra crewExtra) oar.Runtime {
 	out := base
 	out.Session = func(ctx context.Context, installation oar.AvailableInstallation, options oar.SessionOptions) (oar.Session, error) {
@@ -358,19 +326,16 @@ func crewWithOptions(base oar.Runtime, extra crewExtra) oar.Runtime {
 	return out
 }
 
-// PlanningTask is what a planning helper is told: read the code, split the job into steps a helper each, and give
-// the plan as a json code block (protocol's PlanDraft). It changes nothing.
 func PlanningTask(goal, project string, agents []protocol.AgentProfile) string {
 	type node struct {
-		ID    string   `json:"id"`
-		Title string   `json:"title"`
-		Task  string   `json:"task"`
-		Needs []string `json:"needs"`
-		Agent string   `json:"agent,omitempty"`
-		Scope []string `json:"scope"`
-		Check string   `json:"check"`
-		// Acceptance marks the step that writes the acceptance.
-		Acceptance bool `json:"acceptance,omitempty"`
+		ID         string   `json:"id"`
+		Title      string   `json:"title"`
+		Task       string   `json:"task"`
+		Needs      []string `json:"needs"`
+		Agent      string   `json:"agent,omitempty"`
+		Scope      []string `json:"scope"`
+		Check      string   `json:"check"`
+		Acceptance bool     `json:"acceptance,omitempty"`
 	}
 	agent := "lab"
 	if len(agents) > 0 {
@@ -415,12 +380,9 @@ func PlanningTask(goal, project string, agents []protocol.AgentProfile) string {
 	return strings.Join(lines, "\n")
 }
 
-// ── What a turn is reminded of (recall.ts, the crew's part) ──────────────────
-
-// RecallHead is the first words of what a turn is reminded of: crewRecalledIn finds the block by them.
+// crewRecalledIn finds the block by these words.
 const RecallHead = "【你记得的】"
 
-// crewRecallBlock is what goes on top of a turn's input: the memories it is reminded of. Empty when there are none.
 func crewRecallBlock(memories []protocol.Memory, project string) string {
 	if len(memories) == 0 {
 		return ""
@@ -432,7 +394,7 @@ func crewRecallBlock(memories []protocol.Memory, project string) string {
 	return strings.Join(lines, "\n")
 }
 
-// crewWithRecall is a turn's input with what it is reminded of on top, set apart so the detail panel shows the two apart.
+// Set apart, so the detail panel shows the two apart.
 func crewWithRecall(block, input string) string {
 	if block == "" {
 		return input
@@ -440,7 +402,6 @@ func crewWithRecall(block, input string) string {
 	return block + JobBreak + input
 }
 
-// crewRecalledIn is what a turn's input was reminded of (its lines, without the head); "" when nothing.
 func crewRecalledIn(input string) string {
 	parts := strings.Split(input, JobBreak)
 	if len(parts) < 2 {

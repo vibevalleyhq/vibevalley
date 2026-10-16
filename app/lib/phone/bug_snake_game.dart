@@ -1,7 +1,3 @@
-// 贪吃虫 on the farm phone (web/src/phone/BugSnake.tsx): the rules are bug_snake.dart's; here the clock, the pad and
-// the drawing, in the phone's four greens, each cell six of the game's pixels, zoomed whole. Leaving the game (or
-// putting the phone away) pauses it where it is.
-
 import 'dart:math' as math;
 
 import 'package:flutter/scheduler.dart';
@@ -14,20 +10,17 @@ import 'lcd.dart';
 import 'pad.dart';
 import 'widgets.dart';
 
-/// The run in progress, kept while the phone is away; and the best score this session.
 final bugSnakeGameProvider = NotifierProvider<Kept<BugSnake?>, BugSnake?>(() => Kept(null));
 final bugSnakeBestProvider = NotifierProvider<Kept<int>, int>(() => Kept(0));
 
-/// A cell in the game's pixels, and the game's pixels on screen.
 const _cell = 6;
 const _zoom = 3.0;
 const _width = bugSnakeWidth * _cell;
 const _height = bugSnakeHeight * _cell;
 
-/// The head looking right; the other ways are it turned.
+/// The other ways are it turned.
 const _head = [' #### ', '####.#', '######', '######', '####.#', ' #### '];
 
-/// Body segments, striped light and dark, and the tail's tip.
 const _segment = [
   [' #### ', '#++++#', '#++++#', '#++++#', '#++++#', ' #### '],
   [' #### ', '#....#', '#....#', '#....#', '#....#', ' #### '],
@@ -35,13 +28,11 @@ const _segment = [
 const _tail = ['      ', '  ##  ', ' #++# ', ' #++# ', '  ##  ', '      '];
 const _seed = ['   #  ', '  #+# ', ' #++# ', ' #++# ', '  ##  ', '      '];
 
-/// The bug, its legs in two frames.
 const _bug = [
   [' #  # ', '# ## #', ' #### ', '######', ' #### ', '#    #'],
   [' #  # ', '  ##  ', '######', ' #### ', '######', '      '],
 ];
 
-/// Rows turned a quarter clockwise.
 List<String> _turned(List<String> rows) => [
   for (var y = 0; y < rows.length; y++) [for (final row in rows.reversed) row[y]].join(),
 ];
@@ -84,7 +75,6 @@ class _BugSnakeGameState extends ConsumerState<BugSnakeGame> with SingleTickerPr
 
   BugSnake? get _g => ref.read(bugSnakeGameProvider);
 
-  /// Runs the clock while a run is on and not paused.
   void _sync() {
     final g = _g;
     final on = _playing && g != null && g.over == null;
@@ -243,7 +233,6 @@ class _FieldPainter extends CustomPainter {
     canvas.scale(_zoom);
     final p = Paint()..isAntiAlias = false;
     canvas.drawRect(const Rect.fromLTWH(0, 0, _width * 1.0, _height * 1.0), p..color = Lcd.paper);
-    // The field's furrows: a light dot in every cell.
     p.color = Lcd.light;
     for (var y = 0; y < bugSnakeHeight; y++) {
       for (var x = 0; x < bugSnakeWidth; x++) {
@@ -254,7 +243,7 @@ class _FieldPainter extends CustomPainter {
     if (g == null) return;
     void draw(List<String> picture, int c) => drawPattern(canvas, picture, (c % bugSnakeWidth) * _cell * 1.0, (c ~/ bugSnakeWidth) * _cell * 1.0);
     draw(_seed, g.food);
-    // The bug's legs move a tick at a time; it blinks its last ten ticks, before it flies off.
+    // It blinks its last ten ticks, before it flies off.
     final bug = g.bug;
     if (bug != null && (g.bugLeft > 10 || (g.bugLeft ~/ 2) % 2 == 0)) draw(_bug[g.bugLeft % 2], bug);
     for (var i = 0; i < g.body.length; i++) {
@@ -266,7 +255,6 @@ class _FieldPainter extends CustomPainter {
   bool shouldRepaint(_FieldPainter old) => old.g != g;
 }
 
-/// The home screen's icon: a caterpillar on the ground, heading for a seed.
 class BugSnakeIcon extends StatelessWidget {
   const BugSnakeIcon({super.key});
 
@@ -279,7 +267,6 @@ class _IconPainter extends CustomPainter {
 
   static const _rows = ['    # #   ', '    ###   ', '++..#o#  #', '++..###  +'];
 
-  /// Fitted into its box as the web page's SVG viewBox (0 -1 10 10) is: centred, uniform scale.
   @override
   void paint(Canvas canvas, Size size) {
     final k = math.min(size.width / 10, size.height / 10);

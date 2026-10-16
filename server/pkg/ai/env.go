@@ -2,9 +2,6 @@ package ai
 
 import "os"
 
-// API keys from the environment.
-
-// envKeys is where a provider's key is found when none is given.
 var envKeys = map[string]string{
 	"anthropic":  "ANTHROPIC_API_KEY",
 	"deepseek":   "DEEPSEEK_API_KEY",
@@ -14,7 +11,6 @@ var envKeys = map[string]string{
 	"zai":        "ZAI_API_KEY",
 }
 
-// GetEnvApiKey is the provider's key from the environment; "" when there is none.
 func GetEnvApiKey(provider string) string {
 	name, ok := envKeys[provider]
 	if !ok {

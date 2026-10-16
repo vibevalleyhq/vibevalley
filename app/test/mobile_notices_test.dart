@@ -1,6 +1,3 @@
-// The phone's notifications: what tapping one opens reaches the screens as a command, even when the tap launched the
-// app before any screen listened.
-
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';

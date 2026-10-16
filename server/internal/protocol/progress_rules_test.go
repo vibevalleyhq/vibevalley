@@ -1,7 +1,5 @@
 package protocol
 
-// The farm's progress (progress.go), as the removed TypeScript server's progress-rules.test.ts tested the TypeScript one.
-
 import (
 	"strings"
 	"testing"
@@ -82,7 +80,6 @@ func TestFirstTry(t *testing.T) {
 	if has(LedgerEntry{LedgerEntryTold{At: progressAt, Helper: "w1"}}, progressHarvested("w1")) {
 		t.Fatal("told")
 	}
-	// Words for one helper do not spoil another's.
 	rulesEqual(t, ProgressOf([]LedgerEntry{{LedgerEntryTold{At: progressAt, Helper: "w2"}}, progressHarvested("w1")}).Counts["first_try"], int64(1))
 }
 
@@ -201,8 +198,6 @@ func TestEntriesForFacts(t *testing.T) {
 	rulesEqual(t, progressTold(farm, Fact{FactHired{At: 1, Helper: progressHelper("w2", PhaseArriving{})}}), []string{"hired"})
 }
 
-// What the farm's helpers and the person do comes to the ledger through the facts: a harvest that took commits in,
-// the person's words in a job thread and the helpers they name, a helper answering another's call.
 func TestEntriesFromLeavingAndMessages(t *testing.T) {
 	farm := EmptyFarm()
 	w1 := progressHelper("w1", PhaseRipe{})
@@ -214,7 +209,6 @@ func TestEntriesFromLeavingAndMessages(t *testing.T) {
 	rulesEqual(t, EntriesFor(farm, left, after), []LedgerEntry{{LedgerEntryHarvested{
 		Helper: "w1", Agent: rulesPtr("lab"), Project: "clock", Runtime: "pi", Commits: 3, CNY: rulesPtr(0.5), Turns: 2,
 	}}})
-	// Nothing taken in, or sent home some other way: nothing earned.
 	none := int64(0)
 	rulesEqual(t, progressTold(farm, Fact{FactLeft{At: 1, ID: "w1", Closed: &harvested, Merged: &none}}), []string{})
 	dismissed := IssueCloseDismissed
@@ -225,14 +219,11 @@ func TestEntriesFromLeavingAndMessages(t *testing.T) {
 	}
 	thread := rulesPtr("w1")
 	rulesEqual(t, progressTold(farm, Fact{FactMessage{At: 1, Message: said(1, "user", SenderKindUser), Thread: thread}}), []string{"told"})
-	// Named: helpers on the farm only, not the manager, the person, everyone or one that is gone.
 	rulesEqual(t, progressTold(farm, Fact{FactMessage{At: 1, Message: said(2, "user", SenderKindUser, "w2", "foreman", Everyone, "w9")}}), []string{"called"})
-	// The manager's words in the thread are not the person's.
 	rulesEqual(t, progressTold(farm, Fact{FactMessage{At: 1, Message: said(3, "foreman", SenderKindForeman, "w2"), Thread: thread}}), []string{})
 	answered := Fact{FactMessage{At: 1, Message: said(4, "w2", SenderKindHelper), Answers: rulesPtr("w1")}}
 	after, _ = Reduce(farm, answered)
 	rulesEqual(t, EntriesFor(farm, answered, after), []LedgerEntry{{LedgerEntryHandoff{Helper: "w1", To: "w2"}}})
-	// A message counts once: the manager's words grow as they stream in.
 	streaming := Fact{FactMessage{At: 1, Message: said(5, "user", SenderKindUser), Thread: thread}}
 	seen, _ := Reduce(farm, streaming)
 	rulesEqual(t, progressTold(seen, streaming), []string{})
@@ -271,7 +262,6 @@ func TestEntriesPlaybooksLevelsBeds(t *testing.T) {
 		{ID: "b", Title: "b", Task: "b", Needs: []string{}, State: NodeStateMerged},
 	}}
 	in := func(s PlaybookState) Playbook { p := pb; p.State = s; return p }
-	// A playbook changes as its parent issue does.
 	parent := func(state FarmState, s PlaybookState) Fact {
 		return Fact{FactIssue{At: 2, Issue: PlaybookIssues(in(s), state.Issues, 2)[0]}}
 	}

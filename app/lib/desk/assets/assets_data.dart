@@ -1,9 +1,3 @@
-// What the almanac (图鉴) shows, as rules over the sprite manifest (web/src/pages/assets.ts): every picture on a shelf
-// by what it is (helpers by animal and outfit), the frames a picture animates with, and the commands that make a
-// picture again from its sheet (the manifest records which sheet each was cut from). The manifest is
-// assets/pixel/sprites.json; its sizes are the drawings' pixels, shown here in art pixels (over the density) as the
-// page does.
-
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -19,21 +13,18 @@ class Picture {
   final double w;
   final double h;
 
-  /// The point that stands on the ground.
   final double ax;
   final double ay;
 
-  /// The middle of a helper's head.
   final double? hx;
   final double? hy;
 
-  /// The sheet it was cut from, from the repository's root.
+  /// From the repository's root.
   final String? sheet;
 
   String get asset => 'assets/pixel/$name.png';
 }
 
-/// Every picture in the manifest, by name, in the manifest's order.
 class Pictures {
   Pictures(this.all) : _byName = {for (final p in all) p.name: p};
   final List<Picture> all;
@@ -64,8 +55,6 @@ class Pictures {
 }
 
 final picturesProvider = FutureProvider<Pictures>((ref) async => Pictures.parse(await rootBundle.loadString('assets/pixel/sprites.json')));
-
-// ── Shelves ──────────────────────────────────────────────────────────────────
 
 bool _isHelper(String name) => Species.values.any((s) => name.startsWith('${s.wire}-'));
 
@@ -100,12 +89,11 @@ class Group {
   const Group(this.key, this.label, this.pictures);
   final String key;
 
-  /// A helper's animal and outfit; empty for a shelf of one group.
   final String label;
   final List<Picture> pictures;
 }
 
-/// localeCompare(…, 'en', { numeric: true }): case-insensitive, runs of digits by their value.
+/// Case-insensitive, runs of digits by their value.
 int naturalCompare(String a, String b) {
   final re = RegExp(r'\d+|\D+');
   final pa = re.allMatches(a.toLowerCase()).map((m) => m[0]!).toList();
@@ -122,8 +110,6 @@ int naturalCompare(String a, String b) {
   return byLength != 0 ? byLength : a.compareTo(b);
 }
 
-/// A shelf's pictures in groups: a helper's by animal and outfit, in the order the core lists them; any other shelf,
-/// one group by name.
 List<Group> groupsOf(String shelf, List<Picture> pictures) {
   final sorted = [...pictures]..sort((a, b) => naturalCompare(a.name, b.name));
   if (shelf != 'helpers') return sorted.isEmpty ? const [] : [Group(shelf, '', sorted)];
@@ -135,10 +121,7 @@ List<Group> groupsOf(String shelf, List<Picture> pictures) {
   ];
 }
 
-// ── Frames ───────────────────────────────────────────────────────────────────
-
-/// The frames a picture animates with, or null: its numbered siblings (`x-1`, `x-2`, …). The pixel walk has two steps
-/// around a standing frame (`x-1`, `x`, `x-2`, `x`).
+/// The pixel walk has two steps around a standing frame (`x-1`, `x`, `x-2`, `x`).
 List<String>? framesOf(String name, bool Function(String) has) {
   final base = RegExp(r'^(.*)-(\d+)$').firstMatch(name)?[1] ?? name;
   final numbered = <String>[];
@@ -150,9 +133,6 @@ List<String>? framesOf(String name, bool Function(String) has) {
   return frames.contains(name) ? frames : null;
 }
 
-// ── Making it again ──────────────────────────────────────────────────────────
-
-/// The commands that draw a picture's sheet again and cut it, from the repository's root.
 ({String draw, String cut})? remakeOf(Picture p) {
   final sheet = p.sheet;
   if (sheet == null || sheet.isEmpty) return null;
@@ -160,7 +140,6 @@ List<String>? framesOf(String name, bool Function(String) has) {
   return (draw: 'design/pixel/gen.sh $stem', cut: 'python3 design/pixel/process.py $stem');
 }
 
-/// Whether a picture matches what was typed: its name, its shelf's name, or a helper's animal or outfit.
 bool pictureMatches(Picture p, String query) {
   final q = query.trim().toLowerCase();
   if (q.isEmpty) return true;

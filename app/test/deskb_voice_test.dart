@@ -1,6 +1,3 @@
-// 声音: the voice rules ported from protocol, and the settings form (the line on the 声音 page, the agent part for
-// the manager's voice tab): what it shows, what it saves, what it refuses.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desk/voice/voice_page.dart';
@@ -124,7 +121,7 @@ void main() {
     await t.enterText(find.bySemanticsLabel('大模型地址').last, 'not a url');
     await t.pump();
     expect(find.textContaining('大模型的地址要是 http(s) 开头的完整地址'), findsOneWidget);
-    // Leave the field first: its suggestions float over the bar while it has focus, as a datalist does.
+    // Leave the field first: its suggestions float over the bar while it has focus.
     FocusManager.instance.primaryFocus?.unfocus();
     await t.pump();
     await t.tap(find.text('撤销'));

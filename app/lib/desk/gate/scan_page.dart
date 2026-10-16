@@ -1,6 +1,3 @@
-// The camera, on phones, looking for a yard gate's pairing code (gate_page.dart): the first code that is a pairing
-// link closes the page with it; anything else is ignored.
-
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 

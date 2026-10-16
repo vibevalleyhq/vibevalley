@@ -1,8 +1,3 @@
-// What the runtime page shows of oar's facts that the shared rules (../shared/rules.dart) leave out: which optional
-// queries each runtime has (protocol index.ts RUNTIME_FACTS `capabilities`, from @botiverse/oar 0.44.0), and their
-// words (RuntimesPage.tsx CAPABILITY_LABEL). Change them there and here together.
-
-/// Optional runtime capabilities in oar (protocol Capability), in the page's order.
 enum Capability { listModels, accountUsage, checkUpdate, upgrade, skills, mcpServers, tools }
 
 const capabilityLabel = <Capability, String>{
@@ -29,5 +24,4 @@ const _capabilities = <String, List<Capability>>{
   'antigravity': [Capability.listModels, Capability.checkUpdate],
 };
 
-/// The queries oar has for a runtime; none for one it does not know.
 List<Capability> capabilitiesOf(String runtime) => _capabilities[runtime] ?? const [];

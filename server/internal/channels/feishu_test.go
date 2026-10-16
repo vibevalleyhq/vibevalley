@@ -1,9 +1,5 @@
 package channels
 
-// Feishu's receiving (feishu.go): the SDK hands each message to its handler on a goroutine of its own and
-// acknowledges it once the handler returns. The handler must return at once, whatever the bridge is doing, and the
-// bridge takes what came in one message at a time, in order (the TypeScript server queued them the same way).
-
 import (
 	"context"
 	"encoding/json"
@@ -16,8 +12,6 @@ import (
 	"vibevalley/pkg/feishu"
 )
 
-// voiceSDKFeishu delivers like the SDK: each message to the handler on its own goroutine; a message Feishu sends
-// again arrives again. returned says how long each handler call took.
 type voiceSDKFeishu struct {
 	voiceScriptedFeishu
 	deliver  [][]feishu.Message
@@ -53,7 +47,6 @@ func TestFeishuReceivingQueuesWhatTheSDKHandsOver(t *testing.T) {
 	}
 	first, second := msg("om1", "第一句"), msg("om2", "第二句")
 	api := voiceSDKFeishu{
-		// The first message, then the second three times at once (Feishu sending it again while the first is handled).
 		deliver:  [][]feishu.Message{{first}, {second, second, second}},
 		returned: make(chan time.Duration, 8),
 	}
@@ -72,7 +65,6 @@ func TestFeishuReceivingQueuesWhatTheSDKHandsOver(t *testing.T) {
 		taken = append(taken, m)
 		mu.Unlock()
 		if m.ID == "om1" {
-			// The bridge is slow with the first (sending what waited, saying it on the farm).
 			<-release
 		}
 		mu.Lock()
@@ -111,7 +103,6 @@ func TestFeishuReceivingQueuesWhatTheSDKHandsOver(t *testing.T) {
 	for _, m := range taken {
 		ids = append(ids, m.ID)
 	}
-	// Every delivery reaches the bridge, in order; the bridge's inbound table takes each id once.
 	if want := []string{"om1", "om2", "om2", "om2"}; !reflect.DeepEqual(ids, want) {
 		t.Fatalf("taken: %v", ids)
 	}

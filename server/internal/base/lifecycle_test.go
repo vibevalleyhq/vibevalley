@@ -9,7 +9,6 @@ import (
 	"go.uber.org/fx"
 )
 
-// lifecycleTrail is what the probes did, in order.
 type lifecycleTrail struct {
 	mu    sync.Mutex
 	lines []string
@@ -21,7 +20,6 @@ func (t *lifecycleTrail) add(line string) {
 	t.lines = append(t.lines, line)
 }
 
-// Three services, each built from the one before; a and c have something to publish once all have started.
 type probeA struct{ trail *lifecycleTrail }
 type probeB struct{ trail *lifecycleTrail }
 type probeC struct{ trail *lifecycleTrail }

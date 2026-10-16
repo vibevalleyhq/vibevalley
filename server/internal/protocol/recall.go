@@ -1,8 +1,6 @@
 package protocol
 
-// What a helper's turn is reminded of from its agent's memory (packages/protocol/src/recall.ts): the server picks it
-// at the start of each turn, and the agent page shows the same pick ahead of time. Pure functions, no model: words
-// in common, the same project, how recent.
+// Pure, no model: the server picks at the start of each turn, and the agent page shows the same pick ahead of time.
 
 import (
 	"cmp"
@@ -13,18 +11,14 @@ import (
 )
 
 const (
-	// RecallCount, RecallJobs, RecallChars: a turn is reminded of this many memories (this many of them jobs) in this
-	// many characters (UTF-16 units), at most.
+	// Characters are UTF-16 units.
 	RecallCount = 8
 	RecallJobs  = 3
 	RecallChars = 1600
-	// MemoryKeep is how many memories an agent keeps; past this, the ones longest unused go.
+	// Past this, the ones longest unused go.
 	MemoryKeep = 300
 )
 
-// ── Words in common ──────────────────────────────────────────────────────────
-
-// recallStop are pairs and words too common to say what a text is about.
 var recallStop = map[string]bool{}
 
 func init() {
@@ -38,8 +32,7 @@ var (
 	recallHan  = regexp.MustCompile(`[\x{3400}-\x{9fff}]+`)
 )
 
-// TermsOf is what a text is about, as terms: Latin words and numbers in lower case, and each pair of Chinese
-// characters in a row.
+// Latin words and numbers in lower case, and each pair of Chinese characters in a row.
 func TermsOf(text string) map[string]bool {
 	terms := map[string]bool{}
 	for _, word := range recallWord.FindAllString(coreLower(text), -1) {
@@ -68,29 +61,21 @@ func TermsInCommon(a, b map[string]bool) int {
 	return n
 }
 
-// ── What a turn is reminded of ───────────────────────────────────────────────
-
-// Cue is a turn about to start, as recall sees it.
 type Cue struct {
-	// Helper is the helper about to work: what it left itself is in its own session already.
-	Helper  string `json:"helper"`
-	Project string `json:"project"`
-	// Text is what the turn is asked.
-	Text string `json:"text"`
-	// Skip are memories already brought into its session.
-	Skip map[string]bool `json:"-"`
-	Now  int64           `json:"now"`
+	// What it left itself is in its own session already.
+	Helper  string          `json:"helper"`
+	Project string          `json:"project"`
+	Text    string          `json:"text"`
+	Skip    map[string]bool `json:"-"`
+	Now     int64           `json:"now"`
 }
 
 const (
-	recallDay = 86_400_000
-	// recallElsewhere is the words in common that make another project's note worth bringing.
+	recallDay       = 86_400_000
 	recallElsewhere = 3
 )
 
-// Relevance is how much a memory bears on a turn; false when it does not. Notes before jobs; this project's, then
-// every project's; then words in common and how recently it was written or used. Another project's note only when
-// it plainly shares the turn's words; another project's job never.
+// Another project's note only when it plainly shares the turn's words; another project's job never.
 func Relevance(m Memory, cue Cue, terms map[string]bool) (float64, bool) {
 	if cue.Skip[m.ID] || (m.Helper != nil && *m.Helper == cue.Helper) {
 		return 0, false
@@ -123,7 +108,6 @@ func Relevance(m Memory, cue Cue, terms map[string]bool) (float64, bool) {
 	return kind + place + float64(min(shared, 8))*0.4 + math.Exp(-age/30), true
 }
 
-// LineOf is a memory as a line of the reminder.
 func LineOf(m Memory, project string) string {
 	where := "所有项目"
 	if m.Project != nil {
@@ -139,8 +123,6 @@ func LineOf(m Memory, project string) string {
 	return "- （" + where + "）" + m.Text
 }
 
-// Pick is the memories a turn is reminded of: the most relevant first, within RecallCount, RecallJobs and
-// RecallChars.
 func Pick(memories []Memory, cue Cue) []Memory {
 	terms := TermsOf(cue.Text)
 	type scored struct {
@@ -178,9 +160,7 @@ func Pick(memories []Memory, cue Cue) []Memory {
 	return picked
 }
 
-// NextForgotten is the memories (their ids, the first to go first) that go when the agent keeps more than
-// MemoryKeep and its helpers add coming more: the longest unused (last recalled, else written). Mirrors
-// trimMemories in the TypeScript server's db/queries/memories.sql (removed).
+// The longest unused (last recalled, else written) go first.
 func NextForgotten(memories []Memory, coming int) []string {
 	over := len(memories) + coming - MemoryKeep
 	if over <= 0 {

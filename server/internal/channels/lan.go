@@ -27,55 +27,40 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// The yard gate (院门): other devices on the local network (a phone, another Mac) using this farm. The farm itself
-// keeps listening on loopback alone; the gate is a second listener on every interface (VIBEVALLEY_LAN_PORT, default
-// 8790), shut until the owner opens it, and it stays as the owner left it across restarts. Through it go VibeValleyApi
-// and the site streams (apiMux), never /mcp or the page, and only with a paired device's key: helpers run commands
-// on this machine without asking. Opening it, pairing and forgetting devices are this machine's alone.
-//
-// Pairing: the owner asks for a code (good once, for two minutes) and shows it as a QR code or a link; the device
-// sends it with its name and waits; the owner allows or refuses it here. Allowed, the device gets a key of its own
-// (the database keeps only its SHA-256) and sends it as a bearer token. Forgetting a device ends its requests at once.
-// The gate speaks plain HTTP: a key can be overheard on the network it is open on.
-// Rationale: .agents/notes/implemented/feature/2026-10-14-yard-gate.md.
+// The farm itself listens on loopback alone; the gate is a second listener on every interface, shut until the owner opens it. Through it go
+// VibeValleyApi and the site streams, never /mcp, and only with a paired device's key: helpers run commands on this machine without asking. Opening
+// it, pairing and forgetting devices are this machine's alone. The database keeps only each key's SHA-256. The gate speaks plain HTTP: a key can be
+// overheard on the network it is open on.
 
 const (
-	// lanPairingFor: a new code is good this long; a device's asking gets as long again for the owner to answer.
+	// A device's asking gets as long again for the owner to answer.
 	lanPairingFor = 2 * time.Minute
-	// lanWrongTries: this many wrong codes and the pairing is called off.
 	lanWrongTries = 5
-	// lanSeenEvery: a device's last visit is written down at most this often.
-	lanSeenEvery = time.Minute
+	lanSeenEvery  = time.Minute
 )
 
 type lanDevice struct {
 	protocol.LanDevice
 	keyHash string
-	// written is when lastSeen was last written down.
 	written int64
 }
 
 type lanPairing struct {
 	code    string
 	expires time.Time
-	// asking is the name of the device waiting for the owner; answer gets the owner's word, once.
-	asking string
-	answer chan bool
-	wrong  int
+	asking  string
+	answer  chan bool
+	wrong   int
 }
 
-// lanDeviceKey is the context key of the device a request came through the gate with.
 type lanDeviceKey struct{}
 
 type Lan struct {
 	db *sql.DB
-	// API is what the gate lets through (the handler package's apiMux): handler.New hands it over before the farm
-	// starts, since the API answers for every service, the gate's own pages included.
-	API http.Handler
-	// host and port are where the gate listens: every interface unless a test says otherwise; port 0 is any.
-	host string
-	port int
-	// address is this machine's address on the local network, as a device reaches it; tests replace it.
+	// handler.New hands it over before the farm starts, since the API answers for every service, the gate's own pages included.
+	API     http.Handler
+	host    string
+	port    int
 	address func() string
 	now     func() time.Time
 	ctx     context.Context
@@ -87,7 +72,7 @@ type Lan struct {
 	problem  string
 	pairing  *lanPairing
 	devices  map[string]*lanDevice // by id
-	// conns are the requests under way, per device: forgetting a device ends them.
+	// Forgetting a device ends them.
 	conns map[string]map[int]context.CancelFunc
 	next  int
 }
@@ -129,7 +114,6 @@ func newLan(db *sql.DB) (*Lan, error) {
 	return l, nil
 }
 
-// start opens the gate when the owner left it open.
 func (l *Lan) OnStart(ctx context.Context) error {
 	l.ctx = ctx
 	l.mu.Lock()
@@ -146,7 +130,7 @@ func (l *Lan) OnStop() {
 	l.shut()
 }
 
-// listen starts the gate's listener; a port taken is said in the status, the farm runs on. Holds mu.
+// Called with mu held. A port taken is said in the status; the farm runs on.
 func (l *Lan) listen() {
 	if l.server != nil {
 		return
@@ -172,7 +156,7 @@ func (l *Lan) listen() {
 	log.Printf("vibevalley: the yard gate is open on %s", listener.Addr())
 }
 
-// shut closes the listener and every request through it, and calls off a pairing. Holds mu.
+// Called with mu held.
 func (l *Lan) shut() {
 	l.dropPairing()
 	if l.server != nil {
@@ -182,7 +166,6 @@ func (l *Lan) shut() {
 	l.server, l.listener = nil, nil
 }
 
-// SetOpen opens or shuts the gate, and remembers which.
 func (l *Lan) SetOpen(open bool) (protocol.LanStatus, error) {
 	flag := 0
 	if open {
@@ -203,7 +186,6 @@ func (l *Lan) SetOpen(open bool) (protocol.LanStatus, error) {
 	return l.Status(), nil
 }
 
-// Status is the gate as the owner sees it: where it answers, the pairing under way, the devices.
 func (l *Lan) Status() protocol.LanStatus {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -232,7 +214,7 @@ func (l *Lan) Status() protocol.LanStatus {
 	return s
 }
 
-// url is the gate's address on the local network; empty when it is not listening or the machine has none. Holds mu.
+// Called with mu held.
 func (l *Lan) url() string {
 	if l.listener == nil {
 		return ""
@@ -244,12 +226,11 @@ func (l *Lan) url() string {
 	return "http://" + net.JoinHostPort(host, strconv.Itoa(l.listener.Addr().(*net.TCPAddr).Port))
 }
 
-// lanPairLink is what the QR code encodes and a Mac pastes.
 func lanPairLink(gate, code string) string {
 	return "vibevalley://pair?u=" + url.QueryEscape(gate) + "&c=" + url.QueryEscape(code)
 }
 
-// livePairing is the pairing under way, nil once it expired. Holds mu.
+// Called with mu held.
 func (l *Lan) livePairing() *lanPairing {
 	if l.pairing != nil && !l.now().Before(l.pairing.expires) {
 		l.dropPairing()
@@ -257,7 +238,7 @@ func (l *Lan) livePairing() *lanPairing {
 	return l.pairing
 }
 
-// dropPairing calls off the pairing under way: a device waiting on it is refused. Holds mu.
+// Called with mu held.
 func (l *Lan) dropPairing() {
 	if l.pairing != nil && l.pairing.asking != "" {
 		l.pairing.answer <- false
@@ -265,7 +246,6 @@ func (l *Lan) dropPairing() {
 	l.pairing = nil
 }
 
-// StartPairing makes a new pairing code, calling off any earlier one.
 func (l *Lan) StartPairing() (protocol.LanStatus, error) {
 	l.mu.Lock()
 	if !l.open || l.listener == nil {
@@ -289,7 +269,7 @@ func (l *Lan) StopPairing() protocol.LanStatus {
 	return l.Status()
 }
 
-// Answer is the owner's word on the device asking; the code is used up either way.
+// The code is used up either way.
 func (l *Lan) Answer(allow bool) (protocol.LanStatus, error) {
 	l.mu.Lock()
 	p := l.livePairing()
@@ -303,7 +283,6 @@ func (l *Lan) Answer(allow bool) (protocol.LanStatus, error) {
 	return l.Status(), nil
 }
 
-// Pair is a device asking with the code: it waits for the owner, then gets its key or why not.
 func (l *Lan) Pair(ctx context.Context, code, name string) (protocol.LanPaired, error) {
 	name = lanDeviceName(name)
 	l.mu.Lock()
@@ -349,7 +328,7 @@ func (l *Lan) Pair(ctx context.Context, code, name string) (protocol.LanPaired, 
 	}
 }
 
-// callOff ends a pairing whose device stopped waiting, unless the owner has answered or a new one replaced it.
+// Unless the owner has answered or a new pairing replaced it.
 func (l *Lan) callOff(p *lanPairing) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -371,7 +350,6 @@ func (l *Lan) addDevice(name string) (protocol.LanPaired, error) {
 	return protocol.LanPaired{Device: d.ID, Key: key, Farm: lanFarmName()}, nil
 }
 
-// Forget removes a device: its key stops working and its requests under way end.
 func (l *Lan) Forget(id string) (protocol.LanStatus, error) {
 	if _, err := l.db.Exec(`delete from lan_devices where id = ?`, id); err != nil {
 		return protocol.LanStatus{}, err
@@ -386,7 +364,6 @@ func (l *Lan) Forget(id string) (protocol.LanStatus, error) {
 	return l.Status(), nil
 }
 
-// Me is the device a request came through the gate with.
 func (l *Lan) Me(ctx context.Context) (protocol.LanDevice, error) {
 	id, _ := ctx.Value(lanDeviceKey{}).(string)
 	l.mu.Lock()
@@ -397,8 +374,7 @@ func (l *Lan) Me(ctx context.Context) (protocol.LanDevice, error) {
 	return protocol.LanDevice{}, protocol.LanRefused{Reason: "这里就是农场本机，不是经院门来的设备"}
 }
 
-// gate is what the gate's listener answers: a pairing request without a key, else a known device's key, and then
-// only VibeValleyApi and the site streams, not the gate's own settings.
+// Never the gate's own settings.
 func (l *Lan) gate(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
@@ -425,7 +401,6 @@ func (l *Lan) gate(inner http.Handler) http.Handler {
 	})
 }
 
-// deviceOf is the device whose key the header carries, its visit noted; empty for none.
 func (l *Lan) deviceOf(header string) string {
 	key, ok := strings.CutPrefix(header, "Bearer ")
 	if !ok || key == "" {
@@ -459,7 +434,6 @@ func (l *Lan) deviceOf(header string) string {
 	return id
 }
 
-// track keeps a request's cancel under its device until it ends.
 func (l *Lan) track(ctx context.Context, device string) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	l.mu.Lock()
@@ -485,8 +459,7 @@ func lanRefuse(w http.ResponseWriter, status int, reason string) {
 	w.Write(body)
 }
 
-// lanAddress is this machine's private IPv4 address on the local network: Wi-Fi or Ethernet (en*, eth*, wlan*)
-// before others; empty when it has none.
+// Wi-Fi or Ethernet (en*, eth*, wlan*) before others.
 func lanAddress() string {
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -520,7 +493,6 @@ func lanAddress() string {
 	return best
 }
 
-// lanFarmName is this machine's name, as a device shows the farm.
 func lanFarmName() string {
 	name, err := os.Hostname()
 	if err != nil || name == "" {
@@ -529,7 +501,6 @@ func lanFarmName() string {
 	return strings.TrimSuffix(name, ".local")
 }
 
-// lanDeviceName is the name a device gave, tidied: one line, at most 40 characters.
 func lanDeviceName(name string) string {
 	name = strings.Join(strings.Fields(name), " ")
 	if r := []rune(name); len(r) > 40 {

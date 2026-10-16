@@ -1,9 +1,6 @@
 package agent
 
-// The basic tools, nanobot's and every coding agent's: read, write and edit files, list a folder, search, run a
-// command, fetch a web page. Paths are the work directory's unless absolute. No sandbox: like vibevalley's helpers,
-// the agent works on this machine in its folder (AGENTS.md「帮工没有权限确认」), so a host gives these only to
-// agents that are meant to change things (not the manager).
+// No sandbox: a host gives these only to agents that are meant to change things (not the manager).
 
 import (
 	"context"
@@ -26,11 +23,10 @@ import (
 )
 
 type CodingOptions struct {
-	// Where relative paths and commands are.
 	Cwd string
-	// A command is stopped after this long (2 minutes when 0).
+	// 2 minutes when 0.
 	CommandTimeout time.Duration
-	// Laid over the environment commands run with; a nil value takes a variable away.
+	// A nil value takes a variable away.
 	Env map[string]*string
 }
 
@@ -335,7 +331,7 @@ func formatSeconds(d time.Duration) string {
 	return fmt.Sprintf("%g", s)
 }
 
-// localeLess orders names as localeCompare does closely enough: case folded first.
+// Close enough to localeCompare: case folded first.
 func localeLess(a, b string) bool {
 	la, lb := strings.ToLower(a), strings.ToLower(b)
 	if la != lb {
@@ -344,7 +340,6 @@ func localeLess(a, b string) bool {
 	return a < b
 }
 
-// WithEnv is this process's environment with env laid over it (a nil value takes a variable away).
 func WithEnv(env map[string]*string) []string {
 	if len(env) == 0 {
 		return os.Environ()
@@ -377,15 +372,13 @@ func WithEnv(env map[string]*string) []string {
 	return out
 }
 
-// Ran is what running a program came to: its output (stdout and stderr together, clipped), its exit code (-1 when
-// killed by a signal), whether it was stopped for taking too long.
+// Exit code -1 when killed by a signal.
 type Ran struct {
 	Code     int
 	Output   string
 	TimedOut bool
 }
 
-// capped keeps output until it is 200 000 bytes long.
 type capped struct {
 	mu  sync.Mutex
 	buf strings.Builder
@@ -400,9 +393,8 @@ func (c *capped) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Run runs a program in cwd. When it takes longer than timeout it is sent SIGTERM, and SIGKILL 2 s later; when ctx
-// ends (the turn was stopped) it goes at once. It runs in a process group of its own, and the group is what is
-// killed, so a child it left behind does not hold its output open (TS kills only the child).
+// Past timeout it gets SIGTERM, and SIGKILL 2 s later; when ctx ends it goes at once. The whole process group is killed, so a child left behind does
+// not hold the output open.
 func Run(ctx context.Context, argv []string, cwd string, timeout time.Duration, env []string) (Ran, error) {
 	if len(argv) == 0 {
 		return Ran{}, errors.New("跑不起来：没有命令")
@@ -472,8 +464,7 @@ var (
 	hiddenOpen   = regexp.MustCompile(`(?i)<(script|style|noscript|svg)`)
 )
 
-// dropHidden takes out <script>, <style>, <noscript> and <svg> elements with what is in them (TS's one regex with
-// a back-reference, which RE2 lacks).
+// RE2 lacks the back-reference one regex would need.
 func dropHidden(html string) string {
 	var b strings.Builder
 	rest := html
@@ -496,7 +487,6 @@ func dropHidden(html string) string {
 	}
 }
 
-// HtmlText is a web page's words: scripts, styles and tags gone, entities decoded, blank lines squeezed.
 func HtmlText(html string) string {
 	text := dropHidden(html)
 	text = htmlBreak.ReplaceAllString(text, "\n")
@@ -513,7 +503,6 @@ func HtmlText(html string) string {
 	return strings.TrimSpace(text)
 }
 
-// IsDir reports a directory (for hosts checking their work directory).
 func IsDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()

@@ -1,6 +1,3 @@
-// The roster (AgentsPage) and the agent creator (AgentCreatorPage) against a fake server: what they list, and that
-// saving and deleting call the right endpoint with the right body.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desk/agents/agent_creator_page.dart';
@@ -48,7 +45,6 @@ void main() {
       expect(find.text('雇过 7', findRichText: true), findsOneWidget);
       expect(find.text('收成 5', findRichText: true), findsOneWidget);
       expect(find.text('后端 · 接口'), findsOneWidget);
-      // kimi is not on this (fake) machine: the card says why it cannot be sent.
       expect(find.text('派不出去：不认识的 runtime：kimi'), findsOneWidget);
       expect(find.text('捏一个新帮工'), findsWidgets);
     });
@@ -115,7 +111,6 @@ void main() {
       await t.pump();
       await t.tap(labelled('Cursor'));
       await t.pump();
-      // Switching moved the persona into the job, so nothing stops it.
       expect(find.text('配置没问题，可以派活。'), findsOneWidget);
       await t.tap(find.text('人设'));
       await t.pump();

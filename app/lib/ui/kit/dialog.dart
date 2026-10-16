@@ -1,7 +1,3 @@
-// Dialogs: the config pages' dialog (web/src/components/ui/dialog.tsx) and the farm's dialog frame
-// (web/src/farm/dialog.tsx), each as a widget for the frame and a show* function that opens it as a modal route
-// (the page's controlled `open`/`onClose` becomes push/pop: Esc, a click on the backdrop and the close button pop it).
-
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
@@ -9,11 +5,8 @@ import 'base.dart';
 import 'button.dart';
 import 'icons.dart';
 
-/// The config pages' backdrop: rgb(30 20 10 / 0.45).
 const _dialogBackdrop = Color(0x731E140A);
 
-/// Replaces web/src/components/ui/dialog.tsx Dialog's popup: a bark-outlined cream window, at most 512 px wide (the
-/// screen less 32 px) and 85% of its height, 24 px in, a 24 px title and an icon close button (关上). Scrolls as a whole.
 class PxDialog extends StatelessWidget {
   const PxDialog({super.key, required this.title, required this.child, required this.onClose});
   final Widget title;
@@ -66,8 +59,7 @@ class PxDialog extends StatelessWidget {
   }
 }
 
-/// Opens a PxDialog (web/src/components/ui/dialog.tsx Dialog) over the screen, fading and growing from 95% in 150 ms as
-/// a farm dialog does. The builder gets the dialog's context; `Navigator.pop(context, result)` closes it with a result.
+/// The builder gets the dialog's context; `Navigator.pop(context, result)` closes it with a result.
 Future<T?> showPxDialog<T>(BuildContext context, {required Widget title, required WidgetBuilder builder}) => showGeneralDialog<T>(
   context: context,
   barrierDismissible: true,
@@ -82,7 +74,7 @@ Future<T?> showPxDialog<T>(BuildContext context, {required Widget title, require
   ),
 );
 
-/// The farm dialog's fixed sizes (farm/dialog.tsx DIALOG_SIZE): whatever it holds, it keeps its size and scrolls inside.
+/// Whatever it holds, it keeps its size and scrolls inside.
 enum FarmDialogSize {
   sm(480, 384),
   md(480, 608),
@@ -93,9 +85,6 @@ enum FarmDialogSize {
   final double height;
 }
 
-/// Replaces web/src/farm/dialog.tsx FarmDialog's popup: a framed cream card of a fixed size (at most 88% of the screen's
-/// height and its width less 24 px), a title bar (an icon sprite, the 24 px title cut short, a round close button)
-/// over a dashed line, and the body scrolling 16 px in.
 class FarmDialog extends StatelessWidget {
   const FarmDialog({super.key, required this.title, required this.size, required this.child, required this.onClose, this.icon});
   final Widget title;
@@ -103,7 +92,6 @@ class FarmDialog extends StatelessWidget {
   final Widget child;
   final VoidCallback onClose;
 
-  /// A sprite name (assets/pixel), shown 32 px before the title.
   final String? icon;
 
   @override
@@ -144,7 +132,6 @@ class FarmDialog extends StatelessWidget {
                               height: 36,
                               color: s.hovered ? Palette.cream200 : null,
                               alignment: Alignment.center,
-                              // text-xl ×: the close glyph in its place (no characters for icons).
                               child: Transform.translate(
                                 offset: s.pressed ? const Offset(1, 1) : Offset.zero,
                                 child: const SpriteIcon('button-close', size: 18),
@@ -172,14 +159,13 @@ class FarmDialog extends StatelessWidget {
   }
 }
 
-/// A dialog coming up: it fades in and grows from 95%; a screen reader has it from the start.
+/// A screen reader has it from the start.
 Widget _fadeIn(BuildContext context, Animation<double> animation, Animation<double> _, Widget child) => FadeTransition(
   opacity: animation,
   alwaysIncludeSemantics: true,
   child: ScaleTransition(scale: Tween(begin: .95, end: 1.0).animate(animation), child: child),
 );
 
-/// Opens a FarmDialog over the screen: the backdrop is bark at 30%, and the card fades and grows from 95% in 150 ms.
 Future<T?> showFarmDialog<T>(BuildContext context, {required Widget title, required FarmDialogSize size, String? icon, required WidgetBuilder builder}) =>
     showGeneralDialog<T>(
       context: context,
@@ -197,7 +183,6 @@ Future<T?> showFarmDialog<T>(BuildContext context, {required Widget title, requi
       ),
     );
 
-/// Replaces web/src/farm/dialog.tsx Section: a small titled part of a farm dialog, 16 px below the one before.
 class FarmSection extends StatelessWidget {
   const FarmSection({super.key, required this.title, required this.child});
   final String title;

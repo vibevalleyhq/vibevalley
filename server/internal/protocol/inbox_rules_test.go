@@ -1,6 +1,6 @@
 package protocol
 
-// The inbox (inbox.go), case by case; TestReduceGolden compares it only after whole facts.
+// TestReduceGolden compares the inbox only after whole facts; these go case by case.
 
 import (
 	"strings"
@@ -11,7 +11,6 @@ const callsT = int64(1_800_000_000_000)
 
 var callsManager = InboxFrom{InboxFromManager{}}
 
-// callsHelper is a helper of its own (in no playbook) whose second turn ended at callsT+10, saying 接口加好了.
 func callsHelper(id string, phase PhaseValue, change ...func(*Helper)) Helper {
 	h := Helper{
 		ID: id, Name: "后端老周", Agent: "lab", Runtime: "pi", Task: "加个打卡接口", HiredAt: callsT, Turns: 2, Phase: Phase{phase},
@@ -23,7 +22,6 @@ func callsHelper(id string, phase PhaseValue, change ...func(*Helper)) Helper {
 	return h
 }
 
-// callsFailedTurn makes the second turn one that failed at callsT+20.
 func callsFailedTurn(h *Helper) {
 	h.Last = &LastTurn{Outcome: OutcomeFailed, Summary: "测试没过", At: callsT + 20}
 }
@@ -32,7 +30,6 @@ func callsConflict(files ...string) func(*Helper) {
 	return func(h *Helper) { h.Conflict = &Conflict{Base: "main", Files: files} }
 }
 
-// callsQuiet is a turn begun at callsT+30 that has been quiet since since.
 func callsQuiet(since int64) PhaseWorking {
 	return PhaseWorking{Since: callsT + 30, Doing: Doing{Action: WorkerActionRunCommand, Label: "go test ./..."}, QuietSince: rulesPtr(since)}
 }
@@ -47,7 +44,6 @@ func callsStep(id, title string, state NodeState) PlaybookNode {
 	return PlaybookNode{ID: id, Title: title, Task: "做" + title, Needs: []string{}, State: state}
 }
 
-// callsPlaybook is a playbook made at callsT.
 func callsPlaybook(id, title string, state PlaybookState, steps ...PlaybookNode) Playbook {
 	if steps == nil {
 		steps = []PlaybookNode{}
@@ -59,7 +55,6 @@ func callsWithPlaybooks(playbooks ...Playbook) FarmState {
 	return withPlaybooks(EmptyFarm(), playbooks...)
 }
 
-// callsMessage is the manager naming the owner in the square (conversation 1), said in full at callsT+seq.
 func callsMessage(seq int64, change ...func(*ChatMessage)) ChatMessage {
 	m := ChatMessage{
 		Seq: seq, Conversation: 1, From: "foreman", FromKind: SenderKindForeman, Name: "管家", Kind: MessageKindChat,
@@ -73,8 +68,6 @@ func callsMessage(seq int64, change ...func(*ChatMessage)) ChatMessage {
 
 func callsInThread(m *ChatMessage) { m.Conversation = 2 }
 
-// callsChat is the square (conversation 1) read up to squareRead and a job thread (conversation 2) read up to
-// threadRead, nil for never, as the chat keeps them: conversations by id, messages by seq.
 func callsChat(squareRead, threadRead *int64, messages ...ChatMessage) *Chat {
 	return &Chat{
 		Conversations: []Conversation{
@@ -113,7 +106,6 @@ func callsIDs(calls []InboxItem) []string {
 	return out
 }
 
-// callsRows is each call's id, why, words and time: for tests about which calls come, not who makes them.
 func callsRows(calls []InboxItem) [][4]any {
 	out := [][4]any{}
 	for _, c := range calls {
@@ -129,22 +121,18 @@ func TestInboxEmptyFarm(t *testing.T) {
 }
 
 func TestInboxRipeHelperCalls(t *testing.T) {
-	// A ripe turn calls to be harvested, telling what the turn said, from when it ended; answering opens the bed.
 	rulesEqual(t, Inbox(callsFarm(callsHelper("w1", PhaseRipe{}))), []InboxItem{{
 		ID: "w1:harvest:2", Kind: InboxKindHarvest, From: callsFromHelper("w1", "后端老周", "lab"), Text: "接口加好了", At: callsT + 10, Target: callsToWorker("w1"),
 	}})
 }
 
 func TestInboxFailedHelperCalls(t *testing.T) {
-	// A failed turn calls to be fixed, telling what went wrong.
 	rulesEqual(t, Inbox(callsFarm(callsHelper("w1", PhaseFailed{}, callsFailedTurn))), []InboxItem{{
 		ID: "w1:fix:2", Kind: InboxKindFix, From: callsFromHelper("w1", "后端老周", "lab"), Text: "测试没过", At: callsT + 20, Target: callsToWorker("w1"),
 	}})
 }
 
 func TestInboxConflictCalls(t *testing.T) {
-	// Work that would conflict with the main branch calls, ripe or resting; the call counts the files instead of telling
-	// the turn.
 	ripe := callsHelper("w1", PhaseRipe{}, callsConflict("api/clock.go", "api/clock_test.go"))
 	resting := callsHelper("w2", PhaseResting{}, callsConflict("web/clock.tsx"), func(h *Helper) {
 		h.Name, h.Agent, h.Turns = "前端小林", "codex", 3
@@ -157,14 +145,12 @@ func TestInboxConflictCalls(t *testing.T) {
 }
 
 func TestInboxQuietHelperCalls(t *testing.T) {
-	// A helper gone quiet mid-turn calls from the moment it went quiet, about its task: the last turn's words are old.
 	rulesEqual(t, Inbox(callsFarm(callsHelper("w1", callsQuiet(callsT+90)))), []InboxItem{{
 		ID: "w1:quiet:1800000000090", Kind: InboxKindQuiet, From: callsFromHelper("w1", "后端老周", "lab"), Text: "加个打卡接口", At: callsT + 90, Target: callsToWorker("w1"),
 	}})
 }
 
 func TestInboxMostPressingNeedOnly(t *testing.T) {
-	// A helper calls about one thing at a time, the most pressing.
 	quietRetrying := callsQuiet(callsT + 90)
 	quietRetrying.Retry = &Retry{Attempt: 2, Of: rulesPtr(int64(3))}
 	for _, c := range []struct {
@@ -187,7 +173,6 @@ func TestInboxHelpersWithNothingToAskDoNotCall(t *testing.T) {
 	}{
 		{"arriving", PhaseArriving{}},
 		{"working", PhaseWorking{Since: callsT + 30, Doing: Doing{Action: WorkerActionEditFile, Label: "api/clock.go"}}},
-		// Retrying is the runtime's business until the helper goes quiet.
 		{"retrying", PhaseWorking{Since: callsT + 30, Doing: Doing{Action: WorkerActionThinking}, Retry: &Retry{Attempt: 2, Of: rulesPtr(int64(3))}}},
 		{"resting with nothing in the way", PhaseResting{}},
 	} {
@@ -209,9 +194,7 @@ func TestInboxPlaybookHelpersLeaveItToThePlaybook(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) { rulesEqual(t, Inbox(callsFarm(c.helper)), []InboxItem{}) })
 	}
-	// Gone quiet, it still asks: the playbook does not know.
 	rulesEqual(t, callsIDs(Inbox(callsFarm(callsHelper("w1", callsQuiet(callsT+90), inPlaybook)))), []string{"w1:quiet:1800000000090"})
-	// The playbook calls about the failed step instead, as the manager.
 	state := callsFarm(callsHelper("w1", PhaseFailed{}, callsFailedTurn, inPlaybook))
 	state = withPlaybooks(state, callsPlaybook("p1", "打卡", PlaybookStateRunning, callsStep("api", "接口", NodeStateFailed)))
 	rulesEqual(t, Inbox(state), []InboxItem{{
@@ -220,8 +203,6 @@ func TestInboxPlaybookHelpersLeaveItToThePlaybook(t *testing.T) {
 }
 
 func TestInboxHelperTextAndTime(t *testing.T) {
-	// A helper's call tells what its last turn said, or its task when the turn said nothing, and is dated by that turn,
-	// or by the hiring before any turn.
 	said := func(summary string) func(*Helper) { return func(h *Helper) { h.Last.Summary = summary } }
 	noTurn := func(h *Helper) { h.Last = nil }
 	for _, c := range []struct {
@@ -240,30 +221,21 @@ func TestInboxHelperTextAndTime(t *testing.T) {
 }
 
 func TestInboxHelperCallIDs(t *testing.T) {
-	// A call's id is what the phone and the desktop bell remember having rung: it stays while the same thing stands,
-	// and a new thing gets a new one. A helper's call goes by its turn, a quiet spell by when it began.
 	idsOf := func(helpers ...Helper) []string { return callsIDs(Inbox(callsFarm(helpers...))) }
 	rulesEqual(t, idsOf(callsHelper("w1", PhaseRipe{})), []string{"w1:harvest:2"})
-	// The same turn told again later, in other words, is the same call.
 	rulesEqual(t, idsOf(callsHelper("w1", PhaseRipe{}, func(h *Helper) { h.Last.Summary, h.Last.At = "接口加好了，测试也补了", callsT+99 })), []string{"w1:harvest:2"})
-	// The next turn is a new call, ripe or failed.
 	nextTurn := func(h *Helper) { h.Turns = 3 }
 	rulesEqual(t, idsOf(callsHelper("w1", PhaseRipe{}, nextTurn)), []string{"w1:harvest:3"})
 	rulesEqual(t, idsOf(callsHelper("w1", PhaseFailed{}, callsFailedTurn)), []string{"w1:fix:2"})
 	rulesEqual(t, idsOf(callsHelper("w1", PhaseFailed{}, callsFailedTurn, nextTurn)), []string{"w1:fix:3"})
-	// A conflict keeps its id while its files change; once it is gone, the harvest is a call of its own.
 	rulesEqual(t, idsOf(callsHelper("w1", PhaseRipe{}, callsConflict("a.go"))), []string{"w1:conflict:2"})
 	rulesEqual(t, idsOf(callsHelper("w1", PhaseRipe{}, callsConflict("a.go", "b.go", "c.go"))), []string{"w1:conflict:2"})
-	// Each quiet spell is a call of its own, even within one turn.
 	rulesEqual(t, idsOf(callsHelper("w1", callsQuiet(callsT+90))), []string{"w1:quiet:1800000000090"})
 	rulesEqual(t, idsOf(callsHelper("w1", callsQuiet(callsT+300))), []string{"w1:quiet:1800000000300"})
-	// Two helpers on the same turn never share a call.
 	rulesEqual(t, idsOf(callsHelper("w1", PhaseRipe{}), callsHelper("w2", PhaseRipe{})), []string{"w1:harvest:2", "w2:harvest:2"})
 }
 
 func TestInboxPlaybookCalls(t *testing.T) {
-	// The manager calls about a playbook waiting on the owner: drafted (look it over), ripe (harvest it), and each
-	// failed step, in step order, while it runs or is paused. A playbook has no other time: its calls are dated by it.
 	madeAt := func(pb Playbook, ms int64) Playbook {
 		pb.CreatedAt = callsT + ms
 		return pb
@@ -306,8 +278,6 @@ func TestInboxPlaybooksThatDoNotCall(t *testing.T) {
 }
 
 func TestInboxPlaybookCallIDs(t *testing.T) {
-	// A playbook's call goes by the playbook, a stuck step's by the playbook and the step: a draft edited while it waits
-	// is the same call, and the same step stuck in two playbooks is two.
 	draft := callsPlaybook("p1", "打卡", PlaybookStateDraft, callsStep("api", "接口", NodeStateWaiting))
 	edited := callsPlaybook("p1", "打卡和导出", PlaybookStateDraft, callsStep("api", "接口和导出", NodeStateWaiting), callsStep("csv", "导出", NodeStateWaiting))
 	rulesEqual(t, callsIDs(Inbox(callsWithPlaybooks(draft))), []string{"p1:draft"})
@@ -316,7 +286,6 @@ func TestInboxPlaybookCallIDs(t *testing.T) {
 		return callsPlaybook(id, "打卡", PlaybookStateRunning, callsStep("api", "接口", NodeStateFailed))
 	}
 	rulesEqual(t, callsIDs(Inbox(callsWithPlaybooks(stuck("p1"), stuck("p2")))), []string{"p1:failed:api", "p2:failed:api"})
-	// Retried and failed again, the step calls again: from the second failure on, the id counts them.
 	again := stuck("p1")
 	again.Nodes[0].Failures = 2
 	rulesEqual(t, callsIDs(Inbox(callsWithPlaybooks(again))), []string{"p1:failed:api:2"})
@@ -326,8 +295,6 @@ func TestInboxPlaybookCallIDs(t *testing.T) {
 }
 
 func TestInboxMentionCalls(t *testing.T) {
-	// A message said in full that names the owner and is not read yet calls: the manager's as the manager, a helper's as
-	// that helper (with no agent, none); answering opens its conversation.
 	state := callsWithChat(callsChat(nil, nil,
 		callsMessage(4),
 		callsMessage(5, callsInThread, func(m *ChatMessage) {
@@ -346,7 +313,6 @@ func TestInboxMentionCalls(t *testing.T) {
 
 func TestInboxMessagesThatDoNotCall(t *testing.T) {
 	farm := func(read *int64, m ChatMessage) FarmState { return callsWithChat(callsChat(read, nil, m)) }
-	// The first message past the read marker calls.
 	rulesEqual(t, callsIDs(Inbox(farm(rulesPtr(int64(4)), callsMessage(5)))), []string{"m5"})
 	for _, c := range []struct {
 		name   string
@@ -359,7 +325,6 @@ func TestInboxMessagesThatDoNotCall(t *testing.T) {
 		{"read and more after it", rulesPtr(int64(9)), nil},
 		{"naming no one", nil, func(m *ChatMessage) { m.Mentions = nil }},
 		{"naming others", nil, func(m *ChatMessage) { m.Mentions = []string{"w1", "foreman"} }},
-		// Without its conversation there is no read marker to go by, and nothing to open.
 		{"in a conversation the chat does not keep", nil, func(m *ChatMessage) { m.Conversation = 9 }},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -375,13 +340,12 @@ func TestInboxMessagesThatDoNotCall(t *testing.T) {
 }
 
 func TestInboxReadMarkerIsPerConversation(t *testing.T) {
-	// The square is read up to 7; the thread was never opened, so everything in it is unread.
 	state := callsWithChat(callsChat(rulesPtr(int64(7)), nil, callsMessage(3), callsMessage(4, callsInThread), callsMessage(7), callsMessage(8)))
 	rulesEqual(t, callsIDs(Inbox(state)), []string{"m8", "m4"})
 }
 
 func TestInboxClipTheirWords(t *testing.T) {
-	// Words on the phone's small screen stop at 40 UTF-16 units, as the page counts them, with an ellipsis.
+	// 40 UTF-16 units, as the page counts them.
 	fits, long := strings.Repeat("改", 40), strings.Repeat("改", 41)
 	clipped := fits + "…"
 	said := func(summary string) func(*Helper) { return func(h *Helper) { h.Last.Summary = summary } }
@@ -415,7 +379,6 @@ func TestInboxClipTheirWords(t *testing.T) {
 }
 
 func TestInboxNewestFirst(t *testing.T) {
-	// Every kind of call together, newest first, whoever makes it; a helper with nothing to ask stays out.
 	endedAt := func(at int64) func(*Helper) { return func(h *Helper) { h.Last.At = at } }
 	state := callsFarm(
 		callsHelper("w1", PhaseRipe{}, endedAt(callsT+30)),
@@ -446,8 +409,6 @@ func TestInboxNewestFirst(t *testing.T) {
 }
 
 func TestInboxTiesKeepTheirOrder(t *testing.T) {
-	// Calls of the same moment stay in the order they are gathered: helpers as the farm lists them, then playbooks oldest
-	// first (by id at the same moment) and their steps in order, then messages by conversation and by place in it.
 	endedNow := func(h *Helper) { h.Last.At = callsT }
 	saidNow := func(m *ChatMessage) { m.At = callsT }
 	state := callsFarm(callsHelper("w2", PhaseRipe{}, endedNow), callsHelper("w1", PhaseFailed{}, callsFailedTurn, endedNow))

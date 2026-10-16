@@ -1,7 +1,3 @@
-// The desk (web/src/desk/Desk.tsx): where the work is done and set up, beside the farm where it is watched. A wooden
-// rail down the left with the desk's places and the way back to the farm; the place itself fills the rest. The chat
-// lays out its own sidebar; the config pages sit under a header with the farm's state (ConfigDesk).
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,10 +11,8 @@ import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
 import 'router.dart';
 
-/// As tall as the headers beside the rail (--spacing-desk-head).
 const deskHead = 66.0;
 
-/// One of the farm's pictures as an icon (Pix).
 class _Pix extends ConsumerWidget {
   const _Pix(this.name);
   final String name;
@@ -31,10 +25,8 @@ class _Pix extends ConsumerWidget {
   }
 }
 
-/// A place's icon: a picture, or for the helpers an animal's face.
 Widget placeIcon(Place p) => p == Place.agents ? CastFace(cast: castOf(null, 'backend'), size: 26) : _Pix(p.icon);
 
-/// The rail beside a place: the desk's frame for every page there.
 class Desk extends StatelessWidget {
   const Desk({super.key, required this.place, required this.child});
   final Place? place;
@@ -74,7 +66,6 @@ class _Rail extends ConsumerWidget {
           child: IntrinsicHeight(
             child: Column(
               children: [
-                // As tall as the headers beside it, with the manager in its middle.
                 SizedBox(
                   height: deskHead,
                   child: Center(
@@ -112,7 +103,6 @@ class _Rail extends ConsumerWidget {
   );
 }
 
-/// A 44 px square on the rail: framed and raised for the place you are at, darker under the pointer otherwise.
 class _Slot extends StatelessWidget {
   const _Slot({required this.label, required this.onTap, required this.child, this.framed = false, this.fill});
   final String label;
@@ -145,7 +135,6 @@ class _Slot extends StatelessWidget {
   );
 }
 
-/// A config page at the desk: its place's name and the farm's state above it, the page below.
 class _ConfigDesk extends ConsumerWidget {
   const _ConfigDesk({required this.place, required this.child});
   final Place? place;

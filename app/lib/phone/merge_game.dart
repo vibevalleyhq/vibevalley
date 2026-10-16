@@ -1,8 +1,3 @@
-// 种田 2048 on the farm phone (web/src/phone/Merge.tsx): the rules are merge.dart's; here the pad, swipes and the
-// drawing, each stage a 12×12 picture in the phone's four greens. The field is kept while the phone is away or a call
-// comes in. Arrows (or a swipe on the field) slide, B takes one slide back, A starts, goes on after 丰收, and asks
-// before starting over.
-
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
@@ -14,11 +9,10 @@ import 'merge.dart';
 import 'pad.dart';
 import 'widgets.dart';
 
-/// The game in progress, kept while the phone is away; and the best score this session.
 final mergeGameProvider = NotifierProvider<Kept<Merge?>, Merge?>(() => Kept(null));
 final mergeBestProvider = NotifierProvider<Kept<int>, int>(() => Kept(0));
 
-/// Each stage's picture, 12×12: `#` ink, `+` dark, `o` mid, `.` light (web/src/phone/Merge.tsx has the same).
+/// 12×12: `#` ink, `+` dark, `o` mid, `.` light.
 const _pictures = [
   // 种子
   [
@@ -195,7 +189,6 @@ Color? _ink(String c) => switch (c) {
   _ => null,
 };
 
-/// Rows of characters scaled to the box, one cell a pixel of the picture.
 class _RowsPainter extends CustomPainter {
   _RowsPainter(this.rows, this.grid);
   final List<String> rows;
@@ -217,7 +210,6 @@ class _RowsPainter extends CustomPainter {
   bool shouldRepaint(_RowsPainter old) => old.rows != rows || old.grid != grid;
 }
 
-/// A stage's picture; past 丰收, 丰收's.
 class _Crop extends StatelessWidget {
   const _Crop(this.stage, this.size, {this.faint = false});
   final int stage;
@@ -234,11 +226,9 @@ class _Crop extends StatelessWidget {
   );
 }
 
-/// A tile's side, and the gap between tiles, in screen pixels.
 const _tile = 60.0;
 const _gap = 4.0;
 
-/// How far a finger moves before it is a swipe.
 const _swipe = 16.0;
 
 class MergeGame extends ConsumerStatefulWidget {
@@ -250,10 +240,8 @@ class MergeGame extends ConsumerStatefulWidget {
 }
 
 class _MergeGameState extends ConsumerState<MergeGame> with PadGame {
-  /// 丰收 just came up: the field waits for A.
   bool _cheer = false;
 
-  /// A pressed mid-game: start over?
   bool _asking = false;
   Offset _drag = Offset.zero;
 
@@ -467,7 +455,6 @@ class _Tile extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: _tile,
     height: _tile,
-    // The crops that grew on the last slide get a ring.
     decoration: BoxDecoration(
       color: stage > 0 ? Lcd.paper : Lcd.light,
       border: grown ? Border.all(color: Lcd.ink, width: 2) : null,
@@ -484,7 +471,6 @@ class _Tile extends StatelessWidget {
   );
 }
 
-/// The home screen's icon: four tiles, seed, sprout, flower and wheat (web/src/phone/Merge.tsx MergeIcon).
 class MergeIcon extends StatelessWidget {
   const MergeIcon({super.key});
 
@@ -495,7 +481,7 @@ class MergeIcon extends StatelessWidget {
     ['# # ', '# # ', '+ + ', '+ + '],
   ];
 
-  /// The 13×13 picture: each tile a dark frame round a 4×4 crop on the screen's paper.
+  /// Each tile a dark frame round a 4×4 crop on the screen's paper.
   static final _rows = [
     for (var y = 0; y < 13; y++)
       [

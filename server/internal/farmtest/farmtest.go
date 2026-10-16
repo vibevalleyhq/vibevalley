@@ -1,5 +1,4 @@
-// Package farmtest is what the services' tests share: comparing, waiting, git on throwaway repositories, the seeds'
-// pi agent. Only tests import it.
+// Package farmtest is only for tests.
 package farmtest
 
 import (
@@ -15,7 +14,6 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// Eq fails the test unless got and want are deeply equal.
 func Eq(t testing.TB, got, want any, what string) {
 	t.Helper()
 	if !reflect.DeepEqual(got, want) {
@@ -23,7 +21,6 @@ func Eq(t testing.TB, got, want any, what string) {
 	}
 }
 
-// Match fails the test unless got matches the regular expression pattern.
 func Match(t testing.TB, got, pattern, what string) {
 	t.Helper()
 	if !regexp.MustCompile(pattern).MatchString(got) {
@@ -33,7 +30,6 @@ func Match(t testing.TB, got, pattern, what string) {
 
 func Ptr[T any](v T) *T { return &v }
 
-// Until waits for check to hold, a few seconds at most.
 func Until(t testing.TB, what string, check func() bool) {
 	t.Helper()
 	for deadline := time.Now().Add(5 * time.Second); !check(); time.Sleep(10 * time.Millisecond) {
@@ -43,7 +39,6 @@ func Until(t testing.TB, what string, check func() bool) {
 	}
 }
 
-// Await waits for check to give a value, ten seconds at most.
 func Await[T any](t testing.TB, what string, check func() (T, bool)) T {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
@@ -58,7 +53,6 @@ func Await[T any](t testing.TB, what string, check func() (T, bool)) T {
 	return zero
 }
 
-// Git runs git in dir and gives its output, trimmed; failing, it fails the test.
 func Git(t testing.TB, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -70,7 +64,7 @@ func Git(t testing.TB, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// Repo is a repository whose own user is me@vibevalley.test, with mine commits by me and theirs by someone else.
+// The repository's own user is me@vibevalley.test: mine commits by me, theirs by someone else.
 func Repo(t testing.TB, dir string, mine, theirs int) {
 	t.Helper()
 	os.MkdirAll(dir, 0o755)
@@ -85,7 +79,6 @@ func Repo(t testing.TB, dir string, mine, theirs int) {
 	}
 }
 
-// PiInfo is what pi looks like to the crew; a test may change it (to run out of money, say).
 func PiInfo() protocol.RuntimeInfo {
 	return protocol.RuntimeInfo{
 		ID:           "pi",
@@ -94,7 +87,7 @@ func PiInfo() protocol.RuntimeInfo {
 	}
 }
 
-// Lab is the seeds' pi agent; a scripted runtime has no models, so no effort levels: smith would refuse 'medium'.
+// A scripted runtime has no models, so no effort levels: smith would refuse 'medium'.
 func Lab(t testing.TB) protocol.AgentProfile {
 	for _, a := range protocol.SeedAgents() {
 		if a.ID == "lab" {

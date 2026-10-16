@@ -6,13 +6,7 @@ import (
 	"strings"
 )
 
-// IssueStatusOf is where an issue stands (docs/concepts.md): closed once it closed; else by its last run, at work
-// (working) or with its turn over and waiting for the person (waiting); with no run on the farm, waiting for room
-// (queued) or just written down (todo). A run gone without saying how closes it all the same.
-//
-// A playbook's issue stands as its plan does: being planned or worked, waiting on the person (a draft, paused, all
-// done), or over. A step's stands as the step does: waiting its turn (todo), at work by its helper, failed and waiting
-// on the person, or settled.
+// A run gone without saying how closes the issue all the same. A playbook's issue stands as its plan does, a step's as the step does.
 func IssueStatusOf(t Issue, state FarmState) IssueStatus {
 	if t.Closed != nil || t.ClosedAt != nil {
 		return IssueStatusClosed
@@ -59,11 +53,8 @@ func IssueStatusOf(t Issue, state FarmState) IssueStatus {
 	return IssueStatusTodo
 }
 
-// KeepClosedIssues is how many closed issues the state keeps, the latest closed, each with its sub-issues; the board
-// asks for older ones.
 const KeepClosedIssues = 50
 
-// IssueJob is what a run of the issue is told: its title, then its description.
 func IssueJob(t Issue) string {
 	if t.Description == "" {
 		return t.Title
@@ -71,8 +62,6 @@ func IssueJob(t Issue) string {
 	return t.Title + "\n\n" + t.Description
 }
 
-// SplitJob is a job written in one piece as an issue's title (its first line that says something) and description
-// (what comes after it).
 func SplitJob(job string) (title, description string) {
 	lines := strings.Split(strings.ReplaceAll(job, "\r\n", "\n"), "\n")
 	for i, line := range lines {
@@ -83,7 +72,6 @@ func SplitJob(job string) (title, description string) {
 	return "", ""
 }
 
-// IssueOrder is the board's order: the issues not sent yet by rank, then the rest newest first.
 func IssueOrder(a, b Issue) int {
 	sentA, sentB := len(a.Runs) > 0, len(b.Runs) > 0
 	switch {
@@ -97,8 +85,7 @@ func IssueOrder(a, b Issue) int {
 	return cmp.Or(cmp.Compare(b.CreatedAt, a.CreatedAt), cmp.Compare(a.ID, b.ID))
 }
 
-// withIssue is the issues with t put in (or in place of the one of its id), in the board's order, keeping the latest
-// KeepClosedIssues closed ones that are no one's sub-issue; a sub-issue stays and goes with its parent.
+// Keeps the latest KeepClosedIssues closed ones that are no one's sub-issue; a sub-issue stays and goes with its parent.
 func withIssue(all []Issue, t Issue) []Issue {
 	next := slices.DeleteFunc(slices.Clone(all), func(x Issue) bool { return x.ID == t.ID })
 	next = append(next, t)
@@ -120,8 +107,7 @@ func withIssue(all []Issue, t Issue) []Issue {
 	return next
 }
 
-// withIssueStatuses is the state with every issue's status as its runs on the farm make it now; the same slice when
-// none changed.
+// The same slice when none changed.
 func withIssueStatuses(state FarmState) FarmState {
 	var next []Issue
 	for i, t := range state.Issues {

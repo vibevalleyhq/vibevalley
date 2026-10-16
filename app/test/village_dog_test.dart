@@ -1,6 +1,3 @@
-// The dog's day and its tricks (web/src/pixel/dog.ts): it sleeps, wakes at a pat, does its tricks in turn, rolls
-// over after three quick pats, and settles again a while after the last one.
-
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -15,7 +12,6 @@ void main() {
     expect(dog.pet(5), Trick.wag);
     expect(dog.pet(9), Trick.bark);
     expect(dog.pet(13), Trick.jump);
-    // The jump lifts it off the ground.
     expect(dog.look(13.08 + 0.13, false).lift, greaterThan(0));
   });
 
@@ -25,7 +21,6 @@ void main() {
     dog.pet(0.5);
     expect(dog.pet(1), Trick.belly);
     expect(dog.look(1.3, false).picture, 'dog-belly');
-    // Seven seconds after the last pat, with nobody on a call, it settles.
     expect(dog.look(9, false).picture, 'dog-yawn');
   });
 

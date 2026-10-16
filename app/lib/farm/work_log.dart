@@ -1,6 +1,3 @@
-// Under a chat message, the turn behind it (web/src/farm/WorkLog.tsx TurnSteps). The step viewer itself (WorkLog) and
-// each trajectory's steps (workStepsProvider) are lib/desk/shared's; the bed panel uses them as they are.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,11 +8,8 @@ import '../game/state.dart' show turnEndingAt;
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 
-/// Trajectories already asked for whole in this run.
 final _preloaded = <String>{};
 
-/// The turn that ended in a message, in its sender's trajectory: the line that started it, each tool on the way, what
-/// was said. The manager's shows only when it used a tool; a helper's report always, its steps loaded when opened.
 class TurnSteps extends ConsumerStatefulWidget {
   const TurnSteps({super.key, required this.id, required this.at, this.manager = false});
   final String id;
@@ -88,5 +82,4 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
   }
 }
 
-/// Lets the chat (lib/farm/chat_window.dart, lib/desk/chat) show the turn under its messages.
 void installTurnSteps() => chatTurnSteps = (context, id, at, {required manager}) => TurnSteps(id: id, at: at, manager: manager);

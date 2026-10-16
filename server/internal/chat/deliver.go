@@ -13,8 +13,7 @@ import (
 	"vibevalley/internal/runs"
 )
 
-// Writing a message and acting on who it goes to; following the helpers' sessions and the farm's facts. Every
-// function here runs with c.mu held.
+// Every function here runs with c.mu held.
 
 type chatInsert struct {
 	conversation int64
@@ -23,12 +22,9 @@ type chatInsert struct {
 	text         string
 	final        bool
 	meta         *chatMeta
-	// answers is the helper whose call the message answers, said with it on the farm's facts.
-	answers *string
+	answers      *string
 }
 
-// chatWritten is a written message and what to do about it: the recipients to act on, who it named that is not on
-// the farm, whether a hold should be said.
 type chatWritten struct {
 	seq        int64
 	recipients []string
@@ -48,7 +44,6 @@ func (c *Chat) inTx(fn func(s chatStore) error) error {
 	return tx.Commit()
 }
 
-// settle is a final message's mentions, follows and deliveries, in the open transaction.
 func (c *Chat) settle(s chatStore, seq int64) (chatWritten, error) {
 	row, err := s.message(seq)
 	if err != nil || row == nil {
@@ -127,7 +122,6 @@ func (c *Chat) settle(s chatStore, seq int64) (chatWritten, error) {
 			cooling = append(cooling, h.ID)
 		}
 	}
-	// In a channel, its own helpers hear it; anyone on the farm can be named.
 	audience := []string{}
 	for _, h := range helpers {
 		if conv.Kind == "thread" || c.channelOfHelper(h) == conv.ID {
@@ -196,7 +190,6 @@ func (c *Chat) settle(s chatStore, seq int64) (chatWritten, error) {
 	return w, nil
 }
 
-// insert writes a message (and, when final, everything it causes), then tells the pages and the recipients.
 func (c *Chat) insert(in chatInsert) (chatWritten, error) {
 	var written chatWritten
 	err := c.inTx(func(s chatStore) error {
@@ -222,7 +215,6 @@ func (c *Chat) insert(in chatInsert) (chatWritten, error) {
 	return written, nil
 }
 
-// after is what follows a written message: the pages hear of it, a hold is said once, the recipients are acted on.
 func (c *Chat) after(conversation int64, written chatWritten, answers *string) {
 	c.publishMessage(written.seq, answers)
 	c.publishConversation(conversation)
@@ -237,8 +229,6 @@ func (c *Chat) after(conversation int64, written chatWritten, answers *string) {
 	}
 }
 
-// ── Delivering ───────────────────────────────────────────────────────────────
-
 func (c *Chat) deliveryTarget(r chatDeliveryRow) string {
 	return c.targetOfRow(r.ConversationKind, r.ParentSeq, nil, nil, r.ChannelName)
 }
@@ -247,7 +237,6 @@ func (c *Chat) asInbox(r chatDeliveryRow) base.InboxMessage {
 	return base.InboxMessage{Seq: r.Seq, Target: c.deliveryTarget(r), From: r.Sender, FromKind: chatSenderKind(r.SenderKind), Name: r.Name, Text: r.Body}
 }
 
-// groupRows is open deliveries by conversation, for a busy helper's notice.
 func (c *Chat) groupRows(rows []chatDeliveryRow) []base.UnreadRow {
 	var out []base.UnreadRow
 	for _, r := range rows {
@@ -264,7 +253,6 @@ func (c *Chat) groupRows(rows []chatDeliveryRow) []base.UnreadRow {
 	return out
 }
 
-// kick acts on someone's open deliveries: the manager hears them; a helper is woken, or told it has messages.
 func (c *Chat) kick(recipient string) {
 	if err := c.kicked(recipient); err != nil {
 		log.Printf("chat: delivering to %s: %v", recipient, err)
@@ -351,7 +339,6 @@ func (c *Chat) kicked(recipient string) error {
 	return nil
 }
 
-// notify is a busy helper's gathered notice: where there is something new, no words.
 func (c *Chat) notify(recipient string) {
 	if c.compacting[recipient] {
 		return
@@ -387,7 +374,6 @@ func (c *Chat) notify(recipient string) {
 	}
 }
 
-// inboxRows is what who has not read, by conversation, for its inbox and the summary when it is woken.
 func (c *Chat) inboxRows(who string) ([]base.UnreadRow, error) {
 	s := c.store()
 	channel := c.square
@@ -410,8 +396,6 @@ func (c *Chat) inboxRows(who string) ([]base.UnreadRow, error) {
 	}
 	return out, nil
 }
-
-// ── Following the helpers' sessions ──────────────────────────────────────────
 
 func (c *Chat) onActivity(a base.SessionActivity) {
 	c.mu.Lock()
@@ -482,9 +466,7 @@ func (c *Chat) onActivity(a base.SessionActivity) {
 	}
 }
 
-// ── Following the farm: jobs open threads, reports are posted, helpers leave ──
-
-// onFact is each fact the chat follows, handled before the next one.
+// Handled before the next one.
 func (c *Chat) onFact(e protocol.SiteEvent) {
 	switch f := e.Value.(type) {
 	case protocol.FactHired, protocol.FactLeft:
@@ -542,7 +524,6 @@ func (c *Chat) helpersLeft() {
 
 var chatSpaces = regexp.MustCompile(`[\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}]+`)
 
-// openJob is a helper's job: a dispatch message in its channel, its thread, the helper in the chat and following it.
 func (c *Chat) openJob(h protocol.Helper) {
 	if err := c.openedJob(h); err != nil {
 		log.Printf("chat: %s's job: %v", h.ID, err)
@@ -596,7 +577,6 @@ func (c *Chat) openedJob(h protocol.Helper) error {
 	return nil
 }
 
-// postReport is a helper's finished turn in its job thread, as itself: its conclusion, or the summary.
 func (c *Chat) postReport(id string, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
 	helper := c.helper(id)
 	if helper == nil || outcome == protocol.OutcomeInterrupted {
@@ -622,8 +602,6 @@ func (c *Chat) postReport(id string, outcome protocol.Outcome, summary string, s
 		log.Printf("chat: %s's report: %v", id, err)
 	}
 }
-
-// ── Words ────────────────────────────────────────────────────────────────────
 
 // chatIsSpace is JavaScript's \s, for trim.
 func chatIsSpace(r rune) bool {

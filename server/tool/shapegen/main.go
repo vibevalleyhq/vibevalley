@@ -62,7 +62,6 @@ func main() {
 	}
 }
 
-// formatDart is body as dart format writes it (as the Flutter tree keeps every file).
 func formatDart(body string) string {
 	dir, err := os.MkdirTemp("", "shapegen")
 	if err != nil {
@@ -87,8 +86,6 @@ func fail(err error) {
 	fmt.Fprintln(os.Stderr, "shapegen:", err)
 	os.Exit(1)
 }
-
-// ── The shapes, read ─────────────────────────────────────────────────────────
 
 type membership struct {
 	union  string
@@ -306,8 +303,6 @@ func (s *shapes) text(e ast.Expr) string {
 	return b.String()
 }
 
-// ── Go ───────────────────────────────────────────────────────────────────────
-
 // fills are a struct's fields written as [] or {} when nil: required slices and maps (the decoders refuse null).
 func (s *shapes) fills(d *decl, skip string) []string {
 	var out []string
@@ -506,7 +501,6 @@ func pathParams(path string) []string {
 
 func isPointer(e ast.Expr) bool { _, ok := e.(*ast.StarExpr); return ok }
 
-// queryName is a Go parameter's query name: pBefore → before, pID → id.
 func queryName(goName string) string {
 	n := strings.TrimPrefix(goName, "p")
 	if strings.ToUpper(n) == n {
@@ -514,8 +508,6 @@ func queryName(goName string) string {
 	}
 	return strings.ToLower(n[:1]) + n[1:]
 }
-
-// ── Dart ─────────────────────────────────────────────────────────────────────
 
 var initialisms = map[string]bool{"id": true, "url": true, "mcp": true, "api": true, "cny": true, "json": true, "http": true, "uid": true, "asr": true, "llm": true, "tts": true, "tz": true}
 

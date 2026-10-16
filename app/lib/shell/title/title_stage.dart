@@ -1,8 +1,4 @@
-// The title's picture, alive (web/src/title/TitleStage.tsx): the scene on a stage kept at its own 3:2 and covering
-// the screen, slowly panning; on it, in the scene's own coordinates (layers.dart), clouds crossing, smoke from the
-// chimney, plants swaying along the bottom, seeds blowing off the dandelions, at dusk and night fireflies over the
-// fields, and on the hill the farmer (his pose for the hour, breathing; a flickering lantern at night) with the chosen
-// pet. The motions are index.css's title-*; they stop for those who ask for less motion.
+// The motions stop for those who ask for less motion.
 
 import 'dart:math' as math;
 
@@ -47,7 +43,7 @@ class _TitleStageState extends ConsumerState<TitleStage> with SingleTickerProvid
     final t = still ? 0.0 : _t;
     return LayoutBuilder(
       builder: (context, box) {
-        // .title-stage: as wide as the screen, or wider to keep 3:2 at its height; centred.
+        // As wide as the screen, or wider to keep 3:2 at its height; centred.
         final w = math.max(box.maxWidth, box.maxHeight * 1.5);
         final h = w / 1.5;
         return ClipRect(
@@ -101,7 +97,6 @@ class _TitleStageState extends ConsumerState<TitleStage> with SingleTickerProvid
               final scale = cssKeyframes([(0, 0.4), (0.3, 0.75), (1, 1.3)], p);
               final opacity = cssKeyframes([(0, 0), (0.04, 0.95), (0.6, 0.7), (1, 0)], p);
               final pw = s.w * w, ph = pw * sizes[puff.sprite]!.h / sizes[puff.sprite]!.w;
-              // translate -50% -100%, scaled from its bottom middle: the bottom middle sits on (x, y).
               return Positioned(
                 left: x * w - pw / 2,
                 top: y * h - ph,
@@ -147,7 +142,6 @@ class _TitleStageState extends ConsumerState<TitleStage> with SingleTickerProvid
     );
   }
 
-  /// The farmer at the hour's pose, feet on the hill, breathing; at night his lantern flickers.
   Widget _farmer(TitleSprites sizes, double t, double w, double h) {
     final scene = widget.scene;
     final name = managerPose(scene);
@@ -179,7 +173,6 @@ class _TitleStageState extends ConsumerState<TitleStage> with SingleTickerProvid
     );
   }
 
-  /// The chosen pet beside him: its round of frames awake, asleep at night (breathing).
   Widget _pet(TitleSprites sizes, String pet, double t, double w, double h) {
     final scene = widget.scene;
     final asleep = scene == TitleScene.night;
@@ -193,7 +186,6 @@ class _TitleStageState extends ConsumerState<TitleStage> with SingleTickerProvid
     return Positioned(left: (petSpot.x - s.w / 2) * w, top: (petSpot.bottom - s.h) * h, child: img);
   }
 
-  /// Steps through the pet's round (layers.dart) for as long as it is shown.
   String _petFrame(double t) {
     final round = petRound.fold(0, (sum, f) => sum + f.ms);
     var at = (t * 1000).floor() % round;
@@ -205,7 +197,6 @@ class _TitleStageState extends ConsumerState<TitleStage> with SingleTickerProvid
   }
 }
 
-/// title-bg: the whole picture slowly panning, 5% larger, about a point right of and below the middle.
 class _Pan extends StatelessWidget {
   const _Pan({required this.t, required this.size, required this.child});
   final double t;
@@ -217,7 +208,6 @@ class _Pan extends StatelessWidget {
     final p = cssProgress(t, 70, alternate: true);
     final dx = cssKeyframes([(0, -0.01), (1, 0.01)], p, cssEaseInOut) * size.width;
     final dy = cssKeyframes([(0, 0.005), (1, -0.006)], p, cssEaseInOut) * size.height;
-    // transform: scale(1.05) translate3d(dx, dy, 0), about 60% 55%.
     final origin = Offset(size.width * 0.6, size.height * 0.55);
     final m = Matrix4.identity()
       ..translateByDouble(origin.dx, origin.dy, 0, 1)
@@ -227,7 +217,6 @@ class _Pan extends StatelessWidget {
   }
 }
 
-/// title-breathe: a slow rise from the feet.
 class _Breathe extends StatelessWidget {
   const _Breathe({required this.t, required this.child});
   final double t;
@@ -240,7 +229,6 @@ class _Breathe extends StatelessWidget {
   }
 }
 
-/// title-lantern: a warm glow at the farmer's hand that flickers, screened over the picture.
 class _Lantern extends StatelessWidget {
   const _Lantern({required this.t, required this.box});
   final double t;
@@ -264,7 +252,7 @@ class _Lantern extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             backgroundBlendMode: BlendMode.screen,
-            // radial-gradient(circle, …): its radius reaches the box's corner, √2 of half the side.
+            // Its radius reaches the box's corner, √2 of half the side.
             gradient: RadialGradient(
               radius: math.sqrt2 / 2,
               colors: [Color.fromRGBO(255, 210, 110, 0.55 * opacity), Color.fromRGBO(255, 170, 60, 0.2 * opacity), const Color(0x00000000)],
@@ -277,7 +265,6 @@ class _Lantern extends StatelessWidget {
   }
 }
 
-/// title-firefly: a small glowing square drifting back and forth and blinking.
 class _Firefly extends StatelessWidget {
   const _Firefly({required this.mote, required this.index, required this.t, required this.w, required this.h});
   final Mote mote;

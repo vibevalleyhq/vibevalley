@@ -1,7 +1,3 @@
-// A helper's trajectory as rounds: how steps split into rounds, the time bar's spans, comments tied to their step,
-// and the view: earlier rounds folded to their answer, the bar opening a step, a comment sent about a step; and the
-// helpers' farm tools in words.
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,7 +25,6 @@ void main() {
     expect(rounds.map((r) => r.asked?.n), [0, 4]);
     expect(rounds.first.steps.map((s) => s.n), [1, 2, 3]);
     expect(rounds.first.answer?.text, '测试挂了一个，先停在这');
-    // A sub-agent's asked step stays in its round.
     final withSub = roundsOf([...trajectory.take(2), step(9, 1500, StepKind.asked, '帮手的活', under: 1)]);
     expect(withSub.length, 1);
   });
@@ -74,11 +69,9 @@ void main() {
     await t.pump();
     expect(find.text('工单'), findsOneWidget);
     expect(find.text('评论第 2 步'), findsOneWidget);
-    // The first round shows its answer, not its tools.
     expect(find.text('测试挂了一个，先停在这'), findsOneWidget);
     expect(find.text('pnpm test'), findsNothing);
     expect(find.text('你评论：token 过期那条也修掉'), findsNothing);
-    // The comment round shows the words, not the quoted step.
     expect(find.text('token 过期那条也修掉'), findsOneWidget);
 
     await t.tap(find.bySemanticsLabel('跑命令 1 分'));
@@ -86,7 +79,6 @@ void main() {
     expect(find.text('pnpm test'), findsOneWidget);
     expect(find.text('你评论：token 过期那条也修掉'), findsOneWidget);
 
-    // 评论 shows on the step the pointer is over, not on every step.
     expect(find.text('评论'), findsNothing);
     final mouse = await t.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: Offset.zero);

@@ -1,5 +1,3 @@
-// A desk page not moved over from the web page yet: says what it will hold.
-
 import 'package:flutter/material.dart';
 
 import '../app/theme.dart';

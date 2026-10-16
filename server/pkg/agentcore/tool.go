@@ -1,8 +1,6 @@
 package agentcore
 
-// Tools: one with typed parameters (DefineTool), its parameters as the model sees them (JSON Schema), its arguments
-// checked before it runs, and results in a sentence. TS checks arguments with an Effect Schema; here the tool's own
-// JSON Schema is the check (required keys, each property's type), then they are decoded into the tool's Go type.
+// The tool's own JSON Schema is the check (required keys, each property's type), then the arguments are decoded into the tool's Go type.
 
 import (
 	"context"
@@ -14,7 +12,6 @@ import (
 	"vibevalley/pkg/ai"
 )
 
-// ToolSpec is a tool whose parameters decode into P.
 type ToolSpec[P any] struct {
 	Name          string
 	Label         string
@@ -24,7 +21,6 @@ type ToolSpec[P any] struct {
 	Execute       func(ctx context.Context, toolCallID string, params P, onUpdate AgentToolUpdateCallback) (AgentToolResult, error)
 }
 
-// DefineTool is a tool whose arguments are checked against its schema and decoded into P before it runs.
 func DefineTool[P any](spec ToolSpec[P]) AgentTool {
 	label := spec.Label
 	if label == "" {
@@ -45,13 +41,11 @@ func DefineTool[P any](spec ToolSpec[P]) AgentTool {
 	}
 }
 
-// TextResultOptions marks a result.
 type TextResultOptions struct {
 	IsError   bool
 	Terminate bool
 }
 
-// TextResult is a result that is some words.
 func TextResult(text string, options ...TextResultOptions) AgentToolResult {
 	var o TextResultOptions
 	if len(options) > 0 {
@@ -60,7 +54,6 @@ func TextResult(text string, options ...TextResultOptions) AgentToolResult {
 	return AgentToolResult{Content: []ai.Content{ai.NewText(text)}, IsError: o.IsError, Terminate: o.Terminate}
 }
 
-// ResultText is the words of a result: text as it is, a picture as a placeholder.
 func ResultText(content []ai.Content) string {
 	parts := make([]string, 0, len(content))
 	for _, c := range content {
@@ -73,7 +66,6 @@ func ResultText(content []ai.Content) string {
 	return strings.Join(parts, "\n")
 }
 
-// ParametersSchema is parameters as function calling wants them: an object schema.
 func ParametersSchema(tool AgentTool) JsonSchemaObject {
 	if tool.Parameters["type"] == "object" {
 		return tool.Parameters
@@ -81,13 +73,11 @@ func ParametersSchema(tool AgentTool) JsonSchemaObject {
 	return JsonSchemaObject{"type": "object", "properties": map[string]any{}}
 }
 
-// ToolOf is the tool as the model sees it.
 func ToolOf(tool AgentTool) ai.Tool {
 	return ai.Tool{Name: tool.Name, Description: tool.Description, Parameters: ParametersSchema(tool)}
 }
 
-// DecodeArguments is the arguments checked by the tool's schema, or why they do not fit (参数不对：…); a tool that
-// does not check takes them as they are.
+// A tool that does not check takes them as they are.
 func DecodeArguments(tool AgentTool, args json.RawMessage) (json.RawMessage, error) {
 	if len(args) == 0 {
 		args = json.RawMessage("{}")
@@ -112,7 +102,6 @@ func pathOf(path []string) string {
 	return "\n  at [" + strings.Join(quoted, "][") + "]"
 }
 
-// checkSchema says why value does not fit schema, "" when it does: types, required keys, nested objects and arrays.
 func checkSchema(schema map[string]any, value json.RawMessage, path []string) string {
 	if schema == nil {
 		return ""
@@ -212,9 +201,7 @@ func fitsType(t string, v any) bool {
 	return true
 }
 
-// ── JSON Schema in short ────────────────────────────────────────────────
-
-// ObjectSchema is an object's schema: its properties, which of them are required. No properties is an empty object.
+// No properties is an empty object.
 func ObjectSchema(properties map[string]any, required ...string) JsonSchemaObject {
 	if len(properties) == 0 {
 		return JsonSchemaObject{"type": "object", "properties": map[string]any{}}

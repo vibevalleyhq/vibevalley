@@ -1,6 +1,3 @@
-// The generated client (gen/vibevalley.dart) speaks VibeValleyApi as the server does: paths, methods and bodies, query
-// parameters, results decoded into the shared types, and the server's tagged refusals as VibeValleyApiError.
-
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';

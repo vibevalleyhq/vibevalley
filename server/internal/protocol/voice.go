@@ -1,41 +1,29 @@
 package protocol
 
-// Talking to the manager by voice, through Agora Conversational AI (packages/protocol/src/voice.ts): the voice
-// agent's defaults, the choices the voice page offers, which vendors need a key of their own, and what settings can
-// be saved. The settings' shapes are in gen.go (VoiceSettings; the overrides are SettingsUpdateVoice).
-
 import (
 	"encoding/json"
 	"fmt"
 	"regexp"
 )
 
-// VoiceAgentUID is the UID the voice agent joins the channel with: the page tells its audio and transcripts apart by
-// it, and the server starts the agent with it.
+// The page tells the agent's audio and transcripts apart by it.
 const VoiceAgentUID = "123456"
 
 var (
-	// VoiceAreas are Agora's REST regions; pick the one nearest the server.
-	VoiceAreas = AreaValues
-	// VoiceLanguages are the languages ARES recognises that the voice page offers.
+	VoiceAreas     = AreaValues
 	VoiceLanguages = LanguageValues
-	// VoiceModels are the Agora-hosted LLMs: no vendor key.
-	VoiceModels = VoiceLLMAgoraModelValues
-	// VoiceTTSModels are the Agora-hosted MiniMax models.
+	VoiceModels    = VoiceLLMAgoraModelValues
 	VoiceTTSModels = VoiceTTSMinimaxModelValues
-	// DeepgramModels are the Agora-hosted Deepgram models.
 	DeepgramModels = ModelValues
-	// OpenAIVoices are the Agora-hosted OpenAI tts-1 voices.
-	OpenAIVoices = VoiceValues
+	OpenAIVoices   = VoiceValues
 )
 
-// VoiceChoice is a voice the page offers by name.
 type VoiceChoice struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
 }
 
-// MinimaxVoices are the MiniMax system voices offered on the voice page (any other id can be typed).
+// Any other id can be typed.
 var MinimaxVoices = []VoiceChoice{
 	{ID: "Chinese (Mandarin)_Gentle_Youth", Label: "温润青年"},
 	{ID: "male-qn-qingse", Label: "青涩青年"},
@@ -52,7 +40,7 @@ var MinimaxVoices = []VoiceChoice{
 	{ID: "audiobook_female_1", Label: "女性有声书"},
 }
 
-// MicrosoftVoices are the Azure neural voices offered for Microsoft speech (any other name can be typed).
+// Any other name can be typed.
 var MicrosoftVoices = []string{
 	"zh-CN-XiaoxiaoNeural",
 	"zh-CN-YunxiNeural",
@@ -62,8 +50,6 @@ var MicrosoftVoices = []string{
 	"en-US-GuyNeural",
 }
 
-// NeedsASRKey, NeedsLLMKey, NeedsTTSKey: whether the vendor in each stage needs a key of its own, kept like the
-// farm's keys (asrKey, llmKey, ttsKey).
 func NeedsASRKey(asr VoiceASR) bool { _, ok := asr.Value.(VoiceASRMicrosoft); return ok }
 func NeedsLLMKey(llm VoiceLLM) bool { _, ok := llm.Value.(VoiceLLMOpenai); return ok }
 func NeedsTTSKey(tts VoiceTTS) bool { _, ok := tts.Value.(VoiceTTSMicrosoft); return ok }
@@ -74,7 +60,6 @@ const voiceManagerPersona = `你是码农场物语的管家，一个和气、利
 
 这是语音对话：每次只说一两句，口语化，不列清单，不用 markdown。一次最多问一个问题。用中文回答。`
 
-// DefaultVoice is the voice agent's settings when nothing is changed.
 func DefaultVoice() VoiceSettings {
 	return VoiceSettings{
 		Area:           AreaUS,
@@ -91,17 +76,14 @@ func DefaultVoice() VoiceSettings {
 	}
 }
 
-// VoiceLimit is a range the voice page allows for a number, in its unit.
 type VoiceLimit struct{ Min, Max int64 }
 
-// VoiceLimits are the ranges for silenceMs, interruptMs and idleSeconds.
 var VoiceLimits = map[string]VoiceLimit{
 	"silenceMs":   {Min: 200, Max: 2000},
 	"interruptMs": {Min: 80, Max: 1000},
 	"idleSeconds": {Min: 10, Max: 600},
 }
 
-// VoiceFieldLabel is each voice setting's name on the page, by its JSON key.
 var VoiceFieldLabel = map[string]string{
 	"area":           "区域",
 	"language":       "语言",
@@ -118,7 +100,6 @@ var VoiceFieldLabel = map[string]string{
 
 var voiceURL = regexp.MustCompile(`^https?://[^` + coreSpaceClass + `]+$`)
 
-// VoiceProblem is why these overrides cannot be saved; empty when they can.
 func VoiceProblem(v SettingsUpdateVoice) string {
 	if asr, ok := v.ASR.Value.(VoiceASRMicrosoft); ok && coreTrim(asr.Region) == "" {
 		return "微软识别要填区域，比如 eastasia"
@@ -161,7 +142,6 @@ func VoiceProblem(v SettingsUpdateVoice) string {
 	return ""
 }
 
-// VoiceSettingsOver is the settings in use: the overrides over the defaults (TypeScript's voiceSettings).
 func VoiceSettingsOver(defaults VoiceSettings, overrides SettingsUpdateVoice) VoiceSettings {
 	s := defaults
 	if overrides.Area != nil {
@@ -200,7 +180,7 @@ func VoiceSettingsOver(defaults VoiceSettings, overrides SettingsUpdateVoice) Vo
 	return s
 }
 
-// VoiceOverrides is the overrides that give settings over defaults: only what differs (as JSON).
+// Only what differs, as JSON.
 func VoiceOverrides(defaults, settings VoiceSettings) SettingsUpdateVoice {
 	differs := func(a, b any) bool {
 		x, _ := json.Marshal(a)

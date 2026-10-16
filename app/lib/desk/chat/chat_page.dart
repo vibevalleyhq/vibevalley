@@ -1,9 +1,3 @@
-// The chat (/chat), the desk's first place (web/src/desk/ChatApp.tsx): vibevalley's chat as a team chat, after Raft. A
-// sidebar with the channels and the helpers on the farm (a helper opens its job thread, as Raft's direct messages
-// open a chat); the channel with its header, tabs (聊天, 任务: the jobs arranged here, 定时: its schedules) and the
-// input; a thread opened on the right. What is shown is the chat's shown conversation, the farm window's too: the page
-// shows that conversation's channel, and the thread when it is one.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -23,13 +17,11 @@ import '../../rules/chat.dart';
 import '../../rules/farm.dart';
 import '../../rules/schedules.dart';
 
-/// The desk's header height (--spacing-desk-head).
 const _head = 66.0;
 
 const _line = BorderSide(color: Palette.bark900, width: 2);
 const _grey = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, color: Palette.bark500);
 
-/// What a thread is called: a job's by its helper, a plan's by its id, another by the first words it hangs under.
 String threadTitle(Chat? chat, Conversation thread, List<Helper> helpers) {
   if (thread.subjectKind == SubjectKind.job) {
     final helper = helpers.where((h) => h.id == thread.subjectId).firstOrNull;
@@ -48,7 +40,7 @@ enum _Tab { chat, jobs, schedules }
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key, this.id});
 
-  /// A conversation to show once (/chat/7 from a link); then the page goes by what is shown.
+  /// Shown once (/chat/7 from a link); then the page goes by what is shown.
   final int? id;
 
   @override
@@ -143,7 +135,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 children: [
                   if (wideSidebar) SizedBox(width: 288, child: sidebar),
                   Expanded(child: main),
-                  // The thread opens beside the channel, widening from the right; another thread changes it in place.
                   if (wideThread)
                     _Sliding(
                       from: _From.width,
@@ -169,7 +160,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 width: 288,
                 child: _Sliding(from: _From.left, child: _drawer ? sidebar : null),
               ),
-            // On a narrow screen the thread covers the channel, sliding in from the right.
             if (!wideThread)
               Positioned.fill(
                 child: _Sliding(
@@ -313,8 +303,6 @@ class _TabButton extends StatelessWidget {
   );
 }
 
-// ── The sidebar: channels, helpers, the manager ─────────────────────────────
-
 class _Sidebar extends ConsumerWidget {
   const _Sidebar({required this.chat, required this.channel, required this.thread, required this.onPick, required this.onShow, required this.onNew});
   final Chat? chat;
@@ -444,7 +432,6 @@ class _ChannelRow extends StatelessWidget {
   }
 }
 
-/// A titled group in the sidebar that folds.
 class _Section extends StatefulWidget {
   const _Section({required this.title, required this.count, required this.children, this.action});
   final String title;
@@ -459,7 +446,7 @@ class _Section extends StatefulWidget {
 class _SectionState extends State<_Section> with SingleTickerProviderStateMixin {
   bool _open = true;
 
-  /// The rows fold up under the title rather than vanish; folded away, they are not built.
+  /// Folded away, the rows are not built.
   late final _fold = AnimationController(vsync: this, value: 1)..addStatusListener((_) => setState(() {}));
 
   @override
@@ -531,8 +518,7 @@ class _SectionState extends State<_Section> with SingleTickerProviderStateMixin 
 
 enum _From { width, left, right }
 
-/// A panel coming and going: widening from its left edge (`width`, a column in a row) or sliding in from the left or
-/// the right (over the page). Null is no panel; a new panel while one is shown replaces it in place.
+/// Null is no panel; a new panel while one is shown replaces it in place.
 class _Sliding extends StatelessWidget {
   const _Sliding({required this.from, required this.child});
   final _From from;
@@ -640,13 +626,10 @@ class _ManagerLine extends ConsumerWidget {
   }
 }
 
-// ── The tabs besides the chat ───────────────────────────────────────────────
-
 class _Empty extends StatelessWidget {
   const _Empty(this.text, {required this.icon});
   final String text;
 
-  /// The tab's sprite, drawn large over the words.
   final String icon;
 
   @override
@@ -674,7 +657,6 @@ class _Empty extends StatelessWidget {
 
 BoxDecoration get _card => const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(_line), boxShadow: kitDrop);
 
-/// The jobs arranged in this channel: each helper on it, what it does, its thread.
 class _Jobs extends ConsumerWidget {
   const _Jobs({required this.channel, required this.onShow});
   final Conversation channel;
@@ -736,7 +718,6 @@ class _Jobs extends ConsumerWidget {
   }
 }
 
-/// This channel's schedules, to switch off or delete (a second press to be sure); made by telling the manager.
 class _Schedules extends ConsumerStatefulWidget {
   const _Schedules({required this.channel});
   final Conversation channel;
@@ -822,8 +803,6 @@ class _SchedulesState extends ConsumerState<_Schedules> {
   }
 }
 
-// ── A thread, on the right ──────────────────────────────────────────────────
-
 class _ThreadPane extends ConsumerWidget {
   const _ThreadPane({required this.thread, required this.onClose});
   final Conversation thread;
@@ -851,7 +830,6 @@ class _ThreadPane extends ConsumerWidget {
             decoration: const BoxDecoration(border: Border(bottom: _line)),
             child: Row(
               children: [
-                // Whose thread: its helper while it is on the farm, else the thread's bubble.
                 SizedBox.square(
                   dimension: 32,
                   child: Center(child: helper != null ? AgentHead(agent: helper.agent, size: 32) : const Glyph('button-thread')),

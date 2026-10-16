@@ -1,9 +1,3 @@
-// Which farm the app uses: the one on this machine (the desktop app starts it inside itself; elsewhere VIBEVALLEY_SERVER
-// or http://127.0.0.1:8787), or another machine's, through its yard gate (院门, server/internal/channels/lan.go) with this
-// device's key. The choice and the last other farm survive a restart (shared_preferences 'vibevalley.farm'); changing the
-// choice rebuilds the whole app on the new farm (main.dart). A device finds the other farm by scanning the code its
-// owner shows, or pasting its link; when that farm's address changed, scanning again keeps the key it has.
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -14,15 +8,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../gen/vibevalley.dart';
 
-/// Another machine's farm, as this device was let in to it.
 class RemoteFarm {
   const RemoteFarm({required this.url, required this.key, required this.farm, required this.device});
 
-  /// The gate's address: `http://<address>:<port>`.
   final Uri url;
   final String key;
 
-  /// The farm's name (its machine's) and this device's id there.
   final String farm;
   final String device;
 
@@ -39,20 +30,17 @@ class RemoteFarm {
   }
 }
 
-/// The farm the app uses, and the other farm it was last let in to (kept when it goes back to its own).
 @immutable
 class FarmChoice {
   const FarmChoice({this.remote, this.useRemote = false});
   final RemoteFarm? remote;
   final bool useRemote;
 
-  /// The other farm when the app uses it; null: this machine's.
   RemoteFarm? get using => useRemote ? remote : null;
 }
 
 const _key = 'vibevalley.farm';
 
-/// The choice, read before the first frame (loadFarmChoice); main.dart rebuilds the app when it changes.
 final farmChoice = ValueNotifier<FarmChoice>(const FarmChoice());
 
 Future<void> loadFarmChoice() async {
@@ -80,13 +68,13 @@ Future<void> saveFarmChoice(FarmChoice choice) async {
   }
 }
 
-/// What a pairing code travels in (lan.go lanPairLink): `vibevalley://pair?u=<the gate's address>&c=<code>`.
+/// `vibevalley://pair?u=<the gate's address>&c=<code>` (lan.go lanPairLink).
 class PairLink {
   const PairLink(this.url, this.code);
   final Uri url;
   final String code;
 
-  /// The link in a scanned code or pasted text (spaces around it allowed); null when it is not one.
+  /// Spaces around it allowed.
   static PairLink? parse(String text) {
     final link = Uri.tryParse(text.trim());
     if (link == null || link.scheme != 'vibevalley' || link.host != 'pair') return null;
@@ -97,7 +85,6 @@ class PairLink {
   }
 }
 
-/// The name this device asks with, as the other farm's owner sees it.
 String deviceName() {
   var host = '';
   try {
@@ -112,12 +99,9 @@ String deviceName() {
   return '一台设备';
 }
 
-/// A client for a farm at `url`, with this device's key when it has one; tests give a fake.
 typedef ApiFor = VibeValleyApi Function(Uri url, String? key);
 
-/// Gets into the farm a link points to. With a key for it already (the address changed, scanned again), the key is
-/// tried first and kept; otherwise the device asks with the code and waits until that farm's owner answers. Throws
-/// the farm's reason when it is refused.
+/// With a key for it already (the address changed, scanned again), the key is tried first and kept; otherwise the device asks with the code.
 Future<RemoteFarm> pairWith(PairLink link, {required String name, RemoteFarm? known, required ApiFor apiFor}) async {
   if (known != null) {
     final api = apiFor(link.url, known.key);

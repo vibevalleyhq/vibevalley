@@ -11,8 +11,7 @@ import (
 	"vibevalley/internal/runs"
 )
 
-// world is the farm up to chat: the services it is built on and its own, on one lifecycle, as the farm assembles
-// them (farm.New), without the packages above it.
+// Without the packages above it: a test reaches only what is below.
 type world struct {
 	*base.App
 	worldServices

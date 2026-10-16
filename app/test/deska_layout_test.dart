@@ -1,5 +1,3 @@
-// The deskA pages laid out narrow (a phone-wide window) and wide, with every tab open: nothing overflows.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desk/agents/agent_creator_page.dart';

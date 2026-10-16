@@ -1,5 +1,3 @@
-// The kit's words: markdown (parsing, mentions, plain text, drawing), the labels and the quota ports.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/gen/vibevalley.dart';

@@ -1,6 +1,4 @@
-// What the debug console's 事件 tab lists (the web page's core eventLog): every state frame the server sends, and
-// what comes beside it (a helper's steps, notices, runtimes' changes). The web page logs the facts themselves; this
-// client never sees facts, only the folded frames, so a frame stands where the facts were.
+// The client never sees facts, only the folded frames.
 
 import 'dart:async';
 import 'dart:convert';
@@ -11,18 +9,15 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 
-/// One line of the log: a frame, or a side event.
 class LogEntry {
   LogEntry(this.seq, this.type, this.at, this.summary, this._json);
   final int seq;
 
-  /// 'frame', or the side event's type (step, notice, runtime).
   final String type;
   final DateTime at;
   final String summary;
   final Map<String, dynamic> Function() _json;
 
-  /// The whole event, as the server sent it.
   Map<String, dynamic> json() => _json();
 }
 
@@ -32,7 +27,6 @@ class DebugLog {
   final bool paused;
 }
 
-/// How many entries are kept.
 const _keep = 2000;
 
 final debugLogProvider = NotifierProvider<DebugLogNotifier, DebugLog>(DebugLogNotifier.new);
@@ -64,7 +58,6 @@ class DebugLogNotifier extends Notifier<DebugLog> {
   void pause(bool paused) => state = DebugLog(state.entries, paused: paused);
   void clear() => state = DebugLog(const [], paused: state.paused);
 
-  /// The log as JSON lines, one event per line.
   String export() => state.entries.map((e) => jsonEncode(e.json())).join('\n');
 }
 
@@ -78,7 +71,6 @@ String sideType(SiteEvent e) => switch (e) {
 
 String _cut(String s, int n) => s.length > n ? s.substring(0, n) : s;
 
-/// A frame in a line, as the web page's console sums up a snapshot, with its effects.
 String frameSummary(SiteFrame f) {
   final s = f.state;
   final helpers = s.helpers.map((h) => '${h.id}:${_phaseTag(h.phase)}').join(' ');

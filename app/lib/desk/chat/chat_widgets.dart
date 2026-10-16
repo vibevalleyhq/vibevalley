@@ -1,7 +1,3 @@
-// What the farm's chat window and the desk's chat share: the faces (yours, the manager's, a helper's), a pixel glyph
-// at its own size, the thinking dots, and typing with @ (web/src/farm/Chat.tsx typedName, useNameables and the
-// composer's keys).
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,8 +9,7 @@ import '../../village/village_view.dart' show agentsProvider;
 import '../../village/world.dart' show lookOf;
 import 'chat_rules.dart';
 
-/// The person's own face: their portrait on a wheat square, framed as the manager's (MessageList.tsx OwnerFace); 主 on
-/// the wheat until the drawings are in.
+/// 主 on the wheat until the drawings are in.
 class OwnerFace extends ConsumerWidget {
   const OwnerFace({super.key, this.size = 36});
   final double size;
@@ -36,7 +31,6 @@ class OwnerFace extends ConsumerWidget {
   }
 }
 
-/// The manager's face, once the drawings are in.
 class ManagerHead extends ConsumerWidget {
   const ManagerHead({super.key, required this.size});
   final double size;
@@ -49,11 +43,10 @@ class ManagerHead extends ConsumerWidget {
   }
 }
 
-/// A helper's face by its agent (castOf), once the drawings are in.
 class AgentHead extends ConsumerWidget {
   const AgentHead({super.key, required this.agent, required this.size});
 
-  /// The agent id (or, for a message without one, the sender's id).
+  /// For a message without an agent, the sender's id.
   final String agent;
   final double size;
 
@@ -66,14 +59,12 @@ class AgentHead extends ConsumerWidget {
   }
 }
 
-/// Who said a message, as a face.
 Widget senderFace(ChatMessage m, double size) => switch (m.fromKind) {
   SenderKind.user => OwnerFace(size: size),
   SenderKind.foreman => ManagerHead(size: size),
   SenderKind.helper || SenderKind.system => AgentHead(agent: m.agent ?? m.from, size: size),
 };
 
-/// A pixel drawing at its own size (Chat.tsx Glyph).
 class Glyph extends ConsumerWidget {
   const Glyph(this.name, {super.key});
   final String name;
@@ -87,7 +78,6 @@ class Glyph extends ConsumerWidget {
   }
 }
 
-/// A square dot in a colour, with a bark outline (a helper's state on its face).
 class StateDot extends StatelessWidget {
   const StateDot({super.key, required this.color, this.size = 8, this.border = 1});
   final Color color;
@@ -105,7 +95,6 @@ class StateDot extends StatelessWidget {
   );
 }
 
-/// The blinking bar under words still coming (a message or a line being said), in the words' colour.
 class StreamingCaret extends StatefulWidget {
   const StreamingCaret({super.key});
 
@@ -139,7 +128,6 @@ class _StreamingCaretState extends State<StreamingCaret> with SingleTickerProvid
   );
 }
 
-/// Three dots that bob in turn: someone is thinking.
 class ThinkingDots extends StatefulWidget {
   const ThinkingDots({super.key});
 
@@ -186,11 +174,9 @@ class _ThinkingDotsState extends State<ThinkingDots> with SingleTickerProviderSt
     ),
   );
 
-  /// eng-bob: up 2 px half way through, back down, a whole pixel at a time.
   static double _lift(double t) => (t < .5 ? -4 * t : -4 * (1 - t)).roundToDouble();
 }
 
-/// The number badge on a channel or a helper: a bark chip with the count.
 class CountChip extends StatelessWidget {
   const CountChip(this.count, {super.key, this.fill = Palette.bark900, this.ink = Palette.cream50});
   final int count;
@@ -205,11 +191,7 @@ class CountChip extends StatelessWidget {
   );
 }
 
-// ── Typing, and naming someone with @ ────────────────────────────────────────
-
-/// The input's text and the @ menu that follows the caret. Enter sends, Shift+Enter starts a line; with names
-/// offered, the arrows move, Enter or Tab names and Esc closes them; Enter that picks a word in an input method does
-/// neither.
+/// Enter that picks a word in an input method neither sends nor names.
 class Naming extends ChangeNotifier {
   Naming() {
     text.addListener(_follow);
@@ -224,14 +206,11 @@ class Naming extends ChangeNotifier {
   final text = TextEditingController();
   final focus = FocusNode();
 
-  /// Whom the person can name now; the owner keeps it current.
   List<Nameable> all = const [];
 
-  /// The @word being typed, when there is one.
   ({int start, String query})? typing;
   int active = 0;
 
-  /// Called when an @ is typed (the farm window opens itself to show the menu).
   VoidCallback? onNaming;
 
   String _last = '';
@@ -281,7 +260,6 @@ class Naming extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The keys, for a Focus around the input.
   KeyEventResult key(KeyEvent e, VoidCallback send) {
     if (e is KeyUpEvent) return KeyEventResult.ignored;
     if (text.value.composing.isValid && !text.value.composing.isCollapsed) return KeyEventResult.ignored;
@@ -318,13 +296,11 @@ class Naming extends ChangeNotifier {
   }
 }
 
-/// The face beside a name in the @ menu: a helper's, the manager's, or 全 for everyone.
 class NameableFace extends StatelessWidget {
   const NameableFace(this.n, {super.key, this.size = 24, this.everyoneMark = true});
   final Nameable n;
   final double size;
 
-  /// The farm window marks everyone with 全; the desk leaves the place empty.
   final bool everyoneMark;
 
   @override
@@ -343,7 +319,6 @@ class NameableFace extends StatelessWidget {
   }
 }
 
-/// The @ menu's rows: face, token, name, what it is doing.
 class NamingMenu extends StatelessWidget {
   const NamingMenu({super.key, required this.naming, required this.highlight, this.faceSize = 24, this.everyoneMark = true});
   final Naming naming;
@@ -406,20 +381,18 @@ class NamingMenu extends StatelessWidget {
   }
 }
 
-/// The time of day as the desk writes it: 上午09:05 (zh-CN, 12-hour, two digits).
+/// zh-CN, 12-hour, two digits.
 String deskClock(double at) {
   final d = DateTime.fromMillisecondsSinceEpoch(at.round());
   final h12 = d.hour % 12 == 0 ? 12 : d.hour % 12;
   return '${d.hour < 12 ? '上午' : '下午'}${h12.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 }
 
-/// The time of day as the farm window writes it: 09:05.
 String farmClock(double at) {
   final d = DateTime.fromMillisecondsSinceEpoch(at.round());
   return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 }
 
-/// The day a message is on: 今天, 昨天, or 10月13日 (MessageList.tsx dayLabel).
 String dayLabel(double at, [DateTime? now]) {
   final d = DateTime.fromMillisecondsSinceEpoch(at.round());
   final today = now ?? DateTime.now();
@@ -429,5 +402,4 @@ String dayLabel(double at, [DateTime? now]) {
   return '${d.month}月${d.day}日';
 }
 
-/// Now, in epoch milliseconds, as the protocol's functions take it.
 double nowMs() => DateTime.now().millisecondsSinceEpoch.toDouble();

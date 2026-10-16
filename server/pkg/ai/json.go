@@ -1,8 +1,6 @@
 package ai
 
-// Tool arguments as they stream in: half a JSON object, read as much as it says. And the whole of it at the end.
 // Arguments stay JSON text (json.RawMessage), so their keys keep the model's order as JSON.stringify keeps them.
-// Also the JSON writing this port shares: JSON.stringify's way (no HTML escaping, keys in the order given).
 
 import (
 	"bytes"
@@ -11,7 +9,7 @@ import (
 	"strings"
 )
 
-// marshal is JSON.stringify: no HTML escaping, no trailing newline. Values that cannot be written are null.
+// JSON.stringify: no HTML escaping, no trailing newline. Values that cannot be written are null.
 func marshal(v any) []byte {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -22,10 +20,8 @@ func marshal(v any) []byte {
 	return bytes.TrimRight(buf.Bytes(), "\n")
 }
 
-// Stringify is JSON.stringify of v, for whatever is written to disk or the wire.
 func Stringify(v any) string { return string(marshal(v)) }
 
-// object writes a JSON object with its keys in the order they are set.
 type object struct{ buf bytes.Buffer }
 
 func newObject() *object {
@@ -50,13 +46,11 @@ func (o *object) bytes() []byte {
 	return append(out, '}')
 }
 
-// isObject reports JSON text that is one whole object.
 func isObject(text []byte) bool {
 	t := bytes.TrimSpace(text)
 	return len(t) > 0 && t[0] == '{' && json.Valid(t)
 }
 
-// compactObject is a JSON object without its whitespace; nil when text is not one.
 func compactObject(text []byte) json.RawMessage {
 	if !isObject(text) {
 		return nil
@@ -68,13 +62,11 @@ func compactObject(text []byte) json.RawMessage {
 	return json.RawMessage(buf.Bytes())
 }
 
-// Entry is one key of a JSON object and its value as JSON.
 type Entry struct {
 	Key   string
 	Value json.RawMessage
 }
 
-// ObjectEntries is a JSON object's keys and values in its order; nil when it is not an object.
 func ObjectEntries(raw []byte) []Entry {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	tok, err := dec.Token()
@@ -97,7 +89,6 @@ func ObjectEntries(raw []byte) []Entry {
 	return entries
 }
 
-// ObjectOf writes entries as a JSON object, in their order.
 func ObjectOf(entries []Entry) json.RawMessage {
 	o := newObject()
 	for _, e := range entries {
@@ -120,7 +111,6 @@ var (
 	danglingPunctuation   = regexp.MustCompile(`[,:]\s*$`)
 )
 
-// RepairJSON closes what a cut-off JSON text left open (strings, objects, arrays), dropping a dangling key or comma.
 func RepairJSON(text string) string {
 	var closers []byte
 	inString := false
@@ -170,7 +160,6 @@ func RepairJSON(text string) string {
 	return b.String()
 }
 
-// ParseStreamingJSON is as much of a JSON object as has come; {} when nothing can be read yet.
 func ParseStreamingJSON(text string) json.RawMessage {
 	if strings.TrimSpace(text) == "" {
 		return json.RawMessage("{}")
@@ -183,7 +172,7 @@ func ParseStreamingJSON(text string) json.RawMessage {
 	return json.RawMessage("{}")
 }
 
-// WithoutNulls is arguments without their top-level nulls: models send null for an optional parameter they leave out.
+// Models send null for an optional parameter they leave out.
 func WithoutNulls(params json.RawMessage) json.RawMessage {
 	entries := ObjectEntries(params)
 	if entries == nil {
@@ -198,8 +187,7 @@ func WithoutNulls(params json.RawMessage) json.RawMessage {
 	return ObjectOf(kept)
 }
 
-// ParseToolArguments is a tool call's arguments once they are all there. Arguments that cannot be read reach the
-// tool as `_unparsed`, fail its schema, and the model sees why.
+// Arguments that cannot be read reach the tool as `_unparsed`, fail its schema, and the model sees why.
 func ParseToolArguments(text string) json.RawMessage {
 	if strings.TrimSpace(text) == "" {
 		return json.RawMessage("{}")
@@ -207,7 +195,6 @@ func ParseToolArguments(text string) json.RawMessage {
 	if whole := compactObject([]byte(text)); whole != nil {
 		return whole
 	}
-	// Cut off: read what there is.
 	read := ParseStreamingJSON(text)
 	if len(ObjectEntries(read)) > 0 {
 		return read

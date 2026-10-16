@@ -1,7 +1,6 @@
 package agent
 
-// The agent's tools about itself: read a skill's full text, keep a note in its memory or tidy the memory, and look
-// up the conversation that compaction folded away. Every agent has them; they touch only its own folder.
+// They touch only the agent's own folder.
 
 import (
 	"context"
@@ -15,9 +14,8 @@ import (
 
 type SelfOptions struct {
 	Home string
-	// The skills it has now (scanned each time it asks).
+	// Scanned each time it asks.
 	Skills func() []SkillInfo
-	// Whether it keeps a memory.
 	Memory bool
 }
 
@@ -90,7 +88,6 @@ func SelfTools(o SelfOptions) []agentcore.AgentTool {
 	return append(tools, search)
 }
 
-// SearchIn is lines in the archive matching query, with two lines either side, newest file first; at most 20 hits.
 func SearchIn(home, query string) (string, error) {
 	if strings.TrimSpace(query) == "" {
 		return "", errors.New("query 是空的。")

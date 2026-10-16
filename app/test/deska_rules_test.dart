@@ -1,6 +1,3 @@
-// The protocol rules ported for the desk pages (lib/desk/shared): agentIssues, recall's pick and nextForgotten, castOf's
-// hash (the same animal as the web page picks), installedSkills, mergeSteps, the skill slug and the voice overrides.
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desk/voice/voice_rules.dart';
 import 'package:vibevalley/desk/shared/recall.dart';
@@ -40,7 +37,6 @@ void main() {
       final wrong = agentIssues(agent('a', 'A').copyWith(model: 'opus', effort: 'max'), rt).single;
       expect(wrong.level, IssueLevel.error);
       expect(wrong.text, 'Opus 没有 max 这一档，可选：low、high');
-      // No model named: the runtime's default one must take the effort (its settings' when set, else its own).
       final unnamed = agentIssues(agent('a', 'A').copyWith(effort: 'max'), rt).single;
       expect(unnamed.text, 'claude 默认用的 Opus 没有 max 这一档，可选：low、high');
       expect(agentIssues(agent('a', 'A').copyWith(effort: 'high'), rt), isEmpty);
@@ -61,8 +57,8 @@ void main() {
     });
   });
 
-  test('castOf picks the same animal from an id as the web page', () {
-    // From the web page: hash(id) % 7 over bear, rabbit, fox, cat, owl, hedgehog, raccoon.
+  test('castOf picks the same animal from an id every time', () {
+    // hash(id) % 7 over bear, rabbit, fox, cat, owl, hedgehog, raccoon.
     expect(castOf(null, 'backend').species, Species.cat);
     expect(castOf(null, 'agent-7').species, Species.fox);
     expect(castOf(null, '老周').species, Species.hedgehog);

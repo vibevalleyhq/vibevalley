@@ -22,32 +22,16 @@ import (
 	"vibevalley/internal/runs"
 )
 
-// The group chat (田头; ported from the TypeScript server's chat.ts, removed): the person, the manager and the helpers in one square and in
-// channels, with a thread under each job. Every message is written to the database first, in one transaction with
-// who it goes to; then it becomes a fact in the core state for the pages. The rules (who a message goes to, whether
-// it wakes them, what a helper is handed) are protocol's chat_rules.go; this service carries them out:
-//
-//   - A delivery goes pending → announced (a busy helper was told there is something, no words) → handed (the words
-//     were in a turn's input) → seen (that turn spoke, or the helper read them). A session that closes or a turn that
-//     ends without a word puts what it was handed back to pending: given twice rather than lost.
-//   - A busy helper's notices are gathered for a moment into one; an idle helper is woken with the messages for it
-//     and a summary of the rest. A helper whose wakes keep failing before it says anything is no longer woken by
-//     anyone but the person.
-//   - The manager runs in this process: its deliveries go out on ForForeman and count as seen there.
-//
-// Everything that changes the chat runs one at a time (mu). Design and why:
-// .agents/notes/implemented/feature/2026-10-11-farm-group-chat.md.
+// Every message is written to the database first, in one transaction with who it goes to; only then does it become a fact. A delivery goes pending →
+// announced → handed → seen; a session that closes or a turn that ends without a word puts what it was handed back to pending: given twice rather
+// than lost. Everything that changes the chat runs one at a time (mu).
 
 const (
-	// chatReportMax: a report's words in the chat, this long at most (the whole of it is in the helper's steps).
 	chatReportMax = 1500
-	// chatReadLimit: history a read returns, at most, unless asked.
 	chatReadLimit = 30
-	// chatRetryWake: how long a wake waits after a turn that ended without a word.
 	chatRetryWake = 3 * time.Second
 )
 
-// chatCrew is what the chat needs of the crew: the Crew, or a test's stand-in.
 type chatCrew interface {
 	Deliver(id, text string) base.Delivered
 	Activity() *base.Hub[base.SessionActivity]
@@ -60,29 +44,23 @@ type Chat struct {
 	site *base.Site
 	crew chatCrew
 
-	square  int64
-	foreman *base.Hub[base.ForemanNews]
-	// noticeEvery: how long a busy helper's notices gather ($VIBEVALLEY_NOTICE_BATCH_MS); retryWake: how long a wake
-	// waits after a turn that ended without a word ($VIBEVALLEY_RETRY_WAKE_MS).
+	square      int64
+	foreman     *base.Hub[base.ForemanNews]
 	noticeEvery time.Duration
 	retryWake   time.Duration
 
-	// mu: everything that changes the chat, one at a time.
+	// Guards everything that changes the chat.
 	mu sync.Mutex
-	// compacting: helpers compacting their context right now; nothing is slipped in until they are done.
+	// Nothing is slipped in while a helper compacts its context.
 	compacting map[string]bool
-	// failures: wakes in a row that ended without a word, per helper; broken: those past WakeBreaker.
-	failures map[string]int
-	broken   map[string]bool
-	// lastRead: where each agent last read, for the wrong-place guard.
-	lastRead map[string]string
-	// streaming: the manager's messages being written, by its key.
-	streaming map[string]int64
-	// notices: a busy helper's gathered notice, waiting to go.
-	notices map[string]*time.Timer
-	closed  bool
+	failures   map[string]int
+	broken     map[string]bool
+	lastRead   map[string]string
+	streaming  map[string]int64
+	notices    map[string]*time.Timer
+	closed     bool
 
-	// names: the channels' names by id, kept as channels open (read without mu).
+	// The channels' names, read without mu.
 	namesMu sync.Mutex
 	names   map[int64]string
 }
@@ -96,8 +74,6 @@ func chatEnvMs(name string, fallback time.Duration) time.Duration {
 	return fallback
 }
 
-// newChat sets the chat up: its participants and the square, the conversation carried over from farm.json's lines
-// once, what a stop left half done, the open jobs' threads, and the core state's copy of the chat.
 func newChat(cfg base.Config, db *sql.DB, site *base.Site, crew *runs.Crew) (*Chat, error) {
 	c := &Chat{
 		cfg:         cfg,
@@ -142,8 +118,6 @@ func newChat(cfg base.Config, db *sql.DB, site *base.Site, crew *runs.Crew) (*Ch
 
 func (c *Chat) store() chatStore { return chatStore{c.db} }
 
-// restore is what a restart does: carry farm.json's old lines over (once), finish what was half said, give back
-// what was handed and never seen, open the threads of jobs on the farm, and fill the core state's chat.
 func (c *Chat) restore() error {
 	s := c.store()
 	c.mu.Lock()
@@ -166,7 +140,6 @@ func (c *Chat) restore() error {
 	for _, h := range c.helpers() {
 		c.openJob(h)
 	}
-	// The pages' copy of the chat, from the database.
 	convs, err := s.recentConversations(protocol.KeepConversations)
 	if err != nil {
 		return err
@@ -219,8 +192,6 @@ func (c *Chat) carryLines() error {
 	return nil
 }
 
-// start follows the farm (jobs open threads, reports are posted, helpers leave) and the helpers' sessions, then
-// wakes whoever has messages left from before a restart.
 func (c *Chat) OnStart(ctx context.Context) error {
 	_, events, stopEvents := c.site.Events()
 	activity, stopActivity := c.crew.Activity().Subscribe()
@@ -276,7 +247,6 @@ func (c *Chat) OnStop() {
 	}
 }
 
-// later runs fn after d with the chat to itself, unless the chat has closed by then.
 func (c *Chat) later(d time.Duration, fn func()) *time.Timer {
 	return time.AfterFunc(d, func() {
 		c.mu.Lock()
@@ -286,8 +256,6 @@ func (c *Chat) later(d time.Duration, fn func()) *time.Timer {
 		}
 	})
 }
-
-// ── Reading rows ─────────────────────────────────────────────────────────────
 
 func chatSenderKind(kind string) protocol.SenderKind {
 	switch kind {
@@ -352,7 +320,6 @@ func chatToMessage(row chatMsgRow) protocol.ChatMessage {
 	return m
 }
 
-// toConversation is a row as the core state has it, with the person's read position.
 func (c *Chat) toConversation(row chatConvRow) protocol.Conversation {
 	conv := protocol.Conversation{
 		ID:          row.ID,
@@ -386,7 +353,6 @@ func (c *Chat) channelName(id *int64) *string {
 	return nil
 }
 
-// targetOfRow is a row's address: a channel's own name; a thread's channel's (named in the row, or looked up).
 func (c *Chat) targetOfRow(kind string, parent *int64, name *string, channelID *int64, channelName *string) string {
 	conv := protocol.Conversation{Kind: chatConversationKind(kind), Parent: parent, Name: name}
 	if conv.Name == nil {
@@ -418,7 +384,6 @@ func (c *Chat) loadChannels() ([]chatConvRow, error) {
 	return rows, nil
 }
 
-// channelTags is the channels as #<name>, in the order they opened.
 func (c *Chat) channelTags() []string {
 	c.namesMu.Lock()
 	defer c.namesMu.Unlock()
@@ -437,7 +402,6 @@ func (c *Chat) knownChannel(id int64) bool {
 	return ok
 }
 
-// channelIDOf is the channel a conversation row is in.
 func (c *Chat) channelIDOf(row chatConvRow) int64 {
 	if row.Kind == "thread" {
 		if row.ChannelID != nil {
@@ -448,8 +412,7 @@ func (c *Chat) channelIDOf(row chatConvRow) int64 {
 	return row.ID
 }
 
-// channelOfHelper is a helper's channel: where its job was arranged. A channel the database does not have
-// (farm.json kept, the database not) is the square.
+// A channel the database does not have (farm.json kept, the database not) is the square.
 func (c *Chat) channelOfHelper(h protocol.Helper) int64 {
 	if h.Channel != nil && c.knownChannel(*h.Channel) {
 		return *h.Channel
@@ -486,8 +449,6 @@ func (c *Chat) publishConversation(id int64) {
 	}
 }
 
-// publishMessage applies a message to the core state, with what is known of it here: whose job thread it went into,
-// whose call it answers (what the ledger counts as words for a helper, and as a handoff).
 func (c *Chat) publishMessage(seq int64, answers *string) {
 	s := c.store()
 	row, err := s.message(seq)
@@ -515,12 +476,9 @@ func (c *Chat) jobThreadOf(helper string) *int64 {
 	return id
 }
 
-// ── What the person, the manager and the helpers do ──────────────────────────
-
-// chatFail is a refusal: its words are for the person.
+// A refusal's words are for the person.
 func chatFail(format string, args ...any) error { return fmt.Errorf(format, args...) }
 
-// resolveTarget is the conversation a target names; no target: who's own job thread, or the square.
 func (c *Chat) resolveTarget(who, target string) (int64, error) {
 	s := c.store()
 	if chatTrim(target) == "" {
@@ -552,7 +510,6 @@ func (c *Chat) resolveTarget(who, target string) (int64, error) {
 	if under != nil {
 		return *under, nil
 	}
-	// A reply to a channel's message with no thread yet starts one, as in Raft.
 	parent, err := s.message(parsed.Parent)
 	if err != nil {
 		return 0, err
@@ -575,7 +532,6 @@ func (c *Chat) resolveTarget(who, target string) (int64, error) {
 	return thread, nil
 }
 
-// Say is the person saying something: on the square, or in a conversation.
 func (c *Chat) Say(text string, conversation *int64) (protocol.ChatMessage, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -598,7 +554,6 @@ func (c *Chat) Say(text string, conversation *int64) (protocol.ChatMessage, erro
 	if err != nil {
 		return protocol.ChatMessage{}, err
 	}
-	// The person reads what they reply to.
 	if err := s.setReadCursor("user", where, written.seq, base.NowMs()); err != nil {
 		return protocol.ChatMessage{}, err
 	}
@@ -624,7 +579,6 @@ func (c *Chat) Say(text string, conversation *int64) (protocol.ChatMessage, erro
 	return chatToMessage(*row), nil
 }
 
-// TellHelper is the person or the manager saying something in a helper's job thread, which wakes it.
 func (c *Chat) TellHelper(from, helper, text string) (protocol.ChatMessage, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -656,7 +610,6 @@ func chatInboxOf(row chatMsgRow, target string) base.InboxMessage {
 	return base.InboxMessage{Seq: row.Seq, Target: target, From: row.Sender, FromKind: chatSenderKind(row.SenderKind), Name: row.Name, Text: row.Body}
 }
 
-// Speak is an agent (the manager or a helper) saying something, as its farm_say tool does.
 func (c *Chat) Speak(from, text string, opt base.SpeakOptions) (base.Spoken, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -687,7 +640,7 @@ func (c *Chat) Speak(from, text string, opt base.SpeakOptions) (base.Spoken, err
 			return base.Spoken{Kind: "sent", Message: chatToMessage(*m), Target: target, NotOnFarm: []string{}}, nil
 		}
 	}
-	// Read a thread last, posting on a channel: ask once.
+	// Posting on a channel right after reading a thread: confirm once.
 	if last := c.lastRead[from]; row.Kind != "thread" && !opt.Confirm && last != "" && last != target {
 		return base.Spoken{Kind: "confirm", Target: target, LastRead: last}, nil
 	}
@@ -725,7 +678,6 @@ func (c *Chat) Speak(from, text string, opt base.SpeakOptions) (base.Spoken, err
 		}
 		return base.Spoken{Kind: "held", Target: target, Shown: shown, More: len(unseen) - len(shown)}, nil
 	}
-	// A helper answering another helper's call (one named it here since it last spoke): said with the message.
 	var answers *string
 	if from != "foreman" {
 		if answers, err = s.calledBy(from, conversation, math.MaxInt64); err != nil {
@@ -753,8 +705,7 @@ func (c *Chat) Speak(from, text string, opt base.SpeakOptions) (base.Spoken, err
 	return base.Spoken{Kind: "sent", Message: chatToMessage(*m), Target: target, NotOnFarm: notOnFarm}, nil
 }
 
-// ForemanSays is the manager's words as they grow: the same key again replaces them until final; delivered once
-// final.
+// The same key again replaces the words until final; delivered once final.
 func (c *Chat) ForemanSays(conversation int64, key, text string, final bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -799,7 +750,6 @@ func (c *Chat) ForemanSays(conversation int64, key, text string, final bool) {
 	c.after(conversation, written, nil)
 }
 
-// Notice is the farm itself saying something (a schedule come due, a patrol's finding): seen by all, wakes no one.
 // code names the kind, for dropping repeats.
 func (c *Chat) Notice(conversation int64, text, code string) {
 	c.mu.Lock()
@@ -809,8 +759,6 @@ func (c *Chat) Notice(conversation int64, text, code string) {
 	}
 }
 
-// Read is an agent reading a conversation: its latest messages (or those after its read position, or before a
-// message); reading the latest moves its read position there.
 func (c *Chat) Read(who string, opt base.ReadOptions) (base.ReadResult, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -881,7 +829,6 @@ func (c *Chat) Read(who string, opt base.ReadOptions) (base.ReadResult, error) {
 	return base.ReadResult{Target: target, Messages: messages, Older: older}, nil
 }
 
-// Inbox is what who has not read, by conversation.
 func (c *Chat) Inbox(who string) []base.UnreadRow {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -892,7 +839,6 @@ func (c *Chat) Inbox(who string) []base.UnreadRow {
 	return rows
 }
 
-// History is a conversation's messages before a message (the latest when before is nil), oldest first.
 func (c *Chat) History(conversation int64, before, limit *int64) ([]protocol.ChatMessage, error) {
 	b, n := chatNoSeq, int64(50)
 	if before != nil {
@@ -912,7 +858,6 @@ func (c *Chat) History(conversation int64, before, limit *int64) ([]protocol.Cha
 	return out, nil
 }
 
-// MarkRead: the person has read a conversation up to seq.
 func (c *Chat) MarkRead(conversation, seq int64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -931,13 +876,10 @@ func (c *Chat) MarkRead(conversation, seq int64) error {
 	return nil
 }
 
-// JobThread is a helper's job thread: the newest one about it.
 func (c *Chat) JobThread(helper string) *int64 { return c.jobThreadOf(helper) }
 
-// ForForeman is messages for the manager as they come (those that wake it).
 func (c *Chat) ForForeman() *base.Hub[base.ForemanNews] { return c.foreman }
 
-// ForemanDigest is what reached the manager without waking it (reports, mostly), since it last looked; now seen.
 func (c *Chat) ForemanDigest() []base.InboxMessage {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -961,10 +903,8 @@ func (c *Chat) ForemanDigest() []base.InboxMessage {
 	return out
 }
 
-// Square is the square's conversation id.
 func (c *Chat) Square() int64 { return c.square }
 
-// Channels is the channels: the square first.
 func (c *Chat) Channels() []base.ChannelInfo {
 	rows, err := c.loadChannels()
 	if err != nil {
@@ -985,7 +925,6 @@ func chatOptional(s string) *string {
 	return nil
 }
 
-// OpenChannel opens a channel: a name (with or without #), what it is for, a default project.
 func (c *Chat) OpenChannel(name, description, project string) (base.ChannelInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -1015,8 +954,7 @@ func (c *Chat) OpenChannel(name, description, project string) (base.ChannelInfo,
 	return chatChannelInfo(chatConvRow{ID: id, Name: &clean, Description: desc, Project: proj}), nil
 }
 
-// UpdateChannel changes what a channel is for (nil or empty: as it was), or its default project (nil: as it was;
-// empty: none).
+// description nil or empty: as it was; project nil: as it was, empty: none.
 func (c *Chat) UpdateChannel(id int64, description, project *string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -1044,7 +982,6 @@ func (c *Chat) UpdateChannel(id int64, description, project *string) error {
 	return nil
 }
 
-// ChannelOf is the channel a conversation is in (a thread's, or the channel itself).
 func (c *Chat) ChannelOf(conversation int64) base.ChannelInfo {
 	s := c.store()
 	id := c.square
@@ -1057,7 +994,6 @@ func (c *Chat) ChannelOf(conversation int64) base.ChannelInfo {
 	return base.ChannelInfo{ID: c.square, Name: protocol.SquareName}
 }
 
-// ChannelByName is a channel by its name, with or without #.
 func (c *Chat) ChannelByName(name string) *base.ChannelInfo {
 	s := c.store()
 	found, err := s.channelByName(strings.TrimPrefix(chatTrim(name), "#"))

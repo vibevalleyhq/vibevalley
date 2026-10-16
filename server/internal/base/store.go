@@ -1,8 +1,5 @@
 package base
 
-// What vibevalley keeps between runs: the agents, the skill library and the per-runtime settings, in $VIBEVALLEY_HOME/
-// config.json (ported from the TypeScript server's store.ts, removed). A fresh home starts from the protocol's seeds.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -29,8 +26,7 @@ type Store struct {
 	disk *FileWriter
 }
 
-// withoutExamples drops the example skills vibevalley once seeded, where they are still exactly as seeded, and the
-// agents' ticks on them.
+// Only where they are still exactly as seeded.
 func withoutExamples(s stored) stored {
 	examples := protocol.ExampleSkills()
 	untouched := func(k protocol.Skill) bool {
@@ -112,7 +108,6 @@ func (st *Store) Skills() []protocol.Skill {
 	return slices.Clone(st.s.Skills)
 }
 
-// Settings is a runtime's settings; the defaults when none were saved.
 func (st *Store) Settings(runtime string) protocol.RuntimeSettings {
 	st.mu.Lock()
 	defer st.mu.Unlock()

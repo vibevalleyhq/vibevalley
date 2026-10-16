@@ -1,11 +1,7 @@
 package protocol
 
-// Schedules (packages/protocol/src/schedules.ts): things said in a channel at set times ("every morning at nine, run
-// the tests in #clock-in"). Times are written as people say them (once, every so many minutes, daily, some weekdays),
-// never as cron; daily and weekly are in the schedule's time zone. A run missed while the server was off happens once
-// when it is back, not once per miss. The next run is found as Effect's Cron.next finds it: the first matching minute
-// strictly after the last run, a wall time skipped by a clock change taken as the same time before the change (02:30
-// on a spring-forward night is 03:30), a repeated one as its first occurrence.
+// The next run is found as Effect's Cron.next finds it: the first matching minute strictly after the last run, a wall time skipped by a clock change
+// taken as the same time before the change (02:30 on a spring-forward night is 03:30), a repeated one as its first occurrence.
 
 import (
 	"fmt"
@@ -18,10 +14,9 @@ import (
 	"time"
 )
 
-// MinEveryMinutes is the shortest interval, in minutes.
 const MinEveryMinutes = 1
 
-// MissedAfterMS: a run later than this after it was due was missed (the server was off), and says so.
+// A run later than this after it was due was missed (the server was off), and says so.
 const MissedAfterMS = 5 * 60_000
 
 var scheduleTime = regexp.MustCompile(`^([01]?\d|2[0-3]):([0-5]\d)$`)
@@ -93,7 +88,6 @@ func scheduleIntlZone(tz string) *time.Location {
 	return loc
 }
 
-// ScheduleProblem is why a schedule cannot be made as asked; "" when it can.
 func ScheduleProblem(req ScheduleRequest, now int64) string {
 	if coreTrim(req.Name) == "" {
 		return "定时要有个名字"
@@ -173,7 +167,6 @@ func scheduleWallTime(y int, mo time.Month, d, h, mi int, loc *time.Location) in
 	return slices.Min(found) * 1000
 }
 
-// NextRun is when it is next due, counting from its last run (or its making); false when it is off or done.
 func NextRun(s FarmSchedule) (int64, bool) {
 	if !s.Enabled {
 		return 0, false
@@ -224,7 +217,7 @@ func scheduleCron(from int64, at string, days []int64, tz string) (int64, bool) 
 	return scheduleNext(from, h, mi, norm, loc)
 }
 
-// DueSchedules is the schedules due at now, each once however many runs it missed.
+// Each once, however many runs it missed.
 func DueSchedules(all []FarmSchedule, now int64) []FarmSchedule {
 	out := []FarmSchedule{}
 	for _, s := range all {
@@ -235,7 +228,6 @@ func DueSchedules(all []FarmSchedule, now int64) []FarmSchedule {
 	return out
 }
 
-// IsMissed is whether this run is a late one, for a run missed while the server was off.
 func IsMissed(s FarmSchedule, now int64) bool {
 	next, ok := NextRun(s)
 	if !ok {
@@ -244,7 +236,6 @@ func IsMissed(s FarmSchedule, now int64) bool {
 	return now-next > MissedAfterMS
 }
 
-// AfterRun is a schedule after it ran at now: a once is done, the rest count on from now.
 func AfterRun(s FarmSchedule, now int64) FarmSchedule {
 	s.LastRun = &now
 	if _, ok := s.When.Value.(ScheduleWhenOnce); ok {
@@ -253,8 +244,7 @@ func AfterRun(s FarmSchedule, now int64) FarmSchedule {
 	return s
 }
 
-// scheduleClock is a moment as zh-CN's Intl writes month, day, hour and minute: 10/13 09:00. A zone that is none is
-// read as UTC (JavaScript throws).
+// A zone that is none is read as UTC (JavaScript throws).
 func scheduleClock(at int64, tz string) string {
 	loc := scheduleIntlZone(tz)
 	if loc == nil {
@@ -264,7 +254,6 @@ func scheduleClock(at int64, tz string) string {
 	return fmt.Sprintf("%d/%d %02d:%02d", t.Month(), t.Day(), t.Hour(), t.Minute())
 }
 
-// WhenText is when, in words: 「每天 09:00」「每周一、三 09:00」「每 30 分钟」「10/13 09:00 一次」.
 func WhenText(when ScheduleWhen, tz string) string {
 	switch w := when.Value.(type) {
 	case ScheduleWhenOnce:
@@ -293,7 +282,6 @@ func WhenText(when ScheduleWhen, tz string) string {
 	return ""
 }
 
-// NextText is the next run in words, or why there is none.
 func NextText(s FarmSchedule) string {
 	if next, ok := NextRun(s); ok {
 		return scheduleClock(next, s.TZ)
@@ -307,7 +295,6 @@ func NextText(s FarmSchedule) string {
 	return "关着"
 }
 
-// DueText is what is said in its channel when it comes due.
 func DueText(s FarmSchedule, missed bool) string {
 	late := ""
 	if missed {

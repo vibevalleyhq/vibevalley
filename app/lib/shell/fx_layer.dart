@@ -1,8 +1,3 @@
-// Turns the farm's effects into the level-up banner and achievement toasts, and the server's notices and a voice call
-// that broke off into toasts (web/src/ui/FxLayer.tsx). Sounds come from farm_sounds.dart. The farm screen puts FxLayer
-// over the village; the toasts themselves show in the kit's ToastViewport, which AppFrame puts over the whole app
-// with `toastLeading` and `toastKicker` from here.
-
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -17,10 +12,9 @@ import '../voice/voice.dart';
 import 'achievements.dart';
 import '../rules/progress.dart';
 
-/// Effects made on this side to be shown as if they came (the debug console's 升一级 and 弹一个成就).
+/// The debug console's 升一级 and 弹一个成就.
 final localEffects = StreamController<GameEffect>.broadcast();
 
-/// The farm's effects as they come: each frame's off the server's state stream, and the local ones.
 Stream<GameEffect> farmEffects(VibeValleyServer server) {
   late final StreamController<GameEffect> out;
   final subs = <StreamSubscription<GameEffect>>[];
@@ -40,13 +34,10 @@ Stream<GameEffect> farmEffects(VibeValleyServer server) {
   return out.stream;
 }
 
-/// The beds that open at a level (core farm.ts BEDS' unlockLevel).
 const clearingLevels = {5, 8, 12};
 
-/// What a toast raised for an achievement carries.
 typedef Earned = ({String achievement, int tier});
 
-/// The medal for an achievement toast (the bell otherwise, the kit's own).
 Widget? Function(ToastData) toastLeading(SpriteAtlas? atlas) => (toast) {
   final data = toast.data;
   if (toast.type != ToastType.achievement || data is! Earned || atlas == null) return null;
@@ -54,7 +45,6 @@ Widget? Function(ToastData) toastLeading(SpriteAtlas? atlas) => (toast) {
   return a == null ? null : EarnedMedal(atlas: atlas, achievement: a, tier: data.tier);
 };
 
-/// The line above an achievement toast's title.
 String? toastKicker(ToastData toast) {
   final data = toast.data;
   if (toast.type != ToastType.achievement || data is! Earned) return null;
@@ -65,16 +55,12 @@ String? toastKicker(ToastData toast) {
 class FxLayer extends ConsumerStatefulWidget {
   const FxLayer({super.key, this.effects, this.notices, this.call, this.manager});
 
-  /// The effects to show; the farm's (farmEffects) when not given.
   final Stream<GameEffect>? effects;
 
-  /// What happens beside the state; the server's side events when not given. Notices become toasts.
   final Stream<SiteEvent>? notices;
 
-  /// The voice call, to say why it could not start or broke off.
   final VoiceCall? call;
 
-  /// Where toasts go; the kit's `toasts` when not given.
   final ToastManager? manager;
 
   @override
@@ -109,7 +95,6 @@ class _FxLayerState extends ConsumerState<FxLayer> {
     super.dispose();
   }
 
-  // Notices (refusals, errors) from the server become toasts.
   void _notice(SiteEvent e) {
     if (e is! SiteEventNotice) return;
     final level = e.level.wire;
@@ -121,7 +106,6 @@ class _FxLayerState extends ConsumerState<FxLayer> {
     );
   }
 
-  // A voice call that could not start or broke off says why.
   void _voice() {
     final problem = widget.call?.problem;
     if (problem != null && problem != _problem) {
@@ -130,7 +114,6 @@ class _FxLayerState extends ConsumerState<FxLayer> {
     _problem = problem;
   }
 
-  // Level-ups get the banner, achievements a toast.
   void _effect(GameEffect f) {
     switch (f) {
       case GameEffectReward():
@@ -177,7 +160,6 @@ class _FxLayerState extends ConsumerState<FxLayer> {
   }
 }
 
-/// The level-up banner: drops in, holds, fades up and away (index.css animate-banner, 3.4 s).
 class LevelUpBanner extends StatefulWidget {
   const LevelUpBanner({super.key, required this.level, required this.star, required this.onDone});
   final int level;
@@ -232,7 +214,7 @@ class _LevelUpBannerState extends State<LevelUpBanner> with SingleTickerProvider
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // The star stands out of the top (-mt-9): 36 of its 56 px above the paper.
+            // The star stands out of the top: 36 of its 56 px above the paper.
             SizedBox(
               width: 56,
               height: 20,

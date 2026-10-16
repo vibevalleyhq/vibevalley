@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-// Hub sends every value published to every subscriber, in order (Effect's unbounded PubSub): a subscriber that
-// falls behind gets a longer queue, never a dropped value.
+// A subscriber that falls behind gets a longer queue, never a dropped value.
 type Hub[T any] struct {
 	mu   sync.Mutex
 	subs map[*hubSub[T]]struct{}
@@ -22,7 +21,6 @@ type hubSub[T any] struct {
 
 func NewHub[T any]() *Hub[T] { return &Hub[T]{subs: map[*hubSub[T]]struct{}{}} }
 
-// Publish queues v for every subscriber now subscribed.
 func (h *Hub[T]) Publish(v T) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -37,7 +35,6 @@ func (h *Hub[T]) Publish(v T) {
 	}
 }
 
-// Subscribe is a channel of every value published from now on, and the function that ends it (and closes the channel).
 func (h *Hub[T]) Subscribe() (<-chan T, func()) {
 	s := &hubSub[T]{signal: make(chan struct{}, 1)}
 	h.mu.Lock()

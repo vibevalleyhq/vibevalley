@@ -1,10 +1,4 @@
-// The village's own life (web/src/pixel/life.ts, from @heybro/engine/pixi particles, critters, rhythm, material):
-// smoke from the chimneys, butterflies by day and birds flying over, fireflies after dark, the pond's ripples, glints
-// and fish, leaves on the wind, the dog's Zzz, dust where helpers walk. What helpers are doing shows where they do it:
-// the anvil sparks while someone runs commands at the workshop, pages flutter at the book house, the mast sends while
-// someone is on the web, Zzz over the bench; ripe plots twinkle. A click where nothing else takes it answers by what
-// is painted there: dust from the soil, bits from the grass, a splash from the pond. None of it is the farm's state:
-// it is drawn from it, every frame.
+// None of it is the farm's state: it is drawn from it, every frame.
 
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -24,11 +18,10 @@ double _rand(double lo, double hi) => lo + _random.nextDouble() * (hi - lo);
 T _pick<T>(List<T> xs) => xs[_random.nextInt(xs.length)];
 Pt _inside(Box b) => Pt(_rand(b.x0, b.x1), _rand(b.y0, b.y1));
 
-/// How hard the wind blows at `t` seconds: 0.1 (calm) to 1 (a gust), changing slowly (rhythm.ts gust).
+/// 0.1 (calm) to 1 (a gust), changing slowly.
 double gust(double t) => 0.55 + 0.45 * math.sin(t * 0.21) * math.sin(t * 0.067 + 1);
 
-/// Says when it is time again for each thing (rhythm.ts cadence): true once every `seconds` or so for a key, each wait
-/// 70–130% of it; the first call only starts the count, at a random point in the first wait.
+/// Each wait is 70–130% of `seconds`; the first call only starts the count, at a random point in the first wait.
 class Cadence {
   Cadence([math.Random? random]) : _random = random ?? math.Random();
   final math.Random _random;
@@ -45,7 +38,6 @@ class Cadence {
   }
 }
 
-/// What a painted pixel looks like it is made of, from its colour alone (material.ts).
 enum Material { water, leaves, soil, stone, other }
 
 Material materialOf(int r, int g, int b) {
@@ -63,7 +55,7 @@ Material materialOf(int r, int g, int b) {
   return Material.other;
 }
 
-/// What is painted at a point: a material, or the pond's water ('pond'; a teal roof is not).
+/// A teal roof is not the pond.
 sealed class Ground {
   const Ground();
 }
@@ -83,11 +75,9 @@ const _sparkle = ['.#.', '###', '.#.'];
 const _butterfly = Flap.glyphs(['#.#', '.#.'], ['.#.', '.#.']);
 const _bird = Flap.glyphs(['#...#', '.###.'], ['.###.', '#...#']);
 
-/// Where butterflies keep to: the lawns and the flower beds; the yard below the houses, where fireflies drift.
 const _meadows = <Box>[(x0: 12, y0: 110, x1: 90, y1: 215), (x0: 300, y0: 140, x1: 380, y1: 200), (x0: 90, y0: 92, x1: 300, y1: 110)];
 const _yard = (x0: 40.0, y0: 100.0, x1: 330.0, y1: 236.0);
 
-/// What the yard is doing this frame, for its life.
 class LifeFrame {
   const LifeFrame({
     required this.t,
@@ -104,30 +94,23 @@ class LifeFrame {
   /// 0 by day, 1 at night.
   final double night;
 
-  /// Where helpers are walking now, at their feet.
   final List<Pt> walkers;
 
-  /// How many helpers are at work at each building now (bench, library, workshop, mast).
   final Map<String, int> busy;
 
-  /// The ripe plots' soil.
   final List<Box> ripe;
   final bool dogAsleep;
 }
 
-/// The life of the yard: drawn in the lit world over everything standing in it, over the lit world (what shines),
-/// and over everything as painted (hearts, Zzz, where a click landed).
 class VillageLife extends Component {
   VillageLife({required this.village, required this.picture, required this.normals, required this.map, required this.mapWidth, required this.density})
     : bits = Particles(density: density);
 
   final VillageWorld village;
 
-  /// A picture from the atlas by name, centred; null when it is missing.
   final Picture? Function(String name) picture;
   final NormalsOf normals;
 
-  /// The map's pixels (RGBA), to tell what is painted where.
   final ByteData map;
   final int mapWidth;
   final double density;
@@ -137,8 +120,7 @@ class VillageLife extends Component {
   late final _puff = glow(4, const ui.Color(0xFFEBE6DC), strength: 0.9);
   late final _dustPuff = glow(3, const ui.Color(0xFFF6E7C6), strength: 0.8);
 
-  /// The critters' pictures, or their glyphs when a picture is missing. Butterflies are drawn white and take their
-  /// colour; birds keep theirs.
+  /// Butterflies are drawn white and take their colour; birds keep theirs.
   Flap _flap(String name, Flap glyphs) {
     final a = picture('$name-1');
     final b = picture('$name-2');
@@ -167,7 +149,6 @@ class VillageLife extends Component {
   );
   double _flash = 0;
 
-  /// What is painted at a point; null off the map.
   Ground? groundAt(double x, double y) {
     final px = (x * density).floor();
     final py = (y * density).floor();
@@ -178,7 +159,6 @@ class VillageLife extends Component {
     return m == Material.water && village.fx['pond']!.any((b) => inBox(Pt(x, y), b)) ? const Pond() : Painted(m);
   }
 
-  /// A random point in `box` that is painted as `want` says, or null after a few tries.
   Pt? _somewhere(Box box, bool Function(Ground) want) {
     for (var i = 0; i < 8; i++) {
       final p = _inside(box);
@@ -191,7 +171,7 @@ class VillageLife extends Component {
   static bool _isPond(Ground g) => g is Pond;
   static bool _isLeaves(Ground g) => g is Painted && g.material == Material.leaves;
 
-  /// A picture from the critters sheet, centred, facing `dir` (1 right, -1 left); `fallback` when it is missing.
+  /// dir: 1 right, -1 left.
   Look _critter(String name, Look fallback, {double dir = 1}) {
     final p = picture(name);
     return p == null ? fallback : Picture(p.image, p.w, p.h, name: p.name, dir: dir);
@@ -201,10 +181,8 @@ class VillageLife extends Component {
 
   void _zzz(double x, double y) => bits.add(Layer.marks, const Glyph(_zed, ui.Color(0xFFF4EFE0)), x: x, y: y, vx: 3, vy: -5, sway: 1.5, alpha: 0.85, life: 2.2);
 
-  /// A heart over something that was petted.
   void heart(double x, double y) => bits.add(Layer.marks, const Glyph(_heart, ui.Color(0xFFFF7A9A)), x: x - 2, y: y - 4, vy: -12, sway: 2, life: 1.1);
 
-  /// A click on the yard that nothing else took: it answers by what is painted there.
   void poke(double x, double y) {
     bits.ring(Layer.marks, x: x, y: y, from: 1, to: 5, squash: 0.5, color: const ui.Color(0xFFFFF6D8), life: 0.35);
     switch (groundAt(x, y)) {
@@ -271,7 +249,6 @@ class VillageLife extends Component {
     }
   }
 
-  /// Moves everything on; the lights it makes (fireflies, the anvil's flashes, the mast's lamp), for the light.
   List<PointLight> step(LifeFrame f) {
     final t = f.t;
     final dt = f.dt;
@@ -281,7 +258,6 @@ class VillageLife extends Component {
     final lights = <PointLight>[];
     int busy(String place) => f.busy[place] ?? 0;
 
-    // Chimneys smoke; the workshop's thicker while someone works there.
     final chimneys = village.fx['chimney']!;
     for (var i = 0; i < chimneys.length; i++) {
       final b = chimneys[i];
@@ -302,7 +278,6 @@ class VillageLife extends Component {
       }
     }
 
-    // Leaves come off the trees on the wind.
     if (_cadence.due('leaf', 2.6 / (0.4 + wind), t)) {
       final from = _somewhere((x0: 0, y0: 26, x1: village.width, y1: 70), _isLeaves) ?? _somewhere((x0: 0, y0: 100, x1: 70, y1: 220), _isLeaves);
       if (from != null) {
@@ -322,7 +297,6 @@ class VillageLife extends Component {
       }
     }
 
-    // The pond: ripples, sun glints, now and then a fish.
     for (final pond in village.fx['pond']!) {
       final ripple = _cadence.due('ripple', 1.2, t) ? _somewhere(pond, _isPond) : null;
       if (ripple != null) {
@@ -348,10 +322,8 @@ class VillageLife extends Component {
       }
     }
 
-    // The dog dozes.
     if (f.dogAsleep && _cadence.due('zzz', 1.8, t)) _zzz(village.dog.x + 5, village.dog.y - 13);
 
-    // Dust where helpers walk on the yard; a blade or two on the grass.
     if (_cadence.due('dust', 0.16, t)) {
       for (final w in f.walkers) {
         final at = groundAt(w.x, w.y);
@@ -373,7 +345,6 @@ class VillageLife extends Component {
       }
     }
 
-    // The workshop: the anvil sparks while someone works there, and each strike flashes.
     final anvil = village.fx['anvil']!.firstOrNull;
     if (anvil != null && busy('workshop') > 0 && _cadence.due('anvil', 0.3, t)) {
       final cx = (anvil.x0 + anvil.x1) / 2;
@@ -396,7 +367,6 @@ class VillageLife extends Component {
       lights.add((x: (anvil.x0 + anvil.x1) / 2, y: anvil.y0, z: 8, radius: 28, color: const ui.Color(0xFFFFB347), intensity: 1.1));
     }
 
-    // The book house: pages flutter up while someone reads there.
     final library = village.places['library'];
     if (library != null && busy('library') > 0 && _cadence.due('pages', 0.45, t)) {
       bits.add(
@@ -411,7 +381,6 @@ class VillageLife extends Component {
       );
     }
 
-    // The mast: waves go out while someone is on the web; its lamp blinks red at night.
     final mast = village.fx['mast']!.firstOrNull;
     if (mast != null) {
       final top = Pt((mast.x0 + mast.x1) / 2, mast.y0);
@@ -424,11 +393,9 @@ class VillageLife extends Component {
       }
     }
 
-    // Someone waiting on the bench nods off.
     final bench = village.places['bench'];
     if (bench != null && busy('bench') > 0 && _cadence.due('bench', 1.6, t)) _zzz(bench.at.x + 2, bench.at.y - 26);
 
-    // Ripe plots twinkle.
     for (var i = 0; i < f.ripe.length; i++) {
       final b = f.ripe[i];
       if (_cadence.due('ripe:$i', 0.35, t)) {
@@ -436,7 +403,6 @@ class VillageLife extends Component {
       }
     }
 
-    // Butterflies by day, birds now and then, fireflies after dark.
     _butterflies.update(t, dt, day);
     if (day > 0.5 && _cadence.due('birds', 28, t)) _birds.launch(0.3 * day);
     _birds.update(t, dt);

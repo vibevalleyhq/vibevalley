@@ -1,6 +1,3 @@
-// Using a tool on a bed (game/commands.dart applyTool, core farm.ts): what it sends to the server, the effect over the
-// bed, and what the screen opens next; a refusal said over the bed instead.
-
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';

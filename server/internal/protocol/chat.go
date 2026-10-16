@@ -1,13 +1,11 @@
 package protocol
 
-// The group chat's rules that the core state needs (packages/protocol/src/chat.ts).
-
 import (
 	"cmp"
 	"slices"
 )
 
-// How many messages and conversations the state keeps; the database keeps them all.
+// The database keeps them all.
 const (
 	KeepMessages      = 300
 	KeepConversations = 100
@@ -28,7 +26,6 @@ func MessagesIn(chat *Chat, conversation int64) []ChatMessage {
 	return out
 }
 
-// WithMessage is the chat with m in it: a new message at its place, or a growing one replaced; the oldest drop off.
 func WithMessage(chat *Chat, m ChatMessage) Chat {
 	base := Chat{Conversations: []Conversation{}, Messages: []ChatMessage{}}
 	if chat != nil {
@@ -45,7 +42,7 @@ func WithMessage(chat *Chat, m ChatMessage) Chat {
 	return base
 }
 
-// WithConversation is the chat with c in it, new or changed; beyond KeepConversations the quietest go (never a channel).
+// Beyond KeepConversations the quietest go, never a channel.
 func WithConversation(chat *Chat, c Conversation) Chat {
 	base := Chat{Conversations: []Conversation{}, Messages: []ChatMessage{}}
 	if chat != nil {

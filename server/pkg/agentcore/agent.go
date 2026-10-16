@@ -1,10 +1,7 @@
 package agentcore
 
-// The agent: the loop with state, as pi-agent-core's Agent. It holds the transcript, the model and the tools; one
-// run at a time (Prompt while one runs is refused: Steer or FollowUp instead); the state follows the run's events
-// before they are published, so whoever hears an event sees the state that goes with it. Abort cancels the run,
-// which ends it with an aborted answer (loop.go). Runs live as long as the agent: Close (or the context it was made
-// with ending) stops them.
+// The state follows the run's events before they are published, so whoever hears an event sees the state that goes with it. One run at a time: Prompt
+// while one runs is refused (Steer or FollowUp instead).
 
 import (
 	"context"
@@ -13,7 +10,6 @@ import (
 	"vibevalley/pkg/ai"
 )
 
-// AgentError is why the agent did not do what it was asked: Reason "busy", "empty" or "nothing-to-continue".
 type AgentError struct {
 	Reason  string
 	Message string
@@ -29,8 +25,8 @@ type AgentInitialState struct {
 	Messages      []AgentMessage
 }
 
-// AgentOptions is the agent's start and its hooks. The loop config's Model and ThinkingLevel come from the state,
-// its steering and follow-up getters from the agent's queues: those set here are not used.
+// The loop config's Model and ThinkingLevel come from the state, its steering and follow-up getters from the agent's queues: those set here are not
+// used.
 type AgentOptions struct {
 	AgentLoopConfig
 	InitialState AgentInitialState
@@ -43,13 +39,13 @@ type runHandle struct {
 	done   chan struct{}
 }
 
-// Agent is the stateful agent. Safe for concurrent use.
+// Safe for concurrent use.
 type Agent struct {
 	options AgentOptions
 	ctx     context.Context
 	close   context.CancelFunc
 
-	// emitMu keeps a state change and its event together, in order.
+	// Keeps a state change and its event together, in order.
 	emitMu sync.Mutex
 	mu     sync.Mutex
 	state  AgentState
@@ -60,11 +56,10 @@ type Agent struct {
 	followUpQueue []AgentMessage
 	steeringMode  QueueMode
 	followUpMode  QueueMode
-	// The run under way; nil when idle.
-	current *runHandle
+	current       *runHandle
 }
 
-// ApplyEvent is the state after an event: the transcript grows at message_end, the answer being said is shown until then.
+// The transcript grows at message_end; the answer being said is shown until then.
 func ApplyEvent(state AgentState, event AgentEvent) AgentState {
 	switch event.Type {
 	case EventAgentStart:
@@ -104,7 +99,6 @@ func ApplyEvent(state AgentState, event AgentEvent) AgentState {
 	return state
 }
 
-// NewAgent makes an agent; it lives until Close or until ctx ends. ctx's values (ai.WithProviders) reach every request.
 func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 	life, cancel := context.WithCancel(ctx)
 	level := options.InitialState.ThinkingLevel
@@ -143,7 +137,6 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 	return a
 }
 
-// Close stops the run under way and ends the subscriptions.
 func (a *Agent) Close() {
 	a.close()
 	a.Abort()
@@ -151,17 +144,14 @@ func (a *Agent) Close() {
 	a.states.Close()
 }
 
-// State is the state now (a copy).
 func (a *Agent) State() AgentState {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.state.clone()
 }
 
-// Subscribe is the events from now on; Close the subscription when done.
 func (a *Agent) Subscribe() *Subscription[AgentEvent] { return a.events.Subscribe() }
 
-// SubscribeState is the state each time it changes.
 func (a *Agent) SubscribeState() *Subscription[AgentState] { return a.states.Subscribe() }
 
 func (a *Agent) emit(event AgentEvent) {
@@ -220,7 +210,7 @@ func contextOf(s AgentState) AgentContext {
 	return AgentContext{SystemPrompt: s.SystemPrompt, Messages: s.Messages, Tools: s.Tools}
 }
 
-// startLocked starts body as the run (a.mu held, nothing under way).
+// Called with a.mu held and nothing under way.
 func (a *Agent) startLocked(body func(ctx context.Context, s AgentState)) *runHandle {
 	runCtx, cancel := context.WithCancel(a.ctx)
 	h := &runHandle{cancel: cancel, done: make(chan struct{})}
@@ -252,7 +242,7 @@ func wait(ctx context.Context, h *runHandle) error {
 
 var errBusy = &AgentError{Reason: "busy", Message: "正在跑：用 steer 或 followUp"}
 
-// Prompt starts a run with messages and waits for it to end (or for ctx; the run goes on). Refused while one runs.
+// Waits for the run to end (or for ctx; the run goes on).
 func (a *Agent) Prompt(ctx context.Context, messages ...AgentMessage) error {
 	a.mu.Lock()
 	if a.current != nil {
@@ -266,12 +256,10 @@ func (a *Agent) Prompt(ctx context.Context, messages ...AgentMessage) error {
 	return wait(ctx, h)
 }
 
-// PromptText is Prompt with a user's words, and images.
 func (a *Agent) PromptText(ctx context.Context, text string, images ...ai.Content) error {
 	return a.Prompt(ctx, UserMessageOf(text, images...))
 }
 
-// UserMessageOf is a user's words (and images) as a message.
 func UserMessageOf(text string, images ...ai.Content) ai.UserMessage {
 	content := ai.StringContent(text)
 	if len(images) > 0 {
@@ -280,7 +268,6 @@ func UserMessageOf(text string, images ...ai.Content) ai.UserMessage {
 	return ai.UserMessage{Content: content, Timestamp: now()}
 }
 
-// Continue goes on from the transcript: from its tail, or, when the tail is the model's, with what is queued.
 func (a *Agent) Continue(ctx context.Context) error {
 	a.mu.Lock()
 	if a.current != nil {
@@ -322,14 +309,12 @@ func (a *Agent) Continue(ctx context.Context) error {
 	return wait(ctx, h)
 }
 
-// Steer puts a message in before the next request of the run under way.
 func (a *Agent) Steer(m AgentMessage) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.steeringQueue = append(a.steeringQueue, m)
 }
 
-// FollowUp is a message taken when the run would stop.
 func (a *Agent) FollowUp(m AgentMessage) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -367,7 +352,7 @@ func (a *Agent) PeekQueuedMessages() []AgentMessage {
 	return append(append([]AgentMessage{}, a.steeringQueue...), a.followUpQueue...)
 }
 
-// Abort stops the run under way; it ends with an aborted answer. It returns once it has.
+// Returns once the run has ended.
 func (a *Agent) Abort() {
 	a.mu.Lock()
 	h := a.current
@@ -378,14 +363,12 @@ func (a *Agent) Abort() {
 	}
 }
 
-// IsRunning reports a run under way.
 func (a *Agent) IsRunning() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.current != nil
 }
 
-// WaitForIdle returns when no run is under way (or ctx ends).
 func (a *Agent) WaitForIdle(ctx context.Context) error {
 	for {
 		a.mu.Lock()
@@ -400,7 +383,6 @@ func (a *Agent) WaitForIdle(ctx context.Context) error {
 	}
 }
 
-// Reset stops, then forgets the transcript and what was queued.
 func (a *Agent) Reset() {
 	a.Abort()
 	a.ClearAllQueues()

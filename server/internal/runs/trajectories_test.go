@@ -13,8 +13,6 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// Trajectories on throwaway folders (trajectories.test.ts). Offline.
-
 func crewTrajectories(t *testing.T, home string) *Trajectories {
 	t.Helper()
 	site := base.NewSite(home)
@@ -59,7 +57,6 @@ func TestCrewTrajectoryKeptAndListed(t *testing.T) {
 	if tr.Get("../w1") != nil {
 		t.Fatal("nothing read from outside the folder")
 	}
-	// Opened again (back from a restart), it keeps its start and is no longer ended.
 	tr.Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", Agent: farmtest.Ptr("backend"), StartedAt: 99}, 0)
 	again := tr.Get("w1")
 	farmtest.Eq(t, again.Head.StartedAt, int64(1), "start kept")
@@ -87,8 +84,7 @@ func TestCrewOldTrajectoriesLoseTheirSteps(t *testing.T) {
 	crewWriteHead(t, dir, "w2", base.NowMs(), base.NowMs())
 	os.WriteFile(filepath.Join(dir, "w2.json"), []byte("[]"), 0o644)
 	tr := crewTrajectories(t, home)
-	// The ticket stays on the board; its steps are gone.
-	farmtest.Eq(t, len(tr.List("")), 2, "both tickets listed")
+	farmtest.Eq(t, len(tr.List("")), 2, "both issues listed")
 	old := tr.Get("w1")
 	if old == nil || len(old.Steps) != 0 {
 		t.Fatalf("the old one, without its steps: %+v", old)
@@ -130,7 +126,6 @@ func TestCrewSubAgentStepsGoUnderTheirCall(t *testing.T) {
 	j := crewTrajectories(t, t.TempDir()).Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", StartedAt: 1}, 0)
 	j.ToolStarted("task-1", base.ToolStart{Text: "派个帮手", Action: protocol.ToolActionOther, Tool: "Task"}, nil)
 	j.Said("帮手先看看", base.From{"task-1"})
-	// The same call id in the sub-agent is another call.
 	j.ToolStarted("c1", base.ToolStart{Text: "ls", Action: protocol.ToolActionRunCommand, Tool: "bash"}, base.From{"task-1"})
 	j.ToolStarted("c1", base.ToolStart{Text: "pwd", Action: protocol.ToolActionRunCommand, Tool: "bash"}, nil)
 	j.ToolEnded("c1", "a.ts", true, base.From{"task-1"})
@@ -157,7 +152,6 @@ func TestCrewSubAgentStepsGoUnderTheirCall(t *testing.T) {
 		"3 tool pwd /work -",
 		"4 said 帮手看完了  0",
 		"5 said 好  -",
-		// A sub-agent whose starting call is not kept is still marked one.
 		"6 said ，就这样  -1",
 	}, "steps")
 }

@@ -1,8 +1,6 @@
 package ai
 
-// OpenAI-compatible chat completions (DeepSeek, Kimi, Qwen...), streamed. The differences between endpoints are
-// the model's Compat: DeepSeek's thinking models want their earlier reasoning sent back as `reasoning_content`.
-// The request itself (retries, cancelling) is http.go.
+// DeepSeek's thinking models want their earlier reasoning sent back as `reasoning_content` (the model's Compat).
 
 import (
 	"context"
@@ -22,7 +20,6 @@ type ChatToolFunction struct {
 	Arguments string `json:"arguments"`
 }
 
-// ChatPart is a part of a user's content: text, or an image by URL.
 type ChatPart struct {
 	Type     string        `json:"type"`
 	Text     string        `json:"text,omitempty"`
@@ -33,7 +30,7 @@ type ChatImageURL struct {
 	URL string `json:"url"`
 }
 
-// ChatMessage is a chat message. Content is a string, nil (an assistant's null) or []ChatPart.
+// Content is a string, nil (an assistant's null) or []ChatPart.
 type ChatMessage struct {
 	Role             string         `json:"role"`
 	Content          any            `json:"content"`
@@ -45,7 +42,6 @@ type ChatMessage struct {
 
 const imagePlaceholder = "[图片]"
 
-// textOf is content as one text: words joined, a picture as a placeholder.
 func textOf(content UserContent) string {
 	if !content.IsBlocks() {
 		return content.Text
@@ -74,8 +70,7 @@ func answeredCalls(messages []Message) map[string]bool {
 	return answered
 }
 
-// ToChatMessages is the conversation as chat messages. Tool calls that never got a result (an answer cut off, a
-// turn stopped) and results whose call is gone are left out: the endpoint refuses either.
+// Tool calls that never got a result and results whose call is gone are left out: the endpoint refuses either.
 func ToChatMessages(model Model, c Context) []ChatMessage {
 	out := []ChatMessage{}
 	if c.SystemPrompt != "" {
@@ -155,7 +150,6 @@ func ToChatMessages(model Model, c Context) []ChatMessage {
 	return out
 }
 
-// objectSchema is a tool's parameters as function calling wants them: an object schema.
 func objectSchema(schema map[string]any) map[string]any {
 	if schema["type"] == "object" {
 		return schema
@@ -182,7 +176,6 @@ func ToChatTools(tools []Tool) []ChatTool {
 	return out
 }
 
-// RequestBody is the chat completions request body.
 func RequestBody(model Model, c Context, options StreamOptions) map[string]any {
 	compat := model.compat()
 	effort := ""
@@ -263,7 +256,6 @@ type ChatCompletionDetails struct {
 	ReasoningTokens *int `json:"reasoning_tokens,omitempty"`
 }
 
-// SSEChunks is server-sent events as JSON chunks, until [DONE].
 func SSEChunks(body io.Reader) iter.Seq2[ChatChunk, error] { return sseData[ChatChunk](body) }
 
 func intOr(v *int, or int) int {
@@ -273,7 +265,7 @@ func intOr(v *int, or int) int {
 	return *v
 }
 
-// UsageOf is usage as pi counts it: input without what came from the cache.
+// Input without what came from the cache, as pi counts it.
 func UsageOf(u *ChatUsage) RawUsage {
 	if u == nil {
 		return RawUsage{}
@@ -293,7 +285,6 @@ func UsageOf(u *ChatUsage) RawUsage {
 	return out
 }
 
-// AnswerEvents is the chunks of one answer as pi's events.
 func AnswerEvents(model Model, chunks iter.Seq2[ChatChunk, error]) iter.Seq[AssistantMessageEvent] {
 	return func(yield func(AssistantMessageEvent) bool) {
 		emit := func(events []AssistantMessageEvent) bool {
@@ -375,5 +366,4 @@ func streamOpenAICompletions(ctx context.Context, model Model, c Context, option
 	})
 }
 
-// OpenAICompletions is the provider of `openai-completions`.
 var OpenAICompletions = ApiProvider{API: "openai-completions", Stream: streamOpenAICompletions}

@@ -1,10 +1,5 @@
-// The farm's sound effects (web/src/game/sfx.ts), synthesized (synth.dart): no audio files. Each sound is a recipe
-// of tones, filtered noise and bells. The debug console's 音效 tab plays every one.
-//
-// Levels come in three steps of loudness, as the web page measured them with hb.soundStats(): clicks about -28,
-// work on the beds and state changes about -24, rewards about -20. Kept below speech on purpose: once voice is on,
-// the microphone sits next to these. The recipes are the web page's; change them there and here together
-// (tool/sfx_fixture.ts and test/shell_synth_test.dart check that they still agree).
+// Levels come in three steps of loudness (the debug console's 音效 tab measures them): clicks about -28, work on the beds and state changes about -24, rewards
+// about -20. Kept below speech on purpose: once voice is on, the microphone sits next to these.
 
 import 'dart:async';
 import 'dart:io';
@@ -15,7 +10,6 @@ import 'package:flutter/foundation.dart';
 
 import 'synth.dart';
 
-/// A handful of tiny noise bursts spread over `span` seconds: rustling leaves, crumbling soil, sparkles.
 void grains(
   Pen pen, {
   double at = 0,
@@ -27,7 +21,7 @@ void grains(
   FilterType filter = FilterType.bandpass,
 }) {
   for (var i = 0; i < count; i++) {
-    // In the order the web page draws them: frequency, start, length, level.
+    // In this order: frequency, start, length, level (the seeded pen depends on it).
     final f = freq * (0.8 + pen.random() * 0.5);
     final start = at + pen.random() * span;
     final dur = 0.03 + pen.random() * 0.05;
@@ -36,7 +30,6 @@ void grains(
   }
 }
 
-/// Every sound, by name.
 final Map<String, Recipe> sounds = {
   // A click that does something: a soft wooden tock.
   'tap': (pen) {
@@ -203,7 +196,6 @@ final Map<String, Recipe> sounds = {
   },
 };
 
-/// Every sound by where it is heard: the debug console and the asset browser list them so.
 const soundGroups = <({String title, List<String> names})>[
   (title: '界面', names: ['tap', 'nope', 'pick', 'open', 'close']),
   (title: '农具', names: ['water', 'spray', 'weed', 'harvest', 'shovel']),
@@ -213,7 +205,6 @@ const soundGroups = <({String title, List<String> names})>[
   (title: '语音', names: ['voiceOn', 'voiceOff', 'ring']),
 ];
 
-/// Labels for the debug console and the asset browser.
 const soundLabel = <String, String>{
   'tap': '点击',
   'nope': '点不了',
@@ -246,15 +237,12 @@ const soundLabel = <String, String>{
   'ring': '来电',
 };
 
-/// A sound rendered offline, as the web page's renderSound: for the level check and for saving as WAV.
 Float32List renderSound(String name) => renderRecipe(sounds[name]!, seconds: 2, volume: 0.55);
 
-/// Where the WAV goes to be heard. The default plays it with audioplayers; tests put a fake in.
 abstract class SfxOutput {
   Future<void> play(String name, Uint8List wav);
 }
 
-/// Plays each sound from a WAV file in the temp directory, a player per sound so they can overlap.
 class PlayerOutput implements SfxOutput {
   final _files = <String, String>{};
   final _dir = Directory('${Directory.systemTemp.path}/vibevalley-sfx');
@@ -274,11 +262,9 @@ class PlayerOutput implements SfxOutput {
   }
 }
 
-/// How many takes of each sound are kept: plays cycle through them, so a repeated sound keeps a little life (the
-/// page renders each play with a new seed; this renders a few once and reuses them).
+/// Plays cycle through a few takes rendered once, so a repeated sound keeps a little life.
 const _takes = 3;
 
-/// The sound effects by name ('tap', 'coin', 'harvest', 'levelUp'…), as the web page's sfx.
 abstract final class Sfx {
   static SfxOutput? _output;
   static bool _muted = false;
@@ -286,16 +272,14 @@ abstract final class Sfx {
   static final _wavs = <String, Future<Uint8List>>{};
   static final _played = <({String name, DateTime at})>[];
 
-  /// Where sounds go; set to a fake in tests. Until set, the first play makes the audioplayers one.
+  /// Until set, the first play makes the audioplayers one.
   static set output(SfxOutput? output) => _output = output;
 
   static bool get muted => _muted;
   static void setMuted(bool muted) => _muted = muted;
 
-  /// The last sounds that actually played, oldest first.
   static List<({String name, DateTime at})> played() => List.unmodifiable(_played);
 
-  /// Plays a sound now, unless muted or unknown.
   static void play(String name) {
     if (_muted || !sounds.containsKey(name)) return;
     final take = _plays++ % _takes;
@@ -311,20 +295,19 @@ abstract final class Sfx {
     );
   }
 
-  /// Renders every sound's first take ahead, off the UI thread, so the first plays are not late.
+  /// Off the UI thread, so the first plays are not late.
   static Future<void> warm() async {
     for (final name in sounds.keys) {
       await (_wavs['$name-0'] ??= _render(name, 0));
     }
   }
 
-  /// How a take becomes a WAV: rendered off the UI thread. Tests put a stub in.
   static Future<Uint8List> Function(String name, int take) render = (name, take) => Isolate.run(() => wavOf(name, take));
 
   static Future<Uint8List> _render(String name, int take) => render(name, take);
 }
 
-/// A take of a sound as the page plays it live: its own seed, the limiter settled, cut after the last audible sample.
+/// Its own seed, the limiter settled, cut after the last audible sample.
 Uint8List wavOf(String name, int take) {
   final recipe = sounds[name]!;
   final seconds = recipeSeconds(recipe) + 0.3;

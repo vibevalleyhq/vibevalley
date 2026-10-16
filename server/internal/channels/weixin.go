@@ -1,9 +1,5 @@
 package channels
 
-// WeChat as a connector (ported from the TypeScript server's ilink.ts, removed), over pkg/weixin: scanning logs in
-// and names the owner; long polling receives; replies ride on the context token. Outbound only, so the server keeps
-// listening on 127.0.0.1 alone.
-
 import (
 	"context"
 	"errors"
@@ -16,14 +12,12 @@ import (
 	"vibevalley/pkg/weixin"
 )
 
-// ── As a connector ───────────────────────────────────────────────────────────
-
 const (
 	// voiceIlinkLoginFor is how long a login code is waited on; voiceIlinkRefreshes how often a new one is fetched
 	// when it expires.
 	voiceIlinkLoginFor  = 8 * time.Minute
 	voiceIlinkRefreshes = 3
-	// voiceIlinkPoll is the long poll's default; WeChat may say otherwise.
+	// WeChat may say otherwise.
 	voiceIlinkPoll = 35 * time.Second
 )
 
@@ -35,8 +29,6 @@ func voiceIlinkAccountOf(secrets map[string]string) weixin.Account {
 	return weixin.Account{BaseURL: baseURL, Token: secrets["token"]}
 }
 
-// voiceWeixinAdapter is WeChat as a connector: scanning logs in and names the owner; long polling receives; replies
-// ride on the context token.
 type voiceWeixinAdapter struct{ c *Connectors }
 
 func (voiceWeixinAdapter) ID() protocol.ConnectorID { return protocol.ConnectorIDWeixin }

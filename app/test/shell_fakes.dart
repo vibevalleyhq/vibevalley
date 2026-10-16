@@ -1,6 +1,3 @@
-// A server for the shell's widget tests: its HTTP answers come from `handler` (package:http/testing), its streams
-// from controllers the test feeds, its health from `up`. No network.
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -48,7 +45,6 @@ class FakeServer extends VibeValleyServer {
   Future<bool> healthy() async => true;
 }
 
-/// The keys as the server tells them; `deepseek` is where DeepSeek's key comes from, if anywhere.
 Map<String, dynamic> settingsJson({String? deepseek}) {
   const voice = {
     'area': 'CN',
@@ -78,7 +74,6 @@ Map<String, dynamic> settingsJson({String? deepseek}) {
 
 http.Response json(Object body) => http.Response(jsonEncode(body), 200, headers: {'content-type': 'application/json; charset=utf-8'});
 
-/// The farm as the server folds it: these helpers, coins.
 FarmState farmState({List<Map<String, dynamic>> helpers = const [], double coins = 0}) => FarmState.fromJson({
   'call': 'idle',
   'foreman': 'idle',
@@ -86,7 +81,6 @@ FarmState farmState({List<Map<String, dynamic>> helpers = const [], double coins
   if (coins > 0) 'progress': {'coins': coins, 'streak': 0, 'bestStreak': 0, 'counts': <String, Object>{}, 'unlocked': <Object>[]},
 });
 
-/// The overrides every shell test wants: the fake server, a reachable or unreachable one, no sound rendering.
 List<Override> shellOverrides(FakeServer server, {bool reachable = true}) {
   Sfx.render = (_, _) async => Uint8List(0);
   Sfx.setMuted(true);

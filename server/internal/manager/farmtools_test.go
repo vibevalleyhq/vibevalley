@@ -17,10 +17,6 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// The farm's tools over MCP (chat.test.ts's MCP part): a helper's session carries its token, and the token says who
-// is talking. The client is plain JSON-RPC over HTTP, the way a runtime's makes it: initialize opens a session (its id
-// comes back in a header and goes with every later call); each call answers as JSON or on an event stream.
-
 type foremanRPCAnswer struct {
 	Result *struct {
 		Content []struct {
@@ -44,7 +40,6 @@ func (a foremanRPCAnswer) text() string {
 	return out.String()
 }
 
-// foremanMcpClient opens an MCP session at url with the bearer token (none when empty); its call function.
 func foremanMcpClient(t *testing.T, url, token string) func(method string, params any) foremanRPCAnswer {
 	t.Helper()
 	session := ""
@@ -74,7 +69,6 @@ func foremanMcpClient(t *testing.T, url, token string) func(method string, param
 	call := func(method string, params any) foremanRPCAnswer {
 		id++
 		res, raw := post(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
-		// A JSON-RPC answer, as plain JSON or as the last event of a stream.
 		body := raw
 		if strings.Contains(res.Header.Get("content-type"), "text/event-stream") {
 			body = nil

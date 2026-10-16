@@ -1,10 +1,5 @@
 package channels
 
-// QQ as a connector (ported from the TypeScript server's qq.ts, removed), over pkg/qq. QQ has no scan-to-create, so
-// logging in takes the bot's AppID and AppSecret from its admin page; only direct messages are taken; a passive reply
-// past QQ's window waits for the owner's next message. The owner is whoever sends the bot the pairing code. Outbound
-// only, so the server keeps listening on 127.0.0.1 alone.
-
 import (
 	"context"
 	"errors"
@@ -14,7 +9,6 @@ import (
 	"vibevalley/pkg/qq"
 )
 
-// voiceQQAdapter is QQ as a connector: the bot's AppID and AppSecret log in; the owner pairs by sending the code.
 type voiceQQAdapter struct{ c *Connectors }
 
 func (voiceQQAdapter) ID() protocol.ConnectorID { return protocol.ConnectorIDQq }

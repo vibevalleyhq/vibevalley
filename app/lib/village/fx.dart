@@ -1,8 +1,4 @@
-// What happens over a plot when a tool is used on it, in pixels (web/src/pixel/fx.ts): drops from the watering can,
-// a puff of spray, dust from the shovel, the crop popping up at harvest, coins jumping out when the work is taken in.
-// The farm screen says what happened (a tool's effect on a bed, a reward from the server's effects); this draws it
-// with particles (whole pixels, fading in steps), and a harvest flashes a warm light over its plot for a moment. The
-// words that go with them (the note, "+12") are the overlay's.
+// Particles move in whole pixels and fade in steps.
 
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -17,8 +13,7 @@ import 'world.dart';
 final _random = math.Random();
 double _rand(double lo, double hi) => lo + _random.nextDouble() * (hi - lo);
 
-/// What a tool did to a bed (core farm.ts BedFxKind): water, spray, harvest, shovel; note: why it did nothing (only
-/// words, the overlay's).
+/// note: why it did nothing (only words, the overlay's).
 enum BedFx { water, spray, harvest, shovel, note }
 
 class _Flash {
@@ -32,23 +27,20 @@ class _Flash {
   double age = 0;
 }
 
-/// The plots' effects, drawn in the lit world under the yard's own life.
 class PlotFx extends Component {
   PlotFx({required this.village, required this.picture, required this.normals, required double density}) : _bits = Particles(density: density);
 
   final VillageWorld village;
 
-  /// A picture from the atlas by name, its anchor at (`ax`, `ay`); null when it is missing.
   final Picture? Function(String name, {double ax, double ay}) picture;
   final NormalsOf normals;
   final Particles _bits;
   final _flashes = <_Flash>[];
   double _clock = 0;
 
-  /// When each plot (by index) was last worked with a tool: it dips a pixel for a moment.
+  /// It dips a pixel for a moment.
   final pressedAt = <int, double>{};
 
-  /// The middle of a plot's soil.
   ({double x, double y}) _centre(int bed) {
     final at = village.plotAt(bed);
     return (x: at.x, y: at.y - plotH / 2);
@@ -57,13 +49,11 @@ class PlotFx extends Component {
   void _add(Look look, {required double x, required double y, required double vx, required double vy, required double fall, required double life}) =>
       _bits.add(Layer.lit, look, x: x, y: y, vx: vx, vy: vy, fall: fall, life: life);
 
-  /// What a tool did to bed `bed` (its index).
   void burst(BedFx kind, int bed) {
     final c = _centre(bed);
     pressedAt[bed] = _clock;
     switch (kind) {
       case BedFx.water:
-        // Drops fall from above the plot onto it.
         for (var i = 0; i < 14; i++) {
           _add(
             Dot(i % 3 != 0 ? const ui.Color(0xFF6FB3E0) : const ui.Color(0xFFC8E6F7)),
@@ -92,7 +82,6 @@ class PlotFx extends Component {
           );
         }
       case BedFx.harvest:
-        // The crop jumps out of the plot, with a few golden flecks.
         final icon = picture('icon-harvest', ax: 0.5, ay: 1);
         if (icon != null) _add(icon, x: c.x, y: c.y, vx: 0, vy: -38, fall: 30, life: 1.1);
         _flashes.add(_Flash(c.x, c.y - 6, 46, const ui.Color(0xFFFFD36A), 1.3, 0.8));
@@ -104,7 +93,6 @@ class PlotFx extends Component {
     }
   }
 
-  /// Coins jumping out of bed `bed` (its index): `n` earned.
   void coins(int bed, double n) {
     final c = _centre(bed);
     _flashes.add(_Flash(c.x, c.y - 8, 30, const ui.Color(0xFFFFE08A), 0.9, 0.6));
@@ -116,17 +104,15 @@ class PlotFx extends Component {
     }
   }
 
-  /// Moves everything on by `dt` seconds.
   void step(double dt) {
     _clock += dt;
     _flashes.removeWhere((f) => (f.age += dt) >= f.life);
     _bits.step(dt);
   }
 
-  /// The plot's clock: when a press shows, against `pressedAt`.
   double get clock => _clock;
 
-  /// The flashes still fading, as lights: bright at once, then gone in a few steps.
+  /// Bright at once, then gone in a few steps.
   List<PointLight> get lights => [
     for (final f in _flashes) (x: f.x, y: f.y, z: 12, radius: f.radius, color: f.color, intensity: f.strength * (((1 - f.age / f.life) * 3).ceil() / 3)),
   ];

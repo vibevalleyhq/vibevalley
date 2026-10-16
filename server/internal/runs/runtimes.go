@@ -5,14 +5,7 @@ import (
 
 	"vibevalley/internal/base"
 
-	// The coding runtimes on this machine (ported from the TypeScript server's runtimes.ts, removed), as smith finds them: installed or not, their
-	// models and how much is left on their accounts, plus vibevalley's own settings for each (Store). Probing runs a
-	// runtime's own commands, so results are cached. Account usage moves while helpers work: it is read again every few
-	// minutes and soon after a helper's turn, and every change goes out to the pages as a site event.
-	//
-	// It also keeps what each runtime's helpers spent today ($VIBEVALLEY_HOME/spend.json), priced from pi's price list
-	// (crew_pi_prices.json, exported from pi by tool/pi-prices.ts: smith has no price list), so a daily budget can stop
-	// new work (protocol MoneyStop).
+	// Probing runs a runtime's own commands, so results are cached.
 
 	_ "embed"
 	"encoding/json"
@@ -41,20 +34,18 @@ import (
 )
 
 const (
-	// crewProbeTimeout: how long one probe (installation, models, usage) may take before it counts as unknown.
+	// Past this a probe counts as unknown.
 	crewProbeTimeout = 10 * time.Second
-	// crewUsageEvery: account usage is read again this often, whether or not anyone worked.
-	crewUsageEvery = 5 * time.Minute
-	// crewUsageAfterTurn: after a helper's turn, its runtime's usage is read again this much later (several turns share one read).
+	crewUsageEvery   = 5 * time.Minute
+	// Several turns share one read.
 	crewUsageAfterTurn = 20 * time.Second
-	// crewSpendPushAfter: a change to today's spend reaches the pages this much later (a busy helper spends every few seconds).
+	// A busy helper spends every few seconds.
 	crewSpendPushAfter = 3 * time.Second
 )
 
 //go:embed pi_prices.json
 var crewPiPricesJSON []byte
 
-// crewPiPrices is pi's price list: provider → model → price.
 var crewPiPrices = func() map[string]map[string]base.Price {
 	var rows [][]json.RawMessage
 	if err := json.Unmarshal(crewPiPricesJSON, &rows); err != nil {
@@ -77,8 +68,7 @@ var crewPiPrices = func() map[string]map[string]base.Price {
 	return out
 }()
 
-// crewRegistry is the runtimes helpers can run on: smith's built-ins, and vibevalley's own agent, which reads the
-// DeepSeek key the farm's settings have (saved from the title screen, else the environment's, else pi's) each session.
+// vibevalley's own agent reads the farm's DeepSeek key each session.
 func crewRegistry(home string, settings *base.Settings) *oar.RuntimeRegistry {
 	vibevalley := oarruntime.VibeValleyRuntime(oarruntime.Options{
 		Home: func() string { return home },
@@ -93,7 +83,6 @@ func crewRegistry(home string, settings *base.Settings) *oar.RuntimeRegistry {
 	return registry
 }
 
-// crewToday is today on this machine's clock: 2026-10-10.
 func crewToday() string { return time.Now().Format("2006-01-02") }
 
 // crewBinVar is smith's override of where a runtime's command lives: OAR_<RUNTIME>_BIN.
@@ -107,20 +96,17 @@ type crewSpend struct {
 }
 
 type Runtimes struct {
-	cfg   base.Config
-	site  *base.Site
-	store *base.Store
-	// Registry is the runtimes helpers run on; a test puts scripted ones in before the farm starts.
+	cfg       base.Config
+	site      *base.Site
+	store     *base.Store
 	Registry  *oar.RuntimeRegistry
 	cnyPerUsd float64
-	// Probe reads a runtime's info: crewProbe; tests put their own, so nothing on the machine is asked.
-	Probe func(ctx context.Context, id string) protocol.RuntimeInfo
-	// usageOf reads a runtime's account usage: the runtime's reading, or pi's provider balance.
-	usageOf func(ctx context.Context, id string, runtime oar.Runtime, found oar.AvailableInstallation, settings protocol.RuntimeSettings) protocol.AccountUsage
+	Probe     func(ctx context.Context, id string) protocol.RuntimeInfo
+	usageOf   func(ctx context.Context, id string, runtime oar.Runtime, found oar.AvailableInstallation, settings protocol.RuntimeSettings) protocol.AccountUsage
 
 	mu    sync.Mutex
 	cache map[string]protocol.RuntimeInfo
-	// found are installations found, so a usage refresh need not look for the command again.
+	// So a usage refresh need not look for the command again.
 	found   map[string]oar.AvailableInstallation
 	pending map[string]*time.Timer
 	pushes  map[string]*time.Timer
@@ -128,8 +114,7 @@ type Runtimes struct {
 	disk    *base.FileWriter
 	saving  *time.Timer
 	closed  bool
-	// asked counts the usage reads asked for with UsageSoon, by runtime (tests read it).
-	asked map[string]int
+	asked   map[string]int
 }
 
 func newRuntimes(cfg base.Config, site *base.Site, store *base.Store, settings *base.Settings) (*Runtimes, error) {
@@ -157,8 +142,7 @@ func newRuntimes(cfg base.Config, site *base.Site, store *base.Store, settings *
 	return r, nil
 }
 
-// start probes every runtime once in the background, so the first page load does not wait on them all; then keeps
-// the usage fresh.
+// In the background, so the first page load does not wait on every runtime.
 func (r *Runtimes) OnStart(ctx context.Context) error {
 	go func() {
 		r.each(ctx, func(id string) { r.Refresh(ctx, id) })
@@ -176,7 +160,6 @@ func (r *Runtimes) OnStart(ctx context.Context) error {
 	return nil
 }
 
-// each runs f for every runtime vibevalley knows, four at a time.
 func (r *Runtimes) each(ctx context.Context, f func(id string)) {
 	slots := make(chan struct{}, 4)
 	var group sync.WaitGroup
@@ -217,7 +200,7 @@ func (r *Runtimes) spendBody() ([]byte, error) {
 	return json.Marshal(r.spent)
 }
 
-// tallyLocked is today's tally; a new day starts from nothing.
+// A new day starts from nothing.
 func (r *Runtimes) tallyLocked() map[string]float64 {
 	if r.spent.Day != crewToday() {
 		r.spent = crewSpend{Day: crewToday(), ByRuntime: map[string]float64{}}
@@ -232,12 +215,8 @@ func (r *Runtimes) withSpendLocked(info protocol.RuntimeInfo) protocol.RuntimeIn
 	return info
 }
 
-// Runtime is smith's runtime id; false for one this smith does not drive.
 func (r *Runtimes) Runtime(id string) (oar.Runtime, bool) { return r.Registry.Get(id) }
 
-// ── pi: pay as you go, so what is left is the provider's balance ─────────────
-
-// crewPiSettings is pi's own settings (its agent dir's settings.json): its default provider and model.
 func crewPiSettings() (provider, model string) {
 	body, err := os.ReadFile(filepath.Join(pi.AgentDir(), "settings.json"))
 	if err != nil {
@@ -251,7 +230,6 @@ func crewPiSettings() (provider, model string) {
 	return s.DefaultProvider, s.DefaultModel
 }
 
-// crewPiProvider is the provider pi's helpers run on: vibevalley's default model for pi, else pi's own default provider.
 func crewPiProvider(settings protocol.RuntimeSettings) string {
 	if provider, _, _ := strings.Cut(settings.DefaultModel, "/"); strings.TrimSpace(provider) != "" {
 		return strings.TrimSpace(provider)
@@ -260,7 +238,6 @@ func crewPiProvider(settings protocol.RuntimeSettings) string {
 	return provider
 }
 
-// crewEnvName is an environment variable a value in pi's config names instead of being one.
 var crewEnvName = regexp.MustCompile(`^\$?\{?([A-Z][A-Z0-9_]*)\}?$`)
 
 // crewPiValue is a value from pi's config as pi reads it: the environment variable it names when one is set
@@ -275,9 +252,9 @@ func crewPiValue(value string) string {
 }
 
 // crewPiDeepseek is the DeepSeek key pi itself uses and where it sends DeepSeek's requests, as pi's model runtime
-// resolves them (runtimes.ts asks pi's getAuth): the key in its auth.json, else DEEPSEEK_API_KEY, else its models.json's
-// providers.deepseek.apiKey; the base URL in models.json's providers.deepseek.baseUrl, else DeepSeek's own. The base
-// is without a trailing /v1 or slash: the balance is at <base>/user/balance.
+// resolves them: the key in its auth.json, else DEEPSEEK_API_KEY, else its models.json's providers.deepseek.apiKey; the
+// base URL in models.json's providers.deepseek.baseUrl, else DeepSeek's own. The base is without a trailing /v1 or
+// slash: the balance is at <base>/user/balance.
 func crewPiDeepseek() (key, base string) {
 	dir := pi.AgentDir()
 	if body, err := os.ReadFile(filepath.Join(dir, "auth.json")); err == nil {
@@ -318,7 +295,6 @@ func crewUnavailable(reason string) protocol.AccountUsage {
 	return protocol.AccountUsage{Value: protocol.AccountUsageUnavailable{Reason: reason}}
 }
 
-// crewPiBalance is DeepSeek's balance, with the key pi itself uses for it. Other providers report none.
 func crewPiBalance(ctx context.Context, settings protocol.RuntimeSettings) protocol.AccountUsage {
 	provider := crewPiProvider(settings)
 	if provider != "deepseek" {
@@ -364,7 +340,6 @@ func crewPiBalance(ctx context.Context, settings protocol.RuntimeSettings) proto
 	return protocol.AccountUsage{Value: usage}
 }
 
-// crewPiPrice is pi's price for provider/model (or a bare model id, looked up across providers).
 func crewPiPrice(model string) *base.Price {
 	if provider, id, ok := strings.Cut(model, "/"); ok {
 		if p, ok := crewPiPrices[provider][id]; ok {
@@ -389,7 +364,6 @@ func crewSortedKeys[V any](m map[string]V) []string {
 	return keys
 }
 
-// crewFromOar is smith's account usage reading as the farm shows it.
 func crewFromOar(usage oar.AccountUsageSnapshot) protocol.AccountUsage {
 	switch usage.Kind {
 	case "reauth_required":
@@ -417,8 +391,6 @@ func crewFromOar(usage oar.AccountUsageSnapshot) protocol.AccountUsage {
 	return protocol.AccountUsage{Value: ok}
 }
 
-// crewUsageOf is how much is left on this runtime's account: smith's reading, or pi's provider balance. Zero when
-// it cannot tell.
 func (r *Runtimes) crewUsageOf(ctx context.Context, id string, runtime oar.Runtime, found oar.AvailableInstallation, settings protocol.RuntimeSettings) protocol.AccountUsage {
 	if id == "pi" {
 		return crewPiBalance(ctx, settings)
@@ -434,8 +406,6 @@ func (r *Runtimes) crewUsageOf(ctx context.Context, id string, runtime oar.Runti
 	}
 	return crewFromOar(usage)
 }
-
-// ── Probing ──────────────────────────────────────────────────────────────────
 
 func crewInventory[T any](ctx context.Context, read oar.InventoryReader[T], found oar.AvailableInstallation, cwd string, entry func(T) protocol.InventoryEntry) []protocol.InventoryEntry {
 	if read == nil {
@@ -461,7 +431,6 @@ func crewOptional(s string) *string {
 	return &s
 }
 
-// crewProbe reads a runtime's installation, models, usage and inventories, each within crewProbeTimeout.
 func (r *Runtimes) crewProbe(ctx context.Context, id string) protocol.RuntimeInfo {
 	settings := r.store.Settings(id)
 	if bin := strings.TrimSpace(settings.BinPath); bin != "" {
@@ -564,7 +533,6 @@ func (r *Runtimes) crewProbe(ctx context.Context, id string) protocol.RuntimeInf
 	return info
 }
 
-// remember caches a runtime's info and tells the pages.
 func (r *Runtimes) remember(raw protocol.RuntimeInfo) protocol.RuntimeInfo {
 	r.mu.Lock()
 	info := r.withSpendLocked(raw)
@@ -583,7 +551,6 @@ func crewKnownRuntime(id string) bool {
 	return false
 }
 
-// Refresh probes a runtime again; nil for one vibevalley does not know.
 func (r *Runtimes) Refresh(ctx context.Context, id string) *protocol.RuntimeInfo {
 	if !crewKnownRuntime(id) {
 		return nil
@@ -592,7 +559,6 @@ func (r *Runtimes) Refresh(ctx context.Context, id string) *protocol.RuntimeInfo
 	return &info
 }
 
-// Info is the cached info, probing once if there is none.
 func (r *Runtimes) Info(ctx context.Context, id string) *protocol.RuntimeInfo {
 	r.mu.Lock()
 	hit, ok := r.cache[id]
@@ -632,7 +598,6 @@ func (r *Runtimes) Update(ctx context.Context, id string, s protocol.RuntimeSett
 	return r.Refresh(ctx, id)
 }
 
-// refreshUsage reads just the account usage again; tells the pages only when it changed.
 func (r *Runtimes) refreshUsage(ctx context.Context, id string) {
 	runtime, ok := r.Runtime(id)
 	r.mu.Lock()
@@ -652,14 +617,12 @@ func (r *Runtimes) refreshUsage(ctx context.Context, id string) {
 	r.remember(before)
 }
 
-// UsageAsked is how many usage reads of the runtime were asked for with UsageSoon.
 func (r *Runtimes) UsageAsked(id string) int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.asked[id]
 }
 
-// UsageSoon reads the runtime's account usage again in a little while: a helper on it just used some.
 func (r *Runtimes) UsageSoon(id string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -675,11 +638,9 @@ func (r *Runtimes) UsageSoon(id string) {
 	})
 }
 
-// Price is a model's price, for a model as the runtime names it (pi: provider/model); nil when unknown.
 func (r *Runtimes) Price(id, model string) *base.Price {
 	switch id {
 	case oarruntime.VIBEVALLEY_RUNTIME:
-		// vibevalley's own agent: the price in vibevalley/ai's model list (DeepSeek's), the default model when none is named.
 		if model == "" {
 			model = agent.DEFAULT_MODEL
 		}
@@ -700,10 +661,9 @@ func (r *Runtimes) Price(id, model string) *base.Price {
 	return nil
 }
 
-// CnyPerUsd: prices are in dollars; the farm talks in yuan (VIBEVALLEY_CNY_PER_USD, default 7.2).
+// Prices are in dollars; the farm talks in yuan (VIBEVALLEY_CNY_PER_USD, default 7.2).
 func (r *Runtimes) CnyPerUsd() float64 { return r.cnyPerUsd }
 
-// Spend adds to what the runtime's helpers spent today.
 func (r *Runtimes) Spend(id string, cny float64) {
 	if !(cny > 0) {
 		return

@@ -1,26 +1,16 @@
-// A project as a code base, for the projects page (packages/core codebase.ts, packages/protocol projects.ts): languages
-// by name and colour with their aliases merged, a share of the lines each; a commit calendar of 53 weeks, Monday
-// first, every day a plot that grows with its commits; the streaks; how a project is growing, by its newest commit;
-// and what a new project's name and GitHub address must look like. The counting is the server's (tokei and git).
-
 import 'dart:ui' show Color;
 
 import '../../gen/vibevalley.dart';
-
-// ── Languages ────────────────────────────────────────────────────────────────
 
 class LangDef {
   const LangDef(this.label, this.color, this.names);
   final String label;
 
-  /// GitHub linguist's colour, for its share of a bar.
   final Color color;
 
-  /// tokei's and linguist's names for it and common aliases, lower case.
   final List<String> names;
 }
 
-/// The languages with a logo of their own (`lang-<id>`); any other is 'other', under its own name (core LANGS).
 const langs = <String, LangDef>{
   'typescript': LangDef('TypeScript', Color(0xFF3178C6), ['typescript', 'tsx', 'ts']),
   'javascript': LangDef('JavaScript', Color(0xFFF1E05A), ['javascript', 'jsx', 'js', 'mjs', 'cjs']),
@@ -72,29 +62,25 @@ class Language {
   final Color color;
 }
 
-/// A language as named by tokei or linguist (or an alias), any case; one without a logo keeps its own name.
 Language languageOf(String name) {
   final id = _byName[name.trim().toLowerCase()] ?? 'other';
   final def = langs[id]!;
   return Language(id, id == 'other' && name.trim().isNotEmpty ? name.trim() : def.label, def.color);
 }
 
-/// A language's logo sprite (web/src/farm/langs.ts langIcon).
 String langIcon(String id) => 'lang-$id';
 
 class LanguageShare extends Language {
   const LanguageShare(super.id, super.label, super.color, {required this.lines, required this.files, required this.share});
 
-  /// Lines of code and comments (prose in Markdown counts as comments): what a share is of.
+  /// Prose in Markdown counts as comments.
   final double lines;
   final double files;
 
-  /// Of all lines, 0..1.
+  /// 0..1.
   final double share;
 }
 
-/// What a project is written in, as shares of its lines, most first: aliases merged (TSX into TypeScript), and past
-/// the first `top`, the rest as one 其他 (unless the rest is one language). `top` null keeps them all.
 List<LanguageShare> languageShares(List<LanguageCount> counts, {int? top = 7}) {
   final merged = <String, ({Language language, double lines, double files})>{};
   for (final c in counts) {
@@ -124,43 +110,36 @@ List<LanguageShare> languageShares(List<LanguageCount> counts, {int? top = 7}) {
   ];
 }
 
-// ── The commit calendar ──────────────────────────────────────────────────────
-
 String _two(int n) => n.toString().padLeft(2, '0');
 
-/// A day on the local calendar, 'YYYY-MM-DD' (the server counts commits by the same).
+/// The server counts commits by the same day.
 String dayKey(DateTime d) => '${d.year}-${_two(d.month)}-${_two(d.day)}';
 
 class CalendarDay {
   const CalendarDay({required this.day, required this.at, required this.commits, required this.level, required this.future});
   final String day;
 
-  /// When it starts (local midnight).
   final DateTime at;
   final int commits;
 
-  /// How grown its plot is: 0 bare, 1 seeded, 2 sprouting, 3 leafy, 4 in flower.
+  /// 0 bare, 1 seeded, 2 sprouting, 3 leafy, 4 in flower.
   final int level;
 
-  /// After today: drawn, but empty.
   final bool future;
 }
 
 class Calendar {
   const Calendar(this.weeks, this.months);
 
-  /// Columns of seven days, Monday first, the last one holding today.
   final List<List<CalendarDay>> weeks;
 
-  /// Where a month starts: the week it starts in, and its name.
   final List<({int week, String label})> months;
 }
 
-/// The day `offset` days after `from`'s local midnight, by the calendar (a day is not always 24 hours).
+/// By the calendar: a day is not always 24 hours.
 DateTime _plusDays(DateTime from, int offset) => DateTime(from.year, from.month, from.day + offset);
 
-/// The last `weeks` weeks to `now` as a calendar, Monday first. A day's plot grows with its commits, against the busy
-/// days of the year (the 95th percentile, so one huge day does not leave the rest bare).
+/// Levels go against the year's 95th percentile, so one huge day does not leave the rest bare.
 Calendar calendarOf(List<DayCount> days, DateTime now, {int weeks = 53}) {
   final commits = {for (final d in days) d.day: d.commits.round()};
   final today = _plusDays(now, 0);
@@ -192,15 +171,14 @@ Calendar calendarOf(List<DayCount> days, DateTime now, {int weeks = 53}) {
 class Streaks {
   const Streaks({required this.total, required this.days, required this.longest, required this.current, this.busiest});
 
-  /// Commits over the calendar's year, and on how many days.
   final int total;
   final int days;
 
-  /// The longest run of days with commits, and the one going on now (to today, or to yesterday if none yet today).
+  /// The current run goes to today, or to yesterday if none yet today.
   final int longest;
   final int current;
 
-  /// The day with the most commits (the latest, on a tie).
+  /// The latest, on a tie.
   final ({String day, int commits})? busiest;
 }
 
@@ -232,14 +210,10 @@ Streaks streaksOf(Calendar calendar) {
   );
 }
 
-// ── How a project is growing ─────────────────────────────────────────────────
-
-/// The plot that shows how a project grows, and its words.
 typedef Growth = ({String crop, String label});
 
 const _dayMs = 86400000;
 
-/// A project grows while it is worked: in flower a day after a commit, leafy a week on, drying out after a month.
 Growth growthOf(double? last, double now) {
   if (last == null) return (crop: 'empty', label: '还没动过土');
   final days = (now - last) / _dayMs;
@@ -249,8 +223,6 @@ Growth growthOf(double? last, double now) {
   if (days <= 90) return (crop: 'dry', label: '有点干了');
   return (crop: 'withered', label: '荒了');
 }
-
-// ── New projects (protocol projects.ts) ──────────────────────────────────────
 
 final projectName = RegExp(r'^[A-Za-z0-9][\w.-]{0,63}$');
 
@@ -263,14 +235,12 @@ final projectName = RegExp(r'^[A-Za-z0-9][\w.-]{0,63}$');
   return (name: name, url: 'https://github.com/${match[1]}/$name.git');
 }
 
-/// Why a new project cannot be made; null when it can.
 String? projectProblem(NewProject req) {
   if (!projectName.hasMatch(req.name)) return '项目名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符';
   if (req.github != null && githubRepository(req.github!) == null) return '请填公开 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source';
   return null;
 }
 
-/// The projects, the newest-worked first: the one you most likely came for (web/src/farm/projects.ts).
 List<ProjectSummary> sortProjects(List<ProjectSummary> list) => [...list]
   ..sort((a, b) {
     final byLast = (b.last ?? 0).compareTo(a.last ?? 0);

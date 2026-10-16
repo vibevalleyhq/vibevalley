@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// The heartbeat and the schedule ticker read their environment as the TypeScript server's Number(process.env.X ?? d)
-// did: blank or not a number turns the heartbeat off.
 func TestPlanHeartbeatAndScheduleEnv(t *testing.T) {
 	for _, c := range []struct {
 		set       bool

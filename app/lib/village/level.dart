@@ -1,12 +1,10 @@
-// The village's layout, read from village.ldtk (an LDtk project, https://ldtk.io; assets/village.ldtk links to the
-// web page's copy, web/src/pixel/level.ts reads the same file):
+// The village's layout, read from village.ldtk:
 //   Ground (IntGrid, 4 px cells): 1 where feet can go. Plots and props are taken out by the game, so they can move.
 //   Things (entities): Plot (index), Place (place, facing), Prop (spot, sprite), Area (spot; a box), Rest (n),
 //   Light (r), Gate, Queue, Manager, Dog, Fx (kind). Points are where the entity stands (its pivot).
 
 import 'dart:convert';
 
-/// A point in art pixels: the village is 384 × 256.
 class Pt {
   const Pt(this.x, this.y);
   final double x;
@@ -17,7 +15,6 @@ class Pt {
   String toString() => '($x, $y)';
 }
 
-/// A box in art pixels: x0, y0, x1, y1.
 typedef Box = ({double x0, double y0, double x1, double y1});
 
 bool inBox(Pt p, Box b) => p.x >= b.x0 && p.x < b.x1 && p.y >= b.y0 && p.y < b.y1;
@@ -72,13 +69,11 @@ class Level {
     );
   }
 
-  /// Every entity of a kind, in file order.
   List<Thing> thingsOf(String kind) => _things[kind] ?? const [];
 
-  /// The one entity of a kind; the level must have it.
   Thing theThing(String kind) => thingsOf(kind).firstOrNull ?? (throw StateError('village.ldtk: no $kind'));
 
-  /// Whether the ground at `p` can be walked on. Past the right edge the road goes on, as the edge column does.
+  /// Past the right edge the road goes on, as the edge column does.
   bool ground1(Pt p) {
     final cx = (p.x / _gridSize).floor().clamp(-1, _cols - 1);
     final cy = (p.y / _gridSize).floor();

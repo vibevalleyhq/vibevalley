@@ -1,6 +1,3 @@
-// 小恐龙 on the farm phone (web/src/phone/Dino.tsx): the rules are dino.dart's; here the clock, the pad and the
-// drawing, zoomed whole. A is jump, the cross's down (or B) ducks; leaving the game ends the run.
-
 import 'dart:math' as math;
 
 import 'package:flutter/scheduler.dart';
@@ -13,10 +10,9 @@ import 'lcd.dart';
 import 'pad.dart';
 import 'widgets.dart';
 
-/// The best score this session.
 final dinoBestProvider = NotifierProvider<Kept<int>, int>(() => Kept(0));
 
-/// The dinosaur, 12×14, two running frames; ducking, 16×8.
+/// 12×14, two running frames; ducking, 16×8.
 const _run = [
   [
     '      ####  ',
@@ -168,7 +164,6 @@ class _DinoGameState extends ConsumerState<DinoGame> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    // Twice the game's pixels on the small phone, three times on the big one.
     final zoom = widget.big ? 3.0 : 2.0;
     final top = ref.watch(dinoBestProvider);
     final d = _d;
@@ -250,7 +245,6 @@ class _RunPainter extends CustomPainter {
     final p = Paint()..isAntiAlias = false;
     canvas.drawRect(const Rect.fromLTWH(0, 0, dinoWidth * 1.0, dinoHeight * 1.0), p..color = Lcd.paper);
     final run0 = d ?? newDino(0);
-    // The ground: a line, with pebbles going by.
     canvas.drawRect(const Rect.fromLTWH(0, dinoGround * 1.0, dinoWidth * 1.0, 1), p..color = Lcd.dark);
     p.color = Lcd.mid;
     final walked = run0.distance.floor();

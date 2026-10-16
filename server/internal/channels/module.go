@@ -6,7 +6,6 @@ import (
 	"vibevalley/internal/base"
 )
 
-// Module is the package's services, each on the farm's lifecycle.
 func Module(r *base.Readies) fx.Option {
 	return fx.Module("channels", fx.Provide(
 		base.Run[*VoiceLine](r, newVoiceLine),

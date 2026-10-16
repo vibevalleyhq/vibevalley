@@ -1,11 +1,3 @@
-// vibevalley on a phone (iOS, Android): system notifications for what the farm calls the person about, by the desktop
-// app's rules (desktop/notify.dart: a helper's turn done or failed, a conflict, a playbook ripe or stuck, someone
-// naming the person, an achievement, an error). Shown only while the app runs away from the screen: in front, the farm
-// says it itself. iOS suspends an app soon after it leaves the screen, so a notification comes only in that while
-// (connectors reach the person when the app is closed). On Android a foreground service keeps the app, and the farm's
-// stream, alive while it is in the background. Tapping a notification opens what it is about, as a DesktopCommand
-// through desktopProvider's commands.
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -19,10 +11,9 @@ import '../data/providers.dart';
 import '../desktop/command.dart';
 import '../desktop/notify.dart';
 
-/// Whether this is the app on a phone.
 bool get isPhone => !kIsWeb && (Platform.isIOS || Platform.isAndroid);
 
-/// The Android foreground service's notification id (0 is not allowed for one).
+/// 0 is not allowed for a foreground service's notification.
 const _linkId = 1;
 
 const _farmChannel = AndroidNotificationDetails('farm', '农场', channelDescription: '帮工做完活、没做成、叫你的时候', importance: Importance.high, priority: Priority.high);
@@ -44,16 +35,14 @@ class PhoneNotices {
   final _plugin = FlutterLocalNotificationsPlugin();
   late final _commands = StreamController<DesktopCommand>.broadcast(onListen: _flush);
 
-  /// A command from the notification that opened the app, held until a screen listens.
+  /// Held until a screen listens.
   DesktopCommand? _pending;
   bool _ready = false;
   bool _linked = false;
   int _next = 100;
 
-  /// What tapping a notification opens.
   Stream<DesktopCommand> get commands => _commands.stream;
 
-  /// Sets notifications up and asks the person to allow them, before the first frame; nothing off a phone.
   Future<void> start() async {
     if (!isPhone || _ready) return;
     try {
@@ -70,7 +59,6 @@ class PhoneNotices {
     }
   }
 
-  /// A tapped notification's payload (a DesktopCommand's JSON) as a command, held until a screen listens.
   @visibleForTesting
   void open(String? payload) {
     if (payload == null || payload.isEmpty) return;
@@ -109,7 +97,6 @@ class PhoneNotices {
     }
   }
 
-  /// Android: keeps the app alive in the background (a foreground service, with its quiet notification), or lets it go.
   Future<void> keepLinked(bool on) async {
     final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (!_ready || android == null || on == _linked) return;
@@ -132,8 +119,6 @@ class PhoneNotices {
   }
 }
 
-/// Follows the farm for the phone's notifications while the app runs: every frame's new calls, achievement effects
-/// and error notices, notified while the app is away from the screen; on Android, the link kept while it is away.
 final phoneFollowProvider = Provider<void>((ref) {
   if (!isPhone) return;
   final notices = PhoneNotices.instance;
@@ -146,7 +131,7 @@ final phoneFollowProvider = Provider<void>((ref) {
   ref.listen(stateFrameProvider, (_, next) {
     final frame = next.value;
     if (frame == null) return;
-    // Every frame rings the bell, in front too: a call seen on the screen is not notified later.
+    // A call seen on the screen is not notified later.
     for (final call in bell.ring(frame.frame.inbox)) {
       tell(noticeForCall(call));
     }

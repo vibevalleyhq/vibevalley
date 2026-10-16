@@ -1,30 +1,20 @@
-// Ported from packages/protocol/src/index.ts: the manager's agent id (MANAGER_AGENT), money and tokens in words (yuan,
-// spentText), what a conflicting helper is told (conflictTask), what each runtime takes (RUNTIME_FACTS, factsOf, from
-// @botiverse/oar 0.44.0), why nobody new should be sent to a runtime (moneyStop) and what would stop oar opening a
-// session with an agent (agentIssues). They mirror checks the server makes: keep them in step with the TypeScript.
+// The manager's agent id, money and tokens in words, what a conflicting helper is told, what each runtime takes (from
+// @botiverse/oar 0.44.0), why nobody new should be sent to a runtime and what would stop oar opening a session with an
+// agent. They mirror checks the server makes: keep them in step with the Go in server/internal/protocol.
 
 import '../gen/vibevalley.dart';
 import 'seeds.dart';
 
-/// The agent id the manager's memories and trajectory carry (protocol MANAGER_AGENT).
 const managerAgent = 'foreman';
 
-// ── Money and tokens ─────────────────────────────────────────────────────────
-
-/// The money, near enough: ¥0.03, or under ¥0.01 for a few tokens' worth.
 String yuan(num cny) => cny > 0 && cny < 0.01 ? '不到 ¥0.01' : '¥${cny.toStringAsFixed(2)}';
 
 String _wan(double n) => n >= 10000 ? '${(n / 10000).toStringAsFixed(n >= 100000 ? 0 : 1)} 万' : '${n.round()}';
 
-/// What a turn cost, in a few words: 约 ¥0.03 · 2.6 万 token.
 String spentText(Spent spent) => [if (spent.cny != null) '约 ${yuan(spent.cny!)}', '${_wan(spent.tokens)} token'].join(' · ');
 
-/// What a helper is told when its branch conflicts with the project's main branch.
 String conflictTask(String base, List<String> files) => '把 $base 合进你的分支时有冲突（${files.join('、')}）。请在你的分支上运行 git merge $base，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。';
 
-// ── What each runtime takes ──────────────────────────────────────────────────
-
-/// The session options oar may refuse (SessionOption), by their wire names.
 abstract final class SessionOption {
   static const systemPrompt = 'systemPrompt';
   static const appendSystemPrompt = 'appendSystemPrompt';
@@ -37,13 +27,12 @@ abstract final class SessionOption {
 class RuntimeFacts {
   const RuntimeFacts({required this.steer, required this.refused, required this.inProcess});
 
-  /// The runtime can take a message mid-turn. Otherwise the message waits for the turn to end.
+  /// Otherwise the message waits for the turn to end.
   final bool steer;
 
-  /// Session options the runtime refuses (SessionOption), with oar's reason, in the protocol's order.
+  /// With oar's reason, in the protocol's order.
   final Map<String, String> refused;
 
-  /// Runs inside the server process through a Node SDK rather than as a CLI.
   final bool inProcess;
 }
 
@@ -88,16 +77,12 @@ const _unknownFacts = RuntimeFacts(steer: false, refused: {}, inProcess: false);
 
 RuntimeFacts factsOf(String runtime) => runtimeFacts[runtime] ?? _unknownFacts;
 
-// ── Why not send more ───────────────────────────────────────────────────────
-
 String _whenText(num at) {
   final d = DateTime.fromMillisecondsSinceEpoch(at.round());
   String two(int n) => n.toString().padLeft(2, '0');
   return '${d.month} 月 ${d.day} 日 ${two(d.hour)}:${two(d.minute)}';
 }
 
-/// Why nobody new should be sent to this runtime for its account: the balance ran out, today's budget did, or one of
-/// its plan's usage windows is used up.
 String? moneyStop(RuntimeInfo? info) {
   final usage = info?.usage;
   if (info != null && usage is AccountUsageOk) {
@@ -116,21 +101,17 @@ String? moneyStop(RuntimeInfo? info) {
   return null;
 }
 
-// ── An agent's problems ──────────────────────────────────────────────────────
-
 enum IssueLevel { error, warn }
 
 class AgentIssue {
   const AgentIssue(this.field, this.level, this.text);
 
-  /// runtime, persona, effort, env, mcpServers, disallowedTools or model.
   final String field;
   final IssueLevel level;
   final String text;
 }
 
-/// What would go wrong opening a session with this agent. Errors block dispatch; warnings don't. Mirrors the checks oar
-/// makes when a session opens, so the page can say it before the server does.
+/// Mirrors the checks oar makes when a session opens, so the page can say it before the server does.
 List<AgentIssue> agentIssues(AgentProfile agent, RuntimeInfo? runtime) {
   final issues = <AgentIssue>[];
   final facts = factsOf(agent.runtime);

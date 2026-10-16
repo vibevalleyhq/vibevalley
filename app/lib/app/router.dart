@@ -1,6 +1,3 @@
-// The routes, as the web page has them (web/src/site/router.tsx): / is the farm; the rest are places at the desk (a
-// rail of places on the left, the page beside it). Each page lives in lib/desk/<place>/.
-
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
@@ -20,7 +17,6 @@ import '../desk/skills/skills_page.dart';
 import '../desk/voice/voice_page.dart';
 import 'desk.dart';
 
-/// The desk's places, in the rail's order (web/src/desk/Desk.tsx).
 enum Place {
   chat('聊天', '频道和串', 'icon-board', '/chat'),
   tickets('工单', '每次种植的全过程', 'icon-tasks', '/tickets'),
@@ -40,7 +36,6 @@ enum Place {
   final String icon;
   final String path;
 
-  /// The place a location is at: /manager belongs to the helpers' place, as on the web page.
   static Place? of(String location) {
     if (location.startsWith('/manager')) return Place.agents;
     for (final p in values) {
@@ -53,7 +48,7 @@ enum Place {
 final router = GoRouter(
   routes: [
     GoRoute(path: '/pixel', redirect: (_, _) => '/'),
-    // The farm stays mounted beneath the desk pages, hidden and paused, so helpers keep their places (App.tsx).
+    // The farm stays mounted beneath the desk pages, hidden and paused, so helpers keep their places.
     ShellRoute(
       builder: (_, state, child) => _KeepFarm(onFarm: state.uri.path == '/', child: child),
       routes: [
@@ -129,11 +124,9 @@ final router = GoRouter(
       ],
     ),
   ],
-  // Anything unknown is the farm, as on the web page.
   errorBuilder: (_, _) => const _GoHome(),
 );
 
-/// The farm under whatever page the route shows: shown and ticking on the farm itself, hidden and paused elsewhere.
 class _KeepFarm extends StatelessWidget {
   const _KeepFarm({required this.onFarm, required this.child});
   final bool onFarm;
@@ -152,7 +145,6 @@ class _KeepFarm extends StatelessWidget {
   );
 }
 
-/// An unknown location: back to the farm.
 class _GoHome extends StatelessWidget {
   const _GoHome();
 

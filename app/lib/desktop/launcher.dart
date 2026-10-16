@@ -1,17 +1,12 @@
-// The farm inside the desktop app: the Go server (server/cmd/vibevalley, in the bundle as
-// Contents/MacOS/vibevalley-server) started as a child process on a free loopback port, waited for until /api/health
-// answers, and stopped when the app quits: SIGTERM first (the server saves on the way out), killed if it takes too
-// long. Plain dart:io, no Flutter: test/desktop_launcher_test.dart drives it with a fake server script.
+// SIGTERM first: the server saves on the way out. Plain dart:io, no Flutter: test/desktop_launcher_test.dart drives it with a fake server script.
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-/// Where the client finds the farm when the desktop app started one; null otherwise (data/providers.dart then uses
-/// VIBEVALLEY_SERVER or http://127.0.0.1:8787). Set by `startDesktop` before the app's first frame.
+/// null otherwise (data/providers.dart then uses VIBEVALLEY_SERVER or http://127.0.0.1:8787). Set by `startDesktop` before the app's first frame.
 String? embeddedServerAddress;
 
-/// Why the embedded server is not answering: the words are shown to the person.
 class ServerFailed implements Exception {
   ServerFailed(this.reason);
   final String reason;
@@ -20,8 +15,7 @@ class ServerFailed implements Exception {
   String toString() => reason;
 }
 
-/// A free port on 127.0.0.1, as the system hands one out. Another process may take it before the server binds it:
-/// `ServerLauncher.start` tries again with a new one when the server exits early.
+/// Another process may take it before the server binds it: `ServerLauncher.start` tries again with a new one when the server exits early.
 Future<int> freeLoopbackPort() async {
   final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
   final port = socket.port;
@@ -29,7 +23,6 @@ Future<int> freeLoopbackPort() async {
   return port;
 }
 
-/// Whether a farm answers GET /api/health at `base` with a 200.
 Future<bool> answersHealth(Uri base, {Duration timeout = const Duration(milliseconds: 1500)}) async {
   final client = HttpClient()..connectionTimeout = timeout;
   try {
@@ -44,7 +37,6 @@ Future<bool> answersHealth(Uri base, {Duration timeout = const Duration(millisec
   }
 }
 
-/// One started server: where it answers, and how to stop it.
 class RunningServer {
   RunningServer._(this.process, this.url, this._log, this._drained, this._stopTimeout) {
     process.exitCode.then((code) => _exit.complete(code));
@@ -52,11 +44,10 @@ class RunningServer {
 
   final Process process;
 
-  /// `http://127.0.0.1:PORT`, no trailing slash.
+  /// No trailing slash.
   final Uri url;
   final IOSink _log;
 
-  /// The output streams, written to the log until they end: the log closes after them.
   final Future<void> _drained;
   final Duration _stopTimeout;
   final _exit = Completer<int>();
@@ -64,11 +55,10 @@ class RunningServer {
 
   int get pid => process.pid;
 
-  /// Completes with the exit code once the process is gone.
   Future<int> get exited => _exit.future;
   bool get hasExited => _exit.isCompleted;
 
-  /// SIGTERM, then SIGKILL if it is still there after the stop timeout. Safe to call more than once.
+  /// Safe to call more than once.
   Future<void> stop() => _stopping ??= _stop();
 
   Future<void> _stop() async {
@@ -86,7 +76,6 @@ class RunningServer {
   }
 }
 
-/// How to start the server: which binary, with what environment, where its output goes.
 class ServerLauncher {
   ServerLauncher({
     required this.binary,
@@ -102,7 +91,7 @@ class ServerLauncher {
 
   final String binary;
 
-  /// The child's whole environment (not added to this process's): PORT is set on top of it.
+  /// Not added to this process's: PORT is set on top of it.
   final Map<String, String> environment;
   final File logFile;
   final String workingDirectory;
@@ -112,11 +101,10 @@ class ServerLauncher {
   final Duration stopTimeout;
   final Duration pollInterval;
 
-  /// How many ports are tried when the server exits before answering (the port was taken in between).
+  /// The port may be taken in between.
   final int attempts;
   final Future<int> Function() pickPort;
 
-  /// Starts the server and waits until it answers. Fails with a ServerFailed naming the log.
   Future<RunningServer> start() async {
     ServerFailed? last;
     for (var i = 0; i < attempts; i++) {
@@ -148,7 +136,6 @@ class ServerLauncher {
     return RunningServer._(process, Uri.parse('http://127.0.0.1:$port'), log, drained, stopTimeout);
   }
 
-  /// Null once it answers; the reason otherwise (it exited, or took too long).
   Future<ServerFailed?> _waitUntilUp(RunningServer server) async {
     final deadline = DateTime.now().add(startTimeout);
     while (true) {
@@ -160,8 +147,7 @@ class ServerLauncher {
   }
 }
 
-/// KEY=VALUE lines of a .env file (the dotenv way of writing, as cmd/vibevalley reads it): comments, blank lines and `export ` skipped,
-/// one pair of surrounding quotes taken off.
+/// As cmd/vibevalley reads it: comments, blank lines and `export ` skipped, one pair of surrounding quotes taken off.
 Map<String, String> parseEnv(String text) {
   final out = <String, String>{};
   for (final raw in const LineSplitter().convert(text)) {
@@ -183,11 +169,10 @@ Map<String, String> parseEnv(String text) {
   return out;
 }
 
-/// Around the PATH in the shell's output: an interactive shell may print a greeting first.
+/// An interactive shell may print a greeting first.
 const _mark = '__VIBEVALLEY_PATH__';
 
-/// The login shell's PATH: an app opened from Finder or at login gets a bare one, without the places pi, claude and
-/// codex are installed. The given fallback when the shell cannot be asked.
+/// An app opened from Finder or at login gets a bare PATH, without the places pi, claude and codex are installed.
 Future<String> loginShellPath(String fallback, {String? shell}) async {
   try {
     final result = await Process.run(shell ?? Platform.environment['SHELL'] ?? '/bin/zsh', [

@@ -1,9 +1,3 @@
-// The pixel skin's frames and faces (web/src/index.css :root[data-skin='pixel'], web/src/farm/Face.tsx):
-//   PxFrame  a window: a light rim inside, a deeper band along its bottom, a 2 px dark outline with the corners left
-//            out, and a hard drop down and right (--px-frame)
-//   PxInset  a well or chip inside a frame: a 2 px line of the paper's darker shade (--px-inset)
-//   ManagerFace, AnimalFace  the manager's face, and a helper's head cut from its full-body drawing
-
 import 'package:flutter/widgets.dart';
 
 import '../app/theme.dart';
@@ -31,9 +25,7 @@ class _FramePainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
     final p = Paint();
-    // The drop, behind: the box moved 2 right and 4 down.
     canvas.drawRect(Rect.fromLTWH(2, 4, w, h), p..color = Palette.pxDrop);
-    // The outline on each side, corners left out.
     p.color = Palette.pxInk;
     canvas
       ..drawRect(Rect.fromLTWH(0, -2, w, 2), p)
@@ -41,7 +33,6 @@ class _FramePainter extends CustomPainter {
       ..drawRect(Rect.fromLTWH(-2, 0, 2, h), p)
       ..drawRect(Rect.fromLTWH(w, 0, 2, h), p);
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), p..color = paper);
-    // The deeper band along the bottom, then the light rim all round.
     canvas.drawRect(Rect.fromLTWH(0, h - 4, w, 4), p..color = Palette.cream300);
     final rim = Paint()
       ..color = Palette.rim
@@ -54,17 +45,13 @@ class _FramePainter extends CustomPainter {
   bool shouldRepaint(_FramePainter old) => old.paper != paper;
 }
 
-/// A well or chip: the paper with a 2 px inner line of its darker shade.
 BoxDecoration pxInset({Color fill = Palette.cream200, Color line = Palette.cream300}) => BoxDecoration(
   color: fill,
   border: Border.all(color: line, width: 2),
 );
 
-/// A hard 2 px drop under something raised (a button, a bubble of yours).
 const pxDropShadow = [BoxShadow(color: Palette.pxDrop, offset: Offset(2, 2))];
 
-/// The manager's face on its sky-blue square (Face.tsx ManagerFace); another portrait the same way with `look` and
-/// `fill` (the owner's, on wheat).
 class ManagerFace extends StatelessWidget {
   const ManagerFace({super.key, required this.atlas, required this.size, this.look = 'manager-face', this.fill = const Color(0xFFCFE6F5)});
   final SpriteAtlas atlas;
@@ -98,7 +85,6 @@ class ManagerFace extends StatelessWidget {
   }
 }
 
-/// A helper's face: its head, cut from its standing drawing (`look`-down), on a leaf-green square (Face.tsx AnimalFace).
 class AnimalFace extends StatelessWidget {
   const AnimalFace({super.key, required this.atlas, required this.look, required this.size});
   final SpriteAtlas atlas;

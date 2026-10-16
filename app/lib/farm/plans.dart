@@ -1,7 +1,3 @@
-// 种植计划 (web/src/farm/Plans.tsx): the plan board. Every playbook, its steps laid out in columns (each after the
-// steps it needs), and what can be done: ask for a plan, look a draft over and change its steps, start, pause, go on,
-// retry or skip a step, harvest the whole playbook, and read how each step got where it is.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,7 +17,6 @@ import '../rules/playbook.dart';
 
 const _cream = Palette.cream50;
 
-/// A playbook's state in a word or two, for its tag.
 const _stateTag = {
   PlaybookState.planning: ('在拆', Color(0xFFD5DCD7), Palette.bark800),
   PlaybookState.draft: ('等你看', Color(0xFFEFD08F), Palette.bark900),
@@ -34,7 +29,6 @@ const _stateTag = {
 
 FarmTag _tagOf(PlaybookState s) => FarmTag(_stateTag[s]!.$1, fill: _stateTag[s]!.$2, ink: _stateTag[s]!.$3);
 
-/// Each step's card and tag by its state.
 ({Color card, Color? edge, Color tag, Color ink, double opacity}) _nodeTone(NodeState s) => switch (s) {
   NodeState.waiting => (card: Palette.cream100, edge: null, tag: Palette.cream200, ink: _Ink.bark700, opacity: 1),
   NodeState.working => (card: tint(Palette.leaf300, .35), edge: Palette.leaf500, tag: Palette.leaf500, ink: _cream, opacity: 1),
@@ -43,12 +37,11 @@ FarmTag _tagOf(PlaybookState s) => FarmTag(_stateTag[s]!.$1, fill: _stateTag[s]!
   NodeState.skipped => (card: Palette.cream100, edge: null, tag: Palette.cream200, ink: Palette.bark600, opacity: .6),
 };
 
-/// The page's text-bark-700: no such colour is defined, so the text keeps the ink around it.
+/// No such colour is defined on the page, so the text keeps the ink around it.
 abstract final class _Ink {
   static const bark700 = Palette.bark900;
 }
 
-/// The plan board: the tabs of playbooks, newest first, and the one shown; a new plan's form when there is none.
 class Plans extends ConsumerStatefulWidget {
   const Plans({super.key});
 
@@ -128,8 +121,6 @@ class _PlansState extends ConsumerState<Plans> {
     );
   }
 }
-
-// ── Asking for a plan ────────────────────────────────────────────────────────
 
 class NewPlan extends ConsumerStatefulWidget {
   const NewPlan({super.key, this.onCancel, required this.onPlanned});
@@ -223,8 +214,6 @@ class _NewPlanState extends ConsumerState<NewPlan> {
   }
 }
 
-// ── One playbook ─────────────────────────────────────────────────────────────
-
 class PlanView extends ConsumerStatefulWidget {
   const PlanView({super.key, required this.pb});
   final Playbook pb;
@@ -238,7 +227,7 @@ class _PlanViewState extends ConsumerState<PlanView> {
   var _reviewing = false;
   var _adding = false;
 
-  /// The step whose history is shown; null: the whole playbook's.
+  /// null: the whole playbook's.
   String? _only;
 
   Future<void> _act(PlaybookAction action) async {
@@ -340,7 +329,6 @@ class _PlanViewState extends ConsumerState<PlanView> {
   }
 }
 
-/// A button that asks once more before it does something that cannot be taken back.
 class Confirm extends StatefulWidget {
   const Confirm({super.key, required this.label, required this.sure, required this.onConfirm});
   final String label;
@@ -367,7 +355,6 @@ class _ConfirmState extends State<Confirm> {
       : PxButton.text(widget.label, onPressed: () => setState(() => _asking = true));
 }
 
-/// The steps in columns: each column after the ones before it.
 class Graph extends StatefulWidget {
   const Graph({super.key, required this.pb, required this.adding, required this.onSaid, required this.onAdded, required this.onHistory});
   final Playbook pb;
@@ -608,7 +595,6 @@ class NodeCard extends ConsumerWidget {
   }
 }
 
-/// A small cream button (Plans.tsx SmallBtn).
 class SmallBtn extends StatelessWidget {
   const SmallBtn(this.label, {super.key, required this.onTap, this.primary = false});
   final String label;
@@ -640,7 +626,6 @@ String _when(double at) {
   return '${d.month}/${d.day} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 }
 
-/// What happened to the playbook, newest first: who did what, each step's way from start to merge.
 class PlanLog extends ConsumerStatefulWidget {
   const PlanLog({super.key, required this.pb, required this.only, required this.onAll});
   final Playbook pb;
@@ -798,7 +783,6 @@ class _PlanLogRowState extends State<PlanLogRow> {
   }
 }
 
-/// A step's job, title, who does it, what it waits for, and how it is checked; a new step when `node` is missing.
 class NodeEditor extends ConsumerStatefulWidget {
   const NodeEditor({super.key, required this.pb, this.node, required this.onDone});
   final Playbook pb;
@@ -909,9 +893,6 @@ class _NodeEditorState extends ConsumerState<NodeEditor> {
   }
 }
 
-// ── Harvesting the whole playbook ────────────────────────────────────────────
-
-/// What the playbook's branch would bring into the main branch, looked at before saying yes.
 class PlanHarvest extends ConsumerStatefulWidget {
   const PlanHarvest({super.key, required this.pb, required this.onDone});
   final Playbook pb;

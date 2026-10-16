@@ -1,11 +1,6 @@
 package farm
 
-// Moving a farm kept under the project's old names to VibeValley's, once (`vibevalley migrate`). The project was
-// called heybro, then for a day vibefarm; a farm from then keeps its home, logs and work folder under those names,
-// calls its own runtime and the voice line's "farm manager" vendor "heybro", and holds paths to all of these in its
-// files and database. MigrateOldNames moves the folders, rewrites what refers to them, repairs the projects' git
-// worktrees and copies the app's preferences, after copying everything it touches to a backup folder. Nothing else
-// reads the old names: a farm that was not migrated is not found.
+// Everything it touches is copied to a backup folder first. Nothing else reads the old names: a farm that was not migrated is not found.
 
 import (
 	"bytes"
@@ -22,26 +17,20 @@ import (
 	"time"
 )
 
-// oldNames are the project's names before VibeValley, newest first: when two old farms want the same place, the
-// newer one moves there.
+// Newest first: when two old farms want the same place, the newer one moves there.
 var oldNames = []string{"vibefarm", "heybro"}
 
-// channelSuffixes are the desktop app's channels as its folders and preferences name them.
 var channelSuffixes = []struct{ folder, domain string }{{"", ""}, {" Beta", ".beta"}, {" Alpha", ".alpha"}}
 
-// MigrateOptions is whose farm to migrate, and how.
 type MigrateOptions struct {
-	// UserHome is the user's home folder (~).
 	UserHome string
-	// DryRun only reports what would be done.
-	DryRun bool
-	// Backup is where everything is copied before it changes; empty: ~/vibevalley-migration-<time>.
+	DryRun   bool
+	// Empty: ~/vibevalley-migration-<time>.
 	Backup string
-	// Prefs reads and writes the desktop app's preferences; nil: macOS `defaults`.
+	// nil: macOS `defaults`.
 	Prefs PrefsStore
 }
 
-// MigrateReport is what was (or, in a dry run, would be) done.
 type MigrateReport struct {
 	Moves     [][2]string
 	Rewritten []string
@@ -52,7 +41,6 @@ type MigrateReport struct {
 	Backup    string
 }
 
-// PrefsStore reads and writes a preferences domain as plist XML (macOS `defaults export` / `import`).
 type PrefsStore interface {
 	Export(domain string) ([]byte, error)
 	Import(domain string, plist []byte) error
@@ -64,7 +52,6 @@ type move struct {
 	work     bool // a work folder: its worktrees are repaired
 }
 
-// MigrateOldNames moves a farm kept under the old names to the new ones (see the file's comment).
 func MigrateOldNames(opt MigrateOptions) (MigrateReport, error) {
 	var report MigrateReport
 	if opt.UserHome == "" {
@@ -161,8 +148,6 @@ func MigrateOldNames(opt MigrateOptions) (MigrateReport, error) {
 	return report, nil
 }
 
-// oldIDReplacements turn the old names used as identifiers (the farm's own runtime, the voice line's vendor) into the
-// new one, wherever a JSON string is exactly the old name.
 func oldIDReplacements() [][2]string {
 	var out [][2]string
 	for _, name := range oldNames {
@@ -171,7 +156,6 @@ func oldIDReplacements() [][2]string {
 	return out
 }
 
-// plannedMoves are the old folders that move, each to a new place nothing is in yet.
 func plannedMoves(home string, report *MigrateReport) []move {
 	var moves []move
 	taken := map[string]bool{}
@@ -211,7 +195,6 @@ func plannedMoves(home string, report *MigrateReport) []move {
 	return moves
 }
 
-// plannedPrefs are the old preference domains to copy to the new ones, [from, to], where the new one is empty.
 func plannedPrefs(prefs PrefsStore, report *MigrateReport) [][2]string {
 	var out [][2]string
 	old := map[string]string{"heybro": "dev.heybro.flutter", "vibefarm": "dev.vibefarm.app"}
@@ -254,7 +237,6 @@ func isDir(path string) bool {
 
 var envOldKey = regexp.MustCompile(`(?m)^(\s*(?:export\s+)?)(?:HEYBRO|VIBEFARM)_`)
 
-// rewriteHome replaces the old paths and names in a farm home's JSON files, its .env and its database.
 func rewriteHome(home string, replacements [][2]string) ([]string, error) {
 	var rewritten []string
 	err := filepath.WalkDir(home, func(path string, d fs.DirEntry, err error) error {
@@ -301,8 +283,6 @@ func rewriteHome(home string, replacements [][2]string) ([]string, error) {
 	return rewritten, err
 }
 
-// rewriteDatabase replaces the old paths and names in every text column of farm.db, and a column that is exactly an
-// old name (a runtime) with the new one; it answers the tables it changed.
 func rewriteDatabase(path string, replacements [][2]string) ([]string, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -412,9 +392,7 @@ func repairWorktrees(root string, replacements [][2]string) ([]string, error) {
 	return repaired, nil
 }
 
-// renameBranches renames the helpers' branches in the projects of a moved work folder from the old prefixes
-// (heybro/, vibefarm/) to vibevalley/, as the farm's data now names them; a branch checked out in a worktree is renamed
-// there. A branch whose new name is taken already stays.
+// A branch whose new name is taken already stays.
 func renameBranches(root string) ([]string, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -464,7 +442,7 @@ func renameBranches(root string) ([]string, error) {
 	return renamed, nil
 }
 
-// copyTree copies dir to dest: as a clone on APFS (cp -c), else a plain copy.
+// As a clone on APFS (cp -c), else a plain copy.
 func copyTree(dir, dest string) error {
 	if err := exec.Command("cp", "-cRp", dir, dest).Run(); err == nil {
 		return nil
@@ -483,7 +461,6 @@ func slicesSortByLenDesc(pairs [][2]string) {
 	}
 }
 
-// macDefaults is the app's preferences through macOS `defaults`.
 type macDefaults struct{}
 
 func (macDefaults) Export(domain string) ([]byte, error) {

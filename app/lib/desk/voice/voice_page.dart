@@ -1,10 +1,3 @@
-// 声音 (web/src/pages/VoicePage.tsx): the voice line's settings. Agora's App ID and Certificate (the same keys as the
-// title screen's 设置), and how a call listens (region, language, recogniser, when a turn ends) and thinks (LLM). Who
-// talks on it, the manager's voice persona, greeting and voice, is set on the manager's page from the same form
-// (VoiceSettingsForm with VoicePart.agent). Each stage can be Agora-hosted (no key of its own) or a vendor with its own
-// key, kept like the farm's keys. Saved by the server in settings.json, keeping only what differs from the defaults; a
-// change takes effect on the next call.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,8 +19,7 @@ const _languageLabel = <Language, String>{
   Language.koKR: '韩语',
 };
 
-/// The stages' vendors, by their wire names, with what each starts with when picked (the one in use if it is the same
-/// vendor, else these).
+/// What each starts with when picked: the one in use if it is the same vendor, else these.
 const _asrLabel = {'ares': '声网 ARES', 'deepgram': 'Deepgram', 'microsoft': '微软'};
 const _llmLabel = {'vibevalley': '农场的管家', 'agora': '声网托管', 'deepseek': 'DeepSeek', 'openai': '自己的接口'};
 const _ttsLabel = {'minimax': 'MiniMax', 'openai': 'OpenAI', 'microsoft': '微软'};
@@ -58,13 +50,11 @@ String _vendor(Object stage) => switch (stage) {
 
 List<SegmentOption<String>> _options(Map<String, String> labels) => [for (final e in labels.entries) SegmentOption(value: e.key, label: e.value)];
 
-/// The keys this page sets: Agora's, and the voice vendors' own.
 enum _Key { agoraAppId, agoraAppCertificate, asrKey, llmKey, ttsKey }
 
-/// Which settings a page shows: the line (keys, listening, the LLM) or the agent on it (persona, greeting, voice).
 enum VoicePart { line, agent }
 
-/// The part's fields of `from` over `onto`: what 恢复默认 on one page touches.
+/// What 恢复默认 on one page touches.
 VoiceSettings withPart(VoicePart part, VoiceSettings onto, VoiceSettings from) => switch (part) {
   VoicePart.line => voiceWith(
     onto,
@@ -86,7 +76,6 @@ class VoiceSettingsPage extends StatelessWidget {
   Widget build(BuildContext context) => const VoiceSettingsForm(part: VoicePart.line);
 }
 
-/// The voice settings, loaded from the server.
 class VoiceSettingsForm extends ConsumerStatefulWidget {
   const VoiceSettingsForm({super.key, required this.part});
   final VoicePart part;
@@ -201,7 +190,6 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
     }),
   );
 
-  /// A secret's field: typed in hidden, with where the one in use comes from, and 清掉 for one in settings.
   Widget _secret(_Key name, String label, KeyStatus current) => PxField(
     label: label,
     hint: Text(_cleared.contains(name) ? '存的时候清掉' : (current.source != null ? '在用 ${current.hint ?? ''}（${keyFrom[current.source]}）' : '还没有')),
@@ -237,7 +225,6 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
     final status = _status;
     final problem = voiceProblem(asOverrides(_draft));
     final atDefaults = sameVoice(_draft, withPart(part, _draft, status.voiceDefaults));
-    // The bar of words and buttons stays at the bottom (sticky bottom-0) over the page's scroll.
     final bar = PxWindow(
       paper: Palette.cream50,
       padding: const EdgeInsets.all(12),
@@ -749,7 +736,6 @@ String _llmHint(VoiceLlm llm, SettingsStatus status) => switch (llm) {
   VoiceLlmOpenai() => '任何 OpenAI 兼容的接口：通义、Kimi、自己部署的……',
 };
 
-/// A key typed in hidden, with a button to look at what was typed.
 class SecretInput extends StatefulWidget {
   const SecretInput({super.key, required this.value, required this.onChanged, required this.label, this.placeholder = '不改就空着'});
   final String value;
@@ -784,7 +770,6 @@ class _SecretInputState extends State<SecretInput> {
   );
 }
 
-/// The MiniMax voices on offer, each with its sample to play first (the default greeting, recorded once).
 class MiniMaxVoices extends StatefulWidget {
   const MiniMaxVoices({super.key, required this.value, required this.onChanged});
   final String value;
@@ -856,7 +841,6 @@ class _VoiceChip extends StatelessWidget {
   Widget build(BuildContext context) => KitTappable(
     onTap: null,
     builder: (context, _) => Container(
-      // ring-1 when chosen, and each button's focus-visible:ring-2: the skin's inner cream-300 lines.
       color: chosen ? Palette.leaf300.withValues(alpha: .5) : Palette.cream50,
       foregroundDecoration: chosen ? pxRing : null,
       child: Row(

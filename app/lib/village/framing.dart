@@ -7,15 +7,11 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
-/// How much of the village's width may go past each side of the window, and of its height past the top and bottom.
 const villageCutAcross = 0.05;
 const villageCutDown = 0.08;
 
-/// The village's place in a window: its scale (screen pixels to an art pixel), its box (which may reach past the
-/// window), and the part of the window it covers (where the HUD goes).
 typedef VillageFraming = ({double scale, Rect box, Rect shown});
 
-/// The largest whole-number scale whose cuts stay within the limits (at least 1), the village centred.
 VillageFraming frameVillage(Size window, Size village) {
   var scale = 1;
   final cover = math.max(window.width / village.width, window.height / village.height).ceil();

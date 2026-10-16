@@ -26,25 +26,14 @@ import (
 	"vibevalley/pkg/ai"
 )
 
-// The manager (管家; ported from the TypeScript server's foreman.ts, foreman-agent.ts, removed). Typed lines and lines heard by voice reach it;
-// it hires and talks to helpers through the crew, and its words stream onto the farm as the manager's messages. What
-// it thinks with is vibevalley's own agent (vibevalley/agent) on DeepSeek ($VIBEVALLEY_FOREMAN_MODEL, else deepseek-flash), with
-// the manager's tools and no others (it does not code: no files, commands, skills or helpers of its own), and a
-// memory it keeps. The farm's situation is in the system prompt of every request, never in the conversation; what
-// reached it without waking it goes in as hidden `farmNews` messages, kept. Its folder is $VIBEVALLEY_HOME/foreman.
-//
-// A person's words join the manager's run under way (Send); schedules, playbook notices, the heartbeat's findings and
-// helpers' reports wait until it is free (Later). A schedule that names a helper sends it off without asking the
-// manager. The manager on pi (VIBEVALLEY_FOREMAN_RUNTIME=pi, foreman-pi.ts) is not in the Go server: it refuses, saying so.
+// The farm's situation goes in the system prompt of every request, never in the conversation; what reached the manager without waking it goes in as
+// hidden farmNews messages, kept. The manager on pi is refused.
 
 const (
-	// foremanSteps: steps the manager's trajectory keeps, more than a helper's, being the one that stays.
-	foremanSteps = 1000
-	// foremanStreamEvery: how often a reply still being written is pushed to the page.
+	foremanSteps       = 1000
 	foremanStreamEvery = 120 * time.Millisecond
 )
 
-// foremanVoiceNote is what the manager is told of a line said on a call it answers: its words are read out as they come.
 const foremanVoiceNote = "（这句话是主人在电话里说的，你的回答会念给主人听：口语，一两句，先说结论；不念代码、路径、命令和长列表。要用工具时可以先说一句「我看一下」。）"
 
 const foremanSystemPrompt = `你是码农场物语的管家。主人跟你说要做的活，你派农场里的帮工去做。帮工是真实的编码 agent（Claude Code、Codex、pi 等），在主人电脑上的目录里改代码、跑命令。你自己不写代码、不读文件，只派活、盯进度、转告结果。
@@ -73,12 +62,10 @@ const foremanSystemPrompt = `你是码农场物语的管家。主人跟你说要
 
 说话：中文，口语，简短，一般一两句。需要列点时可以用 Markdown，但不要贴大段代码。只说工具结果和汇报里有的东西，不要编造进度、文件名或结果。`
 
-// foremanAgentPrompt is what only vibevalley's own agent can do: it keeps a memory.
 const foremanAgentPrompt = `
 记性：
 - 主人说「记住」「以后都」，或者告诉你一个以后还用得上的偏好、约定：用 remember 记一句。记下的每次都在你的系统提示里。`
 
-// foremanCaller is a call's turn in progress (Call): its words go out as they grow, until the turn settles.
 type foremanCaller struct {
 	mu     sync.Mutex
 	queue  []string
@@ -108,7 +95,6 @@ func (c *foremanCaller) end() {
 	}
 }
 
-// pump hands the words on in order and closes out once the turn ended and all were handed, or when ctx ends.
 func (c *foremanCaller) pump(ctx context.Context, out chan<- string) {
 	defer close(out)
 	for {
@@ -152,40 +138,33 @@ type Foreman struct {
 	playbooks    *tickets.Playbooks
 	schedules    *tickets.Schedules
 	heartbeat    *tickets.Heartbeat
-	// runtime and model: $VIBEVALLEY_FOREMAN_RUNTIME (vibevalley or pi) and $VIBEVALLEY_FOREMAN_MODEL.
-	runtime protocol.Runtime
-	model   string
-	ctx     context.Context
+	runtime      protocol.Runtime
+	model        string
+	ctx          context.Context
 
-	// Stand-ins for tests: llm is the model to talk to (TS's ForemanLlm; nil: DeepSeek's); trace the manager's
-	// trajectory (opened at start when nil).
+	// Stand-ins for tests: llm nil is DeepSeek; trace nil is opened at start.
 	llm   *agent.LLM
 	trace base.Journal
 
-	// mu guards what the lines handled and the words said share.
-	mu sync.Mutex
-	// picked: the helper picked in the chat for the line being handled.
+	// Guards what the lines handled and the words said share.
+	mu     sync.Mutex
 	picked string
-	// quiet: the current run came from voice; its words stay off the farm (the voice agent answered already).
-	quiet bool
-	// replyTo: where the manager's words go, the conversation it is answering.
+	// The current run came from voice: its words stay off the farm, the voice agent answered already.
+	quiet   bool
 	replyTo int64
 	caller  *foremanCaller
-	// toCaller: how much of the message being said has gone to the caller (bytes).
+	// In bytes.
 	toCaller int
-	// said, open: each of its messages has a key of its own; open while one is being said.
 	said     int
 	open     bool
 	lastPush time.Time
 
-	// starting: one brain start at a time. A brain that could not start (no key yet) is tried again on the next line.
+	// A brain that could not start (no key yet) is tried again on the next line.
 	starting sync.Mutex
 	brain    *agent.Agent
 	stops    []func()
 }
 
-// foremanIn is what the manager is built from: everything it reads before a request, and the services its tools
-// act through.
 type foremanIn struct {
 	fx.In
 	Config       base.Config
@@ -212,7 +191,6 @@ func newForeman(in foremanIn) (*Foreman, error) {
 	}, nil
 }
 
-// start listens to what wakes the manager: the chat, schedules come due, the heartbeat, playbooks.
 func (fm *Foreman) OnStart(ctx context.Context) error {
 	fm.ctx = ctx
 	fm.replyTo = fm.chat.Square()
@@ -231,7 +209,6 @@ func (fm *Foreman) OnStart(ctx context.Context) error {
 	return nil
 }
 
-// foremanListen handles what a hub publishes, one at a time, until ctx ends.
 func foremanListen[T any](fm *Foreman, ctx context.Context, hub *base.Hub[T], handle func(T)) {
 	values, stop := hub.Subscribe()
 	fm.stops = append(fm.stops, stop)
@@ -267,8 +244,6 @@ func (fm *Foreman) here() int64 {
 	return fm.replyTo
 }
 
-// ── Who goes, and what the manager is told ───────────────────────────────────
-
 type foremanAgentInfo struct {
 	agent    protocol.AgentProfile
 	info     *protocol.RuntimeInfo
@@ -292,8 +267,6 @@ func (fm *Foreman) agentsWithIssues() []foremanAgentInfo {
 
 func foremanUsable(a foremanAgentInfo) bool { return a.agent.Enabled && len(a.blocking) == 0 }
 
-// choose is who goes when the manager names named (or no one) for task, by the farm's rules: named, picked in the
-// chat, then the best tag match.
 func (fm *Foreman) choose(task, named string) *protocol.AgentProfile {
 	var candidates []runs.Candidate
 	for _, a := range fm.agentsWithIssues() {
@@ -305,7 +278,6 @@ func (fm *Foreman) choose(task, named string) *protocol.AgentProfile {
 	return runs.ChooseAgent(candidates, task, named, picked)
 }
 
-// foremanQuota is what is left on an agent's runtime, as the manager reads it.
 func foremanQuota(info *protocol.RuntimeInfo) string {
 	var usage protocol.AccountUsage
 	budget := 0.0
@@ -335,7 +307,6 @@ func foremanQuota(info *protocol.RuntimeInfo) string {
 	return "额度：" + protocol.QuotaText(usage) + low + today
 }
 
-// situation is what the manager is told before each request: the helpers it can send, who is where, playbooks.
 func (fm *Foreman) situation() string {
 	var helpers []string
 	for _, a := range fm.agentsWithIssues() {
@@ -405,7 +376,6 @@ func (fm *Foreman) situation() string {
 		"\n各频道和地里的帮工：\n" + strings.Join(byChannel, "\n") + plans
 }
 
-// news is what reached the manager without waking it (helpers' reports, mostly), taken once; "" when nothing.
 func (fm *Foreman) news() string {
 	digest := fm.chat.ForemanDigest()
 	if len(digest) == 0 {
@@ -414,10 +384,6 @@ func (fm *Foreman) news() string {
 	return "这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + base.InboxLines(digest)
 }
 
-// ── The brain ────────────────────────────────────────────────────────────────
-
-// foremanDeepseekModel is the DeepSeek model a configured name means: `deepseek/<id>` or `<id>`; another provider's
-// is pi's to run.
 func foremanDeepseekModel(configured string) (string, error) {
 	if configured == "" {
 		return agent.DEFAULT_MODEL, nil
@@ -432,8 +398,7 @@ func foremanDeepseekModel(configured string) (string, error) {
 	return "", errors.New("管家只接 DeepSeek 的模型：VIBEVALLEY_FOREMAN_MODEL 设成 deepseek/<模型> 或直接写模型名，" + configured + " 用不了")
 }
 
-// brainOf is the manager's agent, started on first use: loading it is not free, and a farm without a model works
-// otherwise. Only one that started is kept.
+// Started on first use: loading it is not free, and a farm without a model works otherwise.
 func (fm *Foreman) brainOf() (*agent.Agent, error) {
 	fm.starting.Lock()
 	defer fm.starting.Unlock()
@@ -455,7 +420,6 @@ func (fm *Foreman) brainOf() (*agent.Agent, error) {
 		Situation:    func(context.Context) string { return fm.situation() },
 	}
 	if fm.llm == nil && testing.Testing() {
-		// A test that did not give the manager a model never reaches DeepSeek (or spends money).
 		return nil, errors.New("测试里管家没有模型")
 	}
 	if fm.llm != nil {
@@ -482,7 +446,6 @@ func (fm *Foreman) brainOf() (*agent.Agent, error) {
 	return a, nil
 }
 
-// follow turns the agent's events into the manager's words on the farm and its trajectory, in order.
 func (fm *Foreman) follow(events *agentcore.Subscription[agent.AgentEvent]) {
 	defer events.Close()
 	for {
@@ -543,9 +506,6 @@ func (fm *Foreman) event(e agent.AgentEvent) {
 	}
 }
 
-// ── Its words onto the farm (the mouth) ──────────────────────────────────────
-
-// keyLocked is the key of the message being said: a new one when none is open.
 func (fm *Foreman) keyLocked() string {
 	if !fm.open {
 		fm.open = true
@@ -554,7 +514,6 @@ func (fm *Foreman) keyLocked() string {
 	return fmt.Sprintf("m%d", fm.said)
 }
 
-// grow: the message being said, so far.
 func (fm *Foreman) grow(text string) {
 	fm.mu.Lock()
 	if fm.caller != nil && len(text) > fm.toCaller {
@@ -573,10 +532,8 @@ func (fm *Foreman) grow(text string) {
 	fm.chat.ForemanSays(to, key, text, false)
 }
 
-// done: a message said in full.
 func (fm *Foreman) done(text string) {
 	fm.mu.Lock()
-	// The rest of this message to the caller, and a pause before the next (it may speak again after a tool).
 	if fm.caller != nil && len(text) > fm.toCaller {
 		fm.caller.push(text[fm.toCaller:])
 	}
@@ -593,7 +550,6 @@ func (fm *Foreman) done(text string) {
 	}
 }
 
-// settled: the run is over, nothing more queued.
 func (fm *Foreman) settled() {
 	fm.mu.Lock()
 	if fm.caller != nil {
@@ -607,8 +563,7 @@ func (fm *Foreman) settled() {
 	fm.site.SetForeman(protocol.ForemanStateListening)
 }
 
-// send hands a line to the manager in conversation: now joins the run under way (the person's words); otherwise it
-// waits until the run would stop (a schedule, a playbook's notice, a helper's report).
+// now joins the run under way; otherwise the line waits until the run would stop.
 func (fm *Foreman) send(line string, conversation int64, now bool) {
 	fm.trace.Asked(line, nil)
 	brain, err := fm.brainOf()
@@ -620,7 +575,6 @@ func (fm *Foreman) send(line string, conversation int64, now bool) {
 			said = "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。"
 		}
 		fm.chat.ForemanSays(conversation, fmt.Sprintf("failed%d", base.NowMs()), said, true)
-		// A call waiting for words hears why, and is done.
 		fm.mu.Lock()
 		if fm.caller != nil {
 			fm.caller.push("我这边起不来：" + err.Error())
@@ -643,7 +597,6 @@ func (fm *Foreman) send(line string, conversation int64, now bool) {
 	deliver(agent.UserMessage(line))
 }
 
-// pickedNote is the line saying which helper the person picked in the chat; "" when none.
 func (fm *Foreman) pickedNote(picked string) string {
 	if picked == "" {
 		return ""
@@ -654,8 +607,6 @@ func (fm *Foreman) pickedNote(picked string) string {
 	return ""
 }
 
-// heardInChat is what the chat brings the manager: the person's words for it, an @管家, a helper that failed. A
-// person asking is answered at once; a helper's report waits until the manager is free.
 func (fm *Foreman) heardInChat(news base.ForemanNews) {
 	fromPerson := !slices.ContainsFunc(news.Messages, func(m base.InboxMessage) bool { return m.From != "user" })
 	if fromPerson && news.Conversation == fm.chat.Square() {
@@ -672,8 +623,6 @@ func (fm *Foreman) heardInChat(news base.ForemanNews) {
 	fm.send("【田头】"+news.Target+" 里有给你的话：\n"+base.InboxLines(news.Messages)+"\n\n你的回答会发在 "+news.Target+"。", news.Conversation, fromPerson)
 }
 
-// onDue is a schedule come due (its notice is in the channel already): the manager is asked, in that channel, when it
-// is free. One naming an agent is a recurring issue, Dispatch's.
 func (fm *Foreman) onDue(due base.Due) {
 	s := due.Schedule
 	channel := fm.chat.ChannelOf(s.Channel)
@@ -687,10 +636,6 @@ func (fm *Foreman) onDue(due base.Due) {
 	fm.send(fmt.Sprintf("【定时任务「%s」到点了%s】\n%s\n\n这是 #%s 的定时（%d 号），你的回答会发在那里；照着做，做完说一两句。", s.Name, missed, s.Text, channel.Name, s.ID), channel.ID, false)
 }
 
-// ── What the farm asks of it ─────────────────────────────────────────────────
-
-// Say is the person saying something in the chat (the square, or conversation). It reaches the manager only when
-// it is for the manager (the chat decides). agent is the helper picked in the chat, if any.
 func (fm *Foreman) Say(ctx context.Context, text, agentID string, conversation *int64) error {
 	picked := ""
 	if a := fm.store.Agent(agentID); agentID != "" && a != nil {
@@ -703,8 +648,7 @@ func (fm *Foreman) Say(ctx context.Context, text, agentID string, conversation *
 	return err
 }
 
-// Heard is something said to the voice agent, which already answered out loud: the manager acts on it, in
-// silence. When the manager answers calls itself, what was said reached it on the voice line already.
+// When the manager answers calls itself, what was said reached it on the voice line already.
 func (fm *Foreman) Heard(text, agentID string) {
 	if _, ok := fm.settings.Voice().LLM.Value.(protocol.VoiceLLMVibeValley); ok {
 		return
@@ -720,9 +664,7 @@ func (fm *Foreman) Heard(text, agentID string) {
 	fm.send(fm.pickedNote(picked)+"（这句话是主人用语音说的，语音那边已经回答了。你只要按需派活，不用回复。）\n主人说："+text, fm.chat.Square(), true)
 }
 
-// Call is something said on a call the manager answers itself (the voice line): its words for this turn, as they
-// grow, to be read out; the channel closes when the turn settles, or ctx ends. A newer line on the call ends the one
-// before.
+// A newer line on the call ends the one before.
 func (fm *Foreman) Call(ctx context.Context, text string) <-chan string {
 	out := make(chan string)
 	me := &foremanCaller{signal: make(chan struct{}, 1)}
