@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-一个配置页 `/assets`（`app/lib/desk/assets/`），叫「图鉴」，三个书架：图、指针、音效（[game-ui.md](../../../../docs/game-ui.md)「界面清单」）。
+一个配置页 `/assets`（`app/lib/desk/assets/`），叫「图鉴」，三个书架：图、指针、音效（[farm-ui.md](../../../../docs/reference/farm-ui.md)「界面清单」）。
 
 - **只读应用已经打包的东西**：图来自 `app/assets/pixel/sprites.json`，指针来自 `app/assets/cursors/cursors.json`，音效来自 `app/lib/shell/sfx.dart` 的配方。页面没有自己的素材清单，切了新图它就出现。（当时图和指针都是手绘、像素各一份，后来只留像素的一套，见 [只留像素村](../simplification/2026-10-12-pixel-only.md)。）
 - **清单记下每张图切自哪张原图**（`sheet`，从仓库根算的路径），当时两条切图流水线（`cut_sheets.py`、`design/pixel/process.py`）都写，现在只剩 `design/pixel/process.py`（`cut_sheets.py` 已经删了）。页面按它给出重画和重新切的命令（`remakeOf`）。旧清单是用一次性的脚本补上的，没有重新切图。

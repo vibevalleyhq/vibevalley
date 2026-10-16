@@ -14,7 +14,7 @@ oar 能驱动八种 runtime，种子里的七个帮工档案分在 claude、code
 - 主人现有的配置里，其他 runtime 在「农具」页里停用；停用的不读额度，顶栏的精力瓶也不显示它们。
 - 代码里多 runtime 的支持（参数限制、插话能力、额度读法）都保留，重新启用就能用。
 
-档案名字里的 Kimi、Grok、反重力是当初对应的 runtime，没有改名（[agents-and-runtimes.md](../../../../docs/agents-and-runtimes.md)「种子档案」）。
+档案名字里的 Kimi、Grok、反重力是当初对应的 runtime，没有改名（[agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「种子档案」）。
 
 pi 这条路打磨好以后，claude 和 codex 接了回来（2026-10-11，[claude-and-codex](../feature/2026-10-11-claude-and-codex.md)），各有一个种子档案；opencode、grok、kimi、antigravity、cursor 仍然停用，逐个接回（[other-runtimes](../../proposed/feature/2026-10-10-other-runtimes.md)）。
 

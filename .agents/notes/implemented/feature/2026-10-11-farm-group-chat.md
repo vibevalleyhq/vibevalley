@@ -15,7 +15,7 @@ Raft（botiverse 的人机协作工作区，[源码](https://github.com/botivers
 
 ## Decision
 
-田头是一个跑在本机的小 Raft：人和 agent 在同一个群聊里说话，帮工自己汇报、自己提问、互相交接。行为和接口见 [server.md](../../../../docs/server.md)「田头」、[architecture.md](../../../../docs/architecture.md)「核心状态」、[game-ui.md](../../../../docs/game-ui.md) 界面 16；规则是 protocol 的纯函数（`server/internal/protocol/chat.go`、`chat_rules.go`）。下面只记决定了什么。
+田头是一个跑在本机的小 Raft：人和 agent 在同一个群聊里说话，帮工自己汇报、自己提问、互相交接。行为和接口见 [server.md](../../../../docs/reference/server.md)「田头」、[architecture.md](../../../../docs/architecture.md)「核心状态」、[farm-ui.md](../../../../docs/reference/farm-ui.md) 界面 16；规则是 protocol 的纯函数（`server/internal/protocol/chat.go`、`chat_rules.go`）。下面只记决定了什么。
 
 ### 对话的样子
 

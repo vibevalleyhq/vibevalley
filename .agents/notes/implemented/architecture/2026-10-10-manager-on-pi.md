@@ -17,7 +17,7 @@ Status: implemented
 - 会话存在 `$VIBEVALLEY_HOME/manager`，启动时接着最近的一个。
 - 每句话前面附上「农场现状」，管家不用先查也知道现场。帮工在田头上自己汇报；没做成的汇报作为一条消息交给管家，它说卡在哪、问下一步（[农场群聊](../feature/2026-10-11-farm-group-chat.md)）。
 
-具体行为见 [server.md](../../../../docs/server.md)「管家」。
+具体行为见 [server.md](../../../../docs/reference/server.md)「管家」。
 
 ## Alternatives considered
 

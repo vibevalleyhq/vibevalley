@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-行为见 [server.md](../../../../docs/server.md)「记性」，帮工页上的样子见 [agents-and-runtimes.md](../../../../docs/agents-and-runtimes.md)「捏帮工」。
+行为见 [server.md](../../../../docs/reference/server.md)「记性」，帮工页上的样子见 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「捏帮工」。
 
 - **记性跟着 agent 走**：键是帮工档案的 id，从它派出去的帮工共用一份，跨项目、跨重启。存在服务端数据库的 `memories` 表里（`server/migrations/0001_farm.sql`），不放核心状态：页面只在打开帮工页时读，用不着每个事实都带着它。
 - **一层服务，两个口子**：`Memories` 服务（`server/internal/memory/memory.go`）对帮工的会话（`runs/crew.go`）只露 `Recall`（一轮开始前，给一个线索：哪个 agent、哪个帮工、哪个项目、这一轮的话）和 `Keep`（一轮结束后，给整轮：工单、结局、原话、结论）。`crew.go` 不知道记性存在哪、怎么挑。页面用同一个服务的 `List`、`Write`、`Forget`。换一种存法（向量检索、外面的记忆服务）就是同一个服务的另一种实现。

@@ -12,7 +12,7 @@ Status: implemented
 
 ## Decision
 
-行为见 [server.md](../../../../docs/server.md)「帮工」里的「轨迹」和 [agents-and-runtimes.md](../../../../docs/agents-and-runtimes.md)「管家页」「捏帮工」。
+行为见 [server.md](../../../../docs/reference/server.md)「帮工」里的「轨迹」和 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「管家页」「捏帮工」。
 
 - **轨迹就是干活过程加上它是谁的**。步骤还是 `WorkStep`，一条轨迹一个 journal（`server/internal/runs/steps.go` 的 `crewJournal`）。另外多一个头（protocol 的 `TrajectoryHead`），记名字、帮工档案、农机、项目、工单、什么时候开始、什么时候结束。两样都放在 `$VIBEVALLEY_HOME/steps/`：`<id>.json` 和 `<id>.head.json`。
 - **`Trajectories` 服务管轨迹从开始到删掉**（`internal/runs/trajectories.go`）。`crew.go` 派活时 `Open`，帮工离开时 `Finish`。`Finish` 只是写完、关上、标上结束，不删文件。走了超过 `VIBEVALLEY_TRAJECTORY_DAYS` 天（默认 30，0 是一直留着）的轨迹，服务端启动时删掉它的步骤；头留着，因为它就是一张工单（[工单](2026-10-14-tickets.md)），看板上的历史不该过一个月就消失。工具的输入和输出比只在地块详情里看时留得多（输入 4000 字，输出开头 2000、结尾 4000），事后翻看时能看出发生了什么。

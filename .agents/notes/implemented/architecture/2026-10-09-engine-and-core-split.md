@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> 已被取代：这三层随 [网页退役](../simplification/2026-10-14-retire-the-web-page.md) 删掉了。农场的规则现在是服务端 Go 的纯函数（`server/internal/protocol`）；客户端是一个 Flutter 包（[客户端迁到 Flutter](2026-10-13-flutter-client-over-ts-server.md)），和 VibeValley 无关的那一半（像素村、素材、音效）在 `app/lib/village/`、`app/lib/shell/`（[framework.md](../../../../docs/framework.md)），和其余部分之间没有边界检查。下面是当时的决策。
+> 已被取代：这三层随 [网页退役](../simplification/2026-10-14-retire-the-web-page.md) 删掉了。农场的规则现在是服务端 Go 的纯函数（`server/internal/protocol`）；客户端是一个 Flutter 包（[客户端迁到 Flutter](2026-10-13-flutter-client-over-ts-server.md)），和 VibeValley 无关的那一半（像素村、素材、音效）在 `app/lib/village/`、`app/lib/shell/`（[pixel-village.md](../../../../docs/reference/pixel-village.md)），和其余部分之间没有边界检查。下面是当时的决策。
 
 ## Problem
 
@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-分三层，依赖只往下（[framework.md](../../../../docs/framework.md)）：
+分三层，依赖只往下（[pixel-village.md](../../../../docs/reference/pixel-village.md)）：
 
 - `packages/engine`：和具体游戏无关的框架。`core`（Effect 原语：`state`、`waitFor`、`timedList`、`dayClock`、`toolbox`）、`react`（画面部件）、`audio`（合成音效）、`nav`（寻路）。
 - `packages/core`：农场：核心状态的副本、游戏状态和规则、命令。只依赖 effect、protocol 和 engine/core。外面的东西（后端、存档、时间、语音）都是服务。

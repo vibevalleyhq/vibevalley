@@ -132,7 +132,7 @@ VibeValley 别人难抄的是三样：
 - 游戏层只有 TS；Pixi 只在 `engine/pixi` 里出现。
 - 渲染边界是 engine 里的一个接口，有测试；像素页的整个画面都由快照驱动，点击只往外送意图。
 - 世界和图层、镜头、角色三个模块在 engine 里，各有测试；「帮工去哪」是 core 的纯函数，有测试。
-- 画面预算的检查脚本能跑，结果写进 [framework.md](../../../../docs/framework.md)。
+- 画面预算的检查脚本能跑，结果写进 [pixel-village.md](../../../../docs/reference/pixel-village.md)。
 - 仓库里没有 Rust。哪天要加，先有一篇 Note 说明满足了上面三条里的哪一条。
 
 ## Risks

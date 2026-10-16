@@ -13,12 +13,13 @@
 | [README.md](README.md) | 文档地图和用语表 | 文档内容本身 |
 | 教程：[guide.md](guide.md)、[development.md](development.md) | 照着做走到一个结果：使用、开发 | 完整的清单和表（链接到参考）、理由 |
 | [architecture.md](architecture.md) | 按顺序的地图：分层、核心状态、工地事件、接口、存储、环境变量；改 `server/`、`app/` 之前读 | 各包的细节、决策理由 |
-| 各篇参考（[concepts.md](concepts.md)、[code-style.md](code-style.md)、[server.md](server.md)、[agents-and-runtimes.md](agents-and-runtimes.md)、[game-ui.md](game-ui.md)、[framework.md](framework.md)、[voice.md](voice.md)、[desktop.md](desktop.md)） | 一个子系统现在的行为和约定 | 教学步骤（→ 教程）、理由（→ Note）、历史、计划 |
+| [concepts.md](concepts.md) 和 `reference/` 下的各篇 | 一个子系统现在的行为和约定 | 教学步骤（→ 教程）、理由（→ Note）、历史、计划 |
+| `style/` 下的各篇（[code.md](style/code.md)、[writing.md](style/writing.md)） | 代码和文字怎么写 | 某个子系统的行为 |
 | [Agent Notes](../.agents/notes/README.md) | 决策：为什么、放弃了什么、怎么验证；提案 | 现在的行为说明（→ 文档）、上线后的计划和待办 |
 | 包的 README（`server/README.md`、`app/README.md`、`site/README.md`） | 这个包的对外约定：管什么、导出什么、依赖谁、不变量、测试 | 别的包的事、代码注释的复述 |
-| 代码注释（[写法](code-style.md#注释)） | 这段代码的约定和不显然的约束 | 推理过程、测试流程、远处的行为、概述和历史 |
+| 代码注释（[写法](style/code.md#注释)） | 这段代码的约定和不显然的约束 | 推理过程、测试流程、远处的行为、概述和历史 |
 
-`docs/` 里只放文档：教程和参考。设计过程里的东西不放这里：理由 → Note；还没做的大事 → `proposed/` Note；风险和取舍 → 它所属决策的 Note。包的约定 → 包 README；常驻规矩 → 根目录 `AGENTS.md`，附上理由的链接。
+`docs/` 里只放文档：教程、参考和写法。设计过程里的东西不放这里：理由 → Note；还没做的大事 → `proposed/` Note；风险和取舍 → 它所属决策的 Note。包的约定 → 包 README；常驻规矩 → 根目录 `AGENTS.md`，附上理由的链接。
 
 每篇文档要么是教程，要么是参考：教程按顺序带人走到一个结果，每一步只讲这一步要的；参考按主题查，写现在的行为，不讲顺序。两种内容都有时分开写，小的那部分加标题标明。
 
@@ -29,7 +30,7 @@
 - **用农场的叫法**（[用语表](README.md#用语)）；代码名第一次出现时加上。
 - **直接写**：说清是谁、做什么、什么时候、出错怎样。不写推理过程，不复述代码。
 - **相对链接**：链接仓库里的文件用相对 Markdown 链接，`bun run docs:verify` 会检查它们都能打开。
-- 用中文写，汉字和英文、数字之间留一个空格；一段一个意思。
+- **句子怎么写**照 [style/writing.md](style/writing.md)：用中文写，一句一事，汉字和英文、数字之间留一个空格。
 
 ## 检查清单
 

@@ -8,7 +8,7 @@ Status: proposed
 
 ## Proposal
 
-照 claude 和 codex 的做法，逐个启用、逐个跑通：登录、模型列表、额度、插话、汇报、失败分类、花费（有套餐的按窗口，不按钱），以及用量什么时候报（claude 只在一轮结束时报，汇报因此要等这一帧处理完）。每接通一个，把它的差异记进 [agents-and-runtimes.md](../../../../docs/agents-and-runtimes.md)「在用的农机」的对照表，种子里给它一个档案。
+照 claude 和 codex 的做法，逐个启用、逐个跑通：登录、模型列表、额度、插话、汇报、失败分类、花费（有套餐的按窗口，不按钱），以及用量什么时候报（claude 只在一轮结束时报，汇报因此要等这一帧处理完）。每接通一个，把它的差异记进 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「在用的农机」的对照表，种子里给它一个档案。
 
 ## Alternatives considered
 

@@ -1,8 +1,8 @@
 # 农场界面和玩法
 
-农场是一座像素画的小院（`/`）：帮工照手上的事走去书屋、工坊、电台，地里的庄稼按进度长；面板的入口是院子里的小摊、告示板、邮筒这些东西。农场里的东西怎么对上实际的概念见 [concepts.md](concepts.md)「农场是皮」；像素村怎么画、寻路、音效和素材见 [framework.md](framework.md)。
+农场是一座像素画的小院（`/`）：帮工照手上的事走去书屋、工坊、电台，地里的庄稼按进度长；面板的入口是院子里的小摊、告示板、邮筒这些东西。农场里的东西怎么对上实际的概念见 [concepts.md](../concepts.md)「农场是皮」；像素村怎么画、寻路、音效和素材见 [pixel-village.md](pixel-village.md)。
 
-画风照型号 B「温室花园」（效果图在原图仓库 vibevalley-art，`design/art.sh` 链接进来；[为什么是农场](../.agents/notes/implemented/feature/2026-10-09-farm-instead-of-construction-site.md)、[为什么是像素](../.agents/notes/implemented/feature/2026-10-11-pixel-village.md)）。字体是 Fusion Pixel 12px，字号只用 12 和 24。
+画风照型号 B「温室花园」（效果图在原图仓库 vibevalley-art，`design/art.sh` 链接进来；[为什么是农场](../../.agents/notes/implemented/feature/2026-10-09-farm-instead-of-construction-site.md)、[为什么是像素](../../.agents/notes/implemented/feature/2026-10-11-pixel-village.md)）。字体是 Fusion Pixel 12px，字号只用 12 和 24。
 
 ## 角色
 
@@ -50,7 +50,7 @@
 | 手 | 空地：播种（界面 3）；有帮工：看详情（界面 2） |
 | 浇水 | 给帮工带句话 |
 | 杀虫 | 失败的地：让它接着修 |
-| 除草 | 等你批准的权限请求（[提案](../.agents/notes/proposed/feature/2026-10-10-permission-requests-as-weeds.md)）；现在只有提示 |
+| 除草 | 等你批准的权限请求（[提案](../../.agents/notes/proposed/feature/2026-10-10-permission-requests-as-weeds.md)）；现在只有提示 |
 | 收获 | 先开收成清单（界面 15），确认后合进项目。计划里的步骤不在这里收 |
 | 铲除 | 干着活就叫停，否则请它收工 |
 
@@ -63,7 +63,7 @@
 3. **播种袋**（点空地）：从最多 8 张种子（你写过的工单、给项目的常用工单）里挑一张或自己写，选谁来种。
 4. **帮工栏**（左下）：每个档案一个头像和它农机的体力条，最后一格是「捏帮工」。点一个看它的战绩，可以「下一单派它」。
 5. **捏帮工**（`/agents/:id`，[agents-and-runtimes.md](agents-and-runtimes.md)「捏帮工」）。
-6. **商店**：只列着，买不了（[提案](../.agents/notes/proposed/feature/2026-10-09-shop-and-daily-tasks.md)）。
+6. **商店**：只列着，买不了（[提案](../../.agents/notes/proposed/feature/2026-10-09-shop-and-daily-tasks.md)）。
 7. **仓库**：收获了的工单，每张一格（计划也是一格）。
 8. **任务与成就**（`app/lib/farm/achievements.dart`）：等级、金币、称号，新手任务，开垦，成就墙，彩蛋。
 9. **农场日志**：你、管家说的话和帮工的汇报，按时间倒序，最多 80 行。
@@ -76,7 +76,7 @@
 16. **田头**（右下角的小窗，不占位置）：上面是频道名和管家的状态，点开频道菜单切频道、开频道、看定时；中间是气泡，派活消息下面挂着工单串，汇报带「做完了」「没做成」「叫停了」标签；下面是输入框和麦克风，打 `@` 叫人。看到的就算读过。**聊天页**（`/chat`）是同一个田头摊开成整页：频道、帮工、消息和串。
 17. **管家和宠物**：换管家的样子和宠物，存在本机的偏好里。
 18. **种植计划**（院子里的图纸桌）：上面是计划列表和「新计划」；选中的计划有目标、分支、进度和按状态变的按钮（开工、暂停、继续、收获、放弃）；下面按先后分列画出每一步，验收步骤标「验收」；最下面是计划的经过。
-19. **地图**（`/map`，[截图](images/map.png)）：工作目录下的每个项目是一座小岛，岛上的地是它的 worktree 和空位（`ProjectSummary.slots`）；农场空着的地不够时，多的位置是锁住的地。排队的活是院门外的种子袋。点帮工打开它的工单，点空位写一张工单，点岛看这个项目。
+19. **地图**（`/map`，[截图](../images/map.png)）：工作目录下的每个项目是一座小岛，岛上的地是它的 worktree 和空位（`ProjectSummary.slots`）；农场空着的地不够时，多的位置是锁住的地。排队的活是院门外的种子袋。点帮工打开它的工单，点空位写一张工单，点岛看这个项目。
 
 **工作台**（`app/lib/app/desk.dart`）：干活和配置的地方，农场是看和玩的地方。最左一条木色的栏：管家头像（回农场）、聊天、工单、地图、帮工、农具、技能书、连接器、项目、声音、院门、图鉴、设置。农具里每台农机画成一件农机，钉着那家 agent 的 logo（来自 LobeHub Icons）。
 
@@ -93,13 +93,13 @@
 
 ## 计分
 
-金币、连胜、成就奖的是**收进主分支的活**，不是命令数或花掉的 token（[理由](../.agents/notes/implemented/feature/2026-10-11-achievements.md)）。它们由服务端的账本折出来（`server/internal/protocol/progress.go`），客户端只显示。回报只是金币和称号，不改变帮工怎么干活。
+金币、连胜、成就奖的是**收进主分支的活**，不是命令数或花掉的 token（[理由](../../.agents/notes/implemented/feature/2026-10-11-achievements.md)）。它们由服务端的账本折出来（`server/internal/protocol/progress.go`），客户端只显示。回报只是金币和称号，不改变帮工怎么干活。
 
 | 机制 | 规则 |
 |---|---|
 | 金币 | 一个帮工的活收进主分支：`(30 + min(提交数 × 5, 30)) × 连胜倍率`。收获一个种植计划：`30 + 10 × 合进去的步数`。新手任务每个 20；成就的铜、银、金档各 10、30、60；彩蛋 50 |
 | 连胜 | 连着收进去的活，倍率每件 +10%，最多 ×2；有帮工没做成就清零 |
-| 经验 | 工作目录下所有 git 仓库里你名下的 commit（[理由](../.agents/notes/implemented/feature/2026-10-10-experience-is-commits.md)）；邮箱按 git 的 user.email 加 `VIBEVALLEY_GIT_EMAILS` |
+| 经验 | 工作目录下所有 git 仓库里你名下的 commit（[理由](../../.agents/notes/implemented/feature/2026-10-10-experience-is-commits.md)）；邮箱按 git 的 user.email 加 `VIBEVALLEY_GIT_EMAILS` |
 | 等级 | 从 Lv.n 升到 Lv.n+1 要 `10n` 个 commit；Lv.5、8、12 各开垦一块地 |
 | 成就 | 见下表；计数的分铜、银、金三档 |
 | 称号 | 拿到的任何一档（新手任务除外）都能挂在农场卡上 |
@@ -120,4 +120,4 @@
 | | 运筹帷幄 | 有一批步骤同时做的计划，收获了 | 1 / 3 / 10 |
 | 彩蛋 | 夜猫子、周末农夫、满园春色 | 0–5 点收进一件活；周末收进一件活；六块地同时有人干活 | 一次 |
 
-手机屏幕上整张农场按比例缩小，竖屏布局见[提案](../.agents/notes/proposed/feature/2026-10-09-mobile-layout.md)。
+手机屏幕上整张农场按比例缩小，竖屏布局见[提案](../../.agents/notes/proposed/feature/2026-10-09-mobile-layout.md)。

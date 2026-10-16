@@ -12,7 +12,7 @@ Status: implemented
 - 失败按 smith 的失败分类（`observe.FailureAdviceOf`）说人话（登录有问题、额度用完、限流、余额不够、模型用不了、上下文太长、服务商出错、进程退出……），加上怎么办（再试一次、过一阵再试、要你先处理）；要主人处理的另外发一条醒目的提醒。
 - 管家转述时读汇报的开头（失败原因）和结尾（结论）。（后来帮工在田头上自己汇报，管家不再转述，见 [农场群聊](2026-10-11-farm-group-chat.md)。）
 
-见 [server.md](../../../../docs/server.md)「帮工」。
+见 [server.md](../../../../docs/reference/server.md)「帮工」。
 
 ## Alternatives considered
 

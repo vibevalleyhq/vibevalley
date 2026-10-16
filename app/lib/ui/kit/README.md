@@ -19,7 +19,7 @@
 | `PxMarkdown`、`withMentions`、`plainText`、`parseMarkdown`、`parseInline` | 自己写的 GFM 子集解析器；`@w3` 这样的名字画成小标签；链接通过 `onOpenLink` 或 `kitOpenLink` 打开 |
 | `actionLabel`、`actionMeaning`、`phaseLabel`、`foremanLabel`、`outcomeLabel`、`runtimeLabel`、`ago` | 动作、阶段、管家状态、一轮的结果、农机的叫法，和「多久前」 |
 | `SpriteIcon`、`ActionGlyph`、`PhaseGlyph`、`outcomeIcon`、`Marked` | 图标都是 `design/pixel` 生成的贴图，不用字符代替（像素字体里没有 ✓、✗、›） |
-| `EnergyBottle`、`StaminaBar`、`quotaOf`、`Quota`、`QuotaLevel`、`windowLabel`、`bottleSprite`、`quotaLeft`、`quotaText`、`quotaLow` | 精力瓶和体力条（[game-ui.md](../../../../docs/game-ui.md#精力瓶)） |
+| `EnergyBottle`、`StaminaBar`、`quotaOf`、`Quota`、`QuotaLevel`、`windowLabel`、`bottleSprite`、`quotaLeft`、`quotaText`、`quotaLow` | 精力瓶和体力条（[farm-ui.md](../../../../docs/reference/farm-ui.md#精力瓶)） |
 | `toasts`、`ToastManager`、`ToastViewport`、`ToastType`、`noticeTitle` | 提示。奖章和成就上方那行字由 FX 层通过 `leading`、`kicker` 传进来 |
 | `KitTappable`、`KitText`、`PxWindow`、`DashedLine`、`kitDrop`、`pxRing`、`FillWidth`、`PxScrollView`、`currentColor` | 写新零件时用到的基础件。`pxRing` 是那条 2 px 的 cream-300 内线，用作 `foregroundDecoration`，不占内容的位置；`PxScrollView` 的裁剪比自己大一圈，贴边的框能露出外框线和投影 |
 

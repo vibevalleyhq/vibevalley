@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-见 [server.md](../../../../docs/server.md)「项目和收获」，要点：
+见 [server.md](../../../../docs/reference/server.md)「项目和收获」，要点：
 
 - 工作目录（`VIBEVALLEY_WORK_ROOT`）下的每个文件夹是一个项目，都是 git 仓库；派活必须指定项目，不存在就新建并做初始提交。
 - 每个帮工在 `<工作目录>/.worktrees/` 下有自己的 worktree，分支 `vibevalley/<帮工>-<时间>`；帮工按规矩做完一轮就提交。

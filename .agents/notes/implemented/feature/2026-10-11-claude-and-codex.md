@@ -15,7 +15,7 @@ claude 和 codex 跟 pi 并列使用：
 - **花费只记 token**：pi 的价目表里没有它们，所以不折成人民币，也没有每日预算。
 - **汇报晚一拍**：claude 只在一轮结束的那一帧里报用量，排在 `turn_ended` 后面，而 smith 收到 `turn_ended` 就当场发出汇报。crew 等这一轮的事件都读完（`server/internal/runs/crew.go` 的 `reports`；TypeScript 服务端时是等下一个宏任务）再施加汇报，所以汇报带得上这一轮的花费。种植计划合并一步时用的花费也来自这里。
 
-其余都是本来就按 runtime 通用的代码，这次在真实项目里跑通了：会话、人设和技能、工具的分类、失败的分类、插话、worktree 里提交、收获。各农机的差别见 [agents-and-runtimes.md](../../../../docs/agents-and-runtimes.md)「在用的农机」。
+其余都是本来就按 runtime 通用的代码，这次在真实项目里跑通了：会话、人设和技能、工具的分类、失败的分类、插话、worktree 里提交、收获。各农机的差别见 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「在用的农机」。
 
 ## Alternatives considered
 

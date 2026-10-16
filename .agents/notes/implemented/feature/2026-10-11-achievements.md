@@ -14,7 +14,7 @@ Status: implemented
 
 ## Decision
 
-行为和规则表见 [game-ui.md](../../../../docs/game-ui.md)「计分」和界面 8「任务与成就」，账本怎么记见 [server.md](../../../../docs/server.md)「账本」。
+行为和规则表见 [farm-ui.md](../../../../docs/reference/farm-ui.md)「计分」和界面 8「任务与成就」，账本怎么记见 [server.md](../../../../docs/reference/server.md)「账本」。
 
 - **奖结果，不奖消耗**：金币、连胜、成就都以「收进主分支的活」为准，和等级按真实的 commit 数算一个道理。一轮做完不给金币；命令数、读写次数不进任何规则。
 - **一本账本，在服务端**：服务端把值得记的事按顺序记进数据库的 `ledger` 表（`server/internal/game/ledger.go`）。金币、连胜、成就是账本按顺序折出来的（protocol 的 `progress.go`：`ProgressStep` 一次折一条，`ProgressFold` 折整本），放进核心状态的 `FarmState.progress`，由 `progress` 事实施加；这一条带来了什么（金币、给哪个帮工、到了哪几档）跟在事实的 `news` 里。各个客户端、重启后看到的是同一份；客户端关着时发生的事也算；规则改了，重启时从账本重新折一遍就是新的结果。`farm.json` 不存进度。

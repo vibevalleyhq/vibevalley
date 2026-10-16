@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-主界面是一座 QQ 农场那样的 2.5D 卡通农场（[game-ui.md](../../../../docs/game-ui.md)）：
+主界面是一座 QQ 农场那样的 2.5D 卡通农场（[farm-ui.md](../../../../docs/reference/farm-ui.md)）：
 
 - 请 codex 按同一套内容出了四个型号（经典农场、温室花园、夜间科技温室、竖屏掌上），选定 B「温室花园」：柔和的奶油色、圆角卡片、抬高的花坛当田。
 - 主场景是 2D：一张画好的背景，田地、帮工、管家和狗都是贴上去的精灵，DOM 里摆位置，CSS 做动画，不用 three.js。

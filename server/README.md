@@ -1,6 +1,6 @@
 # server：VibeValley 的服务端
 
-VibeValley 唯一的服务端：答 VibeValleyApi、`/api/site/events`、`/api/site/state` 和 `/mcp`，给 Flutter 客户端。`farm` 是一个库，`cmd/vibevalley` 单独跑它；Flutter 的 macOS 应用把 `cmd/vibevalley` 编进应用、开机拉起（[desktop.md](../docs/desktop.md)）。行为见 [docs/server.md](../docs/server.md)；为什么用 Go、建在 smith 上见 [服务端用 Go 重写](../.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)。
+VibeValley 唯一的服务端：答 VibeValleyApi、`/api/site/events`、`/api/site/state` 和 `/mcp`，给 Flutter 客户端。`farm` 是一个库，`cmd/vibevalley` 单独跑它；Flutter 的 macOS 应用把 `cmd/vibevalley` 编进应用、开机拉起（[desktop.md](../docs/reference/desktop.md)）。行为见 [docs/reference/server.md](../docs/reference/server.md)；为什么用 Go、建在 smith 上见 [服务端用 Go 重写](../.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)。
 
 Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite`）。
 
@@ -21,7 +21,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 | `pkg/agora` | 声网（Agora）：签令牌、拼语音 agent 的请求；不认识农场 |
 | `pkg/weixin`、`pkg/feishu`、`pkg/qq` | 微信、飞书、QQ 机器人的接口：登录、收、发；每个有 `API` 接口（测试换成假的）和真的 `Client`。不认识农场，账号和谁是主人在 `channels` 的桥里 |
 | `pkg/smith` | oar 的 Go 移植（[README](pkg/smith/README.md)），驱动各家编码 agent |
-| `cmd/vibevalley` | 单独跑的服务端：听 `$HOST:$PORT`（默认 `127.0.0.1:8787`）；环境变量先看已经设了的，再看 `--env-file` 和 `$VIBEVALLEY_HOME/.env`；`--log 文件` 把日志也追加到文件里。子命令 `migrate`、`import` 见 [server.md](../docs/server.md)「搬家」 |
+| `cmd/vibevalley` | 单独跑的服务端：听 `$HOST:$PORT`（默认 `127.0.0.1:8787`）；环境变量先看已经设了的，再看 `--env-file` 和 `$VIBEVALLEY_HOME/.env`；`--log 文件` 把日志也追加到文件里。子命令 `migrate`、`import` 见 [server.md](../docs/reference/server.md)「搬家」 |
 | `cmd/vibevalley-agent` | VibeValley 自己的 agent 的命令行 |
 | `tool` | 开发时的工具，不进产品：`shapegen`（Go）从 `protocol` 的形状写出 `gen.go` 和 Flutter 的 `lib/gen`；两个 Node 脚本（自己的 `package.json`）：`pi-prices.ts` 写 pi 的价目表 `internal/runs/pi_prices.json`，`dump-pglite.ts` 给 `vibevalley import` 倒出旧数据库 |
 
@@ -69,9 +69,9 @@ go run ./tool/shapegen          # 写 protocol/gen.go 和 ../app/lib/gen/vibeval
 ## 取舍
 
 - **写错的环境变量**（`VIBEVALLEY_VOICE_MODEL`、`VIBEVALLEY_NOTICE_BATCH_MS`、`VIBEVALLEY_RETRY_WAKE_MS`、`VIBEVALLEY_FOREMAN_RUNTIME` 不认识的值）用默认值，不让服务端起不来；变量的清单见 [architecture.md](../docs/architecture.md)「环境变量」。
-- **端口被占**：语音线路的端口被占时只记一行日志（[voice.md](../docs/voice.md)），院门的写进院门的状态（[server.md](../docs/server.md)「院门」），农场照常。
+- **端口被占**：语音线路的端口被占时只记一行日志（[voice.md](../docs/reference/voice.md)），院门的写进院门的状态（[server.md](../docs/reference/server.md)「院门」），农场照常。
 - **字数上限**：VibeValley 自己的 agent 里的（管家的 `MEMORY.md` 尾巴、工具结果的截断）按字符数；`protocol` 和服务里给人看的文字按 UTF-16 码元量（`base.Units`、`base.Slice`）。
-- **农机**：pi 要 Node（smith 用内嵌的 Node 宿主跑 pi 的 SDK），cursor 接不上（smith 没有 JS 宿主），见 [agents-and-runtimes.md](../docs/agents-and-runtimes.md) 和 [smith 的 GAPS](pkg/smith/GAPS.md)。
+- **农机**：pi 要 Node（smith 用内嵌的 Node 宿主跑 pi 的 SDK），cursor 接不上（smith 没有 JS 宿主），见 [agents-and-runtimes.md](../docs/reference/agents-and-runtimes.md) 和 [smith 的 GAPS](pkg/smith/GAPS.md)。
 
 ## 测试
 

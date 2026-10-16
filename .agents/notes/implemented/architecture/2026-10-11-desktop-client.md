@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-`apps/desktop`：一个 macOS 的 Electron 客户端。（[desktop.md](../../../../docs/desktop.md) 现在写的是 Flutter 版。）
+`apps/desktop`：一个 macOS 的 Electron 客户端。（[desktop.md](../../../../docs/reference/desktop.md) 现在写的是 Flutter 版。）
 
 - **服务端在里面**：客户端先看 8787 上有没有农场。有就用它；没有就在 Electron 的 utility process 里起打包好的 `apps/server`（`dist/main.mjs`，esbuild 只打进服务端和工作区的 TypeScript 包，别的包照常从它旁边的 `node_modules` 里 import）。Electron 44 带的 Node 是 24，和仓库要求的一样。
 - **窗口开服务端发的页面**：服务端设了 `VIBEVALLEY_WEB_DIR` 就在 `/` 发构建好的页面，窗口打开 `http://127.0.0.1:8787`。页面和接口同源，不用代理；本机地址是安全来源，麦克风照常能用。

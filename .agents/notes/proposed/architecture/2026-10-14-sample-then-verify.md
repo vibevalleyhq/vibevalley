@@ -45,7 +45,7 @@ Status: proposed
 
 ### 1. 验收先行（已做，2026-10-14）
 
-种植计划的一步可以是**验收步骤**（计划的步骤现在是子工单，标在 `IssueStep.acceptance`；规则读的 `PlaybookNode` 由它拼出来，[种植计划是带子工单的父工单](../../implemented/architecture/2026-10-15-plans-are-parent-issues.md)）。现在的行为见 [server.md](../../../../docs/server.md)「种植计划」的「验收」。要点和理由：
+种植计划的一步可以是**验收步骤**（计划的步骤现在是子工单，标在 `IssueStep.acceptance`；规则读的 `PlaybookNode` 由它拼出来，[种植计划是带子工单的父工单](../../implemented/architecture/2026-10-15-plans-are-parent-issues.md)）。现在的行为见 [server.md](../../../../docs/reference/server.md)「种植计划」的「验收」。要点和理由：
 
 - **规划时写，排在最前面**：规划的帮工（`runs/rules.go` 的 `PlanningTask`）在修 bug、或要做的事能用测试说清楚的时候，把第一步拆成验收，别的步骤都等它。它只写现在会失败的测试，检查命令只跑这些测试。这是想法 2：验收和修复由不同的帮工、在不同的时候写。
 - **农场判红**：验收步骤做完，检查要**不通过**才合；通过了就退回去，说它没抓住问题。这是想法 4。

@@ -7,7 +7,7 @@
 
 派活派的是档案；一个档案可以同时派出好几个帮工，各自一个 worktree。
 
-跑通了的是四台：VibeValley、pi（DeepSeek 按量付费）、claude 和 codex（订阅套餐）。其余几台 smith 也能驱动，但还没在真实项目里跑通（[提案](../.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)）；cursor 要单独装的 SDK，smith 没接，总是「不支持」。
+跑通了的是四台：VibeValley、pi（DeepSeek 按量付费）、claude 和 codex（订阅套餐）。其余几台 smith 也能驱动，但还没在真实项目里跑通（[提案](../../.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)）；cursor 要单独装的 SDK，smith 没接，总是「不支持」。
 
 ## 在用的农机
 
@@ -24,7 +24,7 @@ VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮�
 
 ## 种子档案
 
-第一次启动时的档案在 `seeds.json` 的 `agents`（列表见 [game-ui.md](game-ui.md)「角色」）。种子只用一次；后来想用 claude、codex，在「农具」页启用它们，再捏一个帮工。
+第一次启动时的档案在 `seeds.json` 的 `agents`（列表见 [farm-ui.md](farm-ui.md)「角色」）。种子只用一次；后来想用 claude、codex，在「农具」页启用它们，再捏一个帮工。
 
 ## 农具（`/runtimes`）
 

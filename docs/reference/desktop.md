@@ -1,6 +1,6 @@
 # macOS 应用
 
-Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏、系统通知和语音快捷键。Dart 这一半在 `app/lib/desktop/`，Swift 那一半在 `app/macos/Runner/`，两边经方法通道 `vibevalley/desktop` 说话（[理由](../.agents/notes/implemented/architecture/2026-10-11-desktop-client.md)）。
+Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏、系统通知和语音快捷键。Dart 这一半在 `app/lib/desktop/`，Swift 那一半在 `app/macos/Runner/`，两边经方法通道 `vibevalley/desktop` 说话（[理由](../../.agents/notes/implemented/architecture/2026-10-11-desktop-client.md)）。
 
 ## 服务端在里面
 
@@ -13,7 +13,7 @@ Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏�
 
 ## 渠道
 
-三个渠道可以同时装、同时开，打包时定（`build-macos.sh --channel`；`lib/desktop/channel.dart`；[理由](../.agents/notes/implemented/process/2026-10-12-release-channels.md)）：
+三个渠道可以同时装、同时开，打包时定（`build-macos.sh --channel`；`lib/desktop/channel.dart`；[理由](../../.agents/notes/implemented/process/2026-10-12-release-channels.md)）：
 
 | 渠道 | 应用 | bundle id | 家目录 |
 |---|---|---|---|

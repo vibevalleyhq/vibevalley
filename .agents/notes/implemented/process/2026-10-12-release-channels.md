@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-三个渠道，同一套代码，打包时选（`pnpm package:alpha|beta|release`）。行为见 [desktop.md](../../../../docs/desktop.md)「渠道」，命令见 [development.md](../../../../docs/development.md)「macOS 应用」。
+三个渠道，同一套代码，打包时选（`pnpm package:alpha|beta|release`）。行为见 [desktop.md](../../../../docs/reference/desktop.md)「渠道」，命令见 [development.md](../../../../docs/development.md)「macOS 应用」。
 
 - **三个应用，不是一个应用的三种设置**：bundle id、应用名都不同，所以能同时装、同时开，单实例锁、登录时打开、通知各管各的。Electron 默认按 `package.json` 的 name 定数据目录和单实例锁（三个渠道一样），所以启动时按应用名另设（`app.setName`、`userData`）；第一次打包后才发现，那时 Alpha 开着正式版就开不起来。
 - **家目录和端口跟着渠道走**：Alpha 用 `~/.heybro-alpha` 和 8789，Beta 用 `~/.heybro-beta` 和 8788，正式版不变。工作目录共用：项目是主人的，哪个农场干都一样。`HEYBRO_HOME`、`HEYBRO_PORT` 仍然能改，想让 Beta 用正式版的数据就设它们。

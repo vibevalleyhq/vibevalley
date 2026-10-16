@@ -9,8 +9,8 @@
 
 ## 叫法
 
-- 代码、接口和服务端的文档用实际的概念：`Issue`、`Helper`、`Project`（[概念](concepts.md)）。不用旧叫法 ticket，也不用网页时代的名字。
-- 界面上的字用中文，用农场的叫法（[用语表](README.md#用语)）。
+- 代码、接口和服务端的文档用实际的概念：`Issue`、`Helper`、`Project`（[概念](../concepts.md)）。不用旧叫法 ticket，也不用网页时代的名字。
+- 界面上的字用中文，用农场的叫法（[用语表](../README.md#用语)）。
 - 注释用英文。
 
 ## 注释
@@ -42,7 +42,7 @@
 | 测试里一步步讲在测什么 | `// No room yet: it waits.` |
 | 历史和出处 | `// ported from the TypeScript server's crew.ts, removed`<br>`// as on the web page` |
 | 别处的叫法 | CSS 类名（`focus-visible:ring-2`）、旧框架（Pixi、Base UI）、TS 的常量名（`QUOTA_LOW`） |
-| 推理过程、行为说明 | 行为写进 [docs](README.md)，理由写进 [Agent Note](../.agents/notes/README.md) |
+| 推理过程、行为说明 | 行为写进 [docs](../README.md)，理由写进 [Agent Note](../../.agents/notes/README.md) |
 
 ### 改代码时
 

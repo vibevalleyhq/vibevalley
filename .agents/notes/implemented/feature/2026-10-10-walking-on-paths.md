@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-见 [framework.md](../../../../docs/framework.md)「像素村」的寻路：
+见 [pixel-village.md](../../../../docs/reference/pixel-village.md)「像素村」的寻路：
 
 - `web/src/farm/paths.ts` 照背景描出能走的地方：草地、石板路，扣掉每块地（顶面加看得见的木框前脸）。（像素村换成了 LDtk 地图的 Ground 层，`app/assets/village.ldtk`；地块和道具的底由游戏扣掉，`app/lib/village/world.dart` 的 `walkable`，见 [像素村](2026-10-11-pixel-village.md)。）
 - `@heybro/engine/nav` 把它铺成 8 像素的格子，A* 找最省的路：石板路比草地便宜，所以从大门进来的帮工先沿石板路走；靠近障碍的格子贵一点，所以走在两块地之间的过道中间；最后把能直走又不更贵的拐角拉直。（现在是它的 Dart 移植 `app/lib/village/nav.dart`；Ground 层只分能走、不能走，石板路不再更便宜。）

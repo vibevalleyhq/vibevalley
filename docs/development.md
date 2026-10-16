@@ -13,7 +13,7 @@ cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:
 
 - 第一次跑 Flutter（和升级 `agora_rtc_engine` 以后）先跑 `app/tool/agora-voice-only.sh`。
 - 帮工在 `~/vibevalley-work`（`VIBEVALLEY_WORK_ROOT`）下干活，设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余环境变量见 [architecture.md](architecture.md)「环境变量」。
-- 语音的凭据见 [voice.md](voice.md)；没有也能打字用。
+- 语音的凭据见 [voice.md](reference/voice.md)；没有也能打字用。
 - 服务端改了代码要重启。
 
 ## macOS 应用
@@ -23,7 +23,7 @@ bun run package:mac                      # app/build/vibevalley.app（带 Go 服
 app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
 ```
 
-渠道、家目录、日志在哪见 [desktop.md](desktop.md)。
+渠道、家目录、日志在哪见 [desktop.md](reference/desktop.md)。
 
 ## 检查和测试
 
@@ -41,6 +41,6 @@ app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
 
 ## 素材、音效和官网
 
-- 贴图在 `design/pixel/` 里生成、切图（[framework.md](framework.md)「素材」），不手改 `sprites.json`。
-- 音效配方在 `app/lib/shell/sfx.dart`（[framework.md](framework.md)「音效」）。
+- 贴图在 `design/pixel/` 里生成、切图（[pixel-village.md](reference/pixel-village.md)「素材」），不手改 `sprites.json`。
+- 音效配方在 `app/lib/shell/sfx.dart`（[pixel-village.md](reference/pixel-village.md)「音效」）。
 - 官网见 [site/README.md](../site/README.md)；`bun run site:deploy` 构建并发到 Cloudflare。

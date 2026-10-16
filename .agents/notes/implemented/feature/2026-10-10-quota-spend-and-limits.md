@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-见 [server.md](../../../../docs/server.md)「额度、花费和上限」和 [game-ui.md](../../../../docs/game-ui.md)「精力瓶」，要点：
+见 [server.md](../../../../docs/reference/server.md)「额度、花费和上限」和 [farm-ui.md](../../../../docs/reference/farm-ui.md)「精力瓶」，要点：
 
 - **额度**：有套餐的读 smith 的账户用量（runtime 的 `AccountUsage`，`server/internal/runs/runtimes.go`）；pi 读 DeepSeek 的余额（用 pi 自己的密钥调 `GET /user/balance`，只读）。画成游戏里的精力瓶和体力条，顶栏、帮工栏、地里、「农具」页都有。
 - **花费**：从会话的 token 总数和 pi 价目表里这个模型的价格算，折成人民币（`VIBEVALLEY_CNY_PER_USD`，所以是估算）；每个帮工、每一轮、每天都看得到。

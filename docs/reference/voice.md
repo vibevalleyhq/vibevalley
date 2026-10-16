@@ -5,7 +5,7 @@
 - **农场的管家**：田头上那个管家本人接电话，看得到地里、自己派活，经「语音线路」接到声网。
 - **别的大模型**（声网托管、DeepSeek、自己的接口）：出声回答的语音管家看不到地里；它听到的一句话，客户端再交给农场的管家去派活。
 
-照 Agora 的官方示例 `agent-quickstart-nextjs` 写成（[理由](../.agents/notes/implemented/feature/2026-10-10-voice-through-agora-quickstart.md)、[语音线路](../.agents/notes/implemented/feature/2026-10-10-voice-through-our-manager.md)）。
+照 Agora 的官方示例 `agent-quickstart-nextjs` 写成（[理由](../../.agents/notes/implemented/feature/2026-10-10-voice-through-agora-quickstart.md)、[语音线路](../../.agents/notes/implemented/feature/2026-10-10-voice-through-our-manager.md)）。
 
 ## 服务端
 
@@ -27,7 +27,7 @@ Agora 的 App ID 和 App Certificate 在首页「设置」或声音页里填，�
 
 ## 配置（`/voice`、`/manager/voice`）
 
-语音设置存在 `settings.json` 的 `voice`，只存和默认不一样的，下一通电话生效。分两处改（[理由](../.agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)）：
+语音设置存在 `settings.json` 的 `voice`，只存和默认不一样的，下一通电话生效。分两处改（[理由](../../.agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)）：
 
 - 工作台的「声音」（`/voice`）配**线路**：凭据和区域、怎么听（识别、语言、断句、打断）、用哪个大模型。
 - 管家页的「声音」（`/manager/voice`）配**电话上的管家**：人设、开场白、出错时说的话、音色。

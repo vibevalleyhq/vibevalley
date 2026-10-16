@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-行为见 [server.md](../../../../docs/server.md)「工单」。
+行为见 [server.md](../../../../docs/reference/server.md)「工单」。
 
 - **数据库是家，核心状态有一份**，和定时、田头一样：开着的工单和最近关上的 50 张（`KeepClosedIssues`）放在核心状态的 `issues` 里，按看板的顺序（`IssueOrder`：没派的按排的先后，其余新的在前）。`Issues` 每改一次数据库就施加一条 `issue` 事实（删掉的是 `issueGone`），开机时从数据库放回去；`farm.json` 不存工单。
 - **状态由折叠算**：`Reduce` 每折一条事实，都按帮工现在的样子重算工单的状态（`IssueStatusOf`），帮工开工、做完一轮，工单的状态当场就跟着变。

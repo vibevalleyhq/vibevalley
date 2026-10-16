@@ -18,7 +18,7 @@ VibeValley 要同时驱动好几种编码 agent（pi、claude、codex……）�
 - oar 用 npm 上的 `@botiverse/oar`：它能直接驱动 claude、codex、grok、kimi、antigravity，还有只有 Node SDK 的 pi 和 cursor；帮工用它的 `@botiverse/oar/agents`。oar 自己用 Promise 和回调，服务端在边界上包成 Effect。
 - Go 代码（`go/`、`apps/console/`、`tests/replay/`）留在仓库里作参考，产品不依赖。
 
-工作目录里的新项目也约定用 TypeScript + Effect v4（工作目录的 `AGENTS.md`，见 [server.md](../../../../docs/server.md)「帮工」）。
+工作目录里的新项目也约定用 TypeScript + Effect v4（工作目录的 `AGENTS.md`，见 [server.md](../../../../docs/reference/server.md)「帮工」）。
 
 ## Alternatives considered
 

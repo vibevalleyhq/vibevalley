@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> 已被取代：农场换成像素村以后，昼夜不再画三张背景、也不用颜色矩阵，而是每个像素按法线贴图打光、天光跟着钟点变（[像素村](2026-10-11-pixel-village.md)）；现在在 Flutter 客户端里，法线贴图由 `app/lib/village/normals.dart` 从画里生成，天光在 `sky.dart`，打光是着色器 `app/shaders/light.frag`（[framework.md](../../../../docs/framework.md)「像素村」）。`DayBackdrop`、`DayLit`、`Lamps` 随 `packages/engine` 删掉了。下面是当时的决策。
+> 已被取代：农场换成像素村以后，昼夜不再画三张背景、也不用颜色矩阵，而是每个像素按法线贴图打光、天光跟着钟点变（[像素村](2026-10-11-pixel-village.md)）；现在在 Flutter 客户端里，法线贴图由 `app/lib/village/normals.dart` 从画里生成，天光在 `sky.dart`，打光是着色器 `app/shaders/light.frag`（[pixel-village.md](../../../../docs/reference/pixel-village.md)「像素村」）。`DayBackdrop`、`DayLit`、`Lamps` 随 `packages/engine` 删掉了。下面是当时的决策。
 
 ## Problem
 
@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-见 [framework.md](../../../../docs/framework.md)「像素村」的「光」：
+见 [pixel-village.md](../../../../docs/reference/pixel-village.md)「像素村」的「光」：
 
 - 背景画三遍：白天、黄昏、夜里。用 codex 以白天的背景为参考只改光线，物件位置的偏差在 1 像素内，所以可以叠着按时钟淡入淡出（`DayBackdrop`）。
 - 贴图的光是一个 SVG 颜色矩阵，作为 `filter` 加在贴图自己的 `<img>` 上（`DayLit`）：只染贴图本身，不会把已经画好的夜景再压暗一遍。气泡和牌子（`Pinned`）不染，保持好认；`Lamps` 是天黑后窗户和门灯的暖光。

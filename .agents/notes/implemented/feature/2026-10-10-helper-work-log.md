@@ -14,7 +14,7 @@ Status: implemented
 - 地块详情打开时 `GET /api/workers/:id/steps` 拿全部，之后靠 `step` 工地事件更新；还在长的一步（字还在出、工具还没返回）用同一个编号再发，发送合并到 0.3 秒一次。
 - 干活过程不进核心状态：它大、长得快，只有打开详情时才需要（[farm-core-state](../architecture/2026-10-11-farm-core-state.md)）。
 
-界面见 [game-ui.md](../../../../docs/game-ui.md) 界面 2。
+界面见 [farm-ui.md](../../../../docs/reference/farm-ui.md) 界面 2。
 
 ## Alternatives considered
 

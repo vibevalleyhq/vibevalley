@@ -12,7 +12,7 @@ Status: implemented
 
 ## Decision
 
-**Flutter 客户端（`app`）是唯一的客户端，完整复刻了网页版，规则只在服务端一份。** 说明在 [app/README.md](../../../../app/README.md)，桌面版的行为见 [desktop.md](../../../../docs/desktop.md)。Electron 版删掉了（[一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md)），网页先冻结、后来也删了（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)）。
+**Flutter 客户端（`app`）是唯一的客户端，完整复刻了网页版，规则只在服务端一份。** 说明在 [app/README.md](../../../../app/README.md)，桌面版的行为见 [desktop.md](../../../../docs/reference/desktop.md)。Electron 版删掉了（[一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md)），网页先冻结、后来也删了（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)）。
 
 1. **服务端是核心状态唯一的持有者**：Go 服务端（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)）。Flutter 经 `VibeValleyApi` 发命令，经 `GET /api/site/state` 收**折好的** `FarmState`（状态变了就再推一整份，至多每 200 毫秒一份），不折事实、不写 `reduce`。`/api/site/events` 当时留给冻结的网页（网页删了以后这条流照旧带着事实），Flutter 只读它去掉事实以后的部分（步骤、提醒、农机的变化）。
 2. **游戏规则在 protocol 里。** 帮工在哪块地、做过什么、本轮的工具和计数、碰过的文件（`Helper.play`），等级和经验、地块（`view`）、来电（当时在 `view` 里，现在是 `SiteFrame` 的 `inbox`，[Inbox](2026-10-15-inbox.md)），升级、成就这类一次性的特效（`SiteFrame` 的效果）都是 `FarmState` 的字段或由它推出来，在 `Reduce`、`ViewOf` 和 `EffectsOf` 里算，服务端推下来。只属于画面、跟着墙上时钟走的（散步、走位、动画、小游戏的局面）在 Dart 里写，照 core 的测试移植。

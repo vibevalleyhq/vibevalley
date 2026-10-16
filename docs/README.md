@@ -1,20 +1,33 @@
 # VibeValley 文档
 
-VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮（[概念](concepts.md)）。这里写现在怎么用、怎么开发、东西怎么工作；为什么这样设计和还没做的提案在 [Agent Notes](../.agents/notes/README.md)，文档怎么写见 [AGENTS.md](AGENTS.md)。
+VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮（[概念](concepts.md)）。这里写现在怎么用、怎么开发、东西怎么工作；为什么这样设计和还没做的提案在 [Agent Notes](../.agents/notes/README.md)，文档放在哪见 [AGENTS.md](AGENTS.md)。
+
+先读：
 
 | 文档 | 讲什么 |
 |---|---|
 | [guide.md](guide.md) | 教程：派第一张工单，看着它干，收获，处理冲突和失败，管住花费，用语音 |
 | [development.md](development.md) | 教程：本机跑起来，检查和测试，改形状、规则和表，打包 |
-| [code-style.md](code-style.md) | 代码风格：格式、叫法、注释写什么不写什么 |
 | [concepts.md](concepts.md) | 概念：实际是什么，农场怎么画它们 |
 | [architecture.md](architecture.md) | 架构：分层、核心状态、工地事件、接口、存储、环境变量。改 `server/`、`app/` 之前读 |
-| [server.md](server.md) | 服务端的各个服务 |
-| [agents-and-runtimes.md](agents-and-runtimes.md) | 帮工档案、农机、技能书 |
-| [game-ui.md](game-ui.md) | 农场界面和玩法 |
-| [framework.md](framework.md) | 像素村、素材和音效 |
-| [voice.md](voice.md) | 语音（Agora ConvoAI） |
-| [desktop.md](desktop.md) | macOS 应用 |
+
+各部分现在怎么工作（`reference/`）：
+
+| 文档 | 讲什么 |
+|---|---|
+| [server.md](reference/server.md) | 服务端的各个服务 |
+| [agents-and-runtimes.md](reference/agents-and-runtimes.md) | 帮工档案、农机、技能书 |
+| [farm-ui.md](reference/farm-ui.md) | 农场界面和玩法 |
+| [pixel-village.md](reference/pixel-village.md) | 像素村、素材和音效 |
+| [voice.md](reference/voice.md) | 语音（Agora ConvoAI） |
+| [desktop.md](reference/desktop.md) | macOS 应用 |
+
+怎么写（`style/`）：
+
+| 文档 | 讲什么 |
+|---|---|
+| [code.md](style/code.md) | 代码：格式、叫法、注释写什么不写什么 |
+| [writing.md](style/writing.md) | 文字：文档、Note、提交说明和注释的句子怎么写 |
 
 ## 用语
 

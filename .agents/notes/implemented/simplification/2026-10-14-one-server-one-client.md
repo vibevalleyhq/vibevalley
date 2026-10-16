@@ -14,7 +14,7 @@ Go 服务端（[服务端用 Go 重写](../architecture/2026-10-13-go-server-on-
 - **唯一的服务端**是 `server`；**唯一的客户端**是 `app`，它的 macOS 应用把 Go 服务端带在里面（`bun run package:mac`）。
 - **网页冻结**：`web/` 和它用的 `packages/core`、`packages/engine` 留着，不再加功能。这一条后来被 [网页退役](2026-10-14-retire-the-web-page.md) 取代：网页和这两个包都删了，规则只留 Go 一份。
 - **还是 TypeScript 的**：`packages/protocol`（形状的唯一来源，TypeScript 的 `reduce` 和规则是对照的基准）、冻结的网页、`tools/`（`@heybro/tools`：导出形状给 Go 和 Flutter 生成类型、算对照数据、`go-contract.ts` 检查正在跑的 Go 服务端）。Effect v4 的规矩只管这几处。这一条后来被 [网页退役](2026-10-14-retire-the-web-page.md) 和 [形状的源头是 Go](../architecture/2026-10-15-go-owns-the-shapes.md) 取代：这几处都删了，仓库里不再有 TypeScript 的包和 Effect，剩下的几个脚本直接用 Bun 或 Node 跑。
-- **原来的农场搬过来**：`server/tool/dump-pglite.ts` 把 TypeScript 服务端的 PGlite 倒成 JSON，`vibevalley import`（`server/cmd/vibevalley/import.go`）拷家目录里的文件、把行按原来的 id 和 seq 放进 SQLite（[server.md](../../../../docs/server.md)「搬家」）。
+- **原来的农场搬过来**：`server/tool/dump-pglite.ts` 把 TypeScript 服务端的 PGlite 倒成 JSON，`vibevalley import`（`server/cmd/vibevalley/import.go`）拷家目录里的文件、把行按原来的 id 和 seq 放进 SQLite（[server.md](../../../../docs/reference/server.md)「搬家」）。
 
 这一篇取代了几篇已经上线的决策里「用哪个服务端、哪个桌面客户端」的部分：[桌面客户端](../architecture/2026-10-11-desktop-client.md)（Electron）、[MyGo 原型](../architecture/2026-10-13-mygo-poc.md)、[MyGo 的原生语音](../feature/2026-10-13-native-agora-voice.md)、[全部用 TypeScript 和 Effect](../architecture/2026-10-09-typescript-effect-and-oar.md)、[自己的 agent](../architecture/2026-10-12-own-agent-on-effect.md)、[ai 和 agent-core](../architecture/2026-10-12-ai-and-agent-core.md)、[管家在 pi 上](../architecture/2026-10-10-manager-on-pi.md)。
 

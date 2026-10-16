@@ -30,7 +30,7 @@ Status: implemented
 - **经过**：计划只经服务端的一个 `put` 写。每写一次，和写之前比一比（protocol 的 `PlaybookChanges`），变了什么记一行，带是谁做的（主人、管家、农场）和为什么，存在田头的数据库里（`playbook_events`，`server/internal/tickets/playbook_log.go`）。事实里仍是整个计划的快照；经过是另存的，回答「这一步怎么走到这里的、工单被谁改过」。
 - **规划的规矩**（`server/internal/runs/rules.go` 的 `PlanningTask`）：不互相依赖的步骤改不同的文件；别拆成一条串行的长链，有先后的按阶段分组。
 
-行为细节见 [docs/server.md](../../../../docs/server.md)「种植计划」和 [docs/game-ui.md](../../../../docs/game-ui.md) 界面 18。
+行为细节见 [docs/reference/server.md](../../../../docs/reference/server.md)「种植计划」和 [docs/reference/farm-ui.md](../../../../docs/reference/farm-ui.md) 界面 18。
 
 ## 对照 Raft 的任务
 

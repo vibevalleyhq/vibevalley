@@ -14,7 +14,7 @@ Status: implemented
 
 ## Decision
 
-行为见 [server.md](../../../../docs/server.md)「工单」和 [concepts.md](../../../../docs/concepts.md)。
+行为见 [server.md](../../../../docs/reference/server.md)「工单」和 [concepts.md](../../../../docs/concepts.md)。
 
 - **工单是服务端的一样东西**：代码里叫 `Issue`（服务 `Issues`，`server/internal/tickets/issues.go`），界面上叫工单。它从写下到关上始终是同一个 id，带着要做什么、项目、帮工档案、优先级、排的先后、什么时候排上队、什么时候怎么关的、属于哪个计划。
 - **执行挂在工单下面**：每派一次帮工是这张工单的一次执行（`runs`，帮工 id，旧的在前）。直接派的活（管家、计划）在 `Dispatch.Hire` 里各开一张新工单，id 是 `t` 加 8 位。
