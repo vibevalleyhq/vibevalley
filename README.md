@@ -2,9 +2,6 @@
 
 > A team of coding agents you direct by voice or chat, drawn as a pixel farm. Runs on your own machine.
 
-> [!NOTE]
-> 仓库正在密集调整：概念、接口和存盘格式都还会变，可能会有 bug，升级后旧数据也可能要迁移。升级前先备份农场的数据（`~/Library/Application Support/vibevalley`，单独跑的服务端是 `~/.vibevalley`）。遇到问题欢迎提 issue。
-
 **VibeValley**（码农场物语）是一个用语音或打字指挥的编码 agent 团队，画成一座像素农场。
 
 你只和**管家**说话。管家把活派给**帮工**，帮工是你机器上真实的编码 agent（pi、Claude Code、Codex……），在你的项目里开分支、改代码、跑测试、提交。地里的庄稼跟着它们的真实进度长：读代码时发芽，改文件时长叶，做完了结出麦子。你看过**收成清单**，才把它的分支合进主分支。
@@ -59,6 +56,9 @@ flowchart LR
 更多见 [docs/architecture.md](docs/architecture.md)。
 
 ## 快速开始
+
+> [!NOTE]
+> 仓库正在密集调整：概念、接口和存盘格式都还会变，可能会有 bug，升级后旧数据也可能要迁移。升级前先备份农场的数据（`~/Library/Application Support/vibevalley`，单独跑的服务端是 `~/.vibevalley`）。遇到问题欢迎提 issue。
 
 ### 需要
 
