@@ -1,0 +1,5 @@
+Create ONE sheet of 9 potion-bottle icons for the game's energy meter, size 1536x1024: a grid of 3 columns x 3 rows, one bottle centred in each cell. All nine are the exact same bottle (same shape, size and place in its cell), so they can be swapped one for another; only what is inside changes.
+The bottle: a small round-bellied glass potion flask with a short neck and a brown cork, a white glint on the glass, a dark warm outline. Image 1 is pixel art already made for the game: match its pixel size and palette; the bottle about as big as one of its icons.
+Row 1, bright green liquid: (1) full up to the neck; (2) three quarters full; (3) half full.
+Row 2: (4) amber-orange liquid, two fifths full; (5) amber-orange liquid, a quarter full; (6) a little red liquid at the very bottom, almost empty.
+Row 3: (7) completely empty, only the glass and the cork; (8) filled with swirling pale grey mist instead of liquid; (9) full of shining gold liquid with tiny sparkles.

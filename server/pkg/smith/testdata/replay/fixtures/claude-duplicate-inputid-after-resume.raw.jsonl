@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"RUN-WORKFLOW-FIXTURE: run the two-phase workflow."}]},"session_id":"1289816a-bfa5-43a0-82b8-b1380fb89d1f","parent_tool_use_id":null,"uuid":"6f1c2d3e-0001-4a5b-8c7d-000000000001","isReplay":true}
+{"type":"command_lifecycle","command_uuid":"6f1c2d3e-0001-4a5b-8c7d-000000000001","state":"completed","uuid":"bd6c6900-ad63-4814-a6ab-7dbcf965ed73","session_id":"1289816a-bfa5-43a0-82b8-b1380fb89d1f"}

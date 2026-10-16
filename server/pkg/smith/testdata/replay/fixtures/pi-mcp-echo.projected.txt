@@ -1,0 +1,37 @@
+agent_start                    │ event → turn_active
+turn_start                     │ event
+message_start                  │ event
+message_end                    │ event
+message_start                  │ event → user_message
+message_end                    │ event
+message_start                  │ event
+message_update:toolcall_start  │ event
+message_update:toolcall_delta  │ event
+message_update:toolcall_delta  │ event
+message_update:toolcall_end    │ event
+message_end                    │ event → usage in=0 out=0 cacheRead=0 cacheWrite=0
+tool_execution_start           │ event → tool_call_started mcp__echo__echo
+tool_execution_end             │ event → tool_call_ended
+message_start                  │ event
+message_end                    │ event
+turn_end                       │ event
+turn_start                     │ event
+message_start                  │ event
+message_update:toolcall_start  │ event
+message_update:toolcall_delta  │ event
+message_update:toolcall_end    │ event
+message_end                    │ event → usage in=0 out=0 cacheRead=0 cacheWrite=0
+tool_execution_start           │ event → tool_call_started mcp__remote__echo
+tool_execution_end             │ event → tool_call_ended
+message_start                  │ event
+message_end                    │ event
+turn_end                       │ event
+turn_start                     │ event
+message_start                  │ event
+message_update:text_start      │ event
+message_update:text_delta      │ event → text_delta
+message_update:text_end        │ event
+message_end                    │ event → usage in=0 out=0 cacheRead=0 cacheWrite=0
+turn_end                       │ event
+agent_end                      │ event
+agent_settled                  │ event → turn_ended completed

@@ -1,0 +1,5 @@
+Create ONE sheet of 10 small painted icons for what a farm helper is doing, shown in the little thought bubble over its head, size 1536x1024: a grid of 5 columns x 2 rows, one icon centred in each cell, all drawn at a similar size.
+Image 2 is the game's icon sheet: match its painted style (gentle shading, soft brown outline, warm colours), but keep each icon very simple and bold, with a strong silhouette, because it is shown as small as 20 pixels. Draw only the object: no circle, no badge, no frame and no bubble behind it.
+Row 1: (1) thinking: a small white thought cloud with three dots in it; (2) reading: an open book; (3) writing: a yellow pencil writing a line on a sheet of paper; (4) working: a wooden hammer striking, with two little motion lines; (5) searching: a magnifying glass with a brass rim.
+Row 2: (6) the web: a small blue and green globe; (7) a plugged-in tool: an electric plug with its cord; (8) waiting: a wooden hourglass with sand running; (9) something else: a sparkle of three small golden stars; (10) talking: a white speech bubble with two short lines inside.
+No text, no letters, no numbers, no logos, no characters.

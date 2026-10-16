@@ -1,0 +1,364 @@
+/* The site in the game's skin (app/lib/app/theme.dart): cream paper, bark ink, hard 2 px drops, the pixel font for
+   names and buttons. Tailwind's theme carries the palette, the fonts, the hard shadows and the title scene's motions
+   (first written for the retired web page); the components use them as utilities. */
+
+@import 'tailwindcss';
+
+@font-face {
+  font-family: 'Fusion Pixel';
+  src: url('/gen/pixel.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* The hour the farm is drawn at: data-scene on <html>, set before the page draws (Base.astro), changed by the hours. */
+@custom-variant morning (&:where(:root[data-scene='morning'] *));
+@custom-variant day (&:where(:root[data-scene='day'] *));
+@custom-variant evening (&:where(:root[data-scene='evening'] *));
+@custom-variant night (&:where(:root[data-scene='night'] *));
+
+@theme {
+  --color-cream-50: #f7e8c4;
+  --color-cream-100: #eedcb2;
+  --color-cream-200: #e2c995;
+  --color-cream-300: #c8a46e;
+  --color-cream-hover: #f1dcab;
+  --color-rim: #fff4d8;
+  --color-bark-400: #9b7550;
+  --color-bark-500: #7f5b3b;
+  --color-bark-600: #67482d;
+  --color-bark-800: #46301d;
+  --color-bark-900: #2f1f13;
+  --color-leaf-300: #b4cb7c;
+  --color-leaf-500: #74a046;
+  --color-leaf-600: #5a8234;
+  --color-leaf-700: #3f6427;
+  --color-leaf-hover: #84b052;
+  --color-wheat: #e5a93c;
+  --color-wheat-hover: #efb84e;
+  --color-berry: #c84a3a;
+  --color-water: #4f8fbd;
+  /* The shade under things and over the scene: a drop's colour, and the dark that words sit on. */
+  --color-drop: rgb(30 20 10 / 0.45);
+  --color-shade: rgb(30 20 10);
+  --color-dusk: #2b2b40;
+  --color-warn: #f4d9c4;
+  --color-firefly: #fff1a0;
+  --color-path: #c9a46a;
+  --color-path-groove: #bf9a5f;
+  --color-path-edge: #8a6a3f;
+
+  --font-pixel: 'Fusion Pixel', 'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif;
+  --font-sans: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Hard drops with no blur, as the game draws them. */
+  --shadow-hard-sm: 2px 2px 0 var(--color-drop);
+  --shadow-hard: 3px 3px 0 var(--color-drop);
+  --shadow-hard-lg: 4px 4px 0 var(--color-drop);
+  --inset-shadow-lit: inset 2px 2px 0 var(--color-rim);
+  --inset-shadow-rim: inset 0 0 0 2px var(--color-rim);
+  --text-shadow-ink: 2px 2px 0 var(--color-bark-900);
+  --text-shadow-soft: 2px 2px 0 rgb(30 20 10 / 0.6);
+  --text-shadow-thin: 1px 1px 0 rgb(30 20 10 / 0.8);
+  --text-shadow-title: 4px 4px 0 var(--color-bark-900), 0 0 24px rgb(30 20 10 / 0.5);
+
+  /* The title scene's motions, as the game has them; each piece's own pace and offset is set where it is placed.
+     Everything that moves across the scene moves by translate, in shares of the scene (cqw, cqh: the stage is a
+     container), never by left or top: the compositor moves it, nothing is laid out or painted again each frame. */
+  --animate-pan: title-pan 70s ease-in-out infinite alternate;
+  --animate-cloud: title-cloud 160s linear infinite;
+  --animate-puff: title-puff 8s linear infinite;
+  --animate-firefly: title-firefly 6s ease-in-out infinite alternate, title-blink 2s ease-in-out infinite alternate;
+  --animate-breathe: title-breathe 3.2s ease-in-out infinite;
+  --animate-lantern: title-lantern 2.4s steps(6) infinite alternate;
+  --animate-sway: title-sway 4s ease-in-out infinite alternate;
+  --animate-seed: title-seed-x 18s ease-in-out infinite, title-seed-y 18s ease-in-out infinite;
+  --animate-seed-spin: title-seed-spin 3s ease-in-out infinite alternate;
+  --animate-float: title-float 5s ease-in-out infinite;
+  --animate-in: title-in 0.45s steps(5) both;
+  --animate-pop: title-pop 0.5s steps(5) both;
+  --animate-hint: hint-bob 1.2s steps(2) infinite;
+  /* The helpers along the field's edge: across the page, and three frames of a step, one shown at a time. */
+  --animate-walk: walk-across 30s linear infinite;
+  --animate-walk-frame: walk-frame 0.6s steps(1) infinite;
+  --animate-wiggle: wiggle 0.4s steps(4);
+  --animate-scratch: scratch 0.9s steps(1) infinite;
+
+  @keyframes title-pan {
+    from {
+      transform: scale(1.05) translate3d(-1%, 0.5%, 0);
+    }
+    to {
+      transform: scale(1.05) translate3d(1%, -0.6%, 0);
+    }
+  }
+  @keyframes title-cloud {
+    from {
+      translate: -40cqw 0;
+    }
+    to {
+      translate: 105cqw 0;
+    }
+  }
+  /* Smoke: out of the chimney's mouth, rising, growing, leaning with the wind and thinning out. */
+  @keyframes title-puff {
+    0% {
+      translate: -50% calc(-100% + 1.4cqh);
+      scale: 0.4;
+      opacity: 0;
+    }
+    4% {
+      opacity: 0.95;
+    }
+    30% {
+      translate: calc(-50% + 0.4cqw) calc(-100% - 5cqh);
+      scale: 0.75;
+    }
+    60% {
+      translate: calc(-50% + 1.8cqw) calc(-100% - 10cqh);
+      opacity: 0.7;
+    }
+    100% {
+      translate: calc(-50% + 4cqw) calc(-100% - 16cqh);
+      scale: 1.3;
+      opacity: 0;
+    }
+  }
+  @keyframes title-firefly {
+    from {
+      transform: translate3d(-10px, 6px, 0);
+    }
+    to {
+      transform: translate3d(14px, -12px, 0);
+    }
+  }
+  @keyframes title-blink {
+    from {
+      opacity: 0.15;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes title-breathe {
+    50% {
+      scale: 1 1.015;
+    }
+  }
+  @keyframes title-lantern {
+    from {
+      opacity: 0.65;
+      scale: 0.92;
+    }
+    to {
+      opacity: 1;
+      scale: 1.06;
+    }
+  }
+  @keyframes title-sway {
+    from {
+      rotate: calc(var(--lean) * -1);
+    }
+    to {
+      rotate: var(--lean);
+    }
+  }
+  /* A seed off a dandelion: across to the right (x) while it rises and fades (y), each on its own curve. */
+  @keyframes title-seed-x {
+    to {
+      translate: 75cqw 0;
+    }
+  }
+  @keyframes title-seed-y {
+    0% {
+      transform: none;
+      opacity: 0;
+    }
+    6% {
+      opacity: 1;
+    }
+    35% {
+      transform: translateY(-20cqh);
+    }
+    65% {
+      transform: translateY(-32cqh);
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-56cqh);
+      opacity: 0;
+    }
+  }
+  @keyframes title-seed-spin {
+    from {
+      rotate: -18deg;
+    }
+    to {
+      rotate: 14deg;
+    }
+  }
+  @keyframes title-float {
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+  @keyframes title-in {
+    from {
+      opacity: 0;
+      transform: translateX(-28px);
+    }
+  }
+  /* A letter of the name hopping into place: up from below, a little too big, then settled. */
+  @keyframes title-pop {
+    0% {
+      opacity: 0;
+      transform: translateY(40%) scale(0.6);
+    }
+    60% {
+      opacity: 1;
+      transform: translateY(-8%) scale(1.08);
+    }
+    100% {
+      transform: none;
+    }
+  }
+  /* The arrow under "scroll down" nudging down the page. */
+  @keyframes hint-bob {
+    50% {
+      translate: 0 4px;
+    }
+  }
+  @keyframes walk-across {
+    from {
+      translate: -80px 0;
+    }
+    to {
+      translate: 100cqw 0;
+    }
+  }
+  /* Four frames, one shown at a time, each a quarter of the step: step, stand, step, stand. */
+  @keyframes walk-frame {
+    0% {
+      opacity: 1;
+    }
+    25% {
+      opacity: 0;
+    }
+  }
+  @keyframes wiggle {
+    25% {
+      rotate: -8deg;
+    }
+    75% {
+      rotate: 8deg;
+    }
+  }
+  @keyframes scratch {
+    50% {
+      translate: 0 -3px;
+    }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+    /* The hour's light on what moves over the scene's picture (the picture itself is painted in it). Every hour lists
+       the same filters in the same order, the identity where it has none, so a change of hour fades from one light to
+       the next: brightness, sepia, saturate, hue-rotate, brightness. */
+    --sky: brightness(1) sepia(0) saturate(1) hue-rotate(0deg) brightness(1);
+    --ground: brightness(1) sepia(0) saturate(1) hue-rotate(0deg) brightness(1);
+    --smoke: brightness(1) sepia(0) saturate(1) hue-rotate(0deg) brightness(1.1);
+    --farmer: brightness(1) sepia(0) saturate(1) hue-rotate(0deg) brightness(1);
+  }
+  :root[data-scene='morning'] {
+    --sky: brightness(1) sepia(0.35) saturate(1.4) hue-rotate(-25deg) brightness(1.03);
+    --ground: brightness(1) sepia(0.15) saturate(1) hue-rotate(0deg) brightness(1.02);
+    --smoke: brightness(1) sepia(0) saturate(1) hue-rotate(0deg) brightness(1.05);
+    --farmer: brightness(1) sepia(0.15) saturate(1) hue-rotate(0deg) brightness(1.02);
+  }
+  :root[data-scene='evening'] {
+    --sky: brightness(1) sepia(0.6) saturate(2.2) hue-rotate(-35deg) brightness(0.98);
+    --ground: brightness(1) sepia(0.45) saturate(1.3) hue-rotate(-12deg) brightness(0.88);
+    --smoke: brightness(1) sepia(0.4) saturate(1.4) hue-rotate(-20deg) brightness(1);
+    --farmer: brightness(1) sepia(0.45) saturate(1.3) hue-rotate(-12deg) brightness(0.88);
+  }
+  :root[data-scene='night'] {
+    --sky: brightness(0.32) sepia(0) saturate(0.6) hue-rotate(25deg) brightness(1);
+    --ground: brightness(0.38) sepia(0) saturate(0.7) hue-rotate(20deg) brightness(1);
+    --smoke: brightness(0.55) sepia(0) saturate(0.6) hue-rotate(20deg) brightness(1);
+    --farmer: brightness(0.6) sepia(0) saturate(0.8) hue-rotate(0deg) brightness(1);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--color-cream-50);
+    color: var(--color-bark-900);
+    font: 17px/1.75 var(--font-sans);
+    overflow-x: clip;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-pixel);
+    line-height: 1.2;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-leaf-500);
+    outline-offset: 2px;
+  }
+
+  /* For those who ask for less motion, the scene holds still where it is (the clouds stay in the sky, the helpers on
+     the path) and nothing comes in: the parts that enter only do so with motion-safe:. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    ::before,
+    ::after {
+      animation-play-state: paused !important;
+    }
+  }
+}
+
+/* A part of the page off the screen holds its animations still until it is back (the islands mark it data-off). */
+@layer base {
+  [data-off],
+  [data-off] * {
+    animation-play-state: paused !important;
+  }
+}
+
+/* The game's panel: cream paper in a bark frame, a light rim inside, a hard drop. */
+@utility panel {
+  @apply border-2 border-bark-900 bg-cream-50 inset-shadow-rim shadow-hard-lg;
+}
+
+/* Pixel art keeps its pixels when scaled. */
+@utility pixelated {
+  image-rendering: pixelated;
+}
+
+/* What moves over the scene's picture, in the hour's light (the variables above). */
+@utility lit-sky {
+  filter: var(--sky);
+  transition: filter 0.9s ease;
+}
+@utility lit-ground {
+  filter: var(--ground);
+  transition: filter 0.9s ease;
+}
+@utility lit-smoke {
+  filter: var(--smoke);
+  transition: filter 0.9s ease;
+}
+@utility lit-farmer {
+  filter: var(--farmer);
+  transition: filter 0.9s ease;
+}

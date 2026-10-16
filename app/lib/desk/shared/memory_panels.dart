@@ -1,0 +1,557 @@
+// What an agent remembers, as its page shows it (web/src/pages/MemoryPanels.tsx).
+//   MemoryPanel         a helper agent's: the job each of its helpers has in hand, what the next turn in a project
+//                       would be reminded of (recall.dart pick, the same the server makes), and every note with whose
+//                       it is, which project, how often it was brought in and whether it goes next when memory is full
+//   ManagerMemoryPanel  the manager's MEMORY.md, all of it carried in its system prompt up to a length
+//   ArchivePanel        the manager's conversation that compaction folded away: search it, open a file
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../app/theme.dart';
+import '../../data/providers.dart';
+import '../../gen/vibevalley.dart';
+import '../../ui/kit/base.dart';
+import '../../ui/kit/button.dart';
+import '../../ui/kit/choice.dart';
+import '../../ui/kit/field.dart';
+import '../../ui/kit/labels.dart';
+import 'recall.dart';
+import 'state.dart';
+import 'widgets.dart';
+import '../../rules/index.dart';
+import '../../rules/playbook.dart';
+
+/// Notes its helpers could still add before the oldest are dropped: those are marked 快忘了.
+const _soon = 10;
+
+/// Which notes the list shows: all (''), those for every project, or one project's.
+const _everywhere = '*';
+
+double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
+
+TextStyle get _lead => KitText.xs.copyWith(height: 1.625, color: Palette.bark600);
+TextStyle get _meta => KitText.xs.copyWith(color: Palette.bark500);
+
+List<Widget> _gap(List<Widget> children, [double gap = 16]) => [
+  for (var i = 0; i < children.length; i++) ...[if (i > 0) SizedBox(height: gap), children[i]],
+];
+
+// ── A helper agent's ─────────────────────────────────────────────────────────
+
+class MemoryPanel extends ConsumerStatefulWidget {
+  const MemoryPanel({super.key, required this.agent});
+  final String agent;
+
+  @override
+  ConsumerState<MemoryPanel> createState() => _MemoryPanelState();
+}
+
+class _MemoryPanelState extends ConsumerState<MemoryPanel> {
+  String _shown = '';
+
+  @override
+  void initState() {
+    super.initState();
+    deskRun(() => ref.read(memoriesProvider.notifier).load(widget.agent));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final list = ref.watch(memoriesProvider.select((all) => all[widget.agent]));
+    final helpers = {for (final h in ref.watch(farmProvider)?.helpers ?? const <Helper>[]) h.id: h.name};
+    final now = _now();
+    final all = list ?? const <Memory>[];
+    final notes = all.where((m) => m.kind == MemoryKind.note).toList();
+    final jobs = all.where((m) => m.kind == MemoryKind.job).toList();
+    final forgetting = nextForgotten(all, _soon);
+    final projectsInMemory = {for (final m in all) ?m.project}.toList()..sort();
+    final filtered = notes.where((m) => _shown == '' || (_shown == _everywhere ? m.project == null : m.project == _shown)).toList();
+    String whose(Memory m) => m.helper != null ? '${helpers[m.helper] ?? m.helper} 记的' : '你记的';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: _gap([
+        Text('这个 agent 派出去的帮工共用一份记性。每一轮开始，和这一轮有关的几条放在它收到的话前面；一轮结束，它在汇报里写的「记住：」那几行，和这件活做到哪了，记进来。', style: _lead),
+        DeskSection(
+          title: '手上的活',
+          count: jobs.length,
+          child: jobs.isEmpty
+              ? const DeskEmpty('它的帮工还没做完过一轮。')
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final m in jobs)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: const BoxDecoration(
+                          color: Palette.cream100,
+                          border: Border(left: BorderSide(color: Palette.leaf500, width: 4)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                Text(m.helper != null ? (helpers[m.helper] ?? m.helper!) : '帮工', style: _meta.copyWith(color: Palette.bark800)),
+                                Text(m.project ?? '所有项目', style: _meta),
+                                Text(ago(m.at, now), style: _meta),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(m.text, style: KitText.sm.copyWith(color: Palette.bark900)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        _RecallPreview(list: all),
+        WriteNote(onWrite: (text, project) => ref.read(memoriesProvider.notifier).write(widget.agent, text, project), withProject: true),
+        DeskSection(
+          title: '记下的',
+          count: notes.length,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (projectsInMemory.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: [
+                      for (final (value, label) in [('', '全部'), (_everywhere, '所有项目'), for (final p in projectsInMemory) (p, p)])
+                        DeskPill(label: label, on: _shown == value, small: true, onTap: () => setState(() => _shown = value)),
+                    ],
+                  ),
+                ),
+              if (filtered.isEmpty)
+                DeskEmpty(notes.isNotEmpty ? '这一栏没有。' : '还没记下什么。帮工在汇报里写「记住：」，或者你在上面替它记。')
+              else
+                for (final m in filtered)
+                  MemoryItem(
+                    memory: m,
+                    faded: forgetting.contains(m.id),
+                    onForget: () => deskRun(() => ref.read(memoriesProvider.notifier).forget(widget.agent, m.id)),
+                    meta: [
+                      m.project ?? '所有项目',
+                      whose(m),
+                      ago(m.at, now),
+                      m.recalled > 0 ? '想起过 ${m.recalled.round()} 次${m.recalledAt != null ? '，上次 ${ago(m.recalledAt!, now)}' : ''}' : '还没想起过',
+                    ],
+                    warning: forgetting.contains(m.id) ? '快忘了：记满 300 条时最先丢' : null,
+                  ),
+            ],
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// What a turn in a project would be reminded of now: the same pick the server makes, without counting it.
+class _RecallPreview extends ConsumerStatefulWidget {
+  const _RecallPreview({required this.list});
+  final List<Memory> list;
+
+  @override
+  ConsumerState<_RecallPreview> createState() => _RecallPreviewState();
+}
+
+class _RecallPreviewState extends ConsumerState<_RecallPreview> {
+  String _project = '';
+  String _text = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final projectNames = ref.watch(projectNamesProvider).value ?? const <String>[];
+    final where = _project.isNotEmpty ? _project : (projectNames.firstOrNull ?? '');
+    final picked = where.isEmpty ? const <Memory>[] : pick(widget.list, Cue(helper: '', project: where, text: _text, now: _now()));
+    final chars = picked.fold<int>(0, (n, m) => n + lineOf(m, where).length + 1);
+    return DeskSection(
+      title: '下回开工会想起',
+      aside: picked.isEmpty ? null : Text('${picked.length} 条 · $chars / $recallChars 字'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 160,
+                child: PxPick(
+                  value: where,
+                  onChanged: (p) => setState(() => _project = p),
+                  placeholder: '选项目',
+                  options: [for (final p in projectNames) PickOption(value: p, label: p)],
+                  semanticLabel: '在哪个项目开工',
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: PxTextInput(value: _text, onChanged: (t) => setState(() => _text = t), placeholder: '这一轮的话（可以不填）', semanticLabel: '这一轮的话'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (picked.isEmpty)
+            DeskEmpty(where.isNotEmpty ? '在这个项目里开工，什么也想不起来。' : '还没有项目。')
+          else
+            Container(
+              color: Palette.cream100,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(picked.map((m) => lineOf(m, where)).join('\n'), style: KitText.xs.copyWith(height: 1.625, color: Palette.bark800)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── The manager's ────────────────────────────────────────────────────────────
+
+class ManagerMemoryPanel extends ConsumerStatefulWidget {
+  const ManagerMemoryPanel({super.key});
+
+  @override
+  ConsumerState<ManagerMemoryPanel> createState() => _ManagerMemoryPanelState();
+}
+
+class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
+  @override
+  void initState() {
+    super.initState();
+    deskRun(() => ref.read(managerMemoryProvider.notifier).load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final view = ref.watch(managerMemoryProvider);
+    if (view == null) return const DeskEmpty('在读管家的记性……');
+    final now = _now();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: _gap([
+        Text('管家每次开口前，整份记性都放在系统提示里；太长时只带最新的（最多 8000 字）。它自己用 remember 记、用 rewrite_memory 整理，你也可以替它记一条。', style: _lead),
+        if (view.runtime == Runtime.pi)
+          Container(
+            color: const Color(0xFFF6E3C8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Text(
+              '管家现在跑在 pi 上（VIBEVALLEY_FOREMAN_RUNTIME=pi），不读这份记性：pi 的会话自己留着对话。换回 VibeValley 自己的 agent 才用得上。',
+              style: KitText.xs.copyWith(color: const Color(0xFF8A4F1D)),
+            ),
+          ),
+        WriteNote(onWrite: (text, _) => ref.read(managerMemoryProvider.notifier).write(text)),
+        DeskSection(
+          title: '记下的',
+          count: view.memories.length,
+          aside: Tooltip(
+            message: view.file,
+            child: Text(view.file, style: KitText.mono.copyWith(color: Palette.bark500)),
+          ),
+          child: view.memories.isEmpty
+              ? const DeskEmpty('还没记下什么。跟管家说「记住……」，或者你在上面替它记。')
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final (i, m) in view.memories.indexed)
+                      MemoryItem(
+                        memory: m,
+                        faded: i >= view.carried,
+                        onForget: () => deskRun(() => ref.read(managerMemoryProvider.notifier).forget(m.id)),
+                        meta: [m.helper == managerAgent ? '管家自己记的' : '你交代的', ago(m.at, now)],
+                        warning: i >= view.carried ? '太旧了，带不进系统提示' : null,
+                      ),
+                  ],
+                ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// The manager's conversation that compaction folded away, word for word: search it, open a file.
+class ArchivePanel extends ConsumerStatefulWidget {
+  const ArchivePanel({super.key});
+
+  @override
+  ConsumerState<ArchivePanel> createState() => _ArchivePanelState();
+}
+
+class _ArchivePanelState extends ConsumerState<ArchivePanel> {
+  String _query = '';
+  ArchiveListing? _listing;
+  ({String name, String text})? _open;
+
+  @override
+  void initState() {
+    super.initState();
+    _search(null);
+  }
+
+  Future<void> _search(String? q) async {
+    final listing = await deskRun(() => ref.read(deskApiProvider).farm.managerArchive(q: q));
+    if (mounted && listing != null) setState(() => _listing = listing);
+  }
+
+  Future<void> _show(String name) async {
+    if (_open?.name == name) return setState(() => _open = null);
+    String text;
+    try {
+      text = await ref.read(deskApiProvider).farm.managerArchiveFile(name: name);
+    } on Object catch (e) {
+      text = reasonOf(e);
+    }
+    if (mounted) setState(() => _open = (name: name, text: text));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final listing = _listing;
+    final now = _now();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: _gap([
+        Text('对话太长时，管家把前面的部分压成一段摘要，原文一字不改地存在这里。摘要里缺了细节，它自己会用 search_archive 来翻；你也可以在这里翻。', style: _lead),
+        Row(
+          children: [
+            Expanded(
+              child: PxTextInput(
+                value: _query,
+                onChanged: (q) => setState(() => _query = q),
+                placeholder: '搜一个词',
+                icon: 'button-search',
+                semanticLabel: '在旧账里搜',
+                onSubmitted: (q) => _search(_query),
+              ),
+            ),
+            const SizedBox(width: 8),
+            PxButton.text('搜', icon: 'button-search', onPressed: _query.trim().isEmpty ? null : () => _search(_query)),
+          ],
+        ),
+        if (listing != null && listing.hits.isNotEmpty)
+          DeskSection(
+            title: '搜到的',
+            count: listing.hits.length,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final h in listing.hits)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    color: Palette.cream100,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${h.file}:${h.line.round()}', style: KitText.mono.copyWith(color: Palette.bark500)),
+                        const SizedBox(height: 2),
+                        Text(h.text, style: KitText.xs.copyWith(height: 1.625, color: Palette.bark800)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        DeskSection(
+          title: '压掉的对话',
+          count: listing?.files.length ?? 0,
+          child: listing == null
+              ? const DeskEmpty('在读……')
+              : listing.files.isEmpty
+              ? const DeskEmpty('还没有：管家的对话还没长到要压缩。')
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final f in listing.files)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        color: Palette.cream100,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            KitTappable(
+                              onTap: () => _show(f.name),
+                              semanticLabel: f.name,
+                              builder: (context, s) => Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        f.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: KitText.mono.copyWith(color: Palette.bark800),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text('${ago(f.at, now)} · ${f.chars.round()} 字', style: _meta),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (_open?.name == f.name)
+                              Container(
+                                constraints: const BoxConstraints(maxHeight: 384),
+                                decoration: const BoxDecoration(
+                                  border: Border(top: BorderSide(color: Palette.cream300)),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                child: SingleChildScrollView(
+                                  child: SelectableText(_open!.text, style: KitText.xs.copyWith(height: 1.625, color: Palette.bark800)),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      ]),
+    );
+  }
+}
+
+// ── Shared ───────────────────────────────────────────────────────────────────
+
+/// 替它记一条: a note written for an agent; with `withProject`, the project it is for (empty for every project).
+class WriteNote extends ConsumerStatefulWidget {
+  const WriteNote({super.key, required this.onWrite, this.withProject = false});
+  final Future<Answer> Function(String text, String? project) onWrite;
+  final bool withProject;
+
+  @override
+  ConsumerState<WriteNote> createState() => _WriteNoteState();
+}
+
+class _WriteNoteState extends ConsumerState<WriteNote> {
+  String _text = '';
+  String _project = '';
+  String _error = '';
+
+  Future<void> _write() async {
+    final answer = await widget.onWrite(_text, _project.trim().isEmpty ? null : _project.trim());
+    if (!mounted) return;
+    setState(() {
+      _error = answer.ok ? '' : answer.text;
+      if (answer.ok) _text = '';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final projectNames = widget.withProject ? (ref.watch(projectNamesProvider).value ?? const <String>[]) : const <String>[];
+    final button = PxButton.text('记下', tone: PxTone.primary, onPressed: _text.trim().isEmpty ? null : _write);
+    return PxField(
+      label: '替它记一条',
+      error: _error.isEmpty ? null : _error,
+      hint: Text(widget.withProject ? '写成下次一看就懂的一句话。项目留空就是所有项目都用得上。' : '写成下次一看就懂的一句话。'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PxTextArea(
+            value: _text,
+            onChanged: (t) => setState(() => _text = t),
+            rows: 2,
+            placeholder: widget.withProject ? '比如：clock-in 的测试用 pnpm test，别用 npm' : '比如：提交信息写中文；周末别派夜班',
+            semanticLabel: '替它记一条',
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (widget.withProject) ...[
+                Expanded(
+                  child: PxTextInput(
+                    value: _project,
+                    onChanged: (p) => setState(() => _project = p),
+                    placeholder: '项目（可以不填）',
+                    mono: true,
+                    semanticLabel: '项目',
+                    suggestions: projectNames,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ] else
+                const Spacer(),
+              button,
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One memory: its text, what is known of it in small words, and 忘掉 when hovered (or focused).
+class MemoryItem extends StatefulWidget {
+  const MemoryItem({super.key, required this.memory, required this.onForget, required this.meta, this.faded = false, this.warning});
+  final Memory memory;
+  final VoidCallback onForget;
+  final List<String> meta;
+  final bool faded;
+
+  /// In amber after the rest: why it is about to go.
+  final String? warning;
+
+  @override
+  State<MemoryItem> createState() => _MemoryItemState();
+}
+
+class _MemoryItemState extends State<MemoryItem> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    onEnter: (_) => setState(() => _hover = true),
+    onExit: (_) => setState(() => _hover = false),
+    child: Opacity(
+      opacity: widget.faded ? .6 : 1,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        color: Palette.cream100,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.memory.text, style: KitText.sm.copyWith(color: Palette.bark900)),
+                  const SizedBox(height: 2),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final m in widget.meta) Text(m, style: _meta),
+                      if (widget.warning != null) Text(widget.warning!, style: _meta.copyWith(color: const Color(0xFFB8682A))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            KitTappable(
+              onTap: widget.onForget,
+              semanticLabel: '忘掉',
+              builder: (context, s) => Opacity(
+                opacity: _hover || s.focused ? 1 : 0,
+                child: Container(
+                  color: s.hovered ? Palette.cream200 : null,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  child: Text('忘掉', style: _meta.copyWith(color: s.hovered ? Palette.berry : Palette.bark500)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}

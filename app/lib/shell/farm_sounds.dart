@@ -1,0 +1,159 @@
+// Where the farm's sounds come from (web/src/farm/sounds.ts): changes in state, not clicks, so a sound plays whoever
+// caused the change (the player, a helper, the server, the debug console). Mute lives in prefs.
+//
+// The farm screen mounts FarmSounds around (or beside) the village and hands it what only it knows: the tool in hand,
+// the beds' effects, which panels and dialogs are open, the voice call. Helpers coming, ripening and failing, and the
+// effects (coins, level-ups, achievements), it reads itself.
+
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../data/providers.dart';
+import '../gen/vibevalley.dart';
+import '../voice/voice.dart';
+import 'fx_layer.dart';
+import 'prefs.dart';
+import 'sfx.dart';
+
+/// A bed's effect (core bedFx): `kind` is water, spray, harvest, shovel or note.
+typedef BedFx = ({Object id, String kind});
+
+const _bedSound = {'water': 'water', 'spray': 'spray', 'harvest': 'harvest', 'shovel': 'shovel', 'note': 'nope'};
+
+class FarmSounds extends ConsumerStatefulWidget {
+  const FarmSounds({super.key, this.child = const SizedBox.shrink(), this.tool, this.bedFx = const [], this.open = const {}, this.call, this.effects});
+  final Widget child;
+
+  /// The tool in hand: any change picks one up.
+  final String? tool;
+
+  /// The beds' effects, as they stand; a new one sounds.
+  final List<BedFx> bedFx;
+
+  /// Panels and dialogs by name (the bed panel, sowing, watering, the friends' dock, the chat…): a swish in, a swish out.
+  final Map<String, bool> open;
+
+  /// The voice call: connecting, hanging up, failing.
+  final VoiceCall? call;
+
+  /// The farm's effects; farmEffects when not given.
+  final Stream<GameEffect>? effects;
+
+  @override
+  ConsumerState<FarmSounds> createState() => _FarmSoundsState();
+}
+
+class _FarmSoundsState extends ConsumerState<FarmSounds> {
+  StreamSubscription<GameEffect>? _effects;
+  CallPhase? _phase;
+  String? _problem;
+
+  @override
+  void initState() {
+    super.initState();
+    _effects = (widget.effects ?? farmEffects(ref.read(serverProvider))).listen((f) {
+      switch (f) {
+        case GameEffectReward():
+          _inTurn('coin', 300);
+        case GameEffectLevelUp():
+          _inTurn('levelUp', 700);
+        case GameEffectAchievement():
+          _inTurn('achievement', 700);
+        case GameEffectPenalty():
+          break;
+      }
+    });
+    _phase = widget.call?.phase;
+    _problem = widget.call?.problem;
+    widget.call?.addListener(_voice);
+    // Rendered ahead, so the first sounds are not late.
+    unawaited(Sfx.warm());
+  }
+
+  @override
+  void dispose() {
+    unawaited(_effects?.cancel());
+    widget.call?.removeListener(_voice);
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(FarmSounds old) {
+    super.didUpdateWidget(old);
+    if (widget.tool != old.tool) Sfx.play('pick');
+    final seen = {for (final f in old.bedFx) f.id};
+    for (final f in widget.bedFx) {
+      if (!seen.contains(f.id)) Sfx.play(_bedSound[f.kind] ?? 'nope');
+    }
+    for (final MapEntry(:key, :value) in widget.open.entries) {
+      if ((old.open[key] ?? false) != value) Sfx.play(value ? 'open' : 'close');
+    }
+    if (widget.call != old.call) {
+      old.call?.removeListener(_voice);
+      widget.call?.addListener(_voice);
+      _phase = widget.call?.phase;
+      _problem = widget.call?.problem;
+    }
+  }
+
+  void _voice() {
+    final call = widget.call;
+    if (call == null) return;
+    final before = _phase;
+    final problem = call.problem;
+    _phase = call.phase;
+    if (problem != null && problem != _problem) {
+      Sfx.play('nope');
+    } else if (call.phase != before) {
+      if (call.phase == CallPhase.live) {
+        Sfx.play('voiceOn');
+      } else if (call.phase == CallPhase.idle && (before == CallPhase.live || before == CallPhase.ending)) {
+        Sfx.play('voiceOff');
+      }
+    }
+    _problem = problem;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Sfx.setMuted(ref.watch(prefsProvider.select((p) => p.muted)));
+    // The first state is the farm as it already was: nothing arrives in it (the page is still silent then, before
+    // the first click unlocks its audio).
+    ref.listen(farmProvider, (prev, next) {
+      if (prev != null && next != null) _helpers(prev.helpers, next.helpers);
+    });
+    return widget.child;
+  }
+}
+
+/// A helper walks on, ripens, fails.
+void _helpers(List<Helper> prev, List<Helper> next) {
+  final before = {for (final h in prev) h.id: h};
+  for (final h in next) {
+    final was = before[h.id];
+    if (was == null) {
+      Sfx.play('arrive');
+    } else if (h.phase is PhaseRipe && was.phase is! PhaseRipe) {
+      _inTurn('ripe', 220);
+    } else if (h.phase is PhaseFailed && was.phase is! PhaseFailed) {
+      Sfx.play('bug');
+    }
+  }
+}
+
+/// Good news takes turns: a finished job ripens, pays and may earn an achievement in the same moment, and played
+/// together those are one muddy chord. Each waits for the one before, then holds the floor for `hold` ms.
+DateTime _floorFree = DateTime.fromMillisecondsSinceEpoch(0);
+
+void _inTurn(String name, int hold) {
+  final now = DateTime.now();
+  final at = now.isAfter(_floorFree) ? now : _floorFree;
+  _floorFree = at.add(Duration(milliseconds: hold));
+  if (at == now) {
+    Sfx.play(name);
+  } else {
+    Timer(at.difference(now), () => Sfx.play(name));
+  }
+}

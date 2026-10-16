@@ -1,0 +1,116 @@
+{
+  "runtime": "kimi",
+  "observedAt": "2026-08-26",
+  "version": "0.38.0",
+  "initialize": {
+    "protocolVersion": 1,
+    "authMethodIds": [
+      "login"
+    ],
+    "loadSession": true,
+    "sessionCapabilities": [
+      "additionalDirectories",
+      "close",
+      "delete",
+      "fork",
+      "list",
+      "resume"
+    ]
+  },
+  "sessionNew": {
+    "configOptionIds": [
+      "model",
+      "thinking",
+      "mode"
+    ],
+    "modeIds": [
+      "default",
+      "plan",
+      "auto",
+      "yolo"
+    ],
+    "modelIds": []
+  },
+  "prompt": {
+    "stopReason": "end_turn",
+    "metaKeys": [],
+    "permissionRequests": [],
+    "terminalRequests": [
+      {
+        "method": "terminal/create",
+        "paramKeys": [
+          "args",
+          "command",
+          "cwd",
+          "env",
+          "outputByteLimit",
+          "sessionId"
+        ]
+      },
+      {
+        "method": "terminal/wait_for_exit",
+        "paramKeys": [
+          "sessionId",
+          "terminalId"
+        ]
+      },
+      {
+        "method": "terminal/output",
+        "paramKeys": [
+          "sessionId",
+          "terminalId"
+        ]
+      },
+      {
+        "method": "terminal/release",
+        "paramKeys": [
+          "sessionId",
+          "terminalId"
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "sessionUpdate": "tool_call",
+        "title": "Bash",
+        "kind": "execute",
+        "status": "pending",
+        "contentTypes": [
+          "content"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "status": "in_progress",
+        "contentTypes": [
+          "content"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "Running: printf OAR_ACP_SNAPSHOT_OK",
+        "kind": "execute",
+        "status": "in_progress",
+        "rawInputKeys": [
+          "command"
+        ],
+        "contentTypes": [
+          "content"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "contentTypes": [
+          "terminal"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "status": "completed",
+        "contentTypes": [
+          "terminal"
+        ]
+      }
+    ]
+  }
+}

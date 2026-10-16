@@ -1,0 +1,2 @@
+Background: a perfectly flat, solid, pure magenta background (#FF00FF) everywhere around the items. Uniform colour, no gradient, no texture, no ground, no cast shadow on the background. Leave wide magenta gaps between items; every item sits fully inside its own grid cell and touches neither another cell nor the image edge. Do not use magenta or pink anywhere on the items themselves.
+No text, no letters, no numbers, no labels.

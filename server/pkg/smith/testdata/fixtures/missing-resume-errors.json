@@ -1,0 +1,52 @@
+{
+  "codex": {
+    "code": -32600,
+    "message": "no rollout found for thread id 00000000-0000-4000-8000-000000000294"
+  },
+  "grok": {
+    "code": -32603,
+    "message": "Path not found.",
+    "data": {
+      "detail": "No such file or directory (os error 2)",
+      "code": "FS_NOT_FOUND"
+    }
+  },
+  "kimi": {
+    "code": -32602,
+    "message": "Invalid params: Unknown sessionId: missing-session",
+    "data": {
+      "sessionId": "missing-session"
+    }
+  },
+  "opencode": {
+    "code": -32603,
+    "message": "Internal error: OpenCode service failure",
+    "data": {
+      "service": "session"
+    }
+  },
+  "opencodeV2": {
+    "code": -32602,
+    "message": "Invalid params: session not found: missing-session",
+    "data": {
+      "sessionId": "missing-session"
+    }
+  },
+  "antigravity": {
+    "code": -32002,
+    "message": "Session not found in the current GEMINI_HOME",
+    "data": {
+      "sessionId": "00000000-0000-4000-8000-000000000294",
+      "geminiHome": "<tmp>/gem",
+      "expectedPath": "<tmp>/gem/antigravity-acp/conversations/00000000-0000-4000-8000-000000000294.db",
+      "details": "No session with this ID exists under GEMINI_HOME ('<tmp>/gem'). If you recently changed GEMINI_HOME, point it back to the directory where the session was created."
+    }
+  },
+  "cursor": {
+    "name": "AgentNotFoundError",
+    "message": "Agent agent-00000000-0000-4000-8000-000000000294 not found",
+    "code": "agent_not_found",
+    "operation": "Agent.listRuns",
+    "isRetryable": false
+  }
+}

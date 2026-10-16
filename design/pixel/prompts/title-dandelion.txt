@@ -1,0 +1,2 @@
+Create ONE image, size 1536x1024: a sprite sheet of dandelions for a game's title screen, laid out in a grid of 4 columns and 2 rows, one item per cell, each centred in its cell.
+Pixel art in the same style as the dandelions in the foreground of Image 1. Top row: four dandelion plants seen from the side, each a thin green stem with a few leaves at the bottom and a round white seed head on top, different heights. Bottom row: four single dandelion seeds floating in the air, each a tiny white fluffy parachute on a thin stalk, slightly different angles.

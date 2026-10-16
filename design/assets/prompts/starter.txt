@@ -1,0 +1,5 @@
+Create ONE sheet of 8 small painted emblems for the farm game's first tasks, size 1536x1024: a grid of 4 columns x 2 rows, one emblem centred in each cell, all drawn at a similar size.
+Image 2 is the game's icon sheet: match its painted style (gentle shading, soft brown outline, warm colours). Draw only the object itself: no disc, no circle, no frame, no badge behind it. Keep each one simple and bold, with a clear silhouette.
+Row 1: (1) a wooden farm gate standing open; (2) a hand holding out a small green seedling with soil on its roots; (3) a green watering can pouring water; (4) a magnifying glass held over a wooden crate of vegetables.
+Row 2: (5) an old-fashioned tin-can telephone: two tin cans joined by a string; (6) an unrolled paper garden plan with a pencil lying on it; (7) a hand cupped beside a mouth shape calling out, with two curved sound lines; (8) a wooden clipboard holding a checklist with three green check marks.
+No text, no letters, no numbers, no logos, no faces.

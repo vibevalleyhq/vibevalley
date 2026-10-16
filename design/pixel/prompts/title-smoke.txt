@@ -1,0 +1,2 @@
+Create ONE image, size 1536x1024: a sprite sheet of chimney smoke for a game's title screen, laid out in a grid of 4 columns and 2 rows, one item per cell, each centred in its cell.
+Pixel-art puffs of soft light grey-white smoke, like the smoke rising from the chimney in Image 1. Top row: four round puffs from small to large. Bottom row: four wispy, stretched puffs from small to large, as smoke thins out higher up.

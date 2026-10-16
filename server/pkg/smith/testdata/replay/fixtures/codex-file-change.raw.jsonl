@@ -1,0 +1,15 @@
+{"method":"turn/started","turn":{"id":"01a1148d-eaff-7573-bf4f-c5b1e629a8cc"}}
+{"method":"item/started","item":{"type":"userMessage","id":"01a1148d-eb36-7ee2-9c58-3dd1cebcb84d"}}
+{"method":"item/completed","item":{"type":"userMessage","id":"01a1148d-eb36-7ee2-9c58-3dd1cebcb84d"}}
+{"method":"item/started","item":{"type":"reasoning","id":"rs-1sJYMnUGbfyZA9ed"}}
+{"method":"item/completed","item":{"type":"reasoning","id":"rs-1sJYMnUGbfyZA9ed"}}
+{"method":"item/started","item":{"type":"fileChange","id":"call_EtWhPsCYKNtfmyAD","changes":[{"path":"<cwd>/added.txt","kind":{"type":"add"},"diff":"fresh line\n"},{"path":"<cwd>/gone.txt","kind":{"type":"delete"},"diff":"deleted\n"},{"path":"<cwd>/notes.txt","kind":{"type":"update","move_path":null},"diff":"@@ -1 +1 @@\n-old note\n+new note\n"},{"path":"<cwd>/old-name.txt","kind":{"type":"update","move_path":"<cwd>/new-name.txt"},"diff":"@@ -1 +1 @@\n-moved before\n+moved after\n\n\nMoved to: <cwd>/new-name.txt"}],"status":"inProgress"}}
+{"method":"item/completed","item":{"type":"fileChange","id":"call_EtWhPsCYKNtfmyAD","changes":[{"path":"<cwd>/added.txt","kind":{"type":"add"},"diff":"fresh line\n"},{"path":"<cwd>/gone.txt","kind":{"type":"delete"},"diff":"deleted\n"},{"path":"<cwd>/notes.txt","kind":{"type":"update","move_path":null},"diff":"@@ -1 +1 @@\n-old note\n+new note\n"},{"path":"<cwd>/old-name.txt","kind":{"type":"update","move_path":"<cwd>/new-name.txt"},"diff":"@@ -1 +1 @@\n-moved before\n+moved after\n\n\nMoved to: <cwd>/new-name.txt"}],"status":"completed"}}
+{"method":"thread/tokenUsage/updated","tokenUsage":{"total":{"totalTokens":0,"inputTokens":0,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":0,"reasoningOutputTokens":0},"last":{"totalTokens":0,"inputTokens":0,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":0,"reasoningOutputTokens":0},"modelContextWindow":258400}}
+{"method":"item/started","item":{"type":"reasoning","id":"rs-QIe5g_ajeFWvogYh"}}
+{"method":"item/completed","item":{"type":"reasoning","id":"rs-QIe5g_ajeFWvogYh"}}
+{"method":"item/started","item":{"type":"agentMessage","id":"msg-jwzJXiN5Cv_SAkCL"}}
+{"method":"item/agentMessage/delta","delta":"patched"}
+{"method":"item/completed","item":{"type":"agentMessage","id":"msg-jwzJXiN5Cv_SAkCL"}}
+{"method":"thread/tokenUsage/updated","tokenUsage":{"total":{"totalTokens":0,"inputTokens":0,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":0,"reasoningOutputTokens":0},"last":{"totalTokens":0,"inputTokens":0,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":0,"reasoningOutputTokens":0},"modelContextWindow":258400}}
+{"method":"turn/completed","turn":{"status":"completed"}}

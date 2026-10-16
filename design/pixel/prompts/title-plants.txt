@@ -1,0 +1,2 @@
+Create ONE image, size 1536x1024: a sprite sheet of foreground plants for a game's title screen, laid out in a grid of 3 columns and 2 rows, one item per cell, each standing on the bottom of its cell.
+Pixel art in the same style as the grass and flowers at the bottom of Image 1, seen close up as if right in front of the camera: a tall tuft of long grass blades; a clump of grass with small yellow wildflowers; a clump with small white daisies; a fern; a clump of tall grass with two dandelion seed heads; a low wide tuft of grass. Fresh greens, warm light from the upper left.

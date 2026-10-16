@@ -1,0 +1,99 @@
+---
+// The one page, in a language: the scene, the helpers on their way, then the sections. The parts that move with the
+// page are React islands (the .tsx beside this): built into the page like the rest, woken in the browser, the top
+// ones once the page has loaded (the scene shows and moves without them; the farm's picture should not wait behind
+// their scripts) and the others as they come near. Their pictures' addresses are passed in from here.
+import Base from '../layouts/Base.astro'
+import type { Copy } from '../i18n/zh'
+import { RUNTIMES, WALKERS, pixelArt, storyArt } from '../lib/assets'
+import { backgroundsOf, screenshotOf, titleArt } from '../lib/images'
+import { FACTS } from '../lib/facts'
+import { COMMANDS, GITHUB } from '../lib/links'
+import { FRONT } from '../lib/scene'
+import Bar from './Bar'
+import Devices from './Devices'
+import Features from './Features'
+import Foot from './Foot.astro'
+import Harvest from './Harvest'
+import Hero from './Hero'
+import How from './How'
+import Parade from './Parade'
+import Screens from './Screens'
+import Start from './Start'
+
+interface Props {
+  copy: Copy
+}
+const { copy } = Astro.props
+const near = { rootMargin: '400px' }
+const field = ['plot-wheat', 'plot-carrot', 'plot-leafy', 'plot-flowering', 'plot-sprout', 'plot-seeded']
+const art = await titleArt()
+const backgrounds = await backgroundsOf()
+const shots = await Promise.all(copy.screens.items.map(async (s) => ({ ...(await screenshotOf(s.image)), caption: s.caption })))
+const devices = { mac: await screenshotOf('farm'), phones: [await screenshotOf('phone-chat'), await screenshotOf('phone-tickets')] as [Awaited<ReturnType<typeof screenshotOf>>, Awaited<ReturnType<typeof screenshotOf>>] }
+const ripe = (n: number, from: number) => Array.from({ length: n }, (_, i) => pixelArt((i + from) % 3 === 2 ? 'plot-carrot' : 'plot-wheat'))
+---
+
+<Base copy={copy} hero={backgrounds}>
+  <Bar client:idle copy={{ home: copy.home, title: copy.title, nav: copy.nav, other: copy.other, name: copy.hero.name }} github={GITHUB} />
+  <main>
+    <Hero
+      client:idle
+      copy={copy.hero}
+      art={art}
+      backgrounds={backgrounds}
+      hint={pixelArt('button-next')}
+      frame={{
+        branchLeft: pixelArt('fg-branch-left'),
+        branchRight: pixelArt('fg-branch-right'),
+        bushLeft: pixelArt('fg-bush-left'),
+        bushRight: pixelArt('fg-bush-right'),
+      }}
+      github={GITHUB}
+    />
+    <script is:inline>
+      // Only this hour's pictures load, before the scene wakes: the farm's background and the farmer's pose.
+      ;(() => {
+        const scene = document.documentElement.dataset.scene
+        for (const img of document.querySelectorAll(`#top [data-scene="${scene}"][data-src], #top [data-scene="${scene}"] [data-src]`)) img.src = img.dataset.src
+      })()
+    </script>
+    <Parade
+      client:visible={near}
+      copy={copy.parade}
+      plots={Array.from({ length: 16 }, (_, i) => pixelArt(field[(i * 5) % field.length]!))}
+      walkers={WALKERS.map((w) => w.frames)}
+      front={Array.from({ length: 12 }, (_, i) => art[FRONT[i % FRONT.length]!])}
+    />
+    <Harvest
+      client:visible={near}
+      copy={copy.harvest}
+      rows={[ripe(18, 0), ripe(14, 1)]}
+      coins={pixelArt('coins-stack')}
+      icons={{ harvest: pixelArt('icon-harvest'), check: pixelArt('mark-check') }}
+    />
+    <How client:visible={near} copy={copy.how} icons={copy.how.steps.map((s) => pixelArt(s.icon))} art={storyArt()} />
+    <Features
+      client:visible={near}
+      copy={{ features: copy.features, runtimes: copy.runtimes }}
+      icons={copy.features.items.map((f) => pixelArt(f.icon))}
+      tallies={FACTS.map((f) => pixelArt(f.icon))}
+      runtimes={[...RUNTIMES.map((r) => ({ name: r.name, logo: pixelArt(r.logo) })), { name: copy.runtimes.own, logo: pixelArt('app-sprout') }]}
+    />
+    <Devices client:visible={near} copy={copy.devices} mac={devices.mac} phones={devices.phones} />
+    <Screens
+      client:visible={near}
+      copy={copy.screens}
+      shots={shots}
+      close={pixelArt('button-close')}
+    />
+    <Start
+      client:visible={near}
+      copy={{ start: copy.start, safety: copy.safety }}
+      commands={COMMANDS}
+      readme={`${GITHUB}#readme`}
+      icons={{ warn: pixelArt('mark-warn'), check: pixelArt('mark-check'), copy: pixelArt('button-copy') }}
+    />
+  </main>
+  <Foot copy={copy} />
+</Base>

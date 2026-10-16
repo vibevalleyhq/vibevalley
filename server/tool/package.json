@@ -1,0 +1,13 @@
+{
+  "name": "@vibevalley/server-tool",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dump-pglite": "node dump-pglite.ts",
+    "pi-prices": "node pi-prices.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@earendil-works/pi-ai": "1.1.0"
+  }
+}

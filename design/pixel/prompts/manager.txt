@@ -1,0 +1,3 @@
+Create ONE sprite sheet, size 1536x1024: a grid of 3 columns x 2 rows, one item per cell, everything at the same scale, whole body visible.
+Row 1 is the farm manager, a friendly young man with a straw hat, a short scarf, rolled-up sleeves and work boots, chibi game proportions (big head, about 2.5 heads tall, about 300 image pixels tall), three-quarter front view facing the viewer: (1) standing relaxed; (2) talking, mouth open, one hand raised explaining; (3) listening, one hand cupped to his ear, head tilted.
+Row 2: (4) a small brown-and-white dog curled up asleep on its side, eyes closed; (5) the same dog sitting up awake, ears perked, tail up; (6) a wooden mailbox on a post.

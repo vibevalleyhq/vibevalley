@@ -1,0 +1,11 @@
+# The farm's queries (pkg/db/queries/*.sql) as typed Go (pkg/db/generated), over the tables migrations/ make.
+# After changing a query or a migration: GOTOOLCHAIN=go1.27.2 go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
+version: "2"
+sql:
+  - engine: sqlite
+    schema: migrations
+    queries: pkg/db/queries
+    gen:
+      go:
+        package: generated
+        out: pkg/db/generated

@@ -1,0 +1,33 @@
+{
+  "commands": [],
+  "agents": [],
+  "output_style": "default",
+  "available_output_styles": [],
+  "user_output_styles_dir": "/home/oar-private-user/.claude/output-styles",
+  "models": [],
+  "account": {
+    "email": "oar-private-account@example.test",
+    "organization": "oar-private-organization",
+    "subscriptionType": "oar-private-plan",
+    "tokenSource": "oauth",
+    "apiKeySource": "none",
+    "apiProvider": "firstParty"
+  },
+  "pid": 654321,
+  "current_permission_mode": "bypassPermissions",
+  "feedback_mode": {
+    "kind": "post"
+  },
+  "analytics_disabled": false,
+  "remote_control_auto_enable": false,
+  "remote_control_auto_connect_default": false,
+  "remote_control_available": false,
+  "remote_control_auto_on_by_default": false,
+  "ide_rc_auto_enable_gate": true,
+  "fast_mode_state": "on",
+  "fast_mode_disabled_reason": null,
+  "session_state": "idle",
+  "capabilities": [
+    "ui_surface_v1"
+  ]
+}

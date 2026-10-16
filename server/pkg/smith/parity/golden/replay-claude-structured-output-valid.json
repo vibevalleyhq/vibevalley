@@ -1,0 +1,1355 @@
+{
+ "name": "replay-claude-structured-output-valid",
+ "source": "tests/replay/fixtures/claude-structured-output-valid.raw.jsonl via foldClaudeStdout",
+ "runtimeId": "claude",
+ "rootSessionId": "claude-session",
+ "records": [
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000,
+   "kind": "request",
+   "id": "req-1",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "prompt",
+    "input": "replay structured-output-valid",
+    "inputId": "claude-input"
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 1,
+   "receivedAt": 1800000000005,
+   "kind": "response",
+   "requestId": "req-1",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000010,
+   "kind": "frame",
+   "body": {
+    "type": "result/success",
+    "native": {
+     "duration_api_ms": 71,
+     "stop_reason": "tool_use",
+     "total_cost_usd": 0,
+     "usage": {
+      "input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "output_tokens": 0,
+      "output_tokens_details": {
+       "thinking_tokens": 0
+      },
+      "server_tool_use": {
+       "web_search_requests": 0,
+       "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+       "ephemeral_1h_input_tokens": 0,
+       "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard",
+      "fallback_credit": null
+     },
+     "modelUsage": {
+      "claude-opus-5-5": {
+       "inputTokens": 0,
+       "outputTokens": 0,
+       "cacheReadInputTokens": 0,
+       "cacheCreationInputTokens": 0,
+       "webSearchRequests": 0,
+       "costUSD": 0,
+       "contextWindow": 1000000,
+       "maxOutputTokens": 128000,
+       "thinkingTokens": 0,
+       "canonicalModel": "claude-opus-5-5",
+       "provider": "firstParty",
+       "costBasis": "list"
+      }
+     },
+     "permission_denials": [],
+     "terminal_reason": "completed",
+     "fast_mode_state": "off",
+     "fast_mode_disabled_reason": "sdk_opt_in_required",
+     "subagent_stats": {
+      "spawned": 0,
+      "requested": {
+       "background": 0,
+       "foreground": 0,
+       "unset": 0
+      },
+      "started_in_background": 0,
+      "max_depth": 0,
+      "spawned_by_subagents": 0,
+      "completed": 0,
+      "failed": 0,
+      "killed": {
+       "parent": 0,
+       "user": 0,
+       "system": 0
+      },
+      "refused": {
+       "depth_limit": 0,
+       "concurrency_limit": 0,
+       "budget": 0
+      },
+      "by_type": {}
+     },
+     "safety_stops": 0,
+     "is_error": false,
+     "num_turns": 2,
+     "subtype": "success",
+     "api_error_status": null,
+     "result": "{\"answer\":4}",
+     "structured_output": {
+      "answer": 4
+     },
+     "ttft_ms": 427,
+     "type": "result",
+     "duration_ms": 467,
+     "ttft_stream_ms": 424,
+     "time_to_request_ms": 395,
+     "first_content_frame_ms": 425,
+     "user_message_uuid": "uuid-0001",
+     "user_message_uuids": [
+      "uuid-0001"
+     ],
+     "request_sent_wall_ms": 1791700623099,
+     "queued_turn_count": 0,
+     "result_index": 0
+    },
+    "events": [
+     {
+      "kind": "service_tier",
+      "serviceTier": "default"
+     },
+     {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed",
+       "structuredOutput": {
+        "answer": 4
+       }
+      }
+     },
+     {
+      "kind": "usage",
+      "usage": {
+       "context": {
+        "tokens": 0,
+        "contextWindow": 1000000,
+        "percent": 0
+       },
+       "tokens": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+       }
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "statusSteps": [
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000000
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000000
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed",
+    "structuredOutput": {
+     "answer": 4
+    }
+   }
+  }
+ ],
+ "statusOf": {
+  "all": {
+   "value": {
+    "kind": "idle",
+    "lastTurnOutcome": {
+     "kind": "completed",
+     "structuredOutput": {
+      "answer": 4
+     }
+    }
+   },
+   "seq": 2
+  },
+  "root": {
+   "value": {
+    "kind": "idle",
+    "lastTurnOutcome": {
+     "kind": "completed",
+     "structuredOutput": {
+      "answer": 4
+     }
+    }
+   },
+   "seq": 2
+  }
+ },
+ "modelOf": {
+  "all": {
+   "value": null,
+   "seq": 2
+  },
+  "root": {
+   "value": null,
+   "seq": 2
+  }
+ },
+ "effortOf": {
+  "all": {
+   "value": null,
+   "seq": 2
+  },
+  "root": {
+   "value": null,
+   "seq": 2
+  }
+ },
+ "serviceTierOf": {
+  "all": {
+   "value": "default",
+   "seq": 2
+  },
+  "root": {
+   "value": "default",
+   "seq": 2
+  }
+ },
+ "contextUsageOf": {
+  "all": {
+   "value": {
+    "tokens": 0,
+    "contextWindow": 1000000,
+    "percent": 0
+   },
+   "seq": 2
+  },
+  "root": {
+   "value": {
+    "tokens": 0,
+    "contextWindow": 1000000,
+    "percent": 0
+   },
+   "seq": 2
+  }
+ },
+ "usageOf": {
+  "all": {
+   "value": {
+    "total": {
+     "input": 0,
+     "output": 0,
+     "cacheRead": 0,
+     "cacheWrite": 0
+    }
+   },
+   "seq": 2
+  },
+  "root": {
+   "value": {
+    "total": {
+     "input": 0,
+     "output": 0,
+     "cacheRead": 0,
+     "cacheWrite": 0
+    }
+   },
+   "seq": 2
+  }
+ },
+ "graphOf": {
+  "nodes": [
+   {
+    "id": "claude-session"
+   }
+  ],
+  "edges": []
+ },
+ "events": [
+  {
+   "kind": "turn_started",
+   "requestId": "req-1",
+   "input": "replay structured-output-valid",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000
+  },
+  {
+   "kind": "service_tier",
+   "serviceTier": "default",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000010
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed",
+    "structuredOutput": {
+     "answer": 4
+    }
+   },
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000010
+  },
+  {
+   "kind": "usage",
+   "usage": {
+    "context": {
+     "tokens": 0,
+     "contextWindow": 1000000,
+     "percent": 0
+    },
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "cacheRead": 0,
+     "cacheWrite": 0
+    }
+   },
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000010
+  }
+ ],
+ "coalesced": [
+  {
+   "kind": "turn_started",
+   "requestId": "req-1",
+   "input": "replay structured-output-valid",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000
+  },
+  {
+   "kind": "service_tier",
+   "serviceTier": "default",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000010
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed",
+    "structuredOutput": {
+     "answer": 4
+    }
+   },
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000010
+  },
+  {
+   "kind": "usage",
+   "usage": {
+    "context": {
+     "tokens": 0,
+     "contextWindow": 1000000,
+     "percent": 0
+    },
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "cacheRead": 0,
+     "cacheWrite": 0
+    }
+   },
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000010
+  }
+ ],
+ "turnEndAfter": [
+  {
+   "afterSeq": -1,
+   "outcome": {
+    "kind": "completed",
+    "structuredOutput": {
+     "answer": 4
+    }
+   }
+  },
+  {
+   "afterSeq": -1,
+   "sessionId": "claude-session",
+   "outcome": {
+    "kind": "completed",
+    "structuredOutput": {
+     "answer": 4
+    }
+   }
+  },
+  {
+   "afterSeq": 0,
+   "sessionId": "claude-session",
+   "outcome": {
+    "kind": "completed",
+    "structuredOutput": {
+     "answer": 4
+    }
+   }
+  },
+  {
+   "afterSeq": 0,
+   "sessionId": "claude-session",
+   "inputId": "claude-input",
+   "outcome": {
+    "kind": "completed",
+    "structuredOutput": {
+     "answer": 4
+    }
+   }
+  },
+  {
+   "afterSeq": 0,
+   "inputId": "claude-input",
+   "outcome": {
+    "kind": "completed",
+    "structuredOutput": {
+     "answer": 4
+    }
+   }
+  }
+ ],
+ "conversation": {
+  "drops": [],
+  "inputs": [
+   [
+    "[\"claude-session\",[],\"claude-input\"]",
+    {
+     "id": "[\"claude-session\",[],\"claude-input\"]",
+     "input": "replay structured-output-valid",
+     "inputId": "claude-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay structured-output-valid",
+         "inputId": "claude-input"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   ]
+  ],
+  "requests": [
+   [
+    "[\"\",\"[\\\"claude-session\\\",[],\\\"req-1\\\"]\"]",
+    "[\"claude-session\",[],\"claude-input\"]"
+   ]
+  ],
+  "actions": [],
+  "cursors": [
+   [
+    "",
+    2
+   ]
+  ],
+  "updates": [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "service_tier",
+     "serviceTier": "default",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 2,
+     "receivedAt": 1800000000010
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "completed",
+      "structuredOutput": {
+       "answer": 4
+      }
+     },
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 2,
+     "receivedAt": 1800000000010
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "usage",
+     "usage": {
+      "context": {
+       "tokens": 0,
+       "contextWindow": 1000000,
+       "percent": 0
+      },
+      "tokens": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0
+      }
+     },
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 2,
+     "receivedAt": 1800000000010
+    }
+   }
+  ]
+ },
+ "conversationUpdates": [
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"claude-session\",[],\"claude-input\"]",
+     "input": "replay structured-output-valid",
+     "inputId": "claude-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay structured-output-valid",
+         "inputId": "claude-input"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"claude-session\",[],\"claude-input\"]",
+     "input": "replay structured-output-valid",
+     "inputId": "claude-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay structured-output-valid",
+         "inputId": "claude-input"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "service_tier",
+     "serviceTier": "default",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 2,
+     "receivedAt": 1800000000010
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "completed",
+      "structuredOutput": {
+       "answer": 4
+      }
+     },
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 2,
+     "receivedAt": 1800000000010
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "usage",
+     "usage": {
+      "context": {
+       "tokens": 0,
+       "contextWindow": 1000000,
+       "percent": 0
+      },
+      "tokens": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0
+      }
+     },
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 2,
+     "receivedAt": 1800000000010
+    }
+   }
+  ]
+ ],
+ "view": {
+  "messages": [
+   {
+    "kind": "input",
+    "id": "in:[\"claude-session\",[],\"claude-input\"]",
+    "input": {
+     "id": "[\"claude-session\",[],\"claude-input\"]",
+     "input": "replay structured-output-valid",
+     "inputId": "claude-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay structured-output-valid",
+         "inputId": "claude-input"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::req-1",
+    "openedBy": "req-1",
+    "sections": [],
+    "outcome": {
+     "kind": "completed",
+     "structuredOutput": {
+      "answer": 4
+     }
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed",
+    "structuredOutput": {
+     "answer": 4
+    }
+   }
+  },
+  "model": null,
+  "effort": null,
+  "serviceTier": "default",
+  "context": {
+   "tokens": 0,
+   "contextWindow": 1000000,
+   "percent": 0
+  },
+  "usage": {
+   "total": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
+   }
+  },
+  "pendingRequests": [],
+  "exited": null,
+  "conversation": {
+   "drops": [],
+   "inputs": [
+    [
+     "[\"claude-session\",[],\"claude-input\"]",
+     {
+      "id": "[\"claude-session\",[],\"claude-input\"]",
+      "input": "replay structured-output-valid",
+      "inputId": "claude-input",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "claude-session",
+         "agentPath": [],
+         "seq": 0,
+         "receivedAt": 1800000000000,
+         "kind": "request",
+         "id": "req-1",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "replay structured-output-valid",
+          "inputId": "claude-input"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "claude-session",
+         "agentPath": [],
+         "seq": 1,
+         "receivedAt": 1800000000005,
+         "kind": "response",
+         "requestId": "req-1",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ]
+   ],
+   "requests": [
+    [
+     "[\"\",\"[\\\"claude-session\\\",[],\\\"req-1\\\"]\"]",
+     "[\"claude-session\",[],\"claude-input\"]"
+    ]
+   ],
+   "actions": [],
+   "cursors": [
+    [
+     "",
+     2
+    ]
+   ],
+   "updates": [
+    {
+     "kind": "event",
+     "event": {
+      "kind": "service_tier",
+      "serviceTier": "default",
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "seq": 2,
+      "receivedAt": 1800000000010
+     }
+    },
+    {
+     "kind": "event",
+     "event": {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed",
+       "structuredOutput": {
+        "answer": 4
+       }
+      },
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "seq": 2,
+      "receivedAt": 1800000000010
+     }
+    },
+    {
+     "kind": "event",
+     "event": {
+      "kind": "usage",
+      "usage": {
+       "context": {
+        "tokens": 0,
+        "contextWindow": 1000000,
+        "percent": 0
+       },
+       "tokens": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+       }
+      },
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "seq": 2,
+      "receivedAt": 1800000000010
+     }
+    }
+   ]
+  },
+  "rootSessionId": "claude-session",
+  "usageBySession": [
+   [
+    "claude-session",
+    {
+     "agents": [
+      [
+       "[]",
+       {
+        "agentPath": [],
+        "tokens": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0
+        }
+       }
+      ]
+     ],
+     "total": null
+    }
+   ]
+  ],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "claude-session"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [
+   [
+    "[]",
+    {
+     "agentPath": [],
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+     }
+    }
+   ]
+  ],
+  "usageTotal": null
+ },
+ "viewStream": {
+  "messages": [
+   {
+    "kind": "input",
+    "id": "in:[\"claude-session\",[],\"claude-input\"]",
+    "input": {
+     "id": "[\"claude-session\",[],\"claude-input\"]",
+     "input": "replay structured-output-valid",
+     "inputId": "claude-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay structured-output-valid",
+         "inputId": "claude-input"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:req-1",
+    "openedBy": "req-1",
+    "sections": [],
+    "outcome": {
+     "kind": "completed",
+     "structuredOutput": {
+      "answer": 4
+     }
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed",
+    "structuredOutput": {
+     "answer": 4
+    }
+   }
+  },
+  "model": null,
+  "effort": null,
+  "serviceTier": "default",
+  "context": {
+   "tokens": 0,
+   "contextWindow": 1000000,
+   "percent": 0
+  },
+  "usage": {
+   "total": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
+   }
+  },
+  "pendingRequests": [],
+  "exited": null,
+  "conversation": {
+   "drops": [],
+   "inputs": [
+    [
+     "[\"claude-session\",[],\"claude-input\"]",
+     {
+      "id": "[\"claude-session\",[],\"claude-input\"]",
+      "input": "replay structured-output-valid",
+      "inputId": "claude-input",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "claude-session",
+         "agentPath": [],
+         "seq": 0,
+         "receivedAt": 1800000000000,
+         "kind": "request",
+         "id": "req-1",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "replay structured-output-valid",
+          "inputId": "claude-input"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "claude-session",
+         "agentPath": [],
+         "seq": 1,
+         "receivedAt": 1800000000005,
+         "kind": "response",
+         "requestId": "req-1",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ]
+   ],
+   "requests": [
+    [
+     "[\"stream-1\",\"[\\\"claude-session\\\",[],\\\"req-1\\\"]\"]",
+     "[\"claude-session\",[],\"claude-input\"]"
+    ]
+   ],
+   "actions": [],
+   "cursors": [
+    [
+     "stream-1",
+     2
+    ]
+   ],
+   "updates": [
+    {
+     "kind": "event",
+     "event": {
+      "kind": "service_tier",
+      "serviceTier": "default",
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "seq": 2,
+      "receivedAt": 1800000000010
+     }
+    },
+    {
+     "kind": "event",
+     "event": {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed",
+       "structuredOutput": {
+        "answer": 4
+       }
+      },
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "seq": 2,
+      "receivedAt": 1800000000010
+     }
+    },
+    {
+     "kind": "event",
+     "event": {
+      "kind": "usage",
+      "usage": {
+       "context": {
+        "tokens": 0,
+        "contextWindow": 1000000,
+        "percent": 0
+       },
+       "tokens": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+       }
+      },
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "seq": 2,
+      "receivedAt": 1800000000010
+     }
+    }
+   ]
+  },
+  "rootSessionId": "claude-session",
+  "usageBySession": [
+   [
+    "claude-session",
+    {
+     "agents": [
+      [
+       "[]",
+       {
+        "agentPath": [],
+        "tokens": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0
+        }
+       }
+      ]
+     ],
+     "total": null
+    }
+   ]
+  ],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "claude-session"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [
+   [
+    "[]",
+    {
+     "agentPath": [],
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+     }
+    }
+   ]
+  ],
+  "usageTotal": null
+ },
+ "viewSteps": [
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": "completed"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 3
+  }
+ ],
+ "viewEvents": {
+  "messages": [
+   {
+    "kind": "turn",
+    "id": "turn::req-1",
+    "openedBy": "req-1",
+    "sections": [],
+    "outcome": {
+     "kind": "completed",
+     "structuredOutput": {
+      "answer": 4
+     }
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle"
+  },
+  "model": null,
+  "effort": null,
+  "serviceTier": "default",
+  "context": {
+   "tokens": 0,
+   "contextWindow": 1000000,
+   "percent": 0
+  },
+  "usage": {
+   "total": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
+   }
+  },
+  "pendingRequests": [],
+  "exited": null,
+  "conversation": {
+   "drops": [],
+   "inputs": [],
+   "requests": [],
+   "actions": [],
+   "cursors": [],
+   "updates": []
+  },
+  "rootSessionId": "claude-session",
+  "usageBySession": [
+   [
+    "claude-session",
+    {
+     "agents": [
+      [
+       "[]",
+       {
+        "agentPath": [],
+        "tokens": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0
+        }
+       }
+      ]
+     ],
+     "total": null
+    }
+   ]
+  ],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "claude-session"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [
+   [
+    "[]",
+    {
+     "agentPath": [],
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+     }
+    }
+   ]
+  ],
+  "usageTotal": null
+ },
+ "tasksOf": {
+  "value": [],
+  "seq": 2
+ },
+ "tasksOfRoot": {
+  "value": [],
+  "seq": 2
+ },
+ "display": {
+  "groups": [],
+  "tools": [],
+  "requests": [],
+  "notices": [],
+  "phases": [
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   }
+  ],
+  "failures": [],
+  "tasks": []
+ }
+}

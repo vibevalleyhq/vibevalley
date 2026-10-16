@@ -1,0 +1,231 @@
+{
+  "runtime": "opencode",
+  "scenario": "files",
+  "observedAt": "2026-10-06",
+  "version": "1.18.30",
+  "initialize": {
+    "protocolVersion": 1,
+    "authMethodIds": [
+      "opencode-login"
+    ],
+    "loadSession": true,
+    "sessionCapabilities": [
+      "close",
+      "fork",
+      "list",
+      "resume"
+    ]
+  },
+  "sessionNew": {
+    "configOptionIds": [
+      "model",
+      "mode"
+    ],
+    "modeIds": [],
+    "modelIds": []
+  },
+  "prompt": {
+    "stopReason": "end_turn",
+    "metaKeys": [],
+    "permissionRequests": [],
+    "terminalRequests": [],
+    "tools": [
+      {
+        "sessionUpdate": "tool_call",
+        "title": "write",
+        "kind": "edit",
+        "status": "pending",
+        "rawInputKeys": []
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "write",
+        "kind": "edit",
+        "status": "in_progress",
+        "rawInputKeys": [
+          "content",
+          "filePath"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "<cwd>/note.txt",
+        "status": "completed",
+        "rawOutputKeys": [
+          "metadata",
+          "output"
+        ],
+        "contentTypes": [
+          "content"
+        ],
+        "rawOutputType": "object"
+      },
+      {
+        "sessionUpdate": "tool_call",
+        "title": "read",
+        "kind": "read",
+        "status": "pending",
+        "rawInputKeys": []
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "read",
+        "kind": "read",
+        "status": "in_progress",
+        "rawInputKeys": [
+          "filePath"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "<cwd>/note.txt",
+        "status": "completed",
+        "rawOutputKeys": [
+          "metadata",
+          "output"
+        ],
+        "contentTypes": [
+          "content"
+        ],
+        "rawOutputType": "object"
+      },
+      {
+        "sessionUpdate": "tool_call",
+        "title": "edit",
+        "kind": "edit",
+        "status": "pending",
+        "rawInputKeys": []
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "edit",
+        "kind": "edit",
+        "status": "in_progress",
+        "rawInputKeys": [
+          "filePath",
+          "newString",
+          "oldString"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "<cwd>/note.txt",
+        "status": "completed",
+        "rawOutputKeys": [
+          "metadata",
+          "output"
+        ],
+        "contentTypes": [
+          "content",
+          "diff"
+        ],
+        "rawOutputType": "object"
+      },
+      {
+        "sessionUpdate": "tool_call",
+        "title": "grep",
+        "kind": "search",
+        "status": "pending",
+        "rawInputKeys": []
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "grep",
+        "kind": "search",
+        "status": "in_progress",
+        "rawInputKeys": [
+          "path",
+          "pattern"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "hello",
+        "status": "completed",
+        "rawOutputKeys": [
+          "metadata",
+          "output"
+        ],
+        "contentTypes": [
+          "content"
+        ],
+        "rawOutputType": "object"
+      },
+      {
+        "sessionUpdate": "tool_call",
+        "title": "glob",
+        "kind": "search",
+        "status": "pending",
+        "rawInputKeys": []
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "glob",
+        "kind": "search",
+        "status": "in_progress",
+        "rawInputKeys": [
+          "path",
+          "pattern"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "<cwd>",
+        "status": "completed",
+        "rawOutputKeys": [
+          "metadata",
+          "output"
+        ],
+        "contentTypes": [
+          "content"
+        ],
+        "rawOutputType": "object"
+      },
+      {
+        "sessionUpdate": "tool_call",
+        "title": "bash",
+        "kind": "execute",
+        "status": "pending",
+        "rawInputKeys": [
+          "cwd"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "cat note.txt",
+        "kind": "execute",
+        "status": "in_progress",
+        "rawInputKeys": [
+          "command",
+          "workdir"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "cat note.txt",
+        "kind": "execute",
+        "status": "in_progress",
+        "rawInputKeys": [
+          "command",
+          "workdir"
+        ],
+        "contentTypes": [
+          "content"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "cat note.txt",
+        "status": "completed",
+        "rawOutputKeys": [
+          "metadata",
+          "output"
+        ],
+        "contentTypes": [
+          "content"
+        ],
+        "rawOutputType": "object"
+      }
+    ]
+  }
+}

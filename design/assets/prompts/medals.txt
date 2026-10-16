@@ -1,0 +1,6 @@
+Create ONE sheet of 8 painted pieces for the farm game's achievement wall, size 1536x1024: a grid of 4 columns x 2 rows, one piece centred in each cell, all drawn at the same size.
+Image 2 is the game's icon sheet: match its painted style (gentle shading, soft brown outline, warm colours).
+Row 1, four round medals of exactly the same shape and size, each a thick rim around a flat, plain, EMPTY warm-cream centre with nothing at all painted in it (a picture is placed on top later), and a short ribbon with two tails hanging below:
+(1) a bronze medal: warm copper-bronze rim, brown ribbon; (2) a silver medal: bright silver rim, blue ribbon; (3) a gold medal: shiny gold rim, red ribbon; (4) a plain weathered wooden disc of the same size with an empty light-wood centre and NO ribbon (a medal not earned yet).
+Row 2: (5) a round weathered wooden disc of the same size, its centre covered by a small closed brass padlock (a secret medal); (6) a round green stamp with a bold white check mark in it; (7) a small neat stack of shiny gold coins; (8) an empty horizontal cloth banner ribbon in warm cream with folded tails at both ends.
+No text, no letters, no numbers, no logos.

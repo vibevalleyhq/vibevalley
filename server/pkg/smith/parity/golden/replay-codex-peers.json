@@ -1,0 +1,5145 @@
+{
+ "name": "replay-codex-peers",
+ "source": "tests/replay/fixtures/codex-peers.raw.jsonl via foldCodexNotification",
+ "runtimeId": "codex",
+ "rootSessionId": "thread-root",
+ "records": [
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000,
+   "kind": "request",
+   "id": "req-1",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "prompt",
+    "input": "replay peers",
+    "inputId": "codex-input"
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 1,
+   "receivedAt": 1800000000005,
+   "kind": "response",
+   "requestId": "req-1",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000010,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-root",
+     "status": {
+      "type": "active"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 3,
+   "receivedAt": 1800000000015,
+   "kind": "frame",
+   "body": {
+    "type": "turn/started",
+    "native": {
+     "method": "turn/started",
+     "threadId": "thread-root",
+     "turn": {
+      "id": "uuid-0001"
+     }
+    },
+    "events": [
+     {
+      "kind": "turn_active"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 4,
+   "receivedAt": 1800000000020,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "userMessage",
+      "id": "uuid-0002"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 5,
+   "receivedAt": 1800000000025,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "userMessage",
+      "id": "uuid-0002"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 6,
+   "receivedAt": 1800000000030,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_09c48445ff3adbeb016abf52f844a087d2be8d38402caf1a7c"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 7,
+   "receivedAt": 1800000000035,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_09c48445ff3adbeb016abf52f844a087d2be8d38402caf1a7c"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 8,
+   "receivedAt": 1800000000040,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-alpha",
+     "status": {
+      "type": "idle"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 9,
+   "receivedAt": 1800000000045,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "call_3aChi38XHBxhinPF0T0qtThW",
+      "kind": "started",
+      "agentThreadId": "thread-alpha",
+      "agentPath": "/root/alpha"
+     }
+    },
+    "events": [
+     {
+      "kind": "session_linked",
+      "parent": "thread-root",
+      "child": "thread-alpha",
+      "via": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 10,
+   "receivedAt": 1800000000050,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "call_3aChi38XHBxhinPF0T0qtThW",
+      "kind": "started",
+      "agentThreadId": "thread-alpha",
+      "agentPath": "/root/alpha"
+     }
+    },
+    "events": [
+     {
+      "kind": "task_started",
+      "taskId": "thread-alpha",
+      "taskType": "agent",
+      "nativeType": "subAgent",
+      "childSessionId": "thread-alpha",
+      "background": true,
+      "description": "/root/alpha",
+      "toolCallId": "call_3aChi38XHBxhinPF0T0qtThW"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 11,
+   "receivedAt": 1800000000055,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-alpha",
+     "status": {
+      "type": "active"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 12,
+   "receivedAt": 1800000000060,
+   "kind": "frame",
+   "body": {
+    "type": "turn/started",
+    "native": {
+     "method": "turn/started",
+     "threadId": "thread-alpha",
+     "turn": {
+      "id": "uuid-0003"
+     }
+    },
+    "events": [
+     {
+      "kind": "turn_active"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "seq": 13,
+   "receivedAt": 1800000000065,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-beta",
+     "status": {
+      "type": "idle"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 14,
+   "receivedAt": 1800000000070,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "call_MJDrhwEshx9n6Xolew2xSpTG",
+      "kind": "started",
+      "agentThreadId": "thread-beta",
+      "agentPath": "/root/beta"
+     }
+    },
+    "events": [
+     {
+      "kind": "session_linked",
+      "parent": "thread-root",
+      "child": "thread-beta",
+      "via": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 15,
+   "receivedAt": 1800000000075,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "call_MJDrhwEshx9n6Xolew2xSpTG",
+      "kind": "started",
+      "agentThreadId": "thread-beta",
+      "agentPath": "/root/beta"
+     }
+    },
+    "events": [
+     {
+      "kind": "task_started",
+      "taskId": "thread-beta",
+      "taskType": "agent",
+      "nativeType": "subAgent",
+      "childSessionId": "thread-beta",
+      "background": true,
+      "description": "/root/beta",
+      "toolCallId": "call_MJDrhwEshx9n6Xolew2xSpTG"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "seq": 16,
+   "receivedAt": 1800000000080,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-beta",
+     "status": {
+      "type": "active"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "spanId": "uuid-0004",
+   "seq": 17,
+   "receivedAt": 1800000000085,
+   "kind": "frame",
+   "body": {
+    "type": "turn/started",
+    "native": {
+     "method": "turn/started",
+     "threadId": "thread-beta",
+     "turn": {
+      "id": "uuid-0004"
+     }
+    },
+    "events": [
+     {
+      "kind": "turn_active"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 18,
+   "receivedAt": 1800000000090,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "collabAgentToolCall",
+      "id": "call_8hfpQJWtuie0IH2QMdc2r1Vo",
+      "tool": "wait",
+      "status": "inProgress",
+      "senderThreadId": "thread-root",
+      "receiverThreadIds": []
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "spanId": "uuid-0004",
+   "seq": 19,
+   "receivedAt": 1800000000095,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-beta",
+     "turnId": "uuid-0004",
+     "item": {
+      "type": "collabAgentToolCall",
+      "id": "call_ivTt1fySHN8JCDEEmDczT26K",
+      "tool": "wait",
+      "status": "inProgress",
+      "senderThreadId": "thread-beta",
+      "receiverThreadIds": []
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 20,
+   "receivedAt": 1800000000100,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "reasoning",
+      "id": "rs_04565d65bf1bba65016abf530b533c87d187b9dcb1d5bd059b"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 21,
+   "receivedAt": 1800000000105,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "reasoning",
+      "id": "rs_04565d65bf1bba65016abf530b533c87d187b9dcb1d5bd059b"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 22,
+   "receivedAt": 1800000000110,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_04565d65bf1bba65016abf530bf06c87d1b34551d5fb2c5cb3"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 23,
+   "receivedAt": 1800000000115,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_04565d65bf1bba65016abf530bf06c87d1b34551d5fb2c5cb3"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 24,
+   "receivedAt": 1800000000120,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "call_ggK2ywDoSRKVh9XhbmZhogku",
+      "kind": "interacted",
+      "agentThreadId": "thread-beta",
+      "agentPath": "/root/beta"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "spanId": "uuid-0004",
+   "seq": 25,
+   "receivedAt": 1800000000125,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-beta",
+     "turnId": "uuid-0004",
+     "item": {
+      "type": "collabAgentToolCall",
+      "id": "call_ivTt1fySHN8JCDEEmDczT26K",
+      "tool": "wait",
+      "status": "completed",
+      "senderThreadId": "thread-beta",
+      "receiverThreadIds": []
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 26,
+   "receivedAt": 1800000000130,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "call_ggK2ywDoSRKVh9XhbmZhogku",
+      "kind": "interacted",
+      "agentThreadId": "thread-beta",
+      "agentPath": "/root/beta"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "spanId": "uuid-0004",
+   "seq": 27,
+   "receivedAt": 1800000000135,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-beta",
+     "turnId": "uuid-0004",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_0a0ba65df6a54aa2016abf53114ffc87d2a33fd12dcf48e20f"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "seq": 28,
+   "receivedAt": 1800000000140,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-gamma",
+     "status": {
+      "type": "idle"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 29,
+   "receivedAt": 1800000000145,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "call_51bM8MbanXn1IQhfWnylcj5u",
+      "kind": "started",
+      "agentThreadId": "thread-gamma",
+      "agentPath": "/root/alpha/gamma"
+     }
+    },
+    "events": [
+     {
+      "kind": "session_linked",
+      "parent": "thread-alpha",
+      "child": "thread-gamma",
+      "via": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 30,
+   "receivedAt": 1800000000150,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "call_51bM8MbanXn1IQhfWnylcj5u",
+      "kind": "started",
+      "agentThreadId": "thread-gamma",
+      "agentPath": "/root/alpha/gamma"
+     }
+    },
+    "events": [
+     {
+      "kind": "task_started",
+      "taskId": "thread-gamma",
+      "taskType": "agent",
+      "nativeType": "subAgent",
+      "childSessionId": "thread-gamma",
+      "background": true,
+      "description": "/root/alpha/gamma",
+      "toolCallId": "call_51bM8MbanXn1IQhfWnylcj5u"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "seq": 31,
+   "receivedAt": 1800000000155,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-gamma",
+     "status": {
+      "type": "active"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "spanId": "uuid-0005",
+   "seq": 32,
+   "receivedAt": 1800000000160,
+   "kind": "frame",
+   "body": {
+    "type": "turn/started",
+    "native": {
+     "method": "turn/started",
+     "threadId": "thread-gamma",
+     "turn": {
+      "id": "uuid-0005"
+     }
+    },
+    "events": [
+     {
+      "kind": "turn_active"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "spanId": "uuid-0004",
+   "seq": 33,
+   "receivedAt": 1800000000165,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-beta",
+     "turnId": "uuid-0004",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_0a0ba65df6a54aa2016abf53114ffc87d2a33fd12dcf48e20f"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 34,
+   "receivedAt": 1800000000170,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "subagent-completed-uuid-0004",
+      "kind": "completed",
+      "agentThreadId": "thread-beta",
+      "agentPath": "/root/beta"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "seq": 35,
+   "receivedAt": 1800000000175,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-beta",
+     "status": {
+      "type": "idle"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "spanId": "uuid-0004",
+   "seq": 36,
+   "receivedAt": 1800000000180,
+   "kind": "frame",
+   "body": {
+    "type": "turn/completed",
+    "native": {
+     "method": "turn/completed",
+     "threadId": "thread-beta",
+     "turn": {
+      "id": "uuid-0004",
+      "status": "completed"
+     }
+    },
+    "events": [
+     {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 37,
+   "receivedAt": 1800000000185,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "subagent-completed-uuid-0004",
+      "kind": "completed",
+      "agentThreadId": "thread-beta",
+      "agentPath": "/root/beta"
+     }
+    },
+    "events": [
+     {
+      "kind": "task_ended",
+      "taskId": "thread-beta",
+      "status": "completed"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 38,
+   "receivedAt": 1800000000190,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "collabAgentToolCall",
+      "id": "call_8hfpQJWtuie0IH2QMdc2r1Vo",
+      "tool": "wait",
+      "status": "completed",
+      "senderThreadId": "thread-root",
+      "receiverThreadIds": []
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 39,
+   "receivedAt": 1800000000195,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "reasoning",
+      "id": "rs_04565d65bf1bba65016abf5315615c87d194e340c13b26297e"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 40,
+   "receivedAt": 1800000000200,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "reasoning",
+      "id": "rs_04565d65bf1bba65016abf5315615c87d194e340c13b26297e"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 41,
+   "receivedAt": 1800000000205,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "collabAgentToolCall",
+      "id": "call_Vmf0n5shK0pzzQTIkf9cL9uH",
+      "tool": "wait",
+      "status": "inProgress",
+      "senderThreadId": "thread-alpha",
+      "receiverThreadIds": []
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "spanId": "uuid-0005",
+   "seq": 42,
+   "receivedAt": 1800000000210,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-gamma",
+     "turnId": "uuid-0005",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "call_NvFTsI4uaH1Xk2CRyrxKbcwT",
+      "kind": "interacted",
+      "agentThreadId": "thread-root",
+      "agentPath": "/root"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "spanId": "uuid-0005",
+   "seq": 43,
+   "receivedAt": 1800000000215,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-gamma",
+     "turnId": "uuid-0005",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "call_NvFTsI4uaH1Xk2CRyrxKbcwT",
+      "kind": "interacted",
+      "agentThreadId": "thread-root",
+      "agentPath": "/root"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "spanId": "uuid-0005",
+   "seq": 44,
+   "receivedAt": 1800000000220,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-gamma",
+     "turnId": "uuid-0005",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_04bc3d83b8322cf9016abf53212fd887d280de4f0c07825aa6"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "spanId": "uuid-0005",
+   "seq": 45,
+   "receivedAt": 1800000000225,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-gamma",
+     "turnId": "uuid-0005",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_04bc3d83b8322cf9016abf53212fd887d280de4f0c07825aa6"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "seq": 46,
+   "receivedAt": 1800000000230,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-gamma",
+     "status": {
+      "type": "idle"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "spanId": "uuid-0005",
+   "seq": 47,
+   "receivedAt": 1800000000235,
+   "kind": "frame",
+   "body": {
+    "type": "turn/completed",
+    "native": {
+     "method": "turn/completed",
+     "threadId": "thread-gamma",
+     "turn": {
+      "id": "uuid-0005",
+      "status": "completed"
+     }
+    },
+    "events": [
+     {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 48,
+   "receivedAt": 1800000000240,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "subagent-completed-uuid-0005",
+      "kind": "completed",
+      "agentThreadId": "thread-gamma",
+      "agentPath": "/root/alpha/gamma"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 49,
+   "receivedAt": 1800000000245,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "subagent-completed-uuid-0005",
+      "kind": "completed",
+      "agentThreadId": "thread-gamma",
+      "agentPath": "/root/alpha/gamma"
+     }
+    },
+    "events": [
+     {
+      "kind": "task_ended",
+      "taskId": "thread-gamma",
+      "status": "completed"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 50,
+   "receivedAt": 1800000000250,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "collabAgentToolCall",
+      "id": "call_Vmf0n5shK0pzzQTIkf9cL9uH",
+      "tool": "wait",
+      "status": "completed",
+      "senderThreadId": "thread-alpha",
+      "receiverThreadIds": []
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 51,
+   "receivedAt": 1800000000255,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_04565d65bf1bba65016abf532290c087d184deb038749f1578"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 52,
+   "receivedAt": 1800000000260,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-alpha",
+     "turnId": "uuid-0003",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_04565d65bf1bba65016abf532290c087d184deb038749f1578"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 53,
+   "receivedAt": 1800000000265,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-alpha",
+     "status": {
+      "type": "idle"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "spanId": "uuid-0003",
+   "seq": 54,
+   "receivedAt": 1800000000270,
+   "kind": "frame",
+   "body": {
+    "type": "turn/completed",
+    "native": {
+     "method": "turn/completed",
+     "threadId": "thread-alpha",
+     "turn": {
+      "id": "uuid-0003",
+      "status": "completed"
+     }
+    },
+    "events": [
+     {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 55,
+   "receivedAt": 1800000000275,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "subagent-completed-uuid-0003",
+      "kind": "completed",
+      "agentThreadId": "thread-alpha",
+      "agentPath": "/root/alpha"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 56,
+   "receivedAt": 1800000000280,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "subAgentActivity",
+      "id": "subagent-completed-uuid-0003",
+      "kind": "completed",
+      "agentThreadId": "thread-alpha",
+      "agentPath": "/root/alpha"
+     }
+    },
+    "events": [
+     {
+      "kind": "task_ended",
+      "taskId": "thread-alpha",
+      "status": "completed"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 57,
+   "receivedAt": 1800000000285,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "collabAgentToolCall",
+      "id": "call_L7k80TOuNq8Z2dMnTo4y2I7v",
+      "tool": "wait",
+      "status": "inProgress",
+      "senderThreadId": "thread-root",
+      "receiverThreadIds": []
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 58,
+   "receivedAt": 1800000000290,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "collabAgentToolCall",
+      "id": "call_L7k80TOuNq8Z2dMnTo4y2I7v",
+      "tool": "wait",
+      "status": "completed",
+      "senderThreadId": "thread-root",
+      "receiverThreadIds": []
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 59,
+   "receivedAt": 1800000000295,
+   "kind": "frame",
+   "body": {
+    "type": "item/started",
+    "native": {
+     "method": "item/started",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_09c48445ff3adbeb016abf532fc3ac87d284bbb8c7c602fbd2"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 60,
+   "receivedAt": 1800000000300,
+   "kind": "frame",
+   "body": {
+    "type": "item/completed",
+    "native": {
+     "method": "item/completed",
+     "threadId": "thread-root",
+     "turnId": "uuid-0001",
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_09c48445ff3adbeb016abf532fc3ac87d284bbb8c7c602fbd2"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 61,
+   "receivedAt": 1800000000305,
+   "kind": "frame",
+   "body": {
+    "type": "thread/status/changed",
+    "native": {
+     "method": "thread/status/changed",
+     "threadId": "thread-root",
+     "status": {
+      "type": "idle"
+     }
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "spanId": "uuid-0001",
+   "seq": 62,
+   "receivedAt": 1800000000310,
+   "kind": "frame",
+   "body": {
+    "type": "turn/completed",
+    "native": {
+     "method": "turn/completed",
+     "threadId": "thread-root",
+     "turn": {
+      "id": "uuid-0001",
+      "status": "completed"
+     }
+    },
+    "events": [
+     {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed"
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "statusSteps": [
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000000
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000000
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000010
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000015
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000020
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000025
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000030
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000035
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000040
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000040
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000050
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000055
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000060
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000065
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000065
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000075
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000080
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000085
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000090
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000095
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000100
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000105
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000110
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000115
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000120
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000125
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000130
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000135
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000140
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000145
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000150
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000155
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000160
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000165
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000170
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000175
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000180
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000185
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000190
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000195
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000200
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000205
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000210
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000215
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000220
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000225
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000230
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000235
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000240
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000245
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000250
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000255
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000260
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000265
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000270
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000275
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000280
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000285
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000290
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000295
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000300
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "codex-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000305
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  }
+ ],
+ "statusOf": {
+  "all": {
+   "value": {
+    "kind": "idle",
+    "lastTurnOutcome": {
+     "kind": "completed"
+    }
+   },
+   "seq": 62
+  },
+  "root": {
+   "value": {
+    "kind": "idle",
+    "lastTurnOutcome": {
+     "kind": "completed"
+    }
+   },
+   "seq": 62
+  }
+ },
+ "modelOf": {
+  "all": {
+   "value": null,
+   "seq": 62
+  },
+  "root": {
+   "value": null,
+   "seq": 62
+  }
+ },
+ "effortOf": {
+  "all": {
+   "value": null,
+   "seq": 62
+  },
+  "root": {
+   "value": null,
+   "seq": 62
+  }
+ },
+ "serviceTierOf": {
+  "all": {
+   "value": null,
+   "seq": 62
+  },
+  "root": {
+   "value": null,
+   "seq": 62
+  }
+ },
+ "contextUsageOf": {
+  "all": {
+   "value": null,
+   "seq": 62
+  },
+  "root": {
+   "value": null,
+   "seq": 62
+  }
+ },
+ "usageOf": {
+  "all": {
+   "value": {
+    "total": null
+   },
+   "seq": 62
+  },
+  "root": {
+   "value": {
+    "total": null
+   },
+   "seq": 62
+  }
+ },
+ "graphOf": {
+  "nodes": [
+   {
+    "id": "thread-root"
+   },
+   {
+    "id": "thread-alpha"
+   },
+   {
+    "id": "thread-beta"
+   },
+   {
+    "id": "thread-gamma"
+   }
+  ],
+  "edges": [
+   {
+    "parent": "thread-root",
+    "child": "thread-alpha",
+    "via": "tool_call"
+   },
+   {
+    "parent": "thread-root",
+    "child": "thread-beta",
+    "via": "tool_call"
+   },
+   {
+    "parent": "thread-alpha",
+    "child": "thread-gamma",
+    "via": "tool_call"
+   }
+  ]
+ },
+ "events": [
+  {
+   "kind": "turn_started",
+   "requestId": "req-1",
+   "input": "replay peers",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000
+  },
+  {
+   "kind": "turn_active",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 3,
+   "receivedAt": 1800000000015,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "session_linked",
+   "parent": "thread-root",
+   "child": "thread-alpha",
+   "via": "tool_call",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000045,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "task_started",
+   "taskId": "thread-alpha",
+   "taskType": "agent",
+   "nativeType": "subAgent",
+   "childSessionId": "thread-alpha",
+   "background": true,
+   "description": "/root/alpha",
+   "toolCallId": "call_3aChi38XHBxhinPF0T0qtThW",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000000050,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "turn_active",
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 12,
+   "receivedAt": 1800000000060,
+   "spanId": "uuid-0003"
+  },
+  {
+   "kind": "session_linked",
+   "parent": "thread-root",
+   "child": "thread-beta",
+   "via": "tool_call",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 14,
+   "receivedAt": 1800000000070,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "task_started",
+   "taskId": "thread-beta",
+   "taskType": "agent",
+   "nativeType": "subAgent",
+   "childSessionId": "thread-beta",
+   "background": true,
+   "description": "/root/beta",
+   "toolCallId": "call_MJDrhwEshx9n6Xolew2xSpTG",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 15,
+   "receivedAt": 1800000000075,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "turn_active",
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000000085,
+   "spanId": "uuid-0004"
+  },
+  {
+   "kind": "session_linked",
+   "parent": "thread-alpha",
+   "child": "thread-gamma",
+   "via": "tool_call",
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 29,
+   "receivedAt": 1800000000145,
+   "spanId": "uuid-0003"
+  },
+  {
+   "kind": "task_started",
+   "taskId": "thread-gamma",
+   "taskType": "agent",
+   "nativeType": "subAgent",
+   "childSessionId": "thread-gamma",
+   "background": true,
+   "description": "/root/alpha/gamma",
+   "toolCallId": "call_51bM8MbanXn1IQhfWnylcj5u",
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 30,
+   "receivedAt": 1800000000150,
+   "spanId": "uuid-0003"
+  },
+  {
+   "kind": "turn_active",
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "seq": 32,
+   "receivedAt": 1800000000160,
+   "spanId": "uuid-0005"
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "seq": 36,
+   "receivedAt": 1800000000180,
+   "spanId": "uuid-0004"
+  },
+  {
+   "kind": "task_ended",
+   "taskId": "thread-beta",
+   "status": "completed",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 37,
+   "receivedAt": 1800000000185,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "seq": 47,
+   "receivedAt": 1800000000235,
+   "spanId": "uuid-0005"
+  },
+  {
+   "kind": "task_ended",
+   "taskId": "thread-gamma",
+   "status": "completed",
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 49,
+   "receivedAt": 1800000000245,
+   "spanId": "uuid-0003"
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 54,
+   "receivedAt": 1800000000270,
+   "spanId": "uuid-0003"
+  },
+  {
+   "kind": "task_ended",
+   "taskId": "thread-alpha",
+   "status": "completed",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 56,
+   "receivedAt": 1800000000280,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 62,
+   "receivedAt": 1800000000310,
+   "spanId": "uuid-0001"
+  }
+ ],
+ "coalesced": [
+  {
+   "kind": "turn_started",
+   "requestId": "req-1",
+   "input": "replay peers",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000
+  },
+  {
+   "kind": "turn_active",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 3,
+   "receivedAt": 1800000000015,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "session_linked",
+   "parent": "thread-root",
+   "child": "thread-alpha",
+   "via": "tool_call",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000045,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "task_started",
+   "taskId": "thread-alpha",
+   "taskType": "agent",
+   "nativeType": "subAgent",
+   "childSessionId": "thread-alpha",
+   "background": true,
+   "description": "/root/alpha",
+   "toolCallId": "call_3aChi38XHBxhinPF0T0qtThW",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000000050,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "turn_active",
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 12,
+   "receivedAt": 1800000000060,
+   "spanId": "uuid-0003"
+  },
+  {
+   "kind": "session_linked",
+   "parent": "thread-root",
+   "child": "thread-beta",
+   "via": "tool_call",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 14,
+   "receivedAt": 1800000000070,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "task_started",
+   "taskId": "thread-beta",
+   "taskType": "agent",
+   "nativeType": "subAgent",
+   "childSessionId": "thread-beta",
+   "background": true,
+   "description": "/root/beta",
+   "toolCallId": "call_MJDrhwEshx9n6Xolew2xSpTG",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 15,
+   "receivedAt": 1800000000075,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "turn_active",
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000000085,
+   "spanId": "uuid-0004"
+  },
+  {
+   "kind": "session_linked",
+   "parent": "thread-alpha",
+   "child": "thread-gamma",
+   "via": "tool_call",
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 29,
+   "receivedAt": 1800000000145,
+   "spanId": "uuid-0003"
+  },
+  {
+   "kind": "task_started",
+   "taskId": "thread-gamma",
+   "taskType": "agent",
+   "nativeType": "subAgent",
+   "childSessionId": "thread-gamma",
+   "background": true,
+   "description": "/root/alpha/gamma",
+   "toolCallId": "call_51bM8MbanXn1IQhfWnylcj5u",
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 30,
+   "receivedAt": 1800000000150,
+   "spanId": "uuid-0003"
+  },
+  {
+   "kind": "turn_active",
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "seq": 32,
+   "receivedAt": 1800000000160,
+   "spanId": "uuid-0005"
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "thread-beta",
+   "agentPath": [],
+   "seq": 36,
+   "receivedAt": 1800000000180,
+   "spanId": "uuid-0004"
+  },
+  {
+   "kind": "task_ended",
+   "taskId": "thread-beta",
+   "status": "completed",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 37,
+   "receivedAt": 1800000000185,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "thread-gamma",
+   "agentPath": [],
+   "seq": 47,
+   "receivedAt": 1800000000235,
+   "spanId": "uuid-0005"
+  },
+  {
+   "kind": "task_ended",
+   "taskId": "thread-gamma",
+   "status": "completed",
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 49,
+   "receivedAt": 1800000000245,
+   "spanId": "uuid-0003"
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "thread-alpha",
+   "agentPath": [],
+   "seq": 54,
+   "receivedAt": 1800000000270,
+   "spanId": "uuid-0003"
+  },
+  {
+   "kind": "task_ended",
+   "taskId": "thread-alpha",
+   "status": "completed",
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 56,
+   "receivedAt": 1800000000280,
+   "spanId": "uuid-0001"
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "thread-root",
+   "agentPath": [],
+   "seq": 62,
+   "receivedAt": 1800000000310,
+   "spanId": "uuid-0001"
+  }
+ ],
+ "turnEndAfter": [
+  {
+   "afterSeq": -1,
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": -1,
+   "sessionId": "thread-root",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 0,
+   "sessionId": "thread-root",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 0,
+   "sessionId": "thread-root",
+   "inputId": "codex-input",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 0,
+   "inputId": "codex-input",
+   "outcome": {
+    "kind": "completed"
+   }
+  }
+ ],
+ "conversation": {
+  "drops": [],
+  "inputs": [
+   [
+    "[\"thread-root\",[],\"codex-input\"]",
+    {
+     "id": "[\"thread-root\",[],\"codex-input\"]",
+     "input": "replay peers",
+     "inputId": "codex-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "thread-root",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay peers",
+         "inputId": "codex-input"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "thread-root",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   ]
+  ],
+  "requests": [
+   [
+    "[\"\",\"[\\\"thread-root\\\",[],\\\"req-1\\\"]\"]",
+    "[\"thread-root\",[],\"codex-input\"]"
+   ]
+  ],
+  "actions": [],
+  "cursors": [
+   [
+    "",
+    62
+   ]
+  ],
+  "updates": [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "completed"
+     },
+     "sessionId": "thread-root",
+     "agentPath": [],
+     "seq": 62,
+     "receivedAt": 1800000000310,
+     "spanId": "uuid-0001"
+    }
+   }
+  ]
+ },
+ "conversationUpdates": [
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"thread-root\",[],\"codex-input\"]",
+     "input": "replay peers",
+     "inputId": "codex-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "thread-root",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay peers",
+         "inputId": "codex-input"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"thread-root\",[],\"codex-input\"]",
+     "input": "replay peers",
+     "inputId": "codex-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "thread-root",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay peers",
+         "inputId": "codex-input"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "thread-root",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_active",
+     "sessionId": "thread-root",
+     "agentPath": [],
+     "seq": 3,
+     "receivedAt": 1800000000015,
+     "spanId": "uuid-0001"
+    }
+   }
+  ],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "session_linked",
+     "parent": "thread-root",
+     "child": "thread-alpha",
+     "via": "tool_call",
+     "sessionId": "thread-root",
+     "agentPath": [],
+     "seq": 9,
+     "receivedAt": 1800000000045,
+     "spanId": "uuid-0001"
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "task_started",
+     "taskId": "thread-alpha",
+     "taskType": "agent",
+     "nativeType": "subAgent",
+     "childSessionId": "thread-alpha",
+     "background": true,
+     "description": "/root/alpha",
+     "toolCallId": "call_3aChi38XHBxhinPF0T0qtThW",
+     "sessionId": "thread-root",
+     "agentPath": [],
+     "seq": 10,
+     "receivedAt": 1800000000050,
+     "spanId": "uuid-0001"
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_active",
+     "sessionId": "thread-alpha",
+     "agentPath": [],
+     "seq": 12,
+     "receivedAt": 1800000000060,
+     "spanId": "uuid-0003"
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "session_linked",
+     "parent": "thread-root",
+     "child": "thread-beta",
+     "via": "tool_call",
+     "sessionId": "thread-root",
+     "agentPath": [],
+     "seq": 14,
+     "receivedAt": 1800000000070,
+     "spanId": "uuid-0001"
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "task_started",
+     "taskId": "thread-beta",
+     "taskType": "agent",
+     "nativeType": "subAgent",
+     "childSessionId": "thread-beta",
+     "background": true,
+     "description": "/root/beta",
+     "toolCallId": "call_MJDrhwEshx9n6Xolew2xSpTG",
+     "sessionId": "thread-root",
+     "agentPath": [],
+     "seq": 15,
+     "receivedAt": 1800000000075,
+     "spanId": "uuid-0001"
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_active",
+     "sessionId": "thread-beta",
+     "agentPath": [],
+     "seq": 17,
+     "receivedAt": 1800000000085,
+     "spanId": "uuid-0004"
+    }
+   }
+  ],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "session_linked",
+     "parent": "thread-alpha",
+     "child": "thread-gamma",
+     "via": "tool_call",
+     "sessionId": "thread-alpha",
+     "agentPath": [],
+     "seq": 29,
+     "receivedAt": 1800000000145,
+     "spanId": "uuid-0003"
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "task_started",
+     "taskId": "thread-gamma",
+     "taskType": "agent",
+     "nativeType": "subAgent",
+     "childSessionId": "thread-gamma",
+     "background": true,
+     "description": "/root/alpha/gamma",
+     "toolCallId": "call_51bM8MbanXn1IQhfWnylcj5u",
+     "sessionId": "thread-alpha",
+     "agentPath": [],
+     "seq": 30,
+     "receivedAt": 1800000000150,
+     "spanId": "uuid-0003"
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_active",
+     "sessionId": "thread-gamma",
+     "agentPath": [],
+     "seq": 32,
+     "receivedAt": 1800000000160,
+     "spanId": "uuid-0005"
+    }
+   }
+  ],
+  [],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "completed"
+     },
+     "sessionId": "thread-beta",
+     "agentPath": [],
+     "seq": 36,
+     "receivedAt": 1800000000180,
+     "spanId": "uuid-0004"
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "task_ended",
+     "taskId": "thread-beta",
+     "status": "completed",
+     "sessionId": "thread-root",
+     "agentPath": [],
+     "seq": 37,
+     "receivedAt": 1800000000185,
+     "spanId": "uuid-0001"
+    }
+   }
+  ],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "completed"
+     },
+     "sessionId": "thread-gamma",
+     "agentPath": [],
+     "seq": 47,
+     "receivedAt": 1800000000235,
+     "spanId": "uuid-0005"
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "task_ended",
+     "taskId": "thread-gamma",
+     "status": "completed",
+     "sessionId": "thread-alpha",
+     "agentPath": [],
+     "seq": 49,
+     "receivedAt": 1800000000245,
+     "spanId": "uuid-0003"
+    }
+   }
+  ],
+  [],
+  [],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "completed"
+     },
+     "sessionId": "thread-alpha",
+     "agentPath": [],
+     "seq": 54,
+     "receivedAt": 1800000000270,
+     "spanId": "uuid-0003"
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "task_ended",
+     "taskId": "thread-alpha",
+     "status": "completed",
+     "sessionId": "thread-root",
+     "agentPath": [],
+     "seq": 56,
+     "receivedAt": 1800000000280,
+     "spanId": "uuid-0001"
+    }
+   }
+  ],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "completed"
+     },
+     "sessionId": "thread-root",
+     "agentPath": [],
+     "seq": 62,
+     "receivedAt": 1800000000310,
+     "spanId": "uuid-0001"
+    }
+   }
+  ]
+ ],
+ "view": {
+  "messages": [
+   {
+    "kind": "input",
+    "id": "in:[\"thread-root\",[],\"codex-input\"]",
+    "input": {
+     "id": "[\"thread-root\",[],\"codex-input\"]",
+     "input": "replay peers",
+     "inputId": "codex-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "thread-root",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay peers",
+         "inputId": "codex-input"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "thread-root",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::req-1",
+    "openedBy": "req-1",
+    "sections": [
+     {
+      "sessionId": "thread-beta",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "notice",
+        "notice": {
+         "cause": "child_turn_ended",
+         "outcome": {
+          "kind": "completed"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "sessionId": "thread-gamma",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "notice",
+        "notice": {
+         "cause": "child_turn_ended",
+         "outcome": {
+          "kind": "completed"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "sessionId": "thread-alpha",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "notice",
+        "notice": {
+         "cause": "child_turn_ended",
+         "outcome": {
+          "kind": "completed"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "completed"
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  "model": null,
+  "effort": null,
+  "serviceTier": null,
+  "context": null,
+  "usage": {
+   "total": null
+  },
+  "pendingRequests": [],
+  "exited": null,
+  "conversation": {
+   "drops": [],
+   "inputs": [
+    [
+     "[\"thread-root\",[],\"codex-input\"]",
+     {
+      "id": "[\"thread-root\",[],\"codex-input\"]",
+      "input": "replay peers",
+      "inputId": "codex-input",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "thread-root",
+         "agentPath": [],
+         "seq": 0,
+         "receivedAt": 1800000000000,
+         "kind": "request",
+         "id": "req-1",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "replay peers",
+          "inputId": "codex-input"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "thread-root",
+         "agentPath": [],
+         "seq": 1,
+         "receivedAt": 1800000000005,
+         "kind": "response",
+         "requestId": "req-1",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ]
+   ],
+   "requests": [
+    [
+     "[\"\",\"[\\\"thread-root\\\",[],\\\"req-1\\\"]\"]",
+     "[\"thread-root\",[],\"codex-input\"]"
+    ]
+   ],
+   "actions": [],
+   "cursors": [
+    [
+     "",
+     62
+    ]
+   ],
+   "updates": [
+    {
+     "kind": "event",
+     "event": {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed"
+      },
+      "sessionId": "thread-root",
+      "agentPath": [],
+      "seq": 62,
+      "receivedAt": 1800000000310,
+      "spanId": "uuid-0001"
+     }
+    }
+   ]
+  },
+  "rootSessionId": "thread-root",
+  "usageBySession": [],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "thread-root"
+    },
+    {
+     "id": "thread-alpha"
+    },
+    {
+     "id": "thread-beta"
+    },
+    {
+     "id": "thread-gamma"
+    }
+   ],
+   "edges": [
+    {
+     "parent": "thread-root",
+     "child": "thread-alpha",
+     "via": "tool_call"
+    },
+    {
+     "parent": "thread-root",
+     "child": "thread-beta",
+     "via": "tool_call"
+    },
+    {
+     "parent": "thread-alpha",
+     "child": "thread-gamma",
+     "via": "tool_call"
+    }
+   ]
+  },
+  "usageByAgent": [],
+  "usageTotal": null
+ },
+ "viewStream": {
+  "messages": [
+   {
+    "kind": "input",
+    "id": "in:[\"thread-root\",[],\"codex-input\"]",
+    "input": {
+     "id": "[\"thread-root\",[],\"codex-input\"]",
+     "input": "replay peers",
+     "inputId": "codex-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "thread-root",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay peers",
+         "inputId": "codex-input"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "thread-root",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:req-1",
+    "openedBy": "req-1",
+    "sections": [
+     {
+      "sessionId": "thread-beta",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "notice",
+        "notice": {
+         "cause": "child_turn_ended",
+         "outcome": {
+          "kind": "completed"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "sessionId": "thread-gamma",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "notice",
+        "notice": {
+         "cause": "child_turn_ended",
+         "outcome": {
+          "kind": "completed"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "sessionId": "thread-alpha",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "notice",
+        "notice": {
+         "cause": "child_turn_ended",
+         "outcome": {
+          "kind": "completed"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "completed"
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  "model": null,
+  "effort": null,
+  "serviceTier": null,
+  "context": null,
+  "usage": {
+   "total": null
+  },
+  "pendingRequests": [],
+  "exited": null,
+  "conversation": {
+   "drops": [],
+   "inputs": [
+    [
+     "[\"thread-root\",[],\"codex-input\"]",
+     {
+      "id": "[\"thread-root\",[],\"codex-input\"]",
+      "input": "replay peers",
+      "inputId": "codex-input",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "thread-root",
+         "agentPath": [],
+         "seq": 0,
+         "receivedAt": 1800000000000,
+         "kind": "request",
+         "id": "req-1",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "replay peers",
+          "inputId": "codex-input"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "thread-root",
+         "agentPath": [],
+         "seq": 1,
+         "receivedAt": 1800000000005,
+         "kind": "response",
+         "requestId": "req-1",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ]
+   ],
+   "requests": [
+    [
+     "[\"stream-1\",\"[\\\"thread-root\\\",[],\\\"req-1\\\"]\"]",
+     "[\"thread-root\",[],\"codex-input\"]"
+    ]
+   ],
+   "actions": [],
+   "cursors": [
+    [
+     "stream-1",
+     62
+    ]
+   ],
+   "updates": [
+    {
+     "kind": "event",
+     "event": {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed"
+      },
+      "sessionId": "thread-root",
+      "agentPath": [],
+      "seq": 62,
+      "receivedAt": 1800000000310,
+      "spanId": "uuid-0001"
+     }
+    }
+   ]
+  },
+  "rootSessionId": "thread-root",
+  "usageBySession": [],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "thread-root"
+    },
+    {
+     "id": "thread-alpha"
+    },
+    {
+     "id": "thread-beta"
+    },
+    {
+     "id": "thread-gamma"
+    }
+   ],
+   "edges": [
+    {
+     "parent": "thread-root",
+     "child": "thread-alpha",
+     "via": "tool_call"
+    },
+    {
+     "parent": "thread-root",
+     "child": "thread-beta",
+     "via": "tool_call"
+    },
+    {
+     "parent": "thread-alpha",
+     "child": "thread-gamma",
+     "via": "tool_call"
+    }
+   ]
+  },
+  "usageByAgent": [],
+  "usageTotal": null
+ },
+ "viewSteps": [
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1,
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"thread-root\",[],\"codex-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [
+      1,
+      1,
+      1
+     ],
+     "outcome": "completed"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  }
+ ],
+ "viewEvents": {
+  "messages": [
+   {
+    "kind": "turn",
+    "id": "turn::req-1",
+    "openedBy": "req-1",
+    "sections": [
+     {
+      "sessionId": "thread-beta",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "notice",
+        "notice": {
+         "cause": "child_turn_ended",
+         "outcome": {
+          "kind": "completed"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "sessionId": "thread-gamma",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "notice",
+        "notice": {
+         "cause": "child_turn_ended",
+         "outcome": {
+          "kind": "completed"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "sessionId": "thread-alpha",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "notice",
+        "notice": {
+         "cause": "child_turn_ended",
+         "outcome": {
+          "kind": "completed"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "completed"
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle"
+  },
+  "model": null,
+  "effort": null,
+  "serviceTier": null,
+  "context": null,
+  "usage": {
+   "total": null
+  },
+  "pendingRequests": [],
+  "exited": null,
+  "conversation": {
+   "drops": [],
+   "inputs": [],
+   "requests": [],
+   "actions": [],
+   "cursors": [],
+   "updates": []
+  },
+  "rootSessionId": "thread-root",
+  "usageBySession": [],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "thread-root"
+    },
+    {
+     "id": "thread-alpha"
+    },
+    {
+     "id": "thread-beta"
+    },
+    {
+     "id": "thread-gamma"
+    }
+   ],
+   "edges": [
+    {
+     "parent": "thread-root",
+     "child": "thread-alpha",
+     "via": "tool_call"
+    },
+    {
+     "parent": "thread-root",
+     "child": "thread-beta",
+     "via": "tool_call"
+    },
+    {
+     "parent": "thread-alpha",
+     "child": "thread-gamma",
+     "via": "tool_call"
+    }
+   ]
+  },
+  "usageByAgent": [],
+  "usageTotal": null
+ },
+ "tasksOf": {
+  "value": [
+   {
+    "taskId": "thread-alpha",
+    "taskType": "agent",
+    "nativeType": "subAgent",
+    "childSessionId": "thread-alpha",
+    "background": true,
+    "description": "/root/alpha",
+    "toolCallId": "call_3aChi38XHBxhinPF0T0qtThW",
+    "sessionId": "thread-root",
+    "agentPath": [],
+    "status": "completed",
+    "startedAt": 1800000000050,
+    "endedAt": 1800000000280
+   },
+   {
+    "taskId": "thread-beta",
+    "taskType": "agent",
+    "nativeType": "subAgent",
+    "childSessionId": "thread-beta",
+    "background": true,
+    "description": "/root/beta",
+    "toolCallId": "call_MJDrhwEshx9n6Xolew2xSpTG",
+    "sessionId": "thread-root",
+    "agentPath": [],
+    "status": "completed",
+    "startedAt": 1800000000075,
+    "endedAt": 1800000000185
+   },
+   {
+    "taskId": "thread-gamma",
+    "taskType": "agent",
+    "nativeType": "subAgent",
+    "childSessionId": "thread-gamma",
+    "background": true,
+    "description": "/root/alpha/gamma",
+    "toolCallId": "call_51bM8MbanXn1IQhfWnylcj5u",
+    "sessionId": "thread-alpha",
+    "agentPath": [],
+    "status": "completed",
+    "startedAt": 1800000000150,
+    "endedAt": 1800000000245
+   }
+  ],
+  "seq": 62
+ },
+ "tasksOfRoot": {
+  "value": [
+   {
+    "taskId": "thread-alpha",
+    "taskType": "agent",
+    "nativeType": "subAgent",
+    "childSessionId": "thread-alpha",
+    "background": true,
+    "description": "/root/alpha",
+    "toolCallId": "call_3aChi38XHBxhinPF0T0qtThW",
+    "sessionId": "thread-root",
+    "agentPath": [],
+    "status": "completed",
+    "startedAt": 1800000000050,
+    "endedAt": 1800000000280
+   },
+   {
+    "taskId": "thread-beta",
+    "taskType": "agent",
+    "nativeType": "subAgent",
+    "childSessionId": "thread-beta",
+    "background": true,
+    "description": "/root/beta",
+    "toolCallId": "call_MJDrhwEshx9n6Xolew2xSpTG",
+    "sessionId": "thread-root",
+    "agentPath": [],
+    "status": "completed",
+    "startedAt": 1800000000075,
+    "endedAt": 1800000000185
+   },
+   {
+    "taskId": "thread-gamma",
+    "taskType": "agent",
+    "nativeType": "subAgent",
+    "childSessionId": "thread-gamma",
+    "background": true,
+    "description": "/root/alpha/gamma",
+    "toolCallId": "call_51bM8MbanXn1IQhfWnylcj5u",
+    "sessionId": "thread-alpha",
+    "agentPath": [],
+    "status": "completed",
+    "startedAt": 1800000000150,
+    "endedAt": 1800000000245
+   }
+  ],
+  "seq": 62
+ },
+ "display": {
+  "groups": [
+   {
+    "segments": [
+     {
+      "kind": "part",
+      "index": 0,
+      "part": {
+       "kind": "notice",
+       "notice": {
+        "cause": "child_turn_ended",
+        "outcome": {
+         "kind": "completed"
+        }
+       }
+      }
+     }
+    ],
+    "summaries": [
+     null
+    ]
+   },
+   {
+    "segments": [
+     {
+      "kind": "part",
+      "index": 0,
+      "part": {
+       "kind": "notice",
+       "notice": {
+        "cause": "child_turn_ended",
+        "outcome": {
+         "kind": "completed"
+        }
+       }
+      }
+     }
+    ],
+    "summaries": [
+     null
+    ]
+   },
+   {
+    "segments": [
+     {
+      "kind": "part",
+      "index": 0,
+      "part": {
+       "kind": "notice",
+       "notice": {
+        "cause": "child_turn_ended",
+        "outcome": {
+         "kind": "completed"
+        }
+       }
+      }
+     }
+    ],
+    "summaries": [
+     null
+    ]
+   }
+  ],
+  "tools": [],
+  "requests": [],
+  "notices": [
+   {
+    "notice": {
+     "cause": "child_turn_ended",
+     "outcome": {
+      "kind": "completed"
+     }
+    },
+    "text": "Subagent turn completed",
+    "tone": "quiet"
+   },
+   {
+    "notice": {
+     "cause": "child_turn_ended",
+     "outcome": {
+      "kind": "completed"
+     }
+    },
+    "text": "Subagent turn completed",
+    "tone": "quiet"
+   },
+   {
+    "notice": {
+     "cause": "child_turn_ended",
+     "outcome": {
+      "kind": "completed"
+     }
+    },
+    "text": "Subagent turn completed",
+    "tone": "quiet"
+   }
+  ],
+  "phases": [
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   }
+  ],
+  "failures": [],
+  "tasks": [
+   "Completed",
+   "Completed",
+   "Completed"
+  ]
+ }
+}

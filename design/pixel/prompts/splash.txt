@@ -1,0 +1,4 @@
+Create ONE image, size 1536x1024: the picture shown for a moment while the "VibeValley 农场" desktop app opens.
+Morning on the farm from Image 1: the wooden farm gate swinging open, the young farmer manager as drawn in Image 2 pushing it open with one hand and waving with the other, the farm dog from Image 1 trotting beside him, and a glimpse of the wooden field beds and the farmhouse behind them.
+Keep the top-left quarter of the image as calm open sky with nothing in it: the app writes a short line there.
+Cozy, warm, inviting. No text, no letters, no UI elements.

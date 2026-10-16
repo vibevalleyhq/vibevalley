@@ -1,0 +1,5 @@
+Create ONE wide image, size 1536x1024: the background of the macOS installer window (a .dmg) for "VibeValley 农场".
+A calm, low-detail farm scene: warm cream morning sky, soft distant hills, a band of green grass along the bottom, a gentle dirt path winding across.
+Leave two large empty and calm areas where the app will place icons on top: one centered in the left third, one centered in the right third, both a little above the vertical middle. Nothing busy behind them: no characters, no buildings, no trees there, only sky and soft hills.
+Between the two areas, in the middle, a small wooden arrow sign on a post, its arrow pointing to the right.
+No text, no letters, no icons, no UI elements.

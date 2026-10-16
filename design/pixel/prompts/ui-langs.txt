@@ -1,0 +1,1 @@
+These are programming-language logos. Keep each logo's shape, colours and the letters that are part of it (TS, JS, GO, R, C, C++, C#, php, >_, 5, 3, Lua, Z, M, { }, YML, V, S, </>), drawn as bold, clear pixel letters a few art pixels tall; they must still read when the icon is shown 24 art pixels tall. The rule against text means no other text.

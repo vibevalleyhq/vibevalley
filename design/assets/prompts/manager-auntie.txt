@@ -1,0 +1,5 @@
+The character is a new manager for the farm, a cheerful farm woman in her fifties: rosy cheeks, hair tied up under a floral headscarf, a light blue gingham shirt with rolled sleeves, a mustard yellow apron with a front pocket holding a small notebook and a pencil, dark trousers and green rubber boots.
+Image 2 is the farm's current manager sprite sheet. Match it exactly in everything except who the character is: the same 2 x 2 grid and cell positions, the same scale and proportions, the same four poses in the same cells, the same soft hand-painted look and outlines. Only the character changes.
+Create ONE sprite sheet, size 1024x1024: a grid of 2 columns x 2 rows, one figure per cell. Full body in cells 1 to 3, all at the same scale as Image 2.
+(1) standing at ease, smiling; (2) talking: one hand raised in a friendly open gesture, mouth open; (3) listening: one hand cupped behind an ear, attentive; (4) head-and-shoulders portrait for an avatar, smiling, facing the viewer.
+No text, no letters, nothing under the feet.

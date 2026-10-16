@@ -1,0 +1,4 @@
+Create ONE image, size 1536x1024: the same title screen as Image 1, redrawn at another time of day. Keep EXACTLY the same composition, camera, buildings, fields, fence, path, rocks and character placement as Image 1 (the farmer manager and the dog stay at the same spot on the right third); only the time of day, the light, the sky and small details change.
+A calm night: a deep blue-violet starry sky with a big round moon, warm yellow light glowing from the farmhouse windows and a lantern by the fence, many fireflies over the fields, cool moonlit greens and blues. The farmer manager holds a small lantern, the dog sleeps curled up beside him.
+Keep the whole left third of the image calm and simple, and the top middle open sky, as in Image 1: the game's title and menu are drawn there.
+No text, no letters, no logos, no UI elements.

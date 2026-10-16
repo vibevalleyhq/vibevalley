@@ -1,0 +1,95 @@
+{
+  "version": "opencode v2.0.26",
+  "model": "opencode/big-pickle",
+  "captured": "2026-10-09",
+  "normalization": "Only session and call IDs replaced. Complete execute notifications retained, including native MCP metadata.",
+  "notifications": [
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "execute-echo",
+        "title": "execute",
+        "name": "execute",
+        "kind": "other",
+        "status": "pending",
+        "locations": [],
+        "rawInput": {},
+        "sessionUpdate": "tool_call"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "execute-echo",
+        "kind": "other",
+        "status": "in_progress",
+        "title": "execute",
+        "locations": [],
+        "rawInput": {
+          "code": " await tools.echo.echo({ text: \"MCP_NEW_271\" })"
+        },
+        "sessionUpdate": "tool_call_update"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "execute-echo",
+        "kind": "other",
+        "status": "in_progress",
+        "title": "execute",
+        "locations": [],
+        "rawInput": {
+          "code": " await tools.echo.echo({ text: \"MCP_NEW_271\" })"
+        },
+        "sessionUpdate": "tool_call_update"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "execute-echo",
+        "kind": "other",
+        "status": "in_progress",
+        "title": "execute",
+        "locations": [],
+        "rawInput": {
+          "code": " await tools.echo.echo({ text: \"MCP_NEW_271\" })"
+        },
+        "sessionUpdate": "tool_call_update"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "execute-echo",
+        "status": "completed",
+        "content": [
+          {
+            "content": {
+              "text": "echo:MCP_NEW_271 via=stdio token=none",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "locations": [],
+        "rawOutput": {
+          "metadata": {
+            "toolCalls": [
+              {
+                "tool": "echo.echo",
+                "status": "completed",
+                "input": {
+                  "text": "MCP_NEW_271"
+                }
+              }
+            ],
+            "truncated": false
+          }
+        },
+        "sessionUpdate": "tool_call_update"
+      }
+    }
+  ]
+}

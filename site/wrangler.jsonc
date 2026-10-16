@@ -1,0 +1,16 @@
+// vibevalley.dev on Cloudflare: a Worker with nothing but the built pages (dist/, no script of its own), on the domain
+// whose DNS is already on Cloudflare; the first deploy adds the domain's record and certificate. `bun run deploy`
+// builds and publishes, with wrangler logged in to the account that holds the domain (`bunx wrangler login`).
+{
+  "name": "vibevalley-site",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    // An address the site does not have gets 404.html, with a 404.
+    "not_found_handling": "404-page",
+  },
+  "routes": [{ "pattern": "vibevalley.dev", "custom_domain": true }],
+  // Only at vibevalley.dev: no workers.dev address, no preview addresses.
+  "workers_dev": false,
+  "preview_urls": false,
+}

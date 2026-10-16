@@ -1,0 +1,4 @@
+Create ONE image, size 1536x1024: the title screen of the game "VibeValley 农场", shown behind the game's menu before you enter the farm.
+Late afternoon, golden hour, over the farm from Image 1, seen from a little further back and higher up than usual: the farmhouse and the workshop, the wooden field beds with young green crops, the fence, trees and distant hills under a warm sky with soft pink and orange clouds. The young farmer manager as drawn in Image 2 stands on the right third of the picture at the edge of the field, looking out over the farm, the farm dog from Image 1 sitting beside him. A few fireflies and drifting dandelion seeds in the air.
+Keep the whole left third of the image calm and simple (sky above, soft grass and a path below, no buildings or characters there): the game's menu is drawn over it. Keep the top middle open sky: the game's title goes there.
+Cozy, warm, nostalgic, inviting. No text, no letters, no logos, no UI elements.

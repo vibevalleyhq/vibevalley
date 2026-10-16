@@ -1,0 +1,4606 @@
+{
+ "name": "replay-claude-steer-lifecycle",
+ "source": "tests/replay/fixtures/claude-steer-lifecycle.raw.jsonl via foldClaudeStdout",
+ "runtimeId": "claude",
+ "rootSessionId": "claude-session",
+ "records": [
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000,
+   "kind": "request",
+   "id": "req-1",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "prompt",
+    "input": "replay steer-lifecycle",
+    "inputId": "claude-input"
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 1,
+   "receivedAt": 1800000000005,
+   "kind": "response",
+   "requestId": "req-1",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000010,
+   "kind": "frame",
+   "body": {
+    "type": "command_lifecycle",
+    "native": {
+     "type": "command_lifecycle",
+     "command_uuid": "uuid-0001",
+     "state": "queued",
+     "uuid": "uuid-0002",
+     "session_id": "uuid-0003"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 3,
+   "receivedAt": 1800000000015,
+   "kind": "frame",
+   "body": {
+    "type": "command_lifecycle",
+    "native": {
+     "type": "command_lifecycle",
+     "command_uuid": "uuid-0001",
+     "state": "started",
+     "uuid": "uuid-0004",
+     "session_id": "uuid-0003"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 4,
+   "receivedAt": 1800000000020,
+   "kind": "frame",
+   "body": {
+    "type": "system/init",
+    "native": {
+     "type": "system",
+     "subtype": "init",
+     "cwd": "/tmp/oar-fixture/work",
+     "session_id": "uuid-0003",
+     "tools": [
+      "Task",
+      "Bash",
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "DesignSync",
+      "Edit",
+      "EnterWorktree",
+      "ExitWorktree",
+      "ListAgents",
+      "Monitor",
+      "NotebookEdit",
+      "PushNotification",
+      "Read",
+      "ReportFindings",
+      "ScheduleWakeup",
+      "SendMessage",
+      "Skill",
+      "TaskStop",
+      "WebFetch",
+      "WebSearch",
+      "Workflow",
+      "Write"
+     ],
+     "mcp_servers": [],
+     "model": "claude-opus-5-5",
+     "permissionMode": "bypassPermissions",
+     "slash_commands": [
+      "deep-research",
+      "design",
+      "design-sync",
+      "dataviz",
+      "update-config",
+      "verify",
+      "debug",
+      "code-review",
+      "simplify",
+      "batch",
+      "fewer-permission-prompts",
+      "doctor",
+      "loop",
+      "claude-api",
+      "workflow-authoring",
+      "run",
+      "run-skill-generator",
+      "plugin-authoring",
+      "advisor",
+      "agents",
+      "auto-mode-setup",
+      "autocompact",
+      "clear",
+      "color",
+      "compact",
+      "config",
+      "output-style",
+      "context",
+      "effort",
+      "fast",
+      "focus",
+      "heapdump",
+      "init",
+      "mcp",
+      "import",
+      "model",
+      "__remote-workflow",
+      "workflow-launch-exec",
+      "reload-plugins",
+      "reload-skills",
+      "rename",
+      "security-review",
+      "usage",
+      "insights",
+      "recap",
+      "skill-doctor",
+      "goal",
+      "design-consent",
+      "design-revoke",
+      "list-agents",
+      "team-onboarding"
+     ],
+     "terminal_slash_commands": [
+      "doctor",
+      "color",
+      "focus",
+      "reload-plugins"
+     ],
+     "apiKeySource": "ANTHROPIC_API_KEY",
+     "claude_code_version": "2.1.292",
+     "output_style": "default",
+     "agents": [
+      "claude",
+      "Explore",
+      "general-purpose",
+      "Plan",
+      "statusline-setup"
+     ],
+     "skills": [
+      "deep-research",
+      "design",
+      "design-sync",
+      "dataviz",
+      "update-config",
+      "verify",
+      "debug",
+      "code-review",
+      "simplify",
+      "batch",
+      "fewer-permission-prompts",
+      "doctor",
+      "loop",
+      "claude-api",
+      "workflow-authoring",
+      "run",
+      "run-skill-generator",
+      "plugin-authoring"
+     ],
+     "plugins": [
+      {
+       "name": "cc-plugin-agents-md",
+       "path": "builtin",
+       "source": "cc-plugin-agents-md@builtin"
+      },
+      {
+       "name": "cc-plugin-telemetry",
+       "path": "builtin",
+       "source": "cc-plugin-telemetry@builtin"
+      },
+      {
+       "name": "cc-plugin-plugin-authoring",
+       "path": "builtin",
+       "source": "cc-plugin-plugin-authoring@builtin"
+      }
+     ],
+     "capabilities": [
+      "interrupt_receipt_v1",
+      "interrupt_cancel_queued_v1",
+      "interrupt_send_now_v1",
+      "msg_lifecycle_v1",
+      "sdk_mcp_tools_list_changed",
+      "sdk_mcp_manifests",
+      "mcp_read_resource_v1",
+      "mcp_tool_ui_meta_v1",
+      "ui_surface_v1"
+     ],
+     "analytics_disabled": false,
+     "product_feedback_disabled": false,
+     "uuid": "uuid-0005",
+     "memory_paths": {
+      "auto": "/home/user/.claude/projects/-tmp/memory/"
+     },
+     "messaging_socket_path": "/tmp/cc-socks/1001.sock",
+     "fast_mode_state": "off",
+     "fast_mode_disabled_reason": "sdk_opt_in_required",
+     "per_turn_effort_active": true,
+     "view_mode": "default"
+    },
+    "events": [
+     {
+      "kind": "model",
+      "model": "claude-opus-5-5"
+     },
+     {
+      "kind": "service_tier",
+      "serviceTier": "default"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 5,
+   "receivedAt": 1800000000025,
+   "kind": "frame",
+   "body": {
+    "type": "system/status",
+    "native": {
+     "type": "system",
+     "subtype": "status",
+     "status": "requesting",
+     "session_id": "uuid-0003",
+     "uuid": "uuid-0006",
+     "user_message_uuids": [
+      "uuid-0001"
+     ]
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 6,
+   "receivedAt": 1800000000030,
+   "kind": "frame",
+   "body": {
+    "type": "user",
+    "native": {
+     "type": "user",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "FIRST-PROMPT: wait then answer"
+       }
+      ]
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0001",
+     "timestamp": "2026-10-10T06:09:29.149Z",
+     "isReplay": true
+    },
+    "events": [
+     {
+      "kind": "user_message",
+      "input": "FIRST-PROMPT: wait then answer",
+      "inputId": "uuid-0001",
+      "nativeMessageId": "uuid-0001",
+      "evidence": "acknowledged"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 7,
+   "receivedAt": 1800000000035,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "message_start",
+      "message": {
+       "id": "msg_gRa6OsrwBJ8ubnzS",
+       "type": "message",
+       "role": "assistant",
+       "content": [],
+       "model": "claude-opus-5-5",
+       "stop_reason": null,
+       "stop_sequence": null,
+       "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0
+       }
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0007",
+     "ttft_ms": 18,
+     "thinking_display": "updates",
+     "user_message_uuid": "uuid-0001",
+     "user_message_uuids": [
+      "uuid-0001"
+     ]
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 8,
+   "receivedAt": 1800000000040,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "content_block_start",
+      "index": 0,
+      "content_block": {
+       "type": "tool_use",
+       "id": "toolu_01SlowFixture00000001",
+       "name": "Bash",
+       "input": {}
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0008"
+    },
+    "events": [
+     {
+      "kind": "tool_call_started",
+      "callId": "toolu_01SlowFixture00000001",
+      "tool": "Bash"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000045,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+       "type": "input_json_delta",
+       "partial_json": "{\"command\":\"timeout "
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0009"
+    },
+    "events": [
+     {
+      "kind": "tool_call_input_delta",
+      "callId": "toolu_01SlowFixture00000001",
+      "delta": "{\"command\":\"timeout "
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000000050,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+       "type": "input_json_delta",
+       "partial_json": "4 tail -f /dev/null;"
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0010"
+    },
+    "events": [
+     {
+      "kind": "tool_call_input_delta",
+      "callId": "toolu_01SlowFixture00000001",
+      "delta": "4 tail -f /dev/null;"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 11,
+   "receivedAt": 1800000000055,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+       "type": "input_json_delta",
+       "partial_json": " echo slow-done\",\"de"
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0011"
+    },
+    "events": [
+     {
+      "kind": "tool_call_input_delta",
+      "callId": "toolu_01SlowFixture00000001",
+      "delta": " echo slow-done\",\"de"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 12,
+   "receivedAt": 1800000000060,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+       "type": "input_json_delta",
+       "partial_json": "scription\":\"Wait fou"
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0012"
+    },
+    "events": [
+     {
+      "kind": "tool_call_input_delta",
+      "callId": "toolu_01SlowFixture00000001",
+      "delta": "scription\":\"Wait fou"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 13,
+   "receivedAt": 1800000000065,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+       "type": "input_json_delta",
+       "partial_json": "r seconds\"}"
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0013"
+    },
+    "events": [
+     {
+      "kind": "tool_call_input_delta",
+      "callId": "toolu_01SlowFixture00000001",
+      "delta": "r seconds\"}"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 14,
+   "receivedAt": 1800000000070,
+   "kind": "frame",
+   "body": {
+    "type": "assistant",
+    "native": {
+     "type": "assistant",
+     "message": {
+      "id": "msg_gRa6OsrwBJ8ubnzS",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+       {
+        "type": "tool_use",
+        "id": "toolu_01SlowFixture00000001",
+        "name": "Bash",
+        "input": {
+         "command": "timeout 4 tail -f /dev/null; echo slow-done",
+         "description": "Wait four seconds"
+        }
+       }
+      ],
+      "model": "claude-opus-5-5",
+      "stop_reason": null,
+      "stop_sequence": null,
+      "usage": {
+       "input_tokens": 0,
+       "output_tokens": 0
+      },
+      "context_management": null
+     },
+     "parent_tool_use_id": null,
+     "session_id": "uuid-0003",
+     "uuid": "uuid-0014",
+     "timestamp": "2026-10-10T06:09:29.226Z",
+     "wire_tool_inputs": {
+      "toolu_01SlowFixture00000001": {
+       "command": "timeout 4 tail -f /dev/null; echo slow-done",
+       "description": "Wait four seconds"
+      }
+     },
+     "user_message_uuid": "uuid-0001",
+     "user_message_uuids": [
+      "uuid-0001"
+     ]
+    },
+    "events": [
+     {
+      "kind": "tool_call_input",
+      "callId": "toolu_01SlowFixture00000001",
+      "input": "{\"command\":\"timeout 4 tail -f /dev/null; echo slow-done\",\"description\":\"Wait four seconds\"}"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 15,
+   "receivedAt": 1800000000075,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "content_block_stop",
+      "index": 0
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0015"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 16,
+   "receivedAt": 1800000000080,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "message_delta",
+      "delta": {
+       "stop_reason": "tool_use",
+       "stop_sequence": null
+      },
+      "usage": {
+       "output_tokens": 0
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0016"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000000085,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "message_stop"
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0017"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 18,
+   "receivedAt": 1800000000090,
+   "kind": "frame",
+   "body": {
+    "type": "command_lifecycle",
+    "native": {
+     "type": "command_lifecycle",
+     "command_uuid": "uuid-0018",
+     "state": "queued",
+     "uuid": "uuid-0019",
+     "session_id": "uuid-0003"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 19,
+   "receivedAt": 1800000000095,
+   "kind": "frame",
+   "body": {
+    "type": "system/task_started",
+    "native": {
+     "type": "system",
+     "subtype": "task_started",
+     "task_id": "bov22129o",
+     "run_id": "0mv1zv89o-6639a7de",
+     "tool_use_id": "toolu_01SlowFixture00000001",
+     "description": "Wait four seconds",
+     "is_backgrounded": false,
+     "task_type": "local_bash",
+     "uuid": "uuid-0020",
+     "session_id": "uuid-0003"
+    },
+    "events": [
+     {
+      "kind": "task_started",
+      "taskId": "bov22129o",
+      "taskType": "shell",
+      "nativeType": "local_bash",
+      "description": "Wait four seconds",
+      "toolCallId": "toolu_01SlowFixture00000001",
+      "background": false
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 20,
+   "receivedAt": 1800000000100,
+   "kind": "frame",
+   "body": {
+    "type": "system/task_notification",
+    "native": {
+     "type": "system",
+     "subtype": "task_notification",
+     "task_id": "bov22129o",
+     "run_id": "0mv1zv89o-6639a7de",
+     "tool_use_id": "toolu_01SlowFixture00000001",
+     "status": "completed",
+     "output_file": "",
+     "summary": "Wait four seconds",
+     "uuid": "uuid-0021",
+     "session_id": "uuid-0003"
+    },
+    "events": [
+     {
+      "kind": "task_ended",
+      "taskId": "bov22129o",
+      "status": "completed",
+      "summary": "Wait four seconds"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 21,
+   "receivedAt": 1800000000105,
+   "kind": "frame",
+   "body": {
+    "type": "user",
+    "native": {
+     "type": "user",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "tool_use_id": "toolu_01SlowFixture00000001",
+        "type": "tool_result",
+        "content": "slow-done",
+        "is_error": false
+       }
+      ]
+     },
+     "parent_tool_use_id": null,
+     "session_id": "uuid-0003",
+     "uuid": "uuid-0022",
+     "timestamp": "2026-10-10T06:09:33.332Z",
+     "tool_use_result": {
+      "stdout": "slow-done",
+      "stderr": "",
+      "interrupted": false,
+      "isImage": false,
+      "noOutputExpected": false,
+      "bashEditDiff": {
+       "files": [],
+       "moreFiles": 0,
+       "unavailable": true
+      }
+     }
+    },
+    "events": [
+     {
+      "kind": "tool_call_ended",
+      "callId": "toolu_01SlowFixture00000001",
+      "content": [
+       {
+        "type": "text",
+        "text": "slow-done"
+       }
+      ],
+      "result": "ok"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 22,
+   "receivedAt": 1800000000110,
+   "kind": "frame",
+   "body": {
+    "type": "user",
+    "native": {
+     "type": "user",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "STEER-INPUT: also say steer-ack"
+       }
+      ]
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0018",
+     "timestamp": "2026-10-10T06:09:30.247Z",
+     "isReplay": true
+    },
+    "events": [
+     {
+      "kind": "user_message",
+      "input": "STEER-INPUT: also say steer-ack",
+      "inputId": "uuid-0018",
+      "nativeMessageId": "uuid-0018",
+      "evidence": "acknowledged"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 23,
+   "receivedAt": 1800000000115,
+   "kind": "frame",
+   "body": {
+    "type": "command_lifecycle",
+    "native": {
+     "type": "command_lifecycle",
+     "command_uuid": "uuid-0018",
+     "state": "started",
+     "uuid": "uuid-0023",
+     "session_id": "uuid-0003"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 24,
+   "receivedAt": 1800000000120,
+   "kind": "frame",
+   "body": {
+    "type": "system/status",
+    "native": {
+     "type": "system",
+     "subtype": "status",
+     "status": "requesting",
+     "session_id": "uuid-0003",
+     "uuid": "uuid-0024",
+     "user_message_uuids": [
+      "uuid-0001",
+      "uuid-0018"
+     ]
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 25,
+   "receivedAt": 1800000000125,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "message_start",
+      "message": {
+       "id": "msg_HBv9GUozWgACmJ4V",
+       "type": "message",
+       "role": "assistant",
+       "content": [],
+       "model": "claude-opus-5-5",
+       "stop_reason": null,
+       "stop_sequence": null,
+       "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0
+       }
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0025",
+     "ttft_ms": 9,
+     "thinking_display": "updates"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 26,
+   "receivedAt": 1800000000130,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "content_block_start",
+      "index": 0,
+      "content_block": {
+       "type": "text",
+       "text": ""
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0026"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 27,
+   "receivedAt": 1800000000135,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+       "type": "text_delta",
+       "text": "first-done"
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0027"
+    },
+    "events": [
+     {
+      "kind": "text_delta",
+      "text": "first-done",
+      "messageId": "msg_HBv9GUozWgACmJ4V"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 28,
+   "receivedAt": 1800000000140,
+   "kind": "frame",
+   "body": {
+    "type": "assistant",
+    "native": {
+     "type": "assistant",
+     "message": {
+      "id": "msg_HBv9GUozWgACmJ4V",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "first-done"
+       }
+      ],
+      "model": "claude-opus-5-5",
+      "stop_reason": null,
+      "stop_sequence": null,
+      "usage": {
+       "input_tokens": 0,
+       "output_tokens": 0
+      },
+      "context_management": null
+     },
+     "parent_tool_use_id": null,
+     "session_id": "uuid-0003",
+     "uuid": "uuid-0028",
+     "timestamp": "2026-10-10T06:09:33.367Z"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 29,
+   "receivedAt": 1800000000145,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "content_block_stop",
+      "index": 0
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0029"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 30,
+   "receivedAt": 1800000000150,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "message_delta",
+      "delta": {
+       "stop_reason": "end_turn",
+       "stop_sequence": null
+      },
+      "usage": {
+       "output_tokens": 0
+      }
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0030"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 31,
+   "receivedAt": 1800000000155,
+   "kind": "frame",
+   "body": {
+    "type": "stream_event",
+    "native": {
+     "type": "stream_event",
+     "event": {
+      "type": "message_stop"
+     },
+     "session_id": "uuid-0003",
+     "parent_tool_use_id": null,
+     "uuid": "uuid-0031"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 32,
+   "receivedAt": 1800000000160,
+   "kind": "frame",
+   "body": {
+    "type": "command_lifecycle",
+    "native": {
+     "type": "command_lifecycle",
+     "command_uuid": "uuid-0018",
+     "state": "completed",
+     "uuid": "uuid-0032",
+     "session_id": "uuid-0003"
+    },
+    "events": []
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 33,
+   "receivedAt": 1800000000165,
+   "kind": "frame",
+   "body": {
+    "type": "result/success",
+    "native": {
+     "duration_api_ms": 76,
+     "stop_reason": "end_turn",
+     "session_id": "uuid-0003",
+     "total_cost_usd": 0,
+     "usage": {
+      "input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "output_tokens": 0,
+      "output_tokens_details": {
+       "thinking_tokens": 0
+      },
+      "server_tool_use": {
+       "web_search_requests": 0,
+       "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+       "ephemeral_1h_input_tokens": 0,
+       "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard",
+      "fallback_credit": null
+     },
+     "modelUsage": {
+      "claude-opus-5-5": {
+       "inputTokens": 0,
+       "outputTokens": 0,
+       "cacheReadInputTokens": 0,
+       "cacheCreationInputTokens": 0,
+       "webSearchRequests": 0,
+       "costUSD": 0,
+       "contextWindow": 1000000,
+       "maxOutputTokens": 128000,
+       "thinkingTokens": 0,
+       "canonicalModel": "claude-opus-5-5",
+       "provider": "firstParty",
+       "costBasis": "list"
+      }
+     },
+     "permission_denials": [],
+     "terminal_reason": "completed",
+     "fast_mode_state": "off",
+     "fast_mode_disabled_reason": "sdk_opt_in_required",
+     "subagent_stats": {
+      "spawned": 0,
+      "requested": {
+       "background": 0,
+       "foreground": 0,
+       "unset": 0
+      },
+      "started_in_background": 0,
+      "max_depth": 0,
+      "spawned_by_subagents": 0,
+      "completed": 0,
+      "failed": 0,
+      "killed": {
+       "parent": 0,
+       "user": 0,
+       "system": 0
+      },
+      "refused": {
+       "depth_limit": 0,
+       "concurrency_limit": 0,
+       "budget": 0
+      },
+      "by_type": {}
+     },
+     "safety_stops": 0,
+     "is_error": false,
+     "num_turns": 2,
+     "subtype": "success",
+     "api_error_status": null,
+     "result": "first-done",
+     "ttft_ms": 199,
+     "type": "result",
+     "duration_ms": 4351,
+     "uuid": "uuid-0033",
+     "ttft_stream_ms": 195,
+     "time_to_request_ms": 177,
+     "first_content_frame_ms": 196,
+     "user_message_uuid": "uuid-0001",
+     "user_message_uuids": [
+      "uuid-0001",
+      "uuid-0018"
+     ],
+     "request_sent_wall_ms": 1791612569205,
+     "queued_turn_count": 0,
+     "result_index": 0
+    },
+    "events": [
+     {
+      "kind": "service_tier",
+      "serviceTier": "default"
+     },
+     {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed"
+      }
+     },
+     {
+      "kind": "usage",
+      "usage": {
+       "context": {
+        "tokens": 0,
+        "contextWindow": 1000000,
+        "percent": 0
+       },
+       "tokens": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 34,
+   "receivedAt": 1800000000170,
+   "kind": "frame",
+   "body": {
+    "type": "command_lifecycle",
+    "native": {
+     "type": "command_lifecycle",
+     "command_uuid": "uuid-0001",
+     "state": "completed",
+     "uuid": "uuid-0034",
+     "session_id": "uuid-0003"
+    },
+    "events": []
+   }
+  }
+ ],
+ "statusSteps": [
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000000
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000000
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000010
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000015
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000015
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000025
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000025
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000035
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001"
+   },
+   "lastEventAt": 1800000000040
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001",
+    "writing": true
+   },
+   "lastEventAt": 1800000000045
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001",
+    "writing": true
+   },
+   "lastEventAt": 1800000000050
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001",
+    "writing": true
+   },
+   "lastEventAt": 1800000000055
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001",
+    "writing": true
+   },
+   "lastEventAt": 1800000000060
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001",
+    "writing": true
+   },
+   "lastEventAt": 1800000000065
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001"
+   },
+   "lastEventAt": 1800000000070
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001"
+   },
+   "lastEventAt": 1800000000075
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001"
+   },
+   "lastEventAt": 1800000000080
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001"
+   },
+   "lastEventAt": 1800000000085
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001"
+   },
+   "lastEventAt": 1800000000090
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001"
+   },
+   "lastEventAt": 1800000000095
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": {
+    "tool": "Bash",
+    "callId": "toolu_01SlowFixture00000001"
+   },
+   "lastEventAt": 1800000000100
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000105
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000105
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000115
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000120
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000125
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000130
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "responding",
+   "lastEventAt": 1800000000135
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "responding",
+   "lastEventAt": 1800000000140
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "responding",
+   "lastEventAt": 1800000000145
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "responding",
+   "lastEventAt": 1800000000150
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "responding",
+   "lastEventAt": 1800000000155
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 0,
+   "requestId": "req-1",
+   "inputId": "claude-input",
+   "phase": "responding",
+   "lastEventAt": 1800000000160
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  }
+ ],
+ "statusOf": {
+  "all": {
+   "value": {
+    "kind": "idle",
+    "lastTurnOutcome": {
+     "kind": "completed"
+    }
+   },
+   "seq": 34
+  },
+  "root": {
+   "value": {
+    "kind": "idle",
+    "lastTurnOutcome": {
+     "kind": "completed"
+    }
+   },
+   "seq": 34
+  }
+ },
+ "modelOf": {
+  "all": {
+   "value": "claude-opus-5-5",
+   "seq": 34
+  },
+  "root": {
+   "value": "claude-opus-5-5",
+   "seq": 34
+  }
+ },
+ "effortOf": {
+  "all": {
+   "value": null,
+   "seq": 34
+  },
+  "root": {
+   "value": null,
+   "seq": 34
+  }
+ },
+ "serviceTierOf": {
+  "all": {
+   "value": "default",
+   "seq": 34
+  },
+  "root": {
+   "value": "default",
+   "seq": 34
+  }
+ },
+ "contextUsageOf": {
+  "all": {
+   "value": {
+    "tokens": 0,
+    "contextWindow": 1000000,
+    "percent": 0
+   },
+   "seq": 34
+  },
+  "root": {
+   "value": {
+    "tokens": 0,
+    "contextWindow": 1000000,
+    "percent": 0
+   },
+   "seq": 34
+  }
+ },
+ "usageOf": {
+  "all": {
+   "value": {
+    "total": {
+     "input": 0,
+     "output": 0,
+     "cacheRead": 0,
+     "cacheWrite": 0
+    }
+   },
+   "seq": 34
+  },
+  "root": {
+   "value": {
+    "total": {
+     "input": 0,
+     "output": 0,
+     "cacheRead": 0,
+     "cacheWrite": 0
+    }
+   },
+   "seq": 34
+  }
+ },
+ "graphOf": {
+  "nodes": [
+   {
+    "id": "claude-session"
+   }
+  ],
+  "edges": []
+ },
+ "events": [
+  {
+   "kind": "turn_started",
+   "requestId": "req-1",
+   "input": "replay steer-lifecycle",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000
+  },
+  {
+   "kind": "model",
+   "model": "claude-opus-5-5",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 4,
+   "receivedAt": 1800000000020
+  },
+  {
+   "kind": "service_tier",
+   "serviceTier": "default",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 4,
+   "receivedAt": 1800000000020
+  },
+  {
+   "kind": "user_message",
+   "input": "FIRST-PROMPT: wait then answer",
+   "inputId": "uuid-0001",
+   "nativeMessageId": "uuid-0001",
+   "evidence": "acknowledged",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 6,
+   "receivedAt": 1800000000030
+  },
+  {
+   "kind": "tool_call_started",
+   "callId": "toolu_01SlowFixture00000001",
+   "tool": "Bash",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 8,
+   "receivedAt": 1800000000040
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "toolu_01SlowFixture00000001",
+   "delta": "{\"command\":\"timeout ",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000045
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "toolu_01SlowFixture00000001",
+   "delta": "4 tail -f /dev/null;",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000000050
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "toolu_01SlowFixture00000001",
+   "delta": " echo slow-done\",\"de",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 11,
+   "receivedAt": 1800000000055
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "toolu_01SlowFixture00000001",
+   "delta": "scription\":\"Wait fou",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 12,
+   "receivedAt": 1800000000060
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "toolu_01SlowFixture00000001",
+   "delta": "r seconds\"}",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 13,
+   "receivedAt": 1800000000065
+  },
+  {
+   "kind": "tool_call_input",
+   "callId": "toolu_01SlowFixture00000001",
+   "input": "{\"command\":\"timeout 4 tail -f /dev/null; echo slow-done\",\"description\":\"Wait four seconds\"}",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 14,
+   "receivedAt": 1800000000070
+  },
+  {
+   "kind": "task_started",
+   "taskId": "bov22129o",
+   "taskType": "shell",
+   "nativeType": "local_bash",
+   "description": "Wait four seconds",
+   "toolCallId": "toolu_01SlowFixture00000001",
+   "background": false,
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 19,
+   "receivedAt": 1800000000095
+  },
+  {
+   "kind": "task_ended",
+   "taskId": "bov22129o",
+   "status": "completed",
+   "summary": "Wait four seconds",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 20,
+   "receivedAt": 1800000000100
+  },
+  {
+   "kind": "tool_call_ended",
+   "callId": "toolu_01SlowFixture00000001",
+   "content": [
+    {
+     "type": "text",
+     "text": "slow-done"
+    }
+   ],
+   "result": "ok",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 21,
+   "receivedAt": 1800000000105
+  },
+  {
+   "kind": "user_message",
+   "input": "STEER-INPUT: also say steer-ack",
+   "inputId": "uuid-0018",
+   "nativeMessageId": "uuid-0018",
+   "evidence": "acknowledged",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 22,
+   "receivedAt": 1800000000110
+  },
+  {
+   "kind": "text_delta",
+   "text": "first-done",
+   "messageId": "msg_HBv9GUozWgACmJ4V",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 27,
+   "receivedAt": 1800000000135
+  },
+  {
+   "kind": "service_tier",
+   "serviceTier": "default",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 33,
+   "receivedAt": 1800000000165
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 33,
+   "receivedAt": 1800000000165
+  },
+  {
+   "kind": "usage",
+   "usage": {
+    "context": {
+     "tokens": 0,
+     "contextWindow": 1000000,
+     "percent": 0
+    },
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "cacheRead": 0,
+     "cacheWrite": 0
+    }
+   },
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 33,
+   "receivedAt": 1800000000165
+  }
+ ],
+ "coalesced": [
+  {
+   "kind": "turn_started",
+   "requestId": "req-1",
+   "input": "replay steer-lifecycle",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000
+  },
+  {
+   "kind": "model",
+   "model": "claude-opus-5-5",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 4,
+   "receivedAt": 1800000000020
+  },
+  {
+   "kind": "service_tier",
+   "serviceTier": "default",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 4,
+   "receivedAt": 1800000000020
+  },
+  {
+   "kind": "user_message",
+   "input": "FIRST-PROMPT: wait then answer",
+   "inputId": "uuid-0001",
+   "nativeMessageId": "uuid-0001",
+   "evidence": "acknowledged",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 6,
+   "receivedAt": 1800000000030
+  },
+  {
+   "kind": "tool_call_started",
+   "callId": "toolu_01SlowFixture00000001",
+   "tool": "Bash",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 8,
+   "receivedAt": 1800000000040
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "toolu_01SlowFixture00000001",
+   "delta": "{\"command\":\"timeout ",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000045
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "toolu_01SlowFixture00000001",
+   "delta": "4 tail -f /dev/null;",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000000050
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "toolu_01SlowFixture00000001",
+   "delta": " echo slow-done\",\"de",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 11,
+   "receivedAt": 1800000000055
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "toolu_01SlowFixture00000001",
+   "delta": "scription\":\"Wait fou",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 12,
+   "receivedAt": 1800000000060
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "toolu_01SlowFixture00000001",
+   "delta": "r seconds\"}",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 13,
+   "receivedAt": 1800000000065
+  },
+  {
+   "kind": "tool_call_input",
+   "callId": "toolu_01SlowFixture00000001",
+   "input": "{\"command\":\"timeout 4 tail -f /dev/null; echo slow-done\",\"description\":\"Wait four seconds\"}",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 14,
+   "receivedAt": 1800000000070
+  },
+  {
+   "kind": "task_started",
+   "taskId": "bov22129o",
+   "taskType": "shell",
+   "nativeType": "local_bash",
+   "description": "Wait four seconds",
+   "toolCallId": "toolu_01SlowFixture00000001",
+   "background": false,
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 19,
+   "receivedAt": 1800000000095
+  },
+  {
+   "kind": "task_ended",
+   "taskId": "bov22129o",
+   "status": "completed",
+   "summary": "Wait four seconds",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 20,
+   "receivedAt": 1800000000100
+  },
+  {
+   "kind": "tool_call_ended",
+   "callId": "toolu_01SlowFixture00000001",
+   "content": [
+    {
+     "type": "text",
+     "text": "slow-done"
+    }
+   ],
+   "result": "ok",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 21,
+   "receivedAt": 1800000000105
+  },
+  {
+   "kind": "user_message",
+   "input": "STEER-INPUT: also say steer-ack",
+   "inputId": "uuid-0018",
+   "nativeMessageId": "uuid-0018",
+   "evidence": "acknowledged",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 22,
+   "receivedAt": 1800000000110
+  },
+  {
+   "kind": "text_delta",
+   "text": "first-done",
+   "messageId": "msg_HBv9GUozWgACmJ4V",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 27,
+   "receivedAt": 1800000000135
+  },
+  {
+   "kind": "service_tier",
+   "serviceTier": "default",
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 33,
+   "receivedAt": 1800000000165
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 33,
+   "receivedAt": 1800000000165
+  },
+  {
+   "kind": "usage",
+   "usage": {
+    "context": {
+     "tokens": 0,
+     "contextWindow": 1000000,
+     "percent": 0
+    },
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "cacheRead": 0,
+     "cacheWrite": 0
+    }
+   },
+   "sessionId": "claude-session",
+   "agentPath": [],
+   "seq": 33,
+   "receivedAt": 1800000000165
+  }
+ ],
+ "turnEndAfter": [
+  {
+   "afterSeq": -1,
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": -1,
+   "sessionId": "claude-session",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 0,
+   "sessionId": "claude-session",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 0,
+   "sessionId": "claude-session",
+   "inputId": "claude-input",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 0,
+   "inputId": "claude-input",
+   "outcome": {
+    "kind": "completed"
+   }
+  }
+ ],
+ "conversation": {
+  "drops": [],
+  "inputs": [
+   [
+    "[\"claude-session\",[],\"claude-input\"]",
+    {
+     "id": "[\"claude-session\",[],\"claude-input\"]",
+     "input": "replay steer-lifecycle",
+     "inputId": "claude-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay steer-lifecycle",
+         "inputId": "claude-input"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   ],
+   [
+    "[\"claude-session\",[],\"uuid-0001\"]",
+    {
+     "id": "[\"claude-session\",[],\"uuid-0001\"]",
+     "inputId": "uuid-0001",
+     "input": "FIRST-PROMPT: wait then answer",
+     "state": "untracked",
+     "attempts": [],
+     "observations": [
+      {
+       "kind": "user_message",
+       "input": "FIRST-PROMPT: wait then answer",
+       "inputId": "uuid-0001",
+       "nativeMessageId": "uuid-0001",
+       "evidence": "acknowledged",
+       "sessionId": "claude-session",
+       "agentPath": [],
+       "seq": 6,
+       "receivedAt": 1800000000030
+      }
+     ]
+    }
+   ],
+   [
+    "[\"claude-session\",[],\"uuid-0018\"]",
+    {
+     "id": "[\"claude-session\",[],\"uuid-0018\"]",
+     "inputId": "uuid-0018",
+     "input": "STEER-INPUT: also say steer-ack",
+     "state": "untracked",
+     "attempts": [],
+     "observations": [
+      {
+       "kind": "user_message",
+       "input": "STEER-INPUT: also say steer-ack",
+       "inputId": "uuid-0018",
+       "nativeMessageId": "uuid-0018",
+       "evidence": "acknowledged",
+       "sessionId": "claude-session",
+       "agentPath": [],
+       "seq": 22,
+       "receivedAt": 1800000000110
+      }
+     ]
+    }
+   ]
+  ],
+  "requests": [
+   [
+    "[\"\",\"[\\\"claude-session\\\",[],\\\"req-1\\\"]\"]",
+    "[\"claude-session\",[],\"claude-input\"]"
+   ]
+  ],
+  "actions": [],
+  "cursors": [
+   [
+    "",
+    34
+   ]
+  ],
+  "updates": []
+ },
+ "conversationUpdates": [
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"claude-session\",[],\"claude-input\"]",
+     "input": "replay steer-lifecycle",
+     "inputId": "claude-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay steer-lifecycle",
+         "inputId": "claude-input"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"claude-session\",[],\"claude-input\"]",
+     "input": "replay steer-lifecycle",
+     "inputId": "claude-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay steer-lifecycle",
+         "inputId": "claude-input"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   }
+  ],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "model",
+     "model": "claude-opus-5-5",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 4,
+     "receivedAt": 1800000000020
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "service_tier",
+     "serviceTier": "default",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 4,
+     "receivedAt": 1800000000020
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"claude-session\",[],\"uuid-0001\"]",
+     "inputId": "uuid-0001",
+     "input": "FIRST-PROMPT: wait then answer",
+     "state": "untracked",
+     "attempts": [],
+     "observations": [
+      {
+       "kind": "user_message",
+       "input": "FIRST-PROMPT: wait then answer",
+       "inputId": "uuid-0001",
+       "nativeMessageId": "uuid-0001",
+       "evidence": "acknowledged",
+       "sessionId": "claude-session",
+       "agentPath": [],
+       "seq": 6,
+       "receivedAt": 1800000000030
+      }
+     ]
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_started",
+     "callId": "toolu_01SlowFixture00000001",
+     "tool": "Bash",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 8,
+     "receivedAt": 1800000000040
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_input_delta",
+     "callId": "toolu_01SlowFixture00000001",
+     "delta": "{\"command\":\"timeout ",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 9,
+     "receivedAt": 1800000000045
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_input_delta",
+     "callId": "toolu_01SlowFixture00000001",
+     "delta": "4 tail -f /dev/null;",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 10,
+     "receivedAt": 1800000000050
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_input_delta",
+     "callId": "toolu_01SlowFixture00000001",
+     "delta": " echo slow-done\",\"de",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 11,
+     "receivedAt": 1800000000055
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_input_delta",
+     "callId": "toolu_01SlowFixture00000001",
+     "delta": "scription\":\"Wait fou",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 12,
+     "receivedAt": 1800000000060
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_input_delta",
+     "callId": "toolu_01SlowFixture00000001",
+     "delta": "r seconds\"}",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 13,
+     "receivedAt": 1800000000065
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_input",
+     "callId": "toolu_01SlowFixture00000001",
+     "input": "{\"command\":\"timeout 4 tail -f /dev/null; echo slow-done\",\"description\":\"Wait four seconds\"}",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 14,
+     "receivedAt": 1800000000070
+    }
+   }
+  ],
+  [],
+  [],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "task_started",
+     "taskId": "bov22129o",
+     "taskType": "shell",
+     "nativeType": "local_bash",
+     "description": "Wait four seconds",
+     "toolCallId": "toolu_01SlowFixture00000001",
+     "background": false,
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 19,
+     "receivedAt": 1800000000095
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "task_ended",
+     "taskId": "bov22129o",
+     "status": "completed",
+     "summary": "Wait four seconds",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 20,
+     "receivedAt": 1800000000100
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_ended",
+     "callId": "toolu_01SlowFixture00000001",
+     "content": [
+      {
+       "type": "text",
+       "text": "slow-done"
+      }
+     ],
+     "result": "ok",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 21,
+     "receivedAt": 1800000000105
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"claude-session\",[],\"uuid-0018\"]",
+     "inputId": "uuid-0018",
+     "input": "STEER-INPUT: also say steer-ack",
+     "state": "untracked",
+     "attempts": [],
+     "observations": [
+      {
+       "kind": "user_message",
+       "input": "STEER-INPUT: also say steer-ack",
+       "inputId": "uuid-0018",
+       "nativeMessageId": "uuid-0018",
+       "evidence": "acknowledged",
+       "sessionId": "claude-session",
+       "agentPath": [],
+       "seq": 22,
+       "receivedAt": 1800000000110
+      }
+     ]
+    }
+   }
+  ],
+  [],
+  [],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "text_delta",
+     "text": "first-done",
+     "messageId": "msg_HBv9GUozWgACmJ4V",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 27,
+     "receivedAt": 1800000000135
+    }
+   }
+  ],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "service_tier",
+     "serviceTier": "default",
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 33,
+     "receivedAt": 1800000000165
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "completed"
+     },
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 33,
+     "receivedAt": 1800000000165
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "usage",
+     "usage": {
+      "context": {
+       "tokens": 0,
+       "contextWindow": 1000000,
+       "percent": 0
+      },
+      "tokens": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0
+      }
+     },
+     "sessionId": "claude-session",
+     "agentPath": [],
+     "seq": 33,
+     "receivedAt": 1800000000165
+    }
+   }
+  ],
+  []
+ ],
+ "view": {
+  "messages": [
+   {
+    "kind": "input",
+    "id": "in:[\"claude-session\",[],\"claude-input\"]",
+    "input": {
+     "id": "[\"claude-session\",[],\"claude-input\"]",
+     "input": "replay steer-lifecycle",
+     "inputId": "claude-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay steer-lifecycle",
+         "inputId": "claude-input"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::req-1",
+    "openedBy": "req-1",
+    "sections": []
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"claude-session\",[],\"uuid-0001\"]",
+    "input": {
+     "id": "[\"claude-session\",[],\"uuid-0001\"]",
+     "inputId": "uuid-0001",
+     "input": "FIRST-PROMPT: wait then answer",
+     "state": "untracked",
+     "attempts": [],
+     "observations": [
+      {
+       "kind": "user_message",
+       "input": "FIRST-PROMPT: wait then answer",
+       "inputId": "uuid-0001",
+       "nativeMessageId": "uuid-0001",
+       "evidence": "acknowledged",
+       "sessionId": "claude-session",
+       "agentPath": [],
+       "seq": 6,
+       "receivedAt": 1800000000030
+      }
+     ]
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::claude-session:8",
+    "sections": [
+     {
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "tool",
+        "callId": "toolu_01SlowFixture00000001",
+        "tool": "Bash",
+        "result": "ok",
+        "startedAt": 1800000000040,
+        "input": "{\"command\":\"timeout 4 tail -f /dev/null; echo slow-done\",\"description\":\"Wait four seconds\"}",
+        "content": [
+         {
+          "type": "text",
+          "text": "slow-done"
+         }
+        ],
+        "endedAt": 1800000000105
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"claude-session\",[],\"uuid-0018\"]",
+    "input": {
+     "id": "[\"claude-session\",[],\"uuid-0018\"]",
+     "inputId": "uuid-0018",
+     "input": "STEER-INPUT: also say steer-ack",
+     "state": "untracked",
+     "attempts": [],
+     "observations": [
+      {
+       "kind": "user_message",
+       "input": "STEER-INPUT: also say steer-ack",
+       "inputId": "uuid-0018",
+       "nativeMessageId": "uuid-0018",
+       "evidence": "acknowledged",
+       "sessionId": "claude-session",
+       "agentPath": [],
+       "seq": 22,
+       "receivedAt": 1800000000110
+      }
+     ]
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::claude-session:27",
+    "sections": [
+     {
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "first-done",
+        "messageId": "msg_HBv9GUozWgACmJ4V"
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "completed"
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  "model": "claude-opus-5-5",
+  "effort": null,
+  "serviceTier": "default",
+  "context": {
+   "tokens": 0,
+   "contextWindow": 1000000,
+   "percent": 0
+  },
+  "usage": {
+   "total": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
+   }
+  },
+  "pendingRequests": [],
+  "exited": null,
+  "conversation": {
+   "drops": [],
+   "inputs": [
+    [
+     "[\"claude-session\",[],\"claude-input\"]",
+     {
+      "id": "[\"claude-session\",[],\"claude-input\"]",
+      "input": "replay steer-lifecycle",
+      "inputId": "claude-input",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "claude-session",
+         "agentPath": [],
+         "seq": 0,
+         "receivedAt": 1800000000000,
+         "kind": "request",
+         "id": "req-1",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "replay steer-lifecycle",
+          "inputId": "claude-input"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "claude-session",
+         "agentPath": [],
+         "seq": 1,
+         "receivedAt": 1800000000005,
+         "kind": "response",
+         "requestId": "req-1",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ],
+    [
+     "[\"claude-session\",[],\"uuid-0001\"]",
+     {
+      "id": "[\"claude-session\",[],\"uuid-0001\"]",
+      "inputId": "uuid-0001",
+      "input": "FIRST-PROMPT: wait then answer",
+      "state": "untracked",
+      "attempts": [],
+      "observations": [
+       {
+        "kind": "user_message",
+        "input": "FIRST-PROMPT: wait then answer",
+        "inputId": "uuid-0001",
+        "nativeMessageId": "uuid-0001",
+        "evidence": "acknowledged",
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 6,
+        "receivedAt": 1800000000030
+       }
+      ]
+     }
+    ],
+    [
+     "[\"claude-session\",[],\"uuid-0018\"]",
+     {
+      "id": "[\"claude-session\",[],\"uuid-0018\"]",
+      "inputId": "uuid-0018",
+      "input": "STEER-INPUT: also say steer-ack",
+      "state": "untracked",
+      "attempts": [],
+      "observations": [
+       {
+        "kind": "user_message",
+        "input": "STEER-INPUT: also say steer-ack",
+        "inputId": "uuid-0018",
+        "nativeMessageId": "uuid-0018",
+        "evidence": "acknowledged",
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 22,
+        "receivedAt": 1800000000110
+       }
+      ]
+     }
+    ]
+   ],
+   "requests": [
+    [
+     "[\"\",\"[\\\"claude-session\\\",[],\\\"req-1\\\"]\"]",
+     "[\"claude-session\",[],\"claude-input\"]"
+    ]
+   ],
+   "actions": [],
+   "cursors": [
+    [
+     "",
+     34
+    ]
+   ],
+   "updates": []
+  },
+  "rootSessionId": "claude-session",
+  "usageBySession": [
+   [
+    "claude-session",
+    {
+     "agents": [
+      [
+       "[]",
+       {
+        "agentPath": [],
+        "tokens": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0
+        }
+       }
+      ]
+     ],
+     "total": null
+    }
+   ]
+  ],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "claude-session"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [
+   [
+    "[]",
+    {
+     "agentPath": [],
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+     }
+    }
+   ]
+  ],
+  "usageTotal": null
+ },
+ "viewStream": {
+  "messages": [
+   {
+    "kind": "input",
+    "id": "in:[\"claude-session\",[],\"claude-input\"]",
+    "input": {
+     "id": "[\"claude-session\",[],\"claude-input\"]",
+     "input": "replay steer-lifecycle",
+     "inputId": "claude-input",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 0,
+        "receivedAt": 1800000000000,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "replay steer-lifecycle",
+         "inputId": "claude-input"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000005,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:req-1",
+    "openedBy": "req-1",
+    "sections": []
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"claude-session\",[],\"uuid-0001\"]",
+    "input": {
+     "id": "[\"claude-session\",[],\"uuid-0001\"]",
+     "inputId": "uuid-0001",
+     "input": "FIRST-PROMPT: wait then answer",
+     "state": "untracked",
+     "attempts": [],
+     "observations": [
+      {
+       "kind": "user_message",
+       "input": "FIRST-PROMPT: wait then answer",
+       "inputId": "uuid-0001",
+       "nativeMessageId": "uuid-0001",
+       "evidence": "acknowledged",
+       "sessionId": "claude-session",
+       "agentPath": [],
+       "seq": 6,
+       "receivedAt": 1800000000030
+      }
+     ]
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:claude-session:8",
+    "sections": [
+     {
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "tool",
+        "callId": "toolu_01SlowFixture00000001",
+        "tool": "Bash",
+        "result": "ok",
+        "startedAt": 1800000000040,
+        "input": "{\"command\":\"timeout 4 tail -f /dev/null; echo slow-done\",\"description\":\"Wait four seconds\"}",
+        "content": [
+         {
+          "type": "text",
+          "text": "slow-done"
+         }
+        ],
+        "endedAt": 1800000000105
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"claude-session\",[],\"uuid-0018\"]",
+    "input": {
+     "id": "[\"claude-session\",[],\"uuid-0018\"]",
+     "inputId": "uuid-0018",
+     "input": "STEER-INPUT: also say steer-ack",
+     "state": "untracked",
+     "attempts": [],
+     "observations": [
+      {
+       "kind": "user_message",
+       "input": "STEER-INPUT: also say steer-ack",
+       "inputId": "uuid-0018",
+       "nativeMessageId": "uuid-0018",
+       "evidence": "acknowledged",
+       "sessionId": "claude-session",
+       "agentPath": [],
+       "seq": 22,
+       "receivedAt": 1800000000110
+      }
+     ]
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:claude-session:27",
+    "sections": [
+     {
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "first-done",
+        "messageId": "msg_HBv9GUozWgACmJ4V"
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "completed"
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  "model": "claude-opus-5-5",
+  "effort": null,
+  "serviceTier": "default",
+  "context": {
+   "tokens": 0,
+   "contextWindow": 1000000,
+   "percent": 0
+  },
+  "usage": {
+   "total": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
+   }
+  },
+  "pendingRequests": [],
+  "exited": null,
+  "conversation": {
+   "drops": [],
+   "inputs": [
+    [
+     "[\"claude-session\",[],\"claude-input\"]",
+     {
+      "id": "[\"claude-session\",[],\"claude-input\"]",
+      "input": "replay steer-lifecycle",
+      "inputId": "claude-input",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "claude-session",
+         "agentPath": [],
+         "seq": 0,
+         "receivedAt": 1800000000000,
+         "kind": "request",
+         "id": "req-1",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "replay steer-lifecycle",
+          "inputId": "claude-input"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "claude-session",
+         "agentPath": [],
+         "seq": 1,
+         "receivedAt": 1800000000005,
+         "kind": "response",
+         "requestId": "req-1",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ],
+    [
+     "[\"claude-session\",[],\"uuid-0001\"]",
+     {
+      "id": "[\"claude-session\",[],\"uuid-0001\"]",
+      "inputId": "uuid-0001",
+      "input": "FIRST-PROMPT: wait then answer",
+      "state": "untracked",
+      "attempts": [],
+      "observations": [
+       {
+        "kind": "user_message",
+        "input": "FIRST-PROMPT: wait then answer",
+        "inputId": "uuid-0001",
+        "nativeMessageId": "uuid-0001",
+        "evidence": "acknowledged",
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 6,
+        "receivedAt": 1800000000030
+       }
+      ]
+     }
+    ],
+    [
+     "[\"claude-session\",[],\"uuid-0018\"]",
+     {
+      "id": "[\"claude-session\",[],\"uuid-0018\"]",
+      "inputId": "uuid-0018",
+      "input": "STEER-INPUT: also say steer-ack",
+      "state": "untracked",
+      "attempts": [],
+      "observations": [
+       {
+        "kind": "user_message",
+        "input": "STEER-INPUT: also say steer-ack",
+        "inputId": "uuid-0018",
+        "nativeMessageId": "uuid-0018",
+        "evidence": "acknowledged",
+        "sessionId": "claude-session",
+        "agentPath": [],
+        "seq": 22,
+        "receivedAt": 1800000000110
+       }
+      ]
+     }
+    ]
+   ],
+   "requests": [
+    [
+     "[\"stream-1\",\"[\\\"claude-session\\\",[],\\\"req-1\\\"]\"]",
+     "[\"claude-session\",[],\"claude-input\"]"
+    ]
+   ],
+   "actions": [],
+   "cursors": [
+    [
+     "stream-1",
+     34
+    ]
+   ],
+   "updates": []
+  },
+  "rootSessionId": "claude-session",
+  "usageBySession": [
+   [
+    "claude-session",
+    {
+     "agents": [
+      [
+       "[]",
+       {
+        "agentPath": [],
+        "tokens": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0
+        }
+       }
+      ]
+     ],
+     "total": null
+    }
+   ]
+  ],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "claude-session"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [
+   [
+    "[]",
+    {
+     "agentPath": [],
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+     }
+    }
+   ]
+  ],
+  "usageTotal": null
+ },
+ "viewSteps": [
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 2
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 5,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    },
+    {
+     "id": "turn::claude-session:27",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 5,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    },
+    {
+     "id": "turn::claude-session:27",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 5,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    },
+    {
+     "id": "turn::claude-session:27",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 5,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    },
+    {
+     "id": "turn::claude-session:27",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 5,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    },
+    {
+     "id": "turn::claude-session:27",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 5,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    },
+    {
+     "id": "turn::claude-session:27",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    },
+    {
+     "id": "turn::claude-session:27",
+     "parts": [
+      1
+     ],
+     "outcome": "completed"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 3
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"claude-session\",[],\"claude-input\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0001\"]"
+    },
+    {
+     "id": "turn::claude-session:8",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"claude-session\",[],\"uuid-0018\"]"
+    },
+    {
+     "id": "turn::claude-session:27",
+     "parts": [
+      1
+     ],
+     "outcome": "completed"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  }
+ ],
+ "viewEvents": {
+  "messages": [
+   {
+    "kind": "turn",
+    "id": "turn::req-1",
+    "openedBy": "req-1",
+    "sections": [
+     {
+      "sessionId": "claude-session",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "tool",
+        "callId": "toolu_01SlowFixture00000001",
+        "tool": "Bash",
+        "result": "ok",
+        "startedAt": 1800000000040,
+        "input": "{\"command\":\"timeout 4 tail -f /dev/null; echo slow-done\",\"description\":\"Wait four seconds\"}",
+        "content": [
+         {
+          "type": "text",
+          "text": "slow-done"
+         }
+        ],
+        "endedAt": 1800000000105
+       },
+       {
+        "kind": "text",
+        "text": "first-done",
+        "messageId": "msg_HBv9GUozWgACmJ4V"
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "completed"
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle"
+  },
+  "model": "claude-opus-5-5",
+  "effort": null,
+  "serviceTier": "default",
+  "context": {
+   "tokens": 0,
+   "contextWindow": 1000000,
+   "percent": 0
+  },
+  "usage": {
+   "total": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
+   }
+  },
+  "pendingRequests": [],
+  "exited": null,
+  "conversation": {
+   "drops": [],
+   "inputs": [],
+   "requests": [],
+   "actions": [],
+   "cursors": [],
+   "updates": []
+  },
+  "rootSessionId": "claude-session",
+  "usageBySession": [
+   [
+    "claude-session",
+    {
+     "agents": [
+      [
+       "[]",
+       {
+        "agentPath": [],
+        "tokens": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0
+        }
+       }
+      ]
+     ],
+     "total": null
+    }
+   ]
+  ],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "claude-session"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [
+   [
+    "[]",
+    {
+     "agentPath": [],
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+     }
+    }
+   ]
+  ],
+  "usageTotal": null
+ },
+ "tasksOf": {
+  "value": [
+   {
+    "taskId": "bov22129o",
+    "taskType": "shell",
+    "nativeType": "local_bash",
+    "description": "Wait four seconds",
+    "toolCallId": "toolu_01SlowFixture00000001",
+    "background": false,
+    "sessionId": "claude-session",
+    "agentPath": [],
+    "status": "completed",
+    "startedAt": 1800000000095,
+    "summary": "Wait four seconds",
+    "endedAt": 1800000000100
+   }
+  ],
+  "seq": 34
+ },
+ "tasksOfRoot": {
+  "value": [
+   {
+    "taskId": "bov22129o",
+    "taskType": "shell",
+    "nativeType": "local_bash",
+    "description": "Wait four seconds",
+    "toolCallId": "toolu_01SlowFixture00000001",
+    "background": false,
+    "sessionId": "claude-session",
+    "agentPath": [],
+    "status": "completed",
+    "startedAt": 1800000000095,
+    "summary": "Wait four seconds",
+    "endedAt": 1800000000100
+   }
+  ],
+  "seq": 34
+ },
+ "display": {
+  "groups": [
+   {
+    "segments": [
+     {
+      "kind": "tools",
+      "index": 0,
+      "parts": [
+       {
+        "kind": "tool",
+        "callId": "toolu_01SlowFixture00000001",
+        "tool": "Bash",
+        "result": "ok",
+        "startedAt": 1800000000040,
+        "input": "{\"command\":\"timeout 4 tail -f /dev/null; echo slow-done\",\"description\":\"Wait four seconds\"}",
+        "content": [
+         {
+          "type": "text",
+          "text": "slow-done"
+         }
+        ],
+        "endedAt": 1800000000105
+       }
+      ],
+      "counts": [
+       {
+        "kind": "run_command",
+        "count": 1
+       }
+      ],
+      "failed": 0
+     }
+    ],
+    "summaries": [
+     {
+      "done": "Ran a command",
+      "running": "Ran a command"
+     }
+    ]
+   },
+   {
+    "segments": [
+     {
+      "kind": "part",
+      "index": 0,
+      "part": {
+       "kind": "text",
+       "text": "first-done",
+       "messageId": "msg_HBv9GUozWgACmJ4V"
+      }
+     }
+    ],
+    "summaries": [
+     null
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "tool": "Bash",
+    "input": "{\"command\":\"timeout 4 tail -f /dev/null; echo slow-done\",\"description\":\"Wait four seconds\"}",
+    "action": {
+     "kind": "run_command",
+     "detail": "timeout 4 tail -f /dev/null; echo slow-done",
+     "command": "timeout 4 tail -f /dev/null; echo slow-done",
+     "description": "Wait four seconds"
+    },
+    "bare": {
+     "kind": "run_command"
+    },
+    "label": "Ran command",
+    "writing": "Preparing command"
+   }
+  ],
+  "requests": [],
+  "notices": [],
+  "phases": [
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001"
+    },
+    "label": "Running Bash",
+    "runtimeLabel": "Running command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001",
+     "writing": true
+    },
+    "label": "Writing Bash arguments",
+    "runtimeLabel": "Preparing command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001",
+     "writing": true
+    },
+    "label": "Writing Bash arguments",
+    "runtimeLabel": "Preparing command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001",
+     "writing": true
+    },
+    "label": "Writing Bash arguments",
+    "runtimeLabel": "Preparing command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001",
+     "writing": true
+    },
+    "label": "Writing Bash arguments",
+    "runtimeLabel": "Preparing command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001",
+     "writing": true
+    },
+    "label": "Writing Bash arguments",
+    "runtimeLabel": "Preparing command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001"
+    },
+    "label": "Running Bash",
+    "runtimeLabel": "Running command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001"
+    },
+    "label": "Running Bash",
+    "runtimeLabel": "Running command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001"
+    },
+    "label": "Running Bash",
+    "runtimeLabel": "Running command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001"
+    },
+    "label": "Running Bash",
+    "runtimeLabel": "Running command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001"
+    },
+    "label": "Running Bash",
+    "runtimeLabel": "Running command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001"
+    },
+    "label": "Running Bash",
+    "runtimeLabel": "Running command"
+   },
+   {
+    "phase": {
+     "tool": "Bash",
+     "callId": "toolu_01SlowFixture00000001"
+    },
+    "label": "Running Bash",
+    "runtimeLabel": "Running command"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   }
+  ],
+  "failures": [],
+  "tasks": [
+   "Completed"
+  ]
+ }
+}

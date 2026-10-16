@@ -1,0 +1,870 @@
+// A trajectory, round by round (web/src/farm/WorkLog.tsx WorkLog, web/src/pages/Trajectories.tsx):
+//   WorkLog         the rounds (rules/rounds.dart): what it was told (the job, a word, a comment on a step), a time bar
+//                   of what it did (a span per step, as long as it took; a tap shows the step), and its steps: what it
+//                   remembered and said, each tool it used (open one for its input and output), its reasoning,
+//                   retries and problems, a sub-agent's indented under the call that started it. Earlier rounds show
+//                   only their answer until opened. A step can be commented on while the helper is there: the comment
+//                   goes to it with the step, and shows under the step. Stays at the bottom while you are there.
+//   TrajectoryLog   one trajectory by id, loaded, then kept up by step events (workStepsProvider)
+//   TrajectoryList  the helpers an agent has sent, newest first, each opening to its trajectory
+// The farm's helper panel and the chat can use WorkLog with steps of their own.
+
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../app/theme.dart';
+import '../../gen/vibevalley.dart';
+import '../../rules/rounds.dart';
+import '../../ui/kit/base.dart';
+import '../../ui/kit/button.dart';
+import '../../ui/kit/field.dart';
+import '../../ui/kit/icons.dart';
+import '../../ui/kit/labels.dart';
+import '../../ui/kit/markdown.dart';
+import 'state.dart';
+import 'widgets.dart';
+
+/// Within this many pixels of the bottom counts as being there.
+const _nearBottom = 48.0;
+
+double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
+
+/// What sends a comment on a step (its `n`) to the helper; it throws why not.
+typedef CommentOn = Future<void> Function(int step, String text);
+
+class WorkLog extends StatefulWidget {
+  const WorkLog({super.key, required this.steps, required this.now, this.asked, this.tall = false, this.working = false, this.onComment});
+  final List<WorkStep> steps;
+  final double now;
+
+  /// What a step it was told is called, when not 工单 (the first) and 带话 (the rest): the manager's are lines it heard.
+  final String? asked;
+
+  /// 36rem high at most; else 22rem.
+  final bool tall;
+
+  /// The last round is still going: its bar runs to now.
+  final bool working;
+
+  /// Comments on a step, while the helper is there to read them; null: no commenting.
+  final CommentOn? onComment;
+
+  @override
+  State<WorkLog> createState() => _WorkLogState();
+}
+
+class _WorkLogState extends State<WorkLog> {
+  final _scroll = ScrollController();
+  final _keys = <int, GlobalKey>{};
+  bool _atBottom = true;
+
+  /// Rounds opened or closed by hand, by the `n` of what started them (-1: before the first); the last is open unless
+  /// closed.
+  final _toggled = <int, bool>{};
+
+  /// The step a bar's span pointed at, shown marked for a moment.
+  int? _marked;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      final p = _scroll.position;
+      _atBottom = p.maxScrollExtent - p.pixels < _nearBottom;
+    });
+    _stick();
+  }
+
+  @override
+  void didUpdateWidget(WorkLog old) {
+    super.didUpdateWidget(old);
+    if (old.steps != widget.steps) _stick();
+  }
+
+  void _stick() {
+    if (!_atBottom) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  int _idOf(Round r) => r.asked?.n.round() ?? -1;
+
+  bool _open(Round r, bool last) => _toggled[_idOf(r)] ?? last;
+
+  void _show(Round r, WorkStep step) {
+    setState(() {
+      _toggled[_idOf(r)] = true;
+      _marked = step.n.round();
+      _atBottom = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final at = _keys[step.n.round()]?.currentContext;
+      if (at != null) Scrollable.ensureVisible(at, alignment: .3, duration: const Duration(milliseconds: 200));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rounds = roundsOf(widget.steps);
+    final comments = commentsOf(widget.steps);
+    // The first one is the job; later ones are what you (or the manager) told it.
+    final firstAsked = widget.steps.where((s) => s.kind == StepKind.asked && s.under == null).firstOrNull?.n;
+    return Container(
+      constraints: BoxConstraints(maxHeight: widget.tall ? 576 : 352),
+      color: Palette.cream100,
+      child: SingleChildScrollView(
+        controller: _scroll,
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < rounds.length; i++) ...[
+              if (i > 0) const SizedBox(height: 10),
+              _roundView(rounds[i], last: i == rounds.length - 1, firstAsked: firstAsked, comments: comments),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _roundView(Round round, {required bool last, required double? firstAsked, required Map<int, List<WorkStep>> comments}) {
+    final live = last && widget.working;
+    final end = live ? widget.now : (round.all.lastOrNull?.at ?? widget.now);
+    final open = _open(round, last);
+    final answer = round.answer;
+    final shown = open ? round.steps : [?answer];
+    final asked = round.asked;
+    final label = asked == null
+        ? '更早的步骤'
+        : asked.on != null
+        ? '评论第 ${asked.on!.round()} 步'
+        : asked.under != null
+        ? '帮手接到'
+        : (widget.asked ?? (asked.n == firstAsked ? '工单' : '带话'));
+    return Container(
+      decoration: BoxDecoration(border: Border.all(color: Palette.cream300)),
+      padding: const EdgeInsets.all(6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          KitTappable(
+            onTap: () => setState(() => _toggled[_idOf(round)] = !open),
+            semanticLabel: open ? '收起这一轮' : '展开这一轮',
+            builder: (context, s) => Container(
+              color: s.hovered ? Palette.creamHover : null,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Row(
+                children: [
+                  AnimatedRotation(
+                    turns: open ? .25 : 0,
+                    duration: kitMotion(context, const Duration(milliseconds: 150)),
+                    child: const SpriteIcon('button-next', size: 12),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(label, style: KitText.xs.copyWith(color: Palette.bark800)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${round.steps.length} 步 · ${tookText(roundMs(round, end: end))}${live ? ' · 进行中' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: KitText.xs.copyWith(color: Palette.bark400),
+                    ),
+                  ),
+                  if (asked != null) _When(at: asked.at, now: widget.now),
+                ],
+              ),
+            ),
+          ),
+          if (asked != null) ...[
+            const SizedBox(height: 4),
+            _keyed(
+              asked,
+              Container(
+                color: Palette.wheat.withValues(alpha: .25),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: _Folded(text: asked.on != null ? commentWords(asked) : asked.text, lines: 4, markdown: false),
+              ),
+            ),
+          ],
+          if (round.steps.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _TimeBar(
+              spans: spansOf(round, end: end),
+              onPick: (step) => _show(round, step),
+            ),
+          ],
+          for (final step in shown) ...[const SizedBox(height: 6), _keyed(step, _withComments(step, comments[step.n.round()]))],
+          if (!open && round.steps.length > shown.length)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: DeskLink('看这一轮的 ${round.steps.length} 步', onTap: () => setState(() => _toggled[_idOf(round)] = true)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _keyed(WorkStep step, Widget child) {
+    final n = step.n.round();
+    final marked = _marked == n;
+    return Container(
+      key: _keys.putIfAbsent(n, GlobalKey.new),
+      decoration: marked ? BoxDecoration(border: Border.all(color: Palette.wheat, width: 2)) : null,
+      child: child,
+    );
+  }
+
+  /// A step, indented under the call when a sub-agent took it, with the comments on it and a way to add one.
+  Widget _withComments(WorkStep step, List<WorkStep>? on) {
+    Widget item = _Step(step: step, now: widget.now, job: false, asked: widget.asked);
+    if (step.under != null) {
+      item = Container(
+        margin: const EdgeInsets.only(left: 20),
+        padding: const EdgeInsets.only(left: 8),
+        decoration: BoxDecoration(
+          border: Border(left: BorderSide(color: Palette.leaf500.withValues(alpha: .4), width: 2)),
+        ),
+        child: item,
+      );
+    }
+    final comment = widget.onComment;
+    if ((on == null || on.isEmpty) && comment == null) return item;
+    return _Commentable(step: step.n.round(), send: comment, comments: on ?? const [], child: item);
+  }
+}
+
+/// Whether there is no pointer that hovers: a phone, where 评论 always shows.
+bool get _touchOnly => defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android;
+
+/// A step with the comments on it beneath, and 评论 floating at its top right while the pointer is over it (on a phone,
+/// once the step is tapped): a long trajectory is not one 评论 line per step.
+class _Commentable extends StatefulWidget {
+  const _Commentable({required this.step, required this.send, required this.comments, required this.child});
+  final int step;
+  final CommentOn? send;
+  final List<WorkStep> comments;
+  final Widget child;
+
+  @override
+  State<_Commentable> createState() => _CommentableState();
+}
+
+class _CommentableState extends State<_Commentable> {
+  bool _hover = false;
+  bool _tapped = false;
+  bool _writing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final send = widget.send;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Listener(
+        onPointerUp: _touchOnly ? (_) => setState(() => _tapped = true) : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              children: [
+                widget.child,
+                if (send != null && !_writing && (_hover || _tapped))
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      color: Palette.cream50,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: DeskLink('评论', onTap: () => setState(() => _writing = true)),
+                    ),
+                  ),
+              ],
+            ),
+            for (final c in widget.comments)
+              Container(
+                margin: const EdgeInsets.only(left: 20, top: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                color: Palette.water.withValues(alpha: .12),
+                child: Text('你评论：${commentWords(c)}', style: KitText.xs.copyWith(color: Palette.bark800)),
+              ),
+            if (send != null && _writing) _CommentBox(step: widget.step, send: send, onDone: () => setState(() => _writing = false)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The round's time bar: a span per step, as long as it took (a sliver at least), coloured by what it was; a tap
+/// shows the step.
+class _TimeBar extends StatelessWidget {
+  const _TimeBar({required this.spans, required this.onPick});
+  final List<Span> spans;
+  final ValueChanged<WorkStep> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = spans.fold<double>(0, (sum, s) => sum + s.ms);
+    // The shortest span still shows: at least 1/80 of the bar.
+    final least = total <= 0 ? 1.0 : total / 80;
+    return SizedBox(
+      height: 14,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final span in spans)
+            Expanded(
+              flex: ((span.ms < least ? least : span.ms) / least * 10).round().clamp(1, 1 << 30),
+              child: Tooltip(
+                message: '${spanLabel(span.step)} · ${tookText(span.ms)}\n${span.step.text.split('\n').first}',
+                child: KitTappable(
+                  onTap: () => onPick(span.step),
+                  semanticLabel: '${spanLabel(span.step)} ${tookText(span.ms)}',
+                  builder: (context, s) => Container(margin: const EdgeInsets.only(right: 1), color: s.hovered ? Palette.bark900 : spanColor(span.step)),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What a span on the bar was, in a word.
+String spanLabel(WorkStep step) => switch (step.kind) {
+  StepKind.asked => '收到',
+  StepKind.recalled => '想起',
+  StepKind.thought => '思考',
+  StepKind.said => '说',
+  StepKind.retry => '重试',
+  StepKind.problem => '出错',
+  StepKind.tool => farmToolText(step.text) != null ? '田头' : actionMeaning[WorkerAction.fromJson((step.action ?? ToolAction.other).wire)] ?? '工具',
+};
+
+/// A span's colour: reading and searching water-blue, editing leaf, commands bark, talking and thinking light, trouble
+/// berry.
+Color spanColor(WorkStep step) => switch (step.kind) {
+  StepKind.asked => Palette.wheat,
+  StepKind.recalled => Palette.leaf300,
+  StepKind.thought => Palette.cream300,
+  StepKind.said => Palette.leaf500,
+  StepKind.retry => Palette.wheatHover,
+  StepKind.problem => Palette.berry,
+  StepKind.tool when step.ok == false => Palette.berry,
+  StepKind.tool => switch (step.action ?? ToolAction.other) {
+    ToolAction.readFile || ToolAction.search || ToolAction.web => Palette.water,
+    ToolAction.editFile => Palette.leaf700,
+    ToolAction.runCommand => Palette.bark600,
+    ToolAction.wait => Palette.cream200,
+    ToolAction.mcp || ToolAction.other => Palette.bark400,
+  },
+};
+
+/// 评论 under a step: a link that opens a line to write in; sending tells the helper, about this step.
+class _CommentBox extends StatefulWidget {
+  const _CommentBox({required this.step, required this.send, required this.onDone});
+  final int step;
+  final CommentOn send;
+
+  /// Sent, or given up: the box goes.
+  final VoidCallback onDone;
+
+  @override
+  State<_CommentBox> createState() => _CommentBoxState();
+}
+
+class _CommentBoxState extends State<_CommentBox> {
+  bool _busy = false;
+  String _text = '';
+
+  Future<void> _submit() async {
+    final text = _text.trim();
+    if (text.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    final sent = await deskRun(() async {
+      await widget.send(widget.step, text);
+      return true;
+    });
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (sent == true) widget.onDone();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, top: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: PxTextInput(
+              value: _text,
+              onChanged: (v) => setState(() => _text = v),
+              onSubmitted: (_) => _submit(),
+              autofocus: true,
+              enabled: !_busy,
+              placeholder: '哪里不对、还差什么：它会带着这一步接着做',
+              semanticLabel: '评论第 ${widget.step} 步',
+            ),
+          ),
+          const SizedBox(width: 6),
+          PxButton.text('发给它', tone: PxTone.primary, size: PxSize.sm, onPressed: _busy || _text.trim().isEmpty ? null : _submit),
+          const SizedBox(width: 6),
+          PxButton.text('算了', size: PxSize.sm, onPressed: _busy ? null : widget.onDone),
+        ],
+      ),
+    );
+  }
+}
+
+class _Step extends StatelessWidget {
+  const _Step({required this.step, required this.now, required this.job, this.asked});
+  final WorkStep step;
+  final double now;
+  final bool job;
+  final String? asked;
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = step.under != null;
+    Widget box({required Color? fill, Border? border, double opacity = 1, required String label, required Widget body}) => Opacity(
+      opacity: opacity,
+      child: Container(
+        decoration: BoxDecoration(color: fill, border: border),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _Head(label: label, at: step.at, now: now),
+            const SizedBox(height: 2),
+            body,
+          ],
+        ),
+      ),
+    );
+    switch (step.kind) {
+      case StepKind.asked:
+        return box(
+          fill: Palette.wheat.withValues(alpha: .25),
+          label: sub ? '帮手接到' : (asked ?? (job ? '工单' : '带话')),
+          body: _Folded(text: step.text, lines: 4, markdown: false),
+        );
+      case StepKind.recalled:
+        // What its agent remembered, brought into the turn with what it was asked.
+        return box(
+          fill: Palette.leaf300.withValues(alpha: .15),
+          border: Border.all(color: Palette.leaf500.withValues(alpha: .4)),
+          label: '想起了',
+          body: _Folded(text: step.text, lines: 3, markdown: false),
+        );
+      case StepKind.thought:
+        // Its reasoning, quieter than what it said and folded short.
+        return box(
+          fill: null,
+          border: Border.all(color: Palette.cream300),
+          opacity: .8,
+          label: sub ? '帮手想了想' : '想了想',
+          body: _Folded(text: step.text, lines: 2, markdown: false),
+        );
+      case StepKind.said:
+        return box(
+          fill: Palette.cream50,
+          label: sub ? '帮手说' : '它说',
+          body: _Folded(text: step.text, lines: 8, markdown: true),
+        );
+      case StepKind.tool:
+        return _ToolStep(step: step, now: now);
+      case StepKind.retry:
+        return _Line(mark: 'button-replay', text: step.text, at: step.at, now: now, fill: Palette.wheat.withValues(alpha: .15), ink: Palette.bark800);
+      case StepKind.problem:
+        return _Line(mark: 'mark-warn', text: step.text, at: step.at, now: now, fill: Palette.berry.withValues(alpha: .12), ink: Palette.berry);
+    }
+  }
+}
+
+class _Line extends StatelessWidget {
+  const _Line({required this.mark, required this.text, required this.at, required this.now, required this.fill, required this.ink});
+
+  /// The sprite before the words.
+  final String mark;
+  final String text;
+  final double at;
+  final double now;
+  final Color fill;
+  final Color ink;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    color: fill,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(padding: const EdgeInsets.only(top: 2), child: SpriteIcon(mark, size: 12)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(text, style: KitText.xs.copyWith(color: ink)),
+        ),
+        _When(at: at, now: now),
+      ],
+    ),
+  );
+}
+
+class _When extends StatelessWidget {
+  const _When({required this.at, required this.now});
+  final double at;
+  final double now;
+
+  @override
+  Widget build(BuildContext context) => Text(ago(at, now), style: KitText.xs.copyWith(color: Palette.bark400));
+}
+
+class _Head extends StatelessWidget {
+  const _Head({required this.label, required this.at, required this.now});
+  final String label;
+  final double at;
+  final double now;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Text(label, style: KitText.xs.copyWith(color: Palette.bark600)),
+      const Spacer(),
+      _When(at: at, now: now),
+    ],
+  );
+}
+
+/// Long text folded to a few lines, with a toggle.
+class _Folded extends StatefulWidget {
+  const _Folded({required this.text, required this.lines, required this.markdown});
+  final String text;
+  final int lines;
+  final bool markdown;
+
+  @override
+  State<_Folded> createState() => _FoldedState();
+}
+
+class _FoldedState extends State<_Folded> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final long = widget.text.length > widget.lines * 60 || widget.text.split('\n').length > widget.lines;
+    final clamp = !_open && long;
+    final style = KitText.sm.copyWith(height: 1.625, color: Palette.bark900);
+    Widget body = widget.markdown
+        ? PxMarkdown(widget.text, style: style)
+        : Text(widget.text, style: style, maxLines: clamp ? widget.lines : null, overflow: clamp ? TextOverflow.ellipsis : null);
+    // Markdown has no line clamp: it is cut at the lines' height instead.
+    if (widget.markdown && clamp) {
+      body = ClipRect(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: widget.lines * 12 * 1.625),
+          child: OverflowBox(alignment: Alignment.topLeft, maxHeight: double.infinity, child: body),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        body,
+        if (long)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: DeskLink(_open ? '收起' : '展开全部', onTap: () => setState(() => _open = !_open)),
+          ),
+      ],
+    );
+  }
+}
+
+/// What a helper's farm tool (the farm's MCP server, chat/farmtools.go) does, in words: null for any other tool.
+String? farmToolText(String text) => switch (RegExp(r'^farm__farm_(\w+)').firstMatch(text.trim())?.group(1)) {
+  'say' => '在田头说话',
+  'read' => '读田头的消息',
+  'inbox' => '看有没有找它的话',
+  'who' => '看田头上都有谁',
+  null => null,
+  final other => '田头：$other',
+};
+
+/// A tool's input as a person reads it: the command for a shell, else its JSON laid out.
+String readableInput(WorkStep step) {
+  final raw = step.input?.trim() ?? '';
+  if (raw.isEmpty) return '';
+  try {
+    final parsed = jsonDecode(raw);
+    if (parsed is Map) {
+      if (parsed['command'] is String) return '\$ ${parsed['command']}';
+      return const JsonEncoder.withIndent('  ').convert(parsed);
+    }
+    if (parsed is List) return const JsonEncoder.withIndent('  ').convert(parsed);
+  } on FormatException {
+    // Not JSON (or clipped): show it as it came.
+  }
+  return raw;
+}
+
+class _ToolStep extends StatefulWidget {
+  const _ToolStep({required this.step, required this.now});
+  final WorkStep step;
+  final double now;
+
+  @override
+  State<_ToolStep> createState() => _ToolStepState();
+}
+
+class _ToolStepState extends State<_ToolStep> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final step = widget.step;
+    final action = WorkerAction.fromJson((step.action ?? ToolAction.other).wire);
+    final farm = farmToolText(step.text);
+    final what = farm ?? step.text;
+    final input = readableInput(step);
+    // The pixel font has no ✓ or ✗: their sprites instead.
+    final (mark, label) = switch (step.ok) {
+      null => (Text('…', style: KitText.xs.copyWith(color: Palette.bark400)), '进行中'),
+      true => (const SpriteIcon('mark-check', size: 12), '成功'),
+      false => (const SpriteIcon('mark-cross', size: 12), '失败'),
+    };
+    return Container(
+      color: Palette.cream50.withValues(alpha: .6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          KitTappable(
+            onTap: () => setState(() => _open = !_open),
+            semanticLabel: '${farm != null ? '田头' : actionMeaning[action]} $what',
+            builder: (context, s) => Container(
+              color: s.hovered ? Palette.cream50 : null,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
+                children: [
+                  ActionGlyph(action, size: 18),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 56,
+                    child: Text(farm != null ? '田头' : actionMeaning[action] ?? '', style: KitText.sm.copyWith(color: Palette.bark800)),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Tooltip(
+                      message: step.text,
+                      child: Text(
+                        what,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: KitText.mono.copyWith(color: Palette.bark600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Tooltip(message: label, child: mark),
+                  const SizedBox(width: 8),
+                  _When(at: step.at, now: widget.now),
+                ],
+              ),
+            ),
+          ),
+          if (_open)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (step.tool != null) Text('工具 ${step.tool}', style: KitText.xs.copyWith(color: Palette.bark400)),
+                  if (input.isNotEmpty) ...[const SizedBox(height: 6), _Pre(input, fill: Palette.bark900, ink: Palette.cream100, maxHeight: 160)],
+                  const SizedBox(height: 6),
+                  if (step.output case final out? when out.isNotEmpty)
+                    _Pre(out, fill: Palette.cream200, ink: Palette.bark900, maxHeight: 224)
+                  else
+                    Text(step.ok == null ? '还没返回' : '没有输出', style: KitText.xs.copyWith(color: Palette.bark400)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Pre extends StatelessWidget {
+  const _Pre(this.text, {required this.fill, required this.ink, required this.maxHeight});
+  final String text;
+  final Color fill;
+  final Color ink;
+  final double maxHeight;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: BoxConstraints(maxHeight: maxHeight),
+    color: fill,
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    child: SingleChildScrollView(
+      child: SelectableText(text, style: KitText.mono.copyWith(color: ink, height: 1.625)),
+    ),
+  );
+}
+
+// ── Trajectories ─────────────────────────────────────────────────────────────
+
+/// One trajectory: its steps, loaded, then kept up as they come.
+class TrajectoryLog extends ConsumerStatefulWidget {
+  const TrajectoryLog({super.key, required this.id, this.asked, this.empty = '还没有动静。'});
+  final String id;
+  final String? asked;
+  final String empty;
+
+  @override
+  ConsumerState<TrajectoryLog> createState() => _TrajectoryLogState();
+}
+
+class _TrajectoryLogState extends ConsumerState<TrajectoryLog> {
+  bool? _found;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(TrajectoryLog old) {
+    super.didUpdateWidget(old);
+    if (old.id != widget.id) _load();
+  }
+
+  Future<void> _load() async {
+    final head = await deskRun(() => ref.read(workStepsProvider.notifier).load(widget.id));
+    if (mounted) setState(() => _found = head != null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = ref.watch(workStepsProvider.select((all) => all[widget.id]));
+    if (_found == null && steps == null) return const DeskEmpty('在读……');
+    if (steps == null || steps.isEmpty) {
+      return DeskEmpty(_found == false && steps == null ? '没有轨迹：它可能早就过了保留的日子。' : widget.empty);
+    }
+    return WorkLog(steps: steps, now: _now(), asked: widget.asked, tall: true);
+  }
+}
+
+/// The helpers an agent has sent, newest first, each opening to its trajectory.
+class TrajectoryList extends ConsumerStatefulWidget {
+  const TrajectoryList({super.key, required this.agent});
+  final String agent;
+
+  @override
+  ConsumerState<TrajectoryList> createState() => _TrajectoryListState();
+}
+
+class _TrajectoryListState extends ConsumerState<TrajectoryList> {
+  List<TrajectoryHead>? _heads;
+  String? _open;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final heads = await deskRun(() => ref.read(deskApiProvider).farm.trajectories(agent: widget.agent));
+    if (mounted) setState(() => _heads = heads ?? const []);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = _now();
+    final heads = _heads;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('它派出去的每个帮工，从接活起的每一步：收到的话、用的每个工具（点开看输入和输出）、说的话。收工以后步骤留 30 天，帮工本身一直列着。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark600)),
+        const SizedBox(height: 16),
+        if (heads == null)
+          const DeskEmpty('在读……')
+        else if (heads.isEmpty)
+          const DeskEmpty('还没派出去过。')
+        else
+          for (final h in heads)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Container(
+                color: Palette.cream100,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    KitTappable(
+                      onTap: () => setState(() => _open = _open == h.id ? null : h.id),
+                      selected: _open == h.id,
+                      semanticLabel: h.name,
+                      builder: (context, s) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(h.name, style: KitText.xs.copyWith(color: Palette.bark800)),
+                                if (h.project != null) Text(h.project!, style: KitText.xs.copyWith(color: Palette.bark500)),
+                                Text('${ago(h.startedAt, now)}接活', style: KitText.xs.copyWith(color: Palette.bark500)),
+                                if (h.endedAt == null)
+                                  const DeskBadge('在场', hat: true)
+                                else
+                                  Text('${ago(h.endedAt!, now)}走的', style: KitText.xs.copyWith(color: Palette.bark500)),
+                              ],
+                            ),
+                            if (h.job != null && h.job!.isNotEmpty)
+                              Text(
+                                h.job!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: KitText.sm.copyWith(color: Palette.bark900),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_open == h.id)
+                      Container(
+                        decoration: const BoxDecoration(
+                          border: Border(top: BorderSide(color: Palette.cream300)),
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: TrajectoryLog(id: h.id),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+}

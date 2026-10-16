@@ -1,0 +1,201 @@
+// The desk (web/src/desk/Desk.tsx): where the work is done and set up, beside the farm where it is watched. A wooden
+// rail down the left with the desk's places and the way back to the farm; the place itself fills the rest. The chat
+// lays out its own sidebar; the config pages sit under a header with the farm's state (ConfigDesk).
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../data/providers.dart';
+import '../desk/shared/faces.dart';
+import '../gen/vibevalley.dart';
+import '../rules/looks.dart';
+import '../shell/title/title_state.dart';
+import '../sprites/atlas.dart';
+import '../ui/kit/kit.dart';
+import 'router.dart';
+
+/// As tall as the headers beside the rail (--spacing-desk-head).
+const deskHead = 66.0;
+
+/// One of the farm's pictures as an icon (Pix).
+class _Pix extends ConsumerWidget {
+  const _Pix(this.name);
+  final String name;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final atlas = ref.watch(atlasProvider).value;
+    if (atlas == null || !atlas.has(name)) return const SizedBox.square(dimension: 26);
+    return SizedBox.square(dimension: 26, child: FittedBox(child: PixelSprite(atlas[name], scale: 1)));
+  }
+}
+
+/// A place's icon: a picture, or for the helpers an animal's face.
+Widget placeIcon(Place p) => p == Place.agents ? CastFace(cast: castOf(null, 'backend'), size: 26) : _Pix(p.icon);
+
+/// The rail beside a place: the desk's frame for every page there.
+class Desk extends StatelessWidget {
+  const Desk({super.key, required this.place, required this.child});
+  final Place? place;
+  final Widget child;
+
+  // A Material under the pages: text fields and ink need one, and it gives the page's text its style.
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Palette.cream50,
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Rail(here: place),
+        Expanded(
+          child: place == Place.chat ? child : _ConfigDesk(place: place, child: child),
+        ),
+      ],
+    ),
+  );
+}
+
+class _Rail extends ConsumerWidget {
+  const _Rail({required this.here});
+  final Place? here;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Container(
+    width: 64,
+    decoration: const BoxDecoration(
+      color: Palette.bark600,
+      border: Border(right: BorderSide(color: Palette.bark900, width: 2)),
+    ),
+    child: LayoutBuilder(
+      builder: (context, box) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: box.maxHeight),
+          child: IntrinsicHeight(
+            child: Column(
+              children: [
+                // As tall as the headers beside it, with the manager in its middle.
+                SizedBox(
+                  height: deskHead,
+                  child: Center(
+                    child: _Slot(
+                      label: '回农场',
+                      framed: true,
+                      fill: Palette.wheat,
+                      onTap: () => context.go('/'),
+                      child: const ClipRect(child: DeskManagerFace(size: 38)),
+                    ),
+                  ),
+                ),
+                for (final p in Place.values) ...[
+                  _Slot(label: '${p.label} · ${p.hint}', framed: p == here, fill: Palette.cream50, onTap: () => context.go(p.path), child: placeIcon(p)),
+                  const SizedBox(height: 8),
+                ],
+                const Spacer(),
+                _Slot(label: '回农场', onTap: () => context.go('/'), child: const _Pix('icon-seeds')),
+                const SizedBox(height: 8),
+                _Slot(
+                  label: '设置（钥匙）',
+                  onTap: () {
+                    context.go('/');
+                    ref.read(titleOpenProvider.notifier).show();
+                  },
+                  child: const _Pix('icon-wrench'),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// A 44 px square on the rail: framed and raised for the place you are at, darker under the pointer otherwise.
+class _Slot extends StatelessWidget {
+  const _Slot({required this.label, required this.onTap, required this.child, this.framed = false, this.fill});
+  final String label;
+  final VoidCallback onTap;
+  final Widget child;
+  final bool framed;
+  final Color? fill;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: label,
+    waitDuration: const Duration(milliseconds: 400),
+    child: KitTappable(
+      onTap: onTap,
+      semanticLabel: label,
+      builder: (context, s) => Container(
+        width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: framed
+            ? BoxDecoration(
+                color: fill,
+                border: Border.all(color: Palette.bark900, width: 2),
+                boxShadow: kitDrop,
+              )
+            : BoxDecoration(color: s.hovered ? Palette.bark800 : null),
+        child: child,
+      ),
+    ),
+  );
+}
+
+/// A config page at the desk: its place's name and the farm's state above it, the page below.
+class _ConfigDesk extends ConsumerWidget {
+  const _ConfigDesk({required this.place, required this.child});
+  final Place? place;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final farm = ref.watch(farmProvider);
+    final live = farm?.call == CallState.live;
+    final working = farm?.helpers.where((h) => h.phase is PhaseWorking).length ?? 0;
+    final p = place;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          height: deskHead,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Palette.bark900, width: 2)),
+          ),
+          child: Row(
+            children: [
+              if (p != null) ...[
+                placeIcon(p),
+                const SizedBox(width: 12),
+                Text(p.label, style: KitText.lg),
+                const SizedBox(width: 12),
+                Text(p.hint, style: KitText.xs.copyWith(color: Palette.bark500)),
+              ],
+              const Spacer(),
+              PxButton(
+                size: PxSize.custom,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                onPressed: () => context.go('/'),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(width: 8, height: 8, color: live ? Palette.leaf500 : Palette.cream300),
+                    const SizedBox(width: 6),
+                    Text(live ? '开工中 · $working 个在干活' : '没开工', style: KitText.xs),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Padding(padding: const EdgeInsets.only(top: 12), child: child),
+        ),
+      ],
+    );
+  }
+}

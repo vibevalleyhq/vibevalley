@@ -1,0 +1,21 @@
+system init                  │ event → model
+user text                    │ event
+assistant tool_use           │ event → tool_call_started Bash
+system background_tasks_changed │ event
+system task_started          │ event → task_started
+user tool_result             │ event → tool_call_ended
+assistant tool_use           │ event → tool_call_started Agent
+system background_tasks_changed │ event
+system task_started          │ event → task_started
+user tool_result             │ event → tool_call_ended
+assistant text               │ event @toolu_017rmJ9ug4RCsCDqB31JdQVA → text_delta
+system background_tasks_changed │ event
+system task_updated          │ event → task_updated
+system task_notification     │ event → task_ended
+assistant thinking           │ event → reasoning empty
+assistant text               │ event → text_delta
+result success               │ event → turn_ended completed, usage in=39009 out=359 cacheRead=29198 cacheWrite=9807
+system task_notification     │ event → task_ended
+system background_tasks_changed │ event
+system task_updated          │ event → task_updated
+system init                  │ event → turn_active, model

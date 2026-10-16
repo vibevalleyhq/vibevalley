@@ -1,0 +1,67 @@
+# app：VibeValley 的 Flutter 客户端
+
+VibeValley 唯一的客户端：农场画面、像素村、手机和小游戏、田头和频道、配置页、标题画面、音效、调试台，外加 macOS 桌面版的壳（菜单栏、通知、语音快捷键）。决策见 [Flutter 客户端](../.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)、[网页退役](../.agents/notes/implemented/simplification/2026-10-14-retire-the-web-page.md)。
+
+## 和服务端
+
+它连 VibeValley 的服务端（[server](../server/README.md)）。
+
+- **状态**：`GET /api/site/state`，每一帧是 `SiteFrame`：服务端折好的 `FarmState`、由它推出来的 `view`（地块、来电、等级）、事实带来的效果。客户端不折事实。
+- **状态以外的事**：`GET /api/site/events` 去掉事实：帮工的步骤、通知、农具的变化（`sideEvents`）。
+- **命令**：`VibeValleyApi` 的 HTTP 接口，`lib/gen/vibevalley.dart` 里生成的客户端。
+- **规则**：从核心状态推出来、但帧里没有的东西（阶段的说法、计划、成就、未读……）在 `lib/rules/`，从当年网页用的 TypeScript 规则移植，每个文件开头写它对应的出处；客户端自己的游戏状态（工具、手机、小游戏、偏好）在各自的目录。
+
+用别的电脑上的农场：在「院门」页扫码（手机）或粘贴配对链接（Mac），那边点头以后，请求都带上这台设备的钥匙；用哪个农场存在偏好里（`lib/data/farm_choice.dart`），换农场时整个应用在新农场上重新开始（[server.md](../docs/server.md#院门)）。
+
+手机上（`lib/mobile/notices.dart`）：App 不在屏幕前时，按桌面版的通知规则（`lib/desktop/notify.dart`）弹系统通知，点了打开那件事；安卓进后台时开一个前台服务，让状态流一直连着（[Note](../.agents/notes/implemented/feature/2026-10-14-phone-notifications.md)）。
+
+macOS 桌面版把 Go 服务端打进应用（`Contents/MacOS/vibevalley-server`），开机在一个空闲的回环端口拉起，退出时停掉；家目录 `~/Library/Application Support/vibevalley`，日志 `~/Library/Logs/vibevalley/server.log`（Alpha、Beta 用各自的名字，[desktop.md](../docs/desktop.md)）。调试时 `--dart-define=VIBEVALLEY_SERVER=…` 连别的服务端。
+
+## 目录
+
+| 目录 | 管什么 |
+|---|---|
+| `lib/app/` | 路由、主题、工作台的外框 |
+| `lib/data/` | 服务端、Riverpod 的 provider |
+| `lib/gen/` | 生成的形状和接口客户端，不手改 |
+| `lib/rules/` | 移植的 protocol 规则 |
+| `lib/ui/kit/` | 像素控件：按钮、输入、选择、对话框、提示、Markdown……（[README](lib/ui/kit/README.md)） |
+| `lib/pages/farm_page.dart`、`lib/farm/`、`lib/game/` | 农场画面、面板、计划、收获、成就；工具和点地的规则 |
+| `lib/village/` | 像素村（Flame）：地图、寻路、帮工和狗、光照、粒子、动静；`hud.dart` 是画在上面的 HUD |
+| `lib/phone/` | 手机、来电、三个小游戏 |
+| `lib/desk/<地方>/` | 配置页：聊天、工单、地图、帮工和档案、管家、农具、技能书、连接器、项目、声音、院门、图鉴；`shared/` 是几页共用的 |
+| `lib/shell/` | 外框：标题画面、启动、服务端不在、桌面标题栏、特效层、音效合成、调试台、偏好 |
+| `lib/desktop/` | macOS 桌面：拉起服务端、菜单栏、通知、快捷键、渠道 |
+| `lib/mobile/` | 手机：系统通知，安卓的前台服务 |
+| `lib/voice/` | 语音：Agora 的 Flutter SDK，字幕走 RTC 的 data stream |
+
+## 跑和打包
+
+```bash
+flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787   # 连一个开着的服务端
+./tool/build-macos.sh                     # build/vibevalley.app（带 Go 服务端）和 build/vibevalley-arm64.dmg
+./tool/build-macos.sh --channel alpha     # Alpha 渠道：自己的 bundle id 和家目录
+```
+
+需要 Flutter 3.47 和 Xcode。第一次（和升级 `agora_rtc_engine` 以后）先跑 `./tool/agora-voice-only.sh`：macOS 和 iOS 只留语音要的 Agora 组件（核心、AI 降噪、AI 回声消除；插件复制到 `third_party/`，不进仓库）。Android 用插件的完整 SDK；app 的 manifest 去掉了插件带来的 `READ_PHONE_STATE`。
+
+## 形状从哪来
+
+`lib/gen/vibevalley.dart` 是生成的：形状在服务端的 `server/internal/protocol/shapes.go` 和 `api.go`，改了以后在 `server/` 跑 `go run ./tool/shapegen`，它同时写 Go 的 `internal/protocol/gen.go` 和这个文件（[server](../server/README.md#形状和规则从哪来)）。联合生成 sealed class，`switch` 能穷尽；既是事实又是工地事件的成员同时实现两个。数字都是 `double`。
+
+## 测试和对照
+
+```bash
+flutter analyze && flutter test           # 不连网：服务端用 MockClient 假的
+VIBEVALLEY_SERVER=http://127.0.0.1:8899 flutter test tool/screens/live_screens_test.dart   # 每一页对着真服务端画成 build/live-*.png
+```
+
+音效合成的对照 `test/fixtures/sfx.json` 是当年网页的合成器算出来的，冻结不再生成；`lib/shell/synth.dart` 有意改了声音时，同一个改动里手改它。
+
+## 取舍
+
+- 没有模拟服务器：调试台的命令都对着真服务端。
+- Flutter 没有图片鼠标指针：农场里的工具指针画在画面上，图鉴的「指针」只展示图。
+- 每天的时间和定时的下次运行按这台机器的时区算。
+- 启动时服务端没答应，不等满 20 秒：别的几步好了就进去，顶上的横幅说连不上，带着去「院门」的入口。
+- 首页只在这台设备第一次打开时出来：进过一次农场以后，再打开直接进农场（`vibevalley.title.seen`）；游戏菜单的「回到首页」照旧能回去。

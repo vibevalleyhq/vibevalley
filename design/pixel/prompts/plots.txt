@@ -1,0 +1,4 @@
+Create ONE sprite sheet, size 1536x1024: 12 small farm plots in a grid of 4 columns x 3 rows, one per cell. Every plot is exactly the same size and shape: a small square bed of soil framed by low wooden planks, seen from the three-quarter top-down camera (the top face and a thin strip of the front planks are visible), about 260 image pixels wide.
+Row 1: (1) freshly tilled empty soil with furrows; (2) just seeded: tilled soil with a few tiny seeds and little holes; (3) tiny green sprouts in rows; (4) leafy young green plants.
+Row 2: (5) bushy plants with small white and yellow flowers; (6) ripe golden wheat, tall and full; (7) withered brown drooping plants with a few small bugs on them; (8) overgrown with wild weeds.
+Row 3: (9) dry cracked soil, nothing growing; (10) a plot not yet cleared: covered with rocks, roots and a tangle of brambles, planks half rotten; (11) harvested: short cut stubble; (12) ripe carrots: leafy green tops and orange carrot tops showing.

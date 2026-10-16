@@ -1,0 +1,1 @@
+run_terminal_command │ Running command: <command>

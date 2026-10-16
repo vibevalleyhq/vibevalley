@@ -1,0 +1,2 @@
+Create ONE image, size 1536x1024: a sprite sheet of SIX separate pixel-art clouds for a game's title screen, laid out in a grid of 3 columns and 2 rows, one cloud per cell, each cloud centred in its cell.
+Clouds in the same pixel-art style as the sky of Image 1: soft fluffy cumulus shapes, plain white and pale cream with light grey-violet shading underneath, flat bottoms. Sizes vary: two large wide clouds, two medium, two small wisps.

@@ -1,0 +1,5 @@
+Create ONE square app icon artwork, size 1024x1024, for the macOS desktop app of "VibeValley 农场".
+Draw it as pixel art, full bleed, edge to edge: no rounded corners, no border, no frame, no drop shadow, no text, no letters. The app cuts the rounded square out of it itself.
+The young farmer manager as drawn in Image 1 (straw hat with a brown band, short dark hair, blue overalls, cheerful closed-eye smile), seen from the chest up, centered, holding up a small green two-leaf sprout in his hands at chest height.
+Behind him, simple and calm: a warm cream sky over the upper two thirds and a band of tilled green field rows across the bottom third.
+Big, simple shapes that still read at 32x32 pixels: his hat and face fill about 60 percent of the width. Keep about 10 percent of quiet margin on every side so nothing important touches an edge.

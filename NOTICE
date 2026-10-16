@@ -1,0 +1,83 @@
+VibeValley
+Copyright 2026 twocucao
+
+Licensed under the Apache License, Version 2.0 (LICENSE).
+
+This product includes software from other projects:
+
+- oar (https://github.com/botiverse/oar), Apache License 2.0.
+  server/pkg/smith is a Go port of oar, modified for vibevalley; oar's license is in
+  server/pkg/smith/LICENSE.
+
+- agent-quickstart-nextjs
+  (https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs),
+  MIT License. server/pkg/agora and server/internal/channels/voice_agora.go adapt its
+  token, invite and stop routes. Its notice:
+
+    MIT License
+
+    Copyright (c) 2025 Agora Community
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+- Fusion Pixel Font (https://github.com/TakWolf/fusion-pixel-font),
+  SIL Open Font License 1.1; app/assets/fonts/fusion-pixel-OFL.txt.
+
+- openclaw-weixin (@tencent-weixin/openclaw-weixin 2.4.10), MIT License.
+  server/pkg/weixin is written from it (iLink bot login, getupdates, sendmessage).
+  Copyright (C) 2026 Tencent. All rights reserved.
+
+- botpy (https://github.com/tencent-connect/botpy), MIT License.
+  server/pkg/qq is written from it (the QQ bot's token, gateway and C2C replies).
+  Copyright (c) 2021 Tencent
+
+- Hugeicons (https://hugeicons.com, @hugeicons/core-free-icons 4.3.5), MIT License.
+  design/pixel/icons holds its SVGs; the pixel button glyphs in app/assets/pixel are
+  redrawn from their shapes.
+  Copyright (c) 2025 Hugeicons
+
+- LobeHub Icons (https://github.com/lobehub/lobe-icons), MIT License.
+  design/pixel/logos holds its PNGs of the coding agents' logos; the runtimes' pixel
+  logos in app/assets/pixel are redrawn from them.
+  Copyright (c) 2023 LobeHub
+
+The four above are under the MIT License, whose terms are:
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+Trademarks: the names and logos of Claude, Claude Code, Codex, Cursor, Grok, Kimi,
+opencode, pi, Antigravity, DeepSeek, Agora, WeChat, Feishu, QQ and the other products
+VibeValley works with belong to their owners. VibeValley shows them only to say which
+product is which; it is not affiliated with or endorsed by them.

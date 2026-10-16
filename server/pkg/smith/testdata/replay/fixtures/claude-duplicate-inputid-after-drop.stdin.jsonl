@@ -1,0 +1,4 @@
+{"type":"user","uuid":"6f1c2d3e-0001-4a5b-8c7d-000000000001","message":{"role":"user","content":[{"type":"text","text":"RUN-WORKFLOW-FIXTURE: run the two-phase workflow."}]}}
+{"type":"user","uuid":"6f1c2d3e-00c0-4a5b-8c7d-0000000000c0","message":{"role":"user","content":[{"type":"text","text":"HOST-PROMPT: say host-answer"}]}}
+{"type":"control_request","request_id":"interrupt-1","request":{"subtype":"interrupt","cancel_queued":true}}
+{"type":"user","uuid":"6f1c2d3e-00c0-4a5b-8c7d-0000000000c0","message":{"role":"user","content":[{"type":"text","text":"HOST-PROMPT: say host-answer"}]}}

@@ -1,0 +1,11 @@
+{"type":"command_lifecycle"}
+{"type":"command_lifecycle"}
+{"type":"system","subtype":"init"}
+{"type":"user","message":{"content":[]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"call_stdio-call","name":"mcp__echo__echo","input":{"text":"stdio-call"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"call_stdio-call","content":[{"type":"text","text":"echo:stdio-call via=stdio token=bc87a593e698"}]}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"call_http-call","name":"mcp__remote__echo","input":{"text":"http-call"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"call_http-call","content":[{"type":"text","text":"echo:http-call via=http token=44dd13e52efb"}]}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"echoed"}]}}
+{"type":"result","subtype":"success","is_error":false,"usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}
+{"type":"command_lifecycle"}

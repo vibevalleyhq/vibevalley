@@ -1,0 +1,26 @@
+.opencode/references/
+node_modules/
+.DS_Store
+__pycache__/
+
+# Image pipeline scratch: keyed and cut intermediates, codex run logs, rejected drafts
+design/assets/logs/
+design/pixel/logs/
+design/assets/rejected/
+design/mockups/*/logs/
+design/mockups/v2/rejected/
+
+# Secrets: Agora credentials and keys for the server ($VIBEVALLEY_HOME/.env, or a file passed with --env-file), and the
+# Agora CLI's project binding for this machine.
+.agora/
+.env
+.env.*
+!.env.example
+design/sounds/*.wav
+
+# The source images live in their own repository (vibevalley-art); design/art.sh links them here.
+design/pixel/raw
+design/assets/raw
+design/mockups/v1
+design/mockups/v2
+

@@ -1,0 +1,45 @@
+---
+// The page for an address the site does not have (the host serves it with a 404): a dry plot and a puzzled dog, in
+// both languages, since there is no telling which one the visitor came from. Not indexed, no address of its own.
+import '../styles/global.css'
+import { PixelLink } from '../components/ui'
+import { en } from '../i18n/en'
+import { zh } from '../i18n/zh'
+import { pixelArt } from '../lib/assets'
+---
+
+<!doctype html>
+<html lang={zh.lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>404 · {zh.title}</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#2f1f13" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/gen/icon-32.png" />
+    <link rel="apple-touch-icon" href="/gen/icon-256.png" />
+    <link rel="preload" href="/gen/pixel.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+  <body class="grid min-h-svh place-items-center bg-cream-100! px-4 py-8">
+    <main class="w-[min(560px,100%)] panel px-[clamp(20px,6vw,48px)] pt-9 pb-10 text-center">
+      <div aria-hidden="true" class="mb-6 flex items-end justify-center gap-1.5">
+        <img class="w-[204px] pixelated" src={pixelArt('plot-dry')} alt="" />
+        <img class="w-[102px] animate-scratch pixelated" src={pixelArt('dog-scratch')} alt="" />
+      </div>
+      {
+        [zh, en].map((c, i) => {
+          const Heading = i === 0 ? 'h1' : 'h2'
+          return (
+            <section lang={c.lang} class:list={[i > 0 && 'mt-7 border-t-2 border-dashed border-cream-300 pt-6']}>
+              <Heading class="text-[32px]">{c.lost.title}</Heading>
+              <p class="mt-2.5 mb-5 text-pretty text-bark-800">{c.lost.text}</p>
+              <PixelLink primary href={c.home} hrefLang={c.lang}>
+                {c.lost.home}
+              </PixelLink>
+            </section>
+          )
+        })
+      }
+    </main>
+  </body>
+</html>

@@ -1,0 +1,103 @@
+// What the debug console's 事件 tab lists (the web page's core eventLog): every state frame the server sends, and
+// what comes beside it (a helper's steps, notices, runtimes' changes). The web page logs the facts themselves; this
+// client never sees facts, only the folded frames, so a frame stands where the facts were.
+
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/providers.dart';
+import '../../gen/vibevalley.dart';
+import '../../ui/kit/kit.dart';
+
+/// One line of the log: a frame, or a side event.
+class LogEntry {
+  LogEntry(this.seq, this.type, this.at, this.summary, this._json);
+  final int seq;
+
+  /// 'frame', or the side event's type (step, notice, runtime).
+  final String type;
+  final DateTime at;
+  final String summary;
+  final Map<String, dynamic> Function() _json;
+
+  /// The whole event, as the server sent it.
+  Map<String, dynamic> json() => _json();
+}
+
+class DebugLog {
+  const DebugLog(this.entries, {this.paused = false});
+  final List<LogEntry> entries;
+  final bool paused;
+}
+
+/// How many entries are kept.
+const _keep = 2000;
+
+final debugLogProvider = NotifierProvider<DebugLogNotifier, DebugLog>(DebugLogNotifier.new);
+
+class DebugLogNotifier extends Notifier<DebugLog> {
+  var _seq = 0;
+
+  @override
+  DebugLog build() {
+    final server = ref.watch(serverProvider);
+    final subs = [
+      server.frames.listen((f) => _add('frame', frameSummary(f.frame), f.frame.toJson)),
+      server.sideEvents.listen((e) => _add(sideType(e), sideSummary(e), e.toJson)),
+    ];
+    ref.onDispose(() {
+      for (final s in subs) {
+        unawaited(s.cancel());
+      }
+    });
+    return const DebugLog([]);
+  }
+
+  void _add(String type, String summary, Map<String, dynamic> Function() json) {
+    if (state.paused) return;
+    final next = [...state.entries, LogEntry(++_seq, type, DateTime.now(), summary, json)];
+    state = DebugLog(next.length > _keep ? next.sublist(next.length - _keep) : next, paused: state.paused);
+  }
+
+  void pause(bool paused) => state = DebugLog(state.entries, paused: paused);
+  void clear() => state = DebugLog(const [], paused: state.paused);
+
+  /// The log as JSON lines, one event per line.
+  String export() => state.entries.map((e) => jsonEncode(e.json())).join('\n');
+}
+
+String sideType(SiteEvent e) => switch (e) {
+  SiteEventStep() => 'step',
+  SiteEventNotice() => 'notice',
+  SiteEventRuntime() => 'runtime',
+  SiteEventSnapshot() => 'snapshot',
+  Fact() => 'fact',
+};
+
+String _cut(String s, int n) => s.length > n ? s.substring(0, n) : s;
+
+/// A frame in a line, as the web page's console sums up a snapshot, with its effects.
+String frameSummary(SiteFrame f) {
+  final s = f.state;
+  final helpers = s.helpers.map((h) => '${h.id}:${_phaseTag(h.phase)}').join(' ');
+  final effects = f.effects.isEmpty ? '' : ' · ${f.effects.map((e) => e.toJson()['kind']).join(' ')}';
+  return 'call=${s.call.wire} foreman=${s.foreman.wire} helpers=${helpers.isEmpty ? '0' : helpers}$effects';
+}
+
+String _phaseTag(Phase p) => switch (p) {
+  PhaseArriving() => 'arriving',
+  PhaseWorking() => 'working',
+  PhaseRipe() => 'ripe',
+  PhaseFailed() => 'failed',
+  PhaseResting() => 'resting',
+};
+
+String sideSummary(SiteEvent e) => switch (e) {
+  SiteEventStep(:final id, :final step) => '$id #${step.n.round()} ${step.kind.wire}: ${_cut(step.text, 80)}',
+  SiteEventNotice(:final level, :final text) => '${level.wire}: $text',
+  SiteEventRuntime(:final info) => '${info.id}: ${quotaText(info.usage)}',
+  SiteEventSnapshot() => 'snapshot',
+  Fact() => e.toJson()['type'].toString(),
+};

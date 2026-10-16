@@ -1,0 +1,15 @@
+{"type":"system","subtype":"init"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"rate_limit_event"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"The user is asking me to run a bash command `echo oar-replay-marker` and then tell them I did it. This is straightforward - I should use the Bash tool to run this command."}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_01DXx134zr68zT8tCZpRDiTG","name":"Bash","input":{"command":"echo oar-replay-marker","description":"Echo the marker string"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_01DXx134zr68zT8tCZpRDiTG","content":"oar-replay-marker"}]}}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"The command ran successfully and output \"oar-replay-marker\". The user asked me to tell them I did it, so I should confirm that I ran the command."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Done. I ran `echo oar-replay-marker` and it output the marker string."}]}}
+{"type":"result","subtype":"success","is_error":false}

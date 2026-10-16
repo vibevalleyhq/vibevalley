@@ -1,0 +1,6169 @@
+{
+ "act-edit_file": {
+  "ax": 17,
+  "ay": 36,
+  "h": 37,
+  "sheet": "design/pixel/raw/ui-actions.png",
+  "w": 34
+ },
+ "act-mcp": {
+  "ax": 17,
+  "ay": 37,
+  "h": 38,
+  "sheet": "design/pixel/raw/ui-actions.png",
+  "w": 35
+ },
+ "act-other": {
+  "ax": 10,
+  "ay": 20,
+  "h": 21,
+  "sheet": "design/pixel/raw/ui-actions.png",
+  "w": 20
+ },
+ "act-read_file": {
+  "ax": 20,
+  "ay": 30,
+  "h": 31,
+  "sheet": "design/pixel/raw/ui-actions.png",
+  "w": 41
+ },
+ "act-run_command": {
+  "ax": 18,
+  "ay": 34,
+  "h": 35,
+  "sheet": "design/pixel/raw/ui-actions.png",
+  "w": 36
+ },
+ "act-search": {
+  "ax": 15,
+  "ay": 36,
+  "h": 37,
+  "sheet": "design/pixel/raw/ui-actions.png",
+  "w": 30
+ },
+ "act-speaking_text": {
+  "ax": 17,
+  "ay": 30,
+  "h": 31,
+  "sheet": "design/pixel/raw/ui-actions.png",
+  "w": 35
+ },
+ "act-thinking": {
+  "ax": 16,
+  "ay": 31,
+  "h": 32,
+  "sheet": "design/pixel/raw/ui-actions.png",
+  "w": 33
+ },
+ "act-wait": {
+  "ax": 12,
+  "ay": 40,
+  "h": 41,
+  "sheet": "design/pixel/raw/ui-actions.png",
+  "w": 25
+ },
+ "act-web": {
+  "ax": 16,
+  "ay": 40,
+  "h": 41,
+  "sheet": "design/pixel/raw/ui-actions.png",
+  "w": 33
+ },
+ "app-sprout": {
+  "ax": 19,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-icons-extra.png",
+  "w": 38
+ },
+ "banner-title": {
+  "ax": 38,
+  "ay": 33,
+  "h": 34,
+  "sheet": "design/pixel/raw/ui-medals.png",
+  "w": 76
+ },
+ "bear-farmer-cheer": {
+  "w": 49,
+  "h": 53,
+  "ax": 24,
+  "ay": 52,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 24.5,
+  "hy": 15.9
+ },
+ "bear-farmer-down": {
+  "w": 36,
+  "h": 56,
+  "ax": 18,
+  "ay": 55,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 18.0,
+  "hy": 16.8
+ },
+ "bear-farmer-down-1": {
+  "w": 36,
+  "h": 57,
+  "ax": 18,
+  "ay": 56,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 18.0,
+  "hy": 17.1
+ },
+ "bear-farmer-down-2": {
+  "w": 36,
+  "h": 56,
+  "ax": 18,
+  "ay": 55,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 18.0,
+  "hy": 16.8
+ },
+ "bear-farmer-hammer-1": {
+  "ax": 24,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-bear.png",
+  "w": 39
+ },
+ "bear-farmer-hammer-2": {
+  "ax": 14,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-bear.png",
+  "w": 43
+ },
+ "bear-farmer-read": {
+  "ax": 16,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-bear.png",
+  "w": 34
+ },
+ "bear-farmer-side": {
+  "w": 32,
+  "h": 56,
+  "ax": 16,
+  "ay": 55,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 16.0,
+  "hy": 16.8
+ },
+ "bear-farmer-side-1": {
+  "w": 32,
+  "h": 56,
+  "ax": 16,
+  "ay": 55,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 16.0,
+  "hy": 16.8
+ },
+ "bear-farmer-side-2": {
+  "w": 33,
+  "h": 57,
+  "ax": 16,
+  "ay": 56,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 16.5,
+  "hy": 17.1
+ },
+ "bear-farmer-sit": {
+  "ax": 17,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/pose-bear.png",
+  "w": 34
+ },
+ "bear-farmer-tinker-1": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear.png",
+  "w": 34
+ },
+ "bear-farmer-tinker-2": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear.png",
+  "w": 34
+ },
+ "bear-farmer-up": {
+  "w": 36,
+  "h": 56,
+  "ax": 18,
+  "ay": 55,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 18.0,
+  "hy": 16.8
+ },
+ "bear-farmer-up-1": {
+  "w": 36,
+  "h": 57,
+  "ax": 18,
+  "ay": 56,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 18.0,
+  "hy": 17.1
+ },
+ "bear-farmer-up-2": {
+  "w": 35,
+  "h": 56,
+  "ax": 17,
+  "ay": 55,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 17.5,
+  "hy": 16.8
+ },
+ "bear-farmer-work": {
+  "w": 34,
+  "h": 60,
+  "ax": 17,
+  "ay": 58,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 17.0,
+  "hy": 18.0
+ },
+ "bear-farmer-worry": {
+  "w": 36,
+  "h": 56,
+  "ax": 18,
+  "ay": 55,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "hx": 18.0,
+  "hy": 16.8
+ },
+ "bear-gardener-cheer": {
+  "ax": 25,
+  "ay": 53,
+  "h": 54,
+  "hx": 25.5,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 51
+ },
+ "bear-gardener-down": {
+  "ax": 18,
+  "ay": 54,
+  "h": 55,
+  "hx": 18.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 37
+ },
+ "bear-gardener-down-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 37
+ },
+ "bear-gardener-down-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 37
+ },
+ "bear-gardener-hammer-1": {
+  "ax": 16,
+  "ay": 60,
+  "h": 61,
+  "sheet": "design/pixel/raw/pose-bear-gardener.png",
+  "w": 37
+ },
+ "bear-gardener-hammer-2": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear-gardener.png",
+  "w": 46
+ },
+ "bear-gardener-read": {
+  "ax": 16,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/pose-bear-gardener.png",
+  "w": 33
+ },
+ "bear-gardener-side": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "hx": 16.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 32
+ },
+ "bear-gardener-side-1": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 33
+ },
+ "bear-gardener-side-2": {
+  "ax": 17,
+  "ay": 56,
+  "h": 57,
+  "hx": 17.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 34
+ },
+ "bear-gardener-sit": {
+  "ax": 16,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/pose-bear-gardener.png",
+  "w": 33
+ },
+ "bear-gardener-tinker-1": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear-gardener.png",
+  "w": 34
+ },
+ "bear-gardener-tinker-2": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear-gardener.png",
+  "w": 34
+ },
+ "bear-gardener-up": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 37
+ },
+ "bear-gardener-up-1": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 36
+ },
+ "bear-gardener-up-2": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 36
+ },
+ "bear-gardener-work": {
+  "ax": 17,
+  "ay": 58,
+  "h": 60,
+  "hx": 17.5,
+  "hy": 18.0,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 35
+ },
+ "bear-gardener-worry": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-gardener.png",
+  "w": 36
+ },
+ "bear-rain-cheer": {
+  "ax": 25,
+  "ay": 53,
+  "h": 54,
+  "hx": 25.0,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 50
+ },
+ "bear-rain-down": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 38
+ },
+ "bear-rain-down-1": {
+  "ax": 19,
+  "ay": 57,
+  "h": 58,
+  "hx": 19.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 38
+ },
+ "bear-rain-down-2": {
+  "ax": 18,
+  "ay": 57,
+  "h": 58,
+  "hx": 18.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 37
+ },
+ "bear-rain-hammer-1": {
+  "ax": 21,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-bear-rain.png",
+  "w": 40
+ },
+ "bear-rain-hammer-2": {
+  "ax": 16,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-bear-rain.png",
+  "w": 45
+ },
+ "bear-rain-read": {
+  "ax": 17,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-bear-rain.png",
+  "w": 36
+ },
+ "bear-rain-side": {
+  "ax": 17,
+  "ay": 57,
+  "h": 58,
+  "hx": 17.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 34
+ },
+ "bear-rain-side-1": {
+  "ax": 17,
+  "ay": 56,
+  "h": 57,
+  "hx": 17.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 34
+ },
+ "bear-rain-side-2": {
+  "ax": 17,
+  "ay": 56,
+  "h": 57,
+  "hx": 17.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 34
+ },
+ "bear-rain-sit": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear-rain.png",
+  "w": 37
+ },
+ "bear-rain-tinker-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear-rain.png",
+  "w": 37
+ },
+ "bear-rain-tinker-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear-rain.png",
+  "w": 37
+ },
+ "bear-rain-up": {
+  "ax": 18,
+  "ay": 54,
+  "h": 55,
+  "hx": 18.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 37
+ },
+ "bear-rain-up-1": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 37
+ },
+ "bear-rain-up-2": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 37
+ },
+ "bear-rain-work": {
+  "ax": 18,
+  "ay": 58,
+  "h": 60,
+  "hx": 18.0,
+  "hy": 18.0,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 36
+ },
+ "bear-rain-worry": {
+  "ax": 19,
+  "ay": 56,
+  "h": 57,
+  "hx": 19.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-rain.png",
+  "w": 38
+ },
+ "bear-winter-cheer": {
+  "ax": 23,
+  "ay": 55,
+  "h": 56,
+  "hx": 23.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 47
+ },
+ "bear-winter-down": {
+  "ax": 17,
+  "ay": 56,
+  "h": 57,
+  "hx": 17.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 35
+ },
+ "bear-winter-down-1": {
+  "ax": 17,
+  "ay": 57,
+  "h": 58,
+  "hx": 17.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 35
+ },
+ "bear-winter-down-2": {
+  "ax": 17,
+  "ay": 57,
+  "h": 58,
+  "hx": 17.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 35
+ },
+ "bear-winter-hammer-1": {
+  "ax": 24,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear-winter.png",
+  "w": 42
+ },
+ "bear-winter-hammer-2": {
+  "ax": 15,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear-winter.png",
+  "w": 44
+ },
+ "bear-winter-read": {
+  "ax": 16,
+  "ay": 60,
+  "h": 61,
+  "sheet": "design/pixel/raw/pose-bear-winter.png",
+  "w": 33
+ },
+ "bear-winter-side": {
+  "ax": 15,
+  "ay": 55,
+  "h": 56,
+  "hx": 15.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 31
+ },
+ "bear-winter-side-1": {
+  "ax": 15,
+  "ay": 54,
+  "h": 55,
+  "hx": 15.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 31
+ },
+ "bear-winter-side-2": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 33
+ },
+ "bear-winter-sit": {
+  "ax": 14,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-bear-winter.png",
+  "w": 30
+ },
+ "bear-winter-tinker-1": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear-winter.png",
+  "w": 34
+ },
+ "bear-winter-tinker-2": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-bear-winter.png",
+  "w": 32
+ },
+ "bear-winter-up": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 35
+ },
+ "bear-winter-up-1": {
+  "ax": 17,
+  "ay": 56,
+  "h": 57,
+  "hx": 17.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 34
+ },
+ "bear-winter-up-2": {
+  "ax": 17,
+  "ay": 57,
+  "h": 58,
+  "hx": 17.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 35
+ },
+ "bear-winter-work": {
+  "ax": 15,
+  "ay": 60,
+  "h": 62,
+  "hx": 15.5,
+  "hy": 18.6,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 31
+ },
+ "bear-winter-worry": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear-winter.png",
+  "w": 32
+ },
+ "bluecat-awake": {
+  "ax": 17,
+  "ay": 38,
+  "h": 39,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 34
+ },
+ "bluecat-bark": {
+  "ax": 20,
+  "ay": 41,
+  "h": 42,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 40
+ },
+ "bluecat-belly": {
+  "ax": 23,
+  "ay": 31,
+  "h": 32,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 47
+ },
+ "bluecat-jump": {
+  "ax": 22,
+  "ay": 35,
+  "h": 36,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 45
+ },
+ "bluecat-lie": {
+  "ax": 23,
+  "ay": 31,
+  "h": 32,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 46
+ },
+ "bluecat-scratch": {
+  "ax": 18,
+  "ay": 38,
+  "h": 39,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 37
+ },
+ "bluecat-sleep": {
+  "ax": 22,
+  "ay": 27,
+  "h": 28,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 45
+ },
+ "bluecat-stand": {
+  "ax": 22,
+  "ay": 40,
+  "h": 41,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 44
+ },
+ "bluecat-stretch": {
+  "ax": 22,
+  "ay": 45,
+  "h": 46,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 44
+ },
+ "bluecat-wag-1": {
+  "ax": 18,
+  "ay": 39,
+  "h": 40,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 36
+ },
+ "bluecat-wag-2": {
+  "ax": 18,
+  "ay": 39,
+  "h": 40,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 36
+ },
+ "bluecat-yawn": {
+  "ax": 17,
+  "ay": 41,
+  "h": 42,
+  "sheet": "design/pixel/raw/bluecat.png",
+  "w": 34
+ },
+ "button-add": {
+  "w": 33,
+  "h": 34,
+  "ax": 16,
+  "ay": 33,
+  "sheet": "design/pixel/raw/glyphs.png"
+ },
+ "button-back": {
+  "ax": 8,
+  "ay": 23,
+  "h": 24,
+  "sheet": "design/pixel/raw/buttons.png",
+  "w": 17
+ },
+ "button-close": {
+  "w": 33,
+  "h": 32,
+  "ax": 16,
+  "ay": 31,
+  "sheet": "design/pixel/raw/glyphs.png"
+ },
+ "button-collapse": {
+  "ax": 12,
+  "ay": 16,
+  "h": 17,
+  "sheet": "design/pixel/raw/buttons.png",
+  "w": 25
+ },
+ "button-copy": {
+  "w": 37,
+  "h": 37,
+  "ax": 18,
+  "ay": 36,
+  "sheet": "design/pixel/raw/glyphs.png"
+ },
+ "button-delete": {
+  "w": 37,
+  "h": 41,
+  "ax": 18,
+  "ay": 40,
+  "sheet": "design/pixel/raw/glyphs.png"
+ },
+ "button-edit": {
+  "w": 30,
+  "h": 32,
+  "ax": 15,
+  "ay": 31,
+  "sheet": "design/pixel/raw/tools.png"
+ },
+ "button-enlarge": {
+  "ax": 12,
+  "ay": 24,
+  "h": 25,
+  "sheet": "design/pixel/raw/buttons.png",
+  "w": 25
+ },
+ "button-filter": {
+  "w": 33,
+  "h": 23,
+  "ax": 16,
+  "ay": 22,
+  "sheet": "design/pixel/raw/tools.png"
+ },
+ "button-folder": {
+  "w": 31,
+  "h": 28,
+  "ax": 15,
+  "ay": 27,
+  "sheet": "design/pixel/raw/tools.png"
+ },
+ "button-hangup": {
+  "ax": 13,
+  "ay": 24,
+  "h": 25,
+  "sheet": "design/pixel/raw/buttons.png",
+  "w": 27
+ },
+ "button-mic": {
+  "ax": 11,
+  "ay": 31,
+  "h": 32,
+  "sheet": "design/pixel/raw/buttons.png",
+  "w": 23
+ },
+ "button-more": {
+  "w": 30,
+  "h": 9,
+  "ax": 15,
+  "ay": 8,
+  "sheet": "design/pixel/raw/tools.png"
+ },
+ "button-mute": {
+  "w": 37,
+  "h": 37,
+  "ax": 18,
+  "ay": 36,
+  "sheet": "design/pixel/raw/media.png"
+ },
+ "button-next": {
+  "w": 21,
+  "h": 33,
+  "ax": 10,
+  "ay": 32,
+  "sheet": "design/pixel/raw/glyphs.png"
+ },
+ "button-open": {
+  "w": 30,
+  "h": 31,
+  "ax": 15,
+  "ay": 30,
+  "sheet": "design/pixel/raw/tools.png"
+ },
+ "button-pause": {
+  "w": 29,
+  "h": 34,
+  "ax": 14,
+  "ay": 33,
+  "sheet": "design/pixel/raw/media.png"
+ },
+ "button-play": {
+  "w": 28,
+  "h": 31,
+  "ax": 14,
+  "ay": 30,
+  "sheet": "design/pixel/raw/media.png"
+ },
+ "button-record": {
+  "w": 34,
+  "h": 33,
+  "ax": 17,
+  "ay": 32,
+  "sheet": "design/pixel/raw/media.png"
+ },
+ "button-refresh": {
+  "w": 31,
+  "h": 33,
+  "ax": 15,
+  "ay": 32,
+  "sheet": "design/pixel/raw/tools.png"
+ },
+ "button-replay": {
+  "w": 42,
+  "h": 41,
+  "ax": 21,
+  "ay": 40,
+  "sheet": "design/pixel/raw/media.png"
+ },
+ "button-search": {
+  "w": 32,
+  "h": 32,
+  "ax": 16,
+  "ay": 31,
+  "sheet": "design/pixel/raw/tools.png"
+ },
+ "button-send": {
+  "ax": 14,
+  "ay": 23,
+  "h": 24,
+  "sheet": "design/pixel/raw/buttons.png",
+  "w": 28
+ },
+ "button-settings": {
+  "w": 33,
+  "h": 33,
+  "ax": 16,
+  "ay": 32,
+  "sheet": "design/pixel/raw/tools.png"
+ },
+ "button-shrink": {
+  "ax": 13,
+  "ay": 26,
+  "h": 27,
+  "sheet": "design/pixel/raw/buttons.png",
+  "w": 26
+ },
+ "button-speaker": {
+  "w": 42,
+  "h": 38,
+  "ax": 21,
+  "ay": 37,
+  "sheet": "design/pixel/raw/media.png"
+ },
+ "button-stop": {
+  "w": 30,
+  "h": 31,
+  "ax": 15,
+  "ay": 30,
+  "sheet": "design/pixel/raw/media.png"
+ },
+ "button-thread": {
+  "ax": 13,
+  "ay": 22,
+  "h": 23,
+  "sheet": "design/pixel/raw/buttons.png",
+  "w": 26
+ },
+ "button-wait": {
+  "w": 35,
+  "h": 44,
+  "ax": 17,
+  "ay": 43,
+  "sheet": "design/pixel/raw/media.png"
+ },
+ "cat-farmer-cheer": {
+  "ax": 25,
+  "ay": 53,
+  "h": 54,
+  "hx": 25.0,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 50
+ },
+ "cat-farmer-down": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 42
+ },
+ "cat-farmer-down-1": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 43
+ },
+ "cat-farmer-down-2": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 42
+ },
+ "cat-farmer-hammer-1": {
+  "ax": 24,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-cat.png",
+  "w": 48
+ },
+ "cat-farmer-hammer-2": {
+  "ax": 22,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-cat.png",
+  "w": 57
+ },
+ "cat-farmer-read": {
+  "ax": 18,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-cat.png",
+  "w": 41
+ },
+ "cat-farmer-side": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 41
+ },
+ "cat-farmer-side-1": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 42
+ },
+ "cat-farmer-side-2": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 41
+ },
+ "cat-farmer-sit": {
+  "ax": 18,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-cat.png",
+  "w": 41
+ },
+ "cat-farmer-tinker-1": {
+  "ax": 23,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat.png",
+  "w": 42
+ },
+ "cat-farmer-tinker-2": {
+  "ax": 22,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat.png",
+  "w": 39
+ },
+ "cat-farmer-up": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 43
+ },
+ "cat-farmer-up-1": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 42
+ },
+ "cat-farmer-up-2": {
+  "ax": 19,
+  "ay": 56,
+  "h": 57,
+  "hx": 19.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 39
+ },
+ "cat-farmer-work": {
+  "ax": 20,
+  "ay": 58,
+  "h": 60,
+  "hx": 20.5,
+  "hy": 18.0,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 41
+ },
+ "cat-farmer-worry": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat.png",
+  "w": 37
+ },
+ "cat-gardener-cheer": {
+  "ax": 25,
+  "ay": 54,
+  "h": 55,
+  "hx": 25.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 50
+ },
+ "cat-gardener-down": {
+  "ax": 21,
+  "ay": 54,
+  "h": 55,
+  "hx": 21.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 43
+ },
+ "cat-gardener-down-1": {
+  "ax": 22,
+  "ay": 56,
+  "h": 57,
+  "hx": 22.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 44
+ },
+ "cat-gardener-down-2": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 43
+ },
+ "cat-gardener-hammer-1": {
+  "ax": 24,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-cat-gardener.png",
+  "w": 47
+ },
+ "cat-gardener-hammer-2": {
+  "ax": 22,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-cat-gardener.png",
+  "w": 55
+ },
+ "cat-gardener-read": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-gardener.png",
+  "w": 41
+ },
+ "cat-gardener-side": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 41
+ },
+ "cat-gardener-side-1": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 42
+ },
+ "cat-gardener-side-2": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 41
+ },
+ "cat-gardener-sit": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-gardener.png",
+  "w": 42
+ },
+ "cat-gardener-tinker-1": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-cat-gardener.png",
+  "w": 41
+ },
+ "cat-gardener-tinker-2": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-gardener.png",
+  "w": 40
+ },
+ "cat-gardener-up": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 43
+ },
+ "cat-gardener-up-1": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 43
+ },
+ "cat-gardener-up-2": {
+  "ax": 19,
+  "ay": 56,
+  "h": 57,
+  "hx": 19.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 39
+ },
+ "cat-gardener-work": {
+  "ax": 21,
+  "ay": 58,
+  "h": 60,
+  "hx": 21.0,
+  "hy": 18.0,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 42
+ },
+ "cat-gardener-worry": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat-gardener.png",
+  "w": 39
+ },
+ "cat-rain-cheer": {
+  "ax": 25,
+  "ay": 54,
+  "h": 55,
+  "hx": 25.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 50
+ },
+ "cat-rain-down": {
+  "ax": 21,
+  "ay": 54,
+  "h": 55,
+  "hx": 21.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 43
+ },
+ "cat-rain-down-1": {
+  "ax": 22,
+  "ay": 56,
+  "h": 57,
+  "hx": 22.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 44
+ },
+ "cat-rain-down-2": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 43
+ },
+ "cat-rain-hammer-1": {
+  "ax": 22,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-cat-rain.png",
+  "w": 54
+ },
+ "cat-rain-hammer-2": {
+  "ax": 24,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-rain.png",
+  "w": 52
+ },
+ "cat-rain-read": {
+  "ax": 18,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-cat-rain.png",
+  "w": 40
+ },
+ "cat-rain-side": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 41
+ },
+ "cat-rain-side-1": {
+  "ax": 21,
+  "ay": 57,
+  "h": 58,
+  "hx": 21.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 42
+ },
+ "cat-rain-side-2": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 41
+ },
+ "cat-rain-sit": {
+  "ax": 18,
+  "ay": 51,
+  "h": 52,
+  "sheet": "design/pixel/raw/pose-cat-rain.png",
+  "w": 40
+ },
+ "cat-rain-tinker-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-rain.png",
+  "w": 37
+ },
+ "cat-rain-tinker-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-rain.png",
+  "w": 37
+ },
+ "cat-rain-up": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 43
+ },
+ "cat-rain-up-1": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 42
+ },
+ "cat-rain-up-2": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 40
+ },
+ "cat-rain-work": {
+  "ax": 21,
+  "ay": 58,
+  "h": 60,
+  "hx": 21.0,
+  "hy": 18.0,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 42
+ },
+ "cat-rain-worry": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat-rain.png",
+  "w": 39
+ },
+ "cat-winter-cheer": {
+  "ax": 23,
+  "ay": 55,
+  "h": 56,
+  "hx": 23.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 47
+ },
+ "cat-winter-down": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 39
+ },
+ "cat-winter-down-1": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 41
+ },
+ "cat-winter-down-2": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 40
+ },
+ "cat-winter-hammer-1": {
+  "ax": 24,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-winter.png",
+  "w": 39
+ },
+ "cat-winter-hammer-2": {
+  "ax": 22,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-cat-winter.png",
+  "w": 49
+ },
+ "cat-winter-read": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-winter.png",
+  "w": 34
+ },
+ "cat-winter-side": {
+  "ax": 19,
+  "ay": 56,
+  "h": 57,
+  "hx": 19.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 39
+ },
+ "cat-winter-side-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 40
+ },
+ "cat-winter-side-2": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 39
+ },
+ "cat-winter-sit": {
+  "ax": 13,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-winter.png",
+  "w": 34
+ },
+ "cat-winter-tinker-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-winter.png",
+  "w": 35
+ },
+ "cat-winter-tinker-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-cat-winter.png",
+  "w": 34
+ },
+ "cat-winter-up": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 40
+ },
+ "cat-winter-up-1": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 40
+ },
+ "cat-winter-up-2": {
+  "ax": 18,
+  "ay": 57,
+  "h": 58,
+  "hx": 18.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 37
+ },
+ "cat-winter-work": {
+  "ax": 18,
+  "ay": 59,
+  "h": 61,
+  "hx": 18.5,
+  "hy": 18.3,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 37
+ },
+ "cat-winter-worry": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "hx": 16.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-cat-winter.png",
+  "w": 33
+ },
+ "coins-stack": {
+  "ax": 30,
+  "ay": 61,
+  "h": 62,
+  "sheet": "design/pixel/raw/ui-medals.png",
+  "w": 60
+ },
+ "connector-feishu": {
+  "ax": 26,
+  "ay": 40,
+  "h": 41,
+  "sheet": "design/pixel/raw/ui-icons-extra.png",
+  "w": 52
+ },
+ "connector-qq": {
+  "ax": 21,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-icons-extra.png",
+  "w": 43
+ },
+ "connector-weixin": {
+  "ax": 21,
+  "ay": 43,
+  "h": 44,
+  "sheet": "design/pixel/raw/ui-icons-extra.png",
+  "w": 43
+ },
+ "critter-bird-1": {
+  "ax": 5,
+  "ay": 10,
+  "h": 11,
+  "sheet": "design/pixel/raw/critters.png",
+  "w": 11
+ },
+ "critter-bird-2": {
+  "ax": 6,
+  "ay": 8,
+  "h": 9,
+  "sheet": "design/pixel/raw/critters.png",
+  "w": 13
+ },
+ "critter-butterfly-1": {
+  "ax": 6,
+  "ay": 9,
+  "h": 10,
+  "sheet": "design/pixel/raw/critters.png",
+  "w": 13
+ },
+ "critter-butterfly-2": {
+  "ax": 3,
+  "ay": 9,
+  "h": 10,
+  "sheet": "design/pixel/raw/critters.png",
+  "w": 7
+ },
+ "critter-fish-1": {
+  "ax": 3,
+  "ay": 10,
+  "h": 11,
+  "sheet": "design/pixel/raw/critters.png",
+  "w": 7
+ },
+ "critter-fish-2": {
+  "ax": 6,
+  "ay": 6,
+  "h": 7,
+  "sheet": "design/pixel/raw/critters.png",
+  "w": 12
+ },
+ "critter-leaf-1": {
+  "ax": 2,
+  "ay": 5,
+  "h": 6,
+  "sheet": "design/pixel/raw/critters.png",
+  "w": 5
+ },
+ "critter-leaf-2": {
+  "ax": 2,
+  "ay": 5,
+  "h": 6,
+  "sheet": "design/pixel/raw/critters.png",
+  "w": 5
+ },
+ "day-0": {
+  "ax": 12,
+  "ay": 23,
+  "h": 24,
+  "sheet": "design/pixel/raw/calendar.png",
+  "w": 25
+ },
+ "day-1": {
+  "ax": 12,
+  "ay": 23,
+  "h": 24,
+  "sheet": "design/pixel/raw/calendar.png",
+  "w": 25
+ },
+ "day-2": {
+  "ax": 12,
+  "ay": 23,
+  "h": 24,
+  "sheet": "design/pixel/raw/calendar.png",
+  "w": 24
+ },
+ "day-3": {
+  "ax": 12,
+  "ay": 23,
+  "h": 24,
+  "sheet": "design/pixel/raw/calendar.png",
+  "w": 25
+ },
+ "day-4": {
+  "ax": 12,
+  "ay": 23,
+  "h": 24,
+  "sheet": "design/pixel/raw/calendar.png",
+  "w": 25
+ },
+ "dog-awake": {
+  "w": 33,
+  "h": 40,
+  "ax": 16,
+  "ay": 39,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-bark": {
+  "w": 37,
+  "h": 40,
+  "ax": 18,
+  "ay": 39,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-belly": {
+  "w": 48,
+  "h": 29,
+  "ax": 24,
+  "ay": 28,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-jump": {
+  "w": 36,
+  "h": 36,
+  "ax": 18,
+  "ay": 35,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-lie": {
+  "w": 38,
+  "h": 34,
+  "ax": 19,
+  "ay": 33,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-scratch": {
+  "w": 34,
+  "h": 38,
+  "ax": 17,
+  "ay": 37,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-sleep": {
+  "w": 43,
+  "h": 25,
+  "ax": 21,
+  "ay": 24,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-stand": {
+  "w": 42,
+  "h": 39,
+  "ax": 21,
+  "ay": 38,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-stretch": {
+  "w": 39,
+  "h": 39,
+  "ax": 19,
+  "ay": 38,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-wag-1": {
+  "w": 33,
+  "h": 40,
+  "ax": 16,
+  "ay": 39,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-wag-2": {
+  "w": 33,
+  "h": 40,
+  "ax": 16,
+  "ay": 39,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "dog-yawn": {
+  "w": 31,
+  "h": 40,
+  "ax": 15,
+  "ay": 39,
+  "sheet": "design/pixel/raw/dog.png"
+ },
+ "emblem-big_playbook": {
+  "ax": 26,
+  "ay": 49,
+  "h": 50,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 52
+ },
+ "emblem-comeback": {
+  "ax": 20,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 40
+ },
+ "emblem-every_machine": {
+  "ax": 28,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 57
+ },
+ "emblem-farm_level": {
+  "ax": 27,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 55
+ },
+ "emblem-first_try": {
+  "ax": 25,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 50
+ },
+ "emblem-full_house": {
+  "ax": 28,
+  "ay": 40,
+  "h": 41,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 57
+ },
+ "emblem-handoff": {
+  "ax": 27,
+  "ay": 38,
+  "h": 39,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 54
+ },
+ "emblem-harvests": {
+  "ax": 24,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 49
+ },
+ "emblem-night_owl": {
+  "ax": 24,
+  "ay": 51,
+  "h": 52,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 49
+ },
+ "emblem-parallel_plan": {
+  "ax": 27,
+  "ay": 41,
+  "h": 42,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 55
+ },
+ "emblem-s_call": {
+  "ax": 24,
+  "ay": 44,
+  "h": 45,
+  "sheet": "design/pixel/raw/ui-starter.png",
+  "w": 49
+ },
+ "emblem-s_hire": {
+  "ax": 23,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-starter.png",
+  "w": 46
+ },
+ "emblem-s_open": {
+  "ax": 24,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-starter.png",
+  "w": 49
+ },
+ "emblem-s_plan": {
+  "ax": 25,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-starter.png",
+  "w": 50
+ },
+ "emblem-s_review": {
+  "ax": 24,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/ui-starter.png",
+  "w": 48
+ },
+ "emblem-s_tell": {
+  "ax": 23,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-starter.png",
+  "w": 47
+ },
+ "emblem-s_voice": {
+  "ax": 23,
+  "ay": 43,
+  "h": 44,
+  "sheet": "design/pixel/raw/ui-starter.png",
+  "w": 46
+ },
+ "emblem-starter": {
+  "ax": 21,
+  "ay": 52,
+  "h": 53,
+  "sheet": "design/pixel/raw/ui-starter.png",
+  "w": 43
+ },
+ "emblem-steady": {
+  "ax": 26,
+  "ay": 50,
+  "h": 51,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 52
+ },
+ "emblem-thrifty": {
+  "ax": 26,
+  "ay": 39,
+  "h": 40,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 53
+ },
+ "emblem-untangle": {
+  "ax": 27,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 54
+ },
+ "emblem-weekend": {
+  "ax": 28,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 56
+ },
+ "emblem-wreath": {
+  "ax": 25,
+  "ay": 50,
+  "h": 51,
+  "sheet": "design/pixel/raw/ui-emblems.png",
+  "w": 50
+ },
+ "energy-empty-0": {
+  "ax": 18,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/energy.png",
+  "w": 37
+ },
+ "energy-empty-10": {
+  "ax": 18,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/energy.png",
+  "w": 37
+ },
+ "energy-gold": {
+  "ax": 18,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/energy.png",
+  "w": 37
+ },
+ "energy-low-25": {
+  "ax": 18,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/energy.png",
+  "w": 37
+ },
+ "energy-low-40": {
+  "ax": 18,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/energy.png",
+  "w": 37
+ },
+ "energy-plenty-100": {
+  "ax": 18,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/energy.png",
+  "w": 37
+ },
+ "energy-plenty-50": {
+  "ax": 18,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/energy.png",
+  "w": 37
+ },
+ "energy-plenty-75": {
+  "ax": 18,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/energy.png",
+  "w": 37
+ },
+ "energy-unknown": {
+  "ax": 18,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/energy.png",
+  "w": 37
+ },
+ "fg-branch-left": {
+  "ax": 51,
+  "ay": 109,
+  "h": 110,
+  "sheet": "design/pixel/raw/foreground.png",
+  "w": 103
+ },
+ "fg-branch-right": {
+  "ax": 48,
+  "ay": 119,
+  "h": 120,
+  "sheet": "design/pixel/raw/foreground.png",
+  "w": 97
+ },
+ "fg-bush-left": {
+  "ax": 58,
+  "ay": 116,
+  "h": 117,
+  "sheet": "design/pixel/raw/foreground.png",
+  "w": 116
+ },
+ "fg-bush-right": {
+  "ax": 59,
+  "ay": 106,
+  "h": 107,
+  "sheet": "design/pixel/raw/foreground.png",
+  "w": 118
+ },
+ "fg-fern": {
+  "ax": 65,
+  "ay": 105,
+  "h": 106,
+  "sheet": "design/pixel/raw/foreground.png",
+  "w": 131
+ },
+ "fg-grass": {
+  "ax": 68,
+  "ay": 66,
+  "h": 67,
+  "sheet": "design/pixel/raw/foreground.png",
+  "w": 136
+ },
+ "fox-farmer-cheer": {
+  "ax": 24,
+  "ay": 54,
+  "h": 55,
+  "hx": 24.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 49
+ },
+ "fox-farmer-down": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "hx": 20.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 41
+ },
+ "fox-farmer-down-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 40
+ },
+ "fox-farmer-down-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 41
+ },
+ "fox-farmer-hammer-1": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-fox.png",
+  "w": 43
+ },
+ "fox-farmer-hammer-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox.png",
+  "w": 47
+ },
+ "fox-farmer-read": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox.png",
+  "w": 38
+ },
+ "fox-farmer-side": {
+  "ax": 19,
+  "ay": 57,
+  "h": 58,
+  "hx": 19.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 38
+ },
+ "fox-farmer-side-1": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 40
+ },
+ "fox-farmer-side-2": {
+  "ax": 19,
+  "ay": 56,
+  "h": 57,
+  "hx": 19.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 38
+ },
+ "fox-farmer-sit": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox.png",
+  "w": 38
+ },
+ "fox-farmer-tinker-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox.png",
+  "w": 38
+ },
+ "fox-farmer-tinker-2": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox.png",
+  "w": 38
+ },
+ "fox-farmer-up": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 41
+ },
+ "fox-farmer-up-1": {
+  "ax": 21,
+  "ay": 57,
+  "h": 58,
+  "hx": 21.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 42
+ },
+ "fox-farmer-up-2": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 40
+ },
+ "fox-farmer-work": {
+  "ax": 20,
+  "ay": 49,
+  "h": 53,
+  "hx": 20.0,
+  "hy": 15.9,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 40
+ },
+ "fox-farmer-worry": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-fox.png",
+  "w": 41
+ },
+ "fox-gardener-cheer": {
+  "ax": 25,
+  "ay": 54,
+  "h": 55,
+  "hx": 25.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 50
+ },
+ "fox-gardener-down": {
+  "ax": 21,
+  "ay": 54,
+  "h": 55,
+  "hx": 21.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 42
+ },
+ "fox-gardener-down-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 40
+ },
+ "fox-gardener-down-2": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 42
+ },
+ "fox-gardener-hammer-1": {
+  "ax": 24,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-fox-gardener.png",
+  "w": 42
+ },
+ "fox-gardener-hammer-2": {
+  "ax": 22,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox-gardener.png",
+  "w": 45
+ },
+ "fox-gardener-read": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-fox-gardener.png",
+  "w": 38
+ },
+ "fox-gardener-side": {
+  "ax": 19,
+  "ay": 57,
+  "h": 58,
+  "hx": 19.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 39
+ },
+ "fox-gardener-side-1": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 41
+ },
+ "fox-gardener-side-2": {
+  "ax": 19,
+  "ay": 57,
+  "h": 58,
+  "hx": 19.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 39
+ },
+ "fox-gardener-sit": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-fox-gardener.png",
+  "w": 38
+ },
+ "fox-gardener-tinker-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox-gardener.png",
+  "w": 38
+ },
+ "fox-gardener-tinker-2": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox-gardener.png",
+  "w": 39
+ },
+ "fox-gardener-up": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 42
+ },
+ "fox-gardener-up-1": {
+  "ax": 21,
+  "ay": 57,
+  "h": 58,
+  "hx": 21.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 42
+ },
+ "fox-gardener-up-2": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 41
+ },
+ "fox-gardener-work": {
+  "ax": 20,
+  "ay": 49,
+  "h": 53,
+  "hx": 20.5,
+  "hy": 15.9,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 41
+ },
+ "fox-gardener-worry": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-fox-gardener.png",
+  "w": 42
+ },
+ "fox-rain-cheer": {
+  "ax": 25,
+  "ay": 54,
+  "h": 55,
+  "hx": 25.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 50
+ },
+ "fox-rain-down": {
+  "ax": 21,
+  "ay": 54,
+  "h": 55,
+  "hx": 21.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 42
+ },
+ "fox-rain-down-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 40
+ },
+ "fox-rain-down-2": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 42
+ },
+ "fox-rain-hammer-1": {
+  "ax": 26,
+  "ay": 58,
+  "h": 59,
+  "sheet": "design/pixel/raw/pose-fox-rain.png",
+  "w": 42
+ },
+ "fox-rain-hammer-2": {
+  "ax": 22,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-fox-rain.png",
+  "w": 54
+ },
+ "fox-rain-read": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-fox-rain.png",
+  "w": 40
+ },
+ "fox-rain-side": {
+  "ax": 19,
+  "ay": 57,
+  "h": 58,
+  "hx": 19.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 38
+ },
+ "fox-rain-side-1": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 40
+ },
+ "fox-rain-side-2": {
+  "ax": 19,
+  "ay": 57,
+  "h": 58,
+  "hx": 19.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 38
+ },
+ "fox-rain-sit": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox-rain.png",
+  "w": 41
+ },
+ "fox-rain-tinker-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox-rain.png",
+  "w": 39
+ },
+ "fox-rain-tinker-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox-rain.png",
+  "w": 39
+ },
+ "fox-rain-up": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 41
+ },
+ "fox-rain-up-1": {
+  "ax": 21,
+  "ay": 57,
+  "h": 58,
+  "hx": 21.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 42
+ },
+ "fox-rain-up-2": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 41
+ },
+ "fox-rain-work": {
+  "ax": 20,
+  "ay": 50,
+  "h": 54,
+  "hx": 20.5,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 41
+ },
+ "fox-rain-worry": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-fox-rain.png",
+  "w": 43
+ },
+ "fox-winter-cheer": {
+  "ax": 24,
+  "ay": 55,
+  "h": 56,
+  "hx": 24.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 48
+ },
+ "fox-winter-down": {
+  "ax": 19,
+  "ay": 57,
+  "h": 58,
+  "hx": 19.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 38
+ },
+ "fox-winter-down-1": {
+  "ax": 19,
+  "ay": 58,
+  "h": 59,
+  "hx": 19.0,
+  "hy": 17.7,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 38
+ },
+ "fox-winter-down-2": {
+  "ax": 19,
+  "ay": 58,
+  "h": 59,
+  "hx": 19.0,
+  "hy": 17.7,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 38
+ },
+ "fox-winter-hammer-1": {
+  "ax": 22,
+  "ay": 51,
+  "h": 52,
+  "sheet": "design/pixel/raw/pose-fox-winter.png",
+  "w": 35
+ },
+ "fox-winter-hammer-2": {
+  "ax": 21,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-fox-winter.png",
+  "w": 48
+ },
+ "fox-winter-read": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox-winter.png",
+  "w": 35
+ },
+ "fox-winter-side": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 36
+ },
+ "fox-winter-side-1": {
+  "ax": 19,
+  "ay": 54,
+  "h": 55,
+  "hx": 19.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 38
+ },
+ "fox-winter-side-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 36
+ },
+ "fox-winter-sit": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox-winter.png",
+  "w": 35
+ },
+ "fox-winter-tinker-1": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox-winter.png",
+  "w": 36
+ },
+ "fox-winter-tinker-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-fox-winter.png",
+  "w": 36
+ },
+ "fox-winter-up": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 38
+ },
+ "fox-winter-up-1": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 40
+ },
+ "fox-winter-up-2": {
+  "ax": 18,
+  "ay": 61,
+  "h": 62,
+  "hx": 18.5,
+  "hy": 18.6,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 37
+ },
+ "fox-winter-work": {
+  "ax": 18,
+  "ay": 52,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 37
+ },
+ "fox-winter-worry": {
+  "ax": 19,
+  "ay": 54,
+  "h": 55,
+  "hx": 19.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-fox-winter.png",
+  "w": 39
+ },
+ "hedgehog-farmer-cheer": {
+  "ax": 26,
+  "ay": 55,
+  "h": 56,
+  "hx": 26.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 52
+ },
+ "hedgehog-farmer-down": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 43
+ },
+ "hedgehog-farmer-down-1": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 43
+ },
+ "hedgehog-farmer-down-2": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 43
+ },
+ "hedgehog-farmer-hammer-1": {
+  "ax": 22,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog.png",
+  "w": 50
+ },
+ "hedgehog-farmer-hammer-2": {
+  "ax": 22,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog.png",
+  "w": 50
+ },
+ "hedgehog-farmer-read": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog.png",
+  "w": 40
+ },
+ "hedgehog-farmer-side": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 43
+ },
+ "hedgehog-farmer-side-1": {
+  "ax": 21,
+  "ay": 57,
+  "h": 58,
+  "hx": 21.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 42
+ },
+ "hedgehog-farmer-side-2": {
+  "ax": 21,
+  "ay": 57,
+  "h": 58,
+  "hx": 21.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 43
+ },
+ "hedgehog-farmer-sit": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-hedgehog.png",
+  "w": 41
+ },
+ "hedgehog-farmer-tinker-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog.png",
+  "w": 42
+ },
+ "hedgehog-farmer-tinker-2": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog.png",
+  "w": 40
+ },
+ "hedgehog-farmer-up": {
+  "ax": 21,
+  "ay": 54,
+  "h": 55,
+  "hx": 21.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 43
+ },
+ "hedgehog-farmer-up-1": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 42
+ },
+ "hedgehog-farmer-up-2": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 42
+ },
+ "hedgehog-farmer-work": {
+  "ax": 23,
+  "ay": 56,
+  "h": 58,
+  "hx": 23.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 46
+ },
+ "hedgehog-farmer-worry": {
+  "ax": 22,
+  "ay": 55,
+  "h": 56,
+  "hx": 22.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog.png",
+  "w": 44
+ },
+ "hedgehog-gardener-cheer": {
+  "ax": 26,
+  "ay": 56,
+  "h": 57,
+  "hx": 26.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 53
+ },
+ "hedgehog-gardener-down": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 43
+ },
+ "hedgehog-gardener-down-1": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 42
+ },
+ "hedgehog-gardener-down-2": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 42
+ },
+ "hedgehog-gardener-hammer-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-gardener.png",
+  "w": 49
+ },
+ "hedgehog-gardener-hammer-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-gardener.png",
+  "w": 54
+ },
+ "hedgehog-gardener-read": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-hedgehog-gardener.png",
+  "w": 41
+ },
+ "hedgehog-gardener-side": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 43
+ },
+ "hedgehog-gardener-side-1": {
+  "ax": 21,
+  "ay": 57,
+  "h": 58,
+  "hx": 21.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 42
+ },
+ "hedgehog-gardener-side-2": {
+  "ax": 21,
+  "ay": 57,
+  "h": 58,
+  "hx": 21.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 42
+ },
+ "hedgehog-gardener-sit": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-gardener.png",
+  "w": 41
+ },
+ "hedgehog-gardener-tinker-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-gardener.png",
+  "w": 40
+ },
+ "hedgehog-gardener-tinker-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-gardener.png",
+  "w": 40
+ },
+ "hedgehog-gardener-up": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 42
+ },
+ "hedgehog-gardener-up-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 41
+ },
+ "hedgehog-gardener-up-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 41
+ },
+ "hedgehog-gardener-work": {
+  "ax": 22,
+  "ay": 56,
+  "h": 58,
+  "hx": 22.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 45
+ },
+ "hedgehog-gardener-worry": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog-gardener.png",
+  "w": 43
+ },
+ "hedgehog-rain-cheer": {
+  "ax": 25,
+  "ay": 55,
+  "h": 56,
+  "hx": 25.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 50
+ },
+ "hedgehog-rain-down": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 42
+ },
+ "hedgehog-rain-down-1": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 41
+ },
+ "hedgehog-rain-down-2": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 41
+ },
+ "hedgehog-rain-hammer-1": {
+  "ax": 22,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-hedgehog-rain.png",
+  "w": 39
+ },
+ "hedgehog-rain-hammer-2": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-rain.png",
+  "w": 44
+ },
+ "hedgehog-rain-read": {
+  "ax": 19,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-hedgehog-rain.png",
+  "w": 39
+ },
+ "hedgehog-rain-side": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 42
+ },
+ "hedgehog-rain-side-1": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 41
+ },
+ "hedgehog-rain-side-2": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 41
+ },
+ "hedgehog-rain-sit": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-hedgehog-rain.png",
+  "w": 39
+ },
+ "hedgehog-rain-tinker-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-rain.png",
+  "w": 40
+ },
+ "hedgehog-rain-tinker-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-rain.png",
+  "w": 37
+ },
+ "hedgehog-rain-up": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "hx": 20.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 41
+ },
+ "hedgehog-rain-up-1": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "hx": 20.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 40
+ },
+ "hedgehog-rain-up-2": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "hx": 20.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 40
+ },
+ "hedgehog-rain-work": {
+  "ax": 22,
+  "ay": 56,
+  "h": 58,
+  "hx": 22.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 45
+ },
+ "hedgehog-rain-worry": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-rain.png",
+  "w": 43
+ },
+ "hedgehog-winter-cheer": {
+  "ax": 25,
+  "ay": 55,
+  "h": 56,
+  "hx": 25.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 50
+ },
+ "hedgehog-winter-down": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 42
+ },
+ "hedgehog-winter-down-1": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 41
+ },
+ "hedgehog-winter-down-2": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 41
+ },
+ "hedgehog-winter-hammer-1": {
+  "ax": 25,
+  "ay": 58,
+  "h": 59,
+  "sheet": "design/pixel/raw/pose-hedgehog-winter.png",
+  "w": 45
+ },
+ "hedgehog-winter-hammer-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-winter.png",
+  "w": 53
+ },
+ "hedgehog-winter-read": {
+  "ax": 20,
+  "ay": 59,
+  "h": 60,
+  "sheet": "design/pixel/raw/pose-hedgehog-winter.png",
+  "w": 40
+ },
+ "hedgehog-winter-side": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "hx": 20.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 41
+ },
+ "hedgehog-winter-side-1": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "hx": 20.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 40
+ },
+ "hedgehog-winter-side-2": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "hx": 20.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 40
+ },
+ "hedgehog-winter-sit": {
+  "ax": 19,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-hedgehog-winter.png",
+  "w": 40
+ },
+ "hedgehog-winter-tinker-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-winter.png",
+  "w": 42
+ },
+ "hedgehog-winter-tinker-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-hedgehog-winter.png",
+  "w": 42
+ },
+ "hedgehog-winter-up": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 40
+ },
+ "hedgehog-winter-up-1": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 39
+ },
+ "hedgehog-winter-up-2": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 39
+ },
+ "hedgehog-winter-work": {
+  "ax": 22,
+  "ay": 57,
+  "h": 59,
+  "hx": 22.0,
+  "hy": 17.7,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 44
+ },
+ "hedgehog-winter-worry": {
+  "ax": 21,
+  "ay": 54,
+  "h": 55,
+  "hx": 21.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-hedgehog-winter.png",
+  "w": 42
+ },
+ "icon-bell": {
+  "ax": 23,
+  "ay": 45,
+  "h": 46,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 46
+ },
+ "icon-board": {
+  "ax": 28,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 56
+ },
+ "icon-branch": {
+  "w": 23,
+  "h": 26,
+  "ax": 11,
+  "ay": 25,
+  "sheet": "design/pixel/raw/mapbits.png"
+ },
+ "icon-bug": {
+  "ax": 21,
+  "ay": 42,
+  "h": 43,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 42
+ },
+ "icon-bunting": {
+  "ax": 29,
+  "ay": 26,
+  "h": 27,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 59
+ },
+ "icon-clock": {
+  "ax": 20,
+  "ay": 48,
+  "h": 49,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 40
+ },
+ "icon-coin": {
+  "ax": 20,
+  "ay": 41,
+  "h": 42,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 41
+ },
+ "icon-crate": {
+  "ax": 26,
+  "ay": 39,
+  "h": 40,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 52
+ },
+ "icon-deed": {
+  "ax": 27,
+  "ay": 50,
+  "h": 51,
+  "sheet": "design/pixel/raw/ui-icons-extra.png",
+  "w": 55
+ },
+ "icon-doghouse": {
+  "ax": 26,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 53
+ },
+ "icon-hand": {
+  "ax": 19,
+  "ay": 43,
+  "h": 44,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 39
+ },
+ "icon-harvest": {
+  "ax": 22,
+  "ay": 52,
+  "h": 53,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 45
+ },
+ "icon-log": {
+  "ax": 24,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 48
+ },
+ "icon-map": {
+  "w": 61,
+  "h": 48,
+  "ax": 30,
+  "ay": 47,
+  "sheet": "design/pixel/raw/mapbits.png"
+ },
+ "icon-pigeon": {
+  "ax": 25,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/ui-icons-extra.png",
+  "w": 50
+ },
+ "icon-plan": {
+  "ax": 29,
+  "ay": 44,
+  "h": 45,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 58
+ },
+ "icon-scarecrow": {
+  "ax": 26,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 53
+ },
+ "icon-seeds": {
+  "ax": 22,
+  "ay": 48,
+  "h": 49,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 45
+ },
+ "icon-shed": {
+  "ax": 28,
+  "ay": 49,
+  "h": 50,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 56
+ },
+ "icon-shop": {
+  "ax": 26,
+  "ay": 52,
+  "h": 53,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 52
+ },
+ "icon-shovel": {
+  "ax": 21,
+  "ay": 52,
+  "h": 53,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 42
+ },
+ "icon-skillbook": {
+  "ax": 23,
+  "ay": 50,
+  "h": 51,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 47
+ },
+ "icon-star": {
+  "ax": 23,
+  "ay": 43,
+  "h": 44,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 47
+ },
+ "icon-tasks": {
+  "ax": 21,
+  "ay": 48,
+  "h": 49,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 42
+ },
+ "icon-trophy": {
+  "ax": 24,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 48
+ },
+ "icon-water": {
+  "ax": 28,
+  "ay": 40,
+  "h": 41,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 57
+ },
+ "icon-weed": {
+  "ax": 26,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-icons.png",
+  "w": 52
+ },
+ "icon-wrench": {
+  "ax": 24,
+  "ay": 48,
+  "h": 49,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 48
+ },
+ "island-lavender": {
+  "w": 488,
+  "h": 330,
+  "ax": 244,
+  "ay": 329,
+  "yard": [
+   93,
+   84,
+   393,
+   223
+  ],
+  "sheet": "design/pixel/raw/island-lavender.png"
+ },
+ "island-meadow": {
+  "w": 583,
+  "h": 381,
+  "ax": 291,
+  "ay": 380,
+  "yard": [
+   141,
+   103,
+   441,
+   251
+  ],
+  "sheet": "design/pixel/raw/island-meadow.png"
+ },
+ "island-orchard": {
+  "w": 533,
+  "h": 345,
+  "ax": 266,
+  "ay": 344,
+  "yard": [
+   117,
+   102,
+   417,
+   232
+  ],
+  "sheet": "design/pixel/raw/island-orchard.png"
+ },
+ "island-pines": {
+  "w": 544,
+  "h": 387,
+  "ax": 272,
+  "ay": 386,
+  "yard": [
+   115,
+   122,
+   415,
+   249
+  ],
+  "sheet": "design/pixel/raw/island-pines.png"
+ },
+ "island-pond": {
+  "w": 578,
+  "h": 384,
+  "ax": 289,
+  "ay": 383,
+  "yard": [
+   129,
+   93,
+   429,
+   261
+  ],
+  "sheet": "design/pixel/raw/island-pond.png"
+ },
+ "island-windmill": {
+  "w": 542,
+  "h": 375,
+  "ax": 271,
+  "ay": 374,
+  "yard": [
+   120,
+   109,
+   420,
+   245
+  ],
+  "sheet": "design/pixel/raw/island-windmill.png"
+ },
+ "lang-c": {
+  "ax": 22,
+  "ay": 51,
+  "h": 52,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 45
+ },
+ "lang-cpp": {
+  "ax": 23,
+  "ay": 50,
+  "h": 51,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 46
+ },
+ "lang-csharp": {
+  "ax": 23,
+  "ay": 51,
+  "h": 52,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 46
+ },
+ "lang-css": {
+  "ax": 23,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 46
+ },
+ "lang-dart": {
+  "ax": 23,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 46
+ },
+ "lang-docker": {
+  "ax": 29,
+  "ay": 43,
+  "h": 44,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 59
+ },
+ "lang-elixir": {
+  "ax": 18,
+  "ay": 50,
+  "h": 51,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 37
+ },
+ "lang-go": {
+  "ax": 31,
+  "ay": 27,
+  "h": 28,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 62
+ },
+ "lang-haskell": {
+  "ax": 28,
+  "ay": 36,
+  "h": 37,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 56
+ },
+ "lang-html": {
+  "ax": 22,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 45
+ },
+ "lang-java": {
+  "ax": 22,
+  "ay": 50,
+  "h": 51,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 45
+ },
+ "lang-javascript": {
+  "ax": 22,
+  "ay": 43,
+  "h": 44,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 45
+ },
+ "lang-json": {
+  "ax": 24,
+  "ay": 44,
+  "h": 45,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 49
+ },
+ "lang-julia": {
+  "ax": 25,
+  "ay": 42,
+  "h": 43,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 51
+ },
+ "lang-jupyter": {
+  "ax": 23,
+  "ay": 48,
+  "h": 49,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 47
+ },
+ "lang-kotlin": {
+  "ax": 20,
+  "ay": 42,
+  "h": 43,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 41
+ },
+ "lang-lua": {
+  "ax": 24,
+  "ay": 49,
+  "h": 50,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 49
+ },
+ "lang-markdown": {
+  "ax": 25,
+  "ay": 38,
+  "h": 39,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 51
+ },
+ "lang-other": {
+  "ax": 21,
+  "ay": 49,
+  "h": 50,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 43
+ },
+ "lang-php": {
+  "ax": 30,
+  "ay": 38,
+  "h": 39,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 61
+ },
+ "lang-powershell": {
+  "ax": 28,
+  "ay": 43,
+  "h": 44,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 56
+ },
+ "lang-python": {
+  "ax": 23,
+  "ay": 45,
+  "h": 46,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 46
+ },
+ "lang-r": {
+  "ax": 28,
+  "ay": 43,
+  "h": 44,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 57
+ },
+ "lang-ruby": {
+  "ax": 24,
+  "ay": 48,
+  "h": 49,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 49
+ },
+ "lang-rust": {
+  "ax": 25,
+  "ay": 51,
+  "h": 52,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 50
+ },
+ "lang-sass": {
+  "ax": 25,
+  "ay": 50,
+  "h": 51,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 50
+ },
+ "lang-scala": {
+  "ax": 18,
+  "ay": 52,
+  "h": 53,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 36
+ },
+ "lang-shell": {
+  "ax": 24,
+  "ay": 41,
+  "h": 42,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 48
+ },
+ "lang-sql": {
+  "ax": 21,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 42
+ },
+ "lang-svelte": {
+  "ax": 21,
+  "ay": 49,
+  "h": 50,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 43
+ },
+ "lang-swift": {
+  "ax": 24,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 48
+ },
+ "lang-terraform": {
+  "ax": 23,
+  "ay": 48,
+  "h": 49,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 46
+ },
+ "lang-typescript": {
+  "ax": 22,
+  "ay": 44,
+  "h": 45,
+  "sheet": "design/pixel/raw/ui-langs-1.png",
+  "w": 45
+ },
+ "lang-vue": {
+  "ax": 26,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 53
+ },
+ "lang-yaml": {
+  "ax": 21,
+  "ay": 48,
+  "h": 49,
+  "sheet": "design/pixel/raw/ui-langs-3.png",
+  "w": 43
+ },
+ "lang-zig": {
+  "ax": 24,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/ui-langs-2.png",
+  "w": 49
+ },
+ "logo-antigravity": {
+  "ax": 27,
+  "ay": 46,
+  "h": 47,
+  "sheet": "design/pixel/raw/logos.png",
+  "w": 54
+ },
+ "logo-claude": {
+  "ax": 27,
+  "ay": 36,
+  "h": 37,
+  "sheet": "design/pixel/raw/logos.png",
+  "w": 54
+ },
+ "logo-codex": {
+  "ax": 25,
+  "ay": 48,
+  "h": 49,
+  "sheet": "design/pixel/raw/logos.png",
+  "w": 51
+ },
+ "logo-cursor": {
+  "ax": 23,
+  "ay": 48,
+  "h": 49,
+  "sheet": "design/pixel/raw/logos.png",
+  "w": 46
+ },
+ "logo-grok": {
+  "ax": 26,
+  "ay": 51,
+  "h": 52,
+  "sheet": "design/pixel/raw/logos.png",
+  "w": 52
+ },
+ "logo-kimi": {
+  "ax": 24,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/logos.png",
+  "w": 49
+ },
+ "logo-opencode": {
+  "ax": 20,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/logos.png",
+  "w": 40
+ },
+ "logo-pi": {
+  "ax": 24,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/logos.png",
+  "w": 49
+ },
+ "machine-beehive": {
+  "ax": 29,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/ui-machines.png",
+  "w": 59
+ },
+ "machine-lantern": {
+  "ax": 25,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/ui-machines.png",
+  "w": 51
+ },
+ "machine-pump": {
+  "ax": 23,
+  "ay": 65,
+  "h": 66,
+  "sheet": "design/pixel/raw/ui-machines.png",
+  "w": 47
+ },
+ "machine-seeder": {
+  "ax": 27,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/ui-machines.png",
+  "w": 55
+ },
+ "machine-tractor": {
+  "ax": 28,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/ui-machines.png",
+  "w": 57
+ },
+ "machine-watercart": {
+  "ax": 25,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/ui-machines.png",
+  "w": 51
+ },
+ "machine-wheelbarrow": {
+  "ax": 27,
+  "ay": 51,
+  "h": 52,
+  "sheet": "design/pixel/raw/ui-machines.png",
+  "w": 55
+ },
+ "machine-windmill": {
+  "ax": 24,
+  "ay": 71,
+  "h": 72,
+  "sheet": "design/pixel/raw/ui-machines.png",
+  "w": 48
+ },
+ "mailbox": {
+  "ax": 12,
+  "ay": 47,
+  "h": 48,
+  "w": 26
+ },
+ "manager": {
+  "ax": 16,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-farmer.png",
+  "w": 33
+ },
+ "manager-auntie": {
+  "ax": 16,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-auntie.png",
+  "w": 32
+ },
+ "manager-auntie-face": {
+  "ax": 27,
+  "ay": 59,
+  "h": 60,
+  "sheet": "design/pixel/raw/look-auntie.png",
+  "w": 55
+ },
+ "manager-auntie-listen": {
+  "ax": 16,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-auntie.png",
+  "w": 33
+ },
+ "manager-auntie-talk": {
+  "ax": 19,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-auntie.png",
+  "w": 38
+ },
+ "manager-face": {
+  "ax": 29,
+  "ay": 62,
+  "h": 63,
+  "sheet": "design/pixel/raw/look-farmer.png",
+  "w": 58
+ },
+ "manager-foreman": {
+  "ax": 18,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-foreman.png",
+  "w": 37
+ },
+ "manager-foreman-face": {
+  "ax": 30,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-foreman.png",
+  "w": 60
+ },
+ "manager-foreman-listen": {
+  "ax": 20,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-foreman.png",
+  "w": 41
+ },
+ "manager-foreman-talk": {
+  "ax": 23,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-foreman.png",
+  "w": 46
+ },
+ "manager-gardener": {
+  "ax": 15,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-gardener.png",
+  "w": 31
+ },
+ "manager-gardener-face": {
+  "ax": 27,
+  "ay": 59,
+  "h": 60,
+  "sheet": "design/pixel/raw/look-gardener.png",
+  "w": 54
+ },
+ "manager-gardener-listen": {
+  "ax": 15,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-gardener.png",
+  "w": 31
+ },
+ "manager-gardener-talk": {
+  "ax": 18,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-gardener.png",
+  "w": 36
+ },
+ "manager-grandpa": {
+  "ax": 16,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-grandpa.png",
+  "w": 33
+ },
+ "manager-grandpa-face": {
+  "ax": 30,
+  "ay": 64,
+  "h": 65,
+  "sheet": "design/pixel/raw/look-grandpa.png",
+  "w": 61
+ },
+ "manager-grandpa-listen": {
+  "ax": 17,
+  "ay": 62,
+  "h": 63,
+  "sheet": "design/pixel/raw/look-grandpa.png",
+  "w": 34
+ },
+ "manager-grandpa-talk": {
+  "ax": 20,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-grandpa.png",
+  "w": 40
+ },
+ "manager-listen": {
+  "ax": 16,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-farmer.png",
+  "w": 33
+ },
+ "manager-robot": {
+  "ax": 17,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-robot.png",
+  "w": 35
+ },
+ "manager-robot-face": {
+  "ax": 28,
+  "ay": 67,
+  "h": 68,
+  "sheet": "design/pixel/raw/look-robot.png",
+  "w": 57
+ },
+ "manager-robot-listen": {
+  "ax": 21,
+  "ay": 65,
+  "h": 66,
+  "sheet": "design/pixel/raw/look-robot.png",
+  "w": 43
+ },
+ "manager-robot-talk": {
+  "ax": 20,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-robot.png",
+  "w": 41
+ },
+ "manager-talk": {
+  "ax": 19,
+  "ay": 63,
+  "h": 64,
+  "sheet": "design/pixel/raw/look-farmer.png",
+  "w": 38
+ },
+ "map": {
+  "ax": 0,
+  "ay": 0,
+  "h": 512,
+  "sheet": "design/pixel/raw/map.png",
+  "w": 768
+ },
+ "map-cloud": {
+  "w": 123,
+  "h": 74,
+  "ax": 61,
+  "ay": 73,
+  "sheet": "design/pixel/raw/mapbits.png"
+ },
+ "map-compass": {
+  "w": 81,
+  "h": 97,
+  "ax": 40,
+  "ay": 96,
+  "sheet": "design/pixel/raw/mapbits.png"
+ },
+ "map-sack": {
+  "w": 31,
+  "h": 28,
+  "ax": 15,
+  "ay": 27,
+  "sheet": "design/pixel/raw/mapbits.png"
+ },
+ "map-stake": {
+  "w": 24,
+  "h": 33,
+  "ax": 12,
+  "ay": 32,
+  "sheet": "design/pixel/raw/mapbits.png"
+ },
+ "mark-check": {
+  "w": 36,
+  "h": 31,
+  "ax": 18,
+  "ay": 30,
+  "sheet": "design/pixel/raw/glyphs.png"
+ },
+ "mark-cross": {
+  "w": 33,
+  "h": 32,
+  "ax": 16,
+  "ay": 31,
+  "sheet": "design/pixel/raw/glyphs.png"
+ },
+ "mark-warn": {
+  "w": 40,
+  "h": 37,
+  "ax": 20,
+  "ay": 36,
+  "sheet": "design/pixel/raw/glyphs.png"
+ },
+ "medal-bronze": {
+  "ax": 32,
+  "ay": 79,
+  "h": 80,
+  "sheet": "design/pixel/raw/ui-medals.png",
+  "w": 64
+ },
+ "medal-gold": {
+  "ax": 32,
+  "ay": 79,
+  "h": 80,
+  "sheet": "design/pixel/raw/ui-medals.png",
+  "w": 65
+ },
+ "medal-locked": {
+  "ax": 35,
+  "ay": 69,
+  "h": 70,
+  "sheet": "design/pixel/raw/ui-medals.png",
+  "w": 70
+ },
+ "medal-silver": {
+  "ax": 32,
+  "ay": 79,
+  "h": 80,
+  "sheet": "design/pixel/raw/ui-medals.png",
+  "w": 65
+ },
+ "medal-wood": {
+  "ax": 35,
+  "ay": 72,
+  "h": 73,
+  "sheet": "design/pixel/raw/ui-medals.png",
+  "w": 71
+ },
+ "owl-farmer-cheer": {
+  "ax": 24,
+  "ay": 54,
+  "h": 55,
+  "hx": 24.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 49
+ },
+ "owl-farmer-down": {
+  "ax": 18,
+  "ay": 54,
+  "h": 55,
+  "hx": 18.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 37
+ },
+ "owl-farmer-down-1": {
+  "ax": 18,
+  "ay": 54,
+  "h": 55,
+  "hx": 18.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 37
+ },
+ "owl-farmer-down-2": {
+  "ax": 18,
+  "ay": 54,
+  "h": 55,
+  "hx": 18.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 37
+ },
+ "owl-farmer-hammer-1": {
+  "ax": 26,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-owl.png",
+  "w": 47
+ },
+ "owl-farmer-hammer-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl.png",
+  "w": 43
+ },
+ "owl-farmer-read": {
+  "ax": 18,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-owl.png",
+  "w": 36
+ },
+ "owl-farmer-side": {
+  "ax": 17,
+  "ay": 56,
+  "h": 57,
+  "hx": 17.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 34
+ },
+ "owl-farmer-side-1": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 34
+ },
+ "owl-farmer-side-2": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 34
+ },
+ "owl-farmer-sit": {
+  "ax": 17,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-owl.png",
+  "w": 36
+ },
+ "owl-farmer-tinker-1": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl.png",
+  "w": 39
+ },
+ "owl-farmer-tinker-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl.png",
+  "w": 36
+ },
+ "owl-farmer-up": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 37
+ },
+ "owl-farmer-up-1": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 37
+ },
+ "owl-farmer-up-2": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 36
+ },
+ "owl-farmer-work": {
+  "ax": 17,
+  "ay": 57,
+  "h": 59,
+  "hx": 17.5,
+  "hy": 17.7,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 35
+ },
+ "owl-farmer-worry": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl.png",
+  "w": 36
+ },
+ "owl-gardener-cheer": {
+  "ax": 24,
+  "ay": 55,
+  "h": 56,
+  "hx": 24.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 48
+ },
+ "owl-gardener-down": {
+  "ax": 18,
+  "ay": 54,
+  "h": 55,
+  "hx": 18.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 37
+ },
+ "owl-gardener-down-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 37
+ },
+ "owl-gardener-down-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 37
+ },
+ "owl-gardener-hammer-1": {
+  "ax": 16,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/pose-owl-gardener.png",
+  "w": 43
+ },
+ "owl-gardener-hammer-2": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-owl-gardener.png",
+  "w": 48
+ },
+ "owl-gardener-read": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl-gardener.png",
+  "w": 34
+ },
+ "owl-gardener-side": {
+  "ax": 17,
+  "ay": 56,
+  "h": 57,
+  "hx": 17.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 34
+ },
+ "owl-gardener-side-1": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 34
+ },
+ "owl-gardener-side-2": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 34
+ },
+ "owl-gardener-sit": {
+  "ax": 17,
+  "ay": 52,
+  "h": 53,
+  "sheet": "design/pixel/raw/pose-owl-gardener.png",
+  "w": 35
+ },
+ "owl-gardener-tinker-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl-gardener.png",
+  "w": 38
+ },
+ "owl-gardener-tinker-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl-gardener.png",
+  "w": 38
+ },
+ "owl-gardener-up": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 37
+ },
+ "owl-gardener-up-1": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 36
+ },
+ "owl-gardener-up-2": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 36
+ },
+ "owl-gardener-work": {
+  "ax": 18,
+  "ay": 57,
+  "h": 59,
+  "hx": 18.0,
+  "hy": 17.7,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 36
+ },
+ "owl-gardener-worry": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-gardener.png",
+  "w": 36
+ },
+ "owl-rain-cheer": {
+  "ax": 24,
+  "ay": 54,
+  "h": 55,
+  "hx": 24.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 49
+ },
+ "owl-rain-down": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 38
+ },
+ "owl-rain-down-1": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 37
+ },
+ "owl-rain-down-2": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 37
+ },
+ "owl-rain-hammer-1": {
+  "ax": 20,
+  "ay": 59,
+  "h": 60,
+  "sheet": "design/pixel/raw/pose-owl-rain.png",
+  "w": 39
+ },
+ "owl-rain-hammer-2": {
+  "ax": 15,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-owl-rain.png",
+  "w": 45
+ },
+ "owl-rain-read": {
+  "ax": 17,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-owl-rain.png",
+  "w": 35
+ },
+ "owl-rain-side": {
+  "ax": 17,
+  "ay": 56,
+  "h": 57,
+  "hx": 17.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 34
+ },
+ "owl-rain-side-1": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 34
+ },
+ "owl-rain-side-2": {
+  "ax": 17,
+  "ay": 56,
+  "h": 57,
+  "hx": 17.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 34
+ },
+ "owl-rain-sit": {
+  "ax": 17,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/pose-owl-rain.png",
+  "w": 35
+ },
+ "owl-rain-tinker-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl-rain.png",
+  "w": 41
+ },
+ "owl-rain-tinker-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl-rain.png",
+  "w": 40
+ },
+ "owl-rain-up": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 38
+ },
+ "owl-rain-up-1": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 37
+ },
+ "owl-rain-up-2": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 37
+ },
+ "owl-rain-work": {
+  "ax": 18,
+  "ay": 57,
+  "h": 59,
+  "hx": 18.0,
+  "hy": 17.7,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 36
+ },
+ "owl-rain-worry": {
+  "ax": 19,
+  "ay": 55,
+  "h": 56,
+  "hx": 19.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-rain.png",
+  "w": 38
+ },
+ "owl-winter-cheer": {
+  "ax": 23,
+  "ay": 54,
+  "h": 55,
+  "hx": 23.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 47
+ },
+ "owl-winter-down": {
+  "ax": 18,
+  "ay": 56,
+  "h": 57,
+  "hx": 18.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 36
+ },
+ "owl-winter-down-1": {
+  "ax": 17,
+  "ay": 57,
+  "h": 58,
+  "hx": 17.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 35
+ },
+ "owl-winter-down-2": {
+  "ax": 17,
+  "ay": 57,
+  "h": 58,
+  "hx": 17.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 35
+ },
+ "owl-winter-hammer-1": {
+  "ax": 18,
+  "ay": 58,
+  "h": 59,
+  "sheet": "design/pixel/raw/pose-owl-winter.png",
+  "w": 43
+ },
+ "owl-winter-hammer-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl-winter.png",
+  "w": 47
+ },
+ "owl-winter-read": {
+  "ax": 16,
+  "ay": 58,
+  "h": 59,
+  "sheet": "design/pixel/raw/pose-owl-winter.png",
+  "w": 34
+ },
+ "owl-winter-side": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 33
+ },
+ "owl-winter-side-1": {
+  "ax": 16,
+  "ay": 54,
+  "h": 55,
+  "hx": 16.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 32
+ },
+ "owl-winter-side-2": {
+  "ax": 16,
+  "ay": 54,
+  "h": 55,
+  "hx": 16.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 33
+ },
+ "owl-winter-sit": {
+  "ax": 16,
+  "ay": 58,
+  "h": 59,
+  "sheet": "design/pixel/raw/pose-owl-winter.png",
+  "w": 32
+ },
+ "owl-winter-tinker-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl-winter.png",
+  "w": 40
+ },
+ "owl-winter-tinker-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-owl-winter.png",
+  "w": 37
+ },
+ "owl-winter-up": {
+  "ax": 18,
+  "ay": 54,
+  "h": 55,
+  "hx": 18.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 36
+ },
+ "owl-winter-up-1": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 35
+ },
+ "owl-winter-up-2": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 35
+ },
+ "owl-winter-work": {
+  "ax": 15,
+  "ay": 59,
+  "h": 61,
+  "hx": 15.5,
+  "hy": 18.3,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 31
+ },
+ "owl-winter-worry": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "hx": 16.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-owl-winter.png",
+  "w": 33
+ },
+ "owner-face": {
+  "w": 61,
+  "h": 64,
+  "ax": 30,
+  "ay": 63,
+  "sheet": "design/pixel/raw/owner.png"
+ },
+ "plot-carrot": {
+  "ax": 34,
+  "ay": 60,
+  "h": 62,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 68
+ },
+ "plot-dry": {
+  "ax": 34,
+  "ay": 54,
+  "h": 56,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 68
+ },
+ "plot-empty": {
+  "ax": 34,
+  "ay": 54,
+  "h": 56,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 68
+ },
+ "plot-flowering": {
+  "ax": 34,
+  "ay": 60,
+  "h": 62,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 68
+ },
+ "plot-harvested": {
+  "ax": 34,
+  "ay": 54,
+  "h": 56,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 68
+ },
+ "plot-leafy": {
+  "ax": 34,
+  "ay": 56,
+  "h": 58,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 68
+ },
+ "plot-locked": {
+  "ax": 34,
+  "ay": 57,
+  "h": 59,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 69
+ },
+ "plot-seeded": {
+  "ax": 34,
+  "ay": 54,
+  "h": 56,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 68
+ },
+ "plot-sprout": {
+  "ax": 34,
+  "ay": 54,
+  "h": 56,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 68
+ },
+ "plot-weeds": {
+  "ax": 36,
+  "ay": 64,
+  "h": 66,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 72
+ },
+ "plot-wheat": {
+  "ax": 34,
+  "ay": 63,
+  "h": 65,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 68
+ },
+ "plot-withered": {
+  "ax": 34,
+  "ay": 60,
+  "h": 62,
+  "sheet": "design/pixel/raw/plots.png",
+  "w": 68
+ },
+ "prop-board": {
+  "ax": 30,
+  "ay": 62,
+  "h": 63,
+  "sheet": "design/pixel/raw/props.png",
+  "w": 60
+ },
+ "prop-crates": {
+  "ax": 32,
+  "ay": 49,
+  "h": 50,
+  "sheet": "design/pixel/raw/props.png",
+  "w": 65
+ },
+ "prop-mailbox": {
+  "ax": 10,
+  "ay": 40,
+  "h": 41,
+  "sheet": "design/pixel/raw/props.png",
+  "w": 20
+ },
+ "prop-signpost": {
+  "ax": 16,
+  "ay": 52,
+  "h": 53,
+  "sheet": "design/pixel/raw/props.png",
+  "w": 33
+ },
+ "prop-stall": {
+  "ax": 31,
+  "ay": 59,
+  "h": 60,
+  "sheet": "design/pixel/raw/props.png",
+  "w": 63
+ },
+ "prop-table": {
+  "ax": 32,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/props.png",
+  "w": 65
+ },
+ "rabbit-farmer-cheer": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 43
+ },
+ "rabbit-farmer-down": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 34
+ },
+ "rabbit-farmer-down-1": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "hx": 16.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 33
+ },
+ "rabbit-farmer-down-2": {
+  "ax": 17,
+  "ay": 57,
+  "h": 58,
+  "hx": 17.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 34
+ },
+ "rabbit-farmer-hammer-1": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit.png",
+  "w": 37
+ },
+ "rabbit-farmer-hammer-2": {
+  "ax": 12,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit.png",
+  "w": 40
+ },
+ "rabbit-farmer-read": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit.png",
+  "w": 30
+ },
+ "rabbit-farmer-side": {
+  "ax": 15,
+  "ay": 55,
+  "h": 56,
+  "hx": 15.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 30
+ },
+ "rabbit-farmer-side-1": {
+  "ax": 15,
+  "ay": 54,
+  "h": 55,
+  "hx": 15.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 30
+ },
+ "rabbit-farmer-side-2": {
+  "ax": 15,
+  "ay": 55,
+  "h": 56,
+  "hx": 15.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 31
+ },
+ "rabbit-farmer-sit": {
+  "ax": 15,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-rabbit.png",
+  "w": 30
+ },
+ "rabbit-farmer-tinker-1": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit.png",
+  "w": 29
+ },
+ "rabbit-farmer-tinker-2": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit.png",
+  "w": 29
+ },
+ "rabbit-farmer-up": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "hx": 16.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 32
+ },
+ "rabbit-farmer-up-1": {
+  "ax": 16,
+  "ay": 57,
+  "h": 58,
+  "hx": 16.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 32
+ },
+ "rabbit-farmer-up-2": {
+  "ax": 16,
+  "ay": 58,
+  "h": 59,
+  "hx": 16.0,
+  "hy": 17.7,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 32
+ },
+ "rabbit-farmer-work": {
+  "ax": 20,
+  "ay": 55,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 41
+ },
+ "rabbit-farmer-worry": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit.png",
+  "w": 33
+ },
+ "rabbit-gardener-cheer": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 43
+ },
+ "rabbit-gardener-down": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 33
+ },
+ "rabbit-gardener-down-1": {
+  "ax": 16,
+  "ay": 57,
+  "h": 58,
+  "hx": 16.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 33
+ },
+ "rabbit-gardener-down-2": {
+  "ax": 16,
+  "ay": 57,
+  "h": 58,
+  "hx": 16.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 33
+ },
+ "rabbit-gardener-hammer-1": {
+  "ax": 12,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit-gardener.png",
+  "w": 37
+ },
+ "rabbit-gardener-hammer-2": {
+  "ax": 11,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit-gardener.png",
+  "w": 50
+ },
+ "rabbit-gardener-read": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-rabbit-gardener.png",
+  "w": 32
+ },
+ "rabbit-gardener-side": {
+  "ax": 15,
+  "ay": 55,
+  "h": 56,
+  "hx": 15.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 30
+ },
+ "rabbit-gardener-side-1": {
+  "ax": 15,
+  "ay": 54,
+  "h": 55,
+  "hx": 15.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 30
+ },
+ "rabbit-gardener-side-2": {
+  "ax": 15,
+  "ay": 55,
+  "h": 56,
+  "hx": 15.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 31
+ },
+ "rabbit-gardener-sit": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-rabbit-gardener.png",
+  "w": 32
+ },
+ "rabbit-gardener-tinker-1": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit-gardener.png",
+  "w": 33
+ },
+ "rabbit-gardener-tinker-2": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit-gardener.png",
+  "w": 33
+ },
+ "rabbit-gardener-up": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "hx": 16.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 33
+ },
+ "rabbit-gardener-up-1": {
+  "ax": 16,
+  "ay": 57,
+  "h": 58,
+  "hx": 16.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 33
+ },
+ "rabbit-gardener-up-2": {
+  "ax": 16,
+  "ay": 58,
+  "h": 59,
+  "hx": 16.0,
+  "hy": 17.7,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 32
+ },
+ "rabbit-gardener-work": {
+  "ax": 20,
+  "ay": 55,
+  "h": 58,
+  "hx": 20.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 41
+ },
+ "rabbit-gardener-worry": {
+  "ax": 16,
+  "ay": 54,
+  "h": 55,
+  "hx": 16.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-rabbit-gardener.png",
+  "w": 33
+ },
+ "rabbit-rain-cheer": {
+  "ax": 21,
+  "ay": 56,
+  "h": 57,
+  "hx": 21.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 43
+ },
+ "rabbit-rain-down": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 32
+ },
+ "rabbit-rain-down-1": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 32
+ },
+ "rabbit-rain-down-2": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "hx": 16.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 33
+ },
+ "rabbit-rain-hammer-1": {
+  "ax": 20,
+  "ay": 59,
+  "h": 60,
+  "sheet": "design/pixel/raw/pose-rabbit-rain.png",
+  "w": 36
+ },
+ "rabbit-rain-hammer-2": {
+  "ax": 14,
+  "ay": 56,
+  "h": 57,
+  "sheet": "design/pixel/raw/pose-rabbit-rain.png",
+  "w": 39
+ },
+ "rabbit-rain-read": {
+  "ax": 16,
+  "ay": 58,
+  "h": 59,
+  "sheet": "design/pixel/raw/pose-rabbit-rain.png",
+  "w": 32
+ },
+ "rabbit-rain-side": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "hx": 14.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 29
+ },
+ "rabbit-rain-side-1": {
+  "ax": 15,
+  "ay": 54,
+  "h": 55,
+  "hx": 15.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 30
+ },
+ "rabbit-rain-side-2": {
+  "ax": 15,
+  "ay": 55,
+  "h": 56,
+  "hx": 15.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 31
+ },
+ "rabbit-rain-sit": {
+  "ax": 15,
+  "ay": 58,
+  "h": 59,
+  "sheet": "design/pixel/raw/pose-rabbit-rain.png",
+  "w": 32
+ },
+ "rabbit-rain-tinker-1": {
+  "ax": 15,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit-rain.png",
+  "w": 32
+ },
+ "rabbit-rain-tinker-2": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit-rain.png",
+  "w": 32
+ },
+ "rabbit-rain-up": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "hx": 16.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 32
+ },
+ "rabbit-rain-up-1": {
+  "ax": 16,
+  "ay": 57,
+  "h": 58,
+  "hx": 16.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 32
+ },
+ "rabbit-rain-up-2": {
+  "ax": 16,
+  "ay": 58,
+  "h": 59,
+  "hx": 16.0,
+  "hy": 17.7,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 32
+ },
+ "rabbit-rain-work": {
+  "ax": 20,
+  "ay": 55,
+  "h": 57,
+  "hx": 20.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 41
+ },
+ "rabbit-rain-worry": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-rain.png",
+  "w": 33
+ },
+ "rabbit-winter-cheer": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 43
+ },
+ "rabbit-winter-down": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 32
+ },
+ "rabbit-winter-down-1": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "hx": 16.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 32
+ },
+ "rabbit-winter-down-2": {
+  "ax": 16,
+  "ay": 56,
+  "h": 57,
+  "hx": 16.0,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 32
+ },
+ "rabbit-winter-hammer-1": {
+  "ax": 22,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-rabbit-winter.png",
+  "w": 36
+ },
+ "rabbit-winter-hammer-2": {
+  "ax": 12,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit-winter.png",
+  "w": 39
+ },
+ "rabbit-winter-read": {
+  "ax": 14,
+  "ay": 57,
+  "h": 58,
+  "sheet": "design/pixel/raw/pose-rabbit-winter.png",
+  "w": 30
+ },
+ "rabbit-winter-side": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "hx": 14.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 29
+ },
+ "rabbit-winter-side-1": {
+  "ax": 15,
+  "ay": 54,
+  "h": 55,
+  "hx": 15.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 30
+ },
+ "rabbit-winter-side-2": {
+  "ax": 14,
+  "ay": 54,
+  "h": 55,
+  "hx": 14.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 29
+ },
+ "rabbit-winter-sit": {
+  "ax": 13,
+  "ay": 58,
+  "h": 59,
+  "sheet": "design/pixel/raw/pose-rabbit-winter.png",
+  "w": 27
+ },
+ "rabbit-winter-tinker-1": {
+  "ax": 15,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit-winter.png",
+  "w": 30
+ },
+ "rabbit-winter-tinker-2": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-rabbit-winter.png",
+  "w": 28
+ },
+ "rabbit-winter-up": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "hx": 16.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 33
+ },
+ "rabbit-winter-up-1": {
+  "ax": 16,
+  "ay": 57,
+  "h": 58,
+  "hx": 16.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 32
+ },
+ "rabbit-winter-up-2": {
+  "ax": 16,
+  "ay": 58,
+  "h": 59,
+  "hx": 16.0,
+  "hy": 17.7,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 32
+ },
+ "rabbit-winter-work": {
+  "ax": 20,
+  "ay": 55,
+  "h": 58,
+  "hx": 20.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 40
+ },
+ "rabbit-winter-worry": {
+  "ax": 14,
+  "ay": 54,
+  "h": 55,
+  "hx": 14.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-rabbit-winter.png",
+  "w": 29
+ },
+ "raccoon-farmer-cheer": {
+  "ax": 24,
+  "ay": 53,
+  "h": 54,
+  "hx": 24.0,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 48
+ },
+ "raccoon-farmer-down": {
+  "ax": 21,
+  "ay": 54,
+  "h": 55,
+  "hx": 21.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 43
+ },
+ "raccoon-farmer-down-1": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 42
+ },
+ "raccoon-farmer-down-2": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 41
+ },
+ "raccoon-farmer-hammer-1": {
+  "ax": 24,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/pose-raccoon.png",
+  "w": 50
+ },
+ "raccoon-farmer-hammer-2": {
+  "ax": 24,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-raccoon.png",
+  "w": 52
+ },
+ "raccoon-farmer-read": {
+  "ax": 16,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/pose-raccoon.png",
+  "w": 39
+ },
+ "raccoon-farmer-side": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 41
+ },
+ "raccoon-farmer-side-1": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 42
+ },
+ "raccoon-farmer-side-2": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 42
+ },
+ "raccoon-farmer-sit": {
+  "ax": 16,
+  "ay": 52,
+  "h": 53,
+  "sheet": "design/pixel/raw/pose-raccoon.png",
+  "w": 40
+ },
+ "raccoon-farmer-tinker-1": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon.png",
+  "w": 36
+ },
+ "raccoon-farmer-tinker-2": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon.png",
+  "w": 33
+ },
+ "raccoon-farmer-up": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 36
+ },
+ "raccoon-farmer-up-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 36
+ },
+ "raccoon-farmer-up-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 37
+ },
+ "raccoon-farmer-work": {
+  "ax": 23,
+  "ay": 54,
+  "h": 55,
+  "hx": 23.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 46
+ },
+ "raccoon-farmer-worry": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon.png",
+  "w": 42
+ },
+ "raccoon-gardener-cheer": {
+  "ax": 24,
+  "ay": 53,
+  "h": 54,
+  "hx": 24.5,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 49
+ },
+ "raccoon-gardener-down": {
+  "ax": 21,
+  "ay": 53,
+  "h": 54,
+  "hx": 21.5,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 43
+ },
+ "raccoon-gardener-down-1": {
+  "ax": 21,
+  "ay": 54,
+  "h": 55,
+  "hx": 21.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 43
+ },
+ "raccoon-gardener-down-2": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "hx": 20.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 41
+ },
+ "raccoon-gardener-hammer-1": {
+  "ax": 27,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-raccoon-gardener.png",
+  "w": 45
+ },
+ "raccoon-gardener-hammer-2": {
+  "ax": 23,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-raccoon-gardener.png",
+  "w": 56
+ },
+ "raccoon-gardener-read": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon-gardener.png",
+  "w": 41
+ },
+ "raccoon-gardener-side": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 41
+ },
+ "raccoon-gardener-side-1": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 42
+ },
+ "raccoon-gardener-side-2": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 42
+ },
+ "raccoon-gardener-sit": {
+  "ax": 16,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-raccoon-gardener.png",
+  "w": 41
+ },
+ "raccoon-gardener-tinker-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon-gardener.png",
+  "w": 38
+ },
+ "raccoon-gardener-tinker-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon-gardener.png",
+  "w": 36
+ },
+ "raccoon-gardener-up": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 37
+ },
+ "raccoon-gardener-up-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 37
+ },
+ "raccoon-gardener-up-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 37
+ },
+ "raccoon-gardener-work": {
+  "ax": 23,
+  "ay": 53,
+  "h": 54,
+  "hx": 23.0,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 46
+ },
+ "raccoon-gardener-worry": {
+  "ax": 21,
+  "ay": 54,
+  "h": 55,
+  "hx": 21.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-raccoon-gardener.png",
+  "w": 42
+ },
+ "raccoon-rain-cheer": {
+  "ax": 24,
+  "ay": 53,
+  "h": 54,
+  "hx": 24.0,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 48
+ },
+ "raccoon-rain-down": {
+  "ax": 22,
+  "ay": 54,
+  "h": 55,
+  "hx": 22.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 44
+ },
+ "raccoon-rain-down-1": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 43
+ },
+ "raccoon-rain-down-2": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 43
+ },
+ "raccoon-rain-hammer-1": {
+  "ax": 24,
+  "ay": 58,
+  "h": 59,
+  "sheet": "design/pixel/raw/pose-raccoon-rain.png",
+  "w": 49
+ },
+ "raccoon-rain-hammer-2": {
+  "ax": 24,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/pose-raccoon-rain.png",
+  "w": 61
+ },
+ "raccoon-rain-read": {
+  "ax": 18,
+  "ay": 54,
+  "h": 55,
+  "sheet": "design/pixel/raw/pose-raccoon-rain.png",
+  "w": 42
+ },
+ "raccoon-rain-side": {
+  "ax": 20,
+  "ay": 56,
+  "h": 57,
+  "hx": 20.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 41
+ },
+ "raccoon-rain-side-1": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 42
+ },
+ "raccoon-rain-side-2": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 42
+ },
+ "raccoon-rain-sit": {
+  "ax": 18,
+  "ay": 50,
+  "h": 51,
+  "sheet": "design/pixel/raw/pose-raccoon-rain.png",
+  "w": 42
+ },
+ "raccoon-rain-tinker-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon-rain.png",
+  "w": 40
+ },
+ "raccoon-rain-tinker-2": {
+  "ax": 16,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon-rain.png",
+  "w": 35
+ },
+ "raccoon-rain-up": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 37
+ },
+ "raccoon-rain-up-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 36
+ },
+ "raccoon-rain-up-2": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "hx": 18.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 37
+ },
+ "raccoon-rain-work": {
+  "ax": 22,
+  "ay": 53,
+  "h": 54,
+  "hx": 22.5,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 45
+ },
+ "raccoon-rain-worry": {
+  "ax": 21,
+  "ay": 55,
+  "h": 56,
+  "hx": 21.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-rain.png",
+  "w": 42
+ },
+ "raccoon-winter-cheer": {
+  "ax": 23,
+  "ay": 53,
+  "h": 54,
+  "hx": 23.0,
+  "hy": 16.2,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 46
+ },
+ "raccoon-winter-down": {
+  "ax": 20,
+  "ay": 55,
+  "h": 56,
+  "hx": 20.5,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 41
+ },
+ "raccoon-winter-down-1": {
+  "ax": 20,
+  "ay": 57,
+  "h": 58,
+  "hx": 20.0,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 40
+ },
+ "raccoon-winter-down-2": {
+  "ax": 19,
+  "ay": 57,
+  "h": 58,
+  "hx": 19.5,
+  "hy": 17.4,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 39
+ },
+ "raccoon-winter-hammer-1": {
+  "ax": 22,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/pose-raccoon-winter.png",
+  "w": 47
+ },
+ "raccoon-winter-hammer-2": {
+  "ax": 23,
+  "ay": 53,
+  "h": 54,
+  "sheet": "design/pixel/raw/pose-raccoon-winter.png",
+  "w": 52
+ },
+ "raccoon-winter-read": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon-winter.png",
+  "w": 36
+ },
+ "raccoon-winter-side": {
+  "ax": 19,
+  "ay": 54,
+  "h": 55,
+  "hx": 19.5,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 39
+ },
+ "raccoon-winter-side-1": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "hx": 20.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 40
+ },
+ "raccoon-winter-side-2": {
+  "ax": 20,
+  "ay": 54,
+  "h": 55,
+  "hx": 20.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 40
+ },
+ "raccoon-winter-sit": {
+  "ax": 14,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon-winter.png",
+  "w": 36
+ },
+ "raccoon-winter-tinker-1": {
+  "ax": 18,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon-winter.png",
+  "w": 37
+ },
+ "raccoon-winter-tinker-2": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "sheet": "design/pixel/raw/pose-raccoon-winter.png",
+  "w": 35
+ },
+ "raccoon-winter-up": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 34
+ },
+ "raccoon-winter-up-1": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 34
+ },
+ "raccoon-winter-up-2": {
+  "ax": 17,
+  "ay": 55,
+  "h": 56,
+  "hx": 17.0,
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 34
+ },
+ "raccoon-winter-work": {
+  "ax": 22,
+  "ay": 56,
+  "h": 57,
+  "hx": 22.5,
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 45
+ },
+ "raccoon-winter-worry": {
+  "ax": 19,
+  "ay": 54,
+  "h": 55,
+  "hx": 19.0,
+  "hy": 16.5,
+  "sheet": "design/pixel/raw/char-raccoon-winter.png",
+  "w": 38
+ },
+ "ragdoll-awake": {
+  "ax": 18,
+  "ay": 39,
+  "h": 40,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 37
+ },
+ "ragdoll-bark": {
+  "ax": 20,
+  "ay": 38,
+  "h": 39,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 40
+ },
+ "ragdoll-belly": {
+  "ax": 25,
+  "ay": 29,
+  "h": 30,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 51
+ },
+ "ragdoll-jump": {
+  "ax": 23,
+  "ay": 32,
+  "h": 33,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 46
+ },
+ "ragdoll-lie": {
+  "ax": 22,
+  "ay": 32,
+  "h": 33,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 45
+ },
+ "ragdoll-scratch": {
+  "ax": 19,
+  "ay": 37,
+  "h": 38,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 39
+ },
+ "ragdoll-sleep": {
+  "ax": 22,
+  "ay": 26,
+  "h": 27,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 45
+ },
+ "ragdoll-stand": {
+  "ax": 21,
+  "ay": 38,
+  "h": 39,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 43
+ },
+ "ragdoll-stretch": {
+  "ax": 21,
+  "ay": 39,
+  "h": 40,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 43
+ },
+ "ragdoll-wag-1": {
+  "ax": 18,
+  "ay": 39,
+  "h": 40,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 36
+ },
+ "ragdoll-wag-2": {
+  "ax": 18,
+  "ay": 39,
+  "h": 40,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 37
+ },
+ "ragdoll-yawn": {
+  "ax": 19,
+  "ay": 39,
+  "h": 40,
+  "sheet": "design/pixel/raw/ragdoll.png",
+  "w": 38
+ },
+ "stamp-done": {
+  "ax": 34,
+  "ay": 69,
+  "h": 70,
+  "sheet": "design/pixel/raw/ui-medals.png",
+  "w": 68
+ }
+}

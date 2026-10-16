@@ -1,0 +1,445 @@
+// The chat: the protocol's chat rules as ported (unread, channels, mentions, schedules in words), the desk's chat page
+// (channels with unread counts, a channel's messages, the read cursor, sending into a conversation) and the farm's
+// chat window (the square, a thread opened from its chip, history paging, sending), over a fake FarmState and a
+// VibeValleyApi on a MockClient.
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:vibevalley/app/theme.dart';
+import 'package:vibevalley/data/providers.dart';
+import 'package:vibevalley/data/server.dart';
+import 'package:vibevalley/desk/chat/chat_page.dart';
+import 'package:vibevalley/desk/chat/chat_rules.dart';
+import 'package:vibevalley/desk/chat/chat_state.dart';
+import 'package:vibevalley/desk/chat/chat_widgets.dart';
+import 'package:vibevalley/desktop/desktop.dart';
+import 'package:vibevalley/farm/chat_window.dart';
+import 'package:vibevalley/gen/vibevalley.dart';
+import 'package:vibevalley/sprites/atlas.dart';
+import 'package:vibevalley/village/village_view.dart' show agentsProvider;
+import 'package:vibevalley/voice/voice.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vibevalley/rules/chat.dart';
+import 'package:vibevalley/rules/farm.dart';
+import 'package:vibevalley/rules/index.dart';
+import 'package:vibevalley/rules/schedules.dart';
+
+final _now = DateTime.now().millisecondsSinceEpoch.toDouble();
+
+ChatMessage _msg(double seq, double conv, String from, SenderKind kind, String text, {MessageKind type = MessageKind.chat, String? name, bool done = true}) =>
+    ChatMessage(
+      seq: seq,
+      conversation: conv,
+      from: from,
+      fromKind: kind,
+      name:
+          name ??
+          (kind == SenderKind.foreman
+              ? '管家'
+              : kind == SenderKind.user
+              ? '主人'
+              : '测试小吴'),
+      agent: kind == SenderKind.helper ? 'tester' : null,
+      kind: type,
+      text: text,
+      final_: done,
+      outcome: type == MessageKind.report ? Outcome.completed : null,
+      at: _now - (10 - seq) * 1000,
+    );
+
+const _helper = Helper(
+  id: 'w1',
+  name: '测试小吴',
+  agent: 'tester',
+  runtime: 'claude',
+  task: '跑一遍测试',
+  hiredAt: 0,
+  turns: 1,
+  phase: PhaseWorking(
+    since: 0,
+    doing: Doing(action: WorkerAction.runCommand, label: 'pnpm test'),
+  ),
+  channel: 1,
+);
+
+/// The square (two unread from the manager), #clock-in (one unread), and w1's job thread under the dispatch.
+FarmState _state({CallState call = CallState.live, double squareRead = 0, List<ChatMessage> more = const []}) => FarmState(
+  call: call,
+  foreman: ForemanState.listening,
+  helpers: const [_helper],
+  chat: Chat(
+    conversations: [
+      Conversation(id: 1, kind: ConversationKind.square, name: '田头', replies: 0, read: squareRead, at: 0, lastSeq: 2),
+      const Conversation(id: 2, kind: ConversationKind.channel, name: 'clock-in', description: '打卡', project: 'clock-in', replies: 0, at: 1, lastSeq: 4),
+      const Conversation(
+        id: 3,
+        kind: ConversationKind.thread,
+        parent: 2,
+        channel: 1,
+        subjectKind: SubjectKind.job,
+        subjectId: 'w1',
+        replies: 1,
+        at: 2,
+        lastSeq: 3,
+      ),
+    ],
+    messages: [
+      _msg(1, 1, 'foreman', SenderKind.foreman, '农场开门了'),
+      _msg(2, 1, 'foreman', SenderKind.foreman, '派给 @w1 跑测试', type: MessageKind.dispatch),
+      _msg(3, 3, 'w1', SenderKind.helper, '测试都过了', type: MessageKind.report),
+      _msg(4, 2, 'w1', SenderKind.helper, '打卡页改好了'),
+      ...more,
+    ],
+  ),
+  schedules: const [
+    FarmSchedule(
+      id: 5,
+      name: '早测',
+      text: '跑一遍测试',
+      channel: 2,
+      when: ScheduleWhenDaily(time: '09:00'),
+      tz: 'Asia/Shanghai',
+      enabled: true,
+      created: 0,
+    ),
+  ],
+);
+
+/// The requests the fake server saw, and what it answers.
+class _Server {
+  final seen = <http.Request>[];
+  late final api = VibeValleyApi(
+    Uri.parse('http://farm.test'),
+    MockClient((r) async {
+      seen.add(r);
+      if (r.method == 'GET' && r.url.path.endsWith('/messages')) {
+        return http.Response(
+          jsonEncode(r.url.path.contains('/3/') ? [_msg(2, 1, 'foreman', SenderKind.foreman, '派给 @w1 跑测试').toJson()] : []),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (r.url.path == '/api/projects') return http.Response('[]', 200);
+      return http.Response('', 204);
+    }),
+  );
+
+  Iterable<http.Request> to(String method, String path) => seen.where((r) => r.method == method && r.url.path == path);
+}
+
+final _atlas = SpriteAtlas.parse(File('assets/pixel/sprites.json').readAsStringSync());
+
+StateFrame _frame(FarmState state) => StateFrame(
+  SiteFrame(
+    state: state,
+    inbox: const [],
+    plans: const [],
+    view: const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {}),
+    effects: const [],
+  ),
+  bytes: 0,
+  decodeMicros: 0,
+);
+
+/// `later`: the states after the first, as the server sends them; `still`: the system asks for less motion.
+Future<void> _pump(WidgetTester t, Widget child, _Server server, FarmState state, {Stream<FarmState>? later, bool still = false}) async {
+  t.view.physicalSize = const Size(1440, 900);
+  t.view.devicePixelRatio = 1;
+  addTearDown(t.view.reset);
+  Stream<StateFrame> frames() async* {
+    yield _frame(state);
+    if (later != null) yield* later.map(_frame);
+  }
+
+  await t.pumpWidget(
+    ProviderScope(
+      overrides: [
+        stateFrameProvider.overrideWith((ref) => frames()),
+        atlasProvider.overrideWith((ref) async => _atlas),
+        agentsProvider.overrideWith((ref) async => const <String, AgentProfile>{}),
+        chatApiProvider.overrideWithValue(server.api),
+        desktopProvider.overrideWithValue(Desktop.none),
+      ],
+      child: MaterialApp(
+        theme: farmTheme(),
+        home: Scaffold(
+          body: still
+              ? Builder(
+                  builder: (context) => MediaQuery(data: MediaQuery.of(context).copyWith(disableAnimations: true), child: child),
+                )
+              : child,
+        ),
+      ),
+    ),
+  );
+  for (var i = 0; i < 5; i++) {
+    await t.pump(const Duration(milliseconds: 20));
+  }
+}
+
+Finder _rich(String text) => find.textContaining(text, findRichText: true);
+
+void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  group('chat rules', () {
+    final chat = _state().chat;
+
+    test('channels: the square first; unread counts the others\' finished words, threads under their channel', () {
+      expect(channelsOf(chat).map((c) => c.id), [1, 2]);
+      expect(unreadIn(chat, chat!.conversations[0]), 2);
+      expect(unreadUnder(chat, chat.conversations[0]), 3);
+      expect(unreadUnder(chat, chat.conversations[1]), 1);
+      expect(unreadTotal(chat), 4);
+      expect(newestUnread(chat, chat.conversations[0]), 2);
+      expect(jobThreadOf(chat, 'w1')?.id, 3);
+      expect(channelOf(chat, chat.conversations[2])?.id, 1);
+      expect(addressOf(chat, chat.conversations[2]), '#田头:2');
+      expect(addressOf(chat, chat.conversations[1]), '#clock-in');
+      expect(channelLabel(chat.conversations[1]), '#clock-in');
+      expect(channelLabel(chat.conversations[0]), '田头');
+    });
+
+    test('who a message names; the @word at the caret; whom it offers', () {
+      expect(mentionsIn('@w3你看 @管家 `@w4` @所有人 @w3'), ['w3', 'foreman', 'everyone']);
+      expect(mentionsIn('mail@w1'), isEmpty);
+      expect(typedName('叫 @w', 4), (start: 2, query: 'w'));
+      expect(typedName('a@w', 3), isNull);
+      final all = nameables(const [_helper], _now);
+      expect(all.map((n) => n.token), ['@w1', '@管家']);
+      expect(offeredFor(all, '管').single.token, '@管家');
+      expect(offeredFor(all, '小吴').single.token, '@w1');
+    });
+
+    test('the thread items carry their thread; spoken lines weave into the square only', () {
+      final square = chat!.conversations[0];
+      final line = Line(id: 1, role: LineRole.user, text: '说一句', final_: true, at: _now - 8500);
+      final items = itemsOf(chat, square, [line]);
+      expect(items.map((i) => i.key), ['m1', 's1', 'm2']);
+      expect((items.last as MessageItem).thread?.id, 3);
+      expect(itemsOf(chat, chat.conversations[1], [line]).map((i) => i.key), ['m4']);
+      final more = const Loaded([], complete: false).merge([_msg(0.5, 3, 'user', SenderKind.user, '早')], complete: true);
+      expect(messagesOf(chat, 3, more).map((m) => m.seq), [0.5, 3]);
+      expect(more.complete, isTrue);
+    });
+
+    test('a helper and a schedule in words', () {
+      expect(phaseText(_helper, _now), '在跑命令：pnpm test');
+      expect(spentText(const Spent(tokens: 26000, cny: 0.031)), '约 ¥0.03 · 2.6 万 token');
+      expect(whenText(const ScheduleWhenWeekly(days: [3, 1, 1], time: '09:00'), 'UTC'), '每周一、三 09:00');
+      expect(whenText(const ScheduleWhenEvery(minutes: 120), 'UTC'), '每 2 小时');
+      final created = DateTime(2026, 10, 13, 8).millisecondsSinceEpoch.toDouble();
+      final daily = FarmSchedule(
+        id: 1,
+        name: 'a',
+        text: 'b',
+        channel: 1,
+        when: const ScheduleWhenDaily(time: '09:00'),
+        tz: 'UTC',
+        enabled: true,
+        created: created,
+      );
+      expect(nextRun(daily), DateTime(2026, 10, 13, 9).millisecondsSinceEpoch);
+      expect(nextText(daily), '10/13 09:00');
+      final off = FarmSchedule(
+        id: 1,
+        name: 'a',
+        text: 'b',
+        channel: 1,
+        when: ScheduleWhenOnce(at: created),
+        tz: 'UTC',
+        enabled: false,
+        created: 0,
+        lastRun: created,
+      );
+      expect(nextText(off), '做过了');
+    });
+  });
+
+  group('the desk chat page', () {
+    testWidgets('channels with unread, the square shown and read, a thread preview under the dispatch', (t) async {
+      final server = _Server();
+      await _pump(t, const ChatPage(), server, _state());
+      expect(find.text('频道'), findsOneWidget);
+      expect(find.text('clock-in'), findsOneWidget);
+      // 田头: two on the square and one in w1's thread; clock-in: one.
+      expect(find.text('3'), findsOneWidget);
+      expect(find.text('1'), findsWidgets);
+      expect(_rich('农场开门了'), findsOneWidget);
+      expect(_rich('1 条回复'), findsOneWidget);
+      expect(find.text('派活'), findsOneWidget);
+      // What is on screen is read: the square up to its newest message.
+      final read = server.to('POST', '/api/chat/1/read');
+      expect(read, hasLength(1));
+      expect(jsonDecode(read.single.body), {'seq': 2});
+    });
+
+    for (final still in [false, true]) {
+      testWidgets(
+        still
+            ? 'with less motion asked for, a message that comes in just appears'
+            : 'a message that comes in while it is open rises into place; the first ones just appear',
+        (t) async {
+          final later = StreamController<FarmState>();
+          addTearDown(later.close);
+          await _pump(t, const ChatPage(), _Server(), _state(), later: later.stream, still: still);
+          Finder fading(String text) => find.ancestor(of: _rich(text), matching: find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1));
+          expect(_rich('农场开门了'), findsWidgets);
+          expect(fading('农场开门了'), findsNothing);
+
+          later.add(_state(more: [_msg(6, 1, 'foreman', SenderKind.foreman, '新来的一句')]));
+          await t.pump();
+          await t.pump(const Duration(milliseconds: 60));
+          expect(_rich('新来的一句'), findsWidgets);
+          expect(fading('新来的一句'), still ? findsNothing : findsWidgets);
+          expect(fading('农场开门了'), findsNothing);
+          await t.pump(const Duration(milliseconds: 300));
+          expect(fading('新来的一句'), findsNothing);
+        },
+      );
+    }
+
+    testWidgets('a channel opens with its history; typing there says it in that conversation', (t) async {
+      final server = _Server();
+      await _pump(t, const ChatPage(), server, _state());
+      await t.tap(find.text('clock-in'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(server.to('GET', '/api/chat/2/messages').single.url.queryParameters, {'limit': '50'});
+      expect(_rich('打卡页改好了'), findsOneWidget);
+      expect(find.text('打卡 · 默认项目 clock-in'), findsOneWidget);
+      await t.enterText(find.byType(TextField).first, '今天把打卡做完');
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump(const Duration(milliseconds: 50));
+      final say = server.to('POST', '/api/say');
+      expect(say, hasLength(1));
+      expect(jsonDecode(say.single.body), {'text': '今天把打卡做完', 'conversation': 2});
+    });
+
+    testWidgets('@ offers whom to name; Enter names, then Enter sends on the square', (t) async {
+      final server = _Server();
+      await _pump(t, const ChatPage(), server, _state());
+      final field = find.byType(TextField).first;
+      await t.enterText(field, '叫 @w');
+      await t.pump();
+      expect(find.byType(NamingMenu), findsOneWidget);
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump();
+      expect(t.widget<TextField>(field).controller!.text, '叫 @w1 ');
+      expect(server.to('POST', '/api/say'), isEmpty);
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump(const Duration(milliseconds: 50));
+      expect(jsonDecode(server.to('POST', '/api/say').single.body), {'text': '叫 @w1'});
+    });
+
+    testWidgets('the thread opens on the right; the schedules tab lists and switches them', (t) async {
+      final server = _Server();
+      await _pump(t, const ChatPage(), server, _state());
+      await t.tap(_rich('1 条回复'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(find.text('测试小吴的工单串'), findsOneWidget);
+      expect(server.to('GET', '/api/chat/3/messages'), hasLength(1));
+      expect(_rich('测试都过了'), findsWidgets);
+      expect(find.text('做完了'), findsOneWidget);
+
+      await t.tap(find.text('clock-in'));
+      await t.pump(const Duration(milliseconds: 50));
+      await t.tap(find.text('定时'));
+      await t.pump();
+      expect(find.text('跑一遍测试'), findsOneWidget);
+      await t.tap(find.text('开着'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(jsonDecode(server.to('PUT', '/api/schedules/5').single.body), {'enabled': false});
+      // The trash glyph; a second press, on its words, deletes.
+      await t.tap(find.byTooltip('删掉'));
+      await t.pump();
+      await t.tap(find.text('确定删？'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(server.to('DELETE', '/api/schedules/5'), hasLength(1));
+    });
+  });
+
+  group('the farm chat window', () {
+    Widget window(_Server server, FarmState state, List<String> said) => Align(
+      alignment: Alignment.bottomRight,
+      child: Consumer(
+        builder: (context, ref, _) => ChatWindow(
+          state: ref.watch(farmProvider) ?? state,
+          atlas: _atlas,
+          agents: const {},
+          call: VoiceCall(VibeValleyServer(Uri.parse('http://farm.test'))),
+          onSay: (text) async => said.add(text),
+        ),
+      ),
+    );
+
+    testWidgets('the square in bubbles; typing there goes through the host; the thread chip opens the thread', (t) async {
+      final server = _Server();
+      final said = <String>[];
+      await _pump(t, window(server, _state(), said), server, _state());
+      expect(_rich('农场开门了'), findsOneWidget);
+      expect(find.text('管家在听'), findsOneWidget);
+      // Elsewhere: clock-in and the thread have new words.
+      expect(find.text('2 处有新话'), findsOneWidget);
+
+      await t.enterText(find.byType(TextField), '现在进度怎么样？');
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump(const Duration(milliseconds: 50));
+      expect(said, ['现在进度怎么样？']);
+
+      await t.tap(find.text('1 条回复'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(find.text('测试小吴的工单串'), findsOneWidget);
+      expect(find.text('@w1'), findsWidgets);
+      expect(_rich('测试都过了'), findsOneWidget);
+      await t.enterText(find.byType(TextField), '再跑一次');
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump(const Duration(milliseconds: 50));
+      expect(jsonDecode(server.to('POST', '/api/say').single.body), {'text': '再跑一次', 'conversation': 3});
+
+      // Back to the square.
+      await t.tap(find.bySemanticsLabel('回到田头').first);
+      await t.pump(const Duration(milliseconds: 50));
+      expect(find.text('测试小吴的工单串'), findsNothing);
+      expect(_rich('农场开门了'), findsOneWidget);
+    });
+
+    testWidgets('an empty square greets; folding leaves the input row', (t) async {
+      final server = _Server();
+      final empty = FarmState(
+        call: CallState.idle,
+        foreman: ForemanState.idle,
+        helpers: const [],
+        chat: const Chat(conversations: [], messages: []),
+      );
+      await _pump(t, window(server, empty, []), server, empty);
+      expect(_rich('这里是田头'), findsOneWidget);
+      expect(find.text('打字或者按麦克风，就开工'), findsOneWidget);
+      expect(find.text('让测试小吴跑一遍测试'), findsOneWidget);
+      await t.tap(find.bySemanticsLabel('收起对话').first);
+      await t.pump(const Duration(milliseconds: 300));
+      expect(_rich('这里是田头'), findsNothing);
+      expect(find.byType(TextField), findsOneWidget);
+    });
+
+    testWidgets('the channel menu lists channels with unread and switches', (t) async {
+      final server = _Server();
+      await _pump(t, window(server, _state(), []), server, _state());
+      await t.tap(find.bySemanticsLabel(RegExp('^频道：田头')));
+      await t.pump();
+      expect(find.text('#clock-in'), findsOneWidget);
+      expect(find.text('开新频道'), findsOneWidget);
+      expect(find.text('定时 1'), findsOneWidget);
+      await t.tap(find.text('#clock-in'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(_rich('打卡页改好了'), findsOneWidget);
+    });
+  });
+}

@@ -1,0 +1,6 @@
+Create ONE icon sheet, size 1536x1024: 12 game UI icons in a grid of 4 columns x 3 rows, one icon centered in each cell.
+Painted in the same soft hand-painted style as the icons in Image 1 (gentle shading, soft brown outline, warm colors). Draw only the object: no circle, no badge, no frame and no button behind it.
+Row 1: (1) an open hand; (2) a green watering can; (3) a red ladybug; (4) a pulled tuft of green weeds with roots.
+Row 2: (5) a golden wheat bundle tied with string; (6) a small garden shovel; (7) a little market stall with a striped awning; (8) a wooden storage crate.
+Row 3: (9) a clipboard with a checklist; (10) a green book with a bookmark; (11) a shiny gold coin; (12) a round alarm clock.
+No text, no letters.

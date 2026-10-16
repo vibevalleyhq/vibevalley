@@ -1,0 +1,41 @@
+{"method":"turn/started","turn":{"id":"01a03786-61c9-7dc1-91fd-21b1b919a629"}}
+{"method":"item/started","item":{"type":"userMessage","id":"01a03786-66a3-7dc0-a61a-b8a1f80fd074"}}
+{"method":"item/completed","item":{"type":"userMessage","id":"01a03786-66a3-7dc0-a61a-b8a1f80fd074"}}
+{"method":"item/started","item":{"type":"agentMessage","id":"msg_08005eb6eab85579016a8d30c063f087d096a4de742bb7e8b8"}}
+{"method":"item/agentMessage/delta","delta":"I"}
+{"method":"item/agentMessage/delta","delta":"’ll"}
+{"method":"item/agentMessage/delta","delta":" run"}
+{"method":"item/agentMessage/delta","delta":" that"}
+{"method":"item/agentMessage/delta","delta":" exact"}
+{"method":"item/agentMessage/delta","delta":" command"}
+{"method":"item/agentMessage/delta","delta":" now"}
+{"method":"item/agentMessage/delta","delta":"."}
+{"method":"item/completed","item":{"type":"agentMessage","id":"msg_08005eb6eab85579016a8d30c063f087d096a4de742bb7e8b8"}}
+{"method":"item/started","item":{"type":"commandExecution","id":"exec-7a5b91e9-3412-4097-8c20-f79d241d03a3","command":"/bin/bash -lc 'echo oar-codex-marker'","aggregatedOutput":null}}
+{"method":"item/completed","item":{"type":"commandExecution","id":"exec-7a5b91e9-3412-4097-8c20-f79d241d03a3","command":"/bin/bash -lc 'echo oar-codex-marker'","aggregatedOutput":"oar-codex-marker\n"}}
+{"method":"item/started","item":{"type":"agentMessage","id":"msg_08005eb6eab85579016a8d30c3ee0c87d0a6dc50b58f0b7607"}}
+{"method":"item/agentMessage/delta","delta":"Ran"}
+{"method":"item/agentMessage/delta","delta":" `"}
+{"method":"item/agentMessage/delta","delta":"echo"}
+{"method":"item/agentMessage/delta","delta":" o"}
+{"method":"item/agentMessage/delta","delta":"ar"}
+{"method":"item/agentMessage/delta","delta":"-c"}
+{"method":"item/agentMessage/delta","delta":"od"}
+{"method":"item/agentMessage/delta","delta":"ex"}
+{"method":"item/agentMessage/delta","delta":"-marker"}
+{"method":"item/agentMessage/delta","delta":"`."}
+{"method":"item/agentMessage/delta","delta":" Output"}
+{"method":"item/agentMessage/delta","delta":":\n\n"}
+{"method":"item/agentMessage/delta","delta":"```"}
+{"method":"item/agentMessage/delta","delta":"text"}
+{"method":"item/agentMessage/delta","delta":"\n"}
+{"method":"item/agentMessage/delta","delta":"o"}
+{"method":"item/agentMessage/delta","delta":"ar"}
+{"method":"item/agentMessage/delta","delta":"-c"}
+{"method":"item/agentMessage/delta","delta":"od"}
+{"method":"item/agentMessage/delta","delta":"ex"}
+{"method":"item/agentMessage/delta","delta":"-marker"}
+{"method":"item/agentMessage/delta","delta":"\n"}
+{"method":"item/agentMessage/delta","delta":"```"}
+{"method":"item/completed","item":{"type":"agentMessage","id":"msg_08005eb6eab85579016a8d30c3ee0c87d0a6dc50b58f0b7607"}}
+{"method":"turn/completed","turn":{"status":"completed"}}

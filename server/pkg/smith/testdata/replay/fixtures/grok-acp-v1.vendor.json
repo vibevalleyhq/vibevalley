@@ -1,0 +1,123 @@
+{
+  "runtime": "grok",
+  "observedAt": "2026-08-26",
+  "version": "grok 1.0.5 (5115b46bc9)",
+  "initialize": {
+    "protocolVersion": 1,
+    "authMethodIds": [
+      "cached_token",
+      "grok.com"
+    ],
+    "defaultAuthMethodId": "cached_token",
+    "loadSession": true,
+    "sessionCapabilities": [
+      "close",
+      "list",
+      "resume"
+    ]
+  },
+  "sessionNew": {
+    "configOptionIds": [],
+    "modeIds": [],
+    "modelIds": [
+      "grok-4.6",
+      "grok-4.5"
+    ]
+  },
+  "prompt": {
+    "stopReason": "end_turn",
+    "metaKeys": [
+      "cachedReadTokens",
+      "inputTokens",
+      "modelId",
+      "outputTokens",
+      "promptId",
+      "reasoningTokens",
+      "requestId",
+      "sessionId",
+      "totalTokens",
+      "usage"
+    ],
+    "permissionRequests": [],
+    "terminalRequests": [
+      {
+        "method": "terminal/create",
+        "paramKeys": [
+          "command",
+          "cwd",
+          "env",
+          "outputByteLimit",
+          "sessionId"
+        ]
+      },
+      {
+        "method": "terminal/wait_for_exit",
+        "paramKeys": [
+          "sessionId",
+          "terminalId"
+        ]
+      },
+      {
+        "method": "terminal/output",
+        "paramKeys": [
+          "sessionId",
+          "terminalId"
+        ]
+      },
+      {
+        "method": "terminal/release",
+        "paramKeys": [
+          "sessionId",
+          "terminalId"
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "sessionUpdate": "tool_call",
+        "title": "run_terminal_command",
+        "rawInputKeys": [
+          "command",
+          "description"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "Execute `printf OAR_ACP_SNAPSHOT_OK`",
+        "kind": "execute",
+        "rawInputKeys": [
+          "command",
+          "description",
+          "is_background",
+          "variant"
+        ],
+        "contentTypes": [
+          "content"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "status": "completed",
+        "rawOutputKeys": [
+          "command",
+          "current_dir",
+          "description",
+          "exit_code",
+          "output",
+          "output_file",
+          "output_for_prompt",
+          "signal",
+          "timed_out",
+          "total_bytes",
+          "truncated",
+          "type",
+          "was_bare_echo"
+        ],
+        "contentTypes": [
+          "content"
+        ],
+        "rawOutputType": "object"
+      }
+    ]
+  }
+}

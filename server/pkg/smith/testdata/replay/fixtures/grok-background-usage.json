@@ -1,0 +1,852 @@
+{
+  "source": "grok 1.0.50 (c58f321264ba), 2026-10-10, experiments/grok-background-usage.ts; native frames, ephemeral session IDs normalized",
+  "scenarios": [
+    {
+      "scenario": "foreground",
+      "frames": [
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "subagent_spawned",
+              "subagent_id": "fake-child",
+              "attempt_id": "at1.8082e8b8ed7d4382912ddf9c1301dcb0",
+              "parent_session_id": "fake-session",
+              "parent_prompt_id": "37ddb60c-eea2-4eb7-a058-2a0662001695",
+              "child_session_id": "fake-child",
+              "subagent_type": "general-purpose",
+              "description": "child",
+              "effective_context_source": "new",
+              "model": "aimock-model",
+              "agentAddress": "aa1.1af063fd1d7a461fa7b48bc3f4be9cf4"
+            },
+            "_meta": {
+              "eventId": "fake-session-7",
+              "agentTimestampMs": 1791620286520
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-child",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "01a124e4-087f-7101-894a-71487d470bee",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 700,
+                "outputTokens": 7,
+                "totalTokens": 707,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 6,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 700,
+                    "outputTokens": 7,
+                    "totalTokens": 707,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 6
+                  }
+                },
+                "numTurns": 1
+              },
+              "elapsed_ms": 90
+            },
+            "_meta": {
+              "eventId": "fake-child-14",
+              "agentTimestampMs": 1791620286681
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "subagent_finished",
+              "subagent_id": "fake-child",
+              "attempt_id": "at1.8082e8b8ed7d4382912ddf9c1301dcb0",
+              "child_session_id": "fake-child",
+              "status": "completed",
+              "tool_calls": 0,
+              "turns": 1,
+              "duration_ms": 163,
+              "tokens_used": 707,
+              "output": "child-done",
+              "will_wake": false
+            },
+            "_meta": {
+              "eventId": "fake-session-15",
+              "agentTimestampMs": 1791620286714
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "37ddb60c-eea2-4eb7-a058-2a0662001695",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 2800,
+                "outputTokens": 30,
+                "totalTokens": 2830,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 3,
+                "apiDurationMs": 29,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 2800,
+                    "outputTokens": 30,
+                    "totalTokens": 2830,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 3,
+                    "apiDurationMs": 29
+                  }
+                },
+                "numTurns": 2
+              },
+              "elapsed_ms": 358
+            },
+            "_meta": {
+              "eventId": "fake-session-23",
+              "agentTimestampMs": 1791620286786
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "session/prompt",
+          "native": {
+            "stopReason": "end_turn",
+            "_meta": {
+              "sessionId": "fake-session",
+              "requestId": "37ddb60c-eea2-4eb7-a058-2a0662001695",
+              "promptId": "37ddb60c-eea2-4eb7-a058-2a0662001695",
+              "totalTokens": 1103,
+              "modelId": "aimock-model",
+              "inputTokens": 1100,
+              "outputTokens": 3,
+              "cachedReadTokens": 0,
+              "reasoningTokens": 0,
+              "usage": {
+                "inputTokens": 2800,
+                "outputTokens": 30,
+                "totalTokens": 2830,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 3,
+                "apiDurationMs": 29,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 2800,
+                    "outputTokens": 30,
+                    "totalTokens": 2830,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 3,
+                    "apiDurationMs": 29
+                  }
+                },
+                "numTurns": 2
+              }
+            }
+          }
+        },
+        {
+          "stage": 2,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "65f7459b-d250-40aa-bc60-7c5df1f733b6",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 10,
+                "outputTokens": 1,
+                "totalTokens": 11,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 5,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 10,
+                    "outputTokens": 1,
+                    "totalTokens": 11,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 5
+                  }
+                },
+                "numTurns": 1
+              },
+              "elapsed_ms": 78
+            },
+            "_meta": {
+              "eventId": "fake-session-30",
+              "agentTimestampMs": 1791620286895
+            }
+          }
+        },
+        {
+          "stage": 2,
+          "type": "session/prompt",
+          "native": {
+            "stopReason": "end_turn",
+            "_meta": {
+              "sessionId": "fake-session",
+              "requestId": "65f7459b-d250-40aa-bc60-7c5df1f733b6",
+              "promptId": "65f7459b-d250-40aa-bc60-7c5df1f733b6",
+              "totalTokens": 11,
+              "modelId": "aimock-model",
+              "inputTokens": 10,
+              "outputTokens": 1,
+              "cachedReadTokens": 0,
+              "reasoningTokens": 0,
+              "usage": {
+                "inputTokens": 10,
+                "outputTokens": 1,
+                "totalTokens": 11,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 5,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 10,
+                    "outputTokens": 1,
+                    "totalTokens": 11,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 5
+                  }
+                },
+                "numTurns": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "background-child-first",
+      "frames": [
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "subagent_spawned",
+              "subagent_id": "fake-child",
+              "attempt_id": "at1.803c04f44a9d4500b88cca0502e08535",
+              "parent_session_id": "fake-session",
+              "parent_prompt_id": "217492e3-8811-4e01-883f-081f05cf1e47",
+              "child_session_id": "fake-child",
+              "subagent_type": "general-purpose",
+              "description": "child",
+              "effective_context_source": "new",
+              "model": "aimock-model",
+              "agentAddress": "aa1.c24d5d0a571e4beca83cdfdd99fa2118"
+            },
+            "_meta": {
+              "eventId": "fake-session-10",
+              "agentTimestampMs": 1791620287393
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-child",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "01a124e4-0be8-7c01-8d1d-0a5563526bc3",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 700,
+                "outputTokens": 7,
+                "totalTokens": 707,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 6,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 700,
+                    "outputTokens": 7,
+                    "totalTokens": 707,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 6
+                  }
+                },
+                "numTurns": 1
+              },
+              "elapsed_ms": 86
+            },
+            "_meta": {
+              "eventId": "fake-child-17",
+              "agentTimestampMs": 1791620287550
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "subagent_finished",
+              "subagent_id": "fake-child",
+              "attempt_id": "at1.803c04f44a9d4500b88cca0502e08535",
+              "child_session_id": "fake-child",
+              "status": "completed",
+              "tool_calls": 0,
+              "turns": 1,
+              "duration_ms": 160,
+              "tokens_used": 707,
+              "output": "child-done",
+              "will_wake": true
+            },
+            "_meta": {
+              "eventId": "fake-session-18",
+              "agentTimestampMs": 1791620287581
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "217492e3-8811-4e01-883f-081f05cf1e47",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 2800,
+                "outputTokens": 30,
+                "totalTokens": 2830,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 3,
+                "apiDurationMs": 208,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 2800,
+                    "outputTokens": 30,
+                    "totalTokens": 2830,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 3,
+                    "apiDurationMs": 208
+                  }
+                },
+                "numTurns": 2
+              },
+              "elapsed_ms": 328
+            },
+            "_meta": {
+              "eventId": "fake-session-23",
+              "agentTimestampMs": 1791620287635
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "session/prompt",
+          "native": {
+            "stopReason": "end_turn",
+            "_meta": {
+              "sessionId": "fake-session",
+              "requestId": "217492e3-8811-4e01-883f-081f05cf1e47",
+              "promptId": "217492e3-8811-4e01-883f-081f05cf1e47",
+              "totalTokens": 1103,
+              "modelId": "aimock-model",
+              "inputTokens": 1100,
+              "outputTokens": 3,
+              "cachedReadTokens": 0,
+              "reasoningTokens": 0,
+              "usage": {
+                "inputTokens": 2800,
+                "outputTokens": 30,
+                "totalTokens": 2830,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 3,
+                "apiDurationMs": 208,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 2800,
+                    "outputTokens": 30,
+                    "totalTokens": 2830,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 3,
+                    "apiDurationMs": 208
+                  }
+                },
+                "numTurns": 2
+              }
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "subagent-completed-fake-child",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 10,
+                "outputTokens": 1,
+                "totalTokens": 11,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 5,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 10,
+                    "outputTokens": 1,
+                    "totalTokens": 11,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 5
+                  }
+                },
+                "numTurns": 1
+              },
+              "elapsed_ms": 77
+            },
+            "_meta": {
+              "eventId": "fake-session-30",
+              "agentTimestampMs": 1791620287712
+            }
+          }
+        },
+        {
+          "stage": 2,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "957da4bc-de26-4cca-bfee-8c38a0a9d09c",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 10,
+                "outputTokens": 1,
+                "totalTokens": 11,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 6,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 10,
+                    "outputTokens": 1,
+                    "totalTokens": 11,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 6
+                  }
+                },
+                "numTurns": 1
+              },
+              "elapsed_ms": 84
+            },
+            "_meta": {
+              "eventId": "fake-session-37",
+              "agentTimestampMs": 1791620287801
+            }
+          }
+        },
+        {
+          "stage": 2,
+          "type": "session/prompt",
+          "native": {
+            "stopReason": "end_turn",
+            "_meta": {
+              "sessionId": "fake-session",
+              "requestId": "957da4bc-de26-4cca-bfee-8c38a0a9d09c",
+              "promptId": "957da4bc-de26-4cca-bfee-8c38a0a9d09c",
+              "totalTokens": 11,
+              "modelId": "aimock-model",
+              "inputTokens": 10,
+              "outputTokens": 1,
+              "cachedReadTokens": 0,
+              "reasoningTokens": 0,
+              "usage": {
+                "inputTokens": 10,
+                "outputTokens": 1,
+                "totalTokens": 11,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 6,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 10,
+                    "outputTokens": 1,
+                    "totalTokens": 11,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 6
+                  }
+                },
+                "numTurns": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "background-parent-first",
+      "frames": [
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "subagent_spawned",
+              "subagent_id": "fake-child",
+              "attempt_id": "at1.c1a7a08f976d4f50a0758482f002c7f2",
+              "parent_session_id": "fake-session",
+              "parent_prompt_id": "406aa898-56c4-45c4-91ba-a08b7213f771",
+              "child_session_id": "fake-child",
+              "subagent_type": "general-purpose",
+              "description": "child",
+              "effective_context_source": "new",
+              "model": "aimock-model",
+              "agentAddress": "aa1.82ebf28ad35a4c66b3de58bc963eca4e"
+            },
+            "_meta": {
+              "eventId": "fake-session-10",
+              "agentTimestampMs": 1791620288277
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "406aa898-56c4-45c4-91ba-a08b7213f771",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 2100,
+                "outputTokens": 23,
+                "totalTokens": 2123,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 2,
+                "apiDurationMs": 11,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 2100,
+                    "outputTokens": 23,
+                    "totalTokens": 2123,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 2,
+                    "apiDurationMs": 11
+                  }
+                },
+                "numTurns": 2,
+                "usageIsIncomplete": true
+              },
+              "elapsed_ms": 225
+            },
+            "_meta": {
+              "eventId": "fake-session-17",
+              "agentTimestampMs": 1791620288413
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "session/prompt",
+          "native": {
+            "stopReason": "end_turn",
+            "_meta": {
+              "sessionId": "fake-session",
+              "requestId": "406aa898-56c4-45c4-91ba-a08b7213f771",
+              "promptId": "406aa898-56c4-45c4-91ba-a08b7213f771",
+              "totalTokens": 1103,
+              "modelId": "aimock-model",
+              "inputTokens": 1100,
+              "outputTokens": 3,
+              "cachedReadTokens": 0,
+              "reasoningTokens": 0,
+              "usage": {
+                "inputTokens": 2100,
+                "outputTokens": 23,
+                "totalTokens": 2123,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 2,
+                "apiDurationMs": 11,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 2100,
+                    "outputTokens": 23,
+                    "totalTokens": 2123,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 2,
+                    "apiDurationMs": 11
+                  }
+                },
+                "numTurns": 2,
+                "usageIsIncomplete": true
+              }
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-child",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "01a124e4-0f5f-7f71-9304-833657fdde89",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 700,
+                "outputTokens": 7,
+                "totalTokens": 707,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 4,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 700,
+                    "outputTokens": 7,
+                    "totalTokens": 707,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 4
+                  }
+                },
+                "numTurns": 1
+              },
+              "elapsed_ms": 118
+            },
+            "_meta": {
+              "eventId": "fake-child-22",
+              "agentTimestampMs": 1791620288470
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "subagent_finished",
+              "subagent_id": "fake-child",
+              "attempt_id": "at1.c1a7a08f976d4f50a0758482f002c7f2",
+              "child_session_id": "fake-child",
+              "status": "completed",
+              "tool_calls": 0,
+              "turns": 1,
+              "duration_ms": 195,
+              "tokens_used": 707,
+              "output": "child-done",
+              "will_wake": true
+            },
+            "_meta": {
+              "eventId": "fake-session-23",
+              "agentTimestampMs": 1791620288500
+            }
+          }
+        },
+        {
+          "stage": 1,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "subagent-completed-fake-child",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 10,
+                "outputTokens": 1,
+                "totalTokens": 11,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 5,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 10,
+                    "outputTokens": 1,
+                    "totalTokens": 11,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 5
+                  }
+                },
+                "numTurns": 1
+              },
+              "elapsed_ms": 67
+            },
+            "_meta": {
+              "eventId": "fake-session-30",
+              "agentTimestampMs": 1791620288568
+            }
+          }
+        },
+        {
+          "stage": 2,
+          "type": "_x.ai/session_notification",
+          "native": {
+            "sessionId": "fake-session",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "422d3a76-d52d-4315-8bd6-9e66510194a9",
+              "stop_reason": "end_turn",
+              "usage": {
+                "inputTokens": 10,
+                "outputTokens": 1,
+                "totalTokens": 11,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 5,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 10,
+                    "outputTokens": 1,
+                    "totalTokens": 11,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 5
+                  }
+                },
+                "numTurns": 1
+              },
+              "elapsed_ms": 82
+            },
+            "_meta": {
+              "eventId": "fake-session-37",
+              "agentTimestampMs": 1791620288652
+            }
+          }
+        },
+        {
+          "stage": 2,
+          "type": "session/prompt",
+          "native": {
+            "stopReason": "end_turn",
+            "_meta": {
+              "sessionId": "fake-session",
+              "requestId": "422d3a76-d52d-4315-8bd6-9e66510194a9",
+              "promptId": "422d3a76-d52d-4315-8bd6-9e66510194a9",
+              "totalTokens": 11,
+              "modelId": "aimock-model",
+              "inputTokens": 10,
+              "outputTokens": 1,
+              "cachedReadTokens": 0,
+              "reasoningTokens": 0,
+              "usage": {
+                "inputTokens": 10,
+                "outputTokens": 1,
+                "totalTokens": 11,
+                "cachedReadTokens": 0,
+                "cacheCreationTokens": 0,
+                "reasoningTokens": 0,
+                "modelCalls": 1,
+                "apiDurationMs": 5,
+                "modelUsage": {
+                  "aimock-model": {
+                    "inputTokens": 10,
+                    "outputTokens": 1,
+                    "totalTokens": 11,
+                    "cachedReadTokens": 0,
+                    "cacheCreationTokens": 0,
+                    "reasoningTokens": 0,
+                    "modelCalls": 1,
+                    "apiDurationMs": 5
+                  }
+                },
+                "numTurns": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

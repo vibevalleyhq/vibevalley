@@ -1,0 +1,3 @@
+Create ONE image, size 1536x1024: Image 1 exactly as it is, with one change only: the young farmer and the dog standing at the lower right are NOT there. Where they stood, show the grass, flowers, the path's edge and the fence post that are behind them, continuing naturally; the spot is an empty patch of grassy hilltop.
+Keep EVERYTHING else exactly the same as Image 1: the same composition and camera, every building, field, fence, tree, rock and flower, the same sky, light, colours and time of day, the same pixel-art style.
+No text, no letters, no logos, no UI elements.

@@ -1,0 +1,15 @@
+turn/started                 │ event → turn_active
+item/started                 │ event
+item/completed               │ event
+item/started                 │ event
+item/completed               │ event
+item/started                 │ event → tool_call_started fileChange
+item/completed               │ event → tool_call_ended
+thread/tokenUsage/updated    │ event → usage
+item/started                 │ event
+item/completed               │ event
+item/started                 │ event
+item/agentMessage/delta      │ event → text_delta
+item/completed               │ event
+thread/tokenUsage/updated    │ event → usage
+turn/completed               │ event → turn_ended completed

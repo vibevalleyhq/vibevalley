@@ -1,0 +1,5 @@
+Create ONE sheet of 8 painted farm-machine icons for the game's tool shed, size 1536x1024: a grid of 4 columns x 2 rows, one icon centred in each cell, all drawn at a similar size.
+Image 2 is the game's icon sheet: match its painted style (gentle shading, soft brown outline, warm colours). Each machine is seen in the same three-quarter view as the farm in Image 1, small and chunky like a toy, with a clear silhouette:
+Row 1: (1) a small red tractor; (2) a green water cart with a wooden barrel; (3) a wooden wheelbarrow full of dark soil; (4) a blue cast-iron hand water pump on a little wooden base.
+Row 2: (5) a yellow push seed drill with a seed hopper; (6) a small wooden windmill water pump; (7) a white beehive box with two bees; (8) a little wooden cart with a glowing lantern on a pole.
+No text, no letters, no logos, no characters.

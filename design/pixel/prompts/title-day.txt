@@ -1,0 +1,4 @@
+Create ONE image, size 1536x1024: the same title screen as Image 1, redrawn at another time of day. Keep EXACTLY the same composition, camera, buildings, fields, fence, path, rocks and character placement as Image 1 (the farmer manager and the dog stay at the same spot on the right third); only the time of day, the light, the sky and small details change.
+A bright clear midday: high sun, a deep blue sky with a few white fluffy clouds, crisp short shadows, fresh saturated greens, butterflies over the crops. The farmer manager shades his eyes with one hand, the dog sits wagging.
+Keep the whole left third of the image calm and simple, and the top middle open sky, as in Image 1: the game's title and menu are drawn there.
+No text, no letters, no logos, no UI elements.

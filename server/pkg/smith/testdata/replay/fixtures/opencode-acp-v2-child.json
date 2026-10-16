@@ -1,0 +1,258 @@
+{
+  "version": "opencode v2.0.26",
+  "model": "opencode/big-pickle",
+  "captured": "2026-10-09",
+  "normalization": "Only session/message/call IDs and the probe cwd are replaced. Native fields, titles, metadata, input and output retained.",
+  "notifications": [
+    {
+      "sessionId": "root",
+      "update": {
+        "availableCommands": [
+          {
+            "name": "init",
+            "description": "guided AGENTS.md setup"
+          },
+          {
+            "name": "review",
+            "description": "review changes [commit|branch|pr], defaults to uncommitted"
+          },
+          {
+            "name": "compact",
+            "description": "Compact the session"
+          }
+        ],
+        "sessionUpdate": "available_commands_update"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "call-1",
+        "title": "subagent",
+        "name": "subagent",
+        "kind": "think",
+        "status": "pending",
+        "locations": [],
+        "rawInput": {},
+        "sessionUpdate": "tool_call"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "call-1",
+        "kind": "think",
+        "status": "in_progress",
+        "title": "subagent",
+        "locations": [],
+        "rawInput": {
+          "agent": "general",
+          "description": "Echo child check",
+          "prompt": "Run `echo CHILD-OK-7731` in its shell and report the output."
+        },
+        "sessionUpdate": "tool_call_update"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "call-1",
+        "kind": "think",
+        "status": "in_progress",
+        "title": "subagent",
+        "locations": [],
+        "rawInput": {
+          "agent": "general",
+          "description": "Echo child check",
+          "prompt": "Run `echo CHILD-OK-7731` in its shell and report the output."
+        },
+        "sessionUpdate": "tool_call_update"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "child-1:call-2",
+        "title": "Echo child check: shell",
+        "name": "shell",
+        "kind": "execute",
+        "status": "pending",
+        "locations": [
+          {
+            "path": "/project"
+          }
+        ],
+        "rawInput": {
+          "cwd": "/project"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "child-1",
+            "parentID": "root",
+            "depth": 1,
+            "title": "Echo child check"
+          }
+        },
+        "sessionUpdate": "tool_call"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "child-1:call-2",
+        "kind": "execute",
+        "status": "in_progress",
+        "title": "Echo child check: echo CHILD-OK-7731",
+        "locations": [
+          {
+            "path": "/project"
+          }
+        ],
+        "rawInput": {
+          "command": "echo CHILD-OK-7731",
+          "cwd": "/project"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "child-1",
+            "parentID": "root",
+            "depth": 1,
+            "title": "Echo child check"
+          }
+        },
+        "sessionUpdate": "tool_call_update"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "child-1:call-2",
+        "kind": "execute",
+        "status": "in_progress",
+        "title": "Echo child check: echo CHILD-OK-7731",
+        "locations": [
+          {
+            "path": "/project"
+          }
+        ],
+        "rawInput": {
+          "command": "echo CHILD-OK-7731",
+          "cwd": "/project"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "child-1",
+            "parentID": "root",
+            "depth": 1,
+            "title": "Echo child check"
+          }
+        },
+        "sessionUpdate": "tool_call_update"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "child-1:call-2",
+        "status": "completed",
+        "content": [
+          {
+            "content": {
+              "text": "CHILD-OK-7731\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "locations": [
+          {
+            "path": "/project"
+          }
+        ],
+        "rawOutput": {
+          "metadata": {
+            "status": "completed",
+            "truncated": false,
+            "exit": 0
+          }
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "child-1",
+            "parentID": "root",
+            "depth": 1,
+            "title": "Echo child check"
+          }
+        },
+        "sessionUpdate": "tool_call_update"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "content": {
+          "text": "CHILD-OK-7731",
+          "type": "text"
+        },
+        "messageId": "message-id",
+        "_meta": {
+          "opencode/child-session": {
+            "id": "child-1",
+            "parentID": "root",
+            "depth": 1,
+            "title": "Echo child check"
+          }
+        },
+        "sessionUpdate": "agent_message_chunk"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "toolCallId": "call-1",
+        "status": "completed",
+        "content": [
+          {
+            "content": {
+              "text": "<subagent sessionID=\"child-1\" state=\"completed\">\nCHILD-OK-7731\n</subagent>",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "locations": [],
+        "rawOutput": {
+          "metadata": {
+            "sessionID": "child-1",
+            "status": "completed",
+            "truncated": false
+          }
+        },
+        "sessionUpdate": "tool_call_update"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "content": {
+          "text": "CHILD-OK-7731",
+          "type": "text"
+        },
+        "messageId": "message-id",
+        "sessionUpdate": "agent_message_chunk"
+      }
+    },
+    {
+      "sessionId": "root",
+      "update": {
+        "used": 4161,
+        "size": 200000,
+        "cost": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "sessionUpdate": "usage_update"
+      }
+    }
+  ]
+}

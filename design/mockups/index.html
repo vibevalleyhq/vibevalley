@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VibeValley 农场 · 型号对比</title>
+    <style>
+      :root {
+        --bg: #f6f1e6;
+        --ink: #2b241d;
+        --muted: #7a6f60;
+        --card: #fffaf0;
+        --line: #e4dccb;
+        --accent: #e8973a;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif; }
+      header { padding: 32px 24px 8px; max-width: 1400px; margin: 0 auto; }
+      h1 { margin: 0; font-size: 28px; }
+      header p { margin: 6px 0 0; color: var(--muted); }
+      main { max-width: 1400px; margin: 0 auto; padding: 16px 24px 48px; display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); }
+      figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+      figure a { display: block; background: #e9e1d0; }
+      figure img { display: block; width: 100%; height: auto; max-height: 720px; object-fit: contain; }
+      figcaption { padding: 14px 16px 16px; }
+      figcaption b { font-size: 17px; }
+      figcaption .tag { display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 700; }
+      figcaption p { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+      .missing { padding: 80px 16px; text-align: center; color: var(--muted); }
+      main h2 { grid-column: 1 / -1; margin: 16px 0 0; font-size: 18px; }
+      figure.small img { max-height: 360px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>VibeValley 农场 · 主界面型号对比</h1>
+      <p>同一套内容，四种风格。第二版里帮工都是小动物，管家是人。点图片看原图。界面清单和农场怎么对上 VibeValley，见 docs/game-ui.md。</p>
+    </header>
+    <main>
+      <h2>第二版 · 小动物帮工，人类管家</h2>
+      <figure>
+        <a href="v2/A-classic.png"><img src="v2/A-classic.png" alt="型号 A 经典农场" onerror="this.parentElement.outerHTML='<div class=missing>v2/A-classic.png 还没生成</div>'" /></a>
+        <figcaption><span class="tag">A</span><b>经典农场</b><p>最像 QQ 农场：明亮的 2D 等距卡通，蓝天草地，木牌按钮，底部好友栏。</p></figcaption>
+      </figure>
+      <figure>
+        <a href="v2/B-cozy.png"><img src="v2/B-cozy.png" alt="型号 B 温室花园" onerror="this.parentElement.outerHTML='<div class=missing>v2/B-cozy.png 还没生成</div>'" /></a>
+        <figcaption><span class="tag">B</span><b>温室花园</b><p>柔和的 cozy 风：奶油色、圆角卡片、抬高的花坛当田，更安静。</p></figcaption>
+      </figure>
+      <figure>
+        <a href="v2/C-night.png"><img src="v2/C-night.png" alt="型号 C 夜间科技温室" onerror="this.parentElement.outerHTML='<div class=missing>v2/C-night.png 还没生成</div>'" /></a>
+        <figcaption><span class="tag">C</span><b>夜间科技温室</b><p>夜里的玻璃温室，补光灯和水培架当田，霓虹点缀，暗色玻璃界面。</p></figcaption>
+      </figure>
+      <figure>
+        <a href="v2/D-mobile.png"><img src="v2/D-mobile.png" alt="型号 D 竖屏掌上" onerror="this.parentElement.outerHTML='<div class=missing>v2/D-mobile.png 还没生成</div>'" /></a>
+        <figcaption><span class="tag">D</span><b>竖屏掌上</b><p>A 的手机竖屏版：上面状态，中间田地，下面工具和大语音键。</p></figcaption>
+      </figure>
+      <h2>第一版 · 人类帮工（对照）</h2>
+      <figure class="small">
+        <a href="v1/A-classic.png"><img src="v1/A-classic.png" alt="型号 A 经典农场" onerror="this.parentElement.outerHTML='<div class=missing>v1/A-classic.png 还没生成</div>'" /></a>
+        <figcaption><span class="tag">A</span><b>经典农场</b><p>第一版：人类帮工。</p></figcaption>
+      </figure>
+      <figure class="small">
+        <a href="v1/B-cozy.png"><img src="v1/B-cozy.png" alt="型号 B 温室花园" onerror="this.parentElement.outerHTML='<div class=missing>v1/B-cozy.png 还没生成</div>'" /></a>
+        <figcaption><span class="tag">B</span><b>温室花园</b><p>第一版：人类帮工。</p></figcaption>
+      </figure>
+      <figure class="small">
+        <a href="v1/C-night.png"><img src="v1/C-night.png" alt="型号 C 夜间科技温室" onerror="this.parentElement.outerHTML='<div class=missing>v1/C-night.png 还没生成</div>'" /></a>
+        <figcaption><span class="tag">C</span><b>夜间科技温室</b><p>第一版：人类帮工。</p></figcaption>
+      </figure>
+      <figure class="small">
+        <a href="v1/D-mobile.png"><img src="v1/D-mobile.png" alt="型号 D 竖屏掌上" onerror="this.parentElement.outerHTML='<div class=missing>v1/D-mobile.png 还没生成</div>'" /></a>
+        <figcaption><span class="tag">D</span><b>竖屏掌上</b><p>第一版：人类帮工。</p></figcaption>
+      </figure>
+    </main>
+  </body>
+</html>

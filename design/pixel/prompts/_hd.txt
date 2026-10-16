@@ -1,0 +1,2 @@
+Image 1 is one of our game's pixel-art pictures. Redraw it at exactly TWICE the pixel density. Keep the same canvas size and the same layout: every item in exactly the same place and cell, with the same pose, proportions, silhouette, colours and outline as in Image 1. Only the pixels get finer: every art pixel is now half as big, so there is twice as much detail (faces and eyes, hair and fur, fabric folds, leaves, wood grain, small props).
+It must stay true pixel art: one strict grid, no anti-aliasing, no blur, no smooth gradients, the same limited warm palette.

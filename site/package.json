@@ -1,0 +1,30 @@
+{
+  "name": "@vibevalley/site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "assets": "bun scripts/prepare.ts",
+    "check": "bun scripts/prepare.ts && astro check",
+    "build": "bun scripts/prepare.ts && astro build",
+    "deploy": "bun run build && bunx wrangler@4 deploy"
+  },
+  "dependencies": {
+    "@astrojs/react": "^7.0.1",
+    "@astrojs/sitemap": "^3.7.4",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.8",
+    "motion": "^14.2.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@astrojs/markdown-remark": "^7.3.0",
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "subset-font": "^2.9.0",
+    "typescript": "^6.0.0"
+  }
+}

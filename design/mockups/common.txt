@@ -1,0 +1,18 @@
+The game is "VibeValley 农场", a cozy Chinese farming web game in the spirit of the classic 2009-era social farm games (like the old QQ Farm), but with NO real brand logos or trademarks. Each farm plot is a coding task that grows through stages.
+
+Characters (important):
+- The helpers are cute little ANIMALS, all different species, each wearing a small farm outfit (straw hat, overalls or apron) and working with farm tools. They are: a bear (老周), a rabbit (小吴), a little fox (阿郑), a cat (Kimi), an owl (Grok), and a hedgehog (阿Pi). No human helpers.
+- The farm manager is a friendly adult HUMAN farmer (straw hat, overalls). The player only talks to this person, who sends the animal helpers to the plots.
+
+Everything below must be visible on the main screen:
+- Farm: 6 diamond-shaped soil plots in an isometric grid, centered. Each plot shows a different state: (1) just seeded, with a small wooden tag; (2) a tiny sprout; (3) a leafy plant with the rabbit watering it; (4) a flowering plant with the fox kneeling to check it; (5) a ripe golden crop with sparkles and a floating bubble "可收获"; (6) a withered plant with small cartoon bugs and a red "!" bubble, the bear standing next to it scratching its head. One more plot is overgrown with weeds and a floating bubble "待批准". Two locked plots at the edge carry a little wooden sign "Lv.5 开垦".
+- A farmhouse at the back. The human farm manager stands at the door with a speech bubble: "好，派阿郑去修字幕面板。" A small dog naps nearby.
+- Background scenery: sky, distant hills, a wooden fence, a few trees.
+- UI, with these Chinese labels:
+  - top-left: round player avatar, "Lv.7", a green experience bar, the title "VibeValley 农场"
+  - top-right: a gold coin counter "1,280" and a clock "10:40"
+  - left side: a vertical column of round buttons labeled 商店, 仓库, 任务, 日志
+  - bottom center: a tool bar of round tool icons labeled 手, 浇水, 杀虫, 除草, 收获, 铲除
+  - bottom: a friends bar with 6 round portraits of the animal helpers, in this order with these names: bear 老周, rabbit 小吴, fox 阿郑, cat Kimi, owl Grok, hedgehog 阿Pi (the last name is exactly the two characters 阿 and Pi)
+  - just above the tool bar: a chat bar with a microphone button and a text field with placeholder "对管家说…"
+Keep text short and legible. Do NOT add any other text, slogans or decorative signs beyond the labels listed above. No watermark, no device frame, no real logos.

@@ -1,0 +1,2 @@
+Create ONE image, size 1536x1024: Image 1 exactly as it is, with one change only: there is NO smoke coming out of any chimney (the game draws the smoke itself). Where smoke was, show what is behind it, continuing naturally.
+Keep EVERYTHING else exactly the same as Image 1: every building, tree, path, fence, prop and colour in the same place, the same pixel-art grid and density.

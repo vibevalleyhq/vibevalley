@@ -1,0 +1,3631 @@
+{
+ "name": "scripted-steer",
+ "source": "packages/oar/src/testing scriptedRuntime",
+ "runtimeId": "scripted",
+ "rootSessionId": "uuid-0001",
+ "records": [
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000,
+   "kind": "frame",
+   "body": {
+    "type": "scripted/model",
+    "native": {
+     "model": "scripted-1"
+    },
+    "events": [
+     {
+      "kind": "model",
+      "model": "scripted-1"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 1,
+   "receivedAt": 1800000000100,
+   "kind": "request",
+   "id": "uuid-0002",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "prompt",
+    "input": "work",
+    "inputId": "uuid-0003"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000200,
+   "kind": "response",
+   "requestId": "uuid-0002",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 3,
+   "receivedAt": 1800000000300,
+   "kind": "frame",
+   "body": {
+    "type": "scripted/text",
+    "native": {
+     "text": "working"
+    },
+    "events": [
+     {
+      "kind": "text_delta",
+      "text": "working"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 4,
+   "receivedAt": 1800000000400,
+   "kind": "request",
+   "id": "uuid-0004",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "steer",
+    "input": "also this",
+    "inputId": "uuid-0005"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 5,
+   "receivedAt": 1800000000500,
+   "kind": "response",
+   "requestId": "uuid-0004",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 6,
+   "receivedAt": 1800000000600,
+   "kind": "request",
+   "id": "uuid-0006",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "steer",
+    "input": "and that",
+    "inputId": "uuid-0007",
+    "origin": {
+     "kind": "notification",
+     "source": "ci"
+    }
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 7,
+   "receivedAt": 1800000000700,
+   "kind": "response",
+   "requestId": "uuid-0006",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 8,
+   "receivedAt": 1800000000800,
+   "kind": "request",
+   "id": "uuid-0008",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "prompt",
+    "input": "too soon",
+    "inputId": "uuid-0009"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000900,
+   "kind": "response",
+   "requestId": "uuid-0008",
+   "body": {
+    "kind": "rejected",
+    "code": "busy",
+    "reason": "busy"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000001000,
+   "kind": "frame",
+   "body": {
+    "type": "scripted/text",
+    "native": {
+     "text": "steered: also this | and that"
+    },
+    "events": [
+     {
+      "kind": "text_delta",
+      "text": "steered: also this | and that"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 11,
+   "receivedAt": 1800000001100,
+   "kind": "frame",
+   "body": {
+    "type": "scripted/end",
+    "native": {
+     "outcome": {
+      "kind": "completed"
+     }
+    },
+    "events": [
+     {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed"
+      }
+     },
+     {
+      "kind": "usage",
+      "usage": {
+       "tokens": {
+        "input": 1,
+        "output": 10
+       },
+       "context": {
+        "tokens": 11,
+        "contextWindow": 200000,
+        "percent": 0.0055000000000000005
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 12,
+   "receivedAt": 1800000001200,
+   "kind": "request",
+   "id": "uuid-0010",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "steer",
+    "input": "late",
+    "inputId": "uuid-0011"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 13,
+   "receivedAt": 1800000001300,
+   "kind": "response",
+   "requestId": "uuid-0010",
+   "body": {
+    "kind": "rejected",
+    "code": "no_active_turn",
+    "reason": "no active turn"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 14,
+   "receivedAt": 1800000001400,
+   "kind": "request",
+   "id": "uuid-0012",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "abort"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 15,
+   "receivedAt": 1800000001500,
+   "kind": "response",
+   "requestId": "uuid-0012",
+   "body": {
+    "kind": "rejected",
+    "code": "no_active_turn",
+    "reason": "no active turn"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 16,
+   "receivedAt": 1800000001600,
+   "kind": "request",
+   "id": "uuid-0013",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "dispose"
+   }
+  },
+  {
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000001700,
+   "kind": "response",
+   "requestId": "uuid-0013",
+   "body": {
+    "kind": "exited",
+    "code": 0
+   }
+  }
+ ],
+ "statusSteps": [
+  {
+   "kind": "idle"
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "requestId": "uuid-0002",
+   "inputId": "uuid-0003",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000100
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "requestId": "uuid-0002",
+   "inputId": "uuid-0003",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000100
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "requestId": "uuid-0002",
+   "inputId": "uuid-0003",
+   "phase": "responding",
+   "lastEventAt": 1800000000300
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "requestId": "uuid-0002",
+   "inputId": "uuid-0003",
+   "phase": "responding",
+   "lastEventAt": 1800000000300
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "requestId": "uuid-0002",
+   "inputId": "uuid-0003",
+   "phase": "responding",
+   "lastEventAt": 1800000000300
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "requestId": "uuid-0002",
+   "inputId": "uuid-0003",
+   "phase": "responding",
+   "lastEventAt": 1800000000300
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "requestId": "uuid-0002",
+   "inputId": "uuid-0003",
+   "phase": "responding",
+   "lastEventAt": 1800000000300
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "requestId": "uuid-0002",
+   "inputId": "uuid-0003",
+   "phase": "responding",
+   "lastEventAt": 1800000000300
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "requestId": "uuid-0002",
+   "inputId": "uuid-0003",
+   "phase": "responding",
+   "lastEventAt": 1800000000300
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "requestId": "uuid-0002",
+   "inputId": "uuid-0003",
+   "phase": "responding",
+   "lastEventAt": 1800000001000
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  }
+ ],
+ "statusOf": {
+  "all": {
+   "value": {
+    "kind": "idle",
+    "lastTurnOutcome": {
+     "kind": "completed"
+    }
+   },
+   "seq": 17
+  },
+  "root": {
+   "value": {
+    "kind": "idle",
+    "lastTurnOutcome": {
+     "kind": "completed"
+    }
+   },
+   "seq": 17
+  }
+ },
+ "modelOf": {
+  "all": {
+   "value": "scripted-1",
+   "seq": 17
+  },
+  "root": {
+   "value": "scripted-1",
+   "seq": 17
+  }
+ },
+ "effortOf": {
+  "all": {
+   "value": null,
+   "seq": 17
+  },
+  "root": {
+   "value": null,
+   "seq": 17
+  }
+ },
+ "serviceTierOf": {
+  "all": {
+   "value": null,
+   "seq": 17
+  },
+  "root": {
+   "value": null,
+   "seq": 17
+  }
+ },
+ "contextUsageOf": {
+  "all": {
+   "value": {
+    "tokens": 11,
+    "contextWindow": 200000,
+    "percent": 0.0055000000000000005
+   },
+   "seq": 17
+  },
+  "root": {
+   "value": {
+    "tokens": 11,
+    "contextWindow": 200000,
+    "percent": 0.0055000000000000005
+   },
+   "seq": 17
+  }
+ },
+ "usageOf": {
+  "all": {
+   "value": {
+    "total": {
+     "input": 1,
+     "output": 10
+    }
+   },
+   "seq": 17
+  },
+  "root": {
+   "value": {
+    "total": {
+     "input": 1,
+     "output": 10
+    }
+   },
+   "seq": 17
+  }
+ },
+ "graphOf": {
+  "nodes": [
+   {
+    "id": "uuid-0001"
+   }
+  ],
+  "edges": []
+ },
+ "events": [
+  {
+   "kind": "model",
+   "model": "scripted-1",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "uuid-0002",
+   "input": "work",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 1,
+   "receivedAt": 1800000000100
+  },
+  {
+   "kind": "text_delta",
+   "text": "working",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 3,
+   "receivedAt": 1800000000300
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "uuid-0008",
+   "input": "too soon",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 8,
+   "receivedAt": 1800000000800
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "uuid-0008",
+   "action": "prompt",
+   "code": "busy",
+   "reason": "busy",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000900
+  },
+  {
+   "kind": "text_delta",
+   "text": "steered: also this | and that",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000001000
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 11,
+   "receivedAt": 1800000001100
+  },
+  {
+   "kind": "usage",
+   "usage": {
+    "tokens": {
+     "input": 1,
+     "output": 10
+    },
+    "context": {
+     "tokens": 11,
+     "contextWindow": 200000,
+     "percent": 0.0055000000000000005
+    }
+   },
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 11,
+   "receivedAt": 1800000001100
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "uuid-0010",
+   "action": "steer",
+   "code": "no_active_turn",
+   "reason": "no active turn",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 13,
+   "receivedAt": 1800000001300
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "uuid-0012",
+   "action": "abort",
+   "code": "no_active_turn",
+   "reason": "no active turn",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 15,
+   "receivedAt": 1800000001500
+  },
+  {
+   "kind": "exited",
+   "code": 0,
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000001700
+  }
+ ],
+ "coalesced": [
+  {
+   "kind": "model",
+   "model": "scripted-1",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "uuid-0002",
+   "input": "work",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 1,
+   "receivedAt": 1800000000100
+  },
+  {
+   "kind": "text_delta",
+   "text": "working",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 3,
+   "receivedAt": 1800000000300
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "uuid-0008",
+   "input": "too soon",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 8,
+   "receivedAt": 1800000000800
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "uuid-0008",
+   "action": "prompt",
+   "code": "busy",
+   "reason": "busy",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000900
+  },
+  {
+   "kind": "text_delta",
+   "text": "steered: also this | and that",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000001000
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 11,
+   "receivedAt": 1800000001100
+  },
+  {
+   "kind": "usage",
+   "usage": {
+    "tokens": {
+     "input": 1,
+     "output": 10
+    },
+    "context": {
+     "tokens": 11,
+     "contextWindow": 200000,
+     "percent": 0.0055000000000000005
+    }
+   },
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 11,
+   "receivedAt": 1800000001100
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "uuid-0010",
+   "action": "steer",
+   "code": "no_active_turn",
+   "reason": "no active turn",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 13,
+   "receivedAt": 1800000001300
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "uuid-0012",
+   "action": "abort",
+   "code": "no_active_turn",
+   "reason": "no active turn",
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 15,
+   "receivedAt": 1800000001500
+  },
+  {
+   "kind": "exited",
+   "code": 0,
+   "sessionId": "uuid-0001",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000001700
+  }
+ ],
+ "turnEndAfter": [
+  {
+   "afterSeq": -1,
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": -1,
+   "sessionId": "uuid-0001",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 1,
+   "sessionId": "uuid-0001",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 1,
+   "sessionId": "uuid-0001",
+   "inputId": "uuid-0003",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 1,
+   "inputId": "uuid-0003",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 4,
+   "sessionId": "uuid-0001",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 4,
+   "sessionId": "uuid-0001",
+   "inputId": "uuid-0005",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 4,
+   "inputId": "uuid-0005",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 6,
+   "sessionId": "uuid-0001",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 6,
+   "sessionId": "uuid-0001",
+   "inputId": "uuid-0007",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 6,
+   "inputId": "uuid-0007",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 8,
+   "sessionId": "uuid-0001",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 8,
+   "sessionId": "uuid-0001",
+   "inputId": "uuid-0009",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 8,
+   "inputId": "uuid-0009",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 12,
+   "sessionId": "uuid-0001",
+   "outcome": {
+    "kind": "failed",
+    "reason": "runtime exited",
+    "failure": "runtime_exited"
+   }
+  },
+  {
+   "afterSeq": 12,
+   "sessionId": "uuid-0001",
+   "inputId": "uuid-0011",
+   "outcome": {
+    "kind": "failed",
+    "reason": "runtime exited",
+    "failure": "runtime_exited"
+   }
+  },
+  {
+   "afterSeq": 12,
+   "inputId": "uuid-0011",
+   "outcome": {
+    "kind": "failed",
+    "reason": "runtime exited",
+    "failure": "runtime_exited"
+   }
+  }
+ ],
+ "conversation": {
+  "drops": [],
+  "inputs": [
+   [
+    "[\"uuid-0001\",[],\"uuid-0003\"]",
+    {
+     "id": "[\"uuid-0001\",[],\"uuid-0003\"]",
+     "input": "work",
+     "inputId": "uuid-0003",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000100,
+        "kind": "request",
+        "id": "uuid-0002",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "work",
+         "inputId": "uuid-0003"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 2,
+        "receivedAt": 1800000000200,
+        "kind": "response",
+        "requestId": "uuid-0002",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   ],
+   [
+    "[\"uuid-0001\",[],\"uuid-0005\"]",
+    {
+     "id": "[\"uuid-0001\",[],\"uuid-0005\"]",
+     "input": "also this",
+     "inputId": "uuid-0005",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000400,
+        "kind": "request",
+        "id": "uuid-0004",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "also this",
+         "inputId": "uuid-0005"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 5,
+        "receivedAt": 1800000000500,
+        "kind": "response",
+        "requestId": "uuid-0004",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   ],
+   [
+    "[\"uuid-0001\",[],\"uuid-0007\"]",
+    {
+     "id": "[\"uuid-0001\",[],\"uuid-0007\"]",
+     "input": "and that",
+     "inputId": "uuid-0007",
+     "origin": {
+      "kind": "notification",
+      "source": "ci"
+     },
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 6,
+        "receivedAt": 1800000000600,
+        "kind": "request",
+        "id": "uuid-0006",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "and that",
+         "inputId": "uuid-0007",
+         "origin": {
+          "kind": "notification",
+          "source": "ci"
+         }
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 7,
+        "receivedAt": 1800000000700,
+        "kind": "response",
+        "requestId": "uuid-0006",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   ],
+   [
+    "[\"uuid-0001\",[],\"uuid-0009\"]",
+    {
+     "id": "[\"uuid-0001\",[],\"uuid-0009\"]",
+     "input": "too soon",
+     "inputId": "uuid-0009",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 8,
+        "receivedAt": 1800000000800,
+        "kind": "request",
+        "id": "uuid-0008",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "too soon",
+         "inputId": "uuid-0009"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 9,
+        "receivedAt": 1800000000900,
+        "kind": "response",
+        "requestId": "uuid-0008",
+        "body": {
+         "kind": "rejected",
+         "code": "busy",
+         "reason": "busy"
+        }
+       },
+       "state": "rejected",
+       "reason": "busy"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   ],
+   [
+    "[\"uuid-0001\",[],\"uuid-0011\"]",
+    {
+     "id": "[\"uuid-0001\",[],\"uuid-0011\"]",
+     "input": "late",
+     "inputId": "uuid-0011",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 12,
+        "receivedAt": 1800000001200,
+        "kind": "request",
+        "id": "uuid-0010",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "late",
+         "inputId": "uuid-0011"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 13,
+        "receivedAt": 1800000001300,
+        "kind": "response",
+        "requestId": "uuid-0010",
+        "body": {
+         "kind": "rejected",
+         "code": "no_active_turn",
+         "reason": "no active turn"
+        }
+       },
+       "state": "rejected",
+       "reason": "no active turn"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   ]
+  ],
+  "requests": [
+   [
+    "[\"\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0002\\\"]\"]",
+    "[\"uuid-0001\",[],\"uuid-0003\"]"
+   ],
+   [
+    "[\"\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0004\\\"]\"]",
+    "[\"uuid-0001\",[],\"uuid-0005\"]"
+   ],
+   [
+    "[\"\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0006\\\"]\"]",
+    "[\"uuid-0001\",[],\"uuid-0007\"]"
+   ],
+   [
+    "[\"\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0008\\\"]\"]",
+    "[\"uuid-0001\",[],\"uuid-0009\"]"
+   ],
+   [
+    "[\"\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0010\\\"]\"]",
+    "[\"uuid-0001\",[],\"uuid-0011\"]"
+   ]
+  ],
+  "actions": [],
+  "cursors": [
+   [
+    "",
+    17
+   ]
+  ],
+  "updates": [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "exited",
+     "code": 0,
+     "sessionId": "uuid-0001",
+     "agentPath": [],
+     "seq": 17,
+     "receivedAt": 1800000001700
+    }
+   }
+  ]
+ },
+ "conversationUpdates": [
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "model",
+     "model": "scripted-1",
+     "sessionId": "uuid-0001",
+     "agentPath": [],
+     "seq": 0,
+     "receivedAt": 1800000000000
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0003\"]",
+     "input": "work",
+     "inputId": "uuid-0003",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000100,
+        "kind": "request",
+        "id": "uuid-0002",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "work",
+         "inputId": "uuid-0003"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0003\"]",
+     "input": "work",
+     "inputId": "uuid-0003",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000100,
+        "kind": "request",
+        "id": "uuid-0002",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "work",
+         "inputId": "uuid-0003"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 2,
+        "receivedAt": 1800000000200,
+        "kind": "response",
+        "requestId": "uuid-0002",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "text_delta",
+     "text": "working",
+     "sessionId": "uuid-0001",
+     "agentPath": [],
+     "seq": 3,
+     "receivedAt": 1800000000300
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0005\"]",
+     "input": "also this",
+     "inputId": "uuid-0005",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000400,
+        "kind": "request",
+        "id": "uuid-0004",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "also this",
+         "inputId": "uuid-0005"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0005\"]",
+     "input": "also this",
+     "inputId": "uuid-0005",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000400,
+        "kind": "request",
+        "id": "uuid-0004",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "also this",
+         "inputId": "uuid-0005"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 5,
+        "receivedAt": 1800000000500,
+        "kind": "response",
+        "requestId": "uuid-0004",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0007\"]",
+     "input": "and that",
+     "inputId": "uuid-0007",
+     "origin": {
+      "kind": "notification",
+      "source": "ci"
+     },
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 6,
+        "receivedAt": 1800000000600,
+        "kind": "request",
+        "id": "uuid-0006",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "and that",
+         "inputId": "uuid-0007",
+         "origin": {
+          "kind": "notification",
+          "source": "ci"
+         }
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0007\"]",
+     "input": "and that",
+     "inputId": "uuid-0007",
+     "origin": {
+      "kind": "notification",
+      "source": "ci"
+     },
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 6,
+        "receivedAt": 1800000000600,
+        "kind": "request",
+        "id": "uuid-0006",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "and that",
+         "inputId": "uuid-0007",
+         "origin": {
+          "kind": "notification",
+          "source": "ci"
+         }
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 7,
+        "receivedAt": 1800000000700,
+        "kind": "response",
+        "requestId": "uuid-0006",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0009\"]",
+     "input": "too soon",
+     "inputId": "uuid-0009",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 8,
+        "receivedAt": 1800000000800,
+        "kind": "request",
+        "id": "uuid-0008",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "too soon",
+         "inputId": "uuid-0009"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0009\"]",
+     "input": "too soon",
+     "inputId": "uuid-0009",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 8,
+        "receivedAt": 1800000000800,
+        "kind": "request",
+        "id": "uuid-0008",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "too soon",
+         "inputId": "uuid-0009"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 9,
+        "receivedAt": 1800000000900,
+        "kind": "response",
+        "requestId": "uuid-0008",
+        "body": {
+         "kind": "rejected",
+         "code": "busy",
+         "reason": "busy"
+        }
+       },
+       "state": "rejected",
+       "reason": "busy"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "text_delta",
+     "text": "steered: also this | and that",
+     "sessionId": "uuid-0001",
+     "agentPath": [],
+     "seq": 10,
+     "receivedAt": 1800000001000
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "completed"
+     },
+     "sessionId": "uuid-0001",
+     "agentPath": [],
+     "seq": 11,
+     "receivedAt": 1800000001100
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "usage",
+     "usage": {
+      "tokens": {
+       "input": 1,
+       "output": 10
+      },
+      "context": {
+       "tokens": 11,
+       "contextWindow": 200000,
+       "percent": 0.0055000000000000005
+      }
+     },
+     "sessionId": "uuid-0001",
+     "agentPath": [],
+     "seq": 11,
+     "receivedAt": 1800000001100
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0011\"]",
+     "input": "late",
+     "inputId": "uuid-0011",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 12,
+        "receivedAt": 1800000001200,
+        "kind": "request",
+        "id": "uuid-0010",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "late",
+         "inputId": "uuid-0011"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0011\"]",
+     "input": "late",
+     "inputId": "uuid-0011",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 12,
+        "receivedAt": 1800000001200,
+        "kind": "request",
+        "id": "uuid-0010",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "late",
+         "inputId": "uuid-0011"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 13,
+        "receivedAt": 1800000001300,
+        "kind": "response",
+        "requestId": "uuid-0010",
+        "body": {
+         "kind": "rejected",
+         "code": "no_active_turn",
+         "reason": "no active turn"
+        }
+       },
+       "state": "rejected",
+       "reason": "no active turn"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "control_rejected",
+     "requestId": "uuid-0012",
+     "action": "abort",
+     "code": "no_active_turn",
+     "reason": "no active turn",
+     "sessionId": "uuid-0001",
+     "agentPath": [],
+     "seq": 15,
+     "receivedAt": 1800000001500
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "exited",
+     "code": 0,
+     "sessionId": "uuid-0001",
+     "agentPath": [],
+     "seq": 17,
+     "receivedAt": 1800000001700
+    }
+   }
+  ]
+ ],
+ "view": {
+  "messages": [
+   {
+    "kind": "input",
+    "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0003\"]",
+     "input": "work",
+     "inputId": "uuid-0003",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000100,
+        "kind": "request",
+        "id": "uuid-0002",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "work",
+         "inputId": "uuid-0003"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 2,
+        "receivedAt": 1800000000200,
+        "kind": "response",
+        "requestId": "uuid-0002",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::uuid-0002",
+    "openedBy": "uuid-0002",
+    "sections": [
+     {
+      "sessionId": "uuid-0001",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "working"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0005\"]",
+     "input": "also this",
+     "inputId": "uuid-0005",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000400,
+        "kind": "request",
+        "id": "uuid-0004",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "also this",
+         "inputId": "uuid-0005"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 5,
+        "receivedAt": 1800000000500,
+        "kind": "response",
+        "requestId": "uuid-0004",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0007\"]",
+     "input": "and that",
+     "inputId": "uuid-0007",
+     "origin": {
+      "kind": "notification",
+      "source": "ci"
+     },
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 6,
+        "receivedAt": 1800000000600,
+        "kind": "request",
+        "id": "uuid-0006",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "and that",
+         "inputId": "uuid-0007",
+         "origin": {
+          "kind": "notification",
+          "source": "ci"
+         }
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 7,
+        "receivedAt": 1800000000700,
+        "kind": "response",
+        "requestId": "uuid-0006",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0009\"]",
+     "input": "too soon",
+     "inputId": "uuid-0009",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 8,
+        "receivedAt": 1800000000800,
+        "kind": "request",
+        "id": "uuid-0008",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "too soon",
+         "inputId": "uuid-0009"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 9,
+        "receivedAt": 1800000000900,
+        "kind": "response",
+        "requestId": "uuid-0008",
+        "body": {
+         "kind": "rejected",
+         "code": "busy",
+         "reason": "busy"
+        }
+       },
+       "state": "rejected",
+       "reason": "busy"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::uuid-0001:10",
+    "sections": [
+     {
+      "sessionId": "uuid-0001",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "steered: also this | and that"
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "completed"
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"uuid-0001\",[],\"uuid-0011\"]",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0011\"]",
+     "input": "late",
+     "inputId": "uuid-0011",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 12,
+        "receivedAt": 1800000001200,
+        "kind": "request",
+        "id": "uuid-0010",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "late",
+         "inputId": "uuid-0011"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 13,
+        "receivedAt": 1800000001300,
+        "kind": "response",
+        "requestId": "uuid-0010",
+        "body": {
+         "kind": "rejected",
+         "code": "no_active_turn",
+         "reason": "no active turn"
+        }
+       },
+       "state": "rejected",
+       "reason": "no active turn"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt::uuid-0001:15",
+    "notice": {
+     "cause": "control_rejected",
+     "action": "abort",
+     "reason": "no active turn"
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt::uuid-0001:17",
+    "notice": {
+     "cause": "exited",
+     "code": 0
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  "model": "scripted-1",
+  "effort": null,
+  "serviceTier": null,
+  "context": {
+   "tokens": 11,
+   "contextWindow": 200000,
+   "percent": 0.0055000000000000005
+  },
+  "usage": {
+   "total": {
+    "input": 1,
+    "output": 10
+   }
+  },
+  "pendingRequests": [],
+  "exited": {
+   "code": 0
+  },
+  "conversation": {
+   "drops": [],
+   "inputs": [
+    [
+     "[\"uuid-0001\",[],\"uuid-0003\"]",
+     {
+      "id": "[\"uuid-0001\",[],\"uuid-0003\"]",
+      "input": "work",
+      "inputId": "uuid-0003",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 1,
+         "receivedAt": 1800000000100,
+         "kind": "request",
+         "id": "uuid-0002",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "work",
+          "inputId": "uuid-0003"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 2,
+         "receivedAt": 1800000000200,
+         "kind": "response",
+         "requestId": "uuid-0002",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ],
+    [
+     "[\"uuid-0001\",[],\"uuid-0005\"]",
+     {
+      "id": "[\"uuid-0001\",[],\"uuid-0005\"]",
+      "input": "also this",
+      "inputId": "uuid-0005",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 4,
+         "receivedAt": 1800000000400,
+         "kind": "request",
+         "id": "uuid-0004",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "steer",
+          "input": "also this",
+          "inputId": "uuid-0005"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 5,
+         "receivedAt": 1800000000500,
+         "kind": "response",
+         "requestId": "uuid-0004",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ],
+    [
+     "[\"uuid-0001\",[],\"uuid-0007\"]",
+     {
+      "id": "[\"uuid-0001\",[],\"uuid-0007\"]",
+      "input": "and that",
+      "inputId": "uuid-0007",
+      "origin": {
+       "kind": "notification",
+       "source": "ci"
+      },
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 6,
+         "receivedAt": 1800000000600,
+         "kind": "request",
+         "id": "uuid-0006",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "steer",
+          "input": "and that",
+          "inputId": "uuid-0007",
+          "origin": {
+           "kind": "notification",
+           "source": "ci"
+          }
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 7,
+         "receivedAt": 1800000000700,
+         "kind": "response",
+         "requestId": "uuid-0006",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ],
+    [
+     "[\"uuid-0001\",[],\"uuid-0009\"]",
+     {
+      "id": "[\"uuid-0001\",[],\"uuid-0009\"]",
+      "input": "too soon",
+      "inputId": "uuid-0009",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 8,
+         "receivedAt": 1800000000800,
+         "kind": "request",
+         "id": "uuid-0008",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "too soon",
+          "inputId": "uuid-0009"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 9,
+         "receivedAt": 1800000000900,
+         "kind": "response",
+         "requestId": "uuid-0008",
+         "body": {
+          "kind": "rejected",
+          "code": "busy",
+          "reason": "busy"
+         }
+        },
+        "state": "rejected",
+        "reason": "busy"
+       }
+      ],
+      "state": "rejected",
+      "observations": []
+     }
+    ],
+    [
+     "[\"uuid-0001\",[],\"uuid-0011\"]",
+     {
+      "id": "[\"uuid-0001\",[],\"uuid-0011\"]",
+      "input": "late",
+      "inputId": "uuid-0011",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 12,
+         "receivedAt": 1800000001200,
+         "kind": "request",
+         "id": "uuid-0010",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "steer",
+          "input": "late",
+          "inputId": "uuid-0011"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 13,
+         "receivedAt": 1800000001300,
+         "kind": "response",
+         "requestId": "uuid-0010",
+         "body": {
+          "kind": "rejected",
+          "code": "no_active_turn",
+          "reason": "no active turn"
+         }
+        },
+        "state": "rejected",
+        "reason": "no active turn"
+       }
+      ],
+      "state": "rejected",
+      "observations": []
+     }
+    ]
+   ],
+   "requests": [
+    [
+     "[\"\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0002\\\"]\"]",
+     "[\"uuid-0001\",[],\"uuid-0003\"]"
+    ],
+    [
+     "[\"\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0004\\\"]\"]",
+     "[\"uuid-0001\",[],\"uuid-0005\"]"
+    ],
+    [
+     "[\"\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0006\\\"]\"]",
+     "[\"uuid-0001\",[],\"uuid-0007\"]"
+    ],
+    [
+     "[\"\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0008\\\"]\"]",
+     "[\"uuid-0001\",[],\"uuid-0009\"]"
+    ],
+    [
+     "[\"\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0010\\\"]\"]",
+     "[\"uuid-0001\",[],\"uuid-0011\"]"
+    ]
+   ],
+   "actions": [],
+   "cursors": [
+    [
+     "",
+     17
+    ]
+   ],
+   "updates": [
+    {
+     "kind": "event",
+     "event": {
+      "kind": "exited",
+      "code": 0,
+      "sessionId": "uuid-0001",
+      "agentPath": [],
+      "seq": 17,
+      "receivedAt": 1800000001700
+     }
+    }
+   ]
+  },
+  "rootSessionId": "uuid-0001",
+  "usageBySession": [
+   [
+    "uuid-0001",
+    {
+     "agents": [
+      [
+       "[]",
+       {
+        "agentPath": [],
+        "tokens": {
+         "input": 1,
+         "output": 10
+        }
+       }
+      ]
+     ],
+     "total": null
+    }
+   ]
+  ],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "uuid-0001"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [
+   [
+    "[]",
+    {
+     "agentPath": [],
+     "tokens": {
+      "input": 1,
+      "output": 10
+     }
+    }
+   ]
+  ],
+  "usageTotal": null
+ },
+ "viewStream": {
+  "messages": [
+   {
+    "kind": "input",
+    "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0003\"]",
+     "input": "work",
+     "inputId": "uuid-0003",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 1,
+        "receivedAt": 1800000000100,
+        "kind": "request",
+        "id": "uuid-0002",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "work",
+         "inputId": "uuid-0003"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 2,
+        "receivedAt": 1800000000200,
+        "kind": "response",
+        "requestId": "uuid-0002",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:uuid-0002",
+    "openedBy": "uuid-0002",
+    "sections": [
+     {
+      "sessionId": "uuid-0001",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "working"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0005\"]",
+     "input": "also this",
+     "inputId": "uuid-0005",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000400,
+        "kind": "request",
+        "id": "uuid-0004",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "also this",
+         "inputId": "uuid-0005"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 5,
+        "receivedAt": 1800000000500,
+        "kind": "response",
+        "requestId": "uuid-0004",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0007\"]",
+     "input": "and that",
+     "inputId": "uuid-0007",
+     "origin": {
+      "kind": "notification",
+      "source": "ci"
+     },
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 6,
+        "receivedAt": 1800000000600,
+        "kind": "request",
+        "id": "uuid-0006",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "and that",
+         "inputId": "uuid-0007",
+         "origin": {
+          "kind": "notification",
+          "source": "ci"
+         }
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 7,
+        "receivedAt": 1800000000700,
+        "kind": "response",
+        "requestId": "uuid-0006",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0009\"]",
+     "input": "too soon",
+     "inputId": "uuid-0009",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 8,
+        "receivedAt": 1800000000800,
+        "kind": "request",
+        "id": "uuid-0008",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "too soon",
+         "inputId": "uuid-0009"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 9,
+        "receivedAt": 1800000000900,
+        "kind": "response",
+        "requestId": "uuid-0008",
+        "body": {
+         "kind": "rejected",
+         "code": "busy",
+         "reason": "busy"
+        }
+       },
+       "state": "rejected",
+       "reason": "busy"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:uuid-0001:10",
+    "sections": [
+     {
+      "sessionId": "uuid-0001",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "steered: also this | and that"
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "completed"
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"uuid-0001\",[],\"uuid-0011\"]",
+    "input": {
+     "id": "[\"uuid-0001\",[],\"uuid-0011\"]",
+     "input": "late",
+     "inputId": "uuid-0011",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 12,
+        "receivedAt": 1800000001200,
+        "kind": "request",
+        "id": "uuid-0010",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "late",
+         "inputId": "uuid-0011"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "uuid-0001",
+        "agentPath": [],
+        "seq": 13,
+        "receivedAt": 1800000001300,
+        "kind": "response",
+        "requestId": "uuid-0010",
+        "body": {
+         "kind": "rejected",
+         "code": "no_active_turn",
+         "reason": "no active turn"
+        }
+       },
+       "state": "rejected",
+       "reason": "no active turn"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt:stream-1:uuid-0001:15",
+    "notice": {
+     "cause": "control_rejected",
+     "action": "abort",
+     "reason": "no active turn"
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt:stream-1:uuid-0001:17",
+    "notice": {
+     "cause": "exited",
+     "code": 0
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "completed"
+   }
+  },
+  "model": "scripted-1",
+  "effort": null,
+  "serviceTier": null,
+  "context": {
+   "tokens": 11,
+   "contextWindow": 200000,
+   "percent": 0.0055000000000000005
+  },
+  "usage": {
+   "total": {
+    "input": 1,
+    "output": 10
+   }
+  },
+  "pendingRequests": [],
+  "exited": {
+   "code": 0
+  },
+  "conversation": {
+   "drops": [],
+   "inputs": [
+    [
+     "[\"uuid-0001\",[],\"uuid-0003\"]",
+     {
+      "id": "[\"uuid-0001\",[],\"uuid-0003\"]",
+      "input": "work",
+      "inputId": "uuid-0003",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 1,
+         "receivedAt": 1800000000100,
+         "kind": "request",
+         "id": "uuid-0002",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "work",
+          "inputId": "uuid-0003"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 2,
+         "receivedAt": 1800000000200,
+         "kind": "response",
+         "requestId": "uuid-0002",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ],
+    [
+     "[\"uuid-0001\",[],\"uuid-0005\"]",
+     {
+      "id": "[\"uuid-0001\",[],\"uuid-0005\"]",
+      "input": "also this",
+      "inputId": "uuid-0005",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 4,
+         "receivedAt": 1800000000400,
+         "kind": "request",
+         "id": "uuid-0004",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "steer",
+          "input": "also this",
+          "inputId": "uuid-0005"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 5,
+         "receivedAt": 1800000000500,
+         "kind": "response",
+         "requestId": "uuid-0004",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ],
+    [
+     "[\"uuid-0001\",[],\"uuid-0007\"]",
+     {
+      "id": "[\"uuid-0001\",[],\"uuid-0007\"]",
+      "input": "and that",
+      "inputId": "uuid-0007",
+      "origin": {
+       "kind": "notification",
+       "source": "ci"
+      },
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 6,
+         "receivedAt": 1800000000600,
+         "kind": "request",
+         "id": "uuid-0006",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "steer",
+          "input": "and that",
+          "inputId": "uuid-0007",
+          "origin": {
+           "kind": "notification",
+           "source": "ci"
+          }
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 7,
+         "receivedAt": 1800000000700,
+         "kind": "response",
+         "requestId": "uuid-0006",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ],
+    [
+     "[\"uuid-0001\",[],\"uuid-0009\"]",
+     {
+      "id": "[\"uuid-0001\",[],\"uuid-0009\"]",
+      "input": "too soon",
+      "inputId": "uuid-0009",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 8,
+         "receivedAt": 1800000000800,
+         "kind": "request",
+         "id": "uuid-0008",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "too soon",
+          "inputId": "uuid-0009"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 9,
+         "receivedAt": 1800000000900,
+         "kind": "response",
+         "requestId": "uuid-0008",
+         "body": {
+          "kind": "rejected",
+          "code": "busy",
+          "reason": "busy"
+         }
+        },
+        "state": "rejected",
+        "reason": "busy"
+       }
+      ],
+      "state": "rejected",
+      "observations": []
+     }
+    ],
+    [
+     "[\"uuid-0001\",[],\"uuid-0011\"]",
+     {
+      "id": "[\"uuid-0001\",[],\"uuid-0011\"]",
+      "input": "late",
+      "inputId": "uuid-0011",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 12,
+         "receivedAt": 1800000001200,
+         "kind": "request",
+         "id": "uuid-0010",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "steer",
+          "input": "late",
+          "inputId": "uuid-0011"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "uuid-0001",
+         "agentPath": [],
+         "seq": 13,
+         "receivedAt": 1800000001300,
+         "kind": "response",
+         "requestId": "uuid-0010",
+         "body": {
+          "kind": "rejected",
+          "code": "no_active_turn",
+          "reason": "no active turn"
+         }
+        },
+        "state": "rejected",
+        "reason": "no active turn"
+       }
+      ],
+      "state": "rejected",
+      "observations": []
+     }
+    ]
+   ],
+   "requests": [
+    [
+     "[\"stream-1\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0002\\\"]\"]",
+     "[\"uuid-0001\",[],\"uuid-0003\"]"
+    ],
+    [
+     "[\"stream-1\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0004\\\"]\"]",
+     "[\"uuid-0001\",[],\"uuid-0005\"]"
+    ],
+    [
+     "[\"stream-1\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0006\\\"]\"]",
+     "[\"uuid-0001\",[],\"uuid-0007\"]"
+    ],
+    [
+     "[\"stream-1\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0008\\\"]\"]",
+     "[\"uuid-0001\",[],\"uuid-0009\"]"
+    ],
+    [
+     "[\"stream-1\",\"[\\\"uuid-0001\\\",[],\\\"uuid-0010\\\"]\"]",
+     "[\"uuid-0001\",[],\"uuid-0011\"]"
+    ]
+   ],
+   "actions": [],
+   "cursors": [
+    [
+     "stream-1",
+     17
+    ]
+   ],
+   "updates": [
+    {
+     "kind": "event",
+     "event": {
+      "kind": "exited",
+      "code": 0,
+      "sessionId": "uuid-0001",
+      "agentPath": [],
+      "seq": 17,
+      "receivedAt": 1800000001700
+     }
+    }
+   ]
+  },
+  "rootSessionId": "uuid-0001",
+  "usageBySession": [
+   [
+    "uuid-0001",
+    {
+     "agents": [
+      [
+       "[]",
+       {
+        "agentPath": [],
+        "tokens": {
+         "input": 1,
+         "output": 10
+        }
+       }
+      ]
+     ],
+     "total": null
+    }
+   ]
+  ],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "uuid-0001"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [
+   [
+    "[]",
+    {
+     "agentPath": [],
+     "tokens": {
+      "input": 1,
+      "output": 10
+     }
+    }
+   ]
+  ],
+  "usageTotal": null
+ },
+ "viewSteps": [
+  {
+   "openTurn": -1,
+   "messages": [],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 5,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]"
+    },
+    {
+     "id": "turn::uuid-0008",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 5,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]"
+    },
+    {
+     "id": "turn::uuid-0001:10",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]"
+    },
+    {
+     "id": "turn::uuid-0001:10",
+     "parts": [
+      1
+     ],
+     "outcome": "completed"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 2
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]"
+    },
+    {
+     "id": "turn::uuid-0001:10",
+     "parts": [
+      1
+     ],
+     "outcome": "completed"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0011\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]"
+    },
+    {
+     "id": "turn::uuid-0001:10",
+     "parts": [
+      1
+     ],
+     "outcome": "completed"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0011\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]"
+    },
+    {
+     "id": "turn::uuid-0001:10",
+     "parts": [
+      1
+     ],
+     "outcome": "completed"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0011\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]"
+    },
+    {
+     "id": "turn::uuid-0001:10",
+     "parts": [
+      1
+     ],
+     "outcome": "completed"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0011\"]"
+    },
+    {
+     "id": "nt::uuid-0001:15"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]"
+    },
+    {
+     "id": "turn::uuid-0001:10",
+     "parts": [
+      1
+     ],
+     "outcome": "completed"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0011\"]"
+    },
+    {
+     "id": "nt::uuid-0001:15"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0003\"]"
+    },
+    {
+     "id": "turn::uuid-0002",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0005\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0007\"]"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0009\"]"
+    },
+    {
+     "id": "turn::uuid-0001:10",
+     "parts": [
+      1
+     ],
+     "outcome": "completed"
+    },
+    {
+     "id": "in:[\"uuid-0001\",[],\"uuid-0011\"]"
+    },
+    {
+     "id": "nt::uuid-0001:15"
+    },
+    {
+     "id": "nt::uuid-0001:17"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  }
+ ],
+ "viewEvents": {
+  "messages": [
+   {
+    "kind": "turn",
+    "id": "turn::uuid-0002",
+    "openedBy": "uuid-0002",
+    "sections": [
+     {
+      "sessionId": "uuid-0001",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "working"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "kind": "turn",
+    "id": "turn::uuid-0001:10",
+    "sections": [
+     {
+      "sessionId": "uuid-0001",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "steered: also this | and that"
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "completed"
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt::uuid-0001:13",
+    "notice": {
+     "cause": "control_rejected",
+     "action": "steer",
+     "reason": "no active turn"
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt::uuid-0001:15",
+    "notice": {
+     "cause": "control_rejected",
+     "action": "abort",
+     "reason": "no active turn"
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt::uuid-0001:17",
+    "notice": {
+     "cause": "exited",
+     "code": 0
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle"
+  },
+  "model": "scripted-1",
+  "effort": null,
+  "serviceTier": null,
+  "context": {
+   "tokens": 11,
+   "contextWindow": 200000,
+   "percent": 0.0055000000000000005
+  },
+  "usage": {
+   "total": {
+    "input": 1,
+    "output": 10
+   }
+  },
+  "pendingRequests": [],
+  "exited": {
+   "code": 0
+  },
+  "conversation": {
+   "drops": [],
+   "inputs": [],
+   "requests": [],
+   "actions": [],
+   "cursors": [],
+   "updates": []
+  },
+  "rootSessionId": "uuid-0001",
+  "usageBySession": [
+   [
+    "uuid-0001",
+    {
+     "agents": [
+      [
+       "[]",
+       {
+        "agentPath": [],
+        "tokens": {
+         "input": 1,
+         "output": 10
+        }
+       }
+      ]
+     ],
+     "total": null
+    }
+   ]
+  ],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "uuid-0001"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [
+   [
+    "[]",
+    {
+     "agentPath": [],
+     "tokens": {
+      "input": 1,
+      "output": 10
+     }
+    }
+   ]
+  ],
+  "usageTotal": null
+ },
+ "tasksOf": {
+  "value": [],
+  "seq": 17
+ },
+ "tasksOfRoot": {
+  "value": [],
+  "seq": 17
+ },
+ "display": {
+  "groups": [
+   {
+    "segments": [
+     {
+      "kind": "part",
+      "index": 0,
+      "part": {
+       "kind": "text",
+       "text": "working"
+      }
+     }
+    ],
+    "summaries": [
+     null
+    ]
+   },
+   {
+    "segments": [
+     {
+      "kind": "part",
+      "index": 0,
+      "part": {
+       "kind": "text",
+       "text": "steered: also this | and that"
+      }
+     }
+    ],
+    "summaries": [
+     null
+    ]
+   }
+  ],
+  "tools": [],
+  "requests": [],
+  "notices": [
+   {
+    "notice": {
+     "cause": "control_rejected",
+     "action": "abort",
+     "reason": "no active turn"
+    },
+    "text": "Abort rejected: no active turn",
+    "tone": "warning"
+   },
+   {
+    "notice": {
+     "cause": "exited",
+     "code": 0
+    },
+    "text": "Runtime exited (code 0)",
+    "tone": "quiet"
+   }
+  ],
+  "phases": [
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   }
+  ],
+  "failures": [],
+  "tasks": []
+ }
+}

@@ -1,0 +1,4 @@
+Create ONE sprite sheet, size 1024x1024: a grid of 2 columns x 2 rows, one figure per cell.
+The character is the human farm manager from Image 1, standing at the cottage door: a young, friendly farmer with a straw hat, cream shirt with rolled sleeves, denim overalls and brown boots. Keep the same face, outfit, colors and art style. Full body in cells 1 to 3, all at the same scale.
+(1) standing at ease, hands on hips, smiling; (2) talking: one hand raised in a friendly open gesture, mouth open; (3) listening: one hand cupped behind an ear, attentive; (4) head-and-shoulders portrait for an avatar, smiling, facing the viewer.
+No text, no letters, nothing under the feet.

@@ -1,0 +1,11 @@
+Create ONE image, size 1536x1024: the whole playfield of a small 2D game, one screen, seen from the three-quarter top-down camera. It is a small lived-in countryside yard at the edge of a village, cosy and a little shabby like the towns of Eastward. Exact layout (pixel coordinates in this 1536x1024 image):
+- Top band (y 0 to 330): a back row of three buildings in front of a mossy cliff with trees, each with its door facing the viewer at the bottom of the building and a short packed-dirt path from the door down to the yard.
+  - Left (x 40 to 430): a small two-storey wooden book house, a hanging sign with an open-book picture (no letters), stacks of books and crates by the door, a reading lamp.
+  - Middle (x 560 to 1000): the farm manager's cottage: warm wood walls, a teal corrugated tin roof, a porch with a lantern, potted plants, a laundry line, a door.
+  - Right (x 1090 to 1500): a workshop shed: brick chimney with a little smoke, big open door, an anvil, a workbench with tools and gears outside, barrels.
+- Centre (x 400 to 1140, y 380 to 860): one big flat rectangular yard of plain bare light-brown soil, completely empty: no plots, no crops, no objects, no puddles, nothing on it, so that farm plots can be placed on it later.
+- Left side (x 0 to 360, y 360 to 1024): grass; a tall radio mast made of a lattice of metal with an antenna and a dish on a small concrete base around (180, 520); below it an old round stone well with a wooden bench next to it around (190, 830).
+- Right side (x 1160 to 1536, y 360 to 1024): grass; a packed-dirt road coming in from the right edge of the image at about y 640 and joining the central yard, with a wooden gate in a low fence where the road enters.
+- Along the bottom edge: a low wooden fence, wild flowers and tall grass; a small pond in the bottom-right corner; a rusty old bicycle leaning on the fence.
+- Wooden power poles with sagging wires along the top, small details everywhere: crates, buckets, flower pots, a cat bowl, stones.
+Warm late-afternoon daylight. No characters, no animals, no people, no text, no letters, no numbers, no UI.

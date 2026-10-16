@@ -1,0 +1,23 @@
+thread/status/changed        │ event
+turn/started                 │ event → turn_active
+item/started                 │ event
+item/completed               │ event
+item/started                 │ event
+item/completed               │ event
+item/started                 │ event → tool_call_started commandExecution
+item/completed               │ event → tool_call_ended
+thread/status/changed        │ event @thread:thread-child
+item/started                 │ event, link thread-root → thread-child (tool_call)
+item/completed               │ event → task_started, link thread-root → thread-child (tool_call)
+thread/status/changed        │ event @thread:thread-child
+turn/started                 │ event @thread:thread-child → turn_active
+item/started                 │ event
+item/completed               │ event
+thread/status/changed        │ event
+turn/completed               │ event → turn_ended completed
+item/started                 │ event @thread:thread-child
+item/completed               │ event @thread:thread-child
+thread/status/changed        │ event @thread:thread-child
+turn/completed               │ event @thread:thread-child → turn_ended completed
+item/started                 │ event, link thread-root → thread-child (tool_call)
+item/completed               │ event → task_ended, link thread-root → thread-child (tool_call)

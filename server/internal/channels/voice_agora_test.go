@@ -1,0 +1,310 @@
+package channels
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"os"
+	"reflect"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/AgoraIO/agora-agents-go/v2/agentkit"
+	"go.uber.org/fx"
+
+	"vibevalley/internal/base"
+	"vibevalley/internal/protocol"
+)
+
+// The voice agent (voice_agora.go): Go asks Agora for exactly what the TypeScript server did, for every kind of
+// vendor (testdata/voice-requests.json: written by the retired TypeScript server, now a frozen golden that changes by
+// hand with voice_agora.go); vendors that need a key say which is missing; tokens need credentials; starting and
+// stopping go through Agora's REST API (captured here, never sent).
+
+const (
+	voiceTestAppID = "11111111111111111111111111111111"
+	voiceTestCert  = "22222222222222222222222222222222"
+)
+
+// voiceCapture answers Agora's REST API: every request kept, each answered with status and body.
+type voiceCapture struct {
+	mu       sync.Mutex
+	urls     []string
+	requests []map[string]any
+	status   int
+	body     string
+}
+
+func (c *voiceCapture) Do(req *http.Request) (*http.Response, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.urls = append(c.urls, req.Method+" "+req.URL.String())
+	var body map[string]any
+	if req.Body != nil {
+		raw, _ := io.ReadAll(req.Body)
+		json.Unmarshal(raw, &body)
+	}
+	c.requests = append(c.requests, body)
+	status, answer := c.status, c.body
+	if status == 0 {
+		status, answer = 200, `{"agent_id":"parity-agent"}`
+	}
+	return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(answer))}, nil
+}
+
+// voiceJSONOf is v as plain JSON values, for comparing.
+func voiceJSONOf(t *testing.T, v any) any {
+	t.Helper()
+	body, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out any
+	json.Unmarshal(body, &out)
+	return out
+}
+
+func TestVoiceRequestsMatchTypeScript(t *testing.T) {
+	raw, err := os.ReadFile("testdata/voice-requests.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Name        string                 `json:"name"`
+		Voice       protocol.VoiceSettings `json:"voice"`
+		Keys        struct{ AsrKey, LlmKey, TtsKey string }
+		DeepseekKey string                 `json:"deepseekKey"`
+		Line        *base.CallLine         `json:"line"`
+		Captions    protocol.VoiceCaptions `json:"captions"`
+		Request     map[string]any         `json:"request"`
+		RequestURL  string                 `json:"requestUrl"`
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			vendors, problem := voiceVendorsFor(c.Voice, base.VoiceKeys{ASRKey: c.Keys.AsrKey, LLMKey: c.Keys.LlmKey, TTSKey: c.Keys.TtsKey}, c.DeepseekKey, c.Line)
+			if problem != "" {
+				t.Fatal(problem)
+			}
+			capture := &voiceCapture{}
+			client := agentkit.NewAgoraClient(agentkit.AgoraClientOptions{Area: voiceAreaOf(c.Voice.Area), AppID: voiceTestAppID, AppCertificate: voiceTestCert, HTTPClient: capture})
+			idle := int(c.Voice.IdleSeconds)
+			session := voiceAgentFor(client, c.Voice, vendors, c.Captions).CreateSession(agentkit.CreateSessionOptions{
+				Name: "parity", Channel: "parity-channel", AgentUID: protocol.VoiceAgentUID, RemoteUIDs: []string{"10001"}, IdleTimeout: &idle, ExpiresIn: 3600,
+			})
+			id, err := session.Start(context.Background())
+			if err != nil || id != "parity-agent" {
+				t.Fatalf("start: %q %v", id, err)
+			}
+			if got := capture.urls[0]; got != "POST "+c.RequestURL {
+				t.Fatalf("endpoint: %s, TypeScript's %s", got, c.RequestURL)
+			}
+			request := capture.requests[0]
+			// Go repeats the app ID in the body; Node puts it only in the URL. The token is signed with the time in it.
+			if request["appid"] != voiceTestAppID {
+				t.Fatalf("app id: %v", request["appid"])
+			}
+			delete(request, "appid")
+			request["properties"].(map[string]any)["token"] = "parity-token"
+			if got, want := voiceJSONOf(t, request), voiceJSONOf(t, c.Request); !reflect.DeepEqual(got, want) {
+				a, _ := json.MarshalIndent(got, "", "  ")
+				b, _ := json.MarshalIndent(want, "", "  ")
+				t.Fatalf("Go's request differs from TypeScript's\nGo=%s\nTypeScript=%s", a, b)
+			}
+		})
+	}
+}
+
+func TestVoiceVendorsSayWhichKeyIsMissing(t *testing.T) {
+	d := protocol.DefaultVoice()
+	with := func(f func(*protocol.VoiceSettings)) protocol.VoiceSettings { v := d; f(&v); return v }
+	if _, problem := voiceVendorsFor(d, base.VoiceKeys{}, "", nil); problem != "" {
+		t.Fatalf("Agora-hosted vendors need no key: %s", problem)
+	}
+	deepseek := with(func(v *protocol.VoiceSettings) {
+		v.LLM = protocol.VoiceLLM{Value: protocol.VoiceLLMDeepseek{Model: "deepseek-chat"}}
+	})
+	if _, problem := voiceVendorsFor(deepseek, base.VoiceKeys{}, "", nil); !strings.Contains(problem, "DeepSeek") {
+		t.Fatalf("deepseek: %q", problem)
+	}
+	if _, problem := voiceVendorsFor(deepseek, base.VoiceKeys{}, "sk-x", nil); problem != "" {
+		t.Fatalf("deepseek with a key: %q", problem)
+	}
+	asr := with(func(v *protocol.VoiceSettings) {
+		v.ASR = protocol.VoiceASR{Value: protocol.VoiceASRMicrosoft{Region: "eastasia"}}
+	})
+	if _, problem := voiceVendorsFor(asr, base.VoiceKeys{}, "", nil); !strings.Contains(problem, "识别") {
+		t.Fatalf("microsoft asr: %q", problem)
+	}
+	llm := with(func(v *protocol.VoiceSettings) {
+		v.LLM = protocol.VoiceLLM{Value: protocol.VoiceLLMOpenai{URL: "https://x/v1/chat/completions", Model: "m"}}
+	})
+	if _, problem := voiceVendorsFor(llm, base.VoiceKeys{}, "", nil); !strings.Contains(problem, "大模型") {
+		t.Fatalf("own llm: %q", problem)
+	}
+	tts := with(func(v *protocol.VoiceSettings) {
+		v.TTS = protocol.VoiceTTS{Value: protocol.VoiceTTSMicrosoft{Region: "eastasia", VoiceName: "zh-CN-XiaoxiaoNeural"}}
+	})
+	if _, problem := voiceVendorsFor(tts, base.VoiceKeys{}, "", nil); !strings.Contains(problem, "合成") {
+		t.Fatalf("microsoft tts: %q", problem)
+	}
+	hosted := with(func(v *protocol.VoiceSettings) {
+		v.ASR = protocol.VoiceASR{Value: protocol.VoiceASRDeepgram{Model: protocol.ModelNova3}}
+		v.TTS = protocol.VoiceTTS{Value: protocol.VoiceTTSOpenai{Voice: protocol.VoiceNova}}
+	})
+	if _, problem := voiceVendorsFor(hosted, base.VoiceKeys{}, "", nil); problem != "" {
+		t.Fatalf("deepgram and openai tts: %q", problem)
+	}
+	vibevalley := with(func(v *protocol.VoiceSettings) { v.LLM = protocol.VoiceLLM{Value: protocol.VoiceLLMVibeValley{}} })
+	if _, problem := voiceVendorsFor(vibevalley, base.VoiceKeys{}, "", nil); !strings.Contains(problem, "语音线路") {
+		t.Fatalf("vibevalley without a line: %q", problem)
+	}
+}
+
+// Every vendor in the protocol is one voiceVendorsFor can use: a member added to VoiceASR, VoiceLLM or VoiceTTS fails
+// here until it is handled. With every key at hand, a problem may still come from the member's empty settings, never
+// from not knowing it.
+func TestVoiceVendorsKnowEveryVendor(t *testing.T) {
+	keys := base.VoiceKeys{ASRKey: "k", LLMKey: "k", TTSKey: "k"}
+	line := &base.CallLine{ID: "l", URL: "http://127.0.0.1:1/v1/chat/completions", Key: "k"}
+	knows := func(member any, v protocol.VoiceSettings) {
+		if _, problem := voiceVendorsFor(v, keys, "sk-x", line); strings.Contains(problem, voiceUnknown) {
+			t.Errorf("%T: %s", member, problem)
+		}
+	}
+	for _, m := range protocol.VoiceASRMembers {
+		v := protocol.DefaultVoice()
+		v.ASR = protocol.VoiceASR{Value: m}
+		knows(m, v)
+	}
+	for _, m := range protocol.VoiceLLMMembers {
+		v := protocol.DefaultVoice()
+		v.LLM = protocol.VoiceLLM{Value: m}
+		knows(m, v)
+	}
+	for _, m := range protocol.VoiceTTSMembers {
+		v := protocol.DefaultVoice()
+		v.TTS = protocol.VoiceTTS{Value: m}
+		knows(m, v)
+	}
+}
+
+// voiceTestFarm is a farm with the voice group's services, its home fresh and the environment empty.
+func voiceTestFarm(t *testing.T) *world {
+	t.Helper()
+	t.Setenv("VIBEVALLEY_VOICE_LINE_PORT", "0")
+	t.Setenv("VIBEVALLEY_VOICE_LINE_URL", "https://line.example.com")
+	home := t.TempDir()
+	// Settings that read nothing of this machine's (its environment, pi's file), for every service that uses them.
+	settings := base.NewSettingsFrom(home, "", func(string) string { return "" })
+	f, err := newWorld(base.Config{Home: home, WorkRoot: t.TempDir(), DBPath: ":memory:"}, fx.Replace(settings))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(f.Close)
+	return f
+}
+
+func TestVoiceSessionsNeedCredentials(t *testing.T) {
+	f := voiceTestFarm(t)
+	ctx := context.Background()
+	var unavailable protocol.VoiceUnavailable
+	if _, err := f.Voice.Session(ctx); !errors.As(err, &unavailable) || !strings.Contains(unavailable.Reason, "App ID") {
+		t.Fatalf("without credentials: %v", err)
+	}
+	if _, err := f.Settings.Save(protocol.SettingsUpdate{AgoraAppID: voicePtr(voiceTestAppID), AgoraAppCertificate: voicePtr(voiceTestCert)}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := f.Voice.Session(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.AppID != voiceTestAppID || !strings.HasPrefix(s.Channel, "vibevalley-") || s.UID == "" || !strings.HasPrefix(s.Token, "007") {
+		t.Fatalf("session: %+v", s)
+	}
+	renewed, err := f.Voice.Renew(ctx, s.Channel, s.UID)
+	if err != nil || renewed.Channel != s.Channel || renewed.UID != s.UID || renewed.Token == "" {
+		t.Fatalf("renew: %+v %v", renewed, err)
+	}
+}
+
+func TestVoiceStartAndStopTheManagerOnHisLine(t *testing.T) {
+	f := voiceTestFarm(t)
+	if err := f.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	capture := &voiceCapture{}
+	f.Voice.http = capture
+	ctx := context.Background()
+	if _, err := f.Settings.Save(protocol.SettingsUpdate{AgoraAppID: voicePtr(voiceTestAppID), AgoraAppCertificate: voicePtr(voiceTestCert),
+		Voice: &protocol.SettingsUpdateVoice{LLM: protocol.VoiceLLM{Value: protocol.VoiceLLMVibeValley{}}}}); err != nil {
+		t.Fatal(err)
+	}
+	captions := protocol.VoiceCaptionsDatastream
+	agent, err := f.Voice.Start(ctx, "ch1", "4242", &captions)
+	if err != nil || agent.AgentID != "parity-agent" {
+		t.Fatalf("start: %+v %v", agent, err)
+	}
+	props := capture.requests[0]["properties"].(map[string]any)
+	llm := props["llm"].(map[string]any)
+	if !strings.HasPrefix(llm["url"].(string), "https://line.example.com/llm/") || llm["api_key"] == "" {
+		t.Fatalf("the manager's line: %v", llm)
+	}
+	if props["parameters"].(map[string]any)["data_channel"] != "datastream" || props["advanced_features"].(map[string]any)["enable_rtm"] != false {
+		t.Fatalf("captions: %v %v", props["parameters"], props["advanced_features"])
+	}
+	if got := props["remote_rtc_uids"]; !reflect.DeepEqual(got, []any{"4242"}) {
+		t.Fatalf("only the page's user is listened to: %v", got)
+	}
+	if n := len(f.VoiceLine.keys); n != 1 {
+		t.Fatalf("one line open, not %d", n)
+	}
+	// Stopping one already leaving is fine; its line closes either way.
+	capture.status, capture.body = 400, `{"detail":"Agent is already in the process of shutting down"}`
+	if err := f.Voice.Stop(ctx, agent.AgentID); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(f.VoiceLine.keys); n != 0 {
+		t.Fatalf("the line stays open: %d", n)
+	}
+	capture.status, capture.body = 500, `{"detail":"boom"}`
+	var failed protocol.VoiceAgentFailed
+	if err := f.Voice.Stop(ctx, "other"); !errors.As(err, &failed) {
+		t.Fatalf("a real failure: %v", err)
+	}
+}
+
+func TestVoiceNativeIsTheFarmsAgent(t *testing.T) {
+	f := voiceTestFarm(t)
+	if _, err := f.Voice.Native(protocol.VoiceCaptionsRtm); err == nil {
+		t.Fatal("no credentials, no agent")
+	}
+	if _, err := f.Settings.Save(protocol.SettingsUpdate{AgoraAppID: voicePtr(voiceTestAppID), AgoraAppCertificate: voicePtr(voiceTestCert),
+		Voice: &protocol.SettingsUpdateVoice{Area: voicePtr(protocol.AreaEU), IdleSeconds: voicePtr(int64(90))}}); err != nil {
+		t.Fatal(err)
+	}
+	native, err := f.Voice.Native(protocol.VoiceCaptionsRtm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer native.Done()
+	if native.Credentials.AppID != voiceTestAppID || native.IdleSeconds != 90 || native.Area != voiceAreaOf(protocol.AreaEU) {
+		t.Fatalf("native: %+v", native)
+	}
+	client := agentkit.NewAgoraClient(agentkit.AgoraClientOptions{Area: native.Area, AppID: voiceTestAppID, AppCertificate: voiceTestCert})
+	props, err := native.Agent(client).ToPropertiesMap(agentkit.ToPropertiesOptions{Channel: "c", AgentUID: protocol.VoiceAgentUID, RemoteUIDs: []string{"1"}, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if props["llm"].(map[string]any)["greeting_message"] != protocol.DefaultVoice().Greeting {
+		t.Fatalf("llm: %v", props["llm"])
+	}
+}

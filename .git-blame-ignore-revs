@@ -1,0 +1,3 @@
+# Whole-workspace formatting: git blame skips these (GitHub reads this file; locally, git config blame.ignoreRevsFile .git-blame-ignore-revs)
+# Format the workspace with oxfmt (pnpm fmt)
+4cf30bc446c74907c068f91aa5b6573e47a88c48

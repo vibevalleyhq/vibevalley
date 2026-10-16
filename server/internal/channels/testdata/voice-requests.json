@@ -1,0 +1,537 @@
+[
+  {
+    "name": "defaults",
+    "voice": {
+      "area": "US",
+      "language": "zh-CN",
+      "asr": {
+        "vendor": "ares"
+      },
+      "llm": {
+        "vendor": "agora",
+        "model": "gpt-4.1-mini"
+      },
+      "tts": {
+        "vendor": "minimax",
+        "model": "speech_2_6_turbo",
+        "voiceId": "Chinese (Mandarin)_Gentle_Youth"
+      },
+      "persona": "你是码农场物语的管家，一个和气、利落的年轻农夫。农场里的帮工是一群小动物，它们其实是写代码的 AI：后端老周（熊）、测试小吴（兔子）、前端阿郑（小狐狸）、文档员 Kimi（猫）、情报 Grok（猫头鹰）、Pi 实验员（刺猬）、夜班反重力（浣熊）。\n\n主人跟你说要做什么活，你就简短确认会派给谁去做，比如「好，让测试小吴去跑一遍测试」。派活和进度由农场自己处理，你看不到地里的实时情况，不要编造进度、结果或文件名；被问到进度时，就说可以看地里的牌子或者日志。\n\n这是语音对话：每次只说一两句，口语化，不列清单，不用 markdown。一次最多问一个问题。用中文回答。",
+      "greeting": "来啦！今天想种点什么？",
+      "failureMessage": "我这边卡了一下，你再说一遍？",
+      "silenceMs": 480,
+      "interruptMs": 160,
+      "idleSeconds": 30
+    },
+    "keys": {},
+    "captions": "rtm",
+    "request": {
+      "name": "parity",
+      "preset": "openai_gpt_4_1_mini,minimax_speech_2_6_turbo",
+      "properties": {
+        "channel": "parity-channel",
+        "token": "parity-token",
+        "agent_rtc_uid": "123456",
+        "remote_rtc_uids": [
+          "10001"
+        ],
+        "idle_timeout": 30,
+        "advanced_features": {
+          "enable_rtm": true,
+          "enable_tools": true
+        },
+        "parameters": {
+          "audio_scenario": "chorus",
+          "data_channel": "rtm",
+          "enable_error_message": true,
+          "enable_metrics": true
+        },
+        "turn_detection": {
+          "language": "zh-CN",
+          "config": {
+            "speech_threshold": 0.5,
+            "start_of_speech": {
+              "mode": "vad",
+              "vad_config": {
+                "interrupt_duration_ms": 160,
+                "prefix_padding_ms": 300
+              }
+            },
+            "end_of_speech": {
+              "mode": "vad",
+              "vad_config": {
+                "silence_duration_ms": 480
+              }
+            }
+          }
+        },
+        "llm": {
+          "params": {
+            "max_tokens": 512,
+            "temperature": 0.7,
+            "top_p": 0.95
+          },
+          "max_history": 15,
+          "system_messages": [
+            {
+              "role": "system",
+              "content": "你是码农场物语的管家，一个和气、利落的年轻农夫。农场里的帮工是一群小动物，它们其实是写代码的 AI：后端老周（熊）、测试小吴（兔子）、前端阿郑（小狐狸）、文档员 Kimi（猫）、情报 Grok（猫头鹰）、Pi 实验员（刺猬）、夜班反重力（浣熊）。\n\n主人跟你说要做什么活，你就简短确认会派给谁去做，比如「好，让测试小吴去跑一遍测试」。派活和进度由农场自己处理，你看不到地里的实时情况，不要编造进度、结果或文件名；被问到进度时，就说可以看地里的牌子或者日志。\n\n这是语音对话：每次只说一两句，口语化，不列清单，不用 markdown。一次最多问一个问题。用中文回答。"
+            }
+          ],
+          "greeting_message": "来啦！今天想种点什么？",
+          "failure_message": "我这边卡了一下，你再说一遍？",
+          "input_modalities": [
+            "text"
+          ],
+          "style": "openai"
+        },
+        "tts": {
+          "vendor": "minimax",
+          "params": {
+            "voice_setting": {
+              "voice_id": "Chinese (Mandarin)_Gentle_Youth"
+            }
+          }
+        },
+        "asr": {
+          "vendor": "ares",
+          "language": "zh-CN"
+        }
+      }
+    },
+    "requestUrl": "https://api-us-west-1.agora.io/api/conversational-ai-agent/v2/projects/11111111111111111111111111111111/join"
+  },
+  {
+    "name": "datastream captions",
+    "voice": {
+      "area": "US",
+      "language": "zh-CN",
+      "asr": {
+        "vendor": "ares"
+      },
+      "llm": {
+        "vendor": "agora",
+        "model": "gpt-4.1-mini"
+      },
+      "tts": {
+        "vendor": "minimax",
+        "model": "speech_2_6_turbo",
+        "voiceId": "Chinese (Mandarin)_Gentle_Youth"
+      },
+      "persona": "你是码农场物语的管家，一个和气、利落的年轻农夫。农场里的帮工是一群小动物，它们其实是写代码的 AI：后端老周（熊）、测试小吴（兔子）、前端阿郑（小狐狸）、文档员 Kimi（猫）、情报 Grok（猫头鹰）、Pi 实验员（刺猬）、夜班反重力（浣熊）。\n\n主人跟你说要做什么活，你就简短确认会派给谁去做，比如「好，让测试小吴去跑一遍测试」。派活和进度由农场自己处理，你看不到地里的实时情况，不要编造进度、结果或文件名；被问到进度时，就说可以看地里的牌子或者日志。\n\n这是语音对话：每次只说一两句，口语化，不列清单，不用 markdown。一次最多问一个问题。用中文回答。",
+      "greeting": "来啦！今天想种点什么？",
+      "failureMessage": "我这边卡了一下，你再说一遍？",
+      "silenceMs": 480,
+      "interruptMs": 160,
+      "idleSeconds": 30
+    },
+    "keys": {},
+    "captions": "datastream",
+    "request": {
+      "name": "parity",
+      "preset": "openai_gpt_4_1_mini,minimax_speech_2_6_turbo",
+      "properties": {
+        "channel": "parity-channel",
+        "token": "parity-token",
+        "agent_rtc_uid": "123456",
+        "remote_rtc_uids": [
+          "10001"
+        ],
+        "idle_timeout": 30,
+        "advanced_features": {
+          "enable_rtm": false,
+          "enable_tools": true
+        },
+        "parameters": {
+          "audio_scenario": "chorus",
+          "data_channel": "datastream",
+          "enable_error_message": true,
+          "enable_metrics": true
+        },
+        "turn_detection": {
+          "language": "zh-CN",
+          "config": {
+            "speech_threshold": 0.5,
+            "start_of_speech": {
+              "mode": "vad",
+              "vad_config": {
+                "interrupt_duration_ms": 160,
+                "prefix_padding_ms": 300
+              }
+            },
+            "end_of_speech": {
+              "mode": "vad",
+              "vad_config": {
+                "silence_duration_ms": 480
+              }
+            }
+          }
+        },
+        "llm": {
+          "params": {
+            "max_tokens": 512,
+            "temperature": 0.7,
+            "top_p": 0.95
+          },
+          "max_history": 15,
+          "system_messages": [
+            {
+              "role": "system",
+              "content": "你是码农场物语的管家，一个和气、利落的年轻农夫。农场里的帮工是一群小动物，它们其实是写代码的 AI：后端老周（熊）、测试小吴（兔子）、前端阿郑（小狐狸）、文档员 Kimi（猫）、情报 Grok（猫头鹰）、Pi 实验员（刺猬）、夜班反重力（浣熊）。\n\n主人跟你说要做什么活，你就简短确认会派给谁去做，比如「好，让测试小吴去跑一遍测试」。派活和进度由农场自己处理，你看不到地里的实时情况，不要编造进度、结果或文件名；被问到进度时，就说可以看地里的牌子或者日志。\n\n这是语音对话：每次只说一两句，口语化，不列清单，不用 markdown。一次最多问一个问题。用中文回答。"
+            }
+          ],
+          "greeting_message": "来啦！今天想种点什么？",
+          "failure_message": "我这边卡了一下，你再说一遍？",
+          "input_modalities": [
+            "text"
+          ],
+          "style": "openai"
+        },
+        "tts": {
+          "vendor": "minimax",
+          "params": {
+            "voice_setting": {
+              "voice_id": "Chinese (Mandarin)_Gentle_Youth"
+            }
+          }
+        },
+        "asr": {
+          "vendor": "ares",
+          "language": "zh-CN"
+        }
+      }
+    },
+    "requestUrl": "https://api-us-west-1.agora.io/api/conversational-ai-agent/v2/projects/11111111111111111111111111111111/join"
+  },
+  {
+    "name": "deepseek, deepgram and openai voices",
+    "voice": {
+      "area": "CN",
+      "language": "en-US",
+      "asr": {
+        "vendor": "deepgram",
+        "model": "nova-3"
+      },
+      "llm": {
+        "vendor": "deepseek",
+        "model": "deepseek-chat"
+      },
+      "tts": {
+        "vendor": "openai",
+        "voice": "nova"
+      },
+      "persona": "你是码农场物语的管家，一个和气、利落的年轻农夫。农场里的帮工是一群小动物，它们其实是写代码的 AI：后端老周（熊）、测试小吴（兔子）、前端阿郑（小狐狸）、文档员 Kimi（猫）、情报 Grok（猫头鹰）、Pi 实验员（刺猬）、夜班反重力（浣熊）。\n\n主人跟你说要做什么活，你就简短确认会派给谁去做，比如「好，让测试小吴去跑一遍测试」。派活和进度由农场自己处理，你看不到地里的实时情况，不要编造进度、结果或文件名；被问到进度时，就说可以看地里的牌子或者日志。\n\n这是语音对话：每次只说一两句，口语化，不列清单，不用 markdown。一次最多问一个问题。用中文回答。",
+      "greeting": "来啦！今天想种点什么？",
+      "failureMessage": "我这边卡了一下，你再说一遍？",
+      "silenceMs": 900,
+      "interruptMs": 300,
+      "idleSeconds": 120
+    },
+    "keys": {},
+    "deepseekKey": "sk-deepseek-placeholder",
+    "captions": "rtm",
+    "request": {
+      "name": "parity",
+      "preset": "deepgram_nova_3,openai_tts_1",
+      "properties": {
+        "channel": "parity-channel",
+        "token": "parity-token",
+        "agent_rtc_uid": "123456",
+        "remote_rtc_uids": [
+          "10001"
+        ],
+        "idle_timeout": 120,
+        "advanced_features": {
+          "enable_rtm": true,
+          "enable_tools": true
+        },
+        "parameters": {
+          "audio_scenario": "chorus",
+          "data_channel": "rtm",
+          "enable_error_message": true,
+          "enable_metrics": true
+        },
+        "turn_detection": {
+          "language": "en-US",
+          "config": {
+            "speech_threshold": 0.5,
+            "start_of_speech": {
+              "mode": "vad",
+              "vad_config": {
+                "interrupt_duration_ms": 300,
+                "prefix_padding_ms": 300
+              }
+            },
+            "end_of_speech": {
+              "mode": "vad",
+              "vad_config": {
+                "silence_duration_ms": 900
+              }
+            }
+          }
+        },
+        "llm": {
+          "url": "https://api.deepseek.com/chat/completions",
+          "api_key": "sk-deepseek-placeholder",
+          "params": {
+            "model": "deepseek-chat",
+            "max_tokens": 512,
+            "temperature": 0.7,
+            "top_p": 0.95
+          },
+          "max_history": 15,
+          "system_messages": [
+            {
+              "role": "system",
+              "content": "你是码农场物语的管家，一个和气、利落的年轻农夫。农场里的帮工是一群小动物，它们其实是写代码的 AI：后端老周（熊）、测试小吴（兔子）、前端阿郑（小狐狸）、文档员 Kimi（猫）、情报 Grok（猫头鹰）、Pi 实验员（刺猬）、夜班反重力（浣熊）。\n\n主人跟你说要做什么活，你就简短确认会派给谁去做，比如「好，让测试小吴去跑一遍测试」。派活和进度由农场自己处理，你看不到地里的实时情况，不要编造进度、结果或文件名；被问到进度时，就说可以看地里的牌子或者日志。\n\n这是语音对话：每次只说一两句，口语化，不列清单，不用 markdown。一次最多问一个问题。用中文回答。"
+            }
+          ],
+          "greeting_message": "来啦！今天想种点什么？",
+          "failure_message": "我这边卡了一下，你再说一遍？",
+          "input_modalities": [
+            "text"
+          ],
+          "style": "openai"
+        },
+        "tts": {
+          "vendor": "openai",
+          "params": {
+            "voice": "nova"
+          }
+        },
+        "asr": {
+          "vendor": "deepgram",
+          "params": {
+            "language": "en-US"
+          },
+          "language": "en-US"
+        }
+      }
+    },
+    "requestUrl": "https://api-cn-east-1.sd-rtn.com/cn/api/conversational-ai-agent/v2/projects/11111111111111111111111111111111/join"
+  },
+  {
+    "name": "microsoft speech and an llm of your own",
+    "voice": {
+      "area": "EU",
+      "language": "zh-HK",
+      "asr": {
+        "vendor": "microsoft",
+        "region": "eastasia"
+      },
+      "llm": {
+        "vendor": "openai",
+        "url": "https://llm.example.com/v1/chat/completions",
+        "model": "gpt-x"
+      },
+      "tts": {
+        "vendor": "microsoft",
+        "region": "eastasia",
+        "voiceName": "zh-CN-XiaoxiaoNeural"
+      },
+      "persona": "你是管家。",
+      "greeting": "在呢。",
+      "failureMessage": "再说一遍？",
+      "silenceMs": 480,
+      "interruptMs": 160,
+      "idleSeconds": 30
+    },
+    "keys": {
+      "asrKey": "asr-placeholder",
+      "llmKey": "llm-placeholder",
+      "ttsKey": "tts-placeholder"
+    },
+    "captions": "datastream",
+    "request": {
+      "name": "parity",
+      "properties": {
+        "channel": "parity-channel",
+        "token": "parity-token",
+        "agent_rtc_uid": "123456",
+        "remote_rtc_uids": [
+          "10001"
+        ],
+        "idle_timeout": 30,
+        "advanced_features": {
+          "enable_rtm": false,
+          "enable_tools": true
+        },
+        "parameters": {
+          "audio_scenario": "chorus",
+          "data_channel": "datastream",
+          "enable_error_message": true,
+          "enable_metrics": true
+        },
+        "turn_detection": {
+          "language": "zh-HK",
+          "config": {
+            "speech_threshold": 0.5,
+            "start_of_speech": {
+              "mode": "vad",
+              "vad_config": {
+                "interrupt_duration_ms": 160,
+                "prefix_padding_ms": 300
+              }
+            },
+            "end_of_speech": {
+              "mode": "vad",
+              "vad_config": {
+                "silence_duration_ms": 480
+              }
+            }
+          }
+        },
+        "llm": {
+          "url": "https://llm.example.com/v1/chat/completions",
+          "api_key": "llm-placeholder",
+          "params": {
+            "model": "gpt-x",
+            "max_tokens": 512,
+            "temperature": 0.7,
+            "top_p": 0.95
+          },
+          "max_history": 15,
+          "system_messages": [
+            {
+              "role": "system",
+              "content": "你是管家。"
+            }
+          ],
+          "greeting_message": "在呢。",
+          "failure_message": "再说一遍？",
+          "input_modalities": [
+            "text"
+          ],
+          "style": "openai"
+        },
+        "tts": {
+          "vendor": "microsoft",
+          "params": {
+            "key": "tts-placeholder",
+            "region": "eastasia",
+            "voice_name": "zh-CN-XiaoxiaoNeural"
+          }
+        },
+        "asr": {
+          "vendor": "microsoft",
+          "params": {
+            "key": "asr-placeholder",
+            "region": "eastasia",
+            "language": "zh-HK"
+          },
+          "language": "zh-HK"
+        }
+      }
+    },
+    "requestUrl": "https://api-eu-west-1.agora.io/api/conversational-ai-agent/v2/projects/11111111111111111111111111111111/join"
+  },
+  {
+    "name": "the manager on the voice line",
+    "voice": {
+      "area": "AP",
+      "language": "zh-CN",
+      "asr": {
+        "vendor": "ares"
+      },
+      "llm": {
+        "vendor": "vibevalley"
+      },
+      "tts": {
+        "vendor": "minimax",
+        "model": "speech_2_6_turbo",
+        "voiceId": "female-shaonv"
+      },
+      "persona": "你是码农场物语的管家，一个和气、利落的年轻农夫。农场里的帮工是一群小动物，它们其实是写代码的 AI：后端老周（熊）、测试小吴（兔子）、前端阿郑（小狐狸）、文档员 Kimi（猫）、情报 Grok（猫头鹰）、Pi 实验员（刺猬）、夜班反重力（浣熊）。\n\n主人跟你说要做什么活，你就简短确认会派给谁去做，比如「好，让测试小吴去跑一遍测试」。派活和进度由农场自己处理，你看不到地里的实时情况，不要编造进度、结果或文件名；被问到进度时，就说可以看地里的牌子或者日志。\n\n这是语音对话：每次只说一两句，口语化，不列清单，不用 markdown。一次最多问一个问题。用中文回答。",
+      "greeting": "来啦！今天想种点什么？",
+      "failureMessage": "我这边卡了一下，你再说一遍？",
+      "silenceMs": 480,
+      "interruptMs": 160,
+      "idleSeconds": 30
+    },
+    "keys": {},
+    "line": {
+      "id": "line1",
+      "url": "https://line.example.com/llm/line1/chat/completions",
+      "key": "line-key-placeholder"
+    },
+    "captions": "rtm",
+    "request": {
+      "name": "parity",
+      "preset": "minimax_speech_2_6_turbo",
+      "properties": {
+        "channel": "parity-channel",
+        "token": "parity-token",
+        "agent_rtc_uid": "123456",
+        "remote_rtc_uids": [
+          "10001"
+        ],
+        "idle_timeout": 30,
+        "advanced_features": {
+          "enable_rtm": true,
+          "enable_tools": true
+        },
+        "parameters": {
+          "audio_scenario": "chorus",
+          "data_channel": "rtm",
+          "enable_error_message": true,
+          "enable_metrics": true
+        },
+        "turn_detection": {
+          "language": "zh-CN",
+          "config": {
+            "speech_threshold": 0.5,
+            "start_of_speech": {
+              "mode": "vad",
+              "vad_config": {
+                "interrupt_duration_ms": 160,
+                "prefix_padding_ms": 300
+              }
+            },
+            "end_of_speech": {
+              "mode": "vad",
+              "vad_config": {
+                "silence_duration_ms": 480
+              }
+            }
+          }
+        },
+        "llm": {
+          "url": "https://line.example.com/llm/line1/chat/completions",
+          "api_key": "line-key-placeholder",
+          "params": {
+            "model": "vibevalley-manager",
+            "max_tokens": 512,
+            "temperature": 0.7,
+            "top_p": 0.95
+          },
+          "max_history": 15,
+          "system_messages": [
+            {
+              "role": "system",
+              "content": "你是码农场物语的管家，一个和气、利落的年轻农夫。农场里的帮工是一群小动物，它们其实是写代码的 AI：后端老周（熊）、测试小吴（兔子）、前端阿郑（小狐狸）、文档员 Kimi（猫）、情报 Grok（猫头鹰）、Pi 实验员（刺猬）、夜班反重力（浣熊）。\n\n主人跟你说要做什么活，你就简短确认会派给谁去做，比如「好，让测试小吴去跑一遍测试」。派活和进度由农场自己处理，你看不到地里的实时情况，不要编造进度、结果或文件名；被问到进度时，就说可以看地里的牌子或者日志。\n\n这是语音对话：每次只说一两句，口语化，不列清单，不用 markdown。一次最多问一个问题。用中文回答。"
+            }
+          ],
+          "greeting_message": "来啦！今天想种点什么？",
+          "failure_message": "我这边卡了一下，你再说一遍？",
+          "input_modalities": [
+            "text"
+          ],
+          "style": "openai"
+        },
+        "tts": {
+          "vendor": "minimax",
+          "params": {
+            "voice_setting": {
+              "voice_id": "female-shaonv"
+            }
+          }
+        },
+        "asr": {
+          "vendor": "ares",
+          "language": "zh-CN"
+        }
+      }
+    },
+    "requestUrl": "https://api-ap-southeast-1.agora.io/api/conversational-ai-agent/v2/projects/11111111111111111111111111111111/join"
+  }
+]

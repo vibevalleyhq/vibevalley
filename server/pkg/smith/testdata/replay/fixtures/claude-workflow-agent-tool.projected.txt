@@ -1,0 +1,64 @@
+system init                  │ event → model, service_tier
+system status                │ event
+user text                    │ event → user_message
+stream_event                 │ event
+stream_event                 │ event → tool_call_started Workflow
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+stream_event                 │ event → tool_call_input_delta
+assistant tool_use           │ event → tool_call_input
+system background_tasks_changed │ event
+system task_started          │ event → task_started
+stream_event                 │ event
+stream_event                 │ event
+user tool_result             │ event → tool_call_ended
+stream_event                 │ event
+system task_progress         │ event → task_updated
+system status                │ event
+stream_event                 │ event
+stream_event                 │ event
+stream_event                 │ event → text_delta
+stream_event                 │ event → text_delta
+stream_event                 │ event → text_delta
+assistant text               │ event
+stream_event                 │ event
+stream_event                 │ event
+stream_event                 │ event
+result success               │ event → service_tier, turn_ended completed, usage in=10300 out=220 cacheRead=0 cacheWrite=0 total in=10300 out=220 cacheRead=0 cacheWrite=0
+system task_progress         │ event
+system task_progress         │ event
+system task_progress         │ event → task_updated
+system task_progress         │ event
+system task_progress         │ event
+system task_updated          │ event → task_updated
+system task_notification     │ event → task_ended
+system background_tasks_changed │ event
+system init                  │ event → turn_active, model, service_tier
+system status                │ event
+stream_event                 │ event
+stream_event                 │ event
+stream_event                 │ event → text_delta
+stream_event                 │ event → text_delta
+stream_event                 │ event → text_delta
+assistant text               │ event
+stream_event                 │ event
+stream_event                 │ event
+stream_event                 │ event
+result success               │ event → service_tier, turn_ended completed, usage in=15900 out=245 cacheRead=0 cacheWrite=0 total in=19650 out=325 cacheRead=0 cacheWrite=0

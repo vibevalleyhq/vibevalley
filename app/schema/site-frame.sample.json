@@ -1,0 +1,98 @@
+{
+  "state": {
+    "call": "live",
+    "foreman": "speaking",
+    "helpers": [
+      {
+        "id": "w1",
+        "name": "Pi 实验员",
+        "agent": "lab",
+        "runtime": "pi",
+        "task": "写打卡",
+        "hiredAt": 1,
+        "turns": 1,
+        "phase": {
+          "_tag": "working",
+          "since": 2,
+          "doing": {
+            "action": "edit_file",
+            "label": "改 checkin.ts"
+          }
+        },
+        "play": {
+          "station": 2,
+          "history": [
+            {
+              "at": 2,
+              "action": "edit_file",
+              "label": "src/checkin.ts"
+            }
+          ],
+          "toolsThisTurn": 1,
+          "counts": {
+            "edit_file": 1
+          },
+          "files": [
+            "src/checkin.ts"
+          ],
+          "commands": [],
+          "turnStartedAt": 2
+        }
+      }
+    ],
+    "chat": {
+      "conversations": [
+        {
+          "id": 1,
+          "kind": "square",
+          "replies": 0,
+          "at": 1
+        }
+      ],
+      "messages": [
+        {
+          "seq": 1,
+          "conversation": 1,
+          "from": "user",
+          "fromKind": "user",
+          "name": "主人",
+          "kind": "chat",
+          "text": "让 Pi 实验员写打卡",
+          "final": true,
+          "at": 1
+        },
+        {
+          "seq": 2,
+          "conversation": 1,
+          "from": "foreman",
+          "fromKind": "foreman",
+          "name": "管家",
+          "kind": "chat",
+          "text": "好，派给 Pi 实验员了",
+          "final": false,
+          "at": 2
+        }
+      ]
+    }
+  },
+  "inbox": [],
+  "plans": [],
+  "view": {
+    "level": {
+      "level": 1,
+      "xp": 0,
+      "need": 10
+    },
+    "plots": {
+      "w1": {
+        "crop": "leafy"
+      }
+    }
+  },
+  "effects": [
+    {
+      "kind": "levelUp",
+      "level": 2
+    }
+  ]
+}

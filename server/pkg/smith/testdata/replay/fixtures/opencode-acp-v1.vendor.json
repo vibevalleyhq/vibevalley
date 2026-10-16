@@ -1,0 +1,79 @@
+{
+  "runtime": "opencode",
+  "observedAt": "2026-10-05",
+  "version": "1.18.30",
+  "initialize": {
+    "protocolVersion": 1,
+    "authMethodIds": [
+      "opencode-login"
+    ],
+    "loadSession": true,
+    "sessionCapabilities": [
+      "close",
+      "fork",
+      "list",
+      "resume"
+    ]
+  },
+  "sessionNew": {
+    "configOptionIds": [
+      "model",
+      "mode"
+    ],
+    "modeIds": [],
+    "modelIds": []
+  },
+  "prompt": {
+    "stopReason": "end_turn",
+    "metaKeys": [],
+    "permissionRequests": [],
+    "terminalRequests": [],
+    "tools": [
+      {
+        "sessionUpdate": "tool_call",
+        "title": "bash",
+        "kind": "execute",
+        "status": "pending",
+        "rawInputKeys": [
+          "cwd"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "printf OAR_ACP_SNAPSHOT_OK",
+        "kind": "execute",
+        "status": "in_progress",
+        "rawInputKeys": [
+          "command",
+          "cwd"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "printf OAR_ACP_SNAPSHOT_OK",
+        "kind": "execute",
+        "status": "in_progress",
+        "rawInputKeys": [
+          "command",
+          "cwd"
+        ],
+        "contentTypes": [
+          "content"
+        ]
+      },
+      {
+        "sessionUpdate": "tool_call_update",
+        "title": "printf OAR_ACP_SNAPSHOT_OK",
+        "status": "completed",
+        "rawOutputKeys": [
+          "metadata",
+          "output"
+        ],
+        "contentTypes": [
+          "content"
+        ],
+        "rawOutputType": "object"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+command_lifecycle            │ event
+command_lifecycle            │ event
+system init                  │ event
+user                         │ event
+assistant tool_use           │ event → tool_call_started mcp__echo__echo
+user tool_result             │ event → tool_call_ended
+assistant tool_use           │ event → tool_call_started mcp__remote__echo
+user tool_result             │ event → tool_call_ended
+assistant text               │ event → text_delta
+result success               │ event → turn_ended completed, usage in=0 out=0 cacheRead=0 cacheWrite=0
+command_lifecycle            │ event

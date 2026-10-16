@@ -1,0 +1,46 @@
+---
+// The page around every language's home: the head (title, description, the share card, both languages' links),
+// the game's stylesheet. The farm opens at dawn (data-scene on <html>); going down the page, the hero runs it to night.
+import '../styles/global.css'
+import type { Copy } from '../i18n/zh'
+import { cardOf } from '../lib/images'
+import type { Scene } from '../lib/scene'
+
+interface Props {
+  copy: Copy
+  /** Each hour's picture of the farm: the dawn's, which the page opens on, is asked for before anything else. */
+  hero: Record<Scene, string>
+}
+const { copy, hero } = Astro.props
+const site = Astro.site ?? new URL('https://vibevalley.dev')
+const here = new URL(copy.home, site)
+const card = new URL(cardOf(), site)
+---
+
+<!doctype html>
+<html lang={copy.lang} data-scene="morning">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{copy.title}</title>
+    <meta name="description" content={copy.description} />
+    <meta name="theme-color" content="#2f1f13" />
+    <link rel="canonical" href={here} />
+    <link rel="alternate" hreflang="zh-CN" href={new URL('/', site)} />
+    <link rel="alternate" hreflang="en" href={new URL('/en/', site)} />
+    <link rel="alternate" hreflang="x-default" href={new URL('/', site)} />
+    <link rel="icon" type="image/png" sizes="32x32" href="/gen/icon-32.png" />
+    <link rel="apple-touch-icon" href="/gen/icon-256.png" />
+    <link rel="preload" href="/gen/pixel.woff2" as="font" type="font/woff2" crossorigin />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={here} />
+    <meta property="og:title" content={copy.title} />
+    <meta property="og:description" content={copy.description} />
+    <meta property="og:image" content={card} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preload" as="image" href={hero.morning} fetchpriority="high" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

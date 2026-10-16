@@ -1,0 +1,57 @@
+name: vibevalley
+description: VibeValley 的 Flutter 客户端验证：看田头和帮工、发一句话、按住说话。服务端在 ../server。
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.6.0
+  flutter_riverpod: ^3.4.3
+  go_router: ^18.0.2
+  shared_preferences: ^2.5.6
+  flame: ^1.38.2
+  agora_rtc_engine: ^6.6.4
+  permission_handler: ^12.0.1
+  url_launcher: ^6.3.1
+  # The farm's sound effects: synthesized to WAV in lib/shell/synth.dart, played from a file.
+  audioplayers: ^6.8.1
+  mobile_scanner: ^7.4.2
+  flutter_local_notifications: ^22.3.2
+
+# Voice only: the plugin without the video extensions (tool/agora-voice-only.sh writes third_party/).
+dependency_overrides:
+  agora_rtc_engine:
+    path: third_party/agora_rtc_engine
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    # The pixel village's drawings (design/pixel/process.py writes them).
+    - assets/pixel/
+    # The village's layout (an LDtk project).
+    - assets/village.ldtk
+    # The voice vendors' sample lines.
+    - assets/voice-samples/
+    # The tools' cursors (design/pixel/process.py ui-cursors).
+    - assets/cursors/
+    # What moves over the title screen's picture (cut by design/pixel/title_layers.py).
+    - assets/title/
+  shaders:
+    # The village's light (lib/village/game.dart): a port of engine/pixi light.ts.
+    - shaders/light.frag
+  fonts:
+    # Fusion Pixel 12px, proportional, Simplified Chinese (TakWolf/fusion-pixel-font, OFL: assets/fonts/fusion-pixel-OFL.txt).
+    - family: FusionPixel
+      fonts:
+        - asset: assets/fonts/fusion-pixel-12px-proportional-zh_hans.otf

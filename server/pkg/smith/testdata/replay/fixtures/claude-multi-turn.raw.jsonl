@@ -1,0 +1,15 @@
+{"type":"system","subtype":"init"}
+{"type":"rate_limit_event"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"The user is asking me to say the word \"apple\" and nothing else. This is a straightforward request. I should comply with it."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"apple"}]}}
+{"type":"result","subtype":"success","is_error":false}
+{"type":"system","subtype":"init"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"The user is asking me to say the word \"banana\" and nothing else. I should comply with this straightforward request."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"banana"}]}}
+{"type":"result","subtype":"success","is_error":false}

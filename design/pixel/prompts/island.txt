@@ -1,0 +1,8 @@
+Create ONE image, size 1536x1024: a single small island of farmland for the world map of the game in Image 1, in exactly its style, palette and light (it is another place in the same world), seen from the same three-quarter top-down camera.
+The island is a raised, rounded, slightly irregular plateau of grassy land, centred in the image, about 1400 px wide and 920 px tall, with nothing around it. Along its whole bottom edge a short earthy cliff face shows (layers of soil and stone, a few hanging roots and moss), about 90 px tall, so it reads as a raised chunk of land; the top and the sides end in a neat grassy edge with a dark outline.
+Exact layout (pixel coordinates in this 1536x1024 image):
+- The yard (x 330 to 1206, y 180 to 660): one flat rectangle of plain bare light-brown soil, the same colour as the yard in Image 1, completely empty: no plots, no crops, no objects, no puddles, nothing on it, so that farm plots can be placed on it later. Its four edges are straight.
+- A low wooden rail fence (about 50 px tall) runs around the yard just outside its edges, with a small open wooden gate in the middle of its bottom side, and a short packed-dirt path from the gate down to the island's bottom edge.
+- On the grass rim around the fence: ISLAND_RIM.
+- Scale: trees about 220 px tall, bushes about 90 px. Tall things stand at the back (top) and on the far left and right, never over the yard; only low grass and flowers right next to the fence.
+No characters, no animals, no people, no text, no letters, no numbers, no UI.

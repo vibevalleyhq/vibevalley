@@ -1,0 +1,106 @@
+{
+  "bug": {
+    "hx": 0,
+    "hy": 2
+  },
+  "bug-no": {
+    "hx": 0,
+    "hy": 2
+  },
+  "bug-ok": {
+    "hx": 0,
+    "hy": 2
+  },
+  "bug-press": {
+    "hx": 0,
+    "hy": 2
+  },
+  "hand": {
+    "hx": 4,
+    "hy": 0
+  },
+  "hand-grab": {
+    "hx": 4,
+    "hy": 2
+  },
+  "hand-no": {
+    "hx": 4,
+    "hy": 0
+  },
+  "hand-point": {
+    "hx": 2,
+    "hy": 0
+  },
+  "hand-press": {
+    "hx": 6,
+    "hy": 0
+  },
+  "harvest": {
+    "hx": 4,
+    "hy": 2
+  },
+  "harvest-no": {
+    "hx": 4,
+    "hy": 2
+  },
+  "harvest-ok": {
+    "hx": 4,
+    "hy": 2
+  },
+  "harvest-press": {
+    "hx": 4,
+    "hy": 2
+  },
+  "shovel": {
+    "hx": 0,
+    "hy": 0
+  },
+  "shovel-no": {
+    "hx": 0,
+    "hy": 0
+  },
+  "shovel-ok": {
+    "hx": 0,
+    "hy": 0
+  },
+  "shovel-press": {
+    "hx": 0,
+    "hy": 0
+  },
+  "wait": {
+    "hx": 0,
+    "hy": 0
+  },
+  "water": {
+    "hx": 10,
+    "hy": 0
+  },
+  "water-no": {
+    "hx": 10,
+    "hy": 0
+  },
+  "water-ok": {
+    "hx": 10,
+    "hy": 0
+  },
+  "water-press": {
+    "hx": 10,
+    "hy": 0
+  },
+  "weed": {
+    "hx": 4,
+    "hy": 4
+  },
+  "weed-no": {
+    "hx": 4,
+    "hy": 4
+  },
+  "weed-ok": {
+    "hx": 4,
+    "hy": 4
+  },
+  "weed-press": {
+    "hx": 4,
+    "hy": 4
+  }
+}

@@ -1,0 +1,5 @@
+Create ONE character sprite sheet for a 2D game, size 1536x1024: a grid of 4 columns x 3 rows, one frame per cell, whole body visible, every frame at exactly the same scale (the character about 280 image pixels tall) with the feet on the same baseline within a row.
+The character: WHO, a cute animal farm helper standing upright on two legs, chibi game proportions (big head, about 2 heads tall), wearing a small straw hat and denim overalls over a cream shirt.
+Row 1, facing DOWN towards the viewer (front view, we see its face): (1) standing still; (2) walking, left foot forward; (3) walking, right foot forward; (4) working: TOOL_ACTION.
+Row 2, facing UP away from the viewer (back view, we see its back and hat, no face): (5) standing still; (6) walking, left foot forward; (7) walking, right foot forward; (8) cheering, both arms up, happy.
+Row 3, facing RIGHT (side view, profile): (9) standing still; (10) walking, front leg forward; (11) walking, legs passing; (12) worried: front view, hands on its cheeks, sweat drop.

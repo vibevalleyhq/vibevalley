@@ -1,0 +1,19 @@
+{"type":"system","subtype":"init"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"rate_limit_event"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"The user is asking me to count from 1 to 30, one number per line, with pauses between each. This is a straightforward request.\n\nHowever, I should note that this is a bit unusual in the context of Claude Code, which is typically used for software engineering tasks. But the user is asking for it, so I should comply.\n\nThe pause instruction is interesting - in text output, I can't actually create real pauses, but I can number them one per line which gives a visual sense of separation/pause.\n\nLet me count from 1 to 30, one per line."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"1\n\n2\n\n3\n\n4\n\n5\n\n6\n\n7\n\n8\n\n9\n\n10\n\n11\n\n12\n\n13\n\n14\n\n15\n\n16\n\n17\n\n18\n\n19\n\n20\n\n21\n\n22\n\n23\n\n24\n\n25\n\n26\n\n27\n\n28\n\n29\n\n30"}]}}
+{"type":"result","subtype":"success","is_error":false}
+{"type":"system","subtype":"init"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"system","subtype":"thinking_tokens"}
+{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"The user is asking me to stop counting and just output the single word \"DONE\". This is straightforward."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"DONE"}]}}
+{"type":"result","subtype":"success","is_error":false}

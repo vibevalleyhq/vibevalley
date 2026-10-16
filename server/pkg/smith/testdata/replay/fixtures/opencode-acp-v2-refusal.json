@@ -1,0 +1,13 @@
+{
+  "version": "opencode v2.0.26",
+  "captured": "2026-10-09",
+  "normalization": "Only the native session ID in the message is replaced. Error captured from a concurrent session/prompt request.",
+  "error": {
+    "code": -32603,
+    "data": {
+      "service": "session"
+    },
+    "name": "RequestError",
+    "message": "Internal error: Session already has an active ACP prompt: fake-session"
+  }
+}

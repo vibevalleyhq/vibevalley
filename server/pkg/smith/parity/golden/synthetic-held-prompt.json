@@ -1,0 +1,5937 @@
+{
+ "name": "synthetic-held-prompt",
+ "source": "hand-built records (smith/parity/generate.ts)",
+ "runtimeId": "codex",
+ "rootSessionId": "q",
+ "records": [
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000,
+   "kind": "frame",
+   "body": {
+    "type": "orphan",
+    "native": {},
+    "events": [
+     {
+      "kind": "tool_call_progress",
+      "callId": "z1",
+      "outputDelta": "partial"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 1,
+   "receivedAt": 1800000000010,
+   "kind": "frame",
+   "body": {
+    "type": "orphan",
+    "native": {},
+    "events": [
+     {
+      "kind": "tool_call_ended",
+      "callId": "z1",
+      "result": "failed",
+      "exitCode": null
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000020,
+   "kind": "frame",
+   "body": {
+    "type": "orphan",
+    "native": {},
+    "events": [
+     {
+      "kind": "tool_call_input",
+      "callId": "z2",
+      "input": "{}"
+     },
+     {
+      "kind": "tool_call_input_delta",
+      "callId": "z3",
+      "delta": "{"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 3,
+   "receivedAt": 1800000000030,
+   "kind": "frame",
+   "body": {
+    "type": "orphan",
+    "native": {},
+    "events": [
+     {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "failed",
+       "failure": "auth",
+       "reason": "login",
+       "credential": "missing"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 4,
+   "receivedAt": 1800000000040,
+   "kind": "request",
+   "id": "req-1",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "prompt",
+    "input": "held",
+    "inputId": "h1"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 5,
+   "receivedAt": 1800000000050,
+   "kind": "response",
+   "requestId": "req-1",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 6,
+   "receivedAt": 1800000000060,
+   "kind": "frame",
+   "body": {
+    "type": "queued",
+    "native": {},
+    "events": [
+     {
+      "kind": "input_queued",
+      "inputId": "h1"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 7,
+   "receivedAt": 1800000000070,
+   "kind": "frame",
+   "body": {
+    "type": "spontaneous",
+    "native": {},
+    "events": [
+     {
+      "kind": "turn_active",
+      "inputId": "other"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 8,
+   "receivedAt": 1800000000080,
+   "kind": "frame",
+   "body": {
+    "type": "spontaneous",
+    "native": {},
+    "events": [
+     {
+      "kind": "text_delta",
+      "text": "notification work"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000090,
+   "kind": "request",
+   "id": "req-2",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "prompt",
+    "input": "too soon",
+    "inputId": "h2"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000000100,
+   "kind": "response",
+   "requestId": "req-2",
+   "body": {
+    "kind": "rejected",
+    "code": "busy",
+    "reason": "busy"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 11,
+   "receivedAt": 1800000000110,
+   "kind": "request",
+   "id": "req-3",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "steer",
+    "input": "nope"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 12,
+   "receivedAt": 1800000000120,
+   "kind": "response",
+   "requestId": "req-3",
+   "body": {
+    "kind": "rejected",
+    "code": "unsupported",
+    "reason": "cannot steer"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 13,
+   "receivedAt": 1800000000130,
+   "kind": "frame",
+   "body": {
+    "type": "spontaneous",
+    "native": {},
+    "events": [
+     {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "completed"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 14,
+   "receivedAt": 1800000000140,
+   "kind": "request",
+   "id": "req-4",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "abort"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 15,
+   "receivedAt": 1800000000150,
+   "kind": "response",
+   "requestId": "req-4",
+   "body": {
+    "kind": "rejected",
+    "code": "no_active_turn",
+    "reason": "idle"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 16,
+   "receivedAt": 1800000000160,
+   "kind": "frame",
+   "body": {
+    "type": "started",
+    "native": {},
+    "events": [
+     {
+      "kind": "turn_active",
+      "inputId": "h1"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000000170,
+   "kind": "frame",
+   "body": {
+    "type": "text",
+    "native": {},
+    "events": [
+     {
+      "kind": "text_delta",
+      "text": "held ran"
+     },
+     {
+      "kind": "reasoning",
+      "content": {
+       "kind": "empty"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 18,
+   "receivedAt": 1800000000180,
+   "kind": "frame",
+   "body": {
+    "type": "tool",
+    "native": {},
+    "events": [
+     {
+      "kind": "tool_call_started",
+      "callId": "k1",
+      "tool": "sleep",
+      "input": "{\"durationMs\":5000}"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 19,
+   "receivedAt": 1800000000190,
+   "kind": "frame",
+   "body": {
+    "type": "end",
+    "native": {},
+    "events": [
+     {
+      "kind": "turn_ended",
+      "outcome": {
+       "kind": "failed",
+       "failure": "quota",
+       "reason": "limit",
+       "resetsAt": "2026-10-14T00:00:00.000Z"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 20,
+   "receivedAt": 1800000000200,
+   "kind": "request",
+   "id": "req-5",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "queue",
+    "input": "idle queue",
+    "inputId": "h3"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 21,
+   "receivedAt": 1800000000210,
+   "kind": "response",
+   "requestId": "req-5",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 22,
+   "receivedAt": 1800000000220,
+   "kind": "frame",
+   "body": {
+    "type": "dropped",
+    "native": {},
+    "events": [
+     {
+      "kind": "input_dropped",
+      "inputId": "h3",
+      "reason": "turn_interrupted"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 23,
+   "receivedAt": 1800000000230,
+   "kind": "request",
+   "id": "req-6",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "prompt",
+    "input": "refused",
+    "inputId": "h4"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 24,
+   "receivedAt": 1800000000240,
+   "kind": "response",
+   "requestId": "req-6",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 25,
+   "receivedAt": 1800000000250,
+   "kind": "frame",
+   "body": {
+    "type": "dropped",
+    "native": {},
+    "events": [
+     {
+      "kind": "input_dropped",
+      "inputId": "h4",
+      "reason": "runtime_refused"
+     }
+    ]
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 26,
+   "receivedAt": 1800000000260,
+   "kind": "request",
+   "id": "req-7",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "prompt",
+    "input": "after",
+    "inputId": "h5"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 27,
+   "receivedAt": 1800000000270,
+   "kind": "response",
+   "requestId": "req-7",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 28,
+   "receivedAt": 1800000000280,
+   "kind": "request",
+   "id": "req-8",
+   "direction": "toRuntime",
+   "body": {
+    "kind": "abort"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 29,
+   "receivedAt": 1800000000290,
+   "kind": "response",
+   "requestId": "req-8",
+   "body": {
+    "kind": "accepted"
+   }
+  },
+  {
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 30,
+   "receivedAt": 1800000000300,
+   "kind": "response",
+   "requestId": "gone",
+   "body": {
+    "kind": "exited",
+    "code": null
+   }
+  }
+ ],
+ "statusSteps": [
+  {
+   "kind": "idle"
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000010
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 1,
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000020
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "failed",
+    "failure": "auth",
+    "reason": "login",
+    "credential": "missing"
+   }
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 4,
+   "requestId": "req-1",
+   "inputId": "h1",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000040
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 4,
+   "requestId": "req-1",
+   "inputId": "h1",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000040
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 4,
+   "requestId": "req-1",
+   "inputId": "h1",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000060,
+   "pendingPrompt": {
+    "inputId": "h1",
+    "sinceSeq": 4,
+    "requestId": "req-1"
+   }
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 7,
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000070,
+   "pendingPrompt": {
+    "inputId": "h1",
+    "sinceSeq": 4,
+    "requestId": "req-1"
+   }
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 7,
+   "pendingPrompt": {
+    "inputId": "h1",
+    "sinceSeq": 4,
+    "requestId": "req-1"
+   },
+   "phase": "responding",
+   "lastEventAt": 1800000000080
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 7,
+   "pendingPrompt": {
+    "inputId": "h1",
+    "sinceSeq": 4,
+    "requestId": "req-1"
+   },
+   "phase": "responding",
+   "lastEventAt": 1800000000080
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 7,
+   "pendingPrompt": {
+    "inputId": "h1",
+    "sinceSeq": 4,
+    "requestId": "req-1"
+   },
+   "phase": "responding",
+   "lastEventAt": 1800000000080
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 7,
+   "pendingPrompt": {
+    "inputId": "h1",
+    "sinceSeq": 4,
+    "requestId": "req-1"
+   },
+   "phase": "responding",
+   "lastEventAt": 1800000000080
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 7,
+   "pendingPrompt": {
+    "inputId": "h1",
+    "sinceSeq": 4,
+    "requestId": "req-1"
+   },
+   "phase": "responding",
+   "lastEventAt": 1800000000080
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 4,
+   "inputId": "h1",
+   "requestId": "req-1",
+   "pendingPrompt": {
+    "inputId": "h1",
+    "sinceSeq": 4,
+    "requestId": "req-1"
+   },
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000130
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 4,
+   "inputId": "h1",
+   "requestId": "req-1",
+   "pendingPrompt": {
+    "inputId": "h1",
+    "sinceSeq": 4,
+    "requestId": "req-1",
+    "stop": {
+     "pendingAbortIds": [
+      "req-4"
+     ],
+     "abortedOnExit": false
+    }
+   },
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000130,
+   "stop": {
+    "pendingAbortIds": [
+     "req-4"
+    ],
+    "abortedOnExit": false
+   }
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 4,
+   "inputId": "h1",
+   "requestId": "req-1",
+   "pendingPrompt": {
+    "inputId": "h1",
+    "sinceSeq": 4,
+    "requestId": "req-1"
+   },
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000130
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 4,
+   "inputId": "h1",
+   "requestId": "req-1",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000160
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 4,
+   "requestId": "req-1",
+   "inputId": "h1",
+   "phase": "thinking",
+   "lastEventAt": 1800000000170
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 4,
+   "requestId": "req-1",
+   "inputId": "h1",
+   "phase": {
+    "tool": "sleep",
+    "callId": "k1"
+   },
+   "lastEventAt": 1800000000180
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "failed",
+    "failure": "quota",
+    "reason": "limit",
+    "resetsAt": "2026-10-14T00:00:00.000Z"
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "failed",
+    "failure": "quota",
+    "reason": "limit",
+    "resetsAt": "2026-10-14T00:00:00.000Z"
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "failed",
+    "failure": "quota",
+    "reason": "limit",
+    "resetsAt": "2026-10-14T00:00:00.000Z"
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "failed",
+    "failure": "quota",
+    "reason": "limit",
+    "resetsAt": "2026-10-14T00:00:00.000Z"
+   }
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 23,
+   "requestId": "req-6",
+   "inputId": "h4",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000230
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 23,
+   "requestId": "req-6",
+   "inputId": "h4",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000230
+  },
+  {
+   "kind": "idle"
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 26,
+   "requestId": "req-7",
+   "inputId": "h5",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000260
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 26,
+   "requestId": "req-7",
+   "inputId": "h5",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000260
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 26,
+   "requestId": "req-7",
+   "inputId": "h5",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000260,
+   "stop": {
+    "pendingAbortIds": [
+     "req-8"
+    ],
+    "abortedOnExit": false
+   }
+  },
+  {
+   "kind": "running",
+   "sinceSeq": 26,
+   "requestId": "req-7",
+   "inputId": "h5",
+   "phase": "waiting_model",
+   "lastEventAt": 1800000000260,
+   "stop": {
+    "pendingAbortIds": [],
+    "abortedOnExit": true
+   }
+  },
+  {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "aborted"
+   }
+  }
+ ],
+ "statusOf": {
+  "all": {
+   "value": {
+    "kind": "idle",
+    "lastTurnOutcome": {
+     "kind": "aborted"
+    }
+   },
+   "seq": 30
+  },
+  "root": {
+   "value": {
+    "kind": "idle",
+    "lastTurnOutcome": {
+     "kind": "aborted"
+    }
+   },
+   "seq": 30
+  }
+ },
+ "modelOf": {
+  "all": {
+   "value": null,
+   "seq": 30
+  },
+  "root": {
+   "value": null,
+   "seq": 30
+  }
+ },
+ "effortOf": {
+  "all": {
+   "value": null,
+   "seq": 30
+  },
+  "root": {
+   "value": null,
+   "seq": 30
+  }
+ },
+ "serviceTierOf": {
+  "all": {
+   "value": null,
+   "seq": 30
+  },
+  "root": {
+   "value": null,
+   "seq": 30
+  }
+ },
+ "contextUsageOf": {
+  "all": {
+   "value": null,
+   "seq": 30
+  },
+  "root": {
+   "value": null,
+   "seq": 30
+  }
+ },
+ "usageOf": {
+  "all": {
+   "value": {
+    "total": null
+   },
+   "seq": 30
+  },
+  "root": {
+   "value": {
+    "total": null
+   },
+   "seq": 30
+  }
+ },
+ "graphOf": {
+  "nodes": [
+   {
+    "id": "q"
+   }
+  ],
+  "edges": []
+ },
+ "events": [
+  {
+   "kind": "tool_call_progress",
+   "callId": "z1",
+   "outputDelta": "partial",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000
+  },
+  {
+   "kind": "tool_call_ended",
+   "callId": "z1",
+   "result": "failed",
+   "exitCode": null,
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 1,
+   "receivedAt": 1800000000010
+  },
+  {
+   "kind": "tool_call_input",
+   "callId": "z2",
+   "input": "{}",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000020
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "z3",
+   "delta": "{",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000020
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "failed",
+    "failure": "auth",
+    "reason": "login",
+    "credential": "missing"
+   },
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 3,
+   "receivedAt": 1800000000030
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "req-1",
+   "input": "held",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 4,
+   "receivedAt": 1800000000040
+  },
+  {
+   "kind": "input_queued",
+   "inputId": "h1",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 6,
+   "receivedAt": 1800000000060
+  },
+  {
+   "kind": "turn_active",
+   "inputId": "other",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 7,
+   "receivedAt": 1800000000070
+  },
+  {
+   "kind": "text_delta",
+   "text": "notification work",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 8,
+   "receivedAt": 1800000000080
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "req-2",
+   "input": "too soon",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000090
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "req-2",
+   "action": "prompt",
+   "code": "busy",
+   "reason": "busy",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000000100
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "req-3",
+   "action": "steer",
+   "code": "unsupported",
+   "reason": "cannot steer",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 12,
+   "receivedAt": 1800000000120
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 13,
+   "receivedAt": 1800000000130
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "req-4",
+   "action": "abort",
+   "code": "no_active_turn",
+   "reason": "idle",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 15,
+   "receivedAt": 1800000000150
+  },
+  {
+   "kind": "turn_active",
+   "inputId": "h1",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 16,
+   "receivedAt": 1800000000160
+  },
+  {
+   "kind": "text_delta",
+   "text": "held ran",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000000170
+  },
+  {
+   "kind": "reasoning",
+   "content": {
+    "kind": "empty"
+   },
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000000170
+  },
+  {
+   "kind": "tool_call_started",
+   "callId": "k1",
+   "tool": "sleep",
+   "input": "{\"durationMs\":5000}",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 18,
+   "receivedAt": 1800000000180
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "failed",
+    "failure": "quota",
+    "reason": "limit",
+    "resetsAt": "2026-10-14T00:00:00.000Z"
+   },
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 19,
+   "receivedAt": 1800000000190
+  },
+  {
+   "kind": "input_dropped",
+   "inputId": "h3",
+   "reason": "turn_interrupted",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 22,
+   "receivedAt": 1800000000220
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "req-6",
+   "input": "refused",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 23,
+   "receivedAt": 1800000000230
+  },
+  {
+   "kind": "input_dropped",
+   "inputId": "h4",
+   "reason": "runtime_refused",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 25,
+   "receivedAt": 1800000000250
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "req-7",
+   "input": "after",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 26,
+   "receivedAt": 1800000000260
+  },
+  {
+   "kind": "exited",
+   "code": null,
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 30,
+   "receivedAt": 1800000000300
+  }
+ ],
+ "coalesced": [
+  {
+   "kind": "tool_call_progress",
+   "callId": "z1",
+   "outputDelta": "partial",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 0,
+   "receivedAt": 1800000000000
+  },
+  {
+   "kind": "tool_call_ended",
+   "callId": "z1",
+   "result": "failed",
+   "exitCode": null,
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 1,
+   "receivedAt": 1800000000010
+  },
+  {
+   "kind": "tool_call_input",
+   "callId": "z2",
+   "input": "{}",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000020
+  },
+  {
+   "kind": "tool_call_input_delta",
+   "callId": "z3",
+   "delta": "{",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 2,
+   "receivedAt": 1800000000020
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "failed",
+    "failure": "auth",
+    "reason": "login",
+    "credential": "missing"
+   },
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 3,
+   "receivedAt": 1800000000030
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "req-1",
+   "input": "held",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 4,
+   "receivedAt": 1800000000040
+  },
+  {
+   "kind": "input_queued",
+   "inputId": "h1",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 6,
+   "receivedAt": 1800000000060
+  },
+  {
+   "kind": "turn_active",
+   "inputId": "other",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 7,
+   "receivedAt": 1800000000070
+  },
+  {
+   "kind": "text_delta",
+   "text": "notification work",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 8,
+   "receivedAt": 1800000000080
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "req-2",
+   "input": "too soon",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 9,
+   "receivedAt": 1800000000090
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "req-2",
+   "action": "prompt",
+   "code": "busy",
+   "reason": "busy",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 10,
+   "receivedAt": 1800000000100
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "req-3",
+   "action": "steer",
+   "code": "unsupported",
+   "reason": "cannot steer",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 12,
+   "receivedAt": 1800000000120
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "completed"
+   },
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 13,
+   "receivedAt": 1800000000130
+  },
+  {
+   "kind": "control_rejected",
+   "requestId": "req-4",
+   "action": "abort",
+   "code": "no_active_turn",
+   "reason": "idle",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 15,
+   "receivedAt": 1800000000150
+  },
+  {
+   "kind": "turn_active",
+   "inputId": "h1",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 16,
+   "receivedAt": 1800000000160
+  },
+  {
+   "kind": "text_delta",
+   "text": "held ran",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000000170
+  },
+  {
+   "kind": "reasoning",
+   "content": {
+    "kind": "empty"
+   },
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 17,
+   "receivedAt": 1800000000170
+  },
+  {
+   "kind": "tool_call_started",
+   "callId": "k1",
+   "tool": "sleep",
+   "input": "{\"durationMs\":5000}",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 18,
+   "receivedAt": 1800000000180
+  },
+  {
+   "kind": "turn_ended",
+   "outcome": {
+    "kind": "failed",
+    "failure": "quota",
+    "reason": "limit",
+    "resetsAt": "2026-10-14T00:00:00.000Z"
+   },
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 19,
+   "receivedAt": 1800000000190
+  },
+  {
+   "kind": "input_dropped",
+   "inputId": "h3",
+   "reason": "turn_interrupted",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 22,
+   "receivedAt": 1800000000220
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "req-6",
+   "input": "refused",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 23,
+   "receivedAt": 1800000000230
+  },
+  {
+   "kind": "input_dropped",
+   "inputId": "h4",
+   "reason": "runtime_refused",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 25,
+   "receivedAt": 1800000000250
+  },
+  {
+   "kind": "turn_started",
+   "requestId": "req-7",
+   "input": "after",
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 26,
+   "receivedAt": 1800000000260
+  },
+  {
+   "kind": "exited",
+   "code": null,
+   "sessionId": "q",
+   "agentPath": [],
+   "seq": 30,
+   "receivedAt": 1800000000300
+  }
+ ],
+ "turnEndAfter": [
+  {
+   "afterSeq": -1,
+   "outcome": {
+    "kind": "failed",
+    "failure": "auth",
+    "reason": "login",
+    "credential": "missing"
+   }
+  },
+  {
+   "afterSeq": -1,
+   "sessionId": "q",
+   "outcome": {
+    "kind": "failed",
+    "failure": "auth",
+    "reason": "login",
+    "credential": "missing"
+   }
+  },
+  {
+   "afterSeq": 4,
+   "sessionId": "q",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 4,
+   "sessionId": "q",
+   "inputId": "h1",
+   "outcome": {
+    "kind": "failed",
+    "failure": "quota",
+    "reason": "limit",
+    "resetsAt": "2026-10-14T00:00:00.000Z"
+   }
+  },
+  {
+   "afterSeq": 4,
+   "inputId": "h1",
+   "outcome": {
+    "kind": "failed",
+    "failure": "quota",
+    "reason": "limit",
+    "resetsAt": "2026-10-14T00:00:00.000Z"
+   }
+  },
+  {
+   "afterSeq": 9,
+   "sessionId": "q",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 9,
+   "sessionId": "q",
+   "inputId": "h2",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 9,
+   "inputId": "h2",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 11,
+   "sessionId": "q",
+   "outcome": {
+    "kind": "completed"
+   }
+  },
+  {
+   "afterSeq": 20,
+   "sessionId": "q",
+   "outcome": {
+    "kind": "aborted"
+   }
+  },
+  {
+   "afterSeq": 20,
+   "sessionId": "q",
+   "inputId": "h3",
+   "outcome": {
+    "kind": "aborted"
+   }
+  },
+  {
+   "afterSeq": 20,
+   "inputId": "h3",
+   "outcome": {
+    "kind": "aborted"
+   }
+  },
+  {
+   "afterSeq": 23,
+   "sessionId": "q",
+   "outcome": {
+    "kind": "aborted"
+   }
+  },
+  {
+   "afterSeq": 23,
+   "sessionId": "q",
+   "inputId": "h4",
+   "outcome": {
+    "kind": "failed",
+    "failure": "unknown",
+    "reason": "runtime refused the input"
+   }
+  },
+  {
+   "afterSeq": 23,
+   "inputId": "h4",
+   "outcome": {
+    "kind": "failed",
+    "failure": "unknown",
+    "reason": "runtime refused the input"
+   }
+  },
+  {
+   "afterSeq": 26,
+   "sessionId": "q",
+   "outcome": {
+    "kind": "aborted"
+   }
+  },
+  {
+   "afterSeq": 26,
+   "sessionId": "q",
+   "inputId": "h5",
+   "outcome": {
+    "kind": "aborted"
+   }
+  },
+  {
+   "afterSeq": 26,
+   "inputId": "h5",
+   "outcome": {
+    "kind": "aborted"
+   }
+  }
+ ],
+ "conversation": {
+  "drops": [
+   [
+    "[\"q\",[],\"h3\"]",
+    {
+     "attempts": 1,
+     "reason": "turn_interrupted"
+    }
+   ],
+   [
+    "[\"q\",[],\"h4\"]",
+    {
+     "attempts": 1,
+     "reason": "runtime_refused"
+    }
+   ]
+  ],
+  "inputs": [
+   [
+    "[\"q\",[],\"h1\"]",
+    {
+     "id": "[\"q\",[],\"h1\"]",
+     "input": "held",
+     "inputId": "h1",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000040,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "held",
+         "inputId": "h1"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 5,
+        "receivedAt": 1800000000050,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": [],
+     "turn": {
+      "state": "active",
+      "seq": 16,
+      "streamId": ""
+     }
+    }
+   ],
+   [
+    "[\"q\",[],\"h2\"]",
+    {
+     "id": "[\"q\",[],\"h2\"]",
+     "input": "too soon",
+     "inputId": "h2",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 9,
+        "receivedAt": 1800000000090,
+        "kind": "request",
+        "id": "req-2",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "too soon",
+         "inputId": "h2"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 10,
+        "receivedAt": 1800000000100,
+        "kind": "response",
+        "requestId": "req-2",
+        "body": {
+         "kind": "rejected",
+         "code": "busy",
+         "reason": "busy"
+        }
+       },
+       "state": "rejected",
+       "reason": "busy"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   ],
+   [
+    "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+    {
+     "id": "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+     "input": "nope",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 11,
+        "receivedAt": 1800000000110,
+        "kind": "request",
+        "id": "req-3",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "nope"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 12,
+        "receivedAt": 1800000000120,
+        "kind": "response",
+        "requestId": "req-3",
+        "body": {
+         "kind": "rejected",
+         "code": "unsupported",
+         "reason": "cannot steer"
+        }
+       },
+       "state": "rejected",
+       "reason": "cannot steer"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   ],
+   [
+    "[\"q\",[],\"h3\"]",
+    {
+     "id": "[\"q\",[],\"h3\"]",
+     "input": "idle queue",
+     "inputId": "h3",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 20,
+        "receivedAt": 1800000000200,
+        "kind": "request",
+        "id": "req-5",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "queue",
+         "input": "idle queue",
+         "inputId": "h3"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 21,
+        "receivedAt": 1800000000210,
+        "kind": "response",
+        "requestId": "req-5",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "dropped",
+     "observations": [],
+     "reason": "turn_interrupted"
+    }
+   ],
+   [
+    "[\"q\",[],\"h4\"]",
+    {
+     "id": "[\"q\",[],\"h4\"]",
+     "input": "refused",
+     "inputId": "h4",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 23,
+        "receivedAt": 1800000000230,
+        "kind": "request",
+        "id": "req-6",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "refused",
+         "inputId": "h4"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 24,
+        "receivedAt": 1800000000240,
+        "kind": "response",
+        "requestId": "req-6",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "dropped",
+     "observations": [],
+     "reason": "runtime_refused"
+    }
+   ],
+   [
+    "[\"q\",[],\"h5\"]",
+    {
+     "id": "[\"q\",[],\"h5\"]",
+     "input": "after",
+     "inputId": "h5",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 26,
+        "receivedAt": 1800000000260,
+        "kind": "request",
+        "id": "req-7",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "after",
+         "inputId": "h5"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 27,
+        "receivedAt": 1800000000270,
+        "kind": "response",
+        "requestId": "req-7",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   ]
+  ],
+  "requests": [
+   [
+    "[\"\",\"[\\\"q\\\",[],\\\"req-1\\\"]\"]",
+    "[\"q\",[],\"h1\"]"
+   ],
+   [
+    "[\"\",\"[\\\"q\\\",[],\\\"req-2\\\"]\"]",
+    "[\"q\",[],\"h2\"]"
+   ],
+   [
+    "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+    "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+   ],
+   [
+    "[\"\",\"[\\\"q\\\",[],\\\"req-5\\\"]\"]",
+    "[\"q\",[],\"h3\"]"
+   ],
+   [
+    "[\"\",\"[\\\"q\\\",[],\\\"req-6\\\"]\"]",
+    "[\"q\",[],\"h4\"]"
+   ],
+   [
+    "[\"\",\"[\\\"q\\\",[],\\\"req-7\\\"]\"]",
+    "[\"q\",[],\"h5\"]"
+   ]
+  ],
+  "actions": [],
+  "cursors": [
+   [
+    "",
+    30
+   ]
+  ],
+  "updates": [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "exited",
+     "code": null,
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 30,
+     "receivedAt": 1800000000300
+    }
+   }
+  ]
+ },
+ "conversationUpdates": [
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_progress",
+     "callId": "z1",
+     "outputDelta": "partial",
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 0,
+     "receivedAt": 1800000000000
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_ended",
+     "callId": "z1",
+     "result": "failed",
+     "exitCode": null,
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 1,
+     "receivedAt": 1800000000010
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_input",
+     "callId": "z2",
+     "input": "{}",
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 2,
+     "receivedAt": 1800000000020
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_input_delta",
+     "callId": "z3",
+     "delta": "{",
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 2,
+     "receivedAt": 1800000000020
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "failed",
+      "failure": "auth",
+      "reason": "login",
+      "credential": "missing"
+     },
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 3,
+     "receivedAt": 1800000000030
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h1\"]",
+     "input": "held",
+     "inputId": "h1",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000040,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "held",
+         "inputId": "h1"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h1\"]",
+     "input": "held",
+     "inputId": "h1",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000040,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "held",
+         "inputId": "h1"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 5,
+        "receivedAt": 1800000000050,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h1\"]",
+     "input": "held",
+     "inputId": "h1",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000040,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "held",
+         "inputId": "h1"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 5,
+        "receivedAt": 1800000000050,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": [],
+     "turn": {
+      "state": "queued",
+      "seq": 6,
+      "streamId": ""
+     }
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "input_queued",
+     "inputId": "h1",
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 6,
+     "receivedAt": 1800000000060
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_active",
+     "inputId": "other",
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 7,
+     "receivedAt": 1800000000070
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "text_delta",
+     "text": "notification work",
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 8,
+     "receivedAt": 1800000000080
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h2\"]",
+     "input": "too soon",
+     "inputId": "h2",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 9,
+        "receivedAt": 1800000000090,
+        "kind": "request",
+        "id": "req-2",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "too soon",
+         "inputId": "h2"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h2\"]",
+     "input": "too soon",
+     "inputId": "h2",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 9,
+        "receivedAt": 1800000000090,
+        "kind": "request",
+        "id": "req-2",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "too soon",
+         "inputId": "h2"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 10,
+        "receivedAt": 1800000000100,
+        "kind": "response",
+        "requestId": "req-2",
+        "body": {
+         "kind": "rejected",
+         "code": "busy",
+         "reason": "busy"
+        }
+       },
+       "state": "rejected",
+       "reason": "busy"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+     "input": "nope",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 11,
+        "receivedAt": 1800000000110,
+        "kind": "request",
+        "id": "req-3",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "nope"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+     "input": "nope",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 11,
+        "receivedAt": 1800000000110,
+        "kind": "request",
+        "id": "req-3",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "nope"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 12,
+        "receivedAt": 1800000000120,
+        "kind": "response",
+        "requestId": "req-3",
+        "body": {
+         "kind": "rejected",
+         "code": "unsupported",
+         "reason": "cannot steer"
+        }
+       },
+       "state": "rejected",
+       "reason": "cannot steer"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "completed"
+     },
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 13,
+     "receivedAt": 1800000000130
+    }
+   }
+  ],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "control_rejected",
+     "requestId": "req-4",
+     "action": "abort",
+     "code": "no_active_turn",
+     "reason": "idle",
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 15,
+     "receivedAt": 1800000000150
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h1\"]",
+     "input": "held",
+     "inputId": "h1",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000040,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "held",
+         "inputId": "h1"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 5,
+        "receivedAt": 1800000000050,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": [],
+     "turn": {
+      "state": "active",
+      "seq": 16,
+      "streamId": ""
+     }
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_active",
+     "inputId": "h1",
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 16,
+     "receivedAt": 1800000000160
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "text_delta",
+     "text": "held ran",
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 17,
+     "receivedAt": 1800000000170
+    }
+   },
+   {
+    "kind": "event",
+    "event": {
+     "kind": "reasoning",
+     "content": {
+      "kind": "empty"
+     },
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 17,
+     "receivedAt": 1800000000170
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "tool_call_started",
+     "callId": "k1",
+     "tool": "sleep",
+     "input": "{\"durationMs\":5000}",
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 18,
+     "receivedAt": 1800000000180
+    }
+   }
+  ],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "turn_ended",
+     "outcome": {
+      "kind": "failed",
+      "failure": "quota",
+      "reason": "limit",
+      "resetsAt": "2026-10-14T00:00:00.000Z"
+     },
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 19,
+     "receivedAt": 1800000000190
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h3\"]",
+     "input": "idle queue",
+     "inputId": "h3",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 20,
+        "receivedAt": 1800000000200,
+        "kind": "request",
+        "id": "req-5",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "queue",
+         "input": "idle queue",
+         "inputId": "h3"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h3\"]",
+     "input": "idle queue",
+     "inputId": "h3",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 20,
+        "receivedAt": 1800000000200,
+        "kind": "request",
+        "id": "req-5",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "queue",
+         "input": "idle queue",
+         "inputId": "h3"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 21,
+        "receivedAt": 1800000000210,
+        "kind": "response",
+        "requestId": "req-5",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h3\"]",
+     "input": "idle queue",
+     "inputId": "h3",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 20,
+        "receivedAt": 1800000000200,
+        "kind": "request",
+        "id": "req-5",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "queue",
+         "input": "idle queue",
+         "inputId": "h3"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 21,
+        "receivedAt": 1800000000210,
+        "kind": "response",
+        "requestId": "req-5",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "dropped",
+     "observations": [],
+     "reason": "turn_interrupted"
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h4\"]",
+     "input": "refused",
+     "inputId": "h4",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 23,
+        "receivedAt": 1800000000230,
+        "kind": "request",
+        "id": "req-6",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "refused",
+         "inputId": "h4"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h4\"]",
+     "input": "refused",
+     "inputId": "h4",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 23,
+        "receivedAt": 1800000000230,
+        "kind": "request",
+        "id": "req-6",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "refused",
+         "inputId": "h4"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 24,
+        "receivedAt": 1800000000240,
+        "kind": "response",
+        "requestId": "req-6",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h4\"]",
+     "input": "refused",
+     "inputId": "h4",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 23,
+        "receivedAt": 1800000000230,
+        "kind": "request",
+        "id": "req-6",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "refused",
+         "inputId": "h4"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 24,
+        "receivedAt": 1800000000240,
+        "kind": "response",
+        "requestId": "req-6",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "dropped",
+     "observations": [],
+     "reason": "runtime_refused"
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h5\"]",
+     "input": "after",
+     "inputId": "h5",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 26,
+        "receivedAt": 1800000000260,
+        "kind": "request",
+        "id": "req-7",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "after",
+         "inputId": "h5"
+        }
+       },
+       "streamId": "",
+       "state": "pending"
+      }
+     ],
+     "state": "pending",
+     "observations": []
+    }
+   }
+  ],
+  [
+   {
+    "kind": "input",
+    "input": {
+     "id": "[\"q\",[],\"h5\"]",
+     "input": "after",
+     "inputId": "h5",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 26,
+        "receivedAt": 1800000000260,
+        "kind": "request",
+        "id": "req-7",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "after",
+         "inputId": "h5"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 27,
+        "receivedAt": 1800000000270,
+        "kind": "response",
+        "requestId": "req-7",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   }
+  ],
+  [],
+  [],
+  [
+   {
+    "kind": "event",
+    "event": {
+     "kind": "exited",
+     "code": null,
+     "sessionId": "q",
+     "agentPath": [],
+     "seq": 30,
+     "receivedAt": 1800000000300
+    }
+   }
+  ]
+ ],
+ "view": {
+  "messages": [
+   {
+    "kind": "turn",
+    "id": "turn::q:0",
+    "sections": [
+     {
+      "sessionId": "q",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "tool",
+        "callId": "z1",
+        "tool": "?",
+        "result": "failed",
+        "endedAt": 1800000000010
+       },
+       {
+        "kind": "tool",
+        "callId": "z2",
+        "tool": "?",
+        "input": "{}",
+        "result": "ended"
+       },
+       {
+        "kind": "tool",
+        "callId": "z3",
+        "tool": "?",
+        "input": "{",
+        "inputPartial": true,
+        "result": "ended"
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "failed",
+     "failure": "auth",
+     "reason": "login",
+     "credential": "missing"
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::q:7",
+    "sections": [
+     {
+      "sessionId": "q",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "notification work"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"q\",[],\"h2\"]",
+    "input": {
+     "id": "[\"q\",[],\"h2\"]",
+     "input": "too soon",
+     "inputId": "h2",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 9,
+        "receivedAt": 1800000000090,
+        "kind": "request",
+        "id": "req-2",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "too soon",
+         "inputId": "h2"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 10,
+        "receivedAt": 1800000000100,
+        "kind": "response",
+        "requestId": "req-2",
+        "body": {
+         "kind": "rejected",
+         "code": "busy",
+         "reason": "busy"
+        }
+       },
+       "state": "rejected",
+       "reason": "busy"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+    "input": {
+     "id": "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+     "input": "nope",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 11,
+        "receivedAt": 1800000000110,
+        "kind": "request",
+        "id": "req-3",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "nope"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 12,
+        "receivedAt": 1800000000120,
+        "kind": "response",
+        "requestId": "req-3",
+        "body": {
+         "kind": "rejected",
+         "code": "unsupported",
+         "reason": "cannot steer"
+        }
+       },
+       "state": "rejected",
+       "reason": "cannot steer"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::q:13",
+    "sections": [],
+    "outcome": {
+     "kind": "completed"
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt::q:15",
+    "notice": {
+     "cause": "control_rejected",
+     "action": "abort",
+     "reason": "idle"
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"q\",[],\"h1\"]",
+    "input": {
+     "id": "[\"q\",[],\"h1\"]",
+     "input": "held",
+     "inputId": "h1",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000040,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "held",
+         "inputId": "h1"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 5,
+        "receivedAt": 1800000000050,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": [],
+     "turn": {
+      "state": "active",
+      "seq": 16,
+      "streamId": ""
+     }
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::q:16",
+    "openedBy": "req-1",
+    "sections": [
+     {
+      "sessionId": "q",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "held ran"
+       },
+       {
+        "kind": "reasoning",
+        "content": {
+         "kind": "empty"
+        }
+       },
+       {
+        "kind": "tool",
+        "callId": "k1",
+        "tool": "sleep",
+        "input": "{\"durationMs\":5000}",
+        "result": "ended",
+        "startedAt": 1800000000180
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "failed",
+     "failure": "quota",
+     "reason": "limit",
+     "resetsAt": "2026-10-14T00:00:00.000Z"
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"q\",[],\"h3\"]",
+    "input": {
+     "id": "[\"q\",[],\"h3\"]",
+     "input": "idle queue",
+     "inputId": "h3",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 20,
+        "receivedAt": 1800000000200,
+        "kind": "request",
+        "id": "req-5",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "queue",
+         "input": "idle queue",
+         "inputId": "h3"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 21,
+        "receivedAt": 1800000000210,
+        "kind": "response",
+        "requestId": "req-5",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "dropped",
+     "observations": [],
+     "reason": "turn_interrupted"
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"q\",[],\"h4\"]",
+    "input": {
+     "id": "[\"q\",[],\"h4\"]",
+     "input": "refused",
+     "inputId": "h4",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 23,
+        "receivedAt": 1800000000230,
+        "kind": "request",
+        "id": "req-6",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "refused",
+         "inputId": "h4"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 24,
+        "receivedAt": 1800000000240,
+        "kind": "response",
+        "requestId": "req-6",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "dropped",
+     "observations": [],
+     "reason": "runtime_refused"
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"q\",[],\"h5\"]",
+    "input": {
+     "id": "[\"q\",[],\"h5\"]",
+     "input": "after",
+     "inputId": "h5",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 26,
+        "receivedAt": 1800000000260,
+        "kind": "request",
+        "id": "req-7",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "after",
+         "inputId": "h5"
+        }
+       },
+       "streamId": "",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 27,
+        "receivedAt": 1800000000270,
+        "kind": "response",
+        "requestId": "req-7",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::req-7",
+    "openedBy": "req-7",
+    "sections": [],
+    "outcome": {
+     "kind": "aborted"
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt::q:30",
+    "notice": {
+     "cause": "exited",
+     "code": null
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "aborted"
+   }
+  },
+  "model": null,
+  "effort": null,
+  "serviceTier": null,
+  "context": null,
+  "usage": {
+   "total": null
+  },
+  "pendingRequests": [],
+  "exited": {
+   "code": null
+  },
+  "conversation": {
+   "drops": [
+    [
+     "[\"q\",[],\"h3\"]",
+     {
+      "attempts": 1,
+      "reason": "turn_interrupted"
+     }
+    ],
+    [
+     "[\"q\",[],\"h4\"]",
+     {
+      "attempts": 1,
+      "reason": "runtime_refused"
+     }
+    ]
+   ],
+   "inputs": [
+    [
+     "[\"q\",[],\"h1\"]",
+     {
+      "id": "[\"q\",[],\"h1\"]",
+      "input": "held",
+      "inputId": "h1",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 4,
+         "receivedAt": 1800000000040,
+         "kind": "request",
+         "id": "req-1",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "held",
+          "inputId": "h1"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 5,
+         "receivedAt": 1800000000050,
+         "kind": "response",
+         "requestId": "req-1",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": [],
+      "turn": {
+       "state": "active",
+       "seq": 16,
+       "streamId": ""
+      }
+     }
+    ],
+    [
+     "[\"q\",[],\"h2\"]",
+     {
+      "id": "[\"q\",[],\"h2\"]",
+      "input": "too soon",
+      "inputId": "h2",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 9,
+         "receivedAt": 1800000000090,
+         "kind": "request",
+         "id": "req-2",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "too soon",
+          "inputId": "h2"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 10,
+         "receivedAt": 1800000000100,
+         "kind": "response",
+         "requestId": "req-2",
+         "body": {
+          "kind": "rejected",
+          "code": "busy",
+          "reason": "busy"
+         }
+        },
+        "state": "rejected",
+        "reason": "busy"
+       }
+      ],
+      "state": "rejected",
+      "observations": []
+     }
+    ],
+    [
+     "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+     {
+      "id": "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+      "input": "nope",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 11,
+         "receivedAt": 1800000000110,
+         "kind": "request",
+         "id": "req-3",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "steer",
+          "input": "nope"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 12,
+         "receivedAt": 1800000000120,
+         "kind": "response",
+         "requestId": "req-3",
+         "body": {
+          "kind": "rejected",
+          "code": "unsupported",
+          "reason": "cannot steer"
+         }
+        },
+        "state": "rejected",
+        "reason": "cannot steer"
+       }
+      ],
+      "state": "rejected",
+      "observations": []
+     }
+    ],
+    [
+     "[\"q\",[],\"h3\"]",
+     {
+      "id": "[\"q\",[],\"h3\"]",
+      "input": "idle queue",
+      "inputId": "h3",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 20,
+         "receivedAt": 1800000000200,
+         "kind": "request",
+         "id": "req-5",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "queue",
+          "input": "idle queue",
+          "inputId": "h3"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 21,
+         "receivedAt": 1800000000210,
+         "kind": "response",
+         "requestId": "req-5",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "dropped",
+      "observations": [],
+      "reason": "turn_interrupted"
+     }
+    ],
+    [
+     "[\"q\",[],\"h4\"]",
+     {
+      "id": "[\"q\",[],\"h4\"]",
+      "input": "refused",
+      "inputId": "h4",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 23,
+         "receivedAt": 1800000000230,
+         "kind": "request",
+         "id": "req-6",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "refused",
+          "inputId": "h4"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 24,
+         "receivedAt": 1800000000240,
+         "kind": "response",
+         "requestId": "req-6",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "dropped",
+      "observations": [],
+      "reason": "runtime_refused"
+     }
+    ],
+    [
+     "[\"q\",[],\"h5\"]",
+     {
+      "id": "[\"q\",[],\"h5\"]",
+      "input": "after",
+      "inputId": "h5",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 26,
+         "receivedAt": 1800000000260,
+         "kind": "request",
+         "id": "req-7",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "after",
+          "inputId": "h5"
+         }
+        },
+        "streamId": "",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 27,
+         "receivedAt": 1800000000270,
+         "kind": "response",
+         "requestId": "req-7",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ]
+   ],
+   "requests": [
+    [
+     "[\"\",\"[\\\"q\\\",[],\\\"req-1\\\"]\"]",
+     "[\"q\",[],\"h1\"]"
+    ],
+    [
+     "[\"\",\"[\\\"q\\\",[],\\\"req-2\\\"]\"]",
+     "[\"q\",[],\"h2\"]"
+    ],
+    [
+     "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+     "[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    ],
+    [
+     "[\"\",\"[\\\"q\\\",[],\\\"req-5\\\"]\"]",
+     "[\"q\",[],\"h3\"]"
+    ],
+    [
+     "[\"\",\"[\\\"q\\\",[],\\\"req-6\\\"]\"]",
+     "[\"q\",[],\"h4\"]"
+    ],
+    [
+     "[\"\",\"[\\\"q\\\",[],\\\"req-7\\\"]\"]",
+     "[\"q\",[],\"h5\"]"
+    ]
+   ],
+   "actions": [],
+   "cursors": [
+    [
+     "",
+     30
+    ]
+   ],
+   "updates": [
+    {
+     "kind": "event",
+     "event": {
+      "kind": "exited",
+      "code": null,
+      "sessionId": "q",
+      "agentPath": [],
+      "seq": 30,
+      "receivedAt": 1800000000300
+     }
+    }
+   ]
+  },
+  "rootSessionId": "q",
+  "usageBySession": [],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "q"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [],
+  "usageTotal": null
+ },
+ "viewStream": {
+  "messages": [
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:q:0",
+    "sections": [
+     {
+      "sessionId": "q",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "tool",
+        "callId": "z1",
+        "tool": "?",
+        "result": "failed",
+        "endedAt": 1800000000010
+       },
+       {
+        "kind": "tool",
+        "callId": "z2",
+        "tool": "?",
+        "input": "{}",
+        "result": "ended"
+       },
+       {
+        "kind": "tool",
+        "callId": "z3",
+        "tool": "?",
+        "input": "{",
+        "inputPartial": true,
+        "result": "ended"
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "failed",
+     "failure": "auth",
+     "reason": "login",
+     "credential": "missing"
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:q:7",
+    "sections": [
+     {
+      "sessionId": "q",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "notification work"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"q\",[],\"h2\"]",
+    "input": {
+     "id": "[\"q\",[],\"h2\"]",
+     "input": "too soon",
+     "inputId": "h2",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 9,
+        "receivedAt": 1800000000090,
+        "kind": "request",
+        "id": "req-2",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "too soon",
+         "inputId": "h2"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 10,
+        "receivedAt": 1800000000100,
+        "kind": "response",
+        "requestId": "req-2",
+        "body": {
+         "kind": "rejected",
+         "code": "busy",
+         "reason": "busy"
+        }
+       },
+       "state": "rejected",
+       "reason": "busy"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"stream-1\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+    "input": {
+     "id": "[\"stream-1\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+     "input": "nope",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 11,
+        "receivedAt": 1800000000110,
+        "kind": "request",
+        "id": "req-3",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "steer",
+         "input": "nope"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 12,
+        "receivedAt": 1800000000120,
+        "kind": "response",
+        "requestId": "req-3",
+        "body": {
+         "kind": "rejected",
+         "code": "unsupported",
+         "reason": "cannot steer"
+        }
+       },
+       "state": "rejected",
+       "reason": "cannot steer"
+      }
+     ],
+     "state": "rejected",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:q:13",
+    "sections": [],
+    "outcome": {
+     "kind": "completed"
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt:stream-1:q:15",
+    "notice": {
+     "cause": "control_rejected",
+     "action": "abort",
+     "reason": "idle"
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"q\",[],\"h1\"]",
+    "input": {
+     "id": "[\"q\",[],\"h1\"]",
+     "input": "held",
+     "inputId": "h1",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 4,
+        "receivedAt": 1800000000040,
+        "kind": "request",
+        "id": "req-1",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "held",
+         "inputId": "h1"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 5,
+        "receivedAt": 1800000000050,
+        "kind": "response",
+        "requestId": "req-1",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": [],
+     "turn": {
+      "state": "active",
+      "seq": 16,
+      "streamId": "stream-1"
+     }
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:q:16",
+    "openedBy": "req-1",
+    "sections": [
+     {
+      "sessionId": "q",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "held ran"
+       },
+       {
+        "kind": "reasoning",
+        "content": {
+         "kind": "empty"
+        }
+       },
+       {
+        "kind": "tool",
+        "callId": "k1",
+        "tool": "sleep",
+        "input": "{\"durationMs\":5000}",
+        "result": "ended",
+        "startedAt": 1800000000180
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "failed",
+     "failure": "quota",
+     "reason": "limit",
+     "resetsAt": "2026-10-14T00:00:00.000Z"
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"q\",[],\"h3\"]",
+    "input": {
+     "id": "[\"q\",[],\"h3\"]",
+     "input": "idle queue",
+     "inputId": "h3",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 20,
+        "receivedAt": 1800000000200,
+        "kind": "request",
+        "id": "req-5",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "queue",
+         "input": "idle queue",
+         "inputId": "h3"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 21,
+        "receivedAt": 1800000000210,
+        "kind": "response",
+        "requestId": "req-5",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "dropped",
+     "observations": [],
+     "reason": "turn_interrupted"
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"q\",[],\"h4\"]",
+    "input": {
+     "id": "[\"q\",[],\"h4\"]",
+     "input": "refused",
+     "inputId": "h4",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 23,
+        "receivedAt": 1800000000230,
+        "kind": "request",
+        "id": "req-6",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "refused",
+         "inputId": "h4"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 24,
+        "receivedAt": 1800000000240,
+        "kind": "response",
+        "requestId": "req-6",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "dropped",
+     "observations": [],
+     "reason": "runtime_refused"
+    }
+   },
+   {
+    "kind": "input",
+    "id": "in:[\"q\",[],\"h5\"]",
+    "input": {
+     "id": "[\"q\",[],\"h5\"]",
+     "input": "after",
+     "inputId": "h5",
+     "attempts": [
+      {
+       "request": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 26,
+        "receivedAt": 1800000000260,
+        "kind": "request",
+        "id": "req-7",
+        "direction": "toRuntime",
+        "body": {
+         "kind": "prompt",
+         "input": "after",
+         "inputId": "h5"
+        }
+       },
+       "streamId": "stream-1",
+       "response": {
+        "sessionId": "q",
+        "agentPath": [],
+        "seq": 27,
+        "receivedAt": 1800000000270,
+        "kind": "response",
+        "requestId": "req-7",
+        "body": {
+         "kind": "accepted"
+        }
+       },
+       "state": "accepted"
+      }
+     ],
+     "state": "accepted",
+     "observations": []
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn:stream-1:req-7",
+    "openedBy": "req-7",
+    "sections": [],
+    "outcome": {
+     "kind": "aborted"
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt:stream-1:q:30",
+    "notice": {
+     "cause": "exited",
+     "code": null
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle",
+   "lastTurnOutcome": {
+    "kind": "aborted"
+   }
+  },
+  "model": null,
+  "effort": null,
+  "serviceTier": null,
+  "context": null,
+  "usage": {
+   "total": null
+  },
+  "pendingRequests": [],
+  "exited": {
+   "code": null
+  },
+  "conversation": {
+   "drops": [
+    [
+     "[\"q\",[],\"h3\"]",
+     {
+      "attempts": 1,
+      "reason": "turn_interrupted"
+     }
+    ],
+    [
+     "[\"q\",[],\"h4\"]",
+     {
+      "attempts": 1,
+      "reason": "runtime_refused"
+     }
+    ]
+   ],
+   "inputs": [
+    [
+     "[\"q\",[],\"h1\"]",
+     {
+      "id": "[\"q\",[],\"h1\"]",
+      "input": "held",
+      "inputId": "h1",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 4,
+         "receivedAt": 1800000000040,
+         "kind": "request",
+         "id": "req-1",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "held",
+          "inputId": "h1"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 5,
+         "receivedAt": 1800000000050,
+         "kind": "response",
+         "requestId": "req-1",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": [],
+      "turn": {
+       "state": "active",
+       "seq": 16,
+       "streamId": "stream-1"
+      }
+     }
+    ],
+    [
+     "[\"q\",[],\"h2\"]",
+     {
+      "id": "[\"q\",[],\"h2\"]",
+      "input": "too soon",
+      "inputId": "h2",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 9,
+         "receivedAt": 1800000000090,
+         "kind": "request",
+         "id": "req-2",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "too soon",
+          "inputId": "h2"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 10,
+         "receivedAt": 1800000000100,
+         "kind": "response",
+         "requestId": "req-2",
+         "body": {
+          "kind": "rejected",
+          "code": "busy",
+          "reason": "busy"
+         }
+        },
+        "state": "rejected",
+        "reason": "busy"
+       }
+      ],
+      "state": "rejected",
+      "observations": []
+     }
+    ],
+    [
+     "[\"stream-1\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+     {
+      "id": "[\"stream-1\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+      "input": "nope",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 11,
+         "receivedAt": 1800000000110,
+         "kind": "request",
+         "id": "req-3",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "steer",
+          "input": "nope"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 12,
+         "receivedAt": 1800000000120,
+         "kind": "response",
+         "requestId": "req-3",
+         "body": {
+          "kind": "rejected",
+          "code": "unsupported",
+          "reason": "cannot steer"
+         }
+        },
+        "state": "rejected",
+        "reason": "cannot steer"
+       }
+      ],
+      "state": "rejected",
+      "observations": []
+     }
+    ],
+    [
+     "[\"q\",[],\"h3\"]",
+     {
+      "id": "[\"q\",[],\"h3\"]",
+      "input": "idle queue",
+      "inputId": "h3",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 20,
+         "receivedAt": 1800000000200,
+         "kind": "request",
+         "id": "req-5",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "queue",
+          "input": "idle queue",
+          "inputId": "h3"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 21,
+         "receivedAt": 1800000000210,
+         "kind": "response",
+         "requestId": "req-5",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "dropped",
+      "observations": [],
+      "reason": "turn_interrupted"
+     }
+    ],
+    [
+     "[\"q\",[],\"h4\"]",
+     {
+      "id": "[\"q\",[],\"h4\"]",
+      "input": "refused",
+      "inputId": "h4",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 23,
+         "receivedAt": 1800000000230,
+         "kind": "request",
+         "id": "req-6",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "refused",
+          "inputId": "h4"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 24,
+         "receivedAt": 1800000000240,
+         "kind": "response",
+         "requestId": "req-6",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "dropped",
+      "observations": [],
+      "reason": "runtime_refused"
+     }
+    ],
+    [
+     "[\"q\",[],\"h5\"]",
+     {
+      "id": "[\"q\",[],\"h5\"]",
+      "input": "after",
+      "inputId": "h5",
+      "attempts": [
+       {
+        "request": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 26,
+         "receivedAt": 1800000000260,
+         "kind": "request",
+         "id": "req-7",
+         "direction": "toRuntime",
+         "body": {
+          "kind": "prompt",
+          "input": "after",
+          "inputId": "h5"
+         }
+        },
+        "streamId": "stream-1",
+        "response": {
+         "sessionId": "q",
+         "agentPath": [],
+         "seq": 27,
+         "receivedAt": 1800000000270,
+         "kind": "response",
+         "requestId": "req-7",
+         "body": {
+          "kind": "accepted"
+         }
+        },
+        "state": "accepted"
+       }
+      ],
+      "state": "accepted",
+      "observations": []
+     }
+    ]
+   ],
+   "requests": [
+    [
+     "[\"stream-1\",\"[\\\"q\\\",[],\\\"req-1\\\"]\"]",
+     "[\"q\",[],\"h1\"]"
+    ],
+    [
+     "[\"stream-1\",\"[\\\"q\\\",[],\\\"req-2\\\"]\"]",
+     "[\"q\",[],\"h2\"]"
+    ],
+    [
+     "[\"stream-1\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]",
+     "[\"stream-1\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    ],
+    [
+     "[\"stream-1\",\"[\\\"q\\\",[],\\\"req-5\\\"]\"]",
+     "[\"q\",[],\"h3\"]"
+    ],
+    [
+     "[\"stream-1\",\"[\\\"q\\\",[],\\\"req-6\\\"]\"]",
+     "[\"q\",[],\"h4\"]"
+    ],
+    [
+     "[\"stream-1\",\"[\\\"q\\\",[],\\\"req-7\\\"]\"]",
+     "[\"q\",[],\"h5\"]"
+    ]
+   ],
+   "actions": [],
+   "cursors": [
+    [
+     "stream-1",
+     30
+    ]
+   ],
+   "updates": [
+    {
+     "kind": "event",
+     "event": {
+      "kind": "exited",
+      "code": null,
+      "sessionId": "q",
+      "agentPath": [],
+      "seq": 30,
+      "receivedAt": 1800000000300
+     }
+    }
+   ]
+  },
+  "rootSessionId": "q",
+  "usageBySession": [],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "q"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [],
+  "usageTotal": null
+ },
+ "viewSteps": [
+  {
+   "openTurn": 0,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 0,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 0,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 2
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 2,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 2,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 2,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::req-1",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 2
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [
+    {
+     "id": "[\"q\",[],\"h1\"]",
+     "state": "accepted"
+    }
+   ],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [
+    {
+     "id": "[\"q\",[],\"h1\"]",
+     "state": "accepted"
+    }
+   ],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 3,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "turn::req-2",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [
+    {
+     "id": "[\"q\",[],\"h1\"]",
+     "state": "accepted"
+    }
+   ],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    }
+   ],
+   "pendingInputs": [
+    {
+     "id": "[\"q\",[],\"h1\"]",
+     "state": "accepted"
+    }
+   ],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    }
+   ],
+   "pendingInputs": [
+    {
+     "id": "[\"q\",[],\"h1\"]",
+     "state": "accepted"
+    }
+   ],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    }
+   ],
+   "pendingInputs": [
+    {
+     "id": "[\"q\",[],\"h1\"]",
+     "state": "accepted"
+    }
+   ],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    }
+   ],
+   "pendingInputs": [
+    {
+     "id": "[\"q\",[],\"h1\"]",
+     "state": "accepted"
+    }
+   ],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    }
+   ],
+   "pendingInputs": [
+    {
+     "id": "[\"q\",[],\"h1\"]",
+     "state": "accepted"
+    }
+   ],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    }
+   ],
+   "pendingInputs": [
+    {
+     "id": "[\"q\",[],\"h1\"]",
+     "state": "accepted"
+    }
+   ],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 7,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 2
+  },
+  {
+   "openTurn": 7,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      2
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 2
+  },
+  {
+   "openTurn": 7,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 10,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h4\"]"
+    },
+    {
+     "id": "turn::req-6",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 10,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h4\"]"
+    },
+    {
+     "id": "turn::req-6",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h4\"]"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 11,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h4\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h5\"]"
+    },
+    {
+     "id": "turn::req-7",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 11,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h4\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h5\"]"
+    },
+    {
+     "id": "turn::req-7",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  },
+  {
+   "openTurn": 11,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h4\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h5\"]"
+    },
+    {
+     "id": "turn::req-7",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": 11,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h4\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h5\"]"
+    },
+    {
+     "id": "turn::req-7",
+     "parts": [],
+     "outcome": null
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 0
+  },
+  {
+   "openTurn": -1,
+   "messages": [
+    {
+     "id": "turn::q:0",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "turn::q:7",
+     "parts": [
+      1
+     ],
+     "outcome": null
+    },
+    {
+     "id": "in:[\"q\",[],\"h2\"]"
+    },
+    {
+     "id": "in:[\"\",\"[\\\"q\\\",[],\\\"req-3\\\"]\"]"
+    },
+    {
+     "id": "turn::q:13",
+     "parts": [],
+     "outcome": "completed"
+    },
+    {
+     "id": "nt::q:15"
+    },
+    {
+     "id": "in:[\"q\",[],\"h1\"]"
+    },
+    {
+     "id": "turn::q:16",
+     "parts": [
+      3
+     ],
+     "outcome": "failed"
+    },
+    {
+     "id": "in:[\"q\",[],\"h3\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h4\"]"
+    },
+    {
+     "id": "in:[\"q\",[],\"h5\"]"
+    },
+    {
+     "id": "turn::req-7",
+     "parts": [],
+     "outcome": "aborted"
+    },
+    {
+     "id": "nt::q:30"
+    }
+   ],
+   "pendingInputs": [],
+   "pendingRequests": [],
+   "updates": 1
+  }
+ ],
+ "viewEvents": {
+  "messages": [
+   {
+    "kind": "turn",
+    "id": "turn::q:0",
+    "sections": [
+     {
+      "sessionId": "q",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "tool",
+        "callId": "z1",
+        "tool": "?",
+        "result": "failed",
+        "endedAt": 1800000000010
+       },
+       {
+        "kind": "tool",
+        "callId": "z2",
+        "tool": "?",
+        "input": "{}",
+        "result": "ended"
+       },
+       {
+        "kind": "tool",
+        "callId": "z3",
+        "tool": "?",
+        "input": "{",
+        "inputPartial": true,
+        "result": "ended"
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "failed",
+     "failure": "auth",
+     "reason": "login",
+     "credential": "missing"
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::req-1",
+    "openedBy": "req-1",
+    "sections": [
+     {
+      "sessionId": "q",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "notification work"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "kind": "notice",
+    "id": "nt::q:12",
+    "notice": {
+     "cause": "control_rejected",
+     "action": "steer",
+     "reason": "cannot steer"
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::q:13",
+    "sections": [],
+    "outcome": {
+     "kind": "completed"
+    }
+   },
+   {
+    "kind": "notice",
+    "id": "nt::q:15",
+    "notice": {
+     "cause": "control_rejected",
+     "action": "abort",
+     "reason": "idle"
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::q:16",
+    "sections": [
+     {
+      "sessionId": "q",
+      "agentPath": [],
+      "parts": [
+       {
+        "kind": "text",
+        "text": "held ran"
+       },
+       {
+        "kind": "reasoning",
+        "content": {
+         "kind": "empty"
+        }
+       },
+       {
+        "kind": "tool",
+        "callId": "k1",
+        "tool": "sleep",
+        "input": "{\"durationMs\":5000}",
+        "result": "ended",
+        "startedAt": 1800000000180
+       }
+      ]
+     }
+    ],
+    "outcome": {
+     "kind": "failed",
+     "failure": "quota",
+     "reason": "limit",
+     "resetsAt": "2026-10-14T00:00:00.000Z"
+    }
+   },
+   {
+    "kind": "turn",
+    "id": "turn::req-6",
+    "openedBy": "req-6",
+    "sections": []
+   },
+   {
+    "kind": "turn",
+    "id": "turn::req-7",
+    "openedBy": "req-7",
+    "sections": []
+   },
+   {
+    "kind": "notice",
+    "id": "nt::q:30",
+    "notice": {
+     "cause": "exited",
+     "code": null
+    }
+   }
+  ],
+  "pendingInputs": [],
+  "openTurn": -1,
+  "status": {
+   "kind": "idle"
+  },
+  "model": null,
+  "effort": null,
+  "serviceTier": null,
+  "context": null,
+  "usage": {
+   "total": null
+  },
+  "pendingRequests": [],
+  "exited": {
+   "code": null
+  },
+  "conversation": {
+   "drops": [],
+   "inputs": [],
+   "requests": [],
+   "actions": [],
+   "cursors": [],
+   "updates": []
+  },
+  "rootSessionId": "q",
+  "usageBySession": [],
+  "sessionGraph": {
+   "nodes": [
+    {
+     "id": "q"
+    }
+   ],
+   "edges": []
+  },
+  "usageByAgent": [],
+  "usageTotal": null
+ },
+ "tasksOf": {
+  "value": [],
+  "seq": 30
+ },
+ "tasksOfRoot": {
+  "value": [],
+  "seq": 30
+ },
+ "display": {
+  "groups": [
+   {
+    "segments": [
+     {
+      "kind": "tools",
+      "index": 0,
+      "parts": [
+       {
+        "kind": "tool",
+        "callId": "z1",
+        "tool": "?",
+        "result": "failed",
+        "endedAt": 1800000000010
+       },
+       {
+        "kind": "tool",
+        "callId": "z2",
+        "tool": "?",
+        "input": "{}",
+        "result": "ended"
+       },
+       {
+        "kind": "tool",
+        "callId": "z3",
+        "tool": "?",
+        "input": "{",
+        "inputPartial": true,
+        "result": "ended"
+       }
+      ],
+      "counts": [
+       {
+        "kind": "other",
+        "count": 3
+       }
+      ],
+      "failed": 1
+     }
+    ],
+    "summaries": [
+     {
+      "done": "Used 3 tools",
+      "running": "Used 3 tools"
+     }
+    ]
+   },
+   {
+    "segments": [
+     {
+      "kind": "part",
+      "index": 0,
+      "part": {
+       "kind": "text",
+       "text": "notification work"
+      }
+     }
+    ],
+    "summaries": [
+     null
+    ]
+   },
+   {
+    "segments": [
+     {
+      "kind": "part",
+      "index": 0,
+      "part": {
+       "kind": "text",
+       "text": "held ran"
+      }
+     },
+     {
+      "kind": "tools",
+      "index": 1,
+      "parts": [
+       {
+        "kind": "reasoning",
+        "content": {
+         "kind": "empty"
+        }
+       },
+       {
+        "kind": "tool",
+        "callId": "k1",
+        "tool": "sleep",
+        "input": "{\"durationMs\":5000}",
+        "result": "ended",
+        "startedAt": 1800000000180
+       }
+      ],
+      "counts": [
+       {
+        "kind": "wait",
+        "count": 1
+       }
+      ],
+      "failed": 0
+     }
+    ],
+    "summaries": [
+     null,
+     {
+      "done": "Waited",
+      "running": "Waited"
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "tool": "?",
+    "input": null,
+    "action": {
+     "kind": "other",
+     "detail": "?"
+    },
+    "bare": {
+     "kind": "other",
+     "detail": "?"
+    },
+    "label": "Failed",
+    "writing": "Preparing"
+   },
+   {
+    "tool": "?",
+    "input": "{}",
+    "action": {
+     "kind": "other",
+     "detail": "?"
+    },
+    "bare": {
+     "kind": "other",
+     "detail": "?"
+    },
+    "label": "Done",
+    "writing": "Preparing"
+   },
+   {
+    "tool": "?",
+    "input": "{",
+    "action": {
+     "kind": "other",
+     "detail": "?"
+    },
+    "bare": {
+     "kind": "other",
+     "detail": "?"
+    },
+    "label": "Done",
+    "writing": "Preparing"
+   },
+   {
+    "tool": "sleep",
+    "input": "{\"durationMs\":5000}",
+    "action": {
+     "kind": "wait",
+     "durationMs": 5000
+    },
+    "bare": {
+     "kind": "wait"
+    },
+    "label": "Waited",
+    "writing": "Preparing to wait"
+   }
+  ],
+  "requests": [],
+  "notices": [
+   {
+    "notice": {
+     "cause": "control_rejected",
+     "action": "abort",
+     "reason": "idle"
+    },
+    "text": "Abort rejected: idle",
+    "tone": "warning"
+   },
+   {
+    "notice": {
+     "cause": "exited",
+     "code": null
+    },
+    "text": "Runtime exited",
+    "tone": "warning"
+   }
+  ],
+  "phases": [
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "responding",
+    "label": "Responding",
+    "runtimeLabel": "Responding"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "thinking",
+    "label": "Thinking",
+    "runtimeLabel": "Thinking"
+   },
+   {
+    "phase": {
+     "tool": "sleep",
+     "callId": "k1"
+    },
+    "label": "Running sleep",
+    "runtimeLabel": "Waiting"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   },
+   {
+    "phase": "waiting_model",
+    "label": "Waiting for model",
+    "runtimeLabel": "Waiting for model"
+   }
+  ],
+  "failures": [
+   {
+    "failure": "auth",
+    "credential": "missing",
+    "text": "Runtime is not signed in.",
+    "advice": {
+     "retry": "no",
+     "userAction": true
+    }
+   },
+   {
+    "failure": "quota",
+    "credential": null,
+    "text": "Runtime reported that its usage limit was reached.",
+    "advice": {
+     "retry": "later",
+     "userAction": false
+    }
+   },
+   {
+    "failure": "quota",
+    "credential": null,
+    "text": "Runtime reported that its usage limit was reached.",
+    "advice": {
+     "retry": "later",
+     "userAction": false
+    }
+   },
+   {
+    "failure": "quota",
+    "credential": null,
+    "text": "Runtime reported that its usage limit was reached.",
+    "advice": {
+     "retry": "later",
+     "userAction": false
+    }
+   },
+   {
+    "failure": "quota",
+    "credential": null,
+    "text": "Runtime reported that its usage limit was reached.",
+    "advice": {
+     "retry": "later",
+     "userAction": false
+    }
+   }
+  ],
+  "tasks": []
+ }
+}

@@ -1,0 +1,160 @@
+# VibeValley · 码农场物语
+
+> A team of coding agents you direct by voice or chat, drawn as a pixel farm. Runs on your own machine.
+
+**VibeValley**（码农场物语）是一个用语音或打字指挥的编码 agent 团队，画成一座像素农场。
+
+你只和**管家**说话。管家把活派给**帮工**，帮工是你机器上真实的编码 agent（pi、Claude Code、Codex……），在你的项目里开分支、改代码、跑测试、提交。地里的庄稼跟着它们的真实进度长：读代码时发芽，改文件时长叶，做完了结出麦子。你看过**收成清单**，才把它的分支合进主分支。
+
+你、管家和帮工在同一个群聊**田头**里说话：每件活下面挂着一个工单串，帮工在里面确认、提问、汇报，你随时插话。说到底，VibeValley 是一个跑在本机的多 agent 协作工作区，外面包了一层游戏的壳。
+
+![农场：田地、管家和右下角的田头](docs/images/farm.png)
+
+> [!WARNING]
+> 帮工**没有权限确认、不开沙箱**，能在这台机器上执行任意命令。服务端只监听 `127.0.0.1`，不要把它暴露到网络上。只把你愿意交给编码 agent 的项目放进工作目录。
+
+## 能做什么
+
+- **派活和收获**：对管家说「在 clock-in 里加一个查询打卡记录的接口，写测试」。管家挑一个合适的帮工，在项目里给它开独立的分支和 worktree。做完后你看提交、diff 和会不会冲突，确认了再合进主分支；冲突了让它自己解决。
+- **同时干好几件活**：最多 6 个帮工同时在地里干活，每人一个分支，互不干扰。
+- **地图**：每个项目是一座小岛，岛上的地是它的 worktree 和还能派活的空位，排队的活是院门外的种子袋；点空位就给这个项目写一张工单。
+- **看得见过程**：每个帮工的每一步都记成轨迹，包括收到的话、每条命令和输出、说的话。哪一步不对，可以就那一步写评论，它会接着改。
+- **种植计划**：长任务先派一个帮工读代码、拆成一张有先后的步骤图，你看过草稿再开工。互不依赖的步骤同时做，每一步过了检查才合进计划分支，最后一次收进主分支。修 bug 时第一步先写一个**会失败的验收测试**，后面的步骤不能改它，最后一步要让它通过。
+- **频道、定时和巡查**：按项目开频道；「每天九点跑一遍测试」这样的定时任务；不调模型的巡查，提醒没人回的提问、没动静的帮工、做完没收的活。
+- **帮工档案和记性**：给帮工捏人设、选农机和模型、装技能。帮工在汇报里写的「记住：……」，下次开工时会想起来。
+- **语音**：按住说话，语音管家（Agora Conversational AI）听你说完，交给同一个管家去派活。
+- **从外面派活**：把田头接到微信、飞书或 QQ，只认你自己的账号。手机或另一台电脑可以经「院门」连进来，前提是你在本机点过头。
+- **管住花费**：每个农机的额度、今天花了多少、每日预算；额度快用完时提醒，用完了就不再派。
+- **农场本身**：像素村有昼夜和光照，有狗、会在路上走的帮工、成就和称号，还有一部能玩小游戏的手机。
+
+![地图：每个项目一座岛，地是它的 worktree 和空位](docs/images/map.png)
+
+## 它是怎么工作的
+
+```mermaid
+flowchart LR
+  you([你]) -- 打字 / 语音 --> app[Flutter 客户端<br/>农场画面、田头、配置]
+  app -- HTTP 命令 --> server
+  server -- SSE：折好的核心状态 --> app
+  subgraph server[Go 服务端 127.0.0.1:8787]
+    foreman[管家<br/>vibevalley 自己的 agent]
+    chat[田头<br/>SQLite]
+    site[核心状态<br/>只由事实改变]
+    crew[帮工<br/>smith]
+  end
+  foreman --> crew
+  crew -- 会话事件 --> site
+  crew --> rt[本机的农机<br/>pi · Claude Code · Codex]
+  rt --> repo[(你的项目<br/>每个帮工一个 worktree)]
+```
+
+- **服务端**（`server/`，Go，不用 cgo）：管家、帮工、田头、项目和收获、种植计划、语音、连接器都在这一个进程里。帮工由 [smith](server/pkg/smith) 驱动，它是 oar 的 Go 移植，统一驱动不同的编码 agent 程序。
+- **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，客户端只读折好的结果。
+- **客户端**（`app/`，Flutter）：农场和像素村（Flame）、田头、配置页、语音。macOS 版把服务端打进了应用里，打开就能用。
+- **形状只写一次**：接口和数据形状写在 Go 里（`server/internal/protocol/shapes.go`、`api.go`），Flutter 的类型和接口客户端由生成器从它写出来，两边不会对不上。
+
+更多见 [docs/architecture.md](docs/architecture.md)。
+
+## 快速开始
+
+### 需要
+
+- macOS（Apple 芯片）。客户端是 Flutter，macOS 应用是主要的形态；手机和别的电脑经「院门」连进来。
+- 至少一个装好并登录的编码 agent：[pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex](https://github.com/openai/codex)。VibeValley 也自带一个农机，只要 DeepSeek 的钥匙。
+- 一把 [DeepSeek](https://platform.deepseek.com/) 的 API 钥匙，管家要用。
+- 构建要 Go 1.27、Flutter 3.47 和 Xcode。
+- 可选：[Agora](https://www.agora.io/) 的凭据（用来语音），以及微信、飞书或 QQ 的机器人（从外面派活）。
+
+### 打一个 macOS 应用
+
+```bash
+git clone https://github.com/vibevalleyhq/vibevalley.git && cd vibevalley
+app/tool/agora-voice-only.sh        # 第一次：只留语音要的 Agora 组件
+bun run package:mac                 # 打出 app/build/vibevalley.app 和 .dmg（就是 app/tool/build-macos.sh）
+open app/build/vibevalley.app
+```
+
+![首页](docs/images/title.jpg)
+
+应用会在一个空闲的本机端口上启动内置的服务端。农场的数据放在 `~/Library/Application Support/vibevalley`，日志在 `~/Library/Logs/vibevalley/server.log`。
+
+### 或者分开跑（开发时）
+
+```bash
+cd server && go run ./cmd/vibevalley                                                  # 服务端，127.0.0.1:8787
+cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787  # 客户端
+```
+
+单独跑的服务端，数据在 `~/.vibevalley`（`VIBEVALLEY_HOME`）。钥匙可以放进 `$VIBEVALLEY_HOME/.env`，也可以用 `--env-file` 另给一个文件。
+
+### 第一次打开
+
+1. 在首页「设置」里填 DeepSeek 的钥匙。
+2. 在「农具房」里启用本机装好的农机。
+3. 把项目放进工作目录（默认 `~/vibevalley-work`，`VIBEVALLEY_WORK_ROOT`），一个文件夹一个项目。没有也行，管家会帮你建。
+4. 在田头对管家说要做什么。
+
+从派第一张工单到收获、处理冲突和失败、管住花费，见 [使用指南](docs/guide.md)。
+
+## 目录
+
+```
+server/            Go 服务端，一个 Go 模块；cmd/vibevalley 单独跑它
+  internal/        按概念分的服务：工单、执行、项目、群聊、管家、频道和连接器、游戏……
+  internal/protocol/  形状、接口和规则的唯一来源；tool/shapegen 从它生成 Go 和 Flutter 的代码
+  pkg/smith/       oar 的 Go 移植：驱动 pi、Claude Code、Codex 等编码 agent
+  pkg/             别的能单独拿去用的库：VibeValley 自己的 agent、数据库查询、微信、飞书、QQ、Agora
+  migrations/      SQLite 的迁移
+app/               Flutter 客户端：农场、像素村、田头、配置页、语音；macOS 版带着服务端
+site/              官网 vibevalley.dev（Astro）
+design/            像素素材的生图提示词、脚本和切图规则（原图和效果图在单独的仓库 vibevalley-art）
+docs/              文档：现在怎么用、怎么开发、各部分怎么工作
+.agents/notes/     Agent Notes：每个设计决策为什么这样做、放弃了什么
+```
+
+## 开发
+
+```bash
+cd server && go vet ./... && go test ./...   # 服务端：测试用假扮的帮工和真的 git 仓库，不连网、不花钱
+cd server && go run ./tool/shapegen          # 改了 protocol/shapes.go 或 api.go：重新生成 Go 和 Flutter 的代码
+bun run flutter:check                        # 生成的代码是否最新、flutter analyze、flutter test
+bun run docs:verify                          # 文档里的链接、Agent Notes 的格式和目录
+```
+
+- [docs/development.md](docs/development.md)：怎么跑起来、检查和测试、改形状和规则、打包。
+- [AGENTS.md](AGENTS.md)：代码的规矩（编码 agent 和人都照它来）。
+- [.agents/notes/](.agents/notes/README.md)：设计决策。改动大的行为之前先读相关的那篇，做了新的决定也写一篇。
+
+这个项目大部分是和编码 agent 一起写的，文档也按「给 agent 读」的标准来写：一个事实只放一处，文档只写现状，理由写进 Note。
+
+## 文档
+
+| 文档 | 讲什么 |
+|---|---|
+| [使用指南](docs/guide.md) | 派活、看着它干、收获、冲突和失败、花费、语音 |
+| [架构](docs/architecture.md) | 分层、核心状态和事实、事件流、HTTP 接口、存储、环境变量 |
+| [服务端](docs/server.md) | 管家、帮工、田头、项目和收获、种植计划、定时、额度、院门、搬家 |
+| [帮工和农机](docs/agents-and-runtimes.md) | 帮工档案、农机、技能、派给谁 |
+| [农场界面](docs/game-ui.md) | 角色、庄稼、工具、每个界面、成就 |
+| [语音](docs/voice.md) | 和管家说话（Agora ConvoAI） |
+| [macOS 应用](docs/desktop.md) | 内置服务端、菜单栏、通知、快捷键、渠道 |
+| [全部文档和用语表](docs/README.md) | 农场里的叫法和代码里的名字怎么对应 |
+
+## 致谢
+
+- [oar](https://github.com/botiverse/oar)（botiverse，Apache-2.0）：驱动编码 agent 的运行时，`server/pkg/smith` 是它的 Go 移植。田头的频道、工单串和外部渠道参照了 botiverse 的 Raft。
+- [Flutter](https://flutter.dev/) 和 [Flame](https://flame-engine.org/)：客户端和像素村。
+- [Agora Conversational AI](https://www.agora.io/)：语音管家；服务端照它的官方示例 [agent-quickstart-nextjs](https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs)（MIT）改写成 Go。
+- [DeepSeek](https://www.deepseek.com/)：管家用的模型。
+- [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL）：像素字体。
+- [Hugeicons](https://hugeicons.com/)（MIT）、[LobeHub Icons](https://github.com/lobehub/lobe-icons)（MIT）：像素图标和农机 logo 照它们的形状重画。
+- [openclaw-weixin](https://www.npmjs.com/package/@tencent-weixin/openclaw-weixin)、[botpy](https://github.com/tencent-connect/botpy)（腾讯，MIT）：微信和 QQ 的连接器照它们写。
+- [LDtk](https://ldtk.io/)：像素村的地图。
+
+## 许可证
+
+[Apache License 2.0](LICENSE)。用到的别的项目和它们的许可证见 [NOTICE](NOTICE)：`server/pkg/smith` 移植自 oar（Apache-2.0，[它的许可证](server/pkg/smith/LICENSE)），语音的服务端改写自 Agora 的示例（MIT），微信和 QQ 的连接器照腾讯的客户端写（MIT），图标照 Hugeicons 和 LobeHub Icons 重画（MIT），像素字体是 Fusion Pixel Font（OFL）。
+
+Claude、Codex、Cursor、DeepSeek、Agora、微信、飞书、QQ 等名字和 logo 归各自的所有者。VibeValley 用它们只为说明连的是哪一个，和它们没有隶属或背书关系。
+
+发现安全问题请看 [SECURITY.md](SECURITY.md)。
