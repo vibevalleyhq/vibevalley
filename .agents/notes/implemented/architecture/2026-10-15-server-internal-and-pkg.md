@@ -12,7 +12,7 @@ Status: implemented
 
 - `cmd/`：命令，`vibevalley`（服务端，含 `import`、`migrate`）和 `vibevalley-agent`。
 - `internal/`：只给本模块用的：农场的服务（一个概念一个包，`farm` 把它们组装起来，见 [一个概念一个包](2026-10-16-a-package-per-concept.md)）和 `protocol`（形状、接口和规则；shapegen 读它的 `shapes.go`、`api.go`，写它的 `gen.go`）。
-- `pkg/`：能单独拿去用的库：`smith`（oar 的 Go 移植，驱动各家编码 agent），`agent`（含 `oarruntime`）、`agentcore`、`ai`（VibeValley 自己的 agent）。
+- `pkg/`：能单独拿去用的库：`smith`（oar 的 Go 移植，驱动各家编码 agent），`agent`（含 `oarruntime`）、`agentcore`、`ai`（VibeValley 自己的 agent）；后来又有了 `db`（sqlc 生成的查询，[查询由 sqlc 生成](2026-10-15-sqlc-queries.md)）和 `agora`、`weixin`、`feishu`、`qq`（声网和三家聊天软件的接口，[一个概念一个包](2026-10-16-a-package-per-concept.md)）。
 - `tool/`：开发时的工具（shapegen、两个 Node 脚本）。
 
 smith 整个搬进 `pkg/smith`，删掉它的 `go.mod` 和 `replace`，import 从 `smith/…` 改成 `vibevalley/pkg/smith/…`。它没有第三方依赖，合并不给 `go.mod` 添东西。smith 自己的 `internal/` 和命令行 `cmd/oar`、`cmd/oar-bridge` 跟着它留在 `pkg/smith` 下面：Go 的 `internal` 只许它的上一层目录引用，这两个命令用到 smith 的 `internal/executable`，搬到 `server/cmd` 就编不过。`go vet ./...`、`go test ./...` 一次查完全部（32 个包，smith 那部分约一分半）。

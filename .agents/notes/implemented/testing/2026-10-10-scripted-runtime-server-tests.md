@@ -8,9 +8,9 @@ Status: implemented
 
 ## Decision
 
-`cd server && go test ./...`（`internal/farm/*_test.go`；当初是 TypeScript 服务端的 vitest 测试，随它一起删了，这一套原样搬到了 Go）：
+`cd server && go test ./...`（每个服务的包有自己的测试，用 `world_test.go` 的 `newWorld` 建它和它下面的服务；一路走过好几个包的留在 `internal/farm`，见 [一个概念一个包](../architecture/2026-10-16-a-package-per-concept.md)；当初是 TypeScript 服务端的 vitest 测试，随它一起删了，这一套原样搬到了 Go）：
 
-- 帮工由 smith（oar 的 Go 移植）的 `oartest` 扮演，对应 oar 的 `scriptedRuntime`：一个真实的会话（同样的记录、同样的折叠、同样的控制语义），没有程序、登录和模型。脚本按工单里的字眼行事：跑一条命令、提交一个文件、写一个版本、发呆、失败、解决冲突。
+- 帮工由 smith（oar 的 Go 移植）的 `oartest`（`server/pkg/smith/oartest`）扮演，对应 oar 的 `scriptedRuntime`：一个真实的会话（同样的记录、同样的折叠、同样的控制语义），没有程序、登录和模型。脚本按工单里的字眼行事：跑一条命令、提交一个文件、写一个版本、发呆、失败、解决冲突。
 - 每个测试在临时目录里用真的 git 仓库和 worktree。
 - 核心状态的 `reduce` 和推导是纯函数，单独测；读会话事件、读汇报、上限也是（`internal/runs/facts.go`、`internal/runs/rules.go`；protocol 的规则在 `server/internal/protocol/*_test.go`），一个事件进去、事实出来，不开会话（[crew-rules-as-pure-functions](../architecture/2026-10-11-crew-rules-as-pure-functions.md)）。
 
@@ -22,4 +22,4 @@ Status: implemented
 
 ## Consequences
 
-`internal/farm` 的一百四十多个测试二十来秒跑完，不花钱。代价是脚本不是模型：模型会不会照规矩写「结论」、会不会自己解决冲突，只能真实运行时验证。
+服务端的这些测试（当时在 `internal/farm` 一个包里，一百四十多个）二十来秒跑完，不花钱。代价是脚本不是模型：模型会不会照规矩写「结论」、会不会自己解决冲突，只能真实运行时验证。

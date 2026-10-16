@@ -28,7 +28,7 @@ VibeValley 有自己的 agent，`@heybro/agent`，完全用 Effect v4 写，参�
 在 VibeValley 里它有三个位置：
 
 - **管家**（`apps/server/src/foreman-agent.ts`）：默认就是它，`VIBEVALLEY_FOREMAN_RUNTIME=pi` 换回 pi。管家的工具在 `foreman-tools.ts` 里用 Effect Schema 定义一次，pi 拿它们的 JSON Schema，所以两种都能用。管家没有编码工具、不派帮手、不加载技能，有记性和定时；农场现状在系统提示里，没叫醒它的汇报记成 `farmNews`，人说的话插进这一轮，定时、提醒和汇报等这一轮做完（[server.md](../../../../docs/server.md)「管家」）。
-- **帮工**（`apps/server/src/vibevalley-runtime.ts`）：包成 oar 的一种 runtime `heybro`，照 oar 自己的 scripted runtime 用它的 runtime-author SPI 写，农具房里多一台；帮工在自己的 worktree 里干活，拿全部基础工具，农场工具经会话给的 MCP 服务器来；花费按模型表的价钱算，可以设每日预算（[agents-and-runtimes.md](../../../../docs/agents-and-runtimes.md)）。
+- **帮工**（`apps/server/src/vibevalley-runtime.ts`）：包成 oar 的一种 runtime `heybro`，照 oar 自己的 scripted runtime 用它的 runtime-author SPI 写，「农具」页里多一台；帮工在自己的 worktree 里干活，拿全部基础工具，农场工具经会话给的 MCP 服务器来；花费按模型表的价钱算，可以设每日预算（[agents-and-runtimes.md](../../../../docs/agents-and-runtimes.md)）。
 - **命令行**（`pnpm --filter @heybro/agent cli`）：不开 VibeValley 也能跟它聊、让它干活。
 
 ## Alternatives considered

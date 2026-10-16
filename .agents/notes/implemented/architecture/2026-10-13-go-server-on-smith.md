@@ -18,7 +18,7 @@ Status: implemented
 server/            Go 模块 vibevalley，不用 cgo
   pkg/smith/               oar 的 Go 移植；testdata 里是从 oar 仓库带来的假 agent 和回放记录
   internal/protocol/       形状（shapes.go、api.go）、核心状态的规则（Reduce、视图、聊天、计划、进度……）
-  internal/                服务，一个概念一个包（base、runs、chat、tickets、manager、channels……）；farm 把它们串成一个 Farm，答 HTTP 和 SSE
+  internal/                服务，一个概念一个包（base、runs、chat、tickets、manager、channels……）；farm 把它们串成一个 Farm，handler 答 HTTP 和 SSE
   pkg/ai、agentcore、agent/  VibeValley 自己的 agent（DeepSeek），管家和 vibevalley 农机用
   cmd/vibevalley           单独跑的服务端，和 `vibevalley import`、`vibevalley migrate`
   cmd/vibevalley-agent     VibeValley 自己的 agent 的命令行
@@ -37,7 +37,7 @@ smith 原先是单独的模块，后来并进来（[internal 和 pkg](2026-10-15
 
 ### 服务和持久化
 
-服务是 `farm` 里的结构体，经 `*Farm` 互相找到，`newX(f)` 建、`start(ctx)` 开后台的活、`ready(ctx)` 发开机就要发布的东西、`close()` 停；服务之间的发布订阅用 `Hub[T]`。（服务怎么建、怎么串，后来被 [服务由 fx 组装](2026-10-15-services-assembled-by-fx.md) 取代：构造函数列出用到的服务，不再经 `*Farm` 互相找。）`farm.json`、`config.json` 和家目录里别的文件格式不变；数据库从 PGlite 换成 SQLite（modernc，纯 Go），一个文件 `$VIBEVALLEY_HOME/farm.db`，表照 PG 的迁移折成最后的样子（`migrations/`），时间存毫秒，一个连接。原来的农场用 `vibevalley import` 搬过来：`tool/dump-pglite.ts` 把 PGlite 倒成 JSON，`vibevalley import`（`cmd/vibevalley/import.go`、`internal/farm/import.go`）拷文件、按原来的 id 和 seq 把行放进 SQLite。
+服务是 `farm` 里的结构体，经 `*Farm` 互相找到，`newX(f)` 建、`start(ctx)` 开后台的活、`ready(ctx)` 发开机就要发布的东西、`close()` 停；服务之间的发布订阅用 `Hub[T]`。（服务怎么建、怎么串，后来被 [服务由 fx 组装](2026-10-15-services-assembled-by-fx.md) 取代：构造函数列出用到的服务，不再经 `*Farm` 互相找；服务后来又按概念分成了包，见 [一个概念一个包](2026-10-16-a-package-per-concept.md)。）`farm.json`、`config.json` 和家目录里别的文件格式不变；数据库从 PGlite 换成 SQLite（modernc，纯 Go），一个文件 `$VIBEVALLEY_HOME/farm.db`，表照 PG 的迁移折成最后的样子（`migrations/`），时间存毫秒，一个连接。原来的农场用 `vibevalley import` 搬过来：`tool/dump-pglite.ts` 把 PGlite 倒成 JSON，`vibevalley import`（`cmd/vibevalley/import.go`、`internal/farm/import.go`）拷文件、按原来的 id 和 seq 把行放进 SQLite。
 
 ### 管家和帮工
 
@@ -60,7 +60,7 @@ smith 原先是单独的模块，后来并进来（[internal 和 pkg](2026-10-15
 - **pi 农机要 Node**：smith 跑 pi 要一个内嵌的 Node 宿主，用 pi 的帮工仍然需要机器上有 Node；VibeValley 自己的农机和 claude、codex 等 CLI 不需要。
 - **管家只跑在 VibeValley 自己的 agent 上**：pi 做管家要把 VibeValley 的工具放进 pi 的进程，smith 的 pi 农机没有这个口子；`VIBEVALLEY_FOREMAN_RUNTIME=pi` 被拒绝（[管家在 pi 上](2026-10-10-manager-on-pi.md) 那一版随 TypeScript 服务端一起没了）。
 - **pi 的价目表** 是 pi-ai 内置的那份（`tool/pi-prices.ts` 导出），不含 pi 配置里自加的模型。
-- 和 TypeScript 服务端行为不同的几处（语音线路端口被占只记日志、写错的环境变量用默认值、语音令牌真的一小时过期、字数按字符数）列在 [server/README.md](../../../../server/README.md)「取舍」。
+- 和 TypeScript 服务端行为不同的几处（语音线路端口被占只记日志、写错的环境变量用默认值、字数按字符数）列在 [server/README.md](../../../../server/README.md)「取舍」；语音令牌一小时过期见 [voice.md](../../../../docs/voice.md)「服务端」。
 - **smith 的测试数据**：`pkg/smith/testdata` 从 oar 仓库拷来，上游改了要手工同步。
 - 声网请求的对照（`internal/channels/testdata/voice-requests.json`）是 TypeScript 服务端生成过的一份，现在冻结，Go 的 `Voice` 是唯一的来源。
 

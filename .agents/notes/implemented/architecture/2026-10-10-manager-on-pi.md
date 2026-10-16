@@ -12,7 +12,7 @@ Status: implemented
 
 设 `VIBEVALLEY_FOREMAN_RUNTIME=pi` 时，管家是服务端进程里的一个 pi 会话（`@earendil-works/pi-coding-agent` 的 `createAgentSession`，`apps/server/src/foreman-pi.ts`）；默认的管家已经换成 VibeValley 自己的 agent，见 [自己的 agent](2026-10-12-own-agent-on-effect.md)。pi 这一版：
 
-- 用本机 pi 的登录，不要另外的 API key。模型依次取 `VIBEVALLEY_FOREMAN_MODEL`、农具房里 pi 的默认模型（现在是 DeepSeek V4.1 Flash）、本机 pi 的默认模型；思考强度默认 `low`。
+- 用本机 pi 的登录，不要另外的 API key。模型依次取 `VIBEVALLEY_FOREMAN_MODEL`、「农具」页里 pi 的默认模型（现在是 DeepSeek V4.1 Flash）、本机 pi 的默认模型；思考强度默认 `low`。
 - 只带 VibeValley 的提示词和工具（`foreman-tools.ts`，和 VibeValley 自己的 agent 共用；pi 拿它们的 JSON Schema），不加载本机 pi 的扩展、技能、提示模板和 AGENTS.md，也没有读写文件、跑命令的工具。
 - 会话存在 `$VIBEVALLEY_HOME/manager`，启动时接着最近的一个。
 - 每句话前面附上「农场现状」，管家不用先查也知道现场。帮工在田头上自己汇报；没做成的汇报作为一条消息交给管家，它说卡在哪、问下一步（[农场群聊](../feature/2026-10-11-farm-group-chat.md)）。

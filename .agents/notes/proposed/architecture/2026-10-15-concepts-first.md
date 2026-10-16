@@ -20,7 +20,7 @@ VibeValley 是从农场往里长的：先有农场、地、帮工、收获，再
 
 1. **概念和模块（这一步已经做了）**：
    - 写下概念文档；
-   - 服务按概念分成 fx 模块：base、projects、agents、runs、chat、tickets、manager、channels、game；
+   - 服务按概念分成 fx 模块：base、projects、agents（后来改叫 memory）、runs、chat、tickets、manager、channels、game（[服务由 fx 组装](../../implemented/architecture/2026-10-15-services-assembled-by-fx.md)）；
    - 每个项目同时能有几个执行，这个上限挪到了 `Projects`，这样项目不用往上调执行。
 2. **游戏只听事件（这一步已经做了）**：
    - 账本的每一条都从事实里算出来。带话、点名、交接现在是群聊直接记的，改成从群聊发出的消息事实里读出来；读不出来的，就加事实。
@@ -34,7 +34,8 @@ VibeValley 是从农场往里长的：先有农场、地、帮工、收获，再
    - 服务端有工单（代码里叫 `Issue`），从写下到关上始终是同一个 id，带着做什么、项目、档案、优先级、状态；
    - 执行挂在工单下面，重开就是同一张工单的下一次执行；
    - 看板直接读服务端给的状态，不再自己推；
-   - 待办表和轨迹头里的数据迁过去；查询改用 sqlc 生成。
+   - 待办表和轨迹头里的数据迁过去；查询改用 sqlc 生成（[sqlc](../../implemented/architecture/2026-10-15-sqlc-queries.md)）。
+
 ### 收敛以后的模型
 
 VibeValley 是 AI 版的 Linear，穿农场的皮。概念收成下面几样，其余的是它们的属性、动作，或者只是入口和皮：
@@ -58,21 +59,24 @@ VibeValley 是 AI 版的 Linear，穿农场的皮。概念收成下面几样，�
 - 优先级的 `normal` 改叫 `medium`；
 - `Issue.agent` 改叫 `assignee`；
 - `AgentProfile` 改叫 `Agent`，`Helper` 改叫 `Run`，`WorkStep` 改叫 `Activity`（`asked` → `prompt`、`said` → `response`、`tool` → `action`、`problem` → `error`）；
-- `IncomingCall` 改叫 `InboxItem`，`Merges.Harvest` 改叫 `Merge`，`Foreman` 改叫 `Manager`。
+- `IncomingCall` 改叫 `InboxItem`（已经改了，见第 5 步），`Merges.Harvest` 改叫 `Merge`，`Foreman` 改叫 `Manager`。
 
 ### 接下来的步骤
 
 5. **Inbox（这一步已经做了，[要你处理的事是一个 Inbox](../../implemented/architecture/2026-10-15-inbox.md)）**：需要你的事和巡查的发现并成一样，巡查只看它。
-6. **计划并进工单**（6a 已经做了：工单进了核心状态，有标题和说明，[工单进核心状态](../../implemented/architecture/2026-10-15-issues-in-core-state.md)；6b、6c 已经做了：计划是带子工单的父工单，[种植计划是带子工单的父工单](../../implemented/architecture/2026-10-15-plans-are-parent-issues.md)；6d 已经做了：写了帮工档案的定时是周期工单，到点写一张新工单开工）：父工单和子工单、先后关系；`Playbook` 的状态和节点迁过去；定时派活改成周期工单。
+6. **计划并进工单（这一步已经做了）**：父工单和子工单、先后关系；`Playbook` 的状态和节点迁过去；定时派活改成周期工单。
+   - 6a：工单进了核心状态，有标题和说明（[工单进核心状态](../../implemented/architecture/2026-10-15-issues-in-core-state.md)）；
+   - 6b、6c：计划是带子工单的父工单（[种植计划是带子工单的父工单](../../implemented/architecture/2026-10-15-plans-are-parent-issues.md)）；收获过的工单就是仓库（[仓库是收获过的工单](../../implemented/feature/2026-10-16-warehouse-is-harvested-issues.md)）；
+   - 6d：写了帮工档案的定时是周期工单，到点写一张新工单开工。
 7. **管家是一个 agent**：能被派工单；定时「发一句话」改成派给管家的周期工单。
 8. **状态分成两份**：
    - 核心状态只装实际的东西：执行、工单、频道和工单串；Inbox 从它现算，和它一起推给客户端；
    - 金币、成就、等级、地块位置挪进农场的画面，和现在的 `FarmView` 一样，从状态和账本算出来；
    - Flutter 的工作台读核心状态，像素村读画面。
 9. **改名，拆包**：
-   - 照上面的名字改类型、字段和服务，生成的 Dart 跟着改；
-   - 存盘的字段和表名一起改，写迁移；复数表名改成单数，查询搬进 sqlc；
-   - 最后按模块拆成 Go 包，模块之间的依赖方向由编译器检查。
+   - 照上面的名字改类型、字段和服务，生成的 Dart 跟着改（只改了 `IncomingCall` 那一组，见第 5 步；`Helper`、`AgentProfile`、`WorkStep`、`Foreman`、`Merges.Harvest`、工单状态和优先级的值还是旧名字）；
+   - 存盘的字段和表名一起改，写迁移；复数表名改成单数，查询搬进 sqlc（新加的 `issue`、`issue_run` 已经是单数，老表还是复数）；
+   - 按模块拆成 Go 包，模块之间的依赖方向由编译器检查（这一项已经做了，[一个概念一个包](../../implemented/architecture/2026-10-16-a-package-per-concept.md)）。
 
 ## Alternatives considered
 

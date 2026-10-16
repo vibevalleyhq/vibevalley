@@ -13,10 +13,10 @@
 | [README.md](README.md) | 文档地图和用语表 | 文档内容本身 |
 | 教程：[guide.md](guide.md)、[development.md](development.md) | 照着做走到一个结果：使用、开发 | 完整的清单和表（链接到参考）、理由 |
 | [architecture.md](architecture.md) | 按顺序的地图：分层、核心状态、工地事件、接口、存储、环境变量；改 `server/`、`app/` 之前读 | 各包的细节、决策理由 |
-| 各篇参考（[server.md](server.md)、[agents-and-runtimes.md](agents-and-runtimes.md)、[game-ui.md](game-ui.md)、[framework.md](framework.md)、[voice.md](voice.md)） | 一个子系统现在的行为和约定 | 教学步骤（→ 教程）、理由（→ Note）、历史、计划 |
+| 各篇参考（[concepts.md](concepts.md)、[code-style.md](code-style.md)、[server.md](server.md)、[agents-and-runtimes.md](agents-and-runtimes.md)、[game-ui.md](game-ui.md)、[framework.md](framework.md)、[voice.md](voice.md)、[desktop.md](desktop.md)） | 一个子系统现在的行为和约定 | 教学步骤（→ 教程）、理由（→ Note）、历史、计划 |
 | [Agent Notes](../.agents/notes/README.md) | 决策：为什么、放弃了什么、怎么验证；提案 | 现在的行为说明（→ 文档）、上线后的计划和待办 |
-| 包的 README（`server/README.md`、`app/README.md`） | 这个包的对外约定：管什么、导出什么、依赖谁、不变量、测试 | 别的包的事、JSDoc 的复述 |
-| 代码注释 | 这段代码的约定和不显然的约束 | 推理过程、测试流程、远处的行为 |
+| 包的 README（`server/README.md`、`app/README.md`、`site/README.md`） | 这个包的对外约定：管什么、导出什么、依赖谁、不变量、测试 | 别的包的事、代码注释的复述 |
+| 代码注释（[写法](code-style.md#注释)） | 这段代码的约定和不显然的约束 | 推理过程、测试流程、远处的行为、概述和历史 |
 
 `docs/` 里只放文档：教程和参考。设计过程里的东西不放这里：理由 → Note；还没做的大事 → `proposed/` Note；风险和取舍 → 它所属决策的 Note。包的约定 → 包 README；常驻规矩 → 根目录 `AGENTS.md`，附上理由的链接。
 

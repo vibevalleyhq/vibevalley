@@ -8,7 +8,7 @@ TypeScript 服务端的 `crew.ts` 长到 800 多行：开会话、关会话、�
 
 ## Decision
 
-规则拆成四个纯函数模块，不碰会话、文件、时钟和 Effect 的服务（当时是 TypeScript 服务端的四个文件；Go 服务端照搬了这个分法：`crewSessionFacts`（记账是 `crewTracking`，步骤是 `crewOp`）在 `server/internal/runs/facts.go`，读汇报（`crewReadReport`）、上限（`crewNoRoom`）、帮工的说明在 `internal/runs/rules.go`，`crew.go` 只管会话的生命周期）：
+规则拆成四个纯函数模块，不碰会话、文件、时钟和 Effect 的服务（当时是 TypeScript 服务端的四个文件；Go 服务端照搬了这个分法：`crewSessionFacts`（记账是 `crewTracking`，步骤是 `crewOp`）在 `server/internal/runs/facts.go`，读汇报（`crewReadReport`）、上限（`crewNoRoom`）、帮工的说明在 `internal/runs/rules.go`，`runs/crew.go` 只管会话的生命周期；收获、合并后来又从它挪到了 `tickets` 的 `Merges`，见 [概念先行](../../proposed/architecture/2026-10-15-concepts-first.md) 的第 3 步）：
 
 - `session-facts.ts`：`sessionFacts(event, helper, tracking, ctx)`。一个 oar 事件、帮工在核心状态里的样子、这个会话自己的记账（`Tracking`：气泡显示的那次工具调用、会话的 token 累计、模型价格、这一轮开始时花了多少、是不是被标了没动静）进去；要施加的事实、干活过程要记的步骤（`JournalOp`，`steps.ts` 的 `record` 照着记）、新的记账、这次花了多少人民币、要查价的模型、要说的提醒出来。
 - `report.ts`：`readReport(report)`，一份汇报的结局、留下的原话、结论、失败原因、要不要你处理。

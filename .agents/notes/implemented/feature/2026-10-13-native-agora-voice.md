@@ -12,7 +12,7 @@ Status: implemented
 
 Go 用 Agora Agents Go SDK v2.12.0 签发 RTC/RTM 令牌并启停云端管家。随包的 Swift `vibevalley-voice` 子进程使用 macOS RTC 4.7.0 和 RTM 2.3.0：负责麦克风、播放、音量、远端用户和 RTM 消息，通过 stdin/stdout JSON 管道与 Go 通信。App Certificate 仅留在 Go；子进程收到的只有 App ID、短期令牌与频道，不经命令行传递。
 
-`VoiceSignal`、`VoiceTurn` 和 `AgentMood` 的形状放在 protocol，core 继续拥有通话生命周期。桌面桥 `nativeVoice` 选择原生 VoiceLink，普通网页和 Electron 仍用已有 Web 适配器。页面通过同源控制接口与 SSE 接收经过校验的事件，不调用浏览器麦克风 API。
+`VoiceSignal`、`VoiceTurn` 和 `AgentMood` 的形状当时放在 TypeScript 的 protocol，core 继续拥有通话生命周期。桌面桥 `nativeVoice` 选择原生 VoiceLink，普通网页和 Electron 仍用已有 Web 适配器。页面通过同源控制接口与 SSE 接收经过校验的事件，不调用浏览器麦克风 API。（这些形状、core、VoiceLink、网页和 Electron 都已经删了。）
 
 原型桥曾带 `voiceDispatch: false`：转写只参与通话，不送到当时还没移植的编码管家，免得每句话触发未实现的 `/api/dispatch`。Go 服务端有了真的管家以后（[服务端用 Go 重写](../architecture/2026-10-13-go-server-on-smith.md)），MyGo 改回 `voiceDispatch: true`，和 Electron 一样派工。
 
@@ -48,7 +48,7 @@ App ID/Certificate 从农场的设置取得（家目录的 settings.json，否�
 
 原生端先订阅 RTM Message 和 Presence，再加入 RTC；云端管家等待订阅确认。页面复用 Electron 的 Agora toolkit TEXT 解析器和字幕映射，删除 Go 自写的转写合并规则，补上此前遗漏的 Presence 状态通知。
 
-结束静音曾试调到 300 ms，但没有完整端到端证据支持改善。对齐时恢复 Electron 的实际配置。云端管家的请求现在由 Go 服务端按农场的设置拼（`farm.Voice.Native`，和网页语音同一份），几种配置的请求由 TypeScript 的 `voiceAgentFor` 生成过一次，存成 `server/internal/farm/testdata/voice-requests.json`，Go 测试逐字比对；TypeScript 服务端删掉以后这份对照冻结，Go 的 `Voice` 是唯一的来源，避免提示词、历史条数和模型参数漂移。Go 和 Node 的 MiniMax 内部标记名称不同，需要在边界转换；测试比较最终 SDK 请求，避免只比较工厂对象却遗漏托管 preset。
+结束静音曾试调到 300 ms，但没有完整端到端证据支持改善。对齐时恢复 Electron 的实际配置。云端管家的请求现在由 Go 服务端按农场的设置拼（当时是 `farm.Voice.Native`，现在是 `server/internal/channels/voice_agora.go` 的 `Voice.Native`，和当时的网页语音同一份），几种配置的请求由 TypeScript 的 `voiceAgentFor` 生成过一次，存成 `server/internal/channels/testdata/voice-requests.json`，Go 测试逐字比对；TypeScript 服务端删掉以后这份对照冻结，Go 的 `Voice` 是唯一的来源，避免提示词、历史条数和模型参数漂移。Go 和 Node 的 MiniMax 内部标记名称不同，需要在边界转换；测试比较最终 SDK 请求，避免只比较工厂对象却遗漏托管 preset。
 
 内存诊断只记录时间、长度和数值，不含转写或密钥。请求对照与字幕／状态回放用于验证行为对齐；真实音频采集和播放仍由不同 SDK 负责，不能据此宣称延迟相同。
 

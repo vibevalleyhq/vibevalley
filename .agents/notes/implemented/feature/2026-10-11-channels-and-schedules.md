@@ -52,7 +52,7 @@ VibeValley 已经有了 Raft 那一半的大部分（田头、串、@、投递�
   - **下次什么时候不存**，从上次跑的时间算：服务端没开着时错过的，开机后只补一次并说明是补的，循环的从现在往后排，中间错过的几次不一个个补。打开、重启都不用改它。
   - **到点先在频道里说一声**，再派活：主人在频道里看得到每次定时做了什么；写了帮工的不经过管家，不花管家的一轮。
   - **定时是农场的，不是 agent 的**：存在农场的表里，页面能看到、能关；管家只是用工具建它。
-- **巡查代替心跳**：nanobot 式的「隔一阵自己醒来看看」每次都是一轮、要花钱，所以不默认叫醒管家，先做一个不调模型的检查。protocol 的 `patrol.go` 看 Inbox 里放着没人管的（@主人 没人回 15 分钟、帮工没动静 20 分钟、做完没收或有冲突 2 小时、计划里没做成的步骤 30 分钟；[要你处理的事是一个 Inbox](../architecture/2026-10-15-inbox.md)），过了宽限期才报，同一件事 4 小时内只报一次；服务端的 `Heartbeat`（同一个文件）每 10 分钟（`VIBEVALLEY_HEARTBEAT_MINUTES`，0 关）巡一遍，有事才按频道各叫醒管家一次（`【巡查】`）。
+- **巡查代替心跳**：nanobot 式的「隔一阵自己醒来看看」每次都是一轮、要花钱，所以不默认叫醒管家，先做一个不调模型的检查。protocol 的 `patrol.go` 看 Inbox 里放着没人管的（@主人 没人回 15 分钟、帮工没动静 20 分钟、做完没收或有冲突 2 小时、计划里没做成的步骤 30 分钟；[要你处理的事是一个 Inbox](../architecture/2026-10-15-inbox.md)），过了宽限期才报，同一件事 4 小时内只报一次；服务端的 `Heartbeat`（和 `Schedules` 同在 `tickets/schedules.go`）每 10 分钟（`VIBEVALLEY_HEARTBEAT_MINUTES`，0 关）巡一遍，有事才按频道各叫醒管家一次（`【巡查】`）。
 
 ### 对照 Raft（v1.21.2 源码）
 
@@ -97,6 +97,6 @@ VibeValley 已经有了 Raft 那一半的大部分（田头、串、@、投递�
 ## Verification
 
 - 频道：`server/internal/chat/chat_test.go` 的 `TestChatChannels`；protocol 的 `chat_rules_test.go`（`TestAudienceInAChannel`、`TestChannelsInTheChat`、`TestChannelNameProblem`）。
-- 定时和巡查：`server/internal/game/ledger_test.go` 的 `TestPlanSchedules`、`TestPlanHeartbeat`，`tickets/schedules_env_test.go`；protocol 的 `schedule_rules_test.go`、`patrol_rules_test.go`。测试里换掉服务的时钟（`now`），不等真的时间。
+- 定时和巡查：`server/internal/game/ledger_test.go` 的 `TestPlanSchedules`、`TestPlanHeartbeat`，`tickets/schedules_env_test.go`；protocol 的 `schedule_rules_test.go`、`patrol_rules_test.go`。测试里换掉服务的时钟（`Schedules.Now`、`Heartbeat.Now`），不等真的时间。
 - 连接器：`server/internal/channels/connectors_test.go`（配对、只认主人、发件表和补发，`TestConnectorsWeixinInAnotherChannel` 接到别的频道）、`channels/feishu_test.go`。
 - 聊天页：`app/test/chat_test.dart`（频道和未读、频道里说话、串、定时的开关和删）。

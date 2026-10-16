@@ -106,7 +106,7 @@ Raft（[源码](https://github.com/botiverse/raft-source)，对照的是 v1.21.2
   - 一步失败两次后停下，不相干的步骤照做；检查没过的一步被打回一次；跳过以后后面的步骤开工；放弃后分支留着。
   - 有环的计划打回给规划的帮工，重给的成为草稿。
   - 服务端重启后，计划暂停，继续后接着做完。
-- `server/internal/protocol/playbook_rules_test.go` 测纯函数：校验、分层、能开工的步骤、读规划的结果、改计划、`NodeTask`、`Reduce` 只留最近 10 个收完的计划、两版计划之间比出的经过和它的说法。
+- `server/internal/protocol/playbook_rules_test.go` 测纯函数：校验、分层、能开工的步骤、读规划的结果、改计划、`NodeTask`、`Reduce` 按家族只留最近 `KeepClosedIssues` 家关上的工单、两版计划之间比出的经过和它的说法。
 - 菱形的那次跑完以后读经过：计划这一层依次是要拆（主人）、拆好了（农场）、开工（主人）、熟了（农场）、收获（主人）；管家改 d 的检查记成管家、只改了「检查」；每一步都是开工、合进去，合进去带帮工、提交号和结论。坏步那次里，检查没过的退回记下了为什么。
 - 计划里的帮工的地不能用收获工具：`app/test/farm_rules_test.dart`（`aimTool`）。收获整个计划给金币，合进去的步数到「五谷丰登」的档位：`server/internal/protocol/progress_rules_test.go` 的 `TestPlaybookHarvested`。（原来这两条在 `packages/core/test/`，随网页删掉了。）
 

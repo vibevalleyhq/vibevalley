@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-现在用 VibeValley 自己的 agent、pi、claude 和 codex（[pi-only-for-now](../../implemented/simplification/2026-10-10-pi-only-for-now.md)、[claude-and-codex](../../implemented/feature/2026-10-11-claude-and-codex.md)）。opencode、grok、kimi、antigravity、cursor 各有长处，也有各自的订阅额度可以用；代码都还在，但没有一种真正跑通过。
+现在用 VibeValley 自己的 agent、pi、claude 和 codex（[pi-only-for-now](../../implemented/simplification/2026-10-10-pi-only-for-now.md)、[claude-and-codex](../../implemented/feature/2026-10-11-claude-and-codex.md)）。opencode、grok、kimi、antigravity、cursor 各有长处，也有各自的订阅额度可以用；smith 里有前四种的驱动（`server/pkg/smith/runtimes/`），cursor 要单独装的 SDK，smith 没有接，「农具」页里总是「不支持」；没有一种真正跑通过。
 
 ## Proposal
 

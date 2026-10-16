@@ -22,7 +22,7 @@ Status: implemented
   - **手上的活**：放在最上面，因为它是现在的状态，不是一条笔记。
   - **下回开工会想起**：选一个项目、可以填一句话，就能看到开工时会想起哪几条。
   - **记下的**：能按项目筛，每条写着谁记的、想起过几次。离上限不到 10 条时，标出最先会丢的那几条（`nextForgotten`，和服务端记满时删掉的顺序一致：最久没想起的先丢，`memory/memory.go` 的 `Keep`）。
-- **挑法搬进 protocol**（现在是 `server/internal/protocol/recall.go`）：`Pick`、`TermsOf`、上限这些常量都在这里，服务端开工时用它挑。当时页面拿同一个函数做预览，两边挑出来的不会对不上；网页删了以后（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)），Flutter 的预览用的是照搬到 Dart 的一份（`app/lib/desk/shared/recall.dart`），和 Go 的没有对照测试守着。怎么从汇报里读「记住：」、提醒块写成什么样，还是服务端的事（`server/internal/memory/memory.go` 读「记住：」，`runs/rules.go` 的 `crewRecallBlock` 写提醒块）。
+- **挑法搬进 protocol**（现在是 `server/internal/protocol/recall.go`）：`Pick`、`TermsOf`、上限这些常量都在这里，服务端开工时用它挑。当时页面拿同一个函数做预览，两边挑出来的不会对不上；网页删了以后（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)），Flutter 的预览用的是照搬到 Dart 的一份（`app/lib/desk/shared/recall.dart`），由对照测试守着和 Go 的挑得一样（`app/test/recall_parity_test.dart` 逐条比 Go 写的 `app/schema/recall.sample.json`）。怎么从汇报里读「记住：」、提醒块写成什么样，还是服务端的事（`server/internal/memory/memory.go` 读「记住：」，`runs/rules.go` 的 `crewRecallBlock` 写提醒块）。
 - **语音设置还是一份，按归属分两处改**：数据仍是 `settings.json` 里的同一份 `VoiceSettings`。
   - 「声音」页管线路：凭据、区域、识别、语言、断句、大模型、没人时多久离开。
   - 管家页的「声音」页签管电话上的管家：人设、开场白、出错时说的话、音色。
@@ -56,4 +56,4 @@ Status: implemented
 ## Verification
 
 - `server/internal/memory/memory_test.go`：`MEMORY.md` 一行一条、新的在前、管家自己记的和主人交代的分开、按 id 忘掉一行、空话被拒绝、系统提示带得下几条、pi 上标出来、旧账的文件列表和搜索和全文、不读旧账目录外的文件。
-- 挑法：`server/internal/protocol/rules_core_test.go`（`TestPickNotes`、`TestPickJobs`，`TestNextForgotten`：记满时先丢最久没用的）和黄金数据 `testdata/rules.jsonl.gz`；`memory/memory_test.go` 的 `TestMemoriesKeepRecallWriteForget` 测开工时按它想起、记上想起的次数。Flutter 那份 Dart 的在 `app/test/deska_rules_test.dart`。
+- 挑法：`server/internal/protocol/rules_core_test.go`（`TestPickNotes`、`TestPickJobs`，`TestNextForgotten`：记满时先丢最久没用的）和黄金数据 `testdata/rules.jsonl.gz`；`memory/memory_test.go` 的 `TestMemoriesKeepRecallWriteForget` 测开工时按它想起、记上想起的次数。Flutter 那份 Dart 的在 `app/test/deska_rules_test.dart`，和 Go 的对照在 `app/test/recall_parity_test.dart`。

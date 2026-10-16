@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-见 [architecture.md](../../../../docs/architecture.md)「模拟服务器和调试台」：
+见 [development.md](../../../../docs/development.md)「调试台」：
 
 - 页面里跑一个模拟服务器（`web/src/mock/`），按服务端的规则扮演管家和帮工，说同一套工地事件，用同一个 `reduce` 维护一份核心状态；`/api/health` 不答应时自动用它，`?mock` 强制用它。（自动用它这一条已经被[页面只给真实数据](../simplification/2026-10-12-real-data-only.md)取代：现在只有 `?mock` 才用。）
 - 所有等待跑在一个可控的虚拟时钟上（替换了 Effect 的 `Clock`），能暂停、倍速、单步。

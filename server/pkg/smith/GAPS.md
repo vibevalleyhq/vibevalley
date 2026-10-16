@@ -1,6 +1,6 @@
 # Known gaps between smith and the TS package
 
-Every entry names what differs, why, and what it costs a host.
+Every entry names what differs, why, and what it costs a host. TS paths and the `pnpm` commands are oar's: they run in an oar checkout with smith at `smith/`.
 
 ## Not ported
 
@@ -24,7 +24,6 @@ What still differs:
 
 ## CLI
 
-- **Not ported:** cursor, which needs the JS SDK. `cmd/oar` registers the built-ins plus morph, as the TS CLI does.
 - **`--max-running 0` and `--max-depth 0`.** `agents.Options` reads 0 as the default (4 and 1), so an explicit 0 cannot be expressed.
 - **Blind input.** `oar login` hides a pasted code with `stty -echo` on a terminal, where TS mutes readline's echo.
 
@@ -36,7 +35,6 @@ What still differs:
 
 ## ACP runtimes: grok, kimi, opencode, antigravity
 
-- **Dispose of an agent that exits on stdin EOF (pending fix).** `executable.LineProcess.Kill` closes stdin, reads the process table (`ps`), then sends SIGTERM. A Node agent sees the EOF in that gap and exits 0. TS ends stdin first too, but Node flushes the end after the synchronous SIGTERM, so the agent dies of the signal (`exited` code null). `runtimes/antigravity` `TestDisposeEndsTheProcessWithoutUnadvertisedClose/plain` fails until `Kill` closes stdin after `SignalGroup(..., false)` (`internal/executable`, not this task's to edit).
 - **Reset instants.** grok's billing period end and kimi's `resetTime` parse as RFC 3339 (or a date-time without zone, read as UTC). TS takes whatever `new Date()` reads, a zone-less time as local time. A value Go cannot parse leaves the window without `resetsAt`.
 - **Numeric strings.** kimi's quota numbers given as strings parse as decimal floats. JS `Number()` forms such as `0x10` are not numbers here.
 - **Empty menus and lists.** `oar.ModelEntry.EffortLevels` and `oar.ListModelsResult.Models` are `omitempty`: a grok model whose effort menu is `[]`, or a listing with no models, has no key where TS has `[]`.

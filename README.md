@@ -6,7 +6,7 @@
 
 你只和**管家**说话。管家把活派给**帮工**，帮工是你机器上真实的编码 agent（pi、Claude Code、Codex……），在你的项目里开分支、改代码、跑测试、提交。地里的庄稼跟着它们的真实进度长：读代码时发芽，改文件时长叶，做完了结出麦子。你看过**收成清单**，才把它的分支合进主分支。
 
-你、管家和帮工在同一个群聊**田头**里说话：每件活下面挂着一个工单串，帮工在里面确认、提问、汇报，你随时插话。说到底，VibeValley 是一个跑在本机的多 agent 协作工作区，外面包了一层游戏的壳。
+你、管家和帮工在同一个群聊**田头**里说话：每件活下面挂着一个工单串，帮工在里面确认、提问、汇报，你随时插话。说到底，VibeValley 是跑在本机的 AI 版 Linear：工单派给编码 agent，它在项目里一轮一轮干活，你看过改动再合并；农场是穿在外面的皮（[概念](docs/concepts.md)）。
 
 ![农场：田地、管家和右下角的田头](docs/images/farm.png)
 
@@ -93,7 +93,7 @@ cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:
 ### 第一次打开
 
 1. 在首页「设置」里填 DeepSeek 的钥匙。
-2. 在「农具房」里启用本机装好的农机。
+2. 在「农具」页里启用本机装好的农机。
 3. 把项目放进工作目录（默认 `~/vibevalley-work`，`VIBEVALLEY_WORK_ROOT`），一个文件夹一个项目。没有也行，管家会帮你建。
 4. 在田头对管家说要做什么。
 
@@ -115,33 +115,12 @@ docs/              文档：现在怎么用、怎么开发、各部分怎么工�
 .agents/notes/     Agent Notes：每个设计决策为什么这样做、放弃了什么
 ```
 
-## 开发
+## 开发和文档
 
-```bash
-cd server && go vet ./... && go test ./...   # 服务端：测试用假扮的帮工和真的 git 仓库，不连网、不花钱
-cd server && go run ./tool/shapegen          # 改了 protocol/shapes.go 或 api.go：重新生成 Go 和 Flutter 的代码
-bun run flutter:check                        # 生成的代码是否最新、flutter analyze、flutter test
-bun run docs:verify                          # 文档里的链接、Agent Notes 的格式和目录
-```
-
-- [docs/development.md](docs/development.md)：怎么跑起来、检查和测试、改形状和规则、打包。
-- [AGENTS.md](AGENTS.md)：代码的规矩（编码 agent 和人都照它来）。
-- [.agents/notes/](.agents/notes/README.md)：设计决策。改动大的行为之前先读相关的那篇，做了新的决定也写一篇。
-
-这个项目大部分是和编码 agent 一起写的，文档也按「给 agent 读」的标准来写：一个事实只放一处，文档只写现状，理由写进 Note。
-
-## 文档
-
-| 文档 | 讲什么 |
-|---|---|
-| [使用指南](docs/guide.md) | 派活、看着它干、收获、冲突和失败、花费、语音 |
-| [架构](docs/architecture.md) | 分层、核心状态和事实、事件流、HTTP 接口、存储、环境变量 |
-| [服务端](docs/server.md) | 管家、帮工、田头、项目和收获、种植计划、定时、额度、院门、搬家 |
-| [帮工和农机](docs/agents-and-runtimes.md) | 帮工档案、农机、技能、派给谁 |
-| [农场界面](docs/game-ui.md) | 角色、庄稼、工具、每个界面、成就 |
-| [语音](docs/voice.md) | 和管家说话（Agora ConvoAI） |
-| [macOS 应用](docs/desktop.md) | 内置服务端、菜单栏、通知、快捷键、渠道 |
-| [全部文档和用语表](docs/README.md) | 农场里的叫法和代码里的名字怎么对应 |
+- [docs/development.md](docs/development.md)：跑起来、检查和测试、打包。
+- [AGENTS.md](AGENTS.md)：代码的规矩和常用命令（编码 agent 和人都照它来）。
+- [docs/](docs/README.md)：各部分现在怎么工作，和农场叫法的用语表。
+- [.agents/notes/](.agents/notes/README.md)：设计决策。改大的行为之前先读相关的那篇。
 
 ## 致谢
 
@@ -156,7 +135,7 @@ bun run docs:verify                          # 文档里的链接、Agent Notes 
 
 ## 许可证
 
-[Apache License 2.0](LICENSE)。用到的别的项目和它们的许可证见 [NOTICE](NOTICE)：`server/pkg/smith` 移植自 oar（Apache-2.0，[它的许可证](server/pkg/smith/LICENSE)），语音的服务端改写自 Agora 的示例（MIT），微信和 QQ 的连接器照腾讯的客户端写（MIT），图标照 Hugeicons 和 LobeHub Icons 重画（MIT），像素字体是 Fusion Pixel Font（OFL）。
+[Apache License 2.0](LICENSE)。用到的别的项目和它们的许可证见 [NOTICE](NOTICE)。
 
 Claude、Codex、Cursor、DeepSeek、Agora、微信、飞书、QQ 等名字和 logo 归各自的所有者。VibeValley 用它们只为说明连的是哪一个，和它们没有隶属或背书关系。
 

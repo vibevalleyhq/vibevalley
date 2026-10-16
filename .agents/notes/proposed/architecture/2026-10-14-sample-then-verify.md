@@ -45,13 +45,13 @@ Status: proposed
 
 ### 1. 验收先行（已做，2026-10-14）
 
-种植计划的一步可以是**验收步骤**（`PlaybookNode.acceptance`）。现在的行为见 [server.md](../../../../docs/server.md)「种植计划」的「验收」。要点和理由：
+种植计划的一步可以是**验收步骤**（计划的步骤现在是子工单，标在 `IssueStep.acceptance`；规则读的 `PlaybookNode` 由它拼出来，[种植计划是带子工单的父工单](../../implemented/architecture/2026-10-15-plans-are-parent-issues.md)）。现在的行为见 [server.md](../../../../docs/server.md)「种植计划」的「验收」。要点和理由：
 
-- **规划时写，排在最前面**：规划的帮工（`PlanningTask`）在修 bug、或要做的事能用测试说清楚的时候，把第一步拆成验收，别的步骤都等它。它只写现在会失败的测试，检查命令只跑这些测试。这是想法 2：验收和修复由不同的帮工、在不同的时候写。
+- **规划时写，排在最前面**：规划的帮工（`runs/rules.go` 的 `PlanningTask`）在修 bug、或要做的事能用测试说清楚的时候，把第一步拆成验收，别的步骤都等它。它只写现在会失败的测试，检查命令只跑这些测试。这是想法 2：验收和修复由不同的帮工、在不同的时候写。
 - **农场判红**：验收步骤做完，检查要**不通过**才合；通过了就退回去，说它没抓住问题。这是想法 4。
 - **合进去就冻结**：农场记下验收步骤改了哪些文件（`frozen`，从计划分支分出来以后改的，提交没提交的、新加的都算），后面的步骤改了这些文件就退回去，让它恢复原样、从代码上修。选择退回而不是悄悄恢复：悄悄恢复会掩盖帮工的意图，帮工也学不到「验收不能动」。
 - **最后一步判绿**：没有步骤等着的步骤做完，要跑它前面每个验收的检查。中间的步骤不跑：长活里前半段（比如只改了数据层）本来就过不了验收。
-- **判断由农场做，规则是纯函数**：`IsAcceptance`、`AcceptancesOf`、`AcceptanceChecks`、`FrozenTouched` 是 Go 的 protocol 包里的纯函数，黄金数据覆盖它们；服务端的 `Playbooks.verified` 只负责跑命令和退回。验收的状态（`acceptance`、`frozen`）在核心状态里，计划板上能看到。
+- **判断由农场做，规则是纯函数**：`IsAcceptance`、`AcceptancesOf`、`AcceptanceChecks`、`FrozenTouched` 是 Go 的 protocol 包里的纯函数，黄金数据覆盖它们；服务端 `tickets` 包的 `Playbooks.verified` 只负责跑命令和退回。验收的状态（`acceptance`、`frozen`）在核心状态里，计划板上能看到。
 
 ### 2. 故障回流成样本，重新采样（待做）
 

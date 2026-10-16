@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-见 [framework.md](../../../../docs/framework.md)「昼夜」：
+见 [framework.md](../../../../docs/framework.md)「像素村」的「光」：
 
 - 背景画三遍：白天、黄昏、夜里。用 codex 以白天的背景为参考只改光线，物件位置的偏差在 1 像素内，所以可以叠着按时钟淡入淡出（`DayBackdrop`）。
 - 贴图的光是一个 SVG 颜色矩阵，作为 `filter` 加在贴图自己的 `<img>` 上（`DayLit`）：只染贴图本身，不会把已经画好的夜景再压暗一遍。气泡和牌子（`Pinned`）不染，保持好认；`Lamps` 是天黑后窗户和门灯的暖光。

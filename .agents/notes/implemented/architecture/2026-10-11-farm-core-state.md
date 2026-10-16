@@ -12,7 +12,7 @@ Status: implemented
 
 - 帮工的生命周期是一个阶段 `phase`：`arriving`、`working`（带在做什么、没动静、重试）、`ripe`、`failed`、`resting`；离开就从状态里删掉。冲突是帮工分支的属性，以最近一次 git 检查为准，不属于阶段。
 - 「在做什么」「要你做什么」「管家怎么描述它」「能不能收」都是从阶段推出来的纯函数（`DoingOf`、`NeedOf`、`PhaseText`、`CanHarvest`；客户端的面板用它们在 `app/lib/rules/farm.dart` 里的 Dart 移植），地块、面板、管家读同一套。
-- 服务端只在 `Site.Apply` 改状态，存进 `farm.json`（田头、进度和定时除外，它们的家是数据库 `farm.db`）；只有服务端需要的（会话、worktree 目录、原话）在 `crew.json`；大块的旁路数据（干活过程、diff）不进核心状态。
+- 服务端只在 `Site.Apply` 改状态，存进 `farm.json`（田头、进度、定时和工单除外，它们的家是数据库 `farm.db`）；只有服务端需要的（会话、worktree 目录、原话）在 `crew.json`；大块的旁路数据（干活过程、diff）不进核心状态。
 - 客户端在核心状态之上叠一层只属于游戏、跟着时钟走的状态（帮工走到哪、一闪而过的效果）；地块位置和历史后来也进了核心状态（`Helper.play`，由 `Reduce` 折，[客户端迁到 Flutter](2026-10-13-flutter-client-over-ts-server.md)）。金币和成就也是核心状态：服务端的账本折出来（[achievements](../feature/2026-10-11-achievements.md)）。
 
 ## Alternatives considered

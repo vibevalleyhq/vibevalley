@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> 打包已被取代：Electron 客户端随 [一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md) 删掉了。三个渠道、三个应用、渠道在构建时定死这几条照旧，现在在 Flutter 的 macOS 应用里：`app/tool/build-macos.sh --channel alpha|beta|release`、`lib/desktop/channel.dart`，bundle id 是 `dev.vibevalley.app`、`.beta`、`.alpha`，家目录是 `~/Library/Application Support/vibevalley`（`vibevalley Beta`、`vibevalley Alpha`）。端口不再按渠道分：每个应用在一个空闲的回环端口起自己的服务端。版本号不再按提交数编。下面 Electron 的细节（`app.setName`、`scripts/build.ts`、`pnpm package:*`、`apps/desktop/release/`）是当时的做法。
+> 打包已被取代：Electron 客户端随 [一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md) 删掉了。三个渠道、三个应用、渠道在构建时定死这几条照旧，现在在 Flutter 的 macOS 应用里：`app/tool/build-macos.sh --channel alpha|beta|release`、`lib/desktop/channel.dart`，bundle id 是 `dev.vibevalley.app`、`.beta`、`.alpha`，家目录是 `~/Library/Application Support/vibevalley`（`vibevalley Beta`、`vibevalley Alpha`）。端口不再按渠道分：每个应用在一个空闲的回环端口起自己的服务端。版本号不再按提交数编。下面 Electron 的细节（`app.setName`、`scripts/build.ts`、`src/channel.ts`、`pnpm package:*`、`apps/desktop/release/`、`apps/desktop/test/channel.test.ts`）是当时的做法，都随 Electron 删了。
 
 ## Problem
 

@@ -30,8 +30,8 @@ Status: implemented
 
 - 页面包小了一截（手绘贴图约 14M，指针 0.3M，字体）；`design/assets/` 从约 230M 变成约 30M。
 - 以后加画面上的东西只想一套。
-- `@heybro/engine/react` 里只有手绘画面用过的部件（`Stage` 的缩放、`Pinned`、`HitArea`、`DayBackdrop`、`DayLit`、`useWalker` 等）现在没人用了，还没删。
-- `index.css` 的基础样式里还有手绘皮肤时代的值（圆角、软阴影），都被像素皮肤的规则盖住。
+- `@heybro/engine/react` 里只有手绘画面用过的部件（`Stage` 的缩放、`Pinned`、`HitArea`、`DayBackdrop`、`DayLit`、`useWalker` 等）当时没人用了，还没删；后来随 `packages/engine` 一起删了（[网页退役](2026-10-14-retire-the-web-page.md)）。
+- `index.css` 的基础样式里当时还有手绘皮肤时代的值（圆角、软阴影），都被像素皮肤的规则盖住（网页删了以后也就没有了）。
 
 ## Verification
 

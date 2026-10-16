@@ -14,7 +14,7 @@ Status: implemented
 
 ## Decision
 
-全部删掉（2026-10-15），连同 `experiments/` 空目录、`vite.config.ts` 里忽略它们的条目和文档里的链接。需要时从 git 历史里找。
+全部删掉（2026-10-15），连同 `experiments/` 空目录、当时 `vite.config.ts` 里忽略它们的条目和文档里的链接。需要时从 git 历史里找。
 
 ## Alternatives considered
 
