@@ -29,7 +29,7 @@ func (q *Queries) AgentWakesSinceUser(ctx context.Context, conversation int64) (
 }
 
 const dropOpen = `-- name: DropOpen :exec
-update delivery set state = 'dropped', dropped_why = ?, session = null
+update delivery set state = 'dropped', dropped_why = ?, launch = null
 where recipient_id = ? and state in ('pending', 'announced', 'handed')
 `
 
@@ -85,12 +85,12 @@ func (q *Queries) LastAgentWake(ctx context.Context, recipientID string) (int64,
 }
 
 const markAnnounced = `-- name: MarkAnnounced :exec
-update delivery set state = 'announced', session = ?, announced_at = ?
+update delivery set state = 'announced', launch = ?, announced_at = ?
 where recipient_id = ? and message_seq = ? and state in ('pending', 'announced')
 `
 
 type MarkAnnouncedParams struct {
-	Session     sql.NullString
+	Launch      sql.NullString
 	AnnouncedAt sql.NullInt64
 	RecipientID string
 	MessageSeq  int64
@@ -98,7 +98,7 @@ type MarkAnnouncedParams struct {
 
 func (q *Queries) MarkAnnounced(ctx context.Context, arg MarkAnnouncedParams) error {
 	_, err := q.db.ExecContext(ctx, markAnnounced,
-		arg.Session,
+		arg.Launch,
 		arg.AnnouncedAt,
 		arg.RecipientID,
 		arg.MessageSeq,
@@ -107,12 +107,12 @@ func (q *Queries) MarkAnnounced(ctx context.Context, arg MarkAnnouncedParams) er
 }
 
 const markHanded = `-- name: MarkHanded :exec
-update delivery set state = 'handed', session = ?, handed_at = ?
+update delivery set state = 'handed', launch = ?, handed_at = ?
 where recipient_id = ? and message_seq = ? and state in ('pending', 'announced')
 `
 
 type MarkHandedParams struct {
-	Session     sql.NullString
+	Launch      sql.NullString
 	HandedAt    sql.NullInt64
 	RecipientID string
 	MessageSeq  int64
@@ -120,7 +120,7 @@ type MarkHandedParams struct {
 
 func (q *Queries) MarkHanded(ctx context.Context, arg MarkHandedParams) error {
 	_, err := q.db.ExecContext(ctx, markHanded,
-		arg.Session,
+		arg.Launch,
 		arg.HandedAt,
 		arg.RecipientID,
 		arg.MessageSeq,
@@ -129,7 +129,7 @@ func (q *Queries) MarkHanded(ctx context.Context, arg MarkHandedParams) error {
 }
 
 const openDeliveries = `-- name: OpenDeliveries :many
-select d.message_seq, d.reason, d.wakes, d.held_by, d.state, d.session, m.conversation_id, m.sender_id, m.kind, m.body, m.created_at,
+select d.message_seq, d.reason, d.wakes, d.held_by, d.state, d.launch, m.conversation_id, m.sender_id, m.kind, m.body, m.created_at,
        p.name, p.kind as sender_kind, c.kind as conversation_kind, c.parent_seq, c.subject_kind, c.subject_id,
        cast(coalesce(ch.name, c.name, '') as text) as channel_name
 from delivery d
@@ -147,7 +147,7 @@ type OpenDeliveriesRow struct {
 	Wakes            bool
 	HeldBy           sql.NullString
 	State            string
-	Session          sql.NullString
+	Launch           sql.NullString
 	ConversationID   int64
 	SenderID         string
 	Kind             string
@@ -177,7 +177,7 @@ func (q *Queries) OpenDeliveries(ctx context.Context, recipientID string) ([]Ope
 			&i.Wakes,
 			&i.HeldBy,
 			&i.State,
-			&i.Session,
+			&i.Launch,
 			&i.ConversationID,
 			&i.SenderID,
 			&i.Kind,
@@ -205,7 +205,7 @@ func (q *Queries) OpenDeliveries(ctx context.Context, recipientID string) ([]Ope
 }
 
 const rollbackAll = `-- name: RollbackAll :exec
-update delivery set state = 'pending', session = null where state in ('announced', 'handed')
+update delivery set state = 'pending', launch = null where state in ('announced', 'handed')
 `
 
 func (q *Queries) RollbackAll(ctx context.Context) error {
@@ -214,21 +214,21 @@ func (q *Queries) RollbackAll(ctx context.Context) error {
 }
 
 const rollbackAnnounced = `-- name: RollbackAnnounced :exec
-update delivery set state = 'pending', session = null where recipient_id = ? and state = 'announced' and session = ?
+update delivery set state = 'pending', launch = null where recipient_id = ? and state = 'announced' and launch = ?
 `
 
 type RollbackAnnouncedParams struct {
 	RecipientID string
-	Session     sql.NullString
+	Launch      sql.NullString
 }
 
 func (q *Queries) RollbackAnnounced(ctx context.Context, arg RollbackAnnouncedParams) error {
-	_, err := q.db.ExecContext(ctx, rollbackAnnounced, arg.RecipientID, arg.Session)
+	_, err := q.db.ExecContext(ctx, rollbackAnnounced, arg.RecipientID, arg.Launch)
 	return err
 }
 
 const rollbackHanded = `-- name: RollbackHanded :execrows
-update delivery set state = 'pending', session = null where recipient_id = ? and state = 'handed'
+update delivery set state = 'pending', launch = null where recipient_id = ? and state = 'handed'
 `
 
 func (q *Queries) RollbackHanded(ctx context.Context, recipientID string) (int64, error) {
@@ -241,18 +241,18 @@ func (q *Queries) RollbackHanded(ctx context.Context, recipientID string) (int64
 
 const seenHanded = `-- name: SeenHanded :many
 update delivery set state = 'seen', seen_at = ?
-where recipient_id = ? and state = 'handed' and session = ?
+where recipient_id = ? and state = 'handed' and launch = ?
 returning message_seq
 `
 
 type SeenHandedParams struct {
 	SeenAt      sql.NullInt64
 	RecipientID string
-	Session     sql.NullString
+	Launch      sql.NullString
 }
 
 func (q *Queries) SeenHanded(ctx context.Context, arg SeenHandedParams) ([]int64, error) {
-	rows, err := q.db.QueryContext(ctx, seenHanded, arg.SeenAt, arg.RecipientID, arg.Session)
+	rows, err := q.db.QueryContext(ctx, seenHanded, arg.SeenAt, arg.RecipientID, arg.Launch)
 	if err != nil {
 		return nil, err
 	}

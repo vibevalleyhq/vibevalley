@@ -25,14 +25,14 @@ type shownCall struct{ ID, Tool string }
 type tracking struct {
 	ShownCall *shownCall
 	// The next report is counted from it.
-	SessionTokens *oar.TokenTotals
-	Price         *runtime.Price
-	RunFrom       *protocol.Spent
+	OarTokens *oar.TokenTotals
+	Price     *runtime.Price
+	RunFrom   *protocol.Spent
 	// The next word from it ends the quiet spell.
 	Quiet bool
 }
 
-type sessionContext struct {
+type factContext struct {
 	ID        string
 	Runtime   string
 	Cwd       string
@@ -146,7 +146,7 @@ func toolOutput(content []oar.ToolOutputPart) string {
 	return strings.Join(parts, "\n")
 }
 
-func sessionFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx sessionContext) reaction {
+func eventFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx factContext) reaction {
 	id := ctx.ID
 	var facts []protocol.FactValue
 	var journal []op
@@ -270,13 +270,13 @@ func sessionFacts(event oar.Event, worker *protocol.Worker, tracking tracking, c
 			break
 		}
 		last := oar.TokenTotals{}
-		if tracking.SessionTokens != nil {
-			last = *tracking.SessionTokens
+		if tracking.OarTokens != nil {
+			last = *tracking.OarTokens
 		}
 		cacheRead, cacheWrite := max(0, or(tokens.CacheRead)-or(last.CacheRead)), max(0, or(tokens.CacheWrite)-or(last.CacheWrite))
 		delta := oar.TokenTotals{Input: max(0, tokens.Input-last.Input), Output: max(0, tokens.Output-last.Output), CacheRead: &cacheRead, CacheWrite: &cacheWrite}
 		copied := *tokens
-		next.SessionTokens = &copied
+		next.OarTokens = &copied
 		if worker == nil {
 			break
 		}

@@ -64,7 +64,7 @@ type Delivery struct {
 	Wakes       bool
 	HeldBy      sql.NullString
 	State       string
-	Session     sql.NullString
+	Launch      sql.NullString
 	AnnouncedAt sql.NullInt64
 	HandedAt    sql.NullInt64
 	SeenAt      sql.NullInt64

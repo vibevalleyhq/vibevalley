@@ -33,7 +33,7 @@ const (
 
 type chatWorkers interface {
 	Deliver(id, text string, by protocol.RunTrigger) worker.Delivered
-	Activity() *base.Hub[worker.SessionActivity]
+	Activity() *base.Hub[worker.LaunchActivity]
 	Find(id string) *worker.Roster
 }
 

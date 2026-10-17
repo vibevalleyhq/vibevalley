@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"vibevalley/internal/testkit"
+	"vibevalley/migrations"
 )
 
 func TestDBMadeOnceAndOpenedAgain(t *testing.T) {
@@ -16,7 +17,7 @@ func TestDBMadeOnceAndOpenedAgain(t *testing.T) {
 	}
 	var version int
 	db.QueryRow("pragma user_version").Scan(&version)
-	testkit.Eq(t, version, 1, "the schema")
+	testkit.Eq(t, version, len(migrations.Names()), "every migration ran")
 	if _, err := db.Exec("insert into issue (id, description, created_at) values ('t1', '', 1)"); err != nil {
 		t.Fatal(err)
 	}

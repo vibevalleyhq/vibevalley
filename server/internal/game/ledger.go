@@ -174,4 +174,3 @@ func (l *ledger) ChooseTitle(achievement *string, tier *int64) {
 	}
 	l.Record(entry)
 }
-

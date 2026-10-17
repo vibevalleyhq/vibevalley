@@ -331,7 +331,7 @@ func (c *Service) kicked(recipient string) error {
 	}
 	now := clock.NowMs()
 	for _, r := range waking {
-		if err := s.markHanded(recipient, r.Seq, delivered.Session, now); err != nil {
+		if err := s.markHanded(recipient, r.Seq, delivered.Launch, now); err != nil {
 			return err
 		}
 	}
@@ -366,7 +366,7 @@ func (c *Service) notify(recipient string) {
 	}
 	now := clock.NowMs()
 	for _, r := range rows {
-		if err := s.markAnnounced(recipient, r.Seq, delivered.Session, now); err != nil {
+		if err := s.markAnnounced(recipient, r.Seq, delivered.Launch, now); err != nil {
 			log.Printf("chat: notice for %s: %v", recipient, err)
 			return
 		}
@@ -396,7 +396,7 @@ func (c *Service) inboxRows(who string) ([]chatUnreadRow, error) {
 	return out, nil
 }
 
-func (c *Service) onActivity(a worker.SessionActivity) {
+func (c *Service) onActivity(a worker.LaunchActivity) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {
@@ -406,7 +406,7 @@ func (c *Service) onActivity(a worker.SessionActivity) {
 	switch a.Kind {
 	case "spoke":
 		delete(c.failures, a.ID)
-		seen, err := s.seenHanded(a.ID, a.Session, clock.NowMs())
+		seen, err := s.seenHanded(a.ID, a.Launch, clock.NowMs())
 		if err != nil {
 			log.Printf("chat: %s spoke: %v", a.ID, err)
 			return
@@ -452,7 +452,7 @@ func (c *Service) onActivity(a worker.SessionActivity) {
 		if _, err := s.rollbackHanded(a.ID); err != nil {
 			log.Printf("chat: %s closed: %v", a.ID, err)
 		}
-		if err := s.rollbackAnnounced(a.ID, a.Session); err != nil {
+		if err := s.rollbackAnnounced(a.ID, a.Launch); err != nil {
 			log.Printf("chat: %s closed: %v", a.ID, err)
 		}
 	case "compacting":

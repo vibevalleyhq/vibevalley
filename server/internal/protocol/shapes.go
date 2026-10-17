@@ -1945,7 +1945,6 @@ type ChatReadRequest struct {
 	Seq int64 `json:"seq"`
 }
 
-
 type ChooseTitleRequest struct {
 	Achievement *string `json:"achievement,omitzero"`
 	Tier        *int64  `json:"tier,omitzero"`

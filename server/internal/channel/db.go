@@ -99,7 +99,7 @@ type chatDeliveryRow struct {
 	Wakes            bool
 	HeldBy           *string
 	State            string
-	Session          *string
+	Launch           *string
 	Conversation     int64
 	Sender           string
 	Kind             string
@@ -393,7 +393,7 @@ func (s chatStore) openDeliveries(recipient string) ([]chatDeliveryRow, error) {
 	}
 	out := make([]chatDeliveryRow, len(list))
 	for i, d := range list {
-		out[i] = chatDeliveryRow{Seq: d.MessageSeq, Reason: d.Reason, Wakes: d.Wakes, HeldBy: textOf(d.HeldBy), State: d.State, Session: textOf(d.Session),
+		out[i] = chatDeliveryRow{Seq: d.MessageSeq, Reason: d.Reason, Wakes: d.Wakes, HeldBy: textOf(d.HeldBy), State: d.State, Launch: textOf(d.Launch),
 			Conversation: d.ConversationID, Sender: d.SenderID, Kind: d.Kind, Body: d.Body, CreatedAt: d.CreatedAt, Name: d.Name, SenderKind: d.SenderKind,
 			ConversationKind: d.ConversationKind, ParentSeq: numberOf(d.ParentSeq), SubjectKind: textOf(d.SubjectKind), SubjectID: textOf(d.SubjectID),
 			ChannelName: channelName(d.ChannelName)}
@@ -401,16 +401,16 @@ func (s chatStore) openDeliveries(recipient string) ([]chatDeliveryRow, error) {
 	return out, nil
 }
 
-func (s chatStore) markAnnounced(recipient string, seq int64, session string, when int64) error {
-	return s.q.MarkAnnounced(bg, generated.MarkAnnouncedParams{Session: nullText(&session), AnnouncedAt: at(when), RecipientID: recipient, MessageSeq: seq})
+func (s chatStore) markAnnounced(recipient string, seq int64, launch string, when int64) error {
+	return s.q.MarkAnnounced(bg, generated.MarkAnnouncedParams{Launch: nullText(&launch), AnnouncedAt: at(when), RecipientID: recipient, MessageSeq: seq})
 }
 
-func (s chatStore) markHanded(recipient string, seq int64, session string, when int64) error {
-	return s.q.MarkHanded(bg, generated.MarkHandedParams{Session: nullText(&session), HandedAt: at(when), RecipientID: recipient, MessageSeq: seq})
+func (s chatStore) markHanded(recipient string, seq int64, launch string, when int64) error {
+	return s.q.MarkHanded(bg, generated.MarkHandedParams{Launch: nullText(&launch), HandedAt: at(when), RecipientID: recipient, MessageSeq: seq})
 }
 
-func (s chatStore) seenHanded(recipient, session string, when int64) ([]int64, error) {
-	return s.q.SeenHanded(bg, generated.SeenHandedParams{SeenAt: at(when), RecipientID: recipient, Session: nullText(&session)})
+func (s chatStore) seenHanded(recipient, launch string, when int64) ([]int64, error) {
+	return s.q.SeenHanded(bg, generated.SeenHandedParams{SeenAt: at(when), RecipientID: recipient, Launch: nullText(&launch)})
 }
 
 func (s chatStore) rollbackHanded(recipient string) (int64, error) {
@@ -419,8 +419,8 @@ func (s chatStore) rollbackHanded(recipient string) (int64, error) {
 
 func (s chatStore) rollbackAll() error { return s.q.RollbackAll(bg) }
 
-func (s chatStore) rollbackAnnounced(recipient, session string) error {
-	return s.q.RollbackAnnounced(bg, generated.RollbackAnnouncedParams{RecipientID: recipient, Session: nullText(&session)})
+func (s chatStore) rollbackAnnounced(recipient, launch string) error {
+	return s.q.RollbackAnnounced(bg, generated.RollbackAnnouncedParams{RecipientID: recipient, Launch: nullText(&launch)})
 }
 
 func (s chatStore) seenUpTo(recipient string, conversation, upto, when int64) error {

@@ -15,7 +15,7 @@ func ev(body oar.EventBody) oar.Event {
 	return oar.Event{Envelope: oar.Envelope{SessionID: "s", AgentPath: []string{}}, Body: body}
 }
 
-var ctx = sessionContext{ID: "w1", Runtime: "pi", Cwd: "/work/clock-in", CnyPerUsd: 7}
+var ctx = factContext{ID: "w1", Runtime: "pi", Cwd: "/work/clock-in", CnyPerUsd: 7}
 
 func workerBase() protocol.Worker {
 	project := "clock-in"
@@ -36,7 +36,7 @@ func i(v int64) *int64     { return &v }
 func TestWorkersRunStartsWithTheJobAndCountsFromWhatWasSpent(t *testing.T) {
 	h := workerBase()
 	h.Spent = &protocol.Spent{Tokens: 50, CNY: f(0.1)}
-	r := sessionFacts(ev(oar.TurnStarted{RequestID: "r", Input: "你是老周" + JobBreak + "加一个查询接口"}), &h, tracking{}, ctx)
+	r := eventFacts(ev(oar.TurnStarted{RequestID: "r", Input: "你是老周" + JobBreak + "加一个查询接口"}), &h, tracking{}, ctx)
 	testkit.Eq(t, r.Facts, []protocol.FactValue{protocol.FactRun{ID: "w1"}}, "facts")
 	testkit.Eq(t, r.Journal, []op{{Type: "prompt", Text: "加一个查询接口"}}, "journal")
 	testkit.Eq(t, *r.Tracking.RunFrom, protocol.Spent{Tokens: 50, CNY: f(0.1)}, "turnFrom")
@@ -45,22 +45,22 @@ func TestWorkersRunStartsWithTheJobAndCountsFromWhatWasSpent(t *testing.T) {
 func TestWorkersRunRemindedOfMemories(t *testing.T) {
 	block := RecallHead + "你以前记下的……\n- （这个项目）测试用 pnpm test"
 	h := workerBase()
-	r := sessionFacts(ev(oar.TurnStarted{RequestID: "r", Input: "你是老周" + JobBreak + withRecall(block, "加一个查询接口")}), &h, tracking{}, ctx)
+	r := eventFacts(ev(oar.TurnStarted{RequestID: "r", Input: "你是老周" + JobBreak + withRecall(block, "加一个查询接口")}), &h, tracking{}, ctx)
 	testkit.Eq(t, r.Journal, []op{{Type: "prompt", Text: "加一个查询接口"}, {Type: "note", Kind: protocol.ActivityKindRecalled, Text: "- （这个项目）测试用 pnpm test"}}, "journal")
 }
 
 func TestWorkersCommandShowsFromItsFolder(t *testing.T) {
 	input := `{"command":"cd /work/clock-in && pnpm test"}`
-	started := sessionFacts(ev(oar.ToolCallStarted{CallID: "c1", Tool: "bash", Input: &input}), working(thinking), tracking{}, ctx)
+	started := eventFacts(ev(oar.ToolCallStarted{CallID: "c1", Tool: "bash", Input: &input}), working(thinking), tracking{}, ctx)
 	testkit.Eq(t, started.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.WorkerActionRunCommand, Label: "pnpm test"}}, "started")
 	testkit.Eq(t, started.Journal[0].Type, "toolStarted", "op")
 	testkit.Eq(t, *started.Tracking.ShownCall, shownCall{ID: "c1", Tool: "bash"}, "shown")
 
 	again := `{"command":"pnpm test"}`
-	same := sessionFacts(ev(oar.ToolCallStarted{CallID: "c2", Tool: "bash", Input: &again}), working(protocol.Doing{Action: protocol.WorkerActionRunCommand, Label: "pnpm test"}), tracking{}, ctx)
+	same := eventFacts(ev(oar.ToolCallStarted{CallID: "c2", Tool: "bash", Input: &again}), working(protocol.Doing{Action: protocol.WorkerActionRunCommand, Label: "pnpm test"}), tracking{}, ctx)
 	testkit.Eq(t, len(same.Facts), 0, "again")
 
-	failed := sessionFacts(ev(oar.ToolCallEnded{CallID: "c1", ExitCode: oar.IntOf(1), Content: []oar.ToolOutputPart{{Type: "text", Text: "1 failing"}}}),
+	failed := eventFacts(ev(oar.ToolCallEnded{CallID: "c1", ExitCode: oar.IntOf(1), Content: []oar.ToolOutputPart{{Type: "text", Text: "1 failing"}}}),
 		working(protocol.Doing{Action: protocol.WorkerActionRunCommand, Label: "pnpm test"}), started.Tracking, ctx)
 	testkit.Eq(t, failed.Journal, []op{{Type: "toolEnded", CallID: "c1", Output: "1 failing", Ok: false}}, "ended")
 	testkit.Eq(t, failed.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.WorkerActionThinking, Label: ""}}, "back to thinking")
@@ -69,25 +69,25 @@ func TestWorkersCommandShowsFromItsFolder(t *testing.T) {
 func TestWorkersFullInputNamesTheTargetBetter(t *testing.T) {
 	tracking := tracking{ShownCall: &shownCall{ID: "c1", Tool: "read"}}
 	input := `{"path":"/work/clock-in/src/http.ts"}`
-	r := sessionFacts(ev(oar.ToolCallInput{CallID: "c1", Input: input}), working(protocol.Doing{Action: protocol.WorkerActionReadFile, Label: "read"}), tracking, ctx)
+	r := eventFacts(ev(oar.ToolCallInput{CallID: "c1", Input: input}), working(protocol.Doing{Action: protocol.WorkerActionReadFile, Label: "read"}), tracking, ctx)
 	testkit.Eq(t, r.Journal, []op{{Type: "toolInput", CallID: "c1", Input: input, Text: "src/http.ts"}}, "journal")
 	testkit.Eq(t, r.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.WorkerActionReadFile, Label: "src/http.ts"}}, "facts")
 }
 
 func TestWorkersReasoningIsAStepWhenShown(t *testing.T) {
-	r := sessionFacts(ev(oar.Reasoning{Content: oar.ReasoningContent{Kind: "text", Text: "先看看路由在哪"}}), working(protocol.Doing{Action: protocol.WorkerActionReadFile, Label: "a.ts"}), tracking{}, ctx)
+	r := eventFacts(ev(oar.Reasoning{Content: oar.ReasoningContent{Kind: "text", Text: "先看看路由在哪"}}), working(protocol.Doing{Action: protocol.WorkerActionReadFile, Label: "a.ts"}), tracking{}, ctx)
 	testkit.Eq(t, r.Journal, []op{{Type: "thought", Text: "先看看路由在哪"}}, "journal")
 	testkit.Eq(t, r.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.WorkerActionThinking}}, "facts")
-	testkit.Eq(t, len(sessionFacts(ev(oar.Reasoning{Content: oar.ReasoningContent{Kind: "redacted"}}), working(thinking), tracking{}, ctx).Journal), 0, "redacted")
+	testkit.Eq(t, len(eventFacts(ev(oar.Reasoning{Content: oar.ReasoningContent{Kind: "redacted"}}), working(thinking), tracking{}, ctx).Journal), 0, "redacted")
 }
 
 func TestWorkersSubAgentStepsSayWhose(t *testing.T) {
-	own := sessionFacts(ev(oar.TextDelta{Text: "好"}), working(thinking), tracking{}, ctx)
+	own := eventFacts(ev(oar.TextDelta{Text: "好"}), working(thinking), tracking{}, ctx)
 	testkit.Eq(t, own.Journal, []op{{Type: "response", Text: "好"}}, "own")
 	input := "{}"
 	event := ev(oar.ToolCallStarted{CallID: "c1", Tool: "bash", Input: &input})
 	event.AgentPath = []string{"task-1"}
-	sub := sessionFacts(event, working(thinking), tracking{}, ctx)
+	sub := eventFacts(event, working(thinking), tracking{}, ctx)
 	testkit.Eq(t, sub.Journal[0].From, From{"task-1"}, "from")
 }
 
@@ -95,7 +95,7 @@ func TestWorkersNotWorkingNoBubble(t *testing.T) {
 	h := workerBase()
 	h.Phase = protocol.Phase{Value: protocol.PhaseResting{}}
 	for _, body := range []oar.EventBody{oar.Reasoning{Content: oar.ReasoningContent{Kind: "empty"}}, oar.TextDelta{Text: "好的"}} {
-		testkit.Eq(t, len(sessionFacts(ev(body), &h, tracking{}, ctx).Facts), 0, "facts")
+		testkit.Eq(t, len(eventFacts(ev(body), &h, tracking{}, ctx).Facts), 0, "facts")
 	}
 }
 
@@ -104,17 +104,17 @@ func TestWorkersSpendingCountedFromTheLastTotal(t *testing.T) {
 	usage := func(input, output int64) oar.EventBody {
 		return oar.Usage{Usage: oar.UsageReport{Tokens: &oar.TokenTotals{Input: input, Output: output, CacheRead: i(0), CacheWrite: i(0)}}}
 	}
-	first := sessionFacts(ev(usage(1_000_000, 0)), working(thinking), tracking{Price: &price}, ctx)
+	first := eventFacts(ev(usage(1_000_000, 0)), working(thinking), tracking{Price: &price}, ctx)
 	testkit.Eq(t, first.SpentCny, 7.0, "first yuan")
 	testkit.Eq(t, first.Facts, []protocol.FactValue{protocol.FactSpent{ID: "w1", Spent: protocol.Spent{Tokens: 1_000_000, CNY: f(7)}}}, "first")
 
 	h := working(thinking)
 	h.Spent = &protocol.Spent{Tokens: 1_000_000, CNY: f(7)}
-	second := sessionFacts(ev(usage(1_000_000, 500_000)), h, first.Tracking, ctx)
+	second := eventFacts(ev(usage(1_000_000, 500_000)), h, first.Tracking, ctx)
 	testkit.Eq(t, second.SpentCny, 7.0, "second yuan")
 	testkit.Eq(t, second.Facts, []protocol.FactValue{protocol.FactSpent{ID: "w1", Spent: protocol.Spent{Tokens: 1_500_000, CNY: f(14)}}}, "second")
 
-	unpriced := sessionFacts(ev(oar.Usage{Usage: oar.UsageReport{Tokens: &oar.TokenTotals{Input: 10, Output: 5}}}), working(thinking), tracking{}, ctx)
+	unpriced := eventFacts(ev(oar.Usage{Usage: oar.UsageReport{Tokens: &oar.TokenTotals{Input: 10, Output: 5}}}), working(thinking), tracking{}, ctx)
 	testkit.Eq(t, unpriced.SpentCny, 0.0, "unpriced yuan")
 	testkit.Eq(t, unpriced.Facts, []protocol.FactValue{protocol.FactSpent{ID: "w1", Spent: protocol.Spent{Tokens: 15}}}, "unpriced")
 
@@ -127,10 +127,10 @@ func TestWorkersSpendingCountedFromTheLastTotal(t *testing.T) {
 
 func TestWorkersQuietEndsWithAWordNotWithUsage(t *testing.T) {
 	doing := protocol.Doing{Action: protocol.WorkerActionRunCommand, Label: "pnpm build"}
-	usage := sessionFacts(ev(oar.Usage{}), working(doing), tracking{Quiet: true}, ctx)
+	usage := eventFacts(ev(oar.Usage{}), working(doing), tracking{Quiet: true}, ctx)
 	testkit.Eq(t, usage.Tracking.Quiet, true, "usage keeps quiet")
 	testkit.Eq(t, len(usage.Facts), 0, "usage facts")
-	word := sessionFacts(ev(oar.TextDelta{Text: "构建完了"}), working(doing), tracking{Quiet: true}, ctx)
+	word := eventFacts(ev(oar.TextDelta{Text: "构建完了"}), working(doing), tracking{Quiet: true}, ctx)
 	testkit.Eq(t, word.Tracking.Quiet, false, "a word ends it")
 	testkit.Eq(t, word.Facts, []protocol.FactValue{
 		protocol.FactDoing{ID: "w1", Action: doing.Action, Label: doing.Label},
@@ -140,26 +140,26 @@ func TestWorkersQuietEndsWithAWordNotWithUsage(t *testing.T) {
 
 func TestWorkersRetriesModelFailuresAndExitsAreSaid(t *testing.T) {
 	maxAttempts, delay := 3, int64(1500)
-	retry := sessionFacts(ev(oar.Retry{Attempt: 2, MaxAttempts: &maxAttempts, DelayMs: &delay, Reason: "429"}), working(thinking), tracking{}, ctx)
+	retry := eventFacts(ev(oar.Retry{Attempt: 2, MaxAttempts: &maxAttempts, DelayMs: &delay, Reason: "429"}), working(thinking), tracking{}, ctx)
 	testkit.Eq(t, retry.Facts, []protocol.FactValue{protocol.FactRetry{ID: "w1", Attempt: 2, Of: i(3)}}, "retry fact")
 	testkit.Eq(t, retry.Journal, []op{{Type: "note", Kind: protocol.ActivityKindRetry, Text: "调用模型没成功，第 2/3 次重试，2 秒后：429"}}, "retry step")
 
-	testkit.Eq(t, sessionFacts(ev(oar.Model{Model: "deepseek-flash"}), working(thinking), tracking{}, ctx).Model, "deepseek-flash", "model")
+	testkit.Eq(t, eventFacts(ev(oar.Model{Model: "deepseek-flash"}), working(thinking), tracking{}, ctx).Model, "deepseek-flash", "model")
 
-	failed := sessionFacts(ev(oar.TurnEnded{Outcome: oar.Failed(oar.FailureBilling, "Insufficient Balance")}), working(thinking), tracking{}, ctx)
+	failed := eventFacts(ev(oar.TurnEnded{Outcome: oar.Failed(oar.FailureBilling, "Insufficient Balance")}), working(thinking), tracking{}, ctx)
 	testkit.Eq(t, failed.Journal[0].Type, "note", "failed step")
 	testkit.Match(t, failed.Journal[0].Text, `^余额不够了：Insufficient Balance`, "failed text")
 
 	code := 137
 	h := working(thinking)
 	h.Runs = 2
-	exited := sessionFacts(ev(oar.Exited{Code: &code}), h, tracking{}, ctx)
+	exited := eventFacts(ev(oar.Exited{Code: &code}), h, tracking{}, ctx)
 	testkit.Eq(t, exited.Facts, []protocol.FactValue{protocol.FactReport{ID: "w1", Outcome: protocol.OutcomeFailed, Summary: "pi 进程退出了（退出码 137）", Runs: 2}}, "exited")
 	testkit.Eq(t, exited.Warn, "老周 的 pi 进程退出了（退出码 137）", "warn")
 	ripe := workerBase()
 	ripe.Phase = protocol.Phase{Value: protocol.PhaseRipe{}}
 	zero := 0
-	testkit.Eq(t, len(sessionFacts(ev(oar.Exited{Code: &zero}), &ripe, tracking{}, ctx).Facts), 0, "between turns")
+	testkit.Eq(t, len(eventFacts(ev(oar.Exited{Code: &zero}), &ripe, tracking{}, ctx).Facts), 0, "between turns")
 }
 
 func TestNear(t *testing.T) {

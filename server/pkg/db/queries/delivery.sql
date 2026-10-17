@@ -4,7 +4,7 @@
 insert into delivery (recipient_id, message_seq, reason, wakes, held_by, created_at) values (?, ?, ?, ?, ?, ?) on conflict do nothing;
 
 -- name: OpenDeliveries :many
-select d.message_seq, d.reason, d.wakes, d.held_by, d.state, d.session, m.conversation_id, m.sender_id, m.kind, m.body, m.created_at,
+select d.message_seq, d.reason, d.wakes, d.held_by, d.state, d.launch, m.conversation_id, m.sender_id, m.kind, m.body, m.created_at,
        p.name, p.kind as sender_kind, c.kind as conversation_kind, c.parent_seq, c.subject_kind, c.subject_id,
        cast(coalesce(ch.name, c.name, '') as text) as channel_name
 from delivery d
@@ -16,26 +16,26 @@ where d.recipient_id = ? and d.state in ('pending', 'announced', 'handed')
 order by d.message_seq;
 
 -- name: MarkAnnounced :exec
-update delivery set state = 'announced', session = ?, announced_at = ?
+update delivery set state = 'announced', launch = ?, announced_at = ?
 where recipient_id = ? and message_seq = ? and state in ('pending', 'announced');
 
 -- name: MarkHanded :exec
-update delivery set state = 'handed', session = ?, handed_at = ?
+update delivery set state = 'handed', launch = ?, handed_at = ?
 where recipient_id = ? and message_seq = ? and state in ('pending', 'announced');
 
 -- name: SeenHanded :many
 update delivery set state = 'seen', seen_at = ?
-where recipient_id = ? and state = 'handed' and session = ?
+where recipient_id = ? and state = 'handed' and launch = ?
 returning message_seq;
 
 -- name: RollbackHanded :execrows
-update delivery set state = 'pending', session = null where recipient_id = ? and state = 'handed';
+update delivery set state = 'pending', launch = null where recipient_id = ? and state = 'handed';
 
 -- name: RollbackAll :exec
-update delivery set state = 'pending', session = null where state in ('announced', 'handed');
+update delivery set state = 'pending', launch = null where state in ('announced', 'handed');
 
 -- name: RollbackAnnounced :exec
-update delivery set state = 'pending', session = null where recipient_id = ? and state = 'announced' and session = ?;
+update delivery set state = 'pending', launch = null where recipient_id = ? and state = 'announced' and launch = ?;
 
 -- name: SeenUpTo :exec
 update delivery set state = 'seen', seen_at = sqlc.arg(at)
@@ -47,7 +47,7 @@ update delivery set state = 'seen', seen_at = ?
 where recipient_id = ? and message_seq = ? and state in ('pending', 'announced', 'handed');
 
 -- name: DropOpen :exec
-update delivery set state = 'dropped', dropped_why = ?, session = null
+update delivery set state = 'dropped', dropped_why = ?, launch = null
 where recipient_id = ? and state in ('pending', 'announced', 'handed');
 
 -- name: AgentWakesSinceUser :one

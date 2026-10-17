@@ -64,7 +64,6 @@ func (a api) SettingSave(_ context.Context, body protocol.SettingsUpdate) (proto
 	return s, refused(err)
 }
 
-
 func (a api) ChannelSay(ctx context.Context, body protocol.SayRequest) error {
 	if body.Bed != nil {
 		a.f.Game.Want(*body.Bed)
@@ -83,7 +82,9 @@ func (a api) ScheduleCreate(_ context.Context, body protocol.ScheduleRequest) (p
 	return s, refused(err)
 }
 
-func (a api) ScheduleList(context.Context) ([]protocol.Schedule, error) { return a.f.Schedule.List(), nil }
+func (a api) ScheduleList(context.Context) ([]protocol.Schedule, error) {
+	return a.f.Schedule.List(), nil
+}
 
 func (a api) ScheduleUpdate(_ context.Context, id int64, body protocol.ScheduleUpdate) error {
 	if body.Enabled == nil {
@@ -179,7 +180,6 @@ func (a api) SessionStop(_ context.Context, id string) error {
 	return nil
 }
 
-
 func (a api) TrajectoryList(_ context.Context, agent *string) ([]protocol.TrajectoryHead, error) {
 	return a.f.Worker.List(ptr.Value(agent)), nil
 }
@@ -239,7 +239,6 @@ func (a api) PlaybookChanges(_ context.Context, id string) (protocol.Changes, er
 func (a api) PlaybookEvents(_ context.Context, id string) ([]protocol.PlaybookEvent, error) {
 	return a.f.Playbook.Events(id), nil
 }
-
 
 func (a api) GameChooseTitle(_ context.Context, body protocol.ChooseTitleRequest) error {
 	a.f.Game.ChooseTitle(body.Achievement, body.Tier)

@@ -33,16 +33,16 @@ type HireOptions struct {
 }
 
 type Delivered struct {
-	Kind    string // run, steered, queued, refused
-	Session string
-	Woke    bool
-	Reason  string
+	Kind   string // run, steered, queued, refused
+	Launch string
+	Woke   bool
+	Reason string
 }
 
-type SessionActivity struct {
+type LaunchActivity struct {
 	Kind    string // spoke, ended, closed, compacting
 	ID      string
-	Session string
+	Launch  string
 	Outcome protocol.Outcome
 	Spoke   bool
 	On      bool

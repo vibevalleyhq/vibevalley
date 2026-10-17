@@ -54,10 +54,10 @@ type workerSaved struct {
 }
 
 type savedHand struct {
-	ID        string            `json:"id"`
-	Place     project.Workplace `json:"place"`
-	SessionID string            `json:"sessionId,omitzero"`
-	LastText  string            `json:"lastText,omitzero"`
+	ID           string            `json:"id"`
+	Place        project.Workplace `json:"place"`
+	OarSessionID string            `json:"oarSessionId,omitzero"`
+	LastText     string            `json:"lastText,omitzero"`
 	// A resumed session is not reminded of these again.
 	Recalled []string `json:"recalled,omitzero"`
 }
@@ -118,13 +118,13 @@ type hand struct {
 	place   project.Workplace
 	journal Journal
 
-	mu        sync.Mutex
-	sess      *oarSession
-	sessionID string
-	lastText  string
-	tracking  tracking
+	mu           sync.Mutex
+	sess         *oarSession
+	oarSessionID string
+	lastText     string
+	tracking     tracking
 	// As the chat names it: <id>#<n>; "" when it has none.
-	session  string
+	launch   string
 	spoke    bool
 	recalled map[string]bool
 	released chan struct{}
@@ -147,7 +147,7 @@ type workers struct {
 	logDir       string
 	farmURL      string
 	stallMs      int64
-	activity     *base.Hub[SessionActivity]
+	activity     *base.Hub[LaunchActivity]
 	disk         *base.FileWriter
 	q            *generated.Queries
 
@@ -185,7 +185,7 @@ func newWorkers(in workersIn) (*workers, error) {
 		farmURL:  "http://" + net.JoinHostPort(in.Config.Host, strconv.Itoa(in.Config.Port)) + "/mcp",
 		logDir:   filepath.Join(in.Config.Home, "logs"),
 		stallMs:  int64(in.Config.Worker.StallSeconds * 1000),
-		activity: base.NewHub[SessionActivity](),
+		activity: base.NewHub[LaunchActivity](),
 		hands:    map[string]*hand{},
 		q:        generated.New(in.DB),
 	}
@@ -254,16 +254,16 @@ func (c *workers) hand(id string) *hand {
 	return c.hands[id]
 }
 
-func (c *workers) Activity() *base.Hub[SessionActivity] { return c.activity }
+func (c *workers) Activity() *base.Hub[LaunchActivity] { return c.activity }
 
-func (c *workers) signal(a SessionActivity) { c.activity.Publish(a) }
+func (c *workers) signal(a LaunchActivity) { c.activity.Publish(a) }
 
 // Called with h.mu held.
 func (c *workers) closedLocked(h *hand) {
-	if h.session != "" {
-		c.signal(SessionActivity{Kind: "closed", ID: h.id, Session: h.session})
+	if h.launch != "" {
+		c.signal(LaunchActivity{Kind: "closed", ID: h.id, Launch: h.launch})
 	}
-	h.session = ""
+	h.launch = ""
 }
 
 func (c *workers) closed(h *hand) {
@@ -296,10 +296,10 @@ func (c *workers) body() ([]byte, error) {
 	slices.SortFunc(hands, func(a, b *hand) int { return strings.Compare(a.id, b.id) })
 	for _, h := range hands {
 		h.mu.Lock()
-		s := savedHand{ID: h.id, Place: h.place, SessionID: h.sessionID, LastText: h.lastText, Recalled: slices.Sorted(maps.Keys(h.recalled))}
+		s := savedHand{ID: h.id, Place: h.place, OarSessionID: h.oarSessionID, LastText: h.lastText, Recalled: slices.Sorted(maps.Keys(h.recalled))}
 		if h.sess != nil {
 			if id := h.sess.agent.Info().SessionID; id != "" {
-				s.SessionID = id
+				s.OarSessionID = id
 			}
 		}
 		h.mu.Unlock()
@@ -360,7 +360,7 @@ func (c *workers) restore() {
 		for _, id := range s.Recalled {
 			recalled[id] = true
 		}
-		c.hands[worker.ID] = &hand{id: worker.ID, place: s.Place, journal: c.trajectoryOf(worker), sessionID: s.SessionID, lastText: s.LastText, recalled: recalled}
+		c.hands[worker.ID] = &hand{id: worker.ID, place: s.Place, journal: c.trajectoryOf(worker), oarSessionID: s.OarSessionID, lastText: s.LastText, recalled: recalled}
 		if protocol.IsBusy(worker) {
 			c.core.Apply(protocol.FactReport{ID: worker.ID, Outcome: protocol.OutcomeInterrupted, Summary: "VibeValley 重启了，这一轮停在了半路", Runs: worker.Runs})
 			c.core.Notice(protocol.NoticeLevelInfo, fmt.Sprintf("VibeValley 重启过，%s 那一轮停下了；给它带句话就能接着干", worker.Name))
@@ -394,9 +394,9 @@ func (c *workers) watch(h *hand, s *oarSession, runtime string) oar.EventObserve
 			return
 		}
 		opened := false
-		var signals []SessionActivity
+		var signals []LaunchActivity
 		h.mu.Lock()
-		if h.session != "" && h.sess == s {
+		if h.launch != "" && h.sess == s {
 			switch event.Body.(type) {
 			case oar.TurnStarted:
 				h.spoke = false
@@ -404,15 +404,15 @@ func (c *workers) watch(h *hand, s *oarSession, runtime string) oar.EventObserve
 			case oar.Reasoning, oar.TextDelta, oar.ToolCallStarted:
 				if !h.spoke {
 					h.spoke = true
-					signals = append(signals, SessionActivity{Kind: "spoke", ID: h.id, Session: h.session})
+					signals = append(signals, LaunchActivity{Kind: "spoke", ID: h.id, Launch: h.launch})
 				}
 			case oar.CompactionStarted:
-				signals = append(signals, SessionActivity{Kind: "compacting", ID: h.id, On: true})
+				signals = append(signals, LaunchActivity{Kind: "compacting", ID: h.id, On: true})
 			case oar.CompactionEnded:
-				signals = append(signals, SessionActivity{Kind: "compacting", ID: h.id, On: false})
+				signals = append(signals, LaunchActivity{Kind: "compacting", ID: h.id, On: false})
 			}
 		}
-		reaction := sessionFacts(event, c.core.Worker(h.id), h.tracking, sessionContext{ID: h.id, Runtime: runtime, Cwd: h.place.Cwd, CnyPerUsd: c.runtimes.CnyPerUsd()})
+		reaction := eventFacts(event, c.core.Worker(h.id), h.tracking, factContext{ID: h.id, Runtime: runtime, Cwd: h.place.Cwd, CnyPerUsd: c.runtimes.CnyPerUsd()})
 		h.tracking = reaction.Tracking
 		if reaction.Model != "" {
 			h.tracking.Price = c.runtimes.Price(runtime, reaction.Model)
@@ -458,7 +458,7 @@ func (c *workers) applyReport(h *hand, report agents.SubagentReport) {
 	}
 	h.lastText = read.Text
 	h.tracking.RunFrom = nil
-	session, spoke := h.session, h.spoke
+	launch, spoke := h.launch, h.spoke
 	h.mu.Unlock()
 	c.core.Apply(protocol.FactReport{ID: h.id, Outcome: read.Outcome, Summary: read.Summary, Runs: int64(report.Turn), Spent: spent})
 	c.endRun(h, read.Outcome, read.Summary, spent)
@@ -467,8 +467,8 @@ func (c *workers) applyReport(h *hand, report agents.SubagentReport) {
 	if read.NeedsYou {
 		c.core.Notice(protocol.NoticeLevelError, fmt.Sprintf("%s 停下了：%s", worker.Name, read.Failure))
 	}
-	if session != "" {
-		c.signal(SessionActivity{Kind: "ended", ID: h.id, Session: session, Outcome: read.Outcome, Spoke: spoke})
+	if launch != "" {
+		c.signal(LaunchActivity{Kind: "ended", ID: h.id, Launch: launch, Outcome: read.Outcome, Spoke: spoke})
 	}
 	c.runtimes.UsageSoon(worker.Runtime)
 	c.save()
@@ -550,12 +550,12 @@ func (c *workers) attach(h *hand, s *oarSession, runtime string) {
 	}
 	released := make(chan struct{})
 	h.sess, h.released = s, released
-	h.session = fmt.Sprintf("%s#%d", h.id, launch)
+	h.launch = fmt.Sprintf("%s#%d", h.id, launch)
 	h.spoke = false
 	if id := s.agent.Info().SessionID; id != "" {
-		h.sessionID = id
+		h.oarSessionID = id
 	}
-	h.tracking.SessionTokens = nil
+	h.tracking.OarTokens = nil
 	h.mu.Unlock()
 	if old != nil {
 		go func() { _ = old.subagents.Close(context.Background()) }()
@@ -694,7 +694,7 @@ func (c *workers) leave(h *hand, closed protocol.IssueClose, merged int64) {
 	c.save()
 }
 
-func (c *workers) closeSession(h *hand) {
+func (c *workers) closeOar(h *hand) {
 	h.mu.Lock()
 	s := h.sess
 	h.mu.Unlock()
@@ -711,7 +711,7 @@ func (c *workers) rest(h *hand) {
 		return
 	}
 	if id := s.agent.Info().SessionID; id != "" {
-		h.sessionID = id
+		h.oarSessionID = id
 	}
 	c.releaseLocked(h)
 	h.sess = nil
@@ -730,7 +730,7 @@ func (c *workers) Dismiss(id string) bool {
 	if worker := c.core.Worker(id); worker != nil {
 		name = worker.Name
 	}
-	c.closeSession(h)
+	c.closeOar(h)
 	c.leave(h, protocol.IssueCloseDismissed, 0)
 	if kept := c.projects.Release(h.place); kept != "" {
 		c.core.Notice(protocol.NoticeLevelInfo, fmt.Sprintf("%s 收工了：%s", name, kept))
@@ -757,7 +757,6 @@ func (c *workers) Leave(id string, closed protocol.IssueClose, merged int64) {
 		c.leave(h, closed, merged)
 	}
 }
-
 
 func (c *workers) remind(agent, worker, project, input string, h *hand, recalled map[string]bool) string {
 	if h != nil {
@@ -789,7 +788,7 @@ func (c *workers) wake(h *hand, worker protocol.Worker, input, recall string) De
 		return Delivered{Kind: "refused", Reason: worker.Name + " 的 agent 已经删掉了，叫不醒"}
 	}
 	h.mu.Lock()
-	resume := h.sessionID
+	resume := h.oarSessionID
 	h.mu.Unlock()
 	ctx := context.Background()
 	s, refused := c.open(ctx, *agent, h.id, h.place, withRecall(recall, input), resume)
@@ -805,12 +804,12 @@ func (c *workers) wake(h *hand, worker protocol.Worker, input, recall string) De
 	}
 	c.attach(h, s, worker.Runtime)
 	h.mu.Lock()
-	session := h.session
+	launch := h.launch
 	h.mu.Unlock()
-	if session == "" {
-		session = h.id
+	if launch == "" {
+		launch = h.id
 	}
-	return Delivered{Kind: "run", Session: session, Woke: true}
+	return Delivered{Kind: "run", Launch: launch, Woke: true}
 }
 
 func (c *workers) Deliver(id, text string, by protocol.RunTrigger) Delivered {
@@ -827,9 +826,9 @@ func (c *workers) Deliver(id, text string, by protocol.RunTrigger) Delivered {
 		recall = c.remind(worker.Agent, id, h.place.Project, text, h, nil)
 	}
 	h.mu.Lock()
-	s, session := h.sess, h.session
+	s, launch := h.sess, h.launch
 	h.mu.Unlock()
-	if s == nil || session == "" {
+	if s == nil || launch == "" {
 		c.expect(h, by)
 		d := c.wake(h, *worker, text, recall)
 		if d.Kind == "refused" {
@@ -842,7 +841,7 @@ func (c *workers) Deliver(id, text string, by protocol.RunTrigger) Delivered {
 	}
 	sent, err := s.agent.Send(context.Background(), withRecall(recall, text), "followup")
 	if err == nil && sent.Kind != "rejected" && sent.Landed == "prompted" {
-		return Delivered{Kind: "run", Session: session}
+		return Delivered{Kind: "run", Launch: launch}
 	}
 	if starts {
 		c.unexpect(h)
@@ -855,12 +854,12 @@ func (c *workers) Deliver(id, text string, by protocol.RunTrigger) Delivered {
 	}
 	if sent.Landed == "queued" {
 		c.expect(h, by)
-		return Delivered{Kind: "queued", Session: session}
+		return Delivered{Kind: "queued", Launch: launch}
 	}
 	if by.Message != nil {
 		c.heardInRun(h, *by.Message)
 	}
-	return Delivered{Kind: "steered", Session: session}
+	return Delivered{Kind: "steered", Launch: launch}
 }
 
 func (c *workers) Tell(id, text string, by protocol.RunTrigger) string {
@@ -992,4 +991,3 @@ func (c *workers) Comment(id string, n int64, comment string) (string, error) {
 	}
 	return CommentText(steps[i], comment), nil
 }
-

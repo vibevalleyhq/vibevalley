@@ -22,7 +22,7 @@ import (
 
 type chatFakeWorkers struct {
 	f     *world
-	hub   *base.Hub[worker.SessionActivity]
+	hub   *base.Hub[worker.LaunchActivity]
 	slow  time.Duration
 	stop  chan struct{}
 	once  sync.Once
@@ -36,7 +36,7 @@ type chatFakeWorkers struct {
 	n       int
 }
 
-func (x *chatFakeWorkers) Activity() *base.Hub[worker.SessionActivity] { return x.hub }
+func (x *chatFakeWorkers) Activity() *base.Hub[worker.LaunchActivity] { return x.hub }
 
 func (x *chatFakeWorkers) Find(id string) *worker.Roster {
 	h := x.f.Core.Worker(id)
@@ -56,7 +56,7 @@ func (x *chatFakeWorkers) Deliver(id, text string, _ protocol.RunTrigger) worker
 	if session, ok := x.running[id]; ok {
 		x.steers[id] = append(x.steers[id], text)
 		x.mu.Unlock()
-		return worker.Delivered{Kind: "steered", Session: session}
+		return worker.Delivered{Kind: "steered", Launch: session}
 	}
 	x.n++
 	session := fmt.Sprintf("%s-%d", id, x.n)
@@ -65,7 +65,7 @@ func (x *chatFakeWorkers) Deliver(id, text string, _ protocol.RunTrigger) worker
 	x.mu.Unlock()
 	x.f.Core.Apply(protocol.FactRun{ID: id})
 	go x.run(id, session, text)
-	return worker.Delivered{Kind: "run", Session: session, Woke: true}
+	return worker.Delivered{Kind: "run", Launch: session, Woke: true}
 }
 
 func (x *chatFakeWorkers) run(id, session, input string) {
@@ -84,7 +84,7 @@ func (x *chatFakeWorkers) run(id, session, input string) {
 		delete(x.running, id)
 		x.mu.Unlock()
 		x.f.Core.Apply(protocol.FactReport{ID: id, Outcome: protocol.OutcomeFailed, Summary: "provider said no", Runs: runs})
-		x.hub.Publish(worker.SessionActivity{Kind: "ended", ID: id, Session: session, Outcome: protocol.OutcomeFailed})
+		x.hub.Publish(worker.LaunchActivity{Kind: "ended", ID: id, Launch: session, Outcome: protocol.OutcomeFailed})
 		return
 	}
 	line := ""
@@ -100,12 +100,12 @@ func (x *chatFakeWorkers) run(id, session, input string) {
 	x.mu.Lock()
 	x.last[id] = "结论：收到了（" + line + "）"
 	x.mu.Unlock()
-	x.hub.Publish(worker.SessionActivity{Kind: "spoke", ID: id, Session: session})
+	x.hub.Publish(worker.LaunchActivity{Kind: "spoke", ID: id, Launch: session})
 	x.mu.Lock()
 	delete(x.running, id)
 	x.mu.Unlock()
 	x.f.Core.Apply(protocol.FactReport{ID: id, Outcome: protocol.OutcomeCompleted, Summary: "收到了", Runs: runs})
-	x.hub.Publish(worker.SessionActivity{Kind: "ended", ID: id, Session: session, Outcome: protocol.OutcomeCompleted, Spoke: true})
+	x.hub.Publish(worker.LaunchActivity{Kind: "ended", ID: id, Launch: session, Outcome: protocol.OutcomeCompleted, Spoke: true})
 }
 
 func (x *chatFakeWorkers) runsOf(id string) []string {
@@ -135,7 +135,7 @@ func chatTestFarm(t *testing.T, home, dbPath string) (*world, *chatFakeWorkers) 
 		t.Fatal(err)
 	}
 	x := &chatFakeWorkers{
-		f: f, hub: base.NewHub[worker.SessionActivity](), slow: 1500 * time.Millisecond, stop: make(chan struct{}),
+		f: f, hub: base.NewHub[worker.LaunchActivity](), slow: 1500 * time.Millisecond, stop: make(chan struct{}),
 		inputs: map[string][]string{}, steers: map[string][]string{}, last: map[string]string{}, running: map[string]string{},
 	}
 	f.Channel.workers = x
