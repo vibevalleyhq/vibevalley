@@ -27,6 +27,7 @@
 #   char-<species>              an animal in the farmer outfit; after the bear they take raw/char-bear.png as reference
 #   char-<species>-<outfit>     the same animal in another outfit (gardener, rain, winter), from its farmer sheet
 #   logos                       the runtimes' logos (logos/, from LobeHub Icons) as pixel art
+#   dsh                         DeepSeek Harness's machine (a whale watering cart) and logo, beside the others; then hd-dsh
 #   ui-<sheet>                  a painted interface sheet (design/assets/raw/<sheet>.png) redrawn as pixel art, same grid
 #                               (ui-langs-1..3: the language logos, letters kept)
 #   look-<look>                 a manager look (farmer, foreman, auntie, grandpa, gardener, robot), from its painted sheet
@@ -71,7 +72,8 @@ draw() {
 
 ${body}"
   for attempt in 1 2; do
-    codex exec -s workspace-write --skip-git-repo-check "$@" -o "logs/${name}.last.txt" -- "$prompt" < /dev/null > "logs/${name}.out.txt" 2>&1 &
+    # raw links into the art repository (art.sh): outside this workspace, so codex's sandbox is let write there too.
+    codex exec -s workspace-write --add-dir "$(cd raw && pwd -P)" --skip-git-repo-check "$@" -o "logs/${name}.last.txt" -- "$prompt" < /dev/null > "logs/${name}.out.txt" 2>&1 &
     local pid=$!
     ( sleep 600; kill "$pid" 2>/dev/null ) &
     local watchdog=$!
@@ -216,6 +218,14 @@ $(cat prompts/_sheet.txt)" ;;
 Image 1 is a sheet of 8 software logos (AI coding agents) in a grid of 4 columns x 2 rows, one per cell. Redraw the WHOLE sheet as pixel-art icons in the style above, for a game's tool shed: exactly the same image size, the same grid, each logo in the same cell, centred, all at the same size (about 260 image pixels across). Keep every logo instantly recognisable: the same silhouette, proportions and colours as in Image 1 (gradients become two or three flat bands of colour); black logos stay near-black with a dark warm outline. Do not add text, letters, frames, badges or backgrounds that are not in the logo. Image 2 is pixel art already made for the game: match its pixel size and outline weight.
 
 $(cat prompts/_sheet.txt)" -i raw/logos-ref.png -i raw/ui-icons.png ;;
+    dsh)
+      draw "$name" "$(style 8)
+
+A sheet of 2 items for a game's tool shed, in a grid of 2 columns x 1 row on a 1536 x 1024 image, one item centred in each cell, for DeepSeek Harness (dsh), an AI coding agent whose logo is Image 1, a blue whale.
+Cell 1 (left): its farm machine, beside the other machines in Image 2 and drawn exactly like them (the same three-quarter view, size, pixel size, outline weight, wood and iron, palette): a small wooden watering cart whose water tank is a friendly blue whale, the same blue as Image 1 (#4D6BFE, in two or three flat bands), with a white belly, sitting on a wooden frame with two iron-rimmed wooden wheels and a short pull handle; a short arc of water rises from the whale's blowhole and stays joined to it. About as tall as the pump in Image 2.
+Cell 2 (right): Image 1 redrawn as a pixel-art icon, beside the logos in Image 3 and drawn exactly like them (the same size, about 260 image pixels across, pixel size and outline weight): the same whale silhouette, eye and white belly, the same blue in two or three flat bands, with a dark warm outline. Nothing added to the logo.
+
+$(cat prompts/_sheet.txt)" -i logos/dsh.png -i raw/ui-machines.png -i raw/logos.png ;;
     ui-*)
       local sheet="${name#ui-}" extra=""
       # A sheet family may add a note of its own (prompts/ui-langs.txt for ui-langs-1..3).

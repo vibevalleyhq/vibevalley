@@ -177,6 +177,8 @@ SHEETS: dict[str, Sheet] = {
         "critter-butterfly-1", "critter-butterfly-2", "critter-bird-1", "critter-bird-2",
         "critter-fish-1", "critter-fish-2", "critter-leaf-1", "critter-leaf-2",
     ], height=5, reference=[0], resize={"critter-bird-1": 0.8, "critter-bird-2": 0.8, "critter-fish-1": 0.85, "critter-fish-2": 0.85, "critter-leaf-1": 0.5, "critter-leaf-2": 0.5}),
+    # DeepSeek Harness came after the eight above (gen.sh dsh): its machine at their scale, its logo beside the logos.
+    "dsh": Sheet(2, 1, ["machine-dsh", "logo-dsh"], height=30, reference=[0]),
     "ui-machines": Sheet(4, 2, ["machine-tractor", "machine-watercart", "machine-wheelbarrow", "machine-pump", "machine-seeder", "machine-windmill", "machine-beehive", "machine-lantern"], height=30, reference=list(range(8))),
     # The map page (lib/desk/map/): its icon, the compass in its corner, a queued job's sack and a free spot's stake on an
     # island, a cloud drifting over, and a worktree's branch.

@@ -3793,6 +3793,13 @@
   "sheet": "design/pixel/raw/logos.png",
   "w": 46
  },
+ "logo-dsh": {
+  "w": 46,
+  "h": 33,
+  "ax": 23,
+  "ay": 32,
+  "sheet": "design/pixel/raw/dsh.png"
+ },
  "logo-grok": {
   "ax": 26,
   "ay": 51,
@@ -3827,6 +3834,13 @@
   "h": 56,
   "sheet": "design/pixel/raw/ui-machines.png",
   "w": 59
+ },
+ "machine-dsh": {
+  "w": 58,
+  "h": 60,
+  "ax": 29,
+  "ay": 59,
+  "sheet": "design/pixel/raw/dsh.png"
  },
  "machine-lantern": {
   "ax": 25,

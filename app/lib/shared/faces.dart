@@ -82,6 +82,7 @@ const _machine = {
   'antigravity': 'machine-lantern',
   // The farm's own agent wears the app's sprout.
   'vibevalley': 'app-sprout',
+  'dsh': 'machine-dsh',
 };
 
 Widget _sprite(SpriteInfo sp, double size) => Image.asset(sp.asset, width: size, height: size, fit: BoxFit.contain, filterQuality: FilterQuality.none);
