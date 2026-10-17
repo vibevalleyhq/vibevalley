@@ -1524,12 +1524,6 @@ type LedgerEntryTitled struct {
 	Tier        *int64  `json:"tier,omitzero"`
 }
 
-//vibevalley:member LedgerEntry carried
-type LedgerEntryCarried struct {
-	At    int64 `json:"at"`
-	Coins int64 `json:"coins"`
-}
-
 type ConnectorID string
 
 const (

@@ -10,7 +10,7 @@ Status: proposed
 |---|---|---|
 | HTTP 接口 | Flutter、院门后的设备 | `protocol/api.go` 的 86 个 `//vibevalley:route`，shapegen 生成，handler 一个方法转给一个服务 |
 | 管家的工具 | 管家（DeepSeek） | `manager/tools.go` 手写的 21 个，再加 `pkg/agent` 自带的 `remember`、`rewrite_memory`、`search_archive`、`load_skill` |
-| MCP | 帮工（Claude Code、Codex、pi……） | `mcp/mcp.go` 手写的 4 个：`farm_say`、`farm_read`、`farm_inbox`、`farm_who` |
+| MCP | 帮工（Claude Code、Codex、pi……） | `mcp/mcp.go` 手写的 4 个：`channel_say`、`channel_read`、`channel_inbox`、`session_list` |
 | 聊天软件、语音 | 主人在外面说话 | 不是工具：文字交给 `Manager.Say`，语音交给 `Manager.Call`，之后由管家的工具干活 |
 | 院门 | 主人配对过的设备 | 整套 HTTP 接口，`gate.go` 里写死不放 `lan.*` 的管理 |
 | 定时、计划 | 服务端自己 | 直接调服务（`issue/dispatch.go` 的 `scheduled`、`playbook.go` 的 `follow`） |
@@ -185,10 +185,10 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 
 | 命令 | 管家 | 帮工 | 备注 |
 |---|---|---|---|
-| `channel say --json` | | ≈ `farm_say` | 以主人的身份说，管家会回 |
+| `channel say --json` | | ≈ `channel_say` | 以主人的身份说，管家会回 |
 | `channel create --json` | ✓ `open_channel` | | |
 | `channel update <id> --json` | ✓ `channel_settings` | | |
-| `channel history <id> [--before --limit]` | ✓ `read_chat` | ≈ `farm_read`，只限自己的串 | |
+| `channel history <id> [--before --limit]` | ✓ `read_chat` | ≈ `channel_read`，只限自己的串 | |
 | `channel mark-read <id> --json` | | | |
 | `manager hear "<话>"` | | | |
 | `manager open` | | | 把管家这条线设成 live |

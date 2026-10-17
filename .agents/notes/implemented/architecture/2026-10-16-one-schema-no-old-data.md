@@ -9,7 +9,7 @@ Status: implemented
 ## Decision
 
 - **不留兼容**：存盘的格式只有现在这一种。`vibevalley.db` 的表、家目录里的文件（`state.json`、`workers.json`、`manager/`、`activities/`）、环境变量（`VIBEVALLEY_MANAGER_*`）都只认现在的名字，没有读旧名字、改写旧文件、搬旧数据的代码。`internal/migrate`、`vibevalley migrate`、`vibevalley import` 和 `tool/dump-pglite.ts` 删了。改名就直接改代码和存盘的名字。
-- **能迁就迁一次**（后来补的）：旧数据能在功能不变的前提下改成现在的样子的，迁一次，之后代码只认现在的样子。家目录的文件在服务加载时改好写回：`config.json` 里缺动物或衣服的档案，由 `agent/cast.go` 按客户端一直在用的同一个挑法补上（看起来和补之前一样），存档案时也补；客户端的 `castOf` 从此只给它不认识的档案（帮工的档案删了、档案还没读到）挑动物。改不成现在的样子的旧数据，仍然不读。
+- **能迁就迁一次**（后来改成一次性）：旧数据在**升级前**用一次性的工具搬成今天的形状，启动时只认今天的名字，不读、不改写旧文件。TypeScript 的农场用 `server/tool/import-ts` 跑一次：读旧的 `farm.db` 和 `steps/`，写今天的库和 `events/`，旧文件由主人归档，跑完导入器删掉。Go 时代的旧家（`workers.json`、`activities/`、`*.head.json`）也是迁移搬过一次，那几个启动搬家器在这次改动里删了（[一次性迁移](2026-10-17-one-way-migration.md)）。改不成今天的形状的旧数据，仍然不读。
 - **一份表结构**：`server/migrations/0001_schema.sql` 是整个库，按主人分段（田头、工单和执行、计划的经过、定时、账本、记性、连接器、院门）。以后改表是它后面的新文件（`go run ./cmd/migrate new 名字` 写出下一个），按名字顺序各跑一次：服务端开机时跑，也可以 `cmd/migrate up` 手动跑，`cmd/migrate status` 看库在第几版。跑的是 `migrations.Up`：跑之前把库留一份 `vibevalley.db.v<n>`，遇到 `user_version` 比它认识的迁移还多的库就不开，免得旧的服务端写坏新的库。`cmd/migrate` 只跑这些迁移文件。
 - **表名用单数**，开关的列写 `boolean`。
 - **SQL 只在 sqlc**：全部查询在 `server/pkg/db/queries/`，一张表一个文件（[查询由 sqlc 生成](2026-10-15-sqlc-queries.md)）；服务里不手写 SQL，只有 `base/db.go` 跑迁移。
@@ -24,7 +24,7 @@ Status: implemented
 
 ## Consequences
 
-- 旧格式的家（旧名字的目录、旧的 `vibevalley.db`）打不开：`vibevalley.db` 的 `user_version` 对不上时服务端拒绝启动，要把家目录移走，从空的农场开始。开发时的农场就是这样重开的。
+- 旧格式的家（旧名字的目录、旧的 `vibevalley.db`）打不开，除非先用一次性导入器搬成今天的形状；搬不了的把家目录移走，从空的农场开始。
 - 以后真有用户了，改存盘的名字要重新写迁移；那时在 `0001_schema.sql` 后面加文件，并把这篇换成新的决定。
 - 看表结构只看一个文件，看一张表怎么读写只看同名的查询文件。
 

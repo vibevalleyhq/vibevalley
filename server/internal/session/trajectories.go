@@ -26,14 +26,7 @@ type trajectories struct {
 }
 
 func newTrajectories(cfg base.Config, core *core.Service) (*trajectories, error) {
-	t := &trajectories{core: core, dir: filepath.Join(cfg.Home, "events"), open: map[string]*journal{}}
-	if err := moveActivities(filepath.Join(cfg.Home, "activities"), t.dir); err != nil {
-		return nil, err
-	}
-	if err := splitAllResults(t.dir); err != nil {
-		return nil, err
-	}
-	return t, nil
+	return &trajectories{core: core, dir: filepath.Join(cfg.Home, "events"), open: map[string]*journal{}}, nil
 }
 
 func (*trajectories) OnStart(context.Context) error { return nil }

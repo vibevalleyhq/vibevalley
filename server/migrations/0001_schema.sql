@@ -1,22 +1,10 @@
--- The farm's database. A change to it is a new file after this one, run once at start in name order (internal/base/db.go).
+-- The schema as it stands after the Session and module renames (2026-10-17), as one baseline:
+-- there is no upgrade path from an older Go database, and none from the TypeScript one (cmd/import-ts reads that).
 
--- The farm's chat: who takes part, channels and threads, messages and what becomes of each for each recipient (channel/).
-
-create table participant (
-  id         text primary key,
-  kind       text not null check (kind in ('user', 'manager', 'worker', 'system')),
-  name       text not null,
-  agent_id   text,
-  runtime    text,
-  joined_at  integer not null,
-  left_at    integer,
-  check ((kind = 'worker') = (agent_id is not null))
-);
-
-create table conversation (
+CREATE TABLE channel_conversation (
   id            integer primary key autoincrement,
   kind          text not null check (kind in ('general', 'channel', 'thread')),
-  parent_seq    integer unique references message (seq),
+  parent_seq    integer unique references channel_message (seq),
   subject_kind  text check (subject_kind in ('issue', 'playbook', 'talk')),
   subject_id    text,
   last_seq      integer,
@@ -25,18 +13,14 @@ create table conversation (
   name          text,
   description   text,
   project       text,
-  channel_id    integer references conversation (id),
+  channel_id    integer references channel_conversation (id),
   check ((kind = 'thread') = (parent_seq is not null)),
   check ((subject_kind is null) or kind = 'thread')
 );
-create unique index conversation_one_general on conversation (kind) where kind = 'general';
-create index conversation_by_subject on conversation (subject_kind, subject_id);
-create unique index conversation_by_name on conversation (name) where name is not null;
-
-create table message (
+CREATE TABLE channel_message (
   seq              integer primary key autoincrement,
-  conversation_id  integer not null references conversation (id),
-  sender_id        text not null references participant (id),
+  conversation_id  integer not null references channel_conversation (id),
+  sender_id        text not null references channel_participant (id),
   kind             text not null check (kind in ('chat', 'dispatch', 'report', 'notice')),
   body             text not null,
   final            boolean not null default 1,
@@ -45,49 +29,40 @@ create table message (
   created_at       integer not null,
   updated_at       integer
 );
-create index message_by_conversation on message (conversation_id, seq);
-create unique index message_send_key on message (sender_id, send_key) where send_key is not null;
-create index message_by_sender on message (sender_id, seq);
-
-create table mention (
-  message_seq  integer not null references message (seq) on delete cascade,
+CREATE TABLE channel_mention (
+  message_seq  integer not null references channel_message (seq) on delete cascade,
   target_id    text not null,
   resolved     text not null check (resolved in ('delivered', 'not_on_farm', 'unknown')),
   primary key (message_seq, target_id)
 );
-create index mention_by_target on mention (target_id, message_seq);
-
-create table follow (
-  conversation_id  integer not null references conversation (id),
-  participant_id   text not null references participant (id),
+CREATE TABLE channel_follow (
+  conversation_id  integer not null references channel_conversation (id),
+  participant_id   text not null references channel_participant (id),
   reason           text not null check (reason in ('owner', 'replied', 'mentioned', 'manual')),
   from_seq         integer not null,
   unfollowed_at    integer,
   primary key (conversation_id, participant_id)
 );
-
-create table read_cursor (
-  participant_id   text not null references participant (id),
-  conversation_id  integer not null references conversation (id),
+CREATE TABLE channel_read_cursor (
+  participant_id   text not null references channel_participant (id),
+  conversation_id  integer not null references channel_conversation (id),
   read_seq         integer not null,
   updated_at       integer not null,
   primary key (participant_id, conversation_id)
 );
-
-create table seen_mark (
-  participant_id  text not null references participant (id),
-  message_seq     integer not null references message (seq) on delete cascade,
+CREATE TABLE channel_seen_mark (
+  participant_id  text not null references channel_participant (id),
+  message_seq     integer not null references channel_message (seq) on delete cascade,
   primary key (participant_id, message_seq)
 );
-
-create table delivery (
-  recipient_id   text not null references participant (id),
-  message_seq    integer not null references message (seq) on delete cascade,
+CREATE TABLE channel_delivery (
+  recipient_id   text not null references channel_participant (id),
+  message_seq    integer not null references channel_message (seq) on delete cascade,
   reason         text not null check (reason in ('mention', 'everyone', 'own_thread', 'follower', 'general', 'dispatch', 'addressed', 'playbook')),
   wakes          boolean not null,
   held_by        text check (held_by in ('hop_limit', 'cooldown', 'wake_breaker')),
   state          text not null default 'pending' check (state in ('pending', 'announced', 'handed', 'seen', 'dropped')),
-  session        text,
+  launch        text,
   announced_at   integer,
   handed_at      integer,
   seen_at        integer,
@@ -95,13 +70,9 @@ create table delivery (
   created_at     integer not null,
   primary key (recipient_id, message_seq),
   check ((held_by is null) or wakes),
-  check ((state in ('announced', 'handed')) = (session is not null) or state in ('seen', 'dropped'))
+  check ((state in ('announced', 'handed')) = (launch is not null) or state in ('seen', 'dropped'))
 );
-create index delivery_open on delivery (recipient_id, message_seq) where state in ('pending', 'announced', 'handed');
-
--- Issues, the workers that worked them, and every run: one go at the work (issue/, worker/runs.go).
-
-create table issue (
+CREATE TABLE issue (
   id          text primary key,
   title       text not null default '',
   description text not null,
@@ -119,18 +90,15 @@ create table issue (
   closed_at   integer,
   closed      text check (closed in ('merged', 'merged_into_plan', 'dismissed', 'lost', 'answered'))
 );
-create index issue_by_parent on issue (parent);
-
-create table issue_worker (
-  worker         text primary key,
+CREATE INDEX issue_by_parent on issue (parent);
+CREATE TABLE issue_session (
+  session         text primary key,
   issue       text not null references issue (id) on delete cascade,
   started_at  integer not null
 );
-create index issue_worker_by_issue on issue_worker (issue, started_at);
-
-create table run (
+CREATE TABLE session_run (
   id           integer primary key,
-  worker       text not null,
+  session       text not null,
   issue        text,
   triggered_by text not null,
   heard        text,
@@ -140,12 +108,7 @@ create table run (
   summary      text,
   spent        text
 );
-create index run_by_issue on run (issue, started_at);
-create index run_by_worker on run (worker, started_at);
-
--- What happened to each playbook (playbook/log.go).
-
-create table playbook_event (
+CREATE TABLE playbook_event (
   seq          integer primary key autoincrement,
   playbook_id  text not null,
   node_id      text,
@@ -154,15 +117,12 @@ create table playbook_event (
   payload      text not null default '{}',
   created_at   integer not null
 );
-create index playbook_event_by_playbook on playbook_event (playbook_id, seq);
-
--- Schedules (schedule/).
-
-create table schedule (
+CREATE INDEX playbook_event_by_playbook on playbook_event (playbook_id, seq);
+CREATE TABLE schedule (
   id          integer primary key autoincrement,
   name        text not null,
   body        text not null,
-  channel_id  integer not null references conversation (id) on delete cascade,
+  channel_id  integer not null references channel_conversation (id) on delete cascade,
   agent       text,
   project     text,
   spec        text not null,
@@ -171,35 +131,26 @@ create table schedule (
   created_at  integer not null,
   last_run    integer
 );
-
--- The ledger the progress is folded from (game/ledger.go).
-
-create table ledger (
+CREATE TABLE game_ledger (
   seq      integer primary key autoincrement,
   kind     text not null,
   at       integer not null,
   payload  text not null default '{}'
 );
-
--- What agents remember (memory/).
-
-create table memory (
+CREATE TABLE memory (
   id           integer primary key autoincrement,
   agent        text not null,
   kind         text not null,
   body         text not null,
   project      text,
-  worker       text,
+  session       text,
   created_at   integer not null,
   recalled     integer not null default 0,
   recalled_at  integer
 );
-create index memory_by_agent on memory (agent, created_at desc);
-create unique index memory_one_issue on memory (agent, worker) where kind = 'issue';
-
--- Chat apps joined to channels (connector/).
-
-create table connector_account (
+CREATE INDEX memory_by_agent on memory (agent, created_at desc);
+CREATE UNIQUE INDEX memory_one_issue on memory (agent, session) where kind = 'issue';
+CREATE TABLE connector_account (
   connector      text primary key check (connector in ('weixin', 'feishu', 'qq')),
   secrets        text not null,
   owner_id       text,
@@ -210,21 +161,19 @@ create table connector_account (
   last_inbound   integer,
   paused_until   integer,
   connected_at   integer not null,
-  channel_id     integer references conversation (id)
+  channel_id     integer references channel_conversation (id)
 );
-
-create table connector_inbound (
+CREATE TABLE connector_inbound (
   connector      text not null,
   ext_id         text not null,
-  message_seq    integer references message (seq) on delete set null,
+  message_seq    integer references channel_message (seq) on delete set null,
   created_at     integer not null,
   primary key (connector, ext_id)
 );
-
-create table connector_outbox (
+CREATE TABLE connector_outbox (
   id             integer primary key autoincrement,
   connector      text not null,
-  message_seq    integer not null references message (seq) on delete cascade,
+  message_seq    integer not null references channel_message (seq) on delete cascade,
   body           text not null,
   state          text not null default 'pending' check (state in ('pending', 'sent', 'dropped')),
   ext_id         text,
@@ -233,20 +182,51 @@ create table connector_outbox (
   created_at     integer not null,
   sent_at        integer
 );
-create index connector_outbox_pending on connector_outbox (connector, id) where state = 'pending';
-create index connector_outbox_by_ext on connector_outbox (connector, ext_id) where ext_id is not null;
-
--- The yard gate and the devices let in (gate/).
-
-create table lan_gate (
+CREATE INDEX connector_outbox_pending on connector_outbox (connector, id) where state = 'pending';
+CREATE INDEX connector_outbox_by_ext on connector_outbox (connector, ext_id) where ext_id is not null;
+CREATE TABLE gate (
   id    integer primary key check (id = 1),
   open  boolean not null
 );
-
-create table lan_device (
+CREATE TABLE gate_device (
   id         text primary key,
   name       text not null,
   key_hash   text not null unique,
   paired_at  integer not null,
   last_seen  integer
 );
+CREATE INDEX issue_session_by_issue on issue_session (issue, started_at);
+CREATE TABLE channel_participant (
+  id         text primary key,
+  kind       text not null check (kind in ('user', 'manager', 'agent', 'system')),
+  name       text not null,
+  agent_id   text,
+  runtime    text,
+  joined_at  integer not null,
+  left_at    integer,
+  check ((kind = 'agent') = (agent_id is not null))
+);
+CREATE UNIQUE INDEX channel_conversation_by_name on channel_conversation (name) where name is not null;
+CREATE INDEX channel_conversation_by_subject on channel_conversation (subject_kind, subject_id);
+CREATE UNIQUE INDEX channel_conversation_one_general on channel_conversation (kind) where kind = 'general';
+CREATE INDEX channel_mention_by_target on channel_mention (target_id, message_seq);
+CREATE INDEX channel_message_by_conversation on channel_message (conversation_id, seq);
+CREATE INDEX channel_message_by_sender on channel_message (sender_id, seq);
+CREATE UNIQUE INDEX channel_message_send_key on channel_message (sender_id, send_key) where send_key is not null;
+CREATE INDEX channel_delivery_open on channel_delivery (recipient_id, message_seq) where state in ('pending', 'announced', 'handed');
+CREATE INDEX session_run_by_issue on session_run (issue, started_at);
+CREATE INDEX session_run_by_session on session_run (session, started_at);
+CREATE TABLE session (
+  id        text primary key,
+  agent     text not null,
+  name      text not null,
+  runtime   text not null,
+  task      text not null,
+  project   text,
+  issue     text,
+  playbook  text,
+  hired_at  integer not null,
+  ended_at  integer,
+  closed    text check (closed in ('merged', 'merged_into_plan', 'dismissed', 'lost', 'answered'))
+);
+CREATE INDEX session_by_agent on session (agent, hired_at);

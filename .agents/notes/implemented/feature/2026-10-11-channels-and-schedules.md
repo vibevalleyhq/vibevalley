@@ -26,7 +26,7 @@ VibeValley 已经有了 Raft 那一半的大部分（田头、串、@、投递�
 ### 多个频道
 
 - 对话多一种 `channel`（`ConversationKind`）。田头是默认的频道（`square`）；每个频道有名字（`#clock-in`）、说明，可以带一个默认项目：在这个频道里派的活，没说项目就在这个项目里干。
-- 地址是 `#<频道>`、`#<频道>:<seq>`（读地址的 `parseChatTarget` 在 `server/internal/channel/rules.go`，写地址的 `TargetOf` 在 `server/internal/protocol/chat_rules.go`），帮工的 `farm_say` 接口不变。
+- 地址是 `#<频道>`、`#<频道>:<seq>`（读地址的 `parseChatTarget` 在 `server/internal/channel/rules.go`，写地址的 `TargetOf` 在 `server/internal/protocol/chat_rules.go`），帮工的 `channel_say` 接口不变。
 - **谁在频道里**：主人和管家在每个频道里；帮工在它的活所在的频道里，在哪个频道派的活，工单串就开在哪个频道下面。投递照旧是 `AudienceOf`：其中的 `helpers` 是这个频道的帮工，`onFarm` 是地里的全部，用来判断 @ 的人在不在地里。三道刹车、送达状态都不变。
 - 管家的「农场现状」按频道分组；管家在哪个频道被叫，就回在哪个频道。`dispatch` 带着频道和它的默认项目；管家还有 `channels`、`open_channel`、`channel_settings` 三个工具（`server/internal/manager/tools.go`）。
 - 私信不做：频道加上串已经够分开事情。

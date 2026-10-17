@@ -130,11 +130,11 @@ func TestToolsOverMcp(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	sort.Strings(names)
-	if !slices.Equal(names, []string{"farm_inbox", "farm_read", "farm_say", "farm_who"}) {
+	if !slices.Equal(names, []string{"channel_inbox", "channel_read", "channel_say", "session_list"}) {
 		t.Fatalf("tools %q", names)
 	}
 
-	who := call("tools/call", map[string]any{"name": "farm_who", "arguments": map[string]any{}}).text()
+	who := call("tools/call", map[string]any{"name": "session_list", "arguments": map[string]any{}}).text()
 	if !regexp.MustCompile(`(?m)^- ` + id + ` `).MatchString(who) {
 		t.Fatalf("who %q", who)
 	}
@@ -142,7 +142,7 @@ func TestToolsOverMcp(t *testing.T) {
 	if strings.Contains(strings.Join(lines[:len(lines)-1], "\n"), "@") {
 		t.Fatal("names are listed with an @, and models copy a wake")
 	}
-	if said := call("tools/call", map[string]any{"name": "farm_say", "arguments": map[string]any{"text": "从 MCP 说一句", "anyway": true}}).text(); !strings.Contains(said, "发出去了") {
+	if said := call("tools/call", map[string]any{"name": "channel_say", "arguments": map[string]any{"text": "从 MCP 说一句", "anyway": true}}).text(); !strings.Contains(said, "发出去了") {
 		t.Fatalf("said %q", said)
 	}
 	i := slices.IndexFunc(protocol.MessagesIn(f.Core.State().Chat, thread.ID), func(m protocol.ChatMessage) bool { return m.Text == "从 MCP 说一句" })
@@ -152,17 +152,17 @@ func TestToolsOverMcp(t *testing.T) {
 	if m := protocol.MessagesIn(f.Core.State().Chat, thread.ID)[i]; m.From != id || m.FromKind != protocol.SenderKindAgent {
 		t.Fatalf("said as %s (%s)", m.From, m.FromKind)
 	}
-	if inbox := call("tools/call", map[string]any{"name": "farm_inbox", "arguments": map[string]any{}}).text(); inbox == "" {
+	if inbox := call("tools/call", map[string]any{"name": "channel_inbox", "arguments": map[string]any{}}).text(); inbox == "" {
 		t.Fatal("no answer from the inbox")
 	}
-	if read := call("tools/call", map[string]any{"name": "farm_read", "arguments": map[string]any{}}).text(); !strings.Contains(read, "从 MCP 说一句") {
+	if read := call("tools/call", map[string]any{"name": "channel_read", "arguments": map[string]any{}}).text(); !strings.Contains(read, "从 MCP 说一句") {
 		t.Fatalf("read %q", read)
 	}
 
-	if text := client(t, url, "")("tools/call", map[string]any{"name": "farm_who", "arguments": map[string]any{}}).text(); !strings.Contains(text, "没认出你是谁") {
+	if text := client(t, url, "")("tools/call", map[string]any{"name": "session_list", "arguments": map[string]any{}}).text(); !strings.Contains(text, "没认出你是谁") {
 		t.Fatalf("no token: %q", text)
 	}
-	if text := client(t, url, "hb_w1_forged")("tools/call", map[string]any{"name": "farm_say", "arguments": map[string]any{"text": "冒名"}}).text(); !strings.Contains(text, "没认出你是谁") {
+	if text := client(t, url, "hb_w1_forged")("tools/call", map[string]any{"name": "channel_say", "arguments": map[string]any{"text": "冒名"}}).text(); !strings.Contains(text, "没认出你是谁") {
 		t.Fatalf("forged: %q", text)
 	}
 }

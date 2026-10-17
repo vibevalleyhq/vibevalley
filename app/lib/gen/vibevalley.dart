@@ -1657,7 +1657,6 @@ sealed class LedgerEntry {
     'busy6' => LedgerEntryMoment.fromJson(j),
     'level' => LedgerEntryLevel.fromJson(j),
     'titled' => LedgerEntryTitled.fromJson(j),
-    'carried' => LedgerEntryCarried.fromJson(j),
     final other => throw FormatException('LedgerEntry: unknown kind', other),
   };
 
@@ -3774,18 +3773,6 @@ final class LedgerEntryTitled extends LedgerEntry {
 
   @override
   Map<String, dynamic> toJson() => {'kind': 'titled', 'at': at, if (achievement != null) 'achievement': achievement!, if (tier != null) 'tier': tier!};
-}
-
-final class LedgerEntryCarried extends LedgerEntry {
-  const LedgerEntryCarried({required this.at, required this.coins});
-
-  factory LedgerEntryCarried.fromJson(Map<String, dynamic> j) => LedgerEntryCarried(at: (j['at'] as num).toDouble(), coins: (j['coins'] as num).toDouble());
-
-  final double at;
-  final double coins;
-
-  @override
-  Map<String, dynamic> toJson() => {'kind': 'carried', 'at': at, 'coins': coins};
 }
 
 enum ConnectorId {

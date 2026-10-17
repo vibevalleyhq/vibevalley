@@ -105,7 +105,7 @@
 
 **送达**：每条给帮工的消息走 未交付 → 提示过 → 已交付 → 看到了。歇着的帮工被叫醒时新一轮带着给它的消息；这一轮真的开口了才算看到，没开口就退回、过一会儿再叫。忙着的帮工攒几秒，插一句不带正文的提示（`BusyNotice`）。宁可重复给，不会丢。
 
-**帮工的工具**（`mcp/mcp.go`，在 `/mcp` 上；`mcp` 是给编码 agent 的入口，和 HTTP 并排）：`farm_say`、`farm_read`、`farm_inbox`、`farm_who`。每个会话带一个自己的令牌（`session/tokens.go`），只用来分清是谁在说话。`farm_say` 发出前会拦下：目标里有它没看过的新消息、读的是串却发到顶层、60 秒内重复同一句。
+**帮工的工具**（`mcp/mcp.go`，在 `/mcp` 上；`mcp` 是给编码 agent 的入口，和 HTTP 并排）：`channel_say`、`channel_read`、`channel_inbox`、`session_list`。每个会话带一个自己的令牌（`session/tokens.go`），只用来分清是谁在说话。`channel_say` 发出前会拦下：目标里有它没看过的新消息、读的是串却发到顶层、60 秒内重复同一句。
 
 ## 连接器：微信、飞书、QQ
 

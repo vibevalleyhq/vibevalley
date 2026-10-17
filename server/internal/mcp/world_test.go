@@ -60,7 +60,7 @@ func open(t *testing.T) *world {
 	w.App = app
 	pi := oartest.Runtime(oartest.Options{ID: "pi", Turn: func(turn *oartest.Turn) error {
 		for _, s := range turn.Options.MCPServers {
-			if s.Name == "farm" {
+			if s.Name == "vibevalley" {
 				w.mu.Lock()
 				w.tokens[turn.Options.Cwd] = strings.TrimPrefix(s.Headers["authorization"], "Bearer ")
 				w.mu.Unlock()

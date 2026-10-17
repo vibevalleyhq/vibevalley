@@ -595,7 +595,7 @@ func (v StateFrame) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-// LedgerEntryValue is a member of LedgerEntry: LedgerEntryHarvested, LedgerEntryFailed, LedgerEntryConflicted, LedgerEntryTold, LedgerEntryReviewed, LedgerEntryPlaybook, LedgerEntryHandoff, LedgerEntryCalled, LedgerEntryHired, LedgerEntryMoment, LedgerEntryLevel, LedgerEntryTitled, LedgerEntryCarried, told apart by "kind".
+// LedgerEntryValue is a member of LedgerEntry: LedgerEntryHarvested, LedgerEntryFailed, LedgerEntryConflicted, LedgerEntryTold, LedgerEntryReviewed, LedgerEntryPlaybook, LedgerEntryHandoff, LedgerEntryCalled, LedgerEntryHired, LedgerEntryMoment, LedgerEntryLevel, LedgerEntryTitled, told apart by "kind".
 type LedgerEntryValue interface{ isLedgerEntry() }
 
 func (u LedgerEntry) IsZero() bool { return u.Value == nil }
@@ -680,10 +680,6 @@ func (u *LedgerEntry) UnmarshalJSON(data []byte) error {
 		var v LedgerEntryTitled
 		err = json.Unmarshal(data, &v)
 		u.Value = v
-	case "carried":
-		var v LedgerEntryCarried
-		err = json.Unmarshal(data, &v)
-		u.Value = v
 	default:
 		return fmt.Errorf("LedgerEntry: unknown kind %q", head.Tag)
 	}
@@ -692,7 +688,7 @@ func (u *LedgerEntry) UnmarshalJSON(data []byte) error {
 
 // LedgerEntryMembers are every member of LedgerEntry, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var LedgerEntryMembers = []LedgerEntryValue{LedgerEntryHarvested{}, LedgerEntryFailed{}, LedgerEntryConflicted{}, LedgerEntryTold{}, LedgerEntryReviewed{}, LedgerEntryPlaybook{}, LedgerEntryHandoff{}, LedgerEntryCalled{}, LedgerEntryHired{}, LedgerEntryMoment{}, LedgerEntryLevel{}, LedgerEntryTitled{}, LedgerEntryCarried{}}
+var LedgerEntryMembers = []LedgerEntryValue{LedgerEntryHarvested{}, LedgerEntryFailed{}, LedgerEntryConflicted{}, LedgerEntryTold{}, LedgerEntryReviewed{}, LedgerEntryPlaybook{}, LedgerEntryHandoff{}, LedgerEntryCalled{}, LedgerEntryHired{}, LedgerEntryMoment{}, LedgerEntryLevel{}, LedgerEntryTitled{}}
 
 // PlaybookEventKindValues are every PlaybookEventKind, in the protocol's order.
 var PlaybookEventKindValues = []PlaybookEventKind{PlaybookEventKindPlanning, PlaybookEventKindDrafted, PlaybookEventKindStarted, PlaybookEventKindPaused, PlaybookEventKindResumed, PlaybookEventKindRipe, PlaybookEventKindMerged, PlaybookEventKindAbandoned, PlaybookEventKindNoted, PlaybookEventKindNodeStarted, PlaybookEventKindNodeSentBack, PlaybookEventKindNodeMerged, PlaybookEventKindNodeFailed, PlaybookEventKindNodeRetried, PlaybookEventKindNodeRequeued, PlaybookEventKindNodeSkipped, PlaybookEventKindNodeEdited, PlaybookEventKindNodeAdded, PlaybookEventKindNodeRemoved}
@@ -1198,15 +1194,6 @@ func (v LedgerEntryTitled) MarshalJSON() ([]byte, error) {
 	p := plain(v)
 
 	return withTag(p, "kind", "titled")
-}
-
-func (LedgerEntryCarried) isLedgerEntry() {}
-
-func (v LedgerEntryCarried) MarshalJSON() ([]byte, error) {
-	type plain LedgerEntryCarried
-	p := plain(v)
-
-	return withTag(p, "kind", "carried")
 }
 
 // ConnectorIDValues are every ConnectorID, in the protocol's order.

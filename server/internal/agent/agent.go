@@ -76,9 +76,6 @@ func New(home string) (*Service, error) {
 		st.s.Settings = map[string]protocol.RuntimeSettings{}
 	}
 	st.s = withoutExamples(st.s)
-	for i, a := range st.s.Agents {
-		st.s.Agents[i] = withCast(a)
-	}
 	if !slices.ContainsFunc(st.s.Agents, func(a protocol.Agent) bool { return a.ID == protocol.ManagerAgent }) {
 		st.s.Agents = append(st.s.Agents, withCast(managerProfile()))
 	}

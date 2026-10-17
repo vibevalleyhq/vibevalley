@@ -20,7 +20,7 @@ func TestSessionsReachTheFarmWhereItAnswers(t *testing.T) {
 	registry, _ := oar.NewRuntimeRegistry(oartest.Runtime(oartest.Options{ID: "pi", Turn: func(turn *oartest.Turn) error {
 		mu.Lock()
 		for _, s := range turn.Options.MCPServers {
-			if s.Name == "farm" {
+			if s.Name == "vibevalley" {
 				urls = append(urls, s.URL)
 			}
 		}

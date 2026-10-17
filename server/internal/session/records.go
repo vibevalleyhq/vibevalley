@@ -5,10 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
-	"os"
-	"path/filepath"
 	"slices"
-	"strings"
 
 	"vibevalley/internal/protocol"
 	"vibevalley/pkg/db/generated"
@@ -117,49 +114,6 @@ func endedSession(r generated.Session, runs []generated.SessionRun) protocol.Ses
 	return s
 }
 
-// Before the table a session's head was events/<id>.head.json: each is moved in once and removed.
-func (c *sessions) moveHeads() {
-	entries, err := os.ReadDir(c.trajectories.dir)
-	if err != nil {
-		return
-	}
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".head.json") {
-			continue
-		}
-		file := filepath.Join(c.trajectories.dir, e.Name())
-		body, err := os.ReadFile(file)
-		if err != nil {
-			continue
-		}
-		var h struct {
-			ID, Name                            string
-			Agent, Runtime, Project, Job, Issue *string
-			StartedAt                           int64
-			EndedAt                             *int64
-			Closed                              *string
-			Playbook                            json.RawMessage
-		}
-		if json.Unmarshal(body, &h) != nil || h.ID == "" || h.ID == protocol.ManagerAgent {
-			_ = os.Remove(file)
-			continue
-		}
-		params := generated.MoveHeadParams{ID: h.ID, Agent: recordValue(h.Agent), Name: h.Name, Runtime: recordValue(h.Runtime), Task: recordValue(h.Job),
-			Project: recordText(h.Project), Issue: recordText(h.Issue), HiredAt: h.StartedAt, Closed: recordText(h.Closed)}
-		if len(h.Playbook) > 0 && string(h.Playbook) != "null" {
-			params.Playbook = sql.NullString{String: string(h.Playbook), Valid: true}
-		}
-		if h.EndedAt != nil {
-			params.EndedAt = sql.NullInt64{Int64: *h.EndedAt, Valid: true}
-		}
-		if err := c.q.MoveHead(context.Background(), params); err != nil {
-			log.Printf("vibevalley: %s not moved in: %v", file, err)
-			continue
-		}
-		_ = os.Remove(file)
-	}
-}
-
 // The logs of sessions that ended more than days ago go; the sessions stay, small, so the board keeps every issue.
 func (c *sessions) expireLogs(days int) {
 	if days <= 0 {
@@ -187,11 +141,4 @@ func recordPtr(s sql.NullString) *string {
 		return nil
 	}
 	return &s.String
-}
-
-func recordValue(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }

@@ -158,8 +158,6 @@ func progressAtOf(e protocol.LedgerEntryValue) int64 {
 		return v.At
 	case protocol.LedgerEntryTitled:
 		return v.At
-	case protocol.LedgerEntryCarried:
-		return v.At
 	}
 	return 0
 }
@@ -248,8 +246,6 @@ func progressStep(folded ledgerFolded, entry protocol.LedgerEntry) (ledgerFolded
 				p.Title = &protocol.ProgressTitle{ID: worn.ID, Tier: *e.Tier}
 			}
 		}
-	case protocol.LedgerEntryCarried:
-		coins += e.Coins
 	}
 	counts = progressAtLeast(counts, "steady", p.BestStreak)
 
@@ -321,7 +317,7 @@ func progressPlaybookEntry(pb protocol.Playbook) protocol.LedgerEntry {
 	return protocol.LedgerEntry{Value: protocol.LedgerEntryPlaybook{Playbook: pb.ID, Merged: int64(len(merged)), Parallel: parallel}}
 }
 
-// Only what the person does in the app (a voice call, a review, coins carried, a title) is recorded where it happens: everything the farm does is
+// Only what the person does in the app (a voice call, a review, a title) is recorded where it happens: everything the farm does is
 // told by its facts.
 func entriesFor(before protocol.CoreState, fact protocol.Fact, after protocol.CoreState) []protocol.LedgerEntry {
 	out := []protocol.LedgerEntry{}

@@ -141,7 +141,7 @@ var managerToolLabels = map[string]string{
 	"search_archive":   "翻旧账",
 }
 
-var managerNamed = []string{"agent", "worker", "project", "name", "query", "note", "goal"}
+var managerNamed = []string{"agent", "session", "project", "name", "query", "note", "goal"}
 
 func managerToolStart(name string, args json.RawMessage) session.ToolStart {
 	var fields map[string]any
@@ -219,10 +219,10 @@ func managerEnum[T ~string](values []T) map[string]any {
 	return s
 }
 
-var managerSessionSchema = agentcore.ObjectSchema(map[string]any{"worker": managerStr("帮工的名字或 id")}, "worker")
+var managerSessionSchema = agentcore.ObjectSchema(map[string]any{"session": managerStr("帮工的名字或 id")}, "session")
 
 type managerSessionArgs struct {
-	Session string `json:"worker"`
+	Session string `json:"session"`
 }
 
 type managerNone struct{}
@@ -576,12 +576,12 @@ func (fm *manager) tools() []agentcore.AgentTool {
 	})
 
 	type tellArgs struct {
-		Session string `json:"worker"`
+		Session string `json:"session"`
 		Message string `json:"message"`
 	}
 	tell := agent.TextTool(agent.TextToolSpec[tellArgs]{
 		Name: "tell", Label: managerToolLabels["tell"], Description: "给一个帮工带话：发在它的工单串里。他正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
-		Parameters: agentcore.ObjectSchema(map[string]any{"worker": managerStr("帮工的名字或 id"), "message": managerStr("要带的话")}, "worker", "message"),
+		Parameters: agentcore.ObjectSchema(map[string]any{"session": managerStr("帮工的名字或 id"), "message": managerStr("要带的话")}, "session", "message"),
 		Run: func(_ context.Context, p tellArgs, _ agent.ToolContext) (string, error) {
 			return withSession(p.Session, func(w session.Roster) string {
 				if _, err := fm.chat.TellSession(protocol.ManagerAgent, w.Session.ID, p.Message); err != nil {

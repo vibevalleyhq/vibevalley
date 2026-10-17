@@ -36,7 +36,7 @@ flowchart LR
   API --> CHAT & FM & TK & CREW & PRJ & RT
   CHAT <-->|给它的话 / 它说的话| FM
   CHAT -->|叫醒、提示| CREW
-  CREW -->|farm_say、farm_read……<br/>带自己的令牌| MCP
+  CREW -->|channel_say、channel_read……<br/>带自己的令牌| MCP
   MCP --> CHAT
   FM -->|写工单、派活、收获、拆计划| TK
   TK -->|开执行、叫走| CREW

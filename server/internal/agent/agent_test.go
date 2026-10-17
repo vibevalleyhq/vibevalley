@@ -63,23 +63,14 @@ func TestAProfileWithoutAnAnimalGetsTheOneItShowed(t *testing.T) {
 	testkit.Eq(t, [2]any{*kept.Look.Species, *kept.Look.Outfit}, [2]any{owl, rain}, "its own are kept")
 }
 
-func TestOldProfilesAreFilledInOnceOnLoad(t *testing.T) {
-	home := t.TempDir()
-	file := filepath.Join(home, "config.json")
-	old := `{"agents":[{"id":"backend","name":"后端","runtime":"pi","look":{"build":"biped","head":"rounded","body":"#fff","trim":"#000","hat":"#f00","eye":"#0ff"}}],"skills":[],"settings":{}}`
-	if err := os.WriteFile(file, []byte(old), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	s, err := New(home)
+func TestASavedProfileWithoutALookIsFilledIn(t *testing.T) {
+	s, err := New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := s.Agent("backend")
-	testkit.Eq(t, [2]any{*a.Look.Species, *a.Look.Outfit}, [2]any{protocol.SpeciesCat, protocol.OutfitFarmer}, "filled in")
-	body, _ := os.ReadFile(file)
-	testkit.Match(t, string(body), `"species":"cat","outfit":"farmer"`, "and written back")
 	saved, _ := s.SaveAgent(protocol.Agent{ID: "agent-7", Name: "新", Runtime: "pi"})
-	testkit.Eq(t, *saved.Look.Species, protocol.SpeciesFox, "a save without one is filled in too")
+	testkit.Eq(t, *saved.Look.Species, protocol.SpeciesFox, "a save without one is filled in")
+	testkit.Eq(t, *saved.Look.Outfit, protocol.OutfitFarmer, "and the outfit too")
 }
 
 // The manager is a profile every farm has: there after the first load and every one after, kept out of the profiles work is

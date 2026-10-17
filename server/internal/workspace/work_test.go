@@ -927,26 +927,13 @@ func TestIssueUpdateChangesOnlyWhatItGives(t *testing.T) {
 }
 
 // A session is a row from when it is sent: listed with the ones on the farm once it has ended, closed, its runs counted.
-// A head from before the table is moved in; an ended session's log goes after session.trajectory_days, its row stays.
+// An ended session's log goes after session.trajectory_days, its row stays.
 func TestEndedSessionsAreRows(t *testing.T) {
 	home, work := dirs(t)
 	dir := filepath.Join(home, "events")
 	os.MkdirAll(dir, 0o755)
-	long := clock.NowMs() - 400*protocol.DayMs
-	os.WriteFile(filepath.Join(dir, "w77.head.json"), []byte(fmt.Sprintf(`{"id":"w77","name":"老周","agent":"backend","runtime":"pi","job":"老活","startedAt":%d,"endedAt":%d,"closed":"merged"}`, long, long)), 0o644)
-	os.WriteFile(filepath.Join(dir, "w77.json"), []byte(`[]`), 0o644)
-	w := openWorld(t, home, work)
-	if _, err := os.Stat(filepath.Join(dir, "w77.head.json")); !os.IsNotExist(err) {
-		t.Fatal("the head is still a file")
-	}
-	if _, err := os.Stat(filepath.Join(dir, "w77.json")); !os.IsNotExist(err) {
-		t.Fatal("a log older than the days kept")
-	}
-	old := w.f.Session.Get("w77")
-	if old == nil || old.Task != "老活" || old.Phase.Value != (protocol.PhaseClosed{At: long, Closed: protocol.IssueCloseMerged}) {
-		t.Fatalf("moved in: %+v", old)
-	}
 	lab := fixture.Lab(t)
+	w := openWorld(t, home, work)
 	s := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "看看目录", "rows", session.HireOptions{}))
 	w.nextReport(t)
 	w.f.Session.Dismiss(s.ID)
@@ -958,6 +945,6 @@ func TestEndedSessionsAreRows(t *testing.T) {
 	for _, x := range w.f.Session.List("") {
 		ids = append(ids, x.ID)
 	}
-	testkit.Eq(t, ids, []string{s.ID, "w77"}, "newest first, the moved one too")
-	testkit.Eq(t, len(w.f.Session.List("backend")), 1, "by agent")
+	testkit.Eq(t, ids, []string{s.ID}, "newest first")
+	testkit.Eq(t, len(w.f.Session.List(lab.ID)), 1, "by agent")
 }

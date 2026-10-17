@@ -118,6 +118,7 @@ void main() {
     expect(shortcutText('Alt+Shift+Space'), '⌥⇧Space');
     expect(DesktopChannel.alpha.titled('码农场物语'), '码农场物语 · Alpha');
     expect(DesktopChannel.release.titled('码农场物语'), '码农场物语');
-    expect(DesktopChannel.named('nope'), DesktopChannel.release);
+    expect(DesktopChannel.named('alpha'), DesktopChannel.alpha);
+    expect(() => DesktopChannel.named('nope'), throwsArgumentError);
   });
 }

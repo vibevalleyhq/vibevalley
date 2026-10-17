@@ -77,10 +77,6 @@ var layers = []base.Layer{
 
 // options go after the farm's own (a test's fx.Decorate, fx.Replace).
 func New(cfg base.Config, options ...fx.Option) (*Workspace, error) {
-	// Before any service reads the home.
-	if err := base.MoveSessionFiles(cfg.Home); err != nil {
-		return nil, err
-	}
 	f := &Workspace{}
 	app, err := base.NewApp(cfg, layers,
 		fx.Options(options...),

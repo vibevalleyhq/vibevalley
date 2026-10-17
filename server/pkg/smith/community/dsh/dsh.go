@@ -74,6 +74,7 @@ const deepseek = "deepseek-official"
 
 // OptionValue is the `model` option's value for a model: dsh values it by the JSON pair ["provider","model"].
 // "deepseek-flash" is DeepSeek's; "provider/model" is that provider's; an empty model or a pair is left as it is.
+// The retired name "deepseek-v4-flash" is the same model as "deepseek-flash" (DeepSeek serves and bills it as flash).
 func OptionValue(model string) string {
 	model = strings.TrimSpace(model)
 	if model == "" || strings.HasPrefix(model, "[") {
@@ -83,8 +84,33 @@ func OptionValue(model string) string {
 	if !ok {
 		provider, id = deepseek, model
 	}
+	if (provider == deepseek || provider == "deepseek-account") && id == "deepseek-v4-flash" {
+		id = "deepseek-flash"
+	}
 	pair, _ := json.Marshal([]string{provider, id})
 	return string(pair)
+}
+
+// CanonicalModelID is a model id with the retired name folded into today's: "provider/deepseek-v4-flash" becomes
+// "provider/deepseek-flash". Anything else, a bare name included, is itself.
+func CanonicalModelID(id string) string {
+	provider, model, ok := strings.Cut(id, "/")
+	if !ok || model == "" {
+		return id
+	}
+	if (provider == deepseek || provider == "deepseek-account") && model == "deepseek-v4-flash" {
+		return provider + "/deepseek-flash"
+	}
+	return id
+}
+
+// modelName is the model part of a model option's value, "deepseek-flash" from ["deepseek-official","deepseek-flash"].
+func modelName(value string) string {
+	_, model, ok := strings.Cut(ModelID(value), "/")
+	if !ok {
+		return ""
+	}
+	return model
 }
 
 // ModelID is how a model is written outside dsh, provider/model, from its option value; a value that is no pair is

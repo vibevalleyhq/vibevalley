@@ -569,11 +569,11 @@ class _FoldedState extends State<_Folded> {
   }
 }
 
-String? farmToolText(String text) => switch (RegExp(r'^farm__farm_(\w+)').firstMatch(text.trim())?.group(1)) {
-  'say' => '在田头说话',
-  'read' => '读田头的消息',
-  'inbox' => '看有没有找它的话',
-  'who' => '看田头上都有谁',
+String? farmToolText(String text) => switch (RegExp(r'^vibevalley__(channel_say|channel_read|channel_inbox|session_list)').firstMatch(text.trim())?.group(1)) {
+  'channel_say' => '在田头说话',
+  'channel_read' => '读田头的消息',
+  'channel_inbox' => '看有没有找它的话',
+  'session_list' => '看田头上都有谁',
   null => null,
   final other => '田头：$other',
 };

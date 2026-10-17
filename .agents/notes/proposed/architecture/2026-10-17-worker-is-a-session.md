@@ -49,11 +49,11 @@ Status: proposed
 
 ### 做到哪了
 
-2026-10-17 做了：协议、服务端的包（`internal/session`）、`Workspace.Session`、表（迁移 `0002_session.sql`：`issue_session`，`run`、`memory` 的 `session` 列，发言人 `'agent'`，库里 JSON 的键）、家目录（`base.MoveSessionFiles`：`workers.json` → `sessions.json`，`state.json` 的键）、配置的 `session.stall_seconds`、Flutter 的类型和名字、黄金数据（按同样的规则转写，不用 update 就过）、当前文档。
+2026-10-17 做了：协议、服务端的包（`internal/session`）、`Workspace.Session`、表（当时的迁移 `0002`，后来并进今天的 `0001_schema.sql` 基线：`issue_session`，`run`、`memory` 的 `session` 列，发言人 `'agent'`，库里 JSON 的键）、家目录（`sessions.json`；搬旧 `workers.json` 的那段后来随一次性导入一起删了）、配置的 `session.stall_seconds`、Flutter 的类型和名字、黄金数据（按同样的规则转写，不用 update 就过）、当前文档；管家的工具参数也从 `worker` 改成了 `session`。
 
-先做的一步是把原来叫 session 的东西改了名，免得和这一层撞：一次启动（`w3#2`）是 launch（`LaunchActivity`、`delivery.launch`），oar 的会话 id 是 `oarSessionId`。迁移跑的时候关掉外键、提交前查 `foreign_key_check`（`migrations.go`），重建 `participant` 才不会改写别的表的引用。
+先做的一步是把原来叫 session 的东西改了名，免得和这一层撞：一次启动（`w3#2`）是 launch（`LaunchActivity`、`delivery.launch`），oar 的会话 id 是 `oarSessionId`。当时的迁移跑的时候关掉外键、提交前查 `foreign_key_check`（`migrations.go`），重建 `participant` 才不会改写别的表的引用。
 
-没改的：管家工具给模型看的参数名还叫 `worker`（对应「帮工」）；农机设置里的 `SessionEnv`、`SessionEffort` 这些指的是 oar 会话的选项，没改名；Note 是历史，里面的 Worker 不改。
+没改的：农机设置里的 `SessionEnv`、`SessionEffort` 这些指的是 oar 会话的选项，没改名；Note 是历史，里面的 Worker 不改。
 
 ## Alternatives considered
 

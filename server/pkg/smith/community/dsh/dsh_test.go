@@ -95,10 +95,12 @@ func applied(opened, params json.RawMessage) json.RawMessage {
 
 func TestOptionValue(t *testing.T) {
 	for model, want := range map[string]string{
-		"deepseek-flash":                   `["deepseek-official","deepseek-flash"]`,
-		"deepseek-official/deepseek-flash": `["deepseek-official","deepseek-flash"]`,
-		`["openrouter","x"]`:               `["openrouter","x"]`,
-		"":                                 "",
+		"deepseek-flash":                      `["deepseek-official","deepseek-flash"]`,
+		"deepseek-official/deepseek-flash":    `["deepseek-official","deepseek-flash"]`,
+		"deepseek-v4-flash":                   `["deepseek-official","deepseek-flash"]`,
+		"deepseek-official/deepseek-v4-flash": `["deepseek-official","deepseek-flash"]`,
+		`["openrouter","x"]`:                  `["openrouter","x"]`,
+		"":                                    "",
 	} {
 		if got := OptionValue(model); got != want {
 			t.Errorf("OptionValue(%q) = %q, want %q", model, got, want)
@@ -122,10 +124,10 @@ func TestProjectModelsReadsGroups(t *testing.T) {
 			t.Errorf("%s: efforts %v default %q", m.ID, m.EffortLevels, m.DefaultEffort)
 		}
 	}
-	if want := []string{"deepseek-official/deepseek-v4-flash", "deepseek-official/deepseek-flash", "deepseek-official/deepseek-v4-pro"}; !slices.Equal(ids, want) {
+	if want := []string{"deepseek-official/deepseek-flash", "deepseek-official/deepseek-v4-pro"}; !slices.Equal(ids, want) {
 		t.Fatalf("ids %v, want %v", ids, want)
 	}
-	if !models[0].Default || models[1].Default || models[1].DisplayName != "DeepSeek-V4.1-Flash-1017" || models[2].DisplayName != "DeepSeek-V4-Pro" {
+	if !models[0].Default || models[1].DisplayName != "DeepSeek-V4-Pro" || models[0].DisplayName != "DeepSeek-V4.1-Flash-1017" {
 		t.Fatalf("models %+v", models)
 	}
 }

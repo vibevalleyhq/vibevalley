@@ -40,15 +40,26 @@ func ProjectModels(response any) []oar.ModelEntry {
 		}
 	}
 	current, _ := model["currentValue"].(string)
+	currentID := CanonicalModelID(ModelID(current))
 	entries := []oar.ModelEntry{}
+	index := map[string]int{}
 	add := func(choice jsonx.Record) {
 		value, _ := choice["value"].(string)
 		if value == "" {
 			return
 		}
-		name := displayName(value, choice)
-		entries = append(entries, oar.ModelEntry{ID: ModelID(value), DisplayName: name, EffortLevels: levels, DefaultEffort: defaultEffort,
-			Default: value == current})
+		id := CanonicalModelID(ModelID(value))
+		entry := oar.ModelEntry{ID: id, DisplayName: displayName(id, choice), EffortLevels: levels, DefaultEffort: defaultEffort,
+			Default: id == currentID}
+		if at, seen := index[id]; seen {
+			// The retired name and today's name are the same model: show today's.
+			if modelName(value) == "deepseek-flash" {
+				entries[at] = entry
+			}
+			return
+		}
+		index[id] = len(entries)
+		entries = append(entries, entry)
 	}
 	for _, choice := range jsonx.AsRecordList(model["options"]) {
 		if group := jsonx.AsRecordList(choice["options"]); group != nil {
@@ -116,9 +127,9 @@ func ListModels(ctx context.Context, installation oar.AvailableInstallation, opt
 // displayName is the choice's name, with the release dsh's own selector badges it with
 // (dsh-client-ui-deepseek-model-label-1017): DeepSeek's deepseek-flash is DeepSeek-V4.1-Flash-1017, the API's only Flash model
 // name (api-docs.deepseek.com/quick_start/pricing).
-func displayName(value string, choice jsonx.Record) string {
+func displayName(id string, choice jsonx.Record) string {
 	name, _ := choice["name"].(string)
-	provider, model, _ := strings.Cut(ModelID(value), "/")
+	provider, model, _ := strings.Cut(id, "/")
 	if (provider == deepseek || provider == "deepseek-account") && model == "deepseek-flash" && name == "DeepSeek-V4.1-Flash" {
 		return name + "-1017"
 	}

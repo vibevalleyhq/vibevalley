@@ -13,7 +13,13 @@ enum DesktopChannel {
   final String productName;
   final String bundleId;
 
-  static DesktopChannel named(String name) => values.firstWhere((c) => c.name == name, orElse: () => release);
+  /// The channel the build was given; an unknown name is a mistake in the build, not a release.
+  static DesktopChannel named(String name) {
+    for (final channel in values) {
+      if (channel.name == name) return channel;
+    }
+    throw ArgumentError('unknown VIBEVALLEY_CHANNEL: $name');
+  }
 
   String titled(String title) => label.isEmpty ? title : '$title · $label';
 }

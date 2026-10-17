@@ -245,7 +245,7 @@ func wakeInput(messages []protocol.InboxMessage, others []chatUnreadRow) string 
 			lines = append(lines, "- "+chatRowText(r))
 		}
 	}
-	lines = append(lines, "", "要回就用 farm_say，target 照抄；要看前面的上下文用 farm_read。不用回的就不回。")
+	lines = append(lines, "", "要回就用 channel_say，target 照抄；要看前面的上下文用 channel_read。不用回的就不回。")
 	return strings.Join(lines, "\n")
 }
 
@@ -254,5 +254,5 @@ func busyNotice(rows []chatUnreadRow) string {
 	for _, r := range rows[:min(len(rows), protocol.SummaryConversations)] {
 		texts = append(texts, chatRowText(r))
 	}
-	return fmt.Sprintf("[%s提示] 有新消息还没读：%s。方便的时候用 farm_read 读；不读不代表没事。", protocol.GeneralName, strings.Join(texts, "；"))
+	return fmt.Sprintf("[%s提示] 有新消息还没读：%s。方便的时候用 channel_read 读；不读不代表没事。", protocol.GeneralName, strings.Join(texts, "；"))
 }

@@ -171,7 +171,6 @@ func TestTitles(t *testing.T) {
 }
 
 func TestCarried(t *testing.T) {
-	testkit.Eq(t, progressOf([]protocol.LedgerEntry{{Value: protocol.LedgerEntryCarried{At: progressAt, Coins: 420}}}).Coins, int64(420))
 }
 
 func progressSession(id string, phase protocol.PhaseValue) protocol.Session {

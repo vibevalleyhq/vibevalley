@@ -39,10 +39,10 @@ void main() {
   });
 
   test("the helpers' farm tools read as what they do", () {
-    expect(farmToolText('farm__farm_inbox'), '看有没有找它的话');
-    expect(farmToolText('farm__farm_say'), '在田头说话');
+    expect(farmToolText('vibevalley__channel_inbox'), '看有没有找它的话');
+    expect(farmToolText('vibevalley__channel_say'), '在田头说话');
     expect(farmToolText('pnpm test'), isNull);
-    expect(spanLabel(step(1, 0, SessionEventType.toolCall, 'farm__farm_read', action: ToolAction.mcp)), '田头');
+    expect(spanLabel(step(1, 0, SessionEventType.toolCall, 'vibevalley__channel_read', action: ToolAction.mcp)), '田头');
   });
 
   test('a comment is tied to its step and read without the quote', () {

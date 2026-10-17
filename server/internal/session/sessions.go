@@ -317,7 +317,6 @@ func (c *sessions) save() {
 }
 
 func (c *sessions) restore() {
-	c.moveHeads()
 	c.expireLogs(c.logDays)
 	c.endOpenRuns()
 	saved := sessionSaved{}
@@ -598,7 +597,7 @@ func (c *sessions) open(ctx context.Context, agent protocol.Agent, id string, pl
 	c.mu.Lock()
 	farmURL := c.farmURL
 	c.mu.Unlock()
-	farm := oar.McpServer{Name: "farm", Type: "http", URL: farmURL, Headers: map[string]string{"authorization": "Bearer " + c.tokens.Issue(id)}}
+	farm := oar.McpServer{Name: "vibevalley", Type: "http", URL: farmURL, Headers: map[string]string{"authorization": "Bearer " + c.tokens.Issue(id)}}
 	extra := extra{MCPServers: []oar.McpServer{farm}}
 	for _, m := range agent.MCPServers {
 		extra.MCPServers = append(extra.MCPServers, toOarMcp(m))

@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-[概念先行](2026-10-15-concepts-first.md)和 [Run 是一次干活](2026-10-16-runs-sessions-crews.md)定了代码里该叫什么。2026-10-17 已经把大部分名字改完：核心状态 `CoreState`、服务 `Core`、路由按概念（`issue.*`、`session.*`、`agent.*`……）、协议里 `Agent`、`Session`、`Run`、`Merge`、`PriorityMedium`、`IssueStatus` 的 `backlog`…`canceled`、默认频道 `general`、家目录 `sessions.json`。
+[概念先行](2026-10-15-concepts-first.md)和 [Run 是一次干活](2026-10-16-runs-sessions-crews.md)定了代码里该叫什么。2026-10-17 已经把大部分名字改完：核心状态 `CoreState`、服务 `Core`、路由按概念（`issue.*`、`session.*`、`agent.*`……）、协议里 `Agent`、`Session`、`Run`、`Merge`、`PriorityMedium`、`IssueStatus` 的 `backlog`…`canceled`、默认频道 `general`、家目录 `sessions.json`、MCP 的工具名（`channel_say`、`channel_read`、`channel_inbox`、`session_list`）。
 
 还剩两处：
 
@@ -45,7 +45,6 @@ Status: proposed
 
 ### 不在这里做
 
-- MCP 服务名 `farm` 和工具名的前缀 `farm_`（`farm_say`、`farm_who`……）：这是 agent 看到的接口，有的农机不给 MCP 工具加命名空间；改之前先查清楚各农机的做法，另议。
 - 帮工阶段的 `ripe`、计划的 `ripe` 和配对设备看到的 `LanStatus.farm`：都是画面上的叫法进了协议，等核心状态拆成两份时再看。
 - 核心状态拆成两份（[概念先行](2026-10-15-concepts-first.md)第 8 步）、包着 oar 的部分挪进 `runtime`（[Run 是一次干活](2026-10-16-runs-sessions-crews.md)）、管家是一个 agent（概念先行第 7 步）：改的是结构，不只是名字。
 
