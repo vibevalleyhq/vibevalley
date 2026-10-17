@@ -84,4 +84,4 @@ smith 是 oar 的 Go 移植（[smith 的 README](../../server/pkg/smith/README.m
 | `prompt`、`steer`、`queue`、`withdraw`、`abort` | 往会话里送话、插话、排队、撤回、叫停 | 带话、叫停（`Session.Deliver`、`Session.Stop`） |
 | `Subagents`、`Subagent`、`SubagentReport` | 宿主在任意农机上开的子会话，每结束一轮交一份报告；oar 把这种用法叫 crew | 每个帮工是一个 `Subagent` |
 
-oar 的会话在开的时候能设系统提示词（替换或追加）、MCP、禁用的工具和环境变量；`Subagents.Spawn` 只带农机、任务、名字、目录、模型、思考档位、服务档位、`Resume` 和环境变量。所以 `session/sessions.go` 给每个帮工单独一个 `Subagents`，底下的农机在开会话时带上档案的人设、技能、MCP 和禁用的工具（[agents-and-runtimes.md](agents-and-runtimes.md)）。kimi、opencode、antigravity 不接系统提示词。
+oar 的会话在开的时候能设系统提示词（替换或追加）、MCP、禁用的工具和环境变量；`Subagents.Spawn` 只带农机、任务、名字、目录、模型、思考档位、服务档位、`Resume` 和环境变量。所以 `session/sessions.go` 给每个帮工单独一个 `Subagents`，底下的农机在开会话时带上档案的人设、技能、MCP 和禁用的工具（[agents-and-runtimes.md](agents-and-runtimes.md)）。kimi、opencode、antigravity、dsh 不接系统提示词。

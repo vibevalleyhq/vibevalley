@@ -61,6 +61,9 @@ type Profile struct {
 	// Switch models with `session/set_config_option` on `model`, for agents
 	// whose `set_model` answers `{}` and pushes nothing (agy_acp_server 1.2.1).
 	ModelViaConfigOption bool
+	// How the session reports a model the agent names by an opaque option value (dsh: ["provider","model"]); nil
+	// reports the value as it is.
+	ModelName func(value string) string
 	// The agent resumes a session in the directory it was created in,
 	// whatever `cwd` the resume names (kimi 2.1.1); OAR reads the session's
 	// own directory from `session/list` and refuses a resume elsewhere.

@@ -804,6 +804,19 @@
         "trim": "#2f9d8f",
         "hat": "#45bf8c"
       }
+    },
+    {
+      "id": "dsh",
+      "label": "DeepSeek Harness",
+      "blurb": "DeepSeek 的 dsh，走 ACP。",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "treads",
+        "head": "orb",
+        "body": "#dce6fb",
+        "trim": "#3b5bdb",
+        "hat": "#4d6bfe"
+      }
     }
   ],
   "runtimeFacts": {
@@ -918,6 +931,18 @@
         "checkUpdate"
       ],
       "inProcess": false
+    },
+    "dsh": {
+      "steer": false,
+      "refused": {
+        "systemPrompt": "dsh acp 没有会话级的系统提示输入",
+        "appendSystemPrompt": "dsh acp 没有会话级的系统提示追加",
+        "disallowedTools": "dsh acp 没有会话级的工具黑名单"
+      },
+      "capabilities": [
+        "listModels"
+      ],
+      "inProcess": false
     }
   },
   "actionText": {
@@ -942,6 +967,7 @@
     "cursor",
     "grok",
     "kimi",
-    "antigravity"
+    "antigravity",
+    "dsh"
   ]
 }

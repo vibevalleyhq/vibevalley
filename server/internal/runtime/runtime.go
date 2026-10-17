@@ -31,6 +31,7 @@ import (
 	vvagent "vibevalley/pkg/agent"
 	"vibevalley/pkg/agent/oarruntime"
 	"vibevalley/pkg/ai"
+	"vibevalley/pkg/smith/community/dsh"
 	"vibevalley/pkg/smith/oar"
 	"vibevalley/pkg/smith/runtimes/defaults"
 	"vibevalley/pkg/smith/runtimes/pi"
@@ -72,7 +73,7 @@ var piPrices = func() map[string]map[string]Price {
 	return out
 }()
 
-// vibevalley's own agent reads the farm's DeepSeek key each session.
+// smith's built-ins, vibevalley's own agent (it reads the farm's DeepSeek key each session) and DeepSeek Harness.
 func registry(home string, settings *setting.Service) *oar.RuntimeRegistry {
 	vibevalley := oarruntime.VibeValleyRuntime(oarruntime.Options{
 		Home: func() string { return home },
@@ -80,7 +81,7 @@ func registry(home string, settings *setting.Service) *oar.RuntimeRegistry {
 			return vvagent.Deepseek(model, settings.DeepseekAPIKey())
 		},
 	})
-	registry, err := oar.NewRuntimeRegistry(append(defaults.Runtimes(), vibevalley)...)
+	registry, err := oar.NewRuntimeRegistry(append(defaults.Runtimes(), vibevalley, dsh.Runtime())...)
 	if err != nil {
 		panic(err)
 	}
@@ -687,6 +688,14 @@ func (r *Service) Price(id, model string) *Price {
 			model = provider + "/" + name
 		}
 		return piPrice(model)
+	case "dsh":
+		// dsh names a model provider/model (community/dsh ModelID); only DeepSeek's own is priced here.
+		if provider, name, ok := strings.Cut(model, "/"); ok && provider == "deepseek-official" {
+			if m, ok := ai.GetModel("deepseek", name); ok {
+				return &Price{Input: m.Cost.Input, Output: m.Cost.Output, CacheRead: m.Cost.CacheRead, CacheWrite: m.Cost.CacheWrite}
+			}
+		}
+		return nil
 	}
 	return nil
 }

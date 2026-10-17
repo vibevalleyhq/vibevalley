@@ -2,7 +2,7 @@
 
 | 词 | 是什么 | 谁决定 |
 |---|---|---|
-| 农机（runtime） | 机器上的一种编码 agent 程序：`vibevalley`（VibeValley 自己的 agent），和 smith 驱动的 `pi`、`claude`、`codex`、`opencode`、`cursor`、`grok`、`kimi`、`antigravity`（`protocol/seeds.json` 的 `runtimeIds`） | 机器上装了什么；「农具」页只能改 VibeValley 怎么用它 |
+| 农机（runtime） | 机器上的一种编码 agent 程序：`vibevalley`（VibeValley 自己的 agent），和 smith 驱动的 `pi`、`claude`、`codex`、`opencode`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`（DeepSeek Harness，`protocol/seeds.json` 的 `runtimeIds`） | 机器上装了什么；「农具」页只能改 VibeValley 怎么用它 |
 | 帮工档案（agent） | 一份配置：农机、模型、思考强度、人设、技能、MCP、禁用的工具、环境变量、适合什么活、长相 | 你在「捏帮工」里捏 |
 
 派活派的是档案；一个档案可以同时派出好几个帮工，各自一个 worktree。
@@ -43,7 +43,7 @@ VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮�
 
 左边选长相（动物和衣服，和农机没有固定对应），中间看它在地里的样子，右边是配置：身份（名字、职责、适合的活）、能力（农机、模型、思考强度）、人设、技能、工具（MCP、禁用的工具）、环境，存过的档案还有记性和轨迹。底部一直显示 protocol 的 `AgentIssues`：哪些会让它派不出去（红），哪些只是提醒（橙），和服务端派活前跑的是同一套。
 
-**人设**交给农机的方式：追加到系统提示（默认）、替换系统提示，或写进工单开头（给不接受系统提示的 kimi、antigravity）。服务端都会再加上农场的规矩和工作目录的 `AGENTS.md`。
+**人设**交给农机的方式：追加到系统提示（默认）、替换系统提示，或写进工单开头（给不接受系统提示的 kimi、antigravity、dsh）。服务端都会再加上农场的规矩和工作目录的 `AGENTS.md`。
 
 **记性**页签列出它的帮工手上的活、下回开工会想起哪几条（和服务端同一套 `Pick`）、记下的每一条；可以替它记、让它忘（[server.md](server.md)「记性」）。
 

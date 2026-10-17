@@ -74,6 +74,7 @@ func open(ctx context.Context, profile Profile, installation oar.AvailableInstal
 	tokenUsage := NewTokenUsage(profile)
 	opening := NewOpening()
 	s.recorder = NewRecorder(gate, profile.AttributeUpdate, tokenUsage)
+	s.recorder.modelName = profile.ModelName
 	client := NewClientApp(s.terminal, ClientHooks{
 		Update: func(params json.RawMessage) {
 			s.mu.Lock()

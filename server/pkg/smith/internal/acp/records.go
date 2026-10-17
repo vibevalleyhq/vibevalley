@@ -81,6 +81,21 @@ type Recorder struct {
 	projections map[string]*ProjectionState
 	bound       *kernel.Kernel
 	queued      []func(*kernel.Kernel)
+	// Profile.ModelName; nil keeps the agent's word.
+	modelName func(value string) string
+}
+
+// named is events with each model report in the runtime's own naming (Profile.ModelName).
+func (r *Recorder) named(events []oar.EventBody) []oar.EventBody {
+	if r.modelName == nil {
+		return events
+	}
+	for i, event := range events {
+		if model, ok := event.(oar.Model); ok {
+			events[i] = oar.Model{Model: r.modelName(model.Model)}
+		}
+	}
+	return events
 }
 
 // NewRecorder records through gate, the profile's attribution and the token accumulator.
@@ -150,7 +165,7 @@ func (r *Recorder) Update(params json.RawMessage) {
 		if kind, ok := update["sessionUpdate"].(string); ok {
 			frameType = kind
 		}
-		k.Frame(oar.FrameBody{Type: frameType, Native: params, Events: events}, atSession(k, sessionID))
+		k.Frame(oar.FrameBody{Type: frameType, Native: params, Events: r.named(events)}, atSession(k, sessionID))
 		if !foreign {
 			usage := false
 			for _, event := range events {
@@ -189,7 +204,7 @@ func (r *Recorder) Extension(method string, params json.RawMessage, afterOpen bo
 				events = append(events, usage)
 			}
 		}
-		k.Frame(oar.FrameBody{Type: method, Native: params, Events: events}, at)
+		k.Frame(oar.FrameBody{Type: method, Native: params, Events: r.named(events)}, at)
 	})
 }
 
@@ -206,7 +221,7 @@ func (r *Recorder) Step(method string, response json.RawMessage) {
 		if effort, ok := ReportedEffort(record); ok {
 			events = append(events, oar.Effort{Effort: effort})
 		}
-		k.Frame(oar.FrameBody{Type: method, Native: response, Events: events}, kernel.RecordAt{})
+		k.Frame(oar.FrameBody{Type: method, Native: response, Events: r.named(events)}, kernel.RecordAt{})
 	})
 }
 

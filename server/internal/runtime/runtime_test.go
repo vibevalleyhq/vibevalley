@@ -65,3 +65,13 @@ func TestRuntimesPiBalanceAsPiConfiguresDeepseek(t *testing.T) {
 
 	testkit.Eq(t, piBalance(context.Background(), protocol.RuntimeSettings{DefaultModel: "anthropic/claude"}), unavailable("anthropic 不报余额"), "another provider")
 }
+
+func TestDshPricesDeepSeeksOwnModels(t *testing.T) {
+	r := &Service{}
+	if p := r.Price("dsh", "deepseek-official/deepseek-flash"); p == nil || p.Input != 0.14 {
+		t.Fatalf("deepseek-flash price %+v", p)
+	}
+	if p := r.Price("dsh", "openrouter/deepseek-flash"); p != nil {
+		t.Fatalf("another provider's model priced %+v", p)
+	}
+}

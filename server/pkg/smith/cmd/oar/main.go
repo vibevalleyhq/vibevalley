@@ -13,6 +13,7 @@ import (
 	"sync"
 	"syscall"
 
+	"vibevalley/pkg/smith/community/dsh"
 	"vibevalley/pkg/smith/community/morph"
 	"vibevalley/pkg/smith/internal/executable"
 	"vibevalley/pkg/smith/internal/shared"
@@ -34,7 +35,7 @@ type cli struct {
 
 func main() {
 	// OAR's built-in runtimes plus the community ones, as packages/cli/src/runtimes.ts.
-	registry, err := oar.NewRuntimeRegistry(append(defaults.Runtimes(), morph.Runtime())...)
+	registry, err := oar.NewRuntimeRegistry(append(defaults.Runtimes(), morph.Runtime(), dsh.Runtime())...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
