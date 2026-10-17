@@ -97,16 +97,7 @@ func VibeValleyRuntime(options Options) oar.Runtime {
 			servers = append(servers, toMcp(m))
 		}
 		s.mcp = agent.ConnectAll(life, servers)
-		disallowed := map[string]bool{}
-		for _, name := range o.DisallowedTools {
-			disallowed[name] = true
-		}
-		var tools []agentcore.AgentTool
-		for _, t := range append(agent.CodingTools(agent.CodingOptions{Cwd: o.Cwd, Env: o.Env}), s.mcp.Tools...) {
-			if !disallowed[t.Name] {
-				tools = append(tools, t)
-			}
-		}
+		tools := append(agent.CodingTools(agent.CodingOptions{Cwd: o.Cwd, Env: o.Env}), s.mcp.Tools...)
 		instructions := ""
 		if o.SystemPrompt != nil {
 			instructions = *o.SystemPrompt
@@ -118,17 +109,18 @@ func VibeValleyRuntime(options Options) oar.Runtime {
 			instructions = strings.Join(parts, "\n\n")
 		}
 		s.agent = agent.NewAgent(life, agent.AgentOptions{
-			Name:          "worker",
-			Instructions:  instructions,
-			Model:         llm.Model,
-			StreamOptions: llm.StreamOptions,
-			ThinkingLevel: o.Effort,
-			Home:          filepath.Join(home(), "workers"),
-			Cwd:           o.Cwd,
-			Tools:         tools,
-			NoMemory:      true,
-			Session:       s.kernel.SessionID(),
-			Schedules:     new(false),
+			Name:            "worker",
+			Instructions:    instructions,
+			Model:           llm.Model,
+			StreamOptions:   llm.StreamOptions,
+			ThinkingLevel:   o.Effort,
+			Home:            filepath.Join(home(), "workers"),
+			Cwd:             o.Cwd,
+			Tools:           tools,
+			DisallowedTools: o.DisallowedTools,
+			NoMemory:        true,
+			Session:         s.kernel.SessionID(),
+			Schedules:       new(false),
 		})
 		// Listening before the first input.
 		events := s.agent.Subscribe()

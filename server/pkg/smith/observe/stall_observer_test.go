@@ -193,3 +193,27 @@ func TestObserveAgentIsolatesAPanickingListener(t *testing.T) {
 	}
 	t.Fatal("the second listener starved behind a panicking one")
 }
+
+func TestObserveStallsOwnsAlreadyRunningTurn(t *testing.T) {
+	session := soHangingSession(t)
+	if result, err := session.Prompt(context.Background(), "already working", oar.InputOptions{}); err != nil || !result.IsAccepted() {
+		t.Fatalf("prompt: %+v %v", result, err)
+	}
+	time.Sleep(60 * time.Millisecond)
+	stalls := make(chan observe.StallInfo, 10)
+	stop := observe.ObserveStalls(session, observe.StallOptions{StallAfter: 50 * time.Millisecond, OnStall: func(info observe.StallInfo) { stalls <- info }})
+	defer stop()
+	select {
+	case info := <-stalls:
+		if info.SilentForMs < 50 {
+			t.Fatalf("early stall: %+v", info)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("missed the turn that started before subscription")
+	}
+	select {
+	case <-stalls:
+		t.Fatal("reported the same silence twice")
+	case <-time.After(100 * time.Millisecond):
+	}
+}

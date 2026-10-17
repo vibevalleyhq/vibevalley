@@ -88,3 +88,32 @@ func TestStatesGatherABurstIntoOneFrame(t *testing.T) {
 	case <-time.After(2 * stateEvery):
 	}
 }
+
+func TestContinuousFactsStillReachDisk(t *testing.T) {
+	home := t.TempDir()
+	s := New(home)
+	defer s.Close()
+	tick := time.NewTicker(25 * time.Millisecond)
+	defer tick.Stop()
+	deadline := time.After(3 * saveAfter)
+	var n int64
+	for {
+		select {
+		case <-tick.C:
+			n++
+			s.SetCommits(protocol.CommitCount{Total: n})
+			body, err := os.ReadFile(filepath.Join(home, "state.json"))
+			if err == nil {
+				var kept protocol.CoreState
+				if err := json.Unmarshal(body, &kept); err != nil {
+					t.Fatal(err)
+				}
+				if kept.Commits.Total > 0 {
+					return
+				}
+			}
+		case <-deadline:
+			t.Fatal("continuous activity postponed persistence indefinitely")
+		}
+	}
+}

@@ -2,6 +2,7 @@
 package agora
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -53,8 +54,30 @@ func NewChannel(prefix string) string {
 func NewUID() string { return fmt.Sprint(random(9_999_000) + 1000) }
 
 // httpClient nil is agentkit's own.
-func NewClient(c Credentials, area option.Area, httpClient sdkcore.HTTPClient) *agentkit.AgoraClient {
-	return agentkit.NewAgoraClient(agentkit.AgoraClientOptions{Area: area, AppID: c.AppID, AppCertificate: c.AppCertificate, HTTPClient: httpClient})
+type Client struct{ client *agentkit.AgoraClient }
+
+func NewClient(c Credentials, area option.Area, httpClient sdkcore.HTTPClient) *Client {
+	return &Client{client: agentkit.NewAgoraClient(agentkit.AgoraClientOptions{Area: area, AppID: c.AppID, AppCertificate: c.AppCertificate, HTTPClient: httpClient})}
+}
+
+type Session struct {
+	Name, Channel, AgentUID, UID string
+	IdleSeconds                  int
+}
+
+func (c *Client) Start(ctx context.Context, a Agent, v Vendors, s Session) (string, error) {
+	session := newAgent(c.client, a, v).CreateSession(agentkit.CreateSessionOptions{
+		Name: s.Name, Channel: s.Channel, AgentUID: s.AgentUID, RemoteUIDs: []string{s.UID}, IdleTimeout: &s.IdleSeconds, ExpiresIn: TokenSeconds,
+	})
+	return session.Start(ctx)
+}
+
+func (c *Client) Stop(ctx context.Context, id string) error {
+	err := c.client.StopAgent(ctx, id)
+	if err == nil || alreadyStopping(err) {
+		return nil
+	}
+	return err
 }
 
 type Vendors struct {
@@ -87,7 +110,7 @@ type Agent struct {
 	Captions Captions
 }
 
-func NewAgent(client *agentkit.AgoraClient, a Agent, v Vendors) *agentkit.Agent {
+func newAgent(client *agentkit.AgoraClient, a Agent, v Vendors) *agentkit.Agent {
 	captions := a.Captions
 	if captions == "" {
 		captions = CaptionsRTM
@@ -132,7 +155,7 @@ func decode[T any](v any) *T {
 
 // Already left or leaving counts as success, as the quickstart treats it. agentkit answers 404 as success itself; the "already shutting down" text
 // arrives in the error's body.
-func AlreadyStopping(err error) bool {
+func alreadyStopping(err error) bool {
 	var api *sdkcore.APIError
 	if errors.As(err, &api) && api.StatusCode == http.StatusNotFound {
 		return true

@@ -15,7 +15,7 @@ func ev(body oar.EventBody) oar.Event {
 	return oar.Event{Envelope: oar.Envelope{SessionID: "s", AgentPath: []string{}}, Body: body}
 }
 
-var ctx = factContext{ID: "w1", Runtime: "pi", Cwd: "/work/clock-in", CnyPerUsd: 7}
+var ctx = factContext{ID: "w1", Runtime: "pi", Cwd: "/work/clock-in"}
 
 func sessionBase() protocol.Session {
 	project := "clock-in"
@@ -100,11 +100,11 @@ func TestSessionsNotWorkingNoBubble(t *testing.T) {
 }
 
 func TestSessionsSpendingCountedFromTheLastTotal(t *testing.T) {
-	price := runtime.Price{Input: 1, Output: 2, CacheRead: 0.1}
+	rate := (runtime.Price{Input: 1, Output: 2, CacheRead: 0.1}).InCNY(7)
 	usage := func(input, output int64) oar.EventBody {
 		return oar.Usage{Usage: oar.UsageReport{Tokens: &oar.TokenTotals{Input: input, Output: output, CacheRead: i(0), CacheWrite: i(0)}}}
 	}
-	first := eventFacts(ev(usage(1_000_000, 0)), working(thinking), tracking{Price: &price}, ctx)
+	first := eventFacts(ev(usage(1_000_000, 0)), working(thinking), tracking{Rate: &rate}, ctx)
 	testkit.Eq(t, first.SpentCny, 7.0, "first yuan")
 	testkit.Eq(t, first.Facts, []protocol.FactValue{protocol.FactSpent{ID: "w1", Spent: protocol.Spent{Tokens: 1_000_000, CNY: f(7)}}}, "first")
 
@@ -118,7 +118,6 @@ func TestSessionsSpendingCountedFromTheLastTotal(t *testing.T) {
 	testkit.Eq(t, unpriced.SpentCny, 0.0, "unpriced yuan")
 	testkit.Eq(t, unpriced.Facts, []protocol.FactValue{protocol.FactSpent{ID: "w1", Spent: protocol.Spent{Tokens: 15}}}, "unpriced")
 
-	testkit.Eq(t, dollars(oar.TokenTotals{Input: 1_000_000, CacheRead: i(400_000), CacheWrite: i(0)}, price), 0.64, "dollars")
 	testkit.Eq(t, *since(protocol.Spent{Tokens: 30, CNY: f(3)}, &protocol.Spent{Tokens: 10, CNY: f(1)}), protocol.Spent{Tokens: 20, CNY: f(2)}, "since")
 	if since(protocol.Spent{Tokens: 30}, nil) != nil {
 		t.Fatal("since nothing is nothing")

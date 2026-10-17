@@ -34,6 +34,7 @@ func ObserveStalls(session oar.Session, options StallOptions) oar.Unsubscribe {
 	var timer *time.Timer
 	generation := 0
 	stopped := false
+	replaying := true
 
 	disarm := func() {
 		if timer != nil {
@@ -45,7 +46,8 @@ func ObserveStalls(session oar.Session, options StallOptions) oar.Unsubscribe {
 	arm := func() {
 		disarm()
 		mine := generation
-		timer = time.AfterFunc(options.StallAfter, func() {
+		delay := options.StallAfter - time.Duration(time.Now().UnixMilli()-status.LastEventAt)*time.Millisecond
+		timer = time.AfterFunc(max(0, delay), func() {
 			mu.Lock()
 			if stopped || mine != generation {
 				mu.Unlock()
@@ -72,12 +74,18 @@ func ObserveStalls(session oar.Session, options StallOptions) oar.Unsubscribe {
 		if record.Kind == oar.KindFrame && len(record.Frame.Events) > 0 {
 			lastRecordKind = "frame:" + record.Frame.Events[len(record.Frame.Events)-1].EventKind()
 		}
-		if status.IsRunning() {
+		if status.IsRunning() && !replaying {
 			arm()
 		} else {
 			disarm()
 		}
-	}, nil)
+	}, &oar.Cursor{SessionID: session.ID(), AfterSeq: -1})
+	mu.Lock()
+	replaying = false
+	if status.IsRunning() {
+		arm()
+	}
+	mu.Unlock()
 
 	return func() {
 		mu.Lock()

@@ -29,7 +29,7 @@ type HireOptions struct {
 	Trigger *protocol.RunTrigger
 	// Called with the session just before it goes on the farm, so what must know of it first (its issue's link) is
 	// written before anyone can see it, or its first run end.
-	Hiring func(protocol.Session)
+	Hiring func(protocol.Session) error
 }
 
 type Delivered struct {

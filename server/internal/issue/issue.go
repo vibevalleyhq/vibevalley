@@ -208,8 +208,8 @@ func (is *issues) Get(id string) (protocol.Issue, error) {
 	return issueOf(row, runs, is.core.State()), nil
 }
 
-// Latest is the issue's newest session, the one its merge, changes, comments and cancel act on; a reopen makes another.
-func (is *issues) Latest(id string) (string, error) {
+// latest is the issue's newest session, the one its merge, changes, comments and cancel act on; a reopen makes another.
+func (is *issues) latest(id string) (string, error) {
 	issue, err := is.Get(id)
 	if err != nil {
 		return "", err
@@ -312,7 +312,7 @@ func (is *issues) Move(id, before string) ([]protocol.Issue, error) {
 	}
 	order := []string{}
 	for _, issue := range all {
-		if len(issue.Sessions) == 0 && issue.ID != id {
+		if len(issue.Sessions) == 0 && issue.Plan == nil && issue.Step == nil && issue.ID != id {
 			order = append(order, issue.ID)
 		}
 	}

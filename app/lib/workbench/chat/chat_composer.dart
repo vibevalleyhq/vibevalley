@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,7 +5,8 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import '../../chat/chat_rules.dart';
-import '../../chat/chat_state.dart';
+import '../../chat/chat_state.dart' show problemOf;
+import '../../data/messages.dart';
 import '../../chat/chat_widgets.dart';
 
 class ChatComposer extends ConsumerStatefulWidget {
@@ -22,6 +21,7 @@ class ChatComposer extends ConsumerStatefulWidget {
 class _ChatComposerState extends ConsumerState<ChatComposer> {
   final _naming = Naming();
   String? _problem;
+  bool _sending = false;
 
   @override
   void initState() {
@@ -35,19 +35,24 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     super.dispose();
   }
 
-  void _send() {
-    final said = _naming.text.text.trim();
-    if (said.isEmpty) return;
+  Future<void> _send() async {
+    final draft = _naming.text.text;
+    final said = draft.trim();
+    if (said.isEmpty || _sending) return;
     final c = widget.conversation;
-    final actions = ref.read(chatActionsProvider);
-    final sent = c != null && c.kind != ConversationKind.general ? actions.sayIn(c.id, said) : actions.talk(said);
-    _naming.clear();
-    setState(() => _problem = null);
-    unawaited(
-      sent.catchError((Object e) {
-        if (mounted) setState(() => _problem = problemOf(e));
-      }),
-    );
+    final messages = ref.read(messagesProvider);
+    setState(() {
+      _sending = true;
+      _problem = null;
+    });
+    try {
+      await messages.send(said, conversation: c);
+      if (mounted && _naming.text.text == draft) _naming.clear();
+    } on Object catch (e) {
+      if (mounted) setState(() => _problem = problemOf(e));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
@@ -113,7 +118,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                         size: PxSize.custom,
                         tone: PxTone.primary,
                         semanticLabel: '发送',
-                        onPressed: empty ? null : _send,
+                        onPressed: empty || _sending ? null : _send,
                         child: const SizedBox.square(dimension: 28, child: Center(child: Glyph('button-send'))),
                       ),
                     ],

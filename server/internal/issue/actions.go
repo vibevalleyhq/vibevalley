@@ -1,0 +1,79 @@
+package issue
+
+import "vibevalley/internal/protocol"
+
+func (s *Service) liveSession(id string) (string, error) {
+	session, err := s.issues.latest(id)
+	if err != nil {
+		return "", err
+	}
+	if s.merges.sessions.Find(session) == nil {
+		return "", protocol.Missing{What: "帮工 " + session}
+	}
+	return session, nil
+}
+
+func (s *Service) Comment(id string, body protocol.CommentRequest) error {
+	issue, err := s.Get(id)
+	if err != nil {
+		return err
+	}
+	if issue.Status == protocol.IssueStatusDone || issue.Status == protocol.IssueStatusCanceled {
+		return protocol.Refused{Reason: "这张工单关上了：带一句话重开它"}
+	}
+	session, err := s.liveSession(id)
+	if err != nil {
+		return err
+	}
+	text := body.Text
+	if body.On != nil {
+		text, err = s.merges.sessions.Comment(session, *body.On, text)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = s.merges.chat.TellSession("user", session, text)
+	return err
+}
+
+func (s *Service) Changes(id string, by protocol.Caller) (protocol.Changes, error) {
+	session, err := s.liveSession(id)
+	if err != nil {
+		return protocol.Changes{}, err
+	}
+	changes, err := s.merges.changesFor(session, by)
+	if err != nil {
+		return protocol.Changes{}, err
+	}
+	if changes == nil {
+		return protocol.Changes{}, protocol.Missing{What: "帮工 " + session}
+	}
+	return *changes, nil
+}
+
+func (s *Service) Merge(id string) (string, error) {
+	session, err := s.liveSession(id)
+	if err != nil {
+		return "", err
+	}
+	return s.merges.merge(session)
+}
+
+func (s *Service) Resolve(id string) error {
+	session, err := s.liveSession(id)
+	if err != nil {
+		return err
+	}
+	return s.merges.resolve(session)
+}
+
+func (s *Service) Cancel(id string) error {
+	session, err := s.liveSession(id)
+	if err != nil {
+		return err
+	}
+	if !s.merges.sessions.Dismiss(session) {
+		return protocol.Missing{What: "帮工 " + session}
+	}
+	return nil
+}

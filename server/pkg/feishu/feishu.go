@@ -74,7 +74,7 @@ func NewClient() *Client {
 	return &Client{
 		accounts: map[Domain]string{"feishu": "https://accounts.feishu.cn", "lark": "https://accounts.larksuite.com"},
 		open:     map[Domain]string{"feishu": lark.FeishuBaseUrl, "lark": lark.LarkBaseUrl},
-		http:     &http.Client{},
+		http:     &http.Client{Timeout: 25 * time.Second},
 	}
 }
 
@@ -224,10 +224,10 @@ func (l *Client) SendText(ctx context.Context, app App, openID, text string) (st
 	if res.Code != 0 {
 		return "", fmt.Errorf("飞书发消息：%d %s", res.Code, res.Msg)
 	}
-	if res.Data != nil && res.Data.MessageId != nil {
+	if res.Data != nil && res.Data.MessageId != nil && *res.Data.MessageId != "" {
 		return *res.Data.MessageId, nil
 	}
-	return "", nil
+	return "", errors.New("飞书发消息：没有确认消息编号")
 }
 
 func Text(m Message) string {

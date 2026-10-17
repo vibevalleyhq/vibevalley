@@ -239,7 +239,7 @@ func TestManagerDispatchesAndHearsVoiceInChat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !regexp.MustCompile(`"customType":"farmNews"[^\n]*做完了`).Match(kept) {
+	if !regexp.MustCompile(`"customType":"managerInput"[^\n]*语音那边已经回答了[^\n]*这期间田头上的汇报[^\n]*做完了`).Match(kept) {
 		t.Fatalf("no farm news kept:\n%s", kept)
 	}
 	if strings.Contains(string(kept), "【农场现状】") {

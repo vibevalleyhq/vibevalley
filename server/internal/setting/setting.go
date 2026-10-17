@@ -4,7 +4,6 @@ package setting
 // for each time they are used, so one saved is used at once; pages see only where each comes from and its last characters; keys are never logged.
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -53,8 +52,6 @@ type Service struct {
 	disk   *base.FileWriter
 }
 
-func newService(cfg base.Config) (*Service, error) { return New(cfg), nil }
-
 // settings.json in the home; the keys and the voice from cfg when the app has none.
 func New(cfg base.Config) *Service {
 	file := filepath.Join(cfg.Home, "settings.json")
@@ -77,9 +74,6 @@ func New(cfg base.Config) *Service {
 	s.stored = voiceReadSettings(file)
 	return s
 }
-
-func (*Service) OnStart(context.Context) error { return nil }
-func (*Service) OnStop()                       {}
 
 func (s *Service) pick(stored, config string) (string, protocol.KeySource) {
 	if stored != "" {
@@ -164,15 +158,14 @@ func (s *Service) Save(u protocol.SettingsUpdate) (protocol.SettingsStatus, erro
 			next.Voice = nil
 		}
 	}
-	s.mu.Unlock()
 	err := s.disk.Write(func() ([]byte, error) {
 		body, err := json.MarshalIndent(next, "", "  ")
 		return append(body, '\n'), err
 	})
 	if err != nil {
+		s.mu.Unlock()
 		return protocol.SettingsStatus{}, fmt.Errorf("存不进 %s：%v", s.file, err)
 	}
-	s.mu.Lock()
 	s.stored = next
 	s.mu.Unlock()
 	return s.Status(), nil
@@ -202,9 +195,13 @@ func (s *Service) Voice() protocol.VoiceSettings {
 	return s.voiceOf(s.stored)
 }
 
-// Only ever from settings.json.
-func (s *Service) VoiceKeys() VoiceKeys {
+func (s *Service) VoiceConfig() VoiceConfig {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return VoiceKeys{ASRKey: s.stored.ASRKey, LLMKey: s.stored.LLMKey, TTSKey: s.stored.TTSKey}
+	key, _ := s.pick(s.stored.DeepseekAPIKey, s.config.deepseek)
+	return VoiceConfig{
+		Voice:          s.voiceOf(s.stored),
+		Keys:           VoiceKeys{ASRKey: s.stored.ASRKey, LLMKey: s.stored.LLMKey, TTSKey: s.stored.TTSKey},
+		DeepseekAPIKey: key,
+	}
 }

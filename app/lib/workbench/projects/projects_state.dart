@@ -1,5 +1,7 @@
 // The last answer stays on show while a new one is asked; a refusal is kept with its reason.
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
@@ -29,61 +31,38 @@ class Survey {
   final Asked<ProjectActivity>? activity;
 }
 
-class ProjectsState {
-  const ProjectsState({this.list, this.surveys = const {}});
+final projectSurveyProvider = NotifierProvider.family<ProjectSurvey, Survey, String>(ProjectSurvey.new);
 
-  /// null until loaded.
-  final List<ProjectSummary>? list;
-
-  final Map<String, Survey> surveys;
-}
-
-final projectsProvider = NotifierProvider<ProjectsNotifier, ProjectsState>(ProjectsNotifier.new);
-
-class ProjectsNotifier extends Notifier<ProjectsState> {
-  bool _loading = false;
+class ProjectSurvey extends Notifier<Survey> {
+  ProjectSurvey(this.project);
+  final String project;
+  Future<void>? _refreshing;
 
   @override
-  ProjectsState build() => const ProjectsState();
-
-  VibeValleyApi get _api => ref.read(apiProvider);
-
-  Future<void> load() async {
-    if (_loading) return;
-    _loading = true;
-    try {
-      final list = await _api.project.list();
-      if (ref.mounted) state = ProjectsState(list: list, surveys: state.surveys);
-    } finally {
-      _loading = false;
-    }
+  Survey build() {
+    unawaited(Future.microtask(refresh));
+    return const Survey();
   }
 
-  void _put(String project, Survey Function(Survey s) change) {
-    final all = {...state.surveys};
-    all[project] = change(all[project] ?? const Survey());
-    state = ProjectsState(list: state.list, surveys: all);
+  Future<void> refresh() => _refreshing ??= _read().whenComplete(() => _refreshing = null);
+
+  Future<void> _read() async {
+    if (!ref.mounted) return;
+    final api = ref.read(apiProvider).project;
+    await Future.wait([
+      _ask<ProjectLanguages>((s) => s.languages, (s, a) => Survey(languages: a, activity: s.activity), () => api.languages(id: project)),
+      _ask<ProjectActivity>((s) => s.activity, (s, a) => Survey(languages: s.languages, activity: a), () => api.activity(id: project)),
+    ]);
   }
 
-  Future<void> survey(String project) => Future.wait([
-    _ask<ProjectLanguages>(project, (s) => s.languages, (s, a) => Survey(languages: a, activity: s.activity), () => _api.project.languages(id: project)),
-    _ask<ProjectActivity>(project, (s) => s.activity, (s, a) => Survey(languages: s.languages, activity: a), () => _api.project.activity(id: project)),
-  ]);
-
-  Future<void> _ask<A>(String project, Asked<A>? Function(Survey) get, Survey Function(Survey, Asked<A>) set, Future<A> Function() request) async {
-    if (get(state.surveys[project] ?? const Survey()) is! Done<A>) _put(project, (s) => set(s, Asking<A>()));
+  Future<void> _ask<A>(Asked<A>? Function(Survey) get, Survey Function(Survey, Asked<A>) set, Future<A> Function() request) async {
+    if (get(state) is! Done<A>) state = set(state, Asking<A>());
     Asked<A> answer;
     try {
       answer = Done(await request());
     } catch (e) {
       answer = Failed('$e');
     }
-    if (ref.mounted) _put(project, (s) => set(s, answer));
-  }
-
-  Future<ProjectSummary> create(NewProject req) async {
-    final project = await _api.project.create(body: req);
-    await load();
-    return project;
+    if (ref.mounted) state = set(state, answer);
   }
 }

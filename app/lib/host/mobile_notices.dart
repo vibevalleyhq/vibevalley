@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import './command.dart';
 import './notify.dart';
 
-bool get isPhone => !kIsWeb && (Platform.isIOS || Platform.isAndroid);
+bool get isPhone => !kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android);
 
 /// 0 is not allowed for a foreground service's notification.
 const _linkId = 1;
@@ -36,6 +36,7 @@ class PhoneNotices {
   HostCommand? _pending;
   bool _ready = false;
   bool _linked = false;
+  AppLifecycleListener? _lifecycle;
   int _next = 100;
 
   Stream<HostCommand> get commands => _commands.stream;
@@ -51,6 +52,7 @@ class PhoneNotices {
       final launch = await _plugin.getNotificationAppLaunchDetails();
       if (launch?.didNotificationLaunchApp ?? false) open(launch!.notificationResponse?.payload);
       _ready = true;
+      _lifecycle ??= AppLifecycleListener(onPause: () => unawaited(_keepLinked(true)), onResume: () => unawaited(_keepLinked(false)));
     } on Object catch (e) {
       debugPrint('vibevalley: notifications: $e');
     }
@@ -94,7 +96,7 @@ class PhoneNotices {
     }
   }
 
-  Future<void> keepLinked(bool on) async {
+  Future<void> _keepLinked(bool on) async {
     final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (!_ready || android == null || on == _linked) return;
     _linked = on;

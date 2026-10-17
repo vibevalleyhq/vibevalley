@@ -62,19 +62,19 @@ type Client struct {
 
 	mu sync.Mutex
 	// Tokens last about two hours: one per app, renewed a minute early.
-	tokens map[string]cachedToken
+	tokens map[App]cachedToken
 	// QQ refuses the same (msg_id, msg_seq) twice.
 	replySeq map[string]int
 }
 
 func NewClient() *Client {
-	return &Client{api: apiBase, tokenURL: tokenURL, http: &http.Client{}, dialer: websocket.DefaultDialer,
-		tokens: map[string]cachedToken{}, replySeq: map[string]int{}}
+	return &Client{api: apiBase, tokenURL: tokenURL, http: &http.Client{Timeout: 25 * time.Second}, dialer: websocket.DefaultDialer,
+		tokens: map[App]cachedToken{}, replySeq: map[string]int{}}
 }
 
 func (q *Client) token(ctx context.Context, app App) (string, error) {
 	q.mu.Lock()
-	cached, ok := q.tokens[app.AppID]
+	cached, ok := q.tokens[app]
 	q.mu.Unlock()
 	if ok && cached.until.After(time.Now()) {
 		return cached.token, nil
@@ -120,7 +120,7 @@ func (q *Client) token(ctx context.Context, app App) (string, error) {
 		}
 	}
 	q.mu.Lock()
-	q.tokens[app.AppID] = cachedToken{body.AccessToken, time.Now().Add(time.Duration(seconds-60) * time.Second)}
+	q.tokens[app] = cachedToken{body.AccessToken, time.Now().Add(time.Duration(seconds-60) * time.Second)}
 	q.mu.Unlock()
 	return body.AccessToken, nil
 }
@@ -137,6 +137,10 @@ func (q *Client) Check(ctx context.Context, app App) error {
 }
 
 func (q *Client) Listen(ctx context.Context, app App, got func(Message)) error {
+	ctx, cancel := context.WithCancel(ctx)
+	var workers sync.WaitGroup
+	defer workers.Wait()
+	defer cancel()
 	token, err := q.token(ctx, app)
 	if err != nil {
 		return err
@@ -175,7 +179,10 @@ func (q *Client) Listen(ctx context.Context, app App, got func(Message)) error {
 	send := func(payload any) {
 		writing.Lock()
 		defer writing.Unlock()
-		ws.WriteJSON(payload)
+		ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		if err := ws.WriteJSON(payload); err != nil {
+			ws.Close()
+		}
 	}
 	defer func() {
 		if beat != nil {
@@ -217,7 +224,9 @@ func (q *Client) Listen(ctx context.Context, app App, got func(Message)) error {
 			}
 			if beat == nil {
 				beat = time.NewTicker(every)
+				workers.Add(1)
 				go func(t *time.Ticker) {
+					defer workers.Done()
 					for {
 						select {
 						case <-ctx.Done():
@@ -285,13 +294,19 @@ func (q *Client) SendText(ctx context.Context, app App, openID, text, msgID stri
 		Message string `json:"message"`
 		Code    *int   `json:"code"`
 	}
-	json.NewDecoder(res.Body).Decode(&body)
+	decodeErr := json.NewDecoder(res.Body).Decode(&body)
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		code := strconv.Itoa(res.StatusCode)
 		if body.Code != nil {
 			code = strconv.Itoa(*body.Code)
 		}
 		return "", &SendError{Status: res.StatusCode, Reason: "QQ 发消息：" + strings.TrimSpace(code+" "+body.Message)}
+	}
+	if decodeErr != nil {
+		return "", &SendError{Reason: "QQ 发消息：读不出发送结果：" + decodeErr.Error()}
+	}
+	if body.ID == "" || (body.Code != nil && *body.Code != 0) {
+		return "", &SendError{Reason: "QQ 发消息：没有确认消息编号 " + body.Message}
 	}
 	return body.ID, nil
 }

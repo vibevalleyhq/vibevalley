@@ -34,9 +34,6 @@ class MessageList extends ConsumerStatefulWidget {
 class _MessageListState extends ConsumerState<MessageList> {
   final _scroll = ScrollController();
 
-  /// So one unread run is marked once.
-  String? _marked;
-
   /// Null until the first rows are shown, so the first page (and a page of older ones loaded above) just appears.
   double? _shownUpTo;
 
@@ -58,11 +55,10 @@ class _MessageListState extends ConsumerState<MessageList> {
   @override
   Widget build(BuildContext context) {
     final farm = ref.watch(stateProvider);
-    final chat = farm?.chat;
     final conversation = widget.conversation;
-    final lines = ref.watch(spokenProvider);
-    final more = conversation == null ? null : ref.watch(chatLoadedProvider)[conversation.id];
-    final all = itemsOf(chat, conversation, lines, more);
+    final feed = ref.watch(chatFeedProvider(conversation?.id));
+    final all = feed.items;
+    if (conversation != null) ref.watch(visibleConversationProvider(conversation.id));
     final filter = widget.filter?.trim() ?? '';
     final items = filter.isEmpty
         ? all
@@ -74,19 +70,9 @@ class _MessageListState extends ConsumerState<MessageList> {
                 }).toLowerCase().contains(filter.toLowerCase()),
               )
               .toList();
-    final parent = conversation?.kind == ConversationKind.thread ? parentOf(chat, conversation!, more) : null;
-    final unread = conversation == null ? 0 : unreadIn(chat, conversation);
+    final parent = feed.parent;
     final waiting =
         farm?.manager == ManagerState.thinking && conversation?.kind != ConversationKind.thread && all.isNotEmpty && all.last.sender != managerAgent;
-
-    // What is on screen is read.
-    if (conversation != null && unread > 0) {
-      final mark = '${conversation.id}:${newestUnread(chat, conversation)}';
-      if (mark != _marked) {
-        _marked = mark;
-        WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(ref.read(chatActionsProvider).markRead(conversation.id).catchError((Object _) {})));
-      }
-    }
 
     final rows = <Widget>[];
     var day = '';
@@ -129,10 +115,10 @@ class _MessageListState extends ConsumerState<MessageList> {
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (conversation != null && all.isNotEmpty && !(more?.complete ?? false) && !hasFilter)
+                if (feed.hasOlder && !hasFilter)
                   Center(
                     child: KitTappable(
-                      onTap: () => unawaited(ref.read(chatActionsProvider).loadOlder(conversation.id).catchError((Object _) {})),
+                      onTap: () => unawaited(ref.read(chatActionsProvider).loadOlder(conversation!.id).catchError((Object _) {})),
                       builder: (context, s) => Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         child: Text('更早的消息', style: _grey.copyWith(color: s.hovered ? Palette.bark900 : Palette.bark500)),

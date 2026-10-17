@@ -4,7 +4,6 @@ import (
 	"context"
 	"math"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,7 +11,6 @@ import (
 	"unicode/utf16"
 
 	"vibevalley/pkg/smith/oar"
-	"vibevalley/pkg/smith/voyage"
 )
 
 // SubagentDepthEnv carries a process's subagent depth to its children.
@@ -130,26 +128,6 @@ func lastSeq(session oar.Session) int64 {
 		return -1
 	}
 	return records[len(records)-1].Seq
-}
-
-// attachLog writes the session's records, retained ones first, to file as a voyage log.
-func attachLog(session oar.Session, file string, header voyage.Header) (*progress, error) {
-	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
-		return nil, err
-	}
-	recorder, err := voyage.Open(file, header)
-	if err != nil {
-		return nil, err
-	}
-	written := newProgress()
-	session.RawEvents(func(record oar.RawEvent) {
-		_ = recorder.Record(record)
-		if record.Kind == oar.KindResponse && record.Response.Kind == oar.ResponseExited {
-			_ = recorder.End("exited")
-		}
-		written.done(record.Seq)
-	}, &oar.Cursor{SessionID: session.ID(), AfterSeq: -1})
-	return written, nil
 }
 
 // sliceUTF16 is JS text.slice(0, n): the first n UTF-16 code units. A cut

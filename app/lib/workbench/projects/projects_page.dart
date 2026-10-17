@@ -15,6 +15,7 @@ import 'codebase.dart';
 import 'new_project_dialog.dart';
 import 'projects_state.dart';
 import '../shared/widgets.dart';
+import '../shared/config_problem.dart';
 
 class ProjectsPage extends ConsumerStatefulWidget {
   const ProjectsPage({super.key, this.id});
@@ -32,7 +33,6 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(ref.read(projectsProvider.notifier).load().catchError((Object _) {}));
     _clock = Timer.periodic(const Duration(minutes: 1), (_) => setState(() => _now = DateTime.now()));
   }
 
@@ -44,19 +44,11 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(projectsProvider);
     final atlas = ref.watch(atlasProvider).value;
-    final list = state.list;
+    final list = ref.watch(projectCatalogProvider).value;
     final sorted = sortProjects(list ?? const []);
     final selected = sorted.where((p) => p.name == widget.id).firstOrNull ?? sorted.firstOrNull;
-    final survey = selected == null ? null : state.surveys[selected.name];
-    if (selected != null && survey == null) {
-      // Asked once per project: the survey's first answer (or refusal) stays until 统计 asks again.
-      final name = selected.name;
-      Future.microtask(() {
-        if (mounted && ref.read(projectsProvider).surveys[name] == null) unawaited(ref.read(projectsProvider.notifier).survey(name));
-      });
-    }
+    final survey = selected == null ? null : ref.watch(projectSurveyProvider(selected.name));
     final now = _now.millisecondsSinceEpoch.toDouble();
     if (atlas == null) return const SizedBox.shrink();
     return ListDetail(
@@ -68,7 +60,10 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: PxButton(
-              onPressed: () => showNewProjectDialog(context),
+              onPressed: () async {
+                final project = await showNewProjectDialog(context);
+                if (project != null && context.mounted) workbenchGo(context, '/projects/${Uri.encodeComponent(project.name)}');
+              },
               child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-add', size: 16), SizedBox(width: 6), Text('新增项目')]),
             ),
           ),
@@ -251,7 +246,7 @@ class _Deed extends ConsumerWidget {
                 size: PxSize.icon,
                 tooltip: busy ? '在数……' : '重新统计',
                 semanticLabel: '重新统计',
-                onPressed: busy ? null : () => ref.read(projectsProvider.notifier).survey(project.name),
+                onPressed: busy ? null : () => ref.read(projectSurveyProvider(project.name).notifier).refresh(),
                 child: const SpriteIcon('button-refresh', size: 16),
               ),
               if (counted != null)
@@ -610,6 +605,7 @@ class _Hands extends ConsumerWidget {
     final a = activity;
     final authors = a is Done<ProjectActivity> ? a.value.authors : const <Author>[];
     if (authors.isEmpty) return const SizedBox.shrink();
+    if (ref.watch(workbenchConfigProvider).error != null) return const ConfigProblem();
     final agents = ref.watch(workbenchConfigProvider).agents;
     final top = authors.first.commits > 0 ? authors.first.commits : 1;
     final rest = authors.skip(_hands).fold<double>(0, (n, x) => n + x.commits);

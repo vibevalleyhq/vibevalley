@@ -3,7 +3,7 @@
 //
 //   VIBEVALLEY_SERVER=http://127.0.0.1:8787 flutter test tool/screens/live_screens_test.dart
 //   VIBEVALLEY_SCREEN=390x844 …     # at a phone's size (default 1440x900)
-//   VIBEVALLEY_EXTRA='bed=/tickets/w2,…' …   # more pages, name=route (with |text as in `pages`)
+//   VIBEVALLEY_EXTRA='bed=/issues/w2,…' …   # more pages, name=route (with |text as in `pages`)
 //   VIBEVALLEY_FRAMES=40,90,150 …   # after a tap, also build/live-<page>@<ms>ms.png that long after it: a transition
 
 import 'dart:io';
@@ -29,10 +29,10 @@ const pages = {
   'title': '/',
   'farm': '/',
   'chat': '/chat',
-  'tickets': '/tickets',
-  'ticket': '/tickets/w11',
-  'ticket-planned': '/tickets/w13',
-  'ticket-new': '/tickets/new',
+  'tickets': '/issues',
+  'ticket': '/issues/w11',
+  'ticket-planned': '/issues/w13',
+  'ticket-new': '/issues/new',
   'map': '/map',
   'map-island': '/map/pb-smoke',
   'gate': '/gate',
@@ -61,9 +61,9 @@ const pages = {
   'connector-qq': '/connectors/qq',
   'projects': '/projects',
   'voice': '/voice',
-  'assets': '/assets',
-  'assets-cursors': '/assets/cursors',
-  'assets-sounds': '/assets/sounds',
+  'assets': '/catalog',
+  'assets-cursors': '/catalog/cursors',
+  'assets-sounds': '/catalog/sounds',
 };
 
 void main() {
@@ -113,6 +113,7 @@ void main() {
           await Future<void>.delayed(const Duration(milliseconds: 50));
           await tester.pump(const Duration(milliseconds: 50));
         }
+        expect(router.routeInformationProvider.value.uri.path, path, reason: '$name must render its requested route');
         Future<void> shoot(String file) async {
           final boundary = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
           final image = await boundary.toImage();
@@ -122,7 +123,9 @@ void main() {
         }
 
         if (tap.isNotEmpty) {
-          await tester.tap(_target(tap.first).last, warnIfMissed: false);
+          final target = _target(tap.first).last;
+          await tester.ensureVisible(target);
+          await tester.tap(target);
           var at = 0;
           for (final ms in frames) {
             await tester.pump(Duration(milliseconds: ms - at));

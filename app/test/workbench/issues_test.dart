@@ -202,7 +202,7 @@ void main() {
       if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
       return switch ((r.method, r.url.path)) {
         ('GET', '/api/v1/sessions') => jsonResponse([conflicted.toJson(), planner.toJson()]),
-        ('GET', '/api/v1/agents') => jsonResponse([]),
+        ('GET', '/api/v1/agents') || ('GET', '/api/v1/skills') || ('GET', '/api/v1/runtimes') => jsonResponse([]),
         ('GET', '/api/v1/sessions/w4') => jsonResponse(conflicted.toJson()),
         ('GET', '/api/v1/sessions/w4/events') => jsonResponse([]),
         _ => jsonResponse(null, 204),
@@ -271,6 +271,8 @@ void main() {
         case ('GET', '/api/v1/sessions'):
           return jsonResponse([_open.toJson(), _closed.toJson()]);
         case ('GET', '/api/v1/agents'):
+        case ('GET', '/api/v1/skills'):
+        case ('GET', '/api/v1/runtimes'):
           return jsonResponse([]);
         case ('GET', '/api/v1/sessions/w1'):
           return jsonResponse(_closed.toJson());

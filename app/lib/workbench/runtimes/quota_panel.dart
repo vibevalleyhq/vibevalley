@@ -7,6 +7,7 @@ import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
+import '../shared/config_problem.dart';
 import 'runtimes_state.dart';
 import '../../rules/quota.dart';
 import '../../rules/seeds.dart';
@@ -24,6 +25,7 @@ class QuotaPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(workbenchConfigProvider).error != null) return const ConfigProblem();
     final runtimes = usableRuntimes(ref.watch(workbenchConfigProvider).runtimes);
     final atlas = ref.watch(atlasProvider).value;
     if (runtimes.isEmpty || atlas == null) return const SizedBox.shrink();

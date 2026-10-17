@@ -153,30 +153,55 @@ class _ConfigDesk extends ConsumerWidget {
           height: workbenchHead,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: const BoxDecoration(border: Border(bottom: pxLine)),
-          child: Row(
-            children: [
-              if (p != null) ...[
-                placeIcon(p),
-                const SizedBox(width: 12),
-                Text(p.label, style: KitText.lg),
-                const SizedBox(width: 12),
-                Text(p.hint, style: KitText.xs.copyWith(color: Palette.bark500)),
-              ],
-              const Spacer(),
-              PxButton(
-                size: PxSize.custom,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                onPressed: () => context.go('/'),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(width: 8, height: 8, color: live ? Palette.leaf500 : Palette.cream300),
-                    const SizedBox(width: 6),
-                    Text(live ? '开工中 · $working 个在干活' : '没开工', style: KitText.xs),
-                  ],
-                ),
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final compact = box.maxWidth < 520;
+              final status = live ? '开工中 · $working 个在干活' : '没开工';
+              return Row(
+                children: [
+                  if (p != null) ...[
+                    placeIcon(p),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(p.label, style: KitText.lg, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                          if (!compact) ...[
+                            const SizedBox(width: 12),
+                            Flexible(
+                              child: Text(
+                                p.hint,
+                                style: KitText.xs.copyWith(color: Palette.bark500),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ] else
+                    const Spacer(),
+                  PxButton(
+                    size: PxSize.custom,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    semanticLabel: status,
+                    onPressed: () => context.go('/'),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(width: 8, height: 8, color: live ? Palette.leaf500 : Palette.cream300),
+                        const SizedBox(width: 6),
+                        Text(compact && live ? '$working 个在干活' : status, style: KitText.xs),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
         Expanded(

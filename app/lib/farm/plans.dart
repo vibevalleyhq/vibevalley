@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
 import '../data/ui_state.dart';
-import '../data/remote.dart' show projectNamesProvider;
+import '../data/remote.dart' show projectNamesProvider, playbookChangesProvider, reasonOf;
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
@@ -351,31 +351,15 @@ class _ConfirmState extends State<Confirm> {
       : PxButton.text(widget.label, onPressed: () => setState(() => _asking = true));
 }
 
-class PlanHarvest extends ConsumerStatefulWidget {
+class PlanHarvest extends ConsumerWidget {
   const PlanHarvest({super.key, required this.pb, required this.onDone});
   final Playbook pb;
   final void Function(Answer? answer) onDone;
 
   @override
-  ConsumerState<PlanHarvest> createState() => _PlanHarvestState();
-}
-
-class _PlanHarvestState extends ConsumerState<PlanHarvest> {
-  Loaded _loaded = const Loading();
-
-  @override
-  void initState() {
-    super.initState();
-    final api = ref.read(apiProvider);
-    loadChanges(() => api.playbook.changes(id: widget.pb.id)).then((l) {
-      if (mounted) setState(() => _loaded = l);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    switch (_loaded) {
-      case Loading():
+  Widget build(BuildContext context, WidgetRef ref) {
+    switch (ref.watch(playbookChangesProvider(pb.id))) {
+      case AsyncLoading():
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
           child: Text(
@@ -384,19 +368,19 @@ class _PlanHarvestState extends ConsumerState<PlanHarvest> {
             style: KitText.sm.copyWith(color: Palette.bark600),
           ),
         );
-      case LoadFailed(:final reason):
+      case AsyncError(:final error):
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Tinted(
               color: tint(Palette.berry, .12),
-              child: Text('看不了改动：$reason', style: KitText.sm.copyWith(color: Palette.berry)),
+              child: Text('看不了改动：${reasonOf(error)}', style: KitText.sm.copyWith(color: Palette.berry)),
             ),
             const SizedBox(height: 12),
-            PxButton.text('先不收', onPressed: () => widget.onDone(null)),
+            PxButton.text('先不收', onPressed: () => onDone(null)),
           ],
         );
-      case LoadReady(:final changes):
+      case AsyncData(value: final changes):
         final (added, removed) = lineCounts(changes);
         final conflicts = changes.conflicts.toSet();
         return Column(
@@ -474,14 +458,12 @@ class _PlanHarvestState extends ConsumerState<PlanHarvest> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                PxButton.text('先不收', onPressed: () => widget.onDone(null)),
+                PxButton.text('先不收', onPressed: () => onDone(null)),
                 const SizedBox(width: 8),
                 PxButton.text(
                   '确认收获，合进 ${changes.base}',
                   tone: PxTone.primary,
-                  onPressed: conflicts.isNotEmpty
-                      ? null
-                      : () async => widget.onDone(await ref.read(farmCommandsProvider).actOnPlaybook(widget.pb.id, PlaybookAction.merge)),
+                  onPressed: conflicts.isNotEmpty ? null : () async => onDone(await ref.read(farmCommandsProvider).actOnPlaybook(pb.id, PlaybookAction.merge)),
                 ),
               ],
             ),

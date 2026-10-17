@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"cmp"
 	"context"
@@ -9,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -200,33 +198,9 @@ func stream(ctx context.Context, path string, raw []string) error {
 		return err
 	}
 	watch := path == protocol.EventsPath || a.flags["watch"] == "true"
-	req, err := http.NewRequestWithContext(ctx, "GET", strings.TrimRight(client(a).Base, "/")+path, nil)
-	if err != nil {
-		return err
-	}
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s: %s", path, res.Status)
-	}
-	scanner := bufio.NewScanner(res.Body)
-	scanner.Buffer(make([]byte, 1<<20), 64<<20)
-	for scanner.Scan() {
-		data, ok := strings.CutPrefix(scanner.Text(), "data: ")
-		if !ok {
-			continue
-		}
-		if err := printJSON(os.Stdout, []byte(data)); err != nil {
-			return err
-		}
-		if !watch {
-			return nil
-		}
-	}
-	return scanner.Err()
+	return client(a).Stream(ctx, path, func(data json.RawMessage) (bool, error) {
+		return watch, printJSON(os.Stdout, data)
+	})
 }
 
 func usage(w io.Writer, only string) error {

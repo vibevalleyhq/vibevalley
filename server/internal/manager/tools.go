@@ -488,15 +488,13 @@ func (fm *manager) tools() []agentcore.AgentTool {
 
 	type openArgs struct {
 		Name        string `json:"name"`
-		Description string `json:"description"`
-		Project     string `json:"project"`
+		Description string `json:"description,omitempty"`
+		Project     string `json:"project,omitempty"`
 	}
 	openChannel := agent.TextTool(agent.TextToolSpec[openArgs]{
 		Name: "open_channel", Label: managerToolLabels["open_channel"],
 		Description: "开一个新频道：一件长期的事、一个项目，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，project 是它的默认项目（在这里派的活默认在这个项目里干）。主人要求了才开。",
-		Parameters: agentcore.ObjectSchema(map[string]any{
-			"name": agentcore.StringSchema(), "description": agentcore.StringSchema(), "project": agentcore.StringSchema(),
-		}, "name"),
+		Parameters:  managerSchema[openArgs](),
 		Run: func(_ context.Context, p openArgs, _ agent.ToolContext) (string, error) {
 			c, err := fm.chat.OpenChannel(p.Name, p.Description, p.Project)
 			if err != nil {
@@ -534,21 +532,29 @@ func (fm *manager) tools() []agentcore.AgentTool {
 	})
 
 	merge := sessionTool("merge", "把一个帮工分支上的提交合进它所在项目的主分支，然后让它收工。会冲突时不合并，帮工留在地里，结果里有让它解决冲突的话。",
-		func(w session.Roster) string { return fm.issue.Merge(w.Session.ID) })
+		func(w session.Roster) string {
+			if w.Session.Issue == nil {
+				return "这个帮工没有工单"
+			}
+			said, err := fm.issue.Merge(*w.Session.Issue)
+			if err != nil {
+				return err.Error()
+			}
+			return said
+		})
 	changes := agent.TextTool(agent.TextToolSpec[managerSessionArgs]{
 		Name: "changes", Label: managerToolLabels["changes"], Parameters: managerSessionSchema,
 		Description: "看收获一个帮工会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者收获前想确认时用。",
 		Run: func(_ context.Context, p managerSessionArgs, _ agent.ToolContext) (string, error) {
 			return withSession(p.Session, func(w session.Roster) string {
-				c, err := fm.issue.Changes(w.Session.ID, protocol.CallerManager)
+				if w.Session.Issue == nil {
+					return "这个帮工没有工单"
+				}
+				c, err := fm.issue.Changes(*w.Session.Issue, protocol.CallerManager)
 				if err != nil {
 					return "看不了改动：" + err.Error()
 				}
-				if c == nil {
-					// Gone between the roster and the look: named as the manager named it.
-					return "没有叫 " + p.Session + " 的帮工"
-				}
-				return managerDescribeChanges(*c)
+				return managerDescribeChanges(c)
 			})
 		},
 	})
@@ -576,12 +582,12 @@ func (fm *manager) tools() []agentcore.AgentTool {
 	})
 
 	type tellArgs struct {
-		Session string `json:"session"`
-		Message string `json:"message"`
+		Session string `json:"session" jsonschema:"帮工的名字或 id"`
+		Message string `json:"message" jsonschema:"要带的话"`
 	}
 	tell := agent.TextTool(agent.TextToolSpec[tellArgs]{
 		Name: "tell", Label: managerToolLabels["tell"], Description: "给一个帮工带话：发在它的工单串里。他正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
-		Parameters: agentcore.ObjectSchema(map[string]any{"session": managerStr("帮工的名字或 id"), "message": managerStr("要带的话")}, "session", "message"),
+		Parameters: managerSchema[tellArgs](),
 		Run: func(_ context.Context, p tellArgs, _ agent.ToolContext) (string, error) {
 			return withSession(p.Session, func(w session.Roster) string {
 				if _, err := fm.chat.TellSession(protocol.ManagerAgent, w.Session.ID, p.Message); err != nil {
@@ -593,11 +599,11 @@ func (fm *manager) tools() []agentcore.AgentTool {
 	})
 
 	type readArgs struct {
-		Target string `json:"target"`
+		Target string `json:"target,omitempty" jsonschema:"#田头、#clock-in，或 #田头:<消息号>"`
 	}
 	readChat := agent.TextTool(agent.TextToolSpec[readArgs]{
 		Name: "read_chat", Label: managerToolLabels["read_chat"], Description: "读一个频道或一个串里最近说的话。target 写 #<频道>（比如 #田头），或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方。",
-		Parameters: agentcore.ObjectSchema(map[string]any{"target": managerStr("#田头、#clock-in，或 #田头:<消息号>")}),
+		Parameters: managerSchema[readArgs](),
 		Run: func(_ context.Context, p readArgs, _ agent.ToolContext) (string, error) {
 			where := p.Target
 			if where == "" {

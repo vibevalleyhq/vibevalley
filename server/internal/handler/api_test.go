@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"vibevalley/internal/handler"
@@ -72,5 +73,32 @@ func TestIssueLifecycleNeedsASession(t *testing.T) {
 	var missing protocol.Missing
 	if err := c.IssueMerge(ctx, "nope"); !errors.As(err, &missing) {
 		t.Errorf("an issue that is not there: %v", err)
+	}
+}
+
+func TestFreshAgentListHasValidRequiredEnums(t *testing.T) {
+	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
+	cfg.Voice.Line.Port, cfg.Lan.Port = 0, 0
+	f, err := workspace.New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(f.Close)
+	srv := httptest.NewServer(handler.New(f))
+	defer srv.Close()
+	c := &protocol.Client{Base: srv.URL}
+	agents, err := c.AgentList(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := false
+	for _, a := range agents {
+		manager = manager || a.ID == protocol.ManagerAgent
+		if !slices.Contains(protocol.BuildValues, a.Look.Build) || !slices.Contains(protocol.HeadValues, a.Look.Head) || !slices.Contains(protocol.PersonaModeValues, a.PersonaMode) {
+			t.Fatalf("agent list has invalid required enum: %+v", a)
+		}
+	}
+	if !manager {
+		t.Fatal("manager missing from list")
 	}
 }

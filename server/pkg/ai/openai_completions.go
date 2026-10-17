@@ -60,27 +60,15 @@ func textOf(content UserContent) string {
 	return strings.Join(parts, "\n")
 }
 
-func answeredCalls(messages []Message) map[string]bool {
-	answered := map[string]bool{}
-	for _, m := range messages {
-		if r, ok := m.(ToolResultMessage); ok {
-			answered[r.ToolCallID] = true
-		}
-	}
-	return answered
-}
-
 // Tool calls that never got a result and results whose call is gone are left out: the endpoint refuses either.
 func ToChatMessages(model Model, c Context) []ChatMessage {
 	out := []ChatMessage{}
 	if c.SystemPrompt != "" {
 		out = append(out, ChatMessage{Role: "system", Content: c.SystemPrompt})
 	}
-	answered := answeredCalls(c.Messages)
-	called := map[string]bool{}
 	images := model.takesImages()
 	compat := model.compat()
-	for _, m := range c.Messages {
+	for _, m := range requestMessages(c.Messages) {
 		switch m := m.(type) {
 		case SystemMessage:
 			out = append(out, ChatMessage{Role: "system", Content: textOf(m.Content)})
@@ -115,10 +103,7 @@ func ToChatMessages(model Model, c Context) []ChatMessage {
 				case TypeThinking:
 					reasoning += b.Thinking
 				case TypeToolCall:
-					if answered[b.ID] {
-						calls = append(calls, ChatToolCall{ID: b.ID, Type: "function", Function: ChatToolFunction{Name: b.Name, Arguments: string(b.Args())}})
-						called[b.ID] = true
-					}
+					calls = append(calls, ChatToolCall{ID: b.ID, Type: "function", Function: ChatToolFunction{Name: b.Name, Arguments: string(b.Args())}})
 				}
 			}
 			if text == "" && len(calls) == 0 {
@@ -133,9 +118,6 @@ func ToChatMessages(model Model, c Context) []ChatMessage {
 			}
 			out = append(out, msg)
 		case ToolResultMessage:
-			if !called[m.ToolCallID] {
-				continue
-			}
 			content := textOf(UserContent{Blocks: m.Content})
 			if content == "" {
 				content = "（没有内容）"
@@ -345,6 +327,8 @@ func AnswerEvents(model Model, chunks iter.Seq2[ChatChunk, error]) iter.Seq[Assi
 			answer = NewAnswer(model, "")
 		}
 		switch finish {
+		case "":
+			emit(answer.Error(StopError, "模型没有回答完", UsageOf(usage)))
 		case "content_filter":
 			emit(answer.Error(StopError, "回答被服务商的内容审核拦下了", UsageOf(usage)))
 		case "length":

@@ -8,6 +8,7 @@ import '../../ui/kit/kit.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
+import '../shared/config_problem.dart';
 import '../../rules/seeds.dart';
 
 const _installed = 'installed:';
@@ -51,6 +52,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
   @override
   Widget build(BuildContext context) {
     final config = ref.watch(workbenchConfigProvider);
+    if (config.error != null) return const ConfigProblem();
     final skills = config.skills;
     final installed = installedSkills(config.runtimes);
     final id = widget.id;

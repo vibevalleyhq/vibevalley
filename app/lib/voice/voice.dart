@@ -5,6 +5,7 @@
 // LiveCaptions and the agent's state come over the RTC data stream (the server starts the agent with captions:
 // 'datastream'; captions.dart): Agora's Flutter RTM package is Android and iOS only.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -17,8 +18,10 @@ import '../gen/vibevalley.dart';
 
 enum CallPhase { idle, connecting, live, ending }
 
+class _CallCancelled implements Exception {}
+
 class VoiceCall extends ChangeNotifier {
-  VoiceCall(this.api, {this.agentPick}) {
+  VoiceCall(this.api, {this.agentPick, RtcEngine Function()? createEngine}) : _createEngine = createEngine ?? createAgoraRtcEngine {
     captions.onHeard = (text) => api.manager
         .hear(
           body: SayRequest(text: text, agent: agentPick?.call()),
@@ -37,6 +40,12 @@ class VoiceCall extends ChangeNotifier {
   }
 
   final VibeValleyApi api;
+  final RtcEngine Function() _createEngine;
+  Future<void>? _starting;
+  Future<void>? _ending;
+  Completer<void>? _cancelStart;
+  bool _disposed = false;
+  bool get _cancelled => _disposed || phase == CallPhase.ending;
 
   final String? Function()? agentPick;
   CallPhase phase = CallPhase.idle;
@@ -82,40 +91,52 @@ class VoiceCall extends ChangeNotifier {
 
   String? _agentId;
 
-  Future<void> start() async {
-    if (phase != CallPhase.idle) return;
+  Future<void> start() {
+    if (_disposed || phase != CallPhase.idle) return Future.value();
+    _cancelStart = Completer<void>();
+    return _starting ??= _start().whenComplete(() => _starting = null);
+  }
+
+  Future<void> _start() async {
+    final cancellation = _cancelStart!;
     _set(CallPhase.connecting, problem: null);
     final watch = Stopwatch()..start();
     try {
       if (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android) {
         if (!(await Permission.microphone.request()).isGranted) throw VibeValleyApiError(0, null, '没有麦克风权限');
       }
+      if (_cancelled) return;
       _note('call: asking for a session');
-      final session = await api.voice.session();
+      final session = await _untilCancelled(api.voice.session(), cancellation);
+      if (_cancelled) return;
       _note('call: session for ${session.channel}, uid ${session.uid}');
-      final engine = createAgoraRtcEngine();
+      final engine = _createEngine();
       _engine = engine;
       // Set up as Shengwang's official Flutter quickstart does (conversational-ai-quickstart-native/flutter).
       await engine.initialize(RtcEngineContext(appId: session.appId, channelProfile: ChannelProfileType.channelProfileLiveBroadcasting));
       engine.registerEventHandler(
         RtcEngineEventHandler(
           onUserJoined: (_, remoteUid, _) {
+            if (_cancelled || !identical(_engine, engine)) return;
             _note('rtc: $remoteUid joined after ${watch.elapsedMilliseconds} ms');
             agentHere = true;
             connectTime ??= watch.elapsed;
             notifyListeners();
           },
           onUserOffline: (_, remoteUid, reason) {
+            if (_cancelled || !identical(_engine, engine)) return;
             _note('rtc: $remoteUid left ($reason)');
             agentHere = false;
             notifyListeners();
           },
           onError: (code, message) {
+            if (_cancelled || !identical(_engine, engine)) return;
             _note('rtc error: $code $message');
             problem = '声网：$code $message';
             notifyListeners();
           },
           onStreamMessage: (_, remoteUid, streamId, data, _, _) {
+            if (_cancelled || !identical(_engine, engine)) return;
             final text = utf8.decode(data, allowMalformed: true);
             packets++;
             lastPacket = text.length > 80 ? '${text.substring(0, 80)}…' : text;
@@ -126,6 +147,7 @@ class VoiceCall extends ChangeNotifier {
             notifyListeners();
           },
           onStreamMessageError: (_, remoteUid, streamId, code, missed, cached) {
+            if (_cancelled || !identical(_engine, engine)) return;
             _note('stream error from $remoteUid/$streamId: $code, missed $missed');
             debugPrint('vibevalley stream error from $remoteUid/$streamId: $code missed $missed');
             problem = '字幕流出错：$code（丢了 $missed 个）';
@@ -136,17 +158,21 @@ class VoiceCall extends ChangeNotifier {
           onLocalAudioStateChanged: (_, state, reason) => _note('rtc: microphone $state ($reason)'),
           // The token lasts an hour: a fresh one for the same channel and uid before it runs out.
           onTokenPrivilegeWillExpire: (connection, _) async {
+            if (_cancelled || !identical(_engine, engine)) return;
             try {
               final fresh = await api.voice.renew(
                 body: RenewRequest(channel: session.channel, uid: session.uid),
               );
-              await _engine?.renewToken(fresh.token);
+              if (_cancelled || !identical(_engine, engine)) return;
+              await engine.renewToken(fresh.token);
             } catch (e) {
+              if (_cancelled || !identical(_engine, engine)) return;
               problem = '令牌续期失败：$e';
               notifyListeners();
             }
           },
           onAudioVolumeIndication: (_, speakers, _, _) {
+            if (_cancelled || !identical(_engine, engine)) return;
             for (final s in speakers) {
               if (s.uid == 0) {
                 micLevel = s.volume ?? 0;
@@ -198,18 +224,35 @@ class VoiceCall extends ChangeNotifier {
       // Twice the captured level (0..400): with the gain above, a quiet microphone still reaches the agent.
       await engine.adjustRecordingSignalVolume(200);
       // Captions over the RTC data stream: Agora's Flutter RTM package is Android and iOS only.
+      if (_cancelled) return;
       _note('call: asking for the voice agent');
-      _agentId = (await api.voice.start(
-        body: StartRequest(channel: session.channel, uid: session.uid),
-      )).agentId;
+      final agent = api.voice
+          .start(
+            body: StartRequest(channel: session.channel, uid: session.uid),
+          )
+          .then((agent) async {
+            if (cancellation.isCompleted) {
+              await _stopAgent(agent.agentId);
+              throw _CallCancelled();
+            }
+            _agentId = agent.agentId;
+            return agent;
+          });
+      await _untilCancelled(agent, cancellation);
       _note('call: agent $_agentId started after ${watch.elapsedMilliseconds} ms');
-      _set(CallPhase.live);
+      if (!_cancelled) _set(CallPhase.live);
     } catch (e) {
       _note('call failed: $e');
       await _teardown();
-      _set(CallPhase.idle, problem: '$e');
+      if (!_cancelled) _set(CallPhase.idle, problem: '$e');
     }
   }
+
+  Future<void> toggle() => switch (phase) {
+    CallPhase.idle => start(),
+    CallPhase.connecting || CallPhase.live => end(),
+    CallPhase.ending => Future.value(),
+  };
 
   Future<void> mute(bool on) async {
     if (phase != CallPhase.live || muted == on) return;
@@ -218,18 +261,33 @@ class VoiceCall extends ChangeNotifier {
     await _engine?.muteLocalAudioStream(on);
   }
 
-  Future<void> end() async {
+  Future<void> end() => _ending ??= _end().whenComplete(() => _ending = null);
+
+  Future<void> _end() async {
     if (phase == CallPhase.idle) return;
     _note('call: hung up ($packets packets, $messages messages)');
     _set(CallPhase.ending);
+    if (_cancelStart?.isCompleted == false) _cancelStart!.complete();
+    await _starting;
     await _teardown();
     _set(CallPhase.idle);
+  }
+
+  Future<T> _untilCancelled<T>(Future<T> request, Completer<void> cancellation) =>
+      Future.any([request, cancellation.future.then<T>((_) => throw _CallCancelled())]);
+
+  Future<void> _stopAgent(String agent) async {
+    try {
+      await api.voice.stop(body: VoiceAgent(agentId: agent)).timeout(const Duration(seconds: 3));
+    } on Object catch (e) {
+      _note('voice agent stop failed: $e');
+    }
   }
 
   Future<void> _teardown() async {
     final agent = _agentId;
     _agentId = null;
-    if (agent != null) await api.voice.stop(body: VoiceAgent(agentId: agent)).catchError((_) {});
+    if (agent != null) await _stopAgent(agent);
     final engine = _engine;
     _engine = null;
     muted = false;
@@ -240,9 +298,21 @@ class VoiceCall extends ChangeNotifier {
     micLevel = 0;
     managerLevel = 0;
     lastPacket = null;
+    connectTime = null;
+    _loudestMic = 0;
+    _loudestManager = 0;
+    _levelsAt = 0;
     if (engine != null) {
-      await engine.leaveChannel();
-      await engine.release();
+      try {
+        await engine.leaveChannel();
+      } on Object catch (e) {
+        _note('rtc leave failed: $e');
+      }
+      try {
+        await engine.release();
+      } on Object catch (e) {
+        _note('rtc release failed: $e');
+      }
     }
   }
 
@@ -255,8 +325,14 @@ class VoiceCall extends ChangeNotifier {
   static const _keep = Object();
 
   @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  @override
   void dispose() {
-    _teardown();
+    _disposed = true;
+    unawaited(end());
     super.dispose();
   }
 }

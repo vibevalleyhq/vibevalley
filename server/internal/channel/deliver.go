@@ -15,7 +15,8 @@ import (
 
 // Every function here runs with c.mu held.
 
-type chatInsert struct {
+type chatWrite struct {
+	id           string
 	conversation string
 	from         string
 	kind         protocol.MessageKind
@@ -23,14 +24,17 @@ type chatInsert struct {
 	final        bool
 	meta         *chatMeta
 	answers      *string
+	thread       *threadSubject
 }
 
 type chatWritten struct {
 	id         string
 	number     int64
 	recipients []string
+	resetWake  []string
 	notOnFarm  []string
 	held       bool
+	thread     string
 }
 
 func (c *Service) inTx(fn func(s chatStore) error) error {
@@ -161,12 +165,12 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 			return chatWritten{}, err
 		}
 	}
-	// The person speaking resets a session's failed wakes: they asked for it themselves.
+	w := chatWritten{id: row.ID, number: row.Number}
+	// Reset the breaker only after the message transaction commits.
 	if row.Sender == "user" {
 		for _, d := range deliveries {
 			if d.Wakes {
-				delete(c.broken, d.Recipient)
-				delete(c.failures, d.Recipient)
+				w.resetWake = append(w.resetWake, d.Recipient)
 			}
 		}
 	}
@@ -178,7 +182,7 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 		}
 		held = n == 0
 	}
-	w := chatWritten{id: row.ID, number: row.Number, held: held}
+	w.held = held
 	for _, d := range deliveries {
 		if d.HeldBy == "" && !slices.Contains(w.recipients, d.Recipient) {
 			w.recipients = append(w.recipients, d.Recipient)
@@ -192,23 +196,48 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 	return w, nil
 }
 
-func (c *Service) insert(in chatInsert) (chatWritten, error) {
+func (c *Service) write(in chatWrite) (chatWritten, error) {
 	var written chatWritten
 	err := c.inTx(func(s chatStore) error {
-		id := base.NewID()
-		number, err := s.insertMessage(id, in.conversation, in.from, string(in.kind), in.text, in.final, in.meta, clock.NowMs())
-		if err != nil {
-			return err
-		}
-		if err := s.touchConversation(in.conversation, number); err != nil {
-			return err
+		id := in.id
+		var number int64
+		if id == "" {
+			id = base.NewID()
+			var err error
+			number, err = s.insertMessage(id, in.conversation, in.from, string(in.kind), in.text, in.final, in.meta, clock.NowMs())
+			if err != nil {
+				return err
+			}
+			if err := s.touchConversation(in.conversation, number); err != nil {
+				return err
+			}
+		} else {
+			if err := s.updateMessageBody(id, in.text, in.final, clock.NowMs()); err != nil {
+				return err
+			}
+			row, err := s.message(id)
+			if err != nil {
+				return err
+			}
+			if row == nil {
+				return fmt.Errorf("没有 %s 这条消息", id)
+			}
+			number = row.Number
 		}
 		if in.final {
+			var err error
 			if written, err = c.settle(s, id); err != nil {
 				return err
 			}
 		}
 		written.id, written.number = id, number
+		if in.thread != nil {
+			var err error
+			written.thread, err = s.threadFor(chatMsgRow{ID: id, Number: number, Conversation: in.conversation}, *in.thread)
+			if err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -219,11 +248,18 @@ func (c *Service) insert(in chatInsert) (chatWritten, error) {
 }
 
 func (c *Service) after(conversation string, written chatWritten, answers *string) {
+	for _, recipient := range written.resetWake {
+		delete(c.broken, recipient)
+		delete(c.failures, recipient)
+	}
 	c.publishMessage(written.id, answers)
 	c.publishConversation(conversation)
+	if written.thread != "" {
+		c.publishConversation(written.thread)
+	}
 	if written.held {
 		text := hopLimitText(protocol.HopLimit)
-		if _, err := c.insert(chatInsert{conversation: conversation, from: "system", kind: protocol.MessageKindNotice, text: text, final: true, meta: &chatMeta{Code: "hop_limit"}}); err != nil {
+		if _, err := c.write(chatWrite{conversation: conversation, from: "system", kind: protocol.MessageKindNotice, text: text, final: true, meta: &chatMeta{Code: "hop_limit"}}); err != nil {
 			log.Printf("chat: hop limit notice: %v", err)
 		}
 	}
@@ -408,15 +444,8 @@ func (c *Service) onActivity(a session.LaunchActivity) {
 	switch a.Kind {
 	case "spoke":
 		delete(c.failures, a.ID)
-		seen, err := s.seenHanded(a.ID, a.Launch, clock.NowMs())
-		if err != nil {
+		if err := c.heardLaunch(a.ID, a.Launch); err != nil {
 			log.Printf("chat: %s spoke: %v", a.ID, err)
-			return
-		}
-		for _, message := range seen {
-			if err := s.addSeenMark(a.ID, message); err != nil {
-				log.Printf("chat: %s spoke: %v", a.ID, err)
-			}
 		}
 	case "ended":
 		if !a.Spoke {
@@ -439,7 +468,7 @@ func (c *Service) onActivity(a session.LaunchActivity) {
 						name = h.Name
 					}
 					text := fmt.Sprintf("%s 连续 %d 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。", name, failed)
-					if _, err := c.insert(chatInsert{conversation: where, from: "system", kind: protocol.MessageKindNotice, text: text, final: true, meta: &chatMeta{Code: "wake_breaker"}}); err != nil {
+					if _, err := c.write(chatWrite{conversation: where, from: "system", kind: protocol.MessageKindNotice, text: text, final: true, meta: &chatMeta{Code: "wake_breaker"}}); err != nil {
 						log.Printf("chat: wake breaker notice: %v", err)
 					}
 				}
@@ -560,20 +589,9 @@ func (c *Service) openedJob(h protocol.Session) error {
 		project = *h.Project
 	}
 	text := fmt.Sprintf("派 @%s（%s）去 %s：%s", h.ID, h.Name, project, what)
-	written, err := c.insert(chatInsert{conversation: channel, from: protocol.ManagerAgent, kind: protocol.MessageKindDispatch, text: text, final: true, meta: &chatMeta{Session: h.ID}})
-	if err != nil {
-		return err
-	}
-	job, id := string(protocol.SubjectKindIssue), h.ID
-	thread := base.NewID()
-	if err := s.createThread(thread, written.id, written.number, &job, &id, channel, clock.NowMs()); err != nil {
-		return err
-	}
-	if err := s.follow(thread, h.ID, "owner", written.number); err != nil {
-		return err
-	}
-	c.publishConversation(thread)
-	return nil
+	_, err = c.write(chatWrite{conversation: channel, from: protocol.ManagerAgent, kind: protocol.MessageKindDispatch, text: text, final: true,
+		meta: &chatMeta{Session: h.ID}, thread: &threadSubject{kind: protocol.SubjectKindIssue, id: h.ID, owner: h.ID}})
+	return err
 }
 
 func (c *Service) postReport(id string, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
@@ -597,7 +615,7 @@ func (c *Service) postReport(id string, outcome protocol.Outcome, summary string
 	}
 	o := outcome
 	meta := &chatMeta{Outcome: &o, Spent: spent, ForPlaybook: w.Playbook != nil}
-	if _, err := c.insert(chatInsert{conversation: *thread, from: id, kind: protocol.MessageKindReport, text: str.Head(text, chatReportMax), final: true, meta: meta}); err != nil {
+	if _, err := c.write(chatWrite{conversation: *thread, from: id, kind: protocol.MessageKindReport, text: str.Head(text, chatReportMax), final: true, meta: meta}); err != nil {
 		log.Printf("chat: %s's report: %v", id, err)
 	}
 }

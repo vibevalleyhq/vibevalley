@@ -15,6 +15,7 @@ import (
 	"vibevalley/pkg/smith/oar"
 	"vibevalley/pkg/smith/oartest"
 	"vibevalley/pkg/smith/observe"
+	"vibevalley/pkg/smith/voyage"
 )
 
 // Ported from tests/subagents.test.ts. Tests that touch OAR_SUBAGENT_DEPTH
@@ -211,6 +212,16 @@ func TestClosingRunningSubagentEndsTaskStoppedAndLogKeepsRecords(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(dir, entries[0].Name()))
 	if err != nil {
 		t.Fatal(err)
+	}
+	records, err := voyage.ReadRecords(strings.NewReader(string(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(records, crew.Get("fake-1").Session.Records()) {
+		t.Fatal("subagent Close returned before its recording caught up")
+	}
+	if strings.Count(string(data), `"kind":"end"`) != 1 || !strings.Contains(string(data), `"reason":"exited"`) {
+		t.Fatal("subagent recording did not end once as exited")
 	}
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if !strings.Contains(lines[0], `"kind":"header"`) {

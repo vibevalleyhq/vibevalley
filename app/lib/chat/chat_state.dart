@@ -3,12 +3,10 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/widgets.dart';
 
 import '../data/providers.dart';
-import '../data/server.dart' show connectWait;
 import '../gen/vibevalley.dart';
-import '../data/prefs.dart';
-import '../data/remote.dart' show agentsProvider;
 import '../voice/captions.dart';
 import '../rules/chat.dart';
 
@@ -40,13 +38,30 @@ final shownConversationProvider = Provider<Conversation?>((ref) {
   return (id == null ? null : conversationOf(chat, id)) ?? generalOf(chat);
 });
 
-final chatProjectNamesProvider = FutureProvider<List<String>>((ref) async {
-  final all = await ref.watch(apiProvider).project.list();
-  all.sort((a, b) {
-    final byLast = (b.last ?? 0).compareTo(a.last ?? 0);
-    return byLast != 0 ? byLast : a.name.compareTo(b.name);
+final chatFeedProvider = Provider.autoDispose.family<({List<ChatItem> items, ChatMessage? parent, bool hasOlder}), String?>((ref, id) {
+  final chat = ref.watch(stateProvider)?.chat;
+  final conversation = id == null ? null : conversationOf(chat, id);
+  final history = id == null ? null : ref.watch(chatLoadedProvider.select((all) => all[id]));
+  final items = itemsOf(chat, conversation, ref.watch(spokenProvider), history);
+  return (
+    items: items,
+    parent: conversation?.kind == ConversationKind.thread ? parentOf(chat, conversation!, history) : null,
+    hasOlder: conversation != null && items.isNotEmpty && !(history?.complete ?? false),
+  );
+});
+
+/// Watching declares a visible conversation; receipts belong to the frame that displayed it.
+final visibleConversationProvider = Provider.autoDispose.family<void, String>((ref, id) {
+  final number = ref.watch(
+    stateProvider.select((state) {
+      final conversation = conversationOf(state?.chat, id);
+      return conversation == null || unreadIn(state?.chat, conversation) == 0 ? null : newestUnread(state?.chat, conversation);
+    }),
+  );
+  if (number == null) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (ref.mounted) unawaited(ref.read(chatActionsProvider)._markRead(id, number).catchError((Object _) {}));
   });
-  return [for (final p in all) p.name];
 });
 
 /// Each caption keeps one id and the time it was first seen.
@@ -80,6 +95,7 @@ String problemOf(Object e) => e is VibeValleyApiError ? e.reason : '$e';
 class ChatActions {
   ChatActions(this._ref);
   final Ref _ref;
+  final _history = <String, Future<void>>{};
 
   VibeValleyApi get _api => _ref.read(apiProvider);
   Chat? get _chat => _ref.read(stateProvider)?.chat;
@@ -96,8 +112,13 @@ class ChatActions {
     return true;
   }
 
-  Future<void> _fetchPage(String conversation, [double? before]) async {
+  Future<void> _fetchPage(String conversation, [double? before]) => _history[conversation] ??= _readPage(conversation, before).whenComplete(() {
+    _history.remove(conversation);
+  });
+
+  Future<void> _readPage(String conversation, double? before) async {
     final page = await _api.channel.history(id: conversation, before: before, limit: chatPage.toDouble());
+    if (!_ref.mounted) return;
     final loaded = _ref.read(chatLoadedProvider.notifier);
     final all = _ref.read(chatLoadedProvider);
     final was = all[conversation] ?? const Loaded([], complete: false);
@@ -111,54 +132,10 @@ class ChatActions {
     await _fetchPage(conversation, oldest?.number);
   }
 
-  Future<void> markRead(String conversation) async {
-    final chat = _chat;
-    final c = conversationOf(chat, conversation);
-    final seq = c == null ? null : newestUnread(chat, c);
-    if (seq == null) return;
-    await _api.channel.markRead(
-      id: conversation,
-      body: ChatReadRequest(number: seq),
-    );
-  }
-
-  /// You can type before you have said hello.
-  Future<bool> whenLive() async {
-    final now = _ref.read(stateProvider)?.call;
-    if (now == CallState.live) return true;
-    if (now != CallState.connecting) unawaited(_api.manager.open().catchError((Object _) {}));
-    final deadline = DateTime.now().add(connectWait);
-    while (DateTime.now().isBefore(deadline)) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      final call = _ref.read(stateProvider)?.call;
-      if (call == CallState.live) return true;
-      if (call == CallState.error) return false;
-    }
-    return false;
-  }
-
-  String? pickedAgent() {
-    final pick = _ref.read(prefsProvider).pick;
-    if (pick == 'auto') return null;
-    final agents = _ref.read(agentsProvider).value;
-    return agents != null && agents.containsKey(pick) ? pick : null;
-  }
-
-  Future<void> sayIn(String conversation, String text) async {
-    final said = text.trim();
-    if (said.isEmpty || !await whenLive()) return;
-    await _api.channel.say(
-      body: SayRequest(text: said, conversation: conversation, agent: pickedAgent()),
-    );
-  }
-
-  Future<void> talk(String text) async {
-    final said = text.trim();
-    if (said.isEmpty || !await whenLive()) return;
-    await _api.channel.say(
-      body: SayRequest(text: said, agent: pickedAgent()),
-    );
-  }
+  Future<void> _markRead(String conversation, double number) => _api.channel.markRead(
+    id: conversation,
+    body: ChatReadRequest(number: number),
+  );
 
   Future<void> openChannel(ChannelRequest req) async {
     final name = req.name.trim().replaceFirst(RegExp('^#'), '');
@@ -166,6 +143,7 @@ class ChatActions {
       body: ChannelRequest(name: name, description: req.description, project: req.project),
     );
     for (var i = 0; i < 40; i++) {
+      if (!_ref.mounted) return;
       final found = channelsOf(_chat).where((c) => c.name == name).firstOrNull;
       if (found != null) return showChat(found.kind == ConversationKind.general ? null : found.id);
       await Future<void>.delayed(const Duration(milliseconds: 50));

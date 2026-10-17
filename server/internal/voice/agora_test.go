@@ -12,12 +12,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/AgoraIO/agora-agents-go/v2/agentkit"
 	"go.uber.org/fx"
 
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/setting"
 	"vibevalley/internal/testkit/fixture"
+	"vibevalley/pkg/agora"
 	"vibevalley/pkg/x/ptr"
 )
 
@@ -91,12 +91,8 @@ func TestVoiceRequestsMatchGolden(t *testing.T) {
 				t.Fatal(problem)
 			}
 			capture := &voiceCapture{}
-			client := agentkit.NewAgoraClient(agentkit.AgoraClientOptions{Area: voiceAreaOf(c.Voice.Area), AppID: voiceTestAppID, AppCertificate: voiceTestCert, HTTPClient: capture})
-			idle := int(c.Voice.IdleSeconds)
-			session := voiceAgentFor(client, c.Voice, vendors).CreateSession(agentkit.CreateSessionOptions{
-				Name: "parity", Channel: "parity-channel", AgentUID: protocol.VoiceAgentUID, RemoteUIDs: []string{"10001"}, IdleTimeout: &idle, ExpiresIn: 3600,
-			})
-			id, err := session.Start(context.Background())
+			client := agora.NewClient(agora.Credentials{AppID: voiceTestAppID, AppCertificate: voiceTestCert}, voiceAreaOf(c.Voice.Area), capture)
+			id, err := client.Start(context.Background(), voiceAgentConfig(c.Voice), vendors, agora.Session{Name: "parity", Channel: "parity-channel", AgentUID: protocol.VoiceAgentUID, UID: "10001", IdleSeconds: int(c.Voice.IdleSeconds)})
 			if err != nil || id != "parity-agent" {
 				t.Fatalf("start: %q %v", id, err)
 			}
@@ -270,29 +266,44 @@ func TestVoiceStartAndStopTheManagerOnHisLine(t *testing.T) {
 	}
 }
 
-func TestVoiceNativeIsTheFarmsAgent(t *testing.T) {
+func TestVoiceCallOwnsItsCredentialsAndLine(t *testing.T) {
 	f := voiceTestFarm(t)
-	if _, err := f.Voice.Native(); err == nil {
-		t.Fatal("no credentials, no agent")
-	}
-	if _, err := f.Setting.Save(protocol.SettingsUpdate{AgoraAppID: ptr.To(voiceTestAppID), AgoraAppCertificate: ptr.To(voiceTestCert),
-		Voice: &protocol.SettingsUpdateVoice{Area: ptr.To(protocol.AreaEU), IdleSeconds: ptr.To(int64(90))}}); err != nil {
+	if err := f.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	native, err := f.Voice.Native()
+	capture := &voiceCapture{}
+	f.Voice.http = capture
+	if _, err := f.Setting.Save(protocol.SettingsUpdate{AgoraAppID: ptr.To(voiceTestAppID), AgoraAppCertificate: ptr.To(voiceTestCert), Voice: &protocol.SettingsUpdateVoice{Area: ptr.To(protocol.AreaEU), Answer: protocol.VoiceAnswer{Value: protocol.VoiceAnswerManager{}}}}); err != nil {
+		t.Fatal(err)
+	}
+	agent, err := f.Voice.Start(context.Background(), "ch1", "42")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer native.Done()
-	if native.Credentials.AppID != voiceTestAppID || native.IdleSeconds != 90 || native.Area != voiceAreaOf(protocol.AreaEU) {
-		t.Fatalf("native: %+v", native)
-	}
-	client := agentkit.NewAgoraClient(agentkit.AgoraClientOptions{Area: native.Area, AppID: voiceTestAppID, AppCertificate: voiceTestCert})
-	props, err := native.Agent(client).ToPropertiesMap(agentkit.ToPropertiesOptions{Channel: "c", AgentUID: protocol.VoiceAgentUID, RemoteUIDs: []string{"1"}, Token: "t"})
-	if err != nil {
+	started := capture.urls[0]
+	if _, err := f.Setting.Save(protocol.SettingsUpdate{AgoraAppID: ptr.To("33333333333333333333333333333333"), Voice: &protocol.SettingsUpdateVoice{Area: ptr.To(protocol.AreaUS)}}); err != nil {
 		t.Fatal(err)
 	}
-	if props["llm"].(map[string]any)["greeting_message"] != protocol.DefaultVoice().Greeting {
-		t.Fatalf("llm: %v", props["llm"])
+	capture.status, capture.body = 500, `{"detail":"temporary failure"}`
+	if err := f.Voice.Stop(context.Background(), agent.AgentID); err == nil {
+		t.Fatal("expected remote stop failure")
+	}
+	if len(f.Voice.keys) != 0 {
+		t.Fatal("failed remote stop retained local line")
+	}
+	capture.status, capture.body = 200, `{}`
+	if err := f.Voice.Stop(context.Background(), agent.AgentID); err != nil {
+		t.Fatal(err)
+	}
+	for _, url := range capture.urls[1:] {
+		if !strings.Contains(url, voiceTestAppID) || strings.Contains(url, "33333333333333333333333333333333") {
+			t.Fatalf("call used changed credentials: %s (started %s)", url, started)
+		}
+		if strings.Contains(started, "api-eu") && !strings.Contains(url, "api-eu") {
+			t.Fatalf("call used changed area: %s", url)
+		}
+	}
+	if len(f.Voice.calls) != 0 {
+		t.Fatal("successfully stopped call retained its lease")
 	}
 }

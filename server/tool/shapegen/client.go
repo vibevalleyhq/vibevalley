@@ -19,21 +19,19 @@ func (s *shapes) goClient(b *strings.Builder) {
 	for _, r := range s.routes {
 		var sig, query []string
 		path := fmt.Sprintf("%q", r.path)
-		names := pathParams(r.path)
-		i := 0
 		body := "nil"
 		for _, p := range r.params {
 			t := s.text(p.typ)
 			sig = append(sig, p.name+" "+t)
 			switch {
-			case p.name == "body":
+			case p.source == paramBody:
 				body = "body"
-			case isPointer(p.typ):
+			case p.source == paramQuery:
 				v := "*" + p.name
 				if t == "*int64" {
 					v = "strconv.FormatInt(*" + p.name + ", 10)"
 				}
-				query = append(query, fmt.Sprintf("\tif %s != nil {\n\t\tq.Set(%q, %s)\n\t}\n", p.name, queryName(p.name), v))
+				query = append(query, fmt.Sprintf("\tif %s != nil {\n\t\tq.Set(%q, %s)\n\t}\n", p.name, p.wire, v))
 			default:
 				v := "string(" + p.name + ")"
 				if t == "int64" {
@@ -41,8 +39,7 @@ func (s *shapes) goClient(b *strings.Builder) {
 				} else if t == "string" {
 					v = p.name
 				}
-				path = strings.Replace(path, "{"+names[i]+"}", `"+url.PathEscape(`+v+`)+"`, 1)
-				i++
+				path = strings.Replace(path, "{"+p.wire+"}", `"+url.PathEscape(`+v+`)+"`, 1)
 			}
 		}
 		path = strings.TrimSuffix(strings.ReplaceAll(path, `+""`, ""), `+""`)

@@ -1,6 +1,7 @@
 package base
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -42,5 +43,19 @@ func TestDBRefusesASchemaItDoesNotKnow(t *testing.T) {
 	db.Close()
 	if _, err := OpenDB(path); err == nil || !strings.Contains(err.Error(), "does not know") {
 		t.Fatalf("opened: %v", err)
+	}
+}
+
+func TestDBPathTreatsURICharactersAsFilename(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "farm?mode=ro#%.db")
+	db, err := OpenDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -43,6 +44,8 @@ type AgentOptions struct {
 	Home          string
 	Cwd           string
 	Tools         []agentcore.AgentTool
+	// Applied after all built-in, host and scheduled tools have been assembled.
+	DisallowedTools []string
 	// nil: the shared, Claude Code's and the work directory's. NoSkills for none.
 	Skills   []string
 	NoSkills bool
@@ -75,7 +78,7 @@ type Agent struct {
 	options AgentOptions
 	ctx     context.Context
 	cancel  context.CancelFunc
-	session Session
+	session *Session
 	skills  func() []SkillInfo
 	folding CompactionOptions
 	events  *agentcore.Hub[AgentEvent]
@@ -128,22 +131,23 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 	if !options.NoSubagents {
 		own = append(own, SubagentTool(func(ctx context.Context, task, label string) (string, error) {
 			helper := NewAgent(ctx, AgentOptions{
-				Name:          options.Name + "-帮手",
-				Instructions:  SUBAGENT_INSTRUCTIONS(options.Name),
-				Model:         options.Model,
-				StreamOptions: options.StreamOptions,
-				GetApiKey:     options.GetApiKey,
-				ThinkingLevel: options.ThinkingLevel,
-				Home:          options.Home,
-				Cwd:           options.Cwd,
-				Tools:         options.Tools,
-				Skills:        skillDirs,
-				NoSkills:      options.NoSkills,
-				NoMemory:      true,
-				MaxSteps:      30,
-				NoSession:     true,
-				NoSubagents:   true,
-				Schedules:     new(false),
+				Name:            options.Name + "-帮手",
+				Instructions:    SUBAGENT_INSTRUCTIONS(options.Name),
+				Model:           options.Model,
+				StreamOptions:   options.StreamOptions,
+				GetApiKey:       options.GetApiKey,
+				ThinkingLevel:   options.ThinkingLevel,
+				Home:            options.Home,
+				Cwd:             options.Cwd,
+				Tools:           options.Tools,
+				DisallowedTools: options.DisallowedTools,
+				Skills:          skillDirs,
+				NoSkills:        options.NoSkills,
+				NoMemory:        true,
+				MaxSteps:        30,
+				NoSession:       true,
+				NoSubagents:     true,
+				Schedules:       new(false),
 			})
 			defer helper.Close()
 			said, err := helper.Ask(ctx, UserMessage(task))
@@ -163,14 +167,14 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 	}
 	tools := append(append([]agentcore.AgentTool{}, options.Tools...), own...)
 	a.Core = agentcore.NewAgent(life, agentcore.AgentOptions{
-		InitialState: agentcore.AgentInitialState{Model: options.Model, ThinkingLevel: options.ThinkingLevel, Tools: tools, Messages: messages},
+		InitialState: agentcore.AgentInitialState{Model: options.Model, ThinkingLevel: options.ThinkingLevel, Tools: allowedTools(tools, options.DisallowedTools), Messages: messages},
 		AgentLoopConfig: agentcore.AgentLoopConfig{
 			StreamOptions: options.StreamOptions,
 			GetApiKey:     options.GetApiKey,
 			ConvertToLlm:  ConvertToLlm,
 			TransformContext: func(ctx context.Context, messages []agentcore.AgentMessage) []agentcore.AgentMessage {
-				if summary, cut, ok := a.fold(ctx, messages); ok {
-					return append([]agentcore.AgentMessage{summary}, messages[cut:]...)
+				if result := a.fold(ctx, messages); result != nil {
+					return result.messages
 				}
 				return messages
 			},
@@ -226,7 +230,7 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 			wake = func(text string) { a.Later(NewCustomMessage("schedule", ai.StringContent(text))) }
 		}
 		s := MakeSchedules(options.Home, wake)
-		a.Core.SetTools(append(a.Core.State().Tools, s.Tools...))
+		a.Core.SetTools(allowedTools(append(a.Core.State().Tools, s.Tools...), options.DisallowedTools))
 		tick := options.ScheduleTick
 		if tick == 0 {
 			tick = 20 * time.Second
@@ -291,20 +295,17 @@ func foldKey(messages []agentcore.AgentMessage, cut int) string {
 	return fmt.Sprintf("%d:%d", cut, at)
 }
 
-func (a *Agent) fold(ctx context.Context, messages []agentcore.AgentMessage) (CompactionSummaryMessage, int, bool) {
-	if EstimateTokens(messages) <= a.folding.Budget {
-		return CompactionSummaryMessage{}, 0, false
+func (a *Agent) fold(ctx context.Context, messages []agentcore.AgentMessage) *compacted {
+	plan := planCompaction(messages, a.folding)
+	if plan == nil {
+		return nil
 	}
-	cut := CutPoint(messages, a.folding.KeepRecent)
-	if cut <= 0 {
-		return CompactionSummaryMessage{}, 0, false
-	}
-	key := foldKey(messages, cut)
+	key := foldKey(messages, plan.cut)
 	a.foldMu.Lock()
 	known, ok := a.folds[key]
 	a.foldMu.Unlock()
 	if ok {
-		return known, cut, true
+		return plan.apply(known)
 	}
 	a.publish(AgentEvent{AgentEvent: agentcore.AgentEvent{Type: EventCompactionStart}, Reason: "threshold"})
 	folding := a.folding
@@ -313,29 +314,29 @@ func (a *Agent) fold(ctx context.Context, messages []agentcore.AgentMessage) (Co
 			folding.StreamOptions.APIKey = key
 		}
 	}
-	summary := Compact(ctx, messages, folding)
+	summary := compact(ctx, *plan, folding)
 	a.publish(AgentEvent{AgentEvent: agentcore.AgentEvent{Type: EventCompactionEnd}, Reason: "threshold", Compaction: summary})
 	if summary == nil {
-		return CompactionSummaryMessage{}, 0, false
+		return nil
 	}
 	a.foldMu.Lock()
 	a.folds[key] = *summary
 	a.foldMu.Unlock()
-	return *summary, cut, true
+	return plan.apply(*summary)
 }
 
 func (a *Agent) settleFold() {
 	messages := a.Core.State().Messages
-	summary, cut, ok := a.fold(a.ctx, messages)
-	if !ok {
+	result := a.fold(a.ctx, messages)
+	if result == nil {
 		return
 	}
 	a.foldMu.Lock()
 	a.folds = map[string]CompactionSummaryMessage{}
 	a.foldMu.Unlock()
-	a.Core.SetMessages(append([]agentcore.AgentMessage{summary}, messages[cut:]...))
+	a.Core.SetMessages(result.messages)
 	if a.session != nil {
-		_ = a.session.Append(summary)
+		_ = a.session.Append(result.summary)
 	}
 }
 
@@ -390,28 +391,21 @@ func (a *Agent) busyRuns() int {
 }
 
 func (a *Agent) deliver(message agentcore.AgentMessage, steer bool) {
-	queue := func() {
-		if steer {
-			a.Core.Steer(message)
-		} else {
-			a.Core.FollowUp(message)
-		}
+	a.mu.Lock()
+	done, started := a.Core.Submit(message, steer)
+	if started {
+		a.runs++
+		a.steps = 0
 	}
-	if a.Core.State().IsStreaming || a.busyRuns() > 0 {
-		queue()
-		// The run may have been ending as it came: it is not lost.
-		if a.busyRuns() == 0 {
-			a.run(a.Core.Continue)
-		}
-		return
+	a.mu.Unlock()
+	if started {
+		go func() {
+			<-done
+			a.mu.Lock()
+			a.runs--
+			a.mu.Unlock()
+		}()
 	}
-	a.run(func(ctx context.Context) error {
-		err := a.Core.Prompt(ctx, message)
-		if _, busy := err.(*agentcore.AgentError); busy {
-			queue()
-		}
-		return err
-	})
 }
 
 // Starts a run when idle, steers the one under way otherwise.
@@ -468,4 +462,8 @@ func (a *Agent) Close() {
 	a.Core.Close()
 	a.done.Wait()
 	a.events.Close()
+}
+
+func allowedTools(tools []agentcore.AgentTool, disallowed []string) []agentcore.AgentTool {
+	return slices.DeleteFunc(tools, func(tool agentcore.AgentTool) bool { return slices.Contains(disallowed, tool.Name) })
 }

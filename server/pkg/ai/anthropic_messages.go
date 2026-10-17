@@ -76,8 +76,6 @@ type AnthropicMessage struct {
 func ToAnthropicMessages(model Model, c Context) (string, []AnthropicMessage) {
 	system := []string{c.SystemPrompt}
 	out := []AnthropicMessage{}
-	answered := answeredCalls(c.Messages)
-	called := map[string]bool{}
 	images := model.takesImages()
 	push := func(role string, blocks []AnthropicBlock) {
 		if len(blocks) == 0 {
@@ -113,7 +111,7 @@ func ToAnthropicMessages(model Model, c Context) (string, []AnthropicMessage) {
 		}
 		return blocks
 	}
-	for _, m := range c.Messages {
+	for _, m := range requestMessages(c.Messages) {
 		switch m := m.(type) {
 		case SystemMessage:
 			if m.Content.IsBlocks() {
@@ -145,20 +143,14 @@ func ToAnthropicMessages(model Model, c Context) (string, []AnthropicMessage) {
 						spoken = true
 					}
 				case TypeToolCall:
-					if answered[b.ID] {
-						blocks = append(blocks, AnthropicBlock{Type: "tool_use", ID: b.ID, Name: b.Name, Input: b.Args()})
-						called[b.ID] = true
-						spoken = true
-					}
+					blocks = append(blocks, AnthropicBlock{Type: "tool_use", ID: b.ID, Name: b.Name, Input: b.Args()})
+					spoken = true
 				}
 			}
 			if spoken {
 				push("assistant", blocks)
 			}
 		case ToolResultMessage:
-			if !called[m.ToolCallID] {
-				continue
-			}
 			content := parts(UserContent{Blocks: m.Content})
 			if len(content) == 0 {
 				content = []AnthropicBlock{{Type: "text", Text: "（没有内容）"}}
@@ -413,6 +405,8 @@ func AnthropicAnswerEvents(model Model, events iter.Seq2[AnthropicEvent, error])
 			answer = NewAnswer(model, "")
 		}
 		switch stop {
+		case "":
+			emit(answer.Error(StopError, "模型没有回答完", usage))
 		case "max_tokens":
 			emit(answer.Done(StopLength, usage))
 		case "tool_use":

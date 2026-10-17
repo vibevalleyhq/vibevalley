@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -27,6 +28,22 @@ var _ Handlers = (*Client)(nil)
 // Do sends one request and returns the answer's body as is: the status is 2xx, or the error is the tagged one the
 // server answered. The command line uses it for endpoints it calls by name.
 func (c *Client) Do(ctx context.Context, method, path string, q url.Values, body []byte) ([]byte, error) {
+	res, err := c.request(ctx, method, path, q, body)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	out, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode/100 != 2 {
+		return nil, answeredError(res.StatusCode, out)
+	}
+	return out, nil
+}
+
+func (c *Client) request(ctx context.Context, method, path string, q url.Values, body []byte) (*http.Response, error) {
 	var in io.Reader
 	if body != nil {
 		in = bytes.NewReader(body)
@@ -49,19 +66,39 @@ func (c *Client) Do(ctx context.Context, method, path string, q url.Values, body
 	if client == nil {
 		client = http.DefaultClient
 	}
-	res, err := client.Do(req)
+	return client.Do(req)
+}
+
+// Stream owns the HTTP response and SSE framing. Returning false stops after this event; errors and cancellation close the response too.
+func (c *Client) Stream(ctx context.Context, path string, consume func(json.RawMessage) (bool, error)) error {
+	res, err := c.request(ctx, http.MethodGet, path, nil, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer res.Body.Close()
-	out, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
+	if res.StatusCode != http.StatusOK {
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return err
+		}
+		return answeredError(res.StatusCode, body)
 	}
-	if res.StatusCode/100 != 2 {
-		return nil, answeredError(res.StatusCode, out)
+	scanner := bufio.NewScanner(res.Body)
+	scanner.Buffer(make([]byte, 1<<20), 64<<20)
+	var data []string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if value, ok := strings.CutPrefix(line, "data:"); ok {
+			data = append(data, strings.TrimPrefix(value, " "))
+		} else if line == "" && len(data) > 0 {
+			more, err := consume(json.RawMessage(strings.Join(data, "\n")))
+			if err != nil || !more {
+				return err
+			}
+			data = nil
+		}
 	}
-	return out, nil
+	return scanner.Err()
 }
 
 // call is Do for a generated method: in is encoded as the body when not nil, the answer decoded into out when not nil.

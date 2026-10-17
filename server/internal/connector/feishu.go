@@ -74,7 +74,7 @@ func (a voiceFeishuAdapter) Receive(ctx context.Context, secrets map[string]stri
 			m := inbox[0]
 			inbox = inbox[1:]
 			mu.Unlock()
-			io.Got(m)
+			io.take(ctx, m)
 		}
 	}()
 	err := a.c.feishu.Listen(ctx, voiceFeishuAppOf(secrets), func(m feishu.Message) {

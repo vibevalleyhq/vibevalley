@@ -153,12 +153,14 @@ type sessions struct {
 	disk     *base.FileWriter
 	q        *generated.Queries
 
-	mu       sync.Mutex
-	hands    map[string]*hand
-	hired    int64
-	launches int64
-	closing  bool
-	pending  *time.Timer
+	// Admission includes opening a turn and publishing it, so concurrent callers cannot claim the same capacity.
+	admission sync.Mutex
+	mu        sync.Mutex
+	hands     map[string]*hand
+	hired     int64
+	launches  int64
+	closing   bool
+	pending   *time.Timer
 }
 
 type sessionsIn struct {
@@ -371,7 +373,26 @@ func exists(path string) bool {
 }
 
 func (c *sessions) NoRoom(runtime, project string) string {
-	return noRoom(c.onFarm(), runtime, str.Trim(project), c.limits(runtime), "")
+	return noRoom(c.capacity(), runtime, str.Trim(project), c.limits(runtime), "")
+}
+
+// A submitted turn owns its slot before smith emits TurnStarted. Its existing trigger queue is the reservation;
+// startRun consumes it only after the working fact is published under the same hand lock.
+func (c *sessions) capacity() []protocol.Session {
+	sessions := slices.Clone(c.onFarm())
+	for i := range sessions {
+		if h := c.hand(sessions[i].ID); h != nil {
+			h.mu.Lock()
+			if current := c.core.Session(h.id); current != nil {
+				sessions[i] = *current
+			}
+			if len(h.triggers) > 0 && !protocol.IsBusy(sessions[i]) {
+				sessions[i].Phase = protocol.Phase{Value: protocol.PhaseWorking{}}
+			}
+			h.mu.Unlock()
+		}
+	}
+	return sessions
 }
 
 func (c *sessions) limits(runtime string) sessionLimits {
@@ -406,10 +427,17 @@ func (c *sessions) watch(h *hand, s *oarSession, runtime string) oar.EventObserv
 				signals = append(signals, LaunchActivity{Kind: "compacting", ID: h.id, On: false})
 			}
 		}
-		reaction := eventFacts(event, c.core.Session(h.id), h.tracking, factContext{ID: h.id, Runtime: runtime, Cwd: h.place.Cwd, CnyPerUsd: c.runtimes.CnyPerUsd()})
+		reaction := eventFacts(event, c.core.Session(h.id), h.tracking, factContext{ID: h.id, Runtime: runtime, Cwd: h.place.Cwd})
 		h.tracking = reaction.Tracking
 		if reaction.Model != "" {
-			h.tracking.Price = c.runtimes.Price(runtime, reaction.Model)
+			h.tracking.Rate = c.runtimes.Quote(runtime, reaction.Model)
+		}
+		if opened {
+			for _, fact := range reaction.Facts {
+				if _, starts := fact.(protocol.FactRun); starts {
+					c.core.Apply(fact)
+				}
+			}
 		}
 		h.mu.Unlock()
 		if opened {
@@ -422,6 +450,9 @@ func (c *sessions) watch(h *hand, s *oarSession, runtime string) oar.EventObserv
 			record(h.journal, op)
 		}
 		for _, fact := range reaction.Facts {
+			if _, starts := fact.(protocol.FactRun); opened && starts {
+				continue
+			}
 			c.core.Apply(fact)
 			if r, ok := fact.(protocol.FactReport); ok {
 				c.endRun(h, r.Outcome, r.Summary, r.Spent)
@@ -511,27 +542,6 @@ func (c *sessions) stalled(h *hand, silentForMs int64) {
 	c.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 已经 %s没动静了%s：点它的地看看过程，不对就叫停", session.Name, quiet, last))
 }
 
-// smith's ObserveStalls only arms on records it sees live and misses a turn that went quiet before it subscribed, so the status is polled.
-func (c *sessions) watchStalls(h *hand, s *oarSession, released <-chan struct{}) {
-	every := time.Duration(max(100, min(c.stallMs/4, 15_000))) * time.Millisecond
-	ticker := time.NewTicker(every)
-	defer ticker.Stop()
-	flagged := int64(-1)
-	for {
-		select {
-		case <-released:
-			return
-		case <-ticker.C:
-		}
-		stall := observe.StallOf(s.agent.Session.Status().Value, clock.NowMs(), c.stallMs)
-		if stall == nil || stall.SinceSeq == flagged || s.detached.Load() {
-			continue
-		}
-		flagged = stall.SinceSeq
-		c.stalled(h, stall.SilentForMs)
-	}
-}
-
 func (c *sessions) attach(h *hand, s *oarSession, runtime string) {
 	c.mu.Lock()
 	c.launches++
@@ -560,10 +570,20 @@ func (c *sessions) attach(h *hand, s *oarSession, runtime string) {
 		reader(record)
 		s.processed.Store(record.Seq)
 	}, &oar.Cursor{SessionID: s.agent.Session.ID(), AfterSeq: -1})
+	stopStalls := observe.ObserveStalls(s.agent.Session, observe.StallOptions{
+		StallAfter: time.Duration(c.stallMs) * time.Millisecond,
+		OnStall: func(info observe.StallInfo) {
+			if !s.detached.Load() {
+				c.stalled(h, info.SilentForMs)
+			}
+		},
+	})
 	s.mu.Lock()
-	s.stop = stopEvents
+	s.stop = func() { stopEvents(); stopStalls() }
+	if s.detached.Load() {
+		s.stop()
+	}
 	s.mu.Unlock()
-	go c.watchStalls(h, s, released)
 	go c.reports(h, s, released)
 	c.save()
 }
@@ -587,12 +607,11 @@ func (c *sessions) releaseLocked(h *hand) {
 }
 
 func (c *sessions) open(ctx context.Context, agent protocol.Agent, id string, place project.Workplace, input, resume string) (*oarSession, string) {
-	base, ok := c.runtimes.Runtime(agent.Runtime)
-	if !ok {
-		return nil, "oar 驱动不了 " + agent.Runtime
+	resolved, err := c.runtimes.Resolve(ctx, agent)
+	if err != nil {
+		return nil, err.Error()
 	}
-	info := c.runtimes.Info(ctx, agent.Runtime)
-	settings := c.store.Settings(agent.Runtime)
+	base := resolved.Runtime
 	text := strings.Join(slices.DeleteFunc([]string{instructions(agent, c.store.Skills()), farmRules(place, c.projects.HouseRules(), id)}, func(s string) bool { return s == "" }), "\n\n")
 	c.mu.Lock()
 	farmURL := c.farmURL
@@ -620,29 +639,7 @@ func (c *sessions) open(ctx context.Context, agent protocol.Agent, id string, pl
 		s.received(report)
 		return nil
 	})
-	// A model the runtime does not list would fail the session: fall back to the runtime's default.
-	wanted := agent.Model
-	if wanted == "" {
-		wanted = settings.DefaultModel
-	}
-	known := wanted == "" || info == nil || info.Models == nil || slices.ContainsFunc(info.Models, func(m protocol.ModelEntry) bool { return m.ID == wanted })
-	if !known {
-		c.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 没有 %s 这个模型，%s 先用默认模型", protocol.RuntimeLabel(agent.Runtime), wanted, agent.Name))
-	}
-	model := ""
-	if known {
-		model = wanted
-	}
-	effort := agent.Effort
-	if effort == "" {
-		effort = settings.DefaultEffort
-	}
-	env := map[string]*string{}
-	for _, vars := range []map[string]string{settings.Env, agent.Env} {
-		for k, v := range vars {
-			env[k] = &v
-		}
-	}
+	model, effort, env := resolved.Model, resolved.Effort, resolved.Env
 	task := input
 	if text != "" && agent.PersonaMode == protocol.PersonaModePrompt {
 		task = text + JobBreak + input
@@ -717,6 +714,8 @@ func (c *sessions) rest(h *hand) {
 }
 
 func (c *sessions) Dismiss(id string) bool {
+	c.admission.Lock()
+	defer c.admission.Unlock()
 	h := c.hand(id)
 	if h == nil {
 		return false
@@ -739,18 +738,6 @@ func (c *sessions) Place(id string) (project.Workplace, bool) {
 		return project.Workplace{}, false
 	}
 	return h.place, true
-}
-
-func (c *sessions) Rest(id string) {
-	if h := c.hand(id); h != nil {
-		c.rest(h)
-	}
-}
-
-func (c *sessions) Leave(id string, closed protocol.IssueClose, merged int64) {
-	if h := c.hand(id); h != nil {
-		c.leave(h, closed, merged)
-	}
 }
 
 func (c *sessions) remind(agent, session, project, input string, h *hand, recalled map[string]bool) string {
@@ -808,6 +795,8 @@ func (c *sessions) wake(h *hand, session protocol.Session, input, recall string)
 }
 
 func (c *sessions) Deliver(id, text string, by protocol.RunTrigger) Delivered {
+	c.admission.Lock()
+	defer c.admission.Unlock()
 	h, session := c.hand(id), c.core.Session(id)
 	if h == nil || session == nil {
 		return Delivered{Kind: "refused", Reason: fmt.Sprintf("没有 %s 这个帮工", id)}
@@ -815,7 +804,7 @@ func (c *sessions) Deliver(id, text string, by protocol.RunTrigger) Delivered {
 	starts := !protocol.IsBusy(*session)
 	recall := ""
 	if starts {
-		if full := noRoom(c.onFarm(), session.Runtime, h.place.Project, c.limits(session.Runtime), id); full != "" {
+		if full := noRoom(c.capacity(), session.Runtime, h.place.Project, c.limits(session.Runtime), id); full != "" {
 			return Delivered{Kind: "refused", Reason: fmt.Sprintf("%s 先不接着干：%s", session.Name, full)}
 		}
 		recall = c.remind(session.Agent, id, h.place.Project, text, h, nil)
@@ -878,6 +867,11 @@ func (c *sessions) Tell(id, text string, by protocol.RunTrigger) string {
 }
 
 func (c *sessions) Send(ctx context.Context, agent protocol.Agent, task, where string, opt HireOptions) Hired {
+	c.admission.Lock()
+	defer c.admission.Unlock()
+	if full := c.NoRoom(agent.Runtime, where); full != "" {
+		return Hired{Refused: full}
+	}
 	c.mu.Lock()
 	c.hired++
 	id := fmt.Sprintf("w%d", c.hired)
@@ -894,6 +888,10 @@ func (c *sessions) Send(ctx context.Context, agent protocol.Agent, task, where s
 	recall := c.remind(agent.ID, id, place.Project, task, nil, recalled)
 	s, refused := c.open(ctx, agent, id, place, withRecall(recall, task), "")
 	if s == nil {
+		c.tokens.Revoke(id)
+		if kept := c.projects.Release(place); kept != "" {
+			c.core.Notice(protocol.NoticeLevelWarn, kept)
+		}
 		return Hired{Refused: fmt.Sprintf("%s 派不出去：%s", agent.Name, refused)}
 	}
 
@@ -912,13 +910,20 @@ func (c *sessions) Send(ctx context.Context, agent protocol.Agent, task, where s
 	if opt.Trigger != nil {
 		first = *opt.Trigger
 	}
+	if opt.Hiring != nil {
+		if err := opt.Hiring(session); err != nil {
+			_ = s.subagents.Close(context.WithoutCancel(ctx))
+			c.tokens.Revoke(id)
+			if kept := c.projects.Release(place); kept != "" {
+				c.core.Notice(protocol.NoticeLevelWarn, kept)
+			}
+			return Hired{Refused: fmt.Sprintf("%s 的工单没记下来：%s", agent.Name, err)}
+		}
+	}
 	h := &hand{id: id, place: place, journal: c.trajectoryOf(session), recalled: recalled, triggers: []protocol.RunTrigger{first}}
 	c.mu.Lock()
 	c.hands[id] = h
 	c.mu.Unlock()
-	if opt.Hiring != nil {
-		opt.Hiring(session)
-	}
 	c.core.Apply(protocol.FactHired{Session: session})
 	c.attach(h, s, agent.Runtime)
 	return Hired{Session: &session}

@@ -117,11 +117,15 @@ func (a voiceWeixinAdapter) Receive(ctx context.Context, secrets map[string]stri
 			if m.MessageType == 2 || m.GroupID != "" || m.FromUserID == "" {
 				continue
 			}
-			io.Got(voiceInbound{ID: m.MessageID, From: m.FromUserID, Text: weixin.Text(m), Reply: m.ContextToken, Quoted: weixin.Quoted(m)})
+			if err := io.Got(voiceInbound{ID: m.MessageID, From: m.FromUserID, Text: weixin.Text(m), Reply: m.ContextToken, Quoted: weixin.Quoted(m)}); err != nil {
+				return &voiceFailure{Kind: "failed", Reason: err.Error()}
+			}
 		}
 		if updates.GetUpdatesBuf != "" && updates.GetUpdatesBuf != buf {
+			if err := io.SaveCursor(updates.GetUpdatesBuf); err != nil {
+				return &voiceFailure{Kind: "failed", Reason: err.Error()}
+			}
 			buf = updates.GetUpdatesBuf
-			io.SaveCursor(buf)
 		}
 	}
 	return nil

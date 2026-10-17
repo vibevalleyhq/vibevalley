@@ -40,16 +40,53 @@ type CompactionOptions struct {
 	KeepRecent    int
 }
 
-func Compact(ctx context.Context, messages []agentcore.AgentMessage, options CompactionOptions) *CompactionSummaryMessage {
-	tokensBefore := EstimateTokens(messages)
-	if tokensBefore <= options.Budget || len(messages) <= options.KeepRecent+2 {
+type compactionPlan struct {
+	messages []agentcore.AgentMessage
+	cut      int
+	tokens   int
+}
+
+func planCompaction(messages []agentcore.AgentMessage, options CompactionOptions) *compactionPlan {
+	tokens := EstimateTokens(messages)
+	if tokens <= options.Budget || len(messages) <= options.KeepRecent+2 {
 		return nil
 	}
 	cut := CutPoint(messages, options.KeepRecent)
 	if cut <= 0 {
 		return nil
 	}
-	text := Transcript(messages[:cut])
+	return &compactionPlan{messages: messages, cut: cut, tokens: tokens}
+}
+
+func applySummary(messages []agentcore.AgentMessage, summary CompactionSummaryMessage) []agentcore.AgentMessage {
+	out := []agentcore.AgentMessage{summary}
+	if summary.Kept > 0 {
+		out = append(out, messages[max(0, len(messages)-summary.Kept):]...)
+	}
+	return out
+}
+
+type compacted struct {
+	summary  CompactionSummaryMessage
+	messages []agentcore.AgentMessage
+}
+
+func (p compactionPlan) apply(summary CompactionSummaryMessage) *compacted {
+	// A cached summary may be reused while more messages join the retained tail.
+	summary.Kept = len(p.messages) - p.cut
+	return &compacted{summary: summary, messages: applySummary(p.messages, summary)}
+}
+
+func Compact(ctx context.Context, messages []agentcore.AgentMessage, options CompactionOptions) *CompactionSummaryMessage {
+	plan := planCompaction(messages, options)
+	if plan == nil {
+		return nil
+	}
+	return compact(ctx, *plan, options)
+}
+
+func compact(ctx context.Context, plan compactionPlan, options CompactionOptions) *CompactionSummaryMessage {
+	text := Transcript(plan.messages[:plan.cut])
 	where, _ := Archive(options.Home, options.Session, text, time.Now())
 	streamOptions := options.StreamOptions
 	streamOptions.Reasoning = ""
@@ -62,5 +99,5 @@ func Compact(ctx context.Context, messages []agentcore.AgentMessage, options Com
 	if answer.StopReason == ai.StopError || said == "" {
 		summary = "（摘要没生成出来，原文见归档。）"
 	}
-	return &CompactionSummaryMessage{Summary: summary, TokensBefore: tokensBefore, Timestamp: time.Now().UnixMilli(), Archive: where, Kept: len(messages) - cut}
+	return &CompactionSummaryMessage{Summary: summary, TokensBefore: plan.tokens, Timestamp: time.Now().UnixMilli(), Archive: where, Kept: len(plan.messages) - plan.cut}
 }

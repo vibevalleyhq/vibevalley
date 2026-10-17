@@ -2,10 +2,14 @@ package agent
 
 import "vibevalley/internal/protocol"
 
-// A profile saved without an animal or outfit gets them here, once, on load or save: the animal picked from its id, the
-// outfit the farmer's. It must pick what the client's castOf (app/lib/rules/looks.dart) picks for a profile it does not
-// know, so a profile looks the same before and after it is filled.
+// Missing appearance fields are filled on load and save; required enum fields must never reach clients as empty strings.
 func withCast(a protocol.Agent) protocol.Agent {
+	if a.Look.Build == "" {
+		a.Look.Build = protocol.BuildBiped
+	}
+	if a.Look.Head == "" {
+		a.Look.Head = protocol.HeadRounded
+	}
 	if a.Look.Species == nil {
 		species := protocol.SpeciesValues[castHash(a.ID)%uint32(len(protocol.SpeciesValues))]
 		a.Look.Species = &species

@@ -71,7 +71,7 @@ func newCommits(cfg base.Config, core *core.Service) (*commits, error) {
 }
 
 func (c *commits) OnStart(ctx context.Context) error {
-	_, events, stop := c.core.Events()
+	events, stop := c.core.Facts()
 	c.mu.Lock()
 	c.stop = stop
 	c.mu.Unlock()

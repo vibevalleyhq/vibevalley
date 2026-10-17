@@ -1,3 +1,4 @@
+import '../data/remote.dart' show projectNamesProvider;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -292,7 +293,7 @@ class _NewChannelPanelState extends ConsumerState<NewChannelPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final projects = ref.watch(chatProjectNamesProvider).value ?? const <String>[];
+    final projects = ref.watch(projectNamesProvider).value ?? const <String>[];
     return Padding(
       padding: const EdgeInsets.all(4),
       child: Column(
@@ -358,7 +359,7 @@ class _ChannelSettingsPanelState extends ConsumerState<ChannelSettingsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final projects = ref.watch(chatProjectNamesProvider).value ?? const <String>[];
+    final projects = ref.watch(projectNamesProvider).value ?? const <String>[];
     return Padding(
       padding: const EdgeInsets.all(4),
       child: Column(

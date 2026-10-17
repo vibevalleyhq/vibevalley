@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -101,6 +102,11 @@ func TestClientSpeaksQQsProtocol(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "QQ 让重新连接") {
 		t.Fatalf("listen ends: %v", err)
 	}
+	stacks := make([]byte, 1<<20)
+	n := runtime.Stack(stacks, true)
+	if strings.Contains(string(stacks[:n]), "qq.(*Client).Listen.func") {
+		t.Fatal("Listen returned with a heartbeat worker still running")
+	}
 	if len(got) != 1 || got[0] != (Message{ID: "m1", From: "o1", Content: " 你好 ", Attachments: 1}) {
 		t.Fatalf("got: %+v", got)
 	}
@@ -121,5 +127,68 @@ func TestClientSpeaksQQsProtocol(t *testing.T) {
 	}
 	if _, ok := sends[2]["msg_id"]; ok {
 		t.Fatalf("no reply, no msg_id: %v", sends[2])
+	}
+}
+
+func TestChangedCredentialsCannotReuseToken(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if jsonBody(t, r)["clientSecret"] != "right" {
+			io.WriteString(w, `{"message":"invalid secret"}`)
+			return
+		}
+		io.WriteString(w, `{"access_token":"T","expires_in":7200}`)
+	}))
+	defer server.Close()
+	client := NewClient()
+	client.tokenURL = server.URL
+	if err := client.Check(context.Background(), App{AppID: "same", Secret: "right"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Check(context.Background(), App{AppID: "same", Secret: "wrong"}); err == nil {
+		t.Fatal("changed credentials bypassed authentication")
+	}
+	if calls != 2 {
+		t.Fatalf("calls: %d", calls)
+	}
+}
+
+func TestMalformedSendResponseIsNotSuccess(t *testing.T) {
+	for _, response := range []string{"broken", `{}`, `{"code":123,"message":"failed"}`} {
+		t.Run(response, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, response) }))
+			defer server.Close()
+			client := NewClient()
+			client.api = server.URL
+			app := App{AppID: "app", Secret: "secret"}
+			client.tokens[app] = cachedToken{token: "T", until: time.Now().Add(time.Hour)}
+			if _, err := client.SendText(context.Background(), app, "owner", "text", "msg"); err == nil {
+				t.Fatal("unconfirmed send reported success")
+			}
+		})
+	}
+}
+
+type deadlineTransport struct{ t *testing.T }
+
+func (d deadlineTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	d.t.Helper()
+	deadline, ok := r.Context().Deadline()
+	if !ok || time.Until(deadline) > 26*time.Second {
+		d.t.Error("network request lacks bounded lifetime")
+	}
+	return nil, context.DeadlineExceeded
+}
+func TestRequestsHaveBoundedLifetime(t *testing.T) {
+	client := NewClient()
+	client.http.Transport = deadlineTransport{t}
+	app := App{AppID: "app", Secret: "secret"}
+	client.tokens[app] = cachedToken{token: "T", until: time.Now().Add(time.Hour)}
+	if err := client.Listen(context.Background(), app, func(Message) {}); err == nil {
+		t.Fatal("gateway failure hidden")
+	}
+	if _, err := client.SendText(context.Background(), app, "owner", "text", ""); err == nil {
+		t.Fatal("send failure hidden")
 	}
 }

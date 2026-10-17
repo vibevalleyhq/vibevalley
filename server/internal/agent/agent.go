@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 
 	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
+	"vibevalley/pkg/x/ptr"
 )
 
 type stored struct {
@@ -69,8 +71,10 @@ func New(home string) (*Service, error) {
 			log.Printf("vibevalley: %s could not be read (%v): kept as %s, the profiles start from the seeds", file, err, aside)
 			st.s = seed
 		}
-	default:
+	case errors.Is(err, os.ErrNotExist):
 		st.s = seed
+	default:
+		return nil, fmt.Errorf("read profiles: %w", err)
 	}
 	if st.s.Settings == nil {
 		st.s.Settings = map[string]protocol.RuntimeSettings{}
@@ -78,6 +82,9 @@ func New(home string) (*Service, error) {
 	st.s = withoutExamples(st.s)
 	if !slices.ContainsFunc(st.s.Agents, func(a protocol.Agent) bool { return a.ID == protocol.ManagerAgent }) {
 		st.s.Agents = append(st.s.Agents, withCast(managerProfile()))
+	}
+	for i := range st.s.Agents {
+		st.s.Agents[i] = withCast(st.s.Agents[i])
 	}
 	return st, st.persist()
 }
@@ -104,9 +111,14 @@ func (st *Service) persist() error {
 
 func (st *Service) change(f func(*stored)) error {
 	st.mu.Lock()
-	f(&st.s)
-	st.mu.Unlock()
-	return st.persist()
+	defer st.mu.Unlock()
+	next := st.s
+	f(&next)
+	if err := st.disk.Write(func() ([]byte, error) { return json.Marshal(next) }); err != nil {
+		return err
+	}
+	st.s = next
+	return nil
 }
 
 // Agents are the profiles work is sent to: every one but the manager's.
@@ -118,7 +130,11 @@ func (st *Service) Agents() []protocol.Agent {
 func (st *Service) All() []protocol.Agent {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	return slices.Clone(st.s.Agents)
+	out := slices.Clone(st.s.Agents)
+	for i := range out {
+		out[i] = cloneAgent(out[i])
+	}
+	return out
 }
 
 // Agent is any profile by id, the manager's too.
@@ -141,7 +157,7 @@ func (st *Service) Settings(runtime string) protocol.RuntimeSettings {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if s, ok := st.s.Settings[runtime]; ok {
-		return s
+		return cloneSettings(s)
 	}
 	return protocol.DefaultSettings()
 }
@@ -161,7 +177,7 @@ func (st *Service) SaveAgent(agent protocol.Agent) (protocol.Agent, error) {
 	}
 	agent = withCast(agent)
 	return agent, st.change(func(s *stored) {
-		s.Agents = upsert(s.Agents, agent, func(a protocol.Agent) string { return a.ID })
+		s.Agents = upsert(s.Agents, cloneAgent(agent), func(a protocol.Agent) string { return a.ID })
 	})
 }
 
@@ -190,7 +206,44 @@ func (st *Service) SaveSettings(runtime string, settings protocol.RuntimeSetting
 		for k, v := range s.Settings {
 			next[k] = v
 		}
-		next[runtime] = settings
+		next[runtime] = cloneSettings(settings)
 		s.Settings = next
 	})
+}
+
+func cloneAgent(a protocol.Agent) protocol.Agent {
+	a.Skills = slices.Clone(a.Skills)
+	a.Tags = slices.Clone(a.Tags)
+	a.DisallowedTools = slices.Clone(a.DisallowedTools)
+	a.Env = maps.Clone(a.Env)
+	if a.Look.Species != nil {
+		a.Look.Species = ptr.To(*a.Look.Species)
+	}
+	if a.Look.Outfit != nil {
+		a.Look.Outfit = ptr.To(*a.Look.Outfit)
+	}
+	a.MCPServers = slices.Clone(a.MCPServers)
+	for i, m := range a.MCPServers {
+		switch v := m.Value.(type) {
+		case protocol.MCPServerStdio:
+			v.Args = slices.Clone(v.Args)
+			v.Env = maps.Clone(v.Env)
+			a.MCPServers[i].Value = v
+		case protocol.MCPServerHTTP:
+			v.Headers = maps.Clone(v.Headers)
+			a.MCPServers[i].Value = v
+		}
+	}
+	return a
+}
+
+func cloneSettings(s protocol.RuntimeSettings) protocol.RuntimeSettings {
+	s.Env = maps.Clone(s.Env)
+	if s.DailyBudget != nil {
+		s.DailyBudget = ptr.To(*s.DailyBudget)
+	}
+	if s.MaxWorking != nil {
+		s.MaxWorking = ptr.To(*s.MaxWorking)
+	}
+	return s
 }

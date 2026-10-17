@@ -25,12 +25,18 @@ class VibeValleyServer {
   final String? key;
 
   bool _closed = false;
-  HttpClient? _streaming;
+  final _streaming = <HttpClient>{};
+  final _closedSignal = Completer<void>();
 
   void close() {
+    if (_closed) return;
     _closed = true;
-    _streaming?.close(force: true);
+    _closedSignal.complete();
+    for (final client in _streaming.toList()) {
+      client.close(force: true);
+    }
     api.close();
+    unawaited(problems.close());
   }
 
   final VibeValleyApi api;
@@ -46,9 +52,9 @@ class VibeValleyServer {
   Stream<LiveEvent> _live() async* {
     await for (final text in _sse(livePath)) {
       try {
-        yield LiveEvent.fromJson(jsonDecode(text) as Map<String, dynamic>);
+        if (!_closed) yield LiveEvent.fromJson(jsonDecode(text) as Map<String, dynamic>);
       } on Object catch (e) {
-        problems.add('$e');
+        if (!_closed) problems.add('$e');
       }
     }
   }
@@ -56,15 +62,20 @@ class VibeValleyServer {
   /// Reconnects, and so starts from a fresh state, when the line drops.
   Stream<ReceivedFrame> states() async* {
     await for (final text in _sse(statePath)) {
-      final watch = Stopwatch()..start();
-      final frame = StateFrame.fromJson(jsonDecode(text) as Map<String, dynamic>);
-      yield ReceivedFrame(frame, bytes: utf8.encode(text).length, decodeMicros: watch.elapsedMicroseconds);
+      try {
+        final watch = Stopwatch()..start();
+        final frame = StateFrame.fromJson(jsonDecode(text) as Map<String, dynamic>);
+        if (!_closed) yield ReceivedFrame(frame, bytes: utf8.encode(text).length, decodeMicros: watch.elapsedMicroseconds);
+      } on Object catch (e) {
+        if (!_closed) problems.add('$e');
+      }
     }
   }
 
   Stream<String> _sse(String path) async* {
     while (!_closed) {
-      final client = _streaming = HttpClient();
+      final client = HttpClient();
+      _streaming.add(client);
       try {
         final request = await client.getUrl(base.resolve(path));
         request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
@@ -75,6 +86,7 @@ class VibeValleyServer {
         final data = StringBuffer();
         // Server-sent events: `data:` lines up to a blank line are one event; `:` lines are pings.
         await for (final line in response.transform(utf8.decoder).transform(const LineSplitter())) {
+          if (_closed) return;
           if (line.startsWith('data:')) {
             data.write(line.substring(line.startsWith('data: ') ? 6 : 5));
           } else if (line.isEmpty && data.isNotEmpty) {
@@ -90,9 +102,10 @@ class VibeValleyServer {
         if (!_closed) problems.add('$e');
       } finally {
         client.close(force: true);
+        _streaming.remove(client);
       }
       if (_closed) return;
-      await Future<void>.delayed(const Duration(seconds: 2));
+      await Future.any([Future<void>.delayed(const Duration(seconds: 2)), _closedSignal.future]);
     }
   }
 

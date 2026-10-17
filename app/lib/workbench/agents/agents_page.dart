@@ -9,6 +9,7 @@ import '../../shared/swatches.dart';
 import '../shared/rules.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
+import '../shared/config_problem.dart';
 import '../../rules/seeds.dart';
 
 class AgentsPage extends ConsumerWidget {
@@ -17,6 +18,7 @@ class AgentsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(workbenchConfigProvider);
+    if (config.error != null) return const ConfigProblem();
     final farm = ref.watch(stateProvider);
     final tallies = farm?.progress?.agents ?? const <String, AgentTally>{};
     final sessions = farm?.sessions ?? const <Session>[];

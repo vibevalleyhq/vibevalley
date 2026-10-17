@@ -161,10 +161,10 @@ Future<void> startDesktop() async {
   final host = DesktopHostChannel.instance.._listen();
   await host._invoke('setup', {'title': desktopChannel.titled('码农场物语')});
   if (farmConnection.value.choice.useRemote) return;
-  await startLocalFarm();
+  await _startLocalFarm();
 }
 
-Future<void> startLocalFarm() async {
+Future<void> _startLocalFarm() async {
   if (!isMacDesktop || farmConnection.value.localAddress != null) return;
   final host = DesktopHostChannel.instance.._listen();
   if (const String.fromEnvironment('VIBEVALLEY_SERVER').isNotEmpty) return;
@@ -193,4 +193,9 @@ Future<void> startLocalFarm() async {
   } on ServerFailed catch (e) {
     await host._invoke('fatal', {'title': desktopChannel.titled('码农场物语开不了门'), 'text': e.reason});
   }
+}
+
+Future<void> useLocalFarm() async {
+  await _startLocalFarm();
+  await saveFarmChoice(FarmChoice(remote: farmConnection.value.choice.remote));
 }

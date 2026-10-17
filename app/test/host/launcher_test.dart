@@ -1,6 +1,7 @@
 @TestOn('mac-os || linux')
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -110,6 +111,43 @@ void main() {
     expect(watch.elapsed, greaterThanOrEqualTo(const Duration(milliseconds: 500)));
     expect(await server.exited, -_sigkill);
     expect(_alive(server.pid), isFalse);
+  });
+
+  test('health checks time out even after response headers arrive', () async {
+    final http = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final sub = http.listen((request) {
+      request.response.headers.contentLength = 100;
+      request.response.write('partial');
+      unawaited(request.response.flush());
+    });
+    try {
+      expect(
+        await answersHealth(Uri.parse('http://127.0.0.1:${http.port}'), timeout: const Duration(milliseconds: 100)).timeout(const Duration(seconds: 2)),
+        isFalse,
+      );
+    } finally {
+      await http.close(force: true);
+      await sub.cancel();
+    }
+  });
+
+  test('a missing binary produces a launch failure naming its log', () async {
+    await expectLater(launcher(File('${dir.path}/missing')).start(), throwsA(isA<ServerFailed>().having((e) => e.reason, 'reason', contains('server.log'))));
+  });
+
+  test('a timed out login shell is killed', () async {
+    final pidFile = File('${dir.path}/shell.pid');
+    final shell = await _script(dir, 'shell', '#!/bin/sh\necho \$\$ > "${pidFile.path}"\nexec sleep 30\n');
+    expect(await loginShellPath('/fallback', shell: shell.path, timeout: const Duration(seconds: 1)), '/fallback');
+    final pid = int.parse((await pidFile.readAsString()).trim());
+    expect(_alive(pid), isFalse);
+  });
+
+  test('invalid UTF-8 from a login shell falls back without an uncaught completion error', () async {
+    final shell = await _script(dir, 'bad-output', r"""#!/bin/sh
+printf '\377'
+""");
+    expect(await loginShellPath('/fallback', shell: shell.path), '/fallback');
   });
 
   test('loginShellPath falls back when the shell cannot be asked', () async {

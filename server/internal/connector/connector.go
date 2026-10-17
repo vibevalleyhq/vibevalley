@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"vibevalley/internal/base"
 	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
 	"vibevalley/internal/manager"
@@ -31,21 +30,6 @@ import (
 
 // WeChat's official client rests this long too.
 const voiceStalePause = time.Hour
-
-// Held messages are tried again after voiceRetryFirst, then twice as long after each try that fails, up to
-// voiceRetryMost; one going out starts over. The owner's next message sends them at once anyway. Variables: tests
-// shorten them.
-var (
-	voiceRetryFirst = 30 * time.Second
-	voiceRetryMost  = 30 * time.Minute
-)
-
-func voiceRetryAfter(wait time.Duration, clear bool) time.Duration {
-	if clear {
-		return voiceRetryFirst
-	}
-	return min(2*wait, voiceRetryMost)
-}
 
 type voiceInbound struct {
 	// Each is taken once.
@@ -76,8 +60,8 @@ type voiceProgress struct {
 
 type voiceReceiving struct {
 	Cursor     string
-	SaveCursor func(cursor string)
-	Got        func(m voiceInbound)
+	SaveCursor func(cursor string) error
+	Got        func(m voiceInbound) error
 }
 
 type voiceAdapter interface {
@@ -102,6 +86,7 @@ type voiceAccount struct {
 func (a *voiceAccount) paused() bool { return a.pausedUntil != 0 && a.pausedUntil > clock.NowMs() }
 
 type Service struct {
+	db   *sql.DB
 	q    *generated.Queries
 	core *core.Service
 
@@ -121,6 +106,7 @@ type Service struct {
 
 func newService(db *sql.DB, core *core.Service, chat *channel.Service, mgr *manager.Service) (*Service, error) {
 	c := &Service{
+		db:     db,
 		q:      generated.New(db),
 		core:   core,
 		ilink:  weixin.NewClient(),
@@ -137,6 +123,7 @@ func newService(db *sql.DB, core *core.Service, chat *channel.Service, mgr *mana
 	adapters := []voiceAdapter{voiceWeixinAdapter{c}, voiceFeishuAdapter{c}, voiceQQAdapter{c}}
 	for _, a := range adapters {
 		b := &voiceBridge{c: c, adapter: a, id: a.ID(), fibers: map[string]context.CancelFunc{}, ctx: context.Background(), progressed: make(chan struct{}, 1)}
+		b.outbox = &voiceOutbox{bridge: b, wake: make(chan struct{}, 1)}
 		if err := b.reload(); err != nil {
 			return nil, err
 		}
@@ -171,7 +158,7 @@ func (c *Service) OnStart(ctx context.Context) error {
 				switch v := e.Value.(type) {
 				case protocol.FactMessage:
 					for _, id := range c.order {
-						c.bridges[id].offer(v.Message, &state)
+						c.bridges[id].outbox.offer(v.Message, &state)
 					}
 					state = c.core.State()
 				case protocol.FactConversation:
@@ -271,7 +258,9 @@ type voiceBridge struct {
 	fibers     map[string]context.CancelFunc
 
 	// The outbox goes out in order.
-	sending sync.Mutex
+	outbox     *voiceOutbox
+	inbound    sync.Mutex
+	transition sync.Mutex
 }
 
 func voiceNullable(s string) sql.NullString { return sql.NullString{String: s, Valid: s != ""} }
@@ -389,95 +378,6 @@ func (b *voiceBridge) pause() {
 	b.setErr("登录过期了，一小时后再试；也可以断开重新连。")
 }
 
-// Stops at the first the app will not take. late: it waited, so many go as one digest.
-func (b *voiceBridge) drain(ctx context.Context, late bool) bool {
-	b.sending.Lock()
-	defer b.sending.Unlock()
-	a := b.accountNow()
-	if a == nil || a.owner == "" || a.paused() {
-		return true
-	}
-	pending, err := b.c.q.PendingOutbox(ctx, string(b.id))
-	if err != nil {
-		log.Printf("vibevalley: %s: %v", b.id, err)
-		return false
-	}
-	if len(pending) == 0 {
-		return true
-	}
-	type batch struct {
-		ids  []string
-		text string
-	}
-	var batches []batch
-	if late && len(pending) > digestOver {
-		lines := make([]string, len(pending))
-		ids := make([]string, len(pending))
-		for i, r := range pending {
-			lines[i], ids[i] = r.Body, r.ID
-		}
-		batches = []batch{{ids, flushText(lines)[0]}}
-	} else {
-		for _, r := range pending {
-			batches = append(batches, batch{[]string{r.ID}, r.Body})
-		}
-	}
-	for _, out := range batches {
-		ext, failure := b.adapter.Send(ctx, a.secrets, a.owner, out.text, a.replyContext)
-		if failure == nil {
-			for _, id := range out.ids {
-				b.kept(b.c.q.OutboxSent(ctx, generated.OutboxSentParams{SentAt: sql.NullInt64{Int64: clock.NowMs(), Valid: true}, ExtID: voiceNullable(ext), ID: id}))
-			}
-			b.setErr("")
-			continue
-		}
-		for _, id := range out.ids {
-			b.kept(b.c.q.OutboxFailed(ctx, generated.OutboxFailedParams{Error: voiceNullable(failure.Reason), ID: id}))
-		}
-		switch failure.Kind {
-		case "stale":
-			b.pause()
-		case "restricted":
-			// The app would not take it now (WeChat's, QQ's reply window): tried again later, and with the owner's
-			// next message.
-			b.setErr("")
-		default:
-			b.setErr(failure.Reason)
-		}
-		return false
-	}
-	return true
-}
-
-func (b *voiceBridge) offer(m protocol.ChatMessage, state *protocol.CoreState) {
-	a := b.accountNow()
-	if a == nil || a.owner == "" || !forOwner(m) {
-		return
-	}
-	var chat *protocol.Chat
-	if state != nil {
-		chat = state.Chat
-	}
-	where := protocol.ConversationOf(chat, m.Conversation)
-	var mine *string
-	if a.channel != nil {
-		mine = a.channel
-	} else if general := protocol.GeneralOf(chat); general != nil {
-		mine = &general.ID
-	}
-	channel := protocol.ChannelOf(chat, where)
-	if (channel == nil) != (mine == nil) || (channel != nil && channel.ID != *mine) {
-		return
-	}
-	for _, piece := range splitText(ownerLine(m, where), maxChars[b.id]) {
-		b.kept(b.c.q.AddOutbox(context.Background(), generated.AddOutboxParams{ID: base.NewID(), Connector: string(b.id), MessageID: m.ID, Body: piece, CreatedAt: clock.NowMs()}))
-	}
-	b.mu.Lock()
-	ctx := b.ctx
-	b.mu.Unlock()
-	b.drain(ctx, false)
-}
-
 func (b *voiceBridge) quotedConversation(ext string) *string {
 	if ext == "" {
 		return nil
@@ -496,45 +396,78 @@ func (b *voiceBridge) quotedConversation(ext string) *string {
 	return nil
 }
 
-func (b *voiceBridge) saveReplyContext(reply string) {
+func (b *voiceBridge) saveReplyContext(ctx context.Context, reply string) error {
 	now := clock.NowMs()
-	b.kept(b.c.q.AccountReply(context.Background(), generated.AccountReplyParams{
-		ReplyContext: voiceNullable(reply), ReplyAt: sql.NullInt64{Int64: now, Valid: true}, LastInbound: sql.NullInt64{Int64: now, Valid: true}, Connector: string(b.id)}))
+	return b.c.q.AccountReply(ctx, generated.AccountReplyParams{
+		ReplyContext: voiceNullable(reply), ReplyAt: sql.NullInt64{Int64: now, Valid: true}, LastInbound: sql.NullInt64{Int64: now, Valid: true}, Connector: string(b.id)})
 }
 
-func (b *voiceBridge) got(ctx context.Context, m voiceInbound) {
+func (b *voiceBridge) got(ctx context.Context, m voiceInbound) (err error) {
+	b.inbound.Lock()
+	defer b.inbound.Unlock()
+	handled := false
+	defer func() {
+		if err == nil && handled && m.ID != "" {
+			err = b.c.q.AddInbound(ctx, generated.AddInboundParams{Connector: string(b.id), ExtID: m.ID, CreatedAt: clock.NowMs()})
+		}
+		if err != nil {
+			b.setErr(err.Error())
+		}
+	}()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	a := b.accountNow()
 	if a == nil {
-		return
+		return nil
 	}
 	if m.ID != "" {
 		if _, err := b.c.q.InboundSeen(ctx, generated.InboundSeenParams{Connector: string(b.id), ExtID: m.ID}); err == nil {
-			return
+			return nil
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
 		}
-		b.kept(b.c.q.AddInbound(ctx, generated.AddInboundParams{Connector: string(b.id), ExtID: m.ID, CreatedAt: clock.NowMs()}))
 	}
-	// Nobody paired yet: the first who sends the code becomes the owner; anyone else is not heard.
+	handled = true
 	if a.owner == "" {
 		if a.pairCode == "" || !isPairing(m.Text, a.pairCode) {
-			log.Printf("vibevalley: %s: a message before pairing was not let in", b.id)
-			return
+			return nil
 		}
-		b.kept(b.c.q.AccountOwner(context.Background(), generated.AccountOwnerParams{OwnerID: voiceNullable(m.From), Connector: string(b.id)}))
-		b.saveReplyContext(m.Reply)
-		b.mustReload()
+		err := b.accountChange(ctx, func(q *generated.Queries) error {
+			if err := q.AccountOwner(ctx, generated.AccountOwnerParams{OwnerID: voiceNullable(m.From), Connector: string(b.id)}); err != nil {
+				return err
+			}
+			now := clock.NowMs()
+			if err := q.AccountReply(ctx, generated.AccountReplyParams{ReplyContext: voiceNullable(m.Reply), ReplyAt: sql.NullInt64{Int64: now, Valid: true}, LastInbound: sql.NullInt64{Int64: now, Valid: true}, Connector: string(b.id)}); err != nil {
+				return err
+			}
+			if m.ID == "" {
+				return nil
+			}
+			return q.AddInbound(ctx, generated.AddInboundParams{Connector: string(b.id), ExtID: m.ID, CreatedAt: now})
+		})
+		if err != nil {
+			return err
+		}
+		handled = false
+		if err := b.reload(); err != nil {
+			return err
+		}
 		b.adapter.Send(ctx, a.secrets, m.From, "配对好了：以后在这里说的话，就是你在农场的田头上说的。", m.Reply)
-		return
+		return nil
 	}
 	if m.From != a.owner {
-		log.Printf("vibevalley: %s: a message from someone else was not let in", b.id)
-		return
+		return nil
 	}
-	b.saveReplyContext(m.Reply)
-	b.mustReload()
-	// A fresh context: what waited goes out first, so the answer to this comes after it.
-	b.drain(ctx, true)
+	if err := b.saveReplyContext(ctx, m.Reply); err != nil {
+		return err
+	}
+	if err := b.reload(); err != nil {
+		return err
+	}
+	b.outbox.reply(ctx)
 	if m.Text == "" {
-		return
+		return nil
 	}
 	conversation := b.quotedConversation(m.Quoted)
 	if conversation == nil {
@@ -545,9 +478,7 @@ func (b *voiceBridge) got(ctx context.Context, m voiceInbound) {
 	if b.c.core.Call() != protocol.CallStateLive {
 		b.c.core.SetCall(protocol.CallStateLive, "")
 	}
-	if err := b.c.say(ctx, m.Text, conversation); err != nil {
-		log.Printf("vibevalley: what came from %s was not said: %v", b.id, err)
-	}
+	return b.c.say(ctx, m.Text, conversation)
 }
 
 func (b *voiceBridge) receiving(ctx context.Context) {
@@ -567,11 +498,13 @@ func (b *voiceBridge) receiving(ctx context.Context) {
 		}
 		io := voiceReceiving{
 			Cursor: a.cursor,
-			SaveCursor: func(cursor string) {
-				b.kept(b.c.q.AccountCursor(ctx, generated.AccountCursorParams{Cursor: cursor, Connector: string(b.id)}))
-				b.mustReload()
+			SaveCursor: func(cursor string) error {
+				if err := b.c.q.AccountCursor(ctx, generated.AccountCursorParams{Cursor: cursor, Connector: string(b.id)}); err != nil {
+					return err
+				}
+				return b.reload()
 			},
-			Got: func(m voiceInbound) { b.got(ctx, m) },
+			Got: func(m voiceInbound) error { return b.got(ctx, m) },
 		}
 		stopped := b.adapter.Receive(ctx, a.secrets, io)
 		if ctx.Err() != nil {
@@ -630,12 +563,7 @@ func (b *voiceBridge) stopAll() {
 
 func (b *voiceBridge) connect() {
 	b.run("receive", b.receiving)
-	b.run("retry", func(ctx context.Context) {
-		wait := voiceRetryFirst
-		for clock.Sleep(ctx, wait) {
-			wait = voiceRetryAfter(wait, b.drain(ctx, false))
-		}
-	})
+	b.run("outbox", b.outbox.run)
 }
 
 func voicePairCode() string {
@@ -676,15 +604,26 @@ func (b *voiceBridge) loggingIn(ctx context.Context, attempt int, in protocol.Co
 		b.setErr(err.Error())
 		return
 	}
-	b.remove("receive")
-	b.kept(b.c.q.DropPendingOutbox(context.Background(), generated.DropPendingOutboxParams{Error: voiceNullable("换了账号"), Connector: string(b.id)}))
+	b.transition.Lock()
+	defer b.transition.Unlock()
+	if ctx.Err() != nil {
+		return
+	}
 	secrets, _ := json.Marshal(linked.Secrets)
 	pair := ""
 	if linked.Owner == "" {
 		pair = voicePairCode()
 	}
-	b.kept(b.c.q.ConnectAccount(context.Background(), generated.ConnectAccountParams{
-		Connector: string(b.id), Secrets: string(secrets), OwnerID: voiceNullable(linked.Owner), PairCode: voiceNullable(pair), ConnectedAt: clock.NowMs()}))
+	if err := b.accountChange(ctx, func(q *generated.Queries) error {
+		if err := q.ConnectAccount(ctx, generated.ConnectAccountParams{Connector: string(b.id), Secrets: string(secrets), OwnerID: voiceNullable(linked.Owner), PairCode: voiceNullable(pair), ConnectedAt: clock.NowMs()}); err != nil {
+			return err
+		}
+		return b.outbox.retire(ctx, q, "换了账号")
+	}); err != nil {
+		b.setErr(err.Error())
+		return
+	}
+	b.remove("receive")
 	b.mustReload()
 	b.setErr("")
 	b.connect()
@@ -741,9 +680,19 @@ func (b *voiceBridge) verify(code string) protocol.ConnectorStatus {
 }
 
 func (b *voiceBridge) logout() protocol.ConnectorStatus {
+	b.transition.Lock()
+	defer b.transition.Unlock()
+	ctx := context.Background()
+	if err := b.accountChange(ctx, func(q *generated.Queries) error {
+		if err := q.DisconnectAccount(ctx, string(b.id)); err != nil {
+			return err
+		}
+		return b.outbox.retire(ctx, q, "断开了")
+	}); err != nil {
+		b.setErr(err.Error())
+		return b.status()
+	}
 	b.stopAll()
-	b.kept(b.c.q.DisconnectAccount(context.Background(), string(b.id)))
-	b.kept(b.c.q.DropPendingOutbox(context.Background(), generated.DropPendingOutboxParams{Error: voiceNullable("断开了"), Connector: string(b.id)}))
 	b.mu.Lock()
 	b.account, b.progress, b.err = nil, nil, ""
 	b.attempt++
@@ -761,4 +710,27 @@ func (b *voiceBridge) setChannel(channel *string) (protocol.ConnectorStatus, err
 	}
 	b.mustReload()
 	return b.status(), nil
+}
+
+func (b *voiceBridge) accountChange(ctx context.Context, change func(*generated.Queries) error) error {
+	tx, err := b.c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := change(b.c.q.WithTx(tx)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r voiceReceiving) take(ctx context.Context, m voiceInbound) {
+	for ctx.Err() == nil {
+		if r.Got(m) == nil {
+			return
+		}
+		if !clock.Sleep(ctx, time.Second) {
+			return
+		}
+	}
 }

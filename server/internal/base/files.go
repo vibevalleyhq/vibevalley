@@ -1,11 +1,9 @@
 package base
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
-	"sync/atomic"
 )
 
 // FileWriter saves a file the server keeps (state.json, sessions.json, config.json…): whole or not at all, and in order.
@@ -15,7 +13,6 @@ type FileWriter struct {
 	path string
 	mode os.FileMode
 	mu   sync.Mutex
-	n    atomic.Int64
 }
 
 func NewFileWriter(path string, mode os.FileMode) *FileWriter {
@@ -36,9 +33,20 @@ func (w *FileWriter) Write(body func() ([]byte, error)) error {
 	if err := os.MkdirAll(filepath.Dir(w.path), 0o755); err != nil {
 		return err
 	}
-	tmp := fmt.Sprintf("%s.%d.%d.tmp", w.path, os.Getpid(), w.n.Add(1))
-	if err := os.WriteFile(tmp, data, w.mode); err != nil {
+	f, err := os.CreateTemp(filepath.Dir(w.path), filepath.Base(w.path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, w.path)
+	defer os.Remove(f.Name())
+	defer f.Close()
+	if err := f.Chmod(w.mode); err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), w.path)
 }

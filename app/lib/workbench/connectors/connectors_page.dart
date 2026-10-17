@@ -45,45 +45,68 @@ const pollEvery = Duration(milliseconds: 1500);
 final connectorsProvider = NotifierProvider<ConnectorsNotifier, Map<ConnectorId, ConnectorStatus>?>(ConnectorsNotifier.new);
 
 class ConnectorsNotifier extends Notifier<Map<ConnectorId, ConnectorStatus>?> {
+  final _revisions = <ConnectorId, int>{};
+  bool _refreshing = false;
   @override
   Map<ConnectorId, ConnectorStatus>? build() => null;
 
   ConnectorApi get _api => ref.read(apiProvider).connector;
 
-  void _keep(Iterable<ConnectorStatus> got) => state = {...?state, for (final s in got) s.id: s};
+  void _keep(Iterable<ConnectorStatus> got) {
+    if (ref.mounted) state = {...?state, for (final s in got) s.id: s};
+  }
 
   /// A failure is left for the next poll.
   Future<void> refresh() async {
+    if (_refreshing || !ref.mounted) return;
+    _refreshing = true;
+    final revisions = {..._revisions};
     try {
-      _keep(await _api.list());
+      final list = await _api.list();
+      _keep(list.where((s) => (_revisions[s.id] ?? 0) == (revisions[s.id] ?? 0)));
     } catch (e) {
-      debugPrint('vibevalley: connectors: $e');
+      if (ref.mounted) debugPrint('vibevalley: connectors: $e');
+    } finally {
+      _refreshing = false;
     }
   }
 
-  Future<void> login(ConnectorId id, [ConnectorLogin input = const ConnectorLogin()]) => _act(() => _api.login(id: id, body: input));
+  Future<void> login(ConnectorId id, [ConnectorLogin input = const ConnectorLogin()]) => _act(id, () => _api.login(id: id, body: input));
   Future<void> verify(ConnectorId id, String code) => _act(
+    id,
     () => _api.verify(
       id: id,
       body: VerifyRequest(code: code),
     ),
   );
-  Future<void> logout(ConnectorId id) => _act(() => _api.logout(id: id));
+  Future<void> logout(ConnectorId id) => _act(id, () => _api.logout(id: id));
 
-  Future<void> _act(Future<ConnectorStatus> Function() call) async {
+  Future<void> _update(ConnectorId id, Future<ConnectorStatus> Function() call) async {
+    final revision = (_revisions[id] ?? 0) + 1;
+    _revisions[id] = revision;
     try {
-      _keep([await call()]);
-    } catch (e) {
-      toasts.add(type: ToastType.error, title: noticeTitle[ToastType.error]!, description: '$e');
+      final got = await call();
+      if (_revisions[id] == revision) _keep([got]);
+    } finally {
+      if (_revisions[id] == revision) _revisions[id] = revision + 1;
     }
   }
 
-  Future<void> setChannel(ConnectorId id, String channel) async => _keep([
-    await _api.channel(
+  Future<void> _act(ConnectorId id, Future<ConnectorStatus> Function() call) async {
+    try {
+      await _update(id, call);
+    } catch (e) {
+      if (ref.mounted) toasts.add(type: ToastType.error, title: noticeTitle[ToastType.error]!, description: '$e');
+    }
+  }
+
+  Future<void> setChannel(ConnectorId id, String channel) => _update(
+    id,
+    () => _api.channel(
       id: id,
       body: ConnectorsChannelRequest(channel: channel),
     ),
-  ]);
+  );
 }
 
 class ConnectorsPage extends ConsumerStatefulWidget {

@@ -70,6 +70,7 @@ class PhoneCalls extends Notifier<PhoneState> {
   /// null until the farm screen's first look, which rings nothing.
   Set<String>? _known;
   bool _active = true;
+  int _activation = 0;
   bool _voiceLive = false;
   DateTime? _voiceSince;
 
@@ -94,11 +95,18 @@ class PhoneCalls extends Notifier<PhoneState> {
         follow();
       }
     });
-    ref.onCancel(() => _active = false);
+    ref.onCancel(() {
+      _active = false;
+      _activation++;
+    });
     ref.onResume(() {
-      _active = true;
-      // Back on the farm screen: what stands now is already missed.
-      _known = {for (final c in state.missed) c.id};
+      final activation = ++_activation;
+      // Lifecycle callbacks cannot read provider state. Prime the resumed inbox before allowing new rings.
+      scheduleMicrotask(() {
+        if (!ref.mounted || activation != _activation) return;
+        _known = {for (final c in state.missed) c.id};
+        _active = true;
+      });
     });
     ref.onDispose(_stopBell);
     final calls = ref.read(inboxProvider);

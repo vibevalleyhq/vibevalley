@@ -2,12 +2,14 @@ package agents
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"vibevalley/pkg/smith/oar"
 	"vibevalley/pkg/smith/observe"
+	"vibevalley/pkg/smith/voyage"
 )
 
 // subagentHooks is what a subagent tells the crew that owns it. Never called
@@ -25,7 +27,7 @@ type subagentIdentity struct {
 	name    string
 	runtime string
 	log     string
-	logged  *progress
+	logged  *voyage.SessionRecording
 }
 
 var runningLimit = SendResult{Kind: "rejected", Code: "running_limit", Reason: "the running limit is reached; wait for a subagent to finish"}
@@ -302,9 +304,22 @@ func (a *Subagent) Interrupt(ctx context.Context) (oar.ControlOutcome, error) {
 // Close disposes the child. A turn it was running that the runtime reports
 // no end for still gets an aborted report. It returns once the subagent (and
 // its log) has read every record the dispose produced.
-func (a *Subagent) Close(ctx context.Context) error {
+func (a *Subagent) Close(ctx context.Context) (err error) {
+	closeLog := false
+	defer func() {
+		if closeLog && a.identity.logged != nil {
+			settle, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			defer cancel()
+			err = errors.Join(err, a.identity.logged.Close(settle))
+		}
+	}()
 	a.mu.Lock()
-	if a.state == "closed" || a.closing {
+	if a.closing {
+		a.mu.Unlock()
+		return nil
+	}
+	closeLog = true
+	if a.state == "closed" {
 		a.mu.Unlock()
 		return nil
 	}
@@ -314,15 +329,12 @@ func (a *Subagent) Close(ctx context.Context) error {
 		open = a.turns
 	}
 	a.mu.Unlock()
-	err := a.Session.Dispose(ctx)
+	err = a.Session.Dispose(ctx)
 	// Go-only: observers run on delivery goroutines; read what dispose recorded first.
 	target := lastSeq(a.Session)
 	settle, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
 	a.seen.reach(settle, target)
-	if a.identity.logged != nil {
-		a.identity.logged.reach(settle, target)
-	}
 	var after []func()
 	a.mu.Lock()
 	if open != -1 && a.turns == open {

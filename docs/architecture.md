@@ -93,6 +93,8 @@ flowchart LR
 
 `GET /api/v1/live`（server-sent events）是 Flutter 的窄流：只发 `LiveEvent` 的三种成员（`SessionEvent`、`Notice`、`Runtime`），不发事实、不发快照；状态仍由 `/api/v1/state` 给。事实的种类见 `shapes.go` 的 `Fact`；帮工的会话事件怎么变成事实见 [server.md](reference/server.md)「帮工」。
 
+流的每次写入限时 20 秒；写入或刷新失败就结束订阅。核心状态按首个变化起算的 500 毫秒窗口合并落盘，持续收到事实不会推迟这次保存；关闭时再保存最后的状态。
+
 ## HTTP 接口
 
 接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](../.agents/notes/implemented/architecture/2026-10-17-api-versioned-paths.md)）。不在里面的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[server.md](reference/server.md)「田头」）。`//vibevalley:can` 写谁能调，院门只放 `remote` 的（[能力表](reference/capabilities.md)、[server.md](reference/server.md)「院门」）。

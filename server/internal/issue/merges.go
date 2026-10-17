@@ -75,14 +75,18 @@ func (m *merges) recheck(id string) {
 }
 
 // The owner asks the session to settle its conflicts: the ones the farm marked on it, else the ones merging would meet now.
-func (m *merges) Resolve(id string) error {
+func (m *merges) resolve(id string) error {
 	session := m.core.Session(id)
 	if session == nil {
 		return protocol.Missing{What: "帮工 " + id}
 	}
 	conflict := session.Conflict
 	if conflict == nil {
-		if changes, err := m.changes(id); err == nil && changes != nil && len(changes.Conflicts) > 0 {
+		changes, err := m.changes(id)
+		if err != nil {
+			return err
+		}
+		if changes != nil && len(changes.Conflicts) > 0 {
 			conflict = &protocol.Conflict{Base: changes.Base, Files: changes.Conflicts}
 		}
 	}
@@ -94,7 +98,7 @@ func (m *merges) Resolve(id string) error {
 }
 
 // Changes are what the session's branch would bring; the game counts the owner's look, not the manager's.
-func (m *merges) Changes(id string, by protocol.Caller) (*protocol.Changes, error) {
+func (m *merges) changesFor(id string, by protocol.Caller) (*protocol.Changes, error) {
 	changes, err := m.changes(id)
 	if err == nil && changes != nil && by == protocol.CallerOwner {
 		m.core.Did(core.OwnerDid{Kind: core.OwnerReviewed, Session: id})
@@ -122,58 +126,25 @@ func (m *merges) changes(id string) (*protocol.Changes, error) {
 	return &changes, nil
 }
 
-func (m *merges) Into(id, target string) ([]string, error) {
-	place, ok := m.sessions.Place(id)
+func (m *merges) merge(id string) (string, error) {
 	session := m.core.Session(id)
-	if !ok || session == nil {
-		return nil, project.MergeFailure{Kind: "error", Reason: fmt.Sprintf("没有 %s 这个帮工", id)}
+	if session == nil {
+		return "", protocol.Missing{What: "帮工 " + id}
 	}
-	if protocol.IsBusy(*session) {
-		return nil, project.MergeFailure{Kind: "error", Reason: session.Name + " 还在干活"}
-	}
-	// Close the session first, so nothing writes to the worktree while it is merged.
-	m.sessions.Rest(id)
-	brought, err := m.projects.MergeInto(place, target)
+	merged, err := m.sessions.Merge(id)
 	if err == nil {
-		m.sessions.Leave(id, protocol.IssueCloseMergedIntoPlan, 0)
-		return brought, nil
-	}
-	if failure, ok := err.(project.MergeFailure); ok && failure.Kind == "conflict" {
-		m.core.Apply(protocol.FactConflict{ID: id, Conflict: &protocol.Conflict{Base: failure.Base, Files: failure.Files}})
-	}
-	return nil, err
-}
-
-func (m *merges) Merge(id string) string {
-	place, ok := m.sessions.Place(id)
-	session := m.core.Session(id)
-	if !ok || session == nil {
-		return fmt.Sprintf("没有 %s 这个帮工", id)
-	}
-	if session.Playbook != nil {
-		return fmt.Sprintf("%s 在做种植计划 %s 里的活：做完会自动合进计划分支，收获整个计划时再进主分支", session.Name, session.Playbook.ID)
-	}
-	if protocol.IsBusy(*session) {
-		return session.Name + " 还在干活：等这一轮做完，或者先叫停，再收"
-	}
-	// Close the session first, so nothing writes to the worktree while it is merged.
-	m.sessions.Rest(id)
-	merged, err := m.projects.Merge(place)
-	if err == nil {
-		m.sessions.Leave(id, protocol.IssueCloseMerged, int64(merged.Commits))
 		m.core.Notice(protocol.NoticeLevelInfo, fmt.Sprintf("收了 %s 的活：%s", session.Name, merged.Text))
-		return merged.Text
+		return merged.Text, nil
 	}
 	failure, ok := err.(project.MergeFailure)
 	if !ok {
 		failure = project.MergeFailure{Kind: "error", Reason: err.Error()}
 	}
 	if failure.Kind == "conflict" {
-		m.core.Apply(protocol.FactConflict{ID: id, Conflict: &protocol.Conflict{Base: failure.Base, Files: failure.Files}})
 		files := strings.Join(failure.Files, "、")
 		m.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 的分支合进 %s 会冲突（%s），先没收。可以让它自己把冲突解决掉", session.Name, failure.Base, files))
-		return fmt.Sprintf("没收：合进 %s 会冲突（%s）。%s 还在地里，分支和 worktree 都在。要它解决就用 tell 告诉它：%s", failure.Base, files, session.Name, protocol.ConflictTask(failure.Base, failure.Files))
+		return "", protocol.Refused{Reason: fmt.Sprintf("没收：合进 %s 会冲突（%s）。%s 还在地里，分支和 worktree 都在。要它解决就用 tell 告诉它：%s", failure.Base, files, session.Name, protocol.ConflictTask(failure.Base, failure.Files))}
 	}
 	m.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 的活没收进去：%s", session.Name, failure.Reason))
-	return fmt.Sprintf("没收进去：%s。%s 还在地里", failure.Reason, session.Name)
+	return "", protocol.Refused{Reason: fmt.Sprintf("没收进去：%s。%s 还在地里", failure.Reason, session.Name)}
 }

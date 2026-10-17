@@ -36,7 +36,7 @@ func (b *beds) Want(bed int64) {
 }
 
 func (b *beds) OnStart(ctx context.Context) error {
-	_, events, stop := b.core.Events()
+	events, stop := b.core.Facts()
 	b.mu.Lock()
 	b.stop = stop
 	b.mu.Unlock()

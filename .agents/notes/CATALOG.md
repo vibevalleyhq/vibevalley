@@ -23,7 +23,7 @@
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
 
-## implemented（84 篇）
+## implemented（86 篇）
 
 ### feature
 
@@ -70,8 +70,10 @@
 
 ### architecture
 
+- 2026-10-17 [动作结果和资源生命周期由拥有它的模块保证](implemented/architecture/2026-10-17-operation-results-and-lifetimes.md)
 - 2026-10-17 [迁移是一次性的，启动只认今天的名字](implemented/architecture/2026-10-17-one-way-migration.md)
 - 2026-10-17 [表按模块命名](implemented/architecture/2026-10-17-names-by-module.md)
+- 2026-10-17 [调用方交意图，模块拥有完整的协调](implemented/architecture/2026-10-17-interfaces-hide-coordination.md)
 - 2026-10-17 [收敛接缝：投影一处、死代码进检查、协议瘦身、异步有规矩、客户端一个入口](implemented/architecture/2026-10-17-converge-the-seams.md)
 - 2026-10-17 [接口带版本，都在 /api/v1 下](implemented/architecture/2026-10-17-api-versioned-paths.md)
 - 2026-10-16 [客户端问服务端，不重写它的规则](implemented/architecture/2026-10-16-the-client-asks-the-server.md)

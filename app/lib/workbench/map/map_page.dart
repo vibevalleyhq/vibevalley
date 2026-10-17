@@ -12,10 +12,9 @@ import '../../rules/cast.dart';
 import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
 import '../../ui/pixel_card.dart' show CardColors, PixelCard, Words;
-import '../../data/remote.dart' show agentsProvider;
+import '../../data/remote.dart' show agentsProvider, projectCatalogProvider;
 import '../projects/codebase.dart' show growthOf;
 import '../projects/projects_page.dart' show since;
-import '../projects/projects_state.dart';
 import '../../shared/faces.dart' show AgentFaceOf, PoseSprite;
 import '../../shared/swatches.dart';
 import '../shared/widgets.dart';
@@ -43,7 +42,6 @@ class _MapPageState extends ConsumerState<MapPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(_load());
     _poll = Timer.periodic(_pollEvery, (_) => unawaited(_load()));
   }
 
@@ -53,7 +51,7 @@ class _MapPageState extends ConsumerState<MapPage> {
     super.dispose();
   }
 
-  Future<void> _load() => ref.read(projectsProvider.notifier).load().catchError((Object _) {});
+  Future<void> _load() => ref.read(projectCatalogProvider.notifier).refresh().catchError((Object _) {});
 
   void _open(String? project) => workbenchGo(context, project == null ? '/map' : '/map/${Uri.encodeComponent(project)}');
 
@@ -63,7 +61,7 @@ class _MapPageState extends ConsumerState<MapPage> {
     final farm = ref.watch(stateProvider);
     final sessions = farm?.sessions ?? const <Session>[];
     final plots = ref.watch(viewProvider)?.plots ?? const <String, PlotView>{};
-    final projects = ref.watch(projectsProvider).list;
+    final projects = ref.watch(projectCatalogProvider).value;
     if (atlas == null) return const SizedBox.shrink();
     final islands = islandsOf(projects: projects ?? const [], sessions: sessions, plots: plots, issues: farm?.issues ?? const []);
     final open = islands.where((i) => i.project == widget.project).firstOrNull;

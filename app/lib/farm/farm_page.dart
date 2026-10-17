@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/providers.dart';
+import '../data/voice.dart';
 import '../chat/chat_state.dart' show chatOpenProvider;
-import '../data/remote.dart' show agentsProvider, workStepsProvider;
-import '../host/desktop.dart';
+import '../data/remote.dart' show agentsProvider;
 import 'chat_window.dart';
 import 'cursors.dart';
 import 'panels.dart';
@@ -45,15 +45,7 @@ class FarmPage extends ConsumerStatefulWidget {
 }
 
 class _FarmPageState extends ConsumerState<FarmPage> {
-  /// Made the first time it is needed, never in dispose: ref is gone by then.
-  VoiceCall? _call;
-  VoiceCall get call => _call ??= VoiceCall(
-    ref.read(apiProvider),
-    agentPick: () {
-      final pick = ref.read(prefsProvider).pick;
-      return pick == 'auto' ? null : pick;
-    },
-  )..addListener(_voice);
+  VoiceCall get call => ref.read(voiceCallProvider);
   VillageGame? _game;
   final _subs = <StreamSubscription<Object?>>[];
   late final AppLifecycleListener _life;
@@ -67,14 +59,12 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onKey);
     _life = AppLifecycleListener(onInactive: _hideNames, onHide: _hideNames);
-    _subs
-      ..add(
-        ref.read(farmEffectsProvider).listen((e) {
-          _game?.play(e);
-          if (e is GameEffectReward) ref.read(rewardsProvider.notifier).push(e);
-        }),
-      )
-      ..add(ref.read(hostProvider).commands.where((c) => c is HostVoice).listen(_voiceCommand));
+    _subs.add(
+      ref.read(farmEffectsProvider).listen((e) {
+        _game?.play(e);
+        if (e is GameEffectReward) ref.read(rewardsProvider.notifier).push(e);
+      }),
+    );
   }
 
   @override
@@ -86,15 +76,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     }
     _namesTimer?.cancel();
     _pointer.dispose();
-    _call
-      ?..removeListener(_voice)
-      ..dispose();
     super.dispose();
-  }
-
-  void _voice() {
-    if (mounted) setState(() {});
-    _game?.voiceLive.value = call.phase == CallPhase.live;
   }
 
   bool get _active => mounted && TickerMode.valuesOf(context).enabled && !ref.read(titleOpenProvider);
@@ -104,7 +86,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     final commands = ref.read(farmCommandsProvider);
     final aim = commands.aim(bed);
     if (aim.aim.ok) Sfx.play('tap');
-    final PlotResult got;
+    final ToolResult got;
     try {
       got = await commands.act(aim);
     } on Object {
@@ -112,8 +94,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
       return;
     }
     if (!mounted) return;
-    applyBedEffects(ref, got.effects);
-    switch (got.result) {
+    switch (got) {
       case ToolRefused() || ToolDone():
         return;
       case ToolSow(:final station):
@@ -156,10 +137,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
   void _openPlans(String? playbook) {
     if (playbook != null) ref.read(planShownProvider.notifier).set(playbook);
     ref.read(panelProvider.notifier).set(FarmPanel.plans);
-  }
-
-  void _voiceCommand(HostCommand command) {
-    if (command is HostVoice) unawaited(call.phase == CallPhase.idle ? call.start() : call.end());
   }
 
   bool get _anyLayer =>
@@ -238,6 +215,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(voiceCallProvider);
     final atlas = ref.watch(atlasProvider).value;
     final village = ref.watch(villageProvider).value;
     final state = ref.watch(stateProvider);
@@ -263,8 +241,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
           break;
       }
     });
-    // Kept from the start, so a panel opened later has the newest.
-    ref.listen(workStepsProvider, (_, _) {});
 
     if (atlas == null || village == null || state == null || view == null) {
       return Scaffold(
@@ -311,13 +287,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
           container: true,
           child: LayoutBuilder(
             builder: (context, window) {
-              final chat = ChatWindow(
-                state: state,
-                atlas: atlas,
-                agents: agents,
-                call: call,
-                onSay: (text) => ref.read(apiProvider).channel.say(body: SayRequest(text: text)),
-              );
+              final chat = ChatWindow(state: state, atlas: atlas, agents: agents, call: call);
               return _farm(window, game, village, atlas, state, view, held, hotspots, chat);
             },
           ),

@@ -318,12 +318,11 @@ void main() {
           atlas: atlas,
           agents: const {},
           call: VoiceCall(VibeValleyServer(Uri.parse('http://farm.test')).api),
-          onSay: (text) async => said.add(text),
         ),
       ),
     );
 
-    testWidgets('the general in bubbles; typing there goes through the host; the thread chip opens the thread', (t) async {
+    testWidgets('the general in bubbles; typing there uses the shared message owner; the thread chip opens the thread', (t) async {
       final server = FakeServer(_answer);
       final said = <String>[];
       await _pump(t, window(server, _state(), said), server, _state());
@@ -334,7 +333,7 @@ void main() {
       await t.enterText(find.byType(TextField), '现在进度怎么样？');
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump(const Duration(milliseconds: 50));
-      expect(said, ['现在进度怎么样？']);
+      expect(server.to('POST', '/api/v1/say').map((r) => (jsonDecode(r.body) as Map)['text']), ['现在进度怎么样？']);
 
       await t.tap(find.text('1 条回复'));
       await t.pump(const Duration(milliseconds: 50));
@@ -344,7 +343,7 @@ void main() {
       await t.enterText(find.byType(TextField), '再跑一次');
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump(const Duration(milliseconds: 50));
-      expect(jsonDecode(server.to('POST', '/api/v1/say').single.body), {'text': '再跑一次', 'conversation': 'c3'});
+      expect(jsonDecode(server.to('POST', '/api/v1/say').last.body), {'text': '再跑一次', 'conversation': 'c3'});
 
       await t.tap(find.bySemanticsLabel('回到田头').first);
       await t.pump(const Duration(milliseconds: 50));

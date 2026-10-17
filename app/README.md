@@ -7,6 +7,11 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 - **状态**：读 `GET /api/v1/state` 折好的 `StateFrame`，自己不折事实（[architecture.md](../docs/architecture.md)「核心状态」）。
 - **状态以外的事**：从 `GET /api/v1/live` 只取步骤、提醒、农机的变化（`sideEvents`）；`/api/v1/events` 的 facts 留给命令行和调试。
 - **命令**：`lib/gen/vibevalley.dart` 里生成的 `VibeValleyApi`，页面只从 `apiProvider` 拿它。
+- **连接生命周期**：`VibeValleyServer` 同时拥有状态流和窄事件流；关闭时释放全部连接，停止重连。坏帧写入错误流，后续合法帧继续接收。
+- **配置同步**：`workbenchConfigProvider` 统一分开管家与派活档案；旧刷新不覆盖新刷新，读取期间的农机推送优先于列表结果。首次加载失败保留错误，和空列表区分。
+- **失败恢复**：配置页显示原因和重试；聊天发送失败保留草稿。连接器和页面资源的旧读取不能覆盖刚完成的动作结果。
+- **读取的拥有者**：项目目录、每个档案的记忆、每个 Session 的轨迹由数据层按对象提供；观察轨迹会自动取回历史并接上增量。聊天层统一提供消息投影和已读生命周期，两张皮只声明当前可见的频道。
+- **通话的拥有者**：当前农场的 ProviderScope 拥有 VoiceCall；页面观察通话，按钮和本机快捷键都发送同一个通话动作。切换农场时旧通话随 scope 释放。
 - **规则**：帧里没有、要从状态推出来的，是 `lib/rules/` 的纯函数；客户端自己的游戏状态（工具、手机、偏好）在各自的目录。
 
 用哪个农场（本机，或经院门配对的另一台电脑）存在偏好里（`lib/data/farm_choice.dart`）。手机上不在屏幕前时按桌面版的规则弹系统通知（`lib/host/mobile_notices.dart`）。macOS 版见 [desktop.md](../docs/reference/desktop.md)。

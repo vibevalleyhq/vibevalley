@@ -178,3 +178,14 @@ func ReadRecords(reader io.Reader) ([]oar.RawEvent, error) {
 	}
 	return records, scanner.Err()
 }
+
+func (r *Recorder) abort() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.file == nil {
+		return nil
+	}
+	err := r.file.Close()
+	r.file = nil
+	return err
+}

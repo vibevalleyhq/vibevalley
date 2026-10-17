@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
@@ -12,8 +11,10 @@ import '../shared/layout.dart';
 import '../shared/resource.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
+import '../shared/config_problem.dart';
 import 'board.dart';
 import 'issue_detail.dart';
+import 'issue_submission.dart';
 
 /// From this wide, a card opens beside the board; narrower, over it.
 Color issueTagColor(IssueTag s) => switch (s) {
@@ -32,27 +33,6 @@ Color? priorityColor(Priority p) => switch (p) {
   Priority.medium => null,
   Priority.low => Palette.cream300,
 };
-
-const _lastPickKey = 'vibevalley.board.pick';
-
-Future<(String, String)> lastPick() async {
-  try {
-    final raw = (await SharedPreferences.getInstance()).getStringList(_lastPickKey);
-    if (raw != null && raw.length == 2) return (raw[0], raw[1]);
-  } on Object {
-    // No storage: nothing remembered.
-  }
-  return ('', '');
-}
-
-Future<void> rememberPick(String agent, String project) async {
-  if (agent.isEmpty && project.isEmpty) return;
-  try {
-    await (await SharedPreferences.getInstance()).setStringList(_lastPickKey, [agent, project]);
-  } on Object {
-    // No storage: not remembered.
-  }
-}
 
 void dispatchedNotice(Dispatched got, String issue, ValueChanged<String?> open) {
   if (got.session != null) {
@@ -275,15 +255,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
   }
 
   Future<void> _add(String text) async {
-    final f = _filter;
-    final (lastAgent, lastProject) = await lastPick();
-    final agent = f.agent.isNotEmpty ? f.agent : lastAgent;
-    final project = f.project.isNotEmpty ? f.project : lastProject;
-    await runAction(
-      () => _api.issue.create(
-        body: IssueRequest(title: text, project: project.isEmpty ? null : project, assignee: agent.isEmpty ? null : agent),
-      ),
-    );
+    await runAction(() => IssueSubmission(_api.issue).quick(text, agent: _filter.agent, project: _filter.project));
   }
 
   @override
@@ -395,6 +367,7 @@ class _Toolbar extends ConsumerWidget {
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
+          if (ref.watch(workbenchConfigProvider).error != null) const ConfigProblem(),
           SizedBox(
             width: 240,
             child: PxTextInput(

@@ -29,15 +29,6 @@ func refused(err error) error {
 
 func missing(what string) error { return protocol.Missing{What: what} }
 
-// latest is the issue's newest session, which must still be on the farm.
-func (a api) latest(issue string) (string, error) {
-	session, err := a.f.Issue.Latest(issue)
-	if err != nil {
-		return "", err
-	}
-	return session, a.session(session)
-}
-
 func (a api) session(id string) error {
 	if a.f.Session.Find(id) == nil {
 		return missing("帮工 " + id)
@@ -110,66 +101,25 @@ func (a api) ManagerHear(_ context.Context, body protocol.SayRequest) error {
 }
 
 func (a api) IssueComment(_ context.Context, id string, body protocol.CommentRequest) error {
-	issue, err := a.f.Issue.Get(id)
-	if err != nil {
-		return err
-	}
-	if issue.Status == protocol.IssueStatusDone || issue.Status == protocol.IssueStatusCanceled {
-		return protocol.Refused{Reason: "这张工单关上了：带一句话重开它"}
-	}
-	session, err := a.f.Issue.Latest(id)
-	if err != nil {
-		return err
-	}
-	text := body.Text
-	if body.On != nil {
-		if text, err = a.f.Session.Comment(session, *body.On, body.Text); err != nil {
-			return err
-		}
-	}
-	_, err = a.f.Channel.TellSession("user", session, text)
-	return refused(err)
+	return refused(a.f.Issue.Comment(id, body))
 }
 
 func (a api) IssueChanges(_ context.Context, id string) (protocol.Changes, error) {
-	session, err := a.f.Issue.Latest(id)
-	if err != nil {
-		return protocol.Changes{}, err
-	}
-	changes, err := a.f.Issue.Changes(session, protocol.CallerOwner)
-	if err != nil {
-		return protocol.Changes{}, refused(err)
-	}
-	if changes == nil {
-		return protocol.Changes{}, missing("帮工 " + session)
-	}
-	return *changes, nil
+	changes, err := a.f.Issue.Changes(id, protocol.CallerOwner)
+	return changes, refused(err)
 }
 
 func (a api) IssueMerge(_ context.Context, id string) error {
-	session, err := a.latest(id)
-	if err != nil {
-		return err
-	}
-	a.f.Issue.Merge(session)
-	return nil
+	_, err := a.f.Issue.Merge(id)
+	return refused(err)
 }
 
 func (a api) IssueResolve(_ context.Context, id string) error {
-	session, err := a.f.Issue.Latest(id)
-	if err != nil {
-		return err
-	}
-	return refused(a.f.Issue.Resolve(session))
+	return refused(a.f.Issue.Resolve(id))
 }
 
 func (a api) IssueCancel(_ context.Context, id string) error {
-	session, err := a.latest(id)
-	if err != nil {
-		return err
-	}
-	a.f.Session.Dismiss(session)
-	return nil
+	return refused(a.f.Issue.Cancel(id))
 }
 
 func (a api) SessionStop(_ context.Context, id string) error {
@@ -261,7 +211,11 @@ func (a api) RuntimeRefresh(ctx context.Context, id string) (protocol.RuntimeInf
 }
 
 func (a api) RuntimeUpdate(ctx context.Context, id string, body protocol.RuntimeSettings) (protocol.RuntimeInfo, error) {
-	if info := a.f.Runtime.Update(ctx, id, body); info != nil {
+	info, err := a.f.Runtime.Update(ctx, id, body)
+	if err != nil {
+		return protocol.RuntimeInfo{}, err
+	}
+	if info != nil {
 		return *info, nil
 	}
 	return protocol.RuntimeInfo{}, missing("runtime " + id)

@@ -70,7 +70,7 @@ func memoryLikeness(a, b map[string]bool) float64 {
 	shared := termsInCommon(a, b)
 	all := len(a) + len(b) - shared
 	if all == 0 {
-		return 1
+		return 0
 	}
 	return float64(shared) / float64(all)
 }
@@ -86,12 +86,13 @@ func memoryIsNewNote(memories []protocol.Memory, text string, project *string) b
 }
 
 type memories struct {
+	db  *sql.DB
 	q   *generated.Queries
 	now func() int64
 }
 
 func newMemories(db *sql.DB) (*memories, error) {
-	return &memories{q: generated.New(db), now: clock.NowMs}, nil
+	return &memories{db: db, q: generated.New(db), now: clock.NowMs}, nil
 }
 func (*memories) OnStart(context.Context) error { return nil }
 func (*memories) OnStop()                       {}
@@ -180,6 +181,13 @@ func (m *memories) Keep(run FinishedRun) {
 }
 
 func (m *memories) keep(run FinishedRun) error {
+	tx, err := m.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	// Reading for deduplication, keeping notes and pruning are one durable change.
+	m = &memories{q: generated.New(tx), now: m.now}
 	known, err := m.list(run.Agent)
 	if err != nil {
 		return err
@@ -194,6 +202,7 @@ func (m *memories) keep(run FinishedRun) error {
 			if _, _, err := m.insertNote(run.Agent, note.Text, project, &session); err != nil {
 				return err
 			}
+			known = append(known, protocol.Memory{Kind: protocol.MemoryKindNote, Text: note.Text, Project: project})
 		}
 	}
 	ctx := context.Background()
@@ -203,7 +212,16 @@ func (m *memories) keep(run FinishedRun) error {
 	}); err != nil {
 		return err
 	}
-	return m.q.ForgetBeyond(ctx, generated.ForgetBeyondParams{Agent: run.Agent, Keep: protocol.MemoryKeep})
+	all, err := m.list(run.Agent)
+	if err != nil {
+		return err
+	}
+	for _, id := range nextForgotten(all, 0) {
+		if err := m.q.Forget(ctx, generated.ForgetParams{Agent: run.Agent, ID: id}); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // Fading marks the ones that would go if this many more were kept.

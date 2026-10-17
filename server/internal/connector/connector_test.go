@@ -15,6 +15,7 @@ import (
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
+	"vibevalley/pkg/db/generated"
 	"vibevalley/pkg/feishu"
 	"vibevalley/pkg/qq"
 	"vibevalley/pkg/weixin"
@@ -532,4 +533,83 @@ func TestConnectorsResumeAfterRestart(t *testing.T) {
 		got := voiceSaidIn(t, f, f.Channel.General())
 		return len(got) == 1 && got[0] == "又见面了"
 	})
+}
+
+func TestInboundDeduplicationFailureDoesNotExecute(t *testing.T) {
+	f := connectorTestFarm(t)
+	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
+	b.account = &voiceAccount{owner: voiceOwner}
+	var heard atomic.Int32
+	f.Connector.say = func(context.Context, string, *string) error { heard.Add(1); return nil }
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	b.got(ctx, voiceInbound{ID: "failed-read", From: voiceOwner, Text: "do work"})
+	if heard.Load() != 0 {
+		t.Fatal("executed despite failed duplicate check")
+	}
+	if b.err == "" {
+		t.Fatal("duplicate-check failure was hidden")
+	}
+}
+
+func TestConcurrentInboundIsTakenOnce(t *testing.T) {
+	f := connectorTestFarm(t)
+	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
+	b.account = &voiceAccount{owner: voiceOwner}
+	var heard atomic.Int32
+	f.Connector.say = func(context.Context, string, *string) error { heard.Add(1); return nil }
+	var workers sync.WaitGroup
+	for range 20 {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			b.got(context.Background(), voiceInbound{ID: "same-message", From: voiceOwner, Text: "do work"})
+		}()
+	}
+	workers.Wait()
+	if heard.Load() != 1 {
+		t.Fatalf("heard %d times", heard.Load())
+	}
+}
+
+func TestAccountChangeRollsBackWhenOutboxUpdateFails(t *testing.T) {
+	f, _ := voiceConnectorsFarm(t)
+	b := f.Connector.bridges[protocol.ConnectorIDQq]
+	in := protocol.ConnectorLogin{AppID: ptr.To("102"), Secret: ptr.To("right")}
+	f.Connector.Login(protocol.ConnectorIDQq, in)
+	voiceReaches(t, f, protocol.ConnectorIDQq, protocol.ConnectorStatePairing)
+	before := b.accountNow()
+	if _, err := f.DB.Exec(`CREATE TRIGGER fail_outbox BEFORE UPDATE ON connector_outbox BEGIN SELECT RAISE(ABORT, 'disk failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	message, err := f.Channel.Say("pending", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Connector.q.AddOutbox(context.Background(), generated.AddOutboxParams{ID: "pending-test", Connector: string(protocol.ConnectorIDQq), MessageID: message.ID, Body: "pending", CreatedAt: 1}); err != nil {
+		t.Fatal(err)
+	}
+	status := f.Connector.Logout(protocol.ConnectorIDQq)
+	if status.State != protocol.ConnectorStatePairing || status.Error == nil {
+		t.Fatalf("failed logout: %+v", status)
+	}
+	row, err := f.Connector.q.ConnectorAccount(context.Background(), string(protocol.ConnectorIDQq))
+	if err != nil || row.Secrets == "" {
+		t.Fatalf("account deletion was not rolled back: %+v %v", row, err)
+	}
+	if b.accountNow() == nil {
+		t.Fatal("failed logout forgot account")
+	}
+	// A new successful external login must not replace the durable account if retiring its outbox fails.
+	in.Force = ptr.To(true)
+	in.AppID = ptr.To("new-app")
+	f.Connector.Login(protocol.ConnectorIDQq, in)
+	status = voiceReaches(t, f, protocol.ConnectorIDQq, protocol.ConnectorStatePairing)
+	if status.Error == nil || b.accountNow().secrets["appId"] != before.secrets["appId"] {
+		t.Fatalf("failed login replaced account: %+v", status)
+	}
+	row, err = f.Connector.q.ConnectorAccount(context.Background(), string(protocol.ConnectorIDQq))
+	if err != nil || strings.Contains(row.Secrets, "new-app") {
+		t.Fatalf("failed login committed: %+v %v", row, err)
+	}
 }

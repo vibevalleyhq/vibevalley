@@ -22,19 +22,6 @@ final menuOpenProvider = held(false);
 
 final farmEffectsProvider = Provider<Stream<GameEffect>>((ref) => farmEffects(ref.watch(serverProvider)));
 
-class BedEffect {
-  const BedEffect(this.bed, this.kind, [this.text]);
-  final int bed;
-  final BedFxKind kind;
-  final String? text;
-}
-
-class PlotResult {
-  const PlotResult(this.result, this.effects);
-  final ToolResult result;
-  final List<BedEffect> effects;
-}
-
 class BedFxEntry {
   const BedFxEntry(this.id, this.bed, this.kind, this.text);
   final int id;
@@ -69,19 +56,14 @@ class Timed<T> extends Notifier<List<T>> {
   }
 }
 
-var _fxIds = 0;
+class BedEffects extends Timed<BedFxEntry> {
+  BedEffects() : super(const Duration(milliseconds: 2200));
+  int _next = 0;
 
-final bedFxProvider = NotifierProvider<Timed<BedFxEntry>, List<BedFxEntry>>(() => Timed(const Duration(milliseconds: 2200)));
-
-void burst(WidgetRef ref, int bed, BedFxKind kind, [String? text]) => ref.read(bedFxProvider.notifier).push(BedFxEntry(++_fxIds, bed, kind, text));
-
-void applyBedEffects(WidgetRef ref, Iterable<BedEffect> effects) {
-  for (final fx in effects) {
-    burst(ref, fx.bed, fx.kind, fx.text);
-  }
+  void emit(int bed, BedFxKind kind, [String? text]) => push(BedFxEntry(++_next, bed, kind, text));
 }
 
-void fireBedEffects(WidgetRef ref, Future<List<BedEffect>> call) => unawaited(call.then((effects) => applyBedEffects(ref, effects), onError: (Object _) {}));
+final bedFxProvider = NotifierProvider<BedEffects, List<BedFxEntry>>(BedEffects.new);
 
 final rewardsProvider = NotifierProvider<Timed<GameEffectReward>, List<GameEffectReward>>(() => Timed(const Duration(milliseconds: 4000)));
 

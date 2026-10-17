@@ -281,7 +281,10 @@ func TestMergeClearsTheWorktree(t *testing.T) {
 	w := openWorld(t, home, work)
 	session := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "写打卡并提交", "clock", session.HireOptions{}))
 	w.nextReport(t)
-	said := w.f.Issue.Merge(session.ID)
+	said, err := w.f.Issue.Merge(*session.Issue)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if session.Branch == nil || !strings.HasPrefix(*session.Branch, "vibevalley/") {
 		t.Fatal("it worked on a branch of its own")
 	}
@@ -299,7 +302,7 @@ func TestMergeGoesInTheLedger(t *testing.T) {
 	w := openWorld(t, home, work)
 	session := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "写打卡并提交", "ledger", session.HireOptions{}))
 	w.nextReport(t)
-	w.f.Issue.Merge(session.ID)
+	w.f.Issue.Merge(*session.Issue)
 	entries := func() int {
 		var n int
 		if err := w.f.DB.QueryRow(`select count(*) from game_ledger where kind = 'harvested' and payload like ?`, `%"session":"`+session.ID+`"%`).Scan(&n); err != nil {
@@ -325,7 +328,7 @@ func TestIssueClosesAndReopens(t *testing.T) {
 	if _, err := w.f.Issue.Reopen(context.Background(), session.ID, "", ""); !errors.As(err, &refused) {
 		t.Fatalf("an open issue: %v", err)
 	}
-	w.f.Issue.Merge(session.ID)
+	w.f.Issue.Merge(*session.Issue)
 	ended := w.f.Session.Get(session.ID)
 	if closed, ok := ended.Phase.Value.(protocol.PhaseClosed); !ok || closed.Closed != protocol.IssueCloseMerged || ended.LastRun == nil ||
 		ended.LastRun.Outcome != protocol.OutcomeCompleted || ended.LastRun.Summary == "" || ended.Runs != 1 || ended.Issue == nil || *ended.Issue != *session.Issue {
@@ -497,14 +500,15 @@ func TestIssueKnowsItsPlaybook(t *testing.T) {
 func TestRestartSessionsComeBackResting(t *testing.T) {
 	home, work := dirs(t)
 	lab := fixture.Lab(t)
-	first := openWorld(t, home, work)
+	db := filepath.Join(home, "vibevalley.db")
+	first := openWorldAt(t, home, work, db)
 	// Waking reads the agent from the store, as in real use: keep the script-friendly one there.
 	first.f.Agent.SaveAgent(lab)
 	session := mustHire(t, first.f.Issue.Hire(context.Background(), lab, "先写一点并提交", "survivor", session.HireOptions{}))
 	first.nextReport(t)
 	first.stop()
 
-	second := openWorld(t, home, work)
+	second := openWorldAt(t, home, work, db)
 	back := second.f.Session.Find(session.ID)
 	if back == nil {
 		t.Fatal("the session came back")
@@ -515,7 +519,7 @@ func TestRestartSessionsComeBackResting(t *testing.T) {
 	testkit.Eq(t, back.Place.Branch, *session.Branch, "on its own branch still")
 	testkit.Match(t, second.f.Session.Tell(session.ID, "再加一句并提交", protocol.RunTrigger{Kind: protocol.RunTriggerKindComment}), `醒了`, "woke")
 	second.nextReport(t)
-	testkit.Match(t, second.f.Issue.Merge(session.ID), `个提交合进了 survivor 的 main`, "merged")
+	testkit.Match(t, mustMerge(t, second.f, *session.Issue), `个提交合进了 survivor 的 main`, "merged")
 }
 
 func TestEveryStepKeptInItsTrajectory(t *testing.T) {
@@ -611,7 +615,8 @@ func TestNobodySentWhenMoneyRunsOut(t *testing.T) {
 	testkit.Match(t, hire().Refused, `余额用完了`, "balance")
 
 	capped := info
-	capped.Settings.DailyBudget, capped.SpentToday = ptr.To[float64](1), ptr.To[float64](1.2)
+	capped.Settings.DailyBudget = ptr.To[float64](1)
+	w.f.Runtime.Spend(capped.ID, 1.2)
 	w.setInfo(capped)
 	testkit.Match(t, hire().Refused, `每日预算 ¥1\.00`, "budget")
 
@@ -630,7 +635,7 @@ func TestNobodySentWhenMoneyRunsOut(t *testing.T) {
 	testkit.Eq(t, hire().Refused, "", "a window not quite used up is fine")
 
 	under := info
-	under.Settings.DailyBudget, under.SpentToday = ptr.To[float64](1), ptr.To[float64](0.4)
+	under.Settings.DailyBudget = ptr.To[float64](2)
 	w.setInfo(under)
 	testkit.Eq(t, hire().Refused, "", "under the budget is fine")
 }
@@ -664,8 +669,8 @@ func TestChangesBeforeAMerge(t *testing.T) {
 	w := openWorld(t, home, work)
 	session := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "写打卡并提交", "preview", session.HireOptions{}))
 	w.nextReport(t)
-	changes, err := w.f.Issue.Changes(session.ID, protocol.CallerManager)
-	if err != nil || changes == nil {
+	changes, err := w.f.Issue.Changes(*session.Issue, protocol.CallerManager)
+	if err != nil {
 		t.Fatalf("changes: %v", err)
 	}
 	w.f.Session.Dismiss(session.ID)
@@ -689,24 +694,28 @@ func TestConflictingBranchStaysUntilResolved(t *testing.T) {
 	b := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "写版本B并提交", "clash", session.HireOptions{}))
 	w.nextReport(t)
 	w.nextReport(t)
-	testkit.Match(t, w.f.Issue.Merge(a.ID), `个提交合进了 clash 的 main`, "first")
-	preview, _ := w.f.Issue.Changes(b.ID, protocol.CallerManager)
+	testkit.Match(t, mustMerge(t, w.f, *a.Issue), `个提交合进了 clash 的 main`, "first")
+	preview, _ := w.f.Issue.Changes(*b.Issue, protocol.CallerManager)
 	testkit.Eq(t, preview.Conflicts, []string{"same.ts"}, "the preview saw it coming")
-	testkit.Match(t, w.f.Issue.Merge(b.ID), `会冲突（same\.ts）`, "second")
+	_, mergeErr := w.f.Issue.Merge(*b.Issue)
+	if mergeErr == nil {
+		t.Fatal("conflicting harvest must return an error")
+	}
+	testkit.Match(t, mergeErr.Error(), `会冲突（same\.ts）`, "second")
 	stayed := w.f.Session.Find(b.ID)
 	if stayed == nil {
 		t.Fatal("the session is still on the farm")
 	}
 	testkit.Eq(t, *stayed.Session.Conflict, protocol.Conflict{Base: "main", Files: []string{"same.ts"}}, "flag")
-	if err := w.f.Issue.Resolve(a.ID); err == nil {
+	if err := w.f.Issue.Resolve(*a.Issue); err == nil {
 		t.Fatal("a session with nothing in the way was asked to resolve")
 	}
 	// The owner's 让它解决冲突: the server says which conflicts, in the owner's words.
-	if err := w.f.Issue.Resolve(b.ID); err != nil {
+	if err := w.f.Issue.Resolve(*b.Issue); err != nil {
 		t.Fatal(err)
 	}
 	w.nextReport(t)
-	testkit.Match(t, w.f.Issue.Merge(b.ID), `合进了 clash 的 main`, "third")
+	testkit.Match(t, mustMerge(t, w.f, *b.Issue), `合进了 clash 的 main`, "third")
 	project := filepath.Join(work, "clash")
 	testkit.Eq(t, testkit.Git(t, project, "show", "main:same.ts"), "export const v = 'A+B'", "both versions")
 	testkit.Eq(t, testkit.Git(t, project, "status", "--porcelain"), "", "main is clean: nothing half-merged")
@@ -872,7 +881,7 @@ func TestAScheduleKeepsOneIssue(t *testing.T) {
 	testkit.Until(t, "a second run", func() bool { return len(runs()) == 2 && runs()[1].EndedAt != nil })
 	testkit.Eq(t, runs()[1].TriggeredBy.Kind, protocol.RunTriggerKindSchedule, "started by the schedule")
 
-	w.f.Issue.Merge(first.Sessions[0])
+	w.f.Issue.Merge(first.ID)
 	testkit.Until(t, "merged", func() bool { return ofSchedule().Status == protocol.IssueStatusDone })
 	due()
 	w.nextReport(t)
@@ -946,4 +955,13 @@ func TestEndedSessionsAreRows(t *testing.T) {
 	}
 	testkit.Eq(t, ids, []string{s.ID}, "newest first")
 	testkit.Eq(t, len(w.f.Session.List(lab.ID)), 1, "by agent")
+}
+
+func mustMerge(t *testing.T, f *Workspace, id string) string {
+	t.Helper()
+	said, err := f.Issue.Merge(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return said
 }

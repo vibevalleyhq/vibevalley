@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/AgoraIO/agora-agents-go/v2/agentkit"
 	"github.com/AgoraIO/agora-agents-go/v2/agentkit/vendors"
 	sdkcore "github.com/AgoraIO/agora-agents-go/v2/core"
 	"github.com/AgoraIO/agora-agents-go/v2/option"
@@ -111,20 +110,8 @@ func voiceVendorsFor(voice protocol.VoiceSettings, keys setting.VoiceKeys, deeps
 
 // Read at each start: a change takes effect on the next call. Captions go over the RTC data stream: Agora's Flutter RTM is
 // Android and iOS only, and the client runs on macOS.
-func voiceAgentFor(client *agentkit.AgoraClient, voice protocol.VoiceSettings, v agora.Vendors) *agentkit.Agent {
-	return agora.NewAgent(client, agora.Agent{
-		Language: string(voice.Language), Persona: voice.Persona, InterruptMs: voice.InterruptMs, SilenceMs: voice.SilenceMs,
-		Captions: agora.CaptionsDataStream,
-	}, v)
-}
-
-// No caller since the embedding host with native voice (MyGo) was removed.
-type VoiceNative struct {
-	Credentials agora.Credentials
-	Area        option.Area
-	IdleSeconds int
-	Agent       func(client *agentkit.AgoraClient) *agentkit.Agent
-	Done        func()
+func voiceAgentConfig(voice protocol.VoiceSettings) agora.Agent {
+	return agora.Agent{Language: string(voice.Language), Persona: voice.Persona, InterruptMs: voice.InterruptMs, SilenceMs: voice.SilenceMs, Captions: agora.CaptionsDataStream}
 }
 
 type voice struct {
@@ -135,13 +122,20 @@ type voice struct {
 	http      sdkcore.HTTPClient
 
 	mu    sync.Mutex
-	lines map[string]string
-	// The calls on that Agora's model answers, and the greeting each says at pickup: their words reach 田头 only through Said.
-	quick map[string]string
+	calls map[string]voiceCall
+}
+
+type voiceCall struct {
+	client  *agora.Client
+	release func()
+	// Agora's model answers, so its words reach 田头 only through Said; the manager's own reach it as it says them.
+	quick bool
+	// Said at every pickup; not worth keeping in 田头.
+	greeting string
 }
 
 func newVoice(core *core.Service, settings *setting.Service, chat *channel.Service, line *voiceLine) (*voice, error) {
-	return &voice{core: core, settings: settings, chat: chat, voiceLine: line, http: &http.Client{Timeout: 25 * time.Second}, lines: map[string]string{}, quick: map[string]string{}}, nil
+	return &voice{core: core, settings: settings, chat: chat, voiceLine: line, http: &http.Client{Timeout: 25 * time.Second}, calls: map[string]voiceCall{}}, nil
 }
 func (*voice) OnStart(context.Context) error { return nil }
 func (*voice) OnStop()                       {}
@@ -177,28 +171,8 @@ func (v *voice) Renew(ctx context.Context, channel, uid string) (protocol.AgoraT
 	return v.issue(channel, uid)
 }
 
-func (v *voice) client(c agora.Credentials, area protocol.Area) *agentkit.AgoraClient {
+func (v *voice) client(c agora.Credentials, area protocol.Area) *agora.Client {
 	return agora.NewClient(c, voiceAreaOf(area), v.http)
-}
-
-func (v *voice) prepare() (protocol.VoiceSettings, *CallLine, agora.Vendors, error) {
-	voice := v.settings.Voice()
-	var line *CallLine
-	if _, ok := voice.Answer.Value.(protocol.VoiceAnswerManager); ok {
-		opened, err := v.voiceLine.Open()
-		if err != nil {
-			return voice, nil, agora.Vendors{}, protocol.VoiceUnavailable{Reason: "管家的语音线路接不通：" + err.Error()}
-		}
-		line = &opened
-	}
-	vendors, problem := voiceVendorsFor(voice, v.settings.VoiceKeys(), v.settings.DeepseekAPIKey(), line)
-	if problem != "" {
-		if line != nil {
-			v.voiceLine.Close(line.ID)
-		}
-		return voice, nil, agora.Vendors{}, protocol.VoiceUnavailable{Reason: problem}
-	}
-	return voice, line, vendors, nil
 }
 
 func (v *voice) Start(ctx context.Context, channel, uid string) (protocol.VoiceAgent, error) {
@@ -209,102 +183,77 @@ func (v *voice) Start(ctx context.Context, channel, uid string) (protocol.VoiceA
 	return agent, err
 }
 
-func (v *voice) start(ctx context.Context, channel, uid string) (protocol.VoiceAgent, error) {
+func (v *voice) start(ctx context.Context, channel, uid string) (result protocol.VoiceAgent, err error) {
 	c, err := v.creds()
 	if err != nil {
-		return protocol.VoiceAgent{}, err
+		return result, err
 	}
-	voice, line, vendors, err := v.prepare()
-	if err != nil {
-		return protocol.VoiceAgent{}, err
-	}
-	idle := int(voice.IdleSeconds)
-	session := voiceAgentFor(v.client(c, voice.Area), voice, vendors).CreateSession(agentkit.CreateSessionOptions{
-		Channel:     channel,
-		AgentUID:    protocol.VoiceAgentUID,
-		RemoteUIDs:  []string{uid},
-		IdleTimeout: &idle,
-		ExpiresIn:   3600,
-	})
-	id, err := session.Start(ctx)
-	if err != nil {
-		if line != nil {
-			v.voiceLine.Close(line.ID)
+	config := v.settings.VoiceConfig()
+	settings := config.Voice
+	var line *CallLine
+	release := func() {}
+	if _, ok := settings.Answer.Value.(protocol.VoiceAnswerManager); ok {
+		opened, err := v.voiceLine.Open()
+		if err != nil {
+			return result, protocol.VoiceUnavailable{Reason: "管家的语音线路接不通：" + err.Error()}
 		}
-		return protocol.VoiceAgent{}, protocol.VoiceAgentFailed{Reason: "请管家进频道失败：" + err.Error()}
+		line = &opened
+		var once sync.Once
+		release = func() { once.Do(func() { v.voiceLine.Close(opened.ID) }) }
+	}
+	defer func() {
+		if err != nil {
+			release()
+		}
+	}()
+	vendors, problem := voiceVendorsFor(settings, config.Keys, config.DeepseekAPIKey, line)
+	if problem != "" {
+		return result, protocol.VoiceUnavailable{Reason: problem}
+	}
+	client := v.client(c, settings.Area)
+	id, err := client.Start(ctx, voiceAgentConfig(settings), vendors, agora.Session{Channel: channel, AgentUID: protocol.VoiceAgentUID, UID: uid, IdleSeconds: int(settings.IdleSeconds)})
+	if err != nil {
+		return result, protocol.VoiceAgentFailed{Reason: "请管家进频道失败：" + err.Error()}
 	}
 	v.mu.Lock()
-	if line != nil {
-		v.lines[id] = line.ID
-	} else {
-		v.quick[id] = strings.TrimSpace(voice.Greeting)
-	}
+	v.calls[id] = voiceCall{client: client, release: release, quick: line == nil, greeting: strings.TrimSpace(settings.Greeting)}
 	v.mu.Unlock()
 	return protocol.VoiceAgent{AgentID: id}, nil
 }
 
-// Only a call still on, that Agora's model answers: a late turn after hangup, or the manager's words, are not kept twice. The greeting
-// is said at every pickup and not kept.
+// Only a call still on, that Agora's model answers: a late turn after hangup, or the manager's words, are not kept twice.
 func (v *voice) Said(agentID, text string) error {
 	v.mu.Lock()
-	greeting, quick := v.quick[agentID]
-	_, managed := v.lines[agentID]
+	call, ok := v.calls[agentID]
 	v.mu.Unlock()
-	if !quick && !managed {
+	if !ok {
 		return protocol.VoiceAgentFailed{Reason: "这通电话已经挂了"}
 	}
-	if quick && strings.TrimSpace(text) != greeting {
+	if call.quick && strings.TrimSpace(text) != call.greeting {
 		v.chat.Spoken(protocol.ManagerAgent, text)
 	}
 	return nil
 }
 
-// Its voice line closes whatever Agora says.
+// A call keeps the client it started with, even when settings change before hangup.
 func (v *voice) Stop(ctx context.Context, agentID string) error {
-	defer func() {
-		v.mu.Lock()
-		line, ok := v.lines[agentID]
-		delete(v.lines, agentID)
-		delete(v.quick, agentID)
-		v.mu.Unlock()
-		if ok {
-			v.voiceLine.Close(line)
+	v.mu.Lock()
+	call, ok := v.calls[agentID]
+	v.mu.Unlock()
+	if ok {
+		defer call.release()
+	} else {
+		c, err := v.creds()
+		if err != nil {
+			return err
 		}
-	}()
-	c, err := v.creds()
-	if err != nil {
-		return err
+		call.client = v.client(c, v.settings.Voice().Area)
 	}
-	if err := v.client(c, v.settings.Voice().Area).StopAgent(ctx, agentID); err != nil && !agora.AlreadyStopping(err) {
+	if err := call.client.Stop(ctx, agentID); err != nil {
 		return protocol.VoiceAgentFailed{Reason: "请管家离开失败：" + err.Error()}
 	}
+	v.mu.Lock()
+	delete(v.calls, agentID)
+	v.mu.Unlock()
 	return nil
-}
-
-// No caller since MyGo was removed.
-func (v *voice) Native() (VoiceNative, error) {
-	c, err := v.creds()
-	if err != nil {
-		return VoiceNative{}, err
-	}
-	voice, line, vendors, err := v.prepare()
-	if err != nil {
-		return VoiceNative{}, err
-	}
-	var once sync.Once
-	return VoiceNative{
-		Credentials: c,
-		Area:        voiceAreaOf(voice.Area),
-		IdleSeconds: int(voice.IdleSeconds),
-		Agent: func(client *agentkit.AgoraClient) *agentkit.Agent {
-			return voiceAgentFor(client, voice, vendors)
-		},
-		Done: func() {
-			once.Do(func() {
-				if line != nil {
-					v.voiceLine.Close(line.ID)
-				}
-			})
-		},
-	}, nil
 }

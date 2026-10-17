@@ -41,7 +41,7 @@ class ChatVoiceToggle extends ConsumerWidget {
         ? const Color(0xFFC9813A)
         : Palette.leaf500;
     return KitTappable(
-      onTap: leaving ? null : () => unawaited(live || joining ? call.end() : call.start()),
+      onTap: leaving ? null : () => unawaited(call.toggle()),
       tooltip: tip,
       semanticLabel: live || joining ? '挂断语音' : '语音说话',
       selected: live,

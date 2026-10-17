@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../data/providers.dart';
 import '../data/ui_state.dart';
 import '../chat/chat_state.dart' show chatActionsProvider, chatOpenProvider;
-import '../data/remote.dart' show workStepsProvider;
+import '../data/remote.dart' show sessionEventsProvider;
 import '../shared/work_log.dart' show WorkLog;
 import '../game/commands.dart';
 import '../game/tools.dart';
@@ -36,16 +36,9 @@ class PlotDetail extends ConsumerStatefulWidget {
 class _PlotDetailState extends ConsumerState<PlotDetail> {
   var _text = '';
 
-  @override
-  void initState() {
-    super.initState();
-    // The server keeps every step: loaded in full when the panel opens, kept up by step events.
-    ref.read(workStepsProvider.notifier).load(widget.session.id).then((_) {}, onError: (Object _) {});
-  }
-
   void _send() {
     if (_text.trim().isEmpty) return;
-    fireBedEffects(ref, ref.read(farmCommandsProvider).water(widget.session, _text));
+    fire(ref.read(farmCommandsProvider).water(widget.session, _text));
     setState(() => _text = '');
   }
 
@@ -57,7 +50,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
     final view = ref.watch(viewProvider);
     final plot = view == null ? const PlotView(crop: Crop.empty) : plotOf(view, session);
     final cast = castOf(agent?.look, session.agent);
-    final log = ref.watch(workStepsProvider.select((all) => all[session.id]));
+    final log = ref.watch(sessionEventsProvider(session.id)).value;
     final hasThread = ref.watch(stateProvider.select((s) => jobThreadOf(s?.chat, session.id)?.id));
     final station = stationOfSession(session);
     final working = isBusy(session);
@@ -228,7 +221,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  PxButton.text('让它解决冲突', tone: PxTone.danger, onPressed: () => fireBedEffects(ref, commands.resolve(session))),
+                  PxButton.text('让它解决冲突', tone: PxTone.danger, onPressed: () => fire(commands.resolve(session))),
                 ],
               ),
             ),
@@ -249,7 +242,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            if (plot.crop == Crop.withered) PxButton.text('杀虫：接着修', tone: PxTone.danger, onPressed: () => fireBedEffects(ref, commands.cure(session))),
+            if (plot.crop == Crop.withered) PxButton.text('杀虫：接着修', tone: PxTone.danger, onPressed: () => fire(commands.cure(session))),
             if (canHarvest(session) && session.playbook == null)
               PxButton.text(
                 '收获…',
@@ -308,7 +301,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                 steps: log,
                 now: now,
                 working: session.phase is PhaseWorking,
-                onComment: (step, text) async => applyBedEffects(ref, await ref.read(farmCommandsProvider).water(session, text, on: step)),
+                onComment: (step, text) => ref.read(farmCommandsProvider).water(session, text, on: step),
               ),
             ),
           )

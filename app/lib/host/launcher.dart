@@ -1,6 +1,7 @@
 // SIGTERM first: the server saves on the way out. Plain dart:io, no Flutter: test/host/launcher_test.dart drives it with a fake server script.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 class ServerFailed implements Exception {
@@ -24,7 +25,7 @@ Future<bool> answersHealth(Uri base, {Duration timeout = const Duration(millisec
   try {
     final request = await client.getUrl(base.resolve('/api/v1/health')).timeout(timeout);
     final response = await request.close().timeout(timeout);
-    await response.drain<void>();
+    await response.drain<void>().timeout(timeout);
     return response.statusCode == 200;
   } on Object {
     return false;
@@ -121,15 +122,25 @@ class ServerLauncher {
     await logFile.parent.create(recursive: true);
     final log = logFile.openWrite(mode: FileMode.append);
     log.writeln('--- ${DateTime.now().toIso8601String()} vibevalley: starting $binary on 127.0.0.1:$port');
-    final process = await Process.start(
-      binary,
-      const [],
-      workingDirectory: workingDirectory,
-      environment: {...environment, 'VIBEVALLEY_PORT': '$port'},
-      includeParentEnvironment: false,
-    );
-    final drained = Future.wait([process.stdout.forEach(log.add), process.stderr.forEach(log.add)]).then<void>((_) {}, onError: (_) {});
-    return RunningServer._(process, Uri.parse('http://127.0.0.1:$port'), log, drained, stopTimeout);
+    try {
+      await log.flush();
+      final process = await Process.start(
+        binary,
+        const [],
+        workingDirectory: workingDirectory,
+        environment: {...environment, 'VIBEVALLEY_PORT': '$port'},
+        includeParentEnvironment: false,
+      );
+      final drained = Future.wait([process.stdout.forEach(log.add), process.stderr.forEach(log.add)]).then<void>((_) {}, onError: (_) {});
+      return RunningServer._(process, Uri.parse('http://127.0.0.1:$port'), log, drained, stopTimeout);
+    } on Object catch (error) {
+      try {
+        await log.close();
+      } on Object {
+        // Report the launch failure even when the log cannot be closed.
+      }
+      throw ServerFailed('服务端启动失败：$error，日志在 ${logFile.path}');
+    }
   }
 
   Future<ServerFailed?> _waitUntilUp(RunningServer server) async {
@@ -147,15 +158,25 @@ class ServerLauncher {
 const _mark = '__VIBEVALLEY_PATH__';
 
 /// An app opened from Finder or at login gets a bare PATH, without the places pi, claude and codex are installed.
-Future<String> loginShellPath(String fallback, {String? shell}) async {
+Future<String> loginShellPath(String fallback, {String? shell, Duration timeout = const Duration(seconds: 5)}) async {
+  Process? process;
+  StreamSubscription<String>? output;
+  StreamSubscription<List<int>>? errors;
   try {
-    final result = await Process.run(shell ?? Platform.environment['SHELL'] ?? '/bin/zsh', [
-      '-ilc',
-      "printf '$_mark%s$_mark' \"\$PATH\"",
-    ]).timeout(const Duration(seconds: 5));
-    final match = RegExp('$_mark(.*)$_mark', dotAll: true).firstMatch('${result.stdout}');
+    process = await Process.start(shell ?? Platform.environment['SHELL'] ?? '/bin/zsh', ['-ilc', "printf '$_mark%s$_mark' \"\$PATH\""]);
+    final text = StringBuffer();
+    final drained = Completer<void>();
+    output = process.stdout.transform(utf8.decoder).listen(text.write, onDone: drained.complete, onError: drained.completeError, cancelOnError: true);
+    errors = process.stderr.listen((_) {});
+    await Future.wait([process.exitCode, drained.future]).timeout(timeout);
+    final match = RegExp('$_mark(.*)$_mark', dotAll: true).firstMatch(text.toString());
     return match?.group(1) ?? fallback;
   } on Object {
+    process?.kill(ProcessSignal.sigkill);
+    await process?.exitCode;
     return fallback;
+  } finally {
+    await output?.cancel();
+    await errors?.cancel();
   }
 }

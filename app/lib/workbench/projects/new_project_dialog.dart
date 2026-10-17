@@ -7,19 +7,13 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import 'codebase.dart';
-import 'projects_state.dart';
-import '../shared/widgets.dart';
+import '../../data/remote.dart';
 
-Future<void> showNewProjectDialog(BuildContext context) => showPxDialog<void>(
-  context,
-  title: const Text('新增项目'),
-  builder: (_) => NewProjectForm(onDone: (name) => workbenchGo(context, '/projects/${Uri.encodeComponent(name)}')),
-);
+Future<ProjectSummary?> showNewProjectDialog(BuildContext context) =>
+    showPxDialog<ProjectSummary>(context, title: const Text('新增项目'), builder: (_) => const NewProjectForm());
 
 class NewProjectForm extends ConsumerStatefulWidget {
-  const NewProjectForm({super.key, required this.onDone});
-
-  final ValueChanged<String> onDone;
+  const NewProjectForm({super.key});
 
   @override
   ConsumerState<NewProjectForm> createState() => _NewProjectFormState();
@@ -53,10 +47,9 @@ class _NewProjectFormState extends ConsumerState<NewProjectForm> {
         }
         return;
       }
-      final project = await ref.read(projectsProvider.notifier).create(_request);
+      final project = await ref.read(projectCatalogProvider.notifier).create(_request);
       if (!mounted) return;
-      Navigator.of(context).pop();
-      widget.onDone(project.name);
+      Navigator.of(context).pop(project);
     } catch (e) {
       if (mounted) {
         setState(() {

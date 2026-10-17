@@ -1,3 +1,4 @@
+import '../../data/remote.dart' show projectNamesProvider;
 // A channel has no members to pick: helpers are in the channel their job was arranged in.
 
 import 'package:flutter/material.dart';
@@ -53,7 +54,7 @@ class _ProjectInput extends ConsumerWidget {
     onChanged: onChanged,
     placeholder: '比如 clock-in',
     semanticLabel: '默认项目',
-    suggestions: ref.watch(chatProjectNamesProvider).value ?? const [],
+    suggestions: ref.watch(projectNamesProvider).value ?? const [],
   );
 }
 

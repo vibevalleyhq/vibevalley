@@ -195,14 +195,66 @@ func TestVoiceLineQuickTunnelLingersAfterTheLastCall(t *testing.T) {
 	}
 }
 
+func TestVoiceLineCannotReopenAfterStop(t *testing.T) {
+	f := voiceTestFarm(t)
+	if err := f.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	line, err := f.Voice.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Voice.voiceLine.OnStop()
+	if _, err := f.Voice.Open(); err == nil {
+		t.Fatal("stopped line reopened")
+	}
+	f.Voice.voiceLine.mu.Lock()
+	_, exists := f.Voice.keys[line.ID]
+	f.Voice.voiceLine.mu.Unlock()
+	if exists {
+		t.Fatal("stop retained call key")
+	}
+}
+
+func TestVoiceLineExpiredTimerCannotCloseReopenedTunnel(t *testing.T) {
+	f := voiceTestFarm(t)
+	f.Voice.url = ""
+	closed := 0
+	f.Voice.openTunnel = func(int) (*voiceTunnel, error) {
+		return &voiceTunnel{url: "https://quick.example.com", close: func() { closed++ }}, nil
+	}
+	if err := f.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	a, err := f.Voice.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Voice.Close(a.ID)
+	old := f.Voice.generation
+	b, err := f.Voice.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Voice.Close(b.ID)
+	f.Voice.expire(old)
+	if closed != 0 {
+		t.Fatal("a stale timer closed a renewed tunnel")
+	}
+	f.Voice.expire(f.Voice.generation)
+	if closed != 1 {
+		t.Fatal("current idle timer did not close tunnel")
+	}
+}
+
 func TestVoiceKeepsWhatAgorasModelSaidOnALiveCall(t *testing.T) {
 	f := voiceTestFarm(t)
 	if err := f.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	f.Voice.voice.mu.Lock()
-	f.Voice.quick["quick"] = "来啦"
-	f.Voice.lines["manager"] = "l1"
+	f.Voice.calls["quick"] = voiceCall{quick: true, greeting: "来啦"}
+	f.Voice.calls["manager"] = voiceCall{}
 	f.Voice.voice.mu.Unlock()
 	if err := f.Voice.Said("gone", "晚到的一句"); err == nil {
 		t.Fatal("a call that is over still keeps words")

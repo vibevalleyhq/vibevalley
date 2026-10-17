@@ -16,6 +16,9 @@ type Project struct {
 type Merged struct {
 	Text    string
 	Commits int
+	Hashes  []string
+	// Publication succeeded; these resources could not be removed.
+	Warning string
 }
 
 type MergeFailure struct {

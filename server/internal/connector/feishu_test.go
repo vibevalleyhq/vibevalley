@@ -59,7 +59,7 @@ func TestFeishuReceivingQueuesWhatTheSDKHandsOver(t *testing.T) {
 		busy  int
 		worst int
 	)
-	io := voiceReceiving{Got: func(m voiceInbound) {
+	io := voiceReceiving{Got: func(m voiceInbound) error {
 		mu.Lock()
 		busy++
 		worst = max(worst, busy)
@@ -71,6 +71,7 @@ func TestFeishuReceivingQueuesWhatTheSDKHandsOver(t *testing.T) {
 		mu.Lock()
 		busy--
 		mu.Unlock()
+		return nil
 	}}
 	ctx, cancel := context.WithCancel(context.Background())
 	stopped := make(chan *voiceFailure)
@@ -114,7 +115,7 @@ func TestFeishuReceivingQueuesWhatTheSDKHandsOver(t *testing.T) {
 
 func TestFeishuReceivingFailsWhenTheConnectionDrops(t *testing.T) {
 	api := voiceSDKFeishu{fail: errors.New("飞书长连接断了：bye"), returned: make(chan time.Duration, 1)}
-	failure := voiceFeishuAdapter{c: &Service{feishu: api}}.Receive(context.Background(), map[string]string{}, voiceReceiving{Got: func(voiceInbound) {}})
+	failure := voiceFeishuAdapter{c: &Service{feishu: api}}.Receive(context.Background(), map[string]string{}, voiceReceiving{Got: func(voiceInbound) error { return nil }})
 	if failure == nil || failure.Kind != "failed" || failure.Reason != "飞书长连接断了：bye" {
 		t.Fatalf("failure: %+v", failure)
 	}

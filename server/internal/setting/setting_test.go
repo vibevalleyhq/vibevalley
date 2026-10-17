@@ -176,7 +176,7 @@ func TestSettingsVoiceVendorKeysAreHints(t *testing.T) {
 	if body, _ := json.Marshal(after); strings.Contains(string(body), "azure-speech-key") {
 		t.Fatal("the key itself never goes to a page")
 	}
-	if got := s.VoiceKeys(); !reflect.DeepEqual(got, VoiceKeys{TTSKey: "azure-speech-key-9f3a"}) {
+	if got := s.VoiceConfig().Keys; !reflect.DeepEqual(got, VoiceKeys{TTSKey: "azure-speech-key-9f3a"}) {
 		t.Fatalf("keys: %+v", got)
 	}
 	voiceSame(t, voiceReadSettings(filepath.Join(home, "settings.json")).Voice, map[string]any{"tts": map[string]any{"vendor": "microsoft", "region": "eastasia", "voiceName": "zh-CN-XiaoxiaoNeural"}}, "the file")

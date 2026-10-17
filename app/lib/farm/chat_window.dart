@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../chat/channel_menu.dart';
 import '../chat/chat_rules.dart';
 import '../chat/chat_state.dart';
+import '../data/messages.dart';
 import '../chat/turn_steps.dart';
 import '../chat/chat_widgets.dart';
 import '../gen/vibevalley.dart';
@@ -86,12 +87,11 @@ const _phaseRing = {
 };
 
 class ChatWindow extends ConsumerStatefulWidget {
-  const ChatWindow({super.key, required this.state, required this.atlas, required this.agents, required this.onSay, required this.call});
+  const ChatWindow({super.key, required this.state, required this.atlas, required this.agents, required this.call});
   final CoreState state;
   final SpriteAtlas atlas;
   final Map<String, Agent> agents;
 
-  final Future<void> Function(String text) onSay;
   final VoiceCall call;
 
   @override
@@ -102,7 +102,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
   final _naming = Naming();
   final _scroll = ScrollController();
   String? _problem;
-  String? _marked;
   String? _shownId;
   bool _skipHeaderTap = false;
   (Duration, Offset)? _lastHeaderUp;
@@ -149,17 +148,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
   void _send(Conversation? conversation, [String? line]) {
     final said = (line ?? _naming.text.text).trim();
     if (said.isEmpty) return;
-    final actions = ref.read(chatActionsProvider);
-    final Future<void> sent;
-    if (conversation != null && conversation.kind != ConversationKind.general) {
-      sent = actions.sayIn(conversation.id, said);
-    } else if (actions.pickedAgent() != null) {
-      sent = actions.talk(said);
-    } else {
-      sent = () async {
-        if (await actions.whenLive()) await widget.onSay(said);
-      }();
-    }
+    final sent = ref.read(messagesProvider).send(said, conversation: conversation);
     if (line == null) _naming.clear();
     setState(() => _problem = null);
     unawaited(
@@ -389,25 +378,16 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
   }
 
   Widget _messages(Chat? chat, Conversation? conversation, ChatPhase phase) {
-    final lines = ref.watch(spokenProvider);
-    final more = conversation == null ? null : ref.watch(chatLoadedProvider)[conversation.id];
-    final items = itemsOf(chat, conversation, lines, more);
-    final parent = conversation?.kind == ConversationKind.thread ? parentOf(chat, conversation!, more) : null;
+    final feed = ref.watch(chatFeedProvider(conversation?.id));
+    final items = feed.items;
+    final parent = feed.parent;
     final thinking = phase == ChatPhase.thinking && conversation?.kind != ConversationKind.thread && (items.lastOrNull?.sender ?? '') != managerAgent;
-    final unread = conversation == null ? 0 : unreadIn(chat, conversation);
-    // What is on screen is read.
-    if (conversation != null && unread > 0) {
-      final mark = '${conversation.id}:${newestUnread(chat, conversation)}';
-      if (mark != _marked) {
-        _marked = mark;
-        WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(ref.read(chatActionsProvider).markRead(conversation.id).catchError((Object _) {})));
-      }
-    }
+    if (conversation != null) ref.watch(visibleConversationProvider(conversation.id));
     final children = <Widget>[
-      if (conversation != null && items.isNotEmpty && !(more?.complete ?? false))
+      if (feed.hasOlder)
         Center(
           child: KitTappable(
-            onTap: () => unawaited(ref.read(chatActionsProvider).loadOlder(conversation.id).catchError((Object _) {})),
+            onTap: () => unawaited(ref.read(chatActionsProvider).loadOlder(conversation!.id).catchError((Object _) {})),
             builder: (context, s) => Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               color: s.hovered ? Palette.cream200 : null,

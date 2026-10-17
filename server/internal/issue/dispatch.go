@@ -152,10 +152,8 @@ func (d *dispatch) Hire(ctx context.Context, agent protocol.Agent, task, project
 	if opt.Issue == "" {
 		opt.Issue = base.NewID()
 	}
-	opt.Hiring = func(w protocol.Session) {
-		if err := d.issues.Ran(opt.Issue, w); err != nil {
-			log.Printf("vibevalley: issue %s: %v", opt.Issue, err)
-		}
+	opt.Hiring = func(w protocol.Session) error {
+		return d.issues.Ran(opt.Issue, w)
 	}
 	hired := d.run.Send(ctx, agent, task, where, opt)
 	if hired.Session != nil {

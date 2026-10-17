@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -56,9 +57,9 @@ func (c *cli) run(ctx context.Context, raw []string) error {
 		c.exitCode = 1
 		return nil
 	}
-	var recorder *voyage.Recorder
+	var recording *voyage.SessionRecording
 	if file, ok := parsed.value("record"); ok {
-		recorder, err = voyage.Open(file, voyage.Header{Runtime: id, Model: options.Model, Effort: options.Effort, ServiceTier: options.ServiceTier, Cwd: cwd, SessionID: session.ID(), StartedAt: time.Now().UnixMilli(), Recorder: "oar-cli/" + version})
+		recording, err = voyage.Attach(file, session, voyage.Header{Runtime: id, Model: options.Model, Effort: options.Effort, ServiceTier: options.ServiceTier, Cwd: cwd, SessionID: session.ID(), StartedAt: time.Now().UnixMilli(), Recorder: "oar-cli/" + version}, "disposed")
 		if err != nil {
 			_ = session.Dispose(context.Background())
 			return err
@@ -66,14 +67,11 @@ func (c *cli) run(ctx context.Context, raw []string) error {
 	}
 	json := parsed.flag("json")
 	var outMu sync.Mutex
-	// Replay from the start so the log and output carry the records stamped while opening.
+	// Replay the output from the start, including records stamped while opening.
 	cursor := &oar.Cursor{SessionID: session.ID(), AfterSeq: -1}
 	recordsDone := make(chan struct{})
 	total := 0
 	session.RawEvents(func(record oar.RawEvent) {
-		if recorder != nil {
-			_ = recorder.Record(record)
-		}
 		if json {
 			outMu.Lock()
 			fmt.Fprintln(c.stdout, compact(record))
@@ -134,8 +132,10 @@ func (c *cli) run(ctx context.Context, raw []string) error {
 		time.Sleep(10 * time.Millisecond)
 	}
 	time.Sleep(300 * time.Millisecond) // the coalesced text's hold
-	if recorder != nil {
-		_ = recorder.End("disposed")
+	if recording != nil {
+		settle, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		err = errors.Join(err, recording.Close(settle))
+		cancel()
 	}
 	if err != nil {
 		return err

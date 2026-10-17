@@ -11,16 +11,19 @@ class WorkbenchResource<T> extends ChangeNotifier {
   String? error;
   bool loading = false;
   bool _disposed = false;
+  int _revision = 0;
 
   Future<void> refresh() async {
-    if (loading) return;
+    if (loading || _disposed) return;
+    final revision = _revision;
     loading = true;
     error = null;
     _notify();
     try {
-      value = await fetch();
+      final next = await fetch();
+      if (!_disposed && revision == _revision) value = next;
     } on Object catch (e) {
-      error = reasonOf(e);
+      if (!_disposed && revision == _revision) error = reasonOf(e);
     } finally {
       loading = false;
       _notify();
@@ -28,6 +31,8 @@ class WorkbenchResource<T> extends ChangeNotifier {
   }
 
   void put(T next) {
+    if (_disposed) return;
+    _revision++;
     value = next;
     error = null;
     _notify();

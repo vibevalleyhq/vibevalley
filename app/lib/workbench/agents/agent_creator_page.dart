@@ -9,6 +9,7 @@ import '../../shared/swatches.dart';
 import '../shared/rules.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
+import '../shared/config_problem.dart';
 import '../../rules/seeds.dart';
 import 'agent_config.dart';
 import 'agent_look.dart';
@@ -86,6 +87,7 @@ class _AgentCreatorPageState extends ConsumerState<AgentCreatorPage> {
     ref.listen(workbenchConfigProvider.select((c) => c.loaded), (was, loaded) {
       if (loaded && _draft == null) setState(() => _start(ref.read(workbenchConfigProvider)));
     });
+    if (config.error != null) return const ConfigProblem();
     final note = KitText.sm.copyWith(color: Palette.bark500);
     if (!config.loaded) {
       return Padding(
@@ -153,46 +155,62 @@ class _CreatorState extends ConsumerState<_Creator> {
     final nameTaken = config.agents.any((a) => a.id != draft.id && a.name == draft.name.trim());
     void patch(Agent a) => widget.onDraft(a);
 
+    final back = Container(
+      foregroundDecoration: pxRing,
+      child: DefaultTextStyle(
+        style: KitText.sm.copyWith(color: Palette.bark600),
+        child: InlineLink('← 全部帮工', color: Palette.bark600, onTap: () => workbenchGo(context, '/agents')),
+      ),
+    );
+    final badge = widget.isNew
+        ? const BadgeLabel('新的', hat: true)
+        : dirty
+        ? const BadgeLabel('没保存', hat: true)
+        : const BadgeLabel('已保存');
+    final actions = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (!widget.isNew && saved != null) _DeleteButton(agent: saved),
+        if (!widget.isNew && dirty && saved != null) PxButton.text('放弃改动', onPressed: () => patch(saved)),
+        PxButton.text(_saving ? '保存中…' : (widget.isNew ? '捏好了，保存' : '保存'), tone: PxTone.primary, onPressed: !dirty || _saving || nameTaken ? null : _save),
+      ],
+    );
+    final name = Text(draft.name.isEmpty ? '无名帮工' : draft.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.lg);
     final bar = PxWindow(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            foregroundDecoration: pxRing,
-            child: DefaultTextStyle(
-              style: KitText.sm.copyWith(color: Palette.bark600),
-              child: InlineLink('← 全部帮工', color: Palette.bark600, onTap: () => workbenchGo(context, '/agents')),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text('/', style: KitText.sm.copyWith(color: Palette.cream300)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(draft.name.isEmpty ? '无名帮工' : draft.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.lg),
-                ),
-                const SizedBox(width: 12),
-                if (widget.isNew) const BadgeLabel('新的', hat: true) else if (dirty) const BadgeLabel('没保存', hat: true) else const BadgeLabel('已保存'),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Wrap(
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (!widget.isNew && saved != null) _DeleteButton(agent: saved),
-              if (!widget.isNew && dirty && saved != null) PxButton.text('放弃改动', onPressed: () => patch(saved)),
-              PxButton.text(
-                _saving ? '保存中…' : (widget.isNew ? '捏好了，保存' : '保存'),
-                tone: PxTone.primary,
-                onPressed: !dirty || _saving || nameTaken ? null : _save,
+      child: LayoutBuilder(
+        builder: (context, box) => box.maxWidth < 600
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [back, badge]),
+                  const SizedBox(height: 8),
+                  name,
+                  const SizedBox(height: 8),
+                  actions,
+                ],
+              )
+            : Row(
+                children: [
+                  back,
+                  const SizedBox(width: 12),
+                  Text('/', style: KitText.sm.copyWith(color: Palette.cream300)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(child: name),
+                        const SizedBox(width: 12),
+                        badge,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  actions,
+                ],
               ),
-            ],
-          ),
-        ],
       ),
     );
 

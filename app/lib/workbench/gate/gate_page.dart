@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/farm_choice.dart';
 import '../../data/server.dart';
-import '../../host/desktop.dart' show startLocalFarm;
+import '../../host/desktop.dart' show useLocalFarm;
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import '../connectors/qr.dart';
@@ -332,10 +332,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
     if (data?.text case final text? when mounted) setState(() => _link = text.trim());
   }
 
-  Future<void> _useOwn() async {
-    await startLocalFarm();
-    await saveFarmChoice(FarmChoice(remote: farmConnection.value.remote));
-  }
+  Future<void> _useOwn() => useLocalFarm();
 
   @override
   Widget build(BuildContext context) {

@@ -35,11 +35,7 @@ void main() {
 
   Future<ToolResult> use(ProviderContainer c, Tool tool, int bed) async {
     c.read(heldToolProvider.notifier).set(tool);
-    final got = await c.read(farmCommandsProvider).act(c.read(farmCommandsProvider).aim(beds[bed]));
-    for (final (i, fx) in got.effects.indexed) {
-      c.read(bedFxProvider.notifier).push(BedFxEntry(i + 1, fx.bed, fx.kind, fx.text));
-    }
-    return got.result;
+    return c.read(farmCommandsProvider).act(c.read(farmCommandsProvider).aim(beds[bed]));
   }
 
   test('the hand opens a worked bed and sows an empty one', () async {
@@ -59,13 +55,12 @@ void main() {
     expect(c.read(bedFxProvider).single.bed, 1);
   });
 
-  test('the command returns its effect; the caller decides where it is shown', () async {
+  test('the command owns its feedback without caller effect plumbing', () async {
     final (c, _) = await setUpFarm();
     c.read(heldToolProvider.notifier).set(Tool.bug);
     final got = await c.read(farmCommandsProvider).act(c.read(farmCommandsProvider).aim(beds[0]));
-    expect(got.result, isA<ToolRefused>());
-    expect(got.effects.single.kind, BedFxKind.note);
-    expect(c.read(bedFxProvider), isEmpty);
+    expect(got, isA<ToolRefused>());
+    expect(c.read(bedFxProvider).single.kind, BedFxKind.note);
   });
 
   test('a click is decided once: the held tool can change between aim and act', () async {
@@ -73,7 +68,7 @@ void main() {
     c.read(heldToolProvider.notifier).set(Tool.bug);
     final aim = c.read(farmCommandsProvider).aim(beds[1]);
     c.read(heldToolProvider.notifier).set(Tool.hand);
-    expect((await c.read(farmCommandsProvider).act(aim)).result, isA<ToolDone>());
+    expect(await c.read(farmCommandsProvider).act(aim), isA<ToolDone>());
     expect(routes.paths, ['POST /api/v1/issues/tw2/comment']);
   });
 

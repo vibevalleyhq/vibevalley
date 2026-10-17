@@ -233,6 +233,13 @@ func (p *Service) ensure(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	root, err := filepath.EvalSymlinks(p.root)
+	if err != nil {
+		return "", err
+	}
+	if filepath.Dir(path) != root {
+		return "", errors.New("项目必须在工作目录里面，不能链接到外面")
+	}
 	top, _ := git(path, "rev-parse", "--show-toplevel")
 	switch {
 	case top != path:
@@ -597,16 +604,22 @@ func (p *Service) Merge(place Workplace) (Merged, error) {
 	if err != nil {
 		return Merged{}, failed(err)
 	}
+	merged := Merged{Text: "这一单没有新的提交", Commits: int(ahead), Warning: cleanupMerged(place, path)}
+	if ahead > 0 {
+		merged.Text = fmt.Sprintf("%d 个提交合进了 %s 的 %s", ahead, place.Project, main)
+	}
+	return merged, nil
+}
+
+// Cleanup cannot undo publication. Its warning must travel with the successful receipt, not replace it with a failure.
+func cleanupMerged(place Workplace, path string) string {
 	if _, err := git(path, "worktree", "remove", "--force", place.Cwd); err != nil {
-		return Merged{}, failed(err)
+		return fmt.Sprintf("改动已合并，worktree %s 和分支 %s 尚未清理：%s", place.Cwd, place.Branch, reason(err))
 	}
 	if _, err := git(path, "branch", "-D", place.Branch); err != nil {
-		return Merged{}, failed(err)
+		return fmt.Sprintf("改动已合并，分支 %s 尚未清理：%s", place.Branch, reason(err))
 	}
-	if ahead > 0 {
-		return Merged{Text: fmt.Sprintf("%d 个提交合进了 %s 的 %s", ahead, place.Project, main), Commits: int(ahead)}, nil
-	}
-	return Merged{Text: "这一单没有新的提交"}, nil
+	return ""
 }
 
 func (p *Service) Release(place Workplace) string {
@@ -647,54 +660,48 @@ func (p *Service) OpenBranch(project, branch string) error {
 	return nil
 }
 
-func (p *Service) MergeInto(place Workplace, target string) ([]string, error) {
+func (p *Service) MergeInto(place Workplace, target string) (Merged, error) {
 	defer p.serially(place.Project)()
 	path := filepath.Join(p.root, place.Project)
 	if place.Branch == "" {
-		return nil, MergeFailure{Kind: "error", Reason: "它直接在项目里干活，没有分支可合"}
+		return Merged{}, MergeFailure{Kind: "error", Reason: "它直接在项目里干活，没有分支可合"}
 	}
 	if err := commitLeft(place.Cwd, "合并前把没提交的改动一并提交"); err != nil {
-		return nil, failed(err)
+		return Merged{}, failed(err)
 	}
 	conflicts, err := conflictsOf(path, target, place.Branch)
 	if err != nil {
-		return nil, failed(err)
+		return Merged{}, failed(err)
 	}
 	if len(conflicts) > 0 {
-		return nil, MergeFailure{Kind: "conflict", Base: target, Files: conflicts}
+		return Merged{}, MergeFailure{Kind: "conflict", Base: target, Files: conflicts}
 	}
 	out, err := git(path, "log", "--reverse", "--format=%h", target+".."+place.Branch)
 	if err != nil {
-		return nil, failed(err)
+		return Merged{}, failed(err)
 	}
 	brought := slices.DeleteFunc(strings.Split(out, "\n"), func(s string) bool { return s == "" })
 	if len(brought) > 0 {
 		ours, err := git(path, "rev-parse", "refs/heads/"+target)
 		if err != nil {
-			return nil, failed(err)
+			return Merged{}, failed(err)
 		}
 		theirs, err := git(path, "rev-parse", place.Branch)
 		if err != nil {
-			return nil, failed(err)
+			return Merged{}, failed(err)
 		}
 		next := theirs
 		if !gitOk(path, "merge-base", "--is-ancestor", ours, theirs) {
 			if next, err = mergeCommit(path, ours, theirs, "合并 "+place.Branch); err != nil {
-				return nil, failed(err)
+				return Merged{}, failed(err)
 			}
 		}
 		// Only from where it was: a target moved meanwhile is not overwritten.
 		if _, err := git(path, "update-ref", "refs/heads/"+target, next, ours); err != nil {
-			return nil, failed(err)
+			return Merged{}, failed(err)
 		}
 	}
-	if _, err := git(path, "worktree", "remove", "--force", place.Cwd); err != nil {
-		return nil, failed(err)
-	}
-	if _, err := git(path, "branch", "-D", place.Branch); err != nil {
-		return nil, failed(err)
-	}
-	return brought, nil
+	return Merged{Commits: len(brought), Hashes: brought, Warning: cleanupMerged(place, path)}, nil
 }
 
 func (p *Service) MergeBranch(project, branch string) (string, error) {
@@ -704,13 +711,14 @@ func (p *Service) MergeBranch(project, branch string) (string, error) {
 	if err != nil {
 		return "", failed(err)
 	}
-	if _, err := git(path, "branch", "-D", branch); err != nil {
-		return "", failed(err)
-	}
+	said := "计划分支上没有新的提交"
 	if ahead > 0 {
-		return fmt.Sprintf("%d 个提交合进了 %s 的 %s", ahead, project, main), nil
+		said = fmt.Sprintf("%d 个提交合进了 %s 的 %s", ahead, project, main)
 	}
-	return "计划分支上没有新的提交", nil
+	if _, err := git(path, "branch", "-D", branch); err != nil {
+		said += fmt.Sprintf("；改动已合并，分支 %s 尚未清理：%s", branch, reason(err))
+	}
+	return said, nil
 }
 
 func (p *Service) Run(ctx context.Context, cwd, command string) (bool, string) {

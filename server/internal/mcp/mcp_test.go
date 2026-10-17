@@ -166,3 +166,43 @@ func TestToolsOverMcp(t *testing.T) {
 		t.Fatalf("forged: %q", text)
 	}
 }
+
+func TestSessionListUsesDomainPhaseDescriptions(t *testing.T) {
+	w := open(t)
+	w.MCP.who = func(string) string { return "caller" }
+	for _, h := range []protocol.Session{
+		{ID: "failed", Name: "失败的", Phase: protocol.Phase{Value: protocol.PhaseFailed{}}},
+		{ID: "resting", Name: "歇着的", Phase: protocol.Phase{Value: protocol.PhaseResting{}}},
+		{ID: "ripe", Name: "冲突的", Phase: protocol.Phase{Value: protocol.PhaseRipe{}}, Conflict: &protocol.Conflict{Base: "main", Files: []string{"a.go"}}},
+	} {
+		w.Core.Apply(protocol.FactHired{Session: h})
+	}
+	server := httptest.NewServer(w.MCP.Handler())
+	defer server.Close()
+	call := client(t, server.URL, "token")
+	text := call("tools/call", map[string]any{"name": "session_list", "arguments": map[string]any{}}).text()
+	for _, want := range []string{"这一轮失败了", "歇着（上一轮没做完）", "合进 main 会冲突（a.go）"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %q in %s", want, text)
+		}
+	}
+}
+
+func TestEveryMcpToolRequiresAuthenticatedSession(t *testing.T) {
+	w := open(t)
+	server := httptest.NewServer(w.MCP.Handler())
+	defer server.Close()
+	call := client(t, server.URL, "")
+	for _, tool := range call("tools/list", map[string]any{}).Result.Tools {
+		t.Run(tool.Name, func(t *testing.T) {
+			args := map[string]any{}
+			if tool.Name == "channel_say" {
+				args["text"] = "must not be posted"
+			}
+			text := call("tools/call", map[string]any{"name": tool.Name, "arguments": args}).text()
+			if !strings.Contains(text, "没认出你是谁") {
+				t.Fatalf("unauthenticated result: %s", text)
+			}
+		})
+	}
+}

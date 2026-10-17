@@ -331,7 +331,11 @@ func TestPlanDiamond(t *testing.T) {
 	news, stopNews := tf.Playbook.News().Subscribe()
 	defer stopNews()
 	id := tf.planned(t, "菱形", "diamond")
-	draft := tf.until(t, id, func(pb protocol.Playbook) bool { return pb.State == protocol.PlaybookStateDraft })
+	draft := tf.until(t, id, func(pb protocol.Playbook) bool {
+		return pb.State == protocol.PlaybookStateDraft && !slices.ContainsFunc(tf.Core.State().Sessions, func(h protocol.Session) bool {
+			return h.Playbook != nil && h.Playbook.ID == id
+		})
+	})
 	var shape [][2]any
 	for _, n := range draft.Nodes {
 		shape = append(shape, [2]any{n.ID, strings.Join(n.Needs, ",")})

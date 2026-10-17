@@ -1,5 +1,5 @@
 // The native menu's commands are app-level navigation: turn one into a farm page, a panel or a selected thing.
-// Voice stays with the farm because it owns the call.
+// The chosen farm scope owns the call as well as its navigation state.
 
 import 'dart:async';
 
@@ -7,13 +7,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../chat/chat_state.dart' show chatActionsProvider, chatOpenProvider;
 import '../data/ui_state.dart';
+import '../data/voice.dart';
 import '../host/desktop.dart' show hostProvider;
 import '../host/command.dart';
 import 'router.dart';
 
 final hostCommandRouterProvider = Provider<void>((ref) {
   final sub = ref.watch(hostProvider).commands.listen((command) {
-    if (command is HostVoice) return;
+    if (command is HostVoice) {
+      unawaited(ref.read(voiceCallProvider).toggle());
+      return;
+    }
     _toFarm(ref);
     switch (command) {
       case HostVoice():

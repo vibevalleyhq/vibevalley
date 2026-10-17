@@ -48,22 +48,6 @@ func (q *Queries) Forget(ctx context.Context, arg ForgetParams) error {
 	return err
 }
 
-const forgetBeyond = `-- name: ForgetBeyond :exec
-delete from memory where memory.agent = ?1 and memory.id not in (
-  select kept.id from memory kept where kept.agent = ?1 order by coalesce(kept.recalled_at, kept.created_at) desc limit ?2)
-`
-
-type ForgetBeyondParams struct {
-	Agent string
-	Keep  int64
-}
-
-// An agent keeps the ones it recalled or wrote last.
-func (q *Queries) ForgetBeyond(ctx context.Context, arg ForgetBeyondParams) error {
-	_, err := q.db.ExecContext(ctx, forgetBeyond, arg.Agent, arg.Keep)
-	return err
-}
-
 const keepJob = `-- name: KeepJob :exec
 insert into memory (id, agent, kind, body, project, session, created_at) values (?, ?, 'issue', ?, ?, ?, ?)
 on conflict (agent, session) where kind = 'issue'

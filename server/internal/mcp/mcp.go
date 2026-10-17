@@ -15,6 +15,7 @@ import (
 	"vibevalley/internal/core"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
+	"vibevalley/pkg/x/clock"
 	"vibevalley/pkg/x/str"
 )
 
@@ -114,59 +115,59 @@ type readArgs struct {
 	Limit  float64 `json:"limit,omitempty"`
 }
 
+// Tool implementations receive an authenticated identity, never a raw transport request.
+func addAuthenticatedTool[Args any](t *Service, server *sdk.Server, tool *sdk.Tool, run func(string, Args) (string, error)) {
+	sdk.AddTool(server, tool, func(_ context.Context, req *sdk.CallToolRequest, args Args) (*sdk.CallToolResult, any, error) {
+		id, err := t.caller(req)
+		if err != nil {
+			return toolText("", err)
+		}
+		text, err := run(id, args)
+		return toolText(text, err)
+	})
+}
+
 func (t *Service) add(server *sdk.Server) {
-	sdk.AddTool(server, &sdk.Tool{
+	addAuthenticatedTool(t, server, &sdk.Tool{
 		Name:        "channel_say",
 		Description: "在农场的群聊里发一条消息。target 不填就是你自己的工单串；#<频道> 是一个频道（#" + protocol.GeneralName + " 是默认的频道田头）；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
-	}, func(_ context.Context, req *sdk.CallToolRequest, p sayArgs) (*sdk.CallToolResult, any, error) {
-		id, err := t.caller(req)
-		if err != nil {
-			return toolText("", err)
-		}
+	}, func(id string, p sayArgs) (string, error) {
 		spoken, err := t.chat.Speak(id, p.Text, channel.SpeakOptions{Target: p.Target, Anyway: p.Anyway, Confirm: p.Confirm})
 		if err != nil {
-			return toolText("", err)
+			return "", err
 		}
-		return toolText(spokenText(spoken), nil)
+		return spokenText(spoken), nil
 	})
 
-	sdk.AddTool(server, &sdk.Tool{
+	addAuthenticatedTool(t, server, &sdk.Tool{
 		Name:        "channel_read",
 		Description: "读田头或一个串。target 不填就是你自己的工单串。unread 只读你还没读过的；before:<消息号> 往前翻。读过的算你看过了。",
-	}, func(_ context.Context, req *sdk.CallToolRequest, p readArgs) (*sdk.CallToolResult, any, error) {
-		id, err := t.caller(req)
-		if err != nil {
-			return toolText("", err)
-		}
+	}, func(id string, p readArgs) (string, error) {
 		r, err := t.chat.Read(id, channel.ReadOptions{Target: p.Target, Unread: p.Unread, Before: int64(p.Before), Limit: int64(p.Limit)})
 		if err != nil {
-			return toolText("", err)
+			return "", err
 		}
 		if len(r.Messages) == 0 {
 			unread := ""
 			if p.Unread {
 				unread = "你没读的"
 			}
-			return toolText(r.Target+" 里没有"+unread+"消息", nil)
+			return r.Target + " 里没有" + unread + "消息", nil
 		}
 		older := ""
 		if r.Older {
 			older = fmt.Sprintf("（更早的还有：before:%d 往前翻）", r.Messages[0].Number)
 		}
-		return toolText(r.Target+older+"：\n"+protocol.InboxLines(r.Messages), nil)
+		return r.Target + older + "：\n" + protocol.InboxLines(r.Messages), nil
 	})
 
-	sdk.AddTool(server, &sdk.Tool{
+	addAuthenticatedTool(t, server, &sdk.Tool{
 		Name:        "channel_inbox",
 		Description: "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。",
-	}, func(_ context.Context, req *sdk.CallToolRequest, _ struct{}) (*sdk.CallToolResult, any, error) {
-		id, err := t.caller(req)
-		if err != nil {
-			return toolText("", err)
-		}
+	}, func(id string, _ struct{}) (string, error) {
 		rows := t.chat.Inbox(id)
 		if len(rows) == 0 {
-			return toolText("没有没读的消息。", nil)
+			return "没有没读的消息。", nil
 		}
 		lines := make([]string, 0, len(rows)+1)
 		for _, r := range rows {
@@ -180,29 +181,17 @@ func (t *Service) add(server *sdk.Server) {
 			lines = append(lines, line)
 		}
 		lines = append(lines, "下一步：channel_read target="+rows[0].Target+" unread=true")
-		return toolText(strings.Join(lines, "\n"), nil)
+		return strings.Join(lines, "\n"), nil
 	})
 
-	sdk.AddTool(server, &sdk.Tool{
+	addAuthenticatedTool(t, server, &sdk.Tool{
 		Name:        "session_list",
 		Description: "地里现在有谁：每个帮工的编号、名字、农机、在哪个项目、在做什么。",
-	}, func(_ context.Context, req *sdk.CallToolRequest, _ struct{}) (*sdk.CallToolResult, any, error) {
-		if _, err := t.caller(req); err != nil {
-			return toolText("", err)
-		}
+	}, func(id string, _ struct{}) (string, error) {
 		// Listed without @: an @ wakes someone, and models copy what they read.
 		lines := []string{"地里有主人、管家，和这些帮工："}
 		for _, h := range t.core.State().Sessions {
-			doing := "这一轮做完了"
-			switch p := h.Phase.Value.(type) {
-			case protocol.PhaseWorking:
-				doing = "在" + protocol.ActionText[p.Doing.Action]
-				if p.Doing.Label != "" {
-					doing += " " + p.Doing.Label
-				}
-			case protocol.PhaseArriving:
-				doing = "刚到"
-			}
+			doing := protocol.PhaseText(h, clock.NowMs())
 			project := "?"
 			if h.Project != nil {
 				project = *h.Project
@@ -211,6 +200,6 @@ func (t *Service) add(server *sdk.Server) {
 			lines = append(lines, fmt.Sprintf("- %s %s（%s，在 %s；%s）工单：%s", h.ID, h.Name, h.Runtime, project, doing, task))
 		}
 		lines = append(lines, "要叫醒谁，就在 channel_say 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。")
-		return toolText(strings.Join(lines, "\n"), nil)
+		return strings.Join(lines, "\n"), nil
 	})
 }

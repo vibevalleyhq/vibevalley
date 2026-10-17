@@ -125,6 +125,9 @@ func runTool(ctx context.Context, tool *AgentTool, id string, args json.RawMessa
 
 // Nothing is said when the run was stopped meanwhile: the stop answers it.
 func execute(ctx context.Context, p prepared, options RunToolCallOptions) (AgentToolCallOutcome, bool) {
+	if ctx.Err() != nil {
+		return AgentToolCallOutcome{}, false
+	}
 	started := time.Now()
 	onUpdate := func(partial AgentToolResult) {
 		if ctx.Err() != nil {
@@ -160,15 +163,16 @@ func execute(ctx context.Context, p prepared, options RunToolCallOptions) (Agent
 			}
 		}
 	}
-	if isError {
-		result.IsError = true
-	}
+	result.IsError = isError
 	duration := time.Since(started).Milliseconds()
 	options.Emit(AgentEvent{Type: EventToolExecutionEnd, ToolCallID: p.toolCall.ID, ToolName: p.toolCall.Name, Result: &result, IsError: isError, DurationMs: &duration})
 	return AgentToolCallOutcome{ToolCall: p.toolCall, Result: result, IsError: isError, DurationMs: &duration}, true
 }
 
 func RunToolCall(ctx context.Context, toolCall ai.Content, options RunToolCallOptions) (AgentToolCallOutcome, bool) {
+	if ctx.Err() != nil {
+		return AgentToolCallOutcome{}, false
+	}
 	p := prepare(ctx, toolCall, options)
 	if p.tool == nil {
 		return p.outcome, true
@@ -224,13 +228,14 @@ type toolsState struct {
 }
 
 type loopRun struct {
-	ctx      context.Context
-	context  AgentContext
-	config   AgentLoopConfig
-	emit     AgentEventSink
-	messages []AgentMessage
-	fresh    []AgentMessage
-	tools    []AgentTool
+	ctx          context.Context
+	context      AgentContext
+	config       AgentLoopConfig
+	emit         AgentEventSink
+	messages     []AgentMessage
+	fresh        []AgentMessage
+	tools        []AgentTool
+	requestTools []AgentTool
 
 	// Where the run is, for a stop to end it properly.
 	answering     *answering
@@ -324,6 +329,7 @@ func (r *loopRun) respond() (ai.AssistantMessage, bool) {
 	if r.stopping() {
 		return ai.AssistantMessage{}, false
 	}
+	r.requestTools = append([]AgentTool(nil), request.Tools...)
 	tools := make([]ai.Tool, 0, len(request.Tools))
 	for _, t := range request.Tools {
 		tools = append(tools, ToolOf(t))
@@ -397,7 +403,7 @@ func (r *loopRun) runTools(assistantMessage ai.AssistantMessage, calls []ai.Cont
 	ctx := r.ctx
 	state := &toolsState{calls: calls, announced: map[string]bool{}, finished: map[string]AgentToolCallOutcome{}}
 	r.toolsOf = state
-	options := RunToolCallOptions{Tools: r.tools, AssistantMessage: assistantMessage, Context: r.snapshot(), Config: r.config, Emit: r.emit}
+	options := RunToolCallOptions{Tools: r.requestTools, AssistantMessage: assistantMessage, Context: r.snapshot(), Config: r.config, Emit: r.emit}
 	var runnable []prepared
 	for _, call := range calls {
 		if r.stopping() {

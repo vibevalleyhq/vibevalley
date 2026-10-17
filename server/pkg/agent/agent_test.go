@@ -274,7 +274,7 @@ func countUsers(c ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ ai.M
 	return ai.FauxAssistantMessage(fmt.Sprintf("第 %d 句", n))
 }
 
-func TestARestartedAgentGoesOnOldSessionConverted(t *testing.T) {
+func TestARestartedAgentContinuesCurrentSessionAndIgnoresLegacy(t *testing.T) {
 	dir := home(t)
 	withAgent(t, dir, []ai.FauxResponseStep{step(countUsers)}, func(r *rig) { eq(t, r.ask("一"), "第 1 句") }, nil)
 	withAgent(t, dir, []ai.FauxResponseStep{step(countUsers)}, func(r *rig) { eq(t, r.ask("二"), "第 2 句") }, nil)
@@ -292,8 +292,8 @@ func TestARestartedAgentGoesOnOldSessionConverted(t *testing.T) {
 		},
 	})), 0o644)
 	withAgent(t, old, []ai.FauxResponseStep{step(countUsers)}, func(r *rig) {
-		eq(t, said(r.agent.History()), []string{"user:旧的话", "assistant:", "toolResult:（空的）", "assistant:旧的回答"})
-		eq(t, r.ask("新的话"), "第 2 句")
+		eq(t, len(r.agent.History()), 0)
+		eq(t, r.ask("新的话"), "第 1 句")
 	}, nil)
 	entries, _ := os.ReadDir(old)
 	var names []string
@@ -303,7 +303,7 @@ func TestARestartedAgentGoesOnOldSessionConverted(t *testing.T) {
 		}
 	}
 	sort.Strings(names)
-	eq(t, names, []string{"test.json.bak", "test.jsonl"})
+	eq(t, names, []string{"test.json", "test.jsonl"})
 }
 
 func TestALongConversationIsFolded(t *testing.T) {

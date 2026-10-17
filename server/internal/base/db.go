@@ -4,6 +4,7 @@ package base
 
 import (
 	"database/sql"
+	"net/url"
 	"path/filepath"
 
 	_ "modernc.org/sqlite"
@@ -28,7 +29,11 @@ func OpenDB(path string) (*sql.DB, error) {
 func OpenDBAsIs(path string) (*sql.DB, error) {
 	dsn := path
 	if path != ":memory:" {
-		dsn = "file:" + filepath.ToSlash(path)
+		absolute, err := filepath.Abs(path)
+		if err != nil {
+			return nil, err
+		}
+		dsn = (&url.URL{Scheme: "file", Path: filepath.ToSlash(absolute)}).String()
 	}
 	db, err := sql.Open("sqlite", dsn+"?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
 	if err != nil {

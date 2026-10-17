@@ -151,12 +151,10 @@ type manager struct {
 	// Guards what the lines handled and the words said share.
 	mu sync.Mutex
 	// The runs of issues for it under way, ended when its run settles.
-	working []managerRun
-	picked  string
-	// The current run came from voice: its words stay off the farm, the voice agent answered already.
-	quiet   bool
-	replyTo string
-	caller  *managerCaller
+	working    []managerRun
+	input      managerInput
+	selected   map[string]string
+	latestCall *managerCaller
 	// In bytes.
 	toCaller int
 	said     int
@@ -194,7 +192,8 @@ func newManager(in managerIn) (*manager, error) {
 
 func (fm *manager) OnStart(ctx context.Context) error {
 	fm.ctx = ctx
-	fm.replyTo = fm.chat.General()
+	fm.input.Conversation = fm.chat.General()
+	fm.selected = map[string]string{}
 	if fm.trace == nil {
 		fm.trace = fm.run.Open(protocol.ManagerAgent, keepManagerEvents)
 	}
@@ -233,17 +232,14 @@ func (fm *manager) OnStop() {
 		stop()
 	}
 	fm.starting.Lock()
-	if fm.brain != nil {
-		fm.brain.Close()
-	}
+	brain := fm.brain
 	fm.starting.Unlock()
+	if brain != nil {
+		brain.Close()
+	}
 }
 
-func (fm *manager) here() string {
-	fm.mu.Lock()
-	defer fm.mu.Unlock()
-	return fm.replyTo
-}
+func (fm *manager) here() string { return fm.requestInput().Conversation }
 
 type managerAgentInfo struct {
 	agent    protocol.Agent
@@ -273,9 +269,7 @@ func (fm *manager) choose(task, named string) *protocol.Agent {
 	for _, a := range fm.agentsWithIssues() {
 		candidates = append(candidates, session.Candidate{Agent: a.agent, Usable: managerUsable(a)})
 	}
-	fm.mu.Lock()
-	picked := fm.picked
-	fm.mu.Unlock()
+	picked := fm.requestInput().Agent
 	return session.ChooseAgent(candidates, task, named, picked)
 }
 
@@ -471,6 +465,13 @@ func (fm *manager) follow(events *agentcore.Subscription[vvagent.AgentEvent]) {
 
 func (fm *manager) event(e vvagent.AgentEvent) {
 	switch e.Type {
+	case agentcore.EventMessageStart:
+		if input, ok := managerInputOf(e.Message); ok {
+			fm.mu.Lock()
+			fm.input = input
+			fm.toCaller = 0
+			fm.mu.Unlock()
+		}
 	case agentcore.EventAgentStart:
 		fm.core.SetManager(protocol.ManagerStateThinking)
 	case agentcore.EventMessageUpdate:
@@ -524,17 +525,17 @@ func (fm *manager) keyLocked() string {
 
 func (fm *manager) grow(text string) {
 	fm.mu.Lock()
-	if fm.caller != nil && len(text) > fm.toCaller {
-		fm.caller.push(text[fm.toCaller:])
+	if fm.input.caller != nil && len(text) > fm.toCaller {
+		fm.input.caller.push(text[fm.toCaller:])
 		fm.toCaller = len(text)
 	}
 	key := fm.keyLocked()
-	if fm.quiet || time.Since(fm.lastPush) < managerStreamEvery {
+	if fm.input.Quiet || time.Since(fm.lastPush) < managerStreamEvery {
 		fm.mu.Unlock()
 		return
 	}
 	fm.lastPush = time.Now()
-	to := fm.replyTo
+	to := fm.input.Conversation
 	fm.mu.Unlock()
 	fm.core.SetManager(protocol.ManagerStateSpeaking)
 	fm.chat.ManagerSays(to, key, text, false)
@@ -542,16 +543,16 @@ func (fm *manager) grow(text string) {
 
 func (fm *manager) done(text string) {
 	fm.mu.Lock()
-	if fm.caller != nil && len(text) > fm.toCaller {
-		fm.caller.push(text[fm.toCaller:])
+	if fm.input.caller != nil && len(text) > fm.toCaller {
+		fm.input.caller.push(text[fm.toCaller:])
 	}
-	if fm.caller != nil && text != "" {
-		fm.caller.push("\n")
+	if fm.input.caller != nil && text != "" {
+		fm.input.caller.push("\n")
 	}
 	fm.toCaller = 0
 	key := fm.keyLocked()
 	fm.open = false
-	quiet, to := fm.quiet, fm.replyTo
+	quiet, to := fm.input.Quiet, fm.input.Conversation
 	fm.mu.Unlock()
 	if text != "" && !quiet {
 		fm.chat.ManagerSays(to, key, text, true)
@@ -560,12 +561,12 @@ func (fm *manager) done(text string) {
 
 func (fm *manager) settled() {
 	fm.mu.Lock()
-	if fm.caller != nil {
-		fm.caller.end()
+	if fm.input.caller != nil {
+		fm.input.caller.end()
 	}
-	fm.caller = nil
-	fm.quiet = false
-	fm.picked = ""
+	fm.input.caller = nil
+	fm.input.Quiet = false
+	fm.input.Agent = ""
 	fm.open = false
 	fm.mu.Unlock()
 	fm.answered(protocol.OutcomeCompleted)
@@ -574,6 +575,11 @@ func (fm *manager) settled() {
 
 // now joins the run under way; otherwise the line waits until the run would stop. false: the manager could not start.
 func (fm *manager) send(line string, conversation string, now bool) bool {
+	return fm.sendInput(line, managerInput{Conversation: conversation}, now)
+}
+
+func (fm *manager) sendInput(line string, input managerInput, now bool) bool {
+	conversation := input.Conversation
 	fm.trace.Asked(line, nil)
 	brain, err := fm.brainOf()
 	if err != nil {
@@ -584,26 +590,20 @@ func (fm *manager) send(line string, conversation string, now bool) bool {
 			said = "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。"
 		}
 		fm.chat.ManagerSays(conversation, fmt.Sprintf("failed%d", clock.NowMs()), said, true)
-		fm.mu.Lock()
-		if fm.caller != nil {
-			fm.caller.push("我这边起不来：" + err.Error())
-			fm.caller.end()
-			fm.caller = nil
+		if input.caller != nil {
+			input.caller.push("我这边起不来：" + err.Error())
+			input.caller.end()
 		}
-		fm.mu.Unlock()
 		return false
 	}
-	fm.mu.Lock()
-	fm.replyTo = conversation
-	fm.mu.Unlock()
 	deliver := brain.Later
 	if now {
 		deliver = brain.Send
 	}
 	if heard := fm.news(); heard != "" {
-		deliver(vvagent.NewCustomMessage("farmNews", ai.StringContent(heard), vvagent.CustomMessageOptions{Hidden: true}))
+		line += "\n\n" + heard
 	}
-	deliver(vvagent.UserMessage(line))
+	deliver(vvagent.NewCustomMessage("managerInput", ai.StringContent(line), vvagent.CustomMessageOptions{Details: input}))
 	return true
 }
 
@@ -619,18 +619,24 @@ func (fm *manager) pickedNote(picked string) string {
 
 func (fm *manager) heardInChat(news channel.ManagerNews) {
 	fromPerson := !slices.ContainsFunc(news.Messages, func(m protocol.InboxMessage) bool { return m.From != "user" })
+	fm.mu.Lock()
+	picked := ""
+	for _, m := range news.Messages {
+		if agent, ok := fm.selected[m.ID]; ok {
+			picked = agent
+			delete(fm.selected, m.ID)
+		}
+	}
+	fm.mu.Unlock()
 	if fromPerson && news.Conversation == fm.chat.General() {
-		fm.mu.Lock()
-		picked := fm.picked
-		fm.mu.Unlock()
 		words := make([]string, len(news.Messages))
 		for i, m := range news.Messages {
 			words[i] = m.Text
 		}
-		fm.send(fm.pickedNote(picked)+"主人说："+strings.Join(words, "\n"), news.Conversation, true)
+		fm.sendInput(fm.pickedNote(picked)+"主人说："+strings.Join(words, "\n"), managerInput{Conversation: news.Conversation, Agent: picked}, true)
 		return
 	}
-	fm.send("【田头】"+news.Target+" 里有给你的话：\n"+protocol.InboxLines(news.Messages)+"\n\n你的回答会发在 "+news.Target+"。", news.Conversation, fromPerson)
+	fm.sendInput(fm.pickedNote(picked)+"【田头】"+news.Target+" 里有给你的话：\n"+protocol.InboxLines(news.Messages)+"\n\n你的回答会发在 "+news.Target+"。", managerInput{Conversation: news.Conversation, Agent: picked}, fromPerson)
 }
 
 // A run of an issue for the manager lasts until the manager's run that takes the line settles.
@@ -677,13 +683,16 @@ func (fm *manager) Say(ctx context.Context, text, agentID string, conversation *
 		picked = a.ID
 	}
 	fm.mu.Lock()
-	fm.picked = picked
-	fm.mu.Unlock()
-	_, err := fm.chat.Say(text, conversation)
+	defer fm.mu.Unlock()
+	message, err := fm.chat.Say(text, conversation)
+	if err == nil && picked != "" {
+		fm.selected[message.ID] = picked
+	}
 	return err
 }
 
-// When the manager answers calls itself, what was said reached it on the voice line already.
+// When the manager answers calls itself, what was said reached it on the voice line already (Call keeps it in 田头). Otherwise
+// Agora's model answered it; the manager hears it here to dispatch, and what it says goes to 田头 like any answer.
 func (fm *manager) Heard(text, agentID string) {
 	if _, ok := fm.settings.Voice().Answer.Value.(protocol.VoiceAnswerManager); ok {
 		return
@@ -693,10 +702,7 @@ func (fm *manager) Heard(text, agentID string) {
 	if a := fm.store.Agent(agentID); agentID != "" && a != nil {
 		picked = a.ID
 	}
-	fm.mu.Lock()
-	fm.picked = picked
-	fm.mu.Unlock()
-	fm.send(fm.pickedNote(picked)+"（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说："+text, fm.chat.General(), true)
+	fm.sendInput(fm.pickedNote(picked)+"（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说："+text, managerInput{Conversation: fm.chat.General(), Agent: picked}, true)
 }
 
 // The words said on the phone; the answer is read out, and both stay in 田头.
@@ -718,21 +724,21 @@ func (fm *manager) answer(ctx context.Context, line string) <-chan string {
 	out := make(chan string)
 	me := &managerCaller{signal: make(chan struct{}, 1)}
 	fm.mu.Lock()
-	if fm.caller != nil {
-		fm.caller.end()
+	if fm.latestCall != nil {
+		fm.latestCall.end()
 	}
-	fm.caller = me
-	fm.toCaller = 0
+	fm.latestCall = me
 	fm.mu.Unlock()
 	go me.pump(ctx, out)
 	go func() {
 		<-ctx.Done()
+		me.end()
 		fm.mu.Lock()
-		if fm.caller == me {
-			fm.caller = nil
+		if fm.latestCall == me {
+			fm.latestCall = nil
 		}
 		fm.mu.Unlock()
 	}()
-	go fm.send(line, fm.chat.General(), true)
+	go fm.sendInput(line, managerInput{Conversation: fm.chat.General(), caller: me}, true)
 	return out
 }

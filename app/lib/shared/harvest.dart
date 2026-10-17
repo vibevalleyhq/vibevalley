@@ -4,89 +4,45 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../game/commands.dart';
-import '../game/state.dart' show fireBedEffects;
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
-import '../data/providers.dart';
-import '../data/remote.dart' show SessionIssue;
+import '../data/remote.dart' show SessionIssue, issueChangesProvider, reasonOf;
 import 'tags.dart';
-
-sealed class Loaded {
-  const Loaded();
-}
-
-final class Loading extends Loaded {
-  const Loading();
-}
-
-final class LoadFailed extends Loaded {
-  const LoadFailed(this.reason);
-  final String reason;
-}
-
-final class LoadReady extends Loaded {
-  const LoadReady(this.changes);
-  final Changes changes;
-}
-
-Future<Loaded> loadChanges(Future<Changes> Function() fetch) async {
-  try {
-    return LoadReady(await fetch());
-  } on VibeValleyApiError catch (e) {
-    return LoadFailed(e.reason);
-  } on Object catch (e) {
-    return LoadFailed('$e');
-  }
-}
 
 /// A binary file counts -1: not counted.
 (int, int) lineCounts(Changes c) =>
     (c.files.fold(0, (n, f) => n + math.max(0, f.added.round())), c.files.fold(0, (n, f) => n + math.max(0, f.removed.round())));
 
-class HarvestReview extends ConsumerStatefulWidget {
+class HarvestReview extends ConsumerWidget {
   const HarvestReview({super.key, required this.session, required this.onDone});
   final Session session;
   final VoidCallback onDone;
 
   @override
-  ConsumerState<HarvestReview> createState() => _HarvestReviewState();
-}
-
-class _HarvestReviewState extends ConsumerState<HarvestReview> {
-  Loaded _loaded = const Loading();
-
-  @override
-  void initState() {
-    super.initState();
-    final api = ref.read(apiProvider);
-    loadChanges(() => api.issue.changes(id: widget.session.issueId)).then((l) {
-      if (mounted) setState(() => _loaded = l);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) => switch (_loaded) {
-    Loading() => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40),
-      child: Text(
-        '正在看它改了什么…',
-        textAlign: TextAlign.center,
-        style: KitText.sm.copyWith(color: Palette.bark600),
-      ),
-    ),
-    LoadFailed(:final reason) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Tinted(
-          color: tint(Palette.berry, .12),
-          child: Text('看不了改动：$reason', style: KitText.sm.copyWith(color: Palette.berry)),
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(issueChangesProvider(session.issueId))
+      .when(
+        loading: () => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: Text(
+            '正在看它改了什么…',
+            textAlign: TextAlign.center,
+            style: KitText.sm.copyWith(color: Palette.bark600),
+          ),
         ),
-        const SizedBox(height: 12),
-        PxButton.text('先不收', onPressed: widget.onDone),
-      ],
-    ),
-    LoadReady(:final changes) => _Ready(session: widget.session, changes: changes, onDone: widget.onDone),
-  };
+        error: (error, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Tinted(
+              color: tint(Palette.berry, .12),
+              child: Text('看不了改动：${reasonOf(error)}', style: KitText.sm.copyWith(color: Palette.berry)),
+            ),
+            const SizedBox(height: 12),
+            PxButton.text('先不收', onPressed: onDone),
+          ],
+        ),
+        data: (changes) => _Ready(session: session, changes: changes, onDone: onDone),
+      );
 }
 
 class _Ready extends ConsumerWidget {
@@ -103,12 +59,12 @@ class _Ready extends ConsumerWidget {
     final conflicts = changes.conflicts;
     final commands = ref.read(farmCommandsProvider);
     void take() {
-      fireBedEffects(ref, commands.harvest(session));
+      fire(commands.harvest(session));
       onDone();
     }
 
     void resolve() {
-      fireBedEffects(ref, commands.resolve(session));
+      fire(commands.resolve(session));
       onDone();
     }
 

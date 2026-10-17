@@ -12,12 +12,11 @@ import 'mobile_notices.dart' show PhoneNotices, isPhone;
 import 'notify.dart';
 
 class HostDelivery {
-  const HostDelivery({required this.notify, this.tray, this.canNotify, this.keepLinked});
+  const HostDelivery({required this.notify, this.tray, this.canNotify});
 
   final Future<void> Function(HostNotice) notify;
   final Future<void> Function(TraySummary)? tray;
   final bool Function()? canNotify;
-  final Future<void> Function(bool)? keepLinked;
 }
 
 final hostDeliveryProvider = Provider<HostDelivery?>((ref) {
@@ -26,11 +25,7 @@ final hostDeliveryProvider = Provider<HostDelivery?>((ref) {
     return HostDelivery(notify: DesktopHostChannel.instance.notify, tray: DesktopHostChannel.instance.tray);
   }
   if (isPhone) {
-    return HostDelivery(
-      notify: PhoneNotices.instance.show,
-      canNotify: () => WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed,
-      keepLinked: PhoneNotices.instance.keepLinked,
-    );
+    return HostDelivery(notify: PhoneNotices.instance.show, canNotify: () => WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed);
   }
   return null;
 });
@@ -38,8 +33,7 @@ final hostDeliveryProvider = Provider<HostDelivery?>((ref) {
 final hostFollowProvider = Provider<void>((ref) {
   final delivery = ref.watch(hostDeliveryProvider);
   if (delivery == null) return;
-  final follow = HostFollow(ref, delivery);
-  ref.onDispose(follow.dispose);
+  HostFollow(ref, delivery);
 });
 
 class HostFollow {
@@ -63,22 +57,15 @@ class HostFollow {
     });
     ref.listen(effectsProvider, (_, next) => _tell(next.value == null ? null : noticeForEffect(next.value!)));
     ref.listen(sideEventsProvider, (_, next) => _tell(next.value == null ? null : noticeForEvent(next.value!)));
-    final keep = delivery.keepLinked;
-    if (keep != null) {
-      _lifecycle = AppLifecycleListener(onPause: () => unawaited(keep(true)), onResume: () => unawaited(keep(false)));
-    }
   }
 
   final Ref ref;
   final HostDelivery delivery;
   final _bell = CallBell();
   TraySummary? _shown;
-  AppLifecycleListener? _lifecycle;
 
   void _tell(HostNotice? notice) {
     if (notice == null || delivery.canNotify?.call() == false) return;
     unawaited(delivery.notify(notice));
   }
-
-  void dispose() => _lifecycle?.dispose();
 }

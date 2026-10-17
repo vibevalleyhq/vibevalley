@@ -43,7 +43,7 @@ func (a voiceQQAdapter) Receive(ctx context.Context, secrets map[string]string, 
 		if m.Attachments > 0 {
 			parts = append(parts, "[附件]")
 		}
-		io.Got(voiceInbound{ID: m.ID, From: m.From, Text: strings.Join(parts, "\n"), Reply: m.ID})
+		io.take(ctx, voiceInbound{ID: m.ID, From: m.From, Text: strings.Join(parts, "\n"), Reply: m.ID})
 	})
 	if err == nil || ctx.Err() != nil {
 		return nil

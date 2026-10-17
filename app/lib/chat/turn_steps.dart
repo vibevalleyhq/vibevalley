@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/remote.dart' show workStepsProvider;
+import '../data/remote.dart' show sessionEventsProvider;
 import '../shared/work_log.dart';
 import '../game/state.dart' show turnEndingAt;
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
-
-final _preloaded = <String>{};
 
 class TurnSteps extends ConsumerStatefulWidget {
   const TurnSteps({super.key, required this.id, required this.at, this.manager = false});
@@ -22,18 +20,9 @@ class TurnSteps extends ConsumerStatefulWidget {
 class _TurnStepsState extends ConsumerState<TurnSteps> {
   var _open = false;
 
-  void _load() => ref.read(workStepsProvider.notifier).load(widget.id).then((_) {}, onError: (Object _) {});
-
-  @override
-  void initState() {
-    super.initState();
-    // The manager's trajectory is read once per run, for the count under its messages; step events keep it up.
-    if (widget.manager && _preloaded.add(widget.id)) _load();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final steps = ref.watch(workStepsProvider.select((all) => all[widget.id]));
+    final steps = ref.watch(sessionEventsProvider(widget.id)).value;
     final turn = steps == null ? const <SessionEvent>[] : turnEndingAt(steps, widget.at);
     final tools = turn.where((s) => s.type == SessionEventType.toolCall).length;
     if (widget.manager && tools == 0) return const SizedBox.shrink();
@@ -47,8 +36,6 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
             alignment: Alignment.centerLeft,
             child: KitTappable(
               onTap: () {
-                // A helper's steps here may be only those since it opened: the whole trajectory comes first.
-                if (!_open && !widget.manager) _load();
                 setState(() => _open = !_open);
               },
               builder: (context, s) => Row(

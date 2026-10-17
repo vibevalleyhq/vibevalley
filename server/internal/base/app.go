@@ -65,7 +65,11 @@ func NewApp(cfg Config, layers []Layer, options ...fx.Option) (*App, error) {
 
 func (a *App) Start(ctx context.Context) error {
 	ctx, a.cancel = context.WithCancel(ctx)
-	return a.app.Start(ctx)
+	if err := a.app.Start(ctx); err != nil {
+		a.cancel()
+		return err
+	}
+	return nil
 }
 
 func (a *App) Close() {
@@ -75,7 +79,9 @@ func (a *App) Close() {
 	if err := a.app.Stop(context.Background()); err != nil {
 		log.Printf("vibevalley: stopping: %v", err)
 	}
-	a.db.Close()
+	if a.db != nil {
+		a.db.Close()
+	}
 }
 
 func (a *App) Readied() []Readier {

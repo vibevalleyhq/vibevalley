@@ -256,6 +256,25 @@ func (a *Agent) Prompt(ctx context.Context, messages ...AgentMessage) error {
 	return wait(ctx, h)
 }
 
+// Submit admits a message synchronously under the run lock. The returned channel
+// signals the admitted run's completion; queued inputs do not start another run.
+func (a *Agent) Submit(message AgentMessage, steer bool) (<-chan struct{}, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.current != nil {
+		if steer {
+			a.steeringQueue = append(a.steeringQueue, message)
+		} else {
+			a.followUpQueue = append(a.followUpQueue, message)
+		}
+		return a.current.done, false
+	}
+	h := a.startLocked(func(runCtx context.Context, s AgentState) {
+		RunAgentLoop(runCtx, []AgentMessage{message}, contextOf(s), a.config(s), a.emit)
+	})
+	return h.done, true
+}
+
 func (a *Agent) PromptText(ctx context.Context, text string, images ...ai.Content) error {
 	return a.Prompt(ctx, UserMessageOf(text, images...))
 }

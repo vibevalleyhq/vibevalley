@@ -467,17 +467,13 @@ func (c *Service) resolveTarget(who, target string) (string, error) {
 	if parent == nil {
 		return "", chatFail("频道里没有 %d 这条消息", parsed.Parent)
 	}
-	if under, err := s.threadByParent(parent.ID); err != nil {
-		return "", err
-	} else if under != nil {
-		return *under, nil
-	}
-	if parent.Conversation != channel {
-		return "", chatFail("频道里没有 %d 这条消息", parsed.Parent)
-	}
-	talk := string(protocol.SubjectKindTalk)
-	thread := base.NewID()
-	if err := s.createThread(thread, parent.ID, parent.Number, &talk, nil, channel, clock.NowMs()); err != nil {
+	var thread string
+	err = c.inTx(func(s chatStore) error {
+		var err error
+		thread, err = s.threadFor(*parent, threadSubject{kind: protocol.SubjectKindTalk})
+		return err
+	})
+	if err != nil {
 		return "", err
 	}
 	c.publishConversation(thread)
@@ -502,11 +498,11 @@ func (c *Service) Say(text string, conversation *string) (protocol.ChatMessage, 
 	if conv == nil {
 		return protocol.ChatMessage{}, chatFail("没有 %s 这个对话", where)
 	}
-	written, err := c.insert(chatInsert{conversation: where, from: "user", kind: protocol.MessageKindChat, text: str.Trim(text), final: true})
+	written, err := c.write(chatWrite{conversation: where, from: "user", kind: protocol.MessageKindChat, text: str.Trim(text), final: true})
 	if err != nil {
 		return protocol.ChatMessage{}, err
 	}
-	if err := s.setReadCursor("user", where, written.number, clock.NowMs()); err != nil {
+	if err := c.readThrough("user", where, written.number); err != nil {
 		return protocol.ChatMessage{}, err
 	}
 	c.publishConversation(where)
@@ -543,13 +539,13 @@ func (c *Service) TellSession(from, session, text string) (protocol.ChatMessage,
 		c.sessions.Deliver(session, str.Trim(text), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
 		return protocol.ChatMessage{}, nil
 	}
-	written, err := c.insert(chatInsert{conversation: *thread, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true})
+	written, err := c.write(chatWrite{conversation: *thread, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true})
 	if err != nil {
 		return protocol.ChatMessage{}, err
 	}
 	s := c.store()
 	if from == "user" {
-		if err := s.setReadCursor("user", *thread, written.number, clock.NowMs()); err != nil {
+		if err := c.readThrough("user", *thread, written.number); err != nil {
 			return protocol.ChatMessage{}, err
 		}
 	}
@@ -641,7 +637,7 @@ func (c *Service) Speak(from, text string, opt SpeakOptions) (Spoken, error) {
 			return Spoken{}, err
 		}
 	}
-	written, err := c.insert(chatInsert{conversation: conversation, from: from, kind: protocol.MessageKindChat, text: words, final: true, answers: answers})
+	written, err := c.write(chatWrite{conversation: conversation, from: from, kind: protocol.MessageKindChat, text: words, final: true, answers: answers})
 	if err != nil {
 		return Spoken{}, err
 	}
@@ -670,13 +666,13 @@ func (c *Service) Spoken(from, text string) {
 	if str.Trim(text) == "" {
 		return
 	}
-	written, err := c.insert(chatInsert{conversation: c.general, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true, meta: &chatMeta{Spoken: true}})
+	written, err := c.write(chatWrite{conversation: c.general, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true, meta: &chatMeta{Spoken: true}})
 	if err != nil {
 		log.Printf("chat: words said on a call: %v", err)
 		return
 	}
 	if from == "user" {
-		if err := c.store().setReadCursor("user", c.general, written.number, clock.NowMs()); err != nil {
+		if err := c.readThrough("user", c.general, written.number); err != nil {
 			log.Printf("chat: words said on a call: %v", err)
 		}
 	}
@@ -687,51 +683,27 @@ func (c *Service) Spoken(from, text string) {
 func (c *Service) ManagerSays(conversation string, key, text string, final bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	id, growing := c.streaming[key]
-	if !growing {
-		if str.Trim(text) == "" && !final {
-			return
-		}
-		written, err := c.insert(chatInsert{conversation: conversation, from: protocol.ManagerAgent, kind: protocol.MessageKindChat, text: text, final: final})
-		if err != nil {
-			log.Printf("chat: the manager's words: %v", err)
-			return
-		}
-		if !final {
-			c.streaming[key] = written.id
-		}
+	id := c.streaming[key]
+	if id == "" && str.Trim(text) == "" && !final {
 		return
 	}
-	if !final {
-		if err := c.store().updateMessageBody(id, text, false, clock.NowMs()); err != nil {
-			log.Printf("chat: the manager's words: %v", err)
-			return
-		}
-		c.publishMessage(id, nil)
-		return
-	}
-	delete(c.streaming, key)
-	var written chatWritten
-	err := c.inTx(func(s chatStore) error {
-		if err := s.updateMessageBody(id, text, true, clock.NowMs()); err != nil {
-			return err
-		}
-		var err error
-		written, err = c.settle(s, id)
-		return err
-	})
+	written, err := c.write(chatWrite{id: id, conversation: conversation, from: protocol.ManagerAgent, kind: protocol.MessageKindChat, text: text, final: final})
 	if err != nil {
 		log.Printf("chat: the manager's words: %v", err)
 		return
 	}
-	c.after(conversation, written, nil)
+	if final {
+		delete(c.streaming, key)
+	} else {
+		c.streaming[key] = written.id
+	}
 }
 
 // code names the kind, for dropping repeats.
 func (c *Service) Notice(conversation string, text, code string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if _, err := c.insert(chatInsert{conversation: conversation, from: "system", kind: protocol.MessageKindNotice, text: text, final: true, meta: &chatMeta{Code: code}}); err != nil {
+	if _, err := c.write(chatWrite{conversation: conversation, from: "system", kind: protocol.MessageKindNotice, text: text, final: true, meta: &chatMeta{Code: code}}); err != nil {
 		log.Printf("chat: notice: %v", err)
 	}
 }
@@ -779,14 +751,7 @@ func (c *Service) Read(who string, opt ReadOptions) (ReadResult, error) {
 		return ReadResult{}, err
 	}
 	if len(rows) > 0 && opt.Before == 0 {
-		upto, now := rows[len(rows)-1].Number, clock.NowMs()
-		if err := s.setReadCursor(who, conversation, upto, now); err != nil {
-			return ReadResult{}, err
-		}
-		if err := s.pruneSeenMarks(who, conversation, upto); err != nil {
-			return ReadResult{}, err
-		}
-		if err := s.seenUpTo(who, conversation, upto, now); err != nil {
+		if err := c.readThrough(who, conversation, rows[len(rows)-1].Number); err != nil {
 			return ReadResult{}, err
 		}
 	}
@@ -846,7 +811,7 @@ func (c *Service) MarkRead(conversation string, seq int64) error {
 	if row == nil {
 		return chatFail("没有 %s 这个对话", conversation)
 	}
-	if err := s.setReadCursor("user", conversation, seq, clock.NowMs()); err != nil {
+	if err := c.readThrough("user", conversation, seq); err != nil {
 		return err
 	}
 	c.publishConversation(conversation)

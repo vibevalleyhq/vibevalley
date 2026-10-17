@@ -153,10 +153,11 @@ func (l *Service) shut() {
 }
 
 func (l *Service) SetOpen(open bool) (protocol.LanStatus, error) {
+	l.mu.Lock()
 	if err := l.q.SetGateOpen(context.Background(), open); err != nil {
+		l.mu.Unlock()
 		return protocol.LanStatus{}, err
 	}
-	l.mu.Lock()
 	l.open = open
 	if open {
 		l.listen()
@@ -379,6 +380,10 @@ func (l *Service) gate(inner http.Handler) http.Handler {
 		}
 		ctx, done := l.track(r.Context(), d)
 		defer done()
+		if ctx.Err() != nil {
+			lanRefuse(w, http.StatusUnauthorized, "这台设备已经被主人移除了")
+			return
+		}
 		inner.ServeHTTP(w, r.WithContext(context.WithValue(ctx, lanDeviceKey{}, d)))
 	})
 }
@@ -419,6 +424,11 @@ func (l *Service) deviceOf(header string) string {
 func (l *Service) track(ctx context.Context, device string) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	l.mu.Lock()
+	if l.devices[device] == nil {
+		l.mu.Unlock()
+		cancel()
+		return ctx, func() {}
+	}
 	l.next++
 	n := l.next
 	if l.conns[device] == nil {

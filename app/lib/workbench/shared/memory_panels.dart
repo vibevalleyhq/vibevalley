@@ -37,14 +37,8 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
   String _shown = '';
 
   @override
-  void initState() {
-    super.initState();
-    runAction(() => ref.read(memoriesProvider.notifier).load(widget.agent));
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final list = ref.watch(memoriesProvider.select((all) => all[widget.agent]));
+    final list = ref.watch(memoryProvider(widget.agent)).value?.memories;
     final sessions = {for (final h in ref.watch(stateProvider)?.sessions ?? const <Session>[]) h.id: h.name};
     final now = _now();
     final all = list ?? const <Memory>[];
@@ -95,7 +89,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                 ),
         ),
         _RecallPreview(agent: widget.agent),
-        WriteNote(onWrite: (text, project) => ref.read(memoriesProvider.notifier).write(widget.agent, text, project), withProject: true),
+        WriteNote(onWrite: (text, project) => ref.read(memoryProvider(widget.agent).notifier).write(text, project), withProject: true),
         WorkbenchSection(
           title: '记下的',
           count: notes.length,
@@ -121,7 +115,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                   MemoryItem(
                     memory: m,
                     faded: m.fading == true,
-                    onForget: () => runAction(() => ref.read(memoriesProvider.notifier).forget(widget.agent, m.id)),
+                    onForget: () => runAction(() => ref.read(memoryProvider(widget.agent).notifier).forget(m.id)),
                     meta: [
                       m.project ?? '所有项目',
                       whose(m),
@@ -196,23 +190,12 @@ class _RecallPreviewState extends ConsumerState<_RecallPreview> {
   }
 }
 
-class ManagerMemoryPanel extends ConsumerStatefulWidget {
+class ManagerMemoryPanel extends ConsumerWidget {
   const ManagerMemoryPanel({super.key});
 
   @override
-  ConsumerState<ManagerMemoryPanel> createState() => _ManagerMemoryPanelState();
-}
-
-class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
-  @override
-  void initState() {
-    super.initState();
-    runAction(() => ref.read(managerMemoryProvider.notifier).load());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final view = ref.watch(managerMemoryProvider);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final view = ref.watch(memoryProvider(managerAgent)).value;
     if (view == null) return const EmptyNote('在读管家的记性……');
     final now = _now();
     return Column(
@@ -220,7 +203,7 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
       mainAxisSize: MainAxisSize.min,
       children: _gap([
         Text('管家每次开口前，整份记性都放在系统提示里；太长时只带最新的（最多 8000 字）。它自己用 remember 记、用 rewrite_memory 整理，你也可以替它记一条。', style: _lead),
-        WriteNote(onWrite: (text, _) => ref.read(managerMemoryProvider.notifier).write(text)),
+        WriteNote(onWrite: (text, _) => ref.read(memoryProvider(managerAgent).notifier).write(text)),
         WorkbenchSection(
           title: '记下的',
           count: view.memories.length,
@@ -237,7 +220,7 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
                       MemoryItem(
                         memory: m,
                         faded: i >= (view.carried ?? view.memories.length),
-                        onForget: () => runAction(() => ref.read(managerMemoryProvider.notifier).forget(m.id)),
+                        onForget: () => runAction(() => ref.read(memoryProvider(managerAgent).notifier).forget(m.id)),
                         meta: [m.session == managerAgent ? '管家自己记的' : '你交代的', ago(m.at, now)],
                         warning: i >= (view.carried ?? view.memories.length) ? '太旧了，带不进系统提示' : null,
                       ),

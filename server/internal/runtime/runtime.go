@@ -218,6 +218,7 @@ func (r *Service) tallyLocked() map[string]float64 {
 }
 
 func (r *Service) withSpendLocked(info protocol.RuntimeInfo) protocol.RuntimeInfo {
+	info.SpentToday = nil
 	if cny, ok := r.tallyLocked()[info.ID]; ok {
 		info.SpentToday = &cny
 	}
@@ -588,6 +589,9 @@ func (r *Service) Refresh(ctx context.Context, id string) *protocol.RuntimeInfo 
 func (r *Service) Info(ctx context.Context, id string) *protocol.RuntimeInfo {
 	r.mu.Lock()
 	hit, ok := r.cache[id]
+	if ok {
+		hit = r.withSpendLocked(hit)
+	}
 	r.mu.Unlock()
 	if ok {
 		return &hit
@@ -622,11 +626,14 @@ func (r *Service) List(ctx context.Context) []protocol.RuntimeInfo {
 	return out
 }
 
-func (r *Service) Update(ctx context.Context, id string, s protocol.RuntimeSettings) *protocol.RuntimeInfo {
-	if _, err := r.store.SaveSettings(id, s); err != nil {
-		log.Printf("vibevalley: could not save the settings of %s: %v", id, err)
+func (r *Service) Update(ctx context.Context, id string, s protocol.RuntimeSettings) (*protocol.RuntimeInfo, error) {
+	if !knownRuntime(id) {
+		return nil, nil
 	}
-	return r.Refresh(ctx, id)
+	if _, err := r.store.SaveSettings(id, s); err != nil {
+		return nil, fmt.Errorf("save runtime %s settings: %w", id, err)
+	}
+	return r.Refresh(ctx, id), nil
 }
 
 func (r *Service) refreshUsage(ctx context.Context, id string) {
@@ -701,9 +708,6 @@ func (r *Service) Price(id, model string) *Price {
 	}
 	return nil
 }
-
-// Prices are in dollars; the farm talks in yuan (cny_per_usd in the configuration, 7.2 by default).
-func (r *Service) CnyPerUsd() float64 { return r.cnyPerUsd }
 
 func (r *Service) Spend(id string, cny float64) {
 	if !(cny > 0) {

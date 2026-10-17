@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../shared/harvest.dart' show HarvestReview;
 import '../../game/commands.dart' show farmCommandsProvider;
-import '../../game/state.dart' show BedEffect, applyBedEffects;
 import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart' show roundsOf, tookText;
 import '../../rules/issues.dart';
@@ -16,8 +15,10 @@ import '../shared/layout.dart';
 import '../projects/new_project_dialog.dart' show showNewProjectDialog;
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
+import '../shared/config_problem.dart';
 import '../../shared/work_log.dart';
 import 'issues_page.dart';
+import 'issue_submission.dart';
 
 class CloseIssue extends ConsumerStatefulWidget {
   const CloseIssue({super.key, required this.session});
@@ -124,14 +125,11 @@ class _TodoState extends ConsumerState<TodoDetail> {
   late String _agent = widget.item?.assignee ?? '';
   late Priority _priority = widget.item?.priority ?? Priority.medium;
   bool _busy = false;
+  late final IssueSubmission _submission;
 
   Future<void> _newProject(BuildContext context) async {
-    final before = {...?ref.read(projectNamesProvider).value};
-    await showNewProjectDialog(context);
-    ref.invalidate(projectNamesProvider);
-    final after = await ref.read(projectNamesProvider.future);
-    final made = after.where((p) => !before.contains(p)).firstOrNull;
-    if (made != null && mounted) setState(() => _project = made);
+    final made = await showNewProjectDialog(context);
+    if (made != null && mounted) setState(() => _project = made.name);
   }
 
   IssueRequest get _request => IssueRequest(
@@ -142,12 +140,13 @@ class _TodoState extends ConsumerState<TodoDetail> {
     priority: _priority,
   );
 
-  // The whole form: an empty project or agent clears it.
-  IssueUpdate get _update => IssueUpdate(title: _title, description: _description, project: _project, assignee: _agent, priority: _priority);
-
-  Future<void> _run(Future<void> Function(VibeValleyApi api) act) async {
+  Future<void> _run(Future<void> Function() act) async {
     setState(() => _busy = true);
-    await runAction(() => act(ref.read(apiProvider)));
+    final done = await runAction(() async {
+      await act();
+      return true;
+    });
+    if (done != true && widget.item == null && _submission.saved != null && mounted) widget.onDone(_submission.saved!.id);
     await widget.reload();
     if (mounted) setState(() => _busy = false);
   }
@@ -155,38 +154,35 @@ class _TodoState extends ConsumerState<TodoDetail> {
   @override
   void initState() {
     super.initState();
+    _submission = IssueSubmission(ref.read(apiProvider).issue, initial: widget.item);
     if (widget.item == null) {
       unawaited(
-        lastPick().then((pick) {
+        IssueSubmission.remembered().then((pick) {
           if (!mounted) return;
           setState(() {
-            if (_agent.isEmpty) _agent = pick.$1;
-            if (_project.isEmpty) _project = pick.$2;
+            if (_agent.isEmpty) _agent = pick.agent;
+            if (_project.isEmpty) _project = pick.project;
           });
         }),
       );
     }
   }
 
-  Future<void> _save() => _run((api) async {
-    unawaited(rememberPick(_agent, _project));
-    final item = widget.item;
-    final saved = item == null ? await api.issue.create(body: _request) : await api.issue.update(id: item.id, body: _update);
-    if (item == null) widget.onDone(saved.id);
+  Future<void> _save() => _run(() async {
+    final saved = await _submission.save(_request);
+    if (widget.item == null) widget.onDone(saved.id);
   });
 
-  Future<void> _start() => _run((api) async {
-    unawaited(rememberPick(_agent, _project));
-    final item = widget.item ?? await api.issue.create(body: _request);
-    if (widget.item != null) await api.issue.update(id: item.id, body: _update);
-    final got = await api.issue.start(id: item.id);
-    dispatchedNotice(got, item.id, widget.onDone);
-    // Waiting for a bed: a new one stays open, now as the 待办 it is.
-    if (got.session == null && widget.item == null) widget.onDone(item.id);
+  Future<void> _start() => _run(() async {
+    final got = await _submission.start(_request);
+    final id = _submission.saved!.id;
+    dispatchedNotice(got, id, widget.onDone);
+    if (got.session == null && widget.item == null) widget.onDone(id);
   });
 
   @override
   Widget build(BuildContext context) {
+    if (ref.watch(workbenchConfigProvider).error != null) return const ConfigProblem();
     final projects = ref.watch(projectNamesProvider).value ?? const <String>[];
     final agents = (ref.watch(workbenchConfigProvider).agents).where((a) => a.enabled).toList();
     final issues = watchAgentIssues(ref, agents);
@@ -281,7 +277,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
                   PxButton.text(
                     '不排了',
                     size: PxSize.sm,
-                    onPressed: _busy ? null : () => _run((api) => api.issue.unqueue(id: widget.item!.id)),
+                    onPressed: _busy ? null : () => _run(() => ref.read(apiProvider).issue.unqueue(id: widget.item!.id)),
                   ),
                 ],
               ),
@@ -300,8 +296,8 @@ class _TodoState extends ConsumerState<TodoDetail> {
                   tone: PxTone.danger,
                   onPressed: _busy
                       ? null
-                      : () => _run((api) async {
-                          await api.issue.delete(id: item.id);
+                      : () => _run(() async {
+                          await ref.read(apiProvider).issue.delete(id: item.id);
                           widget.onDone(null);
                         }),
                 ),
@@ -331,47 +327,11 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
   String _word = '';
   bool _busy = false;
 
-  Future<Changes?>? _changes;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(runAction(() => ref.read(workStepsProvider.notifier).load(widget.sessions.last.id)));
-    _askChanges(first: true);
-  }
-
-  @override
-  void didUpdateWidget(IssueDetail old) {
-    super.didUpdateWidget(old);
-    if (old.state != widget.state) _askChanges();
-  }
-
-  /// `first` from initState, before any build.
-  void _askChanges({bool first = false}) {
-    if (widget.state != IssueTag.waiting || widget.session == null) return;
-    final asked = ref.read(apiProvider).issue.changes(id: widget.issue.id).then<Changes?>((c) => c, onError: (Object _) => null);
-    if (first) {
-      _changes = asked;
-    } else {
-      setState(() {
-        _changes = asked;
-      });
-    }
-  }
-
   VibeValleyApi get _api => ref.read(apiProvider);
 
   Future<void> _act(Future<void> Function() act) async {
     setState(() => _busy = true);
     await runAction(act);
-    await widget.reload();
-    if (mounted) setState(() => _busy = false);
-  }
-
-  Future<void> _actEffects(Future<List<BedEffect>> Function() act) async {
-    setState(() => _busy = true);
-    final effects = await runAction(act);
-    if (effects != null) applyBedEffects(ref, effects);
     await widget.reload();
     if (mounted) setState(() => _busy = false);
   }
@@ -382,8 +342,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
     if (session == null || text.isEmpty) return;
     setState(() => _busy = true);
     final done = await runAction(() async {
-      final effects = await ref.read(farmCommandsProvider).water(session, text);
-      applyBedEffects(ref, effects);
+      await ref.read(farmCommandsProvider).water(session, text);
       return true;
     });
     if (!mounted) return;
@@ -442,12 +401,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
         ?bed,
       ],
       (IssueTag.waiting, final h?) when h.conflict != null => [
-        PxButton.text(
-          '让它解决冲突',
-          size: PxSize.sm,
-          tone: PxTone.primary,
-          onPressed: busy ? null : () => _actEffects(() => ref.read(farmCommandsProvider).resolve(h)),
-        ),
+        PxButton.text('让它解决冲突', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).resolve(h))),
         PxButton.text('关上', size: PxSize.sm, tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
         ?bed,
       ],
@@ -457,7 +411,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
           '接着做',
           size: PxSize.sm,
           tone: PxTone.primary,
-          onPressed: busy ? null : () => _actEffects(() => ref.read(farmCommandsProvider).water(h, '上一轮停在了半路，接着把它做完。')),
+          onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).water(h, '上一轮停在了半路，接着把它做完。')),
         ),
         PxButton.text('收获', size: PxSize.sm, onPressed: busy ? null : () => _close(h)),
         PxButton.text('关上', size: PxSize.sm, tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
@@ -466,7 +420,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
       (IssueTag.waiting, final h?) => [
         if (h.lastRun?.outcome != Outcome.failed) PxButton.text('收获', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _close(h)),
         if (h.lastRun?.outcome == Outcome.failed)
-          PxButton.text('接着修', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _actEffects(() => ref.read(farmCommandsProvider).cure(h))),
+          PxButton.text('接着修', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).cure(h))),
         PxButton.text('关上', size: PxSize.sm, tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
         ?bed,
       ],
@@ -481,7 +435,8 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
     final head = sessions.last;
     final session = widget.session;
     final open = widget.state.open;
-    final steps = ref.watch(workStepsProvider.select((all) => all[head.id])) ?? const <SessionEvent>[];
+    final changes = widget.state == IssueTag.waiting && session != null ? ref.watch(issueChangesProvider(issue.id)) : null;
+    final steps = ref.watch(sessionEventsProvider(head.id)).value ?? const <SessionEvent>[];
     final body = KitText.sm.copyWith(color: Palette.bark800);
     final turns = (session ?? head).runs;
     final cny = (session ?? head).spent?.cny;
@@ -533,16 +488,15 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
           ),
         ),
         _RunsCard(issue: issue.id, version: '${widget.state}:${session?.runs}:${session?.phase.runtimeType}'),
-        if (_changes != null) ...[
+        if (changes != null) ...[
           const SizedBox(height: 12),
-          FutureBuilder<Changes?>(
-            future: _changes,
-            builder: (context, snap) {
-              final c = snap.data;
+          Builder(
+            builder: (context) {
+              final c = changes.value;
               if (c == null) {
                 return PxCard(
                   title: '改动',
-                  child: Text(snap.connectionState == ConnectionState.done ? '读不到改动。' : '在读……', style: body),
+                  child: Text(changes.isLoading ? '在读……' : '读不到改动。', style: body),
                 );
               }
               final added = c.files.fold<double>(0, (n, f) => n + f.added).round();
@@ -588,9 +542,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
                     now: now,
                     tall: true,
                     working: widget.state == IssueTag.working,
-                    onComment: open && session != null
-                        ? (step, text) async => applyBedEffects(ref, await ref.read(farmCommandsProvider).water(session, text, on: step))
-                        : null,
+                    onComment: open && session != null ? (step, text) => ref.read(farmCommandsProvider).water(session, text, on: step) : null,
                   ),
                 ),
         ),

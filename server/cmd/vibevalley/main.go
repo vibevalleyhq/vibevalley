@@ -10,13 +10,11 @@
 package main
 
 import (
-	"bufio"
 	"cmp"
 	"context"
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -226,31 +224,26 @@ func run(cwdFlag, name, model, mcpFile, once string, asked bool) error {
 	mu.Unlock()
 	fmt.Print("› ")
 
-	interrupts := make(chan os.Signal, 1)
-	signal.Notify(interrupts, os.Interrupt)
-	defer signal.Stop(interrupts)
-	lines := make(chan string)
-	go func() {
-		defer close(lines)
-		scanner := bufio.NewScanner(os.Stdin)
-		scanner.Buffer(make([]byte, 1<<20), 1<<20)
-		for scanner.Scan() {
-			lines <- scanner.Text()
-		}
-	}()
+	input := openTerminal(ctx, os.Stdin)
+	defer input.close()
 	for {
 		select {
-		case <-interrupts:
-			if !a.Busy() {
-				fmt.Println()
-				return nil
-			}
-			a.Stop()
-		case line, ok := <-lines:
+		case event, ok := <-input.events:
 			if !ok {
 				return nil
 			}
-			text := strings.TrimSpace(line)
+			if event.err != nil {
+				return event.err
+			}
+			if event.interrupt {
+				if !a.Busy() {
+					fmt.Println()
+					return nil
+				}
+				a.Stop()
+				continue
+			}
+			text := event.text
 			switch {
 			case text == "/exit":
 				return nil

@@ -74,6 +74,9 @@ func parseField(field string, low, high int, names map[string]int) (map[int]bool
 		}
 		for n := from; n <= to; n += step {
 			set[n] = true
+			if step > to-n {
+				break
+			}
 		}
 	}
 	return set, restricted, nil
@@ -86,6 +89,9 @@ func ParseCronExpression(expr string, loc *time.Location) (*Cron, error) {
 	}
 	if len(fields) != 6 {
 		return nil, errors.New("invalid number of segments in cron expression")
+	}
+	if loc == nil {
+		loc = time.Local
 	}
 	c := &Cron{loc: loc}
 	var err error
@@ -132,19 +138,19 @@ func (c *Cron) Next(from time.Time) time.Time {
 	limit := t.AddDate(5, 0, 0)
 	for t.Before(limit) {
 		if !c.months[int(t.Month())] {
-			t = time.Date(t.Year(), t.Month()+1, 1, 0, 0, 0, 0, c.loc)
+			t = nextCalendar(t, t.Year(), t.Month()+1, 1)
 			continue
 		}
 		if !c.dayMatches(t) {
-			t = time.Date(t.Year(), t.Month(), t.Day()+1, 0, 0, 0, 0, c.loc)
+			t = nextCalendar(t, t.Year(), t.Month(), t.Day()+1)
 			continue
 		}
 		if !c.hours[t.Hour()] {
-			t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour()+1, 0, 0, 0, c.loc)
+			t = t.Add(time.Duration(60-t.Minute())*time.Minute - time.Duration(t.Second())*time.Second)
 			continue
 		}
 		if !c.minutes[t.Minute()] {
-			t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()+1, 0, 0, c.loc)
+			t = t.Add(time.Duration(60-t.Second()) * time.Second)
 			continue
 		}
 		if !c.seconds[t.Second()] {
@@ -154,4 +160,13 @@ func (c *Cron) Next(from time.Time) time.Time {
 		return t
 	}
 	return time.Time{}
+}
+
+// Some zones skip midnight; normalization must never move the search backward.
+func nextCalendar(from time.Time, year int, month time.Month, day int) time.Time {
+	next := time.Date(year, month, day, 0, 0, 0, 0, from.Location())
+	if !next.After(from) {
+		return from.Add(time.Hour)
+	}
+	return next
 }

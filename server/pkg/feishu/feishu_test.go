@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -104,5 +105,25 @@ func TestClientRegistersAndSends(t *testing.T) {
 	}
 	if got := Text(Message{MessageType: "image"}); got != "[图片]" {
 		t.Fatal(got)
+	}
+}
+
+func TestSendRequiresMessageID(t *testing.T) {
+	for _, response := range []string{`{"code":0}`, `{"code":0,"data":{}}`, `{"code":0,"data":{"message_id":""}}`} {
+		t.Run(response, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "tenant_access_token") {
+					io.WriteString(w, `{"code":0,"tenant_access_token":"t","expire":7200}`)
+					return
+				}
+				io.WriteString(w, response)
+			}))
+			defer server.Close()
+			client := NewClient()
+			client.open["feishu"] = server.URL
+			if _, err := client.SendText(context.Background(), App{AppID: response, AppSecret: "secret", Domain: "feishu"}, "owner", "text"); err == nil {
+				t.Fatal("missing message id accepted")
+			}
+		})
 	}
 }

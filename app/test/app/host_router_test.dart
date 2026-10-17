@@ -5,15 +5,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibevalley/app/host_router.dart';
 import 'package:vibevalley/data/ui_state.dart';
+import 'package:vibevalley/data/voice.dart';
+import 'package:vibevalley/voice/voice.dart';
+import '../support/server.dart';
 import 'package:vibevalley/host/desktop.dart';
+
+class CommandVoice extends VoiceCall {
+  CommandVoice() : super(FakeServer().api);
+  int toggles = 0;
+  @override
+  Future<void> toggle() async => toggles++;
+}
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  test('a host command opens the thing it names, and voice is left to the farm', () async {
+  test('one host router dispatches navigation and voice commands', () async {
     final commands = StreamController<HostCommand>.broadcast();
+    final voice = CommandVoice();
     final c = ProviderContainer(
       overrides: [
+        voiceCallProvider.overrideWith((ref) => voice),
         hostProvider.overrideWithValue(
           Desktop(isDesktop: false, titleBarHeight: 0, title: '', voiceShortcut: '', nativeVoice: false, voiceDispatch: false, commands: commands.stream),
         ),
@@ -41,5 +53,6 @@ void main() {
     commands.add(const HostVoice());
     await Future<void>.delayed(Duration.zero);
     expect(c.read(selectedProvider), before);
+    expect(voice.toggles, 1);
   });
 }

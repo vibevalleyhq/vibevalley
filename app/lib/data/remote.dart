@@ -13,21 +13,24 @@ import '../rules/playbook.dart';
 String reasonOf(Object e) => e is VibeValleyApiError ? e.reason : '$e';
 
 class WorkbenchConfig {
-  const WorkbenchConfig({this.loaded = false, this.runtimes = const [], this.agents = const [], this.manager, this.skills = const []});
+  const WorkbenchConfig({this.loaded = false, this.error, this.runtimes = const [], this.agents = const [], this.manager, this.skills = const []});
   final bool loaded;
+  final String? error;
   final List<RuntimeInfo> runtimes;
   // The profiles work is sent to; the manager's is apart.
   final List<Agent> agents;
   final Agent? manager;
   final List<Skill> skills;
 
-  WorkbenchConfig copyWith({bool? loaded, List<RuntimeInfo>? runtimes, List<Agent>? agents, Agent? manager, List<Skill>? skills}) => WorkbenchConfig(
-    loaded: loaded ?? this.loaded,
-    runtimes: runtimes ?? this.runtimes,
-    agents: agents ?? this.agents,
-    manager: manager ?? this.manager,
-    skills: skills ?? this.skills,
-  );
+  WorkbenchConfig copyWith({bool? loaded, String? error, List<RuntimeInfo>? runtimes, List<Agent>? agents, Agent? manager, List<Skill>? skills}) =>
+      WorkbenchConfig(
+        loaded: loaded ?? this.loaded,
+        error: error,
+        runtimes: runtimes ?? this.runtimes,
+        agents: agents ?? this.agents,
+        manager: manager ?? this.manager,
+        skills: skills ?? this.skills,
+      );
 
   Agent? agent(String? id) => id == null ? null : agents.where((a) => a.id == id).firstOrNull;
   RuntimeInfo? runtime(String id) => runtimes.where((r) => r.id == id).firstOrNull;
@@ -36,11 +39,19 @@ class WorkbenchConfig {
 final workbenchConfigProvider = NotifierProvider<WorkbenchConfigNotifier, WorkbenchConfig>(WorkbenchConfigNotifier.new);
 
 class WorkbenchConfigNotifier extends Notifier<WorkbenchConfig> {
+  var _generation = 0;
+  var _runtimeRevision = 0;
+  final _runtimeChanges = <String, int>{};
+
   @override
   WorkbenchConfig build() {
     ref.listen(sideEventsProvider, (_, next) {
-      if (next.value case LiveEventRuntime(:final info) when state.runtimes.any((r) => r.id == info.id)) {
-        state = state.copyWith(runtimes: [for (final r in state.runtimes) r.id == info.id ? info : r]);
+      if (next.value case LiveEventRuntime(:final info)) {
+        _runtimeChanges[info.id] = ++_runtimeRevision;
+        state = state.copyWith(
+          runtimes: [for (final r in state.runtimes) r.id == info.id ? info : r, if (!state.runtimes.any((r) => r.id == info.id)) info],
+          error: state.error,
+        );
       }
     });
     unawaited(Future.microtask(refresh));
@@ -49,19 +60,32 @@ class WorkbenchConfigNotifier extends Notifier<WorkbenchConfig> {
 
   VibeValleyApi get _api => ref.read(apiProvider);
 
-  /// Runtimes take a while right after the server starts (it probes each one): the agents and skills need not wait for them.
+  /// A newer refresh owns the result; runtime pushes received during a read win over its snapshot.
   Future<void> refresh() async {
-    await Future.wait([
-      () async {
-        final (agents, skills) = (await _api.agent.list(), await _api.skill.list());
-        state = _withProfiles(agents).copyWith(skills: skills);
-      }(),
-      () async {
-        final runtimes = await _api.runtime.list();
-        state = state.copyWith(runtimes: runtimes);
-      }(),
-    ]).catchError((Object _) => const <Null>[]);
-    state = state.copyWith(loaded: true);
+    if (!ref.mounted) return;
+    final generation = ++_generation;
+    final runtimeRevision = _runtimeRevision;
+    final api = _api;
+    try {
+      await Future.wait([
+        () async {
+          final (agents, skills) = (await api.agent.list(), await api.skill.list());
+          if (ref.mounted && generation == _generation) state = _withProfiles(agents).copyWith(skills: skills);
+        }(),
+        () async {
+          final runtimes = await api.runtime.list();
+          if (!ref.mounted || generation != _generation) return;
+          final pushed = {
+            for (final r in state.runtimes)
+              if ((_runtimeChanges[r.id] ?? 0) > runtimeRevision) r.id: r,
+          };
+          state = state.copyWith(runtimes: [for (final r in runtimes) pushed.remove(r.id) ?? r, ...pushed.values]);
+        }(),
+      ]);
+      if (ref.mounted && generation == _generation) state = state.copyWith(loaded: true);
+    } on Object catch (e) {
+      if (ref.mounted && generation == _generation) state = state.copyWith(error: reasonOf(e));
+    }
   }
 
   /// agent.list has the manager's profile too: it is kept apart, so every list of profiles to send work to has none of it.
@@ -75,24 +99,23 @@ class WorkbenchConfigNotifier extends Notifier<WorkbenchConfig> {
 
   Future<void> saveAgent(Agent agent) async {
     await _api.agent.save(id: agent.id, body: agent);
-    state = _withProfiles(await _api.agent.list());
+    await refresh();
   }
 
   Future<void> deleteAgent(String id) async {
     await _api.agent.delete(id: id);
-    state = _withProfiles(await _api.agent.list());
+    await refresh();
   }
 
   Future<void> saveSkill(Skill skill) async {
     await _api.skill.save(id: skill.id, body: skill);
-    state = state.copyWith(skills: await _api.skill.list());
+    await refresh();
   }
 
   /// Deleting a skill also takes it off the agents that carried it, so both lists come back.
   Future<void> deleteSkill(String id) async {
     await _api.skill.delete(id: id);
-    final (skills, agents) = (await _api.skill.list(), await _api.agent.list());
-    state = state.copyWith(skills: skills, agents: agents);
+    await refresh();
   }
 }
 
@@ -118,14 +141,32 @@ List<InstalledSkill> installedSkills(List<RuntimeInfo> runtimes) {
     ..sort((a, b) => a.name.compareTo(b.name));
 }
 
-final projectNamesProvider = FutureProvider<List<String>>((ref) async {
-  final list = await ref.watch(apiProvider).project.list();
-  list.sort((a, b) {
-    final by = (b.last ?? 0).compareTo(a.last ?? 0);
-    return by != 0 ? by : a.name.compareTo(b.name);
-  });
-  return [for (final p in list) p.name];
-});
+final projectCatalogProvider = AsyncNotifierProvider.autoDispose<ProjectCatalog, List<ProjectSummary>>(ProjectCatalog.new);
+
+class ProjectCatalog extends AsyncNotifier<List<ProjectSummary>> {
+  @override
+  Future<List<ProjectSummary>> build() async {
+    final list = await ref.watch(apiProvider).project.list();
+    list.sort((a, b) {
+      final by = (b.last ?? 0).compareTo(a.last ?? 0);
+      return by != 0 ? by : a.name.compareTo(b.name);
+    });
+    return list;
+  }
+
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
+
+  Future<ProjectSummary> create(NewProject request) async {
+    final project = await ref.read(apiProvider).project.create(body: request);
+    await refresh();
+    return project;
+  }
+}
+
+final projectNamesProvider = FutureProvider.autoDispose<List<String>>((ref) async => [for (final p in await ref.watch(projectCatalogProvider.future)) p.name]);
 
 const stepLimit = 240;
 
@@ -139,102 +180,62 @@ List<SessionEvent> mergeSteps(List<SessionEvent> steps, List<SessionEvent> incom
   return all.length > stepLimit ? all.sublist(all.length - stepLimit) : all;
 }
 
-final workStepsProvider = NotifierProvider<EventsNotifier, Map<String, List<SessionEvent>>>(EventsNotifier.new);
+final playbookChangesProvider = FutureProvider.autoDispose.family<Changes, String>((ref, id) => ref.watch(apiProvider).playbook.changes(id: id));
 
-class EventsNotifier extends Notifier<Map<String, List<SessionEvent>>> {
+final issueChangesProvider = FutureProvider.autoDispose.family<Changes, String>((ref, id) => ref.watch(apiProvider).issue.changes(id: id));
+
+final sessionEventsProvider = AsyncNotifierProvider.autoDispose.family<SessionEvents, List<SessionEvent>, String>(SessionEvents.new);
+
+class SessionEvents extends AsyncNotifier<List<SessionEvent>> {
+  SessionEvents(this.id);
+  final String id;
+
   @override
-  Map<String, List<SessionEvent>> build() {
+  Future<List<SessionEvent>> build() async {
+    final arrived = <SessionEvent>[];
+    var loaded = false;
     ref.listen(sideEventsProvider, (_, next) {
-      if (next.value case LiveEventSession(:final id, :final activity)) {
-        state = {
-          ...state,
-          id: mergeSteps(state[id] ?? const [], [activity]),
-        };
+      if (next.value case LiveEventSession(id: final session, :final activity) when session == id) {
+        if (loaded) {
+          state = AsyncData(mergeSteps(state.value ?? const [], [activity]));
+        } else {
+          arrived.add(activity);
+        }
       }
     });
-    return const {};
-  }
-
-  /// Its log, with what came as events meanwhile kept (they are newer); then the session, null when there is none (the
-  /// manager's log is not a session's).
-  Future<Session?> load(String id) async {
-    final api = ref.read(apiProvider);
-    final events = await api.session.events(id: id);
-    final top = events.isEmpty ? -1 : events.last.seq;
-    state = {
-      ...state,
-      id: mergeSteps(events, [
-        for (final s in state[id] ?? const <SessionEvent>[])
-          if (s.seq > top) s,
-      ]),
-    };
     try {
-      return await api.session.get(id: id);
-    } on VibeValleyApiError catch (e) {
-      if (e.status == 404) return null;
-      rethrow;
+      final events = await ref.watch(apiProvider).session.events(id: id);
+      return mergeSteps(events, arrived);
+    } finally {
+      loaded = true;
     }
   }
 }
 
-final memoriesProvider = NotifierProvider<MemoriesNotifier, Map<String, List<Memory>>>(MemoriesNotifier.new);
+final memoryProvider = AsyncNotifierProvider.autoDispose.family<MemoriesNotifier, MemoryList, String>(MemoriesNotifier.new);
 
-class MemoriesNotifier extends Notifier<Map<String, List<Memory>>> {
+class MemoriesNotifier extends AsyncNotifier<MemoryList> {
+  MemoriesNotifier(this.agent);
+  final String agent;
+
   @override
-  Map<String, List<Memory>> build() => const {};
+  Future<MemoryList> build() => ref.watch(apiProvider).memory.list(agent: agent);
 
-  VibeValleyApi get _api => ref.read(apiProvider);
-
-  Future<void> load(String agent) async {
-    final list = await _api.memory.list(agent: agent);
-    state = {...state, agent: list.memories};
+  Future<void> reload() async {
+    ref.invalidateSelf();
+    await future;
   }
 
-  Future<Answer> write(String agent, String text, String? project) async {
+  Future<Answer> write(String text, [String? project]) async {
     try {
-      final memory = await _api.memory.create(
-        agent: agent,
-        body: MemoryRequest(text: text, project: project),
-      );
-      state = {
-        ...state,
-        agent: [memory, ...?state[agent]],
-      };
-      return (ok: true, text: '记下了');
-    } on Object catch (e) {
-      return (ok: false, text: reasonOf(e));
-    }
-  }
-
-  Future<void> forget(String agent, String id) async {
-    state = {
-      ...state,
-      agent: [
-        for (final m in state[agent] ?? const <Memory>[])
-          if (m.id != id) m,
-      ],
-    };
-    await _api.memory.delete(agent: agent, memory: id);
-  }
-}
-
-final managerMemoryProvider = NotifierProvider<ManagerMemoryNotifier, MemoryList?>(ManagerMemoryNotifier.new);
-
-class ManagerMemoryNotifier extends Notifier<MemoryList?> {
-  @override
-  MemoryList? build() => null;
-
-  VibeValleyApi get _api => ref.read(apiProvider);
-
-  Future<void> load() async => state = await _api.memory.list(agent: managerAgent);
-
-  Future<Answer> write(String text) async {
-    try {
-      await _api.memory.create(
-        agent: managerAgent,
-        body: MemoryRequest(text: text),
-      );
-      await load();
+      await ref
+          .read(apiProvider)
+          .memory
+          .create(
+            agent: agent,
+            body: MemoryRequest(text: text, project: project),
+          );
+      await reload();
       return (ok: true, text: '记下了');
     } on Object catch (e) {
       return (ok: false, text: reasonOf(e));
@@ -242,31 +243,22 @@ class ManagerMemoryNotifier extends Notifier<MemoryList?> {
   }
 
   Future<void> forget(String id) async {
-    final m = state;
-    if (m != null) {
-      state = MemoryList(
-        file: m.file,
-        memories: [
-          for (final x in m.memories)
-            if (x.id != id) x,
-        ],
-        carried: m.carried,
-      );
-    }
-    await _api.memory.delete(agent: managerAgent, memory: id);
-    await load();
+    await ref.read(apiProvider).memory.delete(agent: agent, memory: id);
+    await reload();
   }
 }
 
 /// The runtimes as workbenchConfigProvider has them (pushed by the server as they change); loading until it has read them.
 final runtimesProvider = Provider<AsyncValue<List<RuntimeInfo>>>((ref) {
   final config = ref.watch(workbenchConfigProvider);
+  if (config.error != null) return AsyncError(config.error!, StackTrace.current);
   return config.loaded ? AsyncData(config.runtimes) : const AsyncLoading();
 });
 
 /// The profiles by id, as workbenchConfigProvider has them: an edit anywhere shows everywhere.
 final agentsProvider = Provider<AsyncValue<Map<String, Agent>>>((ref) {
   final config = ref.watch(workbenchConfigProvider);
+  if (config.error != null) return AsyncError(config.error!, StackTrace.current);
   return config.loaded ? AsyncData({for (final a in config.agents) a.id: a}) : const AsyncLoading();
 });
 
@@ -285,7 +277,7 @@ Map<String, List<AgentIssue>> watchAgentIssues(WidgetRef ref, List<Agent> agents
 /// What a session of the agent would recall starting a run in the project, told the text (agent.recall); nothing is counted.
 final recallPreviewProvider = FutureProvider.autoDispose.family<RecallPreview, ({String agent, String project, String text})>((ref, q) {
   // Again when the agent's memories change.
-  ref.watch(memoriesProvider.select((all) => all[q.agent]));
+  ref.watch(memoryProvider(q.agent));
   return ref.watch(apiProvider).memory.recall(agent: q.agent, project: q.project, text: q.text);
 });
 

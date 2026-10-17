@@ -26,17 +26,16 @@ type tracking struct {
 	ShownCall *shownCall
 	// The next report is counted from it.
 	OarTokens *oar.TokenTotals
-	Price     *runtime.Price
+	Rate      *runtime.Rate
 	RunFrom   *protocol.Spent
 	// The next word from it ends the quiet spell.
 	Quiet bool
 }
 
 type factContext struct {
-	ID        string
-	Runtime   string
-	Cwd       string
-	CnyPerUsd float64
+	ID      string
+	Runtime string
+	Cwd     string
 }
 
 type op struct {
@@ -95,12 +94,6 @@ func or(p *int64) int64 {
 		return 0
 	}
 	return *p
-}
-
-// Per million tokens; input counts cache reads and writes too.
-func dollars(t oar.TokenTotals, p runtime.Price) float64 {
-	cacheRead, cacheWrite := float64(or(t.CacheRead)), float64(or(t.CacheWrite))
-	return (math.Max(0, float64(t.Input)-cacheRead-cacheWrite)*p.Input + float64(t.Output)*p.Output + cacheRead*p.CacheRead + cacheWrite*p.CacheWrite) / 1_000_000
 }
 
 func since(now protocol.Spent, from *protocol.Spent) *protocol.Spent {
@@ -281,8 +274,8 @@ func eventFacts(event oar.Event, session *protocol.Session, tracking tracking, c
 			break
 		}
 		var cny *float64
-		if tracking.Price != nil {
-			v := dollars(delta, *tracking.Price) * ctx.CnyPerUsd
+		if tracking.Rate != nil {
+			v := tracking.Rate.Charge(delta)
 			cny = &v
 		}
 		before := protocol.Spent{}

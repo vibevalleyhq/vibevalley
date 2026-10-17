@@ -130,9 +130,44 @@ type route struct {
 	doc                             []string
 }
 
+type paramSource uint8
+
+const (
+	paramPath paramSource = iota
+	paramQuery
+	paramBody
+)
+
 type param struct {
-	name string
-	typ  ast.Expr
+	name   string
+	typ    ast.Expr
+	source paramSource
+	wire   string
+}
+
+// Bind transport meaning once; emitters only choose the syntax of their target language.
+func (r *route) bind() error {
+	names := pathParams(r.path)
+	next := 0
+	for i := range r.params {
+		p := &r.params[i]
+		switch {
+		case p.name == "body":
+			p.source, p.wire = paramBody, "body"
+		case isPointer(p.typ):
+			p.source, p.wire = paramQuery, queryName(p.name)
+		default:
+			if next >= len(names) {
+				return fmt.Errorf("%s: more path parameters than %s has", r.goName, r.path)
+			}
+			p.source, p.wire = paramPath, names[next]
+			next++
+		}
+	}
+	if next != len(names) {
+		return fmt.Errorf("%s: %s has an unbound path parameter", r.goName, r.path)
+	}
+	return nil
 }
 
 type sharedConst struct {
@@ -307,11 +342,14 @@ func (s *shapes) handlers(it *ast.InterfaceType) {
 				continue // ctx
 			}
 			for _, n := range p.Names {
-				r.params = append(r.params, param{n.Name, p.Type})
+				r.params = append(r.params, param{name: n.Name, typ: p.Type})
 			}
 		}
 		if ft.Results != nil && len(ft.Results.List) == 2 {
 			r.result = ft.Results.List[0].Type
+		}
+		if err := r.bind(); err != nil {
+			fail(err)
 		}
 		s.routes = append(s.routes, r)
 	}
@@ -559,10 +597,10 @@ func (e %[1]s) MarshalJSON() ([]byte, error) {
 		var query []string
 		body := false
 		for _, p := range r.params {
-			if p.name == "body" {
+			if p.source == paramBody {
 				body = true
-			} else if isPointer(p.typ) {
-				query = append(query, fmt.Sprintf("%q", queryName(p.name)))
+			} else if p.source == paramQuery {
+				query = append(query, fmt.Sprintf("%q", p.wire))
 			}
 		}
 		qs := "nil"
@@ -576,32 +614,22 @@ func (e %[1]s) MarshalJSON() ([]byte, error) {
 	for _, r := range s.routes {
 		var reads, args []string
 		args = append(args, "r.Context()")
-		path := pathParams(r.path)
-		i := 0
 		for _, p := range r.params {
 			switch {
-			case p.name == "body":
+			case p.source == paramBody:
 				reads = append(reads, fmt.Sprintf("\t\tvar body %s\n\t\tif !decode(w, r, &body) {\n\t\t\treturn\n\t\t}", s.text(p.typ)))
-			case isPointer(p.typ) && s.text(p.typ) == "*int64":
-				reads = append(reads, fmt.Sprintf("\t\t%s := queryNumber(r, %q)", p.name, queryName(p.name)))
-			case isPointer(p.typ):
-				reads = append(reads, fmt.Sprintf("\t\t%s := query(r, %q)", p.name, queryName(p.name)))
+			case p.source == paramQuery && s.text(p.typ) == "*int64":
+				reads = append(reads, fmt.Sprintf("\t\t%s := queryNumber(r, %q)", p.name, p.wire))
+			case p.source == paramQuery:
+				reads = append(reads, fmt.Sprintf("\t\t%s := query(r, %q)", p.name, p.wire))
 			case s.text(p.typ) == "int64":
-				if i >= len(path) {
-					fail(fmt.Errorf("%s: more path parameters than %s has", r.goName, r.path))
-				}
-				reads = append(reads, fmt.Sprintf("\t\t%s, ok := pathNumber(w, r, %q)\n\t\tif !ok {\n\t\t\treturn\n\t\t}", p.name, path[i]))
-				i++
+				reads = append(reads, fmt.Sprintf("\t\t%s, ok := pathNumber(w, r, %q)\n\t\tif !ok {\n\t\t\treturn\n\t\t}", p.name, p.wire))
 			default:
-				if i >= len(path) {
-					fail(fmt.Errorf("%s: more path parameters than %s has", r.goName, r.path))
-				}
-				read := fmt.Sprintf("r.PathValue(%q)", path[i])
+				read := fmt.Sprintf("r.PathValue(%q)", p.wire)
 				if t := s.text(p.typ); t != "string" {
 					read = fmt.Sprintf("%s(%s)", t, read)
 				}
 				reads = append(reads, fmt.Sprintf("\t\t%s := %s", p.name, read))
-				i++
 			}
 			args = append(args, p.name)
 		}
@@ -947,17 +975,15 @@ func (s *shapes) dartFile() string {
 		}
 		var params, query []string
 		pathParts := map[string]string{}
-		names := pathParams(r.path)
-		i := 0
 		body := "null"
 		for _, p := range r.params {
 			switch {
-			case p.name == "body":
+			case p.source == paramBody:
 				t, _ := s.dartTypeOf(p.typ)
 				params = append(params, "required "+t.typ+" body")
 				body = t.write("body")
-			case isPointer(p.typ):
-				q := queryName(p.name)
+			case p.source == paramQuery:
+				q := p.wire
 				t, _ := s.dartTypeOf(p.typ)
 				f := dartField(q)
 				params = append(params, t.typ+"? "+f)
@@ -968,13 +994,12 @@ func (s *shapes) dartFile() string {
 				query = append(query, fmt.Sprintf("if (%s != null) %s: '${%s}'", f, dartStr(q), written))
 			default:
 				t, _ := s.dartTypeOf(p.typ)
-				f := dartField(names[i])
+				f := dartField(p.wire)
 				params = append(params, "required "+t.typ+" "+f)
-				pathParts[names[i]] = t.write(f)
+				pathParts[p.wire] = t.write(f)
 				if s.text(p.typ) == "int64" {
-					pathParts[names[i]] = f + ".toInt()"
+					pathParts[p.wire] = f + ".toInt()"
 				}
-				i++
 			}
 		}
 		url := placeholder.ReplaceAllStringFunc(r.path, func(m string) string {

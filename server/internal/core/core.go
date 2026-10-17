@@ -27,6 +27,8 @@ type Service struct {
 	mu      sync.Mutex
 	state   protocol.CoreState
 	events  *base.Hub[protocol.SideEvent]
+	facts   *base.Hub[protocol.Fact]
+	live    *base.Hub[protocol.LiveEvent]
 	effects *base.Hub[protocol.GameEffect]
 	did     *base.Hub[OwnerDid]
 	disk    *base.FileWriter
@@ -64,6 +66,8 @@ func New(home string) *Service {
 	return &Service{
 		state:   restored(kept),
 		events:  base.NewHub[protocol.SideEvent](),
+		facts:   base.NewHub[protocol.Fact](),
+		live:    base.NewHub[protocol.LiveEvent](),
 		did:     base.NewHub[OwnerDid](),
 		effects: base.NewHub[protocol.GameEffect](),
 		disk:    base.NewFileWriter(file, 0o644),
@@ -83,9 +87,12 @@ func (s *Service) save() {
 		return
 	}
 	if s.pending != nil {
-		s.pending.Stop()
+		return
 	}
 	s.pending = time.AfterFunc(saveAfter, func() {
+		s.mu.Lock()
+		s.pending = nil
+		s.mu.Unlock()
 		if err := s.disk.Write(s.body); err != nil {
 			log.Printf("vibevalley: could not save state.json: %v", err)
 		}
@@ -123,7 +130,7 @@ func (s *Service) Apply(fact protocol.FactValue) {
 	brought := protocol.EffectsOf(s.state, f)
 	s.state = next
 	s.save()
-	s.events.Publish(protocol.SideEvent{Value: f.Value.(protocol.SideEventValue)})
+	s.publish(protocol.SideEvent{Value: f.Value.(protocol.SideEventValue)})
 	for _, e := range brought {
 		s.effects.Publish(e)
 	}
@@ -267,13 +274,27 @@ func (s *Service) SetCommits(count protocol.CommitCount) {
 }
 
 func (s *Service) SessionEvent(id string, step protocol.SessionEvent) {
-	s.events.Publish(protocol.SideEvent{Value: protocol.SideEventSessionEvent{At: clock.NowMs(), ID: id, SessionEvent: step}})
+	s.publish(protocol.SideEvent{Value: protocol.SideEventSessionEvent{At: clock.NowMs(), ID: id, SessionEvent: step}})
 }
 
 func (s *Service) Notice(level protocol.NoticeLevel, text string) {
-	s.events.Publish(protocol.SideEvent{Value: protocol.SideEventNotice{At: clock.NowMs(), Level: level, Text: text}})
+	s.publish(protocol.SideEvent{Value: protocol.SideEventNotice{At: clock.NowMs(), Level: level, Text: text}})
 }
 
 func (s *Service) Runtime(info protocol.RuntimeInfo) {
-	s.events.Publish(protocol.SideEvent{Value: protocol.SideEventRuntime{At: clock.NowMs(), Info: info}})
+	s.publish(protocol.SideEvent{Value: protocol.SideEventRuntime{At: clock.NowMs(), Info: info}})
+}
+
+// Facts and Live subscribe to changes only; the full snapshot protocol stays in Events.
+func (s *Service) Facts() (<-chan protocol.Fact, func())     { return s.facts.Subscribe() }
+func (s *Service) Live() (<-chan protocol.LiveEvent, func()) { return s.live.Subscribe() }
+
+func (s *Service) publish(event protocol.SideEvent) {
+	s.events.Publish(event)
+	if fact, ok := event.Value.(protocol.FactValue); ok {
+		s.facts.Publish(protocol.Fact{Value: fact})
+	}
+	if live, ok := protocol.LiveEventOf(event); ok {
+		s.live.Publish(live)
+	}
 }

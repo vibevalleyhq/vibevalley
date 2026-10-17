@@ -68,7 +68,6 @@ type Service struct {
 	store *agent.Service
 	// The ticker, the tools and the pages all change the list.
 	mu    sync.Mutex
-	all   []protocol.Schedule
 	due   *base.Hub[Due]
 	every time.Duration
 	Now   func() int64
@@ -101,9 +100,6 @@ func newService(cfg base.Config, db *sql.DB, core *core.Service, store *agent.Se
 		if lastRun.Valid && lastRun.Int64 != 0 {
 			sc.LastRun = &lastRun.Int64
 		}
-		s.all = append(s.all, sc)
-	}
-	for _, sc := range s.all {
 		core.Apply(protocol.FactSchedule{Schedule: sc})
 	}
 	return s, nil
@@ -130,20 +126,10 @@ func (s *Service) OnReady(ctx context.Context) {
 
 func (*Service) OnStop() {}
 
-// Called with mu held.
-func (s *Service) put(sc protocol.Schedule) {
-	if i := slices.IndexFunc(s.all, func(x protocol.Schedule) bool { return x.ID == sc.ID }); i >= 0 {
-		s.all = slices.Clone(s.all)
-		s.all[i] = sc
-	} else {
-		s.all = append(slices.Clip(s.all), sc)
-	}
-	s.core.Apply(protocol.FactSchedule{Schedule: sc})
-}
-
 func (s *Service) find(id string) (protocol.Schedule, error) {
-	if i := slices.IndexFunc(s.all, func(x protocol.Schedule) bool { return x.ID == id }); i >= 0 {
-		return s.all[i], nil
+	all := s.core.State().Schedules
+	if i := slices.IndexFunc(all, func(x protocol.Schedule) bool { return x.ID == id }); i >= 0 {
+		return all[i], nil
 	}
 	return protocol.Schedule{}, fmt.Errorf("没有 %s 号定时", id)
 }
@@ -151,7 +137,7 @@ func (s *Service) find(id string) (protocol.Schedule, error) {
 func (s *Service) List() []protocol.Schedule {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return slices.Clone(s.all)
+	return slices.Clone(s.core.State().Schedules)
 }
 
 func (s *Service) Add(req protocol.ScheduleRequest) (protocol.Schedule, error) {
@@ -219,7 +205,7 @@ func (s *Service) Add(req protocol.ScheduleRequest) (protocol.Schedule, error) {
 	if err := s.q.AddSchedule(context.Background(), row); err != nil {
 		return protocol.Schedule{}, err
 	}
-	s.put(sc)
+	s.core.Apply(protocol.FactSchedule{Schedule: sc})
 	return sc, nil
 }
 
@@ -234,9 +220,6 @@ func (s *Service) SetEnabled(id string, enabled bool) (protocol.Schedule, error)
 	if err != nil {
 		return protocol.Schedule{}, err
 	}
-	if err := s.q.EnableSchedule(context.Background(), generated.EnableScheduleParams{Enabled: enabled, ID: id}); err != nil {
-		return protocol.Schedule{}, err
-	}
 	sc := was
 	sc.Enabled = enabled
 	// Switched back on: it counts from now, not from runs it skipped while off.
@@ -246,8 +229,10 @@ func (s *Service) SetEnabled(id string, enabled bool) (protocol.Schedule, error)
 		if err := s.ran(id, now, enabled); err != nil {
 			return protocol.Schedule{}, err
 		}
+	} else if err := s.q.EnableSchedule(context.Background(), generated.EnableScheduleParams{Enabled: enabled, ID: id}); err != nil {
+		return protocol.Schedule{}, err
 	}
-	s.put(sc)
+	s.core.Apply(protocol.FactSchedule{Schedule: sc})
 	return sc, nil
 }
 
@@ -261,7 +246,6 @@ func (s *Service) Remove(id string) (protocol.Schedule, error) {
 	if err := s.q.RemoveSchedule(context.Background(), id); err != nil {
 		return protocol.Schedule{}, err
 	}
-	s.all = slices.DeleteFunc(slices.Clone(s.all), func(x protocol.Schedule) bool { return x.ID == id })
 	s.core.Apply(protocol.FactUnschedule{ID: id})
 	return was, nil
 }
@@ -270,13 +254,14 @@ func (s *Service) Tick() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.Now()
-	for _, sc := range dueSchedules(s.all, now) {
+	for _, sc := range dueSchedules(s.core.State().Schedules, now) {
 		missed := isMissed(sc, now)
 		after := afterRun(sc, now)
 		if err := s.ran(after.ID, now, after.Enabled); err != nil {
 			log.Printf("vibevalley: schedule %s's run was not kept: %v", sc.ID, err)
+			continue
 		}
-		s.put(after)
+		s.core.Apply(protocol.FactSchedule{Schedule: after})
 		s.chat.Notice(sc.Channel, protocol.DueText(sc, missed), "schedule")
 		s.due.Publish(Due{Schedule: after, Missed: missed})
 	}

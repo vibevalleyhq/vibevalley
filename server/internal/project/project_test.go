@@ -117,7 +117,7 @@ func TestSessionsPlaybookBranchMerges(t *testing.T) {
 	}
 	os.WriteFile(filepath.Join(place.Cwd, "a.txt"), []byte("a\n"), 0o644)
 	brought, err := p.MergeInto(place, "vibevalley/plan-1")
-	if err != nil || len(brought) != 1 {
+	if err != nil || len(brought.Hashes) != 1 {
 		t.Fatalf("merged: %v %v", brought, err)
 	}
 	changes, err := p.BranchChanges("plan", "vibevalley/plan-1")
@@ -332,4 +332,44 @@ func TestCheckSaysWhatCreateWouldRefuse(t *testing.T) {
 	testkit.Eq(t, p.Check(protocol.NewProject{Name: "ok-name_1.2"}).Problem, "")
 	testkit.Match(t, p.Check(protocol.NewProject{Name: "-bad"}).Problem, `项目名`)
 	testkit.Match(t, p.Check(protocol.NewProject{Name: "x", Github: ptr.To("https://gitlab.com/a/b")}).Problem, `GitHub`)
+}
+
+func TestPublishedMergeKeepsReceiptWhenWorktreeCleanupFails(t *testing.T) {
+	for _, intoPlan := range []bool{false, true} {
+		t.Run(fmt.Sprint(intoPlan), func(t *testing.T) {
+			root := t.TempDir()
+			p := projects(t, root)
+			target := "main"
+			if intoPlan {
+				target = "plan"
+				if err := p.OpenBranch("demo", target); err != nil {
+					t.Fatal(err)
+				}
+			}
+			place, err := p.Workplace("demo", "w1", true, target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(place.Cwd, "result.txt"), []byte("kept"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			repo := filepath.Join(root, "demo")
+			testkit.Git(t, repo, "worktree", "lock", place.Cwd)
+			var merged Merged
+			if intoPlan {
+				merged, err = p.MergeInto(place, target)
+			} else {
+				merged, err = p.Merge(place)
+			}
+			if err != nil || merged.Commits != 1 || merged.Warning == "" {
+				t.Fatalf("publication receipt: %+v %v", merged, err)
+			}
+			if content := testkit.Git(t, repo, "show", target+":result.txt"); content != "kept" {
+				t.Fatalf("target lost changes: %s", content)
+			}
+			if _, err := os.Stat(place.Cwd); err != nil {
+				t.Fatal("warning must name resources actually retained", err)
+			}
+		})
+	}
 }

@@ -5,7 +5,6 @@ import '../data/providers.dart';
 import '../data/remote.dart' show projectNamesProvider;
 import '../game/commands.dart';
 import '../game/tools.dart';
-import '../game/state.dart' show fireBedEffects;
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../audio/sfx.dart';
@@ -153,7 +152,7 @@ class _WaterFormState extends ConsumerState<WaterForm> {
 
   void _send() {
     if (_text.trim().isEmpty) return;
-    fireBedEffects(ref, ref.read(farmCommandsProvider).water(widget.session, _text));
+    fire(ref.read(farmCommandsProvider).water(widget.session, _text));
     widget.onDone();
   }
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -139,16 +140,19 @@ type Schedules struct {
 	lock sync.Mutex
 }
 
-func (s *Schedules) load() []Job {
+func (s *Schedules) load() ([]Job, error) {
 	data, err := os.ReadFile(s.file)
+	if errors.Is(err, os.ErrNotExist) {
+		return []Job{}, nil
+	}
 	if err != nil {
-		return []Job{}
+		return nil, err
 	}
 	var jobs []Job
-	if json.Unmarshal(data, &jobs) != nil {
-		return []Job{}
+	if err := json.Unmarshal(data, &jobs); err != nil {
+		return nil, err
 	}
-	return jobs
+	return jobs, nil
 }
 
 func (s *Schedules) store(jobs []Job) error {
@@ -168,19 +172,29 @@ func (s *Schedules) store(jobs []Job) error {
 func (s *Schedules) change(f func(jobs []Job) ([]Job, error)) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	jobs, err := f(s.load())
+	before, err := s.load()
+	if err != nil {
+		return err
+	}
+	jobs, err := f(before)
 	if err != nil {
 		return err
 	}
 	return s.store(jobs)
 }
 
-func (s *Schedules) List() []Job { return s.load() }
+func (s *Schedules) List() []Job {
+	jobs, err := s.load()
+	if err != nil {
+		log.Printf("agent: cannot read schedules: %v", err)
+	}
+	return jobs
+}
 
 // At most once each.
 func (s *Schedules) Tick(now time.Time) {
 	var due []Job
-	_ = s.change(func(jobs []Job) ([]Job, error) {
+	err := s.change(func(jobs []Job) ([]Job, error) {
 		due = DueJobs(jobs, now)
 		isDue := map[string]bool{}
 		for _, j := range due {
@@ -199,6 +213,10 @@ func (s *Schedules) Tick(now time.Time) {
 		}
 		return after, nil
 	})
+	if err != nil {
+		log.Printf("agent: cannot claim due schedules: %v", err)
+		return
+	}
 	for _, j := range due {
 		s.wake(DueMessage(j))
 	}
@@ -267,7 +285,10 @@ func MakeSchedules(home string, wake func(text string)) *Schedules {
 		Description: "列出定好的事。",
 		Parameters:  agentcore.ObjectSchema(nil),
 		Run: func(context.Context, struct{}, ToolContext) (string, error) {
-			jobs := s.load()
+			jobs, err := s.load()
+			if err != nil {
+				return "", err
+			}
 			if len(jobs) == 0 {
 				return "没有定好的事。", nil
 			}

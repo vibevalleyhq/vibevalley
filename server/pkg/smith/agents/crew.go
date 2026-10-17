@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -161,7 +162,7 @@ func (c *Subagents) freeIDLocked(spawn SpawnOptions) string {
 	return fmt.Sprintf("%s-%d", base, n)
 }
 
-func (c *Subagents) register(spawn SpawnOptions, runtime oar.Runtime, session oar.Session, log string, logged *progress) *Subagent {
+func (c *Subagents) register(spawn SpawnOptions, runtime oar.Runtime, session oar.Session, log string, logged *voyage.SessionRecording) *Subagent {
 	c.mu.Lock()
 	id := c.freeIDLocked(spawn)
 	agent := newSubagent(subagentIdentity{id: id, name: spawn.Name, runtime: runtime.ID, log: log, logged: logged}, session, subagentHooks{
@@ -208,7 +209,7 @@ func (c *Subagents) open(ctx context.Context, spawn SpawnOptions, runtime oar.Ru
 		return SpawnResult{Kind: "refused", Code: "open_failed", Reason: failure}, nil
 	}
 	log := ""
-	var logged *progress
+	var logged *voyage.SessionRecording
 	var logFailure error
 	if c.logDir != "" {
 		name := spawn.Name
@@ -216,15 +217,23 @@ func (c *Subagents) open(ctx context.Context, spawn SpawnOptions, runtime oar.Ru
 			name = spawn.Runtime
 		}
 		log = filepath.Join(c.logDir, logName(name, session.ID()))
-		logged, logFailure = attachLog(session, log, voyage.Header{Runtime: runtime.ID, Cwd: cwd, SessionID: session.ID(), StartedAt: time.Now().UnixMilli(), Recorder: "oar-subagents",
-			Model: spawn.Model, Effort: spawn.Effort, ServiceTier: spawn.ServiceTier})
+		if logFailure = os.MkdirAll(c.logDir, 0755); logFailure == nil {
+			logged, logFailure = voyage.Attach(log, session, voyage.Header{Runtime: runtime.ID, Cwd: cwd, SessionID: session.ID(), StartedAt: time.Now().UnixMilli(), Recorder: "oar-subagents",
+				Model: spawn.Model, Effort: spawn.Effort, ServiceTier: spawn.ServiceTier}, "exited")
+		}
 	}
 	c.mu.Lock()
 	closed := c.closed
 	c.mu.Unlock()
 	if closed || logFailure != nil {
-		if err := session.Dispose(context.WithoutCancel(ctx)); err != nil {
-			return SpawnResult{}, err
+		disposeErr := session.Dispose(context.WithoutCancel(ctx))
+		if logged != nil {
+			settle, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			disposeErr = errors.Join(disposeErr, logged.Close(settle))
+			cancel()
+		}
+		if disposeErr != nil {
+			return SpawnResult{}, disposeErr
 		}
 		if logFailure == nil {
 			return SpawnResult{Kind: "refused", Code: "closed", Reason: "the subagents were closed while this one opened"}, nil

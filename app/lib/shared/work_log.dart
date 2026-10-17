@@ -699,44 +699,19 @@ class _Pre extends StatelessWidget {
   );
 }
 
-class TrajectoryLog extends ConsumerStatefulWidget {
+class TrajectoryLog extends ConsumerWidget {
   const TrajectoryLog({super.key, required this.id, this.asked, this.empty = '还没有动静。'});
   final String id;
   final String? asked;
   final String empty;
 
   @override
-  ConsumerState<TrajectoryLog> createState() => _TrajectoryLogState();
-}
-
-class _TrajectoryLogState extends ConsumerState<TrajectoryLog> {
-  bool? _found;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  void didUpdateWidget(TrajectoryLog old) {
-    super.didUpdateWidget(old);
-    if (old.id != widget.id) _load();
-  }
-
-  Future<void> _load() async {
-    final head = await runAction(() => ref.read(workStepsProvider.notifier).load(widget.id));
-    if (mounted) setState(() => _found = head != null);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final steps = ref.watch(workStepsProvider.select((all) => all[widget.id]));
-    if (_found == null && steps == null) return const EmptyNote('在读……');
-    if (steps == null || steps.isEmpty) {
-      return EmptyNote(_found == false && steps == null ? '没有轨迹：它可能早就过了保留的日子。' : widget.empty);
-    }
-    return WorkLog(steps: steps, now: _now(), asked: widget.asked, tall: true);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final log = ref.watch(sessionEventsProvider(id));
+    final steps = log.value;
+    if (steps == null) return EmptyNote(log.hasError ? reasonOf(log.error!) : '在读……');
+    if (steps.isEmpty) return EmptyNote(empty);
+    return WorkLog(steps: steps, now: _now(), asked: asked, tall: true);
   }
 }
 

@@ -10,6 +10,7 @@ import '../../ui/kit/kit.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
+import '../shared/config_problem.dart';
 import '../shared/layout.dart';
 import 'runtime_facts.dart';
 import 'runtimes_state.dart';
@@ -23,6 +24,7 @@ class RuntimesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(workbenchConfigProvider);
+    if (config.error != null) return const ConfigProblem();
     final busy = ref.watch(runtimeBusyProvider);
     final atlas = ref.watch(atlasProvider).value;
     if (atlas == null) return const SizedBox.shrink();

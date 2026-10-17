@@ -139,9 +139,11 @@ type voiceLine struct {
 	mu   sync.Mutex
 	keys map[string]string
 	// Apart from the keys: opening a tunnel waits for it to answer, through this very line.
-	tmu     sync.Mutex
-	tunnel  *voiceTunnel
-	closing *time.Timer
+	tmu        sync.Mutex
+	tunnel     *voiceTunnel
+	closing    *time.Timer
+	stopped    bool
+	generation uint64
 }
 
 func newVoiceLine(cfg base.Config, mgr *manager.Service) (*voiceLine, error) {
@@ -162,6 +164,9 @@ func newVoiceLine(cfg base.Config, mgr *manager.Service) (*voiceLine, error) {
 
 // Local only, like the farm: the tunnel is the one way in from outside.
 func (l *voiceLine) OnStart(ctx context.Context) error {
+	l.tmu.Lock()
+	defer l.tmu.Unlock()
+	l.stopped = false
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", l.port))
 	if err != nil {
 		l.problem = "语音线路开不起来：" + err.Error()
@@ -182,6 +187,12 @@ func (l *voiceLine) OnStart(ctx context.Context) error {
 
 func (l *voiceLine) OnStop() {
 	l.tmu.Lock()
+	defer l.tmu.Unlock()
+	l.stopped = true
+	l.generation++
+	l.mu.Lock()
+	clear(l.keys)
+	l.mu.Unlock()
 	if l.closing != nil {
 		l.closing.Stop()
 	}
@@ -189,18 +200,16 @@ func (l *voiceLine) OnStop() {
 		l.tunnel.close()
 		l.tunnel = nil
 	}
-	l.tmu.Unlock()
 	if l.server != nil {
 		l.server.Close()
 	}
 }
 
+// Called with tmu held, through registration of the call key.
 func (l *voiceLine) base() (string, error) {
 	if l.url != "" {
 		return l.url, nil
 	}
-	l.tmu.Lock()
-	defer l.tmu.Unlock()
 	if l.closing != nil {
 		l.closing.Stop()
 		l.closing = nil
@@ -216,6 +225,12 @@ func (l *voiceLine) base() (string, error) {
 }
 
 func (l *voiceLine) Open() (CallLine, error) {
+	l.tmu.Lock()
+	defer l.tmu.Unlock()
+	if l.stopped {
+		return CallLine{}, errors.New("语音线路已经关闭")
+	}
+	l.generation++
 	if l.problem != "" {
 		return CallLine{}, errors.New(l.problem)
 	}
@@ -239,28 +254,37 @@ func (l *voiceLine) Open() (CallLine, error) {
 }
 
 func (l *voiceLine) Close(id string) {
+	l.tmu.Lock()
+	defer l.tmu.Unlock()
 	l.mu.Lock()
 	delete(l.keys, id)
 	calls := len(l.keys)
 	l.mu.Unlock()
-	l.tmu.Lock()
-	defer l.tmu.Unlock()
 	if calls > 0 || l.tunnel == nil {
 		return
 	}
 	if l.closing != nil {
 		l.closing.Stop()
 	}
+	l.generation++
+	generation := l.generation
 	l.closing = time.AfterFunc(voiceLineLinger, func() {
-		l.mu.Lock()
-		calls := len(l.keys)
-		l.mu.Unlock()
-		l.tmu.Lock()
-		defer l.tmu.Unlock()
-		if calls > 0 || l.tunnel == nil {
-			return
-		}
-		l.tunnel.close()
-		l.tunnel = nil
+		l.expire(generation)
 	})
+}
+
+func (l *voiceLine) expire(generation uint64) {
+	l.tmu.Lock()
+	defer l.tmu.Unlock()
+	if generation != l.generation {
+		return
+	}
+	l.mu.Lock()
+	calls := len(l.keys)
+	l.mu.Unlock()
+	if calls > 0 || l.tunnel == nil {
+		return
+	}
+	l.tunnel.close()
+	l.tunnel = nil
 }
