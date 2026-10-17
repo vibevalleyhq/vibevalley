@@ -277,11 +277,12 @@ class _PlanViewState extends ConsumerState<PlanView> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      if (pb.state == PlaybookState.draft) ...[
+                      if (pb.actions?.contains(PlaybookAction.start) ?? false) ...[
                         PxButton.text(_actionText(pb, PlaybookAction.start), tone: PxTone.primary, onPressed: () => _act(PlaybookAction.start)),
                         PxButton.text('加一步', icon: 'button-add', onPressed: () => setState(() => _adding = true)),
                       ],
-                      if (pb.state == PlaybookState.running) PxButton.text(_actionText(pb, PlaybookAction.pause), onPressed: () => _act(PlaybookAction.pause)),
+                      if (pb.actions?.contains(PlaybookAction.pause) ?? false)
+                        PxButton.text(_actionText(pb, PlaybookAction.pause), onPressed: () => _act(PlaybookAction.pause)),
                       if (pb.state == PlaybookState.paused)
                         PxButton.text(_actionText(pb, PlaybookAction.resume), tone: PxTone.primary, onPressed: () => _act(PlaybookAction.resume)),
                       if (pb.state == PlaybookState.ripe)
@@ -290,7 +291,8 @@ class _PlanViewState extends ConsumerState<PlanView> {
                           tone: PxTone.primary,
                           onPressed: () => setState(() => _reviewing = true),
                         ),
-                      Confirm(label: '${_actionText(pb, PlaybookAction.abandon)}这个计划', sure: '确定放弃？分支会留着', onConfirm: () => _act(PlaybookAction.abandon)),
+                      if (pb.actions?.contains(PlaybookAction.abandon) ?? false)
+                        Confirm(label: '${_actionText(pb, PlaybookAction.abandon)}这个计划', sure: '确定放弃？分支会留着', onConfirm: () => _act(PlaybookAction.abandon)),
                     ],
                   ),
                 ),

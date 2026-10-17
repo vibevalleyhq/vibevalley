@@ -15,6 +15,7 @@ func FrameOf(state CoreState, effects []GameEffect) StateFrame {
 		for action, word := range PlaybookActionText {
 			plans[i].ActionText[string(action)] = word
 		}
+		plans[i].Actions = PlaybookActions(plans[i])
 		if len(plans[i].Nodes) == 0 {
 			continue
 		}

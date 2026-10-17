@@ -402,10 +402,12 @@ type Playbook struct {
 	StateTag string `json:"stateTag,omitzero"`
 	// Filled by FrameOf: each action's word. The state and the file keep none.
 	ActionText map[string]string `json:"actionText,omitzero"`
-	Nodes      []PlaybookNode    `json:"nodes"`
-	Parallel   int64             `json:"parallel"`
-	Note       *string           `json:"note,omitzero"`
-	CreatedAt  int64             `json:"createdAt"`
+	// Filled by FrameOf: what the state allows now. The state and the file keep none.
+	Actions   []PlaybookAction `json:"actions,omitzero"`
+	Nodes     []PlaybookNode   `json:"nodes"`
+	Parallel  int64            `json:"parallel"`
+	Note      *string          `json:"note,omitzero"`
+	CreatedAt int64            `json:"createdAt"`
 	// Filled by PlaybooksOf: the steps in the order they can run (LayersOf), whether it waits on the owner (AsksForYou), what
 	// the steps have spent (PlaybookSpent), how many are merged or skipped.
 	Layers     [][]string `json:"layers,omitzero"`

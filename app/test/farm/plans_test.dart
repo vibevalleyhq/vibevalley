@@ -41,6 +41,7 @@ void main() {
     project: 'clock-in',
     state: PlaybookState.draft,
     stateTag: '等你看',
+    actions: const [PlaybookAction.start, PlaybookAction.abandon],
     actionText: actions,
     nodes: [
       node('api', '接口'),
@@ -63,6 +64,7 @@ void main() {
     branch: 'vibevalley/p2',
     state: PlaybookState.ripe,
     stateTag: '可收获',
+    actions: const [PlaybookAction.merge, PlaybookAction.abandon],
     actionText: actions,
     nodes: [node('css', '样式', state: NodeState.merged, conclusion: '改好了')],
     parallel: 1,

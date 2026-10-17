@@ -85,7 +85,7 @@ flowchart LR
 
 工单（`Issue`）里开着的和最近关的 50 家（`KeepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `IssueStatusOf` 算。种植计划是带 `plan` 的父工单，步骤是带 `step` 的子工单，`PlaybooksOf` 读成 `Playbook`（[server.md](reference/server.md)「种植计划」）。田头在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时、账本折出来的进度也在里面（[server.md](reference/server.md)「定时」「游戏」）。
 
-给 Flutter 的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`plans`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `protocol.FrameOf` 拼：给人看的话（帮工在干什么、定时什么时候跑、计划是哪个状态、节点是什么状态、动作叫什么）只在这一步填进状态的副本，`Reduce` 和 `state.json` 里没有。`app/lib/rules/` 只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在客户端。
+给 Flutter 的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`plans`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `protocol.FrameOf` 拼：给人看的话（帮工在干什么、定时什么时候跑、计划是哪个状态、节点是什么状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`Reduce` 和 `state.json` 里没有。`app/lib/rules/` 只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在客户端。
 
 ## 事件流
 

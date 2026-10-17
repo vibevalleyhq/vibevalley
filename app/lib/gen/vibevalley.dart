@@ -860,6 +860,7 @@ class Playbook {
     required this.state,
     this.stateTag,
     this.actionText,
+    this.actions,
     required this.nodes,
     required this.parallel,
     this.note,
@@ -879,6 +880,7 @@ class Playbook {
     state: PlaybookState.fromJson(j['state']),
     stateTag: j['stateTag'] == null ? null : j['stateTag'] as String,
     actionText: j['actionText'] == null ? null : {for (final e in (j['actionText'] as Map<String, dynamic>).entries) e.key: e.value as String},
+    actions: j['actions'] == null ? null : [for (final e in j['actions'] as List) PlaybookAction.fromJson(e)],
     nodes: [for (final e in j['nodes'] as List) PlaybookNode.fromJson(e as Map<String, dynamic>)],
     parallel: (j['parallel'] as num).toDouble(),
     note: j['note'] == null ? null : j['note'] as String,
@@ -901,6 +903,7 @@ class Playbook {
   final PlaybookState state;
   final String? stateTag;
   final Map<String, String>? actionText;
+  final List<PlaybookAction>? actions;
   final List<PlaybookNode> nodes;
   final double parallel;
   final String? note;
@@ -919,6 +922,7 @@ class Playbook {
     'state': state.wire,
     if (stateTag != null) 'stateTag': stateTag!,
     if (actionText != null) 'actionText': {for (final e in actionText!.entries) e.key: e.value},
+    if (actions != null) 'actions': [for (final e in actions!) e.wire],
     'nodes': [for (final e in nodes) e.toJson()],
     'parallel': parallel,
     if (note != null) 'note': note!,

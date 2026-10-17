@@ -337,3 +337,24 @@ func PlaybookText(pb Playbook) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// PlaybookActions is what the plan's state allows now; the frame carries it so the client does not repeat the switch.
+func PlaybookActions(pb Playbook) []PlaybookAction {
+	out := []PlaybookAction{}
+	if pb.State == PlaybookStateDraft && len(PlanProblems(pb.Nodes)) == 0 {
+		out = append(out, PlaybookActionStart)
+	}
+	if pb.State == PlaybookStateRunning {
+		out = append(out, PlaybookActionPause)
+	}
+	if pb.State == PlaybookStatePaused {
+		out = append(out, PlaybookActionResume)
+	}
+	if pb.State == PlaybookStateRipe && pb.Branch != nil {
+		out = append(out, PlaybookActionMerge)
+	}
+	if IsOpen(pb) {
+		out = append(out, PlaybookActionAbandon)
+	}
+	return out
+}
