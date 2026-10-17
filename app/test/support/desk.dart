@@ -233,7 +233,7 @@ Future<void> pumpPage(WidgetTester t, Widget page, Handle handle, {CoreState? fa
       overrides: [
         serverProvider.overrideWithValue(FakeServer(handle)),
         sideEventsProvider.overrideWith((ref) => events ?? const Stream<SideEvent>.empty()),
-        farmProvider.overrideWithValue(farm),
+        stateProvider.overrideWithValue(farm),
         atlasProvider.overrideWith((ref) async => atlas),
       ],
       child: MaterialApp(

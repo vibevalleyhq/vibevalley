@@ -24,7 +24,7 @@ final apiProvider = Provider<VibeValleyApi>((ref) => ref.watch(serverProvider).a
 
 final stateFrameProvider = StreamProvider<ReceivedFrame>((ref) => ref.watch(serverProvider).frames);
 
-final farmProvider = Provider<CoreState?>((ref) => ref.watch(stateFrameProvider).value?.state);
+final stateProvider = Provider<CoreState?>((ref) => ref.watch(stateFrameProvider).value?.state);
 
 final inboxProvider = Provider<List<InboxItem>>((ref) => ref.watch(stateFrameProvider).value?.frame.inbox ?? const []);
 

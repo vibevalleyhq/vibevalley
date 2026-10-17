@@ -18,7 +18,7 @@ class FarmCommands {
   final Ref ref;
 
   VibeValleyApi get _api => ref.read(apiProvider);
-  CoreState? get _farm => ref.read(farmProvider);
+  CoreState? get _farm => ref.read(stateProvider);
 
   void _burst(Session w, BedFxKind kind, [String? text]) {
     final bed = bedOfStation(stationOfSession(w));

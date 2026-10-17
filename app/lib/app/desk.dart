@@ -142,7 +142,7 @@ class _ConfigDesk extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final farm = ref.watch(farmProvider);
+    final farm = ref.watch(stateProvider);
     final live = farm?.call == CallState.live;
     final working = farm?.sessions.where((h) => h.phase is PhaseWorking).length ?? 0;
     final p = place;

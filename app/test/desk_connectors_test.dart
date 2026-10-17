@@ -81,7 +81,8 @@ List<String> rowsOf(QrCode q) => [
 
 Map<String, dynamic> status(String id, String state, {Map<String, dynamic> more = const {}}) => {'id': id, 'state': state, 'pending': 0, ...more};
 
-Routes backend(List<Map<String, dynamic>> list, {Map<String, Object? Function(Call)> more = const {}}) => Routes({'GET /api/v1/connectors': (_) => list, ...more});
+Routes backend(List<Map<String, dynamic>> list, {Map<String, Object? Function(Call)> more = const {}}) =>
+    Routes({'GET /api/v1/connectors': (_) => list, ...more});
 
 void main() {
   group('QR encoder', () {

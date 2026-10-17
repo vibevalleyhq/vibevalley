@@ -145,7 +145,7 @@ class ChannelSettingsForm extends ConsumerStatefulWidget {
 }
 
 class _ChannelSettingsFormState extends ConsumerState<ChannelSettingsForm> {
-  late final Conversation _latest = conversationOf(ref.read(farmProvider)?.chat, widget.channel.id) ?? widget.channel;
+  late final Conversation _latest = conversationOf(ref.read(stateProvider)?.chat, widget.channel.id) ?? widget.channel;
   late String _description = _latest.description ?? '';
   late String _project = _latest.project ?? '';
   String? _error;

@@ -126,7 +126,7 @@ class _NewPlanState extends ConsumerState<NewPlan> {
 
   List<String> _known() {
     final real = ref.watch(projectNamesProvider).value ?? const <String>[];
-    final s = ref.watch(farmProvider);
+    final s = ref.watch(stateProvider);
     return {...real, for (final h in s?.sessions ?? const <Session>[]) ?h.project, for (final p in ref.watch(plansProvider)) p.project}.toList();
   }
 

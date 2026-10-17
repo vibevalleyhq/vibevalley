@@ -9,7 +9,7 @@ import '../../game/commands.dart' show farmCommandsProvider;
 import '../../game/state.dart' show selectedProvider;
 import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart' show roundsOf, tookText;
-import '../../rules/tickets.dart';
+import '../../rules/issues.dart';
 import '../../shell/title/title_state.dart' show titleOpenProvider;
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
@@ -17,17 +17,17 @@ import '../projects/new_project_dialog.dart' show showNewProjectDialog;
 import '../../data/remote.dart';
 import '../../shared/widgets.dart';
 import '../../shared/work_log.dart';
-import 'tickets_page.dart';
+import 'issues_page.dart';
 
-class CloseTicket extends ConsumerStatefulWidget {
-  const CloseTicket({super.key, required this.session});
+class CloseIssue extends ConsumerStatefulWidget {
+  const CloseIssue({super.key, required this.session});
   final Session session;
 
   @override
-  ConsumerState<CloseTicket> createState() => _CloseTicketState();
+  ConsumerState<CloseIssue> createState() => _CloseIssueState();
 }
 
-class _CloseTicketState extends ConsumerState<CloseTicket> {
+class _CloseIssueState extends ConsumerState<CloseIssue> {
   bool _review = false;
 
   @override
@@ -82,7 +82,7 @@ class _ReopenFormState extends State<ReopenForm> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text('「${ticketTitle(widget.issue)}」由同一个帮工档案的新帮工接着做，它会知道这张工单原来要做什么、上一次是怎么关的。', style: KitText.sm.copyWith(color: Palette.bark800, height: 1.625)),
+      Text('「${issueTitle(widget.issue)}」由同一个帮工档案的新帮工接着做，它会知道这张工单原来要做什么、上一次是怎么关的。', style: KitText.sm.copyWith(color: Palette.bark800, height: 1.625)),
       const SizedBox(height: 12),
       PxTextArea(
         value: _text,
@@ -313,21 +313,21 @@ class _TodoState extends ConsumerState<TodoDetail> {
   }
 }
 
-class TicketDetail extends ConsumerStatefulWidget {
-  const TicketDetail({super.key, required this.issue, required this.sessions, required this.state, required this.session, required this.reload});
+class IssueDetail extends ConsumerStatefulWidget {
+  const IssueDetail({super.key, required this.issue, required this.sessions, required this.state, required this.session, required this.reload});
   final Issue issue;
 
   // Oldest first, the ones on the farm and the ended (session.list).
   final List<Session> sessions;
-  final TicketState state;
+  final IssueTag state;
   final Session? session;
   final Future<void> Function() reload;
 
   @override
-  ConsumerState<TicketDetail> createState() => _TicketState();
+  ConsumerState<IssueDetail> createState() => _IssueDetailState();
 }
 
-class _TicketState extends ConsumerState<TicketDetail> {
+class _IssueDetailState extends ConsumerState<IssueDetail> {
   String _word = '';
   bool _busy = false;
 
@@ -341,14 +341,14 @@ class _TicketState extends ConsumerState<TicketDetail> {
   }
 
   @override
-  void didUpdateWidget(TicketDetail old) {
+  void didUpdateWidget(IssueDetail old) {
     super.didUpdateWidget(old);
     if (old.state != widget.state) _askChanges();
   }
 
   /// `first` from initState, before any build.
   void _askChanges({bool first = false}) {
-    if (widget.state != TicketState.waiting || widget.session == null) return;
+    if (widget.state != IssueTag.waiting || widget.session == null) return;
     final asked = ref.read(apiProvider).issue.changes(id: widget.issue.id).then<Changes?>((c) => c, onError: (Object _) => null);
     if (first) {
       _changes = asked;
@@ -403,10 +403,10 @@ class _TicketState extends ConsumerState<TicketDetail> {
   Future<void> _close(Session session) async {
     await showFarmDialog<void>(
       context,
-      title: Text('关上「${ticketTitle(widget.issue)}」'),
+      title: Text('关上「${issueTitle(widget.issue)}」'),
       size: FarmDialogSize.lg,
       icon: 'icon-harvest',
-      builder: (_) => CloseTicket(session: session),
+      builder: (_) => CloseIssue(session: session),
     );
     await widget.reload();
   }
@@ -421,9 +421,9 @@ class _TicketState extends ConsumerState<TicketDetail> {
   List<Widget> _actions(Session? session) {
     final busy = _busy;
     final bed = session == null ? null : PxButton.text('去农场看这块地', icon: 'button-open', size: PxSize.sm, onPressed: () => _toBed(session));
-    if (ticketPlanned(widget.issue, session)) return [?bed];
+    if (issuePlanned(widget.issue, session)) return [?bed];
     return switch ((widget.state, session)) {
-      (TicketState.working, final h?) => [
+      (IssueTag.working, final h?) => [
         PxButton.text(
           '叫停这一轮',
           size: PxSize.sm,
@@ -432,13 +432,13 @@ class _TicketState extends ConsumerState<TicketDetail> {
         PxButton.text('关上', size: PxSize.sm, tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
         ?bed,
       ],
-      (TicketState.waiting, final h?) when h.conflict != null => [
+      (IssueTag.waiting, final h?) when h.conflict != null => [
         PxButton.text('让它解决冲突', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).resolve(h))),
         PxButton.text('关上', size: PxSize.sm, tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
         ?bed,
       ],
       // Stopped halfway (叫停, the server restarted): the work goes on first; what is there can still be harvested.
-      (TicketState.waiting, final h?) when h.lastRun?.outcome == Outcome.interrupted => [
+      (IssueTag.waiting, final h?) when h.lastRun?.outcome == Outcome.interrupted => [
         PxButton.text(
           '接着做',
           size: PxSize.sm,
@@ -449,7 +449,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
         PxButton.text('关上', size: PxSize.sm, tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
         ?bed,
       ],
-      (TicketState.waiting, final h?) => [
+      (IssueTag.waiting, final h?) => [
         if (h.lastRun?.outcome != Outcome.failed) PxButton.text('收获', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _close(h)),
         if (h.lastRun?.outcome == Outcome.failed)
           PxButton.text('接着修', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).cure(h))),
@@ -479,7 +479,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
       mainAxisSize: MainAxisSize.min,
       children: [
         PxCard(
-          title: ticketTitle(issue, ref.watch(plansProvider)),
+          title: issueTitle(issue, ref.watch(plansProvider)),
           aside: Text(widget.state.label),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -505,7 +505,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
                 ),
               ),
               if (summary != null && summary.isNotEmpty) _Row('最后一轮', Text(summary, style: body)),
-              if (ticketPlanned(issue, session))
+              if (issuePlanned(issue, session))
                 _Row(
                   '种植计划',
                   Text(
@@ -573,7 +573,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
                     steps: steps,
                     now: now,
                     tall: true,
-                    working: widget.state == TicketState.working,
+                    working: widget.state == IssueTag.working,
                     onComment: open && session != null ? (step, text) => ref.read(farmCommandsProvider).water(session, text, on: step) : null,
                   ),
                 ),
@@ -599,7 +599,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
               ],
             ),
           )
-        else if (!open && !ticketPlanned(issue, session))
+        else if (!open && !issuePlanned(issue, session))
           PxCard(
             title: '重开',
             child: Column(
@@ -700,13 +700,13 @@ class _RunsCardState extends ConsumerState<_RunsCard> {
 }
 
 /// An issue for the manager: what it was asked, and its runs; the answers are in its channel.
-class ManagerTicketDetail extends StatelessWidget {
-  const ManagerTicketDetail({super.key, required this.issue});
+class ManagerIssueDetail extends StatelessWidget {
+  const ManagerIssueDetail({super.key, required this.issue});
   final Issue issue;
 
   @override
   Widget build(BuildContext context) {
-    final state = ticketState(issue);
+    final state = issueTag(issue);
     final body = KitText.sm.copyWith(color: Palette.bark800);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -75,7 +75,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final farm = ref.watch(farmProvider);
+    final farm = ref.watch(stateProvider);
     final chat = farm?.chat;
     final shown = ref.watch(shownConversationProvider);
     final channels = channelsOf(chat);
@@ -312,7 +312,7 @@ class _Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final channels = channelsOf(chat);
-    final sessions = ref.watch(farmProvider)?.sessions ?? const <Session>[];
+    final sessions = ref.watch(stateProvider)?.sessions ?? const <Session>[];
     return Semantics(
       label: '聊天',
       container: true,
@@ -598,7 +598,7 @@ class _ManagerLine extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mood = ref.watch(farmProvider)?.manager ?? ManagerState.idle;
+    final mood = ref.watch(stateProvider)?.manager ?? ManagerState.idle;
     final dot = switch (mood) {
       ManagerState.idle => Palette.cream300,
       ManagerState.thinking => Palette.wheat,
@@ -661,7 +661,7 @@ class _Jobs extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final farm = ref.watch(farmProvider);
+    final farm = ref.watch(stateProvider);
     final sessions = [...?farm?.sessions.where((h) => h.channel != null ? h.channel == channel.id : channel.kind == ConversationKind.general)];
     if (sessions.isEmpty) return const _Empty('这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。', icon: 'icon-tasks');
     return ListView(
@@ -728,7 +728,7 @@ class _SchedulesState extends ConsumerState<_Schedules> {
 
   @override
   Widget build(BuildContext context) {
-    final schedules = [...?ref.watch(farmProvider)?.schedules?.where((s) => s.channel == widget.channel.id)];
+    final schedules = [...?ref.watch(stateProvider)?.schedules?.where((s) => s.channel == widget.channel.id)];
     if (schedules.isEmpty) return const _Empty('这个频道还没有定时。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。', icon: 'icon-clock');
     final actions = ref.read(chatActionsProvider);
     return ListView(
@@ -807,7 +807,7 @@ class _ThreadPane extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final farm = ref.watch(farmProvider);
+    final farm = ref.watch(stateProvider);
     final sessions = farm?.sessions ?? const <Session>[];
     final session = thread.subjectKind == SubjectKind.issue ? sessions.where((h) => h.id == thread.subjectId).firstOrNull : null;
     final status = session != null

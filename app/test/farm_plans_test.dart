@@ -161,7 +161,11 @@ void main() {
       overrides: overrides(
         farm(),
         view(),
-        fakeApi(routes, {'GET /api/v1/playbooks/p2/events': <Object>[], 'GET /api/v1/playbooks/p2/changes': changes, 'POST /api/v1/playbooks/p2/act': '收进了 main'}),
+        fakeApi(routes, {
+          'GET /api/v1/playbooks/p2/events': <Object>[],
+          'GET /api/v1/playbooks/p2/changes': changes,
+          'POST /api/v1/playbooks/p2/act': '收进了 main',
+        }),
         plans: [ripe],
       ),
     );

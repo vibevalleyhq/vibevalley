@@ -207,7 +207,7 @@ void main() {
     });
   });
 
-  testWidgets('the map: islands and their plots; a free plot starts a ticket there, a helper opens its own, an island its worktrees', (t) async {
+  testWidgets('the map: islands and their plots; a free plot starts an issue there, a helper opens its own, an island its worktrees', (t) async {
     final handle = t.ensureSemantics();
     final now = DateTime.now().millisecondsSinceEpoch;
     final routes = Routes();
@@ -240,7 +240,7 @@ void main() {
           path: '/map/:project',
           builder: (_, s) => Scaffold(body: MapPage(project: s.pathParameters['project'])),
         ),
-        for (final path in ['/tickets/:id', '/projects/:id'])
+        for (final path in ['/issues/:id', '/projects/:id'])
           GoRoute(
             path: path,
             builder: (_, s) {
@@ -291,13 +291,13 @@ void main() {
 
     await t.tap(find.bySemanticsLabel('空位，派一件活到 pb-smoke').first);
     await settle(t);
-    expect(went, ['/tickets/new?project=pb-smoke']);
+    expect(went, ['/issues/new?project=pb-smoke']);
 
     router.go('/map');
     await settle(t);
     await t.tap(find.bySemanticsLabel('测试小吴'));
     await settle(t);
-    expect(went.last, '/tickets/w1');
+    expect(went.last, '/issues/w1');
 
     router.go('/map');
     await settle(t);

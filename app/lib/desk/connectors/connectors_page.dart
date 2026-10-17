@@ -316,7 +316,7 @@ class _ChannelPickState extends ConsumerState<_ChannelPick> {
 
   @override
   Widget build(BuildContext context) {
-    final channels = channelsOf(ref.watch(farmProvider)?.chat);
+    final channels = channelsOf(ref.watch(stateProvider)?.chat);
     return Wrap(
       spacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,

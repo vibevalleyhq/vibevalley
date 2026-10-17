@@ -99,7 +99,7 @@ class Tasks extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final p = ref.watch(farmProvider.select((s) => s?.progress)) ?? emptyProgress;
+    final p = ref.watch(stateProvider.select((s) => s?.progress)) ?? emptyProgress;
     final level = ref.watch(viewProvider.select((v) => v?.level.level.round())) ?? 1;
     List<AchievementDef> of(AchievementCategory c) => achievements.where((a) => a.category == c).toList();
     return Column(
@@ -161,9 +161,9 @@ class _Standing extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final p = ref.watch(farmProvider.select((s) => s?.progress)) ?? emptyProgress;
+    final p = ref.watch(stateProvider.select((s) => s?.progress)) ?? emptyProgress;
     final lv = ref.watch(viewProvider.select((v) => v?.level)) ?? const FarmLevel(level: 1, xp: 0, need: 10);
-    final commits = ref.watch(farmProvider.select((s) => s?.commits?.total)) ?? 0;
+    final commits = ref.watch(stateProvider.select((s) => s?.commits?.total)) ?? 0;
     final level = lv.level.round();
     final need = lv.need.round();
     return Tinted(

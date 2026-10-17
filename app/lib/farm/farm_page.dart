@@ -104,7 +104,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
 
   Future<void> _clickPlot(int index) async {
     final bed = beds[index];
-    final state = ref.read(farmProvider);
+    final state = ref.read(stateProvider);
     final view = ref.read(viewProvider);
     if (state == null || view == null) return;
     final session = bed.unlockLevel == null ? stationOf(state.sessions, bed.station) : null;
@@ -266,7 +266,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
   Widget build(BuildContext context) {
     final atlas = ref.watch(atlasProvider).value;
     final village = ref.watch(villageProvider).value;
-    final state = ref.watch(farmProvider);
+    final state = ref.watch(stateProvider);
     final view = ref.watch(viewProvider);
     final agents = ref.watch(agentsProvider).value ?? const <String, Agent>{};
     final problem = ref.watch(streamProblemProvider).value;

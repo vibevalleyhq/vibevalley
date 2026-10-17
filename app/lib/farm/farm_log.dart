@@ -10,7 +10,7 @@ import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider;
 import 'bits.dart';
 import '../rules/chat.dart';
-import '../rules/tickets.dart' show ticketTitle;
+import '../rules/issues.dart' show issueTitle;
 import '../rules/warehouse.dart';
 import '../shared/faces.dart';
 import '../shared/tags.dart';
@@ -21,7 +21,7 @@ class Warehouse extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final stored = harvestedOf(ref.watch(farmProvider));
+    final stored = harvestedOf(ref.watch(stateProvider));
     if (stored.isEmpty) return const FarmEmpty('仓库还空着。收获进主分支的活会放在这里。');
     final plans = ref.watch(plansProvider);
     final agents = ref.watch(agentsProvider).value ?? const <String, Agent>{};
@@ -42,10 +42,10 @@ class Warehouse extends ConsumerWidget {
                       ref.read(planShownProvider.notifier).set(i.id);
                       ref.read(panelProvider.notifier).set(FarmPanel.plans);
                     } else {
-                      context.go('/tickets/${Uri.encodeComponent(i.id)}');
+                      context.go('/issues/${Uri.encodeComponent(i.id)}');
                     }
                   },
-                  semanticLabel: ticketTitle(i, plans),
+                  semanticLabel: issueTitle(i, plans),
                   builder: (context, s) => Container(
                     color: s.hovered ? Palette.cream200 : Palette.cream100,
                     padding: const EdgeInsets.all(12),
@@ -58,7 +58,7 @@ class Warehouse extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(ticketTitle(i, plans), maxLines: 2, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                              Text(issueTitle(i, plans), maxLines: 2, overflow: TextOverflow.ellipsis, style: KitText.sm),
                               const SizedBox(height: 4),
                               Text(
                                 [
@@ -115,7 +115,7 @@ class FarmLog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final s = ref.watch(farmProvider);
+    final s = ref.watch(stateProvider);
     final look = ref.watch(prefsProvider.select((p) => p.managerLook)) ?? 'farmer';
     final chat = s?.chat;
     final rows = <_Row>[

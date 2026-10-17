@@ -171,7 +171,7 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     final s = widget.scale;
     final village = game.village;
     final atlas = game.atlas;
-    final state = ref.watch(farmProvider);
+    final state = ref.watch(stateProvider);
     final view = ref.watch(viewProvider);
     if (state == null || view == null) return const [];
     final level = view.level.level.round();
@@ -418,7 +418,7 @@ class VillageHud extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final atlas = game.atlas;
     final view = ref.watch(viewProvider);
-    final state = ref.watch(farmProvider);
+    final state = ref.watch(stateProvider);
     final lv = view?.level ?? const FarmLevel(level: 1, xp: 0, need: 10);
     final level = lv.level.round();
     final need = lv.need.round();

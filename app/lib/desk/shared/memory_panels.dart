@@ -45,7 +45,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
   @override
   Widget build(BuildContext context) {
     final list = ref.watch(memoriesProvider.select((all) => all[widget.agent]));
-    final sessions = {for (final h in ref.watch(farmProvider)?.sessions ?? const <Session>[]) h.id: h.name};
+    final sessions = {for (final h in ref.watch(stateProvider)?.sessions ?? const <Session>[]) h.id: h.name};
     final now = _now();
     final all = list ?? const <Memory>[];
     final notes = all.where((m) => m.kind == MemoryKind.note).toList();

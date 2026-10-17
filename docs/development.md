@@ -35,6 +35,7 @@ app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
 - **形状**：改 `server/internal/protocol` 的 `shapes.go` 或 `api.go`，同一个改动里跑 `go run ./tool/shapegen`（[server](../server/README.md#形状和规则从哪来)）。
 - **规则**：改拥有它的包里的纯函数（几个包都用的在 `protocol`），`VIBEVALLEY_GOLDEN=update go test ./internal/...` 重写黄金数据，看 diff。客户端不重写服务端的规则（[客户端问服务端](../.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
 - **表和查询**：迁移在 `server/migrations/`（一个改动一个新文件，跑过的不再改），查询在 `server/pkg/db/queries/`；改完重跑 sqlc（[理由](../.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）。新表用单数名。
+- **旧名字**：`bun run names:verify` 查 `server/internal`、`server/cmd`、`app/lib`、`app/test` 里有没有已经改掉的旧名（挂在 `docs:verify` 里）；加了新名字就把它写进 `scripts/stale-names.ts`。
 
 ## 调试台
 

@@ -47,7 +47,7 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
 
   @override
   Widget build(BuildContext context) {
-    final chat = ref.watch(farmProvider)?.chat;
+    final chat = ref.watch(stateProvider)?.chat;
     final channels = channelsOf(chat);
     final current = widget.current;
     final elsewhere = channels.where((c) => c.id != current?.id).fold(0, (n, c) => n + unreadUnder(chat, c));
@@ -116,7 +116,7 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
     _Mode.list => _list(chat, channels, current),
     _Mode.create => NewChannelPanel(onDone: _close, onBack: () => setState(() => _mode = _Mode.list)),
     _Mode.schedules => ScheduleList(
-      schedules: ref.watch(farmProvider)?.schedules ?? const [],
+      schedules: ref.watch(stateProvider)?.schedules ?? const [],
       channels: channels,
       onBack: () => setState(() => _mode = _Mode.list),
     ),
@@ -125,7 +125,7 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
   };
 
   Widget _list(Chat? chat, List<Conversation> channels, Conversation? current) {
-    final schedules = ref.watch(farmProvider)?.schedules ?? const <Schedule>[];
+    final schedules = ref.watch(stateProvider)?.schedules ?? const <Schedule>[];
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -341,7 +341,7 @@ class ChannelSettingsPanel extends ConsumerStatefulWidget {
 }
 
 class _ChannelSettingsPanelState extends ConsumerState<ChannelSettingsPanel> {
-  late final Conversation _latest = conversationOf(ref.read(farmProvider)?.chat, widget.channel.id) ?? widget.channel;
+  late final Conversation _latest = conversationOf(ref.read(stateProvider)?.chat, widget.channel.id) ?? widget.channel;
   late String _description = _latest.description ?? '';
   late String _project = _latest.project ?? '';
   String? _error;

@@ -6,21 +6,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../rules/tickets.dart';
+import '../../rules/issues.dart';
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import '../../data/remote.dart';
 import '../../shared/widgets.dart';
 import 'board.dart';
-import 'ticket_detail.dart';
+import 'issue_detail.dart';
 
 /// From this wide, a card opens beside the board; narrower, over it.
-Color ticketColor(TicketState s) => switch (s) {
-  TicketState.working => Palette.water,
-  TicketState.waiting => Palette.wheat,
-  TicketState.harvested || TicketState.merged || TicketState.answered => Palette.leaf500,
-  TicketState.dropped || TicketState.closed => Palette.cream300,
-  TicketState.lost => Palette.berry,
+Color issueTagColor(IssueTag s) => switch (s) {
+  IssueTag.working => Palette.water,
+  IssueTag.waiting => Palette.wheat,
+  IssueTag.harvested || IssueTag.merged || IssueTag.answered => Palette.leaf500,
+  IssueTag.dropped || IssueTag.closed => Palette.cream300,
+  IssueTag.lost => Palette.berry,
 };
 
 const priorityLabel = {Priority.urgent: '紧急', Priority.high: '高', Priority.medium: '普通', Priority.low: '低'};
@@ -86,13 +86,13 @@ class TodoCard extends BoardCard {
   List<String?> get words => [item.title, item.description, item.project];
 }
 
-class TicketCard extends BoardCard {
-  const TicketCard(this.issue, this.sessions, this.state, this.session);
+class IssueCard extends BoardCard {
+  const IssueCard(this.issue, this.sessions, this.state, this.session);
   final Issue issue;
 
   // Its sessions, oldest first: the ones on the farm and the ended (session.list).
   final List<Session> sessions;
-  final TicketState state;
+  final IssueTag state;
   final Session? session;
 
   Session get head => sessions.last;
@@ -170,20 +170,20 @@ class BoardFilter {
       BoardFilter(query: query ?? this.query, project: project ?? this.project, agent: agent ?? this.agent);
 }
 
-class TicketsPage extends ConsumerStatefulWidget {
-  const TicketsPage({super.key, this.id, this.project});
+class IssuesPage extends ConsumerStatefulWidget {
+  const IssuesPage({super.key, this.id, this.project});
 
   final String? id;
 
   final String? project;
 
   @override
-  ConsumerState<TicketsPage> createState() => _TicketsPageState();
+  ConsumerState<IssuesPage> createState() => _IssuesPageState();
 }
 
 String _sessionsKey(CoreState? farm) => [for (final i in farm?.issues ?? const <Issue>[]) '${i.id}:${i.sessions.join(',')}:${i.closedAt}'].join(';');
 
-class _TicketsPageState extends ConsumerState<TicketsPage> {
+class _IssuesPageState extends ConsumerState<IssuesPage> {
   Map<String, Session>? _heads;
 
   List<Issue>? _history;
@@ -203,7 +203,7 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
       final heads = await _api.session.list();
       if (mounted) setState(() => _heads = {for (final h in heads) h.id: h});
     } on Object catch (e) {
-      debugPrint('vibevalley: tickets: $e');
+      debugPrint('vibevalley: issues: $e');
     }
   }
 
@@ -214,7 +214,7 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
     if (all != null && mounted) setState(() => _history = all);
   }
 
-  void _open(String? id) => deskGo(context, id == null ? '/tickets' : '/tickets/${Uri.encodeComponent(id)}');
+  void _open(String? id) => deskGo(context, id == null ? '/issues' : '/issues/${Uri.encodeComponent(id)}');
 
   /// Asked about first where it cannot be undone. A 待办 dropped back on its own lane goes last.
   Future<void> _drop(BoardCard card, Lane to) async {
@@ -227,16 +227,16 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
         final got = await deskRun(() => _api.issue.start(id: item.id));
         await _load();
         if (got != null) dispatchedNotice(got, item.id, _open);
-      case (Move.close, TicketCard(:final issue, :final session?)):
+      case (Move.close, IssueCard(:final issue, :final session?)):
         await showFarmDialog<void>(
           context,
-          title: Text('关上「${ticketTitle(issue)}」'),
+          title: Text('关上「${issueTitle(issue)}」'),
           size: FarmDialogSize.lg,
           icon: 'icon-harvest',
-          builder: (_) => CloseTicket(session: session),
+          builder: (_) => CloseIssue(session: session),
         );
         await _load();
-      case (Move.reopen, TicketCard(:final issue)):
+      case (Move.reopen, IssueCard(:final issue)):
         final text = await showPxDialog<String>(
           context,
           title: const Text('重开这张工单'),
@@ -280,8 +280,8 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final farm = ref.watch(farmProvider);
-    ref.listen(farmProvider.select(_sessionsKey), (_, _) => unawaited(_load()));
+    final farm = ref.watch(stateProvider);
+    ref.listen(stateProvider.select(_sessionsKey), (_, _) => unawaited(_load()));
     final heads = _heads;
     final kept = farm?.issues ?? const <Issue>[];
     final issues = [
@@ -296,16 +296,16 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
         if (isForManager(issue))
           ManagerCard(issue)
         else if (issue.plan == null && (issue.parent == null || issue.sessions.isNotEmpty))
-          issue.sessions.isEmpty ? TodoCard(issue) : TicketCard(issue, sessionsOf(issue, heads ?? const {}), ticketState(issue), ticketSession(farm, issue)),
+          issue.sessions.isEmpty ? TodoCard(issue) : IssueCard(issue, sessionsOf(issue, heads ?? const {}), issueTag(issue), issueSession(farm, issue)),
       for (final p in plans)
         if (playbookLane(p) case final lane?) PlaybookCard(p, lane),
     ];
     final id = widget.id;
-    final open = id == null ? null : all.where((c) => c.id == id || (c is TicketCard && ticketIs(c.issue, id))).firstOrNull;
+    final open = id == null ? null : all.where((c) => c.id == id || (c is IssueCard && issueIs(c.issue, id))).firstOrNull;
     final Widget? detail = switch (open) {
       _ when id == 'new' => TodoDetail(key: ValueKey('new:${widget.project}'), item: null, project: widget.project, reload: _load, onDone: _open),
       TodoCard(:final item) => TodoDetail(key: ValueKey(item.id), item: item, reload: _load, onDone: _open),
-      TicketCard(:final issue, :final sessions, :final state, :final session) => TicketDetail(
+      IssueCard(:final issue, :final sessions, :final state, :final session) => IssueDetail(
         key: ValueKey(sessions.last.id),
         issue: issue,
         sessions: sessions,
@@ -313,7 +313,7 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
         session: session,
         reload: _load,
       ),
-      ManagerCard(:final issue) => ManagerTicketDetail(key: ValueKey(issue.id), issue: issue),
+      ManagerCard(:final issue) => ManagerIssueDetail(key: ValueKey(issue.id), issue: issue),
       PlaybookCard() || null => null,
     };
     return LayoutBuilder(
@@ -324,7 +324,7 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
             _Toolbar(filter: _filter, cards: all, shown: all.where(_filter.shows).length, onChanged: (f) => setState(() => _filter = f)),
             const SizedBox(height: 8),
             Expanded(
-              child: TicketBoard(
+              child: IssueBoard(
                 cards: all.where(_filter.shows).toList(),
                 loading: farm == null,
                 selected: open?.id ?? id,

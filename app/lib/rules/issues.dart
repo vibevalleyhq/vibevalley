@@ -1,6 +1,6 @@
 import '../gen/vibevalley.dart';
 
-enum TicketState {
+enum IssueTag {
   working('处理中'),
   waiting('等你看'),
   harvested('已收获'),
@@ -10,34 +10,34 @@ enum TicketState {
   answered('管家答完了'),
   closed('已关');
 
-  const TicketState(this.label);
+  const IssueTag(this.label);
   final String label;
 
   bool get open => this == working || this == waiting;
 }
 
-TicketState ticketState(Issue issue) {
+IssueTag issueTag(Issue issue) {
   switch (issue.status) {
     case IssueStatus.inProgress:
-      return TicketState.working;
+      return IssueTag.working;
     case IssueStatus.inReview:
-      return TicketState.waiting;
+      return IssueTag.waiting;
     case IssueStatus.backlog || IssueStatus.todo || IssueStatus.done || IssueStatus.canceled:
       break;
   }
   return switch (issue.closed) {
-    IssueClose.merged => TicketState.harvested,
-    IssueClose.mergedIntoPlan => TicketState.merged,
-    IssueClose.dismissed => TicketState.dropped,
-    IssueClose.lost => TicketState.lost,
-    IssueClose.answered => TicketState.answered,
-    null => TicketState.closed,
+    IssueClose.merged => IssueTag.harvested,
+    IssueClose.mergedIntoPlan => IssueTag.merged,
+    IssueClose.dismissed => IssueTag.dropped,
+    IssueClose.lost => IssueTag.lost,
+    IssueClose.answered => IssueTag.answered,
+    null => IssueTag.closed,
   };
 }
 
 bool isForManager(Issue issue) => issue.assignee == managerAgent;
 
-String ticketTitle(Issue issue, [List<Playbook> plans = const []]) {
+String issueTitle(Issue issue, [List<Playbook> plans = const []]) {
   final job = issue.title.trim();
   if (job.isEmpty) return issue.id;
   if (issue.parent case final parent?) {
@@ -47,7 +47,7 @@ String ticketTitle(Issue issue, [List<Playbook> plans = const []]) {
   return job.split('\n').first.trim();
 }
 
-bool ticketIs(Issue issue, String id) => issue.id == id || issue.sessions.contains(id);
+bool issueIs(Issue issue, String id) => issue.id == id || issue.sessions.contains(id);
 
 Lane? playbookLane(Playbook p) => switch (p.state) {
   PlaybookState.planning || PlaybookState.running => Lane.working,
@@ -65,7 +65,7 @@ String playbookLine(Playbook p) => switch (p.state) {
   PlaybookState.abandoned => '放弃了',
 };
 
-Session? ticketSession(CoreState? farm, Issue issue) =>
+Session? issueSession(CoreState? farm, Issue issue) =>
     farm == null || issue.sessions.isEmpty || issue.closed != null ? null : farm.sessions.where((h) => h.id == issue.sessions.last).firstOrNull;
 
 enum Lane {
@@ -95,7 +95,7 @@ Move? moveOf(Lane from, Lane to, {bool planned = false}) => switch ((from, to)) 
   _ => null,
 };
 
-bool ticketPlanned(Issue issue, Session? session) =>
+bool issuePlanned(Issue issue, Session? session) =>
     issue.plan != null || issue.parent != null || session?.playbook != null || issue.closed == IssueClose.mergedIntoPlan;
 
 bool matchesQuery(String query, Iterable<String?> fields) {

@@ -1,4 +1,4 @@
-// The farm itself is the server's (farmProvider); nothing here copies it.
+// The farm itself is the server's (stateProvider); nothing here copies it.
 
 import 'dart:async';
 

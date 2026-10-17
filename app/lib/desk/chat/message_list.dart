@@ -56,7 +56,7 @@ class _MessageListState extends ConsumerState<MessageList> {
 
   @override
   Widget build(BuildContext context) {
-    final farm = ref.watch(farmProvider);
+    final farm = ref.watch(stateProvider);
     final chat = farm?.chat;
     final conversation = widget.conversation;
     final lines = ref.watch(spokenProvider);
@@ -307,7 +307,7 @@ class _MessageRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final m = message;
     final agent = ref.watch(agentsProvider).value?[m.agent];
-    final session = m.fromKind == SenderKind.agent ? ref.watch(farmProvider)?.sessions.where((h) => h.id == m.from).firstOrNull : null;
+    final session = m.fromKind == SenderKind.agent ? ref.watch(stateProvider)?.sessions.where((h) => h.id == m.from).firstOrNull : null;
     final dot = session == null ? null : Color(phaseDot(session.phase));
     final who = switch (m.fromKind) {
       SenderKind.agent => [
@@ -446,7 +446,7 @@ class ThreadPreview extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final farm = ref.watch(farmProvider);
+    final farm = ref.watch(stateProvider);
     final chat = farm?.chat;
     final unread = unreadIn(chat, thread);
     final last = messagesIn(chat, thread.id).lastOrNull;

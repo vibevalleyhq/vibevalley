@@ -53,7 +53,7 @@ class _TitleScreenState extends ConsumerState<TitleScreen> with SingleTickerProv
     super.dispose();
   }
 
-  bool get _canContinue => hasFarm(ref.read(farmProvider));
+  bool get _canContinue => hasFarm(ref.read(stateProvider));
 
   List<({_Item id, String label, bool enabled})> _items(bool canContinue) => [
     (id: _Item.start, label: '开始游戏', enabled: true),
@@ -114,7 +114,7 @@ class _TitleScreenState extends ConsumerState<TitleScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    final canContinue = hasFarm(ref.watch(farmProvider));
+    final canContinue = hasFarm(ref.watch(stateProvider));
     final at = _current(canContinue);
     final size = MediaQuery.sizeOf(context);
     final wide = size.width >= 640;

@@ -52,10 +52,10 @@ class Hb {
   Future<void> dismiss(String id) => _api.issue.cancel(id: _issueOf(id));
   Future<void> harvest(String id) => _api.issue.merge(id: _issueOf(id));
 
-  String _issueOf(String session) => (ref.read(farmProvider)?.sessions ?? const <Session>[]).firstWhere((w) => w.id == session).issueId;
+  String _issueOf(String session) => (ref.read(stateProvider)?.sessions ?? const <Session>[]).firstWhere((w) => w.id == session).issueId;
 
   Future<void> everyone(String action) async {
-    for (final h in ref.read(farmProvider)?.sessions ?? const <Session>[]) {
+    for (final h in ref.read(stateProvider)?.sessions ?? const <Session>[]) {
       await (action == 'stop' ? stop(h.id) : dismiss(h.id));
     }
   }

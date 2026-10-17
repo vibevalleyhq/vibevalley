@@ -30,7 +30,7 @@ const field = ['plot-wheat', 'plot-carrot', 'plot-leafy', 'plot-flowering', 'plo
 const art = await titleArt()
 const backgrounds = await backgroundsOf()
 const shots = await Promise.all(copy.screens.items.map(async (s) => ({ ...(await screenshotOf(s.image)), caption: s.caption })))
-const devices = { mac: await screenshotOf('farm'), phones: [await screenshotOf('phone-chat'), await screenshotOf('phone-tickets')] as [Awaited<ReturnType<typeof screenshotOf>>, Awaited<ReturnType<typeof screenshotOf>>] }
+const devices = { mac: await screenshotOf('farm'), phones: [await screenshotOf('phone-chat'), await screenshotOf('phone-issues')] as [Awaited<ReturnType<typeof screenshotOf>>, Awaited<ReturnType<typeof screenshotOf>>] }
 const ripe = (n: number, from: number) => Array.from({ length: n }, (_, i) => pixelArt((i + from) % 3 === 2 ? 'plot-carrot' : 'plot-wheat'))
 ---
 

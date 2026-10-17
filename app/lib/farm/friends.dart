@@ -52,7 +52,7 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
   Widget build(BuildContext context) {
     final height = widget.height;
     final agents = (ref.watch(agentsProvider).value ?? const <String, Agent>{}).values.toList();
-    final sessions = ref.watch(farmProvider.select((s) => s?.sessions)) ?? const <Session>[];
+    final sessions = ref.watch(stateProvider.select((s) => s?.sessions)) ?? const <Session>[];
     final view = ref.watch(viewProvider) ?? const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {});
     final open = ref.watch(friendsOpenProvider);
     final sorted = [...agents.where((a) => a.enabled), ...agents.where((a) => !a.enabled)];
@@ -202,7 +202,7 @@ class Friend extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pick = ref.watch(prefsProvider.select((p) => p.pick));
-    final tally = ref.watch(farmProvider.select((s) => s?.progress?.agents?[agent.id]));
+    final tally = ref.watch(stateProvider.select((s) => s?.progress?.agents?[agent.id]));
     final atlas = ref.watch(atlasProvider).value;
     final runtime = (ref.watch(runtimesProvider).value ?? const <RuntimeInfo>[]).where((r) => r.id == agent.runtime).firstOrNull;
     final quota = quotaOf(runtime);

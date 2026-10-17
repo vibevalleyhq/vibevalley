@@ -60,7 +60,7 @@ class _MapPageState extends ConsumerState<MapPage> {
   @override
   Widget build(BuildContext context) {
     final atlas = ref.watch(atlasProvider).value;
-    final farm = ref.watch(farmProvider);
+    final farm = ref.watch(stateProvider);
     final sessions = farm?.sessions ?? const <Session>[];
     final plots = ref.watch(viewProvider)?.plots ?? const <String, PlotView>{};
     final projects = ref.watch(projectsProvider).list;
@@ -208,7 +208,7 @@ class _Toolbar extends StatelessWidget {
       ],
     );
     final write = PxButton(
-      onPressed: () => deskGo(context, '/tickets/new'),
+      onPressed: () => deskGo(context, '/issues/new'),
       child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-add', size: 16), SizedBox(width: 6), Text('写一张工单')]),
     );
     return LayoutBuilder(
@@ -345,7 +345,7 @@ class _IslandView extends ConsumerWidget {
     final agents = ref.watch(agentsProvider).value ?? const <String, Agent>{};
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     void go(String path) => deskGo(context, path);
-    final newTicket = '/tickets/new?project=${Uri.encodeQueryComponent(island.project)}';
+    final newTicket = '/issues/new?project=${Uri.encodeQueryComponent(island.project)}';
 
     Widget place(SpriteInfo sp, Offset foot, {Widget? child, VoidCallback? onTap, String? tip, String? label}) {
       final picture = child ?? PixelSprite(sp, scale: s);
@@ -374,7 +374,7 @@ class _IslandView extends ConsumerWidget {
       final tip = spotText(spot, now);
       switch (spot) {
         case SpotTaken(:final session, :final plot):
-          final open = '/tickets/${Uri.encodeComponent(session.id)}';
+          final open = '/issues/${Uri.encodeComponent(session.id)}';
           final cast = castOf(agents[session.agent]?.look, session.agent);
           final pose = mapPose(session);
           final body = castSprite(atlas, cast, pose);
@@ -426,7 +426,7 @@ class _IslandView extends ConsumerWidget {
     for (final (i, item) in sacks.indexed) {
       final foot = gate + Offset(16.0 + i * 13, 15);
       layers.add(
-        place(atlas['map-sack'], foot, onTap: () => go('/tickets/${Uri.encodeComponent(item.id)}'), tip: '排队：${item.title}', label: '排队的活：${item.title}'),
+        place(atlas['map-sack'], foot, onTap: () => go('/issues/${Uri.encodeComponent(item.id)}'), tip: '排队：${item.title}', label: '排队的活：${item.title}'),
       );
       if (i == sacks.length - 1 && island.queued.length > sacks.length) {
         layers.add(
@@ -511,7 +511,7 @@ class _Homeless extends StatelessWidget {
                 const SizedBox(width: 4),
                 DefaultTextStyle(
                   style: KitText.xs,
-                  child: DeskLink(h.name, onTap: () => deskGo(context, '/tickets/${Uri.encodeComponent(h.id)}')),
+                  child: DeskLink(h.name, onTap: () => deskGo(context, '/issues/${Uri.encodeComponent(h.id)}')),
                 ),
               ],
             ),
@@ -595,7 +595,7 @@ class _IslandDetail extends StatelessWidget {
                   PxButton.text(
                     '派一件活',
                     tone: island.open > 0 ? PxTone.primary : PxTone.plain,
-                    onPressed: () => deskGo(context, '/tickets/new?project=${Uri.encodeQueryComponent(island.project)}'),
+                    onPressed: () => deskGo(context, '/issues/new?project=${Uri.encodeQueryComponent(island.project)}'),
                   ),
                 ],
               ],
@@ -622,7 +622,7 @@ class _IslandDetail extends StatelessWidget {
                           padding: const EdgeInsets.all(3),
                           tooltip: '看这张工单',
                           semanticLabel: '看这张工单',
-                          onPressed: () => deskGo(context, '/tickets/${Uri.encodeComponent(item.id)}'),
+                          onPressed: () => deskGo(context, '/issues/${Uri.encodeComponent(item.id)}'),
                           child: const SpriteIcon('button-open', size: 12),
                         ),
                       ),
@@ -653,7 +653,7 @@ class _WorktreeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final h = spot.session;
     return KitTappable(
-      onTap: () => deskGo(context, '/tickets/${Uri.encodeComponent(h.id)}'),
+      onTap: () => deskGo(context, '/issues/${Uri.encodeComponent(h.id)}'),
       semanticLabel: '${h.name}：${phaseText(h, now)}',
       builder: (context, st) => Container(
         color: st.hovered ? Palette.cream100 : null,

@@ -23,7 +23,7 @@ class FarmPanels extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessions = ref.watch(farmProvider.select((s) => s?.sessions)) ?? const <Session>[];
+    final sessions = ref.watch(stateProvider.select((s) => s?.sessions)) ?? const <Session>[];
     Session? byId(String? id) => id == null ? null : sessions.where((h) => h.id == id).firstOrNull;
     final selected = byId(ref.watch(selectedProvider));
     final reviewing = byId(ref.watch(reviewingProvider));
@@ -281,7 +281,7 @@ class Shop extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final coins = (ref.watch(farmProvider.select((s) => s?.progress?.coins)) ?? 0).round();
+    final coins = (ref.watch(stateProvider.select((s) => s?.progress?.coins)) ?? 0).round();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

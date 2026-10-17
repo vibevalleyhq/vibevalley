@@ -312,7 +312,7 @@ void main() {
       alignment: Alignment.bottomRight,
       child: Consumer(
         builder: (context, ref, _) => ChatWindow(
-          state: ref.watch(farmProvider) ?? state,
+          state: ref.watch(stateProvider) ?? state,
           atlas: atlas,
           agents: const {},
           call: VoiceCall(VibeValleyServer(Uri.parse('http://farm.test')).api),

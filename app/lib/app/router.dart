@@ -9,7 +9,7 @@ import '../desk/chat/chat_page.dart';
 import '../desk/connectors/connectors_page.dart';
 import '../desk/gate/gate_page.dart';
 import '../desk/map/map_page.dart';
-import '../desk/tickets/tickets_page.dart';
+import '../desk/issues/issues_page.dart';
 import '../desk/manager/manager_page.dart';
 import '../desk/projects/projects_page.dart';
 import '../desk/runtimes/runtimes_page.dart';
@@ -19,7 +19,7 @@ import 'desk.dart';
 
 enum Place {
   chat('聊天', '频道和串', 'icon-board', '/chat'),
-  tickets('工单', '每次种植的全过程', 'icon-tasks', '/tickets'),
+  issues('工单', '每次种植的全过程', 'icon-tasks', '/issues'),
   map('地图', '每个项目一座岛', 'icon-map', '/map'),
   agents('帮工', 'Agent', 'raccoon-farmer-down', '/agents'),
   runtimes('农具', 'Runtime', 'machine-tractor', '/runtimes'),
@@ -61,10 +61,10 @@ final router = GoRouter(
               path: '/chat/:id',
               builder: (_, s) => ChatPage(id: int.tryParse(s.pathParameters['id']!)),
             ),
-            GoRoute(path: '/tickets', builder: (_, _) => const TicketsPage()),
+            GoRoute(path: '/issues', builder: (_, _) => const IssuesPage()),
             GoRoute(
-              path: '/tickets/:id',
-              builder: (_, s) => TicketsPage(id: s.pathParameters['id'], project: s.uri.queryParameters['project']),
+              path: '/issues/:id',
+              builder: (_, s) => IssuesPage(id: s.pathParameters['id'], project: s.uri.queryParameters['project']),
             ),
             GoRoute(path: '/map', builder: (_, _) => const MapPage()),
             GoRoute(

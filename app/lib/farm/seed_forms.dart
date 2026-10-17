@@ -32,7 +32,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
     final agents = (ref.watch(agentsProvider).value ?? const <String, Agent>{}).values.where((a) => a.enabled).toList();
     final pick = ref.watch(prefsProvider.select((p) => p.pick));
     final who = _who ?? (agents.any((a) => a.id == pick) ? pick : 'auto');
-    final asked = askedOf(ref.watch(farmProvider));
+    final asked = askedOf(ref.watch(stateProvider));
     final seeds = seedsFor(asked, ref.watch(projectNamesProvider).value ?? const []);
     void sow() {
       if (_text.trim().isEmpty) return;

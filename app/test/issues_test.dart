@@ -5,9 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
-import 'package:vibevalley/desk/tickets/tickets_page.dart';
+import 'package:vibevalley/desk/issues/issues_page.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/rules/tickets.dart';
+import 'package:vibevalley/rules/issues.dart';
 import 'package:vibevalley/ui/kit/kit.dart' show toasts;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -88,7 +88,7 @@ void main() {
       closed: IssueClose.answered,
       status: IssueStatus.done,
     );
-    expect(ticketState(answered), TicketState.answered);
+    expect(issueTag(answered), IssueTag.answered);
     expect(laneOf(answered.status), Lane.closed);
     expect(isForManager(_issue('t1', 'x')), isFalse);
   });
@@ -118,20 +118,20 @@ void main() {
   });
 
   test("an issue's state: the server's status while open, how it closed after", () {
-    expect(ticketState(_openIssue), TicketState.waiting);
-    expect(ticketState(_issue('t3', 'x', sessions: ['w3'], status: IssueStatus.inProgress)), TicketState.working);
-    expect(ticketState(_closedIssue), TicketState.harvested);
-    expect(ticketState(_issue('t0', 'x', sessions: ['w0'], status: IssueStatus.canceled)), TicketState.closed);
+    expect(issueTag(_openIssue), IssueTag.waiting);
+    expect(issueTag(_issue('t3', 'x', sessions: ['w3'], status: IssueStatus.inProgress)), IssueTag.working);
+    expect(issueTag(_closedIssue), IssueTag.harvested);
+    expect(issueTag(_issue('t0', 'x', sessions: ['w0'], status: IssueStatus.canceled)), IssueTag.closed);
     final step = _issue('p1.api', '写接口', sessions: ['w4'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan, parent: 'p1');
-    expect(ticketState(step), TicketState.merged);
-    expect(ticketPlanned(step, null), isTrue);
+    expect(issueTag(step), IssueTag.merged);
+    expect(issuePlanned(step, null), isTrue);
     const greet = Playbook(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: PlaybookState.draft, nodes: [], parallel: 1, createdAt: 0);
-    expect(ticketTitle(step, [greet]), '加 greet · 写接口');
-    expect(ticketTitle(step), '写接口');
-    expect(ticketTitle(_closedIssue), '写打卡');
-    expect(ticketIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 'w1'), isTrue);
-    expect(ticketIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 't5'), isTrue);
-    expect(ticketIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 'w2'), isFalse);
+    expect(issueTitle(step, [greet]), '加 greet · 写接口');
+    expect(issueTitle(step), '写接口');
+    expect(issueTitle(_closedIssue), '写打卡');
+    expect(issueIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 'w1'), isTrue);
+    expect(issueIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 't5'), isTrue);
+    expect(issueIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 'w2'), isFalse);
   });
 
   test('what dragging between lanes does', () {
@@ -152,8 +152,8 @@ void main() {
     expect(laneOf(IssueStatus.todo), Lane.todo);
     expect(moveOf(Lane.waiting, Lane.closed, planned: true), isNull);
     expect(moveOf(Lane.closed, Lane.working, planned: true), isNull);
-    expect(ticketPlanned(_issue('t5', 'x', sessions: ['w5'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan), null), isTrue);
-    expect(ticketPlanned(_closedIssue, null), isFalse);
+    expect(issuePlanned(_issue('t5', 'x', sessions: ['w5'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan), null), isTrue);
+    expect(issuePlanned(_closedIssue, null), isFalse);
   });
 
   testWidgets("a ticket whose harvest would conflict offers to have it solved, not to harvest; a planner's ticket reads as the playbook's", (t) async {
@@ -215,7 +215,7 @@ void main() {
       ProviderScope(
         overrides: [
           apiProvider.overrideWithValue(api),
-          farmProvider.overrideWithValue(fakes.farm(sessions: [session], issues: issues)),
+          stateProvider.overrideWithValue(fakes.farm(sessions: [session], issues: issues)),
           plansProvider.overrideWithValue(const [
             Playbook(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: PlaybookState.draft, nodes: [], parallel: 1, createdAt: 0),
           ]),
@@ -223,7 +223,7 @@ void main() {
         ],
         child: MaterialApp(
           theme: farmTheme(),
-          home: const Scaffold(body: TicketsPage(id: 'w4')),
+          home: const Scaffold(body: IssuesPage(id: 'w4')),
         ),
       ),
     );
@@ -310,16 +310,16 @@ void main() {
         overrides: [
           apiProvider.overrideWithValue(api),
           _issuesNow.overrideWith(() => _Issues()..seed = issues),
-          farmProvider.overrideWith((ref) => fakes.farm(issues: ref.watch(_issuesNow))),
+          stateProvider.overrideWith((ref) => fakes.farm(issues: ref.watch(_issuesNow))),
           sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
         ],
         child: MaterialApp(
           theme: farmTheme(),
-          home: const Scaffold(body: TicketsPage(id: 'w1')),
+          home: const Scaffold(body: IssuesPage(id: 'w1')),
         ),
       ),
     );
-    container = ProviderScope.containerOf(t.element(find.byType(TicketsPage)));
+    container = ProviderScope.containerOf(t.element(find.byType(IssuesPage)));
     await settle(t);
     for (final lane in ['待办', '处理中', '等你看', '已关']) {
       expect(find.text(lane), findsOneWidget);

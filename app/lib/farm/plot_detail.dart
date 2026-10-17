@@ -57,7 +57,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
     final plot = view == null ? const PlotView(crop: Crop.empty) : plotOf(view, session);
     final cast = castOf(agent?.look, session.agent);
     final log = ref.watch(workStepsProvider.select((all) => all[session.id]));
-    final hasThread = ref.watch(farmProvider.select((s) => jobThreadOf(s?.chat, session.id)?.id));
+    final hasThread = ref.watch(stateProvider.select((s) => jobThreadOf(s?.chat, session.id)?.id));
     final station = stationOfSession(session);
     final working = isBusy(session);
     final current = doingOf(session);
@@ -126,7 +126,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                       if (session.branch != null) FarmTag(session.branch!, ink: Palette.bark800),
                       Text('收获时这条分支会合进项目', style: KitText.xs.copyWith(color: Palette.bark400)),
                       KitTappable(
-                        onTap: () => context.go('/tickets/${Uri.encodeComponent(session.id)}'),
+                        onTap: () => context.go('/issues/${Uri.encodeComponent(session.id)}'),
                         tooltip: '这块地上的这次种植，在工单看板上：几轮、用时、改动',
                         builder: (context, s) => FarmTag('在看板上看', fill: s.hovered ? Palette.cream300 : Palette.cream200, ink: Palette.bark800, goes: true),
                       ),

@@ -28,7 +28,7 @@ void main() {
     final routes = Routes();
     final c = ProviderContainer(overrides: overrides(state, v, fakeApi(routes)));
     addTearDown(c.dispose);
-    c.listen(farmProvider, (_, _) {});
+    c.listen(stateProvider, (_, _) {});
     await c.read(stateFrameProvider.future);
     return (c, routes);
   }

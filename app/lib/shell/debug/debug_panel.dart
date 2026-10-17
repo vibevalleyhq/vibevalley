@@ -354,7 +354,7 @@ class _ControlTabState extends ConsumerState<_ControlTab> {
   @override
   Widget build(BuildContext context) {
     final hb = ref.watch(hbProvider);
-    final farm = ref.watch(farmProvider);
+    final farm = ref.watch(stateProvider);
     final view = ref.watch(viewProvider);
     final hooks = ref.watch(debugHooksProvider);
     final game = farm?.progress;
@@ -470,7 +470,7 @@ class _SessionsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hb = ref.watch(hbProvider);
-    final sessions = ref.watch(farmProvider)?.sessions ?? const <Session>[];
+    final sessions = ref.watch(stateProvider)?.sessions ?? const <Session>[];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

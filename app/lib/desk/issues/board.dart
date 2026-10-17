@@ -8,23 +8,23 @@ import '../../data/providers.dart';
 import '../../game/state.dart' show FarmPanel, panelProvider, planShownProvider;
 import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart' show tookText;
-import '../../rules/tickets.dart';
+import '../../rules/issues.dart';
 import '../../shell/title/title_state.dart' show titleOpenProvider;
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import '../../data/remote.dart';
 import '../../shared/widgets.dart';
 import '../../shared/faces.dart';
-import 'tickets_page.dart';
+import 'issues_page.dart';
 
 Move? cardMove(BoardCard card, Lane to) => switch (card) {
   PlaybookCard() || ManagerCard() => null,
   TodoCard() => moveOf(card.lane, to),
-  TicketCard(:final issue, :final session) => moveOf(card.lane, to, planned: ticketPlanned(issue, session)),
+  IssueCard(:final issue, :final session) => moveOf(card.lane, to, planned: issuePlanned(issue, session)),
 };
 
-class TicketBoard extends StatefulWidget {
-  const TicketBoard({
+class IssueBoard extends StatefulWidget {
+  const IssueBoard({
     super.key,
     required this.cards,
     required this.loading,
@@ -47,12 +47,12 @@ class TicketBoard extends StatefulWidget {
   final Future<void> Function(String text) onAdd;
 
   @override
-  State<TicketBoard> createState() => _BoardState();
+  State<IssueBoard> createState() => _BoardState();
 }
 
 const _oneLane = 700.0;
 
-class _BoardState extends State<TicketBoard> {
+class _BoardState extends State<IssueBoard> {
   Lane _lane = Lane.todo;
 
   Widget _laneView(Lane lane) => _LaneView(
@@ -144,7 +144,7 @@ class _LaneView extends StatelessWidget {
       }
     }
     final head = switch (lane) {
-      Lane.working => '${cards.whereType<TicketCard>().length} / $maxRunning 块地',
+      Lane.working => '${cards.whereType<IssueCard>().length} / $maxRunning 块地',
       _ => '${cards.length}',
     };
     return DragTarget<BoardCard>(
@@ -279,7 +279,7 @@ class _CardView extends ConsumerWidget {
     final (title, who, stripe) = switch (card) {
       PlaybookCard(:final playbook) => ('计划：${playbook.title}', '${playbook.nodes.length} 步', null),
       TodoCard(:final item) => (item.title, agents.where((a) => a.id == item.assignee).firstOrNull?.name ?? '还没选帮工', priorityColor(item.priority)),
-      TicketCard(:final issue, :final head) => (ticketTitle(issue, ref.watch(plansProvider)), head.name, null),
+      IssueCard(:final issue, :final head) => (issueTitle(issue, ref.watch(plansProvider)), head.name, null),
       ManagerCard(:final issue) => (issue.title, '管家', null),
     };
     final tags = <Widget>[];
@@ -296,28 +296,25 @@ class _CardView extends ConsumerWidget {
         lines.add(Text(item.queuedAt != null ? '等空地，${ago(item.queuedAt!, now)}排上的' : '写于 ${ago(item.createdAt, now)}', style: xs));
       case ManagerCard(:final issue):
         if (issue.schedule != null) tags.add(const _Tag('定时', Palette.cream300));
-        final state = ticketState(issue);
+        final state = issueTag(issue);
         lines.add(Text(state.open ? '管家在做' : '${state.label} · ${ago(issue.closedAt ?? issue.createdAt, now)}', style: xs));
-      case TicketCard(:final issue, :final sessions, :final head, :final state, :final session):
+      case IssueCard(:final issue, :final sessions, :final head, :final state, :final session):
         final phase = session?.phase;
         if (session?.conflict != null) tags.add(const _Tag('冲突', Palette.berry));
         if (phase is PhaseWorking && phase.quietSince != null) tags.add(_Tag('${tookText(now - phase.quietSince!)}没动静', Palette.wheat));
         if (phase is PhaseFailed || (session ?? head).lastRun?.outcome == Outcome.failed) tags.add(const _Tag('没做成', Palette.berry));
-        if (state == TicketState.lost) tags.add(const _Tag('丢了', Palette.berry));
+        if (state == IssueTag.lost) tags.add(const _Tag('丢了', Palette.berry));
         if (sessions.length > 1) tags.add(_Tag('第 ${sessions.length} 次', Palette.water));
         if (issue.schedule != null) tags.add(const _Tag('定时', Palette.cream300));
-        if (ticketPlanned(issue, session)) tags.add(const _Tag('种植计划', Palette.leaf500));
+        if (issuePlanned(issue, session)) tags.add(const _Tag('种植计划', Palette.leaf500));
         final turns = (session ?? head).runs.round();
         final cny = (session ?? head).spent?.cny;
         final took = state.open ? '开了 ${tookText(now - head.hiredAt)}' : '用了 ${tookText((issue.closedAt ?? head.endedAt ?? now) - sessions.first.hiredAt)}';
         lines.add(
-          Text(
-            [if (state == TicketState.working) '第 ${turns + 1} 轮' else '$turns 轮', took, if (cny != null) '¥${cny.toStringAsFixed(2)}'].join(' · '),
-            style: xs,
-          ),
+          Text([if (state == IssueTag.working) '第 ${turns + 1} 轮' else '$turns 轮', took, if (cny != null) '¥${cny.toStringAsFixed(2)}'].join(' · '), style: xs),
         );
         final said = (session ?? head).lastRun?.summary;
-        if (state == TicketState.waiting && said != null && said.isNotEmpty) {
+        if (state == IssueTag.waiting && said != null && said.isNotEmpty) {
           lines.add(
             Text(
               said,
@@ -349,12 +346,12 @@ class _CardView extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (card case TicketCard(:final state)) ...[
-                  Padding(padding: const EdgeInsets.only(top: 4), child: StateDot(ticketColor(state))),
+                if (card case IssueCard(:final state)) ...[
+                  Padding(padding: const EdgeInsets.only(top: 4), child: StateDot(issueTagColor(state))),
                   const SizedBox(width: 6),
                 ],
                 if (card case ManagerCard(:final issue)) ...[
-                  Padding(padding: const EdgeInsets.only(top: 4), child: StateDot(ticketColor(ticketState(issue)))),
+                  Padding(padding: const EdgeInsets.only(top: 4), child: StateDot(issueTagColor(issueTag(issue)))),
                   const SizedBox(width: 6),
                 ],
                 if (card is PlaybookCard) ...[const Padding(padding: EdgeInsets.only(top: 4), child: StateDot(Palette.leaf500)), const SizedBox(width: 6)],
@@ -437,7 +434,7 @@ class _Tag extends StatelessWidget {
 }
 
 double _closedAt(BoardCard c) => switch (c) {
-  TicketCard(:final issue, :final head) => issue.closedAt ?? head.hiredAt,
+  IssueCard(:final issue, :final head) => issue.closedAt ?? head.hiredAt,
   ManagerCard(:final issue) => issue.closedAt ?? issue.createdAt,
   TodoCard(:final item) => item.closedAt ?? item.createdAt,
   PlaybookCard() => 0,

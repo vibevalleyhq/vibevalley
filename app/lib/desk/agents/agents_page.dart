@@ -17,7 +17,7 @@ class AgentsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(deskConfigProvider);
-    final farm = ref.watch(farmProvider);
+    final farm = ref.watch(stateProvider);
     final tallies = farm?.progress?.agents ?? const <String, AgentTally>{};
     final sessions = farm?.sessions ?? const <Session>[];
     final skillName = {for (final s in config.skills) s.id: s.name};

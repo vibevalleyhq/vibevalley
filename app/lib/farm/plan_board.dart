@@ -124,7 +124,7 @@ class NodeCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final agent = node.agent == null ? null : (ref.watch(agentsProvider).value ?? const <String, Agent>{})[node.agent];
-    final session = node.session == null ? null : ref.watch(farmProvider)?.sessions.where((h) => h.id == node.session).firstOrNull;
+    final session = node.session == null ? null : ref.watch(stateProvider)?.sessions.where((h) => h.id == node.session).firstOrNull;
     String titleOf(String id) => nodeOf(pb, id)?.title ?? id;
     final waits = node.state == NodeState.waiting ? node.blockedBy ?? const <String>[] : const <String>[];
     final live = pb.state == PlaybookState.running || pb.state == PlaybookState.paused;

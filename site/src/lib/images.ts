@@ -15,7 +15,7 @@ const title = import.meta.glob<{ default: ImageMetadata }>(
   { eager: true },
 )
 const backgrounds = import.meta.glob<{ default: ImageMetadata }>('../../../app/assets/pixel/title-{morning,day,evening,night}.jpg', { eager: true })
-const shots = import.meta.glob<{ default: ImageMetadata }>('../../../docs/images/{farm.png,title.jpg,chat.png,phone-chat.png,phone-tickets.png}', { eager: true })
+const shots = import.meta.glob<{ default: ImageMetadata }>('../../../docs/images/{farm.png,title.jpg,chat.png,phone-chat.png,phone-issues.png}', { eager: true })
 
 const of = (images: Record<string, { default: ImageMetadata }>, path: string) => {
   const image = images[path]?.default

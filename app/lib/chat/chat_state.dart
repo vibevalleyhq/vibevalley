@@ -36,7 +36,7 @@ final chatLoadedProvider = NotifierProvider<ChatValue<Map<double, Loaded>>, Map<
 final spokenProvider = NotifierProvider<SpokenLines, List<Line>>(SpokenLines.new);
 
 final shownConversationProvider = Provider<Conversation?>((ref) {
-  final chat = ref.watch(farmProvider)?.chat;
+  final chat = ref.watch(stateProvider)?.chat;
   final id = ref.watch(chatShownProvider);
   return (id == null ? null : conversationOf(chat, id)) ?? generalOf(chat);
 });
@@ -87,7 +87,7 @@ class ChatActions {
   final Ref _ref;
 
   VibeValleyApi get _api => _ref.read(apiProvider);
-  Chat? get _chat => _ref.read(farmProvider)?.chat;
+  Chat? get _chat => _ref.read(stateProvider)?.chat;
 
   Future<void> showChat(double? conversation) async {
     _ref.read(chatShownProvider.notifier).set(conversation);
@@ -129,13 +129,13 @@ class ChatActions {
 
   /// You can type before you have said hello.
   Future<bool> whenLive() async {
-    final now = _ref.read(farmProvider)?.call;
+    final now = _ref.read(stateProvider)?.call;
     if (now == CallState.live) return true;
     if (now != CallState.connecting) unawaited(_api.manager.open().catchError((Object _) {}));
     final deadline = DateTime.now().add(connectWait);
     while (DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
-      final call = _ref.read(farmProvider)?.call;
+      final call = _ref.read(stateProvider)?.call;
       if (call == CallState.live) return true;
       if (call == CallState.error) return false;
     }
