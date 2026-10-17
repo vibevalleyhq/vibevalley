@@ -114,6 +114,10 @@ func managerDescribeSession(w session.Roster) string {
 		str.Head(h.Task, 60), protocol.PhaseText(h, clock.NowMs()), last, spent)
 }
 
+// Words in a helper's report or a page it read can ask for a merge; only the owner's can make one. The tool stays in the list, so that
+// the prompt's prefix does not change from round to round.
+const managerMergeNotAsked = "没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。"
+
 var managerToolLabels = map[string]string{
 	"dispatch":         "派活",
 	"projects":         "项目",
@@ -537,6 +541,9 @@ func (fm *manager) tools() []agentcore.AgentTool {
 
 	merge := sessionTool("merge", "把一个帮工分支上的提交合进它所在项目的主分支，然后让它收工。会冲突时不合并，帮工留在地里，结果里有让它解决冲突的话。",
 		func(w session.Roster) string {
+			if !fm.requestInput().Owner {
+				return managerMergeNotAsked
+			}
 			if w.Session.Issue == nil {
 				return "这个帮工没有工单"
 			}
@@ -722,6 +729,9 @@ func (fm *manager) tools() []agentcore.AgentTool {
 		Description: "对整个计划：start 开工（主人看过、同意了才用），pause 暂停（正在做的做完，不开新的），resume 继续，abandon 放弃（分支留着），merge 收获（都做完以后，把计划分支合进主分支）。",
 		Parameters:  agentcore.ObjectSchema(map[string]any{"playbook": managerStr("计划 id"), "action": managerEnum(protocol.PlaybookActionValues)}, "playbook", "action"),
 		Run: func(_ context.Context, p actArgs, _ agent.ToolContext) (string, error) {
+			if protocol.PlaybookAction(p.Action) == protocol.PlaybookActionMerge && !fm.requestInput().Owner {
+				return managerMergeNotAsked, nil
+			}
 			return managerAnswered(fm.playbooks.Act(p.Playbook, protocol.PlaybookAction(p.Action), protocol.PlaybookActorManager))
 		},
 	})

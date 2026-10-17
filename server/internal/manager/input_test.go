@@ -83,7 +83,7 @@ func TestNewVoiceCallerDoesNotReceiveOlderChatAnswer(t *testing.T) {
 			return ai.FauxAssistantMessage("voice answer")
 		}),
 	)
-	w.f.Manager.send("chat", w.f.Channel.General(), true)
+	w.f.Manager.send(sourceOwner, "chat", w.f.Channel.General(), true)
 	<-started
 	ctx, cancel := context.WithCancel(w.ctx)
 	defer cancel()
@@ -125,7 +125,7 @@ func TestManagerShutdownDoesNotHoldInputReadLock(t *testing.T) {
 	w.faux.SetResponses(ai.FauxResponseFactory(func(ai.Context, ai.StreamOptions, ai.FauxProviderState, ai.Model) ai.AssistantMessage {
 		return ai.FauxAssistantMessage(ai.FauxToolCall("wait", map[string]any{}, ""))
 	}))
-	fm.send("wait", w.f.Channel.General(), true)
+	fm.send(sourceOwner, "wait", w.f.Channel.General(), true)
 	<-entered
 	stopped := make(chan struct{})
 	go func() { fm.OnStop(); close(stopped) }()
@@ -180,7 +180,7 @@ func TestEachAnswerLeavesItsTokensInTheLog(t *testing.T) {
 	answer := ai.FauxAssistantMessage("收到")
 	answer.Usage = ai.Usage{Input: 8_900, CacheRead: 41_200, Output: 310, TotalTokens: 50_410}
 	w.faux.SetResponses(answer)
-	w.f.Manager.send("在吗", w.f.Channel.General(), true)
+	w.f.Manager.send(sourceOwner, "在吗", w.f.Channel.General(), true)
 	usage := testkit.Await(t, "the usage", func() (protocol.SessionEvent, bool) {
 		for _, e := range w.f.Session.Events(protocol.ManagerAgent, "") {
 			if e.Type == protocol.SessionEventTypeLLMUsage {
@@ -204,7 +204,7 @@ func TestTheSituationIsWholeOnlyAfterAFold(t *testing.T) {
 	ask := func(words string) string {
 		t.Helper()
 		before := len(w.seen())
-		fm.send(words, w.f.Channel.General(), true)
+		fm.send(sourceOwner, words, w.f.Channel.General(), true)
 		c := testkit.Await(t, "the request", func() (ai.Context, bool) {
 			seen := w.seen()
 			if len(seen) <= before {
@@ -222,7 +222,7 @@ func TestTheSituationIsWholeOnlyAfterAFold(t *testing.T) {
 		t.Fatal(err)
 	}
 	second := ask("二")
-	if strings.Contains(second, "【农场现状】") || !strings.HasSuffix(second, "【农场变了】\n+ #clock-in\n+   （没有帮工）\n\n二") {
+	if strings.Contains(second, "【农场现状】") || !strings.HasSuffix(second, "【农场变了】\n+ #clock-in\n+   （没有帮工）\n\n[来源：主人]\n二") {
 		t.Fatalf("second %q", second)
 	}
 	if third := ask("三"); strings.Contains(third, "【农场") {
@@ -282,7 +282,7 @@ func TestARestartGoesOnWithTheRunItCut(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.f.Manager.send("主人说：在 demo 里加个 README", clockIn.ID, true)
+	w.f.Manager.send(sourceOwner, "主人说：在 demo 里加个 README", clockIn.ID, true)
 	file := filepath.Join(memory.ManagerHome(cfg.Home), protocol.ManagerAgent+".jsonl")
 	testkit.Until(t, "the tool's result saved", func() bool {
 		data, _ := os.ReadFile(file)
@@ -313,4 +313,21 @@ func TestARestartGoesOnWithTheRunItCut(t *testing.T) {
 	testkit.Eq(t, said, "接着说完：派好了", "answer")
 	testkit.Eq(t, len(after.State().Contexts), 1, "requests")
 	testkit.Eq(t, len(again.f.Session.Roster()), 1, "helpers")
+}
+
+func TestEverySourceHasItsHead(t *testing.T) {
+	heads := map[string]bool{}
+	for _, source := range managerSources {
+		head := managerHead(source)
+		if !strings.HasPrefix(head, "[来源：") || heads[head] {
+			t.Fatalf("%s: %q", source, head)
+		}
+		heads[head] = true
+	}
+	defer func() {
+		if recover() == nil {
+			t.Fatal("an unknown source has a head")
+		}
+	}()
+	managerHead("")
 }
