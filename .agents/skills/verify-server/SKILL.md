@@ -53,7 +53,7 @@ description: 改了 VibeValley 服务端（server/internal/**、server/cmd/serve
 
    ```bash
    export VIBEVALLEY_SERVER=http://127.0.0.1:8899
-   $V/vv issue add --json '{"title":"verify smoke"}'
+   $V/vv issue create --json '{"title":"verify smoke"}'
    ```
 
    打出新工单，`"status": "backlog"`。服务端拒绝时打出它的原话，退出码 1。

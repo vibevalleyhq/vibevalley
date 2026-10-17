@@ -15,7 +15,7 @@ import (
 )
 
 // The server's configuration: Defaults, then the YAML file, then the environment (VIBEVALLEY_ and the key, dots as
-// underscores: manager.model is VIBEVALLEY_MANAGER_MODEL). A key not in Defaults is never read from the environment.
+// underscores: session.stall_seconds is VIBEVALLEY_SESSION_STALL_SECONDS). A key not in Defaults is never read from the environment.
 type Config struct {
 	// VIBEVALLEY_HOME, or ~/.vibevalley; the YAML file is in it, so it cannot be set there.
 	Home    string `mapstructure:"-"`
