@@ -95,7 +95,7 @@ class DeskBackend {
   final List<Skill> skills;
   final List<RuntimeInfo> runtimes;
   final Map<String, List<Memory>> memories;
-  ManagerMemory? managerMemory;
+  MemoryList? managerMemory;
   final ArchiveListing archive;
   final Map<String, String> archiveFiles;
   final Map<String, Trajectory> trajectories;
@@ -165,30 +165,30 @@ class DeskBackend {
         return jsonResponse([for (final x in runtimes) x.toJson()]);
       case ('GET', ['api', 'projects']):
         return jsonResponse([for (final p in projects) p.toJson()]);
-      case ('GET', ['api', 'agents', final id, 'recall']):
+      case ('GET', ['api', 'memories', final id, 'recall']):
         final lines = recalls[id] ?? const <String>[];
         return jsonResponse({'lines': lines, 'chars': lines.fold<int>(0, (n, l) => n + l.length + 1), 'limit': 1600});
-      case ('GET', ['api', 'agents', final id, 'memories']):
-        return jsonResponse([for (final m in memories[id] ?? const <Memory>[]) m.toJson()]);
-      case ('POST', ['api', 'agents', final id, 'memories']):
+      case ('GET', ['api', 'memories', final id]) when id != managerAgent:
+        return jsonResponse(MemoryList(memories: memories[id] ?? const <Memory>[]).toJson());
+      case ('POST', ['api', 'memories', final id]) when id != managerAgent:
         final req = MemoryRequest.fromJson(body as Map<String, dynamic>);
         final m = memory('m${calls.length}', req.text, agent: id, project: req.project, at: 1);
         memories[id] = [m, ...?memories[id]];
         return jsonResponse(m.toJson());
-      case ('DELETE', ['api', 'agents', final id, 'memories', final mid]):
+      case ('DELETE', ['api', 'memories', final id, final mid]) when id != managerAgent:
         memories[id]?.removeWhere((m) => m.id == mid);
         return http.Response('', 204);
-      case ('GET', ['api', 'manager', 'memories']):
+      case ('GET', ['api', 'memories', managerAgent]):
         return managerMemory == null ? jsonResponse({'_tag': 'Missing', 'reason': '没有'}, 404) : jsonResponse(managerMemory!.toJson());
-      case ('POST', ['api', 'manager', 'memories']):
+      case ('POST', ['api', 'memories', managerAgent]):
         final req = MemoryRequest.fromJson(body as Map<String, dynamic>);
         final m = memory('mm${calls.length}', req.text, agent: 'manager', at: 1);
         final mm = managerMemory!;
-        managerMemory = ManagerMemory(file: mm.file, memories: [m, ...mm.memories], carried: mm.carried + 1);
+        managerMemory = MemoryList(file: mm.file, memories: [m, ...mm.memories], carried: (mm.carried ?? 0) + 1);
         return jsonResponse(m.toJson());
-      case ('DELETE', ['api', 'manager', 'memories', final mid]):
+      case ('DELETE', ['api', 'memories', managerAgent, final mid]):
         final mm = managerMemory!;
-        managerMemory = ManagerMemory(file: mm.file, memories: mm.memories.where((m) => m.id != mid).toList(), carried: mm.carried);
+        managerMemory = MemoryList(file: mm.file, memories: mm.memories.where((m) => m.id != mid).toList(), carried: mm.carried);
         return http.Response('', 204);
       case ('GET', ['api', 'manager', 'archive']):
         final q = r.url.queryParameters['q'];

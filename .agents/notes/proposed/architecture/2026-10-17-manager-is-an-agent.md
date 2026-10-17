@@ -23,7 +23,9 @@ Status: proposed
 
 2026-10-17 做了：档案 `manager` 在加载时补上（`agent.go` 的 `managerProfile`），`Agents()` 是派活用的档案（不含管家），`All()` 是全部，`agent.list` 返回全部；删管家、把它的农机换掉被拒绝；`Issue.Hire` 拒绝派给管家；管家的模型从档案读（`manager.go` 的 `modelOf`），配置的 `manager` 段、`protocol.Runtime` 枚举和 `ManagerMemory.Runtime` 删了（管家本来只能在自己的 agent 上跑，`pi` 一直被拒绝）。Flutter 的 `DeskConfig` 把管家的档案单放在 `manager`，各处的档案列表里没有它。
 
-还没做：记忆的 `memory.*` 合并、频道发言人 `'manager'` 并进 `agent`、管家页上改模型。
+记忆合成 `memory.list`、`recall`、`create`、`delete`（`/api/memories/{agent}`，管家是 `manager`，`MemoryList` 只有管家的带 `file`、`carried`；`memory.Service` 按档案分去行或 `MEMORY.md`）也做了。
+
+还没做：频道发言人 `'manager'` 并进 `agent`、管家页上改模型。
 
 ## Alternatives considered
 

@@ -293,34 +293,21 @@ func (a api) AgentCheck(ctx context.Context, body protocol.AgentCheckRequest) ([
 	return out, nil
 }
 
-func (a api) AgentRecall(_ context.Context, id string, project, text *string) (protocol.RecallPreview, error) {
-	return a.f.Memory.Preview(id, ptr.Value(project), ptr.Value(text)), nil
+func (a api) MemoryList(_ context.Context, agent string) (protocol.MemoryList, error) {
+	return a.f.Memory.MemoriesOf(agent), nil
 }
 
-func (a api) AgentMemories(_ context.Context, id string) ([]protocol.Memory, error) {
-	return a.f.Memory.List(id), nil
+func (a api) MemoryRecall(_ context.Context, agent string, project, text *string) (protocol.RecallPreview, error) {
+	return a.f.Memory.RecallOf(agent, ptr.Value(project), ptr.Value(text))
 }
 
-func (a api) AgentRemember(_ context.Context, id string, body protocol.MemoryRequest) (protocol.Memory, error) {
-	m, err := a.f.Memory.Write(id, body.Text, ptr.Value(body.Project))
+func (a api) MemoryCreate(_ context.Context, agent string, body protocol.MemoryRequest) (protocol.Memory, error) {
+	m, err := a.f.Memory.Remember(agent, body.Text, ptr.Value(body.Project))
 	return m, refused(err)
 }
 
-func (a api) AgentForget(_ context.Context, id, memory string) error {
-	return refused(a.f.Memory.Forget(id, memory))
-}
-
-func (a api) ManagerMemories(context.Context) (protocol.ManagerMemory, error) {
-	return a.f.Memory.Manager(), nil
-}
-
-func (a api) ManagerRemember(_ context.Context, body protocol.MemoryRequest) (protocol.Memory, error) {
-	m, err := a.f.Memory.WriteManager(body.Text)
-	return m, refused(err)
-}
-
-func (a api) ManagerForget(_ context.Context, memory string) error {
-	return refused(a.f.Memory.ForgetManager(memory))
+func (a api) MemoryDelete(_ context.Context, agent, memory string) error {
+	return refused(a.f.Memory.ForgetOf(agent, memory))
 }
 
 func (a api) ManagerListArchive(_ context.Context, q *string) (protocol.ArchiveListing, error) {

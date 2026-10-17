@@ -887,10 +887,11 @@ type MemoryRequest struct {
 	Project *string `json:"project,omitzero"`
 }
 
-type ManagerMemory struct {
-	File     string   `json:"file"`
+type MemoryList struct {
 	Memories []Memory `json:"memories"`
-	Carried  int64    `json:"carried"`
+	// The manager's only: the file it reads, and how many of the newest lines its prompt carries.
+	File    *string `json:"file,omitzero"`
+	Carried *int64  `json:"carried,omitzero"`
 }
 
 type Agent struct {

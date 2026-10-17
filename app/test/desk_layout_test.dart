@@ -26,7 +26,7 @@ DeskBackend _server() => DeskBackend(
       ],
     ),
   ],
-  managerMemory: const ManagerMemory(file: '/m.md', memories: [], carried: 0),
+  managerMemory: const MemoryList(file: '/m.md', memories: [], carried: 0),
 );
 
 void main() {

@@ -185,14 +185,14 @@ class MemoriesNotifier extends Notifier<Map<String, List<Memory>>> {
   VibeValleyApi get _api => ref.read(apiProvider);
 
   Future<void> load(String agent) async {
-    final list = await _api.agent.memories(id: agent);
-    state = {...state, agent: list};
+    final list = await _api.memory.list(agent: agent);
+    state = {...state, agent: list.memories};
   }
 
   Future<Answer> write(String agent, String text, String? project) async {
     try {
-      final memory = await _api.agent.remember(
-        id: agent,
+      final memory = await _api.memory.create(
+        agent: agent,
         body: MemoryRequest(text: text, project: project),
       );
       state = {
@@ -213,23 +213,26 @@ class MemoriesNotifier extends Notifier<Map<String, List<Memory>>> {
           if (m.id != id) m,
       ],
     };
-    await _api.agent.forget(id: agent, memory: id);
+    await _api.memory.delete(agent: agent, memory: id);
   }
 }
 
-final managerMemoryProvider = NotifierProvider<ManagerMemoryNotifier, ManagerMemory?>(ManagerMemoryNotifier.new);
+final managerMemoryProvider = NotifierProvider<ManagerMemoryNotifier, MemoryList?>(ManagerMemoryNotifier.new);
 
-class ManagerMemoryNotifier extends Notifier<ManagerMemory?> {
+class ManagerMemoryNotifier extends Notifier<MemoryList?> {
   @override
-  ManagerMemory? build() => null;
+  MemoryList? build() => null;
 
   VibeValleyApi get _api => ref.read(apiProvider);
 
-  Future<void> load() async => state = await _api.manager.memories();
+  Future<void> load() async => state = await _api.memory.list(agent: managerAgent);
 
   Future<Answer> write(String text) async {
     try {
-      await _api.manager.remember(body: MemoryRequest(text: text));
+      await _api.memory.create(
+        agent: managerAgent,
+        body: MemoryRequest(text: text),
+      );
       await load();
       return (ok: true, text: '记下了');
     } on Object catch (e) {
@@ -240,7 +243,7 @@ class ManagerMemoryNotifier extends Notifier<ManagerMemory?> {
   Future<void> forget(String id) async {
     final m = state;
     if (m != null) {
-      state = ManagerMemory(
+      state = MemoryList(
         file: m.file,
         memories: [
           for (final x in m.memories)
@@ -249,7 +252,7 @@ class ManagerMemoryNotifier extends Notifier<ManagerMemory?> {
         carried: m.carried,
       );
     }
-    await _api.manager.forget(memory: id);
+    await _api.memory.delete(agent: managerAgent, memory: id);
     await load();
   }
 }
@@ -282,7 +285,7 @@ Map<String, List<AgentIssue>> watchAgentIssues(WidgetRef ref, List<Agent> agents
 final recallPreviewProvider = FutureProvider.autoDispose.family<RecallPreview, ({String agent, String project, String text})>((ref, q) {
   // Again when the agent's memories change.
   ref.watch(memoriesProvider.select((all) => all[q.agent]));
-  return ref.watch(apiProvider).agent.recall(id: q.agent, project: q.project, text: q.text);
+  return ref.watch(apiProvider).memory.recall(agent: q.agent, project: q.project, text: q.text);
 });
 
 /// What saving these settings would be refused for (setting.check), null when nothing; keyed by the update as JSON.

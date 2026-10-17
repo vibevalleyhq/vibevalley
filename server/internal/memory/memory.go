@@ -325,14 +325,15 @@ func (mm *managerMemory) fileTime() int64 {
 	return clock.NowMs()
 }
 
-func (mm *managerMemory) Manager() protocol.ManagerMemory {
+func (mm *managerMemory) Manager() protocol.MemoryList {
 	lines := agent.MemoryLines(mm.home)
 	at := mm.fileTime()
 	memories := make([]protocol.Memory, len(lines))
 	for i, l := range lines {
 		memories[len(lines)-1-i] = memoryLineOf(l, at)
 	}
-	return protocol.ManagerMemory{File: mm.file(), Memories: memories, Carried: int64(memoryCarriedLines(lines))}
+	file, carried := mm.file(), int64(memoryCarriedLines(lines))
+	return protocol.MemoryList{File: &file, Memories: memories, Carried: &carried}
 }
 
 var memoryNewlines = regexp.MustCompile(`\s*\n\s*`)

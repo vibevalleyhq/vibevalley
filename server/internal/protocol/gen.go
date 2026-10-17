@@ -747,8 +747,8 @@ func (v ArchiveListing) MarshalJSON() ([]byte, error) {
 // MemoryKindValues are every MemoryKind, in the protocol's order.
 var MemoryKindValues = []MemoryKind{MemoryKindNote, MemoryKindIssue}
 
-func (v ManagerMemory) MarshalJSON() ([]byte, error) {
-	type plain ManagerMemory
+func (v MemoryList) MarshalJSON() ([]byte, error) {
+	type plain MemoryList
 	p := plain(v)
 	if p.Memories == nil {
 		p.Memories = []Memory{}
@@ -2155,13 +2155,10 @@ var Endpoints = []Endpoint{
 	{"agent.check", "POST", "/api/agents/check", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"agent.save", "PUT", "/api/agents/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"agent.delete", "DELETE", "/api/agents/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"agent.memories", "GET", "/api/agents/{id}/memories", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"agent.recall", "GET", "/api/agents/{id}/recall", []string{"project", "text"}, false, []Caller{CallerOwner, CallerRemote}},
-	{"agent.remember", "POST", "/api/agents/{id}/memories", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"agent.forget", "DELETE", "/api/agents/{id}/memories/{memory}", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"manager.memories", "GET", "/api/manager/memories", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"manager.remember", "POST", "/api/manager/memories", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"manager.forget", "DELETE", "/api/manager/memories/{memory}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"memory.list", "GET", "/api/memories/{agent}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"memory.recall", "GET", "/api/memories/{agent}/recall", []string{"project", "text"}, false, []Caller{CallerOwner, CallerRemote}},
+	{"memory.create", "POST", "/api/memories/{agent}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"memory.delete", "DELETE", "/api/memories/{agent}/{memory}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"manager.listArchive", "GET", "/api/manager/archive", []string{"q"}, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"manager.getArchive", "GET", "/api/manager/archive/{name}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"skill.list", "GET", "/api/skills", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2514,47 +2511,31 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		pID := r.PathValue("id")
 		answer(w, nil, h.AgentDelete(r.Context(), pID))
 	})
-	mux.HandleFunc("GET /api/agents/{id}/memories", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		out, err := h.AgentMemories(r.Context(), pID)
+	mux.HandleFunc("GET /api/memories/{agent}", func(w http.ResponseWriter, r *http.Request) {
+		pAgent := r.PathValue("agent")
+		out, err := h.MemoryList(r.Context(), pAgent)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/agents/{id}/recall", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
+	mux.HandleFunc("GET /api/memories/{agent}/recall", func(w http.ResponseWriter, r *http.Request) {
+		pAgent := r.PathValue("agent")
 		pProject := query(r, "project")
 		pText := query(r, "text")
-		out, err := h.AgentRecall(r.Context(), pID, pProject, pText)
+		out, err := h.MemoryRecall(r.Context(), pAgent, pProject, pText)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/agents/{id}/memories", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
+	mux.HandleFunc("POST /api/memories/{agent}", func(w http.ResponseWriter, r *http.Request) {
+		pAgent := r.PathValue("agent")
 		var body MemoryRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.AgentRemember(r.Context(), pID, body)
+		out, err := h.MemoryCreate(r.Context(), pAgent, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/agents/{id}/memories/{memory}", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
+	mux.HandleFunc("DELETE /api/memories/{agent}/{memory}", func(w http.ResponseWriter, r *http.Request) {
+		pAgent := r.PathValue("agent")
 		pMemory := r.PathValue("memory")
-		answer(w, nil, h.AgentForget(r.Context(), pID, pMemory))
-	})
-	mux.HandleFunc("GET /api/manager/memories", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.ManagerMemories(r.Context())
-		answer(w, out, err)
-	})
-	mux.HandleFunc("POST /api/manager/memories", func(w http.ResponseWriter, r *http.Request) {
-		var body MemoryRequest
-		if !decode(w, r, &body) {
-			return
-		}
-		out, err := h.ManagerRemember(r.Context(), body)
-		answer(w, out, err)
-	})
-	mux.HandleFunc("DELETE /api/manager/memories/{memory}", func(w http.ResponseWriter, r *http.Request) {
-		pMemory := r.PathValue("memory")
-		answer(w, nil, h.ManagerForget(r.Context(), pMemory))
+		answer(w, nil, h.MemoryDelete(r.Context(), pAgent, pMemory))
 	})
 	mux.HandleFunc("GET /api/manager/archive", func(w http.ResponseWriter, r *http.Request) {
 		pQ := query(r, "q")
@@ -3039,13 +3020,13 @@ func (c *Client) AgentDelete(ctx context.Context, pID string) error {
 	return c.call(ctx, "DELETE", "/api/agents/"+url.PathEscape(pID), nil, nil, nil)
 }
 
-func (c *Client) AgentMemories(ctx context.Context, pID string) ([]Memory, error) {
-	var out []Memory
-	err := c.call(ctx, "GET", "/api/agents/"+url.PathEscape(pID)+"/memories", nil, nil, &out)
+func (c *Client) MemoryList(ctx context.Context, pAgent string) (MemoryList, error) {
+	var out MemoryList
+	err := c.call(ctx, "GET", "/api/memories/"+url.PathEscape(pAgent), nil, nil, &out)
 	return out, err
 }
 
-func (c *Client) AgentRecall(ctx context.Context, pID string, pProject *string, pText *string) (RecallPreview, error) {
+func (c *Client) MemoryRecall(ctx context.Context, pAgent string, pProject *string, pText *string) (RecallPreview, error) {
 	q := url.Values{}
 	if pProject != nil {
 		q.Set("project", *pProject)
@@ -3054,34 +3035,18 @@ func (c *Client) AgentRecall(ctx context.Context, pID string, pProject *string, 
 		q.Set("text", *pText)
 	}
 	var out RecallPreview
-	err := c.call(ctx, "GET", "/api/agents/"+url.PathEscape(pID)+"/recall", q, nil, &out)
+	err := c.call(ctx, "GET", "/api/memories/"+url.PathEscape(pAgent)+"/recall", q, nil, &out)
 	return out, err
 }
 
-func (c *Client) AgentRemember(ctx context.Context, pID string, body MemoryRequest) (Memory, error) {
+func (c *Client) MemoryCreate(ctx context.Context, pAgent string, body MemoryRequest) (Memory, error) {
 	var out Memory
-	err := c.call(ctx, "POST", "/api/agents/"+url.PathEscape(pID)+"/memories", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/memories/"+url.PathEscape(pAgent), nil, body, &out)
 	return out, err
 }
 
-func (c *Client) AgentForget(ctx context.Context, pID string, pMemory string) error {
-	return c.call(ctx, "DELETE", "/api/agents/"+url.PathEscape(pID)+"/memories/"+url.PathEscape(pMemory), nil, nil, nil)
-}
-
-func (c *Client) ManagerMemories(ctx context.Context) (ManagerMemory, error) {
-	var out ManagerMemory
-	err := c.call(ctx, "GET", "/api/manager/memories", nil, nil, &out)
-	return out, err
-}
-
-func (c *Client) ManagerRemember(ctx context.Context, body MemoryRequest) (Memory, error) {
-	var out Memory
-	err := c.call(ctx, "POST", "/api/manager/memories", nil, body, &out)
-	return out, err
-}
-
-func (c *Client) ManagerForget(ctx context.Context, pMemory string) error {
-	return c.call(ctx, "DELETE", "/api/manager/memories/"+url.PathEscape(pMemory), nil, nil, nil)
+func (c *Client) MemoryDelete(ctx context.Context, pAgent string, pMemory string) error {
+	return c.call(ctx, "DELETE", "/api/memories/"+url.PathEscape(pAgent)+"/"+url.PathEscape(pMemory), nil, nil, nil)
 }
 
 func (c *Client) ManagerListArchive(ctx context.Context, pQ *string) (ArchiveListing, error) {

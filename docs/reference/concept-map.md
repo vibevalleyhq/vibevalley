@@ -23,7 +23,7 @@
 | 帮工档案 | 一种小动物 | `/agents`（`desk/agents`） | `Agent` | `/api/agents` |
 | 农机 | 农具 | `/runtimes`（`desk/runtimes`） | `RuntimeInfo`、`RuntimeSettings` | `/api/runtimes` |
 | 技能书 | 技能书 | `/skills`（`desk/skills`） | `Skill` | `/api/skills` |
-| 记性 | 记性 | 档案页和管家页（`desk/shared/memory_panels.dart`） | `Memory` | `/api/agents/{id}/memories` |
+| 记性 | 记性 | 档案页和管家页（`desk/shared/memory_panels.dart`） | `Memory`、`MemoryList` | `/api/memories/{agent}`（管家是 `manager`） |
 | 管家 | 管家 | `/manager`（`desk/manager`） | `CoreState.Manager`（管家的状态） | `/api/say`、`/api/manager/...` |
 | 工单 | 看板上的卡片 | `/tickets`（`desk/tickets`） | `Issue`、`Issue.Sessions`（这张工单用过的帮工） | `/api/issues` |
 | 种植计划 | 图纸桌、计划板 | `farm/plans.dart` | `Playbook`（从父工单拼回，`StateFrame.Plans`） | `/api/playbooks` |

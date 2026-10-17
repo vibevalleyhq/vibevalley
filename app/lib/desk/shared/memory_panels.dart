@@ -225,8 +225,8 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
           title: '记下的',
           count: view.memories.length,
           aside: Tooltip(
-            message: view.file,
-            child: Text(view.file, style: KitText.mono.copyWith(color: Palette.bark500)),
+            message: view.file ?? '',
+            child: Text(view.file ?? '', style: KitText.mono.copyWith(color: Palette.bark500)),
           ),
           child: view.memories.isEmpty
               ? const DeskEmpty('还没记下什么。跟管家说「记住……」，或者你在上面替它记。')
@@ -236,10 +236,10 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
                     for (final (i, m) in view.memories.indexed)
                       MemoryItem(
                         memory: m,
-                        faded: i >= view.carried,
+                        faded: i >= (view.carried ?? view.memories.length),
                         onForget: () => deskRun(() => ref.read(managerMemoryProvider.notifier).forget(m.id)),
                         meta: [m.session == managerAgent ? '管家自己记的' : '你交代的', ago(m.at, now)],
-                        warning: i >= view.carried ? '太旧了，带不进系统提示' : null,
+                        warning: i >= (view.carried ?? view.memories.length) ? '太旧了，带不进系统提示' : null,
                       ),
                   ],
                 ),

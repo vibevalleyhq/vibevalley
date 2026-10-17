@@ -170,8 +170,8 @@ func TestManagerMemoryLines(t *testing.T) {
 	if view.Memories[1].At != time.Date(2026, 10, 12, 0, 0, 0, 0, time.Local).UnixMilli() {
 		t.Fatalf("dated %d", view.Memories[1].At)
 	}
-	if view.Carried != 2 {
-		t.Fatalf("carried %d", view.Carried)
+	if *view.Carried != 2 {
+		t.Fatalf("carried %d", *view.Carried)
 	}
 	if err := memory.ForgetManager(view.Memories[1].ID); err != nil {
 		t.Fatal(err)

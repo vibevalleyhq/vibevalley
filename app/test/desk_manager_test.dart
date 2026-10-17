@@ -15,7 +15,7 @@ Activity _step(double n, ActivityKind kind, String text, {String? input, String?
     Activity(n: n, at: _now, kind: kind, text: text, action: kind == ActivityKind.action ? ToolAction.runCommand : null, input: input, output: output, ok: ok);
 
 DeskBackend _server() => DeskBackend(
-  managerMemory: ManagerMemory(
+  managerMemory: MemoryList(
     file: '/home/me/.vibevalley/MEMORY.md',
     memories: [
       memory('n1', '提交信息写中文', agent: 'manager', session: 'manager', at: _now),
@@ -78,7 +78,7 @@ void main() {
       await settle(t);
       final post = server.writes.single;
       expect(post.method, 'POST');
-      expect(post.path, '/api/manager/memories');
+      expect(post.path, '/api/memories/manager');
       expect(post.body, {'text': '周末别派夜班'});
       expect(find.text('周末别派夜班'), findsOneWidget);
     });
@@ -89,7 +89,7 @@ void main() {
       await t.tap(labelled('忘掉').first);
       await settle(t);
       expect(server.writes.single.method, 'DELETE');
-      expect(server.writes.single.path, '/api/manager/memories/n1');
+      expect(server.writes.single.path, '/api/memories/manager/n1');
       expect(find.text('提交信息写中文'), findsNothing);
     });
 
@@ -162,7 +162,7 @@ void main() {
       await t.tap(find.text('记下'));
       await settle(t);
       final post = server.writes.single;
-      expect(post.path, '/api/agents/backend/memories');
+      expect(post.path, '/api/memories/backend');
       expect(post.body, {'text': '用 pnpm', 'project': 'clock'});
     });
 

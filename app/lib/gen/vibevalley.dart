@@ -2211,23 +2211,23 @@ class MemoryRequest {
   Map<String, dynamic> toJson() => {'text': text, if (project != null) 'project': project!};
 }
 
-class ManagerMemory {
-  const ManagerMemory({required this.file, required this.memories, required this.carried});
+class MemoryList {
+  const MemoryList({required this.memories, this.file, this.carried});
 
-  factory ManagerMemory.fromJson(Map<String, dynamic> j) => ManagerMemory(
-    file: j['file'] as String,
+  factory MemoryList.fromJson(Map<String, dynamic> j) => MemoryList(
     memories: [for (final e in j['memories'] as List) Memory.fromJson(e as Map<String, dynamic>)],
-    carried: (j['carried'] as num).toDouble(),
+    file: j['file'] == null ? null : j['file'] as String,
+    carried: j['carried'] == null ? null : (j['carried'] as num).toDouble(),
   );
 
-  final String file;
   final List<Memory> memories;
-  final double carried;
+  final String? file;
+  final double? carried;
 
   Map<String, dynamic> toJson() => {
-    'file': file,
     'memories': [for (final e in memories) e.toJson()],
-    'carried': carried,
+    if (file != null) 'file': file!,
+    if (carried != null) 'carried': carried!,
   };
 }
 
@@ -4904,20 +4904,6 @@ class ManagerApi {
     await _api._call('POST', '/api/manager/hear', query: {}, body: body.toJson());
   }
 
-  Future<ManagerMemory> memories() async {
-    final j = await _api._call('GET', '/api/manager/memories', query: {}, body: null);
-    return ManagerMemory.fromJson(j as Map<String, dynamic>);
-  }
-
-  Future<Memory> remember({required MemoryRequest body}) async {
-    final j = await _api._call('POST', '/api/manager/memories', query: {}, body: body.toJson());
-    return Memory.fromJson(j as Map<String, dynamic>);
-  }
-
-  Future<void> forget({required String memory}) async {
-    await _api._call('DELETE', '/api/manager/memories/${Uri.encodeComponent((memory).toString())}', query: {}, body: null);
-  }
-
   Future<ArchiveListing> listArchive({String? q}) async {
     final j = await _api._call('GET', '/api/manager/archive', query: {if (q != null) 'q': '${q!}'}, body: null);
     return ArchiveListing.fromJson(j as Map<String, dynamic>);
@@ -5225,34 +5211,38 @@ class AgentApi {
   Future<void> delete({required String id}) async {
     await _api._call('DELETE', '/api/agents/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
   }
+}
 
-  Future<List<Memory>> memories({required String id}) async {
-    final j = await _api._call('GET', '/api/agents/${Uri.encodeComponent((id).toString())}/memories', query: {}, body: null);
-    return [for (final e in j as List) Memory.fromJson(e as Map<String, dynamic>)];
+/// The `memory` endpoints of VibeValleyApi.
+class MemoryApi {
+  MemoryApi._(this._api);
+  final VibeValleyApi _api;
+
+  /// An agent's memories: the manager's (agent manager) are the lines of its MEMORY.md, with the file and how many of the newest
+  /// its prompt carries; every other agent's are rows.
+  Future<MemoryList> list({required String agent}) async {
+    final j = await _api._call('GET', '/api/memories/${Uri.encodeComponent((agent).toString())}', query: {}, body: null);
+    return MemoryList.fromJson(j as Map<String, dynamic>);
   }
 
-  Future<RecallPreview> recall({required String id, String? project, String? text}) async {
+  /// What the agent would be reminded of on its next start; the manager is not reminded, it carries its whole file.
+  Future<RecallPreview> recall({required String agent, String? project, String? text}) async {
     final j = await _api._call(
       'GET',
-      '/api/agents/${Uri.encodeComponent((id).toString())}/recall',
+      '/api/memories/${Uri.encodeComponent((agent).toString())}/recall',
       query: {if (project != null) 'project': '${project!}', if (text != null) 'text': '${text!}'},
       body: null,
     );
     return RecallPreview.fromJson(j as Map<String, dynamic>);
   }
 
-  Future<Memory> remember({required String id, required MemoryRequest body}) async {
-    final j = await _api._call('POST', '/api/agents/${Uri.encodeComponent((id).toString())}/memories', query: {}, body: body.toJson());
+  Future<Memory> create({required String agent, required MemoryRequest body}) async {
+    final j = await _api._call('POST', '/api/memories/${Uri.encodeComponent((agent).toString())}', query: {}, body: body.toJson());
     return Memory.fromJson(j as Map<String, dynamic>);
   }
 
-  Future<void> forget({required String id, required String memory}) async {
-    await _api._call(
-      'DELETE',
-      '/api/agents/${Uri.encodeComponent((id).toString())}/memories/${Uri.encodeComponent((memory).toString())}',
-      query: {},
-      body: null,
-    );
+  Future<void> delete({required String agent, required String memory}) async {
+    await _api._call('DELETE', '/api/memories/${Uri.encodeComponent((agent).toString())}/${Uri.encodeComponent((memory).toString())}', query: {}, body: null);
   }
 }
 
@@ -5439,6 +5429,7 @@ class VibeValleyApi {
   late final game = GameApi._(this);
   late final runtime = RuntimeApi._(this);
   late final agent = AgentApi._(this);
+  late final memory = MemoryApi._(this);
   late final skill = SkillApi._(this);
   late final project = ProjectApi._(this);
   late final voice = VoiceApi._(this);

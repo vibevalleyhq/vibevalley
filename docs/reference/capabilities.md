@@ -23,9 +23,6 @@
 |---|---|---|---|---|---|
 | `manager.open` | `POST /api/manager/open` | ✓ | ✓ |  |  |
 | `manager.hear` | `POST /api/manager/hear` | ✓ | ✓ |  |  |
-| `manager.memories` | `GET /api/manager/memories` | ✓ | ✓ |  |  |
-| `manager.remember` | `POST /api/manager/memories` | ✓ | ✓ | ✓ |  |
-| `manager.forget` | `DELETE /api/manager/memories/{memory}` | ✓ | ✓ |  |  |
 | `manager.listArchive` | `GET /api/manager/archive` | ✓ | ✓ | ✓ |  |
 | `manager.getArchive` | `GET /api/manager/archive/{name}` | ✓ | ✓ |  |  |
 
@@ -119,10 +116,15 @@
 | `agent.check` | `POST /api/agents/check` | ✓ | ✓ |  |  |
 | `agent.save` | `PUT /api/agents/{id}` | ✓ | ✓ |  |  |
 | `agent.delete` | `DELETE /api/agents/{id}` | ✓ | ✓ |  |  |
-| `agent.memories` | `GET /api/agents/{id}/memories` | ✓ | ✓ |  |  |
-| `agent.recall` | `GET /api/agents/{id}/recall` | ✓ | ✓ |  |  |
-| `agent.remember` | `POST /api/agents/{id}/memories` | ✓ | ✓ |  |  |
-| `agent.forget` | `DELETE /api/agents/{id}/memories/{memory}` | ✓ | ✓ |  |  |
+
+## memory
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `memory.list` | `GET /api/memories/{agent}` | ✓ | ✓ |  |  |
+| `memory.recall` | `GET /api/memories/{agent}/recall` | ✓ | ✓ |  |  |
+| `memory.create` | `POST /api/memories/{agent}` | ✓ | ✓ | ✓ |  |
+| `memory.delete` | `DELETE /api/memories/{agent}/{memory}` | ✓ | ✓ |  |  |
 
 ## skill
 

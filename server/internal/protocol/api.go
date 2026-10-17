@@ -162,27 +162,21 @@ type Handlers interface {
 	//vibevalley:route agent.delete DELETE /api/agents/{id}
 	//vibevalley:can owner remote
 	AgentDelete(ctx context.Context, pID string) error
-	//vibevalley:route agent.memories GET /api/agents/{id}/memories
+	// An agent's memories: the manager's (agent manager) are the lines of its MEMORY.md, with the file and how many of the newest
+	// its prompt carries; every other agent's are rows.
+	//vibevalley:route memory.list GET /api/memories/{agent}
 	//vibevalley:can owner remote
-	AgentMemories(ctx context.Context, pID string) ([]Memory, error)
-	//vibevalley:route agent.recall GET /api/agents/{id}/recall
+	MemoryList(ctx context.Context, pAgent string) (MemoryList, error)
+	// What the agent would be reminded of on its next start; the manager is not reminded, it carries its whole file.
+	//vibevalley:route memory.recall GET /api/memories/{agent}/recall
 	//vibevalley:can owner remote
-	AgentRecall(ctx context.Context, pID string, pProject *string, pText *string) (RecallPreview, error)
-	//vibevalley:route agent.remember POST /api/agents/{id}/memories
-	//vibevalley:can owner remote
-	AgentRemember(ctx context.Context, pID string, body MemoryRequest) (Memory, error)
-	//vibevalley:route agent.forget DELETE /api/agents/{id}/memories/{memory}
-	//vibevalley:can owner remote
-	AgentForget(ctx context.Context, pID string, pMemory string) error
-	//vibevalley:route manager.memories GET /api/manager/memories
-	//vibevalley:can owner remote
-	ManagerMemories(ctx context.Context) (ManagerMemory, error)
-	//vibevalley:route manager.remember POST /api/manager/memories
+	MemoryRecall(ctx context.Context, pAgent string, pProject *string, pText *string) (RecallPreview, error)
+	//vibevalley:route memory.create POST /api/memories/{agent}
 	//vibevalley:can owner remote manager
-	ManagerRemember(ctx context.Context, body MemoryRequest) (Memory, error)
-	//vibevalley:route manager.forget DELETE /api/manager/memories/{memory}
+	MemoryCreate(ctx context.Context, pAgent string, body MemoryRequest) (Memory, error)
+	//vibevalley:route memory.delete DELETE /api/memories/{agent}/{memory}
 	//vibevalley:can owner remote
-	ManagerForget(ctx context.Context, pMemory string) error
+	MemoryDelete(ctx context.Context, pAgent string, pMemory string) error
 	//vibevalley:route manager.listArchive GET /api/manager/archive
 	//vibevalley:can owner remote manager
 	ManagerListArchive(ctx context.Context, pQ *string) (ArchiveListing, error)
