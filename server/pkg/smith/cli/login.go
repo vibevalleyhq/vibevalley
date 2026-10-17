@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"bufio"
@@ -347,7 +347,7 @@ func (c *cli) login(ctx context.Context, raw []string) error {
 		return nil
 	}
 	if !named || id == "all" {
-		fmt.Fprintln(c.stderr, "name one runtime to sign in, e.g. `oar login claude`; `oar login --status` reports them all")
+		fmt.Fprintln(c.stderr, "name one runtime to sign in, e.g. `"+c.name+" login claude`; `"+c.name+" login --status` reports them all")
 		c.exitCode = 1
 		return nil
 	}

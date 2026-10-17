@@ -14,7 +14,6 @@ import (
 
 	"vibevalley/pkg/smith/oar"
 	"vibevalley/pkg/smith/observe"
-	"vibevalley/pkg/smith/runtimes/defaults"
 )
 
 // runtimeChat is `vibevalley runtime chat <runtime>`: a conversation with one runtime through smith, on this machine. It
@@ -36,7 +35,7 @@ func runtimeChat(ctx context.Context, raw []string) error {
 	if err := fs.Parse(raw[1:]); err != nil {
 		return err
 	}
-	registry, err := oar.NewRuntimeRegistry(defaults.Runtimes()...)
+	registry, err := runtimes()
 	if err != nil {
 		return err
 	}

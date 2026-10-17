@@ -111,6 +111,12 @@ func dispatch(ctx context.Context, raw []string) error {
 		return usage(os.Stdout, "")
 	case raw[0] == "issue" && len(raw) > 1 && raw[1] == "run":
 		return issueRun(ctx, raw[2:])
+	case raw[0] == "oar":
+		code, err := oarCommand(raw[1:])
+		if err != nil {
+			return err
+		}
+		os.Exit(code)
 	case raw[0] == "runtime" && len(raw) > 1 && raw[1] == "chat":
 		return runtimeChat(ctx, raw[2:])
 	case raw[0] == "state":

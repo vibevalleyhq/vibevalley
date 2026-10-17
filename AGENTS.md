@@ -29,7 +29,7 @@ scripts/                   文档和 Note 的检查
 
 ```bash
 cd server && go run ./cmd/server                                # 服务端，127.0.0.1:8787
-cd server && go run ./cmd/vibevalley issue list                 # 命令行：调农场的接口（help 列出全部），runtime chat <农机> 直接聊
+cd server && go run ./cmd/vibevalley issue list                 # 命令行：调农场的接口（help 列出全部），runtime chat <农机> 直接聊，oar <命令> 是 smith 的 oar 命令行
 cd server && go run ./cmd/migrate status                        # 库在第几版；up 跑迁移（开机也会跑），new 名字 写下一个迁移
 cd server && go vet ./... && go test ./...                      # 改完服务端
 bun run go:deadcode                                             # 改完服务端：server/internal 里没有只靠测试活着的函数

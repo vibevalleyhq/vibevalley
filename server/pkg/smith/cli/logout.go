@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -75,7 +75,7 @@ func (c *cli) logout(ctx context.Context, raw []string) error {
 	}
 	id, named := parsed.arg(0)
 	if !named || id == "all" {
-		fmt.Fprintln(c.stderr, "name one runtime to sign out, e.g. `oar logout claude`")
+		fmt.Fprintln(c.stderr, "name one runtime to sign out, e.g. `"+c.name+" logout claude`")
 		c.exitCode = 1
 		return nil
 	}

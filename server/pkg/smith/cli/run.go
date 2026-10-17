@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -23,7 +23,7 @@ func (c *cli) run(ctx context.Context, raw []string) error {
 	id, ok1 := parsed.arg(0)
 	prompt, ok2 := parsed.arg(1)
 	if !ok1 || !ok2 {
-		return fmt.Errorf("missing required argument: oar run <runtime> <prompt>")
+		return fmt.Errorf("missing required argument: %s run <runtime> <prompt>", c.name)
 	}
 	runtime, err := c.registry.Require(id)
 	if err != nil {

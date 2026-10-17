@@ -9,7 +9,7 @@ Every entry names what differs, why, and what it costs a host. TS paths and the 
 
 ## Behavior differences
 
-- **No host-exit backstop.** TS kills every owned process group from a `process.on("exit")` hook. Go has no exit hook. A host calls `executable.KillOwned()` and `shared.RemovePrivateTempDirs()` on its shutdown path. `cmd/oar` and `cmd/oar-bridge` do.
+- **No host-exit backstop.** TS kills every owned process group from a `process.on("exit")` hook. Go has no exit hook. A host calls `executable.KillOwned()` and `shared.RemovePrivateTempDirs()` on its shutdown path. `cli.Main` and `cmd/oar-bridge` do.
 - **`McpServer.Env` values are strings.** A JSON `null` in an MCP server's env decodes to `""` through the bridge. TS refuses it at open.
 - **Errors are strings.** Diagnostics travel in error messages, not as structured `cause` objects.
 
@@ -29,7 +29,7 @@ What still differs:
 
 ## Community: morph
 
-- Ported in `community/morph`, including a minimal RFC 6455 client for `/stream/ws`. It is not in the built-in registry, as in TS. `cmd/oar` registers it, as the TS CLI does.
+- Ported in `community/morph`, including a minimal RFC 6455 client for `/stream/ws`. It is not in the built-in registry, as in TS. `cli.Runtimes()` registers it, as the TS CLI does.
 - **Stale TS test.** `tests/community/morph/morph-projection.test.ts` "turn outcomes" expects `quota` for "…429 rate limit", but TS's `classifyFailure` answers `rate_limited`. That test fails on TS too (`OAR_COMMUNITY_TESTS=1`). The Go test asserts TS's actual behavior.
 - No real morph is installed here. The Go tests run against a scripted Console on a loopback server.
 

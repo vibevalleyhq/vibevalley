@@ -35,14 +35,15 @@ run, _ := observe.PromptAndWait(ctx, session, "Find and fix the flaky test", obs
 | `observe` | Folds over the record stream: status, usage, conversation and session view, turn helpers |
 | `runtimes/<id>` | The adapters: claude, codex, grok, kimi, opencode, antigravity, pi |
 | `runtimes/defaults` | The built-in registry |
-| `community/morph` | The morph runtime: not in the built-in registry; `cmd/oar` registers it |
-| `community/dsh` | DeepSeek Harness (`dsh --profile acp`, 0.2.1-rc.1) over the shared ACP layer; no oar port; `cmd/oar` and the VibeValley server register it |
+| `community/morph` | The morph runtime: not in the built-in registry; `cli.Runtimes()` registers it |
+| `community/dsh` | DeepSeek Harness (`dsh --profile acp`, 0.2.1-rc.1) over the shared ACP layer; no oar port; `cli.Runtimes()` and the VibeValley server register it |
 | `brands` | Offline runtime branding, generated from oar's `brands.ts` |
 | `agents` | Subagents over a runtime registry |
 | `oartest` | A scripted runtime with real `Session` semantics, for tests |
 | `voyage` | The `oar-voyage/3` JSONL evidence log |
 | `bridge`, `cmd/oar-bridge` | JSON-RPC over stdio, for hosts in other languages and for the behavior suite |
-| `cmd/oar` | The CLI |
+| `cli` | The CLI (`cli.Main`), over the runtimes a host gives it: `cmd/oar` with `cli.Runtimes()`, `vibevalley oar` with the farm's |
+| `cmd/oar` | The `oar` command |
 
 ## Differences from the TS package
 

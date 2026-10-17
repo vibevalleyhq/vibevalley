@@ -73,12 +73,13 @@ var piPrices = func() map[string]map[string]Price {
 	return out
 }()
 
-// smith's built-ins, vibevalley's own agent (it reads the farm's DeepSeek key each session) and DeepSeek Harness.
-func registry(home string, settings *setting.Service) *oar.RuntimeRegistry {
+// Registry is the farm's runtimes: smith's built-ins, vibevalley's own agent (it reads deepseekKey each session) and
+// DeepSeek Harness. The server and the command line (`vibevalley oar`, `runtime chat`) know the same ones.
+func Registry(home string, deepseekKey func() string) *oar.RuntimeRegistry {
 	vibevalley := oarruntime.VibeValleyRuntime(oarruntime.Options{
 		Home: func() string { return home },
 		Llm: func(_ context.Context, model string) (vvagent.LLM, error) {
-			return vvagent.Deepseek(model, settings.DeepseekAPIKey())
+			return vvagent.Deepseek(model, deepseekKey())
 		},
 	})
 	registry, err := oar.NewRuntimeRegistry(append(defaults.Runtimes(), vibevalley, dsh.Runtime())...)
@@ -128,7 +129,7 @@ type Service struct {
 
 func newService(cfg base.Config, core *core.Service, store *agent.Service, settings *setting.Service) (*Service, error) {
 	spendFile := filepath.Join(cfg.Home, "spend.json")
-	r := &Service{cfg: cfg, core: core, store: store, Registry: registry(cfg.Home, settings), cnyPerUsd: cfg.CNYPerUSD, cache: map[string]protocol.RuntimeInfo{}, found: map[string]oar.AvailableInstallation{},
+	r := &Service{cfg: cfg, core: core, store: store, Registry: Registry(cfg.Home, settings.DeepseekAPIKey), cnyPerUsd: cfg.CNYPerUSD, cache: map[string]protocol.RuntimeInfo{}, found: map[string]oar.AvailableInstallation{},
 		pending: map[string]*time.Timer{}, pushes: map[string]*time.Timer{}, asked: map[string]int{},
 		reads: map[string]uint64{}, readOf: map[string]uint64{},
 		disk: base.NewFileWriter(spendFile, 0o644)}

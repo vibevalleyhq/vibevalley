@@ -1,4 +1,4 @@
-package main
+package cli
 
 // MCP output schemas: the objects a programmatic caller receives (mcp-output-schemas.ts).
 

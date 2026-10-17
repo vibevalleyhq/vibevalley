@@ -77,8 +77,8 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 - 连哪个服务端：`--server`，或者 `VIBEVALLEY_SERVER`，默认 `http://127.0.0.1:8787`，和 Flutter 的 dart-define 同一个名字。
 - 输出默认 JSON，给脚本和 agent 读；`--pretty` 给人看。
 - 手写的只有几个组合动作，也建在 `Client` 上：`issue run <id>`（开工、等到「等你看」、打出改动）。
-- 两类命令：**农场命令**从能力表生成、经 HTTP；**本机工具**直接用 smith、不经服务端，现在只有 `runtime chat`。命令表标明每条是哪一类，生成的文档也列出本机工具。
-- `vibevalley runtime chat <runtime> [--model --resume <oar 会话 id> --cwd -p]`：和一个农机直接聊（claude、codex、kimi、pi……，`runtimes/defaults/builtins.go` 里注册的），一轮一轮，干活时输入的话并进这一轮，Ctrl+C 停这一轮、空闲时再按退出。建在 smith 的 `oar.Session` 上；`oar run <runtime> <prompt>`（`pkg/smith/cmd/oar/run.go`）已经能跑一轮。我们自己的 agent 在注册表里就是农机 `vibevalley`，不带子命令的 `vibevalley` 是 `runtime chat vibevalley` 的简写，也就是现在 `cmd/vibevalley` 的对话。
+- 两类命令：**农场命令**从能力表生成、经 HTTP；**本机工具**直接用 smith、不经服务端：`runtime chat` 和 `oar`。命令表标明每条是哪一类，生成的文档也列出本机工具。
+- `vibevalley runtime chat <runtime> [--model --resume <oar 会话 id> --cwd -p]`：和一个农机直接聊（claude、codex、kimi、pi、dsh……，和服务端同一份：`internal/runtime` 的 `Registry`），一轮一轮，干活时输入的话并进这一轮，Ctrl+C 停这一轮、空闲时再按退出。建在 smith 的 `oar.Session` 上；`oar run <runtime> <prompt>`（`pkg/smith/cli/run.go`）已经能跑一轮。我们自己的 agent 在注册表里就是农机 `vibevalley`，不带子命令的 `vibevalley` 是 `runtime chat vibevalley` 的简写，也就是现在 `cmd/vibevalley` 的对话。
 - 直接聊不算农场的活：没有工单、目录随意，不进核心状态、轨迹和花费。帮工只在 `VIBEVALLEY_WORK_ROOT` 的 worktree 里开工，服务端只认挂在工单上的 Session；要进农场就是派活（`issue create`、`issue start`）。
 - 带档案聊（人设、技能、MCP）以后是 `agent chat <id>`：档案经接口读，对话在本机跑。
 
@@ -253,6 +253,7 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 | `events` | 跟着 `/api/events` |
 | `issue run <id>` | 开工，等到「等你看」或排上队，打出改动；`verify-dispatch` 的主体 |
 | `runtime chat <runtime>` | 本机工具：和一个农机直接聊，不经服务端（第 3 节） |
+| `oar <command>` | 本机工具：smith 的 oar 命令行（`detect`、`models`、`login`、`usage`、`run`……），农机和服务端的一样 |
 | 不带子命令 | `runtime chat vibevalley` 的简写 |
 
 ### 帮工的子集
