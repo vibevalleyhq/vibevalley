@@ -8,7 +8,7 @@ import (
 )
 
 // It takes one of the places for those working at once.
-func IsBusy(h Worker) bool {
+func IsBusy(h Session) bool {
 	switch h.Phase.Value.(type) {
 	case PhaseArriving, PhaseWorking:
 		return true
@@ -16,15 +16,15 @@ func IsBusy(h Worker) bool {
 	return false
 }
 
-func DoingOf(h Worker) Doing {
+func DoingOf(h Session) Doing {
 	if p, ok := h.Phase.Value.(PhaseWorking); ok {
 		return p.Doing
 	}
-	return Doing{Action: WorkerActionNone, Label: ""}
+	return Doing{Action: SessionActionNone, Label: ""}
 }
 
 // What each action is, in words: seeds.json's actionText, which the client reads too.
-var ActionText map[WorkerAction]string
+var ActionText map[SessionAction]string
 
 func coreSpan(ms int64) string {
 	if ms < 60_000 {
@@ -37,7 +37,7 @@ func coreSpan(ms int64) string {
 const phaseSpan = "{span}"
 
 // PhaseText is PhaseWords as said at now.
-func PhaseText(h Worker, now int64) string {
+func PhaseText(h Session, now int64) string {
 	words := PhaseWords(h)
 	if need := NeedOf(h); need != nil && need.Kind == "quiet" {
 		words = strings.ReplaceAll(words, phaseSpan, coreSpan(now-need.Since))
@@ -45,8 +45,8 @@ func PhaseText(h Worker, now int64) string {
 	return words
 }
 
-// PhaseWords is what a worker is doing in words, how long it has been quiet left as {span}.
-func PhaseWords(h Worker) string {
+// PhaseWords is what a session is doing in words, how long it has been quiet left as {span}.
+func PhaseWords(h Session) string {
 	need := NeedOf(h)
 	conflict := ""
 	if need != nil && need.Kind == "conflict" {

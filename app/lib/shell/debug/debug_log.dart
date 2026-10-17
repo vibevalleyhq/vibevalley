@@ -72,9 +72,9 @@ String _cut(String s, int n) => s.length > n ? s.substring(0, n) : s;
 
 String frameSummary(StateFrame f) {
   final s = f.state;
-  final workers = s.workers.map((h) => '${h.id}:${_phaseTag(h.phase)}').join(' ');
+  final sessions = s.sessions.map((h) => '${h.id}:${_phaseTag(h.phase)}').join(' ');
   final effects = f.effects.isEmpty ? '' : ' · ${f.effects.map((e) => e.toJson()['kind']).join(' ')}';
-  return 'call=${s.call.wire} manager=${s.manager.wire} workers=${workers.isEmpty ? '0' : workers}$effects';
+  return 'call=${s.call.wire} manager=${s.manager.wire} sessions=${sessions.isEmpty ? '0' : sessions}$effects';
 }
 
 String _phaseTag(Phase p) => switch (p) {

@@ -64,7 +64,7 @@ func termsInCommon(a, b map[string]bool) int {
 
 type pickCue struct {
 	// What it left itself is in its own session already.
-	Worker  string          `json:"worker"`
+	Session string          `json:"session"`
 	Project string          `json:"project"`
 	Text    string          `json:"text"`
 	Skip    map[string]bool `json:"-"`
@@ -75,7 +75,7 @@ const recallElsewhere = 3
 
 // Another project's note only when it plainly shares the turn's words; another project's job never.
 func relevance(m protocol.Memory, cue pickCue, terms map[string]bool) (float64, bool) {
-	if cue.Skip[m.ID] || (m.Worker != nil && *m.Worker == cue.Worker) {
+	if cue.Skip[m.ID] || (m.Session != nil && *m.Session == cue.Session) {
 		return 0, false
 	}
 	shared := termsInCommon(termsOf(m.Text), terms)

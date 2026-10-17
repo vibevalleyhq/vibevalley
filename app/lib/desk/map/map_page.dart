@@ -61,16 +61,16 @@ class _MapPageState extends ConsumerState<MapPage> {
   Widget build(BuildContext context) {
     final atlas = ref.watch(atlasProvider).value;
     final farm = ref.watch(farmProvider);
-    final workers = farm?.workers ?? const <Worker>[];
+    final sessions = farm?.sessions ?? const <Session>[];
     final plots = ref.watch(viewProvider)?.plots ?? const <String, PlotView>{};
     final projects = ref.watch(projectsProvider).list;
     if (atlas == null) return const SizedBox.shrink();
-    final islands = islandsOf(projects: projects ?? const [], workers: workers, plots: plots, issues: farm?.issues ?? const []);
+    final islands = islandsOf(projects: projects ?? const [], sessions: sessions, plots: plots, issues: farm?.issues ?? const []);
     final open = islands.where((i) => i.project == widget.project).firstOrNull;
     return LayoutBuilder(
       builder: (context, box) {
         final wide = box.maxWidth >= sideBySideFrom;
-        final map = _MapView(atlas: atlas, islands: islands, homeless: homeless(workers), loading: projects == null, selected: open?.project, onOpen: _open);
+        final map = _MapView(atlas: atlas, islands: islands, homeless: homeless(sessions), loading: projects == null, selected: open?.project, onOpen: _open);
         if (open == null) return map;
         final side = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -105,7 +105,7 @@ class _MapView extends StatelessWidget {
   const _MapView({required this.atlas, required this.islands, required this.homeless, required this.loading, required this.selected, required this.onOpen});
   final SpriteAtlas atlas;
   final List<Island> islands;
-  final List<Worker> homeless;
+  final List<Session> homeless;
   final bool loading;
   final String? selected;
   final ValueChanged<String?> onOpen;
@@ -162,7 +162,7 @@ class _MapView extends StatelessWidget {
                                   ),
                               ],
                             ),
-                          if (homeless.isNotEmpty) ...[const SizedBox(height: 16), _Homeless(workers: homeless)],
+                          if (homeless.isNotEmpty) ...[const SizedBox(height: 16), _Homeless(sessions: homeless)],
                         ],
                       ),
                     ),
@@ -373,21 +373,21 @@ class _IslandView extends ConsumerWidget {
       final foot = at[i] + Offset(0, down);
       final tip = spotText(spot, now);
       switch (spot) {
-        case SpotTaken(:final worker, :final plot):
-          final open = '/tickets/${Uri.encodeComponent(worker.id)}';
-          final cast = castOf(agents[worker.agent]?.look, worker.agent);
-          final pose = mapPose(worker);
+        case SpotTaken(:final session, :final plot):
+          final open = '/tickets/${Uri.encodeComponent(session.id)}';
+          final cast = castOf(agents[session.agent]?.look, session.agent);
+          final pose = mapPose(session);
           final body = castSprite(atlas, cast, pose);
           layers
-            ..add(place(atlas.first([cropSprite(plot.crop), 'plot-seeded']), foot, onTap: () => go(open), tip: tip, label: '${worker.name}的地'))
+            ..add(place(atlas.first([cropSprite(plot.crop), 'plot-seeded']), foot, onTap: () => go(open), tip: tip, label: '${session.name}的地'))
             ..add(
               place(
                 body,
-                foot + workerInPlot,
+                foot + sessionInPlot,
                 child: PoseSprite(cast: cast, pose: pose, scale: s),
                 onTap: () => go(open),
                 tip: tip,
-                label: worker.name,
+                label: session.name,
               ),
             );
           if (plot.badge case final badge?) {
@@ -489,8 +489,8 @@ const _tone = {
 };
 
 class _Homeless extends StatelessWidget {
-  const _Homeless({required this.workers});
-  final List<Worker> workers;
+  const _Homeless({required this.sessions});
+  final List<Session> sessions;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -503,7 +503,7 @@ class _Homeless extends StatelessWidget {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text('不在哪个项目里：', style: KitText.xs.copyWith(color: Palette.bark600)),
-          for (final h in workers)
+          for (final h in sessions)
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -651,7 +651,7 @@ class _WorktreeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final h = spot.worker;
+    final h = spot.session;
     return KitTappable(
       onTap: () => deskGo(context, '/tickets/${Uri.encodeComponent(h.id)}'),
       semanticLabel: '${h.name}：${phaseText(h, now)}',

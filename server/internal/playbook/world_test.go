@@ -14,8 +14,8 @@ import (
 	"vibevalley/internal/project"
 	"vibevalley/internal/runtime"
 	"vibevalley/internal/schedule"
+	"vibevalley/internal/session"
 	"vibevalley/internal/setting"
-	"vibevalley/internal/worker"
 )
 
 // Without the packages above it: a test reaches only what is below.
@@ -34,7 +34,7 @@ type worldServices struct {
 	Project  *project.Service
 	Memory   *memory.Service
 	Runtime  *runtime.Service
-	Worker   *worker.Service
+	Session  *session.Service
 	Channel  *channel.Service
 	Issue    *issue.Service
 	Playbook *Service
@@ -43,7 +43,7 @@ type worldServices struct {
 
 func newWorldWith(cfg base.Config, above []base.Layer, options ...fx.Option) (*world, error) {
 	w := &world{}
-	layers := append([]base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, worker.Module, channel.Module, schedule.Module, issue.Module, Module}, above...)
+	layers := append([]base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, session.Module, channel.Module, schedule.Module, issue.Module, Module}, above...)
 	app, err := base.NewApp(cfg, layers,
 		fx.Options(options...),
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),

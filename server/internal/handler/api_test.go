@@ -38,8 +38,8 @@ func TestSaveTakesThePathsID(t *testing.T) {
 	}
 }
 
-// An issue's lifecycle acts on its newest worker: before it was started there is none.
-func TestIssueLifecycleNeedsAWorker(t *testing.T) {
+// An issue's lifecycle acts on its newest session: before it was started there is none.
+func TestIssueLifecycleNeedsASession(t *testing.T) {
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
 	cfg.Voice.Line.Port, cfg.Lan.Port = 0, 0
 	f, err := workspace.New(cfg)

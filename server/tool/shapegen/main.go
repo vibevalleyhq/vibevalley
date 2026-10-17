@@ -391,8 +391,8 @@ func dartSeeds() string {
 		"/// In the order the page shows them.\n" +
 		"final List<AchievementDef> achievements = [for (final j in _seeds['achievements'] as List) AchievementDef.fromJson(j as Map<String, dynamic>)];\n\n" +
 		"/// What each action is, in words; the server says them the same way.\n" +
-		"final Map<WorkerAction, String> actionText = {\n" +
-		"  for (final e in (_seeds['actionText'] as Map<String, dynamic>).entries) WorkerAction.fromJson(e.key): e.value as String,\n" +
+		"final Map<SessionAction, String> actionText = {\n" +
+		"  for (final e in (_seeds['actionText'] as Map<String, dynamic>).entries) SessionAction.fromJson(e.key): e.value as String,\n" +
 		"};\n\n" +
 		"/// In seeds.json's order.\n" +
 		"final List<RuntimePreset> runtimePresets = [for (final j in _seeds['runtimePresets'] as List) RuntimePreset.fromJson(j as Map<String, dynamic>)];\n\n" +

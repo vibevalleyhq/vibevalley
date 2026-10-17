@@ -15,7 +15,7 @@ void main() {
     await pumpFarm(
       tester,
       const Align(alignment: Alignment.bottomLeft, child: FriendsDock(height: 48)),
-      overrides: overrides(farm(workers: []), view(), fakeApi(Routes(), {}), agents: agents),
+      overrides: overrides(farm(sessions: []), view(), fakeApi(Routes(), {}), agents: agents),
     );
     await tester.tap(find.text('帮工').first);
     await settle(tester);

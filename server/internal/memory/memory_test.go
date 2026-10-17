@@ -78,11 +78,11 @@ func TestMemoriesKeepRecallWriteForget(t *testing.T) {
 	}
 	t.Cleanup(func() { f.DB.Close() })
 	m := f.Memory
-	m.Keep(FinishedRun{Agent: "lab", Worker: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeCompleted,
+	m.Keep(FinishedRun{Agent: "lab", Session: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeCompleted,
 		Said: "记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文\n结论：加好了", Summary: "加好了"})
-	m.Keep(FinishedRun{Agent: "lab", Worker: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeFailed,
+	m.Keep(FinishedRun{Agent: "lab", Session: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeFailed,
 		Said: "记住：这个项目用 pnpm test 跑测试", Summary: "测试没过"})
-	m.Keep(FinishedRun{Agent: "lab", Worker: "w2", Project: "clock", Job: "不算", Outcome: protocol.OutcomeInterrupted, Said: "记住：停下的不算"})
+	m.Keep(FinishedRun{Agent: "lab", Session: "w2", Project: "clock", Job: "不算", Outcome: protocol.OutcomeInterrupted, Said: "记住：停下的不算"})
 	all := m.List("lab")
 	var texts []string
 	for _, x := range all {
@@ -103,7 +103,7 @@ func TestMemoriesKeepRecallWriteForget(t *testing.T) {
 		}
 	}
 
-	picked := m.Recall(RecallCue{Agent: "lab", Worker: "w9", Project: "clock", Text: "跑测试"})
+	picked := m.Recall(RecallCue{Agent: "lab", Session: "w9", Project: "clock", Text: "跑测试"})
 	if len(picked.IDs) != 3 || len(picked.Lines) != 3 || picked.Lines[0] != "- （这个项目）这个项目用 pnpm test 跑测试" {
 		t.Fatalf("recalled %+v", picked)
 	}
@@ -152,7 +152,7 @@ func TestManagerMemoryLines(t *testing.T) {
 		t.Fatal(err)
 	}
 	written, err := memory.WriteManager("  周末别派夜班\n真的  ")
-	if err != nil || written.Text != "周末别派夜班 真的" || written.Worker != nil {
+	if err != nil || written.Text != "周末别派夜班 真的" || written.Session != nil {
 		t.Fatalf("%+v %v", written, err)
 	}
 	file, _ := os.ReadFile(filepath.Join(folder, "MEMORY.md"))
@@ -164,8 +164,8 @@ func TestManagerMemoryLines(t *testing.T) {
 	if view.Runtime != protocol.RuntimeVibeValley || len(view.Memories) != 2 {
 		t.Fatalf("%+v", view)
 	}
-	if view.Memories[0].Text != "周末别派夜班 真的" || view.Memories[0].Worker != nil ||
-		view.Memories[1].Text != "主人喜欢早上收到汇报" || view.Memories[1].Worker == nil || *view.Memories[1].Worker != protocol.ManagerAgent {
+	if view.Memories[0].Text != "周末别派夜班 真的" || view.Memories[0].Session != nil ||
+		view.Memories[1].Text != "主人喜欢早上收到汇报" || view.Memories[1].Session == nil || *view.Memories[1].Session != protocol.ManagerAgent {
 		t.Fatalf("%+v", view.Memories)
 	}
 	if view.Memories[1].At != time.Date(2026, 10, 12, 0, 0, 0, 0, time.Local).UnixMilli() {

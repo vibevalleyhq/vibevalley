@@ -71,7 +71,7 @@ Map<int, List<Activity>> commentsOf(List<Activity> steps) {
   return out;
 }
 
-/// worker/activities.go CommentText puts the comment after this head.
+/// session/activities.go CommentText puts the comment after this head.
 String commentWords(Activity asked) {
   const head = '\n\n我的评论：';
   final text = asked.text;

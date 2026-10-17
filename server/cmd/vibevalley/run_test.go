@@ -17,13 +17,13 @@ func TestIssueRunWaitsForTheReview(t *testing.T) {
 	runPoll = time.Millisecond
 	var looks atomic.Int32
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/issues/t1/start", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, `{"worker":"w1"}`) })
+	mux.HandleFunc("POST /api/issues/t1/start", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, `{"session":"w1"}`) })
 	mux.HandleFunc("GET /api/issues/t1", func(w http.ResponseWriter, r *http.Request) {
 		status := "in_progress"
 		if looks.Add(1) > 2 {
 			status = "in_review"
 		}
-		io.WriteString(w, `{"id":"t1","title":"x","priority":"medium","rank":1,"createdAt":1,"workers":["w1"],"status":"`+status+`"}`)
+		io.WriteString(w, `{"id":"t1","title":"x","priority":"medium","rank":1,"createdAt":1,"sessions":["w1"],"status":"`+status+`"}`)
 	})
 	mux.HandleFunc("GET /api/issues/t1/changes", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, `{"project":"demo","base":"main","commits":[],"files":[],"uncommitted":[],"conflicts":[],"behind":0}`)

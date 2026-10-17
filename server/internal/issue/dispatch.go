@@ -16,7 +16,7 @@ import (
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/runtime"
 	"vibevalley/internal/schedule"
-	"vibevalley/internal/worker"
+	"vibevalley/internal/session"
 	"vibevalley/pkg/x/clock"
 	"vibevalley/pkg/x/str"
 )
@@ -28,7 +28,7 @@ type dispatch struct {
 	core      *core.Service
 	store     *agent.Service
 	runtimes  *runtime.Service
-	run       *worker.Service
+	run       *session.Service
 	issues    *issues
 	chat      *channel.Service
 	schedules *schedule.Service
@@ -39,8 +39,8 @@ type dispatch struct {
 	trying sync.Mutex
 }
 
-func newDispatch(core *core.Service, store *agent.Service, runtimes *runtime.Service, workers *worker.Service, issues *issues, chat *channel.Service, schedules *schedule.Service) (*dispatch, error) {
-	return &dispatch{core: core, store: store, runtimes: runtimes, run: workers, issues: issues, chat: chat, schedules: schedules, forManager: base.NewHub[ManagerWork]()}, nil
+func newDispatch(core *core.Service, store *agent.Service, runtimes *runtime.Service, sessions *session.Service, issues *issues, chat *channel.Service, schedules *schedule.Service) (*dispatch, error) {
+	return &dispatch{core: core, store: store, runtimes: runtimes, run: sessions, issues: issues, chat: chat, schedules: schedules, forManager: base.NewHub[ManagerWork]()}, nil
 }
 
 func (d *dispatch) OnStart(ctx context.Context) error {
@@ -73,7 +73,7 @@ func (d *dispatch) OnStop() {
 	}
 }
 
-// A schedule has one issue, for the worker it names or for the manager; each time it comes due is a run of that issue.
+// A schedule has one issue, for the session it names or for the manager; each time it comes due is a run of that issue.
 func (d *dispatch) scheduled(ctx context.Context, due schedule.Due) {
 	s := due.Schedule
 	channel := d.chat.ChannelOf(s.Channel)
@@ -104,7 +104,7 @@ func (d *dispatch) scheduled(ctx context.Context, due schedule.Due) {
 	case isClosed(issue.Status):
 		_, err = d.reopen(ctx, issue.ID, text, channel.ID, by)
 	default:
-		if refused := d.run.Deliver(issue.Workers[len(issue.Workers)-1], text, by); refused.Kind == "refused" {
+		if refused := d.run.Deliver(issue.Sessions[len(issue.Sessions)-1], text, by); refused.Kind == "refused" {
 			err = errors.New(refused.Reason)
 		}
 	}
@@ -113,13 +113,13 @@ func (d *dispatch) scheduled(ctx context.Context, due schedule.Due) {
 	}
 }
 
-func (d *dispatch) Hire(ctx context.Context, agent protocol.Agent, task, project string, opt worker.HireOptions) worker.Hired {
+func (d *dispatch) Hire(ctx context.Context, agent protocol.Agent, task, project string, opt session.HireOptions) session.Hired {
 	if !agent.Enabled {
-		return worker.Hired{Refused: agent.Name + " 被停用了"}
+		return session.Hired{Refused: agent.Name + " 被停用了"}
 	}
 	for _, issue := range d.runtimes.Check(ctx, agent) {
 		if issue.Level == "error" {
-			return worker.Hired{Refused: fmt.Sprintf("%s 派不出去：%s", agent.Name, issue.Text)}
+			return session.Hired{Refused: fmt.Sprintf("%s 派不出去：%s", agent.Name, issue.Text)}
 		}
 	}
 	where := str.Trim(project)
@@ -127,18 +127,18 @@ func (d *dispatch) Hire(ctx context.Context, agent protocol.Agent, task, project
 		where = str.Trim(agent.Workdir)
 	}
 	if where == "" {
-		return worker.Hired{Refused: "没说在哪个项目里做：项目是工作目录下的一个文件夹"}
+		return session.Hired{Refused: "没说在哪个项目里做：项目是工作目录下的一个文件夹"}
 	}
 	if full := d.run.NoRoom(agent.Runtime, where); full != "" {
-		return worker.Hired{Refused: full}
+		return session.Hired{Refused: full}
 	}
 	// A full farm sends home whoever has been idle longest.
 	evicted := ""
-	if workers := d.core.State().Workers; len(workers) >= protocol.MaxRunning {
-		var oldest *protocol.Worker
-		for i := range workers {
-			if !protocol.IsBusy(workers[i]) && (oldest == nil || workers[i].HiredAt < oldest.HiredAt) {
-				oldest = &workers[i]
+	if sessions := d.core.State().Sessions; len(sessions) >= protocol.MaxRunning {
+		var oldest *protocol.Session
+		for i := range sessions {
+			if !protocol.IsBusy(sessions[i]) && (oldest == nil || sessions[i].HiredAt < oldest.HiredAt) {
+				oldest = &sessions[i]
 			}
 		}
 		if oldest != nil {
@@ -149,13 +149,13 @@ func (d *dispatch) Hire(ctx context.Context, agent protocol.Agent, task, project
 	if opt.Issue == "" {
 		opt.Issue = "t" + base.Code(8)
 	}
-	opt.Hiring = func(w protocol.Worker) {
+	opt.Hiring = func(w protocol.Session) {
 		if err := d.issues.Ran(opt.Issue, w); err != nil {
 			log.Printf("vibevalley: issue %s: %v", opt.Issue, err)
 		}
 	}
 	hired := d.run.Send(ctx, agent, task, where, opt)
-	if hired.Worker != nil {
+	if hired.Session != nil {
 		hired.Evicted = evicted
 	}
 	return hired
@@ -185,11 +185,11 @@ func (d *dispatch) start(ctx context.Context, id string, channel int64, by *prot
 		why := full + "：排上队了，有空地就自动开工"
 		return protocol.Dispatched{Queued: &why}, nil
 	}
-	worker, err := d.send(ctx, issue, agent, project, channel, by)
+	session, err := d.send(ctx, issue, agent, project, channel, by)
 	if err != nil {
 		return protocol.Dispatched{}, err
 	}
-	return protocol.Dispatched{Worker: &worker}, nil
+	return protocol.Dispatched{Session: &session}, nil
 }
 
 func (d *dispatch) ready(id string) (protocol.Issue, protocol.Agent, string, error) {
@@ -212,11 +212,11 @@ func (d *dispatch) ready(id string) (protocol.Issue, protocol.Agent, string, err
 }
 
 func (d *dispatch) send(ctx context.Context, issue protocol.Issue, agent protocol.Agent, project string, channel int64, by *protocol.RunTrigger) (string, error) {
-	hired := d.Hire(ctx, agent, issueJob(issue), project, worker.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: by})
-	if hired.Refused != "" || hired.Worker == nil {
+	hired := d.Hire(ctx, agent, issueJob(issue), project, session.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: by})
+	if hired.Refused != "" || hired.Session == nil {
 		return "", protocol.Refused{Reason: hired.Refused}
 	}
-	return hired.Worker.ID, nil
+	return hired.Session.ID, nil
 }
 
 // In the board's order; one that cannot go any more leaves the queue, said in a notice.
@@ -237,9 +237,9 @@ func (d *dispatch) TryQueued(ctx context.Context) {
 		if err == nil && d.run.NoRoom(agent.Runtime, project) != "" {
 			continue
 		}
-		var worker string
+		var session string
 		if err == nil {
-			worker, err = d.send(ctx, issue, agent, project, d.chat.General(), nil)
+			session, err = d.send(ctx, issue, agent, project, d.chat.General(), nil)
 		}
 		if err != nil {
 			if _, unqueue := d.issues.Queue(issue.ID, false); unqueue != nil {
@@ -250,7 +250,7 @@ func (d *dispatch) TryQueued(ctx context.Context) {
 			d.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("排队的「%s」开不了工，留在待办里：%v", title, err))
 			continue
 		}
-		d.core.Notice(protocol.NoticeLevelInfo, fmt.Sprintf("排队的「%s」开工了：%s", title, worker))
+		d.core.Notice(protocol.NoticeLevelInfo, fmt.Sprintf("排队的「%s」开工了：%s", title, session))
 	}
 }
 
@@ -268,10 +268,10 @@ func (d *dispatch) reopen(ctx context.Context, id, text string, channel int64, b
 	if issue.Plan != nil || issue.Step != nil || (issue.Closed != nil && *issue.Closed == protocol.IssueCloseMergedIntoPlan) {
 		return "", protocol.Refused{Reason: "这是种植计划的工单，跟着计划走：在计划里重试这一步，或者重开整个计划"}
 	}
-	if len(issue.Workers) == 0 {
+	if len(issue.Sessions) == 0 {
 		return "", protocol.Refused{Reason: "这张工单还没开过工：直接开工"}
 	}
-	t := d.run.Get(issue.Workers[len(issue.Workers)-1])
+	t := d.run.Get(issue.Sessions[len(issue.Sessions)-1])
 	if t == nil || t.Head.Agent == nil {
 		return "", protocol.Missing{What: "工单 " + id}
 	}
@@ -288,11 +288,11 @@ func (d *dispatch) reopen(ctx context.Context, id, text string, channel int64, b
 	if issue.Project != nil {
 		project = *issue.Project
 	}
-	hired := d.Hire(ctx, *agent, reopenTask(issue, head, text), project, worker.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: &by})
-	if hired.Refused != "" || hired.Worker == nil {
+	hired := d.Hire(ctx, *agent, reopenTask(issue, head, text), project, session.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: &by})
+	if hired.Refused != "" || hired.Session == nil {
 		return "", protocol.Refused{Reason: hired.Refused}
 	}
-	return hired.Worker.ID, nil
+	return hired.Session.ID, nil
 }
 
 func reopenTask(issue protocol.Issue, head protocol.TrajectoryHead, text string) string {
@@ -303,12 +303,12 @@ func reopenTask(issue protocol.Issue, head protocol.TrajectoryHead, text string)
 	var b strings.Builder
 	b.WriteString(now)
 	fmt.Fprintf(&b, "\n\n（这张工单重开了，上一次是 %s（%s）做的。）", head.Name, head.ID)
-	b.WriteString("\n这张工单原来是：" + str.Cut(issueJob(issue), worker.AskedMax))
+	b.WriteString("\n这张工单原来是：" + str.Cut(issueJob(issue), session.AskedMax))
 	if head.Closed != nil {
 		b.WriteString("\n它是怎么关的：" + closedText[*head.Closed])
 	}
 	if head.Outcome != nil && head.Summary != nil {
-		b.WriteString(fmt.Sprintf("\n最后一轮%s：%s", outcomeText[*head.Outcome], str.Cut(str.Trim(*head.Summary), worker.AskedMax)))
+		b.WriteString(fmt.Sprintf("\n最后一轮%s：%s", outcomeText[*head.Outcome], str.Cut(str.Trim(*head.Summary), session.AskedMax)))
 	}
 	b.WriteString("\n先看看项目现在的样子，再接着做。")
 	return b.String()

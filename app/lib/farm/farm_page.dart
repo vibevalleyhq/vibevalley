@@ -107,9 +107,9 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     final state = ref.read(farmProvider);
     final view = ref.read(viewProvider);
     if (state == null || view == null) return;
-    final worker = bed.unlockLevel == null ? stationOf(state.workers, bed.station) : null;
-    final plot = bed.unlockLevel != null ? lockedPlot(bed, view.level.level.round()) : plotOf(view, worker);
-    if (aimTool(ref.read(heldToolProvider), bed, worker, plot, view.level.level.round()).ok) Sfx.play('tap');
+    final session = bed.unlockLevel == null ? stationOf(state.sessions, bed.station) : null;
+    final plot = bed.unlockLevel != null ? lockedPlot(bed, view.level.level.round()) : plotOf(view, session);
+    if (aimTool(ref.read(heldToolProvider), bed, session, plot, view.level.level.round()).ok) Sfx.play('tap');
     final ToolResult result;
     try {
       result = await ref.read(farmCommandsProvider).applyTool(bed);
@@ -123,12 +123,12 @@ class _FarmPageState extends ConsumerState<FarmPage> {
         return;
       case ToolSow(:final station):
         ref.read(sowingProvider.notifier).set(station);
-      case ToolInspect(:final workerId):
-        ref.read(selectedProvider.notifier).set(workerId);
-      case ToolWater(:final workerId):
-        ref.read(wateringProvider.notifier).set(workerId);
-      case ToolReview(:final workerId):
-        ref.read(reviewingProvider.notifier).set(workerId);
+      case ToolInspect(:final sessionId):
+        ref.read(selectedProvider.notifier).set(sessionId);
+      case ToolWater(:final sessionId):
+        ref.read(wateringProvider.notifier).set(sessionId);
+      case ToolReview(:final sessionId):
+        ref.read(reviewingProvider.notifier).set(sessionId);
     }
   }
 
@@ -156,7 +156,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     }
   }
 
-  void _openWorker(String id) => ref.read(selectedProvider.notifier).set(id);
+  void _openSession(String id) => ref.read(selectedProvider.notifier).set(id);
 
   void _openPlans(String? playbook) {
     if (playbook != null) ref.read(planShownProvider.notifier).set(playbook);
@@ -176,8 +176,8 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     switch (c) {
       case DesktopVoice():
         unawaited(call.phase == CallPhase.idle ? call.start() : call.end());
-      case DesktopOpenWorker(:final id):
-        _openWorker(id);
+      case DesktopOpenSession(:final id):
+        _openSession(id);
       case DesktopOpenChat(:final conversation):
         ref.read(chatOpenProvider.notifier).set(true);
         fire(ref.read(chatActionsProvider).showChat(conversation));
@@ -255,7 +255,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
               setTod: game.setTimeOfDay,
               daySpeed: () => game.daySpeed,
               setDaySpeed: (n) => game.daySpeed = n,
-              openWorker: _openWorker,
+              openSession: _openSession,
             ),
           );
     });
@@ -281,8 +281,8 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     });
     ref.listen(phoneTargetProvider, (_, target) {
       switch (target) {
-        case PhoneTargetWorker(:final id):
-          _openWorker(id);
+        case PhoneTargetSession(:final id):
+          _openSession(id);
         case PhoneTargetPlans(:final playbook):
           _openPlans(playbook);
         case null:
@@ -429,8 +429,8 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     Aim? aim;
     if (bed != null) {
       final level = view.level.level.round();
-      final worker = bed.unlockLevel == null ? stationOf(state.workers, bed.station) : null;
-      aim = aimTool(tool, bed, worker, bed.unlockLevel != null ? lockedPlot(bed, level) : plotOf(view, worker), level);
+      final session = bed.unlockLevel == null ? stationOf(state.sessions, bed.station) : null;
+      aim = aimTool(tool, bed, session, bed.unlockLevel != null ? lockedPlot(bed, level) : plotOf(view, session), level);
     }
     return stageCursor(tool: tool, aim: aim, overSpot: game.hoverSpot.value != null, pressed: game.pressing.value);
   }

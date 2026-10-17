@@ -105,7 +105,7 @@ func (m *memories) list(agentID string) ([]protocol.Memory, error) {
 	out := []protocol.Memory{}
 	for _, row := range rows {
 		id, at, recalled, kind, body := row.ID, row.CreatedAt, row.Recalled, row.Kind, row.Body
-		project, worker, recalledAt := row.Project, row.Worker, row.RecalledAt
+		project, session, recalledAt := row.Project, row.Session, row.RecalledAt
 		// A row of a kind this code does not know is left out.
 		if !slices.Contains(protocol.MemoryKindValues, protocol.MemoryKind(kind)) {
 			continue
@@ -114,8 +114,8 @@ func (m *memories) list(agentID string) ([]protocol.Memory, error) {
 		if project.Valid {
 			mem.Project = &project.String
 		}
-		if worker.Valid {
-			mem.Worker = &worker.String
+		if session.Valid {
+			mem.Session = &session.String
 		}
 		if recalledAt.Valid {
 			mem.RecalledAt = &recalledAt.Int64
@@ -132,9 +132,9 @@ func memoryNullable(s *string) sql.NullString {
 	return sql.NullString{String: *s, Valid: true}
 }
 
-func (m *memories) insertNote(agentID, body string, project, worker *string) (int64, int64, error) {
+func (m *memories) insertNote(agentID, body string, project, session *string) (int64, int64, error) {
 	at := clock.NowMs()
-	res, err := m.q.AddNote(context.Background(), generated.AddNoteParams{Agent: agentID, Body: body, Project: memoryNullable(project), Worker: memoryNullable(worker), CreatedAt: at})
+	res, err := m.q.AddNote(context.Background(), generated.AddNoteParams{Agent: agentID, Body: body, Project: memoryNullable(project), Session: memoryNullable(session), CreatedAt: at})
 	if err != nil {
 		return 0, 0, err
 	}
@@ -155,7 +155,7 @@ func (m *memories) Recall(cue RecallCue) Recalled {
 		return Recalled{}
 	}
 	now := clock.NowMs()
-	picked := pick(all, pickCue{Worker: cue.Worker, Project: cue.Project, Text: cue.Text, Skip: cue.Skip, Now: now})
+	picked := pick(all, pickCue{Session: cue.Session, Project: cue.Project, Text: cue.Text, Skip: cue.Skip, Now: now})
 	for _, p := range picked {
 		id, _ := strconv.ParseInt(p.ID, 10, 64)
 		if err := m.q.Recalled(context.Background(), generated.RecalledParams{RecalledAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
@@ -177,7 +177,7 @@ func (m *memories) Keep(run FinishedRun) {
 		return
 	}
 	if err := m.keep(run); err != nil {
-		log.Printf("vibevalley: what %s learned was not kept: %v", run.Worker, err)
+		log.Printf("vibevalley: what %s learned was not kept: %v", run.Session, err)
 	}
 }
 
@@ -186,14 +186,14 @@ func (m *memories) keep(run FinishedRun) error {
 	if err != nil {
 		return err
 	}
-	worker := run.Worker
+	session := run.Session
 	for _, note := range memoryNotesOf(run.Said) {
 		var project *string
 		if !note.Everywhere {
 			project = &run.Project
 		}
 		if memoryIsNewNote(known, note.Text, project) {
-			if _, _, err := m.insertNote(run.Agent, note.Text, project, &worker); err != nil {
+			if _, _, err := m.insertNote(run.Agent, note.Text, project, &session); err != nil {
 				return err
 			}
 		}
@@ -201,7 +201,7 @@ func (m *memories) keep(run FinishedRun) error {
 	ctx := context.Background()
 	if err := m.q.KeepJob(ctx, generated.KeepJobParams{
 		Agent: run.Agent, Body: memoryJobText(run.Job, run.Summary, run.Outcome), Project: sql.NullString{String: run.Project, Valid: true},
-		Worker: sql.NullString{String: run.Worker, Valid: true}, CreatedAt: clock.NowMs(),
+		Session: sql.NullString{String: run.Session, Valid: true}, CreatedAt: clock.NowMs(),
 	}); err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (m *memories) List(agentID string) []protocol.Memory {
 	return all
 }
 
-// What a worker of the agent would recall starting a run in project, told text; nothing is counted as recalled.
+// What a session of the agent would recall starting a run in project, told text; nothing is counted as recalled.
 func (m *memories) Preview(agentID, project, text string) protocol.RecallPreview {
 	out := protocol.RecallPreview{Lines: []string{}, Limit: recallChars}
 	if project == "" {
@@ -284,8 +284,8 @@ func memoryLineOf(line agent.MemoryLine, fileTime int64) protocol.Memory {
 	if person {
 		m.Text = strings.TrimSpace(strings.TrimPrefix(line.Text, memoryFromPerson))
 	} else {
-		worker := protocol.ManagerAgent
-		m.Worker = &worker
+		session := protocol.ManagerAgent
+		m.Session = &session
 	}
 	if line.Date != "" {
 		if day, err := time.ParseInLocation("2006-01-02", line.Date, time.Local); err == nil {

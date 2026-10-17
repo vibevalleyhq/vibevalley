@@ -13,8 +13,8 @@ import (
 // A weekday afternoon, so no secret is found by accident: Tuesday 2026-10-13, 14:00 local time.
 var progressAt = time.Date(2026, 10, 13, 14, 0, 0, 0, time.Local).UnixMilli()
 
-func progressHarvested(worker string, change ...func(*protocol.LedgerEntryHarvested)) protocol.LedgerEntry {
-	e := protocol.LedgerEntryHarvested{At: progressAt, Worker: worker, Project: "clock", Runtime: "pi", Commits: 2, Runs: 1}
+func progressHarvested(session string, change ...func(*protocol.LedgerEntryHarvested)) protocol.LedgerEntry {
+	e := protocol.LedgerEntryHarvested{At: progressAt, Session: session, Project: "clock", Runtime: "pi", Commits: 2, Runs: 1}
 	for _, c := range change {
 		c(&e)
 	}
@@ -62,12 +62,12 @@ func TestHarvestPays(t *testing.T) {
 	testkit.Eq(t, streakMultiplier(30), 2.0)
 
 	folded, news := progressStep(emptyFolded(), progressHarvested("w1"))
-	testkit.Eq(t, news, protocol.ProgressNews{Coins: ptr.To(int64(60)), Worker: ptr.To("w1"), Unlocked: []protocol.Unlock{{ID: "harvests", Tier: 1, At: progressAt}, {ID: "first_try", Tier: 1, At: progressAt}}})
+	testkit.Eq(t, news, protocol.ProgressNews{Coins: ptr.To(int64(60)), Session: ptr.To("w1"), Unlocked: []protocol.Unlock{{ID: "harvests", Tier: 1, At: progressAt}, {ID: "first_try", Tier: 1, At: progressAt}}})
 	testkit.Eq(t, []int64{folded.Progress.Coins, folded.Progress.Streak, folded.Progress.Counts["harvests"]}, []int64{60, 1, 1})
 }
 
 func TestFailedEndsStreak(t *testing.T) {
-	p := progressOf([]protocol.LedgerEntry{progressHarvested("w1"), progressHarvested("w2"), {Value: protocol.LedgerEntryFailed{At: progressAt, Worker: "w3"}}, progressHarvested("w3", func(e *protocol.LedgerEntryHarvested) { e.Runs = 2 })})
+	p := progressOf([]protocol.LedgerEntry{progressHarvested("w1"), progressHarvested("w2"), {Value: protocol.LedgerEntryFailed{At: progressAt, Session: "w3"}}, progressHarvested("w3", func(e *protocol.LedgerEntryHarvested) { e.Runs = 2 })})
 	testkit.Eq(t, p.Streak, int64(1))
 	testkit.Eq(t, p.BestStreak, int64(2))
 	testkit.Eq(t, p.Counts["comeback"], int64(1))
@@ -82,15 +82,15 @@ func TestFirstTry(t *testing.T) {
 	if has(progressHarvested("w1", func(e *protocol.LedgerEntryHarvested) { e.Runs = 3 })) {
 		t.Fatal("three turns")
 	}
-	if has(protocol.LedgerEntry{Value: protocol.LedgerEntryTold{At: progressAt, Worker: "w1"}}, progressHarvested("w1")) {
+	if has(protocol.LedgerEntry{Value: protocol.LedgerEntryTold{At: progressAt, Session: "w1"}}, progressHarvested("w1")) {
 		t.Fatal("told")
 	}
-	testkit.Eq(t, progressOf([]protocol.LedgerEntry{{Value: protocol.LedgerEntryTold{At: progressAt, Worker: "w2"}}, progressHarvested("w1")}).Counts["first_try"], int64(1))
+	testkit.Eq(t, progressOf([]protocol.LedgerEntry{{Value: protocol.LedgerEntryTold{At: progressAt, Session: "w2"}}, progressHarvested("w1")}).Counts["first_try"], int64(1))
 }
 
 func TestConflictsCheapRuntimes(t *testing.T) {
 	p := progressOf([]protocol.LedgerEntry{
-		{Value: protocol.LedgerEntryConflicted{At: progressAt, Worker: "w1"}},
+		{Value: protocol.LedgerEntryConflicted{At: progressAt, Session: "w1"}},
 		progressHarvested("w1", func(e *protocol.LedgerEntryHarvested) { e.CNY = ptr.To(0.01) }),
 		progressHarvested("w2", func(e *protocol.LedgerEntryHarvested) { e.Runtime = "claude" }),
 		progressHarvested("w3", func(e *protocol.LedgerEntryHarvested) { e.Runtime = "claude"; e.CNY = ptr.To(0.2) }),
@@ -107,14 +107,14 @@ func TestStarterTasks(t *testing.T) {
 	p := progressOf([]protocol.LedgerEntry{
 		progressKind(protocol.LedgerEntryMomentKindOpened),
 		progressKind(protocol.LedgerEntryMomentKindOpened),
-		{Value: protocol.LedgerEntryHired{At: progressAt, Worker: "w1"}},
-		{Value: protocol.LedgerEntryReviewed{At: progressAt, Worker: "w1"}},
+		{Value: protocol.LedgerEntryHired{At: progressAt, Session: "w1"}},
+		{Value: protocol.LedgerEntryReviewed{At: progressAt, Session: "w1"}},
 		progressHarvested("w1"),
 	})
 	testkit.Eq(t, progressUnlockIDs(p.Unlocked, "s_"), []string{"s_open#1", "s_hire#1", "s_review#1"})
 	testkit.Eq(t, p.Coins, int64(60+40+20))
-	if _, ok := progressOf([]protocol.LedgerEntry{{Value: protocol.LedgerEntryReviewed{At: progressAt, Worker: "w2"}}, progressHarvested("w1")}).Counts["s_review"]; ok {
-		t.Fatal("s_review for another worker")
+	if _, ok := progressOf([]protocol.LedgerEntry{{Value: protocol.LedgerEntryReviewed{At: progressAt, Session: "w2"}}, progressHarvested("w1")}).Counts["s_review"]; ok {
+		t.Fatal("s_review for another session")
 	}
 }
 
@@ -174,11 +174,11 @@ func TestCarried(t *testing.T) {
 	testkit.Eq(t, progressOf([]protocol.LedgerEntry{{Value: protocol.LedgerEntryCarried{At: progressAt, Coins: 420}}}).Coins, int64(420))
 }
 
-func progressWorker(id string, phase protocol.PhaseValue) protocol.Worker {
-	return protocol.Worker{ID: id, Name: id, Agent: "lab", Runtime: "pi", Task: "…", HiredAt: 0, Runs: 0, Phase: protocol.Phase{Value: phase}}
+func progressSession(id string, phase protocol.PhaseValue) protocol.Session {
+	return protocol.Session{ID: id, Name: id, Agent: "lab", Runtime: "pi", Task: "…", HiredAt: 0, Runs: 0, Phase: protocol.Phase{Value: phase}}
 }
 
-var progressWorkingPhase = protocol.PhaseWorking{Since: 0, Doing: protocol.Doing{Action: protocol.WorkerActionThinking, Label: ""}}
+var progressWorkingPhase = protocol.PhaseWorking{Since: 0, Doing: protocol.Doing{Action: protocol.SessionActionThinking, Label: ""}}
 
 func progressTold(before protocol.CoreState, fact protocol.Fact) []string {
 	after, _ := protocol.Reduce(before, fact)
@@ -194,24 +194,24 @@ func progressTold(before protocol.CoreState, fact protocol.Fact) []string {
 
 func TestEntriesForFacts(t *testing.T) {
 	farm := protocol.EmptyCoreState()
-	farm.Workers = []protocol.Worker{progressWorker("w1", progressWorkingPhase)}
+	farm.Sessions = []protocol.Session{progressSession("w1", progressWorkingPhase)}
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactReport{At: 1, ID: "w1", Outcome: protocol.OutcomeFailed, Runs: 1}}), []string{"failed"})
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactReport{At: 1, ID: "w1", Outcome: protocol.OutcomeCompleted, Runs: 1}}), []string{})
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactConflict{At: 1, ID: "w1", Conflict: &protocol.Conflict{Base: "main", Files: []string{"a.ts"}}}}), []string{"conflicted"})
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactCall{At: 1, State: protocol.CallStateLive}}), []string{"opened"})
-	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactHired{At: 1, Worker: progressWorker("w2", protocol.PhaseArriving{})}}), []string{"hired"})
+	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactHired{At: 1, Session: progressSession("w2", protocol.PhaseArriving{})}}), []string{"hired"})
 }
 
 func TestEntriesFromLeavingAndMessages(t *testing.T) {
 	farm := protocol.EmptyCoreState()
-	w1 := progressWorker("w1", protocol.PhaseRipe{})
+	w1 := progressSession("w1", protocol.PhaseRipe{})
 	w1.Project, w1.Runs, w1.Spent = ptr.To("clock"), 2, &protocol.Spent{Tokens: 900, CNY: ptr.To(0.5)}
-	farm.Workers = []protocol.Worker{w1, progressWorker("w2", progressWorkingPhase)}
+	farm.Sessions = []protocol.Session{w1, progressSession("w2", progressWorkingPhase)}
 	harvested, merged := protocol.IssueCloseMerged, int64(3)
 	left := protocol.Fact{Value: protocol.FactLeft{At: 1, ID: "w1", Closed: &harvested, Merged: &merged}}
 	after, _ := protocol.Reduce(farm, left)
 	testkit.Eq(t, entriesFor(farm, left, after), []protocol.LedgerEntry{{Value: protocol.LedgerEntryHarvested{
-		Worker: "w1", Agent: ptr.To("lab"), Project: "clock", Runtime: "pi", Commits: 3, CNY: ptr.To(0.5), Runs: 2,
+		Session: "w1", Agent: ptr.To("lab"), Project: "clock", Runtime: "pi", Commits: 3, CNY: ptr.To(0.5), Runs: 2,
 	}}})
 	none := int64(0)
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactLeft{At: 1, ID: "w1", Closed: &harvested, Merged: &none}}), []string{})
@@ -225,9 +225,9 @@ func TestEntriesFromLeavingAndMessages(t *testing.T) {
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(1, "user", protocol.SenderKindUser), Thread: thread}}), []string{"told"})
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(2, "user", protocol.SenderKindUser, "w2", protocol.ManagerAgent, protocol.Everyone, "w9")}}), []string{"called"})
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(3, protocol.ManagerAgent, protocol.SenderKindManager, "w2"), Thread: thread}}), []string{})
-	answered := protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(4, "w2", protocol.SenderKindWorker), Answers: ptr.To("w1")}}
+	answered := protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(4, "w2", protocol.SenderKindAgent), Answers: ptr.To("w1")}}
 	after, _ = protocol.Reduce(farm, answered)
-	testkit.Eq(t, entriesFor(farm, answered, after), []protocol.LedgerEntry{{Value: protocol.LedgerEntryHandoff{Worker: "w1", To: "w2"}}})
+	testkit.Eq(t, entriesFor(farm, answered, after), []protocol.LedgerEntry{{Value: protocol.LedgerEntryHandoff{Session: "w1", To: "w2"}}})
 	streaming := protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(5, "user", protocol.SenderKindUser), Thread: thread}}
 	seen, _ := protocol.Reduce(farm, streaming)
 	testkit.Eq(t, progressTold(seen, streaming), []string{})
@@ -236,13 +236,13 @@ func TestEntriesFromLeavingAndMessages(t *testing.T) {
 func TestAgentRecords(t *testing.T) {
 	lab, zhou := ptr.To("lab"), ptr.To("zhou")
 	p := progressOf([]protocol.LedgerEntry{
-		{Value: protocol.LedgerEntryHired{At: progressAt, Worker: "w1", Agent: lab}},
-		{Value: protocol.LedgerEntryHired{At: progressAt, Worker: "w2", Agent: lab}},
-		{Value: protocol.LedgerEntryHired{At: progressAt, Worker: "w3", Agent: zhou}},
-		{Value: protocol.LedgerEntryFailed{At: progressAt, Worker: "w1", Agent: lab}},
+		{Value: protocol.LedgerEntryHired{At: progressAt, Session: "w1", Agent: lab}},
+		{Value: protocol.LedgerEntryHired{At: progressAt, Session: "w2", Agent: lab}},
+		{Value: protocol.LedgerEntryHired{At: progressAt, Session: "w3", Agent: zhou}},
+		{Value: protocol.LedgerEntryFailed{At: progressAt, Session: "w1", Agent: lab}},
 		progressHarvested("w1", func(e *protocol.LedgerEntryHarvested) { e.Agent = lab }),
 		progressHarvested("w3", func(e *protocol.LedgerEntryHarvested) { e.Agent = zhou }),
-		{Value: protocol.LedgerEntryHired{At: progressAt, Worker: "w0"}},
+		{Value: protocol.LedgerEntryHired{At: progressAt, Session: "w0"}},
 		progressHarvested("w0"),
 	})
 	testkit.Eq(t, p.Agents, map[string]protocol.AgentTally{"lab": {Hired: 2, Harvested: 1, Failed: 1}, "zhou": {Hired: 1, Harvested: 1, Failed: 0}})
@@ -251,13 +251,13 @@ func TestAgentRecords(t *testing.T) {
 
 func TestEntriesWithAgent(t *testing.T) {
 	farm := protocol.EmptyCoreState()
-	farm.Workers = []protocol.Worker{progressWorker("w1", progressWorkingPhase)}
+	farm.Sessions = []protocol.Session{progressSession("w1", progressWorkingPhase)}
 	fact := protocol.Fact{Value: protocol.FactReport{At: 1, ID: "w1", Outcome: protocol.OutcomeFailed, Runs: 1}}
 	after, _ := protocol.Reduce(farm, fact)
-	testkit.Eq(t, entriesFor(farm, fact, after), []protocol.LedgerEntry{{Value: protocol.LedgerEntryFailed{Worker: "w1", Agent: ptr.To("lab")}}})
-	came := protocol.Fact{Value: protocol.FactHired{At: 1, Worker: progressWorker("w2", protocol.PhaseArriving{})}}
+	testkit.Eq(t, entriesFor(farm, fact, after), []protocol.LedgerEntry{{Value: protocol.LedgerEntryFailed{Session: "w1", Agent: ptr.To("lab")}}})
+	came := protocol.Fact{Value: protocol.FactHired{At: 1, Session: progressSession("w2", protocol.PhaseArriving{})}}
 	after, _ = protocol.Reduce(farm, came)
-	testkit.Eq(t, entriesFor(farm, came, after), []protocol.LedgerEntry{{Value: protocol.LedgerEntryHired{Worker: "w2", Agent: ptr.To("lab")}}})
+	testkit.Eq(t, entriesFor(farm, came, after), []protocol.LedgerEntry{{Value: protocol.LedgerEntryHired{Session: "w2", Agent: ptr.To("lab")}}})
 }
 
 func TestEntriesPlaybooksLevelsBeds(t *testing.T) {
@@ -283,9 +283,9 @@ func TestEntriesPlaybooksLevelsBeds(t *testing.T) {
 
 	five := protocol.EmptyCoreState()
 	for _, id := range []string{"w1", "w2", "w3", "w4", "w5"} {
-		five.Workers = append(five.Workers, progressWorker(id, progressWorkingPhase))
+		five.Sessions = append(five.Sessions, progressSession(id, progressWorkingPhase))
 	}
-	five.Workers = append(five.Workers, progressWorker("w6", protocol.PhaseResting{}))
+	five.Sessions = append(five.Sessions, progressSession("w6", protocol.PhaseResting{}))
 	testkit.Eq(t, progressTold(five, protocol.Fact{Value: protocol.FactRun{At: 1, ID: "w6"}}), []string{"busy6"})
 }
 

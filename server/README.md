@@ -12,7 +12,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 |---|---|
 | `internal/protocol` | 形状和接口的唯一来源（`shapes.go`、`api.go`）和生成的 `gen.go`；核心状态的全部规则（`Reduce` 和各种纯函数）；`seeds.json`（种子档案、默认设置、农机的能力、成就） |
 | `internal/base` | 地基，不放业务：数据库和迁移、`Hub`、存文件、id、`Config`（viper 读 YAML 和环境变量）、生命周期 |
-| `internal/core`、`setting`、`agent`、`project`、`memory`、`runtime`、`worker`、`channel`、`schedule`、`issue`、`playbook`、`manager`、`gate`、`voice`、`connector`、`game` | 服务，一块业务一个包（见「服务」） |
+| `internal/core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`playbook`、`manager`、`gate`、`voice`、`connector`、`game` | 服务，一块业务一个包（见「服务」） |
 | `internal/workspace` | 把全部包组装成一个 Workspace（`workspace.go`：`Workspace` 握着全部服务） |
 | `internal/handler` | 全部 HTTP 处理：`VibeValleyApi`（`api.go`，每个处理只转给拥有它的服务）、事件流和状态流；`/mcp` 挂的是 `mcp` 包的处理（`http.go`） |
 | `internal/testkit` | 各包的测试共用的：比较（`Eq`、`Match`）、等待（`Until`、`Await` 等会发生的事，`Settle` 查不该发生的）、一次性的 git 仓库；只给测试 import，不 import 农场的包，`protocol` 自己的测试也用它。测试的起点（临时目录里的配置 `fixture.Config`、种子里的 lab 档案和 pi 农机）在 `testkit/fixture` |
@@ -32,7 +32,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 
 一个包是一块业务，只导出一个服务：`<包>.Service`（[理由](../.agents/notes/implemented/architecture/2026-10-16-one-service-per-package.md)）。`Workspace` 和测试的服务表里，它的字段用单数的概念名，调用处读起来是 `f.Project.List()`、`f.Issue.Merge(…)`。一块业务里分开写的几部分是包内不导出的零件（`issue` 的 `issues`、`dispatch`、`merges`），`Service` 嵌入它们，它们导出的方法就是 `Service` 的方法；零件之间不能有同名的导出方法。
 
-构造函数的参数就是它用到的服务和配置（多的用带 `fx.In` 的参数结构体，如 `workersIn`、`managerIn`），一个包的 `Service` 只要一个；没有服务拿整个 `Workspace`。每个包的 `Module`（`func(*base.Readies) fx.Option`）把零件的构造函数设成 `fx.Private`，只把 `Service` 交给 fx（`go.uber.org/fx`）；`base.App` 把给它的各包装在一个生命周期上：`NewApp` 建，`Start` 开，`Close` 停。`workspace.New` 是带全部包的 App（[理由](../.agents/notes/implemented/architecture/2026-10-15-services-assembled-by-fx.md)、[分包](../.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)）。
+构造函数的参数就是它用到的服务和配置（多的用带 `fx.In` 的参数结构体，如 `sessionsIn`、`managerIn`），一个包的 `Service` 只要一个；没有服务拿整个 `Workspace`。每个包的 `Module`（`func(*base.Readies) fx.Option`）把零件的构造函数设成 `fx.Private`，只把 `Service` 交给 fx（`go.uber.org/fx`）；`base.App` 把给它的各包装在一个生命周期上：`NewApp` 建，`Start` 开，`Close` 停。`workspace.New` 是带全部包的 App（[理由](../.agents/notes/implemented/architecture/2026-10-15-services-assembled-by-fx.md)、[分包](../.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)）。
 
 服务按业务分包（[概念](../docs/concepts.md)）：一个包是一块业务，接口窄、里面深；包名用单数，用[用语表](../docs/README.md#用语)里的词。先是活本身，最后是画在上面的游戏。一个包只 import 表里排在它前面的包，编译器替我们守着；反方向的消息走 `base.Hub[T]`（`base/hub.go`：核心状态的事实、执行的动静、群聊和计划给管家的消息），只送给当时在订阅的，慢的排长队，不丢：
 
@@ -44,7 +44,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 | project | `Project` | 仓库、worktree、每个项目同时能有几个执行，和项目页要的统计（`codebase.go`：最近一次提交、语言、一年的提交） |
 | memory | `Memory` | 档案记得的事（`memory.go`）和管家记得的事（`WriteManager`、`ForgetManager`、`Archive`） |
 | runtime | `Runtime` | 农机的探测、额度、花费、价目表 |
-| worker | `Worker` | 为工单开的执行，农场里的帮工（`workers.go`：会话、带话和叫醒、同时干活的上限，建在 smith 上）、执行的步骤和轨迹头（`trajectories.go`）、帮工会话的令牌（`tokens.go`） |
+| session | `Session` | 为工单开的 Session，农场里的帮工（`sessions.go`：会话、带话和叫醒、同时干活的上限，建在 smith 上）、执行的步骤和轨迹头（`trajectories.go`）、帮工会话的令牌（`tokens.go`） |
 | channel | `Channel` | 频道、对话、串、消息、投递 |
 | schedule | `Schedule` | 定时 |
 | issue | `Issue` | 工单（`issue.go`）、派活、排队、重开工单（`dispatch.go`）、收成清单、收获（`merges.go`） |
@@ -56,7 +56,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 | game | `Game` | 服务端的全部游戏：账本（`ledger.go`：金币、连胜、成就）、等级（`commits.go`）、主人刚点的空地（`beds.go`）。只听别的包的事实，业务的服务不调它；只有 HTTP 那一层为主人在应用里做的事调它。账本的折法在 `progress.go`；出帧要用的（地里长什么、帮工在哪块地）在 protocol 的 `game_view.go`、`game_play.go` |
 | mcp | `MCP` | `/mcp`：给编码 agent 的工具（现在是帮工在频道里说话、读、看未读、看谁在）。和 HTTP 一样是入口，只转给拥有它的服务 |
 
-服务之间传的形状放在定义它的包的 `types.go`（`project.Workplace`、`worker.HireOptions`、`channel.Info`……）；`base` 不放形状。
+服务之间传的形状放在定义它的包的 `types.go`（`project.Workplace`、`session.HireOptions`、`channel.Info`……）；`base` 不放形状。
 
 HTTP（`handler`）在最上面，经 `Workspace` 用全部服务；`workspace` 只组装服务，不认识 HTTP。院门答的那部分 API（`apiMux`）在农场开之前交给 `Gate.API`。
 

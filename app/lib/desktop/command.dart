@@ -8,7 +8,7 @@ sealed class DesktopCommand {
     if (j is! Map) return null;
     return switch (j['type']) {
       'voice' => const DesktopVoice(),
-      'worker' when j['id'] is String => DesktopOpenWorker(j['id'] as String),
+      'session' when j['id'] is String => DesktopOpenSession(j['id'] as String),
       'chat' when j['conversation'] is num => DesktopOpenChat((j['conversation'] as num).toDouble()),
       'plans' when j['playbook'] is String => DesktopOpenPlans(j['playbook'] as String),
       'achievements' => const DesktopOpenAchievements(),
@@ -25,13 +25,13 @@ final class DesktopVoice extends DesktopCommand {
   Map<String, Object> toJson() => {'type': 'voice'};
 }
 
-final class DesktopOpenWorker extends DesktopCommand {
-  const DesktopOpenWorker(this.id);
+final class DesktopOpenSession extends DesktopCommand {
+  const DesktopOpenSession(this.id);
   final String id;
   @override
-  Map<String, Object> toJson() => {'type': 'worker', 'id': id};
+  Map<String, Object> toJson() => {'type': 'session', 'id': id};
   @override
-  bool operator ==(Object other) => other is DesktopOpenWorker && other.id == id;
+  bool operator ==(Object other) => other is DesktopOpenSession && other.id == id;
   @override
   int get hashCode => id.hashCode;
 }

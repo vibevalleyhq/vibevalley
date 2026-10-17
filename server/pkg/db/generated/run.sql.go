@@ -48,7 +48,7 @@ func (q *Queries) HeardInRun(ctx context.Context, arg HeardInRunParams) error {
 }
 
 const openRuns = `-- name: OpenRuns :many
-select id, worker, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from run where ended_at is null order by id
+select id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from run where ended_at is null order by id
 `
 
 // What a restart finds still going: those runs stopped with the server.
@@ -63,7 +63,7 @@ func (q *Queries) OpenRuns(ctx context.Context) ([]Run, error) {
 		var i Run
 		if err := rows.Scan(
 			&i.ID,
-			&i.Worker,
+			&i.Session,
 			&i.Issue,
 			&i.TriggeredBy,
 			&i.Heard,
@@ -87,7 +87,7 @@ func (q *Queries) OpenRuns(ctx context.Context) ([]Run, error) {
 }
 
 const runsOfIssue = `-- name: RunsOfIssue :many
-select id, worker, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from run where issue = ? order by started_at, id
+select id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from run where issue = ? order by started_at, id
 `
 
 func (q *Queries) RunsOfIssue(ctx context.Context, issue sql.NullString) ([]Run, error) {
@@ -101,7 +101,7 @@ func (q *Queries) RunsOfIssue(ctx context.Context, issue sql.NullString) ([]Run,
 		var i Run
 		if err := rows.Scan(
 			&i.ID,
-			&i.Worker,
+			&i.Session,
 			&i.Issue,
 			&i.TriggeredBy,
 			&i.Heard,
@@ -126,20 +126,20 @@ func (q *Queries) RunsOfIssue(ctx context.Context, issue sql.NullString) ([]Run,
 
 const startRun = `-- name: StartRun :execlastid
 
-insert into run (worker, issue, triggered_by, started_at) values (?, ?, ?, ?)
+insert into run (session, issue, triggered_by, started_at) values (?, ?, ?, ?)
 `
 
 type StartRunParams struct {
-	Worker      string
+	Session     string
 	Issue       sql.NullString
 	TriggeredBy string
 	StartedAt   int64
 }
 
-// Runs: one go at the work each (worker/runs.go).
+// Runs: one go at the work each (session/runs.go).
 func (q *Queries) StartRun(ctx context.Context, arg StartRunParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, startRun,
-		arg.Worker,
+		arg.Session,
 		arg.Issue,
 		arg.TriggeredBy,
 		arg.StartedAt,

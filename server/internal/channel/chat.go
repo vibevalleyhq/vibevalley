@@ -16,7 +16,7 @@ import (
 	"vibevalley/internal/base"
 	"vibevalley/internal/core"
 	"vibevalley/internal/protocol"
-	"vibevalley/internal/worker"
+	"vibevalley/internal/session"
 	"vibevalley/pkg/db/generated"
 	"vibevalley/pkg/x/clock"
 	"vibevalley/pkg/x/str"
@@ -31,17 +31,17 @@ const (
 	chatReadLimit = 30
 )
 
-type chatWorkers interface {
-	Deliver(id, text string, by protocol.RunTrigger) worker.Delivered
-	Activity() *base.Hub[worker.LaunchActivity]
-	Find(id string) *worker.Roster
+type chatSessions interface {
+	Deliver(id, text string, by protocol.RunTrigger) session.Delivered
+	Activity() *base.Hub[session.LaunchActivity]
+	Find(id string) *session.Roster
 }
 
 type Service struct {
-	cfg     base.Config
-	db      *sql.DB
-	core    *core.Service
-	workers chatWorkers
+	cfg      base.Config
+	db       *sql.DB
+	core     *core.Service
+	sessions chatSessions
 
 	general     int64
 	manager     *base.Hub[ManagerNews]
@@ -50,7 +50,7 @@ type Service struct {
 
 	// Guards everything that changes the chat.
 	mu sync.Mutex
-	// Nothing is slipped in while a worker compacts its context.
+	// Nothing is slipped in while a session compacts its context.
 	compacting map[string]bool
 	failures   map[string]int
 	broken     map[string]bool
@@ -64,12 +64,12 @@ type Service struct {
 	names   map[int64]string
 }
 
-func newService(cfg base.Config, db *sql.DB, core *core.Service, workers *worker.Service) (*Service, error) {
+func newService(cfg base.Config, db *sql.DB, core *core.Service, sessions *session.Service) (*Service, error) {
 	c := &Service{
 		cfg:         cfg,
 		db:          db,
 		core:        core,
-		workers:     workers,
+		sessions:    sessions,
 		manager:     base.NewHub[ManagerNews](),
 		noticeEvery: time.Duration(cfg.Chat.NoticeBatchMs) * time.Millisecond,
 		retryWake:   time.Duration(cfg.Chat.RetryWakeMs) * time.Millisecond,
@@ -141,7 +141,7 @@ func (c *Service) restore() error {
 
 func (c *Service) OnStart(ctx context.Context) error {
 	_, events, stopEvents := c.core.Events()
-	activity, stopActivity := c.workers.Activity().Subscribe()
+	activity, stopActivity := c.sessions.Activity().Subscribe()
 	go func() {
 		defer stopEvents()
 		for {
@@ -177,7 +177,7 @@ func (c *Service) OnStart(ctx context.Context) error {
 		return fmt.Errorf("chat: %w", err)
 	}
 	for _, p := range ps {
-		if p.Kind == string(protocol.SenderKindWorker) && p.Left == nil {
+		if p.Kind == string(protocol.SenderKindAgent) && p.Left == nil {
 			c.kick(p.ID)
 		}
 	}
@@ -206,7 +206,7 @@ func (c *Service) later(d time.Duration, fn func()) *time.Timer {
 
 func chatSenderKind(kind string) protocol.SenderKind {
 	switch kind {
-	case string(protocol.SenderKindUser), string(protocol.SenderKindManager), string(protocol.SenderKindWorker):
+	case string(protocol.SenderKindUser), string(protocol.SenderKindManager), string(protocol.SenderKindAgent):
 		return protocol.SenderKind(kind)
 	}
 	return protocol.SenderKindSystem
@@ -260,9 +260,9 @@ func chatToMessage(row chatMsgRow) protocol.ChatMessage {
 	if len(meta.Mentions) > 0 {
 		m.Mentions = meta.Mentions
 	}
-	if meta.Worker != "" {
-		worker := meta.Worker
-		m.Worker = &worker
+	if meta.Session != "" {
+		session := meta.Session
+		m.Session = &session
 	}
 	return m
 }
@@ -360,16 +360,16 @@ func (c *Service) channelIDOf(row chatConvRow) int64 {
 }
 
 // A channel the database does not have (the state file kept, the database not) is the general channel.
-func (c *Service) channelOfWorker(h protocol.Worker) int64 {
+func (c *Service) channelOfSession(h protocol.Session) int64 {
 	if h.Channel != nil && c.knownChannel(*h.Channel) {
 		return *h.Channel
 	}
 	return c.general
 }
 
-func (c *Service) onFarm() []protocol.Worker { return c.core.State().Workers }
+func (c *Service) onFarm() []protocol.Session { return c.core.State().Sessions }
 
-func (c *Service) workerOf(id string) *protocol.Worker { return c.core.Worker(id) }
+func (c *Service) sessionOf(id string) *protocol.Session { return c.core.Session(id) }
 
 func chatChannelInfo(row chatConvRow) Info {
 	info := Info{ID: row.ID, Name: protocol.GeneralName}
@@ -414,10 +414,10 @@ func (c *Service) publishMessage(seq int64, answers *string) {
 	c.core.Apply(fact)
 }
 
-func (c *Service) issueThreadOf(worker string) *int64 {
-	id, err := c.store().threadOfSubject(string(protocol.SubjectKindIssue), worker)
+func (c *Service) issueThreadOf(session string) *int64 {
+	id, err := c.store().threadOfSubject(string(protocol.SubjectKindIssue), session)
 	if err != nil {
-		log.Printf("chat: job thread of %s: %v", worker, err)
+		log.Printf("chat: job thread of %s: %v", session, err)
 		return nil
 	}
 	return id
@@ -526,16 +526,16 @@ func (c *Service) Say(text string, conversation *int64) (protocol.ChatMessage, e
 	return chatToMessage(*row), nil
 }
 
-func (c *Service) TellWorker(from, worker, text string) (protocol.ChatMessage, error) {
+func (c *Service) TellSession(from, session, text string) (protocol.ChatMessage, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	thread := c.issueThreadOf(worker)
+	thread := c.issueThreadOf(session)
 	if thread == nil {
-		// Hired with no channel, so no thread to say it in: the worker hears it straight.
-		if c.workers.Find(worker) == nil {
-			return protocol.ChatMessage{}, chatFail("没有 %s 这个帮工", worker)
+		// Hired with no channel, so no thread to say it in: the session hears it straight.
+		if c.sessions.Find(session) == nil {
+			return protocol.ChatMessage{}, chatFail("没有 %s 这个帮工", session)
 		}
-		c.workers.Deliver(worker, str.Trim(text), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
+		c.sessions.Deliver(session, str.Trim(text), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
 		return protocol.ChatMessage{}, nil
 	}
 	written, err := c.insert(chatInsert{conversation: *thread, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true})
@@ -828,7 +828,7 @@ func (c *Service) MarkRead(conversation, seq int64) error {
 	return nil
 }
 
-func (c *Service) JobThread(worker string) *int64 { return c.issueThreadOf(worker) }
+func (c *Service) JobThread(session string) *int64 { return c.issueThreadOf(session) }
 
 func (c *Service) ForManager() *base.Hub[ManagerNews] { return c.manager }
 

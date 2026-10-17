@@ -144,7 +144,7 @@ class _ConfigDesk extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final farm = ref.watch(farmProvider);
     final live = farm?.call == CallState.live;
-    final working = farm?.workers.where((h) => h.phase is PhaseWorking).length ?? 0;
+    final working = farm?.sessions.where((h) => h.phase is PhaseWorking).length ?? 0;
     final p = place;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

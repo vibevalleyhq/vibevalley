@@ -17,7 +17,7 @@ type chatStore struct{ q *generated.Queries }
 
 type chatMeta struct {
 	Mentions    []string          `json:"mentions,omitempty"`
-	Worker      string            `json:"worker,omitempty"`
+	Session     string            `json:"session,omitempty"`
 	Outcome     *protocol.Outcome `json:"outcome,omitempty"`
 	Spent       *protocol.Spent   `json:"spent,omitempty"`
 	ForPlaybook bool              `json:"forPlaybook,omitempty"`

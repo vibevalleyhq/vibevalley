@@ -13,7 +13,7 @@ import (
 
 	"vibevalley/internal/channel"
 	"vibevalley/internal/protocol"
-	"vibevalley/internal/worker"
+	"vibevalley/internal/session"
 	"vibevalley/pkg/agent"
 	"vibevalley/pkg/agentcore"
 	"vibevalley/pkg/ai"
@@ -80,8 +80,8 @@ func managerDescribeChanges(c protocol.Changes) string {
 	return strings.Join(lines, "\n")
 }
 
-func managerDescribeWorker(w worker.Roster) string {
-	h := w.Worker
+func managerDescribeSession(w session.Roster) string {
+	h := w.Session
 	last := ""
 	if h.LastRun != nil {
 		how := "停下了"
@@ -143,7 +143,7 @@ var managerToolLabels = map[string]string{
 
 var managerNamed = []string{"agent", "worker", "project", "name", "query", "note", "goal"}
 
-func managerToolStart(name string, args json.RawMessage) worker.ToolStart {
+func managerToolStart(name string, args json.RawMessage) session.ToolStart {
 	var fields map[string]any
 	_ = json.Unmarshal(args, &fields)
 	about := ""
@@ -173,7 +173,7 @@ func managerToolStart(name string, args json.RawMessage) worker.ToolStart {
 			input = string(args)
 		}
 	}
-	return worker.ToolStart{Text: text, Action: protocol.ToolActionOther, Tool: name, Input: input}
+	return session.ToolStart{Text: text, Action: protocol.ToolActionOther, Tool: name, Input: input}
 }
 
 func managerThinkingOf(content []ai.Content) string {
@@ -219,10 +219,10 @@ func managerEnum[T ~string](values []T) map[string]any {
 	return s
 }
 
-var managerWorkerSchema = agentcore.ObjectSchema(map[string]any{"worker": managerStr("帮工的名字或 id")}, "worker")
+var managerSessionSchema = agentcore.ObjectSchema(map[string]any{"worker": managerStr("帮工的名字或 id")}, "worker")
 
-type managerWorkerArgs struct {
-	Worker string `json:"worker"`
+type managerSessionArgs struct {
+	Session string `json:"worker"`
 }
 
 type managerNone struct{}
@@ -236,12 +236,12 @@ func managerAnswered(text string, err error) (string, error) {
 
 func (fm *manager) tools() []agentcore.AgentTool {
 	// The manager may say either.
-	findWorker := func(key string) *worker.Roster {
+	findSession := func(key string) *session.Roster {
 		all := fm.run.Roster()
-		for _, pick := range []func(w worker.Roster) bool{
-			func(w worker.Roster) bool { return w.Worker.ID == key },
-			func(w worker.Roster) bool { return w.Worker.Name == key },
-			func(w worker.Roster) bool { return strings.Contains(key, w.Worker.Name) },
+		for _, pick := range []func(w session.Roster) bool{
+			func(w session.Roster) bool { return w.Session.ID == key },
+			func(w session.Roster) bool { return w.Session.Name == key },
+			func(w session.Roster) bool { return strings.Contains(key, w.Session.Name) },
 		} {
 			if i := slices.IndexFunc(all, pick); i >= 0 {
 				return &all[i]
@@ -249,18 +249,18 @@ func (fm *manager) tools() []agentcore.AgentTool {
 		}
 		return nil
 	}
-	withWorker := func(key string, run func(w worker.Roster) string) (string, error) {
-		w := findWorker(key)
+	withSession := func(key string, run func(w session.Roster) string) (string, error) {
+		w := findSession(key)
 		if w == nil {
 			return "没有叫 " + key + " 的帮工", nil
 		}
 		return run(*w), nil
 	}
-	workerTool := func(name, description string, run func(w worker.Roster) string) agentcore.AgentTool {
-		return agent.TextTool(agent.TextToolSpec[managerWorkerArgs]{
-			Name: name, Label: managerToolLabels[name], Description: description, Parameters: managerWorkerSchema,
-			Run: func(_ context.Context, p managerWorkerArgs, _ agent.ToolContext) (string, error) {
-				return withWorker(p.Worker, run)
+	sessionTool := func(name, description string, run func(w session.Roster) string) agentcore.AgentTool {
+		return agent.TextTool(agent.TextToolSpec[managerSessionArgs]{
+			Name: name, Label: managerToolLabels[name], Description: description, Parameters: managerSessionSchema,
+			Run: func(_ context.Context, p managerSessionArgs, _ agent.ToolContext) (string, error) {
+				return withSession(p.Session, run)
 			},
 		})
 	}
@@ -304,12 +304,12 @@ func (fm *manager) tools() []agentcore.AgentTool {
 				return "没有能派的帮工：先去「帮工」页面建一个，或者把 runtime 装好。", nil
 			}
 			id := channel.ID
-			hired := fm.issue.Hire(ctx, *chosen, p.Task, project, worker.HireOptions{Channel: &id})
-			if hired.Refused != "" || hired.Worker == nil {
+			hired := fm.issue.Hire(ctx, *chosen, p.Task, project, session.HireOptions{Channel: &id})
+			if hired.Refused != "" || hired.Session == nil {
 				fm.core.Notice(protocol.NoticeLevelWarn, hired.Refused)
 				return "派不出去：" + hired.Refused, nil
 			}
-			h := hired.Worker
+			h := hired.Session
 			where := project
 			if h.Project != nil {
 				where = *h.Project
@@ -533,20 +533,20 @@ func (fm *manager) tools() []agentcore.AgentTool {
 		},
 	})
 
-	merge := workerTool("merge", "把一个帮工分支上的提交合进它所在项目的主分支，然后让它收工。会冲突时不合并，帮工留在地里，结果里有让它解决冲突的话。",
-		func(w worker.Roster) string { return fm.issue.Merge(w.Worker.ID) })
-	changes := agent.TextTool(agent.TextToolSpec[managerWorkerArgs]{
-		Name: "changes", Label: managerToolLabels["changes"], Parameters: managerWorkerSchema,
+	merge := sessionTool("merge", "把一个帮工分支上的提交合进它所在项目的主分支，然后让它收工。会冲突时不合并，帮工留在地里，结果里有让它解决冲突的话。",
+		func(w session.Roster) string { return fm.issue.Merge(w.Session.ID) })
+	changes := agent.TextTool(agent.TextToolSpec[managerSessionArgs]{
+		Name: "changes", Label: managerToolLabels["changes"], Parameters: managerSessionSchema,
 		Description: "看收获一个帮工会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者收获前想确认时用。",
-		Run: func(_ context.Context, p managerWorkerArgs, _ agent.ToolContext) (string, error) {
-			return withWorker(p.Worker, func(w worker.Roster) string {
-				c, err := fm.issue.Changes(w.Worker.ID, protocol.CallerManager)
+		Run: func(_ context.Context, p managerSessionArgs, _ agent.ToolContext) (string, error) {
+			return withSession(p.Session, func(w session.Roster) string {
+				c, err := fm.issue.Changes(w.Session.ID, protocol.CallerManager)
 				if err != nil {
 					return "看不了改动：" + err.Error()
 				}
 				if c == nil {
 					// Gone between the roster and the look: named as the manager named it.
-					return "没有叫 " + p.Worker + " 的帮工"
+					return "没有叫 " + p.Session + " 的帮工"
 				}
 				return managerDescribeChanges(*c)
 			})
@@ -562,32 +562,32 @@ func (fm *manager) tools() []agentcore.AgentTool {
 			}
 			lines := make([]string, len(all))
 			for i, w := range all {
-				lines[i] = managerDescribeWorker(w)
+				lines[i] = managerDescribeSession(w)
 			}
 			return strings.Join(lines, "\n"), nil
 		},
 	})
-	check := workerTool("check", "看一个帮工的详细情况和上一轮的完整汇报。", func(w worker.Roster) string {
+	check := sessionTool("check", "看一个帮工的详细情况和上一轮的完整汇报。", func(w session.Roster) string {
 		last := "还没有"
 		if w.LastText != "" {
 			last = managerTail(w.LastText, 2000)
 		}
-		return managerDescribeWorker(w) + "\n目录：" + w.Place.Cwd + "\n上一轮完整汇报（结尾部分）：\n" + last
+		return managerDescribeSession(w) + "\n目录：" + w.Place.Cwd + "\n上一轮完整汇报（结尾部分）：\n" + last
 	})
 
 	type tellArgs struct {
-		Worker  string `json:"worker"`
+		Session string `json:"worker"`
 		Message string `json:"message"`
 	}
 	tell := agent.TextTool(agent.TextToolSpec[tellArgs]{
 		Name: "tell", Label: managerToolLabels["tell"], Description: "给一个帮工带话：发在它的工单串里。他正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
 		Parameters: agentcore.ObjectSchema(map[string]any{"worker": managerStr("帮工的名字或 id"), "message": managerStr("要带的话")}, "worker", "message"),
 		Run: func(_ context.Context, p tellArgs, _ agent.ToolContext) (string, error) {
-			return withWorker(p.Worker, func(w worker.Roster) string {
-				if _, err := fm.chat.TellWorker(protocol.ManagerAgent, w.Worker.ID, p.Message); err != nil {
+			return withSession(p.Session, func(w session.Roster) string {
+				if _, err := fm.chat.TellSession(protocol.ManagerAgent, w.Session.ID, p.Message); err != nil {
 					return "没带到：" + err.Error()
 				}
-				return "已经在 " + w.Worker.Name + " 的工单串里说了"
+				return "已经在 " + w.Session.Name + " 的工单串里说了"
 			})
 		},
 	})
@@ -618,15 +618,15 @@ func (fm *manager) tools() []agentcore.AgentTool {
 		},
 	})
 
-	stop := workerTool("stop", "叫停一个帮工正在做的这一轮。", func(w worker.Roster) string {
-		if fm.run.Stop(w.Worker.ID) {
-			return w.Worker.Name + " 停下了"
+	stop := sessionTool("stop", "叫停一个帮工正在做的这一轮。", func(w session.Roster) string {
+		if fm.run.Stop(w.Session.ID) {
+			return w.Session.Name + " 停下了"
 		}
-		return w.Worker.Name + " 现在没在干活"
+		return w.Session.Name + " 现在没在干活"
 	})
-	dismiss := workerTool("dismiss", "让一个帮工收工离开农场。", func(w worker.Roster) string {
-		fm.run.Dismiss(w.Worker.ID)
-		return w.Worker.Name + " 收工了"
+	dismiss := sessionTool("dismiss", "让一个帮工收工离开农场。", func(w session.Roster) string {
+		fm.run.Dismiss(w.Session.ID)
+		return w.Session.Name + " 收工了"
 	})
 
 	type planArgs struct {

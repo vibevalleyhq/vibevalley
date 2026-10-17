@@ -1,4 +1,4 @@
-package worker
+package session
 
 import (
 	"context"
@@ -101,7 +101,7 @@ func (t *trajectories) heads() []protocol.TrajectoryHead {
 	return out
 }
 
-// Its head is written now unless it has one: a worker back from a restart keeps its start.
+// Its head is written now unless it has one: a session back from a restart keeps its start.
 func (t *trajectories) Open(head protocol.TrajectoryHead, keep int) Journal {
 	since := head
 	if had := t.readHead(head.ID); had != nil {
@@ -119,7 +119,7 @@ func (t *trajectories) Open(head protocol.TrajectoryHead, keep int) Journal {
 	return j
 }
 
-func (t *trajectories) Finish(id string, closed protocol.IssueClose, worker *protocol.Worker) {
+func (t *trajectories) Finish(id string, closed protocol.IssueClose, session *protocol.Session) {
 	t.mu.Lock()
 	j := t.open[id]
 	delete(t.open, id)
@@ -130,17 +130,17 @@ func (t *trajectories) Finish(id string, closed protocol.IssueClose, worker *pro
 	t.mark(id, func(head *protocol.TrajectoryHead) {
 		ended := clock.NowMs()
 		head.EndedAt, head.Closed = &ended, &closed
-		if worker == nil {
+		if session == nil {
 			return
 		}
-		runs := worker.Runs
+		runs := session.Runs
 		head.Runs = &runs
-		if last := worker.LastRun; last != nil {
+		if last := session.LastRun; last != nil {
 			outcome, summary := last.Outcome, last.Summary
 			head.Outcome, head.Summary = &outcome, &summary
 		}
-		if worker.Spent != nil && worker.Spent.CNY != nil {
-			cny := *worker.Spent.CNY
+		if session.Spent != nil && session.Spent.CNY != nil {
+			cny := *session.Spent.CNY
 			head.CNY = &cny
 		}
 	})

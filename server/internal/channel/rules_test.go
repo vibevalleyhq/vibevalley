@@ -10,8 +10,8 @@ import (
 	"vibevalley/pkg/x/ptr"
 )
 
-func rulesJobOf(worker string) protocol.Conversation {
-	return protocol.Conversation{Kind: protocol.ConversationKindThread, SubjectKind: ptr.To(protocol.SubjectKindIssue), SubjectID: ptr.To(worker)}
+func rulesJobOf(session string) protocol.Conversation {
+	return protocol.Conversation{Kind: protocol.ConversationKindThread, SubjectKind: ptr.To(protocol.SubjectKindIssue), SubjectID: ptr.To(session)}
 }
 
 var rulesAudienceBase = chatAudienceInput{
@@ -20,7 +20,7 @@ var rulesAudienceBase = chatAudienceInput{
 	Kind:         protocol.MessageKindChat,
 	Mentions:     []string{},
 	Conversation: protocol.Conversation{Kind: protocol.ConversationKindGeneral},
-	Workers:      []string{"w1", "w2", "w3"},
+	Sessions:     []string{"w1", "w2", "w3"},
 	Followers:    []string{},
 	Cooling:      []string{},
 	Broken:       []string{},
@@ -59,7 +59,7 @@ func TestChannelNameProblem(t *testing.T) {
 func TestAudienceInAChannel(t *testing.T) {
 	channel := protocol.Conversation{Kind: protocol.ConversationKindChannel}
 	in := func(mentions ...string) []chatDelivery {
-		return chatAudience(chatAudienceInput{From: "user", FromKind: protocol.SenderKindUser, Kind: protocol.MessageKindChat, Mentions: mentions, Conversation: channel, Workers: []string{"w1"}, OnFarm: []string{"w1", "w2"}})
+		return chatAudience(chatAudienceInput{From: "user", FromKind: protocol.SenderKindUser, Kind: protocol.MessageKindChat, Mentions: mentions, Conversation: channel, Sessions: []string{"w1"}, OnFarm: []string{"w1", "w2"}})
 	}
 	testkit.Eq(t, in(), []chatDelivery{{Recipient: protocol.ManagerAgent, Reason: reasonAddressed, Wakes: true}, {Recipient: "w1", Reason: reasonGeneral}})
 	var who []string
@@ -99,28 +99,28 @@ func TestThePersonInAJobThread(t *testing.T) {
 		rulesRow(protocol.ManagerAgent, "mention", true, ""),
 		rulesRow("w1", "own_thread", true, ""),
 	})
-	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) { i.Conversation = rulesJobOf("w9") }), [][4]any{}, "a worker that left is no one's to wake")
+	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) { i.Conversation = rulesJobOf("w9") }), [][4]any{}, "a session that left is no one's to wake")
 }
 
 func TestAgentsWakingAgents(t *testing.T) {
-	byWorker := func(change func(*chatAudienceInput)) func(*chatAudienceInput) {
+	bySession := func(change func(*chatAudienceInput)) func(*chatAudienceInput) {
 		return func(i *chatAudienceInput) {
-			i.From, i.FromKind, i.Conversation = "w1", protocol.SenderKindWorker, rulesJobOf("w1")
+			i.From, i.FromKind, i.Conversation = "w1", protocol.SenderKindAgent, rulesJobOf("w1")
 			change(i)
 		}
 	}
-	testkit.Eq(t, rulesAudience(byWorker(func(*chatAudienceInput) {})), [][4]any{}, "a worker in its own thread, naming no one, wakes no one")
-	testkit.Eq(t, rulesAudience(byWorker(func(i *chatAudienceInput) { i.Mentions = []string{"w2"} })), [][4]any{rulesRow("w2", "mention", true, "")})
-	testkit.Eq(t, rulesAudience(byWorker(func(i *chatAudienceInput) { i.Mentions, i.Hops = []string{"w2", "w3"}, protocol.HopLimit-1 })), [][4]any{
+	testkit.Eq(t, rulesAudience(bySession(func(*chatAudienceInput) {})), [][4]any{}, "a session in its own thread, naming no one, wakes no one")
+	testkit.Eq(t, rulesAudience(bySession(func(i *chatAudienceInput) { i.Mentions = []string{"w2"} })), [][4]any{rulesRow("w2", "mention", true, "")})
+	testkit.Eq(t, rulesAudience(bySession(func(i *chatAudienceInput) { i.Mentions, i.Hops = []string{"w2", "w3"}, protocol.HopLimit-1 })), [][4]any{
 		rulesRow("w2", "mention", true, ""),
 		rulesRow("w3", "mention", true, "hop_limit"),
 	})
-	testkit.Eq(t, rulesAudience(byWorker(func(i *chatAudienceInput) { i.Mentions, i.Cooling = []string{"w2"}, []string{"w2"} })), [][4]any{rulesRow("w2", "mention", true, "cooldown")})
-	testkit.Eq(t, rulesAudience(byWorker(func(i *chatAudienceInput) { i.Mentions, i.Broken = []string{"w2"}, []string{"w2"} })), [][4]any{rulesRow("w2", "mention", true, "wake_breaker")})
+	testkit.Eq(t, rulesAudience(bySession(func(i *chatAudienceInput) { i.Mentions, i.Cooling = []string{"w2"}, []string{"w2"} })), [][4]any{rulesRow("w2", "mention", true, "cooldown")})
+	testkit.Eq(t, rulesAudience(bySession(func(i *chatAudienceInput) { i.Mentions, i.Broken = []string{"w2"}, []string{"w2"} })), [][4]any{rulesRow("w2", "mention", true, "wake_breaker")})
 	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) {
 		i.Mentions, i.Broken, i.Hops, i.Cooling = []string{"w2"}, []string{"w2"}, 99, []string{"w2"}
 	})[0], rulesRow("w2", "mention", true, ""))
-	testkit.Eq(t, rulesAudience(byWorker(func(i *chatAudienceInput) { i.Mentions = []string{"everyone", "w1"} })), [][4]any{})
+	testkit.Eq(t, rulesAudience(bySession(func(i *chatAudienceInput) { i.Mentions = []string{"everyone", "w1"} })), [][4]any{})
 	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) {
 		i.From, i.FromKind, i.Conversation = protocol.ManagerAgent, protocol.SenderKindManager, rulesJobOf("w1")
 	}), [][4]any{rulesRow("w1", "own_thread", true, "")})
@@ -129,7 +129,7 @@ func TestAgentsWakingAgents(t *testing.T) {
 func TestReportsDispatchesNotices(t *testing.T) {
 	report := func(outcome protocol.Outcome, forPlaybook bool) func(*chatAudienceInput) {
 		return func(i *chatAudienceInput) {
-			i.From, i.FromKind, i.Kind, i.Conversation, i.Outcome, i.ForPlaybook = "w1", protocol.SenderKindWorker, protocol.MessageKindReport, rulesJobOf("w1"), &outcome, forPlaybook
+			i.From, i.FromKind, i.Kind, i.Conversation, i.Outcome, i.ForPlaybook = "w1", protocol.SenderKindAgent, protocol.MessageKindReport, rulesJobOf("w1"), &outcome, forPlaybook
 		}
 	}
 	testkit.Eq(t, rulesAudience(report(protocol.OutcomeCompleted, false)), [][4]any{rulesRow(protocol.ManagerAgent, "addressed", false, "")})
@@ -146,7 +146,7 @@ func TestReportsDispatchesNotices(t *testing.T) {
 func TestWakeInputAndBusyNotice(t *testing.T) {
 	var messages []protocol.InboxMessage
 	for i := 1; i <= 4; i++ {
-		m := protocol.InboxMessage{Seq: int64(10 + i), Target: "#田头:5", From: "w2", FromKind: protocol.SenderKindWorker, Name: "阿郑", Text: fmt.Sprintf("第 %d 句\n第二行", i)}
+		m := protocol.InboxMessage{Seq: int64(10 + i), Target: "#田头:5", From: "w2", FromKind: protocol.SenderKindAgent, Name: "阿郑", Text: fmt.Sprintf("第 %d 句\n第二行", i)}
 		if i%2 == 1 {
 			m.From, m.FromKind, m.Name = "user", protocol.SenderKindUser, "主人"
 		}

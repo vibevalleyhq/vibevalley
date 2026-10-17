@@ -34,11 +34,11 @@ select cast(coalesce(max(seq), 0) as integer) from message where conversation_id
 update message set final = 1, updated_at = ? where not final;
 
 -- name: CalledBy :one
--- The worker who last @-ed the speaker here since the speaker last spoke.
+-- The session who last @-ed the speaker here since the speaker last spoke.
 select m.sender_id
 from message m
 join mention n on n.message_seq = m.seq and n.target_id = sqlc.arg(speaker)
-join participant p on p.id = m.sender_id and p.kind = 'worker'
+join participant p on p.id = m.sender_id and p.kind = 'agent'
 where m.conversation_id = sqlc.arg(conversation) and m.sender_id <> sqlc.arg(speaker) and m.seq < sqlc.arg(before)
   and m.seq > coalesce((select max(s.seq) from message s where s.conversation_id = sqlc.arg(conversation) and s.sender_id = sqlc.arg(speaker) and s.seq < sqlc.arg(before)), 0)
 order by m.seq desc

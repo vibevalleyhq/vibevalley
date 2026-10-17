@@ -50,7 +50,7 @@ func TestLedger(t *testing.T) {
 	defer stop()
 
 	agent := "lab"
-	f.Game.Record(protocol.LedgerEntryHarvested{Worker: "w1", Agent: &agent, Project: "demo", Runtime: "pi", Commits: 1, Runs: 1})
+	f.Game.Record(protocol.LedgerEntryHarvested{Session: "w1", Agent: &agent, Project: "demo", Runtime: "pi", Commits: 1, Runs: 1})
 	var news *protocol.ProgressNews
 	for news == nil {
 		select {
@@ -62,7 +62,7 @@ func TestLedger(t *testing.T) {
 			t.Fatal("no progress fact")
 		}
 	}
-	if news.Coins == nil || *news.Coins < 35 || ptr.Value(news.Worker) != "w1" {
+	if news.Coins == nil || *news.Coins < 35 || ptr.Value(news.Session) != "w1" {
 		t.Fatalf("news: %+v", news)
 	}
 	progress := f.Core.State().Progress
@@ -70,7 +70,7 @@ func TestLedger(t *testing.T) {
 		t.Fatalf("progress: %+v", progress)
 	}
 
-	f.Core.Apply(protocol.FactHired{Worker: protocol.Worker{ID: "w2", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "试试", Phase: protocol.Phase{Value: protocol.PhaseWorking{}}}})
+	f.Core.Apply(protocol.FactHired{Session: protocol.Session{ID: "w2", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "试试", Phase: protocol.Phase{Value: protocol.PhaseWorking{}}}})
 	f.Core.Apply(protocol.FactReport{ID: "w2", Outcome: protocol.OutcomeFailed, Summary: "坏了", Runs: 1})
 	f.Core.Apply(protocol.FactCommits{Commits: protocol.CommitCount{Total: 1000}})
 	want := []string{"harvested", "hired", "failed", "level"}
@@ -98,7 +98,7 @@ func TestTheOwnersReviewAndCallAreCounted(t *testing.T) {
 	if err := f.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	f.Core.Did(core.OwnerDid{Kind: core.OwnerReviewed, Worker: "w1"})
+	f.Core.Did(core.OwnerDid{Kind: core.OwnerReviewed, Session: "w1"})
 	f.Core.Did(core.OwnerDid{Kind: core.OwnerTalked})
 	// Two services, so in either order.
 	want := []string{"reviewed", "voice"}

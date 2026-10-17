@@ -29,7 +29,7 @@ import (
 )
 
 // The farm itself listens on loopback alone; the gate is a second listener on every interface, shut until the owner opens it. Through it go
-// VibeValleyApi and the state and side-event streams, never /mcp, and only with a paired device's key: workers run commands on this machine without asking. Opening
+// VibeValleyApi and the state and side-event streams, never /mcp, and only with a paired device's key: sessions run commands on this machine without asking. Opening
 // it, pairing and forgetting devices are this machine's alone. The database keeps only each key's SHA-256. The gate speaks plain HTTP: a key can be
 // overheard on the network it is open on.
 

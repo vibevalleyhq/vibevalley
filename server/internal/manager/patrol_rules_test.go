@@ -13,14 +13,14 @@ const (
 	patrolMin = int64(60_000)
 )
 
-func patrolWorker(change func(*protocol.Worker)) protocol.Worker {
-	h := protocol.Worker{ID: "w1", Name: "后端老周", Agent: "lab", Runtime: "pi", Task: "加个接口", HiredAt: patrolT, Runs: 1, Phase: protocol.Phase{Value: protocol.PhaseResting{}}}
+func patrolSession(change func(*protocol.Session)) protocol.Session {
+	h := protocol.Session{ID: "w1", Name: "后端老周", Agent: "lab", Runtime: "pi", Task: "加个接口", HiredAt: patrolT, Runs: 1, Phase: protocol.Phase{Value: protocol.PhaseResting{}}}
 	change(&h)
 	return h
 }
 
 func patrolMessage(change func(*protocol.ChatMessage)) protocol.ChatMessage {
-	m := protocol.ChatMessage{Seq: 10, Conversation: 2, From: "w1", FromKind: protocol.SenderKindWorker, Name: "后端老周", Kind: protocol.MessageKindChat, Text: "@主人 接口要按月查吗？", Final: true, Mentions: []string{"user"}, At: patrolT}
+	m := protocol.ChatMessage{Seq: 10, Conversation: 2, From: "w1", FromKind: protocol.SenderKindAgent, Name: "后端老周", Kind: protocol.MessageKindChat, Text: "@主人 接口要按月查吗？", Final: true, Mentions: []string{"user"}, At: patrolT}
 	change(&m)
 	return m
 }
@@ -69,15 +69,15 @@ func TestPatrolQuietRipeStep(t *testing.T) {
 	draft := protocol.Playbook{ID: "p2", Title: "导出", Project: "demo", State: protocol.PlaybookStateDraft, Parallel: 1, CreatedAt: patrolT}
 	state := patrolFarm(patrolChat())
 	state = patrolWithPlaybooks(state, pb, draft)
-	state.Workers = []protocol.Worker{
-		patrolWorker(func(h *protocol.Worker) {
-			h.Phase = protocol.Phase{Value: protocol.PhaseWorking{Since: patrolT, Doing: protocol.Doing{Action: protocol.WorkerActionRunCommand, Label: "pnpm test"}, QuietSince: ptr.To(patrolT + patrolMin)}}
+	state.Sessions = []protocol.Session{
+		patrolSession(func(h *protocol.Session) {
+			h.Phase = protocol.Phase{Value: protocol.PhaseWorking{Since: patrolT, Doing: protocol.Doing{Action: protocol.SessionActionRunCommand, Label: "pnpm test"}, QuietSince: ptr.To(patrolT + patrolMin)}}
 		}),
-		patrolWorker(func(h *protocol.Worker) {
+		patrolSession(func(h *protocol.Session) {
 			h.ID, h.Name, h.Channel, h.Phase = "w2", "前端小林", ptr.To(int64(5)), protocol.Phase{Value: protocol.PhaseRipe{}}
 			h.LastRun = &protocol.LastRun{Outcome: protocol.OutcomeCompleted, Summary: "好了", At: patrolT}
 		}),
-		patrolWorker(func(h *protocol.Worker) {
+		patrolSession(func(h *protocol.Session) {
 			h.ID, h.Phase = "w3", protocol.Phase{Value: protocol.PhaseFailed{}}
 			h.LastRun = &protocol.LastRun{Outcome: protocol.OutcomeFailed, Summary: "测试没过", At: patrolT}
 		}),

@@ -85,11 +85,11 @@ func TestRulesGolden(t *testing.T) {
 			same(TargetOf(in.C, in.ChannelName))
 		case "phaseText":
 			var in struct {
-				Worker Worker `json:"worker"`
-				Now    int64  `json:"now"`
+				Session Session `json:"session"`
+				Now     int64   `json:"now"`
 			}
 			coreDecode(t, line, row.In, &in)
-			same(PhaseText(in.Worker, in.Now))
+			same(PhaseText(in.Session, in.Now))
 		case "yuan":
 			var cny float64
 			coreDecode(t, line, row.In, &cny)

@@ -241,11 +241,11 @@ sealed class _Hit {
   const _Hit();
 }
 
-final class _HitWorker extends _Hit {
-  const _HitWorker(this.id);
+final class _HitSession extends _Hit {
+  const _HitSession(this.id);
   final String id;
   @override
-  bool operator ==(Object other) => other is _HitWorker && other.id == id;
+  bool operator ==(Object other) => other is _HitSession && other.id == id;
   @override
   int get hashCode => id.hashCode;
 }
@@ -334,8 +334,8 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
   /// Level-ups, achievements and penalties are said over the page, not in the village.
   void play(GameEffect effect) {
     switch (effect) {
-      case GameEffectReward(:final workerId, :final coins):
-        final station = _actors[workerId]?.station ?? _stationOfWorker(workerId);
+      case GameEffectReward(:final sessionId, :final coins):
+        final station = _actors[sessionId]?.station ?? _stationOfSession(sessionId);
         final bed = bedOfStation(station);
         if (bed != null) _fx.coins(bed.index, coins);
       case GameEffectPenalty() || GameEffectLevelUp() || GameEffectAchievement():
@@ -474,7 +474,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     plant('fg-fern', w * 0.6, h + 24, Anchor.bottomCenter);
   }
 
-  int _stationOfWorker(String id) => (_data?.state.workers.where((h) => h.id == id).firstOrNull?.play?.station ?? -1).toInt();
+  int _stationOfSession(String id) => (_data?.state.sessions.where((h) => h.id == id).firstOrNull?.play?.station ?? -1).toInt();
 
   @override
   void onPointerMove(PointerMoveEvent event) {
@@ -489,9 +489,9 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     final at = Offset(p.x, p.y);
     final data = _data;
     if (data != null) {
-      final here = {for (final h in data.state.workers) h.id};
+      final here = {for (final h in data.state.sessions) h.id};
       for (final MapEntry(:key, :value) in _actors.entries.toList().reversed) {
-        if (here.contains(key) && value.leftAt == null && value.body.boxIn(value.node.position).contains(at)) return _HitWorker(key);
+        if (here.contains(key) && value.leftAt == null && value.body.boxIn(value.node.position).contains(at)) return _HitSession(key);
       }
     }
     if (_dog.boxIn().contains(at)) return const _HitDog();
@@ -507,14 +507,14 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
 
   int? _bedOf(_Hit? hit) => switch (hit) {
     _HitPlot(:final bed) => bed,
-    _HitWorker(:final id) => _actors[id]?.bed?.index,
+    _HitSession(:final id) => _actors[id]?.bed?.index,
     _ => null,
   };
 
   void _setHover(_Hit? hit) {
     if (hit == _over) return;
     switch (_over) {
-      case _HitPlot() || _HitWorker():
+      case _HitPlot() || _HitSession():
         final bed = _bedOf(_over);
         if (bed != null && hoverBed.value == bed) hoverBed.value = null;
         pressing.value = false;
@@ -529,7 +529,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     }
     _over = hit;
     switch (hit) {
-      case _HitPlot() || _HitWorker():
+      case _HitPlot() || _HitSession():
         final bed = _bedOf(hit);
         if (bed != null) hoverBed.value = bed;
       case _HitSpot(:final spot):
@@ -547,7 +547,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     _setHover(hit);
     _downOn = hit;
     switch (hit) {
-      case _HitPlot() || _HitWorker():
+      case _HitPlot() || _HitSession():
         if (_bedOf(hit) != null) pressing.value = true;
       case _HitDog():
         _pup.press(true);
@@ -576,7 +576,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     switch (hit) {
       case _HitPlot(:final bed):
         onPlot?.call(bed);
-      case _HitWorker(:final id):
+      case _HitSession(:final id):
         final actor = _actors[id];
         if (actor == null) return;
         actor.hopAt = _t;
@@ -622,12 +622,12 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     final state = data.state;
     final view = data.view;
     final level = view.level.level.round();
-    final present = {for (final h in state.workers) h.id: h};
+    final present = {for (final h in state.sessions) h.id: h};
     // What is under a still pointer is found again as things move under it.
     if (_pointer != null && _downOn == null) _setHover(_hitAt(_pointer!));
     final hovered = hoverBed.value;
 
-    Crop cropOf(Worker h) => view.plots[h.id]?.crop ?? Crop.sprout;
+    Crop cropOf(Session h) => view.plots[h.id]?.crop ?? Crop.sprout;
 
     for (final p in _plots) {
       final bed = p.bed;
@@ -636,9 +636,9 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       if (unlock != null) {
         crop = level >= unlock ? 'flowering' : 'locked';
       } else {
-        final worker = state.workers.where((h) => h.play?.station.toInt() == bed.station).firstOrNull;
-        final leaving = worker == null && _actors.values.any((a) => a.leftAt != null && a.station == bed.station);
-        crop = leaving ? 'harvested' : (worker == null ? 'empty' : cropOf(worker).wire);
+        final session = state.sessions.where((h) => h.play?.station.toInt() == bed.station).firstOrNull;
+        final leaving = session == null && _actors.values.any((a) => a.leftAt != null && a.station == bed.station);
+        crop = leaving ? 'harvested' : (session == null ? 'empty' : cropOf(session).wire);
       }
       p.ripe = unlock == null && (crop == 'wheat' || crop == 'carrot');
       p.sprite.show('plot-$crop');
@@ -664,7 +664,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     final counts = <String, int>{};
     int crowd(String key) => counts[key] ?? 0;
     var queued = 0;
-    for (final h in [...state.workers]..sort((a, b) => a.id.compareTo(b.id))) {
+    for (final h in [...state.sessions]..sort((a, b) => a.id.compareTo(b.id))) {
       final station = (h.play?.station ?? -1).toInt();
       final crop = cropOf(h);
       final pose = poseOf(h, crop);
@@ -816,13 +816,13 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     frames.value++;
   }
 
-  String _placeFor(Worker h, Crop crop) {
+  String _placeFor(Session h, Crop crop) {
     if (plotCalls(crop)) return 'plot';
     final phase = h.phase;
     return phase is PhaseWorking ? placeOfAction(phase.doing.action) : 'plot';
   }
 
-  void _strollOn(_Actor actor, Worker h, Crop crop, String pose) {
+  void _strollOn(_Actor actor, Session h, Crop crop, String pose) {
     final allowed = spotsFor(h, crop, pose);
     final current = actor.stroll;
     if (current != null && allowed.contains(current.spot) && _t < current.until) return;

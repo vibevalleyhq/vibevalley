@@ -75,7 +75,7 @@ func TestPlaybookAsIssues(t *testing.T) {
 	pb := rulesPlaybook(rulesDiamond(), func(pb *Playbook) {
 		pb.Branch, pb.Note = ptr.To("vibevalley/pb-p1"), ptr.To("在做")
 		pb.Nodes[0].State, pb.Nodes[0].Commits = NodeStateMerged, []string{"abc1234"}
-		pb.Nodes[1].State, pb.Nodes[1].Worker, pb.Nodes[1].Tries = NodeStateWorking, ptr.To("w2"), 1
+		pb.Nodes[1].State, pb.Nodes[1].Session, pb.Nodes[1].Tries = NodeStateWorking, ptr.To("w2"), 1
 	})
 	issues := PlaybookIssues(pb, nil, 50)
 	ids := []string{}
@@ -103,11 +103,11 @@ func TestPlaybookAsIssues(t *testing.T) {
 	before := slices.Clone(issues)
 	for i := range before {
 		if before[i].ID == "p1.b" {
-			before[i].Workers = []string{"w2"}
+			before[i].Sessions = []string{"w2"}
 		}
 	}
 	again := PlaybookIssues(pb, before, 90)
-	testkit.Eq(t, again[2].Workers, []string{"w2"})
+	testkit.Eq(t, again[2].Sessions, []string{"w2"})
 	testkit.Eq(t, *again[1].ClosedAt, int64(50))
 	gone := pb
 	gone.State = PlaybookStateAbandoned
@@ -122,7 +122,7 @@ func TestClosedPlaybooksGoWithTheirSteps(t *testing.T) {
 	state := withPlaybooks(EmptyCoreState(), rulesPlaybook(rulesDiamond(), rulesState(PlaybookStateDone)))
 	for i := range KeepClosedIssues {
 		at := int64(100 + i)
-		state, _ = Reduce(state, Fact{FactIssue{Issue: Issue{ID: fmt.Sprintf("c%d", i), Title: "关了", CreatedAt: at, Workers: []string{}, ClosedAt: &at}}})
+		state, _ = Reduce(state, Fact{FactIssue{Issue: Issue{ID: fmt.Sprintf("c%d", i), Title: "关了", CreatedAt: at, Sessions: []string{}, ClosedAt: &at}}})
 	}
 	testkit.Eq(t, PlaybookOf(state, "p1"), (*Playbook)(nil))
 	for _, x := range state.Issues {
@@ -161,19 +161,19 @@ func TestPlaybookChanges(t *testing.T) {
 	}
 	running := rulesPlaybook(rulesDiamond(), func(pb *Playbook) { pb.Branch = ptr.To("vibevalley/pb-p1") })
 	testkit.Eq(t, PlaybookChanges(&draft, running), []PlaybookChange{{Playbook: "p1", Kind: PlaybookEventKindStarted, Detail: ptr.To("vibevalley/pb-p1")}})
-	aWorking := with(node("a", func(n *PlaybookNode) { n.State = NodeStateWorking; n.Worker = ptr.To("w3") }))
-	testkit.Eq(t, PlaybookChanges(&running, aWorking), []PlaybookChange{{Playbook: "p1", Node: ptr.To("a"), Kind: PlaybookEventKindNodeStarted, Worker: ptr.To("w3")}})
-	sentBack := with(node("a", func(n *PlaybookNode) { n.State = NodeStateWorking; n.Worker = ptr.To("w3"); n.Tries = 1 }))
+	aWorking := with(node("a", func(n *PlaybookNode) { n.State = NodeStateWorking; n.Session = ptr.To("w3") }))
+	testkit.Eq(t, PlaybookChanges(&running, aWorking), []PlaybookChange{{Playbook: "p1", Node: ptr.To("a"), Kind: PlaybookEventKindNodeStarted, Session: ptr.To("w3")}})
+	sentBack := with(node("a", func(n *PlaybookNode) { n.State = NodeStateWorking; n.Session = ptr.To("w3"); n.Tries = 1 }))
 	testkit.Eq(t, kinds(&aWorking, sentBack), []string{"a:node_sent_back"})
 	merged := with(node("a", func(n *PlaybookNode) {
 		n.State = NodeStateMerged
 		n.Conclusion = ptr.To("写好了")
 		n.Commits = []string{"3f2a1bc"}
 	}))
-	testkit.Eq(t, PlaybookChanges(&sentBack, merged), []PlaybookChange{{Playbook: "p1", Node: ptr.To("a"), Kind: PlaybookEventKindNodeMerged, Worker: ptr.To("w3"), Detail: ptr.To("写好了"), Commits: []string{"3f2a1bc"}}})
+	testkit.Eq(t, PlaybookChanges(&sentBack, merged), []PlaybookChange{{Playbook: "p1", Node: ptr.To("a"), Kind: PlaybookEventKindNodeMerged, Session: ptr.To("w3"), Detail: ptr.To("写好了"), Commits: []string{"3f2a1bc"}}})
 	failed := with(node("a", func(n *PlaybookNode) {
 		n.State = NodeStateFailed
-		n.Worker = ptr.To("w3")
+		n.Session = ptr.To("w3")
 		n.Conclusion = ptr.To("测试没过")
 	}))
 	testkit.Eq(t, kinds(&aWorking, failed), []string{"a:node_failed"})

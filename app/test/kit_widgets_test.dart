@@ -374,7 +374,9 @@ void main() {
 
   group('icons', () {
     testWidgets('SpriteIcon draws at its size; ActionGlyph draws nothing for none', (t) async {
-      await t.pumpWidget(host(const Row(children: [SpriteIcon('button-close', size: 24), ActionGlyph(WorkerAction.none), ActionGlyph(WorkerAction.editFile)])));
+      await t.pumpWidget(
+        host(const Row(children: [SpriteIcon('button-close', size: 24), ActionGlyph(SessionAction.none), ActionGlyph(SessionAction.editFile)])),
+      );
       final images = find.byType(Image);
       expect(images, findsNWidgets(2));
       expect(t.getSize(images.first), const Size(24, 24));
@@ -406,7 +408,7 @@ void main() {
         await drawn(
           const PhaseWorking(
             since: 0,
-            doing: Doing(action: WorkerAction.runCommand, label: 'go test'),
+            doing: Doing(action: SessionAction.runCommand, label: 'go test'),
           ),
         ),
         'assets/pixel/act-run_command.png',
@@ -415,7 +417,7 @@ void main() {
         await drawn(
           const PhaseWorking(
             since: 0,
-            doing: Doing(action: WorkerAction.none, label: ''),
+            doing: Doing(action: SessionAction.none, label: ''),
           ),
         ),
         isNull,

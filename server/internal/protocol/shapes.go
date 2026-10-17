@@ -14,7 +14,7 @@ const (
 	// The channel everyone is in.
 	//vibevalley:const generalName
 	GeneralName = "田头"
-	// Workers working at once; also the beds on the farm.
+	// Sessions working at once; also the beds on the farm.
 	//vibevalley:const maxRunning
 	MaxRunning = 6
 	// Times are Unix milliseconds.
@@ -99,7 +99,7 @@ type AgentCheck struct {
 	Issues []AgentIssue `json:"issues"`
 }
 
-// What a worker of an agent would be reminded of at the start of a run (Pick), without counting it: the lines it gets
+// What a session of an agent would be reminded of at the start of a run (Pick), without counting it: the lines it gets
 // and their length against RecallChars.
 type RecallPreview struct {
 	Lines []string `json:"lines"`
@@ -175,7 +175,7 @@ type SenderKind string
 const (
 	SenderKindUser    SenderKind = "user"
 	SenderKindManager SenderKind = "manager"
-	SenderKindWorker  SenderKind = "worker"
+	SenderKindAgent   SenderKind = "agent"
 	SenderKindSystem  SenderKind = "system"
 )
 
@@ -212,7 +212,7 @@ type ChatMessage struct {
 	Text         string      `json:"text"`
 	Final        bool        `json:"final"`
 	Mentions     []string    `json:"mentions,omitzero"`
-	Worker       *string     `json:"worker,omitzero"`
+	Session      *string     `json:"session,omitzero"`
 	Outcome      *Outcome    `json:"outcome,omitzero"`
 	Spent        *Spent      `json:"spent,omitzero"`
 	At           int64       `json:"at"`
@@ -255,25 +255,25 @@ type Conflict struct {
 	Files []string `json:"files"`
 }
 
-type WorkerAction string
+type SessionAction string
 
 const (
-	WorkerActionRunCommand   WorkerAction = "run_command"
-	WorkerActionReadFile     WorkerAction = "read_file"
-	WorkerActionEditFile     WorkerAction = "edit_file"
-	WorkerActionSearch       WorkerAction = "search"
-	WorkerActionWeb          WorkerAction = "web"
-	WorkerActionMCP          WorkerAction = "mcp"
-	WorkerActionWait         WorkerAction = "wait"
-	WorkerActionOther        WorkerAction = "other"
-	WorkerActionThinking     WorkerAction = "thinking"
-	WorkerActionSpeakingText WorkerAction = "speaking_text"
-	WorkerActionNone         WorkerAction = "none"
+	SessionActionRunCommand   SessionAction = "run_command"
+	SessionActionReadFile     SessionAction = "read_file"
+	SessionActionEditFile     SessionAction = "edit_file"
+	SessionActionSearch       SessionAction = "search"
+	SessionActionWeb          SessionAction = "web"
+	SessionActionMCP          SessionAction = "mcp"
+	SessionActionWait         SessionAction = "wait"
+	SessionActionOther        SessionAction = "other"
+	SessionActionThinking     SessionAction = "thinking"
+	SessionActionSpeakingText SessionAction = "speaking_text"
+	SessionActionNone         SessionAction = "none"
 )
 
 type Doing struct {
-	Action WorkerAction `json:"action"`
-	Label  string       `json:"label"`
+	Action SessionAction `json:"action"`
+	Label  string        `json:"label"`
 }
 
 //vibevalley:union _tag
@@ -286,18 +286,18 @@ type LastRun struct {
 	Spent   *Spent  `json:"spent,omitzero"`
 }
 
-type WorkerPlaybook struct {
+type SessionPlaybook struct {
 	ID   string  `json:"id"`
 	Node *string `json:"node,omitzero"`
 }
 
 type ActionStep struct {
-	At     int64        `json:"at"`
-	Action WorkerAction `json:"action"`
-	Label  string       `json:"label"`
+	At     int64         `json:"at"`
+	Action SessionAction `json:"action"`
+	Label  string        `json:"label"`
 }
 
-type WorkerPlay struct {
+type SessionPlay struct {
 	Station      int64            `json:"station"`
 	History      []ActionStep     `json:"history"`
 	ToolsThisRun int64            `json:"toolsThisRun"`
@@ -307,25 +307,25 @@ type WorkerPlay struct {
 	RunStartedAt *int64           `json:"runStartedAt,omitzero"`
 }
 
-type Worker struct {
-	ID       string          `json:"id"`
-	Name     string          `json:"name"`
-	Agent    string          `json:"agent"`
-	Runtime  string          `json:"runtime"`
-	Task     string          `json:"task"`
-	Project  *string         `json:"project,omitzero"`
-	Branch   *string         `json:"branch,omitzero"`
-	Worktree *string         `json:"worktree,omitzero"`
-	Conflict *Conflict       `json:"conflict,omitzero"`
-	HiredAt  int64           `json:"hiredAt"`
-	Runs     int64           `json:"runs"`
-	Phase    Phase           `json:"phase"`
-	LastRun  *LastRun        `json:"lastRun,omitzero"`
-	Spent    *Spent          `json:"spent,omitzero"`
-	Playbook *WorkerPlaybook `json:"playbook,omitzero"`
-	Channel  *int64          `json:"channel,omitzero"`
-	Play     *WorkerPlay     `json:"play,omitzero"`
-	Issue    *string         `json:"issue,omitzero"`
+type Session struct {
+	ID       string           `json:"id"`
+	Name     string           `json:"name"`
+	Agent    string           `json:"agent"`
+	Runtime  string           `json:"runtime"`
+	Task     string           `json:"task"`
+	Project  *string          `json:"project,omitzero"`
+	Branch   *string          `json:"branch,omitzero"`
+	Worktree *string          `json:"worktree,omitzero"`
+	Conflict *Conflict        `json:"conflict,omitzero"`
+	HiredAt  int64            `json:"hiredAt"`
+	Runs     int64            `json:"runs"`
+	Phase    Phase            `json:"phase"`
+	LastRun  *LastRun         `json:"lastRun,omitzero"`
+	Spent    *Spent           `json:"spent,omitzero"`
+	Playbook *SessionPlaybook `json:"playbook,omitzero"`
+	Channel  *int64           `json:"channel,omitzero"`
+	Play     *SessionPlay     `json:"play,omitzero"`
+	Issue    *string          `json:"issue,omitzero"`
 	// What it is doing, in words (PhaseWords), filled by FrameOf: in frames only. {span} stands for how long it has been
 	// quiet, which the reader fills from the phase's quietSince by its own clock.
 	PhaseText string `json:"phaseText,omitzero"`
@@ -369,7 +369,7 @@ type PlaybookNode struct {
 	Acceptance *bool     `json:"acceptance,omitzero"`
 	Frozen     []string  `json:"frozen,omitzero"`
 	State      NodeState `json:"state"`
-	Worker     *string   `json:"worker,omitzero"`
+	Session    *string   `json:"session,omitzero"`
 	Conclusion *string   `json:"conclusion,omitzero"`
 	Commits    []string  `json:"commits,omitzero"`
 	Spent      *Spent    `json:"spent,omitzero"`
@@ -425,7 +425,7 @@ type Progress struct {
 
 type ProgressNews struct {
 	Coins    *int64   `json:"coins,omitzero"`
-	Worker   *string  `json:"worker,omitzero"`
+	Session  *string  `json:"session,omitzero"`
 	Unlocked []Unlock `json:"unlocked,omitzero"`
 }
 
@@ -458,7 +458,7 @@ type CoreState struct {
 	Call       CallState    `json:"call"`
 	CallReason *string      `json:"callReason,omitzero"`
 	Manager    ManagerState `json:"manager"`
-	Workers    []Worker     `json:"workers"`
+	Sessions   []Session    `json:"sessions"`
 	Chat       *Chat        `json:"chat,omitzero"`
 	Commits    *CommitCount `json:"commits,omitzero"`
 	Progress   *Progress    `json:"progress,omitzero"`
@@ -701,7 +701,7 @@ type PlaybookEvent struct {
 	Node     *string           `json:"node,omitzero"`
 	Kind     PlaybookEventKind `json:"kind"`
 	Actor    PlaybookActor     `json:"actor"`
-	Worker   *string           `json:"worker,omitzero"`
+	Session  *string           `json:"session,omitzero"`
 	Detail   *string           `json:"detail,omitzero"`
 	Changes  []NodeFieldChange `json:"changes,omitzero"`
 	Commits  []string          `json:"commits,omitzero"`
@@ -867,7 +867,7 @@ type Memory struct {
 	Kind       MemoryKind `json:"kind"`
 	Text       string     `json:"text"`
 	Project    *string    `json:"project,omitzero"`
-	Worker     *string    `json:"worker,omitzero"`
+	Session    *string    `json:"session,omitzero"`
 	At         int64      `json:"at"`
 	Recalled   int64      `json:"recalled"`
 	RecalledAt *int64     `json:"recalledAt,omitzero"`
@@ -1026,8 +1026,8 @@ type PlanRequest struct {
 }
 
 type Dispatched struct {
-	Worker *string `json:"worker,omitzero"`
-	Queued *string `json:"queued,omitzero"`
+	Session *string `json:"session,omitzero"`
+	Queued  *string `json:"queued,omitzero"`
 }
 
 type Issue struct {
@@ -1041,7 +1041,7 @@ type Issue struct {
 	Rank      int64       `json:"rank,omitzero"`
 	CreatedAt int64       `json:"createdAt"`
 	QueuedAt  *int64      `json:"queuedAt,omitzero"`
-	Workers   []string    `json:"workers"`
+	Sessions  []string    `json:"sessions"`
 	ClosedAt  *int64      `json:"closedAt,omitzero"`
 	Closed    *IssueClose `json:"closed,omitzero"`
 	Parent    *string     `json:"parent,omitzero"`
@@ -1066,7 +1066,7 @@ type IssueStep struct {
 	Scope      []string  `json:"scope,omitzero"`
 	Acceptance *bool     `json:"acceptance,omitzero"`
 	Frozen     []string  `json:"frozen,omitzero"`
-	Worker     *string   `json:"worker,omitzero"`
+	Session    *string   `json:"session,omitzero"`
 	Conclusion *string   `json:"conclusion,omitzero"`
 	Commits    []string  `json:"commits,omitzero"`
 	Spent      *Spent    `json:"spent,omitzero"`
@@ -1117,22 +1117,22 @@ type Trajectory struct {
 }
 
 type TrajectoryHead struct {
-	ID           string          `json:"id"`
-	Name         string          `json:"name"`
-	Agent        *string         `json:"agent,omitzero"`
-	Runtime      *string         `json:"runtime,omitzero"`
-	Project      *string         `json:"project,omitzero"`
-	Job          *string         `json:"job,omitzero"`
-	StartedAt    int64           `json:"startedAt"`
-	EndedAt      *int64          `json:"endedAt,omitzero"`
-	Closed       *IssueClose     `json:"closed,omitzero"`
-	Outcome      *Outcome        `json:"outcome,omitzero"`
-	Summary      *string         `json:"summary,omitzero"`
-	Runs         *int64          `json:"runs,omitzero"`
-	CNY          *float64        `json:"cny,omitzero"`
-	ReopenedFrom *string         `json:"reopenedFrom,omitzero"`
-	ReopenedAs   *string         `json:"reopenedAs,omitzero"`
-	Playbook     *WorkerPlaybook `json:"playbook,omitzero"`
+	ID           string           `json:"id"`
+	Name         string           `json:"name"`
+	Agent        *string          `json:"agent,omitzero"`
+	Runtime      *string          `json:"runtime,omitzero"`
+	Project      *string          `json:"project,omitzero"`
+	Job          *string          `json:"job,omitzero"`
+	StartedAt    int64            `json:"startedAt"`
+	EndedAt      *int64           `json:"endedAt,omitzero"`
+	Closed       *IssueClose      `json:"closed,omitzero"`
+	Outcome      *Outcome         `json:"outcome,omitzero"`
+	Summary      *string          `json:"summary,omitzero"`
+	Runs         *int64           `json:"runs,omitzero"`
+	CNY          *float64         `json:"cny,omitzero"`
+	ReopenedFrom *string          `json:"reopenedFrom,omitzero"`
+	ReopenedAs   *string          `json:"reopenedAs,omitzero"`
+	Playbook     *SessionPlaybook `json:"playbook,omitzero"`
 	// ReopenedFrom and ReopenedAs are how runs told it before issues.
 	Issue *string `json:"issue,omitzero"`
 }
@@ -1172,7 +1172,7 @@ type RunTrigger struct {
 // One go at the work, from the input that started it to its report.
 type Run struct {
 	ID          int64      `json:"id"`
-	Worker      string     `json:"worker"`
+	Session     string     `json:"session"`
 	Issue       *string    `json:"issue,omitzero"`
 	TriggeredBy RunTrigger `json:"triggeredBy"`
 	// The messages steered into it while it ran.
@@ -1381,8 +1381,8 @@ type Update struct {
 	Available bool   `json:"available"`
 }
 
-//vibevalley:member InboxFrom worker
-type InboxFromWorker struct {
+//vibevalley:member InboxFrom session
+type InboxFromSession struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Agent string `json:"agent"`
@@ -1392,8 +1392,8 @@ type InboxFromWorker struct {
 type InboxFromManager struct {
 }
 
-//vibevalley:member InboxTarget worker
-type InboxTargetWorker struct {
+//vibevalley:member InboxTarget session
+type InboxTargetSession struct {
 	ID string `json:"id"`
 }
 
@@ -1415,14 +1415,14 @@ type Badge struct {
 
 //vibevalley:member GameEffect reward
 type GameEffectReward struct {
-	WorkerID string `json:"workerId"`
-	Coins    int64  `json:"coins"`
-	Streak   int64  `json:"streak"`
+	SessionID string `json:"sessionId"`
+	Coins     int64  `json:"coins"`
+	Streak    int64  `json:"streak"`
 }
 
 //vibevalley:member GameEffect penalty
 type GameEffectPenalty struct {
-	WorkerID string `json:"workerId"`
+	SessionID string `json:"sessionId"`
 }
 
 //vibevalley:member GameEffect levelUp
@@ -1439,7 +1439,7 @@ type GameEffectAchievement struct {
 //vibevalley:member LedgerEntry harvested
 type LedgerEntryHarvested struct {
 	At      int64    `json:"at"`
-	Worker  string   `json:"worker"`
+	Session string   `json:"session"`
 	Agent   *string  `json:"agent,omitzero"`
 	Project string   `json:"project"`
 	Runtime string   `json:"runtime"`
@@ -1450,27 +1450,27 @@ type LedgerEntryHarvested struct {
 
 //vibevalley:member LedgerEntry failed
 type LedgerEntryFailed struct {
-	At     int64   `json:"at"`
-	Worker string  `json:"worker"`
-	Agent  *string `json:"agent,omitzero"`
+	At      int64   `json:"at"`
+	Session string  `json:"session"`
+	Agent   *string `json:"agent,omitzero"`
 }
 
 //vibevalley:member LedgerEntry conflicted
 type LedgerEntryConflicted struct {
-	At     int64  `json:"at"`
-	Worker string `json:"worker"`
+	At      int64  `json:"at"`
+	Session string `json:"session"`
 }
 
 //vibevalley:member LedgerEntry told
 type LedgerEntryTold struct {
-	At     int64  `json:"at"`
-	Worker string `json:"worker"`
+	At      int64  `json:"at"`
+	Session string `json:"session"`
 }
 
 //vibevalley:member LedgerEntry reviewed
 type LedgerEntryReviewed struct {
-	At     int64  `json:"at"`
-	Worker string `json:"worker"`
+	At      int64  `json:"at"`
+	Session string `json:"session"`
 }
 
 //vibevalley:member LedgerEntry playbook
@@ -1483,22 +1483,22 @@ type LedgerEntryPlaybook struct {
 
 //vibevalley:member LedgerEntry handoff
 type LedgerEntryHandoff struct {
-	At     int64  `json:"at"`
-	Worker string `json:"worker"`
-	To     string `json:"to"`
+	At      int64  `json:"at"`
+	Session string `json:"session"`
+	To      string `json:"to"`
 }
 
 //vibevalley:member LedgerEntry called
 type LedgerEntryCalled struct {
-	At     int64  `json:"at"`
-	Worker string `json:"worker"`
+	At      int64  `json:"at"`
+	Session string `json:"session"`
 }
 
 //vibevalley:member LedgerEntry hired
 type LedgerEntryHired struct {
-	At     int64   `json:"at"`
-	Worker string  `json:"worker"`
-	Agent  *string `json:"agent,omitzero"`
+	At      int64   `json:"at"`
+	Session string  `json:"session"`
+	Agent   *string `json:"agent,omitzero"`
 }
 
 type LedgerEntryMomentKind string
@@ -1765,11 +1765,11 @@ type FactConversation struct {
 //vibevalley:member Fact hired
 //vibevalley:member SideEvent hired
 type FactHired struct {
-	At     int64  `json:"at"`
-	Worker Worker `json:"worker"`
+	At      int64   `json:"at"`
+	Session Session `json:"session"`
 }
 
-// The person planted on this bed just before the worker was hired.
+// The person planted on this bed just before the session was hired.
 //
 //vibevalley:member Fact station
 //vibevalley:member SideEvent station
@@ -1790,10 +1790,10 @@ type FactRun struct {
 //vibevalley:member Fact doing
 //vibevalley:member SideEvent doing
 type FactDoing struct {
-	At     int64        `json:"at"`
-	ID     string       `json:"id"`
-	Action WorkerAction `json:"action"`
-	Label  string       `json:"label"`
+	At     int64         `json:"at"`
+	ID     string        `json:"id"`
+	Action SessionAction `json:"action"`
+	Label  string        `json:"label"`
 }
 
 //vibevalley:member Fact quiet

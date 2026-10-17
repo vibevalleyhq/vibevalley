@@ -1,6 +1,6 @@
 # 服务端：管家和帮工
 
-`server` 是 Go 模块 `vibevalley`，只听 127.0.0.1:8787；局域网里的设备经「院门」进来。包怎么分、服务怎么组装、测试见 [server/README.md](../../server/README.md)；存了什么、配置见 [architecture.md](../architecture.md)。核心状态只经 `Core.Apply` 改；纯规则在 `protocol` 包，只有服务端用的在拥有它的包里（`worker/facts.go`、`worker/rules.go`）。
+`server` 是 Go 模块 `vibevalley`，只听 127.0.0.1:8787；局域网里的设备经「院门」进来。包怎么分、服务怎么组装、测试见 [server/README.md](../../server/README.md)；存了什么、配置见 [architecture.md](../architecture.md)。核心状态只经 `Core.Apply` 改；纯规则在 `protocol` 包，只有服务端用的在拥有它的包里（`session/facts.go`、`session/rules.go`）。
 
 ## 管家
 
@@ -59,19 +59,19 @@
 
 每个帮工是 smith（`server/pkg/smith`）的一个子 agent：并发上限 6（`protocol.MaxRunning`），帮工不能再派帮工。没有权限确认，靠工作目录、worktree 和只听本机圈住（[理由](../../.agents/notes/implemented/architecture/2026-10-10-helpers-as-oar-subagents.md)）。档案决定农机、模型、人设、技能和环境变量（[agents-and-runtimes.md](agents-and-runtimes.md)）。
 
-**农场的规矩**（`worker/rules.go`）：每次派活附上在哪个分支和 worktree、只改这个目录、不切分支不 push；做完一轮就提交；汇报写提交号和怎么验证的，最后一段以「结论：」开头；学到的写成「记住：」；加上工作目录的 `AGENTS.md`（有的话）。
+**农场的规矩**（`session/rules.go`）：每次派活附上在哪个分支和 worktree、只改这个目录、不切分支不 push；做完一轮就提交；汇报写提交号和怎么验证的，最后一段以「结论：」开头；学到的写成「记住：」；加上工作目录的 `AGENTS.md`（有的话）。
 
-**会话事件变成事实**在 `worker/facts.go`（纯函数）：一轮开始、在做什么（`doing`，气泡）、重试、花费、一轮结束。
+**会话事件变成事实**在 `session/facts.go`（纯函数）：一轮开始、在做什么（`doing`，气泡）、重试、花费、一轮结束。
 
-**每次干活**（run，`worker/runs.go`；[提案](../../.agents/notes/proposed/architecture/2026-10-16-runs-workers-crews.md)）：农机开一轮就是一次 run，到这一轮的汇报结束，记在 `run` 表。发话的一方先说清这一轮是为什么开的，农机开了这一轮，run 就记下它：派出去（`issue`）、带话（`comment`，带着那条消息的号）、种植计划（`playbook`）、定时（`schedule`，带着哪个定时、是不是补跑）；没人发话就开的一轮记成农机自己（`runtime`）。干活时插进来的话不开新的 run，记在这一轮读到的话里（`heard`）；排队的话是下一次 run 的触发。叫不醒、被拒的不算 run。服务端重启时还开着的 run 记成叫停了。一张工单的 run 用 `GET /api/issues/{id}/runs` 取，不在核心状态里。
+**每次干活**（run，`session/runs.go`；[提案](../../.agents/notes/proposed/architecture/2026-10-16-runs-workers-crews.md)）：农机开一轮就是一次 run，到这一轮的汇报结束，记在 `run` 表。发话的一方先说清这一轮是为什么开的，农机开了这一轮，run 就记下它：派出去（`issue`）、带话（`comment`，带着那条消息的号）、种植计划（`playbook`）、定时（`schedule`，带着哪个定时、是不是补跑）；没人发话就开的一轮记成农机自己（`runtime`）。干活时插进来的话不开新的 run，记在这一轮读到的话里（`heard`）；排队的话是下一次 run 的触发。叫不醒、被拒的不算 run。服务端重启时还开着的 run 记成叫停了。一张工单的 run 用 `GET /api/issues/{id}/runs` 取，不在核心状态里。
 
-**干活过程**（`worker/activities.go`）：每一步（收到的话、想、说、工具调用的输入和输出）记在 `activities/<id>.json`。带话时可以评论某一步（`on`），服务端把那一步写在话前面交给帮工。
+**干活过程**（`session/activities.go`）：每一步（收到的话、想、说、工具调用的输入和输出）记在 `activities/<id>.json`。带话时可以评论某一步（`on`），服务端把那一步写在话前面交给帮工。
 
-**轨迹**（`worker/trajectories.go`；[理由](../../.agents/notes/implemented/feature/2026-10-13-trajectories.md)）：每个帮工一条，派出去时开始，头文件（`activities/<id>.head.json`）记着是谁、为哪张工单、怎么关的，一直留着；步骤在帮工走了 `trajectory.days` 天后删。管家一条，留最近 1000 步。帮工自己派的子 agent 的步骤挂在派它的那一步下面。
+**轨迹**（`session/trajectories.go`；[理由](../../.agents/notes/implemented/feature/2026-10-13-trajectories.md)）：每个帮工一条，派出去时开始，头文件（`activities/<id>.head.json`）记着是谁、为哪张工单、怎么关的，一直留着；步骤在帮工走了 `trajectory.days` 天后删。管家一条，留最近 1000 步。帮工自己派的子 agent 的步骤挂在派它的那一步下面。
 
 **工单**（`issue/issue.go`、`issue/dispatch.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-15-issue-is-one-thing.md)）：
 
-- 存在 `issue` 和 `issue_worker` 表；开着的和最近关的 50 家在核心状态里。
+- 存在 `issue` 和 `issue_session` 表；开着的和最近关的 50 家在核心状态里。
 - 交给帮工的是标题，空一行，再是说明。
 - **状态**由 `protocol.IssueStatusOf` 算：`backlog`（写下没派）、`todo`（排队等空地）、`in_progress`、`in_review`（等你看）、`done`（合进主分支、合进计划、管家答完）、`canceled`（收工、丢了、放弃、跳过，或没说怎么关的）。看板按它分列。
 - 还没派的能改、能删、能排先后；派出去以后不能。
@@ -82,7 +82,7 @@
 
 **汇报的摘要**取「结论：」那一段。失败按 smith 的分类说人话并说怎么办，要你处理的（登录、余额、额度、模型）另发一条提醒。
 
-**没动静**：一轮里超过 `worker.stall_seconds`（默认 240 秒）没有任何记录，施加 `quiet`、提醒一次；一有动静就结束（[为什么](../../.agents/notes/implemented/feature/2026-10-10-quiet-turns.md)）。
+**没动静**：一轮里超过 `session.stall_seconds`（默认 240 秒）没有任何记录，施加 `quiet`、提醒一次；一有动静就结束（[为什么](../../.agents/notes/implemented/feature/2026-10-10-quiet-turns.md)）。
 
 ## 田头
 
@@ -105,7 +105,7 @@
 
 **送达**：每条给帮工的消息走 未交付 → 提示过 → 已交付 → 看到了。歇着的帮工被叫醒时新一轮带着给它的消息；这一轮真的开口了才算看到，没开口就退回、过一会儿再叫。忙着的帮工攒几秒，插一句不带正文的提示（`BusyNotice`）。宁可重复给，不会丢。
 
-**帮工的工具**（`mcp/mcp.go`，在 `/mcp` 上；`mcp` 是给编码 agent 的入口，和 HTTP 并排）：`farm_say`、`farm_read`、`farm_inbox`、`farm_who`。每个会话带一个自己的令牌（`worker/tokens.go`），只用来分清是谁在说话。`farm_say` 发出前会拦下：目标里有它没看过的新消息、读的是串却发到顶层、60 秒内重复同一句。
+**帮工的工具**（`mcp/mcp.go`，在 `/mcp` 上；`mcp` 是给编码 agent 的入口，和 HTTP 并排）：`farm_say`、`farm_read`、`farm_inbox`、`farm_who`。每个会话带一个自己的令牌（`session/tokens.go`），只用来分清是谁在说话。`farm_say` 发出前会拦下：目标里有它没看过的新消息、读的是串却发到顶层、60 秒内重复同一句。
 
 ## 连接器：微信、飞书、QQ
 
@@ -198,7 +198,7 @@
 
 **派不出去**（protocol 的 `AgentIssues`）：档案停用、农机没装或停用、配置有错、余额用完、到了每日预算、套餐某个窗口用满。正在干的会干完。
 
-**同时干活的上限**：农场 6（`protocol.MaxRunning`）；每台农机 `RuntimeSettings.maxWorking`；每个项目 `project.max_workers`（默认 3）。地都满了又来新活时，歇着的帮工里最早的那个先收工。
+**同时干活的上限**：农场 6（`protocol.MaxRunning`）；每台农机 `RuntimeSettings.maxWorking`；每个项目 `project.max_sessions`（默认 3）。地都满了又来新活时，歇着的帮工里最早的那个先收工。
 
 ## 重启
 

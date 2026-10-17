@@ -3,7 +3,7 @@ import 'dart:isolate';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
-import '../../data/remote.dart' show WorkerIssue;
+import '../../data/remote.dart' show SessionIssue;
 import '../../gen/vibevalley.dart';
 import '../fx_layer.dart';
 import '../sfx.dart';
@@ -11,7 +11,7 @@ import '../synth.dart';
 
 /// Null until the farm screen sets it.
 class DebugHooks {
-  const DebugHooks({required this.tod, required this.setTod, required this.daySpeed, required this.setDaySpeed, required this.openWorker});
+  const DebugHooks({required this.tod, required this.setTod, required this.daySpeed, required this.setDaySpeed, required this.openSession});
 
   /// 0..1, 0.5 is noon.
   final double Function() tod;
@@ -21,7 +21,7 @@ class DebugHooks {
   final double Function() daySpeed;
   final void Function(double speed) setDaySpeed;
 
-  final void Function(String id) openWorker;
+  final void Function(String id) openSession;
 }
 
 final debugHooksProvider = NotifierProvider<DebugHooksNotifier, DebugHooks?>(DebugHooksNotifier.new);
@@ -52,15 +52,15 @@ class Hb {
   Future<void> dismiss(String id) => _api.issue.cancel(id: _issueOf(id));
   Future<void> harvest(String id) => _api.issue.merge(id: _issueOf(id));
 
-  String _issueOf(String worker) => (ref.read(farmProvider)?.workers ?? const <Worker>[]).firstWhere((w) => w.id == worker).issueId;
+  String _issueOf(String session) => (ref.read(farmProvider)?.sessions ?? const <Session>[]).firstWhere((w) => w.id == session).issueId;
 
   Future<void> everyone(String action) async {
-    for (final h in ref.read(farmProvider)?.workers ?? const <Worker>[]) {
+    for (final h in ref.read(farmProvider)?.sessions ?? const <Session>[]) {
       await (action == 'stop' ? stop(h.id) : dismiss(h.id));
     }
   }
 
-  void open(String id) => ref.read(debugHooksProvider)?.openWorker(id);
+  void open(String id) => ref.read(debugHooksProvider)?.openSession(id);
 
   void tod(double t) => ref.read(debugHooksProvider)?.setTod(t);
   void daySpeed(double n) => ref.read(debugHooksProvider)?.setDaySpeed(n);

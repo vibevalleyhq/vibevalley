@@ -10,7 +10,7 @@ List<ChatMessage> turnReportsOf(CoreState? s) => [
     if (m.kind == MessageKind.report && m.final_) m,
 ]..sort((a, b) => b.at.compareTo(a.at));
 
-Issue? issueOfWorker(CoreState? s, String worker) => (s?.issues ?? const <Issue>[]).where((i) => i.workers.contains(worker)).firstOrNull;
+Issue? issueOfSession(CoreState? s, String session) => (s?.issues ?? const <Issue>[]).where((i) => i.sessions.contains(session)).firstOrNull;
 
 List<String> askedOf(CoreState? s) {
   final all = [

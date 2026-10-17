@@ -74,7 +74,7 @@ type UpsertParticipantParams struct {
 	JoinedAt int64
 }
 
-// Who is in the chat: the owner, the manager, the workers, the farm (channel/db.go).
+// Who is in the chat: the owner, the manager, the sessions, the farm (channel/db.go).
 func (q *Queries) UpsertParticipant(ctx context.Context, arg UpsertParticipantParams) error {
 	_, err := q.db.ExecContext(ctx, upsertParticipant,
 		arg.ID,

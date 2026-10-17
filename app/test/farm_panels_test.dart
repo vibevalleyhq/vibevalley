@@ -11,8 +11,8 @@ import 'support/farm.dart';
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  final working = worker('w1', name: '小吴', station: 0, project: 'clock-in', branch: 'vibevalley/w1', files: ['src/a.ts'], commands: ['pnpm test']);
-  final failed = worker(
+  final working = session('w1', name: '小吴', station: 0, project: 'clock-in', branch: 'vibevalley/w1', files: ['src/a.ts'], commands: ['pnpm test']);
+  final failed = session(
     'w2',
     name: '阿郑',
     agent: 'front',
@@ -27,7 +27,7 @@ void main() {
     assignee: 'tester',
     priority: Priority.medium,
     createdAt: 900,
-    workers: const ['w9'],
+    sessions: const ['w9'],
     closedAt: DateTime.now().millisecondsSinceEpoch - 60000.0,
     closed: IssueClose.merged,
     status: IssueStatus.done,
@@ -42,19 +42,19 @@ void main() {
         seq: 2,
         conversation: 2,
         from: 'w9',
-        fromKind: SenderKind.worker,
+        fromKind: SenderKind.agent,
         name: '老李',
         agent: 'tester',
         kind: MessageKind.report,
         text: '补好了',
         final_: true,
-        worker: 'w9',
+        session: 'w9',
         outcome: Outcome.completed,
         at: 1000,
       ),
     ],
   );
-  final state = farm(workers: [working, failed], progress: progress, chat: chat, issues: [harvested]);
+  final state = farm(sessions: [working, failed], progress: progress, chat: chat, issues: [harvested]);
   final v = view(
     plots: {
       'w1': const PlotView(crop: Crop.leafy),

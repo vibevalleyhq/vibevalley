@@ -19,11 +19,11 @@ import '../../rules/farm.dart';
 
 const _grey = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, color: Palette.bark500);
 
-String threadTitle(Chat? chat, Conversation thread, List<Worker> workers) {
+String threadTitle(Chat? chat, Conversation thread, List<Session> sessions) {
   if (thread.subjectKind == SubjectKind.issue) {
-    final worker = workers.where((h) => h.id == thread.subjectId).firstOrNull;
+    final session = sessions.where((h) => h.id == thread.subjectId).firstOrNull;
     final said = messagesIn(chat, thread.id).where((m) => m.from == thread.subjectId).firstOrNull?.name;
-    return '${worker?.name ?? said ?? thread.subjectId ?? ''}的工单串';
+    return '${session?.name ?? said ?? thread.subjectId ?? ''}的工单串';
   }
   if (thread.subjectKind == SubjectKind.playbook) return '计划 ${thread.subjectId ?? ''}';
   final parent = parentOf(chat, thread);
@@ -312,7 +312,7 @@ class _Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final channels = channelsOf(chat);
-    final workers = ref.watch(farmProvider)?.workers ?? const <Worker>[];
+    final sessions = ref.watch(farmProvider)?.sessions ?? const <Session>[];
     return Semantics(
       label: '聊天',
       container: true,
@@ -367,16 +367,16 @@ class _Sidebar extends ConsumerWidget {
                   ),
                   _Section(
                     title: '帮工',
-                    count: workers.length,
+                    count: sessions.length,
                     children: [
-                      if (workers.isEmpty)
+                      if (sessions.isEmpty)
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12),
                           child: Text('还没有帮工在地里：在频道里跟管家说一件活。', style: _grey),
                         ),
-                      for (final h in workers)
-                        _WorkerRow(
-                          worker: h,
+                      for (final h in sessions)
+                        _SessionRow(
+                          session: h,
                           chat: chat,
                           active: thread?.subjectKind == SubjectKind.issue && thread?.subjectId == h.id,
                           onShow: (id) {
@@ -542,16 +542,16 @@ class _Sliding extends StatelessWidget {
   );
 }
 
-class _WorkerRow extends StatelessWidget {
-  const _WorkerRow({required this.worker, required this.chat, required this.active, required this.onShow});
-  final Worker worker;
+class _SessionRow extends StatelessWidget {
+  const _SessionRow({required this.session, required this.chat, required this.active, required this.onShow});
+  final Session session;
   final Chat? chat;
   final bool active;
   final void Function(double id) onShow;
 
   @override
   Widget build(BuildContext context) {
-    final h = worker;
+    final h = session;
     final thread = jobThreadOf(chat, h.id);
     final unread = thread == null ? 0 : unreadIn(chat, thread);
     final phase = phaseText(h, nowMs());
@@ -662,12 +662,12 @@ class _Jobs extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final farm = ref.watch(farmProvider);
-    final workers = [...?farm?.workers.where((h) => h.channel != null ? h.channel == channel.id : channel.kind == ConversationKind.general)];
-    if (workers.isEmpty) return const _Empty('这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。', icon: 'icon-tasks');
+    final sessions = [...?farm?.sessions.where((h) => h.channel != null ? h.channel == channel.id : channel.kind == ConversationKind.general)];
+    if (sessions.isEmpty) return const _Empty('这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。', icon: 'icon-tasks');
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        for (final h in workers)
+        for (final h in sessions)
           Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -808,10 +808,10 @@ class _ThreadPane extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final farm = ref.watch(farmProvider);
-    final workers = farm?.workers ?? const <Worker>[];
-    final worker = thread.subjectKind == SubjectKind.issue ? workers.where((h) => h.id == thread.subjectId).firstOrNull : null;
-    final status = worker != null
-        ? '@${worker.id} · ${phaseText(worker, nowMs())}'
+    final sessions = farm?.sessions ?? const <Session>[];
+    final session = thread.subjectKind == SubjectKind.issue ? sessions.where((h) => h.id == thread.subjectId).firstOrNull : null;
+    final status = session != null
+        ? '@${session.id} · ${phaseText(session, nowMs())}'
         : thread.subjectKind == SubjectKind.issue
         ? '它已经离开农场，串还留着'
         : '${idText(thread.replies)} 条回复';
@@ -829,7 +829,7 @@ class _ThreadPane extends ConsumerWidget {
               children: [
                 SizedBox.square(
                   dimension: 32,
-                  child: Center(child: worker != null ? AgentHead(agent: worker.agent, size: 32) : const Glyph('button-thread')),
+                  child: Center(child: session != null ? AgentHead(agent: session.agent, size: 32) : const Glyph('button-thread')),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -837,10 +837,10 @@ class _ThreadPane extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(threadTitle(farm?.chat, thread, workers), maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                      Text(threadTitle(farm?.chat, thread, sessions), maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
                       Row(
                         children: [
-                          if (worker != null) ...[PhaseGlyph(worker.phase, size: 14), const SizedBox(width: 4)],
+                          if (session != null) ...[PhaseGlyph(session.phase, size: 14), const SizedBox(width: 4)],
                           Flexible(
                             child: Text(status, maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
                           ),
@@ -862,7 +862,7 @@ class _ThreadPane extends ConsumerWidget {
           Expanded(
             child: MessageList(conversation: thread, emptyText: '串里还没人说话。在这里说的话，它的帮工会看到。'),
           ),
-          ChatComposer(conversation: thread, placeholder: worker != null ? '在串里说，${worker.name}会看到' : '回复这个串'),
+          ChatComposer(conversation: thread, placeholder: session != null ? '在串里说，${session.name}会看到' : '回复这个串'),
         ],
       ),
     );

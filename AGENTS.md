@@ -7,7 +7,7 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ```
 server/                    服务端，一个 Go 模块 vibevalley；cmd/server 单独跑它，cmd/vibevalley 是命令行（农场的每个接口、和农机直接聊、自己的 agent），cmd/migrate 管表结构
 server/internal/           农场的服务，一块业务一个包，名字用单数，每个包只导出一个 Service：core、setting、agent、project、
-                           memory、runtime、worker、channel、schedule、issue、playbook、manager、gate、voice、connector、game；
+                           memory、runtime、session、channel、schedule、issue、playbook、manager、gate、voice、connector、game；
                            base 是地基，workspace 把它们组装起来，handler 是全部 HTTP 处理，mcp 是给编码 agent 的工具
 server/migrations/         SQLite 的迁移，启动时按名字顺序跑；也是 sqlc 读的表结构
 server/internal/protocol/  形状（shapes.go、api.go）和规则的唯一来源；tool/shapegen 从它写出 gen.go 和 Flutter 的 lib/gen
@@ -46,7 +46,7 @@ bun run site:check && bun run site:build                       # 改完 site/：
 
 Go 1.27，Flutter 3.47，Bun 1.4（根目录的命令、文档和 Note 的检查），Node 24（只跑 `server/tool` 的 `pi-prices.ts`）。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `server/` 要重启它。
 
-一件事的主线：smith 的会话事件 → `internal/worker/facts.go`（纯函数）读成事实和步骤 → `Core.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/state` 把折好的 `StateFrame` 经 SSE 推给 Flutter；步骤由 `worker/activities.go`、`worker/trajectories.go` 记成每个帮工和管家的轨迹（[architecture.md](docs/architecture.md)、[server.md](docs/reference/server.md)）。
+一件事的主线：smith 的会话事件 → `internal/session/facts.go`（纯函数）读成事实和步骤 → `Core.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/state` 把折好的 `StateFrame` 经 SSE 推给 Flutter；步骤由 `session/activities.go`、`session/trajectories.go` 记成每个帮工和管家的轨迹（[architecture.md](docs/architecture.md)、[server.md](docs/reference/server.md)）。
 
 ## 怎么让 agent 做对
 

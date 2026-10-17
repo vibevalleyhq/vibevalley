@@ -24,8 +24,8 @@ import '../shared/tags.dart';
 import '../rules/money.dart';
 
 class PlotDetail extends ConsumerStatefulWidget {
-  const PlotDetail({super.key, required this.worker, required this.onDone});
-  final Worker worker;
+  const PlotDetail({super.key, required this.session, required this.onDone});
+  final Session session;
   final VoidCallback onDone;
 
   @override
@@ -39,33 +39,33 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
   void initState() {
     super.initState();
     // The server keeps every step: loaded in full when the panel opens, kept up by step events.
-    ref.read(workStepsProvider.notifier).load(widget.worker.id).then((_) {}, onError: (Object _) {});
+    ref.read(workStepsProvider.notifier).load(widget.session.id).then((_) {}, onError: (Object _) {});
   }
 
   void _send() {
     if (_text.trim().isEmpty) return;
-    fire(ref.read(farmCommandsProvider).water(widget.worker, _text));
+    fire(ref.read(farmCommandsProvider).water(widget.session, _text));
     setState(() => _text = '');
   }
 
   @override
   Widget build(BuildContext context) {
-    final worker = widget.worker;
+    final session = widget.session;
     final atlas = ref.watch(atlasProvider).value;
-    final agent = (ref.watch(agentsProvider).value ?? const <String, Agent>{})[worker.agent];
+    final agent = (ref.watch(agentsProvider).value ?? const <String, Agent>{})[session.agent];
     final view = ref.watch(viewProvider);
-    final plot = view == null ? const PlotView(crop: Crop.empty) : plotOf(view, worker);
-    final cast = castOf(agent?.look, worker.agent);
-    final log = ref.watch(workStepsProvider.select((all) => all[worker.id]));
-    final hasThread = ref.watch(farmProvider.select((s) => jobThreadOf(s?.chat, worker.id)?.id));
-    final station = stationOfWorker(worker);
-    final working = isBusy(worker);
-    final current = doingOf(worker);
-    final conflict = canHarvest(worker) ? worker.conflict : null;
-    final phase = worker.phase;
+    final plot = view == null ? const PlotView(crop: Crop.empty) : plotOf(view, session);
+    final cast = castOf(agent?.look, session.agent);
+    final log = ref.watch(workStepsProvider.select((all) => all[session.id]));
+    final hasThread = ref.watch(farmProvider.select((s) => jobThreadOf(s?.chat, session.id)?.id));
+    final station = stationOfSession(session);
+    final working = isBusy(session);
+    final current = doingOf(session);
+    final conflict = canHarvest(session) ? session.conflict : null;
+    final phase = session.phase;
     final quiet = phase is PhaseWorking && phase.quietSince != null;
     final retrying = phase is PhaseWorking && phase.retry != null;
-    final play = worker.play;
+    final play = session.play;
     final history = (play?.history ?? const <ActionStep>[]);
     final steps = history.sublist(history.length > 12 ? history.length - 12 : 0).reversed.toList();
     final commands = ref.read(farmCommandsProvider);
@@ -83,25 +83,25 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
               children: [
                 if (atlas != null && atlas.has(cropSprite(plot.crop)))
                   Positioned(bottom: 0, child: Opacity(opacity: .9, child: _Sprite(atlas[cropSprite(plot.crop)], width: 176))),
-                if (atlas != null) _Sprite(atlas['${lookOf(agent, worker.agent, atlas.has)}-down'], height: 144),
+                if (atlas != null) _Sprite(atlas['${lookOf(agent, session.agent, atlas.has)}-down'], height: 144),
               ],
             ),
           ),
           const SizedBox(height: 8),
           Text(cropLabel[plot.crop]!, style: KitText.sm),
-          Text('${speciesLabel[cast.species]} · ${outfitLabel[cast.outfit]} · ${runtimeName(worker.runtime)}', textAlign: TextAlign.center, style: xs),
+          Text('${speciesLabel[cast.species]} · ${outfitLabel[cast.outfit]} · ${runtimeName(session.runtime)}', textAlign: TextAlign.center, style: xs),
           if (agent != null && agent.model.isNotEmpty) Text(agent.model, style: xs),
-          Text('第 ${station + 1} 块地 · 第 ${worker.runs.round()} 轮', style: xs),
-          if (worker.spent != null) Text('花了 ${spentText(worker.spent!)}', style: xs),
+          Text('第 ${station + 1} 块地 · 第 ${session.runs.round()} 轮', style: xs),
+          if (session.spent != null) Text('花了 ${spentText(session.spent!)}', style: xs),
           const SizedBox(height: 8),
-          _Link('看${agent?.name ?? '它'}的档案', onTap: () => context.go('/agents/${Uri.encodeComponent(worker.agent)}')),
+          _Link('看${agent?.name ?? '它'}的档案', onTap: () => context.go('/agents/${Uri.encodeComponent(session.agent)}')),
         ],
       ),
     );
     final main = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (worker.project != null)
+        if (session.project != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Tinted(
@@ -114,25 +114,25 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       KitTappable(
-                        onTap: () => context.go('/projects/${Uri.encodeComponent(worker.project!)}'),
+                        onTap: () => context.go('/projects/${Uri.encodeComponent(session.project!)}'),
                         tooltip: '看这个项目：种了什么、一年的耕作日历',
                         builder: (context, s) => FarmTag(
-                          '项目 ${worker.project}',
+                          '项目 ${session.project}',
                           fill: s.hovered ? const Color(0xFFB6844E) : const Color(0xFFA5743F),
                           ink: Palette.cream50,
                           goes: true,
                         ),
                       ),
-                      if (worker.branch != null) FarmTag(worker.branch!, ink: Palette.bark800),
+                      if (session.branch != null) FarmTag(session.branch!, ink: Palette.bark800),
                       Text('收获时这条分支会合进项目', style: KitText.xs.copyWith(color: Palette.bark400)),
                       KitTappable(
-                        onTap: () => context.go('/tickets/${Uri.encodeComponent(worker.id)}'),
+                        onTap: () => context.go('/tickets/${Uri.encodeComponent(session.id)}'),
                         tooltip: '这块地上的这次种植，在工单看板上：几轮、用时、改动',
                         builder: (context, s) => FarmTag('在看板上看', fill: s.hovered ? Palette.cream300 : Palette.cream200, ink: Palette.bark800, goes: true),
                       ),
                     ],
                   ),
-                  if (worker.worktree != null)
+                  if (session.worktree != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Row(
@@ -141,9 +141,9 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Tooltip(
-                              message: worker.worktree!,
+                              message: session.worktree!,
                               child: Text(
-                                worker.worktree!,
+                                session.worktree!,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: KitText.mono.copyWith(color: Palette.bark800),
@@ -152,7 +152,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                           ),
                           const SizedBox(width: 6),
                           KitTappable(
-                            onTap: () => Clipboard.setData(ClipboardData(text: worker.worktree ?? '')),
+                            onTap: () => Clipboard.setData(ClipboardData(text: session.worktree ?? '')),
                             builder: (context, s) =>
                                 FarmTag('复制路径', fill: s.hovered ? Palette.cream300 : Palette.cream200, ink: Palette.bark800, icon: 'button-copy'),
                           ),
@@ -163,9 +163,9 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
               ),
             ),
           ),
-        if (worker.playbook != null) PlanLine(worker: worker, onDone: widget.onDone),
-        Text(worker.task, style: KitText.sm),
-        if (current.action != WorkerAction.none)
+        if (session.playbook != null) PlanLine(session: session, onDone: widget.onDone),
+        Text(session.task, style: KitText.sm),
+        if (current.action != SessionAction.none)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Tinted(
@@ -198,7 +198,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                 builder: (context, now) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(phaseText(worker, now), style: KitText.sm),
+                    Text(phaseText(session, now), style: KitText.sm),
                     if (quiet) Text('可能在跑很久的命令，也可能卡住了：看看下面的干活过程，不对就叫停。', style: xs),
                   ],
                 ),
@@ -227,19 +227,19 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  PxButton.text('让它解决冲突', tone: PxTone.danger, onPressed: () => fire(commands.resolve(worker))),
+                  PxButton.text('让它解决冲突', tone: PxTone.danger, onPressed: () => fire(commands.resolve(session))),
                 ],
               ),
             ),
           ),
-        if (worker.lastRun != null && !working)
+        if (session.lastRun != null && !working)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Tinted(
-              color: worker.lastRun!.outcome == Outcome.failed ? tint(Palette.berry, .12) : tint(Palette.wheat, .2),
+              color: session.lastRun!.outcome == Outcome.failed ? tint(Palette.berry, .12) : tint(Palette.wheat, .2),
               child: Text(
-                '${outcomeLabel[worker.lastRun!.outcome]}：${worker.lastRun!.summary}',
-                style: KitText.sm.copyWith(color: worker.lastRun!.outcome == Outcome.failed ? Palette.berry : Palette.bark900),
+                '${outcomeLabel[session.lastRun!.outcome]}：${session.lastRun!.summary}',
+                style: KitText.sm.copyWith(color: session.lastRun!.outcome == Outcome.failed ? Palette.berry : Palette.bark900),
               ),
             ),
           ),
@@ -248,22 +248,22 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            if (plot.crop == Crop.withered) PxButton.text('杀虫：接着修', tone: PxTone.danger, onPressed: () => fire(commands.cure(worker))),
-            if (canHarvest(worker) && worker.playbook == null)
+            if (plot.crop == Crop.withered) PxButton.text('杀虫：接着修', tone: PxTone.danger, onPressed: () => fire(commands.cure(session))),
+            if (canHarvest(session) && session.playbook == null)
               PxButton.text(
                 '收获…',
                 tone: PxTone.primary,
                 onPressed: () {
-                  ref.read(reviewingProvider.notifier).set(worker.id);
+                  ref.read(reviewingProvider.notifier).set(session.id);
                   widget.onDone();
                 },
               ),
-            if (worker.phase is PhaseWorking) PxButton.text('叫停', onPressed: () => fire(commands.stop(worker.id))),
+            if (session.phase is PhaseWorking) PxButton.text('叫停', onPressed: () => fire(commands.stop(session.id))),
             if (hasThread != null)
               PxButton.text(
                 '看工单串',
                 onPressed: () {
-                  fire(ref.read(chatActionsProvider).showJobThread(worker.id));
+                  fire(ref.read(chatActionsProvider).showJobThread(session.id));
                   ref.read(chatOpenProvider.notifier).set(true);
                   widget.onDone();
                 },
@@ -271,7 +271,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
             PxButton.text(
               '请它收工',
               onPressed: () {
-                fire(commands.dismiss(worker.id));
+                fire(commands.dismiss(session.id));
                 widget.onDone();
               },
             ),
@@ -290,8 +290,8 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                   value: _text,
                   onChanged: (v) => setState(() => _text = v),
                   onSubmitted: (_) => _send(),
-                  placeholder: worker.phase is PhaseWorking ? '浇水：干着活也能收到这句话' : '浇水：带句话，它会接着干',
-                  semanticLabel: '给${worker.name}带句话',
+                  placeholder: session.phase is PhaseWorking ? '浇水：干着活也能收到这句话' : '浇水：带句话，它会接着干',
+                  semanticLabel: '给${session.name}带句话',
                 ),
               ),
               const SizedBox(width: 8),
@@ -306,8 +306,8 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
               builder: (context, now) => WorkLog(
                 steps: log,
                 now: now,
-                working: worker.phase is PhaseWorking,
-                onComment: (step, text) => ref.read(farmCommandsProvider).water(worker, text, on: step),
+                working: session.phase is PhaseWorking,
+                onComment: (step, text) => ref.read(farmCommandsProvider).water(session, text, on: step),
               ),
             ),
           )
@@ -428,13 +428,13 @@ class _Link extends StatelessWidget {
 }
 
 class PlanLine extends ConsumerWidget {
-  const PlanLine({super.key, required this.worker, required this.onDone});
-  final Worker worker;
+  const PlanLine({super.key, required this.session, required this.onDone});
+  final Session session;
   final VoidCallback onDone;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tag = worker.playbook;
+    final tag = session.playbook;
     final pb = tag == null ? null : playbookOf(ref.watch(plansProvider), tag.id);
     if (tag == null || pb == null) return const SizedBox.shrink();
     final node = tag.node == null ? null : nodeOf(pb, tag.node!);

@@ -17,7 +17,7 @@ func TestStartedAgainFromStateJSON(t *testing.T) {
 	home := t.TempDir()
 	was := protocol.EmptyCoreState()
 	was.Call, was.CallReason, was.Manager = protocol.CallStateLive, ptr.To("挂了"), protocol.ManagerStateSpeaking
-	was.Workers = []protocol.Worker{{ID: "w1", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "写", Phase: protocol.Phase{Value: protocol.PhaseRipe{}}}}
+	was.Sessions = []protocol.Session{{ID: "w1", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "写", Phase: protocol.Phase{Value: protocol.PhaseRipe{}}}}
 	was.Progress = ptr.To(protocol.EmptyProgress())
 	was.Schedules = []protocol.Schedule{{ID: 1, Name: "日报"}}
 	was.Issues = []protocol.Issue{{ID: "i1"}}
@@ -29,8 +29,8 @@ func TestStartedAgainFromStateJSON(t *testing.T) {
 	got := s.State()
 	testkit.Eq(t, [3]any{got.Call, got.CallReason, got.Manager}, [3]any{protocol.CallStateIdle, (*string)(nil), protocol.ManagerStateIdle}, "idle again")
 	testkit.Eq(t, [3]bool{got.Progress == nil, got.Schedules == nil, got.Issues == nil}, [3]bool{true, true, true}, "the database's parts come from the database")
-	testkit.Eq(t, len(got.Workers), 1, "the workers stay")
-	testkit.Eq(t, got.Workers[0].Play != nil, true, "at their stations")
+	testkit.Eq(t, len(got.Sessions), 1, "the sessions stay")
+	testkit.Eq(t, got.Sessions[0].Play != nil, true, "at their stations")
 }
 
 func TestApplyStampsAndKeepsNoNewsBack(t *testing.T) {
@@ -38,7 +38,7 @@ func TestApplyStampsAndKeepsNoNewsBack(t *testing.T) {
 	s := New(home)
 	_, events, stop := s.Events()
 	defer stop()
-	s.Apply(protocol.FactHired{Worker: protocol.Worker{ID: "w1", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "写", Phase: protocol.Phase{Value: protocol.PhaseArriving{}}}})
+	s.Apply(protocol.FactHired{Session: protocol.Session{ID: "w1", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "写", Phase: protocol.Phase{Value: protocol.PhaseArriving{}}}})
 	<-events
 	s.SetManager(protocol.ManagerStateThinking)
 	select {

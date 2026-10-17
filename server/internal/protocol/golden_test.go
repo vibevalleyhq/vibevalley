@@ -12,7 +12,7 @@ import (
 
 const sampleState = `{
   "call": "live", "manager": "speaking", "reports": [],
-  "workers": [{
+  "sessions": [{
     "id": "w1", "name": "Pi 实验员", "agent": "lab", "runtime": "pi", "task": "写打卡", "hiredAt": 1, "runs": 1,
     "phase": {"_tag": "working", "since": 2, "doing": {"action": "edit_file", "label": "改 checkin.ts"}},
     "play": {

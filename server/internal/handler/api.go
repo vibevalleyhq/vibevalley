@@ -29,17 +29,17 @@ func refused(err error) error {
 
 func missing(what string) error { return protocol.Missing{What: what} }
 
-// latest is the issue's newest worker, which must still be on the farm.
+// latest is the issue's newest session, which must still be on the farm.
 func (a api) latest(issue string) (string, error) {
-	worker, err := a.f.Issue.Latest(issue)
+	session, err := a.f.Issue.Latest(issue)
 	if err != nil {
 		return "", err
 	}
-	return worker, a.worker(worker)
+	return session, a.session(session)
 }
 
-func (a api) worker(id string) error {
-	if a.f.Worker.Find(id) == nil {
+func (a api) session(id string) error {
+	if a.f.Session.Find(id) == nil {
 		return missing("帮工 " + id)
 	}
 	return nil
@@ -117,75 +117,75 @@ func (a api) IssueComment(_ context.Context, id string, body protocol.CommentReq
 	if issue.Status == protocol.IssueStatusDone || issue.Status == protocol.IssueStatusCanceled {
 		return protocol.Refused{Reason: "这张工单关上了：带一句话重开它"}
 	}
-	worker, err := a.f.Issue.Latest(id)
+	session, err := a.f.Issue.Latest(id)
 	if err != nil {
 		return err
 	}
 	text := body.Text
 	if body.On != nil {
-		if text, err = a.f.Worker.Comment(worker, *body.On, body.Text); err != nil {
+		if text, err = a.f.Session.Comment(session, *body.On, body.Text); err != nil {
 			return err
 		}
 	}
-	_, err = a.f.Channel.TellWorker("user", worker, text)
+	_, err = a.f.Channel.TellSession("user", session, text)
 	return refused(err)
 }
 
 func (a api) IssueChanges(_ context.Context, id string) (protocol.Changes, error) {
-	worker, err := a.f.Issue.Latest(id)
+	session, err := a.f.Issue.Latest(id)
 	if err != nil {
 		return protocol.Changes{}, err
 	}
-	changes, err := a.f.Issue.Changes(worker, protocol.CallerOwner)
+	changes, err := a.f.Issue.Changes(session, protocol.CallerOwner)
 	if err != nil {
 		return protocol.Changes{}, refused(err)
 	}
 	if changes == nil {
-		return protocol.Changes{}, missing("帮工 " + worker)
+		return protocol.Changes{}, missing("帮工 " + session)
 	}
 	return *changes, nil
 }
 
 func (a api) IssueMerge(_ context.Context, id string) error {
-	worker, err := a.latest(id)
+	session, err := a.latest(id)
 	if err != nil {
 		return err
 	}
-	a.f.Issue.Merge(worker)
+	a.f.Issue.Merge(session)
 	return nil
 }
 
 func (a api) IssueResolve(_ context.Context, id string) error {
-	worker, err := a.f.Issue.Latest(id)
+	session, err := a.f.Issue.Latest(id)
 	if err != nil {
 		return err
 	}
-	return refused(a.f.Issue.Resolve(worker))
+	return refused(a.f.Issue.Resolve(session))
 }
 
 func (a api) IssueCancel(_ context.Context, id string) error {
-	worker, err := a.latest(id)
+	session, err := a.latest(id)
 	if err != nil {
 		return err
 	}
-	a.f.Worker.Dismiss(worker)
+	a.f.Session.Dismiss(session)
 	return nil
 }
 
 func (a api) SessionStop(_ context.Context, id string) error {
-	if err := a.worker(id); err != nil {
+	if err := a.session(id); err != nil {
 		return err
 	}
-	a.f.Worker.Stop(id)
+	a.f.Session.Stop(id)
 	return nil
 }
 
 func (a api) TrajectoryList(_ context.Context, agent *string) ([]protocol.TrajectoryHead, error) {
-	return a.f.Worker.List(ptr.Value(agent)), nil
+	return a.f.Session.List(ptr.Value(agent)), nil
 }
 
 func (a api) TrajectoryGet(_ context.Context, id string) (protocol.Trajectory, error) {
-	if t := a.f.Worker.Get(id); t != nil {
+	if t := a.f.Session.Get(id); t != nil {
 		return *t, nil
 	}
 	return protocol.Trajectory{}, missing("轨迹 " + id)
@@ -468,11 +468,11 @@ func (a api) GatePair(ctx context.Context, body protocol.LanPairRequest) (protoc
 func (a api) GateMe(ctx context.Context) (protocol.LanDevice, error) { return a.f.Gate.Me(ctx) }
 
 func (a api) IssueReopen(ctx context.Context, id string, body protocol.ReopenRequest) (protocol.Dispatched, error) {
-	worker, err := a.f.Issue.Reopen(context.WithoutCancel(ctx), id, body.Text, a.f.Channel.General())
+	session, err := a.f.Issue.Reopen(context.WithoutCancel(ctx), id, body.Text, a.f.Channel.General())
 	if err != nil {
 		return protocol.Dispatched{}, refused(err)
 	}
-	return protocol.Dispatched{Worker: &worker}, nil
+	return protocol.Dispatched{Session: &session}, nil
 }
 
 func (a api) IssueList(context.Context) ([]protocol.Issue, error) { return a.f.Issue.List() }
@@ -485,7 +485,7 @@ func (a api) IssueRuns(_ context.Context, id string) ([]protocol.Run, error) {
 	if _, err := a.f.Issue.Get(id); err != nil {
 		return nil, err
 	}
-	return a.f.Worker.Runs(id)
+	return a.f.Session.Runs(id)
 }
 
 func (a api) IssueCreate(_ context.Context, body protocol.IssueRequest) (protocol.Issue, error) {

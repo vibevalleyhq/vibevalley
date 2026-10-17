@@ -15,17 +15,17 @@ import 'server.dart';
 export 'server.dart';
 import 'package:vibevalley/data/remote.dart';
 
-WorkerPlay play(int station, {List<ActionStep> history = const [], List<String> files = const [], List<String> commands = const []}) =>
-    WorkerPlay(station: station.toDouble(), history: history, toolsThisRun: 0, counts: const {}, files: files, commands: commands);
+SessionPlay play(int station, {List<ActionStep> history = const [], List<String> files = const [], List<String> commands = const []}) =>
+    SessionPlay(station: station.toDouble(), history: history, toolsThisRun: 0, counts: const {}, files: files, commands: commands);
 
-Worker worker(
+Session session(
   String id, {
   String name = '小吴',
   String agent = 'tester',
   int station = 0,
   Phase phase = const PhaseWorking(
     since: 0,
-    doing: Doing(action: WorkerAction.editFile, label: 'src/a.ts'),
+    doing: Doing(action: SessionAction.editFile, label: 'src/a.ts'),
   ),
   String task = '跑一遍测试',
   String? project,
@@ -33,12 +33,12 @@ Worker worker(
   String? worktree,
   Conflict? conflict,
   LastRun? last,
-  WorkerPlaybook? playbook,
+  SessionPlaybook? playbook,
   List<String> files = const [],
   List<String> commands = const [],
   String? says,
   String? issue,
-}) => Worker(
+}) => Session(
   id: id,
   issue: issue ?? 't$id',
   name: name,
@@ -90,8 +90,8 @@ const progress = Progress(
   multiplier: 1.2,
 );
 
-CoreState farm({List<Worker> workers = const [], Progress? progress, Chat? chat, List<Issue>? issues}) =>
-    CoreState(call: CallState.live, manager: ManagerState.listening, workers: workers, progress: progress, chat: chat, issues: issues);
+CoreState farm({List<Session> sessions = const [], Progress? progress, Chat? chat, List<Issue>? issues}) =>
+    CoreState(call: CallState.live, manager: ManagerState.listening, sessions: sessions, progress: progress, chat: chat, issues: issues);
 
 FarmView view({Map<String, PlotView> plots = const {}, int level = 3, int xp = 4}) => FarmView(
   level: FarmLevel(level: level.toDouble(), xp: xp.toDouble(), need: level * 10.0),

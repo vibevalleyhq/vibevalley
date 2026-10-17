@@ -10,7 +10,7 @@ import (
 	"vibevalley/pkg/x/clock"
 )
 
-// The person plants on an empty bed and then says what to do; the manager hires a worker for it some seconds later.
+// The person plants on an empty bed and then says what to do; the manager hires a session for it some seconds later.
 const wantBedFor = 10 * time.Second
 
 type beds struct {
@@ -28,7 +28,7 @@ type bedWish struct {
 
 func newBeds(core *core.Service) (*beds, error) { return &beds{core: core}, nil }
 
-// The next worker hired within wantBedFor goes to this bed, if it is still free.
+// The next session hired within wantBedFor goes to this bed, if it is still free.
 func (b *beds) Want(bed int64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -64,7 +64,7 @@ func (b *beds) hired(f protocol.FactHired) {
 	b.wanted = nil
 	b.mu.Unlock()
 	if wish != nil && wish.until > f.At {
-		b.core.Apply(protocol.FactStation{ID: f.Worker.ID, Station: wish.bed})
+		b.core.Apply(protocol.FactStation{ID: f.Session.ID, Station: wish.bed})
 	}
 }
 

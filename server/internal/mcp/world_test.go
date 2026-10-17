@@ -18,14 +18,14 @@ import (
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/runtime"
 	"vibevalley/internal/schedule"
+	"vibevalley/internal/session"
 	"vibevalley/internal/setting"
 	"vibevalley/internal/testkit/fixture"
-	"vibevalley/internal/worker"
 	"vibevalley/pkg/smith/oar"
 	"vibevalley/pkg/smith/oartest"
 )
 
-// Without the packages above it: a test reaches only what is below. Workers run on a scripted pi that keeps the token each session is handed.
+// Without the packages above it: a test reaches only what is below. Sessions run on a scripted pi that keeps the token each session is handed.
 type world struct {
 	*base.App
 	worldServices
@@ -51,7 +51,7 @@ func open(t *testing.T) *world {
 	w := &world{ctx: context.Background(), tokens: map[string]string{}}
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
 	cfg.Patrol.HeartbeatMinutes = 0
-	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, worker.Module, channel.Module, schedule.Module, issue.Module, Module},
+	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, session.Module, channel.Module, schedule.Module, issue.Module, Module},
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),
 	)
 	if err != nil {

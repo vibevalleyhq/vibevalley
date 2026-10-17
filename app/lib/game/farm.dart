@@ -45,30 +45,30 @@ final class ToolSow extends ToolResult {
 }
 
 final class ToolInspect extends ToolResult {
-  const ToolInspect(this.workerId);
-  final String workerId;
+  const ToolInspect(this.sessionId);
+  final String sessionId;
 }
 
 final class ToolWater extends ToolResult {
-  const ToolWater(this.workerId);
-  final String workerId;
+  const ToolWater(this.sessionId);
+  final String sessionId;
 }
 
 final class ToolReview extends ToolResult {
-  const ToolReview(this.workerId);
-  final String workerId;
+  const ToolReview(this.sessionId);
+  final String sessionId;
 }
 
 enum BedFxKind { water, spray, harvest, shovel, note }
 
 /// 0..5, or -1 while every bed is taken.
-int stationOfWorker(Worker h) => h.play?.station.round() ?? -1;
+int stationOfSession(Session h) => h.play?.station.round() ?? -1;
 
-Worker? stationOf(List<Worker> workers, int station) => station < 0 ? null : workers.where((h) => stationOfWorker(h) == station).firstOrNull;
+Session? stationOf(List<Session> sessions, int station) => station < 0 ? null : sessions.where((h) => stationOfSession(h) == station).firstOrNull;
 
 int? nextClearing(int level) => beds.where((b) => b.unlockLevel != null && b.unlockLevel! > level).firstOrNull?.unlockLevel;
 
-PlotView plotOf(FarmView view, Worker? h) => h == null ? const PlotView(crop: Crop.empty) : (view.plots[h.id] ?? const PlotView(crop: Crop.empty));
+PlotView plotOf(FarmView view, Session? h) => h == null ? const PlotView(crop: Crop.empty) : (view.plots[h.id] ?? const PlotView(crop: Crop.empty));
 
 PlotView lockedPlot(Bed bed, int level) => PlotView(crop: level >= (bed.unlockLevel ?? 1 << 30) ? Crop.flowering : Crop.locked);
 
@@ -87,25 +87,27 @@ const cropLabel = {
   Crop.locked: '没开垦',
 };
 
-Aim aimTool(Tool tool, Bed bed, Worker? worker, PlotView plot, int level) {
+Aim aimTool(Tool tool, Bed bed, Session? session, PlotView plot, int level) {
   final unlock = bed.unlockLevel;
   if (unlock != null) return Aim(false, level >= unlock ? '开垦好的花坛' : 'Lv.$unlock 开垦这块地');
   final crop = plot.crop;
   switch (tool) {
     case Tool.hand:
-      return Aim(true, worker != null ? '看看这块地' : '播种');
+      return Aim(true, session != null ? '看看这块地' : '播种');
     case Tool.water:
-      return worker != null ? Aim(true, '给${worker.name}浇水（带句话）') : const Aim(false, '还没种东西，先用手播种');
+      return session != null ? Aim(true, '给${session.name}浇水（带句话）') : const Aim(false, '还没种东西，先用手播种');
     case Tool.bug:
-      return worker != null && crop == Crop.withered ? const Aim(true, '杀虫：让它接着修') : const Aim(false, '这块地没有虫');
+      return session != null && crop == Crop.withered ? const Aim(true, '杀虫：让它接着修') : const Aim(false, '这块地没有虫');
     case Tool.weed:
       return Aim(false, crop == Crop.weeds ? '批准还没接上' : '没有杂草');
     case Tool.harvest:
       // A playbook's step goes into the playbook's branch by itself; the whole playbook is harvested on its board.
-      if (worker?.playbook != null) return const Aim(false, '计划里的一步：做完自动合进计划分支');
-      return worker != null && canHarvest(worker) ? Aim(true, isRipe(crop) ? '收获，帮工收工' : '收获：看看它改了什么') : Aim(false, worker != null ? '还没熟，等它做完' : '空地没有东西可收');
+      if (session?.playbook != null) return const Aim(false, '计划里的一步：做完自动合进计划分支');
+      return session != null && canHarvest(session)
+          ? Aim(true, isRipe(crop) ? '收获，帮工收工' : '收获：看看它改了什么')
+          : Aim(false, session != null ? '还没熟，等它做完' : '空地没有东西可收');
     case Tool.shovel:
-      return worker != null ? Aim(true, worker.phase is PhaseWorking ? '铲除：叫停' : '铲除：请它收工') : const Aim(false, '空地不用铲');
+      return session != null ? Aim(true, session.phase is PhaseWorking ? '铲除：叫停' : '铲除：请它收工') : const Aim(false, '空地不用铲');
   }
 }
 

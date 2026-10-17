@@ -40,7 +40,7 @@ void main() {
     final state = CoreState(
       call: CallState.live,
       manager: ManagerState.listening,
-      workers: const [],
+      sessions: const [],
       progress: const Progress(coins: 20, streak: 0, bestStreak: 0, counts: {}, unlocked: []),
       chat: Chat(
         conversations: const [Conversation(id: 1, kind: ConversationKind.general, name: '田头', replies: 0, at: 0)],

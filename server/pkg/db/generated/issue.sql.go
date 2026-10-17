@@ -291,7 +291,7 @@ type OpenIssueParams struct {
 	CreatedAt   int64
 }
 
-// A worker starts on it: made from the worker's job when it is new, else open again and out of the queue.
+// A session starts on it: made from the session's job when it is new, else open again and out of the queue.
 func (q *Queries) OpenIssue(ctx context.Context, arg OpenIssueParams) error {
 	_, err := q.db.ExecContext(ctx, openIssue,
 		arg.ID,
@@ -398,7 +398,7 @@ type PutIssueParams struct {
 	Step        sql.NullString
 }
 
-// An issue as its playbook has it now; its workers and its queue are not the playbook's.
+// An issue as its playbook has it now; its sessions and its queue are not the playbook's.
 func (q *Queries) PutIssue(ctx context.Context, arg PutIssueParams) error {
 	_, err := q.db.ExecContext(ctx, putIssue,
 		arg.ID,

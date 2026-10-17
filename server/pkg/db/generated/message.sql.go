@@ -14,7 +14,7 @@ const calledBy = `-- name: CalledBy :one
 select m.sender_id
 from message m
 join mention n on n.message_seq = m.seq and n.target_id = ?1
-join participant p on p.id = m.sender_id and p.kind = 'worker'
+join participant p on p.id = m.sender_id and p.kind = 'agent'
 where m.conversation_id = ?2 and m.sender_id <> ?1 and m.seq < ?3
   and m.seq > coalesce((select max(s.seq) from message s where s.conversation_id = ?2 and s.sender_id = ?1 and s.seq < ?3), 0)
 order by m.seq desc
@@ -27,7 +27,7 @@ type CalledByParams struct {
 	Before       int64
 }
 
-// The worker who last @-ed the speaker here since the speaker last spoke.
+// The session who last @-ed the speaker here since the speaker last spoke.
 func (q *Queries) CalledBy(ctx context.Context, arg CalledByParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, calledBy, arg.Speaker, arg.Conversation, arg.Before)
 	var sender_id string

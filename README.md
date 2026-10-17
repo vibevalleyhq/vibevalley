@@ -40,11 +40,11 @@ flowchart LR
     manager[管家<br/>vibevalley 自己的 agent]
     chat[田头<br/>SQLite]
     site[核心状态<br/>只由事实改变]
-    workers[帮工<br/>smith]
+    sessions[帮工<br/>smith]
   end
-  manager --> workers
-  workers -- 会话事件 --> site
-  workers --> rt[本机的农机<br/>pi · Claude Code · Codex]
+  manager --> sessions
+  sessions -- 会话事件 --> site
+  sessions --> rt[本机的农机<br/>pi · Claude Code · Codex]
   rt --> repo[(你的项目<br/>每个帮工一个 worktree)]
 ```
 

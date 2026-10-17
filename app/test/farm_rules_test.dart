@@ -18,31 +18,31 @@ void main() {
 
   test('aimTool: the hand plants an empty bed and looks at a worked one; a locked bed says when it opens', () {
     expect(aimTool(Tool.hand, bed0, null, empty, 1).text, '播种');
-    expect(aimTool(Tool.hand, bed0, worker('w1'), empty, 1).text, '看看这块地');
+    expect(aimTool(Tool.hand, bed0, session('w1'), empty, 1).text, '看看这块地');
     final lockedAim = aimTool(Tool.hand, locked, null, empty, 1);
     expect((lockedAim.ok, lockedAim.text), (false, 'Lv.5 开垦这块地'));
     expect(aimTool(Tool.hand, locked, null, empty, 5).text, '开垦好的花坛');
   });
 
   test('aimTool: water needs a helper, bug a withered plot, harvest a finished turn not in a playbook, shovel stops or dismisses', () {
-    final w = worker('w1', name: '小吴');
+    final w = session('w1', name: '小吴');
     expect(aimTool(Tool.water, bed0, w, empty, 1).text, '给小吴浇水（带句话）');
     expect(aimTool(Tool.water, bed0, null, empty, 1).ok, isFalse);
     expect(aimTool(Tool.bug, bed0, w, const PlotView(crop: Crop.withered), 1).ok, isTrue);
     expect(aimTool(Tool.bug, bed0, w, empty, 1).text, '这块地没有虫');
     expect(aimTool(Tool.weed, bed0, w, const PlotView(crop: Crop.weeds), 1).text, '批准还没接上');
-    final ripe = worker('w2', phase: const PhaseRipe());
+    final ripe = session('w2', phase: const PhaseRipe());
     expect(aimTool(Tool.harvest, bed0, ripe, const PlotView(crop: Crop.wheat), 1).text, '收获，帮工收工');
-    expect(aimTool(Tool.harvest, bed0, worker('w3', phase: const PhaseResting()), empty, 1).text, '收获：看看它改了什么');
+    expect(aimTool(Tool.harvest, bed0, session('w3', phase: const PhaseResting()), empty, 1).text, '收获：看看它改了什么');
     expect(aimTool(Tool.harvest, bed0, w, empty, 1).text, '还没熟，等它做完');
     expect(
       aimTool(
         Tool.harvest,
         bed0,
-        worker(
+        session(
           'w4',
           phase: const PhaseRipe(),
-          playbook: const WorkerPlaybook(id: 'p1'),
+          playbook: const SessionPlaybook(id: 'p1'),
         ),
         empty,
         1,
@@ -78,24 +78,24 @@ void main() {
   });
 
   test('phaseText fills the server\'s words with the clock', () {
-    final quiet = worker(
+    final quiet = session(
       'w1',
       phase: const PhaseWorking(
         since: 0,
-        doing: Doing(action: WorkerAction.runCommand, label: 'pnpm test'),
+        doing: Doing(action: SessionAction.runCommand, label: 'pnpm test'),
         quietSince: 1000,
       ),
       says: '在跑命令：pnpm test（已经 {span}没动静了）',
     );
     expect(phaseText(quiet, 1000 + 120000), '在跑命令：pnpm test（已经 2 分钟没动静了）');
-    final conflicted = worker(
+    final conflicted = session(
       'w3',
       phase: const PhaseRipe(),
       conflict: const Conflict(base: 'main', files: ['a.ts']),
     );
     expect(mapPose(conflicted), Pose.worry);
     expect(
-      phaseText(worker('w3', phase: const PhaseRipe(), says: '这一轮做完了，等收获'), 0),
+      phaseText(session('w3', phase: const PhaseRipe(), says: '这一轮做完了，等收获'), 0),
       '这一轮做完了，等收获',
       reason: 'not quiet: the words as they are',
     );

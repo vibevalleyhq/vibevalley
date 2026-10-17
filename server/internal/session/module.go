@@ -1,4 +1,4 @@
-package worker
+package session
 
 import (
 	"go.uber.org/fx"
@@ -8,7 +8,7 @@ import (
 
 func Module(r *base.Readies) fx.Option {
 	return fx.Module("run",
-		fx.Provide(fx.Private, newWorkers, newTrajectories, newTokens),
+		fx.Provide(fx.Private, newSessions, newTrajectories, newTokens),
 		fx.Provide(base.Run[*Service](r, newService)),
 	)
 }

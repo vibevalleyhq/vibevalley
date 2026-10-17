@@ -49,9 +49,9 @@ class DebugPanel extends ConsumerStatefulWidget {
   ConsumerState<DebugPanel> createState() => _DebugPanelState();
 }
 
-enum _Tab { control, workers, sounds, events }
+enum _Tab { control, sessions, sounds, events }
 
-const _tabLabel = {_Tab.control: '控制', _Tab.workers: '帮工', _Tab.sounds: '音效', _Tab.events: '事件'};
+const _tabLabel = {_Tab.control: '控制', _Tab.sessions: '帮工', _Tab.sounds: '音效', _Tab.events: '事件'};
 
 class _DebugPanelState extends ConsumerState<DebugPanel> {
   _Tab _tab = _Tab.control;
@@ -83,7 +83,7 @@ class _DebugPanelState extends ConsumerState<DebugPanel> {
                   Expanded(
                     child: switch (_tab) {
                       _Tab.control => const _Scroll(child: _ControlTab()),
-                      _Tab.workers => const _Scroll(child: _WorkersTab()),
+                      _Tab.sessions => const _Scroll(child: _SessionsTab()),
                       _Tab.sounds => const _Scroll(child: _SoundsTab()),
                       _Tab.events => const _EventsTab(),
                     },
@@ -464,43 +464,43 @@ class _Slider extends StatelessWidget {
   );
 }
 
-class _WorkersTab extends ConsumerWidget {
-  const _WorkersTab();
+class _SessionsTab extends ConsumerWidget {
+  const _SessionsTab();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hb = ref.watch(hbProvider);
-    final workers = ref.watch(farmProvider)?.workers ?? const <Worker>[];
+    final sessions = ref.watch(farmProvider)?.sessions ?? const <Session>[];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Section(
           title: '全部',
-          aside: '场上 ${workers.length} 个',
+          aside: '场上 ${sessions.length} 个',
           child: _Row([
             _Btn(label: '全部叫停', onTap: () => _run(context, () => hb.everyone('stop'))),
             _Btn(label: '全部收工', tone: _Tone.bad, onTap: () => _run(context, () => hb.everyone('dismiss'))),
           ]),
         ),
-        if (workers.isEmpty)
+        if (sessions.isEmpty)
           const Text(
             '地里没有帮工。先开工，再对管家说句话。',
             style: TextStyle(fontFamily: pixelFont, fontSize: 12, color: Palette.ink500),
           ),
-        for (final h in workers) ...[_WorkerCard(worker: h, hb: hb), const SizedBox(height: 8)],
+        for (final h in sessions) ...[_SessionCard(session: h, hb: hb), const SizedBox(height: 8)],
       ],
     );
   }
 }
 
-class _WorkerCard extends StatelessWidget {
-  const _WorkerCard({required this.worker, required this.hb});
-  final Worker worker;
+class _SessionCard extends StatelessWidget {
+  const _SessionCard({required this.session, required this.hb});
+  final Session session;
   final Hb hb;
 
   @override
   Widget build(BuildContext context) {
-    final h = worker;
+    final h = session;
     return Container(
       color: _ink850,
       padding: const EdgeInsets.all(10),

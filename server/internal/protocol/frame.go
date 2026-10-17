@@ -2,7 +2,7 @@ package protocol
 
 import "slices"
 
-// What the client gets. The words for people (a worker's phaseText, a schedule's whenText and nextText) are said here and
+// What the client gets. The words for people (a session's phaseText, a schedule's whenText and nextText) are said here and
 // only here, on a copy: Reduce keeps the facts and what the services read, so the words never reach state.json.
 func FrameOf(state CoreState, effects []GameEffect) StateFrame {
 	if effects == nil {
@@ -12,12 +12,12 @@ func FrameOf(state CoreState, effects []GameEffect) StateFrame {
 }
 
 func withWords(state CoreState) CoreState {
-	if len(state.Workers) > 0 {
-		workers := slices.Clone(state.Workers)
-		for i := range workers {
-			workers[i].PhaseText = PhaseWords(workers[i])
+	if len(state.Sessions) > 0 {
+		sessions := slices.Clone(state.Sessions)
+		for i := range sessions {
+			sessions[i].PhaseText = PhaseWords(sessions[i])
 		}
-		state.Workers = workers
+		state.Sessions = sessions
 	}
 	if len(state.Schedules) > 0 {
 		schedules := slices.Clone(state.Schedules)

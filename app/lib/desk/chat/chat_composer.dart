@@ -52,7 +52,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
 
   @override
   Widget build(BuildContext context) {
-    _naming.all = nameables(ref.watch(farmProvider)?.workers ?? const [], nowMs());
+    _naming.all = nameables(ref.watch(farmProvider)?.sessions ?? const [], nowMs());
     final empty = _naming.text.text.trim().isEmpty;
     return Container(
       decoration: const BoxDecoration(border: Border(top: pxLine)),

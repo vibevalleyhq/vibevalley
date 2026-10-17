@@ -76,7 +76,7 @@ var CallStateValues = []CallState{CallStateIdle, CallStateConnecting, CallStateL
 var ManagerStateValues = []ManagerState{ManagerStateIdle, ManagerStateListening, ManagerStateThinking, ManagerStateSpeaking}
 
 // SenderKindValues are every SenderKind, in the protocol's order.
-var SenderKindValues = []SenderKind{SenderKindUser, SenderKindManager, SenderKindWorker, SenderKindSystem}
+var SenderKindValues = []SenderKind{SenderKindUser, SenderKindManager, SenderKindAgent, SenderKindSystem}
 
 // MessageKindValues are every MessageKind, in the protocol's order.
 var MessageKindValues = []MessageKind{MessageKindChat, MessageKindDispatch, MessageKindReport, MessageKindNotice}
@@ -99,8 +99,8 @@ func (v Conflict) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-// WorkerActionValues are every WorkerAction, in the protocol's order.
-var WorkerActionValues = []WorkerAction{WorkerActionRunCommand, WorkerActionReadFile, WorkerActionEditFile, WorkerActionSearch, WorkerActionWeb, WorkerActionMCP, WorkerActionWait, WorkerActionOther, WorkerActionThinking, WorkerActionSpeakingText, WorkerActionNone}
+// SessionActionValues are every SessionAction, in the protocol's order.
+var SessionActionValues = []SessionAction{SessionActionRunCommand, SessionActionReadFile, SessionActionEditFile, SessionActionSearch, SessionActionWeb, SessionActionMCP, SessionActionWait, SessionActionOther, SessionActionThinking, SessionActionSpeakingText, SessionActionNone}
 
 // PhaseValue is a member of Phase: PhaseArriving, PhaseWorking, PhaseRipe, PhaseFailed, PhaseResting, told apart by "_tag".
 type PhaseValue interface{ isPhase() }
@@ -157,8 +157,8 @@ func (u *Phase) UnmarshalJSON(data []byte) error {
 // handle every one of them does.
 var PhaseMembers = []PhaseValue{PhaseArriving{}, PhaseWorking{}, PhaseRipe{}, PhaseFailed{}, PhaseResting{}}
 
-func (v WorkerPlay) MarshalJSON() ([]byte, error) {
-	type plain WorkerPlay
+func (v SessionPlay) MarshalJSON() ([]byte, error) {
+	type plain SessionPlay
 	p := plain(v)
 	if p.History == nil {
 		p.History = []ActionStep{}
@@ -286,8 +286,8 @@ func (v Chat) MarshalJSON() ([]byte, error) {
 func (v CoreState) MarshalJSON() ([]byte, error) {
 	type plain CoreState
 	p := plain(v)
-	if p.Workers == nil {
-		p.Workers = []Worker{}
+	if p.Sessions == nil {
+		p.Sessions = []Session{}
 	}
 	return json.Marshal(p)
 }
@@ -420,7 +420,7 @@ func (v RuntimeSettings) MarshalJSON() ([]byte, error) {
 // InboxKindValues are every InboxKind, in the protocol's order.
 var InboxKindValues = []InboxKind{InboxKindMerge, InboxKindFix, InboxKindConflict, InboxKindQuiet, InboxKindPlanDraft, InboxKindPlanRipe, InboxKindPlanFailed, InboxKindMention}
 
-// InboxFromValue is a member of InboxFrom: InboxFromWorker, InboxFromManager, told apart by "kind".
+// InboxFromValue is a member of InboxFrom: InboxFromSession, InboxFromManager, told apart by "kind".
 type InboxFromValue interface{ isInboxFrom() }
 
 func (u InboxFrom) IsZero() bool { return u.Value == nil }
@@ -445,8 +445,8 @@ func (u *InboxFrom) UnmarshalJSON(data []byte) error {
 	}
 	var err error
 	switch head.Tag {
-	case "worker":
-		var v InboxFromWorker
+	case "session":
+		var v InboxFromSession
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "manager":
@@ -461,9 +461,9 @@ func (u *InboxFrom) UnmarshalJSON(data []byte) error {
 
 // InboxFromMembers are every member of InboxFrom, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var InboxFromMembers = []InboxFromValue{InboxFromWorker{}, InboxFromManager{}}
+var InboxFromMembers = []InboxFromValue{InboxFromSession{}, InboxFromManager{}}
 
-// InboxTargetValue is a member of InboxTarget: InboxTargetWorker, InboxTargetPlans, InboxTargetChat, told apart by "kind".
+// InboxTargetValue is a member of InboxTarget: InboxTargetSession, InboxTargetPlans, InboxTargetChat, told apart by "kind".
 type InboxTargetValue interface{ isInboxTarget() }
 
 func (u InboxTarget) IsZero() bool { return u.Value == nil }
@@ -488,8 +488,8 @@ func (u *InboxTarget) UnmarshalJSON(data []byte) error {
 	}
 	var err error
 	switch head.Tag {
-	case "worker":
-		var v InboxTargetWorker
+	case "session":
+		var v InboxTargetSession
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "plans":
@@ -508,7 +508,7 @@ func (u *InboxTarget) UnmarshalJSON(data []byte) error {
 
 // InboxTargetMembers are every member of InboxTarget, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var InboxTargetMembers = []InboxTargetValue{InboxTargetWorker{}, InboxTargetPlans{}, InboxTargetChat{}}
+var InboxTargetMembers = []InboxTargetValue{InboxTargetSession{}, InboxTargetPlans{}, InboxTargetChat{}}
 
 // CropValues are every Crop, in the protocol's order.
 var CropValues = []Crop{CropEmpty, CropSeeded, CropSprout, CropLeafy, CropFlowering, CropWheat, CropCarrot, CropWithered, CropWeeds, CropDry, CropHarvested, CropLocked}
@@ -819,8 +819,8 @@ var PlaybookActionValues = []PlaybookAction{PlaybookActionStart, PlaybookActionP
 func (v Issue) MarshalJSON() ([]byte, error) {
 	type plain Issue
 	p := plain(v)
-	if p.Workers == nil {
-		p.Workers = []string{}
+	if p.Sessions == nil {
+		p.Sessions = []string{}
 	}
 	return json.Marshal(p)
 }
@@ -1011,13 +1011,13 @@ func (v AccountUsageUnavailable) MarshalJSON() ([]byte, error) {
 	return withTag(p, "status", "unavailable")
 }
 
-func (InboxFromWorker) isInboxFrom() {}
+func (InboxFromSession) isInboxFrom() {}
 
-func (v InboxFromWorker) MarshalJSON() ([]byte, error) {
-	type plain InboxFromWorker
+func (v InboxFromSession) MarshalJSON() ([]byte, error) {
+	type plain InboxFromSession
 	p := plain(v)
 
-	return withTag(p, "kind", "worker")
+	return withTag(p, "kind", "session")
 }
 
 func (InboxFromManager) isInboxFrom() {}
@@ -1029,13 +1029,13 @@ func (v InboxFromManager) MarshalJSON() ([]byte, error) {
 	return withTag(p, "kind", "manager")
 }
 
-func (InboxTargetWorker) isInboxTarget() {}
+func (InboxTargetSession) isInboxTarget() {}
 
-func (v InboxTargetWorker) MarshalJSON() ([]byte, error) {
-	type plain InboxTargetWorker
+func (v InboxTargetSession) MarshalJSON() ([]byte, error) {
+	type plain InboxTargetSession
 	p := plain(v)
 
-	return withTag(p, "kind", "worker")
+	return withTag(p, "kind", "session")
 }
 
 func (InboxTargetPlans) isInboxTarget() {}

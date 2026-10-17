@@ -139,8 +139,8 @@ class _WhoTile extends StatelessWidget {
 const _dropsOfAdvice = ['改动小一点', '先别动测试', '做完跟我说一声', '顺便补个测试'];
 
 class WaterForm extends ConsumerStatefulWidget {
-  const WaterForm({super.key, required this.worker, required this.onDone});
-  final Worker worker;
+  const WaterForm({super.key, required this.session, required this.onDone});
+  final Session session;
   final VoidCallback onDone;
 
   @override
@@ -152,13 +152,13 @@ class _WaterFormState extends ConsumerState<WaterForm> {
 
   void _send() {
     if (_text.trim().isEmpty) return;
-    fire(ref.read(farmCommandsProvider).water(widget.worker, _text));
+    fire(ref.read(farmCommandsProvider).water(widget.session, _text));
     widget.onDone();
   }
 
   @override
   Widget build(BuildContext context) {
-    final w = widget.worker;
+    final w = widget.session;
     final xs = KitText.xs.copyWith(color: Palette.bark600);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -6,7 +6,7 @@ import (
 
 type FinishedRun struct {
 	Agent   string
-	Worker  string
+	Session string
 	Project string
 	Job     string
 	Outcome protocol.Outcome
@@ -16,7 +16,7 @@ type FinishedRun struct {
 
 type RecallCue struct {
 	Agent   string
-	Worker  string
+	Session string
 	Project string
 	Text    string
 	Skip    map[string]bool

@@ -27,7 +27,7 @@ String clipLine(String text, [int max = 140]) {
 }
 
 DesktopCommand openFor(InboxTarget target) => switch (target) {
-  InboxTargetWorker(:final id) => DesktopOpenWorker(id),
+  InboxTargetSession(:final id) => DesktopOpenSession(id),
   InboxTargetPlans(:final playbook) => DesktopOpenPlans(playbook),
   InboxTargetChat(:final conversation) => DesktopOpenChat(conversation),
 };
@@ -113,7 +113,7 @@ String? waitingLine(InboxItem call) {
 }
 
 TraySummary traySummary(CoreState state, List<InboxItem> inbox) {
-  final working = state.workers.where((h) => h.phase is PhaseWorking).length;
+  final working = state.sessions.where((h) => h.phase is PhaseWorking).length;
   final waiting = [for (final c in inbox) ?waitingLine(c)];
   final unread = unreadTotal(state.chat);
   final lines = [state.call == CallState.live ? (working > 0 ? '$working 个帮工在干活' : '开工了，没有在干的活') : '还没开工', ...waiting, if (unread > 0) '田头 $unread 条没读'];

@@ -2,7 +2,7 @@
   "state": {
     "call": "live",
     "manager": "speaking",
-    "workers": [
+    "sessions": [
       {
         "id": "w1",
         "name": "Pi 实验员",

@@ -13,9 +13,9 @@ import (
 	"testing"
 
 	"vibevalley/internal/protocol"
+	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
-	"vibevalley/internal/worker"
 )
 
 type rpcAnswer struct {
@@ -96,11 +96,11 @@ func client(t *testing.T, url, token string) func(method string, params any) rpc
 func TestToolsOverMcp(t *testing.T) {
 	w := open(t)
 	f := w
-	hired := f.Issue.Hire(w.ctx, fixture.Lab(t), "写 hello", "chat-j", worker.HireOptions{})
-	if hired.Worker == nil {
+	hired := f.Issue.Hire(w.ctx, fixture.Lab(t), "写 hello", "chat-j", session.HireOptions{})
+	if hired.Session == nil {
 		t.Fatalf("not hired: %s", hired.Refused)
 	}
-	id := hired.Worker.ID
+	id := hired.Session.ID
 	token := testkit.Await(t, "the session's token", func() (string, bool) {
 		w.mu.Lock()
 		defer w.mu.Unlock()
@@ -149,7 +149,7 @@ func TestToolsOverMcp(t *testing.T) {
 	if i < 0 {
 		t.Fatal("not in its job thread")
 	}
-	if m := protocol.MessagesIn(f.Core.State().Chat, thread.ID)[i]; m.From != id || m.FromKind != protocol.SenderKindWorker {
+	if m := protocol.MessagesIn(f.Core.State().Chat, thread.ID)[i]; m.From != id || m.FromKind != protocol.SenderKindAgent {
 		t.Fatalf("said as %s (%s)", m.From, m.FromKind)
 	}
 	if inbox := call("tools/call", map[string]any{"name": "farm_inbox", "arguments": map[string]any{}}).text(); inbox == "" {

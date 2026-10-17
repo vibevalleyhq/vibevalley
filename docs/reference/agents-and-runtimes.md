@@ -20,7 +20,7 @@
 
 额度和花费见 [server.md](server.md)「额度、花费和上限」。各农机不接受哪些开会话的参数、能不能中途插话，写在 `seeds.json` 的 `runtimeFacts`（抄自 smith 各农机的 `RefusedSessionOptions`）；页面上不接受的选项是灰的。
 
-VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮手（`spawn_agent`）、读技能这些工具，对话存在 `$VIBEVALLEY_HOME/workers/<会话 id>.jsonl`。
+VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮手（`spawn_agent`）、读技能这些工具，对话存在 `$VIBEVALLEY_HOME/sessions/<会话 id>.jsonl`。
 
 ## 种子档案
 
@@ -54,7 +54,7 @@ VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮�
 
 ## 派给谁
 
-`dispatch` 的 `agent` 按这个顺序落到一个档案（`worker/rules.go` 的 `ChooseAgent`，管家和计划共用）：
+`dispatch` 的 `agent` 按这个顺序落到一个档案（`session/rules.go` 的 `ChooseAgent`，管家和计划共用）：
 
 1. 填的是档案的名字或 id：就是它。
 2. 填的是农机：这台农机上第一个能派的档案。

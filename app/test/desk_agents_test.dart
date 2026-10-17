@@ -20,7 +20,7 @@ DeskBackend _server() => DeskBackend(
 CoreState _farm() => CoreState.fromJson({
   'call': 'idle',
   'manager': 'idle',
-  'workers': [],
+  'sessions': [],
   'progress': {
     'coins': 0,
     'streak': 0,

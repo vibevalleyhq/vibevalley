@@ -62,7 +62,7 @@ class AgentHead extends ConsumerWidget {
 Widget senderFace(ChatMessage m, double size) => switch (m.fromKind) {
   SenderKind.user => OwnerFace(size: size),
   SenderKind.manager => ManagerHead(size: size),
-  SenderKind.worker || SenderKind.system => AgentHead(agent: m.agent ?? m.from, size: size),
+  SenderKind.agent || SenderKind.system => AgentHead(agent: m.agent ?? m.from, size: size),
 };
 
 class Glyph extends ConsumerWidget {
@@ -305,7 +305,7 @@ class NameableFace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final h = n.worker;
+    final h = n.session;
     if (h != null) return AgentHead(agent: h.agent, size: size);
     if (n.name == '管家') return ManagerHead(size: size);
     if (!everyoneMark) return SizedBox.square(dimension: size);
@@ -359,7 +359,7 @@ class NamingMenu extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(n.token, style: KitText.mono),
                           const SizedBox(width: 8),
-                          if (n.worker != null) ...[Text(n.name, style: KitText.sm.copyWith(color: Palette.bark800)), const SizedBox(width: 8)],
+                          if (n.session != null) ...[Text(n.name, style: KitText.sm.copyWith(color: Palette.bark800)), const SizedBox(width: 8)],
                           Expanded(
                             child: Text(
                               n.note,

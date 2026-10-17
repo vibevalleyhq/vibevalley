@@ -24,8 +24,8 @@ import (
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/runtime"
 	"vibevalley/internal/schedule"
+	"vibevalley/internal/session"
 	"vibevalley/internal/setting"
-	"vibevalley/internal/worker"
 	vvagent "vibevalley/pkg/agent"
 	"vibevalley/pkg/agentcore"
 	"vibevalley/pkg/ai"
@@ -136,7 +136,7 @@ type manager struct {
 	settings  *setting.Service
 	runtimes  *runtime.Service
 	projects  *project.Service
-	run       *worker.Service
+	run       *session.Service
 	issue     *issue.Service
 	chat      *channel.Service
 	playbooks *playbook.Service
@@ -148,7 +148,7 @@ type manager struct {
 
 	// Stand-ins for tests: llm nil is DeepSeek; trace nil is opened at start.
 	llm   *vvagent.LLM
-	trace worker.Journal
+	trace session.Journal
 
 	// Guards what the lines handled and the words said share.
 	mu sync.Mutex
@@ -179,7 +179,7 @@ type managerIn struct {
 	Setting  *setting.Service
 	Runtime  *runtime.Service
 	Project  *project.Service
-	Run      *worker.Service
+	Run      *session.Service
 	Issue    *issue.Service
 	Channel  *channel.Service
 	Playbook *playbook.Service
@@ -271,14 +271,14 @@ func (fm *manager) agentsWithIssues() []managerAgentInfo {
 func managerUsable(a managerAgentInfo) bool { return a.agent.Enabled && len(a.blocking) == 0 }
 
 func (fm *manager) choose(task, named string) *protocol.Agent {
-	var candidates []worker.Candidate
+	var candidates []session.Candidate
 	for _, a := range fm.agentsWithIssues() {
-		candidates = append(candidates, worker.Candidate{Agent: a.agent, Usable: managerUsable(a)})
+		candidates = append(candidates, session.Candidate{Agent: a.agent, Usable: managerUsable(a)})
 	}
 	fm.mu.Lock()
 	picked := fm.picked
 	fm.mu.Unlock()
-	return worker.ChooseAgent(candidates, task, named, picked)
+	return session.ChooseAgent(candidates, task, named, picked)
 }
 
 func managerQuota(info *protocol.RuntimeInfo) string {
@@ -313,7 +313,7 @@ func managerQuota(info *protocol.RuntimeInfo) string {
 }
 
 func (fm *manager) situation() string {
-	var workers []string
+	var sessions []string
 	for _, a := range fm.agentsWithIssues() {
 		line := fmt.Sprintf("- %s（id %s，%s）适合：%s", a.agent.Name, a.agent.ID, protocol.RuntimeLabel(a.agent.Runtime), a.agent.Role)
 		if len(a.agent.Tags) > 0 {
@@ -327,7 +327,7 @@ func (fm *manager) situation() string {
 		default:
 			line += "；现在派不了：停用了"
 		}
-		workers = append(workers, line)
+		sessions = append(sessions, line)
 	}
 	roster := fm.run.Roster()
 	here := fm.chat.ChannelOf(fm.here())
@@ -336,11 +336,11 @@ func (fm *manager) situation() string {
 		var theirs []string
 		for _, w := range roster {
 			channel := fm.chat.General()
-			if w.Worker.Channel != nil {
-				channel = *w.Worker.Channel
+			if w.Session.Channel != nil {
+				channel = *w.Session.Channel
 			}
 			if channel == c.ID {
-				theirs = append(theirs, managerDescribeWorker(w))
+				theirs = append(theirs, managerDescribeSession(w))
 			}
 		}
 		head := "#" + c.Name
@@ -377,7 +377,7 @@ func (fm *manager) situation() string {
 	if len(open) > 0 {
 		plans = "\n种植计划：\n" + strings.Join(open, "\n")
 	}
-	return "【农场现状】\n项目（工作目录 " + fm.projects.Root() + " 下的文件夹）：" + folders + "\n可以派的帮工：\n" + strings.Join(workers, "\n") +
+	return "【农场现状】\n项目（工作目录 " + fm.projects.Root() + " 下的文件夹）：" + folders + "\n可以派的帮工：\n" + strings.Join(sessions, "\n") +
 		"\n各频道和地里的帮工：\n" + strings.Join(byChannel, "\n") + plans
 }
 

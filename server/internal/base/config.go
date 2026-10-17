@@ -72,16 +72,16 @@ type Config struct {
 		// 0 or less: looked at every millisecond.
 		TickMs float64 `mapstructure:"tick_ms"`
 	} `mapstructure:"schedule"`
-	Worker struct {
-		// Quiet this long, a worker is shown as stuck.
+	Session struct {
+		// Quiet this long, a session is shown as stuck.
 		StallSeconds float64 `mapstructure:"stall_seconds"`
-	} `mapstructure:"worker"`
+	} `mapstructure:"session"`
 	Project struct {
-		// Workers at once in one project.
-		MaxWorkers int `mapstructure:"max_workers"`
+		// Sessions at once in one project.
+		MaxSessions int `mapstructure:"max_sessions"`
 	} `mapstructure:"project"`
 	Trajectory struct {
-		// The activities of a worker gone this long are deleted; 0 or less keeps them.
+		// The activities of a session gone this long are deleted; 0 or less keeps them.
 		Days int `mapstructure:"days"`
 	} `mapstructure:"trajectory"`
 	Chat struct {
@@ -103,8 +103,8 @@ func Defaults() Config {
 	c.CNYPerUSD = 7.2
 	c.Patrol.HeartbeatMinutes = 10
 	c.Schedule.TickMs = 20_000
-	c.Worker.StallSeconds = 240
-	c.Project.MaxWorkers = 3
+	c.Session.StallSeconds = 240
+	c.Project.MaxSessions = 3
 	c.Trajectory.Days = 30
 	c.Chat.NoticeBatchMs = protocol.NoticeBatchMs
 	c.Chat.RetryWakeMs = 3_000

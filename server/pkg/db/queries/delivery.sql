@@ -58,10 +58,10 @@ join participant s on s.id = m.sender_id
 join participant r on r.id = d.recipient_id
 where m.conversation_id = sqlc.arg(conversation)
   and m.seq > coalesce((select max(u.seq) from message u where u.conversation_id = sqlc.arg(conversation) and u.sender_id = 'user'), 0)
-  and s.kind in ('worker', 'manager') and r.kind in ('worker', 'manager') and d.wakes and d.held_by is null;
+  and s.kind in ('agent', 'manager') and r.kind in ('agent', 'manager') and d.wakes and d.held_by is null;
 
 -- name: LastAgentWake :one
 select cast(coalesce(max(d.created_at), 0) as integer) from delivery d
 join message m on m.seq = d.message_seq
 join participant s on s.id = m.sender_id
-where d.recipient_id = ? and s.kind in ('worker', 'manager') and d.wakes and d.held_by is null;
+where d.recipient_id = ? and s.kind in ('agent', 'manager') and d.wakes and d.held_by is null;

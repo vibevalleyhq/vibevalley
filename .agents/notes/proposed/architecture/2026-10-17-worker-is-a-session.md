@@ -47,6 +47,14 @@ Status: proposed
 
 一个改动做完，不留旧名（[只有一份表结构，不认旧数据](../../implemented/architecture/2026-10-16-one-schema-no-old-data.md)）：协议和 shapegen → 服务端的包、表、家目录的文件 → Flutter → 黄金数据转写 → 文档和 Note 的事实。和能力提案里路由的收敛一起做，路由只改一次名。
 
+### 做到哪了
+
+2026-10-17 做了：协议、服务端的包（`internal/session`）、`Workspace.Session`、表（迁移 `0002_session.sql`：`issue_session`，`run`、`memory` 的 `session` 列，发言人 `'agent'`，库里 JSON 的键）、家目录（`base.MoveSessionFiles`：`workers.json` → `sessions.json`，`state.json` 的键）、配置的 `session.stall_seconds`、Flutter 的类型和名字、黄金数据（按同样的规则转写，不用 update 就过）、当前文档。
+
+先做的一步是把原来叫 session 的东西改了名，免得和这一层撞：一次启动（`w3#2`）是 launch（`LaunchActivity`、`delivery.launch`），oar 的会话 id 是 `oarSessionId`。迁移跑的时候关掉外键、提交前查 `foreign_key_check`（`migrations.go`），重建 `participant` 才不会改写别的表的引用。
+
+没改的：管家工具给模型看的参数名还叫 `worker`（对应「帮工」）；农机设置里的 `SessionEnv`、`SessionEffort` 这些指的是 oar 会话的选项，没改名；Note 是历史，里面的 Worker 不改。
+
 ## Alternatives considered
 
 **留着 Worker。** 不和 oar 重名。主人不选：`Worker` 说不出这一层是什么，重名靠用词规则分得开。

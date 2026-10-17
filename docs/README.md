@@ -38,7 +38,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 叫法 | 代码里 | 意思 | 不用 |
 |---|---|---|---|
 | 管家 | manager | 你直接说话的 agent，替你派活 | 工头、主 agent |
-| 帮工 | worker（协议里还叫 helper） | 为一张工单开的一个编码会话，跨好几次干活 | 工人、子 agent |
+| 帮工 | Session（[concepts](concepts.md#session-和-oar-会话)） | 一个档案为一张工单接的活，跨好几次干活 | 工人、子 agent、worker |
 | 一次干活 | run | 一次触发到一次汇报：派出去、带话、计划、定时、农机自己 | 一轮、turn |
 | 帮工档案 | agent（`Agent`） | 一份配置：农机、模型、人设、技能、哪种小动物 | 角色、profile |
 | 农机 | runtime | 机器上的一种编码 agent 程序（pi、claude、codex……） | harness、引擎 |

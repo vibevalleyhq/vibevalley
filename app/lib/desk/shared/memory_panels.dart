@@ -45,14 +45,14 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
   @override
   Widget build(BuildContext context) {
     final list = ref.watch(memoriesProvider.select((all) => all[widget.agent]));
-    final workers = {for (final h in ref.watch(farmProvider)?.workers ?? const <Worker>[]) h.id: h.name};
+    final sessions = {for (final h in ref.watch(farmProvider)?.sessions ?? const <Session>[]) h.id: h.name};
     final now = _now();
     final all = list ?? const <Memory>[];
     final notes = all.where((m) => m.kind == MemoryKind.note).toList();
     final jobs = all.where((m) => m.kind == MemoryKind.issue).toList();
     final projectsInMemory = {for (final m in all) ?m.project}.toList()..sort();
     final filtered = notes.where((m) => _shown == '' || (_shown == _everywhere ? m.project == null : m.project == _shown)).toList();
-    String whose(Memory m) => m.worker != null ? '${workers[m.worker] ?? m.worker} 记的' : '你记的';
+    String whose(Memory m) => m.session != null ? '${sessions[m.session] ?? m.session} 记的' : '你记的';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -81,7 +81,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                             Wrap(
                               spacing: 8,
                               children: [
-                                Text(m.worker != null ? (workers[m.worker] ?? m.worker!) : '帮工', style: _meta.copyWith(color: Palette.bark800)),
+                                Text(m.session != null ? (sessions[m.session] ?? m.session!) : '帮工', style: _meta.copyWith(color: Palette.bark800)),
                                 Text(m.project ?? '所有项目', style: _meta),
                                 Text(ago(m.at, now), style: _meta),
                               ],
@@ -247,7 +247,7 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
                         memory: m,
                         faded: i >= view.carried,
                         onForget: () => deskRun(() => ref.read(managerMemoryProvider.notifier).forget(m.id)),
-                        meta: [m.worker == managerAgent ? '管家自己记的' : '你交代的', ago(m.at, now)],
+                        meta: [m.session == managerAgent ? '管家自己记的' : '你交代的', ago(m.at, now)],
                         warning: i >= view.carried ? '太旧了，带不进系统提示' : null,
                       ),
                   ],

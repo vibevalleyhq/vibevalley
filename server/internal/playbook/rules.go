@@ -415,5 +415,5 @@ func retryText(node protocol.PlaybookNode) string {
 }
 
 func changeOf(e protocol.PlaybookEvent) protocol.PlaybookChange {
-	return protocol.PlaybookChange{Playbook: e.Playbook, Node: e.Node, Kind: e.Kind, Worker: e.Worker, Detail: e.Detail, Changes: e.Changes, Commits: e.Commits}
+	return protocol.PlaybookChange{Playbook: e.Playbook, Node: e.Node, Kind: e.Kind, Session: e.Session, Detail: e.Detail, Changes: e.Changes, Commits: e.Commits}
 }

@@ -23,14 +23,14 @@ func TestForOwner(t *testing.T) {
 		m.Kind, m.From, m.FromKind = protocol.MessageKindNotice, "system", protocol.SenderKindSystem
 	})), false)
 	testkit.Eq(t, forOwner(coreMsg(func(m *protocol.ChatMessage) {
-		m.Kind, m.From, m.FromKind = protocol.MessageKindReport, "w1", protocol.SenderKindWorker
+		m.Kind, m.From, m.FromKind = protocol.MessageKindReport, "w1", protocol.SenderKindAgent
 	})), true)
 	testkit.Eq(t, forOwner(coreMsg(func(m *protocol.ChatMessage) { m.Kind = protocol.MessageKindDispatch })), true)
 	testkit.Eq(t, forOwner(coreMsg(func(m *protocol.ChatMessage) {
-		m.From, m.FromKind, m.Mentions = "w1", protocol.SenderKindWorker, []string{"w2"}
-	})), false, "workers among themselves")
+		m.From, m.FromKind, m.Mentions = "w1", protocol.SenderKindAgent, []string{"w2"}
+	})), false, "sessions among themselves")
 	testkit.Eq(t, forOwner(coreMsg(func(m *protocol.ChatMessage) {
-		m.From, m.FromKind, m.Mentions = "w1", protocol.SenderKindWorker, []string{"user"}
+		m.From, m.FromKind, m.Mentions = "w1", protocol.SenderKindAgent, []string{"user"}
 	})), true)
 }
 
@@ -42,10 +42,10 @@ func TestPlainText(t *testing.T) {
 func TestOwnerLine(t *testing.T) {
 	testkit.Eq(t, ownerLine(coreMsg(func(m *protocol.ChatMessage) { m.Text = "好的" }), &protocol.Conversation{Kind: protocol.ConversationKindGeneral}), "【管家】\n好的")
 	testkit.Eq(t, ownerLine(coreMsg(func(m *protocol.ChatMessage) {
-		m.Kind, m.From, m.FromKind, m.Name, m.Outcome, m.Text = protocol.MessageKindReport, "w1", protocol.SenderKindWorker, "后端老周", ptr.To(protocol.OutcomeFailed), "测试挂了"
+		m.Kind, m.From, m.FromKind, m.Name, m.Outcome, m.Text = protocol.MessageKindReport, "w1", protocol.SenderKindAgent, "后端老周", ptr.To(protocol.OutcomeFailed), "测试挂了"
 	}), &protocol.Conversation{Kind: protocol.ConversationKindThread}), "【后端老周 · 没做成】\n测试挂了")
 	testkit.Eq(t, ownerLine(coreMsg(func(m *protocol.ChatMessage) {
-		m.From, m.FromKind, m.Name, m.Mentions, m.Text = "w1", protocol.SenderKindWorker, "后端老周", []string{"user"}, "@主人 用哪个库？"
+		m.From, m.FromKind, m.Name, m.Mentions, m.Text = "w1", protocol.SenderKindAgent, "后端老周", []string{"user"}, "@主人 用哪个库？"
 	}), &protocol.Conversation{Kind: protocol.ConversationKindThread}), "【后端老周 · 在工单串里】\n@主人 用哪个库？")
 }
 

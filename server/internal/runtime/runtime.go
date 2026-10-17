@@ -43,7 +43,7 @@ const (
 	usageEvery   = 5 * time.Minute
 	// Several runs share one read.
 	usageAfterRun = 20 * time.Second
-	// A busy worker spends every few seconds.
+	// A busy session spends every few seconds.
 	spendPushAfter = 3 * time.Second
 )
 

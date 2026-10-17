@@ -35,15 +35,15 @@ func PlaybookIssues(pb Playbook, before []Issue, now int64) []Issue {
 		was[t.ID] = t
 	}
 	keep := func(t Issue, closed *IssueClose) Issue {
-		t.Workers, t.Priority, t.CreatedAt = []string{}, PriorityMedium, pb.CreatedAt
+		t.Sessions, t.Priority, t.CreatedAt = []string{}, PriorityMedium, pb.CreatedAt
 		if old, ok := was[t.ID]; ok {
-			t.Workers, t.Priority, t.CreatedAt, t.Status = old.Workers, old.Priority, old.CreatedAt, old.Status
+			t.Sessions, t.Priority, t.CreatedAt, t.Status = old.Sessions, old.Priority, old.CreatedAt, old.Status
 			if closed != nil && old.ClosedAt != nil {
 				t.ClosedAt = old.ClosedAt
 			}
 		}
-		if t.Workers == nil {
-			t.Workers = []string{}
+		if t.Sessions == nil {
+			t.Sessions = []string{}
 		}
 		t.Closed = closed
 		if closed != nil && t.ClosedAt == nil {
@@ -66,7 +66,7 @@ func PlaybookIssues(pb Playbook, before []Issue, now int64) []Issue {
 			ID: StepIssueID(pb.ID, n.ID), Title: n.Title, Description: n.Task, Project: &project, Assignee: n.Agent, Rank: int64(i),
 			Parent: &parent, BlockedBy: blocked,
 			Step: &IssueStep{
-				Key: n.ID, State: n.State, Check: n.Check, Scope: n.Scope, Acceptance: n.Acceptance, Frozen: n.Frozen, Worker: n.Worker,
+				Key: n.ID, State: n.State, Check: n.Check, Scope: n.Scope, Acceptance: n.Acceptance, Frozen: n.Frozen, Session: n.Session,
 				Conclusion: n.Conclusion, Commits: n.Commits, Spent: n.Spent, Tries: n.Tries, Failures: n.Failures,
 			},
 		}, stepClosed(pb.State, n)))
@@ -98,7 +98,7 @@ func playbookFrom(parent Issue, issues []Issue) Playbook {
 		}
 		pb.Nodes = append(pb.Nodes, PlaybookNode{
 			ID: s.Key, Title: t.Title, Task: t.Description, Needs: needs, Agent: t.Assignee, Check: s.Check, Scope: s.Scope,
-			Acceptance: s.Acceptance, Frozen: s.Frozen, State: s.State, Worker: s.Worker, Conclusion: s.Conclusion, Commits: s.Commits,
+			Acceptance: s.Acceptance, Frozen: s.Frozen, State: s.State, Session: s.Session, Conclusion: s.Conclusion, Commits: s.Commits,
 			Spent: s.Spent, Tries: s.Tries, Failures: s.Failures,
 		})
 	}

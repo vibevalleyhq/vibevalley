@@ -127,7 +127,7 @@ func TestEditNode(t *testing.T) {
 	}
 	testkit.Eq(t, protocol.NodeOf(removed.Playbook, "d").Needs, []string{"b"})
 
-	running := rulesPlaybook(append([]protocol.PlaybookNode{rulesWith(rulesNode("a"), func(n *protocol.PlaybookNode) { n.State = protocol.NodeStateWorking; n.Worker = ptr.To("w1") })}, rulesDiamond()[1:]...))
+	running := rulesPlaybook(append([]protocol.PlaybookNode{rulesWith(rulesNode("a"), func(n *protocol.PlaybookNode) { n.State = protocol.NodeStateWorking; n.Session = ptr.To("w1") })}, rulesDiamond()[1:]...))
 	busy := editNode(running, "a", protocol.NodeEdit{Task: ptr.To("别的")})
 	if busy.OK {
 		t.Fatal("busy")

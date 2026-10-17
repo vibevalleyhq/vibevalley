@@ -55,8 +55,8 @@ RuntimeInfo runtime(String id, {bool available = true, List<ModelEntry>? models,
   checkedAt: 0,
 );
 
-Memory memory(String id, String text, {String agent = 'backend', MemoryKind kind = MemoryKind.note, String? project, String? worker, double at = 0}) =>
-    Memory(id: id, agent: agent, kind: kind, text: text, project: project, worker: worker, at: at, recalled: 0);
+Memory memory(String id, String text, {String agent = 'backend', MemoryKind kind = MemoryKind.note, String? project, String? session, double at = 0}) =>
+    Memory(id: id, agent: agent, kind: kind, text: text, project: project, session: session, at: at, recalled: 0);
 
 VoiceSettings voice({String greeting = '来啦！今天想种点什么？'}) => VoiceSettings(
   area: Area.uS,

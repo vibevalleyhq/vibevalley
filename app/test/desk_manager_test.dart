@@ -19,7 +19,7 @@ DeskBackend _server() => DeskBackend(
     runtime: Runtime.vibevalley,
     file: '/home/me/.vibevalley/MEMORY.md',
     memories: [
-      memory('n1', '提交信息写中文', agent: 'manager', worker: 'manager', at: _now),
+      memory('n1', '提交信息写中文', agent: 'manager', session: 'manager', at: _now),
       memory('n0', '很旧的一条', agent: 'manager', at: _now),
     ],
     carried: 1,

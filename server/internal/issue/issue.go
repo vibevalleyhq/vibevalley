@@ -13,24 +13,24 @@ import (
 	"vibevalley/internal/base"
 	"vibevalley/internal/core"
 	"vibevalley/internal/protocol"
-	"vibevalley/internal/worker"
+	"vibevalley/internal/session"
 	"vibevalley/pkg/db/generated"
 	"vibevalley/pkg/x/clock"
 	"vibevalley/pkg/x/str"
 )
 
-// An issue closes when its last worker leaves, as the fact that the worker left says how, and opens again with another worker. A playbook's issues
-// open and close as the plan says, not as their workers leave.
+// An issue closes when its last session leaves, as the fact that the session left says how, and opens again with another session. A playbook's issues
+// open and close as the plan says, not as their sessions leave.
 
 type issues struct {
 	db           *sql.DB
 	q            *generated.Queries
 	core         *core.Service
-	trajectories *worker.Service
+	trajectories *session.Service
 	stop         func()
 }
 
-func newIssues(db *sql.DB, core *core.Service, trajectories *worker.Service) (*issues, error) {
+func newIssues(db *sql.DB, core *core.Service, trajectories *session.Service) (*issues, error) {
 	is := &issues{db: db, q: generated.New(db), core: core, trajectories: trajectories}
 	if err := is.restore(context.Background()); err != nil {
 		return nil, fmt.Errorf("issues: %w", err)
@@ -43,13 +43,13 @@ func (is *issues) restore(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	all, err := is.q.WorkersOfKept(ctx, protocol.KeepClosedIssues)
+	all, err := is.q.SessionsOfKept(ctx, protocol.KeepClosedIssues)
 	if err != nil {
 		return err
 	}
 	runs := map[string][]string{}
 	for _, r := range all {
-		runs[r.Issue] = append(runs[r.Issue], r.Worker)
+		runs[r.Issue] = append(runs[r.Issue], r.Session)
 	}
 	state := is.core.State()
 	for _, row := range rows {
@@ -96,14 +96,14 @@ func (is *issues) OnStop() {
 }
 
 func (is *issues) left(ctx context.Context, f protocol.FactLeft) {
-	issue, err := is.q.IssueOfWorker(ctx, f.ID)
+	issue, err := is.q.IssueOfSession(ctx, f.ID)
 	if err != nil {
 		return
 	}
 	if row, err := is.q.GetIssue(ctx, issue); err != nil || row.Plan.Valid || row.Step.Valid {
 		return
 	}
-	if runs, err := is.q.WorkersOf(ctx, issue); err != nil || len(runs) == 0 || runs[len(runs)-1] != f.ID {
+	if runs, err := is.q.SessionsOf(ctx, issue); err != nil || len(runs) == 0 || runs[len(runs)-1] != f.ID {
 		return
 	}
 	if is.q.CloseIssue(ctx, generated.CloseIssueParams{ClosedAt: issueAt(clock.NowMs()), Closed: issueClosed(f.Closed), ID: issue}) == nil {
@@ -113,7 +113,7 @@ func (is *issues) left(ctx context.Context, f protocol.FactLeft) {
 
 func issueOf(row generated.Issue, runs []string, state protocol.CoreState) protocol.Issue {
 	out := protocol.Issue{
-		ID: row.ID, Title: row.Title, Description: row.Description, Priority: protocol.Priority(row.Priority), CreatedAt: row.CreatedAt, Workers: []string{},
+		ID: row.ID, Title: row.Title, Description: row.Description, Priority: protocol.Priority(row.Priority), CreatedAt: row.CreatedAt, Sessions: []string{},
 	}
 	if row.Project.Valid {
 		out.Project = &row.Project.String
@@ -155,9 +155,9 @@ func issueOf(row generated.Issue, runs []string, state protocol.CoreState) proto
 		}
 	}
 	if runs != nil {
-		out.Workers = runs
+		out.Sessions = runs
 	}
-	if len(out.Workers) == 0 || out.Step != nil {
+	if len(out.Sessions) == 0 || out.Step != nil {
 		out.Rank = row.Rank
 	}
 	out.Status = protocol.IssueStatusOf(out, state)
@@ -170,13 +170,13 @@ func (is *issues) List() ([]protocol.Issue, error) {
 	if err != nil {
 		return nil, err
 	}
-	all, err := is.q.AllWorkers(ctx)
+	all, err := is.q.AllSessions(ctx)
 	if err != nil {
 		return nil, err
 	}
 	runs := map[string][]string{}
 	for _, r := range all {
-		runs[r.Issue] = append(runs[r.Issue], r.Worker)
+		runs[r.Issue] = append(runs[r.Issue], r.Session)
 	}
 	state := is.core.State()
 	out := make([]protocol.Issue, 0, len(rows))
@@ -190,7 +190,7 @@ func (is *issues) List() ([]protocol.Issue, error) {
 func (is *issues) Get(id string) (protocol.Issue, error) {
 	ctx := context.Background()
 	issue := id
-	if owner, err := is.q.IssueOfWorker(ctx, id); err == nil {
+	if owner, err := is.q.IssueOfSession(ctx, id); err == nil {
 		issue = owner
 	}
 	row, err := is.q.GetIssue(ctx, issue)
@@ -200,23 +200,23 @@ func (is *issues) Get(id string) (protocol.Issue, error) {
 	if err != nil {
 		return protocol.Issue{}, err
 	}
-	runs, err := is.q.WorkersOf(ctx, issue)
+	runs, err := is.q.SessionsOf(ctx, issue)
 	if err != nil {
 		return protocol.Issue{}, err
 	}
 	return issueOf(row, runs, is.core.State()), nil
 }
 
-// Latest is the issue's newest worker, the one its merge, changes, comments and cancel act on; a reopen makes another.
+// Latest is the issue's newest session, the one its merge, changes, comments and cancel act on; a reopen makes another.
 func (is *issues) Latest(id string) (string, error) {
 	issue, err := is.Get(id)
 	if err != nil {
 		return "", err
 	}
-	if len(issue.Workers) == 0 {
+	if len(issue.Sessions) == 0 {
 		return "", protocol.Refused{Reason: "这张工单还没开工"}
 	}
-	return issue.Workers[len(issue.Workers)-1], nil
+	return issue.Sessions[len(issue.Sessions)-1], nil
 }
 
 func (is *issues) unsent(id string) (protocol.Issue, error) {
@@ -227,7 +227,7 @@ func (is *issues) unsent(id string) (protocol.Issue, error) {
 	if issue.Plan != nil || issue.Step != nil {
 		return issue, protocol.Refused{Reason: "这是种植计划的工单：在计划里改"}
 	}
-	if len(issue.Workers) > 0 {
+	if len(issue.Sessions) > 0 {
 		return issue, protocol.Refused{Reason: "这张工单已经开工了"}
 	}
 	return issue, nil
@@ -311,7 +311,7 @@ func (is *issues) Move(id, before string) ([]protocol.Issue, error) {
 	}
 	order := []string{}
 	for _, issue := range all {
-		if len(issue.Workers) == 0 && issue.ID != id {
+		if len(issue.Sessions) == 0 && issue.ID != id {
 			order = append(order, issue.ID)
 		}
 	}
@@ -358,21 +358,21 @@ func (is *issues) Queue(id string, queued bool) (protocol.Issue, error) {
 	return is.Get(id)
 }
 
-// An issue not written down first (the manager sending someone at once, a playbook's step) is made from the worker's job.
-func (is *issues) Ran(id string, worker protocol.Worker) error {
+// An issue not written down first (the manager sending someone at once, a playbook's step) is made from the session's job.
+func (is *issues) Ran(id string, session protocol.Session) error {
 	tx, err := is.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	ctx, q := context.Background(), is.q.WithTx(tx)
-	title, description := splitJob(worker.Task)
+	title, description := splitJob(session.Task)
 	if err := q.OpenIssue(ctx, generated.OpenIssueParams{
-		ID: id, Title: title, Description: description, Project: issueNull(worker.Project), Assignee: issueNull(&worker.Agent), CreatedAt: worker.HiredAt,
+		ID: id, Title: title, Description: description, Project: issueNull(session.Project), Assignee: issueNull(&session.Agent), CreatedAt: session.HiredAt,
 	}); err != nil {
 		return err
 	}
-	if err := q.AddWorker(ctx, generated.AddWorkerParams{Worker: worker.ID, Issue: id, StartedAt: worker.HiredAt}); err != nil {
+	if err := q.AddSession(ctx, generated.AddSessionParams{Session: session.ID, Issue: id, StartedAt: session.HiredAt}); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -387,13 +387,13 @@ func (is *issues) family(ctx context.Context, q *generated.Queries, id string) (
 	if err != nil {
 		return nil, err
 	}
-	all, err := q.WorkersOfFamily(ctx, id)
+	all, err := q.SessionsOfFamily(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	runs := map[string][]string{}
 	for _, r := range all {
-		runs[r.Issue] = append(runs[r.Issue], r.Worker)
+		runs[r.Issue] = append(runs[r.Issue], r.Session)
 	}
 	state := is.core.State()
 	out := make([]protocol.Issue, 0, len(rows))

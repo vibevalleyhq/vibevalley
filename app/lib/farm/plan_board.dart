@@ -124,12 +124,12 @@ class NodeCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final agent = node.agent == null ? null : (ref.watch(agentsProvider).value ?? const <String, Agent>{})[node.agent];
-    final worker = node.worker == null ? null : ref.watch(farmProvider)?.workers.where((h) => h.id == node.worker).firstOrNull;
+    final session = node.session == null ? null : ref.watch(farmProvider)?.sessions.where((h) => h.id == node.session).firstOrNull;
     String titleOf(String id) => nodeOf(pb, id)?.title ?? id;
     final waits = node.state == NodeState.waiting ? node.blockedBy ?? const <String>[] : const <String>[];
     final live = pb.state == PlaybookState.running || pb.state == PlaybookState.paused;
     final editable = pb.state == PlaybookState.draft || (live && (node.state == NodeState.waiting || node.state == NodeState.failed));
-    final doing = worker == null ? null : doingOf(worker);
+    final doing = session == null ? null : doingOf(session);
     final commands = ref.read(farmCommandsProvider);
     Future<void> nodeAct(NodeAction action) async => onSaid(await commands.actOnNode(pb.id, node.id, action));
     final tone = _nodeTone(node.state);
@@ -207,14 +207,14 @@ class NodeCard extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(waits.isNotEmpty ? '等 ${waits.map(titleOf).join('、')}' : '接在 ${node.needs.map(titleOf).join('、')} 后面', style: small),
               ),
-            if (worker != null)
+            if (session != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Container(
                   color: Palette.cream50.withValues(alpha: .7),
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                   child: Text(
-                    '${worker.name} · 第 ${stationOfWorker(worker) + 1} 块地${doing != null && doing.action != WorkerAction.none ? ' · 在${actionText[doing.action]}' : ''}',
+                    '${session.name} · 第 ${stationOfSession(session) + 1} 块地${doing != null && doing.action != SessionAction.none ? ' · 在${actionText[doing.action]}' : ''}',
                     style: KitText.xs.copyWith(color: Palette.bark800),
                   ),
                 ),

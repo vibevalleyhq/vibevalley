@@ -1,4 +1,4 @@
-package worker
+package session
 
 import (
 	"fmt"
@@ -14,9 +14,9 @@ import (
 	"vibevalley/pkg/x/str"
 )
 
-// Pure: it reads the worker as the core state has it and the session's own bookkeeping, and changes nothing.
+// Pure: it reads the session as the core state has it and the session's own bookkeeping, and changes nothing.
 
-// The bubble over a worker's head holds about this much.
+// The bubble over a session's head holds about this much.
 const labelMax = 40
 
 // So a later full input can fix up the bubble's label.
@@ -146,21 +146,21 @@ func toolOutput(content []oar.ToolOutputPart) string {
 	return strings.Join(parts, "\n")
 }
 
-func eventFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx factContext) reaction {
+func eventFacts(event oar.Event, session *protocol.Session, tracking tracking, ctx factContext) reaction {
 	id := ctx.ID
 	var facts []protocol.FactValue
 	var journal []op
 	next := tracking
 	r := reaction{}
 	var working *protocol.PhaseWorking
-	if worker != nil {
-		if p, ok := worker.Phase.Value.(protocol.PhaseWorking); ok {
+	if session != nil {
+		if p, ok := session.Phase.Value.(protocol.PhaseWorking); ok {
 			working = &p
 		}
 	}
 
 	// A fact only when something changed.
-	doing := func(action protocol.WorkerAction, label string) {
+	doing := func(action protocol.SessionAction, label string) {
 		if working == nil || (working.Doing.Action == action && working.Doing.Label == label) {
 			return
 		}
@@ -178,8 +178,8 @@ func eventFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx
 	switch e := event.Body.(type) {
 	case oar.TurnStarted:
 		from := protocol.Spent{}
-		if worker != nil && worker.Spent != nil {
-			from = *worker.Spent
+		if session != nil && session.Spent != nil {
+			from = *session.Spent
 		}
 		next.RunFrom = &from
 		// A prompt-mode persona and what the turn is reminded of ride on top of the input: the panel shows the job
@@ -194,7 +194,7 @@ func eventFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx
 		}
 		facts = append(facts, protocol.FactRun{ID: id})
 	case oar.Reasoning:
-		doing(protocol.WorkerActionThinking, "")
+		doing(protocol.SessionActionThinking, "")
 		if e.Content.Kind == "text" && e.Content.Text != "" {
 			journal = append(journal, op{Type: "thought", Text: e.Content.Text})
 		}
@@ -215,7 +215,7 @@ func eventFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx
 			start.Input = *e.Input
 		}
 		journal = append(journal, op{Type: "toolStarted", CallID: e.CallID, Start: start})
-		doing(protocol.WorkerAction(kind), str.Clip(label, labelMax))
+		doing(protocol.SessionAction(kind), str.Clip(label, labelMax))
 	case oar.ToolCallInput:
 		// The complete input arrives later on some runtimes (claude); it names the target better.
 		detail := ""
@@ -226,9 +226,9 @@ func eventFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx
 			}
 		}
 		journal = append(journal, op{Type: "toolInput", CallID: e.CallID, Input: e.Input, Text: detail})
-		if detail != "" && worker != nil {
-			action := protocol.DoingOf(*worker).Action
-			if action != protocol.WorkerActionNone && action != protocol.WorkerActionThinking && action != protocol.WorkerActionSpeakingText {
+		if detail != "" && session != nil {
+			action := protocol.DoingOf(*session).Action
+			if action != protocol.SessionActionNone && action != protocol.SessionActionThinking && action != protocol.SessionActionSpeakingText {
 				doing(action, str.Clip(detail, labelMax))
 			}
 		}
@@ -239,11 +239,11 @@ func eventFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx
 		}
 		journal = append(journal, op{Type: "toolEnded", CallID: e.CallID, Output: toolOutput(e.Content), Ok: e.Result != "failed" && code == 0})
 		if tracking.ShownCall != nil && e.CallID == tracking.ShownCall.ID {
-			doing(protocol.WorkerActionThinking, "")
+			doing(protocol.SessionActionThinking, "")
 		}
 	case oar.TextDelta:
 		journal = append(journal, op{Type: "response", Text: e.Text})
-		doing(protocol.WorkerActionSpeakingText, "")
+		doing(protocol.SessionActionSpeakingText, "")
 	case oar.Retry:
 		text := fmt.Sprintf("调用模型没成功，第 %d", e.Attempt)
 		if e.MaxAttempts != nil && *e.MaxAttempts != 0 {
@@ -277,7 +277,7 @@ func eventFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx
 		delta := oar.TokenTotals{Input: max(0, tokens.Input-last.Input), Output: max(0, tokens.Output-last.Output), CacheRead: &cacheRead, CacheWrite: &cacheWrite}
 		copied := *tokens
 		next.OarTokens = &copied
-		if worker == nil {
+		if session == nil {
 			break
 		}
 		var cny *float64
@@ -286,8 +286,8 @@ func eventFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx
 			cny = &v
 		}
 		before := protocol.Spent{}
-		if worker.Spent != nil {
-			before = *worker.Spent
+		if session.Spent != nil {
+			before = *session.Spent
 		}
 		spent := protocol.Spent{Tokens: before.Tokens + delta.Input + delta.Output}
 		if before.CNY != nil || cny != nil {
@@ -311,13 +311,13 @@ func eventFacts(event oar.Event, worker *protocol.Worker, tracking tracking, ctx
 			journal = append(journal, op{Type: "note", Kind: protocol.ActivityKindError, Text: failureText(e.Outcome)})
 		}
 	case oar.Exited:
-		if worker != nil && protocol.IsBusy(*worker) {
+		if session != nil && protocol.IsBusy(*session) {
 			why := ctx.Runtime + " 进程退出了"
 			if e.Code != nil {
 				why += fmt.Sprintf("（退出码 %d）", *e.Code)
 			}
-			facts = append(facts, protocol.FactReport{ID: id, Outcome: protocol.OutcomeFailed, Summary: why, Runs: worker.Runs})
-			r.Warn = worker.Name + " 的 " + why
+			facts = append(facts, protocol.FactReport{ID: id, Outcome: protocol.OutcomeFailed, Summary: why, Runs: session.Runs})
+			r.Warn = session.Name + " 的 " + why
 		}
 	}
 

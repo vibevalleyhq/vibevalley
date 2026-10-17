@@ -117,7 +117,7 @@ var a = 1;
 
   group('labels', () {
     test('every action and phase has its word', () {
-      for (final a in WorkerAction.values) {
+      for (final a in SessionAction.values) {
         expect(actionText.containsKey(a), isTrue, reason: 'seeds.json has every action\'s words');
       }
       expect(phaseLabel(const PhaseRipe()), '完工');

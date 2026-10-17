@@ -13,16 +13,16 @@ import (
 
 	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
+	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
-	"vibevalley/internal/worker"
 	"vibevalley/pkg/x/clock"
 	"vibevalley/pkg/x/str"
 )
 
-type chatFakeWorkers struct {
+type chatFakeSessions struct {
 	f     *world
-	hub   *base.Hub[worker.LaunchActivity]
+	hub   *base.Hub[session.LaunchActivity]
 	slow  time.Duration
 	stop  chan struct{}
 	once  sync.Once
@@ -36,39 +36,39 @@ type chatFakeWorkers struct {
 	n       int
 }
 
-func (x *chatFakeWorkers) Activity() *base.Hub[worker.LaunchActivity] { return x.hub }
+func (x *chatFakeSessions) Activity() *base.Hub[session.LaunchActivity] { return x.hub }
 
-func (x *chatFakeWorkers) Find(id string) *worker.Roster {
-	h := x.f.Core.Worker(id)
+func (x *chatFakeSessions) Find(id string) *session.Roster {
+	h := x.f.Core.Session(id)
 	if h == nil {
 		return nil
 	}
 	x.mu.Lock()
 	defer x.mu.Unlock()
-	return &worker.Roster{Worker: *h, LastText: x.last[id]}
+	return &session.Roster{Session: *h, LastText: x.last[id]}
 }
 
-func (x *chatFakeWorkers) Deliver(id, text string, _ protocol.RunTrigger) worker.Delivered {
-	if x.f.Core.Worker(id) == nil {
-		return worker.Delivered{Kind: "refused", Reason: "不在地里"}
+func (x *chatFakeSessions) Deliver(id, text string, _ protocol.RunTrigger) session.Delivered {
+	if x.f.Core.Session(id) == nil {
+		return session.Delivered{Kind: "refused", Reason: "不在地里"}
 	}
 	x.mu.Lock()
-	if session, ok := x.running[id]; ok {
+	if launch, ok := x.running[id]; ok {
 		x.steers[id] = append(x.steers[id], text)
 		x.mu.Unlock()
-		return worker.Delivered{Kind: "steered", Launch: session}
+		return session.Delivered{Kind: "steered", Launch: launch}
 	}
 	x.n++
-	session := fmt.Sprintf("%s-%d", id, x.n)
-	x.running[id] = session
+	launch := fmt.Sprintf("%s-%d", id, x.n)
+	x.running[id] = launch
 	x.inputs[id] = append(x.inputs[id], text)
 	x.mu.Unlock()
 	x.f.Core.Apply(protocol.FactRun{ID: id})
-	go x.run(id, session, text)
-	return worker.Delivered{Kind: "run", Launch: session, Woke: true}
+	go x.run(id, launch, text)
+	return session.Delivered{Kind: "run", Launch: launch, Woke: true}
 }
 
-func (x *chatFakeWorkers) run(id, session, input string) {
+func (x *chatFakeSessions) run(id, launch, input string) {
 	if strings.Contains(input, "慢慢做") {
 		select {
 		case <-time.After(x.slow):
@@ -84,7 +84,7 @@ func (x *chatFakeWorkers) run(id, session, input string) {
 		delete(x.running, id)
 		x.mu.Unlock()
 		x.f.Core.Apply(protocol.FactReport{ID: id, Outcome: protocol.OutcomeFailed, Summary: "provider said no", Runs: runs})
-		x.hub.Publish(worker.LaunchActivity{Kind: "ended", ID: id, Launch: session, Outcome: protocol.OutcomeFailed})
+		x.hub.Publish(session.LaunchActivity{Kind: "ended", ID: id, Launch: launch, Outcome: protocol.OutcomeFailed})
 		return
 	}
 	line := ""
@@ -100,21 +100,21 @@ func (x *chatFakeWorkers) run(id, session, input string) {
 	x.mu.Lock()
 	x.last[id] = "结论：收到了（" + line + "）"
 	x.mu.Unlock()
-	x.hub.Publish(worker.LaunchActivity{Kind: "spoke", ID: id, Launch: session})
+	x.hub.Publish(session.LaunchActivity{Kind: "spoke", ID: id, Launch: launch})
 	x.mu.Lock()
 	delete(x.running, id)
 	x.mu.Unlock()
 	x.f.Core.Apply(protocol.FactReport{ID: id, Outcome: protocol.OutcomeCompleted, Summary: "收到了", Runs: runs})
-	x.hub.Publish(worker.LaunchActivity{Kind: "ended", ID: id, Launch: session, Outcome: protocol.OutcomeCompleted, Spoke: true})
+	x.hub.Publish(session.LaunchActivity{Kind: "ended", ID: id, Launch: launch, Outcome: protocol.OutcomeCompleted, Spoke: true})
 }
 
-func (x *chatFakeWorkers) runsOf(id string) []string {
+func (x *chatFakeSessions) runsOf(id string) []string {
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	return slices.Clone(x.inputs[id])
 }
 
-func (x *chatFakeWorkers) steersOf(id string) []string {
+func (x *chatFakeSessions) steersOf(id string) []string {
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	return slices.Clone(x.steers[id])
@@ -128,17 +128,17 @@ func chatConversation(f *world, id *int64) *protocol.Conversation {
 	return protocol.ConversationOf(f.Core.State().Chat, *id)
 }
 
-func chatTestFarm(t *testing.T, home, dbPath string) (*world, *chatFakeWorkers) {
+func chatTestFarm(t *testing.T, home, dbPath string) (*world, *chatFakeSessions) {
 	t.Helper()
 	f, err := newWorld(fixture.Config(home, t.TempDir(), dbPath))
 	if err != nil {
 		t.Fatal(err)
 	}
-	x := &chatFakeWorkers{
-		f: f, hub: base.NewHub[worker.LaunchActivity](), slow: 1500 * time.Millisecond, stop: make(chan struct{}),
+	x := &chatFakeSessions{
+		f: f, hub: base.NewHub[session.LaunchActivity](), slow: 1500 * time.Millisecond, stop: make(chan struct{}),
 		inputs: map[string][]string{}, steers: map[string][]string{}, last: map[string]string{}, running: map[string]string{},
 	}
-	f.Channel.workers = x
+	f.Channel.sessions = x
 	f.Channel.noticeEvery = 300 * time.Millisecond
 	f.Channel.retryWake = 100 * time.Millisecond
 	if err := f.Start(context.Background()); err != nil {
@@ -194,9 +194,9 @@ func chatDeliveryOf(t *testing.T, f *world, recipient string, seq int64) *chatTe
 	return nil
 }
 
-func (x *chatFakeWorkers) hire(t *testing.T, id, task, project string, channel *int64) protocol.Conversation {
+func (x *chatFakeSessions) hire(t *testing.T, id, task, project string, channel *int64) protocol.Conversation {
 	t.Helper()
-	x.f.Core.Apply(protocol.FactHired{Worker: protocol.Worker{
+	x.f.Core.Apply(protocol.FactHired{Session: protocol.Session{
 		ID: id, Name: "帮工" + id, Agent: "lab", Runtime: "pi", Task: task, Project: &project, HiredAt: clock.NowMs(),
 		Phase: protocol.Phase{Value: protocol.PhaseResting{}}, Channel: channel,
 	}})
@@ -241,7 +241,7 @@ func TestChatJobOpensThreadUnderDispatch(t *testing.T) {
 		t.Fatalf("general: %+v", general)
 	}
 	i := slices.IndexFunc(chatMessagesIn(f, general.ID), func(m protocol.ChatMessage) bool {
-		return m.Kind == protocol.MessageKindDispatch && m.Worker != nil && *m.Worker == "w1"
+		return m.Kind == protocol.MessageKindDispatch && m.Session != nil && *m.Session == "w1"
 	})
 	if i < 0 {
 		t.Fatal("no dispatch on the general channel")
@@ -259,7 +259,7 @@ func TestChatJobOpensThreadUnderDispatch(t *testing.T) {
 			report = m
 		}
 	}
-	if report.From != "w1" || report.FromKind != protocol.SenderKindWorker || report.Outcome == nil || *report.Outcome != protocol.OutcomeCompleted {
+	if report.From != "w1" || report.FromKind != protocol.SenderKindAgent || report.Outcome == nil || *report.Outcome != protocol.OutcomeCompleted {
 		t.Fatalf("report: %+v", report)
 	}
 	if !strings.Contains(report.Text, "收到了") || strings.Contains(report.Text, "结论") {
@@ -270,7 +270,7 @@ func TestChatJobOpensThreadUnderDispatch(t *testing.T) {
 	}
 }
 
-func TestChatPersonInJobThreadWakesWorker(t *testing.T) {
+func TestChatPersonInJobThreadWakesSession(t *testing.T) {
 	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
 	thread := x.hire(t, "w2", "写 hello", "chat-b", nil)
 	said, err := f.Channel.Say("把输出改成中文", &thread.ID)
@@ -314,7 +314,7 @@ func TestChatGeneralReachesManager(t *testing.T) {
 	}
 	testkit.Settle()
 	if len(x.runsOf("w3")) != before {
-		t.Fatal("a run for the worker")
+		t.Fatal("a run for the session")
 	}
 	d := chatDeliveryOf(t, f, "w3", said.Seq)
 	if d == nil || d.Reason != "general" || d.Wakes {
@@ -349,7 +349,7 @@ func TestChatChannels(t *testing.T) {
 		t.Fatalf("thread's channel: %v", thread.Channel)
 	}
 	i := slices.IndexFunc(chatMessagesIn(f, channel.ID), func(m protocol.ChatMessage) bool {
-		return m.Kind == protocol.MessageKindDispatch && m.Worker != nil && *m.Worker == "w4"
+		return m.Kind == protocol.MessageKindDispatch && m.Session != nil && *m.Session == "w4"
 	})
 	if i < 0 || *thread.Parent != chatMessagesIn(f, channel.ID)[i].Seq {
 		t.Fatal("the dispatch is not in the channel, or the thread not under it")
@@ -366,10 +366,10 @@ func TestChatChannels(t *testing.T) {
 		t.Fatalf("news: %+v", heard)
 	}
 	if d := chatDeliveryOf(t, f, "w4", said.Seq); d == nil || d.Reason != "general" {
-		t.Fatalf("the channel's worker: %+v", d)
+		t.Fatalf("the channel's session: %+v", d)
 	}
 	if d := chatDeliveryOf(t, f, "w5", said.Seq); d != nil {
-		t.Fatalf("the general channel's worker: %+v", d)
+		t.Fatalf("the general channel's session: %+v", d)
 	}
 	read, err := f.Channel.Read("w4", ReadOptions{Target: "#clock-in"})
 	if err != nil || read.Target != "#clock-in" {
@@ -398,10 +398,10 @@ func TestChatChannels(t *testing.T) {
 	}
 }
 
-func TestChatBusyWorkerGetsOneNotice(t *testing.T) {
+func TestChatBusySessionGetsOneNotice(t *testing.T) {
 	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
 	project := "chat-d"
-	f.Core.Apply(protocol.FactHired{Worker: protocol.Worker{
+	f.Core.Apply(protocol.FactHired{Session: protocol.Session{
 		ID: "w6", Name: "帮工w6", Agent: "lab", Runtime: "pi", Task: "慢慢做一个大活", Project: &project, HiredAt: clock.NowMs(),
 		Phase: protocol.Phase{Value: protocol.PhaseResting{}},
 	}})
@@ -413,7 +413,7 @@ func TestChatBusyWorkerGetsOneNotice(t *testing.T) {
 		return *c, true
 	})
 	x.Deliver("w6", "慢慢做一个大活", protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
-	if h := f.Core.Worker("w6"); h == nil || !protocol.IsBusy(*h) {
+	if h := f.Core.Session("w6"); h == nil || !protocol.IsBusy(*h) {
 		t.Fatal("not working")
 	}
 	if _, err := f.Channel.Say("补充：顺便写测试", &thread.ID); err != nil {
@@ -669,11 +669,11 @@ func TestChatInboxAndDigest(t *testing.T) {
 	}
 }
 
-func TestChatWorkerLeaves(t *testing.T) {
+func TestChatSessionLeaves(t *testing.T) {
 	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
 	x.hire(t, "w13", "写 hello", "chat-m", nil)
 	testkit.Until(t, "resting", func() bool {
-		h := f.Core.Worker("w13")
+		h := f.Core.Session("w13")
 		return h != nil && !protocol.IsBusy(*h)
 	})
 	general := f.Channel.General()
@@ -708,13 +708,13 @@ func TestChatRestartGivesHandedWordsAgain(t *testing.T) {
 	x.close()
 
 	savedJSON := `{"hired":14,"hands":[{"id":"w14","place":{"project":"chat-i","cwd":"` + t.TempDir() + `"}}]}`
-	if err := os.WriteFile(filepath.Join(home, "workers.json"), []byte(savedJSON), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(home, "sessions.json"), []byte(savedJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	g, y := chatTestFarm(t, home, db)
 	y.slow = 10 * time.Millisecond
-	if g.Core.Worker("w14") == nil {
-		t.Fatal("the worker did not come back")
+	if g.Core.Session("w14") == nil {
+		t.Fatal("the session did not come back")
 	}
 	g.Core.Apply(protocol.FactReport{ID: "w14", Outcome: protocol.OutcomeInterrupted, Summary: "重启了"})
 	testkit.Until(t, "seen after the restart", func() bool {
@@ -739,7 +739,7 @@ func TestChatSummaryOf(t *testing.T) {
 		{"做了一些事\n\n- 结论：好了", "好了"},
 		{"第一段\n\n第二段", "第一段\n\n第二段"},
 	} {
-		if got := worker.SummaryOf(c.in); got != c.want {
+		if got := session.SummaryOf(c.in); got != c.want {
 			t.Errorf("SummaryOf(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}

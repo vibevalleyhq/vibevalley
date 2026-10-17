@@ -1,4 +1,4 @@
-package worker
+package session
 
 // A run starts when the runtime opens a turn and ends with that turn's report. What started it is known only to whoever sent the input,
 // so the sender leaves its trigger on the hand first (triggers, in order) and the turn takes the oldest; a turn nobody asked for is the
@@ -16,14 +16,14 @@ import (
 )
 
 // Called before the input goes out, so the turn it opens finds it.
-func (c *workers) expect(h *hand, by protocol.RunTrigger) {
+func (c *sessions) expect(h *hand, by protocol.RunTrigger) {
 	h.mu.Lock()
 	h.triggers = append(h.triggers, by)
 	h.mu.Unlock()
 }
 
 // Undoes expect when the input did not open a turn.
-func (c *workers) unexpect(h *hand) {
+func (c *sessions) unexpect(h *hand) {
 	h.mu.Lock()
 	if n := len(h.triggers); n > 0 {
 		h.triggers = h.triggers[:n-1]
@@ -31,7 +31,7 @@ func (c *workers) unexpect(h *hand) {
 	h.mu.Unlock()
 }
 
-func (c *workers) startRun(h *hand) {
+func (c *sessions) startRun(h *hand) {
 	h.mu.Lock()
 	by := protocol.RunTrigger{Kind: protocol.RunTriggerKindRuntime}
 	if len(h.triggers) > 0 {
@@ -39,11 +39,11 @@ func (c *workers) startRun(h *hand) {
 	}
 	h.mu.Unlock()
 	var issue sql.NullString
-	if worker := c.core.Worker(h.id); worker != nil && worker.Issue != nil {
-		issue = sql.NullString{String: *worker.Issue, Valid: true}
+	if session := c.core.Session(h.id); session != nil && session.Issue != nil {
+		issue = sql.NullString{String: *session.Issue, Valid: true}
 	}
 	trigger, _ := json.Marshal(by)
-	id, err := c.q.StartRun(context.Background(), generated.StartRunParams{Worker: h.id, Issue: issue, TriggeredBy: string(trigger), StartedAt: clock.NowMs()})
+	id, err := c.q.StartRun(context.Background(), generated.StartRunParams{Session: h.id, Issue: issue, TriggeredBy: string(trigger), StartedAt: clock.NowMs()})
 	if err != nil {
 		log.Printf("vibevalley: %s's run not kept: %v", h.id, err)
 		return
@@ -53,7 +53,7 @@ func (c *workers) startRun(h *hand) {
 	h.mu.Unlock()
 }
 
-func (c *workers) heardInRun(h *hand, seq int64) {
+func (c *sessions) heardInRun(h *hand, seq int64) {
 	h.mu.Lock()
 	id := h.run
 	if id != 0 {
@@ -69,7 +69,7 @@ func (c *workers) heardInRun(h *hand, seq int64) {
 	}
 }
 
-func (c *workers) endRun(h *hand, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
+func (c *sessions) endRun(h *hand, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
 	h.mu.Lock()
 	id := h.run
 	h.run, h.heard = 0, nil
@@ -79,7 +79,7 @@ func (c *workers) endRun(h *hand, outcome protocol.Outcome, summary string, spen
 	}
 }
 
-func (c *workers) finishRun(id int64, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
+func (c *sessions) finishRun(id int64, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
 	params := generated.EndRunParams{
 		EndedAt: sql.NullInt64{Int64: clock.NowMs(), Valid: true}, Outcome: sql.NullString{String: string(outcome), Valid: true},
 		Summary: sql.NullString{String: summary, Valid: summary != ""}, ID: id,
@@ -94,7 +94,7 @@ func (c *workers) finishRun(id int64, outcome protocol.Outcome, summary string, 
 }
 
 // The runs still going when the server stopped stopped with it.
-func (c *workers) endOpenRuns() {
+func (c *sessions) endOpenRuns() {
 	open, err := c.q.OpenRuns(context.Background())
 	if err != nil {
 		log.Printf("vibevalley: open runs: %v", err)
@@ -105,24 +105,24 @@ func (c *workers) endOpenRuns() {
 	}
 }
 
-// A run that is no worker's: the manager's, on an issue for it.
-func (c *workers) OpenRun(worker, issue string, by protocol.RunTrigger) int64 {
+// A run that is no session's: the manager's, on an issue for it.
+func (c *sessions) OpenRun(session, issue string, by protocol.RunTrigger) int64 {
 	trigger, _ := json.Marshal(by)
-	id, err := c.q.StartRun(context.Background(), generated.StartRunParams{Worker: worker, Issue: sql.NullString{String: issue, Valid: issue != ""}, TriggeredBy: string(trigger), StartedAt: clock.NowMs()})
+	id, err := c.q.StartRun(context.Background(), generated.StartRunParams{Session: session, Issue: sql.NullString{String: issue, Valid: issue != ""}, TriggeredBy: string(trigger), StartedAt: clock.NowMs()})
 	if err != nil {
-		log.Printf("vibevalley: %s's run not kept: %v", worker, err)
+		log.Printf("vibevalley: %s's run not kept: %v", session, err)
 		return 0
 	}
 	return id
 }
 
-func (c *workers) CloseRun(id int64, outcome protocol.Outcome, summary string) {
+func (c *sessions) CloseRun(id int64, outcome protocol.Outcome, summary string) {
 	if id != 0 {
 		c.finishRun(id, outcome, summary, nil)
 	}
 }
 
-func (c *workers) Runs(issue string) ([]protocol.Run, error) {
+func (c *sessions) Runs(issue string) ([]protocol.Run, error) {
 	rows, err := c.q.RunsOfIssue(context.Background(), sql.NullString{String: issue, Valid: true})
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func (c *workers) Runs(issue string) ([]protocol.Run, error) {
 }
 
 func runOf(r generated.Run) protocol.Run {
-	run := protocol.Run{ID: r.ID, Worker: r.Worker, Heard: []int64{}, StartedAt: r.StartedAt}
+	run := protocol.Run{ID: r.ID, Session: r.Session, Heard: []int64{}, StartedAt: r.StartedAt}
 	if err := json.Unmarshal([]byte(r.TriggeredBy), &run.TriggeredBy); err != nil {
 		log.Printf("vibevalley: run %d: what started it cannot be read: %v", r.ID, err)
 	}

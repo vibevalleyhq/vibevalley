@@ -12,7 +12,7 @@ const (
 	// Counted since the person last spoke in the conversation.
 	HopLimit            = 4
 	AgentWakeCooldownMs = 60_000
-	// Past this, only the person wakes the worker.
+	// Past this, only the person wakes the session.
 	WakeBreaker          = 3
 	NoticeBatchMs        = 3_000
 	WakeMessages         = 3
@@ -47,7 +47,7 @@ type InboxMessage struct {
 }
 
 // The words' own line breaks are marked, so no message can pass for a header.
-// One line each, in order: how the manager and a worker read what came to them.
+// One line each, in order: how the manager and a session read what came to them.
 func InboxLines(messages []InboxMessage) string {
 	lines := make([]string, len(messages))
 	for i, m := range messages {
@@ -58,7 +58,7 @@ func InboxLines(messages []InboxMessage) string {
 
 func MessageLine(m InboxMessage) string {
 	from := m.Name
-	if m.FromKind == SenderKindWorker {
+	if m.FromKind == SenderKindAgent {
 		from = m.From + " " + m.Name
 	}
 	return fmt.Sprintf("[target=%s msg=%d from=%s] %s", m.Target, m.Seq, from, strings.ReplaceAll(str.Trim(m.Text), "\n", "\n  │ "))

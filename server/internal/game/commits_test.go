@@ -10,12 +10,12 @@ import (
 	"vibevalley/internal/testkit/fixture"
 )
 
-func TestWorkersCommitsCountedOncePerRepository(t *testing.T) {
+func TestSessionsCommitsCountedOncePerRepository(t *testing.T) {
 	root := t.TempDir()
 	testkit.Repo(t, filepath.Join(root, "app"), 3, 2)
 	tree := filepath.Join(root, ".worktrees", "w1")
 	testkit.Git(t, filepath.Join(root, "app"), "worktree", "add", "-q", "-b", "vibevalley/w1", tree)
-	testkit.Git(t, tree, "commit", "-q", "--allow-empty", "-m", "worker work")
+	testkit.Git(t, tree, "commit", "-q", "--allow-empty", "-m", "session work")
 	testkit.Repo(t, filepath.Join(root, "tools", "cli"), 1, 0)
 	c, _ := newCommits(fixture.Config("", root, ""), nil)
 	count := c.Count(context.Background())

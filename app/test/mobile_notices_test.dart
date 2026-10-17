@@ -7,7 +7,7 @@ import 'package:vibevalley/mobile/notices.dart';
 void main() {
   test('a tap waits for a screen, then opens what the notification was about', () async {
     final notices = PhoneNotices.instance;
-    notices.open(jsonEncode(const DesktopOpenWorker('w3').toJson()));
+    notices.open(jsonEncode(const DesktopOpenSession('w3').toJson()));
     final got = <DesktopCommand>[];
     final sub = notices.commands.listen(got.add);
     await Future<void>.delayed(Duration.zero);
@@ -17,7 +17,7 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     await sub.cancel();
     expect(got.map((c) => c.toJson()), [
-      {'type': 'worker', 'id': 'w3'},
+      {'type': 'session', 'id': 'w3'},
       {'type': 'achievements'},
     ]);
   });

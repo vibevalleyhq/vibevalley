@@ -40,10 +40,10 @@ Map<String, dynamic> settingsJson({String? deepseek}) {
   };
 }
 
-CoreState farmState({List<Map<String, dynamic>> workers = const [], double coins = 0}) => CoreState.fromJson({
+CoreState farmState({List<Map<String, dynamic>> sessions = const [], double coins = 0}) => CoreState.fromJson({
   'call': 'idle',
   'manager': 'idle',
-  'workers': workers,
+  'sessions': sessions,
   if (coins > 0) 'progress': {'coins': coins, 'streak': 0, 'bestStreak': 0, 'counts': <String, Object>{}, 'unlocked': <Object>[]},
 });
 

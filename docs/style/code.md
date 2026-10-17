@@ -9,7 +9,7 @@
 
 ## 叫法
 
-- 代码、接口和服务端的文档用实际的概念：`Issue`、`Worker`、`Project`（[概念](../concepts.md)）。不用旧叫法 ticket，也不用网页时代的名字。
+- 代码、接口和服务端的文档用实际的概念：`Issue`、`Session`、`Project`（[概念](../concepts.md)）。不用旧叫法 ticket，也不用网页时代的名字。
 - 界面上的字用中文，用农场的叫法（[用语表](../README.md#用语)）。
 - 注释用英文。
 

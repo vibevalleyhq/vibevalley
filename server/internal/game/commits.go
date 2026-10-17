@@ -15,7 +15,7 @@ import (
 )
 
 // A repository with several worktrees counts once. "Yours" is by author email (git's global and each repository's user.email, and
-// git_emails in the configuration); workers commit as you, so their commits count.
+// git_emails in the configuration); sessions commit as you, so their commits count.
 
 const (
 	repoDepth     = 3

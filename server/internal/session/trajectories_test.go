@@ -1,4 +1,4 @@
-package worker
+package session
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ import (
 	"vibevalley/pkg/x/ptr"
 )
 
-func workerTrajectories(t *testing.T, home string, change ...func(*base.Config)) *trajectories {
+func sessionTrajectories(t *testing.T, home string, change ...func(*base.Config)) *trajectories {
 	t.Helper()
 	core := core.New(home)
 	cfg := fixture.Config(home, home, "")
@@ -33,7 +33,7 @@ func workerTrajectories(t *testing.T, home string, change ...func(*base.Config))
 }
 
 func TestTrajectoryKeptAndListed(t *testing.T) {
-	tr := workerTrajectories(t, t.TempDir())
+	tr := sessionTrajectories(t, t.TempDir())
 	j := tr.Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", Agent: ptr.To("backend"), Job: ptr.To("加分页"), StartedAt: 1}, 0)
 	j.Asked("加分页", nil)
 	j.ToolStarted("c1", ToolStart{Text: "ls", Action: protocol.ToolActionRunCommand, Tool: "bash"}, nil)
@@ -91,7 +91,7 @@ func TestOldTrajectoriesLoseTheirSteps(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "w1.json"), []byte(`[{"n":0,"at":0,"kind":"prompt","text":"老活"}]`), 0o644)
 	writeHead(t, dir, "w2", clock.NowMs(), clock.NowMs())
 	os.WriteFile(filepath.Join(dir, "w2.json"), []byte("[]"), 0o644)
-	tr := workerTrajectories(t, home)
+	tr := sessionTrajectories(t, home)
 	testkit.Eq(t, len(tr.List("")), 2, "both issues listed")
 	old := tr.Get("w1")
 	if old == nil || len(old.Activities) != 0 {
@@ -111,11 +111,11 @@ func TestTrajectoryDaysZeroKeepsForGood(t *testing.T) {
 	os.MkdirAll(dir, 0o755)
 	long := clock.NowMs() - 400*protocol.DayMs
 	writeHead(t, dir, "w1", long, long)
-	testkit.Eq(t, len(workerTrajectories(t, home, func(c *base.Config) { c.Trajectory.Days = 0 }).List("")), 1, "kept")
+	testkit.Eq(t, len(sessionTrajectories(t, home, func(c *base.Config) { c.Trajectory.Days = 0 }).List("")), 1, "kept")
 }
 
 func TestReasoningRunsOn(t *testing.T) {
-	j := workerTrajectories(t, t.TempDir()).Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", StartedAt: 1}, 0)
+	j := sessionTrajectories(t, t.TempDir()).Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", StartedAt: 1}, 0)
 	j.Thought("先看", nil)
 	j.Thought("路由", nil)
 	j.Said("好", nil)
@@ -130,7 +130,7 @@ func TestReasoningRunsOn(t *testing.T) {
 }
 
 func TestSubAgentStepsGoUnderTheirCall(t *testing.T) {
-	j := workerTrajectories(t, t.TempDir()).Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", StartedAt: 1}, 0)
+	j := sessionTrajectories(t, t.TempDir()).Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", StartedAt: 1}, 0)
 	j.ToolStarted("task-1", ToolStart{Text: "派个帮手", Action: protocol.ToolActionOther, Tool: "Task"}, nil)
 	j.Said("帮手先看看", From{"task-1"})
 	j.ToolStarted("c1", ToolStart{Text: "ls", Action: protocol.ToolActionRunCommand, Tool: "bash"}, From{"task-1"})

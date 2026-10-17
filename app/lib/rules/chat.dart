@@ -29,7 +29,8 @@ Conversation? channelOf(Chat? chat, Conversation? c) {
 }
 
 /// `#name`, or `#channel:seq` for a thread (the seq of the message it hangs under).
-Conversation? jobThreadOf(Chat? chat, String worker) => chat?.conversations.lastWhereOrNull((c) => c.subjectKind == SubjectKind.issue && c.subjectId == worker);
+Conversation? jobThreadOf(Chat? chat, String session) =>
+    chat?.conversations.lastWhereOrNull((c) => c.subjectKind == SubjectKind.issue && c.subjectId == session);
 
 List<ChatMessage> messagesIn(Chat? chat, double conversation) => [...?chat?.messages.where((m) => m.conversation == conversation)];
 

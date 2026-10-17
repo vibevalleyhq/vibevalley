@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-每个帮工是 oar 子 agent 的一个会话：当初用 oar 的 `createSubagents()`，现在是 smith（oar 的 Go 移植，`server/pkg/smith`）的 `agents`，在 `server/internal/worker/workers.go` 里（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)）；并发上限 6、深度上限 1。帮工档案的人设、技能、MCP 服务器和禁用的工具，通过一个只给这次派活用的 runtime 包装传进会话（oar 的 spawn 只收模型、思考强度、环境变量和目录）。会话事件变成核心状态的事实（[farm-core-state](2026-10-11-farm-core-state.md)），每轮的报告交给管家（后来帮工在田头上自己汇报，没做成的才交给管家，见 [农场群聊](../feature/2026-10-11-farm-group-chat.md)）。
+每个帮工是 oar 子 agent 的一个会话：当初用 oar 的 `createSubagents()`，现在是 smith（oar 的 Go 移植，`server/pkg/smith`）的 `agents`，在 `server/internal/session/sessions.go` 里（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)）；并发上限 6、深度上限 1。帮工档案的人设、技能、MCP 服务器和禁用的工具，通过一个只给这次派活用的 runtime 包装传进会话（oar 的 spawn 只收模型、思考强度、环境变量和目录）。会话事件变成核心状态的事实（[farm-core-state](2026-10-11-farm-core-state.md)），每轮的报告交给管家（后来帮工在田头上自己汇报，没做成的才交给管家，见 [农场群聊](../feature/2026-10-11-farm-group-chat.md)）。
 
 oar 默认不要权限确认、不开沙箱。2026-10-10 主人确认接受，用这几道边界代替：帮工只在 `VIBEVALLEY_WORK_ROOT` 下的项目里开工，每人一个 git worktree 和分支（[projects-worktrees-and-harvest](2026-10-10-projects-worktrees-and-harvest.md)）；服务端只听 127.0.0.1（后来有两个例外，都是另开的监听、各有钥匙：经隧道给声网的语音线路，见 [语音接到我们自己的管家](../feature/2026-10-10-voice-through-our-manager.md)；默认关着、只放主人点过头的设备的院门，见 [院门](../feature/2026-10-14-yard-gate.md)）。
 

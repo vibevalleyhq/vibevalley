@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"vibevalley/internal/protocol"
+	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
-	"vibevalley/internal/worker"
 	"vibevalley/pkg/x/clock"
 	"vibevalley/pkg/x/str"
 )
@@ -40,7 +40,7 @@ var planPlans = map[string]any{
 	}},
 }
 
-type planFakeWorkers struct {
+type planFakeSessions struct {
 	f *world
 
 	mu       sync.Mutex
@@ -54,13 +54,13 @@ type planFakeWorkers struct {
 	release  chan struct{}
 }
 
-func newPlanFakeWorkers(f *world, release chan struct{}) *planFakeWorkers {
-	return &planFakeWorkers{f: f, last: map[string]string{}, attempts: map[string]int{}, written: map[string]bool{}, started: map[string]bool{}, touched: map[string][]string{}, told: map[string][]string{}, release: release}
+func newPlanFakeSessions(f *world, release chan struct{}) *planFakeSessions {
+	return &planFakeSessions{f: f, last: map[string]string{}, attempts: map[string]int{}, written: map[string]bool{}, started: map[string]bool{}, touched: map[string][]string{}, told: map[string][]string{}, release: release}
 }
 
 var planGoal = regexp.MustCompile(`要做的事：(\S+)`)
 
-func (c *planFakeWorkers) work(h protocol.Worker, input string) (protocol.Outcome, string) {
+func (c *planFakeSessions) work(h protocol.Session, input string) (protocol.Outcome, string) {
 	if h.Playbook == nil || h.Playbook.Node == nil {
 		var plan any
 		if strings.Contains(input, "计划有问题") {
@@ -119,8 +119,8 @@ func (c *planFakeWorkers) work(h protocol.Worker, input string) (protocol.Outcom
 	return protocol.OutcomeCompleted, "结论：写好了 steps/" + id + ".txt"
 }
 
-func (c *planFakeWorkers) run(id, input string) {
-	h := c.f.Core.Worker(id)
+func (c *planFakeSessions) run(id, input string) {
+	h := c.f.Core.Session(id)
 	if h == nil {
 		return
 	}
@@ -138,27 +138,27 @@ func (c *planFakeWorkers) run(id, input string) {
 	c.f.Core.Apply(protocol.FactReport{ID: id, Outcome: outcome, Summary: summary, Runs: 1})
 }
 
-func (c *planFakeWorkers) Hire(_ context.Context, agent protocol.Agent, task, project string, opt worker.HireOptions) worker.Hired {
+func (c *planFakeSessions) Hire(_ context.Context, agent protocol.Agent, task, project string, opt session.HireOptions) session.Hired {
 	c.mu.Lock()
 	c.n++
 	id := fmt.Sprintf("w%d", c.n)
 	c.mu.Unlock()
 	wt := "/wt/" + id
-	h := protocol.Worker{
+	h := protocol.Session{
 		ID: id, Name: "帮工" + id, Agent: agent.ID, Runtime: agent.Runtime, Task: task, Project: &project, Worktree: &wt,
 		HiredAt: clock.NowMs(), Phase: protocol.Phase{Value: protocol.PhaseWorking{Since: clock.NowMs()}}, Playbook: opt.Playbook,
 	}
-	c.f.Core.Apply(protocol.FactHired{Worker: h})
+	c.f.Core.Apply(protocol.FactHired{Session: h})
 	if opt.Issue != "" {
 		if err := c.f.Issue.Ran(opt.Issue, h); err != nil {
 			panic(err)
 		}
 	}
 	go c.run(id, task)
-	return worker.Hired{Worker: &h}
+	return session.Hired{Session: &h}
 }
 
-func (c *planFakeWorkers) Tell(id, text string) string {
+func (c *planFakeSessions) Tell(id, text string) string {
 	c.mu.Lock()
 	c.told[id] = append(c.told[id], text)
 	c.mu.Unlock()
@@ -167,27 +167,27 @@ func (c *planFakeWorkers) Tell(id, text string) string {
 	return "说了"
 }
 
-func (c *planFakeWorkers) Dismiss(id string) bool {
+func (c *planFakeSessions) Dismiss(id string) bool {
 	c.f.Core.Apply(protocol.FactLeft{ID: id})
 	return true
 }
 
-func (c *planFakeWorkers) Find(id string) *worker.Roster {
-	h := c.f.Core.Worker(id)
+func (c *planFakeSessions) Find(id string) *session.Roster {
+	h := c.f.Core.Session(id)
 	if h == nil {
 		return nil
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return &worker.Roster{Worker: *h, LastText: c.last[id]}
+	return &session.Roster{Session: *h, LastText: c.last[id]}
 }
 
-func (c *planFakeWorkers) MergeInto(id, target string) ([]string, error) {
+func (c *planFakeSessions) MergeInto(id, target string) ([]string, error) {
 	return []string{"c0ffee-" + id}, nil
 }
 
 type planFakeProjects struct {
-	workers  *planFakeWorkers
+	sessions *planFakeSessions
 	mu       sync.Mutex
 	branches []string
 }
@@ -195,10 +195,10 @@ type planFakeProjects struct {
 var planTestFile = regexp.MustCompile(`steps/(\w+)\.txt`)
 
 func (p *planFakeProjects) Run(_ context.Context, cwd, command string) (bool, string) {
-	p.workers.mu.Lock()
-	defer p.workers.mu.Unlock()
+	p.sessions.mu.Lock()
+	defer p.sessions.mu.Unlock()
 	for _, m := range planTestFile.FindAllStringSubmatch(command, -1) {
-		if !p.workers.written[m[1]] {
+		if !p.sessions.written[m[1]] {
 			return false, "steps/" + m[1] + ".txt: no such file"
 		}
 	}
@@ -206,13 +206,13 @@ func (p *planFakeProjects) Run(_ context.Context, cwd, command string) (bool, st
 }
 
 func (p *planFakeProjects) ChangedFiles(cwd, _ string) ([]string, error) {
-	h := p.workers.f.Core.Worker(strings.TrimPrefix(cwd, "/wt/"))
+	h := p.sessions.f.Core.Session(strings.TrimPrefix(cwd, "/wt/"))
 	if h == nil || h.Playbook == nil || h.Playbook.Node == nil {
 		return nil, nil
 	}
-	p.workers.mu.Lock()
-	defer p.workers.mu.Unlock()
-	return slices.Clone(p.workers.touched[*h.Playbook.Node]), nil
+	p.sessions.mu.Lock()
+	defer p.sessions.mu.Unlock()
+	return slices.Clone(p.sessions.touched[*h.Playbook.Node]), nil
 }
 
 func (p *planFakeProjects) OpenBranch(project, branch string) error {
@@ -232,7 +232,7 @@ func (p *planFakeProjects) BranchChanges(project, branch string) (protocol.Chang
 
 type planTestFarm struct {
 	*world
-	workers  *planFakeWorkers
+	sessions *planFakeSessions
 	projects *planFakeProjects
 	mu       sync.Mutex
 	facts    []protocol.Playbook
@@ -247,9 +247,9 @@ func newPlanTestFarm(t *testing.T, home string, release chan struct{}, before fu
 	if err != nil {
 		t.Fatal(err)
 	}
-	tf := &planTestFarm{world: f, workers: newPlanFakeWorkers(f, release)}
-	tf.projects = &planFakeProjects{workers: tf.workers}
-	f.Playbook.workers, f.Playbook.projects, f.Playbook.check = tf.workers, tf.projects, func(protocol.Agent) []protocol.AgentIssue { return nil }
+	tf := &planTestFarm{world: f, sessions: newPlanFakeSessions(f, release)}
+	tf.projects = &planFakeProjects{sessions: tf.sessions}
+	f.Playbook.sessions, f.Playbook.projects, f.Playbook.check = tf.sessions, tf.projects, func(protocol.Agent) []protocol.AgentIssue { return nil }
 	for _, a := range f.Agent.Agents() {
 		a.Effort = ""
 		if _, err := f.Agent.SaveAgent(a); err != nil {
@@ -339,7 +339,7 @@ func TestPlanDiamond(t *testing.T) {
 	if fmt.Sprint(shape) != "[[a ] [b a] [c a] [d b,c]]" {
 		t.Fatalf("draft: %v", shape)
 	}
-	if slices.ContainsFunc(tf.Core.State().Workers, func(h protocol.Worker) bool { return h.Playbook != nil && h.Playbook.ID == id }) {
+	if slices.ContainsFunc(tf.Core.State().Sessions, func(h protocol.Session) bool { return h.Playbook != nil && h.Playbook.ID == id }) {
 		t.Fatal("the planner went home with the draft")
 	}
 	if got := <-news; !strings.HasPrefix(got, "【种植计划】"+id+" 拆好了") {
@@ -367,7 +367,7 @@ func TestPlanDiamond(t *testing.T) {
 		t.Fatal("d started after b and c were merged")
 	}
 	for _, n := range ripe.Nodes {
-		if n.State != protocol.NodeStateMerged || len(n.Commits) == 0 || planStr(n.Conclusion) != "写好了 steps/"+n.ID+".txt" || n.Worker != nil {
+		if n.State != protocol.NodeStateMerged || len(n.Commits) == 0 || planStr(n.Conclusion) != "写好了 steps/"+n.ID+".txt" || n.Session != nil {
 			t.Fatalf("step %s: %+v", n.ID, n)
 		}
 	}
@@ -405,7 +405,7 @@ func TestPlanDiamond(t *testing.T) {
 	merged := history[slices.IndexFunc(history, func(e protocol.PlaybookEvent) bool {
 		return planStr(e.Node) == "a" && e.Kind == protocol.PlaybookEventKindNodeMerged
 	})]
-	if merged.Worker == nil || len(merged.Commits) == 0 || planStr(merged.Detail) != "写好了 steps/a.txt" {
+	if merged.Session == nil || len(merged.Commits) == 0 || planStr(merged.Detail) != "写好了 steps/a.txt" {
 		t.Fatalf("merged: %+v", merged)
 	}
 	for i := 1; i < len(history); i++ {
@@ -432,15 +432,15 @@ func TestPlanAcceptanceFirst(t *testing.T) {
 	if repro.Tries != 1 || fix.Tries != 1 {
 		t.Fatalf("tries: repro %d, fix %d", repro.Tries, fix.Tries)
 	}
-	tf.workers.mu.Lock()
-	defer tf.workers.mu.Unlock()
+	tf.sessions.mu.Lock()
+	defer tf.sessions.mu.Unlock()
 	told := func(step string) string {
-		for _, h := range tf.Core.State().Workers {
+		for _, h := range tf.Core.State().Sessions {
 			if h.Playbook != nil && h.Playbook.Node != nil && *h.Playbook.Node == step {
-				return strings.Join(tf.workers.told[h.ID], "\n")
+				return strings.Join(tf.sessions.told[h.ID], "\n")
 			}
 		}
-		return strings.Join(tf.workers.told[map[string]string{"repro": "w2", "fix": "w3"}[step]], "\n")
+		return strings.Join(tf.sessions.told[map[string]string{"repro": "w2", "fix": "w3"}[step]], "\n")
 	}
 	if got := told("repro"); !strings.Contains(got, "现在就通过了") {
 		t.Fatalf("repro was told: %s", got)
@@ -548,15 +548,15 @@ func TestPlanRestart(t *testing.T) {
 	first.until(t, id, func(pb protocol.Playbook) bool { return pb.State == protocol.PlaybookStateDraft })
 	first.act(t, id, protocol.PlaybookActionStart)
 	working := first.until(t, id, func(pb protocol.Playbook) bool { return planState(pb, "slow") == protocol.NodeStateWorking })
-	worker := planStr(planNode(working, "slow").Worker)
+	session := planStr(planNode(working, "slow").Session)
 	first.Close()
 
-	savedJSON := `{"hired":9,"hands":[{"id":"` + worker + `","place":{"project":"` + working.Project + `","cwd":"` + t.TempDir() + `"}}]}`
-	if err := os.WriteFile(filepath.Join(home, "workers.json"), []byte(savedJSON), 0o644); err != nil {
+	savedJSON := `{"hired":9,"hands":[{"id":"` + session + `","place":{"project":"` + working.Project + `","cwd":"` + t.TempDir() + `"}}]}`
+	if err := os.WriteFile(filepath.Join(home, "sessions.json"), []byte(savedJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	second := newPlanTestFarm(t, home, release, nil)
-	second.workers.attempts["slow"] = 1
+	second.sessions.attempts["slow"] = 1
 	paused := second.until(t, id, func(pb protocol.Playbook) bool { return pb.State == protocol.PlaybookStatePaused })
 	if !strings.Contains(planStr(paused.Note), "重启") {
 		t.Fatal(planStr(paused.Note))
@@ -575,7 +575,7 @@ func TestPlanChooseAgent(t *testing.T) {
 	a := func(id, runtime string, tags ...string) protocol.Agent {
 		return protocol.Agent{ID: id, Name: "名" + id, Runtime: runtime, Tags: tags}
 	}
-	cands := []worker.Candidate{{Agent: a("x", "pi", "测试"), Usable: true}, {Agent: a("y", "claude", "前端", "页面"), Usable: true}, {Agent: a("z", "codex"), Usable: false}}
+	cands := []session.Candidate{{Agent: a("x", "pi", "测试"), Usable: true}, {Agent: a("y", "claude", "前端", "页面"), Usable: true}, {Agent: a("z", "codex"), Usable: false}}
 	for _, c := range []struct{ task, named, want string }{
 		{"改页面的前端", "", "y"},
 		{"随便", "", "x"},
@@ -584,17 +584,17 @@ func TestPlanChooseAgent(t *testing.T) {
 		{"随便", "claude", "y"},
 		{"随便", "codex", "x"},
 	} {
-		if got := worker.ChooseAgent(cands, c.task, c.named, ""); got == nil || got.ID != c.want {
+		if got := session.ChooseAgent(cands, c.task, c.named, ""); got == nil || got.ID != c.want {
 			t.Errorf("%q named %q: %v, want %s", c.task, c.named, got, c.want)
 		}
 	}
-	if worker.ChooseAgent(cands[2:], "x", "", "") != nil {
+	if session.ChooseAgent(cands[2:], "x", "", "") != nil {
 		t.Error("no usable agent")
 	}
 	if got := str.Clip("  一二三\n四五  ", 4); got != "一二三…" {
 		t.Error(got)
 	}
-	task := worker.PlanningTask("做个打卡", "clock", []protocol.Agent{a("lab", "pi", "实验")})
+	task := session.PlanningTask("做个打卡", "clock", []protocol.Agent{a("lab", "pi", "实验")})
 	if !strings.Contains(task, "要做的事：做个打卡") || !strings.Contains(task, `"agent": "lab"`) || !strings.Contains(task, "  - lab：名lab，适合：（实验）") {
 		t.Error(task)
 	}
@@ -611,7 +611,7 @@ func TestPlanIsAParentIssue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if parent.Plan == nil || parent.Title != "菱形" || len(parent.Workers) != 1 || parent.Status != protocol.IssueStatusInReview {
+	if parent.Plan == nil || parent.Title != "菱形" || len(parent.Sessions) != 1 || parent.Status != protocol.IssueStatusInReview {
 		t.Fatalf("the parent: %+v", parent)
 	}
 	d, err := tf.Issue.Get(protocol.StepIssueID(id, "d"))
@@ -631,11 +631,11 @@ func TestPlanIsAParentIssue(t *testing.T) {
 	tf.act(t, id, protocol.PlaybookActionStart)
 	tf.until(t, id, func(pb protocol.Playbook) bool { return pb.State == protocol.PlaybookStateRipe })
 	a, _ := tf.Issue.Get(protocol.StepIssueID(id, "a"))
-	if len(a.Workers) != 1 || a.Closed == nil || *a.Closed != protocol.IssueCloseMergedIntoPlan {
+	if len(a.Sessions) != 1 || a.Closed == nil || *a.Closed != protocol.IssueCloseMergedIntoPlan {
 		t.Fatalf("a step done: %+v", a)
 	}
-	if got, _ := tf.Issue.Get(a.Workers[0]); got.ID != a.ID {
-		t.Fatalf("its worker's issue: %s", got.ID)
+	if got, _ := tf.Issue.Get(a.Sessions[0]); got.ID != a.ID {
+		t.Fatalf("its session's issue: %s", got.ID)
 	}
 	if _, err := tf.Issue.Reopen(context.Background(), a.ID, "", 0); !errors.As(err, &refused) {
 		t.Fatalf("a step reopened on the board: %v", err)

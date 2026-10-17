@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../shell/prefs.dart';
-import '../data/remote.dart' show agentsProvider, WorkerIssue;
+import '../data/remote.dart' show agentsProvider, SessionIssue;
 import 'farm.dart';
 import 'state.dart';
 import '../rules/playbook.dart';
@@ -20,13 +20,13 @@ class FarmCommands {
   VibeValleyApi get _api => ref.read(apiProvider);
   CoreState? get _farm => ref.read(farmProvider);
 
-  void _burst(Worker w, BedFxKind kind, [String? text]) {
-    final bed = bedOfStation(stationOfWorker(w));
+  void _burst(Session w, BedFxKind kind, [String? text]) {
+    final bed = bedOfStation(stationOfSession(w));
     if (bed != null) burst(ref, bed.index, kind, text);
   }
 
   /// `on`: a comment on that step of its trajectory.
-  Future<void> water(Worker w, String text, {int? on}) async {
+  Future<void> water(Session w, String text, {int? on}) async {
     await _api.issue.comment(
       id: w.issueId,
       body: CommentRequest(text: text, on: on?.toDouble()),
@@ -35,12 +35,12 @@ class FarmCommands {
   }
 
   /// The server tells it what its conflicts are and to settle them.
-  Future<void> resolve(Worker w) async {
+  Future<void> resolve(Session w) async {
     await _api.issue.resolve(id: w.issueId);
     _burst(w, BedFxKind.water);
   }
 
-  Future<void> cure(Worker w) async {
+  Future<void> cure(Session w) async {
     await _api.issue.comment(
       id: w.issueId,
       body: CommentRequest(text: bugText(w.task)),
@@ -48,12 +48,12 @@ class FarmCommands {
     _burst(w, BedFxKind.spray);
   }
 
-  Future<void> harvest(Worker w) async {
+  Future<void> harvest(Session w) async {
     await _api.issue.merge(id: w.issueId);
     _burst(w, BedFxKind.harvest, '收进仓库');
   }
 
-  Future<void> shovel(Worker w) async {
+  Future<void> shovel(Session w) async {
     if (w.phase is PhaseWorking) {
       await _api.session.stop(id: w.id);
     } else {
@@ -65,7 +65,7 @@ class FarmCommands {
   Future<void> stop(String id) => _api.session.stop(id: id);
   Future<void> dismiss(String id) => _api.issue.cancel(id: _issueOf(id));
 
-  String _issueOf(String worker) => (_farm?.workers ?? const <Worker>[]).firstWhere((w) => w.id == worker).issueId;
+  String _issueOf(String session) => (_farm?.sessions ?? const <Session>[]).firstWhere((w) => w.id == session).issueId;
 
   String? get pickedAgent {
     final pick = ref.read(prefsProvider).pick;
@@ -100,26 +100,26 @@ class FarmCommands {
     final tool = ref.read(heldToolProvider);
     final state = _farm;
     final view = ref.read(viewProvider);
-    final worker = state == null ? null : stationOf(state.workers, bed.station);
+    final session = state == null ? null : stationOf(state.sessions, bed.station);
     final level = view?.level.level.round() ?? 1;
-    final aim = aimTool(tool, bed, worker, view == null ? const PlotView(crop: Crop.empty) : plotOf(view, worker), level);
-    if (!aim.ok || worker == null) {
+    final aim = aimTool(tool, bed, session, view == null ? const PlotView(crop: Crop.empty) : plotOf(view, session), level);
+    if (!aim.ok || session == null) {
       if (aim.ok) return ToolSow(bed.station);
       burst(ref, bed.index, BedFxKind.note, aim.text);
       return ToolRefused(aim.text);
     }
     switch (tool) {
       case Tool.hand:
-        return ToolInspect(worker.id);
+        return ToolInspect(session.id);
       case Tool.water:
-        return ToolWater(worker.id);
+        return ToolWater(session.id);
       case Tool.bug:
-        await cure(worker);
+        await cure(session);
         return const ToolDone();
       case Tool.harvest:
-        return ToolReview(worker.id);
+        return ToolReview(session.id);
       case Tool.shovel:
-        await shovel(worker);
+        await shovel(session);
         return const ToolDone();
       case Tool.weed:
         return const ToolDone();

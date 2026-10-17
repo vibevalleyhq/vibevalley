@@ -17,18 +17,18 @@ import (
 	"vibevalley/internal/project"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/runtime"
-	"vibevalley/internal/worker"
+	"vibevalley/internal/session"
 	"vibevalley/pkg/x/clock"
 	"vibevalley/pkg/x/str"
 )
 
-// Playbook workers are followed through the core state's facts: a worker's run ending is the cue. Everything here runs one at a time.
+// Playbook sessions are followed through the core state's facts: a session's run ending is the cue. Everything here runs one at a time.
 
-type planWorkers interface {
-	Hire(ctx context.Context, agent protocol.Agent, task, project string, opt worker.HireOptions) worker.Hired
+type planSessions interface {
+	Hire(ctx context.Context, agent protocol.Agent, task, project string, opt session.HireOptions) session.Hired
 	Tell(id, text string) string
 	Dismiss(id string) bool
-	Find(id string) *worker.Roster
+	Find(id string) *session.Roster
 	MergeInto(id, target string) ([]string, error)
 }
 
@@ -59,7 +59,7 @@ type playbooks struct {
 	ctx          context.Context
 	stop         func()
 
-	workers  planWorkers
+	sessions planSessions
 	projects planProjects
 	// nil: runtime.Check. Tests put their own.
 	check func(protocol.Agent) []protocol.AgentIssue
@@ -67,23 +67,23 @@ type playbooks struct {
 
 type planWork struct {
 	dispatch *issue.Service
-	workers  *worker.Service
+	sessions *session.Service
 	merges   *issue.Service
 }
 
-func (w planWork) Hire(ctx context.Context, agent protocol.Agent, task, project string, opt worker.HireOptions) worker.Hired {
+func (w planWork) Hire(ctx context.Context, agent protocol.Agent, task, project string, opt session.HireOptions) session.Hired {
 	return w.dispatch.Hire(ctx, agent, task, project, opt)
 }
 func (w planWork) Tell(id, text string) string {
-	return w.workers.Tell(id, text, protocol.RunTrigger{Kind: protocol.RunTriggerKindPlaybook})
+	return w.sessions.Tell(id, text, protocol.RunTrigger{Kind: protocol.RunTriggerKindPlaybook})
 }
-func (w planWork) Dismiss(id string) bool                        { return w.workers.Dismiss(id) }
-func (w planWork) Find(id string) *worker.Roster                 { return w.workers.Find(id) }
+func (w planWork) Dismiss(id string) bool                        { return w.sessions.Dismiss(id) }
+func (w planWork) Find(id string) *session.Roster                { return w.sessions.Find(id) }
 func (w planWork) MergeInto(id, target string) ([]string, error) { return w.merges.Into(id, target) }
 
-func newPlaybooks(core *core.Service, issues *issue.Service, store *agent.Service, log *playbookLog, workers *worker.Service, projects *project.Service, runtimes *runtime.Service) (*playbooks, error) {
+func newPlaybooks(core *core.Service, issues *issue.Service, store *agent.Service, log *playbookLog, sessions *session.Service, projects *project.Service, runtimes *runtime.Service) (*playbooks, error) {
 	return &playbooks{
-		core: core, issues: issues, store: store, playbookLog: log, runtimes: runtimes, workers: planWork{issues, workers, issues}, projects: projects,
+		core: core, issues: issues, store: store, playbookLog: log, runtimes: runtimes, sessions: planWork{issues, sessions, issues}, projects: projects,
 		planners: map[string]string{}, plannerTries: map[string]int{}, news: base.NewHub[string](), ctx: context.Background(),
 	}, nil
 }
@@ -106,7 +106,7 @@ func planWithNote(pb protocol.Playbook, note string) protocol.Playbook {
 }
 
 func planUnmanned(n protocol.PlaybookNode) protocol.PlaybookNode {
-	n.Worker = nil
+	n.Session = nil
 	return n
 }
 
@@ -117,13 +117,13 @@ func planStr(s *string) string {
 	return *s
 }
 
-func (p *playbooks) candidates() []worker.Candidate {
-	var out []worker.Candidate
+func (p *playbooks) candidates() []session.Candidate {
+	var out []session.Candidate
 	for _, a := range p.store.Agents() {
 		usable := a.Enabled && !slices.ContainsFunc(p.issuesOf(a), func(i protocol.AgentIssue) bool {
 			return i.Level == "error"
 		})
-		out = append(out, worker.Candidate{Agent: a, Usable: usable})
+		out = append(out, session.Candidate{Agent: a, Usable: usable})
 	}
 	return out
 }
@@ -162,7 +162,7 @@ func (p *playbooks) giveUp(pb protocol.Playbook, why string) {
 	pb.State = protocol.PlaybookStateAbandoned
 	p.putFarm(planWithNote(pb, why))
 	if planner != "" {
-		p.workers.Dismiss(planner)
+		p.sessions.Dismiss(planner)
 	}
 	p.core.Notice(protocol.NoticeLevelWarn, "计划「"+pb.Title+"」没拆成："+why)
 	p.tellManager(pb.ID + "「" + pb.Title + "」没拆成：" + why + "。问主人要不要换个说法再拆。")
@@ -179,7 +179,7 @@ func (p *playbooks) Plan(goal, project, agent string, by protocol.PlaybookActor)
 		return "", errors.New("没说在哪个项目里做：项目是工作目录下的一个文件夹")
 	}
 	all := p.candidates()
-	chosen := worker.ChooseAgent(all, "规划 计划 拆分 "+goal, agent, "")
+	chosen := session.ChooseAgent(all, "规划 计划 拆分 "+goal, agent, "")
 	if chosen == nil {
 		return "", errors.New("没有能派的帮工来拆计划")
 	}
@@ -199,9 +199,9 @@ func (p *playbooks) Plan(goal, project, agent string, by protocol.PlaybookActor)
 		}
 	}
 	worktree := true
-	hired := p.workers.Hire(p.ctx, *chosen, worker.PlanningTask(goal, where, usable), where,
-		worker.HireOptions{Worktree: &worktree, Playbook: &protocol.WorkerPlaybook{ID: pb.ID}, Issue: pb.ID, Trigger: &protocol.RunTrigger{Kind: protocol.RunTriggerKindPlaybook}})
-	if hired.Worker == nil {
+	hired := p.sessions.Hire(p.ctx, *chosen, session.PlanningTask(goal, where, usable), where,
+		session.HireOptions{Worktree: &worktree, Playbook: &protocol.SessionPlaybook{ID: pb.ID}, Issue: pb.ID, Trigger: &protocol.RunTrigger{Kind: protocol.RunTriggerKindPlaybook}})
+	if hired.Session == nil {
 		reason := hired.Refused
 		if reason == "" {
 			reason = "没派出去"
@@ -210,11 +210,11 @@ func (p *playbooks) Plan(goal, project, agent string, by protocol.PlaybookActor)
 		p.put(planWithNote(pb, "规划的帮工派不出去："+reason), by, "")
 		return "", errors.New(reason)
 	}
-	p.planners[pb.ID] = hired.Worker.ID
-	return fmt.Sprintf("%s 去看代码、拆计划了（%s）。拆好了会放在「计划」里，你看过再开工。", hired.Worker.Name, pb.ID), nil
+	p.planners[pb.ID] = hired.Session.ID
+	return fmt.Sprintf("%s 去看代码、拆计划了（%s）。拆好了会放在「计划」里，你看过再开工。", hired.Session.Name, pb.ID), nil
 }
 
-func (p *playbooks) planned(pb protocol.Playbook, worker protocol.Worker, report protocol.FactReport) {
+func (p *playbooks) planned(pb protocol.Playbook, session protocol.Session, report protocol.FactReport) {
 	if pb.State != protocol.PlaybookStatePlanning {
 		return
 	}
@@ -229,12 +229,12 @@ func (p *playbooks) planned(pb protocol.Playbook, worker protocol.Worker, report
 			return
 		}
 		p.plannerTries[pb.ID] = tries + 1
-		p.workers.Tell(worker.ID, "上一轮没做成。看一下报错，接着把计划拆完，最后用 json 代码块给出。")
+		p.sessions.Tell(session.ID, "上一轮没做成。看一下报错，接着把计划拆完，最后用 json 代码块给出。")
 		return
 	case protocol.OutcomeCompleted:
 	}
 	last := ""
-	if r := p.workers.Find(worker.ID); r != nil {
+	if r := p.sessions.Find(session.ID); r != nil {
 		last = r.LastText
 	}
 	parsed := parsePlan(last)
@@ -252,7 +252,7 @@ func (p *playbooks) planned(pb protocol.Playbook, worker protocol.Worker, report
 		for i, x := range parsed.Problems {
 			lines[i] = "- " + x
 		}
-		p.workers.Tell(worker.ID, "计划有问题：\n"+strings.Join(lines, "\n")+"\n\n改好，在最后用一个 json 代码块重新给出整张计划。")
+		p.sessions.Tell(session.ID, "计划有问题：\n"+strings.Join(lines, "\n")+"\n\n改好，在最后用一个 json 代码块重新给出整张计划。")
 		return
 	}
 	delete(p.planners, pb.ID)
@@ -264,7 +264,7 @@ func (p *playbooks) planned(pb protocol.Playbook, worker protocol.Worker, report
 	draft.Nodes, draft.State = parsed.Nodes, protocol.PlaybookStateDraft
 	draft = planWithNote(draft, "")
 	p.putFarm(draft)
-	p.workers.Dismiss(worker.ID)
+	p.sessions.Dismiss(session.ID)
 	p.core.Notice(protocol.NoticeLevelInfo, fmt.Sprintf("计划「%s」拆好了，%d 步：在「计划」里看过再开工", draft.Title, len(draft.Nodes)))
 	p.tellManager(draft.ID + " 拆好了，等主人看过再开工（plan_action start）。用一两句话告诉主人拆成了哪几步。\n" + protocol.PlaybookText(draft))
 }
@@ -276,29 +276,29 @@ func (p *playbooks) schedule(id string) {
 	}
 	pb := *got
 	for _, node := range startable(pb) {
-		agent := worker.ChooseAgent(p.candidates(), node.Task, planStr(node.Agent), "")
+		agent := session.ChooseAgent(p.candidates(), node.Task, planStr(node.Agent), "")
 		refused := "没有能派的帮工"
-		var hired worker.Hired
+		var hired session.Hired
 		if agent != nil {
 			worktree := true
 			nodeID := node.ID
-			hired = p.workers.Hire(p.ctx, *agent, nodeTask(pb, node), pb.Project, worker.HireOptions{
-				Worktree: &worktree, Playbook: &protocol.WorkerPlaybook{ID: pb.ID, Node: &nodeID}, Base: planStr(pb.Branch), Trigger: &protocol.RunTrigger{Kind: protocol.RunTriggerKindPlaybook},
+			hired = p.sessions.Hire(p.ctx, *agent, nodeTask(pb, node), pb.Project, session.HireOptions{
+				Worktree: &worktree, Playbook: &protocol.SessionPlaybook{ID: pb.ID, Node: &nodeID}, Base: planStr(pb.Branch), Trigger: &protocol.RunTrigger{Kind: protocol.RunTriggerKindPlaybook},
 				Issue: protocol.StepIssueID(pb.ID, node.ID),
 			})
 			refused = hired.Refused
 		}
-		if hired.Worker == nil {
-			// Not now: it waits, and is tried again when a worker finishes or leaves.
+		if hired.Session == nil {
+			// Not now: it waits, and is tried again when a session finishes or leaves.
 			note := "「" + node.Title + "」先等着：" + refused
 			if planStr(pb.Note) != note {
 				p.putFarm(planWithNote(pb, note))
 			}
 			return
 		}
-		worker := hired.Worker.ID
+		session := hired.Session.ID
 		pb = protocol.WithNode(planWithNote(pb, ""), node.ID, func(n protocol.PlaybookNode) protocol.PlaybookNode {
-			n.State, n.Worker, n.Tries = protocol.NodeStateWorking, &worker, 0
+			n.State, n.Session, n.Tries = protocol.NodeStateWorking, &session, 0
 			return n
 		})
 		p.putFarm(pb)
@@ -316,7 +316,7 @@ func (p *playbooks) stepFailed(pb protocol.Playbook, node protocol.PlaybookNode,
 		"。它后面的步骤在等；问主人是重试（node_action retry）、改工单，还是跳过（node_action skip）。")
 }
 
-func (p *playbooks) sendBack(pb protocol.Playbook, node protocol.PlaybookNode, worker, text, why string) {
+func (p *playbooks) sendBack(pb protocol.Playbook, node protocol.PlaybookNode, session, text, why string) {
 	if node.Tries >= protocol.AutoRetries {
 		p.stepFailed(pb, node, why)
 		return
@@ -325,16 +325,16 @@ func (p *playbooks) sendBack(pb protocol.Playbook, node protocol.PlaybookNode, w
 		n.Tries++
 		return n
 	}), protocol.PlaybookActorSystem, why)
-	p.workers.Tell(worker, text)
+	p.sessions.Tell(session, text)
 }
 
-// Judged by the farm, not by the step's worker. Not verified: it is sent back, and the answer is false.
-func (p *playbooks) verified(pb protocol.Playbook, node protocol.PlaybookNode, workerID string) (ok bool, frozen []string) {
-	worker := p.core.Worker(workerID)
-	if worker == nil || worker.Worktree == nil {
+// Judged by the farm, not by the step's session. Not verified: it is sent back, and the answer is false.
+func (p *playbooks) verified(pb protocol.Playbook, node protocol.PlaybookNode, sessionID string) (ok bool, frozen []string) {
+	session := p.core.Session(sessionID)
+	if session == nil || session.Worktree == nil {
 		return true, nil
 	}
-	cwd := *worker.Worktree
+	cwd := *session.Worktree
 	var changed []string
 	if pb.Branch != nil && (protocol.IsAcceptance(node) || len(protocol.AcceptancesOf(pb, node)) > 0) {
 		files, err := p.projects.ChangedFiles(cwd, *pb.Branch)
@@ -346,13 +346,13 @@ func (p *playbooks) verified(pb protocol.Playbook, node protocol.PlaybookNode, w
 	}
 	if protocol.IsAcceptance(node) && node.Check != nil {
 		if passed, _ := p.projects.Run(p.ctx, cwd, *node.Check); passed {
-			p.sendBack(pb, node, workerID, acceptancePassedText(*node.Check), "验收 "+*node.Check+" 现在就通过了")
+			p.sendBack(pb, node, sessionID, acceptancePassedText(*node.Check), "验收 "+*node.Check+" 现在就通过了")
 			return false, nil
 		}
 		return true, changed
 	}
 	if touched := frozenTouched(pb, node, changed); len(touched) > 0 {
-		p.sendBack(pb, node, workerID, frozenTouchedText(touched), "改了冻结的验收："+strings.Join(touched, "、"))
+		p.sendBack(pb, node, sessionID, frozenTouchedText(touched), "改了冻结的验收："+strings.Join(touched, "、"))
 		return false, nil
 	}
 	var checks []string
@@ -361,16 +361,16 @@ func (p *playbooks) verified(pb protocol.Playbook, node protocol.PlaybookNode, w
 	}
 	for _, check := range append(checks, protocol.AcceptanceChecks(pb, node)...) {
 		if passed, output := p.projects.Run(p.ctx, cwd, check); !passed {
-			p.sendBack(pb, node, workerID, checkFailedText(check, output), "做完跑 "+check+" 没通过")
+			p.sendBack(pb, node, sessionID, checkFailedText(check, output), "做完跑 "+check+" 没通过")
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-func (p *playbooks) stepDone(pb protocol.Playbook, node protocol.PlaybookNode, workerID, conclusion string) {
-	worker := p.core.Worker(workerID)
-	ok, frozen := p.verified(pb, node, workerID)
+func (p *playbooks) stepDone(pb protocol.Playbook, node protocol.PlaybookNode, sessionID, conclusion string) {
+	session := p.core.Session(sessionID)
+	ok, frozen := p.verified(pb, node, sessionID)
 	if !ok {
 		return
 	}
@@ -378,12 +378,12 @@ func (p *playbooks) stepDone(pb protocol.Playbook, node protocol.PlaybookNode, w
 		p.stepFailed(pb, node, "计划还没有分支")
 		return
 	}
-	commits, err := p.workers.MergeInto(workerID, *pb.Branch)
+	commits, err := p.sessions.MergeInto(sessionID, *pb.Branch)
 	if err != nil {
 		var f project.MergeFailure
 		if errors.As(err, &f) && f.Kind == "conflict" {
 			// It merges the playbook's branch into its own and resolves the conflict; then this runs again.
-			p.sendBack(pb, node, workerID, protocol.ConflictTask(f.Base, f.Files), "合进计划分支会冲突："+strings.Join(f.Files, "、"))
+			p.sendBack(pb, node, sessionID, protocol.ConflictTask(f.Base, f.Files), "合进计划分支会冲突："+strings.Join(f.Files, "、"))
 			return
 		}
 		why := err.Error()
@@ -399,8 +399,8 @@ func (p *playbooks) stepDone(pb protocol.Playbook, node protocol.PlaybookNode, w
 		if protocol.IsAcceptance(n) {
 			n.Frozen = frozen
 		}
-		if worker != nil && worker.Spent != nil {
-			spent := *worker.Spent
+		if session != nil && session.Spent != nil {
+			spent := *session.Spent
 			n.Spent = &spent
 		}
 		return n
@@ -416,12 +416,12 @@ func (p *playbooks) stepDone(pb protocol.Playbook, node protocol.PlaybookNode, w
 	}
 }
 
-func (p *playbooks) stepEnded(pb protocol.Playbook, node protocol.PlaybookNode, worker protocol.Worker, report protocol.FactReport) {
+func (p *playbooks) stepEnded(pb protocol.Playbook, node protocol.PlaybookNode, session protocol.Session, report protocol.FactReport) {
 	switch report.Outcome {
 	case protocol.OutcomeCompleted:
-		p.stepDone(pb, node, worker.ID, report.Summary)
+		p.stepDone(pb, node, session.ID, report.Summary)
 	case protocol.OutcomeFailed:
-		p.sendBack(pb, node, worker.ID, retryText(node), report.Summary)
+		p.sendBack(pb, node, session.ID, retryText(node), report.Summary)
 	case protocol.OutcomeInterrupted:
 		if pb.State != protocol.PlaybookStateRunning {
 			return
@@ -441,19 +441,19 @@ func (p *playbooks) follow(fact protocol.FactValue) {
 	}()
 	switch f := fact.(type) {
 	case protocol.FactReport:
-		worker := p.core.Worker(f.ID)
-		if worker == nil || worker.Playbook == nil {
+		session := p.core.Session(f.ID)
+		if session == nil || session.Playbook == nil {
 			break
 		}
-		tag := *worker.Playbook
+		tag := *session.Playbook
 		pb := p.get(tag.ID)
 		if pb == nil || !protocol.IsOpen(*pb) {
 			break
 		}
 		if tag.Node == nil {
-			p.planned(*pb, *worker, f)
-		} else if node := protocol.NodeOf(*pb, *tag.Node); node != nil && planStr(node.Worker) == worker.ID && node.State == protocol.NodeStateWorking {
-			p.stepEnded(*pb, *node, *worker, f)
+			p.planned(*pb, *session, f)
+		} else if node := protocol.NodeOf(*pb, *tag.Node); node != nil && planStr(node.Session) == session.ID && node.State == protocol.NodeStateWorking {
+			p.stepEnded(*pb, *node, *session, f)
 		}
 	case protocol.FactLeft:
 		// Sent home from outside the playbook (a full farm, the person): its step did not get done.
@@ -465,7 +465,7 @@ func (p *playbooks) follow(fact protocol.FactValue) {
 				p.giveUp(pb, "规划的帮工被请走了")
 			}
 			i := slices.IndexFunc(pb.Nodes, func(n protocol.PlaybookNode) bool {
-				return planStr(n.Worker) == f.ID && n.State == protocol.NodeStateWorking
+				return planStr(n.Session) == f.ID && n.State == protocol.NodeStateWorking
 			})
 			if i >= 0 {
 				node := pb.Nodes[i]
@@ -495,11 +495,11 @@ func (p *playbooks) resumeWorking(id string) {
 		if pb == nil {
 			return
 		}
-		var worker *protocol.Worker
-		if node.Worker != nil {
-			worker = p.core.Worker(*node.Worker)
+		var session *protocol.Session
+		if node.Session != nil {
+			session = p.core.Session(*node.Session)
 		}
-		if worker == nil {
+		if session == nil {
 			p.putFarm(protocol.WithNode(*pb, node.ID, func(n protocol.PlaybookNode) protocol.PlaybookNode {
 				n = planUnmanned(n)
 				n.State = protocol.NodeStateWaiting
@@ -507,17 +507,17 @@ func (p *playbooks) resumeWorking(id string) {
 			}))
 			continue
 		}
-		if protocol.IsBusy(*worker) {
+		if protocol.IsBusy(*session) {
 			continue
 		}
-		if _, ripe := worker.Phase.Value.(protocol.PhaseRipe); ripe {
+		if _, ripe := session.Phase.Value.(protocol.PhaseRipe); ripe {
 			summary := "做完了"
-			if worker.LastRun != nil {
-				summary = worker.LastRun.Summary
+			if session.LastRun != nil {
+				summary = session.LastRun.Summary
 			}
-			p.stepDone(*pb, node, worker.ID, summary)
+			p.stepDone(*pb, node, session.ID, summary)
 		} else {
-			p.workers.Tell(worker.ID, "接着把这一步做完："+node.Title)
+			p.sessions.Tell(session.ID, "接着把这一步做完："+node.Title)
 		}
 	}
 }
@@ -576,11 +576,11 @@ func (p *playbooks) Act(id string, action protocol.PlaybookAction, by protocol.P
 		planner := p.planners[pb.ID]
 		delete(p.planners, pb.ID)
 		if planner != "" {
-			p.workers.Dismiss(planner)
+			p.sessions.Dismiss(planner)
 		}
 		for _, n := range pb.Nodes {
-			if n.State == protocol.NodeStateWorking && n.Worker != nil {
-				p.workers.Dismiss(*n.Worker)
+			if n.State == protocol.NodeStateWorking && n.Session != nil {
+				p.sessions.Dismiss(*n.Session)
 			}
 		}
 		next := pb
@@ -646,18 +646,18 @@ func (p *playbooks) NodeAct(id, nodeID string, action protocol.NodeAction, by pr
 		if node.State != protocol.NodeStateFailed {
 			return "", errors.New("「" + node.Title + "」没有失败，不用重试")
 		}
-		var worker *protocol.Worker
-		if node.Worker != nil {
-			worker = p.core.Worker(*node.Worker)
+		var session *protocol.Session
+		if node.Session != nil {
+			session = p.core.Session(*node.Session)
 		}
-		if worker != nil && !protocol.IsBusy(*worker) {
-			// Its worker is still there: it goes on in the same session, with the (perhaps changed) job.
+		if session != nil && !protocol.IsBusy(*session) {
+			// Its session is still there: it goes on in the same session, with the (perhaps changed) job.
 			p.put(protocol.WithNode(pb, node.ID, func(n protocol.PlaybookNode) protocol.PlaybookNode {
 				n.State, n.Tries = protocol.NodeStateWorking, 0
 				return n
 			}), by, "")
-			p.workers.Tell(worker.ID, retryText(node)+"\n\n这一步的工单：\n"+node.Task)
-			return worker.Name + " 接着做「" + node.Title + "」", nil
+			p.sessions.Tell(session.ID, retryText(node)+"\n\n这一步的工单：\n"+node.Task)
+			return session.Name + " 接着做「" + node.Title + "」", nil
 		}
 		p.put(protocol.WithNode(pb, node.ID, func(n protocol.PlaybookNode) protocol.PlaybookNode {
 			n = planUnmanned(n)
@@ -673,8 +673,8 @@ func (p *playbooks) NodeAct(id, nodeID string, action protocol.NodeAction, by pr
 			}
 			return "", errors.New("「" + node.Title + "」已经做完了")
 		}
-		if node.Worker != nil {
-			p.workers.Dismiss(*node.Worker)
+		if node.Session != nil {
+			p.sessions.Dismiss(*node.Session)
 		}
 		next := protocol.WithNode(pb, node.ID, func(n protocol.PlaybookNode) protocol.PlaybookNode {
 			n = planUnmanned(n)
@@ -743,7 +743,7 @@ func (p *playbooks) Changes(id string) (protocol.Changes, error) {
 	return p.projects.BranchChanges(pb.Project, *pb.Branch)
 }
 
-// The workers, started before, have already marked the runs that stopped with the server.
+// The sessions, started before, have already marked the runs that stopped with the server.
 func (p *playbooks) OnStart(ctx context.Context) error {
 	p.mu.Lock()
 	p.ctx = ctx
@@ -752,9 +752,9 @@ func (p *playbooks) OnStart(ctx context.Context) error {
 		case pb.State == protocol.PlaybookStatePlanning:
 			pb.State = protocol.PlaybookStateAbandoned
 			p.putFarm(planWithNote(pb, "VibeValley 重启了，规划停在了半路：再说一遍要做什么"))
-			for _, h := range p.core.State().Workers {
+			for _, h := range p.core.State().Sessions {
 				if h.Playbook != nil && h.Playbook.ID == pb.ID && h.Playbook.Node == nil {
-					p.workers.Dismiss(h.ID)
+					p.sessions.Dismiss(h.ID)
 				}
 			}
 		case pb.State == protocol.PlaybookStateRunning &&

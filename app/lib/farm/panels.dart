@@ -23,8 +23,8 @@ class FarmPanels extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final workers = ref.watch(farmProvider.select((s) => s?.workers)) ?? const <Worker>[];
-    Worker? byId(String? id) => id == null ? null : workers.where((h) => h.id == id).firstOrNull;
+    final sessions = ref.watch(farmProvider.select((s) => s?.sessions)) ?? const <Session>[];
+    Session? byId(String? id) => id == null ? null : sessions.where((h) => h.id == id).firstOrNull;
     final selected = byId(ref.watch(selectedProvider));
     final reviewing = byId(ref.watch(reviewingProvider));
     final sowing = ref.watch(sowingProvider);
@@ -39,7 +39,7 @@ class FarmPanels extends ConsumerWidget {
             title: '${selected.name}的地',
             size: FarmDialogSize.lg,
             onClose: () => ref.read(selectedProvider.notifier).set(null),
-            child: PlotDetail(worker: selected, onDone: () => ref.read(selectedProvider.notifier).set(null)),
+            child: PlotDetail(session: selected, onDone: () => ref.read(selectedProvider.notifier).set(null)),
           ),
         if (reviewing != null)
           FarmLayer(
@@ -48,7 +48,7 @@ class FarmPanels extends ConsumerWidget {
             icon: 'icon-harvest',
             size: FarmDialogSize.lg,
             onClose: () => ref.read(reviewingProvider.notifier).set(null),
-            child: HarvestReview(key: ValueKey(reviewing.id), worker: reviewing, onDone: () => ref.read(reviewingProvider.notifier).set(null)),
+            child: HarvestReview(key: ValueKey(reviewing.id), session: reviewing, onDone: () => ref.read(reviewingProvider.notifier).set(null)),
           ),
         if (sowing != null)
           FarmLayer(
@@ -66,7 +66,7 @@ class FarmPanels extends ConsumerWidget {
             icon: 'icon-water',
             size: FarmDialogSize.sm,
             onClose: () => ref.read(wateringProvider.notifier).set(null),
-            child: WaterForm(worker: watering, onDone: () => ref.read(wateringProvider.notifier).set(null)),
+            child: WaterForm(session: watering, onDone: () => ref.read(wateringProvider.notifier).set(null)),
           ),
         if (panel != null)
           FarmLayer(

@@ -307,12 +307,12 @@ class _MessageRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final m = message;
     final agent = ref.watch(agentsProvider).value?[m.agent];
-    final worker = m.fromKind == SenderKind.worker ? ref.watch(farmProvider)?.workers.where((h) => h.id == m.from).firstOrNull : null;
-    final dot = worker == null ? null : Color(phaseDot(worker.phase));
+    final session = m.fromKind == SenderKind.agent ? ref.watch(farmProvider)?.sessions.where((h) => h.id == m.from).firstOrNull : null;
+    final dot = session == null ? null : Color(phaseDot(session.phase));
     final who = switch (m.fromKind) {
-      SenderKind.worker => [
+      SenderKind.agent => [
         '@${m.from}',
-        if (worker != null) runtimeLabel[worker.runtime] ?? worker.runtime,
+        if (session != null) runtimeLabel[session.runtime] ?? session.runtime,
         if (agent != null && agent.role.isNotEmpty) _roleShort(agent.role),
       ].where((s) => s.isNotEmpty).join(' '),
       _ => '',
@@ -328,7 +328,7 @@ class _MessageRow extends ConsumerWidget {
         ? null
         : m.fromKind == SenderKind.manager && m.kind != MessageKind.dispatch
         ? steps(context, managerAgent, m.at, manager: true)
-        : m.fromKind == SenderKind.worker && m.kind == MessageKind.report
+        : m.fromKind == SenderKind.agent && m.kind == MessageKind.report
         ? steps(context, m.from, m.at, manager: false)
         : null;
     return _Frame(
@@ -450,7 +450,7 @@ class ThreadPreview extends ConsumerWidget {
     final chat = farm?.chat;
     final unread = unreadIn(chat, thread);
     final last = messagesIn(chat, thread.id).lastOrNull;
-    final worker = thread.subjectKind == SubjectKind.issue ? farm?.workers.where((h) => h.id == thread.subjectId).firstOrNull : null;
+    final session = thread.subjectKind == SubjectKind.issue ? farm?.sessions.where((h) => h.id == thread.subjectId).firstOrNull : null;
     return KitTappable(
       onTap: () => unawaited(ref.read(chatActionsProvider).showChat(thread.id).catchError((Object _) {})),
       builder: (context, s) => Container(
@@ -477,9 +477,9 @@ class ThreadPreview extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(width: 8),
-                if (worker != null) ...[PhaseGlyph(worker.phase, size: 14), const SizedBox(width: 4)],
+                if (session != null) ...[PhaseGlyph(session.phase, size: 14), const SizedBox(width: 4)],
                 Expanded(
-                  child: worker == null ? const SizedBox() : Text(phaseText(worker, nowMs()), maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
+                  child: session == null ? const SizedBox() : Text(phaseText(session, nowMs()), maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
                 ),
                 Opacity(opacity: s.hovered || s.focused ? 1 : .6, child: const SpriteIcon('button-next', size: 12)),
               ],

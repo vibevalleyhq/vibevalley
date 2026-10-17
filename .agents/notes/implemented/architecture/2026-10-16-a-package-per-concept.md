@@ -18,7 +18,7 @@ Status: implemented
 - **声网的逻辑在 `pkg/agora`**：签令牌、用 agentkit 拼 agent（听法、字幕走哪条路、会说话的大模型）、「已经在走」算停成功。它不 import `internal/`，用哪几家服务、人设是什么由调用的人给；`voice/agora.go` 只把农场的语音设置（protocol 的联合、缺 key 时的中文提示、语音线路）换成它要的。凭据的类型是 `agora.Credentials`，`Settings` 也用它。
 - **微信、飞书、QQ 的接口也在 `pkg`**（`pkg/weixin`、`pkg/feishu`、`pkg/qq`）：每家的消息形状、`API` 接口和真的 `Client`（登录、收、发、从消息里读出字），连同对着本地假服务器的测试。`channels` 留下桥（账号、只认主人、配对、发件表、补发）和三个适配器，适配器把三家的接口接到桥上。
 - **每个包有自己的 `Module`**（`func(*base.Readies) fx.Option`），`base.App` 把 `base` 和给它的包装在一个生命周期上；`farm.New` 是带全部包的 App，加上 HTTP 和院门的 API。生命周期的方法跨了包，所以导出：`OnStart`、`OnStop`、`OnReady`。构造函数只在自己包的 `Module` 里用，还是 `newX`。
-- **文件名去掉前缀**：包已经说了它属于谁（`worker/facts.go`、`playbook/playbook.go`、`game/ledger.go`），只有同一个包里分不清的留着（`voice/line.go`、`voice_agora.go`）。包内没导出的名字不改前缀，那只是噪音。
+- **文件名去掉前缀**：包已经说了它属于谁（`session/facts.go`、`playbook/playbook.go`、`game/ledger.go`），只有同一个包里分不清的留着（`voice/line.go`、`voice_agora.go`）。包内没导出的名字不改前缀，那只是噪音。
 - **测试跟着它测的包走**，而且只碰得到它下面的东西：
   - 包自己的测试用 `newWorld`（`world_test.go`）：一个 `base.App`，带排在前面的包和本包。`tickets` 的 `newWorldWith` 能多带后面的包，计划的测试要看账本。
   - 一路走过好几个包的（派帮工、收获、记账）留在 `farm`，用 `New`。它们要碰的几样内部变成了导出的测试口子：`Runtimes.Registry`、`Runtimes.Probe`、`Schedules.Now`、`Heartbeat.Now`、`Dispatch.TryQueued`，读计数的 `Runtimes.UsageAsked`、`Commits.Asked`；别的改成直接查数据库。

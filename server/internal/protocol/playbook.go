@@ -307,8 +307,8 @@ func PlaybookText(pb Playbook) string {
 			mark = "（验收）"
 		}
 		line := "  - " + n.ID + " " + n.Title + mark + "：" + detail
-		if n.Worker != nil && *n.Worker != "" {
-			line += "（帮工 " + *n.Worker + "）"
+		if n.Session != nil && *n.Session != "" {
+			line += "（帮工 " + *n.Session + "）"
 		}
 		if n.Conclusion != nil && *n.Conclusion != "" {
 			line += "；" + str.Slice(*n.Conclusion, 0, 80)

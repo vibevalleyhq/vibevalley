@@ -13,7 +13,7 @@ claude 和 codex 跟 pi 并列使用：
 - **种子档案**：新加两个。Claude 师傅（claude，读大代码库、重构、查难缠的 bug）、Codex 老匠（codex，照工单把功能做出来，改到测试通过）。模型和思考强度不填，跟着农机自己的默认值走。已有的配置不会自动多出它们，要在「农具」页启用，再捏一个；主人现在的配置里已经加上了。
 - **额度用完就不派**：这两台按套餐计费，不按钱。`MoneyStop`（protocol 的 `helpers.go`）原来只看余额和每日预算，现在多看一条：任何一个用量窗口到了 100%，就不再派人，并写明哪天几点重置。否则派出去也只会以「额度用完」失败。
 - **花费只记 token**：pi 的价目表里没有它们，所以不折成人民币，也没有每日预算。
-- **汇报晚一拍**：claude 只在一轮结束的那一帧里报用量，排在 `turn_ended` 后面，而 smith 收到 `turn_ended` 就当场发出汇报。crew 等这一轮的事件都读完（`server/internal/worker/workers.go` 的 `reports`；TypeScript 服务端时是等下一个宏任务）再施加汇报，所以汇报带得上这一轮的花费。种植计划合并一步时用的花费也来自这里。
+- **汇报晚一拍**：claude 只在一轮结束的那一帧里报用量，排在 `turn_ended` 后面，而 smith 收到 `turn_ended` 就当场发出汇报。crew 等这一轮的事件都读完（`server/internal/session/sessions.go` 的 `reports`；TypeScript 服务端时是等下一个宏任务）再施加汇报，所以汇报带得上这一轮的花费。种植计划合并一步时用的花费也来自这里。
 
 其余都是本来就按 runtime 通用的代码，这次在真实项目里跑通了：会话、人设和技能、工具的分类、失败的分类、插话、worktree 里提交、收获。各农机的差别见 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「在用的农机」。
 

@@ -34,7 +34,7 @@ const _open = TrajectoryHead(id: 'w2', name: '小郑', agent: 'frontend', projec
 Issue _issue(
   String id,
   String text, {
-  List<String> workers = const [],
+  List<String> sessions = const [],
   IssueStatus status = IssueStatus.backlog,
   IssueClose? closed,
   String? parent,
@@ -46,7 +46,7 @@ Issue _issue(
   assignee: 'backend',
   priority: Priority.medium,
   createdAt: 0,
-  workers: workers,
+  sessions: sessions,
   closedAt: closed == null ? null : 60000,
   closed: closed,
   parent: parent,
@@ -54,8 +54,8 @@ Issue _issue(
   status: status,
 );
 
-final _closedIssue = _issue('t1', '写打卡', workers: ['w1'], status: IssueStatus.done, closed: IssueClose.merged);
-final _openIssue = _issue('t2', '改登录页', workers: ['w2'], status: IssueStatus.inReview);
+final _closedIssue = _issue('t1', '写打卡', sessions: ['w1'], status: IssueStatus.done, closed: IssueClose.merged);
+final _openIssue = _issue('t2', '改登录页', sessions: ['w2'], status: IssueStatus.inReview);
 
 class _Issues extends Notifier<List<Issue>> {
   List<Issue> seed = const [];
@@ -68,7 +68,15 @@ final _issuesNow = NotifierProvider<_Issues, List<Issue>>(_Issues.new);
 
 void main() {
   test("an issue for the manager: in 处理中 while the manager works on it, closed once it answered", () {
-    const working = Issue(id: 't9', title: '看进度', assignee: managerAgent, priority: Priority.medium, createdAt: 0, workers: [], status: IssueStatus.inProgress);
+    const working = Issue(
+      id: 't9',
+      title: '看进度',
+      assignee: managerAgent,
+      priority: Priority.medium,
+      createdAt: 0,
+      sessions: [],
+      status: IssueStatus.inProgress,
+    );
     expect(isForManager(working), isTrue);
     expect(laneOf(working.status), Lane.working);
     const answered = Issue(
@@ -77,7 +85,7 @@ void main() {
       assignee: managerAgent,
       priority: Priority.medium,
       createdAt: 0,
-      workers: [],
+      sessions: [],
       closedAt: 1,
       closed: IssueClose.answered,
       status: IssueStatus.done,
@@ -91,7 +99,7 @@ void main() {
     String took(double ms) => '${(ms / 60000).round()} 分钟';
     const done = Run(
       id: 1,
-      worker: 'w1',
+      session: 'w1',
       triggeredBy: RunTrigger(kind: RunTriggerKind.comment, message: 42),
       heard: [43, 44],
       startedAt: 0,
@@ -102,7 +110,7 @@ void main() {
     expect(runText(done, 999999, took), '带话（#42） · 做完了 · 3 分钟 · ¥0.50 · 中途听到 2 句');
     const going = Run(
       id: 2,
-      worker: 'w1',
+      session: 'w1',
       triggeredBy: RunTrigger(kind: RunTriggerKind.schedule, missed: true),
       heard: [],
       startedAt: 0,
@@ -113,19 +121,19 @@ void main() {
 
   test("an issue's state: the server's status while open, how it closed after", () {
     expect(ticketState(_openIssue), TicketState.waiting);
-    expect(ticketState(_issue('t3', 'x', workers: ['w3'], status: IssueStatus.inProgress)), TicketState.working);
+    expect(ticketState(_issue('t3', 'x', sessions: ['w3'], status: IssueStatus.inProgress)), TicketState.working);
     expect(ticketState(_closedIssue), TicketState.harvested);
-    expect(ticketState(_issue('t0', 'x', workers: ['w0'], status: IssueStatus.canceled)), TicketState.closed);
-    final step = _issue('p1.api', '写接口', workers: ['w4'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan, parent: 'p1');
+    expect(ticketState(_issue('t0', 'x', sessions: ['w0'], status: IssueStatus.canceled)), TicketState.closed);
+    final step = _issue('p1.api', '写接口', sessions: ['w4'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan, parent: 'p1');
     expect(ticketState(step), TicketState.merged);
     expect(ticketPlanned(step, null), isTrue);
     const greet = Playbook(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: PlaybookState.draft, nodes: [], parallel: 1, createdAt: 0);
     expect(ticketTitle(step, [greet]), '加 greet · 写接口');
     expect(ticketTitle(step), '写接口');
     expect(ticketTitle(_closedIssue), '写打卡');
-    expect(ticketIs(_issue('t5', 'x', workers: ['w1', 'w6']), 'w1'), isTrue);
-    expect(ticketIs(_issue('t5', 'x', workers: ['w1', 'w6']), 't5'), isTrue);
-    expect(ticketIs(_issue('t5', 'x', workers: ['w1', 'w6']), 'w2'), isFalse);
+    expect(ticketIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 'w1'), isTrue);
+    expect(ticketIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 't5'), isTrue);
+    expect(ticketIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 'w2'), isFalse);
   });
 
   test('what dragging between lanes does', () {
@@ -146,7 +154,7 @@ void main() {
     expect(laneOf(IssueStatus.todo), Lane.todo);
     expect(moveOf(Lane.waiting, Lane.closed, planned: true), isNull);
     expect(moveOf(Lane.closed, Lane.working, planned: true), isNull);
-    expect(ticketPlanned(_issue('t5', 'x', workers: ['w5'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan), null), isTrue);
+    expect(ticketPlanned(_issue('t5', 'x', sessions: ['w5'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan), null), isTrue);
     expect(ticketPlanned(_closedIssue, null), isFalse);
   });
 
@@ -159,11 +167,11 @@ void main() {
     const conflicted = TrajectoryHead(id: 'w4', name: '省钱小工 2', agent: 'flash', project: 'demo', job: '改成 hey', startedAt: 0);
     const planner = TrajectoryHead(id: 'w5', name: '省钱小工', agent: 'flash', project: 'demo', job: '这一轮你是规划师：……', startedAt: 0, endedAt: 1);
     final issues = [
-      _issue('t4', '改成 hey', workers: ['w4'], status: IssueStatus.inReview),
+      _issue('t4', '改成 hey', sessions: ['w4'], status: IssueStatus.inReview),
       _issue(
         'p1',
         '加 greet',
-        workers: ['w5'],
+        sessions: ['w5'],
         status: IssueStatus.inReview,
         plan: const IssuePlan(state: PlaybookState.draft, parallel: 1),
       ),
@@ -178,7 +186,7 @@ void main() {
         _ => jsonResponse(null, 204),
       };
     }).api;
-    final worker = fakes.worker(
+    final session = fakes.session(
       'w4',
       phase: const PhaseRipe(),
       project: 'demo',
@@ -188,7 +196,7 @@ void main() {
       ProviderScope(
         overrides: [
           apiProvider.overrideWithValue(api),
-          farmProvider.overrideWithValue(fakes.farm(workers: [worker], issues: issues)),
+          farmProvider.overrideWithValue(fakes.farm(sessions: [session], issues: issues)),
           plansProvider.overrideWithValue(const [
             Playbook(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: PlaybookState.draft, nodes: [], parallel: 1, createdAt: 0),
           ]),
@@ -225,10 +233,10 @@ void main() {
         assignee: 'backend',
         priority: Priority.urgent,
         createdAt: 0,
-        workers: [],
+        sessions: [],
         status: IssueStatus.backlog,
       ),
-      const Issue(id: 'a2', title: '改文案', project: 'site', priority: Priority.medium, createdAt: 1, workers: [], status: IssueStatus.backlog),
+      const Issue(id: 'a2', title: '改文案', project: 'site', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.backlog),
       _openIssue,
       _closedIssue,
     ];
@@ -260,7 +268,7 @@ void main() {
             assignee: body.assignee,
             priority: Priority.medium,
             createdAt: 2,
-            workers: const [],
+            sessions: const [],
             status: IssueStatus.backlog,
           );
           issues = [item, ...issues];
@@ -277,7 +285,7 @@ void main() {
           changed();
           return jsonResponse(const Dispatched(queued: '已经有 6 个帮工在干活了：排上队了，有空地就自动开工').toJson());
         case ('POST', '/api/issues/t1/reopen'):
-          return jsonResponse(const Dispatched(worker: 'w3').toJson());
+          return jsonResponse(const Dispatched(session: 'w3').toJson());
       }
       return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
     }).api;

@@ -17,7 +17,7 @@ import (
 	"vibevalley/pkg/x/clock"
 )
 
-// tokei keeps to what git keeps (it reads .gitignore). Commits are counted on every branch (workers' unharvested work counts too), merges left out,
+// tokei keeps to what git keeps (it reads .gitignore). Commits are counted on every branch (sessions' unharvested work counts too), merges left out,
 // by local day.
 
 // Not what a project is written in: gitignore patterns, as tokei's --exclude takes them.

@@ -30,7 +30,7 @@ update issue set queued_at = null where id = ?;
 update issue set closed_at = ?, closed = ? where id = ?;
 
 -- name: OpenIssue :exec
--- A worker starts on it: made from the worker's job when it is new, else open again and out of the queue.
+-- A session starts on it: made from the session's job when it is new, else open again and out of the queue.
 insert into issue (id, title, description, project, assignee, created_at) values (?, ?, ?, ?, ?, ?)
 on conflict (id) do update set queued_at = null, closed_at = null, closed = null;
 
@@ -46,7 +46,7 @@ where closed_at is null or id in (select id from latest) or parent in (select id
 select * from issue where id = sqlc.arg(id) or parent = sqlc.arg(id);
 
 -- name: PutIssue :exec
--- An issue as its playbook has it now; its workers and its queue are not the playbook's.
+-- An issue as its playbook has it now; its sessions and its queue are not the playbook's.
 insert into issue (id, title, description, project, assignee, priority, rank, created_at, closed_at, closed, parent, blocked_by, plan, step)
 values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 on conflict (id) do update set

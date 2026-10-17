@@ -1,5 +1,5 @@
 // VibeValley's command line. With no command, or `runtime chat vibevalley`: the agent on its own, in a terminal, a
-// conversation on DeepSeek with the coding tools, skills, memory, workers, schedules and the MCP servers in a config
+// conversation on DeepSeek with the coding tools, skills, memory, sessions, schedules and the MCP servers in a config
 // file; what is typed while it works joins the turn, Ctrl+C stops the turn, and again (idle) quits. `runtime chat
 // <runtime>` talks to another runtime the same way (chat.go). Every other command is one of the farm's endpoints, called
 // over HTTP (farm.go).

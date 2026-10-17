@@ -326,7 +326,7 @@ String spanLabel(Activity step) => switch (step.kind) {
   ActivityKind.response => '说',
   ActivityKind.retry => '重试',
   ActivityKind.error => '出错',
-  ActivityKind.action => farmToolText(step.text) != null ? '田头' : actionText[WorkerAction.fromJson((step.action ?? ToolAction.other).wire)] ?? '工具',
+  ActivityKind.action => farmToolText(step.text) != null ? '田头' : actionText[SessionAction.fromJson((step.action ?? ToolAction.other).wire)] ?? '工具',
 };
 
 Color spanColor(Activity step) => switch (step.kind) {
@@ -603,7 +603,7 @@ class _ToolStepState extends State<_ToolStep> {
   @override
   Widget build(BuildContext context) {
     final step = widget.step;
-    final action = WorkerAction.fromJson((step.action ?? ToolAction.other).wire);
+    final action = SessionAction.fromJson((step.action ?? ToolAction.other).wire);
     final farm = farmToolText(step.text);
     final what = farm ?? step.text;
     final input = readableInput(step);

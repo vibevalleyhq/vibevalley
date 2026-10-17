@@ -127,7 +127,7 @@ class _NewPlanState extends ConsumerState<NewPlan> {
   List<String> _known() {
     final real = ref.watch(projectNamesProvider).value ?? const <String>[];
     final s = ref.watch(farmProvider);
-    return {...real, for (final h in s?.workers ?? const <Worker>[]) ?h.project, for (final p in ref.watch(plansProvider)) p.project}.toList();
+    return {...real, for (final h in s?.sessions ?? const <Session>[]) ?h.project, for (final p in ref.watch(plansProvider)) p.project}.toList();
   }
 
   Future<void> _submit(String project) async {

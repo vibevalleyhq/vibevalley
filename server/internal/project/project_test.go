@@ -35,7 +35,7 @@ func projects(t *testing.T, root string, change ...func(*base.Config)) *Service 
 	return p
 }
 
-func TestWorkersProjectNamesAndAddresses(t *testing.T) {
+func TestSessionsProjectNamesAndAddresses(t *testing.T) {
 	name, url, ok := githubRepository(" https://github.com/botiverse/raft-source.git/ ")
 	testkit.Eq(t, []any{name, url, ok}, []any{"raft-source", "https://github.com/botiverse/raft-source.git", true}, "github")
 	for _, github := range []string{"file:///tmp/repo", "https://github.com.evil/x/y", "https://u:secret@github.com/x/y", "https://github.com/x/y/tree/main", "--upload-pack=bad", "https://github.com/x/.."} {
@@ -50,7 +50,7 @@ func TestWorkersProjectNamesAndAddresses(t *testing.T) {
 	}
 }
 
-func TestWorkersNewProjectsAndDuplicates(t *testing.T) {
+func TestSessionsNewProjectsAndDuplicates(t *testing.T) {
 	root := t.TempDir()
 	os.Mkdir(filepath.Join(root, "existing"), 0o755)
 	os.WriteFile(filepath.Join(root, "existing", "keep"), []byte("mine"), 0o644)
@@ -76,7 +76,7 @@ func TestWorkersNewProjectsAndDuplicates(t *testing.T) {
 	testkit.Eq(t, string(body), "mine", "existing folder untouched")
 }
 
-func TestWorkersCloneOffline(t *testing.T) {
+func TestSessionsCloneOffline(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, ".source")
 	os.Mkdir(source, 0o755)
@@ -105,7 +105,7 @@ func TestWorkersCloneOffline(t *testing.T) {
 	}
 }
 
-func TestWorkersPlaybookBranchMerges(t *testing.T) {
+func TestSessionsPlaybookBranchMerges(t *testing.T) {
 	root := t.TempDir()
 	p := projects(t, root)
 	if err := p.OpenBranch("plan", "vibevalley/plan-1"); err != nil {
@@ -133,7 +133,7 @@ func TestWorkersPlaybookBranchMerges(t *testing.T) {
 	testkit.Eq(t, []any{ok, out}, []any{false, "a"}, "run")
 }
 
-func TestWorkersChangedFilesSinceTheBase(t *testing.T) {
+func TestSessionsChangedFilesSinceTheBase(t *testing.T) {
 	root := t.TempDir()
 	p := projects(t, root)
 	if err := p.OpenBranch("plan", "vibevalley/plan-1"); err != nil {
@@ -163,7 +163,7 @@ func TestWorkersChangedFilesSinceTheBase(t *testing.T) {
 	testkit.Eq(t, []any{got, err}, []any{[]string{"a.txt", "b.txt", "c.txt", "new.txt"}, nil}, "changed")
 }
 
-func TestWorkersTokeiOutput(t *testing.T) {
+func TestSessionsTokeiOutput(t *testing.T) {
 	report := func(name string) map[string]any {
 		return map[string]any{"name": name, "stats": map[string]any{"blanks": 0, "code": 1, "comments": 0, "blobs": map[string]any{}}}
 	}
@@ -203,7 +203,7 @@ func TestWorkersTokeiOutput(t *testing.T) {
 	}
 }
 
-func TestWorkersActivityOf(t *testing.T) {
+func TestSessionsActivityOf(t *testing.T) {
 	at := func(iso string) int64 { tm, _ := time.Parse(time.RFC3339, iso); return tm.Unix() }
 	day := func(ms int64) string { return time.UnixMilli(ms).UTC().Format("2006-01-02") }
 	log := strings.Join([]string{
@@ -245,7 +245,7 @@ func workRoot(t *testing.T) string {
 	return root
 }
 
-func TestWorkersProjectsWithTheirNewestCommit(t *testing.T) {
+func TestSessionsProjectsWithTheirNewestCommit(t *testing.T) {
 	root := workRoot(t)
 	list := projects(t, root).Summaries(context.Background())
 	byName := map[string]protocol.ProjectSummary{}
@@ -260,13 +260,13 @@ func TestWorkersProjectsWithTheirNewestCommit(t *testing.T) {
 	testkit.Eq(t, byName["notes"], protocol.ProjectSummary{Name: "notes", Path: byName["notes"].Path, Git: false, Slots: 3}, "notes")
 }
 
-func TestWorkersSlotsAreTheProjectLimitWithinTheBeds(t *testing.T) {
+func TestSessionsSlotsAreTheProjectLimitWithinTheBeds(t *testing.T) {
 	for limit, slots := range map[int]int64{3: 3, 1: 1, 0: protocol.MaxRunning, 9: protocol.MaxRunning} {
 		testkit.Eq(t, (&Service{perProject: limit}).Slots(), slots, fmt.Sprint("limit ", limit))
 	}
 }
 
-func TestWorkersAYearOfCommits(t *testing.T) {
+func TestSessionsAYearOfCommits(t *testing.T) {
 	c := projects(t, workRoot(t))
 	activity := c.Activity(context.Background(), "app")
 	if activity == nil {
@@ -284,14 +284,14 @@ func TestWorkersAYearOfCommits(t *testing.T) {
 	}
 }
 
-func TestWorkersWithoutTokei(t *testing.T) {
+func TestSessionsWithoutTokei(t *testing.T) {
 	_, err := projects(t, workRoot(t), func(c *base.Config) { c.Tokei = "/nowhere/tokei" }).Languages(context.Background(), "app")
 	if err == nil || err.Error() != noTokei {
 		t.Fatalf("refused with how to get it: %v", err)
 	}
 }
 
-func TestWorkersTokeiCounts(t *testing.T) {
+func TestSessionsTokeiCounts(t *testing.T) {
 	if _, err := exec.LookPath("tokei"); err != nil {
 		t.Skip("tokei is not installed")
 	}
@@ -310,7 +310,7 @@ func TestWorkersTokeiCounts(t *testing.T) {
 	}
 }
 
-func TestWorkersLeftOversCommittedWithoutCaches(t *testing.T) {
+func TestSessionsLeftOversCommittedWithoutCaches(t *testing.T) {
 	dir := t.TempDir()
 	testkit.Repo(t, dir, 1, 0)
 	os.MkdirAll(filepath.Join(dir, "__pycache__"), 0o755)

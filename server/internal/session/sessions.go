@@ -1,4 +1,4 @@
-package worker
+package session
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 	"vibevalley/pkg/x/str"
 )
 
-// smith runs sessions without permission prompts or a sandbox: the only fence is where a worker starts, inside VIBEVALLEY_WORK_ROOT in its own
+// smith runs sessions without permission prompts or a sandbox: the only fence is where a session starts, inside VIBEVALLEY_WORK_ROOT in its own
 // worktree. The chat calls Deliver holding its own lock, so nothing here calls back into the chat. smith's spawn takes only model, effort, env and
 // cwd, and its runtime registry is fixed once made, so each session gets a Subagents of its own over a one-runtime registry that carries the agent's
 // persona, MCP servers and disallowed tools (withOptions).
@@ -48,7 +48,7 @@ const (
 	closeWait  = 15 * time.Second
 )
 
-type workerSaved struct {
+type sessionSaved struct {
 	Hired int64       `json:"hired"`
 	Hands []savedHand `json:"hands"`
 }
@@ -134,7 +134,7 @@ type hand struct {
 	heard    []int64
 }
 
-type workers struct {
+type sessions struct {
 	core         *core.Service
 	store        *agent.Service
 	tokens       *tokens
@@ -159,7 +159,7 @@ type workers struct {
 	pending  *time.Timer
 }
 
-type workersIn struct {
+type sessionsIn struct {
 	fx.In
 	Config       base.Config
 	DB           *sql.DB
@@ -172,19 +172,19 @@ type workersIn struct {
 	Runtimes     *runtime.Service
 }
 
-func newWorkers(in workersIn) (*workers, error) {
+func newSessions(in sessionsIn) (*sessions, error) {
 	root, err := filepath.Abs(in.Config.WorkRoot)
 	if err != nil {
 		return nil, err
 	}
-	c := &workers{
+	c := &sessions{
 		core: in.Core, store: in.Store, tokens: in.Tokens, trajectories: in.Trajectories, memories: in.Memories,
 		projects: in.Projects, runtimes: in.Runtimes,
 		root:     root,
-		file:     filepath.Join(in.Config.Home, "workers.json"),
+		file:     filepath.Join(in.Config.Home, "sessions.json"),
 		farmURL:  "http://" + net.JoinHostPort(in.Config.Host, strconv.Itoa(in.Config.Port)) + "/mcp",
 		logDir:   filepath.Join(in.Config.Home, "logs"),
-		stallMs:  int64(in.Config.Worker.StallSeconds * 1000),
+		stallMs:  int64(in.Config.Session.StallSeconds * 1000),
 		activity: base.NewHub[LaunchActivity](),
 		hands:    map[string]*hand{},
 		q:        generated.New(in.DB),
@@ -194,24 +194,24 @@ func newWorkers(in workersIn) (*workers, error) {
 }
 
 // For a farm listening on a free port (port 0): sessions opened from now on reach /mcp there.
-func (c *workers) SetAddress(addr string) {
+func (c *sessions) SetAddress(addr string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.farmURL = "http://" + addr + "/mcp"
 }
 
-func (c *workers) FarmURL() string {
+func (c *sessions) FarmURL() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.farmURL
 }
 
-func (*workers) OnStart(context.Context) error { return nil }
+func (*sessions) OnStart(context.Context) error { return nil }
 
-func (c *workers) OnReady(context.Context) { c.restore() }
+func (c *sessions) OnReady(context.Context) { c.restore() }
 
 // The sessions are let go first: a turn cut off by the shutdown is reported when the farm comes back (restore), not on the way out.
-func (c *workers) OnStop() {
+func (c *sessions) OnStop() {
 	c.mu.Lock()
 	c.closing = true
 	if c.pending != nil {
@@ -220,7 +220,7 @@ func (c *workers) OnStop() {
 	hands := slices.Collect(maps.Values(c.hands))
 	c.mu.Unlock()
 	if err := c.disk.Write(c.body); err != nil {
-		log.Printf("vibevalley: could not save workers.json: %v", err)
+		log.Printf("vibevalley: could not save sessions.json: %v", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), closeWait)
 	defer cancel()
@@ -238,59 +238,59 @@ func (c *workers) OnStop() {
 	group.Wait()
 }
 
-func (c *workers) onFarm() []protocol.Worker { return c.core.State().Workers }
+func (c *sessions) onFarm() []protocol.Session { return c.core.State().Sessions }
 
-func (c *workers) working(id string) bool {
-	if h := c.core.Worker(id); h != nil {
+func (c *sessions) working(id string) bool {
+	if h := c.core.Session(id); h != nil {
 		_, ok := h.Phase.Value.(protocol.PhaseWorking)
 		return ok
 	}
 	return false
 }
 
-func (c *workers) hand(id string) *hand {
+func (c *sessions) hand(id string) *hand {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.hands[id]
 }
 
-func (c *workers) Activity() *base.Hub[LaunchActivity] { return c.activity }
+func (c *sessions) Activity() *base.Hub[LaunchActivity] { return c.activity }
 
-func (c *workers) signal(a LaunchActivity) { c.activity.Publish(a) }
+func (c *sessions) signal(a LaunchActivity) { c.activity.Publish(a) }
 
 // Called with h.mu held.
-func (c *workers) closedLocked(h *hand) {
+func (c *sessions) closedLocked(h *hand) {
 	if h.launch != "" {
 		c.signal(LaunchActivity{Kind: "closed", ID: h.id, Launch: h.launch})
 	}
 	h.launch = ""
 }
 
-func (c *workers) closed(h *hand) {
+func (c *sessions) closed(h *hand) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	c.closedLocked(h)
 }
 
-func (c *workers) trajectoryOf(worker protocol.Worker) Journal {
-	head := protocol.TrajectoryHead{ID: worker.ID, Name: worker.Name, StartedAt: worker.HiredAt}
-	agent, runtime, job := worker.Agent, worker.Runtime, worker.Task
+func (c *sessions) trajectoryOf(session protocol.Session) Journal {
+	head := protocol.TrajectoryHead{ID: session.ID, Name: session.Name, StartedAt: session.HiredAt}
+	agent, runtime, job := session.Agent, session.Runtime, session.Task
 	head.Agent, head.Runtime, head.Job = &agent, &runtime, &job
-	if worker.Project != nil {
-		project := *worker.Project
+	if session.Project != nil {
+		project := *session.Project
 		head.Project = &project
 	}
-	if worker.Playbook != nil {
-		playbook := *worker.Playbook
+	if session.Playbook != nil {
+		playbook := *session.Playbook
 		head.Playbook = &playbook
 	}
-	head.Issue = worker.Issue
+	head.Issue = session.Issue
 	return c.trajectories.Open(head, 0)
 }
 
-func (c *workers) body() ([]byte, error) {
+func (c *sessions) body() ([]byte, error) {
 	c.mu.Lock()
-	saved := workerSaved{Hired: c.hired, Hands: []savedHand{}}
+	saved := sessionSaved{Hired: c.hired, Hands: []savedHand{}}
 	hands := slices.Collect(maps.Values(c.hands))
 	c.mu.Unlock()
 	slices.SortFunc(hands, func(a, b *hand) int { return strings.Compare(a.id, b.id) })
@@ -308,7 +308,7 @@ func (c *workers) body() ([]byte, error) {
 	return json.Marshal(saved)
 }
 
-func (c *workers) save() {
+func (c *sessions) save() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closing {
@@ -319,51 +319,51 @@ func (c *workers) save() {
 	}
 	c.pending = time.AfterFunc(saveAfter, func() {
 		if err := c.disk.Write(c.body); err != nil {
-			log.Printf("vibevalley: could not save workers.json: %v", err)
+			log.Printf("vibevalley: could not save sessions.json: %v", err)
 		}
 	})
 }
 
-func (c *workers) restore() {
+func (c *sessions) restore() {
 	c.endOpenRuns()
-	saved := workerSaved{}
+	saved := sessionSaved{}
 	if body, err := os.ReadFile(c.file); err == nil {
 		if json.Unmarshal(body, &saved) != nil {
-			saved = workerSaved{}
+			saved = sessionSaved{}
 		}
 	}
-	// Numbering goes on from the highest id seen, so a new worker never takes an old one's steps.
+	// Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
 	c.hired = saved.Hired
 	for _, h := range c.onFarm() {
 		if n, err := strconv.ParseInt(strings.TrimPrefix(h.ID, "w"), 10, 64); err == nil && n > c.hired {
 			c.hired = n
 		}
 	}
-	for _, worker := range c.onFarm() {
-		i := slices.IndexFunc(saved.Hands, func(s savedHand) bool { return s.ID == worker.ID })
+	for _, session := range c.onFarm() {
+		i := slices.IndexFunc(saved.Hands, func(s savedHand) bool { return s.ID == session.ID })
 		var s *savedHand
 		if i >= 0 {
 			s = &saved.Hands[i]
 		}
 		if s == nil || !exists(s.Place.Cwd) {
 			lost := protocol.IssueCloseLost
-			c.core.Apply(protocol.FactLeft{ID: worker.ID, Closed: &lost})
-			c.trajectories.Finish(worker.ID, protocol.IssueCloseLost, &worker)
+			c.core.Apply(protocol.FactLeft{ID: session.ID, Closed: &lost})
+			c.trajectories.Finish(session.ID, protocol.IssueCloseLost, &session)
 			where := ""
 			if s != nil {
 				where = "（" + s.Place.Cwd + "）"
 			}
-			c.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 干活的目录不见了%s，没接回来", worker.Name, where))
+			c.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 干活的目录不见了%s，没接回来", session.Name, where))
 			continue
 		}
 		recalled := map[string]bool{}
 		for _, id := range s.Recalled {
 			recalled[id] = true
 		}
-		c.hands[worker.ID] = &hand{id: worker.ID, place: s.Place, journal: c.trajectoryOf(worker), oarSessionID: s.OarSessionID, lastText: s.LastText, recalled: recalled}
-		if protocol.IsBusy(worker) {
-			c.core.Apply(protocol.FactReport{ID: worker.ID, Outcome: protocol.OutcomeInterrupted, Summary: "VibeValley 重启了，这一轮停在了半路", Runs: worker.Runs})
-			c.core.Notice(protocol.NoticeLevelInfo, fmt.Sprintf("VibeValley 重启过，%s 那一轮停下了；给它带句话就能接着干", worker.Name))
+		c.hands[session.ID] = &hand{id: session.ID, place: s.Place, journal: c.trajectoryOf(session), oarSessionID: s.OarSessionID, lastText: s.LastText, recalled: recalled}
+		if protocol.IsBusy(session) {
+			c.core.Apply(protocol.FactReport{ID: session.ID, Outcome: protocol.OutcomeInterrupted, Summary: "VibeValley 重启了，这一轮停在了半路", Runs: session.Runs})
+			c.core.Notice(protocol.NoticeLevelInfo, fmt.Sprintf("VibeValley 重启过，%s 那一轮停下了；给它带句话就能接着干", session.Name))
 		}
 	}
 	if len(c.hands) > 0 {
@@ -376,19 +376,19 @@ func exists(path string) bool {
 	return err == nil
 }
 
-func (c *workers) NoRoom(runtime, project string) string {
+func (c *sessions) NoRoom(runtime, project string) string {
 	return noRoom(c.onFarm(), runtime, str.Trim(project), c.limits(runtime), "")
 }
 
-func (c *workers) limits(runtime string) workerLimits {
-	l := workerLimits{Workspace: protocol.MaxRunning, PerProject: c.projects.Limit()}
+func (c *sessions) limits(runtime string) sessionLimits {
+	l := sessionLimits{Workspace: protocol.MaxRunning, PerProject: c.projects.Limit()}
 	if s := c.store.Settings(runtime); s.MaxWorking != nil {
 		l.PerRuntime = int(*s.MaxWorking)
 	}
 	return l
 }
 
-func (c *workers) watch(h *hand, s *oarSession, runtime string) oar.EventObserver {
+func (c *sessions) watch(h *hand, s *oarSession, runtime string) oar.EventObserver {
 	return func(event oar.Event) {
 		if s.detached.Load() {
 			return
@@ -412,7 +412,7 @@ func (c *workers) watch(h *hand, s *oarSession, runtime string) oar.EventObserve
 				signals = append(signals, LaunchActivity{Kind: "compacting", ID: h.id, On: false})
 			}
 		}
-		reaction := eventFacts(event, c.core.Worker(h.id), h.tracking, factContext{ID: h.id, Runtime: runtime, Cwd: h.place.Cwd, CnyPerUsd: c.runtimes.CnyPerUsd()})
+		reaction := eventFacts(event, c.core.Session(h.id), h.tracking, factContext{ID: h.id, Runtime: runtime, Cwd: h.place.Cwd, CnyPerUsd: c.runtimes.CnyPerUsd()})
 		h.tracking = reaction.Tracking
 		if reaction.Model != "" {
 			h.tracking.Price = c.runtimes.Price(runtime, reaction.Model)
@@ -445,16 +445,16 @@ func (c *workers) watch(h *hand, s *oarSession, runtime string) oar.EventObserve
 	}
 }
 
-func (c *workers) applyReport(h *hand, report agents.SubagentReport) {
-	worker := c.core.Worker(h.id)
-	if worker == nil {
+func (c *sessions) applyReport(h *hand, report agents.SubagentReport) {
+	session := c.core.Session(h.id)
+	if session == nil {
 		return
 	}
 	read := readReport(report.Outcome, report.Text)
 	h.mu.Lock()
 	var spent *protocol.Spent
-	if worker.Spent != nil {
-		spent = since(*worker.Spent, h.tracking.RunFrom)
+	if session.Spent != nil {
+		spent = since(*session.Spent, h.tracking.RunFrom)
 	}
 	h.lastText = read.Text
 	h.tracking.RunFrom = nil
@@ -463,19 +463,19 @@ func (c *workers) applyReport(h *hand, report agents.SubagentReport) {
 	c.core.Apply(protocol.FactReport{ID: h.id, Outcome: read.Outcome, Summary: read.Summary, Runs: int64(report.Turn), Spent: spent})
 	c.endRun(h, read.Outcome, read.Summary, spent)
 	project := h.place.Project
-	go c.memories.Keep(memory.FinishedRun{Agent: worker.Agent, Worker: h.id, Project: project, Job: worker.Task, Outcome: read.Outcome, Said: read.Text, Summary: read.Summary})
+	go c.memories.Keep(memory.FinishedRun{Agent: session.Agent, Session: h.id, Project: project, Job: session.Task, Outcome: read.Outcome, Said: read.Text, Summary: read.Summary})
 	if read.NeedsYou {
-		c.core.Notice(protocol.NoticeLevelError, fmt.Sprintf("%s 停下了：%s", worker.Name, read.Failure))
+		c.core.Notice(protocol.NoticeLevelError, fmt.Sprintf("%s 停下了：%s", session.Name, read.Failure))
 	}
 	if launch != "" {
 		c.signal(LaunchActivity{Kind: "ended", ID: h.id, Launch: launch, Outcome: read.Outcome, Spoke: spoke})
 	}
-	c.runtimes.UsageSoon(worker.Runtime)
+	c.runtimes.UsageSoon(session.Runtime)
 	c.save()
 }
 
 // Each report waits until its turn's events are read: what the turn spent arrives in the same frame as its end.
-func (c *workers) reports(h *hand, s *oarSession, released <-chan struct{}) {
+func (c *sessions) reports(h *hand, s *oarSession, released <-chan struct{}) {
 	for {
 		r, ok := s.next(released)
 		if !ok {
@@ -492,12 +492,12 @@ func (c *workers) reports(h *hand, s *oarSession, released <-chan struct{}) {
 	}
 }
 
-func (c *workers) stalled(h *hand, silentForMs int64) {
-	worker := c.core.Worker(h.id)
-	if worker == nil {
+func (c *sessions) stalled(h *hand, silentForMs int64) {
+	session := c.core.Session(h.id)
+	if session == nil {
 		return
 	}
-	working, ok := worker.Phase.Value.(protocol.PhaseWorking)
+	working, ok := session.Phase.Value.(protocol.PhaseWorking)
 	if !ok {
 		return
 	}
@@ -514,11 +514,11 @@ func (c *workers) stalled(h *hand, silentForMs int64) {
 		last = "（最后在：" + label + "）"
 	}
 	h.journal.Note(protocol.ActivityKindError, fmt.Sprintf("已经 %s没动静了%s。可能在跑很久的命令，也可能卡住了", quiet, last), nil)
-	c.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 已经 %s没动静了%s：点它的地看看过程，不对就叫停", worker.Name, quiet, last))
+	c.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 已经 %s没动静了%s：点它的地看看过程，不对就叫停", session.Name, quiet, last))
 }
 
 // smith's ObserveStalls only arms on records it sees live and misses a turn that went quiet before it subscribed, so the status is polled.
-func (c *workers) watchStalls(h *hand, s *oarSession, released <-chan struct{}) {
+func (c *sessions) watchStalls(h *hand, s *oarSession, released <-chan struct{}) {
 	every := time.Duration(max(100, min(c.stallMs/4, 15_000))) * time.Millisecond
 	ticker := time.NewTicker(every)
 	defer ticker.Stop()
@@ -538,7 +538,7 @@ func (c *workers) watchStalls(h *hand, s *oarSession, released <-chan struct{}) 
 	}
 }
 
-func (c *workers) attach(h *hand, s *oarSession, runtime string) {
+func (c *sessions) attach(h *hand, s *oarSession, runtime string) {
 	c.mu.Lock()
 	c.launches++
 	launch := c.launches
@@ -575,7 +575,7 @@ func (c *workers) attach(h *hand, s *oarSession, runtime string) {
 }
 
 // Called with h.mu held.
-func (c *workers) releaseLocked(h *hand) {
+func (c *sessions) releaseLocked(h *hand) {
 	s := h.sess
 	if s == nil {
 		return
@@ -592,7 +592,7 @@ func (c *workers) releaseLocked(h *hand) {
 	}
 }
 
-func (c *workers) open(ctx context.Context, agent protocol.Agent, id string, place project.Workplace, input, resume string) (*oarSession, string) {
+func (c *sessions) open(ctx context.Context, agent protocol.Agent, id string, place project.Workplace, input, resume string) (*oarSession, string) {
 	base, ok := c.runtimes.Runtime(agent.Runtime)
 	if !ok {
 		return nil, "oar 驱动不了 " + agent.Runtime
@@ -676,11 +676,11 @@ func (c *workers) open(ctx context.Context, agent protocol.Agent, id string, pla
 	return s, ""
 }
 
-func (c *workers) leave(h *hand, closed protocol.IssueClose, merged int64) {
+func (c *sessions) leave(h *hand, closed protocol.IssueClose, merged int64) {
 	h.mu.Lock()
 	c.releaseLocked(h)
 	h.mu.Unlock()
-	c.trajectories.Finish(h.id, closed, c.core.Worker(h.id))
+	c.trajectories.Finish(h.id, closed, c.core.Session(h.id))
 	c.closed(h)
 	c.tokens.Revoke(h.id)
 	c.mu.Lock()
@@ -694,7 +694,7 @@ func (c *workers) leave(h *hand, closed protocol.IssueClose, merged int64) {
 	c.save()
 }
 
-func (c *workers) closeOar(h *hand) {
+func (c *sessions) closeOar(h *hand) {
 	h.mu.Lock()
 	s := h.sess
 	h.mu.Unlock()
@@ -703,7 +703,7 @@ func (c *workers) closeOar(h *hand) {
 	}
 }
 
-func (c *workers) rest(h *hand) {
+func (c *sessions) rest(h *hand) {
 	h.mu.Lock()
 	s := h.sess
 	if s == nil {
@@ -721,14 +721,14 @@ func (c *workers) rest(h *hand) {
 	c.save()
 }
 
-func (c *workers) Dismiss(id string) bool {
+func (c *sessions) Dismiss(id string) bool {
 	h := c.hand(id)
 	if h == nil {
 		return false
 	}
 	name := id
-	if worker := c.core.Worker(id); worker != nil {
-		name = worker.Name
+	if session := c.core.Session(id); session != nil {
+		name = session.Name
 	}
 	c.closeOar(h)
 	c.leave(h, protocol.IssueCloseDismissed, 0)
@@ -738,7 +738,7 @@ func (c *workers) Dismiss(id string) bool {
 	return true
 }
 
-func (c *workers) Place(id string) (project.Workplace, bool) {
+func (c *sessions) Place(id string) (project.Workplace, bool) {
 	h := c.hand(id)
 	if h == nil {
 		return project.Workplace{}, false
@@ -746,25 +746,25 @@ func (c *workers) Place(id string) (project.Workplace, bool) {
 	return h.place, true
 }
 
-func (c *workers) Rest(id string) {
+func (c *sessions) Rest(id string) {
 	if h := c.hand(id); h != nil {
 		c.rest(h)
 	}
 }
 
-func (c *workers) Leave(id string, closed protocol.IssueClose, merged int64) {
+func (c *sessions) Leave(id string, closed protocol.IssueClose, merged int64) {
 	if h := c.hand(id); h != nil {
 		c.leave(h, closed, merged)
 	}
 }
 
-func (c *workers) remind(agent, worker, project, input string, h *hand, recalled map[string]bool) string {
+func (c *sessions) remind(agent, session, project, input string, h *hand, recalled map[string]bool) string {
 	if h != nil {
 		h.mu.Lock()
 		recalled = maps.Clone(h.recalled)
 		h.mu.Unlock()
 	}
-	found := c.memories.Recall(memory.RecallCue{Agent: agent, Worker: worker, Project: project, Text: input, Skip: maps.Clone(recalled)})
+	found := c.memories.Recall(memory.RecallCue{Agent: agent, Session: session, Project: project, Text: input, Skip: maps.Clone(recalled)})
 	if h != nil {
 		h.mu.Lock()
 		for _, id := range found.IDs {
@@ -782,10 +782,10 @@ func (c *workers) remind(agent, worker, project, input string, h *hand, recalled
 	return recallBlock(found.Lines)
 }
 
-func (c *workers) wake(h *hand, worker protocol.Worker, input, recall string) Delivered {
-	agent := c.store.Agent(worker.Agent)
+func (c *sessions) wake(h *hand, session protocol.Session, input, recall string) Delivered {
+	agent := c.store.Agent(session.Agent)
 	if agent == nil {
-		return Delivered{Kind: "refused", Reason: worker.Name + " 的 agent 已经删掉了，叫不醒"}
+		return Delivered{Kind: "refused", Reason: session.Name + " 的 agent 已经删掉了，叫不醒"}
 	}
 	h.mu.Lock()
 	resume := h.oarSessionID
@@ -796,13 +796,13 @@ func (c *workers) wake(h *hand, worker protocol.Worker, input, recall string) De
 		h.mu.Lock()
 		h.recalled = map[string]bool{}
 		h.mu.Unlock()
-		recall = c.remind(worker.Agent, h.id, h.place.Project, input, h, nil)
+		recall = c.remind(session.Agent, h.id, h.place.Project, input, h, nil)
 		s, refused = c.open(ctx, *agent, h.id, h.place, withRecall(recall, "（VibeValley 重启过，之前的会话接不上了。你在这个分支上做过的事看 git log。）\n\n"+input), "")
 	}
 	if s == nil {
-		return Delivered{Kind: "refused", Reason: fmt.Sprintf("%s 叫不醒：%s", worker.Name, refused)}
+		return Delivered{Kind: "refused", Reason: fmt.Sprintf("%s 叫不醒：%s", session.Name, refused)}
 	}
-	c.attach(h, s, worker.Runtime)
+	c.attach(h, s, session.Runtime)
 	h.mu.Lock()
 	launch := h.launch
 	h.mu.Unlock()
@@ -812,25 +812,25 @@ func (c *workers) wake(h *hand, worker protocol.Worker, input, recall string) De
 	return Delivered{Kind: "run", Launch: launch, Woke: true}
 }
 
-func (c *workers) Deliver(id, text string, by protocol.RunTrigger) Delivered {
-	h, worker := c.hand(id), c.core.Worker(id)
-	if h == nil || worker == nil {
+func (c *sessions) Deliver(id, text string, by protocol.RunTrigger) Delivered {
+	h, session := c.hand(id), c.core.Session(id)
+	if h == nil || session == nil {
 		return Delivered{Kind: "refused", Reason: fmt.Sprintf("没有 %s 这个帮工", id)}
 	}
-	starts := !protocol.IsBusy(*worker)
+	starts := !protocol.IsBusy(*session)
 	recall := ""
 	if starts {
-		if full := noRoom(c.onFarm(), worker.Runtime, h.place.Project, c.limits(worker.Runtime), id); full != "" {
-			return Delivered{Kind: "refused", Reason: fmt.Sprintf("%s 先不接着干：%s", worker.Name, full)}
+		if full := noRoom(c.onFarm(), session.Runtime, h.place.Project, c.limits(session.Runtime), id); full != "" {
+			return Delivered{Kind: "refused", Reason: fmt.Sprintf("%s 先不接着干：%s", session.Name, full)}
 		}
-		recall = c.remind(worker.Agent, id, h.place.Project, text, h, nil)
+		recall = c.remind(session.Agent, id, h.place.Project, text, h, nil)
 	}
 	h.mu.Lock()
 	s, launch := h.sess, h.launch
 	h.mu.Unlock()
 	if s == nil || launch == "" {
 		c.expect(h, by)
-		d := c.wake(h, *worker, text, recall)
+		d := c.wake(h, *session, text, recall)
 		if d.Kind == "refused" {
 			c.unexpect(h)
 		}
@@ -847,10 +847,10 @@ func (c *workers) Deliver(id, text string, by protocol.RunTrigger) Delivered {
 		c.unexpect(h)
 	}
 	if err != nil {
-		return Delivered{Kind: "refused", Reason: fmt.Sprintf("%s 没收到：%s", worker.Name, err.Error())}
+		return Delivered{Kind: "refused", Reason: fmt.Sprintf("%s 没收到：%s", session.Name, err.Error())}
 	}
 	if sent.Kind == "rejected" {
-		return Delivered{Kind: "refused", Reason: fmt.Sprintf("%s 没收到：%s", worker.Name, sent.Reason)}
+		return Delivered{Kind: "refused", Reason: fmt.Sprintf("%s 没收到：%s", session.Name, sent.Reason)}
 	}
 	if sent.Landed == "queued" {
 		c.expect(h, by)
@@ -862,11 +862,11 @@ func (c *workers) Deliver(id, text string, by protocol.RunTrigger) Delivered {
 	return Delivered{Kind: "steered", Launch: launch}
 }
 
-func (c *workers) Tell(id, text string, by protocol.RunTrigger) string {
+func (c *sessions) Tell(id, text string, by protocol.RunTrigger) string {
 	d := c.Deliver(id, text, by)
 	name := id
-	if worker := c.core.Worker(id); worker != nil {
-		name = worker.Name
+	if session := c.core.Session(id); session != nil {
+		name = session.Name
 	}
 	switch d.Kind {
 	case "steered":
@@ -882,7 +882,7 @@ func (c *workers) Tell(id, text string, by protocol.RunTrigger) string {
 	return d.Reason
 }
 
-func (c *workers) Send(ctx context.Context, agent protocol.Agent, task, where string, opt HireOptions) Hired {
+func (c *sessions) Send(ctx context.Context, agent protocol.Agent, task, where string, opt HireOptions) Hired {
 	c.mu.Lock()
 	c.hired++
 	id := fmt.Sprintf("w%d", c.hired)
@@ -903,33 +903,33 @@ func (c *workers) Send(ctx context.Context, agent protocol.Agent, task, where st
 	}
 
 	projectName := place.Project
-	worker := protocol.Worker{ID: id, Name: workerName(c.onFarm(), agent.ID, agent.Name), Agent: agent.ID, Runtime: agent.Runtime, Task: task, Project: &projectName,
+	session := protocol.Session{ID: id, Name: sessionName(c.onFarm(), agent.ID, agent.Name), Agent: agent.ID, Runtime: agent.Runtime, Task: task, Project: &projectName,
 		HiredAt: clock.NowMs(), Phase: protocol.Phase{Value: protocol.PhaseArriving{}}, Playbook: opt.Playbook, Channel: opt.Channel}
 	if opt.Issue != "" {
 		issue := opt.Issue
-		worker.Issue = &issue
+		session.Issue = &issue
 	}
 	if place.Branch != "" {
 		branch, cwd := place.Branch, place.Cwd
-		worker.Branch, worker.Worktree = &branch, &cwd
+		session.Branch, session.Worktree = &branch, &cwd
 	}
 	first := protocol.RunTrigger{Kind: protocol.RunTriggerKindIssue}
 	if opt.Trigger != nil {
 		first = *opt.Trigger
 	}
-	h := &hand{id: id, place: place, journal: c.trajectoryOf(worker), recalled: recalled, triggers: []protocol.RunTrigger{first}}
+	h := &hand{id: id, place: place, journal: c.trajectoryOf(session), recalled: recalled, triggers: []protocol.RunTrigger{first}}
 	c.mu.Lock()
 	c.hands[id] = h
 	c.mu.Unlock()
 	if opt.Hiring != nil {
-		opt.Hiring(worker)
+		opt.Hiring(session)
 	}
-	c.core.Apply(protocol.FactHired{Worker: worker})
+	c.core.Apply(protocol.FactHired{Session: session})
 	c.attach(h, s, agent.Runtime)
-	return Hired{Worker: &worker}
+	return Hired{Session: &session}
 }
 
-func (c *workers) Stop(id string) bool {
+func (c *sessions) Stop(id string) bool {
 	h := c.hand(id)
 	if h == nil {
 		return false
@@ -947,17 +947,17 @@ func (c *workers) Stop(id string) bool {
 	return true
 }
 
-func (c *workers) view(h *hand) *Roster {
-	worker := c.core.Worker(h.id)
-	if worker == nil {
+func (c *sessions) view(h *hand) *Roster {
+	session := c.core.Session(h.id)
+	if session == nil {
 		return nil
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return &Roster{Worker: *worker, Place: h.place, LastText: h.lastText}
+	return &Roster{Session: *session, Place: h.place, LastText: h.lastText}
 }
 
-func (c *workers) Roster() []Roster {
+func (c *sessions) Roster() []Roster {
 	c.mu.Lock()
 	hands := slices.Collect(maps.Values(c.hands))
 	c.mu.Unlock()
@@ -971,16 +971,16 @@ func (c *workers) Roster() []Roster {
 	return out
 }
 
-func (c *workers) Find(id string) *Roster {
+func (c *sessions) Find(id string) *Roster {
 	if h := c.hand(id); h != nil {
 		return c.view(h)
 	}
 	return nil
 }
 
-// What the worker is told for a comment on step n of its trajectory: the step, then the comment. A step gone (only the
+// What the session is told for a comment on step n of its trajectory: the step, then the comment. A step gone (only the
 // latest are kept) is Missing.
-func (c *workers) Comment(id string, n int64, comment string) (string, error) {
+func (c *sessions) Comment(id string, n int64, comment string) (string, error) {
 	var steps []protocol.Activity
 	if h := c.hand(id); h != nil {
 		steps = h.journal.Activities()

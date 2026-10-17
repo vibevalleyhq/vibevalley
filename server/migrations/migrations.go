@@ -3,6 +3,7 @@
 package migrations
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -50,19 +51,36 @@ func Up(db *sql.DB, path string) ([]string, error) {
 			}
 		}
 	}
+	// Foreign keys are off while a migration runs, as SQLite's way to build a table again asks (a rename would rewrite the
+	// references to it): on one connection, since the pragma is the connection's and cannot change inside a transaction.
+	// Each migration is checked before it commits.
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, "pragma foreign_keys = off"); err != nil {
+		return nil, err
+	}
+	defer conn.ExecContext(ctx, "pragma foreign_keys = on")
 	var ran []string
 	for i, name := range names[done:] {
 		body, err := FS.ReadFile(name)
 		if err != nil {
 			return ran, err
 		}
-		tx, err := db.Begin()
+		tx, err := conn.BeginTx(ctx, nil)
 		if err != nil {
 			return ran, err
 		}
 		if _, err := tx.Exec(string(body)); err != nil {
 			tx.Rollback()
 			return ran, fmt.Errorf("migration %s: %w", name, err)
+		}
+		if broken, err := foreignKeysBroken(tx); err != nil || broken != "" {
+			tx.Rollback()
+			return ran, fmt.Errorf("migration %s leaves a foreign key broken: %s %v", name, broken, err)
 		}
 		if _, err := tx.Exec(fmt.Sprintf("pragma user_version = %d", done+i+1)); err != nil {
 			tx.Rollback()
@@ -74,4 +92,22 @@ func Up(db *sql.DB, path string) ([]string, error) {
 		ran = append(ran, name)
 	}
 	return ran, nil
+}
+
+// foreignKeysBroken names the first row whose reference points nowhere, "" when there is none.
+func foreignKeysBroken(tx *sql.Tx) (string, error) {
+	rows, err := tx.Query("pragma foreign_key_check")
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	if rows.Next() {
+		var table, parent string
+		var rowid, fk sql.NullInt64
+		if err := rows.Scan(&table, &rowid, &parent, &fk); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%s row %d → %s", table, rowid.Int64, parent), nil
+	}
+	return "", rows.Err()
 }

@@ -4,7 +4,7 @@ import "context"
 
 // One method each, so a new endpoint fails the build until it is answered. vibevalley:route is the operation (group.name, the Flutter client's
 // api.group.name), method and path; vibevalley:can is who may call it: owner (on the farm's machine), remote (a device through the
-// gate, which lets only these through), manager (its tools), session (a worker, with its key). The table is Endpoints in gen.go and
+// gate, which lets only these through), manager (its tools), session (a session, with its key). The table is Endpoints in gen.go and
 // docs/reference/capabilities.md.
 type Handlers interface {
 	//vibevalley:route server.health GET /api/health
@@ -48,7 +48,7 @@ type Handlers interface {
 	//vibevalley:route manager.hear POST /api/manager/hear
 	//vibevalley:can owner remote
 	ManagerHear(ctx context.Context, body SayRequest) error
-	// To the issue's newest worker, as the owner: on is a step of its trajectory to comment on. A closed issue is refused: reopen it.
+	// To the issue's newest session, as the owner: on is a step of its trajectory to comment on. A closed issue is refused: reopen it.
 	//vibevalley:route issue.comment POST /api/issues/{id}/comment
 	//vibevalley:can owner remote manager
 	IssueComment(ctx context.Context, pID string, body CommentRequest) error
@@ -58,11 +58,11 @@ type Handlers interface {
 	//vibevalley:route issue.merge POST /api/issues/{id}/merge
 	//vibevalley:can owner remote manager
 	IssueMerge(ctx context.Context, pID string) error
-	// Tells the newest worker to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
+	// Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
 	//vibevalley:route issue.resolve POST /api/issues/{id}/resolve
 	//vibevalley:can owner remote
 	IssueResolve(ctx context.Context, pID string) error
-	// Sends the newest worker home without merging: the issue closes as dismissed.
+	// Sends the newest session home without merging: the issue closes as dismissed.
 	//vibevalley:route issue.cancel POST /api/issues/{id}/cancel
 	//vibevalley:can owner remote manager
 	IssueCancel(ctx context.Context, pID string) error

@@ -25,18 +25,18 @@ int phaseDot(Phase p) => switch (p) {
 const menuMax = 6;
 
 class Nameable {
-  const Nameable({required this.token, required this.name, required this.note, this.worker});
+  const Nameable({required this.token, required this.name, required this.note, this.session});
   final String token;
   final String name;
   final String note;
-  final Worker? worker;
+  final Session? session;
 }
 
 /// Everyone only when there is more than one helper.
-List<Nameable> nameables(List<Worker> workers, double now) => [
-  for (final h in workers) Nameable(token: '@${h.id}', name: h.name, note: phaseText(h, now), worker: h),
+List<Nameable> nameables(List<Session> sessions, double now) => [
+  for (final h in sessions) Nameable(token: '@${h.id}', name: h.name, note: phaseText(h, now), session: h),
   Nameable(token: mentionOf[managerAgent]!, name: '管家', note: '派活、拆计划、问进度'),
-  if (workers.length > 1) Nameable(token: mentionOf[everyone]!, name: '所有人', note: '叫醒地里每个帮工'),
+  if (sessions.length > 1) Nameable(token: mentionOf[everyone]!, name: '所有人', note: '叫醒地里每个帮工'),
 ];
 
 final _typed = RegExp(r'(^|[^\p{L}\p{N}_@])@([\p{L}\p{N}_]*)$', unicode: true);

@@ -62,7 +62,7 @@ flowchart LR
 仓库的目录见根目录 [AGENTS.md](../AGENTS.md#目录)，服务端每个包管什么见 [server/README.md](../server/README.md#目录)。
 
 - **形状和规则**：Go 的 `server/internal/protocol` 是唯一的来源。形状写在 `shapes.go`、接口写在 `api.go`，`server/tool/shapegen` 从它们写出 Go 的胶水代码（`internal/protocol/gen.go`）和 Flutter 的类型与接口客户端（`app/lib/gen/vibevalley.dart`）；规则是同一个包里的纯函数（[server](../server/README.md#形状和规则从哪来)、[理由](../.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。
-- **服务**：`server/internal/` 下一块业务一个包，包名用单数，从下往上是 `base`（地基）、`core`（核心状态）、`setting`、`agent`、`project`、`memory`、`runtime`、`worker`、`channel`、`schedule`、`issue`、`playbook`、`manager`、`gate`、`voice`、`connector`、`game`；一个包只 import 排在它前面的包，反方向的消息走 `base.Hub`。每个服务是包里的一个结构体，由 fx 组装；`workspace` 把全部包装在一个生命周期上（[server/README.md](../server/README.md#服务)、[理由](../.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)、[包名](../.agents/notes/implemented/architecture/2026-10-16-deep-modules-singular-names.md)）。执行由 smith 驱动，管家是 VibeValley 自己的 agent（[agents-and-runtimes.md](reference/agents-and-runtimes.md)）。
+- **服务**：`server/internal/` 下一块业务一个包，包名用单数，从下往上是 `base`（地基）、`core`（核心状态）、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`playbook`、`manager`、`gate`、`voice`、`connector`、`game`；一个包只 import 排在它前面的包，反方向的消息走 `base.Hub`。每个服务是包里的一个结构体，由 fx 组装；`workspace` 把全部包装在一个生命周期上（[server/README.md](../server/README.md#服务)、[理由](../.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)、[包名](../.agents/notes/implemented/architecture/2026-10-16-deep-modules-singular-names.md)）。执行由 smith 驱动，管家是 VibeValley 自己的 agent（[agents-and-runtimes.md](reference/agents-and-runtimes.md)）。
 - **HTTP 和 MCP**：`server/internal/handler` 在最上面，答 `VibeValleyApi`、两条事件流；`server/internal/mcp` 是给编码 agent 的另一个入口，挂在 `/mcp`；`cmd/server` 单独跑它（[server.md](reference/server.md)；[理由](../.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](../.agents/notes/implemented/architecture/2026-10-10-site-events-over-sse.md)）。
 - **存盘**：SQLite，表在 `server/migrations/`，查询在 `server/pkg/db/queries/`、由 sqlc 生成成 `server/pkg/db/generated/`（[理由](../.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）；下文「存了什么」。
 - **客户端**：Flutter 只连服务端的接口，用 Riverpod 管状态（[理由](../.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)）；macOS 版把服务端打进应用（[desktop.md](reference/desktop.md)）。
@@ -71,7 +71,7 @@ flowchart LR
 
 农场上的一切（通话、管家、帮工、田头、工单和计划、定时、commit 数、金币和成就）是一个值 `CoreState`（`server/internal/protocol/shapes.go`；[理由](../.agents/notes/implemented/architecture/2026-10-11-farm-core-state.md)）。只有服务端持有它，只在 `Core.Apply`（`server/internal/core/core.go`）里改：每个事实（雇了一个帮工、开始一轮、这一轮结束、一张工单变了……）由纯函数 `Reduce(state, fact)`（`protocol/core.go`）折进去。不改变状态的事实不发。
 
-每个帮工（`Worker`）的阶段 `phase` 是它生命周期的唯一状态：
+每个帮工（`Session`）的阶段 `phase` 是它生命周期的唯一状态：
 
 | 阶段 | 含义 | 要你做什么（`NeedOf`） |
 |---|---|---|
@@ -105,7 +105,7 @@ flowchart LR
 | `settings.json` | 首页「设置」里存的钥匙和语音设置；只有你能读 |
 | `state.json` | 核心状态，田头、进度、定时和工单除外：帮工、commit 数 |
 | `vibevalley.db` | SQLite：田头、工单和它们的帮工、每次干活（`run`）、计划的经过、账本、记性、定时、连接器、院门的设备（表名是单数，结构在 `server/migrations/`：现在只有一个 `0001_schema.sql`，以后的改动是它后面的新文件，启动时按名字顺序各跑一次，跑之前把库留一份 `vibevalley.db.v<n>`；库比服务端认识的新就不开）。查询都在 `server/pkg/db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
-| `workers.json` | 只有服务端需要的：每个帮工的项目目录或 worktree、农机自己的会话 id、最后一轮的完整原话 |
+| `sessions.json` | 只有服务端需要的：每个帮工的项目目录或 worktree、农机自己的会话 id、最后一轮的完整原话 |
 | `activities/<id>.json`、`activities/<id>.head.json` | 轨迹：每个帮工的干活过程（帮工走了留 30 天）和它的头：是谁、为哪张工单干、怎么关的（一直留着）；管家的（`manager`） |
 | `spend.json` | 今天每台农机花了多少 |
 | `manager/` | 管家（VibeValley 自己的 agent）：对话 `manager.jsonl`、记性 `MEMORY.md`、压掉的旧对话 `archive/` |
@@ -141,8 +141,8 @@ flowchart LR
 | `cny_per_usd` | 价目表是美元，折成人民币的汇率 | 7.2 |
 | `patrol.heartbeat_minutes` | 巡查的间隔，0 是关掉 | 10 |
 | `schedule.tick_ms` | 多久看一遍有没有到点的定时 | 20000 |
-| `worker.stall_seconds` | 一轮里多久没动静就提醒 | 240 |
-| `project.max_workers` | 一个项目里最多几个帮工同时干活 | 3 |
+| `session.stall_seconds` | 一轮里多久没动静就提醒 | 240 |
+| `project.max_sessions` | 一个项目里最多几个帮工同时干活 | 3 |
 | `trajectory.days` | 帮工走了以后，它的干活过程留几天（轨迹的头一直留着）；0 是一直留着 | 30 |
 | `chat.notice_batch_ms` | 忙着的帮工收到的提示，攒多久合成一条 | 3000 |
 | `chat.retry_wake_ms` | 叫醒在开口前就失败了，多久以后再叫一次 | 3000 |

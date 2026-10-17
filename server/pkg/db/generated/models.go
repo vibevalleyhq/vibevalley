@@ -99,8 +99,8 @@ type Issue struct {
 	Closed      sql.NullString
 }
 
-type IssueWorker struct {
-	Worker    string
+type IssueSession struct {
+	Session   string
 	Issue     string
 	StartedAt int64
 }
@@ -131,7 +131,7 @@ type Memory struct {
 	Kind       string
 	Body       string
 	Project    sql.NullString
-	Worker     sql.NullString
+	Session    sql.NullString
 	CreatedAt  int64
 	Recalled   int64
 	RecalledAt sql.NullInt64
@@ -185,7 +185,7 @@ type ReadCursor struct {
 
 type Run struct {
 	ID          int64
-	Worker      string
+	Session     string
 	Issue       sql.NullString
 	TriggeredBy string
 	Heard       sql.NullString

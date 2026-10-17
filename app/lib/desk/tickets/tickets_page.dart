@@ -54,7 +54,7 @@ Future<void> rememberPick(String agent, String project) async {
 }
 
 void dispatchedNotice(Dispatched got, String issue, ValueChanged<String?> open) {
-  if (got.worker != null) {
+  if (got.session != null) {
     open(issue);
   } else if (got.queued case final why?) {
     toasts.add(type: ToastType.info, title: '排上队了', description: why);
@@ -87,14 +87,14 @@ class TodoCard extends BoardCard {
 }
 
 class TicketCard extends BoardCard {
-  const TicketCard(this.issue, this.workers, this.state, this.worker);
+  const TicketCard(this.issue, this.sessions, this.state, this.session);
   final Issue issue;
 
-  final List<TrajectoryHead> workers;
+  final List<TrajectoryHead> sessions;
   final TicketState state;
-  final Worker? worker;
+  final Session? session;
 
-  TrajectoryHead get head => workers.last;
+  TrajectoryHead get head => sessions.last;
   @override
   String get id => issue.id;
   @override
@@ -107,8 +107,8 @@ class TicketCard extends BoardCard {
   List<String?> get words => [issue.title, issue.description, head.name, issue.project, issue.id, head.summary];
 }
 
-List<TrajectoryHead> workersOf(Issue issue, Map<String, TrajectoryHead> heads) => [
-  for (final id in issue.workers) heads[id] ?? TrajectoryHead(id: id, name: id, agent: issue.assignee, project: issue.project, startedAt: issue.createdAt),
+List<TrajectoryHead> sessionsOf(Issue issue, Map<String, TrajectoryHead> heads) => [
+  for (final id in issue.sessions) heads[id] ?? TrajectoryHead(id: id, name: id, agent: issue.assignee, project: issue.project, startedAt: issue.createdAt),
 ];
 
 /// An issue for the manager: open while the manager works on it, closed once it has answered; never dragged.
@@ -167,7 +167,7 @@ class TicketsPage extends ConsumerStatefulWidget {
   ConsumerState<TicketsPage> createState() => _TicketsPageState();
 }
 
-String _workersKey(CoreState? farm) => [for (final i in farm?.issues ?? const <Issue>[]) '${i.id}:${i.workers.join(',')}:${i.closedAt}'].join(';');
+String _sessionsKey(CoreState? farm) => [for (final i in farm?.issues ?? const <Issue>[]) '${i.id}:${i.sessions.join(',')}:${i.closedAt}'].join(';');
 
 class _TicketsPageState extends ConsumerState<TicketsPage> {
   Map<String, TrajectoryHead>? _heads;
@@ -213,13 +213,13 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
         final got = await deskRun(() => _api.issue.start(id: item.id));
         await _load();
         if (got != null) dispatchedNotice(got, item.id, _open);
-      case (Move.close, TicketCard(:final issue, :final worker?)):
+      case (Move.close, TicketCard(:final issue, :final session?)):
         await showFarmDialog<void>(
           context,
           title: Text('关上「${ticketTitle(issue)}」'),
           size: FarmDialogSize.lg,
           icon: 'icon-harvest',
-          builder: (_) => CloseTicket(worker: worker),
+          builder: (_) => CloseTicket(session: session),
         );
         await _load();
       case (Move.reopen, TicketCard(:final issue)):
@@ -236,7 +236,7 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
           ),
         );
         await _load();
-        if (got?.worker != null) _open(issue.id);
+        if (got?.session != null) _open(issue.id);
       default:
         return;
     }
@@ -267,7 +267,7 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
   @override
   Widget build(BuildContext context) {
     final farm = ref.watch(farmProvider);
-    ref.listen(farmProvider.select(_workersKey), (_, _) => unawaited(_load()));
+    ref.listen(farmProvider.select(_sessionsKey), (_, _) => unawaited(_load()));
     final heads = _heads;
     final kept = farm?.issues ?? const <Issue>[];
     final issues = [
@@ -281,8 +281,8 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
       for (final issue in issues)
         if (isForManager(issue))
           ManagerCard(issue)
-        else if (issue.plan == null && (issue.parent == null || issue.workers.isNotEmpty))
-          issue.workers.isEmpty ? TodoCard(issue) : TicketCard(issue, workersOf(issue, heads ?? const {}), ticketState(issue), ticketWorker(farm, issue)),
+        else if (issue.plan == null && (issue.parent == null || issue.sessions.isNotEmpty))
+          issue.sessions.isEmpty ? TodoCard(issue) : TicketCard(issue, sessionsOf(issue, heads ?? const {}), ticketState(issue), ticketSession(farm, issue)),
       for (final p in plans)
         if (playbookLane(p) case final lane?) PlaybookCard(p, lane),
     ];
@@ -291,12 +291,12 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
     final Widget? detail = switch (open) {
       _ when id == 'new' => TodoDetail(key: ValueKey('new:${widget.project}'), item: null, project: widget.project, reload: _load, onDone: _open),
       TodoCard(:final item) => TodoDetail(key: ValueKey(item.id), item: item, reload: _load, onDone: _open),
-      TicketCard(:final issue, :final workers, :final state, :final worker) => TicketDetail(
-        key: ValueKey(workers.last.id),
+      TicketCard(:final issue, :final sessions, :final state, :final session) => TicketDetail(
+        key: ValueKey(sessions.last.id),
         issue: issue,
-        workers: workers,
+        sessions: sessions,
         state: state,
-        worker: worker,
+        session: session,
         reload: _load,
       ),
       ManagerCard(:final issue) => ManagerTicketDetail(key: ValueKey(issue.id), issue: issue),

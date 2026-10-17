@@ -32,10 +32,10 @@ func issueRun(ctx context.Context, raw []string) error {
 		fmt.Fprintln(os.Stderr, *got.Queued)
 		return nil
 	}
-	if got.Worker == nil {
+	if got.Session == nil {
 		return fmt.Errorf("%s 交给了管家，看田头", id)
 	}
-	fmt.Fprintf(os.Stderr, "开工了：%s\n", *got.Worker)
+	fmt.Fprintf(os.Stderr, "开工了：%s\n", *got.Session)
 	last := protocol.IssueStatus("")
 	for {
 		issue, err := c.IssueGet(ctx, id)

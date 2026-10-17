@@ -14,22 +14,22 @@ import (
 	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
 	"vibevalley/internal/protocol"
-	"vibevalley/internal/worker"
+	"vibevalley/internal/session"
 	"vibevalley/pkg/x/str"
 )
 
-// The bearer token each worker session is handed (Tokens) only says who is calling. Every tool answers in words a model acts on, a refusal too.
+// The bearer token each session session is handed (Tokens) only says who is calling. Every tool answers in words a model acts on, a refusal too.
 
 type Service struct {
 	core    *core.Service
-	tokens  *worker.Service
+	tokens  *session.Service
 	chat    *channel.Service
 	handler http.Handler
 	// nil: the farm's Tokens. Tests may put their own.
 	who func(token string) string
 }
 
-func newService(cfg base.Config, core *core.Service, tokens *worker.Service, chat *channel.Service) (*Service, error) {
+func newService(cfg base.Config, core *core.Service, tokens *session.Service, chat *channel.Service) (*Service, error) {
 	t := &Service{core: core, tokens: tokens, chat: chat}
 	server := sdk.NewServer(&sdk.Implementation{Name: "vibevalley", Version: cfg.Version}, nil)
 	t.add(server)
@@ -192,7 +192,7 @@ func (t *Service) add(server *sdk.Server) {
 		}
 		// Listed without @: an @ wakes someone, and models copy what they read.
 		lines := []string{"地里有主人、管家，和这些帮工："}
-		for _, h := range t.core.State().Workers {
+		for _, h := range t.core.State().Sessions {
 			doing := "这一轮做完了"
 			switch p := h.Phase.Value.(type) {
 			case protocol.PhaseWorking:

@@ -9,9 +9,9 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，和 [Multica](https://gi
 ```
 Workspace（工作目录，一张大地图）
 ├── 项目（一个 git 仓库，大地图上的一座岛）
-│   └── worktree（岛上的一块地；一个 Worker 占一块）
+│   └── worktree（岛上的一块地；一个 Session 占一块）
 └── 工单（可以指一个项目）
-    └── Worker（派一次是一个；重开是同一张工单的下一个）
+    └── Session（派一次是一个；重开是同一张工单的下一个）
         └── run（一次干活：一次触发到一次汇报）
 ```
 
@@ -20,11 +20,15 @@ Workspace（工作目录，一张大地图）
 ## 一件活怎么走
 
 1. 主人或管家写下一张**工单**，选一个 **agent 档案**和一个**项目**，派出去。
-2. 服务端开一个 **Worker**：档案在一个 runtime 上的会话，在项目的 worktree 里、自己的分支上干活。
+2. 服务端开一个 **Session**：档案在一个 runtime 上接的这份活，在项目的 worktree 里、自己的分支上干。
 3. 每次 **run** 从一次触发开始（派出去、一条 comment、计划走到下一步、定时），到一次汇报结束；中间每一**步**都记下来。
 4. 主人看**改动**：合进主分支（工单关上）、带句话接着做，或者不合就关。
 
-说话都在**频道**里，结构照 Discord：频道 → 消息 → 挂在消息下面的串，每张工单一个串。现在只有一个人：主人，没有成员和权限；在频道里说话的是主人、管家和 Worker。同时干活的 Worker 有上限，派不出去的排队。
+说话都在**频道**里，结构照 Discord：频道 → 消息 → 挂在消息下面的串，每张工单一个串。现在只有一个人：主人，没有成员和权限；在频道里说话的是主人、管家和档案（经它的 Session）。同时干活的 Session 有上限，派不出去的排队。
+
+## Session 和 oar 会话
+
+单写的 Session 只指上面这一层：一个档案为一张工单接的活。农机那一层（smith 的 `oar.Session`，重启后会换一个）在代码里只经包名出现，文档里写「oar 会话」；中文里我们这一层写 Session，不写「会话」（[Worker 改叫 Session](../.agents/notes/proposed/architecture/2026-10-17-worker-is-a-session.md)）。
 
 ## 东西
 
@@ -36,7 +40,7 @@ Workspace（工作目录，一张大地图）
 | runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 smith 驱动 | 农机 |
 | 项目 | `Project` | 一个 git 仓库，和能同时在里面干活的执行数（`slots`） | 岛，也是一张小地图 |
 | 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，关上的能重开 | 看板上的卡片 |
-| Worker | `Worker`（服务是 `worker.Service`，派活是 `Issue.Hire`） | 档案为一张工单开的会话，有自己的 worktree 和分支，直到收获或收工；跨好几次 run | 帮工 |
+| Session | `Session`（服务是 `session.Service`，派活是 `Issue.Hire`） | 档案为一张工单接的活，有自己的 worktree 和分支，直到收获或收工；跨好几次 run，重启后还是同一个 | 帮工 |
 | Run | `Run`（`run` 表）；核心状态里是 `FactRun` 到 `FactReport` | 一次干活：一次触发到一次汇报，包着一个 oar turn | 一季庄稼 |
 | 步骤 | `Activity`，全部是 `Trajectory` | 一次 run 里的每一步 | 干活过程 |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 | 收成清单 |

@@ -11,14 +11,14 @@ import (
 )
 
 const addNote = `-- name: AddNote :execresult
-insert into memory (agent, kind, body, project, worker, created_at) values (?, 'note', ?, ?, ?, ?)
+insert into memory (agent, kind, body, project, session, created_at) values (?, 'note', ?, ?, ?, ?)
 `
 
 type AddNoteParams struct {
 	Agent     string
 	Body      string
 	Project   sql.NullString
-	Worker    sql.NullString
+	Session   sql.NullString
 	CreatedAt int64
 }
 
@@ -27,7 +27,7 @@ func (q *Queries) AddNote(ctx context.Context, arg AddNoteParams) (sql.Result, e
 		arg.Agent,
 		arg.Body,
 		arg.Project,
-		arg.Worker,
+		arg.Session,
 		arg.CreatedAt,
 	)
 }
@@ -63,8 +63,8 @@ func (q *Queries) ForgetBeyond(ctx context.Context, arg ForgetBeyondParams) erro
 }
 
 const keepJob = `-- name: KeepJob :exec
-insert into memory (agent, kind, body, project, worker, created_at) values (?, 'issue', ?, ?, ?, ?)
-on conflict (agent, worker) where kind = 'issue'
+insert into memory (agent, kind, body, project, session, created_at) values (?, 'issue', ?, ?, ?, ?)
+on conflict (agent, session) where kind = 'issue'
 do update set body = excluded.body, project = excluded.project, created_at = excluded.created_at
 `
 
@@ -72,17 +72,17 @@ type KeepJobParams struct {
 	Agent     string
 	Body      string
 	Project   sql.NullString
-	Worker    sql.NullString
+	Session   sql.NullString
 	CreatedAt int64
 }
 
-// One job memory for each worker: written again as the worker goes on.
+// One job memory for each session: written again as the session goes on.
 func (q *Queries) KeepJob(ctx context.Context, arg KeepJobParams) error {
 	_, err := q.db.ExecContext(ctx, keepJob,
 		arg.Agent,
 		arg.Body,
 		arg.Project,
-		arg.Worker,
+		arg.Session,
 		arg.CreatedAt,
 	)
 	return err
@@ -90,7 +90,7 @@ func (q *Queries) KeepJob(ctx context.Context, arg KeepJobParams) error {
 
 const memoriesOf = `-- name: MemoriesOf :many
 
-select id, agent, kind, body, project, worker, created_at, recalled, recalled_at from memory where agent = ? order by created_at desc, id desc
+select id, agent, kind, body, project, session, created_at, recalled, recalled_at from memory where agent = ? order by created_at desc, id desc
 `
 
 // What agents remember (memory/memory.go).
@@ -109,7 +109,7 @@ func (q *Queries) MemoriesOf(ctx context.Context, agent string) ([]Memory, error
 			&i.Kind,
 			&i.Body,
 			&i.Project,
-			&i.Worker,
+			&i.Session,
 			&i.CreatedAt,
 			&i.Recalled,
 			&i.RecalledAt,

@@ -39,17 +39,17 @@ func TestPickJobs(t *testing.T) {
 	var memories []protocol.Memory
 	for i := range 5 {
 		memories = append(memories, recallMemory(fmt.Sprintf("job%d", i), fmt.Sprintf("第 %d 件活 → 做好了", i), func(m *protocol.Memory) {
-			m.Kind, m.Project, m.Worker, m.At = protocol.MemoryKindIssue, ptr.To("clock"), ptr.To(fmt.Sprintf("w%d", i)), recallNow-int64(i)*protocol.DayMs
+			m.Kind, m.Project, m.Session, m.At = protocol.MemoryKindIssue, ptr.To("clock"), ptr.To(fmt.Sprintf("w%d", i)), recallNow-int64(i)*protocol.DayMs
 		}))
 	}
 	memories = append(memories,
 		recallMemory("note", "迁移文件在 db/migrations", func(m *protocol.Memory) { m.Project = ptr.To("clock") }),
 		recallMemory("job-blog", "博客的活 → 做好了", func(m *protocol.Memory) {
-			m.Kind, m.Project, m.Worker = protocol.MemoryKindIssue, ptr.To("blog"), ptr.To("w8")
+			m.Kind, m.Project, m.Session = protocol.MemoryKindIssue, ptr.To("blog"), ptr.To("w8")
 		}),
 	)
 	testkit.Eq(t, recallIDs(pick(memories, recallCue("随便做点什么", nil))), []string{"note", "job0", "job1", "job2"})
-	testkit.Eq(t, recallIDs(pick(memories, recallCue("随便做点什么", func(c *pickCue) { c.Worker, c.Skip = "w0", map[string]bool{"note": true} }))), []string{"job1", "job2", "job3"})
+	testkit.Eq(t, recallIDs(pick(memories, recallCue("随便做点什么", func(c *pickCue) { c.Session, c.Skip = "w0", map[string]bool{"note": true} }))), []string{"job1", "job2", "job3"})
 	var many []protocol.Memory
 	for i := range 20 {
 		many = append(many, recallMemory(fmt.Sprintf("n%d", i), fmt.Sprintf("这个项目的第 %d 条约定", i), func(m *protocol.Memory) { m.Project = ptr.To("clock") }))
@@ -88,7 +88,7 @@ func recallMemory(id, text string, change func(*protocol.Memory)) protocol.Memor
 }
 
 func recallCue(text string, change func(*pickCue)) pickCue {
-	c := pickCue{Worker: "w9", Project: "clock", Text: text, Skip: map[string]bool{}, Now: recallNow}
+	c := pickCue{Session: "w9", Project: "clock", Text: text, Skip: map[string]bool{}, Now: recallNow}
 	if change != nil {
 		change(&c)
 	}

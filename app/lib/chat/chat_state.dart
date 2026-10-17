@@ -94,8 +94,8 @@ class ChatActions {
     if (conversation != null && !_ref.read(chatLoadedProvider).containsKey(conversation)) await _fetchPage(conversation);
   }
 
-  Future<bool> showJobThread(String worker) async {
-    final thread = jobThreadOf(_chat, worker);
+  Future<bool> showJobThread(String session) async {
+    final thread = jobThreadOf(_chat, session);
     if (thread == null) return false;
     await showChat(thread.id);
     return true;

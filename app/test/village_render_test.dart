@@ -13,28 +13,28 @@ import 'package:vibevalley/village/game.dart';
 import 'package:vibevalley/village/level.dart';
 import 'package:vibevalley/village/world.dart';
 
-WorkerPlay _play(int station) =>
-    WorkerPlay(station: station.toDouble(), history: const [], toolsThisRun: 0, counts: const {}, files: const [], commands: const [], runStartedAt: 0);
+SessionPlay _play(int station) =>
+    SessionPlay(station: station.toDouble(), history: const [], toolsThisRun: 0, counts: const {}, files: const [], commands: const [], runStartedAt: 0);
 
-Worker _worker(String id, String agent, Phase phase, int station) =>
-    Worker(id: id, name: id, agent: agent, runtime: 'pi', task: '写打卡', hiredAt: 0, runs: 1, phase: phase, play: _play(station));
+Session _session(String id, String agent, Phase phase, int station) =>
+    Session(id: id, name: id, agent: agent, runtime: 'pi', task: '写打卡', hiredAt: 0, runs: 1, phase: phase, play: _play(station));
 
-PhaseWorking _doing(WorkerAction action) => PhaseWorking(
+PhaseWorking _doing(SessionAction action) => PhaseWorking(
   since: 0,
   doing: Doing(action: action, label: 'a.ts'),
 );
 
 VillageData _farm() {
-  final workers = [
-    _worker('w1', 'lab', _doing(WorkerAction.editFile), 0),
-    _worker('w2', 'zhou', const PhaseRipe(), 1),
-    _worker('w3', 'kimi', _doing(WorkerAction.readFile), 2),
-    _worker('w4', 'codex', _doing(WorkerAction.runCommand), 3),
-    _worker('w5', 'pi', _doing(WorkerAction.web), 4),
-    _worker('w6', 'oar', _doing(WorkerAction.wait), 5),
-    _worker('w7', 'qwen', const PhaseArriving(), -1),
+  final sessions = [
+    _session('w1', 'lab', _doing(SessionAction.editFile), 0),
+    _session('w2', 'zhou', const PhaseRipe(), 1),
+    _session('w3', 'kimi', _doing(SessionAction.readFile), 2),
+    _session('w4', 'codex', _doing(SessionAction.runCommand), 3),
+    _session('w5', 'pi', _doing(SessionAction.web), 4),
+    _session('w6', 'oar', _doing(SessionAction.wait), 5),
+    _session('w7', 'qwen', const PhaseArriving(), -1),
   ];
-  final state = CoreState(call: CallState.idle, manager: ManagerState.speaking, workers: workers);
+  final state = CoreState(call: CallState.idle, manager: ManagerState.speaking, sessions: sessions);
   final view = FarmView(
     level: const FarmLevel(level: 6, xp: 0, need: 60),
     plots: {
@@ -110,7 +110,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(game.hoverBed.value, 6);
     game
-      ..play(const GameEffectReward(workerId: 'w1', coins: 20, streak: 1))
+      ..play(const GameEffectReward(sessionId: 'w1', coins: 20, streak: 1))
       ..burst(BedFx.water, 6);
     await _run(tester, 0.3);
     await _save(tester, 'day');

@@ -110,13 +110,13 @@ class _FarmSoundsState extends ConsumerState<FarmSounds> {
     Sfx.setMuted(ref.watch(prefsProvider.select((p) => p.muted)));
     // The first state is the farm as it already was: nothing arrives in it.
     ref.listen(farmProvider, (prev, next) {
-      if (prev != null && next != null) _workers(prev.workers, next.workers);
+      if (prev != null && next != null) _sessions(prev.sessions, next.sessions);
     });
     return widget.child;
   }
 }
 
-void _workers(List<Worker> prev, List<Worker> next) {
+void _sessions(List<Session> prev, List<Session> next) {
   final before = {for (final h in prev) h.id: h};
   for (final h in next) {
     final was = before[h.id];

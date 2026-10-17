@@ -28,11 +28,11 @@ class SpriteIcon extends StatelessWidget {
 
 class ActionGlyph extends StatelessWidget {
   const ActionGlyph(this.action, {super.key, this.size = 16});
-  final WorkerAction action;
+  final SessionAction action;
   final double size;
 
   @override
-  Widget build(BuildContext context) => action == WorkerAction.none ? const SizedBox.shrink() : SpriteIcon('act-${action.wire}', size: size);
+  Widget build(BuildContext context) => action == SessionAction.none ? const SizedBox.shrink() : SpriteIcon('act-${action.wire}', size: size);
 }
 
 const outcomeIcon = <Outcome, String>{Outcome.completed: 'icon-harvest', Outcome.failed: 'icon-bug', Outcome.interrupted: 'icon-shovel'};
@@ -45,7 +45,7 @@ class PhaseGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) => switch (phase) {
     PhaseArriving() => SpriteIcon('icon-seeds', size: size),
-    PhaseWorking(doing: Doing(action: WorkerAction.none)) => SizedBox.square(dimension: size),
+    PhaseWorking(doing: Doing(action: SessionAction.none)) => SizedBox.square(dimension: size),
     PhaseWorking(:final doing) => _Bob(child: SpriteIcon('act-${doing.action.wire}', size: size)),
     PhaseRipe() => SpriteIcon('icon-harvest', size: size),
     PhaseFailed() => SpriteIcon('icon-bug', size: size),

@@ -85,7 +85,7 @@ void main() {
       effects.add(const GameEffectAchievement(achievement: 'harvests', tier: 2));
       effects.add(const GameEffectAchievement(achievement: 's_open', tier: 1));
       effects.add(const GameEffectAchievement(achievement: 'no_such', tier: 1));
-      effects.add(const GameEffectReward(workerId: 'w1', coins: 30, streak: 1));
+      effects.add(const GameEffectReward(sessionId: 'w1', coins: 30, streak: 1));
       await tester.pump();
       final list = manager.toasts;
       expect(list.map((t) => t.title), ['开门', '小有收成']);

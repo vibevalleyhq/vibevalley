@@ -26,18 +26,18 @@ final fakeInbox = NotifierProvider<FakeInbox, List<InboxItem>>(FakeInbox.new);
 const ripe = InboxItem(
   id: 'w1:merge:2',
   kind: InboxKind.merge,
-  from: InboxFromWorker(id: 'w1', name: '阿郑', agent: 'zheng'),
+  from: InboxFromSession(id: 'w1', name: '阿郑', agent: 'zheng'),
   text: '修好了登录页',
   at: 30,
-  target: InboxTargetWorker(id: 'w1'),
+  target: InboxTargetSession(id: 'w1'),
 );
 const failed = InboxItem(
   id: 'w2:fix:1',
   kind: InboxKind.fix,
-  from: InboxFromWorker(id: 'w2', name: '阿周', agent: 'zhou'),
+  from: InboxFromSession(id: 'w2', name: '阿周', agent: 'zhou'),
   text: '测试没过',
   at: 20,
-  target: InboxTargetWorker(id: 'w2'),
+  target: InboxTargetSession(id: 'w2'),
 );
 const draft = InboxItem(
   id: 'pb1:draft',
@@ -134,7 +134,7 @@ void main() {
     await tester.tap(find.text('接听'));
     await tester.pump();
     expect(container.read(phoneOpenProvider), isFalse);
-    expect(targets.single, isA<PhoneTargetWorker>().having((t) => t.id, 'id', 'w2'));
+    expect(targets.single, isA<PhoneTargetSession>().having((t) => t.id, 'id', 'w2'));
     expect(container.read(phoneProvider).missed.map((c) => c.id), ['w1:merge:2']);
     expect(container.read(phoneProvider).log.single, isA<PhoneLogCall>().having((e) => e.answered, 'answered', true));
     await done(tester);

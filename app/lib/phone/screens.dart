@@ -89,7 +89,7 @@ class CallerFace extends ConsumerWidget {
     final atlas = ref.watch(atlasProvider).value;
     if (atlas == null) return SizedBox.square(dimension: size);
     return switch (call.from) {
-      InboxFromWorker(:final id, :final agent) => AnimalFace(
+      InboxFromSession(:final id, :final agent) => AnimalFace(
         atlas: atlas,
         look: lookOf((ref.watch(agentsProvider).value ?? const {})[agent], agent.isEmpty ? id : agent, atlas.has),
         size: size,

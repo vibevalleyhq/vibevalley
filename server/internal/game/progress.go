@@ -169,21 +169,21 @@ func progressStep(folded ledgerFolded, entry protocol.LedgerEntry) (ledgerFolded
 	p, seen := folded.Progress, folded.Seen
 	counts := p.Counts
 	var coins int64
-	worker := ""
+	session := ""
 	at := progressAtOf(entry.Value)
 	switch e := entry.Value.(type) {
 	case protocol.LedgerEntryHarvested:
 		streak := p.Streak + 1
 		p.Streak, p.BestStreak = streak, max(p.BestStreak, streak)
 		coins += harvestCoins(e.Commits, streak)
-		worker = e.Worker
-		told := slices.Contains(seen.Told, e.Worker)
-		failed := slices.Contains(seen.Failed, e.Worker)
+		session = e.Session
+		told := slices.Contains(seen.Told, e.Session)
+		failed := slices.Contains(seen.Failed, e.Session)
 		counts = progressBump(counts, "harvests", 1)
 		if e.Runs <= 1 && !told && !failed {
 			counts = progressBump(counts, "first_try", 1)
 		}
-		if slices.Contains(seen.Conflicted, e.Worker) {
+		if slices.Contains(seen.Conflicted, e.Session) {
 			counts = progressBump(counts, "untangle", 1)
 		}
 		if failed {
@@ -192,7 +192,7 @@ func progressStep(folded ledgerFolded, entry protocol.LedgerEntry) (ledgerFolded
 		if e.CNY != nil && *e.CNY < cheapCNY {
 			counts = progressBump(counts, "thrifty", 1)
 		}
-		if slices.Contains(seen.Reviewed, e.Worker) {
+		if slices.Contains(seen.Reviewed, e.Session) {
 			counts = progressAtLeast(counts, "s_review", 1)
 		}
 		seen.Runtimes = progressAdd(seen.Runtimes, e.Runtime)
@@ -207,14 +207,14 @@ func progressStep(folded ledgerFolded, entry protocol.LedgerEntry) (ledgerFolded
 		}
 	case protocol.LedgerEntryFailed:
 		p.Streak = 0
-		seen.Failed = progressAdd(seen.Failed, e.Worker)
+		seen.Failed = progressAdd(seen.Failed, e.Session)
 	case protocol.LedgerEntryConflicted:
-		seen.Conflicted = progressAdd(seen.Conflicted, e.Worker)
+		seen.Conflicted = progressAdd(seen.Conflicted, e.Session)
 	case protocol.LedgerEntryTold:
-		seen.Told = progressAdd(seen.Told, e.Worker)
+		seen.Told = progressAdd(seen.Told, e.Session)
 		counts = progressAtLeast(counts, "s_tell", 1)
 	case protocol.LedgerEntryReviewed:
-		seen.Reviewed = progressAdd(seen.Reviewed, e.Worker)
+		seen.Reviewed = progressAdd(seen.Reviewed, e.Session)
 	case protocol.LedgerEntryPlaybook:
 		coins += playbookCoins(e.Merged)
 		counts = progressAtLeast(counts, "big_playbook", e.Merged)
@@ -274,8 +274,8 @@ func progressStep(folded ledgerFolded, entry protocol.LedgerEntry) (ledgerFolded
 	if coins != 0 {
 		news.Coins = &coins
 	}
-	if worker != "" {
-		news.Worker = &worker
+	if session != "" {
+		news.Session = &session
 	}
 	if len(unlocked) > 0 {
 		news.Unlocked = unlocked
@@ -294,7 +294,7 @@ const fullHouse = 6
 
 func progressWorking(state protocol.CoreState) int {
 	n := 0
-	for _, h := range state.Workers {
+	for _, h := range state.Sessions {
 		if _, ok := h.Phase.Value.(protocol.PhaseWorking); ok {
 			n++
 		}
@@ -327,12 +327,12 @@ func entriesFor(before protocol.CoreState, fact protocol.Fact, after protocol.Co
 	out := []protocol.LedgerEntry{}
 	switch f := fact.Value.(type) {
 	case protocol.FactReport:
-		h := protocol.WorkerOf(after, f.ID)
+		h := protocol.SessionOf(after, f.ID)
 		if h == nil {
-			h = protocol.WorkerOf(before, f.ID)
+			h = protocol.SessionOf(before, f.ID)
 		}
 		if f.Outcome == protocol.OutcomeFailed {
-			e := protocol.LedgerEntryFailed{Worker: f.ID}
+			e := protocol.LedgerEntryFailed{Session: f.ID}
 			if h != nil && h.Agent != "" {
 				agent := h.Agent
 				e.Agent = &agent
@@ -341,15 +341,15 @@ func entriesFor(before protocol.CoreState, fact protocol.Fact, after protocol.Co
 		}
 	case protocol.FactConflict:
 		if f.Conflict != nil {
-			out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryConflicted{Worker: f.ID}})
+			out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryConflicted{Session: f.ID}})
 		}
 	case protocol.FactCall:
 		if f.State == protocol.CallStateLive {
 			out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryMoment{Kind: protocol.LedgerEntryMomentKindOpened}})
 		}
 	case protocol.FactHired:
-		agent := f.Worker.Agent
-		out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryHired{Worker: f.Worker.ID, Agent: &agent}})
+		agent := f.Session.Agent
+		out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryHired{Session: f.Session.ID, Agent: &agent}})
 	case protocol.FactIssue:
 		if f.Issue.Plan == nil {
 			break
@@ -369,10 +369,10 @@ func entriesFor(before protocol.CoreState, fact protocol.Fact, after protocol.Co
 		}
 	case protocol.FactLeft:
 		// Harvested: only when something went into the main branch, which is what earns.
-		h := protocol.WorkerOf(before, f.ID)
+		h := protocol.SessionOf(before, f.ID)
 		if h != nil && f.Closed != nil && *f.Closed == protocol.IssueCloseMerged && f.Merged != nil && *f.Merged > 0 {
 			agent := h.Agent
-			e := protocol.LedgerEntryHarvested{Worker: f.ID, Agent: &agent, Runtime: h.Runtime, Commits: *f.Merged, Runs: h.Runs}
+			e := protocol.LedgerEntryHarvested{Session: f.ID, Agent: &agent, Runtime: h.Runtime, Commits: *f.Merged, Runs: h.Runs}
 			if h.Project != nil {
 				e.Project = *h.Project
 			}
@@ -389,16 +389,16 @@ func entriesFor(before protocol.CoreState, fact protocol.Fact, after protocol.Co
 		switch f.Message.FromKind {
 		case protocol.SenderKindUser:
 			if f.Thread != nil {
-				out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryTold{Worker: *f.Thread}})
+				out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryTold{Session: *f.Thread}})
 			}
 			for _, named := range f.Message.Mentions {
-				if named != protocol.ManagerAgent && named != "user" && named != protocol.Everyone && protocol.WorkerOf(before, named) != nil {
-					out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryCalled{Worker: named}})
+				if named != protocol.ManagerAgent && named != "user" && named != protocol.Everyone && protocol.SessionOf(before, named) != nil {
+					out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryCalled{Session: named}})
 				}
 			}
-		case protocol.SenderKindWorker:
+		case protocol.SenderKindAgent:
 			if f.Answers != nil {
-				out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryHandoff{Worker: *f.Answers, To: f.Message.From}})
+				out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryHandoff{Session: *f.Answers, To: f.Message.From}})
 			}
 		}
 	case protocol.FactCommits:

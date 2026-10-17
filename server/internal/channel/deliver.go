@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"vibevalley/internal/protocol"
-	"vibevalley/internal/worker"
+	"vibevalley/internal/session"
 	"vibevalley/pkg/db/generated"
 	"vibevalley/pkg/x/clock"
 	"vibevalley/pkg/x/str"
@@ -54,9 +54,9 @@ func (c *Service) settle(s chatStore, seq int64) (chatWritten, error) {
 	}
 	meta := chatMetaOf(row.Meta)
 	mentions := mentionsIn(row.Body)
-	workers := c.onFarm()
-	onFarm := make([]string, len(workers))
-	for i, h := range workers {
+	sessions := c.onFarm()
+	onFarm := make([]string, len(sessions))
+	for i, h := range sessions {
 		onFarm[i] = h.ID
 	}
 	participants, err := s.participants()
@@ -112,7 +112,7 @@ func (c *Service) settle(s chatStore, seq int64) (chatWritten, error) {
 	}
 	now := clock.NowMs()
 	cooling := []string{}
-	for _, h := range workers {
+	for _, h := range sessions {
 		at, err := s.lastAgentWake(h.ID)
 		if err != nil {
 			return chatWritten{}, err
@@ -122,8 +122,8 @@ func (c *Service) settle(s chatStore, seq int64) (chatWritten, error) {
 		}
 	}
 	audience := []string{}
-	for _, h := range workers {
-		if conv.Kind == "thread" || c.channelOfWorker(h) == conv.ID {
+	for _, h := range sessions {
+		if conv.Kind == "thread" || c.channelOfSession(h) == conv.ID {
 			audience = append(audience, h.ID)
 		}
 	}
@@ -140,7 +140,7 @@ func (c *Service) settle(s chatStore, seq int64) (chatWritten, error) {
 		Kind:         chatMessageKind(row.Kind),
 		Mentions:     mentions,
 		Conversation: protocol.Conversation{Kind: chatConversationKind(conv.Kind), SubjectKind: chatSubjectKind(conv.SubjectKind), SubjectID: conv.SubjectID},
-		Workers:      audience,
+		Sessions:     audience,
 		OnFarm:       onFarm,
 		Followers:    followers,
 		Hops:         hops,
@@ -158,7 +158,7 @@ func (c *Service) settle(s chatStore, seq int64) (chatWritten, error) {
 			return chatWritten{}, err
 		}
 	}
-	// The person speaking resets a worker's failed wakes: they asked for it themselves.
+	// The person speaking resets a session's failed wakes: they asked for it themselves.
 	if row.Sender == "user" {
 		for _, d := range deliveries {
 			if d.Wakes {
@@ -295,11 +295,11 @@ func (c *Service) kicked(recipient string) error {
 		}
 		return nil
 	}
-	worker := c.workerOf(recipient)
-	if worker == nil {
+	session := c.sessionOf(recipient)
+	if session == nil {
 		return s.dropOpen(recipient, "left")
 	}
-	if protocol.IsBusy(*worker) {
+	if protocol.IsBusy(*session) {
 		// Gathered for a moment: a burst of messages is one notice.
 		pending := slices.ContainsFunc(rows, func(r chatDeliveryRow) bool { return r.State == "pending" && r.HeldBy == nil })
 		if pending && c.notices[recipient] == nil {
@@ -324,7 +324,7 @@ func (c *Service) kicked(recipient string) error {
 	others := slices.DeleteFunc(unread, func(o chatUnreadRow) bool {
 		return slices.ContainsFunc(messages, func(m protocol.InboxMessage) bool { return m.Target == o.Target })
 	})
-	delivered := c.workers.Deliver(recipient, wakeInput(messages, others), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: &waking[0].Seq})
+	delivered := c.sessions.Deliver(recipient, wakeInput(messages, others), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: &waking[0].Seq})
 	if delivered.Kind == "refused" {
 		log.Printf("chat: %s not woken: %s", recipient, delivered.Reason)
 		return nil
@@ -342,11 +342,11 @@ func (c *Service) notify(recipient string) {
 	if c.compacting[recipient] {
 		return
 	}
-	worker := c.workerOf(recipient)
-	if worker == nil {
+	session := c.sessionOf(recipient)
+	if session == nil {
 		return
 	}
-	if !protocol.IsBusy(*worker) {
+	if !protocol.IsBusy(*session) {
 		c.kick(recipient)
 		return
 	}
@@ -360,7 +360,7 @@ func (c *Service) notify(recipient string) {
 	if len(rows) == 0 {
 		return
 	}
-	delivered := c.workers.Deliver(recipient, busyNotice(c.groupRows(rows)), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: &rows[0].Seq})
+	delivered := c.sessions.Deliver(recipient, busyNotice(c.groupRows(rows)), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: &rows[0].Seq})
 	if delivered.Kind == "refused" {
 		return
 	}
@@ -376,8 +376,8 @@ func (c *Service) notify(recipient string) {
 func (c *Service) inboxRows(who string) ([]chatUnreadRow, error) {
 	s := c.store()
 	channel := c.general
-	if h := c.workerOf(who); h != nil {
-		channel = c.channelOfWorker(*h)
+	if h := c.sessionOf(who); h != nil {
+		channel = c.channelOfSession(*h)
 	}
 	rows, err := s.inboxOf(who, channel)
 	if err != nil {
@@ -396,7 +396,7 @@ func (c *Service) inboxRows(who string) ([]chatUnreadRow, error) {
 	return out, nil
 }
 
-func (c *Service) onActivity(a worker.LaunchActivity) {
+func (c *Service) onActivity(a session.LaunchActivity) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {
@@ -433,7 +433,7 @@ func (c *Service) onActivity(a worker.LaunchActivity) {
 						where = *thread
 					}
 					name := a.ID
-					if h := c.workerOf(a.ID); h != nil {
+					if h := c.sessionOf(a.ID); h != nil {
 						name = h.Name
 					}
 					text := fmt.Sprintf("%s 连续 %d 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。", name, failed)
@@ -480,7 +480,7 @@ func (c *Service) onFact(e protocol.SideEvent) {
 			}
 			return
 		}
-		c.workersLeft()
+		c.sessionsLeft()
 	case protocol.FactReport:
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -490,7 +490,7 @@ func (c *Service) onFact(e protocol.SideEvent) {
 	}
 }
 
-func (c *Service) workersLeft() {
+func (c *Service) sessionsLeft() {
 	s := c.store()
 	on := map[string]bool{}
 	for _, h := range c.onFarm() {
@@ -498,12 +498,12 @@ func (c *Service) workersLeft() {
 	}
 	ps, err := s.participants()
 	if err != nil {
-		log.Printf("chat: workers left: %v", err)
+		log.Printf("chat: sessions left: %v", err)
 		return
 	}
 	now := clock.NowMs()
 	for _, p := range ps {
-		if p.Kind != string(protocol.SenderKindWorker) || p.Left != nil || on[p.ID] {
+		if p.Kind != string(protocol.SenderKindAgent) || p.Left != nil || on[p.ID] {
 			continue
 		}
 		if err := s.participantLeft(p.ID, now); err != nil {
@@ -521,22 +521,22 @@ func (c *Service) workersLeft() {
 	}
 }
 
-func (c *Service) openJob(h protocol.Worker) {
+func (c *Service) openJob(h protocol.Session) {
 	if err := c.openedJob(h); err != nil {
 		log.Printf("chat: %s's job: %v", h.ID, err)
 	}
 }
 
-func (c *Service) openedJob(h protocol.Worker) error {
+func (c *Service) openedJob(h protocol.Session) error {
 	s := c.store()
 	agent, runtime := h.Agent, h.Runtime
-	if err := s.upsertParticipant(h.ID, string(protocol.SenderKindWorker), h.Name, &agent, &runtime, clock.NowMs()); err != nil {
+	if err := s.upsertParticipant(h.ID, string(protocol.SenderKindAgent), h.Name, &agent, &runtime, clock.NowMs()); err != nil {
 		return err
 	}
 	if c.issueThreadOf(h.ID) != nil {
 		return nil
 	}
-	channel := c.channelOfWorker(h)
+	channel := c.channelOfSession(h)
 	latest, err := s.latestSeq(channel)
 	if err != nil {
 		return err
@@ -558,7 +558,7 @@ func (c *Service) openedJob(h protocol.Worker) error {
 		project = *h.Project
 	}
 	text := fmt.Sprintf("派 @%s（%s）去 %s：%s", h.ID, h.Name, project, what)
-	written, err := c.insert(chatInsert{conversation: channel, from: protocol.ManagerAgent, kind: protocol.MessageKindDispatch, text: text, final: true, meta: &chatMeta{Worker: h.ID}})
+	written, err := c.insert(chatInsert{conversation: channel, from: protocol.ManagerAgent, kind: protocol.MessageKindDispatch, text: text, final: true, meta: &chatMeta{Session: h.ID}})
 	if err != nil {
 		return err
 	}
@@ -575,7 +575,7 @@ func (c *Service) openedJob(h protocol.Worker) error {
 }
 
 func (c *Service) postReport(id string, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
-	w := c.workerOf(id)
+	w := c.sessionOf(id)
 	if w == nil || outcome == protocol.OutcomeInterrupted {
 		return
 	}
@@ -585,8 +585,8 @@ func (c *Service) postReport(id string, outcome protocol.Outcome, summary string
 	}
 	said := ""
 	if outcome == protocol.OutcomeCompleted {
-		if r := c.workers.Find(id); r != nil {
-			said = worker.SummaryOf(r.LastText)
+		if r := c.sessions.Find(id); r != nil {
+			said = session.SummaryOf(r.LastText)
 		}
 	}
 	text := said

@@ -1,4 +1,4 @@
-// What the client reads from the server besides the state stream: the profiles, the runtimes, the projects, the workers'
+// What the client reads from the server besides the state stream: the profiles, the runtimes, the projects, the sessions'
 // activities, the memories. Every edit goes through the server and then reloads the part it changed; nothing here folds facts.
 
 import 'dart:async';
@@ -263,7 +263,7 @@ final agentIssuesProvider = FutureProvider.autoDispose.family<Map<String, List<A
 Map<String, List<AgentIssue>> watchAgentIssues(WidgetRef ref, List<Agent> agents) =>
     ref.watch(agentIssuesProvider(jsonEncode([for (final a in agents) a.toJson()]))).value ?? const {};
 
-/// What a worker of the agent would recall starting a run in the project, told the text (agent.recall); nothing is counted.
+/// What a session of the agent would recall starting a run in the project, told the text (agent.recall); nothing is counted.
 final recallPreviewProvider = FutureProvider.autoDispose.family<RecallPreview, ({String agent, String project, String text})>((ref, q) {
   // Again when the agent's memories change.
   ref.watch(memoriesProvider.select((all) => all[q.agent]));
@@ -280,8 +280,8 @@ final settingsProblemProvider = FutureProvider.autoDispose.family<String?, Strin
 /// Null until the server answers, and when nothing is wrong.
 String? watchSettingsProblem(WidgetRef ref, SettingsUpdate update) => ref.watch(settingsProblemProvider(jsonEncode(update.toJson()))).value;
 
-/// The issue a worker works: the server gives every worker one, and an issue's lifecycle (comment, changes, merge,
+/// The issue a session works: the server gives every session one, and an issue's lifecycle (comment, changes, merge,
 /// cancel) is asked by it.
-extension WorkerIssue on Worker {
-  String get issueId => issue ?? (throw StateError('worker $id has no issue'));
+extension SessionIssue on Session {
+  String get issueId => issue ?? (throw StateError('session $id has no issue'));
 }

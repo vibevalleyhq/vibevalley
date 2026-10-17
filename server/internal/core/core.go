@@ -58,8 +58,8 @@ func New(home string) *Service {
 			log.Printf("vibevalley: state.json unreadable, starting empty: %v", err)
 		}
 	}
-	if kept.Workers == nil {
-		kept.Workers = []protocol.Worker{}
+	if kept.Sessions == nil {
+		kept.Sessions = []protocol.Session{}
 	}
 	return &Service{
 		state:   restored(kept),
@@ -209,10 +209,10 @@ func (s *Service) State() protocol.CoreState {
 	return s.state
 }
 
-func (s *Service) Worker(id string) *protocol.Worker {
+func (s *Service) Session(id string) *protocol.Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if h := protocol.WorkerOf(s.state, id); h != nil {
+	if h := protocol.SessionOf(s.state, id); h != nil {
 		copy := *h
 		return &copy
 	}
@@ -229,13 +229,13 @@ func (s *Service) Call() protocol.CallState {
 type OwnerDid struct {
 	Kind OwnerDidKind
 	// Reviewed: whose changes.
-	Worker string
+	Session string
 }
 
 type OwnerDidKind string
 
 const (
-	OwnerReviewed OwnerDidKind = "reviewed" // looked at a worker's changes (issue.Review)
+	OwnerReviewed OwnerDidKind = "reviewed" // looked at a session's changes (issue.Review)
 	OwnerTalked   OwnerDidKind = "talked"   // a voice agent came on the call (voice.Start)
 )
 

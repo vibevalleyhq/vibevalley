@@ -1,4 +1,4 @@
-package worker
+package session
 
 import (
 	"encoding/json"
@@ -23,14 +23,14 @@ const (
 	keepActivities = 240
 	textMax        = 6000
 	AskedMax       = 2000
-	// Trajectories are looked back on after the worker has gone, so a tool's input and output keep enough to tell what
+	// Trajectories are looked back on after the session has gone, so a tool's input and output keep enough to tell what
 	// happened: a whole command or patch, a test run's failures.
 	inputMax = 4000
 	// A tool's output keeps its start and its end: a test run's verdict is at the bottom.
-	outputHead      = 2000
-	outputTail      = 4000
-	pushAfter       = 300 * time.Millisecond
-	workerSaveAfter = 1500 * time.Millisecond
+	outputHead       = 2000
+	outputTail       = 4000
+	pushAfter        = 300 * time.Millisecond
+	sessionSaveAfter = 1500 * time.Millisecond
 )
 
 func clipOutput(text string) string {
@@ -150,7 +150,7 @@ func (j *journal) changedLocked(n int64) {
 	if j.saving != nil {
 		j.saving.Stop()
 	}
-	j.saving = time.AfterFunc(workerSaveAfter, func() {
+	j.saving = time.AfterFunc(sessionSaveAfter, func() {
 		if err := j.write(); err != nil {
 			log.Printf("vibevalley: could not save %s: %v", j.file, err)
 		}

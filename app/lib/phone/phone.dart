@@ -40,8 +40,8 @@ sealed class PhoneTarget {
   const PhoneTarget();
 }
 
-final class PhoneTargetWorker extends PhoneTarget {
-  const PhoneTargetWorker(this.id);
+final class PhoneTargetSession extends PhoneTarget {
+  const PhoneTargetSession(this.id);
   final String id;
 }
 
@@ -199,8 +199,8 @@ class _FarmPhoneState extends ConsumerState<FarmPhone> {
     ref.read(phoneProvider.notifier).settle(call, answered: answered);
     if (!answered) return;
     switch (call.target) {
-      case InboxTargetWorker(:final id):
-        ref.read(phoneTargetProvider.notifier).go(PhoneTargetWorker(id));
+      case InboxTargetSession(:final id):
+        ref.read(phoneTargetProvider.notifier).go(PhoneTargetSession(id));
       case InboxTargetPlans(:final playbook):
         ref.read(phoneTargetProvider.notifier).go(PhoneTargetPlans(playbook));
       case InboxTargetChat(:final conversation):

@@ -126,10 +126,10 @@ class _FramesBuilderState extends State<FramesBuilder> {
 
 typedef PlotWords = ({String at, PixelCard card});
 
-String plotTitle(Bed bed, Worker? worker, Crop crop) {
+String plotTitle(Bed bed, Session? session, Crop crop) {
   if (bed.unlockLevel != null) return crop == Crop.locked ? '没开垦的地' : '花坛';
-  if (worker == null) return '第 ${bed.station + 1} 块地 · 空地';
-  return '${worker.name} · ${cropLabel[crop]}';
+  if (session == null) return '第 ${bed.station + 1} 块地 · 空地';
+  return '${session.name} · ${cropLabel[crop]}';
 }
 
 ({String key, String text, bool final_, double at})? lastManagerSaid(Chat? chat, List<Line> lines) {
@@ -181,15 +181,15 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     final hoverBed = game.hoverBed.value;
     final hoverSpot = game.hoverSpot.value;
     final reveal = game.revealNames.value;
-    final workers = state.workers;
+    final sessions = state.sessions;
     final back = <Widget>[];
     final front = <Widget>[];
 
     for (final bed in beds) {
       final at = village.plotAt(bed.index);
-      final worker = bed.unlockLevel == null ? stationOf(workers, bed.station) : null;
-      final plot = bed.unlockLevel != null ? lockedPlot(bed, level) : plotOf(view, worker);
-      final words = _plotWords(bed, worker, plot, level, tool, hoverBed, fx, rewards, workers);
+      final session = bed.unlockLevel == null ? stationOf(sessions, bed.station) : null;
+      final plot = bed.unlockLevel != null ? lockedPlot(bed, level) : plotOf(view, session);
+      final words = _plotWords(bed, session, plot, level, tool, hoverBed, fx, rewards, sessions);
       if (words == null) continue;
       final card = switch (words.at) {
         'middle' => _Pin(at.x * s, (at.y - plotH / 2) * s, words.card, ay: 0.5),
@@ -199,13 +199,13 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
       (words.at == 'above' ? front : back).add(card);
     }
 
-    for (final h in workers) {
+    for (final h in sessions) {
       final head = game.heads[h.id];
       if (head == null) continue;
       final doing = doingOf(h);
       final named = h.phase is PhaseArriving;
       final act = 'act-${doing.action.wire}';
-      if (doing.action == WorkerAction.none && !named) continue;
+      if (doing.action == SessionAction.none && !named) continue;
       back.add(
         _Pin(
           head.x * s,
@@ -214,7 +214,7 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
             padX: 3,
             padY: 2,
             rows: [
-              [if (doing.action != WorkerAction.none && atlas.has(act)) Icon(atlas[act], 18), if (named) Words(h.name)],
+              [if (doing.action != SessionAction.none && atlas.has(act)) Icon(atlas[act], 18), if (named) Words(h.name)],
             ],
           ),
         ),
@@ -321,30 +321,30 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
 
   PlotWords? _plotWords(
     Bed bed,
-    Worker? worker,
+    Session? session,
     PlotView plot,
     int level,
     Tool tool,
     int? hoverBed,
     List<BedFxEntry> fx,
     List<GameEffectReward> rewards,
-    List<Worker> workers,
+    List<Session> sessions,
   ) {
     if (hoverBed == bed.index) {
-      final aim = aimTool(tool, bed, worker, plot, level);
+      final aim = aimTool(tool, bed, session, plot, level);
       return (
         at: 'above',
         card: PixelCard(
           center: true,
           rows: [
-            [Words(plotTitle(bed, worker, plot.crop))],
-            if (worker?.project != null) [Words(worker!.project!, color: CardColors.muted)],
+            [Words(plotTitle(bed, session, plot.crop))],
+            if (session?.project != null) [Words(session!.project!, color: CardColors.muted)],
             [Words(aim.ok ? '点击：${aim.text}' : aim.text, color: aim.ok ? CardColors.good : CardColors.muted)],
           ],
         ),
       );
     }
-    final reward = bed.station < 0 ? null : rewards.where((r) => workers.any((h) => h.id == r.workerId && stationOfWorker(h) == bed.station)).lastOrNull;
+    final reward = bed.station < 0 ? null : rewards.where((r) => sessions.any((h) => h.id == r.sessionId && stationOfSession(h) == bed.station)).lastOrNull;
     if (reward != null) {
       return (
         at: 'rail',
@@ -404,7 +404,7 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     final fresh = line != null && (_finalAt == null || now - _finalAt! < _speechMs);
     if (ref.watch(chatOpenProvider) || widget.game.revealNames.value) return null;
     if (fresh) return plainText(line.text);
-    return state.workers.isEmpty ? '今天种点什么？' : null;
+    return state.sessions.isEmpty ? '今天种点什么？' : null;
   }
 }
 

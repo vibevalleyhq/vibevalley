@@ -11,9 +11,9 @@ import (
 	"testing"
 
 	"vibevalley/internal/protocol"
+	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
-	"vibevalley/internal/worker"
 	"vibevalley/pkg/agent"
 	"vibevalley/pkg/ai"
 	"vibevalley/pkg/smith/oar"
@@ -183,7 +183,7 @@ func TestManagerDispatchesAndHearsVoiceInSilence(t *testing.T) {
 		t.Fatalf("line %q", line)
 	}
 	trail := testkit.Await(t, "its trajectory", func() (*protocol.Trajectory, bool) {
-		tr := f.Worker.Get(protocol.ManagerAgent)
+		tr := f.Session.Get(protocol.ManagerAgent)
 		return tr, tr != nil && len(tr.Activities) >= 3 && tr.Activities[len(tr.Activities)-1].Kind == protocol.ActivityKindResponse
 	})
 	if trail.Head.Name != "管家" {
@@ -201,13 +201,13 @@ func TestManagerDispatchesAndHearsVoiceInSilence(t *testing.T) {
 	if answer.Text != "好，已在了" {
 		t.Fatalf("answer %+v", answer)
 	}
-	roster := f.Worker.Roster()
+	roster := f.Session.Roster()
 	if len(roster) != 1 || roster[0].Place.Project != "demo" {
 		t.Fatalf("roster %+v", roster)
 	}
 	testkit.Until(t, "its report", func() bool {
-		all := f.Worker.Roster()
-		return len(all) == 1 && all[0].Worker.LastRun != nil
+		all := f.Session.Roster()
+		return len(all) == 1 && all[0].Session.LastRun != nil
 	})
 
 	before := len(w.seen())
@@ -290,11 +290,11 @@ func TestManagerSchedulesComeDue(t *testing.T) {
 		return i, ok && i.Closed != nil && *i.Closed == protocol.IssueCloseAnswered
 	})
 	testkit.Eq(t, *answered.Assignee, protocol.ManagerAgent, "an issue for the manager")
-	runs, err := f.Worker.Runs(answered.ID)
+	runs, err := f.Session.Runs(answered.ID)
 	if err != nil || len(runs) != 1 {
 		t.Fatalf("runs %+v %v", runs, err)
 	}
-	testkit.Eq(t, runs[0].Worker, protocol.ManagerAgent, "the manager's run")
+	testkit.Eq(t, runs[0].Session, protocol.ManagerAgent, "the manager's run")
 	testkit.Eq(t, runs[0].TriggeredBy.Kind, protocol.RunTriggerKindSchedule, "started by the schedule")
 	testkit.Eq(t, *runs[0].TriggeredBy.Schedule, made.ID, "this one")
 	testkit.Eq(t, *runs[0].Outcome, protocol.OutcomeCompleted, "and done")
@@ -309,18 +309,18 @@ func TestManagerSchedulesComeDue(t *testing.T) {
 	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "巡检", Text: "跑一遍检查", Channel: &ops.ID, Agent: &lab, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + 150}}}); err != nil {
 		t.Fatal(err)
 	}
-	sent := testkit.Await(t, "the worker sent", func() (worker.Roster, bool) {
-		for _, r := range f.Worker.Roster() {
-			if r.Worker.Task == "巡检\n\n跑一遍检查" {
+	sent := testkit.Await(t, "the session sent", func() (session.Roster, bool) {
+		for _, r := range f.Session.Roster() {
+			if r.Session.Task == "巡检\n\n跑一遍检查" {
 				return r, true
 			}
 		}
-		return worker.Roster{}, false
+		return session.Roster{}, false
 	})
-	if sent.Worker.Channel == nil || *sent.Worker.Channel != ops.ID || sent.Place.Project != "demo" {
+	if sent.Session.Channel == nil || *sent.Session.Channel != ops.ID || sent.Place.Project != "demo" {
 		t.Fatalf("sent %+v", sent)
 	}
-	if issue, err := f.Issue.Get(sent.Worker.ID); err != nil || issue.Schedule == nil || issue.Title != "巡检" {
+	if issue, err := f.Issue.Get(sent.Session.ID); err != nil || issue.Schedule == nil || issue.Title != "巡检" {
 		t.Fatalf("its issue: %+v %v", issue, err)
 	}
 	if len(w.seen()) != asked {
@@ -341,9 +341,9 @@ func TestManagerHearsThePatrol(t *testing.T) {
 		t.Fatal(err)
 	}
 	testkit.Until(t, "the work ripe", func() bool {
-		return slices.ContainsFunc(f.Worker.Roster(), func(r worker.Roster) bool {
-			_, ripe := r.Worker.Phase.Value.(protocol.PhaseRipe)
-			return r.Worker.Task == "加个 CHANGELOG" && ripe
+		return slices.ContainsFunc(f.Session.Roster(), func(r session.Roster) bool {
+			_, ripe := r.Session.Phase.Value.(protocol.PhaseRipe)
+			return r.Session.Task == "加个 CHANGELOG" && ripe
 		})
 	})
 	hoursOn := func(h float64) func() int64 {

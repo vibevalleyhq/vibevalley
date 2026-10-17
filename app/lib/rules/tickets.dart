@@ -47,7 +47,7 @@ String ticketTitle(Issue issue, [List<Playbook> plans = const []]) {
   return job.split('\n').first.trim();
 }
 
-bool ticketIs(Issue issue, String id) => issue.id == id || issue.workers.contains(id);
+bool ticketIs(Issue issue, String id) => issue.id == id || issue.sessions.contains(id);
 
 Lane? playbookLane(Playbook p) => switch (p.state) {
   PlaybookState.planning || PlaybookState.running => Lane.working,
@@ -65,8 +65,8 @@ String playbookLine(Playbook p) => switch (p.state) {
   PlaybookState.abandoned => '放弃了',
 };
 
-Worker? ticketWorker(CoreState? farm, Issue issue) =>
-    farm == null || issue.workers.isEmpty || issue.closed != null ? null : farm.workers.where((h) => h.id == issue.workers.last).firstOrNull;
+Session? ticketSession(CoreState? farm, Issue issue) =>
+    farm == null || issue.sessions.isEmpty || issue.closed != null ? null : farm.sessions.where((h) => h.id == issue.sessions.last).firstOrNull;
 
 enum Lane {
   todo('待办'),
@@ -95,8 +95,8 @@ Move? moveOf(Lane from, Lane to, {bool planned = false}) => switch ((from, to)) 
   _ => null,
 };
 
-bool ticketPlanned(Issue issue, Worker? worker) =>
-    issue.plan != null || issue.parent != null || worker?.playbook != null || issue.closed == IssueClose.mergedIntoPlan;
+bool ticketPlanned(Issue issue, Session? session) =>
+    issue.plan != null || issue.parent != null || session?.playbook != null || issue.closed == IssueClose.mergedIntoPlan;
 
 bool matchesQuery(String query, Iterable<String?> fields) {
   final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);

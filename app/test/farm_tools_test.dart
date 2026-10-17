@@ -12,10 +12,10 @@ import 'package:http/http.dart' as http;
 import 'support/farm.dart';
 
 void main() {
-  final working = worker('w1', name: '小吴', station: 0);
-  final failed = worker('w2', name: '阿郑', station: 1, phase: const PhaseFailed(), task: '修登录');
-  final ripe = worker('w3', name: '老李', station: 2, phase: const PhaseRipe());
-  final state = farm(workers: [working, failed, ripe]);
+  final working = session('w1', name: '小吴', station: 0);
+  final failed = session('w2', name: '阿郑', station: 1, phase: const PhaseFailed(), task: '修登录');
+  final ripe = session('w3', name: '老李', station: 2, phase: const PhaseRipe());
+  final state = farm(sessions: [working, failed, ripe]);
   final v = view(
     plots: {
       'w1': const PlotView(crop: Crop.leafy),
@@ -40,7 +40,7 @@ void main() {
 
   test('the hand opens a worked bed and sows an empty one', () async {
     final (c, routes) = await setUpFarm();
-    expect(await use(c, Tool.hand, 0), isA<ToolInspect>().having((r) => r.workerId, 'worker', 'w1'));
+    expect(await use(c, Tool.hand, 0), isA<ToolInspect>().having((r) => r.sessionId, 'session', 'w1'));
     expect(await use(c, Tool.hand, 4), isA<ToolSow>().having((r) => r.station, 'station', 4));
     expect(routes.calls, isEmpty);
   });
@@ -57,7 +57,7 @@ void main() {
 
   test('harvest on a ripe bed asks to look at the changes first', () async {
     final (c, routes) = await setUpFarm();
-    expect(await use(c, Tool.harvest, 2), isA<ToolReview>().having((r) => r.workerId, 'worker', 'w3'));
+    expect(await use(c, Tool.harvest, 2), isA<ToolReview>().having((r) => r.sessionId, 'session', 'w3'));
     expect(routes.calls, isEmpty);
   });
 

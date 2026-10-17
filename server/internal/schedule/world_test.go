@@ -13,9 +13,9 @@ import (
 	"vibevalley/internal/memory"
 	"vibevalley/internal/project"
 	"vibevalley/internal/runtime"
+	"vibevalley/internal/session"
 	"vibevalley/internal/setting"
 	"vibevalley/internal/testkit/fixture"
-	"vibevalley/internal/worker"
 )
 
 // Without the packages above it: a test reaches only what is below.
@@ -36,7 +36,7 @@ type worldServices struct {
 func open(t *testing.T, home string) *world {
 	t.Helper()
 	w := &world{}
-	app, err := base.NewApp(fixture.Config(home, t.TempDir(), ""), []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, worker.Module, channel.Module, Module},
+	app, err := base.NewApp(fixture.Config(home, t.TempDir(), ""), []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, session.Module, channel.Module, Module},
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),
 	)
 	if err != nil {

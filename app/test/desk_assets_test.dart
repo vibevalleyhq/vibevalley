@@ -33,12 +33,12 @@ void main() {
     expect(shelfOf('day-0'), 'ui');
     expect(shelfOf('connector-qq'), 'logos');
     expect(shelfOf('something-new'), 'other');
-    final workers = groupsOf('helpers', [
+    final sessions = groupsOf('helpers', [
       for (final p in pictures.all)
         if (shelfOf(p.name) == 'helpers') p,
     ]);
-    expect(workers.first.label, '熊 · 农夫');
-    expect(workers.every((g) => g.pictures.every((p) => p.name.startsWith(g.key))), isTrue);
+    expect(sessions.first.label, '熊 · 农夫');
+    expect(sessions.every((g) => g.pictures.every((p) => p.name.startsWith(g.key))), isTrue);
   });
 
   test('frames and matching', () {

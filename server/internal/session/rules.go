@@ -1,4 +1,4 @@
-package worker
+package session
 
 import (
 	"context"
@@ -107,7 +107,7 @@ func outcomeOf(o oar.TurnOutcome) protocol.Outcome {
 	return protocol.OutcomeFailed
 }
 
-type workerRead struct {
+type sessionRead struct {
 	Outcome  protocol.Outcome
 	Text     string
 	Summary  string
@@ -115,14 +115,14 @@ type workerRead struct {
 	NeedsYou bool
 }
 
-func readReport(outcome oar.TurnOutcome, said string) workerRead {
-	r := workerRead{Outcome: outcomeOf(outcome)}
+func readReport(outcome oar.TurnOutcome, said string) sessionRead {
+	r := sessionRead{Outcome: outcomeOf(outcome)}
 	if outcome.Kind == "failed" {
 		r.Failure = failureText(outcome)
 		r.NeedsYou = needsYou[outcome.Failure]
 	}
 	said = str.Trim(said)
-	// A failed run leads with why it failed; what the worker said before that follows.
+	// A failed run leads with why it failed; what the session said before that follows.
 	switch {
 	case r.Failure != "" && said != "":
 		r.Text = r.Failure + "\n\n" + said
@@ -145,16 +145,16 @@ func readReport(outcome oar.TurnOutcome, said string) workerRead {
 	return r
 }
 
-type workerLimits struct {
+type sessionLimits struct {
 	Workspace  int
 	PerRuntime int
 	PerProject int
 }
 
-// except is a worker about to work again: it does not count against itself.
-func noRoom(workers []protocol.Worker, runtime, project string, limits workerLimits, except string) string {
-	var busy []protocol.Worker
-	for _, h := range workers {
+// except is a session about to work again: it does not count against itself.
+func noRoom(sessions []protocol.Session, runtime, project string, limits sessionLimits, except string) string {
+	var busy []protocol.Session
+	for _, h := range sessions {
 		if protocol.IsBusy(h) && h.ID != except {
 			busy = append(busy, h)
 		}
@@ -180,9 +180,9 @@ func noRoom(workers []protocol.Worker, runtime, project string, limits workerLim
 	return ""
 }
 
-func workerName(workers []protocol.Worker, agentID, agentName string) string {
+func sessionName(sessions []protocol.Session, agentID, agentName string) string {
 	same := 0
-	for _, h := range workers {
+	for _, h := range sessions {
 		if h.Agent == agentID {
 			same++
 		}

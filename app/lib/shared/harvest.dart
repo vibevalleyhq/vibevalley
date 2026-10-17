@@ -7,7 +7,7 @@ import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 import '../data/providers.dart';
-import '../data/remote.dart' show WorkerIssue;
+import '../data/remote.dart' show SessionIssue;
 import 'tags.dart';
 
 sealed class Loaded {
@@ -43,8 +43,8 @@ Future<Loaded> loadChanges(Future<Changes> Function() fetch) async {
     (c.files.fold(0, (n, f) => n + math.max(0, f.added.round())), c.files.fold(0, (n, f) => n + math.max(0, f.removed.round())));
 
 class HarvestReview extends ConsumerStatefulWidget {
-  const HarvestReview({super.key, required this.worker, required this.onDone});
-  final Worker worker;
+  const HarvestReview({super.key, required this.session, required this.onDone});
+  final Session session;
   final VoidCallback onDone;
 
   @override
@@ -58,7 +58,7 @@ class _HarvestReviewState extends ConsumerState<HarvestReview> {
   void initState() {
     super.initState();
     final api = ref.read(apiProvider);
-    loadChanges(() => api.issue.changes(id: widget.worker.issueId)).then((l) {
+    loadChanges(() => api.issue.changes(id: widget.session.issueId)).then((l) {
       if (mounted) setState(() => _loaded = l);
     });
   }
@@ -84,13 +84,13 @@ class _HarvestReviewState extends ConsumerState<HarvestReview> {
         PxButton.text('先不收', onPressed: widget.onDone),
       ],
     ),
-    LoadReady(:final changes) => _Ready(worker: widget.worker, changes: changes, onDone: widget.onDone),
+    LoadReady(:final changes) => _Ready(session: widget.session, changes: changes, onDone: widget.onDone),
   };
 }
 
 class _Ready extends ConsumerWidget {
-  const _Ready({required this.worker, required this.changes, required this.onDone});
-  final Worker worker;
+  const _Ready({required this.session, required this.changes, required this.onDone});
+  final Session session;
   final Changes changes;
   final VoidCallback onDone;
 
@@ -102,12 +102,12 @@ class _Ready extends ConsumerWidget {
     final conflicts = changes.conflicts;
     final commands = ref.read(farmCommandsProvider);
     void take() {
-      fire(commands.harvest(worker));
+      fire(commands.harvest(session));
       onDone();
     }
 
     void resolve() {
-      fire(commands.resolve(worker));
+      fire(commands.resolve(session));
       onDone();
     }
 

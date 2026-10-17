@@ -9,39 +9,39 @@ import (
 )
 
 func EmptyCoreState() CoreState {
-	return CoreState{Call: CallStateIdle, Manager: ManagerStateIdle, Workers: []Worker{}}
+	return CoreState{Call: CallStateIdle, Manager: ManagerStateIdle, Sessions: []Session{}}
 }
 
-func WorkerOf(state CoreState, id string) *Worker {
-	for i := range state.Workers {
-		if state.Workers[i].ID == id {
-			return &state.Workers[i]
+func SessionOf(state CoreState, id string) *Session {
+	for i := range state.Sessions {
+		if state.Sessions[i].ID == id {
+			return &state.Sessions[i]
 		}
 	}
 	return nil
 }
 
-// The very same state when there is no such worker.
-func withWorker(state CoreState, id string, change func(Worker) Worker) (CoreState, bool) {
-	i := slices.IndexFunc(state.Workers, func(h Worker) bool { return h.ID == id })
+// The very same state when there is no such session.
+func withSession(state CoreState, id string, change func(Session) Session) (CoreState, bool) {
+	i := slices.IndexFunc(state.Sessions, func(h Session) bool { return h.ID == id })
 	if i < 0 {
 		return state, false
 	}
-	workers := slices.Clone(state.Workers)
-	workers[i] = change(workers[i])
-	state.Workers = workers
+	sessions := slices.Clone(state.Sessions)
+	sessions[i] = change(sessions[i])
+	state.Sessions = sessions
 	return state, true
 }
 
 func whileWorking(state CoreState, id string, change func(PhaseWorking) PhaseWorking) (CoreState, bool) {
-	h := WorkerOf(state, id)
+	h := SessionOf(state, id)
 	if h == nil {
 		return state, false
 	}
 	if _, ok := h.Phase.Value.(PhaseWorking); !ok {
 		return state, false
 	}
-	return withWorker(state, id, func(h Worker) Worker {
+	return withSession(state, id, func(h Session) Session {
 		h.Phase = Phase{change(h.Phase.Value.(PhaseWorking))}
 		return h
 	})
@@ -68,7 +68,7 @@ func EmptyProgress() Progress {
 
 func same(a, b any) bool { return reflect.DeepEqual(a, b) }
 
-// A fact that changes nothing says so (false), and Core.Apply does not send it; facts about workers not on the farm change
+// A fact that changes nothing says so (false), and Core.Apply does not send it; facts about sessions not on the farm change
 // nothing. The issues' statuses follow whatever changed.
 func Reduce(state CoreState, fact Fact) (CoreState, bool) {
 	next, changed := reduce(state, fact)
@@ -119,26 +119,26 @@ func reduce(state CoreState, fact Fact) (CoreState, bool) {
 		state.Chat = &chat
 		return state, true
 	case FactHired:
-		others := slices.DeleteFunc(slices.Clone(state.Workers), func(h Worker) bool { return h.ID == f.Worker.ID })
-		var play WorkerPlay
-		if was := WorkerOf(state, f.Worker.ID); was != nil && was.Play != nil {
+		others := slices.DeleteFunc(slices.Clone(state.Sessions), func(h Session) bool { return h.ID == f.Session.ID })
+		var play SessionPlay
+		if was := SessionOf(state, f.Session.ID); was != nil && was.Play != nil {
 			play = *was.Play
 		} else {
-			play = PlayOf(f.Worker)
+			play = PlayOf(f.Session)
 			play.Station = FreeStation(others, nil)
 		}
-		h := f.Worker
+		h := f.Session
 		h.Play = &play
-		state.Workers = append(others, h)
+		state.Sessions = append(others, h)
 		return state, true
 	case FactStation:
 		return stationed(state, f)
 	case FactRun:
-		return withWorker(state, f.ID, func(h Worker) Worker {
+		return withSession(state, f.ID, func(h Session) Session {
 			if f.Task != nil && *f.Task != "" {
 				h.Task = *f.Task
 			}
-			h.Phase = Phase{PhaseWorking{Since: f.At, Doing: Doing{Action: WorkerActionThinking, Label: ""}}}
+			h.Phase = Phase{PhaseWorking{Since: f.At, Doing: Doing{Action: SessionActionThinking, Label: ""}}}
 			play := playedRun(PlayOf(h), f.At)
 			h.Play = &play
 			return h
@@ -150,7 +150,7 @@ func reduce(state CoreState, fact Fact) (CoreState, bool) {
 		if !changed {
 			return state, false
 		}
-		return withWorker(after, f.ID, func(h Worker) Worker {
+		return withSession(after, f.ID, func(h Session) Session {
 			play := playedDoing(PlayOf(h), f)
 			h.Play = &play
 			return h
@@ -171,16 +171,16 @@ func reduce(state CoreState, fact Fact) (CoreState, bool) {
 			return p
 		})
 	case FactSpent:
-		return withWorker(state, f.ID, func(h Worker) Worker {
+		return withSession(state, f.ID, func(h Session) Session {
 			spent := f.Spent
 			h.Spent = &spent
 			return h
 		})
 	case FactReport:
-		if WorkerOf(state, f.ID) == nil {
+		if SessionOf(state, f.ID) == nil {
 			return state, false
 		}
-		next, _ := withWorker(state, f.ID, func(x Worker) Worker {
+		next, _ := withSession(state, f.ID, func(x Session) Session {
 			x.Runs = f.Runs
 			x.Phase = ended(f.Outcome)
 			x.LastRun = &LastRun{Outcome: f.Outcome, Summary: f.Summary, At: f.At, Spent: f.Spent}
@@ -188,12 +188,12 @@ func reduce(state CoreState, fact Fact) (CoreState, bool) {
 		})
 		return next, true
 	case FactConflict:
-		return withWorker(state, f.ID, func(h Worker) Worker {
+		return withSession(state, f.ID, func(h Session) Session {
 			h.Conflict = f.Conflict
 			return h
 		})
 	case FactLeft:
-		state.Workers = slices.DeleteFunc(slices.Clone(state.Workers), func(h Worker) bool { return h.ID == f.ID })
+		state.Sessions = slices.DeleteFunc(slices.Clone(state.Sessions), func(h Session) bool { return h.ID == f.ID })
 		return state, true
 	case FactCommits:
 		if state.Commits != nil && same(*state.Commits, f.Commits) {

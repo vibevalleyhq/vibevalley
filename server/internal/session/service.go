@@ -1,4 +1,4 @@
-package worker
+package session
 
 import (
 	"context"
@@ -10,11 +10,11 @@ import (
 type Service struct {
 	*tokens
 	*trajectories
-	*workers
+	*sessions
 	parts base.Parts
 }
 
-func newService(a *tokens, b *trajectories, c *workers) (*Service, error) {
+func newService(a *tokens, b *trajectories, c *sessions) (*Service, error) {
 	return &Service{a, b, c, base.Parts{a, b, c}}, nil
 }
 

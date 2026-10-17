@@ -14,8 +14,8 @@ const callsT = int64(1_800_000_000_000)
 
 var callsManager = InboxFrom{InboxFromManager{}}
 
-func callsWorker(id string, phase PhaseValue, change ...func(*Worker)) Worker {
-	h := Worker{
+func callsSession(id string, phase PhaseValue, change ...func(*Session)) Session {
+	h := Session{
 		ID: id, Name: "后端老周", Agent: "lab", Runtime: "pi", Task: "加个打卡接口", HiredAt: callsT, Runs: 2, Phase: Phase{phase},
 		LastRun: &LastRun{Outcome: OutcomeCompleted, Summary: "接口加好了", At: callsT + 10},
 	}
@@ -25,21 +25,21 @@ func callsWorker(id string, phase PhaseValue, change ...func(*Worker)) Worker {
 	return h
 }
 
-func callsFailedRun(h *Worker) {
+func callsFailedRun(h *Session) {
 	h.LastRun = &LastRun{Outcome: OutcomeFailed, Summary: "测试没过", At: callsT + 20}
 }
 
-func callsConflict(files ...string) func(*Worker) {
-	return func(h *Worker) { h.Conflict = &Conflict{Base: "main", Files: files} }
+func callsConflict(files ...string) func(*Session) {
+	return func(h *Session) { h.Conflict = &Conflict{Base: "main", Files: files} }
 }
 
 func callsQuiet(since int64) PhaseWorking {
-	return PhaseWorking{Since: callsT + 30, Doing: Doing{Action: WorkerActionRunCommand, Label: "go test ./..."}, QuietSince: ptr.To(since)}
+	return PhaseWorking{Since: callsT + 30, Doing: Doing{Action: SessionActionRunCommand, Label: "go test ./..."}, QuietSince: ptr.To(since)}
 }
 
-func callsFarm(workers ...Worker) CoreState {
+func callsFarm(sessions ...Session) CoreState {
 	s := EmptyCoreState()
-	s.Workers = append(s.Workers, workers...)
+	s.Sessions = append(s.Sessions, sessions...)
 	return s
 }
 
@@ -87,11 +87,11 @@ func callsWithChat(chat *Chat) CoreState {
 	return s
 }
 
-func callsFromWorker(id, name, agent string) InboxFrom {
-	return InboxFrom{InboxFromWorker{ID: id, Name: name, Agent: agent}}
+func callsFromSession(id, name, agent string) InboxFrom {
+	return InboxFrom{InboxFromSession{ID: id, Name: name, Agent: agent}}
 }
 
-func callsToWorker(id string) InboxTarget { return InboxTarget{InboxTargetWorker{ID: id}} }
+func callsToSession(id string) InboxTarget { return InboxTarget{InboxTargetSession{ID: id}} }
 
 func callsToPlans(playbook string) InboxTarget {
 	return InboxTarget{InboxTargetPlans{Playbook: playbook}}
@@ -123,33 +123,33 @@ func TestInboxEmptyFarm(t *testing.T) {
 	testkit.Eq(t, Inbox(callsWithChat(callsChat(nil, nil))), []InboxItem{})
 }
 
-func TestInboxRipeWorkerCalls(t *testing.T) {
-	testkit.Eq(t, Inbox(callsFarm(callsWorker("w1", PhaseRipe{}))), []InboxItem{{
-		ID: "w1:merge:2", Kind: InboxKindMerge, From: callsFromWorker("w1", "后端老周", "lab"), Text: "接口加好了", At: callsT + 10, Target: callsToWorker("w1"),
+func TestInboxRipeSessionCalls(t *testing.T) {
+	testkit.Eq(t, Inbox(callsFarm(callsSession("w1", PhaseRipe{}))), []InboxItem{{
+		ID: "w1:merge:2", Kind: InboxKindMerge, From: callsFromSession("w1", "后端老周", "lab"), Text: "接口加好了", At: callsT + 10, Target: callsToSession("w1"),
 	}})
 }
 
-func TestInboxFailedWorkerCalls(t *testing.T) {
-	testkit.Eq(t, Inbox(callsFarm(callsWorker("w1", PhaseFailed{}, callsFailedRun))), []InboxItem{{
-		ID: "w1:fix:2", Kind: InboxKindFix, From: callsFromWorker("w1", "后端老周", "lab"), Text: "测试没过", At: callsT + 20, Target: callsToWorker("w1"),
+func TestInboxFailedSessionCalls(t *testing.T) {
+	testkit.Eq(t, Inbox(callsFarm(callsSession("w1", PhaseFailed{}, callsFailedRun))), []InboxItem{{
+		ID: "w1:fix:2", Kind: InboxKindFix, From: callsFromSession("w1", "后端老周", "lab"), Text: "测试没过", At: callsT + 20, Target: callsToSession("w1"),
 	}})
 }
 
 func TestInboxConflictCalls(t *testing.T) {
-	ripe := callsWorker("w1", PhaseRipe{}, callsConflict("api/clock.go", "api/clock_test.go"))
-	resting := callsWorker("w2", PhaseResting{}, callsConflict("web/clock.tsx"), func(h *Worker) {
+	ripe := callsSession("w1", PhaseRipe{}, callsConflict("api/clock.go", "api/clock_test.go"))
+	resting := callsSession("w2", PhaseResting{}, callsConflict("web/clock.tsx"), func(h *Session) {
 		h.Name, h.Agent, h.Runs = "前端小林", "codex", 3
 		h.LastRun = &LastRun{Outcome: OutcomeInterrupted, At: callsT + 5}
 	})
 	testkit.Eq(t, Inbox(callsFarm(ripe, resting)), []InboxItem{
-		{ID: "w1:conflict:2", Kind: InboxKindConflict, From: callsFromWorker("w1", "后端老周", "lab"), Text: "2 个文件和主分支冲突", At: callsT + 10, Target: callsToWorker("w1")},
-		{ID: "w2:conflict:3", Kind: InboxKindConflict, From: callsFromWorker("w2", "前端小林", "codex"), Text: "1 个文件和主分支冲突", At: callsT + 5, Target: callsToWorker("w2")},
+		{ID: "w1:conflict:2", Kind: InboxKindConflict, From: callsFromSession("w1", "后端老周", "lab"), Text: "2 个文件和主分支冲突", At: callsT + 10, Target: callsToSession("w1")},
+		{ID: "w2:conflict:3", Kind: InboxKindConflict, From: callsFromSession("w2", "前端小林", "codex"), Text: "1 个文件和主分支冲突", At: callsT + 5, Target: callsToSession("w2")},
 	})
 }
 
-func TestInboxQuietWorkerCalls(t *testing.T) {
-	testkit.Eq(t, Inbox(callsFarm(callsWorker("w1", callsQuiet(callsT+90)))), []InboxItem{{
-		ID: "w1:quiet:1800000000090", Kind: InboxKindQuiet, From: callsFromWorker("w1", "后端老周", "lab"), Text: "加个打卡接口", At: callsT + 90, Target: callsToWorker("w1"),
+func TestInboxQuietSessionCalls(t *testing.T) {
+	testkit.Eq(t, Inbox(callsFarm(callsSession("w1", callsQuiet(callsT+90)))), []InboxItem{{
+		ID: "w1:quiet:1800000000090", Kind: InboxKindQuiet, From: callsFromSession("w1", "后端老周", "lab"), Text: "加个打卡接口", At: callsT + 90, Target: callsToSession("w1"),
 	}})
 }
 
@@ -157,85 +157,85 @@ func TestInboxMostPressingNeedOnly(t *testing.T) {
 	quietRetrying := callsQuiet(callsT + 90)
 	quietRetrying.Retry = &Retry{Attempt: 2, Of: ptr.To(int64(3))}
 	for _, c := range []struct {
-		name   string
-		worker Worker
-		want   [][4]any
+		name    string
+		session Session
+		want    [][4]any
 	}{
-		{"a conflict before the harvest", callsWorker("w1", PhaseRipe{}, callsConflict("a.go")), [][4]any{{"w1:conflict:2", InboxKindConflict, "1 个文件和主分支冲突", callsT + 10}}},
-		{"a failed turn before its conflict", callsWorker("w1", PhaseFailed{}, callsFailedRun, callsConflict("a.go")), [][4]any{{"w1:fix:2", InboxKindFix, "测试没过", callsT + 20}}},
-		{"quiet while retrying", callsWorker("w1", quietRetrying), [][4]any{{"w1:quiet:1800000000090", InboxKindQuiet, "加个打卡接口", callsT + 90}}},
+		{"a conflict before the harvest", callsSession("w1", PhaseRipe{}, callsConflict("a.go")), [][4]any{{"w1:conflict:2", InboxKindConflict, "1 个文件和主分支冲突", callsT + 10}}},
+		{"a failed turn before its conflict", callsSession("w1", PhaseFailed{}, callsFailedRun, callsConflict("a.go")), [][4]any{{"w1:fix:2", InboxKindFix, "测试没过", callsT + 20}}},
+		{"quiet while retrying", callsSession("w1", quietRetrying), [][4]any{{"w1:quiet:1800000000090", InboxKindQuiet, "加个打卡接口", callsT + 90}}},
 	} {
-		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, callsRows(Inbox(callsFarm(c.worker))), c.want) })
+		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, callsRows(Inbox(callsFarm(c.session))), c.want) })
 	}
 }
 
-func TestInboxWorkersWithNothingToAskDoNotCall(t *testing.T) {
+func TestInboxSessionsWithNothingToAskDoNotCall(t *testing.T) {
 	for _, c := range []struct {
 		name  string
 		phase PhaseValue
 	}{
 		{"arriving", PhaseArriving{}},
-		{"working", PhaseWorking{Since: callsT + 30, Doing: Doing{Action: WorkerActionEditFile, Label: "api/clock.go"}}},
-		{"retrying", PhaseWorking{Since: callsT + 30, Doing: Doing{Action: WorkerActionThinking}, Retry: &Retry{Attempt: 2, Of: ptr.To(int64(3))}}},
+		{"working", PhaseWorking{Since: callsT + 30, Doing: Doing{Action: SessionActionEditFile, Label: "api/clock.go"}}},
+		{"retrying", PhaseWorking{Since: callsT + 30, Doing: Doing{Action: SessionActionThinking}, Retry: &Retry{Attempt: 2, Of: ptr.To(int64(3))}}},
 		{"resting with nothing in the way", PhaseResting{}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			testkit.Eq(t, Inbox(callsFarm(callsWorker("w1", c.phase))), []InboxItem{})
+			testkit.Eq(t, Inbox(callsFarm(callsSession("w1", c.phase))), []InboxItem{})
 		})
 	}
 }
 
-func TestInboxPlaybookWorkersLeaveItToThePlaybook(t *testing.T) {
-	inPlaybook := func(h *Worker) { h.Playbook = &WorkerPlaybook{ID: "p1", Node: ptr.To("api")} }
+func TestInboxPlaybookSessionsLeaveItToThePlaybook(t *testing.T) {
+	inPlaybook := func(h *Session) { h.Playbook = &SessionPlaybook{ID: "p1", Node: ptr.To("api")} }
 	for _, c := range []struct {
-		name   string
-		worker Worker
+		name    string
+		session Session
 	}{
-		{"ripe", callsWorker("w1", PhaseRipe{}, inPlaybook)},
-		{"failed", callsWorker("w1", PhaseFailed{}, callsFailedRun, inPlaybook)},
-		{"conflicted", callsWorker("w1", PhaseResting{}, callsConflict("a.go"), inPlaybook)},
+		{"ripe", callsSession("w1", PhaseRipe{}, inPlaybook)},
+		{"failed", callsSession("w1", PhaseFailed{}, callsFailedRun, inPlaybook)},
+		{"conflicted", callsSession("w1", PhaseResting{}, callsConflict("a.go"), inPlaybook)},
 	} {
-		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, Inbox(callsFarm(c.worker)), []InboxItem{}) })
+		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, Inbox(callsFarm(c.session)), []InboxItem{}) })
 	}
-	testkit.Eq(t, callsIDs(Inbox(callsFarm(callsWorker("w1", callsQuiet(callsT+90), inPlaybook)))), []string{"w1:quiet:1800000000090"})
-	state := callsFarm(callsWorker("w1", PhaseFailed{}, callsFailedRun, inPlaybook))
+	testkit.Eq(t, callsIDs(Inbox(callsFarm(callsSession("w1", callsQuiet(callsT+90), inPlaybook)))), []string{"w1:quiet:1800000000090"})
+	state := callsFarm(callsSession("w1", PhaseFailed{}, callsFailedRun, inPlaybook))
 	state = withPlaybooks(state, callsPlaybook("p1", "打卡", PlaybookStateRunning, callsStep("api", "接口", NodeStateFailed)))
 	testkit.Eq(t, Inbox(state), []InboxItem{{
 		ID: "p1:failed:api", Kind: InboxKindPlanFailed, From: callsManager, Text: "打卡：接口", At: callsT, Target: callsToPlans("p1"),
 	}})
 }
 
-func TestInboxWorkerTextAndTime(t *testing.T) {
-	said := func(summary string) func(*Worker) { return func(h *Worker) { h.LastRun.Summary = summary } }
-	noRun := func(h *Worker) { h.LastRun = nil }
+func TestInboxSessionTextAndTime(t *testing.T) {
+	said := func(summary string) func(*Session) { return func(h *Session) { h.LastRun.Summary = summary } }
+	noRun := func(h *Session) { h.LastRun = nil }
 	for _, c := range []struct {
-		name   string
-		worker Worker
-		want   [][4]any
+		name    string
+		session Session
+		want    [][4]any
 	}{
-		{"what the turn said", callsWorker("w1", PhaseRipe{}), [][4]any{{"w1:merge:2", InboxKindMerge, "接口加好了", callsT + 10}}},
-		{"the task when the turn said nothing", callsWorker("w1", PhaseRipe{}, said("")), [][4]any{{"w1:merge:2", InboxKindMerge, "加个打卡接口", callsT + 10}}},
-		{"the task and the hiring before any turn", callsWorker("w1", PhaseRipe{}, noRun), [][4]any{{"w1:merge:2", InboxKindMerge, "加个打卡接口", callsT}}},
-		{"a failed turn that said nothing", callsWorker("w1", PhaseFailed{}, callsFailedRun, said("")), [][4]any{{"w1:fix:2", InboxKindFix, "加个打卡接口", callsT + 20}}},
-		{"a conflict before any turn", callsWorker("w1", PhaseResting{}, callsConflict("a.go"), noRun), [][4]any{{"w1:conflict:2", InboxKindConflict, "1 个文件和主分支冲突", callsT}}},
+		{"what the turn said", callsSession("w1", PhaseRipe{}), [][4]any{{"w1:merge:2", InboxKindMerge, "接口加好了", callsT + 10}}},
+		{"the task when the turn said nothing", callsSession("w1", PhaseRipe{}, said("")), [][4]any{{"w1:merge:2", InboxKindMerge, "加个打卡接口", callsT + 10}}},
+		{"the task and the hiring before any turn", callsSession("w1", PhaseRipe{}, noRun), [][4]any{{"w1:merge:2", InboxKindMerge, "加个打卡接口", callsT}}},
+		{"a failed turn that said nothing", callsSession("w1", PhaseFailed{}, callsFailedRun, said("")), [][4]any{{"w1:fix:2", InboxKindFix, "加个打卡接口", callsT + 20}}},
+		{"a conflict before any turn", callsSession("w1", PhaseResting{}, callsConflict("a.go"), noRun), [][4]any{{"w1:conflict:2", InboxKindConflict, "1 个文件和主分支冲突", callsT}}},
 	} {
-		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, callsRows(Inbox(callsFarm(c.worker))), c.want) })
+		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, callsRows(Inbox(callsFarm(c.session))), c.want) })
 	}
 }
 
-func TestInboxWorkerCallIDs(t *testing.T) {
-	idsOf := func(workers ...Worker) []string { return callsIDs(Inbox(callsFarm(workers...))) }
-	testkit.Eq(t, idsOf(callsWorker("w1", PhaseRipe{})), []string{"w1:merge:2"})
-	testkit.Eq(t, idsOf(callsWorker("w1", PhaseRipe{}, func(h *Worker) { h.LastRun.Summary, h.LastRun.At = "接口加好了，测试也补了", callsT+99 })), []string{"w1:merge:2"})
-	nextRun := func(h *Worker) { h.Runs = 3 }
-	testkit.Eq(t, idsOf(callsWorker("w1", PhaseRipe{}, nextRun)), []string{"w1:merge:3"})
-	testkit.Eq(t, idsOf(callsWorker("w1", PhaseFailed{}, callsFailedRun)), []string{"w1:fix:2"})
-	testkit.Eq(t, idsOf(callsWorker("w1", PhaseFailed{}, callsFailedRun, nextRun)), []string{"w1:fix:3"})
-	testkit.Eq(t, idsOf(callsWorker("w1", PhaseRipe{}, callsConflict("a.go"))), []string{"w1:conflict:2"})
-	testkit.Eq(t, idsOf(callsWorker("w1", PhaseRipe{}, callsConflict("a.go", "b.go", "c.go"))), []string{"w1:conflict:2"})
-	testkit.Eq(t, idsOf(callsWorker("w1", callsQuiet(callsT+90))), []string{"w1:quiet:1800000000090"})
-	testkit.Eq(t, idsOf(callsWorker("w1", callsQuiet(callsT+300))), []string{"w1:quiet:1800000000300"})
-	testkit.Eq(t, idsOf(callsWorker("w1", PhaseRipe{}), callsWorker("w2", PhaseRipe{})), []string{"w1:merge:2", "w2:merge:2"})
+func TestInboxSessionCallIDs(t *testing.T) {
+	idsOf := func(sessions ...Session) []string { return callsIDs(Inbox(callsFarm(sessions...))) }
+	testkit.Eq(t, idsOf(callsSession("w1", PhaseRipe{})), []string{"w1:merge:2"})
+	testkit.Eq(t, idsOf(callsSession("w1", PhaseRipe{}, func(h *Session) { h.LastRun.Summary, h.LastRun.At = "接口加好了，测试也补了", callsT+99 })), []string{"w1:merge:2"})
+	nextRun := func(h *Session) { h.Runs = 3 }
+	testkit.Eq(t, idsOf(callsSession("w1", PhaseRipe{}, nextRun)), []string{"w1:merge:3"})
+	testkit.Eq(t, idsOf(callsSession("w1", PhaseFailed{}, callsFailedRun)), []string{"w1:fix:2"})
+	testkit.Eq(t, idsOf(callsSession("w1", PhaseFailed{}, callsFailedRun, nextRun)), []string{"w1:fix:3"})
+	testkit.Eq(t, idsOf(callsSession("w1", PhaseRipe{}, callsConflict("a.go"))), []string{"w1:conflict:2"})
+	testkit.Eq(t, idsOf(callsSession("w1", PhaseRipe{}, callsConflict("a.go", "b.go", "c.go"))), []string{"w1:conflict:2"})
+	testkit.Eq(t, idsOf(callsSession("w1", callsQuiet(callsT+90))), []string{"w1:quiet:1800000000090"})
+	testkit.Eq(t, idsOf(callsSession("w1", callsQuiet(callsT+300))), []string{"w1:quiet:1800000000300"})
+	testkit.Eq(t, idsOf(callsSession("w1", PhaseRipe{}), callsSession("w2", PhaseRipe{})), []string{"w1:merge:2", "w2:merge:2"})
 }
 
 func TestInboxPlaybookCalls(t *testing.T) {
@@ -301,15 +301,15 @@ func TestInboxMentionCalls(t *testing.T) {
 	state := callsWithChat(callsChat(nil, nil,
 		callsMessage(4),
 		callsMessage(5, callsInThread, func(m *ChatMessage) {
-			m.From, m.FromKind, m.Name, m.Agent, m.Text = "w1", SenderKindWorker, "后端老周", ptr.To("lab"), "@主人 接口要按月查吗？"
+			m.From, m.FromKind, m.Name, m.Agent, m.Text = "w1", SenderKindAgent, "后端老周", ptr.To("lab"), "@主人 接口要按月查吗？"
 		}),
 		callsMessage(6, callsInThread, func(m *ChatMessage) {
-			m.From, m.FromKind, m.Name, m.Text = "w2", SenderKindWorker, "前端小林", "@主人 页面缺设计稿"
+			m.From, m.FromKind, m.Name, m.Text = "w2", SenderKindAgent, "前端小林", "@主人 页面缺设计稿"
 		}),
 	))
 	testkit.Eq(t, Inbox(state), []InboxItem{
-		{ID: "m6", Kind: InboxKindMention, From: callsFromWorker("w2", "前端小林", ""), Text: "@主人 页面缺设计稿", At: callsT + 6, Target: callsToChat(2)},
-		{ID: "m5", Kind: InboxKindMention, From: callsFromWorker("w1", "后端老周", "lab"), Text: "@主人 接口要按月查吗？", At: callsT + 5, Target: callsToChat(2)},
+		{ID: "m6", Kind: InboxKindMention, From: callsFromSession("w2", "前端小林", ""), Text: "@主人 页面缺设计稿", At: callsT + 6, Target: callsToChat(2)},
+		{ID: "m5", Kind: InboxKindMention, From: callsFromSession("w1", "后端老周", "lab"), Text: "@主人 接口要按月查吗？", At: callsT + 5, Target: callsToChat(2)},
 		{ID: "m4", Kind: InboxKindMention, From: callsManager, Text: "@主人 这块地能收了", At: callsT + 4, Target: callsToChat(1)},
 	})
 }
@@ -351,20 +351,20 @@ func TestInboxClipTheirWords(t *testing.T) {
 	// 40 UTF-16 units, as the page counts them.
 	fits, long := strings.Repeat("改", 40), strings.Repeat("改", 41)
 	clipped := fits + "…"
-	said := func(summary string) func(*Worker) { return func(h *Worker) { h.LastRun.Summary = summary } }
-	task := func(task string) func(*Worker) { return func(h *Worker) { h.Task = task } }
+	said := func(summary string) func(*Session) { return func(h *Session) { h.LastRun.Summary = summary } }
+	task := func(task string) func(*Session) { return func(h *Session) { h.Task = task } }
 	for _, c := range []struct {
 		name  string
 		state CoreState
 		want  string
 	}{
-		{"a summary that fits", callsFarm(callsWorker("w1", PhaseRipe{}, said(fits))), fits},
-		{"a long summary", callsFarm(callsWorker("w1", PhaseRipe{}, said(long))), clipped},
-		{"a failed turn's long summary", callsFarm(callsWorker("w1", PhaseFailed{}, callsFailedRun, said(long))), clipped},
-		{"a long task, the turn saying nothing", callsFarm(callsWorker("w1", PhaseRipe{}, said(""), task(long))), clipped},
-		{"two-unit characters, 40 units", callsFarm(callsWorker("w1", PhaseRipe{}, said(strings.Repeat("🌾", 20)))), strings.Repeat("🌾", 20)},
-		{"two-unit characters, 42 units", callsFarm(callsWorker("w1", PhaseRipe{}, said(strings.Repeat("🌾", 21)))), strings.Repeat("🌾", 20) + "…"},
-		{"a quiet worker's long task", callsFarm(callsWorker("w1", callsQuiet(callsT+90), task(long))), clipped},
+		{"a summary that fits", callsFarm(callsSession("w1", PhaseRipe{}, said(fits))), fits},
+		{"a long summary", callsFarm(callsSession("w1", PhaseRipe{}, said(long))), clipped},
+		{"a failed turn's long summary", callsFarm(callsSession("w1", PhaseFailed{}, callsFailedRun, said(long))), clipped},
+		{"a long task, the turn saying nothing", callsFarm(callsSession("w1", PhaseRipe{}, said(""), task(long))), clipped},
+		{"two-unit characters, 40 units", callsFarm(callsSession("w1", PhaseRipe{}, said(strings.Repeat("🌾", 20)))), strings.Repeat("🌾", 20)},
+		{"two-unit characters, 42 units", callsFarm(callsSession("w1", PhaseRipe{}, said(strings.Repeat("🌾", 21)))), strings.Repeat("🌾", 20) + "…"},
+		{"a quiet session's long task", callsFarm(callsSession("w1", callsQuiet(callsT+90), task(long))), clipped},
 		{"a draft's long title", callsWithPlaybooks(callsPlaybook("p1", long, PlaybookStateDraft)), clipped},
 		{"a ripe playbook's long title", callsWithPlaybooks(callsPlaybook("p1", long, PlaybookStateRipe)), clipped},
 		{"a stuck step with its playbook's title", callsWithPlaybooks(callsPlaybook("p1", strings.Repeat("计", 30), PlaybookStateRunning,
@@ -382,13 +382,13 @@ func TestInboxClipTheirWords(t *testing.T) {
 }
 
 func TestInboxNewestFirst(t *testing.T) {
-	endedAt := func(at int64) func(*Worker) { return func(h *Worker) { h.LastRun.At = at } }
+	endedAt := func(at int64) func(*Session) { return func(h *Session) { h.LastRun.At = at } }
 	state := callsFarm(
-		callsWorker("w1", PhaseRipe{}, endedAt(callsT+30)),
-		callsWorker("w2", PhaseFailed{}, callsFailedRun),
-		callsWorker("w3", PhaseResting{}, callsConflict("a.go"), endedAt(callsT+10)),
-		callsWorker("w4", callsQuiet(callsT+40)),
-		callsWorker("w5", PhaseArriving{}),
+		callsSession("w1", PhaseRipe{}, endedAt(callsT+30)),
+		callsSession("w2", PhaseFailed{}, callsFailedRun),
+		callsSession("w3", PhaseResting{}, callsConflict("a.go"), endedAt(callsT+10)),
+		callsSession("w4", callsQuiet(callsT+40)),
+		callsSession("w5", PhaseArriving{}),
 	)
 	draft := callsPlaybook("p1", "打卡", PlaybookStateDraft)
 	draft.CreatedAt = callsT + 5
@@ -412,9 +412,9 @@ func TestInboxNewestFirst(t *testing.T) {
 }
 
 func TestInboxTiesKeepTheirOrder(t *testing.T) {
-	endedNow := func(h *Worker) { h.LastRun.At = callsT }
+	endedNow := func(h *Session) { h.LastRun.At = callsT }
 	saidNow := func(m *ChatMessage) { m.At = callsT }
-	state := callsFarm(callsWorker("w2", PhaseRipe{}, endedNow), callsWorker("w1", PhaseFailed{}, callsFailedRun, endedNow))
+	state := callsFarm(callsSession("w2", PhaseRipe{}, endedNow), callsSession("w1", PhaseFailed{}, callsFailedRun, endedNow))
 	state = withPlaybooks(state,
 		callsPlaybook("p2", "导出", PlaybookStateDraft),
 		callsPlaybook("p1", "报表", PlaybookStateRunning, callsStep("b", "页面", NodeStateFailed), callsStep("a", "接口", NodeStateFailed)),

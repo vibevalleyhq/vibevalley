@@ -162,27 +162,27 @@ class VillageWorld {
 
 bool isRipe(Crop crop) => crop == Crop.wheat || crop == Crop.carrot;
 
-const _handsOn = {WorkerAction.editFile, WorkerAction.runCommand, WorkerAction.mcp, WorkerAction.other};
+const _handsOn = {SessionAction.editFile, SessionAction.runCommand, SessionAction.mcp, SessionAction.other};
 
-String poseOf(Worker h, Crop crop) {
+String poseOf(Session h, Crop crop) {
   if (isRipe(crop)) return 'cheer';
   if (crop == Crop.withered || crop == Crop.dry) return 'worry';
   final phase = h.phase;
-  if (phase is! PhaseWorking || phase.doing.action == WorkerAction.none) return 'idle';
+  if (phase is! PhaseWorking || phase.doing.action == SessionAction.none) return 'idle';
   return _handsOn.contains(phase.doing.action) ? 'work' : 'think';
 }
 
-String placeOfAction(WorkerAction action) => switch (action) {
-  WorkerAction.readFile || WorkerAction.search => 'library',
-  WorkerAction.runCommand || WorkerAction.mcp => 'workshop',
-  WorkerAction.web => 'mast',
-  WorkerAction.wait => 'bench',
+String placeOfAction(SessionAction action) => switch (action) {
+  SessionAction.readFile || SessionAction.search => 'library',
+  SessionAction.runCommand || SessionAction.mcp => 'workshop',
+  SessionAction.web => 'mast',
+  SessionAction.wait => 'bench',
   _ => 'plot',
 };
 
 bool plotCalls(Crop crop) => isRipe(crop) || crop == Crop.withered || crop == Crop.dry;
 
-List<String> spotsFor(Worker h, Crop crop, String pose) {
+List<String> spotsFor(Session h, Crop crop, String pose) {
   if (isRipe(crop) || crop == Crop.dry) return const ['front'];
   if (crop == Crop.withered) return const ['front', 'left', 'right'];
   return switch (h.phase) {

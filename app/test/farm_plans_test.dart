@@ -181,11 +181,11 @@ void main() {
 
   testWidgets("a helper's harvest: commits, files and a diff; then harvested", (tester) async {
     final routes = Routes();
-    final w = worker('w3', name: '老李', station: 2, phase: const PhaseRipe());
+    final w = session('w3', name: '老李', station: 2, phase: const PhaseRipe());
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
-      overrides: overrides(farm(workers: [w]), view(), fakeApi(routes, {'GET /api/issues/tw3/changes': changes})),
+      overrides: overrides(farm(sessions: [w]), view(), fakeApi(routes, {'GET /api/issues/tw3/changes': changes})),
     );
     c.read(reviewingProvider.notifier).set('w3');
     await settle(tester);
@@ -204,7 +204,7 @@ void main() {
 
   testWidgets('a harvest that would conflict asks the helper to resolve it', (tester) async {
     final routes = Routes();
-    final w = worker('w3', name: '老李', station: 2, phase: const PhaseRipe());
+    final w = session('w3', name: '老李', station: 2, phase: const PhaseRipe());
     final conflicted = {
       ...changes,
       'conflicts': ['src/dark.css'],
@@ -212,7 +212,7 @@ void main() {
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
-      overrides: overrides(farm(workers: [w]), view(), fakeApi(routes, {'GET /api/issues/tw3/changes': conflicted})),
+      overrides: overrides(farm(sessions: [w]), view(), fakeApi(routes, {'GET /api/issues/tw3/changes': conflicted})),
     );
     c.read(reviewingProvider.notifier).set('w3');
     await settle(tester);
@@ -226,8 +226,8 @@ void main() {
   });
 
   testWidgets('changes that cannot be read say why', (tester) async {
-    final w = worker('w3', name: '老李', station: 2, phase: const PhaseRipe());
-    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(farm(workers: [w]), view(), fakeApi(Routes())));
+    final w = session('w3', name: '老李', station: 2, phase: const PhaseRipe());
+    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(farm(sessions: [w]), view(), fakeApi(Routes())));
     c.read(reviewingProvider.notifier).set('w3');
     await settle(tester);
     expect(find.textContaining('看不了改动：'), findsOneWidget);

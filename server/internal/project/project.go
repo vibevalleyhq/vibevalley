@@ -22,7 +22,7 @@ import (
 	"vibevalley/pkg/x/str"
 )
 
-// A harvest that would conflict is not attempted: the worker is asked to merge the main branch in and resolve it. Merging into a playbook's branch
+// A harvest that would conflict is not attempted: the session is asked to merge the main branch in and resolve it. Merging into a playbook's branch
 // never checks it out: merge-tree writes the tree, commit-tree and update-ref put it on the branch.
 
 const (
@@ -71,7 +71,7 @@ func projectProblem(req protocol.NewProject) string {
 // gitignore is what a fresh repository ignores, so a first commit of an existing folder does not take its dependencies.
 const gitignore = "node_modules/\ndist/\nbuild/\n.env\n.env.*\n!.env.example\n.DS_Store\n__pycache__/\n*.pyc\n.pytest_cache/\n.venv/\n"
 
-// neverCommitted is what a worker's left-over changes are committed without, whatever the project ignores: caches
+// neverCommitted is what a session's left-over changes are committed without, whatever the project ignores: caches
 // and installed packages a run leaves behind (pathspecs for git add).
 var neverCommitted = []string{":(exclude,glob)**/__pycache__/**", ":(exclude,glob)**/*.pyc", ":(exclude,glob)**/.pytest_cache/**", ":(exclude,glob)**/node_modules/**", ":(exclude,glob)**/.DS_Store"}
 
@@ -169,7 +169,7 @@ func reason(err error) string {
 type Service struct {
 	root  string
 	trees string
-	// More than a few workers in one project start changing the same files.
+	// More than a few sessions in one project start changing the same files.
 	perProject int
 
 	tokei string
@@ -189,7 +189,7 @@ func newService(cfg base.Config) (*Service, error) {
 	}
 	tokei := cmp.Or(cfg.Tokei, "tokei")
 	return &Service{
-		root: root, trees: filepath.Join(root, ".worktrees"), perProject: cfg.Project.MaxWorkers, tokei: tokei,
+		root: root, trees: filepath.Join(root, ".worktrees"), perProject: cfg.Project.MaxSessions, tokei: tokei,
 		queues: map[string]*sync.Mutex{}, pending: map[string]bool{},
 	}, nil
 }
@@ -208,7 +208,7 @@ func (*Service) OnStop()                       {}
 
 func (p *Service) Root() string { return p.root }
 
-// Two workers sent to a new project at once must not both run git init, and two harvests must not merge into the same branch together.
+// Two sessions sent to a new project at once must not both run git init, and two harvests must not merge into the same branch together.
 func (p *Service) serially(project string) func() {
 	p.mu.Lock()
 	q, ok := p.queues[project]
@@ -333,7 +333,7 @@ func (p *Service) List() []Project {
 	return out
 }
 
-func (p *Service) Workplace(project, worker string, worktree bool, baseBranch string) (Workplace, error) {
+func (p *Service) Workplace(project, session string, worktree bool, baseBranch string) (Workplace, error) {
 	defer p.serially(project)()
 	path, err := p.ensure(project)
 	if err != nil {
@@ -343,8 +343,8 @@ func (p *Service) Workplace(project, worker string, worktree bool, baseBranch st
 		return Workplace{Project: project, Cwd: path}, nil
 	}
 	stamp := strconv.FormatInt(clock.NowMs(), 36)
-	branch := "vibevalley/" + worker + "-" + stamp
-	cwd := filepath.Join(p.trees, project+"-"+worker+"-"+stamp)
+	branch := "vibevalley/" + session + "-" + stamp
+	cwd := filepath.Join(p.trees, project+"-"+session+"-"+stamp)
 	if err := os.MkdirAll(p.trees, 0o755); err != nil {
 		return Workplace{}, err
 	}
@@ -559,7 +559,7 @@ func (p *Service) mergeMain(path, branch, kept string) (main string, ahead int64
 	if err != nil {
 		return "", 0, err
 	}
-	// A merge that would conflict is not tried: the worker resolves it on its branch first.
+	// A merge that would conflict is not tried: the session resolves it on its branch first.
 	conflicts, err := conflictsOf(path, main, branch)
 	if err != nil {
 		return "", 0, err

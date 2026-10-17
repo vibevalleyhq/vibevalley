@@ -69,7 +69,7 @@ func (l *ledger) OnStart(ctx context.Context) error {
 		for d := range did {
 			switch d.Kind {
 			case core.OwnerReviewed:
-				l.Record(protocol.LedgerEntryReviewed{Worker: d.Worker})
+				l.Record(protocol.LedgerEntryReviewed{Session: d.Session})
 			case core.OwnerTalked:
 				l.Record(protocol.LedgerEntryMoment{Kind: protocol.LedgerEntryMomentKindVoice})
 			}

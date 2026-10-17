@@ -14,7 +14,7 @@ type PlaybookChange struct {
 	Playbook string            `json:"playbook"`
 	Node     *string           `json:"node,omitzero"`
 	Kind     PlaybookEventKind `json:"kind"`
-	Worker   *string           `json:"worker,omitzero"`
+	Session  *string           `json:"session,omitzero"`
 	Detail   *string           `json:"detail,omitzero"`
 	Changes  []NodeFieldChange `json:"changes,omitzero"`
 	Commits  []string          `json:"commits,omitzero"`
@@ -102,20 +102,20 @@ func PlaybookChanges(before *Playbook, after Playbook) []PlaybookChange {
 		if was.State == n.State {
 			if n.State == NodeStateWorking && n.Tries > was.Tries {
 				var who PlaybookChange
-				if n.Worker != nil && *n.Worker != "" {
-					who.Worker = n.Worker
+				if n.Session != nil && *n.Session != "" {
+					who.Session = n.Session
 				}
 				step(n, PlaybookEventKindNodeSentBack, who)
 			}
 			continue
 		}
-		worker := n.Worker
-		if worker == nil {
-			worker = was.Worker
+		session := n.Session
+		if session == nil {
+			session = was.Session
 		}
 		var who PlaybookChange
-		if worker != nil && *worker != "" {
-			who.Worker = worker
+		if session != nil && *session != "" {
+			who.Session = session
 		}
 		switch n.State {
 		case NodeStateWorking:
@@ -167,8 +167,8 @@ func PlaybookEventText(e PlaybookChange, titleOf func(node string) string) strin
 		step = "「" + titleOf(*e.Node) + "」"
 	}
 	by, why, detail := "", "", ""
-	if e.Worker != nil && *e.Worker != "" {
-		by = "（" + *e.Worker + "）"
+	if e.Session != nil && *e.Session != "" {
+		by = "（" + *e.Session + "）"
 	}
 	if e.Detail != nil && *e.Detail != "" {
 		detail = *e.Detail

@@ -23,9 +23,9 @@ import (
 	"vibevalley/internal/project"
 	"vibevalley/internal/runtime"
 	"vibevalley/internal/schedule"
+	"vibevalley/internal/session"
 	"vibevalley/internal/setting"
 	"vibevalley/internal/voice"
-	"vibevalley/internal/worker"
 )
 
 type Workspace struct {
@@ -45,7 +45,7 @@ type services struct {
 	Memory    *memory.Service
 	Runtime   *runtime.Service
 	Game      *game.Service
-	Worker    *worker.Service
+	Session   *session.Service
 	Issue     *issue.Service
 	Channel   *channel.Service
 	Playbook  *playbook.Service
@@ -62,7 +62,7 @@ var layers = []base.Layer{
 	project.Module,
 	memory.Module,
 	runtime.Module,
-	worker.Module,
+	session.Module,
 	channel.Module,
 	schedule.Module,
 	issue.Module,
@@ -77,6 +77,10 @@ var layers = []base.Layer{
 
 // options go after the farm's own (a test's fx.Decorate, fx.Replace).
 func New(cfg base.Config, options ...fx.Option) (*Workspace, error) {
+	// Before any service reads the home.
+	if err := base.MoveSessionFiles(cfg.Home); err != nil {
+		return nil, err
+	}
 	f := &Workspace{}
 	app, err := base.NewApp(cfg, layers,
 		fx.Options(options...),
@@ -93,6 +97,6 @@ func (f *Workspace) Start(ctx context.Context) error {
 	if err := f.App.Start(ctx); err != nil {
 		return err
 	}
-	log.Printf("vibevalley server %s: workers work under %s; settings in %s", f.Version, f.WorkRoot, f.Home)
+	log.Printf("vibevalley server %s: sessions work under %s; settings in %s", f.Version, f.WorkRoot, f.Home)
 	return nil
 }

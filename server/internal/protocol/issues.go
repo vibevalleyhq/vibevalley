@@ -36,8 +36,8 @@ func IssueStatusOf(t Issue, state CoreState) IssueStatus {
 		case NodeStateFailed:
 			return IssueStatusInReview
 		case NodeStateWorking:
-			if t.Step.Worker != nil {
-				if h := WorkerOf(state, *t.Step.Worker); h != nil && IsBusy(*h) {
+			if t.Step.Session != nil {
+				if h := SessionOf(state, *t.Step.Session); h != nil && IsBusy(*h) {
 					return IssueStatusInProgress
 				}
 			}
@@ -47,8 +47,8 @@ func IssueStatusOf(t Issue, state CoreState) IssueStatus {
 		}
 		return IssueStatusCanceled
 	}
-	if n := len(t.Workers); n > 0 {
-		h := WorkerOf(state, t.Workers[n-1])
+	if n := len(t.Sessions); n > 0 {
+		h := SessionOf(state, t.Sessions[n-1])
 		switch {
 		case h == nil:
 			return IssueStatusCanceled
@@ -78,7 +78,7 @@ func closedStatus(c *IssueClose) IssueStatus {
 const KeepClosedIssues = 50
 
 func IssueOrder(a, b Issue) int {
-	sentA, sentB := len(a.Workers) > 0, len(b.Workers) > 0
+	sentA, sentB := len(a.Sessions) > 0, len(b.Sessions) > 0
 	switch {
 	case !sentA && !sentB:
 		return cmp.Or(cmp.Compare(a.Rank, b.Rank), cmp.Compare(a.CreatedAt, b.CreatedAt), cmp.Compare(a.ID, b.ID))
@@ -131,7 +131,7 @@ func withIssueStatuses(state CoreState) CoreState {
 	return state
 }
 
-// What a worker is told when merging its base in would conflict: the owner's resolve, the plan sending a step back.
+// What a session is told when merging its base in would conflict: the owner's resolve, the plan sending a step back.
 func ConflictTask(base string, files []string) string {
 	return fmt.Sprintf("把 %s 合进你的分支时有冲突（%s）。请在你的分支上运行 git merge %s，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。", base, strings.Join(files, "、"), base)
 }

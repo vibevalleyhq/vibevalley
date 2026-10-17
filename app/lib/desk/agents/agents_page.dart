@@ -19,7 +19,7 @@ class AgentsPage extends ConsumerWidget {
     final config = ref.watch(deskConfigProvider);
     final farm = ref.watch(farmProvider);
     final tallies = farm?.progress?.agents ?? const <String, AgentTally>{};
-    final workers = farm?.workers ?? const <Worker>[];
+    final sessions = farm?.sessions ?? const <Session>[];
     final skillName = {for (final s in config.skills) s.id: s.name};
 
     final cards = <Widget>[
@@ -29,7 +29,7 @@ class AgentsPage extends ConsumerWidget {
           agent: a,
           runtime: config.runtime(a.runtime),
           tally: tallies[a.id],
-          here: workers.where((h) => h.agent == a.id).length,
+          here: sessions.where((h) => h.agent == a.id).length,
           skillName: skillName,
         ),
       const _NewCard(),

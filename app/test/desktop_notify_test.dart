@@ -6,7 +6,7 @@ import 'package:vibevalley/gen/vibevalley.dart';
 InboxItem _call(
   String id,
   InboxKind kind, {
-  InboxFrom from = const InboxFromWorker(id: 'h1', name: '阿土', agent: 'oar'),
+  InboxFrom from = const InboxFromSession(id: 'h1', name: '阿土', agent: 'oar'),
   String text = '修好登录页',
   InboxTarget? target,
 }) => InboxItem(
@@ -15,14 +15,14 @@ InboxItem _call(
   from: from,
   text: text,
   at: 1,
-  target: target ?? const InboxTargetWorker(id: 'h1'),
+  target: target ?? const InboxTargetSession(id: 'h1'),
 );
 
 CoreState _state({String call = 'live', List<Map<String, dynamic>> conversations = const [], List<Map<String, dynamic>> messages = const []}) =>
     CoreState.fromJson({
       'call': call,
       'manager': ManagerState.values.first.wire,
-      'workers': const <Object>[],
+      'sessions': const <Object>[],
       'chat': {'conversations': conversations, 'messages': messages},
     });
 
@@ -37,7 +37,7 @@ void main() {
   });
 
   test('calls become notifications in the Electron client words, opening what they are about', () {
-    expect(noticeForCall(_call('a', InboxKind.merge)), const DesktopNotice('阿土 做完了', '修好登录页', DesktopOpenWorker('h1')));
+    expect(noticeForCall(_call('a', InboxKind.merge)), const DesktopNotice('阿土 做完了', '修好登录页', DesktopOpenSession('h1')));
     expect(noticeForCall(_call('b', InboxKind.fix)).title, '阿土 没做成');
     expect(noticeForCall(_call('c', InboxKind.quiet)).body, '可能在跑很久的命令，也可能卡住了：看看它的干活过程。');
     expect(
@@ -106,10 +106,10 @@ void main() {
   });
 
   test('commands round-trip the protocol JSON; unknown ones are dropped', () {
-    for (final c in const <DesktopCommand>[DesktopVoice(), DesktopOpenWorker('h1'), DesktopOpenChat(3), DesktopOpenPlans('pb'), DesktopOpenAchievements()]) {
+    for (final c in const <DesktopCommand>[DesktopVoice(), DesktopOpenSession('h1'), DesktopOpenChat(3), DesktopOpenPlans('pb'), DesktopOpenAchievements()]) {
       expect(DesktopCommand.fromJson(c.toJson())?.toJson(), c.toJson());
     }
-    expect(DesktopCommand.fromJson({'type': 'worker'}), isNull);
+    expect(DesktopCommand.fromJson({'type': 'session'}), isNull);
     expect(DesktopCommand.fromJson({'type': 'later'}), isNull);
     expect(DesktopCommand.fromJson('voice'), isNull);
   });

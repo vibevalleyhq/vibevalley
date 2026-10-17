@@ -26,7 +26,7 @@ const _status = {
   FriendStatus.away: (dot: Color(0x00000000), label: '没在农场'),
 };
 
-FriendStatus statusOf(List<Worker> mine, FarmView view) {
+FriendStatus statusOf(List<Session> mine, FarmView view) {
   final crops = [for (final w in mine) plotOf(view, w).crop];
   if (crops.contains(Crop.withered)) return FriendStatus.bug;
   if (crops.any(isRipe)) return FriendStatus.ripe;
@@ -52,11 +52,11 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
   Widget build(BuildContext context) {
     final height = widget.height;
     final agents = (ref.watch(agentsProvider).value ?? const <String, Agent>{}).values.toList();
-    final workers = ref.watch(farmProvider.select((s) => s?.workers)) ?? const <Worker>[];
+    final sessions = ref.watch(farmProvider.select((s) => s?.sessions)) ?? const <Session>[];
     final view = ref.watch(viewProvider) ?? const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {});
     final open = ref.watch(friendsOpenProvider);
     final sorted = [...agents.where((a) => a.enabled), ...agents.where((a) => !a.enabled)];
-    final statuses = [for (final a in sorted) statusOf(workers.where((h) => h.agent == a.id).toList(), view)];
+    final statuses = [for (final a in sorted) statusOf(sessions.where((h) => h.agent == a.id).toList(), view)];
     final busy = statuses.where((s) => s == FriendStatus.busy).length;
     final attention = statuses.contains(FriendStatus.bug)
         ? FriendStatus.bug

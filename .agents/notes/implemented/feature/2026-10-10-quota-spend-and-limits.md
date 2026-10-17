@@ -31,4 +31,4 @@ Status: implemented
 
 ## Verification
 
-`server/internal/workspace/work_test.go` 的 `TestCrewNobodySentWhenMoneyRunsOut`、`TestCrewLimitsOnProjectAndRuntime`；`server/internal/worker/rules_test.go` 的 `TestCrewRoomOnTheFarm` 逐条测上限，`TestCrewSpendingCountedFromTheLastTotal` 测花费。
+`server/internal/workspace/work_test.go` 的 `TestCrewNobodySentWhenMoneyRunsOut`、`TestCrewLimitsOnProjectAndRuntime`；`server/internal/session/rules_test.go` 的 `TestCrewRoomOnTheFarm` 逐条测上限，`TestCrewSpendingCountedFromTheLastTotal` 测花费。

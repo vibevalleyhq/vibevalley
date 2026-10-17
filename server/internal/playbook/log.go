@@ -15,7 +15,7 @@ import (
 const planReadLimit = 1000
 
 type planPayload struct {
-	Worker  *string                    `json:"worker,omitzero"`
+	Session *string                    `json:"session,omitzero"`
 	Detail  *string                    `json:"detail,omitzero"`
 	Changes []protocol.NodeFieldChange `json:"changes,omitzero"`
 	Commits []string                   `json:"commits,omitzero"`
@@ -31,7 +31,7 @@ func (*playbookLog) OnStop()                          {}
 func (l *playbookLog) Record(before *protocol.Playbook, after protocol.Playbook, actor protocol.PlaybookActor, why string) {
 	at := clock.NowMs()
 	for _, c := range protocol.PlaybookChanges(before, after) {
-		p := planPayload{Worker: c.Worker, Detail: c.Detail, Changes: c.Changes, Commits: c.Commits}
+		p := planPayload{Session: c.Session, Detail: c.Detail, Changes: c.Changes, Commits: c.Commits}
 		if why != "" && (p.Detail == nil || *p.Detail == "") {
 			w := why
 			p.Detail = &w
@@ -70,7 +70,7 @@ func (l *playbookLog) List(playbook string) []protocol.PlaybookEvent {
 		}
 		var p planPayload
 		if json.Unmarshal([]byte(payload), &p) == nil {
-			e.Worker, e.Detail, e.Changes, e.Commits = p.Worker, p.Detail, p.Changes, p.Commits
+			e.Session, e.Detail, e.Changes, e.Commits = p.Session, p.Detail, p.Changes, p.Commits
 		}
 		out = append(out, e)
 	}

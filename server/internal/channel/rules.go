@@ -118,8 +118,8 @@ type chatAudienceInput struct {
 	Mentions []string             `json:"mentions"`
 	// Only its Kind, SubjectKind and SubjectID are read.
 	Conversation protocol.Conversation `json:"conversation"`
-	Workers      []string              `json:"workers"`
-	// Workers when nil.
+	Sessions     []string              `json:"sessions"`
+	// Sessions when nil.
 	OnFarm      []string          `json:"onFarm"`
 	Followers   []string          `json:"followers"`
 	Hops        int64             `json:"hops"`
@@ -134,10 +134,10 @@ func chatAudience(i chatAudienceInput) []chatDelivery {
 	if i.Kind == protocol.MessageKindNotice || i.Kind == protocol.MessageKindDispatch || i.FromKind == protocol.SenderKindSystem {
 		return out
 	}
-	byAgent := i.FromKind == protocol.SenderKindWorker || i.FromKind == protocol.SenderKindManager
+	byAgent := i.FromKind == protocol.SenderKindAgent || i.FromKind == protocol.SenderKindManager
 	onFarm := i.OnFarm
 	if onFarm == nil {
-		onFarm = i.Workers
+		onFarm = i.Sessions
 	}
 	hops := i.Hops
 	add := func(recipient string, reason chatDeliveryReason, wakes bool) {
@@ -172,7 +172,7 @@ func chatAudience(i chatAudienceInput) []chatDelivery {
 	for _, m := range i.Mentions {
 		if m == protocol.Everyone {
 			if i.FromKind == protocol.SenderKindUser {
-				for _, h := range i.Workers {
+				for _, h := range i.Sessions {
 					add(h, reasonEveryone, true)
 				}
 			}
@@ -197,7 +197,7 @@ func chatAudience(i chatAudienceInput) []chatDelivery {
 			if !slices.ContainsFunc(i.Mentions, func(m string) bool { return m != "user" }) {
 				add(protocol.ManagerAgent, reasonAddressed, true)
 			}
-			for _, h := range i.Workers {
+			for _, h := range i.Sessions {
 				add(h, reasonGeneral, false)
 			}
 		}

@@ -20,7 +20,7 @@ import 'tickets_page.dart';
 Move? cardMove(BoardCard card, Lane to) => switch (card) {
   PlaybookCard() || ManagerCard() => null,
   TodoCard() => moveOf(card.lane, to),
-  TicketCard(:final issue, :final worker) => moveOf(card.lane, to, planned: ticketPlanned(issue, worker)),
+  TicketCard(:final issue, :final session) => moveOf(card.lane, to, planned: ticketPlanned(issue, session)),
 };
 
 class TicketBoard extends StatefulWidget {
@@ -298,25 +298,25 @@ class _CardView extends ConsumerWidget {
         if (issue.schedule != null) tags.add(const _Tag('定时', Palette.cream300));
         final state = ticketState(issue);
         lines.add(Text(state.open ? '管家在做' : '${state.label} · ${ago(issue.closedAt ?? issue.createdAt, now)}', style: xs));
-      case TicketCard(:final issue, :final workers, :final head, :final state, :final worker):
-        final phase = worker?.phase;
-        if (worker?.conflict != null) tags.add(const _Tag('冲突', Palette.berry));
+      case TicketCard(:final issue, :final sessions, :final head, :final state, :final session):
+        final phase = session?.phase;
+        if (session?.conflict != null) tags.add(const _Tag('冲突', Palette.berry));
         if (phase is PhaseWorking && phase.quietSince != null) tags.add(_Tag('${tookText(now - phase.quietSince!)}没动静', Palette.wheat));
-        if (phase is PhaseFailed || (worker?.lastRun?.outcome ?? head.outcome) == Outcome.failed) tags.add(const _Tag('没做成', Palette.berry));
+        if (phase is PhaseFailed || (session?.lastRun?.outcome ?? head.outcome) == Outcome.failed) tags.add(const _Tag('没做成', Palette.berry));
         if (state == TicketState.lost) tags.add(const _Tag('丢了', Palette.berry));
-        if (workers.length > 1) tags.add(_Tag('第 ${workers.length} 次', Palette.water));
+        if (sessions.length > 1) tags.add(_Tag('第 ${sessions.length} 次', Palette.water));
         if (issue.schedule != null) tags.add(const _Tag('定时', Palette.cream300));
-        if (ticketPlanned(issue, worker)) tags.add(const _Tag('种植计划', Palette.leaf500));
-        final turns = (worker?.runs ?? head.runs ?? 0).round();
-        final cny = worker?.spent?.cny ?? head.cny;
-        final took = state.open ? '开了 ${tookText(now - head.startedAt)}' : '用了 ${tookText((issue.closedAt ?? head.endedAt ?? now) - workers.first.startedAt)}';
+        if (ticketPlanned(issue, session)) tags.add(const _Tag('种植计划', Palette.leaf500));
+        final turns = (session?.runs ?? head.runs ?? 0).round();
+        final cny = session?.spent?.cny ?? head.cny;
+        final took = state.open ? '开了 ${tookText(now - head.startedAt)}' : '用了 ${tookText((issue.closedAt ?? head.endedAt ?? now) - sessions.first.startedAt)}';
         lines.add(
           Text(
             [if (state == TicketState.working) '第 ${turns + 1} 轮' else '$turns 轮', took, if (cny != null) '¥${cny.toStringAsFixed(2)}'].join(' · '),
             style: xs,
           ),
         );
-        final said = worker?.lastRun?.summary ?? head.summary;
+        final said = session?.lastRun?.summary ?? head.summary;
         if (state == TicketState.waiting && said != null && said.isNotEmpty) {
           lines.add(
             Text(

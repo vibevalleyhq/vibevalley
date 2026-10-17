@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
+	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
-	"vibevalley/internal/worker"
 	"vibevalley/pkg/smith/oar"
 	"vibevalley/pkg/smith/oartest"
 )
@@ -30,12 +30,12 @@ func TestSessionsReachTheFarmWhereItAnswers(t *testing.T) {
 	}}))
 	w.f.Runtime.Registry = registry
 
-	first := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "看看", "reach", worker.HireOptions{}))
+	first := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "看看", "reach", session.HireOptions{}))
 	w.nextReport(t)
-	w.f.Worker.SetAddress("127.0.0.1:54321")
-	mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "再看看", "reach", worker.HireOptions{}))
+	w.f.Session.SetAddress("127.0.0.1:54321")
+	mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "再看看", "reach", session.HireOptions{}))
 	w.nextReport(t)
-	w.f.Worker.Dismiss(first.ID)
+	w.f.Session.Dismiss(first.ID)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -50,5 +50,5 @@ func TestFarmURLFollowsHostAndPort(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.DB.Close()
-	testkit.Eq(t, f.Worker.FarmURL(), "http://localhost:9100/mcp", "host and port")
+	testkit.Eq(t, f.Session.FarmURL(), "http://localhost:9100/mcp", "host and port")
 }

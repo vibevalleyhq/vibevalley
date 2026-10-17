@@ -20,8 +20,8 @@ import '../../shared/work_log.dart';
 import 'tickets_page.dart';
 
 class CloseTicket extends ConsumerStatefulWidget {
-  const CloseTicket({super.key, required this.worker});
-  final Worker worker;
+  const CloseTicket({super.key, required this.session});
+  final Session session;
 
   @override
   ConsumerState<CloseTicket> createState() => _CloseTicketState();
@@ -32,16 +32,16 @@ class _CloseTicketState extends ConsumerState<CloseTicket> {
 
   @override
   Widget build(BuildContext context) {
-    final worker = widget.worker;
+    final session = widget.session;
     void done() => Navigator.of(context).pop();
-    if (_review) return HarvestReview(worker: worker, onDone: done);
-    final working = worker.phase is PhaseWorking || worker.phase is PhaseArriving;
+    if (_review) return HarvestReview(session: session, onDone: done);
+    final working = session.phase is PhaseWorking || session.phase is PhaseArriving;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          working ? '${worker.name} 还在干这张工单。关上就是叫停它、让它收工，分支上的改动不合进主分支。' : '收获就是把 ${worker.name} 的分支合进项目的主分支，先看一遍收成清单；不收就是让它收工，改动不合进去。',
+          working ? '${session.name} 还在干这张工单。关上就是叫停它、让它收工，分支上的改动不合进主分支。' : '收获就是把 ${session.name} 的分支合进项目的主分支，先看一遍收成清单；不收就是让它收工，改动不合进去。',
           style: KitText.sm.copyWith(color: Palette.bark800, height: 1.625),
         ),
         const SizedBox(height: 16),
@@ -54,7 +54,7 @@ class _CloseTicketState extends ConsumerState<CloseTicket> {
               working ? '叫停并收工' : '不收，直接收工',
               tone: PxTone.danger,
               onPressed: () async {
-                await deskRun(() => ref.read(apiProvider).issue.cancel(id: worker.issueId));
+                await deskRun(() => ref.read(apiProvider).issue.cancel(id: session.issueId));
                 done();
               },
             ),
@@ -182,7 +182,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
     final got = await api.issue.start(id: item.id);
     dispatchedNotice(got, item.id, widget.onDone);
     // Waiting for a bed: a new one stays open, now as the 待办 it is.
-    if (got.worker == null && widget.item == null) widget.onDone(item.id);
+    if (got.session == null && widget.item == null) widget.onDone(item.id);
   });
 
   @override
@@ -314,12 +314,12 @@ class _TodoState extends ConsumerState<TodoDetail> {
 }
 
 class TicketDetail extends ConsumerStatefulWidget {
-  const TicketDetail({super.key, required this.issue, required this.workers, required this.state, required this.worker, required this.reload});
+  const TicketDetail({super.key, required this.issue, required this.sessions, required this.state, required this.session, required this.reload});
   final Issue issue;
 
-  final List<TrajectoryHead> workers;
+  final List<TrajectoryHead> sessions;
   final TicketState state;
-  final Worker? worker;
+  final Session? session;
   final Future<void> Function() reload;
 
   @override
@@ -335,7 +335,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
   @override
   void initState() {
     super.initState();
-    unawaited(deskRun(() => ref.read(workStepsProvider.notifier).load(widget.workers.last.id)));
+    unawaited(deskRun(() => ref.read(workStepsProvider.notifier).load(widget.sessions.last.id)));
     _askChanges(first: true);
   }
 
@@ -347,7 +347,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
 
   /// `first` from initState, before any build.
   void _askChanges({bool first = false}) {
-    if (widget.state != TicketState.waiting || widget.worker == null) return;
+    if (widget.state != TicketState.waiting || widget.session == null) return;
     final asked = ref.read(apiProvider).issue.changes(id: widget.issue.id).then<Changes?>((c) => c, onError: (Object _) => null);
     if (first) {
       _changes = asked;
@@ -368,12 +368,12 @@ class _TicketState extends ConsumerState<TicketDetail> {
   }
 
   Future<void> _tell() async {
-    final worker = widget.worker;
+    final session = widget.session;
     final text = _word.trim();
-    if (worker == null || text.isEmpty) return;
+    if (session == null || text.isEmpty) return;
     setState(() => _busy = true);
     final done = await deskRun(() async {
-      await ref.read(farmCommandsProvider).water(worker, text);
+      await ref.read(farmCommandsProvider).water(session, text);
       return true;
     });
     if (!mounted) return;
@@ -393,35 +393,35 @@ class _TicketState extends ConsumerState<TicketDetail> {
     );
     if (!mounted) return;
     setState(() => _busy = false);
-    if (got?.worker case final worker?) {
-      toasts.add(type: ToastType.info, title: '工单重开了', description: '$worker 接着做。');
+    if (got?.session case final session?) {
+      toasts.add(type: ToastType.info, title: '工单重开了', description: '$session 接着做。');
       await widget.reload();
     }
   }
 
-  Future<void> _close(Worker worker) async {
+  Future<void> _close(Session session) async {
     await showFarmDialog<void>(
       context,
       title: Text('关上「${ticketTitle(widget.issue)}」'),
       size: FarmDialogSize.lg,
       icon: 'icon-harvest',
-      builder: (_) => CloseTicket(worker: worker),
+      builder: (_) => CloseTicket(session: session),
     );
     await widget.reload();
   }
 
-  void _toBed(Worker worker) {
+  void _toBed(Session session) {
     ref.read(titleOpenProvider.notifier).enterFarm(start: false);
-    ref.read(selectedProvider.notifier).set(worker.id);
+    ref.read(selectedProvider.notifier).set(session.id);
     deskGo(context, '/');
   }
 
   /// A playbook's step has none of its own: it goes with its playbook.
-  List<Widget> _actions(Worker? worker) {
+  List<Widget> _actions(Session? session) {
     final busy = _busy;
-    final bed = worker == null ? null : PxButton.text('去农场看这块地', icon: 'button-open', size: PxSize.sm, onPressed: () => _toBed(worker));
-    if (ticketPlanned(widget.issue, worker)) return [?bed];
-    return switch ((widget.state, worker)) {
+    final bed = session == null ? null : PxButton.text('去农场看这块地', icon: 'button-open', size: PxSize.sm, onPressed: () => _toBed(session));
+    if (ticketPlanned(widget.issue, session)) return [?bed];
+    return switch ((widget.state, session)) {
       (TicketState.working, final h?) => [
         PxButton.text(
           '叫停这一轮',
@@ -462,16 +462,16 @@ class _TicketState extends ConsumerState<TicketDetail> {
   @override
   Widget build(BuildContext context) {
     final issue = widget.issue;
-    final workers = widget.workers;
-    final head = workers.last;
-    final worker = widget.worker;
+    final sessions = widget.sessions;
+    final head = sessions.last;
+    final session = widget.session;
     final open = widget.state.open;
     final steps = ref.watch(workStepsProvider.select((all) => all[head.id])) ?? const <Activity>[];
     final body = KitText.sm.copyWith(color: Palette.bark800);
-    final turns = worker?.runs ?? head.runs;
-    final cny = worker?.spent?.cny ?? head.cny;
-    final summary = worker?.lastRun?.summary ?? head.summary;
-    final actions = _actions(worker);
+    final turns = session?.runs ?? head.runs;
+    final cny = session?.spent?.cny ?? head.cny;
+    final summary = session?.lastRun?.summary ?? head.summary;
+    final actions = _actions(session);
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -487,11 +487,11 @@ class _TicketState extends ConsumerState<TicketDetail> {
               if (actions.isNotEmpty) ...[Wrap(spacing: 8, runSpacing: 8, children: actions), const SizedBox(height: 12)],
               _Row('谁在做', Text('${head.name}${head.runtime != null ? '（${head.runtime}）' : ''}', style: body)),
               if (issue.project != null) _Row('项目', Text(issue.project!, style: body)),
-              if (worker?.branch != null) _Row('分支', Text(worker!.branch!, style: KitText.mono.copyWith(color: Palette.bark800))),
+              if (session?.branch != null) _Row('分支', Text(session!.branch!, style: KitText.mono.copyWith(color: Palette.bark800))),
               _Row('开单', Text(wallClockText(issue.createdAt), style: body)),
               if (issue.closedAt != null) _Row('关单', Text(wallClockText(issue.closedAt!), style: body)),
-              if (workers.length > 1)
-                _Row('做过', Text('${workers.length} 次：${workers.map((r) => '${r.name}（${r.id}）').join(' → ')}', style: body.copyWith(height: 1.5))),
+              if (sessions.length > 1)
+                _Row('做过', Text('${sessions.length} 次：${sessions.map((r) => '${r.name}（${r.id}）').join(' → ')}', style: body.copyWith(height: 1.5))),
               _Row(
                 '用时',
                 Text(
@@ -504,20 +504,20 @@ class _TicketState extends ConsumerState<TicketDetail> {
                 ),
               ),
               if (summary != null && summary.isNotEmpty) _Row('最后一轮', Text(summary, style: body)),
-              if (ticketPlanned(issue, worker))
+              if (ticketPlanned(issue, session))
                 _Row(
                   '种植计划',
                   Text(
-                    worker?.playbook != null ? '这是计划 ${worker!.playbook!.id} 里的一步：做完自动合进计划分支，收获整个计划时再进主分支。在农场的「计划」里管它。' : '这是种植计划里的一步，已经合进了计划分支，跟着计划走。',
+                    session?.playbook != null ? '这是计划 ${session!.playbook!.id} 里的一步：做完自动合进计划分支，收获整个计划时再进主分支。在农场的「计划」里管它。' : '这是种植计划里的一步，已经合进了计划分支，跟着计划走。',
                     style: body,
                   ),
                 ),
-              if (worker?.conflict case final conflict?)
+              if (session?.conflict case final conflict?)
                 _Row('冲突', Text('合进 ${conflict.base} 会冲突：${conflict.files.join('、')}', style: body.copyWith(color: Palette.berry))),
             ],
           ),
         ),
-        _RunsCard(issue: issue.id, version: '${widget.state}:${worker?.runs}:${worker?.phase.runtimeType}'),
+        _RunsCard(issue: issue.id, version: '${widget.state}:${session?.runs}:${session?.phase.runtimeType}'),
         if (_changes != null) ...[
           const SizedBox(height: 12),
           FutureBuilder<Changes?>(
@@ -573,12 +573,12 @@ class _TicketState extends ConsumerState<TicketDetail> {
                     now: now,
                     tall: true,
                     working: widget.state == TicketState.working,
-                    onComment: open && worker != null ? (step, text) => ref.read(farmCommandsProvider).water(worker, text, on: step) : null,
+                    onComment: open && session != null ? (step, text) => ref.read(farmCommandsProvider).water(session, text, on: step) : null,
                   ),
                 ),
         ),
         const SizedBox(height: 12),
-        if (open && worker != null)
+        if (open && session != null)
           PxCard(
             title: '带话',
             child: Row(
@@ -589,8 +589,8 @@ class _TicketState extends ConsumerState<TicketDetail> {
                     onChanged: (v) => setState(() => _word = v),
                     onSubmitted: (_) => _tell(),
                     enabled: !_busy,
-                    placeholder: worker.phase is PhaseWorking ? '干着活也能收到这句话' : '说一句，它接着做一轮',
-                    semanticLabel: '给${worker.name}带句话',
+                    placeholder: session.phase is PhaseWorking ? '干着活也能收到这句话' : '说一句，它接着做一轮',
+                    semanticLabel: '给${session.name}带句话',
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -598,7 +598,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
               ],
             ),
           )
-        else if (!open && !ticketPlanned(issue, worker))
+        else if (!open && !ticketPlanned(issue, session))
           PxCard(
             title: '重开',
             child: Column(

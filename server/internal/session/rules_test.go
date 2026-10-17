@@ -1,4 +1,4 @@
-package worker
+package session
 
 import (
 	"strings"
@@ -17,24 +17,24 @@ func ev(body oar.EventBody) oar.Event {
 
 var ctx = factContext{ID: "w1", Runtime: "pi", Cwd: "/work/clock-in", CnyPerUsd: 7}
 
-func workerBase() protocol.Worker {
+func sessionBase() protocol.Session {
 	project := "clock-in"
-	return protocol.Worker{ID: "w1", Name: "老周", Agent: "zhou", Runtime: "pi", Task: "加接口", Project: &project, Phase: protocol.Phase{Value: protocol.PhaseArriving{}}}
+	return protocol.Session{ID: "w1", Name: "老周", Agent: "zhou", Runtime: "pi", Task: "加接口", Project: &project, Phase: protocol.Phase{Value: protocol.PhaseArriving{}}}
 }
 
-func working(doing protocol.Doing) *protocol.Worker {
-	h := workerBase()
+func working(doing protocol.Doing) *protocol.Session {
+	h := sessionBase()
 	h.Phase = protocol.Phase{Value: protocol.PhaseWorking{Doing: doing}}
 	return &h
 }
 
-var thinking = protocol.Doing{Action: protocol.WorkerActionThinking}
+var thinking = protocol.Doing{Action: protocol.SessionActionThinking}
 
 func f(v float64) *float64 { return &v }
 func i(v int64) *int64     { return &v }
 
-func TestWorkersRunStartsWithTheJobAndCountsFromWhatWasSpent(t *testing.T) {
-	h := workerBase()
+func TestSessionsRunStartsWithTheJobAndCountsFromWhatWasSpent(t *testing.T) {
+	h := sessionBase()
 	h.Spent = &protocol.Spent{Tokens: 50, CNY: f(0.1)}
 	r := eventFacts(ev(oar.TurnStarted{RequestID: "r", Input: "你是老周" + JobBreak + "加一个查询接口"}), &h, tracking{}, ctx)
 	testkit.Eq(t, r.Facts, []protocol.FactValue{protocol.FactRun{ID: "w1"}}, "facts")
@@ -42,46 +42,46 @@ func TestWorkersRunStartsWithTheJobAndCountsFromWhatWasSpent(t *testing.T) {
 	testkit.Eq(t, *r.Tracking.RunFrom, protocol.Spent{Tokens: 50, CNY: f(0.1)}, "turnFrom")
 }
 
-func TestWorkersRunRemindedOfMemories(t *testing.T) {
+func TestSessionsRunRemindedOfMemories(t *testing.T) {
 	block := RecallHead + "你以前记下的……\n- （这个项目）测试用 pnpm test"
-	h := workerBase()
+	h := sessionBase()
 	r := eventFacts(ev(oar.TurnStarted{RequestID: "r", Input: "你是老周" + JobBreak + withRecall(block, "加一个查询接口")}), &h, tracking{}, ctx)
 	testkit.Eq(t, r.Journal, []op{{Type: "prompt", Text: "加一个查询接口"}, {Type: "note", Kind: protocol.ActivityKindRecalled, Text: "- （这个项目）测试用 pnpm test"}}, "journal")
 }
 
-func TestWorkersCommandShowsFromItsFolder(t *testing.T) {
+func TestSessionsCommandShowsFromItsFolder(t *testing.T) {
 	input := `{"command":"cd /work/clock-in && pnpm test"}`
 	started := eventFacts(ev(oar.ToolCallStarted{CallID: "c1", Tool: "bash", Input: &input}), working(thinking), tracking{}, ctx)
-	testkit.Eq(t, started.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.WorkerActionRunCommand, Label: "pnpm test"}}, "started")
+	testkit.Eq(t, started.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.SessionActionRunCommand, Label: "pnpm test"}}, "started")
 	testkit.Eq(t, started.Journal[0].Type, "toolStarted", "op")
 	testkit.Eq(t, *started.Tracking.ShownCall, shownCall{ID: "c1", Tool: "bash"}, "shown")
 
 	again := `{"command":"pnpm test"}`
-	same := eventFacts(ev(oar.ToolCallStarted{CallID: "c2", Tool: "bash", Input: &again}), working(protocol.Doing{Action: protocol.WorkerActionRunCommand, Label: "pnpm test"}), tracking{}, ctx)
+	same := eventFacts(ev(oar.ToolCallStarted{CallID: "c2", Tool: "bash", Input: &again}), working(protocol.Doing{Action: protocol.SessionActionRunCommand, Label: "pnpm test"}), tracking{}, ctx)
 	testkit.Eq(t, len(same.Facts), 0, "again")
 
 	failed := eventFacts(ev(oar.ToolCallEnded{CallID: "c1", ExitCode: oar.IntOf(1), Content: []oar.ToolOutputPart{{Type: "text", Text: "1 failing"}}}),
-		working(protocol.Doing{Action: protocol.WorkerActionRunCommand, Label: "pnpm test"}), started.Tracking, ctx)
+		working(protocol.Doing{Action: protocol.SessionActionRunCommand, Label: "pnpm test"}), started.Tracking, ctx)
 	testkit.Eq(t, failed.Journal, []op{{Type: "toolEnded", CallID: "c1", Output: "1 failing", Ok: false}}, "ended")
-	testkit.Eq(t, failed.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.WorkerActionThinking, Label: ""}}, "back to thinking")
+	testkit.Eq(t, failed.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.SessionActionThinking, Label: ""}}, "back to thinking")
 }
 
-func TestWorkersFullInputNamesTheTargetBetter(t *testing.T) {
+func TestSessionsFullInputNamesTheTargetBetter(t *testing.T) {
 	tracking := tracking{ShownCall: &shownCall{ID: "c1", Tool: "read"}}
 	input := `{"path":"/work/clock-in/src/http.ts"}`
-	r := eventFacts(ev(oar.ToolCallInput{CallID: "c1", Input: input}), working(protocol.Doing{Action: protocol.WorkerActionReadFile, Label: "read"}), tracking, ctx)
+	r := eventFacts(ev(oar.ToolCallInput{CallID: "c1", Input: input}), working(protocol.Doing{Action: protocol.SessionActionReadFile, Label: "read"}), tracking, ctx)
 	testkit.Eq(t, r.Journal, []op{{Type: "toolInput", CallID: "c1", Input: input, Text: "src/http.ts"}}, "journal")
-	testkit.Eq(t, r.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.WorkerActionReadFile, Label: "src/http.ts"}}, "facts")
+	testkit.Eq(t, r.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.SessionActionReadFile, Label: "src/http.ts"}}, "facts")
 }
 
-func TestWorkersReasoningIsAStepWhenShown(t *testing.T) {
-	r := eventFacts(ev(oar.Reasoning{Content: oar.ReasoningContent{Kind: "text", Text: "先看看路由在哪"}}), working(protocol.Doing{Action: protocol.WorkerActionReadFile, Label: "a.ts"}), tracking{}, ctx)
+func TestSessionsReasoningIsAStepWhenShown(t *testing.T) {
+	r := eventFacts(ev(oar.Reasoning{Content: oar.ReasoningContent{Kind: "text", Text: "先看看路由在哪"}}), working(protocol.Doing{Action: protocol.SessionActionReadFile, Label: "a.ts"}), tracking{}, ctx)
 	testkit.Eq(t, r.Journal, []op{{Type: "thought", Text: "先看看路由在哪"}}, "journal")
-	testkit.Eq(t, r.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.WorkerActionThinking}}, "facts")
+	testkit.Eq(t, r.Facts, []protocol.FactValue{protocol.FactDoing{ID: "w1", Action: protocol.SessionActionThinking}}, "facts")
 	testkit.Eq(t, len(eventFacts(ev(oar.Reasoning{Content: oar.ReasoningContent{Kind: "redacted"}}), working(thinking), tracking{}, ctx).Journal), 0, "redacted")
 }
 
-func TestWorkersSubAgentStepsSayWhose(t *testing.T) {
+func TestSessionsSubAgentStepsSayWhose(t *testing.T) {
 	own := eventFacts(ev(oar.TextDelta{Text: "好"}), working(thinking), tracking{}, ctx)
 	testkit.Eq(t, own.Journal, []op{{Type: "response", Text: "好"}}, "own")
 	input := "{}"
@@ -91,15 +91,15 @@ func TestWorkersSubAgentStepsSayWhose(t *testing.T) {
 	testkit.Eq(t, sub.Journal[0].From, From{"task-1"}, "from")
 }
 
-func TestWorkersNotWorkingNoBubble(t *testing.T) {
-	h := workerBase()
+func TestSessionsNotWorkingNoBubble(t *testing.T) {
+	h := sessionBase()
 	h.Phase = protocol.Phase{Value: protocol.PhaseResting{}}
 	for _, body := range []oar.EventBody{oar.Reasoning{Content: oar.ReasoningContent{Kind: "empty"}}, oar.TextDelta{Text: "好的"}} {
 		testkit.Eq(t, len(eventFacts(ev(body), &h, tracking{}, ctx).Facts), 0, "facts")
 	}
 }
 
-func TestWorkersSpendingCountedFromTheLastTotal(t *testing.T) {
+func TestSessionsSpendingCountedFromTheLastTotal(t *testing.T) {
 	price := runtime.Price{Input: 1, Output: 2, CacheRead: 0.1}
 	usage := func(input, output int64) oar.EventBody {
 		return oar.Usage{Usage: oar.UsageReport{Tokens: &oar.TokenTotals{Input: input, Output: output, CacheRead: i(0), CacheWrite: i(0)}}}
@@ -125,8 +125,8 @@ func TestWorkersSpendingCountedFromTheLastTotal(t *testing.T) {
 	}
 }
 
-func TestWorkersQuietEndsWithAWordNotWithUsage(t *testing.T) {
-	doing := protocol.Doing{Action: protocol.WorkerActionRunCommand, Label: "pnpm build"}
+func TestSessionsQuietEndsWithAWordNotWithUsage(t *testing.T) {
+	doing := protocol.Doing{Action: protocol.SessionActionRunCommand, Label: "pnpm build"}
 	usage := eventFacts(ev(oar.Usage{}), working(doing), tracking{Quiet: true}, ctx)
 	testkit.Eq(t, usage.Tracking.Quiet, true, "usage keeps quiet")
 	testkit.Eq(t, len(usage.Facts), 0, "usage facts")
@@ -134,11 +134,11 @@ func TestWorkersQuietEndsWithAWordNotWithUsage(t *testing.T) {
 	testkit.Eq(t, word.Tracking.Quiet, false, "a word ends it")
 	testkit.Eq(t, word.Facts, []protocol.FactValue{
 		protocol.FactDoing{ID: "w1", Action: doing.Action, Label: doing.Label},
-		protocol.FactDoing{ID: "w1", Action: protocol.WorkerActionSpeakingText},
+		protocol.FactDoing{ID: "w1", Action: protocol.SessionActionSpeakingText},
 	}, "facts")
 }
 
-func TestWorkersRetriesModelFailuresAndExitsAreSaid(t *testing.T) {
+func TestSessionsRetriesModelFailuresAndExitsAreSaid(t *testing.T) {
 	maxAttempts, delay := 3, int64(1500)
 	retry := eventFacts(ev(oar.Retry{Attempt: 2, MaxAttempts: &maxAttempts, DelayMs: &delay, Reason: "429"}), working(thinking), tracking{}, ctx)
 	testkit.Eq(t, retry.Facts, []protocol.FactValue{protocol.FactRetry{ID: "w1", Attempt: 2, Of: i(3)}}, "retry fact")
@@ -156,7 +156,7 @@ func TestWorkersRetriesModelFailuresAndExitsAreSaid(t *testing.T) {
 	exited := eventFacts(ev(oar.Exited{Code: &code}), h, tracking{}, ctx)
 	testkit.Eq(t, exited.Facts, []protocol.FactValue{protocol.FactReport{ID: "w1", Outcome: protocol.OutcomeFailed, Summary: "pi 进程退出了（退出码 137）", Runs: 2}}, "exited")
 	testkit.Eq(t, exited.Warn, "老周 的 pi 进程退出了（退出码 137）", "warn")
-	ripe := workerBase()
+	ripe := sessionBase()
 	ripe.Phase = protocol.Phase{Value: protocol.PhaseRipe{}}
 	zero := 0
 	testkit.Eq(t, len(eventFacts(ev(oar.Exited{Code: &zero}), &ripe, tracking{}, ctx).Facts), 0, "between turns")
@@ -179,7 +179,7 @@ func TestSummaryIsTheVerdict(t *testing.T) {
 
 func TestCompletedRunRead(t *testing.T) {
 	read := readReport(oar.Completed(), "  改了路由。\n\n结论：加好了，commit abc123  ")
-	testkit.Eq(t, read, workerRead{Outcome: protocol.OutcomeCompleted, Text: "改了路由。\n\n结论：加好了，commit abc123", Summary: "加好了，commit abc123"}, "read")
+	testkit.Eq(t, read, sessionRead{Outcome: protocol.OutcomeCompleted, Text: "改了路由。\n\n结论：加好了，commit abc123", Summary: "加好了，commit abc123"}, "read")
 	testkit.Eq(t, readReport(oar.Completed(), "").Summary, "做完了", "empty completed")
 	testkit.Eq(t, readReport(oar.AbortedOutcome(), "").Outcome, protocol.OutcomeInterrupted, "aborted")
 	testkit.Eq(t, readReport(oar.AbortedOutcome(), "").Summary, "没做完", "aborted summary")
@@ -203,36 +203,36 @@ func TestClip(t *testing.T) {
 	testkit.Eq(t, str.Clip("abcdefghij", 5), "abcd…", "cut")
 }
 
-func limitWorker(id, runtime, project string, working bool) protocol.Worker {
+func limitSession(id, runtime, project string, working bool) protocol.Session {
 	phase := protocol.Phase{Value: protocol.PhaseRipe{}}
 	if working {
 		phase = protocol.Phase{Value: protocol.PhaseWorking{Doing: thinking}}
 	}
-	return protocol.Worker{ID: id, Name: id, Agent: "zhou", Runtime: runtime, Project: &project, Phase: phase}
+	return protocol.Session{ID: id, Name: id, Agent: "zhou", Runtime: runtime, Project: &project, Phase: phase}
 }
 
 func TestRoomOnTheFarm(t *testing.T) {
-	limits := workerLimits{Workspace: 3, PerRuntime: 2, PerProject: 2}
-	h := limitWorker
+	limits := sessionLimits{Workspace: 3, PerRuntime: 2, PerProject: 2}
+	h := limitSession
 	testkit.Eq(t, noRoom(nil, "pi", "a", limits, ""), "", "empty farm")
-	testkit.Match(t, noRoom([]protocol.Worker{h("w1", "pi", "a", true), h("w2", "claude", "b", true), h("w3", "codex", "c", true)}, "pi", "a", limits, ""), `已经有 3 个帮工在干活了`, "farm")
-	testkit.Match(t, noRoom([]protocol.Worker{h("w1", "pi", "a", true), h("w2", "pi", "b", true)}, "pi", "c", limits, ""), `最多同时 2 个（在 Runtime 页面可以改）`, "runtime")
-	testkit.Match(t, noRoom([]protocol.Worker{h("w1", "pi", "a", true), h("w2", "claude", "a", true)}, "codex", "a", limits, ""), `项目 a 里已经有 2 个帮工在干活`, "project")
+	testkit.Match(t, noRoom([]protocol.Session{h("w1", "pi", "a", true), h("w2", "claude", "b", true), h("w3", "codex", "c", true)}, "pi", "a", limits, ""), `已经有 3 个帮工在干活了`, "farm")
+	testkit.Match(t, noRoom([]protocol.Session{h("w1", "pi", "a", true), h("w2", "pi", "b", true)}, "pi", "c", limits, ""), `最多同时 2 个（在 Runtime 页面可以改）`, "runtime")
+	testkit.Match(t, noRoom([]protocol.Session{h("w1", "pi", "a", true), h("w2", "claude", "a", true)}, "codex", "a", limits, ""), `项目 a 里已经有 2 个帮工在干活`, "project")
 
-	two := []protocol.Worker{h("w1", "pi", "a", true), h("w2", "pi", "a", true)}
-	testkit.Eq(t, noRoom([]protocol.Worker{h("w1", "pi", "a", false), h("w2", "pi", "a", false)}, "pi", "a", limits, ""), "", "only working count")
+	two := []protocol.Session{h("w1", "pi", "a", true), h("w2", "pi", "a", true)}
+	testkit.Eq(t, noRoom([]protocol.Session{h("w1", "pi", "a", false), h("w2", "pi", "a", false)}, "pi", "a", limits, ""), "", "only working count")
 	if noRoom(two, "pi", "a", limits, "") == "" {
 		t.Fatal("two working fill it")
 	}
-	testkit.Eq(t, noRoom(two, "pi", "a", workerLimits{Workspace: 6}, ""), "", "0 is no cap")
-	testkit.Eq(t, noRoom(two, "pi", "a", workerLimits{Workspace: 3, PerRuntime: 3, PerProject: 3}, "w1"), "", "not against itself")
+	testkit.Eq(t, noRoom(two, "pi", "a", sessionLimits{Workspace: 6}, ""), "", "0 is no cap")
+	testkit.Eq(t, noRoom(two, "pi", "a", sessionLimits{Workspace: 3, PerRuntime: 3, PerProject: 3}, "w1"), "", "not against itself")
 }
 
-func TestWorkerName(t *testing.T) {
-	h := limitWorker
-	testkit.Eq(t, workerName(nil, "zhou", "老周"), "老周", "first")
-	testkit.Eq(t, workerName([]protocol.Worker{h("w1", "pi", "a", true)}, "zhou", "老周"), "老周 2", "second")
-	testkit.Eq(t, workerName([]protocol.Worker{h("w1", "pi", "a", true), h("w2", "pi", "a", true)}, "zhou", "老周"), "老周 3", "third")
+func TestSessionName(t *testing.T) {
+	h := limitSession
+	testkit.Eq(t, sessionName(nil, "zhou", "老周"), "老周", "first")
+	testkit.Eq(t, sessionName([]protocol.Session{h("w1", "pi", "a", true)}, "zhou", "老周"), "老周 2", "second")
+	testkit.Eq(t, sessionName([]protocol.Session{h("w1", "pi", "a", true), h("w2", "pi", "a", true)}, "zhou", "老周"), "老周 3", "third")
 }
 
 func TestChooseAgent(t *testing.T) {

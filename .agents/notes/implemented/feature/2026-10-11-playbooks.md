@@ -28,7 +28,7 @@ Status: implemented
 - **服务端**：`server/internal/playbook/playbook.go` 听工地事实，一次只做一件事。管家多了五个工具（`plan`、`playbooks`、`plan_edit`、`plan_action`、`node_action`），计划里帮工的汇报不再转给管家，只在要人拿主意时由计划告诉它。
 - **页面**：院子里的图纸桌（或农场手机上的「计划」）打开计划板，步骤按先后分列，每步一张卡片，最下面是计划的经过。
 - **经过**：计划只经服务端的一个 `put` 写。每写一次，和写之前比一比（protocol 的 `PlaybookChanges`），变了什么记一行，带是谁做的（主人、管家、农场）和为什么，存在田头的数据库里（`playbook_event`，`server/internal/playbook/log.go`）。事实里仍是整个计划的快照；经过是另存的，回答「这一步怎么走到这里的、工单被谁改过」。
-- **规划的规矩**（`server/internal/worker/rules.go` 的 `PlanningTask`）：不互相依赖的步骤改不同的文件；别拆成一条串行的长链，有先后的按阶段分组。
+- **规划的规矩**（`server/internal/session/rules.go` 的 `PlanningTask`）：不互相依赖的步骤改不同的文件；别拆成一条串行的长链，有先后的按阶段分组。
 
 行为细节见 [docs/reference/server.md](../../../../docs/reference/server.md)「种植计划」和 [docs/reference/farm-ui.md](../../../../docs/reference/farm-ui.md) 界面 18。
 

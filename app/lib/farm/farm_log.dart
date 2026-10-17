@@ -149,7 +149,7 @@ class FarmLog extends ConsumerWidget {
                 const SizedBox(width: 10),
                 ...switch (row) {
                   _SaidRow(:final message) => _said(message, look),
-                  _ReportRow(:final report) => _report(report, issueOfWorker(s, report.worker ?? report.from)),
+                  _ReportRow(:final report) => _report(report, issueOfSession(s, report.session ?? report.from)),
                 },
               ],
             ),

@@ -12,15 +12,15 @@ var Achievements []AchievementDef
 var seedsJSON []byte
 
 var seeds struct {
-	Agents          []Agent                 `json:"agents"`
-	DefaultSettings RuntimeSettings         `json:"defaultSettings"`
-	ExampleSkills   []Skill                 `json:"exampleSkills"`
-	Achievements    []AchievementDef        `json:"achievements"`
-	RuntimePresets  []RuntimePreset         `json:"runtimePresets"`
-	FallbackPreset  RuntimePreset           `json:"fallbackPreset"`
-	RuntimeFacts    map[string]RuntimeFacts `json:"runtimeFacts"`
-	RuntimeIDs      []string                `json:"runtimeIds"`
-	ActionText      map[WorkerAction]string `json:"actionText"`
+	Agents          []Agent                  `json:"agents"`
+	DefaultSettings RuntimeSettings          `json:"defaultSettings"`
+	ExampleSkills   []Skill                  `json:"exampleSkills"`
+	Achievements    []AchievementDef         `json:"achievements"`
+	RuntimePresets  []RuntimePreset          `json:"runtimePresets"`
+	FallbackPreset  RuntimePreset            `json:"fallbackPreset"`
+	RuntimeFacts    map[string]RuntimeFacts  `json:"runtimeFacts"`
+	RuntimeIDs      []string                 `json:"runtimeIds"`
+	ActionText      map[SessionAction]string `json:"actionText"`
 }
 
 func init() {

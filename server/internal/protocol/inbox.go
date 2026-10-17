@@ -1,6 +1,6 @@
 package protocol
 
-// A playbook's own workers leave their finished, failed and conflicted work to the playbook, which asks in their place; a quiet one still asks.
+// A playbook's own sessions leave their finished, failed and conflicted work to the playbook, which asks in their place; a quiet one still asks.
 
 import (
 	"cmp"
@@ -35,7 +35,7 @@ func InboxEntries(state CoreState) []InboxEntry {
 	chat := state.Chat
 	general := conversationID(GeneralOf(chat))
 	out := []InboxEntry{}
-	for _, h := range state.Workers {
+	for _, h := range state.Sessions {
 		need := NeedOf(h)
 		if need == nil || need.Kind == "retrying" || (h.Playbook != nil && need.Kind != "quiet") {
 			continue
@@ -45,8 +45,8 @@ func InboxEntries(state CoreState) []InboxEntry {
 			c := *h.Channel
 			channel = &c
 		}
-		from := InboxFrom{InboxFromWorker{ID: h.ID, Name: h.Name, Agent: h.Agent}}
-		target := InboxTarget{InboxTargetWorker{ID: h.ID}}
+		from := InboxFrom{InboxFromSession{ID: h.ID, Name: h.Name, Agent: h.Agent}}
+		target := InboxTarget{InboxTargetSession{ID: h.ID}}
 		at := h.HiredAt
 		summary := h.Task
 		if h.LastRun != nil {
@@ -145,12 +145,12 @@ func InboxEntries(state CoreState) []InboxEntry {
 					continue
 				}
 				from := manager
-				if m.FromKind == SenderKindWorker {
+				if m.FromKind == SenderKindAgent {
 					agent := ""
 					if m.Agent != nil {
 						agent = *m.Agent
 					}
-					from = InboxFrom{InboxFromWorker{ID: m.From, Name: m.Name, Agent: agent}}
+					from = InboxFrom{InboxFromSession{ID: m.From, Name: m.Name, Agent: agent}}
 				}
 				since := m.At
 				out = append(out, InboxEntry{

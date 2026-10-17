@@ -150,7 +150,7 @@ class ChatParentMessage extends StatelessWidget {
                 TextSpan(
                   children: [
                     TextSpan(text: message.name),
-                    if (message.fromKind == SenderKind.worker)
+                    if (message.fromKind == SenderKind.agent)
                       TextSpan(
                         text: ' @${message.from}',
                         style: KitText.mono.copyWith(color: Palette.bark500),

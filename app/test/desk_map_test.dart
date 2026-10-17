@@ -13,7 +13,7 @@ import 'support/farm.dart';
 
 const _working = PhaseWorking(
   since: 0,
-  doing: Doing(action: WorkerAction.editFile, label: 'src/a.ts'),
+  doing: Doing(action: SessionAction.editFile, label: 'src/a.ts'),
 );
 
 ProjectSummary _project(String name, {double? last, double slots = 3}) => ProjectSummary(name: name, path: "/work/$name", git: true, last: last, slots: slots);
@@ -25,13 +25,13 @@ Issue _todo(String id, String project, {double? queuedAt}) => Issue(
   priority: Priority.medium,
   createdAt: 0,
   queuedAt: queuedAt,
-  workers: const [],
+  sessions: const [],
   status: queuedAt == null ? IssueStatus.backlog : IssueStatus.todo,
 );
 
-Worker _hired(String id, String? project, Phase phase, {double at = 0, Conflict? conflict, String? branch, String? name}) {
-  final h = worker(id, name: name ?? '帮工$id', project: project, phase: phase, conflict: conflict, branch: branch);
-  return Worker(
+Session _hired(String id, String? project, Phase phase, {double at = 0, Conflict? conflict, String? branch, String? name}) {
+  final h = session(id, name: name ?? '帮工$id', project: project, phase: phase, conflict: conflict, branch: branch);
+  return Session(
     id: h.id,
     name: h.name,
     agent: h.agent,
@@ -49,7 +49,7 @@ Worker _hired(String id, String? project, Phase phase, {double at = 0, Conflict?
 List<String> _kinds(Island i) => [
   for (final s in i.spots)
     switch (s) {
-      SpotTaken(:final worker) => worker.id,
+      SpotTaken(:final session) => session.id,
       SpotOpen() => 'open',
       SpotShut() => 'shut',
     },
@@ -62,7 +62,7 @@ void main() {
     test('worktrees in the order the helpers came, then the room the project and the farm leave', () {
       final islands = islandsOf(
         projects: projects,
-        workers: [
+        sessions: [
           _hired('w2', 'clock-in', const PhaseRipe(), at: 2),
           _hired('w1', 'clock-in', _working, at: 1),
           _hired('w4', 'clock-in', const PhaseResting(), at: 4),
@@ -84,7 +84,7 @@ void main() {
       expect(_kinds(islands[2]), ['open', 'open', 'open']);
       expect(
         [
-          for (final h in homeless([..._workersOf(islands), _hired('w3', null, const PhaseFailed())])) h.id,
+          for (final h in homeless([..._sessionsOf(islands), _hired('w3', null, const PhaseFailed())])) h.id,
         ],
         ['w3'],
       );
@@ -94,7 +94,7 @@ void main() {
     test('a full project has no room; when every bed is working, its slots are shut', () {
       final full = islandsOf(
         projects: projects,
-        workers: [
+        sessions: [
           for (final id in ['a', 'b', 'c']) _hired(id, 'clock-in', _working),
         ],
         plots: const {},
@@ -106,7 +106,7 @@ void main() {
 
       final busyFarm = islandsOf(
         projects: projects,
-        workers: [for (var i = 0; i < 6; i++) _hired('h$i', i.isEven ? 'clock-in' : 'docs', _working)],
+        sessions: [for (var i = 0; i < 6; i++) _hired('h$i', i.isEven ? 'clock-in' : 'docs', _working)],
         plots: const {},
         issues: const [],
       );
@@ -114,7 +114,7 @@ void main() {
     });
 
     test('a project gone from the list keeps its helpers and takes no more', () {
-      final gone = islandsOf(projects: const [], workers: [_hired('w1', 'old', const PhaseRipe())], plots: const {}, issues: const []).single;
+      final gone = islandsOf(projects: const [], sessions: [_hired('w1', 'old', const PhaseRipe())], plots: const {}, issues: const []).single;
       expect(gone.summary, isNull);
       expect(_kinds(gone), ['w1']);
       expect(islandText(gone), '不在工作目录里了');
@@ -123,7 +123,7 @@ void main() {
     test('a yard holds six plots at most', () {
       final crowded = islandsOf(
         projects: [_project('big', slots: 6)],
-        workers: [for (var i = 0; i < 5; i++) _hired('r$i', 'big', const PhaseResting())],
+        sessions: [for (var i = 0; i < 5; i++) _hired('r$i', 'big', const PhaseResting())],
         plots: const {},
         issues: const [],
       ).single;
@@ -168,7 +168,7 @@ void main() {
             'p',
             const PhaseWorking(
               since: 0,
-              doing: Doing(action: WorkerAction.thinking, label: ''),
+              doing: Doing(action: SessionAction.thinking, label: ''),
             ),
           ),
         ),
@@ -219,13 +219,13 @@ void main() {
       ],
     });
     final state = farm(
-      workers: [
+      sessions: [
         _hired('w1', 'clock-in', _working, branch: 'vibevalley/w1-tests', name: '测试小吴'),
         _hired('w2', 'clock-in', const PhaseRipe(), at: 1, branch: 'vibevalley/w2-makeup'),
         _hired('w5', 'docs', _working),
       ],
       issues: [
-        const Issue(id: 'b1', title: '写周报', project: 'docs', priority: Priority.medium, createdAt: 0, queuedAt: 5, workers: [], status: IssueStatus.todo),
+        const Issue(id: 'b1', title: '写周报', project: 'docs', priority: Priority.medium, createdAt: 0, queuedAt: 5, sessions: [], status: IssueStatus.todo),
       ],
     );
     final went = <String>[];
@@ -314,4 +314,4 @@ void main() {
   });
 }
 
-Iterable<Worker> _workersOf(List<Island> islands) => islands.expand((i) => i.workers);
+Iterable<Session> _sessionsOf(List<Island> islands) => islands.expand((i) => i.sessions);

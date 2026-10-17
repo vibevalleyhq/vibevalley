@@ -8,21 +8,21 @@ import (
 	"vibevalley/internal/testkit"
 )
 
-func TestBedsTheNextWorkerTakesThePlantedBed(t *testing.T) {
+func TestBedsTheNextSessionTakesThePlantedBed(t *testing.T) {
 	f := gameOpen(t, t.TempDir())
 	defer f.Close()
 	if err := f.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	stationOf := func(id string) int64 {
-		h := protocol.WorkerOf(f.Core.State(), id)
+		h := protocol.SessionOf(f.Core.State(), id)
 		if h == nil {
 			return -2
 		}
 		return protocol.PlayOf(*h).Station
 	}
 	hire := func(id string) {
-		f.Core.Apply(protocol.FactHired{Worker: protocol.Worker{ID: id, Name: id, Agent: "lab", Runtime: "pi", Phase: protocol.Phase{Value: protocol.PhaseArriving{}}}})
+		f.Core.Apply(protocol.FactHired{Session: protocol.Session{ID: id, Name: id, Agent: "lab", Runtime: "pi", Phase: protocol.Phase{Value: protocol.PhaseArriving{}}}})
 	}
 
 	f.Game.Want(4)

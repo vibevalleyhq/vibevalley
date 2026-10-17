@@ -9,9 +9,9 @@ import (
 func TestStationOnlyToAFreeBed(t *testing.T) {
 	state := EmptyCoreState()
 	for _, id := range []string{"w1", "w2"} {
-		state, _ = Reduce(state, Fact{FactHired{At: 1, Worker: Worker{ID: id, Name: id, Phase: Phase{PhaseArriving{}}}}})
+		state, _ = Reduce(state, Fact{FactHired{At: 1, Session: Session{ID: id, Name: id, Phase: Phase{PhaseArriving{}}}}})
 	}
-	stationOf := func(s CoreState, id string) int64 { return PlayOf(*WorkerOf(s, id)).Station }
+	stationOf := func(s CoreState, id string) int64 { return PlayOf(*SessionOf(s, id)).Station }
 	testkit.Eq(t, stationOf(state, "w1"), int64(0))
 	testkit.Eq(t, stationOf(state, "w2"), int64(1))
 

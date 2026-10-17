@@ -41,7 +41,7 @@ class TitleOpen extends Notifier<bool> {
   void show() => state = true;
 }
 
-bool hasFarm(CoreState? farm) => farm != null && (farm.workers.isNotEmpty || (farm.chat?.messages.length ?? 0) > 0 || (farm.progress?.coins ?? 0) > 0);
+bool hasFarm(CoreState? farm) => farm != null && (farm.sessions.isNotEmpty || (farm.chat?.messages.length ?? 0) > 0 || (farm.progress?.coins ?? 0) > 0);
 
 bool managerReady(SettingsStatus? status) => status?.deepseekApiKey.source != null;
 

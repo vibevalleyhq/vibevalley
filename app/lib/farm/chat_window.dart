@@ -179,7 +179,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
     final thread = shown?.kind == ConversationKind.thread ? shown : null;
     final phase = chatPhaseOf(widget.call, s);
     final unread = unreadTotal(chat);
-    _naming.all = nameables(s.workers, nowMs());
+    _naming.all = nameables(s.sessions, nowMs());
     if (shown?.id != _shownId) {
       _shownId = shown?.id;
       if (_scroll.hasClients) _scroll.jumpTo(0);
@@ -347,11 +347,11 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
   Widget _threadHeader(Chat? chat, Conversation thread, bool large) {
     final channel = channelOf(chat, thread);
     final backTo = channel?.kind == ConversationKind.channel ? channel!.id : null;
-    final worker = thread.subjectKind == SubjectKind.issue ? widget.state.workers.where((h) => h.id == thread.subjectId).firstOrNull : null;
+    final session = thread.subjectKind == SubjectKind.issue ? widget.state.sessions.where((h) => h.id == thread.subjectId).firstOrNull : null;
     final said = messagesIn(chat, thread.id).where((m) => m.from == thread.subjectId).firstOrNull?.name;
-    final title = thread.subjectKind == SubjectKind.issue ? '${worker?.name ?? said ?? thread.subjectId ?? ''}的工单串' : '串';
-    final status = worker != null
-        ? phaseText(worker, nowMs())
+    final title = thread.subjectKind == SubjectKind.issue ? '${session?.name ?? said ?? thread.subjectId ?? ''}的工单串' : '串';
+    final status = session != null
+        ? phaseText(session, nowMs())
         : thread.subjectKind == SubjectKind.issue
         ? '它已经离开农场，串还留着'
         : '${idText(thread.replies)} 条回复';
@@ -367,12 +367,12 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
               Flexible(
                 child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
               ),
-              if (worker != null) ...[
+              if (session != null) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   color: Palette.cream200,
-                  child: Text('@${worker.id}', style: KitText.mono.copyWith(color: Palette.bark600)),
+                  child: Text('@${session.id}', style: KitText.mono.copyWith(color: Palette.bark600)),
                 ),
               ],
               _inHeader(_NewElsewhere(chat: chat, except: thread.id, onShow: _show)),
@@ -468,7 +468,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
   Widget _face(ChatMessage m, double size) => switch (m.fromKind) {
     SenderKind.user => OwnerFace(size: size),
     SenderKind.manager => ManagerFace(atlas: widget.atlas, size: size),
-    SenderKind.worker ||
+    SenderKind.agent ||
     SenderKind.system => AnimalFace(atlas: widget.atlas, look: lookOf(widget.agents[m.agent], m.agent ?? m.from, widget.atlas.has), size: size),
   };
 
@@ -501,7 +501,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
             message: m,
             first: first,
             face: _face(m, 30),
-            steps: steps != null && m.final_ && m.fromKind == SenderKind.worker ? steps(context, m.from, m.at, manager: false) : null,
+            steps: steps != null && m.final_ && m.fromKind == SenderKind.agent ? steps(context, m.from, m.at, manager: false) : null,
           );
         }
         final chip = thread == null ? null : ChatThreadChip(thread: thread, unread: unreadIn(widget.state.chat, thread), onTap: () => _show(thread.id));
@@ -558,7 +558,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
 
   Widget _composer(Conversation? conversation, Conversation? thread, ChatPhase phase, {required bool open, required bool unread}) {
     final voiceOn = widget.call.phase == CallPhase.live;
-    final owner = thread?.subjectKind == SubjectKind.issue ? widget.state.workers.where((h) => h.id == thread!.subjectId).firstOrNull : null;
+    final owner = thread?.subjectKind == SubjectKind.issue ? widget.state.sessions.where((h) => h.id == thread!.subjectId).firstOrNull : null;
     final placeholder = thread != null
         ? (owner != null ? '在串里说，${owner.name}会看到…' : '在串里说…')
         : voiceOn
@@ -657,7 +657,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
     );
   }
 
-  Widget _senderName(ChatMessage m) => m.fromKind != SenderKind.worker
+  Widget _senderName(ChatMessage m) => m.fromKind != SenderKind.agent
       ? Text(m.name)
       : Text.rich(
           TextSpan(

@@ -29,7 +29,7 @@ type Need struct {
 	Retry    *Retry
 }
 
-func NeedOf(h Worker) *Need {
+func NeedOf(h Session) *Need {
 	switch p := h.Phase.Value.(type) {
 	case PhaseWorking:
 		if p.QuietSince != nil {
@@ -53,8 +53,8 @@ func NeedOf(h Worker) *Need {
 	return nil
 }
 
-func ripeCrop(h Worker) Crop {
-	// The same worker ripens to the same crop every time.
+func ripeCrop(h Session) Crop {
+	// The same session ripens to the same crop every time.
 	f := fnv.New32a()
 	f.Write([]byte(h.ID))
 	if f.Sum32()%2 == 1 {
@@ -63,7 +63,7 @@ func ripeCrop(h Worker) Crop {
 	return CropWheat
 }
 
-func growth(h Worker) Crop {
+func growth(h Session) Crop {
 	play := PlayOf(h)
 	since := h.HiredAt
 	if play.RunStartedAt != nil {
@@ -74,9 +74,9 @@ func growth(h Worker) Crop {
 		if step.At < since {
 			continue
 		}
-		if step.Action == WorkerActionEditFile && crop == CropSprout {
+		if step.Action == SessionActionEditFile && crop == CropSprout {
 			crop = CropLeafy
-		} else if step.Action == WorkerActionRunCommand && crop == CropLeafy {
+		} else if step.Action == SessionActionRunCommand && crop == CropLeafy {
 			crop = CropFlowering
 		}
 	}
@@ -94,7 +94,7 @@ var (
 
 func badge(b Badge) *Badge { return &b }
 
-func PlotOfWorker(h Worker) PlotView {
+func PlotOfSession(h Session) PlotView {
 	need := NeedOf(h)
 	conflict := need != nil && need.Kind == "conflict"
 	switch h.Phase.Value.(type) {
@@ -152,28 +152,28 @@ func EffectsOf(before CoreState, fact Fact) []GameEffect {
 		}
 		var out []GameEffect
 		if f.News.Coins != nil && *f.News.Coins != 0 {
-			worker := ""
-			if f.News.Worker != nil {
-				worker = *f.News.Worker
+			session := ""
+			if f.News.Session != nil {
+				session = *f.News.Session
 			}
-			out = append(out, GameEffect{GameEffectReward{WorkerID: worker, Coins: *f.News.Coins, Streak: f.Progress.Streak}})
+			out = append(out, GameEffect{GameEffectReward{SessionID: session, Coins: *f.News.Coins, Streak: f.Progress.Streak}})
 		}
 		for _, u := range f.News.Unlocked {
 			out = append(out, GameEffect{GameEffectAchievement{Achievement: u.ID, Tier: u.Tier}})
 		}
 		return out
 	case FactReport:
-		if f.Outcome == OutcomeFailed && WorkerOf(before, f.ID) != nil {
-			return []GameEffect{{GameEffectPenalty{WorkerID: f.ID}}}
+		if f.Outcome == OutcomeFailed && SessionOf(before, f.ID) != nil {
+			return []GameEffect{{GameEffectPenalty{SessionID: f.ID}}}
 		}
 	}
 	return nil
 }
 
 func ViewOf(state CoreState) FarmView {
-	plots := make(map[string]PlotView, len(state.Workers))
-	for _, h := range state.Workers {
-		plots[h.ID] = PlotOfWorker(h)
+	plots := make(map[string]PlotView, len(state.Sessions))
+	for _, h := range state.Sessions {
+		plots[h.ID] = PlotOfSession(h)
 	}
 	return FarmView{Level: FarmLevelOf(state), Plots: plots}
 }

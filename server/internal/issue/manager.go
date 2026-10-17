@@ -1,7 +1,7 @@
 package issue
 
-// An issue for the manager (protocol.ManagerAgent) is handed to the manager, not to a worker. It is open while the manager works on it and
-// closed as answered once it has; a run of it is the manager's (worker.Service.OpenRun).
+// An issue for the manager (protocol.ManagerAgent) is handed to the manager, not to a session. It is open while the manager works on it and
+// closed as answered once it has; a run of it is the manager's (session.Service.OpenRun).
 
 import (
 	"context"

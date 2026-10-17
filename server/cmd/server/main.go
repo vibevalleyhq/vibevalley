@@ -59,14 +59,14 @@ func main() {
 	if err := f.Start(ctx); err != nil {
 		log.Fatal(err)
 	}
-	// host is 127.0.0.1 unless set: workers run without permission prompts, so the farm is never for the network.
+	// host is 127.0.0.1 unless set: sessions run without permission prompts, so the farm is never for the network.
 	listener, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)))
 	if err != nil {
 		log.Fatal(fmt.Errorf("vibevalley: %w", err))
 	}
-	f.Worker.SetAddress(listener.Addr().String())
+	f.Session.SetAddress(listener.Addr().String())
 	// Requests share the server's context: stopping ends the pages' event streams, which never end on their own, so
-	// the farm saves (state.json, workers.json, the database) without waiting for them.
+	// the farm saves (state.json, sessions.json, the database) without waiting for them.
 	server := &http.Server{Handler: answer, BaseContext: func(net.Listener) context.Context { return ctx }}
 	done := make(chan struct{})
 	go func() {

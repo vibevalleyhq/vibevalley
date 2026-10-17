@@ -19,7 +19,7 @@ const everyone = 'everyone';
 /// The channel everyone is in.
 const generalName = '田头';
 
-/// Workers working at once; also the beds on the farm.
+/// Sessions working at once; also the beds on the farm.
 const maxRunning = 6;
 
 /// Times are Unix milliseconds.
@@ -279,7 +279,7 @@ enum ManagerState {
 enum SenderKind {
   user('user'),
   manager('manager'),
-  worker('worker'),
+  agent('agent'),
   system('system');
 
   const SenderKind(this.wire);
@@ -334,7 +334,7 @@ class ChatMessage {
     required this.text,
     required this.final_,
     this.mentions,
-    this.worker,
+    this.session,
     this.outcome,
     this.spent,
     required this.at,
@@ -351,7 +351,7 @@ class ChatMessage {
     text: j['text'] as String,
     final_: j['final'] as bool,
     mentions: j['mentions'] == null ? null : [for (final e in j['mentions'] as List) e as String],
-    worker: j['worker'] == null ? null : j['worker'] as String,
+    session: j['session'] == null ? null : j['session'] as String,
     outcome: j['outcome'] == null ? null : Outcome.fromJson(j['outcome']),
     spent: j['spent'] == null ? null : Spent.fromJson(j['spent'] as Map<String, dynamic>),
     at: (j['at'] as num).toDouble(),
@@ -367,7 +367,7 @@ class ChatMessage {
   final String text;
   final bool final_;
   final List<String>? mentions;
-  final String? worker;
+  final String? session;
   final Outcome? outcome;
   final Spent? spent;
   final double at;
@@ -383,7 +383,7 @@ class ChatMessage {
     'text': text,
     'final': final_,
     if (mentions != null) 'mentions': [for (final e in mentions!) e],
-    if (worker != null) 'worker': worker!,
+    if (session != null) 'session': session!,
     if (outcome != null) 'outcome': outcome!.wire,
     if (spent != null) 'spent': spent!.toJson(),
     'at': at,
@@ -491,7 +491,7 @@ class Conflict {
   };
 }
 
-enum WorkerAction {
+enum SessionAction {
   runCommand('run_command'),
   readFile('read_file'),
   editFile('edit_file'),
@@ -504,18 +504,18 @@ enum WorkerAction {
   speakingText('speaking_text'),
   none('none');
 
-  const WorkerAction(this.wire);
+  const SessionAction(this.wire);
   final String wire;
 
-  static WorkerAction fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('WorkerAction: unknown value', v));
+  static SessionAction fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('SessionAction: unknown value', v));
 }
 
 class Doing {
   const Doing({required this.action, required this.label});
 
-  factory Doing.fromJson(Map<String, dynamic> j) => Doing(action: WorkerAction.fromJson(j['action']), label: j['label'] as String);
+  factory Doing.fromJson(Map<String, dynamic> j) => Doing(action: SessionAction.fromJson(j['action']), label: j['label'] as String);
 
-  final WorkerAction action;
+  final SessionAction action;
   final String label;
 
   Map<String, dynamic> toJson() => {'action': action.wire, 'label': label};
@@ -555,10 +555,10 @@ class LastRun {
   Map<String, dynamic> toJson() => {'outcome': outcome.wire, 'summary': summary, 'at': at, if (spent != null) 'spent': spent!.toJson()};
 }
 
-class WorkerPlaybook {
-  const WorkerPlaybook({required this.id, this.node});
+class SessionPlaybook {
+  const SessionPlaybook({required this.id, this.node});
 
-  factory WorkerPlaybook.fromJson(Map<String, dynamic> j) => WorkerPlaybook(id: j['id'] as String, node: j['node'] == null ? null : j['node'] as String);
+  factory SessionPlaybook.fromJson(Map<String, dynamic> j) => SessionPlaybook(id: j['id'] as String, node: j['node'] == null ? null : j['node'] as String);
 
   final String id;
   final String? node;
@@ -570,17 +570,17 @@ class ActionStep {
   const ActionStep({required this.at, required this.action, required this.label});
 
   factory ActionStep.fromJson(Map<String, dynamic> j) =>
-      ActionStep(at: (j['at'] as num).toDouble(), action: WorkerAction.fromJson(j['action']), label: j['label'] as String);
+      ActionStep(at: (j['at'] as num).toDouble(), action: SessionAction.fromJson(j['action']), label: j['label'] as String);
 
   final double at;
-  final WorkerAction action;
+  final SessionAction action;
   final String label;
 
   Map<String, dynamic> toJson() => {'at': at, 'action': action.wire, 'label': label};
 }
 
-class WorkerPlay {
-  const WorkerPlay({
+class SessionPlay {
+  const SessionPlay({
     required this.station,
     required this.history,
     required this.toolsThisRun,
@@ -590,7 +590,7 @@ class WorkerPlay {
     this.runStartedAt,
   });
 
-  factory WorkerPlay.fromJson(Map<String, dynamic> j) => WorkerPlay(
+  factory SessionPlay.fromJson(Map<String, dynamic> j) => SessionPlay(
     station: (j['station'] as num).toDouble(),
     history: [for (final e in j['history'] as List) ActionStep.fromJson(e as Map<String, dynamic>)],
     toolsThisRun: (j['toolsThisRun'] as num).toDouble(),
@@ -619,8 +619,8 @@ class WorkerPlay {
   };
 }
 
-class Worker {
-  const Worker({
+class Session {
+  const Session({
     required this.id,
     required this.name,
     required this.agent,
@@ -642,7 +642,7 @@ class Worker {
     this.phaseText,
   });
 
-  factory Worker.fromJson(Map<String, dynamic> j) => Worker(
+  factory Session.fromJson(Map<String, dynamic> j) => Session(
     id: j['id'] as String,
     name: j['name'] as String,
     agent: j['agent'] as String,
@@ -657,9 +657,9 @@ class Worker {
     phase: Phase.fromJson(j['phase'] as Map<String, dynamic>),
     lastRun: j['lastRun'] == null ? null : LastRun.fromJson(j['lastRun'] as Map<String, dynamic>),
     spent: j['spent'] == null ? null : Spent.fromJson(j['spent'] as Map<String, dynamic>),
-    playbook: j['playbook'] == null ? null : WorkerPlaybook.fromJson(j['playbook'] as Map<String, dynamic>),
+    playbook: j['playbook'] == null ? null : SessionPlaybook.fromJson(j['playbook'] as Map<String, dynamic>),
     channel: j['channel'] == null ? null : (j['channel'] as num).toDouble(),
-    play: j['play'] == null ? null : WorkerPlay.fromJson(j['play'] as Map<String, dynamic>),
+    play: j['play'] == null ? null : SessionPlay.fromJson(j['play'] as Map<String, dynamic>),
     issue: j['issue'] == null ? null : j['issue'] as String,
     phaseText: j['phaseText'] == null ? null : j['phaseText'] as String,
   );
@@ -678,9 +678,9 @@ class Worker {
   final Phase phase;
   final LastRun? lastRun;
   final Spent? spent;
-  final WorkerPlaybook? playbook;
+  final SessionPlaybook? playbook;
   final double? channel;
-  final WorkerPlay? play;
+  final SessionPlay? play;
   final String? issue;
   final String? phaseText;
 
@@ -762,7 +762,7 @@ class PlaybookNode {
     this.acceptance,
     this.frozen,
     required this.state,
-    this.worker,
+    this.session,
     this.conclusion,
     this.commits,
     this.spent,
@@ -782,7 +782,7 @@ class PlaybookNode {
     acceptance: j['acceptance'] == null ? null : j['acceptance'] as bool,
     frozen: j['frozen'] == null ? null : [for (final e in j['frozen'] as List) e as String],
     state: NodeState.fromJson(j['state']),
-    worker: j['worker'] == null ? null : j['worker'] as String,
+    session: j['session'] == null ? null : j['session'] as String,
     conclusion: j['conclusion'] == null ? null : j['conclusion'] as String,
     commits: j['commits'] == null ? null : [for (final e in j['commits'] as List) e as String],
     spent: j['spent'] == null ? null : Spent.fromJson(j['spent'] as Map<String, dynamic>),
@@ -801,7 +801,7 @@ class PlaybookNode {
   final bool? acceptance;
   final List<String>? frozen;
   final NodeState state;
-  final String? worker;
+  final String? session;
   final String? conclusion;
   final List<String>? commits;
   final Spent? spent;
@@ -820,7 +820,7 @@ class PlaybookNode {
     if (acceptance != null) 'acceptance': acceptance!,
     if (frozen != null) 'frozen': [for (final e in frozen!) e],
     'state': state.wire,
-    if (worker != null) 'worker': worker!,
+    if (session != null) 'session': session!,
     if (conclusion != null) 'conclusion': conclusion!,
     if (commits != null) 'commits': [for (final e in commits!) e],
     if (spent != null) 'spent': spent!.toJson(),
@@ -977,21 +977,21 @@ class Progress {
 }
 
 class ProgressNews {
-  const ProgressNews({this.coins, this.worker, this.unlocked});
+  const ProgressNews({this.coins, this.session, this.unlocked});
 
   factory ProgressNews.fromJson(Map<String, dynamic> j) => ProgressNews(
     coins: j['coins'] == null ? null : (j['coins'] as num).toDouble(),
-    worker: j['worker'] == null ? null : j['worker'] as String,
+    session: j['session'] == null ? null : j['session'] as String,
     unlocked: j['unlocked'] == null ? null : [for (final e in j['unlocked'] as List) Unlock.fromJson(e as Map<String, dynamic>)],
   );
 
   final double? coins;
-  final String? worker;
+  final String? session;
   final List<Unlock>? unlocked;
 
   Map<String, dynamic> toJson() => {
     if (coins != null) 'coins': coins!,
-    if (worker != null) 'worker': worker!,
+    if (session != null) 'session': session!,
     if (unlocked != null) 'unlocked': [for (final e in unlocked!) e.toJson()],
   };
 }
@@ -1097,7 +1097,7 @@ class CoreState {
     required this.call,
     this.callReason,
     required this.manager,
-    required this.workers,
+    required this.sessions,
     this.chat,
     this.commits,
     this.progress,
@@ -1109,7 +1109,7 @@ class CoreState {
     call: CallState.fromJson(j['call']),
     callReason: j['callReason'] == null ? null : j['callReason'] as String,
     manager: ManagerState.fromJson(j['manager']),
-    workers: [for (final e in j['workers'] as List) Worker.fromJson(e as Map<String, dynamic>)],
+    sessions: [for (final e in j['sessions'] as List) Session.fromJson(e as Map<String, dynamic>)],
     chat: j['chat'] == null ? null : Chat.fromJson(j['chat'] as Map<String, dynamic>),
     commits: j['commits'] == null ? null : CommitCount.fromJson(j['commits'] as Map<String, dynamic>),
     progress: j['progress'] == null ? null : Progress.fromJson(j['progress'] as Map<String, dynamic>),
@@ -1120,7 +1120,7 @@ class CoreState {
   final CallState call;
   final String? callReason;
   final ManagerState manager;
-  final List<Worker> workers;
+  final List<Session> sessions;
   final Chat? chat;
   final CommitCount? commits;
   final Progress? progress;
@@ -1131,7 +1131,7 @@ class CoreState {
     'call': call.wire,
     if (callReason != null) 'callReason': callReason!,
     'manager': manager.wire,
-    'workers': [for (final e in workers) e.toJson()],
+    'sessions': [for (final e in sessions) e.toJson()],
     if (chat != null) 'chat': chat!.toJson(),
     if (commits != null) 'commits': commits!.toJson(),
     if (progress != null) 'progress': progress!.toJson(),
@@ -1478,7 +1478,7 @@ sealed class InboxFrom {
   const InboxFrom();
 
   factory InboxFrom.fromJson(Map<String, dynamic> j) => switch (j['kind']) {
-    'worker' => InboxFromWorker.fromJson(j),
+    'session' => InboxFromSession.fromJson(j),
     'manager' => InboxFromManager.fromJson(j),
     final other => throw FormatException('InboxFrom: unknown kind', other),
   };
@@ -1491,7 +1491,7 @@ sealed class InboxTarget {
   const InboxTarget();
 
   factory InboxTarget.fromJson(Map<String, dynamic> j) => switch (j['kind']) {
-    'worker' => InboxTargetWorker.fromJson(j),
+    'session' => InboxTargetSession.fromJson(j),
     'plans' => InboxTargetPlans.fromJson(j),
     'chat' => InboxTargetChat.fromJson(j),
     final other => throw FormatException('InboxTarget: unknown kind', other),
@@ -1709,7 +1709,7 @@ class PlaybookEvent {
     this.node,
     required this.kind,
     required this.actor,
-    this.worker,
+    this.session,
     this.detail,
     this.changes,
     this.commits,
@@ -1723,7 +1723,7 @@ class PlaybookEvent {
     node: j['node'] == null ? null : j['node'] as String,
     kind: PlaybookEventKind.fromJson(j['kind']),
     actor: PlaybookActor.fromJson(j['actor']),
-    worker: j['worker'] == null ? null : j['worker'] as String,
+    session: j['session'] == null ? null : j['session'] as String,
     detail: j['detail'] == null ? null : j['detail'] as String,
     changes: j['changes'] == null ? null : [for (final e in j['changes'] as List) NodeFieldChange.fromJson(e as Map<String, dynamic>)],
     commits: j['commits'] == null ? null : [for (final e in j['commits'] as List) e as String],
@@ -1736,7 +1736,7 @@ class PlaybookEvent {
   final String? node;
   final PlaybookEventKind kind;
   final PlaybookActor actor;
-  final String? worker;
+  final String? session;
   final String? detail;
   final List<NodeFieldChange>? changes;
   final List<String>? commits;
@@ -1749,7 +1749,7 @@ class PlaybookEvent {
     if (node != null) 'node': node!,
     'kind': kind.wire,
     'actor': actor.wire,
-    if (worker != null) 'worker': worker!,
+    if (session != null) 'session': session!,
     if (detail != null) 'detail': detail!,
     if (changes != null) 'changes': [for (final e in changes!) e.toJson()],
     if (commits != null) 'commits': [for (final e in commits!) e],
@@ -2144,7 +2144,7 @@ class Memory {
     required this.kind,
     required this.text,
     this.project,
-    this.worker,
+    this.session,
     required this.at,
     required this.recalled,
     this.recalledAt,
@@ -2157,7 +2157,7 @@ class Memory {
     kind: MemoryKind.fromJson(j['kind']),
     text: j['text'] as String,
     project: j['project'] == null ? null : j['project'] as String,
-    worker: j['worker'] == null ? null : j['worker'] as String,
+    session: j['session'] == null ? null : j['session'] as String,
     at: (j['at'] as num).toDouble(),
     recalled: (j['recalled'] as num).toDouble(),
     recalledAt: j['recalledAt'] == null ? null : (j['recalledAt'] as num).toDouble(),
@@ -2169,7 +2169,7 @@ class Memory {
   final MemoryKind kind;
   final String text;
   final String? project;
-  final String? worker;
+  final String? session;
   final double at;
   final double recalled;
   final double? recalledAt;
@@ -2181,7 +2181,7 @@ class Memory {
     'kind': kind.wire,
     'text': text,
     if (project != null) 'project': project!,
-    if (worker != null) 'worker': worker!,
+    if (session != null) 'session': session!,
     'at': at,
     'recalled': recalled,
     if (recalledAt != null) 'recalledAt': recalledAt!,
@@ -2552,15 +2552,15 @@ class PlanRequest {
 }
 
 class Dispatched {
-  const Dispatched({this.worker, this.queued});
+  const Dispatched({this.session, this.queued});
 
   factory Dispatched.fromJson(Map<String, dynamic> j) =>
-      Dispatched(worker: j['worker'] == null ? null : j['worker'] as String, queued: j['queued'] == null ? null : j['queued'] as String);
+      Dispatched(session: j['session'] == null ? null : j['session'] as String, queued: j['queued'] == null ? null : j['queued'] as String);
 
-  final String? worker;
+  final String? session;
   final String? queued;
 
-  Map<String, dynamic> toJson() => {if (worker != null) 'worker': worker!, if (queued != null) 'queued': queued!};
+  Map<String, dynamic> toJson() => {if (session != null) 'session': session!, if (queued != null) 'queued': queued!};
 }
 
 class Issue {
@@ -2574,7 +2574,7 @@ class Issue {
     this.rank,
     required this.createdAt,
     this.queuedAt,
-    required this.workers,
+    required this.sessions,
     this.closedAt,
     this.closed,
     this.parent,
@@ -2595,7 +2595,7 @@ class Issue {
     rank: j['rank'] == null ? null : (j['rank'] as num).toDouble(),
     createdAt: (j['createdAt'] as num).toDouble(),
     queuedAt: j['queuedAt'] == null ? null : (j['queuedAt'] as num).toDouble(),
-    workers: [for (final e in j['workers'] as List) e as String],
+    sessions: [for (final e in j['sessions'] as List) e as String],
     closedAt: j['closedAt'] == null ? null : (j['closedAt'] as num).toDouble(),
     closed: j['closed'] == null ? null : IssueClose.fromJson(j['closed']),
     parent: j['parent'] == null ? null : j['parent'] as String,
@@ -2615,7 +2615,7 @@ class Issue {
   final double? rank;
   final double createdAt;
   final double? queuedAt;
-  final List<String> workers;
+  final List<String> sessions;
   final double? closedAt;
   final IssueClose? closed;
   final String? parent;
@@ -2635,7 +2635,7 @@ class Issue {
     if (rank != null) 'rank': rank!,
     'createdAt': createdAt,
     if (queuedAt != null) 'queuedAt': queuedAt!,
-    'workers': [for (final e in workers) e],
+    'sessions': [for (final e in sessions) e],
     if (closedAt != null) 'closedAt': closedAt!,
     if (closed != null) 'closed': closed!.wire,
     if (parent != null) 'parent': parent!,
@@ -2673,7 +2673,7 @@ class IssueStep {
     this.scope,
     this.acceptance,
     this.frozen,
-    this.worker,
+    this.session,
     this.conclusion,
     this.commits,
     this.spent,
@@ -2688,7 +2688,7 @@ class IssueStep {
     scope: j['scope'] == null ? null : [for (final e in j['scope'] as List) e as String],
     acceptance: j['acceptance'] == null ? null : j['acceptance'] as bool,
     frozen: j['frozen'] == null ? null : [for (final e in j['frozen'] as List) e as String],
-    worker: j['worker'] == null ? null : j['worker'] as String,
+    session: j['session'] == null ? null : j['session'] as String,
     conclusion: j['conclusion'] == null ? null : j['conclusion'] as String,
     commits: j['commits'] == null ? null : [for (final e in j['commits'] as List) e as String],
     spent: j['spent'] == null ? null : Spent.fromJson(j['spent'] as Map<String, dynamic>),
@@ -2702,7 +2702,7 @@ class IssueStep {
   final List<String>? scope;
   final bool? acceptance;
   final List<String>? frozen;
-  final String? worker;
+  final String? session;
   final String? conclusion;
   final List<String>? commits;
   final Spent? spent;
@@ -2716,7 +2716,7 @@ class IssueStep {
     if (scope != null) 'scope': [for (final e in scope!) e],
     if (acceptance != null) 'acceptance': acceptance!,
     if (frozen != null) 'frozen': [for (final e in frozen!) e],
-    if (worker != null) 'worker': worker!,
+    if (session != null) 'session': session!,
     if (conclusion != null) 'conclusion': conclusion!,
     if (commits != null) 'commits': [for (final e in commits!) e],
     if (spent != null) 'spent': spent!.toJson(),
@@ -2857,7 +2857,7 @@ class TrajectoryHead {
     cny: j['cny'] == null ? null : (j['cny'] as num).toDouble(),
     reopenedFrom: j['reopenedFrom'] == null ? null : j['reopenedFrom'] as String,
     reopenedAs: j['reopenedAs'] == null ? null : j['reopenedAs'] as String,
-    playbook: j['playbook'] == null ? null : WorkerPlaybook.fromJson(j['playbook'] as Map<String, dynamic>),
+    playbook: j['playbook'] == null ? null : SessionPlaybook.fromJson(j['playbook'] as Map<String, dynamic>),
     issue: j['issue'] == null ? null : j['issue'] as String,
   );
 
@@ -2876,7 +2876,7 @@ class TrajectoryHead {
   final double? cny;
   final String? reopenedFrom;
   final String? reopenedAs;
-  final WorkerPlaybook? playbook;
+  final SessionPlaybook? playbook;
   final String? issue;
 
   Map<String, dynamic> toJson() => {
@@ -2952,7 +2952,7 @@ class RunTrigger {
 class Run {
   const Run({
     required this.id,
-    required this.worker,
+    required this.session,
     this.issue,
     required this.triggeredBy,
     required this.heard,
@@ -2965,7 +2965,7 @@ class Run {
 
   factory Run.fromJson(Map<String, dynamic> j) => Run(
     id: (j['id'] as num).toDouble(),
-    worker: j['worker'] as String,
+    session: j['session'] as String,
     issue: j['issue'] == null ? null : j['issue'] as String,
     triggeredBy: RunTrigger.fromJson(j['triggeredBy'] as Map<String, dynamic>),
     heard: [for (final e in j['heard'] as List) (e as num).toDouble()],
@@ -2977,7 +2977,7 @@ class Run {
   );
 
   final double id;
-  final String worker;
+  final String session;
   final String? issue;
   final RunTrigger triggeredBy;
   final List<double> heard;
@@ -2989,7 +2989,7 @@ class Run {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'worker': worker,
+    'session': session,
     if (issue != null) 'issue': issue!,
     'triggeredBy': triggeredBy.toJson(),
     'heard': [for (final e in heard) e],
@@ -3526,17 +3526,17 @@ class Update {
   Map<String, dynamic> toJson() => {'current': current, 'latest': latest, 'available': available};
 }
 
-final class InboxFromWorker extends InboxFrom {
-  const InboxFromWorker({required this.id, required this.name, required this.agent});
+final class InboxFromSession extends InboxFrom {
+  const InboxFromSession({required this.id, required this.name, required this.agent});
 
-  factory InboxFromWorker.fromJson(Map<String, dynamic> j) => InboxFromWorker(id: j['id'] as String, name: j['name'] as String, agent: j['agent'] as String);
+  factory InboxFromSession.fromJson(Map<String, dynamic> j) => InboxFromSession(id: j['id'] as String, name: j['name'] as String, agent: j['agent'] as String);
 
   final String id;
   final String name;
   final String agent;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'worker', 'id': id, 'name': name, 'agent': agent};
+  Map<String, dynamic> toJson() => {'kind': 'session', 'id': id, 'name': name, 'agent': agent};
 }
 
 final class InboxFromManager extends InboxFrom {
@@ -3548,15 +3548,15 @@ final class InboxFromManager extends InboxFrom {
   Map<String, dynamic> toJson() => {'kind': 'manager'};
 }
 
-final class InboxTargetWorker extends InboxTarget {
-  const InboxTargetWorker({required this.id});
+final class InboxTargetSession extends InboxTarget {
+  const InboxTargetSession({required this.id});
 
-  factory InboxTargetWorker.fromJson(Map<String, dynamic> j) => InboxTargetWorker(id: j['id'] as String);
+  factory InboxTargetSession.fromJson(Map<String, dynamic> j) => InboxTargetSession(id: j['id'] as String);
 
   final String id;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'worker', 'id': id};
+  Map<String, dynamic> toJson() => {'kind': 'session', 'id': id};
 }
 
 final class InboxTargetPlans extends InboxTarget {
@@ -3593,28 +3593,28 @@ class PlotViewBadge {
 }
 
 final class GameEffectReward extends GameEffect {
-  const GameEffectReward({required this.workerId, required this.coins, required this.streak});
+  const GameEffectReward({required this.sessionId, required this.coins, required this.streak});
 
   factory GameEffectReward.fromJson(Map<String, dynamic> j) =>
-      GameEffectReward(workerId: j['workerId'] as String, coins: (j['coins'] as num).toDouble(), streak: (j['streak'] as num).toDouble());
+      GameEffectReward(sessionId: j['sessionId'] as String, coins: (j['coins'] as num).toDouble(), streak: (j['streak'] as num).toDouble());
 
-  final String workerId;
+  final String sessionId;
   final double coins;
   final double streak;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'reward', 'workerId': workerId, 'coins': coins, 'streak': streak};
+  Map<String, dynamic> toJson() => {'kind': 'reward', 'sessionId': sessionId, 'coins': coins, 'streak': streak};
 }
 
 final class GameEffectPenalty extends GameEffect {
-  const GameEffectPenalty({required this.workerId});
+  const GameEffectPenalty({required this.sessionId});
 
-  factory GameEffectPenalty.fromJson(Map<String, dynamic> j) => GameEffectPenalty(workerId: j['workerId'] as String);
+  factory GameEffectPenalty.fromJson(Map<String, dynamic> j) => GameEffectPenalty(sessionId: j['sessionId'] as String);
 
-  final String workerId;
+  final String sessionId;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'penalty', 'workerId': workerId};
+  Map<String, dynamic> toJson() => {'kind': 'penalty', 'sessionId': sessionId};
 }
 
 final class GameEffectLevelUp extends GameEffect {
@@ -3644,7 +3644,7 @@ final class GameEffectAchievement extends GameEffect {
 final class LedgerEntryHarvested extends LedgerEntry {
   const LedgerEntryHarvested({
     required this.at,
-    required this.worker,
+    required this.session,
     this.agent,
     required this.project,
     required this.runtime,
@@ -3655,7 +3655,7 @@ final class LedgerEntryHarvested extends LedgerEntry {
 
   factory LedgerEntryHarvested.fromJson(Map<String, dynamic> j) => LedgerEntryHarvested(
     at: (j['at'] as num).toDouble(),
-    worker: j['worker'] as String,
+    session: j['session'] as String,
     agent: j['agent'] == null ? null : j['agent'] as String,
     project: j['project'] as String,
     runtime: j['runtime'] as String,
@@ -3665,7 +3665,7 @@ final class LedgerEntryHarvested extends LedgerEntry {
   );
 
   final double at;
-  final String worker;
+  final String session;
   final String? agent;
   final String project;
   final String runtime;
@@ -3677,7 +3677,7 @@ final class LedgerEntryHarvested extends LedgerEntry {
   Map<String, dynamic> toJson() => {
     'kind': 'harvested',
     'at': at,
-    'worker': worker,
+    'session': session,
     if (agent != null) 'agent': agent!,
     'project': project,
     'runtime': runtime,
@@ -3688,53 +3688,53 @@ final class LedgerEntryHarvested extends LedgerEntry {
 }
 
 final class LedgerEntryFailed extends LedgerEntry {
-  const LedgerEntryFailed({required this.at, required this.worker, this.agent});
+  const LedgerEntryFailed({required this.at, required this.session, this.agent});
 
   factory LedgerEntryFailed.fromJson(Map<String, dynamic> j) =>
-      LedgerEntryFailed(at: (j['at'] as num).toDouble(), worker: j['worker'] as String, agent: j['agent'] == null ? null : j['agent'] as String);
+      LedgerEntryFailed(at: (j['at'] as num).toDouble(), session: j['session'] as String, agent: j['agent'] == null ? null : j['agent'] as String);
 
   final double at;
-  final String worker;
+  final String session;
   final String? agent;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'failed', 'at': at, 'worker': worker, if (agent != null) 'agent': agent!};
+  Map<String, dynamic> toJson() => {'kind': 'failed', 'at': at, 'session': session, if (agent != null) 'agent': agent!};
 }
 
 final class LedgerEntryConflicted extends LedgerEntry {
-  const LedgerEntryConflicted({required this.at, required this.worker});
+  const LedgerEntryConflicted({required this.at, required this.session});
 
-  factory LedgerEntryConflicted.fromJson(Map<String, dynamic> j) => LedgerEntryConflicted(at: (j['at'] as num).toDouble(), worker: j['worker'] as String);
+  factory LedgerEntryConflicted.fromJson(Map<String, dynamic> j) => LedgerEntryConflicted(at: (j['at'] as num).toDouble(), session: j['session'] as String);
 
   final double at;
-  final String worker;
+  final String session;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'conflicted', 'at': at, 'worker': worker};
+  Map<String, dynamic> toJson() => {'kind': 'conflicted', 'at': at, 'session': session};
 }
 
 final class LedgerEntryTold extends LedgerEntry {
-  const LedgerEntryTold({required this.at, required this.worker});
+  const LedgerEntryTold({required this.at, required this.session});
 
-  factory LedgerEntryTold.fromJson(Map<String, dynamic> j) => LedgerEntryTold(at: (j['at'] as num).toDouble(), worker: j['worker'] as String);
+  factory LedgerEntryTold.fromJson(Map<String, dynamic> j) => LedgerEntryTold(at: (j['at'] as num).toDouble(), session: j['session'] as String);
 
   final double at;
-  final String worker;
+  final String session;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'told', 'at': at, 'worker': worker};
+  Map<String, dynamic> toJson() => {'kind': 'told', 'at': at, 'session': session};
 }
 
 final class LedgerEntryReviewed extends LedgerEntry {
-  const LedgerEntryReviewed({required this.at, required this.worker});
+  const LedgerEntryReviewed({required this.at, required this.session});
 
-  factory LedgerEntryReviewed.fromJson(Map<String, dynamic> j) => LedgerEntryReviewed(at: (j['at'] as num).toDouble(), worker: j['worker'] as String);
+  factory LedgerEntryReviewed.fromJson(Map<String, dynamic> j) => LedgerEntryReviewed(at: (j['at'] as num).toDouble(), session: j['session'] as String);
 
   final double at;
-  final String worker;
+  final String session;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'reviewed', 'at': at, 'worker': worker};
+  Map<String, dynamic> toJson() => {'kind': 'reviewed', 'at': at, 'session': session};
 }
 
 final class LedgerEntryPlaybook extends LedgerEntry {
@@ -3757,43 +3757,43 @@ final class LedgerEntryPlaybook extends LedgerEntry {
 }
 
 final class LedgerEntryHandoff extends LedgerEntry {
-  const LedgerEntryHandoff({required this.at, required this.worker, required this.to});
+  const LedgerEntryHandoff({required this.at, required this.session, required this.to});
 
   factory LedgerEntryHandoff.fromJson(Map<String, dynamic> j) =>
-      LedgerEntryHandoff(at: (j['at'] as num).toDouble(), worker: j['worker'] as String, to: j['to'] as String);
+      LedgerEntryHandoff(at: (j['at'] as num).toDouble(), session: j['session'] as String, to: j['to'] as String);
 
   final double at;
-  final String worker;
+  final String session;
   final String to;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'handoff', 'at': at, 'worker': worker, 'to': to};
+  Map<String, dynamic> toJson() => {'kind': 'handoff', 'at': at, 'session': session, 'to': to};
 }
 
 final class LedgerEntryCalled extends LedgerEntry {
-  const LedgerEntryCalled({required this.at, required this.worker});
+  const LedgerEntryCalled({required this.at, required this.session});
 
-  factory LedgerEntryCalled.fromJson(Map<String, dynamic> j) => LedgerEntryCalled(at: (j['at'] as num).toDouble(), worker: j['worker'] as String);
+  factory LedgerEntryCalled.fromJson(Map<String, dynamic> j) => LedgerEntryCalled(at: (j['at'] as num).toDouble(), session: j['session'] as String);
 
   final double at;
-  final String worker;
+  final String session;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'called', 'at': at, 'worker': worker};
+  Map<String, dynamic> toJson() => {'kind': 'called', 'at': at, 'session': session};
 }
 
 final class LedgerEntryHired extends LedgerEntry {
-  const LedgerEntryHired({required this.at, required this.worker, this.agent});
+  const LedgerEntryHired({required this.at, required this.session, this.agent});
 
   factory LedgerEntryHired.fromJson(Map<String, dynamic> j) =>
-      LedgerEntryHired(at: (j['at'] as num).toDouble(), worker: j['worker'] as String, agent: j['agent'] == null ? null : j['agent'] as String);
+      LedgerEntryHired(at: (j['at'] as num).toDouble(), session: j['session'] as String, agent: j['agent'] == null ? null : j['agent'] as String);
 
   final double at;
-  final String worker;
+  final String session;
   final String? agent;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'hired', 'at': at, 'worker': worker, if (agent != null) 'agent': agent!};
+  Map<String, dynamic> toJson() => {'kind': 'hired', 'at': at, 'session': session, if (agent != null) 'agent': agent!};
 }
 
 enum LedgerEntryMomentKind {
@@ -4395,16 +4395,16 @@ final class FactConversation extends Fact implements SideEvent {
 }
 
 final class FactHired extends Fact implements SideEvent {
-  const FactHired({required this.at, required this.worker});
+  const FactHired({required this.at, required this.session});
 
   factory FactHired.fromJson(Map<String, dynamic> j) =>
-      FactHired(at: (j['at'] as num).toDouble(), worker: Worker.fromJson(j['worker'] as Map<String, dynamic>));
+      FactHired(at: (j['at'] as num).toDouble(), session: Session.fromJson(j['session'] as Map<String, dynamic>));
 
   final double at;
-  final Worker worker;
+  final Session session;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'hired', 'at': at, 'worker': worker.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'hired', 'at': at, 'session': session.toJson()};
 }
 
 final class FactStation extends Fact implements SideEvent {
@@ -4439,11 +4439,11 @@ final class FactDoing extends Fact implements SideEvent {
   const FactDoing({required this.at, required this.id, required this.action, required this.label});
 
   factory FactDoing.fromJson(Map<String, dynamic> j) =>
-      FactDoing(at: (j['at'] as num).toDouble(), id: j['id'] as String, action: WorkerAction.fromJson(j['action']), label: j['label'] as String);
+      FactDoing(at: (j['at'] as num).toDouble(), id: j['id'] as String, action: SessionAction.fromJson(j['action']), label: j['label'] as String);
 
   final double at;
   final String id;
-  final WorkerAction action;
+  final SessionAction action;
   final String label;
 
   @override
@@ -4879,8 +4879,8 @@ final Map<String, dynamic> _seeds = jsonDecode(
 final List<AchievementDef> achievements = [for (final j in _seeds['achievements'] as List) AchievementDef.fromJson(j as Map<String, dynamic>)];
 
 /// What each action is, in words; the server says them the same way.
-final Map<WorkerAction, String> actionText = {
-  for (final e in (_seeds['actionText'] as Map<String, dynamic>).entries) WorkerAction.fromJson(e.key): e.value as String,
+final Map<SessionAction, String> actionText = {
+  for (final e in (_seeds['actionText'] as Map<String, dynamic>).entries) SessionAction.fromJson(e.key): e.value as String,
 };
 
 /// In seeds.json's order.
@@ -5026,7 +5026,7 @@ class IssueApi {
   IssueApi._(this._api);
   final VibeValleyApi _api;
 
-  /// To the issue's newest worker, as the owner: on is a step of its trajectory to comment on. A closed issue is refused: reopen it.
+  /// To the issue's newest session, as the owner: on is a step of its trajectory to comment on. A closed issue is refused: reopen it.
   Future<void> comment({required String id, required CommentRequest body}) async {
     await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/comment', query: {}, body: body.toJson());
   }
@@ -5040,12 +5040,12 @@ class IssueApi {
     await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/merge', query: {}, body: null);
   }
 
-  /// Tells the newest worker to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
+  /// Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
   Future<void> resolve({required String id}) async {
     await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/resolve', query: {}, body: null);
   }
 
-  /// Sends the newest worker home without merging: the issue closes as dismissed.
+  /// Sends the newest session home without merging: the issue closes as dismissed.
   Future<void> cancel({required String id}) async {
     await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/cancel', query: {}, body: null);
   }

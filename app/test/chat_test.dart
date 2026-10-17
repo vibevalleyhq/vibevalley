@@ -38,7 +38,7 @@ ChatMessage _msg(double seq, double conv, String from, SenderKind kind, String t
               : kind == SenderKind.user
               ? '主人'
               : '测试小吴'),
-      agent: kind == SenderKind.worker ? 'tester' : null,
+      agent: kind == SenderKind.agent ? 'tester' : null,
       kind: type,
       text: text,
       final_: done,
@@ -46,7 +46,7 @@ ChatMessage _msg(double seq, double conv, String from, SenderKind kind, String t
       at: _now - (10 - seq) * 1000,
     );
 
-const _worker = Worker(
+const _session = Session(
   id: 'w1',
   name: '测试小吴',
   agent: 'tester',
@@ -56,7 +56,7 @@ const _worker = Worker(
   runs: 1,
   phase: PhaseWorking(
     since: 0,
-    doing: Doing(action: WorkerAction.runCommand, label: 'pnpm test'),
+    doing: Doing(action: SessionAction.runCommand, label: 'pnpm test'),
   ),
   channel: 1,
   phaseText: '在跑命令：pnpm test',
@@ -65,7 +65,7 @@ const _worker = Worker(
 CoreState _state({CallState call = CallState.live, double generalRead = 0, List<ChatMessage> more = const []}) => CoreState(
   call: call,
   manager: ManagerState.listening,
-  workers: const [_worker],
+  sessions: const [_session],
   chat: Chat(
     conversations: [
       Conversation(id: 1, kind: ConversationKind.general, name: '田头', replies: 0, read: generalRead, at: 0, lastSeq: 2),
@@ -85,8 +85,8 @@ CoreState _state({CallState call = CallState.live, double generalRead = 0, List<
     messages: [
       _msg(1, 1, 'manager', SenderKind.manager, '农场开门了'),
       _msg(2, 1, 'manager', SenderKind.manager, '派给 @w1 跑测试', type: MessageKind.dispatch),
-      _msg(3, 3, 'w1', SenderKind.worker, '测试都过了', type: MessageKind.report),
-      _msg(4, 2, 'w1', SenderKind.worker, '打卡页改好了'),
+      _msg(3, 3, 'w1', SenderKind.agent, '测试都过了', type: MessageKind.report),
+      _msg(4, 2, 'w1', SenderKind.agent, '打卡页改好了'),
       ...more,
     ],
   ),
@@ -184,7 +184,7 @@ void main() {
     test('the @word at the caret; whom it offers', () {
       expect(typedName('叫 @w', 4), (start: 2, query: 'w'));
       expect(typedName('a@w', 3), isNull);
-      final all = nameables(const [_worker], _now);
+      final all = nameables(const [_session], _now);
       expect(all.map((n) => n.token), ['@w1', '@管家']);
       expect(offeredFor(all, '管').single.token, '@管家');
       expect(offeredFor(all, '小吴').single.token, '@w1');
@@ -203,7 +203,7 @@ void main() {
     });
 
     test('a helper in words', () {
-      expect(phaseText(_worker, _now), '在跑命令：pnpm test');
+      expect(phaseText(_session, _now), '在跑命令：pnpm test');
       expect(spentText(const Spent(tokens: 26000, cny: 0.031)), '约 ¥0.03 · 2.6 万 token');
     });
   });
@@ -355,7 +355,7 @@ void main() {
       final empty = CoreState(
         call: CallState.idle,
         manager: ManagerState.idle,
-        workers: const [],
+        sessions: const [],
         chat: const Chat(conversations: [], messages: []),
       );
       await _pump(t, window(server, empty, []), server, empty);

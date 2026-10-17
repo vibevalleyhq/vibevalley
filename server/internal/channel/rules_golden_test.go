@@ -7,7 +7,7 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// Who hears a message, how a target and a mention are read, how a woken worker is told, over the recorded cases
+// Who hears a message, how a target and a mention are read, how a woken session is told, over the recorded cases
 // (testdata/rules.jsonl.gz).
 func TestRulesGolden(t *testing.T) {
 	seen := golden.Rules(t, "testdata/rules.jsonl.gz", func(c golden.Case) any {
