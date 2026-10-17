@@ -19,7 +19,7 @@ type EndRunParams struct {
 	Outcome sql.NullString
 	Summary sql.NullString
 	Spent   sql.NullString
-	ID      int64
+	ID      string
 }
 
 func (q *Queries) EndRun(ctx context.Context, arg EndRunParams) error {
@@ -39,7 +39,7 @@ update session_run set heard = ? where id = ?
 
 type HeardInRunParams struct {
 	Heard sql.NullString
-	ID    int64
+	ID    string
 }
 
 func (q *Queries) HeardInRun(ctx context.Context, arg HeardInRunParams) error {
@@ -200,12 +200,13 @@ func (q *Queries) RunsOfSession(ctx context.Context, session string) ([]SessionR
 	return items, nil
 }
 
-const startRun = `-- name: StartRun :execlastid
+const startRun = `-- name: StartRun :exec
 
-insert into session_run (session, issue, triggered_by, started_at) values (?, ?, ?, ?)
+insert into session_run (id, session, issue, triggered_by, started_at) values (?, ?, ?, ?, ?)
 `
 
 type StartRunParams struct {
+	ID          string
 	Session     string
 	Issue       sql.NullString
 	TriggeredBy string
@@ -213,15 +214,13 @@ type StartRunParams struct {
 }
 
 // Runs: one go at the work each (session/runs.go).
-func (q *Queries) StartRun(ctx context.Context, arg StartRunParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, startRun,
+func (q *Queries) StartRun(ctx context.Context, arg StartRunParams) error {
+	_, err := q.db.ExecContext(ctx, startRun,
+		arg.ID,
 		arg.Session,
 		arg.Issue,
 		arg.TriggeredBy,
 		arg.StartedAt,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+	return err
 }

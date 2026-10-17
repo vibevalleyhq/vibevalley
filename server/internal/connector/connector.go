@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"vibevalley/internal/base"
 	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
 	"vibevalley/internal/manager"
@@ -95,7 +96,7 @@ type voiceAccount struct {
 	lastInbound  int64
 	pausedUntil  int64
 	connectedAt  int64
-	channel      *int64
+	channel      *string
 }
 
 func (a *voiceAccount) paused() bool { return a.pausedUntil != 0 && a.pausedUntil > clock.NowMs() }
@@ -108,9 +109,9 @@ type Service struct {
 	feishu feishu.API
 	qq     qq.API
 
-	say           func(ctx context.Context, text string, conversation *int64) error
+	say           func(ctx context.Context, text string, conversation *string) error
 	channelByName func(name string) *channel.Info
-	general       func() int64
+	general       func() string
 
 	bridges map[protocol.ConnectorID]*voiceBridge
 	order   []protocol.ConnectorID
@@ -125,7 +126,7 @@ func newService(db *sql.DB, core *core.Service, chat *channel.Service, mgr *mana
 		ilink:  weixin.NewClient(),
 		feishu: feishu.NewClient(),
 		qq:     qq.NewClient(),
-		say: func(ctx context.Context, text string, conversation *int64) error {
+		say: func(ctx context.Context, text string, conversation *string) error {
 			return mgr.Say(ctx, text, "", conversation)
 		},
 		channelByName: chat.ChannelByName,
@@ -246,7 +247,7 @@ func (c *Service) SetChannel(id protocol.ConnectorID, name string) (protocol.Con
 	if channel == nil {
 		return protocol.ConnectorStatus{}, fmt.Errorf("没有叫 %s 的频道", name)
 	}
-	var to *int64
+	var to *string
 	if channel.ID != c.general() {
 		to = &channel.ID
 	}
@@ -289,7 +290,7 @@ func (b *voiceBridge) reload() error {
 	a := &voiceAccount{secrets: map[string]string{}, owner: row.OwnerID.String, pairCode: row.PairCode.String, cursor: row.Cursor,
 		replyContext: row.ReplyContext.String, lastInbound: row.LastInbound.Int64, pausedUntil: row.PausedUntil.Int64, connectedAt: row.ConnectedAt}
 	if row.ChannelID.Valid {
-		a.channel = &row.ChannelID.Int64
+		a.channel = &row.ChannelID.String
 	}
 	if err := json.Unmarshal([]byte(row.Secrets), &a.secrets); err != nil {
 		b.err = "存着的登录信息读不出来，断开重新连一次"
@@ -405,20 +406,20 @@ func (b *voiceBridge) drain(ctx context.Context, late bool) bool {
 		return true
 	}
 	type batch struct {
-		ids  []int64
+		ids  []string
 		text string
 	}
 	var batches []batch
 	if late && len(pending) > digestOver {
 		lines := make([]string, len(pending))
-		ids := make([]int64, len(pending))
+		ids := make([]string, len(pending))
 		for i, r := range pending {
 			lines[i], ids[i] = r.Body, r.ID
 		}
 		batches = []batch{{ids, flushText(lines)[0]}}
 	} else {
 		for _, r := range pending {
-			batches = append(batches, batch{[]int64{r.ID}, r.Body})
+			batches = append(batches, batch{[]string{r.ID}, r.Body})
 		}
 	}
 	for _, out := range batches {
@@ -458,7 +459,7 @@ func (b *voiceBridge) offer(m protocol.ChatMessage, state *protocol.CoreState) {
 		chat = state.Chat
 	}
 	where := protocol.ConversationOf(chat, m.Conversation)
-	var mine *int64
+	var mine *string
 	if a.channel != nil {
 		mine = a.channel
 	} else if general := protocol.GeneralOf(chat); general != nil {
@@ -469,7 +470,7 @@ func (b *voiceBridge) offer(m protocol.ChatMessage, state *protocol.CoreState) {
 		return
 	}
 	for _, piece := range splitText(ownerLine(m, where), maxChars[b.id]) {
-		b.kept(b.c.q.AddOutbox(context.Background(), generated.AddOutboxParams{Connector: string(b.id), MessageSeq: m.Seq, Body: piece, CreatedAt: clock.NowMs()}))
+		b.kept(b.c.q.AddOutbox(context.Background(), generated.AddOutboxParams{ID: base.NewID(), Connector: string(b.id), MessageID: m.ID, Body: piece, CreatedAt: clock.NowMs()}))
 	}
 	b.mu.Lock()
 	ctx := b.ctx
@@ -477,7 +478,7 @@ func (b *voiceBridge) offer(m protocol.ChatMessage, state *protocol.CoreState) {
 	b.drain(ctx, false)
 }
 
-func (b *voiceBridge) quotedConversation(ext string) *int64 {
+func (b *voiceBridge) quotedConversation(ext string) *string {
 	if ext == "" {
 		return nil
 	}
@@ -487,7 +488,7 @@ func (b *voiceBridge) quotedConversation(ext string) *int64 {
 	}
 	if chat := b.c.core.State().Chat; chat != nil {
 		for _, m := range chat.Messages {
-			if m.Seq == seq {
+			if m.ID == seq {
 				return &m.Conversation
 			}
 		}
@@ -750,10 +751,10 @@ func (b *voiceBridge) logout() protocol.ConnectorStatus {
 	return b.status()
 }
 
-func (b *voiceBridge) setChannel(channel *int64) (protocol.ConnectorStatus, error) {
-	to := sql.NullInt64{}
+func (b *voiceBridge) setChannel(channel *string) (protocol.ConnectorStatus, error) {
+	to := sql.NullString{}
 	if channel != nil {
-		to = sql.NullInt64{Int64: *channel, Valid: true}
+		to = sql.NullString{String: *channel, Valid: true}
 	}
 	if err := b.c.q.AccountChannel(context.Background(), generated.AccountChannelParams{ChannelID: to, Connector: string(b.id)}); err != nil {
 		return protocol.ConnectorStatus{}, err

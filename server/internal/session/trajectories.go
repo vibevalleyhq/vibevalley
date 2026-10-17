@@ -66,7 +66,7 @@ func (t *trajectories) Finish(id string) {
 }
 
 // Events is a session's log, oldest first: from memory while it is open, else from disk; run > 0 is that run's only.
-func (t *trajectories) Events(id string, run int64) []protocol.SessionEvent {
+func (t *trajectories) Events(id string, run string) []protocol.SessionEvent {
 	if !knownID.MatchString(id) {
 		return nil
 	}
@@ -79,7 +79,7 @@ func (t *trajectories) Events(id string, run int64) []protocol.SessionEvent {
 	} else {
 		all = readJournal(t.eventsFile(id))
 	}
-	if run <= 0 {
+	if run == "" {
 		return all
 	}
 	out := []protocol.SessionEvent{}

@@ -1,7 +1,7 @@
--- Who follows a thread, from which message on (channel/db.go).
+-- Who follows a thread, from which message number on (channel/db.go).
 
 -- name: Follow :exec
-insert into channel_follow (conversation_id, participant_id, reason, from_seq) values (?, ?, ?, ?)
+insert into channel_follow (conversation_id, participant_id, reason, from_number) values (?, ?, ?, ?)
 on conflict (conversation_id, participant_id) do update set unfollowed_at = null;
 
 -- name: Followers :many

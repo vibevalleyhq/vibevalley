@@ -78,7 +78,7 @@ type journal struct {
 	pushing, saving *time.Timer
 	closed          bool
 	// run is the open run the events belong to, nil between runs.
-	run *int64
+	run *string
 }
 
 func openJournal(file string, initial []protocol.SessionEvent, push func(protocol.SessionEvent), keep int) *journal {
@@ -224,14 +224,14 @@ func (j *journal) draftLocked(e protocol.SessionEvent, from From, call string) {
 	j.changedLocked(e.Seq)
 }
 
-func (j *journal) RunStarted(id int64) {
+func (j *journal) RunStarted(id string) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	j.run = &id
 	j.addLocked(protocol.SessionEvent{Type: protocol.SessionEventTypeRunStart}, nil)
 }
 
-func (j *journal) RunEnded(id int64, outcome protocol.Outcome) {
+func (j *journal) RunEnded(id string, outcome protocol.Outcome) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	if j.run == nil || *j.run != id {

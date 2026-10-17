@@ -22,6 +22,7 @@ void main() {
   );
   final harvested = Issue(
     id: 't9',
+    number: 9,
     title: '给 README 补上怎么启动',
     project: 'clock-in',
     assignee: 'tester',
@@ -34,13 +35,24 @@ void main() {
   );
   const chat = Chat(
     conversations: [
-      Conversation(id: 1, kind: ConversationKind.general, name: '田头', replies: 1, at: 0),
-      Conversation(id: 2, kind: ConversationKind.thread, parent: 1, channel: 1, subjectKind: SubjectKind.issue, subjectId: 'w9', replies: 1, at: 0),
+      Conversation(id: 'c1', kind: ConversationKind.general, name: '田头', replies: 1, at: 0),
+      Conversation(
+        id: 'c2',
+        kind: ConversationKind.thread,
+        parent: 'm1',
+        parentNumber: 1,
+        channel: 'c1',
+        subjectKind: SubjectKind.issue,
+        subjectId: 'w9',
+        replies: 1,
+        at: 0,
+      ),
     ],
     messages: [
       ChatMessage(
-        seq: 2,
-        conversation: 2,
+        id: 'm2',
+        number: 2,
+        conversation: 'c2',
         from: 'w9',
         fromKind: SenderKind.agent,
         name: '老李',

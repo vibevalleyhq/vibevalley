@@ -204,7 +204,7 @@ class _FarmPhoneState extends ConsumerState<FarmPhone> {
       case InboxTargetPlans(:final playbook):
         ref.read(phoneTargetProvider.notifier).go(PhoneTargetPlans(playbook));
       case InboxTargetChat(:final conversation):
-        router?.go('/chat/${conversation.toInt()}');
+        router?.go('/chat/$conversation');
     }
   }
 

@@ -113,7 +113,8 @@ func (is *issues) left(ctx context.Context, f protocol.FactLeft) {
 
 func issueOf(row generated.Issue, runs []string, state protocol.CoreState) protocol.Issue {
 	out := protocol.Issue{
-		ID: row.ID, Title: row.Title, Description: row.Description, Priority: protocol.Priority(row.Priority), CreatedAt: row.CreatedAt, Sessions: []string{},
+		ID: row.ID, Number: row.Number, Title: row.Title, Description: row.Description, Priority: protocol.Priority(row.Priority),
+		CreatedAt: row.CreatedAt, Sessions: []string{},
 	}
 	if row.Project.Valid {
 		out.Project = &row.Project.String
@@ -135,7 +136,7 @@ func issueOf(row generated.Issue, runs []string, state protocol.CoreState) proto
 		out.Parent = &row.Parent.String
 	}
 	if row.Schedule.Valid {
-		out.Schedule = &row.Schedule.Int64
+		out.Schedule = &row.Schedule.String
 	}
 	if row.BlockedBy.Valid {
 		if err := json.Unmarshal([]byte(row.BlockedBy.String), &out.BlockedBy); err != nil {
@@ -235,16 +236,16 @@ func (is *issues) unsent(id string) (protocol.Issue, error) {
 
 func (is *issues) Add(in protocol.IssueRequest) (protocol.Issue, error) { return is.add(in, nil) }
 
-func (is *issues) AddScheduled(in protocol.IssueRequest, schedule int64) (protocol.Issue, error) {
+func (is *issues) AddScheduled(in protocol.IssueRequest, schedule string) (protocol.Issue, error) {
 	return is.add(in, &schedule)
 }
 
-func (is *issues) add(in protocol.IssueRequest, schedule *int64) (protocol.Issue, error) {
+func (is *issues) add(in protocol.IssueRequest, schedule *string) (protocol.Issue, error) {
 	title, description, err := issueWords(in)
 	if err != nil {
 		return protocol.Issue{}, err
 	}
-	id := "t" + base.Code(8)
+	id := base.NewID()
 	if err := is.q.AddIssue(context.Background(), generated.AddIssueParams{
 		ID: id, Title: title, Description: description, Project: issueNull(in.Project), Assignee: issueNull(in.Assignee), Priority: string(issuePriority(in.Priority)),
 		CreatedAt: clock.NowMs(), Schedule: issueSchedule(schedule),
@@ -498,11 +499,11 @@ func issueNull(s *string) sql.NullString {
 
 func issueAt(ms int64) sql.NullInt64 { return sql.NullInt64{Int64: ms, Valid: true} }
 
-func issueSchedule(id *int64) sql.NullInt64 {
+func issueSchedule(id *string) sql.NullString {
 	if id == nil {
-		return sql.NullInt64{}
+		return sql.NullString{}
 	}
-	return issueAt(*id)
+	return sql.NullString{String: *id, Valid: true}
 }
 
 func issueClosed(how *protocol.IssueClose) sql.NullString {

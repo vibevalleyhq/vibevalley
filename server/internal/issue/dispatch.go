@@ -150,7 +150,7 @@ func (d *dispatch) Hire(ctx context.Context, agent protocol.Agent, task, project
 		}
 	}
 	if opt.Issue == "" {
-		opt.Issue = "t" + base.Code(8)
+		opt.Issue = base.NewID()
 	}
 	opt.Hiring = func(w protocol.Session) {
 		if err := d.issues.Ran(opt.Issue, w); err != nil {
@@ -164,12 +164,12 @@ func (d *dispatch) Hire(ctx context.Context, agent protocol.Agent, task, project
 	return hired
 }
 
-func (d *dispatch) Start(ctx context.Context, id string, channel int64) (protocol.Dispatched, error) {
+func (d *dispatch) Start(ctx context.Context, id string, channel string) (protocol.Dispatched, error) {
 	return d.start(ctx, id, channel, nil)
 }
 
 // by nil: the issue sent out.
-func (d *dispatch) start(ctx context.Context, id string, channel int64, by *protocol.RunTrigger) (protocol.Dispatched, error) {
+func (d *dispatch) start(ctx context.Context, id string, channel string, by *protocol.RunTrigger) (protocol.Dispatched, error) {
 	if issue, err := d.issues.Get(id); err == nil && protocol.IsForManager(issue) {
 		trigger := protocol.RunTrigger{Kind: protocol.RunTriggerKindIssue}
 		if by != nil {
@@ -214,7 +214,7 @@ func (d *dispatch) ready(id string) (protocol.Issue, protocol.Agent, string, err
 	return issue, *agent, project, nil
 }
 
-func (d *dispatch) send(ctx context.Context, issue protocol.Issue, agent protocol.Agent, project string, channel int64, by *protocol.RunTrigger) (string, error) {
+func (d *dispatch) send(ctx context.Context, issue protocol.Issue, agent protocol.Agent, project string, channel string, by *protocol.RunTrigger) (string, error) {
 	hired := d.Hire(ctx, agent, issueJob(issue), project, session.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: by})
 	if hired.Refused != "" || hired.Session == nil {
 		return "", protocol.Refused{Reason: hired.Refused}
@@ -259,11 +259,11 @@ func (d *dispatch) TryQueued(ctx context.Context) {
 
 const reopenDefault = "接着把这张工单做完"
 
-func (d *dispatch) Reopen(ctx context.Context, id, text string, channel int64) (string, error) {
+func (d *dispatch) Reopen(ctx context.Context, id, text string, channel string) (string, error) {
 	return d.reopen(ctx, id, text, channel, protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
 }
 
-func (d *dispatch) reopen(ctx context.Context, id, text string, channel int64, by protocol.RunTrigger) (string, error) {
+func (d *dispatch) reopen(ctx context.Context, id, text string, channel string, by protocol.RunTrigger) (string, error) {
 	issue, err := d.issues.Get(id)
 	if err != nil {
 		return "", err

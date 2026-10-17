@@ -71,9 +71,9 @@ void main() {
     'behind': 0,
   };
   final events = [
-    {'seq': 1, 'playbook': 'p1', 'kind': 'drafted', 'actor': 'system', 'detail': '3 步', 'at': 0, 'text': '拆好了，3 步，等主人看'},
+    {'id': 'pe1', 'playbook': 'p1', 'kind': 'drafted', 'actor': 'system', 'detail': '3 步', 'at': 0, 'text': '拆好了，3 步，等主人看'},
     {
-      'seq': 2,
+      'id': 'pe2',
       'playbook': 'p1',
       'node': 'api',
       'kind': 'node_edited',

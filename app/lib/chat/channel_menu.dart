@@ -196,7 +196,7 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
               _Link(
                 onTap: () {
                   _close();
-                  context.go(current == null || current.kind == ConversationKind.general ? '/chat' : '/chat/${idText(current.id)}');
+                  context.go(current == null || current.kind == ConversationKind.general ? '/chat' : '/chat/${current.id}');
                 },
                 child: const Row(children: [SpriteIcon('button-open', size: 12), SizedBox(width: 4), Text('频道页')]),
               ),
@@ -401,7 +401,7 @@ class ScheduleList extends ConsumerStatefulWidget {
 
 class _ScheduleListState extends ConsumerState<ScheduleList> {
   String? _error;
-  double? _deleting;
+  String? _deleting;
 
   Future<void> _act(Future<void> Function() effect) async {
     setState(() => _error = null);

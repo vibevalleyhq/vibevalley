@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -110,7 +109,7 @@ func (m *memories) list(agentID string) ([]protocol.Memory, error) {
 		if !slices.Contains(protocol.MemoryKindValues, protocol.MemoryKind(kind)) {
 			continue
 		}
-		mem := protocol.Memory{ID: strconv.FormatInt(id, 10), Agent: agentID, Kind: protocol.MemoryKind(kind), Text: body, At: at, Recalled: recalled}
+		mem := protocol.Memory{ID: id, Agent: agentID, Kind: protocol.MemoryKind(kind), Text: body, At: at, Recalled: recalled}
 		if project.Valid {
 			mem.Project = &project.String
 		}
@@ -132,14 +131,14 @@ func memoryNullable(s *string) sql.NullString {
 	return sql.NullString{String: *s, Valid: true}
 }
 
-func (m *memories) insertNote(agentID, body string, project, session *string) (int64, int64, error) {
+func (m *memories) insertNote(agentID, body string, project, session *string) (string, int64, error) {
 	at := clock.NowMs()
-	res, err := m.q.AddNote(context.Background(), generated.AddNoteParams{Agent: agentID, Body: body, Project: memoryNullable(project), Session: memoryNullable(session), CreatedAt: at})
+	id := base.NewID()
+	_, err := m.q.AddNote(context.Background(), generated.AddNoteParams{ID: id, Agent: agentID, Body: body, Project: memoryNullable(project), Session: memoryNullable(session), CreatedAt: at})
 	if err != nil {
-		return 0, 0, err
+		return "", 0, err
 	}
-	id, err := res.LastInsertId()
-	return id, at, err
+	return id, at, nil
 }
 
 // What a run recalls: the memories' ids (not to give the same session again) and the lines it is told, as it is told them.
@@ -157,8 +156,7 @@ func (m *memories) Recall(cue RecallCue) Recalled {
 	now := clock.NowMs()
 	picked := pick(all, pickCue{Session: cue.Session, Project: cue.Project, Text: cue.Text, Skip: cue.Skip, Now: now})
 	for _, p := range picked {
-		id, _ := strconv.ParseInt(p.ID, 10, 64)
-		if err := m.q.Recalled(context.Background(), generated.RecalledParams{RecalledAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
+		if err := m.q.Recalled(context.Background(), generated.RecalledParams{RecalledAt: sql.NullInt64{Int64: now, Valid: true}, ID: p.ID}); err != nil {
 			log.Printf("vibevalley: %s could not recall: %v", cue.Agent, err)
 			return Recalled{}
 		}
@@ -200,7 +198,7 @@ func (m *memories) keep(run FinishedRun) error {
 	}
 	ctx := context.Background()
 	if err := m.q.KeepJob(ctx, generated.KeepJobParams{
-		Agent: run.Agent, Body: memoryJobText(run.Job, run.Summary, run.Outcome), Project: sql.NullString{String: run.Project, Valid: true},
+		ID: base.NewID(), Agent: run.Agent, Body: memoryJobText(run.Job, run.Summary, run.Outcome), Project: sql.NullString{String: run.Project, Valid: true},
 		Session: sql.NullString{String: run.Session, Valid: true}, CreatedAt: clock.NowMs(),
 	}); err != nil {
 		return err
@@ -257,16 +255,11 @@ func (m *memories) Write(agentID, text, project string) (protocol.Memory, error)
 		log.Printf("vibevalley: a note for %s: %v", agentID, err)
 		return protocol.Memory{}, errors.New("没记下来：数据库写不进去")
 	}
-	return protocol.Memory{ID: strconv.FormatInt(id, 10), Agent: agentID, Kind: protocol.MemoryKindNote, Text: body, Project: where, At: at}, nil
+	return protocol.Memory{ID: id, Agent: agentID, Kind: protocol.MemoryKindNote, Text: body, Project: where, At: at}, nil
 }
 
-// An id that is not a number is none.
 func (m *memories) Forget(agentID, id string) error {
-	n, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		return nil
-	}
-	return m.q.Forget(context.Background(), generated.ForgetParams{Agent: agentID, ID: n})
+	return m.q.Forget(context.Background(), generated.ForgetParams{Agent: agentID, ID: id})
 }
 
 func ManagerHome(home string) string { return filepath.Join(home, "manager") }

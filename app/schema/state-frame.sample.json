@@ -44,7 +44,7 @@
     "chat": {
       "conversations": [
         {
-          "id": 1,
+          "id": "c1",
           "kind": "general",
           "replies": 0,
           "at": 1
@@ -52,8 +52,9 @@
       ],
       "messages": [
         {
-          "seq": 1,
-          "conversation": 1,
+          "id": "m1",
+          "number": 1,
+          "conversation": "c1",
           "from": "user",
           "fromKind": "user",
           "name": "主人",
@@ -63,8 +64,9 @@
           "at": 1
         },
         {
-          "seq": 2,
-          "conversation": 1,
+          "id": "m2",
+          "number": 2,
+          "conversation": "c1",
           "from": "manager",
           "fromKind": "manager",
           "name": "管家",

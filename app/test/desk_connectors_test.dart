@@ -102,12 +102,17 @@ void main() {
   });
 
   test('channelsOf: 田头 first, then the channels by id, no threads', () {
-    Conversation c(double id, ConversationKind kind, [String? name]) => Conversation(id: id, kind: kind, name: name, replies: 0, at: 0);
+    Conversation c(String id, ConversationKind kind, [String? name]) => Conversation(id: id, kind: kind, name: name, replies: 0, at: 0);
     final chat = Chat(
-      conversations: [c(3, ConversationKind.channel, 'b'), c(4, ConversationKind.thread), c(2, ConversationKind.channel, 'a'), c(1, ConversationKind.general)],
+      conversations: [
+        c('c3', ConversationKind.channel, 'b'),
+        c('c4', ConversationKind.thread),
+        c('c2', ConversationKind.channel, 'a'),
+        c('c1', ConversationKind.general),
+      ],
       messages: const [],
     );
-    expect([for (final x in channelsOf(chat)) x.id], [1, 2, 3]);
+    expect([for (final x in channelsOf(chat)) x.id], ["c1", "c2", "c3"]);
   });
 
   testWidgets('off: the list says how each logs in, and 扫码登录 starts a login', (t) async {

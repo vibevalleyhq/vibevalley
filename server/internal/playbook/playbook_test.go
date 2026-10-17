@@ -409,7 +409,7 @@ func TestPlanDiamond(t *testing.T) {
 		t.Fatalf("merged: %+v", merged)
 	}
 	for i := 1; i < len(history); i++ {
-		if history[i].Seq <= history[i-1].Seq {
+		if history[i].ID <= history[i-1].ID {
 			t.Fatal("not in order")
 		}
 	}
@@ -625,7 +625,7 @@ func TestPlanIsAParentIssue(t *testing.T) {
 	if _, err := tf.Issue.Edit(d.ID, protocol.IssueUpdate{Title: new("改")}); !errors.As(err, &refused) {
 		t.Fatalf("a step changed on the board: %v", err)
 	}
-	if _, err := tf.Issue.Start(context.Background(), d.ID, 0); !errors.As(err, &refused) {
+	if _, err := tf.Issue.Start(context.Background(), d.ID, ""); !errors.As(err, &refused) {
 		t.Fatalf("a step started on the board: %v", err)
 	}
 	tf.act(t, id, protocol.PlaybookActionStart)
@@ -637,7 +637,7 @@ func TestPlanIsAParentIssue(t *testing.T) {
 	if got, _ := tf.Issue.Get(a.Sessions[0]); got.ID != a.ID {
 		t.Fatalf("its session's issue: %s", got.ID)
 	}
-	if _, err := tf.Issue.Reopen(context.Background(), a.ID, "", 0); !errors.As(err, &refused) {
+	if _, err := tf.Issue.Reopen(context.Background(), a.ID, "", ""); !errors.As(err, &refused) {
 		t.Fatalf("a step reopened on the board: %v", err)
 	}
 	tf.act(t, id, protocol.PlaybookActionMerge)

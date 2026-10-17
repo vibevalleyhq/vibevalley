@@ -11,10 +11,11 @@ import (
 )
 
 const addNote = `-- name: AddNote :execresult
-insert into memory (agent, kind, body, project, session, created_at) values (?, 'note', ?, ?, ?, ?)
+insert into memory (id, agent, kind, body, project, session, created_at) values (?, ?, 'note', ?, ?, ?, ?)
 `
 
 type AddNoteParams struct {
+	ID        string
 	Agent     string
 	Body      string
 	Project   sql.NullString
@@ -24,6 +25,7 @@ type AddNoteParams struct {
 
 func (q *Queries) AddNote(ctx context.Context, arg AddNoteParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, addNote,
+		arg.ID,
 		arg.Agent,
 		arg.Body,
 		arg.Project,
@@ -38,7 +40,7 @@ delete from memory where agent = ? and id = ?
 
 type ForgetParams struct {
 	Agent string
-	ID    int64
+	ID    string
 }
 
 func (q *Queries) Forget(ctx context.Context, arg ForgetParams) error {
@@ -63,12 +65,13 @@ func (q *Queries) ForgetBeyond(ctx context.Context, arg ForgetBeyondParams) erro
 }
 
 const keepJob = `-- name: KeepJob :exec
-insert into memory (agent, kind, body, project, session, created_at) values (?, 'issue', ?, ?, ?, ?)
+insert into memory (id, agent, kind, body, project, session, created_at) values (?, ?, 'issue', ?, ?, ?, ?)
 on conflict (agent, session) where kind = 'issue'
 do update set body = excluded.body, project = excluded.project, created_at = excluded.created_at
 `
 
 type KeepJobParams struct {
+	ID        string
 	Agent     string
 	Body      string
 	Project   sql.NullString
@@ -79,6 +82,7 @@ type KeepJobParams struct {
 // One job memory for each session: written again as the session goes on.
 func (q *Queries) KeepJob(ctx context.Context, arg KeepJobParams) error {
 	_, err := q.db.ExecContext(ctx, keepJob,
+		arg.ID,
 		arg.Agent,
 		arg.Body,
 		arg.Project,
@@ -133,7 +137,7 @@ update memory set recalled = recalled + 1, recalled_at = ? where id = ?
 
 type RecalledParams struct {
 	RecalledAt sql.NullInt64
-	ID         int64
+	ID         string
 }
 
 func (q *Queries) Recalled(ctx context.Context, arg RecalledParams) error {

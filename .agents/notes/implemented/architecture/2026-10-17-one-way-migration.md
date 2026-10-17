@@ -30,10 +30,10 @@ Status: implemented
 - 2026-10-17 之前的家要先导入才能继续用；导入器只在 git 历史里，旧文件归档在 `retired-ts-<日期>/`，备份在仓库外。
 - 表结构只剩一份，读它不用再叠改动；旧 Go 库（如果以后从别处翻出来）不再能升，`0001` 是现在的形状。
 - 档案少了动物或衣服时，客户端照 `castOf` 挑一个显示；服务端只在保存时把它写进去。
-- 导入后的数据：1 张工单（`clock-in`，已合入）、7 条消息、15 条账本（135 金币、6 个成就）、3 条记性、w1 的 10 条事件和 1 次 run。
+- 导入后的数据：1 张工单（`clock-in`，`number` 1，已合入）、7 条消息（每个对话里从 1 数）、15 条账本（135 金币、6 个成就）、3 条记性、1 个 Session（新的 uuid）和它的 10 条事件、1 次 run。
 
 ## Verification
 
-- 真的家目录：备份成 `~/vibevalley-home-2026-10-17.tar.gz`，跑导入器，旧文件移进 `retired-ts-2026-10-17/`，起服务端后 `GET /api/v1/state` 里是那张工单、田头的 7 条消息、`progress.coins` 135；`session events w1` 打出 10 条事件，`issue runs w1` 打出 1 次 run。
+- 真的家目录：先备份成 `~/vibevalley-home-2026-10-17.tar.gz`；uuidv7 的形状定下来后再次备份成 `~/vibevalley-home-2026-10-17-uuid.tar.gz`，用导入器把 TypeScript 农场重导进新库，起服务端后 `GET /api/v1/state` 里是 `number` 1 的工单、田头的 7 条消息、`progress.coins` 135；`session events <uuid>` 打出 10 条事件，`issue runs <uuid>` 打出 1 次 run。
 - 干净的家：从 `0001_schema.sql` 建出的表和索引，和改动前 `0001`–`0005` 跑完的一样（21 张表）。
 - `go vet ./... && go test ./...`、`go run ./tool/shapegen -check`、`bun run flutter:check`、`bun run docs:verify`。

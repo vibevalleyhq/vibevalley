@@ -16,8 +16,3 @@ select * from session where ended_at is not null and (sqlc.arg(agent) = '' or ag
 
 -- name: SessionsEndedBefore :many
 select id from session where ended_at < ?;
-
--- name: MoveHead :exec
--- A head from before the table, as it was: its end too.
-insert into session (id, agent, name, runtime, task, project, issue, playbook, hired_at, ended_at, closed)
-values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict (id) do nothing;

@@ -379,7 +379,7 @@ func entriesFor(before protocol.CoreState, fact protocol.Fact, after protocol.Co
 			out = append(out, protocol.LedgerEntry{Value: e})
 		}
 	case protocol.FactMessage:
-		if !progressNewMessage(before, f.Message.Seq) {
+		if !progressNewMessage(before, f.Message.ID) {
 			break
 		}
 		switch f.Message.FromKind {
@@ -416,8 +416,8 @@ func entriesFor(before protocol.CoreState, fact protocol.Fact, after protocol.Co
 
 // progressNewMessage is whether a message is new to the state: the manager's words change as they stream in, and count
 // once.
-func progressNewMessage(state protocol.CoreState, seq int64) bool {
-	return state.Chat == nil || !slices.ContainsFunc(state.Chat.Messages, func(m protocol.ChatMessage) bool { return m.Seq == seq })
+func progressNewMessage(state protocol.CoreState, id string) bool {
+	return state.Chat == nil || !slices.ContainsFunc(state.Chat.Messages, func(m protocol.ChatMessage) bool { return m.ID == id })
 }
 
 func catchUp(state protocol.CoreState) []protocol.LedgerEntry {

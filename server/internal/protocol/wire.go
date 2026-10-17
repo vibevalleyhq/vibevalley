@@ -34,16 +34,6 @@ func query(r *http.Request, name string) *string {
 	return &v
 }
 
-// A path parameter that is a number (a schedule's, a conversation's id); anything else is nothing there (404).
-func pathNumber(w http.ResponseWriter, r *http.Request, name string) (int64, bool) {
-	n, err := strconv.ParseInt(r.PathValue(name), 10, 64)
-	if err != nil {
-		answer(w, nil, Missing{What: r.PathValue(name)})
-		return 0, false
-	}
-	return n, true
-}
-
 // A query parameter that is a number; one missing or not a number is none.
 func queryNumber(r *http.Request, name string) *int64 {
 	v := query(r, name)

@@ -9,7 +9,7 @@ sealed class DesktopCommand {
     return switch (j['type']) {
       'voice' => const DesktopVoice(),
       'session' when j['id'] is String => DesktopOpenSession(j['id'] as String),
-      'chat' when j['conversation'] is num => DesktopOpenChat((j['conversation'] as num).toDouble()),
+      'chat' when j['conversation'] is String => DesktopOpenChat(j['conversation'] as String),
       'plans' when j['playbook'] is String => DesktopOpenPlans(j['playbook'] as String),
       'achievements' => const DesktopOpenAchievements(),
       _ => null,
@@ -38,7 +38,7 @@ final class DesktopOpenSession extends DesktopCommand {
 
 final class DesktopOpenChat extends DesktopCommand {
   const DesktopOpenChat(this.conversation);
-  final double conversation;
+  final String conversation;
   @override
   Map<String, Object> toJson() => {'type': 'chat', 'conversation': conversation};
   @override

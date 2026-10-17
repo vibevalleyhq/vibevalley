@@ -10,23 +10,29 @@ import (
 )
 
 const addLedgerEntry = `-- name: AddLedgerEntry :exec
-insert into game_ledger (kind, at, payload) values (?, ?, ?)
+insert into game_ledger (id, kind, at, payload) values (?, ?, ?, ?)
 `
 
 type AddLedgerEntryParams struct {
+	ID      string
 	Kind    string
 	At      int64
 	Payload string
 }
 
 func (q *Queries) AddLedgerEntry(ctx context.Context, arg AddLedgerEntryParams) error {
-	_, err := q.db.ExecContext(ctx, addLedgerEntry, arg.Kind, arg.At, arg.Payload)
+	_, err := q.db.ExecContext(ctx, addLedgerEntry,
+		arg.ID,
+		arg.Kind,
+		arg.At,
+		arg.Payload,
+	)
 	return err
 }
 
 const ledgerEntries = `-- name: LedgerEntries :many
 
-select kind, at, payload from game_ledger order by seq
+select kind, at, payload from game_ledger order by id
 `
 
 type LedgerEntriesRow struct {

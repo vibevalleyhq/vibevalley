@@ -20,7 +20,7 @@ func scheduleAt(iso string) int64 {
 }
 
 func scheduleMake(change ...func(*Schedule)) Schedule {
-	s := Schedule{ID: 1, Name: "测试", Text: "跑一遍测试", Channel: 1, When: ScheduleWhen{ScheduleWhenDaily{Time: "09:00"}}, TZ: scheduleSH, Enabled: true, Created: scheduleAt("2026-10-12T08:00:00")}
+	s := Schedule{ID: "c1", Name: "测试", Text: "跑一遍测试", Channel: "c1", When: ScheduleWhen{ScheduleWhenDaily{Time: "09:00"}}, TZ: scheduleSH, Enabled: true, Created: scheduleAt("2026-10-12T08:00:00")}
 	for _, c := range change {
 		c(&s)
 	}
@@ -113,9 +113,9 @@ func TestReduceKeepsSchedules(t *testing.T) {
 	offState, _ := Reduce(one, Fact{FactSchedule{Schedule: off}})
 	testkit.Eq(t, offState.Schedules[0].Enabled, false)
 	testkit.Eq(t, FrameOf(offState, nil).State.Schedules[0].NextText, "关着")
-	gone, _ := Reduce(offState, Fact{FactUnschedule{ID: 1}})
+	gone, _ := Reduce(offState, Fact{FactUnschedule{ID: "c1"}})
 	testkit.Eq(t, gone.Schedules, []Schedule{})
-	if _, changed := Reduce(EmptyCoreState(), Fact{FactUnschedule{ID: 9}}); changed {
+	if _, changed := Reduce(EmptyCoreState(), Fact{FactUnschedule{ID: "c9"}}); changed {
 		t.Fatal("unschedule of none")
 	}
 }

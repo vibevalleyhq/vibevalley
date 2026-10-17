@@ -11,24 +11,24 @@ import (
 
 const follow = `-- name: Follow :exec
 
-insert into channel_follow (conversation_id, participant_id, reason, from_seq) values (?, ?, ?, ?)
+insert into channel_follow (conversation_id, participant_id, reason, from_number) values (?, ?, ?, ?)
 on conflict (conversation_id, participant_id) do update set unfollowed_at = null
 `
 
 type FollowParams struct {
-	ConversationID int64
+	ConversationID string
 	ParticipantID  string
 	Reason         string
-	FromSeq        int64
+	FromNumber     int64
 }
 
-// Who follows a thread, from which message on (channel/db.go).
+// Who follows a thread, from which message number on (channel/db.go).
 func (q *Queries) Follow(ctx context.Context, arg FollowParams) error {
 	_, err := q.db.ExecContext(ctx, follow,
 		arg.ConversationID,
 		arg.ParticipantID,
 		arg.Reason,
-		arg.FromSeq,
+		arg.FromNumber,
 	)
 	return err
 }
@@ -37,7 +37,7 @@ const followers = `-- name: Followers :many
 select participant_id from channel_follow where conversation_id = ? and unfollowed_at is null order by participant_id
 `
 
-func (q *Queries) Followers(ctx context.Context, conversationID int64) ([]string, error) {
+func (q *Queries) Followers(ctx context.Context, conversationID string) ([]string, error) {
 	rows, err := q.db.QueryContext(ctx, followers, conversationID)
 	if err != nil {
 		return nil, err

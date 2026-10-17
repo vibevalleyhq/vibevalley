@@ -19,7 +19,7 @@ func TestStartedAgainFromStateJSON(t *testing.T) {
 	was.Call, was.CallReason, was.Manager = protocol.CallStateLive, ptr.To("挂了"), protocol.ManagerStateSpeaking
 	was.Sessions = []protocol.Session{{ID: "w1", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "写", Phase: protocol.Phase{Value: protocol.PhaseRipe{}}}}
 	was.Progress = ptr.To(protocol.EmptyProgress())
-	was.Schedules = []protocol.Schedule{{ID: 1, Name: "日报"}}
+	was.Schedules = []protocol.Schedule{{ID: "x1", Name: "日报"}}
 	was.Issues = []protocol.Issue{{ID: "i1"}}
 	body, _ := json.Marshal(was)
 	if err := os.WriteFile(filepath.Join(home, "state.json"), body, 0o644); err != nil {

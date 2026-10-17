@@ -1,7 +1,7 @@
 -- Runs: one go at the work each (session/runs.go).
 
--- name: StartRun :execlastid
-insert into session_run (session, issue, triggered_by, started_at) values (?, ?, ?, ?);
+-- name: StartRun :exec
+insert into session_run (id, session, issue, triggered_by, started_at) values (?, ?, ?, ?, ?);
 
 -- name: HeardInRun :exec
 update session_run set heard = ? where id = ?;

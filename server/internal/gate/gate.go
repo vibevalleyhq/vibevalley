@@ -321,7 +321,7 @@ func (l *Service) callOff(p *lanPairing) {
 
 func (l *Service) addDevice(name string) (protocol.LanPaired, error) {
 	key := lanKey()
-	d := &lanDevice{LanDevice: protocol.LanDevice{ID: "d" + base.Code(8), Name: name, PairedAt: l.now().UnixMilli()}, keyHash: lanHash(key)}
+	d := &lanDevice{LanDevice: protocol.LanDevice{ID: base.NewID(), Name: name, PairedAt: l.now().UnixMilli()}, keyHash: lanHash(key)}
 	if err := l.q.AddLanDevice(context.Background(), generated.AddLanDeviceParams{ID: d.ID, Name: d.Name, KeyHash: d.keyHash, PairedAt: d.PairedAt}); err != nil {
 		return protocol.LanPaired{}, err
 	}

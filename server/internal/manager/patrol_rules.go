@@ -23,7 +23,7 @@ var patrolGrace = map[protocol.InboxKind]int64{
 
 type patrolNote struct {
 	Key     string
-	Channel *int64
+	Channel *string
 	Text    string
 }
 

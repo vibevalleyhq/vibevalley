@@ -39,6 +39,7 @@ Issue _issue(
   IssuePlan? plan,
 }) => Issue(
   id: id,
+  number: 1,
   title: text,
   project: 'clock',
   assignee: 'backend',
@@ -68,6 +69,7 @@ void main() {
   test("an issue for the manager: in 处理中 while the manager works on it, closed once it answered", () {
     const working = Issue(
       id: 't9',
+      number: 1,
       title: '看进度',
       assignee: managerAgent,
       priority: Priority.medium,
@@ -79,6 +81,7 @@ void main() {
     expect(laneOf(working.status), Lane.working);
     const answered = Issue(
       id: 't9',
+      number: 1,
       title: '看进度',
       assignee: managerAgent,
       priority: Priority.medium,
@@ -96,18 +99,18 @@ void main() {
   test('a run in one line: what started it, how it went, how long, what it cost, what it heard', () {
     String took(double ms) => '${(ms / 60000).round()} 分钟';
     const done = Run(
-      id: 1,
+      id: 'r1',
       session: 'w1',
-      triggeredBy: RunTrigger(kind: RunTriggerKind.comment, message: 42),
-      heard: [43, 44],
+      triggeredBy: RunTrigger(kind: RunTriggerKind.comment, message: 'm42'),
+      heard: ['m43', 'm44'],
       startedAt: 0,
       endedAt: 180000,
       outcome: Outcome.completed,
       spent: Spent(tokens: 10, cny: 0.5),
     );
-    expect(runText(done, 999999, took), '带话（#42） · 做完了 · 3 分钟 · ¥0.50 · 中途听到 2 句');
+    expect(runText(done, 999999, took), '带话（#m42） · 做完了 · 3 分钟 · ¥0.50 · 中途听到 2 句');
     const going = Run(
-      id: 2,
+      id: 'r2',
       session: 'w1',
       triggeredBy: RunTrigger(kind: RunTriggerKind.schedule, missed: true),
       heard: [],
@@ -247,6 +250,7 @@ void main() {
     var issues = [
       const Issue(
         id: 'a1',
+        number: 1,
         title: '加日志',
         project: 'clock',
         assignee: 'backend',
@@ -255,7 +259,7 @@ void main() {
         sessions: [],
         status: IssueStatus.backlog,
       ),
-      const Issue(id: 'a2', title: '改文案', project: 'site', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.backlog),
+      const Issue(id: 'a2', number: 1, title: '改文案', project: 'site', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.backlog),
       _openIssue,
       _closedIssue,
     ];
@@ -279,6 +283,7 @@ void main() {
           final body = IssueRequest.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
           final item = Issue(
             id: 'a9',
+            number: 1,
             title: body.title,
             project: body.project,
             assignee: body.assignee,

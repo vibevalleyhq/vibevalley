@@ -183,7 +183,7 @@ func TestManagerDispatchesAndHearsVoiceInSilence(t *testing.T) {
 		t.Fatalf("line %q", line)
 	}
 	trail := testkit.Await(t, "its log", func() ([]protocol.SessionEvent, bool) {
-		events := f.Session.Events(protocol.ManagerAgent, 0)
+		events := f.Session.Events(protocol.ManagerAgent, "")
 		return events, len(events) >= 3 && events[len(events)-1].Type == protocol.SessionEventTypeAssistantMessage
 	})
 	last := trail[len(trail)-4:]
@@ -265,7 +265,7 @@ func TestManagerSchedulesComeDue(t *testing.T) {
 		t.Fatal(err)
 	}
 	if made.Channel != f.Channel.General() {
-		t.Fatalf("channel %d", made.Channel)
+		t.Fatalf("channel %s", made.Channel)
 	}
 	if said := w.managerSaid(t, 1); !slices.Equal(said, []string{"到点了，看了一眼"}) {
 		t.Fatalf("said %q", said)

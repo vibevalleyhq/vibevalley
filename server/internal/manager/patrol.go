@@ -14,7 +14,7 @@ import (
 // Patrol (巡查) looks over the Inbox for what has waited too long and wakes the manager once per channel; it puts nothing on the farm itself.
 
 type PatrolNews struct {
-	Channel int64
+	Channel string
 	Text    string
 }
 
@@ -71,8 +71,8 @@ func (h *patrol) Patrol() {
 	chat := h.chat
 	report, memory := patrolStep(h.core.State(), h.PatrolNow(), h.memory)
 	h.memory = memory
-	var order []int64
-	byChannel := map[int64][]patrolNote{}
+	var order []string
+	byChannel := map[string][]patrolNote{}
 	for _, f := range report {
 		channel := chat.General()
 		if f.Channel != nil {

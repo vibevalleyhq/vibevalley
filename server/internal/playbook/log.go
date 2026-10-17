@@ -7,6 +7,7 @@ import (
 	"log"
 	"slices"
 
+	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
 	"vibevalley/pkg/db/generated"
 	"vibevalley/pkg/x/clock"
@@ -42,7 +43,7 @@ func (l *playbookLog) Record(before *protocol.Playbook, after protocol.Playbook,
 			node = sql.NullString{String: *c.Node, Valid: true}
 		}
 		if err := l.q.AddPlaybookEvent(context.Background(), generated.AddPlaybookEventParams{
-			PlaybookID: c.Playbook, NodeID: node, Kind: string(c.Kind), Actor: string(actor), Payload: string(payload), CreatedAt: at,
+			ID: base.NewID(), PlaybookID: c.Playbook, NodeID: node, Kind: string(c.Kind), Actor: string(actor), Payload: string(payload), CreatedAt: at,
 		}); err != nil {
 			log.Printf("vibevalley: a playbook event was not kept: %v", err)
 		}
@@ -58,7 +59,7 @@ func (l *playbookLog) List(playbook string) []protocol.PlaybookEvent {
 	}
 	out := []protocol.PlaybookEvent{}
 	for _, row := range rows {
-		e := protocol.PlaybookEvent{Seq: row.Seq, Playbook: row.PlaybookID, At: row.CreatedAt}
+		e := protocol.PlaybookEvent{ID: row.ID, Playbook: row.PlaybookID, At: row.CreatedAt}
 		node, payload := row.NodeID, row.Payload
 		e.Kind, e.Actor = protocol.PlaybookEventKind(row.Kind), protocol.PlaybookActor(row.Actor)
 		if !slices.Contains(protocol.PlaybookEventKindValues, e.Kind) || !slices.Contains(protocol.PlaybookActorValues, e.Actor) {

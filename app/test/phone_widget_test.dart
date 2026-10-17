@@ -47,7 +47,14 @@ const draft = InboxItem(
   at: 40,
   target: InboxTargetPlans(playbook: 'pb1'),
 );
-const mention = InboxItem(id: 'm4', kind: InboxKind.mention, from: InboxFromManager(), text: '@主人 要不要收？', at: 50, target: InboxTargetChat(conversation: 3));
+const mention = InboxItem(
+  id: 'm4',
+  kind: InboxKind.mention,
+  from: InboxFromManager(),
+  text: '@主人 要不要收？',
+  at: 50,
+  target: InboxTargetChat(conversation: 'c3'),
+);
 
 class Corner extends ConsumerWidget {
   const Corner({super.key, required this.call});
@@ -180,7 +187,7 @@ void main() {
     expect(find.text('@主人 要不要收？'), findsOneWidget);
     await tester.tap(find.text('@主人 要不要收？'));
     await tester.pumpAndSettle();
-    expect(routes, ['/chat/3']);
+    expect(routes, ['/chat/c3']);
     await done(tester);
   });
 

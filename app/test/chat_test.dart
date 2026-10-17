@@ -27,8 +27,9 @@ final _now = DateTime.now().millisecondsSinceEpoch.toDouble();
 
 ChatMessage _msg(double seq, double conv, String from, SenderKind kind, String text, {MessageKind type = MessageKind.chat, String? name, bool done = true}) =>
     ChatMessage(
-      seq: seq,
-      conversation: conv,
+      id: 'm${seq.round()}',
+      number: seq,
+      conversation: 'c${conv.round()}',
       from: from,
       fromKind: kind,
       name:
@@ -58,7 +59,7 @@ const _session = Session(
     since: 0,
     doing: Doing(action: SessionAction.runCommand, label: 'pnpm test'),
   ),
-  channel: 1,
+  channel: 'c1',
   phaseText: '在跑命令：pnpm test',
 );
 
@@ -68,18 +69,18 @@ CoreState _state({CallState call = CallState.live, double generalRead = 0, List<
   sessions: const [_session],
   chat: Chat(
     conversations: [
-      Conversation(id: 1, kind: ConversationKind.general, name: '田头', replies: 0, read: generalRead, at: 0, lastSeq: 2),
-      const Conversation(id: 2, kind: ConversationKind.channel, name: 'clock-in', description: '打卡', project: 'clock-in', replies: 0, at: 1, lastSeq: 4),
+      Conversation(id: 'c1', kind: ConversationKind.general, name: '田头', replies: 0, read: generalRead, at: 0, lastNumber: 2),
+      const Conversation(id: 'c2', kind: ConversationKind.channel, name: 'clock-in', description: '打卡', project: 'clock-in', replies: 0, at: 1, lastNumber: 4),
       const Conversation(
-        id: 3,
+        id: 'c3',
         kind: ConversationKind.thread,
-        parent: 2,
-        channel: 1,
+        parent: 'm2',
+        channel: 'c1',
         subjectKind: SubjectKind.issue,
         subjectId: 'w1',
         replies: 1,
         at: 2,
-        lastSeq: 3,
+        lastNumber: 3,
       ),
     ],
     messages: [
@@ -92,10 +93,10 @@ CoreState _state({CallState call = CallState.live, double generalRead = 0, List<
   ),
   schedules: const [
     Schedule(
-      id: 5,
+      id: 's5',
       name: '早测',
       text: '跑一遍测试',
-      channel: 2,
+      channel: 'c2',
       when: ScheduleWhenDaily(time: '09:00'),
       tz: 'Asia/Shanghai',
       enabled: true,
@@ -169,14 +170,14 @@ void main() {
     final chat = _state().chat;
 
     test('channels: the general first; unread counts the others\' finished words, threads under their channel', () {
-      expect(channelsOf(chat).map((c) => c.id), [1, 2]);
+      expect(channelsOf(chat).map((c) => c.id), ['c1', 'c2']);
       expect(unreadIn(chat, chat!.conversations[0]), 2);
       expect(unreadUnder(chat, chat.conversations[0]), 3);
       expect(unreadUnder(chat, chat.conversations[1]), 1);
       expect(unreadTotal(chat), 4);
       expect(newestUnread(chat, chat.conversations[0]), 2);
-      expect(jobThreadOf(chat, 'w1')?.id, 3);
-      expect(channelOf(chat, chat.conversations[2])?.id, 1);
+      expect(jobThreadOf(chat, 'w1')?.id, 'c3');
+      expect(channelOf(chat, chat.conversations[2])?.id, 'c1');
       expect(channelLabel(chat.conversations[1]), '#clock-in');
       expect(channelLabel(chat.conversations[0]), '田头');
     });
@@ -195,10 +196,10 @@ void main() {
       final line = Line(id: 1, role: LineRole.user, text: '说一句', final_: true, at: _now - 8500);
       final items = itemsOf(chat, general, [line]);
       expect(items.map((i) => i.key), ['m1', 's1', 'm2']);
-      expect((items.last as MessageItem).thread?.id, 3);
+      expect((items.last as MessageItem).thread?.id, 'c3');
       expect(itemsOf(chat, chat.conversations[1], [line]).map((i) => i.key), ['m4']);
       final more = const Loaded([], complete: false).merge([_msg(0.5, 3, 'user', SenderKind.user, '早')], complete: true);
-      expect(messagesOf(chat, 3, more).map((m) => m.seq), [0.5, 3]);
+      expect(messagesOf(chat, 'c3', more).map((m) => m.number), [0.5, 3]);
       expect(more.complete, isTrue);
     });
 
@@ -219,9 +220,9 @@ void main() {
       expect(_rich('农场开门了'), findsOneWidget);
       expect(_rich('1 条回复'), findsOneWidget);
       expect(find.text('派活'), findsOneWidget);
-      final read = server.to('POST', '/api/v1/channels/1/read');
+      final read = server.to('POST', '/api/v1/channels/c1/read');
       expect(read, hasLength(1));
-      expect(jsonDecode(read.single.body), {'seq': 2});
+      expect(jsonDecode(read.single.body), {'number': 2});
     });
 
     for (final still in [false, true]) {
@@ -254,7 +255,7 @@ void main() {
       await _pump(t, const ChatPage(), server, _state());
       await t.tap(find.text('clock-in'));
       await t.pump(const Duration(milliseconds: 50));
-      expect(server.to('GET', '/api/v1/channels/2/messages').single.url.queryParameters, {'limit': '50'});
+      expect(server.to('GET', '/api/v1/channels/c2/messages').single.url.queryParameters, {'limit': '50'});
       expect(_rich('打卡页改好了'), findsOneWidget);
       expect(find.text('打卡 · 默认项目 clock-in'), findsOneWidget);
       await t.enterText(find.byType(TextField).first, '今天把打卡做完');
@@ -262,7 +263,7 @@ void main() {
       await t.pump(const Duration(milliseconds: 50));
       final say = server.to('POST', '/api/v1/say');
       expect(say, hasLength(1));
-      expect(jsonDecode(say.single.body), {'text': '今天把打卡做完', 'conversation': 2});
+      expect(jsonDecode(say.single.body), {'text': '今天把打卡做完', 'conversation': 'c2'});
     });
 
     testWidgets('@ offers whom to name; Enter names, then Enter sends on the square', (t) async {
@@ -287,7 +288,7 @@ void main() {
       await t.tap(_rich('1 条回复'));
       await t.pump(const Duration(milliseconds: 50));
       expect(find.text('测试小吴的工单串'), findsOneWidget);
-      expect(server.to('GET', '/api/v1/channels/3/messages'), hasLength(1));
+      expect(server.to('GET', '/api/v1/channels/c3/messages'), hasLength(1));
       expect(_rich('测试都过了'), findsWidgets);
       expect(find.text('做完了'), findsOneWidget);
 
@@ -298,12 +299,12 @@ void main() {
       expect(find.text('跑一遍测试'), findsOneWidget);
       await t.tap(find.text('开着'));
       await t.pump(const Duration(milliseconds: 50));
-      expect(jsonDecode(server.to('PUT', '/api/v1/schedules/5').single.body), {'enabled': false});
+      expect(jsonDecode(server.to('PUT', '/api/v1/schedules/s5').single.body), {'enabled': false});
       await t.tap(find.byTooltip('删掉'));
       await t.pump();
       await t.tap(find.text('确定删？'));
       await t.pump(const Duration(milliseconds: 50));
-      expect(server.to('DELETE', '/api/v1/schedules/5'), hasLength(1));
+      expect(server.to('DELETE', '/api/v1/schedules/s5'), hasLength(1));
     });
   });
 
@@ -342,7 +343,7 @@ void main() {
       await t.enterText(find.byType(TextField), '再跑一次');
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump(const Duration(milliseconds: 50));
-      expect(jsonDecode(server.to('POST', '/api/v1/say').single.body), {'text': '再跑一次', 'conversation': 3});
+      expect(jsonDecode(server.to('POST', '/api/v1/say').single.body), {'text': '再跑一次', 'conversation': 'c3'});
 
       await t.tap(find.bySemanticsLabel('回到田头').first);
       await t.pump(const Duration(milliseconds: 50));

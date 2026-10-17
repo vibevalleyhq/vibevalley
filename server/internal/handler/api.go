@@ -86,7 +86,7 @@ func (a api) ScheduleList(context.Context) ([]protocol.Schedule, error) {
 	return a.f.Schedule.List(), nil
 }
 
-func (a api) ScheduleUpdate(_ context.Context, id int64, body protocol.ScheduleUpdate) error {
+func (a api) ScheduleUpdate(_ context.Context, id string, body protocol.ScheduleUpdate) error {
 	if body.Enabled == nil {
 		return nil
 	}
@@ -94,12 +94,12 @@ func (a api) ScheduleUpdate(_ context.Context, id int64, body protocol.ScheduleU
 	return refused(err)
 }
 
-func (a api) ScheduleDelete(_ context.Context, id int64) error {
+func (a api) ScheduleDelete(_ context.Context, id string) error {
 	_, err := a.f.Schedule.Remove(id)
 	return refused(err)
 }
 
-func (a api) ChannelUpdate(_ context.Context, id int64, body protocol.ChannelUpdate) error {
+func (a api) ChannelUpdate(_ context.Context, id string, body protocol.ChannelUpdate) error {
 	return refused(a.f.Channel.UpdateChannel(id, body.Description, body.Project))
 }
 
@@ -191,7 +191,7 @@ func (a api) SessionGet(_ context.Context, id string) (protocol.Session, error) 
 	return protocol.Session{}, missing("帮工 " + id)
 }
 
-func (a api) SessionEvents(_ context.Context, id string, run *int64) ([]protocol.SessionEvent, error) {
+func (a api) SessionEvents(_ context.Context, id string, run *string) ([]protocol.SessionEvent, error) {
 	return a.f.Session.Events(id, ptr.Value(run)), nil
 }
 
@@ -220,7 +220,7 @@ func (a api) PlaybookNodeAct(_ context.Context, id, node string, body protocol.N
 	return s, refused(err)
 }
 
-func (a api) ChannelHistory(_ context.Context, id int64, before, limit *int64) ([]protocol.ChatMessage, error) {
+func (a api) ChannelHistory(_ context.Context, id string, before, limit *int64) ([]protocol.ChatMessage, error) {
 	messages, err := a.f.Channel.History(id, before, limit)
 	if err != nil {
 		return nil, missing(err.Error())
@@ -228,8 +228,8 @@ func (a api) ChannelHistory(_ context.Context, id int64, before, limit *int64) (
 	return messages, nil
 }
 
-func (a api) ChannelMarkRead(_ context.Context, id int64, body protocol.ChatReadRequest) error {
-	if err := a.f.Channel.MarkRead(id, body.Seq); err != nil {
+func (a api) ChannelMarkRead(_ context.Context, id string, body protocol.ChatReadRequest) error {
+	if err := a.f.Channel.MarkRead(id, body.Number); err != nil {
 		return missing(err.Error())
 	}
 	return nil

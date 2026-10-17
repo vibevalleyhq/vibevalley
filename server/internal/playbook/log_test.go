@@ -18,7 +18,7 @@ func TestPlaybookLog(t *testing.T) {
 	next := pb
 	next.State = protocol.PlaybookStateAbandoned
 	f.Playbook.Record(&pb, next, protocol.PlaybookActorSystem, "重启了")
-	if _, err := f.DB.Exec("insert into playbook_event (playbook_id, kind, actor, created_at) values ('p1', 'gone', 'system', 1)"); err != nil {
+	if _, err := f.DB.Exec("insert into playbook_event (id, playbook_id, kind, actor, created_at) values ('pe-gone', 'p1', 'gone', 'system', 1)"); err != nil {
 		t.Fatal(err)
 	}
 	events := f.Playbook.List("p1")
@@ -28,7 +28,7 @@ func TestPlaybookLog(t *testing.T) {
 	if events[0].Kind != protocol.PlaybookEventKindPlanning || events[0].Actor != protocol.PlaybookActorUser || planStr(events[0].Detail) != "做打卡" {
 		t.Fatalf("first: %+v", events[0])
 	}
-	if events[1].Kind != protocol.PlaybookEventKindAbandoned || planStr(events[1].Detail) != "重启了" || events[1].Seq <= events[0].Seq {
+	if events[1].Kind != protocol.PlaybookEventKindAbandoned || planStr(events[1].Detail) != "重启了" || events[1].ID <= events[0].ID {
 		t.Fatalf("second: %+v", events[1])
 	}
 	if len(f.Playbook.List("p2")) != 0 {

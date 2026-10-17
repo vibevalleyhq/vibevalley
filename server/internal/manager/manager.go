@@ -155,7 +155,7 @@ type manager struct {
 	picked  string
 	// The current run came from voice: its words stay off the farm, the voice agent answered already.
 	quiet   bool
-	replyTo int64
+	replyTo string
 	caller  *managerCaller
 	// In bytes.
 	toCaller int
@@ -239,7 +239,7 @@ func (fm *manager) OnStop() {
 	fm.starting.Unlock()
 }
 
-func (fm *manager) here() int64 {
+func (fm *manager) here() string {
 	fm.mu.Lock()
 	defer fm.mu.Unlock()
 	return fm.replyTo
@@ -573,7 +573,7 @@ func (fm *manager) settled() {
 }
 
 // now joins the run under way; otherwise the line waits until the run would stop. false: the manager could not start.
-func (fm *manager) send(line string, conversation int64, now bool) bool {
+func (fm *manager) send(line string, conversation string, now bool) bool {
 	fm.trace.Asked(line, nil)
 	brain, err := fm.brainOf()
 	if err != nil {
@@ -642,7 +642,7 @@ func (fm *manager) onWork(w issue.ManagerWork) {
 		if w.By.Missed {
 			missed = "（服务端没开着时错过的，补一次）"
 		}
-		line = fmt.Sprintf("【定时任务「%s」到点了%s】\n%s\n\n这是 #%s 的定时（%d 号），你的回答会发在那里；照着做，做完说一两句。", s.Name, missed, s.Text, channel.Name, s.ID)
+		line = fmt.Sprintf("【定时任务「%s」到点了%s】\n%s\n\n这是 #%s 的定时（%s），你的回答会发在那里；照着做，做完说一两句。", s.Name, missed, s.Text, channel.Name, s.ID)
 	}
 	run := fm.run.OpenRun(protocol.ManagerAgent, w.Issue.ID, w.By)
 	fm.mu.Lock()
@@ -654,7 +654,7 @@ func (fm *manager) onWork(w issue.ManagerWork) {
 }
 
 type managerRun struct {
-	run   int64
+	run   string
 	issue string
 }
 
@@ -671,7 +671,7 @@ func (fm *manager) answered(outcome protocol.Outcome) {
 	}
 }
 
-func (fm *manager) Say(ctx context.Context, text, agentID string, conversation *int64) error {
+func (fm *manager) Say(ctx context.Context, text, agentID string, conversation *string) error {
 	picked := ""
 	if a := fm.store.Agent(agentID); agentID != "" && a != nil {
 		picked = a.ID

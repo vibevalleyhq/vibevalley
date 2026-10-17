@@ -94,7 +94,7 @@ func spokenText(s channel.Spoken) string {
 			}
 			absent = "。" + strings.Join(names, "、") + " 不在地里，没送到"
 		}
-		return fmt.Sprintf("发出去了：%s msg=%d%s", s.Target, s.Message.Seq, absent)
+		return fmt.Sprintf("发出去了：%s msg=%d%s", s.Target, s.Message.Number, absent)
 	}
 }
 
@@ -151,7 +151,7 @@ func (t *Service) add(server *sdk.Server) {
 		}
 		older := ""
 		if r.Older {
-			older = fmt.Sprintf("（更早的还有：before:%d 往前翻）", r.Messages[0].Seq)
+			older = fmt.Sprintf("（更早的还有：before:%d 往前翻）", r.Messages[0].Number)
 		}
 		return toolText(r.Target+older+"：\n"+protocol.InboxLines(r.Messages), nil)
 	})

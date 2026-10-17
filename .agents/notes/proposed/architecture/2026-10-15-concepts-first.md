@@ -74,7 +74,7 @@ VibeValley 是 AI 版的 Linear，穿农场的皮。概念收成下面几样，�
    - 金币、成就、等级、地块位置挪进农场的画面，和现在的 `FarmView` 一样，从状态和账本算出来；
    - Flutter 的工作台读核心状态，像素村读画面。
 9. **改名，拆包**：
-   - 照上面的名字改类型、字段和服务，生成的 Dart 跟着改（改了 `IncomingCall` 那一组，见第 5 步；`Helper`、`Foreman` 改成了 `Worker`、`Manager`，`Worker` 后来改叫 `Session`，见 [Run 是一次干活，Session 跨好几次 run](2026-10-16-runs-sessions-crews.md)；`AgentProfile`、`WorkStep`、`Merges.Harvest`、工单状态和优先级的值也都改完了，见 [改完旧名字](2026-10-16-finish-the-renames.md)）；
+   - 照上面的名字改类型、字段和服务，生成的 Dart 跟着改（改了 `IncomingCall` 那一组，见第 5 步；`Helper`、`Foreman` 改成了 `Worker`、`Manager`，`Worker` 后来改叫 `Session`，见 [Run 是一次干活，Session 跨好几次 run](2026-10-16-runs-sessions-crews.md)；`AgentProfile`、`WorkStep`、`Merges.Harvest`、工单状态和优先级的值也都改完了，见 [改完旧名字](../../implemented/architecture/2026-10-16-finish-the-renames.md)）；
    - 存盘的字段和表名一起改，写迁移；复数表名改成单数，查询搬进 sqlc（新加的 `issue`、`issue_run` 已经是单数，老表还是复数）；
    - 按模块拆成 Go 包，模块之间的依赖方向由编译器检查（这一项已经做了，[一个概念一个包](../../implemented/architecture/2026-10-16-a-package-per-concept.md)）。
 

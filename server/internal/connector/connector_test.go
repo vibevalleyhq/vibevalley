@@ -178,7 +178,7 @@ func voiceConnectorsFarm(t *testing.T) (*world, *voiceScript) {
 	c := f.Connector
 	c.ilink, c.feishu, c.qq = voiceScriptedIlink{s}, voiceScriptedFeishu{s}, voiceScriptedQQ{s}
 	var n atomic.Int64
-	c.say = func(_ context.Context, text string, conversation *int64) error {
+	c.say = func(_ context.Context, text string, conversation *string) error {
 		said, err := f.Channel.Say(text, conversation)
 		if err != nil {
 			return err
@@ -220,7 +220,7 @@ func voiceNth(t *testing.T, s *voiceScript, app protocol.ConnectorID, n int, wha
 	})
 }
 
-func voiceSaidIn(t *testing.T, f *world, conversation int64) []string {
+func voiceSaidIn(t *testing.T, f *world, conversation string) []string {
 	t.Helper()
 	history, err := f.Channel.History(conversation, nil, nil)
 	if err != nil {
@@ -510,7 +510,7 @@ func TestConnectorsResumeAfterRestart(t *testing.T) {
 		s := &voiceScript{weixin: make(chan weixin.Message, 4), feishu: make(chan feishu.Message, 4), qq: make(chan qq.Message, 4)}
 		s.qr = []weixin.QrStatus{{Status: "confirmed", BotToken: "tok", IlinkBotID: "bot1", IlinkUserID: voiceOwner}}
 		f.Connector.ilink, f.Connector.feishu, f.Connector.qq = voiceScriptedIlink{s}, voiceScriptedFeishu{s}, voiceScriptedQQ{s}
-		f.Connector.say = func(_ context.Context, text string, conversation *int64) error {
+		f.Connector.say = func(_ context.Context, text string, conversation *string) error {
 			_, err := f.Channel.Say(text, conversation)
 			return err
 		}

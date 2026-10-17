@@ -103,7 +103,7 @@ class _MessageListState extends ConsumerState<MessageList> {
         _Arrive(
           key: ValueKey(switch (item) {
             SpokenItem(:final line) => 'line ${line.id}',
-            MessageItem(:final message) => 'message ${message.seq}',
+            MessageItem(:final message) => 'message ${message.number}',
           }),
           fresh: shownUpTo != null && item.at > shownUpTo,
           child: _Row(item: item, continues: continues),

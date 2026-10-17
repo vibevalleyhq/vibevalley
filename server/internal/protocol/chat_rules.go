@@ -22,14 +22,14 @@ const (
 	HeldShown     = 3
 )
 
-// A channel is #<name> (#田头), a thread #<its channel>:<the seq of the message it hangs under>. channelName nil: the general channel.
+// A channel is #<name> (#田头), a thread #<its channel>:<the number of the message it hangs under>. channelName nil: the general channel.
 func TargetOf(c Conversation, channelName *string) string {
-	if c.Kind == ConversationKindThread && c.Parent != nil {
+	if c.Kind == ConversationKindThread && c.ParentNumber != nil {
 		name := GeneralName
 		if channelName != nil {
 			name = *channelName
 		}
-		return "#" + name + ":" + strconv.FormatInt(*c.Parent, 10)
+		return "#" + name + ":" + strconv.FormatInt(*c.ParentNumber, 10)
 	}
 	if c.Name != nil {
 		return "#" + *c.Name
@@ -38,7 +38,8 @@ func TargetOf(c Conversation, channelName *string) string {
 }
 
 type InboxMessage struct {
-	Seq      int64      `json:"seq"`
+	ID       string     `json:"id"`
+	Number   int64      `json:"number"`
 	Target   string     `json:"target"`
 	From     string     `json:"from"`
 	FromKind SenderKind `json:"fromKind"`
@@ -61,7 +62,7 @@ func MessageLine(m InboxMessage) string {
 	if m.FromKind == SenderKindAgent {
 		from = m.From + " " + m.Name
 	}
-	return fmt.Sprintf("[target=%s msg=%d from=%s] %s", m.Target, m.Seq, from, strings.ReplaceAll(str.Trim(m.Text), "\n", "\n  │ "))
+	return fmt.Sprintf("[target=%s msg=%d from=%s] %s", m.Target, m.Number, from, strings.ReplaceAll(str.Trim(m.Text), "\n", "\n  │ "))
 }
 
 func GeneralOf(chat *Chat) *Conversation {
@@ -83,7 +84,7 @@ func ChannelOf(chat *Chat, c *Conversation) *Conversation {
 	if IsChannel(*c) {
 		return c
 	}
-	channel := int64(-1)
+	channel := ""
 	if c.Channel != nil {
 		channel = *c.Channel
 	}
@@ -101,7 +102,7 @@ func AddressOf(chat *Chat, c Conversation) string {
 	return TargetOf(c, name)
 }
 
-func ConversationOf(chat *Chat, id int64) *Conversation {
+func ConversationOf(chat *Chat, id string) *Conversation {
 	if chat == nil {
 		return nil
 	}

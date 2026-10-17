@@ -18,7 +18,7 @@ func TestDBMadeOnceAndOpenedAgain(t *testing.T) {
 	var version int
 	db.QueryRow("pragma user_version").Scan(&version)
 	testkit.Eq(t, version, len(migrations.Names()), "every migration ran")
-	if _, err := db.Exec("insert into issue (id, description, created_at) values ('t1', '', 1)"); err != nil {
+	if _, err := db.Exec("insert into issue (id, number, description, created_at) values ('t1', 1, '', 1)"); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()

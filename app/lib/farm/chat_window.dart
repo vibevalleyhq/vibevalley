@@ -102,7 +102,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
   final _scroll = ScrollController();
   String? _problem;
   String? _marked;
-  double? _shownId;
+  String? _shownId;
   bool _skipHeaderTap = false;
   (Duration, Offset)? _lastHeaderUp;
 
@@ -143,7 +143,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
 
   void _toggleLarge() => ref.read(chatLargeProvider.notifier).set(!ref.read(chatLargeProvider));
 
-  void _show(double? id) => unawaited(ref.read(chatActionsProvider).showChat(id).catchError((Object _) {}));
+  void _show(String? id) => unawaited(ref.read(chatActionsProvider).showChat(id).catchError((Object _) {}));
 
   void _send(Conversation? conversation, [String? line]) {
     final said = (line ?? _naming.text.text).trim();
@@ -709,14 +709,14 @@ class _HeaderButton extends StatelessWidget {
 class _NewElsewhere extends StatelessWidget {
   const _NewElsewhere({required this.chat, required this.except, required this.onShow});
   final Chat? chat;
-  final double? except;
-  final void Function(double? id) onShow;
+  final String? except;
+  final void Function(String? id) onShow;
 
   @override
   Widget build(BuildContext context) {
     final waiting = [...?chat?.conversations.where((c) => c.id != except && unreadIn(chat, c) > 0)];
     if (waiting.isEmpty) return const SizedBox.shrink();
-    final newest = waiting.reduce((a, b) => (b.lastSeq ?? 0) > (a.lastSeq ?? 0) ? b : a);
+    final newest = waiting.reduce((a, b) => (b.lastNumber ?? 0) > (a.lastNumber ?? 0) ? b : a);
     final text = waiting.length > 1
         ? '${waiting.length} 处有新话'
         : newest.kind == ConversationKind.thread

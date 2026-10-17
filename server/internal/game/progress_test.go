@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -218,7 +219,7 @@ func TestEntriesFromLeavingAndMessages(t *testing.T) {
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactLeft{At: 1, ID: "w1", Closed: &dismissed}}), []string{})
 
 	said := func(seq int64, from string, kind protocol.SenderKind, mentions ...string) protocol.ChatMessage {
-		return protocol.ChatMessage{Seq: seq, Conversation: 7, From: from, FromKind: kind, Name: from, Kind: protocol.MessageKindChat, Text: "…", Final: true, Mentions: mentions, At: 1}
+		return protocol.ChatMessage{ID: fmt.Sprintf("m%d", seq), Number: seq, Conversation: "c7", From: from, FromKind: kind, Name: from, Kind: protocol.MessageKindChat, Text: "…", Final: true, Mentions: mentions, At: 1}
 	}
 	thread := ptr.To("w1")
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(1, "user", protocol.SenderKindUser), Thread: thread}}), []string{"told"})

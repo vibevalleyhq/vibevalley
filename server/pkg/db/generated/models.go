@@ -9,23 +9,24 @@ import (
 )
 
 type ChannelConversation struct {
-	ID          int64
-	Kind        string
-	ParentSeq   sql.NullInt64
-	SubjectKind sql.NullString
-	SubjectID   sql.NullString
-	LastSeq     sql.NullInt64
-	ReplyCount  int64
-	CreatedAt   int64
-	Name        sql.NullString
-	Description sql.NullString
-	Project     sql.NullString
-	ChannelID   sql.NullInt64
+	ID           string
+	Kind         string
+	ParentID     sql.NullString
+	ParentNumber sql.NullInt64
+	SubjectKind  sql.NullString
+	SubjectID    sql.NullString
+	LastNumber   sql.NullInt64
+	ReplyCount   int64
+	CreatedAt    int64
+	Name         sql.NullString
+	Description  sql.NullString
+	Project      sql.NullString
+	ChannelID    sql.NullString
 }
 
 type ChannelDelivery struct {
 	RecipientID string
-	MessageSeq  int64
+	MessageID   string
 	Reason      string
 	Wakes       bool
 	HeldBy      sql.NullString
@@ -39,22 +40,23 @@ type ChannelDelivery struct {
 }
 
 type ChannelFollow struct {
-	ConversationID int64
+	ConversationID string
 	ParticipantID  string
 	Reason         string
-	FromSeq        int64
+	FromNumber     int64
 	UnfollowedAt   sql.NullInt64
 }
 
 type ChannelMention struct {
-	MessageSeq int64
-	TargetID   string
-	Resolved   string
+	MessageID string
+	TargetID  string
+	Resolved  string
 }
 
 type ChannelMessage struct {
-	Seq            int64
-	ConversationID int64
+	ID             string
+	ConversationID string
+	Number         int64
 	SenderID       string
 	Kind           string
 	Body           string
@@ -77,14 +79,14 @@ type ChannelParticipant struct {
 
 type ChannelReadCursor struct {
 	ParticipantID  string
-	ConversationID int64
-	ReadSeq        int64
+	ConversationID string
+	ReadNumber     int64
 	UpdatedAt      int64
 }
 
 type ChannelSeenMark struct {
 	ParticipantID string
-	MessageSeq    int64
+	MessageID     string
 }
 
 type ConnectorAccount struct {
@@ -98,31 +100,31 @@ type ConnectorAccount struct {
 	LastInbound  sql.NullInt64
 	PausedUntil  sql.NullInt64
 	ConnectedAt  int64
-	ChannelID    sql.NullInt64
+	ChannelID    sql.NullString
 }
 
 type ConnectorInbound struct {
-	Connector  string
-	ExtID      string
-	MessageSeq sql.NullInt64
-	CreatedAt  int64
+	Connector string
+	ExtID     string
+	MessageID sql.NullString
+	CreatedAt int64
 }
 
 type ConnectorOutbox struct {
-	ID         int64
-	Connector  string
-	MessageSeq int64
-	Body       string
-	State      string
-	ExtID      sql.NullString
-	Tries      int64
-	Error      sql.NullString
-	CreatedAt  int64
-	SentAt     sql.NullInt64
+	ID        string
+	Connector string
+	MessageID string
+	Body      string
+	State     string
+	ExtID     sql.NullString
+	Tries     int64
+	Error     sql.NullString
+	CreatedAt int64
+	SentAt    sql.NullInt64
 }
 
 type GameLedger struct {
-	Seq     int64
+	ID      string
 	Kind    string
 	At      int64
 	Payload string
@@ -143,6 +145,7 @@ type GateDevice struct {
 
 type Issue struct {
 	ID          string
+	Number      int64
 	Title       string
 	Description string
 	Project     sql.NullString
@@ -153,7 +156,7 @@ type Issue struct {
 	BlockedBy   sql.NullString
 	Plan        sql.NullString
 	Step        sql.NullString
-	Schedule    sql.NullInt64
+	Schedule    sql.NullString
 	CreatedAt   int64
 	QueuedAt    sql.NullInt64
 	ClosedAt    sql.NullInt64
@@ -167,7 +170,7 @@ type IssueSession struct {
 }
 
 type Memory struct {
-	ID         int64
+	ID         string
 	Agent      string
 	Kind       string
 	Body       string
@@ -179,7 +182,7 @@ type Memory struct {
 }
 
 type PlaybookEvent struct {
-	Seq        int64
+	ID         string
 	PlaybookID string
 	NodeID     sql.NullString
 	Kind       string
@@ -189,10 +192,10 @@ type PlaybookEvent struct {
 }
 
 type Schedule struct {
-	ID        int64
+	ID        string
 	Name      string
 	Body      string
-	ChannelID int64
+	ChannelID string
 	Agent     sql.NullString
 	Project   sql.NullString
 	Spec      string
@@ -217,7 +220,7 @@ type Session struct {
 }
 
 type SessionRun struct {
-	ID          int64
+	ID          string
 	Session     string
 	Issue       sql.NullString
 	TriggeredBy string

@@ -11,28 +11,28 @@ import (
 
 const addSeenMark = `-- name: AddSeenMark :exec
 
-insert into channel_seen_mark (participant_id, message_seq) values (?, ?) on conflict do nothing
+insert into channel_seen_mark (participant_id, message_id) values (?, ?) on conflict do nothing
 `
 
 type AddSeenMarkParams struct {
 	ParticipantID string
-	MessageSeq    int64
+	MessageID     string
 }
 
 // Messages seen past the read cursor, until the cursor catches up (channel/db.go).
 func (q *Queries) AddSeenMark(ctx context.Context, arg AddSeenMarkParams) error {
-	_, err := q.db.ExecContext(ctx, addSeenMark, arg.ParticipantID, arg.MessageSeq)
+	_, err := q.db.ExecContext(ctx, addSeenMark, arg.ParticipantID, arg.MessageID)
 	return err
 }
 
 const pruneSeenMarks = `-- name: PruneSeenMarks :exec
 delete from channel_seen_mark where participant_id = ?1
-  and message_seq in (select seq from channel_message where conversation_id = ?2 and seq <= ?3)
+  and message_id in (select id from channel_message where conversation_id = ?2 and number <= ?3)
 `
 
 type PruneSeenMarksParams struct {
 	Participant  string
-	Conversation int64
+	Conversation string
 	Upto         int64
 }
 

@@ -130,8 +130,8 @@ type hand struct {
 	released chan struct{}
 	// The triggers of the turns asked for and not opened yet, oldest first; the run of the open turn and what it heard (runs.go).
 	triggers []protocol.RunTrigger
-	run      int64
-	heard    []int64
+	run      string
+	heard    []string
 }
 
 type sessions struct {

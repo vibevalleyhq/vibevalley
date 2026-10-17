@@ -20,7 +20,7 @@ func patrolSession(change func(*protocol.Session)) protocol.Session {
 }
 
 func patrolMessage(change func(*protocol.ChatMessage)) protocol.ChatMessage {
-	m := protocol.ChatMessage{Seq: 10, Conversation: 2, From: "w1", FromKind: protocol.SenderKindAgent, Name: "后端老周", Kind: protocol.MessageKindChat, Text: "@主人 接口要按月查吗？", Final: true, Mentions: []string{"user"}, At: patrolT}
+	m := protocol.ChatMessage{ID: "m10", Number: 10, Conversation: "x2", From: "w1", FromKind: protocol.SenderKindAgent, Name: "后端老周", Kind: protocol.MessageKindChat, Text: "@主人 接口要按月查吗？", Final: true, Mentions: []string{"user"}, At: patrolT}
 	change(&m)
 	return m
 }
@@ -28,9 +28,9 @@ func patrolMessage(change func(*protocol.ChatMessage)) protocol.ChatMessage {
 func patrolChat(messages ...protocol.ChatMessage) *protocol.Chat {
 	return &protocol.Chat{
 		Conversations: []protocol.Conversation{
-			{ID: 1, Kind: protocol.ConversationKindGeneral, Name: ptr.To("田头"), At: patrolT},
-			{ID: 5, Kind: protocol.ConversationKindChannel, Name: ptr.To("ops"), At: patrolT},
-			{ID: 2, Kind: protocol.ConversationKindThread, Parent: ptr.To(int64(3)), Channel: ptr.To(int64(5)), SubjectKind: ptr.To(protocol.SubjectKindIssue), SubjectID: ptr.To("w1"), Replies: 1, At: patrolT},
+			{ID: "x1", Kind: protocol.ConversationKindGeneral, Name: ptr.To("田头"), At: patrolT},
+			{ID: "x5", Kind: protocol.ConversationKindChannel, Name: ptr.To("ops"), At: patrolT},
+			{ID: "x2", Kind: protocol.ConversationKindThread, Parent: ptr.To("m3"), ParentNumber: ptr.To[int64](3), Channel: ptr.To("x5"), SubjectKind: ptr.To(protocol.SubjectKindIssue), SubjectID: ptr.To("w1"), Replies: 1, At: patrolT},
 		},
 		Messages: messages,
 	}
@@ -53,10 +53,10 @@ func TestPatrolAsk(t *testing.T) {
 	found := patrolBriefs(asked)
 	testkit.Eq(t, len(found), 1)
 	testkit.Eq(t, found[0].Key, "m10")
-	testkit.Eq(t, *found[0].Channel, int64(5))
+	testkit.Eq(t, *found[0].Channel, "x5")
 	testkit.Match(t, found[0].Text, `后端老周 在 #ops:3 问主人的话，24 小时没人回`)
 	answered := patrolFarm(patrolChat(patrolMessage(func(*protocol.ChatMessage) {}), patrolMessage(func(m *protocol.ChatMessage) {
-		m.Seq, m.From, m.FromKind, m.Name, m.Text, m.Mentions = 11, "user", protocol.SenderKindUser, "主人", "按月", []string{}
+		m.ID, m.Number, m.From, m.FromKind, m.Name, m.Text, m.Mentions = "m11", 11, "user", protocol.SenderKindUser, "主人", "按月", []string{}
 	})))
 	testkit.Eq(t, patrolBriefs(answered), []patrolNote{})
 	notAsked := patrolFarm(patrolChat(patrolMessage(func(m *protocol.ChatMessage) { m.Mentions = []string{protocol.ManagerAgent} })))
@@ -74,7 +74,7 @@ func TestPatrolQuietRipeStep(t *testing.T) {
 			h.Phase = protocol.Phase{Value: protocol.PhaseWorking{Since: patrolT, Doing: protocol.Doing{Action: protocol.SessionActionRunCommand, Label: "pnpm test"}, QuietSince: ptr.To(patrolT + patrolMin)}}
 		}),
 		patrolSession(func(h *protocol.Session) {
-			h.ID, h.Name, h.Channel, h.Phase = "w2", "前端小林", ptr.To(int64(5)), protocol.Phase{Value: protocol.PhaseRipe{}}
+			h.ID, h.Name, h.Channel, h.Phase = "w2", "前端小林", ptr.To("x5"), protocol.Phase{Value: protocol.PhaseRipe{}}
 			h.LastRun = &protocol.LastRun{Outcome: protocol.OutcomeCompleted, Summary: "好了", At: patrolT}
 		}),
 		patrolSession(func(h *protocol.Session) {
@@ -86,7 +86,7 @@ func TestPatrolQuietRipeStep(t *testing.T) {
 	for _, f := range patrolBriefs(state) {
 		got = append(got, [2]any{f.Key, *f.Channel})
 	}
-	testkit.Eq(t, got, [][2]any{{"w1:quiet:1800000060000", int64(1)}, {"w2:merge:1", int64(5)}, {"p1:failed:api", int64(1)}})
+	testkit.Eq(t, got, [][2]any{{"w1:quiet:1800000060000", "x1"}, {"w2:merge:1", "x5"}, {"p1:failed:api", "x1"}})
 	notes := patrolBriefs(state)
 	testkit.Match(t, notes[0].Text, `^后端老周（w1）在干活，24 小时没动静了，最后在「pnpm test」$`)
 	testkit.Match(t, notes[1].Text, `^前端小林（w2）的活做完 24 小时了还没收：「加个接口」$`)

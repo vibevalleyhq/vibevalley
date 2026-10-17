@@ -99,7 +99,7 @@ func reduce(state CoreState, fact Fact) (CoreState, bool) {
 	case FactMessage:
 		if state.Chat != nil {
 			for _, m := range state.Chat.Messages {
-				if m.Seq == f.Message.Seq && same(m, f.Message) {
+				if m.ID == f.Message.ID && same(m, f.Message) {
 					return state, false
 				}
 			}

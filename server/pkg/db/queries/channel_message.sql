@@ -1,34 +1,37 @@
--- What is said, in order: seq is the order of the whole chat (channel/db.go).
+-- What is said, in order: a message's id is a uuidv7 and sorts by time; its number is its place in its conversation (channel/db.go).
 
 -- name: InsertMessage :one
-insert into channel_message (conversation_id, sender_id, kind, body, final, meta, created_at) values (?, ?, ?, ?, ?, ?, ?) returning seq;
+insert into channel_message (id, conversation_id, number, sender_id, kind, body, final, meta, created_at)
+values (sqlc.arg(id), sqlc.arg(conversation), (select coalesce(max(number), 0) + 1 from channel_message where conversation_id = sqlc.arg(conversation)),
+        sqlc.arg(sender), sqlc.arg(kind), sqlc.arg(body), sqlc.arg(final), sqlc.arg(meta), sqlc.arg(created_at))
+returning number;
 
 -- name: UpdateMessageBody :exec
-update channel_message set body = ?, final = ?, updated_at = ? where seq = ?;
+update channel_message set body = ?, final = ?, updated_at = ? where id = ?;
 
 -- name: UpdateMessageMeta :exec
-update channel_message set meta = ? where seq = ?;
+update channel_message set meta = ? where id = ?;
 
--- name: MessageBySeq :one
-select sqlc.embed(m), sqlc.embed(p) from channel_message m join channel_participant p on p.id = m.sender_id where m.seq = ?;
+-- name: MessageByID :one
+select sqlc.embed(m), sqlc.embed(p) from channel_message m join channel_participant p on p.id = m.sender_id where m.id = ?;
 
 -- name: RecentMessages :many
-select sqlc.embed(m), sqlc.embed(p) from channel_message m join channel_participant p on p.id = m.sender_id order by m.seq desc limit ?;
+select sqlc.embed(m), sqlc.embed(p) from channel_message m join channel_participant p on p.id = m.sender_id order by m.id desc limit ?;
 
 -- name: MessagesBefore :many
 -- Newest first.
 select sqlc.embed(m), sqlc.embed(p) from channel_message m join channel_participant p on p.id = m.sender_id
-where m.conversation_id = ? and m.seq < ? order by m.seq desc limit ?;
+where m.conversation_id = ? and m.number < ? order by m.number desc limit ?;
 
 -- name: MessagesAfter :many
 select sqlc.embed(m), sqlc.embed(p) from channel_message m join channel_participant p on p.id = m.sender_id
-where m.conversation_id = ? and m.seq > ? order by m.seq limit ?;
+where m.conversation_id = ? and m.number > ? order by m.number limit ?;
 
 -- name: RecentDuplicate :one
-select seq from channel_message where sender_id = ? and conversation_id = ? and body = ? and created_at > ? order by seq desc limit 1;
+select id from channel_message where sender_id = ? and conversation_id = ? and body = ? and created_at > ? order by id desc limit 1;
 
--- name: LatestSeq :one
-select cast(coalesce(max(seq), 0) as integer) from channel_message where conversation_id = ?;
+-- name: LatestNumber :one
+select cast(coalesce(max(number), 0) as integer) from channel_message where conversation_id = ?;
 
 -- name: FinalizeAll :exec
 update channel_message set final = 1, updated_at = ? where not final;
@@ -37,22 +40,26 @@ update channel_message set final = 1, updated_at = ? where not final;
 -- The session who last @-ed the speaker here since the speaker last spoke.
 select m.sender_id
 from channel_message m
-join channel_mention n on n.message_seq = m.seq and n.target_id = sqlc.arg(speaker)
+join channel_mention n on n.message_id = m.id and n.target_id = sqlc.arg(speaker)
 join channel_participant p on p.id = m.sender_id and p.kind = 'agent'
-where m.conversation_id = sqlc.arg(conversation) and m.sender_id <> sqlc.arg(speaker) and m.seq < sqlc.arg(before)
-  and m.seq > coalesce((select max(s.seq) from channel_message s where s.conversation_id = sqlc.arg(conversation) and s.sender_id = sqlc.arg(speaker) and s.seq < sqlc.arg(before)), 0)
-order by m.seq desc
+where m.conversation_id = sqlc.arg(conversation) and m.sender_id <> sqlc.arg(speaker) and m.id < sqlc.arg(before)
+  and m.id > coalesce((select max(s.id) from channel_message s where s.conversation_id = sqlc.arg(conversation) and s.sender_id = sqlc.arg(speaker) and s.id < sqlc.arg(before)), '')
+order by m.id desc
 limit 1;
 
 -- name: UnseenIn :many
 -- Newest first.
-select m.seq from channel_message m
+select m.id from channel_message m
 where m.conversation_id = sqlc.arg(conversation) and m.sender_id <> sqlc.arg(participant) and m.final
-  and m.seq > coalesce((select read_seq from channel_read_cursor where participant_id = sqlc.arg(participant) and conversation_id = sqlc.arg(conversation)), 0)
-  and not exists (select 1 from channel_seen_mark s where s.participant_id = sqlc.arg(participant) and s.message_seq = m.seq)
-order by m.seq desc;
+  and m.number > coalesce((select read_number from channel_read_cursor where participant_id = sqlc.arg(participant) and conversation_id = sqlc.arg(conversation)), 0)
+  and not exists (select 1 from channel_seen_mark s where s.participant_id = sqlc.arg(participant) and s.message_id = m.id)
+order by m.number desc;
 
 -- name: HoldNoticeSinceUser :one
 select count(*) from channel_message m
 where m.conversation_id = sqlc.arg(conversation) and m.sender_id = 'system' and json_extract(m.meta, '$.code') = 'hop_limit'
-  and m.seq > coalesce((select max(u.seq) from channel_message u where u.conversation_id = sqlc.arg(conversation) and u.sender_id = 'user'), 0);
+  and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = sqlc.arg(conversation) and u.sender_id = 'user'), '');
+
+-- name: MessageByNumber :one
+select sqlc.embed(m), sqlc.embed(p) from channel_message m join channel_participant p on p.id = m.sender_id
+where m.conversation_id = ? and m.number = ?;

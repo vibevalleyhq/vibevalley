@@ -10,7 +10,7 @@ import (
 )
 
 func coreMsg(change func(*protocol.ChatMessage)) protocol.ChatMessage {
-	m := protocol.ChatMessage{Seq: 1, Conversation: 1, From: protocol.ManagerAgent, FromKind: protocol.SenderKindManager, Name: "管家", Kind: protocol.MessageKindChat, Text: "好", Final: true}
+	m := protocol.ChatMessage{ID: "m1", Number: 1, Conversation: "c1", From: protocol.ManagerAgent, FromKind: protocol.SenderKindManager, Name: "管家", Kind: protocol.MessageKindChat, Text: "好", Final: true}
 	change(&m)
 	return m
 }

@@ -12,16 +12,16 @@ import (
 
 const agentWakesSinceUser = `-- name: AgentWakesSinceUser :one
 select count(*) from channel_delivery d
-join channel_message m on m.seq = d.message_seq
+join channel_message m on m.id = d.message_id
 join channel_participant s on s.id = m.sender_id
 join channel_participant r on r.id = d.recipient_id
 where m.conversation_id = ?1
-  and m.seq > coalesce((select max(u.seq) from channel_message u where u.conversation_id = ?1 and u.sender_id = 'user'), 0)
+  and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = ?1 and u.sender_id = 'user'), '')
   and s.kind in ('agent', 'manager') and r.kind in ('agent', 'manager') and d.wakes and d.held_by is null
 `
 
 // Agents waking agents since the owner last spoke here, held ones not counted.
-func (q *Queries) AgentWakesSinceUser(ctx context.Context, conversation int64) (int64, error) {
+func (q *Queries) AgentWakesSinceUser(ctx context.Context, conversation string) (int64, error) {
 	row := q.db.QueryRowContext(ctx, agentWakesSinceUser, conversation)
 	var count int64
 	err := row.Scan(&count)
@@ -45,12 +45,12 @@ func (q *Queries) DropOpen(ctx context.Context, arg DropOpenParams) error {
 
 const insertDelivery = `-- name: InsertDelivery :exec
 
-insert into channel_delivery (recipient_id, message_seq, reason, wakes, held_by, created_at) values (?, ?, ?, ?, ?, ?) on conflict do nothing
+insert into channel_delivery (recipient_id, message_id, reason, wakes, held_by, created_at) values (?, ?, ?, ?, ?, ?) on conflict do nothing
 `
 
 type InsertDeliveryParams struct {
 	RecipientID string
-	MessageSeq  int64
+	MessageID   string
 	Reason      string
 	Wakes       bool
 	HeldBy      sql.NullString
@@ -61,7 +61,7 @@ type InsertDeliveryParams struct {
 func (q *Queries) InsertDelivery(ctx context.Context, arg InsertDeliveryParams) error {
 	_, err := q.db.ExecContext(ctx, insertDelivery,
 		arg.RecipientID,
-		arg.MessageSeq,
+		arg.MessageID,
 		arg.Reason,
 		arg.Wakes,
 		arg.HeldBy,
@@ -72,7 +72,7 @@ func (q *Queries) InsertDelivery(ctx context.Context, arg InsertDeliveryParams) 
 
 const lastAgentWake = `-- name: LastAgentWake :one
 select cast(coalesce(max(d.created_at), 0) as integer) from channel_delivery d
-join channel_message m on m.seq = d.message_seq
+join channel_message m on m.id = d.message_id
 join channel_participant s on s.id = m.sender_id
 where d.recipient_id = ? and s.kind in ('agent', 'manager') and d.wakes and d.held_by is null
 `
@@ -86,14 +86,14 @@ func (q *Queries) LastAgentWake(ctx context.Context, recipientID string) (int64,
 
 const markAnnounced = `-- name: MarkAnnounced :exec
 update channel_delivery set state = 'announced', launch = ?, announced_at = ?
-where recipient_id = ? and message_seq = ? and state in ('pending', 'announced')
+where recipient_id = ? and message_id = ? and state in ('pending', 'announced')
 `
 
 type MarkAnnouncedParams struct {
 	Launch      sql.NullString
 	AnnouncedAt sql.NullInt64
 	RecipientID string
-	MessageSeq  int64
+	MessageID   string
 }
 
 func (q *Queries) MarkAnnounced(ctx context.Context, arg MarkAnnouncedParams) error {
@@ -101,21 +101,21 @@ func (q *Queries) MarkAnnounced(ctx context.Context, arg MarkAnnouncedParams) er
 		arg.Launch,
 		arg.AnnouncedAt,
 		arg.RecipientID,
-		arg.MessageSeq,
+		arg.MessageID,
 	)
 	return err
 }
 
 const markHanded = `-- name: MarkHanded :exec
 update channel_delivery set state = 'handed', launch = ?, handed_at = ?
-where recipient_id = ? and message_seq = ? and state in ('pending', 'announced')
+where recipient_id = ? and message_id = ? and state in ('pending', 'announced')
 `
 
 type MarkHandedParams struct {
 	Launch      sql.NullString
 	HandedAt    sql.NullInt64
 	RecipientID string
-	MessageSeq  int64
+	MessageID   string
 }
 
 func (q *Queries) MarkHanded(ctx context.Context, arg MarkHandedParams) error {
@@ -123,32 +123,33 @@ func (q *Queries) MarkHanded(ctx context.Context, arg MarkHandedParams) error {
 		arg.Launch,
 		arg.HandedAt,
 		arg.RecipientID,
-		arg.MessageSeq,
+		arg.MessageID,
 	)
 	return err
 }
 
 const openDeliveries = `-- name: OpenDeliveries :many
-select d.message_seq, d.reason, d.wakes, d.held_by, d.state, d.launch, m.conversation_id, m.sender_id, m.kind, m.body, m.created_at,
-       p.name, p.kind as sender_kind, c.kind as conversation_kind, c.parent_seq, c.subject_kind, c.subject_id,
+select d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.conversation_id, m.sender_id, m.kind, m.body, m.created_at,
+       p.name, p.kind as sender_kind, c.kind as conversation_kind, c.parent_id, c.parent_number, c.subject_kind, c.subject_id,
        cast(coalesce(ch.name, c.name, '') as text) as channel_name
 from channel_delivery d
-join channel_message m on m.seq = d.message_seq
+join channel_message m on m.id = d.message_id
 join channel_participant p on p.id = m.sender_id
 join channel_conversation c on c.id = m.conversation_id
 left join channel_conversation ch on ch.id = c.channel_id
 where d.recipient_id = ? and d.state in ('pending', 'announced', 'handed')
-order by d.message_seq
+order by m.id
 `
 
 type OpenDeliveriesRow struct {
-	MessageSeq       int64
+	MessageID        string
+	Number           int64
 	Reason           string
 	Wakes            bool
 	HeldBy           sql.NullString
 	State            string
 	Launch           sql.NullString
-	ConversationID   int64
+	ConversationID   string
 	SenderID         string
 	Kind             string
 	Body             string
@@ -156,7 +157,8 @@ type OpenDeliveriesRow struct {
 	Name             string
 	SenderKind       string
 	ConversationKind string
-	ParentSeq        sql.NullInt64
+	ParentID         sql.NullString
+	ParentNumber     sql.NullInt64
 	SubjectKind      sql.NullString
 	SubjectID        sql.NullString
 	ChannelName      string
@@ -172,7 +174,8 @@ func (q *Queries) OpenDeliveries(ctx context.Context, recipientID string) ([]Ope
 	for rows.Next() {
 		var i OpenDeliveriesRow
 		if err := rows.Scan(
-			&i.MessageSeq,
+			&i.MessageID,
+			&i.Number,
 			&i.Reason,
 			&i.Wakes,
 			&i.HeldBy,
@@ -186,7 +189,8 @@ func (q *Queries) OpenDeliveries(ctx context.Context, recipientID string) ([]Ope
 			&i.Name,
 			&i.SenderKind,
 			&i.ConversationKind,
-			&i.ParentSeq,
+			&i.ParentID,
+			&i.ParentNumber,
 			&i.SubjectKind,
 			&i.SubjectID,
 			&i.ChannelName,
@@ -242,7 +246,7 @@ func (q *Queries) RollbackHanded(ctx context.Context, recipientID string) (int64
 const seenHanded = `-- name: SeenHanded :many
 update channel_delivery set state = 'seen', seen_at = ?
 where recipient_id = ? and state = 'handed' and launch = ?
-returning message_seq
+returning message_id
 `
 
 type SeenHandedParams struct {
@@ -251,19 +255,19 @@ type SeenHandedParams struct {
 	Launch      sql.NullString
 }
 
-func (q *Queries) SeenHanded(ctx context.Context, arg SeenHandedParams) ([]int64, error) {
+func (q *Queries) SeenHanded(ctx context.Context, arg SeenHandedParams) ([]string, error) {
 	rows, err := q.db.QueryContext(ctx, seenHanded, arg.SeenAt, arg.RecipientID, arg.Launch)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []int64
+	var items []string
 	for rows.Next() {
-		var message_seq int64
-		if err := rows.Scan(&message_seq); err != nil {
+		var message_id string
+		if err := rows.Scan(&message_id); err != nil {
 			return nil, err
 		}
-		items = append(items, message_seq)
+		items = append(items, message_id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -276,39 +280,40 @@ func (q *Queries) SeenHanded(ctx context.Context, arg SeenHandedParams) ([]int64
 
 const seenOne = `-- name: SeenOne :exec
 update channel_delivery set state = 'seen', seen_at = ?
-where recipient_id = ? and message_seq = ? and state in ('pending', 'announced', 'handed')
+where recipient_id = ? and message_id = ? and state in ('pending', 'announced', 'handed')
 `
 
 type SeenOneParams struct {
 	SeenAt      sql.NullInt64
 	RecipientID string
-	MessageSeq  int64
+	MessageID   string
 }
 
 func (q *Queries) SeenOne(ctx context.Context, arg SeenOneParams) error {
-	_, err := q.db.ExecContext(ctx, seenOne, arg.SeenAt, arg.RecipientID, arg.MessageSeq)
+	_, err := q.db.ExecContext(ctx, seenOne, arg.SeenAt, arg.RecipientID, arg.MessageID)
 	return err
 }
 
 const seenUpTo = `-- name: SeenUpTo :exec
 update channel_delivery set state = 'seen', seen_at = ?1
-where recipient_id = ?2 and message_seq <= ?3 and state in ('pending', 'announced', 'handed')
-  and message_seq in (select seq from channel_message where channel_message.conversation_id = ?4)
+where recipient_id = ?2 and message_id in (
+    select id from channel_message where conversation_id = ?3 and number <= ?4)
+  and state in ('pending', 'announced', 'handed')
 `
 
 type SeenUpToParams struct {
 	At           sql.NullInt64
 	Recipient    string
+	Conversation string
 	Upto         int64
-	Conversation int64
 }
 
 func (q *Queries) SeenUpTo(ctx context.Context, arg SeenUpToParams) error {
 	_, err := q.db.ExecContext(ctx, seenUpTo,
 		arg.At,
 		arg.Recipient,
-		arg.Upto,
 		arg.Conversation,
+		arg.Upto,
 	)
 	return err
 }

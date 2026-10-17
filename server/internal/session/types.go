@@ -22,7 +22,7 @@ type HireOptions struct {
 	Base     string
 	Worktree *bool
 	Playbook *protocol.SessionPlaybook
-	Channel  *int64
+	Channel  *string
 	// Empty: Dispatch makes one from the job.
 	Issue string
 	// What its first run is for; nil: the issue sent out.
@@ -68,7 +68,7 @@ type Journal interface {
 	ToolEnded(callID, output string, ok bool, from From)
 	Note(kind protocol.SessionEventType, text string, from From)
 	// RunStarted opens run id: every event after it is the run's until RunEnded closes it with how it ended.
-	RunStarted(id int64)
-	RunEnded(id int64, outcome protocol.Outcome)
+	RunStarted(id string)
+	RunEnded(id string, outcome protocol.Outcome)
 	Close()
 }

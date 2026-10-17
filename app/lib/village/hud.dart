@@ -136,7 +136,7 @@ String plotTitle(Bed bed, Session? session, Crop crop) {
   final general = generalOf(chat);
   final typed = general == null ? null : messagesIn(chat, general.id).where((m) => m.fromKind == SenderKind.manager && m.kind == MessageKind.chat).lastOrNull;
   final aloud = lines.where((l) => l.role == LineRole.manager).lastOrNull;
-  final a = typed == null ? null : (key: 'm${typed.seq}', text: typed.text, final_: typed.final_, at: typed.at);
+  final a = typed == null ? null : (key: 'm${typed.id}', text: typed.text, final_: typed.final_, at: typed.at);
   final b = aloud == null ? null : (key: 's${aloud.id}', text: aloud.text, final_: aloud.final_, at: aloud.at);
   if (a == null) return b;
   if (b == null) return a;

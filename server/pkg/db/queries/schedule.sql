@@ -3,8 +3,8 @@
 -- name: Schedules :many
 select * from schedule order by id;
 
--- name: AddSchedule :execlastid
-insert into schedule (name, body, channel_id, agent, project, spec, tz, enabled, created_at) values (?, ?, ?, ?, ?, ?, ?, 1, ?);
+-- name: AddSchedule :exec
+insert into schedule (id, name, body, channel_id, agent, project, spec, tz, enabled, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
 
 -- name: ScheduleRan :exec
 update schedule set last_run = ?, enabled = ? where id = ?;

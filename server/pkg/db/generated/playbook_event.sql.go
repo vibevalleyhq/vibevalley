@@ -12,10 +12,11 @@ import (
 
 const addPlaybookEvent = `-- name: AddPlaybookEvent :exec
 
-insert into playbook_event (playbook_id, node_id, kind, actor, payload, created_at) values (?, ?, ?, ?, ?, ?)
+insert into playbook_event (id, playbook_id, node_id, kind, actor, payload, created_at) values (?, ?, ?, ?, ?, ?, ?)
 `
 
 type AddPlaybookEventParams struct {
+	ID         string
 	PlaybookID string
 	NodeID     sql.NullString
 	Kind       string
@@ -27,6 +28,7 @@ type AddPlaybookEventParams struct {
 // What happened to each playbook (playbook/log.go).
 func (q *Queries) AddPlaybookEvent(ctx context.Context, arg AddPlaybookEventParams) error {
 	_, err := q.db.ExecContext(ctx, addPlaybookEvent,
+		arg.ID,
 		arg.PlaybookID,
 		arg.NodeID,
 		arg.Kind,
@@ -38,7 +40,7 @@ func (q *Queries) AddPlaybookEvent(ctx context.Context, arg AddPlaybookEventPara
 }
 
 const playbookEvents = `-- name: PlaybookEvents :many
-select seq, playbook_id, node_id, kind, actor, payload, created_at from playbook_event where playbook_id = ? order by seq limit ?
+select id, playbook_id, node_id, kind, actor, payload, created_at from playbook_event where playbook_id = ? order by id limit ?
 `
 
 type PlaybookEventsParams struct {
@@ -56,7 +58,7 @@ func (q *Queries) PlaybookEvents(ctx context.Context, arg PlaybookEventsParams) 
 	for rows.Next() {
 		var i PlaybookEvent
 		if err := rows.Scan(
-			&i.Seq,
+			&i.ID,
 			&i.PlaybookID,
 			&i.NodeID,
 			&i.Kind,

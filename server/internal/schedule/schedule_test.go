@@ -66,8 +66,8 @@ func TestSchedules(t *testing.T) {
 	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Agent: &nobody, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}); err == nil || !strings.Contains(err.Error(), "没有叫 nobody") {
 		t.Fatal(err)
 	}
-	var elsewhere int64 = 999
-	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Channel: &elsewhere, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}); err == nil || !strings.Contains(err.Error(), "999") {
+	elsewhere := "elsewhere"
+	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Channel: &elsewhere, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}); err == nil || !strings.Contains(err.Error(), "elsewhere") {
 		t.Fatal(err)
 	}
 	project := "demo"

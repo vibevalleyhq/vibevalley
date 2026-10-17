@@ -15,7 +15,7 @@ update connector_account set channel_id = ? where connector = ?
 `
 
 type AccountChannelParams struct {
-	ChannelID sql.NullInt64
+	ChannelID sql.NullString
 	Connector string
 }
 

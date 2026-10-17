@@ -62,7 +62,7 @@ Status: implemented
 ### 不在这里做
 
 - `shapes.go` 按概念拆成几个文件：要改生成器和大量文档里的路径，收益只是好找，等阶段 3 之后再看。
-- 主键换 uuidv7：见 [改完旧名字](../../proposed/architecture/2026-10-16-finish-the-renames.md)。
+- 主键换 uuidv7：见 [改完旧名字](2026-10-16-finish-the-renames.md)。
 
 ## Alternatives considered
 

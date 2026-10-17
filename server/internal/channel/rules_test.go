@@ -146,7 +146,7 @@ func TestReportsDispatchesNotices(t *testing.T) {
 func TestWakeInputAndBusyNotice(t *testing.T) {
 	var messages []protocol.InboxMessage
 	for i := 1; i <= 4; i++ {
-		m := protocol.InboxMessage{Seq: int64(10 + i), Target: "#田头:5", From: "w2", FromKind: protocol.SenderKindAgent, Name: "阿郑", Text: fmt.Sprintf("第 %d 句\n第二行", i)}
+		m := protocol.InboxMessage{ID: fmt.Sprintf("m%d", 10+i), Number: int64(10 + i), Target: "#田头:5", From: "w2", FromKind: protocol.SenderKindAgent, Name: "阿郑", Text: fmt.Sprintf("第 %d 句\n第二行", i)}
 		if i%2 == 1 {
 			m.From, m.FromKind, m.Name = "user", protocol.SenderKindUser, "主人"
 		}

@@ -38,13 +38,13 @@ type Handlers interface {
 	// Only what the body gives changes.
 	//vibevalley:route schedule.update PUT /api/v1/schedules/{id}
 	//vibevalley:can owner remote
-	ScheduleUpdate(ctx context.Context, pID int64, body ScheduleUpdate) error
+	ScheduleUpdate(ctx context.Context, pID string, body ScheduleUpdate) error
 	//vibevalley:route schedule.delete DELETE /api/v1/schedules/{id}
 	//vibevalley:can owner remote manager
-	ScheduleDelete(ctx context.Context, pID int64) error
+	ScheduleDelete(ctx context.Context, pID string) error
 	//vibevalley:route channel.update PUT /api/v1/channels/{id}
 	//vibevalley:can owner remote manager
-	ChannelUpdate(ctx context.Context, pID int64, body ChannelUpdate) error
+	ChannelUpdate(ctx context.Context, pID string, body ChannelUpdate) error
 	//vibevalley:route manager.hear POST /api/v1/manager/hear
 	//vibevalley:can owner remote
 	ManagerHear(ctx context.Context, body SayRequest) error
@@ -79,7 +79,7 @@ type Handlers interface {
 	// Its log, oldest first; run gives one run's only. The manager's log is session manager's.
 	//vibevalley:route session.events GET /api/v1/sessions/{id}/events
 	//vibevalley:can owner remote
-	SessionEvents(ctx context.Context, pID string, pRun *int64) ([]SessionEvent, error)
+	SessionEvents(ctx context.Context, pID string, pRun *string) ([]SessionEvent, error)
 	//vibevalley:route issue.list GET /api/v1/issues
 	//vibevalley:can owner remote
 	IssueList(ctx context.Context) ([]Issue, error)
@@ -128,10 +128,10 @@ type Handlers interface {
 	PlaybookNodeAct(ctx context.Context, pID string, pNode string, body NodeActRequest) (string, error)
 	//vibevalley:route channel.history GET /api/v1/channels/{id}/messages
 	//vibevalley:can owner remote manager
-	ChannelHistory(ctx context.Context, pID int64, pBefore *int64, pLimit *int64) ([]ChatMessage, error)
+	ChannelHistory(ctx context.Context, pID string, pBefore *int64, pLimit *int64) ([]ChatMessage, error)
 	//vibevalley:route channel.markRead POST /api/v1/channels/{id}/read
 	//vibevalley:can owner remote
-	ChannelMarkRead(ctx context.Context, pID int64, body ChatReadRequest) error
+	ChannelMarkRead(ctx context.Context, pID string, body ChatReadRequest) error
 	//vibevalley:route playbook.changes GET /api/v1/playbooks/{id}/changes
 	//vibevalley:can owner remote
 	PlaybookChanges(ctx context.Context, pID string) (Changes, error)

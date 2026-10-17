@@ -25,13 +25,13 @@ class ChatValue<T> extends Notifier<T> {
 }
 
 /// null: the general.
-final chatShownProvider = NotifierProvider<ChatValue<double?>, double?>(() => ChatValue(null));
+final chatShownProvider = NotifierProvider<ChatValue<String?>, String?>(() => ChatValue(null));
 
 final chatOpenProvider = NotifierProvider<ChatValue<bool>, bool>(() => ChatValue(true));
 
 final chatLargeProvider = NotifierProvider<ChatValue<bool>, bool>(() => ChatValue(false));
 
-final chatLoadedProvider = NotifierProvider<ChatValue<Map<double, Loaded>>, Map<double, Loaded>>(() => ChatValue(const {}));
+final chatLoadedProvider = NotifierProvider<ChatValue<Map<String, Loaded>>, Map<String, Loaded>>(() => ChatValue(const {}));
 
 final spokenProvider = NotifierProvider<SpokenLines, List<Line>>(SpokenLines.new);
 
@@ -89,7 +89,7 @@ class ChatActions {
   VibeValleyApi get _api => _ref.read(apiProvider);
   Chat? get _chat => _ref.read(stateProvider)?.chat;
 
-  Future<void> showChat(double? conversation) async {
+  Future<void> showChat(String? conversation) async {
     _ref.read(chatShownProvider.notifier).set(conversation);
     if (conversation != null && !_ref.read(chatLoadedProvider).containsKey(conversation)) await _fetchPage(conversation);
   }
@@ -101,7 +101,7 @@ class ChatActions {
     return true;
   }
 
-  Future<void> _fetchPage(double conversation, [double? before]) async {
+  Future<void> _fetchPage(String conversation, [double? before]) async {
     final page = await _api.channel.history(id: conversation, before: before, limit: chatPage.toDouble());
     final loaded = _ref.read(chatLoadedProvider.notifier);
     final all = _ref.read(chatLoadedProvider);
@@ -109,21 +109,21 @@ class ChatActions {
     loaded.set({...all, conversation: was.merge(page, complete: page.length < chatPage)});
   }
 
-  Future<void> loadOlder(double conversation) async {
+  Future<void> loadOlder(String conversation) async {
     final more = _ref.read(chatLoadedProvider)[conversation];
     if (more?.complete ?? false) return;
     final oldest = messagesOf(_chat, conversation, more).firstOrNull;
-    await _fetchPage(conversation, oldest?.seq);
+    await _fetchPage(conversation, oldest?.number);
   }
 
-  Future<void> markRead(double conversation) async {
+  Future<void> markRead(String conversation) async {
     final chat = _chat;
     final c = conversationOf(chat, conversation);
     final seq = c == null ? null : newestUnread(chat, c);
     if (seq == null) return;
     await _api.channel.markRead(
       id: conversation,
-      body: ChatReadRequest(seq: seq),
+      body: ChatReadRequest(number: seq),
     );
   }
 
@@ -149,7 +149,7 @@ class ChatActions {
     return agents != null && agents.containsKey(pick) ? pick : null;
   }
 
-  Future<void> sayIn(double conversation, String text) async {
+  Future<void> sayIn(String conversation, String text) async {
     final said = text.trim();
     if (said.isEmpty || !await whenLive()) return;
     await _api.channel.say(
@@ -177,14 +177,14 @@ class ChatActions {
     }
   }
 
-  Future<void> updateChannel(double id, ChannelUpdate update) => _api.channel.update(id: id, body: update);
+  Future<void> updateChannel(String id, ChannelUpdate update) => _api.channel.update(id: id, body: update);
 
-  Future<void> setScheduleEnabled(double id, bool enabled) => _api.schedule.update(
+  Future<void> setScheduleEnabled(String id, bool enabled) => _api.schedule.update(
     id: id,
     body: ScheduleUpdate(enabled: enabled),
   );
 
-  Future<void> removeSchedule(double id) => _api.schedule.delete(id: id);
+  Future<void> removeSchedule(String id) => _api.schedule.delete(id: id);
 }
 
 final chatActionsProvider = Provider<ChatActions>(ChatActions.new);

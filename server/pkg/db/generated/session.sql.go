@@ -99,43 +99,6 @@ func (q *Queries) KeepSession(ctx context.Context, arg KeepSessionParams) error 
 	return err
 }
 
-const moveHead = `-- name: MoveHead :exec
-insert into session (id, agent, name, runtime, task, project, issue, playbook, hired_at, ended_at, closed)
-values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict (id) do nothing
-`
-
-type MoveHeadParams struct {
-	ID       string
-	Agent    string
-	Name     string
-	Runtime  string
-	Task     string
-	Project  sql.NullString
-	Issue    sql.NullString
-	Playbook sql.NullString
-	HiredAt  int64
-	EndedAt  sql.NullInt64
-	Closed   sql.NullString
-}
-
-// A head from before the table, as it was: its end too.
-func (q *Queries) MoveHead(ctx context.Context, arg MoveHeadParams) error {
-	_, err := q.db.ExecContext(ctx, moveHead,
-		arg.ID,
-		arg.Agent,
-		arg.Name,
-		arg.Runtime,
-		arg.Task,
-		arg.Project,
-		arg.Issue,
-		arg.Playbook,
-		arg.HiredAt,
-		arg.EndedAt,
-		arg.Closed,
-	)
-	return err
-}
-
 const sessionByID = `-- name: SessionByID :one
 select id, agent, name, runtime, task, project, issue, playbook, hired_at, ended_at, closed from session where id = ?
 `

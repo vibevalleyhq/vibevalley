@@ -26,7 +26,7 @@ func gameOpen(t *testing.T, home string) *world {
 
 func ledgerKinds(t *testing.T, f *world) []string {
 	t.Helper()
-	rows, err := f.DB.Query("select kind from game_ledger order by seq")
+	rows, err := f.DB.Query("select kind from game_ledger order by id")
 	if err != nil {
 		t.Fatal(err)
 	}

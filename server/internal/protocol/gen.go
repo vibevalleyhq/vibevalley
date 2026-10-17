@@ -841,7 +841,7 @@ func (v Run) MarshalJSON() ([]byte, error) {
 	type plain Run
 	p := plain(v)
 	if p.Heard == nil {
-		p.Heard = []int64{}
+		p.Heard = []string{}
 	}
 	return json.Marshal(p)
 }
@@ -2237,10 +2237,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/v1/schedules/{id}", func(w http.ResponseWriter, r *http.Request) {
-		pID, ok := pathNumber(w, r, "id")
-		if !ok {
-			return
-		}
+		pID := r.PathValue("id")
 		var body ScheduleUpdate
 		if !decode(w, r, &body) {
 			return
@@ -2248,17 +2245,11 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		answer(w, nil, h.ScheduleUpdate(r.Context(), pID, body))
 	})
 	mux.HandleFunc("DELETE /api/v1/schedules/{id}", func(w http.ResponseWriter, r *http.Request) {
-		pID, ok := pathNumber(w, r, "id")
-		if !ok {
-			return
-		}
+		pID := r.PathValue("id")
 		answer(w, nil, h.ScheduleDelete(r.Context(), pID))
 	})
 	mux.HandleFunc("PUT /api/v1/channels/{id}", func(w http.ResponseWriter, r *http.Request) {
-		pID, ok := pathNumber(w, r, "id")
-		if !ok {
-			return
-		}
+		pID := r.PathValue("id")
 		var body ChannelUpdate
 		if !decode(w, r, &body) {
 			return
@@ -2313,7 +2304,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	})
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		pRun := queryNumber(r, "run")
+		pRun := query(r, "run")
 		out, err := h.SessionEvents(r.Context(), pID, pRun)
 		answer(w, out, err)
 	})
@@ -2424,20 +2415,14 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/v1/channels/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
-		pID, ok := pathNumber(w, r, "id")
-		if !ok {
-			return
-		}
+		pID := r.PathValue("id")
 		pBefore := queryNumber(r, "before")
 		pLimit := queryNumber(r, "limit")
 		out, err := h.ChannelHistory(r.Context(), pID, pBefore, pLimit)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/v1/channels/{id}/read", func(w http.ResponseWriter, r *http.Request) {
-		pID, ok := pathNumber(w, r, "id")
-		if !ok {
-			return
-		}
+		pID := r.PathValue("id")
 		var body ChatReadRequest
 		if !decode(w, r, &body) {
 			return
@@ -2793,16 +2778,16 @@ func (c *Client) ScheduleList(ctx context.Context) ([]Schedule, error) {
 	return out, err
 }
 
-func (c *Client) ScheduleUpdate(ctx context.Context, pID int64, body ScheduleUpdate) error {
-	return c.call(ctx, "PUT", "/api/v1/schedules/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, body, nil)
+func (c *Client) ScheduleUpdate(ctx context.Context, pID string, body ScheduleUpdate) error {
+	return c.call(ctx, "PUT", "/api/v1/schedules/"+url.PathEscape(pID), nil, body, nil)
 }
 
-func (c *Client) ScheduleDelete(ctx context.Context, pID int64) error {
-	return c.call(ctx, "DELETE", "/api/v1/schedules/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, nil, nil)
+func (c *Client) ScheduleDelete(ctx context.Context, pID string) error {
+	return c.call(ctx, "DELETE", "/api/v1/schedules/"+url.PathEscape(pID), nil, nil, nil)
 }
 
-func (c *Client) ChannelUpdate(ctx context.Context, pID int64, body ChannelUpdate) error {
-	return c.call(ctx, "PUT", "/api/v1/channels/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, body, nil)
+func (c *Client) ChannelUpdate(ctx context.Context, pID string, body ChannelUpdate) error {
+	return c.call(ctx, "PUT", "/api/v1/channels/"+url.PathEscape(pID), nil, body, nil)
 }
 
 func (c *Client) ManagerHear(ctx context.Context, body SayRequest) error {
@@ -2851,10 +2836,10 @@ func (c *Client) SessionGet(ctx context.Context, pID string) (Session, error) {
 	return out, err
 }
 
-func (c *Client) SessionEvents(ctx context.Context, pID string, pRun *int64) ([]SessionEvent, error) {
+func (c *Client) SessionEvents(ctx context.Context, pID string, pRun *string) ([]SessionEvent, error) {
 	q := url.Values{}
 	if pRun != nil {
-		q.Set("run", strconv.FormatInt(*pRun, 10))
+		q.Set("run", *pRun)
 	}
 	var out []SessionEvent
 	err := c.call(ctx, "GET", "/api/v1/sessions/"+url.PathEscape(pID)+"/events", q, nil, &out)
@@ -2949,7 +2934,7 @@ func (c *Client) PlaybookNodeAct(ctx context.Context, pID string, pNode string, 
 	return out, err
 }
 
-func (c *Client) ChannelHistory(ctx context.Context, pID int64, pBefore *int64, pLimit *int64) ([]ChatMessage, error) {
+func (c *Client) ChannelHistory(ctx context.Context, pID string, pBefore *int64, pLimit *int64) ([]ChatMessage, error) {
 	q := url.Values{}
 	if pBefore != nil {
 		q.Set("before", strconv.FormatInt(*pBefore, 10))
@@ -2958,12 +2943,12 @@ func (c *Client) ChannelHistory(ctx context.Context, pID int64, pBefore *int64, 
 		q.Set("limit", strconv.FormatInt(*pLimit, 10))
 	}
 	var out []ChatMessage
-	err := c.call(ctx, "GET", "/api/v1/channels/"+url.PathEscape(strconv.FormatInt(pID, 10))+"/messages", q, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/channels/"+url.PathEscape(pID)+"/messages", q, nil, &out)
 	return out, err
 }
 
-func (c *Client) ChannelMarkRead(ctx context.Context, pID int64, body ChatReadRequest) error {
-	return c.call(ctx, "POST", "/api/v1/channels/"+url.PathEscape(strconv.FormatInt(pID, 10))+"/read", nil, body, nil)
+func (c *Client) ChannelMarkRead(ctx context.Context, pID string, body ChatReadRequest) error {
+	return c.call(ctx, "POST", "/api/v1/channels/"+url.PathEscape(pID)+"/read", nil, body, nil)
 }
 
 func (c *Client) PlaybookChanges(ctx context.Context, pID string) (Changes, error) {

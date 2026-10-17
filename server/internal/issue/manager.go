@@ -17,17 +17,17 @@ import (
 
 type ManagerWork struct {
 	Issue   protocol.Issue
-	Channel int64
+	Channel string
 	By      protocol.RunTrigger
 	// The schedule that came due, when one did.
 	Schedule *protocol.Schedule
 }
 
-func (is *issues) OfSchedule(id int64) (protocol.Issue, bool) {
-	row, err := is.q.LatestOfSchedule(context.Background(), sql.NullInt64{Int64: id, Valid: true})
+func (is *issues) OfSchedule(id string) (protocol.Issue, bool) {
+	row, err := is.q.LatestOfSchedule(context.Background(), sql.NullString{String: id, Valid: true})
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			log.Printf("vibevalley: schedule %d's issue: %v", id, err)
+			log.Printf("vibevalley: schedule %s's issue: %v", id, err)
 		}
 		return protocol.Issue{}, false
 	}
@@ -69,7 +69,7 @@ func (is *issues) closeManagersOpen(ctx context.Context) {
 
 func (d *dispatch) ForManager() *base.Hub[ManagerWork] { return d.forManager }
 
-func (d *dispatch) toManager(issue protocol.Issue, channel int64, by protocol.RunTrigger, due *protocol.Schedule) error {
+func (d *dispatch) toManager(issue protocol.Issue, channel string, by protocol.RunTrigger, due *protocol.Schedule) error {
 	if isClosed(issue.Status) {
 		if err := d.issues.reopen(issue.ID); err != nil {
 			return err

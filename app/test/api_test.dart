@@ -17,10 +17,12 @@ void main() {
         return http.Response('', 204);
       }),
     );
-    await api.channel.say(body: const SayRequest(text: '种一垄萝卜', conversation: 3));
+    await api.channel.say(
+      body: const SayRequest(text: '种一垄萝卜', conversation: 'c3'),
+    );
     expect(seen.method, 'POST');
     expect(seen.url.path, '/api/v1/say');
-    expect(jsonDecode(seen.body), {'text': '种一垄萝卜', 'conversation': 3});
+    expect(jsonDecode(seen.body), {'text': '种一垄萝卜', 'conversation': 'c3'});
   });
 
   test('path and query parameters; a chat page comes back as the same ChatMessage the state uses', () async {
@@ -31,15 +33,26 @@ void main() {
         seen = r.url;
         return http.Response(
           jsonEncode([
-            {'seq': 7, 'conversation': 1, 'from': 'manager', 'fromKind': 'manager', 'name': '管家', 'kind': 'chat', 'text': '好', 'final': true, 'at': 1},
+            {
+              'id': 'm7',
+              'number': 7,
+              'conversation': 'c1',
+              'from': 'manager',
+              'fromKind': 'manager',
+              'name': '管家',
+              'kind': 'chat',
+              'text': '好',
+              'final': true,
+              'at': 1,
+            },
           ]),
           200,
           headers: {'content-type': 'application/json; charset=utf-8'},
         );
       }),
     );
-    final page = await api.channel.history(id: 1, before: 10, limit: 20);
-    expect(seen.path, '/api/v1/channels/1/messages');
+    final page = await api.channel.history(id: 'c1', before: 10, limit: 20);
+    expect(seen.path, '/api/v1/channels/c1/messages');
     expect(seen.queryParameters, {'before': '10', 'limit': '20'});
     expect(page.single, isA<ChatMessage>());
     expect(page.single.text, '好');

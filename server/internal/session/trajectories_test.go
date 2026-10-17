@@ -32,14 +32,14 @@ func sessionTrajectories(t *testing.T, home string, change ...func(*base.Config)
 func TestLogKeptAndReadBack(t *testing.T) {
 	tr := sessionTrajectories(t, t.TempDir())
 	j := tr.Open("w1", 0)
-	j.RunStarted(7)
+	j.RunStarted("r7")
 	j.Asked("加分页", nil)
 	j.ToolStarted("c1", ToolStart{Text: "ls", Action: protocol.ToolActionRunCommand, Tool: "bash"}, nil)
 	j.ToolEnded("c1", "a\nb", true, nil)
-	j.RunEnded(7, protocol.OutcomeCompleted)
+	j.RunEnded("r7", protocol.OutcomeCompleted)
 	tr.Finish("w1")
 	var kinds []string
-	for _, s := range tr.Events("w1", 0) {
+	for _, s := range tr.Events("w1", "") {
 		out := ""
 		if s.Output != nil {
 			out = *s.Output
@@ -47,9 +47,9 @@ func TestLogKeptAndReadBack(t *testing.T) {
 		kinds = append(kinds, string(s.Type)+":"+out)
 	}
 	testkit.Eq(t, kinds, []string{"run/start:", "user/message:", "tool/call:", "tool/result:a\nb", "run/end:"}, "read back: the output in the result")
-	testkit.Eq(t, len(tr.Events("w1", 7)), 5, "the run's")
-	testkit.Eq(t, len(tr.Events("w1", 8)), 0, "another run's")
-	if tr.Events("../w1", 0) != nil {
+	testkit.Eq(t, len(tr.Events("w1", "r7")), 5, "the run's")
+	testkit.Eq(t, len(tr.Events("w1", "r8")), 0, "another run's")
+	if tr.Events("../w1", "") != nil {
 		t.Fatal("nothing read from outside the folder")
 	}
 	testkit.Eq(t, len(tr.Open("w1", 0).Events()), 5, "taken up again")

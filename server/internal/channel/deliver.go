@@ -5,6 +5,7 @@ import (
 	"log"
 	"slices"
 
+	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/pkg/db/generated"
@@ -15,7 +16,7 @@ import (
 // Every function here runs with c.mu held.
 
 type chatInsert struct {
-	conversation int64
+	conversation string
 	from         string
 	kind         protocol.MessageKind
 	text         string
@@ -25,7 +26,8 @@ type chatInsert struct {
 }
 
 type chatWritten struct {
-	seq        int64
+	id         string
+	number     int64
 	recipients []string
 	notOnFarm  []string
 	held       bool
@@ -43,8 +45,8 @@ func (c *Service) inTx(fn func(s chatStore) error) error {
 	return tx.Commit()
 }
 
-func (c *Service) settle(s chatStore, seq int64) (chatWritten, error) {
-	row, err := s.message(seq)
+func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
+	row, err := s.message(id)
 	if err != nil || row == nil {
 		return chatWritten{}, err
 	}
@@ -78,26 +80,26 @@ func (c *Service) settle(s chatStore, seq int64) (chatWritten, error) {
 			how = "not_on_farm"
 		}
 		named[i] = resolved{m, how}
-		if err := s.insertMention(seq, m, how); err != nil {
+		if err := s.insertMention(row.ID, m, how); err != nil {
 			return chatWritten{}, err
 		}
 	}
 	if len(mentions) > 0 {
 		meta.Mentions = mentions
-		if err := s.updateMessageMeta(seq, meta); err != nil {
+		if err := s.updateMessageMeta(row.ID, meta); err != nil {
 			return chatWritten{}, err
 		}
 	}
 	var followers []string
 	if conv.Kind == "thread" {
 		if row.Sender != "system" {
-			if err := s.follow(conv.ID, row.Sender, "replied", seq); err != nil {
+			if err := s.follow(conv.ID, row.Sender, "replied", row.Number); err != nil {
 				return chatWritten{}, err
 			}
 		}
 		for _, m := range named {
 			if m.how == "delivered" && (m.id == protocol.ManagerAgent || slices.Contains(onFarm, m.id)) {
-				if err := s.follow(conv.ID, m.id, "mentioned", seq-1); err != nil {
+				if err := s.follow(conv.ID, m.id, "mentioned", row.Number-1); err != nil {
 					return chatWritten{}, err
 				}
 			}
@@ -154,7 +156,7 @@ func (c *Service) settle(s chatStore, seq int64) (chatWritten, error) {
 	}
 	deliveries := chatAudience(in)
 	for _, d := range deliveries {
-		if err := s.insertDelivery(d, seq, now); err != nil {
+		if err := s.insertDelivery(d, row.ID, now); err != nil {
 			return chatWritten{}, err
 		}
 	}
@@ -175,7 +177,7 @@ func (c *Service) settle(s chatStore, seq int64) (chatWritten, error) {
 		}
 		held = n == 0
 	}
-	w := chatWritten{seq: seq, held: held}
+	w := chatWritten{id: row.ID, number: row.Number, held: held}
 	for _, d := range deliveries {
 		if d.HeldBy == "" && !slices.Contains(w.recipients, d.Recipient) {
 			w.recipients = append(w.recipients, d.Recipient)
@@ -192,19 +194,20 @@ func (c *Service) settle(s chatStore, seq int64) (chatWritten, error) {
 func (c *Service) insert(in chatInsert) (chatWritten, error) {
 	var written chatWritten
 	err := c.inTx(func(s chatStore) error {
-		seq, err := s.insertMessage(in.conversation, in.from, string(in.kind), in.text, in.final, in.meta, clock.NowMs())
+		id := base.NewID()
+		number, err := s.insertMessage(id, in.conversation, in.from, string(in.kind), in.text, in.final, in.meta, clock.NowMs())
 		if err != nil {
 			return err
 		}
-		if err := s.touchConversation(in.conversation, seq); err != nil {
+		if err := s.touchConversation(in.conversation, number); err != nil {
 			return err
 		}
 		if in.final {
-			if written, err = c.settle(s, seq); err != nil {
+			if written, err = c.settle(s, id); err != nil {
 				return err
 			}
 		}
-		written.seq = seq
+		written.id, written.number = id, number
 		return nil
 	})
 	if err != nil {
@@ -214,8 +217,8 @@ func (c *Service) insert(in chatInsert) (chatWritten, error) {
 	return written, nil
 }
 
-func (c *Service) after(conversation int64, written chatWritten, answers *string) {
-	c.publishMessage(written.seq, answers)
+func (c *Service) after(conversation string, written chatWritten, answers *string) {
+	c.publishMessage(written.id, answers)
 	c.publishConversation(conversation)
 	if written.held {
 		text := hopLimitText(protocol.HopLimit)
@@ -229,11 +232,11 @@ func (c *Service) after(conversation int64, written chatWritten, answers *string
 }
 
 func (c *Service) deliveryTarget(r chatDeliveryRow) string {
-	return c.targetOfRow(r.ConversationKind, r.ParentSeq, nil, nil, r.ChannelName)
+	return c.targetOfRow(r.ConversationKind, r.Parent, r.ParentNumber, nil, nil, r.ChannelName)
 }
 
 func (c *Service) asInbox(r chatDeliveryRow) protocol.InboxMessage {
-	return protocol.InboxMessage{Seq: r.Seq, Target: c.deliveryTarget(r), From: r.Sender, FromKind: chatSenderKind(r.SenderKind), Name: r.Name, Text: r.Body}
+	return protocol.InboxMessage{ID: r.Message, Number: r.Number, Target: c.deliveryTarget(r), From: r.Sender, FromKind: chatSenderKind(r.SenderKind), Name: r.Name, Text: r.Body}
 }
 
 func (c *Service) groupRows(rows []chatDeliveryRow) []chatUnreadRow {
@@ -271,8 +274,8 @@ func (c *Service) kicked(recipient string) error {
 		}
 	}
 	if recipient == protocol.ManagerAgent {
-		var order []int64
-		byConversation := map[int64][]chatDeliveryRow{}
+		var order []string
+		byConversation := map[string][]chatDeliveryRow{}
 		for _, r := range waking {
 			if _, ok := byConversation[r.Conversation]; !ok {
 				order = append(order, r.Conversation)
@@ -288,7 +291,7 @@ func (c *Service) kicked(recipient string) error {
 			}
 			c.manager.Publish(ManagerNews{Conversation: conversation, Target: messages[0].Target, Messages: messages})
 			for _, r := range rs {
-				if err := s.seenOne(protocol.ManagerAgent, r.Seq, now); err != nil {
+				if err := s.seenOne(protocol.ManagerAgent, r.Message, now); err != nil {
 					return err
 				}
 			}
@@ -324,14 +327,14 @@ func (c *Service) kicked(recipient string) error {
 	others := slices.DeleteFunc(unread, func(o chatUnreadRow) bool {
 		return slices.ContainsFunc(messages, func(m protocol.InboxMessage) bool { return m.Target == o.Target })
 	})
-	delivered := c.sessions.Deliver(recipient, wakeInput(messages, others), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: &waking[0].Seq})
+	delivered := c.sessions.Deliver(recipient, wakeInput(messages, others), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: &waking[0].Message})
 	if delivered.Kind == "refused" {
 		log.Printf("chat: %s not woken: %s", recipient, delivered.Reason)
 		return nil
 	}
 	now := clock.NowMs()
 	for _, r := range waking {
-		if err := s.markHanded(recipient, r.Seq, delivered.Launch, now); err != nil {
+		if err := s.markHanded(recipient, r.Message, delivered.Launch, now); err != nil {
 			return err
 		}
 	}
@@ -360,13 +363,13 @@ func (c *Service) notify(recipient string) {
 	if len(rows) == 0 {
 		return
 	}
-	delivered := c.sessions.Deliver(recipient, busyNotice(c.groupRows(rows)), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: &rows[0].Seq})
+	delivered := c.sessions.Deliver(recipient, busyNotice(c.groupRows(rows)), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: &rows[0].Message})
 	if delivered.Kind == "refused" {
 		return
 	}
 	now := clock.NowMs()
 	for _, r := range rows {
-		if err := s.markAnnounced(recipient, r.Seq, delivered.Launch, now); err != nil {
+		if err := s.markAnnounced(recipient, r.Message, delivered.Launch, now); err != nil {
 			log.Printf("chat: notice for %s: %v", recipient, err)
 			return
 		}
@@ -385,11 +388,9 @@ func (c *Service) inboxRows(who string) ([]chatUnreadRow, error) {
 	}
 	out := []chatUnreadRow{}
 	for _, r := range rows[:min(len(rows), protocol.SummaryConversations)] {
-		u := chatUnreadRow{Target: c.targetOfRow(r.Kind, r.ParentSeq, nil, nil, r.ChannelName), Unread: r.Unread, MentionsYou: r.MentionsYou}
-		if r.Latest != nil {
-			if latest, err := s.message(*r.Latest); err == nil && latest != nil {
-				u.Latest = latest.Name
-			}
+		u := chatUnreadRow{Target: c.targetOfRow(r.Kind, r.Parent, r.ParentNumber, nil, nil, r.ChannelName), Unread: r.Unread, MentionsYou: r.MentionsYou}
+		if latest, err := s.messageByNumber(r.ID, r.Latest); err == nil && latest != nil {
+			u.Latest = latest.Name
 		}
 		out = append(out, u)
 	}
@@ -411,8 +412,8 @@ func (c *Service) onActivity(a session.LaunchActivity) {
 			log.Printf("chat: %s spoke: %v", a.ID, err)
 			return
 		}
-		for _, seq := range seen {
-			if err := s.addSeenMark(a.ID, seq); err != nil {
+		for _, message := range seen {
+			if err := s.addSeenMark(a.ID, message); err != nil {
 				log.Printf("chat: %s spoke: %v", a.ID, err)
 			}
 		}
@@ -537,7 +538,7 @@ func (c *Service) openedJob(h protocol.Session) error {
 		return nil
 	}
 	channel := c.channelOfSession(h)
-	latest, err := s.latestSeq(channel)
+	latest, err := s.latestNumber(channel)
 	if err != nil {
 		return err
 	}
@@ -563,11 +564,11 @@ func (c *Service) openedJob(h protocol.Session) error {
 		return err
 	}
 	job, id := string(protocol.SubjectKindIssue), h.ID
-	thread, err := s.createThread(written.seq, &job, &id, channel, clock.NowMs())
-	if err != nil {
+	thread := base.NewID()
+	if err := s.createThread(thread, written.id, written.number, &job, &id, channel, clock.NowMs()); err != nil {
 		return err
 	}
-	if err := s.follow(thread, h.ID, "owner", written.seq); err != nil {
+	if err := s.follow(thread, h.ID, "owner", written.number); err != nil {
 		return err
 	}
 	c.publishConversation(thread)

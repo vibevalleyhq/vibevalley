@@ -10,7 +10,7 @@ import (
 )
 
 const addInbound = `-- name: AddInbound :exec
-insert into connector_inbound (connector, ext_id, message_seq, created_at) values (?, ?, null, ?) on conflict (connector, ext_id) do nothing
+insert into connector_inbound (connector, ext_id, message_id, created_at) values (?, ?, null, ?) on conflict (connector, ext_id) do nothing
 `
 
 type AddInboundParams struct {

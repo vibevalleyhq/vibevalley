@@ -13,7 +13,7 @@ const (
 
 func IsChannel(c Conversation) bool { return c.Kind != ConversationKindThread }
 
-func MessagesIn(chat *Chat, conversation int64) []ChatMessage {
+func MessagesIn(chat *Chat, conversation string) []ChatMessage {
 	if chat == nil {
 		return nil
 	}
@@ -32,11 +32,11 @@ func WithMessage(chat *Chat, m ChatMessage) Chat {
 		base = *chat
 	}
 	messages := slices.Clone(base.Messages)
-	if i := slices.IndexFunc(messages, func(x ChatMessage) bool { return x.Seq == m.Seq }); i >= 0 {
+	if i := slices.IndexFunc(messages, func(x ChatMessage) bool { return x.ID == m.ID }); i >= 0 {
 		messages[i] = m
 	} else {
 		messages = append(messages, m)
-		slices.SortStableFunc(messages, func(a, b ChatMessage) int { return cmp.Compare(a.Seq, b.Seq) })
+		slices.SortStableFunc(messages, func(a, b ChatMessage) int { return cmp.Compare(a.ID, b.ID) })
 	}
 	base.Messages = lastN(messages, KeepMessages)
 	return base
@@ -64,8 +64,8 @@ func WithConversation(chat *Chat, c Conversation) Chat {
 		return 0
 	}
 	last := func(x Conversation) int64 {
-		if x.LastSeq != nil {
-			return *x.LastSeq
+		if x.LastNumber != nil {
+			return *x.LastNumber
 		}
 		return 0
 	}
@@ -75,7 +75,7 @@ func WithConversation(chat *Chat, c Conversation) Chat {
 		}
 		return cmp.Compare(last(b), last(a))
 	})
-	keep := map[int64]bool{}
+	keep := map[string]bool{}
 	for _, x := range ranked[:KeepConversations] {
 		keep[x.ID] = true
 	}

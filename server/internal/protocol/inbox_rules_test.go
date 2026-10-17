@@ -3,6 +3,7 @@ package protocol
 // TestReduceGolden compares the inbox only after whole facts; these go case by case.
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -60,7 +61,7 @@ func callsWithPlaybooks(playbooks ...Playbook) CoreState {
 
 func callsMessage(seq int64, change ...func(*ChatMessage)) ChatMessage {
 	m := ChatMessage{
-		Seq: seq, Conversation: 1, From: ManagerAgent, FromKind: SenderKindManager, Name: "管家", Kind: MessageKindChat,
+		ID: fmt.Sprintf("m%d", seq), Number: seq, Conversation: "c1", From: ManagerAgent, FromKind: SenderKindManager, Name: "管家", Kind: MessageKindChat,
 		Text: "@主人 这块地能收了", Final: true, Mentions: []string{"user"}, At: callsT + seq,
 	}
 	for _, c := range change {
@@ -69,13 +70,13 @@ func callsMessage(seq int64, change ...func(*ChatMessage)) ChatMessage {
 	return m
 }
 
-func callsInThread(m *ChatMessage) { m.Conversation = 2 }
+func callsInThread(m *ChatMessage) { m.Conversation = "c2" }
 
 func callsChat(generalRead, threadRead *int64, messages ...ChatMessage) *Chat {
 	return &Chat{
 		Conversations: []Conversation{
-			{ID: 1, Kind: ConversationKindGeneral, Name: ptr.To("田头"), Read: generalRead, At: callsT},
-			{ID: 2, Kind: ConversationKindThread, Parent: ptr.To(int64(1)), SubjectKind: ptr.To(SubjectKindIssue), SubjectID: ptr.To("w1"), Read: threadRead, At: callsT},
+			{ID: "c1", Kind: ConversationKindGeneral, Name: ptr.To("田头"), Read: generalRead, At: callsT},
+			{ID: "c2", Kind: ConversationKindThread, Parent: ptr.To("m1"), ParentNumber: ptr.To(int64(1)), SubjectKind: ptr.To(SubjectKindIssue), SubjectID: ptr.To("w1"), Read: threadRead, At: callsT},
 		},
 		Messages: append([]ChatMessage{}, messages...),
 	}
@@ -97,7 +98,7 @@ func callsToPlans(playbook string) InboxTarget {
 	return InboxTarget{InboxTargetPlans{Playbook: playbook}}
 }
 
-func callsToChat(conversation int64) InboxTarget {
+func callsToChat(conversation string) InboxTarget {
 	return InboxTarget{InboxTargetChat{Conversation: conversation}}
 }
 
@@ -308,9 +309,9 @@ func TestInboxMentionCalls(t *testing.T) {
 		}),
 	))
 	testkit.Eq(t, Inbox(state), []InboxItem{
-		{ID: "m6", Kind: InboxKindMention, From: callsFromSession("w2", "前端小林", ""), Text: "@主人 页面缺设计稿", At: callsT + 6, Target: callsToChat(2)},
-		{ID: "m5", Kind: InboxKindMention, From: callsFromSession("w1", "后端老周", "lab"), Text: "@主人 接口要按月查吗？", At: callsT + 5, Target: callsToChat(2)},
-		{ID: "m4", Kind: InboxKindMention, From: callsManager, Text: "@主人 这块地能收了", At: callsT + 4, Target: callsToChat(1)},
+		{ID: "m6", Kind: InboxKindMention, From: callsFromSession("w2", "前端小林", ""), Text: "@主人 页面缺设计稿", At: callsT + 6, Target: callsToChat("c2")},
+		{ID: "m5", Kind: InboxKindMention, From: callsFromSession("w1", "后端老周", "lab"), Text: "@主人 接口要按月查吗？", At: callsT + 5, Target: callsToChat("c2")},
+		{ID: "m4", Kind: InboxKindMention, From: callsManager, Text: "@主人 这块地能收了", At: callsT + 4, Target: callsToChat("c1")},
 	})
 }
 
@@ -328,7 +329,7 @@ func TestInboxMessagesThatDoNotCall(t *testing.T) {
 		{"read and more after it", ptr.To(int64(9)), nil},
 		{"naming no one", nil, func(m *ChatMessage) { m.Mentions = nil }},
 		{"naming others", nil, func(m *ChatMessage) { m.Mentions = []string{"w1", ManagerAgent} }},
-		{"in a conversation the chat does not keep", nil, func(m *ChatMessage) { m.Conversation = 9 }},
+		{"in a conversation the chat does not keep", nil, func(m *ChatMessage) { m.Conversation = "c9" }},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			m := callsMessage(5)

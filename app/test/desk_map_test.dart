@@ -20,6 +20,7 @@ ProjectSummary _project(String name, {double? last, double slots = 3}) => Projec
 
 Issue _todo(String id, String project, {double? queuedAt}) => Issue(
   id: id,
+  number: 1,
   title: '活 $id',
   project: project,
   priority: Priority.medium,
@@ -225,7 +226,17 @@ void main() {
         _hired('w5', 'docs', _working),
       ],
       issues: [
-        const Issue(id: 'b1', title: '写周报', project: 'docs', priority: Priority.medium, createdAt: 0, queuedAt: 5, sessions: [], status: IssueStatus.todo),
+        const Issue(
+          id: 'b1',
+          number: 1,
+          title: '写周报',
+          project: 'docs',
+          priority: Priority.medium,
+          createdAt: 0,
+          queuedAt: 5,
+          sessions: [],
+          status: IssueStatus.todo,
+        ),
       ],
     );
     final went = <String>[];

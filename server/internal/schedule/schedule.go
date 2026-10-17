@@ -27,9 +27,9 @@ import (
 
 type chatView interface {
 	Channels() []channel.Info
-	General() int64
-	Notice(conversation int64, text, code string)
-	ChannelOf(conversation int64) channel.Info
+	General() string
+	Notice(conversation string, text, code string)
+	ChannelOf(conversation string) channel.Info
 }
 
 // $TZ, else where /etc/localtime points, else the offset now.
@@ -141,11 +141,11 @@ func (s *Service) put(sc protocol.Schedule) {
 	s.core.Apply(protocol.FactSchedule{Schedule: sc})
 }
 
-func (s *Service) find(id int64) (protocol.Schedule, error) {
+func (s *Service) find(id string) (protocol.Schedule, error) {
 	if i := slices.IndexFunc(s.all, func(x protocol.Schedule) bool { return x.ID == id }); i >= 0 {
 		return s.all[i], nil
 	}
-	return protocol.Schedule{}, fmt.Errorf("没有 %d 号定时", id)
+	return protocol.Schedule{}, fmt.Errorf("没有 %s 号定时", id)
 }
 
 func (s *Service) List() []protocol.Schedule {
@@ -168,7 +168,7 @@ func (s *Service) Add(req protocol.ScheduleRequest) (protocol.Schedule, error) {
 	}
 	i := slices.IndexFunc(chat.Channels(), func(c channel.Info) bool { return c.ID == want })
 	if i < 0 {
-		return protocol.Schedule{}, fmt.Errorf("没有 %d 这个频道", want)
+		return protocol.Schedule{}, fmt.Errorf("没有 %s 这个频道", want)
 	}
 	channel := chat.Channels()[i]
 	var agent *protocol.Agent
@@ -207,7 +207,8 @@ func (s *Service) Add(req protocol.ScheduleRequest) (protocol.Schedule, error) {
 		// Counted from now, by the same clock that ticks.
 		Enabled: true, Created: now,
 	}
-	row := generated.AddScheduleParams{Name: sc.Name, Body: sc.Text, ChannelID: sc.Channel, Spec: string(spec), Tz: tz, CreatedAt: now}
+	sc.ID = base.NewID()
+	row := generated.AddScheduleParams{ID: sc.ID, Name: sc.Name, Body: sc.Text, ChannelID: sc.Channel, Spec: string(spec), Tz: tz, CreatedAt: now}
 	if agent != nil {
 		id := agent.ID
 		sc.Agent, row.Agent = &id, sql.NullString{String: id, Valid: true}
@@ -215,18 +216,18 @@ func (s *Service) Add(req protocol.ScheduleRequest) (protocol.Schedule, error) {
 	if project != "" {
 		sc.Project, row.Project = &project, sql.NullString{String: project, Valid: true}
 	}
-	if sc.ID, err = s.q.AddSchedule(context.Background(), row); err != nil {
+	if err := s.q.AddSchedule(context.Background(), row); err != nil {
 		return protocol.Schedule{}, err
 	}
 	s.put(sc)
 	return sc, nil
 }
 
-func (s *Service) ran(id, at int64, enabled bool) error {
+func (s *Service) ran(id string, at int64, enabled bool) error {
 	return s.q.ScheduleRan(context.Background(), generated.ScheduleRanParams{LastRun: sql.NullInt64{Int64: at, Valid: true}, Enabled: enabled, ID: id})
 }
 
-func (s *Service) SetEnabled(id int64, enabled bool) (protocol.Schedule, error) {
+func (s *Service) SetEnabled(id string, enabled bool) (protocol.Schedule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	was, err := s.find(id)
@@ -250,7 +251,7 @@ func (s *Service) SetEnabled(id int64, enabled bool) (protocol.Schedule, error) 
 	return sc, nil
 }
 
-func (s *Service) Remove(id int64) (protocol.Schedule, error) {
+func (s *Service) Remove(id string) (protocol.Schedule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	was, err := s.find(id)
@@ -273,7 +274,7 @@ func (s *Service) Tick() {
 		missed := isMissed(sc, now)
 		after := afterRun(sc, now)
 		if err := s.ran(after.ID, now, after.Enabled); err != nil {
-			log.Printf("vibevalley: schedule %d's run was not kept: %v", sc.ID, err)
+			log.Printf("vibevalley: schedule %s's run was not kept: %v", sc.ID, err)
 		}
 		s.put(after)
 		s.chat.Notice(sc.Channel, protocol.DueText(sc, missed), "schedule")

@@ -1,7 +1,6 @@
 // Nothing here folds facts: it only reads the chat the server sent.
 
 import '../gen/vibevalley.dart';
-import '../ui/kit/labels.dart';
 
 const mentionOf = {managerAgent: '@管家', 'user': '@主人', everyone: '@所有人'};
 
@@ -20,26 +19,26 @@ List<Conversation> channelsOf(Chat? chat) {
   return all;
 }
 
-Conversation? conversationOf(Chat? chat, double id) => chat?.conversations.where((c) => c.id == id).firstOrNull;
+Conversation? conversationOf(Chat? chat, String id) => chat?.conversations.where((c) => c.id == id).firstOrNull;
 
 Conversation? channelOf(Chat? chat, Conversation? c) {
   if (c == null) return generalOf(chat);
   if (isChannel(c)) return c;
-  return conversationOf(chat, c.channel ?? -1) ?? generalOf(chat);
+  return conversationOf(chat, c.channel ?? "") ?? generalOf(chat);
 }
 
 /// `#name`, or `#channel:seq` for a thread (the seq of the message it hangs under).
 Conversation? jobThreadOf(Chat? chat, String session) =>
     chat?.conversations.lastWhereOrNull((c) => c.subjectKind == SubjectKind.issue && c.subjectId == session);
 
-List<ChatMessage> messagesIn(Chat? chat, double conversation) => [...?chat?.messages.where((m) => m.conversation == conversation)];
+List<ChatMessage> messagesIn(Chat? chat, String conversation) => [...?chat?.messages.where((m) => m.conversation == conversation)];
 
 int unreadIn(Chat? chat, Conversation c) =>
-    messagesIn(chat, c.id).where((m) => m.seq > (c.read ?? 0) && m.from != 'user' && m.kind != MessageKind.notice && m.final_).length;
+    messagesIn(chat, c.id).where((m) => m.number > (c.read ?? 0) && m.from != 'user' && m.kind != MessageKind.notice && m.final_).length;
 
 int unreadTotal(Chat? chat) => [...?chat?.conversations].fold(0, (n, c) => n + unreadIn(chat, c));
 
-double? newestUnread(Chat? chat, Conversation c) => messagesIn(chat, c.id).lastWhereOrNull((m) => m.final_ && m.seq > (c.read ?? 0))?.seq;
+double? newestUnread(Chat? chat, Conversation c) => messagesIn(chat, c.id).lastWhereOrNull((m) => m.final_ && m.number > (c.read ?? 0))?.number;
 
 enum LineRole { user, manager }
 
@@ -59,11 +58,11 @@ class Loaded {
   final bool complete;
 
   Loaded merge(List<ChatMessage> more, {required bool complete}) {
-    final all = {for (final m in messages) m.seq: m};
+    final all = {for (final m in messages) m.id: m};
     for (final m in more) {
-      all[m.seq] = m;
+      all[m.id] = m;
     }
-    final sorted = all.values.toList()..sort((a, b) => a.seq.compareTo(b.seq));
+    final sorted = all.values.toList()..sort((a, b) => a.number.compareTo(b.number));
     return Loaded(sorted, complete: complete || this.complete);
   }
 }
@@ -81,7 +80,7 @@ final class MessageItem extends ChatItem {
   final ChatMessage message;
   final Conversation? thread;
   @override
-  String get key => 'm${numberText(message.seq)}';
+  String get key => message.id;
   @override
   double get at => message.at;
   @override
@@ -99,21 +98,21 @@ final class SpokenItem extends ChatItem {
   String get sender => line.role.name;
 }
 
-List<ChatMessage> messagesOf(Chat? chat, double conversation, [Loaded? more]) {
-  final all = <double, ChatMessage>{};
+List<ChatMessage> messagesOf(Chat? chat, String conversation, [Loaded? more]) {
+  final all = <String, ChatMessage>{};
   for (final m in more?.messages ?? const <ChatMessage>[]) {
-    all[m.seq] = m;
+    all[m.id] = m;
   }
   for (final m in messagesIn(chat, conversation)) {
-    all[m.seq] = m;
+    all[m.id] = m;
   }
-  return all.values.toList()..sort((a, b) => a.seq.compareTo(b.seq));
+  return all.values.toList()..sort((a, b) => a.number.compareTo(b.number));
 }
 
 ChatMessage? parentOf(Chat? chat, Conversation thread, [Loaded? more]) {
   final p = thread.parent;
   if (p == null) return null;
-  return chat?.messages.where((m) => m.seq == p).firstOrNull ?? more?.messages.where((m) => m.seq == p).firstOrNull;
+  return chat?.messages.where((m) => m.id == p).firstOrNull ?? more?.messages.where((m) => m.id == p).firstOrNull;
 }
 
 /// On the general (or before the server sent it) the spoken lines are woven in by time.
@@ -122,7 +121,7 @@ List<ChatItem> itemsOf(Chat? chat, Conversation? conversation, List<Line> lines,
     for (final c in chat?.conversations ?? const <Conversation>[])
       if (c.kind == ConversationKind.thread && c.parent != null) c.parent!: c,
   };
-  final messages = conversation == null ? <ChatItem>[] : <ChatItem>[for (final m in messagesOf(chat, conversation.id, more)) MessageItem(m, threads[m.seq])];
+  final messages = conversation == null ? <ChatItem>[] : <ChatItem>[for (final m in messagesOf(chat, conversation.id, more)) MessageItem(m, threads[m.id])];
   if (conversation != null && conversation.kind != ConversationKind.general) return messages;
   final all = [...messages, for (final l in lines) SpokenItem(l)];
   // A stable sort: messages and lines at the same moment keep their order.

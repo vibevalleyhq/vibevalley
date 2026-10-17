@@ -6,10 +6,13 @@ select * from issue order by rank, created_at, id;
 -- name: GetIssue :one
 select * from issue where id = ?;
 
+-- name: IssueByNumber :one
+select * from issue where number = ?;
+
 -- name: AddIssue :exec
-insert into issue (id, title, description, project, assignee, priority, rank, created_at, schedule)
-values (sqlc.arg(id), sqlc.arg(title), sqlc.arg(description), sqlc.arg(project), sqlc.arg(assignee), sqlc.arg(priority),
-        (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.arg(schedule));
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, schedule)
+values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.arg(project), sqlc.arg(assignee),
+        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.arg(schedule));
 
 -- name: EditIssue :exec
 update issue set title = ?, description = ?, project = ?, assignee = ?, priority = ? where id = ?;
@@ -31,7 +34,8 @@ update issue set closed_at = ?, closed = ? where id = ?;
 
 -- name: OpenIssue :exec
 -- A session starts on it: made from the session's job when it is new, else open again and out of the queue.
-insert into issue (id, title, description, project, assignee, created_at) values (?, ?, ?, ?, ?, ?)
+insert into issue (id, number, title, description, project, assignee, created_at)
+values (?, (select coalesce(max(number), 0) + 1 from issue), ?, ?, ?, ?, ?)
 on conflict (id) do update set queued_at = null, closed_at = null, closed = null;
 
 -- name: KeptIssues :many
@@ -47,8 +51,8 @@ select * from issue where id = sqlc.arg(id) or parent = sqlc.arg(id);
 
 -- name: PutIssue :exec
 -- An issue as its playbook has it now; its sessions and its queue are not the playbook's.
-insert into issue (id, title, description, project, assignee, priority, rank, created_at, closed_at, closed, parent, blocked_by, plan, step)
-values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, closed_at, closed, parent, blocked_by, plan, step)
+values (?, (select coalesce(max(number), 0) + 1 from issue), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 on conflict (id) do update set
   title = excluded.title, description = excluded.description, project = excluded.project, assignee = excluded.assignee, rank = excluded.rank,
   closed_at = excluded.closed_at, closed = excluded.closed, parent = excluded.parent, blocked_by = excluded.blocked_by,

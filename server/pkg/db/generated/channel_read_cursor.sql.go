@@ -10,40 +10,40 @@ import (
 )
 
 const readCursor = `-- name: ReadCursor :one
-select read_seq from channel_read_cursor where participant_id = ? and conversation_id = ?
+select read_number from channel_read_cursor where participant_id = ? and conversation_id = ?
 `
 
 type ReadCursorParams struct {
 	ParticipantID  string
-	ConversationID int64
+	ConversationID string
 }
 
 func (q *Queries) ReadCursor(ctx context.Context, arg ReadCursorParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, readCursor, arg.ParticipantID, arg.ConversationID)
-	var read_seq int64
-	err := row.Scan(&read_seq)
-	return read_seq, err
+	var read_number int64
+	err := row.Scan(&read_number)
+	return read_number, err
 }
 
 const setReadCursor = `-- name: SetReadCursor :exec
 
-insert into channel_read_cursor (participant_id, conversation_id, read_seq, updated_at) values (?, ?, ?, ?)
-on conflict (participant_id, conversation_id) do update set read_seq = max(channel_read_cursor.read_seq, excluded.read_seq), updated_at = excluded.updated_at
+insert into channel_read_cursor (participant_id, conversation_id, read_number, updated_at) values (?, ?, ?, ?)
+on conflict (participant_id, conversation_id) do update set read_number = max(channel_read_cursor.read_number, excluded.read_number), updated_at = excluded.updated_at
 `
 
 type SetReadCursorParams struct {
 	ParticipantID  string
-	ConversationID int64
-	ReadSeq        int64
+	ConversationID string
+	ReadNumber     int64
 	UpdatedAt      int64
 }
 
-// How far each participant has read in each conversation; it only moves on (channel/db.go).
+// How far each participant has read in each conversation, by message number; it only moves on (channel/db.go).
 func (q *Queries) SetReadCursor(ctx context.Context, arg SetReadCursorParams) error {
 	_, err := q.db.ExecContext(ctx, setReadCursor,
 		arg.ParticipantID,
 		arg.ConversationID,
-		arg.ReadSeq,
+		arg.ReadNumber,
 		arg.UpdatedAt,
 	)
 	return err

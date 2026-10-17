@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（13 篇）
+## proposed（12 篇）
 
 ### feature
 
@@ -19,11 +19,10 @@
 - 2026-10-17 [管家是一份内置档案](proposed/architecture/2026-10-17-manager-is-an-agent.md)
 - 2026-10-17 [先有能力，再有入口：一张能力表，接口、命令行、管家、帮工都从它来](proposed/architecture/2026-10-17-capabilities-before-surfaces.md)
 - 2026-10-16 [Run 是一次干活，Session 跨好几次 run，小队（Crew）编排 agent](proposed/architecture/2026-10-16-runs-sessions-crews.md)
-- 2026-10-16 [改完旧名字，主键用 uuidv7](proposed/architecture/2026-10-16-finish-the-renames.md)
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
 
-## implemented（83 篇）
+## implemented（84 篇）
 
 ### feature
 
@@ -80,6 +79,7 @@
 - 2026-10-16 [只有一份表结构，不认旧数据](implemented/architecture/2026-10-16-one-schema-no-old-data.md)
 - 2026-10-16 [配置只有一份 YAML 和环境变量，由 viper 读](implemented/architecture/2026-10-16-one-config-file.md)
 - 2026-10-16 [服务端的游戏收在一处](implemented/architecture/2026-10-16-game-in-one-place.md)
+- 2026-10-16 [改完旧名字，主键用 uuidv7](implemented/architecture/2026-10-16-finish-the-renames.md)
 - 2026-10-16 [按业务分深模块，包名用单数和自己的词](implemented/architecture/2026-10-16-deep-modules-singular-names.md)
 - 2026-10-16 [通用的小封装收进 pkg/x](implemented/architecture/2026-10-16-common-wrappers-in-pkg-x.md)
 - 2026-10-16 [客户端分层：两张皮在上，共用的在下](implemented/architecture/2026-10-16-client-layers.md)

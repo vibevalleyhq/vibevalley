@@ -53,8 +53,16 @@ void main() {
       const DesktopNotice('计划「登录改版」都做完了', '看看改动，收获进主分支', DesktopOpenPlans('pb1')),
     );
     expect(
-      noticeForCall(_call('m3', InboxKind.mention, from: const InboxFromManager(), text: '看一眼', target: const InboxTargetChat(conversation: 2))),
-      const DesktopNotice('管家 叫你', '看一眼', DesktopOpenChat(2)),
+      noticeForCall(
+        _call(
+          'm3',
+          InboxKind.mention,
+          from: const InboxFromManager(),
+          text: '看一眼',
+          target: const InboxTargetChat(conversation: 'c2'),
+        ),
+      ),
+      const DesktopNotice('管家 叫你', '看一眼', DesktopOpenChat('c2')),
     );
   });
 
@@ -81,17 +89,18 @@ void main() {
         text: '登录改版',
         target: const InboxTargetPlans(playbook: 'pb'),
       ),
-      _call('m9', InboxKind.mention, target: const InboxTargetChat(conversation: 1)),
+      _call('m9', InboxKind.mention, target: const InboxTargetChat(conversation: 'c1')),
     ];
     final state = _state(
       conversations: [
-        {'id': 1, 'kind': 'general', 'replies': 0, 'read': 1, 'at': 0},
+        {'id': 'c1', 'kind': 'general', 'replies': 0, 'read': 1, 'at': 0},
       ],
       messages: [
         for (final (seq, from, kind) in [(1, 'manager', 'chat'), (2, 'manager', 'chat'), (3, 'user', 'chat'), (4, 'h1', 'notice'), (5, 'h1', 'chat')])
           {
-            'seq': seq,
-            'conversation': 1,
+            'id': 'm$seq',
+            'number': seq,
+            'conversation': 'c1',
             'from': from,
             'fromKind': from == 'user' ? 'user' : 'manager',
             'name': from,
@@ -106,7 +115,13 @@ void main() {
   });
 
   test('commands round-trip the protocol JSON; unknown ones are dropped', () {
-    for (final c in const <DesktopCommand>[DesktopVoice(), DesktopOpenSession('h1'), DesktopOpenChat(3), DesktopOpenPlans('pb'), DesktopOpenAchievements()]) {
+    for (final c in const <DesktopCommand>[
+      DesktopVoice(),
+      DesktopOpenSession('h1'),
+      DesktopOpenChat('c3'),
+      DesktopOpenPlans('pb'),
+      DesktopOpenAchievements(),
+    ]) {
       expect(DesktopCommand.fromJson(c.toJson())?.toJson(), c.toJson());
     }
     expect(DesktopCommand.fromJson({'type': 'session'}), isNull);

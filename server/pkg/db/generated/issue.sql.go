@@ -11,9 +11,9 @@ import (
 )
 
 const addIssue = `-- name: AddIssue :exec
-insert into issue (id, title, description, project, assignee, priority, rank, created_at, schedule)
-values (?1, ?2, ?3, ?4, ?5, ?6,
-        (select coalesce(max(rank), 0) + 1 from issue), ?7, ?8)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, schedule)
+values (?1, (select coalesce(max(number), 0) + 1 from issue), ?2, ?3, ?4, ?5,
+        ?6, (select coalesce(max(rank), 0) + 1 from issue), ?7, ?8)
 `
 
 type AddIssueParams struct {
@@ -24,7 +24,7 @@ type AddIssueParams struct {
 	Assignee    sql.NullString
 	Priority    string
 	CreatedAt   int64
-	Schedule    sql.NullInt64
+	Schedule    sql.NullString
 }
 
 func (q *Queries) AddIssue(ctx context.Context, arg AddIssueParams) error {
@@ -82,7 +82,7 @@ func (q *Queries) EditIssue(ctx context.Context, arg EditIssueParams) error {
 }
 
 const family = `-- name: Family :many
-select id, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue where id = ?1 or parent = ?1
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue where id = ?1 or parent = ?1
 `
 
 // An issue and its sub-issues.
@@ -97,6 +97,7 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 		var i Issue
 		if err := rows.Scan(
 			&i.ID,
+			&i.Number,
 			&i.Title,
 			&i.Description,
 			&i.Project,
@@ -127,7 +128,7 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 }
 
 const getIssue = `-- name: GetIssue :one
-select id, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue where id = ?
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue where id = ?
 `
 
 func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
@@ -135,6 +136,36 @@ func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
 	var i Issue
 	err := row.Scan(
 		&i.ID,
+		&i.Number,
+		&i.Title,
+		&i.Description,
+		&i.Project,
+		&i.Assignee,
+		&i.Priority,
+		&i.Rank,
+		&i.Parent,
+		&i.BlockedBy,
+		&i.Plan,
+		&i.Step,
+		&i.Schedule,
+		&i.CreatedAt,
+		&i.QueuedAt,
+		&i.ClosedAt,
+		&i.Closed,
+	)
+	return i, err
+}
+
+const issueByNumber = `-- name: IssueByNumber :one
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue where number = ?
+`
+
+func (q *Queries) IssueByNumber(ctx context.Context, number int64) (Issue, error) {
+	row := q.db.QueryRowContext(ctx, issueByNumber, number)
+	var i Issue
+	err := row.Scan(
+		&i.ID,
+		&i.Number,
 		&i.Title,
 		&i.Description,
 		&i.Project,
@@ -156,7 +187,7 @@ func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
 
 const keptIssues = `-- name: KeptIssues :many
 with latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit ?1)
-select id, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue
 where closed_at is null or id in (select id from latest) or parent in (select id from latest)
    or parent in (select id from issue where closed_at is null)
 `
@@ -173,6 +204,7 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 		var i Issue
 		if err := rows.Scan(
 			&i.ID,
+			&i.Number,
 			&i.Title,
 			&i.Description,
 			&i.Project,
@@ -203,15 +235,16 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 }
 
 const latestOfSchedule = `-- name: LatestOfSchedule :one
-select id, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue where schedule = ? order by created_at desc, id desc limit 1
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue where schedule = ? order by created_at desc, id desc limit 1
 `
 
 // A schedule's issue: the one it made last.
-func (q *Queries) LatestOfSchedule(ctx context.Context, schedule sql.NullInt64) (Issue, error) {
+func (q *Queries) LatestOfSchedule(ctx context.Context, schedule sql.NullString) (Issue, error) {
 	row := q.db.QueryRowContext(ctx, latestOfSchedule, schedule)
 	var i Issue
 	err := row.Scan(
 		&i.ID,
+		&i.Number,
 		&i.Title,
 		&i.Description,
 		&i.Project,
@@ -233,7 +266,7 @@ func (q *Queries) LatestOfSchedule(ctx context.Context, schedule sql.NullInt64) 
 
 const listIssues = `-- name: ListIssues :many
 
-select id, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue order by rank, created_at, id
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue order by rank, created_at, id
 `
 
 // Issues (issue/issue.go).
@@ -248,6 +281,7 @@ func (q *Queries) ListIssues(ctx context.Context) ([]Issue, error) {
 		var i Issue
 		if err := rows.Scan(
 			&i.ID,
+			&i.Number,
 			&i.Title,
 			&i.Description,
 			&i.Project,
@@ -278,7 +312,8 @@ func (q *Queries) ListIssues(ctx context.Context) ([]Issue, error) {
 }
 
 const openIssue = `-- name: OpenIssue :exec
-insert into issue (id, title, description, project, assignee, created_at) values (?, ?, ?, ?, ?, ?)
+insert into issue (id, number, title, description, project, assignee, created_at)
+values (?, (select coalesce(max(number), 0) + 1 from issue), ?, ?, ?, ?, ?)
 on conflict (id) do update set queued_at = null, closed_at = null, closed = null
 `
 
@@ -373,8 +408,8 @@ func (q *Queries) PlanIDs(ctx context.Context) ([]string, error) {
 }
 
 const putIssue = `-- name: PutIssue :exec
-insert into issue (id, title, description, project, assignee, priority, rank, created_at, closed_at, closed, parent, blocked_by, plan, step)
-values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, closed_at, closed, parent, blocked_by, plan, step)
+values (?, (select coalesce(max(number), 0) + 1 from issue), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 on conflict (id) do update set
   title = excluded.title, description = excluded.description, project = excluded.project, assignee = excluded.assignee, rank = excluded.rank,
   closed_at = excluded.closed_at, closed = excluded.closed, parent = excluded.parent, blocked_by = excluded.blocked_by,

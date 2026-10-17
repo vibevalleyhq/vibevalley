@@ -324,7 +324,8 @@ class Spent {
 
 class ChatMessage {
   const ChatMessage({
-    required this.seq,
+    required this.id,
+    required this.number,
     required this.conversation,
     required this.from,
     required this.fromKind,
@@ -341,8 +342,9 @@ class ChatMessage {
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
-    seq: (j['seq'] as num).toDouble(),
-    conversation: (j['conversation'] as num).toDouble(),
+    id: j['id'] as String,
+    number: (j['number'] as num).toDouble(),
+    conversation: j['conversation'] as String,
     from: j['from'] as String,
     fromKind: SenderKind.fromJson(j['fromKind']),
     name: j['name'] as String,
@@ -357,8 +359,9 @@ class ChatMessage {
     at: (j['at'] as num).toDouble(),
   );
 
-  final double seq;
-  final double conversation;
+  final String id;
+  final double number;
+  final String conversation;
   final String from;
   final SenderKind fromKind;
   final String name;
@@ -373,7 +376,8 @@ class ChatMessage {
   final double at;
 
   Map<String, dynamic> toJson() => {
-    'seq': seq,
+    'id': id,
+    'number': number,
     'conversation': conversation,
     'from': from,
     'fromKind': fromKind.wire,
@@ -418,44 +422,47 @@ class Conversation {
     required this.id,
     required this.kind,
     this.parent,
+    this.parentNumber,
     this.name,
     this.description,
     this.project,
     this.channel,
     this.subjectKind,
     this.subjectId,
-    this.lastSeq,
+    this.lastNumber,
     required this.replies,
     this.read,
     required this.at,
   });
 
   factory Conversation.fromJson(Map<String, dynamic> j) => Conversation(
-    id: (j['id'] as num).toDouble(),
+    id: j['id'] as String,
     kind: ConversationKind.fromJson(j['kind']),
-    parent: j['parent'] == null ? null : (j['parent'] as num).toDouble(),
+    parent: j['parent'] == null ? null : j['parent'] as String,
+    parentNumber: j['parentNumber'] == null ? null : (j['parentNumber'] as num).toDouble(),
     name: j['name'] == null ? null : j['name'] as String,
     description: j['description'] == null ? null : j['description'] as String,
     project: j['project'] == null ? null : j['project'] as String,
-    channel: j['channel'] == null ? null : (j['channel'] as num).toDouble(),
+    channel: j['channel'] == null ? null : j['channel'] as String,
     subjectKind: j['subjectKind'] == null ? null : SubjectKind.fromJson(j['subjectKind']),
     subjectId: j['subjectId'] == null ? null : j['subjectId'] as String,
-    lastSeq: j['lastSeq'] == null ? null : (j['lastSeq'] as num).toDouble(),
+    lastNumber: j['lastNumber'] == null ? null : (j['lastNumber'] as num).toDouble(),
     replies: (j['replies'] as num).toDouble(),
     read: j['read'] == null ? null : (j['read'] as num).toDouble(),
     at: (j['at'] as num).toDouble(),
   );
 
-  final double id;
+  final String id;
   final ConversationKind kind;
-  final double? parent;
+  final String? parent;
+  final double? parentNumber;
   final String? name;
   final String? description;
   final String? project;
-  final double? channel;
+  final String? channel;
   final SubjectKind? subjectKind;
   final String? subjectId;
-  final double? lastSeq;
+  final double? lastNumber;
   final double replies;
   final double? read;
   final double at;
@@ -464,13 +471,14 @@ class Conversation {
     'id': id,
     'kind': kind.wire,
     if (parent != null) 'parent': parent!,
+    if (parentNumber != null) 'parentNumber': parentNumber!,
     if (name != null) 'name': name!,
     if (description != null) 'description': description!,
     if (project != null) 'project': project!,
     if (channel != null) 'channel': channel!,
     if (subjectKind != null) 'subjectKind': subjectKind!.wire,
     if (subjectId != null) 'subjectId': subjectId!,
-    if (lastSeq != null) 'lastSeq': lastSeq!,
+    if (lastNumber != null) 'lastNumber': lastNumber!,
     'replies': replies,
     if (read != null) 'read': read!,
     'at': at,
@@ -659,7 +667,7 @@ class Session {
     lastRun: j['lastRun'] == null ? null : LastRun.fromJson(j['lastRun'] as Map<String, dynamic>),
     spent: j['spent'] == null ? null : Spent.fromJson(j['spent'] as Map<String, dynamic>),
     playbook: j['playbook'] == null ? null : SessionPlaybook.fromJson(j['playbook'] as Map<String, dynamic>),
-    channel: j['channel'] == null ? null : (j['channel'] as num).toDouble(),
+    channel: j['channel'] == null ? null : j['channel'] as String,
     play: j['play'] == null ? null : SessionPlay.fromJson(j['play'] as Map<String, dynamic>),
     issue: j['issue'] == null ? null : j['issue'] as String,
     phaseText: j['phaseText'] == null ? null : j['phaseText'] as String,
@@ -680,7 +688,7 @@ class Session {
   final LastRun? lastRun;
   final Spent? spent;
   final SessionPlaybook? playbook;
-  final double? channel;
+  final String? channel;
   final SessionPlay? play;
   final String? issue;
   final String? phaseText;
@@ -1030,10 +1038,10 @@ class Schedule {
   });
 
   factory Schedule.fromJson(Map<String, dynamic> j) => Schedule(
-    id: (j['id'] as num).toDouble(),
+    id: j['id'] as String,
     name: j['name'] as String,
     text: j['text'] as String,
-    channel: (j['channel'] as num).toDouble(),
+    channel: j['channel'] as String,
     agent: j['agent'] == null ? null : j['agent'] as String,
     project: j['project'] == null ? null : j['project'] as String,
     when: ScheduleWhen.fromJson(j['when'] as Map<String, dynamic>),
@@ -1045,10 +1053,10 @@ class Schedule {
     nextText: j['nextText'] == null ? null : j['nextText'] as String,
   );
 
-  final double id;
+  final String id;
   final String name;
   final String text;
-  final double channel;
+  final String channel;
   final String? agent;
   final String? project;
   final ScheduleWhen when;
@@ -1197,7 +1205,7 @@ class SessionEvent {
     seq: (j['seq'] as num).toDouble(),
     time: (j['time'] as num).toDouble(),
     type: SessionEventType.fromJson(j['type']),
-    run: j['run'] == null ? null : (j['run'] as num).toDouble(),
+    run: j['run'] == null ? null : j['run'] as String,
     call: j['call'] == null ? null : (j['call'] as num).toDouble(),
     under: j['under'] == null ? null : (j['under'] as num).toDouble(),
     text: j['text'] as String,
@@ -1212,7 +1220,7 @@ class SessionEvent {
   final double seq;
   final double time;
   final SessionEventType type;
-  final double? run;
+  final String? run;
   final double? call;
   final double? under;
   final String text;
@@ -1716,7 +1724,7 @@ class NodeFieldChange {
 
 class PlaybookEvent {
   const PlaybookEvent({
-    required this.seq,
+    required this.id,
     required this.playbook,
     this.node,
     required this.kind,
@@ -1730,7 +1738,7 @@ class PlaybookEvent {
   });
 
   factory PlaybookEvent.fromJson(Map<String, dynamic> j) => PlaybookEvent(
-    seq: (j['seq'] as num).toDouble(),
+    id: j['id'] as String,
     playbook: j['playbook'] as String,
     node: j['node'] == null ? null : j['node'] as String,
     kind: PlaybookEventKind.fromJson(j['kind']),
@@ -1743,7 +1751,7 @@ class PlaybookEvent {
     text: j['text'] == null ? null : j['text'] as String,
   );
 
-  final double seq;
+  final String id;
   final String playbook;
   final String? node;
   final PlaybookEventKind kind;
@@ -1756,7 +1764,7 @@ class PlaybookEvent {
   final String? text;
 
   Map<String, dynamic> toJson() => {
-    'seq': seq,
+    'id': id,
     'playbook': playbook,
     if (node != null) 'node': node!,
     'kind': kind.wire,
@@ -2575,6 +2583,7 @@ class Dispatched {
 class Issue {
   const Issue({
     required this.id,
+    required this.number,
     required this.title,
     this.description,
     this.project,
@@ -2596,6 +2605,7 @@ class Issue {
 
   factory Issue.fromJson(Map<String, dynamic> j) => Issue(
     id: j['id'] as String,
+    number: (j['number'] as num).toDouble(),
     title: j['title'] as String,
     description: j['description'] == null ? null : j['description'] as String,
     project: j['project'] == null ? null : j['project'] as String,
@@ -2611,11 +2621,12 @@ class Issue {
     blockedBy: j['blockedBy'] == null ? null : [for (final e in j['blockedBy'] as List) e as String],
     plan: j['plan'] == null ? null : IssuePlan.fromJson(j['plan'] as Map<String, dynamic>),
     step: j['step'] == null ? null : IssueStep.fromJson(j['step'] as Map<String, dynamic>),
-    schedule: j['schedule'] == null ? null : (j['schedule'] as num).toDouble(),
+    schedule: j['schedule'] == null ? null : j['schedule'] as String,
     status: IssueStatus.fromJson(j['status']),
   );
 
   final String id;
+  final double number;
   final String title;
   final String? description;
   final String? project;
@@ -2631,11 +2642,12 @@ class Issue {
   final List<String>? blockedBy;
   final IssuePlan? plan;
   final IssueStep? step;
-  final double? schedule;
+  final String? schedule;
   final IssueStatus status;
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'number': number,
     'title': title,
     if (description != null) 'description': description!,
     if (project != null) 'project': project!,
@@ -2843,14 +2855,14 @@ class RunTrigger {
 
   factory RunTrigger.fromJson(Map<String, dynamic> j) => RunTrigger(
     kind: RunTriggerKind.fromJson(j['kind']),
-    message: j['message'] == null ? null : (j['message'] as num).toDouble(),
-    schedule: j['schedule'] == null ? null : (j['schedule'] as num).toDouble(),
+    message: j['message'] == null ? null : j['message'] as String,
+    schedule: j['schedule'] == null ? null : j['schedule'] as String,
     missed: j['missed'] == null ? null : j['missed'] as bool,
   );
 
   final RunTriggerKind kind;
-  final double? message;
-  final double? schedule;
+  final String? message;
+  final String? schedule;
   final bool? missed;
 
   Map<String, dynamic> toJson() => {
@@ -2876,11 +2888,11 @@ class Run {
   });
 
   factory Run.fromJson(Map<String, dynamic> j) => Run(
-    id: (j['id'] as num).toDouble(),
+    id: j['id'] as String,
     session: j['session'] as String,
     issue: j['issue'] == null ? null : j['issue'] as String,
     triggeredBy: RunTrigger.fromJson(j['triggeredBy'] as Map<String, dynamic>),
-    heard: [for (final e in j['heard'] as List) (e as num).toDouble()],
+    heard: [for (final e in j['heard'] as List) e as String],
     startedAt: (j['startedAt'] as num).toDouble(),
     endedAt: j['endedAt'] == null ? null : (j['endedAt'] as num).toDouble(),
     outcome: j['outcome'] == null ? null : Outcome.fromJson(j['outcome']),
@@ -2888,11 +2900,11 @@ class Run {
     spent: j['spent'] == null ? null : Spent.fromJson(j['spent'] as Map<String, dynamic>),
   );
 
-  final double id;
+  final String id;
   final String session;
   final String? issue;
   final RunTrigger triggeredBy;
-  final List<double> heard;
+  final List<String> heard;
   final double startedAt;
   final double? endedAt;
   final Outcome? outcome;
@@ -2931,13 +2943,13 @@ class SayRequest {
   factory SayRequest.fromJson(Map<String, dynamic> j) => SayRequest(
     text: j['text'] as String,
     bed: j['bed'] == null ? null : (j['bed'] as num).toDouble(),
-    conversation: j['conversation'] == null ? null : (j['conversation'] as num).toDouble(),
+    conversation: j['conversation'] == null ? null : j['conversation'] as String,
     agent: j['agent'] == null ? null : j['agent'] as String,
   );
 
   final String text;
   final double? bed;
-  final double? conversation;
+  final String? conversation;
   final String? agent;
 
   Map<String, dynamic> toJson() => {
@@ -2966,7 +2978,7 @@ class ScheduleRequest {
   factory ScheduleRequest.fromJson(Map<String, dynamic> j) => ScheduleRequest(
     name: j['name'] as String,
     text: j['text'] as String,
-    channel: j['channel'] == null ? null : (j['channel'] as num).toDouble(),
+    channel: j['channel'] == null ? null : j['channel'] as String,
     agent: j['agent'] == null ? null : j['agent'] as String,
     project: j['project'] == null ? null : j['project'] as String,
     when: ScheduleWhen.fromJson(j['when'] as Map<String, dynamic>),
@@ -2975,7 +2987,7 @@ class ScheduleRequest {
 
   final String name;
   final String text;
-  final double? channel;
+  final String? channel;
   final String? agent;
   final String? project;
   final ScheduleWhen when;
@@ -3497,9 +3509,9 @@ final class InboxTargetPlans extends InboxTarget {
 final class InboxTargetChat extends InboxTarget {
   const InboxTargetChat({required this.conversation});
 
-  factory InboxTargetChat.fromJson(Map<String, dynamic> j) => InboxTargetChat(conversation: (j['conversation'] as num).toDouble());
+  factory InboxTargetChat.fromJson(Map<String, dynamic> j) => InboxTargetChat(conversation: j['conversation'] as String);
 
-  final double conversation;
+  final String conversation;
 
   @override
   Map<String, dynamic> toJson() => {'kind': 'chat', 'conversation': conversation};
@@ -4536,10 +4548,10 @@ final class FactSchedule extends Fact implements SideEvent {
 final class FactUnschedule extends Fact implements SideEvent {
   const FactUnschedule({required this.at, required this.id});
 
-  factory FactUnschedule.fromJson(Map<String, dynamic> j) => FactUnschedule(at: (j['at'] as num).toDouble(), id: (j['id'] as num).toDouble());
+  factory FactUnschedule.fromJson(Map<String, dynamic> j) => FactUnschedule(at: (j['at'] as num).toDouble(), id: j['id'] as String);
 
   final double at;
-  final double id;
+  final String id;
 
   @override
   Map<String, dynamic> toJson() => {'type': 'unschedule', 'at': at, 'id': id};
@@ -4685,13 +4697,13 @@ class NodeActRequest {
 }
 
 class ChatReadRequest {
-  const ChatReadRequest({required this.seq});
+  const ChatReadRequest({required this.number});
 
-  factory ChatReadRequest.fromJson(Map<String, dynamic> j) => ChatReadRequest(seq: (j['seq'] as num).toDouble());
+  factory ChatReadRequest.fromJson(Map<String, dynamic> j) => ChatReadRequest(number: (j['number'] as num).toDouble());
 
-  final double seq;
+  final double number;
 
-  Map<String, dynamic> toJson() => {'seq': seq};
+  Map<String, dynamic> toJson() => {'number': number};
 }
 
 class ChooseTitleRequest {
@@ -4865,22 +4877,22 @@ class ChannelApi {
     await _api._call('POST', '/api/v1/channels', query: {}, body: body.toJson());
   }
 
-  Future<void> update({required double id, required ChannelUpdate body}) async {
-    await _api._call('PUT', '/api/v1/channels/${Uri.encodeComponent((id.toInt()).toString())}', query: {}, body: body.toJson());
+  Future<void> update({required String id, required ChannelUpdate body}) async {
+    await _api._call('PUT', '/api/v1/channels/${Uri.encodeComponent((id).toString())}', query: {}, body: body.toJson());
   }
 
-  Future<List<ChatMessage>> history({required double id, double? before, double? limit}) async {
+  Future<List<ChatMessage>> history({required String id, double? before, double? limit}) async {
     final j = await _api._call(
       'GET',
-      '/api/v1/channels/${Uri.encodeComponent((id.toInt()).toString())}/messages',
+      '/api/v1/channels/${Uri.encodeComponent((id).toString())}/messages',
       query: {if (before != null) 'before': '${before!.toInt()}', if (limit != null) 'limit': '${limit!.toInt()}'},
       body: null,
     );
     return [for (final e in j as List) ChatMessage.fromJson(e as Map<String, dynamic>)];
   }
 
-  Future<void> markRead({required double id, required ChatReadRequest body}) async {
-    await _api._call('POST', '/api/v1/channels/${Uri.encodeComponent((id.toInt()).toString())}/read', query: {}, body: body.toJson());
+  Future<void> markRead({required String id, required ChatReadRequest body}) async {
+    await _api._call('POST', '/api/v1/channels/${Uri.encodeComponent((id).toString())}/read', query: {}, body: body.toJson());
   }
 }
 
@@ -4900,12 +4912,12 @@ class ScheduleApi {
   }
 
   /// Only what the body gives changes.
-  Future<void> update({required double id, required ScheduleUpdate body}) async {
-    await _api._call('PUT', '/api/v1/schedules/${Uri.encodeComponent((id.toInt()).toString())}', query: {}, body: body.toJson());
+  Future<void> update({required String id, required ScheduleUpdate body}) async {
+    await _api._call('PUT', '/api/v1/schedules/${Uri.encodeComponent((id).toString())}', query: {}, body: body.toJson());
   }
 
-  Future<void> delete({required double id}) async {
-    await _api._call('DELETE', '/api/v1/schedules/${Uri.encodeComponent((id.toInt()).toString())}', query: {}, body: null);
+  Future<void> delete({required String id}) async {
+    await _api._call('DELETE', '/api/v1/schedules/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
   }
 }
 
@@ -5010,11 +5022,11 @@ class SessionApi {
   }
 
   /// Its log, oldest first; run gives one run's only. The manager's log is session manager's.
-  Future<List<SessionEvent>> events({required String id, double? run}) async {
+  Future<List<SessionEvent>> events({required String id, String? run}) async {
     final j = await _api._call(
       'GET',
       '/api/v1/sessions/${Uri.encodeComponent((id).toString())}/events',
-      query: {if (run != null) 'run': '${run!.toInt()}'},
+      query: {if (run != null) 'run': '${run!}'},
       body: null,
     );
     return [for (final e in j as List) SessionEvent.fromJson(e as Map<String, dynamic>)];

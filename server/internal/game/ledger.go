@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sync"
 
+	"vibevalley/internal/base"
 	"vibevalley/internal/core"
 	"vibevalley/internal/protocol"
 	"vibevalley/pkg/db/generated"
@@ -141,7 +142,7 @@ func (l *ledger) write(input protocol.LedgerEntryValue) error {
 	delete(fields, "kind")
 	delete(fields, "at")
 	payload, _ := json.Marshal(fields)
-	if err := l.q.AddLedgerEntry(context.Background(), generated.AddLedgerEntryParams{Kind: kind, At: at, Payload: string(payload)}); err != nil {
+	if err := l.q.AddLedgerEntry(context.Background(), generated.AddLedgerEntryParams{ID: base.NewID(), Kind: kind, At: at, Payload: string(payload)}); err != nil {
 		return err
 	}
 	next, news := progressStep(l.folded, entry)

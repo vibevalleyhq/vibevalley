@@ -121,7 +121,7 @@ func (x *chatFakeSessions) steersOf(id string) []string {
 }
 
 // The conversation the service found, as the core state has it.
-func chatConversation(f *world, id *int64) *protocol.Conversation {
+func chatConversation(f *world, id *string) *protocol.Conversation {
 	if id == nil {
 		return nil
 	}
@@ -154,22 +154,22 @@ func chatTestFarm(t *testing.T, home, dbPath string) (*world, *chatFakeSessions)
 	return f, x
 }
 
-func chatMessagesIn(f *world, conversation int64) []protocol.ChatMessage {
+func chatMessagesIn(f *world, conversation string) []protocol.ChatMessage {
 	chat := f.Core.State().Chat
 	return protocol.MessagesIn(chat, conversation)
 }
 
 type chatTestDelivery struct {
-	Seq    int64
-	Reason string
-	Wakes  bool
-	HeldBy string
-	State  string
+	Message string
+	Reason  string
+	Wakes   bool
+	HeldBy  string
+	State   string
 }
 
 func chatDeliveries(t *testing.T, f *world, recipient string) []chatTestDelivery {
 	t.Helper()
-	rows, err := f.DB.Query(`select message_seq, reason, wakes, coalesce(held_by, ''), state from channel_delivery where recipient_id = ? order by message_seq`, recipient)
+	rows, err := f.DB.Query(`select message_id, reason, wakes, coalesce(held_by, ''), state from channel_delivery where recipient_id = ? order by message_id`, recipient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func chatDeliveries(t *testing.T, f *world, recipient string) []chatTestDelivery
 	var out []chatTestDelivery
 	for rows.Next() {
 		var d chatTestDelivery
-		if err := rows.Scan(&d.Seq, &d.Reason, &d.Wakes, &d.HeldBy, &d.State); err != nil {
+		if err := rows.Scan(&d.Message, &d.Reason, &d.Wakes, &d.HeldBy, &d.State); err != nil {
 			t.Fatal(err)
 		}
 		out = append(out, d)
@@ -185,16 +185,16 @@ func chatDeliveries(t *testing.T, f *world, recipient string) []chatTestDelivery
 	return out
 }
 
-func chatDeliveryOf(t *testing.T, f *world, recipient string, seq int64) *chatTestDelivery {
+func chatDeliveryOf(t *testing.T, f *world, recipient string, message string) *chatTestDelivery {
 	for _, d := range chatDeliveries(t, f, recipient) {
-		if d.Seq == seq {
+		if d.Message == message {
 			return &d
 		}
 	}
 	return nil
 }
 
-func (x *chatFakeSessions) hire(t *testing.T, id, task, project string, channel *int64) protocol.Conversation {
+func (x *chatFakeSessions) hire(t *testing.T, id, task, project string, channel *string) protocol.Conversation {
 	t.Helper()
 	x.f.Core.Apply(protocol.FactHired{Session: protocol.Session{
 		ID: id, Name: "帮工" + id, Agent: "lab", Runtime: "pi", Task: task, Project: &project, HiredAt: clock.NowMs(),
@@ -218,17 +218,17 @@ func (x *chatFakeSessions) hire(t *testing.T, id, task, project string, channel 
 	return thread
 }
 
-func chatNews(t *testing.T, news <-chan ManagerNews, seq int64) ManagerNews {
+func chatNews(t *testing.T, news <-chan ManagerNews, message string) ManagerNews {
 	t.Helper()
 	timeout := time.After(5 * time.Second)
 	for {
 		select {
 		case n := <-news:
-			if slices.ContainsFunc(n.Messages, func(m protocol.InboxMessage) bool { return m.Seq == seq }) {
+			if slices.ContainsFunc(n.Messages, func(m protocol.InboxMessage) bool { return m.ID == message }) {
 				return n
 			}
 		case <-timeout:
-			t.Fatalf("the manager never heard of %d", seq)
+			t.Fatalf("the manager never heard of %s", message)
 		}
 	}
 }
@@ -247,8 +247,8 @@ func TestChatJobOpensThreadUnderDispatch(t *testing.T) {
 		t.Fatal("no dispatch on the general channel")
 	}
 	dispatch := chatMessagesIn(f, general.ID)[i]
-	if thread.Parent == nil || *thread.Parent != dispatch.Seq {
-		t.Fatalf("thread under %v, dispatch %d", thread.Parent, dispatch.Seq)
+	if thread.Parent == nil || *thread.Parent != dispatch.ID {
+		t.Fatalf("thread under %v, dispatch %s", thread.Parent, dispatch.ID)
 	}
 	if !strings.Contains(dispatch.Text, "派 @w1（帮工w1）去 chat-a：写 hello") {
 		t.Fatalf("dispatch: %q", dispatch.Text)
@@ -279,12 +279,12 @@ func TestChatPersonInJobThreadWakesSession(t *testing.T) {
 	}
 	testkit.Until(t, "a second turn", func() bool { return len(x.runsOf("w2")) >= 2 })
 	input := x.runsOf("w2")[1]
-	want := fmt.Sprintf("[target=#田头:%d msg=%d from=主人] 把输出改成中文", *thread.Parent, said.Seq)
+	want := fmt.Sprintf("[target=#田头:%d msg=%d from=主人] 把输出改成中文", *thread.ParentNumber, said.Number)
 	if !strings.Contains(input, want) {
 		t.Fatalf("input %q lacks %q", input, want)
 	}
 	testkit.Until(t, "seen", func() bool {
-		d := chatDeliveryOf(t, f, "w2", said.Seq)
+		d := chatDeliveryOf(t, f, "w2", said.ID)
 		return d != nil && d.State == "seen"
 	})
 	testkit.Until(t, "its reply in the thread", func() bool {
@@ -308,7 +308,7 @@ func TestChatGeneralReachesManager(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	heard := chatNews(t, news, said.Seq)
+	heard := chatNews(t, news, said.ID)
 	if len(heard.Messages) != 1 || heard.Messages[0].Text != "今天进度怎么样" || heard.Target != "#田头" || heard.Conversation != f.Channel.General() {
 		t.Fatalf("news: %+v", heard)
 	}
@@ -316,11 +316,11 @@ func TestChatGeneralReachesManager(t *testing.T) {
 	if len(x.runsOf("w3")) != before {
 		t.Fatal("a run for the session")
 	}
-	d := chatDeliveryOf(t, f, "w3", said.Seq)
+	d := chatDeliveryOf(t, f, "w3", said.ID)
 	if d == nil || d.Reason != "general" || d.Wakes {
 		t.Fatalf("passive delivery: %+v", d)
 	}
-	if d := chatDeliveryOf(t, f, protocol.ManagerAgent, said.Seq); d == nil || d.State != "seen" {
+	if d := chatDeliveryOf(t, f, protocol.ManagerAgent, said.ID); d == nil || d.State != "seen" {
 		t.Fatalf("the manager's delivery: %+v", d)
 	}
 }
@@ -351,7 +351,7 @@ func TestChatChannels(t *testing.T) {
 	i := slices.IndexFunc(chatMessagesIn(f, channel.ID), func(m protocol.ChatMessage) bool {
 		return m.Kind == protocol.MessageKindDispatch && m.Session != nil && *m.Session == "w4"
 	})
-	if i < 0 || *thread.Parent != chatMessagesIn(f, channel.ID)[i].Seq {
+	if i < 0 || *thread.Parent != chatMessagesIn(f, channel.ID)[i].ID {
 		t.Fatal("the dispatch is not in the channel, or the thread not under it")
 	}
 	x.hire(t, "w5", "写 hello", "chat-sq", nil)
@@ -361,14 +361,14 @@ func TestChatChannels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	heard := chatNews(t, news, said.Seq)
+	heard := chatNews(t, news, said.ID)
 	if heard.Conversation != channel.ID || heard.Target != "#clock-in" {
 		t.Fatalf("news: %+v", heard)
 	}
-	if d := chatDeliveryOf(t, f, "w4", said.Seq); d == nil || d.Reason != "general" {
+	if d := chatDeliveryOf(t, f, "w4", said.ID); d == nil || d.Reason != "general" {
 		t.Fatalf("the channel's session: %+v", d)
 	}
-	if d := chatDeliveryOf(t, f, "w5", said.Seq); d != nil {
+	if d := chatDeliveryOf(t, f, "w5", said.ID); d != nil {
 		t.Fatalf("the general channel's session: %+v", d)
 	}
 	read, err := f.Channel.Read("w4", ReadOptions{Target: "#clock-in"})
@@ -516,7 +516,7 @@ func TestChatSpeaking(t *testing.T) {
 		t.Fatalf("first: %+v %v", first, err)
 	}
 	again, err := f.Channel.Speak("w10", "我先看看代码", SpeakOptions{})
-	if err != nil || again.Kind != "sent" || again.Message.Seq != first.Message.Seq {
+	if err != nil || again.Kind != "sent" || again.Message.ID != first.Message.ID {
 		t.Fatalf("a retry is the same message: %+v %v", again, err)
 	}
 
@@ -525,7 +525,7 @@ func TestChatSpeaking(t *testing.T) {
 		t.Fatal(err)
 	}
 	held, err := f.Channel.Speak("w10", "我改好了", SpeakOptions{})
-	if err != nil || held.Kind != "held" || len(held.Shown) != 1 || held.Shown[0].Seq != words.Seq {
+	if err != nil || held.Kind != "held" || len(held.Shown) != 1 || held.Shown[0].ID != words.ID {
 		t.Fatalf("held: %+v %v", held, err)
 	}
 	if sent, err := f.Channel.Speak("w10", "我改好了", SpeakOptions{}); err != nil || sent.Kind != "sent" {
@@ -536,7 +536,7 @@ func TestChatSpeaking(t *testing.T) {
 		t.Fatal(err)
 	}
 	asked, err := f.Channel.Speak("w10", "大家好", SpeakOptions{Target: "#田头"})
-	if err != nil || asked.Kind != "confirm" || asked.LastRead != fmt.Sprintf("#田头:%d", *thread.Parent) {
+	if err != nil || asked.Kind != "confirm" || asked.LastRead != fmt.Sprintf("#田头:%d", *thread.ParentNumber) {
 		t.Fatalf("asked: %+v %v", asked, err)
 	}
 	if sent, err := f.Channel.Speak("w10", "大家好", SpeakOptions{Target: "#田头", Confirm: true, Anyway: true}); err != nil || sent.Kind != "sent" {
@@ -549,7 +549,7 @@ func TestChatSpeaking(t *testing.T) {
 	if _, err := f.Channel.Speak("w10", "hi", SpeakOptions{Target: "#田头:999999"}); err == nil || !strings.Contains(err.Error(), "没有 999999 这条消息") {
 		t.Fatalf("a thread under nothing: %v", err)
 	}
-	if _, err := f.Channel.Speak("w10", "接着说", SpeakOptions{Target: fmt.Sprintf("#田头:%d", absent.Message.Seq), Anyway: true}); err == nil {
+	if _, err := f.Channel.Speak("w10", "接着说", SpeakOptions{Target: fmt.Sprintf("#田头:%d", absent.Message.Number), Anyway: true}); err == nil {
 		t.Fatal("a thread under a thread's message")
 	}
 	general := f.Channel.General()
@@ -557,11 +557,11 @@ func TestChatSpeaking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	talk, err := f.Channel.Speak("w10", "早", SpeakOptions{Target: fmt.Sprintf("#田头:%d", sq.Seq), Anyway: true})
-	if err != nil || talk.Kind != "sent" || talk.Target != fmt.Sprintf("#田头:%d", sq.Seq) {
+	talk, err := f.Channel.Speak("w10", "早", SpeakOptions{Target: fmt.Sprintf("#田头:%d", sq.Number), Anyway: true})
+	if err != nil || talk.Kind != "sent" || talk.Target != fmt.Sprintf("#田头:%d", sq.Number) {
 		t.Fatalf("talk: %+v %v", talk, err)
 	}
-	under, _ := f.Channel.store().threadByParent(sq.Seq)
+	under, _ := f.Channel.store().threadByParent(sq.ID)
 	if under := chatConversation(f, under); under == nil || under.SubjectKind == nil || *under.SubjectKind != protocol.SubjectKindTalk {
 		t.Fatalf("talk thread: %+v", under)
 	}
@@ -586,7 +586,7 @@ func TestChatManagerSaysGrowsThenDelivers(t *testing.T) {
 	if got := ours(); len(got) != 1 || got[0].Final || got[0].Text != "好的，我叫 @w11 去" {
 		t.Fatalf("growing: %+v", got)
 	}
-	if d := chatDeliveryOf(t, f, "w11", ours()[0].Seq); d != nil {
+	if d := chatDeliveryOf(t, f, "w11", ours()[0].ID); d != nil {
 		t.Fatalf("delivered before final: %+v", d)
 	}
 	f.Channel.ManagerSays(general, "k1", "好的，我叫 @w11 去看看", true)
@@ -604,7 +604,7 @@ func TestChatManagerSaysGrowsThenDelivers(t *testing.T) {
 	if last := ms[len(ms)-1]; last.Kind != protocol.MessageKindNotice || last.From != "system" {
 		t.Fatalf("notice: %+v", last)
 	}
-	if ds := chatDeliveries(t, f, "w11"); ds[len(ds)-1].Seq == ms[len(ms)-1].Seq {
+	if ds := chatDeliveries(t, f, "w11"); ds[len(ds)-1].Message == ms[len(ms)-1].ID {
 		t.Fatal("a notice was delivered")
 	}
 }
@@ -618,17 +618,17 @@ func TestChatHistoryAndMarkRead(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		seqs = append(seqs, m.Seq)
+		seqs = append(seqs, m.Number)
 	}
 	limit, before := int64(2), seqs[4]
 	got, err := f.Channel.History(general, &before, &limit)
-	if err != nil || len(got) != 2 || got[0].Seq != seqs[2] || got[1].Seq != seqs[3] {
+	if err != nil || len(got) != 2 || got[0].Number != seqs[2] || got[1].Number != seqs[3] {
 		t.Fatalf("history: %+v %v", got, err)
 	}
 	if err := f.Channel.MarkRead(general, seqs[1]); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Channel.MarkRead(9999, 1); err == nil {
+	if err := f.Channel.MarkRead("nope", 1); err == nil {
 		t.Fatal("marked a conversation that is not there")
 	}
 	sq := protocol.GeneralOf(f.Core.State().Chat)
@@ -647,7 +647,7 @@ func TestChatInboxAndDigest(t *testing.T) {
 	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
 	thread := x.hire(t, "w12", "写 hello", "chat-l", nil)
 	digest := f.Channel.ManagerDigest()
-	if len(digest) != 1 || digest[0].From != "w12" || digest[0].Target != fmt.Sprintf("#田头:%d", *thread.Parent) {
+	if len(digest) != 1 || digest[0].From != "w12" || digest[0].Target != fmt.Sprintf("#田头:%d", *thread.ParentNumber) {
 		t.Fatalf("digest: %+v", digest)
 	}
 	if again := f.Channel.ManagerDigest(); len(again) != 0 {
@@ -702,7 +702,7 @@ func TestChatRestartGivesHandedWordsAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	testkit.Until(t, "handed", func() bool {
-		d := chatDeliveryOf(t, f, "w14", said.Seq)
+		d := chatDeliveryOf(t, f, "w14", said.ID)
 		return d != nil && d.State == "handed"
 	})
 	x.close()
@@ -718,7 +718,7 @@ func TestChatRestartGivesHandedWordsAgain(t *testing.T) {
 	}
 	g.Core.Apply(protocol.FactReport{ID: "w14", Outcome: protocol.OutcomeInterrupted, Summary: "重启了"})
 	testkit.Until(t, "seen after the restart", func() bool {
-		d := chatDeliveryOf(t, g, "w14", said.Seq)
+		d := chatDeliveryOf(t, g, "w14", said.ID)
 		return d != nil && d.State == "seen"
 	})
 	runs := y.runsOf("w14")
@@ -728,7 +728,7 @@ func TestChatRestartGivesHandedWordsAgain(t *testing.T) {
 	if c := chatConversation(g, g.Channel.JobThread("w14")); c == nil || c.ID != thread.ID {
 		t.Fatalf("job thread after restart: %+v", c)
 	}
-	if !slices.ContainsFunc(chatMessagesIn(g, thread.ID), func(m protocol.ChatMessage) bool { return m.Seq == said.Seq }) {
+	if !slices.ContainsFunc(chatMessagesIn(g, thread.ID), func(m protocol.ChatMessage) bool { return m.ID == said.ID }) {
 		t.Fatal("the message did not come back")
 	}
 }

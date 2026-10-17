@@ -21,10 +21,10 @@ const sampleState = `{
     }
   }],
   "chat": {
-    "conversations": [{"id": 1, "kind": "general", "replies": 0, "at": 1}],
+    "conversations": [{"id": "c1", "kind": "general", "replies": 0, "at": 1}],
     "messages": [
-      {"seq": 1, "conversation": 1, "from": "user", "fromKind": "user", "name": "主人", "kind": "chat", "text": "让 Pi 实验员写打卡", "final": true, "at": 1},
-      {"seq": 2, "conversation": 1, "from": "manager", "fromKind": "manager", "name": "管家", "kind": "chat", "text": "好，派给 Pi 实验员了", "final": false, "at": 2}
+      {"id": "m1", "number": 1, "conversation": "c1", "from": "user", "fromKind": "user", "name": "主人", "kind": "chat", "text": "让 Pi 实验员写打卡", "final": true, "at": 1},
+      {"id": "m2", "number": 2, "conversation": "c1", "from": "manager", "fromKind": "manager", "name": "管家", "kind": "chat", "text": "好，派给 Pi 实验员了", "final": false, "at": 2}
     ]
   }
 }`

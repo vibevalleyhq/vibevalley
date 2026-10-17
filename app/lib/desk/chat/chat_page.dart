@@ -38,7 +38,7 @@ class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key, this.id});
 
   /// Shown once (/chat/7 from a link); then the page goes by what is shown.
-  final int? id;
+  final String? id;
 
   @override
   ConsumerState<ChatPage> createState() => _ChatPageState();
@@ -48,7 +48,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   _Tab _tab = _Tab.chat;
   String? _search;
   bool _drawer = false;
-  double? _channelShown;
+  String? _channelShown;
 
   @override
   void initState() {
@@ -67,11 +67,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (id == null) return;
     // After the first frame: the provider is not changed while the tree builds.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(ref.read(chatActionsProvider).showChat(id.toDouble()).catchError((Object _) {}));
+      if (mounted) unawaited(ref.read(chatActionsProvider).showChat(id).catchError((Object _) {}));
     });
   }
 
-  void _show(double? id) => unawaited(ref.read(chatActionsProvider).showChat(id).catchError((Object _) {}));
+  void _show(String? id) => unawaited(ref.read(chatActionsProvider).showChat(id).catchError((Object _) {}));
 
   @override
   Widget build(BuildContext context) {
@@ -306,7 +306,7 @@ class _Sidebar extends ConsumerWidget {
   final Conversation? channel;
   final Conversation? thread;
   final VoidCallback onPick;
-  final void Function(double? id) onShow;
+  final void Function(String? id) onShow;
   final VoidCallback onNew;
 
   @override
@@ -547,7 +547,7 @@ class _SessionRow extends StatelessWidget {
   final Session session;
   final Chat? chat;
   final bool active;
-  final void Function(double id) onShow;
+  final void Function(String id) onShow;
 
   @override
   Widget build(BuildContext context) {
@@ -657,7 +657,7 @@ BoxDecoration get _card => const BoxDecoration(color: Palette.cream50, border: B
 class _Jobs extends ConsumerWidget {
   const _Jobs({required this.channel, required this.onShow});
   final Conversation channel;
-  final void Function(double? id) onShow;
+  final void Function(String? id) onShow;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -724,7 +724,7 @@ class _Schedules extends ConsumerStatefulWidget {
 }
 
 class _SchedulesState extends ConsumerState<_Schedules> {
-  double? _deleting;
+  String? _deleting;
 
   @override
   Widget build(BuildContext context) {

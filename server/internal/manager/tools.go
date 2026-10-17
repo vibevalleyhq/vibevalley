@@ -198,7 +198,7 @@ func managerScheduleLine(s protocol.Schedule, channel string) string {
 	if s.Enabled {
 		next = "下次 " + next
 	}
-	return fmt.Sprintf("- %d 号「%s」#%s %s%s；%s\n  %s", s.ID, s.Name, channel, protocol.WhenText(s.When, s.TZ), direct, next, s.Text)
+	return fmt.Sprintf("- %s 号「%s」#%s %s%s；%s\n  %s", s.ID, s.Name, channel, protocol.WhenText(s.When, s.TZ), direct, next, s.Text)
 }
 
 func managerStr(description string) map[string]any {
@@ -458,7 +458,7 @@ func (fm *manager) tools() []agentcore.AgentTool {
 			if len(all) == 0 {
 				return "没有定时。", nil
 			}
-			names := map[int64]string{}
+			names := map[string]string{}
 			for _, c := range fm.chat.Channels() {
 				names[c.ID] = c.Name
 			}
@@ -475,13 +475,13 @@ func (fm *manager) tools() []agentcore.AgentTool {
 	})
 
 	type idArgs struct {
-		ID float64 `json:"id"`
+		ID string `json:"id"`
 	}
 	cancelSchedule := agent.TextTool(agent.TextToolSpec[idArgs]{
 		Name: "cancel_schedule", Label: managerToolLabels["cancel_schedule"], Description: "删掉一个定时（编号从 list_schedules 看）。",
-		Parameters: agentcore.ObjectSchema(map[string]any{"id": agentcore.NumberSchema()}, "id"),
+		Parameters: agentcore.ObjectSchema(map[string]any{"id": agentcore.StringSchema()}, "id"),
 		Run: func(_ context.Context, p idArgs, _ agent.ToolContext) (string, error) {
-			s, err := fm.schedule.Remove(int64(p.ID))
+			s, err := fm.schedule.Remove(p.ID)
 			return managerAnswered("删掉了「"+s.Name+"」。", err)
 		},
 	})

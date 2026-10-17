@@ -11,17 +11,17 @@ import (
 
 const insertMention = `-- name: InsertMention :exec
 
-insert into channel_mention (message_seq, target_id, resolved) values (?, ?, ?) on conflict do nothing
+insert into channel_mention (message_id, target_id, resolved) values (?, ?, ?) on conflict do nothing
 `
 
 type InsertMentionParams struct {
-	MessageSeq int64
-	TargetID   string
-	Resolved   string
+	MessageID string
+	TargetID  string
+	Resolved  string
 }
 
 // Who a message @-ed, and what came of it (channel/db.go).
 func (q *Queries) InsertMention(ctx context.Context, arg InsertMentionParams) error {
-	_, err := q.db.ExecContext(ctx, insertMention, arg.MessageSeq, arg.TargetID, arg.Resolved)
+	_, err := q.db.ExecContext(ctx, insertMention, arg.MessageID, arg.TargetID, arg.Resolved)
 	return err
 }

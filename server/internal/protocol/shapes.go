@@ -202,8 +202,9 @@ type Spent struct {
 }
 
 type ChatMessage struct {
-	Seq          int64       `json:"seq"`
-	Conversation int64       `json:"conversation"`
+	ID           string      `json:"id"`
+	Number       int64       `json:"number"`
+	Conversation string      `json:"conversation"`
 	From         string      `json:"from"`
 	FromKind     SenderKind  `json:"fromKind"`
 	Name         string      `json:"name"`
@@ -235,19 +236,20 @@ const (
 )
 
 type Conversation struct {
-	ID          int64            `json:"id"`
-	Kind        ConversationKind `json:"kind"`
-	Parent      *int64           `json:"parent,omitzero"`
-	Name        *string          `json:"name,omitzero"`
-	Description *string          `json:"description,omitzero"`
-	Project     *string          `json:"project,omitzero"`
-	Channel     *int64           `json:"channel,omitzero"`
-	SubjectKind *SubjectKind     `json:"subjectKind,omitzero"`
-	SubjectID   *string          `json:"subjectId,omitzero"`
-	LastSeq     *int64           `json:"lastSeq,omitzero"`
-	Replies     int64            `json:"replies"`
-	Read        *int64           `json:"read,omitzero"`
-	At          int64            `json:"at"`
+	ID           string           `json:"id"`
+	Kind         ConversationKind `json:"kind"`
+	Parent       *string          `json:"parent,omitzero"`
+	ParentNumber *int64           `json:"parentNumber,omitzero"`
+	Name         *string          `json:"name,omitzero"`
+	Description  *string          `json:"description,omitzero"`
+	Project      *string          `json:"project,omitzero"`
+	Channel      *string          `json:"channel,omitzero"`
+	SubjectKind  *SubjectKind     `json:"subjectKind,omitzero"`
+	SubjectID    *string          `json:"subjectId,omitzero"`
+	LastNumber   *int64           `json:"lastNumber,omitzero"`
+	Replies      int64            `json:"replies"`
+	Read         *int64           `json:"read,omitzero"`
+	At           int64            `json:"at"`
 }
 
 type Conflict struct {
@@ -323,7 +325,7 @@ type Session struct {
 	LastRun  *LastRun         `json:"lastRun,omitzero"`
 	Spent    *Spent           `json:"spent,omitzero"`
 	Playbook *SessionPlaybook `json:"playbook,omitzero"`
-	Channel  *int64           `json:"channel,omitzero"`
+	Channel  *string          `json:"channel,omitzero"`
 	Play     *SessionPlay     `json:"play,omitzero"`
 	Issue    *string          `json:"issue,omitzero"`
 	// What it is doing, in words (PhaseWords), filled by FrameOf: in frames only. {span} stands for how long it has been
@@ -433,10 +435,10 @@ type ProgressNews struct {
 type ScheduleWhen struct{ Value ScheduleWhenValue }
 
 type Schedule struct {
-	ID      int64        `json:"id"`
+	ID      string       `json:"id"`
 	Name    string       `json:"name"`
 	Text    string       `json:"text"`
-	Channel int64        `json:"channel"`
+	Channel string       `json:"channel"`
 	Agent   *string      `json:"agent,omitzero"`
 	Project *string      `json:"project,omitzero"`
 	When    ScheduleWhen `json:"when"`
@@ -504,7 +506,7 @@ type SessionEvent struct {
 	Seq    int64            `json:"seq"`
 	Time   int64            `json:"time"`
 	Type   SessionEventType `json:"type"`
-	Run    *int64           `json:"run,omitzero"`
+	Run    *string          `json:"run,omitzero"`
 	Call   *int64           `json:"call,omitzero"`
 	Under  *int64           `json:"under,omitzero"`
 	Text   string           `json:"text"`
@@ -706,7 +708,7 @@ type NodeFieldChange struct {
 }
 
 type PlaybookEvent struct {
-	Seq      int64             `json:"seq"`
+	ID       string            `json:"id"`
 	Playbook string            `json:"playbook"`
 	Node     *string           `json:"node,omitzero"`
 	Kind     PlaybookEventKind `json:"kind"`
@@ -1042,6 +1044,7 @@ type Dispatched struct {
 
 type Issue struct {
 	ID          string   `json:"id"`
+	Number      int64    `json:"number"`
 	Title       string   `json:"title"`
 	Description string   `json:"description,omitzero"`
 	Project     *string  `json:"project,omitzero"`
@@ -1058,7 +1061,7 @@ type Issue struct {
 	BlockedBy []string    `json:"blockedBy,omitzero"`
 	Plan      *IssuePlan  `json:"plan,omitzero"`
 	Step      *IssueStep  `json:"step,omitzero"`
-	Schedule  *int64      `json:"schedule,omitzero"`
+	Schedule  *string     `json:"schedule,omitzero"`
 	Status    IssueStatus `json:"status"`
 }
 
@@ -1147,20 +1150,20 @@ const (
 type RunTrigger struct {
 	Kind RunTriggerKind `json:"kind"`
 	// comment: the message that woke it.
-	Message *int64 `json:"message,omitzero"`
+	Message *string `json:"message,omitzero"`
 	// schedule: which one, and whether this is the run it missed while the server was off.
-	Schedule *int64 `json:"schedule,omitzero"`
-	Missed   bool   `json:"missed,omitzero"`
+	Schedule *string `json:"schedule,omitzero"`
+	Missed   bool    `json:"missed,omitzero"`
 }
 
 // One go at the work, from the input that started it to its report.
 type Run struct {
-	ID          int64      `json:"id"`
+	ID          string     `json:"id"`
 	Session     string     `json:"session"`
 	Issue       *string    `json:"issue,omitzero"`
 	TriggeredBy RunTrigger `json:"triggeredBy"`
 	// The messages steered into it while it ran.
-	Heard     []int64  `json:"heard"`
+	Heard     []string `json:"heard"`
 	StartedAt int64    `json:"startedAt"`
 	EndedAt   *int64   `json:"endedAt,omitzero"`
 	Outcome   *Outcome `json:"outcome,omitzero"`
@@ -1176,7 +1179,7 @@ type CommentRequest struct {
 type SayRequest struct {
 	Text         string  `json:"text"`
 	Bed          *int64  `json:"bed,omitzero"`
-	Conversation *int64  `json:"conversation,omitzero"`
+	Conversation *string `json:"conversation,omitzero"`
 	Agent        *string `json:"agent,omitzero"`
 }
 
@@ -1188,7 +1191,7 @@ type ChannelUpdate struct {
 type ScheduleRequest struct {
 	Name    string       `json:"name"`
 	Text    string       `json:"text"`
-	Channel *int64       `json:"channel,omitzero"`
+	Channel *string      `json:"channel,omitzero"`
 	Agent   *string      `json:"agent,omitzero"`
 	Project *string      `json:"project,omitzero"`
 	When    ScheduleWhen `json:"when"`
@@ -1397,7 +1400,7 @@ type InboxTargetPlans struct {
 
 //vibevalley:member InboxTarget chat
 type InboxTargetChat struct {
-	Conversation int64 `json:"conversation"`
+	Conversation string `json:"conversation"`
 }
 
 //vibevalley:dart PlotViewBadge
@@ -1868,8 +1871,8 @@ type FactSchedule struct {
 //vibevalley:member Fact unschedule
 //vibevalley:member SideEvent unschedule
 type FactUnschedule struct {
-	At int64 `json:"at"`
-	ID int64 `json:"id"`
+	At int64  `json:"at"`
+	ID string `json:"id"`
 }
 
 //vibevalley:union type
@@ -1922,7 +1925,7 @@ type NodeActRequest struct {
 }
 
 type ChatReadRequest struct {
-	Seq int64 `json:"seq"`
+	Number int64 `json:"number"`
 }
 
 type ChooseTitleRequest struct {

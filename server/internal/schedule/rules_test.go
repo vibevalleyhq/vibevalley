@@ -18,7 +18,7 @@ func at(iso string) int64 {
 }
 
 func TestDueOnceMissedAndRun(t *testing.T) {
-	s := protocol.Schedule{ID: 1, Name: "测试", Text: "跑一遍测试", Channel: 1, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenDaily{Time: "09:00"}},
+	s := protocol.Schedule{ID: "x1", Name: "测试", Text: "跑一遍测试", Channel: "c1", When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenDaily{Time: "09:00"}},
 		TZ: "Asia/Shanghai", Enabled: true, Created: at("2026-10-01T08:00:00"), LastRun: ptr.To(at("2026-10-09T09:00:00"))}
 	now := at("2026-10-12T11:00:00")
 	testkit.Eq(t, dueSchedules([]protocol.Schedule{s}, now), []protocol.Schedule{s}, "three missed days are one run")

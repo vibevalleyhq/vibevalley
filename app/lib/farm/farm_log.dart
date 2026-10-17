@@ -119,7 +119,7 @@ class FarmLog extends ConsumerWidget {
     final look = ref.watch(prefsProvider.select((p) => p.managerLook)) ?? 'farmer';
     final chat = s?.chat;
     final rows = <_Row>[
-      for (final m in messagesIn(chat, generalOf(chat)?.id ?? -1))
+      for (final m in messagesIn(chat, generalOf(chat)?.id ?? ""))
         if (m.kind == MessageKind.chat && (m.fromKind == SenderKind.user || m.fromKind == SenderKind.manager)) _SaidRow(m),
       for (final r in turnReportsOf(s)) _ReportRow(r),
     ]..sort((a, b) => b.at.compareTo(a.at));

@@ -14,15 +14,15 @@ const channelByName = `-- name: ChannelByName :one
 select id from channel_conversation where name = ? and kind in ('general', 'channel')
 `
 
-func (q *Queries) ChannelByName(ctx context.Context, name sql.NullString) (int64, error) {
+func (q *Queries) ChannelByName(ctx context.Context, name sql.NullString) (string, error) {
 	row := q.db.QueryRowContext(ctx, channelByName, name)
-	var id int64
+	var id string
 	err := row.Scan(&id)
 	return id, err
 }
 
 const channels = `-- name: Channels :many
-select id, kind, parent_seq, subject_kind, subject_id, last_seq, reply_count, created_at, name, description, project, channel_id from channel_conversation where kind in ('general', 'channel') order by case when kind = 'general' then 0 else 1 end, id
+select id, kind, parent_id, parent_number, subject_kind, subject_id, last_number, reply_count, created_at, name, description, project, channel_id from channel_conversation where kind in ('general', 'channel') order by case when kind = 'general' then 0 else 1 end, id
 `
 
 // The general channel first.
@@ -38,10 +38,11 @@ func (q *Queries) Channels(ctx context.Context) ([]ChannelConversation, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.Kind,
-			&i.ParentSeq,
+			&i.ParentID,
+			&i.ParentNumber,
 			&i.SubjectKind,
 			&i.SubjectID,
-			&i.LastSeq,
+			&i.LastNumber,
 			&i.ReplyCount,
 			&i.CreatedAt,
 			&i.Name,
@@ -63,19 +64,20 @@ func (q *Queries) Channels(ctx context.Context) ([]ChannelConversation, error) {
 }
 
 const conversationByID = `-- name: ConversationByID :one
-select id, kind, parent_seq, subject_kind, subject_id, last_seq, reply_count, created_at, name, description, project, channel_id from channel_conversation where id = ?
+select id, kind, parent_id, parent_number, subject_kind, subject_id, last_number, reply_count, created_at, name, description, project, channel_id from channel_conversation where id = ?
 `
 
-func (q *Queries) ConversationByID(ctx context.Context, id int64) (ChannelConversation, error) {
+func (q *Queries) ConversationByID(ctx context.Context, id string) (ChannelConversation, error) {
 	row := q.db.QueryRowContext(ctx, conversationByID, id)
 	var i ChannelConversation
 	err := row.Scan(
 		&i.ID,
 		&i.Kind,
-		&i.ParentSeq,
+		&i.ParentID,
+		&i.ParentNumber,
 		&i.SubjectKind,
 		&i.SubjectID,
-		&i.LastSeq,
+		&i.LastNumber,
 		&i.ReplyCount,
 		&i.CreatedAt,
 		&i.Name,
@@ -86,68 +88,69 @@ func (q *Queries) ConversationByID(ctx context.Context, id int64) (ChannelConver
 	return i, err
 }
 
-const createChannel = `-- name: CreateChannel :one
-insert into channel_conversation (kind, name, description, project, created_at) values ('channel', ?, ?, ?, ?) returning id
+const createChannel = `-- name: CreateChannel :exec
+insert into channel_conversation (id, kind, name, description, project, created_at) values (?, 'channel', ?, ?, ?, ?)
 `
 
 type CreateChannelParams struct {
+	ID          string
 	Name        sql.NullString
 	Description sql.NullString
 	Project     sql.NullString
 	CreatedAt   int64
 }
 
-func (q *Queries) CreateChannel(ctx context.Context, arg CreateChannelParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, createChannel,
+func (q *Queries) CreateChannel(ctx context.Context, arg CreateChannelParams) error {
+	_, err := q.db.ExecContext(ctx, createChannel,
+		arg.ID,
 		arg.Name,
 		arg.Description,
 		arg.Project,
 		arg.CreatedAt,
 	)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+	return err
 }
 
-const createGeneral = `-- name: CreateGeneral :one
-insert into channel_conversation (kind, name, created_at) values ('general', ?, ?) returning id
+const createGeneral = `-- name: CreateGeneral :exec
+insert into channel_conversation (id, kind, name, created_at) values (?, 'general', ?, ?)
 `
 
 type CreateGeneralParams struct {
+	ID        string
 	Name      sql.NullString
 	CreatedAt int64
 }
 
-func (q *Queries) CreateGeneral(ctx context.Context, arg CreateGeneralParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, createGeneral, arg.Name, arg.CreatedAt)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+func (q *Queries) CreateGeneral(ctx context.Context, arg CreateGeneralParams) error {
+	_, err := q.db.ExecContext(ctx, createGeneral, arg.ID, arg.Name, arg.CreatedAt)
+	return err
 }
 
-const createThread = `-- name: CreateThread :one
-insert into channel_conversation (kind, parent_seq, subject_kind, subject_id, channel_id, created_at) values ('thread', ?, ?, ?, ?, ?) returning id
+const createThread = `-- name: CreateThread :exec
+insert into channel_conversation (id, kind, parent_id, parent_number, subject_kind, subject_id, channel_id, created_at) values (?, 'thread', ?, ?, ?, ?, ?, ?)
 `
 
 type CreateThreadParams struct {
-	ParentSeq   sql.NullInt64
-	SubjectKind sql.NullString
-	SubjectID   sql.NullString
-	ChannelID   sql.NullInt64
-	CreatedAt   int64
+	ID           string
+	ParentID     sql.NullString
+	ParentNumber sql.NullInt64
+	SubjectKind  sql.NullString
+	SubjectID    sql.NullString
+	ChannelID    sql.NullString
+	CreatedAt    int64
 }
 
-func (q *Queries) CreateThread(ctx context.Context, arg CreateThreadParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, createThread,
-		arg.ParentSeq,
+func (q *Queries) CreateThread(ctx context.Context, arg CreateThreadParams) error {
+	_, err := q.db.ExecContext(ctx, createThread,
+		arg.ID,
+		arg.ParentID,
+		arg.ParentNumber,
 		arg.SubjectKind,
 		arg.SubjectID,
 		arg.ChannelID,
 		arg.CreatedAt,
 	)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+	return err
 }
 
 const generalID = `-- name: GeneralID :one
@@ -156,18 +159,18 @@ select id from channel_conversation where kind = 'general'
 `
 
 // The general channel, the channels and the threads under their messages (channel/db.go).
-func (q *Queries) GeneralID(ctx context.Context) (int64, error) {
+func (q *Queries) GeneralID(ctx context.Context) (string, error) {
 	row := q.db.QueryRowContext(ctx, generalID)
-	var id int64
+	var id string
 	err := row.Scan(&id)
 	return id, err
 }
 
 const inboxOf = `-- name: InboxOf :many
-select c.id, c.kind, c.parent_seq, c.subject_kind, c.subject_id, cast(coalesce(ch.name, c.name, '') as text) as channel_name,
-       count(m.seq) as unread,
-       cast(max(exists (select 1 from channel_mention x where x.message_seq = m.seq and x.target_id = ?1)) as boolean) as mentions_you,
-       cast(max(m.seq) as integer) as latest
+select c.id, c.kind, c.parent_id, c.parent_number, c.subject_kind, c.subject_id, cast(coalesce(ch.name, c.name, '') as text) as channel_name,
+       count(m.id) as unread,
+       cast(max(exists (select 1 from channel_mention x where x.message_id = m.id and x.target_id = ?1)) as boolean) as mentions_you,
+       cast(coalesce(max(m.number), 0) as integer) as latest
 from channel_conversation c
 left join channel_conversation ch on ch.id = c.channel_id
 join channel_message m on m.conversation_id = c.id
@@ -175,28 +178,29 @@ left join channel_read_cursor rc on rc.participant_id = ?1 and rc.conversation_i
 left join channel_follow f on f.conversation_id = c.id and f.participant_id = ?1 and f.unfollowed_at is null
 where m.sender_id <> ?1 and m.final and m.kind <> 'notice'
   and (c.id = ?2 or f.participant_id is not null)
-  and m.seq > max(coalesce(rc.read_seq, 0), coalesce(f.from_seq, 0))
-  and not exists (select 1 from channel_seen_mark s where s.participant_id = ?1 and s.message_seq = m.seq)
+  and m.number > max(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))
+  and not exists (select 1 from channel_seen_mark s where s.participant_id = ?1 and s.message_id = m.id)
 group by c.id
-order by max(m.seq) desc
+order by max(m.number) desc
 limit 20
 `
 
 type InboxOfParams struct {
 	Participant string
-	Channel     int64
+	Channel     string
 }
 
 type InboxOfRow struct {
-	ID          int64
-	Kind        string
-	ParentSeq   sql.NullInt64
-	SubjectKind sql.NullString
-	SubjectID   sql.NullString
-	ChannelName string
-	Unread      int64
-	MentionsYou bool
-	Latest      int64
+	ID           string
+	Kind         string
+	ParentID     sql.NullString
+	ParentNumber sql.NullInt64
+	SubjectKind  sql.NullString
+	SubjectID    sql.NullString
+	ChannelName  string
+	Unread       int64
+	MentionsYou  bool
+	Latest       int64
 }
 
 // A participant's unread: the channel it is in and the threads it follows, newest first.
@@ -212,7 +216,8 @@ func (q *Queries) InboxOf(ctx context.Context, arg InboxOfParams) ([]InboxOfRow,
 		if err := rows.Scan(
 			&i.ID,
 			&i.Kind,
-			&i.ParentSeq,
+			&i.ParentID,
+			&i.ParentNumber,
 			&i.SubjectKind,
 			&i.SubjectID,
 			&i.ChannelName,
@@ -234,7 +239,7 @@ func (q *Queries) InboxOf(ctx context.Context, arg InboxOfParams) ([]InboxOfRow,
 }
 
 const recentConversations = `-- name: RecentConversations :many
-select id, kind, parent_seq, subject_kind, subject_id, last_seq, reply_count, created_at, name, description, project, channel_id from channel_conversation order by coalesce(last_seq, 0) desc, id desc limit ?
+select id, kind, parent_id, parent_number, subject_kind, subject_id, last_number, reply_count, created_at, name, description, project, channel_id from channel_conversation order by coalesce(last_number, 0) desc, id desc limit ?
 `
 
 func (q *Queries) RecentConversations(ctx context.Context, limit int64) ([]ChannelConversation, error) {
@@ -249,10 +254,11 @@ func (q *Queries) RecentConversations(ctx context.Context, limit int64) ([]Chann
 		if err := rows.Scan(
 			&i.ID,
 			&i.Kind,
-			&i.ParentSeq,
+			&i.ParentID,
+			&i.ParentNumber,
 			&i.SubjectKind,
 			&i.SubjectID,
-			&i.LastSeq,
+			&i.LastNumber,
 			&i.ReplyCount,
 			&i.CreatedAt,
 			&i.Name,
@@ -274,12 +280,12 @@ func (q *Queries) RecentConversations(ctx context.Context, limit int64) ([]Chann
 }
 
 const threadByParent = `-- name: ThreadByParent :one
-select id from channel_conversation where parent_seq = ?
+select id from channel_conversation where parent_id = ?
 `
 
-func (q *Queries) ThreadByParent(ctx context.Context, parentSeq sql.NullInt64) (int64, error) {
-	row := q.db.QueryRowContext(ctx, threadByParent, parentSeq)
-	var id int64
+func (q *Queries) ThreadByParent(ctx context.Context, parentID sql.NullString) (string, error) {
+	row := q.db.QueryRowContext(ctx, threadByParent, parentID)
+	var id string
 	err := row.Scan(&id)
 	return id, err
 }
@@ -293,27 +299,27 @@ type ThreadOfSubjectParams struct {
 	SubjectID   sql.NullString
 }
 
-func (q *Queries) ThreadOfSubject(ctx context.Context, arg ThreadOfSubjectParams) (int64, error) {
+func (q *Queries) ThreadOfSubject(ctx context.Context, arg ThreadOfSubjectParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, threadOfSubject, arg.SubjectKind, arg.SubjectID)
-	var id int64
+	var id string
 	err := row.Scan(&id)
 	return id, err
 }
 
 const touchConversation = `-- name: TouchConversation :exec
 update channel_conversation
-set last_seq = max(coalesce(last_seq, 0), cast(?1 as integer)),
+set last_number = max(coalesce(last_number, 0), ?1),
     reply_count = reply_count + case when kind = 'thread' then 1 else 0 end
 where id = ?2
 `
 
 type TouchConversationParams struct {
-	Seq int64
-	ID  int64
+	Number interface{}
+	ID     string
 }
 
 func (q *Queries) TouchConversation(ctx context.Context, arg TouchConversationParams) error {
-	_, err := q.db.ExecContext(ctx, touchConversation, arg.Seq, arg.ID)
+	_, err := q.db.ExecContext(ctx, touchConversation, arg.Number, arg.ID)
 	return err
 }
 
@@ -324,7 +330,7 @@ update channel_conversation set description = ?, project = ? where id = ? and ki
 type UpdateChannelParams struct {
 	Description sql.NullString
 	Project     sql.NullString
-	ID          int64
+	ID          string
 }
 
 func (q *Queries) UpdateChannel(ctx context.Context, arg UpdateChannelParams) error {

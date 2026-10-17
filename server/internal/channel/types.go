@@ -5,7 +5,7 @@ import (
 )
 
 type Info struct {
-	ID          int64
+	ID          string
 	Name        string
 	Description string
 	Project     string
@@ -41,7 +41,7 @@ type ReadResult struct {
 }
 
 type ManagerNews struct {
-	Conversation int64
+	Conversation string
 	Target       string
 	Messages     []protocol.InboxMessage
 }

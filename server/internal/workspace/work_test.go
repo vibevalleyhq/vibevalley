@@ -317,12 +317,12 @@ func TestIssueClosesAndReopens(t *testing.T) {
 	lab := fixture.Lab(t)
 	w.f.Agent.SaveAgent(lab)
 	session := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "写打卡并提交", "tickets", session.HireOptions{}))
-	if session.Issue == nil || !strings.HasPrefix(*session.Issue, "t") {
+	if session.Issue == nil || *session.Issue == "" {
 		t.Fatalf("sent at once, it works an issue of its own: %+v", session.Issue)
 	}
 	w.nextReport(t)
 	var refused protocol.Refused
-	if _, err := w.f.Issue.Reopen(context.Background(), session.ID, "", 0); !errors.As(err, &refused) {
+	if _, err := w.f.Issue.Reopen(context.Background(), session.ID, "", ""); !errors.As(err, &refused) {
 		t.Fatalf("an open issue: %v", err)
 	}
 	w.f.Issue.Merge(session.ID)
@@ -339,7 +339,7 @@ func TestIssueClosesAndReopens(t *testing.T) {
 	}
 	testkit.Until(t, "the issue closed with its run", closedAs(protocol.IssueCloseMerged))
 
-	again, err := w.f.Issue.Reopen(context.Background(), session.ID, "打卡还要记下时区", 0)
+	again, err := w.f.Issue.Reopen(context.Background(), session.ID, "打卡还要记下时区", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,11 +351,11 @@ func TestIssueClosesAndReopens(t *testing.T) {
 	reopened := w.f.Session.Get(again)
 	testkit.Match(t, reopened.Task, `^打卡还要记下时区\n\n（这张工单重开了，上一次是 .+（`+session.ID+`）做的。）`, "what to do now comes first")
 	testkit.Match(t, reopened.Task, `这张工单原来是：写打卡并提交\n它是怎么关的：收获了`, "the job and how its last run closed")
-	if _, err := w.f.Issue.Reopen(context.Background(), *session.Issue, "", 0); !errors.As(err, &refused) {
+	if _, err := w.f.Issue.Reopen(context.Background(), *session.Issue, "", ""); !errors.As(err, &refused) {
 		t.Fatalf("reopened while open: %v", err)
 	}
 	var missing protocol.Missing
-	if _, err := w.f.Issue.Reopen(context.Background(), "w404", "", 0); !errors.As(err, &missing) {
+	if _, err := w.f.Issue.Reopen(context.Background(), "w404", "", ""); !errors.As(err, &missing) {
 		t.Fatalf("no such issue: %v", err)
 	}
 	w.f.Session.Dismiss(again)
@@ -365,7 +365,7 @@ func TestIssueClosesAndReopens(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.f.Issue.Reopen(context.Background(), issue.ID, "", 0); !errors.As(err, &refused) || !strings.Contains(refused.Reason, "种植计划") {
+	if _, err := w.f.Issue.Reopen(context.Background(), issue.ID, "", ""); !errors.As(err, &refused) || !strings.Contains(refused.Reason, "种植计划") {
 		t.Fatalf("a playbook's step: %v", err)
 	}
 }
@@ -393,7 +393,7 @@ func TestIssueWrittenDownStarts(t *testing.T) {
 		return nil
 	}
 	testkit.Eq(t, inState(issue.ID).Title, "写打卡并提交", "in the core state as soon as it is written")
-	if _, err := w.f.Issue.Start(context.Background(), issue.ID, 0); !errors.As(err, &refused) {
+	if _, err := w.f.Issue.Start(context.Background(), issue.ID, ""); !errors.As(err, &refused) {
 		t.Fatalf("no agent yet: %v", err)
 	}
 	project, agent := "backlog", lab.ID
@@ -401,7 +401,7 @@ func TestIssueWrittenDownStarts(t *testing.T) {
 		t.Fatal(err)
 	}
 	testkit.Eq(t, []string{*issue.Project, *issue.Assignee}, []string{"backlog", lab.ID}, "edited")
-	got, err := w.f.Issue.Start(context.Background(), issue.ID, 0)
+	got, err := w.f.Issue.Start(context.Background(), issue.ID, "")
 	if err != nil || got.Session == nil {
 		t.Fatalf("started: %+v %v", got, err)
 	}
@@ -414,7 +414,7 @@ func TestIssueWrittenDownStarts(t *testing.T) {
 		x := inState(issue.ID)
 		return x != nil && len(x.Sessions) == 1 && x.Status == protocol.IssueStatusInReview
 	})
-	if _, err := w.f.Issue.Start(context.Background(), issue.ID, 0); !errors.As(err, &refused) {
+	if _, err := w.f.Issue.Start(context.Background(), issue.ID, ""); !errors.As(err, &refused) {
 		t.Fatalf("started twice: %v", err)
 	}
 	if _, err := w.f.Issue.Edit(issue.ID, protocol.IssueUpdate{Title: new("改不了了")}); !errors.As(err, &refused) {
@@ -457,7 +457,7 @@ func TestIssueWaitsForAFreeBed(t *testing.T) {
 		Phase: protocol.Phase{Value: protocol.PhaseWorking{Since: clock.NowMs(), Doing: protocol.Doing{}}},
 	}})
 	issue, _ := w.f.Issue.Add(protocol.IssueRequest{Title: "等空地的活", Project: &project, Assignee: &agent})
-	got, err := w.f.Issue.Start(context.Background(), issue.ID, 0)
+	got, err := w.f.Issue.Start(context.Background(), issue.ID, "")
 	if err != nil || got.Session != nil || got.Queued == nil || !strings.Contains(*got.Queued, "排上队了") {
 		t.Fatalf("queued: %+v %v", got, err)
 	}
@@ -524,7 +524,7 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	lab := fixture.Lab(t)
 	session := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "看看目录", "steps", session.HireOptions{}))
 	w.nextReport(t)
-	steps := w.f.Session.Events(session.ID, 0)
+	steps := w.f.Session.Events(session.ID, "")
 	w.f.Session.Dismiss(session.ID)
 	after := w.f.Session.Get(session.ID)
 	if after == nil {
@@ -543,13 +543,13 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	}
 	want := []protocol.SessionEventType{protocol.SessionEventTypeRunStart, protocol.SessionEventTypeUserMessage, protocol.SessionEventTypeToolCall,
 		protocol.SessionEventTypeToolResult, protocol.SessionEventTypeAssistantMessage, protocol.SessionEventTypeRunEnd}
-	testkit.Eq(t, kinds(w.f.Session.Events(session.ID, 0)), want, "kept")
-	for _, e := range w.f.Session.Events(session.ID, 0) {
-		if e.Run == nil || *e.Run != *w.f.Session.Events(session.ID, 0)[0].Run {
+	testkit.Eq(t, kinds(w.f.Session.Events(session.ID, "")), want, "kept")
+	for _, e := range w.f.Session.Events(session.ID, "") {
+		if e.Run == nil || *e.Run != *w.f.Session.Events(session.ID, "")[0].Run {
 			t.Fatalf("an event outside the run: %+v", e)
 		}
 	}
-	testkit.Eq(t, w.f.Session.Events(session.ID, 0)[len(w.f.Session.Events(session.ID, 0))-1].Text, string(protocol.OutcomeCompleted), "the run's end says how it ended")
+	testkit.Eq(t, w.f.Session.Events(session.ID, "")[len(w.f.Session.Events(session.ID, ""))-1].Text, string(protocol.OutcomeCompleted), "the run's end says how it ended")
 	if !slices.ContainsFunc(w.f.Session.List(lab.ID), func(s protocol.Session) bool { return s.ID == session.ID }) {
 		t.Fatal("listed")
 	}
@@ -565,7 +565,7 @@ func TestCommentOnAStep(t *testing.T) {
 	w := openWorld(t, home, work)
 	hired := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "看看目录", "comments", session.HireOptions{}))
 	w.nextReport(t)
-	steps := w.f.Session.Events(hired.ID, 0)
+	steps := w.f.Session.Events(hired.ID, "")
 	tool := steps[slices.IndexFunc(steps, func(e protocol.SessionEvent) bool { return e.Type == protocol.SessionEventTypeToolCall })]
 	told, err := w.f.Session.Comment(hired.ID, tool.Seq, "这里换成 ls -la 再看一遍")
 	if err != nil {
@@ -575,7 +575,7 @@ func TestCommentOnAStep(t *testing.T) {
 	testkit.Match(t, told, `输出的结尾：hi\n\n我的评论：这里换成 ls -la 再看一遍$`, "the step's output, then the comment")
 	w.f.Session.Tell(hired.ID, told, protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
 	w.nextReport(t)
-	steps = w.f.Session.Events(hired.ID, 0)
+	steps = w.f.Session.Events(hired.ID, "")
 	i := slices.IndexFunc(steps, func(s protocol.SessionEvent) bool {
 		return s.Type == protocol.SessionEventTypeUserMessage && s.Seq > tool.Seq
 	})
@@ -644,7 +644,7 @@ func TestQuietSessionIsFlagged(t *testing.T) {
 		return need, need != nil && need.Kind == "quiet" && clock.NowMs()-need.Since >= 500
 	})
 	w.nextReport(t)
-	steps := w.f.Session.Events(session.ID, 0)
+	steps := w.f.Session.Events(session.ID, "")
 	w.f.Session.Dismiss(session.ID)
 	w.mu.Lock()
 	notes := slices.Clone(w.notes)
@@ -800,8 +800,7 @@ func TestRunsKeepWhatStartedEachRun(t *testing.T) {
 	first.f.Agent.SaveAgent(lab)
 	session := mustHire(t, first.f.Issue.Hire(context.Background(), lab, "写打卡并提交", "runs", session.HireOptions{}))
 	first.nextReport(t)
-	seq := int64(42)
-	said := protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: &seq}
+	said := protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: ptr.To("m42")}
 	testkit.Match(t, first.f.Session.Tell(session.ID, "再看看", said), `新的一轮`, "a second turn")
 	first.nextReport(t)
 	runs := func(w *testWorld) []protocol.Run {
@@ -821,9 +820,9 @@ func TestRunsKeepWhatStartedEachRun(t *testing.T) {
 
 	first.f.Session.Tell(session.ID, "发呆一会儿", protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
 	testkit.Until(t, "a third run going", func() bool { return len(runs(first)) == 3 })
-	more := int64(43)
+	more := "m43"
 	testkit.Eq(t, first.f.Session.Deliver(session.ID, "顺便看看", protocol.RunTrigger{Kind: protocol.RunTriggerKindComment, Message: &more}).Kind, "steered", "said while it works")
-	testkit.Eq(t, runs(first)[2].Heard, []int64{more}, "heard by the run going")
+	testkit.Eq(t, runs(first)[2].Heard, []string{more}, "heard by the run going")
 	first.stop()
 	second := openWorldAt(t, home, work, db)
 	testkit.Eq(t, *runs(second)[2].Outcome, protocol.OutcomeInterrupted, "the restart stopped it")

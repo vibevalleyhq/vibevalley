@@ -6,7 +6,6 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"vibevalley/pkg/x/str"
@@ -16,7 +15,7 @@ import (
 // from when the reader first saw it. Brief is for the manager, {ago} filled with how long it has waited.
 type InboxEntry struct {
 	Item    InboxItem
-	Channel *int64
+	Channel *string
 	Since   *int64
 	Brief   string
 }
@@ -129,10 +128,10 @@ func InboxEntries(state CoreState) []InboxEntry {
 
 	// A message said in full that names the person, not read and not answered in its conversation yet.
 	if chat != nil {
-		lastFromUser := map[int64]int64{}
+		lastFromUser := map[string]int64{}
 		for _, m := range chat.Messages {
 			if m.From == "user" {
-				lastFromUser[m.Conversation] = max(lastFromUser[m.Conversation], m.Seq)
+				lastFromUser[m.Conversation] = max(lastFromUser[m.Conversation], m.Number)
 			}
 		}
 		for _, c := range chat.Conversations {
@@ -141,7 +140,7 @@ func InboxEntries(state CoreState) []InboxEntry {
 				read = *c.Read
 			}
 			for _, m := range MessagesIn(chat, c.ID) {
-				if !m.Final || m.From == "user" || m.Seq <= read || lastFromUser[c.ID] > m.Seq || !slices.Contains(m.Mentions, "user") {
+				if !m.Final || m.From == "user" || m.Number <= read || lastFromUser[c.ID] > m.Number || !slices.Contains(m.Mentions, "user") {
 					continue
 				}
 				from := manager
@@ -154,7 +153,7 @@ func InboxEntries(state CoreState) []InboxEntry {
 				}
 				since := m.At
 				out = append(out, InboxEntry{
-					Item: InboxItem{ID: "m" + strconv.FormatInt(m.Seq, 10), Kind: InboxKindMention, From: from, Text: str.Cut(m.Text, 40), At: m.At,
+					Item: InboxItem{ID: m.ID, Kind: InboxKindMention, From: from, Text: str.Cut(m.Text, 40), At: m.At,
 						Target: InboxTarget{InboxTargetChat{Conversation: c.ID}}},
 					Channel: conversationID(ChannelOf(chat, &c)), Since: &since,
 					Brief: m.Name + " 在 " + AddressOf(chat, c) + " 问主人的话，{ago}没人回：「" + str.Slice(oneLine(m.Text), 0, 80) + "」",
@@ -165,7 +164,7 @@ func InboxEntries(state CoreState) []InboxEntry {
 	return out
 }
 
-func conversationID(c *Conversation) *int64 {
+func conversationID(c *Conversation) *string {
 	if c == nil {
 		return nil
 	}

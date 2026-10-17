@@ -13,18 +13,18 @@ import (
 const calledBy = `-- name: CalledBy :one
 select m.sender_id
 from channel_message m
-join channel_mention n on n.message_seq = m.seq and n.target_id = ?1
+join channel_mention n on n.message_id = m.id and n.target_id = ?1
 join channel_participant p on p.id = m.sender_id and p.kind = 'agent'
-where m.conversation_id = ?2 and m.sender_id <> ?1 and m.seq < ?3
-  and m.seq > coalesce((select max(s.seq) from channel_message s where s.conversation_id = ?2 and s.sender_id = ?1 and s.seq < ?3), 0)
-order by m.seq desc
+where m.conversation_id = ?2 and m.sender_id <> ?1 and m.id < ?3
+  and m.id > coalesce((select max(s.id) from channel_message s where s.conversation_id = ?2 and s.sender_id = ?1 and s.id < ?3), '')
+order by m.id desc
 limit 1
 `
 
 type CalledByParams struct {
 	Speaker      string
-	Conversation int64
-	Before       int64
+	Conversation string
+	Before       string
 }
 
 // The session who last @-ed the speaker here since the speaker last spoke.
@@ -47,10 +47,10 @@ func (q *Queries) FinalizeAll(ctx context.Context, updatedAt sql.NullInt64) erro
 const holdNoticeSinceUser = `-- name: HoldNoticeSinceUser :one
 select count(*) from channel_message m
 where m.conversation_id = ?1 and m.sender_id = 'system' and json_extract(m.meta, '$.code') = 'hop_limit'
-  and m.seq > coalesce((select max(u.seq) from channel_message u where u.conversation_id = ?1 and u.sender_id = 'user'), 0)
+  and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = ?1 and u.sender_id = 'user'), '')
 `
 
-func (q *Queries) HoldNoticeSinceUser(ctx context.Context, conversation int64) (int64, error) {
+func (q *Queries) HoldNoticeSinceUser(ctx context.Context, conversation string) (int64, error) {
 	row := q.db.QueryRowContext(ctx, holdNoticeSinceUser, conversation)
 	var count int64
 	err := row.Scan(&count)
@@ -59,61 +59,108 @@ func (q *Queries) HoldNoticeSinceUser(ctx context.Context, conversation int64) (
 
 const insertMessage = `-- name: InsertMessage :one
 
-insert into channel_message (conversation_id, sender_id, kind, body, final, meta, created_at) values (?, ?, ?, ?, ?, ?, ?) returning seq
+insert into channel_message (id, conversation_id, number, sender_id, kind, body, final, meta, created_at)
+values (?1, ?2, (select coalesce(max(number), 0) + 1 from channel_message where conversation_id = ?2),
+        ?3, ?4, ?5, ?6, ?7, ?8)
+returning number
 `
 
 type InsertMessageParams struct {
-	ConversationID int64
-	SenderID       string
-	Kind           string
-	Body           string
-	Final          bool
-	Meta           sql.NullString
-	CreatedAt      int64
+	ID           string
+	Conversation string
+	Sender       string
+	Kind         string
+	Body         string
+	Final        bool
+	Meta         sql.NullString
+	CreatedAt    int64
 }
 
-// What is said, in order: seq is the order of the whole chat (channel/db.go).
+// What is said, in order: a message's id is a uuidv7 and sorts by time; its number is its place in its conversation (channel/db.go).
 func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, insertMessage,
-		arg.ConversationID,
-		arg.SenderID,
+		arg.ID,
+		arg.Conversation,
+		arg.Sender,
 		arg.Kind,
 		arg.Body,
 		arg.Final,
 		arg.Meta,
 		arg.CreatedAt,
 	)
-	var seq int64
-	err := row.Scan(&seq)
-	return seq, err
+	var number int64
+	err := row.Scan(&number)
+	return number, err
 }
 
-const latestSeq = `-- name: LatestSeq :one
-select cast(coalesce(max(seq), 0) as integer) from channel_message where conversation_id = ?
+const latestNumber = `-- name: LatestNumber :one
+select cast(coalesce(max(number), 0) as integer) from channel_message where conversation_id = ?
 `
 
-func (q *Queries) LatestSeq(ctx context.Context, conversationID int64) (int64, error) {
-	row := q.db.QueryRowContext(ctx, latestSeq, conversationID)
+func (q *Queries) LatestNumber(ctx context.Context, conversationID string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, latestNumber, conversationID)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
 }
 
-const messageBySeq = `-- name: MessageBySeq :one
-select m.seq, m.conversation_id, m.sender_id, m.kind, m.body, m.final, m.meta, m.send_key, m.created_at, m.updated_at, p.id, p.kind, p.name, p.agent_id, p.runtime, p.joined_at, p.left_at from channel_message m join channel_participant p on p.id = m.sender_id where m.seq = ?
+const messageByID = `-- name: MessageByID :one
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.send_key, m.created_at, m.updated_at, p.id, p.kind, p.name, p.agent_id, p.runtime, p.joined_at, p.left_at from channel_message m join channel_participant p on p.id = m.sender_id where m.id = ?
 `
 
-type MessageBySeqRow struct {
+type MessageByIDRow struct {
 	ChannelMessage     ChannelMessage
 	ChannelParticipant ChannelParticipant
 }
 
-func (q *Queries) MessageBySeq(ctx context.Context, seq int64) (MessageBySeqRow, error) {
-	row := q.db.QueryRowContext(ctx, messageBySeq, seq)
-	var i MessageBySeqRow
+func (q *Queries) MessageByID(ctx context.Context, id string) (MessageByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, messageByID, id)
+	var i MessageByIDRow
 	err := row.Scan(
-		&i.ChannelMessage.Seq,
+		&i.ChannelMessage.ID,
 		&i.ChannelMessage.ConversationID,
+		&i.ChannelMessage.Number,
+		&i.ChannelMessage.SenderID,
+		&i.ChannelMessage.Kind,
+		&i.ChannelMessage.Body,
+		&i.ChannelMessage.Final,
+		&i.ChannelMessage.Meta,
+		&i.ChannelMessage.SendKey,
+		&i.ChannelMessage.CreatedAt,
+		&i.ChannelMessage.UpdatedAt,
+		&i.ChannelParticipant.ID,
+		&i.ChannelParticipant.Kind,
+		&i.ChannelParticipant.Name,
+		&i.ChannelParticipant.AgentID,
+		&i.ChannelParticipant.Runtime,
+		&i.ChannelParticipant.JoinedAt,
+		&i.ChannelParticipant.LeftAt,
+	)
+	return i, err
+}
+
+const messageByNumber = `-- name: MessageByNumber :one
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.send_key, m.created_at, m.updated_at, p.id, p.kind, p.name, p.agent_id, p.runtime, p.joined_at, p.left_at from channel_message m join channel_participant p on p.id = m.sender_id
+where m.conversation_id = ? and m.number = ?
+`
+
+type MessageByNumberParams struct {
+	ConversationID string
+	Number         int64
+}
+
+type MessageByNumberRow struct {
+	ChannelMessage     ChannelMessage
+	ChannelParticipant ChannelParticipant
+}
+
+func (q *Queries) MessageByNumber(ctx context.Context, arg MessageByNumberParams) (MessageByNumberRow, error) {
+	row := q.db.QueryRowContext(ctx, messageByNumber, arg.ConversationID, arg.Number)
+	var i MessageByNumberRow
+	err := row.Scan(
+		&i.ChannelMessage.ID,
+		&i.ChannelMessage.ConversationID,
+		&i.ChannelMessage.Number,
 		&i.ChannelMessage.SenderID,
 		&i.ChannelMessage.Kind,
 		&i.ChannelMessage.Body,
@@ -134,13 +181,13 @@ func (q *Queries) MessageBySeq(ctx context.Context, seq int64) (MessageBySeqRow,
 }
 
 const messagesAfter = `-- name: MessagesAfter :many
-select m.seq, m.conversation_id, m.sender_id, m.kind, m.body, m.final, m.meta, m.send_key, m.created_at, m.updated_at, p.id, p.kind, p.name, p.agent_id, p.runtime, p.joined_at, p.left_at from channel_message m join channel_participant p on p.id = m.sender_id
-where m.conversation_id = ? and m.seq > ? order by m.seq limit ?
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.send_key, m.created_at, m.updated_at, p.id, p.kind, p.name, p.agent_id, p.runtime, p.joined_at, p.left_at from channel_message m join channel_participant p on p.id = m.sender_id
+where m.conversation_id = ? and m.number > ? order by m.number limit ?
 `
 
 type MessagesAfterParams struct {
-	ConversationID int64
-	Seq            int64
+	ConversationID string
+	Number         int64
 	Limit          int64
 }
 
@@ -150,7 +197,7 @@ type MessagesAfterRow struct {
 }
 
 func (q *Queries) MessagesAfter(ctx context.Context, arg MessagesAfterParams) ([]MessagesAfterRow, error) {
-	rows, err := q.db.QueryContext(ctx, messagesAfter, arg.ConversationID, arg.Seq, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, messagesAfter, arg.ConversationID, arg.Number, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -159,8 +206,9 @@ func (q *Queries) MessagesAfter(ctx context.Context, arg MessagesAfterParams) ([
 	for rows.Next() {
 		var i MessagesAfterRow
 		if err := rows.Scan(
-			&i.ChannelMessage.Seq,
+			&i.ChannelMessage.ID,
 			&i.ChannelMessage.ConversationID,
+			&i.ChannelMessage.Number,
 			&i.ChannelMessage.SenderID,
 			&i.ChannelMessage.Kind,
 			&i.ChannelMessage.Body,
@@ -191,13 +239,13 @@ func (q *Queries) MessagesAfter(ctx context.Context, arg MessagesAfterParams) ([
 }
 
 const messagesBefore = `-- name: MessagesBefore :many
-select m.seq, m.conversation_id, m.sender_id, m.kind, m.body, m.final, m.meta, m.send_key, m.created_at, m.updated_at, p.id, p.kind, p.name, p.agent_id, p.runtime, p.joined_at, p.left_at from channel_message m join channel_participant p on p.id = m.sender_id
-where m.conversation_id = ? and m.seq < ? order by m.seq desc limit ?
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.send_key, m.created_at, m.updated_at, p.id, p.kind, p.name, p.agent_id, p.runtime, p.joined_at, p.left_at from channel_message m join channel_participant p on p.id = m.sender_id
+where m.conversation_id = ? and m.number < ? order by m.number desc limit ?
 `
 
 type MessagesBeforeParams struct {
-	ConversationID int64
-	Seq            int64
+	ConversationID string
+	Number         int64
 	Limit          int64
 }
 
@@ -208,7 +256,7 @@ type MessagesBeforeRow struct {
 
 // Newest first.
 func (q *Queries) MessagesBefore(ctx context.Context, arg MessagesBeforeParams) ([]MessagesBeforeRow, error) {
-	rows, err := q.db.QueryContext(ctx, messagesBefore, arg.ConversationID, arg.Seq, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, messagesBefore, arg.ConversationID, arg.Number, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -217,8 +265,9 @@ func (q *Queries) MessagesBefore(ctx context.Context, arg MessagesBeforeParams) 
 	for rows.Next() {
 		var i MessagesBeforeRow
 		if err := rows.Scan(
-			&i.ChannelMessage.Seq,
+			&i.ChannelMessage.ID,
 			&i.ChannelMessage.ConversationID,
+			&i.ChannelMessage.Number,
 			&i.ChannelMessage.SenderID,
 			&i.ChannelMessage.Kind,
 			&i.ChannelMessage.Body,
@@ -249,30 +298,30 @@ func (q *Queries) MessagesBefore(ctx context.Context, arg MessagesBeforeParams) 
 }
 
 const recentDuplicate = `-- name: RecentDuplicate :one
-select seq from channel_message where sender_id = ? and conversation_id = ? and body = ? and created_at > ? order by seq desc limit 1
+select id from channel_message where sender_id = ? and conversation_id = ? and body = ? and created_at > ? order by id desc limit 1
 `
 
 type RecentDuplicateParams struct {
 	SenderID       string
-	ConversationID int64
+	ConversationID string
 	Body           string
 	CreatedAt      int64
 }
 
-func (q *Queries) RecentDuplicate(ctx context.Context, arg RecentDuplicateParams) (int64, error) {
+func (q *Queries) RecentDuplicate(ctx context.Context, arg RecentDuplicateParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, recentDuplicate,
 		arg.SenderID,
 		arg.ConversationID,
 		arg.Body,
 		arg.CreatedAt,
 	)
-	var seq int64
-	err := row.Scan(&seq)
-	return seq, err
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }
 
 const recentMessages = `-- name: RecentMessages :many
-select m.seq, m.conversation_id, m.sender_id, m.kind, m.body, m.final, m.meta, m.send_key, m.created_at, m.updated_at, p.id, p.kind, p.name, p.agent_id, p.runtime, p.joined_at, p.left_at from channel_message m join channel_participant p on p.id = m.sender_id order by m.seq desc limit ?
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.send_key, m.created_at, m.updated_at, p.id, p.kind, p.name, p.agent_id, p.runtime, p.joined_at, p.left_at from channel_message m join channel_participant p on p.id = m.sender_id order by m.id desc limit ?
 `
 
 type RecentMessagesRow struct {
@@ -290,8 +339,9 @@ func (q *Queries) RecentMessages(ctx context.Context, limit int64) ([]RecentMess
 	for rows.Next() {
 		var i RecentMessagesRow
 		if err := rows.Scan(
-			&i.ChannelMessage.Seq,
+			&i.ChannelMessage.ID,
 			&i.ChannelMessage.ConversationID,
+			&i.ChannelMessage.Number,
 			&i.ChannelMessage.SenderID,
 			&i.ChannelMessage.Kind,
 			&i.ChannelMessage.Body,
@@ -322,32 +372,32 @@ func (q *Queries) RecentMessages(ctx context.Context, limit int64) ([]RecentMess
 }
 
 const unseenIn = `-- name: UnseenIn :many
-select m.seq from channel_message m
+select m.id from channel_message m
 where m.conversation_id = ?1 and m.sender_id <> ?2 and m.final
-  and m.seq > coalesce((select read_seq from channel_read_cursor where participant_id = ?2 and conversation_id = ?1), 0)
-  and not exists (select 1 from channel_seen_mark s where s.participant_id = ?2 and s.message_seq = m.seq)
-order by m.seq desc
+  and m.number > coalesce((select read_number from channel_read_cursor where participant_id = ?2 and conversation_id = ?1), 0)
+  and not exists (select 1 from channel_seen_mark s where s.participant_id = ?2 and s.message_id = m.id)
+order by m.number desc
 `
 
 type UnseenInParams struct {
-	Conversation int64
+	Conversation string
 	Participant  string
 }
 
 // Newest first.
-func (q *Queries) UnseenIn(ctx context.Context, arg UnseenInParams) ([]int64, error) {
+func (q *Queries) UnseenIn(ctx context.Context, arg UnseenInParams) ([]string, error) {
 	rows, err := q.db.QueryContext(ctx, unseenIn, arg.Conversation, arg.Participant)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []int64
+	var items []string
 	for rows.Next() {
-		var seq int64
-		if err := rows.Scan(&seq); err != nil {
+		var id string
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		items = append(items, seq)
+		items = append(items, id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -359,14 +409,14 @@ func (q *Queries) UnseenIn(ctx context.Context, arg UnseenInParams) ([]int64, er
 }
 
 const updateMessageBody = `-- name: UpdateMessageBody :exec
-update channel_message set body = ?, final = ?, updated_at = ? where seq = ?
+update channel_message set body = ?, final = ?, updated_at = ? where id = ?
 `
 
 type UpdateMessageBodyParams struct {
 	Body      string
 	Final     bool
 	UpdatedAt sql.NullInt64
-	Seq       int64
+	ID        string
 }
 
 func (q *Queries) UpdateMessageBody(ctx context.Context, arg UpdateMessageBodyParams) error {
@@ -374,21 +424,21 @@ func (q *Queries) UpdateMessageBody(ctx context.Context, arg UpdateMessageBodyPa
 		arg.Body,
 		arg.Final,
 		arg.UpdatedAt,
-		arg.Seq,
+		arg.ID,
 	)
 	return err
 }
 
 const updateMessageMeta = `-- name: UpdateMessageMeta :exec
-update channel_message set meta = ? where seq = ?
+update channel_message set meta = ? where id = ?
 `
 
 type UpdateMessageMetaParams struct {
 	Meta sql.NullString
-	Seq  int64
+	ID   string
 }
 
 func (q *Queries) UpdateMessageMeta(ctx context.Context, arg UpdateMessageMetaParams) error {
-	_, err := q.db.ExecContext(ctx, updateMessageMeta, arg.Meta, arg.Seq)
+	_, err := q.db.ExecContext(ctx, updateMessageMeta, arg.Meta, arg.ID)
 	return err
 }

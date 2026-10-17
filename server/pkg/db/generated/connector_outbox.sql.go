@@ -12,21 +12,23 @@ import (
 
 const addOutbox = `-- name: AddOutbox :exec
 
-insert into connector_outbox (connector, message_seq, body, created_at) values (?, ?, ?, ?)
+insert into connector_outbox (id, connector, message_id, body, created_at) values (?, ?, ?, ?, ?)
 `
 
 type AddOutboxParams struct {
-	Connector  string
-	MessageSeq int64
-	Body       string
-	CreatedAt  int64
+	ID        string
+	Connector string
+	MessageID string
+	Body      string
+	CreatedAt int64
 }
 
 // What goes out to each chat app, in order (connector/connector.go).
 func (q *Queries) AddOutbox(ctx context.Context, arg AddOutboxParams) error {
 	_, err := q.db.ExecContext(ctx, addOutbox,
+		arg.ID,
 		arg.Connector,
-		arg.MessageSeq,
+		arg.MessageID,
 		arg.Body,
 		arg.CreatedAt,
 	)
@@ -59,9 +61,9 @@ func (q *Queries) DropPendingOutbox(ctx context.Context, arg DropPendingOutboxPa
 }
 
 const messageOfExt = `-- name: MessageOfExt :one
-select message_seq from connector_outbox where connector_outbox.connector = ?1 and connector_outbox.ext_id = ?2
+select message_id from connector_outbox where connector_outbox.connector = ?1 and connector_outbox.ext_id = ?2
 union all
-select message_seq from connector_inbound where connector_inbound.connector = ?1 and connector_inbound.ext_id = ?2 and message_seq is not null
+select message_id from connector_inbound where connector_inbound.connector = ?1 and connector_inbound.ext_id = ?2 and message_id is not null
 limit 1
 `
 
@@ -71,11 +73,11 @@ type MessageOfExtParams struct {
 }
 
 // The farm's message an app's id stands for: one this farm sent, or one it heard.
-func (q *Queries) MessageOfExt(ctx context.Context, arg MessageOfExtParams) (int64, error) {
+func (q *Queries) MessageOfExt(ctx context.Context, arg MessageOfExtParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, messageOfExt, arg.Connector, arg.ExtID)
-	var message_seq int64
-	err := row.Scan(&message_seq)
-	return message_seq, err
+	var message_id string
+	err := row.Scan(&message_id)
+	return message_id, err
 }
 
 const outboxFailed = `-- name: OutboxFailed :exec
@@ -84,7 +86,7 @@ update connector_outbox set tries = tries + 1, error = ? where id = ?
 
 type OutboxFailedParams struct {
 	Error sql.NullString
-	ID    int64
+	ID    string
 }
 
 func (q *Queries) OutboxFailed(ctx context.Context, arg OutboxFailedParams) error {
@@ -99,7 +101,7 @@ update connector_outbox set state = 'sent', sent_at = ?, ext_id = ?, tries = tri
 type OutboxSentParams struct {
 	SentAt sql.NullInt64
 	ExtID  sql.NullString
-	ID     int64
+	ID     string
 }
 
 func (q *Queries) OutboxSent(ctx context.Context, arg OutboxSentParams) error {
@@ -112,7 +114,7 @@ select id, body from connector_outbox where connector = ? and state = 'pending' 
 `
 
 type PendingOutboxRow struct {
-	ID   int64
+	ID   string
 	Body string
 }
 

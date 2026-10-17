@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
 	"vibevalley/pkg/db/generated"
 	"vibevalley/pkg/x/clock"
@@ -43,7 +44,8 @@ func (c *sessions) startRun(h *hand) {
 		issue = sql.NullString{String: *session.Issue, Valid: true}
 	}
 	trigger, _ := json.Marshal(by)
-	id, err := c.q.StartRun(context.Background(), generated.StartRunParams{Session: h.id, Issue: issue, TriggeredBy: string(trigger), StartedAt: clock.NowMs()})
+	id := base.NewID()
+	err := c.q.StartRun(context.Background(), generated.StartRunParams{ID: id, Session: h.id, Issue: issue, TriggeredBy: string(trigger), StartedAt: clock.NowMs()})
 	if err != nil {
 		log.Printf("vibevalley: %s's run not kept: %v", h.id, err)
 		return
@@ -54,34 +56,34 @@ func (c *sessions) startRun(h *hand) {
 	h.journal.RunStarted(id)
 }
 
-func (c *sessions) heardInRun(h *hand, seq int64) {
+func (c *sessions) heardInRun(h *hand, id string) {
 	h.mu.Lock()
-	id := h.run
-	if id != 0 {
-		h.heard = append(h.heard, seq)
+	run := h.run
+	if run != "" {
+		h.heard = append(h.heard, id)
 	}
 	heard, _ := json.Marshal(h.heard)
 	h.mu.Unlock()
-	if id == 0 {
+	if run == "" {
 		return
 	}
-	if err := c.q.HeardInRun(context.Background(), generated.HeardInRunParams{Heard: sql.NullString{String: string(heard), Valid: true}, ID: id}); err != nil {
-		log.Printf("vibevalley: run %d: %v", id, err)
+	if err := c.q.HeardInRun(context.Background(), generated.HeardInRunParams{Heard: sql.NullString{String: string(heard), Valid: true}, ID: run}); err != nil {
+		log.Printf("vibevalley: run %s: %v", id, err)
 	}
 }
 
 func (c *sessions) endRun(h *hand, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
 	h.mu.Lock()
 	id := h.run
-	h.run, h.heard = 0, nil
+	h.run, h.heard = "", nil
 	h.mu.Unlock()
-	if id != 0 {
+	if id != "" {
 		h.journal.RunEnded(id, outcome)
 		c.finishRun(id, outcome, summary, spent)
 	}
 }
 
-func (c *sessions) finishRun(id int64, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
+func (c *sessions) finishRun(id string, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
 	params := generated.EndRunParams{
 		EndedAt: sql.NullInt64{Int64: clock.NowMs(), Valid: true}, Outcome: sql.NullString{String: string(outcome), Valid: true},
 		Summary: sql.NullString{String: summary, Valid: summary != ""}, ID: id,
@@ -91,7 +93,7 @@ func (c *sessions) finishRun(id int64, outcome protocol.Outcome, summary string,
 		params.Spent = sql.NullString{String: string(body), Valid: true}
 	}
 	if err := c.q.EndRun(context.Background(), params); err != nil {
-		log.Printf("vibevalley: run %d: %v", id, err)
+		log.Printf("vibevalley: run %s: %v", id, err)
 	}
 }
 
@@ -108,18 +110,19 @@ func (c *sessions) endOpenRuns() {
 }
 
 // A run that is no session's: the manager's, on an issue for it.
-func (c *sessions) OpenRun(session, issue string, by protocol.RunTrigger) int64 {
+func (c *sessions) OpenRun(session, issue string, by protocol.RunTrigger) string {
 	trigger, _ := json.Marshal(by)
-	id, err := c.q.StartRun(context.Background(), generated.StartRunParams{Session: session, Issue: sql.NullString{String: issue, Valid: issue != ""}, TriggeredBy: string(trigger), StartedAt: clock.NowMs()})
+	id := base.NewID()
+	err := c.q.StartRun(context.Background(), generated.StartRunParams{ID: id, Session: session, Issue: sql.NullString{String: issue, Valid: issue != ""}, TriggeredBy: string(trigger), StartedAt: clock.NowMs()})
 	if err != nil {
 		log.Printf("vibevalley: %s's run not kept: %v", session, err)
-		return 0
+		return ""
 	}
 	return id
 }
 
-func (c *sessions) CloseRun(id int64, outcome protocol.Outcome, summary string) {
-	if id != 0 {
+func (c *sessions) CloseRun(id string, outcome protocol.Outcome, summary string) {
+	if id != "" {
 		c.finishRun(id, outcome, summary, nil)
 	}
 }
@@ -137,16 +140,16 @@ func (c *sessions) Runs(issue string) ([]protocol.Run, error) {
 }
 
 func runOf(r generated.SessionRun) protocol.Run {
-	run := protocol.Run{ID: r.ID, Session: r.Session, Heard: []int64{}, StartedAt: r.StartedAt}
+	run := protocol.Run{ID: r.ID, Session: r.Session, Heard: []string{}, StartedAt: r.StartedAt}
 	if err := json.Unmarshal([]byte(r.TriggeredBy), &run.TriggeredBy); err != nil {
-		log.Printf("vibevalley: run %d: what started it cannot be read: %v", r.ID, err)
+		log.Printf("vibevalley: run %s: what started it cannot be read: %v", r.ID, err)
 	}
 	if r.Issue.Valid {
 		run.Issue = &r.Issue.String
 	}
 	if r.Heard.Valid {
 		if err := json.Unmarshal([]byte(r.Heard.String), &run.Heard); err != nil {
-			log.Printf("vibevalley: run %d: what it heard cannot be read: %v", r.ID, err)
+			log.Printf("vibevalley: run %s: what it heard cannot be read: %v", r.ID, err)
 		}
 	}
 	if r.EndedAt.Valid {

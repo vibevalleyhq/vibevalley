@@ -10,14 +10,15 @@ import (
 	"database/sql"
 )
 
-const addSchedule = `-- name: AddSchedule :execlastid
-insert into schedule (name, body, channel_id, agent, project, spec, tz, enabled, created_at) values (?, ?, ?, ?, ?, ?, ?, 1, ?)
+const addSchedule = `-- name: AddSchedule :exec
+insert into schedule (id, name, body, channel_id, agent, project, spec, tz, enabled, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
 `
 
 type AddScheduleParams struct {
+	ID        string
 	Name      string
 	Body      string
-	ChannelID int64
+	ChannelID string
 	Agent     sql.NullString
 	Project   sql.NullString
 	Spec      string
@@ -25,8 +26,9 @@ type AddScheduleParams struct {
 	CreatedAt int64
 }
 
-func (q *Queries) AddSchedule(ctx context.Context, arg AddScheduleParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, addSchedule,
+func (q *Queries) AddSchedule(ctx context.Context, arg AddScheduleParams) error {
+	_, err := q.db.ExecContext(ctx, addSchedule,
+		arg.ID,
 		arg.Name,
 		arg.Body,
 		arg.ChannelID,
@@ -36,10 +38,7 @@ func (q *Queries) AddSchedule(ctx context.Context, arg AddScheduleParams) (int64
 		arg.Tz,
 		arg.CreatedAt,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+	return err
 }
 
 const enableSchedule = `-- name: EnableSchedule :exec
@@ -48,7 +47,7 @@ update schedule set enabled = ? where id = ?
 
 type EnableScheduleParams struct {
 	Enabled bool
-	ID      int64
+	ID      string
 }
 
 func (q *Queries) EnableSchedule(ctx context.Context, arg EnableScheduleParams) error {
@@ -60,7 +59,7 @@ const removeSchedule = `-- name: RemoveSchedule :exec
 delete from schedule where id = ?
 `
 
-func (q *Queries) RemoveSchedule(ctx context.Context, id int64) error {
+func (q *Queries) RemoveSchedule(ctx context.Context, id string) error {
 	_, err := q.db.ExecContext(ctx, removeSchedule, id)
 	return err
 }
@@ -72,7 +71,7 @@ update schedule set last_run = ?, enabled = ? where id = ?
 type ScheduleRanParams struct {
 	LastRun sql.NullInt64
 	Enabled bool
-	ID      int64
+	ID      string
 }
 
 func (q *Queries) ScheduleRan(ctx context.Context, arg ScheduleRanParams) error {

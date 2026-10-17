@@ -19,8 +19,9 @@ import 'package:vibevalley/shell/title/title_state.dart';
 import 'package:vibevalley/data/remote.dart';
 
 ChatMessage _said(int seq, SenderKind kind, String from, String name, String text) => ChatMessage(
-  seq: seq.toDouble(),
-  conversation: 1,
+  id: 'm$seq',
+  number: seq.toDouble(),
+  conversation: 'c1',
   from: from,
   fromKind: kind,
   name: name,
@@ -43,7 +44,7 @@ void main() {
       sessions: const [],
       progress: const Progress(coins: 20, streak: 0, bestStreak: 0, counts: {}, unlocked: []),
       chat: Chat(
-        conversations: const [Conversation(id: 1, kind: ConversationKind.general, name: '田头', replies: 0, at: 0)],
+        conversations: const [Conversation(id: 'c1', kind: ConversationKind.general, name: '田头', replies: 0, at: 0)],
         messages: [
           _said(1, SenderKind.manager, 'manager', '管家', '农场开门了，今天种点什么？'),
           _said(2, SenderKind.user, 'user', '主人', '让 antigravity 给农场加个夜间模式'),

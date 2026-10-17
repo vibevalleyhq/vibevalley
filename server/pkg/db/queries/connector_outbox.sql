@@ -1,7 +1,7 @@
 -- What goes out to each chat app, in order (connector/connector.go).
 
 -- name: AddOutbox :exec
-insert into connector_outbox (connector, message_seq, body, created_at) values (?, ?, ?, ?);
+insert into connector_outbox (id, connector, message_id, body, created_at) values (?, ?, ?, ?, ?);
 
 -- name: PendingOutbox :many
 select id, body from connector_outbox where connector = ? and state = 'pending' order by id;
@@ -20,7 +20,7 @@ update connector_outbox set state = 'dropped', error = ? where connector = ? and
 
 -- name: MessageOfExt :one
 -- The farm's message an app's id stands for: one this farm sent, or one it heard.
-select message_seq from connector_outbox where connector_outbox.connector = ?1 and connector_outbox.ext_id = ?2
+select message_id from connector_outbox where connector_outbox.connector = ?1 and connector_outbox.ext_id = ?2
 union all
-select message_seq from connector_inbound where connector_inbound.connector = ?1 and connector_inbound.ext_id = ?2 and message_seq is not null
+select message_id from connector_inbound where connector_inbound.connector = ?1 and connector_inbound.ext_id = ?2 and message_id is not null
 limit 1;
