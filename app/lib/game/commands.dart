@@ -95,14 +95,23 @@ class FarmCommands {
     );
   }
 
-  /// When the tool does not apply, the reason is said over the bed.
-  Future<ToolResult> applyTool(Bed bed) async {
+  /// The click's decision: read the farm once, so the page's sound and the command use the same aim.
+  PlotAim aim(Bed bed) {
     final tool = ref.read(heldToolProvider);
     final state = _farm;
     final view = ref.read(viewProvider);
     final session = state == null ? null : stationOf(state.sessions, bed.station);
     final level = view?.level.level.round() ?? 1;
     final aim = aimTool(tool, bed, session, view == null ? const PlotView(crop: Crop.empty) : plotOf(view, session), level);
+    return PlotAim(bed: bed, tool: tool, session: session, aim: aim);
+  }
+
+  /// When the tool does not apply, the reason is said over the bed.
+  Future<ToolResult> act(PlotAim plot) async {
+    final bed = plot.bed;
+    final tool = plot.tool;
+    final session = plot.session;
+    final aim = plot.aim;
     if (!aim.ok || session == null) {
       if (aim.ok) return ToolSow(bed.station);
       burst(ref, bed.index, BedFxKind.note, aim.text);

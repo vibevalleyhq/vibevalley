@@ -35,7 +35,7 @@ void main() {
 
   Future<ToolResult> use(ProviderContainer c, Tool tool, int bed) {
     c.read(heldToolProvider.notifier).set(tool);
-    return c.read(farmCommandsProvider).applyTool(beds[bed]);
+    return c.read(farmCommandsProvider).act(c.read(farmCommandsProvider).aim(beds[bed]));
   }
 
   test('the hand opens a worked bed and sows an empty one', () async {
@@ -53,6 +53,15 @@ void main() {
     expect(routes.calls.single.body, {'text': '接着修：修登录。看一下报错，修好再跑一遍测试'});
     expect(c.read(bedFxProvider).single.kind, BedFxKind.spray);
     expect(c.read(bedFxProvider).single.bed, 1);
+  });
+
+  test('a click is decided once: the held tool can change between aim and act', () async {
+    final (c, routes) = await setUpFarm();
+    c.read(heldToolProvider.notifier).set(Tool.bug);
+    final aim = c.read(farmCommandsProvider).aim(beds[1]);
+    c.read(heldToolProvider.notifier).set(Tool.hand);
+    expect(await c.read(farmCommandsProvider).act(aim), isA<ToolDone>());
+    expect(routes.paths, ['POST /api/v1/issues/tw2/comment']);
   });
 
   test('harvest on a ripe bed asks to look at the changes first', () async {

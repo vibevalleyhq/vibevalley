@@ -26,6 +26,15 @@ class Aim {
   final String text;
 }
 
+/// A click's decision, taken once: the page plays its sound and the command acts on the same snapshot.
+class PlotAim {
+  const PlotAim({required this.bed, required this.tool, required this.session, required this.aim});
+  final Bed bed;
+  final Tool tool;
+  final Session? session;
+  final Aim aim;
+}
+
 sealed class ToolResult {
   const ToolResult();
 }

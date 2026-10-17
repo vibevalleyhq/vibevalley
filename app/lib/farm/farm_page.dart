@@ -104,15 +104,12 @@ class _FarmPageState extends ConsumerState<FarmPage> {
 
   Future<void> _clickPlot(int index) async {
     final bed = beds[index];
-    final state = ref.read(stateProvider);
-    final view = ref.read(viewProvider);
-    if (state == null || view == null) return;
-    final session = bed.unlockLevel == null ? stationOf(state.sessions, bed.station) : null;
-    final plot = bed.unlockLevel != null ? lockedPlot(bed, view.level.level.round()) : plotOf(view, session);
-    if (aimTool(ref.read(heldToolProvider), bed, session, plot, view.level.level.round()).ok) Sfx.play('tap');
+    final commands = ref.read(farmCommandsProvider);
+    final aim = commands.aim(bed);
+    if (aim.aim.ok) Sfx.play('tap');
     final ToolResult result;
     try {
-      result = await ref.read(farmCommandsProvider).applyTool(bed);
+      result = await commands.act(aim);
     } on Object {
       // The server said no: its notice says why.
       return;
