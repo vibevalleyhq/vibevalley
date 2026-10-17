@@ -326,6 +326,7 @@ String spanLabel(SessionEvent step) => switch (step.type) {
   SessionEventType.assistantThinking => '思考',
   SessionEventType.assistantMessage => '说',
   SessionEventType.llmRetry => '重试',
+  SessionEventType.llmUsage => '缓存',
   SessionEventType.runError => '出错',
   SessionEventType.runStart || SessionEventType.runEnd || SessionEventType.toolResult => '',
   SessionEventType.toolCall => farmToolText(step.text) != null ? '田头' : actionText[SessionAction.fromJson((step.action ?? ToolAction.other).wire)] ?? '工具',
@@ -336,7 +337,7 @@ Color spanColor(SessionEvent step) => switch (step.type) {
   SessionEventType.memoryRecalled => Palette.leaf300,
   SessionEventType.assistantThinking => Palette.cream300,
   SessionEventType.assistantMessage => Palette.leaf500,
-  SessionEventType.llmRetry => Palette.wheatHover,
+  SessionEventType.llmRetry || SessionEventType.llmUsage => Palette.wheatHover,
   SessionEventType.runError => Palette.berry,
   SessionEventType.runStart || SessionEventType.runEnd || SessionEventType.toolResult => Palette.cream200,
   SessionEventType.toolCall when step.ok == false => Palette.berry,
@@ -462,6 +463,8 @@ class _Step extends StatelessWidget {
         return _ToolStep(step: step, now: now);
       case SessionEventType.llmRetry:
         return _Line(mark: 'button-replay', text: step.text, at: step.time, now: now, fill: Palette.wheat.withValues(alpha: .15), ink: Palette.bark800);
+      case SessionEventType.llmUsage:
+        return _Line(mark: 'icon-coin', text: step.text, at: step.time, now: now, fill: Palette.wheat.withValues(alpha: .08), ink: Palette.bark600);
       case SessionEventType.runError:
         return _Line(mark: 'mark-warn', text: step.text, at: step.time, now: now, fill: Palette.berry.withValues(alpha: .12), ink: Palette.berry);
       // Not rows: a run's bounds split the rounds, a result is shown in its call (shownEvents).

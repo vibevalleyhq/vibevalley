@@ -20,10 +20,13 @@ const (
 	EventAgentSettled    = "agent_settled"
 	EventCompactionStart = "compaction_start"
 	EventCompactionEnd   = "compaction_end"
+	EventPrefixChanged   = "prefix_changed"
 )
 
 // AgentEvent is an agentcore event, or one of this agent's own: agent_settled (Aborted), compaction_start
-// (Reason "threshold"), compaction_end (Reason, Compaction: nil when nothing was folded).
+// (Reason "threshold"), compaction_end (Reason, Compaction: nil when nothing was folded), prefix_changed (Reason: the
+// parts of the prompt's start that changed since the request before, with no compaction between, as PromptParts names
+// them, joined by commas).
 type AgentEvent struct {
 	agentcore.AgentEvent
 	Aborted bool
@@ -92,6 +95,8 @@ type Agent struct {
 	// Made once per place.
 	folds  map[string]CompactionSummaryMessage
 	foldMu sync.Mutex
+	// What the last request's prompt start hashed to, per part; nil before the first request and after a compaction.
+	sent map[string]string
 }
 
 // ctx's values (ai.WithProviders) reach every request, and its end stops the agent.
@@ -180,7 +185,9 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 			},
 			PrepareRequest: func(ctx context.Context, p agentcore.PrepareRequestContext) *agentcore.AgentRequestUpdate {
 				c := p.Context
-				c.SystemPrompt = a.systemPrompt(ctx)
+				parts := a.promptParts(ctx)
+				c.SystemPrompt = joinParts(parts)
+				a.noteChanges(parts, c.Tools)
 				return &agentcore.AgentRequestUpdate{Context: &c}
 			},
 			FinishTurn: func(context.Context, agentcore.AgentTurnContext) *agentcore.AgentTurnDecision {
@@ -257,7 +264,8 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 
 func (a *Agent) publish(e AgentEvent) { a.events.Publish(e) }
 
-func (a *Agent) systemPrompt(ctx context.Context) string {
+// The parts of the system prompt, in order, named instructions, env, skills, memory, situation; an empty one is left out.
+func (a *Agent) promptParts(ctx context.Context) []promptPart {
 	found := a.skills()
 	memory := ""
 	if !a.options.NoMemory {
@@ -267,24 +275,18 @@ func (a *Agent) systemPrompt(ctx context.Context) string {
 	if a.options.Situation != nil {
 		situation = a.options.Situation(ctx)
 	}
-	parts := []string{
-		strings.TrimSpace(a.options.Instructions),
-		"## 环境\n- 工作目录：" + a.options.Cwd + "\n- 现在：" + localeTime(time.Now()),
+	parts := []promptPart{
+		{"instructions", strings.TrimSpace(a.options.Instructions)},
+		{"env", "## 环境\n- 工作目录：" + a.options.Cwd + "\n- 现在：" + localeTime(time.Now())},
 	}
 	if len(found) > 0 {
-		parts = append(parts, "## 技能\n要用哪个先用 load_skill 读它的全文，再照着做：\n"+SkillIndex(found, 0))
+		parts = append(parts, promptPart{"skills", "## 技能\n要用哪个先用 load_skill 读它的全文，再照着做：\n" + SkillIndex(found, 0)})
 	}
 	if memory != "" {
-		parts = append(parts, "## 记性（你以前记下的）\n"+memory)
+		parts = append(parts, promptPart{"memory", "## 记性（你以前记下的）\n" + memory})
 	}
-	parts = append(parts, situation)
-	var kept []string
-	for _, p := range parts {
-		if p != "" {
-			kept = append(kept, p)
-		}
-	}
-	return strings.Join(kept, "\n\n")
+	parts = append(parts, promptPart{"situation", situation})
+	return slices.DeleteFunc(parts, func(p promptPart) bool { return p.text == "" })
 }
 
 func foldKey(messages []agentcore.AgentMessage, cut int) string {
@@ -322,6 +324,7 @@ func (a *Agent) fold(ctx context.Context, messages []agentcore.AgentMessage) *co
 	a.foldMu.Lock()
 	a.folds[key] = *summary
 	a.foldMu.Unlock()
+	a.forgetSent()
 	return plan.apply(*summary)
 }
 

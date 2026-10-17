@@ -522,3 +522,28 @@ func TestATSSessionFileReadsBack(t *testing.T) {
 		eq(t, ai.Stringify(m), lines[i])
 	}
 }
+
+func prefixChanges(r *rig) []string {
+	var out []string
+	for _, e := range r.all() {
+		if e.Type == EventPrefixChanged {
+			out = append(out, e.Reason)
+		}
+	}
+	return out
+}
+
+func TestAChangedToolIsToldAsAChangedPrefix(t *testing.T) {
+	dir := home(t)
+	withAgent(t, dir, []ai.FauxResponseStep{ai.FauxAssistantMessage("一"), ai.FauxAssistantMessage("二")}, func(r *rig) {
+		r.ask("a")
+		r.until(has(EventAgentSettled))
+		eq(t, len(prefixChanges(r)), 0)
+		r.agent.Core.SetTools(r.agent.Core.State().Tools[1:])
+		r.ask("b")
+		r.until(func(events []AgentEvent) bool { return len(prefixChanges(r)) > 0 })
+		if got := prefixChanges(r); !strings.Contains(got[0], "tools") {
+			t.Fatalf("changed %q", got)
+		}
+	}, nil)
+}

@@ -67,6 +67,8 @@ type Journal interface {
 	ToolInput(callID, input, text string, from From)
 	ToolEnded(callID, output string, ok bool, from From)
 	Note(kind protocol.SessionEventType, text string, from From)
+	// An llm/usage: one model answer's tokens, with text to show for them.
+	Usage(tokens protocol.EventTokens, text string, from From)
 	// RunStarted opens run id: every event after it is the run's until RunEnded closes it with how it ended.
 	RunStarted(id string)
 	RunEnded(id string, outcome protocol.Outcome)

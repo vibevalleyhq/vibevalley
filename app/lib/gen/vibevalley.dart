@@ -1202,6 +1202,7 @@ enum SessionEventType {
   toolCall('tool/call'),
   toolResult('tool/result'),
   llmRetry('llm/retry'),
+  llmUsage('llm/usage'),
   runError('run/error'),
   runEnd('run/end');
 
@@ -1243,6 +1244,7 @@ class SessionEvent {
     this.output,
     this.ok,
     this.on,
+    this.tokens,
   });
 
   factory SessionEvent.fromJson(Map<String, dynamic> j) => SessionEvent(
@@ -1259,6 +1261,7 @@ class SessionEvent {
     output: j['output'] == null ? null : j['output'] as String,
     ok: j['ok'] == null ? null : j['ok'] as bool,
     on: j['on'] == null ? null : (j['on'] as num).toDouble(),
+    tokens: j['tokens'] == null ? null : EventTokens.fromJson(j['tokens'] as Map<String, dynamic>),
   );
 
   final double seq;
@@ -1274,6 +1277,7 @@ class SessionEvent {
   final String? output;
   final bool? ok;
   final double? on;
+  final EventTokens? tokens;
 
   Map<String, dynamic> toJson() => {
     'seq': seq,
@@ -1289,7 +1293,21 @@ class SessionEvent {
     if (output != null) 'output': output!,
     if (ok != null) 'ok': ok!,
     if (on != null) 'on': on!,
+    if (tokens != null) 'tokens': tokens!.toJson(),
   };
+}
+
+class EventTokens {
+  const EventTokens({required this.input, required this.cacheRead, required this.output});
+
+  factory EventTokens.fromJson(Map<String, dynamic> j) =>
+      EventTokens(input: (j['input'] as num).toDouble(), cacheRead: (j['cacheRead'] as num).toDouble(), output: (j['output'] as num).toDouble());
+
+  final double input;
+  final double cacheRead;
+  final double output;
+
+  Map<String, dynamic> toJson() => {'input': input, 'cacheRead': cacheRead, 'output': output};
 }
 
 enum NoticeLevel {

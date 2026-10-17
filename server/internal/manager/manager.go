@@ -163,6 +163,8 @@ type manager struct {
 	said     int
 	open     bool
 	lastPush time.Time
+	// The parts of the prompt's start the next answer was asked with changed, as prefix_changed says them.
+	prefixChanged string
 
 	// A brain that could not start (no key yet) is tried again on the next line.
 	starting sync.Mutex
@@ -494,6 +496,7 @@ func (fm *manager) event(e vvagent.AgentEvent) {
 			fm.trace.Thought(thinking, nil)
 		}
 		fm.trace.Said(text, nil)
+		fm.noteUsage(m.Usage)
 		why := m.ErrorMessage
 		if why == "" {
 			why = "模型出错了"
@@ -505,6 +508,11 @@ func (fm *manager) event(e vvagent.AgentEvent) {
 		if m.StopReason == ai.StopError {
 			fm.core.Notice(protocol.NoticeLevelError, "管家出错了："+why)
 		}
+	case vvagent.EventPrefixChanged:
+		log.Printf("vibevalley: the manager's prompt start changed between compactions: %s", e.Reason)
+		fm.mu.Lock()
+		fm.prefixChanged = e.Reason
+		fm.mu.Unlock()
 	case vvagent.EventAgentSettled:
 		fm.settled()
 	case agentcore.EventToolExecutionStart:
@@ -516,6 +524,19 @@ func (fm *manager) event(e vvagent.AgentEvent) {
 		}
 		fm.trace.ToolEnded(e.ToolCallID, result, !e.IsError, nil)
 	}
+}
+
+// An answer that failed before any token came has none to tell.
+func (fm *manager) noteUsage(u ai.Usage) {
+	if u.Input == 0 && u.CacheRead == 0 && u.Output == 0 {
+		return
+	}
+	fm.mu.Lock()
+	changed := fm.prefixChanged
+	fm.prefixChanged = ""
+	fm.mu.Unlock()
+	tokens := managerTokens(u)
+	fm.trace.Usage(tokens, managerUsageText(tokens, changed), nil)
 }
 
 func (fm *manager) keyLocked() string {

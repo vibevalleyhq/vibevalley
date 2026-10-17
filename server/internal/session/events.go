@@ -378,6 +378,12 @@ func (j *journal) Note(kind protocol.SessionEventType, text string, from From) {
 	j.addLocked(protocol.SessionEvent{Type: kind, Text: text}, from)
 }
 
+func (j *journal) Usage(tokens protocol.EventTokens, text string, from From) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.addLocked(protocol.SessionEvent{Type: protocol.SessionEventTypeLLMUsage, Text: text, Tokens: &tokens}, from)
+}
+
 func (j *journal) Close() {
 	j.mu.Lock()
 	j.sealLocked()

@@ -183,7 +183,7 @@ func TestManagerDispatchesAndHearsVoiceInChat(t *testing.T) {
 		t.Fatalf("line %q", line)
 	}
 	trail := testkit.Await(t, "its log", func() ([]protocol.SessionEvent, bool) {
-		events := f.Session.Events(protocol.ManagerAgent, "")
+		events := slices.DeleteFunc(f.Session.Events(protocol.ManagerAgent, ""), func(e protocol.SessionEvent) bool { return e.Type == protocol.SessionEventTypeLLMUsage })
 		return events, len(events) >= 3 && events[len(events)-1].Type == protocol.SessionEventTypeAssistantMessage
 	})
 	last := trail[len(trail)-4:]

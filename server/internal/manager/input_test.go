@@ -169,3 +169,26 @@ func TestFarmNewsAndInstructionAreOneModelInput(t *testing.T) {
 		t.Fatalf("one input made %d model requests", got)
 	}
 }
+
+func TestEachAnswerLeavesItsTokensInTheLog(t *testing.T) {
+	w := managerOpen(t)
+	answer := ai.FauxAssistantMessage("收到")
+	answer.Usage = ai.Usage{Input: 8_900, CacheRead: 41_200, Output: 310, TotalTokens: 50_410}
+	w.faux.SetResponses(answer)
+	w.f.Manager.send("在吗", w.f.Channel.General(), true)
+	usage := testkit.Await(t, "the usage", func() (protocol.SessionEvent, bool) {
+		for _, e := range w.f.Session.Events(protocol.ManagerAgent, "") {
+			if e.Type == protocol.SessionEventTypeLLMUsage {
+				return e, true
+			}
+		}
+		return protocol.SessionEvent{}, false
+	})
+	testkit.Eq(t, *usage.Tokens, protocol.EventTokens{Input: 8_900, CacheRead: 41_200, Output: 310}, "tokens")
+	testkit.Eq(t, usage.Text, "缓存命中 82%：读缓存 41 200，没命中 8 900，输出 310", "text")
+}
+
+func TestUsageText(t *testing.T) {
+	testkit.Eq(t, managerUsageText(protocol.EventTokens{Input: 1_000, CacheRead: 1_000, Output: 1_234_567}, "memory,tools"), "缓存命中 50%：读缓存 1 000，没命中 1 000，输出 1 234 567；开头变了：记性、工具", "changed")
+	testkit.Eq(t, managerUsageText(protocol.EventTokens{Output: 12}, ""), "没报读了多少：输出 12", "no input")
+}

@@ -510,6 +510,7 @@ const (
 	SessionEventTypeToolCall          SessionEventType = "tool/call"
 	SessionEventTypeToolResult        SessionEventType = "tool/result"
 	SessionEventTypeLLMRetry          SessionEventType = "llm/retry"
+	SessionEventTypeLLMUsage          SessionEventType = "llm/usage"
 	SessionEventTypeRunError          SessionEventType = "run/error"
 	SessionEventTypeRunEnd            SessionEventType = "run/end"
 )
@@ -545,6 +546,15 @@ type SessionEvent struct {
 	Output *string          `json:"output,omitzero"`
 	Ok     *bool            `json:"ok,omitzero"`
 	On     *int64           `json:"on,omitzero"`
+	// On an llm/usage.
+	Tokens *EventTokens `json:"tokens,omitzero"`
+}
+
+// One model answer's tokens. Input is the part of the prompt not read from the cache.
+type EventTokens struct {
+	Input     int64 `json:"input"`
+	CacheRead int64 `json:"cacheRead"`
+	Output    int64 `json:"output"`
 }
 
 type NoticeLevel string
