@@ -279,3 +279,9 @@ final settingsProblemProvider = FutureProvider.autoDispose.family<String?, Strin
 
 /// Null until the server answers, and when nothing is wrong.
 String? watchSettingsProblem(WidgetRef ref, SettingsUpdate update) => ref.watch(settingsProblemProvider(jsonEncode(update.toJson()))).value;
+
+/// The issue a worker works: the server gives every worker one, and an issue's lifecycle (comment, changes, merge,
+/// cancel) is asked by it.
+extension WorkerIssue on Worker {
+  String get issueId => issue ?? (throw StateError('worker $id has no issue'));
+}

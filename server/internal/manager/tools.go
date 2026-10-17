@@ -540,7 +540,7 @@ func (fm *manager) tools() []agentcore.AgentTool {
 		Description: "看收获一个帮工会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者收获前想确认时用。",
 		Run: func(_ context.Context, p managerWorkerArgs, _ agent.ToolContext) (string, error) {
 			return withWorker(p.Worker, func(w worker.Roster) string {
-				c, err := fm.issue.Changes(w.Worker.ID)
+				c, err := fm.issue.Changes(w.Worker.ID, protocol.CallerManager)
 				if err != nil {
 					return "看不了改动：" + err.Error()
 				}

@@ -99,16 +99,16 @@ void main() {
     expect(routes.paths, contains('GET /api/trajectories/w1'));
     await tester.tap(find.text('叫停'));
     await settle(tester);
-    expect(routes.paths, contains('POST /api/workers/w1/stop'));
+    expect(routes.paths, contains('POST /api/sessions/w1/stop'));
     await tester.enterText(find.byType(EditableText).first, '先别动测试');
     await tester.pump();
     await tester.tap(find.text('浇水').last);
     await settle(tester);
-    expect(routes.calls.last.path, '/api/workers/w1/tell');
+    expect(routes.calls.last.path, '/api/issues/tw1/comment');
     expect(routes.calls.last.body, {'text': '先别动测试'});
     await tester.tap(find.text('请它收工'));
     await settle(tester);
-    expect(routes.paths, contains('POST /api/workers/w1/dismiss'));
+    expect(routes.paths, contains('POST /api/issues/tw1/cancel'));
     expect(c.read(selectedProvider), isNull);
     expect(find.text('小吴的地'), findsNothing);
     await tester.pump(const Duration(seconds: 3));
@@ -122,7 +122,7 @@ void main() {
     expect(find.text('失败：测试挂了'), findsOneWidget);
     await tester.tap(find.text('杀虫：接着修'));
     await settle(tester);
-    expect(routes.calls.last.path, '/api/workers/w2/tell');
+    expect(routes.calls.last.path, '/api/issues/tw2/comment');
     await tester.pump(const Duration(seconds: 3));
   });
 

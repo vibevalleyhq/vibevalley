@@ -82,7 +82,7 @@ func (m *merges) Resolve(id string) error {
 	}
 	conflict := worker.Conflict
 	if conflict == nil {
-		if changes, err := m.Changes(id); err == nil && changes != nil && len(changes.Conflicts) > 0 {
+		if changes, err := m.changes(id); err == nil && changes != nil && len(changes.Conflicts) > 0 {
 			conflict = &protocol.Conflict{Base: changes.Base, Files: changes.Conflicts}
 		}
 	}
@@ -93,16 +93,16 @@ func (m *merges) Resolve(id string) error {
 	return err
 }
 
-// Changes as the owner looks at them, which the game counts; the manager's look is Changes.
-func (m *merges) Review(id string) (*protocol.Changes, error) {
-	changes, err := m.Changes(id)
-	if err == nil && changes != nil {
+// Changes are what the worker's branch would bring; the game counts the owner's look, not the manager's.
+func (m *merges) Changes(id string, by protocol.Caller) (*protocol.Changes, error) {
+	changes, err := m.changes(id)
+	if err == nil && changes != nil && by == protocol.CallerOwner {
 		m.core.Did(core.OwnerDid{Kind: core.OwnerReviewed, Worker: id})
 	}
 	return changes, err
 }
 
-func (m *merges) Changes(id string) (*protocol.Changes, error) {
+func (m *merges) changes(id string) (*protocol.Changes, error) {
 	place, ok := m.workers.Place(id)
 	if !ok {
 		return nil, nil

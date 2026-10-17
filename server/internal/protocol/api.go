@@ -48,25 +48,28 @@ type Handlers interface {
 	//vibevalley:route manager.hear POST /api/manager/hear
 	//vibevalley:can owner remote
 	ManagerHear(ctx context.Context, body SayRequest) error
-	//vibevalley:route worker.tell POST /api/workers/{id}/tell
+	// To the issue's newest worker, as the owner: on is a step of its trajectory to comment on. A closed issue is refused: reopen it.
+	//vibevalley:route issue.comment POST /api/issues/{id}/comment
 	//vibevalley:can owner remote manager
-	WorkerTell(ctx context.Context, pID string, body TellRequest) error
-	//vibevalley:route worker.stop POST /api/workers/{id}/stop
+	IssueComment(ctx context.Context, pID string, body CommentRequest) error
+	//vibevalley:route issue.changes GET /api/issues/{id}/changes
 	//vibevalley:can owner remote manager
-	WorkerStop(ctx context.Context, pID string) error
-	//vibevalley:route worker.dismiss POST /api/workers/{id}/dismiss
+	IssueChanges(ctx context.Context, pID string) (Changes, error)
+	//vibevalley:route issue.merge POST /api/issues/{id}/merge
 	//vibevalley:can owner remote manager
-	WorkerDismiss(ctx context.Context, pID string) error
-	//vibevalley:route worker.merge POST /api/workers/{id}/merge
-	//vibevalley:can owner remote manager
-	WorkerMerge(ctx context.Context, pID string) error
-	// Tells the worker to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
-	//vibevalley:route worker.resolve POST /api/workers/{id}/resolve
+	IssueMerge(ctx context.Context, pID string) error
+	// Tells the newest worker to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
+	//vibevalley:route issue.resolve POST /api/issues/{id}/resolve
 	//vibevalley:can owner remote
-	WorkerResolve(ctx context.Context, pID string) error
-	//vibevalley:route worker.changes GET /api/workers/{id}/changes
+	IssueResolve(ctx context.Context, pID string) error
+	// Sends the newest worker home without merging: the issue closes as dismissed.
+	//vibevalley:route issue.cancel POST /api/issues/{id}/cancel
 	//vibevalley:can owner remote manager
-	WorkerChanges(ctx context.Context, pID string) (Changes, error)
+	IssueCancel(ctx context.Context, pID string) error
+	// Stops a session's turn; it stays, and a comment starts the next.
+	//vibevalley:route session.stop POST /api/sessions/{id}/stop
+	//vibevalley:can owner remote manager
+	SessionStop(ctx context.Context, pID string) error
 	//vibevalley:route trajectory.list GET /api/trajectories
 	//vibevalley:can owner remote
 	TrajectoryList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error)

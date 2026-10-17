@@ -2122,12 +2122,12 @@ var Endpoints = []Endpoint{
 	{"schedule.delete", "DELETE", "/api/schedules/{id}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"channel.update", "PUT", "/api/channels/{id}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"manager.hear", "POST", "/api/manager/hear", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"worker.tell", "POST", "/api/workers/{id}/tell", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"worker.stop", "POST", "/api/workers/{id}/stop", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"worker.dismiss", "POST", "/api/workers/{id}/dismiss", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"worker.merge", "POST", "/api/workers/{id}/merge", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"worker.resolve", "POST", "/api/workers/{id}/resolve", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"worker.changes", "GET", "/api/workers/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.comment", "POST", "/api/issues/{id}/comment", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.changes", "GET", "/api/issues/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.merge", "POST", "/api/issues/{id}/merge", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.resolve", "POST", "/api/issues/{id}/resolve", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.cancel", "POST", "/api/issues/{id}/cancel", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"session.stop", "POST", "/api/sessions/{id}/stop", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"trajectory.list", "GET", "/api/trajectories", []string{"agent"}, false, []Caller{CallerOwner, CallerRemote}},
 	{"trajectory.get", "GET", "/api/trajectories/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.list", "GET", "/api/issues", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2286,34 +2286,34 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		}
 		answer(w, nil, h.ManagerHear(r.Context(), body))
 	})
-	mux.HandleFunc("POST /api/workers/{id}/tell", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/issues/{id}/comment", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		var body TellRequest
+		var body CommentRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.WorkerTell(r.Context(), pID, body))
+		answer(w, nil, h.IssueComment(r.Context(), pID, body))
 	})
-	mux.HandleFunc("POST /api/workers/{id}/stop", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/issues/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		answer(w, nil, h.WorkerStop(r.Context(), pID))
-	})
-	mux.HandleFunc("POST /api/workers/{id}/dismiss", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		answer(w, nil, h.WorkerDismiss(r.Context(), pID))
-	})
-	mux.HandleFunc("POST /api/workers/{id}/merge", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		answer(w, nil, h.WorkerMerge(r.Context(), pID))
-	})
-	mux.HandleFunc("POST /api/workers/{id}/resolve", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		answer(w, nil, h.WorkerResolve(r.Context(), pID))
-	})
-	mux.HandleFunc("GET /api/workers/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		out, err := h.WorkerChanges(r.Context(), pID)
+		out, err := h.IssueChanges(r.Context(), pID)
 		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/issues/{id}/merge", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		answer(w, nil, h.IssueMerge(r.Context(), pID))
+	})
+	mux.HandleFunc("POST /api/issues/{id}/resolve", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		answer(w, nil, h.IssueResolve(r.Context(), pID))
+	})
+	mux.HandleFunc("POST /api/issues/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		answer(w, nil, h.IssueCancel(r.Context(), pID))
+	})
+	mux.HandleFunc("POST /api/sessions/{id}/stop", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		answer(w, nil, h.SessionStop(r.Context(), pID))
 	})
 	mux.HandleFunc("GET /api/trajectories", func(w http.ResponseWriter, r *http.Request) {
 		pAgent := query(r, "agent")
@@ -2833,30 +2833,30 @@ func (c *Client) ManagerHear(ctx context.Context, body SayRequest) error {
 	return c.call(ctx, "POST", "/api/manager/hear", nil, body, nil)
 }
 
-func (c *Client) WorkerTell(ctx context.Context, pID string, body TellRequest) error {
-	return c.call(ctx, "POST", "/api/workers/"+url.PathEscape(pID)+"/tell", nil, body, nil)
+func (c *Client) IssueComment(ctx context.Context, pID string, body CommentRequest) error {
+	return c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/comment", nil, body, nil)
 }
 
-func (c *Client) WorkerStop(ctx context.Context, pID string) error {
-	return c.call(ctx, "POST", "/api/workers/"+url.PathEscape(pID)+"/stop", nil, nil, nil)
-}
-
-func (c *Client) WorkerDismiss(ctx context.Context, pID string) error {
-	return c.call(ctx, "POST", "/api/workers/"+url.PathEscape(pID)+"/dismiss", nil, nil, nil)
-}
-
-func (c *Client) WorkerMerge(ctx context.Context, pID string) error {
-	return c.call(ctx, "POST", "/api/workers/"+url.PathEscape(pID)+"/merge", nil, nil, nil)
-}
-
-func (c *Client) WorkerResolve(ctx context.Context, pID string) error {
-	return c.call(ctx, "POST", "/api/workers/"+url.PathEscape(pID)+"/resolve", nil, nil, nil)
-}
-
-func (c *Client) WorkerChanges(ctx context.Context, pID string) (Changes, error) {
+func (c *Client) IssueChanges(ctx context.Context, pID string) (Changes, error) {
 	var out Changes
-	err := c.call(ctx, "GET", "/api/workers/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/issues/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
 	return out, err
+}
+
+func (c *Client) IssueMerge(ctx context.Context, pID string) error {
+	return c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/merge", nil, nil, nil)
+}
+
+func (c *Client) IssueResolve(ctx context.Context, pID string) error {
+	return c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/resolve", nil, nil, nil)
+}
+
+func (c *Client) IssueCancel(ctx context.Context, pID string) error {
+	return c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/cancel", nil, nil, nil)
+}
+
+func (c *Client) SessionStop(ctx context.Context, pID string) error {
+	return c.call(ctx, "POST", "/api/sessions/"+url.PathEscape(pID)+"/stop", nil, nil, nil)
 }
 
 func (c *Client) TrajectoryList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error) {

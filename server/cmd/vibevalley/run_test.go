@@ -25,7 +25,7 @@ func TestIssueRunWaitsForTheReview(t *testing.T) {
 		}
 		io.WriteString(w, `{"id":"t1","title":"x","priority":"medium","rank":1,"createdAt":1,"workers":["w1"],"status":"`+status+`"}`)
 	})
-	mux.HandleFunc("GET /api/workers/w1/changes", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/issues/t1/changes", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, `{"project":"demo","base":"main","commits":[],"files":[],"uncommitted":[],"conflicts":[],"behind":0}`)
 	})
 	srv := httptest.NewServer(mux)

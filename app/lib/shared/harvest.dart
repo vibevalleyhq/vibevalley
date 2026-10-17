@@ -7,6 +7,7 @@ import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 import '../data/providers.dart';
+import '../data/remote.dart' show WorkerIssue;
 import 'tags.dart';
 
 sealed class Loaded {
@@ -57,7 +58,7 @@ class _HarvestReviewState extends ConsumerState<HarvestReview> {
   void initState() {
     super.initState();
     final api = ref.read(apiProvider);
-    loadChanges(() => api.worker.changes(id: widget.worker.id)).then((l) {
+    loadChanges(() => api.issue.changes(id: widget.worker.issueId)).then((l) {
       if (mounted) setState(() => _loaded = l);
     });
   }

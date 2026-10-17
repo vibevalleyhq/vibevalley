@@ -206,7 +206,7 @@ void main() {
     expect(find.text('写接口'), findsNothing);
     await t.tap(find.text('让它解决冲突'));
     await settle(t);
-    expect(writes.single, startsWith('POST /api/workers/w4/resolve'));
+    expect(writes.single, startsWith('POST /api/issues/tw4/resolve'));
   });
 
   testWidgets('a card per job in its lane; a 待办 dragged into 处理中 is sent; a closed one reopened', (t) async {

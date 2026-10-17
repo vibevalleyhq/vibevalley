@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../shell/prefs.dart';
-import '../data/remote.dart' show agentsProvider;
+import '../data/remote.dart' show agentsProvider, WorkerIssue;
 import 'farm.dart';
 import 'state.dart';
 import '../rules/playbook.dart';
@@ -27,43 +27,45 @@ class FarmCommands {
 
   /// `on`: a comment on that step of its trajectory.
   Future<void> water(Worker w, String text, {int? on}) async {
-    await _api.worker.tell(
-      id: w.id,
-      body: TellRequest(text: text, on: on?.toDouble()),
+    await _api.issue.comment(
+      id: w.issueId,
+      body: CommentRequest(text: text, on: on?.toDouble()),
     );
     _burst(w, BedFxKind.water);
   }
 
   /// The server tells it what its conflicts are and to settle them.
   Future<void> resolve(Worker w) async {
-    await _api.worker.resolve(id: w.id);
+    await _api.issue.resolve(id: w.issueId);
     _burst(w, BedFxKind.water);
   }
 
   Future<void> cure(Worker w) async {
-    await _api.worker.tell(
-      id: w.id,
-      body: TellRequest(text: bugText(w.task)),
+    await _api.issue.comment(
+      id: w.issueId,
+      body: CommentRequest(text: bugText(w.task)),
     );
     _burst(w, BedFxKind.spray);
   }
 
   Future<void> harvest(Worker w) async {
-    await _api.worker.merge(id: w.id);
+    await _api.issue.merge(id: w.issueId);
     _burst(w, BedFxKind.harvest, '收进仓库');
   }
 
   Future<void> shovel(Worker w) async {
     if (w.phase is PhaseWorking) {
-      await _api.worker.stop(id: w.id);
+      await _api.session.stop(id: w.id);
     } else {
-      await _api.worker.dismiss(id: w.id);
+      await _api.issue.cancel(id: w.issueId);
     }
     _burst(w, BedFxKind.shovel);
   }
 
-  Future<void> stop(String id) => _api.worker.stop(id: id);
-  Future<void> dismiss(String id) => _api.worker.dismiss(id: id);
+  Future<void> stop(String id) => _api.session.stop(id: id);
+  Future<void> dismiss(String id) => _api.issue.cancel(id: _issueOf(id));
+
+  String _issueOf(String worker) => (_farm?.workers ?? const <Worker>[]).firstWhere((w) => w.id == worker).issueId;
 
   String? get pickedAgent {
     final pick = ref.read(prefsProvider).pick;

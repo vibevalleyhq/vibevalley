@@ -37,8 +37,10 @@ Worker worker(
   List<String> files = const [],
   List<String> commands = const [],
   String? says,
+  String? issue,
 }) => Worker(
   id: id,
+  issue: issue ?? 't$id',
   name: name,
   agent: agent,
   runtime: 'claude',

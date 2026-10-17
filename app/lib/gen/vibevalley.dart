@@ -3001,10 +3001,11 @@ class Run {
   };
 }
 
-class TellRequest {
-  const TellRequest({required this.text, this.on});
+class CommentRequest {
+  const CommentRequest({required this.text, this.on});
 
-  factory TellRequest.fromJson(Map<String, dynamic> j) => TellRequest(text: j['text'] as String, on: j['on'] == null ? null : (j['on'] as num).toDouble());
+  factory CommentRequest.fromJson(Map<String, dynamic> j) =>
+      CommentRequest(text: j['text'] as String, on: j['on'] == null ? null : (j['on'] as num).toDouble());
 
   final String text;
   final double? on;
@@ -5020,58 +5021,34 @@ class ScheduleApi {
   }
 }
 
-/// The `worker` endpoints of VibeValleyApi.
-class WorkerApi {
-  WorkerApi._(this._api);
-  final VibeValleyApi _api;
-
-  Future<void> tell({required String id, required TellRequest body}) async {
-    await _api._call('POST', '/api/workers/${Uri.encodeComponent((id).toString())}/tell', query: {}, body: body.toJson());
-  }
-
-  Future<void> stop({required String id}) async {
-    await _api._call('POST', '/api/workers/${Uri.encodeComponent((id).toString())}/stop', query: {}, body: null);
-  }
-
-  Future<void> dismiss({required String id}) async {
-    await _api._call('POST', '/api/workers/${Uri.encodeComponent((id).toString())}/dismiss', query: {}, body: null);
-  }
-
-  Future<void> merge({required String id}) async {
-    await _api._call('POST', '/api/workers/${Uri.encodeComponent((id).toString())}/merge', query: {}, body: null);
-  }
-
-  /// Tells the worker to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
-  Future<void> resolve({required String id}) async {
-    await _api._call('POST', '/api/workers/${Uri.encodeComponent((id).toString())}/resolve', query: {}, body: null);
-  }
-
-  Future<Changes> changes({required String id}) async {
-    final j = await _api._call('GET', '/api/workers/${Uri.encodeComponent((id).toString())}/changes', query: {}, body: null);
-    return Changes.fromJson(j as Map<String, dynamic>);
-  }
-}
-
-/// The `trajectory` endpoints of VibeValleyApi.
-class TrajectoryApi {
-  TrajectoryApi._(this._api);
-  final VibeValleyApi _api;
-
-  Future<List<TrajectoryHead>> list({String? agent}) async {
-    final j = await _api._call('GET', '/api/trajectories', query: {if (agent != null) 'agent': '${agent!}'}, body: null);
-    return [for (final e in j as List) TrajectoryHead.fromJson(e as Map<String, dynamic>)];
-  }
-
-  Future<Trajectory> get({required String id}) async {
-    final j = await _api._call('GET', '/api/trajectories/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
-    return Trajectory.fromJson(j as Map<String, dynamic>);
-  }
-}
-
 /// The `issue` endpoints of VibeValleyApi.
 class IssueApi {
   IssueApi._(this._api);
   final VibeValleyApi _api;
+
+  /// To the issue's newest worker, as the owner: on is a step of its trajectory to comment on. A closed issue is refused: reopen it.
+  Future<void> comment({required String id, required CommentRequest body}) async {
+    await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/comment', query: {}, body: body.toJson());
+  }
+
+  Future<Changes> changes({required String id}) async {
+    final j = await _api._call('GET', '/api/issues/${Uri.encodeComponent((id).toString())}/changes', query: {}, body: null);
+    return Changes.fromJson(j as Map<String, dynamic>);
+  }
+
+  Future<void> merge({required String id}) async {
+    await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/merge', query: {}, body: null);
+  }
+
+  /// Tells the newest worker to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
+  Future<void> resolve({required String id}) async {
+    await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/resolve', query: {}, body: null);
+  }
+
+  /// Sends the newest worker home without merging: the issue closes as dismissed.
+  Future<void> cancel({required String id}) async {
+    await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/cancel', query: {}, body: null);
+  }
 
   Future<List<Issue>> list() async {
     final j = await _api._call('GET', '/api/issues', query: {}, body: null);
@@ -5121,6 +5098,33 @@ class IssueApi {
   Future<Dispatched> reopen({required String id, required ReopenRequest body}) async {
     final j = await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/reopen', query: {}, body: body.toJson());
     return Dispatched.fromJson(j as Map<String, dynamic>);
+  }
+}
+
+/// The `session` endpoints of VibeValleyApi.
+class SessionApi {
+  SessionApi._(this._api);
+  final VibeValleyApi _api;
+
+  /// Stops a session's turn; it stays, and a comment starts the next.
+  Future<void> stop({required String id}) async {
+    await _api._call('POST', '/api/sessions/${Uri.encodeComponent((id).toString())}/stop', query: {}, body: null);
+  }
+}
+
+/// The `trajectory` endpoints of VibeValleyApi.
+class TrajectoryApi {
+  TrajectoryApi._(this._api);
+  final VibeValleyApi _api;
+
+  Future<List<TrajectoryHead>> list({String? agent}) async {
+    final j = await _api._call('GET', '/api/trajectories', query: {if (agent != null) 'agent': '${agent!}'}, body: null);
+    return [for (final e in j as List) TrajectoryHead.fromJson(e as Map<String, dynamic>)];
+  }
+
+  Future<Trajectory> get({required String id}) async {
+    final j = await _api._call('GET', '/api/trajectories/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
+    return Trajectory.fromJson(j as Map<String, dynamic>);
   }
 }
 
@@ -5448,9 +5452,9 @@ class VibeValleyApi {
   late final setting = SettingApi._(this);
   late final channel = ChannelApi._(this);
   late final schedule = ScheduleApi._(this);
-  late final worker = WorkerApi._(this);
-  late final trajectory = TrajectoryApi._(this);
   late final issue = IssueApi._(this);
+  late final session = SessionApi._(this);
+  late final trajectory = TrajectoryApi._(this);
   late final playbook = PlaybookApi._(this);
   late final game = GameApi._(this);
   late final runtime = RuntimeApi._(this);

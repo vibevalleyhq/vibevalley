@@ -185,7 +185,7 @@ void main() {
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
-      overrides: overrides(farm(workers: [w]), view(), fakeApi(routes, {'GET /api/workers/w3/changes': changes})),
+      overrides: overrides(farm(workers: [w]), view(), fakeApi(routes, {'GET /api/issues/tw3/changes': changes})),
     );
     c.read(reviewingProvider.notifier).set('w3');
     await settle(tester);
@@ -197,7 +197,7 @@ void main() {
     expect(find.text('+body { color: #fff }'), findsOneWidget);
     await tester.tap(find.text('确认收获，合进 main'));
     await settle(tester);
-    expect(routes.calls.last.path, '/api/workers/w3/merge');
+    expect(routes.calls.last.path, '/api/issues/tw3/merge');
     expect(c.read(reviewingProvider), isNull);
     await tester.pump(const Duration(seconds: 3));
   });
@@ -212,7 +212,7 @@ void main() {
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
-      overrides: overrides(farm(workers: [w]), view(), fakeApi(routes, {'GET /api/workers/w3/changes': conflicted})),
+      overrides: overrides(farm(workers: [w]), view(), fakeApi(routes, {'GET /api/issues/tw3/changes': conflicted})),
     );
     c.read(reviewingProvider.notifier).set('w3');
     await settle(tester);
@@ -221,7 +221,7 @@ void main() {
     await tester.tap(find.text('让它解决冲突'));
     await settle(tester);
     // The server tells it which conflicts (ConflictTask).
-    expect(routes.calls.last.path, '/api/workers/w3/resolve');
+    expect(routes.calls.last.path, '/api/issues/tw3/resolve');
     await tester.pump(const Duration(seconds: 3));
   });
 

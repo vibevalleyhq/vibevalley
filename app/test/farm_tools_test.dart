@@ -49,7 +49,7 @@ void main() {
     final (c, routes) = await setUpFarm();
     expect(await use(c, Tool.water, 0), isA<ToolWater>());
     expect(await use(c, Tool.bug, 1), isA<ToolDone>());
-    expect(routes.paths, ['POST /api/workers/w2/tell']);
+    expect(routes.paths, ['POST /api/issues/tw2/comment']);
     expect(routes.calls.single.body, {'text': '接着修：修登录。看一下报错，修好再跑一遍测试'});
     expect(c.read(bedFxProvider).single.kind, BedFxKind.spray);
     expect(c.read(bedFxProvider).single.bed, 1);
@@ -65,7 +65,7 @@ void main() {
     final (c, routes) = await setUpFarm();
     await use(c, Tool.shovel, 0);
     await use(c, Tool.shovel, 2);
-    expect(routes.paths, ['POST /api/workers/w1/stop', 'POST /api/workers/w3/dismiss']);
+    expect(routes.paths, ['POST /api/sessions/w1/stop', 'POST /api/issues/tw3/cancel']);
     expect(c.read(bedFxProvider).map((f) => f.kind), [BedFxKind.shovel, BedFxKind.shovel]);
   });
 

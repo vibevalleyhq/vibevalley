@@ -131,7 +131,7 @@
 
 **项目**（`project/project.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-10-projects-worktrees-and-harvest.md)）：工作目录下的每个文件夹是一个项目。派到不存在的项目就新建（`git init -b main`、`.gitignore`、初始提交）。每个帮工在 `<工作目录>/.worktrees/` 下有自己的 worktree，分支 `vibevalley/<帮工>-<时间>`。同一个项目里改仓库的操作一个一个来。
 
-**收成清单**（`GET /api/workers/{id}/changes`）：提交、改的文件和 diff、没提交的、主分支多了几个提交、会不会冲突（`git merge-tree`，不碰工作区）。
+**收成清单**（`GET /api/issues/{id}/changes`，看的是这张工单最新的帮工）：提交、改的文件和 diff、没提交的、主分支多了几个提交、会不会冲突（`git merge-tree`，不碰工作区）。
 
 **收获**：
 

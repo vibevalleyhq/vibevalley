@@ -29,6 +29,15 @@ func refused(err error) error {
 
 func missing(what string) error { return protocol.Missing{What: what} }
 
+// latest is the issue's newest worker, which must still be on the farm.
+func (a api) latest(issue string) (string, error) {
+	worker, err := a.f.Issue.Latest(issue)
+	if err != nil {
+		return "", err
+	}
+	return worker, a.worker(worker)
+}
+
 func (a api) worker(id string) error {
 	if a.f.Worker.Find(id) == nil {
 		return missing("帮工 " + id)
@@ -99,58 +108,75 @@ func (a api) ManagerHear(_ context.Context, body protocol.SayRequest) error {
 	return nil
 }
 
-func (a api) WorkerTell(_ context.Context, id string, body protocol.TellRequest) error {
-	if err := a.worker(id); err != nil {
+func (a api) IssueComment(_ context.Context, id string, body protocol.CommentRequest) error {
+	issue, err := a.f.Issue.Get(id)
+	if err != nil {
+		return err
+	}
+	if issue.Status == protocol.IssueStatusDone || issue.Status == protocol.IssueStatusCanceled {
+		return protocol.Refused{Reason: "这张工单关上了：带一句话重开它"}
+	}
+	worker, err := a.f.Issue.Latest(id)
+	if err != nil {
 		return err
 	}
 	text := body.Text
 	if body.On != nil {
-		var err error
-		if text, err = a.f.Worker.Comment(id, *body.On, body.Text); err != nil {
+		if text, err = a.f.Worker.Comment(worker, *body.On, body.Text); err != nil {
 			return err
 		}
 	}
-	_, err := a.f.Channel.TellWorker("user", id, text)
+	_, err = a.f.Channel.TellWorker("user", worker, text)
 	return refused(err)
 }
 
-func (a api) WorkerStop(_ context.Context, id string) error {
+func (a api) IssueChanges(_ context.Context, id string) (protocol.Changes, error) {
+	worker, err := a.f.Issue.Latest(id)
+	if err != nil {
+		return protocol.Changes{}, err
+	}
+	changes, err := a.f.Issue.Changes(worker, protocol.CallerOwner)
+	if err != nil {
+		return protocol.Changes{}, refused(err)
+	}
+	if changes == nil {
+		return protocol.Changes{}, missing("帮工 " + worker)
+	}
+	return *changes, nil
+}
+
+func (a api) IssueMerge(_ context.Context, id string) error {
+	worker, err := a.latest(id)
+	if err != nil {
+		return err
+	}
+	a.f.Issue.Merge(worker)
+	return nil
+}
+
+func (a api) IssueResolve(_ context.Context, id string) error {
+	worker, err := a.f.Issue.Latest(id)
+	if err != nil {
+		return err
+	}
+	return refused(a.f.Issue.Resolve(worker))
+}
+
+func (a api) IssueCancel(_ context.Context, id string) error {
+	worker, err := a.latest(id)
+	if err != nil {
+		return err
+	}
+	a.f.Worker.Dismiss(worker)
+	return nil
+}
+
+func (a api) SessionStop(_ context.Context, id string) error {
 	if err := a.worker(id); err != nil {
 		return err
 	}
 	a.f.Worker.Stop(id)
 	return nil
-}
-
-func (a api) WorkerDismiss(_ context.Context, id string) error {
-	if err := a.worker(id); err != nil {
-		return err
-	}
-	a.f.Worker.Dismiss(id)
-	return nil
-}
-
-func (a api) WorkerMerge(_ context.Context, id string) error {
-	if err := a.worker(id); err != nil {
-		return err
-	}
-	a.f.Issue.Merge(id)
-	return nil
-}
-
-func (a api) WorkerResolve(_ context.Context, id string) error {
-	return refused(a.f.Issue.Resolve(id))
-}
-
-func (a api) WorkerChanges(_ context.Context, id string) (protocol.Changes, error) {
-	changes, err := a.f.Issue.Review(id)
-	if err != nil {
-		return protocol.Changes{}, refused(err)
-	}
-	if changes == nil {
-		return protocol.Changes{}, missing("帮工 " + id)
-	}
-	return *changes, nil
 }
 
 

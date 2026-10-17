@@ -48,7 +48,7 @@ func issueRun(ctx context.Context, raw []string) error {
 		}
 		switch issue.Status {
 		case protocol.IssueStatusInReview, protocol.IssueStatusDone, protocol.IssueStatusCanceled:
-			changes, err := c.WorkerChanges(ctx, *got.Worker)
+			changes, err := c.IssueChanges(ctx, id)
 			if err != nil {
 				return err
 			}

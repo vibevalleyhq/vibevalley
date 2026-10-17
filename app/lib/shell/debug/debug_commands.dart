@@ -3,6 +3,7 @@ import 'dart:isolate';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
+import '../../data/remote.dart' show WorkerIssue;
 import '../../gen/vibevalley.dart';
 import '../fx_layer.dart';
 import '../sfx.dart';
@@ -43,13 +44,15 @@ class Hb {
 
   Future<void> hear(String text) => _api.channel.say(body: SayRequest(text: text));
 
-  Future<void> tell(String id, String text) => _api.worker.tell(
-    id: id,
-    body: TellRequest(text: text),
+  Future<void> tell(String id, String text) => _api.issue.comment(
+    id: _issueOf(id),
+    body: CommentRequest(text: text),
   );
-  Future<void> stop(String id) => _api.worker.stop(id: id);
-  Future<void> dismiss(String id) => _api.worker.dismiss(id: id);
-  Future<void> harvest(String id) => _api.worker.merge(id: id);
+  Future<void> stop(String id) => _api.session.stop(id: id);
+  Future<void> dismiss(String id) => _api.issue.cancel(id: _issueOf(id));
+  Future<void> harvest(String id) => _api.issue.merge(id: _issueOf(id));
+
+  String _issueOf(String worker) => (ref.read(farmProvider)?.workers ?? const <Worker>[]).firstWhere((w) => w.id == worker).issueId;
 
   Future<void> everyone(String action) async {
     for (final h in ref.read(farmProvider)?.workers ?? const <Worker>[]) {

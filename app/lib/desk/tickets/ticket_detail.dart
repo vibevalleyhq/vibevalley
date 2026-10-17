@@ -54,7 +54,7 @@ class _CloseTicketState extends ConsumerState<CloseTicket> {
               working ? '叫停并收工' : '不收，直接收工',
               tone: PxTone.danger,
               onPressed: () async {
-                await deskRun(() => ref.read(apiProvider).worker.dismiss(id: worker.id));
+                await deskRun(() => ref.read(apiProvider).issue.cancel(id: worker.issueId));
                 done();
               },
             ),
@@ -348,7 +348,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
   /// `first` from initState, before any build.
   void _askChanges({bool first = false}) {
     if (widget.state != TicketState.waiting || widget.worker == null) return;
-    final asked = ref.read(apiProvider).worker.changes(id: widget.workers.last.id).then<Changes?>((c) => c, onError: (Object _) => null);
+    final asked = ref.read(apiProvider).issue.changes(id: widget.issue.id).then<Changes?>((c) => c, onError: (Object _) => null);
     if (first) {
       _changes = asked;
     } else {
@@ -426,7 +426,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
         PxButton.text(
           '叫停这一轮',
           size: PxSize.sm,
-          onPressed: busy ? null : () => _act(() => _api.worker.stop(id: h.id)),
+          onPressed: busy ? null : () => _act(() => _api.session.stop(id: h.id)),
         ),
         PxButton.text('关上', size: PxSize.sm, tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
         ?bed,

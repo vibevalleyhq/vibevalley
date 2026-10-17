@@ -56,28 +56,15 @@
 | `schedule.update` | `PUT /api/schedules/{id}` | ✓ | ✓ |  |  |
 | `schedule.delete` | `DELETE /api/schedules/{id}` | ✓ | ✓ | ✓ |  |
 
-## worker
-
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
-|---|---|---|---|---|---|
-| `worker.tell` | `POST /api/workers/{id}/tell` | ✓ | ✓ | ✓ |  |
-| `worker.stop` | `POST /api/workers/{id}/stop` | ✓ | ✓ | ✓ |  |
-| `worker.dismiss` | `POST /api/workers/{id}/dismiss` | ✓ | ✓ | ✓ |  |
-| `worker.merge` | `POST /api/workers/{id}/merge` | ✓ | ✓ | ✓ |  |
-| `worker.resolve` | `POST /api/workers/{id}/resolve` | ✓ | ✓ |  |  |
-| `worker.changes` | `GET /api/workers/{id}/changes` | ✓ | ✓ | ✓ |  |
-
-## trajectory
-
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
-|---|---|---|---|---|---|
-| `trajectory.list` | `GET /api/trajectories` | ✓ | ✓ |  |  |
-| `trajectory.get` | `GET /api/trajectories/{id}` | ✓ | ✓ |  |  |
-
 ## issue
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
+| `issue.comment` | `POST /api/issues/{id}/comment` | ✓ | ✓ | ✓ |  |
+| `issue.changes` | `GET /api/issues/{id}/changes` | ✓ | ✓ | ✓ |  |
+| `issue.merge` | `POST /api/issues/{id}/merge` | ✓ | ✓ | ✓ |  |
+| `issue.resolve` | `POST /api/issues/{id}/resolve` | ✓ | ✓ |  |  |
+| `issue.cancel` | `POST /api/issues/{id}/cancel` | ✓ | ✓ | ✓ |  |
 | `issue.list` | `GET /api/issues` | ✓ | ✓ |  |  |
 | `issue.get` | `GET /api/issues/{id}` | ✓ | ✓ |  |  |
 | `issue.runs` | `GET /api/issues/{id}/runs` | ✓ | ✓ |  |  |
@@ -88,6 +75,19 @@
 | `issue.unqueue` | `POST /api/issues/{id}/unqueue` | ✓ | ✓ |  |  |
 | `issue.start` | `POST /api/issues/{id}/start` | ✓ | ✓ | ✓ |  |
 | `issue.reopen` | `POST /api/issues/{id}/reopen` | ✓ | ✓ |  |  |
+
+## session
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `session.stop` | `POST /api/sessions/{id}/stop` | ✓ | ✓ | ✓ |  |
+
+## trajectory
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `trajectory.list` | `GET /api/trajectories` | ✓ | ✓ |  |  |
+| `trajectory.get` | `GET /api/trajectories/{id}` | ✓ | ✓ |  |  |
 
 ## playbook
 

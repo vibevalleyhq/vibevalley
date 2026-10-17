@@ -207,6 +207,18 @@ func (is *issues) Get(id string) (protocol.Issue, error) {
 	return issueOf(row, runs, is.core.State()), nil
 }
 
+// Latest is the issue's newest worker, the one its merge, changes, comments and cancel act on; a reopen makes another.
+func (is *issues) Latest(id string) (string, error) {
+	issue, err := is.Get(id)
+	if err != nil {
+		return "", err
+	}
+	if len(issue.Workers) == 0 {
+		return "", protocol.Refused{Reason: "这张工单还没开工"}
+	}
+	return issue.Workers[len(issue.Workers)-1], nil
+}
+
 func (is *issues) unsent(id string) (protocol.Issue, error) {
 	issue, err := is.Get(id)
 	if err != nil {

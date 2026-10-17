@@ -1184,7 +1184,7 @@ type Run struct {
 	Spent     *Spent   `json:"spent,omitzero"`
 }
 
-type TellRequest struct {
+type CommentRequest struct {
 	Text string `json:"text"`
 	On   *int64 `json:"on,omitzero"`
 }

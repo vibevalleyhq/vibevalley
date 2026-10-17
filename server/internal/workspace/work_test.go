@@ -651,7 +651,7 @@ func TestChangesBeforeAMerge(t *testing.T) {
 	w := openWorld(t, home, work)
 	worker := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "写打卡并提交", "preview", worker.HireOptions{}))
 	w.nextReport(t)
-	changes, err := w.f.Issue.Changes(worker.ID)
+	changes, err := w.f.Issue.Changes(worker.ID, protocol.CallerManager)
 	if err != nil || changes == nil {
 		t.Fatalf("changes: %v", err)
 	}
@@ -677,7 +677,7 @@ func TestConflictingBranchStaysUntilResolved(t *testing.T) {
 	w.nextReport(t)
 	w.nextReport(t)
 	testkit.Match(t, w.f.Issue.Merge(a.ID), `个提交合进了 clash 的 main`, "first")
-	preview, _ := w.f.Issue.Changes(b.ID)
+	preview, _ := w.f.Issue.Changes(b.ID, protocol.CallerManager)
 	testkit.Eq(t, preview.Conflicts, []string{"same.ts"}, "the preview saw it coming")
 	testkit.Match(t, w.f.Issue.Merge(b.ID), `会冲突（same\.ts）`, "second")
 	stayed := w.f.Worker.Find(b.ID)

@@ -27,12 +27,12 @@
 | 管家 | 管家 | `/manager`（`desk/manager`） | `CoreState.Manager`（管家的状态） | `/api/say`、`/api/manager/...` |
 | 工单 | 看板上的卡片 | `/tickets`（`desk/tickets`） | `Issue`、`Issue.Workers`（这张工单用过的帮工） | `/api/issues` |
 | 种植计划 | 图纸桌、计划板 | `farm/plans.dart` | `Playbook`（从父工单拼回，`StateFrame.Plans`） | `/api/playbooks` |
-| 帮工 | 地里干活的小动物 | 地块和地块详情（`farm/plot_detail.dart`） | `Worker`（`CoreState.Workers`） | `/api/workers/{id}/...` |
+| 帮工 | 地里干活的小动物 | 地块和地块详情（`farm/plot_detail.dart`） | `Worker`（`CoreState.Workers`） | `/api/sessions/{id}/stop`；别的按工单：`/api/issues/{id}/...` |
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Worker.Phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `FactRun` 到 `FactReport`、`Worker.Runs`、`LastRun` | `/api/issues/{id}/runs` |
 | 干活过程 | 干活过程 | `farm/work_log.dart` | `Activity`、`Trajectory`、`TrajectoryHead` | `/api/trajectories` |
-| 收成清单、收获 | 收获 | `shared/harvest.dart` | `Changes` | `/api/workers/{id}/changes`、`/api/workers/{id}/merge` |
+| 收成清单、收获 | 收获 | `shared/harvest.dart` | `Changes` | `/api/issues/{id}/changes`、`/api/issues/{id}/merge` |
 | 田头、频道 | 田头 | 田头窗口（`farm/chat_window.dart`）、`/chat`（`desk/chat`） | `Conversation`（`kind`：`square`、`channel`）、`ChatMessage`、`CoreState.Chat` | `/api/channels`、`/api/channels/{id}/messages` |
-| 工单串、评论 | 工单串 | 派活消息下面的串；干活过程里的「评论」 | `Conversation`（`kind: thread`）；评论某一步是 `worker.CommentText` 拼出来的一句话 | `/api/channels/{id}/messages`、`/api/workers/{id}/tell` |
+| 工单串、评论 | 工单串 | 派活消息下面的串；干活过程里的「评论」 | `Conversation`（`kind: thread`）；评论某一步是 `worker.CommentText` 拼出来的一句话 | `/api/channels/{id}/messages`、`/api/issues/{id}/comment` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Schedule`；它的工单是 `Issue.Schedule` 指着它的那张 | `/api/schedules` |
 | 来电 | 手机来电 | `phone/calls.dart` | `InboxItem`（`StateFrame.Inbox`，从核心状态现算） | |
 | 连接器 | 连接器 | `/connectors`（`desk/connectors`） | `ConnectorStatus` | `/api/connectors` |
