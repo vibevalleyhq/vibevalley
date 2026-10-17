@@ -17,7 +17,7 @@ Status: implemented
 
 ## Decision
 
-- **两个来源**：一份 YAML（`$VIBEVALLEY_HOME/vibevalley.yaml`，或 `--config` 给的文件）和环境变量。由 [viper](https://github.com/spf13/viper) 读，优先级从低到高：默认值、YAML、环境变量。环境变量名是 `VIBEVALLEY_` 加上键名，点和横线换成下划线（`manager.model` → `VIBEVALLEY_MANAGER_MODEL`）。
+- **两个来源**：一份 YAML（`$VIBEVALLEY_HOME/vibevalley.yaml`，或 `--config` 给的文件）和环境变量。由 [viper](https://github.com/spf13/viper) 读，优先级从低到高：默认值、YAML、环境变量。环境变量名是 `VIBEVALLEY_` 加上键名，点和横线换成下划线（`session.stall_seconds` → `VIBEVALLEY_SESSION_STALL_SECONDS`）。
 - **家目录不在 YAML 里**：YAML 在家目录里，所以家目录只由 `VIBEVALLEY_HOME` 或默认值（`~/.vibevalley`）定。
 - **三个外家的名字照旧**：`DEEPSEEK_API_KEY`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE` 是那几家自己的约定，绑定到 `deepseek.api_key`、`agora.app_id`、`agora.app_certificate`，YAML 里也能写。
 - **一个有类型的 `base.Config`**：开机读一次（`base.LoadConfig`），经 fx 交给服务；服务只读它的字段，不调 `os.Getenv`。`base.Defaults()` 是全部默认值的唯一出处，零就是零：端口 0 是随便一个，`patrol.heartbeat_minutes` 0 是关掉。测试从 `base.ConfigAt(home, work, db)` 出发再改字段，不用 `t.Setenv`。
@@ -33,7 +33,6 @@ work_root: ~/vibevalley-work
 db: ""                  # 空：家目录的 vibevalley.db；memory：内存
 host: 127.0.0.1
 port: 8787
-manager: { runtime: "", model: "" }
 agent: { model: "" }    # cmd/vibevalley 单独跑时
 deepseek: { api_key: "" }
 agora: { app_id: "", app_certificate: "" }
@@ -44,9 +43,8 @@ tokei: ""
 cny_per_usd: 0
 patrol: { heartbeat_minutes: 0 }
 schedule: { tick_ms: 0 }
-worker: { stall_seconds: 0 }
-project: { max_workers: 0 }
-trajectory: { days: 0 }
+session: { stall_seconds: 0, trajectory_days: 0 }
+project: { max_sessions: 0 }
 chat: { notice_batch_ms: 0, retry_wake_ms: 0 }
 ```
 

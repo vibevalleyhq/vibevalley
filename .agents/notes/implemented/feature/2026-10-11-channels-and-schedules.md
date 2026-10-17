@@ -99,6 +99,6 @@ VibeValley 已经有了 Raft 那一半的大部分（田头、串、@、投递�
 ## Verification
 
 - 频道：`server/internal/channel/chat_test.go` 的 `TestChatChannels`；protocol 的 `chat_rules_test.go`（`TestAudienceInAChannel`、`TestChannelsInTheChat`、`TestChannelNameProblem`）。
-- 定时和巡查：`server/internal/game/ledger_test.go` 的 `TestPlanSchedules`、`TestPlanHeartbeat`，`schedule/env_test.go`；protocol 的 `schedule_rules_test.go`、`patrol_rules_test.go`。测试里换掉服务的时钟（`Schedules.Now`、`Heartbeat.Now`），不等真的时间。
+- 定时和巡查：`server/internal/schedule/schedule_test.go`、`rules_test.go`，protocol 的 `schedule_rules_test.go`，`server/internal/manager/patrol_test.go`。测试里换掉服务的时钟（`Schedule.Now`、`Manager.PatrolNow`），不等真的时间。
 - 连接器：`server/internal/connector/connector_test.go`（配对、只认主人、发件表和补发，`TestConnectorsWeixinInAnotherChannel` 接到别的频道）、`connector/feishu_test.go`。
 - 聊天页：`app/test/chat_test.dart`（频道和未读、频道里说话、串、定时的开关和删）。

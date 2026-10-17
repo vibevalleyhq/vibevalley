@@ -4,7 +4,7 @@
 
 ## 管家
 
-管家是 VibeValley 自己的 agent（`server/pkg/agent`；`manager/manager.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-12-own-agent-on-effect.md)），带管家的提示词和工具，第一句话到了才起来。它没有读写文件、跑命令的工具，自己不写代码。
+管家是 VibeValley 自己的 agent（`server/pkg/agent`；`manager/manager.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-12-own-agent.md)），带管家的提示词和工具，第一句话到了才起来。它没有读写文件、跑命令的工具，自己不写代码。
 
 - **模型**：只接 DeepSeek，在管家的档案里（档案 `manager`，每个农场都有、删不了、只在 VibeValley 自己的 agent 上跑；`vibevalley agent save manager --json …` 改，管家下次开口时用上），没写是 `deepseek-flash`。钥匙先取首页「设置」，再取配置的 `deepseek.api_key`（`DEEPSEEK_API_KEY`）；每次请求前现取。都没有时它在田头说起不来。
 - **对话**：存在 `manager/manager.jsonl`，太长时把早先的压成摘要，原文归档在 `manager/archive/`。

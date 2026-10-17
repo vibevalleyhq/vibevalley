@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-- 核心状态存在 `$VIBEVALLEY_HOME/state.json`（写入合并 0.5 秒，先写临时文件再改名；田头、进度、定时和工单除外，它们的家是数据库 `vibevalley.db`，开机放回核心状态）；管家的会话在 `manager/`；每个帮工的会话 id、worktree 目录、最后一轮原话和这个会话已经想起过的记性在 `workers.json`（接回原会话时不再提一遍；接不上、另开新会话时重新想起）；干活过程在 `steps/`。
+- 核心状态存在 `$VIBEVALLEY_HOME/state.json`（写入合并 0.5 秒，先写临时文件再改名；田头、进度、定时和工单除外，它们的家是数据库 `vibevalley.db`，开机放回核心状态）；管家的会话在 `manager/`；每个帮工的会话 id、worktree 目录、最后一轮原话和这个会话已经想起过的记性在 `sessions.json`（接回原会话时不再提一遍；接不上、另开新会话时重新想起）；干活过程在 `events/<会话 id>.json`。
 - 重启后帮工回到各自的地上，会话先不打开。有人带话时，smith（oar 的 Go 移植）按会话 id 接着原来的会话开新一轮；接不上就在同一个 worktree 里新开会话，并告诉它看 git log。收获、收工不需要会话。
 - 重启时正在干的那一轮记成「VibeValley 重启了，这一轮停在了半路」，帮工歇着，发一条提醒；worktree 不见了的不接回来。
 - 帮工编号接着以前的往下排，不会撞上旧的干活过程。
@@ -21,8 +21,8 @@ Status: implemented
 
 ## Consequences
 
-重启对主人几乎透明，花一句话就能接着干。代价是要维护两个持久化文件和它们之间的对应（`state.json` 里有、`workers.json` 里没有的帮工会被请走）。
+重启对主人几乎透明，花一句话就能接着干。代价是要维护两个持久化文件和它们之间的对应（`state.json` 里有、`sessions.json` 里没有的帮工会被请走）。
 
 ## Verification
 
-`server/internal/workspace/work_test.go` 的 `TestCrewRestartHelpersComeBackResting`：第一次运行雇一个帮工并提交，第二次运行它在地里、带话能接着干、能收获。
+`server/internal/workspace/work_test.go` 的 `TestRestartSessionsComeBackResting`：第一次运行雇一个帮工并提交，第二次运行它在地里、带话能接着干、能收获。

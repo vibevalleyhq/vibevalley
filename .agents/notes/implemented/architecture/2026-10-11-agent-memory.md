@@ -11,9 +11,9 @@ Status: implemented
 行为见 [server.md](../../../../docs/reference/server.md)「记性」，帮工页上的样子见 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「捏帮工」。
 
 - **记性跟着 agent 走**：键是帮工档案的 id，从它派出去的帮工共用一份，跨项目、跨重启。存在服务端数据库的 `memory` 表里（`server/migrations/0001_schema.sql`），不放核心状态：页面只在打开帮工页时读，用不着每个事实都带着它。
-- **一层服务，两个口子**：`Memories` 服务（`server/internal/memory/memory.go`）对帮工的会话（`session/sessions.go`）只露 `Recall`（一轮开始前，给一个线索：哪个 agent、哪个帮工、哪个项目、这一轮的话）和 `Keep`（一轮结束后，给整轮：工单、结局、原话、结论）。`crew.go` 不知道记性存在哪、怎么挑。页面用同一个服务的 `List`、`Write`、`Forget`。换一种存法（向量检索、外面的记忆服务）就是同一个服务的另一种实现。
-- **想起**：帮工每开新的一轮（刚派出去、被叫醒、做完一轮又被带话）时，`crew.go` 把挑出来的几条用「【你记得的】」开头放在输入前面，和输入隔一条分隔线（`runs.JobBreak`）。干活中途插的话不想起。`session/facts.go` 从输入里认出这一段，干活过程里先记工单、再记一步「想起了」。同一个会话里想起过的不再给：想起过哪些存在 `workers.json`，服务端重启、接回原会话也不再给；原会话接不上、另开新会话时重新想起。
-- **挑法是纯函数，不调模型**（`server/internal/protocol/recall.go` 的 `Pick`；帮工页经 `GET /api/agents/{id}/recall` 问服务端下回开工会想起什么，不计成想起过，[客户端问服务端](2026-10-16-the-client-asks-the-server.md)）：记下的话先于做过的活，这个项目先于所有项目，别的项目的话要和这一轮的话共有三个以上的词才算，做过的活只算这个项目的、最多三件；再按共有的词和新旧排，最多 8 条、1600 字。词是拉丁字母的词和相邻的两个汉字。
+- **一层服务，两个口子**：`Memories` 服务（`server/internal/memory/memory.go`）对帮工的会话（`session/sessions.go`）只露 `Recall`（一轮开始前，给一个线索：哪个 agent、哪个帮工、哪个项目、这一轮的话）和 `Keep`（一轮结束后，给整轮：工单、结局、原话、结论）。`session/sessions.go` 不知道记性存在哪、怎么挑。页面用同一个服务的 `List`、`Write`、`Forget`。换一种存法（向量检索、外面的记忆服务）就是同一个服务的另一种实现。
+- **想起**：帮工每开新的一轮（刚派出去、被叫醒、做完一轮又被带话）时，`session/sessions.go` 把挑出来的几条用「【你记得的】」开头放在输入前面，和输入隔一条分隔线（`session.JobBreak`）。干活中途插的话不想起。`session/facts.go` 从输入里认出这一段，干活过程里先记工单、再记一步「想起了」。同一个会话里想起过的不再给：想起过哪些存在 `sessions.json`，服务端重启、接回原会话也不再给；原会话接不上、另开新会话时重新想起。
+- **挑法是纯函数，不调模型**（`server/internal/memory/recall.go` 的 `pick`；帮工页经 `GET /api/memories/{agent}/recall` 问服务端下回开工会想起什么，不计成想起过，[客户端问服务端](2026-10-16-the-client-asks-the-server.md)）：记下的话先于做过的活，这个项目先于所有项目，别的项目的话要和这一轮的话共有三个以上的词才算，做过的活只算这个项目的、最多三件；再按共有的词和新旧排，最多 8 条、1600 字。词是拉丁字母的词和相邻的两个汉字。
 - **记下**：帮工自己决定记什么。农场的规矩（`session/rules.go`）告诉它：学到下次还用得上的，在结论前写「记住：」开头的行，所有项目都成立的写「记住（所有项目）：」。`memory/memory.go` 读出这些行（每轮最多 5 条），和已有的几乎一样就不记。另外农场自己记下这个帮工的那件活和最后一轮的结论（每个帮工一条，每轮改写）。叫停的一轮不记。每个 agent 最多留 300 条，多了先丢最久没用的。
 - **主人能管**：帮工页的「记性」页签列出它记得的，能替它记一条、让它忘掉一条；还显示手上的活、下回开工会想起什么、哪几条快忘了（[管家页和记性面板](../feature/2026-10-13-agent-pages-memory-and-voice.md)）。
 - **记不住不拦着干活**：读写失败只记日志，那一轮照常。
@@ -44,14 +44,13 @@ Status: implemented
 ## Verification
 
 - `server/internal/memory/memory_test.go`：读「记住：」（列表符号、加粗、所有项目、重复、上限）、做过的活怎么写、去重；经服务记下、想起、替它记、忘掉，叫停的一轮不记。
-- `server/internal/protocol/rules_core_test.go`：词、挑法（这个项目、所有项目、别的项目要共有的词、做过的活只算这个项目且最多三件、不给自己的和已经想起过的、条数上限）；黄金数据（`rules_golden_test.go`）再拿随机输入比一遍。
+- `server/internal/memory/recall_test.go`：词、挑法（这个项目、所有项目、别的项目要共有的词、做过的活只算这个项目且最多三件、不给自己的和已经想起过的、条数上限）；黄金数据（`memory/rules_golden_test.go`）再拿随机输入比一遍。
 - `server/internal/session/rules_test.go`：带提醒的输入（前面有人设也行）记成两步：工单、想起了。
-- 端到端（脚本扮演的帮工在汇报里写「记住：」，记进它的 agent；同一个 agent 的下一个帮工在同一个项目里想起这个项目的话、所有项目的话和上一件活，工单本身干净；在别的项目里只想起所有项目的话）由 `server/internal/workspace/memory_test.go` 覆盖（当初是 TypeScript 服务端的 `crew.test.ts`）：扮演帮工的脚本在工单里有「记一笔」时写「记住：」，测试还看同一个会话里不会再提已经想起过的（服务端重启、接回原会话以后也一样，`TestCrewMemoryRecalledOnceAcrossARestart`），另一个 agent 什么也想不起。
+- 端到端（脚本扮演的帮工在汇报里写「记住：」，记进它的 agent；同一个 agent 的下一个帮工在同一个项目里想起这个项目的话、所有项目的话和上一件活，工单本身干净；在别的项目里只想起所有项目的话）由 `server/internal/workspace/memory_test.go` 覆盖（当初是 TypeScript 服务端的 `crew.test.ts`）：扮演帮工的脚本在工单里有「记一笔」时写「记住：」，测试还看同一个会话里不会再提已经想起过的（服务端重启、接回原会话以后也一样，`TestMemoryRecalledOnceAcrossARestart`），另一个 agent 什么也想不起。
 - `server/internal/memory/memory_test.go` 的 `TestPreviewPicksWithoutCountingAndTheLongestUnusedFade`：预览挑出的和开工时一样、不计成想起过，快满时最久没用的标成 `fading`。
 - 别的服务端测试里扮演帮工的脚本只读输入里分隔线后面的部分（工单），和干活过程显示的一样。
 
 ## Deferred
 
-- 管家的记性进这个服务：现在管家在 VibeValley 自己的 agent 上用 `manager/MEMORY.md`，由同一个包里另一个服务 `ManagerMemory` 读写，管家页经它读写那个文件（[管家页和记性面板](../feature/2026-10-13-agent-pages-memory-and-voice.md)）。
 - `farm_recall` 工具：一轮中间按需再查。
 - 向量检索的实现。

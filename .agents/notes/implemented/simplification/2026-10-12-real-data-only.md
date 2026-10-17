@@ -15,7 +15,7 @@ Status: implemented
 - **探测农机时读它的清单**：oar 的 `skills`、`mcpServers`、`tools`，在帮工干活的根目录下读（`server/internal/runtime/runtime.go`）。读不到的仍是空。
 - **技能书分两部分**：上面是这台机器上装的技能，从各农机的清单合成一份（`installedSkills`），只读，帮工按需自己加载；下面是 VibeValley 自己的技能库，主人写的，派活时写进人设。
 - **不再预置示例技能**：新装的农场技能库是空的。原来种下的示例，在配置里一字没改的，启动时拿掉，档案上对它们的勾也拿掉；改过的留着（`withoutExamples`）。示例只留给模拟服务器（`EXAMPLE_SKILLS`）；模拟服务器后来随 [网页退役](2026-10-14-retire-the-web-page.md) 删了，示例现在只在种子数据里（`seeds.json` 的 `exampleSkills`），给 `withoutExamples` 认出没改过的那几个。
-- **页面只连真的服务端**：连不上就在顶上说「连不上 VibeValley 服务端」，每几秒再试，连上自己消失；不再自动换成模拟。模拟服务器只在网址加 `?mock` 时用，调试台的场景和没有服务端时看画面还用它。这一条取代了[页面里的模拟服务器](../testing/2026-10-09-in-page-mock-and-debug-console.md)里「`/api/health` 不答应时自动用它」的那部分，模拟服务器本身照旧。（模拟服务器和 `?mock` 后来也删了；Flutter 客户端连不上时照样在顶上说这一句，见 `app/lib/shell/server_away.dart`。）
+- **页面只连真的服务端**：连不上就在顶上说「连不上 VibeValley 服务端」，每几秒再试，连上自己消失；不再自动换成模拟。模拟服务器只在网址加 `?mock` 时用，调试台的场景和没有服务端时看画面还用它。这一条取代了页面里的模拟服务器里「`/api/health` 不答应时自动用它」的那部分，模拟服务器本身照旧。（模拟服务器和 `?mock` 后来也删了；Flutter 客户端连不上时照样在顶上说这一句，见 `app/lib/shell/server_away.dart`。）
 
 帮工档案的种子（后端老周这些）这次没动：它们是真能派活的配置，不是假数据。
 

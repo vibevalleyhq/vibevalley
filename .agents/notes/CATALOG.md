@@ -24,7 +24,7 @@
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
 
-## implemented（93 篇）
+## implemented（81 篇）
 
 ### feature
 
@@ -35,7 +35,6 @@
 - 2026-10-14 [一次种植是一张工单](implemented/feature/2026-10-14-tickets.md)
 - 2026-10-14 [手机上的通知](implemented/feature/2026-10-14-phone-notifications.md)
 - 2026-10-13 [每个帮工和管家都有一条轨迹，帮工走了也留着](implemented/feature/2026-10-13-trajectories.md)
-- 2026-10-13 [MyGo 的 Agora 原生语音](implemented/feature/2026-10-13-native-agora-voice.md)
 - 2026-10-13 [管家有自己的页面；记性按「手上的活、下回会想起、记下的」展示；语音设置分线路和管家两处](implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)
 - 2026-10-12 [声音页：Agora 和语音管家的设置在一页里改，只存改过的](implemented/feature/2026-10-12-voice-page.md)
 - 2026-10-12 [首页和设置：开始、继续、设置；钥匙存在 settings.json](implemented/feature/2026-10-12-title-screen-and-settings.md)
@@ -59,7 +58,6 @@
 - 2026-10-10 [很久没动静的一轮要提醒](implemented/feature/2026-10-10-quiet-turns.md)
 - 2026-10-10 [帮工的干活过程逐步记下来](implemented/feature/2026-10-10-helper-work-log.md)
 - 2026-10-10 [农场经验就是你的 commit](implemented/feature/2026-10-10-experience-is-commits.md)
-- 2026-10-10 [昼夜用重新打光的背景和颜色矩阵](implemented/feature/2026-10-10-day-night-lighting.md)
 - 2026-10-09 [画成一座农场，不是工地](implemented/feature/2026-10-09-farm-instead-of-construction-site.md)
 
 ### simplification
@@ -96,24 +94,17 @@
 - 2026-10-15 [工单是一样东西](implemented/architecture/2026-10-15-issue-is-one-thing.md)
 - 2026-10-15 [要你处理的事是一个 Inbox](implemented/architecture/2026-10-15-inbox.md)
 - 2026-10-15 [形状的源头是 Go：TypeScript 退出](implemented/architecture/2026-10-15-go-owns-the-shapes.md)
-- 2026-10-13 [MyGo 与 Go 后端最小通路](implemented/architecture/2026-10-13-mygo-poc.md)
 - 2026-10-13 [服务端用 Go 重写，帮工建在 smith 上](implemented/architecture/2026-10-13-go-server-on-smith.md)
 - 2026-10-13 [客户端迁到 Flutter，完整复刻网页版](implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)
-- 2026-10-12 [农场的通用 UI 组件](implemented/architecture/2026-10-12-ui-components.md)
-- 2026-10-12 [自己的 agent：完全用 Effect 写，当管家，也当帮工](implemented/architecture/2026-10-12-own-agent-on-effect.md)
+- 2026-10-12 [自己的 agent：Go 写的，当管家，也当帮工](implemented/architecture/2026-10-12-own-agent.md)
 - 2026-10-12 [像素村的像素密一倍](implemented/architecture/2026-10-12-denser-pixels.md)
-- 2026-10-12 [拆出 ai 和 agent-core 两个包，字面量和 pi 对齐](implemented/architecture/2026-10-12-ai-and-agent-core.md)
+- 2026-10-11 [帮工的规则写成纯函数，会话只管生命周期](implemented/architecture/2026-10-11-session-rules-as-pure-functions.md)
 - 2026-10-11 [农场是一份核心状态，只因事实而变](implemented/architecture/2026-10-11-farm-core-state.md)
-- 2026-10-11 [桌面客户端：服务端在 Electron 里，窗口开服务端发的页面](implemented/architecture/2026-10-11-desktop-client.md)
-- 2026-10-11 [帮工的规则写成纯函数，crew.ts 只管会话](implemented/architecture/2026-10-11-crew-rules-as-pure-functions.md)
 - 2026-10-11 [每个 agent 的记性：一轮开始时想起，结束时记下，存法可以换](implemented/architecture/2026-10-11-agent-memory.md)
 - 2026-10-10 [工地事件走 server-sent events，命令走 HTTP](implemented/architecture/2026-10-10-site-events-over-sse.md)
 - 2026-10-10 [服务端重启不丢农场](implemented/architecture/2026-10-10-restart-keeps-the-farm.md)
 - 2026-10-10 [项目、每人一个 worktree，收获前先查冲突](implemented/architecture/2026-10-10-projects-worktrees-and-harvest.md)
-- 2026-10-10 [管家是服务端里的一个 pi 会话](implemented/architecture/2026-10-10-manager-on-pi.md)
 - 2026-10-10 [帮工是 oar 的子 agent，不要权限确认](implemented/architecture/2026-10-10-helpers-as-oar-subagents.md)
-- 2026-10-09 [全部用 TypeScript 和 Effect，oar 用它的 TypeScript 包](implemented/architecture/2026-10-09-typescript-effect-and-oar.md)
-- 2026-10-09 [游戏框架和农场核心分开](implemented/architecture/2026-10-09-engine-and-core-split.md)
 
 ### process
 
@@ -122,7 +113,6 @@
 - 2026-10-17 [让容易的写法就是对的写法](implemented/process/2026-10-17-make-the-easy-thing-the-right-thing.md)
 - 2026-10-15 [改名 VibeValley（码农场物语）](implemented/process/2026-10-15-rename-to-vibevalley.md)
 - 2026-10-15 [Note 的目录由脚本生成，检查跑在 Bun 上](implemented/process/2026-10-15-notes-catalog.md)
-- 2026-10-13 [格式、lint、测试和页面构建都交给 Vite+](implemented/process/2026-10-13-vite-plus-toolchain.md)
 - 2026-10-12 [桌面客户端分 alpha、beta、release 三个渠道打包](implemented/process/2026-10-12-release-channels.md)
 - 2026-10-11 [决策记在 Agent Notes，文档只写现状](implemented/process/2026-10-11-agent-notes-and-doc-tiers.md)
 - 2026-10-09 [素材用 codex 生图，脚本切图](implemented/process/2026-10-09-image-pipeline-with-codex.md)
@@ -131,8 +121,6 @@
 
 - 2026-10-17 [测试共用一套工具和一个替身](implemented/testing/2026-10-17-one-test-kit.md)
 - 2026-10-10 [服务端测试用脚本扮演帮工](implemented/testing/2026-10-10-scripted-runtime-server-tests.md)
-- 2026-10-10 [core 的规则有单元测试](implemented/testing/2026-10-10-core-rule-tests.md)
-- 2026-10-09 [页面里有一个按同样规则跑的模拟服务器和调试台](implemented/testing/2026-10-09-in-page-mock-and-debug-console.md)
 
 ## rejected（1 篇）
 

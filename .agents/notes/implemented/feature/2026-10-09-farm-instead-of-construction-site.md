@@ -25,7 +25,7 @@ Status: implemented
 
 **型号 A（经典农场）。** 最像 QQ 农场，但颜色和按钮更吵，和长时间开着的工作工具不搭。
 
-**型号 C（夜间科技温室）。** 好看但暗，字和状态不好认；夜里的样子后来改成昼夜变化（[day-night-lighting](2026-10-10-day-night-lighting.md)）。
+**型号 C（夜间科技温室）。** 好看但暗，字和状态不好认；夜里的样子后来改成昼夜变化（现在的打光见 [pixel-village.md](../../../../docs/reference/pixel-village.md)）。
 
 **型号 D（竖屏掌上）。** 留作手机版（[mobile-layout](../../proposed/feature/2026-10-09-mobile-layout.md)）。
 

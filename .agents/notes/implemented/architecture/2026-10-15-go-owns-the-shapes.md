@@ -16,7 +16,7 @@ Status: implemented
 - **删掉的**：`server/contract/`（`@heybro/protocol`、`@heybro/tools`：Effect 的形状、导出脚本、契约检查）、`server/tool/go_types.ts`、`app/tool/dart_types.ts`、两个 `generate.sh`、中间的 schema 文件（`site.schema.json`、`vibevalley.openapi.json`、`site-frame.schema.json`）、根目录的 pnpm workspace、锁文件、`vite.config.ts` 和 Vite+ 的提交钩子。种子数据 `server/internal/protocol/seeds.json` 从导出物变成直接改的数据文件。
 - **还剩的 Node**：`server/tool` 的两个脚本（倒出旧的 PGlite 数据库、写 pi 的价目表，自己一个 `package.json`），用 Node 24 直接跑；`scripts/` 的文档检查当时也是，后来改用 Bun 跑（[Note 的目录由脚本生成](../process/2026-10-15-notes-catalog.md)）。根目录的 `package.json` 只剩几个命令，没有依赖。
 
-这一篇取代了 [服务端和客户端两个目录](2026-10-15-server-and-app.md) 里的 `server/contract/`、[Go 服务端](2026-10-13-go-server-on-smith.md) 里「TypeScript 的 protocol 仍是形状的唯一来源」、[Flutter 客户端](2026-10-13-flutter-client-over-ts-server.md) 里「形状从 protocol 导出」，和 [Vite+ 工具链](../process/2026-10-13-vite-plus-toolchain.md) 整篇。
+这一篇取代了 [服务端和客户端两个目录](2026-10-15-server-and-app.md) 里的 `server/contract/`、[Go 服务端](2026-10-13-go-server-on-smith.md) 里「TypeScript 的 protocol 仍是形状的唯一来源」，和 [Flutter 客户端](2026-10-13-flutter-client-over-ts-server.md) 里「形状从 protocol 导出」。
 
 ## Alternatives considered
 

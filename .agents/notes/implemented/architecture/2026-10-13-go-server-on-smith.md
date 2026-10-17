@@ -59,7 +59,7 @@ smith 原先是单独的模块，后来并进来（[internal 和 pkg](2026-10-15
 - 服务端一个 Go 二进制（约 19 MB），不带 Node；`CGO_ENABLED=0` 编得过，Flutter 应用直接带上它。宿主从 MyGo 换成了 Flutter，库的形状不受影响。
 - **两份 `reduce`**：只要冻结的网页还在，改核心状态的规则就要两边一起改、重新生成对照数据；对照测试只覆盖随机生成到的情形。（网页后来删了，规则只剩 Go 一份，见 [网页退役](../simplification/2026-10-14-retire-the-web-page.md)。）
 - **pi 农机要 Node**：smith 跑 pi 要一个内嵌的 Node 宿主，用 pi 的帮工仍然需要机器上有 Node；VibeValley 自己的农机和 claude、codex 等 CLI 不需要。
-- **管家只跑在 VibeValley 自己的 agent 上**：pi 做管家要把 VibeValley 的工具放进 pi 的进程，smith 的 pi 农机没有这个口子；`manager.runtime=pi` 被拒绝（[管家在 pi 上](2026-10-10-manager-on-pi.md) 那一版随 TypeScript 服务端一起没了）。
+- **管家只跑在 VibeValley 自己的 agent 上**：pi 做管家要把 VibeValley 的工具放进 pi 的进程，smith 的 pi 农机没有这个口子；`manager.runtime=pi` 被拒绝（管家在 pi 上那一版随 TypeScript 服务端一起没了）。
 - **pi 的价目表** 是 pi-ai 内置的那份（`tool/pi-prices.ts` 导出），不含 pi 配置里自加的模型。
 - 和 TypeScript 服务端行为不同的几处（语音线路端口被占只记日志、写错的环境变量用默认值、字数按字符数）列在 [server/README.md](../../../../server/README.md)「取舍」；语音令牌一小时过期见 [voice.md](../../../../docs/reference/voice.md)「服务端」。
 - **smith 的测试数据**：`pkg/smith/testdata` 从 oar 仓库拷来，上游改了要手工同步。

@@ -46,7 +46,7 @@ Raft（botiverse 的人机协作工作区，[源码](https://github.com/botivers
 
 ### 帮工怎么说话：农场的工具
 
-服务端在 `/mcp`（只听本机，MCP 官方 Go SDK 的 Streamable HTTP，`server/internal/channel/farmtools.go`）上给帮工四个工具：`farm_say`、`farm_read`、`farm_inbox`、`farm_who`。派帮工时，通过 smith 的 `mcpServers` 交给它的会话，带一个这次会话专用的令牌（`Authorization: Bearer …`），换会话、收工就作废；令牌只分清是谁，不防人。
+服务端在 `/mcp`（只听本机，MCP 官方 Go SDK 的 Streamable HTTP，`server/internal/mcp/mcp.go`）上给帮工四个工具：`farm_say`、`farm_read`、`farm_inbox`、`farm_who`。派帮工时，通过 smith 的 `mcpServers` 交给它的会话，带一个这次会话专用的令牌（`Authorization: Bearer …`），换会话、收工就作废；令牌只分清是谁，不防人。
 
 - **最后的汇报照旧自动贴出**：一轮的结论以帮工自己的名义贴进它的工单串，原文在「干活过程」里。`farm_say` 只用于一轮中间：确认、提问、交接。
 - **新鲜度拦截照 Raft 做**：`farm_say` 的目标里有它没看过的新消息，就先不发，把最多 3 条给它看，改了再发或 `anyway: true` 照发。
@@ -284,8 +284,8 @@ Raft 的实现里有很多看起来繁琐的地方。逐条对照 VibeValley 的
 ## Verification
 
 - `server/internal/protocol/chat_rules_test.go`：@ 的解析、对话的地址、给谁和叫不叫醒（含三道闸）、帮工收到的话、核心状态里留哪些，只测纯函数。
-- `server/internal/channel/chat_test.go`：smith 的 `oartest` 扮演帮工、真的 git 仓库、内存里的 SQLite。派活开串、汇报贴进串；串里的话叫醒帮工，开口才算看到；忙时只插一条提示；来回上限和冷却；叫醒熔断；重启后已交付没看到的再给一遍。`server/internal/manager/farmtools_test.go`：经 HTTP 调 `/mcp`，令牌认人，没有令牌或冒名的认不出，拦截、重试、防发错地方。
-- `state.json` 不存田头（Go 的 `Site` 只存核心状态里田头以外的部分）。`app/test/chat_test.dart`：客户端把田头、语音的话、串、未读合成的样子。
+- `server/internal/channel/chat_test.go`：smith 的 `oartest` 扮演帮工、真的 git 仓库、内存里的 SQLite。派活开串、汇报贴进串；串里的话叫醒帮工，开口才算看到；忙时只插一条提示；来回上限和冷却；叫醒熔断；重启后已交付没看到的再给一遍。`server/internal/mcp/mcp_test.go`：经 HTTP 调 `/mcp`，令牌认人，没有令牌或冒名的认不出，拦截、重试、防发错地方。
+- `state.json` 不存田头（Go 的 `Core` 只存核心状态里田头以外的部分）。`app/test/chat_test.dart`：客户端把田头、语音的话、串、未读合成的样子。
 - 2026-10-11 用真的农机跑了一遍：pi 的帮工一轮中间用 `farm_say` 在自己的串里说话、用 `farm_who` 看地里有谁，汇报贴进串；claude 的帮工在自己的串里 @ pi 的帮工，pi 的帮工正忙，收到提示，读了以后在 claude 的串里回答，claude 的帮工读到回答写进结论。同一次里 pi 的帮工把 `farm_who` 的 @ 名单抄进回答，叫醒了管家，管家的转述又叫醒了 pi 的帮工，第 4 次 agent 叫醒 agent 被来回上限拦下，串里贴了提示；因此有了上面「名单不带 @」那一条。codex 还没在田头上真跑过。
 
 ## Deferred

@@ -51,7 +51,7 @@ Status: implemented
 
 ### Why not 后端也换成 Go（smith）？（当初的理由；后来换了）
 
-后来主人要「一个 MyGo 就能搞定一切」，服务端换成了 Go（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)），下面这段是当时没换的理由。smith 补上了 [typescript-effect-and-oar](2026-10-09-typescript-effect-and-oar.md) 当初没选 Go 的理由（Go 版接不上真实的 runtime），但它只是 oar 这一层：驱动帮工的编码 agent。服务端约 1.56 万行（田头、项目、收获、种植计划、定时、连接器、语音线路、轨迹），管家用的 `@heybro/agent`、`agent-core`、`ai` 约 5900 行，protocol 的 `reduce` 和规则约 3800 行，都要用 Go 重写。Go 服务端加 Dart 客户端，形状和 `reduce` 就成了两份、两种语言；跑 pi 时 smith 还要内嵌一个 Node 进程，去不掉 Node。等哪天真要去掉 Node 服务端，再拿 smith 换 oar 这一块。
+后来主人要「一个 MyGo 就能搞定一切」，服务端换成了 Go（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)），下面这段是当时没换的理由。smith 补上了当初没选 Go 的理由（Go 版接不上真实的 runtime），但它只是 oar 这一层：驱动帮工的编码 agent。服务端约 1.56 万行（田头、项目、收获、种植计划、定时、连接器、语音线路、轨迹），管家用的 `@heybro/agent`、`agent-core`、`ai` 约 5900 行，protocol 的 `reduce` 和规则约 3800 行，都要用 Go 重写。Go 服务端加 Dart 客户端，形状和 `reduce` 就成了两份、两种语言；跑 pi 时 smith 还要内嵌一个 Node 进程，去不掉 Node。等哪天真要去掉 Node 服务端，再拿 smith 换 oar 这一块。
 
 **客户端也重写 `reduce`（Dart 里一份）。** 客户端能离线地自己折事实，但就是第二份核心状态，两边改规则要一起改、靠自觉对齐。推折好的状态省掉这一份，代价是带宽，验证里量。
 
@@ -67,7 +67,7 @@ Status: implemented
 
 **React Native。** 能直接用 `@heybro/core` 和 protocol（它们本来就不碰 DOM），但像素农场的 Pixi 要套 WebView 或换渲染，桌面端也弱。
 
-**MyGo（Go 加 WKWebView，[原型](2026-10-13-mygo-poc.md)）。** 换的是桌面的宿主，界面还是网页，不解决手机。
+**MyGo（Go 加 WKWebView 的原型）。** 换的是桌面的宿主，界面还是网页，不解决手机。
 
 ## Consequences
 

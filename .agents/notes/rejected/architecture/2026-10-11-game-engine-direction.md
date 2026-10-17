@@ -11,7 +11,7 @@ VibeValley 要做大：像素村和院子、更多地点和角色、帮工按日
 1. **核心状态只有一份，在 TS 里。** protocol 的 `reduce` 由服务端、页面、模拟服务器、桌面版主进程四处共用（[理由](../../implemented/architecture/2026-10-11-farm-core-state.md)）。
 2. **界面大半是字。** 田头有 Markdown、@ 补全、中文输入法；还有干活过程、收成清单的 diff、计划板、配置页、成就面板。画面只占其中一块。
 3. **语音是 Agora 网页 SDK 加 ConvoAI**，在页面（Chromium）里跑。
-4. **服务端是 Node。** 管家用 pi，帮工用 oar，数据库是 PGlite（WASM）；桌面版用 Electron 把它带在身边（[理由](../../implemented/architecture/2026-10-11-desktop-client.md)）。（写这篇时的情形；后来服务端换成了 Go、客户端换成了 Flutter，见 [服务端用 Go 重写](../../implemented/architecture/2026-10-13-go-server-on-smith.md)、[客户端迁到 Flutter](../../implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)。）
+4. **服务端是 Node。** 管家用 pi，帮工用 oar，数据库是 PGlite（WASM）；桌面版用 Electron 把它带在身边。（写这篇时的情形；后来服务端换成了 Go、客户端换成了 Flutter，见 [服务端用 Go 重写](../../implemented/architecture/2026-10-13-go-server-on-smith.md)、[客户端迁到 Flutter](../../implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)。）
 5. **代码主要由编码 agent 来写**，VibeValley 自己就是这么写出来的。
 
 要自己写的那部分：院子、帮工去哪、动画、光影、点击、镜头、碰撞、粒子。这些不管选哪条路都得写。差别在三处：底下垫的是什么，和核心状态怎么接，谁来写、写得多快。

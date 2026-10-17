@@ -12,7 +12,7 @@ Status: implemented
 
 - 帮工由 smith（oar 的 Go 移植）的 `oartest`（`server/pkg/smith/oartest`）扮演，对应 oar 的 `scriptedRuntime`：一个真实的会话（同样的记录、同样的折叠、同样的控制语义），没有程序、登录和模型。脚本按工单里的字眼行事：跑一条命令、提交一个文件、写一个版本、发呆、失败、解决冲突。
 - 每个测试在临时目录里用真的 git 仓库和 worktree。
-- 核心状态的 `reduce` 和推导是纯函数，单独测；读会话事件、读汇报、上限也是（`internal/session/facts.go`、`internal/session/rules.go`；protocol 的规则在 `server/internal/protocol/*_test.go`），一个事件进去、事实出来，不开会话（[crew-rules-as-pure-functions](../architecture/2026-10-11-crew-rules-as-pure-functions.md)）。
+- 核心状态的 `Reduce` 和推导是纯函数，单独测；读会话事件、读汇报、上限也是（`internal/session/facts.go`、`internal/session/rules.go`；protocol 的规则在 `server/internal/protocol/*_test.go`），一个事件进去、事实出来，不开会话（[规则是纯函数](../architecture/2026-10-11-session-rules-as-pure-functions.md)）。
 
 ## Alternatives considered
 

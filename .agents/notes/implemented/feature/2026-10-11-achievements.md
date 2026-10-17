@@ -17,10 +17,10 @@ Status: implemented
 行为和规则表见 [farm-ui.md](../../../../docs/reference/farm-ui.md)「计分」和界面 8「任务与成就」，账本怎么记见 [server.md](../../../../docs/reference/server.md)「游戏」。
 
 - **奖结果，不奖消耗**：金币、连胜、成就都以「收进主分支的活」为准，和等级按真实的 commit 数算一个道理。一轮做完不给金币；命令数、读写次数不进任何规则。
-- **一本账本，在服务端**：服务端把值得记的事按顺序记进数据库的 `ledger` 表（`server/internal/game/ledger.go`）。金币、连胜、成就是账本按顺序折出来的（protocol 的 `game_progress.go`：`ProgressStep` 一次折一条，`ProgressFold` 折整本），放进核心状态的 `CoreState.progress`，由 `progress` 事实施加；这一条带来了什么（金币、给哪个帮工、到了哪几档）跟在事实的 `news` 里。各个客户端、重启后看到的是同一份；客户端关着时发生的事也算；规则改了，重启时从账本重新折一遍就是新的结果。`state.json` 不存进度。
+- **一本账本，在服务端**：服务端把值得记的事按顺序记进数据库的 `ledger` 表（`server/internal/game/ledger.go`）。金币、连胜、成就是账本按顺序折出来的（`server/internal/game/progress.go` 的 `progressStep` 一次折一条，`progressFold` 折整本），放进核心状态的 `CoreState.progress`，由 `progress` 事实施加；这一条带来了什么（金币、给哪个帮工、到了哪几档）跟在事实的 `news` 里。各个客户端、重启后看到的是同一份；客户端关着时发生的事也算；规则改了，重启时从账本重新折一遍就是新的结果。`state.json` 不存进度。
 - **每个档案的战绩也由账本折出来**：派出帮工、收进主分支、一轮没做成这三种条目带上帮工的档案，折成 `progress.agents`（雇过、收成、没做成）。原来这些数在页面里随看到的事件累加、存在浏览器里，关着页面时的事不算，换浏览器就是另一个数。
-- **事实说的事由一个纯函数挑**：`EntriesFor(before, fact, after)` 决定哪些事实记进账本（一轮没做成、会冲突、开工、派出帮工、收获、拆好计划、收获计划、带话、点名、交接、升级、六块地都在干活）；只有主人在应用里做的事由看到它的地方记（语音、看收成清单、称号、旧金币）。收获、带话、点名、交接原来也由看到它的地方记，后来改成从帮工离开和田头消息的事实里读出来，游戏只听事实（[概念先行](../../proposed/architecture/2026-10-15-concepts-first.md) 第 2 步）。服务端的账本看工地事件、自己折一份核心状态来调用它。（当时网页的模拟服务器也在 `apply` 里调用它，模拟服务器随网页删掉了。）
-- **档位和进度**：计数的成就分铜、银、金三档，带进度条和拿到的日期；新手任务和彩蛋是一次性的。成就单在 protocol 的 `Achievements`（`game_progress.go`）；客户端的 `app/lib/rules/progress.dart` 有一份 Dart 移植，任务与成就面板、成就提示和 macOS 的通知读它。
+- **事实说的事由一个纯函数挑**：`entriesFor(before, fact, after)` 决定哪些事实记进账本（一轮没做成、会冲突、开工、派出帮工、收获、拆好计划、收获计划、带话、点名、交接、升级、六块地都在干活）；只有主人在应用里做的事由看到它的地方记（语音、看收成清单、称号、旧金币）。收获、带话、点名、交接原来也由看到它的地方记，后来改成从帮工离开和田头消息的事实里读出来，游戏只听事实（[概念先行](../../proposed/architecture/2026-10-15-concepts-first.md) 第 2 步）。服务端的账本看工地事件、自己折一份核心状态来调用它。（当时网页的模拟服务器也在 `apply` 里调用它，模拟服务器随网页删掉了。）
+- **档位和进度**：计数的成就分铜、银、金三档，带进度条和拿到的日期；新手任务和彩蛋是一次性的。成就单在 `server/internal/protocol/seeds.go` 的 `Achievements`；客户端的 `app/lib/rules/progress.dart` 有一份 Dart 移植，任务与成就面板、成就提示和 macOS 的通知读它。
 - **新手任务**：七件第一次该做的事（开门、派活、带话、验收、说话、规划、点名），在「任务与成就」面板最上面打勾，每个 20 金币。
 - **回报不碰干活**：金币以后在商店换装饰，成就给称号（新手任务除外）；帮工怎么派、地有几块，规则不变（地块跟等级走）。
 - **客户端只显示**：读核心状态的 `progress` 和帧里 `view` 的等级，不另存；`progress` 事实的 `news` 由 protocol 的 `EffectsOf` 变成帧里要放的效果（金币飘起、成就提示），升级横幅来自 commit 数（`LevelUps`）。调试台改不了金币、等级和成就，只能放一遍横幅和提示，什么都不记。
@@ -35,7 +35,7 @@ Status: implemented
 
 **按 token、命令数给奖励。** 最好算，但奖的是花钱，正好和「管住花费」相反。
 
-**「哪些事实要记」写在服务端的账本服务里。** 一开始就是这样写的；可模拟服务器也要记同样的账，抄一份迟早对不上。挪成 protocol 的纯函数 `entriesFor`，两边调用同一个，也能单独测。（模拟服务器随网页删了；现在是 Go 的 `EntriesFor`，`server/internal/protocol/game_progress.go`。）
+**「哪些事实要记」写在服务端的账本服务里。** 一开始就是这样写的；可模拟服务器也要记同样的账，抄一份迟早对不上。挪成 protocol 的纯函数 `entriesFor`，两边调用同一个，也能单独测。（模拟服务器随网页删了；现在是 Go 的 `entriesFor`，`server/internal/game/progress.go`。）
 
 **每个档位一张奖章图。** 21 个成就 × 3 档要画 60 多张，风格也难一致。框和图案分开画，叠起来。
 
@@ -51,8 +51,8 @@ Status: implemented
 
 ## Verification
 
-- `server/internal/protocol/game_progress_rules_test.go`：收获的金币和连胜加成、失败断连胜、一气呵成的条件、解铃人、浴火重生、一分钱一分货、物尽其用、新手任务各一次、计划的步数和同时做的一批、档位按顺序各一次、彩蛋、称号只能挂拿到的档位且不挂新手任务、旧金币；`EntriesFor` 对每种事实记什么、计划只记一次、跨级、六块地填满；`CatchUp`。
-- `server/internal/workspace/work_test.go` 的 `TestCrewHarvestGoesInTheLedger`：脚本扮演的帮工收获后，账本里有这一笔。`server/internal/game/ledger_test.go` 的 `TestPlanLedger`：记一笔收获，进度事实带着金币；派活、没做成、升级由事实记下；旧金币只记一次；重启后折回同样的进度。
+- `server/internal/game/progress_test.go`：收获的金币和连胜加成、失败断连胜、一气呵成的条件、解铃人、浴火重生、一分钱一分货、物尽其用、新手任务各一次、计划的步数和同时做的一批、档位按顺序各一次、彩蛋、称号只能挂拿到的档位且不挂新手任务、旧金币；`entriesFor` 对每种事实记什么、计划只记一次、跨级、六块地填满；`catchUp`。
+- `server/internal/workspace/work_test.go` 的 `TestMergeGoesInTheLedger`：脚本扮演的帮工收获后，账本里有这一笔。`server/internal/game/ledger_test.go` 的 `TestPlanLedger`：记一笔收获，进度事实带着金币；派活、没做成、升级由事实记下；旧金币只记一次；重启后折回同样的进度。
 - `news` 变成什么效果（金币、成就）、commit 数带来的升级：protocol 的黄金数据逐条比（`server/internal/protocol/reduce_golden_test.go` 的 `TestReduceGolden`）。原来测页面这一半的 `packages/core/test/` 随网页删掉了。
 - `app/test/desktop_notify_test.dart`：到了一档弹通知、点开任务与成就。
 - 模拟农场里截图看过：收获后金币从帮工头上飘起、成就提示里是奖章、面板的新手任务、成就墙、彩蛋、称号的选单和农场卡上的称号。
