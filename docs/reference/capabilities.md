@@ -52,7 +52,8 @@
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
 | `schedule.create` | `POST /api/schedules` | ✓ | ✓ | ✓ |  |
-| `schedule.toggle` | `PUT /api/schedules/{id}` | ✓ | ✓ |  |  |
+| `schedule.list` | `GET /api/schedules` | ✓ | ✓ | ✓ |  |
+| `schedule.update` | `PUT /api/schedules/{id}` | ✓ | ✓ |  |  |
 | `schedule.delete` | `DELETE /api/schedules/{id}` | ✓ | ✓ | ✓ |  |
 
 ## worker
@@ -84,7 +85,7 @@
 | `issue.update` | `PUT /api/issues/{id}` | ✓ | ✓ |  |  |
 | `issue.delete` | `DELETE /api/issues/{id}` | ✓ | ✓ |  |  |
 | `issue.move` | `PUT /api/issues/{id}/move` | ✓ | ✓ |  |  |
-| `issue.queue` | `PUT /api/issues/{id}/queue` | ✓ | ✓ |  |  |
+| `issue.unqueue` | `POST /api/issues/{id}/unqueue` | ✓ | ✓ |  |  |
 | `issue.start` | `POST /api/issues/{id}/start` | ✓ | ✓ | ✓ |  |
 | `issue.reopen` | `POST /api/issues/{id}/reopen` | ✓ | ✓ |  |  |
 

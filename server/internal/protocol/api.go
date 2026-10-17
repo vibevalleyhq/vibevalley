@@ -32,9 +32,13 @@ type Handlers interface {
 	//vibevalley:route schedule.create POST /api/schedules
 	//vibevalley:can owner remote manager
 	ScheduleCreate(ctx context.Context, body ScheduleRequest) (Schedule, error)
-	//vibevalley:route schedule.toggle PUT /api/schedules/{id}
+	//vibevalley:route schedule.list GET /api/schedules
+	//vibevalley:can owner remote manager
+	ScheduleList(ctx context.Context) ([]Schedule, error)
+	// Only what the body gives changes.
+	//vibevalley:route schedule.update PUT /api/schedules/{id}
 	//vibevalley:can owner remote
-	ScheduleToggle(ctx context.Context, pID int64, body ToggleScheduleRequest) error
+	ScheduleUpdate(ctx context.Context, pID int64, body ScheduleUpdate) error
 	//vibevalley:route schedule.delete DELETE /api/schedules/{id}
 	//vibevalley:can owner remote manager
 	ScheduleDelete(ctx context.Context, pID int64) error
@@ -90,9 +94,10 @@ type Handlers interface {
 	//vibevalley:route issue.move PUT /api/issues/{id}/move
 	//vibevalley:can owner remote
 	IssueMove(ctx context.Context, pID string, body MoveIssueRequest) ([]Issue, error)
-	//vibevalley:route issue.queue PUT /api/issues/{id}/queue
+	// Back to the backlog; an issue is queued by issue.start when there is no room.
+	//vibevalley:route issue.unqueue POST /api/issues/{id}/unqueue
 	//vibevalley:can owner remote
-	IssueQueue(ctx context.Context, pID string, body QueueIssueRequest) (Issue, error)
+	IssueUnqueue(ctx context.Context, pID string) (Issue, error)
 	//vibevalley:route issue.start POST /api/issues/{id}/start
 	//vibevalley:can owner remote manager
 	IssueStart(ctx context.Context, pID string) (Dispatched, error)

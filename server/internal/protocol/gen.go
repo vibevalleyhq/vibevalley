@@ -2117,7 +2117,8 @@ var Endpoints = []Endpoint{
 	{"channel.say", "POST", "/api/say", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"channel.create", "POST", "/api/channels", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"schedule.create", "POST", "/api/schedules", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"schedule.toggle", "PUT", "/api/schedules/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"schedule.list", "GET", "/api/schedules", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"schedule.update", "PUT", "/api/schedules/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"schedule.delete", "DELETE", "/api/schedules/{id}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"channel.update", "PUT", "/api/channels/{id}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"manager.hear", "POST", "/api/manager/hear", nil, true, []Caller{CallerOwner, CallerRemote}},
@@ -2136,7 +2137,7 @@ var Endpoints = []Endpoint{
 	{"issue.update", "PUT", "/api/issues/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.delete", "DELETE", "/api/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.move", "PUT", "/api/issues/{id}/move", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"issue.queue", "PUT", "/api/issues/{id}/queue", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.unqueue", "POST", "/api/issues/{id}/unqueue", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.start", "POST", "/api/issues/{id}/start", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"issue.reopen", "POST", "/api/issues/{id}/reopen", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"playbook.plan", "POST", "/api/playbooks", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
@@ -2245,16 +2246,20 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.ScheduleCreate(r.Context(), body)
 		answer(w, out, err)
 	})
+	mux.HandleFunc("GET /api/schedules", func(w http.ResponseWriter, r *http.Request) {
+		out, err := h.ScheduleList(r.Context())
+		answer(w, out, err)
+	})
 	mux.HandleFunc("PUT /api/schedules/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID, ok := pathNumber(w, r, "id")
 		if !ok {
 			return
 		}
-		var body ToggleScheduleRequest
+		var body ScheduleUpdate
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.ScheduleToggle(r.Context(), pID, body))
+		answer(w, nil, h.ScheduleUpdate(r.Context(), pID, body))
 	})
 	mux.HandleFunc("DELETE /api/schedules/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID, ok := pathNumber(w, r, "id")
@@ -2364,13 +2369,9 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.IssueMove(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/issues/{id}/queue", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/issues/{id}/unqueue", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		var body QueueIssueRequest
-		if !decode(w, r, &body) {
-			return
-		}
-		out, err := h.IssueQueue(r.Context(), pID, body)
+		out, err := h.IssueUnqueue(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/issues/{id}/start", func(w http.ResponseWriter, r *http.Request) {
@@ -2810,7 +2811,13 @@ func (c *Client) ScheduleCreate(ctx context.Context, body ScheduleRequest) (Sche
 	return out, err
 }
 
-func (c *Client) ScheduleToggle(ctx context.Context, pID int64, body ToggleScheduleRequest) error {
+func (c *Client) ScheduleList(ctx context.Context) ([]Schedule, error) {
+	var out []Schedule
+	err := c.call(ctx, "GET", "/api/schedules", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) ScheduleUpdate(ctx context.Context, pID int64, body ScheduleUpdate) error {
 	return c.call(ctx, "PUT", "/api/schedules/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, body, nil)
 }
 
@@ -2908,9 +2915,9 @@ func (c *Client) IssueMove(ctx context.Context, pID string, body MoveIssueReques
 	return out, err
 }
 
-func (c *Client) IssueQueue(ctx context.Context, pID string, body QueueIssueRequest) (Issue, error) {
+func (c *Client) IssueUnqueue(ctx context.Context, pID string) (Issue, error) {
 	var out Issue
-	err := c.call(ctx, "PUT", "/api/issues/"+url.PathEscape(pID)+"/queue", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/unqueue", nil, nil, &out)
 	return out, err
 }
 

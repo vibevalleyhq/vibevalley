@@ -27,8 +27,8 @@ func (f *mountFake) ScheduleDelete(_ context.Context, id int64) error {
 	return nil
 }
 
-func (f *mountFake) ScheduleToggle(_ context.Context, _ int64, body ToggleScheduleRequest) error {
-	f.toggled = append(f.toggled, body.Enabled)
+func (f *mountFake) ScheduleUpdate(_ context.Context, _ int64, body ScheduleUpdate) error {
+	f.toggled = append(f.toggled, *body.Enabled)
 	return nil
 }
 

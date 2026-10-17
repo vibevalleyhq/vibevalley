@@ -4705,14 +4705,14 @@ final class SideEventRuntime extends SideEvent {
   Map<String, dynamic> toJson() => {'type': 'runtime', 'at': at, 'info': info.toJson()};
 }
 
-class ToggleScheduleRequest {
-  const ToggleScheduleRequest({required this.enabled});
+class ScheduleUpdate {
+  const ScheduleUpdate({this.enabled});
 
-  factory ToggleScheduleRequest.fromJson(Map<String, dynamic> j) => ToggleScheduleRequest(enabled: j['enabled'] as bool);
+  factory ScheduleUpdate.fromJson(Map<String, dynamic> j) => ScheduleUpdate(enabled: j['enabled'] == null ? null : j['enabled'] as bool);
 
-  final bool enabled;
+  final bool? enabled;
 
-  Map<String, dynamic> toJson() => {'enabled': enabled};
+  Map<String, dynamic> toJson() => {if (enabled != null) 'enabled': enabled!};
 }
 
 class MoveIssueRequest {
@@ -4723,16 +4723,6 @@ class MoveIssueRequest {
   final String? before;
 
   Map<String, dynamic> toJson() => {if (before != null) 'before': before!};
-}
-
-class QueueIssueRequest {
-  const QueueIssueRequest({required this.queued});
-
-  factory QueueIssueRequest.fromJson(Map<String, dynamic> j) => QueueIssueRequest(queued: j['queued'] as bool);
-
-  final bool queued;
-
-  Map<String, dynamic> toJson() => {'queued': queued};
 }
 
 class ReopenRequest {
@@ -4989,7 +4979,13 @@ class ScheduleApi {
     return Schedule.fromJson(j as Map<String, dynamic>);
   }
 
-  Future<void> toggle({required double id, required ToggleScheduleRequest body}) async {
+  Future<List<Schedule>> list() async {
+    final j = await _api._call('GET', '/api/schedules', query: {}, body: null);
+    return [for (final e in j as List) Schedule.fromJson(e as Map<String, dynamic>)];
+  }
+
+  /// Only what the body gives changes.
+  Future<void> update({required double id, required ScheduleUpdate body}) async {
     await _api._call('PUT', '/api/schedules/${Uri.encodeComponent((id.toInt()).toString())}', query: {}, body: body.toJson());
   }
 
@@ -5085,8 +5081,9 @@ class IssueApi {
     return [for (final e in j as List) Issue.fromJson(e as Map<String, dynamic>)];
   }
 
-  Future<Issue> queue({required String id, required QueueIssueRequest body}) async {
-    final j = await _api._call('PUT', '/api/issues/${Uri.encodeComponent((id).toString())}/queue', query: {}, body: body.toJson());
+  /// Back to the backlog; an issue is queued by issue.start when there is no room.
+  Future<Issue> unqueue({required String id}) async {
+    final j = await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/unqueue', query: {}, body: null);
     return Issue.fromJson(j as Map<String, dynamic>);
   }
 

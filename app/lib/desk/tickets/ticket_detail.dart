@@ -278,7 +278,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
                   PxButton.text(
                     '不排了',
                     size: PxSize.sm,
-                    onPressed: _busy ? null : () => _run((api) => api.issue.queue(id: widget.item!.id, body: const QueueIssueRequest(queued: false))),
+                    onPressed: _busy ? null : () => _run((api) => api.issue.unqueue(id: widget.item!.id)),
                   ),
                 ],
               ),

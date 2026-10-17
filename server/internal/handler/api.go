@@ -74,8 +74,13 @@ func (a api) ScheduleCreate(_ context.Context, body protocol.ScheduleRequest) (p
 	return s, refused(err)
 }
 
-func (a api) ScheduleToggle(_ context.Context, id int64, body protocol.ToggleScheduleRequest) error {
-	_, err := a.f.Schedule.SetEnabled(id, body.Enabled)
+func (a api) ScheduleList(context.Context) ([]protocol.Schedule, error) { return a.f.Schedule.List(), nil }
+
+func (a api) ScheduleUpdate(_ context.Context, id int64, body protocol.ScheduleUpdate) error {
+	if body.Enabled == nil {
+		return nil
+	}
+	_, err := a.f.Schedule.SetEnabled(id, *body.Enabled)
 	return refused(err)
 }
 
@@ -241,7 +246,10 @@ func (a api) AgentList(context.Context) ([]protocol.Agent, error) {
 	return a.f.Agent.Agents(), nil
 }
 
-func (a api) AgentSave(_ context.Context, _ string, body protocol.Agent) (protocol.Agent, error) {
+func (a api) AgentSave(_ context.Context, id string, body protocol.Agent) (protocol.Agent, error) {
+	if body.ID != id {
+		return protocol.Agent{}, protocol.Refused{Reason: "路径里的档案 " + id + " 和请求里的 " + body.ID + " 不是一个"}
+	}
 	saved, err := a.f.Agent.SaveAgent(body)
 	return saved, refused(err)
 }
@@ -303,7 +311,10 @@ func (a api) ManagerGetArchive(_ context.Context, name string) (string, error) {
 
 func (a api) SkillList(context.Context) ([]protocol.Skill, error) { return a.f.Agent.Skills(), nil }
 
-func (a api) SkillSave(_ context.Context, _ string, body protocol.Skill) (protocol.Skill, error) {
+func (a api) SkillSave(_ context.Context, id string, body protocol.Skill) (protocol.Skill, error) {
+	if body.ID != id {
+		return protocol.Skill{}, protocol.Refused{Reason: "路径里的技能 " + id + " 和请求里的 " + body.ID + " 不是一个"}
+	}
 	return a.f.Agent.SaveSkill(body)
 }
 
@@ -471,6 +482,6 @@ func (a api) IssueStart(ctx context.Context, id string) (protocol.Dispatched, er
 	return got, refused(err)
 }
 
-func (a api) IssueQueue(_ context.Context, id string, body protocol.QueueIssueRequest) (protocol.Issue, error) {
-	return a.f.Issue.Queue(id, body.Queued)
+func (a api) IssueUnqueue(_ context.Context, id string) (protocol.Issue, error) {
+	return a.f.Issue.Queue(id, false)
 }

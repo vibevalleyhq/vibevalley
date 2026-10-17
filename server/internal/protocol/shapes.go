@@ -1912,16 +1912,12 @@ type SideEventRuntime struct {
 	Info RuntimeInfo `json:"info"`
 }
 
-type ToggleScheduleRequest struct {
-	Enabled bool `json:"enabled"`
+type ScheduleUpdate struct {
+	Enabled *bool `json:"enabled,omitzero"`
 }
 
 type MoveIssueRequest struct {
 	Before *string `json:"before,omitzero"`
-}
-
-type QueueIssueRequest struct {
-	Queued bool `json:"queued"`
 }
 
 type ReopenRequest struct {

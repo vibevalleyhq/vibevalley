@@ -179,9 +179,9 @@ class ChatActions {
 
   Future<void> updateChannel(double id, ChannelUpdate update) => _api.channel.update(id: id, body: update);
 
-  Future<void> setScheduleEnabled(double id, bool enabled) => _api.schedule.toggle(
+  Future<void> setScheduleEnabled(double id, bool enabled) => _api.schedule.update(
     id: id,
-    body: ToggleScheduleRequest(enabled: enabled),
+    body: ScheduleUpdate(enabled: enabled),
   );
 
   Future<void> removeSchedule(double id) => _api.schedule.delete(id: id);
