@@ -5014,6 +5014,11 @@ class ManagerApi {
     await _api._call('POST', '/api/v1/manager/open', query: {}, body: null);
   }
 
+  /// Ends the manager's run under way and drops what waits for it; the sessions it sent keep working.
+  Future<void> stop() async {
+    await _api._call('POST', '/api/v1/manager/stop', query: {}, body: null);
+  }
+
   Future<void> hear({required SayRequest body}) async {
     await _api._call('POST', '/api/v1/manager/hear', query: {}, body: body.toJson());
   }

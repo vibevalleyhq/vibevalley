@@ -2183,6 +2183,7 @@ type Endpoint struct {
 var Endpoints = []Endpoint{
 	{"server.health", "GET", "/api/v1/health", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"manager.open", "POST", "/api/v1/manager/open", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"manager.stop", "POST", "/api/v1/manager/stop", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"setting.load", "GET", "/api/v1/settings", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"setting.check", "POST", "/api/v1/settings/check", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"setting.save", "PUT", "/api/v1/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
@@ -2275,6 +2276,9 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	})
 	mux.HandleFunc("POST /api/v1/manager/open", func(w http.ResponseWriter, r *http.Request) {
 		answer(w, nil, h.ManagerOpen(r.Context()))
+	})
+	mux.HandleFunc("POST /api/v1/manager/stop", func(w http.ResponseWriter, r *http.Request) {
+		answer(w, nil, h.ManagerStop(r.Context()))
 	})
 	mux.HandleFunc("GET /api/v1/settings", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.SettingLoad(r.Context())
@@ -2839,6 +2843,10 @@ func (c *Client) ServerHealth(ctx context.Context) (Health, error) {
 
 func (c *Client) ManagerOpen(ctx context.Context) error {
 	return c.call(ctx, "POST", "/api/v1/manager/open", nil, nil, nil)
+}
+
+func (c *Client) ManagerStop(ctx context.Context) error {
+	return c.call(ctx, "POST", "/api/v1/manager/stop", nil, nil, nil)
 }
 
 func (c *Client) SettingLoad(ctx context.Context) (SettingsStatus, error) {

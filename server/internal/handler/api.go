@@ -42,6 +42,8 @@ func (a api) ServerHealth(context.Context) (protocol.Health, error) {
 
 func (a api) ManagerOpen(context.Context) error { a.f.Core.Open(); return nil }
 
+func (a api) ManagerStop(context.Context) error { a.f.Manager.Stop(); return nil }
+
 func (a api) SettingLoad(context.Context) (protocol.SettingsStatus, error) {
 	return a.f.Setting.Status(), nil
 }

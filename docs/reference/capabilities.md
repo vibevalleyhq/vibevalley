@@ -22,6 +22,7 @@
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
 | `manager.open` | `POST /api/v1/manager/open` | ✓ | ✓ |  |  |
+| `manager.stop` | `POST /api/v1/manager/stop` | ✓ | ✓ |  |  |
 | `manager.hear` | `POST /api/v1/manager/hear` | ✓ | ✓ |  |  |
 | `manager.listArchive` | `GET /api/v1/manager/archive` | ✓ | ✓ | ✓ |  |
 | `manager.getArchive` | `GET /api/v1/manager/archive/{name}` | ✓ | ✓ |  |  |

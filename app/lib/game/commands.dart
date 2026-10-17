@@ -62,6 +62,7 @@ class FarmCommands {
   }
 
   Future<void> stop(String id) => _api.session.stop(id: id);
+  Future<void> stopManager() => _api.manager.stop();
   Future<void> dismiss(String id) => _api.issue.cancel(id: _issueOf(id));
 
   String _issueOf(String session) => (_farm?.sessions ?? const <Session>[]).firstWhere((w) => w.id == session).issueId;

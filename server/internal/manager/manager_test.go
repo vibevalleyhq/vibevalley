@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
@@ -109,10 +110,15 @@ func managerRespond(c ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ 
 
 func managerOpen(t *testing.T) *managerWorld {
 	t.Helper()
-	faux := ai.FauxProvider(ai.FauxProviderOptions{})
+	return managerOpenWith(t, ai.FauxProviderOptions{}, managerRespond)
+}
+
+func managerOpenWith(t *testing.T, options ai.FauxProviderOptions, respond func(ai.Context, ai.StreamOptions, ai.FauxProviderState, ai.Model) ai.AssistantMessage) *managerWorld {
+	t.Helper()
+	faux := ai.FauxProvider(options)
 	steps := make([]ai.FauxResponseStep, 100)
 	for i := range steps {
-		steps[i] = ai.FauxResponseFactory(managerRespond)
+		steps[i] = ai.FauxResponseFactory(respond)
 	}
 	faux.SetResponses(steps...)
 	return managerStart(t, fixture.Config(t.TempDir(), t.TempDir(), ":memory:"), faux)
@@ -503,4 +509,59 @@ func TestManagerToolStart(t *testing.T) {
 	if managerToolStart("unknown", nil).Text != "unknown" {
 		t.Fatal("an unknown tool is named by its name")
 	}
+}
+
+func TestManagerStopsItsRun(t *testing.T) {
+	long := strings.Repeat("我看一下地里的情况，", 40)
+	w := managerOpenWith(t, ai.FauxProviderOptions{Delay: 5 * time.Millisecond}, func(c ai.Context, o ai.StreamOptions, s ai.FauxProviderState, m ai.Model) ai.AssistantMessage {
+		if _, ok := managerAnsweredCtx(c); ok {
+			return ai.FauxAssistantMessage(long)
+		}
+		return managerRespond(c, o, s, m)
+	})
+	f := w.f
+	f.Manager.Stop()
+	made, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "派活", Text: "加个 README", When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + 50}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.Until(t, "the manager speaking after it dispatched", func() bool {
+		return f.Core.State().Manager == protocol.ManagerStateSpeaking && len(f.Session.Roster()) == 1
+	})
+	f.Manager.Stop()
+	testkit.Until(t, "the manager listening", func() bool { return f.Core.State().Manager == protocol.ManagerStateListening })
+	answered := testkit.Await(t, "its issue answered", func() (protocol.Issue, bool) {
+		i, ok := f.Issue.OfSchedule(made.ID)
+		return i, ok && i.Closed != nil
+	})
+	runs, err := f.Session.Runs(answered.ID)
+	if err != nil || len(runs) != 1 || runs[0].Outcome == nil {
+		t.Fatalf("runs %+v %v", runs, err)
+	}
+	testkit.Eq(t, *runs[0].Outcome, protocol.OutcomeInterrupted, "the manager's run")
+	if roster := f.Session.Roster(); len(roster) != 1 || roster[0].Place.Project != "demo" {
+		t.Fatalf("the session it sent: %+v", roster)
+	}
+	events := f.Session.Events(protocol.ManagerAgent, "")
+	if !slices.ContainsFunc(events, func(e protocol.SessionEvent) bool {
+		return e.Type == protocol.SessionEventTypeRunError && e.Text == "主人叫停了"
+	}) {
+		t.Fatal("no note of the stop in its log")
+	}
+	said := testkit.Await(t, "the half it said", func() (protocol.ChatMessage, bool) {
+		for _, m := range protocol.MessagesIn(f.Core.State().Chat, f.Channel.General()) {
+			if m.From == protocol.ManagerAgent && m.Final && strings.HasPrefix(m.Text, "我看") {
+				return m, true
+			}
+		}
+		return protocol.ChatMessage{}, false
+	})
+	if said.Text == "" || said.Text == long || !strings.HasPrefix(long, said.Text) {
+		t.Fatalf("said %q", said.Text)
+	}
+	asked := len(w.seen())
+	f.Manager.Stop()
+	testkit.Settle()
+	testkit.Eq(t, f.Core.State().Manager, protocol.ManagerStateListening, "stopped while it listens")
+	testkit.Eq(t, len(w.seen()), asked, "no request")
 }

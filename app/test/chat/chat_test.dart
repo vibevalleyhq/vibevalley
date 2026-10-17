@@ -17,7 +17,9 @@ import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/data/remote.dart' show agentsProvider;
 import 'package:vibevalley/voice/voice.dart';
 import 'package:http/http.dart' as http;
+
 import '../support/server.dart' show FakeServer, atlas, jsonResponse;
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibevalley/rules/chat.dart';
 import 'package:vibevalley/rules/sessions.dart';
@@ -63,47 +65,57 @@ const _session = Session(
   phaseText: '在跑命令：pnpm test',
 );
 
-CoreState _state({CallState call = CallState.live, double generalRead = 0, List<ChatMessage> more = const []}) => CoreState(
-  call: call,
-  manager: ManagerState.listening,
-  sessions: const [_session],
-  chat: Chat(
-    conversations: [
-      Conversation(id: 'c1', kind: ConversationKind.general, name: '田头', replies: 0, read: generalRead, at: 0, lastNumber: 2),
-      const Conversation(id: 'c2', kind: ConversationKind.channel, name: 'clock-in', description: '打卡', project: 'clock-in', replies: 0, at: 1, lastNumber: 4),
-      const Conversation(
-        id: 'c3',
-        kind: ConversationKind.thread,
-        parent: 'm2',
-        channel: 'c1',
-        subjectKind: SubjectKind.issue,
-        subjectId: 'w1',
-        replies: 1,
-        at: 2,
-        lastNumber: 3,
+CoreState _state({CallState call = CallState.live, ManagerState manager = ManagerState.listening, double generalRead = 0, List<ChatMessage> more = const []}) =>
+    CoreState(
+      call: call,
+      manager: manager,
+      sessions: const [_session],
+      chat: Chat(
+        conversations: [
+          Conversation(id: 'c1', kind: ConversationKind.general, name: '田头', replies: 0, read: generalRead, at: 0, lastNumber: 2),
+          const Conversation(
+            id: 'c2',
+            kind: ConversationKind.channel,
+            name: 'clock-in',
+            description: '打卡',
+            project: 'clock-in',
+            replies: 0,
+            at: 1,
+            lastNumber: 4,
+          ),
+          const Conversation(
+            id: 'c3',
+            kind: ConversationKind.thread,
+            parent: 'm2',
+            channel: 'c1',
+            subjectKind: SubjectKind.issue,
+            subjectId: 'w1',
+            replies: 1,
+            at: 2,
+            lastNumber: 3,
+          ),
+        ],
+        messages: [
+          _msg(1, 1, 'manager', SenderKind.manager, '农场开门了'),
+          _msg(2, 1, 'manager', SenderKind.manager, '派给 @w1 跑测试', type: MessageKind.dispatch),
+          _msg(3, 3, 'w1', SenderKind.agent, '测试都过了', type: MessageKind.report),
+          _msg(4, 2, 'w1', SenderKind.agent, '打卡页改好了'),
+          ...more,
+        ],
       ),
-    ],
-    messages: [
-      _msg(1, 1, 'manager', SenderKind.manager, '农场开门了'),
-      _msg(2, 1, 'manager', SenderKind.manager, '派给 @w1 跑测试', type: MessageKind.dispatch),
-      _msg(3, 3, 'w1', SenderKind.agent, '测试都过了', type: MessageKind.report),
-      _msg(4, 2, 'w1', SenderKind.agent, '打卡页改好了'),
-      ...more,
-    ],
-  ),
-  schedules: const [
-    Schedule(
-      id: 's5',
-      name: '早测',
-      text: '跑一遍测试',
-      channel: 'c2',
-      when: ScheduleWhenDaily(time: '09:00'),
-      tz: 'Asia/Shanghai',
-      enabled: true,
-      created: 0,
-    ),
-  ],
-);
+      schedules: const [
+        Schedule(
+          id: 's5',
+          name: '早测',
+          text: '跑一遍测试',
+          channel: 'c2',
+          when: ScheduleWhenDaily(time: '09:00'),
+          tz: 'Asia/Shanghai',
+          enabled: true,
+          created: 0,
+        ),
+      ],
+    );
 
 /// The chat's history for conversation 3; anything else is nothing.
 Future<http.Response> _answer(http.Request r) async {
@@ -267,6 +279,19 @@ void main() {
       expect(jsonDecode(say.single.body), {'text': '今天把打卡做完', 'conversation': 'c2'});
     });
 
+    testWidgets('the stop button shows while the manager thinks and stops it', (t) async {
+      final server = FakeServer(_answer);
+      final later = StreamController<CoreState>();
+      addTearDown(later.close);
+      await _pump(t, const ChatPage(), server, _state(), later: later.stream);
+      expect(find.bySemanticsLabel('叫停管家'), findsNothing);
+      later.add(_state(manager: ManagerState.thinking));
+      await t.pump(const Duration(milliseconds: 20));
+      await t.tap(find.bySemanticsLabel('叫停管家'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(server.to('POST', '/api/v1/manager/stop'), hasLength(1));
+    });
+
     testWidgets('@ offers whom to name; Enter names, then Enter sends on the square', (t) async {
       final server = FakeServer(_answer);
       await _pump(t, const ChatPage(), server, _state());
@@ -367,6 +392,19 @@ void main() {
       await t.pump(const Duration(milliseconds: 300));
       expect(_rich('这里是田头'), findsNothing);
       expect(find.byType(TextField), findsOneWidget);
+    });
+
+    testWidgets('the stop button shows while the manager speaks and stops it', (t) async {
+      final server = FakeServer(_answer);
+      final later = StreamController<CoreState>();
+      addTearDown(later.close);
+      await _pump(t, window(server, _state(), []), server, _state(), later: later.stream);
+      expect(find.bySemanticsLabel('叫停管家'), findsNothing);
+      later.add(_state(manager: ManagerState.speaking));
+      await t.pump(const Duration(milliseconds: 20));
+      await t.tap(find.bySemanticsLabel('叫停管家'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(server.to('POST', '/api/v1/manager/stop'), hasLength(1));
     });
 
     testWidgets('the channel menu lists channels with unread and switches', (t) async {

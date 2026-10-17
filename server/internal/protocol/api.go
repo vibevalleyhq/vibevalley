@@ -13,6 +13,10 @@ type Handlers interface {
 	//vibevalley:route manager.open POST /api/v1/manager/open
 	//vibevalley:can owner remote
 	ManagerOpen(ctx context.Context) error
+	// Ends the manager's run under way and drops what waits for it; the sessions it sent keep working.
+	//vibevalley:route manager.stop POST /api/v1/manager/stop
+	//vibevalley:can owner remote
+	ManagerStop(ctx context.Context) error
 	//vibevalley:route setting.load GET /api/v1/settings
 	//vibevalley:can owner remote
 	SettingLoad(ctx context.Context) (SettingsStatus, error)

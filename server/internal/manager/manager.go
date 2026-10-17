@@ -493,7 +493,7 @@ func (fm *manager) event(e vvagent.AgentEvent) {
 		fm.prefixChanged = e.Reason
 		fm.mu.Unlock()
 	case vvagent.EventAgentSettled:
-		fm.settled()
+		fm.settled(e.Aborted)
 	case agentcore.EventToolExecutionStart:
 		fm.trace.ToolStarted(e.ToolCallID, managerToolStart(e.ToolName, e.Args), nil)
 	case agentcore.EventToolExecutionEnd:
@@ -571,7 +571,11 @@ func (fm *manager) done(text string) {
 	}
 }
 
-func (fm *manager) settled() {
+// Only Stop aborts a run: the brain's own context ending publishes no settle.
+func (fm *manager) settled(aborted bool) {
+	if aborted {
+		fm.trace.Note(protocol.SessionEventTypeRunError, "主人叫停了", nil)
+	}
 	fm.mu.Lock()
 	if fm.input.caller != nil {
 		fm.input.caller.end()
@@ -581,8 +585,23 @@ func (fm *manager) settled() {
 	fm.input.Agent = ""
 	fm.open = false
 	fm.mu.Unlock()
-	fm.answered(protocol.OutcomeCompleted)
+	outcome := protocol.OutcomeCompleted
+	if aborted {
+		outcome = protocol.OutcomeInterrupted
+	}
+	fm.answered(outcome)
 	fm.core.SetManager(protocol.ManagerStateListening)
+}
+
+// The lines waiting for the manager are dropped with the run: the patrol tells again, and a plan's state is on its board. The
+// sessions it sent keep working.
+func (fm *manager) Stop() {
+	fm.starting.Lock()
+	brain := fm.brain
+	fm.starting.Unlock()
+	if brain != nil {
+		brain.Stop()
+	}
 }
 
 // now joins the run under way; otherwise the line waits until the run would stop. false: the manager could not start.

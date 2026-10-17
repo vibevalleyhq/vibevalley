@@ -16,6 +16,7 @@
 - **说话**：中文、口语、一两句，只说工具结果和汇报里有的；在串里被问就回在串里。语音管家转来的话（`/api/v1/manager/hear`）已经在电话里答过了：它按需派活，派了就说一句派给了谁，没派就不说（[voice.md](voice.md)「客户端」）。
 - **OpenAI 的协议**：`POST /v1/chat/completions`（只听 127.0.0.1，院门不放），`model` 是 `vibevalley-manager`，`stream` 为真时回 `chat.completion.chunk` 的 SSE，否则回一个 `chat.completion`。只取最后一条 `user` 的话，当作主人在田头说的，回答也进田头；`system`、前面的几轮和 `tools` 不读，回的只有字。同一时间只流一个回答：新的请求（或一通电话里的新一句）结束上一个的流。协议在 `pkg/agent/openai.go`，语音线路也用它（[voice.md](voice.md)「语音线路」）。
 - **听到什么**：没 @ 别人的话、@管家 的话、没做成的汇报、计划的提醒、到点的定时、巡查的发现。它忙时人的话插进这一轮，其余等这一轮做完。做完的汇报不叫醒它，下次开口时一起交给它。
+- **叫停**：管家在想或在说时，田头的输入框旁边有停止键（`POST /api/v1/manager/stop`，`vibevalley manager stop`）。它停掉正在跑的这一轮、丢掉排着等它的话（巡查过后还会再报，计划的状态在计划板上）；已经说出来的半句留在田头，派出去的帮工照常干活；交给管家的工单那一轮记成叫停了（`interrupted`），管家的日志里记一条「主人叫停了」。管家闲着时什么也不做。
 
 工具在 `manager/tools.go`：派活（`dispatch`，挑谁见 [agents-and-runtimes.md](agents-and-runtimes.md)「派给谁」）、看和收获（`changes`、`merge`）、看帮工（`roster`、`check`）、带话叫停收工（`tell`、`stop`、`dismiss`）、频道、定时、记性和种植计划。
 
