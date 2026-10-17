@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/farm_choice.dart';
@@ -192,46 +191,5 @@ Future<void> startLocalFarm() async {
     await host._invoke('server', {'pid': server.pid, 'url': embeddedServerAddress});
   } on ServerFailed catch (e) {
     await host._invoke('fatal', {'title': desktopChannel.titled('码农场物语开不了门'), 'text': e.reason});
-  }
-}
-
-/// Swift shows a notification only while the farm's window is not in front (in front, the farm says it itself).
-final desktopFollowProvider = Provider<void>((ref) {
-  if (!ref.watch(hostProvider).isDesktop) return;
-  final host = DesktopHostChannel.instance;
-  final bell = CallBell();
-  var shown = TraySummary.opening;
-  unawaited(host.tray(shown));
-  ref.listen(stateFrameProvider, (_, next) {
-    final frame = next.value;
-    if (frame == null) return;
-    final summary = traySummary(frame.state, frame.frame.inbox);
-    if (summary != shown) {
-      shown = summary;
-      unawaited(host.tray(summary));
-    }
-    for (final call in bell.ring(frame.frame.inbox)) {
-      unawaited(host.notify(noticeForCall(call)));
-    }
-  });
-  ref.listen(effectsProvider, (_, next) {
-    final notice = next.value == null ? null : noticeForEffect(next.value!);
-    if (notice != null) unawaited(host.notify(notice));
-  });
-  ref.listen(sideEventsProvider, (_, next) {
-    final notice = next.value == null ? null : noticeForEvent(next.value!);
-    if (notice != null) unawaited(host.notify(notice));
-  });
-});
-
-class DesktopHost extends ConsumerWidget {
-  const DesktopHost({super.key, required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(desktopFollowProvider);
-    ref.watch(phoneFollowProvider);
-    return child;
   }
 }

@@ -3,11 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/providers.dart';
 import './command.dart';
 import './notify.dart';
 
@@ -118,26 +115,3 @@ class PhoneNotices {
     }
   }
 }
-
-final phoneFollowProvider = Provider<void>((ref) {
-  if (!isPhone) return;
-  final notices = PhoneNotices.instance;
-  final bell = CallBell();
-  bool away() => WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed;
-  void tell(HostNotice? notice) {
-    if (notice != null && away()) unawaited(notices.show(notice));
-  }
-
-  ref.listen(stateFrameProvider, (_, next) {
-    final frame = next.value;
-    if (frame == null) return;
-    // A call seen on the screen is not notified later.
-    for (final call in bell.ring(frame.frame.inbox)) {
-      tell(noticeForCall(call));
-    }
-  });
-  ref.listen(effectsProvider, (_, next) => tell(next.value == null ? null : noticeForEffect(next.value!)));
-  ref.listen(sideEventsProvider, (_, next) => tell(next.value == null ? null : noticeForEvent(next.value!)));
-  final lifecycle = AppLifecycleListener(onPause: () => unawaited(notices.keepLinked(true)), onResume: () => unawaited(notices.keepLinked(false)));
-  ref.onDispose(lifecycle.dispose);
-});
