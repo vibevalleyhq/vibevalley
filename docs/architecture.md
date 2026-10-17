@@ -119,7 +119,7 @@ flowchart LR
 配置只有两个来源，由 viper 读（`base.LoadConfig`；[理由](../.agents/notes/implemented/architecture/2026-10-16-one-config-file.md)）：
 
 1. `$VIBEVALLEY_HOME/vibevalley.yaml`，或 `--config` 给的文件；
-2. 环境变量，比文件优先：`VIBEVALLEY_` 加上键名，点换成下划线，比如 `manager.model` 是 `VIBEVALLEY_MANAGER_MODEL`。三个外家的钥匙用它们自己的名字：`DEEPSEEK_API_KEY`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。
+2. 环境变量，比文件优先：`VIBEVALLEY_` 加上键名，点换成下划线，比如 `session.stall_seconds` 是 `VIBEVALLEY_SESSION_STALL_SECONDS`。三个外家的钥匙用它们自己的名字：`DEEPSEEK_API_KEY`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。
 
 家目录不在文件里：它由 `VIBEVALLEY_HOME` 定，默认 `~/.vibevalley`。写错的数字、不是端口的端口、`--config` 给了却找不到的文件，服务端都不起来。首页「设置」里存的钥匙和语音设置比配置优先。
 
@@ -128,8 +128,6 @@ flowchart LR
 | `work_root` | 工作目录：每个子文件夹是一个项目，帮工只在这里面干活；也是算经验的范围 | `~/vibevalley-work` |
 | `db` | 数据库：SQLite 文件，给的是文件夹就用里面的 `vibevalley.db`；`memory` 是只在内存里 | `$VIBEVALLEY_HOME/vibevalley.db` |
 | `host`、`port` | 只听本机：帮工没有权限确认，服务端不能对外。帮工拿到的 `/mcp` 地址也由它们拼出 | `127.0.0.1`、`8787` |
-| `manager.model` | 管家用的 DeepSeek 模型（`deepseek-flash` 或 `deepseek/deepseek-flash`） | `deepseek-flash` |
-| `manager.runtime` | 管家用什么想事情：只有 VibeValley 自己的 agent；`pi` 会被拒绝 | （自己的 agent） |
 | `agent.model` | 单独跑 `cmd/vibevalley` 时用的模型 | `deepseek-flash` |
 | `deepseek.api_key` | 管家和 VibeValley 农机用的 DeepSeek 钥匙（`DEEPSEEK_API_KEY`） | |
 | `agora.app_id`、`agora.app_certificate` | 语音：签 RTC 和 RTM 令牌、请语音管家（`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`）；都没有时语音不可用，别的照常 | |

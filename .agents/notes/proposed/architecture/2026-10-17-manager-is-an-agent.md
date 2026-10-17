@@ -10,7 +10,7 @@ Status: proposed
 
 ## Proposal
 
-- 管家是一份内置的档案：id `manager`，新字段 `role`：管家是 `manager`，其余档案不填。内置的意思是：服务端开机时确保它在，主人不能删、不能改 `role`，`agent.delete manager` 拒绝。
+- 管家是一份内置的档案：id `manager`（`protocol.ManagerAgent`）就是它的记号，不另加字段：`Agent.Role` 已经是一句描述（「写接口、改 server」）。内置的意思是：服务端开机时确保它在，`agent.delete manager` 拒绝，农机只能是 `vibevalley`。
 - 农机和模型从配置挪进这份档案：`agent save manager` 能改；配置的 `manager.runtime`、`manager.model` 删掉，按「不留兼容」在加载时把旧值写进档案一次（`agent/cast.go` 那样）。
 - 名字 Manager 只留给这个角色和派活的服务 `internal/manager`；界面上还叫管家。不改叫 Agent：`Agent` 指全部档案，`manager.hear`、`manager.archive` 是只有它有的，归到 `agent.*` 下读起来像对所有档案说的。
 - 随之收敛的：
@@ -18,6 +18,12 @@ Status: proposed
   - 频道的发言人 `participant.kind` 只剩 `user`、`agent`、`system`，`agent_id` 是 `manager` 的就是管家。
   - `manager.*` 只剩 `manager.hear`、`manager.open`、`manager.archive.*`。
 - 管家能用什么工具仍由 `internal/manager` 定，不进档案的 `skills`、`mcpServers`：它的工具是派活的规则，主人改了会让派活失灵。
+
+### 做到哪了
+
+2026-10-17 做了：档案 `manager` 在加载时补上（`agent.go` 的 `managerProfile`），`Agents()` 是派活用的档案（不含管家），`All()` 是全部，`agent.list` 返回全部；删管家、把它的农机换掉被拒绝；`Issue.Hire` 拒绝派给管家；管家的模型从档案读（`manager.go` 的 `modelOf`），配置的 `manager` 段、`protocol.Runtime` 枚举和 `ManagerMemory.Runtime` 删了（管家本来只能在自己的 agent 上跑，`pi` 一直被拒绝）。Flutter 的 `DeskConfig` 把管家的档案单放在 `manager`，各处的档案列表里没有它。
+
+还没做：记忆的 `memory.*` 合并、频道发言人 `'manager'` 并进 `agent`、管家页上改模型。
 
 ## Alternatives considered
 
@@ -27,12 +33,12 @@ Status: proposed
 
 ## Acceptance criteria
 
-- `agent list` 里有 `manager`，`role: manager`；`agent save manager` 能改它的农机和模型，删它、改它的 `role` 被拒绝。
+- `agent list` 里有 `manager`；`agent save manager` 能改它的模型，删它、把它的农机换掉被拒绝。
 - 配置里没有 `manager.runtime`、`manager.model`；旧的配置打开一次后，值在档案里。
 - 记忆、频道发言人、轨迹里没有为管家写的特例分支（`grep -rn "ManagerAgent" server/internal` 只剩档案的定义和派活的判断）。
 - `go vet ./... && go test ./...`、`shapegen -check`、`bun run flutter:check` 通过。
 
 ## Risks
 
-- 主人在档案页把管家的农机改成写代码用的那种，管家的派活工具不变，但模型和人设变了，派活的质量会变；档案页对 `role: manager` 的档案宜只放农机、模型两项。
+- 档案里只有模型对管家有用（农机固定、工具由 `internal/manager` 定）；管家页宜只放模型一项，别的字段改了也不起作用。
 - 档案存在 `config.json`，管家进了档案，坏掉的 `config.json` 也会让管家起不来；开机时缺了就按默认补上。

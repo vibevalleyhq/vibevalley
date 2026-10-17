@@ -16,7 +16,6 @@ Activity _step(double n, ActivityKind kind, String text, {String? input, String?
 
 DeskBackend _server() => DeskBackend(
   managerMemory: ManagerMemory(
-    runtime: Runtime.vibevalley,
     file: '/home/me/.vibevalley/MEMORY.md',
     memories: [
       memory('n1', '提交信息写中文', agent: 'manager', session: 'manager', at: _now),

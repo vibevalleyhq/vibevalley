@@ -79,8 +79,24 @@ func New(home string) (*Service, error) {
 	for i, a := range st.s.Agents {
 		st.s.Agents[i] = withCast(a)
 	}
+	if !slices.ContainsFunc(st.s.Agents, func(a protocol.Agent) bool { return a.ID == protocol.ManagerAgent }) {
+		st.s.Agents = append(st.s.Agents, withCast(managerProfile()))
+	}
 	return st, st.persist()
 }
+
+// The manager is a profile every farm has: built in, never deleted, on VibeValley's own agent (it runs no other).
+func managerProfile() protocol.Agent {
+	return protocol.Agent{
+		ID: protocol.ManagerAgent, Name: "管家", Role: "替主人派活、转告结果", Enabled: true, Runtime: managerRuntime,
+		PersonaMode: protocol.PersonaModeAppend, Skills: []string{}, MCPServers: []protocol.MCPServer{}, DisallowedTools: []string{},
+		Env: map[string]string{}, Tags: []string{},
+	}
+}
+
+// The runtime id of VibeValley's own agent, the one the manager runs on.
+const managerRuntime = "vibevalley"
+
 
 func (st *Service) persist() error {
 	return st.disk.Write(func() ([]byte, error) {
@@ -97,14 +113,21 @@ func (st *Service) change(f func(*stored)) error {
 	return st.persist()
 }
 
+// Agents are the profiles work is sent to: every one but the manager's.
 func (st *Service) Agents() []protocol.Agent {
+	return slices.DeleteFunc(st.All(), func(a protocol.Agent) bool { return a.ID == protocol.ManagerAgent })
+}
+
+// All the profiles, the manager's too.
+func (st *Service) All() []protocol.Agent {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	return slices.Clone(st.s.Agents)
 }
 
+// Agent is any profile by id, the manager's too.
 func (st *Service) Agent(id string) *protocol.Agent {
-	for _, a := range st.Agents() {
+	for _, a := range st.All() {
 		if a.ID == id {
 			return &a
 		}
@@ -137,8 +160,8 @@ func upsert[T any](list []T, item T, id func(T) string) []T {
 }
 
 func (st *Service) SaveAgent(agent protocol.Agent) (protocol.Agent, error) {
-	if agent.ID == protocol.ManagerAgent {
-		return agent, errors.New("manager 是管家的，档案换个 id")
+	if agent.ID == protocol.ManagerAgent && agent.Runtime != managerRuntime {
+		return agent, errors.New("管家只在 VibeValley 自己的 agent 上跑：农机留着 " + managerRuntime)
 	}
 	agent = withCast(agent)
 	return agent, st.change(func(s *stored) {
@@ -147,6 +170,9 @@ func (st *Service) SaveAgent(agent protocol.Agent) (protocol.Agent, error) {
 }
 
 func (st *Service) DeleteAgent(id string) error {
+	if id == protocol.ManagerAgent {
+		return protocol.Refused{Reason: "管家是每个农场都有的，删不了"}
+	}
 	return st.change(func(s *stored) {
 		s.Agents = slices.DeleteFunc(slices.Clone(s.Agents), func(a protocol.Agent) bool { return a.ID == id })
 	})

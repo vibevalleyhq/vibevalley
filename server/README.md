@@ -83,7 +83,7 @@ go run ./tool/shapegen          # 写 protocol/gen.go 和 ../app/lib/gen/vibeval
 
 ## 取舍
 
-- **写错的配置**：读不成数字的值、不是端口的端口让服务端起不来，开机就看到；能读却不认识的值（`voice.model` 不在列表里、`manager.runtime` 不是 `pi`）用默认。键的清单见 [architecture.md](../docs/architecture.md)「配置」。
+- **写错的配置**：读不成数字的值、不是端口的端口让服务端起不来，开机就看到；能读却不认识的值（`voice.model` 不在列表里）用默认。键的清单见 [architecture.md](../docs/architecture.md)「配置」。
 - **存着的文件读不了**：`config.json` 挪到旁边（`config.json.unreadable-<时间>`），档案从种子开始；挪不成就不启动，绝不覆盖主人的文件。失败不当成功：写轨迹、合并后退出合并、退回待办这些出错时记日志或说给主人，不悄悄吞掉。
 - **端口被占**：语音线路的端口被占时只记一行日志（[voice.md](../docs/reference/voice.md)），院门的写进院门的状态（[server.md](../docs/reference/server.md)「院门」），农场照常。
 - **字数上限**：VibeValley 自己的 agent 里的（管家的 `MEMORY.md` 尾巴、工具结果的截断）按字符数；`protocol` 和服务里给人看的文字按 UTF-16 码元量，空白照 JavaScript 的 `\s`：只有 `pkg/x/str` 一份（`str.Units`、`Slice`、`Trim`、`SpaceClass`、`Cut`、`Clip`），服务和规则都用它，黄金数据守着的就是这一份。

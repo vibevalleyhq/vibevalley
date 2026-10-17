@@ -2212,22 +2212,19 @@ class MemoryRequest {
 }
 
 class ManagerMemory {
-  const ManagerMemory({required this.runtime, required this.file, required this.memories, required this.carried});
+  const ManagerMemory({required this.file, required this.memories, required this.carried});
 
   factory ManagerMemory.fromJson(Map<String, dynamic> j) => ManagerMemory(
-    runtime: Runtime.fromJson(j['runtime']),
     file: j['file'] as String,
     memories: [for (final e in j['memories'] as List) Memory.fromJson(e as Map<String, dynamic>)],
     carried: (j['carried'] as num).toDouble(),
   );
 
-  final Runtime runtime;
   final String file;
   final List<Memory> memories;
   final double carried;
 
   Map<String, dynamic> toJson() => {
-    'runtime': runtime.wire,
     'file': file,
     'memories': [for (final e in memories) e.toJson()],
     'carried': carried,
@@ -3883,16 +3880,6 @@ class Author {
   final double commits;
 
   Map<String, dynamic> toJson() => {'name': name, 'commits': commits};
-}
-
-enum Runtime {
-  vibevalley('vibevalley'),
-  pi('pi');
-
-  const Runtime(this.wire);
-  final String wire;
-
-  static Runtime fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('Runtime: unknown value', v));
 }
 
 /// Told apart by `type`; switch over the subclasses.

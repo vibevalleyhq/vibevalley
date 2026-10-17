@@ -381,9 +381,13 @@ func TestManagerHearsThePatrol(t *testing.T) {
 
 func TestManagerTellsItsStartFailure(t *testing.T) {
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
-	cfg.Manager.Runtime = "pi"
 	f, err := newWorld(cfg)
 	if err != nil {
+		t.Fatal(err)
+	}
+	manager := *f.Agent.Agent(protocol.ManagerAgent)
+	manager.Model = "openai/gpt"
+	if _, err := f.Agent.SaveAgent(manager); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Start(context.Background()); err != nil {
@@ -394,7 +398,7 @@ func TestManagerTellsItsStartFailure(t *testing.T) {
 	for piece := range f.Manager.Call(context.Background(), "在吗") {
 		words = append(words, piece)
 	}
-	if len(words) != 1 || !strings.Contains(words[0], "manager.runtime: pi") {
+	if len(words) != 1 || !strings.Contains(words[0], "只接 DeepSeek") {
 		t.Fatalf("words %q", words)
 	}
 	said := testkit.Await(t, "the refusal on 田头", func() (string, bool) {

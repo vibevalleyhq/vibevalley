@@ -269,13 +269,6 @@ func (m *memories) Forget(agentID, id string) error {
 	return m.q.Forget(context.Background(), generated.ForgetParams{Agent: agentID, ID: n})
 }
 
-func ManagerRuntime(cfg base.Config) protocol.Runtime {
-	if cfg.Manager.Runtime == string(protocol.RuntimePi) {
-		return protocol.RuntimePi
-	}
-	return protocol.RuntimeVibeValley
-}
-
 func ManagerHome(home string) string { return filepath.Join(home, "manager") }
 
 func memoryLineOf(line agent.MemoryLine, fileTime int64) protocol.Memory {
@@ -315,11 +308,10 @@ func memoryCarriedLines(lines []agent.MemoryLine) int {
 
 type managerMemory struct {
 	home    string
-	runtime protocol.Runtime
 }
 
 func newManagerMemory(cfg base.Config) (*managerMemory, error) {
-	return &managerMemory{home: ManagerHome(cfg.Home), runtime: ManagerRuntime(cfg)}, nil
+	return &managerMemory{home: ManagerHome(cfg.Home)}, nil
 }
 func (*managerMemory) OnStart(context.Context) error { return nil }
 func (*managerMemory) OnStop()                       {}
@@ -340,7 +332,7 @@ func (mm *managerMemory) Manager() protocol.ManagerMemory {
 	for i, l := range lines {
 		memories[len(lines)-1-i] = memoryLineOf(l, at)
 	}
-	return protocol.ManagerMemory{Runtime: mm.runtime, File: mm.file(), Memories: memories, Carried: int64(memoryCarriedLines(lines))}
+	return protocol.ManagerMemory{File: mm.file(), Memories: memories, Carried: int64(memoryCarriedLines(lines))}
 }
 
 var memoryNewlines = regexp.MustCompile(`\s*\n\s*`)

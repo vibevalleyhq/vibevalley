@@ -131,11 +131,10 @@ func TestMemoriesKeepRecallWriteForget(t *testing.T) {
 	}
 }
 
-func openManagerMemory(t *testing.T, runtime string) (*managerMemory, string) {
+func openManagerMemory(t *testing.T) (*managerMemory, string) {
 	t.Helper()
 	home := t.TempDir()
 	cfg := fixture.Config(home, "", "")
-	cfg.Manager.Runtime = runtime
 	mm, err := newManagerMemory(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +143,7 @@ func openManagerMemory(t *testing.T, runtime string) (*managerMemory, string) {
 }
 
 func TestManagerMemoryLines(t *testing.T) {
-	memory, folder := openManagerMemory(t, "")
+	memory, folder := openManagerMemory(t)
 	if len(memory.Manager().Memories) != 0 {
 		t.Fatal("remembers something already")
 	}
@@ -161,7 +160,7 @@ func TestManagerMemoryLines(t *testing.T) {
 	}
 
 	view := memory.Manager()
-	if view.Runtime != protocol.RuntimeVibeValley || len(view.Memories) != 2 {
+	if len(view.Memories) != 2 {
 		t.Fatalf("%+v", view)
 	}
 	if view.Memories[0].Text != "周末别派夜班 真的" || view.Memories[0].Session != nil ||
@@ -199,10 +198,7 @@ func TestManagerMemoryCarriedLines(t *testing.T) {
 }
 
 func TestManagerMemoryArchive(t *testing.T) {
-	memory, folder := openManagerMemory(t, "pi")
-	if memory.Manager().Runtime != protocol.RuntimePi {
-		t.Fatal("not on pi")
-	}
+	memory, folder := openManagerMemory(t)
 	if err := os.MkdirAll(filepath.Join(folder, "archive"), 0o755); err != nil {
 		t.Fatal(err)
 	}

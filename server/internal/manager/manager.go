@@ -142,8 +142,6 @@ type manager struct {
 	playbooks *playbook.Service
 	schedule  *schedule.Service
 	patrol    *patrol
-	runtime   protocol.Runtime
-	model     string
 	ctx       context.Context
 
 	// Stand-ins for tests: llm nil is DeepSeek; trace nil is opened at start.
@@ -190,7 +188,7 @@ func newManager(in managerIn) (*manager, error) {
 	return &manager{
 		cfg: in.Config, core: in.Core, store: in.Agent, settings: in.Setting, runtimes: in.Runtime,
 		projects: in.Project, run: in.Run, issue: in.Issue, chat: in.Channel, playbooks: in.Playbook, schedule: in.Schedule,
-		runtime: memory.ManagerRuntime(in.Config), model: strings.TrimSpace(in.Config.Manager.Model), ctx: context.Background(),
+		ctx: context.Background(),
 	}, nil
 }
 
@@ -400,7 +398,15 @@ func managerDeepseekModel(configured string) (string, error) {
 	if provider == "deepseek" {
 		return rest, nil
 	}
-	return "", errors.New("管家只接 DeepSeek 的模型：配置里的 manager.model 设成 deepseek/<模型> 或直接写模型名，" + configured + " 用不了")
+	return "", errors.New("管家只接 DeepSeek 的模型：管家档案的模型设成 deepseek/<模型> 或直接写模型名，" + configured + " 用不了")
+}
+
+// The model in the manager's profile; read when the manager starts, so a change is used from its next start.
+func (fm *manager) modelOf() string {
+	if a := fm.store.Agent(protocol.ManagerAgent); a != nil {
+		return strings.TrimSpace(a.Model)
+	}
+	return ""
 }
 
 // Started on first use: loading it is not free, and a farm without a model works otherwise.
@@ -409,9 +415,6 @@ func (fm *manager) brainOf() (*vvagent.Agent, error) {
 	defer fm.starting.Unlock()
 	if fm.brain != nil {
 		return fm.brain, nil
-	}
-	if fm.runtime == protocol.RuntimePi {
-		return nil, errors.New("管家还不能在 pi 上跑：去掉配置里的 manager.runtime: pi，用 VibeValley 自己的 agent")
 	}
 	options := vvagent.AgentOptions{
 		Name:         protocol.ManagerAgent,
@@ -424,15 +427,15 @@ func (fm *manager) brainOf() (*vvagent.Agent, error) {
 		Schedules:    new(false),
 		Situation:    func(context.Context) string { return fm.situation() },
 	}
-	if fm.llm == nil && testing.Testing() {
-		return nil, errors.New("测试里管家没有模型")
-	}
 	if fm.llm != nil {
 		options.Model, options.StreamOptions = fm.llm.Model, fm.llm.StreamOptions
 	} else {
-		id, err := managerDeepseekModel(fm.model)
+		id, err := managerDeepseekModel(fm.modelOf())
 		if err != nil {
 			return nil, err
+		}
+		if testing.Testing() {
+			return nil, errors.New("测试里管家没有模型")
 		}
 		llm, err := vvagent.Deepseek(id, fm.settings.DeepseekAPIKey())
 		if err != nil {

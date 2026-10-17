@@ -28,11 +28,6 @@ type Config struct {
 	Host string `mapstructure:"host"`
 	Port int    `mapstructure:"port"`
 
-	Manager struct {
-		// "pi", or the manager runs on VibeValley's own agent.
-		Runtime string `mapstructure:"runtime"`
-		Model   string `mapstructure:"model"`
-	} `mapstructure:"manager"`
 	// cmd/vibevalley on its own; empty is the agent's default model.
 	Agent struct {
 		Model string `mapstructure:"model"`

@@ -268,7 +268,7 @@ func (a api) RuntimeUpgrade(context.Context, string) (protocol.RuntimeInfo, erro
 }
 
 func (a api) AgentList(context.Context) ([]protocol.Agent, error) {
-	return a.f.Agent.Agents(), nil
+	return a.f.Agent.All(), nil
 }
 
 func (a api) AgentSave(_ context.Context, id string, body protocol.Agent) (protocol.Agent, error) {

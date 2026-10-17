@@ -220,15 +220,6 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
       mainAxisSize: MainAxisSize.min,
       children: _gap([
         Text('管家每次开口前，整份记性都放在系统提示里；太长时只带最新的（最多 8000 字）。它自己用 remember 记、用 rewrite_memory 整理，你也可以替它记一条。', style: _lead),
-        if (view.runtime == Runtime.pi)
-          Container(
-            color: const Color(0xFFF6E3C8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              '管家现在跑在 pi 上（配置里的 manager.runtime 是 pi），不读这份记性：pi 的会话自己留着对话。换回 VibeValley 自己的 agent 才用得上。',
-              style: KitText.xs.copyWith(color: const Color(0xFF8A4F1D)),
-            ),
-          ),
         WriteNote(onWrite: (text, _) => ref.read(managerMemoryProvider.notifier).write(text)),
         DeskSection(
           title: '记下的',

@@ -114,6 +114,9 @@ func (d *dispatch) scheduled(ctx context.Context, due schedule.Due) {
 }
 
 func (d *dispatch) Hire(ctx context.Context, agent protocol.Agent, task, project string, opt session.HireOptions) session.Hired {
+	if agent.ID == protocol.ManagerAgent {
+		return session.Hired{Refused: "管家不下地：派给一个帮工档案"}
+	}
 	if !agent.Enabled {
 		return session.Hired{Refused: agent.Name + " 被停用了"}
 	}

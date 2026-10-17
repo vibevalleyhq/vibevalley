@@ -13,14 +13,21 @@ import '../rules/playbook.dart';
 String reasonOf(Object e) => e is VibeValleyApiError ? e.reason : '$e';
 
 class DeskConfig {
-  const DeskConfig({this.loaded = false, this.runtimes = const [], this.agents = const [], this.skills = const []});
+  const DeskConfig({this.loaded = false, this.runtimes = const [], this.agents = const [], this.manager, this.skills = const []});
   final bool loaded;
   final List<RuntimeInfo> runtimes;
+  // The profiles work is sent to; the manager's is apart.
   final List<Agent> agents;
+  final Agent? manager;
   final List<Skill> skills;
 
-  DeskConfig copyWith({bool? loaded, List<RuntimeInfo>? runtimes, List<Agent>? agents, List<Skill>? skills}) =>
-      DeskConfig(loaded: loaded ?? this.loaded, runtimes: runtimes ?? this.runtimes, agents: agents ?? this.agents, skills: skills ?? this.skills);
+  DeskConfig copyWith({bool? loaded, List<RuntimeInfo>? runtimes, List<Agent>? agents, Agent? manager, List<Skill>? skills}) => DeskConfig(
+    loaded: loaded ?? this.loaded,
+    runtimes: runtimes ?? this.runtimes,
+    agents: agents ?? this.agents,
+    manager: manager ?? this.manager,
+    skills: skills ?? this.skills,
+  );
 
   Agent? agent(String? id) => id == null ? null : agents.where((a) => a.id == id).firstOrNull;
   RuntimeInfo? runtime(String id) => runtimes.where((r) => r.id == id).firstOrNull;
@@ -47,7 +54,7 @@ class DeskConfigNotifier extends Notifier<DeskConfig> {
     await Future.wait([
       () async {
         final (agents, skills) = (await _api.agent.list(), await _api.skill.list());
-        state = state.copyWith(agents: agents, skills: skills);
+        state = _withProfiles(agents).copyWith(skills: skills);
       }(),
       () async {
         final runtimes = await _api.runtime.list();
@@ -57,14 +64,23 @@ class DeskConfigNotifier extends Notifier<DeskConfig> {
     state = state.copyWith(loaded: true);
   }
 
+  /// agent.list has the manager's profile too: it is kept apart, so every list of profiles to send work to has none of it.
+  DeskConfig _withProfiles(List<Agent> all) => state.copyWith(
+    agents: [
+      for (final a in all)
+        if (a.id != managerAgent) a,
+    ],
+    manager: all.where((a) => a.id == managerAgent).firstOrNull,
+  );
+
   Future<void> saveAgent(Agent agent) async {
     await _api.agent.save(id: agent.id, body: agent);
-    state = state.copyWith(agents: await _api.agent.list());
+    state = _withProfiles(await _api.agent.list());
   }
 
   Future<void> deleteAgent(String id) async {
     await _api.agent.delete(id: id);
-    state = state.copyWith(agents: await _api.agent.list());
+    state = _withProfiles(await _api.agent.list());
   }
 
   Future<void> saveSkill(Skill skill) async {
@@ -225,7 +241,6 @@ class ManagerMemoryNotifier extends Notifier<ManagerMemory?> {
     final m = state;
     if (m != null) {
       state = ManagerMemory(
-        runtime: m.runtime,
         file: m.file,
         memories: [
           for (final x in m.memories)

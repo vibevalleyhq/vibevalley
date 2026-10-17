@@ -184,11 +184,11 @@ class DeskBackend {
         final req = MemoryRequest.fromJson(body as Map<String, dynamic>);
         final m = memory('mm${calls.length}', req.text, agent: 'manager', at: 1);
         final mm = managerMemory!;
-        managerMemory = ManagerMemory(runtime: mm.runtime, file: mm.file, memories: [m, ...mm.memories], carried: mm.carried + 1);
+        managerMemory = ManagerMemory(file: mm.file, memories: [m, ...mm.memories], carried: mm.carried + 1);
         return jsonResponse(m.toJson());
       case ('DELETE', ['api', 'manager', 'memories', final mid]):
         final mm = managerMemory!;
-        managerMemory = ManagerMemory(runtime: mm.runtime, file: mm.file, memories: mm.memories.where((m) => m.id != mid).toList(), carried: mm.carried);
+        managerMemory = ManagerMemory(file: mm.file, memories: mm.memories.where((m) => m.id != mid).toList(), carried: mm.carried);
         return http.Response('', 204);
       case ('GET', ['api', 'manager', 'archive']):
         final q = r.url.queryParameters['q'];

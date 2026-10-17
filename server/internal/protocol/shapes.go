@@ -888,7 +888,6 @@ type MemoryRequest struct {
 }
 
 type ManagerMemory struct {
-	Runtime  Runtime  `json:"runtime"`
 	File     string   `json:"file"`
 	Memories []Memory `json:"memories"`
 	Carried  int64    `json:"carried"`
@@ -1549,13 +1548,6 @@ type Author struct {
 	Name    string `json:"name"`
 	Commits int64  `json:"commits"`
 }
-
-type Runtime string
-
-const (
-	RuntimeVibeValley Runtime = "vibevalley"
-	RuntimePi         Runtime = "pi"
-)
 
 //vibevalley:union type
 type MCPServer struct{ Value MCPServerValue }

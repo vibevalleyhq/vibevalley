@@ -1208,9 +1208,6 @@ func (v LedgerEntryCarried) MarshalJSON() ([]byte, error) {
 // ConnectorIDValues are every ConnectorID, in the protocol's order.
 var ConnectorIDValues = []ConnectorID{ConnectorIDWeixin, ConnectorIDFeishu, ConnectorIDQq}
 
-// RuntimeValues are every Runtime, in the protocol's order.
-var RuntimeValues = []Runtime{RuntimeVibeValley, RuntimePi}
-
 // MCPServerValue is a member of MCPServer: MCPServerStdio, MCPServerHTTP, told apart by "type".
 type MCPServerValue interface{ isMCPServer() }
 

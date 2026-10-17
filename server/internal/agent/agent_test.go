@@ -1,8 +1,10 @@
 package agent
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"vibevalley/internal/protocol"
@@ -78,4 +80,44 @@ func TestOldProfilesAreFilledInOnceOnLoad(t *testing.T) {
 	testkit.Match(t, string(body), `"species":"cat","outfit":"farmer"`, "and written back")
 	saved, _ := s.SaveAgent(protocol.Agent{ID: "agent-7", Name: "新", Runtime: "pi"})
 	testkit.Eq(t, *saved.Look.Species, protocol.SpeciesFox, "a save without one is filled in too")
+}
+
+// The manager is a profile every farm has: there after the first load and every one after, kept out of the profiles work is
+// sent to, never deleted, and only ever on VibeValley's own agent; its model is the profile's to change.
+func TestTheManagerIsABuiltInProfile(t *testing.T) {
+	home := t.TempDir()
+	s, err := New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := s.Agent(protocol.ManagerAgent)
+	if manager == nil || manager.Runtime != managerRuntime || !manager.Enabled {
+		t.Fatalf("the manager: %+v", manager)
+	}
+	if slices.ContainsFunc(s.Agents(), func(a protocol.Agent) bool { return a.ID == protocol.ManagerAgent }) {
+		t.Fatal("work could be sent to the manager")
+	}
+	if !slices.ContainsFunc(s.All(), func(a protocol.Agent) bool { return a.ID == protocol.ManagerAgent }) {
+		t.Fatal("the manager is not listed")
+	}
+	var refused protocol.Refused
+	if err := s.DeleteAgent(protocol.ManagerAgent); !errors.As(err, &refused) {
+		t.Fatalf("deleted: %v", err)
+	}
+	other := *manager
+	other.Runtime = "claude"
+	if _, err := s.SaveAgent(other); err == nil {
+		t.Fatal("the manager on claude")
+	}
+	manager.Model = "deepseek-pro"
+	if _, err := s.SaveAgent(*manager); err != nil {
+		t.Fatal(err)
+	}
+	again, err := New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := again.Agent(protocol.ManagerAgent); got == nil || got.Model != "deepseek-pro" || len(again.All()) != len(s.All()) {
+		t.Fatalf("after a restart: %+v, %d profiles", got, len(again.All()))
+	}
 }

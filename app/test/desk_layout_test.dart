@@ -26,7 +26,7 @@ DeskBackend _server() => DeskBackend(
       ],
     ),
   ],
-  managerMemory: const ManagerMemory(runtime: Runtime.pi, file: '/m.md', memories: [], carried: 0),
+  managerMemory: const ManagerMemory(file: '/m.md', memories: [], carried: 0),
 );
 
 void main() {
@@ -43,7 +43,7 @@ void main() {
         await settle(t);
       }
       await pumpPage(t, const ManagerPage(), server.handle, size: size);
-      expect(find.textContaining('管家现在跑在 pi 上'), findsOneWidget);
+      expect(find.textContaining('管家每次开口前'), findsOneWidget);
       await pumpPage(t, const SkillsPage(id: 's'), server.handle, size: size);
       expect(find.text('先写测试'), findsWidgets);
       await t.pumpWidget(const SizedBox());
