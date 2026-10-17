@@ -34,7 +34,7 @@ Status: proposed
 |---|---|
 | 协议 `Worker`、`CoreState.Workers`、`Issue.Workers`、`WorkerOf` | `Session`、`CoreState.Sessions`、`Issue.Sessions`、`SessionOf` |
 | `WorkerAction*`、`WorkerPlay`、`WorkerPlaybook`、`GameEffect.WorkerID` | `SessionAction*`、`SessionPlay`、`SessionPlaybook`、`GameEffect.SessionID` |
-| `SenderKindWorker`（`"worker"`）、`participant.kind` 的 `'worker'` | `agent`，带档案 id：在频道里说话的是档案。管家成为内置档案以后（[管家是一份内置档案](2026-10-17-manager-is-an-agent.md)），`'manager'` 也并进 `agent`，`agent_id` 是 `manager` |
+| `SenderKindWorker`（`"worker"`）、`participant.kind` 的 `'worker'` | `agent`，带档案 id：在频道里说话的是档案。`'manager'` 留着：管家在频道里是另一种参与者（[管家是一份内置档案](2026-10-17-manager-is-an-agent.md) 的 Alternatives） |
 | 包 `internal/worker`、`Workspace.Worker`、`worker.Service` | `internal/session`、`Workspace.Session`、`session.Service` |
 | 表 `issue_worker`（列 `worker`） | `issue_session`（列 `session`），一个迁移 |
 | 家目录 `workers.json` | `sessions.json`，加载时改名写回 |
