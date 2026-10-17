@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"encoding/json"
+
 	vvagent "vibevalley/pkg/agent"
 	"vibevalley/pkg/agentcore"
 )
@@ -11,7 +13,9 @@ type managerInput struct {
 	Conversation string `json:"conversation"`
 	Agent        string `json:"agent,omitempty"`
 	Quiet        bool   `json:"quiet,omitempty"`
-	caller       *managerCaller
+	// The issue handed to the manager that this input is; its run ends when the manager's settles.
+	Issue  string `json:"issue,omitempty"`
+	caller *managerCaller
 }
 
 func managerInputOf(message agentcore.AgentMessage) (managerInput, bool) {
@@ -19,8 +23,19 @@ func managerInputOf(message agentcore.AgentMessage) (managerInput, bool) {
 	if !ok || custom.CustomType != "managerInput" {
 		return managerInput{}, false
 	}
-	input, ok := custom.Details.(managerInput)
-	return input, ok
+	switch details := custom.Details.(type) {
+	case managerInput:
+		return details, true
+	// Read back from manager.jsonl.
+	case map[string]any:
+		var input managerInput
+		data, err := json.Marshal(details)
+		if err != nil || json.Unmarshal(data, &input) != nil {
+			return managerInput{}, false
+		}
+		return input, true
+	}
+	return managerInput{}, false
 }
 
 // Tools run synchronously with the request; output routing follows the ordered event stream.

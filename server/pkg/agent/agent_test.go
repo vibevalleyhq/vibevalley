@@ -709,3 +709,64 @@ func TestCutPointKeepsTheLastWords(t *testing.T) {
 		}
 	}
 }
+
+func TestARunCutOffIsGoneOnWith(t *testing.T) {
+	now := time.Now().UnixMilli()
+	asked := ai.UserMessage{Content: ai.StringContent("列一下"), Timestamp: now}
+	call := ai.FauxAssistantMessage([]ai.Content{ai.FauxToolCall("list_dir", nil, "call-1")})
+	call.Timestamp = now
+	result := ai.ToolResultMessage{ToolCallID: "call-1", ToolName: "list_dir", Content: []ai.Content{ai.NewText("（空的）")}, Timestamp: now}
+	old := result
+	old.Timestamp = now - 2*time.Hour.Milliseconds()
+	stopped := ai.ToolResultMessage{ToolCallID: "call-1", ToolName: "list_dir", Content: []ai.Content{ai.NewText(agentcore.STOPPED)}, IsError: true, Timestamp: now}
+	answer := ai.FauxAssistantMessage("列完了")
+	for _, c := range []struct {
+		name       string
+		lines      []agentcore.AgentMessage
+		unfinished bool
+		resumed    bool
+	}{
+		{"a tool done, not answered", []agentcore.AgentMessage{asked, call, result}, true, true},
+		{"cut off in a tool", []agentcore.AgentMessage{asked, call}, true, true},
+		{"answered", []agentcore.AgentMessage{asked, call, result, answer}, false, false},
+		{"two hours ago", []agentcore.AgentMessage{asked, call, old}, true, false},
+		{"stopped", []agentcore.AgentMessage{asked, call, stopped}, false, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := home(t)
+			var lines []string
+			for _, m := range c.lines {
+				lines = append(lines, ai.Stringify(m))
+			}
+			file := filepath.Join(dir, "test.jsonl")
+			_ = os.WriteFile(file, []byte(strings.Join(lines, "\n")+"\n"), 0o644)
+			eq(t, SessionUnfinished(file), c.unfinished)
+			withAgent(t, dir, []ai.FauxResponseStep{step(func(ctx ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ ai.Model) ai.AssistantMessage {
+				return ai.FauxAssistantMessage(fmt.Sprintf("%v", results(ctx)))
+			})}, func(r *rig) {
+				eq(t, r.agent.Resume(30*time.Minute), c.resumed)
+				if !c.resumed {
+					time.Sleep(20 * time.Millisecond)
+					eq(t, r.faux.State().CallCount, 0)
+					return
+				}
+				r.until(has(EventAgentSettled))
+				eq(t, r.faux.State().CallCount, 1)
+				got := results(r.faux.State().Contexts[0])
+				if c.name == "cut off in a tool" {
+					eq(t, got, []toolResult{{true, RESUMED_UNKNOWN}})
+				} else {
+					eq(t, got, []toolResult{{false, "（空的）"}})
+				}
+			}, nil)
+			if c.resumed {
+				data, _ := os.ReadFile(file)
+				added := []string{"assistant"}
+				if c.name == "cut off in a tool" {
+					added = []string{"toolResult", "assistant"}
+				}
+				eq(t, roles(string(data))[len(c.lines):], added)
+			}
+		})
+	}
+}

@@ -234,7 +234,9 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 				if !ok {
 					return
 				}
-				if e.Type == agentcore.EventMessageEnd && a.session != nil {
+				// Not what closing it made (the answer cut off, its tools' "stopped"): the file ends where the run was
+				// cut, as after a crash, and Resume goes on from there.
+				if e.Type == agentcore.EventMessageEnd && a.session != nil && life.Err() == nil {
 					_ = a.session.Append(e.Message)
 				}
 				a.publish(AgentEvent{AgentEvent: e})
@@ -409,9 +411,13 @@ func (a *Agent) settleFold() {
 
 func (a *Agent) run(start func(ctx context.Context) error) {
 	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.runLocked(start)
+}
+
+func (a *Agent) runLocked(start func(ctx context.Context) error) {
 	a.runs++
 	a.steps = 0
-	a.mu.Unlock()
 	go func() {
 		defer func() {
 			a.mu.Lock()

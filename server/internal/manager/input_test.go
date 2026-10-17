@@ -2,11 +2,14 @@ package manager
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 	"vibevalley/pkg/agentcore"
 
+	"vibevalley/internal/memory"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
@@ -253,4 +256,61 @@ func TestOnlyItsOwnScheduleSoonKeepsTheManagerFromFoldingIdle(t *testing.T) {
 		t.Fatal(err)
 	}
 	testkit.Eq(t, fm.wakeSoon(10*time.Minute), true, "its own in 5 minutes")
+}
+
+func TestInputReadBackFromTheFileKeepsItsRouting(t *testing.T) {
+	line := `{"role":"custom","customType":"managerInput","content":"主人说：在吗","display":true,"details":{"conversation":"c-1","agent":"lab","issue":"i-1"},"timestamp":1}`
+	m, err := vvagent.DecodeMessage([]byte(line))
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, ok := managerInputOf(m)
+	testkit.Eq(t, ok, true, "known")
+	testkit.Eq(t, input, managerInput{Conversation: "c-1", Agent: "lab", Issue: "i-1"}, "input")
+}
+
+func TestARestartGoesOnWithTheRunItCut(t *testing.T) {
+	cfg := fixture.Config(t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "vibevalley.db"))
+	// Slow enough that the second answer is still coming when the farm stops.
+	before := ai.FauxProvider(ai.FauxProviderOptions{Delay: 5 * time.Millisecond})
+	before.SetResponses(
+		ai.FauxAssistantMessage(ai.FauxToolCall("dispatch", map[string]any{"task": "加个 README", "project": "demo"}, "")),
+		ai.FauxAssistantMessage(strings.Repeat("还在说", 400)),
+	)
+	w := managerStart(t, cfg, before)
+	clockIn, err := w.f.Channel.OpenChannel("clock-in", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.f.Manager.send("主人说：在 demo 里加个 README", clockIn.ID, true)
+	file := filepath.Join(memory.ManagerHome(cfg.Home), protocol.ManagerAgent+".jsonl")
+	testkit.Until(t, "the tool's result saved", func() bool {
+		data, _ := os.ReadFile(file)
+		return strings.Contains(string(data), `"role":"toolResult"`)
+	})
+	testkit.Until(t, "the second answer coming", func() bool { return len(before.State().Contexts) == 2 })
+	w.f.Close()
+	if !vvagent.SessionUnfinished(file) {
+		t.Fatal("the cut run looks finished")
+	}
+
+	after := ai.FauxProvider(ai.FauxProviderOptions{})
+	after.SetResponses(ai.FauxResponseFactory(func(c ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ ai.Model) ai.AssistantMessage {
+		if result, ok := managerAnsweredCtx(c); ok && strings.Contains(result, "派") {
+			return ai.FauxAssistantMessage("接着说完：派好了")
+		}
+		return ai.FauxAssistantMessage("不对")
+	}))
+	again := managerStart(t, cfg, after)
+	said := testkit.Await(t, "the run gone on with", func() (string, bool) {
+		for _, m := range protocol.MessagesIn(again.f.Core.State().Chat, clockIn.ID) {
+			if m.From == protocol.ManagerAgent && m.Final && !strings.HasPrefix(m.Text, "派 ") {
+				return m.Text, true
+			}
+		}
+		return "", false
+	})
+	testkit.Eq(t, said, "接着说完：派好了", "answer")
+	testkit.Eq(t, len(after.State().Contexts), 1, "requests")
+	testkit.Eq(t, len(again.f.Session.Roster()), 1, "helpers")
 }

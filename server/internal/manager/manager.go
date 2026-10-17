@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -35,6 +36,8 @@ import (
 const (
 	keepManagerEvents  = 1000
 	managerStreamEvery = 120 * time.Millisecond
+	// A run cut off longer ago than this is left: what it was for has likely moved on.
+	managerResumeWithin = 30 * time.Minute
 )
 
 const managerVoiceNote = "（这句话是主人在电话里说的，你的回答会念给主人听：口语，一两句，先说结论；不念代码、路径、命令和长列表。要用工具时可以先说一句「我看一下」。）"
@@ -212,7 +215,38 @@ func (fm *manager) OnStart(ctx context.Context) error {
 	managerListen(fm, ctx, fm.issue.ForManager(), fm.onWork)
 	managerListen(fm, ctx, fm.patrol.News(), func(n PatrolNews) { fm.send(n.Text, n.Channel, false) })
 	managerListen(fm, ctx, fm.playbooks.News(), func(line string) { fm.send(line, fm.chat.General(), false) })
+	if vvagent.SessionUnfinished(filepath.Join(memory.ManagerHome(fm.cfg.Home), protocol.ManagerAgent+".jsonl")) && (fm.llm != nil || fm.settings.DeepseekAPIKey() != "") {
+		go fm.resume()
+	}
 	return nil
+}
+
+// The run the last start was cut off in goes on, answering where its input came from. Its first message is in the
+// conversation already, so the input is read back from there; a run of an issue ends that issue's run as it settles
+// (the run itself was closed as interrupted when the farm started).
+func (fm *manager) resume() {
+	brain, err := fm.brainOf()
+	if err != nil {
+		log.Printf("vibevalley: the manager could not go on with its last run: %v", err)
+		return
+	}
+	input := fm.requestInput()
+	fm.mu.Lock()
+	fm.input, fm.toCaller = input, 0
+	before := len(fm.working)
+	if input.Issue != "" {
+		fm.working = append(fm.working, managerRun{issue: input.Issue})
+	}
+	fm.mu.Unlock()
+	if brain.Resume(managerResumeWithin) {
+		return
+	}
+	fm.mu.Lock()
+	fm.working = slices.Delete(fm.working, before, len(fm.working))
+	fm.mu.Unlock()
+	if !brain.Busy() {
+		fm.trace.Note(protocol.SessionEventTypeRunError, "上一轮停在了半路，太久了，没有接着做", nil)
+	}
 }
 
 func managerListen[T any](fm *manager, ctx context.Context, hub *base.Hub[T], handle func(T)) {
@@ -663,7 +697,7 @@ func (fm *manager) onWork(w issue.ManagerWork) {
 	fm.mu.Lock()
 	fm.working = append(fm.working, managerRun{run: run, issue: w.Issue.ID})
 	fm.mu.Unlock()
-	if !fm.send(line, channel.ID, false) {
+	if !fm.sendInput(line, managerInput{Conversation: channel.ID, Issue: w.Issue.ID}, false) {
 		fm.answered(protocol.OutcomeFailed)
 	}
 }

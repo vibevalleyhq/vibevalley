@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
@@ -108,7 +109,17 @@ func managerRespond(c ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ 
 
 func managerOpen(t *testing.T) *managerWorld {
 	t.Helper()
-	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
+	faux := ai.FauxProvider(ai.FauxProviderOptions{})
+	steps := make([]ai.FauxResponseStep, 100)
+	for i := range steps {
+		steps[i] = ai.FauxResponseFactory(managerRespond)
+	}
+	faux.SetResponses(steps...)
+	return managerStart(t, fixture.Config(t.TempDir(), t.TempDir(), ":memory:"), faux)
+}
+
+func managerStart(t *testing.T, cfg base.Config, faux *ai.FauxProviderHandle) *managerWorld {
+	t.Helper()
 	cfg.Schedule.TickMs = 50
 	// Rounds are run by hand here.
 	cfg.Patrol.HeartbeatMinutes = 0
@@ -139,12 +150,7 @@ func managerOpen(t *testing.T) *managerWorld {
 		}
 		return fixture.Pi()
 	}
-	w.faux = ai.FauxProvider(ai.FauxProviderOptions{})
-	steps := make([]ai.FauxResponseStep, 100)
-	for i := range steps {
-		steps[i] = ai.FauxResponseFactory(managerRespond)
-	}
-	w.faux.SetResponses(steps...)
+	w.faux = faux
 	f.Manager.llm = &agent.LLM{Model: w.faux.GetModel()}
 	w.ctx = ai.WithProviders(context.Background(), w.faux.Provider)
 	if err := f.Start(w.ctx); err != nil {
