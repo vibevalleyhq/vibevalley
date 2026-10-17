@@ -15,7 +15,7 @@
 ### architecture
 
 - 2026-10-18 [记性有多个来源：照 Hermes 的接口，统一的工具，本地用 SQLite 全文检索](proposed/architecture/2026-10-18-memory-providers.md)
-- 2026-10-18 [记忆都存在 SQLite：一张表、一张全文索引、主人画像和管家的记性也进来](proposed/architecture/2026-10-18-memory-in-sqlite.md)
+- 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](proposed/architecture/2026-10-18-memory-in-sqlite.md)
 - 2026-10-18 [通话走 Agora，听写走识别，管家说 OpenAI 的协议](proposed/architecture/2026-10-18-calls-dictation-and-the-agent.md)
 - 2026-10-18 [对照 Grok Bot 的常驻 agent：管家还差什么](proposed/architecture/2026-10-18-always-on-manager.md)
 - 2026-10-17 [Worker 改叫 Session](proposed/architecture/2026-10-17-worker-is-a-session.md)

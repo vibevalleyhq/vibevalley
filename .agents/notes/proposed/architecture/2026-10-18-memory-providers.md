@@ -55,6 +55,16 @@ type provider interface {
 - `Scope` 是 `Owner`、`Agent`、`Project`、`Session`，各来源自己翻译：EverOS 是 `user_id`、`agent_id`、`project_id`、`session_id`，`app_id` 固定 `vibevalley`；Nowledge 是 `agent_id`，项目做 label，`source_app` 固定 `vibevalley`。
 - `SyncTurn` 给全部材料：「记住：」的行、汇报、这一轮的对话。各来源拿自己要的：本地收那几行和做过的活，Nowledge 用 `memory_add` 收那几行，EverOS 把对话交给 `memory/add`，会话结束时在 `OnSessionEnd` 里 `flush`。
 - `Recalled` 带来源的名字和分数，供合并和页签显示。
+- 记忆分四类，和 Hermes 一样（[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)第 1 节）：精选记忆（`profile`、`note`）、经过（`issue`、`episode`）、技能、外接来源。`SearchQuery` 带 `Kind`，各来源照自己的东西翻译：
+
+  | 我们的种类 | 本地 | Nowledge Mem | EverOS |
+  |---|---|---|---|
+  | `profile` | `memory` 表 | `read_context_bundle`，或带主人 label 的 `memory_search` | user profile |
+  | `note` | `memory` 表 | `memory_search`、`memory_add` | agent 的 cases |
+  | `issue`、`episode` | `memory` 表 | `thread_search`、`thread_fetch_messages` | episodes |
+  | 技能 | 技能书（不经这个接口） | `find_skills`（不经这个接口） | agent 的 skills（不经这个接口） |
+
+  某一类一家没有，就对那一类回空。技能不经这个接口：它要主人批才生效，走技能书（[先采样，再验收](2026-10-14-sample-then-verify.md)第 4 步）。
 - 现有的 `RecallCue`、`FinishedRun`（`server/internal/memory/types.go`）扩成这里的形状。
 
 Hermes 有、这次不要的：`on_turn_start`（我们的单位是 run，不是对话的一轮）、`on_pre_compress`（压缩是各家农机自己的事，服务端看不到）、`on_session_switch` 和 `identity_signature`（一个进程服务多个会话、多个人是 Hermes 网关的场景）、`on_delegation`（计划拆出的是子工单，各有自己的 run）、`recall_status`（`Recalled` 带来源就够）、`save_config` 和 `backup_paths`（配置在 `settings.json`，备份就是家目录）。

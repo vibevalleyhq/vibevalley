@@ -1,4 +1,4 @@
-# Agent Note: 记忆都存在 SQLite：一张表、一张全文索引、主人画像和管家的记性也进来
+# Agent Note: 记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来
 
 Status: proposed
 
@@ -18,21 +18,33 @@ Status: proposed
 
 ## Proposal
 
-### 1. 存什么、不存什么
+### 1. 四类记忆，和 Hermes 对齐
 
-进 SQLite 的是**记忆**：以后还要想起的事实。
+[Hermes](https://github.com/NousResearch/hermes-agent) 的记忆分四类，我们用同样的分法，各自的做法照我们的规矩：
+
+| Hermes | 我们 | 存在哪 |
+|---|---|---|
+| 精选记忆：`USER.md`（主人画像）、`MEMORY.md`（agent 的笔记），冻结着拼进提示 | `profile` 和 `note` | 本篇的 `memory` 表 |
+| 翻以前的会话：`session_search`，FTS5 检索历史会话，再调一次 LLM 总结 | `issue`（每个 Session 一份总结）和 `episode`（每次干活的经过），`memory_search` 带 `kind` 翻；不另调模型 | 本篇的 `memory` 表 |
+| 技能（程序性记忆）：复杂的活做完后 agent 自己写技能，用的时候改进 | 帮工起草、主人批，批了进技能书（[先采样，再验收](2026-10-14-sample-then-verify.md)第 4 步） | 草稿和用过几次在 SQLite；批了的技能照旧在 `config.json` 的技能书里 |
+| 外接的记忆来源：实现 `MemoryProvider`，只能开一个 | 同一个接口，能同时开多个（[记性有多个来源](2026-10-18-memory-providers.md)） | 各家自己那里 |
+
+### 2. 存什么、不存什么
+
+进 SQLite 的是**记忆**：以后还要想起、翻到的东西。
 
 | 种类（`kind`） | 是什么 | 范围（`scope`） | 谁写 |
 |---|---|---|---|
 | `profile` | 关于主人的事实和偏好：「提交信息用中文」「表名用单数」 | `owner`：所有 agent 共享 | 主人、管家、帮工的「记住（主人）：」 |
 | `note` | 一个 agent 学到的：「这个项目测试用 `pnpm test`」 | `agent`：这个档案；`project` 为空就是所有项目 | 帮工的「记住：」、`memory_add`、主人替它记 |
 | `issue` | 做过的活：工单和最后的结论，一个 Session 一条 | `agent` | 农场收工时写 |
+| `episode` | 一次干活（run）的经过：这一轮交给它的话、它最后的汇报、改了哪些文件；管家压缩时归档的原文，切成段 | `agent` | 农场收工时写；管家压缩时写 |
 
-不进的是**上下文和日志**：管家的会话 `manager.jsonl`、压缩时归档的原文 `archive/`、轨迹、帮工的事件。它们是「这一段对话说了什么」，按会话存、按会话读，照旧是文件；`search_archive` 照旧翻它们。
+不进的是**原样的上下文和日志**：管家的会话 `manager.jsonl`、归档原文的文件 `archive/`、轨迹、帮工的事件。它们照旧是文件，按会话存、按会话读；`episode` 里是从它们抄出来、为了检索的那一部分，文件还是原样的那份。`search_archive` 并进 `memory_search`（`kind = episode`、`agent = manager`），旧工具名留到管家的提示改完。
 
-管家的 `MEMORY.md` 没有了：主人交代的变成 `profile`，管家自己记的变成 `agent = manager` 的 `note`。`pkg/agent` 是能单独用的库，它自己的 `MEMORY.md` 留着给命令行用；管家经第 5 节的接口改用这张表。
+管家的 `MEMORY.md` 没有了：主人交代的变成 `profile`，管家自己记的变成 `agent = manager` 的 `note`。`pkg/agent` 是能单独用的库，它自己的 `MEMORY.md` 留着给命令行用；管家经第 6 节的接口改用这张表。
 
-### 2. 表
+### 3. 表
 
 一个迁移（`migrations/<序号>_memory.sql`，序号接在当时最后一个后面）把 `memory` 换成新的形状，表名照「模块_概念」，模块是 `internal/memory`：
 
@@ -41,10 +53,10 @@ CREATE TABLE memory_next (
   id           text primary key,
   scope        text not null check (scope in ('owner', 'agent')),
   agent        text,                -- the profile id; null for scope owner
-  kind         text not null check (kind in ('profile', 'note', 'issue')),
+  kind         text not null check (kind in ('profile', 'note', 'issue', 'episode')),
   title        text,
   body         text not null,
-  terms        text not null default '',   -- body cut by gse, space-joined, lower case (section 3)
+  terms        text not null default '',   -- body cut by gse, space-joined, lower case (section 4)
   terms_of     integer not null default 0, -- which cut: memory.TermsVersion
   labels       text not null default '[]', -- JSON array
   importance   integer not null default 0 check (importance between 0 and 3),
@@ -85,7 +97,7 @@ END;
 ```
 
 - 旧的 `job` 在这里改成 `issue`；旧的两种作者按种类分：`note` 是 agent 记的，`issue` 是农场记的。主人替它记的现在分不出来，算 agent 的。
-- 搬过来的行 `terms` 是空的、`terms_of` 是 0：SQL 里切不了中文，由第 3 节开机补。
+- 搬过来的行 `terms` 是空的、`terms_of` 是 0：SQL 里切不了中文，由第 4 节开机补。
 - 2026-10-18 试过：
   - sqlc v1.31.1 认这张 FTS5 虚表和触发器。查询里要按列 `MATCH`（`memory_term.terms match sqlc.arg(query)`），整表 `MATCH` 它不认；`bm25()` 要包一层 `cast(... as real)`；别名不能叫 `rank`（sqlc 的保留字）。
   - `modernc.org/sqlite` v1.60.1 上增、删、按范围过滤都对；外部内容模式只多四张影子表（`memory_term_data`、`_idx`、`_docsize`、`_config`），文本不存两份。
@@ -93,20 +105,21 @@ END;
 
 `migrations/names_test.go` 要求每张表有自己的 `queries/<表>.sql`，影子表过不了：它跳过 `sqlite_master.sql` 以 `CREATE VIRTUAL TABLE` 开头的表的影子表（名字是「虚表名_data / _idx / _content / _docsize / _config」），虚表本身仍要有 `queries/memory_term.sql`（可以只有一条 `rebuild`）。
 
-### 3. 切词：gse，版本号管重切
+### 4. 切词：gse，版本号管重切
 
 - `internal/memory/terms.go`：`Terms(text) string`，用 gse 的 `CutSearch` 切，只留含字母或数字的词，转小写，空格连起来；查询用 `QueryTerms(text) []string`：`CutSearch` 和 `CutAll` 的并集，每个词加引号，用 `OR` 连。
 - 词典只嵌 gse 的简体词典（`data/dict/zh/s_1.txt` 压成 gzip，约 1.9 MB），`LoadDictStr` 加载；不调 `LoadDictEmbed`，它会把日文、繁体、idf 词典全链进来（二进制从 9 MB 到 41 MB；只嵌简体是 12 MB，2026-10-18 量过）。词典文件旁记下取自 gse 的哪个版本，`NOTICE` 写明出处（gse 是 Apache-2.0，词典来自结巴分词，MIT）。
 - `const TermsVersion = 1`：切法或词典变了就加一。`memory` 服务开机后在后台把 `terms_of < TermsVersion` 的行重切、写回（触发器同步索引），一批一百行。这不是兼容旧数据：`terms` 是从 `body` 算出来的索引，和重建缓存一样。
 - 词典加载约 350 ms，放在开机后的后台；没加载完时写入照旧（`terms` 留空、`terms_of` 为 0，等后台补），检索退回按新旧列出。
 
-### 4. 读：三条路
+### 5. 读：四条路
 
 | 路 | 什么时候 | 查什么 | 给多少 |
 |---|---|---|---|
 | **画像**（`SystemPromptBlock`） | 管家的会话打开时和每次压缩后；帮工每个会话的第一轮 | `scope = owner`、`kind = profile`、没被取代的，按 `importance` 降序、`created_at` 升序 | 最多 100 条、4000 字（照 Grok Bot 的上限）；超了先丢最不重要、最旧的，管家页标出来 |
-| **开工想起**（`Prefetch`） | 帮工每开新的一轮 | 用工单和这一轮的话做查询词，FTS 取前 50 个候选，范围是 `agent = 我` 的 `note` 和 `issue` | 交给第 4 节下面的纯函数排，最多 8 条、1600 字（现在的数） |
-| **工具查**（`memory_search`） | 管家和帮工主动调 | 工具给的查询词，加上可选的 `project`、`kind` | 默认 10 条 |
+| **开工想起**（`Prefetch`） | 帮工每开新的一轮 | 用工单和这一轮的话做查询词，FTS 取前 50 个候选，范围是 `agent = 我` 的 `note` 和 `issue` | 交给本节下面的纯函数排，最多 8 条、1600 字（现在的数） |
+| **工具查**（`memory_search`） | 管家和帮工主动调 | 工具给的查询词，加上可选的 `project`、`kind`；不给 `kind` 时只查 `profile`、`note`、`issue` | 默认 10 条 |
+| **翻经过**（`memory_search`，`kind = episode`） | 想起「上次这事怎么弄的」 | 同上，只查 `episode` | 默认 5 条，每条一段摘录 |
 
 候选取出来以后，排序是 `internal/memory/rank.go` 的一个纯函数，替换现在的 `pick`，黄金数据跟着它：
 
@@ -121,17 +134,20 @@ score = -bm25                    (FTS 的相关度，越大越好)
 - 没有查询词（切出来是空的）时退回按新旧列出，和现在一样能用。
 - 做过的活只算这个项目的、最多 3 件（现在的规矩）。
 - 想起过的照旧 `recalled + 1`、记下 `recalled_at`。
+- `episode` 不进开工想起：同一个 Session 的 `issue` 已经是它的总结，开工时给总结就够。
+- **摘录**：翻到的 `episode` 只回命中的那一段，由 `internal/memory/excerpt.go` 的纯函数从 `body` 里截：第一个命中的词前后各约 80 字。不用 FTS5 的 `snippet()`：索引里存的是切开的词，它截出来的是一串空格隔开的词，不是原文。Hermes 在这一步再调一次 LLM 总结，我们不调。
 
 画像只在会话打开和压缩后取一次，中途记了新的，下一次压缩前不改系统提示，在最新那条输入里写一句「记性有更新：……」，管家的提示开头因此不变。
 
-### 5. 写：一个口子
+### 6. 写：一个口子
 
 所有写入经 `memory` 服务，`pkg/agent` 和 `internal/session` 不碰表：
 
 - **记一条**（`memory_add`、帮工的「记住：」、主人替它记、管家的 `remember`）：先算 `terms`，再在同一个范围（`scope`、`agent`、`project`）里找几乎一样的（沿用 `memoryLikeness` ≥ 0.8）。有就在一个事务里插新的、把旧的 `replaced_by` 设成新的 id；没有就只插。帮工的「记住（主人）：」写成 `profile`。
 - **做过的活**：照现在的 `KeepJob`，一个 Session 一条，改写。
+- **经过**：每次干活收工时（`SyncTurn`）写一条 `episode`：`title` 是工单的标题，`body` 是这一轮交给它的话、它最后的汇报、改了的文件名，最多 4000 字；管家压缩时把归档的原文按消息切成不超过 2000 字的段，每段一条。叫停的一轮也写，标出是叫停的。
 - **改一条、忘掉一条**：`replace`、`remove` 按 id，取代 `rewrite_memory` 的整份重写（Hermes 的 memory 工具也是 add、replace、remove）。agent 只能改、删它看到过的那几条：工具只认这一次检索或画像里出现过的 id。
-- **上限**：每个档案的 `note` 和 `issue` 最多 300 条（现在的 `MemoryKeep`），超了删最久没想起的；被取代的旧行保留 30 天给页签看历史，然后删掉；画像不按条数删，只按第 4 节的字数截。
+- **上限**：每个档案的 `note` 和 `issue` 最多 300 条（现在的 `MemoryKeep`），超了删最久没想起的；`episode` 每个档案留 180 天、最多 2000 条，超了删最旧的；被取代的旧行保留 30 天给页签看历史，然后删掉；画像不按条数删，只按第 5 节的字数截。
 
 `pkg/agent` 加一个可选的接口，管家传进去，没传就照旧用 `MEMORY.md`：
 
@@ -145,15 +161,15 @@ type MemoryStore interface {
 }
 ```
 
-### 6. 页签
+### 7. 页签
 
 - 帮工的「记性」页签照旧：手上的活、下回开工会想起的、它记的和你记的、快忘了的；多一列「被取代」，点开看前后。
 - 管家页的「记性」页签分成两块：**主人画像**（所有 agent 共享，标出超出 4000 字被截掉的）和管家自己记的。
 - 接口照现在的 `memory.*` 分组（[先有能力，再有入口](2026-10-17-capabilities-before-surfaces.md)），`MemoryList` 多出 `profile` 一组；`ManagerMemory` 的 `File` 字段没有了。
 
-### 7. 搬家
+### 8. 搬家
 
-- 表里的数据由第 2 节的迁移搬，开机跑迁移时一起做，搬完 `memory` 就是新的形状。
+- 表里的数据由第 3 节的迁移搬，开机跑迁移时一起做，搬完 `memory` 就是新的形状。
 - `MEMORY.md`：主人现在的家里没有（2026-10-18 查过 `~/Library/Application Support/vibevalley` 和 `~/.vibevalley`），不写导入。别的机器上有的，照「不留兼容」，升级前用一个一次性的命令行把每一行读成 `profile`（「主人交代：」开头的）或管家的 `note`，跑完连同命令一起删。
 - 搬完以后服务端不读 `manager/MEMORY.md`。
 
@@ -163,8 +179,9 @@ type MemoryStore interface {
 2. `terms.go`（gse 和嵌入的词典）、开机后台补切。
 3. `rank.go` 取代 `pick`，重写黄金数据；`Prefetch`、`memory_search` 走 FTS。
 4. 画像和管家：`pkg/agent.MemoryStore`、管家改用它、页签。
+5. 经过：收工写 `episode`、管家压缩时写归档的段、`excerpt.go`、`search_archive` 并进 `memory_search`。
 
-这四步就是[记性有多个来源](2026-10-18-memory-providers.md)第 1 步「接口和本地来源」里的本地那一半。
+前四步就是[记性有多个来源](2026-10-18-memory-providers.md)第 1 步「接口和本地来源」里的本地那一半。
 
 ## Alternatives considered
 
@@ -178,6 +195,10 @@ type MemoryStore interface {
 
 **向量检索（embedding）。** 要一个 embedding 模型，本机没有，用服务商的多一份钱；外面的来源（Nowledge、EverOS）本来就做语义检索，本地先做全文检索。
 
+**翻经过时照 Hermes 再调一次 LLM 总结。** 读起来更顺，可每次翻都多花一次钱；同一个 Session 已经有一份 `issue` 总结，再给命中的原文摘录，够用。
+
+**`episode` 也进开工想起。** 想起的预算只有 8 条、1600 字，经过一条就能占满；开工时给 `issue` 的总结，要细节让它自己翻。
+
 **每条记忆一个 Markdown 文件。** 见[记性有多个来源](2026-10-18-memory-providers.md)的同一条。
 
 ## Acceptance criteria
@@ -185,6 +206,7 @@ type MemoryStore interface {
 - 迁移在一份主人家里 `vibevalley.db` 的拷贝上跑过：3 条都在，那条 `job` 成了 `issue`；`go test ./migrations` 过（含跳过影子表）；开机前留下了库的备份。
 - 「测试」「提交」「refreshSession」「表名单数」都搜得到对应的记忆，别的档案的 `note` 搜不到，主人的 `profile` 每个 agent 都在画像里。
 - 记一条几乎一样的，旧的被取代，不再被想起；页签看得到前后。
+- 帮工收工以后，用它汇报里的一句话 `memory_search`（`kind = episode`）能翻到这一次，回的是原文的那一段，不是切开的词；管家归档过的原文同样翻得到。
 - `TermsVersion` 加一以后开机，所有行被重切，检索结果不变。
 - 管家的系统提示在两次压缩之间一字不差，中途记了新的也一样。
 - 服务端不再读写 `manager/MEMORY.md`；`CGO_ENABLED=0 go build ./cmd/server` 能编，二进制多不超过 5 MB。
