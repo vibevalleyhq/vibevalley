@@ -12,6 +12,7 @@ import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import '../connectors/qr.dart';
 import '../shared/layout.dart';
+import '../shared/resource.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import 'scan_page.dart';
@@ -29,8 +30,7 @@ class GatePage extends ConsumerStatefulWidget {
 }
 
 class _GatePageState extends ConsumerState<GatePage> {
-  LanStatus? _status;
-  String? _unreachable;
+  late final WorkbenchResource<LanStatus> _gate;
   Timer? _poll;
 
   /// The gate is managed from the machine whose farm it is: not while this app uses another's.
@@ -39,41 +39,36 @@ class _GatePageState extends ConsumerState<GatePage> {
   @override
   void initState() {
     super.initState();
+    _gate = WorkbenchResource(() => _api.status())..addListener(_changed);
     if (_ownFarm) {
-      unawaited(_refresh());
-      _poll = Timer.periodic(_pollEvery, (_) => unawaited(_refresh()));
+      unawaited(_gate.refresh());
+      _poll = Timer.periodic(_pollEvery, (_) => unawaited(_gate.refresh()));
     }
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _gate
+      ..removeListener(_changed)
+      ..dispose();
     super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
   }
 
   GateApi get _api => ref.read(apiProvider).gate;
 
-  Future<void> _refresh() async {
-    try {
-      final got = await _api.status();
-      if (!mounted) return;
-      setState(() {
-        _status = got;
-        _unreachable = null;
-      });
-    } on Object catch (e) {
-      if (mounted) setState(() => _unreachable = reasonOf(e));
-    }
-  }
-
   Future<void> _act(Future<LanStatus> Function(GateApi api) call) async {
     final got = await runAction(() => call(_api));
-    if (got != null && mounted) setState(() => _status = got);
+    if (got != null) _gate.put(got);
   }
 
   @override
   Widget build(BuildContext context) {
-    final status = _status;
+    final status = _gate.value;
     return Padding(
       // The cards' outlines and drops whole: a little room above the first.
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
@@ -85,7 +80,7 @@ class _GatePageState extends ConsumerState<GatePage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_ownFarm) ...[
-                  _GateCard(status: status, unreachable: _unreachable, act: _act),
+                  _GateCard(status: status, unreachable: _gate.error, act: _act),
                   if (status != null && status.devices.isNotEmpty) ...[const SizedBox(height: 12), _DevicesCard(devices: status.devices, act: _act)],
                   const SizedBox(height: 12),
                 ],

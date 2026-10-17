@@ -9,6 +9,7 @@ import '../../gen/vibevalley.dart';
 import '../../rules/issues.dart';
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
+import '../shared/resource.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import 'board.dart';
@@ -184,8 +185,7 @@ class IssuesPage extends ConsumerStatefulWidget {
 String _sessionsKey(CoreState? farm) => [for (final i in farm?.issues ?? const <Issue>[]) '${i.id}:${i.sessions.join(',')}:${i.closedAt}'].join(';');
 
 class _IssuesPageState extends ConsumerState<IssuesPage> {
-  Map<String, Session>? _heads;
-
+  late final WorkbenchResource<Map<String, Session>> _sessions;
   List<Issue>? _history;
   BoardFilter _filter = const BoardFilter();
   bool _older = false;
@@ -193,19 +193,27 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(_load());
+    _sessions = WorkbenchResource(_fetchSessions)..addListener(_changed);
+    unawaited(_sessions.refresh());
+  }
+
+  @override
+  void dispose() {
+    _sessions
+      ..removeListener(_changed)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
   }
 
   VibeValleyApi get _api => ref.read(apiProvider);
 
-  Future<void> _load() async {
-    try {
-      final heads = await _api.session.list();
-      if (mounted) setState(() => _heads = {for (final h in heads) h.id: h});
-    } on Object catch (e) {
-      debugPrint('vibevalley: issues: $e');
-    }
-  }
+  Future<Map<String, Session>> _fetchSessions() async => {for (final h in await _api.session.list()) h.id: h};
+
+  Future<void> _load() => _sessions.refresh();
 
   Future<void> _toggleOlder() async {
     setState(() => _older = !_older);
@@ -282,7 +290,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
   Widget build(BuildContext context) {
     final farm = ref.watch(stateProvider);
     ref.listen(stateProvider.select(_sessionsKey), (_, _) => unawaited(_load()));
-    final heads = _heads;
+    final heads = _sessions.value;
     final kept = farm?.issues ?? const <Issue>[];
     final issues = [
       ...kept,
