@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -22,12 +21,11 @@ import (
 
 	"vibevalley/internal/base"
 	"vibevalley/internal/manager"
+	"vibevalley/internal/protocol"
+	vvagent "vibevalley/pkg/agent"
 )
 
-// Only this one endpoint is reachable through the tunnel, and only with the call's own key. Only the newest thing said is taken from a request: the
-// manager keeps the conversation itself.
-
-const voiceLineModel = "vibevalley-manager"
+// Only this one endpoint is reachable through the tunnel, and only with the call's own key.
 
 const (
 	// A new quick tunnel's address takes a while to answer (seen: about 25 s).
@@ -37,65 +35,20 @@ const (
 	voiceLineMisheard = "嗯？我没听清，你再说一遍？"
 )
 
-func voiceLastUserText(body any) string {
-	obj, _ := body.(map[string]any)
-	messages, ok := obj["messages"].([]any)
-	if !ok {
-		return ""
-	}
-	for i := len(messages) - 1; i >= 0; i-- {
-		m, _ := messages[i].(map[string]any)
-		if m["role"] != "user" {
-			continue
-		}
-		switch content := m["content"].(type) {
-		case string:
-			return strings.TrimSpace(content)
-		case []any:
-			var b strings.Builder
-			for _, part := range content {
-				p, _ := part.(map[string]any)
-				if text, ok := p["text"].(string); ok && p["type"] == "text" {
-					b.WriteString(text)
-				}
-			}
-			return strings.TrimSpace(b.String())
-		}
-		return ""
-	}
-	return ""
-}
-
-func voiceSSEChunk(id string, created int64, content string, stop, first bool) string {
-	delta := map[string]any{}
-	var finish any
-	if stop {
-		finish = "stop"
-	} else {
-		if first {
-			delta["role"] = "assistant"
-		}
-		delta["content"] = content
-	}
-	type choice struct {
-		Index        int            `json:"index"`
-		Delta        map[string]any `json:"delta"`
-		FinishReason any            `json:"finish_reason"`
-	}
-	body, _ := json.Marshal(struct {
-		ID      string   `json:"id"`
-		Object  string   `json:"object"`
-		Created int64    `json:"created"`
-		Model   string   `json:"model"`
-		Choices []choice `json:"choices"`
-	}{id, "chat.completion.chunk", created, voiceLineModel, []choice{{0, delta, finish}}})
-	return "data: " + string(body) + "\n\n"
-}
-
 var voiceLineRoute = regexp.MustCompile(`^/llm/([\w-]+)/chat/completions$`)
 
 // call's words stop when its context ends: Agora hangs up on an answer when the person talks over it.
 func voiceLineAnswer(keyOf func(call string) string, call func(ctx context.Context, text string) <-chan string, logf func(string, ...any)) http.Handler {
+	answer := vvagent.ChatCompletions{
+		Answerer: func(model string) func(ctx context.Context, text string) <-chan string {
+			if model != protocol.ManagerModel {
+				return nil
+			}
+			return call
+		},
+		Misheard: voiceLineMisheard,
+		Logf:     logf,
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		route := voiceLineRoute.FindStringSubmatch(r.URL.Path)
 		if r.Method != http.MethodPost || route == nil {
@@ -108,60 +61,7 @@ func voiceLineAnswer(keyOf func(call string) string, call func(ctx context.Conte
 			io.WriteString(w, `{"error":{"message":"unauthorized"}}`)
 			return
 		}
-		asked := time.Now()
-		var body any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		text := voiceLastUserText(body)
-		flusher, _ := w.(http.Flusher)
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
-		w.WriteHeader(http.StatusOK)
-		raw := make([]byte, 6)
-		rand.Read(raw)
-		id := "chatcmpl-" + hex.EncodeToString(raw)
-		created := asked.Unix()
-		send := func(s string) bool {
-			if _, err := io.WriteString(w, s); err != nil {
-				return false
-			}
-			if flusher != nil {
-				flusher.Flush()
-			}
-			return true
-		}
-		var words <-chan string
-		if text != "" {
-			words = call(r.Context(), text)
-		} else {
-			misheard := make(chan string, 1)
-			misheard <- voiceLineMisheard
-			close(misheard)
-			words = misheard
-		}
-		first := true
-		for {
-			select {
-			case <-r.Context().Done():
-				return
-			case content, open := <-words:
-				if !open {
-					send(voiceSSEChunk(id, created, "", true, false))
-					send("data: [DONE]\n\n")
-					return
-				}
-				if first && logf != nil {
-					logf("vibevalley: the voice line's first words %dms after it was asked", time.Since(asked).Milliseconds())
-				}
-				if !send(voiceSSEChunk(id, created, content, false, first)) {
-					return
-				}
-				first = false
-			}
-		}
+		answer.ServeHTTP(w, r)
 	})
 }
 

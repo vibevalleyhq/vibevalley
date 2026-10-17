@@ -699,8 +699,21 @@ func (fm *manager) Heard(text, agentID string) {
 	fm.send(fm.pickedNote(picked)+"（这句话是主人用语音说的，语音那边已经回答了。你只要按需派活，不用回复。）\n主人说："+text, fm.chat.General(), true)
 }
 
-// A newer line on the call ends the one before.
+// The words said on the phone; the answer is read out.
 func (fm *manager) Call(ctx context.Context, text string) <-chan string {
+	return fm.answer(ctx, managerVoiceNote+"\n主人说："+text)
+}
+
+// The manager as protocol.ManagerModel on the farm's own chat/completions: what is asked there is the owner's, as in 田头.
+func (fm *manager) Answerer(model string) func(ctx context.Context, text string) <-chan string {
+	if model != protocol.ManagerModel {
+		return nil
+	}
+	return func(ctx context.Context, text string) <-chan string { return fm.answer(ctx, "主人说："+text) }
+}
+
+// One answer streams at a time, the call's or chat/completions': a newer line ends the one before.
+func (fm *manager) answer(ctx context.Context, line string) <-chan string {
 	out := make(chan string)
 	me := &managerCaller{signal: make(chan struct{}, 1)}
 	fm.mu.Lock()
@@ -719,6 +732,6 @@ func (fm *manager) Call(ctx context.Context, text string) <-chan string {
 		}
 		fm.mu.Unlock()
 	}()
-	go fm.send(managerVoiceNote+"\n主人说："+text, fm.chat.General(), true)
+	go fm.send(line, fm.chat.General(), true)
 	return out
 }

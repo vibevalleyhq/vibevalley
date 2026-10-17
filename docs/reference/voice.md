@@ -36,7 +36,7 @@ Agora 的 App ID 和 App Certificate 在首页「设置」或声音页里填，�
 
 ## 语音线路（「想」选农场的管家时）
 
-`server/internal/voice/line.go`：声网按 OpenAI Chat Completions 协议来问管家，管家的话边生成边以 SSE 流回去念。
+`server/internal/voice/line.go`：声网按 OpenAI Chat Completions 协议来问管家（`model` 是 `vibevalley-manager`），管家的话边生成边以 SSE 流回去念。协议和本机的 `/v1/chat/completions` 是同一份（`pkg/agent/openai.go`，[server.md](server.md)「管家」），线路只管监听、钥匙和隧道。
 
 - **只有这一个接口对外**：另开一个监听（配置的 `voice.line.port`，默认 8788，只听 127.0.0.1），上面只有 `POST /llm/<通话>/chat/completions`。端口被占时只记日志，农场照常。
 - **隧道**：设了 `voice.line.url` 就用它；没设时第一通电话开一个 cloudflared 临时隧道，等它能应答（最多 60 秒），最后一通挂了 10 分钟后关掉。

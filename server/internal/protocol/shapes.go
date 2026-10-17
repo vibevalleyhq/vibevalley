@@ -35,6 +35,12 @@ const (
 	LivePath = "/api/v1/live"
 )
 
+// The model the manager answers as on the OpenAI chat/completions protocol: on the voice line and on the farm's own ChatCompletionsPath.
+const ManagerModel = "vibevalley-manager"
+
+// Outside /api/v1, so an OpenAI client needs only base_url, and the yard gate (which lets the API through) never lets it in.
+const ChatCompletionsPath = "/v1/chat/completions"
+
 // The voice settings' numbers may be set within these (the voice page's sliders, the settings' check).
 const (
 	//vibevalley:const voiceSilenceMsMin

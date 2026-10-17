@@ -4,11 +4,13 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/workspace"
+	vvagent "vibevalley/pkg/agent"
 )
 
 // Keeps proxies from closing a quiet event stream.
@@ -21,6 +23,7 @@ func New(f *workspace.Workspace) http.Handler {
 	mux := apiMux(f)
 	mux.Handle("/mcp", f.MCP.Handler())
 	mux.Handle("/mcp/", f.MCP.Handler())
+	mux.Handle(protocol.ChatCompletionsPath, vvagent.ChatCompletions{Answerer: f.Manager.Answerer, Logf: log.Printf})
 	return mux
 }
 

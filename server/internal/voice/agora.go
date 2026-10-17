@@ -71,7 +71,7 @@ func voiceVendorsFor(voice protocol.VoiceSettings, keys setting.VoiceKeys, deeps
 		if line == nil {
 			return agora.Vendors{}, "管家的语音线路没接通"
 		}
-		v.LLM = speech(vendors.OpenAIOptions{APIKey: line.Key, BaseURL: line.URL, Model: voiceLineModel})
+		v.LLM = speech(vendors.OpenAIOptions{APIKey: line.Key, BaseURL: line.URL, Model: protocol.ManagerModel})
 	case protocol.VoiceLLMAgora:
 		v.LLM = speech(vendors.OpenAIOptions{Model: string(llm.Model)})
 	case protocol.VoiceLLMDeepseek:

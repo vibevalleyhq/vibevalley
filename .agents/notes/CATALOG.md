@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（12 篇）
+## proposed（13 篇）
 
 ### feature
 
@@ -14,6 +14,7 @@
 
 ### architecture
 
+- 2026-10-18 [通话走 Agora，听写走识别，管家说 OpenAI 的协议](proposed/architecture/2026-10-18-calls-dictation-and-the-agent.md)
 - 2026-10-17 [Worker 改叫 Session](proposed/architecture/2026-10-17-worker-is-a-session.md)
 - 2026-10-17 [Session、Run、事件：一个 agent loop 的日志，和消息之间只有两个口子](proposed/architecture/2026-10-17-session-run-step.md)
 - 2026-10-17 [管家是一份内置档案](proposed/architecture/2026-10-17-manager-is-an-agent.md)

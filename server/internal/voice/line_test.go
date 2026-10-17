@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"vibevalley/internal/protocol"
 )
 
 func voiceServeLine(t *testing.T, call func(ctx context.Context, text string) <-chan string) string {
@@ -30,7 +32,7 @@ func voiceServeLine(t *testing.T, call func(ctx context.Context, text string) <-
 
 func voiceAsk(t *testing.T, ctx context.Context, baseURL, path, key string, messages any) *http.Response {
 	t.Helper()
-	body, _ := json.Marshal(map[string]any{"model": "x", "stream": true, "messages": messages})
+	body, _ := json.Marshal(map[string]any{"model": protocol.ManagerModel, "stream": true, "messages": messages})
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+path, strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 	if key != "" {
@@ -50,40 +52,6 @@ func voiceWords(words ...string) <-chan string {
 	}
 	close(out)
 	return out
-}
-
-func TestVoiceLineTakesTheNewestThingSaid(t *testing.T) {
-	var body any
-	json.Unmarshal([]byte(`{"messages":[{"role":"system","content":"你是管家"},{"role":"user","content":"旧的"},{"role":"assistant","content":"好"},{"role":"user","content":" 让老周跑测试 "}]}`), &body)
-	if got := voiceLastUserText(body); got != "让老周跑测试" {
-		t.Fatal(got)
-	}
-	json.Unmarshal([]byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"看看"},{"type":"image_url"},{"type":"text","text":"进度"}]}]}`), &body)
-	if got := voiceLastUserText(body); got != "看看进度" {
-		t.Fatal(got)
-	}
-	json.Unmarshal([]byte(`{"messages":[{"role":"assistant","content":"好"}]}`), &body)
-	if got := voiceLastUserText(body); got != "" {
-		t.Fatal(got)
-	}
-	if got := voiceLastUserText(nil); got != "" {
-		t.Fatal(got)
-	}
-}
-
-func TestVoiceLineChunksAreOpenAIs(t *testing.T) {
-	var first, stop any
-	json.Unmarshal([]byte(strings.TrimPrefix(voiceSSEChunk("id1", 7, "好", false, true), "data: ")), &first)
-	var want any
-	json.Unmarshal([]byte(`{"id":"id1","object":"chat.completion.chunk","created":7,"model":"vibevalley-manager","choices":[{"index":0,"delta":{"role":"assistant","content":"好"},"finish_reason":null}]}`), &want)
-	if !reflect.DeepEqual(first, want) {
-		t.Fatalf("first: %v", first)
-	}
-	json.Unmarshal([]byte(strings.TrimPrefix(voiceSSEChunk("id1", 7, "", true, false), "data: ")), &stop)
-	choice := stop.(map[string]any)["choices"].([]any)[0]
-	if !reflect.DeepEqual(choice, map[string]any{"index": float64(0), "delta": map[string]any{}, "finish_reason": "stop"}) {
-		t.Fatalf("stop: %v", choice)
-	}
 }
 
 func TestVoiceLineLetsOnlyThisCallsKeyIn(t *testing.T) {
