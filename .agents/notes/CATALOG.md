@@ -26,10 +26,11 @@
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
 
-## implemented（86 篇）
+## implemented（87 篇）
 
 ### feature
 
+- 2026-10-18 [定时加上 cron，管家自己定回头看](implemented/feature/2026-10-18-cron-and-follow-ups.md)
 - 2026-10-16 [仓库装收获了的工单](implemented/feature/2026-10-16-warehouse-is-harvested-issues.md)
 - 2026-10-15 [地图：每个项目一座岛，地是它的 worktree 和空位](implemented/feature/2026-10-15-project-map.md)
 - 2026-10-15 [农场盖满窗口，裁一点边](implemented/feature/2026-10-15-farm-fills-the-window.md)

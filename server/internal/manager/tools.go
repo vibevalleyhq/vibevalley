@@ -372,6 +372,7 @@ func (fm *manager) tools() []agentcore.AgentTool {
 		Minutes *float64  `json:"minutes"`
 		Time    string    `json:"time"`
 		Days    []float64 `json:"days"`
+		Cron    string    `json:"cron"`
 		Channel string    `json:"channel"`
 		Agent   string    `json:"agent"`
 		Project string    `json:"project"`
@@ -379,15 +380,16 @@ func (fm *manager) tools() []agentcore.AgentTool {
 	}
 	schedule := agent.TextTool(agent.TextToolSpec[scheduleArgs]{
 		Name: "schedule", Label: managerToolLabels["schedule"],
-		Description: "定一件按时间来的事：到点时频道里出现一条「⏰ 定时」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）。text 写清楚到时候做什么、做完告诉谁。",
+		Description: "定一件按时间来的事：到点时频道里出现一条「⏰ 定时」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（cron 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
 		Parameters: agentcore.ObjectSchema(map[string]any{
 			"name":    managerStr("简短的名字，比如 每日测试"),
 			"text":    managerStr("到点时说的话：要做的事"),
-			"kind":    managerEnum([]string{"once", "every", "daily", "weekly"}),
+			"kind":    managerEnum([]string{"once", "every", "daily", "weekly", "cron"}),
 			"at":      agentcore.StringSchema(),
 			"minutes": agentcore.NumberSchema(),
 			"time":    managerStr("HH:MM"),
 			"days":    map[string]any{"type": "array", "items": agentcore.NumberSchema()},
+			"cron":    managerStr("五段 cron：分 时 日 月 周几"),
 			"channel": managerStr("在哪个频道，比如 #clock-in；不填是你正在回话的频道"),
 			"agent":   managerStr("直接派给哪个帮工档案（名字或 id）；不填就是到点交给你"),
 			"project": managerStr("直接派活时的项目；不填用频道的默认项目"),
@@ -423,6 +425,8 @@ func (fm *manager) tools() []agentcore.AgentTool {
 					when = protocol.ScheduleWhenEvery{Minutes: minutes}
 				case "daily":
 					when = protocol.ScheduleWhenDaily{Time: p.Time}
+				case "cron":
+					when = protocol.ScheduleWhenCron{Expr: p.Cron}
 				default:
 					days := []int64{}
 					for _, d := range p.Days {

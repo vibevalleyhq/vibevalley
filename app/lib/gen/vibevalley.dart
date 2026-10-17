@@ -1057,6 +1057,7 @@ sealed class ScheduleWhen {
     'every' => ScheduleWhenEvery.fromJson(j),
     'daily' => ScheduleWhenDaily.fromJson(j),
     'weekly' => ScheduleWhenWeekly.fromJson(j),
+    'cron' => ScheduleWhenCron.fromJson(j),
     final other => throw FormatException('ScheduleWhen: unknown kind', other),
   };
 
@@ -3415,6 +3416,17 @@ final class ScheduleWhenWeekly extends ScheduleWhen {
     'days': [for (final e in days) e],
     'time': time,
   };
+}
+
+final class ScheduleWhenCron extends ScheduleWhen {
+  const ScheduleWhenCron({required this.expr});
+
+  factory ScheduleWhenCron.fromJson(Map<String, dynamic> j) => ScheduleWhenCron(expr: j['expr'] as String);
+
+  final String expr;
+
+  @override
+  Map<String, dynamic> toJson() => {'kind': 'cron', 'expr': expr};
 }
 
 enum Via {

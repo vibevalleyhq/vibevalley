@@ -1364,6 +1364,13 @@ type ScheduleWhenWeekly struct {
 	Time string  `json:"time"`
 }
 
+// Expr is five cron fields (minute hour day month weekday), read in the schedule's zone.
+//
+//vibevalley:member ScheduleWhen cron
+type ScheduleWhenCron struct {
+	Expr string `json:"expr"`
+}
+
 type Via string
 
 const (

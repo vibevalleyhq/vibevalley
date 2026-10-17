@@ -79,3 +79,23 @@ func TestEnableRecurringScheduleHasNoPartialCommit(t *testing.T) {
 		t.Fatal("memory changed")
 	}
 }
+
+func TestCronScheduleSurvivesRestart(t *testing.T) {
+	dir := t.TempDir()
+	f := open(t, dir)
+	tz := "Asia/Shanghai"
+	sc, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "早会", Text: "看看昨天的活", TZ: &tz, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenCron{Expr: "0 9 * * 1-5"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "坏的", Text: "t", When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenCron{Expr: "0 9 * *"}}}); err == nil {
+		t.Fatal("took a cron of four fields")
+	}
+	f.Close()
+	g := open(t, dir)
+	defer g.Close()
+	got := g.Schedule.List()
+	if len(got) != 1 || got[0].ID != sc.ID || got[0].When.Value != (protocol.ScheduleWhenCron{Expr: "0 9 * * 1-5"}) {
+		t.Fatalf("after restart: %+v", got)
+	}
+}

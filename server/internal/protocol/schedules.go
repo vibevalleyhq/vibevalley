@@ -124,6 +124,8 @@ func ScheduleProblem(req ScheduleRequest, now int64) string {
 			return ""
 		}
 		return "每周的哪几天：0 到 6，0 是周日"
+	case ScheduleWhenCron:
+		return cronProblem(w.Expr, now, req.TZ)
 	}
 	return "不认识这种定时"
 }
@@ -195,6 +197,8 @@ func NextRun(s Schedule) (int64, bool) {
 			days = nil
 		}
 		return scheduleCron(from, w.Time, days, s.TZ)
+	case ScheduleWhenCron:
+		return scheduleCronNext(from, w.Expr, s.TZ)
 	}
 	return 0, false
 }
@@ -254,6 +258,8 @@ func WhenText(when ScheduleWhen, tz string) string {
 			}
 		}
 		return "每周" + strings.Join(names, "、") + " " + w.Time
+	case ScheduleWhenCron:
+		return cronText(w.Expr)
 	}
 	return ""
 }

@@ -224,7 +224,7 @@ func (v Progress) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-// ScheduleWhenValue is a member of ScheduleWhen: ScheduleWhenOnce, ScheduleWhenEvery, ScheduleWhenDaily, ScheduleWhenWeekly, told apart by "kind".
+// ScheduleWhenValue is a member of ScheduleWhen: ScheduleWhenOnce, ScheduleWhenEvery, ScheduleWhenDaily, ScheduleWhenWeekly, ScheduleWhenCron, told apart by "kind".
 type ScheduleWhenValue interface{ isScheduleWhen() }
 
 func (u ScheduleWhen) IsZero() bool { return u.Value == nil }
@@ -265,6 +265,10 @@ func (u *ScheduleWhen) UnmarshalJSON(data []byte) error {
 		var v ScheduleWhenWeekly
 		err = json.Unmarshal(data, &v)
 		u.Value = v
+	case "cron":
+		var v ScheduleWhenCron
+		err = json.Unmarshal(data, &v)
+		u.Value = v
 	default:
 		return fmt.Errorf("ScheduleWhen: unknown kind %q", head.Tag)
 	}
@@ -273,7 +277,7 @@ func (u *ScheduleWhen) UnmarshalJSON(data []byte) error {
 
 // ScheduleWhenMembers are every member of ScheduleWhen, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var ScheduleWhenMembers = []ScheduleWhenValue{ScheduleWhenOnce{}, ScheduleWhenEvery{}, ScheduleWhenDaily{}, ScheduleWhenWeekly{}}
+var ScheduleWhenMembers = []ScheduleWhenValue{ScheduleWhenOnce{}, ScheduleWhenEvery{}, ScheduleWhenDaily{}, ScheduleWhenWeekly{}, ScheduleWhenCron{}}
 
 func (v Chat) MarshalJSON() ([]byte, error) {
 	type plain Chat
@@ -936,6 +940,15 @@ func (v ScheduleWhenWeekly) MarshalJSON() ([]byte, error) {
 		p.Days = []int64{}
 	}
 	return withTag(p, "kind", "weekly")
+}
+
+func (ScheduleWhenCron) isScheduleWhen() {}
+
+func (v ScheduleWhenCron) MarshalJSON() ([]byte, error) {
+	type plain ScheduleWhenCron
+	p := plain(v)
+
+	return withTag(p, "kind", "cron")
 }
 
 // ViaValues are every Via, in the protocol's order.

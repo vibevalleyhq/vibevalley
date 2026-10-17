@@ -47,7 +47,7 @@ VibeValley 已经有了 Raft 那一半的大部分（田头、串、@、投递�
 
 ### 定时任务
 
-- 表 `schedule`（`server/migrations/0001_schema.sql`）：在哪个频道、什么时候、说什么、交给谁（某个帮工档案，或者让管家决定）、开没开、上次什么时候跑的。「什么时候」照 Raft 的提醒：一次性的时刻、每隔多久（至少 1 分钟）、每天几点、每周几几点，带时区；不做 cron 表达式，管家和主人都更难写错。
+- 表 `schedule`（`server/migrations/0001_schema.sql`）：在哪个频道、什么时候、说什么、交给谁（某个帮工档案，或者让管家决定）、开没开、上次什么时候跑的。「什么时候」照 Raft 的提醒：一次性的时刻、每隔多久（至少 1 分钟）、每天几点、每周几几点，带时区；不做 cron 表达式，管家和主人都更难写错（后来加了，见[定时加上 cron](2026-10-18-cron-and-follow-ups.md)）。
 - 规则是 protocol 的纯函数（`server/internal/protocol/schedules.go`：`NextRun`、`DueSchedules`、`AfterRun`、`ScheduleProblem`、`DueText`）。服务端的 `Schedules`（`server/internal/schedule/schedule.go`）每 20 秒看一遍：到点了先在频道里说一条「⏰ 定时「…」到点了：…」，再交给管家（等它这一轮做完）；写明了帮工档案的是周期工单，每次触发写一张新工单开工（地满了排队），不经过管家（[概念先行](../../proposed/architecture/2026-10-15-concepts-first.md) 第 6 步）。之后就是一次普通的派活：开串、干活、汇报、收获。
 - 主人在任何频道里都可以说「每天早上九点在 #clock-in 跑一遍测试」，管家用 `schedule`、`list_schedules`、`cancel_schedule` 建、看、删。VibeValley 自己的 agent 当管家时，不用它自带的定时（它的 `schedules.json`；`foreman.go` 里关掉了）。聊天页的「定时」标签和频道菜单里的「定时」可以开关、删。
 - 几个决定：
