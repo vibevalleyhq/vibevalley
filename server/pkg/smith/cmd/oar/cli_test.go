@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"vibevalley/pkg/smith/observe"
 
 	"vibevalley/pkg/smith/agents"
 	"vibevalley/pkg/smith/oar"
@@ -30,7 +31,7 @@ func at(receivedAt int64, path []string, bodies ...oar.EventBody) []oar.Event {
 }
 
 func renderAll(runtime string) func([]oar.Event) []string {
-	render := progressRenderer(runtime)
+	render := observe.ProgressRenderer(runtime)
 	return func(events []oar.Event) []string {
 		lines := []string{}
 		for _, event := range events {
@@ -64,15 +65,15 @@ func TestProgressPrintsNothingForQuietEvents(t *testing.T) {
 func TestRenderOpened(t *testing.T) {
 	model, low, high, tier := "gpt-5.5", "low", "high", "priority"
 	for _, c := range []struct {
-		opened openedSession
+		opened observe.OpenedSession
 		want   string
 	}{
-		{openedSession{sessionID: "t-1", model: &model, effort: &low}, "[session t-1 · model gpt-5.5 · effort low]"},
-		{openedSession{sessionID: "t-1", resumed: true, model: &model, effort: &high}, "[resumed t-1 · model gpt-5.5 · effort high]"},
-		{openedSession{sessionID: "c-1"}, "[session c-1]"},
-		{openedSession{sessionID: "t", serviceTier: &tier}, "[session t · tier priority]"},
+		{observe.OpenedSession{SessionID: "t-1", Model: &model, Effort: &low}, "[session t-1 · model gpt-5.5 · effort low]"},
+		{observe.OpenedSession{SessionID: "t-1", Resumed: true, Model: &model, Effort: &high}, "[resumed t-1 · model gpt-5.5 · effort high]"},
+		{observe.OpenedSession{SessionID: "c-1"}, "[session c-1]"},
+		{observe.OpenedSession{SessionID: "t", ServiceTier: &tier}, "[session t · tier priority]"},
 	} {
-		if got := renderOpened(c.opened); got != c.want {
+		if got := observe.RenderOpened(c.opened); got != c.want {
 			t.Fatalf("got %q, want %q", got, c.want)
 		}
 	}
@@ -106,7 +107,7 @@ func TestProgressTextThinkingAndTools(t *testing.T) {
 }
 
 func TestProgressOutcomesAndMetaLines(t *testing.T) {
-	if got := renderOutcome(oar.Failed(oar.FailureQuota, "credit balance too low")); got != "[turn failed: quota] credit balance too low" {
+	if got := observe.RenderOutcome(oar.Failed(oar.FailureQuota, "credit balance too low")); got != "[turn failed: quota] credit balance too low" {
 		t.Fatal(got)
 	}
 	render := renderAll("claude")

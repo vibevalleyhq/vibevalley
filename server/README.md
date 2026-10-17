@@ -24,7 +24,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 | `pkg/weixin`、`pkg/feishu`、`pkg/qq` | 微信、飞书、QQ 机器人的接口：登录、收、发；每个有 `API` 接口（测试换成假的）和真的 `Client`。不认识农场，账号和谁是主人在 `connector` 里 |
 | `pkg/smith` | oar 的 Go 移植（[README](pkg/smith/README.md)），驱动各家编码 agent |
 | `cmd/server` | 单独跑的服务端：听 `$HOST:$PORT`（默认 `127.0.0.1:8787`）；环境变量先看已经设了的，再看 `--env-file` 和 `$VIBEVALLEY_HOME/.env`；`--log 文件` 把日志也追加到文件里 |
-| `cmd/vibevalley` | VibeValley 自己的 agent 的命令行 |
+| `cmd/vibevalley` | 命令行：`<组> <操作>` 调农场的一个接口（从 `protocol.Endpoints` 来，经 `protocol.Client`），`state`、`events` 读两条流，`runtime chat <农机>` 在本机和一个农机直接聊（不经农场），不带命令是 VibeValley 自己的 agent |
 | `cmd/migrate` | 表结构：`status` 看库在第几版、`up` 跑没跑过的、`new 名字` 在 `migrations/` 写下一个 `000N_名字.sql`；库和服务端读的是同一个（`--env-file`、`$VIBEVALLEY_HOME/.env`、`VIBEVALLEY_DB`）。服务端开机照旧自己跑 |
 | `tool` | 开发时的工具，不进产品：`shapegen`（Go）从 `protocol` 的形状写出 `gen.go` 和 Flutter 的 `lib/gen`；Node 脚本 `pi-prices.ts`（自己的 `package.json`）写 pi 的价目表 `internal/runtime/pi_prices.json` |
 

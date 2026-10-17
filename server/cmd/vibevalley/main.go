@@ -1,8 +1,12 @@
-// The agent on its own, in a terminal: a conversation on DeepSeek with the coding tools, skills, memory, workers,
-// schedules and the MCP servers in a config file. What is typed while it works joins the turn; Ctrl+C stops the
-// turn, and again (idle) quits.
+// VibeValley's command line. With no command, or `runtime chat vibevalley`: the agent on its own, in a terminal, a
+// conversation on DeepSeek with the coding tools, skills, memory, workers, schedules and the MCP servers in a config
+// file; what is typed while it works joins the turn, Ctrl+C stops the turn, and again (idle) quits. `runtime chat
+// <runtime>` talks to another runtime the same way (chat.go). Every other command is one of the farm's endpoints, called
+// over HTTP (farm.go).
 //
 //	go run ./cmd/vibevalley [--cwd DIR] [--name NAME] [--model ID] [--mcp FILE] [-p PROMPT]
+//	go run ./cmd/vibevalley runtime chat claude
+//	go run ./cmd/vibevalley issue list
 package main
 
 import (
@@ -92,22 +96,52 @@ func show(e agent.AgentEvent, total *spent, prompt func()) {
 }
 
 func main() {
-	cwdFlag := flag.String("cwd", "", "它读写文件、跑命令的地方（默认当前目录）")
-	name := flag.String("name", "vibevalley", "它自己的目录是 ~/.vibevalley/agent/<name>/")
-	model := flag.String("model", "", "模型（默认配置里的 agent.model，再是 deepseek-flash）")
-	mcpFile := flag.String("mcp", "", "MCP 配置（默认 ~/.vibevalley/agent/<name>/mcp.json）")
-	once := flag.String("p", "", "问这一句就走")
-	flag.Parse()
+	if err := dispatch(context.Background(), os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+}
+
+func dispatch(ctx context.Context, raw []string) error {
+	if len(raw) == 0 || strings.HasPrefix(raw[0], "-") && raw[0] != "--help" {
+		return ownChat(raw)
+	}
+	switch {
+	case raw[0] == "help" || raw[0] == "--help":
+		return usage(os.Stdout, "")
+	case raw[0] == "issue" && len(raw) > 1 && raw[1] == "run":
+		return issueRun(ctx, raw[2:])
+	case raw[0] == "runtime" && len(raw) > 1 && raw[1] == "chat":
+		return runtimeChat(ctx, raw[2:])
+	case raw[0] == "state":
+		return stream(ctx, "/api/state", raw[1:])
+	case raw[0] == "events":
+		return stream(ctx, "/api/events", raw[1:])
+	case isGroup(raw[0]):
+		return call(ctx, raw)
+	}
+	usage(os.Stderr, "")
+	return fmt.Errorf("没有 %s 这个命令", raw[0])
+}
+
+// ownChat is the conversation with VibeValley's own agent.
+func ownChat(raw []string) error {
+	fs := flag.NewFlagSet("vibevalley", flag.ContinueOnError)
+	cwdFlag := fs.String("cwd", "", "它读写文件、跑命令的地方（默认当前目录）")
+	name := fs.String("name", "vibevalley", "它自己的目录是 ~/.vibevalley/agent/<name>/")
+	model := fs.String("model", "", "模型（默认配置里的 agent.model，再是 deepseek-flash）")
+	mcpFile := fs.String("mcp", "", "MCP 配置（默认 ~/.vibevalley/agent/<name>/mcp.json）")
+	once := fs.String("p", "", "问这一句就走")
+	if err := fs.Parse(raw); err != nil {
+		return err
+	}
 	asked := false
-	flag.Visit(func(f *flag.Flag) {
+	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "p" {
 			asked = true
 		}
 	})
-	if err := run(*cwdFlag, *name, *model, *mcpFile, *once, asked); err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
+	return run(*cwdFlag, *name, *model, *mcpFile, *once, asked)
 }
 
 func run(cwdFlag, name, model, mcpFile, once string, asked bool) error {

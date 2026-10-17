@@ -1,4 +1,4 @@
-package main
+package observe
 
 import (
 	"fmt"
@@ -6,40 +6,39 @@ import (
 	"sync"
 
 	"vibevalley/pkg/smith/oar"
-	"vibevalley/pkg/smith/observe"
 )
 
 // Rendering session events as progress lines (packages/cli/src/progress.ts):
 // assistant text verbatim, everything else a bracketed meta line.
 
-type openedSession struct {
-	sessionID   string
-	resumed     bool
-	model       *string
-	effort      *string
-	serviceTier *string
+type OpenedSession struct {
+	SessionID   string
+	Resumed     bool
+	Model       *string
+	Effort      *string
+	ServiceTier *string
 }
 
-// renderOpened is the first line: which session this run is, and what the runtime said it runs.
-func renderOpened(opened openedSession) string {
+// RenderOpened is the first line: which session this run is, and what the runtime said it runs.
+func RenderOpened(opened OpenedSession) string {
 	label := "session"
-	if opened.resumed {
+	if opened.Resumed {
 		label = "resumed"
 	}
-	parts := []string{label + " " + opened.sessionID}
-	if opened.model != nil {
-		parts = append(parts, "model "+*opened.model)
+	parts := []string{label + " " + opened.SessionID}
+	if opened.Model != nil {
+		parts = append(parts, "model "+*opened.Model)
 	}
-	if opened.serviceTier != nil {
-		parts = append(parts, "tier "+*opened.serviceTier)
+	if opened.ServiceTier != nil {
+		parts = append(parts, "tier "+*opened.ServiceTier)
 	}
-	if opened.effort != nil {
-		parts = append(parts, "effort "+*opened.effort)
+	if opened.Effort != nil {
+		parts = append(parts, "effort "+*opened.Effort)
 	}
 	return "[" + strings.Join(parts, " · ") + "]"
 }
 
-func renderOutcome(outcome oar.TurnOutcome) string {
+func RenderOutcome(outcome oar.TurnOutcome) string {
 	switch outcome.Kind {
 	case "completed":
 		return "[turn completed]"
@@ -51,13 +50,13 @@ func renderOutcome(outcome oar.TurnOutcome) string {
 
 type startedCall struct {
 	tool       string
-	kind       observe.ToolActionKind
+	kind       ToolActionKind
 	detail     string
 	receivedAt int64
 }
 
-// progressRenderer returns the printable lines for one event.
-func progressRenderer(runtimeID string) func(oar.Event) []string {
+// ProgressRenderer returns the printable lines for one event.
+func ProgressRenderer(runtimeID string) func(oar.Event) []string {
 	var mu sync.Mutex
 	started := map[string]startedCall{}
 	return func(event oar.Event) []string {
@@ -80,9 +79,9 @@ func progressRenderer(runtimeID string) func(oar.Event) []string {
 			}
 			return nil
 		case oar.ToolCallStarted:
-			action := observe.ClassifyTool(runtimeID, e.Tool, e.Input)
+			action := ClassifyTool(runtimeID, e.Tool, e.Input)
 			started[key+e.CallID] = startedCall{tool: e.Tool, kind: action.Kind, detail: action.Detail, receivedAt: event.ReceivedAt}
-			label := observe.ToolActionLabel(action.Kind, "running")
+			label := ToolActionLabel(action.Kind, "running")
 			if action.Detail == "" {
 				return []string{agent + "[" + label + "]"}
 			}
@@ -93,23 +92,23 @@ func progressRenderer(runtimeID string) func(oar.Event) []string {
 				return nil
 			}
 			input := e.Input
-			action := observe.ClassifyTool(runtimeID, call.tool, &input)
+			action := ClassifyTool(runtimeID, call.tool, &input)
 			if action.Detail == "" || action.Detail == call.detail {
 				return nil
 			}
 			call.detail = action.Detail
 			started[key+e.CallID] = call
-			return []string{agent + "[" + observe.ToolActionLabel(action.Kind, "running") + "] " + action.Detail}
+			return []string{agent + "[" + ToolActionLabel(action.Kind, "running") + "] " + action.Detail}
 		case oar.ToolCallEnded:
 			call, ok := started[key+e.CallID]
 			delete(started, key+e.CallID)
 			if !ok {
-				return []string{agent + "[" + observe.ToolActionLabel(observe.ToolOther, "done") + "]"}
+				return []string{agent + "[" + ToolActionLabel(ToolOther, "done") + "]"}
 			}
 			seconds := float64(event.ReceivedAt-call.receivedAt) / 1000
-			return []string{fmt.Sprintf("%s[%s] (%.1fs)", agent, observe.ToolActionLabel(call.kind, "done"), seconds)}
+			return []string{fmt.Sprintf("%s[%s] (%.1fs)", agent, ToolActionLabel(call.kind, "done"), seconds)}
 		case oar.TurnEnded:
-			return []string{agent + renderOutcome(e.Outcome)}
+			return []string{agent + RenderOutcome(e.Outcome)}
 		case oar.CompactionStarted:
 			if e.Trigger == "" {
 				return []string{agent + "[compacting]"}

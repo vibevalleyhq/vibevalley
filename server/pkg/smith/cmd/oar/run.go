@@ -84,8 +84,8 @@ func (c *cli) run(ctx context.Context, raw []string) error {
 		outMu.Unlock()
 	}, cursor)
 	if !json {
-		fmt.Fprintln(c.stdout, renderOpened(openedSession{sessionID: session.ID(), resumed: options.Resume != "", model: session.Model().Value, effort: session.Effort().Value, serviceTier: session.ServiceTier().Value}))
-		render := progressRenderer(id)
+		fmt.Fprintln(c.stdout, observe.RenderOpened(observe.OpenedSession{SessionID: session.ID(), Resumed: options.Resume != "", Model: session.Model().Value, Effort: session.Effort().Value, ServiceTier: session.ServiceTier().Value}))
+		render := observe.ProgressRenderer(id)
 		session.Events(func(event oar.Event) {
 			lines := render(event)
 			outMu.Lock()

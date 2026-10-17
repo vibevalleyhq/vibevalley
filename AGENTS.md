@@ -5,7 +5,7 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ## 目录
 
 ```
-server/                    服务端，一个 Go 模块 vibevalley；cmd/server 单独跑它，cmd/vibevalley 是自己的 agent 的命令行，cmd/migrate 管表结构
+server/                    服务端，一个 Go 模块 vibevalley；cmd/server 单独跑它，cmd/vibevalley 是命令行（农场的每个接口、和农机直接聊、自己的 agent），cmd/migrate 管表结构
 server/internal/           农场的服务，一块业务一个包，名字用单数，每个包只导出一个 Service：core、setting、agent、project、
                            memory、runtime、worker、channel、schedule、issue、playbook、manager、gate、voice、connector、game；
                            base 是地基，workspace 把它们组装起来，handler 是全部 HTTP 处理，mcp 是给编码 agent 的工具
@@ -29,6 +29,7 @@ scripts/                   文档和 Note 的检查
 
 ```bash
 cd server && go run ./cmd/server                                # 服务端，127.0.0.1:8787
+cd server && go run ./cmd/vibevalley issue list                 # 命令行：调农场的接口（help 列出全部），runtime chat <农机> 直接聊
 cd server && go run ./cmd/migrate status                        # 库在第几版；up 跑迁移（开机也会跑），new 名字 写下一个迁移
 cd server && go vet ./... && go test ./...                      # 改完服务端
 bun run go:deadcode                                             # 改完服务端：server/internal 里没有只靠测试活着的函数

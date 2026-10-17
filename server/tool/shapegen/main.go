@@ -445,9 +445,12 @@ func (s *shapes) goFile() string {
 package protocol
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 )
 `)
 	marshal := func(name string, fills []string, last string) {
@@ -547,13 +550,26 @@ func (e %[1]s) MarshalJSON() ([]byte, error) {
 	for _, c := range callers {
 		fmt.Fprintf(&b, "\tCaller%s Caller = %q\n", strings.ToUpper(c[:1])+c[1:], c)
 	}
-	b.WriteString(")\n\n// Endpoint is one route of Handlers: its operation (group.op), method, path and callers.\ntype Endpoint struct {\n\tOp, Method, Path string\n\tCan []Caller\n}\n\n// Endpoints lists every route of Handlers, in api.go's order.\nvar Endpoints = []Endpoint{\n")
+	b.WriteString(")\n\n// Endpoint is one route of Handlers: its operation (group.op), method, path ({name} for a path parameter), the names of\n// its query parameters, whether it takes a JSON body, and its callers.\ntype Endpoint struct {\n\tOp, Method, Path string\n\tQuery []string\n\tBody bool\n\tCan []Caller\n}\n\n// Endpoints lists every route of Handlers, in api.go's order.\nvar Endpoints = []Endpoint{\n")
 	for _, r := range s.routes {
 		var can []string
 		for _, c := range r.can {
 			can = append(can, "Caller"+strings.ToUpper(c[:1])+c[1:])
 		}
-		fmt.Fprintf(&b, "\t{%q, %q, %q, []Caller{%s}},\n", r.group+"."+r.op, r.method, r.path, strings.Join(can, ", "))
+		var query []string
+		body := false
+		for _, p := range r.params {
+			if p.name == "body" {
+				body = true
+			} else if isPointer(p.typ) {
+				query = append(query, fmt.Sprintf("%q", queryName(p.name)))
+			}
+		}
+		qs := "nil"
+		if len(query) > 0 {
+			qs = "[]string{" + strings.Join(query, ", ") + "}"
+		}
+		fmt.Fprintf(&b, "\t{%q, %q, %q, %s, %v, []Caller{%s}},\n", r.group+"."+r.op, r.method, r.path, qs, body, strings.Join(can, ", "))
 	}
 	b.WriteString("}\n")
 	b.WriteString("\n// Mount routes every VibeValleyApi endpoint on mux to h: requests decoded, answers and tagged errors encoded (200 with\n// JSON, 204 when there is nothing to say, the error's own status).\nfunc Mount(mux *http.ServeMux, h Handlers) {\n")
@@ -602,6 +618,7 @@ func (e %[1]s) MarshalJSON() ([]byte, error) {
 		b.WriteString("\t})\n")
 	}
 	b.WriteString("}\n")
+	s.goClient(&b)
 	out, err := format.Source([]byte(b.String()))
 	if err != nil {
 		os.WriteFile(filepath.Join(os.TempDir(), "shapegen-gen.go"), []byte(b.String()), 0o644)

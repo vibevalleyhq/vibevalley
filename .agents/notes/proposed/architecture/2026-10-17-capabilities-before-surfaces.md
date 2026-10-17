@@ -76,7 +76,7 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 - 命令从命令表来：`vibevalley <组> <操作> [路径参数] [--json 请求体]`，例如 `vibevalley issue start tDS4CG8AX`。另加 `state`（一帧 `StateFrame`，`--watch` 一直跟着）和 `events`。
 - 连哪个服务端：`--server`，或者 `VIBEVALLEY_SERVER`，默认 `http://127.0.0.1:8787`，和 Flutter 的 dart-define 同一个名字。
 - 输出默认 JSON，给脚本和 agent 读；`--pretty` 给人看。
-- 手写的只有几个组合动作，也建在 `Client` 上：`issue run <id> --wait`（开工、跟着 `/api/state` 等到「等你看」、打出改动）。
+- 手写的只有几个组合动作，也建在 `Client` 上：`issue run <id>`（开工、等到「等你看」、打出改动）。
 - 两类命令：**农场命令**从能力表生成、经 HTTP；**本机工具**直接用 smith、不经服务端，现在只有 `runtime chat`。命令表标明每条是哪一类，生成的文档也列出本机工具。
 - `vibevalley runtime chat <runtime> [--model --resume <oar 会话 id> --cwd -p]`：和一个农机直接聊（claude、codex、kimi、pi……，`runtimes/defaults/builtins.go` 里注册的），一轮一轮，干活时输入的话并进这一轮，Ctrl+C 停这一轮、空闲时再按退出。建在 smith 的 `oar.Session` 上；`oar run <runtime> <prompt>`（`pkg/smith/cmd/oar/run.go`）已经能跑一轮。我们自己的 agent 在注册表里就是农机 `vibevalley`，不带子命令的 `vibevalley` 是 `runtime chat vibevalley` 的简写，也就是现在 `cmd/vibevalley` 的对话。
 - 直接聊不算农场的活：没有工单、目录随意，不进核心状态、轨迹和花费。帮工只在 `VIBEVALLEY_WORK_ROOT` 的 worktree 里开工，服务端只认挂在工单上的 Session；要进农场就是派活（`issue create`、`issue start`）。
@@ -147,8 +147,8 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 
 ### 做的顺序
 
-1. `//vibevalley:can` 和 `//vibevalley:tool`，给 86 个操作都写上；生成能力表的文档；院门改成按 `remote` 放。
-2. 生成 `Client` 和命令表，做命令行；写 `verify-dispatch`，步骤就是命令行的几条命令，真的派一次活。
+1. `//vibevalley:can` 和 `//vibevalley:tool`，给全部操作都写上；生成能力表的文档；院门改成按 `remote` 放。（`can`、`protocol.Endpoints`、能力表、院门已做；85 个操作，不是 86；`tool` 留到第 4 步，和管家工具的检查一起做。）
+2. 生成 `Client` 和命令表，做命令行；写 `verify-dispatch`，步骤就是命令行的几条命令，真的派一次活。（`protocol.Client`、`Endpoints` 带查询参数和请求体、`cmd/vibevalley` 的农场命令、`state`、`events`、`runtime chat`、`issue run <id>`（开工、等到等你看、打出改动；不要 `--wait`，它总是等）已做，`verify-server` 改用命令行；`verify-dispatch` 还没做：要真的派一次活。）
 3. 第 4 节的改名和收敛，和 Worker 改叫 Session 一个改动做完；派活一个入口、`Changes` 带上「谁在看」、`update` 只改给出的字段。
 4. 检查管家的工具、MCP 和能力表对得上；按第 5 节主人定的补帮工的能力。
 
@@ -251,7 +251,7 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 |---|---|
 | `state [--watch]` | `/api/state` 的一帧 `StateFrame`；`--watch` 一直跟着 |
 | `events` | 跟着 `/api/events` |
-| `issue run <id> --wait` | 开工，跟着 `state` 等到「等你看」或排上队，打出改动；`verify-dispatch` 的主体 |
+| `issue run <id>` | 开工，等到「等你看」或排上队，打出改动；`verify-dispatch` 的主体 |
 | `runtime chat <runtime>` | 本机工具：和一个农机直接聊，不经服务端（第 3 节） |
 | 不带子命令 | `runtime chat vibevalley` 的简写 |
 

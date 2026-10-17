@@ -4,9 +4,12 @@
 package protocol
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 )
 
 // AgentIssueLevelValues are every AgentIssueLevel, in the protocol's order.
@@ -2095,99 +2098,102 @@ const (
 	CallerSession Caller = "session"
 )
 
-// Endpoint is one route of Handlers: its operation (group.op), method, path and callers.
+// Endpoint is one route of Handlers: its operation (group.op), method, path ({name} for a path parameter), the names of
+// its query parameters, whether it takes a JSON body, and its callers.
 type Endpoint struct {
 	Op, Method, Path string
+	Query            []string
+	Body             bool
 	Can              []Caller
 }
 
 // Endpoints lists every route of Handlers, in api.go's order.
 var Endpoints = []Endpoint{
-	{"server.health", "GET", "/api/health", []Caller{CallerOwner, CallerRemote}},
-	{"server.start", "POST", "/api/start", []Caller{CallerOwner, CallerRemote}},
-	{"setting.load", "GET", "/api/settings", []Caller{CallerOwner, CallerRemote}},
-	{"setting.check", "POST", "/api/settings/check", []Caller{CallerOwner, CallerRemote}},
-	{"setting.save", "PUT", "/api/settings", []Caller{CallerOwner, CallerRemote}},
-	{"server.end", "POST", "/api/end", []Caller{CallerOwner, CallerRemote}},
-	{"channel.say", "POST", "/api/say", []Caller{CallerOwner, CallerRemote}},
-	{"channel.open", "POST", "/api/channels", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"schedule.add", "POST", "/api/schedules", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"schedule.toggle", "PUT", "/api/schedules/{id}", []Caller{CallerOwner, CallerRemote}},
-	{"schedule.remove", "DELETE", "/api/schedules/{id}", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"channel.update", "PUT", "/api/channels/{id}", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"issue.dispatch", "POST", "/api/dispatch", []Caller{CallerOwner, CallerRemote}},
-	{"worker.tell", "POST", "/api/workers/{id}/tell", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"worker.stop", "POST", "/api/workers/{id}/stop", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"worker.dismiss", "POST", "/api/workers/{id}/dismiss", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"worker.merge", "POST", "/api/workers/{id}/merge", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"worker.resolve", "POST", "/api/workers/{id}/resolve", []Caller{CallerOwner, CallerRemote}},
-	{"worker.changes", "GET", "/api/workers/{id}/changes", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"worker.activities", "GET", "/api/workers/{id}/activities", []Caller{CallerOwner, CallerRemote}},
-	{"trajectory.list", "GET", "/api/trajectories", []Caller{CallerOwner, CallerRemote}},
-	{"trajectory.find", "GET", "/api/trajectories/{id}", []Caller{CallerOwner, CallerRemote}},
-	{"issue.list", "GET", "/api/issues", []Caller{CallerOwner, CallerRemote}},
-	{"issue.find", "GET", "/api/issues/{id}", []Caller{CallerOwner, CallerRemote}},
-	{"issue.runs", "GET", "/api/issues/{id}/runs", []Caller{CallerOwner, CallerRemote}},
-	{"issue.add", "POST", "/api/issues", []Caller{CallerOwner, CallerRemote}},
-	{"issue.edit", "PUT", "/api/issues/{id}", []Caller{CallerOwner, CallerRemote}},
-	{"issue.remove", "DELETE", "/api/issues/{id}", []Caller{CallerOwner, CallerRemote}},
-	{"issue.move", "PUT", "/api/issues/{id}/place", []Caller{CallerOwner, CallerRemote}},
-	{"issue.queue", "PUT", "/api/issues/{id}/queue", []Caller{CallerOwner, CallerRemote}},
-	{"issue.start", "POST", "/api/issues/{id}/start", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"issue.reopen", "POST", "/api/issues/{id}/reopen", []Caller{CallerOwner, CallerRemote}},
-	{"playbook.plan", "POST", "/api/playbooks", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.editNode", "PUT", "/api/playbooks/{id}/nodes/{node}", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.removeNode", "DELETE", "/api/playbooks/{id}/nodes/{node}", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.act", "POST", "/api/playbooks/{id}/act", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.nodeAct", "POST", "/api/playbooks/{id}/nodes/{node}/act", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"channel.history", "GET", "/api/chat/{id}/messages", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"channel.read", "POST", "/api/chat/{id}/read", []Caller{CallerOwner, CallerRemote}},
-	{"playbook.changes", "GET", "/api/playbooks/{id}/changes", []Caller{CallerOwner, CallerRemote}},
-	{"playbook.events", "GET", "/api/playbooks/{id}/events", []Caller{CallerOwner, CallerRemote}},
-	{"progress.carryCoins", "POST", "/api/progress/carry", []Caller{CallerOwner, CallerRemote}},
-	{"progress.chooseTitle", "POST", "/api/progress/title", []Caller{CallerOwner, CallerRemote}},
-	{"runtime.list", "GET", "/api/runtimes", []Caller{CallerOwner, CallerRemote}},
-	{"runtime.refresh", "POST", "/api/runtimes/{id}/refresh", []Caller{CallerOwner, CallerRemote}},
-	{"runtime.update", "PUT", "/api/runtimes/{id}/settings", []Caller{CallerOwner, CallerRemote}},
-	{"runtime.upgrade", "POST", "/api/runtimes/{id}/upgrade", []Caller{CallerOwner, CallerRemote}},
-	{"agent.list", "GET", "/api/agents", []Caller{CallerOwner, CallerRemote}},
-	{"agent.check", "POST", "/api/agents/check", []Caller{CallerOwner, CallerRemote}},
-	{"agent.save", "PUT", "/api/agents/{id}", []Caller{CallerOwner, CallerRemote}},
-	{"agent.delete", "DELETE", "/api/agents/{id}", []Caller{CallerOwner, CallerRemote}},
-	{"agent.memories", "GET", "/api/agents/{id}/memories", []Caller{CallerOwner, CallerRemote}},
-	{"agent.recall", "GET", "/api/agents/{id}/recall", []Caller{CallerOwner, CallerRemote}},
-	{"agent.remember", "POST", "/api/agents/{id}/memories", []Caller{CallerOwner, CallerRemote}},
-	{"agent.forget", "DELETE", "/api/agents/{id}/memories/{memory}", []Caller{CallerOwner, CallerRemote}},
-	{"manager.memories", "GET", "/api/manager/memories", []Caller{CallerOwner, CallerRemote}},
-	{"manager.remember", "POST", "/api/manager/memories", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"manager.forget", "DELETE", "/api/manager/memories/{memory}", []Caller{CallerOwner, CallerRemote}},
-	{"manager.archive", "GET", "/api/manager/archive", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"manager.archiveFile", "GET", "/api/manager/archive/{name}", []Caller{CallerOwner, CallerRemote}},
-	{"skill.list", "GET", "/api/skills", []Caller{CallerOwner, CallerRemote}},
-	{"skill.save", "PUT", "/api/skills/{id}", []Caller{CallerOwner, CallerRemote}},
-	{"skill.delete", "DELETE", "/api/skills/{id}", []Caller{CallerOwner, CallerRemote}},
-	{"project.list", "GET", "/api/projects", []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"project.check", "POST", "/api/projects/check", []Caller{CallerOwner, CallerRemote}},
-	{"project.create", "POST", "/api/projects", []Caller{CallerOwner, CallerRemote}},
-	{"project.languages", "GET", "/api/projects/{id}/languages", []Caller{CallerOwner, CallerRemote}},
-	{"project.activity", "GET", "/api/projects/{id}/activity", []Caller{CallerOwner, CallerRemote}},
-	{"voice.session", "POST", "/api/voice/session", []Caller{CallerOwner, CallerRemote}},
-	{"voice.renew", "POST", "/api/voice/renew", []Caller{CallerOwner, CallerRemote}},
-	{"voice.start", "POST", "/api/voice/agent", []Caller{CallerOwner, CallerRemote}},
-	{"voice.stop", "POST", "/api/voice/agent/stop", []Caller{CallerOwner, CallerRemote}},
-	{"connector.list", "GET", "/api/connectors", []Caller{CallerOwner, CallerRemote}},
-	{"connector.login", "POST", "/api/connectors/{id}/login", []Caller{CallerOwner, CallerRemote}},
-	{"connector.verify", "POST", "/api/connectors/{id}/verify", []Caller{CallerOwner, CallerRemote}},
-	{"connector.logout", "POST", "/api/connectors/{id}/logout", []Caller{CallerOwner, CallerRemote}},
-	{"connector.channel", "PUT", "/api/connectors/{id}/channel", []Caller{CallerOwner, CallerRemote}},
-	{"lan.status", "GET", "/api/lan", []Caller{CallerOwner}},
-	{"lan.setOpen", "PUT", "/api/lan", []Caller{CallerOwner}},
-	{"lan.startPairing", "POST", "/api/lan/pairing", []Caller{CallerOwner}},
-	{"lan.stopPairing", "DELETE", "/api/lan/pairing", []Caller{CallerOwner}},
-	{"lan.answerPairing", "POST", "/api/lan/pairing/answer", []Caller{CallerOwner}},
-	{"lan.forgetDevice", "DELETE", "/api/lan/devices/{id}", []Caller{CallerOwner}},
-	{"lan.pair", "POST", "/api/lan/pair", []Caller{CallerOwner, CallerRemote}},
-	{"lan.me", "GET", "/api/lan/me", []Caller{CallerOwner, CallerRemote}},
+	{"server.health", "GET", "/api/health", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"server.start", "POST", "/api/start", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"setting.load", "GET", "/api/settings", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"setting.check", "POST", "/api/settings/check", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"setting.save", "PUT", "/api/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"server.end", "POST", "/api/end", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"channel.say", "POST", "/api/say", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"channel.open", "POST", "/api/channels", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"schedule.add", "POST", "/api/schedules", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"schedule.toggle", "PUT", "/api/schedules/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"schedule.remove", "DELETE", "/api/schedules/{id}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"channel.update", "PUT", "/api/channels/{id}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.dispatch", "POST", "/api/dispatch", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"worker.tell", "POST", "/api/workers/{id}/tell", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"worker.stop", "POST", "/api/workers/{id}/stop", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"worker.dismiss", "POST", "/api/workers/{id}/dismiss", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"worker.merge", "POST", "/api/workers/{id}/merge", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"worker.resolve", "POST", "/api/workers/{id}/resolve", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"worker.changes", "GET", "/api/workers/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"worker.activities", "GET", "/api/workers/{id}/activities", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"trajectory.list", "GET", "/api/trajectories", []string{"agent"}, false, []Caller{CallerOwner, CallerRemote}},
+	{"trajectory.find", "GET", "/api/trajectories/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.list", "GET", "/api/issues", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.find", "GET", "/api/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.runs", "GET", "/api/issues/{id}/runs", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.add", "POST", "/api/issues", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.edit", "PUT", "/api/issues/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.remove", "DELETE", "/api/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.move", "PUT", "/api/issues/{id}/place", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.queue", "PUT", "/api/issues/{id}/queue", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.start", "POST", "/api/issues/{id}/start", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.reopen", "POST", "/api/issues/{id}/reopen", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"playbook.plan", "POST", "/api/playbooks", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.editNode", "PUT", "/api/playbooks/{id}/nodes/{node}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.removeNode", "DELETE", "/api/playbooks/{id}/nodes/{node}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.act", "POST", "/api/playbooks/{id}/act", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.nodeAct", "POST", "/api/playbooks/{id}/nodes/{node}/act", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"channel.history", "GET", "/api/chat/{id}/messages", []string{"before", "limit"}, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"channel.read", "POST", "/api/chat/{id}/read", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"playbook.changes", "GET", "/api/playbooks/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"playbook.events", "GET", "/api/playbooks/{id}/events", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"progress.carryCoins", "POST", "/api/progress/carry", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"progress.chooseTitle", "POST", "/api/progress/title", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"runtime.list", "GET", "/api/runtimes", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"runtime.refresh", "POST", "/api/runtimes/{id}/refresh", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"runtime.update", "PUT", "/api/runtimes/{id}/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"runtime.upgrade", "POST", "/api/runtimes/{id}/upgrade", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"agent.list", "GET", "/api/agents", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"agent.check", "POST", "/api/agents/check", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"agent.save", "PUT", "/api/agents/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"agent.delete", "DELETE", "/api/agents/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"agent.memories", "GET", "/api/agents/{id}/memories", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"agent.recall", "GET", "/api/agents/{id}/recall", []string{"project", "text"}, false, []Caller{CallerOwner, CallerRemote}},
+	{"agent.remember", "POST", "/api/agents/{id}/memories", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"agent.forget", "DELETE", "/api/agents/{id}/memories/{memory}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"manager.memories", "GET", "/api/manager/memories", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"manager.remember", "POST", "/api/manager/memories", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"manager.forget", "DELETE", "/api/manager/memories/{memory}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"manager.archive", "GET", "/api/manager/archive", []string{"q"}, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"manager.archiveFile", "GET", "/api/manager/archive/{name}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"skill.list", "GET", "/api/skills", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"skill.save", "PUT", "/api/skills/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"skill.delete", "DELETE", "/api/skills/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"project.list", "GET", "/api/projects", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"project.check", "POST", "/api/projects/check", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"project.create", "POST", "/api/projects", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"project.languages", "GET", "/api/projects/{id}/languages", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"project.activity", "GET", "/api/projects/{id}/activity", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"voice.session", "POST", "/api/voice/session", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"voice.renew", "POST", "/api/voice/renew", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"voice.start", "POST", "/api/voice/agent", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"voice.stop", "POST", "/api/voice/agent/stop", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"connector.list", "GET", "/api/connectors", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"connector.login", "POST", "/api/connectors/{id}/login", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"connector.verify", "POST", "/api/connectors/{id}/verify", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"connector.logout", "POST", "/api/connectors/{id}/logout", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"connector.channel", "PUT", "/api/connectors/{id}/channel", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"lan.status", "GET", "/api/lan", nil, false, []Caller{CallerOwner}},
+	{"lan.setOpen", "PUT", "/api/lan", nil, true, []Caller{CallerOwner}},
+	{"lan.startPairing", "POST", "/api/lan/pairing", nil, false, []Caller{CallerOwner}},
+	{"lan.stopPairing", "DELETE", "/api/lan/pairing", nil, false, []Caller{CallerOwner}},
+	{"lan.answerPairing", "POST", "/api/lan/pairing/answer", nil, true, []Caller{CallerOwner}},
+	{"lan.forgetDevice", "DELETE", "/api/lan/devices/{id}", nil, false, []Caller{CallerOwner}},
+	{"lan.pair", "POST", "/api/lan/pair", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"lan.me", "GET", "/api/lan/me", nil, false, []Caller{CallerOwner, CallerRemote}},
 }
 
 // Mount routes every VibeValleyApi endpoint on mux to h: requests decoded, answers and tagged errors encoded (200 with
@@ -2736,4 +2742,537 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.LanMe(r.Context())
 		answer(w, out, err)
 	})
+}
+
+// taggedError decodes body as the API error its tag names; nil for a tag that is none.
+func taggedError(tag string, body []byte) error {
+	switch tag {
+	case "Refused":
+		var e Refused
+		if json.Unmarshal(body, &e) != nil {
+			return nil
+		}
+		return e
+	case "Missing":
+		var e Missing
+		if json.Unmarshal(body, &e) != nil {
+			return nil
+		}
+		return e
+	case "VoiceUnavailable":
+		var e VoiceUnavailable
+		if json.Unmarshal(body, &e) != nil {
+			return nil
+		}
+		return e
+	case "VoiceAgentFailed":
+		var e VoiceAgentFailed
+		if json.Unmarshal(body, &e) != nil {
+			return nil
+		}
+		return e
+	case "ConnectorRefused":
+		var e ConnectorRefused
+		if json.Unmarshal(body, &e) != nil {
+			return nil
+		}
+		return e
+	case "LanRefused":
+		var e LanRefused
+		if json.Unmarshal(body, &e) != nil {
+			return nil
+		}
+		return e
+	}
+	return nil
+}
+
+func (c *Client) ServerHealth(ctx context.Context) (Health, error) {
+	var out Health
+	err := c.call(ctx, "GET", "/api/health", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) ServerStart(ctx context.Context) error {
+	return c.call(ctx, "POST", "/api/start", nil, nil, nil)
+}
+
+func (c *Client) SettingLoad(ctx context.Context) (SettingsStatus, error) {
+	var out SettingsStatus
+	err := c.call(ctx, "GET", "/api/settings", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) SettingCheck(ctx context.Context, body SettingsUpdate) (SettingsCheck, error) {
+	var out SettingsCheck
+	err := c.call(ctx, "POST", "/api/settings/check", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) SettingSave(ctx context.Context, body SettingsUpdate) (SettingsStatus, error) {
+	var out SettingsStatus
+	err := c.call(ctx, "PUT", "/api/settings", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) ServerEnd(ctx context.Context) error {
+	return c.call(ctx, "POST", "/api/end", nil, nil, nil)
+}
+
+func (c *Client) ChannelSay(ctx context.Context, body SayRequest) error {
+	return c.call(ctx, "POST", "/api/say", nil, body, nil)
+}
+
+func (c *Client) ChannelOpen(ctx context.Context, body ChannelRequest) error {
+	return c.call(ctx, "POST", "/api/channels", nil, body, nil)
+}
+
+func (c *Client) ScheduleAdd(ctx context.Context, body ScheduleRequest) (Schedule, error) {
+	var out Schedule
+	err := c.call(ctx, "POST", "/api/schedules", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) ScheduleToggle(ctx context.Context, pID int64, body ToggleScheduleRequest) error {
+	return c.call(ctx, "PUT", "/api/schedules/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, body, nil)
+}
+
+func (c *Client) ScheduleRemove(ctx context.Context, pID int64) error {
+	return c.call(ctx, "DELETE", "/api/schedules/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, nil, nil)
+}
+
+func (c *Client) ChannelUpdate(ctx context.Context, pID int64, body ChannelUpdate) error {
+	return c.call(ctx, "PUT", "/api/channels/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, body, nil)
+}
+
+func (c *Client) IssueDispatch(ctx context.Context, body SayRequest) error {
+	return c.call(ctx, "POST", "/api/dispatch", nil, body, nil)
+}
+
+func (c *Client) WorkerTell(ctx context.Context, pID string, body TellRequest) error {
+	return c.call(ctx, "POST", "/api/workers/"+url.PathEscape(pID)+"/tell", nil, body, nil)
+}
+
+func (c *Client) WorkerStop(ctx context.Context, pID string) error {
+	return c.call(ctx, "POST", "/api/workers/"+url.PathEscape(pID)+"/stop", nil, nil, nil)
+}
+
+func (c *Client) WorkerDismiss(ctx context.Context, pID string) error {
+	return c.call(ctx, "POST", "/api/workers/"+url.PathEscape(pID)+"/dismiss", nil, nil, nil)
+}
+
+func (c *Client) WorkerMerge(ctx context.Context, pID string) error {
+	return c.call(ctx, "POST", "/api/workers/"+url.PathEscape(pID)+"/merge", nil, nil, nil)
+}
+
+func (c *Client) WorkerResolve(ctx context.Context, pID string) error {
+	return c.call(ctx, "POST", "/api/workers/"+url.PathEscape(pID)+"/resolve", nil, nil, nil)
+}
+
+func (c *Client) WorkerChanges(ctx context.Context, pID string) (Changes, error) {
+	var out Changes
+	err := c.call(ctx, "GET", "/api/workers/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) WorkerActivities(ctx context.Context, pID string) ([]Activity, error) {
+	var out []Activity
+	err := c.call(ctx, "GET", "/api/workers/"+url.PathEscape(pID)+"/activities", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) TrajectoryList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error) {
+	q := url.Values{}
+	if pAgent != nil {
+		q.Set("agent", *pAgent)
+	}
+	var out []TrajectoryHead
+	err := c.call(ctx, "GET", "/api/trajectories", q, nil, &out)
+	return out, err
+}
+
+func (c *Client) TrajectoryFind(ctx context.Context, pID string) (Trajectory, error) {
+	var out Trajectory
+	err := c.call(ctx, "GET", "/api/trajectories/"+url.PathEscape(pID), nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) IssueList(ctx context.Context) ([]Issue, error) {
+	var out []Issue
+	err := c.call(ctx, "GET", "/api/issues", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) IssueFind(ctx context.Context, pID string) (Issue, error) {
+	var out Issue
+	err := c.call(ctx, "GET", "/api/issues/"+url.PathEscape(pID), nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) IssueRuns(ctx context.Context, pID string) ([]Run, error) {
+	var out []Run
+	err := c.call(ctx, "GET", "/api/issues/"+url.PathEscape(pID)+"/runs", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) IssueAdd(ctx context.Context, body IssueRequest) (Issue, error) {
+	var out Issue
+	err := c.call(ctx, "POST", "/api/issues", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) IssueEdit(ctx context.Context, pID string, body IssueRequest) (Issue, error) {
+	var out Issue
+	err := c.call(ctx, "PUT", "/api/issues/"+url.PathEscape(pID), nil, body, &out)
+	return out, err
+}
+
+func (c *Client) IssueRemove(ctx context.Context, pID string) error {
+	return c.call(ctx, "DELETE", "/api/issues/"+url.PathEscape(pID), nil, nil, nil)
+}
+
+func (c *Client) IssueMove(ctx context.Context, pID string, body MoveIssueRequest) ([]Issue, error) {
+	var out []Issue
+	err := c.call(ctx, "PUT", "/api/issues/"+url.PathEscape(pID)+"/place", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) IssueQueue(ctx context.Context, pID string, body QueueIssueRequest) (Issue, error) {
+	var out Issue
+	err := c.call(ctx, "PUT", "/api/issues/"+url.PathEscape(pID)+"/queue", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) IssueStart(ctx context.Context, pID string) (Dispatched, error) {
+	var out Dispatched
+	err := c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/start", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) IssueReopen(ctx context.Context, pID string, body ReopenRequest) (Dispatched, error) {
+	var out Dispatched
+	err := c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/reopen", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) PlaybookPlan(ctx context.Context, body PlanRequest) (string, error) {
+	var out string
+	err := c.call(ctx, "POST", "/api/playbooks", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) PlaybookEditNode(ctx context.Context, pID string, pNode string, body NodeEdit) (string, error) {
+	var out string
+	err := c.call(ctx, "PUT", "/api/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode), nil, body, &out)
+	return out, err
+}
+
+func (c *Client) PlaybookRemoveNode(ctx context.Context, pID string, pNode string) (string, error) {
+	var out string
+	err := c.call(ctx, "DELETE", "/api/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode), nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) PlaybookAct(ctx context.Context, pID string, body PlaybookActRequest) (string, error) {
+	var out string
+	err := c.call(ctx, "POST", "/api/playbooks/"+url.PathEscape(pID)+"/act", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) PlaybookNodeAct(ctx context.Context, pID string, pNode string, body NodeActRequest) (string, error) {
+	var out string
+	err := c.call(ctx, "POST", "/api/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode)+"/act", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) ChannelHistory(ctx context.Context, pID int64, pBefore *int64, pLimit *int64) ([]ChatMessage, error) {
+	q := url.Values{}
+	if pBefore != nil {
+		q.Set("before", strconv.FormatInt(*pBefore, 10))
+	}
+	if pLimit != nil {
+		q.Set("limit", strconv.FormatInt(*pLimit, 10))
+	}
+	var out []ChatMessage
+	err := c.call(ctx, "GET", "/api/chat/"+url.PathEscape(strconv.FormatInt(pID, 10))+"/messages", q, nil, &out)
+	return out, err
+}
+
+func (c *Client) ChannelRead(ctx context.Context, pID int64, body ChatReadRequest) error {
+	return c.call(ctx, "POST", "/api/chat/"+url.PathEscape(strconv.FormatInt(pID, 10))+"/read", nil, body, nil)
+}
+
+func (c *Client) PlaybookChanges(ctx context.Context, pID string) (Changes, error) {
+	var out Changes
+	err := c.call(ctx, "GET", "/api/playbooks/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) PlaybookEvents(ctx context.Context, pID string) ([]PlaybookEvent, error) {
+	var out []PlaybookEvent
+	err := c.call(ctx, "GET", "/api/playbooks/"+url.PathEscape(pID)+"/events", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) ProgressCarryCoins(ctx context.Context, body CarryCoinsRequest) (CarryCoinsResult, error) {
+	var out CarryCoinsResult
+	err := c.call(ctx, "POST", "/api/progress/carry", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) ProgressChooseTitle(ctx context.Context, body ChooseTitleRequest) error {
+	return c.call(ctx, "POST", "/api/progress/title", nil, body, nil)
+}
+
+func (c *Client) RuntimeList(ctx context.Context) ([]RuntimeInfo, error) {
+	var out []RuntimeInfo
+	err := c.call(ctx, "GET", "/api/runtimes", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) RuntimeRefresh(ctx context.Context, pID string) (RuntimeInfo, error) {
+	var out RuntimeInfo
+	err := c.call(ctx, "POST", "/api/runtimes/"+url.PathEscape(pID)+"/refresh", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) RuntimeUpdate(ctx context.Context, pID string, body RuntimeSettings) (RuntimeInfo, error) {
+	var out RuntimeInfo
+	err := c.call(ctx, "PUT", "/api/runtimes/"+url.PathEscape(pID)+"/settings", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) RuntimeUpgrade(ctx context.Context, pID string) (RuntimeInfo, error) {
+	var out RuntimeInfo
+	err := c.call(ctx, "POST", "/api/runtimes/"+url.PathEscape(pID)+"/upgrade", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) AgentList(ctx context.Context) ([]Agent, error) {
+	var out []Agent
+	err := c.call(ctx, "GET", "/api/agents", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) AgentCheck(ctx context.Context, body AgentCheckRequest) ([]AgentCheck, error) {
+	var out []AgentCheck
+	err := c.call(ctx, "POST", "/api/agents/check", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) AgentSave(ctx context.Context, pID string, body Agent) (Agent, error) {
+	var out Agent
+	err := c.call(ctx, "PUT", "/api/agents/"+url.PathEscape(pID), nil, body, &out)
+	return out, err
+}
+
+func (c *Client) AgentDelete(ctx context.Context, pID string) error {
+	return c.call(ctx, "DELETE", "/api/agents/"+url.PathEscape(pID), nil, nil, nil)
+}
+
+func (c *Client) AgentMemories(ctx context.Context, pID string) ([]Memory, error) {
+	var out []Memory
+	err := c.call(ctx, "GET", "/api/agents/"+url.PathEscape(pID)+"/memories", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) AgentRecall(ctx context.Context, pID string, pProject *string, pText *string) (RecallPreview, error) {
+	q := url.Values{}
+	if pProject != nil {
+		q.Set("project", *pProject)
+	}
+	if pText != nil {
+		q.Set("text", *pText)
+	}
+	var out RecallPreview
+	err := c.call(ctx, "GET", "/api/agents/"+url.PathEscape(pID)+"/recall", q, nil, &out)
+	return out, err
+}
+
+func (c *Client) AgentRemember(ctx context.Context, pID string, body MemoryRequest) (Memory, error) {
+	var out Memory
+	err := c.call(ctx, "POST", "/api/agents/"+url.PathEscape(pID)+"/memories", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) AgentForget(ctx context.Context, pID string, pMemory string) error {
+	return c.call(ctx, "DELETE", "/api/agents/"+url.PathEscape(pID)+"/memories/"+url.PathEscape(pMemory), nil, nil, nil)
+}
+
+func (c *Client) ManagerMemories(ctx context.Context) (ManagerMemory, error) {
+	var out ManagerMemory
+	err := c.call(ctx, "GET", "/api/manager/memories", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) ManagerRemember(ctx context.Context, body MemoryRequest) (Memory, error) {
+	var out Memory
+	err := c.call(ctx, "POST", "/api/manager/memories", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) ManagerForget(ctx context.Context, pMemory string) error {
+	return c.call(ctx, "DELETE", "/api/manager/memories/"+url.PathEscape(pMemory), nil, nil, nil)
+}
+
+func (c *Client) ManagerArchive(ctx context.Context, pQ *string) (ArchiveListing, error) {
+	q := url.Values{}
+	if pQ != nil {
+		q.Set("q", *pQ)
+	}
+	var out ArchiveListing
+	err := c.call(ctx, "GET", "/api/manager/archive", q, nil, &out)
+	return out, err
+}
+
+func (c *Client) ManagerArchiveFile(ctx context.Context, pName string) (string, error) {
+	var out string
+	err := c.call(ctx, "GET", "/api/manager/archive/"+url.PathEscape(pName), nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) SkillList(ctx context.Context) ([]Skill, error) {
+	var out []Skill
+	err := c.call(ctx, "GET", "/api/skills", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) SkillSave(ctx context.Context, pID string, body Skill) (Skill, error) {
+	var out Skill
+	err := c.call(ctx, "PUT", "/api/skills/"+url.PathEscape(pID), nil, body, &out)
+	return out, err
+}
+
+func (c *Client) SkillDelete(ctx context.Context, pID string) error {
+	return c.call(ctx, "DELETE", "/api/skills/"+url.PathEscape(pID), nil, nil, nil)
+}
+
+func (c *Client) ProjectList(ctx context.Context) ([]ProjectSummary, error) {
+	var out []ProjectSummary
+	err := c.call(ctx, "GET", "/api/projects", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) ProjectCheck(ctx context.Context, body NewProject) (ProjectCheck, error) {
+	var out ProjectCheck
+	err := c.call(ctx, "POST", "/api/projects/check", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) ProjectCreate(ctx context.Context, body NewProject) (ProjectSummary, error) {
+	var out ProjectSummary
+	err := c.call(ctx, "POST", "/api/projects", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) ProjectLanguages(ctx context.Context, pID string) (ProjectLanguages, error) {
+	var out ProjectLanguages
+	err := c.call(ctx, "GET", "/api/projects/"+url.PathEscape(pID)+"/languages", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) ProjectActivity(ctx context.Context, pID string) (ProjectActivity, error) {
+	var out ProjectActivity
+	err := c.call(ctx, "GET", "/api/projects/"+url.PathEscape(pID)+"/activity", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) VoiceSession(ctx context.Context) (VoiceSession, error) {
+	var out VoiceSession
+	err := c.call(ctx, "POST", "/api/voice/session", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) VoiceRenew(ctx context.Context, body RenewRequest) (VoiceSession, error) {
+	var out VoiceSession
+	err := c.call(ctx, "POST", "/api/voice/renew", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) VoiceStart(ctx context.Context, body StartRequest) (VoiceAgent, error) {
+	var out VoiceAgent
+	err := c.call(ctx, "POST", "/api/voice/agent", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) VoiceStop(ctx context.Context, body VoiceAgent) error {
+	return c.call(ctx, "POST", "/api/voice/agent/stop", nil, body, nil)
+}
+
+func (c *Client) ConnectorList(ctx context.Context) ([]ConnectorStatus, error) {
+	var out []ConnectorStatus
+	err := c.call(ctx, "GET", "/api/connectors", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) ConnectorLogin(ctx context.Context, pID ConnectorID, body ConnectorLogin) (ConnectorStatus, error) {
+	var out ConnectorStatus
+	err := c.call(ctx, "POST", "/api/connectors/"+url.PathEscape(string(pID))+"/login", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) ConnectorVerify(ctx context.Context, pID ConnectorID, body VerifyRequest) (ConnectorStatus, error) {
+	var out ConnectorStatus
+	err := c.call(ctx, "POST", "/api/connectors/"+url.PathEscape(string(pID))+"/verify", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) ConnectorLogout(ctx context.Context, pID ConnectorID) (ConnectorStatus, error) {
+	var out ConnectorStatus
+	err := c.call(ctx, "POST", "/api/connectors/"+url.PathEscape(string(pID))+"/logout", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) ConnectorChannel(ctx context.Context, pID ConnectorID, body ConnectorsChannelRequest) (ConnectorStatus, error) {
+	var out ConnectorStatus
+	err := c.call(ctx, "PUT", "/api/connectors/"+url.PathEscape(string(pID))+"/channel", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) LanStatus(ctx context.Context) (LanStatus, error) {
+	var out LanStatus
+	err := c.call(ctx, "GET", "/api/lan", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) LanSetOpen(ctx context.Context, body SetOpenRequest) (LanStatus, error) {
+	var out LanStatus
+	err := c.call(ctx, "PUT", "/api/lan", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) LanStartPairing(ctx context.Context) (LanStatus, error) {
+	var out LanStatus
+	err := c.call(ctx, "POST", "/api/lan/pairing", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) LanStopPairing(ctx context.Context) (LanStatus, error) {
+	var out LanStatus
+	err := c.call(ctx, "DELETE", "/api/lan/pairing", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) LanAnswerPairing(ctx context.Context, body AnswerPairingRequest) (LanStatus, error) {
+	var out LanStatus
+	err := c.call(ctx, "POST", "/api/lan/pairing/answer", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) LanForgetDevice(ctx context.Context, pID string) (LanStatus, error) {
+	var out LanStatus
+	err := c.call(ctx, "DELETE", "/api/lan/devices/"+url.PathEscape(pID), nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) LanPair(ctx context.Context, body LanPairRequest) (LanPaired, error) {
+	var out LanPaired
+	err := c.call(ctx, "POST", "/api/lan/pair", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) LanMe(ctx context.Context) (LanDevice, error) {
+	var out LanDevice
+	err := c.call(ctx, "GET", "/api/lan/me", nil, nil, &out)
+	return out, err
 }
