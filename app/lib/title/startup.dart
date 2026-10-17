@@ -7,7 +7,7 @@ import '../data/providers.dart';
 import '../ui/kit/kit.dart';
 import '../village/village_view.dart';
 import '../ui/glyphs.dart';
-import '../shared/server_away.dart';
+import '../shared/connection_banner.dart';
 import 'scene.dart';
 import '../data/ui_state.dart';
 

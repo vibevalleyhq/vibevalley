@@ -4,14 +4,14 @@ import 'package:go_router/go_router.dart';
 
 import '../data/providers.dart';
 import '../data/ui_state.dart';
-import '../game/farm.dart';
+import '../game/tools.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider, runtimesProvider;
 import 'popover.dart';
-import 'quota.dart';
-import '../rules/farm.dart';
+import 'quota_pill.dart';
+import '../rules/sessions.dart';
 import '../rules/seeds.dart';
 import './faces.dart';
 import './tags.dart';

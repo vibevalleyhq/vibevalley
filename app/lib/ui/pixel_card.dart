@@ -4,7 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import 'theme.dart';
 import '../sprites/atlas.dart';
-import 'px.dart';
+import 'pixels.dart';
 
 abstract final class CardColors {
   static const ink = Color(0xFF3A2A18);

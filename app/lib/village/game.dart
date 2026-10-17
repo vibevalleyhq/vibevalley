@@ -15,7 +15,7 @@ import '../audio/sfx.dart';
 import '../sprites/atlas.dart';
 import 'critters.dart' show PointLight;
 import 'dog.dart';
-import 'fx.dart';
+import 'bursts.dart';
 import 'level.dart';
 import 'life.dart';
 import 'nav.dart';
@@ -24,11 +24,11 @@ import 'particles.dart';
 import 'pass.dart';
 import 'sky.dart';
 import 'world.dart';
-import '../rules/looks.dart';
-import '../shared/looks.dart';
+import '../rules/cast.dart';
+import '../shared/swatches.dart';
 
 export 'critters.dart' show PointLight;
-export 'fx.dart' show BedFx;
+export 'bursts.dart' show BedFx;
 
 /// Art pixels a second, and frames of the walk cycle a second.
 const _walkSpeed = 42.0;

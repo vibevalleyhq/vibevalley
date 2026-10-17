@@ -5,9 +5,9 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import '../../shared/faces.dart';
-import '../../shared/looks.dart';
+import '../../shared/swatches.dart';
 import '../shared/widgets.dart';
-import '../../rules/looks.dart';
+import '../../rules/cast.dart';
 
 const stagePoses = [
   (pose: Pose.idle, label: '待命', crop: Crop.empty),

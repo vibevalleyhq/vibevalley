@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../voice/voice.dart';
-import '../game/fx.dart';
+import '../game/effects.dart';
 import '../data/prefs.dart';
 import '../audio/sfx.dart';
 

@@ -9,7 +9,7 @@ import '../shared/widgets.dart';
 import '../../shared/work_log.dart';
 import '../voice/voice_page.dart';
 import '../../gen/vibevalley.dart' show managerAgent;
-import '../../rules/looks.dart';
+import '../../rules/cast.dart';
 
 const _tabs = [('memory', '记性'), ('trajectory', '轨迹'), ('archive', '旧账'), ('voice', '声音')];
 

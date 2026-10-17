@@ -7,7 +7,7 @@ import '../data/server.dart' show connectWait;
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../data/remote.dart' show agentsProvider, SessionIssue;
-import 'farm.dart';
+import 'tools.dart';
 import 'state.dart';
 import '../rules/playbook.dart';
 

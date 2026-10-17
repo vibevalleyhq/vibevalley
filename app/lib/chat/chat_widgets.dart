@@ -7,7 +7,7 @@ import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider;
 import 'chat_rules.dart';
-import '../shared/looks.dart';
+import '../shared/swatches.dart';
 
 /// 主 on the wheat until the drawings are in.
 class OwnerFace extends ConsumerWidget {

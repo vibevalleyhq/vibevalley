@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../data/remote.dart' show SessionIssue;
 import '../gen/vibevalley.dart';
-import '../game/fx.dart';
+import '../game/effects.dart';
 import '../audio/sfx.dart';
 import '../audio/synth.dart';
 

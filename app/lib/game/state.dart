@@ -7,8 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../data/ui_state.dart';
 import '../gen/vibevalley.dart';
-import './fx.dart' show farmEffects;
-import 'farm.dart';
+import './effects.dart' show farmEffects;
+import 'tools.dart';
 
 final heldToolProvider = held(Tool.hand);
 

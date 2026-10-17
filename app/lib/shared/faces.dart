@@ -9,9 +9,9 @@ import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../sprites/atlas.dart';
-import '../ui/px.dart';
-import 'looks.dart';
-import '../rules/looks.dart';
+import '../ui/pixels.dart';
+import 'swatches.dart';
+import '../rules/cast.dart';
 import '../data/remote.dart';
 
 const _grey = ColorFilter.matrix([

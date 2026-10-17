@@ -8,7 +8,7 @@ import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider;
-import 'bits.dart';
+import 'widgets.dart';
 import '../rules/chat.dart';
 import '../rules/issues.dart' show issueTitle;
 import '../rules/warehouse.dart';

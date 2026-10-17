@@ -6,7 +6,7 @@ import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/desk/map/map_page.dart';
 import 'package:vibevalley/desk/map/map_rules.dart';
-import 'package:vibevalley/shared/looks.dart' show Pose;
+import 'package:vibevalley/shared/swatches.dart' show Pose;
 import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/farm.dart';

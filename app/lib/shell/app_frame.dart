@@ -11,8 +11,8 @@ import '../ui/kit/kit.dart';
 import '../debug/debug_log.dart';
 import '../debug/debug_panel.dart';
 import 'desktop_title_bar.dart';
-import '../game/fx.dart';
-import '../shared/server_away.dart';
+import '../game/effects.dart';
+import '../shared/connection_banner.dart';
 import '../title/startup.dart';
 import '../title/title_screen.dart';
 import '../data/ui_state.dart';
@@ -95,7 +95,7 @@ class _AppFrameState extends ConsumerState<AppFrame> {
                       const DebugPanel(),
                       ToastViewport(leading: toastLeading(atlas), kicker: toastKicker),
                       if (title) const TitleScreen(),
-                      const ServerAway(),
+                      const ConnectionBanner(),
                       if (widget.startup) const Startup(),
                     ],
                   ),

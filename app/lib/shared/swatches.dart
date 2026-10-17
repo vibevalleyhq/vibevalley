@@ -5,7 +5,7 @@ import 'dart:ui' show Color;
 
 import '../gen/vibevalley.dart';
 import '../sprites/atlas.dart';
-import '../rules/looks.dart';
+import '../rules/cast.dart';
 
 final swatches = (
   body: ['#f3e9da', '#e9e6de', '#e7e6fb', '#d3efe8', '#dfe4ea', '#f4e6d4', '#b9c4d1', '#3d434a', '#2a2e33', '#f6d8c8'],

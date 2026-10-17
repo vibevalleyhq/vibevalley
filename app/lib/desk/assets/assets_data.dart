@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
-import '../../rules/looks.dart';
+import '../../rules/cast.dart';
 
 class Picture {
   const Picture({required this.name, required this.w, required this.h, required this.ax, required this.ay, this.hx, this.hy, this.sheet});

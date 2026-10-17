@@ -18,8 +18,8 @@ import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
 import '../voice/voice.dart';
 import '../rules/chat.dart';
-import '../rules/farm.dart';
-import '../shared/looks.dart';
+import '../rules/sessions.dart';
+import '../shared/swatches.dart';
 import 'chat_messages.dart';
 import 'chat_voice.dart';
 

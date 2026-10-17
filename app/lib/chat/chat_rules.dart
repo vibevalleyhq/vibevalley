@@ -2,7 +2,7 @@
 
 import '../gen/vibevalley.dart';
 import '../rules/chat.dart';
-import '../rules/farm.dart';
+import '../rules/sessions.dart';
 import '../ui/kit/labels.dart';
 
 int unreadUnder(Chat? chat, Conversation channel) => [

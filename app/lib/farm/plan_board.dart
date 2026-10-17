@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
 import '../game/commands.dart';
-import '../game/farm.dart';
+import '../game/tools.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider;
-import 'bits.dart';
-import '../rules/farm.dart';
+import 'widgets.dart';
+import '../rules/sessions.dart';
 import '../rules/playbook.dart';
 import '../shared/faces.dart';
 import '../shared/tags.dart';

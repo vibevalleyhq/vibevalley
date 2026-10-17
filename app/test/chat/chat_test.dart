@@ -20,7 +20,7 @@ import 'package:http/http.dart' as http;
 import '../support/server.dart' show FakeServer, atlas, jsonResponse;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibevalley/rules/chat.dart';
-import 'package:vibevalley/rules/farm.dart';
+import 'package:vibevalley/rules/sessions.dart';
 import 'package:vibevalley/rules/money.dart';
 
 final _now = DateTime.now().millisecondsSinceEpoch.toDouble();

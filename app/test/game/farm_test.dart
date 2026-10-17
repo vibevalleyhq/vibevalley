@@ -1,13 +1,13 @@
 import 'package:flutter_test/flutter_test.dart' hide Retry;
 import 'package:vibevalley/farm/cursors.dart';
-import 'package:vibevalley/game/farm.dart';
+import 'package:vibevalley/game/tools.dart';
 import 'package:vibevalley/game/state.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/farm.dart';
 import 'package:vibevalley/desk/map/map_rules.dart';
-import 'package:vibevalley/shared/looks.dart' show Pose;
-import 'package:vibevalley/rules/farm.dart';
+import 'package:vibevalley/shared/swatches.dart' show Pose;
+import 'package:vibevalley/rules/sessions.dart';
 import 'package:vibevalley/rules/progress.dart';
 import 'package:vibevalley/rules/money.dart';
 

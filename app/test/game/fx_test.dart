@@ -5,20 +5,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/ui/medals.dart';
-import 'package:vibevalley/game/fx.dart';
-import 'package:vibevalley/shared/server_away.dart';
+import 'package:vibevalley/game/effects.dart';
+import 'package:vibevalley/shared/connection_banner.dart';
 import 'package:vibevalley/ui/kit/kit.dart';
 
 import '../support/shell.dart';
 import 'package:vibevalley/rules/progress.dart';
 
 void main() {
-  group('ServerAway', () {
+  group('ConnectionBanner', () {
     Future<void> show(WidgetTester tester, {required bool reachable}) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: shellOverrides(FakeServer(), reachable: reachable),
-          child: const MaterialApp(home: Scaffold(body: ServerAway())),
+          child: const MaterialApp(home: Scaffold(body: ConnectionBanner())),
         ),
       );
       await tester.pump();

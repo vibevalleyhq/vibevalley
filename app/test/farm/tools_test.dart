@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/game/commands.dart';
-import 'package:vibevalley/game/farm.dart';
+import 'package:vibevalley/game/tools.dart';
 import 'package:vibevalley/game/state.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:http/http.dart' as http;

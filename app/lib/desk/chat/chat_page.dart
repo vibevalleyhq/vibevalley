@@ -15,7 +15,7 @@ import 'dialogs.dart';
 import '../desk_shell.dart' show deskHead;
 import 'message_list.dart';
 import '../../rules/chat.dart';
-import '../../rules/farm.dart';
+import '../../rules/sessions.dart';
 
 const _grey = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, color: Palette.bark500);
 

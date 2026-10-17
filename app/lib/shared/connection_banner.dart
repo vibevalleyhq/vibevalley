@@ -23,8 +23,8 @@ final serverReachableProvider = StreamProvider<bool>((ref) async* {
 
 bool watchReachable(WidgetRef ref) => ref.watch(serverReachableProvider).value ?? true;
 
-class ServerAway extends ConsumerWidget {
-  const ServerAway({super.key});
+class ConnectionBanner extends ConsumerWidget {
+  const ConnectionBanner({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

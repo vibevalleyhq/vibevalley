@@ -11,7 +11,7 @@ import '../../chat/chat_rules.dart';
 import '../../chat/chat_state.dart';
 import '../../chat/chat_widgets.dart';
 import '../../rules/chat.dart';
-import '../../rules/farm.dart';
+import '../../rules/sessions.dart';
 import '../../rules/money.dart';
 
 /// A sender's messages this close together share one header.

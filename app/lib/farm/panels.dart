@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
 import '../data/ui_state.dart';
-import '../game/farm.dart';
+import '../game/tools.dart';
 import '../game/state.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
@@ -13,7 +13,7 @@ import 'achievements.dart';
 import '../shared/harvest.dart';
 import 'menu.dart';
 import 'plans.dart';
-import '../rules/looks.dart';
+import '../rules/cast.dart';
 import '../shared/tags.dart';
 import 'farm_log.dart';
 import 'plot_detail.dart';

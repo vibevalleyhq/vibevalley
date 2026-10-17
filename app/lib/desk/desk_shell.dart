@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../data/providers.dart';
 import '../shared/faces.dart';
 import '../gen/vibevalley.dart';
-import '../rules/looks.dart';
+import '../rules/cast.dart';
 import '../data/ui_state.dart';
 import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';

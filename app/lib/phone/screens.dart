@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../sprites/atlas.dart';
-import '../ui/px.dart';
+import '../ui/pixels.dart';
 import '../data/remote.dart' show agentsProvider;
 import '../voice/voice.dart';
 import 'calls.dart';
@@ -16,7 +16,7 @@ import 'kit.dart';
 import '../rules/view.dart';
 import 'bug_snake_game.dart';
 import 'merge_game.dart';
-import '../shared/looks.dart';
+import '../shared/swatches.dart';
 
 enum PhoneApp { home, missed, log, blocks, dino, sokoban, bugs, merge }
 

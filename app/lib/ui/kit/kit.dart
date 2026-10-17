@@ -1,5 +1,5 @@
 export '../theme.dart';
-export '../px.dart';
+export '../pixels.dart';
 export 'base.dart';
 export 'button.dart';
 export 'choice.dart';

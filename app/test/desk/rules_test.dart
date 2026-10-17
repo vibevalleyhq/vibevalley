@@ -4,7 +4,7 @@ import 'package:vibevalley/desk/skills/skills_page.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/desk.dart';
-import 'package:vibevalley/rules/looks.dart';
+import 'package:vibevalley/rules/cast.dart';
 import 'package:vibevalley/rules/seeds.dart';
 
 void main() {

@@ -2,7 +2,7 @@
 
 import '../gen/vibevalley.dart';
 import '../rules/beds.dart';
-import '../rules/farm.dart';
+import '../rules/sessions.dart';
 
 export '../rules/beds.dart' show Bed, beds, bedOfStation, isRipe;
 

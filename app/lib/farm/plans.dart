@@ -8,7 +8,7 @@ import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider;
-import 'bits.dart';
+import 'widgets.dart';
 import '../shared/harvest.dart';
 import '../rules/playbook.dart';
 import '../shared/tags.dart';

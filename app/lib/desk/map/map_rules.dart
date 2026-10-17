@@ -5,8 +5,8 @@ import 'dart:math' as math;
 import 'dart:ui' show Offset, Rect;
 
 import '../../gen/vibevalley.dart';
-import '../../rules/farm.dart';
-import '../../shared/looks.dart' show Pose;
+import '../../rules/sessions.dart';
+import '../../shared/swatches.dart' show Pose;
 
 sealed class Spot {
   const Spot();

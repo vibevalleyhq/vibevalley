@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
-import '../../shared/looks.dart';
+import '../../shared/swatches.dart';
 import '../shared/rules.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
