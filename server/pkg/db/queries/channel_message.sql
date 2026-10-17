@@ -1,9 +1,9 @@
 -- What is said, in order: a message's id is a uuidv7 and sorts by time; its number is its place in its conversation (channel/db.go).
 
 -- name: InsertMessage :one
-insert into channel_message (id, conversation_id, number, sender_id, kind, body, final, meta, created_at)
+insert into channel_message (id, conversation_id, number, sender_id, kind, body, final, meta, send_key, created_at)
 values (sqlc.arg(id), sqlc.arg(conversation), (select coalesce(max(number), 0) + 1 from channel_message where conversation_id = sqlc.arg(conversation)),
-        sqlc.arg(sender), sqlc.arg(kind), sqlc.arg(body), sqlc.arg(final), sqlc.arg(meta), sqlc.arg(created_at))
+        sqlc.arg(sender), sqlc.arg(kind), sqlc.arg(body), sqlc.arg(final), sqlc.arg(meta), sqlc.arg(send_key), sqlc.arg(created_at))
 returning number;
 
 -- name: UpdateMessageBody :exec
@@ -14,6 +14,9 @@ update channel_message set meta = ? where id = ?;
 
 -- name: MessageByID :one
 select sqlc.embed(m), sqlc.embed(p) from channel_message m join channel_participant p on p.id = m.sender_id where m.id = ?;
+
+-- name: MessageBySendKey :one
+select sqlc.embed(m), sqlc.embed(p) from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = ? and m.send_key = ?;
 
 -- name: RecentMessages :many
 select sqlc.embed(m), sqlc.embed(p) from channel_message m join channel_participant p on p.id = m.sender_id order by m.id desc limit ?;

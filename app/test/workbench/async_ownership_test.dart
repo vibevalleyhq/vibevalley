@@ -83,8 +83,8 @@ void main() {
     final c = ProviderContainer(overrides: [apiProvider.overrideWithValue(server.api), stateProvider.overrideWithValue(null)]);
     addTearDown(c.dispose);
     addTearDown(server.close);
-    final first = expectLater(c.read(messagesProvider).send('first'), throwsA(isA<VibeValleyApiError>()));
-    final second = expectLater(c.read(messagesProvider).send('second'), throwsA(isA<VibeValleyApiError>()));
+    final first = expectLater(c.read(messagesProvider).send('first', sendKey: 'k1'), throwsA(isA<VibeValleyApiError>()));
+    final second = expectLater(c.read(messagesProvider).send('second', sendKey: 'k2'), throwsA(isA<VibeValleyApiError>()));
     pending.complete(jsonResponse({'reason': '没有钥匙'}, 503));
     await Future.wait([first, second]);
     expect(server.requests, hasLength(1));

@@ -61,7 +61,7 @@ func TestOutboxConfirmsDigestAsOneBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := range 4 {
-		m, err := f.Channel.Say(fmt.Sprint(i), nil)
+		m, _, err := f.Channel.Say(fmt.Sprint(i), nil, "")
 		if err != nil {
 			t.Fatal(err)
 		}

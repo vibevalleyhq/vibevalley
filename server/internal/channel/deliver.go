@@ -25,6 +25,8 @@ type chatWrite struct {
 	meta         *chatMeta
 	answers      *string
 	thread       *threadSubject
+	// The client's key for one send, "" for none: the same key from the same sender again is that message, not a new one.
+	sendKey string
 }
 
 type chatWritten struct {
@@ -35,6 +37,8 @@ type chatWritten struct {
 	notOnFarm  []string
 	held       bool
 	thread     string
+	// A send with a key already written: nothing new is written or delivered.
+	again bool
 }
 
 func (c *Service) inTx(fn func(s chatStore) error) error {
@@ -201,10 +205,20 @@ func (c *Service) write(in chatWrite) (chatWritten, error) {
 	err := c.inTx(func(s chatStore) error {
 		id := in.id
 		var number int64
+		if id == "" && in.sendKey != "" {
+			seen, err := s.messageBySendKey(in.from, in.sendKey)
+			if err != nil {
+				return err
+			}
+			if seen != nil {
+				written = chatWritten{id: seen.ID, number: seen.Number, again: true}
+				return nil
+			}
+		}
 		if id == "" {
 			id = base.NewID()
 			var err error
-			number, err = s.insertMessage(id, in.conversation, in.from, string(in.kind), in.text, in.final, in.meta, clock.NowMs())
+			number, err = s.insertMessage(id, in.conversation, in.from, string(in.kind), in.text, in.final, in.meta, in.sendKey, clock.NowMs())
 			if err != nil {
 				return err
 			}
@@ -243,7 +257,9 @@ func (c *Service) write(in chatWrite) (chatWritten, error) {
 	if err != nil {
 		return chatWritten{}, err
 	}
-	c.after(in.conversation, written, in.answers)
+	if !written.again {
+		c.after(in.conversation, written, in.answers)
+	}
 	return written, nil
 }
 

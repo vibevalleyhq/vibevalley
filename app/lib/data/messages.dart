@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -33,7 +34,8 @@ class Messages {
     throw TimeoutException('等管家接通超时，请重试', connectWait);
   }
 
-  Future<void> send(String text, {Conversation? conversation, int? bed, String? agent}) async {
+  /// [sendKey] names this one send: a retry with the same key is the message already said, not a second one.
+  Future<void> send(String text, {required String sendKey, Conversation? conversation, int? bed, String? agent}) async {
     final said = text.trim();
     if (said.isEmpty || !await _ready()) return;
     final pick = ref.read(prefsProvider).pick;
@@ -48,7 +50,29 @@ class Messages {
             conversation: conversation?.kind == ConversationKind.general ? null : conversation?.id,
             bed: bed?.toDouble(),
             agent: agent ?? chosen,
+            sendKey: sendKey,
           ),
         );
   }
+}
+
+final _keys = Random.secure();
+
+/// 16 random bytes in hex.
+String newSendKey() => List.generate(16, (_) => _keys.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+
+/// One key per draft: sending the same draft again, after a failure, reuses its key; a sent draft's key is not used again.
+class SendKeys {
+  String? _draft;
+  String _key = '';
+
+  String of(String draft) {
+    if (draft != _draft) {
+      _draft = draft;
+      _key = newSendKey();
+    }
+    return _key;
+  }
+
+  void sent() => _draft = null;
 }

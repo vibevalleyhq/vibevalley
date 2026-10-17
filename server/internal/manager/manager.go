@@ -739,15 +739,16 @@ func (fm *manager) answered(outcome protocol.Outcome) {
 	}
 }
 
-func (fm *manager) Say(ctx context.Context, text, agentID string, conversation *string) error {
+// sendKey: the client's key for this send, "" for none; a retry with the same key is the message already said.
+func (fm *manager) Say(ctx context.Context, text, agentID string, conversation *string, sendKey string) error {
 	picked := ""
 	if a := fm.store.Agent(agentID); agentID != "" && a != nil {
 		picked = a.ID
 	}
 	fm.mu.Lock()
 	defer fm.mu.Unlock()
-	message, err := fm.chat.Say(text, conversation)
-	if err == nil && picked != "" {
+	message, again, err := fm.chat.Say(text, conversation, sendKey)
+	if err == nil && !again && picked != "" {
 		fm.selected[message.ID] = picked
 	}
 	return err
@@ -755,21 +756,24 @@ func (fm *manager) Say(ctx context.Context, text, agentID string, conversation *
 
 // When the manager answers calls itself, what was said reached it on the voice line already (Call keeps it in 田头). Otherwise
 // Agora's model answered it; the manager hears it here to dispatch, and what it says goes to 田头 like any answer.
-func (fm *manager) Heard(text, agentID string) {
+func (fm *manager) Heard(text, agentID, sendKey string) error {
 	if _, ok := fm.settings.Voice().Answer.Value.(protocol.VoiceAnswerManager); ok {
-		return
+		return nil
 	}
-	fm.chat.Spoken("user", text)
+	if again, err := fm.chat.Spoken("user", text, sendKey); err != nil || again {
+		return err
+	}
 	picked := ""
 	if a := fm.store.Agent(agentID); agentID != "" && a != nil {
 		picked = a.ID
 	}
 	fm.sendInput(fm.pickedNote(picked)+"（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说："+text, managerInput{Conversation: fm.chat.General(), Agent: picked}, true)
+	return nil
 }
 
 // The words said on the phone; the answer is read out, and both stay in 田头.
 func (fm *manager) Call(ctx context.Context, text string) <-chan string {
-	fm.chat.Spoken("user", text)
+	fm.chat.Spoken("user", text, "")
 	return fm.answer(ctx, managerVoiceNote+"\n主人说："+text)
 }
 

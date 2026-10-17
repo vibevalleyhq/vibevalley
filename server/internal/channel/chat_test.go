@@ -273,7 +273,7 @@ func TestChatJobOpensThreadUnderDispatch(t *testing.T) {
 func TestChatPersonInJobThreadWakesSession(t *testing.T) {
 	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
 	thread := x.hire(t, "w2", "写 hello", "chat-b", nil)
-	said, err := f.Channel.Say("把输出改成中文", &thread.ID)
+	said, _, err := f.Channel.Say("把输出改成中文", &thread.ID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +304,7 @@ func TestChatGeneralReachesManager(t *testing.T) {
 	news, stop := f.Channel.ForManager().Subscribe()
 	defer stop()
 	before := len(x.runsOf("w3"))
-	said, err := f.Channel.Say("今天进度怎么样", nil)
+	said, _, err := f.Channel.Say("今天进度怎么样", nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestChatChannels(t *testing.T) {
 	x.hire(t, "w5", "写 hello", "chat-sq", nil)
 	news, stop := f.Channel.ForManager().Subscribe()
 	defer stop()
-	said, err := f.Channel.Say("打卡页今天能好吗", &channel.ID)
+	said, _, err := f.Channel.Say("打卡页今天能好吗", &channel.ID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,10 +416,10 @@ func TestChatBusySessionGetsOneNotice(t *testing.T) {
 	if h := f.Core.Session("w6"); h == nil || !protocol.IsBusy(*h) {
 		t.Fatal("not working")
 	}
-	if _, err := f.Channel.Say("补充：顺便写测试", &thread.ID); err != nil {
+	if _, _, err := f.Channel.Say("补充：顺便写测试", &thread.ID, ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Channel.Say("还有：写 README", &thread.ID); err != nil {
+	if _, _, err := f.Channel.Say("还有：写 README", &thread.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	testkit.Until(t, "a second turn", func() bool { return len(x.runsOf("w6")) >= 2 })
@@ -475,7 +475,7 @@ func TestChatWakeBreaker(t *testing.T) {
 	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
 	a := x.hire(t, "w8", "写 hello", "chat-f", nil)
 	x.hire(t, "w9", "写 world", "chat-g", nil)
-	if _, err := f.Channel.Say("@w8 这次必败", nil); err != nil {
+	if _, _, err := f.Channel.Say("@w8 这次必败", nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	testkit.Until(t, "the breaker notice", func() bool {
@@ -499,7 +499,7 @@ func TestChatWakeBreaker(t *testing.T) {
 	if last := ds[len(ds)-1]; last.HeldBy != "wake_breaker" {
 		t.Fatalf("from w9: %+v", last)
 	}
-	if _, err := f.Channel.Say("@w8 再试一次", nil); err != nil {
+	if _, _, err := f.Channel.Say("@w8 再试一次", nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	testkit.Until(t, "woken by the person", func() bool {
@@ -520,7 +520,7 @@ func TestChatSpeaking(t *testing.T) {
 		t.Fatalf("a retry is the same message: %+v %v", again, err)
 	}
 
-	words, err := f.Channel.Say("先别动 main", &thread.ID)
+	words, _, err := f.Channel.Say("先别动 main", &thread.ID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +553,7 @@ func TestChatSpeaking(t *testing.T) {
 		t.Fatal("a thread under a thread's message")
 	}
 	general := f.Channel.General()
-	sq, err := f.Channel.Say("大家早", &general)
+	sq, _, err := f.Channel.Say("大家早", &general, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -614,7 +614,7 @@ func TestChatHistoryAndMarkRead(t *testing.T) {
 	general := f.Channel.General()
 	var seqs []int64
 	for i := range 5 {
-		m, err := f.Channel.Say(fmt.Sprintf("第 %d 句", i), &general)
+		m, _, err := f.Channel.Say(fmt.Sprintf("第 %d 句", i), &general, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -635,7 +635,7 @@ func TestChatHistoryAndMarkRead(t *testing.T) {
 	if sq == nil || sq.Read == nil || *sq.Read != seqs[4] {
 		t.Fatalf("read: %+v", sq)
 	}
-	if _, err := f.Channel.Say("  ", nil); err == nil {
+	if _, _, err := f.Channel.Say("  ", nil, ""); err == nil {
 		t.Fatal("said nothing")
 	}
 	if digest := f.Channel.ManagerDigest(); len(digest) != 0 {
@@ -654,7 +654,7 @@ func TestChatInboxAndDigest(t *testing.T) {
 		t.Fatalf("digest again: %+v", again)
 	}
 	general := f.Channel.General()
-	if _, err := f.Channel.Say("大家看一下", &general); err != nil {
+	if _, _, err := f.Channel.Say("大家看一下", &general, ""); err != nil {
 		t.Fatal(err)
 	}
 	inbox := f.Channel.Inbox("w12")
@@ -677,7 +677,7 @@ func TestChatSessionLeaves(t *testing.T) {
 		return h != nil && !protocol.IsBusy(*h)
 	})
 	general := f.Channel.General()
-	if _, err := f.Channel.Say("随便说说", &general); err != nil {
+	if _, _, err := f.Channel.Say("随便说说", &general, ""); err != nil {
 		t.Fatal(err)
 	}
 	f.Core.Apply(protocol.FactLeft{ID: "w13"})
@@ -697,7 +697,7 @@ func TestChatRestartGivesHandedWordsAgain(t *testing.T) {
 	f, x := chatTestFarm(t, home, db)
 	thread := x.hire(t, "w14", "写 hello", "chat-i", nil)
 	x.slow = time.Minute
-	said, err := f.Channel.Say("慢慢做：再加一个文件", &thread.ID)
+	said, _, err := f.Channel.Say("慢慢做：再加一个文件", &thread.ID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -746,4 +746,40 @@ func TestChatSummaryOf(t *testing.T) {
 	if got := str.Head("😀abc", 1); got != "" {
 		t.Errorf("clip: %q", got)
 	}
+}
+
+func TestChatSendKeyWritesOnce(t *testing.T) {
+	f, _ := chatTestFarm(t, t.TempDir(), ":memory:")
+	first, again, err := f.Channel.Say("早", nil, "k1")
+	if err != nil || again {
+		t.Fatalf("first: %v %v", again, err)
+	}
+	second, again, err := f.Channel.Say("早", nil, "k1")
+	if err != nil || !again || second.ID != first.ID || second.Number != first.Number {
+		t.Fatalf("the same key again: %+v %v %v", second, again, err)
+	}
+	if _, again, err := f.Channel.Say("早", nil, "k2"); err != nil || again {
+		t.Fatalf("another key: %v %v", again, err)
+	}
+	for range 2 {
+		if _, again, err := f.Channel.Say("晚", nil, ""); err != nil || again {
+			t.Fatalf("no key: %v %v", again, err)
+		}
+	}
+	if _, _, err := f.Channel.Say("早", nil, strings.Repeat("k", 65)); err == nil || err.Error() != "sendKey 太长" {
+		t.Fatalf("a long key: %v", err)
+	}
+	for range 2 {
+		if _, err := f.Channel.Spoken("user", "电话里说的", "k3"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	said := map[string]int{}
+	for _, m := range chatMessagesIn(f, f.Channel.General()) {
+		if m.From == "user" {
+			said[m.Text]++
+		}
+	}
+	testkit.Eq(t, said, map[string]int{"早": 2, "晚": 2, "电话里说的": 1}, "in 田头")
+	testkit.Eq(t, len(chatDeliveries(t, f, protocol.ManagerAgent)), 4, "deliveries to the manager")
 }

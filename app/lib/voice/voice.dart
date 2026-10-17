@@ -8,6 +8,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/foundation.dart';
@@ -20,11 +21,16 @@ enum CallPhase { idle, connecting, live, ending }
 
 class _CallCancelled implements Exception {}
 
+final _keys = Random.secure();
+
+/// As data/messages.dart's newSendKey, which this layer cannot import.
+String _sendKey() => List.generate(16, (_) => _keys.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+
 class VoiceCall extends ChangeNotifier {
   VoiceCall(this.api, {this.agentPick, RtcEngine Function()? createEngine}) : _createEngine = createEngine ?? createAgoraRtcEngine {
     captions.onHeard = (text) => api.manager
         .hear(
-          body: SayRequest(text: text, agent: agentPick?.call()),
+          body: SayRequest(text: text, agent: agentPick?.call(), sendKey: _sendKey()),
         )
         .catchError((Object _) {});
     // The server keeps it only while the call is on, and only when Agora's model answered.

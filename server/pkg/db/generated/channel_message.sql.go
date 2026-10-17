@@ -59,9 +59,9 @@ func (q *Queries) HoldNoticeSinceUser(ctx context.Context, conversation string) 
 
 const insertMessage = `-- name: InsertMessage :one
 
-insert into channel_message (id, conversation_id, number, sender_id, kind, body, final, meta, created_at)
+insert into channel_message (id, conversation_id, number, sender_id, kind, body, final, meta, send_key, created_at)
 values (?1, ?2, (select coalesce(max(number), 0) + 1 from channel_message where conversation_id = ?2),
-        ?3, ?4, ?5, ?6, ?7, ?8)
+        ?3, ?4, ?5, ?6, ?7, ?8, ?9)
 returning number
 `
 
@@ -73,6 +73,7 @@ type InsertMessageParams struct {
 	Body         string
 	Final        bool
 	Meta         sql.NullString
+	SendKey      sql.NullString
 	CreatedAt    int64
 }
 
@@ -86,6 +87,7 @@ func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (i
 		arg.Body,
 		arg.Final,
 		arg.Meta,
+		arg.SendKey,
 		arg.CreatedAt,
 	)
 	var number int64
@@ -157,6 +159,46 @@ type MessageByNumberRow struct {
 func (q *Queries) MessageByNumber(ctx context.Context, arg MessageByNumberParams) (MessageByNumberRow, error) {
 	row := q.db.QueryRowContext(ctx, messageByNumber, arg.ConversationID, arg.Number)
 	var i MessageByNumberRow
+	err := row.Scan(
+		&i.ChannelMessage.ID,
+		&i.ChannelMessage.ConversationID,
+		&i.ChannelMessage.Number,
+		&i.ChannelMessage.SenderID,
+		&i.ChannelMessage.Kind,
+		&i.ChannelMessage.Body,
+		&i.ChannelMessage.Final,
+		&i.ChannelMessage.Meta,
+		&i.ChannelMessage.SendKey,
+		&i.ChannelMessage.CreatedAt,
+		&i.ChannelMessage.UpdatedAt,
+		&i.ChannelParticipant.ID,
+		&i.ChannelParticipant.Kind,
+		&i.ChannelParticipant.Name,
+		&i.ChannelParticipant.AgentID,
+		&i.ChannelParticipant.Runtime,
+		&i.ChannelParticipant.JoinedAt,
+		&i.ChannelParticipant.LeftAt,
+	)
+	return i, err
+}
+
+const messageBySendKey = `-- name: MessageBySendKey :one
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.send_key, m.created_at, m.updated_at, p.id, p.kind, p.name, p.agent_id, p.runtime, p.joined_at, p.left_at from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = ? and m.send_key = ?
+`
+
+type MessageBySendKeyParams struct {
+	SenderID string
+	SendKey  sql.NullString
+}
+
+type MessageBySendKeyRow struct {
+	ChannelMessage     ChannelMessage
+	ChannelParticipant ChannelParticipant
+}
+
+func (q *Queries) MessageBySendKey(ctx context.Context, arg MessageBySendKeyParams) (MessageBySendKeyRow, error) {
+	row := q.db.QueryRowContext(ctx, messageBySendKey, arg.SenderID, arg.SendKey)
+	var i MessageBySendKeyRow
 	err := row.Scan(
 		&i.ChannelMessage.ID,
 		&i.ChannelMessage.ConversationID,

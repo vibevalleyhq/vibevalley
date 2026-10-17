@@ -271,13 +271,24 @@ func (s chatStore) touchConversation(id string, number int64) error {
 	return s.q.TouchConversation(bg, generated.TouchConversationParams{Number: number, ID: id})
 }
 
-func (s chatStore) insertMessage(id, conversation, sender, kind, body string, final bool, meta *chatMeta, created int64) (int64, error) {
+// sendKey "" is none.
+func (s chatStore) insertMessage(id, conversation, sender, kind, body string, final bool, meta *chatMeta, sendKey string, created int64) (int64, error) {
 	m, err := chatMetaText(meta)
 	if err != nil {
 		return 0, err
 	}
+	key := sql.NullString{String: sendKey, Valid: sendKey != ""}
 	return s.q.InsertMessage(bg, generated.InsertMessageParams{ID: id, Conversation: conversation, Sender: sender, Kind: kind, Body: body, Final: final,
-		Meta: nullText(m), CreatedAt: created})
+		Meta: nullText(m), SendKey: key, CreatedAt: created})
+}
+
+func (s chatStore) messageBySendKey(sender, sendKey string) (*chatMsgRow, error) {
+	r, err := found(s.q.MessageBySendKey(bg, generated.MessageBySendKeyParams{SenderID: sender, SendKey: sql.NullString{String: sendKey, Valid: true}}))
+	if r == nil {
+		return nil, err
+	}
+	m := chatMsgOf(r.ChannelMessage, r.ChannelParticipant)
+	return &m, nil
 }
 
 func (s chatStore) updateMessageBody(id string, body string, final bool, updated int64) error {

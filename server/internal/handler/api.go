@@ -62,7 +62,7 @@ func (a api) ChannelSay(ctx context.Context, body protocol.SayRequest) error {
 		a.f.Game.Want(*body.Bed)
 	}
 	a.f.Core.Open()
-	return refused(a.f.Manager.Say(ctx, body.Text, ptr.Value(body.Agent), body.Conversation))
+	return refused(a.f.Manager.Say(ctx, body.Text, ptr.Value(body.Agent), body.Conversation, ptr.Value(body.SendKey)))
 }
 
 func (a api) ChannelCreate(_ context.Context, body protocol.ChannelRequest) error {
@@ -98,8 +98,7 @@ func (a api) ChannelUpdate(_ context.Context, id string, body protocol.ChannelUp
 
 func (a api) ManagerHear(_ context.Context, body protocol.SayRequest) error {
 	a.f.Core.Open()
-	a.f.Manager.Heard(body.Text, ptr.Value(body.Agent))
-	return nil
+	return refused(a.f.Manager.Heard(body.Text, ptr.Value(body.Agent), ptr.Value(body.SendKey)))
 }
 
 func (a api) IssueComment(_ context.Context, id string, body protocol.CommentRequest) error {

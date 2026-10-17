@@ -102,6 +102,7 @@ class ChatWindow extends ConsumerStatefulWidget {
 
 class _ChatWindowState extends ConsumerState<ChatWindow> {
   final _naming = Naming();
+  final _keys = SendKeys();
   final _scroll = ScrollController();
   String? _problem;
   String? _shownId;
@@ -147,16 +148,30 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
 
   void _show(String? id) => unawaited(ref.read(chatActionsProvider).showChat(id).catchError((Object _) {}));
 
+  /// The field clears at once; when the send fails, the draft comes back with its key, so sending it again cannot say it twice.
   void _send(Conversation? conversation, [String? line]) {
     final said = (line ?? _naming.text.text).trim();
     if (said.isEmpty) return;
-    final sent = ref.read(messagesProvider).send(said, conversation: conversation);
-    if (line == null) _naming.clear();
+    final draft = line == null;
+    final sent = ref.read(messagesProvider).send(said, sendKey: draft ? _keys.of(said) : newSendKey(), conversation: conversation);
+    if (draft) _naming.clear();
     setState(() => _problem = null);
     unawaited(
-      sent.catchError((Object e) {
-        if (mounted) setState(() => _problem = problemOf(e));
-      }),
+      sent.then(
+        (_) {
+          if (draft) _keys.sent();
+        },
+        onError: (Object e) {
+          if (!mounted) return;
+          if (draft && _naming.text.text.isEmpty) {
+            _naming.text.value = TextEditingValue(
+              text: said,
+              selection: TextSelection.collapsed(offset: said.length),
+            );
+          }
+          setState(() => _problem = problemOf(e));
+        },
+      ),
     );
   }
 

@@ -126,6 +126,20 @@ Future<http.Response> _answer(http.Request r) async {
   return http.Response('', 204);
 }
 
+/// The first say fails, as when the line drops; the rest go through.
+FakeServer _flaky() {
+  var failed = false;
+  return FakeServer((r) async {
+    if (r.url.path == '/api/v1/say' && !failed) {
+      failed = true;
+      return jsonResponse({'reason': '线断了'}, 503);
+    }
+    return _answer(r);
+  });
+}
+
+List<Map<String, dynamic>> _says(FakeServer server) => server.to('POST', '/api/v1/say').map((r) => jsonDecode(r.body) as Map<String, dynamic>).toList();
+
 ReceivedFrame _frame(CoreState state) => ReceivedFrame(
   StateFrame(
     state: state,
@@ -276,7 +290,7 @@ void main() {
       await t.pump(const Duration(milliseconds: 50));
       final say = server.to('POST', '/api/v1/say');
       expect(say, hasLength(1));
-      expect(jsonDecode(say.single.body), {'text': '今天把打卡做完', 'conversation': 'c2'});
+      expect(jsonDecode(say.single.body), {'text': '今天把打卡做完', 'conversation': 'c2', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
     });
 
     testWidgets('the stop button shows while the manager thinks and stops it', (t) async {
@@ -292,6 +306,27 @@ void main() {
       expect(server.to('POST', '/api/v1/manager/stop'), hasLength(1));
     });
 
+    testWidgets('a send that fails keeps the draft, and sending it again uses the same key', (t) async {
+      final server = _flaky();
+      await _pump(t, const ChatPage(), server, _state());
+      final field = find.byType(TextField).first;
+      await t.enterText(field, '把打卡做完');
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump(const Duration(milliseconds: 50));
+      expect(find.text('线断了'), findsOneWidget);
+      expect(t.widget<TextField>(field).controller!.text, '把打卡做完');
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump(const Duration(milliseconds: 50));
+      expect(t.widget<TextField>(field).controller!.text, '');
+      await t.enterText(field, '把打卡做完');
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump(const Duration(milliseconds: 50));
+      final keys = _says(server).map((b) => b['sendKey']).toList();
+      expect(keys, hasLength(3));
+      expect(keys[1], keys[0]);
+      expect(keys[2], isNot(keys[0]));
+    });
+
     testWidgets('@ offers whom to name; Enter names, then Enter sends on the square', (t) async {
       final server = FakeServer(_answer);
       await _pump(t, const ChatPage(), server, _state());
@@ -305,7 +340,7 @@ void main() {
       expect(server.to('POST', '/api/v1/say'), isEmpty);
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump(const Duration(milliseconds: 50));
-      expect(jsonDecode(server.to('POST', '/api/v1/say').single.body), {'text': '叫 @w1'});
+      expect(jsonDecode(server.to('POST', '/api/v1/say').single.body), {'text': '叫 @w1', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
     });
 
     testWidgets('the thread opens on the right; the schedules tab lists and switches them', (t) async {
@@ -368,7 +403,7 @@ void main() {
       await t.enterText(find.byType(TextField), '再跑一次');
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump(const Duration(milliseconds: 50));
-      expect(jsonDecode(server.to('POST', '/api/v1/say').last.body), {'text': '再跑一次', 'conversation': 'c3'});
+      expect(jsonDecode(server.to('POST', '/api/v1/say').last.body), {'text': '再跑一次', 'conversation': 'c3', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
 
       await t.tap(find.bySemanticsLabel('回到田头').first);
       await t.pump(const Duration(milliseconds: 50));
@@ -405,6 +440,23 @@ void main() {
       await t.tap(find.bySemanticsLabel('叫停管家'));
       await t.pump(const Duration(milliseconds: 50));
       expect(server.to('POST', '/api/v1/manager/stop'), hasLength(1));
+    });
+
+    testWidgets('a send that fails puts the draft back, and sending it again uses the same key', (t) async {
+      final server = _flaky();
+      await _pump(t, window(server, _state(), []), server, _state());
+      await t.enterText(find.byType(TextField), '现在进度怎么样？');
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump(const Duration(milliseconds: 50));
+      expect(find.text('线断了'), findsOneWidget);
+      expect(t.widget<TextField>(find.byType(TextField)).controller!.text, '现在进度怎么样？');
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump(const Duration(milliseconds: 50));
+      expect(t.widget<TextField>(find.byType(TextField)).controller!.text, '');
+      expect(find.text('线断了'), findsNothing);
+      final says = _says(server);
+      expect(says.map((b) => b['text']), ['现在进度怎么样？', '现在进度怎么样？']);
+      expect(says[1]['sendKey'], says[0]['sendKey']);
     });
 
     testWidgets('the channel menu lists channels with unread and switches', (t) async {

@@ -153,7 +153,7 @@ void main() {
     await tester.tap(find.text('播种').last);
     await settle(tester);
     final say = routes.calls.where((x) => x.path == '/api/v1/say').single;
-    expect(say.body, {'text': '给 README 补上怎么启动', 'bed': 3, 'agent': 'front'});
+    expect(say.body, {'text': '给 README 补上怎么启动', 'bed': 3, 'agent': 'front', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
     expect(c.read(sowingProvider), isNull);
   });
 

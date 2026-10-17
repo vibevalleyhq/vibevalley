@@ -67,7 +67,7 @@ class FarmCommands {
 
   String _issueOf(String session) => (_farm?.sessions ?? const <Session>[]).firstWhere((w) => w.id == session).issueId;
 
-  Future<void> plant(int station, String text, [String? agent]) => ref.read(messagesProvider).send(text, bed: station, agent: agent);
+  Future<void> plant(int station, String text, [String? agent]) => ref.read(messagesProvider).send(text, sendKey: newSendKey(), bed: station, agent: agent);
 
   /// The click's decision: read the farm once, so the page's sound and the command use the same aim.
   PlotAim aim(Bed bed) {

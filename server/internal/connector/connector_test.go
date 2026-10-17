@@ -180,7 +180,7 @@ func voiceConnectorsFarm(t *testing.T) (*world, *voiceScript) {
 	c.ilink, c.feishu, c.qq = voiceScriptedIlink{s}, voiceScriptedFeishu{s}, voiceScriptedQQ{s}
 	var n atomic.Int64
 	c.say = func(_ context.Context, text string, conversation *string) error {
-		said, err := f.Channel.Say(text, conversation)
+		said, _, err := f.Channel.Say(text, conversation, "")
 		if err != nil {
 			return err
 		}
@@ -512,7 +512,7 @@ func TestConnectorsResumeAfterRestart(t *testing.T) {
 		s.qr = []weixin.QrStatus{{Status: "confirmed", BotToken: "tok", IlinkBotID: "bot1", IlinkUserID: voiceOwner}}
 		f.Connector.ilink, f.Connector.feishu, f.Connector.qq = voiceScriptedIlink{s}, voiceScriptedFeishu{s}, voiceScriptedQQ{s}
 		f.Connector.say = func(_ context.Context, text string, conversation *string) error {
-			_, err := f.Channel.Say(text, conversation)
+			_, _, err := f.Channel.Say(text, conversation, "")
 			return err
 		}
 		if err := f.Start(context.Background()); err != nil {
@@ -582,7 +582,7 @@ func TestAccountChangeRollsBackWhenOutboxUpdateFails(t *testing.T) {
 	if _, err := f.DB.Exec(`CREATE TRIGGER fail_outbox BEFORE UPDATE ON connector_outbox BEGIN SELECT RAISE(ABORT, 'disk failure'); END`); err != nil {
 		t.Fatal(err)
 	}
-	message, err := f.Channel.Say("pending", nil)
+	message, _, err := f.Channel.Say("pending", nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}

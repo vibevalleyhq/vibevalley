@@ -2994,25 +2994,28 @@ class CommentRequest {
 }
 
 class SayRequest {
-  const SayRequest({required this.text, this.bed, this.conversation, this.agent});
+  const SayRequest({required this.text, this.bed, this.conversation, this.agent, this.sendKey});
 
   factory SayRequest.fromJson(Map<String, dynamic> j) => SayRequest(
     text: j['text'] as String,
     bed: j['bed'] == null ? null : (j['bed'] as num).toDouble(),
     conversation: j['conversation'] == null ? null : j['conversation'] as String,
     agent: j['agent'] == null ? null : j['agent'] as String,
+    sendKey: j['sendKey'] == null ? null : j['sendKey'] as String,
   );
 
   final String text;
   final double? bed;
   final String? conversation;
   final String? agent;
+  final String? sendKey;
 
   Map<String, dynamic> toJson() => {
     'text': text,
     if (bed != null) 'bed': bed!,
     if (conversation != null) 'conversation': conversation!,
     if (agent != null) 'agent': agent!,
+    if (sendKey != null) 'sendKey': sendKey!,
   };
 }
 

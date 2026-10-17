@@ -230,7 +230,7 @@ func (v *voice) Said(agentID, text string) error {
 		return protocol.VoiceAgentFailed{Reason: "这通电话已经挂了"}
 	}
 	if call.quick && strings.TrimSpace(text) != call.greeting {
-		v.chat.Spoken(protocol.ManagerAgent, text)
+		v.chat.Spoken(protocol.ManagerAgent, text, "")
 	}
 	return nil
 }

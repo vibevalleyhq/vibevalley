@@ -22,6 +22,7 @@ class ChatComposer extends ConsumerStatefulWidget {
 
 class _ChatComposerState extends ConsumerState<ChatComposer> {
   final _naming = Naming();
+  final _keys = SendKeys();
   String? _problem;
   bool _sending = false;
 
@@ -48,7 +49,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       _problem = null;
     });
     try {
-      await messages.send(said, conversation: c);
+      await messages.send(said, sendKey: _keys.of(said), conversation: c);
+      _keys.sent();
       if (mounted && _naming.text.text == draft) _naming.clear();
     } on Object catch (e) {
       if (mounted) setState(() => _problem = problemOf(e));

@@ -17,7 +17,7 @@ func TestRolledBackMessageDoesNotResetWakeBreaker(t *testing.T) {
 	c.failures["w1"] = protocol.WakeBreaker
 	failure := errors.New("commit failed")
 	err := c.inTx(func(s chatStore) error {
-		if _, err := s.insertMessage("rollback-message", c.general, "user", "chat", "@w1 retry", true, nil, clock.NowMs()); err != nil {
+		if _, err := s.insertMessage("rollback-message", c.general, "user", "chat", "@w1 retry", true, nil, "", clock.NowMs()); err != nil {
 			return err
 		}
 		written, err := c.settle(s, "rollback-message")

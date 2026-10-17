@@ -480,11 +480,18 @@ func (c *Service) resolveTarget(who, target string) (string, error) {
 	return thread, nil
 }
 
-func (c *Service) Say(text string, conversation *string) (protocol.ChatMessage, error) {
+// The client's key for one send, so a retry of it is the same message.
+const sendKeyMax = 64
+
+// again: sendKey was sent before, and the message is that one, written and delivered then.
+func (c *Service) Say(text string, conversation *string, sendKey string) (message protocol.ChatMessage, again bool, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if str.Trim(text) == "" {
-		return protocol.ChatMessage{}, errors.New("没说什么")
+		return protocol.ChatMessage{}, false, errors.New("没说什么")
+	}
+	if str.Units(sendKey) > sendKeyMax {
+		return protocol.ChatMessage{}, false, errors.New("sendKey 太长")
 	}
 	s := c.store()
 	where := c.general
@@ -493,17 +500,24 @@ func (c *Service) Say(text string, conversation *string) (protocol.ChatMessage, 
 	}
 	conv, err := s.conversation(where)
 	if err != nil {
-		return protocol.ChatMessage{}, err
+		return protocol.ChatMessage{}, false, err
 	}
 	if conv == nil {
-		return protocol.ChatMessage{}, chatFail("没有 %s 这个对话", where)
+		return protocol.ChatMessage{}, false, chatFail("没有 %s 这个对话", where)
 	}
-	written, err := c.write(chatWrite{conversation: where, from: "user", kind: protocol.MessageKindChat, text: str.Trim(text), final: true})
+	written, err := c.write(chatWrite{conversation: where, from: "user", kind: protocol.MessageKindChat, text: str.Trim(text), final: true, sendKey: sendKey})
 	if err != nil {
-		return protocol.ChatMessage{}, err
+		return protocol.ChatMessage{}, false, err
+	}
+	if written.again {
+		row, err := s.message(written.id)
+		if err != nil || row == nil {
+			return protocol.ChatMessage{}, false, err
+		}
+		return chatToMessage(*row), true, nil
 	}
 	if err := c.readThrough("user", where, written.number); err != nil {
-		return protocol.ChatMessage{}, err
+		return protocol.ChatMessage{}, false, err
 	}
 	c.publishConversation(where)
 	if len(written.notOnFarm) > 0 {
@@ -519,12 +533,12 @@ func (c *Service) Say(text string, conversation *string) (protocol.ChatMessage, 
 	}
 	row, err := s.message(written.id)
 	if err != nil {
-		return protocol.ChatMessage{}, err
+		return protocol.ChatMessage{}, false, err
 	}
 	if row == nil {
-		return protocol.ChatMessage{}, errors.New("写进去了，但读不回来")
+		return protocol.ChatMessage{}, false, errors.New("写进去了，但读不回来")
 	}
-	return chatToMessage(*row), nil
+	return chatToMessage(*row), written.again, nil
 }
 
 func (c *Service) TellSession(from, session, text string) (protocol.ChatMessage, error) {
@@ -659,17 +673,23 @@ func (c *Service) Speak(from, text string, opt SpeakOptions) (Spoken, error) {
 }
 
 // Words said on a call, by the owner ("user") or the manager, kept in 田头 as they were said. The manager already heard them on the
-// call, so they wake no one.
-func (c *Service) Spoken(from, text string) {
+// call, so they wake no one. again: sendKey was sent before, and nothing more is kept.
+func (c *Service) Spoken(from, text, sendKey string) (again bool, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if str.Trim(text) == "" {
-		return
+	if str.Units(sendKey) > sendKeyMax {
+		return false, errors.New("sendKey 太长")
 	}
-	written, err := c.write(chatWrite{conversation: c.general, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true, meta: &chatMeta{Spoken: true}})
+	if str.Trim(text) == "" {
+		return false, nil
+	}
+	written, err := c.write(chatWrite{conversation: c.general, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true, meta: &chatMeta{Spoken: true}, sendKey: sendKey})
 	if err != nil {
 		log.Printf("chat: words said on a call: %v", err)
-		return
+		return false, nil
+	}
+	if written.again {
+		return true, nil
 	}
 	if from == "user" {
 		if err := c.readThrough("user", c.general, written.number); err != nil {
@@ -677,6 +697,7 @@ func (c *Service) Spoken(from, text string) {
 		}
 	}
 	c.publishConversation(c.general)
+	return false, nil
 }
 
 // The same key again replaces the words until final; delivered once final.

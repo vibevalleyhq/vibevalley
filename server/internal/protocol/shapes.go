@@ -1216,6 +1216,8 @@ type SayRequest struct {
 	Bed          *int64  `json:"bed,omitzero"`
 	Conversation *string `json:"conversation,omitzero"`
 	Agent        *string `json:"agent,omitzero"`
+	// The client's key for this one send, up to 64 characters: sent again (a retry), it is the message already said, not a second.
+	SendKey *string `json:"sendKey,omitzero"`
 }
 
 type ChannelUpdate struct {

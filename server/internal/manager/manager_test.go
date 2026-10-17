@@ -194,7 +194,7 @@ func TestManagerDispatchesAndHearsVoiceInChat(t *testing.T) {
 	w := managerOpen(t)
 	f := w.f
 	w.enableLab(t)
-	if err := f.Manager.Say(w.ctx, "帮我在 demo 里加个 README", "", nil); err != nil {
+	if err := f.Manager.Say(w.ctx, "帮我在 demo 里加个 README", "", nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	if said := w.managerSaid(t, 1); !slices.Equal(said, []string{"好，已在了"}) {
@@ -236,7 +236,7 @@ func TestManagerDispatchesAndHearsVoiceInChat(t *testing.T) {
 	})
 
 	before := len(w.seen())
-	f.Manager.Heard("随便说一句", "")
+	f.Manager.Heard("随便说一句", "", "")
 	testkit.Until(t, "the manager asked", func() bool { return len(w.seen()) > before })
 	testkit.Settle()
 	if said := w.managerSaid(t, 2); said[len(said)-1] != "收到" {
@@ -302,7 +302,7 @@ func TestManagerCallStreamsItsWords(t *testing.T) {
 	if _, err := f.Setting.Save(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{Answer: protocol.VoiceAnswer{Value: protocol.VoiceAnswerManager{}}}}); err != nil {
 		t.Fatal(err)
 	}
-	f.Manager.Heard("随便说一句", "")
+	f.Manager.Heard("随便说一句", "", "")
 	testkit.Settle()
 	if len(w.seen()) != before+1 {
 		t.Fatal("the relay reached the manager")
@@ -392,7 +392,7 @@ func TestManagerHearsThePatrol(t *testing.T) {
 	w := managerOpen(t)
 	f := w.f
 	w.enableLab(t)
-	if err := f.Manager.Say(w.ctx, "帮我在 notes 里加个 CHANGELOG", "", nil); err != nil {
+	if err := f.Manager.Say(w.ctx, "帮我在 notes 里加个 CHANGELOG", "", nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	testkit.Until(t, "the work ripe", func() bool {
@@ -564,4 +564,35 @@ func TestManagerStopsItsRun(t *testing.T) {
 	testkit.Settle()
 	testkit.Eq(t, f.Core.State().Manager, protocol.ManagerStateListening, "stopped while it listens")
 	testkit.Eq(t, len(w.seen()), asked, "no request")
+}
+
+func TestManagerHearsASendKeyOnce(t *testing.T) {
+	w := managerOpen(t)
+	f := w.f
+	for range 2 {
+		if err := f.Manager.Say(w.ctx, "地里怎么样", "", nil, "k1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for range 2 {
+		if err := f.Manager.Heard("电话里问一句", "", "k2"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.managerSaid(t, 2)
+	testkit.Settle()
+	heard := map[string]int{}
+	for _, m := range w.seen()[len(w.seen())-1].Messages {
+		if text, ok := managerUserText(m); ok {
+			for _, said := range []string{"地里怎么样", "电话里问一句"} {
+				if strings.Contains(text, said) {
+					heard[said]++
+				}
+			}
+		}
+	}
+	testkit.Eq(t, heard, map[string]int{"地里怎么样": 1, "电话里问一句": 1}, "what the manager heard")
+	if err := f.Manager.Say(w.ctx, "早", "", nil, strings.Repeat("k", 65)); err == nil {
+		t.Fatal("a long key was taken")
+	}
 }

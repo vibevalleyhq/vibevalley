@@ -18,7 +18,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 | 4 | 不在场时压缩、压缩复用开头 | 31:31 | 做了（b7cbbe3）：一轮停下后超过 9.6 万、空闲 10 分钟、管家没有 10 分钟内的定时才压；摘要请求用同一个开头、不许调工具；留下最后 3 句话 | [提示开头不变](../../implemented/architecture/2026-10-18-stable-prompt-prefix.md)「不在场时压缩」 |
 | 5 | 来源和指令分开；收获、新定时要主人点头 | 26:28、11:13 | 待做 | [分清话是谁说的](2026-10-18-source-is-not-instruction.md) |
 | 6 | 一轮做到一半时重启，接着做 | 16:17 | 做了：开机时对话没做完、不到 30 分钟就接着那一轮，做到一半的工具补「不知道做没做成」；叫停的不接 | 本篇[第 6 节](#6-重启后接着做完那一轮) |
-| 7 | 发消息不带唯一的键，重试会发两条 | 15:26 | 待做 | 本篇[第 7 节](#7-发消息带-sendkey) |
+| 7 | 发消息不带唯一的键，重试会发两条 | 15:26 | 做了 | 本篇[第 7 节](#7-发消息带-sendkey) |
 | 8 | 关于主人的事实所有 agent 共享 | 32:50 | 归记忆的提案 | [记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)、[记性有多个来源](2026-10-18-memory-providers.md) |
 | 9 | 管家的错变成评测 | 36:05 | 待做 | [管家的错变成评测](2026-10-18-manager-evals.md) |
 | 10 | 帮工的长汇报整段进管家的上下文 | 28:46 | 待做（本次核对新发现） | 本篇[第 10 节](#10-长汇报不整段进管家) |
@@ -171,9 +171,9 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 - **形状**：`SayRequest`（`shapes.go:1204-1209`）加 `SendKey *string`（`json:"sendKey,omitzero"`）：客户端为一次发送生成的键，1–64 个字符；超长就拒绝，说「sendKey 太长」。跑 `go run ./tool/shapegen`。
 - **表**：不用迁移。`channel_message` 已经有 `send_key` 列和 `(sender_id, send_key)` 上的唯一索引（`server/migrations/0001_schema.sql:31`、`220`），代码里一直没写过它。
 - **查询**：`server/pkg/db/queries/channel_message.sql` 的 `InsertMessage`（第 3–7 行）加 `send_key` 参数；新加 `MessageBySendKey`：按发送者和 `send_key` 取一条。跑 sqlc。
-- **写**：`chatWrite`（`internal/channel/deliver.go:18-28`）加 `sendKey string`；`write`（`deliver.go:199` 起）在新建消息之前、同一个事务里，`sendKey` 非空就先按它查，查到了就把那条当结果返回，标上 `chatWritten.again = true`，不插新的、不投递。`Say`（`internal/channel/chat.go:483`）加参数 `sendKey string`，`again` 时跳过 `readThrough`、`publishConversation` 和「不在地里」的提醒，直接返回原来那条。`Spoken`（`chat.go:663`）同样加 `sendKey`。
-- **调用的地方**：`manager.Say`（`manager.go:694-706`）把键传下去，`again` 时不再记一次选定的帮工；`ChannelSay`、`ManagerHear`（`internal/handler/api.go:58-64`、`97-101`）传 `ptr.Value(body.SendKey)`；`Heard`（`manager.go:710`）把键传给 `Spoken`，`again` 时不再交给管家。连接器那条路已经按外部 id 去重，传空。
-- **Flutter**：`Messages.send`（`app/lib/data/messages.dart:36-53`）加参数 `String sendKey`，键用 `Random.secure()` 生成 16 字节、十六进制（不加依赖）。工作台的输入框（`chat_composer.dart:39-57`）为一份草稿生成一个键，草稿没变就一直用它，发成功才换；农场的聊天窗（`chat_window.dart:149-160`）改成失败时把草稿放回输入框、键不变，重发用同一个键。种地发话（`app/lib/game/commands.dart:69`）、语音（`app/lib/voice/voice.dart:27`）每次一个新键。
+- **写**：`chatWrite`（`internal/channel/deliver.go:18-28`）加 `sendKey string`；`write`（`deliver.go:199` 起）在新建消息之前、同一个事务里，`sendKey` 非空就先按它查，查到了就把那条当结果返回，标上 `chatWritten.again = true`，不插新的、不投递。`Say`（`internal/channel/chat.go:483`）加参数 `sendKey string`、多返回一个 `again`，`again` 时跳过 `readThrough`、`publishConversation` 和「不在地里」的提醒，直接返回原来那条。`Spoken`（`chat.go:663`）同样加 `sendKey`，返回 `(again bool, err error)`：键太长是错，写失败照旧只记日志。
+- **调用的地方**：`manager.Say`（`manager.go:694-706`）把键传下去，`again` 时不再记一次选定的帮工；`ChannelSay`、`ManagerHear`（`internal/handler/api.go:58-64`、`97-101`）传 `ptr.Value(body.SendKey)`；`Heard`（`manager.go:710`）把键传给 `Spoken`，`again` 时不再交给管家；它改成返回 `error`，键太长时 `ManagerHear` 拒绝。连接器那条路已经按外部 id 去重，传空。
+- **Flutter**：`Messages.send`（`app/lib/data/messages.dart:36-53`）加参数 `String sendKey`，键用 `Random.secure()` 生成 16 字节、十六进制（不加依赖）。工作台的输入框（`chat_composer.dart:39-57`）为一份草稿生成一个键，草稿没变就一直用它，发成功才换；农场的聊天窗（`chat_window.dart:149-160`）改成失败时把草稿放回输入框、键不变，重发用同一个键。种地发话（`app/lib/game/commands.dart:69`）、语音（`app/lib/voice/voice.dart:27`）每次一个新键；`lib/voice` 在 `lib/data` 下面一层，import 不到 `newSendKey`，自己生成。
 - **测试**：
   - `internal/channel`：同一个键 `Say` 两次，对话里一条消息、管家只收到一次；不同的键两条；没有键两条。
   - `internal/manager`：同一个键经 `Say` 两次，`FauxProvider` 只收到一条输入。
