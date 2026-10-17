@@ -170,7 +170,7 @@ void main() {
     testWidgets('TrajectoryList lists the helpers it sent and opens one', (t) async {
       final server = _server();
       await pumpPage(t, const SingleChildScrollView(child: TrajectoryList(agent: 'backend')), server.handle);
-      expect(server.calls.first.path, '/api/trajectories?agent=backend');
+      expect(server.calls.first.path, '/api/sessions?agent=backend');
       expect(find.text('老周一号'), findsOneWidget);
       expect(find.text('改登录'), findsOneWidget);
       await t.tap(labelled('老周一号'));

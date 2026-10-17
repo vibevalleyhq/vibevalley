@@ -180,11 +180,11 @@ func (a api) SessionStop(_ context.Context, id string) error {
 	return nil
 }
 
-func (a api) TrajectoryList(_ context.Context, agent *string) ([]protocol.TrajectoryHead, error) {
+func (a api) SessionList(_ context.Context, agent *string) ([]protocol.TrajectoryHead, error) {
 	return a.f.Session.List(ptr.Value(agent)), nil
 }
 
-func (a api) TrajectoryGet(_ context.Context, id string) (protocol.Trajectory, error) {
+func (a api) SessionGet(_ context.Context, id string) (protocol.Trajectory, error) {
 	if t := a.f.Session.Get(id); t != nil {
 		return *t, nil
 	}

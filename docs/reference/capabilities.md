@@ -81,13 +81,8 @@
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
 | `session.stop` | `POST /api/sessions/{id}/stop` | ✓ | ✓ | ✓ |  |
-
-## trajectory
-
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
-|---|---|---|---|---|---|
-| `trajectory.list` | `GET /api/trajectories` | ✓ | ✓ |  |  |
-| `trajectory.get` | `GET /api/trajectories/{id}` | ✓ | ✓ |  |  |
+| `session.list` | `GET /api/sessions` | ✓ | ✓ |  |  |
+| `session.get` | `GET /api/sessions/{id}` | ✓ | ✓ |  |  |
 
 ## playbook
 

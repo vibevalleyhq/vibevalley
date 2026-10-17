@@ -143,7 +143,7 @@ class ActivitiesNotifier extends Notifier<Map<String, List<Activity>>> {
   Future<TrajectoryHead?> load(String id) async {
     final Trajectory found;
     try {
-      found = await ref.read(apiProvider).trajectory.get(id: id);
+      found = await ref.read(apiProvider).session.get(id: id);
     } on VibeValleyApiError catch (e) {
       if (e.status == 404) return null;
       rethrow;

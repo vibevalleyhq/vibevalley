@@ -70,12 +70,12 @@ type Handlers interface {
 	//vibevalley:route session.stop POST /api/sessions/{id}/stop
 	//vibevalley:can owner remote manager
 	SessionStop(ctx context.Context, pID string) error
-	//vibevalley:route trajectory.list GET /api/trajectories
+	//vibevalley:route session.list GET /api/sessions
 	//vibevalley:can owner remote
-	TrajectoryList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error)
-	//vibevalley:route trajectory.get GET /api/trajectories/{id}
+	SessionList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error)
+	//vibevalley:route session.get GET /api/sessions/{id}
 	//vibevalley:can owner remote
-	TrajectoryGet(ctx context.Context, pID string) (Trajectory, error)
+	SessionGet(ctx context.Context, pID string) (Trajectory, error)
 	//vibevalley:route issue.list GET /api/issues
 	//vibevalley:can owner remote
 	IssueList(ctx context.Context) ([]Issue, error)

@@ -86,7 +86,7 @@ func TestOldTrajectoriesLoseTheirSteps(t *testing.T) {
 	home := t.TempDir()
 	dir := filepath.Join(home, "activities")
 	os.MkdirAll(dir, 0o755)
-	long := clock.NowMs() - int64(base.Defaults().Trajectory.Days+1)*protocol.DayMs
+	long := clock.NowMs() - int64(base.Defaults().Session.TrajectoryDays+1)*protocol.DayMs
 	writeHead(t, dir, "w1", long, long)
 	os.WriteFile(filepath.Join(dir, "w1.json"), []byte(`[{"n":0,"at":0,"kind":"prompt","text":"老活"}]`), 0o644)
 	writeHead(t, dir, "w2", clock.NowMs(), clock.NowMs())
@@ -111,7 +111,7 @@ func TestTrajectoryDaysZeroKeepsForGood(t *testing.T) {
 	os.MkdirAll(dir, 0o755)
 	long := clock.NowMs() - 400*protocol.DayMs
 	writeHead(t, dir, "w1", long, long)
-	testkit.Eq(t, len(sessionTrajectories(t, home, func(c *base.Config) { c.Trajectory.Days = 0 }).List("")), 1, "kept")
+	testkit.Eq(t, len(sessionTrajectories(t, home, func(c *base.Config) { c.Session.TrajectoryDays = 0 }).List("")), 1, "kept")
 }
 
 func TestReasoningRunsOn(t *testing.T) {

@@ -186,7 +186,7 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
 
   Future<void> _load() async {
     try {
-      final heads = await _api.trajectory.list();
+      final heads = await _api.session.list();
       if (mounted) setState(() => _heads = {for (final h in heads) h.id: h});
     } on Object catch (e) {
       debugPrint('vibevalley: tickets: $e');

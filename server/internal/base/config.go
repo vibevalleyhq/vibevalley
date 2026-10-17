@@ -75,15 +75,13 @@ type Config struct {
 	Session struct {
 		// Quiet this long, a session is shown as stuck.
 		StallSeconds float64 `mapstructure:"stall_seconds"`
+		// The steps of a session gone this long are deleted (its head stays); 0 or less keeps them.
+		TrajectoryDays int `mapstructure:"trajectory_days"`
 	} `mapstructure:"session"`
 	Project struct {
 		// Sessions at once in one project.
 		MaxSessions int `mapstructure:"max_sessions"`
 	} `mapstructure:"project"`
-	Trajectory struct {
-		// The activities of a session gone this long are deleted; 0 or less keeps them.
-		Days int `mapstructure:"days"`
-	} `mapstructure:"trajectory"`
 	Chat struct {
 		NoticeBatchMs int `mapstructure:"notice_batch_ms"`
 		RetryWakeMs   int `mapstructure:"retry_wake_ms"`
@@ -105,7 +103,7 @@ func Defaults() Config {
 	c.Schedule.TickMs = 20_000
 	c.Session.StallSeconds = 240
 	c.Project.MaxSessions = 3
-	c.Trajectory.Days = 30
+	c.Session.TrajectoryDays = 30
 	c.Chat.NoticeBatchMs = protocol.NoticeBatchMs
 	c.Chat.RetryWakeMs = 3_000
 	return c

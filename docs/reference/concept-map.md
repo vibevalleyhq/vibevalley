@@ -29,7 +29,7 @@
 | 种植计划 | 图纸桌、计划板 | `farm/plans.dart` | `Playbook`（从父工单拼回，`StateFrame.Plans`） | `/api/playbooks` |
 | 帮工 | 地里干活的小动物 | 地块和地块详情（`farm/plot_detail.dart`） | `Session`（`CoreState.Sessions`） | `/api/sessions/{id}/stop`；别的按工单：`/api/issues/{id}/...` |
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.Phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `FactRun` 到 `FactReport`、`Session.Runs`、`LastRun` | `/api/issues/{id}/runs` |
-| 干活过程 | 干活过程 | `farm/work_log.dart` | `Activity`、`Trajectory`、`TrajectoryHead` | `/api/trajectories` |
+| 干活过程 | 干活过程 | `farm/work_log.dart` | `Activity`、`Trajectory`、`TrajectoryHead`（一个 Session 的步骤） | `/api/sessions`、`/api/sessions/{id}` |
 | 收成清单、收获 | 收获 | `shared/harvest.dart` | `Changes` | `/api/issues/{id}/changes`、`/api/issues/{id}/merge` |
 | 田头、频道 | 田头 | 田头窗口（`farm/chat_window.dart`）、`/chat`（`desk/chat`） | `Conversation`（`kind`：`square`、`channel`）、`ChatMessage`、`CoreState.Chat` | `/api/channels`、`/api/channels/{id}/messages` |
 | 工单串、评论 | 工单串 | 派活消息下面的串；干活过程里的「评论」 | `Conversation`（`kind: thread`）；评论某一步是 `session.CommentText` 拼出来的一句话 | `/api/channels/{id}/messages`、`/api/issues/{id}/comment` |

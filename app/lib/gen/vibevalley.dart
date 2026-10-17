@@ -5110,20 +5110,14 @@ class SessionApi {
   Future<void> stop({required String id}) async {
     await _api._call('POST', '/api/sessions/${Uri.encodeComponent((id).toString())}/stop', query: {}, body: null);
   }
-}
-
-/// The `trajectory` endpoints of VibeValleyApi.
-class TrajectoryApi {
-  TrajectoryApi._(this._api);
-  final VibeValleyApi _api;
 
   Future<List<TrajectoryHead>> list({String? agent}) async {
-    final j = await _api._call('GET', '/api/trajectories', query: {if (agent != null) 'agent': '${agent!}'}, body: null);
+    final j = await _api._call('GET', '/api/sessions', query: {if (agent != null) 'agent': '${agent!}'}, body: null);
     return [for (final e in j as List) TrajectoryHead.fromJson(e as Map<String, dynamic>)];
   }
 
   Future<Trajectory> get({required String id}) async {
-    final j = await _api._call('GET', '/api/trajectories/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
+    final j = await _api._call('GET', '/api/sessions/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
     return Trajectory.fromJson(j as Map<String, dynamic>);
   }
 }
@@ -5454,7 +5448,6 @@ class VibeValleyApi {
   late final schedule = ScheduleApi._(this);
   late final issue = IssueApi._(this);
   late final session = SessionApi._(this);
-  late final trajectory = TrajectoryApi._(this);
   late final playbook = PlaybookApi._(this);
   late final game = GameApi._(this);
   late final runtime = RuntimeApi._(this);

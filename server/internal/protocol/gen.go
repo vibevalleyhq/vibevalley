@@ -2128,8 +2128,8 @@ var Endpoints = []Endpoint{
 	{"issue.resolve", "POST", "/api/issues/{id}/resolve", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.cancel", "POST", "/api/issues/{id}/cancel", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"session.stop", "POST", "/api/sessions/{id}/stop", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"trajectory.list", "GET", "/api/trajectories", []string{"agent"}, false, []Caller{CallerOwner, CallerRemote}},
-	{"trajectory.get", "GET", "/api/trajectories/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"session.list", "GET", "/api/sessions", []string{"agent"}, false, []Caller{CallerOwner, CallerRemote}},
+	{"session.get", "GET", "/api/sessions/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.list", "GET", "/api/issues", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.get", "GET", "/api/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.runs", "GET", "/api/issues/{id}/runs", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2315,14 +2315,14 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		pID := r.PathValue("id")
 		answer(w, nil, h.SessionStop(r.Context(), pID))
 	})
-	mux.HandleFunc("GET /api/trajectories", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/sessions", func(w http.ResponseWriter, r *http.Request) {
 		pAgent := query(r, "agent")
-		out, err := h.TrajectoryList(r.Context(), pAgent)
+		out, err := h.SessionList(r.Context(), pAgent)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/trajectories/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.TrajectoryGet(r.Context(), pID)
+		out, err := h.SessionGet(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/issues", func(w http.ResponseWriter, r *http.Request) {
@@ -2859,19 +2859,19 @@ func (c *Client) SessionStop(ctx context.Context, pID string) error {
 	return c.call(ctx, "POST", "/api/sessions/"+url.PathEscape(pID)+"/stop", nil, nil, nil)
 }
 
-func (c *Client) TrajectoryList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error) {
+func (c *Client) SessionList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error) {
 	q := url.Values{}
 	if pAgent != nil {
 		q.Set("agent", *pAgent)
 	}
 	var out []TrajectoryHead
-	err := c.call(ctx, "GET", "/api/trajectories", q, nil, &out)
+	err := c.call(ctx, "GET", "/api/sessions", q, nil, &out)
 	return out, err
 }
 
-func (c *Client) TrajectoryGet(ctx context.Context, pID string) (Trajectory, error) {
+func (c *Client) SessionGet(ctx context.Context, pID string) (Trajectory, error) {
 	var out Trajectory
-	err := c.call(ctx, "GET", "/api/trajectories/"+url.PathEscape(pID), nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/sessions/"+url.PathEscape(pID), nil, nil, &out)
 	return out, err
 }
 

@@ -143,7 +143,7 @@ flowchart LR
 | `schedule.tick_ms` | 多久看一遍有没有到点的定时 | 20000 |
 | `session.stall_seconds` | 一轮里多久没动静就提醒 | 240 |
 | `project.max_sessions` | 一个项目里最多几个帮工同时干活 | 3 |
-| `trajectory.days` | 帮工走了以后，它的干活过程留几天（轨迹的头一直留着）；0 是一直留着 | 30 |
+| `session.trajectory_days` | Session 走了以后，它的步骤留几天（轨迹的头一直留着）；0 是一直留着 | 30 |
 | `chat.notice_batch_ms` | 忙着的帮工收到的提示，攒多久合成一条 | 3000 |
 | `chat.retry_wake_ms` | 叫醒在开口前就失败了，多久以后再叫一次 | 3000 |
 

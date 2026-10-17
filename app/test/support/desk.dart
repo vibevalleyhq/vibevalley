@@ -195,13 +195,13 @@ class DeskBackend {
         return jsonResponse(q == null ? ArchiveListing(files: archive.files, hits: const []).toJson() : archive.toJson());
       case ('GET', ['api', 'manager', 'archive', final name]):
         return jsonResponse(archiveFiles[name] ?? '');
-      case ('GET', ['api', 'trajectories']):
+      case ('GET', ['api', 'sessions']):
         final agent = r.url.queryParameters['agent'];
         return jsonResponse([
           for (final h in heads)
             if (agent == null || h.agent == agent) h.toJson(),
         ]);
-      case ('GET', ['api', 'trajectories', final id]):
+      case ('GET', ['api', 'sessions', final id]):
         final t = trajectories[id];
         return t == null ? jsonResponse({'_tag': 'Missing', 'reason': '没有'}, 404) : jsonResponse(t.toJson());
       case ('GET', ['api', 'settings']):

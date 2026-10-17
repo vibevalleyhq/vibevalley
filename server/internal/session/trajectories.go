@@ -34,7 +34,7 @@ type trajectories struct {
 func newTrajectories(cfg base.Config, core *core.Service) (*trajectories, error) {
 	t := &trajectories{core: core, dir: filepath.Join(cfg.Home, "activities"), open: map[string]*journal{}, writers: map[string]*base.FileWriter{}}
 	// The steps of those that ended long ago go; their heads stay, small, so the board keeps every issue.
-	if days := cfg.Trajectory.Days; days > 0 {
+	if days := cfg.Session.TrajectoryDays; days > 0 {
 		old := clock.NowMs() - int64(days)*protocol.DayMs
 		for _, head := range t.heads() {
 			if head.EndedAt != nil && *head.EndedAt < old {

@@ -101,8 +101,8 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 | `worker.dismiss` | `issue.cancel` | 3 |
 | `worker.tell {text, on}` | `issue.comment {text, on}` | 3；工单关上时拒绝，提示 `reopen` |
 | `worker.stop` | `session.stop` | 只打断这一轮 |
-| `worker.activities` | 删 | 和 `trajectory.get(Session id)` 是同一份步骤（`handler/api.go:156`、`:168`），没人调 |
-| `trajectory.find` | `trajectory.get` | 2 |
+| `worker.activities` | 删 | 和 `session.get(Session id)` 是同一份步骤（`handler/api.go:156`、`:168`），没人调 |
+| `trajectory.list` / `find` | `session.list` / `get`，路径 `/api/sessions…` | 1、2：轨迹是一个 Session 的步骤，归 session |
 | `issue.dispatch` | `manager.hear` | 实际是 `Manager.Heard`：交给管家一句话 |
 | `channel.open` | `channel.create` | 2 |
 | `channel.read {seq}` | `channel.markRead` | 实际是 `MarkRead`；`read` 读起来是读消息 |
@@ -178,8 +178,8 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 | `issue cancel <id>` | ✓ `dismiss` | | 请走，工单以 dismissed 关上 |
 | `issue reopen <id> --json` | | | 带一句话开一个新的 Session |
 | `session stop <id>` | ✓ `stop` | | 打断这一轮 |
-| `trajectory list [--agent]` | | | |
-| `trajectory get <id>` | | | Session 或管家的全部步骤 |
+| `session list [--agent]` | | | |
+| `session get <id>` | | | Session 或管家的全部步骤 |
 
 ### 频道和管家
 

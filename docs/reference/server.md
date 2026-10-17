@@ -67,7 +67,7 @@
 
 **干活过程**（`session/activities.go`）：每一步（收到的话、想、说、工具调用的输入和输出）记在 `activities/<id>.json`。带话时可以评论某一步（`on`），服务端把那一步写在话前面交给帮工。
 
-**轨迹**（`session/trajectories.go`；[理由](../../.agents/notes/implemented/feature/2026-10-13-trajectories.md)）：每个帮工一条，派出去时开始，头文件（`activities/<id>.head.json`）记着是谁、为哪张工单、怎么关的，一直留着；步骤在帮工走了 `trajectory.days` 天后删。管家一条，留最近 1000 步。帮工自己派的子 agent 的步骤挂在派它的那一步下面。
+**轨迹**（`session/trajectories.go`；[理由](../../.agents/notes/implemented/feature/2026-10-13-trajectories.md)）：每个帮工一条，派出去时开始，头文件（`activities/<id>.head.json`）记着是谁、为哪张工单、怎么关的，一直留着；步骤在帮工走了 `session.trajectory_days` 天后删。管家一条，留最近 1000 步。帮工自己派的子 agent 的步骤挂在派它的那一步下面。
 
 **工单**（`issue/issue.go`、`issue/dispatch.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-15-issue-is-one-thing.md)）：
 

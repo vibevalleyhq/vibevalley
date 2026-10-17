@@ -180,9 +180,9 @@ void main() {
     final api = FakeServer((r) async {
       if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
       return switch ((r.method, r.url.path)) {
-        ('GET', '/api/trajectories') => jsonResponse([conflicted.toJson(), planner.toJson()]),
+        ('GET', '/api/sessions') => jsonResponse([conflicted.toJson(), planner.toJson()]),
         ('GET', '/api/agents') => jsonResponse([]),
-        ('GET', '/api/trajectories/w4') => jsonResponse(const Trajectory(head: conflicted, activities: []).toJson()),
+        ('GET', '/api/sessions/w4') => jsonResponse(const Trajectory(head: conflicted, activities: []).toJson()),
         _ => jsonResponse(null, 204),
       };
     }).api;
@@ -245,11 +245,11 @@ void main() {
     final api = FakeServer((r) async {
       if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
       switch ((r.method, r.url.path)) {
-        case ('GET', '/api/trajectories'):
+        case ('GET', '/api/sessions'):
           return jsonResponse([_open.toJson(), _closed.toJson()]);
         case ('GET', '/api/agents'):
           return jsonResponse([]);
-        case ('GET', '/api/trajectories/w1'):
+        case ('GET', '/api/sessions/w1'):
           return jsonResponse(
             const Trajectory(
               head: _closed,

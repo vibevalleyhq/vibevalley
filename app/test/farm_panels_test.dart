@@ -86,7 +86,7 @@ void main() {
 
   testWidgets('a bed: what it is doing, its project, its steps, and its buttons', (tester) async {
     final routes = Routes();
-    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes, {'GET /api/trajectories/w1': steps}), agents: agents));
+    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes, {'GET /api/sessions/w1': steps}), agents: agents));
     c.read(selectedProvider.notifier).set('w1');
     await settle(tester);
     expect(find.text('小吴的地'), findsOneWidget);
@@ -96,7 +96,7 @@ void main() {
     expect(find.text('工单'), findsOneWidget);
     expect(find.text('碰过的文件'), findsOneWidget);
     expect(find.text('\$ pnpm test'), findsOneWidget);
-    expect(routes.paths, contains('GET /api/trajectories/w1'));
+    expect(routes.paths, contains('GET /api/sessions/w1'));
     await tester.tap(find.text('叫停'));
     await settle(tester);
     expect(routes.paths, contains('POST /api/sessions/w1/stop'));

@@ -753,7 +753,7 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
   }
 
   Future<void> _load() async {
-    final heads = await deskRun(() => ref.read(apiProvider).trajectory.list(agent: widget.agent));
+    final heads = await deskRun(() => ref.read(apiProvider).session.list(agent: widget.agent));
     if (mounted) setState(() => _heads = heads ?? const []);
   }
 
