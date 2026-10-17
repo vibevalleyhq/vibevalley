@@ -17,3 +17,7 @@
 ## 验证
 
 `go test -race ./internal/manager`。`input_test.go` 用模型响应屏障验证后入队频道不抢当前回复及档案，以及新语音流不接收前一条聊天的回答。
+
+## 评测
+
+主人标出的做错的一轮（`MarkWrong`，`evals.go`）存在家目录的 `manager/evals/<id>.json`。挑过、去掉私人内容、写了 `expect` 的放进 `testdata/evals/`：`evals_test.go` 查每个样例录下的那一轮过不了它的 `expect`（跟着 `go test`）；`evals_live_test.go`（`-tags evals`）用真模型把每个样例重放 `VIBEVALLEY_EVAL_N` 次（默认 5），至少过 `N − 1` 次算过。`expect` 的几种判断和 `evalCheck` 在 `evals_check_test.go`，只有测试用。`testdata/evals/think-before-dispatch.json` 是照着样例的格式手写的例子，不是录下的。

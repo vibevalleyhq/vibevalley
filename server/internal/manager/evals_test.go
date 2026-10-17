@@ -159,3 +159,78 @@ func TestManagerMarkWrongRefusesALineItNeverHeard(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 }
+
+func TestEvalCheckJudgesEveryKind(t *testing.T) {
+	turn := []agentcore.AgentMessage{
+		ai.AssistantMessage{Content: []ai.Content{ai.NewToolCall("c1", "dispatch", json.RawMessage(`{"project":"demo","task":"加个 README"}`))}},
+		ai.ToolResultMessage{ToolCallID: "c1", ToolName: "dispatch", Content: []ai.Content{ai.NewText("派了")}},
+		ai.AssistantMessage{Content: []ai.Content{ai.NewText("派给了 Kimi")}},
+	}
+	quiet := turn[:2]
+	passed := map[string]bool{}
+	for _, c := range []struct {
+		e    evalExpect
+		on   []agentcore.AgentMessage
+		pass bool
+	}{
+		{evalExpect{Kind: evalCalled, Tool: "dispatch"}, turn, true},
+		{evalExpect{Kind: evalCalled, Tool: "dispatch", ArgContains: `"project":"demo"`}, turn, true},
+		{evalExpect{Kind: evalCalled, Tool: "dispatch", ArgContains: `"project":"notes"`}, turn, false},
+		{evalExpect{Kind: evalCalled, Tool: "plan"}, turn, false},
+		{evalExpect{Kind: evalNotCalled, Tool: "plan"}, turn, true},
+		{evalExpect{Kind: evalNotCalled, Tool: "dispatch"}, turn, false},
+		{evalExpect{Kind: evalSilent}, quiet, true},
+		{evalExpect{Kind: evalSilent}, turn, false},
+		{evalExpect{Kind: evalSays, Contains: "Kimi"}, turn, true},
+		{evalExpect{Kind: evalSays, Contains: "Kimi"}, quiet, false},
+		{evalExpect{Kind: evalSaysNot, Contains: "Kimi"}, quiet, true},
+		{evalExpect{Kind: evalSaysNot, Contains: "Kimi"}, turn, false},
+		{evalExpect{Kind: evalCalled}, turn, false},
+		{evalExpect{Kind: evalSays}, turn, false},
+		{evalExpect{Kind: "maybe"}, turn, false},
+	} {
+		if missed := evalCheck([]evalExpect{c.e}, c.on); (len(missed) == 0) != c.pass {
+			t.Errorf("%+v on %d messages: missed %v", c.e, len(c.on), missed)
+		}
+		if c.pass {
+			passed[c.e.Kind] = true
+		}
+	}
+	for _, kind := range evalKinds {
+		if !passed[kind] {
+			t.Errorf("no turn passes %s", kind)
+		}
+	}
+}
+
+// Each committed case is red on the turn it recorded: its expect catches the error it was saved for.
+func TestManagerEvalCasesCatchTheirError(t *testing.T) {
+	cases := evalCases(t, filepath.Join("testdata", "evals"))
+	if len(cases) == 0 {
+		t.Fatal("no cases in testdata/evals")
+	}
+	tools := (&manager{}).toolNames()
+	for _, c := range cases {
+		name := filepath.Base(c.file)
+		if c.ID == "" || c.Want == "" || c.Model == "" {
+			t.Errorf("%s: id %q, want %q, model %q", name, c.ID, c.Want, c.Model)
+		}
+		if !managerIsInput(c.input) {
+			t.Errorf("%s: the input is a %s, not a managerInput", name, c.input.Role())
+		}
+		if len(c.Expect) == 0 {
+			t.Errorf("%s: no expect", name)
+		}
+		for _, e := range c.Expect {
+			if problem := evalProblem(e); problem != "" {
+				t.Errorf("%s: %s", name, problem)
+			}
+			if e.Tool != "" && !slices.Contains(tools, e.Tool) {
+				t.Errorf("%s: the manager has no tool %q", name, e.Tool)
+			}
+		}
+		if missed := evalCheck(c.Expect, c.did); len(missed) == 0 {
+			t.Errorf("%s: what it recorded passes its expect, so the expect does not catch the error", name)
+		}
+	}
+}
