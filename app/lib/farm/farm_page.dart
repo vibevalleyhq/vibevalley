@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/providers.dart';
 import '../chat/chat_state.dart' show chatOpenProvider;
@@ -29,13 +28,12 @@ import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
 import '../village/world.dart' show VillageWorld;
 import '../village/game.dart';
+import 'first_visit.dart';
 import 'input.dart';
 import '../village/hud.dart';
 import '../village/framing.dart';
 import '../village/village_view.dart';
 import '../voice/voice.dart';
-
-const namesSeenKey = 'vibevalley.pixel.names-seen';
 
 const firstNamesTime = Duration(milliseconds: 6000);
 
@@ -208,14 +206,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
 
   Future<void> _firstVisit() async {
     _namesChecked = true;
-    var seen = true;
-    try {
-      final store = await SharedPreferences.getInstance();
-      seen = store.containsKey(namesSeenKey);
-      await store.setString(namesSeenKey, '1');
-    } on Object {
-      // Storage is off: no first-visit names, the rest works.
-    }
+    final seen = await markNamesSeen();
     if (seen || !mounted) return;
     _game?.revealNames.value = true;
     _namesTimer = Timer(firstNamesTime, _hideNames);
