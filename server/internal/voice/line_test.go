@@ -194,3 +194,34 @@ func TestVoiceLineQuickTunnelLingersAfterTheLastCall(t *testing.T) {
 		t.Fatalf("reopened: %d %v", opened, err)
 	}
 }
+
+func TestVoiceKeepsWhatAgorasModelSaidOnALiveCall(t *testing.T) {
+	f := voiceTestFarm(t)
+	if err := f.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.Voice.voice.mu.Lock()
+	f.Voice.quick["quick"] = "来啦"
+	f.Voice.lines["manager"] = "l1"
+	f.Voice.voice.mu.Unlock()
+	if err := f.Voice.Said("gone", "晚到的一句"); err == nil {
+		t.Fatal("a call that is over still keeps words")
+	}
+	if err := f.Voice.Said("quick", " 来啦 "); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"quick", "manager"} {
+		if err := f.Voice.Said(id, id+" 说的"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var kept []string
+	for _, m := range protocol.MessagesIn(f.Core.State().Chat, f.Channel.General()) {
+		if m.Spoken {
+			kept = append(kept, m.From+"："+m.Text)
+		}
+	}
+	if !reflect.DeepEqual(kept, []string{"manager：quick 说的"}) {
+		t.Fatalf("kept %q", kept)
+	}
+}

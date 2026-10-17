@@ -24,6 +24,16 @@ class VoiceCall extends ChangeNotifier {
           body: SayRequest(text: text, agent: agentPick?.call()),
         )
         .catchError((Object _) {});
+    // The server keeps it only while the call is on, and only when Agora's model answered.
+    captions.onAnswered = (text) {
+      final agent = _agentId;
+      if (agent == null) return;
+      api.voice
+          .said(
+            body: VoiceSaid(agentId: agent, text: text),
+          )
+          .catchError((Object _) {});
+    };
   }
 
   final VibeValleyApi api;

@@ -13,13 +13,17 @@
 
 - `POST /api/v1/voice/session` 开一个频道和数字 uid，签一个 RTC + RTM 通用的令牌，一小时过期；`/renew` 续一个。
 - `POST /api/v1/voice/agent` 按语音设置请语音管家进频道；`/agent/stop` 请它离开，它已经在走也算成功。
+- `POST /api/v1/voice/agent/said` 交来托管模型在一轮里说的话（`agentId`、`text`），记进田头。只收还没挂的那一通，而且「想」不是农场的管家；开场白不记。挂了以后才到的回 `VoiceAgentFailed`。
 - 凭据缺了返回带原因的 `VoiceUnavailable`，别的照常。
 
 ## 客户端
 
 `app/lib/voice/`（`VoiceCall`）：从服务端取令牌，用 Agora 的 Flutter SDK 加入频道。Flutter 的 RTM 只有移动端，所以字幕、打断和语音管家的状态都走 RTC 的 data stream（`captions.dart` 拼块再解）。令牌快过期时换新的。只链语音要的 Agora 组件（`app/tool/agora-voice-only.sh`）。
 
-语音里说的话只在客户端，不写进田头，帮工看不到。你说完一句，字幕定稿时交给农场派活（`POST /api/v1/manager/hear`，管家只派活不回话）。
+通话进田头的主频道，和打字一样看得到；这些消息带 `spoken`，不叫醒任何人（管家已经在电话里听到了）。
+
+- 你说的：字幕定稿时交给农场（`POST /api/v1/manager/hear`），服务端记成你的发言，再交给管家派活。管家派了活就用一句话说派给了谁，没派就不说话。「想」选农场的管家时不走这条，由语音线路记（见下面「语音线路」）。
+- 托管模型说的：一轮说完或被你打断时，客户端把它说到的部分交给 `/voice/agent/said`。
 
 ## 凭据
 
@@ -41,5 +45,5 @@ Agora 的 App ID 和 App Certificate 在首页「设置」或声音页里填，�
 - **只有这一个接口对外**：另开一个监听（配置的 `voice.line.port`，默认 8788，只听 127.0.0.1），上面只有 `POST /llm/<通话>/chat/completions`。端口被占时只记日志，农场照常。
 - **隧道**：设了 `voice.line.url` 就用它；没设时第一通电话开一个 cloudflared 临时隧道，等它能应答（最多 60 秒），最后一通挂了 10 分钟后关掉。
 - **每通电话一把钥匙**：声网的请求要带 `Authorization: Bearer <钥匙>`，挂了就作废。
-- 只取最新的一句交给管家（`Manager.Call`），对话历史以管家自己的会话为准；声网打断时丢掉正在念的。
+- 只取最新的一句交给管家（`Manager.Call`），对话历史以管家自己的会话为准；声网打断时丢掉正在念的。这一句先记进田头（带 `spoken`），管家的回答照常进田头。
 - 这时 `/api/v1/manager/hear` 不再转给管家，免得一句话处理两次。

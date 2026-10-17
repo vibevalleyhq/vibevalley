@@ -229,7 +229,9 @@ type ChatMessage struct {
 	Session      *string     `json:"session,omitzero"`
 	Outcome      *Outcome    `json:"outcome,omitzero"`
 	Spent        *Spent      `json:"spent,omitzero"`
-	At           int64       `json:"at"`
+	// Said on a call rather than typed.
+	Spoken bool  `json:"spoken,omitzero"`
+	At     int64 `json:"at"`
 }
 
 type ConversationKind string
@@ -1965,6 +1967,12 @@ type ChooseTitleRequest struct {
 type RenewRequest struct {
 	Channel string `json:"channel"`
 	UID     string `json:"uid"`
+}
+
+// What Agora's model said in one turn of a call (the client reads it off the captions): kept in 田头, since only the client hears it.
+type VoiceSaid struct {
+	AgentID string `json:"agentId"`
+	Text    string `json:"text"`
 }
 
 type StartRequest struct {

@@ -32,6 +32,10 @@ class LiveCaptions {
   void Function(String text)? onHeard;
   final _heard = <int>{};
 
+  /// The manager's words of a turn, once the turn is over or talked over: what it got to say.
+  void Function(String text)? onAnswered;
+  final _answered = <int>{};
+
   static const keep = 8;
 
   bool feed(String packet) {
@@ -59,6 +63,7 @@ class LiveCaptions {
         c
           ..done = true
           ..interrupted = true;
+        _answer(c);
         return true;
       default:
         return false;
@@ -68,6 +73,7 @@ class LiveCaptions {
   void clear() {
     agentState = null;
     _heard.clear();
+    _answered.clear();
     turns.clear();
     _chunks.clear();
   }
@@ -83,6 +89,11 @@ class LiveCaptions {
         ..done = done;
     }
     if (speaker == Speaker.you && done && text.trim().isNotEmpty && _heard.add(turn)) onHeard?.call(text);
+    if (speaker == Speaker.manager && done) _answer(_find(speaker, turn)!);
+  }
+
+  void _answer(Caption c) {
+    if (c.text.trim().isNotEmpty && _answered.add(c.turn)) onAnswered?.call(c.text);
   }
 
   Caption? _find(Speaker speaker, int turn) {

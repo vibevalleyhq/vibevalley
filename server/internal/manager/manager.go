@@ -688,19 +688,20 @@ func (fm *manager) Heard(text, agentID string) {
 	if _, ok := fm.settings.Voice().LLM.Value.(protocol.VoiceLLMVibeValley); ok {
 		return
 	}
+	fm.chat.Spoken("user", text)
 	picked := ""
 	if a := fm.store.Agent(agentID); agentID != "" && a != nil {
 		picked = a.ID
 	}
 	fm.mu.Lock()
 	fm.picked = picked
-	fm.quiet = true
 	fm.mu.Unlock()
-	fm.send(fm.pickedNote(picked)+"（这句话是主人用语音说的，语音那边已经回答了。你只要按需派活，不用回复。）\n主人说："+text, fm.chat.General(), true)
+	fm.send(fm.pickedNote(picked)+"（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说："+text, fm.chat.General(), true)
 }
 
-// The words said on the phone; the answer is read out.
+// The words said on the phone; the answer is read out, and both stay in 田头.
 func (fm *manager) Call(ctx context.Context, text string) <-chan string {
+	fm.chat.Spoken("user", text)
 	return fm.answer(ctx, managerVoiceNote+"\n主人说："+text)
 }
 

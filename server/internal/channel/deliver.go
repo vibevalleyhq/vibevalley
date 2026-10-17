@@ -150,6 +150,7 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 		Broken:       broken,
 		Outcome:      meta.Outcome,
 		ForPlaybook:  meta.ForPlaybook,
+		Spoken:       meta.Spoken,
 	}
 	if in.Conversation.SubjectID != nil && *in.Conversation.SubjectID == "" {
 		in.Conversation.SubjectID = nil

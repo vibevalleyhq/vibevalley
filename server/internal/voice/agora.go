@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	sdkcore "github.com/AgoraIO/agora-agents-go/v2/core"
 	"github.com/AgoraIO/agora-agents-go/v2/option"
 
+	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/setting"
@@ -127,15 +129,18 @@ type VoiceNative struct {
 type voice struct {
 	core      *core.Service
 	settings  *setting.Service
+	chat      *channel.Service
 	voiceLine *voiceLine
 	http      sdkcore.HTTPClient
 
 	mu    sync.Mutex
 	lines map[string]string
+	// The calls on that Agora's model answers, and the greeting each says at pickup: their words reach 田头 only through Said.
+	quick map[string]string
 }
 
-func newVoice(core *core.Service, settings *setting.Service, line *voiceLine) (*voice, error) {
-	return &voice{core: core, settings: settings, voiceLine: line, http: &http.Client{Timeout: 25 * time.Second}, lines: map[string]string{}}, nil
+func newVoice(core *core.Service, settings *setting.Service, chat *channel.Service, line *voiceLine) (*voice, error) {
+	return &voice{core: core, settings: settings, chat: chat, voiceLine: line, http: &http.Client{Timeout: 25 * time.Second}, lines: map[string]string{}, quick: map[string]string{}}, nil
 }
 func (*voice) OnStart(context.Context) error { return nil }
 func (*voice) OnStop()                       {}
@@ -231,12 +236,30 @@ func (v *voice) start(ctx context.Context, channel, uid string, captions *protoc
 		}
 		return protocol.VoiceAgent{}, protocol.VoiceAgentFailed{Reason: "请管家进频道失败：" + err.Error()}
 	}
+	v.mu.Lock()
 	if line != nil {
-		v.mu.Lock()
 		v.lines[id] = line.ID
-		v.mu.Unlock()
+	} else {
+		v.quick[id] = strings.TrimSpace(voice.Greeting)
 	}
+	v.mu.Unlock()
 	return protocol.VoiceAgent{AgentID: id}, nil
+}
+
+// Only a call still on, that Agora's model answers: a late turn after hangup, or the manager's words, are not kept twice. The greeting
+// is said at every pickup and not kept.
+func (v *voice) Said(agentID, text string) error {
+	v.mu.Lock()
+	greeting, quick := v.quick[agentID]
+	_, managed := v.lines[agentID]
+	v.mu.Unlock()
+	if !quick && !managed {
+		return protocol.VoiceAgentFailed{Reason: "这通电话已经挂了"}
+	}
+	if quick && strings.TrimSpace(text) != greeting {
+		v.chat.Spoken(protocol.ManagerAgent, text)
+	}
+	return nil
 }
 
 // Its voice line closes whatever Agora says.
@@ -245,6 +268,7 @@ func (v *voice) Stop(ctx context.Context, agentID string) error {
 		v.mu.Lock()
 		line, ok := v.lines[agentID]
 		delete(v.lines, agentID)
+		delete(v.quick, agentID)
 		v.mu.Unlock()
 		if ok {
 			v.voiceLine.Close(line)

@@ -224,6 +224,9 @@ type Handlers interface {
 	//vibevalley:route voice.stop POST /api/v1/voice/agent/stop
 	//vibevalley:can owner remote
 	VoiceStop(ctx context.Context, body VoiceAgent) error
+	//vibevalley:route voice.said POST /api/v1/voice/agent/said
+	//vibevalley:can owner remote
+	VoiceSaid(ctx context.Context, body VoiceSaid) error
 	//vibevalley:route connector.list GET /api/v1/connectors
 	//vibevalley:can owner remote
 	ConnectorList(ctx context.Context) ([]ConnectorStatus, error)

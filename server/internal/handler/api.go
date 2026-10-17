@@ -392,6 +392,10 @@ func (a api) VoiceStart(ctx context.Context, body protocol.StartRequest) (protoc
 	return agent, err
 }
 
+func (a api) VoiceSaid(ctx context.Context, body protocol.VoiceSaid) error {
+	return a.f.Voice.Said(body.AgentID, body.Text)
+}
+
 func (a api) VoiceStop(ctx context.Context, body protocol.VoiceAgent) error {
 	err := a.f.Voice.Stop(ctx, body.AgentID)
 	voiceLog("agent stop "+body.AgentID, "", err)

@@ -345,6 +345,7 @@ class ChatMessage {
     this.session,
     this.outcome,
     this.spent,
+    this.spoken,
     required this.at,
   });
 
@@ -363,6 +364,7 @@ class ChatMessage {
     session: j['session'] == null ? null : j['session'] as String,
     outcome: j['outcome'] == null ? null : Outcome.fromJson(j['outcome']),
     spent: j['spent'] == null ? null : Spent.fromJson(j['spent'] as Map<String, dynamic>),
+    spoken: j['spoken'] == null ? null : j['spoken'] as bool,
     at: (j['at'] as num).toDouble(),
   );
 
@@ -380,6 +382,7 @@ class ChatMessage {
   final String? session;
   final Outcome? outcome;
   final Spent? spent;
+  final bool? spoken;
   final double at;
 
   Map<String, dynamic> toJson() => {
@@ -397,6 +400,7 @@ class ChatMessage {
     if (session != null) 'session': session!,
     if (outcome != null) 'outcome': outcome!.wire,
     if (spent != null) 'spent': spent!.toJson(),
+    if (spoken != null) 'spoken': spoken!,
     'at': at,
   };
 }
@@ -4774,6 +4778,17 @@ class RenewRequest {
   Map<String, dynamic> toJson() => {'channel': channel, 'uid': uid};
 }
 
+class VoiceSaid {
+  const VoiceSaid({required this.agentId, required this.text});
+
+  factory VoiceSaid.fromJson(Map<String, dynamic> j) => VoiceSaid(agentId: j['agentId'] as String, text: j['text'] as String);
+
+  final String agentId;
+  final String text;
+
+  Map<String, dynamic> toJson() => {'agentId': agentId, 'text': text};
+}
+
 class StartRequest {
   const StartRequest({required this.channel, required this.uid, this.captions});
 
@@ -5361,6 +5376,10 @@ class VoiceApi {
 
   Future<void> stop({required VoiceAgent body}) async {
     await _api._call('POST', '/api/v1/voice/agent/stop', query: {}, body: body.toJson());
+  }
+
+  Future<void> said({required VoiceSaid body}) async {
+    await _api._call('POST', '/api/v1/voice/agent/said', query: {}, body: body.toJson());
   }
 }
 

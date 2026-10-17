@@ -256,6 +256,7 @@ func chatToMessage(row chatMsgRow) protocol.ChatMessage {
 		Final:        row.Final,
 		Outcome:      meta.Outcome,
 		Spent:        meta.Spent,
+		Spoken:       meta.Spoken,
 		At:           row.CreatedAt,
 	}
 	if row.AgentID != nil && *row.AgentID != "" {
@@ -659,6 +660,27 @@ func (c *Service) Speak(from, text string, opt SpeakOptions) (Spoken, error) {
 		notOnFarm = []string{}
 	}
 	return Spoken{Kind: "sent", Message: chatToMessage(*m), Target: target, NotOnFarm: notOnFarm}, nil
+}
+
+// Words said on a call, by the owner ("user") or the manager, kept in 田头 as they were said. The manager already heard them on the
+// call, so they wake no one.
+func (c *Service) Spoken(from, text string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if str.Trim(text) == "" {
+		return
+	}
+	written, err := c.insert(chatInsert{conversation: c.general, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true, meta: &chatMeta{Spoken: true}})
+	if err != nil {
+		log.Printf("chat: words said on a call: %v", err)
+		return
+	}
+	if from == "user" {
+		if err := c.store().setReadCursor("user", c.general, written.number, clock.NowMs()); err != nil {
+			log.Printf("chat: words said on a call: %v", err)
+		}
+	}
+	c.publishConversation(c.general)
 }
 
 // The same key again replaces the words until final; delivered once final.

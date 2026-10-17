@@ -127,11 +127,12 @@ type chatAudienceInput struct {
 	Broken      []string          `json:"broken"`
 	Outcome     *protocol.Outcome `json:"outcome,omitzero"`
 	ForPlaybook bool              `json:"forPlaybook,omitzero"`
+	Spoken      bool              `json:"spoken,omitzero"`
 }
 
 func chatAudience(i chatAudienceInput) []chatDelivery {
 	out := []chatDelivery{}
-	if i.Kind == protocol.MessageKindNotice || i.Kind == protocol.MessageKindDispatch || i.FromKind == protocol.SenderKindSystem {
+	if i.Kind == protocol.MessageKindNotice || i.Kind == protocol.MessageKindDispatch || i.FromKind == protocol.SenderKindSystem || i.Spoken {
 		return out
 	}
 	byAgent := i.FromKind == protocol.SenderKindAgent || i.FromKind == protocol.SenderKindManager

@@ -165,7 +165,7 @@ func (w *managerWorld) enableLab(t *testing.T) {
 	}
 }
 
-func TestManagerDispatchesAndHearsVoiceInSilence(t *testing.T) {
+func TestManagerDispatchesAndHearsVoiceInChat(t *testing.T) {
 	w := managerOpen(t)
 	f := w.f
 	w.enableLab(t)
@@ -214,8 +214,23 @@ func TestManagerDispatchesAndHearsVoiceInSilence(t *testing.T) {
 	f.Manager.Heard("随便说一句", "")
 	testkit.Until(t, "the manager asked", func() bool { return len(w.seen()) > before })
 	testkit.Settle()
-	if said := w.managerSaid(t, 1); !slices.Equal(said, []string{"好，已在了"}) {
+	if said := w.managerSaid(t, 2); said[len(said)-1] != "收到" {
 		t.Fatalf("heard by voice, it said %q", said)
+	}
+	spoken := slices.IndexFunc(protocol.MessagesIn(f.Core.State().Chat, f.Channel.General()), func(m protocol.ChatMessage) bool {
+		return m.From == "user" && m.Text == "随便说一句" && m.Spoken
+	})
+	if spoken < 0 {
+		t.Fatal("what was said on the call is not in 田头")
+	}
+	heard := 0
+	for _, c := range w.seen()[before:] {
+		if strings.Contains(managerLastLine(c), "随便说一句") {
+			heard++
+		}
+	}
+	if heard != 1 {
+		t.Fatalf("the words on the call reached the manager %d times", heard)
 	}
 	if line := managerLastLine(w.seen()[len(w.seen())-1]); !strings.Contains(line, "语音那边已经回答了") {
 		t.Fatalf("line %q", line)
@@ -247,6 +262,18 @@ func TestManagerCallStreamsItsWords(t *testing.T) {
 	if !regexp.MustCompile(`主人在电话里说的[\s\S]*主人说：现在地里怎么样`).MatchString(managerLastLine(seen[len(seen)-1])) || len(seen) != before+1 {
 		t.Fatalf("asked %d times; last %q", len(seen)-before, managerLastLine(seen[len(seen)-1]))
 	}
+	call := func() []string {
+		var kept []string
+		for _, m := range protocol.MessagesIn(f.Core.State().Chat, f.Channel.General()) {
+			if m.Spoken || m.From == protocol.ManagerAgent {
+				kept = append(kept, m.From+"："+m.Text)
+			}
+		}
+		return kept
+	}
+	if kept := testkit.Await(t, "the call in 田头", func() ([]string, bool) { k := call(); return k, len(k) == 2 }); !slices.Equal(kept, []string{"user：现在地里怎么样", "manager：收到"}) {
+		t.Fatalf("田头 %q", kept)
+	}
 	if _, err := f.Setting.Save(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{LLM: protocol.VoiceLLM{Value: protocol.VoiceLLMVibeValley{}}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -254,6 +281,9 @@ func TestManagerCallStreamsItsWords(t *testing.T) {
 	testkit.Settle()
 	if len(w.seen()) != before+1 {
 		t.Fatal("the relay reached the manager")
+	}
+	if kept := call(); len(kept) != 2 {
+		t.Fatalf("what the voice line already kept is kept again: %q", kept)
 	}
 }
 

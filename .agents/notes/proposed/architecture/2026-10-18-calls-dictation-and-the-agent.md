@@ -134,12 +134,11 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 ### 做到哪了
 
-2026-10-18 做了第 1 步：`pkg/agent/openai.go` 的 `ChatCompletions`，语音线路（`voice/line.go`）只剩路由和钥匙；主服务挂了 `protocol.ChatCompletionsPath`（`/v1/chat/completions`），模型名是 `protocol.ManagerModel`。同一天做了第 2 步：Agora 本来就只在上表的几处，加了两条检查守住它。管家的 `Call`（电话里的话，带语音的提示）和 `Answerer`（本机的 chat/completions，当作田头里的话）共用一个 `answer`：同一时间只流一个回答，新的一句结束上一个的流。
+2026-10-18 做了第 1 步：`pkg/agent/openai.go` 的 `ChatCompletions`，语音线路（`voice/line.go`）只剩路由和钥匙；主服务挂了 `protocol.ChatCompletionsPath`（`/v1/chat/completions`），模型名是 `protocol.ManagerModel`。同一天做了第 2 步：Agora 本来就只在上表的几处，加了两条检查守住它。第 3 步也做了：消息多了 `spoken`（`ChatMessage.Spoken`，存在 `chatMeta`），`chatAudience` 见到它不投给任何人；主人的话由 `Manager.Heard`（快嘴）或 `Manager.Call`（管家）记，快嘴的回答由客户端的 `LiveCaptions.onAnswered` 交给 `POST /api/v1/voice/agent/said`，服务端只收还没挂、开始时「想」不是管家的那一通，开场白不记。管家旁听不再 `Quiet`，提示里让它派了活才说一句。管家的 `Call`（电话里的话，带语音的提示）和 `Answerer`（本机的 chat/completions，当作田头里的话）共用一个 `answer`：同一时间只流一个回答，新的一句结束上一个的流。
 
 待定：
 
 - 名字（`call`、`dictation`、`answer`、`quick`、`tidy`）要对一下[用语表](../../../../docs/README.md#用语)；界面上通话仍叫「听」「想」「说」，听写叫什么另定。
-- 快嘴的回答由客户端上报，服务端要不要只收当前通话的。
 
 ## Alternatives considered
 

@@ -153,6 +153,7 @@
 | `voice.renew` | `POST /api/v1/voice/renew` | ✓ | ✓ |  |  |
 | `voice.start` | `POST /api/v1/voice/agent` | ✓ | ✓ |  |  |
 | `voice.stop` | `POST /api/v1/voice/agent/stop` | ✓ | ✓ |  |  |
+| `voice.said` | `POST /api/v1/voice/agent/said` | ✓ | ✓ |  |  |
 
 ## connector
 

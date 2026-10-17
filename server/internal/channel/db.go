@@ -22,6 +22,8 @@ type chatMeta struct {
 	Spent       *protocol.Spent   `json:"spent,omitempty"`
 	ForPlaybook bool              `json:"forPlaybook,omitempty"`
 	Code        string            `json:"code,omitempty"`
+	// Said on a call: the manager heard it there, so it wakes no one here.
+	Spoken bool `json:"spoken,omitempty"`
 }
 
 // Anything unreadable is no meta.
