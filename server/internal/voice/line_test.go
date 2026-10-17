@@ -101,7 +101,7 @@ func TestVoiceLineLetsOnlyThisCallsKeyIn(t *testing.T) {
 			t.Fatalf("%s %s: %d", c.path, c.key, res.StatusCode)
 		}
 	}
-	if res := voiceAsk(t, ctx, baseURL, "/api/settings", "k1", []any{}); res.StatusCode != 404 {
+	if res := voiceAsk(t, ctx, baseURL, "/api/v1/settings", "k1", []any{}); res.StatusCode != 404 {
 		t.Fatalf("nothing else of the farm is here: %d", res.StatusCode)
 	}
 	res := voiceAsk(t, ctx, baseURL, "/llm/c1/chat/completions", "k1", []any{

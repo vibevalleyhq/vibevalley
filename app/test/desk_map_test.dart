@@ -212,7 +212,7 @@ void main() {
     final now = DateTime.now().millisecondsSinceEpoch;
     final routes = Routes();
     final api = fakeApi(routes, {
-      'GET /api/projects': [
+      'GET /api/v1/projects': [
         {'name': 'clock-in', 'path': '/work/clock-in', 'git': true, 'last': now - 3600000, 'slots': 3},
         {'name': 'docs', 'path': '/work/docs', 'git': true, 'last': now - 3 * 86400000, 'slots': 3},
         {'name': 'pb-smoke', 'path': '/work/pb-smoke', 'git': false, 'slots': 2},

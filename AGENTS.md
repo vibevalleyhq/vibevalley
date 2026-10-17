@@ -46,7 +46,7 @@ bun run site:check && bun run site:build                       # 改完 site/：
 
 Go 1.27，Flutter 3.47，Bun 1.4（根目录的命令、文档和 Note 的检查），Node 24（只跑 `server/tool` 的 `pi-prices.ts`）。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `server/` 要重启它。
 
-一件事的主线：smith 的会话事件 → `internal/session/facts.go`（纯函数）读成事实和事件 → `Core.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/state` 把折好的 `StateFrame` 经 SSE 推给 Flutter；事件由 `session/events.go`、`session/trajectories.go` 记成每个 Session 和管家的日志（[architecture.md](docs/architecture.md)、[server.md](docs/reference/server.md)）。
+一件事的主线：smith 的会话事件 → `internal/session/facts.go`（纯函数）读成事实和事件 → `Core.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给 Flutter；事件由 `session/events.go`、`session/trajectories.go` 记成每个 Session 和管家的日志（[architecture.md](docs/architecture.md)、[server.md](docs/reference/server.md)）。
 
 ## 怎么让 agent 做对
 
@@ -67,7 +67,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **生成的不手改**：`internal/protocol/gen.go` 和 Flutter 的 `lib/gen/` 由 `tool/shapegen` 写，`bun run flutter:check` 查它们是不是最新；`pkg/db/generated` 由 sqlc 写（[理由](.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）。
 - **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `server/internal` 包（`issue`、`issue_session`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `pkg/db/queries/<表>.sql`，一张表一个文件，Go 里只调 sqlc 生成的；`migrations` 的测试查这几条（[理由](.agents/notes/implemented/architecture/2026-10-17-names-by-module.md)）。
 - **不留兼容**：存盘的格式（`vibevalley.db` 的表、家目录的文件、环境变量）只认现在的名字；改名就直接改，不在读的地方长期兜底旧数据；旧数据能在功能不变的前提下补齐、改成现在的样子的，就迁一次：表在 `server/migrations/` 的新文件里迁，家目录的文件在加载时改好写回（如档案缺的动物，`agent/cast.go`）（[理由](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。
-- **Flutter 不折事实**：它读 `GET /api/state` 折好的 `CoreState`；要新的数据就加进 protocol 的字段和 `Reduce`，Dart 里只写跟着时钟走的画面；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在 Dart 里重写，加一个字段或接口问服务端（[理由](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)、[客户端问服务端](.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
+- **Flutter 不折事实**：它读 `GET /api/v1/state` 折好的 `CoreState`；要新的数据就加进 protocol 的字段和 `Reduce`，Dart 里只写跟着时钟走的画面；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在 Dart 里重写，加一个字段或接口问服务端（[理由](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)、[客户端问服务端](.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
 - **客户端分层**：`gen`、`ui`、`data`、`chat`（田头）、`shared`（两张皮共用的画面）在下，工作台 `desk` 和农场 `farm`、`village` 两张皮在上；皮之间不互相 import，两张都用的放进 `shared`（[理由](.agents/notes/implemented/architecture/2026-10-16-client-layers.md)）。
 - **通用的小封装在 `pkg/x`**：字符串（按 UTF-16 数、JavaScript 的空白）、数字（照 JavaScript 写）、指针、时间各一个包；要用就 import，不在自己包里再写一份 `xxxPtr`、`chatTrim`（[理由](.agents/notes/implemented/architecture/2026-10-16-common-wrappers-in-pkg-x.md)）。
 - **封闭的联合穷尽处理**：要每种都处理的地方（按 `_tag` 或 `type` 分支），`switch` 覆盖每一种，加新成员时让编译器或测试报错：Dart 的 sealed class 由编译器查；Go 的编译器不查类型 `switch`，用生成的成员表（`XMembers`）写测试。

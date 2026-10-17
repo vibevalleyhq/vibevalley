@@ -120,9 +120,9 @@ func dispatch(ctx context.Context, raw []string) error {
 	case raw[0] == "runtime" && len(raw) > 1 && raw[1] == "chat":
 		return runtimeChat(ctx, raw[2:])
 	case raw[0] == "state":
-		return stream(ctx, "/api/state", raw[1:])
+		return stream(ctx, "/api/v1/state", raw[1:])
 	case raw[0] == "events":
-		return stream(ctx, "/api/events", raw[1:])
+		return stream(ctx, "/api/v1/events", raw[1:])
 	case isGroup(raw[0]):
 		return call(ctx, raw)
 	}

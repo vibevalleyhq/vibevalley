@@ -10,11 +10,11 @@ Status: implemented
 
 - **服务端算好，客户端读**：
   - `RuntimeInfo.stop`：`MoneyStop` 的那句话，服务端在每次给出农机信息时填（花费变了重算）。
-  - `POST /api/agents/check`：给一组档案（没存的草稿也行），回每个的 `AgentIssue`；档案页、编辑页、派活的下拉框都用它（`data/remote.dart` 的 `watchAgentIssues`）。
-  - `GET /api/agents/{id}/recall?project=&text=`：`Pick` 挑出的几行和字数，不计成想起过；`Memory.fading` 标出再记十条就会丢的。
-  - `POST /api/projects/check`：新增项目时会拒绝的第一处（`projectProblem`），新增项目的对话框提交前问它；Dart 里的项目名正则和那句话删了。
-  - `POST /api/settings/check`：保存时会拒绝的第一处（`SettingsProblem`、`VoiceProblem`），语音页边改边问。语音设置发整份，`setting.Save` 用 `VoiceOverrides` 自己留下和默认不一样的；客户端不再知道「默认值」怎么比。
-  - `POST /api/issues/{id}/resolve`：服务端看这个帮工的冲突（核心状态里标的，没有就现查），用 `ConflictTask` 以主人的名义告诉它。
+  - `POST /api/v1/agents/check`：给一组档案（没存的草稿也行），回每个的 `AgentIssue`；档案页、编辑页、派活的下拉框都用它（`data/remote.dart` 的 `watchAgentIssues`）。
+  - `GET /api/v1/memories/{agent}/recall?project=&text=`：`Pick` 挑出的几行和字数，不计成想起过；`Memory.fading` 标出再记十条就会丢的。
+  - `POST /api/v1/projects/check`：新增项目时会拒绝的第一处（`projectProblem`），新增项目的对话框提交前问它；Dart 里的项目名正则和那句话删了。
+  - `POST /api/v1/settings/check`：保存时会拒绝的第一处（`SettingsProblem`、`VoiceProblem`），语音页边改边问。语音设置发整份，`setting.Save` 用 `VoiceOverrides` 自己留下和默认不一样的；客户端不再知道「默认值」怎么比。
+  - `POST /api/v1/issues/{id}/resolve`：服务端看这个帮工的冲突（核心状态里标的，没有就现查），用 `ConflictTask` 以主人的名义告诉它。
   - 跟着状态走的话在出帧时由 `protocol.FrameOf` 填进状态的副本（起初写在 `Reduce` 里，会进 `state.json`，后来挪了，见[收敛接缝](2026-10-17-converge-the-seams.md)）：帮工在干什么（`Session.phaseText`，没动静多久写成 `{span}`，客户端按自己的钟填，和收件箱的 `{ago}` 一样）、定时什么时候跑、下次几点（`Schedule.whenText`、`nextText`，按定时自己的时区说）、连胜倍率（`Progress.multiplier`）。
   - 额度：`RuntimeInfo.quota` 带剩几成和那句话（`runtime/quota.go`），管家和额度条都读它。
   - 成就表、每档的金币在 `seeds.json`，经生成到 `lib/gen` 的 `achievements`；Dart 不再手抄一份成就表和金币。

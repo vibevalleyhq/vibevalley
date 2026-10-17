@@ -44,7 +44,7 @@ class VibeValleyServer {
   late final Stream<SideEvent> sideEvents = _events().where((e) => e is! Fact && e is! SideEventSnapshot).asBroadcastStream();
 
   Stream<SideEvent> _events() async* {
-    await for (final text in _sse('/api/events')) {
+    await for (final text in _sse('/api/v1/events')) {
       try {
         yield SideEvent.fromJson(jsonDecode(text) as Map<String, dynamic>);
       } on Object catch (e) {
@@ -55,7 +55,7 @@ class VibeValleyServer {
 
   /// Reconnects, and so starts from a fresh state, when the line drops.
   Stream<ReceivedFrame> states() async* {
-    await for (final text in _sse('/api/state')) {
+    await for (final text in _sse('/api/v1/state')) {
       final watch = Stopwatch()..start();
       final frame = StateFrame.fromJson(jsonDecode(text) as Map<String, dynamic>);
       yield ReceivedFrame(frame, bytes: utf8.encode(text).length, decodeMicros: watch.elapsedMicroseconds);
@@ -86,7 +86,7 @@ class VibeValleyServer {
       } on SocketException {
         // The server is not up (yet): try again shortly.
       } on Object catch (e) {
-        // An older server without /api/state, a bad frame, a key refused: said once per attempt, then tried again.
+        // An older server without /api/v1/state, a bad frame, a key refused: said once per attempt, then tried again.
         if (!_closed) problems.add('$e');
       } finally {
         client.close(force: true);

@@ -11,15 +11,15 @@
 
 `server/internal/voice/agora.go`（`Workspace` 上的 `Voice`）；签令牌、拼语音管家的请求在 `server/pkg/agora`。
 
-- `POST /api/voice/session` 开一个频道和数字 uid，签一个 RTC + RTM 通用的令牌，一小时过期；`/renew` 续一个。
-- `POST /api/voice/agent` 按语音设置请语音管家进频道；`/agent/stop` 请它离开，它已经在走也算成功。
+- `POST /api/v1/voice/session` 开一个频道和数字 uid，签一个 RTC + RTM 通用的令牌，一小时过期；`/renew` 续一个。
+- `POST /api/v1/voice/agent` 按语音设置请语音管家进频道；`/agent/stop` 请它离开，它已经在走也算成功。
 - 凭据缺了返回带原因的 `VoiceUnavailable`，别的照常。
 
 ## 客户端
 
 `app/lib/voice/`（`VoiceCall`）：从服务端取令牌，用 Agora 的 Flutter SDK 加入频道。Flutter 的 RTM 只有移动端，所以字幕、打断和语音管家的状态都走 RTC 的 data stream（`captions.dart` 拼块再解）。令牌快过期时换新的。只链语音要的 Agora 组件（`app/tool/agora-voice-only.sh`）。
 
-语音里说的话只在客户端，不写进田头，帮工看不到。你说完一句，字幕定稿时交给农场派活（`POST /api/manager/hear`，管家只派活不回话）。
+语音里说的话只在客户端，不写进田头，帮工看不到。你说完一句，字幕定稿时交给农场派活（`POST /api/v1/manager/hear`，管家只派活不回话）。
 
 ## 凭据
 
@@ -27,7 +27,7 @@ Agora 的 App ID 和 App Certificate 在首页「设置」或声音页里填，�
 
 ## 配置（`/voice`、`/manager/voice`）
 
-语音设置存在 `settings.json` 的 `voice`，只存和默认不一样的（页面发整份，服务端存的时候自己去掉和默认一样的），下一通电话生效。页面上一边改一边问 `POST /api/settings/check`，说的就是保存时会被拒的理由。分两处改（[理由](../../.agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)）：
+语音设置存在 `settings.json` 的 `voice`，只存和默认不一样的（页面发整份，服务端存的时候自己去掉和默认一样的），下一通电话生效。页面上一边改一边问 `POST /api/v1/settings/check`，说的就是保存时会被拒的理由。分两处改（[理由](../../.agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)）：
 
 - 工作台的「声音」（`/voice`）配**线路**：凭据和区域、怎么听（识别、语言、断句、打断）、用哪个大模型。
 - 管家页的「声音」（`/manager/voice`）配**电话上的管家**：人设、开场白、出错时说的话、音色。
@@ -42,4 +42,4 @@ Agora 的 App ID 和 App Certificate 在首页「设置」或声音页里填，�
 - **隧道**：设了 `voice.line.url` 就用它；没设时第一通电话开一个 cloudflared 临时隧道，等它能应答（最多 60 秒），最后一通挂了 10 分钟后关掉。
 - **每通电话一把钥匙**：声网的请求要带 `Authorization: Bearer <钥匙>`，挂了就作废。
 - 只取最新的一句交给管家（`Manager.Call`），对话历史以管家自己的会话为准；声网打断时丢掉正在念的。
-- 这时 `/api/manager/hear` 不再转给管家，免得一句话处理两次。
+- 这时 `/api/v1/manager/hear` 不再转给管家，免得一句话处理两次。

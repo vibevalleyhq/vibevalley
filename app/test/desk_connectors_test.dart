@@ -81,7 +81,7 @@ List<String> rowsOf(QrCode q) => [
 
 Map<String, dynamic> status(String id, String state, {Map<String, dynamic> more = const {}}) => {'id': id, 'state': state, 'pending': 0, ...more};
 
-Routes backend(List<Map<String, dynamic>> list, {Map<String, Object? Function(Call)> more = const {}}) => Routes({'GET /api/connectors': (_) => list, ...more});
+Routes backend(List<Map<String, dynamic>> list, {Map<String, Object? Function(Call)> more = const {}}) => Routes({'GET /api/v1/connectors': (_) => list, ...more});
 
 void main() {
   group('QR encoder', () {
@@ -113,7 +113,7 @@ void main() {
     final b = backend(
       [status('weixin', 'off'), status('feishu', 'connected'), status('qq', 'off')],
       more: {
-        'POST /api/connectors/weixin/login': (_) => status('weixin', 'waiting', more: {'qr': _weixin}),
+        'POST /api/v1/connectors/weixin/login': (_) => status('weixin', 'waiting', more: {'qr': _weixin}),
       },
     );
     await pumpPage(t, const ConnectorsPage(), b.handle);
@@ -132,7 +132,7 @@ void main() {
     final b = backend(
       [status('qq', 'off')],
       more: {
-        'POST /api/connectors/qq/login': (_) => status('qq', 'pairing', more: {'pairCode': '1234'}),
+        'POST /api/v1/connectors/qq/login': (_) => status('qq', 'pairing', more: {'pairCode': '1234'}),
       },
     );
     await pumpPage(t, const ConnectorsPage(id: 'qq'), b.handle);

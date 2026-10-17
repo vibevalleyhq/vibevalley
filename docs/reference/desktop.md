@@ -4,7 +4,7 @@ Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏�
 
 ## 服务端在里面
 
-- 应用带着 Go 服务端（`Contents/MacOS/vibevalley-server`）。画第一帧之前，`launcher.dart` 在 127.0.0.1 上找一个空闲端口把它拉起，等 `GET /api/health` 答应（最多 40 秒，失败换端口再试，最多三次）；起不来就弹框说原因和日志在哪。
+- 应用带着 Go 服务端（`Contents/MacOS/vibevalley-server`）。画第一帧之前，`launcher.dart` 在 127.0.0.1 上找一个空闲端口把它拉起，等 `GET /api/v1/health` 答应（最多 40 秒，失败换端口再试，最多三次）；起不来就弹框说原因和日志在哪。
 - 退出时先给服务端发 SIGTERM，让它存好状态；8 秒还没退就强行结束。
 - **家目录**是 `~/Library/Application Support/vibevalley`，和终端里跑的 `~/.vibevalley` 不是同一个农场。日志在 `~/Library/Logs/vibevalley/server.log`。
 - **PATH**：从 Finder 打开的应用找不到 pi、claude、codex，所以先问登录 shell 要 PATH 再交给服务端。

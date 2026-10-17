@@ -15,7 +15,7 @@ import 'package:vibevalley/rules/money.dart';
 Routes backend() {
   Object? saved;
   final b = Routes({
-    'GET /api/runtimes': (_) => [
+    'GET /api/v1/runtimes': (_) => [
       runtimeJson(
         'claude',
         usage: {
@@ -38,10 +38,10 @@ Routes backend() {
       )..addAll({'settings': ?saved}),
       runtimeJson('pi', spentToday: 1.5, dailyBudget: 5),
     ],
-    'GET /api/agents': (_) => [agentJson('a1', '阿郑', 'claude')],
-    'GET /api/skills': (_) => <Object>[],
-    'POST /api/runtimes/claude/refresh': (_) => runtimeJson('claude', update: {'current': '1.2.3', 'latest': '1.3.0', 'available': true}),
-    'PUT /api/runtimes/claude/settings': (c) => {...runtimeJson('claude'), 'settings': saved = c.body},
+    'GET /api/v1/agents': (_) => [agentJson('a1', '阿郑', 'claude')],
+    'GET /api/v1/skills': (_) => <Object>[],
+    'POST /api/v1/runtimes/claude/refresh': (_) => runtimeJson('claude', update: {'current': '1.2.3', 'latest': '1.3.0', 'available': true}),
+    'PUT /api/v1/runtimes/claude/settings': (c) => {...runtimeJson('claude'), 'settings': saved = c.body},
   });
   return b;
 }
@@ -99,7 +99,7 @@ void main() {
     await pumpPage(t, const RuntimesPage(id: 'claude'), b.handle);
     await t.tap(find.text('重新检测'));
     await settle(t);
-    expect(b.named('POST', '/api/runtimes/claude/refresh'), hasLength(1));
+    expect(b.named('POST', '/api/v1/runtimes/claude/refresh'), hasLength(1));
     await t.tap(find.text('升级到 1.3.0'));
     await t.pump();
     expect(find.text('会跑 Claude Code 自己的更新程序，改动这台机器。'), findsOneWidget);
@@ -117,7 +117,7 @@ void main() {
     expect(find.text('保存'), findsOneWidget);
     await t.tap(find.text('保存'));
     await settle(t);
-    final put = b.named('PUT', '/api/runtimes/claude/settings');
+    final put = b.named('PUT', '/api/v1/runtimes/claude/settings');
     expect(put, hasLength(1));
     expect((put.single.body! as Map)['binPath'], '/opt/claude');
     expect(find.text('保存'), findsNothing);

@@ -77,7 +77,7 @@ func lanAsk(t *testing.T, addr, code, name string) <-chan []byte {
 	got := make(chan []byte, 1)
 	go func() {
 		raw, _ := json.Marshal(protocol.LanPairRequest{Code: code, Name: name})
-		res, err := http.Post(addr+"/api/gate/pair", "application/json", bytes.NewReader(raw))
+		res, err := http.Post(addr+"/api/v1/gate/pair", "application/json", bytes.NewReader(raw))
 		if err != nil {
 			got <- []byte(err.Error())
 			return
@@ -129,13 +129,13 @@ func TestLanShutUntilOpened(t *testing.T) {
 		t.Fatalf("pairing with the gate shut: %v", err)
 	}
 	addr := lanOpen(t, f)
-	if code, _ := lanRequest(t, "GET", addr+"/api/health", "", nil); code != http.StatusUnauthorized {
+	if code, _ := lanRequest(t, "GET", addr+"/api/v1/health", "", nil); code != http.StatusUnauthorized {
 		t.Fatalf("health without a key: %d", code)
 	}
 	if _, err := f.Gate.SetOpen(false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := http.Get(addr + "/api/health"); err == nil {
+	if _, err := http.Get(addr + "/api/v1/health"); err == nil {
 		t.Fatal("the gate still answers once shut")
 	}
 }
@@ -148,10 +148,10 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 		t.Fatalf("after pairing: %+v", s)
 	}
 
-	if code, body := lanRequest(t, "GET", addr+"/api/health", paired.Key, nil); code != 200 || !strings.Contains(string(body), `"ok":true`) {
+	if code, body := lanRequest(t, "GET", addr+"/api/v1/health", paired.Key, nil); code != 200 || !strings.Contains(string(body), `"ok":true`) {
 		t.Fatalf("health: %d %s", code, body)
 	}
-	code, body := lanRequest(t, "GET", addr+"/api/gate/me", paired.Key, nil)
+	code, body := lanRequest(t, "GET", addr+"/api/v1/gate/me", paired.Key, nil)
 	var me protocol.LanDevice
 	if json.Unmarshal(body, &me); code != 200 || me.ID != paired.Device || me.LastSeen == nil {
 		t.Fatalf("me: %d %s", code, body)
@@ -161,12 +161,12 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 			t.Fatalf("%s: %d", path, code)
 		}
 	}
-	for _, c := range []struct{ method, path string }{{"GET", "/api/gate"}, {"PUT", "/api/gate"}, {"POST", "/api/gate/pairing"}, {"DELETE", "/api/gate/devices/" + paired.Device}} {
+	for _, c := range []struct{ method, path string }{{"GET", "/api/v1/gate"}, {"PUT", "/api/v1/gate"}, {"POST", "/api/v1/gate/pairing"}, {"DELETE", "/api/v1/gate/devices/" + paired.Device}} {
 		if code, body := lanRequest(t, c.method, addr+c.path, paired.Key, map[string]bool{"open": false}); code != http.StatusForbidden || !strings.Contains(string(body), "LanRefused") {
 			t.Fatalf("%s %s: %d %s", c.method, c.path, code, body)
 		}
 	}
-	if code, _ := lanRequest(t, "GET", addr+"/api/health", paired.Key+"x", nil); code != http.StatusUnauthorized {
+	if code, _ := lanRequest(t, "GET", addr+"/api/v1/health", paired.Key+"x", nil); code != http.StatusUnauthorized {
 		t.Fatalf("a wrong key: %d", code)
 	}
 	if _, err := f.Gate.Me(context.Background()); err == nil {
@@ -227,7 +227,7 @@ func TestLanForgetEndsTheDevicesStreams(t *testing.T) {
 	f := lanTestFarm(t, ":memory:")
 	addr := lanOpen(t, f)
 	paired := lanPair(t, f, addr, "旧手机")
-	req, _ := http.NewRequest("GET", addr+"/api/state", nil)
+	req, _ := http.NewRequest("GET", addr+"/api/v1/state", nil)
 	req.Header.Set("Authorization", "Bearer "+paired.Key)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil || res.StatusCode != 200 {
@@ -251,7 +251,7 @@ func TestLanForgetEndsTheDevicesStreams(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the stream outlived its device")
 	}
-	if code, _ := lanRequest(t, "GET", addr+"/api/health", paired.Key, nil); code != http.StatusUnauthorized {
+	if code, _ := lanRequest(t, "GET", addr+"/api/v1/health", paired.Key, nil); code != http.StatusUnauthorized {
 		t.Fatalf("a forgotten key: %d", code)
 	}
 }
@@ -266,7 +266,7 @@ func TestLanRemembersAcrossRestarts(t *testing.T) {
 	if !s.Open || s.URL == nil || len(s.Devices) != 1 || s.Devices[0].ID != paired.Device {
 		t.Fatalf("after a restart: %+v", s)
 	}
-	if code, _ := lanRequest(t, "GET", *s.URL+"/api/health", paired.Key, nil); code != 200 {
+	if code, _ := lanRequest(t, "GET", *s.URL+"/api/v1/health", paired.Key, nil); code != 200 {
 		t.Fatalf("the old key after a restart: %d", code)
 	}
 }

@@ -109,7 +109,7 @@ Future<http.Response> _answer(http.Request r) async {
   if (r.method == 'GET' && r.url.path.endsWith('/messages')) {
     return jsonResponse(r.url.path.contains('/3/') ? [_msg(2, 1, 'manager', SenderKind.manager, '派给 @w1 跑测试').toJson()] : []);
   }
-  if (r.url.path == '/api/projects') return jsonResponse([]);
+  if (r.url.path == '/api/v1/projects') return jsonResponse([]);
   return http.Response('', 204);
 }
 
@@ -219,7 +219,7 @@ void main() {
       expect(_rich('农场开门了'), findsOneWidget);
       expect(_rich('1 条回复'), findsOneWidget);
       expect(find.text('派活'), findsOneWidget);
-      final read = server.to('POST', '/api/channels/1/read');
+      final read = server.to('POST', '/api/v1/channels/1/read');
       expect(read, hasLength(1));
       expect(jsonDecode(read.single.body), {'seq': 2});
     });
@@ -254,13 +254,13 @@ void main() {
       await _pump(t, const ChatPage(), server, _state());
       await t.tap(find.text('clock-in'));
       await t.pump(const Duration(milliseconds: 50));
-      expect(server.to('GET', '/api/channels/2/messages').single.url.queryParameters, {'limit': '50'});
+      expect(server.to('GET', '/api/v1/channels/2/messages').single.url.queryParameters, {'limit': '50'});
       expect(_rich('打卡页改好了'), findsOneWidget);
       expect(find.text('打卡 · 默认项目 clock-in'), findsOneWidget);
       await t.enterText(find.byType(TextField).first, '今天把打卡做完');
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump(const Duration(milliseconds: 50));
-      final say = server.to('POST', '/api/say');
+      final say = server.to('POST', '/api/v1/say');
       expect(say, hasLength(1));
       expect(jsonDecode(say.single.body), {'text': '今天把打卡做完', 'conversation': 2});
     });
@@ -275,10 +275,10 @@ void main() {
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump();
       expect(t.widget<TextField>(field).controller!.text, '叫 @w1 ');
-      expect(server.to('POST', '/api/say'), isEmpty);
+      expect(server.to('POST', '/api/v1/say'), isEmpty);
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump(const Duration(milliseconds: 50));
-      expect(jsonDecode(server.to('POST', '/api/say').single.body), {'text': '叫 @w1'});
+      expect(jsonDecode(server.to('POST', '/api/v1/say').single.body), {'text': '叫 @w1'});
     });
 
     testWidgets('the thread opens on the right; the schedules tab lists and switches them', (t) async {
@@ -287,7 +287,7 @@ void main() {
       await t.tap(_rich('1 条回复'));
       await t.pump(const Duration(milliseconds: 50));
       expect(find.text('测试小吴的工单串'), findsOneWidget);
-      expect(server.to('GET', '/api/channels/3/messages'), hasLength(1));
+      expect(server.to('GET', '/api/v1/channels/3/messages'), hasLength(1));
       expect(_rich('测试都过了'), findsWidgets);
       expect(find.text('做完了'), findsOneWidget);
 
@@ -298,12 +298,12 @@ void main() {
       expect(find.text('跑一遍测试'), findsOneWidget);
       await t.tap(find.text('开着'));
       await t.pump(const Duration(milliseconds: 50));
-      expect(jsonDecode(server.to('PUT', '/api/schedules/5').single.body), {'enabled': false});
+      expect(jsonDecode(server.to('PUT', '/api/v1/schedules/5').single.body), {'enabled': false});
       await t.tap(find.byTooltip('删掉'));
       await t.pump();
       await t.tap(find.text('确定删？'));
       await t.pump(const Duration(milliseconds: 50));
-      expect(server.to('DELETE', '/api/schedules/5'), hasLength(1));
+      expect(server.to('DELETE', '/api/v1/schedules/5'), hasLength(1));
     });
   });
 
@@ -342,7 +342,7 @@ void main() {
       await t.enterText(find.byType(TextField), '再跑一次');
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump(const Duration(milliseconds: 50));
-      expect(jsonDecode(server.to('POST', '/api/say').single.body), {'text': '再跑一次', 'conversation': 3});
+      expect(jsonDecode(server.to('POST', '/api/v1/say').single.body), {'text': '再跑一次', 'conversation': 3});
 
       await t.tap(find.bySemanticsLabel('回到田头').first);
       await t.pump(const Duration(milliseconds: 50));

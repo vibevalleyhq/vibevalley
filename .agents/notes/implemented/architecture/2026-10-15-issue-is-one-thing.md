@@ -23,7 +23,7 @@ Status: implemented
 - **工单随最后一次执行关上**：`Issues` 听帮工离开的事实（`FactLeft`，带着怎么关的），离开的是最后一次执行就关上工单。`Crew` 不知道工单，只把 `HireOptions.Issue` 记在帮工和轨迹头上。
 - **存在数据库**：`issue` 表和 `issue_run` 表（表名用单数）。查询用 sqlc 生成（[查询由 sqlc 生成](2026-10-15-sqlc-queries.md)）。当初不进核心状态、看板隔几秒问一次；后来被 [工单进核心状态](2026-10-15-issues-in-core-state.md) 取代。
 - **老数据迁过来**：迁移 `0006_issue.sql` 把待办表搬进 `issue`（id 不变）。轨迹头在文件里，所以开机时由 `Issues.adopt` 收：头上记着工单的进那张，从前重开出来的进原来那张，其余各自一张、id 用帮工 id。跑几遍都一样。迁移前数据库先复制一份到 `vibevalley.db.v<N>`。
-- **找工单可以用帮工 id**：`GET /api/issues/{id}`、重开、看板的 `/tickets/<id>` 都认工单 id 和它任何一次执行的帮工 id，农场和地图上从帮工点进来照样打开它的工单。
+- **找工单可以用帮工 id**：`GET /api/v1/issues/{id}`、重开、看板的 `/tickets/<id>` 都认工单 id 和它任何一次执行的帮工 id，农场和地图上从帮工点进来照样打开它的工单。
 
 ## Alternatives considered
 
@@ -45,4 +45,4 @@ Status: implemented
 
 - `server/internal/protocol/issues_test.go`：状态怎么算。
 - `server/internal/workspace/work_test.go`：`TestCrewIssueClosesAndReopens`（随最后一次执行关上、用帮工 id 或工单 id 重开、同一张工单两次执行、重开交给帮工的文字、开着的和合进计划的不能重开）；`TestCrewIssueWrittenDownStarts`（写下、改、开工、开工后不能再改、排先后）；`TestCrewIssueWaitsForAFreeBed`（排队、有空地自己开工、手动排上拿出）；`TestCrewIssueAdoptsTheRunsOfBefore`（老的轨迹头按重开的链收成工单，重启后不重复）。
-- `app/test/tickets_test.dart`：看板读 `/api/issues`，用帮工 id 打开它的工单，重开发到 `/api/issues/{id}/reopen`。
+- `app/test/tickets_test.dart`：看板读 `/api/v1/issues`，用帮工 id 打开它的工单，重开发到 `/api/v1/issues/{id}/reopen`。

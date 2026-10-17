@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-项目页的「新增项目」提供「开一块新地」和「去别人家看看」。前者创建带初始提交的仓库，后者接收公开 GitHub 仓库主页 HTTPS 地址，自动建议项目名并允许修改。两者都在 `VIBEVALLEY_WORK_ROOT` 下创建一个直接子目录。协议在 protocol（`NewProject`、`FarmCreateProject`），纯校验在 `server/internal/project/project.go`（`projectProblem`；表单提交前经 `POST /api/projects/check` 问它，客户端不再照搬一份），文件系统操作在 Projects 服务；HTTP 处理只转发，客户端成功后刷新项目列表，页面打开新项目。
+项目页的「新增项目」提供「开一块新地」和「去别人家看看」。前者创建带初始提交的仓库，后者接收公开 GitHub 仓库主页 HTTPS 地址，自动建议项目名并允许修改。两者都在 `VIBEVALLEY_WORK_ROOT` 下创建一个直接子目录。协议在 protocol（`NewProject`、`FarmCreateProject`），纯校验在 `server/internal/project/project.go`（`projectProblem`；表单提交前经 `POST /api/v1/projects/check` 问它，客户端不再照搬一份），文件系统操作在 Projects 服务；HTTP 处理只转发，客户端成功后刷新项目列表，页面打开新项目。
 
 导入只克隆，不派帮工、不安装依赖、不运行项目。保留原仓库历史与 origin。下载期间显示进行中，不伪造百分比；克隆最多 3 分钟，关闭终端认证提示，失败返回可重试原因。目录通过排他 mkdir 取得，存在任何同名目录或符号链接都拒绝；失败只清理本次创建的目录。创建与帮工开工共用项目队列，进行中的目录不进入项目列表。
 

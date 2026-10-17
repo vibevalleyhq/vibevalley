@@ -92,7 +92,7 @@ void main() {
       await settle(t);
       final post = server.writes.single;
       expect(post.method, 'POST');
-      expect(post.path, '/api/memories/manager');
+      expect(post.path, '/api/v1/memories/manager');
       expect(post.body, {'text': '周末别派夜班'});
       expect(find.text('周末别派夜班'), findsOneWidget);
     });
@@ -103,7 +103,7 @@ void main() {
       await t.tap(labelled('忘掉').first);
       await settle(t);
       expect(server.writes.single.method, 'DELETE');
-      expect(server.writes.single.path, '/api/memories/manager/n1');
+      expect(server.writes.single.path, '/api/v1/memories/manager/n1');
       expect(find.text('提交信息写中文'), findsNothing);
     });
 
@@ -136,7 +136,7 @@ void main() {
       await typeInto(t, '在旧账里搜', '登录');
       await t.tap(find.text('搜'));
       await settle(t);
-      expect(server.calls.last.path, '/api/manager/archive?q=%E7%99%BB%E5%BD%95');
+      expect(server.calls.last.path, '/api/v1/manager/archive?q=%E7%99%BB%E5%BD%95');
       expect(find.text('主人说：登录页要改'), findsOneWidget);
       await t.tap(labelled('2026-10-01.md'));
       await settle(t);
@@ -155,7 +155,7 @@ void main() {
       await settle(t);
       final put = server.writes.single;
       expect(put.method, 'PUT');
-      expect(put.path, '/api/settings');
+      expect(put.path, '/api/v1/settings');
       // The voice goes whole; the server keeps what differs from its defaults.
       expect(((put.body! as Map)['voice'] as Map)['greeting'], '来了来了');
       expect(find.text('存好了，下一通电话就用上。'), findsOneWidget);
@@ -176,14 +176,14 @@ void main() {
       await t.tap(find.text('记下'));
       await settle(t);
       final post = server.writes.single;
-      expect(post.path, '/api/memories/backend');
+      expect(post.path, '/api/v1/memories/backend');
       expect(post.body, {'text': '用 pnpm', 'project': 'clock'});
     });
 
     testWidgets('TrajectoryList lists the helpers it sent and opens one', (t) async {
       final server = _server();
       await pumpPage(t, const SingleChildScrollView(child: TrajectoryList(agent: 'backend')), server.handle);
-      expect(server.calls.first.path, '/api/sessions?agent=backend');
+      expect(server.calls.first.path, '/api/v1/sessions?agent=backend');
       expect(find.text('老周一号'), findsOneWidget);
       expect(find.text('改登录'), findsOneWidget);
       await t.tap(labelled('老周一号'));

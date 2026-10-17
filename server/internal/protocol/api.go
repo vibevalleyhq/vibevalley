@@ -7,260 +7,260 @@ import "context"
 // gate, which lets only these through), manager (its tools), session (a session, with its key). The table is Endpoints in gen.go and
 // docs/reference/capabilities.md.
 type Handlers interface {
-	//vibevalley:route server.health GET /api/health
+	//vibevalley:route server.health GET /api/v1/health
 	//vibevalley:can owner remote
 	ServerHealth(ctx context.Context) (Health, error)
-	//vibevalley:route manager.open POST /api/manager/open
+	//vibevalley:route manager.open POST /api/v1/manager/open
 	//vibevalley:can owner remote
 	ManagerOpen(ctx context.Context) error
-	//vibevalley:route setting.load GET /api/settings
+	//vibevalley:route setting.load GET /api/v1/settings
 	//vibevalley:can owner remote
 	SettingLoad(ctx context.Context) (SettingsStatus, error)
 	// The first thing Save would refuse in these settings, without saving them.
-	//vibevalley:route setting.check POST /api/settings/check
+	//vibevalley:route setting.check POST /api/v1/settings/check
 	//vibevalley:can owner remote
 	SettingCheck(ctx context.Context, body SettingsUpdate) (SettingsCheck, error)
-	//vibevalley:route setting.save PUT /api/settings
+	//vibevalley:route setting.save PUT /api/v1/settings
 	//vibevalley:can owner remote
 	SettingSave(ctx context.Context, body SettingsUpdate) (SettingsStatus, error)
-	//vibevalley:route channel.say POST /api/say
+	//vibevalley:route channel.say POST /api/v1/say
 	//vibevalley:can owner remote
 	ChannelSay(ctx context.Context, body SayRequest) error
-	//vibevalley:route channel.create POST /api/channels
+	//vibevalley:route channel.create POST /api/v1/channels
 	//vibevalley:can owner remote manager
 	ChannelCreate(ctx context.Context, body ChannelRequest) error
-	//vibevalley:route schedule.create POST /api/schedules
+	//vibevalley:route schedule.create POST /api/v1/schedules
 	//vibevalley:can owner remote manager
 	ScheduleCreate(ctx context.Context, body ScheduleRequest) (Schedule, error)
-	//vibevalley:route schedule.list GET /api/schedules
+	//vibevalley:route schedule.list GET /api/v1/schedules
 	//vibevalley:can owner remote manager
 	ScheduleList(ctx context.Context) ([]Schedule, error)
 	// Only what the body gives changes.
-	//vibevalley:route schedule.update PUT /api/schedules/{id}
+	//vibevalley:route schedule.update PUT /api/v1/schedules/{id}
 	//vibevalley:can owner remote
 	ScheduleUpdate(ctx context.Context, pID int64, body ScheduleUpdate) error
-	//vibevalley:route schedule.delete DELETE /api/schedules/{id}
+	//vibevalley:route schedule.delete DELETE /api/v1/schedules/{id}
 	//vibevalley:can owner remote manager
 	ScheduleDelete(ctx context.Context, pID int64) error
-	//vibevalley:route channel.update PUT /api/channels/{id}
+	//vibevalley:route channel.update PUT /api/v1/channels/{id}
 	//vibevalley:can owner remote manager
 	ChannelUpdate(ctx context.Context, pID int64, body ChannelUpdate) error
-	//vibevalley:route manager.hear POST /api/manager/hear
+	//vibevalley:route manager.hear POST /api/v1/manager/hear
 	//vibevalley:can owner remote
 	ManagerHear(ctx context.Context, body SayRequest) error
 	// To the issue's newest session, as the owner: on is a step of its trajectory to comment on. A closed issue is refused: reopen it.
-	//vibevalley:route issue.comment POST /api/issues/{id}/comment
+	//vibevalley:route issue.comment POST /api/v1/issues/{id}/comment
 	//vibevalley:can owner remote manager
 	IssueComment(ctx context.Context, pID string, body CommentRequest) error
-	//vibevalley:route issue.changes GET /api/issues/{id}/changes
+	//vibevalley:route issue.changes GET /api/v1/issues/{id}/changes
 	//vibevalley:can owner remote manager
 	IssueChanges(ctx context.Context, pID string) (Changes, error)
-	//vibevalley:route issue.merge POST /api/issues/{id}/merge
+	//vibevalley:route issue.merge POST /api/v1/issues/{id}/merge
 	//vibevalley:can owner remote manager
 	IssueMerge(ctx context.Context, pID string) error
 	// Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
-	//vibevalley:route issue.resolve POST /api/issues/{id}/resolve
+	//vibevalley:route issue.resolve POST /api/v1/issues/{id}/resolve
 	//vibevalley:can owner remote
 	IssueResolve(ctx context.Context, pID string) error
 	// Sends the newest session home without merging: the issue closes as dismissed.
-	//vibevalley:route issue.cancel POST /api/issues/{id}/cancel
+	//vibevalley:route issue.cancel POST /api/v1/issues/{id}/cancel
 	//vibevalley:can owner remote manager
 	IssueCancel(ctx context.Context, pID string) error
 	// Stops a session's turn; it stays, and a comment starts the next.
-	//vibevalley:route session.stop POST /api/sessions/{id}/stop
+	//vibevalley:route session.stop POST /api/v1/sessions/{id}/stop
 	//vibevalley:can owner remote manager
 	SessionStop(ctx context.Context, pID string) error
-	//vibevalley:route session.list GET /api/sessions
+	//vibevalley:route session.list GET /api/v1/sessions
 	//vibevalley:can owner remote
 	SessionList(ctx context.Context, pAgent *string) ([]Session, error)
-	//vibevalley:route session.get GET /api/sessions/{id}
+	//vibevalley:route session.get GET /api/v1/sessions/{id}
 	//vibevalley:can owner remote
 	SessionGet(ctx context.Context, pID string) (Session, error)
 	// Its log, oldest first; run gives one run's only. The manager's log is session manager's.
-	//vibevalley:route session.events GET /api/sessions/{id}/events
+	//vibevalley:route session.events GET /api/v1/sessions/{id}/events
 	//vibevalley:can owner remote
 	SessionEvents(ctx context.Context, pID string, pRun *int64) ([]SessionEvent, error)
-	//vibevalley:route issue.list GET /api/issues
+	//vibevalley:route issue.list GET /api/v1/issues
 	//vibevalley:can owner remote
 	IssueList(ctx context.Context) ([]Issue, error)
-	//vibevalley:route issue.get GET /api/issues/{id}
+	//vibevalley:route issue.get GET /api/v1/issues/{id}
 	//vibevalley:can owner remote
 	IssueGet(ctx context.Context, pID string) (Issue, error)
-	//vibevalley:route issue.runs GET /api/issues/{id}/runs
+	//vibevalley:route issue.runs GET /api/v1/issues/{id}/runs
 	//vibevalley:can owner remote
 	IssueRuns(ctx context.Context, pID string) ([]Run, error)
-	//vibevalley:route issue.create POST /api/issues
+	//vibevalley:route issue.create POST /api/v1/issues
 	//vibevalley:can owner remote
 	IssueCreate(ctx context.Context, body IssueRequest) (Issue, error)
-	//vibevalley:route issue.update PUT /api/issues/{id}
+	//vibevalley:route issue.update PUT /api/v1/issues/{id}
 	//vibevalley:can owner remote
 	IssueUpdate(ctx context.Context, pID string, body IssueUpdate) (Issue, error)
-	//vibevalley:route issue.delete DELETE /api/issues/{id}
+	//vibevalley:route issue.delete DELETE /api/v1/issues/{id}
 	//vibevalley:can owner remote
 	IssueDelete(ctx context.Context, pID string) error
-	//vibevalley:route issue.move PUT /api/issues/{id}/move
+	//vibevalley:route issue.move PUT /api/v1/issues/{id}/move
 	//vibevalley:can owner remote
 	IssueMove(ctx context.Context, pID string, body MoveIssueRequest) ([]Issue, error)
 	// Back to the backlog; an issue is queued by issue.start when there is no room.
-	//vibevalley:route issue.unqueue POST /api/issues/{id}/unqueue
+	//vibevalley:route issue.unqueue POST /api/v1/issues/{id}/unqueue
 	//vibevalley:can owner remote
 	IssueUnqueue(ctx context.Context, pID string) (Issue, error)
-	//vibevalley:route issue.start POST /api/issues/{id}/start
+	//vibevalley:route issue.start POST /api/v1/issues/{id}/start
 	//vibevalley:can owner remote manager
 	IssueStart(ctx context.Context, pID string) (Dispatched, error)
-	//vibevalley:route issue.reopen POST /api/issues/{id}/reopen
+	//vibevalley:route issue.reopen POST /api/v1/issues/{id}/reopen
 	//vibevalley:can owner remote
 	IssueReopen(ctx context.Context, pID string, body ReopenRequest) (Dispatched, error)
-	//vibevalley:route playbook.plan POST /api/playbooks
+	//vibevalley:route playbook.plan POST /api/v1/playbooks
 	//vibevalley:can owner remote manager
 	PlaybookPlan(ctx context.Context, body PlanRequest) (string, error)
-	//vibevalley:route playbook.updateNode PUT /api/playbooks/{id}/nodes/{node}
+	//vibevalley:route playbook.updateNode PUT /api/v1/playbooks/{id}/nodes/{node}
 	//vibevalley:can owner remote manager
 	PlaybookUpdateNode(ctx context.Context, pID string, pNode string, body NodeEdit) (string, error)
-	//vibevalley:route playbook.deleteNode DELETE /api/playbooks/{id}/nodes/{node}
+	//vibevalley:route playbook.deleteNode DELETE /api/v1/playbooks/{id}/nodes/{node}
 	//vibevalley:can owner remote manager
 	PlaybookDeleteNode(ctx context.Context, pID string, pNode string) (string, error)
-	//vibevalley:route playbook.act POST /api/playbooks/{id}/act
+	//vibevalley:route playbook.act POST /api/v1/playbooks/{id}/act
 	//vibevalley:can owner remote manager
 	PlaybookAct(ctx context.Context, pID string, body PlaybookActRequest) (string, error)
-	//vibevalley:route playbook.nodeAct POST /api/playbooks/{id}/nodes/{node}/act
+	//vibevalley:route playbook.nodeAct POST /api/v1/playbooks/{id}/nodes/{node}/act
 	//vibevalley:can owner remote manager
 	PlaybookNodeAct(ctx context.Context, pID string, pNode string, body NodeActRequest) (string, error)
-	//vibevalley:route channel.history GET /api/channels/{id}/messages
+	//vibevalley:route channel.history GET /api/v1/channels/{id}/messages
 	//vibevalley:can owner remote manager
 	ChannelHistory(ctx context.Context, pID int64, pBefore *int64, pLimit *int64) ([]ChatMessage, error)
-	//vibevalley:route channel.markRead POST /api/channels/{id}/read
+	//vibevalley:route channel.markRead POST /api/v1/channels/{id}/read
 	//vibevalley:can owner remote
 	ChannelMarkRead(ctx context.Context, pID int64, body ChatReadRequest) error
-	//vibevalley:route playbook.changes GET /api/playbooks/{id}/changes
+	//vibevalley:route playbook.changes GET /api/v1/playbooks/{id}/changes
 	//vibevalley:can owner remote
 	PlaybookChanges(ctx context.Context, pID string) (Changes, error)
-	//vibevalley:route playbook.events GET /api/playbooks/{id}/events
+	//vibevalley:route playbook.events GET /api/v1/playbooks/{id}/events
 	//vibevalley:can owner remote
 	PlaybookEvents(ctx context.Context, pID string) ([]PlaybookEvent, error)
-	//vibevalley:route game.chooseTitle POST /api/game/title
+	//vibevalley:route game.chooseTitle POST /api/v1/game/title
 	//vibevalley:can owner remote
 	GameChooseTitle(ctx context.Context, body ChooseTitleRequest) error
-	//vibevalley:route runtime.list GET /api/runtimes
+	//vibevalley:route runtime.list GET /api/v1/runtimes
 	//vibevalley:can owner remote
 	RuntimeList(ctx context.Context) ([]RuntimeInfo, error)
-	//vibevalley:route runtime.refresh POST /api/runtimes/{id}/refresh
+	//vibevalley:route runtime.refresh POST /api/v1/runtimes/{id}/refresh
 	//vibevalley:can owner remote
 	RuntimeRefresh(ctx context.Context, pID string) (RuntimeInfo, error)
-	//vibevalley:route runtime.update PUT /api/runtimes/{id}/settings
+	//vibevalley:route runtime.update PUT /api/v1/runtimes/{id}/settings
 	//vibevalley:can owner remote
 	RuntimeUpdate(ctx context.Context, pID string, body RuntimeSettings) (RuntimeInfo, error)
-	//vibevalley:route runtime.upgrade POST /api/runtimes/{id}/upgrade
+	//vibevalley:route runtime.upgrade POST /api/v1/runtimes/{id}/upgrade
 	//vibevalley:can owner remote
 	RuntimeUpgrade(ctx context.Context, pID string) (RuntimeInfo, error)
-	//vibevalley:route agent.list GET /api/agents
+	//vibevalley:route agent.list GET /api/v1/agents
 	//vibevalley:can owner remote
 	AgentList(ctx context.Context) ([]Agent, error)
 	// The issues of each profile as it would be dispatched now; a draft not saved yet too.
-	//vibevalley:route agent.check POST /api/agents/check
+	//vibevalley:route agent.check POST /api/v1/agents/check
 	//vibevalley:can owner remote
 	AgentCheck(ctx context.Context, body AgentCheckRequest) ([]AgentCheck, error)
-	//vibevalley:route agent.save PUT /api/agents/{id}
+	//vibevalley:route agent.save PUT /api/v1/agents/{id}
 	//vibevalley:can owner remote
 	AgentSave(ctx context.Context, pID string, body Agent) (Agent, error)
-	//vibevalley:route agent.delete DELETE /api/agents/{id}
+	//vibevalley:route agent.delete DELETE /api/v1/agents/{id}
 	//vibevalley:can owner remote
 	AgentDelete(ctx context.Context, pID string) error
 	// An agent's memories: the manager's (agent manager) are the lines of its MEMORY.md, with the file and how many of the newest
 	// its prompt carries; every other agent's are rows.
-	//vibevalley:route memory.list GET /api/memories/{agent}
+	//vibevalley:route memory.list GET /api/v1/memories/{agent}
 	//vibevalley:can owner remote
 	MemoryList(ctx context.Context, pAgent string) (MemoryList, error)
 	// What the agent would be reminded of on its next start; the manager is not reminded, it carries its whole file.
-	//vibevalley:route memory.recall GET /api/memories/{agent}/recall
+	//vibevalley:route memory.recall GET /api/v1/memories/{agent}/recall
 	//vibevalley:can owner remote
 	MemoryRecall(ctx context.Context, pAgent string, pProject *string, pText *string) (RecallPreview, error)
-	//vibevalley:route memory.create POST /api/memories/{agent}
+	//vibevalley:route memory.create POST /api/v1/memories/{agent}
 	//vibevalley:can owner remote manager
 	MemoryCreate(ctx context.Context, pAgent string, body MemoryRequest) (Memory, error)
-	//vibevalley:route memory.delete DELETE /api/memories/{agent}/{memory}
+	//vibevalley:route memory.delete DELETE /api/v1/memories/{agent}/{memory}
 	//vibevalley:can owner remote
 	MemoryDelete(ctx context.Context, pAgent string, pMemory string) error
-	//vibevalley:route manager.listArchive GET /api/manager/archive
+	//vibevalley:route manager.listArchive GET /api/v1/manager/archive
 	//vibevalley:can owner remote manager
 	ManagerListArchive(ctx context.Context, pQ *string) (ArchiveListing, error)
-	//vibevalley:route manager.getArchive GET /api/manager/archive/{name}
+	//vibevalley:route manager.getArchive GET /api/v1/manager/archive/{name}
 	//vibevalley:can owner remote
 	ManagerGetArchive(ctx context.Context, pName string) (string, error)
-	//vibevalley:route skill.list GET /api/skills
+	//vibevalley:route skill.list GET /api/v1/skills
 	//vibevalley:can owner remote
 	SkillList(ctx context.Context) ([]Skill, error)
-	//vibevalley:route skill.save PUT /api/skills/{id}
+	//vibevalley:route skill.save PUT /api/v1/skills/{id}
 	//vibevalley:can owner remote
 	SkillSave(ctx context.Context, pID string, body Skill) (Skill, error)
-	//vibevalley:route skill.delete DELETE /api/skills/{id}
+	//vibevalley:route skill.delete DELETE /api/v1/skills/{id}
 	//vibevalley:can owner remote
 	SkillDelete(ctx context.Context, pID string) error
-	//vibevalley:route project.list GET /api/projects
+	//vibevalley:route project.list GET /api/v1/projects
 	//vibevalley:can owner remote manager
 	ProjectList(ctx context.Context) ([]ProjectSummary, error)
 	// The first thing Create would refuse in this project, without making it.
-	//vibevalley:route project.check POST /api/projects/check
+	//vibevalley:route project.check POST /api/v1/projects/check
 	//vibevalley:can owner remote
 	ProjectCheck(ctx context.Context, body NewProject) (ProjectCheck, error)
-	//vibevalley:route project.create POST /api/projects
+	//vibevalley:route project.create POST /api/v1/projects
 	//vibevalley:can owner remote
 	ProjectCreate(ctx context.Context, body NewProject) (ProjectSummary, error)
-	//vibevalley:route project.languages GET /api/projects/{id}/languages
+	//vibevalley:route project.languages GET /api/v1/projects/{id}/languages
 	//vibevalley:can owner remote
 	ProjectLanguages(ctx context.Context, pID string) (ProjectLanguages, error)
-	//vibevalley:route project.activity GET /api/projects/{id}/activity
+	//vibevalley:route project.activity GET /api/v1/projects/{id}/activity
 	//vibevalley:can owner remote
 	ProjectActivity(ctx context.Context, pID string) (ProjectActivity, error)
-	//vibevalley:route voice.session POST /api/voice/session
+	//vibevalley:route voice.session POST /api/v1/voice/session
 	//vibevalley:can owner remote
 	VoiceSession(ctx context.Context) (VoiceSession, error)
-	//vibevalley:route voice.renew POST /api/voice/renew
+	//vibevalley:route voice.renew POST /api/v1/voice/renew
 	//vibevalley:can owner remote
 	VoiceRenew(ctx context.Context, body RenewRequest) (VoiceSession, error)
-	//vibevalley:route voice.start POST /api/voice/agent
+	//vibevalley:route voice.start POST /api/v1/voice/agent
 	//vibevalley:can owner remote
 	VoiceStart(ctx context.Context, body StartRequest) (VoiceAgent, error)
-	//vibevalley:route voice.stop POST /api/voice/agent/stop
+	//vibevalley:route voice.stop POST /api/v1/voice/agent/stop
 	//vibevalley:can owner remote
 	VoiceStop(ctx context.Context, body VoiceAgent) error
-	//vibevalley:route connector.list GET /api/connectors
+	//vibevalley:route connector.list GET /api/v1/connectors
 	//vibevalley:can owner remote
 	ConnectorList(ctx context.Context) ([]ConnectorStatus, error)
-	//vibevalley:route connector.login POST /api/connectors/{id}/login
+	//vibevalley:route connector.login POST /api/v1/connectors/{id}/login
 	//vibevalley:can owner remote
 	ConnectorLogin(ctx context.Context, pID ConnectorID, body ConnectorLogin) (ConnectorStatus, error)
-	//vibevalley:route connector.verify POST /api/connectors/{id}/verify
+	//vibevalley:route connector.verify POST /api/v1/connectors/{id}/verify
 	//vibevalley:can owner remote
 	ConnectorVerify(ctx context.Context, pID ConnectorID, body VerifyRequest) (ConnectorStatus, error)
-	//vibevalley:route connector.logout POST /api/connectors/{id}/logout
+	//vibevalley:route connector.logout POST /api/v1/connectors/{id}/logout
 	//vibevalley:can owner remote
 	ConnectorLogout(ctx context.Context, pID ConnectorID) (ConnectorStatus, error)
-	//vibevalley:route connector.channel PUT /api/connectors/{id}/channel
+	//vibevalley:route connector.channel PUT /api/v1/connectors/{id}/channel
 	//vibevalley:can owner remote
 	ConnectorChannel(ctx context.Context, pID ConnectorID, body ConnectorsChannelRequest) (ConnectorStatus, error)
-	//vibevalley:route gate.status GET /api/gate
+	//vibevalley:route gate.status GET /api/v1/gate
 	//vibevalley:can owner
 	GateStatus(ctx context.Context) (LanStatus, error)
-	//vibevalley:route gate.update PUT /api/gate
+	//vibevalley:route gate.update PUT /api/v1/gate
 	//vibevalley:can owner
 	GateUpdate(ctx context.Context, body SetOpenRequest) (LanStatus, error)
-	//vibevalley:route gate.startPairing POST /api/gate/pairing
+	//vibevalley:route gate.startPairing POST /api/v1/gate/pairing
 	//vibevalley:can owner
 	GateStartPairing(ctx context.Context) (LanStatus, error)
-	//vibevalley:route gate.stopPairing DELETE /api/gate/pairing
+	//vibevalley:route gate.stopPairing DELETE /api/v1/gate/pairing
 	//vibevalley:can owner
 	GateStopPairing(ctx context.Context) (LanStatus, error)
-	//vibevalley:route gate.answerPairing POST /api/gate/pairing/answer
+	//vibevalley:route gate.answerPairing POST /api/v1/gate/pairing/answer
 	//vibevalley:can owner
 	GateAnswerPairing(ctx context.Context, body AnswerPairingRequest) (LanStatus, error)
-	//vibevalley:route gate.deleteDevice DELETE /api/gate/devices/{id}
+	//vibevalley:route gate.deleteDevice DELETE /api/v1/gate/devices/{id}
 	//vibevalley:can owner
 	GateDeleteDevice(ctx context.Context, pID string) (LanStatus, error)
-	//vibevalley:route gate.pair POST /api/gate/pair
+	//vibevalley:route gate.pair POST /api/v1/gate/pair
 	//vibevalley:can owner remote
 	GatePair(ctx context.Context, body LanPairRequest) (LanPaired, error)
-	//vibevalley:route gate.me GET /api/gate/me
+	//vibevalley:route gate.me GET /api/v1/gate/me
 	//vibevalley:can owner remote
 	GateMe(ctx context.Context) (LanDevice, error)
 }

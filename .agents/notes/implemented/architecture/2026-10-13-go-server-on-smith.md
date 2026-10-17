@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-服务端是 Go 写的一个库（`server`，模块 `vibevalley`），`cmd/server` 单独跑它；Flutter 的 macOS 应用把 `cmd/server` 编成 `vibevalley-server` 放进应用、开机作为子进程拉起（[客户端迁到 Flutter](2026-10-13-flutter-client-over-ts-server.md)）。对外是原来那一份 HTTP 和 SSE 契约（`VibeValleyApi`、`/api/events`、`/api/state`、`/mcp`），Flutter 连它（冻结的网页当时也连它，后来删了，[网页退役](../simplification/2026-10-14-retire-the-web-page.md)）。TypeScript 的服务端和它独用的 agent 包已经删掉（[一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md)）。说明在 [server/README.md](../../../../server/README.md)。
+服务端是 Go 写的一个库（`server`，模块 `vibevalley`），`cmd/server` 单独跑它；Flutter 的 macOS 应用把 `cmd/server` 编成 `vibevalley-server` 放进应用、开机作为子进程拉起（[客户端迁到 Flutter](2026-10-13-flutter-client-over-ts-server.md)）。对外是原来那一份 HTTP 和 SSE 契约（`VibeValleyApi`、`/api/v1/events`、`/api/v1/state`、`/mcp`），Flutter 连它（冻结的网页当时也连它，后来删了，[网页退役](../simplification/2026-10-14-retire-the-web-page.md)）。TypeScript 的服务端和它独用的 agent 包已经删掉（[一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md)）。说明在 [server/README.md](../../../../server/README.md)。
 
 ### 目录
 
@@ -34,7 +34,7 @@ smith 原先是单独的模块，后来并进来（[internal 和 pkg](2026-10-15
 
 ### 核心状态只有一份
 
-服务端用 Go 的 `Reduce` 折事实，`EffectsOf`、`ViewOf` 推出 `StateFrame` 给 Flutter。（后面这些后来被 [网页退役](../simplification/2026-10-14-retire-the-web-page.md) 取代：网页和 TypeScript 的规则删了，规则只剩 Go 一份，对照数据成了 Go 自己的黄金数据。）当时冻结的网页还用 TypeScript 的 `reduce` 折 `/api/events` 上的事实，两份靠对照测试拦住分歧：`tool/parity.ts` 用 TypeScript 的规则折几千个随机事实（每种事实、在不在场的帮工、超长的中文和表情），Go 的 `reduce_golden_test.go` 逐个比状态、特效和视图，一个字段不同就失败。其余纯规则（聊天、计划、进度、定时、巡视、记性）照同样的办法移植和对照（`tool/rules-parity.ts`、`tool/play-parity.ts`）。
+服务端用 Go 的 `Reduce` 折事实，`EffectsOf`、`ViewOf` 推出 `StateFrame` 给 Flutter。（后面这些后来被 [网页退役](../simplification/2026-10-14-retire-the-web-page.md) 取代：网页和 TypeScript 的规则删了，规则只剩 Go 一份，对照数据成了 Go 自己的黄金数据。）当时冻结的网页还用 TypeScript 的 `reduce` 折 `/api/v1/events` 上的事实，两份靠对照测试拦住分歧：`tool/parity.ts` 用 TypeScript 的规则折几千个随机事实（每种事实、在不在场的帮工、超长的中文和表情），Go 的 `reduce_golden_test.go` 逐个比状态、特效和视图，一个字段不同就失败。其余纯规则（聊天、计划、进度、定时、巡视、记性）照同样的办法移植和对照（`tool/rules-parity.ts`、`tool/play-parity.ts`）。
 
 ### 服务和持久化
 

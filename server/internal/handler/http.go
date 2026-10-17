@@ -29,8 +29,8 @@ func apiMux(f *workspace.Workspace) *http.ServeMux {
 	a := api{f}
 	mux := http.NewServeMux()
 	protocol.Mount(mux, a)
-	mux.HandleFunc("GET /api/events", a.sideEvents)
-	mux.HandleFunc("GET /api/state", a.stateFrames)
+	mux.HandleFunc("GET /api/v1/events", a.sideEvents)
+	mux.HandleFunc("GET /api/v1/state", a.stateFrames)
 	return mux
 }
 

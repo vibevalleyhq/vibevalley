@@ -35,9 +35,9 @@ Map<String, dynamic> settingsJson({Map<String, dynamic>? voice}) => {
 Routes backend({String? problem}) {
   Map<String, dynamic>? saved;
   return Routes({
-    'GET /api/settings': (_) => settingsJson(voice: saved),
-    'POST /api/settings/check': (_) => {'problem': ?problem},
-    'PUT /api/settings': (c) {
+    'GET /api/v1/settings': (_) => settingsJson(voice: saved),
+    'POST /api/v1/settings/check': (_) => {'problem': ?problem},
+    'PUT /api/v1/settings': (c) {
       final voice = (c.body! as Map)['voice'] as Map<String, dynamic>?;
       if (voice != null) saved = {...voiceJson(), ...voice};
       return settingsJson(voice: saved);
@@ -67,7 +67,7 @@ void main() {
     await t.tap(find.text('保存'));
     await settle(t);
     // The voice goes whole; the server keeps what differs from its defaults.
-    final put = b.named('PUT', '/api/settings').single.body! as Map;
+    final put = b.named('PUT', '/api/v1/settings').single.body! as Map;
     expect(put.keys, ['voice']);
     expect((put['voice'] as Map)['area'], 'CN');
     expect(find.text('存好了，下一通电话就用上。'), findsOneWidget);
@@ -98,7 +98,7 @@ void main() {
     expect(find.text('存的时候清掉'), findsOneWidget);
     await t.tap(find.text('保存'));
     await settle(t);
-    expect(b.named('PUT', '/api/settings').single.body, {'agoraAppCertificate': ''});
+    expect(b.named('PUT', '/api/v1/settings').single.body, {'agoraAppCertificate': ''});
   });
 
   testWidgets('the agent part: persona, greeting and the MiniMax voices with their samples', (t) async {
@@ -116,7 +116,7 @@ void main() {
     await t.pump();
     await t.tap(find.text('保存'));
     await settle(t);
-    final voice = (b.named('PUT', '/api/settings').single.body! as Map)['voice'] as Map;
+    final voice = (b.named('PUT', '/api/v1/settings').single.body! as Map)['voice'] as Map;
     expect(voice['tts'], {'vendor': 'minimax', 'model': 'speech_2_6_turbo', 'voiceId': 'female-yujie'});
   });
 }

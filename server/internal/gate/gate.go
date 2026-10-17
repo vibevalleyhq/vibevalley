@@ -360,11 +360,11 @@ func (l *Service) Me(ctx context.Context) (protocol.LanDevice, error) {
 func (l *Service) gate(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if r.Method == http.MethodPost && path == "/api/gate/pair" {
+		if r.Method == http.MethodPost && path == "/api/v1/gate/pair" {
 			inner.ServeHTTP(w, r)
 			return
 		}
-		if !strings.HasPrefix(path, "/api/") {
+		if !strings.HasPrefix(path, "/api/v1/") {
 			http.NotFound(w, r)
 			return
 		}
@@ -514,8 +514,8 @@ var remoteRoutes = func() *http.ServeMux {
 			mux.Handle(e.Method+" "+e.Path, ok)
 		}
 	}
-	mux.Handle("GET /api/state", ok)
-	mux.Handle("GET /api/events", ok)
+	mux.Handle("GET /api/v1/state", ok)
+	mux.Handle("GET /api/v1/events", ok)
 	return mux
 }()
 

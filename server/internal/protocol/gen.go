@@ -2110,104 +2110,104 @@ type Endpoint struct {
 
 // Endpoints lists every route of Handlers, in api.go's order.
 var Endpoints = []Endpoint{
-	{"server.health", "GET", "/api/health", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"manager.open", "POST", "/api/manager/open", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"setting.load", "GET", "/api/settings", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"setting.check", "POST", "/api/settings/check", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"setting.save", "PUT", "/api/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"channel.say", "POST", "/api/say", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"channel.create", "POST", "/api/channels", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"schedule.create", "POST", "/api/schedules", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"schedule.list", "GET", "/api/schedules", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"schedule.update", "PUT", "/api/schedules/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"schedule.delete", "DELETE", "/api/schedules/{id}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"channel.update", "PUT", "/api/channels/{id}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"manager.hear", "POST", "/api/manager/hear", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"issue.comment", "POST", "/api/issues/{id}/comment", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"issue.changes", "GET", "/api/issues/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"issue.merge", "POST", "/api/issues/{id}/merge", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"issue.resolve", "POST", "/api/issues/{id}/resolve", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"issue.cancel", "POST", "/api/issues/{id}/cancel", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"session.stop", "POST", "/api/sessions/{id}/stop", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"session.list", "GET", "/api/sessions", []string{"agent"}, false, []Caller{CallerOwner, CallerRemote}},
-	{"session.get", "GET", "/api/sessions/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"session.events", "GET", "/api/sessions/{id}/events", []string{"run"}, false, []Caller{CallerOwner, CallerRemote}},
-	{"issue.list", "GET", "/api/issues", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"issue.get", "GET", "/api/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"issue.runs", "GET", "/api/issues/{id}/runs", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"issue.create", "POST", "/api/issues", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"issue.update", "PUT", "/api/issues/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"issue.delete", "DELETE", "/api/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"issue.move", "PUT", "/api/issues/{id}/move", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"issue.unqueue", "POST", "/api/issues/{id}/unqueue", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"issue.start", "POST", "/api/issues/{id}/start", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"issue.reopen", "POST", "/api/issues/{id}/reopen", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"playbook.plan", "POST", "/api/playbooks", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.updateNode", "PUT", "/api/playbooks/{id}/nodes/{node}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.deleteNode", "DELETE", "/api/playbooks/{id}/nodes/{node}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.act", "POST", "/api/playbooks/{id}/act", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.nodeAct", "POST", "/api/playbooks/{id}/nodes/{node}/act", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"channel.history", "GET", "/api/channels/{id}/messages", []string{"before", "limit"}, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"channel.markRead", "POST", "/api/channels/{id}/read", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"playbook.changes", "GET", "/api/playbooks/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"playbook.events", "GET", "/api/playbooks/{id}/events", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"game.chooseTitle", "POST", "/api/game/title", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"runtime.list", "GET", "/api/runtimes", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"runtime.refresh", "POST", "/api/runtimes/{id}/refresh", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"runtime.update", "PUT", "/api/runtimes/{id}/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"runtime.upgrade", "POST", "/api/runtimes/{id}/upgrade", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"agent.list", "GET", "/api/agents", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"agent.check", "POST", "/api/agents/check", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"agent.save", "PUT", "/api/agents/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"agent.delete", "DELETE", "/api/agents/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"memory.list", "GET", "/api/memories/{agent}", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"memory.recall", "GET", "/api/memories/{agent}/recall", []string{"project", "text"}, false, []Caller{CallerOwner, CallerRemote}},
-	{"memory.create", "POST", "/api/memories/{agent}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"memory.delete", "DELETE", "/api/memories/{agent}/{memory}", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"manager.listArchive", "GET", "/api/manager/archive", []string{"q"}, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"manager.getArchive", "GET", "/api/manager/archive/{name}", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"skill.list", "GET", "/api/skills", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"skill.save", "PUT", "/api/skills/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"skill.delete", "DELETE", "/api/skills/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"project.list", "GET", "/api/projects", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"project.check", "POST", "/api/projects/check", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"project.create", "POST", "/api/projects", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"project.languages", "GET", "/api/projects/{id}/languages", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"project.activity", "GET", "/api/projects/{id}/activity", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"voice.session", "POST", "/api/voice/session", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"voice.renew", "POST", "/api/voice/renew", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"voice.start", "POST", "/api/voice/agent", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"voice.stop", "POST", "/api/voice/agent/stop", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"connector.list", "GET", "/api/connectors", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"connector.login", "POST", "/api/connectors/{id}/login", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"connector.verify", "POST", "/api/connectors/{id}/verify", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"connector.logout", "POST", "/api/connectors/{id}/logout", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"connector.channel", "PUT", "/api/connectors/{id}/channel", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"gate.status", "GET", "/api/gate", nil, false, []Caller{CallerOwner}},
-	{"gate.update", "PUT", "/api/gate", nil, true, []Caller{CallerOwner}},
-	{"gate.startPairing", "POST", "/api/gate/pairing", nil, false, []Caller{CallerOwner}},
-	{"gate.stopPairing", "DELETE", "/api/gate/pairing", nil, false, []Caller{CallerOwner}},
-	{"gate.answerPairing", "POST", "/api/gate/pairing/answer", nil, true, []Caller{CallerOwner}},
-	{"gate.deleteDevice", "DELETE", "/api/gate/devices/{id}", nil, false, []Caller{CallerOwner}},
-	{"gate.pair", "POST", "/api/gate/pair", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"gate.me", "GET", "/api/gate/me", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"server.health", "GET", "/api/v1/health", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"manager.open", "POST", "/api/v1/manager/open", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"setting.load", "GET", "/api/v1/settings", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"setting.check", "POST", "/api/v1/settings/check", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"setting.save", "PUT", "/api/v1/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"channel.say", "POST", "/api/v1/say", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"channel.create", "POST", "/api/v1/channels", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"schedule.create", "POST", "/api/v1/schedules", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"schedule.list", "GET", "/api/v1/schedules", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"schedule.update", "PUT", "/api/v1/schedules/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"schedule.delete", "DELETE", "/api/v1/schedules/{id}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"channel.update", "PUT", "/api/v1/channels/{id}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"manager.hear", "POST", "/api/v1/manager/hear", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.comment", "POST", "/api/v1/issues/{id}/comment", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.changes", "GET", "/api/v1/issues/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.merge", "POST", "/api/v1/issues/{id}/merge", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.resolve", "POST", "/api/v1/issues/{id}/resolve", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.cancel", "POST", "/api/v1/issues/{id}/cancel", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"session.stop", "POST", "/api/v1/sessions/{id}/stop", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"session.list", "GET", "/api/v1/sessions", []string{"agent"}, false, []Caller{CallerOwner, CallerRemote}},
+	{"session.get", "GET", "/api/v1/sessions/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"session.events", "GET", "/api/v1/sessions/{id}/events", []string{"run"}, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.list", "GET", "/api/v1/issues", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.get", "GET", "/api/v1/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.runs", "GET", "/api/v1/issues/{id}/runs", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.create", "POST", "/api/v1/issues", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.update", "PUT", "/api/v1/issues/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.delete", "DELETE", "/api/v1/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.move", "PUT", "/api/v1/issues/{id}/move", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.unqueue", "POST", "/api/v1/issues/{id}/unqueue", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.start", "POST", "/api/v1/issues/{id}/start", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.reopen", "POST", "/api/v1/issues/{id}/reopen", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"playbook.plan", "POST", "/api/v1/playbooks", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.updateNode", "PUT", "/api/v1/playbooks/{id}/nodes/{node}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.deleteNode", "DELETE", "/api/v1/playbooks/{id}/nodes/{node}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.act", "POST", "/api/v1/playbooks/{id}/act", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.nodeAct", "POST", "/api/v1/playbooks/{id}/nodes/{node}/act", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"channel.history", "GET", "/api/v1/channels/{id}/messages", []string{"before", "limit"}, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"channel.markRead", "POST", "/api/v1/channels/{id}/read", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"playbook.changes", "GET", "/api/v1/playbooks/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"playbook.events", "GET", "/api/v1/playbooks/{id}/events", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"game.chooseTitle", "POST", "/api/v1/game/title", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"runtime.list", "GET", "/api/v1/runtimes", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"runtime.refresh", "POST", "/api/v1/runtimes/{id}/refresh", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"runtime.update", "PUT", "/api/v1/runtimes/{id}/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"runtime.upgrade", "POST", "/api/v1/runtimes/{id}/upgrade", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"agent.list", "GET", "/api/v1/agents", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"agent.check", "POST", "/api/v1/agents/check", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"agent.save", "PUT", "/api/v1/agents/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"agent.delete", "DELETE", "/api/v1/agents/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"memory.list", "GET", "/api/v1/memories/{agent}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"memory.recall", "GET", "/api/v1/memories/{agent}/recall", []string{"project", "text"}, false, []Caller{CallerOwner, CallerRemote}},
+	{"memory.create", "POST", "/api/v1/memories/{agent}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"memory.delete", "DELETE", "/api/v1/memories/{agent}/{memory}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"manager.listArchive", "GET", "/api/v1/manager/archive", []string{"q"}, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"manager.getArchive", "GET", "/api/v1/manager/archive/{name}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"skill.list", "GET", "/api/v1/skills", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"skill.save", "PUT", "/api/v1/skills/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"skill.delete", "DELETE", "/api/v1/skills/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"project.list", "GET", "/api/v1/projects", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"project.check", "POST", "/api/v1/projects/check", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"project.create", "POST", "/api/v1/projects", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"project.languages", "GET", "/api/v1/projects/{id}/languages", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"project.activity", "GET", "/api/v1/projects/{id}/activity", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"voice.session", "POST", "/api/v1/voice/session", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"voice.renew", "POST", "/api/v1/voice/renew", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"voice.start", "POST", "/api/v1/voice/agent", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"voice.stop", "POST", "/api/v1/voice/agent/stop", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"connector.list", "GET", "/api/v1/connectors", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"connector.login", "POST", "/api/v1/connectors/{id}/login", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"connector.verify", "POST", "/api/v1/connectors/{id}/verify", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"connector.logout", "POST", "/api/v1/connectors/{id}/logout", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"connector.channel", "PUT", "/api/v1/connectors/{id}/channel", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"gate.status", "GET", "/api/v1/gate", nil, false, []Caller{CallerOwner}},
+	{"gate.update", "PUT", "/api/v1/gate", nil, true, []Caller{CallerOwner}},
+	{"gate.startPairing", "POST", "/api/v1/gate/pairing", nil, false, []Caller{CallerOwner}},
+	{"gate.stopPairing", "DELETE", "/api/v1/gate/pairing", nil, false, []Caller{CallerOwner}},
+	{"gate.answerPairing", "POST", "/api/v1/gate/pairing/answer", nil, true, []Caller{CallerOwner}},
+	{"gate.deleteDevice", "DELETE", "/api/v1/gate/devices/{id}", nil, false, []Caller{CallerOwner}},
+	{"gate.pair", "POST", "/api/v1/gate/pair", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"gate.me", "GET", "/api/v1/gate/me", nil, false, []Caller{CallerOwner, CallerRemote}},
 }
 
 // Mount routes every VibeValleyApi endpoint on mux to h: requests decoded, answers and tagged errors encoded (200 with
 // JSON, 204 when there is nothing to say, the error's own status).
 func Mount(mux *http.ServeMux, h Handlers) {
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.ServerHealth(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/manager/open", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/manager/open", func(w http.ResponseWriter, r *http.Request) {
 		answer(w, nil, h.ManagerOpen(r.Context()))
 	})
-	mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/settings", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.SettingLoad(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/settings/check", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/settings/check", func(w http.ResponseWriter, r *http.Request) {
 		var body SettingsUpdate
 		if !decode(w, r, &body) {
 			return
@@ -2215,7 +2215,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.SettingCheck(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/settings", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/settings", func(w http.ResponseWriter, r *http.Request) {
 		var body SettingsUpdate
 		if !decode(w, r, &body) {
 			return
@@ -2223,21 +2223,21 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.SettingSave(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/say", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/say", func(w http.ResponseWriter, r *http.Request) {
 		var body SayRequest
 		if !decode(w, r, &body) {
 			return
 		}
 		answer(w, nil, h.ChannelSay(r.Context(), body))
 	})
-	mux.HandleFunc("POST /api/channels", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/channels", func(w http.ResponseWriter, r *http.Request) {
 		var body ChannelRequest
 		if !decode(w, r, &body) {
 			return
 		}
 		answer(w, nil, h.ChannelCreate(r.Context(), body))
 	})
-	mux.HandleFunc("POST /api/schedules", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/schedules", func(w http.ResponseWriter, r *http.Request) {
 		var body ScheduleRequest
 		if !decode(w, r, &body) {
 			return
@@ -2245,11 +2245,11 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.ScheduleCreate(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/schedules", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/schedules", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.ScheduleList(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/schedules/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/schedules/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID, ok := pathNumber(w, r, "id")
 		if !ok {
 			return
@@ -2260,14 +2260,14 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		}
 		answer(w, nil, h.ScheduleUpdate(r.Context(), pID, body))
 	})
-	mux.HandleFunc("DELETE /api/schedules/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/schedules/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID, ok := pathNumber(w, r, "id")
 		if !ok {
 			return
 		}
 		answer(w, nil, h.ScheduleDelete(r.Context(), pID))
 	})
-	mux.HandleFunc("PUT /api/channels/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/channels/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID, ok := pathNumber(w, r, "id")
 		if !ok {
 			return
@@ -2278,14 +2278,14 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		}
 		answer(w, nil, h.ChannelUpdate(r.Context(), pID, body))
 	})
-	mux.HandleFunc("POST /api/manager/hear", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/manager/hear", func(w http.ResponseWriter, r *http.Request) {
 		var body SayRequest
 		if !decode(w, r, &body) {
 			return
 		}
 		answer(w, nil, h.ManagerHear(r.Context(), body))
 	})
-	mux.HandleFunc("POST /api/issues/{id}/comment", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/issues/{id}/comment", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		var body CommentRequest
 		if !decode(w, r, &body) {
@@ -2293,58 +2293,58 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		}
 		answer(w, nil, h.IssueComment(r.Context(), pID, body))
 	})
-	mux.HandleFunc("GET /api/issues/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/issues/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.IssueChanges(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/issues/{id}/merge", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/issues/{id}/merge", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		answer(w, nil, h.IssueMerge(r.Context(), pID))
 	})
-	mux.HandleFunc("POST /api/issues/{id}/resolve", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/issues/{id}/resolve", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		answer(w, nil, h.IssueResolve(r.Context(), pID))
 	})
-	mux.HandleFunc("POST /api/issues/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/issues/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		answer(w, nil, h.IssueCancel(r.Context(), pID))
 	})
-	mux.HandleFunc("POST /api/sessions/{id}/stop", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/sessions/{id}/stop", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		answer(w, nil, h.SessionStop(r.Context(), pID))
 	})
-	mux.HandleFunc("GET /api/sessions", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/sessions", func(w http.ResponseWriter, r *http.Request) {
 		pAgent := query(r, "agent")
 		out, err := h.SessionList(r.Context(), pAgent)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.SessionGet(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/sessions/{id}/events", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/sessions/{id}/events", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		pRun := queryNumber(r, "run")
 		out, err := h.SessionEvents(r.Context(), pID, pRun)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/issues", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/issues", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.IssueList(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/issues/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/issues/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.IssueGet(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/issues/{id}/runs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/issues/{id}/runs", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.IssueRuns(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/issues", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/issues", func(w http.ResponseWriter, r *http.Request) {
 		var body IssueRequest
 		if !decode(w, r, &body) {
 			return
@@ -2352,7 +2352,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.IssueCreate(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/issues/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/issues/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		var body IssueUpdate
 		if !decode(w, r, &body) {
@@ -2361,11 +2361,11 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.IssueUpdate(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/issues/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/issues/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		answer(w, nil, h.IssueDelete(r.Context(), pID))
 	})
-	mux.HandleFunc("PUT /api/issues/{id}/move", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/issues/{id}/move", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		var body MoveIssueRequest
 		if !decode(w, r, &body) {
@@ -2374,17 +2374,17 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.IssueMove(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/issues/{id}/unqueue", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/issues/{id}/unqueue", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.IssueUnqueue(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/issues/{id}/start", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/issues/{id}/start", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.IssueStart(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/issues/{id}/reopen", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/issues/{id}/reopen", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		var body ReopenRequest
 		if !decode(w, r, &body) {
@@ -2393,7 +2393,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.IssueReopen(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/playbooks", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/playbooks", func(w http.ResponseWriter, r *http.Request) {
 		var body PlanRequest
 		if !decode(w, r, &body) {
 			return
@@ -2401,7 +2401,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.PlaybookPlan(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/playbooks/{id}/nodes/{node}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/playbooks/{id}/nodes/{node}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		pNode := r.PathValue("node")
 		var body NodeEdit
@@ -2411,13 +2411,13 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.PlaybookUpdateNode(r.Context(), pID, pNode, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/playbooks/{id}/nodes/{node}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/playbooks/{id}/nodes/{node}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		pNode := r.PathValue("node")
 		out, err := h.PlaybookDeleteNode(r.Context(), pID, pNode)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/playbooks/{id}/act", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/playbooks/{id}/act", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		var body PlaybookActRequest
 		if !decode(w, r, &body) {
@@ -2426,7 +2426,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.PlaybookAct(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/playbooks/{id}/nodes/{node}/act", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/playbooks/{id}/nodes/{node}/act", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		pNode := r.PathValue("node")
 		var body NodeActRequest
@@ -2436,7 +2436,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.PlaybookNodeAct(r.Context(), pID, pNode, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/channels/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/channels/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
 		pID, ok := pathNumber(w, r, "id")
 		if !ok {
 			return
@@ -2446,7 +2446,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.ChannelHistory(r.Context(), pID, pBefore, pLimit)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/channels/{id}/read", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/channels/{id}/read", func(w http.ResponseWriter, r *http.Request) {
 		pID, ok := pathNumber(w, r, "id")
 		if !ok {
 			return
@@ -2457,33 +2457,33 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		}
 		answer(w, nil, h.ChannelMarkRead(r.Context(), pID, body))
 	})
-	mux.HandleFunc("GET /api/playbooks/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/playbooks/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.PlaybookChanges(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/playbooks/{id}/events", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/playbooks/{id}/events", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.PlaybookEvents(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/game/title", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/game/title", func(w http.ResponseWriter, r *http.Request) {
 		var body ChooseTitleRequest
 		if !decode(w, r, &body) {
 			return
 		}
 		answer(w, nil, h.GameChooseTitle(r.Context(), body))
 	})
-	mux.HandleFunc("GET /api/runtimes", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/runtimes", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.RuntimeList(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/runtimes/{id}/refresh", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/runtimes/{id}/refresh", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.RuntimeRefresh(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/runtimes/{id}/settings", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/runtimes/{id}/settings", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		var body RuntimeSettings
 		if !decode(w, r, &body) {
@@ -2492,16 +2492,16 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.RuntimeUpdate(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/runtimes/{id}/upgrade", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/runtimes/{id}/upgrade", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.RuntimeUpgrade(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/agents", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/agents", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.AgentList(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/agents/check", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/agents/check", func(w http.ResponseWriter, r *http.Request) {
 		var body AgentCheckRequest
 		if !decode(w, r, &body) {
 			return
@@ -2509,7 +2509,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.AgentCheck(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/agents/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/agents/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		var body Agent
 		if !decode(w, r, &body) {
@@ -2518,23 +2518,23 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.AgentSave(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/agents/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/agents/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		answer(w, nil, h.AgentDelete(r.Context(), pID))
 	})
-	mux.HandleFunc("GET /api/memories/{agent}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/memories/{agent}", func(w http.ResponseWriter, r *http.Request) {
 		pAgent := r.PathValue("agent")
 		out, err := h.MemoryList(r.Context(), pAgent)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/memories/{agent}/recall", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/memories/{agent}/recall", func(w http.ResponseWriter, r *http.Request) {
 		pAgent := r.PathValue("agent")
 		pProject := query(r, "project")
 		pText := query(r, "text")
 		out, err := h.MemoryRecall(r.Context(), pAgent, pProject, pText)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/memories/{agent}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/memories/{agent}", func(w http.ResponseWriter, r *http.Request) {
 		pAgent := r.PathValue("agent")
 		var body MemoryRequest
 		if !decode(w, r, &body) {
@@ -2543,26 +2543,26 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.MemoryCreate(r.Context(), pAgent, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/memories/{agent}/{memory}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/memories/{agent}/{memory}", func(w http.ResponseWriter, r *http.Request) {
 		pAgent := r.PathValue("agent")
 		pMemory := r.PathValue("memory")
 		answer(w, nil, h.MemoryDelete(r.Context(), pAgent, pMemory))
 	})
-	mux.HandleFunc("GET /api/manager/archive", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/manager/archive", func(w http.ResponseWriter, r *http.Request) {
 		pQ := query(r, "q")
 		out, err := h.ManagerListArchive(r.Context(), pQ)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/manager/archive/{name}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/manager/archive/{name}", func(w http.ResponseWriter, r *http.Request) {
 		pName := r.PathValue("name")
 		out, err := h.ManagerGetArchive(r.Context(), pName)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/skills", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/skills", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.SkillList(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/skills/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/skills/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		var body Skill
 		if !decode(w, r, &body) {
@@ -2571,15 +2571,15 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.SkillSave(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/skills/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/skills/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		answer(w, nil, h.SkillDelete(r.Context(), pID))
 	})
-	mux.HandleFunc("GET /api/projects", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/projects", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.ProjectList(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/projects/check", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/projects/check", func(w http.ResponseWriter, r *http.Request) {
 		var body NewProject
 		if !decode(w, r, &body) {
 			return
@@ -2587,7 +2587,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.ProjectCheck(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/projects", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/projects", func(w http.ResponseWriter, r *http.Request) {
 		var body NewProject
 		if !decode(w, r, &body) {
 			return
@@ -2595,21 +2595,21 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.ProjectCreate(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/projects/{id}/languages", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/projects/{id}/languages", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.ProjectLanguages(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/projects/{id}/activity", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/projects/{id}/activity", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.ProjectActivity(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/voice/session", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/voice/session", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.VoiceSession(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/voice/renew", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/voice/renew", func(w http.ResponseWriter, r *http.Request) {
 		var body RenewRequest
 		if !decode(w, r, &body) {
 			return
@@ -2617,7 +2617,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.VoiceRenew(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/voice/agent", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/voice/agent", func(w http.ResponseWriter, r *http.Request) {
 		var body StartRequest
 		if !decode(w, r, &body) {
 			return
@@ -2625,18 +2625,18 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.VoiceStart(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/voice/agent/stop", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/voice/agent/stop", func(w http.ResponseWriter, r *http.Request) {
 		var body VoiceAgent
 		if !decode(w, r, &body) {
 			return
 		}
 		answer(w, nil, h.VoiceStop(r.Context(), body))
 	})
-	mux.HandleFunc("GET /api/connectors", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/connectors", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.ConnectorList(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/connectors/{id}/login", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/connectors/{id}/login", func(w http.ResponseWriter, r *http.Request) {
 		pID := ConnectorID(r.PathValue("id"))
 		var body ConnectorLogin
 		if !decode(w, r, &body) {
@@ -2645,7 +2645,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.ConnectorLogin(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/connectors/{id}/verify", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/connectors/{id}/verify", func(w http.ResponseWriter, r *http.Request) {
 		pID := ConnectorID(r.PathValue("id"))
 		var body VerifyRequest
 		if !decode(w, r, &body) {
@@ -2654,12 +2654,12 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.ConnectorVerify(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/connectors/{id}/logout", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/connectors/{id}/logout", func(w http.ResponseWriter, r *http.Request) {
 		pID := ConnectorID(r.PathValue("id"))
 		out, err := h.ConnectorLogout(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/connectors/{id}/channel", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/connectors/{id}/channel", func(w http.ResponseWriter, r *http.Request) {
 		pID := ConnectorID(r.PathValue("id"))
 		var body ConnectorsChannelRequest
 		if !decode(w, r, &body) {
@@ -2668,11 +2668,11 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.ConnectorChannel(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/gate", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/gate", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.GateStatus(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/gate", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/gate", func(w http.ResponseWriter, r *http.Request) {
 		var body SetOpenRequest
 		if !decode(w, r, &body) {
 			return
@@ -2680,15 +2680,15 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.GateUpdate(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/gate/pairing", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/gate/pairing", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.GateStartPairing(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/gate/pairing", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/gate/pairing", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.GateStopPairing(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/gate/pairing/answer", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/gate/pairing/answer", func(w http.ResponseWriter, r *http.Request) {
 		var body AnswerPairingRequest
 		if !decode(w, r, &body) {
 			return
@@ -2696,12 +2696,12 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.GateAnswerPairing(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/gate/devices/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/gate/devices/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.GateDeleteDevice(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/gate/pair", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/gate/pair", func(w http.ResponseWriter, r *http.Request) {
 		var body LanPairRequest
 		if !decode(w, r, &body) {
 			return
@@ -2709,7 +2709,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.GatePair(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/gate/me", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/gate/me", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.GateMe(r.Context())
 		answer(w, out, err)
 	})
@@ -2760,92 +2760,92 @@ func taggedError(tag string, body []byte) error {
 
 func (c *Client) ServerHealth(ctx context.Context) (Health, error) {
 	var out Health
-	err := c.call(ctx, "GET", "/api/health", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/health", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) ManagerOpen(ctx context.Context) error {
-	return c.call(ctx, "POST", "/api/manager/open", nil, nil, nil)
+	return c.call(ctx, "POST", "/api/v1/manager/open", nil, nil, nil)
 }
 
 func (c *Client) SettingLoad(ctx context.Context) (SettingsStatus, error) {
 	var out SettingsStatus
-	err := c.call(ctx, "GET", "/api/settings", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/settings", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) SettingCheck(ctx context.Context, body SettingsUpdate) (SettingsCheck, error) {
 	var out SettingsCheck
-	err := c.call(ctx, "POST", "/api/settings/check", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/settings/check", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) SettingSave(ctx context.Context, body SettingsUpdate) (SettingsStatus, error) {
 	var out SettingsStatus
-	err := c.call(ctx, "PUT", "/api/settings", nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/settings", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) ChannelSay(ctx context.Context, body SayRequest) error {
-	return c.call(ctx, "POST", "/api/say", nil, body, nil)
+	return c.call(ctx, "POST", "/api/v1/say", nil, body, nil)
 }
 
 func (c *Client) ChannelCreate(ctx context.Context, body ChannelRequest) error {
-	return c.call(ctx, "POST", "/api/channels", nil, body, nil)
+	return c.call(ctx, "POST", "/api/v1/channels", nil, body, nil)
 }
 
 func (c *Client) ScheduleCreate(ctx context.Context, body ScheduleRequest) (Schedule, error) {
 	var out Schedule
-	err := c.call(ctx, "POST", "/api/schedules", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/schedules", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) ScheduleList(ctx context.Context) ([]Schedule, error) {
 	var out []Schedule
-	err := c.call(ctx, "GET", "/api/schedules", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/schedules", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) ScheduleUpdate(ctx context.Context, pID int64, body ScheduleUpdate) error {
-	return c.call(ctx, "PUT", "/api/schedules/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, body, nil)
+	return c.call(ctx, "PUT", "/api/v1/schedules/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, body, nil)
 }
 
 func (c *Client) ScheduleDelete(ctx context.Context, pID int64) error {
-	return c.call(ctx, "DELETE", "/api/schedules/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, nil, nil)
+	return c.call(ctx, "DELETE", "/api/v1/schedules/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, nil, nil)
 }
 
 func (c *Client) ChannelUpdate(ctx context.Context, pID int64, body ChannelUpdate) error {
-	return c.call(ctx, "PUT", "/api/channels/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, body, nil)
+	return c.call(ctx, "PUT", "/api/v1/channels/"+url.PathEscape(strconv.FormatInt(pID, 10)), nil, body, nil)
 }
 
 func (c *Client) ManagerHear(ctx context.Context, body SayRequest) error {
-	return c.call(ctx, "POST", "/api/manager/hear", nil, body, nil)
+	return c.call(ctx, "POST", "/api/v1/manager/hear", nil, body, nil)
 }
 
 func (c *Client) IssueComment(ctx context.Context, pID string, body CommentRequest) error {
-	return c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/comment", nil, body, nil)
+	return c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/comment", nil, body, nil)
 }
 
 func (c *Client) IssueChanges(ctx context.Context, pID string) (Changes, error) {
 	var out Changes
-	err := c.call(ctx, "GET", "/api/issues/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/issues/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) IssueMerge(ctx context.Context, pID string) error {
-	return c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/merge", nil, nil, nil)
+	return c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/merge", nil, nil, nil)
 }
 
 func (c *Client) IssueResolve(ctx context.Context, pID string) error {
-	return c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/resolve", nil, nil, nil)
+	return c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/resolve", nil, nil, nil)
 }
 
 func (c *Client) IssueCancel(ctx context.Context, pID string) error {
-	return c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/cancel", nil, nil, nil)
+	return c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/cancel", nil, nil, nil)
 }
 
 func (c *Client) SessionStop(ctx context.Context, pID string) error {
-	return c.call(ctx, "POST", "/api/sessions/"+url.PathEscape(pID)+"/stop", nil, nil, nil)
+	return c.call(ctx, "POST", "/api/v1/sessions/"+url.PathEscape(pID)+"/stop", nil, nil, nil)
 }
 
 func (c *Client) SessionList(ctx context.Context, pAgent *string) ([]Session, error) {
@@ -2854,13 +2854,13 @@ func (c *Client) SessionList(ctx context.Context, pAgent *string) ([]Session, er
 		q.Set("agent", *pAgent)
 	}
 	var out []Session
-	err := c.call(ctx, "GET", "/api/sessions", q, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/sessions", q, nil, &out)
 	return out, err
 }
 
 func (c *Client) SessionGet(ctx context.Context, pID string) (Session, error) {
 	var out Session
-	err := c.call(ctx, "GET", "/api/sessions/"+url.PathEscape(pID), nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/sessions/"+url.PathEscape(pID), nil, nil, &out)
 	return out, err
 }
 
@@ -2870,95 +2870,95 @@ func (c *Client) SessionEvents(ctx context.Context, pID string, pRun *int64) ([]
 		q.Set("run", strconv.FormatInt(*pRun, 10))
 	}
 	var out []SessionEvent
-	err := c.call(ctx, "GET", "/api/sessions/"+url.PathEscape(pID)+"/events", q, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/sessions/"+url.PathEscape(pID)+"/events", q, nil, &out)
 	return out, err
 }
 
 func (c *Client) IssueList(ctx context.Context) ([]Issue, error) {
 	var out []Issue
-	err := c.call(ctx, "GET", "/api/issues", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/issues", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) IssueGet(ctx context.Context, pID string) (Issue, error) {
 	var out Issue
-	err := c.call(ctx, "GET", "/api/issues/"+url.PathEscape(pID), nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/issues/"+url.PathEscape(pID), nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) IssueRuns(ctx context.Context, pID string) ([]Run, error) {
 	var out []Run
-	err := c.call(ctx, "GET", "/api/issues/"+url.PathEscape(pID)+"/runs", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/issues/"+url.PathEscape(pID)+"/runs", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) IssueCreate(ctx context.Context, body IssueRequest) (Issue, error) {
 	var out Issue
-	err := c.call(ctx, "POST", "/api/issues", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/issues", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) IssueUpdate(ctx context.Context, pID string, body IssueUpdate) (Issue, error) {
 	var out Issue
-	err := c.call(ctx, "PUT", "/api/issues/"+url.PathEscape(pID), nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/issues/"+url.PathEscape(pID), nil, body, &out)
 	return out, err
 }
 
 func (c *Client) IssueDelete(ctx context.Context, pID string) error {
-	return c.call(ctx, "DELETE", "/api/issues/"+url.PathEscape(pID), nil, nil, nil)
+	return c.call(ctx, "DELETE", "/api/v1/issues/"+url.PathEscape(pID), nil, nil, nil)
 }
 
 func (c *Client) IssueMove(ctx context.Context, pID string, body MoveIssueRequest) ([]Issue, error) {
 	var out []Issue
-	err := c.call(ctx, "PUT", "/api/issues/"+url.PathEscape(pID)+"/move", nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/issues/"+url.PathEscape(pID)+"/move", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) IssueUnqueue(ctx context.Context, pID string) (Issue, error) {
 	var out Issue
-	err := c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/unqueue", nil, nil, &out)
+	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/unqueue", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) IssueStart(ctx context.Context, pID string) (Dispatched, error) {
 	var out Dispatched
-	err := c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/start", nil, nil, &out)
+	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/start", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) IssueReopen(ctx context.Context, pID string, body ReopenRequest) (Dispatched, error) {
 	var out Dispatched
-	err := c.call(ctx, "POST", "/api/issues/"+url.PathEscape(pID)+"/reopen", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/reopen", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) PlaybookPlan(ctx context.Context, body PlanRequest) (string, error) {
 	var out string
-	err := c.call(ctx, "POST", "/api/playbooks", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/playbooks", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) PlaybookUpdateNode(ctx context.Context, pID string, pNode string, body NodeEdit) (string, error) {
 	var out string
-	err := c.call(ctx, "PUT", "/api/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode), nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode), nil, body, &out)
 	return out, err
 }
 
 func (c *Client) PlaybookDeleteNode(ctx context.Context, pID string, pNode string) (string, error) {
 	var out string
-	err := c.call(ctx, "DELETE", "/api/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode), nil, nil, &out)
+	err := c.call(ctx, "DELETE", "/api/v1/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode), nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) PlaybookAct(ctx context.Context, pID string, body PlaybookActRequest) (string, error) {
 	var out string
-	err := c.call(ctx, "POST", "/api/playbooks/"+url.PathEscape(pID)+"/act", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/playbooks/"+url.PathEscape(pID)+"/act", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) PlaybookNodeAct(ctx context.Context, pID string, pNode string, body NodeActRequest) (string, error) {
 	var out string
-	err := c.call(ctx, "POST", "/api/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode)+"/act", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode)+"/act", nil, body, &out)
 	return out, err
 }
 
@@ -2971,79 +2971,79 @@ func (c *Client) ChannelHistory(ctx context.Context, pID int64, pBefore *int64, 
 		q.Set("limit", strconv.FormatInt(*pLimit, 10))
 	}
 	var out []ChatMessage
-	err := c.call(ctx, "GET", "/api/channels/"+url.PathEscape(strconv.FormatInt(pID, 10))+"/messages", q, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/channels/"+url.PathEscape(strconv.FormatInt(pID, 10))+"/messages", q, nil, &out)
 	return out, err
 }
 
 func (c *Client) ChannelMarkRead(ctx context.Context, pID int64, body ChatReadRequest) error {
-	return c.call(ctx, "POST", "/api/channels/"+url.PathEscape(strconv.FormatInt(pID, 10))+"/read", nil, body, nil)
+	return c.call(ctx, "POST", "/api/v1/channels/"+url.PathEscape(strconv.FormatInt(pID, 10))+"/read", nil, body, nil)
 }
 
 func (c *Client) PlaybookChanges(ctx context.Context, pID string) (Changes, error) {
 	var out Changes
-	err := c.call(ctx, "GET", "/api/playbooks/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/playbooks/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) PlaybookEvents(ctx context.Context, pID string) ([]PlaybookEvent, error) {
 	var out []PlaybookEvent
-	err := c.call(ctx, "GET", "/api/playbooks/"+url.PathEscape(pID)+"/events", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/playbooks/"+url.PathEscape(pID)+"/events", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) GameChooseTitle(ctx context.Context, body ChooseTitleRequest) error {
-	return c.call(ctx, "POST", "/api/game/title", nil, body, nil)
+	return c.call(ctx, "POST", "/api/v1/game/title", nil, body, nil)
 }
 
 func (c *Client) RuntimeList(ctx context.Context) ([]RuntimeInfo, error) {
 	var out []RuntimeInfo
-	err := c.call(ctx, "GET", "/api/runtimes", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/runtimes", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) RuntimeRefresh(ctx context.Context, pID string) (RuntimeInfo, error) {
 	var out RuntimeInfo
-	err := c.call(ctx, "POST", "/api/runtimes/"+url.PathEscape(pID)+"/refresh", nil, nil, &out)
+	err := c.call(ctx, "POST", "/api/v1/runtimes/"+url.PathEscape(pID)+"/refresh", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) RuntimeUpdate(ctx context.Context, pID string, body RuntimeSettings) (RuntimeInfo, error) {
 	var out RuntimeInfo
-	err := c.call(ctx, "PUT", "/api/runtimes/"+url.PathEscape(pID)+"/settings", nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/runtimes/"+url.PathEscape(pID)+"/settings", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) RuntimeUpgrade(ctx context.Context, pID string) (RuntimeInfo, error) {
 	var out RuntimeInfo
-	err := c.call(ctx, "POST", "/api/runtimes/"+url.PathEscape(pID)+"/upgrade", nil, nil, &out)
+	err := c.call(ctx, "POST", "/api/v1/runtimes/"+url.PathEscape(pID)+"/upgrade", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) AgentList(ctx context.Context) ([]Agent, error) {
 	var out []Agent
-	err := c.call(ctx, "GET", "/api/agents", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/agents", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) AgentCheck(ctx context.Context, body AgentCheckRequest) ([]AgentCheck, error) {
 	var out []AgentCheck
-	err := c.call(ctx, "POST", "/api/agents/check", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/agents/check", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) AgentSave(ctx context.Context, pID string, body Agent) (Agent, error) {
 	var out Agent
-	err := c.call(ctx, "PUT", "/api/agents/"+url.PathEscape(pID), nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/agents/"+url.PathEscape(pID), nil, body, &out)
 	return out, err
 }
 
 func (c *Client) AgentDelete(ctx context.Context, pID string) error {
-	return c.call(ctx, "DELETE", "/api/agents/"+url.PathEscape(pID), nil, nil, nil)
+	return c.call(ctx, "DELETE", "/api/v1/agents/"+url.PathEscape(pID), nil, nil, nil)
 }
 
 func (c *Client) MemoryList(ctx context.Context, pAgent string) (MemoryList, error) {
 	var out MemoryList
-	err := c.call(ctx, "GET", "/api/memories/"+url.PathEscape(pAgent), nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/memories/"+url.PathEscape(pAgent), nil, nil, &out)
 	return out, err
 }
 
@@ -3056,18 +3056,18 @@ func (c *Client) MemoryRecall(ctx context.Context, pAgent string, pProject *stri
 		q.Set("text", *pText)
 	}
 	var out RecallPreview
-	err := c.call(ctx, "GET", "/api/memories/"+url.PathEscape(pAgent)+"/recall", q, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/memories/"+url.PathEscape(pAgent)+"/recall", q, nil, &out)
 	return out, err
 }
 
 func (c *Client) MemoryCreate(ctx context.Context, pAgent string, body MemoryRequest) (Memory, error) {
 	var out Memory
-	err := c.call(ctx, "POST", "/api/memories/"+url.PathEscape(pAgent), nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/memories/"+url.PathEscape(pAgent), nil, body, &out)
 	return out, err
 }
 
 func (c *Client) MemoryDelete(ctx context.Context, pAgent string, pMemory string) error {
-	return c.call(ctx, "DELETE", "/api/memories/"+url.PathEscape(pAgent)+"/"+url.PathEscape(pMemory), nil, nil, nil)
+	return c.call(ctx, "DELETE", "/api/v1/memories/"+url.PathEscape(pAgent)+"/"+url.PathEscape(pMemory), nil, nil, nil)
 }
 
 func (c *Client) ManagerListArchive(ctx context.Context, pQ *string) (ArchiveListing, error) {
@@ -3076,158 +3076,158 @@ func (c *Client) ManagerListArchive(ctx context.Context, pQ *string) (ArchiveLis
 		q.Set("q", *pQ)
 	}
 	var out ArchiveListing
-	err := c.call(ctx, "GET", "/api/manager/archive", q, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/manager/archive", q, nil, &out)
 	return out, err
 }
 
 func (c *Client) ManagerGetArchive(ctx context.Context, pName string) (string, error) {
 	var out string
-	err := c.call(ctx, "GET", "/api/manager/archive/"+url.PathEscape(pName), nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/manager/archive/"+url.PathEscape(pName), nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) SkillList(ctx context.Context) ([]Skill, error) {
 	var out []Skill
-	err := c.call(ctx, "GET", "/api/skills", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/skills", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) SkillSave(ctx context.Context, pID string, body Skill) (Skill, error) {
 	var out Skill
-	err := c.call(ctx, "PUT", "/api/skills/"+url.PathEscape(pID), nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/skills/"+url.PathEscape(pID), nil, body, &out)
 	return out, err
 }
 
 func (c *Client) SkillDelete(ctx context.Context, pID string) error {
-	return c.call(ctx, "DELETE", "/api/skills/"+url.PathEscape(pID), nil, nil, nil)
+	return c.call(ctx, "DELETE", "/api/v1/skills/"+url.PathEscape(pID), nil, nil, nil)
 }
 
 func (c *Client) ProjectList(ctx context.Context) ([]ProjectSummary, error) {
 	var out []ProjectSummary
-	err := c.call(ctx, "GET", "/api/projects", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/projects", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) ProjectCheck(ctx context.Context, body NewProject) (ProjectCheck, error) {
 	var out ProjectCheck
-	err := c.call(ctx, "POST", "/api/projects/check", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/projects/check", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) ProjectCreate(ctx context.Context, body NewProject) (ProjectSummary, error) {
 	var out ProjectSummary
-	err := c.call(ctx, "POST", "/api/projects", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/projects", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) ProjectLanguages(ctx context.Context, pID string) (ProjectLanguages, error) {
 	var out ProjectLanguages
-	err := c.call(ctx, "GET", "/api/projects/"+url.PathEscape(pID)+"/languages", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/projects/"+url.PathEscape(pID)+"/languages", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) ProjectActivity(ctx context.Context, pID string) (ProjectActivity, error) {
 	var out ProjectActivity
-	err := c.call(ctx, "GET", "/api/projects/"+url.PathEscape(pID)+"/activity", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/projects/"+url.PathEscape(pID)+"/activity", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) VoiceSession(ctx context.Context) (VoiceSession, error) {
 	var out VoiceSession
-	err := c.call(ctx, "POST", "/api/voice/session", nil, nil, &out)
+	err := c.call(ctx, "POST", "/api/v1/voice/session", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) VoiceRenew(ctx context.Context, body RenewRequest) (VoiceSession, error) {
 	var out VoiceSession
-	err := c.call(ctx, "POST", "/api/voice/renew", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/voice/renew", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) VoiceStart(ctx context.Context, body StartRequest) (VoiceAgent, error) {
 	var out VoiceAgent
-	err := c.call(ctx, "POST", "/api/voice/agent", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/voice/agent", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) VoiceStop(ctx context.Context, body VoiceAgent) error {
-	return c.call(ctx, "POST", "/api/voice/agent/stop", nil, body, nil)
+	return c.call(ctx, "POST", "/api/v1/voice/agent/stop", nil, body, nil)
 }
 
 func (c *Client) ConnectorList(ctx context.Context) ([]ConnectorStatus, error) {
 	var out []ConnectorStatus
-	err := c.call(ctx, "GET", "/api/connectors", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/connectors", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) ConnectorLogin(ctx context.Context, pID ConnectorID, body ConnectorLogin) (ConnectorStatus, error) {
 	var out ConnectorStatus
-	err := c.call(ctx, "POST", "/api/connectors/"+url.PathEscape(string(pID))+"/login", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/connectors/"+url.PathEscape(string(pID))+"/login", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) ConnectorVerify(ctx context.Context, pID ConnectorID, body VerifyRequest) (ConnectorStatus, error) {
 	var out ConnectorStatus
-	err := c.call(ctx, "POST", "/api/connectors/"+url.PathEscape(string(pID))+"/verify", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/connectors/"+url.PathEscape(string(pID))+"/verify", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) ConnectorLogout(ctx context.Context, pID ConnectorID) (ConnectorStatus, error) {
 	var out ConnectorStatus
-	err := c.call(ctx, "POST", "/api/connectors/"+url.PathEscape(string(pID))+"/logout", nil, nil, &out)
+	err := c.call(ctx, "POST", "/api/v1/connectors/"+url.PathEscape(string(pID))+"/logout", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) ConnectorChannel(ctx context.Context, pID ConnectorID, body ConnectorsChannelRequest) (ConnectorStatus, error) {
 	var out ConnectorStatus
-	err := c.call(ctx, "PUT", "/api/connectors/"+url.PathEscape(string(pID))+"/channel", nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/connectors/"+url.PathEscape(string(pID))+"/channel", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) GateStatus(ctx context.Context) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "GET", "/api/gate", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/gate", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) GateUpdate(ctx context.Context, body SetOpenRequest) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "PUT", "/api/gate", nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/gate", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) GateStartPairing(ctx context.Context) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "POST", "/api/gate/pairing", nil, nil, &out)
+	err := c.call(ctx, "POST", "/api/v1/gate/pairing", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) GateStopPairing(ctx context.Context) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "DELETE", "/api/gate/pairing", nil, nil, &out)
+	err := c.call(ctx, "DELETE", "/api/v1/gate/pairing", nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) GateAnswerPairing(ctx context.Context, body AnswerPairingRequest) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "POST", "/api/gate/pairing/answer", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/gate/pairing/answer", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) GateDeleteDevice(ctx context.Context, pID string) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "DELETE", "/api/gate/devices/"+url.PathEscape(pID), nil, nil, &out)
+	err := c.call(ctx, "DELETE", "/api/v1/gate/devices/"+url.PathEscape(pID), nil, nil, &out)
 	return out, err
 }
 
 func (c *Client) GatePair(ctx context.Context, body LanPairRequest) (LanPaired, error) {
 	var out LanPaired
-	err := c.call(ctx, "POST", "/api/gate/pair", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/gate/pair", nil, body, &out)
 	return out, err
 }
 
 func (c *Client) GateMe(ctx context.Context) (LanDevice, error) {
 	var out LanDevice
-	err := c.call(ctx, "GET", "/api/gate/me", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/gate/me", nil, nil, &out)
 	return out, err
 }

@@ -9,170 +9,170 @@
 | 管家 | 管家 | 管家的工具 |
 | Session | 帮工 | 带钥匙的命令行 |
 
-`GET /api/state` 和 `GET /api/events` 是 SSE，不在 `Handlers` 里：主人和院门都能读。
+`GET /api/v1/state` 和 `GET /api/v1/events` 是 SSE，不在 `Handlers` 里：主人和院门都能读。接口都在 `/api/v1` 下；换成不兼容的形状时另起 `/api/v2`，`v1` 留到设备都升级（[理由](../../.agents/notes/implemented/architecture/2026-10-17-api-versioned-paths.md)）。
 
 ## server
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `server.health` | `GET /api/health` | ✓ | ✓ |  |  |
+| `server.health` | `GET /api/v1/health` | ✓ | ✓ |  |  |
 
 ## manager
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `manager.open` | `POST /api/manager/open` | ✓ | ✓ |  |  |
-| `manager.hear` | `POST /api/manager/hear` | ✓ | ✓ |  |  |
-| `manager.listArchive` | `GET /api/manager/archive` | ✓ | ✓ | ✓ |  |
-| `manager.getArchive` | `GET /api/manager/archive/{name}` | ✓ | ✓ |  |  |
+| `manager.open` | `POST /api/v1/manager/open` | ✓ | ✓ |  |  |
+| `manager.hear` | `POST /api/v1/manager/hear` | ✓ | ✓ |  |  |
+| `manager.listArchive` | `GET /api/v1/manager/archive` | ✓ | ✓ | ✓ |  |
+| `manager.getArchive` | `GET /api/v1/manager/archive/{name}` | ✓ | ✓ |  |  |
 
 ## setting
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `setting.load` | `GET /api/settings` | ✓ | ✓ |  |  |
-| `setting.check` | `POST /api/settings/check` | ✓ | ✓ |  |  |
-| `setting.save` | `PUT /api/settings` | ✓ | ✓ |  |  |
+| `setting.load` | `GET /api/v1/settings` | ✓ | ✓ |  |  |
+| `setting.check` | `POST /api/v1/settings/check` | ✓ | ✓ |  |  |
+| `setting.save` | `PUT /api/v1/settings` | ✓ | ✓ |  |  |
 
 ## channel
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `channel.say` | `POST /api/say` | ✓ | ✓ |  |  |
-| `channel.create` | `POST /api/channels` | ✓ | ✓ | ✓ |  |
-| `channel.update` | `PUT /api/channels/{id}` | ✓ | ✓ | ✓ |  |
-| `channel.history` | `GET /api/channels/{id}/messages` | ✓ | ✓ | ✓ |  |
-| `channel.markRead` | `POST /api/channels/{id}/read` | ✓ | ✓ |  |  |
+| `channel.say` | `POST /api/v1/say` | ✓ | ✓ |  |  |
+| `channel.create` | `POST /api/v1/channels` | ✓ | ✓ | ✓ |  |
+| `channel.update` | `PUT /api/v1/channels/{id}` | ✓ | ✓ | ✓ |  |
+| `channel.history` | `GET /api/v1/channels/{id}/messages` | ✓ | ✓ | ✓ |  |
+| `channel.markRead` | `POST /api/v1/channels/{id}/read` | ✓ | ✓ |  |  |
 
 ## schedule
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `schedule.create` | `POST /api/schedules` | ✓ | ✓ | ✓ |  |
-| `schedule.list` | `GET /api/schedules` | ✓ | ✓ | ✓ |  |
-| `schedule.update` | `PUT /api/schedules/{id}` | ✓ | ✓ |  |  |
-| `schedule.delete` | `DELETE /api/schedules/{id}` | ✓ | ✓ | ✓ |  |
+| `schedule.create` | `POST /api/v1/schedules` | ✓ | ✓ | ✓ |  |
+| `schedule.list` | `GET /api/v1/schedules` | ✓ | ✓ | ✓ |  |
+| `schedule.update` | `PUT /api/v1/schedules/{id}` | ✓ | ✓ |  |  |
+| `schedule.delete` | `DELETE /api/v1/schedules/{id}` | ✓ | ✓ | ✓ |  |
 
 ## issue
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `issue.comment` | `POST /api/issues/{id}/comment` | ✓ | ✓ | ✓ |  |
-| `issue.changes` | `GET /api/issues/{id}/changes` | ✓ | ✓ | ✓ |  |
-| `issue.merge` | `POST /api/issues/{id}/merge` | ✓ | ✓ | ✓ |  |
-| `issue.resolve` | `POST /api/issues/{id}/resolve` | ✓ | ✓ |  |  |
-| `issue.cancel` | `POST /api/issues/{id}/cancel` | ✓ | ✓ | ✓ |  |
-| `issue.list` | `GET /api/issues` | ✓ | ✓ |  |  |
-| `issue.get` | `GET /api/issues/{id}` | ✓ | ✓ |  |  |
-| `issue.runs` | `GET /api/issues/{id}/runs` | ✓ | ✓ |  |  |
-| `issue.create` | `POST /api/issues` | ✓ | ✓ |  |  |
-| `issue.update` | `PUT /api/issues/{id}` | ✓ | ✓ |  |  |
-| `issue.delete` | `DELETE /api/issues/{id}` | ✓ | ✓ |  |  |
-| `issue.move` | `PUT /api/issues/{id}/move` | ✓ | ✓ |  |  |
-| `issue.unqueue` | `POST /api/issues/{id}/unqueue` | ✓ | ✓ |  |  |
-| `issue.start` | `POST /api/issues/{id}/start` | ✓ | ✓ | ✓ |  |
-| `issue.reopen` | `POST /api/issues/{id}/reopen` | ✓ | ✓ |  |  |
+| `issue.comment` | `POST /api/v1/issues/{id}/comment` | ✓ | ✓ | ✓ |  |
+| `issue.changes` | `GET /api/v1/issues/{id}/changes` | ✓ | ✓ | ✓ |  |
+| `issue.merge` | `POST /api/v1/issues/{id}/merge` | ✓ | ✓ | ✓ |  |
+| `issue.resolve` | `POST /api/v1/issues/{id}/resolve` | ✓ | ✓ |  |  |
+| `issue.cancel` | `POST /api/v1/issues/{id}/cancel` | ✓ | ✓ | ✓ |  |
+| `issue.list` | `GET /api/v1/issues` | ✓ | ✓ |  |  |
+| `issue.get` | `GET /api/v1/issues/{id}` | ✓ | ✓ |  |  |
+| `issue.runs` | `GET /api/v1/issues/{id}/runs` | ✓ | ✓ |  |  |
+| `issue.create` | `POST /api/v1/issues` | ✓ | ✓ |  |  |
+| `issue.update` | `PUT /api/v1/issues/{id}` | ✓ | ✓ |  |  |
+| `issue.delete` | `DELETE /api/v1/issues/{id}` | ✓ | ✓ |  |  |
+| `issue.move` | `PUT /api/v1/issues/{id}/move` | ✓ | ✓ |  |  |
+| `issue.unqueue` | `POST /api/v1/issues/{id}/unqueue` | ✓ | ✓ |  |  |
+| `issue.start` | `POST /api/v1/issues/{id}/start` | ✓ | ✓ | ✓ |  |
+| `issue.reopen` | `POST /api/v1/issues/{id}/reopen` | ✓ | ✓ |  |  |
 
 ## session
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `session.stop` | `POST /api/sessions/{id}/stop` | ✓ | ✓ | ✓ |  |
-| `session.list` | `GET /api/sessions` | ✓ | ✓ |  |  |
-| `session.get` | `GET /api/sessions/{id}` | ✓ | ✓ |  |  |
-| `session.events` | `GET /api/sessions/{id}/events` | ✓ | ✓ |  |  |
+| `session.stop` | `POST /api/v1/sessions/{id}/stop` | ✓ | ✓ | ✓ |  |
+| `session.list` | `GET /api/v1/sessions` | ✓ | ✓ |  |  |
+| `session.get` | `GET /api/v1/sessions/{id}` | ✓ | ✓ |  |  |
+| `session.events` | `GET /api/v1/sessions/{id}/events` | ✓ | ✓ |  |  |
 
 ## playbook
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `playbook.plan` | `POST /api/playbooks` | ✓ | ✓ | ✓ |  |
-| `playbook.updateNode` | `PUT /api/playbooks/{id}/nodes/{node}` | ✓ | ✓ | ✓ |  |
-| `playbook.deleteNode` | `DELETE /api/playbooks/{id}/nodes/{node}` | ✓ | ✓ | ✓ |  |
-| `playbook.act` | `POST /api/playbooks/{id}/act` | ✓ | ✓ | ✓ |  |
-| `playbook.nodeAct` | `POST /api/playbooks/{id}/nodes/{node}/act` | ✓ | ✓ | ✓ |  |
-| `playbook.changes` | `GET /api/playbooks/{id}/changes` | ✓ | ✓ |  |  |
-| `playbook.events` | `GET /api/playbooks/{id}/events` | ✓ | ✓ |  |  |
+| `playbook.plan` | `POST /api/v1/playbooks` | ✓ | ✓ | ✓ |  |
+| `playbook.updateNode` | `PUT /api/v1/playbooks/{id}/nodes/{node}` | ✓ | ✓ | ✓ |  |
+| `playbook.deleteNode` | `DELETE /api/v1/playbooks/{id}/nodes/{node}` | ✓ | ✓ | ✓ |  |
+| `playbook.act` | `POST /api/v1/playbooks/{id}/act` | ✓ | ✓ | ✓ |  |
+| `playbook.nodeAct` | `POST /api/v1/playbooks/{id}/nodes/{node}/act` | ✓ | ✓ | ✓ |  |
+| `playbook.changes` | `GET /api/v1/playbooks/{id}/changes` | ✓ | ✓ |  |  |
+| `playbook.events` | `GET /api/v1/playbooks/{id}/events` | ✓ | ✓ |  |  |
 
 ## game
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `game.chooseTitle` | `POST /api/game/title` | ✓ | ✓ |  |  |
+| `game.chooseTitle` | `POST /api/v1/game/title` | ✓ | ✓ |  |  |
 
 ## runtime
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `runtime.list` | `GET /api/runtimes` | ✓ | ✓ |  |  |
-| `runtime.refresh` | `POST /api/runtimes/{id}/refresh` | ✓ | ✓ |  |  |
-| `runtime.update` | `PUT /api/runtimes/{id}/settings` | ✓ | ✓ |  |  |
-| `runtime.upgrade` | `POST /api/runtimes/{id}/upgrade` | ✓ | ✓ |  |  |
+| `runtime.list` | `GET /api/v1/runtimes` | ✓ | ✓ |  |  |
+| `runtime.refresh` | `POST /api/v1/runtimes/{id}/refresh` | ✓ | ✓ |  |  |
+| `runtime.update` | `PUT /api/v1/runtimes/{id}/settings` | ✓ | ✓ |  |  |
+| `runtime.upgrade` | `POST /api/v1/runtimes/{id}/upgrade` | ✓ | ✓ |  |  |
 
 ## agent
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `agent.list` | `GET /api/agents` | ✓ | ✓ |  |  |
-| `agent.check` | `POST /api/agents/check` | ✓ | ✓ |  |  |
-| `agent.save` | `PUT /api/agents/{id}` | ✓ | ✓ |  |  |
-| `agent.delete` | `DELETE /api/agents/{id}` | ✓ | ✓ |  |  |
+| `agent.list` | `GET /api/v1/agents` | ✓ | ✓ |  |  |
+| `agent.check` | `POST /api/v1/agents/check` | ✓ | ✓ |  |  |
+| `agent.save` | `PUT /api/v1/agents/{id}` | ✓ | ✓ |  |  |
+| `agent.delete` | `DELETE /api/v1/agents/{id}` | ✓ | ✓ |  |  |
 
 ## memory
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `memory.list` | `GET /api/memories/{agent}` | ✓ | ✓ |  |  |
-| `memory.recall` | `GET /api/memories/{agent}/recall` | ✓ | ✓ |  |  |
-| `memory.create` | `POST /api/memories/{agent}` | ✓ | ✓ | ✓ |  |
-| `memory.delete` | `DELETE /api/memories/{agent}/{memory}` | ✓ | ✓ |  |  |
+| `memory.list` | `GET /api/v1/memories/{agent}` | ✓ | ✓ |  |  |
+| `memory.recall` | `GET /api/v1/memories/{agent}/recall` | ✓ | ✓ |  |  |
+| `memory.create` | `POST /api/v1/memories/{agent}` | ✓ | ✓ | ✓ |  |
+| `memory.delete` | `DELETE /api/v1/memories/{agent}/{memory}` | ✓ | ✓ |  |  |
 
 ## skill
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `skill.list` | `GET /api/skills` | ✓ | ✓ |  |  |
-| `skill.save` | `PUT /api/skills/{id}` | ✓ | ✓ |  |  |
-| `skill.delete` | `DELETE /api/skills/{id}` | ✓ | ✓ |  |  |
+| `skill.list` | `GET /api/v1/skills` | ✓ | ✓ |  |  |
+| `skill.save` | `PUT /api/v1/skills/{id}` | ✓ | ✓ |  |  |
+| `skill.delete` | `DELETE /api/v1/skills/{id}` | ✓ | ✓ |  |  |
 
 ## project
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `project.list` | `GET /api/projects` | ✓ | ✓ | ✓ |  |
-| `project.check` | `POST /api/projects/check` | ✓ | ✓ |  |  |
-| `project.create` | `POST /api/projects` | ✓ | ✓ |  |  |
-| `project.languages` | `GET /api/projects/{id}/languages` | ✓ | ✓ |  |  |
-| `project.activity` | `GET /api/projects/{id}/activity` | ✓ | ✓ |  |  |
+| `project.list` | `GET /api/v1/projects` | ✓ | ✓ | ✓ |  |
+| `project.check` | `POST /api/v1/projects/check` | ✓ | ✓ |  |  |
+| `project.create` | `POST /api/v1/projects` | ✓ | ✓ |  |  |
+| `project.languages` | `GET /api/v1/projects/{id}/languages` | ✓ | ✓ |  |  |
+| `project.activity` | `GET /api/v1/projects/{id}/activity` | ✓ | ✓ |  |  |
 
 ## voice
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `voice.session` | `POST /api/voice/session` | ✓ | ✓ |  |  |
-| `voice.renew` | `POST /api/voice/renew` | ✓ | ✓ |  |  |
-| `voice.start` | `POST /api/voice/agent` | ✓ | ✓ |  |  |
-| `voice.stop` | `POST /api/voice/agent/stop` | ✓ | ✓ |  |  |
+| `voice.session` | `POST /api/v1/voice/session` | ✓ | ✓ |  |  |
+| `voice.renew` | `POST /api/v1/voice/renew` | ✓ | ✓ |  |  |
+| `voice.start` | `POST /api/v1/voice/agent` | ✓ | ✓ |  |  |
+| `voice.stop` | `POST /api/v1/voice/agent/stop` | ✓ | ✓ |  |  |
 
 ## connector
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `connector.list` | `GET /api/connectors` | ✓ | ✓ |  |  |
-| `connector.login` | `POST /api/connectors/{id}/login` | ✓ | ✓ |  |  |
-| `connector.verify` | `POST /api/connectors/{id}/verify` | ✓ | ✓ |  |  |
-| `connector.logout` | `POST /api/connectors/{id}/logout` | ✓ | ✓ |  |  |
-| `connector.channel` | `PUT /api/connectors/{id}/channel` | ✓ | ✓ |  |  |
+| `connector.list` | `GET /api/v1/connectors` | ✓ | ✓ |  |  |
+| `connector.login` | `POST /api/v1/connectors/{id}/login` | ✓ | ✓ |  |  |
+| `connector.verify` | `POST /api/v1/connectors/{id}/verify` | ✓ | ✓ |  |  |
+| `connector.logout` | `POST /api/v1/connectors/{id}/logout` | ✓ | ✓ |  |  |
+| `connector.channel` | `PUT /api/v1/connectors/{id}/channel` | ✓ | ✓ |  |  |
 
 ## gate
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `gate.status` | `GET /api/gate` | ✓ |  |  |  |
-| `gate.update` | `PUT /api/gate` | ✓ |  |  |  |
-| `gate.startPairing` | `POST /api/gate/pairing` | ✓ |  |  |  |
-| `gate.stopPairing` | `DELETE /api/gate/pairing` | ✓ |  |  |  |
-| `gate.answerPairing` | `POST /api/gate/pairing/answer` | ✓ |  |  |  |
-| `gate.deleteDevice` | `DELETE /api/gate/devices/{id}` | ✓ |  |  |  |
-| `gate.pair` | `POST /api/gate/pair` | ✓ | ✓ |  |  |
-| `gate.me` | `GET /api/gate/me` | ✓ | ✓ |  |  |
+| `gate.status` | `GET /api/v1/gate` | ✓ |  |  |  |
+| `gate.update` | `PUT /api/v1/gate` | ✓ |  |  |  |
+| `gate.startPairing` | `POST /api/v1/gate/pairing` | ✓ |  |  |  |
+| `gate.stopPairing` | `DELETE /api/v1/gate/pairing` | ✓ |  |  |  |
+| `gate.answerPairing` | `POST /api/v1/gate/pairing/answer` | ✓ |  |  |  |
+| `gate.deleteDevice` | `DELETE /api/v1/gate/devices/{id}` | ✓ |  |  |  |
+| `gate.pair` | `POST /api/v1/gate/pair` | ✓ | ✓ |  |  |
+| `gate.me` | `GET /api/v1/gate/me` | ✓ | ✓ |  |  |

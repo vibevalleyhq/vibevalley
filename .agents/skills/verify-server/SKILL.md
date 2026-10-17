@@ -1,6 +1,6 @@
 ---
 name: verify-server
-description: 改了 VibeValley 服务端（server/internal/**、server/cmd/server、server/migrations、server/pkg/db）之后，在临时的家目录里起一个真的服务端，用接口和 /api/state 证明改动在跑着的程序上生效。用在：改了接口、核心状态、工单、群聊、设置、迁移；主人说「验证一下」「跑起来看看」「确认服务端能用」。只改了纯函数的规则、测试已经覆盖的，跑测试就够，不用它。
+description: 改了 VibeValley 服务端（server/internal/**、server/cmd/server、server/migrations、server/pkg/db）之后，在临时的家目录里起一个真的服务端，用接口和 /api/v1/state 证明改动在跑着的程序上生效。用在：改了接口、核心状态、工单、群聊、设置、迁移；主人说「验证一下」「跑起来看看」「确认服务端能用」。只改了纯函数的规则、测试已经覆盖的，跑测试就够，不用它。
 ---
 
 # 验证服务端
@@ -10,7 +10,7 @@ description: 改了 VibeValley 服务端（server/internal/**、server/cmd/serve
 ## 什么时候用
 
 - 改了 `server/internal/handler`、`server/internal/protocol/api.go`：新的或改过的接口。
-- 改了某个服务的行为（`issue`、`channel`、`setting`、`schedule`、`playbook`……），想看它经接口和 `/api/state` 出来的样子。
+- 改了某个服务的行为（`issue`、`channel`、`setting`、`schedule`、`playbook`……），想看它经接口和 `/api/v1/state` 出来的样子。
 - 改了 `server/migrations` 或 `server/pkg/db/queries`：新库能建、能读写。
 - 改了开机的流程（`server/cmd/server`、`server/internal/workspace`）。
 
@@ -44,7 +44,7 @@ description: 改了 VibeValley 服务端（server/internal/**、server/cmd/serve
 
    ```bash
    VIBEVALLEY_HOME=$V/home VIBEVALLEY_WORK_ROOT=$V/work VIBEVALLEY_PORT=8899 $V/server --log $V/server.log > $V/stdout.log 2>&1 & disown
-   for i in $(seq 1 30); do curl -sf http://127.0.0.1:8899/api/health && break; sleep 0.5; done
+   for i in $(seq 1 30); do curl -sf http://127.0.0.1:8899/api/v1/health && break; sleep 0.5; done
    ```
 
    `disown` 让服务端在这条命令的 shell 退出后还活着。成功时输出 `{"ok":true,"version":"…"}`，`$V/server.log` 里有 `vibevalley: listening on http://127.0.0.1:8899`。
@@ -76,7 +76,7 @@ description: 改了 VibeValley 服务端（server/internal/**、server/cmd/serve
 
 - 第 2 步健康检查的输出。
 - 第 3 步的命令和打出的结果（去掉无关的字段）。
-- 第 4 步 `/api/state` 里和改动有关的那一段。
+- 第 4 步 `/api/v1/state` 里和改动有关的那一段。
 - 服务端日志里有没有 `error`、`panic`：`grep -iE 'error|panic' $V/server.log`。
 
 ## 出错时
@@ -93,4 +93,4 @@ pkill -f "$V/server"
 rm -rf "$V"
 ```
 
-`pgrep -f "$V/server"` 没有输出，`curl -s --max-time 1 http://127.0.0.1:8899/api/health` 也没有输出，就是停了。
+`pgrep -f "$V/server"` 没有输出，`curl -s --max-time 1 http://127.0.0.1:8899/api/v1/health` 也没有输出，就是停了。

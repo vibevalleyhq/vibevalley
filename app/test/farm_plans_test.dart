@@ -94,7 +94,7 @@ void main() {
       overrides: overrides(
         farm(),
         view(),
-        fakeApi(routes, {'GET /api/playbooks/p1/events': events, 'POST /api/playbooks/p1/act': '开工了', 'PUT /api/playbooks/p1/nodes/ui': '改好了「页面」'}),
+        fakeApi(routes, {'GET /api/v1/playbooks/p1/events': events, 'POST /api/v1/playbooks/p1/act': '开工了', 'PUT /api/v1/playbooks/p1/nodes/ui': '改好了「页面」'}),
         agents: {'tester': agent('tester', '测试小吴')},
         plans: [draft],
       ),
@@ -110,7 +110,7 @@ void main() {
     expect(find.text('改了「接口」的工单'), findsOneWidget);
     await tester.tap(find.text('开工'));
     await settle(tester);
-    expect(routes.calls.where((x) => x.path == '/api/playbooks/p1/act').single.body, {'action': 'start'});
+    expect(routes.calls.where((x) => x.path == '/api/v1/playbooks/p1/act').single.body, {'action': 'start'});
     expect(find.text('开工了'), findsOneWidget);
     await tester.tap(find.text('改').at(2));
     await settle(tester);
@@ -120,7 +120,7 @@ void main() {
     await tester.tap(find.text('改好了'));
     await settle(tester);
     final put = routes.calls.where((x) => x.method == 'PUT').single;
-    expect(put.path, '/api/playbooks/p1/nodes/ui');
+    expect(put.path, '/api/v1/playbooks/p1/nodes/ui');
     expect((put.body! as Map)['needs'], ['api']);
     expect(find.text('改好了「页面」'), findsOneWidget);
   });
@@ -134,10 +134,10 @@ void main() {
         farm(),
         view(),
         fakeApi(routes, {
-          'GET /api/projects': [
+          'GET /api/v1/projects': [
             {'name': 'clock-in', 'path': '/work/clock-in', 'git': true, 'slots': 3},
           ],
-          'POST /api/playbooks': '在拆了（p3）',
+          'POST /api/v1/playbooks': '在拆了（p3）',
         }),
       ),
     );
@@ -148,7 +148,7 @@ void main() {
     await settle(tester);
     await tester.tap(find.text('拆计划'));
     await settle(tester);
-    final plan = routes.calls.where((x) => x.path == '/api/playbooks').single;
+    final plan = routes.calls.where((x) => x.path == '/api/v1/playbooks').single;
     expect(plan.body, {'goal': '给 clock-in 加按月查询', 'project': 'clock-in'});
     expect(c.read(planShownProvider), 'p3');
   });
@@ -161,7 +161,7 @@ void main() {
       overrides: overrides(
         farm(),
         view(),
-        fakeApi(routes, {'GET /api/playbooks/p2/events': <Object>[], 'GET /api/playbooks/p2/changes': changes, 'POST /api/playbooks/p2/act': '收进了 main'}),
+        fakeApi(routes, {'GET /api/v1/playbooks/p2/events': <Object>[], 'GET /api/v1/playbooks/p2/changes': changes, 'POST /api/v1/playbooks/p2/act': '收进了 main'}),
         plans: [ripe],
       ),
     );
@@ -185,7 +185,7 @@ void main() {
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
-      overrides: overrides(farm(sessions: [w]), view(), fakeApi(routes, {'GET /api/issues/tw3/changes': changes})),
+      overrides: overrides(farm(sessions: [w]), view(), fakeApi(routes, {'GET /api/v1/issues/tw3/changes': changes})),
     );
     c.read(reviewingProvider.notifier).set('w3');
     await settle(tester);
@@ -197,7 +197,7 @@ void main() {
     expect(find.text('+body { color: #fff }'), findsOneWidget);
     await tester.tap(find.text('确认收获，合进 main'));
     await settle(tester);
-    expect(routes.calls.last.path, '/api/issues/tw3/merge');
+    expect(routes.calls.last.path, '/api/v1/issues/tw3/merge');
     expect(c.read(reviewingProvider), isNull);
     await tester.pump(const Duration(seconds: 3));
   });
@@ -212,7 +212,7 @@ void main() {
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
-      overrides: overrides(farm(sessions: [w]), view(), fakeApi(routes, {'GET /api/issues/tw3/changes': conflicted})),
+      overrides: overrides(farm(sessions: [w]), view(), fakeApi(routes, {'GET /api/v1/issues/tw3/changes': conflicted})),
     );
     c.read(reviewingProvider.notifier).set('w3');
     await settle(tester);
@@ -221,7 +221,7 @@ void main() {
     await tester.tap(find.text('让它解决冲突'));
     await settle(tester);
     // The server tells it which conflicts (ConflictTask).
-    expect(routes.calls.last.path, '/api/issues/tw3/resolve');
+    expect(routes.calls.last.path, '/api/v1/issues/tw3/resolve');
     await tester.pump(const Duration(seconds: 3));
   });
 

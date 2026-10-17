@@ -18,12 +18,12 @@ func TestRemoteMayFollowsCan(t *testing.T) {
 			t.Errorf("%s %s %s: the gate lets it through %v, can remote %v", e.Op, e.Method, e.Path, got, want)
 		}
 	}
-	for _, path := range []string{"/api/state", "/api/events"} {
+	for _, path := range []string{"/api/v1/state", "/api/v1/events"} {
 		if !remoteMay(httptest.NewRequest("GET", path, nil)) {
 			t.Errorf("GET %s refused", path)
 		}
 	}
-	if remoteMay(httptest.NewRequest("GET", "/api/nothing-here", nil)) {
+	if remoteMay(httptest.NewRequest("GET", "/api/v1/nothing-here", nil)) {
 		t.Error("an unknown path let through")
 	}
 }

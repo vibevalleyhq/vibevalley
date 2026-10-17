@@ -23,8 +23,8 @@ void main() {
   setUp(() {
     settings = settingsJson();
     server = FakeServer((r) async {
-      if (r.url.path == '/api/settings' && r.method == 'GET') return jsonResponse(settings);
-      if (r.url.path == '/api/settings' && r.method == 'PUT') return jsonResponse(settings);
+      if (r.url.path == '/api/v1/settings' && r.method == 'GET') return jsonResponse(settings);
+      if (r.url.path == '/api/v1/settings' && r.method == 'PUT') return jsonResponse(settings);
       return http.Response('', 204);
     });
     container = ProviderContainer(overrides: shellOverrides(server));
@@ -97,7 +97,7 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
     expect(container.read(titleOpenProvider), isFalse);
     expect(find.text('开始游戏'), findsNothing);
-    expect(server.requests.map((r) => '${r.method} ${r.url.path}'), contains('POST /api/manager/open'));
+    expect(server.requests.map((r) => '${r.method} ${r.url.path}'), contains('POST /api/v1/manager/open'));
     await unmount(tester);
   });
 
@@ -109,7 +109,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
     expect(container.read(titleOpenProvider), isFalse);
-    expect(server.requests.where((r) => r.url.path == '/api/manager/open'), isEmpty);
+    expect(server.requests.where((r) => r.url.path == '/api/v1/manager/open'), isEmpty);
     await unmount(tester);
   });
 

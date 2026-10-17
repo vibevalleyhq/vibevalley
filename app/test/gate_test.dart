@@ -65,11 +65,11 @@ void main() {
         MockClient((r) async {
           calls.add('${r.method} ${r.url.path} ${key ?? '-'}');
           switch ((r.method, r.url.path)) {
-            case ('GET', '/api/gate/me'):
+            case ('GET', '/api/v1/gate/me'):
               return known.contains(key)
                   ? jsonResponse(const LanDevice(id: 'd1', name: 'iPhone', pairedAt: 1).toJson())
                   : jsonResponse({'_tag': 'LanRefused', 'reason': '没配对'}, 401);
-            case ('POST', '/api/gate/pair'):
+            case ('POST', '/api/v1/gate/pair'):
               final body = LanPairRequest.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
               expect(body.code, 'ABC234');
               return allow
@@ -86,7 +86,7 @@ void main() {
       final (apiFor, calls) = farm();
       final got = await pairWith(link, name: 'iPhone', apiFor: apiFor);
       expect((got.url, got.key, got.farm, got.device), (Uri.parse(_gate), 'new-key', 'lucas-mbp', 'd2'));
-      expect(calls, ['POST /api/gate/pair -']);
+      expect(calls, ['POST /api/v1/gate/pair -']);
     });
 
     test('keeps a key the farm still knows, at its new address', () async {
@@ -94,7 +94,7 @@ void main() {
       final known = RemoteFarm(url: Uri.parse('http://10.0.0.2:8790'), key: 'old-key', farm: 'lucas-mbp', device: 'd1');
       final got = await pairWith(link, name: 'iPhone', known: known, apiFor: apiFor);
       expect((got.url, got.key), (Uri.parse(_gate), 'old-key'));
-      expect(calls, ['GET /api/gate/me old-key']);
+      expect(calls, ['GET /api/v1/gate/me old-key']);
     });
 
     test('asks again when the farm forgot the key, and says why it is refused', () async {
@@ -104,7 +104,7 @@ void main() {
         pairWith(link, name: 'iPhone', known: known, apiFor: apiFor),
         throwsA(isA<VibeValleyApiError>().having((e) => e.reason, 'reason', '主人没让这台设备进来')),
       );
-      expect(calls, ['GET /api/gate/me old-key', 'POST /api/gate/pair -']);
+      expect(calls, ['GET /api/v1/gate/me old-key', 'POST /api/v1/gate/pair -']);
     });
   });
 
@@ -117,12 +117,12 @@ void main() {
       MockClient((r) async {
         if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
         switch ((r.method, r.url.path)) {
-          case ('GET', '/api/gate'):
+          case ('GET', '/api/v1/gate'):
             break;
-          case ('PUT', '/api/gate'):
+          case ('PUT', '/api/v1/gate'):
             final open = (jsonDecode(r.body) as Map)['open'] as bool;
             status = LanStatus(open: open, farm: 'lucas-mbp', url: open ? _gate : null, devices: status.devices);
-          case ('POST', '/api/gate/pairing/answer'):
+          case ('POST', '/api/v1/gate/pairing/answer'):
             status = LanStatus(
               open: true,
               farm: 'lucas-mbp',
@@ -132,7 +132,7 @@ void main() {
                 const LanDevice(id: 'd2', name: '小明的 iPhone', pairedAt: 2),
               ],
             );
-          case ('DELETE', '/api/gate/devices/d2'):
+          case ('DELETE', '/api/v1/gate/devices/d2'):
             status = LanStatus(open: true, farm: 'lucas-mbp', url: _gate, devices: status.devices.where((d) => d.id != 'd2').toList());
           default:
             return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
@@ -167,7 +167,7 @@ void main() {
       expect(find.text('关着'), findsOneWidget);
       await t.tap(find.text('打开院门'));
       await settle(t);
-      expect(writes, ['PUT /api/gate {"open":true}']);
+      expect(writes, ['PUT /api/v1/gate {"open":true}']);
       expect(find.text(_gate), findsOneWidget);
       expect(find.text('添加设备'), findsOneWidget);
       await t.pumpWidget(const SizedBox.shrink());
@@ -190,11 +190,11 @@ void main() {
       expect(find.text('「小明的 iPhone」想进院门。让它进来以后，它能和你一样用这个农场。'), findsOneWidget);
       await t.tap(find.text('让它进来'));
       await settle(t);
-      expect(writes, ['POST /api/gate/pairing/answer {"allow":true}']);
+      expect(writes, ['POST /api/v1/gate/pairing/answer {"allow":true}']);
       expect(find.text('小明的 iPhone'), findsOneWidget);
       await t.tap(find.text('移除'));
       await settle(t);
-      expect(writes.last, startsWith('DELETE /api/gate/devices/d2'));
+      expect(writes.last, startsWith('DELETE /api/v1/gate/devices/d2'));
       expect(find.text('小明的 iPhone'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
     });

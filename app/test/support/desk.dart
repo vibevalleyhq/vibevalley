@@ -110,13 +110,15 @@ class DeskBackend {
   final recalls = <String, List<String>>{};
 
   /// What changed something: the checks are questions, though they are POSTs.
-  List<Call> get writes => calls.where((c) => c.method != 'GET' && !const {'/api/agents/check', '/api/settings/check'}.contains(c.path)).toList();
+  List<Call> get writes => calls.where((c) => c.method != 'GET' && !const {'/api/v1/agents/check', '/api/v1/settings/check'}.contains(c.path)).toList();
 
   Future<http.Response> handle(http.Request r) async {
     final path = r.url.path;
     final body = r.body.isEmpty ? null : jsonDecode(r.body);
     calls.add((method: r.method, path: r.url.hasQuery ? '$path?${r.url.query}' : path, body: body));
     final parts = path.split('/').where((p) => p.isNotEmpty).map(Uri.decodeComponent).toList();
+    // The API's version prefix is one segment, not part of the route's own path.
+    if (parts.length > 1 && parts[0] == 'api' && parts[1] == 'v1') parts.removeAt(1);
     switch ((r.method, parts)) {
       case ('POST', ['api', 'agents', 'check']):
         // The server's first check only: the rest of AgentIssues is the Go's, tested there.

@@ -193,13 +193,13 @@ func flagsOf(e protocol.Endpoint) []string {
 	return out
 }
 
-// stream prints /api/state or /api/events: the first frame, or every one with --watch (events are always watched).
+// stream prints /api/v1/state or /api/v1/events: the first frame, or every one with --watch (events are always watched).
 func stream(ctx context.Context, path string, raw []string) error {
 	a, err := parseArgs(raw)
 	if err != nil {
 		return err
 	}
-	watch := path == "/api/events" || a.flags["watch"] == "true"
+	watch := path == "/api/v1/events" || a.flags["watch"] == "true"
 	req, err := http.NewRequestWithContext(ctx, "GET", strings.TrimRight(client(a).Base, "/")+path, nil)
 	if err != nil {
 		return err
@@ -236,8 +236,8 @@ func usage(w io.Writer, only string) error {
                                              和一个农机直接聊，不经过农场
   vibevalley oar <command> [args...]         smith 的 oar 命令行，农机和农场的一样（oar help 列出命令）
   vibevalley issue run <id>                  开工，等它交回来，打出改动
-  vibevalley state [--watch]                 核心状态（GET /api/state）
-  vibevalley events                          副作用（GET /api/events）
+  vibevalley state [--watch]                 核心状态（GET /api/v1/state）
+  vibevalley events                          副作用（GET /api/v1/events）
   vibevalley <group> <op> [参数…] [--json 请求体|-]
                                              调农场的一个接口，答复是 JSON
 

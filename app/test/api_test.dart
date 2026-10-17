@@ -19,7 +19,7 @@ void main() {
     );
     await api.channel.say(body: const SayRequest(text: '种一垄萝卜', conversation: 3));
     expect(seen.method, 'POST');
-    expect(seen.url.path, '/api/say');
+    expect(seen.url.path, '/api/v1/say');
     expect(jsonDecode(seen.body), {'text': '种一垄萝卜', 'conversation': 3});
   });
 
@@ -39,7 +39,7 @@ void main() {
       }),
     );
     final page = await api.channel.history(id: 1, before: 10, limit: 20);
-    expect(seen.path, '/api/channels/1/messages');
+    expect(seen.path, '/api/v1/channels/1/messages');
     expect(seen.queryParameters, {'before': '10', 'limit': '20'});
     expect(page.single, isA<ChatMessage>());
     expect(page.single.text, '好');

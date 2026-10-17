@@ -51,7 +51,7 @@ Status: implemented
 ### 阶段 5：客户端一个入口
 
 - [x] `chatApiProvider` 并进 `apiProvider`，页面拿 api 只有一条路（`VoiceCall` 也只拿 api，不拿整个服务端）
-- [x] 扫页面里的规则（不是排版、不是跟着时钟走的），能问服务端的改成字段，剩下的挪进 `rules/` 或 `shared/`（查出新增项目的检查是 Go 的抄本，改成 `POST /api/projects/check`；从 GitHub 地址猜项目名只是填表的方便，留在页面）
+- [x] 扫页面里的规则（不是排版、不是跟着时钟走的），能问服务端的改成字段，剩下的挪进 `rules/` 或 `shared/`（查出新增项目的检查是 Go 的抄本，改成 `POST /api/v1/projects/check`；从 GitHub 地址猜项目名只是填表的方便，留在页面）
 - [x] 测试替身只认 `test/support/server.dart`（看板测试也改用它；院门配对要连另一台农场的地址，自己建 api）
 
 ### 阶段 6：残留

@@ -49,7 +49,7 @@ void main() {
     final (c, routes) = await setUpFarm();
     expect(await use(c, Tool.water, 0), isA<ToolWater>());
     expect(await use(c, Tool.bug, 1), isA<ToolDone>());
-    expect(routes.paths, ['POST /api/issues/tw2/comment']);
+    expect(routes.paths, ['POST /api/v1/issues/tw2/comment']);
     expect(routes.calls.single.body, {'text': '接着修：修登录。看一下报错，修好再跑一遍测试'});
     expect(c.read(bedFxProvider).single.kind, BedFxKind.spray);
     expect(c.read(bedFxProvider).single.bed, 1);
@@ -65,7 +65,7 @@ void main() {
     final (c, routes) = await setUpFarm();
     await use(c, Tool.shovel, 0);
     await use(c, Tool.shovel, 2);
-    expect(routes.paths, ['POST /api/sessions/w1/stop', 'POST /api/issues/tw3/cancel']);
+    expect(routes.paths, ['POST /api/v1/sessions/w1/stop', 'POST /api/v1/issues/tw3/cancel']);
     expect(c.read(bedFxProvider).map((f) => f.kind), [BedFxKind.shovel, BedFxKind.shovel]);
   });
 
@@ -91,7 +91,7 @@ void main() {
   test('sowing asks the manager with the bed and the agent', () async {
     final (c, routes) = await setUpFarm();
     await c.read(farmCommandsProvider).plant(3, '给 README 补上怎么启动', 'tester');
-    expect(routes.paths, ['POST /api/say']);
+    expect(routes.paths, ['POST /api/v1/say']);
     expect(routes.calls.single.body, {'text': '给 README 补上怎么启动', 'bed': 3, 'agent': 'tester'});
   });
 
@@ -102,8 +102,8 @@ void main() {
         state,
         v,
         fakeApi(routes, {
-          'POST /api/playbooks/p1/act': '开工了',
-          'POST /api/playbooks/p1/nodes/api/act': http.Response(
+          'POST /api/v1/playbooks/p1/act': '开工了',
+          'POST /api/v1/playbooks/p1/nodes/api/act': http.Response(
             jsonEncode({'_tag': 'Refused', 'reason': '这一步没失败，不用重试'}),
             409,
             headers: {'content-type': 'application/json; charset=utf-8'},

@@ -12,7 +12,7 @@ exec python3 -c '
 import http.server, os, sys
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        ok = self.path == "/api/health"
+        ok = self.path == "/api/v1/health"
         self.send_response(200 if ok else 404)
         self.end_headers()
         self.wfile.write(b"{\"ok\":true,\"version\":\"fake\"}" if ok else b"")

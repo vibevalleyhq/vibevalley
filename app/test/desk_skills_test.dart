@@ -53,7 +53,7 @@ void main() {
     await settle(t);
     final put = server.writes.single;
     expect(put.method, 'PUT');
-    expect(put.path, '/api/skills/tests-first');
+    expect(put.path, '/api/v1/skills/tests-first');
     expect(put.body, {'id': 'tests-first', 'name': '先写测试', 'description': '改行为之前，先补一个会失败的测试。', 'body': '先写测试，再改代码。'});
   });
 
@@ -65,7 +65,7 @@ void main() {
     await typeInto(t, '正文', '表驱动测试。');
     await t.tap(find.text('保存'));
     await settle(t);
-    expect(server.writes.single.path, '/api/skills/go-style');
+    expect(server.writes.single.path, '/api/v1/skills/go-style');
     expect((server.writes.single.body! as Map)['name'], 'Go Style');
   });
 
@@ -78,6 +78,6 @@ void main() {
     await t.tap(find.text('删除'));
     await settle(t);
     expect(server.writes.single.method, 'DELETE');
-    expect(server.writes.single.path, '/api/skills/tests-first');
+    expect(server.writes.single.path, '/api/v1/skills/tests-first');
   });
 }

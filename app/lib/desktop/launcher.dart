@@ -22,7 +22,7 @@ Future<int> freeLoopbackPort() async {
 Future<bool> answersHealth(Uri base, {Duration timeout = const Duration(milliseconds: 1500)}) async {
   final client = HttpClient()..connectionTimeout = timeout;
   try {
-    final request = await client.getUrl(base.resolve('/api/health')).timeout(timeout);
+    final request = await client.getUrl(base.resolve('/api/v1/health')).timeout(timeout);
     final response = await request.close().timeout(timeout);
     await response.drain<void>();
     return response.statusCode == 200;

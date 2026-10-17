@@ -198,10 +198,10 @@ void main() {
     final api = FakeServer((r) async {
       if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
       return switch ((r.method, r.url.path)) {
-        ('GET', '/api/sessions') => jsonResponse([conflicted.toJson(), planner.toJson()]),
-        ('GET', '/api/agents') => jsonResponse([]),
-        ('GET', '/api/sessions/w4') => jsonResponse(conflicted.toJson()),
-        ('GET', '/api/sessions/w4/events') => jsonResponse([]),
+        ('GET', '/api/v1/sessions') => jsonResponse([conflicted.toJson(), planner.toJson()]),
+        ('GET', '/api/v1/agents') => jsonResponse([]),
+        ('GET', '/api/v1/sessions/w4') => jsonResponse(conflicted.toJson()),
+        ('GET', '/api/v1/sessions/w4/events') => jsonResponse([]),
         _ => jsonResponse(null, 204),
       };
     }).api;
@@ -233,7 +233,7 @@ void main() {
     expect(find.text('写接口'), findsNothing);
     await t.tap(find.text('让它解决冲突'));
     await settle(t);
-    expect(writes.single, startsWith('POST /api/issues/tw4/resolve'));
+    expect(writes.single, startsWith('POST /api/v1/issues/tw4/resolve'));
   });
 
   testWidgets('a card per job in its lane; a 待办 dragged into 处理中 is sent; a closed one reopened', (t) async {
@@ -264,18 +264,18 @@ void main() {
     final api = FakeServer((r) async {
       if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
       switch ((r.method, r.url.path)) {
-        case ('GET', '/api/sessions'):
+        case ('GET', '/api/v1/sessions'):
           return jsonResponse([_open.toJson(), _closed.toJson()]);
-        case ('GET', '/api/agents'):
+        case ('GET', '/api/v1/agents'):
           return jsonResponse([]);
-        case ('GET', '/api/sessions/w1'):
+        case ('GET', '/api/v1/sessions/w1'):
           return jsonResponse(_closed.toJson());
-        case ('GET', '/api/sessions/w1/events'):
+        case ('GET', '/api/v1/sessions/w1/events'):
           return jsonResponse([
             const SessionEvent(seq: 0, time: 0, type: SessionEventType.userMessage, text: '写打卡').toJson(),
             const SessionEvent(seq: 1, time: 5000, type: SessionEventType.assistantMessage, text: '打卡写好了').toJson(),
           ]);
-        case ('POST', '/api/issues'):
+        case ('POST', '/api/v1/issues'):
           final body = IssueRequest.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
           final item = Issue(
             id: 'a9',
@@ -290,17 +290,17 @@ void main() {
           issues = [item, ...issues];
           changed();
           return jsonResponse(item.toJson());
-        case ('PUT', '/api/issues/a2/move'):
+        case ('PUT', '/api/v1/issues/a2/move'):
           issues = [issues[1], issues[0], ...issues.skip(2)];
           changed();
           return jsonResponse([for (final i in issues) i.toJson()]);
-        case ('POST', '/api/issues/a1/start'):
+        case ('POST', '/api/v1/issues/a1/start'):
           issues = [
             for (final i in issues) i.id == 'a1' ? Issue.fromJson({...i.toJson(), 'queuedAt': 3, 'status': 'todo'}) : i,
           ];
           changed();
           return jsonResponse(const Dispatched(queued: '已经有 6 个帮工在干活了：排上队了，有空地就自动开工').toJson());
-        case ('POST', '/api/issues/t1/reopen'):
+        case ('POST', '/api/v1/issues/t1/reopen'):
           return jsonResponse(const Dispatched(session: 'w3').toJson());
       }
       return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
@@ -342,7 +342,7 @@ void main() {
     await t.enterText(find.descendant(of: find.bySemanticsLabel('写一张待办'), matching: find.byType(EditableText)), '补测试');
     await t.testTextInput.receiveAction(TextInputAction.done);
     await settle(t);
-    expect(writes.last, 'POST /api/issues {"title":"补测试","project":"clock","assignee":"backend"}');
+    expect(writes.last, 'POST /api/v1/issues {"title":"补测试","project":"clock","assignee":"backend"}');
     expect(find.text('补测试'), findsOneWidget);
 
     Future<void> drag(Offset from, Offset to) async {
@@ -356,7 +356,7 @@ void main() {
     }
 
     await drag(t.getCenter(find.text('改文案')), t.getCenter(find.text('加日志')));
-    expect(writes.last, 'PUT /api/issues/a2/move {"before":"a1"}');
+    expect(writes.last, 'PUT /api/v1/issues/a2/move {"before":"a1"}');
     expect(find.text('2 轮 · 1 分 · 花了 ¥0.42'), findsOneWidget);
     expect(find.text('打卡写好了，测试全过'), findsOneWidget);
 
@@ -366,7 +366,7 @@ void main() {
     expect(toasts.toasts.first.title, '还差一点');
 
     await drag(t.getCenter(find.text('加日志')), t.getCenter(find.text('处理中')) + const Offset(0, 120));
-    expect(writes.last, 'POST /api/issues/a1/start ');
+    expect(writes.last, 'POST /api/v1/issues/a1/start ');
     expect(toasts.toasts.first.title, '排上队了');
     expect(find.text('排队中'), findsOneWidget);
 
@@ -374,7 +374,7 @@ void main() {
     await t.pump();
     await t.tap(find.text('重开').last);
     await settle(t);
-    expect(writes.last, 'POST /api/issues/t1/reopen {"text":"打卡还要记时区"}');
+    expect(writes.last, 'POST /api/v1/issues/t1/reopen {"text":"打卡还要记时区"}');
     await t.pumpWidget(const SizedBox.shrink());
     await t.pump(const Duration(seconds: 6));
   });

@@ -13,7 +13,7 @@ Status: implemented
 行为见 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「管家页」「捏帮工」和 [voice.md](../../../../docs/reference/voice.md)「配置」。
 
 - **管家有自己的页面**（`/manager`，`app/lib/desk/manager/manager_page.dart`），是帮工页的第一张卡片。管家不是帮工档案（`Agent`，当时叫 `AgentProfile`）：它没有农机、技能和地可配，硬塞进捏帮工页只会多出一堆用不上的页签。它有三个页签：记性、旧账、声音（后来又加了「轨迹」，见 [轨迹](2026-10-13-trajectories.md)）。
-- **管家的记性不换存法，页面直接读写那个文件**（`server/internal/memory/memory.go`，接口 `/api/manager/...`）：
+- **管家的记性不换存法，页面直接读写那个文件**（`server/internal/memory/memory.go`，接口 `/api/v1/manager/...`）：
   - `MEMORY.md` 一行算一条，按这一行的 hash 认，用来忘掉某一条。
   - 主人替它记的写成「主人交代：……」。这样页面分得清是谁记的，管家读的时候也知道。
   - 文件的读写和搜法放在 VibeValley 自己的 agent（`server/pkg/agent/memory.go`：`MemoryLines`、`ForgetLine`、`ArchiveFiles`、`ReadArchive`、`SearchArchive`）。管家自己的 `search_archive` 工具和页面用的是同一套。
@@ -22,7 +22,7 @@ Status: implemented
   - **手上的活**：放在最上面，因为它是现在的状态，不是一条笔记。
   - **下回开工会想起**：选一个项目、可以填一句话，就能看到开工时会想起哪几条。
   - **记下的**：能按项目筛，每条写着谁记的、想起过几次。离上限不到 10 条时，标出最先会丢的那几条（`nextForgotten`，和服务端记满时删掉的顺序一致：最久没想起的先丢，`memory/memory.go` 的 `Keep`）。
-- **挑法在 memory 包**（`server/internal/memory/recall.go` 的 `pick`、`termsOf`、上限这些常量）：服务端开工时用它挑。页面拿同一份规则做预览，两边挑出来的不会对不上；网页删了以后（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)），Flutter 的预览直接问服务端（`app/lib/desk/shared/memory_panels.dart` 的 `recallPreviewProvider`，`GET /api/memories/{agent}/recall`），Dart 里没有第二份挑法。怎么从汇报里读「记住：」、提醒块写成什么样，还是服务端的事（`server/internal/memory/memory.go` 读「记住：」，`session/rules.go` 的 `withRecall` 写提醒块）。
+- **挑法在 memory 包**（`server/internal/memory/recall.go` 的 `pick`、`termsOf`、上限这些常量）：服务端开工时用它挑。页面拿同一份规则做预览，两边挑出来的不会对不上；网页删了以后（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)），Flutter 的预览直接问服务端（`app/lib/desk/shared/memory_panels.dart` 的 `recallPreviewProvider`，`GET /api/v1/memories/{agent}/recall`），Dart 里没有第二份挑法。怎么从汇报里读「记住：」、提醒块写成什么样，还是服务端的事（`server/internal/memory/memory.go` 读「记住：」，`session/rules.go` 的 `withRecall` 写提醒块）。
 - **语音设置还是一份，按归属分两处改**：数据仍是 `settings.json` 里的同一份 `VoiceSettings`。
   - 「声音」页管线路：凭据、区域、识别、语言、断句、大模型、没人时多久离开。
   - 管家页的「声音」页签管电话上的管家：人设、开场白、出错时说的话、音色。

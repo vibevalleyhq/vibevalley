@@ -56,7 +56,7 @@ void main() {
       await settle(t);
       final put = server.writes.single;
       expect(put.method, 'PUT');
-      expect(put.path, '/api/agents/backend');
+      expect(put.path, '/api/v1/agents/backend');
       expect((put.body! as Map)['enabled'], false);
       expect((put.body! as Map)['name'], '后端老周');
       expect(find.text('启用'), findsOneWidget);
@@ -73,7 +73,7 @@ void main() {
       await t.tap(find.text('捏好了，保存'));
       await settle(t);
       final put = server.writes.single;
-      expect(put.path, '/api/agents/agent-1');
+      expect(put.path, '/api/v1/agents/agent-1');
       final body = put.body! as Map<String, dynamic>;
       expect(body['runtime'], 'claude');
       expect(body['role'], '跑测试');
@@ -96,7 +96,7 @@ void main() {
       await t.tap(find.text('保存'));
       await settle(t);
       final put = server.writes.single;
-      expect(put.path, '/api/agents/backend');
+      expect(put.path, '/api/v1/agents/backend');
       final body = put.body! as Map<String, dynamic>;
       expect(body['name'], '后端大周');
       expect(body['skills'], isEmpty);
@@ -152,7 +152,7 @@ void main() {
       await t.tap(find.text('删除'));
       await settle(t);
       expect(server.writes.single.method, 'DELETE');
-      expect(server.writes.single.path, '/api/agents/backend');
+      expect(server.writes.single.path, '/api/v1/agents/backend');
     });
 
     testWidgets('an id nobody has says so', (t) async {

@@ -4814,7 +4814,7 @@ class ServerApi {
   final VibeValleyApi _api;
 
   Future<Health> health() async {
-    final j = await _api._call('GET', '/api/health', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/health', query: {}, body: null);
     return Health.fromJson(j as Map<String, dynamic>);
   }
 }
@@ -4825,20 +4825,20 @@ class ManagerApi {
   final VibeValleyApi _api;
 
   Future<void> open() async {
-    await _api._call('POST', '/api/manager/open', query: {}, body: null);
+    await _api._call('POST', '/api/v1/manager/open', query: {}, body: null);
   }
 
   Future<void> hear({required SayRequest body}) async {
-    await _api._call('POST', '/api/manager/hear', query: {}, body: body.toJson());
+    await _api._call('POST', '/api/v1/manager/hear', query: {}, body: body.toJson());
   }
 
   Future<ArchiveListing> listArchive({String? q}) async {
-    final j = await _api._call('GET', '/api/manager/archive', query: {if (q != null) 'q': '${q!}'}, body: null);
+    final j = await _api._call('GET', '/api/v1/manager/archive', query: {if (q != null) 'q': '${q!}'}, body: null);
     return ArchiveListing.fromJson(j as Map<String, dynamic>);
   }
 
   Future<String> getArchive({required String name}) async {
-    final j = await _api._call('GET', '/api/manager/archive/${Uri.encodeComponent((name).toString())}', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/manager/archive/${Uri.encodeComponent((name).toString())}', query: {}, body: null);
     return j as String;
   }
 }
@@ -4849,18 +4849,18 @@ class SettingApi {
   final VibeValleyApi _api;
 
   Future<SettingsStatus> load() async {
-    final j = await _api._call('GET', '/api/settings', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/settings', query: {}, body: null);
     return SettingsStatus.fromJson(j as Map<String, dynamic>);
   }
 
   /// The first thing Save would refuse in these settings, without saving them.
   Future<SettingsCheck> check({required SettingsUpdate body}) async {
-    final j = await _api._call('POST', '/api/settings/check', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/settings/check', query: {}, body: body.toJson());
     return SettingsCheck.fromJson(j as Map<String, dynamic>);
   }
 
   Future<SettingsStatus> save({required SettingsUpdate body}) async {
-    final j = await _api._call('PUT', '/api/settings', query: {}, body: body.toJson());
+    final j = await _api._call('PUT', '/api/v1/settings', query: {}, body: body.toJson());
     return SettingsStatus.fromJson(j as Map<String, dynamic>);
   }
 }
@@ -4871,21 +4871,21 @@ class ChannelApi {
   final VibeValleyApi _api;
 
   Future<void> say({required SayRequest body}) async {
-    await _api._call('POST', '/api/say', query: {}, body: body.toJson());
+    await _api._call('POST', '/api/v1/say', query: {}, body: body.toJson());
   }
 
   Future<void> create({required ChannelRequest body}) async {
-    await _api._call('POST', '/api/channels', query: {}, body: body.toJson());
+    await _api._call('POST', '/api/v1/channels', query: {}, body: body.toJson());
   }
 
   Future<void> update({required double id, required ChannelUpdate body}) async {
-    await _api._call('PUT', '/api/channels/${Uri.encodeComponent((id.toInt()).toString())}', query: {}, body: body.toJson());
+    await _api._call('PUT', '/api/v1/channels/${Uri.encodeComponent((id.toInt()).toString())}', query: {}, body: body.toJson());
   }
 
   Future<List<ChatMessage>> history({required double id, double? before, double? limit}) async {
     final j = await _api._call(
       'GET',
-      '/api/channels/${Uri.encodeComponent((id.toInt()).toString())}/messages',
+      '/api/v1/channels/${Uri.encodeComponent((id.toInt()).toString())}/messages',
       query: {if (before != null) 'before': '${before!.toInt()}', if (limit != null) 'limit': '${limit!.toInt()}'},
       body: null,
     );
@@ -4893,7 +4893,7 @@ class ChannelApi {
   }
 
   Future<void> markRead({required double id, required ChatReadRequest body}) async {
-    await _api._call('POST', '/api/channels/${Uri.encodeComponent((id.toInt()).toString())}/read', query: {}, body: body.toJson());
+    await _api._call('POST', '/api/v1/channels/${Uri.encodeComponent((id.toInt()).toString())}/read', query: {}, body: body.toJson());
   }
 }
 
@@ -4903,22 +4903,22 @@ class ScheduleApi {
   final VibeValleyApi _api;
 
   Future<Schedule> create({required ScheduleRequest body}) async {
-    final j = await _api._call('POST', '/api/schedules', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/schedules', query: {}, body: body.toJson());
     return Schedule.fromJson(j as Map<String, dynamic>);
   }
 
   Future<List<Schedule>> list() async {
-    final j = await _api._call('GET', '/api/schedules', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/schedules', query: {}, body: null);
     return [for (final e in j as List) Schedule.fromJson(e as Map<String, dynamic>)];
   }
 
   /// Only what the body gives changes.
   Future<void> update({required double id, required ScheduleUpdate body}) async {
-    await _api._call('PUT', '/api/schedules/${Uri.encodeComponent((id.toInt()).toString())}', query: {}, body: body.toJson());
+    await _api._call('PUT', '/api/v1/schedules/${Uri.encodeComponent((id.toInt()).toString())}', query: {}, body: body.toJson());
   }
 
   Future<void> delete({required double id}) async {
-    await _api._call('DELETE', '/api/schedules/${Uri.encodeComponent((id.toInt()).toString())}', query: {}, body: null);
+    await _api._call('DELETE', '/api/v1/schedules/${Uri.encodeComponent((id.toInt()).toString())}', query: {}, body: null);
   }
 }
 
@@ -4929,75 +4929,75 @@ class IssueApi {
 
   /// To the issue's newest session, as the owner: on is a step of its trajectory to comment on. A closed issue is refused: reopen it.
   Future<void> comment({required String id, required CommentRequest body}) async {
-    await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/comment', query: {}, body: body.toJson());
+    await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/comment', query: {}, body: body.toJson());
   }
 
   Future<Changes> changes({required String id}) async {
-    final j = await _api._call('GET', '/api/issues/${Uri.encodeComponent((id).toString())}/changes', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/changes', query: {}, body: null);
     return Changes.fromJson(j as Map<String, dynamic>);
   }
 
   Future<void> merge({required String id}) async {
-    await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/merge', query: {}, body: null);
+    await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/merge', query: {}, body: null);
   }
 
   /// Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
   Future<void> resolve({required String id}) async {
-    await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/resolve', query: {}, body: null);
+    await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/resolve', query: {}, body: null);
   }
 
   /// Sends the newest session home without merging: the issue closes as dismissed.
   Future<void> cancel({required String id}) async {
-    await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/cancel', query: {}, body: null);
+    await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/cancel', query: {}, body: null);
   }
 
   Future<List<Issue>> list() async {
-    final j = await _api._call('GET', '/api/issues', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/issues', query: {}, body: null);
     return [for (final e in j as List) Issue.fromJson(e as Map<String, dynamic>)];
   }
 
   Future<Issue> get({required String id}) async {
-    final j = await _api._call('GET', '/api/issues/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/issues/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
     return Issue.fromJson(j as Map<String, dynamic>);
   }
 
   Future<List<Run>> runs({required String id}) async {
-    final j = await _api._call('GET', '/api/issues/${Uri.encodeComponent((id).toString())}/runs', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/runs', query: {}, body: null);
     return [for (final e in j as List) Run.fromJson(e as Map<String, dynamic>)];
   }
 
   Future<Issue> create({required IssueRequest body}) async {
-    final j = await _api._call('POST', '/api/issues', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/issues', query: {}, body: body.toJson());
     return Issue.fromJson(j as Map<String, dynamic>);
   }
 
   Future<Issue> update({required String id, required IssueUpdate body}) async {
-    final j = await _api._call('PUT', '/api/issues/${Uri.encodeComponent((id).toString())}', query: {}, body: body.toJson());
+    final j = await _api._call('PUT', '/api/v1/issues/${Uri.encodeComponent((id).toString())}', query: {}, body: body.toJson());
     return Issue.fromJson(j as Map<String, dynamic>);
   }
 
   Future<void> delete({required String id}) async {
-    await _api._call('DELETE', '/api/issues/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
+    await _api._call('DELETE', '/api/v1/issues/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
   }
 
   Future<List<Issue>> move({required String id, required MoveIssueRequest body}) async {
-    final j = await _api._call('PUT', '/api/issues/${Uri.encodeComponent((id).toString())}/move', query: {}, body: body.toJson());
+    final j = await _api._call('PUT', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/move', query: {}, body: body.toJson());
     return [for (final e in j as List) Issue.fromJson(e as Map<String, dynamic>)];
   }
 
   /// Back to the backlog; an issue is queued by issue.start when there is no room.
   Future<Issue> unqueue({required String id}) async {
-    final j = await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/unqueue', query: {}, body: null);
+    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/unqueue', query: {}, body: null);
     return Issue.fromJson(j as Map<String, dynamic>);
   }
 
   Future<Dispatched> start({required String id}) async {
-    final j = await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/start', query: {}, body: null);
+    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/start', query: {}, body: null);
     return Dispatched.fromJson(j as Map<String, dynamic>);
   }
 
   Future<Dispatched> reopen({required String id, required ReopenRequest body}) async {
-    final j = await _api._call('POST', '/api/issues/${Uri.encodeComponent((id).toString())}/reopen', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/reopen', query: {}, body: body.toJson());
     return Dispatched.fromJson(j as Map<String, dynamic>);
   }
 }
@@ -5009,16 +5009,16 @@ class SessionApi {
 
   /// Stops a session's turn; it stays, and a comment starts the next.
   Future<void> stop({required String id}) async {
-    await _api._call('POST', '/api/sessions/${Uri.encodeComponent((id).toString())}/stop', query: {}, body: null);
+    await _api._call('POST', '/api/v1/sessions/${Uri.encodeComponent((id).toString())}/stop', query: {}, body: null);
   }
 
   Future<List<Session>> list({String? agent}) async {
-    final j = await _api._call('GET', '/api/sessions', query: {if (agent != null) 'agent': '${agent!}'}, body: null);
+    final j = await _api._call('GET', '/api/v1/sessions', query: {if (agent != null) 'agent': '${agent!}'}, body: null);
     return [for (final e in j as List) Session.fromJson(e as Map<String, dynamic>)];
   }
 
   Future<Session> get({required String id}) async {
-    final j = await _api._call('GET', '/api/sessions/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/sessions/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
     return Session.fromJson(j as Map<String, dynamic>);
   }
 
@@ -5026,7 +5026,7 @@ class SessionApi {
   Future<List<SessionEvent>> events({required String id, double? run}) async {
     final j = await _api._call(
       'GET',
-      '/api/sessions/${Uri.encodeComponent((id).toString())}/events',
+      '/api/v1/sessions/${Uri.encodeComponent((id).toString())}/events',
       query: {if (run != null) 'run': '${run!.toInt()}'},
       body: null,
     );
@@ -5040,14 +5040,14 @@ class PlaybookApi {
   final VibeValleyApi _api;
 
   Future<String> plan({required PlanRequest body}) async {
-    final j = await _api._call('POST', '/api/playbooks', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/playbooks', query: {}, body: body.toJson());
     return j as String;
   }
 
   Future<String> updateNode({required String id, required String node, required NodeEdit body}) async {
     final j = await _api._call(
       'PUT',
-      '/api/playbooks/${Uri.encodeComponent((id).toString())}/nodes/${Uri.encodeComponent((node).toString())}',
+      '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/nodes/${Uri.encodeComponent((node).toString())}',
       query: {},
       body: body.toJson(),
     );
@@ -5057,7 +5057,7 @@ class PlaybookApi {
   Future<String> deleteNode({required String id, required String node}) async {
     final j = await _api._call(
       'DELETE',
-      '/api/playbooks/${Uri.encodeComponent((id).toString())}/nodes/${Uri.encodeComponent((node).toString())}',
+      '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/nodes/${Uri.encodeComponent((node).toString())}',
       query: {},
       body: null,
     );
@@ -5065,14 +5065,14 @@ class PlaybookApi {
   }
 
   Future<String> act({required String id, required PlaybookActRequest body}) async {
-    final j = await _api._call('POST', '/api/playbooks/${Uri.encodeComponent((id).toString())}/act', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/act', query: {}, body: body.toJson());
     return j as String;
   }
 
   Future<String> nodeAct({required String id, required String node, required NodeActRequest body}) async {
     final j = await _api._call(
       'POST',
-      '/api/playbooks/${Uri.encodeComponent((id).toString())}/nodes/${Uri.encodeComponent((node).toString())}/act',
+      '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/nodes/${Uri.encodeComponent((node).toString())}/act',
       query: {},
       body: body.toJson(),
     );
@@ -5080,12 +5080,12 @@ class PlaybookApi {
   }
 
   Future<Changes> changes({required String id}) async {
-    final j = await _api._call('GET', '/api/playbooks/${Uri.encodeComponent((id).toString())}/changes', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/changes', query: {}, body: null);
     return Changes.fromJson(j as Map<String, dynamic>);
   }
 
   Future<List<PlaybookEvent>> events({required String id}) async {
-    final j = await _api._call('GET', '/api/playbooks/${Uri.encodeComponent((id).toString())}/events', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/events', query: {}, body: null);
     return [for (final e in j as List) PlaybookEvent.fromJson(e as Map<String, dynamic>)];
   }
 }
@@ -5096,7 +5096,7 @@ class GameApi {
   final VibeValleyApi _api;
 
   Future<void> chooseTitle({required ChooseTitleRequest body}) async {
-    await _api._call('POST', '/api/game/title', query: {}, body: body.toJson());
+    await _api._call('POST', '/api/v1/game/title', query: {}, body: body.toJson());
   }
 }
 
@@ -5106,22 +5106,22 @@ class RuntimeApi {
   final VibeValleyApi _api;
 
   Future<List<RuntimeInfo>> list() async {
-    final j = await _api._call('GET', '/api/runtimes', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/runtimes', query: {}, body: null);
     return [for (final e in j as List) RuntimeInfo.fromJson(e as Map<String, dynamic>)];
   }
 
   Future<RuntimeInfo> refresh({required String id}) async {
-    final j = await _api._call('POST', '/api/runtimes/${Uri.encodeComponent((id).toString())}/refresh', query: {}, body: null);
+    final j = await _api._call('POST', '/api/v1/runtimes/${Uri.encodeComponent((id).toString())}/refresh', query: {}, body: null);
     return RuntimeInfo.fromJson(j as Map<String, dynamic>);
   }
 
   Future<RuntimeInfo> update({required String id, required RuntimeSettings body}) async {
-    final j = await _api._call('PUT', '/api/runtimes/${Uri.encodeComponent((id).toString())}/settings', query: {}, body: body.toJson());
+    final j = await _api._call('PUT', '/api/v1/runtimes/${Uri.encodeComponent((id).toString())}/settings', query: {}, body: body.toJson());
     return RuntimeInfo.fromJson(j as Map<String, dynamic>);
   }
 
   Future<RuntimeInfo> upgrade({required String id}) async {
-    final j = await _api._call('POST', '/api/runtimes/${Uri.encodeComponent((id).toString())}/upgrade', query: {}, body: null);
+    final j = await _api._call('POST', '/api/v1/runtimes/${Uri.encodeComponent((id).toString())}/upgrade', query: {}, body: null);
     return RuntimeInfo.fromJson(j as Map<String, dynamic>);
   }
 }
@@ -5132,23 +5132,23 @@ class AgentApi {
   final VibeValleyApi _api;
 
   Future<List<Agent>> list() async {
-    final j = await _api._call('GET', '/api/agents', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/agents', query: {}, body: null);
     return [for (final e in j as List) Agent.fromJson(e as Map<String, dynamic>)];
   }
 
   /// The issues of each profile as it would be dispatched now; a draft not saved yet too.
   Future<List<AgentCheck>> check({required AgentCheckRequest body}) async {
-    final j = await _api._call('POST', '/api/agents/check', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/agents/check', query: {}, body: body.toJson());
     return [for (final e in j as List) AgentCheck.fromJson(e as Map<String, dynamic>)];
   }
 
   Future<Agent> save({required String id, required Agent body}) async {
-    final j = await _api._call('PUT', '/api/agents/${Uri.encodeComponent((id).toString())}', query: {}, body: body.toJson());
+    final j = await _api._call('PUT', '/api/v1/agents/${Uri.encodeComponent((id).toString())}', query: {}, body: body.toJson());
     return Agent.fromJson(j as Map<String, dynamic>);
   }
 
   Future<void> delete({required String id}) async {
-    await _api._call('DELETE', '/api/agents/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
+    await _api._call('DELETE', '/api/v1/agents/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
   }
 }
 
@@ -5160,7 +5160,7 @@ class MemoryApi {
   /// An agent's memories: the manager's (agent manager) are the lines of its MEMORY.md, with the file and how many of the newest
   /// its prompt carries; every other agent's are rows.
   Future<MemoryList> list({required String agent}) async {
-    final j = await _api._call('GET', '/api/memories/${Uri.encodeComponent((agent).toString())}', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/memories/${Uri.encodeComponent((agent).toString())}', query: {}, body: null);
     return MemoryList.fromJson(j as Map<String, dynamic>);
   }
 
@@ -5168,7 +5168,7 @@ class MemoryApi {
   Future<RecallPreview> recall({required String agent, String? project, String? text}) async {
     final j = await _api._call(
       'GET',
-      '/api/memories/${Uri.encodeComponent((agent).toString())}/recall',
+      '/api/v1/memories/${Uri.encodeComponent((agent).toString())}/recall',
       query: {if (project != null) 'project': '${project!}', if (text != null) 'text': '${text!}'},
       body: null,
     );
@@ -5176,12 +5176,17 @@ class MemoryApi {
   }
 
   Future<Memory> create({required String agent, required MemoryRequest body}) async {
-    final j = await _api._call('POST', '/api/memories/${Uri.encodeComponent((agent).toString())}', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/memories/${Uri.encodeComponent((agent).toString())}', query: {}, body: body.toJson());
     return Memory.fromJson(j as Map<String, dynamic>);
   }
 
   Future<void> delete({required String agent, required String memory}) async {
-    await _api._call('DELETE', '/api/memories/${Uri.encodeComponent((agent).toString())}/${Uri.encodeComponent((memory).toString())}', query: {}, body: null);
+    await _api._call(
+      'DELETE',
+      '/api/v1/memories/${Uri.encodeComponent((agent).toString())}/${Uri.encodeComponent((memory).toString())}',
+      query: {},
+      body: null,
+    );
   }
 }
 
@@ -5191,17 +5196,17 @@ class SkillApi {
   final VibeValleyApi _api;
 
   Future<List<Skill>> list() async {
-    final j = await _api._call('GET', '/api/skills', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/skills', query: {}, body: null);
     return [for (final e in j as List) Skill.fromJson(e as Map<String, dynamic>)];
   }
 
   Future<Skill> save({required String id, required Skill body}) async {
-    final j = await _api._call('PUT', '/api/skills/${Uri.encodeComponent((id).toString())}', query: {}, body: body.toJson());
+    final j = await _api._call('PUT', '/api/v1/skills/${Uri.encodeComponent((id).toString())}', query: {}, body: body.toJson());
     return Skill.fromJson(j as Map<String, dynamic>);
   }
 
   Future<void> delete({required String id}) async {
-    await _api._call('DELETE', '/api/skills/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
+    await _api._call('DELETE', '/api/v1/skills/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
   }
 }
 
@@ -5211,28 +5216,28 @@ class ProjectApi {
   final VibeValleyApi _api;
 
   Future<List<ProjectSummary>> list() async {
-    final j = await _api._call('GET', '/api/projects', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/projects', query: {}, body: null);
     return [for (final e in j as List) ProjectSummary.fromJson(e as Map<String, dynamic>)];
   }
 
   /// The first thing Create would refuse in this project, without making it.
   Future<ProjectCheck> check({required NewProject body}) async {
-    final j = await _api._call('POST', '/api/projects/check', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/projects/check', query: {}, body: body.toJson());
     return ProjectCheck.fromJson(j as Map<String, dynamic>);
   }
 
   Future<ProjectSummary> create({required NewProject body}) async {
-    final j = await _api._call('POST', '/api/projects', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/projects', query: {}, body: body.toJson());
     return ProjectSummary.fromJson(j as Map<String, dynamic>);
   }
 
   Future<ProjectLanguages> languages({required String id}) async {
-    final j = await _api._call('GET', '/api/projects/${Uri.encodeComponent((id).toString())}/languages', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/projects/${Uri.encodeComponent((id).toString())}/languages', query: {}, body: null);
     return ProjectLanguages.fromJson(j as Map<String, dynamic>);
   }
 
   Future<ProjectActivity> activity({required String id}) async {
-    final j = await _api._call('GET', '/api/projects/${Uri.encodeComponent((id).toString())}/activity', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/projects/${Uri.encodeComponent((id).toString())}/activity', query: {}, body: null);
     return ProjectActivity.fromJson(j as Map<String, dynamic>);
   }
 }
@@ -5243,22 +5248,22 @@ class VoiceApi {
   final VibeValleyApi _api;
 
   Future<VoiceSession> session() async {
-    final j = await _api._call('POST', '/api/voice/session', query: {}, body: null);
+    final j = await _api._call('POST', '/api/v1/voice/session', query: {}, body: null);
     return VoiceSession.fromJson(j as Map<String, dynamic>);
   }
 
   Future<VoiceSession> renew({required RenewRequest body}) async {
-    final j = await _api._call('POST', '/api/voice/renew', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/voice/renew', query: {}, body: body.toJson());
     return VoiceSession.fromJson(j as Map<String, dynamic>);
   }
 
   Future<VoiceAgent> start({required StartRequest body}) async {
-    final j = await _api._call('POST', '/api/voice/agent', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/voice/agent', query: {}, body: body.toJson());
     return VoiceAgent.fromJson(j as Map<String, dynamic>);
   }
 
   Future<void> stop({required VoiceAgent body}) async {
-    await _api._call('POST', '/api/voice/agent/stop', query: {}, body: body.toJson());
+    await _api._call('POST', '/api/v1/voice/agent/stop', query: {}, body: body.toJson());
   }
 }
 
@@ -5268,27 +5273,27 @@ class ConnectorApi {
   final VibeValleyApi _api;
 
   Future<List<ConnectorStatus>> list() async {
-    final j = await _api._call('GET', '/api/connectors', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/connectors', query: {}, body: null);
     return [for (final e in j as List) ConnectorStatus.fromJson(e as Map<String, dynamic>)];
   }
 
   Future<ConnectorStatus> login({required ConnectorId id, required ConnectorLogin body}) async {
-    final j = await _api._call('POST', '/api/connectors/${Uri.encodeComponent((id.wire).toString())}/login', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/connectors/${Uri.encodeComponent((id.wire).toString())}/login', query: {}, body: body.toJson());
     return ConnectorStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<ConnectorStatus> verify({required ConnectorId id, required VerifyRequest body}) async {
-    final j = await _api._call('POST', '/api/connectors/${Uri.encodeComponent((id.wire).toString())}/verify', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/connectors/${Uri.encodeComponent((id.wire).toString())}/verify', query: {}, body: body.toJson());
     return ConnectorStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<ConnectorStatus> logout({required ConnectorId id}) async {
-    final j = await _api._call('POST', '/api/connectors/${Uri.encodeComponent((id.wire).toString())}/logout', query: {}, body: null);
+    final j = await _api._call('POST', '/api/v1/connectors/${Uri.encodeComponent((id.wire).toString())}/logout', query: {}, body: null);
     return ConnectorStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<ConnectorStatus> channel({required ConnectorId id, required ConnectorsChannelRequest body}) async {
-    final j = await _api._call('PUT', '/api/connectors/${Uri.encodeComponent((id.wire).toString())}/channel', query: {}, body: body.toJson());
+    final j = await _api._call('PUT', '/api/v1/connectors/${Uri.encodeComponent((id.wire).toString())}/channel', query: {}, body: body.toJson());
     return ConnectorStatus.fromJson(j as Map<String, dynamic>);
   }
 }
@@ -5299,42 +5304,42 @@ class GateApi {
   final VibeValleyApi _api;
 
   Future<LanStatus> status() async {
-    final j = await _api._call('GET', '/api/gate', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/gate', query: {}, body: null);
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanStatus> update({required SetOpenRequest body}) async {
-    final j = await _api._call('PUT', '/api/gate', query: {}, body: body.toJson());
+    final j = await _api._call('PUT', '/api/v1/gate', query: {}, body: body.toJson());
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanStatus> startPairing() async {
-    final j = await _api._call('POST', '/api/gate/pairing', query: {}, body: null);
+    final j = await _api._call('POST', '/api/v1/gate/pairing', query: {}, body: null);
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanStatus> stopPairing() async {
-    final j = await _api._call('DELETE', '/api/gate/pairing', query: {}, body: null);
+    final j = await _api._call('DELETE', '/api/v1/gate/pairing', query: {}, body: null);
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanStatus> answerPairing({required AnswerPairingRequest body}) async {
-    final j = await _api._call('POST', '/api/gate/pairing/answer', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/gate/pairing/answer', query: {}, body: body.toJson());
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanStatus> deleteDevice({required String id}) async {
-    final j = await _api._call('DELETE', '/api/gate/devices/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
+    final j = await _api._call('DELETE', '/api/v1/gate/devices/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanPaired> pair({required LanPairRequest body}) async {
-    final j = await _api._call('POST', '/api/gate/pair', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/gate/pair', query: {}, body: body.toJson());
     return LanPaired.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanDevice> me() async {
-    final j = await _api._call('GET', '/api/gate/me', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/gate/me', query: {}, body: null);
     return LanDevice.fromJson(j as Map<String, dynamic>);
   }
 }

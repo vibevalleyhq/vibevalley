@@ -104,13 +104,13 @@ void main() {
       {'name': 'notes', 'path': '/work/notes', 'git': false, 'slots': 3},
     ];
     return Routes({
-      'GET /api/projects': (_) => list,
+      'GET /api/v1/projects': (_) => list,
       // The server's first check only: the rest of projectProblem is the Go's, tested there.
-      'POST /api/projects/check': (Call c) => {if (((c.body! as Map)['name'] as String).startsWith('-')) 'problem': '项目名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符'},
-      'GET /api/agents': (_) => [agentJson('a1', '阿郑', 'claude')],
-      'GET /api/skills': (_) => <Object>[],
-      'GET /api/runtimes': (_) => <Object>[],
-      'GET /api/projects/farm/languages': (_) => {
+      'POST /api/v1/projects/check': (Call c) => {if (((c.body! as Map)['name'] as String).startsWith('-')) 'problem': '项目名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符'},
+      'GET /api/v1/agents': (_) => [agentJson('a1', '阿郑', 'claude')],
+      'GET /api/v1/skills': (_) => <Object>[],
+      'GET /api/v1/runtimes': (_) => <Object>[],
+      'GET /api/v1/projects/farm/languages': (_) => {
         'project': 'farm',
         'at': now,
         'languages': [
@@ -118,7 +118,7 @@ void main() {
           {'name': 'Dart', 'files': 4, 'code': 300, 'comments': 0, 'blanks': 5},
         ],
       },
-      'GET /api/projects/farm/activity': (_) => {
+      'GET /api/v1/projects/farm/activity': (_) => {
         'project': 'farm',
         'at': now,
         'days': [
@@ -131,7 +131,7 @@ void main() {
         'total': 42,
         'first': DateTime(2025, 3, 1).millisecondsSinceEpoch,
       },
-      'POST /api/projects': (c) {
+      'POST /api/v1/projects': (c) {
         final name = (c.body! as Map)['name'] as String;
         list = [
           ...list,
@@ -150,7 +150,7 @@ void main() {
     ];
     expect(names, orderedEquals([...names]..sort()));
     expect(find.text('还不是 git 仓库'), findsOneWidget);
-    expect(b.named('GET', '/api/projects/farm/languages'), hasLength(1));
+    expect(b.named('GET', '/api/v1/projects/farm/languages'), hasLength(1));
     expect(find.text('1,300 行'), findsOneWidget);
     expect(find.text('2 样'), findsOneWidget);
     expect(find.text('42 次提交'), findsOneWidget);
@@ -178,13 +178,13 @@ void main() {
     await t.tap(find.text('创建项目'));
     await settle(t);
     expect(find.text('项目名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符'), findsOneWidget);
-    expect(b.named('POST', '/api/projects'), isEmpty);
+    expect(b.named('POST', '/api/v1/projects'), isEmpty);
     await t.enterText(find.bySemanticsLabel('项目名').last, 'patch');
     await t.pump();
     await t.tap(find.text('创建项目'));
     await settle(t);
     await settle(t); // the check, then the making, then the dialog closing
-    expect(b.named('POST', '/api/projects').single.body, {'name': 'patch'});
+    expect(b.named('POST', '/api/v1/projects').single.body, {'name': 'patch'});
     expect(find.text('创建项目'), findsNothing);
     expect(find.text('patch'), findsOneWidget);
   });

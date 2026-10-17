@@ -86,7 +86,7 @@ void main() {
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
-      overrides: overrides(state, v, fakeApi(routes, {'GET /api/sessions/w1/events': steps}), agents: agents),
+      overrides: overrides(state, v, fakeApi(routes, {'GET /api/v1/sessions/w1/events': steps}), agents: agents),
     );
     c.read(selectedProvider.notifier).set('w1');
     await settle(tester);
@@ -97,19 +97,19 @@ void main() {
     expect(find.text('工单'), findsOneWidget);
     expect(find.text('碰过的文件'), findsOneWidget);
     expect(find.text('\$ pnpm test'), findsOneWidget);
-    expect(routes.paths, contains('GET /api/sessions/w1/events'));
+    expect(routes.paths, contains('GET /api/v1/sessions/w1/events'));
     await tester.tap(find.text('叫停'));
     await settle(tester);
-    expect(routes.paths, contains('POST /api/sessions/w1/stop'));
+    expect(routes.paths, contains('POST /api/v1/sessions/w1/stop'));
     await tester.enterText(find.byType(EditableText).first, '先别动测试');
     await tester.pump();
     await tester.tap(find.text('浇水').last);
     await settle(tester);
-    expect(routes.calls.last.path, '/api/issues/tw1/comment');
+    expect(routes.calls.last.path, '/api/v1/issues/tw1/comment');
     expect(routes.calls.last.body, {'text': '先别动测试'});
     await tester.tap(find.text('请它收工'));
     await settle(tester);
-    expect(routes.paths, contains('POST /api/issues/tw1/cancel'));
+    expect(routes.paths, contains('POST /api/v1/issues/tw1/cancel'));
     expect(c.read(selectedProvider), isNull);
     expect(find.text('小吴的地'), findsNothing);
     await tester.pump(const Duration(seconds: 3));
@@ -123,13 +123,13 @@ void main() {
     expect(find.text('失败：测试挂了'), findsOneWidget);
     await tester.tap(find.text('杀虫：接着修'));
     await settle(tester);
-    expect(routes.calls.last.path, '/api/issues/tw2/comment');
+    expect(routes.calls.last.path, '/api/v1/issues/tw2/comment');
     await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('the seed bag sows a seed on its bed, by the agent picked', (tester) async {
     final routes = Routes();
-    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes, {'GET /api/projects': []}), agents: agents));
+    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes, {'GET /api/v1/projects': []}), agents: agents));
     c.read(sowingProvider.notifier).set(3);
     await settle(tester);
     expect(find.text('播种 · 第 4 块地'), findsOneWidget);
@@ -139,7 +139,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('播种').last);
     await settle(tester);
-    final say = routes.calls.where((x) => x.path == '/api/say').single;
+    final say = routes.calls.where((x) => x.path == '/api/v1/say').single;
     expect(say.body, {'text': '给 README 补上怎么启动', 'bed': 3, 'agent': 'front'});
     expect(c.read(sowingProvider), isNull);
   });
@@ -205,7 +205,7 @@ void main() {
     await settle(tester);
     await tester.tap(find.text('开张大吉').first);
     await settle(tester);
-    expect(routes.calls.single.path, '/api/game/title');
+    expect(routes.calls.single.path, '/api/v1/game/title');
     expect(routes.calls.single.body, {'achievement': 'harvests', 'tier': 1});
   });
 
