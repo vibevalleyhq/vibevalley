@@ -15,19 +15,19 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 
 | 目录 | 管什么 |
 |---|---|
-| `lib/app/` | 路由、主题、工作台的外框 |
+| `lib/app/` | App 根：路由、ProviderScope/DesktopHost、MaterialApp |
 | `lib/data/` | 服务端（状态流、事件流、接口客户端）、Riverpod 的 provider、用哪个农场 |
 | `lib/gen/` | 生成的形状和接口客户端，不手改 |
 | `lib/rules/` | 读核心状态的纯函数 |
 | `lib/chat/` | 田头的数据和小部件：频道、消息、未读、发话；工作台的聊天页和农场的田头窗口都用它 |
-| `lib/shared/` | 农场和工作台都用的：帮工的样子、干活过程、收成清单、小部件 |
+| `lib/shared/` | 几张画面都用的：帮工的样子、干活过程、收成清单、朋友和额度、音效配方、小部件 |
 | `lib/ui/kit/` | 像素控件：按钮、输入、选择、对话框、提示、Markdown……（[README](lib/ui/kit/README.md)） |
 | `lib/farm/`、`lib/game/` | 农场画面、面板（地块详情、播种袋、仓库、日志、商店、任务与成就、种植计划、收成清单）、田头窗口、帮工栏、精力瓶；工具和点地的规则 |
 | `lib/sprites/` | 按 `sprites.json` 读图（`atlas.dart`） |
 | `lib/village/` | 像素村（Flame）：地图、寻路、帮工和狗、光照、粒子、动静；`hud.dart` 是画在上面的 HUD |
 | `lib/phone/` | 手机、来电、五个小游戏 |
 | `lib/desk/<地方>/` | 工作台的各页：聊天、工单、地图、帮工和档案、管家、农具、技能书、连接器、项目、声音、院门、图鉴；`shared/` 是几页共用的 |
-| `lib/shell/` | 外框：桌面标题栏、连不上时的横幅 |
+| `lib/shell/` | 外框：AppFrame、桌面标题栏 |
 | `lib/title/` | 首页：启动、场景和菜单 |
 | `lib/audio/` | 音效配方和合成 |
 | `lib/debug/` | 调试台 |
@@ -55,7 +55,7 @@ flutter analyze && flutter test           # 不连网：服务端用 MockClient 
 VIBEVALLEY_SERVER=http://127.0.0.1:8899 flutter test tool/screens/live_screens_test.dart   # 每一页对着真服务端画成 build/live-*.png
 ```
 
-替身都在 `test/support/`：`server.dart` 是唯一的 `FakeServer`（继承 `VibeValleyServer`，每个请求交给一个处理函数并记下来）、按「方法 路径」回答的 `Routes`、`settle`、`atlas`；`desk.dart` 有工作台各页的 `DeskBackend` 和 `pumpPage`，`farm.dart`、`shell.dart` 是农场和外壳的。测试文件按 `lib` 的层起名（`desk_<页>_test.dart`、`farm_…`、`shell_…`）。
+替身都在 `test/support/`：`server.dart` 是唯一的 `FakeServer`（继承 `VibeValleyServer`，每个请求交给一个处理函数并记下来）、按「方法 路径」回答的 `Routes`、`settle`、`atlas`；`desk.dart` 有工作台各页的 `DeskBackend` 和 `pumpPage`，`farm.dart`、`shell.dart` 是农场和外壳的。测试目录跟着 `lib` 分层（`test/desk/`、`test/farm/`、`test/village/`……），`test/support/` 是替身，`test/fixtures/` 是冻结的对照。
 
 音效合成的对照 `test/fixtures/sfx.json` 是冻结的，没有生成它的脚本；`lib/audio/synth.dart` 有意改了声音时，同一个改动里手改它。
 

@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "flutter:check": "cd server && go run ./tool/shapegen -check && cd ../app && flutter analyze && flutter test && cd .. && bun scripts/app-imports.ts",
+    "flutter:check": "cd server && go run ./tool/shapegen -check && cd ../app && sh tool/format-check.sh && flutter analyze && flutter test && cd .. && bun scripts/app-imports.ts",
     "notes:verify": "bun scripts/agent-notes.ts",
     "notes:catalog": "bun scripts/agent-notes.ts --write",
     "docs:verify": "bun scripts/agent-notes.ts && bun scripts/skills.ts && bun scripts/doc-links.ts && bun scripts/stale-names.ts",

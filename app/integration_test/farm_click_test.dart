@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/main.dart';
+import 'package:vibevalley/app/app.dart';
 import 'package:vibevalley/data/ui_state.dart';
 import 'package:vibevalley/village/village_view.dart';
 import 'package:integration_test/integration_test.dart';

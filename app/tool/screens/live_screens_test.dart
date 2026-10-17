@@ -19,7 +19,7 @@ import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/data/server.dart';
 import 'package:vibevalley/host/desktop.dart';
-import 'package:vibevalley/main.dart';
+import 'package:vibevalley/app/app.dart';
 import 'package:vibevalley/data/ui_state.dart';
 
 // name: route, or 'route|text' to tap the (last) widget showing that text once the page is up: a tab, a panel's
