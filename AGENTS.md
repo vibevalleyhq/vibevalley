@@ -36,6 +36,7 @@ bun run go:deadcode                                             # 改完服务�
 cd server && go run ./tool/shapegen                             # 改完 protocol/shapes.go 或 api.go：重写 gen.go 和 Flutter 的 lib/gen
 cd server && GOTOOLCHAIN=go1.27.2 go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate   # 改完 pkg/db/queries 或 migrations：重写 pkg/db/generated
 cd server && VIBEVALLEY_GOLDEN=update go test ./internal/...           # 有意改了规则：用 Go 的结果重写各包的黄金数据，再看 diff
+cd server && go test -tags evals -run TestManagerEvalsLive -count=1 -v ./internal/manager   # 改了管家的提示或工具描述：真模型重放管家的样例（要 DEEPSEEK_API_KEY、花钱，先问主人；verify-manager-evals）
 cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787   # 客户端连开着的服务端
 bun run flutter:check                                           # 改完 app 或形状：生成的是否最新、analyze、test、import 分层
 bun run app:imports                                             # 改完 app/lib 的 import：只能往下一层走（flutter:check 也跑）
