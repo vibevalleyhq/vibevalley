@@ -28,7 +28,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 讲什么 |
 |---|---|
 | [code.md](style/code.md) | 代码：格式、叫法、注释写什么不写什么 |
-| [writing.md](style/writing.md) | 文字：文档、Note、提交说明和注释的句子怎么写 |
+| [writing.md](style/writing.md) | 文字：写什么、删什么，词和格式怎么写；文档、Note、skill、提交说明、注释和回复都用 |
 
 ## 用语
 
