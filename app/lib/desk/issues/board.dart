@@ -12,7 +12,7 @@ import '../../data/ui_state.dart' show FarmPanel, panelProvider, planShownProvid
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../../shared/faces.dart';
 import 'issues_page.dart';
 
@@ -179,7 +179,7 @@ class _LaneView extends StatelessWidget {
             const SizedBox(height: 8),
             Expanded(
               child: loading
-                  ? const DeskEmpty('在读……')
+                  ? const EmptyNote('在读……')
                   : cards.isEmpty
                   ? Text(_emptyText[lane]!, style: KitText.xs.copyWith(color: Palette.bark400, height: 1.625))
                   : ListView.separated(
@@ -187,7 +187,7 @@ class _LaneView extends StatelessWidget {
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, i) {
                         if (i == shown.length) {
-                          return Center(child: DeskLink(hidden > 0 ? '更早的 $hidden 张' : '只看最近的', onTap: onOlder));
+                          return Center(child: InlineLink(hidden > 0 ? '更早的 $hidden 张' : '只看最近的', onTap: onOlder));
                         }
                         final card = shown[i];
                         final view = _CardView(card: card, selected: card.id == selected, onOpen: onOpen);

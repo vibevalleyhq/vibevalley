@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../../data/providers.dart';
 
 enum RuntimeBusy { refreshing, upgrading }
@@ -26,7 +26,7 @@ class RuntimeCommands extends Notifier<Map<String, RuntimeBusy>> {
   Future<void> _withBusy(String id, RuntimeBusy what, Future<RuntimeInfo> Function() run) async {
     _set(id, what);
     try {
-      if (await deskRun(run) != null) await ref.read(deskConfigProvider.notifier).refresh();
+      if (await runAction(run) != null) await ref.read(deskConfigProvider.notifier).refresh();
     } finally {
       if (ref.mounted) _set(id, null);
     }
@@ -37,6 +37,6 @@ class RuntimeCommands extends Notifier<Map<String, RuntimeBusy>> {
   Future<void> upgrade(String id) => _withBusy(id, RuntimeBusy.upgrading, () => _api.runtime.upgrade(id: id));
 
   Future<void> update(String id, RuntimeSettings settings) async {
-    if (await deskRun(() => _api.runtime.update(id: id, body: settings)) != null) await ref.read(deskConfigProvider.notifier).refresh();
+    if (await runAction(() => _api.runtime.update(id: id, body: settings)) != null) await ref.read(deskConfigProvider.notifier).refresh();
   }
 }

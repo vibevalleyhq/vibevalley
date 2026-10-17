@@ -8,7 +8,7 @@ import '../audio/sfx.dart';
 import 'bug_snake.dart';
 import 'lcd.dart';
 import 'pad.dart';
-import 'widgets.dart';
+import 'kit.dart';
 
 final bugSnakeGameProvider = NotifierProvider<Kept<BugSnake?>, BugSnake?>(() => Kept(null));
 final bugSnakeBestProvider = NotifierProvider<Kept<int>, int>(() => Kept(0));

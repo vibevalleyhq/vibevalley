@@ -6,7 +6,7 @@ import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import '../../shared/faces.dart';
 import '../../shared/looks.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../../rules/looks.dart';
 
 const stagePoses = [

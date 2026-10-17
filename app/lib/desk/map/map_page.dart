@@ -18,7 +18,7 @@ import '../projects/projects_page.dart' show since;
 import '../projects/projects_state.dart';
 import '../../shared/faces.dart' show AgentFaceOf, PoseSprite;
 import '../../shared/looks.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import 'map_rules.dart';
 
 /// The issues and helpers come with the farm's state.
@@ -77,7 +77,7 @@ class _MapPageState extends ConsumerState<MapPage> {
           children: [
             Align(
               alignment: Alignment.centerRight,
-              child: DeskLink(wide ? '收起' : '回地图', onTap: () => _open(null)),
+              child: InlineLink(wide ? '收起' : '回地图', onTap: () => _open(null)),
             ),
             const SizedBox(height: 6),
             Expanded(
@@ -511,7 +511,7 @@ class _Homeless extends StatelessWidget {
                 const SizedBox(width: 4),
                 DefaultTextStyle(
                   style: KitText.xs,
-                  child: DeskLink(h.name, onTap: () => deskGo(context, '/issues/${Uri.encodeComponent(h.id)}')),
+                  child: InlineLink(h.name, onTap: () => deskGo(context, '/issues/${Uri.encodeComponent(h.id)}')),
                 ),
               ],
             ),
@@ -572,7 +572,7 @@ class _IslandDetail extends StatelessWidget {
             const SizedBox(height: 12),
             Text('Worktree · ${taken.length} 个', style: KitText.sm),
             const SizedBox(height: 6),
-            if (taken.isEmpty) const DeskEmpty('岛上还没有帮工：每派一件活来，就多一个 worktree。') else for (final t in taken) _WorktreeRow(spot: t, now: now),
+            if (taken.isEmpty) const EmptyNote('岛上还没有帮工：每派一件活来，就多一个 worktree。') else for (final t in taken) _WorktreeRow(spot: t, now: now),
             const SizedBox(height: 12),
             Row(
               children: [

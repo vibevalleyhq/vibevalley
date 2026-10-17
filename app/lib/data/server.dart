@@ -121,3 +121,5 @@ class _Keyed extends http.BaseClient {
   @override
   void close() => _inner.close();
 }
+
+const connectWait = Duration(seconds: 20);

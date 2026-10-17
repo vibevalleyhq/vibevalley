@@ -8,7 +8,7 @@ import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import 'codebase.dart';
 import 'projects_state.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 
 Future<void> showNewProjectDialog(BuildContext context) => showPxDialog<void>(
   context,

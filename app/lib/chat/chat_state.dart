@@ -6,12 +6,12 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
+import '../data/server.dart' show connectWait;
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../data/remote.dart' show agentsProvider;
 import '../voice/captions.dart';
 import '../rules/chat.dart';
-import '../rules/session.dart';
 
 const chatPage = 50;
 

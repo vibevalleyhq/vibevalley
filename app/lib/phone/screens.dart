@@ -12,7 +12,7 @@ import '../data/remote.dart' show agentsProvider;
 import '../voice/voice.dart';
 import 'calls.dart';
 import 'lcd.dart';
-import 'widgets.dart';
+import 'kit.dart';
 import '../rules/view.dart';
 import 'bug_snake_game.dart';
 import 'merge_game.dart';

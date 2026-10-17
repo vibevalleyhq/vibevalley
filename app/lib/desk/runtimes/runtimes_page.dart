@@ -9,7 +9,7 @@ import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../shared/layout.dart';
 import 'runtime_facts.dart';
 import 'runtimes_state.dart';

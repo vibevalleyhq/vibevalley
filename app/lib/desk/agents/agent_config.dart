@@ -7,7 +7,7 @@ import '../../shared/faces.dart';
 import '../shared/memory_panels.dart';
 import '../shared/rules.dart';
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../../shared/work_log.dart';
 import '../../rules/seeds.dart';
 
@@ -380,7 +380,7 @@ class _SkillPicker extends ConsumerWidget {
       children: [
         PxField(
           label: '技能库',
-          aside: DeskLink('管理技能库 →', onTap: () => deskGo(context, '/skills')),
+          aside: InlineLink('管理技能库 →', onTap: () => deskGo(context, '/skills')),
           hint: const Text('选中的技能跟人设一起交给帮工，每个技能一节。'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

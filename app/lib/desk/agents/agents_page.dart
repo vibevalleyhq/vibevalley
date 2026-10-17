@@ -8,7 +8,7 @@ import '../../shared/faces.dart';
 import '../../shared/looks.dart';
 import '../shared/rules.dart';
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../../rules/seeds.dart';
 
 class AgentsPage extends ConsumerWidget {
@@ -274,7 +274,7 @@ class _AgentCard extends ConsumerWidget {
                         Flexible(
                           child: Text(a.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.base),
                         ),
-                        if (here > 0) ...[const SizedBox(width: 8), DeskBadge('在场 $here', hat: true)],
+                        if (here > 0) ...[const SizedBox(width: 8), BadgeLabel('在场 $here', hat: true)],
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -378,7 +378,7 @@ class _Toggle extends ConsumerWidget {
     final a = agent;
     final label = a.enabled ? '停用' : '启用';
     return KitTappable(
-      onTap: () => deskRun(() => ref.read(deskConfigProvider.notifier).saveAgent(a.copyWith(enabled: !a.enabled))),
+      onTap: () => runAction(() => ref.read(deskConfigProvider.notifier).saveAgent(a.copyWith(enabled: !a.enabled))),
       semanticLabel: '$label ${a.name}',
       builder: (context, s) => Opacity(
         opacity: shown || s.focused ? 1 : 0,

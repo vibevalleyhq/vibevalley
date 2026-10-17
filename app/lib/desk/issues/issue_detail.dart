@@ -14,7 +14,7 @@ import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import '../projects/new_project_dialog.dart' show showNewProjectDialog;
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../../shared/work_log.dart';
 import 'issues_page.dart';
 
@@ -53,7 +53,7 @@ class _CloseIssueState extends ConsumerState<CloseIssue> {
               working ? '叫停并收工' : '不收，直接收工',
               tone: PxTone.danger,
               onPressed: () async {
-                await deskRun(() => ref.read(apiProvider).issue.cancel(id: session.issueId));
+                await runAction(() => ref.read(apiProvider).issue.cancel(id: session.issueId));
                 done();
               },
             ),
@@ -146,7 +146,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
 
   Future<void> _run(Future<void> Function(VibeValleyApi api) act) async {
     setState(() => _busy = true);
-    await deskRun(() => act(ref.read(apiProvider)));
+    await runAction(() => act(ref.read(apiProvider)));
     await widget.reload();
     if (mounted) setState(() => _busy = false);
   }
@@ -231,7 +231,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
           const SizedBox(height: 12),
           PxField(
             label: '项目',
-            hint: projects.isEmpty ? DeskLink('工作目录里还没有项目：新建一个', onTap: () => _newProject(context)) : DeskLink('＋ 新建项目', onTap: () => _newProject(context)),
+            hint: projects.isEmpty ? InlineLink('工作目录里还没有项目：新建一个', onTap: () => _newProject(context)) : InlineLink('＋ 新建项目', onTap: () => _newProject(context)),
             child: PxPick(
               value: _project,
               placeholder: '在哪个项目里做',
@@ -335,7 +335,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
   @override
   void initState() {
     super.initState();
-    unawaited(deskRun(() => ref.read(workStepsProvider.notifier).load(widget.sessions.last.id)));
+    unawaited(runAction(() => ref.read(workStepsProvider.notifier).load(widget.sessions.last.id)));
     _askChanges(first: true);
   }
 
@@ -362,7 +362,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
 
   Future<void> _act(Future<void> Function() act) async {
     setState(() => _busy = true);
-    await deskRun(act);
+    await runAction(act);
     await widget.reload();
     if (mounted) setState(() => _busy = false);
   }
@@ -372,7 +372,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
     final text = _word.trim();
     if (session == null || text.isEmpty) return;
     setState(() => _busy = true);
-    final done = await deskRun(() async {
+    final done = await runAction(() async {
       await ref.read(farmCommandsProvider).water(session, text);
       return true;
     });
@@ -385,7 +385,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
 
   Future<void> _reopen() async {
     setState(() => _busy = true);
-    final got = await deskRun(
+    final got = await runAction(
       () => _api.issue.reopen(
         id: widget.issue.id,
         body: ReopenRequest(text: _word.trim()),
@@ -566,7 +566,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
         PxCard(
           title: '干活过程',
           child: steps.isEmpty
-              ? DeskEmpty(head.endedAt == null ? '还没有步骤。' : '干活过程只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了；它是谁做的、怎么关的还在上面。')
+              ? EmptyNote(head.endedAt == null ? '还没有步骤。' : '干活过程只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了；它是谁做的、怎么关的还在上面。')
               : Ticking(
                   builder: (context, now) => WorkLog(
                     steps: steps,

@@ -8,7 +8,7 @@ import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import 'voice_rules.dart';
 import 'voice_samples.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 
 const _areaLabel = <Area, String>{Area.uS: '美国', Area.eU: '欧洲', Area.aP: '亚太', Area.cN: '中国大陆'};
 const _languageLabel = <Language, String>{

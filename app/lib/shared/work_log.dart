@@ -191,7 +191,7 @@ class _WorkLogState extends State<WorkLog> {
           if (!open && round.steps.length > shown.length)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: DeskLink('看这一轮的 ${round.steps.length} 步', onTap: () => setState(() => _toggled[_idOf(round)] = true)),
+              child: InlineLink('看这一轮的 ${round.steps.length} 步', onTap: () => setState(() => _toggled[_idOf(round)] = true)),
             ),
         ],
       ),
@@ -267,7 +267,7 @@ class _CommentableState extends State<_Commentable> {
                     child: Container(
                       color: Palette.cream50,
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: DeskLink('评论', onTap: () => setState(() => _writing = true)),
+                      child: InlineLink('评论', onTap: () => setState(() => _writing = true)),
                     ),
                   ),
               ],
@@ -368,7 +368,7 @@ class _CommentBoxState extends State<_CommentBox> {
     final text = _text.trim();
     if (text.isEmpty || _busy) return;
     setState(() => _busy = true);
-    final sent = await deskRun(() async {
+    final sent = await runAction(() async {
       await widget.send(widget.step, text);
       return true;
     });
@@ -562,7 +562,7 @@ class _FoldedState extends State<_Folded> {
         if (long)
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: DeskLink(_open ? '收起' : '展开全部', onTap: () => setState(() => _open = !_open)),
+            child: InlineLink(_open ? '收起' : '展开全部', onTap: () => setState(() => _open = !_open)),
           ),
       ],
     );
@@ -725,16 +725,16 @@ class _TrajectoryLogState extends ConsumerState<TrajectoryLog> {
   }
 
   Future<void> _load() async {
-    final head = await deskRun(() => ref.read(workStepsProvider.notifier).load(widget.id));
+    final head = await runAction(() => ref.read(workStepsProvider.notifier).load(widget.id));
     if (mounted) setState(() => _found = head != null);
   }
 
   @override
   Widget build(BuildContext context) {
     final steps = ref.watch(workStepsProvider.select((all) => all[widget.id]));
-    if (_found == null && steps == null) return const DeskEmpty('在读……');
+    if (_found == null && steps == null) return const EmptyNote('在读……');
     if (steps == null || steps.isEmpty) {
-      return DeskEmpty(_found == false && steps == null ? '没有轨迹：它可能早就过了保留的日子。' : widget.empty);
+      return EmptyNote(_found == false && steps == null ? '没有轨迹：它可能早就过了保留的日子。' : widget.empty);
     }
     return WorkLog(steps: steps, now: _now(), asked: widget.asked, tall: true);
   }
@@ -759,7 +759,7 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
   }
 
   Future<void> _load() async {
-    final heads = await deskRun(() => ref.read(apiProvider).session.list(agent: widget.agent));
+    final heads = await runAction(() => ref.read(apiProvider).session.list(agent: widget.agent));
     if (mounted) setState(() => _heads = heads ?? const []);
   }
 
@@ -774,9 +774,9 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
         Text('它派出去的每个帮工，从接活起的每一步：收到的话、用的每个工具（点开看输入和输出）、说的话。收工以后步骤留 30 天，帮工本身一直列着。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark600)),
         const SizedBox(height: 16),
         if (heads == null)
-          const DeskEmpty('在读……')
+          const EmptyNote('在读……')
         else if (heads.isEmpty)
-          const DeskEmpty('还没派出去过。')
+          const EmptyNote('还没派出去过。')
         else
           for (final h in heads)
             Padding(
@@ -803,7 +803,7 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
                                 if (h.project != null) Text(h.project!, style: KitText.xs.copyWith(color: Palette.bark500)),
                                 Text('${ago(h.hiredAt, now)}接活', style: KitText.xs.copyWith(color: Palette.bark500)),
                                 if (h.endedAt == null)
-                                  const DeskBadge('在场', hat: true)
+                                  const BadgeLabel('在场', hat: true)
                                 else
                                   Text('${ago(h.endedAt!, now)}走的', style: KitText.xs.copyWith(color: Palette.bark500)),
                               ],

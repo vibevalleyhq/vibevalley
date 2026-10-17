@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
+import '../data/server.dart' show connectWait;
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../data/remote.dart' show agentsProvider, SessionIssue;
 import 'farm.dart';
 import 'state.dart';
 import '../rules/playbook.dart';
-import '../rules/session.dart';
 
 final farmCommandsProvider = Provider<FarmCommands>(FarmCommands.new);
 

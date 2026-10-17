@@ -10,7 +10,7 @@ import '../../ui/kit/choice.dart';
 import '../../ui/kit/field.dart';
 import '../../ui/kit/labels.dart';
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import './widgets.dart';
 import '../../rules/playbook.dart';
 
 /// Notes its helpers could still add before the oldest are dropped: those are marked 快忘了.
@@ -39,7 +39,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
   @override
   void initState() {
     super.initState();
-    deskRun(() => ref.read(memoriesProvider.notifier).load(widget.agent));
+    runAction(() => ref.read(memoriesProvider.notifier).load(widget.agent));
   }
 
   @override
@@ -63,7 +63,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
           title: '手上的活',
           count: jobs.length,
           child: jobs.isEmpty
-              ? const DeskEmpty('它的帮工还没做完过一轮。')
+              ? const EmptyNote('它的帮工还没做完过一轮。')
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -115,13 +115,13 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                   ),
                 ),
               if (filtered.isEmpty)
-                DeskEmpty(notes.isNotEmpty ? '这一栏没有。' : '还没记下什么。帮工在汇报里写「记住：」，或者你在上面替它记。')
+                EmptyNote(notes.isNotEmpty ? '这一栏没有。' : '还没记下什么。帮工在汇报里写「记住：」，或者你在上面替它记。')
               else
                 for (final m in filtered)
                   MemoryItem(
                     memory: m,
                     faded: m.fading == true,
-                    onForget: () => deskRun(() => ref.read(memoriesProvider.notifier).forget(widget.agent, m.id)),
+                    onForget: () => runAction(() => ref.read(memoriesProvider.notifier).forget(widget.agent, m.id)),
                     meta: [
                       m.project ?? '所有项目',
                       whose(m),
@@ -183,7 +183,7 @@ class _RecallPreviewState extends ConsumerState<_RecallPreview> {
           ),
           const SizedBox(height: 8),
           if (lines.isEmpty)
-            DeskEmpty(where.isNotEmpty ? '在这个项目里开工，什么也想不起来。' : '还没有项目。')
+            EmptyNote(where.isNotEmpty ? '在这个项目里开工，什么也想不起来。' : '还没有项目。')
           else
             Container(
               color: Palette.cream100,
@@ -207,13 +207,13 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
   @override
   void initState() {
     super.initState();
-    deskRun(() => ref.read(managerMemoryProvider.notifier).load());
+    runAction(() => ref.read(managerMemoryProvider.notifier).load());
   }
 
   @override
   Widget build(BuildContext context) {
     final view = ref.watch(managerMemoryProvider);
-    if (view == null) return const DeskEmpty('在读管家的记性……');
+    if (view == null) return const EmptyNote('在读管家的记性……');
     final now = _now();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -229,7 +229,7 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
             child: Text(view.file ?? '', style: KitText.mono.copyWith(color: Palette.bark500)),
           ),
           child: view.memories.isEmpty
-              ? const DeskEmpty('还没记下什么。跟管家说「记住……」，或者你在上面替它记。')
+              ? const EmptyNote('还没记下什么。跟管家说「记住……」，或者你在上面替它记。')
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -237,7 +237,7 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
                       MemoryItem(
                         memory: m,
                         faded: i >= (view.carried ?? view.memories.length),
-                        onForget: () => deskRun(() => ref.read(managerMemoryProvider.notifier).forget(m.id)),
+                        onForget: () => runAction(() => ref.read(managerMemoryProvider.notifier).forget(m.id)),
                         meta: [m.session == managerAgent ? '管家自己记的' : '你交代的', ago(m.at, now)],
                         warning: i >= (view.carried ?? view.memories.length) ? '太旧了，带不进系统提示' : null,
                       ),
@@ -268,7 +268,7 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
   }
 
   Future<void> _search(String? q) async {
-    final listing = await deskRun(() => ref.read(apiProvider).manager.listArchive(q: q));
+    final listing = await runAction(() => ref.read(apiProvider).manager.listArchive(q: q));
     if (mounted && listing != null) setState(() => _listing = listing);
   }
 
@@ -336,9 +336,9 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
           title: '压掉的对话',
           count: listing?.files.length ?? 0,
           child: listing == null
-              ? const DeskEmpty('在读……')
+              ? const EmptyNote('在读……')
               : listing.files.isEmpty
-              ? const DeskEmpty('还没有：管家的对话还没长到要压缩。')
+              ? const EmptyNote('还没有：管家的对话还没长到要压缩。')
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [

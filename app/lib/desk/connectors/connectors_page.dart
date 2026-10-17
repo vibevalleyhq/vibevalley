@@ -9,7 +9,7 @@ import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import 'qr.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../../rules/chat.dart';
 
 const connectorLabel = <ConnectorId, String>{ConnectorId.weixin: '微信', ConnectorId.feishu: '飞书', ConnectorId.qq: 'QQ'};

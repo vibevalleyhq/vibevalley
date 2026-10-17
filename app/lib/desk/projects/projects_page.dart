@@ -14,7 +14,7 @@ import '../../data/remote.dart';
 import 'codebase.dart';
 import 'new_project_dialog.dart';
 import 'projects_state.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 
 class ProjectsPage extends ConsumerStatefulWidget {
   const ProjectsPage({super.key, this.id});

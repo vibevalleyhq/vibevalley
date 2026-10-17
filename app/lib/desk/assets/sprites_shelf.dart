@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ui/kit/kit.dart';
 import 'assets_data.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import 'assets_page.dart';
 
 class SpritesShelf extends ConsumerStatefulWidget {

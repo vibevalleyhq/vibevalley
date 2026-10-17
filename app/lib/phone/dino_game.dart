@@ -8,7 +8,7 @@ import '../audio/sfx.dart';
 import 'dino.dart';
 import 'lcd.dart';
 import 'pad.dart';
-import 'widgets.dart';
+import 'kit.dart';
 
 final dinoBestProvider = NotifierProvider<Kept<int>, int>(() => Kept(0));
 

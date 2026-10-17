@@ -5,7 +5,7 @@ import '../../data/prefs.dart';
 import '../../ui/kit/kit.dart';
 import '../../shared/faces.dart';
 import '../shared/memory_panels.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../../shared/work_log.dart';
 import '../voice/voice_page.dart';
 import '../../gen/vibevalley.dart' show managerAgent;
@@ -74,7 +74,7 @@ class _ManagerPageState extends ConsumerState<ManagerPage> {
                         children: [
                           DefaultTextStyle(
                             style: KitText.xs.copyWith(color: Palette.bark500),
-                            child: DeskLink('← 全部帮工', color: Palette.bark500, onTap: () => deskGo(context, '/agents')),
+                            child: InlineLink('← 全部帮工', color: Palette.bark500, onTap: () => deskGo(context, '/agents')),
                           ),
                           const Text('管家', style: KitText.x2l),
                           Text(

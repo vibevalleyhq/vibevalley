@@ -8,7 +8,7 @@ import '../audio/sfx.dart';
 import 'blocks.dart';
 import 'lcd.dart';
 import 'pad.dart';
-import 'widgets.dart';
+import 'kit.dart';
 
 final blocksGameProvider = NotifierProvider<Kept<Blocks?>, Blocks?>(() => Kept(null));
 final blocksBestProvider = NotifierProvider<Kept<int>, int>(() => Kept(0));

@@ -13,7 +13,7 @@ import '../../ui/kit/kit.dart';
 import '../connectors/qr.dart';
 import '../shared/layout.dart';
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import 'scan_page.dart';
 import '../../data/providers.dart';
 
@@ -67,7 +67,7 @@ class _GatePageState extends ConsumerState<GatePage> {
   }
 
   Future<void> _act(Future<LanStatus> Function(GateApi api) call) async {
-    final got = await deskRun(() => call(_api));
+    final got = await runAction(() => call(_api));
     if (got != null && mounted) setState(() => _status = got);
   }
 

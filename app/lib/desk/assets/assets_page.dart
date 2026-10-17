@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../ui/kit/kit.dart';
 import 'assets_data.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import 'cursors_shelf.dart';
 import 'sounds_shelf.dart';
 import 'sprites_shelf.dart';

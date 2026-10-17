@@ -8,7 +8,7 @@ import '../../ui/kit/kit.dart';
 import '../../shared/looks.dart';
 import '../shared/rules.dart';
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../../rules/seeds.dart';
 import 'agent_config.dart';
 import 'agent_look.dart';
@@ -102,7 +102,7 @@ class _AgentCreatorPageState extends ConsumerState<AgentCreatorPage> {
           child: Row(
             children: [
               const Text('没有这个帮工。'),
-              DeskLink('回到全部帮工', onTap: () => deskGo(context, '/agents')),
+              InlineLink('回到全部帮工', onTap: () => deskGo(context, '/agents')),
             ],
           ),
         ),
@@ -133,7 +133,7 @@ class _CreatorState extends ConsumerState<_Creator> {
     final draft = widget.draft;
     setState(() => _saving = true);
     final name = draft.name.trim();
-    final ok = await deskRun(() async {
+    final ok = await runAction(() async {
       await ref.read(deskConfigProvider.notifier).saveAgent(draft.copyWith(name: name.isEmpty ? '无名 agent' : name));
       return true;
     });
@@ -161,7 +161,7 @@ class _CreatorState extends ConsumerState<_Creator> {
             foregroundDecoration: pxRing,
             child: DefaultTextStyle(
               style: KitText.sm.copyWith(color: Palette.bark600),
-              child: DeskLink('← 全部帮工', color: Palette.bark600, onTap: () => deskGo(context, '/agents')),
+              child: InlineLink('← 全部帮工', color: Palette.bark600, onTap: () => deskGo(context, '/agents')),
             ),
           ),
           const SizedBox(width: 12),
@@ -174,7 +174,7 @@ class _CreatorState extends ConsumerState<_Creator> {
                   child: Text(draft.name.isEmpty ? '无名帮工' : draft.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.lg),
                 ),
                 const SizedBox(width: 12),
-                if (widget.isNew) const DeskBadge('新的', hat: true) else if (dirty) const DeskBadge('没保存', hat: true) else const DeskBadge('已保存'),
+                if (widget.isNew) const BadgeLabel('新的', hat: true) else if (dirty) const BadgeLabel('没保存', hat: true) else const BadgeLabel('已保存'),
               ],
             ),
           ),
@@ -309,7 +309,7 @@ class _DeleteButtonState extends ConsumerState<_DeleteButton> {
           '删除',
           tone: PxTone.danger,
           onPressed: () async {
-            final done = await deskRun(() async {
+            final done = await runAction(() async {
               await ref.read(deskConfigProvider.notifier).deleteAgent(widget.agent.id);
               return true;
             });

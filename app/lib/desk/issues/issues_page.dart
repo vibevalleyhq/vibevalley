@@ -10,7 +10,7 @@ import '../../rules/issues.dart';
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import 'board.dart';
 import 'issue_detail.dart';
 
@@ -210,7 +210,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
   Future<void> _toggleOlder() async {
     setState(() => _older = !_older);
     if (!_older) return;
-    final all = await deskRun(_api.issue.list);
+    final all = await runAction(_api.issue.list);
     if (all != null && mounted) setState(() => _history = all);
   }
 
@@ -224,7 +224,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         _open(item.id);
         toasts.add(type: ToastType.info, title: '还差一点', description: '选好派哪个帮工、在哪个项目里做，再点「开工」。');
       case (Move.start, TodoCard(:final item)):
-        final got = await deskRun(() => _api.issue.start(id: item.id));
+        final got = await runAction(() => _api.issue.start(id: item.id));
         await _load();
         if (got != null) dispatchedNotice(got, item.id, _open);
       case (Move.close, IssueCard(:final issue, :final session?)):
@@ -243,7 +243,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
           builder: (_) => ReopenForm(issue: issue),
         );
         if (text == null) return;
-        final got = await deskRun(
+        final got = await runAction(
           () => _api.issue.reopen(
             id: issue.id,
             body: ReopenRequest(text: text),
@@ -258,7 +258,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
 
   Future<void> _place(TodoCard card, String? before) async {
     if (card.id == before) return;
-    await deskRun(
+    await runAction(
       () => _api.issue.move(
         id: card.id,
         body: MoveIssueRequest(before: before),
@@ -271,7 +271,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
     final (lastAgent, lastProject) = await lastPick();
     final agent = f.agent.isNotEmpty ? f.agent : lastAgent;
     final project = f.project.isNotEmpty ? f.project : lastProject;
-    await deskRun(
+    await runAction(
       () => _api.issue.create(
         body: IssueRequest(title: text, project: project.isEmpty ? null : project, assignee: agent.isEmpty ? null : agent),
       ),
@@ -344,7 +344,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
           children: [
             Align(
               alignment: Alignment.centerRight,
-              child: DeskLink(box.maxWidth >= sideBySideFrom ? '收起' : '回看板', onTap: () => _open(null)),
+              child: InlineLink(box.maxWidth >= sideBySideFrom ? '收起' : '回看板', onTap: () => _open(null)),
             ),
             const SizedBox(height: 6),
             Expanded(child: PxScrollView(child: detail)),
@@ -427,7 +427,7 @@ class _Toolbar extends ConsumerWidget {
           ),
           if (filter.any) ...[
             Text('$shown / ${cards.length} 张', style: KitText.xs.copyWith(color: Palette.bark500)),
-            DeskLink('清掉筛选', onTap: () => onChanged(const BoardFilter())),
+            InlineLink('清掉筛选', onTap: () => onChanged(const BoardFilter())),
           ],
         ],
       ),

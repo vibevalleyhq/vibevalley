@@ -7,7 +7,7 @@ import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
-import '../../shared/widgets.dart';
+import '../shared/widgets.dart';
 import '../../rules/seeds.dart';
 
 const _installed = 'installed:';
@@ -289,7 +289,7 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
   Future<void> _save() async {
     final skills = ref.read(deskConfigProvider).skills;
     final id = _draft.id.isNotEmpty ? _draft.id : slug(_draft.name, {for (final s in skills) s.id});
-    final done = await deskRun(() async {
+    final done = await runAction(() async {
       await ref.read(deskConfigProvider.notifier).saveSkill(Skill(id: id, name: _draft.name.trim(), description: _draft.description, body: _draft.body));
       return true;
     });
@@ -297,7 +297,7 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
   }
 
   Future<void> _delete(Skill skill) async {
-    final done = await deskRun(() async {
+    final done = await runAction(() async {
       await ref.read(deskConfigProvider.notifier).deleteSkill(skill.id);
       return true;
     });

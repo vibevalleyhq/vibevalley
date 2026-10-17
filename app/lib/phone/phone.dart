@@ -18,7 +18,7 @@ import 'lcd.dart';
 import 'pad.dart';
 import 'screens.dart';
 import 'sokoban_game.dart';
-import 'widgets.dart';
+import 'kit.dart';
 
 export 'calls.dart' show phoneProvider, PhoneState;
 

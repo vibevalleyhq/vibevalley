@@ -7,7 +7,7 @@ import '../audio/sfx.dart';
 import 'lcd.dart';
 import 'merge.dart';
 import 'pad.dart';
-import 'widgets.dart';
+import 'kit.dart';
 
 final mergeGameProvider = NotifierProvider<Kept<Merge?>, Merge?>(() => Kept(null));
 final mergeBestProvider = NotifierProvider<Kept<int>, int>(() => Kept(0));
