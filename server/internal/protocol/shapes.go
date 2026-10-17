@@ -392,12 +392,14 @@ type PlaybookNode struct {
 }
 
 type Playbook struct {
-	ID        string         `json:"id"`
-	Title     string         `json:"title"`
-	Goal      string         `json:"goal"`
-	Project   string         `json:"project"`
-	Branch    *string        `json:"branch,omitzero"`
-	State     PlaybookState  `json:"state"`
+	ID      string        `json:"id"`
+	Title   string        `json:"title"`
+	Goal    string        `json:"goal"`
+	Project string        `json:"project"`
+	Branch  *string       `json:"branch,omitzero"`
+	State   PlaybookState `json:"state"`
+	// Filled by FrameOf: the short tag for State. The state and the file keep none.
+	StateTag  string         `json:"stateTag,omitzero"`
 	Nodes     []PlaybookNode `json:"nodes"`
 	Parallel  int64          `json:"parallel"`
 	Note      *string        `json:"note,omitzero"`

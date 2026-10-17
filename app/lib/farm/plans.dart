@@ -16,17 +16,17 @@ import '../rules/money.dart';
 import 'plan_board.dart';
 import 'plan_log.dart';
 
-const _stateTag = {
-  PlaybookState.planning: ('在拆', Color(0xFFD5DCD7), Palette.bark800),
-  PlaybookState.draft: ('等你看', Color(0xFFEFD08F), Palette.bark900),
-  PlaybookState.running: ('在做', Palette.leaf500, Palette.cream50),
-  PlaybookState.paused: ('暂停了', Palette.cream300, Palette.bark800),
-  PlaybookState.ripe: ('可收获', Palette.wheat, Palette.bark900),
-  PlaybookState.done: ('收完了', Palette.cream200, Palette.bark600),
-  PlaybookState.abandoned: ('放弃了', Palette.cream200, Palette.bark500),
+const _stateTone = {
+  PlaybookState.planning: (Color(0xFFD5DCD7), Palette.bark800),
+  PlaybookState.draft: (Color(0xFFEFD08F), Palette.bark900),
+  PlaybookState.running: (Palette.leaf500, Palette.cream50),
+  PlaybookState.paused: (Palette.cream300, Palette.bark800),
+  PlaybookState.ripe: (Palette.wheat, Palette.bark900),
+  PlaybookState.done: (Palette.cream200, Palette.bark600),
+  PlaybookState.abandoned: (Palette.cream200, Palette.bark500),
 };
 
-FarmTag _tagOf(PlaybookState s) => FarmTag(_stateTag[s]!.$1, fill: _stateTag[s]!.$2, ink: _stateTag[s]!.$3);
+FarmTag _tagOf(Playbook p) => FarmTag(p.stateTag ?? '', fill: _stateTone[p.state]!.$1, ink: _stateTone[p.state]!.$2);
 
 class Plans extends ConsumerStatefulWidget {
   const Plans({super.key});
@@ -78,7 +78,7 @@ class _PlansState extends ConsumerState<Plans> {
                           child: Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.xs),
                         ),
                         const SizedBox(width: 6),
-                        _tagOf(p.state),
+                        _tagOf(p),
                       ],
                     ),
                   ),
@@ -241,7 +241,7 @@ class _PlanViewState extends ConsumerState<PlanView> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(pb.title, style: KitText.sm),
-                  _tagOf(pb.state),
+                  _tagOf(pb),
                   if (pb.nodes.isNotEmpty) Text('$settled/${pb.nodes.length} 步', style: xs),
                   if (spent != null) Text('花了 ${spentText(spent)}', style: xs),
                 ],

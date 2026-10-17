@@ -38,6 +38,7 @@ void main() {
     goal: '给 clock-in 加按月查询',
     project: 'clock-in',
     state: PlaybookState.draft,
+    stateTag: '等你看',
     nodes: [
       node('api', '接口'),
       node('ui', '页面', needs: ['api'], blockedBy: ['api']),
@@ -58,6 +59,7 @@ void main() {
     project: 'farm',
     branch: 'vibevalley/p2',
     state: PlaybookState.ripe,
+    stateTag: '可收获',
     nodes: [node('css', '样式', state: NodeState.merged, conclusion: '改好了')],
     parallel: 1,
     createdAt: 1,

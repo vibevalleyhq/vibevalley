@@ -103,6 +103,17 @@ var PlaybookStateText = map[PlaybookState]string{
 	PlaybookStateAbandoned: "放弃了",
 }
 
+// The short tag beside a plan's state in the list; PlaybookStateText is the longer sentence.
+var PlaybookStateTag = map[PlaybookState]string{
+	PlaybookStatePlanning:  "在拆",
+	PlaybookStateDraft:     "等你看",
+	PlaybookStateRunning:   "在做",
+	PlaybookStatePaused:    "暂停了",
+	PlaybookStateRipe:      "可收获",
+	PlaybookStateDone:      "收完了",
+	PlaybookStateAbandoned: "放弃了",
+}
+
 var NodeStateText = map[NodeState]string{
 	NodeStateWaiting: "等着",
 	NodeStateWorking: "在做",

@@ -10,6 +10,7 @@ func FrameOf(state CoreState, effects []GameEffect) StateFrame {
 	}
 	plans := PlaybooksOf(state)
 	for i := range plans {
+		plans[i].StateTag = PlaybookStateTag[plans[i].State]
 		if len(plans[i].Nodes) == 0 {
 			continue
 		}
