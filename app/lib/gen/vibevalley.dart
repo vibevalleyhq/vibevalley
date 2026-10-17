@@ -786,6 +786,9 @@ class PlaybookNode {
     this.failures,
     this.blockedBy,
     this.stateText,
+    this.actions,
+    this.canEdit,
+    this.canRemove,
   });
 
   factory PlaybookNode.fromJson(Map<String, dynamic> j) => PlaybookNode(
@@ -807,6 +810,9 @@ class PlaybookNode {
     failures: j['failures'] == null ? null : (j['failures'] as num).toDouble(),
     blockedBy: j['blockedBy'] == null ? null : [for (final e in j['blockedBy'] as List) e as String],
     stateText: j['stateText'] == null ? null : j['stateText'] as String,
+    actions: j['actions'] == null ? null : [for (final e in j['actions'] as List) NodeAction.fromJson(e)],
+    canEdit: j['canEdit'] == null ? null : j['canEdit'] as bool,
+    canRemove: j['canRemove'] == null ? null : j['canRemove'] as bool,
   );
 
   final String id;
@@ -827,6 +833,9 @@ class PlaybookNode {
   final double? failures;
   final List<String>? blockedBy;
   final String? stateText;
+  final List<NodeAction>? actions;
+  final bool? canEdit;
+  final bool? canRemove;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -847,6 +856,9 @@ class PlaybookNode {
     if (failures != null) 'failures': failures!,
     if (blockedBy != null) 'blockedBy': [for (final e in blockedBy!) e],
     if (stateText != null) 'stateText': stateText!,
+    if (actions != null) 'actions': [for (final e in actions!) e.wire],
+    if (canEdit != null) 'canEdit': canEdit!,
+    if (canRemove != null) 'canRemove': canRemove!,
   };
 }
 

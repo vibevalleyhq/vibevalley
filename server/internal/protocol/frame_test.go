@@ -20,4 +20,6 @@ func TestTheFrameSaysTheWordsOnACopy(t *testing.T) {
 	testkit.Eq(t, frame.Plans[0].StateTag, "在做", "the plan's tag")
 	testkit.Eq(t, frame.Plans[0].ActionText["pause"], "暂停", "the action's word")
 	testkit.Eq(t, frame.Plans[0].Actions, []PlaybookAction{PlaybookActionPause, PlaybookActionAbandon}, "the actions the state allows")
+	testkit.Eq(t, frame.Plans[0].Nodes[0].Actions, []NodeAction{NodeActionSkip}, "the node actions")
+	testkit.Eq(t, [2]bool{frame.Plans[0].Nodes[0].CanEdit, frame.Plans[0].Nodes[0].CanRemove}, [2]bool{true, true}, "the node edit gates")
 }

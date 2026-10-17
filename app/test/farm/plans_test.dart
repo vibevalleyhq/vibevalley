@@ -30,6 +30,8 @@ void main() {
     conclusion: conclusion,
     tries: 0,
     stateText: state.wire,
+    canEdit: true,
+    canRemove: true,
   );
 
   // What the server fills in (PlaybooksOf) is written out as it would.

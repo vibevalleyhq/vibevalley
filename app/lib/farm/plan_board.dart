@@ -127,8 +127,7 @@ class NodeCard extends ConsumerWidget {
     final session = node.session == null ? null : ref.watch(stateProvider)?.sessions.where((h) => h.id == node.session).firstOrNull;
     String titleOf(String id) => nodeOf(pb, id)?.title ?? id;
     final waits = node.state == NodeState.waiting ? node.blockedBy ?? const <String>[] : const <String>[];
-    final live = pb.state == PlaybookState.running || pb.state == PlaybookState.paused;
-    final editable = pb.state == PlaybookState.draft || (live && (node.state == NodeState.waiting || node.state == NodeState.failed));
+    final editable = node.canEdit ?? false;
     final doing = session == null ? null : doingOf(session);
     final commands = ref.read(farmCommandsProvider);
     Future<void> nodeAct(NodeAction action) async => onSaid(await commands.actOnNode(pb.id, node.id, action));
@@ -248,10 +247,10 @@ class NodeCard extends ConsumerWidget {
               spacing: 4,
               runSpacing: 4,
               children: [
-                if (live && node.state == NodeState.failed) SmallBtn('重试', onTap: () => nodeAct(NodeAction.retry)),
-                if (live && (node.state == NodeState.failed || node.state == NodeState.waiting)) SmallBtn('跳过', onTap: () => nodeAct(NodeAction.skip)),
+                if (node.actions?.contains(NodeAction.retry) ?? false) SmallBtn('重试', onTap: () => nodeAct(NodeAction.retry)),
+                if (node.actions?.contains(NodeAction.skip) ?? false) SmallBtn('跳过', onTap: () => nodeAct(NodeAction.skip)),
                 if (editable) SmallBtn('改', onTap: onEdit),
-                if (pb.state == PlaybookState.draft) SmallBtn('删', onTap: () async => onSaid(await commands.removeNode(pb.id, node.id))),
+                if (node.canRemove ?? false) SmallBtn('删', onTap: () async => onSaid(await commands.removeNode(pb.id, node.id))),
                 SmallBtn('经过', onTap: onHistory),
               ],
             ),

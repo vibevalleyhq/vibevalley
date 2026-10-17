@@ -22,6 +22,9 @@ func FrameOf(state CoreState, effects []GameEffect) StateFrame {
 		nodes := slices.Clone(plans[i].Nodes)
 		for j := range nodes {
 			nodes[j].StateText = NodeStateText[nodes[j].State]
+			nodes[j].Actions = NodeActions(plans[i], nodes[j])
+			nodes[j].CanEdit = CanEditNode(plans[i], &nodes[j])
+			nodes[j].CanRemove = CanRemoveNode(plans[i], &nodes[j])
 		}
 		plans[i].Nodes = nodes
 	}

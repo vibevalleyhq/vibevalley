@@ -358,3 +358,30 @@ func PlaybookActions(pb Playbook) []PlaybookAction {
 	}
 	return out
 }
+
+// NodeActions is what the plan and the node allow now: retry a failed step, skip a waiting or failed one.
+func NodeActions(pb Playbook, node PlaybookNode) []NodeAction {
+	out := []NodeAction{}
+	if pb.State != PlaybookStateRunning && pb.State != PlaybookStatePaused {
+		return out
+	}
+	if node.State == NodeStateFailed {
+		out = append(out, NodeActionRetry)
+	}
+	if node.State == NodeStateWaiting || node.State == NodeStateFailed {
+		out = append(out, NodeActionSkip)
+	}
+	return out
+}
+
+// CanEditNode is the plan's and the node's edit gate; nil means adding a step in a draft.
+func CanEditNode(pb Playbook, node *PlaybookNode) bool {
+	return pb.State == PlaybookStateDraft ||
+		((pb.State == PlaybookStateRunning || pb.State == PlaybookStatePaused) &&
+			(node == nil || node.State == NodeStateWaiting || node.State == NodeStateFailed))
+}
+
+// CanRemoveNode is CanEditNode plus the one exception: a failed step is skipped, not deleted.
+func CanRemoveNode(pb Playbook, node *PlaybookNode) bool {
+	return node != nil && CanEditNode(pb, node) && node.State != NodeStateFailed
+}

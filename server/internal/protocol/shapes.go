@@ -389,6 +389,10 @@ type PlaybookNode struct {
 	BlockedBy []string `json:"blockedBy,omitzero"`
 	// Filled by FrameOf: the client's word for State. The state and the file keep none.
 	StateText string `json:"stateText,omitzero"`
+	// Filled by FrameOf: what the node's state and the plan allow now.
+	Actions   []NodeAction `json:"actions,omitzero"`
+	CanEdit   bool         `json:"canEdit,omitzero"`
+	CanRemove bool         `json:"canRemove,omitzero"`
 }
 
 type Playbook struct {

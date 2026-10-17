@@ -244,9 +244,7 @@ type editResult struct {
 }
 
 func editable(pb protocol.Playbook, node *protocol.PlaybookNode) bool {
-	return pb.State == protocol.PlaybookStateDraft ||
-		((pb.State == protocol.PlaybookStateRunning || pb.State == protocol.PlaybookStatePaused) &&
-			(node == nil || node.State == protocol.NodeStateWaiting || node.State == protocol.NodeStateFailed))
+	return protocol.CanEditNode(pb, node)
 }
 
 func checkedPlaybook(pb protocol.Playbook) editResult {
@@ -316,7 +314,7 @@ func removeNode(pb protocol.Playbook, id string) editResult {
 	if node == nil {
 		return editResult{Problem: "计划里没有「" + id + "」这一步"}
 	}
-	if !editable(pb, node) || node.State == protocol.NodeStateFailed {
+	if !protocol.CanRemoveNode(pb, node) {
 		return editResult{Problem: "「" + node.Title + "」" + protocol.NodeStateText[node.State] + "，不能删了：可以跳过它"}
 	}
 	nodes := []protocol.PlaybookNode{}
