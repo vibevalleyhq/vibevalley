@@ -345,7 +345,7 @@ class _IslandView extends ConsumerWidget {
     final agents = ref.watch(agentsProvider).value ?? const <String, Agent>{};
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     void go(String path) => deskGo(context, path);
-    final newTicket = '/issues/new?project=${Uri.encodeQueryComponent(island.project)}';
+    final newIssue = '/issues/new?project=${Uri.encodeQueryComponent(island.project)}';
 
     Widget place(SpriteInfo sp, Offset foot, {Widget? child, VoidCallback? onTap, String? tip, String? label}) {
       final picture = child ?? PixelSprite(sp, scale: s);
@@ -415,8 +415,8 @@ class _IslandView extends ConsumerWidget {
           }
         case SpotOpen():
           layers
-            ..add(place(atlas['plot-empty'], foot, onTap: () => go(newTicket), tip: tip, label: '空位，派一件活到 ${island.project}'))
-            ..add(place(atlas['map-stake'], foot + const Offset(9, -12), onTap: () => go(newTicket), tip: tip));
+            ..add(place(atlas['plot-empty'], foot, onTap: () => go(newIssue), tip: tip, label: '空位，派一件活到 ${island.project}'))
+            ..add(place(atlas['map-stake'], foot + const Offset(9, -12), onTap: () => go(newIssue), tip: tip));
         case SpotShut():
           layers.add(place(atlas['plot-locked'], foot, tip: tip, label: '等地'));
       }

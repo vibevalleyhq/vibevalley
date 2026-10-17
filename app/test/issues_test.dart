@@ -159,7 +159,7 @@ void main() {
     expect(issuePlanned(_closedIssue, null), isFalse);
   });
 
-  testWidgets("a ticket whose harvest would conflict offers to have it solved, not to harvest; a planner's ticket reads as the playbook's", (t) async {
+  testWidgets("an issue whose harvest would conflict offers to have it solved, not to harvest; a planner's issue reads as the playbook's", (t) async {
     t.view.physicalSize = const Size(1600, 1000);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);

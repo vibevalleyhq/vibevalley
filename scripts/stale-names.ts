@@ -18,6 +18,8 @@ interface Rule {
   readonly pattern: RegExp
   /** What to write instead. */
   readonly says: string
+  /** Only these directories, when the word is fine elsewhere (a project named tickets). */
+  readonly dirs?: readonly string[]
 }
 
 const RULES: readonly Rule[] = [
@@ -25,6 +27,12 @@ const RULES: readonly Rule[] = [
     name: 'an API path without its version',
     pattern: /["'`]\/api\/(?!v1\/)/,
     says: 'every route is under /api/v1',
+  },
+  {
+    name: 'the word ticket',
+    pattern: /\btickets?\b/,
+    says: 'issues and the issue board',
+    dirs: ['app/lib', 'app/test'],
   },
   {
     name: 'ticket in the client',
@@ -69,6 +77,7 @@ for (const file of files) {
   const lines = readFileSync(resolve(root, file), 'utf8').split('\n')
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
+      if (rule.dirs && !rule.dirs.some((dir) => file.startsWith(dir + '/'))) continue
       if (rule.pattern.test(line)) hits.push(`${file}:${i + 1}: ${rule.name} — ${rule.says}`)
     }
   }
