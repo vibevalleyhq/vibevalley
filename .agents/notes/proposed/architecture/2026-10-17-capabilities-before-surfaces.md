@@ -149,7 +149,7 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 
 1. `//vibevalley:can` 和 `//vibevalley:tool`，给全部操作都写上；生成能力表的文档；院门改成按 `remote` 放。（`can`、`protocol.Endpoints`、能力表、院门已做；85 个操作，不是 86；`tool` 留到第 4 步，和管家工具的检查一起做。）
 2. 生成 `Client` 和命令表，做命令行；写 `verify-dispatch`，步骤就是命令行的几条命令，真的派一次活。（`protocol.Client`、`Endpoints` 带查询参数和请求体、`cmd/vibevalley` 的农场命令、`state`、`events`、`runtime chat`、`issue run <id>`（开工、等到等你看、打出改动；不要 `--wait`，它总是等）已做，`verify-server` 改用命令行；`verify-dispatch` 还没做：要真的派一次活。）
-3. 第 4 节的改名和收敛，和 Worker 改叫 Session 一个改动做完（只改名、不改行为的那些已做：`get`、`create`、`update`、`delete`、`markRead`、`manager.hear`、`manager.open`、`gate.*`、`game.chooseTitle`、频道的路径；按工单 id 的生命周期、`unqueue`、`update` 只改给出的字段、删掉没人调的、记忆合并还没做）；派活一个入口、`Changes` 带上「谁在看」、`update` 只改给出的字段。
+3. 第 4 节的改名和收敛，和 Worker 改叫 Session 一个改动做完（只改名、不改行为的那些已做：`get`、`create`、`update`、`delete`、`markRead`、`manager.hear`、`manager.open`、`gate.*`、`game.chooseTitle`、频道的路径；删掉没人调的 `worker.activities`、`progress.carryCoins`、`server.end` 已做；按工单 id 的生命周期、`unqueue`、`update` 只改给出的字段、记忆合并还没做）；派活一个入口、`Changes` 带上「谁在看」、`update` 只改给出的字段。
 4. 检查管家的工具、MCP 和能力表对得上；按第 5 节主人定的补帮工的能力。
 
 ## 命令行清单

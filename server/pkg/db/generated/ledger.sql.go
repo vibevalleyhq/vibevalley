@@ -24,17 +24,6 @@ func (q *Queries) AddLedgerEntry(ctx context.Context, arg AddLedgerEntryParams) 
 	return err
 }
 
-const countLedgerKind = `-- name: CountLedgerKind :one
-select count(*) from ledger where kind = ?
-`
-
-func (q *Queries) CountLedgerKind(ctx context.Context, kind string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countLedgerKind, kind)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const ledgerEntries = `-- name: LedgerEntries :many
 
 select kind, at, payload from ledger order by seq

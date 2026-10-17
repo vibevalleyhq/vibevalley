@@ -76,9 +76,6 @@ func TestLedger(t *testing.T) {
 	want := []string{"harvested", "hired", "failed", "level"}
 	testkit.Await(t, "the ledger has "+strings.Join(want, ", "), func() ([]string, bool) { k := ledgerKinds(t, f); return k, reflect.DeepEqual(k, want) })
 
-	if !f.Game.Carry(120) || f.Game.Carry(50) || f.Game.Carry(0) {
-		t.Fatal("coins carry once")
-	}
 	before := *f.Core.State().Progress
 	f.Close()
 
@@ -90,7 +87,7 @@ func TestLedger(t *testing.T) {
 	if err := again.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if kinds := ledgerKinds(t, again); kinds[len(kinds)-1] != "carried" {
+	if kinds := ledgerKinds(t, again); kinds[len(kinds)-1] != "level" {
 		t.Fatalf("no catch-up for a level already on the ledger: %v", kinds)
 	}
 }

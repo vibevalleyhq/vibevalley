@@ -140,7 +140,7 @@ func TestMemoryKeptAndRecalled(t *testing.T) {
 		"- 做过（这个项目）：" + job.Text,
 	})), "recalled in the same project")
 	w.nextReport(t)
-	steps, _ := w.f.Worker.Activities(second.ID)
+	steps := w.f.Worker.Get(second.ID).Activities
 	if len(steps) < 2 {
 		t.Fatalf("steps: %+v", steps)
 	}
@@ -168,7 +168,9 @@ func TestMemoryKeptAndRecalled(t *testing.T) {
 	if len(theirs) != 1 || theirs[0].Kind != protocol.MemoryKindIssue || theirs[0].Worker == nil || *theirs[0].Worker != other.ID {
 		t.Fatalf("the other agent keeps: %+v", theirs)
 	}
-	w.f.Worker.DismissAll()
+	for _, h := range w.f.Core.State().Workers {
+		w.f.Worker.Dismiss(h.ID)
+	}
 }
 
 func TestMemoryRecalledOnceAcrossARestart(t *testing.T) {

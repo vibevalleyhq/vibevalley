@@ -55,11 +55,6 @@ func (a api) SettingSave(_ context.Context, body protocol.SettingsUpdate) (proto
 	return s, refused(err)
 }
 
-func (a api) ServerEnd(context.Context) error {
-	a.f.Worker.DismissAll()
-	a.f.Core.SetCall(protocol.CallStateIdle, "")
-	return nil
-}
 
 func (a api) ChannelSay(ctx context.Context, body protocol.SayRequest) error {
 	if body.Bed != nil {
@@ -153,13 +148,6 @@ func (a api) WorkerChanges(_ context.Context, id string) (protocol.Changes, erro
 	return *changes, nil
 }
 
-func (a api) WorkerActivities(_ context.Context, id string) ([]protocol.Activity, error) {
-	steps, ok := a.f.Worker.Activities(id)
-	if !ok {
-		return nil, missing("帮工 " + id)
-	}
-	return steps, nil
-}
 
 func (a api) TrajectoryList(_ context.Context, agent *string) ([]protocol.TrajectoryHead, error) {
 	return a.f.Worker.List(ptr.Value(agent)), nil
@@ -221,9 +209,6 @@ func (a api) PlaybookEvents(_ context.Context, id string) ([]protocol.PlaybookEv
 	return a.f.Playbook.Events(id), nil
 }
 
-func (a api) ProgressCarryCoins(_ context.Context, body protocol.CarryCoinsRequest) (protocol.CarryCoinsResult, error) {
-	return protocol.CarryCoinsResult{Carried: a.f.Game.Carry(body.Coins)}, nil
-}
 
 func (a api) GameChooseTitle(_ context.Context, body protocol.ChooseTitleRequest) error {
 	a.f.Game.ChooseTitle(body.Achievement, body.Tier)

@@ -4775,26 +4775,6 @@ class ChatReadRequest {
   Map<String, dynamic> toJson() => {'seq': seq};
 }
 
-class CarryCoinsRequest {
-  const CarryCoinsRequest({required this.coins});
-
-  factory CarryCoinsRequest.fromJson(Map<String, dynamic> j) => CarryCoinsRequest(coins: (j['coins'] as num).toDouble());
-
-  final double coins;
-
-  Map<String, dynamic> toJson() => {'coins': coins};
-}
-
-class CarryCoinsResult {
-  const CarryCoinsResult({required this.carried});
-
-  factory CarryCoinsResult.fromJson(Map<String, dynamic> j) => CarryCoinsResult(carried: j['carried'] as bool);
-
-  final bool carried;
-
-  Map<String, dynamic> toJson() => {'carried': carried};
-}
-
 class ChooseTitleRequest {
   const ChooseTitleRequest({this.achievement, this.tier});
 
@@ -4904,10 +4884,6 @@ class ServerApi {
   Future<Health> health() async {
     final j = await _api._call('GET', '/api/health', query: {}, body: null);
     return Health.fromJson(j as Map<String, dynamic>);
-  }
-
-  Future<void> end() async {
-    await _api._call('POST', '/api/end', query: {}, body: null);
   }
 }
 
@@ -5052,11 +5028,6 @@ class WorkerApi {
     final j = await _api._call('GET', '/api/workers/${Uri.encodeComponent((id).toString())}/changes', query: {}, body: null);
     return Changes.fromJson(j as Map<String, dynamic>);
   }
-
-  Future<List<Activity>> activities({required String id}) async {
-    final j = await _api._call('GET', '/api/workers/${Uri.encodeComponent((id).toString())}/activities', query: {}, body: null);
-    return [for (final e in j as List) Activity.fromJson(e as Map<String, dynamic>)];
-  }
 }
 
 /// The `trajectory` endpoints of VibeValleyApi.
@@ -5183,17 +5154,6 @@ class PlaybookApi {
   Future<List<PlaybookEvent>> events({required String id}) async {
     final j = await _api._call('GET', '/api/playbooks/${Uri.encodeComponent((id).toString())}/events', query: {}, body: null);
     return [for (final e in j as List) PlaybookEvent.fromJson(e as Map<String, dynamic>)];
-  }
-}
-
-/// The `progress` endpoints of VibeValleyApi.
-class ProgressApi {
-  ProgressApi._(this._api);
-  final VibeValleyApi _api;
-
-  Future<CarryCoinsResult> carryCoins({required CarryCoinsRequest body}) async {
-    final j = await _api._call('POST', '/api/progress/carry', query: {}, body: body.toJson());
-    return CarryCoinsResult.fromJson(j as Map<String, dynamic>);
   }
 }
 
@@ -5469,7 +5429,6 @@ class VibeValleyApi {
   late final trajectory = TrajectoryApi._(this);
   late final issue = IssueApi._(this);
   late final playbook = PlaybookApi._(this);
-  late final progress = ProgressApi._(this);
   late final game = GameApi._(this);
   late final runtime = RuntimeApi._(this);
   late final agent = AgentApi._(this);

@@ -523,7 +523,7 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	lab := fixture.Lab(t)
 	worker := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "看看目录", "steps", worker.HireOptions{}))
 	w.nextReport(t)
-	steps, _ := w.f.Worker.Activities(worker.ID)
+	steps := w.f.Worker.Get(worker.ID).Activities
 	w.f.Worker.Dismiss(worker.ID)
 	after := w.f.Worker.Get(worker.ID)
 	if after == nil {
@@ -557,14 +557,14 @@ func TestCommentOnAStep(t *testing.T) {
 	w := openWorld(t, home, work)
 	hired := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "看看目录", "comments", worker.HireOptions{}))
 	w.nextReport(t)
-	steps, _ := w.f.Worker.Activities(hired.ID)
+	steps := w.f.Worker.Get(hired.ID).Activities
 	tool := steps[1]
 	told := worker.CommentText(tool, "这里换成 ls -la 再看一遍")
 	testkit.Match(t, told, `^【评论第 1 步】关于你这一步的操作：echo hi`, "names the step")
 	testkit.Match(t, told, `输出的结尾：hi\n\n我的评论：这里换成 ls -la 再看一遍$`, "the step's output, then the comment")
 	w.f.Worker.Tell(hired.ID, told, protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
 	w.nextReport(t)
-	steps, _ = w.f.Worker.Activities(hired.ID)
+	steps = w.f.Worker.Get(hired.ID).Activities
 	i := slices.IndexFunc(steps, func(s protocol.Activity) bool { return s.Kind == protocol.ActivityKindPrompt && s.N > tool.N })
 	if i < 0 || steps[i].On == nil || *steps[i].On != tool.N {
 		t.Fatalf("the comment is tied to step %d: %+v", tool.N, steps)
@@ -631,7 +631,7 @@ func TestQuietWorkerIsFlagged(t *testing.T) {
 		return need, need != nil && need.Kind == "quiet" && clock.NowMs()-need.Since >= 500
 	})
 	w.nextReport(t)
-	steps, _ := w.f.Worker.Activities(worker.ID)
+	steps := w.f.Worker.Get(worker.ID).Activities
 	w.f.Worker.Dismiss(worker.ID)
 	w.mu.Lock()
 	notes := slices.Clone(w.notes)
@@ -742,7 +742,9 @@ func TestTwoSentToANewProjectAtOnce(t *testing.T) {
 	w.nextReport(t)
 	w.nextReport(t)
 	testkit.Eq(t, len(w.f.Worker.Roster()), 2, "both on the farm")
-	w.f.Worker.DismissAll()
+	for _, h := range w.f.Core.State().Workers {
+		w.f.Worker.Dismiss(h.ID)
+	}
 	testkit.Eq(t, len(w.f.Worker.Roster()), 0, "all gone home")
 }
 

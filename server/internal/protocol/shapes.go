@@ -1940,13 +1940,6 @@ type ChatReadRequest struct {
 	Seq int64 `json:"seq"`
 }
 
-type CarryCoinsRequest struct {
-	Coins int64 `json:"coins"`
-}
-
-type CarryCoinsResult struct {
-	Carried bool `json:"carried"`
-}
 
 type ChooseTitleRequest struct {
 	Achievement *string `json:"achievement,omitzero"`

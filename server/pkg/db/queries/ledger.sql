@@ -6,5 +6,3 @@ select kind, at, payload from ledger order by seq;
 -- name: AddLedgerEntry :exec
 insert into ledger (kind, at, payload) values (?, ?, ?);
 
--- name: CountLedgerKind :one
-select count(*) from ledger where kind = ?;

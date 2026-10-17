@@ -23,9 +23,6 @@ type Handlers interface {
 	//vibevalley:route setting.save PUT /api/settings
 	//vibevalley:can owner remote
 	SettingSave(ctx context.Context, body SettingsUpdate) (SettingsStatus, error)
-	//vibevalley:route server.end POST /api/end
-	//vibevalley:can owner remote
-	ServerEnd(ctx context.Context) error
 	//vibevalley:route channel.say POST /api/say
 	//vibevalley:can owner remote
 	ChannelSay(ctx context.Context, body SayRequest) error
@@ -66,9 +63,6 @@ type Handlers interface {
 	//vibevalley:route worker.changes GET /api/workers/{id}/changes
 	//vibevalley:can owner remote manager
 	WorkerChanges(ctx context.Context, pID string) (Changes, error)
-	//vibevalley:route worker.activities GET /api/workers/{id}/activities
-	//vibevalley:can owner remote
-	WorkerActivities(ctx context.Context, pID string) ([]Activity, error)
 	//vibevalley:route trajectory.list GET /api/trajectories
 	//vibevalley:can owner remote
 	TrajectoryList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error)
@@ -132,9 +126,6 @@ type Handlers interface {
 	//vibevalley:route playbook.events GET /api/playbooks/{id}/events
 	//vibevalley:can owner remote
 	PlaybookEvents(ctx context.Context, pID string) ([]PlaybookEvent, error)
-	//vibevalley:route progress.carryCoins POST /api/progress/carry
-	//vibevalley:can owner remote
-	ProgressCarryCoins(ctx context.Context, body CarryCoinsRequest) (CarryCoinsResult, error)
 	//vibevalley:route game.chooseTitle POST /api/game/title
 	//vibevalley:can owner remote
 	GameChooseTitle(ctx context.Context, body ChooseTitleRequest) error

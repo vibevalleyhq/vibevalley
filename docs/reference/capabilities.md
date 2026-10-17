@@ -16,7 +16,6 @@
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
 | `server.health` | `GET /api/health` | ✓ | ✓ |  |  |
-| `server.end` | `POST /api/end` | ✓ | ✓ |  |  |
 
 ## manager
 
@@ -66,7 +65,6 @@
 | `worker.merge` | `POST /api/workers/{id}/merge` | ✓ | ✓ | ✓ |  |
 | `worker.resolve` | `POST /api/workers/{id}/resolve` | ✓ | ✓ |  |  |
 | `worker.changes` | `GET /api/workers/{id}/changes` | ✓ | ✓ | ✓ |  |
-| `worker.activities` | `GET /api/workers/{id}/activities` | ✓ | ✓ |  |  |
 
 ## trajectory
 
@@ -101,12 +99,6 @@
 | `playbook.nodeAct` | `POST /api/playbooks/{id}/nodes/{node}/act` | ✓ | ✓ | ✓ |  |
 | `playbook.changes` | `GET /api/playbooks/{id}/changes` | ✓ | ✓ |  |  |
 | `playbook.events` | `GET /api/playbooks/{id}/events` | ✓ | ✓ |  |  |
-
-## progress
-
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
-|---|---|---|---|---|---|
-| `progress.carryCoins` | `POST /api/progress/carry` | ✓ | ✓ |  |  |
 
 ## game
 

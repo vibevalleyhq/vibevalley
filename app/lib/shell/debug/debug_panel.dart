@@ -365,7 +365,10 @@ class _ControlTabState extends ConsumerState<_ControlTab> {
         _Section(
           title: '通话',
           aside: '现在：${farm?.call.wire ?? '—'}',
-          child: _Row([_Btn(label: '开工', tone: _Tone.hat, onTap: () => _run(context, hb.start)), _Btn(label: '收工', onTap: () => _run(context, hb.end))]),
+          child: _Row([
+            _Btn(label: '开工', tone: _Tone.hat, onTap: () => _run(context, hb.start)),
+            _Btn(label: '收工', onTap: () => _run(context, () => hb.everyone('dismiss'))),
+          ]),
         ),
         _Section(
           title: '管家',

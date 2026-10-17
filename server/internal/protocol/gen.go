@@ -2114,7 +2114,6 @@ var Endpoints = []Endpoint{
 	{"setting.load", "GET", "/api/settings", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"setting.check", "POST", "/api/settings/check", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"setting.save", "PUT", "/api/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"server.end", "POST", "/api/end", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"channel.say", "POST", "/api/say", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"channel.create", "POST", "/api/channels", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"schedule.create", "POST", "/api/schedules", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
@@ -2128,7 +2127,6 @@ var Endpoints = []Endpoint{
 	{"worker.merge", "POST", "/api/workers/{id}/merge", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"worker.resolve", "POST", "/api/workers/{id}/resolve", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"worker.changes", "GET", "/api/workers/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"worker.activities", "GET", "/api/workers/{id}/activities", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"trajectory.list", "GET", "/api/trajectories", []string{"agent"}, false, []Caller{CallerOwner, CallerRemote}},
 	{"trajectory.get", "GET", "/api/trajectories/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.list", "GET", "/api/issues", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2150,7 +2148,6 @@ var Endpoints = []Endpoint{
 	{"channel.markRead", "POST", "/api/channels/{id}/read", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"playbook.changes", "GET", "/api/playbooks/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"playbook.events", "GET", "/api/playbooks/{id}/events", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"progress.carryCoins", "POST", "/api/progress/carry", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"game.chooseTitle", "POST", "/api/game/title", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"runtime.list", "GET", "/api/runtimes", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"runtime.refresh", "POST", "/api/runtimes/{id}/refresh", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2225,9 +2222,6 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		}
 		out, err := h.SettingSave(r.Context(), body)
 		answer(w, out, err)
-	})
-	mux.HandleFunc("POST /api/end", func(w http.ResponseWriter, r *http.Request) {
-		answer(w, nil, h.ServerEnd(r.Context()))
 	})
 	mux.HandleFunc("POST /api/say", func(w http.ResponseWriter, r *http.Request) {
 		var body SayRequest
@@ -2314,11 +2308,6 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	mux.HandleFunc("GET /api/workers/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.WorkerChanges(r.Context(), pID)
-		answer(w, out, err)
-	})
-	mux.HandleFunc("GET /api/workers/{id}/activities", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		out, err := h.WorkerActivities(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/trajectories", func(w http.ResponseWriter, r *http.Request) {
@@ -2470,14 +2459,6 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	mux.HandleFunc("GET /api/playbooks/{id}/events", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.PlaybookEvents(r.Context(), pID)
-		answer(w, out, err)
-	})
-	mux.HandleFunc("POST /api/progress/carry", func(w http.ResponseWriter, r *http.Request) {
-		var body CarryCoinsRequest
-		if !decode(w, r, &body) {
-			return
-		}
-		out, err := h.ProgressCarryCoins(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/game/title", func(w http.ResponseWriter, r *http.Request) {
@@ -2815,10 +2796,6 @@ func (c *Client) SettingSave(ctx context.Context, body SettingsUpdate) (Settings
 	return out, err
 }
 
-func (c *Client) ServerEnd(ctx context.Context) error {
-	return c.call(ctx, "POST", "/api/end", nil, nil, nil)
-}
-
 func (c *Client) ChannelSay(ctx context.Context, body SayRequest) error {
 	return c.call(ctx, "POST", "/api/say", nil, body, nil)
 }
@@ -2872,12 +2849,6 @@ func (c *Client) WorkerResolve(ctx context.Context, pID string) error {
 func (c *Client) WorkerChanges(ctx context.Context, pID string) (Changes, error) {
 	var out Changes
 	err := c.call(ctx, "GET", "/api/workers/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
-	return out, err
-}
-
-func (c *Client) WorkerActivities(ctx context.Context, pID string) ([]Activity, error) {
-	var out []Activity
-	err := c.call(ctx, "GET", "/api/workers/"+url.PathEscape(pID)+"/activities", nil, nil, &out)
 	return out, err
 }
 
@@ -3011,12 +2982,6 @@ func (c *Client) PlaybookChanges(ctx context.Context, pID string) (Changes, erro
 func (c *Client) PlaybookEvents(ctx context.Context, pID string) ([]PlaybookEvent, error) {
 	var out []PlaybookEvent
 	err := c.call(ctx, "GET", "/api/playbooks/"+url.PathEscape(pID)+"/events", nil, nil, &out)
-	return out, err
-}
-
-func (c *Client) ProgressCarryCoins(ctx context.Context, body CarryCoinsRequest) (CarryCoinsResult, error) {
-	var out CarryCoinsResult
-	err := c.call(ctx, "POST", "/api/progress/carry", nil, body, &out)
 	return out, err
 }
 

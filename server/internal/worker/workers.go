@@ -758,14 +758,6 @@ func (c *workers) Leave(id string, closed protocol.IssueClose, merged int64) {
 	}
 }
 
-func (c *workers) DismissAll() {
-	c.mu.Lock()
-	ids := slices.Sorted(maps.Keys(c.hands))
-	c.mu.Unlock()
-	for _, id := range ids {
-		c.Dismiss(id)
-	}
-}
 
 func (c *workers) remind(agent, worker, project, input string, h *hand, recalled map[string]bool) string {
 	if h != nil {
@@ -990,7 +982,10 @@ func (c *workers) Find(id string) *Roster {
 // What the worker is told for a comment on step n of its trajectory: the step, then the comment. A step gone (only the
 // latest are kept) is Missing.
 func (c *workers) Comment(id string, n int64, comment string) (string, error) {
-	steps, _ := c.Activities(id)
+	var steps []protocol.Activity
+	if h := c.hand(id); h != nil {
+		steps = h.journal.Activities()
+	}
 	i := slices.IndexFunc(steps, func(s protocol.Activity) bool { return s.N == n })
 	if i < 0 {
 		return "", protocol.Missing{What: fmt.Sprintf("第 %d 步（太早的步骤不再保留）", n)}
@@ -998,10 +993,3 @@ func (c *workers) Comment(id string, n int64, comment string) (string, error) {
 	return CommentText(steps[i], comment), nil
 }
 
-func (c *workers) Activities(id string) ([]protocol.Activity, bool) {
-	h := c.hand(id)
-	if h == nil {
-		return nil, false
-	}
-	return h.journal.Activities(), true
-}

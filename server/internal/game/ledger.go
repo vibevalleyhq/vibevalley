@@ -175,18 +175,3 @@ func (l *ledger) ChooseTitle(achievement *string, tier *int64) {
 	l.Record(entry)
 }
 
-func (l *ledger) Carry(coins int64) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if coins <= 0 {
-		return false
-	}
-	if n, err := l.q.CountLedgerKind(context.Background(), "carried"); err != nil || n > 0 {
-		return false
-	}
-	if err := l.write(protocol.LedgerEntryCarried{Coins: coins}); err != nil {
-		log.Printf("vibevalley: carried coins were not kept: %v", err)
-		return false
-	}
-	return true
-}
