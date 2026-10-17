@@ -169,7 +169,7 @@ type chatTestDelivery struct {
 
 func chatDeliveries(t *testing.T, f *world, recipient string) []chatTestDelivery {
 	t.Helper()
-	rows, err := f.DB.Query(`select message_seq, reason, wakes, coalesce(held_by, ''), state from message_delivery where recipient_id = ? order by message_seq`, recipient)
+	rows, err := f.DB.Query(`select message_seq, reason, wakes, coalesce(held_by, ''), state from channel_delivery where recipient_id = ? order by message_seq`, recipient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -686,7 +686,7 @@ func TestChatSessionLeaves(t *testing.T) {
 		return len(ds) > 0 && ds[len(ds)-1].State == "dropped"
 	})
 	var left *int64
-	if err := f.DB.QueryRow(`select left_at from participant where id = 'w13'`).Scan(&left); err != nil || left == nil {
+	if err := f.DB.QueryRow(`select left_at from channel_participant where id = 'w13'`).Scan(&left); err != nil || left == nil {
 		t.Fatalf("left_at: %v %v", left, err)
 	}
 }

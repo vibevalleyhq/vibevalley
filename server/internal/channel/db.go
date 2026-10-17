@@ -173,18 +173,18 @@ func found[T any](v T, err error) (*T, error) {
 	return &v, nil
 }
 
-func chatMsgOf(m generated.Message, p generated.Participant) chatMsgRow {
+func chatMsgOf(m generated.ChannelMessage, p generated.ChannelParticipant) chatMsgRow {
 	return chatMsgRow{Seq: m.Seq, Conversation: m.ConversationID, Sender: m.SenderID, Kind: m.Kind, Body: m.Body, Final: m.Final, Meta: textOf(m.Meta),
 		CreatedAt: m.CreatedAt, Name: p.Name, SenderKind: p.Kind, AgentID: textOf(p.AgentID)}
 }
 
-func chatConvOf(c generated.Conversation) chatConvRow {
+func chatConvOf(c generated.ChannelConversation) chatConvRow {
 	return chatConvRow{ID: c.ID, Kind: c.Kind, ParentSeq: numberOf(c.ParentSeq), SubjectKind: textOf(c.SubjectKind), SubjectID: textOf(c.SubjectID),
 		LastSeq: numberOf(c.LastSeq), Replies: c.ReplyCount, CreatedAt: c.CreatedAt, Name: textOf(c.Name), Description: textOf(c.Description),
 		Project: textOf(c.Project), ChannelID: numberOf(c.ChannelID)}
 }
 
-func chatConvsOf(list []generated.Conversation, err error) ([]chatConvRow, error) {
+func chatConvsOf(list []generated.ChannelConversation, err error) ([]chatConvRow, error) {
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +292,7 @@ func (s chatStore) message(seq int64) (*chatMsgRow, error) {
 	if r == nil {
 		return nil, err
 	}
-	m := chatMsgOf(r.Message, r.Participant)
+	m := chatMsgOf(r.ChannelMessage, r.ChannelParticipant)
 	return &m, nil
 }
 
@@ -303,7 +303,7 @@ func (s chatStore) recentMessages(limit int) ([]chatMsgRow, error) {
 	}
 	out := make([]chatMsgRow, len(list))
 	for i, r := range list {
-		out[i] = chatMsgOf(r.Message, r.Participant)
+		out[i] = chatMsgOf(r.ChannelMessage, r.ChannelParticipant)
 	}
 	return out, nil
 }
@@ -316,7 +316,7 @@ func (s chatStore) messagesBefore(conversation, before int64, limit int) ([]chat
 	}
 	out := make([]chatMsgRow, len(list))
 	for i, r := range list {
-		out[i] = chatMsgOf(r.Message, r.Participant)
+		out[i] = chatMsgOf(r.ChannelMessage, r.ChannelParticipant)
 	}
 	return out, nil
 }
@@ -328,7 +328,7 @@ func (s chatStore) messagesAfter(conversation, after int64, limit int) ([]chatMs
 	}
 	out := make([]chatMsgRow, len(list))
 	for i, r := range list {
-		out[i] = chatMsgOf(r.Message, r.Participant)
+		out[i] = chatMsgOf(r.ChannelMessage, r.ChannelParticipant)
 	}
 	return out, nil
 }

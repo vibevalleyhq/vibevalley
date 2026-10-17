@@ -55,18 +55,18 @@
 | 工单 | `Issue`（`issue/issue.go`、`dispatch.go`；派给管家的在 `manager.go`） | `issue`、`issue_session` 表（一行是一个帮工） | |
 | 种植计划 | `Playbook` | `issue` 表（带 `plan` 的父工单）、`playbook_event` 表 | |
 | 帮工 | `Session`（`session/sessions.go`） | `state.json`（核心状态里的帮工）、`sessions.json`（目录、农机的会话 id、最后一轮的原话） | 一个帮工是一个 `agents.Subagent`，包着一个 `oar.Session`；每个帮工有自己的 `agents.Subagents` |
-| 一次干活（run） | `Session`（`session/runs.go`）；`session/facts.go` 把会话事件读成事实 | `run` 表 | 一个 oar turn（`TurnStarted` 到 `TurnEnded`），结束时交一份 `SubagentReport` |
+| 一次干活（run） | `Session`（`session/runs.go`）；`session/facts.go` 把会话事件读成事实 | `session_run` 表 | 一个 oar turn（`TurnStarted` 到 `TurnEnded`），结束时交一份 `SubagentReport` |
 | 干活过程 | `Session`（`session/trajectories.go`、`activities.go`） | `activities/<id>.json`、`activities/<id>.head.json`；原始记录在 `logs/` | oar 的事件：`TextDelta`、`Reasoning`、`ToolCallStarted`、`ToolCallEnded`…… |
 | 收成清单、收获 | `Issue`（`issue/merges.go`） | 帮工的分支和 worktree | |
-| 田头、频道、工单串 | `Channel`；帮工在频道里说话经 `MCP`（`/mcp`） | `conversation`、`message`、`participant`、`message_delivery`、`read_cursor`、`mention`、`follow`、`seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
+| 田头、频道、工单串 | `Channel`；帮工在频道里说话经 `MCP`（`/mcp`） | `channel_conversation`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
 | 定时 | `Schedule` | `schedule` 表 | |
 | 巡查 | `Manager`（`manager/patrol.go`） | 不存：每轮从核心状态算 | |
 | 来电 | 不存：`protocol.Inbox` 从核心状态算 | | |
 | 连接器 | `Connector`；三家的接口在 `pkg/weixin`、`pkg/feishu`、`pkg/qq` | `connector_account`、`connector_inbound`、`connector_outbox` 表 | |
-| 院门 | `Gate` | `lan_gate`、`lan_device` 表 | |
+| 院门 | `Gate` | `gate`、`gate_device` 表 | |
 | 语音 | `Voice`（`voice/agora.go`、`line.go`）；声网在 `pkg/agora` | `settings.json` | |
 | 钥匙和语音设置 | `Setting` | `settings.json`（只有你能读） | 会话的 `Env` |
-| 进度、成就 | `Game`（`game/ledger.go`） | `ledger` 表；进度从它折出来 | |
+| 进度、成就 | `Game`（`game/ledger.go`） | `game_ledger` 表；进度从它折出来 | |
 | 等级 | `Game`（`game/commits.go`） | `state.json` 里的 commit 数 | |
 | 地 | `Game`（`game/beds.go`）；规则在 `protocol/game_play.go` | `state.json` 里的 `play.station` | |
 | 核心状态 | `Core` | `state.json`（聊天、进度、定时和工单除外） | |

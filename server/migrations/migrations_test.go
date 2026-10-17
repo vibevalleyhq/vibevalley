@@ -37,13 +37,13 @@ func TestSessionMigrationKeepsTheRows(t *testing.T) {
 	}
 	var kind, session, run, memory, launch, ledger, meta string
 	for q, dst := range map[string]*string{
-		"select kind from participant where id = 'w3'":         &kind,
+		"select kind from channel_participant where id = 'w3'": &kind,
 		"select session from issue_session where issue = 't1'": &session,
-		"select session from run":                              &run,
+		"select session from session_run":                      &run,
 		"select session from memory":                           &memory,
-		"select launch from message_delivery":                  &launch,
-		"select payload from ledger":                           &ledger,
-		"select meta from message":                             &meta,
+		"select launch from channel_delivery":                  &launch,
+		"select payload from game_ledger":                      &ledger,
+		"select meta from channel_message":                     &meta,
 	} {
 		if err := db.QueryRow(q).Scan(dst); err != nil {
 			t.Fatalf("%s: %v", q, err)
@@ -60,7 +60,7 @@ func TestSessionMigrationKeepsTheRows(t *testing.T) {
 	if db.QueryRow("pragma foreign_keys").Scan(&on); on != 1 {
 		t.Fatal("foreign keys are off after migrating")
 	}
-	if _, err := db.Exec(`insert into participant (id, kind, name, joined_at) values ('w4', 'worker', 'x', 1)`); err == nil {
+	if _, err := db.Exec(`insert into channel_participant (id, kind, name, joined_at) values ('w4', 'worker', 'x', 1)`); err == nil {
 		t.Fatal("a worker participant is still allowed")
 	}
 }

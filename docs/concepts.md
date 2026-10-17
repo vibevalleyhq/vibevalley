@@ -41,7 +41,7 @@ Workspace（工作目录，一张大地图）
 | 项目 | `Project` | 一个 git 仓库，和能同时在里面干活的执行数（`slots`） | 岛，也是一张小地图 |
 | 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，关上的能重开 | 看板上的卡片 |
 | Session | `Session`（服务是 `session.Service`，派活是 `Issue.Hire`） | 档案为一张工单接的活，有自己的 worktree 和分支，直到收获或收工；跨好几次 run，重启后还是同一个 | 帮工 |
-| Run | `Run`（`run` 表）；核心状态里是 `FactRun` 到 `FactReport` | 一次干活：一次触发到一次汇报，包着一个 oar turn | 一季庄稼 |
+| Run | `Run`（`session_run` 表）；核心状态里是 `FactRun` 到 `FactReport` | 一次干活：一次触发到一次汇报，包着一个 oar turn | 一季庄稼 |
 | 步骤 | `Activity`，全部是 `Trajectory` | 一次 run 里的每一步 | 干活过程 |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 | 收成清单 |
 | 合并 | `Issue.Merge` | 把分支合进主分支，关上工单 | 收获 |

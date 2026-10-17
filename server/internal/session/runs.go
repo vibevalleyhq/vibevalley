@@ -134,7 +134,7 @@ func (c *sessions) Runs(issue string) ([]protocol.Run, error) {
 	return out, nil
 }
 
-func runOf(r generated.Run) protocol.Run {
+func runOf(r generated.SessionRun) protocol.Run {
 	run := protocol.Run{ID: r.ID, Session: r.Session, Heard: []int64{}, StartedAt: r.StartedAt}
 	if err := json.Unmarshal([]byte(r.TriggeredBy), &run.TriggeredBy); err != nil {
 		log.Printf("vibevalley: run %d: what started it cannot be read: %v", r.ID, err)

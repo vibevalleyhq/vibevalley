@@ -301,7 +301,7 @@ func TestMergeGoesInTheLedger(t *testing.T) {
 	w.f.Issue.Merge(session.ID)
 	entries := func() int {
 		var n int
-		if err := w.f.DB.QueryRow(`select count(*) from ledger where kind = 'harvested' and payload like ?`, `%"session":"`+session.ID+`"%`).Scan(&n); err != nil {
+		if err := w.f.DB.QueryRow(`select count(*) from game_ledger where kind = 'harvested' and payload like ?`, `%"session":"`+session.ID+`"%`).Scan(&n); err != nil {
 			t.Fatal(err)
 		}
 		return n

@@ -63,7 +63,7 @@
 
 **会话事件变成事实**在 `session/facts.go`（纯函数）：一轮开始、在做什么（`doing`，气泡）、重试、花费、一轮结束。
 
-**每次干活**（run，`session/runs.go`；[提案](../../.agents/notes/proposed/architecture/2026-10-16-runs-workers-crews.md)）：农机开一轮就是一次 run，到这一轮的汇报结束，记在 `run` 表。发话的一方先说清这一轮是为什么开的，农机开了这一轮，run 就记下它：派出去（`issue`）、带话（`comment`，带着那条消息的号）、种植计划（`playbook`）、定时（`schedule`，带着哪个定时、是不是补跑）；没人发话就开的一轮记成农机自己（`runtime`）。干活时插进来的话不开新的 run，记在这一轮读到的话里（`heard`）；排队的话是下一次 run 的触发。叫不醒、被拒的不算 run。服务端重启时还开着的 run 记成叫停了。一张工单的 run 用 `GET /api/issues/{id}/runs` 取，不在核心状态里。
+**每次干活**（run，`session/runs.go`；[提案](../../.agents/notes/proposed/architecture/2026-10-16-runs-workers-crews.md)）：农机开一轮就是一次 run，到这一轮的汇报结束，记在 `session_run` 表。发话的一方先说清这一轮是为什么开的，农机开了这一轮，run 就记下它：派出去（`issue`）、带话（`comment`，带着那条消息的号）、种植计划（`playbook`）、定时（`schedule`，带着哪个定时、是不是补跑）；没人发话就开的一轮记成农机自己（`runtime`）。干活时插进来的话不开新的 run，记在这一轮读到的话里（`heard`）；排队的话是下一次 run 的触发。叫不醒、被拒的不算 run。服务端重启时还开着的 run 记成叫停了。一张工单的 run 用 `GET /api/issues/{id}/runs` 取，不在核心状态里。
 
 **干活过程**（`session/activities.go`）：每一步（收到的话、想、说、工具调用的输入和输出）记在 `activities/<id>.json`。带话时可以评论某一步（`on`），服务端把那一步写在话前面交给帮工。
 
@@ -162,7 +162,7 @@
 
 **特效**：金币、升级、成就、没做成的惩罚由 `EffectsOf` 从事实和折之前的状态算出，`Core` 和帧一起发。
 
-**农场账本**（`game/ledger.go`；[理由](../../.agents/notes/implemented/feature/2026-10-11-achievements.md)）是 `ledger` 表：值得记的事，一条一行，按顺序。金币、连胜、成就和每个档案的战绩都由它折出来（`game/progress.go`），规则见 [farm-ui.md](farm-ui.md)「计分」。
+**农场账本**（`game/ledger.go`；[理由](../../.agents/notes/implemented/feature/2026-10-11-achievements.md)）是 `game_ledger` 表：值得记的事，一条一行，按顺序。金币、连胜、成就和每个档案的战绩都由它折出来（`game/progress.go`），规则见 [farm-ui.md](farm-ui.md)「计分」。
 
 - 账本自己看事件流，用 `game/progress.go` 的 `entriesFor` 读出要记的（收获、没做成、冲突、派出、拆好计划、升级、带话……）；业务的服务不调它。只有主人在应用里做的几件事（语音接通、看收成清单、挂称号）在 HTTP 那一层记。
 - 记一条就施加 `progress` 事实，带来金币或成就时带上 `news`。

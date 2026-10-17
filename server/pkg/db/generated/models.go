@@ -8,6 +8,85 @@ import (
 	"database/sql"
 )
 
+type ChannelConversation struct {
+	ID          int64
+	Kind        string
+	ParentSeq   sql.NullInt64
+	SubjectKind sql.NullString
+	SubjectID   sql.NullString
+	LastSeq     sql.NullInt64
+	ReplyCount  int64
+	CreatedAt   int64
+	Name        sql.NullString
+	Description sql.NullString
+	Project     sql.NullString
+	ChannelID   sql.NullInt64
+}
+
+type ChannelDelivery struct {
+	RecipientID string
+	MessageSeq  int64
+	Reason      string
+	Wakes       bool
+	HeldBy      sql.NullString
+	State       string
+	Launch      sql.NullString
+	AnnouncedAt sql.NullInt64
+	HandedAt    sql.NullInt64
+	SeenAt      sql.NullInt64
+	DroppedWhy  sql.NullString
+	CreatedAt   int64
+}
+
+type ChannelFollow struct {
+	ConversationID int64
+	ParticipantID  string
+	Reason         string
+	FromSeq        int64
+	UnfollowedAt   sql.NullInt64
+}
+
+type ChannelMention struct {
+	MessageSeq int64
+	TargetID   string
+	Resolved   string
+}
+
+type ChannelMessage struct {
+	Seq            int64
+	ConversationID int64
+	SenderID       string
+	Kind           string
+	Body           string
+	Final          bool
+	Meta           sql.NullString
+	SendKey        sql.NullString
+	CreatedAt      int64
+	UpdatedAt      sql.NullInt64
+}
+
+type ChannelParticipant struct {
+	ID       string
+	Kind     string
+	Name     string
+	AgentID  sql.NullString
+	Runtime  sql.NullString
+	JoinedAt int64
+	LeftAt   sql.NullInt64
+}
+
+type ChannelReadCursor struct {
+	ParticipantID  string
+	ConversationID int64
+	ReadSeq        int64
+	UpdatedAt      int64
+}
+
+type ChannelSeenMark struct {
+	ParticipantID string
+	MessageSeq    int64
+}
+
 type ConnectorAccount struct {
 	Connector    string
 	Secrets      string
@@ -42,27 +121,24 @@ type ConnectorOutbox struct {
 	SentAt     sql.NullInt64
 }
 
-type Conversation struct {
-	ID          int64
-	Kind        string
-	ParentSeq   sql.NullInt64
-	SubjectKind sql.NullString
-	SubjectID   sql.NullString
-	LastSeq     sql.NullInt64
-	ReplyCount  int64
-	CreatedAt   int64
-	Name        sql.NullString
-	Description sql.NullString
-	Project     sql.NullString
-	ChannelID   sql.NullInt64
+type GameLedger struct {
+	Seq     int64
+	Kind    string
+	At      int64
+	Payload string
 }
 
-type Follow struct {
-	ConversationID int64
-	ParticipantID  string
-	Reason         string
-	FromSeq        int64
-	UnfollowedAt   sql.NullInt64
+type Gate struct {
+	ID   int64
+	Open bool
+}
+
+type GateDevice struct {
+	ID       string
+	Name     string
+	KeyHash  string
+	PairedAt int64
+	LastSeen sql.NullInt64
 }
 
 type Issue struct {
@@ -90,26 +166,6 @@ type IssueSession struct {
 	StartedAt int64
 }
 
-type LanDevice struct {
-	ID       string
-	Name     string
-	KeyHash  string
-	PairedAt int64
-	LastSeen sql.NullInt64
-}
-
-type LanGate struct {
-	ID   int64
-	Open bool
-}
-
-type Ledger struct {
-	Seq     int64
-	Kind    string
-	At      int64
-	Payload string
-}
-
 type Memory struct {
 	ID         int64
 	Agent      string
@@ -122,50 +178,6 @@ type Memory struct {
 	RecalledAt sql.NullInt64
 }
 
-type Mention struct {
-	MessageSeq int64
-	TargetID   string
-	Resolved   string
-}
-
-type Message struct {
-	Seq            int64
-	ConversationID int64
-	SenderID       string
-	Kind           string
-	Body           string
-	Final          bool
-	Meta           sql.NullString
-	SendKey        sql.NullString
-	CreatedAt      int64
-	UpdatedAt      sql.NullInt64
-}
-
-type MessageDelivery struct {
-	RecipientID string
-	MessageSeq  int64
-	Reason      string
-	Wakes       bool
-	HeldBy      sql.NullString
-	State       string
-	Launch      sql.NullString
-	AnnouncedAt sql.NullInt64
-	HandedAt    sql.NullInt64
-	SeenAt      sql.NullInt64
-	DroppedWhy  sql.NullString
-	CreatedAt   int64
-}
-
-type Participant struct {
-	ID       string
-	Kind     string
-	Name     string
-	AgentID  sql.NullString
-	Runtime  sql.NullString
-	JoinedAt int64
-	LeftAt   sql.NullInt64
-}
-
 type PlaybookEvent struct {
 	Seq        int64
 	PlaybookID string
@@ -174,26 +186,6 @@ type PlaybookEvent struct {
 	Actor      string
 	Payload    string
 	CreatedAt  int64
-}
-
-type ReadCursor struct {
-	ParticipantID  string
-	ConversationID int64
-	ReadSeq        int64
-	UpdatedAt      int64
-}
-
-type Run struct {
-	ID          int64
-	Session     string
-	Issue       sql.NullString
-	TriggeredBy string
-	Heard       sql.NullString
-	StartedAt   int64
-	EndedAt     sql.NullInt64
-	Outcome     sql.NullString
-	Summary     sql.NullString
-	Spent       sql.NullString
 }
 
 type Schedule struct {
@@ -210,7 +202,15 @@ type Schedule struct {
 	LastRun   sql.NullInt64
 }
 
-type SeenMark struct {
-	ParticipantID string
-	MessageSeq    int64
+type SessionRun struct {
+	ID          int64
+	Session     string
+	Issue       sql.NullString
+	TriggeredBy string
+	Heard       sql.NullString
+	StartedAt   int64
+	EndedAt     sql.NullInt64
+	Outcome     sql.NullString
+	Summary     sql.NullString
+	Spent       sql.NullString
 }
