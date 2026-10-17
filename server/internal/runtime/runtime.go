@@ -690,8 +690,12 @@ func (r *Service) Price(id, model string) *Price {
 		}
 		return piPrice(model)
 	case "dsh":
-		// dsh names a model provider/model (community/dsh ModelID); only DeepSeek's own is priced here.
+		// dsh names a model provider/model (community/dsh ModelID); only DeepSeek's own is priced here. Its ACP default,
+		// deepseek-v4-flash, is an alias the API answers as deepseek-flash (probed 2026-10-17).
 		if provider, name, ok := strings.Cut(model, "/"); ok && provider == "deepseek-official" {
+			if name == "deepseek-v4-flash" {
+				name = "deepseek-flash"
+			}
 			if m, ok := ai.GetModel("deepseek", name); ok {
 				return &Price{Input: m.Cost.Input, Output: m.Cost.Output, CacheRead: m.Cost.CacheRead, CacheWrite: m.Cost.CacheWrite}
 			}

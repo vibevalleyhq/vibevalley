@@ -3,6 +3,7 @@ package dsh
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"vibevalley/pkg/smith/internal/acp"
@@ -45,7 +46,7 @@ func ProjectModels(response any) []oar.ModelEntry {
 		if value == "" {
 			return
 		}
-		name, _ := choice["name"].(string)
+		name := displayName(value, choice)
 		entries = append(entries, oar.ModelEntry{ID: ModelID(value), DisplayName: name, EffortLevels: levels, DefaultEffort: defaultEffort,
 			Default: value == current})
 	}
@@ -110,4 +111,15 @@ func ListModels(ctx context.Context, installation oar.AvailableInstallation, opt
 		return oar.ListModelsResult{Kind: "unsupported", Reason: "this dsh build returns no model config option on session/new"}, nil
 	}
 	return oar.ListModelsResult{Kind: "ok", Models: models}, nil
+}
+
+// displayName is the choice's name, with the release dsh's own selector badges it with
+// (dsh-client-ui-deepseek-model-label-1017): DeepSeek's deepseek-flash named exactly DeepSeek-V4.1-Flash is the 1017 build.
+func displayName(value string, choice jsonx.Record) string {
+	name, _ := choice["name"].(string)
+	provider, model, _ := strings.Cut(ModelID(value), "/")
+	if (provider == deepseek || provider == "deepseek-account") && model == "deepseek-flash" && name == "DeepSeek-V4.1-Flash" {
+		return name + "-1017"
+	}
+	return name
 }

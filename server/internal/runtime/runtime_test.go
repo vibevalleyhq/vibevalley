@@ -71,6 +71,9 @@ func TestDshPricesDeepSeeksOwnModels(t *testing.T) {
 	if p := r.Price("dsh", "deepseek-official/deepseek-flash"); p == nil || p.Input != 0.14 {
 		t.Fatalf("deepseek-flash price %+v", p)
 	}
+	if p := r.Price("dsh", "deepseek-official/deepseek-v4-flash"); p == nil || p.Input != 0.14 {
+		t.Fatalf("deepseek-v4-flash price %+v", p)
+	}
 	if p := r.Price("dsh", "openrouter/deepseek-flash"); p != nil {
 		t.Fatalf("another provider's model priced %+v", p)
 	}

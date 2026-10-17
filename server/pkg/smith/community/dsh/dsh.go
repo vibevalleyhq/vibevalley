@@ -1,5 +1,5 @@
 // Package dsh is the DeepSeek Harness runtime: `dsh --profile acp` (DeepSeek Harness's automation ACP server, dsh
-// 0.2.1-rc.1, ACP v1) driven through the shared ACP layer. It is no OAR port; a host adds Runtime() to its registry.
+// 0.2.1-rc.2, ACP v1) driven through the shared ACP layer. It is no OAR port; a host adds Runtime() to its registry.
 //
 // What the server offers, probed 2026-10-17: initialize with no auth methods, session/new, session/resume, session/list
 // and session/close, one prompt at a time, session/cancel, and session/set_config_option with a `model` select

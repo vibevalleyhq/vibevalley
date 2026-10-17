@@ -36,7 +36,7 @@ run, _ := observe.PromptAndWait(ctx, session, "Find and fix the flaky test", obs
 | `runtimes/<id>` | The adapters: claude, codex, grok, kimi, opencode, antigravity, pi |
 | `runtimes/defaults` | The built-in registry |
 | `community/morph` | The morph runtime: not in the built-in registry; `cli.Runtimes()` registers it |
-| `community/dsh` | DeepSeek Harness (`dsh --profile acp`, 0.2.1-rc.1) over the shared ACP layer; no oar port; `cli.Runtimes()` and the VibeValley server register it |
+| `community/dsh` | DeepSeek Harness (`dsh --profile acp`, 0.2.1-rc.2) over the shared ACP layer; no oar port; `cli.Runtimes()` and the VibeValley server register it |
 | `brands` | Offline runtime branding, generated from oar's `brands.ts` |
 | `agents` | Subagents over a runtime registry |
 | `oartest` | A scripted runtime with real `Session` semantics, for tests |

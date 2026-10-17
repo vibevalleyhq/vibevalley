@@ -14,7 +14,7 @@ import (
 )
 
 // The test binary stands in for `dsh --profile acp` when DSH_FAKE names the file it logs to: it answers with what
-// dsh 0.2.1-rc.1 answered (testdata), and logs every request.
+// dsh 0.2.1-rc.2 answered (testdata), and logs every request.
 func TestMain(m *testing.M) {
 	if log := os.Getenv("DSH_FAKE"); log != "" {
 		fake(log)
@@ -28,7 +28,7 @@ func answersFile() string {
 	if file := os.Getenv("DSH_FAKE_ANSWERS"); file != "" {
 		return file
 	}
-	file, _ := filepath.Abs(filepath.Join("testdata", "acp-0.2.1-rc.1.json"))
+	file, _ := filepath.Abs(filepath.Join("testdata", "acp-0.2.1-rc.2.json"))
 	return file
 }
 
@@ -125,7 +125,7 @@ func TestProjectModelsReadsGroups(t *testing.T) {
 	if want := []string{"deepseek-official/deepseek-v4-flash", "deepseek-official/deepseek-flash", "deepseek-official/deepseek-v4-pro"}; !slices.Equal(ids, want) {
 		t.Fatalf("ids %v, want %v", ids, want)
 	}
-	if !models[0].Default || models[1].Default || models[1].DisplayName != "DeepSeek-V4.1-Flash" {
+	if !models[0].Default || models[1].Default || models[1].DisplayName != "DeepSeek-V4.1-Flash-1017" || models[2].DisplayName != "DeepSeek-V4-Pro" {
 		t.Fatalf("models %+v", models)
 	}
 }
