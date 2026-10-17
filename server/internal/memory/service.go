@@ -9,12 +9,12 @@ import (
 
 // The package's one service: its parts' exported methods are its own.
 type Service struct {
-	*memories
+	*providers
 	*managerMemory
 	parts base.Parts
 }
 
-func newService(a *memories, b *managerMemory) (*Service, error) {
+func newService(a *providers, b *managerMemory) (*Service, error) {
 	return &Service{a, b, base.Parts{a, b}}, nil
 }
 

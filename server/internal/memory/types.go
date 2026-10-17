@@ -20,4 +20,6 @@ type RecallCue struct {
 	Project string
 	Text    string
 	Skip    map[string]bool
+	// Only asking: nothing is counted as recalled (the 记性 tab's preview).
+	Peek bool
 }

@@ -118,6 +118,10 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 3. **Nowledge Mem**：MCP 客户端用已有的 `github.com/modelcontextprotocol/go-sdk`；设置里的来源表、记性页签按 `Can()` 显示。
 4. **EverOS**：HTTP 客户端，`SyncTurn` 送对话、`OnSessionEnd` 时 `flush`。
 
+### 做到哪了
+
+2026-10-18 做了第 1 步的接口那一半：`server/internal/memory/provider.go` 是接口，`providers.go` 是管理器，`local.go` 把原来的 `memories` 包成本地来源，行为不变（`internal/session` 和处理函数没改）。接口里只放了现在有人调的方法（`Name`、`Available`、`OnStart`、`OnStop`、`Prefetch`、`SyncTurn`、`List`、`Add`、`Forget`），其余的等第一个调用的人来了再加：`go:deadcode` 不留只靠测试活着的方法。已知的缺口：几个来源一起想起时，本地挑出、合并时又被挤掉的那几条，也记成了想起过；只有本地一个来源时不会发生，接第二个来源时改成合并之后再记。本地的存法（迁移、FTS5、gse）还没做，见[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)。
+
 ## Alternatives considered
 
 **只能开一个外接来源（Hermes 的做法）。** 它这样限制，是因为每个来源都带自己的工具。我们对 agent 只给一套统一的工具，来源多了工具也不变；而 EverOS 和 Nowledge 主人都要。
