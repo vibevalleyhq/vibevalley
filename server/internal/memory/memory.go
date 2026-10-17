@@ -307,7 +307,7 @@ func memoryCarriedLines(lines []agent.MemoryLine) int {
 }
 
 type managerMemory struct {
-	home    string
+	home string
 }
 
 func newManagerMemory(cfg base.Config) (*managerMemory, error) {

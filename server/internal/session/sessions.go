@@ -254,7 +254,7 @@ func (c *sessions) hand(id string) *hand {
 	return c.hands[id]
 }
 
-func (c *sessions) Activity() *base.Hub[LaunchActivity] { return c.activity }
+func (c *sessions) Launches() *base.Hub[LaunchActivity] { return c.activity }
 
 func (c *sessions) signal(a LaunchActivity) { c.activity.Publish(a) }
 
@@ -513,7 +513,7 @@ func (c *sessions) stalled(h *hand, silentForMs int64) {
 	if label := working.Doing.Label; label != "" {
 		last = "（最后在：" + label + "）"
 	}
-	h.journal.Note(protocol.ActivityKindError, fmt.Sprintf("已经 %s没动静了%s。可能在跑很久的命令，也可能卡住了", quiet, last), nil)
+	h.journal.Note(protocol.SessionEventTypeRunError, fmt.Sprintf("已经 %s没动静了%s。可能在跑很久的命令，也可能卡住了", quiet, last), nil)
 	c.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 已经 %s没动静了%s：点它的地看看过程，不对就叫停", session.Name, quiet, last))
 }
 
@@ -981,11 +981,11 @@ func (c *sessions) Find(id string) *Roster {
 // What the session is told for a comment on step n of its trajectory: the step, then the comment. A step gone (only the
 // latest are kept) is Missing.
 func (c *sessions) Comment(id string, n int64, comment string) (string, error) {
-	var steps []protocol.Activity
+	var steps []protocol.SessionEvent
 	if h := c.hand(id); h != nil {
-		steps = h.journal.Activities()
+		steps = h.journal.Events()
 	}
-	i := slices.IndexFunc(steps, func(s protocol.Activity) bool { return s.N == n })
+	i := slices.IndexFunc(steps, func(s protocol.SessionEvent) bool { return s.Seq == n })
 	if i < 0 {
 		return "", protocol.Missing{What: fmt.Sprintf("第 %d 步（太早的步骤不再保留）", n)}
 	}

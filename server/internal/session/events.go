@@ -20,9 +20,9 @@ import (
 // A step that grows (text still streaming in, a tool that has not returned) is sent again under the same number; sends are batched a little.
 
 const (
-	keepActivities = 240
-	textMax        = 6000
-	AskedMax       = 2000
+	keepEvents = 240
+	textMax    = 6000
+	AskedMax   = 2000
 	// Trajectories are looked back on after the session has gone, so a tool's input and output keep enough to tell what
 	// happened: a whole command or patch, a test run's failures.
 	inputMax = 4000
@@ -41,12 +41,12 @@ func clipOutput(text string) string {
 	return fmt.Sprintf("%s\n… 省略 %d 个字 …\n%s", str.Slice(text, 0, outputHead), n-outputHead-outputTail, str.Slice(text, -outputTail, n))
 }
 
-func readJournal(file string) []protocol.Activity {
+func readJournal(file string) []protocol.SessionEvent {
 	body, err := os.ReadFile(file)
 	if err != nil {
 		return nil
 	}
-	var steps []protocol.Activity
+	var steps []protocol.SessionEvent
 	if json.Unmarshal(body, &steps) != nil {
 		return nil
 	}
@@ -63,12 +63,12 @@ type runOn struct {
 // All methods are safe for concurrent use.
 type journal struct {
 	file string
-	push func(protocol.Activity)
+	push func(protocol.SessionEvent)
 	keep int
 	disk *base.FileWriter
 
 	mu    sync.Mutex
-	steps []protocol.Activity
+	steps []protocol.SessionEvent
 	next  int64
 	// calls are tool calls not yet returned; started is every call started (a sub-agent's steps go under the call
 	// that started it). A tool call is known by its id within its agent, never by the id alone.
@@ -78,24 +78,26 @@ type journal struct {
 	dirty              []int64
 	pushing, saving    *time.Timer
 	closed             bool
+	// run is the open run the events belong to, nil between runs.
+	run *int64
 }
 
-func openJournal(file string, initial []protocol.Activity, push func(protocol.Activity), keep int) *journal {
+func openJournal(file string, initial []protocol.SessionEvent, push func(protocol.SessionEvent), keep int) *journal {
 	if keep <= 0 {
-		keep = keepActivities
+		keep = keepEvents
 	}
-	j := &journal{file: file, push: push, keep: keep, disk: base.NewFileWriter(file, 0o644), steps: append([]protocol.Activity(nil), initial...),
+	j := &journal{file: file, push: push, keep: keep, disk: base.NewFileWriter(file, 0o644), steps: append([]protocol.SessionEvent(nil), initial...),
 		calls: map[string]int64{}, started: map[string]int64{}}
 	if n := len(j.steps); n > 0 {
-		j.next = j.steps[n-1].N + 1
+		j.next = j.steps[n-1].Seq + 1
 	}
 	return j
 }
 
-func (j *journal) Activities() []protocol.Activity {
+func (j *journal) Events() []protocol.SessionEvent {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	return append([]protocol.Activity{}, j.steps...)
+	return append([]protocol.SessionEvent{}, j.steps...)
 }
 
 func (j *journal) write() error {
@@ -115,7 +117,7 @@ func (j *journal) flush() {
 		j.pushing.Stop()
 		j.pushing = nil
 	}
-	var out []protocol.Activity
+	var out []protocol.SessionEvent
 	for _, n := range j.dirty {
 		if i := j.indexLocked(n); i >= 0 {
 			out = append(out, j.steps[i])
@@ -130,7 +132,7 @@ func (j *journal) flush() {
 
 func (j *journal) indexLocked(n int64) int {
 	for i := len(j.steps) - 1; i >= 0; i-- {
-		if j.steps[i].N == n {
+		if j.steps[i].Seq == n {
 			return i
 		}
 	}
@@ -177,20 +179,37 @@ func (j *journal) underLocked(from From) *int64 {
 	return &parent
 }
 
-func (j *journal) addLocked(step protocol.Activity, from From) int64 {
+func (j *journal) addLocked(step protocol.SessionEvent, from From) int64 {
 	j.speaking, j.thinking = nil, nil
 	n := j.next
 	j.next++
-	step.N, step.At, step.Under = n, clock.NowMs(), j.underLocked(from)
+	step.Seq, step.Time, step.Under, step.Run = n, clock.NowMs(), j.underLocked(from), j.run
 	j.steps = append(j.steps, step)
 	if over := len(j.steps) - j.keep; over > 0 {
-		j.steps = append([]protocol.Activity(nil), j.steps[over:]...)
+		j.steps = append([]protocol.SessionEvent(nil), j.steps[over:]...)
 	}
 	j.changedLocked(n)
 	return n
 }
 
-func (j *journal) patchLocked(n int64, change func(*protocol.Activity)) {
+func (j *journal) RunStarted(id int64) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.run = &id
+	j.addLocked(protocol.SessionEvent{Type: protocol.SessionEventTypeRunStart}, nil)
+}
+
+func (j *journal) RunEnded(id int64, outcome protocol.Outcome) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.run == nil || *j.run != id {
+		return
+	}
+	j.addLocked(protocol.SessionEvent{Type: protocol.SessionEventTypeRunEnd, Text: string(outcome)}, nil)
+	j.run = nil
+}
+
+func (j *journal) patchLocked(n int64, change func(*protocol.SessionEvent)) {
 	i := j.indexLocked(n)
 	if i < 0 {
 		return
@@ -202,7 +221,7 @@ func (j *journal) patchLocked(n int64, change func(*protocol.Activity)) {
 func (j *journal) Asked(text string, from From) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	j.addLocked(protocol.Activity{Kind: protocol.ActivityKindPrompt, Text: str.Cut(str.Trim(text), AskedMax), On: commentOn(text)}, from)
+	j.addLocked(protocol.SessionEvent{Type: protocol.SessionEventTypeUserMessage, Text: str.Cut(str.Trim(text), AskedMax), On: commentOn(text)}, from)
 }
 
 // The journal reads the mark back to tie the step it was asked to the step it comments on.
@@ -215,11 +234,11 @@ const (
 	commentSays = "我的评论："
 )
 
-func CommentText(step protocol.Activity, comment string) string {
+func CommentText(step protocol.SessionEvent, comment string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "【评论第 %d 步】", step.N)
-	switch step.Kind {
-	case protocol.ActivityKindAction:
+	fmt.Fprintf(&b, "【评论第 %d 步】", step.Seq)
+	switch step.Type {
+	case protocol.SessionEventTypeToolCall:
 		b.WriteString("关于你这一步的操作：" + str.Cut(str.Trim(step.Text), commentAbout))
 		if step.Input != nil && str.Trim(*step.Input) != "" {
 			b.WriteString("\n输入：" + str.Cut(str.Trim(*step.Input), commentAbout))
@@ -234,9 +253,9 @@ func CommentText(step protocol.Activity, comment string) string {
 			}
 			b.WriteString("\n输出的结尾：" + out)
 		}
-	case protocol.ActivityKindResponse:
+	case protocol.SessionEventTypeAssistantMessage:
 		b.WriteString("关于你说的这段话：" + str.Cut(str.Trim(step.Text), commentAbout))
-	case protocol.ActivityKindThought:
+	case protocol.SessionEventTypeAssistantThinking:
 		b.WriteString("关于你这段思考：" + str.Cut(str.Trim(step.Text), commentAbout))
 	default:
 		b.WriteString("关于这一步：" + str.Cut(str.Trim(step.Text), commentAbout))
@@ -257,7 +276,7 @@ func commentOn(text string) *int64 {
 	return &n
 }
 
-func (j *journal) runOn(kind protocol.ActivityKind, text string, from From) {
+func (j *journal) runOn(kind protocol.SessionEventType, text string, from From) {
 	if text == "" {
 		return
 	}
@@ -265,27 +284,29 @@ func (j *journal) runOn(kind protocol.ActivityKind, text string, from From) {
 	defer j.mu.Unlock()
 	who := strings.Join(from, "/")
 	on := &j.speaking
-	if kind == protocol.ActivityKindThought {
+	if kind == protocol.SessionEventTypeAssistantThinking {
 		on = &j.thinking
 	}
 	if *on != nil && (*on).from == who && j.indexLocked((*on).n) >= 0 {
-		j.patchLocked((*on).n, func(s *protocol.Activity) { s.Text = str.Cut(s.Text+text, textMax) })
+		j.patchLocked((*on).n, func(s *protocol.SessionEvent) { s.Text = str.Cut(s.Text+text, textMax) })
 		return
 	}
-	n := j.addLocked(protocol.Activity{Kind: kind, Text: str.Cut(text, textMax)}, from)
+	n := j.addLocked(protocol.SessionEvent{Type: kind, Text: str.Cut(text, textMax)}, from)
 	*on = &runOn{n: n, from: who}
 }
 
-func (j *journal) Said(text string, from From) { j.runOn(protocol.ActivityKindResponse, text, from) }
+func (j *journal) Said(text string, from From) {
+	j.runOn(protocol.SessionEventTypeAssistantMessage, text, from)
+}
 func (j *journal) Thought(text string, from From) {
-	j.runOn(protocol.ActivityKindThought, text, from)
+	j.runOn(protocol.SessionEventTypeAssistantThinking, text, from)
 }
 
 func (j *journal) ToolStarted(callID string, start ToolStart, from From) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	action, tool := start.Action, start.Tool
-	step := protocol.Activity{Kind: protocol.ActivityKindAction, Text: start.Text, Action: &action, Tool: &tool}
+	step := protocol.SessionEvent{Type: protocol.SessionEventTypeToolCall, Text: start.Text, Action: &action, Tool: &tool}
 	if start.Input != "" {
 		input := str.Cut(start.Input, inputMax)
 		step.Input = &input
@@ -299,7 +320,7 @@ func (j *journal) ToolInput(callID, input, text string, from From) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	if n, ok := j.calls[callKey(from, callID)]; ok {
-		j.patchLocked(n, func(s *protocol.Activity) {
+		j.patchLocked(n, func(s *protocol.SessionEvent) {
 			clipped := str.Cut(input, inputMax)
 			s.Input = &clipped
 			if text != "" {
@@ -318,7 +339,7 @@ func (j *journal) ToolEnded(callID, output string, ok bool, from From) {
 		return
 	}
 	delete(j.calls, key)
-	j.patchLocked(n, func(s *protocol.Activity) {
+	j.patchLocked(n, func(s *protocol.SessionEvent) {
 		s.Ok = &ok
 		if str.Trim(output) != "" {
 			clipped := clipOutput(str.TrimEnd(output))
@@ -327,10 +348,10 @@ func (j *journal) ToolEnded(callID, output string, ok bool, from From) {
 	})
 }
 
-func (j *journal) Note(kind protocol.ActivityKind, text string, from From) {
+func (j *journal) Note(kind protocol.SessionEventType, text string, from From) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	j.addLocked(protocol.Activity{Kind: kind, Text: text}, from)
+	j.addLocked(protocol.SessionEvent{Type: kind, Text: text}, from)
 }
 
 func (j *journal) Close() {

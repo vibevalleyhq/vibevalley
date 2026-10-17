@@ -14,7 +14,7 @@ Status: implemented
 
 行为见 [server.md](../../../../docs/reference/server.md)「帮工」里的「轨迹」和 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「管家页」「捏帮工」。
 
-- **轨迹就是干活过程加上它是谁的**。步骤还是 `Activity`（当时叫 `WorkStep`），一条轨迹一个 journal（`server/internal/session/activities.go` 的 `crewJournal`）。另外多一个头（protocol 的 `TrajectoryHead`），记名字、帮工档案、农机、项目、工单、什么时候开始、什么时候结束。两样都放在 `$VIBEVALLEY_HOME/steps/`：`<id>.json` 和 `<id>.head.json`。
+- **轨迹就是干活过程加上它是谁的**。步骤还是 `Activity`（当时叫 `WorkStep`），一条轨迹一个 journal（`server/internal/session/events.go` 的 `crewJournal`）。另外多一个头（protocol 的 `TrajectoryHead`），记名字、帮工档案、农机、项目、工单、什么时候开始、什么时候结束。两样都放在 `$VIBEVALLEY_HOME/steps/`：`<id>.json` 和 `<id>.head.json`。
 - **`Trajectories` 服务管轨迹从开始到删掉**（`internal/session/trajectories.go`）。`crew.go` 派活时 `Open`，帮工离开时 `Finish`。`Finish` 只是写完、关上、标上结束，不删文件。走了超过 `trajectory.days` 天（默认 30，0 是一直留着）的轨迹，服务端启动时删掉它的步骤；头留着，因为它就是一张工单（[工单](2026-10-14-tickets.md)），看板上的历史不该过一个月就消失。工具的输入和输出比只在地块详情里看时留得多（输入 4000 字，输出开头 2000、结尾 4000），事后翻看时能看出发生了什么。
 - **管家的轨迹走同一条路**，id 是 `foreman`，不会结束，留最近 1000 步：
   - `foreman.go` 把交给它的每一句话记成「收到」。
@@ -22,7 +22,7 @@ Status: implemented
   - 步骤照样用 `step` 工地事件推给页面，页面不用为管家另写一套。
 - **思考和帮手也在轨迹里**：
   - 农机交出来的思考记成 `thought` 一步。
-  - 帮工派出去的子 agent 按 oar 的 `agentPath`（smith 里是 `AgentPath`，`session/facts.go` 读）认出来，步骤带上 `under`（派它出去的那次调用的步号），工具调用按「哪个 agent 的、哪一个」认（`session/activities.go`）。
+  - 帮工派出去的子 agent 按 oar 的 `agentPath`（smith 里是 `AgentPath`，`session/facts.go` 读）认出来，步骤带上 `under`（派它出去的那次调用的步号），工具调用按「哪个 agent 的、哪一个」认（`session/events.go`）。
   - 这样每个子 agent 的轨迹都排在它的帮工的轨迹里，接在派它出去的那一步下面，不另开一条。
 - **页面**：
   - 管家页的「轨迹」页签和帮工档案页的「轨迹」页签，都用农场地块详情那套干活过程的显示（`WorkLog`，`app/lib/shared/work_log.dart`）。

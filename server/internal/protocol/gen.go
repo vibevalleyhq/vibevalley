@@ -292,8 +292,8 @@ func (v CoreState) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-// ActivityKindValues are every ActivityKind, in the protocol's order.
-var ActivityKindValues = []ActivityKind{ActivityKindPrompt, ActivityKindRecalled, ActivityKindThought, ActivityKindResponse, ActivityKindAction, ActivityKindRetry, ActivityKindError}
+// SessionEventTypeValues are every SessionEventType, in the protocol's order.
+var SessionEventTypeValues = []SessionEventType{SessionEventTypeRunStart, SessionEventTypeUserMessage, SessionEventTypeMemoryRecalled, SessionEventTypeAssistantThinking, SessionEventTypeAssistantMessage, SessionEventTypeToolCall, SessionEventTypeLLMRetry, SessionEventTypeRunError, SessionEventTypeRunEnd}
 
 // ToolActionValues are every ToolAction, in the protocol's order.
 var ToolActionValues = []ToolAction{ToolActionRunCommand, ToolActionReadFile, ToolActionEditFile, ToolActionSearch, ToolActionWeb, ToolActionMCP, ToolActionWait, ToolActionOther}
@@ -834,8 +834,8 @@ var PriorityValues = []Priority{PriorityUrgent, PriorityHigh, PriorityMedium, Pr
 func (v Trajectory) MarshalJSON() ([]byte, error) {
 	type plain Trajectory
 	p := plain(v)
-	if p.Activities == nil {
-		p.Activities = []Activity{}
+	if p.Events == nil {
+		p.Events = []SessionEvent{}
 	}
 	return json.Marshal(p)
 }
@@ -1864,7 +1864,7 @@ func (v FactUnschedule) MarshalJSON() ([]byte, error) {
 	return withTag(p, "type", "unschedule")
 }
 
-// SideEventValue is a member of SideEvent: FactCall, FactManager, FactMessage, FactConversation, FactHired, FactStation, FactRun, FactDoing, FactQuiet, FactRetry, FactSpent, FactReport, FactConflict, FactLeft, FactCommits, FactIssue, FactIssueGone, FactProgress, FactSchedule, FactUnschedule, SideEventSnapshot, SideEventActivity, SideEventNotice, SideEventRuntime, told apart by "type".
+// SideEventValue is a member of SideEvent: FactCall, FactManager, FactMessage, FactConversation, FactHired, FactStation, FactRun, FactDoing, FactQuiet, FactRetry, FactSpent, FactReport, FactConflict, FactLeft, FactCommits, FactIssue, FactIssueGone, FactProgress, FactSchedule, FactUnschedule, SideEventSnapshot, SideEventSessionEvent, SideEventNotice, SideEventRuntime, told apart by "type".
 type SideEventValue interface{ isSideEvent() }
 
 func (u SideEvent) IsZero() bool { return u.Value == nil }
@@ -1973,8 +1973,8 @@ func (u *SideEvent) UnmarshalJSON(data []byte) error {
 		var v SideEventSnapshot
 		err = json.Unmarshal(data, &v)
 		u.Value = v
-	case "activity":
-		var v SideEventActivity
+	case "event":
+		var v SideEventSessionEvent
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "notice":
@@ -1993,7 +1993,7 @@ func (u *SideEvent) UnmarshalJSON(data []byte) error {
 
 // SideEventMembers are every member of SideEvent, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var SideEventMembers = []SideEventValue{FactCall{}, FactManager{}, FactMessage{}, FactConversation{}, FactHired{}, FactStation{}, FactRun{}, FactDoing{}, FactQuiet{}, FactRetry{}, FactSpent{}, FactReport{}, FactConflict{}, FactLeft{}, FactCommits{}, FactIssue{}, FactIssueGone{}, FactProgress{}, FactSchedule{}, FactUnschedule{}, SideEventSnapshot{}, SideEventActivity{}, SideEventNotice{}, SideEventRuntime{}}
+var SideEventMembers = []SideEventValue{FactCall{}, FactManager{}, FactMessage{}, FactConversation{}, FactHired{}, FactStation{}, FactRun{}, FactDoing{}, FactQuiet{}, FactRetry{}, FactSpent{}, FactReport{}, FactConflict{}, FactLeft{}, FactCommits{}, FactIssue{}, FactIssueGone{}, FactProgress{}, FactSchedule{}, FactUnschedule{}, SideEventSnapshot{}, SideEventSessionEvent{}, SideEventNotice{}, SideEventRuntime{}}
 
 func (SideEventSnapshot) isSideEvent() {}
 
@@ -2004,13 +2004,13 @@ func (v SideEventSnapshot) MarshalJSON() ([]byte, error) {
 	return withTag(p, "type", "snapshot")
 }
 
-func (SideEventActivity) isSideEvent() {}
+func (SideEventSessionEvent) isSideEvent() {}
 
-func (v SideEventActivity) MarshalJSON() ([]byte, error) {
-	type plain SideEventActivity
+func (v SideEventSessionEvent) MarshalJSON() ([]byte, error) {
+	type plain SideEventSessionEvent
 	p := plain(v)
 
-	return withTag(p, "type", "activity")
+	return withTag(p, "type", "event")
 }
 
 func (SideEventNotice) isSideEvent() {}

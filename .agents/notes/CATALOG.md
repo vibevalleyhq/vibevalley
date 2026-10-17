@@ -16,7 +16,7 @@
 ### architecture
 
 - 2026-10-17 [Worker 改叫 Session](proposed/architecture/2026-10-17-worker-is-a-session.md)
-- 2026-10-17 [Session、Run、Step：一个 agent loop 的三层，和消息之间只有两个口子](proposed/architecture/2026-10-17-session-run-step.md)
+- 2026-10-17 [Session、Run、事件：一个 agent loop 的日志，和消息之间只有两个口子](proposed/architecture/2026-10-17-session-run-step.md)
 - 2026-10-17 [管家是一份内置档案](proposed/architecture/2026-10-17-manager-is-an-agent.md)
 - 2026-10-17 [先有能力，再有入口：一张能力表，接口、命令行、管家、帮工都从它来](proposed/architecture/2026-10-17-capabilities-before-surfaces.md)
 - 2026-10-16 [Run 是一次干活，Worker 跨好几次 run，小队（Crew）编排 agent](proposed/architecture/2026-10-16-runs-workers-crews.md)

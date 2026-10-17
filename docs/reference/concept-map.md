@@ -29,7 +29,7 @@
 | 种植计划 | 图纸桌、计划板 | `farm/plans.dart` | `Playbook`（从父工单拼回，`StateFrame.Plans`） | `/api/playbooks` |
 | 帮工 | 地里干活的小动物 | 地块和地块详情（`farm/plot_detail.dart`） | `Session`（`CoreState.Sessions`） | `/api/sessions/{id}/stop`；别的按工单：`/api/issues/{id}/...` |
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.Phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `FactRun` 到 `FactReport`、`Session.Runs`、`LastRun` | `/api/issues/{id}/runs` |
-| 干活过程 | 干活过程 | `farm/work_log.dart` | `Activity`、`Trajectory`、`TrajectoryHead`（一个 Session 的步骤） | `/api/sessions`、`/api/sessions/{id}` |
+| 干活过程 | 干活过程 | `farm/work_log.dart` | `SessionEvent`、`Trajectory`、`TrajectoryHead`（一个 Session 的事件日志） | `/api/sessions`、`/api/sessions/{id}` |
 | 收成清单、收获 | 收获 | `shared/harvest.dart` | `Changes` | `/api/issues/{id}/changes`、`/api/issues/{id}/merge` |
 | 田头、频道 | 田头 | 田头窗口（`farm/chat_window.dart`）、`/chat`（`desk/chat`） | `Conversation`（`kind`：`square`、`channel`）、`ChatMessage`、`CoreState.Chat` | `/api/channels`、`/api/channels/{id}/messages` |
 | 工单串、评论 | 工单串 | 派活消息下面的串；干活过程里的「评论」 | `Conversation`（`kind: thread`）；评论某一步是 `session.CommentText` 拼出来的一句话 | `/api/channels/{id}/messages`、`/api/issues/{id}/comment` |
@@ -56,7 +56,7 @@
 | 种植计划 | `Playbook` | `issue` 表（带 `plan` 的父工单）、`playbook_event` 表 | |
 | 帮工 | `Session`（`session/sessions.go`） | `state.json`（核心状态里的帮工）、`sessions.json`（目录、农机的会话 id、最后一轮的原话） | 一个帮工是一个 `agents.Subagent`，包着一个 `oar.Session`；每个帮工有自己的 `agents.Subagents` |
 | 一次干活（run） | `Session`（`session/runs.go`）；`session/facts.go` 把会话事件读成事实 | `session_run` 表 | 一个 oar turn（`TurnStarted` 到 `TurnEnded`），结束时交一份 `SubagentReport` |
-| 干活过程 | `Session`（`session/trajectories.go`、`activities.go`） | `activities/<id>.json`、`activities/<id>.head.json`；原始记录在 `logs/` | oar 的事件：`TextDelta`、`Reasoning`、`ToolCallStarted`、`ToolCallEnded`…… |
+| 干活过程 | `Session`（`session/trajectories.go`、`events.go`） | `events/<id>.json`、`events/<id>.head.json`；原始记录在 `logs/` | oar 的事件：`TextDelta`、`Reasoning`、`ToolCallStarted`、`ToolCallEnded`…… |
 | 收成清单、收获 | `Issue`（`issue/merges.go`） | 帮工的分支和 worktree | |
 | 田头、频道、工单串 | `Channel`；帮工在频道里说话经 `MCP`（`/mcp`） | `channel_conversation`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
 | 定时 | `Schedule` | `schedule` 表 | |

@@ -47,7 +47,7 @@ type op struct {
 	Input  string
 	Output string
 	Ok     bool
-	Kind   protocol.ActivityKind
+	Kind   protocol.SessionEventType
 	From   From
 }
 
@@ -190,7 +190,7 @@ func eventFacts(event oar.Event, session *protocol.Session, tracking tracking, c
 		}
 		journal = append(journal, op{Type: "prompt", Text: asked})
 		if recalled := recalledIn(e.Input); recalled != "" {
-			journal = append(journal, op{Type: "note", Kind: protocol.ActivityKindRecalled, Text: recalled})
+			journal = append(journal, op{Type: "note", Kind: protocol.SessionEventTypeMemoryRecalled, Text: recalled})
 		}
 		facts = append(facts, protocol.FactRun{ID: id})
 	case oar.Reasoning:
@@ -256,7 +256,7 @@ func eventFacts(event oar.Event, session *protocol.Session, tracking tracking, c
 		if e.Reason != "" {
 			text += "：" + str.Clip(e.Reason, 160)
 		}
-		journal = append(journal, op{Type: "note", Kind: protocol.ActivityKindRetry, Text: text})
+		journal = append(journal, op{Type: "note", Kind: protocol.SessionEventTypeLLMRetry, Text: text})
 		fact := protocol.FactRetry{ID: id, Attempt: int64(e.Attempt)}
 		if e.MaxAttempts != nil && *e.MaxAttempts != 0 {
 			of := int64(*e.MaxAttempts)
@@ -308,7 +308,7 @@ func eventFacts(event oar.Event, session *protocol.Session, tracking tracking, c
 		r.Model = e.Model
 	case oar.TurnEnded:
 		if e.Outcome.Kind == "failed" {
-			journal = append(journal, op{Type: "note", Kind: protocol.ActivityKindError, Text: failureText(e.Outcome)})
+			journal = append(journal, op{Type: "note", Kind: protocol.SessionEventTypeRunError, Text: failureText(e.Outcome)})
 		}
 	case oar.Exited:
 		if session != nil && protocol.IsBusy(*session) {

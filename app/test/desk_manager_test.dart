@@ -11,8 +11,8 @@ import 'support/desk.dart';
 
 final _now = DateTime.now().millisecondsSinceEpoch.toDouble();
 
-Activity _step(double n, ActivityKind kind, String text, {String? input, String? output, bool? ok}) =>
-    Activity(n: n, at: _now, kind: kind, text: text, action: kind == ActivityKind.action ? ToolAction.runCommand : null, input: input, output: output, ok: ok);
+SessionEvent _step(double n, SessionEventType kind, String text, {String? input, String? output, bool? ok}) =>
+    SessionEvent(seq: n, time: _now, type: kind, text: text, action: kind == SessionEventType.toolCall ? ToolAction.runCommand : null, input: input, output: output, ok: ok);
 
 DeskBackend _server() => DeskBackend(
   managerMemory: MemoryList(
@@ -31,15 +31,15 @@ DeskBackend _server() => DeskBackend(
   trajectories: {
     'manager': Trajectory(
       head: TrajectoryHead(id: 'manager', name: '管家', startedAt: _now),
-      activities: [
-        _step(1, ActivityKind.prompt, '帮我跑测试'),
-        _step(2, ActivityKind.action, 'pnpm test', input: '{"command":"pnpm test"}', output: '12 passed', ok: true),
-        _step(3, ActivityKind.response, '测试都过了。'),
+      events: [
+        _step(1, SessionEventType.userMessage, '帮我跑测试'),
+        _step(2, SessionEventType.toolCall, 'pnpm test', input: '{"command":"pnpm test"}', output: '12 passed', ok: true),
+        _step(3, SessionEventType.assistantMessage, '测试都过了。'),
       ],
     ),
     'h1': Trajectory(
       head: TrajectoryHead(id: 'h1', name: '老周一号', agent: 'backend', project: 'clock', job: '改登录', startedAt: _now),
-      activities: [_step(1, ActivityKind.prompt, '改登录')],
+      events: [_step(1, SessionEventType.userMessage, '改登录')],
     ),
   },
   heads: [TrajectoryHead(id: 'h1', name: '老周一号', agent: 'backend', project: 'clock', job: '改登录', startedAt: _now, endedAt: _now)],
@@ -110,7 +110,7 @@ void main() {
       final events = StreamController<SideEvent>.broadcast();
       addTearDown(events.close);
       await pumpPage(t, const ManagerPage(tab: 'trajectory'), server.handle, events: events.stream);
-      events.add(SideEventActivity(at: _now, id: 'manager', activity: _step(4, ActivityKind.error, '网断了')));
+      events.add(SideEventSessionEvent(at: _now, id: 'manager', activity: _step(4, SessionEventType.runError, '网断了')));
       await settle(t);
       expect(find.text('网断了'), findsOneWidget);
     });

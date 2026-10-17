@@ -89,14 +89,14 @@ final rewardsProvider = NotifierProvider<Timed<GameEffectReward>, List<GameEffec
 /// A message lands a moment after the step it ends: steps this much later still count as its turn.
 const _slackMs = 3000;
 
-List<Activity> turnEndingAt(List<Activity> steps, double at) {
+List<SessionEvent> turnEndingAt(List<SessionEvent> steps, double at) {
   var end = -1;
   for (var i = 0; i < steps.length; i++) {
-    if (steps[i].at <= at + _slackMs) end = i;
+    if (steps[i].time <= at + _slackMs) end = i;
   }
   if (end < 0) return const [];
   var start = end;
-  while (start > 0 && steps[start].kind != ActivityKind.prompt) {
+  while (start > 0 && steps[start].type != SessionEventType.userMessage) {
     start--;
   }
   return steps.sublist(start, end + 1);

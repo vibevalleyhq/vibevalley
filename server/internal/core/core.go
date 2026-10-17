@@ -266,8 +266,8 @@ func (s *Service) SetCommits(count protocol.CommitCount) {
 	s.Apply(protocol.FactCommits{Commits: count})
 }
 
-func (s *Service) Activity(id string, step protocol.Activity) {
-	s.events.Publish(protocol.SideEvent{Value: protocol.SideEventActivity{At: clock.NowMs(), ID: id, Activity: step}})
+func (s *Service) SessionEvent(id string, step protocol.SessionEvent) {
+	s.events.Publish(protocol.SideEvent{Value: protocol.SideEventSessionEvent{At: clock.NowMs(), ID: id, SessionEvent: step}})
 }
 
 func (s *Service) Notice(level protocol.NoticeLevel, text string) {

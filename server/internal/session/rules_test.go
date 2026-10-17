@@ -46,7 +46,7 @@ func TestSessionsRunRemindedOfMemories(t *testing.T) {
 	block := RecallHead + "你以前记下的……\n- （这个项目）测试用 pnpm test"
 	h := sessionBase()
 	r := eventFacts(ev(oar.TurnStarted{RequestID: "r", Input: "你是老周" + JobBreak + withRecall(block, "加一个查询接口")}), &h, tracking{}, ctx)
-	testkit.Eq(t, r.Journal, []op{{Type: "prompt", Text: "加一个查询接口"}, {Type: "note", Kind: protocol.ActivityKindRecalled, Text: "- （这个项目）测试用 pnpm test"}}, "journal")
+	testkit.Eq(t, r.Journal, []op{{Type: "prompt", Text: "加一个查询接口"}, {Type: "note", Kind: protocol.SessionEventTypeMemoryRecalled, Text: "- （这个项目）测试用 pnpm test"}}, "journal")
 }
 
 func TestSessionsCommandShowsFromItsFolder(t *testing.T) {
@@ -142,7 +142,7 @@ func TestSessionsRetriesModelFailuresAndExitsAreSaid(t *testing.T) {
 	maxAttempts, delay := 3, int64(1500)
 	retry := eventFacts(ev(oar.Retry{Attempt: 2, MaxAttempts: &maxAttempts, DelayMs: &delay, Reason: "429"}), working(thinking), tracking{}, ctx)
 	testkit.Eq(t, retry.Facts, []protocol.FactValue{protocol.FactRetry{ID: "w1", Attempt: 2, Of: i(3)}}, "retry fact")
-	testkit.Eq(t, retry.Journal, []op{{Type: "note", Kind: protocol.ActivityKindRetry, Text: "调用模型没成功，第 2/3 次重试，2 秒后：429"}}, "retry step")
+	testkit.Eq(t, retry.Journal, []op{{Type: "note", Kind: protocol.SessionEventTypeLLMRetry, Text: "调用模型没成功，第 2/3 次重试，2 秒后：429"}}, "retry step")
 
 	testkit.Eq(t, eventFacts(ev(oar.Model{Model: "deepseek-flash"}), working(thinking), tracking{}, ctx).Model, "deepseek-flash", "model")
 
@@ -250,7 +250,7 @@ func TestCommentOnlyFromItsMark(t *testing.T) {
 	if commentOn("随便说一句") != nil {
 		t.Fatal("a plain message comments on nothing")
 	}
-	if on := commentOn(CommentText(protocol.Activity{N: 3, Kind: protocol.ActivityKindResponse, Text: "好"}, "再想想")); on == nil || *on != 3 {
+	if on := commentOn(CommentText(protocol.SessionEvent{Seq: 3, Type: protocol.SessionEventTypeAssistantMessage, Text: "好"}, "再想想")); on == nil || *on != 3 {
 		t.Fatalf("a comment on step 3: %v", on)
 	}
 }

@@ -33,7 +33,7 @@ const (
 
 type chatSessions interface {
 	Deliver(id, text string, by protocol.RunTrigger) session.Delivered
-	Activity() *base.Hub[session.LaunchActivity]
+	Launches() *base.Hub[session.LaunchActivity]
 	Find(id string) *session.Roster
 }
 
@@ -141,7 +141,7 @@ func (c *Service) restore() error {
 
 func (c *Service) OnStart(ctx context.Context) error {
 	_, events, stopEvents := c.core.Events()
-	activity, stopActivity := c.sessions.Activity().Subscribe()
+	activity, stopActivity := c.sessions.Launches().Subscribe()
 	go func() {
 		defer stopEvents()
 		for {

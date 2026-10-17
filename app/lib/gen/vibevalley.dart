@@ -1140,19 +1140,22 @@ class CoreState {
   };
 }
 
-enum ActivityKind {
-  prompt('prompt'),
-  recalled('recalled'),
-  thought('thought'),
-  response('response'),
-  action('action'),
-  retry('retry'),
-  error('error');
+enum SessionEventType {
+  runStart('run/start'),
+  userMessage('user/message'),
+  memoryRecalled('memory/recalled'),
+  assistantThinking('assistant/thinking'),
+  assistantMessage('assistant/message'),
+  toolCall('tool/call'),
+  llmRetry('llm/retry'),
+  runError('run/error'),
+  runEnd('run/end');
 
-  const ActivityKind(this.wire);
+  const SessionEventType(this.wire);
   final String wire;
 
-  static ActivityKind fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('ActivityKind: unknown value', v));
+  static SessionEventType fromJson(Object? v) =>
+      values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('SessionEventType: unknown value', v));
 }
 
 enum ToolAction {
@@ -1171,11 +1174,12 @@ enum ToolAction {
   static ToolAction fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('ToolAction: unknown value', v));
 }
 
-class Activity {
-  const Activity({
-    required this.n,
-    required this.at,
-    required this.kind,
+class SessionEvent {
+  const SessionEvent({
+    required this.seq,
+    required this.time,
+    required this.type,
+    this.run,
     this.under,
     required this.text,
     this.action,
@@ -1186,10 +1190,11 @@ class Activity {
     this.on,
   });
 
-  factory Activity.fromJson(Map<String, dynamic> j) => Activity(
-    n: (j['n'] as num).toDouble(),
-    at: (j['at'] as num).toDouble(),
-    kind: ActivityKind.fromJson(j['kind']),
+  factory SessionEvent.fromJson(Map<String, dynamic> j) => SessionEvent(
+    seq: (j['seq'] as num).toDouble(),
+    time: (j['time'] as num).toDouble(),
+    type: SessionEventType.fromJson(j['type']),
+    run: j['run'] == null ? null : (j['run'] as num).toDouble(),
     under: j['under'] == null ? null : (j['under'] as num).toDouble(),
     text: j['text'] as String,
     action: j['action'] == null ? null : ToolAction.fromJson(j['action']),
@@ -1200,9 +1205,10 @@ class Activity {
     on: j['on'] == null ? null : (j['on'] as num).toDouble(),
   );
 
-  final double n;
-  final double at;
-  final ActivityKind kind;
+  final double seq;
+  final double time;
+  final SessionEventType type;
+  final double? run;
   final double? under;
   final String text;
   final ToolAction? action;
@@ -1213,9 +1219,10 @@ class Activity {
   final double? on;
 
   Map<String, dynamic> toJson() => {
-    'n': n,
-    'at': at,
-    'kind': kind.wire,
+    'seq': seq,
+    'time': time,
+    'type': type.wire,
+    if (run != null) 'run': run!,
     if (under != null) 'under': under!,
     'text': text,
     if (action != null) 'action': action!.wire,
@@ -2801,19 +2808,19 @@ class IssueRequest {
 }
 
 class Trajectory {
-  const Trajectory({required this.head, required this.activities});
+  const Trajectory({required this.head, required this.events});
 
   factory Trajectory.fromJson(Map<String, dynamic> j) => Trajectory(
     head: TrajectoryHead.fromJson(j['head'] as Map<String, dynamic>),
-    activities: [for (final e in j['activities'] as List) Activity.fromJson(e as Map<String, dynamic>)],
+    events: [for (final e in j['events'] as List) SessionEvent.fromJson(e as Map<String, dynamic>)],
   );
 
   final TrajectoryHead head;
-  final List<Activity> activities;
+  final List<SessionEvent> events;
 
   Map<String, dynamic> toJson() => {
     'head': head.toJson(),
-    'activities': [for (final e in activities) e.toJson()],
+    'events': [for (final e in events) e.toJson()],
   };
 }
 
@@ -4656,7 +4663,7 @@ sealed class SideEvent {
     'schedule' => FactSchedule.fromJson(j),
     'unschedule' => FactUnschedule.fromJson(j),
     'snapshot' => SideEventSnapshot.fromJson(j),
-    'activity' => SideEventActivity.fromJson(j),
+    'event' => SideEventSessionEvent.fromJson(j),
     'notice' => SideEventNotice.fromJson(j),
     'runtime' => SideEventRuntime.fromJson(j),
     final other => throw FormatException('SideEvent: unknown type', other),
@@ -4678,18 +4685,18 @@ final class SideEventSnapshot extends SideEvent {
   Map<String, dynamic> toJson() => {'type': 'snapshot', 'at': at, 'state': state.toJson()};
 }
 
-final class SideEventActivity extends SideEvent {
-  const SideEventActivity({required this.at, required this.id, required this.activity});
+final class SideEventSessionEvent extends SideEvent {
+  const SideEventSessionEvent({required this.at, required this.id, required this.activity});
 
-  factory SideEventActivity.fromJson(Map<String, dynamic> j) =>
-      SideEventActivity(at: (j['at'] as num).toDouble(), id: j['id'] as String, activity: Activity.fromJson(j['activity'] as Map<String, dynamic>));
+  factory SideEventSessionEvent.fromJson(Map<String, dynamic> j) =>
+      SideEventSessionEvent(at: (j['at'] as num).toDouble(), id: j['id'] as String, activity: SessionEvent.fromJson(j['activity'] as Map<String, dynamic>));
 
   final double at;
   final String id;
-  final Activity activity;
+  final SessionEvent activity;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'activity', 'at': at, 'id': id, 'activity': activity.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'event', 'at': at, 'id': id, 'activity': activity.toJson()};
 }
 
 final class SideEventNotice extends SideEvent {

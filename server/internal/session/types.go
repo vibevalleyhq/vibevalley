@@ -59,13 +59,16 @@ type ToolStart struct {
 type From []string
 
 type Journal interface {
-	Activities() []protocol.Activity
+	Events() []protocol.SessionEvent
 	Asked(text string, from From)
 	Said(text string, from From)
 	Thought(text string, from From)
 	ToolStarted(callID string, start ToolStart, from From)
 	ToolInput(callID, input, text string, from From)
 	ToolEnded(callID, output string, ok bool, from From)
-	Note(kind protocol.ActivityKind, text string, from From)
+	Note(kind protocol.SessionEventType, text string, from From)
+	// RunStarted opens run id: every event after it is the run's until RunEnded closes it with how it ended.
+	RunStarted(id int64)
+	RunEnded(id int64, outcome protocol.Outcome)
 	Close()
 }

@@ -45,14 +45,14 @@ func TestTrajectoryKeptAndListed(t *testing.T) {
 		t.Fatalf("w1 ended: %+v", w1)
 	}
 	var kinds []string
-	for _, s := range w1.Activities {
+	for _, s := range w1.Events {
 		out := ""
 		if s.Output != nil {
 			out = *s.Output
 		}
-		kinds = append(kinds, string(s.Kind)+":"+out)
+		kinds = append(kinds, string(s.Type)+":"+out)
 	}
-	testkit.Eq(t, kinds, []string{"prompt:", "action:a\nb"}, "steps")
+	testkit.Eq(t, kinds, []string{"user/message:", "tool/call:a\nb"}, "steps")
 	ids := func(heads []protocol.TrajectoryHead) []string {
 		var out []string
 		for _, h := range heads {
@@ -71,7 +71,7 @@ func TestTrajectoryKeptAndListed(t *testing.T) {
 	if again.Head.EndedAt != nil {
 		t.Fatal("no longer ended")
 	}
-	testkit.Eq(t, len(again.Activities), 2, "steps kept")
+	testkit.Eq(t, len(again.Events), 2, "steps kept")
 }
 
 func writeHead(t *testing.T, dir, id string, started, ended int64) {
@@ -84,7 +84,7 @@ func writeHead(t *testing.T, dir, id string, started, ended int64) {
 
 func TestOldTrajectoriesLoseTheirSteps(t *testing.T) {
 	home := t.TempDir()
-	dir := filepath.Join(home, "activities")
+	dir := filepath.Join(home, "events")
 	os.MkdirAll(dir, 0o755)
 	long := clock.NowMs() - int64(base.Defaults().Session.TrajectoryDays+1)*protocol.DayMs
 	writeHead(t, dir, "w1", long, long)
@@ -94,7 +94,7 @@ func TestOldTrajectoriesLoseTheirSteps(t *testing.T) {
 	tr := sessionTrajectories(t, home)
 	testkit.Eq(t, len(tr.List("")), 2, "both issues listed")
 	old := tr.Get("w1")
-	if old == nil || len(old.Activities) != 0 {
+	if old == nil || len(old.Events) != 0 {
 		t.Fatalf("the old one, without its steps: %+v", old)
 	}
 	entries, _ := os.ReadDir(dir)
@@ -107,7 +107,7 @@ func TestOldTrajectoriesLoseTheirSteps(t *testing.T) {
 
 func TestTrajectoryDaysZeroKeepsForGood(t *testing.T) {
 	home := t.TempDir()
-	dir := filepath.Join(home, "activities")
+	dir := filepath.Join(home, "events")
 	os.MkdirAll(dir, 0o755)
 	long := clock.NowMs() - 400*protocol.DayMs
 	writeHead(t, dir, "w1", long, long)
@@ -123,10 +123,10 @@ func TestReasoningRunsOn(t *testing.T) {
 	j.ToolStarted("c1", ToolStart{Text: "ls", Action: protocol.ToolActionRunCommand, Tool: "bash"}, nil)
 	j.Thought("看完了", nil)
 	var got []string
-	for _, s := range j.Activities() {
-		got = append(got, string(s.Kind)+":"+s.Text)
+	for _, s := range j.Events() {
+		got = append(got, string(s.Type)+":"+s.Text)
 	}
-	testkit.Eq(t, got, []string{"thought:先看路由", "response:好", "thought:再想想", "action:ls", "thought:看完了"}, "steps")
+	testkit.Eq(t, got, []string{"assistant/thinking:先看路由", "assistant/message:好", "assistant/thinking:再想想", "tool/call:ls", "assistant/thinking:看完了"}, "steps")
 }
 
 func TestSubAgentStepsGoUnderTheirCall(t *testing.T) {
@@ -142,7 +142,7 @@ func TestSubAgentStepsGoUnderTheirCall(t *testing.T) {
 	j.Said("好", nil)
 	j.Said("，就这样", From{"ghost"})
 	var got []string
-	for _, s := range j.Activities() {
+	for _, s := range j.Events() {
 		out, under := "", "-"
 		if s.Output != nil {
 			out = *s.Output
@@ -150,16 +150,16 @@ func TestSubAgentStepsGoUnderTheirCall(t *testing.T) {
 		if s.Under != nil {
 			under = fmt.Sprint(*s.Under)
 		}
-		got = append(got, fmt.Sprintf("%d %s %s %s %s", s.N, s.Kind, s.Text, out, under))
+		got = append(got, fmt.Sprintf("%d %s %s %s %s", s.Seq, s.Type, s.Text, out, under))
 	}
 	testkit.Eq(t, got, []string{
-		"0 action 派个帮手 看完了 -",
-		"1 response 帮手先看看  0",
-		"2 action ls a.ts 0",
-		"3 action pwd /work -",
-		"4 response 帮手看完了  0",
-		"5 response 好  -",
-		"6 response ，就这样  -1",
+		"0 tool/call 派个帮手 看完了 -",
+		"1 assistant/message 帮手先看看  0",
+		"2 tool/call ls a.ts 0",
+		"3 tool/call pwd /work -",
+		"4 assistant/message 帮手看完了  0",
+		"5 assistant/message 好  -",
+		"6 assistant/message ，就这样  -1",
 	}, "steps")
 }
 
@@ -175,13 +175,13 @@ func TestJournalSendsAndWrites(t *testing.T) {
 	j.Said("的", nil)
 	select {
 	case e := <-events:
-		step, ok := e.Value.(protocol.SideEventActivity)
-		if !ok || step.ID != "w9" || step.Activity.Text != "好的" {
+		step, ok := e.Value.(protocol.SideEventSessionEvent)
+		if !ok || step.ID != "w9" || step.SessionEvent.Text != "好的" {
 			t.Fatalf("one step, grown, sent once: %+v", e.Value)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("the step was not sent")
 	}
 	tr.Finish("w9", protocol.IssueCloseDismissed, nil)
-	testkit.Eq(t, len(readJournal(filepath.Join(home, "activities", "w9.json"))), 1, "written")
+	testkit.Eq(t, len(readJournal(filepath.Join(home, "events", "w9.json"))), 1, "written")
 }

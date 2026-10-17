@@ -467,16 +467,19 @@ type CoreState struct {
 	Issues []Issue `json:"issues,omitzero"`
 }
 
-type ActivityKind string
+// What a SessionEvent is, named as DeepSeek Harness's session events are: <subject>/<what>.
+type SessionEventType string
 
 const (
-	ActivityKindPrompt   ActivityKind = "prompt"
-	ActivityKindRecalled ActivityKind = "recalled"
-	ActivityKindThought  ActivityKind = "thought"
-	ActivityKindResponse ActivityKind = "response"
-	ActivityKindAction   ActivityKind = "action"
-	ActivityKindRetry    ActivityKind = "retry"
-	ActivityKindError    ActivityKind = "error"
+	SessionEventTypeRunStart          SessionEventType = "run/start"
+	SessionEventTypeUserMessage       SessionEventType = "user/message"
+	SessionEventTypeMemoryRecalled    SessionEventType = "memory/recalled"
+	SessionEventTypeAssistantThinking SessionEventType = "assistant/thinking"
+	SessionEventTypeAssistantMessage  SessionEventType = "assistant/message"
+	SessionEventTypeToolCall          SessionEventType = "tool/call"
+	SessionEventTypeLLMRetry          SessionEventType = "llm/retry"
+	SessionEventTypeRunError          SessionEventType = "run/error"
+	SessionEventTypeRunEnd            SessionEventType = "run/end"
 )
 
 type ToolAction string
@@ -492,18 +495,21 @@ const (
 	ToolActionOther      ToolAction = "other"
 )
 
-type Activity struct {
-	N      int64        `json:"n"`
-	At     int64        `json:"at"`
-	Kind   ActivityKind `json:"kind"`
-	Under  *int64       `json:"under,omitzero"`
-	Text   string       `json:"text"`
-	Action *ToolAction  `json:"action,omitzero"`
-	Tool   *string      `json:"tool,omitzero"`
-	Input  *string      `json:"input,omitzero"`
-	Output *string      `json:"output,omitzero"`
-	Ok     *bool        `json:"ok,omitzero"`
-	On     *int64       `json:"on,omitzero"`
+// One entry of a session's log, append-ordered by Seq: what came in, what the agent thought, said and did, and the run
+// boundaries. Every one after a run/start belongs to that run (Run) until its run/end.
+type SessionEvent struct {
+	Seq    int64            `json:"seq"`
+	Time   int64            `json:"time"`
+	Type   SessionEventType `json:"type"`
+	Run    *int64           `json:"run,omitzero"`
+	Under  *int64           `json:"under,omitzero"`
+	Text   string           `json:"text"`
+	Action *ToolAction      `json:"action,omitzero"`
+	Tool   *string          `json:"tool,omitzero"`
+	Input  *string          `json:"input,omitzero"`
+	Output *string          `json:"output,omitzero"`
+	Ok     *bool            `json:"ok,omitzero"`
+	On     *int64           `json:"on,omitzero"`
 }
 
 type NoticeLevel string
@@ -1112,8 +1118,8 @@ type IssueRequest struct {
 }
 
 type Trajectory struct {
-	Head       TrajectoryHead `json:"head"`
-	Activities []Activity     `json:"activities"`
+	Head   TrajectoryHead `json:"head"`
+	Events []SessionEvent `json:"events"`
 }
 
 type TrajectoryHead struct {
@@ -1894,11 +1900,11 @@ type SideEventSnapshot struct {
 	State CoreState `json:"state"`
 }
 
-//vibevalley:member SideEvent activity
-type SideEventActivity struct {
-	At       int64    `json:"at"`
-	ID       string   `json:"id"`
-	Activity Activity `json:"activity"`
+//vibevalley:member SideEvent event
+type SideEventSessionEvent struct {
+	At           int64        `json:"at"`
+	ID           string       `json:"id"`
+	SessionEvent SessionEvent `json:"activity"`
 }
 
 //vibevalley:member SideEvent notice

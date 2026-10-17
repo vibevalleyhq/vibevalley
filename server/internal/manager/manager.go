@@ -36,8 +36,8 @@ import (
 // hidden farmNews messages, kept. The manager on pi is refused.
 
 const (
-	keepManagerActivities = 1000
-	managerStreamEvery    = 120 * time.Millisecond
+	keepManagerEvents  = 1000
+	managerStreamEvery = 120 * time.Millisecond
 )
 
 const managerVoiceNote = "（这句话是主人在电话里说的，你的回答会念给主人听：口语，一两句，先说结论；不念代码、路径、命令和长列表。要用工具时可以先说一句「我看一下」。）"
@@ -196,7 +196,7 @@ func (fm *manager) OnStart(ctx context.Context) error {
 	fm.ctx = ctx
 	fm.replyTo = fm.chat.General()
 	if fm.trace == nil {
-		fm.trace = fm.run.Open(protocol.TrajectoryHead{ID: protocol.ManagerAgent, Name: "管家", StartedAt: clock.NowMs()}, keepManagerActivities)
+		fm.trace = fm.run.Open(protocol.TrajectoryHead{ID: protocol.ManagerAgent, Name: "管家", StartedAt: clock.NowMs()}, keepManagerEvents)
 	}
 	// In a test that gave the manager no model, it hears nothing: the other services' tests run as without it, and
 	// nothing reaches DeepSeek (a key in the environment would be used otherwise).
@@ -495,7 +495,7 @@ func (fm *manager) event(e vvagent.AgentEvent) {
 			why = "模型出错了"
 		}
 		if m.StopReason == ai.StopError {
-			fm.trace.Note(protocol.ActivityKindError, why, nil)
+			fm.trace.Note(protocol.SessionEventTypeRunError, why, nil)
 		}
 		fm.done(text)
 		if m.StopReason == ai.StopError {
@@ -577,7 +577,7 @@ func (fm *manager) send(line string, conversation int64, now bool) bool {
 	fm.trace.Asked(line, nil)
 	brain, err := fm.brainOf()
 	if err != nil {
-		fm.trace.Note(protocol.ActivityKindError, "起不来："+err.Error(), nil)
+		fm.trace.Note(protocol.SessionEventTypeRunError, "起不来："+err.Error(), nil)
 		fm.core.Notice(protocol.NoticeLevelError, "管家起不来："+err.Error())
 		said := "我这边起不来：" + err.Error()
 		if errors.Is(err, vvagent.ErrNoDeepSeekKey) {

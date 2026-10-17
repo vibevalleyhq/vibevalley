@@ -4,28 +4,28 @@ class Round {
   const Round(this.asked, this.steps);
 
   /// null for steps before the first one (a trajectory whose start was dropped).
-  final Activity? asked;
+  final SessionEvent? asked;
 
-  final List<Activity> steps;
+  final List<SessionEvent> steps;
 
   /// null while it has said nothing.
-  Activity? get answer {
+  SessionEvent? get answer {
     for (final s in steps.reversed) {
-      if (s.kind == ActivityKind.response && s.under == null) return s;
+      if (s.type == SessionEventType.assistantMessage && s.under == null) return s;
     }
     return null;
   }
 
-  List<Activity> get all => [?asked, ...steps];
+  List<SessionEvent> get all => [?asked, ...steps];
 }
 
 /// A sub-agent's told steps are part of the call.
-List<Round> roundsOf(List<Activity> steps) {
+List<Round> roundsOf(List<SessionEvent> steps) {
   final rounds = <Round>[];
-  Activity? asked;
-  var current = <Activity>[];
+  SessionEvent? asked;
+  var current = <SessionEvent>[];
   for (final s in steps) {
-    if (s.kind == ActivityKind.prompt && s.under == null) {
+    if (s.type == SessionEventType.userMessage && s.under == null) {
       if (asked != null || current.isNotEmpty) rounds.add(Round(asked, current));
       asked = s;
       current = [];
@@ -39,20 +39,20 @@ List<Round> roundsOf(List<Activity> steps) {
 
 class Span {
   const Span(this.step, this.ms);
-  final Activity step;
+  final SessionEvent step;
   final double ms;
 }
 
 /// Each step lasts until the next one starts; the last until `end` (now, while the round goes on; else its own start).
 List<Span> spansOf(Round round, {required double end}) {
   final all = round.all;
-  return [for (var i = 0; i < all.length; i++) Span(all[i], ((i + 1 < all.length ? all[i + 1].at : end) - all[i].at).clamp(0, double.infinity).toDouble())];
+  return [for (var i = 0; i < all.length; i++) Span(all[i], ((i + 1 < all.length ? all[i + 1].time : end) - all[i].time).clamp(0, double.infinity).toDouble())];
 }
 
 double roundMs(Round round, {required double end}) {
   final all = round.all;
   if (all.isEmpty) return 0;
-  return (end - all.first.at).clamp(0, double.infinity).toDouble();
+  return (end - all.first.time).clamp(0, double.infinity).toDouble();
 }
 
 String tookText(double ms) {
@@ -63,16 +63,16 @@ String tookText(double ms) {
   return m % 60 == 0 ? '${m ~/ 60} 小时' : '${m ~/ 60} 小时 ${m % 60} 分';
 }
 
-Map<int, List<Activity>> commentsOf(List<Activity> steps) {
-  final out = <int, List<Activity>>{};
+Map<int, List<SessionEvent>> commentsOf(List<SessionEvent> steps) {
+  final out = <int, List<SessionEvent>>{};
   for (final s in steps) {
-    if (s.kind == ActivityKind.prompt && s.on != null) (out[s.on!.round()] ??= []).add(s);
+    if (s.type == SessionEventType.userMessage && s.on != null) (out[s.on!.round()] ??= []).add(s);
   }
   return out;
 }
 
 /// session/activities.go CommentText puts the comment after this head.
-String commentWords(Activity asked) {
+String commentWords(SessionEvent asked) {
   const head = '\n\n我的评论：';
   final text = asked.text;
   final at = text.lastIndexOf(head);

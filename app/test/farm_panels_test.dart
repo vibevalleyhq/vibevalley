@@ -68,12 +68,12 @@ void main() {
 
   final steps = {
     'head': {'id': 'w1', 'name': '小吴', 'startedAt': 0},
-    'activities': [
-      {'n': 1, 'at': 0, 'kind': 'prompt', 'text': '跑一遍测试'},
+    'events': [
+      {'seq': 1, 'time': 0, 'type': 'user/message', 'text': '跑一遍测试'},
       {
-        'n': 2,
-        'at': 10,
-        'kind': 'action',
+        'seq': 2,
+        'time': 10,
+        'type': 'tool/call',
         'text': 'pnpm test',
         'action': 'run_command',
         'tool': 'Bash',

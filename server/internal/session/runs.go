@@ -51,6 +51,7 @@ func (c *sessions) startRun(h *hand) {
 	h.mu.Lock()
 	h.run, h.heard = id, nil
 	h.mu.Unlock()
+	h.journal.RunStarted(id)
 }
 
 func (c *sessions) heardInRun(h *hand, seq int64) {
@@ -75,6 +76,7 @@ func (c *sessions) endRun(h *hand, outcome protocol.Outcome, summary string, spe
 	h.run, h.heard = 0, nil
 	h.mu.Unlock()
 	if id != 0 {
+		h.journal.RunEnded(id, outcome)
 		c.finishRun(id, outcome, summary, spent)
 	}
 }

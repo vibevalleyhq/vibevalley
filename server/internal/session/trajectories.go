@@ -32,13 +32,16 @@ type trajectories struct {
 }
 
 func newTrajectories(cfg base.Config, core *core.Service) (*trajectories, error) {
-	t := &trajectories{core: core, dir: filepath.Join(cfg.Home, "activities"), open: map[string]*journal{}, writers: map[string]*base.FileWriter{}}
+	t := &trajectories{core: core, dir: filepath.Join(cfg.Home, "events"), open: map[string]*journal{}, writers: map[string]*base.FileWriter{}}
+	if err := moveActivities(filepath.Join(cfg.Home, "activities"), t.dir); err != nil {
+		return nil, err
+	}
 	// The steps of those that ended long ago go; their heads stay, small, so the board keeps every issue.
 	if days := cfg.Session.TrajectoryDays; days > 0 {
 		old := clock.NowMs() - int64(days)*protocol.DayMs
 		for _, head := range t.heads() {
 			if head.EndedAt != nil && *head.EndedAt < old {
-				_ = os.Remove(t.activitiesFile(head.ID))
+				_ = os.Remove(t.eventsFile(head.ID))
 			}
 		}
 	}
@@ -59,8 +62,8 @@ func (t *trajectories) OnStop() {
 	}
 }
 
-func (t *trajectories) activitiesFile(id string) string { return filepath.Join(t.dir, id+".json") }
-func (t *trajectories) headFile(id string) string       { return filepath.Join(t.dir, id+".head.json") }
+func (t *trajectories) eventsFile(id string) string { return filepath.Join(t.dir, id+".json") }
+func (t *trajectories) headFile(id string) string   { return filepath.Join(t.dir, id+".head.json") }
 
 func (t *trajectories) readHead(id string) *protocol.TrajectoryHead {
 	body, err := os.ReadFile(t.headFile(id))
@@ -112,7 +115,7 @@ func (t *trajectories) Open(head protocol.TrajectoryHead, keep int) Journal {
 		log.Printf("vibevalley: could not save %s: %v", t.headFile(head.ID), err)
 	}
 	id := head.ID
-	j := openJournal(t.activitiesFile(id), readJournal(t.activitiesFile(id)), func(step protocol.Activity) { t.core.Activity(id, step) }, keep)
+	j := openJournal(t.eventsFile(id), readJournal(t.eventsFile(id)), func(step protocol.SessionEvent) { t.core.SessionEvent(id, step) }, keep)
 	t.mu.Lock()
 	t.open[id] = j
 	t.mu.Unlock()
@@ -179,11 +182,11 @@ func (t *trajectories) Get(id string) *protocol.Trajectory {
 	t.mu.Lock()
 	j := t.open[id]
 	t.mu.Unlock()
-	var steps []protocol.Activity
+	var steps []protocol.SessionEvent
 	if j != nil {
-		steps = j.Activities()
+		steps = j.Events()
 	} else {
-		steps = readJournal(t.activitiesFile(id))
+		steps = readJournal(t.eventsFile(id))
 	}
-	return &protocol.Trajectory{Head: *head, Activities: steps}
+	return &protocol.Trajectory{Head: *head, Events: steps}
 }

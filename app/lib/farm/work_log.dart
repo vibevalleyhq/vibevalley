@@ -35,8 +35,8 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
   @override
   Widget build(BuildContext context) {
     final steps = ref.watch(workStepsProvider.select((all) => all[widget.id]));
-    final turn = steps == null ? const <Activity>[] : turnEndingAt(steps, widget.at);
-    final tools = turn.where((s) => s.kind == ActivityKind.action).length;
+    final turn = steps == null ? const <SessionEvent>[] : turnEndingAt(steps, widget.at);
+    final tools = turn.where((s) => s.type == SessionEventType.toolCall).length;
     if (widget.manager && tools == 0) return const SizedBox.shrink();
     final label = tools > 0 ? '用了 $tools 个工具' : '这一轮的干活过程';
     return Padding(

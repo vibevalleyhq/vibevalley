@@ -110,15 +110,15 @@ void main() {
   });
 
   test('turnEndingAt: from the last line it was told up to the message', () {
-    Activity s(int n, ActivityKind kind, double at) => Activity(n: n.toDouble(), at: at, kind: kind, text: '');
+    SessionEvent s(int n, SessionEventType kind, double at) => SessionEvent(seq: n.toDouble(), time: at, type: kind, text: '');
     final steps = [
-      s(1, ActivityKind.prompt, 0),
-      s(2, ActivityKind.action, 10),
-      s(3, ActivityKind.prompt, 10000),
-      s(4, ActivityKind.action, 10010),
-      s(5, ActivityKind.response, 10020),
+      s(1, SessionEventType.userMessage, 0),
+      s(2, SessionEventType.toolCall, 10),
+      s(3, SessionEventType.userMessage, 10000),
+      s(4, SessionEventType.toolCall, 10010),
+      s(5, SessionEventType.assistantMessage, 10020),
     ];
-    expect(turnEndingAt(steps, 50).map((x) => x.n), [1, 2]);
-    expect(turnEndingAt(steps, 7500).map((x) => x.n), [3, 4, 5]);
+    expect(turnEndingAt(steps, 50).map((x) => x.seq), [1, 2]);
+    expect(turnEndingAt(steps, 7500).map((x) => x.seq), [3, 4, 5]);
   });
 }

@@ -42,7 +42,7 @@ void main() {
   });
 
   test('mergeSteps lays new steps over old by number, in order', () {
-    Activity step(double n, String text) => Activity(n: n, at: n, kind: ActivityKind.response, text: text);
+    SessionEvent step(double n, String text) => SessionEvent(seq: n, time: n, type: SessionEventType.assistantMessage, text: text);
     final merged = mergeSteps([step(1, 'a'), step(2, 'b')], [step(2, 'B'), step(3, 'c')]);
     expect(merged.map((s) => s.text), ['a', 'B', 'c']);
   });

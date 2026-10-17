@@ -466,7 +466,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
     final head = sessions.last;
     final session = widget.session;
     final open = widget.state.open;
-    final steps = ref.watch(workStepsProvider.select((all) => all[head.id])) ?? const <Activity>[];
+    final steps = ref.watch(workStepsProvider.select((all) => all[head.id])) ?? const <SessionEvent>[];
     final body = KitText.sm.copyWith(color: Palette.bark800);
     final turns = session?.runs ?? head.runs;
     final cny = session?.spent?.cny ?? head.cny;

@@ -130,22 +130,22 @@ final projectNamesProvider = FutureProvider<List<String>>((ref) async {
 const stepLimit = 240;
 
 /// By number, in order.
-List<Activity> mergeSteps(List<Activity> steps, List<Activity> incoming) {
-  final byN = {for (final s in steps) s.n: s};
+List<SessionEvent> mergeSteps(List<SessionEvent> steps, List<SessionEvent> incoming) {
+  final byN = {for (final s in steps) s.seq: s};
   for (final s in incoming) {
-    byN[s.n] = s;
+    byN[s.seq] = s;
   }
-  final all = byN.values.toList()..sort((a, b) => a.n.compareTo(b.n));
+  final all = byN.values.toList()..sort((a, b) => a.seq.compareTo(b.seq));
   return all.length > stepLimit ? all.sublist(all.length - stepLimit) : all;
 }
 
-final workStepsProvider = NotifierProvider<ActivitiesNotifier, Map<String, List<Activity>>>(ActivitiesNotifier.new);
+final workStepsProvider = NotifierProvider<EventsNotifier, Map<String, List<SessionEvent>>>(EventsNotifier.new);
 
-class ActivitiesNotifier extends Notifier<Map<String, List<Activity>>> {
+class EventsNotifier extends Notifier<Map<String, List<SessionEvent>>> {
   @override
-  Map<String, List<Activity>> build() {
+  Map<String, List<SessionEvent>> build() {
     ref.listen(sideEventsProvider, (_, next) {
-      if (next.value case SideEventActivity(:final id, :final activity)) {
+      if (next.value case SideEventSessionEvent(:final id, :final activity)) {
         state = {
           ...state,
           id: mergeSteps(state[id] ?? const [], [activity]),
@@ -164,12 +164,12 @@ class ActivitiesNotifier extends Notifier<Map<String, List<Activity>>> {
       if (e.status == 404) return null;
       rethrow;
     }
-    final top = found.activities.isEmpty ? -1 : found.activities.last.n;
+    final top = found.events.isEmpty ? -1 : found.events.last.seq;
     state = {
       ...state,
-      id: mergeSteps(found.activities, [
-        for (final s in state[id] ?? const <Activity>[])
-          if (s.n > top) s,
+      id: mergeSteps(found.events, [
+        for (final s in state[id] ?? const <SessionEvent>[])
+          if (s.seq > top) s,
       ]),
     };
     return found.head;

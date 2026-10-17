@@ -25,7 +25,7 @@ typedef CommentOn = Future<void> Function(int step, String text);
 
 class WorkLog extends StatefulWidget {
   const WorkLog({super.key, required this.steps, required this.now, this.asked, this.tall = false, this.working = false, this.onComment});
-  final List<Activity> steps;
+  final List<SessionEvent> steps;
   final double now;
 
   final String? asked;
@@ -79,27 +79,31 @@ class _WorkLogState extends State<WorkLog> {
     super.dispose();
   }
 
-  int _idOf(Round r) => r.asked?.n.round() ?? -1;
+  int _idOf(Round r) => r.asked?.seq.round() ?? -1;
 
   bool _open(Round r, bool last) => _toggled[_idOf(r)] ?? last;
 
-  void _show(Round r, Activity step) {
+  void _show(Round r, SessionEvent step) {
     setState(() {
       _toggled[_idOf(r)] = true;
-      _marked = step.n.round();
+      _marked = step.seq.round();
       _atBottom = false;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final at = _keys[step.n.round()]?.currentContext;
+      final at = _keys[step.seq.round()]?.currentContext;
       if (at != null) Scrollable.ensureVisible(at, alignment: .3, duration: const Duration(milliseconds: 200));
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final rounds = roundsOf(widget.steps);
-    final comments = commentsOf(widget.steps);
-    final firstAsked = widget.steps.where((s) => s.kind == ActivityKind.prompt && s.under == null).firstOrNull?.n;
+    final steps = [
+      for (final s in widget.steps)
+        if (s.type != SessionEventType.runStart && s.type != SessionEventType.runEnd) s,
+    ];
+    final rounds = roundsOf(steps);
+    final comments = commentsOf(steps);
+    final firstAsked = steps.where((s) => s.type == SessionEventType.userMessage && s.under == null).firstOrNull?.seq;
     return Container(
       constraints: BoxConstraints(maxHeight: widget.tall ? 576 : 352),
       color: Palette.cream100,
@@ -119,9 +123,9 @@ class _WorkLogState extends State<WorkLog> {
     );
   }
 
-  Widget _roundView(Round round, {required bool last, required double? firstAsked, required Map<int, List<Activity>> comments}) {
+  Widget _roundView(Round round, {required bool last, required double? firstAsked, required Map<int, List<SessionEvent>> comments}) {
     final live = last && widget.working;
-    final end = live ? widget.now : (round.all.lastOrNull?.at ?? widget.now);
+    final end = live ? widget.now : (round.all.lastOrNull?.time ?? widget.now);
     final open = _open(round, last);
     final answer = round.answer;
     final shown = open ? round.steps : [?answer];
@@ -132,7 +136,7 @@ class _WorkLogState extends State<WorkLog> {
         ? '评论第 ${asked.on!.round()} 步'
         : asked.under != null
         ? '帮手接到'
-        : (widget.asked ?? (asked.n == firstAsked ? '工单' : '带话'));
+        : (widget.asked ?? (asked.seq == firstAsked ? '工单' : '带话'));
     return Container(
       decoration: BoxDecoration(border: Border.all(color: Palette.cream300)),
       padding: const EdgeInsets.all(6),
@@ -163,7 +167,7 @@ class _WorkLogState extends State<WorkLog> {
                       style: KitText.xs.copyWith(color: Palette.bark400),
                     ),
                   ),
-                  if (asked != null) _When(at: asked.at, now: widget.now),
+                  if (asked != null) _When(at: asked.time, now: widget.now),
                 ],
               ),
             ),
@@ -186,7 +190,7 @@ class _WorkLogState extends State<WorkLog> {
               onPick: (step) => _show(round, step),
             ),
           ],
-          for (final step in shown) ...[const SizedBox(height: 6), _keyed(step, _withComments(step, comments[step.n.round()]))],
+          for (final step in shown) ...[const SizedBox(height: 6), _keyed(step, _withComments(step, comments[step.seq.round()]))],
           if (!open && round.steps.length > shown.length)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -197,8 +201,8 @@ class _WorkLogState extends State<WorkLog> {
     );
   }
 
-  Widget _keyed(Activity step, Widget child) {
-    final n = step.n.round();
+  Widget _keyed(SessionEvent step, Widget child) {
+    final n = step.seq.round();
     final marked = _marked == n;
     return Container(
       key: _keys.putIfAbsent(n, GlobalKey.new),
@@ -207,7 +211,7 @@ class _WorkLogState extends State<WorkLog> {
     );
   }
 
-  Widget _withComments(Activity step, List<Activity>? on) {
+  Widget _withComments(SessionEvent step, List<SessionEvent>? on) {
     Widget item = _Step(step: step, now: widget.now, job: false, asked: widget.asked);
     if (step.under != null) {
       item = Container(
@@ -221,7 +225,7 @@ class _WorkLogState extends State<WorkLog> {
     }
     final comment = widget.onComment;
     if ((on == null || on.isEmpty) && comment == null) return item;
-    return _Commentable(step: step.n.round(), send: comment, comments: on ?? const [], child: item);
+    return _Commentable(step: step.seq.round(), send: comment, comments: on ?? const [], child: item);
   }
 }
 
@@ -232,7 +236,7 @@ class _Commentable extends StatefulWidget {
   const _Commentable({required this.step, required this.send, required this.comments, required this.child});
   final int step;
   final CommentOn? send;
-  final List<Activity> comments;
+  final List<SessionEvent> comments;
   final Widget child;
 
   @override
@@ -289,7 +293,7 @@ class _CommentableState extends State<_Commentable> {
 class _TimeBar extends StatelessWidget {
   const _TimeBar({required this.spans, required this.onPick});
   final List<Span> spans;
-  final ValueChanged<Activity> onPick;
+  final ValueChanged<SessionEvent> onPick;
 
   @override
   Widget build(BuildContext context) {
@@ -319,25 +323,27 @@ class _TimeBar extends StatelessWidget {
   }
 }
 
-String spanLabel(Activity step) => switch (step.kind) {
-  ActivityKind.prompt => '收到',
-  ActivityKind.recalled => '想起',
-  ActivityKind.thought => '思考',
-  ActivityKind.response => '说',
-  ActivityKind.retry => '重试',
-  ActivityKind.error => '出错',
-  ActivityKind.action => farmToolText(step.text) != null ? '田头' : actionText[SessionAction.fromJson((step.action ?? ToolAction.other).wire)] ?? '工具',
+String spanLabel(SessionEvent step) => switch (step.type) {
+  SessionEventType.userMessage => '收到',
+  SessionEventType.memoryRecalled => '想起',
+  SessionEventType.assistantThinking => '思考',
+  SessionEventType.assistantMessage => '说',
+  SessionEventType.llmRetry => '重试',
+  SessionEventType.runError => '出错',
+  SessionEventType.runStart || SessionEventType.runEnd => '',
+  SessionEventType.toolCall => farmToolText(step.text) != null ? '田头' : actionText[SessionAction.fromJson((step.action ?? ToolAction.other).wire)] ?? '工具',
 };
 
-Color spanColor(Activity step) => switch (step.kind) {
-  ActivityKind.prompt => Palette.wheat,
-  ActivityKind.recalled => Palette.leaf300,
-  ActivityKind.thought => Palette.cream300,
-  ActivityKind.response => Palette.leaf500,
-  ActivityKind.retry => Palette.wheatHover,
-  ActivityKind.error => Palette.berry,
-  ActivityKind.action when step.ok == false => Palette.berry,
-  ActivityKind.action => switch (step.action ?? ToolAction.other) {
+Color spanColor(SessionEvent step) => switch (step.type) {
+  SessionEventType.userMessage => Palette.wheat,
+  SessionEventType.memoryRecalled => Palette.leaf300,
+  SessionEventType.assistantThinking => Palette.cream300,
+  SessionEventType.assistantMessage => Palette.leaf500,
+  SessionEventType.llmRetry => Palette.wheatHover,
+  SessionEventType.runError => Palette.berry,
+  SessionEventType.runStart || SessionEventType.runEnd => Palette.cream200,
+  SessionEventType.toolCall when step.ok == false => Palette.berry,
+  SessionEventType.toolCall => switch (step.action ?? ToolAction.other) {
     ToolAction.readFile || ToolAction.search || ToolAction.web => Palette.water,
     ToolAction.editFile => Palette.leaf700,
     ToolAction.runCommand => Palette.bark600,
@@ -403,7 +409,7 @@ class _CommentBoxState extends State<_CommentBox> {
 
 class _Step extends StatelessWidget {
   const _Step({required this.step, required this.now, required this.job, this.asked});
-  final Activity step;
+  final SessionEvent step;
   final double now;
   final bool job;
   final String? asked;
@@ -420,28 +426,28 @@ class _Step extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            _Head(label: label, at: step.at, now: now),
+            _Head(label: label, at: step.time, now: now),
             const SizedBox(height: 2),
             body,
           ],
         ),
       ),
     );
-    switch (step.kind) {
-      case ActivityKind.prompt:
+    switch (step.type) {
+      case SessionEventType.userMessage:
         return box(
           fill: Palette.wheat.withValues(alpha: .25),
           label: sub ? '帮手接到' : (asked ?? (job ? '工单' : '带话')),
           body: _Folded(text: step.text, lines: 4, markdown: false),
         );
-      case ActivityKind.recalled:
+      case SessionEventType.memoryRecalled:
         return box(
           fill: Palette.leaf300.withValues(alpha: .15),
           border: Border.all(color: Palette.leaf500.withValues(alpha: .4)),
           label: '想起了',
           body: _Folded(text: step.text, lines: 3, markdown: false),
         );
-      case ActivityKind.thought:
+      case SessionEventType.assistantThinking:
         return box(
           fill: null,
           border: Border.all(color: Palette.cream300),
@@ -449,18 +455,21 @@ class _Step extends StatelessWidget {
           label: sub ? '帮手想了想' : '想了想',
           body: _Folded(text: step.text, lines: 2, markdown: false),
         );
-      case ActivityKind.response:
+      case SessionEventType.assistantMessage:
         return box(
           fill: Palette.cream50,
           label: sub ? '帮手说' : '它说',
           body: _Folded(text: step.text, lines: 8, markdown: true),
         );
-      case ActivityKind.action:
+      case SessionEventType.toolCall:
         return _ToolStep(step: step, now: now);
-      case ActivityKind.retry:
-        return _Line(mark: 'button-replay', text: step.text, at: step.at, now: now, fill: Palette.wheat.withValues(alpha: .15), ink: Palette.bark800);
-      case ActivityKind.error:
-        return _Line(mark: 'mark-warn', text: step.text, at: step.at, now: now, fill: Palette.berry.withValues(alpha: .12), ink: Palette.berry);
+      case SessionEventType.llmRetry:
+        return _Line(mark: 'button-replay', text: step.text, at: step.time, now: now, fill: Palette.wheat.withValues(alpha: .15), ink: Palette.bark800);
+      case SessionEventType.runError:
+        return _Line(mark: 'mark-warn', text: step.text, at: step.time, now: now, fill: Palette.berry.withValues(alpha: .12), ink: Palette.berry);
+      // A run's bounds are where the log's rounds split, not entries of their own (the list leaves them out).
+      case SessionEventType.runStart || SessionEventType.runEnd:
+        return const SizedBox.shrink();
     }
   }
 }
@@ -572,7 +581,7 @@ String? farmToolText(String text) => switch (RegExp(r'^farm__farm_(\w+)').firstM
   final other => '田头：$other',
 };
 
-String readableInput(Activity step) {
+String readableInput(SessionEvent step) {
   final raw = step.input?.trim() ?? '';
   if (raw.isEmpty) return '';
   try {
@@ -590,7 +599,7 @@ String readableInput(Activity step) {
 
 class _ToolStep extends StatefulWidget {
   const _ToolStep({required this.step, required this.now});
-  final Activity step;
+  final SessionEvent step;
   final double now;
 
   @override
@@ -648,7 +657,7 @@ class _ToolStepState extends State<_ToolStep> {
                   const SizedBox(width: 8),
                   Tooltip(message: label, child: mark),
                   const SizedBox(width: 8),
-                  _When(at: step.at, now: widget.now),
+                  _When(at: step.time, now: widget.now),
                 ],
               ),
             ),

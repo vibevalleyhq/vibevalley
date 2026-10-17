@@ -61,7 +61,7 @@ class DebugLogNotifier extends Notifier<DebugLog> {
 }
 
 String sideType(SideEvent e) => switch (e) {
-  SideEventActivity() => 'step',
+  SideEventSessionEvent() => 'step',
   SideEventNotice() => 'notice',
   SideEventRuntime() => 'runtime',
   SideEventSnapshot() => 'snapshot',
@@ -86,7 +86,7 @@ String _phaseTag(Phase p) => switch (p) {
 };
 
 String sideSummary(SideEvent e) => switch (e) {
-  SideEventActivity(:final id, :final activity) => '$id #${activity.n.round()} ${activity.kind.wire}: ${_cut(activity.text, 80)}',
+  SideEventSessionEvent(:final id, :final activity) => '$id #${activity.seq.round()} ${activity.type.wire}: ${_cut(activity.text, 80)}',
   SideEventNotice(:final level, :final text) => '${level.wire}: $text',
   SideEventRuntime(:final info) => '${info.id}: ${info.quota?.text ?? ''}',
   SideEventSnapshot() => 'snapshot',

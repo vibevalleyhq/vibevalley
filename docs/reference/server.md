@@ -65,9 +65,9 @@
 
 **每次干活**（run，`session/runs.go`；[提案](../../.agents/notes/proposed/architecture/2026-10-16-runs-workers-crews.md)）：农机开一轮就是一次 run，到这一轮的汇报结束，记在 `session_run` 表。发话的一方先说清这一轮是为什么开的，农机开了这一轮，run 就记下它：派出去（`issue`）、带话（`comment`，带着那条消息的号）、种植计划（`playbook`）、定时（`schedule`，带着哪个定时、是不是补跑）；没人发话就开的一轮记成农机自己（`runtime`）。干活时插进来的话不开新的 run，记在这一轮读到的话里（`heard`）；排队的话是下一次 run 的触发。叫不醒、被拒的不算 run。服务端重启时还开着的 run 记成叫停了。一张工单的 run 用 `GET /api/issues/{id}/runs` 取，不在核心状态里。
 
-**干活过程**（`session/activities.go`）：每一步（收到的话、想、说、工具调用的输入和输出）记在 `activities/<id>.json`。带话时可以评论某一步（`on`），服务端把那一步写在话前面交给帮工。
+**干活过程**（`session/events.go`）：一个 Session 的日志，一条一个 `SessionEvent`（`seq`、`time`、`type`，照 DeepSeek Harness 的会话事件）：`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入和输出）、`llm/retry`、`run/error`，记在 `events/<id>.json`。每个 Run 由 `run/start` 和 `run/end`（带它的结果）围起来，中间的事件都带着这个 `run`。带话时可以评论某一条（`on` 是它的 `seq`），服务端把那一条写在话前面交给帮工。
 
-**轨迹**（`session/trajectories.go`；[理由](../../.agents/notes/implemented/feature/2026-10-13-trajectories.md)）：每个帮工一条，派出去时开始，头文件（`activities/<id>.head.json`）记着是谁、为哪张工单、怎么关的，一直留着；步骤在帮工走了 `session.trajectory_days` 天后删。管家一条，留最近 1000 步。帮工自己派的子 agent 的步骤挂在派它的那一步下面。
+**轨迹**（`session/trajectories.go`；[理由](../../.agents/notes/implemented/feature/2026-10-13-trajectories.md)）：每个帮工一条，派出去时开始，头文件（`events/<id>.head.json`）记着是谁、为哪张工单、怎么关的，一直留着；步骤在帮工走了 `session.trajectory_days` 天后删。管家一条，留最近 1000 步。帮工自己派的子 agent 的步骤挂在派它的那一步下面。
 
 **工单**（`issue/issue.go`、`issue/dispatch.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-15-issue-is-one-thing.md)）：
 

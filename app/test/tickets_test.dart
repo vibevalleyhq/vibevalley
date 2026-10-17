@@ -182,7 +182,7 @@ void main() {
       return switch ((r.method, r.url.path)) {
         ('GET', '/api/sessions') => jsonResponse([conflicted.toJson(), planner.toJson()]),
         ('GET', '/api/agents') => jsonResponse([]),
-        ('GET', '/api/sessions/w4') => jsonResponse(const Trajectory(head: conflicted, activities: []).toJson()),
+        ('GET', '/api/sessions/w4') => jsonResponse(const Trajectory(head: conflicted, events: []).toJson()),
         _ => jsonResponse(null, 204),
       };
     }).api;
@@ -253,9 +253,9 @@ void main() {
           return jsonResponse(
             const Trajectory(
               head: _closed,
-              activities: [
-                Activity(n: 0, at: 0, kind: ActivityKind.prompt, text: '写打卡'),
-                Activity(n: 1, at: 5000, kind: ActivityKind.response, text: '打卡写好了'),
+              events: [
+                SessionEvent(seq: 0, time: 0, type: SessionEventType.userMessage, text: '写打卡'),
+                SessionEvent(seq: 1, time: 5000, type: SessionEventType.assistantMessage, text: '打卡写好了'),
               ],
             ).toJson(),
           );

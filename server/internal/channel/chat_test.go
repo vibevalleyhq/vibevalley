@@ -36,7 +36,7 @@ type chatFakeSessions struct {
 	n       int
 }
 
-func (x *chatFakeSessions) Activity() *base.Hub[session.LaunchActivity] { return x.hub }
+func (x *chatFakeSessions) Launches() *base.Hub[session.LaunchActivity] { return x.hub }
 
 func (x *chatFakeSessions) Find(id string) *session.Roster {
 	h := x.f.Core.Session(id)

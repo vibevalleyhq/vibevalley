@@ -97,7 +97,6 @@ func managerProfile() protocol.Agent {
 // The runtime id of VibeValley's own agent, the one the manager runs on.
 const managerRuntime = "vibevalley"
 
-
 func (st *Service) persist() error {
 	return st.disk.Write(func() ([]byte, error) {
 		st.mu.Lock()

@@ -62,7 +62,7 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 | 命令行 | shapegen 写出 Go 的 `protocol.Client`（实现同一个 `Handlers` 接口）和命令表 | 新增，见下面第 3 节 |
 | 院门 | 只放 `can` 里有 `remote` 的操作 | 替掉 `gate.go` 里写死的 `lan.*` |
 | 管家的工具 | 先**检查**：管家的每个工具都对得上一个 `can manager` 的操作；`can manager` 的操作都有工具 | 以后再看要不要直接生成 |
-| MCP | 只对外：主人机器上的 agent 用农场的能力，工具从能力表来 | 帮工不再用 MCP（[Session、Run、Step](2026-10-17-session-run-step.md)） |
+| MCP | 只对外：主人机器上的 agent 用农场的能力，工具从能力表来 | 帮工不再用 MCP（[Session、Run、事件](2026-10-17-session-run-step.md)） |
 | 聊天软件、语音 | 不变：说话交给管家 | 以后可以加斜杠命令，一条命令对一个 `owner` 操作 |
 | 定时、计划 | 不变：服务端自己调服务 | — |
 
@@ -135,7 +135,7 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 | 能力 | 现在 | 定了 | 理由 |
 |---|---|---|---|
 | Session 读自己的工单、工单串 | 做不到，只能读频道 | 进的口子带进来：派活时带工单，投递时带串里它没看过的上文 | 帮工不知道工单写了什么就开工，是现在汇报跑题的来源之一 |
-| Session 报「卡住了，要主人拿主意」 | 汇报里的 `NeedsYou` 进 Inbox | 已经有：出的口子做（[Session、Run、Step](2026-10-17-session-run-step.md)） |
+| Session 报「卡住了，要主人拿主意」 | 汇报里的 `NeedsYou` 进 Inbox | 已经有：出的口子做（[Session、Run、事件](2026-10-17-session-run-step.md)） |
 | Session 记事 | 一轮结束时服务端记下这件活（`memory.Keep`）；VibeValley 自己的农机关着 `NoMemory` | 出的口子做，不给 Session 工具；`NoMemory` 保持 | 记忆归档案，任何农机都走同一条路 |
 | 管家建项目、改档案、改设置、改农机 | 做不到 | 不给 | 主人的配置，管家改了主人不知道 |
 | 管家看、改别的档案的记忆 | 只能记自己的 | 不给 | 档案的记忆由它自己的 Session 和主人写；派活时 `memory.recall` 已经自动挑给 Session |
@@ -257,7 +257,7 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 
 ### 帮工的子集
 
-没有。Session 不调农场的接口：它要的东西由投递带进来，它说的话由服务端在一轮结束时整理出去，见 [Session、Run、Step](2026-10-17-session-run-step.md)。原来定的「命令行加每次执行一把钥匙」和 `session.say`、`session.inbox`、`session.ask` 不做了；`can` 里的 `session` 留着不用，等真的有 Session 要调的操作再说。
+没有。Session 不调农场的接口：它要的东西由投递带进来，它说的话由服务端在一轮结束时整理出去，见 [Session、Run、事件](2026-10-17-session-run-step.md)。原来定的「命令行加每次执行一把钥匙」和 `session.say`、`session.inbox`、`session.ask` 不做了；`can` 里的 `session` 留着不用，等真的有 Session 要调的操作再说。
 
 ### 已定
 
@@ -282,7 +282,7 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 - 管家的工具和 MCP 的工具都对得上 `can` 里的 `manager`、`session`，有测试；加一个 `can manager` 的操作不加工具，测试失败。
 - 派活只剩一条规则：管家派的也先有工单，满了排队。
 - 每个操作至少有一个入口用它。
-- `mcp.go` 里没有 `farm_*`，`/mcp` 的工具从能力表来（[Session、Run、Step](2026-10-17-session-run-step.md)）。
+- `mcp.go` 里没有 `farm_*`，`/mcp` 的工具从能力表来（[Session、Run、事件](2026-10-17-session-run-step.md)）。
 - 第 4 节的表做完：没有 `add`、`edit`、`remove`、`find`、`open` 这些动词，没有 `/api/workers`、`/api/chat`、`/api/lan` 路径。
 
 ## Risks

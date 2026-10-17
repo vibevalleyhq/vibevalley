@@ -184,14 +184,14 @@ func TestManagerDispatchesAndHearsVoiceInSilence(t *testing.T) {
 	}
 	trail := testkit.Await(t, "its trajectory", func() (*protocol.Trajectory, bool) {
 		tr := f.Session.Get(protocol.ManagerAgent)
-		return tr, tr != nil && len(tr.Activities) >= 3 && tr.Activities[len(tr.Activities)-1].Kind == protocol.ActivityKindResponse
+		return tr, tr != nil && len(tr.Events) >= 3 && tr.Events[len(tr.Events)-1].Type == protocol.SessionEventTypeAssistantMessage
 	})
 	if trail.Head.Name != "管家" {
 		t.Fatalf("head %+v", trail.Head)
 	}
-	last := trail.Activities[len(trail.Activities)-3:]
+	last := trail.Events[len(trail.Events)-3:]
 	asked, tool, answer := last[0], last[1], last[2]
-	if asked.Kind != protocol.ActivityKindPrompt || !strings.Contains(asked.Text, "加个 README") {
+	if asked.Type != protocol.SessionEventTypeUserMessage || !strings.Contains(asked.Text, "加个 README") {
 		t.Fatalf("asked %+v", asked)
 	}
 	if tool.Tool == nil || *tool.Tool != "dispatch" || tool.Text != "派活：demo" || tool.Ok == nil || !*tool.Ok ||

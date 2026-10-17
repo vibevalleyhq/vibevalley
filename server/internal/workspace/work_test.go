@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -523,7 +524,7 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	lab := fixture.Lab(t)
 	session := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "看看目录", "steps", session.HireOptions{}))
 	w.nextReport(t)
-	steps := w.f.Session.Get(session.ID).Activities
+	steps := w.f.Session.Get(session.ID).Events
 	w.f.Session.Dismiss(session.ID)
 	after := w.f.Session.Get(session.ID)
 	if after == nil {
@@ -533,23 +534,30 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	if after.Head.EndedAt == nil {
 		t.Fatal("ended")
 	}
-	kinds := func(steps []protocol.Activity) []protocol.ActivityKind {
-		var out []protocol.ActivityKind
+	kinds := func(steps []protocol.SessionEvent) []protocol.SessionEventType {
+		var out []protocol.SessionEventType
 		for _, s := range steps {
-			out = append(out, s.Kind)
+			out = append(out, s.Type)
 		}
 		return out
 	}
-	want := []protocol.ActivityKind{protocol.ActivityKindPrompt, protocol.ActivityKindAction, protocol.ActivityKindResponse}
-	testkit.Eq(t, kinds(after.Activities), want, "kept")
+	want := []protocol.SessionEventType{protocol.SessionEventTypeRunStart, protocol.SessionEventTypeUserMessage, protocol.SessionEventTypeToolCall,
+		protocol.SessionEventTypeAssistantMessage, protocol.SessionEventTypeRunEnd}
+	testkit.Eq(t, kinds(after.Events), want, "kept")
+	for _, e := range after.Events {
+		if e.Run == nil || *e.Run != *after.Events[0].Run {
+			t.Fatalf("an event outside the run: %+v", e)
+		}
+	}
+	testkit.Eq(t, after.Events[len(after.Events)-1].Text, string(protocol.OutcomeCompleted), "the run's end says how it ended")
 	if !slices.ContainsFunc(w.f.Session.List(lab.ID), func(h protocol.TrajectoryHead) bool { return h.ID == session.ID }) {
 		t.Fatal("listed")
 	}
 	testkit.Eq(t, kinds(steps), want, "steps")
-	testkit.Eq(t, steps[0].Text, "看看目录", "asked")
-	testkit.Eq(t, []string{string(*steps[1].Action), steps[1].Text, *steps[1].Output}, []string{"run_command", "echo hi", "hi"}, "tool")
-	testkit.Eq(t, *steps[1].Ok, true, "ok")
-	testkit.Match(t, steps[2].Text, `做完了：看看目录`, "said")
+	testkit.Eq(t, steps[1].Text, "看看目录", "asked")
+	testkit.Eq(t, []string{string(*steps[2].Action), steps[2].Text, *steps[2].Output}, []string{"run_command", "echo hi", "hi"}, "tool")
+	testkit.Eq(t, *steps[2].Ok, true, "ok")
+	testkit.Match(t, steps[3].Text, `做完了：看看目录`, "said")
 }
 
 func TestCommentOnAStep(t *testing.T) {
@@ -557,17 +565,19 @@ func TestCommentOnAStep(t *testing.T) {
 	w := openWorld(t, home, work)
 	hired := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "看看目录", "comments", session.HireOptions{}))
 	w.nextReport(t)
-	steps := w.f.Session.Get(hired.ID).Activities
-	tool := steps[1]
+	steps := w.f.Session.Get(hired.ID).Events
+	tool := steps[slices.IndexFunc(steps, func(e protocol.SessionEvent) bool { return e.Type == protocol.SessionEventTypeToolCall })]
 	told := session.CommentText(tool, "这里换成 ls -la 再看一遍")
-	testkit.Match(t, told, `^【评论第 1 步】关于你这一步的操作：echo hi`, "names the step")
+	testkit.Match(t, told, fmt.Sprintf(`^【评论第 %d 步】关于你这一步的操作：echo hi`, tool.Seq), "names the step")
 	testkit.Match(t, told, `输出的结尾：hi\n\n我的评论：这里换成 ls -la 再看一遍$`, "the step's output, then the comment")
 	w.f.Session.Tell(hired.ID, told, protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
 	w.nextReport(t)
-	steps = w.f.Session.Get(hired.ID).Activities
-	i := slices.IndexFunc(steps, func(s protocol.Activity) bool { return s.Kind == protocol.ActivityKindPrompt && s.N > tool.N })
-	if i < 0 || steps[i].On == nil || *steps[i].On != tool.N {
-		t.Fatalf("the comment is tied to step %d: %+v", tool.N, steps)
+	steps = w.f.Session.Get(hired.ID).Events
+	i := slices.IndexFunc(steps, func(s protocol.SessionEvent) bool {
+		return s.Type == protocol.SessionEventTypeUserMessage && s.Seq > tool.Seq
+	})
+	if i < 0 || steps[i].On == nil || *steps[i].On != tool.Seq {
+		t.Fatalf("the comment is tied to step %d: %+v", tool.Seq, steps)
 	}
 }
 
@@ -631,7 +641,7 @@ func TestQuietSessionIsFlagged(t *testing.T) {
 		return need, need != nil && need.Kind == "quiet" && clock.NowMs()-need.Since >= 500
 	})
 	w.nextReport(t)
-	steps := w.f.Session.Get(session.ID).Activities
+	steps := w.f.Session.Get(session.ID).Events
 	w.f.Session.Dismiss(session.ID)
 	w.mu.Lock()
 	notes := slices.Clone(w.notes)
@@ -639,8 +649,8 @@ func TestQuietSessionIsFlagged(t *testing.T) {
 	if !slices.ContainsFunc(notes, func(s string) bool { return strings.Contains(s, "没动静") }) {
 		t.Fatalf("the farm is told: %v", notes)
 	}
-	if !slices.ContainsFunc(steps, func(s protocol.Activity) bool {
-		return s.Kind == protocol.ActivityKindError && strings.Contains(s.Text, "没动静")
+	if !slices.ContainsFunc(steps, func(s protocol.SessionEvent) bool {
+		return s.Type == protocol.SessionEventTypeRunError && strings.Contains(s.Text, "没动静")
 	}) {
 		t.Fatal("its steps say so")
 	}
@@ -751,7 +761,7 @@ func TestTwoSentToANewProjectAtOnce(t *testing.T) {
 func TestActivityAndTokens(t *testing.T) {
 	home, work := dirs(t)
 	w := openWorld(t, home, work)
-	activity, stop := w.f.Session.Activity().Subscribe()
+	activity, stop := w.f.Session.Launches().Subscribe()
 	defer stop()
 	session := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "看看", "talk", session.HireOptions{}))
 	var kinds []string

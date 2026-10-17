@@ -46,7 +46,7 @@ bun run site:check && bun run site:build                       # 改完 site/：
 
 Go 1.27，Flutter 3.47，Bun 1.4（根目录的命令、文档和 Note 的检查），Node 24（只跑 `server/tool` 的 `pi-prices.ts`）。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `server/` 要重启它。
 
-一件事的主线：smith 的会话事件 → `internal/session/facts.go`（纯函数）读成事实和步骤 → `Core.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/state` 把折好的 `StateFrame` 经 SSE 推给 Flutter；步骤由 `session/activities.go`、`session/trajectories.go` 记成每个帮工和管家的轨迹（[architecture.md](docs/architecture.md)、[server.md](docs/reference/server.md)）。
+一件事的主线：smith 的会话事件 → `internal/session/facts.go`（纯函数）读成事实和事件 → `Core.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/state` 把折好的 `StateFrame` 经 SSE 推给 Flutter；事件由 `session/events.go`、`session/trajectories.go` 记成每个 Session 和管家的日志（[architecture.md](docs/architecture.md)、[server.md](docs/reference/server.md)）。
 
 ## 怎么让 agent 做对
 

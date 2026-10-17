@@ -140,12 +140,13 @@ func TestMemoryKeptAndRecalled(t *testing.T) {
 		"- 做过（这个项目）：" + job.Text,
 	})), "recalled in the same project")
 	w.nextReport(t)
-	steps := w.f.Session.Get(second.ID).Activities
-	if len(steps) < 2 {
+	steps := w.f.Session.Get(second.ID).Events
+	if len(steps) < 3 || steps[0].Type != protocol.SessionEventTypeRunStart {
 		t.Fatalf("steps: %+v", steps)
 	}
-	testkit.Eq(t, []any{steps[0].Kind, steps[0].Text, steps[1].Kind, steps[1].Text},
-		[]any{protocol.ActivityKindPrompt, "再加一个下班打卡", protocol.ActivityKindRecalled, strings.Join(recalled, "\n")}, "its steps")
+	steps = steps[1:]
+	testkit.Eq(t, []any{steps[0].Type, steps[0].Text, steps[1].Type, steps[1].Text},
+		[]any{protocol.SessionEventTypeUserMessage, "再加一个下班打卡", protocol.SessionEventTypeMemoryRecalled, strings.Join(recalled, "\n")}, "its steps")
 
 	memo := "memo"
 	if _, err := w.f.Memory.Write(scribe.ID, "下班打卡也要有测试", memo); err != nil {
