@@ -40,7 +40,7 @@ Status: proposed
 | `owner` | 主人在农场那台电脑上 | Flutter、命令行 |
 | `remote` | 主人配对过的设备 | 院门 |
 | `manager` | 管家 | 管家的工具 |
-| `session` | 帮工（一个 Session） | MCP，或者命令行加每次执行一把钥匙（见「帮工的子集」） |
+| `session` | 帮工（一个 Session） | 暂不用：Session 不调农场的接口（「帮工的子集」） |
 
 例：
 
@@ -62,7 +62,7 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 | 命令行 | shapegen 写出 Go 的 `protocol.Client`（实现同一个 `Handlers` 接口）和命令表 | 新增，见下面第 3 节 |
 | 院门 | 只放 `can` 里有 `remote` 的操作 | 替掉 `gate.go` 里写死的 `lan.*` |
 | 管家的工具 | 先**检查**：管家的每个工具都对得上一个 `can manager` 的操作；`can manager` 的操作都有工具 | 以后再看要不要直接生成 |
-| MCP | 同上，对 `session` | 补不补帮工的能力，按第 5 节主人定的来 |
+| MCP | 只对外：主人机器上的 agent 用农场的能力，工具从能力表来 | 帮工不再用 MCP（[Session、Run、Step](2026-10-17-session-run-step.md)） |
 | 聊天软件、语音 | 不变：说话交给管家 | 以后可以加斜杠命令，一条命令对一个 `owner` 操作 |
 | 定时、计划 | 不变：服务端自己调服务 | — |
 
@@ -134,9 +134,9 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 
 | 能力 | 现在 | 定了 | 理由 |
 |---|---|---|---|
-| Session 读自己的工单、工单串 | 做不到，只能读频道 | 给：`issue.get`、`channel.history` 给 `session`，只限自己的 | 帮工不知道工单写了什么就开工，是现在汇报跑题的来源之一 |
-| Session 报「卡住了，要主人拿主意」 | 只能在频道里说 | 给：新操作 `session.ask {question}`，进 Inbox；和 [权限请求画成杂草](../feature/2026-10-10-permission-requests-as-weeds.md) 用同一个 Inbox 项 | 频道里的一句话会被别的消息冲掉，Inbox 是「要你处理的事」 |
-| Session 记事 | 只有 VibeValley 自己的农机能，且关着（`oarruntime` 的 `NoMemory`） | 给：`memory.create` 给 `session`，只记到自己的档案；`oarruntime` 保持 `NoMemory` | 记忆归档案，任何农机都走同一个操作，不靠某一家农机的自带工具 |
+| Session 读自己的工单、工单串 | 做不到，只能读频道 | 进的口子带进来：派活时带工单，投递时带串里它没看过的上文 | 帮工不知道工单写了什么就开工，是现在汇报跑题的来源之一 |
+| Session 报「卡住了，要主人拿主意」 | 汇报里的 `NeedsYou` 进 Inbox | 已经有：出的口子做（[Session、Run、Step](2026-10-17-session-run-step.md)） |
+| Session 记事 | 一轮结束时服务端记下这件活（`memory.Keep`）；VibeValley 自己的农机关着 `NoMemory` | 出的口子做，不给 Session 工具；`NoMemory` 保持 | 记忆归档案，任何农机都走同一条路 |
 | 管家建项目、改档案、改设置、改农机 | 做不到 | 不给 | 主人的配置，管家改了主人不知道 |
 | 管家看、改别的档案的记忆 | 只能记自己的 | 不给 | 档案的记忆由它自己的 Session 和主人写；派活时 `memory.recall` 已经自动挑给 Session |
 | 院门后的设备管院门 | 不给 | 保持不给 | |
@@ -257,25 +257,11 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 
 ### 帮工的子集
 
-**定了：帮工经命令行加每次执行一把钥匙，MCP 的 `farm_*` 迁完就删。** 每家编码 agent 都有 shell，不是每家都接 MCP；一个人只走一个入口，少一个手写的面。Multica 就是这样：daemon 开工时把 `MULTICA_TOKEN`、`MULTICA_SERVER_URL` 放进 agent 的环境（`server/internal/daemon/daemon.go:165`），提示词让它跑 `multica issue get <id> --output json`、`multica issue comment list`（`server/internal/daemon/prompt.go:259`），MCP 只用来给 agent 配别的服务。
-
-- 开工时服务端往 Session 的环境里放 `VIBEVALLEY_SERVER` 和 `VIBEVALLEY_SESSION_KEY`；钥匙一个 Session 一把，Session 结束就作废，只存哈希。
-- 带钥匙的请求只能调 `can session` 的操作，「只限自己的」由服务按钥匙对应的 Session 查；不带钥匙的还是主人（只听 127.0.0.1 不变）。
-- 帮工的提示词写明这几条命令，和 Multica 的 `prompt.go` 一样。
-
-| 帮工要做的事 | 现在 | 命令 |
-|---|---|---|
-| 读自己的工单 | 做不到 | `issue get` |
-| 读自己工单串的消息 | `farm_read` | `channel history` |
-| 在频道里说话 | `farm_say` | 新操作 `session.say`：以这个 Session 的档案说 |
-| 看收件箱 | `farm_inbox` | 新操作 `session.inbox` |
-| 看谁在干活 | `farm_who` | `state` 里的 Session |
-| 报「卡住了」 | 做不到 | 新操作 `session.ask` |
-| 记事 | 做不到 | `memory create` |
+没有。Session 不调农场的接口：它要的东西由投递带进来，它说的话由服务端在一轮结束时整理出去，见 [Session、Run、Step](2026-10-17-session-run-step.md)。原来定的「命令行加每次执行一把钥匙」和 `session.say`、`session.inbox`、`session.ask` 不做了；`can` 里的 `session` 留着不用，等真的有 Session 要调的操作再说。
 
 ### 已定
 
-2026-10-17 主人让定的几件，已经写进上面各节：`server.start` → `manager.open`，`server.end` 删；`progress.carryCoins` 删；帮工走命令行加钥匙（「帮工的子集」）；能力上的空缺（第 5 节）；直接聊叫 `runtime chat`（第 3 节）。
+2026-10-17 主人让定的几件，已经写进上面各节：`server.start` → `manager.open`，`server.end` 删；`progress.carryCoins` 删；帮工不调农场的接口（「帮工的子集」）；能力上的空缺（第 5 节）；直接聊叫 `runtime chat`（第 3 节）。
 
 ## Alternatives considered
 
@@ -296,7 +282,7 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 - 管家的工具和 MCP 的工具都对得上 `can` 里的 `manager`、`session`，有测试；加一个 `can manager` 的操作不加工具，测试失败。
 - 派活只剩一条规则：管家派的也先有工单，满了排队。
 - 每个操作至少有一个入口用它。
-- 帮工经命令行和钥匙做「帮工的子集」里的每件事，有测试；带别的 Session 的钥匙读不到这张工单；`mcp.go` 里没有 `farm_*`。
+- `mcp.go` 里没有 `farm_*`，`/mcp` 的工具从能力表来（[Session、Run、Step](2026-10-17-session-run-step.md)）。
 - 第 4 节的表做完：没有 `add`、`edit`、`remove`、`find`、`open` 这些动词，没有 `/api/workers`、`/api/chat`、`/api/lan` 路径。
 
 ## Risks
@@ -305,5 +291,4 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 - 管家派活改成先写工单、满了排队以后，管家原来「满了就告诉主人派不出去」的说法要跟着改，不然主人以为没派。
 - 命令行和对话共用 `cmd/vibevalley` 一个名字：对话只在不带子命令时、或 `runtime chat` 时打开，带别的子命令一律是一次调用。
 - `runtime chat` 在本机跑，花的钱不进农场的账；主人以为农场记着的话会对不上，命令开头打一行说明。
-- 第 5 节里给帮工的能力一旦给了，帮工就能读到更多东西；只给「自己的」，在服务里按钥匙对应的 Session 查，不靠帮工自觉。
-- 钥匙在 Session 的环境变量里，帮工跑的命令、写的日志都可能带出去；钥匙只能调 `can session` 的操作、Session 结束就作废，漏了也只够读写这一张工单。
+- `/mcp` 对外以后，主人机器上任何 agent 都能经它做主人能做的事；它和命令行一样只听 127.0.0.1，院门不放它。
