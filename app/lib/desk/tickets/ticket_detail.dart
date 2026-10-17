@@ -142,6 +142,9 @@ class _TodoState extends ConsumerState<TodoDetail> {
     priority: _priority,
   );
 
+  // The whole form: an empty project or agent clears it.
+  IssueUpdate get _update => IssueUpdate(title: _title, description: _description, project: _project, assignee: _agent, priority: _priority);
+
   Future<void> _run(Future<void> Function(VibeValleyApi api) act) async {
     setState(() => _busy = true);
     await deskRun(() => act(ref.read(apiProvider)));
@@ -168,14 +171,14 @@ class _TodoState extends ConsumerState<TodoDetail> {
   Future<void> _save() => _run((api) async {
     unawaited(rememberPick(_agent, _project));
     final item = widget.item;
-    final saved = item == null ? await api.issue.create(body: _request) : await api.issue.update(id: item.id, body: _request);
+    final saved = item == null ? await api.issue.create(body: _request) : await api.issue.update(id: item.id, body: _update);
     if (item == null) widget.onDone(saved.id);
   });
 
   Future<void> _start() => _run((api) async {
     unawaited(rememberPick(_agent, _project));
     final item = widget.item ?? await api.issue.create(body: _request);
-    if (widget.item != null) await api.issue.update(id: item.id, body: _request);
+    if (widget.item != null) await api.issue.update(id: item.id, body: _update);
     final got = await api.issue.start(id: item.id);
     dispatchedNotice(got, item.id, widget.onDone);
     // Waiting for a bed: a new one stays open, now as the 待办 it is.

@@ -2751,6 +2751,32 @@ enum Priority {
   static Priority fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('Priority: unknown value', v));
 }
 
+class IssueUpdate {
+  const IssueUpdate({this.title, this.description, this.project, this.assignee, this.priority});
+
+  factory IssueUpdate.fromJson(Map<String, dynamic> j) => IssueUpdate(
+    title: j['title'] == null ? null : j['title'] as String,
+    description: j['description'] == null ? null : j['description'] as String,
+    project: j['project'] == null ? null : j['project'] as String,
+    assignee: j['assignee'] == null ? null : j['assignee'] as String,
+    priority: j['priority'] == null ? null : Priority.fromJson(j['priority']),
+  );
+
+  final String? title;
+  final String? description;
+  final String? project;
+  final String? assignee;
+  final Priority? priority;
+
+  Map<String, dynamic> toJson() => {
+    if (title != null) 'title': title!,
+    if (description != null) 'description': description!,
+    if (project != null) 'project': project!,
+    if (assignee != null) 'assignee': assignee!,
+    if (priority != null) 'priority': priority!.wire,
+  };
+}
+
 class IssueRequest {
   const IssueRequest({required this.title, this.description, this.project, this.assignee, this.priority});
 
@@ -5067,7 +5093,7 @@ class IssueApi {
     return Issue.fromJson(j as Map<String, dynamic>);
   }
 
-  Future<Issue> update({required String id, required IssueRequest body}) async {
+  Future<Issue> update({required String id, required IssueUpdate body}) async {
     final j = await _api._call('PUT', '/api/issues/${Uri.encodeComponent((id).toString())}', query: {}, body: body.toJson());
     return Issue.fromJson(j as Map<String, dynamic>);
   }

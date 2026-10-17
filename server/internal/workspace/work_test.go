@@ -396,7 +396,7 @@ func TestIssueWrittenDownStarts(t *testing.T) {
 		t.Fatalf("no agent yet: %v", err)
 	}
 	project, agent := "backlog", lab.ID
-	if issue, err = w.f.Issue.Edit(issue.ID, protocol.IssueRequest{Title: "写打卡并提交", Project: &project, Assignee: &agent}); err != nil {
+	if issue, err = w.f.Issue.Edit(issue.ID, protocol.IssueUpdate{Project: &project, Assignee: &agent}); err != nil {
 		t.Fatal(err)
 	}
 	testkit.Eq(t, []string{*issue.Project, *issue.Assignee}, []string{"backlog", lab.ID}, "edited")
@@ -416,7 +416,7 @@ func TestIssueWrittenDownStarts(t *testing.T) {
 	if _, err := w.f.Issue.Start(context.Background(), issue.ID, 0); !errors.As(err, &refused) {
 		t.Fatalf("started twice: %v", err)
 	}
-	if _, err := w.f.Issue.Edit(issue.ID, protocol.IssueRequest{Title: "改不了了"}); !errors.As(err, &refused) {
+	if _, err := w.f.Issue.Edit(issue.ID, protocol.IssueUpdate{Title: new("改不了了")}); !errors.As(err, &refused) {
 		t.Fatalf("edited once started: %v", err)
 	}
 	unsent := func(all []protocol.Issue) (out []string) {
@@ -891,4 +891,24 @@ func TestAWorkersIssueIsThereWhenItArrives(t *testing.T) {
 		t.Fatalf("its issue when it arrived: %v", err)
 	}
 	w.nextReport(t)
+}
+
+func TestIssueUpdateChangesOnlyWhatItGives(t *testing.T) {
+	home, work := dirs(t)
+	w := openWorld(t, home, work)
+	high := protocol.PriorityHigh
+	issue, err := w.f.Issue.Add(protocol.IssueRequest{Title: "写打卡", Description: "每天一次", Project: new("demo"), Assignee: new("lab"), Priority: &high})
+	if err != nil {
+		t.Fatal(err)
+	}
+	issue, err = w.f.Issue.Edit(issue.ID, protocol.IssueUpdate{Title: new("写打卡并提交")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, []any{issue.Title, issue.Description, *issue.Project, *issue.Assignee, issue.Priority}, []any{"写打卡并提交", "每天一次", "demo", "lab", protocol.PriorityHigh}, "the rest kept")
+	issue, err = w.f.Issue.Edit(issue.ID, protocol.IssueUpdate{Project: new("")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, []any{issue.Project == nil, *issue.Assignee}, []any{true, "lab"}, "an empty project is none")
 }

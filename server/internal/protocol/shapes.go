@@ -1094,6 +1094,15 @@ const (
 	PriorityLow    Priority = "low"
 )
 
+// IssueUpdate changes only what it gives; an empty project or assignee is none.
+type IssueUpdate struct {
+	Title       *string   `json:"title,omitzero"`
+	Description *string   `json:"description,omitzero"`
+	Project     *string   `json:"project,omitzero"`
+	Assignee    *string   `json:"assignee,omitzero"`
+	Priority    *Priority `json:"priority,omitzero"`
+}
+
 type IssueRequest struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description,omitzero"`

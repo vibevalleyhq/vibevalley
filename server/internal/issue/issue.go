@@ -243,9 +243,27 @@ func (is *issues) add(in protocol.IssueRequest, schedule *int64) (protocol.Issue
 	return is.Get(id)
 }
 
-func (is *issues) Edit(id string, in protocol.IssueRequest) (protocol.Issue, error) {
-	if _, err := is.unsent(id); err != nil {
+// Edit changes what upd gives and keeps the rest.
+func (is *issues) Edit(id string, upd protocol.IssueUpdate) (protocol.Issue, error) {
+	was, err := is.unsent(id)
+	if err != nil {
 		return protocol.Issue{}, err
+	}
+	in := protocol.IssueRequest{Title: was.Title, Description: was.Description, Project: was.Project, Assignee: was.Assignee, Priority: &was.Priority}
+	if upd.Title != nil {
+		in.Title = *upd.Title
+	}
+	if upd.Description != nil {
+		in.Description = *upd.Description
+	}
+	if upd.Project != nil {
+		in.Project = upd.Project
+	}
+	if upd.Assignee != nil {
+		in.Assignee = upd.Assignee
+	}
+	if upd.Priority != nil {
+		in.Priority = upd.Priority
 	}
 	title, description, err := issueWords(in)
 	if err != nil {

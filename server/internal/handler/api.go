@@ -467,7 +467,7 @@ func (a api) IssueCreate(_ context.Context, body protocol.IssueRequest) (protoco
 	return a.f.Issue.Add(body)
 }
 
-func (a api) IssueUpdate(_ context.Context, id string, body protocol.IssueRequest) (protocol.Issue, error) {
+func (a api) IssueUpdate(_ context.Context, id string, body protocol.IssueUpdate) (protocol.Issue, error) {
 	return a.f.Issue.Edit(id, body)
 }
 

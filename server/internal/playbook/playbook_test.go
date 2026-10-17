@@ -622,7 +622,7 @@ func TestPlanIsAParentIssue(t *testing.T) {
 		t.Fatalf("a step: %+v", d)
 	}
 	var refused protocol.Refused
-	if _, err := tf.Issue.Edit(d.ID, protocol.IssueRequest{Title: "改"}); !errors.As(err, &refused) {
+	if _, err := tf.Issue.Edit(d.ID, protocol.IssueUpdate{Title: new("改")}); !errors.As(err, &refused) {
 		t.Fatalf("a step changed on the board: %v", err)
 	}
 	if _, err := tf.Issue.Start(context.Background(), d.ID, 0); !errors.As(err, &refused) {

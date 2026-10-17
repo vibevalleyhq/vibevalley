@@ -87,7 +87,7 @@ type Handlers interface {
 	IssueCreate(ctx context.Context, body IssueRequest) (Issue, error)
 	//vibevalley:route issue.update PUT /api/issues/{id}
 	//vibevalley:can owner remote
-	IssueUpdate(ctx context.Context, pID string, body IssueRequest) (Issue, error)
+	IssueUpdate(ctx context.Context, pID string, body IssueUpdate) (Issue, error)
 	//vibevalley:route issue.delete DELETE /api/issues/{id}
 	//vibevalley:can owner remote
 	IssueDelete(ctx context.Context, pID string) error

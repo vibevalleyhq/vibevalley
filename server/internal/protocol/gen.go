@@ -2349,7 +2349,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	})
 	mux.HandleFunc("PUT /api/issues/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		var body IssueRequest
+		var body IssueUpdate
 		if !decode(w, r, &body) {
 			return
 		}
@@ -2899,7 +2899,7 @@ func (c *Client) IssueCreate(ctx context.Context, body IssueRequest) (Issue, err
 	return out, err
 }
 
-func (c *Client) IssueUpdate(ctx context.Context, pID string, body IssueRequest) (Issue, error) {
+func (c *Client) IssueUpdate(ctx context.Context, pID string, body IssueUpdate) (Issue, error) {
 	var out Issue
 	err := c.call(ctx, "PUT", "/api/issues/"+url.PathEscape(pID), nil, body, &out)
 	return out, err
