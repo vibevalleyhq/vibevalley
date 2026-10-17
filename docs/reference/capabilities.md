@@ -1,0 +1,182 @@
+# 能力表
+
+由 `server/tool/shapegen` 从 `server/internal/protocol/api.go` 的 `//vibevalley:route` 和 `//vibevalley:can` 写出，不手改；`go run ./tool/shapegen -check` 查它是不是最新。为什么这样分见 [先有能力，再有入口](../../.agents/notes/proposed/architecture/2026-10-17-capabilities-before-surfaces.md)。
+
+| 谁 | 是谁 | 从哪个入口 |
+|---|---|---|
+| 主人 | 主人在农场那台电脑上 | Flutter、命令行 |
+| 院门 | 主人配对过的设备 | 院门只放这一列打了 ✓ 的 |
+| 管家 | 管家 | 管家的工具 |
+| Session | 帮工 | 带钥匙的命令行 |
+
+`GET /api/state` 和 `GET /api/events` 是 SSE，不在 `Handlers` 里：主人和院门都能读。
+
+## server
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `server.health` | `GET /api/health` | ✓ | ✓ |  |  |
+| `server.start` | `POST /api/start` | ✓ | ✓ |  |  |
+| `server.end` | `POST /api/end` | ✓ | ✓ |  |  |
+
+## setting
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `setting.load` | `GET /api/settings` | ✓ | ✓ |  |  |
+| `setting.check` | `POST /api/settings/check` | ✓ | ✓ |  |  |
+| `setting.save` | `PUT /api/settings` | ✓ | ✓ |  |  |
+
+## channel
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `channel.say` | `POST /api/say` | ✓ | ✓ |  |  |
+| `channel.open` | `POST /api/channels` | ✓ | ✓ | ✓ |  |
+| `channel.update` | `PUT /api/channels/{id}` | ✓ | ✓ | ✓ |  |
+| `channel.history` | `GET /api/chat/{id}/messages` | ✓ | ✓ | ✓ |  |
+| `channel.read` | `POST /api/chat/{id}/read` | ✓ | ✓ |  |  |
+
+## schedule
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `schedule.add` | `POST /api/schedules` | ✓ | ✓ | ✓ |  |
+| `schedule.toggle` | `PUT /api/schedules/{id}` | ✓ | ✓ |  |  |
+| `schedule.remove` | `DELETE /api/schedules/{id}` | ✓ | ✓ | ✓ |  |
+
+## issue
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `issue.dispatch` | `POST /api/dispatch` | ✓ | ✓ |  |  |
+| `issue.list` | `GET /api/issues` | ✓ | ✓ |  |  |
+| `issue.find` | `GET /api/issues/{id}` | ✓ | ✓ |  |  |
+| `issue.runs` | `GET /api/issues/{id}/runs` | ✓ | ✓ |  |  |
+| `issue.add` | `POST /api/issues` | ✓ | ✓ |  |  |
+| `issue.edit` | `PUT /api/issues/{id}` | ✓ | ✓ |  |  |
+| `issue.remove` | `DELETE /api/issues/{id}` | ✓ | ✓ |  |  |
+| `issue.move` | `PUT /api/issues/{id}/place` | ✓ | ✓ |  |  |
+| `issue.queue` | `PUT /api/issues/{id}/queue` | ✓ | ✓ |  |  |
+| `issue.start` | `POST /api/issues/{id}/start` | ✓ | ✓ | ✓ |  |
+| `issue.reopen` | `POST /api/issues/{id}/reopen` | ✓ | ✓ |  |  |
+
+## worker
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `worker.tell` | `POST /api/workers/{id}/tell` | ✓ | ✓ | ✓ |  |
+| `worker.stop` | `POST /api/workers/{id}/stop` | ✓ | ✓ | ✓ |  |
+| `worker.dismiss` | `POST /api/workers/{id}/dismiss` | ✓ | ✓ | ✓ |  |
+| `worker.merge` | `POST /api/workers/{id}/merge` | ✓ | ✓ | ✓ |  |
+| `worker.resolve` | `POST /api/workers/{id}/resolve` | ✓ | ✓ |  |  |
+| `worker.changes` | `GET /api/workers/{id}/changes` | ✓ | ✓ | ✓ |  |
+| `worker.activities` | `GET /api/workers/{id}/activities` | ✓ | ✓ |  |  |
+
+## trajectory
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `trajectory.list` | `GET /api/trajectories` | ✓ | ✓ |  |  |
+| `trajectory.find` | `GET /api/trajectories/{id}` | ✓ | ✓ |  |  |
+
+## playbook
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `playbook.plan` | `POST /api/playbooks` | ✓ | ✓ | ✓ |  |
+| `playbook.editNode` | `PUT /api/playbooks/{id}/nodes/{node}` | ✓ | ✓ | ✓ |  |
+| `playbook.removeNode` | `DELETE /api/playbooks/{id}/nodes/{node}` | ✓ | ✓ | ✓ |  |
+| `playbook.act` | `POST /api/playbooks/{id}/act` | ✓ | ✓ | ✓ |  |
+| `playbook.nodeAct` | `POST /api/playbooks/{id}/nodes/{node}/act` | ✓ | ✓ | ✓ |  |
+| `playbook.changes` | `GET /api/playbooks/{id}/changes` | ✓ | ✓ |  |  |
+| `playbook.events` | `GET /api/playbooks/{id}/events` | ✓ | ✓ |  |  |
+
+## progress
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `progress.carryCoins` | `POST /api/progress/carry` | ✓ | ✓ |  |  |
+| `progress.chooseTitle` | `POST /api/progress/title` | ✓ | ✓ |  |  |
+
+## runtime
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `runtime.list` | `GET /api/runtimes` | ✓ | ✓ |  |  |
+| `runtime.refresh` | `POST /api/runtimes/{id}/refresh` | ✓ | ✓ |  |  |
+| `runtime.update` | `PUT /api/runtimes/{id}/settings` | ✓ | ✓ |  |  |
+| `runtime.upgrade` | `POST /api/runtimes/{id}/upgrade` | ✓ | ✓ |  |  |
+
+## agent
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `agent.list` | `GET /api/agents` | ✓ | ✓ |  |  |
+| `agent.check` | `POST /api/agents/check` | ✓ | ✓ |  |  |
+| `agent.save` | `PUT /api/agents/{id}` | ✓ | ✓ |  |  |
+| `agent.delete` | `DELETE /api/agents/{id}` | ✓ | ✓ |  |  |
+| `agent.memories` | `GET /api/agents/{id}/memories` | ✓ | ✓ |  |  |
+| `agent.recall` | `GET /api/agents/{id}/recall` | ✓ | ✓ |  |  |
+| `agent.remember` | `POST /api/agents/{id}/memories` | ✓ | ✓ |  |  |
+| `agent.forget` | `DELETE /api/agents/{id}/memories/{memory}` | ✓ | ✓ |  |  |
+
+## manager
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `manager.memories` | `GET /api/manager/memories` | ✓ | ✓ |  |  |
+| `manager.remember` | `POST /api/manager/memories` | ✓ | ✓ | ✓ |  |
+| `manager.forget` | `DELETE /api/manager/memories/{memory}` | ✓ | ✓ |  |  |
+| `manager.archive` | `GET /api/manager/archive` | ✓ | ✓ | ✓ |  |
+| `manager.archiveFile` | `GET /api/manager/archive/{name}` | ✓ | ✓ |  |  |
+
+## skill
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `skill.list` | `GET /api/skills` | ✓ | ✓ |  |  |
+| `skill.save` | `PUT /api/skills/{id}` | ✓ | ✓ |  |  |
+| `skill.delete` | `DELETE /api/skills/{id}` | ✓ | ✓ |  |  |
+
+## project
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `project.list` | `GET /api/projects` | ✓ | ✓ | ✓ |  |
+| `project.check` | `POST /api/projects/check` | ✓ | ✓ |  |  |
+| `project.create` | `POST /api/projects` | ✓ | ✓ |  |  |
+| `project.languages` | `GET /api/projects/{id}/languages` | ✓ | ✓ |  |  |
+| `project.activity` | `GET /api/projects/{id}/activity` | ✓ | ✓ |  |  |
+
+## voice
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `voice.session` | `POST /api/voice/session` | ✓ | ✓ |  |  |
+| `voice.renew` | `POST /api/voice/renew` | ✓ | ✓ |  |  |
+| `voice.start` | `POST /api/voice/agent` | ✓ | ✓ |  |  |
+| `voice.stop` | `POST /api/voice/agent/stop` | ✓ | ✓ |  |  |
+
+## connector
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `connector.list` | `GET /api/connectors` | ✓ | ✓ |  |  |
+| `connector.login` | `POST /api/connectors/{id}/login` | ✓ | ✓ |  |  |
+| `connector.verify` | `POST /api/connectors/{id}/verify` | ✓ | ✓ |  |  |
+| `connector.logout` | `POST /api/connectors/{id}/logout` | ✓ | ✓ |  |  |
+| `connector.channel` | `PUT /api/connectors/{id}/channel` | ✓ | ✓ |  |  |
+
+## lan
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `lan.status` | `GET /api/lan` | ✓ |  |  |  |
+| `lan.setOpen` | `PUT /api/lan` | ✓ |  |  |  |
+| `lan.startPairing` | `POST /api/lan/pairing` | ✓ |  |  |  |
+| `lan.stopPairing` | `DELETE /api/lan/pairing` | ✓ |  |  |  |
+| `lan.answerPairing` | `POST /api/lan/pairing/answer` | ✓ |  |  |  |
+| `lan.forgetDevice` | `DELETE /api/lan/devices/{id}` | ✓ |  |  |  |
+| `lan.pair` | `POST /api/lan/pair` | ✓ | ✓ |  |  |
+| `lan.me` | `GET /api/lan/me` | ✓ | ✓ |  |  |

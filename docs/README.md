@@ -16,6 +16,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 讲什么 |
 |---|---|
 | [concept-map.md](reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
+| [capabilities.md](reference/capabilities.md) | 每个接口谁能调：主人、院门、管家、Session；shapegen 写出 |
 | [server.md](reference/server.md) | 服务端的各个服务 |
 | [agents-and-runtimes.md](reference/agents-and-runtimes.md) | 帮工档案、农机、技能书 |
 | [farm-ui.md](reference/farm-ui.md) | 农场界面和玩法 |

@@ -14,7 +14,10 @@
 //	//vibevalley:error <status>          on a struct: an API error, answered with that status and tagged with its name
 //	//vibevalley:dart <Name>             the Dart name, when the Go one would clash with Flutter's (Badge)
 //	//vibevalley:route <group.op> <METHOD> <path>   on a Handlers method: its operation, method and path
+//	//vibevalley:can <caller>...         on a Handlers method: who may call it (owner, remote, manager, session); required
 //	//vibevalley:const <dartName>        on an untyped constant (a string or a number): the client gets it under that name
+//
+// The endpoints and their callers also go into docs/reference/capabilities.md.
 //
 // The client's part of seeds.json (the runtimes' presets and facts, the fallback preset) goes into the Dart file too, decoded
 // into the generated types.
@@ -50,7 +53,7 @@ func main() {
 	s := load("internal/protocol/shapes.go", "internal/protocol/api.go")
 	goOut := s.goFile()
 	dartOut := formatDart(s.dartFile())
-	outputs := []struct{ path, body string }{{"internal/protocol/gen.go", goOut}, {"../app/lib/gen/vibevalley.dart", dartOut}}
+	outputs := []struct{ path, body string }{{"internal/protocol/gen.go", goOut}, {"../app/lib/gen/vibevalley.dart", dartOut}, {"../docs/reference/capabilities.md", s.capabilities()}}
 	stale := false
 	for _, o := range outputs {
 		if *check {
@@ -121,6 +124,7 @@ type decl struct {
 
 type route struct {
 	group, op, method, path, goName string
+	can                             []string
 	params                          []param
 	result                          ast.Expr // nil: no answer
 	doc                             []string
@@ -275,15 +279,27 @@ func (s *shapes) handlers(it *ast.InterfaceType) {
 		dirs, doc := directives(m.Doc)
 		r := route{goName: m.Names[0].Name, doc: doc}
 		for _, dir := range dirs {
-			if dir[0] != "route" {
+			switch dir[0] {
+			case "route":
+				args := strings.Fields(dir[1])
+				group, op, _ := strings.Cut(args[0], ".")
+				r.group, r.op, r.method, r.path = group, op, args[1], args[2]
+			case "can":
+				for _, c := range strings.Fields(dir[1]) {
+					if !slicesContain(callers, c) {
+						fail(fmt.Errorf("%s: vibevalley:can %s is none of %v", r.goName, c, callers))
+					}
+					r.can = append(r.can, c)
+				}
+			default:
 				fail(fmt.Errorf("%s: unknown directive vibevalley:%s", r.goName, dir[0]))
 			}
-			args := strings.Fields(dir[1])
-			group, op, _ := strings.Cut(args[0], ".")
-			r.group, r.op, r.method, r.path = group, op, args[1], args[2]
 		}
 		if r.path == "" {
 			fail(fmt.Errorf("%s has no vibevalley:route", r.goName))
+		}
+		if len(r.can) == 0 {
+			fail(fmt.Errorf("%s has no vibevalley:can", r.goName))
 		}
 		ft := m.Type.(*ast.FuncType)
 		for i, p := range ft.Params.List {
@@ -300,6 +316,9 @@ func (s *shapes) handlers(it *ast.InterfaceType) {
 		s.routes = append(s.routes, r)
 	}
 }
+
+// Who may call an endpoint, in the order capabilities.md lists them.
+var callers = []string{"owner", "remote", "manager", "session"}
 
 func mustUnquote(s string) string {
 	u, err := strconv.Unquote(s)
@@ -524,6 +543,19 @@ func (e %[1]s) MarshalJSON() ([]byte, error) {
 }
 `, d.name, message, d.status)
 	}
+	b.WriteString("\n// Caller is who may call an endpoint (vibevalley:can in api.go).\ntype Caller string\n\nconst (\n")
+	for _, c := range callers {
+		fmt.Fprintf(&b, "\tCaller%s Caller = %q\n", strings.ToUpper(c[:1])+c[1:], c)
+	}
+	b.WriteString(")\n\n// Endpoint is one route of Handlers: its operation (group.op), method, path and callers.\ntype Endpoint struct {\n\tOp, Method, Path string\n\tCan []Caller\n}\n\n// Endpoints lists every route of Handlers, in api.go's order.\nvar Endpoints = []Endpoint{\n")
+	for _, r := range s.routes {
+		var can []string
+		for _, c := range r.can {
+			can = append(can, "Caller"+strings.ToUpper(c[:1])+c[1:])
+		}
+		fmt.Fprintf(&b, "\t{%q, %q, %q, []Caller{%s}},\n", r.group+"."+r.op, r.method, r.path, strings.Join(can, ", "))
+	}
+	b.WriteString("}\n")
 	b.WriteString("\n// Mount routes every VibeValleyApi endpoint on mux to h: requests decoded, answers and tagged errors encoded (200 with\n// JSON, 204 when there is nothing to say, the error's own status).\nfunc Mount(mux *http.ServeMux, h Handlers) {\n")
 	for _, r := range s.routes {
 		var reads, args []string

@@ -93,7 +93,7 @@ flowchart LR
 
 ## HTTP 接口
 
-接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。不在里面的三个：`/api/events`、`/api/state` 两条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[server.md](reference/server.md)「田头」）。`/api/lan/*` 里管院门的接口只在本机答（[server.md](reference/server.md)「院门」）。
+接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。不在里面的三个：`/api/events`、`/api/state` 两条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[server.md](reference/server.md)「田头」）。`//vibevalley:can` 写谁能调，院门只放 `remote` 的（[能力表](reference/capabilities.md)、[server.md](reference/server.md)「院门」）。
 
 ## 存了什么
 

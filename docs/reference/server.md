@@ -122,7 +122,7 @@
 手机、另一台 Mac 和这台电脑用同一个农场（`gate/gate.go`；[理由](../../.agents/notes/implemented/feature/2026-10-14-yard-gate.md)），在「院门」页（`/gate`）管。
 
 - **另一个监听**：在所有网卡上听 `lan.port`（默认 8790），默认关着。
-- **只放这些**：`VibeValleyApi` 和两条流，不放 `/mcp`。每个请求要带 `Authorization: Bearer <钥匙>`；只有 `POST /api/lan/pair` 不要。院门自己的管理接口只在本机能用。
+- **只放这些**：[能力表](capabilities.md)里院门一列打了 ✓ 的接口（`api.go` 的 `//vibevalley:can remote`，`internal/gate` 按 `protocol.Endpoints` 匹配）和两条流，不放 `/mcp`；别的答 403。每个请求要带 `Authorization: Bearer <钥匙>`；只有 `POST /api/lan/pair` 不要。院门自己的管理接口没有 `remote`，只在本机能用。
 - **配对**：主人点「添加设备」，得到一个配对码（2 分钟有效，用一次就作废），画成 `vibevalley://pair?…` 的二维码。设备带码来要钥匙，等主人在本机点头。数据库只存钥匙的 SHA-256。
 - **移除**一台设备或关上院门，它的连接当场断开。
 - **明文**：院门走 HTTP，不加密，只在信得过的网络里开。

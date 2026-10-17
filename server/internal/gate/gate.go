@@ -356,7 +356,7 @@ func (l *Service) Me(ctx context.Context) (protocol.LanDevice, error) {
 	return protocol.LanDevice{}, protocol.LanRefused{Reason: "这里就是农场本机，不是经院门来的设备"}
 }
 
-// Never the gate's own settings.
+// Only what api.go marks vibevalley:can remote, and the two streams, which are not Handlers.
 func (l *Service) gate(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
@@ -373,8 +373,8 @@ func (l *Service) gate(inner http.Handler) http.Handler {
 			lanRefuse(w, http.StatusUnauthorized, "这台设备没配对，或者已经被主人移除了：回那台电脑上扫码配对")
 			return
 		}
-		if (path == "/api/lan" || strings.HasPrefix(path, "/api/lan/")) && path != "/api/lan/me" {
-			lanRefuse(w, http.StatusForbidden, "院门只能在农场那台电脑上管")
+		if !remoteMay(r) {
+			lanRefuse(w, http.StatusForbidden, "院门不放这个：只能在农场那台电脑上做")
 			return
 		}
 		ctx, done := l.track(r.Context(), d)
@@ -503,4 +503,23 @@ func lanKey() string {
 func lanHash(key string) string {
 	sum := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(sum[:])
+}
+
+// remoteRoutes matches the endpoints a device may call; a request it has no pattern for is refused.
+var remoteRoutes = func() *http.ServeMux {
+	mux := http.NewServeMux()
+	ok := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	for _, e := range protocol.Endpoints {
+		if slices.Contains(e.Can, protocol.CallerRemote) {
+			mux.Handle(e.Method+" "+e.Path, ok)
+		}
+	}
+	mux.Handle("GET /api/state", ok)
+	mux.Handle("GET /api/events", ok)
+	return mux
+}()
+
+func remoteMay(r *http.Request) bool {
+	_, pattern := remoteRoutes.Handler(r)
+	return pattern != ""
 }

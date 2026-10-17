@@ -2085,6 +2085,111 @@ func (e LanRefused) MarshalJSON() ([]byte, error) {
 	return withTag(plain(e), "_tag", "LanRefused")
 }
 
+// Caller is who may call an endpoint (vibevalley:can in api.go).
+type Caller string
+
+const (
+	CallerOwner   Caller = "owner"
+	CallerRemote  Caller = "remote"
+	CallerManager Caller = "manager"
+	CallerSession Caller = "session"
+)
+
+// Endpoint is one route of Handlers: its operation (group.op), method, path and callers.
+type Endpoint struct {
+	Op, Method, Path string
+	Can              []Caller
+}
+
+// Endpoints lists every route of Handlers, in api.go's order.
+var Endpoints = []Endpoint{
+	{"server.health", "GET", "/api/health", []Caller{CallerOwner, CallerRemote}},
+	{"server.start", "POST", "/api/start", []Caller{CallerOwner, CallerRemote}},
+	{"setting.load", "GET", "/api/settings", []Caller{CallerOwner, CallerRemote}},
+	{"setting.check", "POST", "/api/settings/check", []Caller{CallerOwner, CallerRemote}},
+	{"setting.save", "PUT", "/api/settings", []Caller{CallerOwner, CallerRemote}},
+	{"server.end", "POST", "/api/end", []Caller{CallerOwner, CallerRemote}},
+	{"channel.say", "POST", "/api/say", []Caller{CallerOwner, CallerRemote}},
+	{"channel.open", "POST", "/api/channels", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"schedule.add", "POST", "/api/schedules", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"schedule.toggle", "PUT", "/api/schedules/{id}", []Caller{CallerOwner, CallerRemote}},
+	{"schedule.remove", "DELETE", "/api/schedules/{id}", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"channel.update", "PUT", "/api/channels/{id}", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.dispatch", "POST", "/api/dispatch", []Caller{CallerOwner, CallerRemote}},
+	{"worker.tell", "POST", "/api/workers/{id}/tell", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"worker.stop", "POST", "/api/workers/{id}/stop", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"worker.dismiss", "POST", "/api/workers/{id}/dismiss", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"worker.merge", "POST", "/api/workers/{id}/merge", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"worker.resolve", "POST", "/api/workers/{id}/resolve", []Caller{CallerOwner, CallerRemote}},
+	{"worker.changes", "GET", "/api/workers/{id}/changes", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"worker.activities", "GET", "/api/workers/{id}/activities", []Caller{CallerOwner, CallerRemote}},
+	{"trajectory.list", "GET", "/api/trajectories", []Caller{CallerOwner, CallerRemote}},
+	{"trajectory.find", "GET", "/api/trajectories/{id}", []Caller{CallerOwner, CallerRemote}},
+	{"issue.list", "GET", "/api/issues", []Caller{CallerOwner, CallerRemote}},
+	{"issue.find", "GET", "/api/issues/{id}", []Caller{CallerOwner, CallerRemote}},
+	{"issue.runs", "GET", "/api/issues/{id}/runs", []Caller{CallerOwner, CallerRemote}},
+	{"issue.add", "POST", "/api/issues", []Caller{CallerOwner, CallerRemote}},
+	{"issue.edit", "PUT", "/api/issues/{id}", []Caller{CallerOwner, CallerRemote}},
+	{"issue.remove", "DELETE", "/api/issues/{id}", []Caller{CallerOwner, CallerRemote}},
+	{"issue.move", "PUT", "/api/issues/{id}/place", []Caller{CallerOwner, CallerRemote}},
+	{"issue.queue", "PUT", "/api/issues/{id}/queue", []Caller{CallerOwner, CallerRemote}},
+	{"issue.start", "POST", "/api/issues/{id}/start", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"issue.reopen", "POST", "/api/issues/{id}/reopen", []Caller{CallerOwner, CallerRemote}},
+	{"playbook.plan", "POST", "/api/playbooks", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.editNode", "PUT", "/api/playbooks/{id}/nodes/{node}", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.removeNode", "DELETE", "/api/playbooks/{id}/nodes/{node}", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.act", "POST", "/api/playbooks/{id}/act", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"playbook.nodeAct", "POST", "/api/playbooks/{id}/nodes/{node}/act", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"channel.history", "GET", "/api/chat/{id}/messages", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"channel.read", "POST", "/api/chat/{id}/read", []Caller{CallerOwner, CallerRemote}},
+	{"playbook.changes", "GET", "/api/playbooks/{id}/changes", []Caller{CallerOwner, CallerRemote}},
+	{"playbook.events", "GET", "/api/playbooks/{id}/events", []Caller{CallerOwner, CallerRemote}},
+	{"progress.carryCoins", "POST", "/api/progress/carry", []Caller{CallerOwner, CallerRemote}},
+	{"progress.chooseTitle", "POST", "/api/progress/title", []Caller{CallerOwner, CallerRemote}},
+	{"runtime.list", "GET", "/api/runtimes", []Caller{CallerOwner, CallerRemote}},
+	{"runtime.refresh", "POST", "/api/runtimes/{id}/refresh", []Caller{CallerOwner, CallerRemote}},
+	{"runtime.update", "PUT", "/api/runtimes/{id}/settings", []Caller{CallerOwner, CallerRemote}},
+	{"runtime.upgrade", "POST", "/api/runtimes/{id}/upgrade", []Caller{CallerOwner, CallerRemote}},
+	{"agent.list", "GET", "/api/agents", []Caller{CallerOwner, CallerRemote}},
+	{"agent.check", "POST", "/api/agents/check", []Caller{CallerOwner, CallerRemote}},
+	{"agent.save", "PUT", "/api/agents/{id}", []Caller{CallerOwner, CallerRemote}},
+	{"agent.delete", "DELETE", "/api/agents/{id}", []Caller{CallerOwner, CallerRemote}},
+	{"agent.memories", "GET", "/api/agents/{id}/memories", []Caller{CallerOwner, CallerRemote}},
+	{"agent.recall", "GET", "/api/agents/{id}/recall", []Caller{CallerOwner, CallerRemote}},
+	{"agent.remember", "POST", "/api/agents/{id}/memories", []Caller{CallerOwner, CallerRemote}},
+	{"agent.forget", "DELETE", "/api/agents/{id}/memories/{memory}", []Caller{CallerOwner, CallerRemote}},
+	{"manager.memories", "GET", "/api/manager/memories", []Caller{CallerOwner, CallerRemote}},
+	{"manager.remember", "POST", "/api/manager/memories", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"manager.forget", "DELETE", "/api/manager/memories/{memory}", []Caller{CallerOwner, CallerRemote}},
+	{"manager.archive", "GET", "/api/manager/archive", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"manager.archiveFile", "GET", "/api/manager/archive/{name}", []Caller{CallerOwner, CallerRemote}},
+	{"skill.list", "GET", "/api/skills", []Caller{CallerOwner, CallerRemote}},
+	{"skill.save", "PUT", "/api/skills/{id}", []Caller{CallerOwner, CallerRemote}},
+	{"skill.delete", "DELETE", "/api/skills/{id}", []Caller{CallerOwner, CallerRemote}},
+	{"project.list", "GET", "/api/projects", []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"project.check", "POST", "/api/projects/check", []Caller{CallerOwner, CallerRemote}},
+	{"project.create", "POST", "/api/projects", []Caller{CallerOwner, CallerRemote}},
+	{"project.languages", "GET", "/api/projects/{id}/languages", []Caller{CallerOwner, CallerRemote}},
+	{"project.activity", "GET", "/api/projects/{id}/activity", []Caller{CallerOwner, CallerRemote}},
+	{"voice.session", "POST", "/api/voice/session", []Caller{CallerOwner, CallerRemote}},
+	{"voice.renew", "POST", "/api/voice/renew", []Caller{CallerOwner, CallerRemote}},
+	{"voice.start", "POST", "/api/voice/agent", []Caller{CallerOwner, CallerRemote}},
+	{"voice.stop", "POST", "/api/voice/agent/stop", []Caller{CallerOwner, CallerRemote}},
+	{"connector.list", "GET", "/api/connectors", []Caller{CallerOwner, CallerRemote}},
+	{"connector.login", "POST", "/api/connectors/{id}/login", []Caller{CallerOwner, CallerRemote}},
+	{"connector.verify", "POST", "/api/connectors/{id}/verify", []Caller{CallerOwner, CallerRemote}},
+	{"connector.logout", "POST", "/api/connectors/{id}/logout", []Caller{CallerOwner, CallerRemote}},
+	{"connector.channel", "PUT", "/api/connectors/{id}/channel", []Caller{CallerOwner, CallerRemote}},
+	{"lan.status", "GET", "/api/lan", []Caller{CallerOwner}},
+	{"lan.setOpen", "PUT", "/api/lan", []Caller{CallerOwner}},
+	{"lan.startPairing", "POST", "/api/lan/pairing", []Caller{CallerOwner}},
+	{"lan.stopPairing", "DELETE", "/api/lan/pairing", []Caller{CallerOwner}},
+	{"lan.answerPairing", "POST", "/api/lan/pairing/answer", []Caller{CallerOwner}},
+	{"lan.forgetDevice", "DELETE", "/api/lan/devices/{id}", []Caller{CallerOwner}},
+	{"lan.pair", "POST", "/api/lan/pair", []Caller{CallerOwner, CallerRemote}},
+	{"lan.me", "GET", "/api/lan/me", []Caller{CallerOwner, CallerRemote}},
+}
+
 // Mount routes every VibeValleyApi endpoint on mux to h: requests decoded, answers and tagged errors encoded (200 with
 // JSON, 204 when there is nothing to say, the error's own status).
 func Mount(mux *http.ServeMux, h Handlers) {

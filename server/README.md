@@ -71,7 +71,7 @@ HTTP（`handler`）在最上面，经 `Workspace` 用全部服务；`workspace` 
 
 ## 形状和规则从哪来
 
-形状和规则都只在这里的 `protocol` 包（[理由](../.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。形状写在 `shapes.go`：结构体、`type X string` 加常量的枚举、带标签的联合（`//vibevalley:union` 和成员上的 `//vibevalley:member`）、接口的错误（`//vibevalley:error`）；接口写在 `api.go` 的 `Handlers` 里，每个方法带 `//vibevalley:route`；数字 id 的路径参数写 `int64`（查询参数 `*int64`），生成的 `Mount` 解析，处理函数拿到的就是数字。改了它们跑：
+形状和规则都只在这里的 `protocol` 包（[理由](../.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。形状写在 `shapes.go`：结构体、`type X string` 加常量的枚举、带标签的联合（`//vibevalley:union` 和成员上的 `//vibevalley:member`）、接口的错误（`//vibevalley:error`）；接口写在 `api.go` 的 `Handlers` 里，每个方法带 `//vibevalley:route` 和 `//vibevalley:can`（谁能调：`owner`、`remote`、`manager`、`session`，写成 `protocol.Endpoints` 和 [能力表](../docs/reference/capabilities.md)，院门按它放行）；数字 id 的路径参数写 `int64`（查询参数 `*int64`），生成的 `Mount` 解析，处理函数拿到的就是数字。改了它们跑：
 
 ```bash
 go run ./tool/shapegen          # 写 protocol/gen.go 和 ../app/lib/gen/vibevalley.dart；-check 只查是不是最新
