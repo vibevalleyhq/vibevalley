@@ -280,6 +280,11 @@ func (a api) ManagerGetArchive(_ context.Context, name string) (string, error) {
 	return "", missing("旧账 " + name)
 }
 
+func (a api) ManagerMarkWrong(_ context.Context, body protocol.ManagerEvalRequest) (protocol.ManagerEval, error) {
+	eval, err := a.f.Manager.MarkWrong(body.On, body.Want)
+	return eval, refused(err)
+}
+
 func (a api) SkillList(context.Context) ([]protocol.Skill, error) { return a.f.Agent.Skills(), nil }
 
 func (a api) SkillSave(_ context.Context, id string, body protocol.Skill) (protocol.Skill, error) {

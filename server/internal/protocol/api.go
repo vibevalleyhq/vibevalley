@@ -191,6 +191,10 @@ type Handlers interface {
 	//vibevalley:route manager.getArchive GET /api/v1/manager/archive/{name}
 	//vibevalley:can owner remote
 	ManagerGetArchive(ctx context.Context, pName string) (string, error)
+	// Saves the turn begun at a step of the manager's log as a case for its evals, with what it should have done.
+	//vibevalley:route manager.markWrong POST /api/v1/manager/evals
+	//vibevalley:can owner remote
+	ManagerMarkWrong(ctx context.Context, body ManagerEvalRequest) (ManagerEval, error)
 	//vibevalley:route skill.list GET /api/v1/skills
 	//vibevalley:can owner remote
 	SkillList(ctx context.Context) ([]Skill, error)

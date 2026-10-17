@@ -8,7 +8,8 @@ import '../shared/memory_panels.dart';
 import '../shared/widgets.dart';
 import '../../shared/work_log.dart';
 import '../voice/voice_page.dart';
-import '../../gen/vibevalley.dart' show managerAgent;
+import '../../data/providers.dart';
+import '../../gen/vibevalley.dart' show managerAgent, ManagerEvalRequest;
 import '../../rules/cast.dart';
 
 const _tabs = [('memory', '记性'), ('trajectory', '轨迹'), ('archive', '旧账'), ('voice', '声音')];
@@ -44,9 +45,22 @@ class _ManagerPageState extends ConsumerState<ManagerPage> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('管家每一轮的经过：它收到的话、调的每个工具（点开看参数和结果）、它说的话。新的在下面，一直留着最近的 1000 步。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark600)),
+            Text(
+              '管家每一轮的经过：它收到的话、调的每个工具（点开看参数和结果）、它说的话。新的在下面，一直留着最近的 1000 步。哪一轮做错了，在它收到的话上点「这一轮做错了」，写一句应该怎样，存成一条评测。',
+              style: KitText.xs.copyWith(height: 1.625, color: Palette.bark600),
+            ),
             const SizedBox(height: 16),
-            const TrajectoryLog(id: managerAgent, asked: '收到', empty: '管家还没开过口。'),
+            TrajectoryLog(
+              id: managerAgent,
+              asked: '收到',
+              empty: '管家还没开过口。',
+              onMarkWrong: (step, want) => ref
+                  .read(apiProvider)
+                  .manager
+                  .markWrong(
+                    body: ManagerEvalRequest(on: step.toDouble(), want: want),
+                  ),
+            ),
           ],
         ),
       ),

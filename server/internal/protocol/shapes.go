@@ -891,6 +891,18 @@ type Skill struct {
 	Body        string `json:"body"`
 }
 
+// On is the seq of the user/message in the manager's log that began the wrong turn; Want is what the owner says it should have done.
+type ManagerEvalRequest struct {
+	On   int64  `json:"on"`
+	Want string `json:"want"`
+}
+
+// File is the case on disk, under the manager's home: evals/<id>.json.
+type ManagerEval struct {
+	ID   string `json:"id"`
+	File string `json:"file"`
+}
+
 type ArchiveListing struct {
 	Files []ArchiveFile `json:"files"`
 	Hits  []ArchiveHit  `json:"hits"`

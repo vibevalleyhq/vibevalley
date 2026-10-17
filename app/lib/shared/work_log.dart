@@ -23,8 +23,11 @@ double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
 
 typedef CommentOn = Future<void> Function(int step, String text);
 
+/// Saves the round its user/message `step` began as a case of the manager's evals; `want` is what it should have done.
+typedef MarkWrong = Future<ManagerEval> Function(int step, String want);
+
 class WorkLog extends StatefulWidget {
-  const WorkLog({super.key, required this.steps, required this.now, this.asked, this.tall = false, this.working = false, this.onComment});
+  const WorkLog({super.key, required this.steps, required this.now, this.asked, this.tall = false, this.working = false, this.onComment, this.onMarkWrong});
   final List<SessionEvent> steps;
   final double now;
 
@@ -35,6 +38,8 @@ class WorkLog extends StatefulWidget {
   final bool working;
 
   final CommentOn? onComment;
+
+  final MarkWrong? onMarkWrong;
 
   @override
   State<WorkLog> createState() => _WorkLogState();
@@ -49,6 +54,9 @@ class _WorkLogState extends State<WorkLog> {
   final _toggled = <int, bool>{};
 
   int? _marked;
+
+  /// The rounds marked wrong here, by their asked step's `n`: the case's file.
+  final _wrong = <int, String>{};
 
   @override
   void initState() {
@@ -169,17 +177,7 @@ class _WorkLogState extends State<WorkLog> {
               ),
             ),
           ),
-          if (asked != null) ...[
-            const SizedBox(height: 4),
-            _keyed(
-              asked,
-              Container(
-                color: Palette.wheat.withValues(alpha: .25),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: _Folded(text: asked.on != null ? commentWords(asked) : asked.text, lines: 4, markdown: false),
-              ),
-            ),
-          ],
+          if (asked != null) ...[const SizedBox(height: 4), _keyed(asked, _askedView(asked))],
           if (round.steps.isNotEmpty) ...[
             const SizedBox(height: 6),
             _TimeBar(
@@ -196,6 +194,18 @@ class _WorkLogState extends State<WorkLog> {
         ],
       ),
     );
+  }
+
+  Widget _askedView(SessionEvent asked) {
+    final box = Container(
+      color: Palette.wheat.withValues(alpha: .25),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: _Folded(text: asked.on != null ? commentWords(asked) : asked.text, lines: 4, markdown: false),
+    );
+    final mark = widget.onMarkWrong;
+    if (mark == null) return box;
+    final n = asked.seq.round();
+    return _Markable(step: n, send: mark, file: _wrong[n], onMarked: (file) => setState(() => _wrong[n] = file), child: box);
   }
 
   Widget _keyed(SessionEvent step, Widget child) {
@@ -280,6 +290,123 @@ class _CommentableState extends State<_Commentable> {
                 child: Text('你评论：${commentWords(c)}', style: KitText.xs.copyWith(color: Palette.bark800)),
               ),
             if (send != null && _writing) _CommentBox(step: widget.step, send: send, onDone: () => setState(() => _writing = false)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 这一轮做错了 floats over what began the round, as 评论 does over a step.
+class _Markable extends StatefulWidget {
+  const _Markable({required this.step, required this.send, required this.file, required this.onMarked, required this.child});
+  final int step;
+  final MarkWrong send;
+
+  /// The saved case; null until it is marked.
+  final String? file;
+  final ValueChanged<String> onMarked;
+  final Widget child;
+
+  @override
+  State<_Markable> createState() => _MarkableState();
+}
+
+class _MarkableState extends State<_Markable> {
+  bool _hover = false;
+  bool _tapped = false;
+  bool _writing = false;
+  bool _busy = false;
+  String _want = '';
+
+  Future<void> _submit() async {
+    final want = _want.trim();
+    if (want.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    final eval = await runAction(() => widget.send(widget.step, want));
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (eval != null) _writing = false;
+    });
+    if (eval != null) widget.onMarked(eval.file);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final file = widget.file;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Listener(
+        onPointerUp: _touchOnly ? (_) => setState(() => _tapped = true) : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              children: [
+                widget.child,
+                if (file == null && !_writing && (_hover || _tapped))
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      color: Palette.cream50,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SpriteIcon('icon-bug', size: 12),
+                          const SizedBox(width: 4),
+                          InlineLink('这一轮做错了', onTap: () => setState(() => _writing = true)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            if (file != null)
+              Tooltip(
+                message: file,
+                child: Container(
+                  margin: const EdgeInsets.only(top: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  color: Palette.berry.withValues(alpha: .12),
+                  child: Row(
+                    children: [
+                      const SpriteIcon('icon-bug', size: 12),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text('标成了做错的一轮，存成了一条评测', style: KitText.xs.copyWith(color: Palette.bark800)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_writing)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: PxTextInput(
+                        value: _want,
+                        onChanged: (v) => setState(() => _want = v),
+                        onSubmitted: (_) => _submit(),
+                        autofocus: true,
+                        enabled: !_busy,
+                        placeholder: '它应该怎样：比如「先问我是哪个项目，别直接派活」',
+                        semanticLabel: '这一轮应该怎样',
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    PxButton.text('记下', tone: PxTone.primary, size: PxSize.sm, onPressed: _busy || _want.trim().isEmpty ? null : _submit),
+                    const SizedBox(width: 6),
+                    PxButton.text('算了', size: PxSize.sm, onPressed: _busy ? null : () => setState(() => _writing = false)),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -703,10 +830,11 @@ class _Pre extends StatelessWidget {
 }
 
 class TrajectoryLog extends ConsumerWidget {
-  const TrajectoryLog({super.key, required this.id, this.asked, this.empty = '还没有动静。'});
+  const TrajectoryLog({super.key, required this.id, this.asked, this.empty = '还没有动静。', this.onMarkWrong});
   final String id;
   final String? asked;
   final String empty;
+  final MarkWrong? onMarkWrong;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -714,7 +842,7 @@ class TrajectoryLog extends ConsumerWidget {
     final steps = log.value;
     if (steps == null) return EmptyNote(log.hasError ? reasonOf(log.error!) : '在读……');
     if (steps.isEmpty) return EmptyNote(empty);
-    return WorkLog(steps: steps, now: _now(), asked: asked, tall: true);
+    return WorkLog(steps: steps, now: _now(), asked: asked, tall: true, onMarkWrong: onMarkWrong);
   }
 }
 

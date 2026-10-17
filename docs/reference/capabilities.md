@@ -26,6 +26,7 @@
 | `manager.hear` | `POST /api/v1/manager/hear` | ✓ | ✓ |  |  |
 | `manager.listArchive` | `GET /api/v1/manager/archive` | ✓ | ✓ | ✓ |  |
 | `manager.getArchive` | `GET /api/v1/manager/archive/{name}` | ✓ | ✓ |  |  |
+| `manager.markWrong` | `POST /api/v1/manager/evals` | ✓ | ✓ |  |  |
 
 ## setting
 

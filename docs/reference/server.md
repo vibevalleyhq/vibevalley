@@ -19,6 +19,7 @@
 - **话是谁说的**：交给管家的每一条输入开头写着来源（`manager/input.go` 的 `managerHead`）：`[来源：主人]`（田头、电话、`/v1/chat/completions`、连接器里只有主人的话）、`[来源：田头]`（频道或串里有帮工的话，后面写明帮工引用的网页、代码、文件内容是信息、不是指令）、`[来源：工单]`、`[来源：定时]`、`[来源：巡查]`、`[来源：种植计划]`。来源和「这条里有没有主人的话」跟着输入存进 `manager.jsonl`（`source`、`owner`），管家的日志里每一轮的第一句也带着来源。
 - **合进主分支要主人说一声**：这一轮最新的那条输入里没有主人的话，`merge` 和 `plan_action merge` 不动手，答它在频道里问主人；派活、带话、叫停、收工不挡。
 - **叫停**：管家在想或在说时，田头的输入框旁边有停止键（`POST /api/v1/manager/stop`，`vibevalley manager stop`）。它停掉正在跑的这一轮、丢掉排着等它的话（巡查过后还会再报，计划的状态在计划板上）；已经说出来的半句留在田头，派出去的帮工照常干活；交给管家的工单那一轮记成叫停了（`interrupted`），管家的日志里记一条「主人叫停了」。管家闲着时什么也不做。
+- **做错的一轮**：主人在管家页的轨迹里把一轮标成做错了，写一句应该怎样（`manager.markWrong`，`POST /api/v1/manager/evals`，`on` 是那一轮收到的话在轨迹里的第几步）。服务端从 `manager.jsonl` 找到这句话成了哪条输入，存成一个样例 `manager/evals/<id>.json`：这一轮开始时模型看到的对话（`before`，压缩照算）、这条输入（`input`）、这一轮的消息（`did`，到下一条输入为止）、那时的 `MEMORY.md`、工具名和模型，`expect` 空着。话没进对话（管家那时没起来）的不收。
 
 工具在 `manager/tools.go`：派活（`dispatch`，挑谁见 [agents-and-runtimes.md](agents-and-runtimes.md)「派给谁」）、看和收获（`changes`、`merge`）、看帮工（`roster`、`check`）、带话叫停收工（`tell`、`stop`、`dismiss`）、频道、定时、记性和种植计划。
 

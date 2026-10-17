@@ -2238,6 +2238,7 @@ var Endpoints = []Endpoint{
 	{"memory.delete", "DELETE", "/api/v1/memories/{agent}/{memory}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"manager.listArchive", "GET", "/api/v1/manager/archive", []string{"q"}, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"manager.getArchive", "GET", "/api/v1/manager/archive/{name}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"manager.markWrong", "POST", "/api/v1/manager/evals", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"skill.list", "GET", "/api/v1/skills", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"skill.save", "PUT", "/api/v1/skills/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"skill.delete", "DELETE", "/api/v1/skills/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2618,6 +2619,14 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	mux.HandleFunc("GET /api/v1/manager/archive/{name}", func(w http.ResponseWriter, r *http.Request) {
 		pName := r.PathValue("name")
 		out, err := h.ManagerGetArchive(r.Context(), pName)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/v1/manager/evals", func(w http.ResponseWriter, r *http.Request) {
+		var body ManagerEvalRequest
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.ManagerMarkWrong(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/v1/skills", func(w http.ResponseWriter, r *http.Request) {
@@ -3164,6 +3173,12 @@ func (c *Client) ManagerListArchive(ctx context.Context, pQ *string) (ArchiveLis
 func (c *Client) ManagerGetArchive(ctx context.Context, pName string) (string, error) {
 	var out string
 	err := c.call(ctx, "GET", "/api/v1/manager/archive/"+url.PathEscape(pName), nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) ManagerMarkWrong(ctx context.Context, body ManagerEvalRequest) (ManagerEval, error) {
+	var out ManagerEval
+	err := c.call(ctx, "POST", "/api/v1/manager/evals", nil, body, &out)
 	return out, err
 }
 

@@ -2171,6 +2171,28 @@ class Skill {
   Map<String, dynamic> toJson() => {'id': id, 'name': name, 'description': description, 'body': body};
 }
 
+class ManagerEvalRequest {
+  const ManagerEvalRequest({required this.on, required this.want});
+
+  factory ManagerEvalRequest.fromJson(Map<String, dynamic> j) => ManagerEvalRequest(on: (j['on'] as num).toDouble(), want: j['want'] as String);
+
+  final double on;
+  final String want;
+
+  Map<String, dynamic> toJson() => {'on': on, 'want': want};
+}
+
+class ManagerEval {
+  const ManagerEval({required this.id, required this.file});
+
+  factory ManagerEval.fromJson(Map<String, dynamic> j) => ManagerEval(id: j['id'] as String, file: j['file'] as String);
+
+  final String id;
+  final String file;
+
+  Map<String, dynamic> toJson() => {'id': id, 'file': file};
+}
+
 class ArchiveListing {
   const ArchiveListing({required this.files, required this.hits});
 
@@ -5034,6 +5056,12 @@ class ManagerApi {
   Future<String> getArchive({required String name}) async {
     final j = await _api._call('GET', '/api/v1/manager/archive/${Uri.encodeComponent((name).toString())}', query: {}, body: null);
     return j as String;
+  }
+
+  /// Saves the turn begun at a step of the manager's log as a case for its evals, with what it should have done.
+  Future<ManagerEval> markWrong({required ManagerEvalRequest body}) async {
+    final j = await _api._call('POST', '/api/v1/manager/evals', query: {}, body: body.toJson());
+    return ManagerEval.fromJson(j as Map<String, dynamic>);
   }
 }
 

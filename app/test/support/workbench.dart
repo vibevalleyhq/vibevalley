@@ -198,6 +198,8 @@ class WorkbenchBackend {
         return jsonResponse(q == null ? ArchiveListing(files: archive.files, hits: const []).toJson() : archive.toJson());
       case ('GET', ['api', 'manager', 'archive', final name]):
         return jsonResponse(archiveFiles[name] ?? '');
+      case ('POST', ['api', 'manager', 'evals']):
+        return jsonResponse(const ManagerEval(id: 'e1', file: '/home/me/.vibevalley/manager/evals/e1.json').toJson());
       case ('GET', ['api', 'sessions']):
         final agent = r.url.queryParameters['agent'];
         return jsonResponse([

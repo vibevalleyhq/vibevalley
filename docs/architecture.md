@@ -112,7 +112,7 @@ flowchart LR
 | `sessions.json` | 只有服务端需要的：每个帮工的项目目录或 worktree、农机自己的会话 id、最后一轮的完整原话 |
 | `events/<id>.json` | 每个 Session 的事件日志（走了留 30 天；是谁、为哪张工单、怎么关的在库里的 `session` 表，一直留着）；管家的是 `manager.json` |
 | `spend.json` | 今天每台农机花了多少 |
-| `manager/` | 管家（VibeValley 自己的 agent）：对话 `manager.jsonl`、记性 `MEMORY.md`、压掉的旧对话 `archive/` |
+| `manager/` | 管家（VibeValley 自己的 agent）：对话 `manager.jsonl`、记性 `MEMORY.md`、压掉的旧对话 `archive/`、主人标出的做错的一轮 `evals/` |
 | `logs/` | smith 记的每个帮工会话的原始记录 |
 | `vibevalley.yaml` | 可选：配置（见下）；放钥匙时不进仓库 |
 

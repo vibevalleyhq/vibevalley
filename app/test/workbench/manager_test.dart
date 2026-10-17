@@ -121,6 +121,24 @@ void main() {
       expect(find.text('12 passed'), findsOneWidget);
     });
 
+    testWidgets('这一轮做错了 saves the round as a case with what it should have done, and marks it', (t) async {
+      final server = _server();
+      await pumpPage(t, const ManagerPage(tab: 'trajectory'), server.handle);
+      await t.tap(find.text('帮我跑测试'));
+      await t.pump();
+      await t.tap(find.text('这一轮做错了'));
+      await t.pump();
+      await typeInto(t, '这一轮应该怎样', '先问我是哪个项目');
+      await t.tap(find.text('记下'));
+      await settle(t);
+      final post = server.writes.single;
+      expect(post.method, 'POST');
+      expect(post.path, '/api/v1/manager/evals');
+      expect(post.body, {'on': 1, 'want': '先问我是哪个项目'});
+      expect(find.text('标成了做错的一轮，存成了一条评测'), findsOneWidget);
+      expect(find.text('这一轮做错了'), findsNothing);
+    });
+
     testWidgets('a step event adds to the trajectory as it comes', (t) async {
       final server = _server();
       final events = StreamController<LiveEvent>.broadcast();
