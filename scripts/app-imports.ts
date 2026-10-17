@@ -3,6 +3,8 @@
  * the order in `app/lib`; `workbench` and `farm` are the two skins, `village` draws the farm for them, `phone` is the phone
  * inside the farm, `app` only composes and `shell` is the frame around everything.
  *
+ * A vendor's SDK stays in the one folder that adapts it (VENDOR): the rest of the client sees our own types.
+ *
  * Run by `bun run flutter:check`; a bad edge names the file, the line, and both ends.
  */
 
@@ -32,6 +34,11 @@ const RANK: Record<string, number> = {
   app: 11,
 }
 
+// Agora is one way to make a call: only lib/voice talks to its SDK.
+const VENDOR: Record<string, string> = {
+  agora_rtc_engine: 'lib/voice/',
+}
+
 interface Edge {
   from: string
   to: string
@@ -41,6 +48,7 @@ interface Edge {
 
 const files = globSync('lib/**/*.dart', { cwd: root })
 const edges: Edge[] = []
+const strays: string[] = []
 const importLine = /import\s+'([^']+)'/g
 for (const file of files) {
   const layer = file.split('/')[1]
@@ -49,6 +57,10 @@ for (const file of files) {
   for (const [i, line] of lines.entries()) {
     for (const match of line.matchAll(importLine)) {
       const spec = match[1]
+      const vendor = spec.startsWith('package:') ? spec.slice('package:'.length).split('/')[0] : ''
+      if (vendor in VENDOR && !file.startsWith(VENDOR[vendor])) {
+        strays.push(`app-imports: ${file}:${i + 1}: ${vendor} only belongs in ${VENDOR[vendor]}`)
+      }
       let target: string
       if (spec.startsWith('package:vibevalley/')) target = spec.slice('package:vibevalley/'.length).split('/')[0]
       else if (spec.startsWith('.')) {
@@ -64,5 +76,6 @@ for (const file of files) {
 for (const e of edges) {
   console.error(`app-imports: ${e.file}:${e.line}: ${e.from} -> ${e.to} goes up the layers (${e.to} must sit below ${e.from})`)
 }
-if (edges.length > 0) process.exit(1)
+for (const s of strays) console.error(s)
+if (edges.length > 0 || strays.length > 0) process.exit(1)
 console.log(`app-imports: ${files.length} files ok`)

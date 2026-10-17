@@ -75,11 +75,12 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 | 层 | Agora 只能出现在 | 其他地方看到的 |
 |---|---|---|
-| 服务端 | `server/pkg/agora`（令牌、请 agent、vendors 的构造）和 `server/internal/voice/agora.go`（把通话设置翻译成 `pkg/agora` 的参数） | `voice.Service` 的 `Session`、`Renew`、`Start`、`Stop` |
-| 客户端 | `app/lib/voice/agora.dart`（引擎、进频道、data stream）和 `app/lib/voice/agora_captions.dart`（分块格式） | `VoiceCall`：阶段、字幕、两条音量、管家的状态 |
+| 服务端 | `server/pkg/agora`（令牌、请 agent）和 `server/internal/voice/agora.go`（把通话设置翻译成 Agora 的 vendors 和参数） | `voice.Service` 的 `Session`、`Renew`、`Start`、`Stop` |
+| 客户端 | `app/lib/voice/`（`voice.dart` 里的引擎、`captions.dart` 的分块格式） | `VoiceCall`：阶段、字幕、两条音量、管家的状态 |
 
-- `internal/voice/agora.go` 不再 import `agentkit/vendors`；`pkg/agora` 不 import `protocol`。
-- 检查：服务端的 Go 测试扫 import，`github.com/AgoraIO/` 只在上表两处；`scripts/app-imports.ts` 加一条，`package:agora_rtc_engine` 只在 `app/lib/voice/agora*.dart`。
+- 检查：`server/internal/voice/agora_boundary_test.go` 扫整个 `server/` 的 import，`github.com/AgoraIO/` 只在上表两处；`scripts/app-imports.ts` 的 `VENDOR`，`package:agora_rtc_engine` 只在 `app/lib/voice/`。
+- vendors 的构造留在 `voice/agora.go`：它要读 `protocol` 的设置，搬进 `pkg/agora` 就得在那边再写一份同样的选项类型。
+- 客户端不再拆文件：`VoiceCall` 直接持有 `RtcEngine`，测试也伪造它（`app/test/voice/lifecycle_test.dart`）；拆成 `agora.dart` 就要在中间造一个只有一个实现的接口。界面只用 `VoiceCall`，边界已经在 `lib/voice/` 这一层。
 - 通话里的识别和合成仍由 Agora 调。断句、打断和识别绑在一起，拆出来就要自己做实时链路。
 - 现在不抽「实时平台」接口：第二家真要接时再抽。能换平台的关键是第 1 节的 OpenAI 接口，不是 Go 里的接口。
 
@@ -124,7 +125,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 每步单独一个改动，各自能过检查：
 
 1. **OpenAI 协议层**（第 1 节）：从 `line.go` 搬进 `pkg/agent`，语音线路改用它，加 `/v1/chat/completions`。语音的行为不变。
-2. **收拢 Agora 的代码**（第 2 节的表）：只挪代码、加 import 检查。
+2. **守住 Agora 的边界**（第 2 节的表）：加 import 检查，代码不挪。
 3. **电话进田头**（第 2 节的后半）：只改行为；改完更新 voice.md。
 4. **拆形状**（第 4 节的 `call`）：改 `protocol`、跑 `shapegen`、改声音页、改写旧的 `settings.json`。
 5. **听写**（第 3 节、第 4 节的 `dictation`）：先接一家云上的厂商和热词，再做整理，最后做本机的识别。
@@ -133,7 +134,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 ### 做到哪了
 
-2026-10-18 做了第 1 步：`pkg/agent/openai.go` 的 `ChatCompletions`，语音线路（`voice/line.go`）只剩路由和钥匙；主服务挂了 `protocol.ChatCompletionsPath`（`/v1/chat/completions`），模型名是 `protocol.ManagerModel`。管家的 `Call`（电话里的话，带语音的提示）和 `Answerer`（本机的 chat/completions，当作田头里的话）共用一个 `answer`：同一时间只流一个回答，新的一句结束上一个的流。
+2026-10-18 做了第 1 步：`pkg/agent/openai.go` 的 `ChatCompletions`，语音线路（`voice/line.go`）只剩路由和钥匙；主服务挂了 `protocol.ChatCompletionsPath`（`/v1/chat/completions`），模型名是 `protocol.ManagerModel`。同一天做了第 2 步：Agora 本来就只在上表的几处，加了两条检查守住它。管家的 `Call`（电话里的话，带语音的提示）和 `Answerer`（本机的 chat/completions，当作田头里的话）共用一个 `answer`：同一时间只流一个回答，新的一句结束上一个的流。
 
 待定：
 
@@ -160,7 +161,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 - `curl` 主服务的 `/v1/chat/completions`（`model: vibevalley-manager`、`stream: true`）能拿到管家的回答，SSE 以 `finish_reason: stop` 和 `[DONE]` 结束；`stream: false` 回一个完整的 `chat.completion`；不认识的 `model` 回 404。
 - `server/internal/voice/line.go` 里没有 OpenAI 协议的代码；语音线路的测试照旧通过。
-- `github.com/AgoraIO/` 只在 `server/pkg/agora` 和 `server/internal/voice/agora.go`，`package:agora_rtc_engine` 只在 `app/lib/voice/agora*.dart`；在别处加一行 import，`go test ./...` 或 `bun run app:imports` 报错。
+- `github.com/AgoraIO/` 只在 `server/pkg/agora` 和 `server/internal/voice/agora.go`，`package:agora_rtc_engine` 只在 `app/lib/voice/`；在别处加一行 import，`go test ./...` 或 `bun run app:imports` 报错。
 - `protocol` 里带 Agora 名字、或只有 Agora 才懂的字段，都在 `VoiceSettings.call` 下（和那张票、凭据）；`VoiceCaptions` 不在了。
 - 两种 `answer` 下打一通电话，挂了以后田头主频道里有主人说的每一句和对应的回答（照 `verify-server` 查频道的消息；真人说话照 `verify-app`）。
 - 听写：对着 WebSocket 送一段录好的中英混说的 PCM，`final` 里的项目名、档案名和农场里的写法一致；识别失败时输入框保留已有的字，并说明原因。
