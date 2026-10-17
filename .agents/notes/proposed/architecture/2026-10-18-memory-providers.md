@@ -75,7 +75,7 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 
 | 谁 | 从哪拿到 | 工具 | 范围 |
 |---|---|---|---|
-| 管家 | `internal/manager` 的工具表 | `memory_search`、`memory_add`，原来的 `rewrite_memory`、`search_archive` 照旧 | 主人和管家；可以查任何档案 |
+| 管家 | `internal/manager` 的工具表 | `memory_search`、`memory_add`，按 id 的 `memory_replace`、`memory_remove`（取代整份重写的 `rewrite_memory`），`search_archive` 照旧 | 主人和管家；可以查任何档案 |
 | 帮工 | 农场的 `/mcp`（`internal/mcp`，和 `channel_say` 并排） | `memory_search`、`memory_add` | 由会话的令牌定死：自己的档案和当前项目，写不进别人的 |
 
 - `memory_search` 走 `SearchAll`，`memory_add` 走 `AddAll`。
@@ -83,6 +83,8 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 - 来源自带的工具（Nowledge 的 `thread_search` 等）默认不给，设置里按来源单独打开；打开了由管理器替它注册、转发调用。
 
 ### 4. 本地来源：SQLite，FTS5 的 `bm25()`，gse 切词
+
+表结构、索引、排序和搬家写在[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)；这里只留选型。
 
 - **还用 SQLite**，形状照 Nowledge 扩：`title`、`labels`、`importance`、类型（记下的话、做过的活、偏好、流程……）、谁记的、取代了哪条（`supersede`，原来「差不多就不记」改成新的取代旧的）。表结构的改动照规矩加一个迁移，表名照「模块_概念」。
 - **检索**：一张 FTS5 的虚表放切好的词，`bm25()` 排序，再叠上现有的偏好（这个项目先于所有项目，新的先于旧的）。`modernc.org/sqlite` v1.60.1（SQLite 3.53.4）自带 FTS5 和 `bm25()`，2026-10-18 测过。
@@ -93,9 +95,9 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
   - 加载约 350 ms，第一次检索时再加载，或者开机后在后台加载。
 - `pick` 换成这条检索以后，「下回开工会想起什么」的预览和「快忘了」的标记照旧由本地算；外面的来源，预览直接问它，没有「快忘了」。
 
-### 5. 管家的 `MEMORY.md` 不动
+### 5. 管家的记性和主人画像也进本地来源
 
-它是拼进管家系统提示的一段固定文字，对应 Hermes 内置的 `MEMORY.md`，由本地来源的 `SystemPromptBlock` 给出。以后把外面来源里关于主人的部分（Nowledge 的 `read_context_bundle`、EverOS 的 user profile）也经 `SystemPromptBlock` 拼进去，对应 Hermes 的 `USER.md`。这一步不在本提案里。
+本地来源的表、索引、查询和搬家见[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)：管家的 `MEMORY.md` 拆成所有 agent 共享的主人画像和管家自己的记忆，都在同一张表里，由本地来源的 `SystemPromptBlock` 给出（对应 Hermes 内置的 `USER.md` 和 `MEMORY.md`）。以后把外面来源里关于主人的部分（Nowledge 的 `read_context_bundle`、EverOS 的 user profile）也经 `SystemPromptBlock` 拼进去，那一步不在本提案里。
 
 ### 步骤
 
