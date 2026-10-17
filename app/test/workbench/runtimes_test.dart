@@ -124,13 +124,13 @@ void main() {
   });
 
   testWidgets('a runtime pushed by the server replaces the one shown', (t) async {
-    final events = StreamController<SideEvent>();
+    final events = StreamController<LiveEvent>();
     addTearDown(events.close);
     await pumpPage(t, const RuntimesPage(id: 'claude'), backend().handle, events: events.stream);
     expect(find.text('1.2.3 · 1 个 agent'), findsOneWidget);
     final next = runtimeJson('claude');
     (next['installation'] as Map)['version'] = '2.0.0';
-    events.add(SideEventRuntime(at: 0, info: RuntimeInfo.fromJson(next)));
+    events.add(LiveEventRuntime(at: 0, info: RuntimeInfo.fromJson(next)));
     await settle(t);
     expect(find.text('2.0.0 · 1 个 agent'), findsOneWidget);
   });

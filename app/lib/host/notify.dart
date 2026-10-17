@@ -79,8 +79,8 @@ HostNotice? noticeForEffect(GameEffect effect) {
   return HostNotice('$what：${tierTitle(a, tier)}', clipLine(a.detail), const HostOpenAchievements());
 }
 
-HostNotice? noticeForEvent(SideEvent event) => switch (event) {
-  SideEventNotice(level: NoticeLevel.error, :final text) => HostNotice('码农场物语', clipLine(text)),
+HostNotice? noticeForEvent(LiveEvent event) => switch (event) {
+  LiveEventNotice(level: NoticeLevel.error, :final text) => HostNotice('码农场物语', clipLine(text)),
   _ => null,
 };
 

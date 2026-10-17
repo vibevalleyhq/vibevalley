@@ -89,11 +89,13 @@ flowchart LR
 
 ## 事件流
 
-`GET /api/v1/events`（server-sent events）：连上先发一条 `snapshot`（整份核心状态），之后发事实，以及几样核心状态之外的：轨迹的一步（`step`）、提醒（`notice`）、农机变了（`runtime`）。断线重连又从快照开始。Flutter 读帧，只从这条流取核心状态之外的那几样。事实的种类见 `shapes.go` 的 `Fact`；帮工的会话事件怎么变成事实见 [server.md](reference/server.md)「帮工」。
+`GET /api/v1/events`（server-sent events）：连上先发一条 `snapshot`（整份核心状态），之后发事实，以及几样核心状态之外的：轨迹的一步（`step`）、提醒（`notice`）、农机变了（`runtime`）。断线重连又从快照开始。这条流留给命令行和调试。
+
+`GET /api/v1/live`（server-sent events）是 Flutter 的窄流：只发 `LiveEvent` 的三种成员（`SessionEvent`、`Notice`、`Runtime`），不发事实、不发快照；状态仍由 `/api/v1/state` 给。事实的种类见 `shapes.go` 的 `Fact`；帮工的会话事件怎么变成事实见 [server.md](reference/server.md)「帮工」。
 
 ## HTTP 接口
 
-接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](../.agents/notes/implemented/architecture/2026-10-17-api-versioned-paths.md)）。不在里面的三个：`/api/v1/events`、`/api/v1/state` 两条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[server.md](reference/server.md)「田头」）。`//vibevalley:can` 写谁能调，院门只放 `remote` 的（[能力表](reference/capabilities.md)、[server.md](reference/server.md)「院门」）。
+接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](../.agents/notes/implemented/architecture/2026-10-17-api-versioned-paths.md)）。不在里面的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[server.md](reference/server.md)「田头」）。`//vibevalley:can` 写谁能调，院门只放 `remote` 的（[能力表](reference/capabilities.md)、[server.md](reference/server.md)「院门」）。
 
 ## 存了什么
 

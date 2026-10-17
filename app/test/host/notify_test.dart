@@ -71,8 +71,8 @@ void main() {
     expect(noticeForEffect(const GameEffectAchievement(achievement: 'steady', tier: 3))!.title, '升到金牌：金牌稳如老农');
     expect(noticeForEffect(const GameEffectAchievement(achievement: 's_hire', tier: 1))!.title, '新手任务做完了：派活');
     expect(noticeForEffect(const GameEffectAchievement(achievement: 'unknown', tier: 1)), isNull);
-    expect(noticeForEvent(const SideEventNotice(at: 0, level: NoticeLevel.error, text: '数据库\n坏了')), const HostNotice('码农场物语', '数据库 坏了'));
-    expect(noticeForEvent(const SideEventNotice(at: 0, level: NoticeLevel.info, text: 'hi')), isNull);
+    expect(noticeForEvent(const LiveEventNotice(at: 0, level: NoticeLevel.error, text: '数据库\n坏了')), const HostNotice('码农场物语', '数据库 坏了'));
+    expect(noticeForEvent(const LiveEventNotice(at: 0, level: NoticeLevel.info, text: 'hi')), isNull);
   });
 
   test('the menu bar: what goes on, what waits, what is unread', () {

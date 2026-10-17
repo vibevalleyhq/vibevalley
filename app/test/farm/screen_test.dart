@@ -64,7 +64,7 @@ void main() {
             stateFrameProvider.overrideWith((ref) => Stream.value(frame)),
             agentsProvider.overrideWithValue(AsyncData(const <String, Agent>{})),
             streamProblemProvider.overrideWith((ref) => const Stream<String>.empty()),
-            sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
+            sideEventsProvider.overrideWith((ref) => const Stream<LiveEvent>.empty()),
             farmEffectsProvider.overrideWithValue(const Stream<GameEffect>.empty()),
             hostProvider.overrideWithValue(Desktop.none),
             runtimesProvider.overrideWithValue(

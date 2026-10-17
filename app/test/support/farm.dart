@@ -107,7 +107,7 @@ List<Override> overrides(CoreState state, FarmView v, VibeValleyApi api, {Map<St
     stateFrameProvider.overrideWith((ref) => Stream.value(frame)),
     agentsProvider.overrideWithValue(AsyncData(agents)),
     runtimesProvider.overrideWithValue(AsyncData(const <RuntimeInfo>[])),
-    sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
+    sideEventsProvider.overrideWith((ref) => const Stream<LiveEvent>.empty()),
     streamProblemProvider.overrideWith((ref) => const Stream<String>.empty()),
     apiProvider.overrideWithValue(api),
     farmEffectsProvider.overrideWithValue(const Stream<GameEffect>.empty()),

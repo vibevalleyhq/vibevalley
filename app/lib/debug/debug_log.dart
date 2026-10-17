@@ -60,12 +60,10 @@ class DebugLogNotifier extends Notifier<DebugLog> {
   String export() => state.entries.map((e) => jsonEncode(e.json())).join('\n');
 }
 
-String sideType(SideEvent e) => switch (e) {
-  SideEventSessionEvent() => 'step',
-  SideEventNotice() => 'notice',
-  SideEventRuntime() => 'runtime',
-  SideEventSnapshot() => 'snapshot',
-  Fact() => 'fact',
+String sideType(LiveEvent e) => switch (e) {
+  LiveEventSession() => 'step',
+  LiveEventNotice() => 'notice',
+  LiveEventRuntime() => 'runtime',
 };
 
 String _cut(String s, int n) => s.length > n ? s.substring(0, n) : s;
@@ -86,10 +84,8 @@ String _phaseTag(Phase p) => switch (p) {
   PhaseClosed() => 'closed',
 };
 
-String sideSummary(SideEvent e) => switch (e) {
-  SideEventSessionEvent(:final id, :final activity) => '$id #${activity.seq.round()} ${activity.type.wire}: ${_cut(activity.text, 80)}',
-  SideEventNotice(:final level, :final text) => '${level.wire}: $text',
-  SideEventRuntime(:final info) => '${info.id}: ${info.quota?.text ?? ''}',
-  SideEventSnapshot() => 'snapshot',
-  Fact() => e.toJson()['type'].toString(),
+String sideSummary(LiveEvent e) => switch (e) {
+  LiveEventSession(:final id, :final activity) => '$id #${activity.seq.round()} ${activity.type.wire}: ${_cut(activity.text, 80)}',
+  LiveEventNotice(:final level, :final text) => '${level.wire}: $text',
+  LiveEventRuntime(:final info) => '${info.id}: ${info.quota?.text ?? ''}',
 };

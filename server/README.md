@@ -1,6 +1,6 @@
 # server：VibeValley 的服务端
 
-VibeValley 唯一的服务端：答 VibeValleyApi、`/api/v1/events`、`/api/v1/state` 和 `/mcp`，给 Flutter 客户端。`workspace` 是一个库，`cmd/server` 单独跑它；Flutter 的 macOS 应用把 `cmd/server` 编进应用、开机拉起（[desktop.md](../docs/reference/desktop.md)）。行为见 [docs/reference/server.md](../docs/reference/server.md)；为什么用 Go、建在 smith 上见 [服务端用 Go 重写](../.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)。
+VibeValley 唯一的服务端：答 VibeValleyApi、`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 和 `/mcp`，给 Flutter 客户端。`workspace` 是一个库，`cmd/server` 单独跑它；Flutter 的 macOS 应用把 `cmd/server` 编进应用、开机拉起（[desktop.md](../docs/reference/desktop.md)）。行为见 [docs/reference/server.md](../docs/reference/server.md)；为什么用 Go、建在 smith 上见 [服务端用 Go 重写](../.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)。
 
 Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite`）。
 

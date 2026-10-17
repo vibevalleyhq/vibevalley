@@ -356,7 +356,7 @@ func (l *Service) Me(ctx context.Context) (protocol.LanDevice, error) {
 	return protocol.LanDevice{}, protocol.LanRefused{Reason: "这里就是农场本机，不是经院门来的设备"}
 }
 
-// Only what api.go marks vibevalley:can remote, and the two streams, which are not Handlers.
+// Only what api.go marks vibevalley:can remote, and the three streams, which are not Handlers.
 func (l *Service) gate(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
@@ -516,6 +516,7 @@ var remoteRoutes = func() *http.ServeMux {
 	}
 	mux.Handle("GET /api/v1/state", ok)
 	mux.Handle("GET /api/v1/events", ok)
+	mux.Handle("GET /api/v1/live", ok)
 	return mux
 }()
 

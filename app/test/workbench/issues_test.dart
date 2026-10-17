@@ -222,7 +222,7 @@ void main() {
           plansProvider.overrideWithValue(const [
             Playbook(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: PlaybookState.draft, nodes: [], parallel: 1, createdAt: 0),
           ]),
-          sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
+          sideEventsProvider.overrideWith((ref) => const Stream<LiveEvent>.empty()),
         ],
         child: MaterialApp(
           theme: farmTheme(),
@@ -316,7 +316,7 @@ void main() {
           apiProvider.overrideWithValue(api),
           _issuesNow.overrideWith(() => _Issues()..seed = issues),
           stateProvider.overrideWith((ref) => fakes.farm(issues: ref.watch(_issuesNow))),
-          sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
+          sideEventsProvider.overrideWith((ref) => const Stream<LiveEvent>.empty()),
         ],
         child: MaterialApp(
           theme: farmTheme(),

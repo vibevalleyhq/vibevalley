@@ -39,12 +39,12 @@ void main() {
 
   group('FxLayer', () {
     late StreamController<GameEffect> effects;
-    late StreamController<SideEvent> notices;
+    late StreamController<LiveEvent> notices;
     late ToastManager manager;
 
     setUp(() {
       effects = StreamController<GameEffect>.broadcast();
-      notices = StreamController<SideEvent>.broadcast();
+      notices = StreamController<LiveEvent>.broadcast();
       manager = ToastManager();
     });
 
@@ -99,8 +99,8 @@ void main() {
 
     testWidgets('notices become toasts titled by their level', (tester) async {
       await show(tester);
-      notices.add(SideEventNotice(at: 0, level: NoticeLevel.fromJson('warn'), text: '地里种满了'));
-      notices.add(SideEventNotice(at: 0, level: NoticeLevel.fromJson('error'), text: '模型调用失败'));
+      notices.add(LiveEventNotice(at: 0, level: NoticeLevel.fromJson('warn'), text: '地里种满了'));
+      notices.add(LiveEventNotice(at: 0, level: NoticeLevel.fromJson('error'), text: '模型调用失败'));
       await tester.pump();
       expect(manager.toasts.map((t) => (t.type, t.title, t.description)), [('error', '出错了', '模型调用失败'), ('warn', '没派成', '地里种满了')]);
       expect(manager.toasts.first.timeout, const Duration(milliseconds: 7000));

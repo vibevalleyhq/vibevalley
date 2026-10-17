@@ -2022,6 +2022,80 @@ func (v SideEventRuntime) MarshalJSON() ([]byte, error) {
 	return withTag(p, "type", "runtime")
 }
 
+// LiveEventValue is a member of LiveEvent: LiveEventSession, LiveEventNotice, LiveEventRuntime, told apart by "type".
+type LiveEventValue interface{ isLiveEvent() }
+
+func (u LiveEvent) IsZero() bool { return u.Value == nil }
+
+func (u LiveEvent) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+func (u *LiveEvent) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		u.Value = nil
+		return nil
+	}
+	var head struct {
+		Tag string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &head); err != nil {
+		return err
+	}
+	var err error
+	switch head.Tag {
+	case "event":
+		var v LiveEventSession
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "notice":
+		var v LiveEventNotice
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "runtime":
+		var v LiveEventRuntime
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	default:
+		return fmt.Errorf("LiveEvent: unknown type %q", head.Tag)
+	}
+	return err
+}
+
+// LiveEventMembers are every member of LiveEvent, each zero, in the protocol's order: a test can see that a switch meant to
+// handle every one of them does.
+var LiveEventMembers = []LiveEventValue{LiveEventSession{}, LiveEventNotice{}, LiveEventRuntime{}}
+
+func (LiveEventSession) isLiveEvent() {}
+
+func (v LiveEventSession) MarshalJSON() ([]byte, error) {
+	type plain LiveEventSession
+	p := plain(v)
+
+	return withTag(p, "type", "event")
+}
+
+func (LiveEventNotice) isLiveEvent() {}
+
+func (v LiveEventNotice) MarshalJSON() ([]byte, error) {
+	type plain LiveEventNotice
+	p := plain(v)
+
+	return withTag(p, "type", "notice")
+}
+
+func (LiveEventRuntime) isLiveEvent() {}
+
+func (v LiveEventRuntime) MarshalJSON() ([]byte, error) {
+	type plain LiveEventRuntime
+	p := plain(v)
+
+	return withTag(p, "type", "runtime")
+}
+
 func (e Refused) Error() string { return e.Reason }
 
 func (Refused) HTTPStatus() int { return 409 }

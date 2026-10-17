@@ -57,7 +57,7 @@ class FxLayer extends ConsumerStatefulWidget {
 
   final Stream<GameEffect>? effects;
 
-  final Stream<SideEvent>? notices;
+  final Stream<LiveEvent>? notices;
 
   final VoiceCall? call;
 
@@ -100,8 +100,8 @@ class _FxLayerState extends ConsumerState<FxLayer> {
     super.dispose();
   }
 
-  void _notice(SideEvent e) {
-    if (e is! SideEventNotice) return;
+  void _notice(LiveEvent e) {
+    if (e is! LiveEventNotice) return;
     final level = e.level.wire;
     _toasts.add(
       type: level,

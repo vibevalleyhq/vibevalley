@@ -49,7 +49,7 @@ class FakeServer extends VibeValleyServer {
   final Handle _handle;
   final requests = <http.Request>[];
   final frameFeed = StreamController<ReceivedFrame>.broadcast();
-  final sideFeed = StreamController<SideEvent>.broadcast();
+  final sideFeed = StreamController<LiveEvent>.broadcast();
 
   late final VibeValleyApi _api = VibeValleyApi(
     base,
@@ -66,7 +66,7 @@ class FakeServer extends VibeValleyServer {
   Stream<ReceivedFrame> get frames => frameFeed.stream;
 
   @override
-  Stream<SideEvent> get sideEvents => sideFeed.stream;
+  Stream<LiveEvent> get sideEvents => sideFeed.stream;
 
   @override
   Future<bool> healthy() async => true;

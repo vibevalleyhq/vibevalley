@@ -1989,3 +1989,42 @@ type ConnectorRefused struct {
 type LanRefused struct {
 	Reason string `json:"reason"`
 }
+
+// The client's own stream: only what it cannot fold from a StateFrame. The facts stay on SideEvent for the CLI.
+//
+//vibevalley:union type
+type LiveEvent struct{ Value LiveEventValue }
+
+//vibevalley:member LiveEvent event
+type LiveEventSession struct {
+	At       int64        `json:"at"`
+	ID       string       `json:"id"`
+	Activity SessionEvent `json:"activity"`
+}
+
+//vibevalley:member LiveEvent notice
+type LiveEventNotice struct {
+	At    int64       `json:"at"`
+	Level NoticeLevel `json:"level"`
+	Text  string      `json:"text"`
+}
+
+//vibevalley:member LiveEvent runtime
+type LiveEventRuntime struct {
+	At   int64       `json:"at"`
+	Info RuntimeInfo `json:"info"`
+}
+
+// LiveEventOf turns a side event into the client's narrower stream; facts and the snapshot are not part of it.
+func LiveEventOf(e SideEvent) (LiveEvent, bool) {
+	switch v := e.Value.(type) {
+	case SideEventSessionEvent:
+		return LiveEvent{Value: LiveEventSession{At: v.At, ID: v.ID, Activity: v.SessionEvent}}, true
+	case SideEventNotice:
+		return LiveEvent{Value: LiveEventNotice{At: v.At, Level: v.Level, Text: v.Text}}, true
+	case SideEventRuntime:
+		return LiveEvent{Value: LiveEventRuntime{At: v.At, Info: v.Info}}, true
+	default:
+		return LiveEvent{}, false
+	}
+}

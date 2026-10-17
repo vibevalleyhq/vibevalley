@@ -20,7 +20,7 @@ func (s *shapes) capabilities() string {
 | 管家 | 管家 | 管家的工具 |
 | Session | 帮工 | 带钥匙的命令行 |
 
-` + "`GET /api/v1/state`" + ` 和 ` + "`GET /api/v1/events`" + ` 是 SSE，不在 ` + "`Handlers`" + ` 里：主人和院门都能读。接口都在 ` + "`/api/v1`" + ` 下；换成不兼容的形状时另起 ` + "`/api/v2`" + `，` + "`v1`" + ` 留到设备都升级（[理由](../../.agents/notes/implemented/architecture/2026-10-17-api-versioned-paths.md)）。
+` + "`GET /api/v1/state`" + `、` + "`GET /api/v1/events`" + ` 和 ` + "`GET /api/v1/live`" + ` 是 SSE，不在 ` + "`Handlers`" + ` 里：主人和院门都能读；` + "`/state`" + ` 给折好的帧，` + "`/live`" + ` 只给客户端要的三种 side event，` + "`/events`" + ` 留给命令行和调试。接口都在 ` + "`/api/v1`" + ` 下；换成不兼容的形状时另起 ` + "`/api/v2`" + `，` + "`v1`" + ` 留到设备都升级（[理由](../../.agents/notes/implemented/architecture/2026-10-17-api-versioned-paths.md)）。
 `)
 	// Groups in the order api.go first names them; api.go interleaves them.
 	var groups []string

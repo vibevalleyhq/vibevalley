@@ -224,7 +224,7 @@ class WorkbenchBackend {
 }
 
 /// The providers go with the tree, so their retries end with the test.
-Future<void> pumpPage(WidgetTester t, Widget page, Handle handle, {CoreState? farm, Stream<SideEvent>? events, Size size = const Size(1600, 1200)}) async {
+Future<void> pumpPage(WidgetTester t, Widget page, Handle handle, {CoreState? farm, Stream<LiveEvent>? events, Size size = const Size(1600, 1200)}) async {
   t.view.physicalSize = size;
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
@@ -232,7 +232,7 @@ Future<void> pumpPage(WidgetTester t, Widget page, Handle handle, {CoreState? fa
     ProviderScope(
       overrides: [
         serverProvider.overrideWithValue(FakeServer(handle)),
-        sideEventsProvider.overrideWith((ref) => events ?? const Stream<SideEvent>.empty()),
+        sideEventsProvider.overrideWith((ref) => events ?? const Stream<LiveEvent>.empty()),
         stateProvider.overrideWithValue(farm),
         atlasProvider.overrideWith((ref) async => atlas),
       ],

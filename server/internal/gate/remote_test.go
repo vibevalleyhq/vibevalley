@@ -18,7 +18,7 @@ func TestRemoteMayFollowsCan(t *testing.T) {
 			t.Errorf("%s %s %s: the gate lets it through %v, can remote %v", e.Op, e.Method, e.Path, got, want)
 		}
 	}
-	for _, path := range []string{"/api/v1/state", "/api/v1/events"} {
+	for _, path := range []string{"/api/v1/state", "/api/v1/events", "/api/v1/live"} {
 		if !remoteMay(httptest.NewRequest("GET", path, nil)) {
 			t.Errorf("GET %s refused", path)
 		}

@@ -121,10 +121,10 @@ void main() {
 
     testWidgets('a step event adds to the trajectory as it comes', (t) async {
       final server = _server();
-      final events = StreamController<SideEvent>.broadcast();
+      final events = StreamController<LiveEvent>.broadcast();
       addTearDown(events.close);
       await pumpPage(t, const ManagerPage(tab: 'trajectory'), server.handle, events: events.stream);
-      events.add(SideEventSessionEvent(at: _now, id: 'manager', activity: _step(4, SessionEventType.runError, '网断了')));
+      events.add(LiveEventSession(at: _now, id: 'manager', activity: _step(4, SessionEventType.runError, '网断了')));
       await settle(t);
       expect(find.text('网断了'), findsOneWidget);
     });

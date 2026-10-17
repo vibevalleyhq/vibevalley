@@ -40,13 +40,13 @@ class VibeValleyServer {
 
   late final Stream<ReceivedFrame> frames = states().asBroadcastStream();
 
-  /// Facts are left out: the state stream already brings them, folded.
-  late final Stream<SideEvent> sideEvents = _events().where((e) => e is! Fact && e is! SideEventSnapshot).asBroadcastStream();
+  /// The server's own narrow stream: step, notice, runtime. No facts, no snapshot.
+  late final Stream<LiveEvent> sideEvents = _live().asBroadcastStream();
 
-  Stream<SideEvent> _events() async* {
-    await for (final text in _sse('/api/v1/events')) {
+  Stream<LiveEvent> _live() async* {
+    await for (final text in _sse('/api/v1/live')) {
       try {
-        yield SideEvent.fromJson(jsonDecode(text) as Map<String, dynamic>);
+        yield LiveEvent.fromJson(jsonDecode(text) as Map<String, dynamic>);
       } on Object catch (e) {
         problems.add('$e');
       }

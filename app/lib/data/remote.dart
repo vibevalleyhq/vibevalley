@@ -39,7 +39,7 @@ class WorkbenchConfigNotifier extends Notifier<WorkbenchConfig> {
   @override
   WorkbenchConfig build() {
     ref.listen(sideEventsProvider, (_, next) {
-      if (next.value case SideEventRuntime(:final info) when state.runtimes.any((r) => r.id == info.id)) {
+      if (next.value case LiveEventRuntime(:final info) when state.runtimes.any((r) => r.id == info.id)) {
         state = state.copyWith(runtimes: [for (final r in state.runtimes) r.id == info.id ? info : r]);
       }
     });
@@ -145,7 +145,7 @@ class EventsNotifier extends Notifier<Map<String, List<SessionEvent>>> {
   @override
   Map<String, List<SessionEvent>> build() {
     ref.listen(sideEventsProvider, (_, next) {
-      if (next.value case SideEventSessionEvent(:final id, :final activity)) {
+      if (next.value case LiveEventSession(:final id, :final activity)) {
         state = {
           ...state,
           id: mergeSteps(state[id] ?? const [], [activity]),

@@ -30,6 +30,7 @@ func apiMux(f *workspace.Workspace) *http.ServeMux {
 	mux := http.NewServeMux()
 	protocol.Mount(mux, a)
 	mux.HandleFunc("GET /api/v1/events", a.sideEvents)
+	mux.HandleFunc("GET /api/v1/live", a.liveEvents)
 	mux.HandleFunc("GET /api/v1/state", a.stateFrames)
 	return mux
 }
@@ -64,6 +65,39 @@ func sse(w http.ResponseWriter) (func(any) bool, func() bool, bool) {
 		return true
 	}
 	return send, ping, true
+}
+
+// The client's stream: no facts, no snapshot; the StateFrame already carries the state.
+func (a api) liveEvents(w http.ResponseWriter, r *http.Request) {
+	send, ping, ok := sse(w)
+	if !ok {
+		return
+	}
+	_, events, stop := a.f.Core.Events()
+	defer stop()
+	tick := time.NewTicker(heartbeat)
+	defer tick.Stop()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case e, open := <-events:
+			if !open {
+				return
+			}
+			live, ok := protocol.LiveEventOf(e)
+			if !ok {
+				continue
+			}
+			if !send(live) {
+				return
+			}
+		case <-tick.C:
+			if !ping() {
+				return
+			}
+		}
+	}
 }
 
 func (a api) sideEvents(w http.ResponseWriter, r *http.Request) {

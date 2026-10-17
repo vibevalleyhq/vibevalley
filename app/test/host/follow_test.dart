@@ -34,7 +34,7 @@ void main() {
   test('one follow sends calls to the delivery, and tray summaries beside them', () async {
     final frames = StreamController<ReceivedFrame>.broadcast();
     final effects = StreamController<GameEffect>.broadcast();
-    final sides = StreamController<SideEvent>.broadcast();
+    final sides = StreamController<LiveEvent>.broadcast();
     final notices = <HostNotice>[];
     final trays = <TraySummary>[];
     final c = ProviderContainer(
@@ -66,7 +66,7 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(notices.last.title, '升到银牌：小有收成');
 
-    sides.add(const SideEventNotice(at: 0, level: NoticeLevel.error, text: '数据库坏了'));
+    sides.add(const LiveEventNotice(at: 0, level: NoticeLevel.error, text: '数据库坏了'));
     await Future<void>.delayed(Duration.zero);
     expect(notices.last.title, '码农场物语');
   });
@@ -78,7 +78,7 @@ void main() {
       overrides: [
         stateFrameProvider.overrideWith((ref) => frames.stream),
         effectsProvider.overrideWith((ref) => const Stream<GameEffect>.empty()),
-        sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
+        sideEventsProvider.overrideWith((ref) => const Stream<LiveEvent>.empty()),
         hostDeliveryProvider.overrideWithValue(HostDelivery(notify: (n) async => notices.add(n), canNotify: () => false)),
       ],
     );

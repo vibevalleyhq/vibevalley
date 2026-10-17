@@ -32,6 +32,6 @@ final effectsProvider = StreamProvider<GameEffect>((ref) => ref.watch(serverProv
 
 final streamProblemProvider = StreamProvider<String>((ref) => ref.watch(serverProvider).problems.stream);
 
-final sideEventsProvider = StreamProvider<SideEvent>((ref) => ref.watch(serverProvider).sideEvents);
+final sideEventsProvider = StreamProvider<LiveEvent>((ref) => ref.watch(serverProvider).sideEvents);
 
 final atlasProvider = FutureProvider<SpriteAtlas>((ref) => SpriteAtlas.load(rootBundle));

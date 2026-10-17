@@ -5,7 +5,7 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 ## 和服务端
 
 - **状态**：读 `GET /api/v1/state` 折好的 `StateFrame`，自己不折事实（[architecture.md](../docs/architecture.md)「核心状态」）。
-- **状态以外的事**：从 `GET /api/v1/events` 只取步骤、提醒、农机的变化（`sideEvents`）。
+- **状态以外的事**：从 `GET /api/v1/live` 只取步骤、提醒、农机的变化（`sideEvents`）；`/api/v1/events` 的 facts 留给命令行和调试。
 - **命令**：`lib/gen/vibevalley.dart` 里生成的 `VibeValleyApi`，页面只从 `apiProvider` 拿它。
 - **规则**：帧里没有、要从状态推出来的，是 `lib/rules/` 的纯函数；客户端自己的游戏状态（工具、手机、偏好）在各自的目录。
 
