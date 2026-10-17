@@ -114,7 +114,8 @@ func ListModels(ctx context.Context, installation oar.AvailableInstallation, opt
 }
 
 // displayName is the choice's name, with the release dsh's own selector badges it with
-// (dsh-client-ui-deepseek-model-label-1017): DeepSeek's deepseek-flash named exactly DeepSeek-V4.1-Flash is the 1017 build.
+// (dsh-client-ui-deepseek-model-label-1017): DeepSeek's deepseek-flash is DeepSeek-V4.1-Flash-1017, the API's only Flash model
+// name (api-docs.deepseek.com/quick_start/pricing).
 func displayName(value string, choice jsonx.Record) string {
 	name, _ := choice["name"].(string)
 	provider, model, _ := strings.Cut(ModelID(value), "/")
