@@ -14,22 +14,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'support/server.dart' show FakeServer, jsonResponse, settle;
 import 'support/farm.dart' as fakes;
 
-const _closed = TrajectoryHead(
+const _closed = Session(
   id: 'w1',
   name: '小吴',
   agent: 'backend',
   runtime: 'claude',
   project: 'clock',
-  job: '写打卡\n细节在 README',
-  startedAt: 0,
-  endedAt: 60000,
-  closed: IssueClose.merged,
-  outcome: Outcome.completed,
-  summary: '打卡写好了，测试全过',
+  task: '写打卡\n细节在 README',
+  hiredAt: 0,
   runs: 2,
-  cny: 0.42,
+  phase: PhaseClosed(at: 60000, closed: IssueClose.merged),
+  lastRun: LastRun(outcome: Outcome.completed, summary: '打卡写好了，测试全过', at: 60000),
+  spent: Spent(tokens: 0, cny: 0.42),
 );
-const _open = TrajectoryHead(id: 'w2', name: '小郑', agent: 'frontend', project: 'clock', job: '改登录页', startedAt: 70000);
+const _open = Session(id: 'w2', name: '小郑', agent: 'frontend', runtime: '', project: 'clock', task: '改登录页', hiredAt: 70000, runs: 0, phase: PhaseResting());
 
 Issue _issue(
   String id,
@@ -164,8 +162,28 @@ void main() {
     addTearDown(t.view.reset);
     SharedPreferences.setMockInitialValues({});
     final writes = <String>[];
-    const conflicted = TrajectoryHead(id: 'w4', name: '省钱小工 2', agent: 'flash', project: 'demo', job: '改成 hey', startedAt: 0);
-    const planner = TrajectoryHead(id: 'w5', name: '省钱小工', agent: 'flash', project: 'demo', job: '这一轮你是规划师：……', startedAt: 0, endedAt: 1);
+    const conflicted = Session(
+      id: 'w4',
+      name: '省钱小工 2',
+      agent: 'flash',
+      runtime: '',
+      project: 'demo',
+      task: '改成 hey',
+      hiredAt: 0,
+      runs: 0,
+      phase: PhaseResting(),
+    );
+    const planner = Session(
+      id: 'w5',
+      name: '省钱小工',
+      agent: 'flash',
+      runtime: '',
+      project: 'demo',
+      task: '这一轮你是规划师：……',
+      hiredAt: 0,
+      runs: 0,
+      phase: PhaseClosed(at: 1, closed: IssueClose.merged),
+    );
     final issues = [
       _issue('t4', '改成 hey', sessions: ['w4'], status: IssueStatus.inReview),
       _issue(
@@ -182,7 +200,8 @@ void main() {
       return switch ((r.method, r.url.path)) {
         ('GET', '/api/sessions') => jsonResponse([conflicted.toJson(), planner.toJson()]),
         ('GET', '/api/agents') => jsonResponse([]),
-        ('GET', '/api/sessions/w4') => jsonResponse(const Trajectory(head: conflicted, events: []).toJson()),
+        ('GET', '/api/sessions/w4') => jsonResponse(conflicted.toJson()),
+        ('GET', '/api/sessions/w4/events') => jsonResponse([]),
         _ => jsonResponse(null, 204),
       };
     }).api;
@@ -250,15 +269,12 @@ void main() {
         case ('GET', '/api/agents'):
           return jsonResponse([]);
         case ('GET', '/api/sessions/w1'):
-          return jsonResponse(
-            const Trajectory(
-              head: _closed,
-              events: [
-                SessionEvent(seq: 0, time: 0, type: SessionEventType.userMessage, text: '写打卡'),
-                SessionEvent(seq: 1, time: 5000, type: SessionEventType.assistantMessage, text: '打卡写好了'),
-              ],
-            ).toJson(),
-          );
+          return jsonResponse(_closed.toJson());
+        case ('GET', '/api/sessions/w1/events'):
+          return jsonResponse([
+            const SessionEvent(seq: 0, time: 0, type: SessionEventType.userMessage, text: '写打卡').toJson(),
+            const SessionEvent(seq: 1, time: 5000, type: SessionEventType.assistantMessage, text: '打卡写好了').toJson(),
+          ]);
         case ('POST', '/api/issues'):
           final body = IssueRequest.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
           final item = Issue(

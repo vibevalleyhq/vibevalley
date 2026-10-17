@@ -72,10 +72,14 @@ type Handlers interface {
 	SessionStop(ctx context.Context, pID string) error
 	//vibevalley:route session.list GET /api/sessions
 	//vibevalley:can owner remote
-	SessionList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error)
+	SessionList(ctx context.Context, pAgent *string) ([]Session, error)
 	//vibevalley:route session.get GET /api/sessions/{id}
 	//vibevalley:can owner remote
-	SessionGet(ctx context.Context, pID string) (Trajectory, error)
+	SessionGet(ctx context.Context, pID string) (Session, error)
+	// Its log, oldest first; run gives one run's only. The manager's log is session manager's.
+	//vibevalley:route session.events GET /api/sessions/{id}/events
+	//vibevalley:can owner remote
+	SessionEvents(ctx context.Context, pID string, pRun *int64) ([]SessionEvent, error)
 	//vibevalley:route issue.list GET /api/issues
 	//vibevalley:can owner remote
 	IssueList(ctx context.Context) ([]Issue, error)

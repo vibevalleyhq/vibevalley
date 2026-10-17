@@ -202,6 +202,20 @@ type Schedule struct {
 	LastRun   sql.NullInt64
 }
 
+type Session struct {
+	ID       string
+	Agent    string
+	Name     string
+	Runtime  string
+	Task     string
+	Project  sql.NullString
+	Issue    sql.NullString
+	Playbook sql.NullString
+	HiredAt  int64
+	EndedAt  sql.NullInt64
+	Closed   sql.NullString
+}
+
 type SessionRun struct {
 	ID          int64
 	Session     string

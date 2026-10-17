@@ -86,12 +86,88 @@ func (q *Queries) OpenRuns(ctx context.Context) ([]SessionRun, error) {
 	return items, nil
 }
 
+const runsOfEndedSessions = `-- name: RunsOfEndedSessions :many
+select id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from session_run where session in (select id from session where ended_at is not null) order by session, id
+`
+
+func (q *Queries) RunsOfEndedSessions(ctx context.Context) ([]SessionRun, error) {
+	rows, err := q.db.QueryContext(ctx, runsOfEndedSessions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SessionRun
+	for rows.Next() {
+		var i SessionRun
+		if err := rows.Scan(
+			&i.ID,
+			&i.Session,
+			&i.Issue,
+			&i.TriggeredBy,
+			&i.Heard,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.Outcome,
+			&i.Summary,
+			&i.Spent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const runsOfIssue = `-- name: RunsOfIssue :many
 select id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from session_run where issue = ? order by started_at, id
 `
 
 func (q *Queries) RunsOfIssue(ctx context.Context, issue sql.NullString) ([]SessionRun, error) {
 	rows, err := q.db.QueryContext(ctx, runsOfIssue, issue)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SessionRun
+	for rows.Next() {
+		var i SessionRun
+		if err := rows.Scan(
+			&i.ID,
+			&i.Session,
+			&i.Issue,
+			&i.TriggeredBy,
+			&i.Heard,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.Outcome,
+			&i.Summary,
+			&i.Spent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const runsOfSession = `-- name: RunsOfSession :many
+select id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from session_run where session = ? order by id
+`
+
+func (q *Queries) RunsOfSession(ctx context.Context, session string) ([]SessionRun, error) {
+	rows, err := q.db.QueryContext(ctx, runsOfSession, session)
 	if err != nil {
 		return nil, err
 	}

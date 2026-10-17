@@ -80,6 +80,7 @@
 | `session.stop` | `POST /api/sessions/{id}/stop` | ✓ | ✓ | ✓ |  |
 | `session.list` | `GET /api/sessions` | ✓ | ✓ |  |  |
 | `session.get` | `GET /api/sessions/{id}` | ✓ | ✓ |  |  |
+| `session.events` | `GET /api/sessions/{id}/events` | ✓ | ✓ |  |  |
 
 ## playbook
 

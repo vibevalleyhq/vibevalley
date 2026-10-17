@@ -326,10 +326,10 @@ func TestIssueClosesAndReopens(t *testing.T) {
 		t.Fatalf("an open issue: %v", err)
 	}
 	w.f.Issue.Merge(session.ID)
-	head := w.f.Session.Get(session.ID).Head
-	if head.Closed == nil || *head.Closed != protocol.IssueCloseMerged || head.Outcome == nil || *head.Outcome != protocol.OutcomeCompleted ||
-		head.Summary == nil || head.Runs == nil || *head.Runs != 1 || head.Issue == nil || *head.Issue != *session.Issue {
-		t.Fatalf("closed: %+v", head)
+	ended := w.f.Session.Get(session.ID)
+	if closed, ok := ended.Phase.Value.(protocol.PhaseClosed); !ok || closed.Closed != protocol.IssueCloseMerged || ended.LastRun == nil ||
+		ended.LastRun.Outcome != protocol.OutcomeCompleted || ended.LastRun.Summary == "" || ended.Runs != 1 || ended.Issue == nil || *ended.Issue != *session.Issue {
+		t.Fatalf("closed: %+v", ended)
 	}
 	closedAs := func(how protocol.IssueClose) func() bool {
 		return func() bool {
@@ -348,9 +348,9 @@ func TestIssueClosesAndReopens(t *testing.T) {
 	testkit.Eq(t, issue.ID, *session.Issue, "the same issue")
 	testkit.Eq(t, issue.Sessions, []string{session.ID, again}, "its runs")
 	testkit.Eq(t, issue.Closed == nil && issue.ClosedAt == nil, true, "open again")
-	reopened := w.f.Session.Get(again).Head
-	testkit.Match(t, *reopened.Job, `^打卡还要记下时区\n\n（这张工单重开了，上一次是 .+（`+session.ID+`）做的。）`, "what to do now comes first")
-	testkit.Match(t, *reopened.Job, `这张工单原来是：写打卡并提交\n它是怎么关的：收获了`, "the job and how its last run closed")
+	reopened := w.f.Session.Get(again)
+	testkit.Match(t, reopened.Task, `^打卡还要记下时区\n\n（这张工单重开了，上一次是 .+（`+session.ID+`）做的。）`, "what to do now comes first")
+	testkit.Match(t, reopened.Task, `这张工单原来是：写打卡并提交\n它是怎么关的：收获了`, "the job and how its last run closed")
 	if _, err := w.f.Issue.Reopen(context.Background(), *session.Issue, "", 0); !errors.As(err, &refused) {
 		t.Fatalf("reopened while open: %v", err)
 	}
@@ -406,7 +406,7 @@ func TestIssueWrittenDownStarts(t *testing.T) {
 		t.Fatalf("started: %+v %v", got, err)
 	}
 	w.nextReport(t)
-	testkit.Eq(t, *w.f.Session.Get(*got.Session).Head.Job, "写打卡并提交", "its run's job")
+	testkit.Eq(t, w.f.Session.Get(*got.Session).Task, "写打卡并提交", "its run's job")
 	started, _ := w.f.Issue.Get(issue.ID)
 	testkit.Eq(t, started.Sessions, []string{*got.Session}, "the same issue, its run on it")
 	testkit.Eq(t, started.Status, protocol.IssueStatusInReview, "its turn over")
@@ -472,7 +472,7 @@ func TestIssueWaitsForAFreeBed(t *testing.T) {
 	w.f.Issue.TryQueued(context.Background())
 	w.nextReport(t)
 	testkit.Eq(t, status(), protocol.IssueStatusInReview, "started, its turn over")
-	if !slices.ContainsFunc(w.f.Session.List(lab.ID), func(h protocol.TrajectoryHead) bool { return h.Job != nil && *h.Job == "等空地的活" }) {
+	if !slices.ContainsFunc(w.f.Session.List(lab.ID), func(s protocol.Session) bool { return s.Task == "等空地的活" }) {
 		t.Fatal("its run")
 	}
 	other, _ := w.f.Issue.Add(protocol.IssueRequest{Title: "别排了"})
@@ -488,7 +488,7 @@ func TestIssueKnowsItsPlaybook(t *testing.T) {
 	w := openWorld(t, home, work)
 	node := "impl"
 	session := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "做一步", "planned", session.HireOptions{Playbook: &protocol.SessionPlaybook{ID: "p1", Node: &node}}))
-	head := w.f.Session.Get(session.ID).Head
+	head := w.f.Session.Get(session.ID)
 	if head.Playbook == nil || head.Playbook.ID != "p1" || head.Playbook.Node == nil || *head.Playbook.Node != "impl" {
 		t.Fatalf("the issue's playbook: %+v", head.Playbook)
 	}
@@ -524,14 +524,14 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	lab := fixture.Lab(t)
 	session := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "看看目录", "steps", session.HireOptions{}))
 	w.nextReport(t)
-	steps := w.f.Session.Get(session.ID).Events
+	steps := w.f.Session.Events(session.ID, 0)
 	w.f.Session.Dismiss(session.ID)
 	after := w.f.Session.Get(session.ID)
 	if after == nil {
 		t.Fatal("the trajectory outlives the session")
 	}
-	testkit.Eq(t, []string{*after.Head.Job, *after.Head.Agent, *after.Head.Project}, []string{"看看目录", lab.ID, "steps"}, "head")
-	if after.Head.EndedAt == nil {
+	testkit.Eq(t, []string{after.Task, after.Agent, *after.Project}, []string{"看看目录", lab.ID, "steps"}, "who it was")
+	if _, ok := after.Phase.Value.(protocol.PhaseClosed); !ok {
 		t.Fatal("ended")
 	}
 	kinds := func(steps []protocol.SessionEvent) []protocol.SessionEventType {
@@ -543,14 +543,14 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	}
 	want := []protocol.SessionEventType{protocol.SessionEventTypeRunStart, protocol.SessionEventTypeUserMessage, protocol.SessionEventTypeToolCall,
 		protocol.SessionEventTypeAssistantMessage, protocol.SessionEventTypeRunEnd}
-	testkit.Eq(t, kinds(after.Events), want, "kept")
-	for _, e := range after.Events {
-		if e.Run == nil || *e.Run != *after.Events[0].Run {
+	testkit.Eq(t, kinds(w.f.Session.Events(session.ID, 0)), want, "kept")
+	for _, e := range w.f.Session.Events(session.ID, 0) {
+		if e.Run == nil || *e.Run != *w.f.Session.Events(session.ID, 0)[0].Run {
 			t.Fatalf("an event outside the run: %+v", e)
 		}
 	}
-	testkit.Eq(t, after.Events[len(after.Events)-1].Text, string(protocol.OutcomeCompleted), "the run's end says how it ended")
-	if !slices.ContainsFunc(w.f.Session.List(lab.ID), func(h protocol.TrajectoryHead) bool { return h.ID == session.ID }) {
+	testkit.Eq(t, w.f.Session.Events(session.ID, 0)[len(w.f.Session.Events(session.ID, 0))-1].Text, string(protocol.OutcomeCompleted), "the run's end says how it ended")
+	if !slices.ContainsFunc(w.f.Session.List(lab.ID), func(s protocol.Session) bool { return s.ID == session.ID }) {
 		t.Fatal("listed")
 	}
 	testkit.Eq(t, kinds(steps), want, "steps")
@@ -565,14 +565,14 @@ func TestCommentOnAStep(t *testing.T) {
 	w := openWorld(t, home, work)
 	hired := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "看看目录", "comments", session.HireOptions{}))
 	w.nextReport(t)
-	steps := w.f.Session.Get(hired.ID).Events
+	steps := w.f.Session.Events(hired.ID, 0)
 	tool := steps[slices.IndexFunc(steps, func(e protocol.SessionEvent) bool { return e.Type == protocol.SessionEventTypeToolCall })]
 	told := session.CommentText(tool, "这里换成 ls -la 再看一遍")
 	testkit.Match(t, told, fmt.Sprintf(`^【评论第 %d 步】关于你这一步的操作：echo hi`, tool.Seq), "names the step")
 	testkit.Match(t, told, `输出的结尾：hi\n\n我的评论：这里换成 ls -la 再看一遍$`, "the step's output, then the comment")
 	w.f.Session.Tell(hired.ID, told, protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
 	w.nextReport(t)
-	steps = w.f.Session.Get(hired.ID).Events
+	steps = w.f.Session.Events(hired.ID, 0)
 	i := slices.IndexFunc(steps, func(s protocol.SessionEvent) bool {
 		return s.Type == protocol.SessionEventTypeUserMessage && s.Seq > tool.Seq
 	})
@@ -641,7 +641,7 @@ func TestQuietSessionIsFlagged(t *testing.T) {
 		return need, need != nil && need.Kind == "quiet" && clock.NowMs()-need.Since >= 500
 	})
 	w.nextReport(t)
-	steps := w.f.Session.Get(session.ID).Events
+	steps := w.f.Session.Events(session.ID, 0)
 	w.f.Session.Dismiss(session.ID)
 	w.mu.Lock()
 	notes := slices.Clone(w.notes)
@@ -921,4 +921,40 @@ func TestIssueUpdateChangesOnlyWhatItGives(t *testing.T) {
 		t.Fatal(err)
 	}
 	testkit.Eq(t, []any{issue.Project == nil, *issue.Assignee}, []any{true, "lab"}, "an empty project is none")
+}
+
+// A session is a row from when it is sent: listed with the ones on the farm once it has ended, closed, its runs counted.
+// A head from before the table is moved in; an ended session's log goes after session.trajectory_days, its row stays.
+func TestEndedSessionsAreRows(t *testing.T) {
+	home, work := dirs(t)
+	dir := filepath.Join(home, "events")
+	os.MkdirAll(dir, 0o755)
+	long := clock.NowMs() - 400*protocol.DayMs
+	os.WriteFile(filepath.Join(dir, "w77.head.json"), []byte(fmt.Sprintf(`{"id":"w77","name":"老周","agent":"backend","runtime":"pi","job":"老活","startedAt":%d,"endedAt":%d,"closed":"merged"}`, long, long)), 0o644)
+	os.WriteFile(filepath.Join(dir, "w77.json"), []byte(`[]`), 0o644)
+	w := openWorld(t, home, work)
+	if _, err := os.Stat(filepath.Join(dir, "w77.head.json")); !os.IsNotExist(err) {
+		t.Fatal("the head is still a file")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "w77.json")); !os.IsNotExist(err) {
+		t.Fatal("a log older than the days kept")
+	}
+	old := w.f.Session.Get("w77")
+	if old == nil || old.Task != "老活" || old.Phase.Value != (protocol.PhaseClosed{At: long, Closed: protocol.IssueCloseMerged}) {
+		t.Fatalf("moved in: %+v", old)
+	}
+	lab := fixture.Lab(t)
+	s := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "看看目录", "rows", session.HireOptions{}))
+	w.nextReport(t)
+	w.f.Session.Dismiss(s.ID)
+	got := w.f.Session.Get(s.ID)
+	if closed, ok := got.Phase.Value.(protocol.PhaseClosed); !ok || closed.Closed != protocol.IssueCloseDismissed || got.Runs != 1 || got.LastRun == nil {
+		t.Fatalf("ended: %+v", got)
+	}
+	var ids []string
+	for _, x := range w.f.Session.List("") {
+		ids = append(ids, x.ID)
+	}
+	testkit.Eq(t, ids, []string{s.ID, "w77"}, "newest first, the moved one too")
+	testkit.Eq(t, len(w.f.Session.List("backend")), 1, "by agent")
 }

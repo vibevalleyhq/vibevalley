@@ -182,14 +182,11 @@ func TestManagerDispatchesAndHearsVoiceInSilence(t *testing.T) {
 	if line := managerLastLine(first); line != "主人说：帮我在 demo 里加个 README" {
 		t.Fatalf("line %q", line)
 	}
-	trail := testkit.Await(t, "its trajectory", func() (*protocol.Trajectory, bool) {
-		tr := f.Session.Get(protocol.ManagerAgent)
-		return tr, tr != nil && len(tr.Events) >= 3 && tr.Events[len(tr.Events)-1].Type == protocol.SessionEventTypeAssistantMessage
+	trail := testkit.Await(t, "its log", func() ([]protocol.SessionEvent, bool) {
+		events := f.Session.Events(protocol.ManagerAgent, 0)
+		return events, len(events) >= 3 && events[len(events)-1].Type == protocol.SessionEventTypeAssistantMessage
 	})
-	if trail.Head.Name != "管家" {
-		t.Fatalf("head %+v", trail.Head)
-	}
-	last := trail.Events[len(trail.Events)-3:]
+	last := trail[len(trail)-3:]
 	asked, tool, answer := last[0], last[1], last[2]
 	if asked.Type != protocol.SessionEventTypeUserMessage || !strings.Contains(asked.Text, "加个 README") {
 		t.Fatalf("asked %+v", asked)

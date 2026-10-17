@@ -2,48 +2,33 @@ package session
 
 import (
 	"context"
-	"encoding/json"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
-	"strings"
 	"sync"
 
 	"vibevalley/internal/base"
 	"vibevalley/internal/core"
 	"vibevalley/internal/protocol"
-	"vibevalley/pkg/x/clock"
 )
 
 // Nothing that leads out of the folder.
 var knownID = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
+// trajectories keeps each session's log of events, events/<id>.json: the open ones in memory as they grow, the others on
+// disk. Who the session is lives in the session table (records.go).
 type trajectories struct {
 	core *core.Service
 	dir  string
 
-	mu      sync.Mutex
-	open    map[string]*journal
-	writers map[string]*base.FileWriter
-	// One head changed at a time, read to written.
-	marking sync.Mutex
+	mu   sync.Mutex
+	open map[string]*journal
 }
 
 func newTrajectories(cfg base.Config, core *core.Service) (*trajectories, error) {
-	t := &trajectories{core: core, dir: filepath.Join(cfg.Home, "events"), open: map[string]*journal{}, writers: map[string]*base.FileWriter{}}
+	t := &trajectories{core: core, dir: filepath.Join(cfg.Home, "events"), open: map[string]*journal{}}
 	if err := moveActivities(filepath.Join(cfg.Home, "activities"), t.dir); err != nil {
 		return nil, err
-	}
-	// The steps of those that ended long ago go; their heads stay, small, so the board keeps every issue.
-	if days := cfg.Session.TrajectoryDays; days > 0 {
-		old := clock.NowMs() - int64(days)*protocol.DayMs
-		for _, head := range t.heads() {
-			if head.EndedAt != nil && *head.EndedAt < old {
-				_ = os.Remove(t.eventsFile(head.ID))
-			}
-		}
 	}
 	return t, nil
 }
@@ -63,66 +48,18 @@ func (t *trajectories) OnStop() {
 }
 
 func (t *trajectories) eventsFile(id string) string { return filepath.Join(t.dir, id+".json") }
-func (t *trajectories) headFile(id string) string   { return filepath.Join(t.dir, id+".head.json") }
 
-func (t *trajectories) readHead(id string) *protocol.TrajectoryHead {
-	body, err := os.ReadFile(t.headFile(id))
-	if err != nil {
-		return nil
-	}
-	var head protocol.TrajectoryHead
-	if json.Unmarshal(body, &head) != nil || head.ID == "" {
-		return nil
-	}
-	return &head
-}
-
-func (t *trajectories) writeHead(head protocol.TrajectoryHead) error {
-	t.mu.Lock()
-	w, ok := t.writers[head.ID]
-	if !ok {
-		w = base.NewFileWriter(t.headFile(head.ID), 0o644)
-		t.writers[head.ID] = w
-	}
-	t.mu.Unlock()
-	return w.Write(func() ([]byte, error) { return json.Marshal(head) })
-}
-
-func (t *trajectories) heads() []protocol.TrajectoryHead {
-	entries, err := os.ReadDir(t.dir)
-	if err != nil {
-		return nil
-	}
-	var out []protocol.TrajectoryHead
-	for _, e := range entries {
-		if name, ok := strings.CutSuffix(e.Name(), ".head.json"); ok {
-			if head := t.readHead(name); head != nil {
-				out = append(out, *head)
-			}
-		}
-	}
-	return out
-}
-
-// Its head is written now unless it has one: a session back from a restart keeps its start.
-func (t *trajectories) Open(head protocol.TrajectoryHead, keep int) Journal {
-	since := head
-	if had := t.readHead(head.ID); had != nil {
-		since = *had
-	}
-	since.EndedAt = nil
-	if err := t.writeHead(since); err != nil {
-		log.Printf("vibevalley: could not save %s: %v", t.headFile(head.ID), err)
-	}
-	id := head.ID
-	j := openJournal(t.eventsFile(id), readJournal(t.eventsFile(id)), func(step protocol.SessionEvent) { t.core.SessionEvent(id, step) }, keep)
+// Open is a session's log, carried on from what it kept: a session back from a restart goes on where it was.
+func (t *trajectories) Open(id string, keep int) Journal {
+	j := openJournal(t.eventsFile(id), readJournal(t.eventsFile(id)), func(e protocol.SessionEvent) { t.core.SessionEvent(id, e) }, keep)
 	t.mu.Lock()
 	t.open[id] = j
 	t.mu.Unlock()
 	return j
 }
 
-func (t *trajectories) Finish(id string, closed protocol.IssueClose, session *protocol.Session) {
+// Finish writes the log out and lets it go; it stays on disk.
+func (t *trajectories) Finish(id string) {
 	t.mu.Lock()
 	j := t.open[id]
 	delete(t.open, id)
@@ -130,63 +67,37 @@ func (t *trajectories) Finish(id string, closed protocol.IssueClose, session *pr
 	if j != nil {
 		j.Close()
 	}
-	t.mark(id, func(head *protocol.TrajectoryHead) {
-		ended := clock.NowMs()
-		head.EndedAt, head.Closed = &ended, &closed
-		if session == nil {
-			return
-		}
-		runs := session.Runs
-		head.Runs = &runs
-		if last := session.LastRun; last != nil {
-			outcome, summary := last.Outcome, last.Summary
-			head.Outcome, head.Summary = &outcome, &summary
-		}
-		if session.Spent != nil && session.Spent.CNY != nil {
-			cny := *session.Spent.CNY
-			head.CNY = &cny
-		}
-	})
 }
 
-func (t *trajectories) mark(id string, change func(*protocol.TrajectoryHead)) {
-	t.marking.Lock()
-	defer t.marking.Unlock()
-	if head := t.readHead(id); head != nil {
-		change(head)
-		if err := t.writeHead(*head); err != nil {
-			log.Printf("vibevalley: the trajectory of %s was not marked: %v", id, err)
-		}
-	}
-}
-
-func (t *trajectories) List(agent string) []protocol.TrajectoryHead {
-	out := []protocol.TrajectoryHead{}
-	for _, h := range t.heads() {
-		if agent == "" || (h.Agent != nil && *h.Agent == agent) {
-			out = append(out, h)
-		}
-	}
-	slices.SortStableFunc(out, func(a, b protocol.TrajectoryHead) int { return int(b.StartedAt - a.StartedAt) })
-	return out
-}
-
-func (t *trajectories) Get(id string) *protocol.Trajectory {
+// Events is a session's log, oldest first: from memory while it is open, else from disk; run > 0 is that run's only.
+func (t *trajectories) Events(id string, run int64) []protocol.SessionEvent {
 	if !knownID.MatchString(id) {
-		return nil
-	}
-	head := t.readHead(id)
-	if head == nil {
 		return nil
 	}
 	t.mu.Lock()
 	j := t.open[id]
 	t.mu.Unlock()
-	var steps []protocol.SessionEvent
+	var all []protocol.SessionEvent
 	if j != nil {
-		steps = j.Events()
+		all = j.Events()
 	} else {
-		steps = readJournal(t.eventsFile(id))
+		all = readJournal(t.eventsFile(id))
 	}
-	return &protocol.Trajectory{Head: *head, Events: steps}
+	if run <= 0 {
+		return all
+	}
+	out := []protocol.SessionEvent{}
+	for _, e := range all {
+		if e.Run != nil && *e.Run == run {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// forget deletes a session's log; who it was stays in the table.
+func (t *trajectories) forget(id string) {
+	if knownID.MatchString(id) {
+		_ = os.Remove(t.eventsFile(id))
+	}
 }

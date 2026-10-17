@@ -102,7 +102,7 @@ func (v Conflict) MarshalJSON() ([]byte, error) {
 // SessionActionValues are every SessionAction, in the protocol's order.
 var SessionActionValues = []SessionAction{SessionActionRunCommand, SessionActionReadFile, SessionActionEditFile, SessionActionSearch, SessionActionWeb, SessionActionMCP, SessionActionWait, SessionActionOther, SessionActionThinking, SessionActionSpeakingText, SessionActionNone}
 
-// PhaseValue is a member of Phase: PhaseArriving, PhaseWorking, PhaseRipe, PhaseFailed, PhaseResting, told apart by "_tag".
+// PhaseValue is a member of Phase: PhaseArriving, PhaseWorking, PhaseRipe, PhaseFailed, PhaseResting, PhaseClosed, told apart by "_tag".
 type PhaseValue interface{ isPhase() }
 
 func (u Phase) IsZero() bool { return u.Value == nil }
@@ -147,6 +147,10 @@ func (u *Phase) UnmarshalJSON(data []byte) error {
 		var v PhaseResting
 		err = json.Unmarshal(data, &v)
 		u.Value = v
+	case "closed":
+		var v PhaseClosed
+		err = json.Unmarshal(data, &v)
+		u.Value = v
 	default:
 		return fmt.Errorf("Phase: unknown _tag %q", head.Tag)
 	}
@@ -155,7 +159,7 @@ func (u *Phase) UnmarshalJSON(data []byte) error {
 
 // PhaseMembers are every member of Phase, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var PhaseMembers = []PhaseValue{PhaseArriving{}, PhaseWorking{}, PhaseRipe{}, PhaseFailed{}, PhaseResting{}}
+var PhaseMembers = []PhaseValue{PhaseArriving{}, PhaseWorking{}, PhaseRipe{}, PhaseFailed{}, PhaseResting{}, PhaseClosed{}}
 
 func (v SessionPlay) MarshalJSON() ([]byte, error) {
 	type plain SessionPlay
@@ -831,15 +835,6 @@ var IssueStatusValues = []IssueStatus{IssueStatusBacklog, IssueStatusTodo, Issue
 // PriorityValues are every Priority, in the protocol's order.
 var PriorityValues = []Priority{PriorityUrgent, PriorityHigh, PriorityMedium, PriorityLow}
 
-func (v Trajectory) MarshalJSON() ([]byte, error) {
-	type plain Trajectory
-	p := plain(v)
-	if p.Events == nil {
-		p.Events = []SessionEvent{}
-	}
-	return json.Marshal(p)
-}
-
 // IssueCloseValues are every IssueClose, in the protocol's order.
 var IssueCloseValues = []IssueClose{IssueCloseMerged, IssueCloseMergedIntoPlan, IssueCloseDismissed, IssueCloseLost, IssueCloseAnswered}
 
@@ -901,6 +896,15 @@ func (v PhaseResting) MarshalJSON() ([]byte, error) {
 	p := plain(v)
 
 	return withTag(p, "_tag", "resting")
+}
+
+func (PhaseClosed) isPhase() {}
+
+func (v PhaseClosed) MarshalJSON() ([]byte, error) {
+	type plain PhaseClosed
+	p := plain(v)
+
+	return withTag(p, "_tag", "closed")
 }
 
 func (ScheduleWhenOnce) isScheduleWhen() {}
@@ -2127,6 +2131,7 @@ var Endpoints = []Endpoint{
 	{"session.stop", "POST", "/api/sessions/{id}/stop", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"session.list", "GET", "/api/sessions", []string{"agent"}, false, []Caller{CallerOwner, CallerRemote}},
 	{"session.get", "GET", "/api/sessions/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"session.events", "GET", "/api/sessions/{id}/events", []string{"run"}, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.list", "GET", "/api/issues", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.get", "GET", "/api/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.runs", "GET", "/api/issues/{id}/runs", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2317,6 +2322,12 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	mux.HandleFunc("GET /api/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.SessionGet(r.Context(), pID)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("GET /api/sessions/{id}/events", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		pRun := queryNumber(r, "run")
+		out, err := h.SessionEvents(r.Context(), pID, pRun)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/issues", func(w http.ResponseWriter, r *http.Request) {
@@ -2837,19 +2848,29 @@ func (c *Client) SessionStop(ctx context.Context, pID string) error {
 	return c.call(ctx, "POST", "/api/sessions/"+url.PathEscape(pID)+"/stop", nil, nil, nil)
 }
 
-func (c *Client) SessionList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error) {
+func (c *Client) SessionList(ctx context.Context, pAgent *string) ([]Session, error) {
 	q := url.Values{}
 	if pAgent != nil {
 		q.Set("agent", *pAgent)
 	}
-	var out []TrajectoryHead
+	var out []Session
 	err := c.call(ctx, "GET", "/api/sessions", q, nil, &out)
 	return out, err
 }
 
-func (c *Client) SessionGet(ctx context.Context, pID string) (Trajectory, error) {
-	var out Trajectory
+func (c *Client) SessionGet(ctx context.Context, pID string) (Session, error) {
+	var out Session
 	err := c.call(ctx, "GET", "/api/sessions/"+url.PathEscape(pID), nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) SessionEvents(ctx context.Context, pID string, pRun *int64) ([]SessionEvent, error) {
+	q := url.Values{}
+	if pRun != nil {
+		q.Set("run", strconv.FormatInt(*pRun, 10))
+	}
+	var out []SessionEvent
+	err := c.call(ctx, "GET", "/api/sessions/"+url.PathEscape(pID)+"/events", q, nil, &out)
 	return out, err
 }
 

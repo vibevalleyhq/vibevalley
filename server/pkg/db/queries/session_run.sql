@@ -15,3 +15,9 @@ select * from session_run where ended_at is null order by id;
 
 -- name: RunsOfIssue :many
 select * from session_run where issue = ? order by started_at, id;
+
+-- name: RunsOfSession :many
+select * from session_run where session = ? order by id;
+
+-- name: RunsOfEndedSessions :many
+select * from session_run where session in (select id from session where ended_at is not null) order by session, id;

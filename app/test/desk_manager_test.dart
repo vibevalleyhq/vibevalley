@@ -11,8 +11,16 @@ import 'support/desk.dart';
 
 final _now = DateTime.now().millisecondsSinceEpoch.toDouble();
 
-SessionEvent _step(double n, SessionEventType kind, String text, {String? input, String? output, bool? ok}) =>
-    SessionEvent(seq: n, time: _now, type: kind, text: text, action: kind == SessionEventType.toolCall ? ToolAction.runCommand : null, input: input, output: output, ok: ok);
+SessionEvent _step(double n, SessionEventType kind, String text, {String? input, String? output, bool? ok}) => SessionEvent(
+  seq: n,
+  time: _now,
+  type: kind,
+  text: text,
+  action: kind == SessionEventType.toolCall ? ToolAction.runCommand : null,
+  input: input,
+  output: output,
+  ok: ok,
+);
 
 DeskBackend _server() => DeskBackend(
   managerMemory: MemoryList(
@@ -28,21 +36,27 @@ DeskBackend _server() => DeskBackend(
     hits: const [ArchiveHit(file: '2026-10-01.md', line: 12, text: '主人说：登录页要改')],
   ),
   archiveFiles: const {'2026-10-01.md': '主人：把登录页改一下\n管家：好'},
-  trajectories: {
-    'manager': Trajectory(
-      head: TrajectoryHead(id: 'manager', name: '管家', startedAt: _now),
-      events: [
-        _step(1, SessionEventType.userMessage, '帮我跑测试'),
-        _step(2, SessionEventType.toolCall, 'pnpm test', input: '{"command":"pnpm test"}', output: '12 passed', ok: true),
-        _step(3, SessionEventType.assistantMessage, '测试都过了。'),
-      ],
-    ),
-    'h1': Trajectory(
-      head: TrajectoryHead(id: 'h1', name: '老周一号', agent: 'backend', project: 'clock', job: '改登录', startedAt: _now),
-      events: [_step(1, SessionEventType.userMessage, '改登录')],
-    ),
+  events: {
+    'manager': [
+      _step(1, SessionEventType.userMessage, '帮我跑测试'),
+      _step(2, SessionEventType.toolCall, 'pnpm test', input: '{"command":"pnpm test"}', output: '12 passed', ok: true),
+      _step(3, SessionEventType.assistantMessage, '测试都过了。'),
+    ],
+    'h1': [_step(1, SessionEventType.userMessage, '改登录')],
   },
-  heads: [TrajectoryHead(id: 'h1', name: '老周一号', agent: 'backend', project: 'clock', job: '改登录', startedAt: _now, endedAt: _now)],
+  heads: [
+    Session(
+      id: 'h1',
+      name: '老周一号',
+      agent: 'backend',
+      runtime: 'claude',
+      project: 'clock',
+      task: '改登录',
+      hiredAt: _now,
+      runs: 1,
+      phase: PhaseClosed(at: _now, closed: IssueClose.dismissed),
+    ),
+  ],
   memories: {
     'backend': [
       memory('j1', '登录改到一半', kind: MemoryKind.issue, project: 'clock', at: _now),

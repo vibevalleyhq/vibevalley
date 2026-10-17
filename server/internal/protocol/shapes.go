@@ -1117,32 +1117,6 @@ type IssueRequest struct {
 	Priority    *Priority `json:"priority,omitzero"`
 }
 
-type Trajectory struct {
-	Head   TrajectoryHead `json:"head"`
-	Events []SessionEvent `json:"events"`
-}
-
-type TrajectoryHead struct {
-	ID           string           `json:"id"`
-	Name         string           `json:"name"`
-	Agent        *string          `json:"agent,omitzero"`
-	Runtime      *string          `json:"runtime,omitzero"`
-	Project      *string          `json:"project,omitzero"`
-	Job          *string          `json:"job,omitzero"`
-	StartedAt    int64            `json:"startedAt"`
-	EndedAt      *int64           `json:"endedAt,omitzero"`
-	Closed       *IssueClose      `json:"closed,omitzero"`
-	Outcome      *Outcome         `json:"outcome,omitzero"`
-	Summary      *string          `json:"summary,omitzero"`
-	Runs         *int64           `json:"runs,omitzero"`
-	CNY          *float64         `json:"cny,omitzero"`
-	ReopenedFrom *string          `json:"reopenedFrom,omitzero"`
-	ReopenedAs   *string          `json:"reopenedAs,omitzero"`
-	Playbook     *SessionPlaybook `json:"playbook,omitzero"`
-	// ReopenedFrom and ReopenedAs are how runs told it before issues.
-	Issue *string `json:"issue,omitzero"`
-}
-
 type IssueClose string
 
 const (
@@ -1303,6 +1277,15 @@ type PhaseFailed struct {
 
 //vibevalley:member Phase resting
 type PhaseResting struct {
+}
+
+// A session that has ended, from session.list or session.get: when, and how its issue took it. The core state's sessions
+// are the ones on the farm, never closed.
+//
+//vibevalley:member Phase closed
+type PhaseClosed struct {
+	At     int64      `json:"at"`
+	Closed IssueClose `json:"closed"`
 }
 
 type Repo struct {

@@ -12,6 +12,8 @@ Status: implemented
 
 ## Decision
 
+头文件和 `TrajectoryHead` 后来被 [Session、Run、事件](../../proposed/architecture/2026-10-17-session-run-step.md) 取代：是谁、怎么关的进了 `session` 表，走了的 Session 也是 `Session`（阶段 `closed`）；步骤是 `SessionEvent`，在 `events/<id>.json`。下面是当时的决定。
+
 行为见 [server.md](../../../../docs/reference/server.md)「帮工」里的「轨迹」和 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「管家页」「捏帮工」。
 
 - **轨迹就是干活过程加上它是谁的**。步骤还是 `Activity`（当时叫 `WorkStep`），一条轨迹一个 journal（`server/internal/session/events.go` 的 `crewJournal`）。另外多一个头（protocol 的 `TrajectoryHead`），记名字、帮工档案、农机、项目、工单、什么时候开始、什么时候结束。两样都放在 `$VIBEVALLEY_HOME/steps/`：`<id>.json` 和 `<id>.head.json`。

@@ -274,44 +274,42 @@ func (d *dispatch) reopen(ctx context.Context, id, text string, channel int64, b
 	if len(issue.Sessions) == 0 {
 		return "", protocol.Refused{Reason: "这张工单还没开过工：直接开工"}
 	}
-	t := d.run.Get(issue.Sessions[len(issue.Sessions)-1])
-	if t == nil || t.Head.Agent == nil {
+	last := d.run.Get(issue.Sessions[len(issue.Sessions)-1])
+	if last == nil {
 		return "", protocol.Missing{What: "工单 " + id}
 	}
-	head := t.Head
-	switch {
-	case !isClosed(issue.Status):
-		return "", protocol.Refused{Reason: head.Name + " 还在做这张工单：直接给它带话"}
+	if !isClosed(issue.Status) {
+		return "", protocol.Refused{Reason: last.Name + " 还在做这张工单：直接给它带话"}
 	}
-	agent := d.store.Agent(*head.Agent)
+	agent := d.store.Agent(last.Agent)
 	if agent == nil {
-		return "", protocol.Refused{Reason: "派它的帮工档案 " + *head.Agent + " 不在了"}
+		return "", protocol.Refused{Reason: "派它的帮工档案 " + last.Agent + " 不在了"}
 	}
 	project := ""
 	if issue.Project != nil {
 		project = *issue.Project
 	}
-	hired := d.Hire(ctx, *agent, reopenTask(issue, head, text), project, session.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: &by})
+	hired := d.Hire(ctx, *agent, reopenTask(issue, *last, text), project, session.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: &by})
 	if hired.Refused != "" || hired.Session == nil {
 		return "", protocol.Refused{Reason: hired.Refused}
 	}
 	return hired.Session.ID, nil
 }
 
-func reopenTask(issue protocol.Issue, head protocol.TrajectoryHead, text string) string {
+func reopenTask(issue protocol.Issue, last protocol.Session, text string) string {
 	now := str.Trim(text)
 	if now == "" {
 		now = reopenDefault
 	}
 	var b strings.Builder
 	b.WriteString(now)
-	fmt.Fprintf(&b, "\n\n（这张工单重开了，上一次是 %s（%s）做的。）", head.Name, head.ID)
+	fmt.Fprintf(&b, "\n\n（这张工单重开了，上一次是 %s（%s）做的。）", last.Name, last.ID)
 	b.WriteString("\n这张工单原来是：" + str.Cut(issueJob(issue), session.AskedMax))
-	if head.Closed != nil {
-		b.WriteString("\n它是怎么关的：" + closedText[*head.Closed])
+	if closed, ok := last.Phase.Value.(protocol.PhaseClosed); ok {
+		b.WriteString("\n它是怎么关的：" + closedText[closed.Closed])
 	}
-	if head.Outcome != nil && head.Summary != nil {
-		b.WriteString(fmt.Sprintf("\n最后一轮%s：%s", outcomeText[*head.Outcome], str.Cut(str.Trim(*head.Summary), session.AskedMax)))
+	if r := last.LastRun; r != nil {
+		b.WriteString(fmt.Sprintf("\n最后一轮%s：%s", outcomeText[r.Outcome], str.Cut(str.Trim(r.Summary), session.AskedMax)))
 	}
 	b.WriteString("\n先看看项目现在的样子，再接着做。")
 	return b.String()

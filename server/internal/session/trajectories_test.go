@@ -1,9 +1,7 @@
 package session
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -13,8 +11,6 @@ import (
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
-	"vibevalley/pkg/x/clock"
-	"vibevalley/pkg/x/ptr"
 )
 
 func sessionTrajectories(t *testing.T, home string, change ...func(*base.Config)) *trajectories {
@@ -32,90 +28,35 @@ func sessionTrajectories(t *testing.T, home string, change ...func(*base.Config)
 	return tr
 }
 
-func TestTrajectoryKeptAndListed(t *testing.T) {
+// A session's log is kept as it grows, read back from disk once it is let go, and taken up again where it was.
+func TestLogKeptAndReadBack(t *testing.T) {
 	tr := sessionTrajectories(t, t.TempDir())
-	j := tr.Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", Agent: ptr.To("backend"), Job: ptr.To("加分页"), StartedAt: 1}, 0)
+	j := tr.Open("w1", 0)
+	j.RunStarted(7)
 	j.Asked("加分页", nil)
 	j.ToolStarted("c1", ToolStart{Text: "ls", Action: protocol.ToolActionRunCommand, Tool: "bash"}, nil)
 	j.ToolEnded("c1", "a\nb", true, nil)
-	tr.Open(protocol.TrajectoryHead{ID: "w2", Name: "小吴", Agent: ptr.To("tester"), StartedAt: 2}, 0)
-	tr.Finish("w1", protocol.IssueCloseDismissed, nil)
-	w1 := tr.Get("w1")
-	if w1 == nil || w1.Head.EndedAt == nil {
-		t.Fatalf("w1 ended: %+v", w1)
-	}
+	j.RunEnded(7, protocol.OutcomeCompleted)
+	tr.Finish("w1")
 	var kinds []string
-	for _, s := range w1.Events {
+	for _, s := range tr.Events("w1", 0) {
 		out := ""
 		if s.Output != nil {
 			out = *s.Output
 		}
 		kinds = append(kinds, string(s.Type)+":"+out)
 	}
-	testkit.Eq(t, kinds, []string{"user/message:", "tool/call:a\nb"}, "steps")
-	ids := func(heads []protocol.TrajectoryHead) []string {
-		var out []string
-		for _, h := range heads {
-			out = append(out, h.ID)
-		}
-		return out
-	}
-	testkit.Eq(t, ids(tr.List("")), []string{"w2", "w1"}, "newest first")
-	testkit.Eq(t, ids(tr.List("backend")), []string{"w1"}, "by agent")
-	if tr.Get("../w1") != nil {
+	testkit.Eq(t, kinds, []string{"run/start:", "user/message:", "tool/call:a\nb", "run/end:"}, "read back")
+	testkit.Eq(t, len(tr.Events("w1", 7)), 4, "the run's")
+	testkit.Eq(t, len(tr.Events("w1", 8)), 0, "another run's")
+	if tr.Events("../w1", 0) != nil {
 		t.Fatal("nothing read from outside the folder")
 	}
-	tr.Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", Agent: ptr.To("backend"), StartedAt: 99}, 0)
-	again := tr.Get("w1")
-	testkit.Eq(t, again.Head.StartedAt, int64(1), "start kept")
-	if again.Head.EndedAt != nil {
-		t.Fatal("no longer ended")
-	}
-	testkit.Eq(t, len(again.Events), 2, "steps kept")
-}
-
-func writeHead(t *testing.T, dir, id string, started, ended int64) {
-	t.Helper()
-	body, _ := json.Marshal(protocol.TrajectoryHead{ID: id, Name: id, StartedAt: started, EndedAt: &ended})
-	if err := os.WriteFile(filepath.Join(dir, id+".head.json"), body, 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestOldTrajectoriesLoseTheirSteps(t *testing.T) {
-	home := t.TempDir()
-	dir := filepath.Join(home, "events")
-	os.MkdirAll(dir, 0o755)
-	long := clock.NowMs() - int64(base.Defaults().Session.TrajectoryDays+1)*protocol.DayMs
-	writeHead(t, dir, "w1", long, long)
-	os.WriteFile(filepath.Join(dir, "w1.json"), []byte(`[{"n":0,"at":0,"kind":"prompt","text":"老活"}]`), 0o644)
-	writeHead(t, dir, "w2", clock.NowMs(), clock.NowMs())
-	os.WriteFile(filepath.Join(dir, "w2.json"), []byte("[]"), 0o644)
-	tr := sessionTrajectories(t, home)
-	testkit.Eq(t, len(tr.List("")), 2, "both issues listed")
-	old := tr.Get("w1")
-	if old == nil || len(old.Events) != 0 {
-		t.Fatalf("the old one, without its steps: %+v", old)
-	}
-	entries, _ := os.ReadDir(dir)
-	var names []string
-	for _, e := range entries {
-		names = append(names, e.Name())
-	}
-	testkit.Eq(t, names, []string{"w1.head.json", "w2.head.json", "w2.json"}, "files left")
-}
-
-func TestTrajectoryDaysZeroKeepsForGood(t *testing.T) {
-	home := t.TempDir()
-	dir := filepath.Join(home, "events")
-	os.MkdirAll(dir, 0o755)
-	long := clock.NowMs() - 400*protocol.DayMs
-	writeHead(t, dir, "w1", long, long)
-	testkit.Eq(t, len(sessionTrajectories(t, home, func(c *base.Config) { c.Session.TrajectoryDays = 0 }).List("")), 1, "kept")
+	testkit.Eq(t, len(tr.Open("w1", 0).Events()), 4, "taken up again")
 }
 
 func TestReasoningRunsOn(t *testing.T) {
-	j := sessionTrajectories(t, t.TempDir()).Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", StartedAt: 1}, 0)
+	j := sessionTrajectories(t, t.TempDir()).Open("w1", 0)
 	j.Thought("先看", nil)
 	j.Thought("路由", nil)
 	j.Said("好", nil)
@@ -130,7 +71,7 @@ func TestReasoningRunsOn(t *testing.T) {
 }
 
 func TestSubAgentStepsGoUnderTheirCall(t *testing.T) {
-	j := sessionTrajectories(t, t.TempDir()).Open(protocol.TrajectoryHead{ID: "w1", Name: "老周", StartedAt: 1}, 0)
+	j := sessionTrajectories(t, t.TempDir()).Open("w1", 0)
 	j.ToolStarted("task-1", ToolStart{Text: "派个帮手", Action: protocol.ToolActionOther, Tool: "Task"}, nil)
 	j.Said("帮手先看看", From{"task-1"})
 	j.ToolStarted("c1", ToolStart{Text: "ls", Action: protocol.ToolActionRunCommand, Tool: "bash"}, From{"task-1"})
@@ -170,7 +111,7 @@ func TestJournalSendsAndWrites(t *testing.T) {
 	_, events, stop := core.Events()
 	defer stop()
 	tr, _ := newTrajectories(fixture.Config(home, "", ""), core)
-	j := tr.Open(protocol.TrajectoryHead{ID: "w9", Name: "老周", StartedAt: 1}, 0)
+	j := tr.Open("w9", 0)
 	j.Said("好", nil)
 	j.Said("的", nil)
 	select {
@@ -182,6 +123,6 @@ func TestJournalSendsAndWrites(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("the step was not sent")
 	}
-	tr.Finish("w9", protocol.IssueCloseDismissed, nil)
+	tr.Finish("w9")
 	testkit.Eq(t, len(readJournal(filepath.Join(home, "events", "w9.json"))), 1, "written")
 }

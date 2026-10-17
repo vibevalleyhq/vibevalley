@@ -317,7 +317,8 @@ class TicketDetail extends ConsumerStatefulWidget {
   const TicketDetail({super.key, required this.issue, required this.sessions, required this.state, required this.session, required this.reload});
   final Issue issue;
 
-  final List<TrajectoryHead> sessions;
+  // Oldest first, the ones on the farm and the ended (session.list).
+  final List<Session> sessions;
   final TicketState state;
   final Session? session;
   final Future<void> Function() reload;
@@ -468,9 +469,9 @@ class _TicketState extends ConsumerState<TicketDetail> {
     final open = widget.state.open;
     final steps = ref.watch(workStepsProvider.select((all) => all[head.id])) ?? const <SessionEvent>[];
     final body = KitText.sm.copyWith(color: Palette.bark800);
-    final turns = session?.runs ?? head.runs;
-    final cny = session?.spent?.cny ?? head.cny;
-    final summary = session?.lastRun?.summary ?? head.summary;
+    final turns = (session ?? head).runs;
+    final cny = (session ?? head).spent?.cny;
+    final summary = (session ?? head).lastRun?.summary;
     final actions = _actions(session);
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     return Column(
@@ -485,7 +486,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (actions.isNotEmpty) ...[Wrap(spacing: 8, runSpacing: 8, children: actions), const SizedBox(height: 12)],
-              _Row('谁在做', Text('${head.name}${head.runtime != null ? '（${head.runtime}）' : ''}', style: body)),
+              _Row('谁在做', Text('${head.name}${head.runtime.isNotEmpty ? '（${head.runtime}）' : ''}', style: body)),
               if (issue.project != null) _Row('项目', Text(issue.project!, style: body)),
               if (session?.branch != null) _Row('分支', Text(session!.branch!, style: KitText.mono.copyWith(color: Palette.bark800))),
               _Row('开单', Text(wallClockText(issue.createdAt), style: body)),
@@ -496,8 +497,8 @@ class _TicketState extends ConsumerState<TicketDetail> {
                 '用时',
                 Text(
                   [
-                    '${turns?.round() ?? roundsOf(steps).length} 轮',
-                    tookText((head.endedAt ?? now) - head.startedAt),
+                    '${turns > 0 ? turns.round() : roundsOf(steps).length} 轮',
+                    tookText((head.endedAt ?? now) - head.hiredAt),
                     if (cny != null) '花了 ¥${cny.toStringAsFixed(2)}',
                   ].join(' · '),
                   style: body,
@@ -566,7 +567,7 @@ class _TicketState extends ConsumerState<TicketDetail> {
         PxCard(
           title: '干活过程',
           child: steps.isEmpty
-              ? DeskEmpty(head.endedAt == null ? '还没有步骤。' : '干活过程只留 30 天（配置里的 trajectory.days），这张工单的已经清掉了；它是谁做的、怎么关的还在上面。')
+              ? DeskEmpty(head.endedAt == null ? '还没有步骤。' : '干活过程只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了；它是谁做的、怎么关的还在上面。')
               : Ticking(
                   builder: (context, now) => WorkLog(
                     steps: steps,

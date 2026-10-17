@@ -140,7 +140,7 @@ func TestMemoryKeptAndRecalled(t *testing.T) {
 		"- 做过（这个项目）：" + job.Text,
 	})), "recalled in the same project")
 	w.nextReport(t)
-	steps := w.f.Session.Get(second.ID).Events
+	steps := w.f.Session.Events(second.ID, 0)
 	if len(steps) < 3 || steps[0].Type != protocol.SessionEventTypeRunStart {
 		t.Fatalf("steps: %+v", steps)
 	}

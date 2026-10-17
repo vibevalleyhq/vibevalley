@@ -155,24 +155,25 @@ class EventsNotifier extends Notifier<Map<String, List<SessionEvent>>> {
     return const {};
   }
 
-  /// Null when there is none. Steps that came as events meanwhile stay: they are newer.
-  Future<TrajectoryHead?> load(String id) async {
-    final Trajectory found;
-    try {
-      found = await ref.read(apiProvider).session.get(id: id);
-    } on VibeValleyApiError catch (e) {
-      if (e.status == 404) return null;
-      rethrow;
-    }
-    final top = found.events.isEmpty ? -1 : found.events.last.seq;
+  /// Its log, with what came as events meanwhile kept (they are newer); then the session, null when there is none (the
+  /// manager's log is not a session's).
+  Future<Session?> load(String id) async {
+    final api = ref.read(apiProvider);
+    final events = await api.session.events(id: id);
+    final top = events.isEmpty ? -1 : events.last.seq;
     state = {
       ...state,
-      id: mergeSteps(found.events, [
+      id: mergeSteps(events, [
         for (final s in state[id] ?? const <SessionEvent>[])
           if (s.seq > top) s,
       ]),
     };
-    return found.head;
+    try {
+      return await api.session.get(id: id);
+    } on VibeValleyApiError catch (e) {
+      if (e.status == 404) return null;
+      rethrow;
+    }
   }
 }
 
@@ -300,6 +301,14 @@ String? watchSettingsProblem(WidgetRef ref, SettingsUpdate update) => ref.watch(
 
 /// The issue a session works: the server gives every session one, and an issue's lifecycle (comment, changes, merge,
 /// cancel) is asked by it.
+extension SessionEnd on Session {
+  /// When it ended; null for one on the farm.
+  double? get endedAt => switch (phase) {
+    PhaseClosed(:final at) => at,
+    _ => null,
+  };
+}
+
 extension SessionIssue on Session {
   String get issueId => issue ?? (throw StateError('session $id has no issue'));
 }

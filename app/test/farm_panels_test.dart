@@ -66,27 +66,28 @@ void main() {
   );
   final agents = {'tester': agent('tester', '测试小吴'), 'front': agent('front', '前端阿郑')};
 
-  final steps = {
-    'head': {'id': 'w1', 'name': '小吴', 'startedAt': 0},
-    'events': [
-      {'seq': 1, 'time': 0, 'type': 'user/message', 'text': '跑一遍测试'},
-      {
-        'seq': 2,
-        'time': 10,
-        'type': 'tool/call',
-        'text': 'pnpm test',
-        'action': 'run_command',
-        'tool': 'Bash',
-        'input': '{"command":"pnpm test"}',
-        'output': 'ok',
-        'ok': true,
-      },
-    ],
-  };
+  final steps = [
+    {'seq': 1, 'time': 0, 'type': 'user/message', 'text': '跑一遍测试'},
+    {
+      'seq': 2,
+      'time': 10,
+      'type': 'tool/call',
+      'text': 'pnpm test',
+      'action': 'run_command',
+      'tool': 'Bash',
+      'input': '{"command":"pnpm test"}',
+      'output': 'ok',
+      'ok': true,
+    },
+  ];
 
   testWidgets('a bed: what it is doing, its project, its steps, and its buttons', (tester) async {
     final routes = Routes();
-    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes, {'GET /api/sessions/w1': steps}), agents: agents));
+    final c = await pumpFarm(
+      tester,
+      const FarmPanels(),
+      overrides: overrides(state, v, fakeApi(routes, {'GET /api/sessions/w1/events': steps}), agents: agents),
+    );
     c.read(selectedProvider.notifier).set('w1');
     await settle(tester);
     expect(find.text('小吴的地'), findsOneWidget);
@@ -96,7 +97,7 @@ void main() {
     expect(find.text('工单'), findsOneWidget);
     expect(find.text('碰过的文件'), findsOneWidget);
     expect(find.text('\$ pnpm test'), findsOneWidget);
-    expect(routes.paths, contains('GET /api/sessions/w1'));
+    expect(routes.paths, contains('GET /api/sessions/w1/events'));
     await tester.tap(find.text('叫停'));
     await settle(tester);
     expect(routes.paths, contains('POST /api/sessions/w1/stop'));

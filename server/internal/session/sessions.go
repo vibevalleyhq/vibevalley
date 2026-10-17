@@ -147,9 +147,11 @@ type sessions struct {
 	logDir       string
 	farmURL      string
 	stallMs      int64
-	activity     *base.Hub[LaunchActivity]
-	disk         *base.FileWriter
-	q            *generated.Queries
+	// The days an ended session's log is kept (session.trajectory_days).
+	logDays  int
+	activity *base.Hub[LaunchActivity]
+	disk     *base.FileWriter
+	q        *generated.Queries
 
 	mu       sync.Mutex
 	hands    map[string]*hand
@@ -185,6 +187,7 @@ func newSessions(in sessionsIn) (*sessions, error) {
 		farmURL:  "http://" + net.JoinHostPort(in.Config.Host, strconv.Itoa(in.Config.Port)) + "/mcp",
 		logDir:   filepath.Join(in.Config.Home, "logs"),
 		stallMs:  int64(in.Config.Session.StallSeconds * 1000),
+		logDays:  in.Config.Session.TrajectoryDays,
 		activity: base.NewHub[LaunchActivity](),
 		hands:    map[string]*hand{},
 		q:        generated.New(in.DB),
@@ -273,19 +276,8 @@ func (c *sessions) closed(h *hand) {
 }
 
 func (c *sessions) trajectoryOf(session protocol.Session) Journal {
-	head := protocol.TrajectoryHead{ID: session.ID, Name: session.Name, StartedAt: session.HiredAt}
-	agent, runtime, job := session.Agent, session.Runtime, session.Task
-	head.Agent, head.Runtime, head.Job = &agent, &runtime, &job
-	if session.Project != nil {
-		project := *session.Project
-		head.Project = &project
-	}
-	if session.Playbook != nil {
-		playbook := *session.Playbook
-		head.Playbook = &playbook
-	}
-	head.Issue = session.Issue
-	return c.trajectories.Open(head, 0)
+	c.keep(session)
+	return c.trajectories.Open(session.ID, 0)
 }
 
 func (c *sessions) body() ([]byte, error) {
@@ -325,6 +317,8 @@ func (c *sessions) save() {
 }
 
 func (c *sessions) restore() {
+	c.moveHeads()
+	c.expireLogs(c.logDays)
 	c.endOpenRuns()
 	saved := sessionSaved{}
 	if body, err := os.ReadFile(c.file); err == nil {
@@ -348,7 +342,8 @@ func (c *sessions) restore() {
 		if s == nil || !exists(s.Place.Cwd) {
 			lost := protocol.IssueCloseLost
 			c.core.Apply(protocol.FactLeft{ID: session.ID, Closed: &lost})
-			c.trajectories.Finish(session.ID, protocol.IssueCloseLost, &session)
+			c.trajectories.Finish(session.ID)
+			c.ended(session.ID, protocol.IssueCloseLost)
 			where := ""
 			if s != nil {
 				where = "（" + s.Place.Cwd + "）"
@@ -680,7 +675,8 @@ func (c *sessions) leave(h *hand, closed protocol.IssueClose, merged int64) {
 	h.mu.Lock()
 	c.releaseLocked(h)
 	h.mu.Unlock()
-	c.trajectories.Finish(h.id, closed, c.core.Session(h.id))
+	c.trajectories.Finish(h.id)
+	c.ended(h.id, closed)
 	c.closed(h)
 	c.tokens.Revoke(h.id)
 	c.mu.Lock()

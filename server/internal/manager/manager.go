@@ -196,7 +196,7 @@ func (fm *manager) OnStart(ctx context.Context) error {
 	fm.ctx = ctx
 	fm.replyTo = fm.chat.General()
 	if fm.trace == nil {
-		fm.trace = fm.run.Open(protocol.TrajectoryHead{ID: protocol.ManagerAgent, Name: "管家", StartedAt: clock.NowMs()}, keepManagerEvents)
+		fm.trace = fm.run.Open(protocol.ManagerAgent, keepManagerEvents)
 	}
 	// In a test that gave the manager no model, it hears nothing: the other services' tests run as without it, and
 	// nothing reaches DeepSeek (a key in the environment would be used otherwise).

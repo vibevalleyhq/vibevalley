@@ -752,7 +752,7 @@ class TrajectoryList extends ConsumerStatefulWidget {
 }
 
 class _TrajectoryListState extends ConsumerState<TrajectoryList> {
-  List<TrajectoryHead>? _heads;
+  List<Session>? _heads;
   String? _open;
 
   @override
@@ -804,16 +804,16 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
                               children: [
                                 Text(h.name, style: KitText.xs.copyWith(color: Palette.bark800)),
                                 if (h.project != null) Text(h.project!, style: KitText.xs.copyWith(color: Palette.bark500)),
-                                Text('${ago(h.startedAt, now)}接活', style: KitText.xs.copyWith(color: Palette.bark500)),
+                                Text('${ago(h.hiredAt, now)}接活', style: KitText.xs.copyWith(color: Palette.bark500)),
                                 if (h.endedAt == null)
                                   const DeskBadge('在场', hat: true)
                                 else
                                   Text('${ago(h.endedAt!, now)}走的', style: KitText.xs.copyWith(color: Palette.bark500)),
                               ],
                             ),
-                            if (h.job != null && h.job!.isNotEmpty)
+                            if (h.task.isNotEmpty)
                               Text(
-                                h.job!,
+                                h.task,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: KitText.sm.copyWith(color: Palette.bark900),

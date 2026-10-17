@@ -137,7 +137,7 @@ Pose mapPose(Session h) {
     PhaseWorking() => Pose.work,
     PhaseRipe() => Pose.cheer,
     PhaseFailed() => Pose.worry,
-    PhaseArriving() || PhaseResting() => Pose.idle,
+    PhaseArriving() || PhaseResting() || PhaseClosed() => Pose.idle,
   };
 }
 

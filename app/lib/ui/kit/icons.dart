@@ -50,6 +50,7 @@ class PhaseGlyph extends StatelessWidget {
     PhaseRipe() => SpriteIcon('icon-harvest', size: size),
     PhaseFailed() => SpriteIcon('icon-bug', size: size),
     PhaseResting() => SpriteIcon('act-wait', size: size),
+    PhaseClosed(:final closed) => SpriteIcon(closed == IssueClose.merged ? 'icon-harvest' : 'act-wait', size: size),
   };
 }
 

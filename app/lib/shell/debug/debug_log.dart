@@ -83,6 +83,7 @@ String _phaseTag(Phase p) => switch (p) {
   PhaseRipe() => 'ripe',
   PhaseFailed() => 'failed',
   PhaseResting() => 'resting',
+  PhaseClosed() => 'closed',
 };
 
 String sideSummary(SideEvent e) => switch (e) {

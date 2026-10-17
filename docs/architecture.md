@@ -106,7 +106,7 @@ flowchart LR
 | `state.json` | 核心状态，田头、进度、定时和工单除外：帮工、commit 数 |
 | `vibevalley.db` | SQLite：田头、工单和它们的帮工、每次干活（`session_run`）、计划的经过、账本、记性、定时、连接器、院门的设备（表名是「模块_概念」、单数，结构在 `server/migrations/`：`0001_schema.sql` 和它后面的改动，启动时按名字顺序各跑一次，跑之前把库留一份 `vibevalley.db.v<n>`；库比服务端认识的新就不开）。查询都在 `server/pkg/db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
 | `sessions.json` | 只有服务端需要的：每个帮工的项目目录或 worktree、农机自己的会话 id、最后一轮的完整原话 |
-| `events/<id>.json`、`events/<id>.head.json` | 轨迹：每个 Session 的事件日志（走了留 30 天）和它的头：是谁、为哪张工单干、怎么关的（一直留着）；管家的（`manager`） |
+| `events/<id>.json` | 每个 Session 的事件日志（走了留 30 天；是谁、为哪张工单、怎么关的在库里的 `session` 表，一直留着）；管家的是 `manager.json` |
 | `spend.json` | 今天每台农机花了多少 |
 | `manager/` | 管家（VibeValley 自己的 agent）：对话 `manager.jsonl`、记性 `MEMORY.md`、压掉的旧对话 `archive/` |
 | `logs/` | smith 记的每个帮工会话的原始记录 |
@@ -141,7 +141,7 @@ flowchart LR
 | `schedule.tick_ms` | 多久看一遍有没有到点的定时 | 20000 |
 | `session.stall_seconds` | 一轮里多久没动静就提醒 | 240 |
 | `project.max_sessions` | 一个项目里最多几个帮工同时干活 | 3 |
-| `session.trajectory_days` | Session 走了以后，它的步骤留几天（轨迹的头一直留着）；0 是一直留着 | 30 |
+| `session.trajectory_days` | Session 走了以后，它的事件日志留几天（`session` 表里的行一直留着）；0 是一直留着 | 30 |
 | `chat.notice_batch_ms` | 忙着的帮工收到的提示，攒多久合成一条 | 3000 |
 | `chat.retry_wake_ms` | 叫醒在开口前就失败了，多久以后再叫一次 | 3000 |
 

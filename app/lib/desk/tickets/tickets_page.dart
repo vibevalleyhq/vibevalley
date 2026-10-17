@@ -90,11 +90,12 @@ class TicketCard extends BoardCard {
   const TicketCard(this.issue, this.sessions, this.state, this.session);
   final Issue issue;
 
-  final List<TrajectoryHead> sessions;
+  // Its sessions, oldest first: the ones on the farm and the ended (session.list).
+  final List<Session> sessions;
   final TicketState state;
   final Session? session;
 
-  TrajectoryHead get head => sessions.last;
+  Session get head => sessions.last;
   @override
   String get id => issue.id;
   @override
@@ -104,11 +105,24 @@ class TicketCard extends BoardCard {
   @override
   String? get agent => issue.assignee;
   @override
-  List<String?> get words => [issue.title, issue.description, head.name, issue.project, issue.id, head.summary];
+  List<String?> get words => [issue.title, issue.description, head.name, issue.project, issue.id, head.lastRun?.summary];
 }
 
-List<TrajectoryHead> sessionsOf(Issue issue, Map<String, TrajectoryHead> heads) => [
-  for (final id in issue.sessions) heads[id] ?? TrajectoryHead(id: id, name: id, agent: issue.assignee, project: issue.project, startedAt: issue.createdAt),
+/// A session session.list has not answered for yet stands in with what the issue knows.
+List<Session> sessionsOf(Issue issue, Map<String, Session> heads) => [
+  for (final id in issue.sessions)
+    heads[id] ??
+        Session(
+          id: id,
+          name: id,
+          agent: issue.assignee ?? '',
+          runtime: '',
+          task: issue.title,
+          project: issue.project,
+          hiredAt: issue.createdAt,
+          runs: 0,
+          phase: const PhaseResting(),
+        ),
 ];
 
 /// An issue for the manager: open while the manager works on it, closed once it has answered; never dragged.
@@ -170,7 +184,7 @@ class TicketsPage extends ConsumerStatefulWidget {
 String _sessionsKey(CoreState? farm) => [for (final i in farm?.issues ?? const <Issue>[]) '${i.id}:${i.sessions.join(',')}:${i.closedAt}'].join(';');
 
 class _TicketsPageState extends ConsumerState<TicketsPage> {
-  Map<String, TrajectoryHead>? _heads;
+  Map<String, Session>? _heads;
 
   List<Issue>? _history;
   BoardFilter _filter = const BoardFilter();

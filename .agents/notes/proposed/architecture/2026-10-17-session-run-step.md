@@ -46,7 +46,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 ### 顺序
 
 1. 管家成为内置档案（它的会话才能进 `session` 表）。
-2. `SessionEvent` 和 Run 的边界（已做）；`session` 表、`Phase` 的 `closed`、接口；搬头文件；删 `Trajectory`、`TrajectoryHead`；日志只追加。Flutter 的干活记录页和工单详情页改读 `Session` 和 `Run`。
+2. `SessionEvent` 和 Run 的边界（已做）；`session` 表、`Phase` 的 `closed`、`session.list`/`get` 给 `Session`、`session.events`、搬头文件、删 `Trajectory`、`TrajectoryHead`（已做：`session/records.go`，迁移 `0005_session_table.sql`）；日志只追加（没做）。Flutter 的干活记录页和工单详情页改读 `Session` 和 `Run`。
 3. 两个口子：投递带上文，交代里的 @ 投递出去；删 `farm_*` 和令牌，改 `session/rules.go` 给帮工的说明。
 
 ## Alternatives considered

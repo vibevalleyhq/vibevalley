@@ -531,6 +531,7 @@ sealed class Phase {
     'ripe' => PhaseRipe.fromJson(j),
     'failed' => PhaseFailed.fromJson(j),
     'resting' => PhaseResting.fromJson(j),
+    'closed' => PhaseClosed.fromJson(j),
     final other => throw FormatException('Phase: unknown _tag', other),
   };
 
@@ -2807,103 +2808,6 @@ class IssueRequest {
   };
 }
 
-class Trajectory {
-  const Trajectory({required this.head, required this.events});
-
-  factory Trajectory.fromJson(Map<String, dynamic> j) => Trajectory(
-    head: TrajectoryHead.fromJson(j['head'] as Map<String, dynamic>),
-    events: [for (final e in j['events'] as List) SessionEvent.fromJson(e as Map<String, dynamic>)],
-  );
-
-  final TrajectoryHead head;
-  final List<SessionEvent> events;
-
-  Map<String, dynamic> toJson() => {
-    'head': head.toJson(),
-    'events': [for (final e in events) e.toJson()],
-  };
-}
-
-class TrajectoryHead {
-  const TrajectoryHead({
-    required this.id,
-    required this.name,
-    this.agent,
-    this.runtime,
-    this.project,
-    this.job,
-    required this.startedAt,
-    this.endedAt,
-    this.closed,
-    this.outcome,
-    this.summary,
-    this.runs,
-    this.cny,
-    this.reopenedFrom,
-    this.reopenedAs,
-    this.playbook,
-    this.issue,
-  });
-
-  factory TrajectoryHead.fromJson(Map<String, dynamic> j) => TrajectoryHead(
-    id: j['id'] as String,
-    name: j['name'] as String,
-    agent: j['agent'] == null ? null : j['agent'] as String,
-    runtime: j['runtime'] == null ? null : j['runtime'] as String,
-    project: j['project'] == null ? null : j['project'] as String,
-    job: j['job'] == null ? null : j['job'] as String,
-    startedAt: (j['startedAt'] as num).toDouble(),
-    endedAt: j['endedAt'] == null ? null : (j['endedAt'] as num).toDouble(),
-    closed: j['closed'] == null ? null : IssueClose.fromJson(j['closed']),
-    outcome: j['outcome'] == null ? null : Outcome.fromJson(j['outcome']),
-    summary: j['summary'] == null ? null : j['summary'] as String,
-    runs: j['runs'] == null ? null : (j['runs'] as num).toDouble(),
-    cny: j['cny'] == null ? null : (j['cny'] as num).toDouble(),
-    reopenedFrom: j['reopenedFrom'] == null ? null : j['reopenedFrom'] as String,
-    reopenedAs: j['reopenedAs'] == null ? null : j['reopenedAs'] as String,
-    playbook: j['playbook'] == null ? null : SessionPlaybook.fromJson(j['playbook'] as Map<String, dynamic>),
-    issue: j['issue'] == null ? null : j['issue'] as String,
-  );
-
-  final String id;
-  final String name;
-  final String? agent;
-  final String? runtime;
-  final String? project;
-  final String? job;
-  final double startedAt;
-  final double? endedAt;
-  final IssueClose? closed;
-  final Outcome? outcome;
-  final String? summary;
-  final double? runs;
-  final double? cny;
-  final String? reopenedFrom;
-  final String? reopenedAs;
-  final SessionPlaybook? playbook;
-  final String? issue;
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    if (agent != null) 'agent': agent!,
-    if (runtime != null) 'runtime': runtime!,
-    if (project != null) 'project': project!,
-    if (job != null) 'job': job!,
-    'startedAt': startedAt,
-    if (endedAt != null) 'endedAt': endedAt!,
-    if (closed != null) 'closed': closed!.wire,
-    if (outcome != null) 'outcome': outcome!.wire,
-    if (summary != null) 'summary': summary!,
-    if (runs != null) 'runs': runs!,
-    if (cny != null) 'cny': cny!,
-    if (reopenedFrom != null) 'reopenedFrom': reopenedFrom!,
-    if (reopenedAs != null) 'reopenedAs': reopenedAs!,
-    if (playbook != null) 'playbook': playbook!.toJson(),
-    if (issue != null) 'issue': issue!,
-  };
-}
-
 enum IssueClose {
   merged('merged'),
   mergedIntoPlan('merged_into_plan'),
@@ -3339,6 +3243,18 @@ final class PhaseResting extends Phase {
 
   @override
   Map<String, dynamic> toJson() => {'_tag': 'resting'};
+}
+
+final class PhaseClosed extends Phase {
+  const PhaseClosed({required this.at, required this.closed});
+
+  factory PhaseClosed.fromJson(Map<String, dynamic> j) => PhaseClosed(at: (j['at'] as num).toDouble(), closed: IssueClose.fromJson(j['closed']));
+
+  final double at;
+  final IssueClose closed;
+
+  @override
+  Map<String, dynamic> toJson() => {'_tag': 'closed', 'at': at, 'closed': closed.wire};
 }
 
 class Repo {
@@ -5091,14 +5007,25 @@ class SessionApi {
     await _api._call('POST', '/api/sessions/${Uri.encodeComponent((id).toString())}/stop', query: {}, body: null);
   }
 
-  Future<List<TrajectoryHead>> list({String? agent}) async {
+  Future<List<Session>> list({String? agent}) async {
     final j = await _api._call('GET', '/api/sessions', query: {if (agent != null) 'agent': '${agent!}'}, body: null);
-    return [for (final e in j as List) TrajectoryHead.fromJson(e as Map<String, dynamic>)];
+    return [for (final e in j as List) Session.fromJson(e as Map<String, dynamic>)];
   }
 
-  Future<Trajectory> get({required String id}) async {
+  Future<Session> get({required String id}) async {
     final j = await _api._call('GET', '/api/sessions/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
-    return Trajectory.fromJson(j as Map<String, dynamic>);
+    return Session.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// Its log, oldest first; run gives one run's only. The manager's log is session manager's.
+  Future<List<SessionEvent>> events({required String id, double? run}) async {
+    final j = await _api._call(
+      'GET',
+      '/api/sessions/${Uri.encodeComponent((id).toString())}/events',
+      query: {if (run != null) 'run': '${run!.toInt()}'},
+      body: null,
+    );
+    return [for (final e in j as List) SessionEvent.fromJson(e as Map<String, dynamic>)];
   }
 }
 

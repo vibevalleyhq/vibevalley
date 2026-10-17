@@ -82,7 +82,7 @@ class DeskBackend {
     this.managerMemory,
     this.archive = const ArchiveListing(files: [], hits: []),
     this.archiveFiles = const {},
-    this.trajectories = const {},
+    this.events = const {},
     this.heads = const [],
     this.settings,
     this.projects = const [],
@@ -98,8 +98,9 @@ class DeskBackend {
   MemoryList? managerMemory;
   final ArchiveListing archive;
   final Map<String, String> archiveFiles;
-  final Map<String, Trajectory> trajectories;
-  final List<TrajectoryHead> heads;
+  // By session: its log (session.events), and the sessions session.list and session.get answer with.
+  final Map<String, List<SessionEvent>> events;
+  final List<Session> heads;
   SettingsStatus? settings;
   final List<ProjectSummary> projects;
 
@@ -201,9 +202,11 @@ class DeskBackend {
           for (final h in heads)
             if (agent == null || h.agent == agent) h.toJson(),
         ]);
+      case ('GET', ['api', 'sessions', final id, 'events']):
+        return jsonResponse([for (final e in events[id] ?? const <SessionEvent>[]) e.toJson()]);
       case ('GET', ['api', 'sessions', final id]):
-        final t = trajectories[id];
-        return t == null ? jsonResponse({'_tag': 'Missing', 'reason': '没有'}, 404) : jsonResponse(t.toJson());
+        final s = heads.where((h) => h.id == id).firstOrNull;
+        return s == null ? jsonResponse({'_tag': 'Missing', 'reason': '没有'}, 404) : jsonResponse(s.toJson());
       case ('GET', ['api', 'settings']):
         return jsonResponse(settings!.toJson());
       case ('PUT', ['api', 'settings']):

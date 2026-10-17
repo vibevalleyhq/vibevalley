@@ -67,7 +67,7 @@
 
 **干活过程**（`session/events.go`）：一个 Session 的日志，一条一个 `SessionEvent`（`seq`、`time`、`type`，照 DeepSeek Harness 的会话事件）：`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入和输出）、`llm/retry`、`run/error`，记在 `events/<id>.json`。每个 Run 由 `run/start` 和 `run/end`（带它的结果）围起来，中间的事件都带着这个 `run`。带话时可以评论某一条（`on` 是它的 `seq`），服务端把那一条写在话前面交给帮工。
 
-**轨迹**（`session/trajectories.go`；[理由](../../.agents/notes/implemented/feature/2026-10-13-trajectories.md)）：每个帮工一条，派出去时开始，头文件（`events/<id>.head.json`）记着是谁、为哪张工单、怎么关的，一直留着；步骤在帮工走了 `session.trajectory_days` 天后删。管家一条，留最近 1000 步。帮工自己派的子 agent 的步骤挂在派它的那一步下面。
+**Session 的记录**（`session/records.go`、`session/trajectories.go`；[理由](../../.agents/notes/implemented/feature/2026-10-13-trajectories.md)、[提案](../../.agents/notes/proposed/architecture/2026-10-17-session-run-step.md)）：每个 Session 派出去时在 `session` 表里写一行：谁、哪个档案、哪张工单、哪个项目、什么时候开始；走的时候记上什么时候、怎么关的，一直留着。`session.list` 和 `session.get` 给的都是 `Session`：在地里的从核心状态来，走了的从这张表来，阶段是 `closed`，轮数、最后一轮的结果和花费从 `session_run` 算。事件日志在走了 `session.trajectory_days` 天后删，`session.events` 读它；管家一条，留最近 1000 条。帮工自己派的子 agent 的事件挂在派它的那一条下面（`under`）。
 
 **工单**（`issue/issue.go`、`issue/dispatch.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-15-issue-is-one-thing.md)）：
 
