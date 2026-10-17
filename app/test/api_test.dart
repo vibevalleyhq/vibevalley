@@ -39,7 +39,7 @@ void main() {
       }),
     );
     final page = await api.channel.history(id: 1, before: 10, limit: 20);
-    expect(seen.path, '/api/chat/1/messages');
+    expect(seen.path, '/api/channels/1/messages');
     expect(seen.queryParameters, {'before': '10', 'limit': '20'});
     expect(page.single, isA<ChatMessage>());
     expect(page.single.text, '好');

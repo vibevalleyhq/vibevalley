@@ -735,6 +735,14 @@ func camel(s string) string {
 
 var dartReserved = map[string]bool{"final": true, "default": true, "class": true, "enum": true, "in": true, "is": true, "new": true, "null": true, "switch": true, "case": true, "var": true, "const": true, "this": true, "with": true, "get": true, "set": true}
 
+// dartMethod is an operation's method name: get and set are fine there (http's Client.get), unlike for a field.
+func dartMethod(op string) string {
+	if op != "get" && op != "set" {
+		return dartField(op)
+	}
+	return op
+}
+
 func dartField(name string) string {
 	if dartReserved[camel(name)] {
 		return camel(name) + "_"
@@ -989,9 +997,9 @@ func (s *shapes) dartFile() string {
 		var code string
 		if r.result != nil {
 			t, _ := s.dartTypeOf(r.result)
-			code = fmt.Sprintf("%s  Future<%s> %s(%s) async {\n    final j = await %s;\n    return %s;\n  }", doc, t.typ, dartField(r.op), signature, call, t.read("j"))
+			code = fmt.Sprintf("%s  Future<%s> %s(%s) async {\n    final j = await %s;\n    return %s;\n  }", doc, t.typ, dartMethod(r.op), signature, call, t.read("j"))
 		} else {
-			code = fmt.Sprintf("%s  Future<void> %s(%s) async {\n    await %s;\n  }", doc, dartField(r.op), signature, call)
+			code = fmt.Sprintf("%s  Future<void> %s(%s) async {\n    await %s;\n  }", doc, dartMethod(r.op), signature, call)
 		}
 		g.methods = append(g.methods, code)
 	}

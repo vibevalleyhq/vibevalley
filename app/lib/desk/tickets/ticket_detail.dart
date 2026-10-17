@@ -168,14 +168,14 @@ class _TodoState extends ConsumerState<TodoDetail> {
   Future<void> _save() => _run((api) async {
     unawaited(rememberPick(_agent, _project));
     final item = widget.item;
-    final saved = item == null ? await api.issue.add(body: _request) : await api.issue.edit(id: item.id, body: _request);
+    final saved = item == null ? await api.issue.create(body: _request) : await api.issue.update(id: item.id, body: _request);
     if (item == null) widget.onDone(saved.id);
   });
 
   Future<void> _start() => _run((api) async {
     unawaited(rememberPick(_agent, _project));
-    final item = widget.item ?? await api.issue.add(body: _request);
-    if (widget.item != null) await api.issue.edit(id: item.id, body: _request);
+    final item = widget.item ?? await api.issue.create(body: _request);
+    if (widget.item != null) await api.issue.update(id: item.id, body: _request);
     final got = await api.issue.start(id: item.id);
     dispatchedNotice(got, item.id, widget.onDone);
     // Waiting for a bed: a new one stays open, now as the 待办 it is.
@@ -298,7 +298,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
                   onPressed: _busy
                       ? null
                       : () => _run((api) async {
-                          await api.issue.remove(id: item.id);
+                          await api.issue.delete(id: item.id);
                           widget.onDone(null);
                         }),
                 ),

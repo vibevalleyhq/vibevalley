@@ -121,7 +121,7 @@ class ChatActions {
     final c = conversationOf(chat, conversation);
     final seq = c == null ? null : newestUnread(chat, c);
     if (seq == null) return;
-    await _api.channel.read(
+    await _api.channel.markRead(
       id: conversation,
       body: ChatReadRequest(seq: seq),
     );
@@ -131,7 +131,7 @@ class ChatActions {
   Future<bool> whenLive() async {
     final now = _ref.read(farmProvider)?.call;
     if (now == CallState.live) return true;
-    if (now != CallState.connecting) unawaited(_api.server.start().catchError((Object _) {}));
+    if (now != CallState.connecting) unawaited(_api.manager.open().catchError((Object _) {}));
     final deadline = DateTime.now().add(connectWait);
     while (DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -167,7 +167,7 @@ class ChatActions {
 
   Future<void> openChannel(ChannelRequest req) async {
     final name = req.name.trim().replaceFirst(RegExp('^#'), '');
-    await _api.channel.open(
+    await _api.channel.create(
       body: ChannelRequest(name: name, description: req.description, project: req.project),
     );
     for (var i = 0; i < 40; i++) {
@@ -184,7 +184,7 @@ class ChatActions {
     body: ToggleScheduleRequest(enabled: enabled),
   );
 
-  Future<void> removeSchedule(double id) => _api.schedule.remove(id: id);
+  Future<void> removeSchedule(double id) => _api.schedule.delete(id: id);
 }
 
 final chatActionsProvider = Provider<ChatActions>(ChatActions.new);

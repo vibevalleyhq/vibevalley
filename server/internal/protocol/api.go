@@ -10,9 +10,9 @@ type Handlers interface {
 	//vibevalley:route server.health GET /api/health
 	//vibevalley:can owner remote
 	ServerHealth(ctx context.Context) (Health, error)
-	//vibevalley:route server.start POST /api/start
+	//vibevalley:route manager.open POST /api/manager/open
 	//vibevalley:can owner remote
-	ServerStart(ctx context.Context) error
+	ManagerOpen(ctx context.Context) error
 	//vibevalley:route setting.load GET /api/settings
 	//vibevalley:can owner remote
 	SettingLoad(ctx context.Context) (SettingsStatus, error)
@@ -29,24 +29,24 @@ type Handlers interface {
 	//vibevalley:route channel.say POST /api/say
 	//vibevalley:can owner remote
 	ChannelSay(ctx context.Context, body SayRequest) error
-	//vibevalley:route channel.open POST /api/channels
+	//vibevalley:route channel.create POST /api/channels
 	//vibevalley:can owner remote manager
-	ChannelOpen(ctx context.Context, body ChannelRequest) error
-	//vibevalley:route schedule.add POST /api/schedules
+	ChannelCreate(ctx context.Context, body ChannelRequest) error
+	//vibevalley:route schedule.create POST /api/schedules
 	//vibevalley:can owner remote manager
-	ScheduleAdd(ctx context.Context, body ScheduleRequest) (Schedule, error)
+	ScheduleCreate(ctx context.Context, body ScheduleRequest) (Schedule, error)
 	//vibevalley:route schedule.toggle PUT /api/schedules/{id}
 	//vibevalley:can owner remote
 	ScheduleToggle(ctx context.Context, pID int64, body ToggleScheduleRequest) error
-	//vibevalley:route schedule.remove DELETE /api/schedules/{id}
+	//vibevalley:route schedule.delete DELETE /api/schedules/{id}
 	//vibevalley:can owner remote manager
-	ScheduleRemove(ctx context.Context, pID int64) error
+	ScheduleDelete(ctx context.Context, pID int64) error
 	//vibevalley:route channel.update PUT /api/channels/{id}
 	//vibevalley:can owner remote manager
 	ChannelUpdate(ctx context.Context, pID int64, body ChannelUpdate) error
-	//vibevalley:route issue.dispatch POST /api/dispatch
+	//vibevalley:route manager.hear POST /api/manager/hear
 	//vibevalley:can owner remote
-	IssueDispatch(ctx context.Context, body SayRequest) error
+	ManagerHear(ctx context.Context, body SayRequest) error
 	//vibevalley:route worker.tell POST /api/workers/{id}/tell
 	//vibevalley:can owner remote manager
 	WorkerTell(ctx context.Context, pID string, body TellRequest) error
@@ -72,28 +72,28 @@ type Handlers interface {
 	//vibevalley:route trajectory.list GET /api/trajectories
 	//vibevalley:can owner remote
 	TrajectoryList(ctx context.Context, pAgent *string) ([]TrajectoryHead, error)
-	//vibevalley:route trajectory.find GET /api/trajectories/{id}
+	//vibevalley:route trajectory.get GET /api/trajectories/{id}
 	//vibevalley:can owner remote
-	TrajectoryFind(ctx context.Context, pID string) (Trajectory, error)
+	TrajectoryGet(ctx context.Context, pID string) (Trajectory, error)
 	//vibevalley:route issue.list GET /api/issues
 	//vibevalley:can owner remote
 	IssueList(ctx context.Context) ([]Issue, error)
-	//vibevalley:route issue.find GET /api/issues/{id}
+	//vibevalley:route issue.get GET /api/issues/{id}
 	//vibevalley:can owner remote
-	IssueFind(ctx context.Context, pID string) (Issue, error)
+	IssueGet(ctx context.Context, pID string) (Issue, error)
 	//vibevalley:route issue.runs GET /api/issues/{id}/runs
 	//vibevalley:can owner remote
 	IssueRuns(ctx context.Context, pID string) ([]Run, error)
-	//vibevalley:route issue.add POST /api/issues
+	//vibevalley:route issue.create POST /api/issues
 	//vibevalley:can owner remote
-	IssueAdd(ctx context.Context, body IssueRequest) (Issue, error)
-	//vibevalley:route issue.edit PUT /api/issues/{id}
+	IssueCreate(ctx context.Context, body IssueRequest) (Issue, error)
+	//vibevalley:route issue.update PUT /api/issues/{id}
 	//vibevalley:can owner remote
-	IssueEdit(ctx context.Context, pID string, body IssueRequest) (Issue, error)
-	//vibevalley:route issue.remove DELETE /api/issues/{id}
+	IssueUpdate(ctx context.Context, pID string, body IssueRequest) (Issue, error)
+	//vibevalley:route issue.delete DELETE /api/issues/{id}
 	//vibevalley:can owner remote
-	IssueRemove(ctx context.Context, pID string) error
-	//vibevalley:route issue.move PUT /api/issues/{id}/place
+	IssueDelete(ctx context.Context, pID string) error
+	//vibevalley:route issue.move PUT /api/issues/{id}/move
 	//vibevalley:can owner remote
 	IssueMove(ctx context.Context, pID string, body MoveIssueRequest) ([]Issue, error)
 	//vibevalley:route issue.queue PUT /api/issues/{id}/queue
@@ -108,24 +108,24 @@ type Handlers interface {
 	//vibevalley:route playbook.plan POST /api/playbooks
 	//vibevalley:can owner remote manager
 	PlaybookPlan(ctx context.Context, body PlanRequest) (string, error)
-	//vibevalley:route playbook.editNode PUT /api/playbooks/{id}/nodes/{node}
+	//vibevalley:route playbook.updateNode PUT /api/playbooks/{id}/nodes/{node}
 	//vibevalley:can owner remote manager
-	PlaybookEditNode(ctx context.Context, pID string, pNode string, body NodeEdit) (string, error)
-	//vibevalley:route playbook.removeNode DELETE /api/playbooks/{id}/nodes/{node}
+	PlaybookUpdateNode(ctx context.Context, pID string, pNode string, body NodeEdit) (string, error)
+	//vibevalley:route playbook.deleteNode DELETE /api/playbooks/{id}/nodes/{node}
 	//vibevalley:can owner remote manager
-	PlaybookRemoveNode(ctx context.Context, pID string, pNode string) (string, error)
+	PlaybookDeleteNode(ctx context.Context, pID string, pNode string) (string, error)
 	//vibevalley:route playbook.act POST /api/playbooks/{id}/act
 	//vibevalley:can owner remote manager
 	PlaybookAct(ctx context.Context, pID string, body PlaybookActRequest) (string, error)
 	//vibevalley:route playbook.nodeAct POST /api/playbooks/{id}/nodes/{node}/act
 	//vibevalley:can owner remote manager
 	PlaybookNodeAct(ctx context.Context, pID string, pNode string, body NodeActRequest) (string, error)
-	//vibevalley:route channel.history GET /api/chat/{id}/messages
+	//vibevalley:route channel.history GET /api/channels/{id}/messages
 	//vibevalley:can owner remote manager
 	ChannelHistory(ctx context.Context, pID int64, pBefore *int64, pLimit *int64) ([]ChatMessage, error)
-	//vibevalley:route channel.read POST /api/chat/{id}/read
+	//vibevalley:route channel.markRead POST /api/channels/{id}/read
 	//vibevalley:can owner remote
-	ChannelRead(ctx context.Context, pID int64, body ChatReadRequest) error
+	ChannelMarkRead(ctx context.Context, pID int64, body ChatReadRequest) error
 	//vibevalley:route playbook.changes GET /api/playbooks/{id}/changes
 	//vibevalley:can owner remote
 	PlaybookChanges(ctx context.Context, pID string) (Changes, error)
@@ -135,9 +135,9 @@ type Handlers interface {
 	//vibevalley:route progress.carryCoins POST /api/progress/carry
 	//vibevalley:can owner remote
 	ProgressCarryCoins(ctx context.Context, body CarryCoinsRequest) (CarryCoinsResult, error)
-	//vibevalley:route progress.chooseTitle POST /api/progress/title
+	//vibevalley:route game.chooseTitle POST /api/game/title
 	//vibevalley:can owner remote
-	ProgressChooseTitle(ctx context.Context, body ChooseTitleRequest) error
+	GameChooseTitle(ctx context.Context, body ChooseTitleRequest) error
 	//vibevalley:route runtime.list GET /api/runtimes
 	//vibevalley:can owner remote
 	RuntimeList(ctx context.Context) ([]RuntimeInfo, error)
@@ -184,12 +184,12 @@ type Handlers interface {
 	//vibevalley:route manager.forget DELETE /api/manager/memories/{memory}
 	//vibevalley:can owner remote
 	ManagerForget(ctx context.Context, pMemory string) error
-	//vibevalley:route manager.archive GET /api/manager/archive
+	//vibevalley:route manager.listArchive GET /api/manager/archive
 	//vibevalley:can owner remote manager
-	ManagerArchive(ctx context.Context, pQ *string) (ArchiveListing, error)
-	//vibevalley:route manager.archiveFile GET /api/manager/archive/{name}
+	ManagerListArchive(ctx context.Context, pQ *string) (ArchiveListing, error)
+	//vibevalley:route manager.getArchive GET /api/manager/archive/{name}
 	//vibevalley:can owner remote
-	ManagerArchiveFile(ctx context.Context, pName string) (string, error)
+	ManagerGetArchive(ctx context.Context, pName string) (string, error)
 	//vibevalley:route skill.list GET /api/skills
 	//vibevalley:can owner remote
 	SkillList(ctx context.Context) ([]Skill, error)
@@ -242,28 +242,28 @@ type Handlers interface {
 	//vibevalley:route connector.channel PUT /api/connectors/{id}/channel
 	//vibevalley:can owner remote
 	ConnectorChannel(ctx context.Context, pID ConnectorID, body ConnectorsChannelRequest) (ConnectorStatus, error)
-	//vibevalley:route lan.status GET /api/lan
+	//vibevalley:route gate.status GET /api/gate
 	//vibevalley:can owner
-	LanStatus(ctx context.Context) (LanStatus, error)
-	//vibevalley:route lan.setOpen PUT /api/lan
+	GateStatus(ctx context.Context) (LanStatus, error)
+	//vibevalley:route gate.update PUT /api/gate
 	//vibevalley:can owner
-	LanSetOpen(ctx context.Context, body SetOpenRequest) (LanStatus, error)
-	//vibevalley:route lan.startPairing POST /api/lan/pairing
+	GateUpdate(ctx context.Context, body SetOpenRequest) (LanStatus, error)
+	//vibevalley:route gate.startPairing POST /api/gate/pairing
 	//vibevalley:can owner
-	LanStartPairing(ctx context.Context) (LanStatus, error)
-	//vibevalley:route lan.stopPairing DELETE /api/lan/pairing
+	GateStartPairing(ctx context.Context) (LanStatus, error)
+	//vibevalley:route gate.stopPairing DELETE /api/gate/pairing
 	//vibevalley:can owner
-	LanStopPairing(ctx context.Context) (LanStatus, error)
-	//vibevalley:route lan.answerPairing POST /api/lan/pairing/answer
+	GateStopPairing(ctx context.Context) (LanStatus, error)
+	//vibevalley:route gate.answerPairing POST /api/gate/pairing/answer
 	//vibevalley:can owner
-	LanAnswerPairing(ctx context.Context, body AnswerPairingRequest) (LanStatus, error)
-	//vibevalley:route lan.forgetDevice DELETE /api/lan/devices/{id}
+	GateAnswerPairing(ctx context.Context, body AnswerPairingRequest) (LanStatus, error)
+	//vibevalley:route gate.deleteDevice DELETE /api/gate/devices/{id}
 	//vibevalley:can owner
-	LanForgetDevice(ctx context.Context, pID string) (LanStatus, error)
-	//vibevalley:route lan.pair POST /api/lan/pair
+	GateDeleteDevice(ctx context.Context, pID string) (LanStatus, error)
+	//vibevalley:route gate.pair POST /api/gate/pair
 	//vibevalley:can owner remote
-	LanPair(ctx context.Context, body LanPairRequest) (LanPaired, error)
-	//vibevalley:route lan.me GET /api/lan/me
+	GatePair(ctx context.Context, body LanPairRequest) (LanPaired, error)
+	//vibevalley:route gate.me GET /api/gate/me
 	//vibevalley:can owner remote
-	LanMe(ctx context.Context) (LanDevice, error)
+	GateMe(ctx context.Context) (LanDevice, error)
 }

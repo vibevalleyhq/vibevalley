@@ -19,8 +19,8 @@ enum CallPhase { idle, connecting, live, ending }
 
 class VoiceCall extends ChangeNotifier {
   VoiceCall(this.api, {this.agentPick}) {
-    captions.onHeard = (text) => api.issue
-        .dispatch(
+    captions.onHeard = (text) => api.manager
+        .hear(
           body: SayRequest(text: text, agent: agentPick?.call()),
         )
         .catchError((Object _) {});

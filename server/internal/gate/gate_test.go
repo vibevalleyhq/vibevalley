@@ -77,7 +77,7 @@ func lanAsk(t *testing.T, addr, code, name string) <-chan []byte {
 	got := make(chan []byte, 1)
 	go func() {
 		raw, _ := json.Marshal(protocol.LanPairRequest{Code: code, Name: name})
-		res, err := http.Post(addr+"/api/lan/pair", "application/json", bytes.NewReader(raw))
+		res, err := http.Post(addr+"/api/gate/pair", "application/json", bytes.NewReader(raw))
 		if err != nil {
 			got <- []byte(err.Error())
 			return
@@ -151,7 +151,7 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 	if code, body := lanRequest(t, "GET", addr+"/api/health", paired.Key, nil); code != 200 || !strings.Contains(string(body), `"ok":true`) {
 		t.Fatalf("health: %d %s", code, body)
 	}
-	code, body := lanRequest(t, "GET", addr+"/api/lan/me", paired.Key, nil)
+	code, body := lanRequest(t, "GET", addr+"/api/gate/me", paired.Key, nil)
 	var me protocol.LanDevice
 	if json.Unmarshal(body, &me); code != 200 || me.ID != paired.Device || me.LastSeen == nil {
 		t.Fatalf("me: %d %s", code, body)
@@ -161,7 +161,7 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 			t.Fatalf("%s: %d", path, code)
 		}
 	}
-	for _, c := range []struct{ method, path string }{{"GET", "/api/lan"}, {"PUT", "/api/lan"}, {"POST", "/api/lan/pairing"}, {"DELETE", "/api/lan/devices/" + paired.Device}} {
+	for _, c := range []struct{ method, path string }{{"GET", "/api/gate"}, {"PUT", "/api/gate"}, {"POST", "/api/gate/pairing"}, {"DELETE", "/api/gate/devices/" + paired.Device}} {
 		if code, body := lanRequest(t, c.method, addr+c.path, paired.Key, map[string]bool{"open": false}); code != http.StatusForbidden || !strings.Contains(string(body), "LanRefused") {
 			t.Fatalf("%s %s: %d %s", c.method, c.path, code, body)
 		}

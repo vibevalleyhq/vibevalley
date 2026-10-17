@@ -10,7 +10,7 @@
 - **对话**：存在 `manager/manager.jsonl`，太长时把早先的压成摘要，原文归档在 `manager/archive/`。
 - **记性**：主人让它记的用 `remember` 记在 `manager/MEMORY.md`，每一句都带着（[agents-and-runtimes.md](agents-and-runtimes.md)「管家页」）。
 - **农场现状**：每次请求的系统提示里带着项目、能派的档案（额度、花费、派不出去的原因）、地里的帮工和没收完的计划，不存进对话。
-- **说话**：中文、口语、一两句，只说工具结果和汇报里有的；在串里被问就回在串里。语音管家转来的话（`/api/dispatch`）它只派活不回话。
+- **说话**：中文、口语、一两句，只说工具结果和汇报里有的；在串里被问就回在串里。语音管家转来的话（`/api/manager/hear`）它只派活不回话。
 - **听到什么**：没 @ 别人的话、@管家 的话、没做成的汇报、计划的提醒、到点的定时、巡查的发现。它忙时人的话插进这一轮，其余等这一轮做完。做完的汇报不叫醒它，下次开口时一起交给它。
 
 工具在 `manager/tools.go`：派活（`dispatch`，挑谁见 [agents-and-runtimes.md](agents-and-runtimes.md)「派给谁」）、看和收获（`changes`、`merge`）、看帮工（`roster`、`check`）、带话叫停收工（`tell`、`stop`、`dismiss`）、频道、定时、记性和种植计划。
@@ -122,7 +122,7 @@
 手机、另一台 Mac 和这台电脑用同一个农场（`gate/gate.go`；[理由](../../.agents/notes/implemented/feature/2026-10-14-yard-gate.md)），在「院门」页（`/gate`）管。
 
 - **另一个监听**：在所有网卡上听 `lan.port`（默认 8790），默认关着。
-- **只放这些**：[能力表](capabilities.md)里院门一列打了 ✓ 的接口（`api.go` 的 `//vibevalley:can remote`，`internal/gate` 按 `protocol.Endpoints` 匹配）和两条流，不放 `/mcp`；别的答 403。每个请求要带 `Authorization: Bearer <钥匙>`；只有 `POST /api/lan/pair` 不要。院门自己的管理接口没有 `remote`，只在本机能用。
+- **只放这些**：[能力表](capabilities.md)里院门一列打了 ✓ 的接口（`api.go` 的 `//vibevalley:can remote`，`internal/gate` 按 `protocol.Endpoints` 匹配）和两条流，不放 `/mcp`；别的答 403。每个请求要带 `Authorization: Bearer <钥匙>`；只有 `POST /api/gate/pair` 不要。院门自己的管理接口没有 `remote`，只在本机能用。
 - **配对**：主人点「添加设备」，得到一个配对码（2 分钟有效，用一次就作废），画成 `vibevalley://pair?…` 的二维码。设备带码来要钥匙，等主人在本机点头。数据库只存钥匙的 SHA-256。
 - **移除**一台设备或关上院门，它的连接当场断开。
 - **明文**：院门走 HTTP，不加密，只在信得过的网络里开。

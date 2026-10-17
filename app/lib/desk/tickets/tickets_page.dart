@@ -258,7 +258,7 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
     final agent = f.agent.isNotEmpty ? f.agent : lastAgent;
     final project = f.project.isNotEmpty ? f.project : lastProject;
     await deskRun(
-      () => _api.issue.add(
+      () => _api.issue.create(
         body: IssueRequest(title: text, project: project.isEmpty ? null : project, assignee: agent.isEmpty ? null : agent),
       ),
     );

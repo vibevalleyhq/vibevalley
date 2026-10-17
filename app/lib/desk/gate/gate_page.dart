@@ -51,7 +51,7 @@ class _GatePageState extends ConsumerState<GatePage> {
     super.dispose();
   }
 
-  LanApi get _api => ref.read(apiProvider).lan;
+  GateApi get _api => ref.read(apiProvider).gate;
 
   Future<void> _refresh() async {
     try {
@@ -66,7 +66,7 @@ class _GatePageState extends ConsumerState<GatePage> {
     }
   }
 
-  Future<void> _act(Future<LanStatus> Function(LanApi api) call) async {
+  Future<void> _act(Future<LanStatus> Function(GateApi api) call) async {
     final got = await deskRun(() => call(_api));
     if (got != null && mounted) setState(() => _status = got);
   }
@@ -103,7 +103,7 @@ class _GateCard extends StatelessWidget {
   const _GateCard({required this.status, required this.unreachable, required this.act});
   final LanStatus? status;
   final String? unreachable;
-  final Future<void> Function(Future<LanStatus> Function(LanApi api) call) act;
+  final Future<void> Function(Future<LanStatus> Function(GateApi api) call) act;
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +126,7 @@ class _GateCard extends StatelessWidget {
                     child: PxButton.text(
                       '打开院门',
                       tone: PxTone.primary,
-                      onPressed: () => act((api) => api.setOpen(body: const SetOpenRequest(open: true))),
+                      onPressed: () => act((api) => api.update(body: const SetOpenRequest(open: true))),
                     ),
                   ),
                 ] else ...[
@@ -139,7 +139,7 @@ class _GateCard extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         PxButton.text('添加设备', tone: PxTone.primary, onPressed: s.url == null ? null : () => act((api) => api.startPairing())),
-                        PxButton.text('关上院门', onPressed: () => act((api) => api.setOpen(body: const SetOpenRequest(open: false)))),
+                        PxButton.text('关上院门', onPressed: () => act((api) => api.update(body: const SetOpenRequest(open: false)))),
                       ],
                     ),
                 ],
@@ -168,7 +168,7 @@ class _GateCard extends StatelessWidget {
 class _Pairing extends StatelessWidget {
   const _Pairing({required this.pairing, required this.act});
   final LanPairing pairing;
-  final Future<void> Function(Future<LanStatus> Function(LanApi api) call) act;
+  final Future<void> Function(Future<LanStatus> Function(GateApi api) call) act;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +258,7 @@ class _Pairing extends StatelessWidget {
 class _DevicesCard extends StatelessWidget {
   const _DevicesCard({required this.devices, required this.act});
   final List<LanDevice> devices;
-  final Future<void> Function(Future<LanStatus> Function(LanApi api) call) act;
+  final Future<void> Function(Future<LanStatus> Function(GateApi api) call) act;
 
   @override
   Widget build(BuildContext context) => PxCard(
@@ -279,7 +279,7 @@ class _DevicesCard extends StatelessWidget {
                   '移除',
                   tone: PxTone.danger,
                   size: PxSize.sm,
-                  onPressed: () => act((api) => api.forgetDevice(id: d.id)),
+                  onPressed: () => act((api) => api.deleteDevice(id: d.id)),
                 ),
               ],
             ),

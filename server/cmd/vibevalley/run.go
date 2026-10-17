@@ -38,7 +38,7 @@ func issueRun(ctx context.Context, raw []string) error {
 	fmt.Fprintf(os.Stderr, "开工了：%s\n", *got.Worker)
 	last := protocol.IssueStatus("")
 	for {
-		issue, err := c.IssueFind(ctx, id)
+		issue, err := c.IssueGet(ctx, id)
 		if err != nil {
 			return err
 		}

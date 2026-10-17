@@ -219,7 +219,7 @@ void main() {
       expect(_rich('农场开门了'), findsOneWidget);
       expect(_rich('1 条回复'), findsOneWidget);
       expect(find.text('派活'), findsOneWidget);
-      final read = server.to('POST', '/api/chat/1/read');
+      final read = server.to('POST', '/api/channels/1/read');
       expect(read, hasLength(1));
       expect(jsonDecode(read.single.body), {'seq': 2});
     });
@@ -254,7 +254,7 @@ void main() {
       await _pump(t, const ChatPage(), server, _state());
       await t.tap(find.text('clock-in'));
       await t.pump(const Duration(milliseconds: 50));
-      expect(server.to('GET', '/api/chat/2/messages').single.url.queryParameters, {'limit': '50'});
+      expect(server.to('GET', '/api/channels/2/messages').single.url.queryParameters, {'limit': '50'});
       expect(_rich('打卡页改好了'), findsOneWidget);
       expect(find.text('打卡 · 默认项目 clock-in'), findsOneWidget);
       await t.enterText(find.byType(TextField).first, '今天把打卡做完');
@@ -287,7 +287,7 @@ void main() {
       await t.tap(_rich('1 条回复'));
       await t.pump(const Duration(milliseconds: 50));
       expect(find.text('测试小吴的工单串'), findsOneWidget);
-      expect(server.to('GET', '/api/chat/3/messages'), hasLength(1));
+      expect(server.to('GET', '/api/channels/3/messages'), hasLength(1));
       expect(_rich('测试都过了'), findsWidgets);
       expect(find.text('做完了'), findsOneWidget);
 

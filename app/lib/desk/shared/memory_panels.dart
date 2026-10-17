@@ -277,7 +277,7 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
   }
 
   Future<void> _search(String? q) async {
-    final listing = await deskRun(() => ref.read(apiProvider).manager.archive(q: q));
+    final listing = await deskRun(() => ref.read(apiProvider).manager.listArchive(q: q));
     if (mounted && listing != null) setState(() => _listing = listing);
   }
 
@@ -285,7 +285,7 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
     if (_open?.name == name) return setState(() => _open = null);
     String text;
     try {
-      text = await ref.read(apiProvider).manager.archiveFile(name: name);
+      text = await ref.read(apiProvider).manager.getArchive(name: name);
     } on Object catch (e) {
       text = reasonOf(e);
     }

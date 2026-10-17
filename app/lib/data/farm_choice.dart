@@ -106,7 +106,7 @@ Future<RemoteFarm> pairWith(PairLink link, {required String name, RemoteFarm? kn
   if (known != null) {
     final api = apiFor(link.url, known.key);
     try {
-      final me = await api.lan.me();
+      final me = await api.gate.me();
       return RemoteFarm(url: link.url, key: known.key, farm: known.farm, device: me.id);
     } on Object {
       // Not a key this farm knows (or no answer): ask with the code.
@@ -116,7 +116,7 @@ Future<RemoteFarm> pairWith(PairLink link, {required String name, RemoteFarm? kn
   }
   final api = apiFor(link.url, null);
   try {
-    final paired = await api.lan.pair(
+    final paired = await api.gate.pair(
       body: LanPairRequest(code: link.code, name: name),
     );
     return RemoteFarm(url: link.url, key: paired.key, farm: paired.farm, device: paired.device);

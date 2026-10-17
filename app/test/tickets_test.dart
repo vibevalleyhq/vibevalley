@@ -266,7 +266,7 @@ void main() {
           issues = [item, ...issues];
           changed();
           return jsonResponse(item.toJson());
-        case ('PUT', '/api/issues/a2/place'):
+        case ('PUT', '/api/issues/a2/move'):
           issues = [issues[1], issues[0], ...issues.skip(2)];
           changed();
           return jsonResponse([for (final i in issues) i.toJson()]);
@@ -332,7 +332,7 @@ void main() {
     }
 
     await drag(t.getCenter(find.text('改文案')), t.getCenter(find.text('加日志')));
-    expect(writes.last, 'PUT /api/issues/a2/place {"before":"a1"}');
+    expect(writes.last, 'PUT /api/issues/a2/move {"before":"a1"}');
     expect(find.text('2 轮 · 1 分 · 花了 ¥0.42'), findsOneWidget);
     expect(find.text('打卡写好了，测试全过'), findsOneWidget);
 

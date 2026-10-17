@@ -204,7 +204,7 @@ void main() {
     await settle(tester);
     await tester.tap(find.text('开张大吉').first);
     await settle(tester);
-    expect(routes.calls.single.path, '/api/progress/title');
+    expect(routes.calls.single.path, '/api/game/title');
     expect(routes.calls.single.body, {'achievement': 'harvests', 'tier': 1});
   });
 

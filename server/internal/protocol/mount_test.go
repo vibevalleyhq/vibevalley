@@ -19,7 +19,7 @@ type mountFake struct {
 	history [][2]*int64
 }
 
-func (f *mountFake) ScheduleRemove(_ context.Context, id int64) error {
+func (f *mountFake) ScheduleDelete(_ context.Context, id int64) error {
 	if id == 404 {
 		return Missing{What: "定时 404"}
 	}
@@ -61,7 +61,7 @@ func TestMountKeepsTheContract(t *testing.T) {
 	testkit.Eq(t, [2]any{code, f.toggled}, [2]any{http.StatusBadRequest, []bool(nil)}, "a body that is not JSON never reaches the service")
 	code, body = ask("GET", "/api/health", "")
 	testkit.Eq(t, [2]any{code, body}, [2]any{http.StatusInternalServerError, "boom"}, "any other error is 500")
-	code, body = ask("GET", "/api/chat/3/messages?before=10&limit=many", "")
+	code, body = ask("GET", "/api/channels/3/messages?before=10&limit=many", "")
 	testkit.Eq(t, [2]any{code, body}, [2]any{http.StatusOK, "[]"}, "a nil list is []")
 	testkit.Eq(t, *f.history[0][0], int64(10), "a number query")
 	testkit.Eq(t, f.history[0][1], (*int64)(nil), "one that is not a number is none")

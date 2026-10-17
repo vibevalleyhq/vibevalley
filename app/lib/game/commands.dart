@@ -75,7 +75,7 @@ class FarmCommands {
   Future<bool> whenLive() async {
     final now = _farm?.call;
     if (now == CallState.live) return true;
-    if (now != CallState.connecting) unawaited(_api.server.start().catchError((Object _) {}));
+    if (now != CallState.connecting) unawaited(_api.manager.open().catchError((Object _) {}));
     final until = DateTime.now().add(connectWait);
     while (DateTime.now().isBefore(until)) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -135,8 +135,8 @@ class FarmCommands {
   }
 
   Future<Answer> plan(PlanRequest request) => _answer(() => _api.playbook.plan(body: request));
-  Future<Answer> editNode(String id, String node, NodeEdit edit) => _answer(() => _api.playbook.editNode(id: id, node: node, body: edit));
-  Future<Answer> removeNode(String id, String node) => _answer(() => _api.playbook.removeNode(id: id, node: node));
+  Future<Answer> editNode(String id, String node, NodeEdit edit) => _answer(() => _api.playbook.updateNode(id: id, node: node, body: edit));
+  Future<Answer> removeNode(String id, String node) => _answer(() => _api.playbook.deleteNode(id: id, node: node));
   Future<Answer> actOnPlaybook(String id, PlaybookAction action) => _answer(
     () => _api.playbook.act(
       id: id,
@@ -151,7 +151,7 @@ class FarmCommands {
     ),
   );
 
-  Future<void> chooseTitle([String? achievement, int? tier]) => _api.progress.chooseTitle(
+  Future<void> chooseTitle([String? achievement, int? tier]) => _api.game.chooseTitle(
     body: ChooseTitleRequest(achievement: achievement, tier: tier?.toDouble()),
   );
 

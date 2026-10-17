@@ -110,12 +110,12 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 | `schedule.add` / `remove` / `toggle` | `schedule.create` / `delete` / `update`；补 `schedule.list` | 2、4；管家有 `list_schedules`，接口没有 |
 | `agent.memories` / `remember` / `forget`、`manager.memories` / `remember` / `forget` | `memory.list` / `create` / `delete`，带 `agent`（档案 id 或 `manager`） | 6 个收成 3 个；管家本来是一个档案 id（`protocol.ManagerAgent`）；`ManagerMemory` 多出的部分要放进 `list` 的返回 |
 | `agent.recall` | `memory.recall` | 预览的是记忆 |
-| `manager.archive` / `archiveFile` | `manager.archive.list` / `get` | 2 |
-| `playbook.editNode` / `removeNode` | `playbook.node.update` / `delete` | 2 |
+| `manager.archive` / `archiveFile` | `manager.listArchive` / `getArchive` | 2；操作名只有一段，它也是 Dart 客户端的方法名 |
+| `playbook.editNode` / `removeNode` | `playbook.updateNode` / `deleteNode` | 2 |
 | `playbook.act`、`playbook.nodeAct` | 不变 | 动作是封闭的枚举（start、pause、resume、abandon、merge；retry、skip），一个操作加枚举比拆成七个清楚 |
 | `progress.carryCoins` | 删，连同 `ledger.Carry` | 只有这个接口调 `Game.Carry`，Flutter 和别的入口都不调 |
 | `progress.chooseTitle` | `game.chooseTitle` | 1 |
-| `lan.*` | `gate.status` / `update` / `pairing.start` / `pairing.stop` / `pairing.answer` / `device.delete` / `pair` / `me` | 1、4 |
+| `lan.*` | `gate.status` / `update` / `startPairing` / `stopPairing` / `answerPairing` / `deleteDevice` / `pair` / `me`，路径 `/api/gate…` | 1、4 |
 | `server.start` | `manager.open` | 1；它只做 `Core.Open`：把管家这条线设成 live（`core.go:247`） |
 | `server.end` | 删，连同 `Worker.DismissAll` | 只有调试命令调它（`debug_commands.dart:43`）；它把「挂断管家」和「请走全部帮工」两件事绑在一起 |
 | `CallState` | `ManagerLine`，只留 `idle`、`live` | 服务端只设这两个（`handler/api.go:60`、`core.go:249`、`connector.go:545`）；`connecting`、`ending`、`error` 从没设过 |
@@ -149,7 +149,7 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 
 1. `//vibevalley:can` 和 `//vibevalley:tool`，给全部操作都写上；生成能力表的文档；院门改成按 `remote` 放。（`can`、`protocol.Endpoints`、能力表、院门已做；85 个操作，不是 86；`tool` 留到第 4 步，和管家工具的检查一起做。）
 2. 生成 `Client` 和命令表，做命令行；写 `verify-dispatch`，步骤就是命令行的几条命令，真的派一次活。（`protocol.Client`、`Endpoints` 带查询参数和请求体、`cmd/vibevalley` 的农场命令、`state`、`events`、`runtime chat`、`issue run <id>`（开工、等到等你看、打出改动；不要 `--wait`，它总是等）已做，`verify-server` 改用命令行；`verify-dispatch` 还没做：要真的派一次活。）
-3. 第 4 节的改名和收敛，和 Worker 改叫 Session 一个改动做完；派活一个入口、`Changes` 带上「谁在看」、`update` 只改给出的字段。
+3. 第 4 节的改名和收敛，和 Worker 改叫 Session 一个改动做完（只改名、不改行为的那些已做：`get`、`create`、`update`、`delete`、`markRead`、`manager.hear`、`manager.open`、`gate.*`、`game.chooseTitle`、频道的路径；按工单 id 的生命周期、`unqueue`、`update` 只改给出的字段、删掉没人调的、记忆合并还没做）；派活一个入口、`Changes` 带上「谁在看」、`update` 只改给出的字段。
 4. 检查管家的工具、MCP 和能力表对得上；按第 5 节主人定的补帮工的能力。
 
 ## 命令行清单
@@ -192,8 +192,8 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 | `channel mark-read <id> --json` | | | |
 | `manager hear "<话>"` | | | |
 | `manager open` | | | 把管家这条线设成 live |
-| `manager archive list [--q]` | ✓ `search_archive` | | |
-| `manager archive get <name>` | | | |
+| `manager list-archive [--q]` | ✓ `search_archive` | | |
+| `manager get-archive <name>` | | | |
 
 ### 记忆
 
@@ -209,10 +209,10 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 | 命令 | 管家 | 备注 |
 |---|---|---|
 | `playbook plan --json` | ✓ `plan` | |
-| `playbook node update <id> <node> --json` | ✓ `plan_edit` | |
-| `playbook node delete <id> <node>` | ✓ `plan_edit` | |
+| `playbook update-node <id> <node> --json` | ✓ `plan_edit` | |
+| `playbook delete-node <id> <node>` | ✓ `plan_edit` | |
 | `playbook act <id> --json` | ✓ `plan_action` | |
-| `playbook node act <id> <node> --json` | ✓ `node_action` | |
+| `playbook node-act <id> <node> --json` | ✓ `node_action` | |
 | `playbook changes <id>` | | |
 | `playbook events <id>` | | |
 | `schedule list` | ✓ `list_schedules` | 新补 |
@@ -239,7 +239,7 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 | 命令 | 备注 |
 |---|---|
 | `connector list` / `login <id> --json` / `verify <id> --json` / `logout <id>` / `channel <id> --json` | 登录要扫码，命令行只能打出链接 |
-| `gate status` / `update --json` / `pairing start` / `pairing stop` / `pairing answer --json` / `device delete <id>` | 不给 `remote` |
+| `gate status` / `update --json` / `start-pairing` / `stop-pairing` / `answer-pairing --json` / `delete-device <id>` | 不给 `remote` |
 | `gate pair --json` / `gate me` | 设备那一端调，`remote` ✓ |
 | `voice session` / `renew` / `start` / `stop` | 声网的令牌，只有客户端用 |
 | `game choose-title --json` | |

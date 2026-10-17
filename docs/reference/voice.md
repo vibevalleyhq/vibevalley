@@ -19,7 +19,7 @@
 
 `app/lib/voice/`（`VoiceCall`）：从服务端取令牌，用 Agora 的 Flutter SDK 加入频道。Flutter 的 RTM 只有移动端，所以字幕、打断和语音管家的状态都走 RTC 的 data stream（`captions.dart` 拼块再解）。令牌快过期时换新的。只链语音要的 Agora 组件（`app/tool/agora-voice-only.sh`）。
 
-语音里说的话只在客户端，不写进田头，帮工看不到。你说完一句，字幕定稿时交给农场派活（`POST /api/dispatch`，管家只派活不回话）。
+语音里说的话只在客户端，不写进田头，帮工看不到。你说完一句，字幕定稿时交给农场派活（`POST /api/manager/hear`，管家只派活不回话）。
 
 ## 凭据
 
@@ -42,4 +42,4 @@ Agora 的 App ID 和 App Certificate 在首页「设置」或声音页里填，�
 - **隧道**：设了 `voice.line.url` 就用它；没设时第一通电话开一个 cloudflared 临时隧道，等它能应答（最多 60 秒），最后一通挂了 10 分钟后关掉。
 - **每通电话一把钥匙**：声网的请求要带 `Authorization: Bearer <钥匙>`，挂了就作废。
 - 只取最新的一句交给管家（`Manager.Call`），对话历史以管家自己的会话为准；声网打断时丢掉正在念的。
-- 这时 `/api/dispatch` 不再转给管家，免得一句话处理两次。
+- 这时 `/api/manager/hear` 不再转给管家，免得一句话处理两次。

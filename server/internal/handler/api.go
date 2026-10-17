@@ -40,7 +40,7 @@ func (a api) ServerHealth(context.Context) (protocol.Health, error) {
 	return protocol.Health{Ok: true, Version: a.f.Version}, nil
 }
 
-func (a api) ServerStart(context.Context) error { a.f.Core.Open(); return nil }
+func (a api) ManagerOpen(context.Context) error { a.f.Core.Open(); return nil }
 
 func (a api) SettingLoad(context.Context) (protocol.SettingsStatus, error) {
 	return a.f.Setting.Status(), nil
@@ -69,12 +69,12 @@ func (a api) ChannelSay(ctx context.Context, body protocol.SayRequest) error {
 	return refused(a.f.Manager.Say(ctx, body.Text, ptr.Value(body.Agent), body.Conversation))
 }
 
-func (a api) ChannelOpen(_ context.Context, body protocol.ChannelRequest) error {
+func (a api) ChannelCreate(_ context.Context, body protocol.ChannelRequest) error {
 	_, err := a.f.Channel.OpenChannel(body.Name, ptr.Value(body.Description), ptr.Value(body.Project))
 	return refused(err)
 }
 
-func (a api) ScheduleAdd(_ context.Context, body protocol.ScheduleRequest) (protocol.Schedule, error) {
+func (a api) ScheduleCreate(_ context.Context, body protocol.ScheduleRequest) (protocol.Schedule, error) {
 	s, err := a.f.Schedule.Add(body)
 	return s, refused(err)
 }
@@ -84,7 +84,7 @@ func (a api) ScheduleToggle(_ context.Context, id int64, body protocol.ToggleSch
 	return refused(err)
 }
 
-func (a api) ScheduleRemove(_ context.Context, id int64) error {
+func (a api) ScheduleDelete(_ context.Context, id int64) error {
 	_, err := a.f.Schedule.Remove(id)
 	return refused(err)
 }
@@ -93,7 +93,7 @@ func (a api) ChannelUpdate(_ context.Context, id int64, body protocol.ChannelUpd
 	return refused(a.f.Channel.UpdateChannel(id, body.Description, body.Project))
 }
 
-func (a api) IssueDispatch(_ context.Context, body protocol.SayRequest) error {
+func (a api) ManagerHear(_ context.Context, body protocol.SayRequest) error {
 	a.f.Core.Open()
 	a.f.Manager.Heard(body.Text, ptr.Value(body.Agent))
 	return nil
@@ -165,7 +165,7 @@ func (a api) TrajectoryList(_ context.Context, agent *string) ([]protocol.Trajec
 	return a.f.Worker.List(ptr.Value(agent)), nil
 }
 
-func (a api) TrajectoryFind(_ context.Context, id string) (protocol.Trajectory, error) {
+func (a api) TrajectoryGet(_ context.Context, id string) (protocol.Trajectory, error) {
 	if t := a.f.Worker.Get(id); t != nil {
 		return *t, nil
 	}
@@ -177,12 +177,12 @@ func (a api) PlaybookPlan(_ context.Context, body protocol.PlanRequest) (string,
 	return s, refused(err)
 }
 
-func (a api) PlaybookEditNode(_ context.Context, id, node string, body protocol.NodeEdit) (string, error) {
+func (a api) PlaybookUpdateNode(_ context.Context, id, node string, body protocol.NodeEdit) (string, error) {
 	s, err := a.f.Playbook.EditNode(id, node, body, protocol.PlaybookActorUser)
 	return s, refused(err)
 }
 
-func (a api) PlaybookRemoveNode(_ context.Context, id, node string) (string, error) {
+func (a api) PlaybookDeleteNode(_ context.Context, id, node string) (string, error) {
 	s, err := a.f.Playbook.RemoveNode(id, node, protocol.PlaybookActorUser)
 	return s, refused(err)
 }
@@ -205,7 +205,7 @@ func (a api) ChannelHistory(_ context.Context, id int64, before, limit *int64) (
 	return messages, nil
 }
 
-func (a api) ChannelRead(_ context.Context, id int64, body protocol.ChatReadRequest) error {
+func (a api) ChannelMarkRead(_ context.Context, id int64, body protocol.ChatReadRequest) error {
 	if err := a.f.Channel.MarkRead(id, body.Seq); err != nil {
 		return missing(err.Error())
 	}
@@ -225,7 +225,7 @@ func (a api) ProgressCarryCoins(_ context.Context, body protocol.CarryCoinsReque
 	return protocol.CarryCoinsResult{Carried: a.f.Game.Carry(body.Coins)}, nil
 }
 
-func (a api) ProgressChooseTitle(_ context.Context, body protocol.ChooseTitleRequest) error {
+func (a api) GameChooseTitle(_ context.Context, body protocol.ChooseTitleRequest) error {
 	a.f.Game.ChooseTitle(body.Achievement, body.Tier)
 	return nil
 }
@@ -305,11 +305,11 @@ func (a api) ManagerForget(_ context.Context, memory string) error {
 	return refused(a.f.Memory.ForgetManager(memory))
 }
 
-func (a api) ManagerArchive(_ context.Context, q *string) (protocol.ArchiveListing, error) {
+func (a api) ManagerListArchive(_ context.Context, q *string) (protocol.ArchiveListing, error) {
 	return a.f.Memory.Archive(ptr.Value(q)), nil
 }
 
-func (a api) ManagerArchiveFile(_ context.Context, name string) (string, error) {
+func (a api) ManagerGetArchive(_ context.Context, name string) (string, error) {
 	if text, ok := a.f.Memory.ArchiveFile(name); ok {
 		return text, nil
 	}
@@ -418,33 +418,33 @@ func (a api) ConnectorChannel(_ context.Context, id protocol.ConnectorID, body p
 	return s, nil
 }
 
-func (a api) LanStatus(context.Context) (protocol.LanStatus, error) { return a.f.Gate.Status(), nil }
+func (a api) GateStatus(context.Context) (protocol.LanStatus, error) { return a.f.Gate.Status(), nil }
 
-func (a api) LanSetOpen(_ context.Context, body protocol.SetOpenRequest) (protocol.LanStatus, error) {
+func (a api) GateUpdate(_ context.Context, body protocol.SetOpenRequest) (protocol.LanStatus, error) {
 	return a.f.Gate.SetOpen(body.Open)
 }
 
-func (a api) LanStartPairing(context.Context) (protocol.LanStatus, error) {
+func (a api) GateStartPairing(context.Context) (protocol.LanStatus, error) {
 	return a.f.Gate.StartPairing()
 }
 
-func (a api) LanStopPairing(context.Context) (protocol.LanStatus, error) {
+func (a api) GateStopPairing(context.Context) (protocol.LanStatus, error) {
 	return a.f.Gate.StopPairing(), nil
 }
 
-func (a api) LanAnswerPairing(_ context.Context, body protocol.AnswerPairingRequest) (protocol.LanStatus, error) {
+func (a api) GateAnswerPairing(_ context.Context, body protocol.AnswerPairingRequest) (protocol.LanStatus, error) {
 	return a.f.Gate.Answer(body.Allow)
 }
 
-func (a api) LanForgetDevice(_ context.Context, id string) (protocol.LanStatus, error) {
+func (a api) GateDeleteDevice(_ context.Context, id string) (protocol.LanStatus, error) {
 	return a.f.Gate.Forget(id)
 }
 
-func (a api) LanPair(ctx context.Context, body protocol.LanPairRequest) (protocol.LanPaired, error) {
+func (a api) GatePair(ctx context.Context, body protocol.LanPairRequest) (protocol.LanPaired, error) {
 	return a.f.Gate.Pair(ctx, body.Code, body.Name)
 }
 
-func (a api) LanMe(ctx context.Context) (protocol.LanDevice, error) { return a.f.Gate.Me(ctx) }
+func (a api) GateMe(ctx context.Context) (protocol.LanDevice, error) { return a.f.Gate.Me(ctx) }
 
 func (a api) IssueReopen(ctx context.Context, id string, body protocol.ReopenRequest) (protocol.Dispatched, error) {
 	worker, err := a.f.Issue.Reopen(context.WithoutCancel(ctx), id, body.Text, a.f.Channel.General())
@@ -456,7 +456,7 @@ func (a api) IssueReopen(ctx context.Context, id string, body protocol.ReopenReq
 
 func (a api) IssueList(context.Context) ([]protocol.Issue, error) { return a.f.Issue.List() }
 
-func (a api) IssueFind(_ context.Context, id string) (protocol.Issue, error) {
+func (a api) IssueGet(_ context.Context, id string) (protocol.Issue, error) {
 	return a.f.Issue.Get(id)
 }
 
@@ -467,11 +467,11 @@ func (a api) IssueRuns(_ context.Context, id string) ([]protocol.Run, error) {
 	return a.f.Worker.Runs(id)
 }
 
-func (a api) IssueAdd(_ context.Context, body protocol.IssueRequest) (protocol.Issue, error) {
+func (a api) IssueCreate(_ context.Context, body protocol.IssueRequest) (protocol.Issue, error) {
 	return a.f.Issue.Add(body)
 }
 
-func (a api) IssueEdit(_ context.Context, id string, body protocol.IssueRequest) (protocol.Issue, error) {
+func (a api) IssueUpdate(_ context.Context, id string, body protocol.IssueRequest) (protocol.Issue, error) {
 	return a.f.Issue.Edit(id, body)
 }
 
@@ -479,7 +479,7 @@ func (a api) IssueMove(_ context.Context, id string, body protocol.MoveIssueRequ
 	return a.f.Issue.Move(id, ptr.Value(body.Before))
 }
 
-func (a api) IssueRemove(_ context.Context, id string) error { return a.f.Issue.Remove(id) }
+func (a api) IssueDelete(_ context.Context, id string) error { return a.f.Issue.Remove(id) }
 
 func (a api) IssueStart(ctx context.Context, id string) (protocol.Dispatched, error) {
 	got, err := a.f.Issue.Start(context.WithoutCancel(ctx), id, a.f.Channel.General())

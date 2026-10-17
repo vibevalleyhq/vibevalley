@@ -31,12 +31,12 @@
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Worker.Phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `FactRun` 到 `FactReport`、`Worker.Runs`、`LastRun` | `/api/issues/{id}/runs` |
 | 干活过程 | 干活过程 | `farm/work_log.dart` | `Activity`、`Trajectory`、`TrajectoryHead` | `/api/workers/{id}/activities`、`/api/trajectories` |
 | 收成清单、收获 | 收获 | `shared/harvest.dart` | `Changes` | `/api/workers/{id}/changes`、`/api/workers/{id}/merge` |
-| 田头、频道 | 田头 | 田头窗口（`farm/chat_window.dart`）、`/chat`（`desk/chat`） | `Conversation`（`kind`：`square`、`channel`）、`ChatMessage`、`CoreState.Chat` | `/api/chat/messages`、`/api/channels` |
-| 工单串、评论 | 工单串 | 派活消息下面的串；干活过程里的「评论」 | `Conversation`（`kind: thread`）；评论某一步是 `worker.CommentText` 拼出来的一句话 | `/api/chat/messages`、`/api/workers/{id}/tell` |
+| 田头、频道 | 田头 | 田头窗口（`farm/chat_window.dart`）、`/chat`（`desk/chat`） | `Conversation`（`kind`：`square`、`channel`）、`ChatMessage`、`CoreState.Chat` | `/api/channels`、`/api/channels/{id}/messages` |
+| 工单串、评论 | 工单串 | 派活消息下面的串；干活过程里的「评论」 | `Conversation`（`kind: thread`）；评论某一步是 `worker.CommentText` 拼出来的一句话 | `/api/channels/{id}/messages`、`/api/workers/{id}/tell` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Schedule`；它的工单是 `Issue.Schedule` 指着它的那张 | `/api/schedules` |
 | 来电 | 手机来电 | `phone/calls.dart` | `InboxItem`（`StateFrame.Inbox`，从核心状态现算） | |
 | 连接器 | 连接器 | `/connectors`（`desk/connectors`） | `ConnectorStatus` | `/api/connectors` |
-| 院门 | 院门 | `/gate`（`desk/gate`） | `LanStatus`、`LanDevice` | `/api/lan` |
+| 院门 | 院门 | `/gate`（`desk/gate`） | `LanStatus`、`LanDevice` | `/api/gate` |
 | 语音 | 麦克风 | `/voice`（`desk/voice`）、`voice/` | `VoiceSettings` | `/api/voice/...` |
 | 进度、成就 | 金币、连胜、任务与成就 | `farm/achievements.dart` | `Progress`、`LedgerEntry`、`CoreState.Progress` | `/api/progress/...` |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.Level` | |

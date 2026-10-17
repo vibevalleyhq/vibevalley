@@ -97,7 +97,7 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
     expect(container.read(titleOpenProvider), isFalse);
     expect(find.text('开始游戏'), findsNothing);
-    expect(server.requests.map((r) => '${r.method} ${r.url.path}'), contains('POST /api/start'));
+    expect(server.requests.map((r) => '${r.method} ${r.url.path}'), contains('POST /api/manager/open'));
     await unmount(tester);
   });
 
@@ -109,7 +109,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
     expect(container.read(titleOpenProvider), isFalse);
-    expect(server.requests.where((r) => r.url.path == '/api/start'), isEmpty);
+    expect(server.requests.where((r) => r.url.path == '/api/manager/open'), isEmpty);
     await unmount(tester);
   });
 

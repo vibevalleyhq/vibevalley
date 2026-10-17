@@ -360,7 +360,7 @@ func (l *Service) Me(ctx context.Context) (protocol.LanDevice, error) {
 func (l *Service) gate(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if r.Method == http.MethodPost && path == "/api/lan/pair" {
+		if r.Method == http.MethodPost && path == "/api/gate/pair" {
 			inner.ServeHTTP(w, r)
 			return
 		}

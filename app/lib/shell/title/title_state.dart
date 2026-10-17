@@ -28,7 +28,7 @@ class TitleOpen extends Notifier<bool> {
 
   void enterFarm({required bool start}) {
     state = false;
-    if (start) unawaited(ref.read(apiProvider).server.start().catchError((Object _) {}));
+    if (start) unawaited(ref.read(apiProvider).manager.open().catchError((Object _) {}));
     unawaited(() async {
       try {
         await (await SharedPreferences.getInstance()).setBool(_seenKey, true);

@@ -39,7 +39,7 @@ class Hb {
 
   VibeValleyApi get _api => ref.read(apiProvider);
 
-  Future<void> start() => _api.server.start();
+  Future<void> start() => _api.manager.open();
   Future<void> end() => _api.server.end();
 
   Future<void> hear(String text) => _api.channel.say(body: SayRequest(text: text));
