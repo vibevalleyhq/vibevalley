@@ -1,6 +1,6 @@
 # 概念在各层的名字
 
-一个概念在每一层叫什么：从农场里看到的，到界面、协议、HTTP、服务端、存储，最后到 oar。概念本身是什么见 [concepts.md](../concepts.md)，叫法见[用语表](../README.md#用语)。几处名字打算改，见[提案](../../.agents/notes/proposed/architecture/2026-10-16-runs-workers-crews.md)。
+一个概念在每一层叫什么：从农场里看到的，到界面、协议、HTTP、服务端、存储，最后到 oar。概念本身是什么见 [concepts.md](../concepts.md)，叫法见[用语表](../README.md#用语)。小队还没做，见[提案](../../.agents/notes/proposed/architecture/2026-10-16-runs-sessions-crews.md)。
 
 ## 各层
 
@@ -31,7 +31,7 @@
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.Phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `FactRun` 到 `FactReport`、`Session.Runs`、`LastRun` | `/api/issues/{id}/runs` |
 | 干活过程 | 干活过程 | `farm/work_log.dart` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/sessions`、`/api/sessions/{id}`、`/api/sessions/{id}/events` |
 | 收成清单、收获 | 收获 | `shared/harvest.dart` | `Changes` | `/api/issues/{id}/changes`、`/api/issues/{id}/merge` |
-| 田头、频道 | 田头 | 田头窗口（`farm/chat_window.dart`）、`/chat`（`desk/chat`） | `Conversation`（`kind`：`square`、`channel`）、`ChatMessage`、`CoreState.Chat` | `/api/channels`、`/api/channels/{id}/messages` |
+| 田头、频道 | 田头 | 田头窗口（`farm/chat_window.dart`）、`/chat`（`desk/chat`） | `Conversation`（`kind`：`general`、`channel`）、`ChatMessage`、`CoreState.Chat` | `/api/channels`、`/api/channels/{id}/messages` |
 | 工单串、评论 | 工单串 | 派活消息下面的串；干活过程里的「评论」 | `Conversation`（`kind: thread`）；评论某一步是 `session.CommentText` 拼出来的一句话 | `/api/channels/{id}/messages`、`/api/issues/{id}/comment` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Schedule`；它的工单是 `Issue.Schedule` 指着它的那张 | `/api/schedules` |
 | 来电 | 手机来电 | `phone/calls.dart` | `InboxItem`（`StateFrame.Inbox`，从核心状态现算） | |

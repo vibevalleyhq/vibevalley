@@ -6,7 +6,7 @@ Status: proposed
 
 一个 agent 档案为一张工单干的那一份活（一个 oar 子 agent，加上自己的 worktree 和分支，从派出去到合并或请走，跨好几次 run），代码里叫 `Worker`。这个词说的是「干活的人」，不是「一个档案在一张工单上的一次接活」：`agent list` 和 `worker list` 并排时，读的人以为是两种人。Linear 把这一层叫 agent session，主人想的也是「后端老周在 tDS4 上的那个会话」。
 
-[Run 是一次干活](2026-10-16-runs-workers-crews.md)当时没选 Session，理由是和 oar 的 `Session` 重名。2026-10-17 主人定了：重名可以接受，用词规则分开两层，这一层改叫 Session。本篇取代那一篇 Alternatives 里「跨 run 的那层叫 Session。没选」这一条。
+[Run 是一次干活](2026-10-16-runs-sessions-crews.md)当时没选 Session，理由是和 oar 的 `Session` 重名。2026-10-17 主人定了：重名可以接受，用词规则分开两层，这一层改叫 Session。本篇取代那一篇 Alternatives 里「跨 run 的那层叫 Session。没选」这一条。
 
 ## Proposal
 

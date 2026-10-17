@@ -2,12 +2,11 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（14 篇）
+## proposed（13 篇）
 
 ### feature
 
 - 2026-10-13 [帮工各自的音色](proposed/feature/2026-10-13-helper-voices.md)
-- 2026-10-10 [帮工的权限请求变成地里的杂草](proposed/feature/2026-10-10-permission-requests-as-weeds.md)
 - 2026-10-10 [pi 打磨好之后接回其他 runtime](proposed/feature/2026-10-10-other-runtimes.md)
 - 2026-10-09 [商店和每日任务](proposed/feature/2026-10-09-shop-and-daily-tasks.md)
 - 2026-10-09 [手机竖屏版面](proposed/feature/2026-10-09-mobile-layout.md)
@@ -19,7 +18,7 @@
 - 2026-10-17 [Session、Run、事件：一个 agent loop 的日志，和消息之间只有两个口子](proposed/architecture/2026-10-17-session-run-step.md)
 - 2026-10-17 [管家是一份内置档案](proposed/architecture/2026-10-17-manager-is-an-agent.md)
 - 2026-10-17 [先有能力，再有入口：一张能力表，接口、命令行、管家、帮工都从它来](proposed/architecture/2026-10-17-capabilities-before-surfaces.md)
-- 2026-10-16 [Run 是一次干活，Worker 跨好几次 run，小队（Crew）编排 agent](proposed/architecture/2026-10-16-runs-workers-crews.md)
+- 2026-10-16 [Run 是一次干活，Session 跨好几次 run，小队（Crew）编排 agent](proposed/architecture/2026-10-16-runs-sessions-crews.md)
 - 2026-10-16 [改完旧名字，主键用 uuidv7](proposed/architecture/2026-10-16-finish-the-renames.md)
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
@@ -122,7 +121,11 @@
 - 2026-10-17 [测试共用一套工具和一个替身](implemented/testing/2026-10-17-one-test-kit.md)
 - 2026-10-10 [服务端测试用脚本扮演帮工](implemented/testing/2026-10-10-scripted-runtime-server-tests.md)
 
-## rejected（1 篇）
+## rejected（2 篇）
+
+### feature
+
+- 2026-10-10 [帮工的权限请求变成地里的杂草](rejected/feature/2026-10-10-permission-requests-as-weeds.md) — 帮工不做权限确认是常驻规矩：靠本机、工作目录和院门划边界，逐条批准会让帮工停在命令上等人，和无人值守冲突；「除草」留着位置
 
 ### architecture
 

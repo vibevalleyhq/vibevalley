@@ -16,7 +16,7 @@ oar 默认不要权限确认、不开沙箱。2026-10-10 主人确认接受，�
 
 **每种 runtime 自己接。** oar 已经统一了发现、开会话、事件、插话和报告，自己接要重写这些。
 
-**开着权限确认，由页面一个个批准。** 页面还没有批准的界面（「除草」，见 [permission-requests-as-weeds](../../proposed/feature/2026-10-10-permission-requests-as-weeds.md)）；在那之前开着确认，帮工会卡在第一个命令上。
+**开着权限确认，由页面一个个批准。** 页面没有批准的界面（「除草」留着位置，[提案已否决](../../rejected/feature/2026-10-10-permission-requests-as-weeds.md)）；开着确认，帮工会卡在第一个命令上。
 
 **开沙箱。** 各 runtime 的沙箱能力不一样（codex 有 `OAR_CODEX_SANDBOX`，其他没有统一的），先用工作目录和 worktree 圈住。
 

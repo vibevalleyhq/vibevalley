@@ -50,7 +50,7 @@
 | 手 | 空地：播种（界面 3）；有帮工：看详情（界面 2） |
 | 浇水 | 给帮工带句话 |
 | 杀虫 | 失败的地：让它接着修 |
-| 除草 | 等你批准的权限请求（[提案](../../.agents/notes/proposed/feature/2026-10-10-permission-requests-as-weeds.md)）；现在只有提示 |
+| 除草 | 等你批准的权限请求（[提案已否决](../../.agents/notes/rejected/feature/2026-10-10-permission-requests-as-weeds.md)）；现在只有提示 |
 | 收获 | 先开收成清单（界面 15），确认后合进项目。计划里的步骤不在这里收 |
 | 铲除 | 干着活就叫停，否则请它收工 |
 

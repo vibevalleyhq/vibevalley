@@ -37,7 +37,7 @@ Status: implemented
 - ready 的顺序按包认：`farm` 的测试里是 `game`、`run`、`schedule`、`connector`。`Farm` 的服务表里 `Game` 排在 `Run` 前面，让等级先数出来。
 - 手动开服务的测试（`workspace/work_test.go`）按包开，一个 `Service` 只开一次，否则它的零件会开两遍。
 - `mcp` 的测试在它自己的包里，带排在下面的包和一个扮演帮工、记下令牌的 pi。
-- [Run、Worker、Crew 的提案](../../proposed/architecture/2026-10-16-runs-workers-crews.md)里的服务也照这个约定。
+- [Run、Session、Crew 的提案](../../proposed/architecture/2026-10-16-runs-sessions-crews.md)里的服务也照这个约定。
 
 ## Verification
 

@@ -6,7 +6,7 @@ Status: implemented
 
 [频道和定时](../feature/2026-10-11-channels-and-schedules.md)让定时到点后有两个出口：写了帮工档案的每次写一张新工单，没写的直接对管家说一句话。两个出口靠两个订阅者各自看「有没有写档案」来分工，这个约定是隐式的；交给管家的那一半不进看板，也不留下干了什么。
 
-主人的模型是：issue 和 comment 都能触发一次干活（run，见 [Run、Worker、Crew 的提案](../../proposed/architecture/2026-10-16-runs-workers-crews.md)）。定时应该是同一种东西：一种触发。
+主人的模型是：issue 和 comment 都能触发一次干活（run，见 [Run、Session、Crew 的提案](../../proposed/architecture/2026-10-16-runs-sessions-crews.md)）。定时应该是同一种东西：一种触发。
 
 ## Decision
 

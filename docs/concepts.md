@@ -45,7 +45,7 @@ Workspace（工作目录，一张大地图）
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` | 干活过程 |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 | 收成清单 |
 | 合并 | `Issue.Merge` | 把分支合进主分支，关上工单 | 收获 |
-| 频道 | `Conversation`（`kind: square`、`channel`） | 说话的地方；默认的是田头，主人可以再开；外面的聊天软件经连接器接到一个频道上 | 田头和别的频道 |
+| 频道 | `Conversation`（`kind: general`、`channel`） | 说话的地方；默认的是田头，主人可以再开；外面的聊天软件经连接器接到一个频道上 | 田头和别的频道 |
 | 工单串 | `kind: thread`、`subjectKind: issue` | 一张工单下的对话，相当于 Linear 的评论 | 工单串 |
 | 计划 | 带 `plan` 的父工单 | 一件大活拆成有先后的子工单（`step`、`blockedBy`），每步合进计划分支，最后合进主分支 | 种植计划 |
 | 定时 | `Schedule` | 一张工单的一种触发：一个定时一张工单，派给一个档案或管家，每次到点是它的一次 run | 定时 |

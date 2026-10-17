@@ -14,8 +14,8 @@ Status: implemented
   - `GET /api/agents/{id}/recall?project=&text=`：`Pick` 挑出的几行和字数，不计成想起过；`Memory.fading` 标出再记十条就会丢的。
   - `POST /api/projects/check`：新增项目时会拒绝的第一处（`projectProblem`），新增项目的对话框提交前问它；Dart 里的项目名正则和那句话删了。
   - `POST /api/settings/check`：保存时会拒绝的第一处（`SettingsProblem`、`VoiceProblem`），语音页边改边问。语音设置发整份，`setting.Save` 用 `VoiceOverrides` 自己留下和默认不一样的；客户端不再知道「默认值」怎么比。
-  - `POST /api/workers/{id}/resolve`：服务端看这个帮工的冲突（核心状态里标的，没有就现查），用 `ConflictTask` 以主人的名义告诉它。
-  - 跟着状态走的话在出帧时由 `protocol.FrameOf` 填进状态的副本（起初写在 `Reduce` 里，会进 `state.json`，后来挪了，见[收敛接缝](2026-10-17-converge-the-seams.md)）：帮工在干什么（`Worker.phaseText`，没动静多久写成 `{span}`，客户端按自己的钟填，和收件箱的 `{ago}` 一样）、定时什么时候跑、下次几点（`Schedule.whenText`、`nextText`，按定时自己的时区说）、连胜倍率（`Progress.multiplier`）。
+  - `POST /api/issues/{id}/resolve`：服务端看这个帮工的冲突（核心状态里标的，没有就现查），用 `ConflictTask` 以主人的名义告诉它。
+  - 跟着状态走的话在出帧时由 `protocol.FrameOf` 填进状态的副本（起初写在 `Reduce` 里，会进 `state.json`，后来挪了，见[收敛接缝](2026-10-17-converge-the-seams.md)）：帮工在干什么（`Session.phaseText`，没动静多久写成 `{span}`，客户端按自己的钟填，和收件箱的 `{ago}` 一样）、定时什么时候跑、下次几点（`Schedule.whenText`、`nextText`，按定时自己的时区说）、连胜倍率（`Progress.multiplier`）。
   - 额度：`RuntimeInfo.quota` 带剩几成和那句话（`runtime/quota.go`），管家和额度条都读它。
   - 成就表、每档的金币在 `seeds.json`，经生成到 `lib/gen` 的 `achievements`；Dart 不再手抄一份成就表和金币。
   - 每种动作怎么说（跑命令、读文件……）在 `seeds.json` 的 `actionText`，Go 的 `ActionText` 和 Dart 生成的 `actionText` 读同一份；原来 Dart 的 `actionMeaning` 抄了一份，已经和 Go 差了两个词。
@@ -23,8 +23,8 @@ Status: implemented
 - **Go 里不留「为了对照」的规则**：只给页面读帧用的小函数（哪些频道、某个帮工的工单串、未读几条、某档成就叫什么、离下一档还差多少、庄稼熟没熟、能不能收），开着的服务端不调，只在 Go 里录黄金数据，Dart 另有一份。这种删掉 Go 的，留在客户端：它们是读帧，不是折事实。判断用 `go run golang.org/x/tools/cmd/deadcode@latest ./...`：protocol 里导出却从 `main` 走不到的，要么让服务端用上（填进形状），要么删。
 - **客户端里一份数据一个来源**：档案和农机只从 `deskConfigProvider` 读（服务端推的 `SideEventRuntime` 让农机保持最新），`agentsProvider`、`runtimesProvider` 是从它派生的；看板不再自己读档案，农场不再每分钟轮询农机。工地事件只有 `sideEventsProvider` 一条。
 - **两边都要的值由生成带过去**：`//vibevalley:const` 和 `seeds.json` 的客户端部分（[Go 拥有形状](2026-10-15-go-owns-the-shapes.md)）。这一篇管的是规则，那一篇管的是值。
-- **处理函数只转发**：`worker.Comment` 拼评论，`game.ChooseTitle` 定称号的账，`core.Open` 是「主人一开口农场就开张」；数字 id 的路径参数在 `api.go` 里写 `int64`，生成的 `Mount` 统一解析（不是数字就 404）；主人做的、不改状态的事由经手的服务说给 `core.Did`（`OwnerReviewed`、`OwnerTalked`），游戏订阅 `core.OwnerDids` 记账。不用事实：`Core.Apply` 不发不改状态的事实，事实就是状态的变化。不让游戏 import `issue`、`voice`：游戏要先于帮工准备好（帮工读它的提交数），依赖它们就排到后面去了。
-- **顺手修的**：主人给没有工单串的帮工带话，`TellWorker` 报错、handler 吞掉了，话没到；现在没有串就直接交给帮工，handler 也把错误交回去。
+- **处理函数只转发**：`issue.comment` 拼评论，`game.ChooseTitle` 定称号的账，`core.Open` 是「主人一开口农场就开张」；路径参数的 id 是 `string`，生成的 `Mount` 统一解码；主人做的、不改状态的事由经手的服务说给 `core.Did`（`OwnerReviewed`、`OwnerTalked`），游戏订阅 `core.OwnerDids` 记账。不用事实：`Core.Apply` 不发不改状态的事实，事实就是状态的变化。不让游戏 import `issue`、`voice`：游戏要先于帮工准备好（帮工读它的提交数），依赖它们就排到后面去了。
+- **顺手修的**：主人给没有工单串的帮工带话，`TellSession` 报错、handler 吞掉了，话没到；现在没有串就直接交给帮工，handler 也把错误交回去。
 
 ## Alternatives considered
 
