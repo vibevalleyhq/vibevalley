@@ -54,7 +54,7 @@ List<Override> shellOverrides(FakeServer server, {bool reachable = true}) {
     serverProvider.overrideWithValue(server),
     serverReachableProvider.overrideWith((ref) => Stream.value(reachable)),
     // The tests run on a Mac: not the desktop app all the same.
-    desktopProvider.overrideWithValue(Desktop.none),
+    hostProvider.overrideWithValue(Desktop.none),
   ];
 }
 

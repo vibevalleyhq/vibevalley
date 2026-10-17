@@ -142,7 +142,7 @@ Future<void> _pump(WidgetTester t, Widget child, FakeServer server, CoreState st
         atlasProvider.overrideWith((ref) async => atlas),
         agentsProvider.overrideWithValue(AsyncData(const <String, Agent>{})),
         apiProvider.overrideWithValue(server.api),
-        desktopProvider.overrideWithValue(Desktop.none),
+        hostProvider.overrideWithValue(Desktop.none),
       ],
       child: MaterialApp(
         theme: farmTheme(),

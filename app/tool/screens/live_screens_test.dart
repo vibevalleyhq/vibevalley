@@ -88,7 +88,7 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [serverProvider.overrideWithValue(VibeValleyServer(Uri.parse(address))), desktopProvider.overrideWithValue(Desktop.none)],
+          overrides: [serverProvider.overrideWithValue(VibeValleyServer(Uri.parse(address))), hostProvider.overrideWithValue(Desktop.none)],
           child: RepaintBoundary(key: key, child: const VibeValleyApp()),
         ),
       );

@@ -37,7 +37,7 @@ void main() {
   });
 
   test('calls become notifications in the Electron client words, opening what they are about', () {
-    expect(noticeForCall(_call('a', InboxKind.merge)), const DesktopNotice('阿土 做完了', '修好登录页', DesktopOpenSession('h1')));
+    expect(noticeForCall(_call('a', InboxKind.merge)), const HostNotice('阿土 做完了', '修好登录页', HostOpenSession('h1')));
     expect(noticeForCall(_call('b', InboxKind.fix)).title, '阿土 没做成');
     expect(noticeForCall(_call('c', InboxKind.quiet)).body, '可能在跑很久的命令，也可能卡住了：看看它的干活过程。');
     expect(
@@ -50,7 +50,7 @@ void main() {
           target: const InboxTargetPlans(playbook: 'pb1'),
         ),
       ),
-      const DesktopNotice('计划「登录改版」都做完了', '看看改动，收获进主分支', DesktopOpenPlans('pb1')),
+      const HostNotice('计划「登录改版」都做完了', '看看改动，收获进主分支', HostOpenPlans('pb1')),
     );
     expect(
       noticeForCall(
@@ -62,19 +62,16 @@ void main() {
           target: const InboxTargetChat(conversation: 'c2'),
         ),
       ),
-      const DesktopNotice('管家 叫你', '看一眼', DesktopOpenChat('c2')),
+      const HostNotice('管家 叫你', '看一眼', HostOpenChat('c2')),
     );
   });
 
   test('achievements and errors', () {
-    expect(
-      noticeForEffect(const GameEffectAchievement(achievement: 'harvests', tier: 2)),
-      const DesktopNotice('升到银牌：小有收成', '收进主分支的活', DesktopOpenAchievements()),
-    );
+    expect(noticeForEffect(const GameEffectAchievement(achievement: 'harvests', tier: 2)), const HostNotice('升到银牌：小有收成', '收进主分支的活', HostOpenAchievements()));
     expect(noticeForEffect(const GameEffectAchievement(achievement: 'steady', tier: 3))!.title, '升到金牌：金牌稳如老农');
     expect(noticeForEffect(const GameEffectAchievement(achievement: 's_hire', tier: 1))!.title, '新手任务做完了：派活');
     expect(noticeForEffect(const GameEffectAchievement(achievement: 'unknown', tier: 1)), isNull);
-    expect(noticeForEvent(const SideEventNotice(at: 0, level: NoticeLevel.error, text: '数据库\n坏了')), const DesktopNotice('码农场物语', '数据库 坏了'));
+    expect(noticeForEvent(const SideEventNotice(at: 0, level: NoticeLevel.error, text: '数据库\n坏了')), const HostNotice('码农场物语', '数据库 坏了'));
     expect(noticeForEvent(const SideEventNotice(at: 0, level: NoticeLevel.info, text: 'hi')), isNull);
   });
 
@@ -115,18 +112,12 @@ void main() {
   });
 
   test('commands round-trip the protocol JSON; unknown ones are dropped', () {
-    for (final c in const <DesktopCommand>[
-      DesktopVoice(),
-      DesktopOpenSession('h1'),
-      DesktopOpenChat('c3'),
-      DesktopOpenPlans('pb'),
-      DesktopOpenAchievements(),
-    ]) {
-      expect(DesktopCommand.fromJson(c.toJson())?.toJson(), c.toJson());
+    for (final c in const <HostCommand>[HostVoice(), HostOpenSession('h1'), HostOpenChat('c3'), HostOpenPlans('pb'), HostOpenAchievements()]) {
+      expect(HostCommand.fromJson(c.toJson())?.toJson(), c.toJson());
     }
-    expect(DesktopCommand.fromJson({'type': 'session'}), isNull);
-    expect(DesktopCommand.fromJson({'type': 'later'}), isNull);
-    expect(DesktopCommand.fromJson('voice'), isNull);
+    expect(HostCommand.fromJson({'type': 'session'}), isNull);
+    expect(HostCommand.fromJson({'type': 'later'}), isNull);
+    expect(HostCommand.fromJson('voice'), isNull);
   });
 
   test('shortcut and channel words', () {

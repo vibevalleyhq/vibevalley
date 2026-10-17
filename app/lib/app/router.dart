@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../farm/farm_page.dart';
 import '../desk/agents/agent_creator_page.dart';
 import '../desk/agents/agents_page.dart';
-import '../desk/assets/assets_page.dart';
+import '../desk/catalog/catalog_page.dart';
 import '../desk/chat/chat_page.dart';
 import '../desk/connectors/connectors_page.dart';
 import '../desk/gate/gate_page.dart';
@@ -77,20 +77,20 @@ final router = GoRouter(
             GoRoute(path: '/voice', builder: (_, _) => const VoiceSettingsPage()),
             GoRoute(path: '/gate', builder: (_, _) => const GatePage()),
             GoRoute(
-              path: '/assets/cursors',
-              builder: (_, _) => const AssetsPage(shelf: 'cursors'),
+              path: '/catalog/cursors',
+              builder: (_, _) => const CatalogPage(shelf: 'cursors'),
             ),
             GoRoute(
-              path: '/assets/sounds',
-              builder: (_, _) => const AssetsPage(shelf: 'sounds'),
+              path: '/catalog/sounds',
+              builder: (_, _) => const CatalogPage(shelf: 'sounds'),
             ),
             GoRoute(
-              path: '/assets',
-              builder: (_, _) => const AssetsPage(shelf: 'sprites'),
+              path: '/catalog',
+              builder: (_, _) => const CatalogPage(shelf: 'sprites'),
             ),
             GoRoute(
-              path: '/assets/:id',
-              builder: (_, s) => AssetsPage(shelf: 'sprites', id: s.pathParameters['id']),
+              path: '/catalog/:id',
+              builder: (_, s) => CatalogPage(shelf: 'sprites', id: s.pathParameters['id']),
             ),
           ],
         ),

@@ -57,7 +57,7 @@ class GameMenu extends ConsumerWidget {
               PxButton.text('技能书', onPressed: () => leave('/skills')),
               PxButton.text('连接器', onPressed: () => leave('/connectors')),
               PxButton.text('项目', onPressed: () => leave('/projects')),
-              PxButton.text('图鉴', onPressed: () => leave('/assets')),
+              PxButton.text('图鉴', onPressed: () => leave('/catalog')),
             ],
           ),
         ),

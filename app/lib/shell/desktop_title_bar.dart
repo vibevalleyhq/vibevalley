@@ -11,7 +11,7 @@ class DesktopTitleBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final desktop = ref.watch(desktopProvider);
+    final desktop = ref.watch(hostProvider);
     if (!desktop.isDesktop || desktop.titleBarHeight <= 0) return const SizedBox.shrink();
     return Container(
       height: desktop.titleBarHeight,

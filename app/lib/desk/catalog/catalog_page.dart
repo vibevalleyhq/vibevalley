@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../ui/kit/kit.dart';
-import 'assets_data.dart';
+import 'catalog_data.dart';
 import '../shared/widgets.dart';
 import 'cursors_shelf.dart';
 import 'sounds_shelf.dart';
@@ -59,10 +59,10 @@ class _GroundPainter extends CustomPainter {
   bool shouldRepaint(_GroundPainter old) => old.ground != ground;
 }
 
-const _shelfTabs = [('sprites', '图', '/assets'), ('cursors', '指针', '/assets/cursors'), ('sounds', '音效', '/assets/sounds')];
+const _shelfTabs = [('sprites', '图', '/catalog'), ('cursors', '指针', '/catalog/cursors'), ('sounds', '音效', '/catalog/sounds')];
 
-class AssetsPage extends StatelessWidget {
-  const AssetsPage({super.key, required this.shelf, this.id});
+class CatalogPage extends StatelessWidget {
+  const CatalogPage({super.key, required this.shelf, this.id});
 
   final String shelf;
   final String? id;

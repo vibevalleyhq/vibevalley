@@ -11,7 +11,7 @@ enum Place {
   projects('项目', '代码库', 'icon-deed', '/projects'),
   voice('声音', 'Agora 语音', 'act-speaking_text', '/voice'),
   gate('院门', '手机和别的电脑', 'icon-shed', '/gate'),
-  assets('图鉴', '素材', 'icon-log', '/assets');
+  catalog('图鉴', '素材', 'icon-log', '/catalog');
 
   const Place(this.label, this.hint, this.icon, this.path);
   final String label;

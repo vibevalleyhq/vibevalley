@@ -33,15 +33,15 @@ class PhoneNotices {
   static final instance = PhoneNotices._();
 
   final _plugin = FlutterLocalNotificationsPlugin();
-  late final _commands = StreamController<DesktopCommand>.broadcast(onListen: _flush);
+  late final _commands = StreamController<HostCommand>.broadcast(onListen: _flush);
 
   /// Held until a screen listens.
-  DesktopCommand? _pending;
+  HostCommand? _pending;
   bool _ready = false;
   bool _linked = false;
   int _next = 100;
 
-  Stream<DesktopCommand> get commands => _commands.stream;
+  Stream<HostCommand> get commands => _commands.stream;
 
   Future<void> start() async {
     if (!isPhone || _ready) return;
@@ -62,9 +62,9 @@ class PhoneNotices {
   @visibleForTesting
   void open(String? payload) {
     if (payload == null || payload.isEmpty) return;
-    DesktopCommand? command;
+    HostCommand? command;
     try {
-      command = DesktopCommand.fromJson(jsonDecode(payload));
+      command = HostCommand.fromJson(jsonDecode(payload));
     } on Object {
       return;
     }
@@ -82,7 +82,7 @@ class PhoneNotices {
     if (held != null) scheduleMicrotask(() => _commands.add(held));
   }
 
-  Future<void> show(DesktopNotice notice) async {
+  Future<void> show(HostNotice notice) async {
     if (!_ready) return;
     try {
       await _plugin.show(
@@ -124,7 +124,7 @@ final phoneFollowProvider = Provider<void>((ref) {
   final notices = PhoneNotices.instance;
   final bell = CallBell();
   bool away() => WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed;
-  void tell(DesktopNotice? notice) {
+  void tell(HostNotice? notice) {
     if (notice != null && away()) unawaited(notices.show(notice));
   }
 

@@ -7,18 +7,18 @@ import '../rules/view.dart';
 import 'command.dart';
 
 /// null opens the farm itself.
-class DesktopNotice {
-  const DesktopNotice(this.title, this.body, [this.open]);
+class HostNotice {
+  const HostNotice(this.title, this.body, [this.open]);
   final String title;
   final String body;
-  final DesktopCommand? open;
+  final HostCommand? open;
 
   @override
-  bool operator ==(Object other) => other is DesktopNotice && other.title == title && other.body == body && other.open == open;
+  bool operator ==(Object other) => other is HostNotice && other.title == title && other.body == body && other.open == open;
   @override
   int get hashCode => Object.hash(title, body, open);
   @override
-  String toString() => 'DesktopNotice($title, $body, ${open?.toJson()})';
+  String toString() => 'HostNotice($title, $body, ${open?.toJson()})';
 }
 
 String clipLine(String text, [int max = 140]) {
@@ -26,25 +26,25 @@ String clipLine(String text, [int max = 140]) {
   return one.length > max ? '${one.substring(0, max - 1)}…' : one;
 }
 
-DesktopCommand openFor(InboxTarget target) => switch (target) {
-  InboxTargetSession(:final id) => DesktopOpenSession(id),
-  InboxTargetPlans(:final playbook) => DesktopOpenPlans(playbook),
-  InboxTargetChat(:final conversation) => DesktopOpenChat(conversation),
+HostCommand openFor(InboxTarget target) => switch (target) {
+  InboxTargetSession(:final id) => HostOpenSession(id),
+  InboxTargetPlans(:final playbook) => HostOpenPlans(playbook),
+  InboxTargetChat(:final conversation) => HostOpenChat(conversation),
 };
 
-DesktopNotice noticeForCall(InboxItem call) {
+HostNotice noticeForCall(InboxItem call) {
   final who = callerName(call);
   final open = openFor(call.target);
   final text = clipLine(call.text);
   return switch (call.kind) {
-    InboxKind.merge => DesktopNotice('$who 做完了', text, open),
-    InboxKind.fix => DesktopNotice('$who 没做成', text, open),
-    InboxKind.conflict => DesktopNotice('$who 的活合进主分支会冲突', text, open),
-    InboxKind.quiet => DesktopNotice('$who 好一阵没动静了', '可能在跑很久的命令，也可能卡住了：看看它的干活过程。', open),
-    InboxKind.planDraft => DesktopNotice('计划「$text」拆好了', '看过再开工', open),
-    InboxKind.planRipe => DesktopNotice('计划「$text」都做完了', '看看改动，收获进主分支', open),
-    InboxKind.planFailed => DesktopNotice('计划卡住了：$text', '重试、改工单，或者跳过', open),
-    InboxKind.mention => DesktopNotice('$who 叫你', text, open),
+    InboxKind.merge => HostNotice('$who 做完了', text, open),
+    InboxKind.fix => HostNotice('$who 没做成', text, open),
+    InboxKind.conflict => HostNotice('$who 的活合进主分支会冲突', text, open),
+    InboxKind.quiet => HostNotice('$who 好一阵没动静了', '可能在跑很久的命令，也可能卡住了：看看它的干活过程。', open),
+    InboxKind.planDraft => HostNotice('计划「$text」拆好了', '看过再开工', open),
+    InboxKind.planRipe => HostNotice('计划「$text」都做完了', '看看改动，收获进主分支', open),
+    InboxKind.planFailed => HostNotice('计划卡住了：$text', '重试、改工单，或者跳过', open),
+    InboxKind.mention => HostNotice('$who 叫你', text, open),
   };
 }
 
@@ -66,7 +66,7 @@ class CallBell {
   }
 }
 
-DesktopNotice? noticeForEffect(GameEffect effect) {
+HostNotice? noticeForEffect(GameEffect effect) {
   if (effect is! GameEffectAchievement) return null;
   final a = achievementOf(effect.achievement);
   if (a == null) return null;
@@ -76,11 +76,11 @@ DesktopNotice? noticeForEffect(GameEffect effect) {
     AchievementCategory.secret => '发现一个彩蛋',
     _ => tier == 3 ? '升到金牌' : (tier == 2 ? '升到银牌' : '解锁成就'),
   };
-  return DesktopNotice('$what：${tierTitle(a, tier)}', clipLine(a.detail), const DesktopOpenAchievements());
+  return HostNotice('$what：${tierTitle(a, tier)}', clipLine(a.detail), const HostOpenAchievements());
 }
 
-DesktopNotice? noticeForEvent(SideEvent event) => switch (event) {
-  SideEventNotice(level: NoticeLevel.error, :final text) => DesktopNotice('码农场物语', clipLine(text)),
+HostNotice? noticeForEvent(SideEvent event) => switch (event) {
+  SideEventNotice(level: NoticeLevel.error, :final text) => HostNotice('码农场物语', clipLine(text)),
   _ => null,
 };
 

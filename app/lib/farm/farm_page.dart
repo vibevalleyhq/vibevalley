@@ -78,7 +78,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
           if (e is GameEffectReward) ref.read(rewardsProvider.notifier).push(e);
         }),
       )
-      ..add(ref.read(desktopProvider).commands.listen(_command));
+      ..add(ref.read(hostProvider).commands.listen(_command));
   }
 
   @override
@@ -171,20 +171,20 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     if (router != null && router.routerDelegate.currentConfiguration.uri.path != '/') router.go('/');
   }
 
-  void _command(DesktopCommand c) {
+  void _command(HostCommand c) {
     if (!mounted) return;
-    if (c is! DesktopVoice) _toFarm();
+    if (c is! HostVoice) _toFarm();
     switch (c) {
-      case DesktopVoice():
+      case HostVoice():
         unawaited(call.phase == CallPhase.idle ? call.start() : call.end());
-      case DesktopOpenSession(:final id):
+      case HostOpenSession(:final id):
         _openSession(id);
-      case DesktopOpenChat(:final conversation):
+      case HostOpenChat(:final conversation):
         ref.read(chatOpenProvider.notifier).set(true);
         fire(ref.read(chatActionsProvider).showChat(conversation));
-      case DesktopOpenPlans(:final playbook):
+      case HostOpenPlans(:final playbook):
         _openPlans(playbook);
-      case DesktopOpenAchievements():
+      case HostOpenAchievements():
         ref.read(panelProvider.notifier).set(FarmPanel.tasks);
     }
   }

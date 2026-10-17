@@ -71,10 +71,10 @@ class Desktop {
 
   final bool voiceDispatch;
 
-  final Stream<DesktopCommand> commands;
+  final Stream<HostCommand> commands;
 }
 
-final desktopProvider = Provider<Desktop>(
+final hostProvider = Provider<Desktop>(
   (ref) => isMacDesktop
       ? Desktop(
           isDesktop: true,
@@ -107,11 +107,11 @@ class DesktopHostChannel {
   static final instance = DesktopHostChannel._();
 
   static const _channel = MethodChannel('vibevalley/desktop');
-  final _commands = StreamController<DesktopCommand>.broadcast();
+  final _commands = StreamController<HostCommand>.broadcast();
   RunningServer? _server;
   bool _listening = false;
 
-  Stream<DesktopCommand> get commands => _commands.stream;
+  Stream<HostCommand> get commands => _commands.stream;
 
   void _listen() {
     if (_listening) return;
@@ -119,7 +119,7 @@ class DesktopHostChannel {
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'command':
-          final command = DesktopCommand.fromJson(call.arguments);
+          final command = HostCommand.fromJson(call.arguments);
           if (command != null) _commands.add(command);
           return null;
         case 'quit':
@@ -142,7 +142,7 @@ class DesktopHostChannel {
 
   Future<void> tray(TraySummary summary) => _invoke('tray', {'title': summary.title, 'lines': summary.lines});
 
-  Future<void> notify(DesktopNotice notice) =>
+  Future<void> notify(HostNotice notice) =>
       _invoke('notify', {'title': notice.title, 'body': notice.body, if (notice.open != null) 'command': notice.open!.toJson()});
 }
 
@@ -197,7 +197,7 @@ Future<void> startLocalFarm() async {
 
 /// Swift shows a notification only while the farm's window is not in front (in front, the farm says it itself).
 final desktopFollowProvider = Provider<void>((ref) {
-  if (!ref.watch(desktopProvider).isDesktop) return;
+  if (!ref.watch(hostProvider).isDesktop) return;
   final host = DesktopHostChannel.instance;
   final bell = CallBell();
   var shown = TraySummary.opening;

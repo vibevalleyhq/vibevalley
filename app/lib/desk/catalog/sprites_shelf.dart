@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ui/kit/kit.dart';
-import 'assets_data.dart';
+import 'catalog_data.dart';
 import '../shared/widgets.dart';
-import 'assets_page.dart';
+import 'catalog_page.dart';
 
 class SpritesShelf extends ConsumerStatefulWidget {
   const SpritesShelf({super.key, this.id});
@@ -217,7 +217,7 @@ class _Tiles extends StatelessWidget {
             SizedBox(
               width: width,
               child: KitTappable(
-                onTap: () => deskGo(context, '/assets/${Uri.encodeComponent(p.name)}'),
+                onTap: () => deskGo(context, '/catalog/${Uri.encodeComponent(p.name)}'),
                 tooltip: '${p.name} · ${numberText(p.w)}×${numberText(p.h)}',
                 selected: selected?.name == p.name,
                 builder: (context, s) => Container(
@@ -422,7 +422,7 @@ class _DetailState extends State<_Detail> {
                       for (final (i, name) in frames.indexed)
                         if (widget.all[name] case final f?)
                           KitTappable(
-                            onTap: () => deskGo(context, '/assets/${Uri.encodeComponent(name)}'),
+                            onTap: () => deskGo(context, '/catalog/${Uri.encodeComponent(name)}'),
                             tooltip: name,
                             builder: (context, s) => Container(
                               width: 44,

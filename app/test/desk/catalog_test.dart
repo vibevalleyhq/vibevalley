@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/desk/assets/assets_data.dart';
-import 'package:vibevalley/desk/assets/assets_page.dart';
+import 'package:vibevalley/desk/catalog/catalog_data.dart';
+import 'package:vibevalley/desk/catalog/catalog_page.dart';
 import 'package:vibevalley/audio/sfx.dart';
 
 import '../support/desk.dart';
@@ -53,7 +53,7 @@ void main() {
   });
 
   testWidgets('the pictures shelf: counts, search and a picture in detail', (t) async {
-    await pumpPage(t, const AssetsPage(shelf: 'sprites', id: 'plot-flowering'), Routes({}).handle);
+    await pumpPage(t, const CatalogPage(shelf: 'sprites', id: 'plot-flowering'), Routes({}).handle);
     await settle(t);
     expect(find.text('全部'), findsOneWidget);
     expect(find.text('${pictures.all.length}'), findsOneWidget);
@@ -69,7 +69,7 @@ void main() {
     final out = _Silent();
     Sfx.output = out;
     addTearDown(() => Sfx.output = null);
-    await pumpPage(t, const AssetsPage(shelf: 'sounds'), Routes({}).handle);
+    await pumpPage(t, const CatalogPage(shelf: 'sounds'), Routes({}).handle);
     expect(find.text('奖励'), findsOneWidget);
     await t.tap(find.text('金币'));
     await t.runAsync(() => Future<void>.delayed(const Duration(seconds: 2)));

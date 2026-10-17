@@ -19,7 +19,7 @@ class ChatVoiceToggle extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final desktop = ref.watch(desktopProvider);
+    final desktop = ref.watch(hostProvider);
     final live = call.phase == CallPhase.live;
     final joining = call.phase == CallPhase.connecting;
     final leaving = call.phase == CallPhase.ending;

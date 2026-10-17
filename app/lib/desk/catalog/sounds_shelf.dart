@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../audio/sfx.dart';
 import '../../ui/kit/kit.dart';
-import 'assets_page.dart';
+import 'catalog_page.dart';
 
 class SoundsShelf extends StatelessWidget {
   const SoundsShelf({super.key});

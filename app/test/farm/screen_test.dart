@@ -66,7 +66,7 @@ void main() {
             streamProblemProvider.overrideWith((ref) => const Stream<String>.empty()),
             sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
             farmEffectsProvider.overrideWithValue(const Stream<GameEffect>.empty()),
-            desktopProvider.overrideWithValue(Desktop.none),
+            hostProvider.overrideWithValue(Desktop.none),
             runtimesProvider.overrideWithValue(
               AsyncData([
                 RuntimeInfo(

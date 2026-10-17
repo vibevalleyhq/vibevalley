@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ui/kit/kit.dart';
-import 'assets_page.dart';
+import 'catalog_page.dart';
 import 'sprites_shelf.dart';
 
 /// Null when the app was built without them.

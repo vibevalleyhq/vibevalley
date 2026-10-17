@@ -111,7 +111,7 @@ List<Override> overrides(CoreState state, FarmView v, VibeValleyApi api, {Map<St
     streamProblemProvider.overrideWith((ref) => const Stream<String>.empty()),
     apiProvider.overrideWithValue(api),
     farmEffectsProvider.overrideWithValue(const Stream<GameEffect>.empty()),
-    desktopProvider.overrideWithValue(Desktop.none),
+    hostProvider.overrideWithValue(Desktop.none),
   ];
 }
 
