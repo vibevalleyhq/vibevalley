@@ -14,6 +14,7 @@ import '../gen/vibevalley.dart';
 import '../audio/sfx.dart';
 import '../sprites/atlas.dart';
 import 'critters.dart' show PointLight;
+import 'hits.dart';
 import 'dog.dart';
 import 'bursts.dart';
 import 'level.dart';
@@ -237,45 +238,6 @@ class VillageData {
   final Map<String, Agent> agents;
 }
 
-sealed class _Hit {
-  const _Hit();
-}
-
-final class _HitSession extends _Hit {
-  const _HitSession(this.id);
-  final String id;
-  @override
-  bool operator ==(Object other) => other is _HitSession && other.id == id;
-  @override
-  int get hashCode => id.hashCode;
-}
-
-final class _HitDog extends _Hit {
-  const _HitDog();
-  @override
-  bool operator ==(Object other) => other is _HitDog;
-  @override
-  int get hashCode => 1;
-}
-
-final class _HitSpot extends _Hit {
-  const _HitSpot(this.spot);
-  final String spot;
-  @override
-  bool operator ==(Object other) => other is _HitSpot && other.spot == spot;
-  @override
-  int get hashCode => spot.hashCode;
-}
-
-final class _HitPlot extends _Hit {
-  const _HitPlot(this.bed);
-  final int bed;
-  @override
-  bool operator ==(Object other) => other is _HitPlot && other.bed == bed;
-  @override
-  int get hashCode => bed;
-}
-
 class _Taps extends PositionComponent with TapCallbacks {
   _Taps(this._game, Vector2 size) : super(size: size, priority: -200000);
   final VillageGame _game;
@@ -382,8 +344,8 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
   final _aim = Vector2.zero();
 
   Vector2? _pointer;
-  _Hit? _over;
-  _Hit? _downOn;
+  VillageHit? _over;
+  VillageHit? _downOn;
 
   @override
   Color backgroundColor() => const Color(0xFF2B3320);
@@ -485,42 +447,40 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     _setHover(_hitAt(_pointer!));
   }
 
-  _Hit? _hitAt(Vector2 p) {
-    final at = Offset(p.x, p.y);
+  VillageHit? _hitAt(Vector2 p) {
     final data = _data;
-    if (data != null) {
-      final here = {for (final h in data.state.sessions) h.id};
-      for (final MapEntry(:key, :value) in _actors.entries.toList().reversed) {
-        if (here.contains(key) && value.leftAt == null && value.body.boxIn(value.node.position).contains(at)) return _HitSession(key);
-      }
-    }
-    if (_dog.boxIn().contains(at)) return const _HitDog();
-    for (final MapEntry(key: spot, value: b) in village.spotBoxes.entries.toList().reversed) {
-      if (p.x >= b.x0 && p.x < b.x1 && p.y >= b.y0 && p.y < b.y1) return _HitSpot(spot);
-    }
-    for (final plot in _plots.reversed) {
-      final b = village.plotBox(plot.bed.index);
-      if (p.x >= b.x0 && p.x < b.x1 && p.y >= b.y0 - 4 && p.y < b.y1 + 2) return _HitPlot(plot.bed.index);
-    }
-    return null;
+    final sessions = <String, Rect>{
+      if (data != null)
+        for (final MapEntry(key: id, value: actor) in _actors.entries)
+          if (actor.leftAt == null && data.state.sessions.any((h) => h.id == id)) id: actor.body.boxIn(actor.node.position),
+    };
+    return villageHitAt(
+      VillageHitData(
+        sessions: sessions,
+        dog: _dog.boxIn(),
+        spots: village.spotBoxes,
+        plots: {for (final plot in _plots) plot.bed.index: village.plotBox(plot.bed.index)},
+      ),
+      Offset(p.x, p.y),
+    );
   }
 
-  int? _bedOf(_Hit? hit) => switch (hit) {
-    _HitPlot(:final bed) => bed,
-    _HitSession(:final id) => _actors[id]?.bed?.index,
+  int? _bedOf(VillageHit? hit) => switch (hit) {
+    VillageHitPlot(:final bed) => bed,
+    VillageHitSession(:final id) => _actors[id]?.bed?.index,
     _ => null,
   };
 
-  void _setHover(_Hit? hit) {
+  void _setHover(VillageHit? hit) {
     if (hit == _over) return;
     switch (_over) {
-      case _HitPlot() || _HitSession():
+      case VillageHitPlot() || VillageHitSession():
         final bed = _bedOf(_over);
         if (bed != null && hoverBed.value == bed) hoverBed.value = null;
         pressing.value = false;
-      case _HitSpot(:final spot):
+      case VillageHitSpot(:final spot):
         if (hoverSpot.value == spot) hoverSpot.value = null;
-      case _HitDog():
+      case VillageHitDog():
         _pup
           ..point(false)
           ..press(false);
@@ -529,12 +489,12 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     }
     _over = hit;
     switch (hit) {
-      case _HitPlot() || _HitSession():
+      case VillageHitPlot() || VillageHitSession():
         final bed = _bedOf(hit);
         if (bed != null) hoverBed.value = bed;
-      case _HitSpot(:final spot):
+      case VillageHitSpot(:final spot):
         hoverSpot.value = spot;
-      case _HitDog():
+      case VillageHitDog():
         _pup.point(true);
       case null:
         break;
@@ -547,11 +507,11 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     _setHover(hit);
     _downOn = hit;
     switch (hit) {
-      case _HitPlot() || _HitSession():
+      case VillageHitPlot() || VillageHitSession():
         if (_bedOf(hit) != null) pressing.value = true;
-      case _HitDog():
+      case VillageHitDog():
         _pup.press(true);
-      case _HitSpot() || null:
+      case VillageHitSpot() || null:
         break;
     }
   }
@@ -561,7 +521,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     final down = _downOn;
     _downOn = null;
     pressing.value = false;
-    if (hit is _HitDog) _pup.press(false);
+    if (hit is VillageHitDog) _pup.press(false);
     if (hit == down) _tap(hit, p);
     if (touch) pointerExit();
   }
@@ -572,19 +532,19 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     _pup.press(false);
   }
 
-  void _tap(_Hit? hit, Vector2 p) {
+  void _tap(VillageHit? hit, Vector2 p) {
     switch (hit) {
-      case _HitPlot(:final bed):
+      case VillageHitPlot(:final bed):
         onPlot?.call(bed);
-      case _HitSession(:final id):
+      case VillageHitSession(:final id):
         final actor = _actors[id];
         if (actor == null) return;
         actor.hopAt = _t;
         final bed = actor.bed;
         if (bed != null) onPlot?.call(bed.index);
-      case _HitSpot(:final spot):
+      case VillageHitSpot(:final spot):
         onSpot?.call(spot);
-      case _HitDog():
+      case VillageHitDog():
         _petDog();
       case null:
         _life.poke(p.x, p.y);
