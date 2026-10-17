@@ -247,8 +247,10 @@ class NodeCard extends ConsumerWidget {
               spacing: 4,
               runSpacing: 4,
               children: [
-                if (node.actions?.contains(NodeAction.retry) ?? false) SmallBtn('重试', onTap: () => nodeAct(NodeAction.retry)),
-                if (node.actions?.contains(NodeAction.skip) ?? false) SmallBtn('跳过', onTap: () => nodeAct(NodeAction.skip)),
+                if (node.actions?.contains(NodeAction.retry) ?? false)
+                  SmallBtn(node.actionText?[NodeAction.retry.wire] ?? '', onTap: () => nodeAct(NodeAction.retry)),
+                if (node.actions?.contains(NodeAction.skip) ?? false)
+                  SmallBtn(node.actionText?[NodeAction.skip.wire] ?? '', onTap: () => nodeAct(NodeAction.skip)),
                 if (editable) SmallBtn('改', onTap: onEdit),
                 if (node.canRemove ?? false) SmallBtn('删', onTap: () async => onSaid(await commands.removeNode(pb.id, node.id))),
                 SmallBtn('经过', onTap: onHistory),

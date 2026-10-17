@@ -787,6 +787,7 @@ class PlaybookNode {
     this.blockedBy,
     this.stateText,
     this.actions,
+    this.actionText,
     this.canEdit,
     this.canRemove,
   });
@@ -811,6 +812,7 @@ class PlaybookNode {
     blockedBy: j['blockedBy'] == null ? null : [for (final e in j['blockedBy'] as List) e as String],
     stateText: j['stateText'] == null ? null : j['stateText'] as String,
     actions: j['actions'] == null ? null : [for (final e in j['actions'] as List) NodeAction.fromJson(e)],
+    actionText: j['actionText'] == null ? null : {for (final e in (j['actionText'] as Map<String, dynamic>).entries) e.key: e.value as String},
     canEdit: j['canEdit'] == null ? null : j['canEdit'] as bool,
     canRemove: j['canRemove'] == null ? null : j['canRemove'] as bool,
   );
@@ -834,6 +836,7 @@ class PlaybookNode {
   final List<String>? blockedBy;
   final String? stateText;
   final List<NodeAction>? actions;
+  final Map<String, String>? actionText;
   final bool? canEdit;
   final bool? canRemove;
 
@@ -857,6 +860,7 @@ class PlaybookNode {
     if (blockedBy != null) 'blockedBy': [for (final e in blockedBy!) e],
     if (stateText != null) 'stateText': stateText!,
     if (actions != null) 'actions': [for (final e in actions!) e.wire],
+    if (actionText != null) 'actionText': {for (final e in actionText!.entries) e.key: e.value},
     if (canEdit != null) 'canEdit': canEdit!,
     if (canRemove != null) 'canRemove': canRemove!,
   };

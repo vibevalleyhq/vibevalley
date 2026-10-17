@@ -23,6 +23,10 @@ func FrameOf(state CoreState, effects []GameEffect) StateFrame {
 		for j := range nodes {
 			nodes[j].StateText = NodeStateText[nodes[j].State]
 			nodes[j].Actions = NodeActions(plans[i], nodes[j])
+			nodes[j].ActionText = make(map[string]string, len(nodes[j].Actions))
+			for _, action := range nodes[j].Actions {
+				nodes[j].ActionText[string(action)] = NodeActionText[action]
+			}
 			nodes[j].CanEdit = CanEditNode(plans[i], &nodes[j])
 			nodes[j].CanRemove = CanRemoveNode(plans[i], &nodes[j])
 		}

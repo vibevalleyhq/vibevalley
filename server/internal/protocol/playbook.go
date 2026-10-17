@@ -385,3 +385,9 @@ func CanEditNode(pb Playbook, node *PlaybookNode) bool {
 func CanRemoveNode(pb Playbook, node *PlaybookNode) bool {
 	return node != nil && CanEditNode(pb, node) && node.State != NodeStateFailed
 }
+
+// What each node action is called; the node buttons read this map from the frame.
+var NodeActionText = map[NodeAction]string{
+	NodeActionRetry: "重试",
+	NodeActionSkip:  "跳过",
+}

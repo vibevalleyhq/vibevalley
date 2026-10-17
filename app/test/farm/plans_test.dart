@@ -32,6 +32,7 @@ void main() {
     stateText: state.wire,
     canEdit: true,
     canRemove: true,
+    actionText: const {'retry': '重试', 'skip': '跳过'},
   );
 
   // What the server fills in (PlaybooksOf) is written out as it would.
