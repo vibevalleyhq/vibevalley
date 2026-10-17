@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../rules/warehouse.dart' show harvestedOf;
 import '../data/providers.dart';
-import '../desk/chat/chat_state.dart' show chatOpenProvider, spokenProvider;
+import '../chat/chat_state.dart' show chatOpenProvider, spokenProvider;
 import '../farm/friends.dart';
 import '../farm/quota.dart';
 import '../game/farm.dart';
@@ -25,8 +25,6 @@ import 'world.dart' show plotH, spotNames;
 import '../rules/chat.dart';
 import '../rules/clock.dart';
 import '../rules/farm.dart';
-import '../rules/playbook.dart';
-import '../rules/progress.dart';
 
 const hudEdge = 8.0;
 const hudGap = 4.0;
@@ -128,16 +126,16 @@ class _FramesBuilderState extends State<FramesBuilder> {
 
 typedef PlotWords = ({String at, PixelCard card});
 
-String plotTitle(Bed bed, Helper? worker, Crop crop) {
+String plotTitle(Bed bed, Worker? worker, Crop crop) {
   if (bed.unlockLevel != null) return crop == Crop.locked ? '没开垦的地' : '花坛';
   if (worker == null) return '第 ${bed.station + 1} 块地 · 空地';
   return '${worker.name} · ${cropLabel[crop]}';
 }
 
-({String key, String text, bool final_, double at})? lastForemanSaid(Chat? chat, List<Line> lines) {
-  final square = squareOf(chat);
-  final typed = square == null ? null : messagesIn(chat, square.id).where((m) => m.fromKind == SenderKind.foreman && m.kind == MessageKind.chat).lastOrNull;
-  final aloud = lines.where((l) => l.role == LineRole.foreman).lastOrNull;
+({String key, String text, bool final_, double at})? lastManagerSaid(Chat? chat, List<Line> lines) {
+  final general = generalOf(chat);
+  final typed = general == null ? null : messagesIn(chat, general.id).where((m) => m.fromKind == SenderKind.manager && m.kind == MessageKind.chat).lastOrNull;
+  final aloud = lines.where((l) => l.role == LineRole.manager).lastOrNull;
   final a = typed == null ? null : (key: 'm${typed.seq}', text: typed.text, final_: typed.final_, at: typed.at);
   final b = aloud == null ? null : (key: 's${aloud.id}', text: aloud.text, final_: aloud.final_, at: aloud.at);
   if (a == null) return b;
@@ -183,15 +181,15 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     final hoverBed = game.hoverBed.value;
     final hoverSpot = game.hoverSpot.value;
     final reveal = game.revealNames.value;
-    final helpers = state.helpers;
+    final workers = state.workers;
     final back = <Widget>[];
     final front = <Widget>[];
 
     for (final bed in beds) {
       final at = village.plotAt(bed.index);
-      final worker = bed.unlockLevel == null ? stationOf(helpers, bed.station) : null;
+      final worker = bed.unlockLevel == null ? stationOf(workers, bed.station) : null;
       final plot = bed.unlockLevel != null ? lockedPlot(bed, level) : plotOf(view, worker);
-      final words = _plotWords(bed, worker, plot, level, tool, hoverBed, fx, rewards, helpers);
+      final words = _plotWords(bed, worker, plot, level, tool, hoverBed, fx, rewards, workers);
       if (words == null) continue;
       final card = switch (words.at) {
         'middle' => _Pin(at.x * s, (at.y - plotH / 2) * s, words.card, ay: 0.5),
@@ -201,7 +199,7 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
       (words.at == 'above' ? front : back).add(card);
     }
 
-    for (final h in helpers) {
+    for (final h in workers) {
       final head = game.heads[h.id];
       if (head == null) continue;
       final doing = doingOf(h);
@@ -295,7 +293,7 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
       i++;
       final count = switch (spot) {
         'warehouse' => harvestedOf(state).length,
-        'plans' => ref.watch(plansProvider).where(asksForYou).length,
+        'plans' => ref.watch(plansProvider).where((p) => p.asksForYou ?? false).length,
         _ => 0,
       };
       if (count > 0) {
@@ -323,14 +321,14 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
 
   PlotWords? _plotWords(
     Bed bed,
-    Helper? worker,
+    Worker? worker,
     PlotView plot,
     int level,
     Tool tool,
     int? hoverBed,
     List<BedFxEntry> fx,
     List<GameEffectReward> rewards,
-    List<Helper> helpers,
+    List<Worker> workers,
   ) {
     if (hoverBed == bed.index) {
       final aim = aimTool(tool, bed, worker, plot, level);
@@ -346,7 +344,7 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
         ),
       );
     }
-    final reward = bed.station < 0 ? null : rewards.where((r) => helpers.any((h) => h.id == r.workerId && stationOfHelper(h) == bed.station)).lastOrNull;
+    final reward = bed.station < 0 ? null : rewards.where((r) => workers.any((h) => h.id == r.workerId && stationOfWorker(h) == bed.station)).lastOrNull;
     if (reward != null) {
       return (
         at: 'rail',
@@ -395,8 +393,8 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     return null;
   }
 
-  String? _managerWords(FarmState state) {
-    final line = lastForemanSaid(state.chat, ref.watch(spokenProvider));
+  String? _managerWords(CoreState state) {
+    final line = lastManagerSaid(state.chat, ref.watch(spokenProvider));
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     if (line != null && line.key != _heardKey) {
       _heardKey = line.key;
@@ -406,7 +404,7 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     final fresh = line != null && (_finalAt == null || now - _finalAt! < _speechMs);
     if (ref.watch(chatOpenProvider) || widget.game.revealNames.value) return null;
     if (fresh) return plainText(line.text);
-    return state.helpers.isEmpty ? '今天种点什么？' : null;
+    return state.workers.isEmpty ? '今天种点什么？' : null;
   }
 }
 
@@ -423,7 +421,7 @@ class VillageHud extends ConsumerWidget {
     final state = ref.watch(farmProvider);
     final lv = view?.level ?? const FarmLevel(level: 1, xp: 0, need: 10);
     final level = lv.level.round();
-    final need = xpToNext(level);
+    final need = lv.need.round();
     final next = nextClearing(level);
     final coins = (state?.progress?.coins ?? 0).toDouble();
     final look = ref.watch(prefsProvider.select((p) => p.managerLook)) ?? 'farmer';

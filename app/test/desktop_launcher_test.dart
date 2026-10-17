@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desktop/launcher.dart';
 
 const _answering = r'''#!/bin/sh
-echo "fake farm: home=$VIBEVALLEY_HOME work=$VIBEVALLEY_WORK_ROOT port=$PORT"
+echo "fake farm: home=$VIBEVALLEY_HOME work=$VIBEVALLEY_WORK_ROOT port=$VIBEVALLEY_PORT"
 exec python3 -c '
 import http.server, os, sys
 class H(http.server.BaseHTTPRequestHandler):
@@ -18,7 +18,7 @@ class H(http.server.BaseHTTPRequestHandler):
         self.wfile.write(b"{\"ok\":true,\"version\":\"fake\"}" if ok else b"")
     def log_message(self, *a): pass
 print("fake farm: listening", flush=True)
-http.server.HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
+http.server.HTTPServer(("127.0.0.1", int(os.environ["VIBEVALLEY_PORT"])), H).serve_forever()
 '
 ''';
 
@@ -110,10 +110,6 @@ void main() {
     expect(watch.elapsed, greaterThanOrEqualTo(const Duration(milliseconds: 500)));
     expect(await server.exited, -_sigkill);
     expect(_alive(server.pid), isFalse);
-  });
-
-  test('parseEnv reads the home .env', () {
-    expect(parseEnv('# keys\nexport A=1\nB="two words"\nC=three # note\n\nbad\n=x\n'), {'A': '1', 'B': 'two words', 'C': 'three'});
   });
 
   test('loginShellPath falls back when the shell cannot be asked', () async {

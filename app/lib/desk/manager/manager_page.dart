@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shell/prefs.dart';
 import '../../ui/kit/kit.dart';
-import '../shared/faces.dart';
+import '../../shared/faces.dart';
 import '../shared/memory_panels.dart';
-import '../shared/widgets.dart';
-import '../shared/work_log.dart';
+import '../../shared/widgets.dart';
+import '../../shared/work_log.dart';
 import '../voice/voice_page.dart';
-import '../../rules/index.dart';
+import '../../gen/vibevalley.dart' show managerAgent;
 import '../../rules/looks.dart';
 
 const _tabs = [('memory', '记性'), ('trajectory', '轨迹'), ('archive', '旧账'), ('voice', '声音')];

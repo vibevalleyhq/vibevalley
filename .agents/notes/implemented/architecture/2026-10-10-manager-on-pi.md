@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> 已被取代：管家跑在 VibeValley 自己的 agent 上（[自己的 agent](2026-10-12-own-agent-on-effect.md)）；Go 服务端没有 pi 管家，`VIBEVALLEY_FOREMAN_RUNTIME=pi` 被拒绝（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)），`foreman-pi.ts` 随 TypeScript 服务端删掉了（[一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md)）。下面是当时的决策。
+> 已被取代：管家跑在 VibeValley 自己的 agent 上（[自己的 agent](2026-10-12-own-agent-on-effect.md)）；Go 服务端没有 pi 管家，`manager.runtime=pi` 被拒绝（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)），`foreman-pi.ts` 随 TypeScript 服务端删掉了（[一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md)）。下面是当时的决策。
 
 ## Problem
 

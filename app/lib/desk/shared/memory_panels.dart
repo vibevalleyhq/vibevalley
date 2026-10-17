@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../app/theme.dart';
+import '../../ui/theme.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/base.dart';
@@ -9,15 +9,11 @@ import '../../ui/kit/button.dart';
 import '../../ui/kit/choice.dart';
 import '../../ui/kit/field.dart';
 import '../../ui/kit/labels.dart';
-import 'recall.dart';
-import 'state.dart';
-import 'widgets.dart';
-import '../../rules/index.dart';
+import '../../data/remote.dart';
+import '../../shared/widgets.dart';
 import '../../rules/playbook.dart';
 
 /// Notes its helpers could still add before the oldest are dropped: those are marked 快忘了.
-const _soon = 10;
-
 const _everywhere = '*';
 
 double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
@@ -49,15 +45,14 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
   @override
   Widget build(BuildContext context) {
     final list = ref.watch(memoriesProvider.select((all) => all[widget.agent]));
-    final helpers = {for (final h in ref.watch(farmProvider)?.helpers ?? const <Helper>[]) h.id: h.name};
+    final workers = {for (final h in ref.watch(farmProvider)?.workers ?? const <Worker>[]) h.id: h.name};
     final now = _now();
     final all = list ?? const <Memory>[];
     final notes = all.where((m) => m.kind == MemoryKind.note).toList();
-    final jobs = all.where((m) => m.kind == MemoryKind.job).toList();
-    final forgetting = nextForgotten(all, _soon);
+    final jobs = all.where((m) => m.kind == MemoryKind.issue).toList();
     final projectsInMemory = {for (final m in all) ?m.project}.toList()..sort();
     final filtered = notes.where((m) => _shown == '' || (_shown == _everywhere ? m.project == null : m.project == _shown)).toList();
-    String whose(Memory m) => m.helper != null ? '${helpers[m.helper] ?? m.helper} 记的' : '你记的';
+    String whose(Memory m) => m.worker != null ? '${workers[m.worker] ?? m.worker} 记的' : '你记的';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -86,7 +81,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                             Wrap(
                               spacing: 8,
                               children: [
-                                Text(m.helper != null ? (helpers[m.helper] ?? m.helper!) : '帮工', style: _meta.copyWith(color: Palette.bark800)),
+                                Text(m.worker != null ? (workers[m.worker] ?? m.worker!) : '帮工', style: _meta.copyWith(color: Palette.bark800)),
                                 Text(m.project ?? '所有项目', style: _meta),
                                 Text(ago(m.at, now), style: _meta),
                               ],
@@ -99,7 +94,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                   ],
                 ),
         ),
-        _RecallPreview(list: all),
+        _RecallPreview(agent: widget.agent),
         WriteNote(onWrite: (text, project) => ref.read(memoriesProvider.notifier).write(widget.agent, text, project), withProject: true),
         DeskSection(
           title: '记下的',
@@ -125,7 +120,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                 for (final m in filtered)
                   MemoryItem(
                     memory: m,
-                    faded: forgetting.contains(m.id),
+                    faded: m.fading == true,
                     onForget: () => deskRun(() => ref.read(memoriesProvider.notifier).forget(widget.agent, m.id)),
                     meta: [
                       m.project ?? '所有项目',
@@ -133,7 +128,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                       ago(m.at, now),
                       m.recalled > 0 ? '想起过 ${m.recalled.round()} 次${m.recalledAt != null ? '，上次 ${ago(m.recalledAt!, now)}' : ''}' : '还没想起过',
                     ],
-                    warning: forgetting.contains(m.id) ? '快忘了：记满 300 条时最先丢' : null,
+                    warning: m.fading == true ? '快忘了：记满 $memoryKeep 条时最先丢' : null,
                   ),
             ],
           ),
@@ -143,10 +138,10 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
   }
 }
 
-/// The same pick the server makes, without counting it.
+/// The pick the server would make, without counting it (agent.recall).
 class _RecallPreview extends ConsumerStatefulWidget {
-  const _RecallPreview({required this.list});
-  final List<Memory> list;
+  const _RecallPreview({required this.agent});
+  final String agent;
 
   @override
   ConsumerState<_RecallPreview> createState() => _RecallPreviewState();
@@ -160,11 +155,11 @@ class _RecallPreviewState extends ConsumerState<_RecallPreview> {
   Widget build(BuildContext context) {
     final projectNames = ref.watch(projectNamesProvider).value ?? const <String>[];
     final where = _project.isNotEmpty ? _project : (projectNames.firstOrNull ?? '');
-    final picked = where.isEmpty ? const <Memory>[] : pick(widget.list, Cue(helper: '', project: where, text: _text, now: _now()));
-    final chars = picked.fold<int>(0, (n, m) => n + lineOf(m, where).length + 1);
+    final preview = where.isEmpty ? null : ref.watch(recallPreviewProvider((agent: widget.agent, project: where, text: _text))).value;
+    final lines = preview?.lines ?? const <String>[];
     return DeskSection(
       title: '下回开工会想起',
-      aside: picked.isEmpty ? null : Text('${picked.length} 条 · $chars / $recallChars 字'),
+      aside: lines.isEmpty ? null : Text('${lines.length} 条 · ${preview!.chars} / ${preview.limit} 字'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -187,13 +182,13 @@ class _RecallPreviewState extends ConsumerState<_RecallPreview> {
             ],
           ),
           const SizedBox(height: 8),
-          if (picked.isEmpty)
+          if (lines.isEmpty)
             DeskEmpty(where.isNotEmpty ? '在这个项目里开工，什么也想不起来。' : '还没有项目。')
           else
             Container(
               color: Palette.cream100,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Text(picked.map((m) => lineOf(m, where)).join('\n'), style: KitText.xs.copyWith(height: 1.625, color: Palette.bark800)),
+              child: Text(lines.join('\n'), style: KitText.xs.copyWith(height: 1.625, color: Palette.bark800)),
             ),
         ],
       ),
@@ -230,7 +225,7 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
             color: const Color(0xFFF6E3C8),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Text(
-              '管家现在跑在 pi 上（VIBEVALLEY_FOREMAN_RUNTIME=pi），不读这份记性：pi 的会话自己留着对话。换回 VibeValley 自己的 agent 才用得上。',
+              '管家现在跑在 pi 上（配置里的 manager.runtime 是 pi），不读这份记性：pi 的会话自己留着对话。换回 VibeValley 自己的 agent 才用得上。',
               style: KitText.xs.copyWith(color: const Color(0xFF8A4F1D)),
             ),
           ),
@@ -252,7 +247,7 @@ class _ManagerMemoryPanelState extends ConsumerState<ManagerMemoryPanel> {
                         memory: m,
                         faded: i >= view.carried,
                         onForget: () => deskRun(() => ref.read(managerMemoryProvider.notifier).forget(m.id)),
-                        meta: [m.helper == managerAgent ? '管家自己记的' : '你交代的', ago(m.at, now)],
+                        meta: [m.worker == managerAgent ? '管家自己记的' : '你交代的', ago(m.at, now)],
                         warning: i >= view.carried ? '太旧了，带不进系统提示' : null,
                       ),
                   ],
@@ -282,7 +277,7 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
   }
 
   Future<void> _search(String? q) async {
-    final listing = await deskRun(() => ref.read(deskApiProvider).farm.managerArchive(q: q));
+    final listing = await deskRun(() => ref.read(apiProvider).manager.archive(q: q));
     if (mounted && listing != null) setState(() => _listing = listing);
   }
 
@@ -290,7 +285,7 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
     if (_open?.name == name) return setState(() => _open = null);
     String text;
     try {
-      text = await ref.read(deskApiProvider).farm.managerArchiveFile(name: name);
+      text = await ref.read(apiProvider).manager.archiveFile(name: name);
     } on Object catch (e) {
       text = reasonOf(e);
     }

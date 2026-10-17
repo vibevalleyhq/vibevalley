@@ -16,13 +16,14 @@ import (
 // Cut from the top when the prompt carries it: the newest notes matter most.
 const MEMORY_PROMPT_CHARS = 8_000
 
-func memoryFile(home string) string { return filepath.Join(home, "MEMORY.md") }
+// Where an agent with this home keeps its memory; the manager page reads it there (internal/memory).
+func MemoryFile(home string) string { return filepath.Join(home, "MEMORY.md") }
 
 func ReadMemory(home string) string {
-	data, _ := os.ReadFile(memoryFile(home))
+	data, _ := os.ReadFile(MemoryFile(home))
 	t := strings.TrimSpace(string(data))
 	if r := []rune(t); len(r) > MEMORY_PROMPT_CHARS {
-		return "（更早的记录省略了，全文在 " + memoryFile(home) + "）\n" + string(r[len(r)-MEMORY_PROMPT_CHARS:])
+		return "（更早的记录省略了，全文在 " + MemoryFile(home) + "）\n" + string(r[len(r)-MEMORY_PROMPT_CHARS:])
 	}
 	return t
 }
@@ -47,7 +48,7 @@ func lineID(line string) string {
 }
 
 func MemoryLines(home string) []MemoryLine {
-	data, _ := os.ReadFile(memoryFile(home))
+	data, _ := os.ReadFile(MemoryFile(home))
 	out := []MemoryLine{}
 	for _, line := range strings.Split(string(data), "\n") {
 		t := strings.TrimSpace(line)
@@ -64,7 +65,7 @@ func MemoryLines(home string) []MemoryLine {
 }
 
 func ForgetLine(home, id string) error {
-	data, err := os.ReadFile(memoryFile(home))
+	data, err := os.ReadFile(MemoryFile(home))
 	if err != nil {
 		return nil
 	}
@@ -72,7 +73,7 @@ func ForgetLine(home, id string) error {
 	for i, l := range lines {
 		if strings.TrimSpace(l) != "" && lineID(l) == id {
 			kept := append(append([]string{}, lines[:i]...), lines[i+1:]...)
-			return os.WriteFile(memoryFile(home), []byte(strings.Join(kept, "\n")), 0o644)
+			return os.WriteFile(MemoryFile(home), []byte(strings.Join(kept, "\n")), 0o644)
 		}
 	}
 	return nil
@@ -82,7 +83,7 @@ func Remember(home, note string, now time.Time) error {
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(memoryFile(home), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(MemoryFile(home), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -98,7 +99,7 @@ func RewriteMemory(home, text string) error {
 	if !strings.HasSuffix(text, "\n") {
 		text += "\n"
 	}
-	return os.WriteFile(memoryFile(home), []byte(text), 0o644)
+	return os.WriteFile(MemoryFile(home), []byte(text), 0o644)
 }
 
 // Date.toISOString with its colons and dot made dashes.

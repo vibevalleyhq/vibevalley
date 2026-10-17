@@ -1,7 +1,7 @@
 package protocol
 
-// The next run is found as Effect's Cron.next finds it: the first matching minute strictly after the last run, a wall time skipped by a clock change
-// taken as the same time before the change (02:30 on a spring-forward night is 03:30), a repeated one as its first occurrence.
+// The next run is the first matching minute strictly after the last run. A wall time skipped by a clock change is taken as the same time before
+// the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence.
 
 import (
 	"fmt"
@@ -12,11 +12,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"vibevalley/pkg/x/num"
+	"vibevalley/pkg/x/str"
 )
 
 const MinEveryMinutes = 1
 
-// A run later than this after it was due was missed (the server was off), and says so.
 const MissedAfterMS = 5 * 60_000
 
 var scheduleTime = regexp.MustCompile(`^([01]?\d|2[0-3]):([0-5]\d)$`)
@@ -24,13 +26,13 @@ var scheduleTime = regexp.MustCompile(`^([01]?\d|2[0-3]):([0-5]\d)$`)
 var Weekdays = [7]string{"日", "一", "二", "三", "四", "五", "六"}
 
 var (
-	scheduleCronZones sync.Map // string → *time.Location, or nil when not a zone
-	scheduleIntlZones sync.Map
+	scheduleRunZones   sync.Map // string → *time.Location, or nil when not a zone
+	scheduleGivenZones sync.Map
 )
 
 var (
-	scheduleCronOffset = regexp.MustCompile(`([+-])(\d{2}):(\d{2})$`)
-	scheduleIntlOffset = regexp.MustCompile(`^([+-])([01]\d|2[0-3])(?::?([0-5]\d))?$`)
+	scheduleRunOffset   = regexp.MustCompile(`([+-])(\d{2}):(\d{2})$`)
+	scheduleGivenOffset = regexp.MustCompile(`^([+-])([01]\d|2[0-3])(?::?([0-5]\d))?$`)
 )
 
 func scheduleFixed(tz, sign, hours, minutes string) *time.Location {
@@ -54,48 +56,48 @@ func scheduleNamed(tz string) *time.Location {
 	return loc
 }
 
-// scheduleCronZone is a time zone as Effect's Cron reads it: an offset when it starts with GMT, + or - (GMT+08:00,
-// +08:00), else an IANA name; nil when it is neither.
-func scheduleCronZone(tz string) *time.Location {
-	if v, ok := scheduleCronZones.Load(tz); ok {
+// The zone runs are counted in: an offset when it starts with GMT, + or - (GMT+08:00, +08:00), else an IANA name; nil when it is neither. It takes
+// fewer offsets than scheduleGivenZone: not +0800 or +08.
+func scheduleRunZone(tz string) *time.Location {
+	if v, ok := scheduleRunZones.Load(tz); ok {
 		return v.(*time.Location)
 	}
 	var loc *time.Location
 	if strings.HasPrefix(tz, "GMT") || strings.HasPrefix(tz, "+") || strings.HasPrefix(tz, "-") {
-		if m := scheduleCronOffset.FindStringSubmatch(tz); m != nil {
+		if m := scheduleRunOffset.FindStringSubmatch(tz); m != nil {
 			loc = scheduleFixed(tz, m[1], m[2], m[3])
 		}
 	} else {
 		loc = scheduleNamed(tz)
 	}
-	scheduleCronZones.Store(tz, loc)
+	scheduleRunZones.Store(tz, loc)
 	return loc
 }
 
-// scheduleIntlZone is a time zone as Intl.DateTimeFormat reads it: an IANA name, or an offset (+08:00, +0800, +08);
-// nil when it is neither. Names are matched as Go's zone database matches them, not case-blind as Intl does.
-func scheduleIntlZone(tz string) *time.Location {
-	if v, ok := scheduleIntlZones.Load(tz); ok {
+// The zone a schedule may be given and its times are written in: an IANA name, matched as Go's zone database matches it, or an offset (+08:00,
+// +0800, +08); nil when it is neither.
+func scheduleGivenZone(tz string) *time.Location {
+	if v, ok := scheduleGivenZones.Load(tz); ok {
 		return v.(*time.Location)
 	}
 	var loc *time.Location
-	if m := scheduleIntlOffset.FindStringSubmatch(tz); m != nil {
+	if m := scheduleGivenOffset.FindStringSubmatch(tz); m != nil {
 		loc = scheduleFixed(tz, m[1], m[2], m[3])
 	} else if !strings.HasPrefix(tz, "+") && !strings.HasPrefix(tz, "-") {
 		loc = scheduleNamed(tz)
 	}
-	scheduleIntlZones.Store(tz, loc)
+	scheduleGivenZones.Store(tz, loc)
 	return loc
 }
 
 func ScheduleProblem(req ScheduleRequest, now int64) string {
-	if coreTrim(req.Name) == "" {
+	if str.Trim(req.Name) == "" {
 		return "定时要有个名字"
 	}
-	if coreTrim(req.Text) == "" {
+	if str.Trim(req.Text) == "" {
 		return "定时要写到点了做什么"
 	}
-	if req.TZ != nil && scheduleIntlZone(*req.TZ) == nil {
+	if req.TZ != nil && scheduleGivenZone(*req.TZ) == nil {
 		return "不认识这个时区：" + *req.TZ
 	}
 	switch w := req.When.Value.(type) {
@@ -167,7 +169,7 @@ func scheduleWallTime(y int, mo time.Month, d, h, mi int, loc *time.Location) in
 	return slices.Min(found) * 1000
 }
 
-func NextRun(s FarmSchedule) (int64, bool) {
+func NextRun(s Schedule) (int64, bool) {
 	if !s.Enabled {
 		return 0, false
 	}
@@ -183,7 +185,8 @@ func NextRun(s FarmSchedule) (int64, bool) {
 		return 0, false
 	case ScheduleWhenEvery:
 		// A fraction of a millisecond is due at the next whole one.
-		return int64(math.Ceil(float64(from) + w.Minutes*60_000)), true
+		// The conversion stops a fused multiply-add (arm64): the product is rounded first, as in JavaScript.
+		return int64(math.Ceil(float64(from) + float64(w.Minutes*60_000))), true
 	case ScheduleWhenDaily:
 		return scheduleCron(from, w.Time, nil, s.TZ)
 	case ScheduleWhenWeekly:
@@ -198,7 +201,7 @@ func NextRun(s FarmSchedule) (int64, bool) {
 
 func scheduleCron(from int64, at string, days []int64, tz string) (int64, bool) {
 	m := scheduleTime.FindStringSubmatch(at)
-	loc := scheduleCronZone(tz)
+	loc := scheduleRunZone(tz)
 	if m == nil || loc == nil {
 		return 0, false
 	}
@@ -217,36 +220,9 @@ func scheduleCron(from int64, at string, days []int64, tz string) (int64, bool) 
 	return scheduleNext(from, h, mi, norm, loc)
 }
 
-// Each once, however many runs it missed.
-func DueSchedules(all []FarmSchedule, now int64) []FarmSchedule {
-	out := []FarmSchedule{}
-	for _, s := range all {
-		if next, ok := NextRun(s); ok && next <= now {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-func IsMissed(s FarmSchedule, now int64) bool {
-	next, ok := NextRun(s)
-	if !ok {
-		next = now
-	}
-	return now-next > MissedAfterMS
-}
-
-func AfterRun(s FarmSchedule, now int64) FarmSchedule {
-	s.LastRun = &now
-	if _, ok := s.When.Value.(ScheduleWhenOnce); ok {
-		s.Enabled = false
-	}
-	return s
-}
-
-// A zone that is none is read as UTC (JavaScript throws).
+// A zone that is none is read as UTC.
 func scheduleClock(at int64, tz string) string {
-	loc := scheduleIntlZone(tz)
+	loc := scheduleGivenZone(tz)
 	if loc == nil {
 		loc = time.UTC
 	}
@@ -260,9 +236,9 @@ func WhenText(when ScheduleWhen, tz string) string {
 		return scheduleClock(w.At, tz) + " 一次"
 	case ScheduleWhenEvery:
 		if math.Mod(w.Minutes, 60) == 0 {
-			return "每 " + playbookNumberText(w.Minutes/60) + " 小时"
+			return "每 " + num.Text(w.Minutes/60) + " 小时"
 		}
-		return "每 " + playbookNumberText(w.Minutes) + " 分钟"
+		return "每 " + num.Text(w.Minutes) + " 分钟"
 	case ScheduleWhenDaily:
 		return "每天 " + w.Time
 	case ScheduleWhenWeekly:
@@ -282,7 +258,7 @@ func WhenText(when ScheduleWhen, tz string) string {
 	return ""
 }
 
-func NextText(s FarmSchedule) string {
+func NextText(s Schedule) string {
 	if next, ok := NextRun(s); ok {
 		return scheduleClock(next, s.TZ)
 	}
@@ -295,7 +271,7 @@ func NextText(s FarmSchedule) string {
 	return "关着"
 }
 
-func DueText(s FarmSchedule, missed bool) string {
+func DueText(s Schedule, missed bool) string {
 	late := ""
 	if missed {
 		late = "（服务端没开着时错过的，补一次）"

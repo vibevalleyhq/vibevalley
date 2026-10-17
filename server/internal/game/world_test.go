@@ -5,14 +5,22 @@ import (
 
 	"go.uber.org/fx"
 
+	"vibevalley/internal/agent"
 	"vibevalley/internal/base"
-	"vibevalley/internal/channels"
-	"vibevalley/internal/chat"
+	"vibevalley/internal/channel"
+	"vibevalley/internal/connector"
+	"vibevalley/internal/core"
+	"vibevalley/internal/gate"
+	"vibevalley/internal/issue"
 	"vibevalley/internal/manager"
 	"vibevalley/internal/memory"
-	"vibevalley/internal/projects"
-	"vibevalley/internal/runs"
-	"vibevalley/internal/tickets"
+	"vibevalley/internal/playbook"
+	"vibevalley/internal/project"
+	"vibevalley/internal/runtime"
+	"vibevalley/internal/schedule"
+	"vibevalley/internal/setting"
+	"vibevalley/internal/voice"
+	"vibevalley/internal/worker"
 )
 
 // Without the packages above it: a test reaches only what is below.
@@ -24,39 +32,28 @@ type world struct {
 type worldServices struct {
 	fx.In
 
-	DB            *sql.DB
-	Site          *base.Site
-	Store         *base.Store
-	Settings      *base.Settings
-	Projects      *projects.Projects
-	Codebase      *projects.Codebase
-	Memories      *memory.Memories
-	ManagerMemory *memory.ManagerMemory
-	Runtimes      *runs.Runtimes
-	Tokens        *runs.Tokens
-	Trajectories  *runs.Trajectories
-	Crew          *runs.Crew
-	Chat          *chat.Chat
-	FarmTools     *chat.FarmTools
-	Dispatch      *tickets.Dispatch
-	Merges        *tickets.Merges
-	Issues        *tickets.Issues
-	PlaybookLog   *tickets.PlaybookLog
-	Playbooks     *tickets.Playbooks
-	Schedules     *tickets.Schedules
-	Heartbeat     *tickets.Heartbeat
-	Foreman       *manager.Foreman
-	VoiceLine     *channels.VoiceLine
-	Voice         *channels.Voice
-	Connectors    *channels.Connectors
-	Lan           *channels.Lan
-	Ledger        *Ledger
-	Commits       *Commits
+	DB        *sql.DB
+	Core      *core.Service
+	Agent     *agent.Service
+	Setting   *setting.Service
+	Project   *project.Service
+	Memory    *memory.Service
+	Runtime   *runtime.Service
+	Worker    *worker.Service
+	Channel   *channel.Service
+	Issue     *issue.Service
+	Playbook  *playbook.Service
+	Schedule  *schedule.Service
+	Manager   *manager.Service
+	Voice     *voice.Service
+	Connector *connector.Service
+	Gate      *gate.Service
+	Game      *Service
 }
 
 func newWorld(cfg base.Config, options ...fx.Option) (*world, error) {
 	w := &world{}
-	app, err := base.NewApp(cfg, []base.Layer{projects.Module, memory.Module, runs.Module, chat.Module, tickets.Module, manager.Module, channels.Module, Module},
+	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, worker.Module, channel.Module, schedule.Module, issue.Module, playbook.Module, manager.Module, gate.Module, voice.Module, connector.Module, Module},
 		fx.Options(options...),
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),
 	)

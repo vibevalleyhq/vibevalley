@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../shell/prefs.dart';
-import '../village/village_view.dart' show agentsProvider;
+import '../data/remote.dart' show agentsProvider;
 import 'farm.dart';
 import 'state.dart';
 import '../rules/playbook.dart';
@@ -17,47 +17,53 @@ class FarmCommands {
   FarmCommands(this.ref);
   final Ref ref;
 
-  FarmApi get _api => ref.read(farmApiProvider);
-  FarmState? get _farm => ref.read(farmProvider);
+  VibeValleyApi get _api => ref.read(apiProvider);
+  CoreState? get _farm => ref.read(farmProvider);
 
-  void _burst(Helper w, BedFxKind kind, [String? text]) {
-    final bed = bedOfStation(stationOfHelper(w));
+  void _burst(Worker w, BedFxKind kind, [String? text]) {
+    final bed = bedOfStation(stationOfWorker(w));
     if (bed != null) burst(ref, bed.index, kind, text);
   }
 
   /// `on`: a comment on that step of its trajectory.
-  Future<void> water(Helper w, String text, {int? on}) async {
-    await _api.tell(
+  Future<void> water(Worker w, String text, {int? on}) async {
+    await _api.worker.tell(
       id: w.id,
       body: TellRequest(text: text, on: on?.toDouble()),
     );
     _burst(w, BedFxKind.water);
   }
 
-  Future<void> cure(Helper w) async {
-    await _api.tell(
+  /// The server tells it what its conflicts are and to settle them.
+  Future<void> resolve(Worker w) async {
+    await _api.worker.resolve(id: w.id);
+    _burst(w, BedFxKind.water);
+  }
+
+  Future<void> cure(Worker w) async {
+    await _api.worker.tell(
       id: w.id,
       body: TellRequest(text: bugText(w.task)),
     );
     _burst(w, BedFxKind.spray);
   }
 
-  Future<void> harvest(Helper w) async {
-    await _api.harvest(id: w.id);
+  Future<void> harvest(Worker w) async {
+    await _api.worker.merge(id: w.id);
     _burst(w, BedFxKind.harvest, '收进仓库');
   }
 
-  Future<void> shovel(Helper w) async {
+  Future<void> shovel(Worker w) async {
     if (w.phase is PhaseWorking) {
-      await _api.stop(id: w.id);
+      await _api.worker.stop(id: w.id);
     } else {
-      await _api.dismiss(id: w.id);
+      await _api.worker.dismiss(id: w.id);
     }
     _burst(w, BedFxKind.shovel);
   }
 
-  Future<void> stop(String id) => _api.stop(id: id);
-  Future<void> dismiss(String id) => _api.dismiss(id: id);
+  Future<void> stop(String id) => _api.worker.stop(id: id);
+  Future<void> dismiss(String id) => _api.worker.dismiss(id: id);
 
   String? get pickedAgent {
     final pick = ref.read(prefsProvider).pick;
@@ -69,7 +75,7 @@ class FarmCommands {
   Future<bool> whenLive() async {
     final now = _farm?.call;
     if (now == CallState.live) return true;
-    if (now != CallState.connecting) unawaited(_api.start().catchError((Object _) {}));
+    if (now != CallState.connecting) unawaited(_api.server.start().catchError((Object _) {}));
     final until = DateTime.now().add(connectWait);
     while (DateTime.now().isBefore(until)) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -82,7 +88,7 @@ class FarmCommands {
 
   Future<void> plant(int station, String text, [String? agent]) async {
     if (!await whenLive()) return;
-    await _api.say(
+    await _api.channel.say(
       body: SayRequest(text: text, bed: station.toDouble(), agent: agent ?? pickedAgent),
     );
   }
@@ -92,7 +98,7 @@ class FarmCommands {
     final tool = ref.read(heldToolProvider);
     final state = _farm;
     final view = ref.read(viewProvider);
-    final worker = state == null ? null : stationOf(state.helpers, bed.station);
+    final worker = state == null ? null : stationOf(state.workers, bed.station);
     final level = view?.level.level.round() ?? 1;
     final aim = aimTool(tool, bed, worker, view == null ? const PlotView(crop: Crop.empty) : plotOf(view, worker), level);
     if (!aim.ok || worker == null) {
@@ -128,28 +134,28 @@ class FarmCommands {
     }
   }
 
-  Future<Answer> plan(PlanRequest request) => _answer(() => _api.plan(body: request));
-  Future<Answer> editNode(String id, String node, NodeEdit edit) => _answer(() => _api.editNode(id: id, node: node, body: edit));
-  Future<Answer> removeNode(String id, String node) => _answer(() => _api.removeNode(id: id, node: node));
+  Future<Answer> plan(PlanRequest request) => _answer(() => _api.playbook.plan(body: request));
+  Future<Answer> editNode(String id, String node, NodeEdit edit) => _answer(() => _api.playbook.editNode(id: id, node: node, body: edit));
+  Future<Answer> removeNode(String id, String node) => _answer(() => _api.playbook.removeNode(id: id, node: node));
   Future<Answer> actOnPlaybook(String id, PlaybookAction action) => _answer(
-    () => _api.playbookAct(
+    () => _api.playbook.act(
       id: id,
       body: PlaybookActRequest(action: action),
     ),
   );
   Future<Answer> actOnNode(String id, String node, NodeAction action) => _answer(
-    () => _api.nodeAct(
+    () => _api.playbook.nodeAct(
       id: id,
       node: node,
       body: NodeActRequest(action: action),
     ),
   );
 
-  Future<void> chooseTitle([String? achievement, int? tier]) => _api.chooseTitle(
+  Future<void> chooseTitle([String? achievement, int? tier]) => _api.progress.chooseTitle(
     body: ChooseTitleRequest(achievement: achievement, tier: tier?.toDouble()),
   );
 
-  Future<void> refreshRuntime(String id) => _api.refreshRuntime(id: id);
+  Future<void> refreshRuntime(String id) => _api.runtime.refresh(id: id);
 }
 
 /// A refusal is the server's to tell (a notice).

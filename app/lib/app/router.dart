@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
-import '../pages/farm_page.dart';
+import '../farm/farm_page.dart';
 import '../desk/agents/agent_creator_page.dart';
 import '../desk/agents/agents_page.dart';
 import '../desk/assets/assets_page.dart';

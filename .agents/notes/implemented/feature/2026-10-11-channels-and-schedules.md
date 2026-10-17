@@ -19,16 +19,18 @@ VibeValley 已经有了 Raft 那一半的大部分（田头、串、@、投递�
 
 ## Decision
 
+到点以后怎么派，后来改成了一个定时一张工单、每次到点是它的一次 run，没写档案的派给管家：[定时是一张工单的触发](../architecture/2026-10-16-a-schedule-is-a-trigger.md)。
+
 一句话：**频道是安排任务的地方，渠道是频道通向外面的门，定时是按时间往频道里说的话。** 派活、汇报、投递、刹车全部照田头的规则走，不另起一套。现在的样子见 [server.md](../../../../docs/reference/server.md)「田头」「定时」「巡查」「连接器：微信、飞书、QQ」。
 
 ### 多个频道
 
 - 对话多一种 `channel`（`ConversationKind`）。田头是默认的频道（`square`）；每个频道有名字（`#clock-in`）、说明，可以带一个默认项目：在这个频道里派的活，没说项目就在这个项目里干。
-- 地址是 `#<频道>`、`#<频道>:<seq>`（protocol 的 `ParseTarget`、`TargetOf`，在 `server/internal/protocol/chat_rules.go`），帮工的 `farm_say` 接口不变。
+- 地址是 `#<频道>`、`#<频道>:<seq>`（读地址的 `parseChatTarget` 在 `server/internal/channel/rules.go`，写地址的 `TargetOf` 在 `server/internal/protocol/chat_rules.go`），帮工的 `farm_say` 接口不变。
 - **谁在频道里**：主人和管家在每个频道里；帮工在它的活所在的频道里，在哪个频道派的活，工单串就开在哪个频道下面。投递照旧是 `AudienceOf`：其中的 `helpers` 是这个频道的帮工，`onFarm` 是地里的全部，用来判断 @ 的人在不在地里。三道刹车、送达状态都不变。
 - 管家的「农场现状」按频道分组；管家在哪个频道被叫，就回在哪个频道。`dispatch` 带着频道和它的默认项目；管家还有 `channels`、`open_channel`、`channel_settings` 三个工具（`server/internal/manager/tools.go`）。
 - 私信不做：频道加上串已经够分开事情。
-- **界面**：农场窗口标题里有频道菜单（`app/lib/desk/chat/channel_menu.dart`）。另有一整页的聊天页（`/chat`，`app/lib/desk/chat/`），布局照 Raft：频道和帮工的侧栏、频道头和「聊天 / 任务 / 定时」标签、平铺的消息行和串的预览、右边的串、创建频道的对话框。起初做成了 Raft 原样的白底黑线、常规字体，主人要的是和像素农场一套，于是改成农场的纸色、木色、像素字和像素图标。农场窗口和这一页显示的是同一个对话，输入框按它显示的对话发。
+- **界面**：农场窗口标题里有频道菜单（`app/lib/chat/channel_menu.dart`）。另有一整页的聊天页（`/chat`，`app/lib/desk/chat/`），布局照 Raft：频道和帮工的侧栏、频道头和「聊天 / 任务 / 定时」标签、平铺的消息行和串的预览、右边的串、创建频道的对话框。起初做成了 Raft 原样的白底黑线、常规字体，主人要的是和像素农场一套，于是改成农场的纸色、木色、像素字和像素图标。农场窗口和这一页显示的是同一个对话，输入框按它显示的对话发。
 
 ### 外部渠道
 
@@ -38,21 +40,21 @@ VibeValley 已经有了 Raft 那一半的大部分（田头、串、@、投递�
 - **只认主人**：帮工没有权限确认、能在机器上跑命令，所以外部渠道里只有主人自己的账号说的话会进频道；别人说的话丢掉并记一笔。密钥在服务端的数据库和 `$VIBEVALLEY_HOME` 里，不进仓库、不进日志。
 - **做了微信、飞书、QQ**（主人要的这三个），设置在「连接器」页（`app/lib/desk/connectors/`）。几个决定：
   - **都用官方接口**：微信是腾讯给机器人的 iLink 接口（官方的 `@tencent-weixin/openclaw-weixin` 用它），飞书是扫码建个人机器人应用加官方 SDK 的长连接，QQ 是 QQ 开放平台的机器人加 WebSocket 网关。不用 hook 客户端、破解协议的办法（比如接 QQ 的 NapCat）：会封号，也等于把登录交给第三方。三家都只往外连。
-  - **一个桥，三个适配器**（`server/internal/channels/connectors.go`，适配器在 `channels/weixin.go`、`channels/feishu.go`、`channels/qq.go`，三家自己的接口在 `server/pkg/weixin`、`feishu`、`qq`）：账号、只认主人、配对、发件表、补发和摘要都在桥里，适配器只管登录、收、发。再接一家（Telegram、钉钉、企业微信）只写一个适配器。
+  - **一个桥，三个适配器**（`server/internal/connector/connector.go`，适配器在 `connector/weixin.go`、`connector/feishu.go`、`connector/qq.go`，三家自己的接口在 `server/pkg/weixin`、`feishu`、`qq`）：账号、只认主人、配对、发件表、补发和摘要都在桥里，适配器只管登录、收、发。再接一家（Telegram、钉钉、企业微信）只写一个适配器。
   - **主人怎么认**：微信扫码时就知道是谁；飞书、QQ 拿不准，统一用配对码：连上后页面显示 6 位码，第一个私聊机器人发码的人成为主人。比让主人去找自己在那个平台上的 id 好用。
   - **马上发，拒收的进发件表**：每条都马上发，微信、飞书在主人没说话时也能送到；QQ 只能在主人说话后的一段时间里回复。应用拒收的进发件表，按指数退避重试（30 秒起，翻倍，最多半小时），主人下次说话时也补发，多了合成摘要。原先以为微信也只能跟着主人最近一句话回复，汇报要等主人开口；后来改成先当它能主动发，发不出去再退避重试。
   - 默认接在田头上，连接器页可以改接到别的频道：进来的话说在那个频道，出去的只发那个频道里的。
 
 ### 定时任务
 
-- 表 `schedules`（`server/migrations/0001_farm.sql`）：在哪个频道、什么时候、说什么、交给谁（某个帮工档案，或者让管家决定）、开没开、上次什么时候跑的。「什么时候」照 Raft 的提醒：一次性的时刻、每隔多久（至少 1 分钟）、每天几点、每周几几点，带时区；不做 cron 表达式，管家和主人都更难写错。
-- 规则是 protocol 的纯函数（`server/internal/protocol/schedules.go`：`NextRun`、`DueSchedules`、`AfterRun`、`ScheduleProblem`、`DueText`）。服务端的 `Schedules`（`server/internal/tickets/schedules.go`）每 20 秒看一遍：到点了先在频道里说一条「⏰ 定时「…」到点了：…」，再交给管家（等它这一轮做完）；写明了帮工档案的是周期工单，每次触发写一张新工单开工（地满了排队），不经过管家（[概念先行](../../proposed/architecture/2026-10-15-concepts-first.md) 第 6 步）。之后就是一次普通的派活：开串、干活、汇报、收获。
+- 表 `schedule`（`server/migrations/0001_schema.sql`）：在哪个频道、什么时候、说什么、交给谁（某个帮工档案，或者让管家决定）、开没开、上次什么时候跑的。「什么时候」照 Raft 的提醒：一次性的时刻、每隔多久（至少 1 分钟）、每天几点、每周几几点，带时区；不做 cron 表达式，管家和主人都更难写错。
+- 规则是 protocol 的纯函数（`server/internal/protocol/schedules.go`：`NextRun`、`DueSchedules`、`AfterRun`、`ScheduleProblem`、`DueText`）。服务端的 `Schedules`（`server/internal/schedule/schedule.go`）每 20 秒看一遍：到点了先在频道里说一条「⏰ 定时「…」到点了：…」，再交给管家（等它这一轮做完）；写明了帮工档案的是周期工单，每次触发写一张新工单开工（地满了排队），不经过管家（[概念先行](../../proposed/architecture/2026-10-15-concepts-first.md) 第 6 步）。之后就是一次普通的派活：开串、干活、汇报、收获。
 - 主人在任何频道里都可以说「每天早上九点在 #clock-in 跑一遍测试」，管家用 `schedule`、`list_schedules`、`cancel_schedule` 建、看、删。VibeValley 自己的 agent 当管家时，不用它自带的定时（它的 `schedules.json`；`foreman.go` 里关掉了）。聊天页的「定时」标签和频道菜单里的「定时」可以开关、删。
 - 几个决定：
   - **下次什么时候不存**，从上次跑的时间算：服务端没开着时错过的，开机后只补一次并说明是补的，循环的从现在往后排，中间错过的几次不一个个补。打开、重启都不用改它。
   - **到点先在频道里说一声**，再派活：主人在频道里看得到每次定时做了什么；写了帮工的不经过管家，不花管家的一轮。
   - **定时是农场的，不是 agent 的**：存在农场的表里，页面能看到、能关；管家只是用工具建它。
-- **巡查代替心跳**：nanobot 式的「隔一阵自己醒来看看」每次都是一轮、要花钱，所以不默认叫醒管家，先做一个不调模型的检查。protocol 的 `patrol.go` 看 Inbox 里放着没人管的（@主人 没人回 15 分钟、帮工没动静 20 分钟、做完没收或有冲突 2 小时、计划里没做成的步骤 30 分钟；[要你处理的事是一个 Inbox](../architecture/2026-10-15-inbox.md)），过了宽限期才报，同一件事 4 小时内只报一次；服务端的 `Heartbeat`（和 `Schedules` 同在 `tickets/schedules.go`）每 10 分钟（`VIBEVALLEY_HEARTBEAT_MINUTES`，0 关）巡一遍，有事才按频道各叫醒管家一次（`【巡查】`）。
+- **巡查代替心跳**：nanobot 式的「隔一阵自己醒来看看」每次都是一轮、要花钱，所以不默认叫醒管家，先做一个不调模型的检查。protocol 的 `patrol.go` 看 Inbox 里放着没人管的（@主人 没人回 15 分钟、帮工没动静 20 分钟、做完没收或有冲突 2 小时、计划里没做成的步骤 30 分钟；[要你处理的事是一个 Inbox](../architecture/2026-10-15-inbox.md)），过了宽限期才报，同一件事 4 小时内只报一次；服务端的 `Heartbeat`（和 `Schedules` 同在 `schedule/schedule.go`）每 10 分钟（`patrol.heartbeat_minutes`，0 关）巡一遍，有事才按频道各叫醒管家一次（`【巡查】`）。
 
 ### 对照 Raft（v1.21.2 源码）
 
@@ -96,7 +98,7 @@ VibeValley 已经有了 Raft 那一半的大部分（田头、串、@、投递�
 
 ## Verification
 
-- 频道：`server/internal/chat/chat_test.go` 的 `TestChatChannels`；protocol 的 `chat_rules_test.go`（`TestAudienceInAChannel`、`TestChannelsInTheChat`、`TestChannelNameProblem`）。
-- 定时和巡查：`server/internal/game/ledger_test.go` 的 `TestPlanSchedules`、`TestPlanHeartbeat`，`tickets/schedules_env_test.go`；protocol 的 `schedule_rules_test.go`、`patrol_rules_test.go`。测试里换掉服务的时钟（`Schedules.Now`、`Heartbeat.Now`），不等真的时间。
-- 连接器：`server/internal/channels/connectors_test.go`（配对、只认主人、发件表和补发，`TestConnectorsWeixinInAnotherChannel` 接到别的频道）、`channels/feishu_test.go`。
+- 频道：`server/internal/channel/chat_test.go` 的 `TestChatChannels`；protocol 的 `chat_rules_test.go`（`TestAudienceInAChannel`、`TestChannelsInTheChat`、`TestChannelNameProblem`）。
+- 定时和巡查：`server/internal/game/ledger_test.go` 的 `TestPlanSchedules`、`TestPlanHeartbeat`，`schedule/env_test.go`；protocol 的 `schedule_rules_test.go`、`patrol_rules_test.go`。测试里换掉服务的时钟（`Schedules.Now`、`Heartbeat.Now`），不等真的时间。
+- 连接器：`server/internal/connector/connector_test.go`（配对、只认主人、发件表和补发，`TestConnectorsWeixinInAnotherChannel` 接到别的频道）、`connector/feishu_test.go`。
 - 聊天页：`app/test/chat_test.dart`（频道和未读、频道里说话、串、定时的开关和删）。

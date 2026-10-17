@@ -4,7 +4,6 @@
 //   - The title scene's pictures and sprites: WebP at their own size (lossy, at a quality where a zoomed crop shows no
 //     difference), a fifth to a half of the originals.
 //   - Screenshots: WebP in a few widths, for the browser to pick by the screen.
-//   - The share card stays the original JPEG, which every site that shows cards can read.
 import type { ImageMetadata } from 'astro'
 import { getImage } from 'astro:assets'
 import { SCENES, SHOWN, type Scene, type SpriteName } from './scene'
@@ -35,9 +34,6 @@ export async function backgroundsOf(): Promise<Record<Scene, string>> {
   const pairs = await Promise.all(SCENES.map(async (s) => [s, (await getImage({ src: of(backgrounds, `../../../app/assets/pixel/title-${s}.jpg`), format: 'webp', quality: 82 })).src] as const))
   return Object.fromEntries(pairs) as Record<Scene, string>
 }
-
-/** The share card: the farm at dusk, the original JPEG. */
-export const cardOf = () => of(backgrounds, '../../../app/assets/pixel/title-evening.jpg').src
 
 /** A screenshot from docs/images by its file's name, in a few widths (each its own copy, so the original is dropped). */
 export async function screenshotOf(name: string) {

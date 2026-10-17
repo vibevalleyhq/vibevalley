@@ -7,14 +7,14 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
-import '../shared/faces.dart';
-import '../shared/state.dart';
-import '../shared/widgets.dart';
-import 'layout.dart';
+import '../../shared/faces.dart';
+import '../../data/remote.dart';
+import '../../shared/widgets.dart';
+import '../shared/layout.dart';
 import 'runtime_facts.dart';
 import 'runtimes_state.dart';
-import '../../rules/index.dart';
 import '../../rules/seeds.dart';
+import '../../rules/money.dart';
 
 class RuntimesPage extends ConsumerWidget {
   const RuntimesPage({super.key, this.id});
@@ -73,7 +73,7 @@ class _ListItem extends StatelessWidget {
           RuntimeIcon(runtime: preset.id, size: 36, muted: !ok),
           const SizedBox(width: 10),
           Expanded(
-            child: RowText(preset.label, '$status${using > 0 ? ' · $using 个 agent' : ''}', extra: ok ? _ListStamina(usage: r!.usage) : null),
+            child: RowText(preset.label, '$status${using > 0 ? ' · $using 个 agent' : ''}', extra: ok ? _ListStamina(info: r!) : null),
           ),
           const SizedBox(width: 10),
           StateDot(ok ? (r!.settings.enabled ? Palette.leaf500 : Palette.cream300) : Palette.berry),
@@ -84,12 +84,12 @@ class _ListItem extends StatelessWidget {
 }
 
 class _ListStamina extends StatelessWidget {
-  const _ListStamina({required this.usage});
-  final AccountUsage? usage;
+  const _ListStamina({required this.info});
+  final RuntimeInfo info;
 
   @override
   Widget build(BuildContext context) {
-    final quota = quotaOf(usage);
+    final quota = quotaOf(info);
     if (quota.level == QuotaLevel.unknown) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 4),
@@ -375,8 +375,8 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
     final wanted = _draft.defaultModel.isNotEmpty ? _draft.defaultModel : models.where((m) => m.isDefault).firstOrNull?.id;
     final model = models.where((m) => m.id == wanted).firstOrNull;
     final facts = factsOf(info.id);
-    final refusedEffort = facts.refused[SessionOption.effort];
-    final refusedEnv = facts.refused[SessionOption.env];
+    final refusedEffort = facts.refused[sessionEffort];
+    final refusedEnv = facts.refused[sessionEnv];
     final envVar = 'OAR_${info.id.toUpperCase()}_BIN';
     final effortHint = refusedEffort ?? ((model?.effortLevels.isNotEmpty ?? false) ? null : '这个模型没有推理强度可选。');
     return PxCard(
@@ -540,7 +540,7 @@ class RuntimeUsage extends StatelessWidget {
         return Text('读不到：$reason', style: muted);
       case AccountUsageBalance() || AccountUsageOk():
     }
-    final quota = quotaOf(usage);
+    final quota = quotaOf(info);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -734,7 +734,7 @@ class _InventoryCard extends StatelessWidget {
 class _AgentsCard extends StatelessWidget {
   const _AgentsCard({required this.runtime, required this.agents});
   final String runtime;
-  final List<AgentProfile> agents;
+  final List<Agent> agents;
 
   @override
   Widget build(BuildContext context) => PxCard(

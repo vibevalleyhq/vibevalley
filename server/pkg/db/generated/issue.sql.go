@@ -11,7 +11,7 @@ import (
 )
 
 const addIssue = `-- name: AddIssue :exec
-insert into issue (id, title, description, project, agent, priority, rank, created_at, schedule)
+insert into issue (id, title, description, project, assignee, priority, rank, created_at, schedule)
 values (?1, ?2, ?3, ?4, ?5, ?6,
         (select coalesce(max(rank), 0) + 1 from issue), ?7, ?8)
 `
@@ -21,7 +21,7 @@ type AddIssueParams struct {
 	Title       string
 	Description string
 	Project     sql.NullString
-	Agent       sql.NullString
+	Assignee    sql.NullString
 	Priority    string
 	CreatedAt   int64
 	Schedule    sql.NullInt64
@@ -33,59 +33,12 @@ func (q *Queries) AddIssue(ctx context.Context, arg AddIssueParams) error {
 		arg.Title,
 		arg.Description,
 		arg.Project,
-		arg.Agent,
+		arg.Assignee,
 		arg.Priority,
 		arg.CreatedAt,
 		arg.Schedule,
 	)
 	return err
-}
-
-const addRun = `-- name: AddRun :exec
-insert into issue_run (run, issue, started_at) values (?, ?, ?) on conflict (run) do nothing
-`
-
-type AddRunParams struct {
-	Run       string
-	Issue     string
-	StartedAt int64
-}
-
-func (q *Queries) AddRun(ctx context.Context, arg AddRunParams) error {
-	_, err := q.db.ExecContext(ctx, addRun, arg.Run, arg.Issue, arg.StartedAt)
-	return err
-}
-
-const allRuns = `-- name: AllRuns :many
-select issue, run from issue_run order by started_at, run
-`
-
-type AllRunsRow struct {
-	Issue string
-	Run   string
-}
-
-func (q *Queries) AllRuns(ctx context.Context) ([]AllRunsRow, error) {
-	rows, err := q.db.QueryContext(ctx, allRuns)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []AllRunsRow
-	for rows.Next() {
-		var i AllRunsRow
-		if err := rows.Scan(&i.Issue, &i.Run); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const closeIssue = `-- name: CloseIssue :exec
@@ -104,14 +57,14 @@ func (q *Queries) CloseIssue(ctx context.Context, arg CloseIssueParams) error {
 }
 
 const editIssue = `-- name: EditIssue :exec
-update issue set title = ?, description = ?, project = ?, agent = ?, priority = ? where id = ?
+update issue set title = ?, description = ?, project = ?, assignee = ?, priority = ? where id = ?
 `
 
 type EditIssueParams struct {
 	Title       string
 	Description string
 	Project     sql.NullString
-	Agent       sql.NullString
+	Assignee    sql.NullString
 	Priority    string
 	ID          string
 }
@@ -121,7 +74,7 @@ func (q *Queries) EditIssue(ctx context.Context, arg EditIssueParams) error {
 		arg.Title,
 		arg.Description,
 		arg.Project,
-		arg.Agent,
+		arg.Assignee,
 		arg.Priority,
 		arg.ID,
 	)
@@ -129,7 +82,7 @@ func (q *Queries) EditIssue(ctx context.Context, arg EditIssueParams) error {
 }
 
 const family = `-- name: Family :many
-select id, description, project, agent, priority, rank, created_at, queued_at, closed_at, closed, playbook, title, parent, blocked_by, "plan", step, schedule from issue where id = ?1 or parent = ?1
+select id, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue where id = ?1 or parent = ?1
 `
 
 // An issue and its sub-issues.
@@ -144,22 +97,21 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 		var i Issue
 		if err := rows.Scan(
 			&i.ID,
+			&i.Title,
 			&i.Description,
 			&i.Project,
-			&i.Agent,
+			&i.Assignee,
 			&i.Priority,
 			&i.Rank,
-			&i.CreatedAt,
-			&i.QueuedAt,
-			&i.ClosedAt,
-			&i.Closed,
-			&i.Playbook,
-			&i.Title,
 			&i.Parent,
 			&i.BlockedBy,
 			&i.Plan,
 			&i.Step,
 			&i.Schedule,
+			&i.CreatedAt,
+			&i.QueuedAt,
+			&i.ClosedAt,
+			&i.Closed,
 		); err != nil {
 			return nil, err
 		}
@@ -175,7 +127,7 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 }
 
 const getIssue = `-- name: GetIssue :one
-select id, description, project, agent, priority, rank, created_at, queued_at, closed_at, closed, playbook, title, parent, blocked_by, "plan", step, schedule from issue where id = ?
+select id, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue where id = ?
 `
 
 func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
@@ -183,69 +135,28 @@ func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
 	var i Issue
 	err := row.Scan(
 		&i.ID,
+		&i.Title,
 		&i.Description,
 		&i.Project,
-		&i.Agent,
+		&i.Assignee,
 		&i.Priority,
 		&i.Rank,
-		&i.CreatedAt,
-		&i.QueuedAt,
-		&i.ClosedAt,
-		&i.Closed,
-		&i.Playbook,
-		&i.Title,
 		&i.Parent,
 		&i.BlockedBy,
 		&i.Plan,
 		&i.Step,
 		&i.Schedule,
+		&i.CreatedAt,
+		&i.QueuedAt,
+		&i.ClosedAt,
+		&i.Closed,
 	)
 	return i, err
 }
 
-const issueOfRun = `-- name: IssueOfRun :one
-select issue from issue_run where run = ?
-`
-
-func (q *Queries) IssueOfRun(ctx context.Context, run string) (string, error) {
-	row := q.db.QueryRowContext(ctx, issueOfRun, run)
-	var issue string
-	err := row.Scan(&issue)
-	return issue, err
-}
-
-const keepIssue = `-- name: KeepIssue :exec
-insert into issue (id, title, description, project, agent, created_at, playbook) values (?, ?, ?, ?, ?, ?, ?)
-on conflict (id) do nothing
-`
-
-type KeepIssueParams struct {
-	ID          string
-	Title       string
-	Description string
-	Project     sql.NullString
-	Agent       sql.NullString
-	CreatedAt   int64
-	Playbook    sql.NullString
-}
-
-// An issue made from a run of before the book: only when it is not there yet.
-func (q *Queries) KeepIssue(ctx context.Context, arg KeepIssueParams) error {
-	_, err := q.db.ExecContext(ctx, keepIssue,
-		arg.ID,
-		arg.Title,
-		arg.Description,
-		arg.Project,
-		arg.Agent,
-		arg.CreatedAt,
-		arg.Playbook,
-	)
-	return err
-}
-
 const keptIssues = `-- name: KeptIssues :many
 with latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit ?1)
-select id, description, project, agent, priority, rank, created_at, queued_at, closed_at, closed, playbook, title, parent, blocked_by, "plan", step, schedule from issue
+select id, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue
 where closed_at is null or id in (select id from latest) or parent in (select id from latest)
    or parent in (select id from issue where closed_at is null)
 `
@@ -262,22 +173,21 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 		var i Issue
 		if err := rows.Scan(
 			&i.ID,
+			&i.Title,
 			&i.Description,
 			&i.Project,
-			&i.Agent,
+			&i.Assignee,
 			&i.Priority,
 			&i.Rank,
-			&i.CreatedAt,
-			&i.QueuedAt,
-			&i.ClosedAt,
-			&i.Closed,
-			&i.Playbook,
-			&i.Title,
 			&i.Parent,
 			&i.BlockedBy,
 			&i.Plan,
 			&i.Step,
 			&i.Schedule,
+			&i.CreatedAt,
+			&i.QueuedAt,
+			&i.ClosedAt,
+			&i.Closed,
 		); err != nil {
 			return nil, err
 		}
@@ -292,12 +202,41 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 	return items, nil
 }
 
-const listIssues = `-- name: ListIssues :many
-
-select id, description, project, agent, priority, rank, created_at, queued_at, closed_at, closed, playbook, title, parent, blocked_by, "plan", step, schedule from issue order by rank, created_at, id
+const latestOfSchedule = `-- name: LatestOfSchedule :one
+select id, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue where schedule = ? order by created_at desc, id desc limit 1
 `
 
-// Issues and their runs (tickets/issues.go).
+// A schedule's issue: the one it made last.
+func (q *Queries) LatestOfSchedule(ctx context.Context, schedule sql.NullInt64) (Issue, error) {
+	row := q.db.QueryRowContext(ctx, latestOfSchedule, schedule)
+	var i Issue
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Description,
+		&i.Project,
+		&i.Assignee,
+		&i.Priority,
+		&i.Rank,
+		&i.Parent,
+		&i.BlockedBy,
+		&i.Plan,
+		&i.Step,
+		&i.Schedule,
+		&i.CreatedAt,
+		&i.QueuedAt,
+		&i.ClosedAt,
+		&i.Closed,
+	)
+	return i, err
+}
+
+const listIssues = `-- name: ListIssues :many
+
+select id, title, description, project, assignee, priority, rank, parent, blocked_by, "plan", step, schedule, created_at, queued_at, closed_at, closed from issue order by rank, created_at, id
+`
+
+// Issues (issue/issue.go).
 func (q *Queries) ListIssues(ctx context.Context) ([]Issue, error) {
 	rows, err := q.db.QueryContext(ctx, listIssues)
 	if err != nil {
@@ -309,22 +248,21 @@ func (q *Queries) ListIssues(ctx context.Context) ([]Issue, error) {
 		var i Issue
 		if err := rows.Scan(
 			&i.ID,
+			&i.Title,
 			&i.Description,
 			&i.Project,
-			&i.Agent,
+			&i.Assignee,
 			&i.Priority,
 			&i.Rank,
-			&i.CreatedAt,
-			&i.QueuedAt,
-			&i.ClosedAt,
-			&i.Closed,
-			&i.Playbook,
-			&i.Title,
 			&i.Parent,
 			&i.BlockedBy,
 			&i.Plan,
 			&i.Step,
 			&i.Schedule,
+			&i.CreatedAt,
+			&i.QueuedAt,
+			&i.ClosedAt,
+			&i.Closed,
 		); err != nil {
 			return nil, err
 		}
@@ -339,22 +277,8 @@ func (q *Queries) ListIssues(ctx context.Context) ([]Issue, error) {
 	return items, nil
 }
 
-const moveRuns = `-- name: MoveRuns :exec
-update issue_run set issue = ?1 where issue = ?2
-`
-
-type MoveRunsParams struct {
-	Dest string
-	Src  string
-}
-
-func (q *Queries) MoveRuns(ctx context.Context, arg MoveRunsParams) error {
-	_, err := q.db.ExecContext(ctx, moveRuns, arg.Dest, arg.Src)
-	return err
-}
-
 const openIssue = `-- name: OpenIssue :exec
-insert into issue (id, title, description, project, agent, created_at) values (?, ?, ?, ?, ?, ?)
+insert into issue (id, title, description, project, assignee, created_at) values (?, ?, ?, ?, ?, ?)
 on conflict (id) do update set queued_at = null, closed_at = null, closed = null
 `
 
@@ -363,21 +287,48 @@ type OpenIssueParams struct {
 	Title       string
 	Description string
 	Project     sql.NullString
-	Agent       sql.NullString
+	Assignee    sql.NullString
 	CreatedAt   int64
 }
 
-// A run starts on it: made from the run's job when it is new, else open again and out of the queue.
+// A worker starts on it: made from the worker's job when it is new, else open again and out of the queue.
 func (q *Queries) OpenIssue(ctx context.Context, arg OpenIssueParams) error {
 	_, err := q.db.ExecContext(ctx, openIssue,
 		arg.ID,
 		arg.Title,
 		arg.Description,
 		arg.Project,
-		arg.Agent,
+		arg.Assignee,
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const openOf = `-- name: OpenOf :many
+select id from issue where assignee = ? and closed_at is null
+`
+
+func (q *Queries) OpenOf(ctx context.Context, assignee sql.NullString) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, openOf, assignee)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const placeIssue = `-- name: PlaceIssue :exec
@@ -422,10 +373,10 @@ func (q *Queries) PlanIDs(ctx context.Context) ([]string, error) {
 }
 
 const putIssue = `-- name: PutIssue :exec
-insert into issue (id, title, description, project, agent, priority, rank, created_at, closed_at, closed, parent, blocked_by, plan, step)
+insert into issue (id, title, description, project, assignee, priority, rank, created_at, closed_at, closed, parent, blocked_by, plan, step)
 values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 on conflict (id) do update set
-  title = excluded.title, description = excluded.description, project = excluded.project, agent = excluded.agent, rank = excluded.rank,
+  title = excluded.title, description = excluded.description, project = excluded.project, assignee = excluded.assignee, rank = excluded.rank,
   closed_at = excluded.closed_at, closed = excluded.closed, parent = excluded.parent, blocked_by = excluded.blocked_by,
   plan = excluded.plan, step = excluded.step
 `
@@ -435,7 +386,7 @@ type PutIssueParams struct {
 	Title       string
 	Description string
 	Project     sql.NullString
-	Agent       sql.NullString
+	Assignee    sql.NullString
 	Priority    string
 	Rank        int64
 	CreatedAt   int64
@@ -447,14 +398,14 @@ type PutIssueParams struct {
 	Step        sql.NullString
 }
 
-// An issue as its playbook has it now; its runs and its queue are not the playbook's.
+// An issue as its playbook has it now; its workers and its queue are not the playbook's.
 func (q *Queries) PutIssue(ctx context.Context, arg PutIssueParams) error {
 	_, err := q.db.ExecContext(ctx, putIssue,
 		arg.ID,
 		arg.Title,
 		arg.Description,
 		arg.Project,
-		arg.Agent,
+		arg.Assignee,
 		arg.Priority,
 		arg.Rank,
 		arg.CreatedAt,
@@ -491,136 +442,13 @@ func (q *Queries) RemoveIssue(ctx context.Context, id string) error {
 	return err
 }
 
-const runsOf = `-- name: RunsOf :many
-select run from issue_run where issue = ? order by started_at, run
+const reopenIssue = `-- name: ReopenIssue :exec
+update issue set closed_at = null, closed = null, queued_at = null where id = ?
 `
 
-func (q *Queries) RunsOf(ctx context.Context, issue string) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, runsOf, issue)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var run string
-		if err := rows.Scan(&run); err != nil {
-			return nil, err
-		}
-		items = append(items, run)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const runsOfFamily = `-- name: RunsOfFamily :many
-select issue_run.issue, issue_run.run from issue_run
-where issue_run.issue in (select id from issue where id = ?1 or parent = ?1)
-order by issue_run.started_at, issue_run.run
-`
-
-type RunsOfFamilyRow struct {
-	Issue string
-	Run   string
-}
-
-func (q *Queries) RunsOfFamily(ctx context.Context, id string) ([]RunsOfFamilyRow, error) {
-	rows, err := q.db.QueryContext(ctx, runsOfFamily, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []RunsOfFamilyRow
-	for rows.Next() {
-		var i RunsOfFamilyRow
-		if err := rows.Scan(&i.Issue, &i.Run); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const runsOfKept = `-- name: RunsOfKept :many
-with latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit ?1)
-select issue_run.issue, issue_run.run from issue_run
-where issue_run.issue in (
-  select id from issue
-  where closed_at is null or id in (select id from latest) or parent in (select id from latest)
-     or parent in (select id from issue where closed_at is null))
-order by issue_run.started_at, issue_run.run
-`
-
-type RunsOfKeptRow struct {
-	Issue string
-	Run   string
-}
-
-func (q *Queries) RunsOfKept(ctx context.Context, closed int64) ([]RunsOfKeptRow, error) {
-	rows, err := q.db.QueryContext(ctx, runsOfKept, closed)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []RunsOfKeptRow
-	for rows.Next() {
-		var i RunsOfKeptRow
-		if err := rows.Scan(&i.Issue, &i.Run); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const taggedIssues = `-- name: TaggedIssues :many
-select id, playbook from issue where playbook is not null and plan is null and step is null
-`
-
-type TaggedIssuesRow struct {
-	ID       string
-	Playbook sql.NullString
-}
-
-// Issues of before playbooks were issues, tagged with the playbook (and the step) their run was for.
-func (q *Queries) TaggedIssues(ctx context.Context) ([]TaggedIssuesRow, error) {
-	rows, err := q.db.QueryContext(ctx, taggedIssues)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []TaggedIssuesRow
-	for rows.Next() {
-		var i TaggedIssuesRow
-		if err := rows.Scan(&i.ID, &i.Playbook); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) ReopenIssue(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, reopenIssue, id)
+	return err
 }
 
 const unqueueIssue = `-- name: UnqueueIssue :exec

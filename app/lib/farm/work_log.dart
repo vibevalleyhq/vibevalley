@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../desk/chat/chat_state.dart' show chatTurnSteps;
-import '../desk/shared/state.dart' show workStepsProvider;
-import '../desk/shared/work_log.dart';
+import '../chat/chat_state.dart' show chatTurnSteps;
+import '../data/remote.dart' show workStepsProvider;
+import '../shared/work_log.dart';
 import '../game/state.dart' show turnEndingAt;
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
@@ -35,8 +35,8 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
   @override
   Widget build(BuildContext context) {
     final steps = ref.watch(workStepsProvider.select((all) => all[widget.id]));
-    final turn = steps == null ? const <WorkStep>[] : turnEndingAt(steps, widget.at);
-    final tools = turn.where((s) => s.kind == StepKind.tool).length;
+    final turn = steps == null ? const <Activity>[] : turnEndingAt(steps, widget.at);
+    final tools = turn.where((s) => s.kind == ActivityKind.action).length;
     if (widget.manager && tools == 0) return const SizedBox.shrink();
     final label = tools > 0 ? '用了 $tools 个工具' : '这一轮的干活过程';
     return Padding(

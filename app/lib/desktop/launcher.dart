@@ -1,11 +1,7 @@
 // SIGTERM first: the server saves on the way out. Plain dart:io, no Flutter: test/desktop_launcher_test.dart drives it with a fake server script.
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
-
-/// null otherwise (data/providers.dart then uses VIBEVALLEY_SERVER or http://127.0.0.1:8787). Set by `startDesktop` before the app's first frame.
-String? embeddedServerAddress;
 
 class ServerFailed implements Exception {
   ServerFailed(this.reason);
@@ -91,7 +87,7 @@ class ServerLauncher {
 
   final String binary;
 
-  /// Not added to this process's: PORT is set on top of it.
+  /// Not added to this process's: VIBEVALLEY_PORT is set on top of it.
   final Map<String, String> environment;
   final File logFile;
   final String workingDirectory;
@@ -129,7 +125,7 @@ class ServerLauncher {
       binary,
       const [],
       workingDirectory: workingDirectory,
-      environment: {...environment, 'PORT': '$port'},
+      environment: {...environment, 'VIBEVALLEY_PORT': '$port'},
       includeParentEnvironment: false,
     );
     final drained = Future.wait([process.stdout.forEach(log.add), process.stderr.forEach(log.add)]).then<void>((_) {}, onError: (_) {});
@@ -145,28 +141,6 @@ class ServerLauncher {
       await Future.any([Future<void>.delayed(pollInterval), server.exited]);
     }
   }
-}
-
-/// As cmd/vibevalley reads it: comments, blank lines and `export ` skipped, one pair of surrounding quotes taken off.
-Map<String, String> parseEnv(String text) {
-  final out = <String, String>{};
-  for (final raw in const LineSplitter().convert(text)) {
-    var line = raw.trim();
-    if (line.isEmpty || line.startsWith('#')) continue;
-    if (line.startsWith('export ')) line = line.substring(7).trimLeft();
-    final eq = line.indexOf('=');
-    if (eq <= 0) continue;
-    final key = line.substring(0, eq).trim();
-    var value = line.substring(eq + 1).trim();
-    if (value.length >= 2 && (value[0] == '"' || value[0] == "'") && value[value.length - 1] == value[0]) {
-      value = value.substring(1, value.length - 1);
-    } else {
-      final hash = value.indexOf(' #');
-      if (hash >= 0) value = value.substring(0, hash).trimRight();
-    }
-    out[key] = value;
-  }
-  return out;
 }
 
 /// An interactive shell may print a greeting first.

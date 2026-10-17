@@ -26,6 +26,7 @@ bun run deploy    # 构建，再发到 Cloudflare
 - `src/lib/images.ts` 的清单要包含 `scene.ts` 的 `SHOWN`，缺了构建会报错。
 - 别读导入的图的属性（连 `width` 也不行）：Astro 会把原图也发出去。尺寸从 `.clone` 上读。
 - 像素字太大，`scripts/prepare.ts` 在构建前把它裁成用到的字，写进 `public/gen/`（不进 git）。
+- 分享图（`og:image`）也由 `scripts/prepare.ts` 在构建前画，每种语言一张（`public/gen/card-<lang>.jpg`，1200×630）：傍晚的农场配首屏的名字、标语和那句介绍，画法在 `scripts/card.ts`。字是像素字的字形转成的路径，不靠系统装的字体；改了 `hero` 的字，图跟着变。
 
 ## 动画
 
@@ -38,6 +39,10 @@ bun run deploy    # 构建，再发到 Cloudflare
 ## 文字
 
 `src/i18n/zh.ts` 和 `en.ts` 形状一样（类型查）。加一段话先加在 `zh.ts`，再补 `en.ts`。
+
+## 演讲稿
+
+一场演讲一个目录，在 `talks/<场>/`：幻灯片是一个自己带样式和翻页的 `index.html` 加它的图，旁边是提纲和会议给的模板。这里不发布；讲完以后把 `index.html` 和图挪进 `public/talks/<场>/`，构建时原样拷过去，发布在 `/talks/<场>/`。稿子上的署名用「海拉鲁编程客」，不写真名。
 
 ## 发布
 

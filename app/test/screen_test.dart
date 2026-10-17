@@ -7,16 +7,16 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/app/theme.dart';
+import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/data/server.dart';
 import 'package:vibevalley/desktop/desktop.dart';
 import 'package:vibevalley/game/farm.dart';
 import 'package:vibevalley/game/state.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/pages/farm_page.dart';
+import 'package:vibevalley/farm/farm_page.dart';
 import 'package:vibevalley/shell/title/title_state.dart';
-import 'package:vibevalley/village/village_view.dart';
+import 'package:vibevalley/data/remote.dart';
 
 ChatMessage _said(int seq, SenderKind kind, String from, String name, String text) => ChatMessage(
   seq: seq.toDouble(),
@@ -37,22 +37,22 @@ void main() {
         ..addFont(Future.value(ByteData.sublistView(File('assets/fonts/fusion-pixel-12px-proportional-zh_hans.otf').readAsBytesSync())));
       await font.load();
     });
-    final state = FarmState(
+    final state = CoreState(
       call: CallState.live,
-      foreman: ForemanState.listening,
-      helpers: const [],
+      manager: ManagerState.listening,
+      workers: const [],
       progress: const Progress(coins: 20, streak: 0, bestStreak: 0, counts: {}, unlocked: []),
       chat: Chat(
-        conversations: const [Conversation(id: 1, kind: ConversationKind.square, name: '田头', replies: 0, at: 0)],
+        conversations: const [Conversation(id: 1, kind: ConversationKind.general, name: '田头', replies: 0, at: 0)],
         messages: [
-          _said(1, SenderKind.foreman, 'foreman', '管家', '农场开门了，今天种点什么？'),
+          _said(1, SenderKind.manager, 'manager', '管家', '农场开门了，今天种点什么？'),
           _said(2, SenderKind.user, 'user', '主人', '让 antigravity 给农场加个夜间模式'),
-          _said(3, SenderKind.foreman, 'foreman', '管家', '还没有用 Antigravity 的 agent，先去 Agent 页面建一个。'),
+          _said(3, SenderKind.manager, 'manager', '管家', '还没有用 Antigravity 的 agent，先去 Agent 页面建一个。'),
         ],
       ),
     );
     const view = FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {});
-    final frame = StateFrame(SiteFrame(state: state, inbox: const [], plans: const [], view: view, effects: const []), bytes: 0, decodeMicros: 0);
+    final frame = ReceivedFrame(StateFrame(state: state, inbox: const [], plans: const [], view: view, effects: const []), bytes: 0, decodeMicros: 0);
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1;
     final key = GlobalKey();
@@ -61,14 +61,13 @@ void main() {
         ProviderScope(
           overrides: [
             stateFrameProvider.overrideWith((ref) => Stream.value(frame)),
-            agentsProvider.overrideWith((ref) async => const <String, AgentProfile>{}),
+            agentsProvider.overrideWithValue(AsyncData(const <String, Agent>{})),
             streamProblemProvider.overrideWith((ref) => const Stream<String>.empty()),
-            sideEventsProvider.overrideWith((ref) => const Stream<SiteEvent>.empty()),
+            sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
             farmEffectsProvider.overrideWithValue(const Stream<GameEffect>.empty()),
-            farmNoticesProvider.overrideWithValue(const Stream<SiteEvent>.empty()),
             desktopProvider.overrideWithValue(Desktop.none),
-            runtimesProvider.overrideWith(
-              (ref) => Stream.value([
+            runtimesProvider.overrideWithValue(
+              AsyncData([
                 RuntimeInfo(
                   id: 'claude',
                   installation: const InstallationAvailable(via: Via.executable, command: 'claude'),

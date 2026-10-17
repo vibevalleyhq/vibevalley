@@ -1,22 +1,22 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/app/theme.dart';
-import 'package:vibevalley/desk/shared/work_log.dart';
+import 'package:vibevalley/ui/theme.dart';
+import 'package:vibevalley/shared/work_log.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/rules/rounds.dart';
 
-WorkStep step(int n, double at, StepKind kind, String text, {ToolAction? action, bool? ok, int? under, int? on, String? output}) =>
-    WorkStep(n: n.toDouble(), at: at, kind: kind, text: text, action: action, ok: ok, under: under?.toDouble(), on: on?.toDouble(), output: output);
+Activity step(int n, double at, ActivityKind kind, String text, {ToolAction? action, bool? ok, int? under, int? on, String? output}) =>
+    Activity(n: n.toDouble(), at: at, kind: kind, text: text, action: action, ok: ok, under: under?.toDouble(), on: on?.toDouble(), output: output);
 
 final trajectory = [
-  step(0, 0, StepKind.asked, '修登录'),
-  step(1, 1000, StepKind.tool, 'rg handleLogin', action: ToolAction.search, ok: true),
-  step(2, 3000, StepKind.tool, 'pnpm test', action: ToolAction.runCommand, ok: false, output: '1 failed'),
-  step(3, 63000, StepKind.said, '测试挂了一个，先停在这'),
-  step(4, 100000, StepKind.asked, '【评论第 2 步】关于你这一步的操作：pnpm test\n\n我的评论：token 过期那条也修掉', on: 2),
-  step(5, 101000, StepKind.tool, 'edit src/auth.ts', action: ToolAction.editFile, ok: true),
-  step(6, 106000, StepKind.said, '修好了，测试全过'),
+  step(0, 0, ActivityKind.prompt, '修登录'),
+  step(1, 1000, ActivityKind.action, 'rg handleLogin', action: ToolAction.search, ok: true),
+  step(2, 3000, ActivityKind.action, 'pnpm test', action: ToolAction.runCommand, ok: false, output: '1 failed'),
+  step(3, 63000, ActivityKind.response, '测试挂了一个，先停在这'),
+  step(4, 100000, ActivityKind.prompt, '【评论第 2 步】关于你这一步的操作：pnpm test\n\n我的评论：token 过期那条也修掉', on: 2),
+  step(5, 101000, ActivityKind.action, 'edit src/auth.ts', action: ToolAction.editFile, ok: true),
+  step(6, 106000, ActivityKind.response, '修好了，测试全过'),
 ];
 
 void main() {
@@ -25,7 +25,7 @@ void main() {
     expect(rounds.map((r) => r.asked?.n), [0, 4]);
     expect(rounds.first.steps.map((s) => s.n), [1, 2, 3]);
     expect(rounds.first.answer?.text, '测试挂了一个，先停在这');
-    final withSub = roundsOf([...trajectory.take(2), step(9, 1500, StepKind.asked, '帮手的活', under: 1)]);
+    final withSub = roundsOf([...trajectory.take(2), step(9, 1500, ActivityKind.prompt, '帮手的活', under: 1)]);
     expect(withSub.length, 1);
   });
 
@@ -42,7 +42,7 @@ void main() {
     expect(farmToolText('farm__farm_inbox'), '看有没有找它的话');
     expect(farmToolText('farm__farm_say'), '在田头说话');
     expect(farmToolText('pnpm test'), isNull);
-    expect(spanLabel(step(1, 0, StepKind.tool, 'farm__farm_read', action: ToolAction.mcp)), '田头');
+    expect(spanLabel(step(1, 0, ActivityKind.action, 'farm__farm_read', action: ToolAction.mcp)), '田头');
   });
 
   test('a comment is tied to its step and read without the quote', () {

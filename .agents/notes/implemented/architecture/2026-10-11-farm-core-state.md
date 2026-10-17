@@ -8,11 +8,11 @@ Status: implemented
 
 ## Decision
 
-农场上的一切是一个值 `FarmState`，只因事实而变，由协议里一个纯函数 `Reduce(state, fact)`（`server/internal/protocol/farm.go`）折进去（[architecture.md](../../../../docs/architecture.md)「核心状态」）。当初服务端、页面和模拟服务器调的是同一个 TypeScript 的 `reduce`；网页退役以后只剩服务端折，客户端读折好的状态（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)）。
+农场上的一切是一个值 `CoreState`，只因事实而变，由协议里一个纯函数 `Reduce(state, fact)`（`server/internal/protocol/core.go`）折进去（[architecture.md](../../../../docs/architecture.md)「核心状态」）。当初服务端、页面和模拟服务器调的是同一个 TypeScript 的 `reduce`；网页退役以后只剩服务端折，客户端读折好的状态（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)）。
 
 - 帮工的生命周期是一个阶段 `phase`：`arriving`、`working`（带在做什么、没动静、重试）、`ripe`、`failed`、`resting`；离开就从状态里删掉。冲突是帮工分支的属性，以最近一次 git 检查为准，不属于阶段。
-- 「在做什么」「要你做什么」「管家怎么描述它」「能不能收」都是从阶段推出来的纯函数（`DoingOf`、`NeedOf`、`PhaseText`、`CanHarvest`；客户端的面板用它们在 `app/lib/rules/farm.dart` 里的 Dart 移植），地块、面板、管家读同一套。
-- 服务端只在 `Site.Apply` 改状态，存进 `farm.json`（田头、进度、定时和工单除外，它们的家是数据库 `farm.db`）；只有服务端需要的（会话、worktree 目录、原话）在 `crew.json`；大块的旁路数据（干活过程、diff）不进核心状态。
+- 「在做什么」「要你做什么」「管家怎么描述它」「能不能收」都是从阶段推出来的纯函数（`DoingOf`、`NeedOf`、`PhaseText`、`CanMerge`；客户端的面板用它们在 `app/lib/rules/farm.dart` 里的 Dart 移植），地块、面板、管家读同一套。
+- 服务端只在 `Site.Apply` 改状态，存进 `state.json`（田头、进度、定时和工单除外，它们的家是数据库 `vibevalley.db`）；只有服务端需要的（会话、worktree 目录、原话）在 `workers.json`；大块的旁路数据（干活过程、diff）不进核心状态。
 - 客户端在核心状态之上叠一层只属于游戏、跟着时钟走的状态（帮工走到哪、一闪而过的效果）；地块位置和历史后来也进了核心状态（`Helper.play`，由 `Reduce` 折，[客户端迁到 Flutter](2026-10-13-flutter-client-over-ts-server.md)）。金币和成就也是核心状态：服务端的账本折出来（[achievements](../feature/2026-10-11-achievements.md)）。
 
 ## Alternatives considered
@@ -29,4 +29,4 @@ Status: implemented
 
 ## Verification
 
-当初由 TypeScript 服务端的 `farm.test.ts` 覆盖 `reduce` 和推导：帮工的一生、对不存在的帮工的事实不改状态、对话的增长和截断、快照过线来回不变。现在 `Reduce` 只在 Go（`server/internal/protocol/farm.go`），`server/internal/protocol/parity_test.go` 的 `TestReduceGolden` 拿几千个随机事实的黄金数据（当年由 TypeScript 的一份折出）逐个比状态、特效和视图。
+当初由 TypeScript 服务端的 `farm.test.ts` 覆盖 `reduce` 和推导：帮工的一生、对不存在的帮工的事实不改状态、对话的增长和截断、快照过线来回不变。现在 `Reduce` 只在 Go（`server/internal/protocol/core.go`），`server/internal/protocol/reduce_golden_test.go` 的 `TestReduceGolden` 拿几千个随机事实的黄金数据（当年由 TypeScript 的一份折出）逐个比状态、特效和视图。

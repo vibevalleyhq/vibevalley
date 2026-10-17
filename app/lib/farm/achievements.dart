@@ -6,9 +6,9 @@ import '../game/commands.dart';
 import '../game/farm.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
-import 'bits.dart';
 import 'popover.dart';
 import '../rules/progress.dart';
+import '../shared/tags.dart';
 
 class Medal extends StatelessWidget {
   const Medal({super.key, required this.achievement, required this.tier, required this.size});
@@ -165,7 +165,7 @@ class _Standing extends ConsumerWidget {
     final lv = ref.watch(viewProvider.select((v) => v?.level)) ?? const FarmLevel(level: 1, xp: 0, need: 10);
     final commits = ref.watch(farmProvider.select((s) => s?.commits?.total)) ?? 0;
     final level = lv.level.round();
-    final need = xpToNext(level);
+    final need = lv.need.round();
     return Tinted(
       padding: const EdgeInsets.all(12),
       child: Wrap(
@@ -201,7 +201,7 @@ class _Standing extends ConsumerWidget {
                 children: [
                   Text(_thousands(p.coins.round()), style: KitText.xl),
                   Text(
-                    p.streak > 1 ? '连胜 ${p.streak.round()} · 收成金币 ×${streakMultiplier(p.streak).toStringAsFixed(1)}' : '收进主分支才给金币',
+                    p.streak > 1 ? '连胜 ${p.streak.round()} · 收成金币 ×${(p.multiplier ?? 1).toStringAsFixed(1)}' : '收进主分支才给金币',
                     style: KitText.xs.copyWith(color: Palette.bark600),
                   ),
                 ],
@@ -509,7 +509,7 @@ class AchievementCard extends StatelessWidget {
                           children: [
                             for (final (i, need) in a.tiers.indexed)
                               Tooltip(
-                                message: '${_tierText[i + 1]}：$need $unit',
+                                message: '${_tierText[i + 1]}：${numberText(need)} $unit',
                                 child: Container(width: 8, height: 8, margin: const EdgeInsets.only(left: 4), color: i < tier ? _pip[i + 1] : Palette.cream300),
                               ),
                           ],

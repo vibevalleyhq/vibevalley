@@ -37,14 +37,14 @@ flowchart LR
   app -- HTTP 命令 --> server
   server -- SSE：折好的核心状态 --> app
   subgraph server[Go 服务端 127.0.0.1:8787]
-    foreman[管家<br/>vibevalley 自己的 agent]
+    manager[管家<br/>vibevalley 自己的 agent]
     chat[田头<br/>SQLite]
     site[核心状态<br/>只由事实改变]
-    crew[帮工<br/>smith]
+    workers[帮工<br/>smith]
   end
-  foreman --> crew
-  crew -- 会话事件 --> site
-  crew --> rt[本机的农机<br/>pi · Claude Code · Codex]
+  manager --> workers
+  workers -- 会话事件 --> site
+  workers --> rt[本机的农机<br/>pi · Claude Code · Codex]
   rt --> repo[(你的项目<br/>每个帮工一个 worktree)]
 ```
 
@@ -84,7 +84,7 @@ open app/build/vibevalley.app
 ### 或者分开跑（开发时）
 
 ```bash
-cd server && go run ./cmd/vibevalley                                                  # 服务端，127.0.0.1:8787
+cd server && go run ./cmd/server                                                  # 服务端，127.0.0.1:8787
 cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787  # 客户端
 ```
 
@@ -102,7 +102,7 @@ cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:
 ## 目录
 
 ```
-server/            Go 服务端，一个 Go 模块；cmd/vibevalley 单独跑它
+server/            Go 服务端，一个 Go 模块；cmd/server 单独跑它
   internal/        按概念分的服务：工单、执行、项目、群聊、管家、频道和连接器、游戏……
   internal/protocol/  形状、接口和规则的唯一来源；tool/shapegen 从它生成 Go 和 Flutter 的代码
   pkg/smith/       oar 的 Go 移植：驱动 pi、Claude Code、Codex 等编码 agent

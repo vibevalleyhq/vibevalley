@@ -3,7 +3,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 
-import '../../app/theme.dart';
+import '../theme.dart';
 import 'base.dart';
 
 const _mentionHref = '#mention';

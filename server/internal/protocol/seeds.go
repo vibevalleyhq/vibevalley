@@ -5,41 +5,34 @@ import (
 	"encoding/json"
 )
 
+// The achievements, in the order the page shows them.
+var Achievements []AchievementDef
+
 //go:embed seeds.json
 var seedsJSON []byte
 
-type RuntimePreset struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
-	Blurb string `json:"blurb"`
-	Look  Look   `json:"look"`
-}
-
-type RuntimeFacts struct {
-	Steer        bool              `json:"steer"`
-	Refused      map[string]string `json:"refused"`
-	Capabilities []string          `json:"capabilities"`
-	InProcess    bool              `json:"inProcess"`
-}
-
 var seeds struct {
-	Agents          []AgentProfile          `json:"agents"`
+	Agents          []Agent                 `json:"agents"`
 	DefaultSettings RuntimeSettings         `json:"defaultSettings"`
 	ExampleSkills   []Skill                 `json:"exampleSkills"`
+	Achievements    []AchievementDef        `json:"achievements"`
 	RuntimePresets  []RuntimePreset         `json:"runtimePresets"`
+	FallbackPreset  RuntimePreset           `json:"fallbackPreset"`
 	RuntimeFacts    map[string]RuntimeFacts `json:"runtimeFacts"`
 	RuntimeIDs      []string                `json:"runtimeIds"`
+	ActionText      map[WorkerAction]string `json:"actionText"`
 }
 
 func init() {
 	if err := json.Unmarshal(seedsJSON, &seeds); err != nil {
 		panic("protocol: seeds.json: " + err.Error())
 	}
+	Achievements, ActionText = seeds.Achievements, seeds.ActionText
 }
 
 // A copy each call.
-func SeedAgents() []AgentProfile {
-	var out []AgentProfile
+func SeedAgents() []Agent {
+	var out []Agent
 	body, _ := json.Marshal(seeds.Agents)
 	_ = json.Unmarshal(body, &out)
 	return out
@@ -53,8 +46,6 @@ func DefaultSettings() RuntimeSettings {
 
 func ExampleSkills() []Skill { return append([]Skill(nil), seeds.ExampleSkills...) }
 
-func RuntimePresets() []RuntimePreset { return append([]RuntimePreset(nil), seeds.RuntimePresets...) }
-
 // A runtime with no look of its own gets the fallback's, under its own id.
 func PresetOf(runtime string) RuntimePreset {
 	for _, p := range seeds.RuntimePresets {
@@ -62,7 +53,9 @@ func PresetOf(runtime string) RuntimePreset {
 			return p
 		}
 	}
-	return RuntimePreset{ID: runtime, Label: runtime, Blurb: "VibeValley 还没有专属外形的 runtime。", Look: Look{Build: BuildBiped, Head: HeadRounded, Body: "#f1e8d8", Trim: "#5d5850", Hat: "#f2b53a", Eye: "#a6f4ff"}}
+	p := seeds.FallbackPreset
+	p.ID, p.Label = runtime, runtime
+	return p
 }
 
 func RuntimeLabel(runtime string) string { return PresetOf(runtime).Label }
@@ -75,5 +68,3 @@ func FactsOf(runtime string) RuntimeFacts {
 	}
 	return RuntimeFacts{Refused: map[string]string{}}
 }
-
-func CanSteer(runtime string) bool { return FactsOf(runtime).Steer }

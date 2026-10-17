@@ -3,8 +3,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
-import '../shared/state.dart';
-import '../shared/widgets.dart';
+import '../../data/remote.dart';
+import '../../shared/widgets.dart';
+import '../../data/providers.dart';
 
 enum RuntimeBusy { refreshing, upgrading }
 
@@ -14,7 +15,7 @@ class RuntimeCommands extends Notifier<Map<String, RuntimeBusy>> {
   @override
   Map<String, RuntimeBusy> build() => const {};
 
-  VibeValleyApi get _api => ref.read(deskApiProvider);
+  VibeValleyApi get _api => ref.read(apiProvider);
 
   void _set(String id, RuntimeBusy? what) => state = {
     for (final e in state.entries)
@@ -31,11 +32,11 @@ class RuntimeCommands extends Notifier<Map<String, RuntimeBusy>> {
     }
   }
 
-  Future<void> refresh(String id) => _withBusy(id, RuntimeBusy.refreshing, () => _api.farm.refreshRuntime(id: id));
+  Future<void> refresh(String id) => _withBusy(id, RuntimeBusy.refreshing, () => _api.runtime.refresh(id: id));
 
-  Future<void> upgrade(String id) => _withBusy(id, RuntimeBusy.upgrading, () => _api.farm.upgradeRuntime(id: id));
+  Future<void> upgrade(String id) => _withBusy(id, RuntimeBusy.upgrading, () => _api.runtime.upgrade(id: id));
 
   Future<void> update(String id, RuntimeSettings settings) async {
-    if (await deskRun(() => _api.farm.updateRuntime(id: id, body: settings)) != null) await ref.read(deskConfigProvider.notifier).refresh();
+    if (await deskRun(() => _api.runtime.update(id: id, body: settings)) != null) await ref.read(deskConfigProvider.notifier).refresh();
   }
 }

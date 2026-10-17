@@ -7,14 +7,15 @@
 需要 Go 1.27、Flutter 3.47、Xcode 和 Bun 1.4。帮工用本机装好并登录的农机（pi、Claude Code、codex）；VibeValley 自己的农机和管家只要 DeepSeek 的钥匙。
 
 ```bash
-cd server && go run ./cmd/vibevalley     # 只听 127.0.0.1:8787，读 $VIBEVALLEY_HOME/.env
+cd server && go run ./cmd/server     # 只听 127.0.0.1:8787，读 $VIBEVALLEY_HOME/vibevalley.yaml
 cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787
 ```
 
 - 第一次跑 Flutter（和升级 `agora_rtc_engine` 以后）先跑 `app/tool/agora-voice-only.sh`。
-- 帮工在 `~/vibevalley-work`（`VIBEVALLEY_WORK_ROOT`）下干活，设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余环境变量见 [architecture.md](architecture.md)「环境变量」。
+- 帮工在 `~/vibevalley-work`（`VIBEVALLEY_WORK_ROOT`）下干活，设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见 [architecture.md](architecture.md)「配置」。
 - 语音的凭据见 [voice.md](reference/voice.md)；没有也能打字用。
 - 服务端改了代码要重启。
+- 改表结构：`cd server && go run ./cmd/migrate new 名字` 在 `migrations/` 写下一个迁移，写好以后跑 sqlc（命令在 [AGENTS.md](../AGENTS.md)），服务端下次开机时跑它；`go run ./cmd/migrate status` 看本机的库在第几版，`up` 不起服务端也能跑。
 
 ## macOS 应用
 
@@ -32,7 +33,7 @@ app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
 ## 改形状、规则和表
 
 - **形状**：改 `server/internal/protocol` 的 `shapes.go` 或 `api.go`，同一个改动里跑 `go run ./tool/shapegen`（[server](../server/README.md#形状和规则从哪来)）。
-- **规则**：改 protocol 里的纯函数，`go test ./internal/protocol -update` 重写黄金数据，看 diff；Flutter 的 `lib/rules/` 有它的移植的一起改。
+- **规则**：改拥有它的包里的纯函数（几个包都用的在 `protocol`），`VIBEVALLEY_GOLDEN=update go test ./internal/...` 重写黄金数据，看 diff。客户端不重写服务端的规则（[客户端问服务端](../.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
 - **表和查询**：迁移在 `server/migrations/`（一个改动一个新文件，跑过的不再改），查询在 `server/pkg/db/queries/`；改完重跑 sqlc（[理由](../.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）。新表用单数名。
 
 ## 调试台

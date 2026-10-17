@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 )
 
-// FileWriter saves a file the server keeps (farm.json, crew.json, config.json…): whole or not at all, and in order.
+// FileWriter saves a file the server keeps (state.json, workers.json, config.json…): whole or not at all, and in order.
 // Each write goes to a temporary file and is renamed over the file, so a crash never leaves half a file; writes to one
 // file run one after another, so the last one asked for is the one left on disk.
 type FileWriter struct {

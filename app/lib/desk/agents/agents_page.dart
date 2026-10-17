@@ -4,12 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
-import '../shared/faces.dart';
-import '../shared/looks.dart';
+import '../../shared/faces.dart';
+import '../../shared/looks.dart';
 import '../shared/rules.dart';
-import '../shared/state.dart';
-import '../shared/widgets.dart';
-import '../../rules/index.dart';
+import '../../data/remote.dart';
+import '../../shared/widgets.dart';
 import '../../rules/seeds.dart';
 
 class AgentsPage extends ConsumerWidget {
@@ -20,7 +19,7 @@ class AgentsPage extends ConsumerWidget {
     final config = ref.watch(deskConfigProvider);
     final farm = ref.watch(farmProvider);
     final tallies = farm?.progress?.agents ?? const <String, AgentTally>{};
-    final helpers = farm?.helpers ?? const <Helper>[];
+    final workers = farm?.workers ?? const <Worker>[];
     final skillName = {for (final s in config.skills) s.id: s.name};
 
     final cards = <Widget>[
@@ -30,7 +29,7 @@ class AgentsPage extends ConsumerWidget {
           agent: a,
           runtime: config.runtime(a.runtime),
           tally: tallies[a.id],
-          here: helpers.where((h) => h.agent == a.id).length,
+          here: workers.where((h) => h.agent == a.id).length,
           skillName: skillName,
         ),
       const _NewCard(),
@@ -223,7 +222,7 @@ class _ManagerCard extends StatelessWidget {
 
 class _AgentCard extends ConsumerWidget {
   const _AgentCard({required this.agent, required this.runtime, required this.tally, required this.here, required this.skillName});
-  final AgentProfile agent;
+  final Agent agent;
   final RuntimeInfo? runtime;
   final AgentTally? tally;
   final int here;
@@ -232,7 +231,7 @@ class _AgentCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final a = agent;
-    final errors = agentIssues(a, runtime).where((i) => i.level == IssueLevel.error).toList();
+    final errors = (watchAgentIssues(ref, [a])[a.id] ?? const <AgentIssue>[]).where((i) => i.level == AgentIssueLevel.error).toList();
     final available = runtime?.installation is InstallationAvailable;
     return _Card(
       path: '/agents/${Uri.encodeComponent(a.id)}',
@@ -371,7 +370,7 @@ class _AgentCard extends ConsumerWidget {
 
 class _Toggle extends ConsumerWidget {
   const _Toggle({required this.agent, required this.shown});
-  final AgentProfile agent;
+  final Agent agent;
   final bool shown;
 
   @override

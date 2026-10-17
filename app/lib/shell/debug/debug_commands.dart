@@ -7,11 +7,10 @@ import '../../gen/vibevalley.dart';
 import '../fx_layer.dart';
 import '../sfx.dart';
 import '../synth.dart';
-import '../../rules/progress.dart';
 
 /// Null until the farm screen sets it.
 class DebugHooks {
-  const DebugHooks({required this.tod, required this.setTod, required this.daySpeed, required this.setDaySpeed, required this.openHelper});
+  const DebugHooks({required this.tod, required this.setTod, required this.daySpeed, required this.setDaySpeed, required this.openWorker});
 
   /// 0..1, 0.5 is noon.
   final double Function() tod;
@@ -21,7 +20,7 @@ class DebugHooks {
   final double Function() daySpeed;
   final void Function(double speed) setDaySpeed;
 
-  final void Function(String id) openHelper;
+  final void Function(String id) openWorker;
 }
 
 final debugHooksProvider = NotifierProvider<DebugHooksNotifier, DebugHooks?>(DebugHooksNotifier.new);
@@ -38,28 +37,28 @@ class Hb {
   Hb(this.ref);
   final Ref ref;
 
-  VibeValleyApi get _api => ref.read(serverProvider).api;
+  VibeValleyApi get _api => ref.read(apiProvider);
 
-  Future<void> start() => _api.farm.start();
-  Future<void> end() => _api.farm.end();
+  Future<void> start() => _api.server.start();
+  Future<void> end() => _api.server.end();
 
-  Future<void> hear(String text) => _api.farm.say(body: SayRequest(text: text));
+  Future<void> hear(String text) => _api.channel.say(body: SayRequest(text: text));
 
-  Future<void> tell(String id, String text) => _api.farm.tell(
+  Future<void> tell(String id, String text) => _api.worker.tell(
     id: id,
     body: TellRequest(text: text),
   );
-  Future<void> stop(String id) => _api.farm.stop(id: id);
-  Future<void> dismiss(String id) => _api.farm.dismiss(id: id);
-  Future<void> harvest(String id) => _api.farm.harvest(id: id);
+  Future<void> stop(String id) => _api.worker.stop(id: id);
+  Future<void> dismiss(String id) => _api.worker.dismiss(id: id);
+  Future<void> harvest(String id) => _api.worker.merge(id: id);
 
   Future<void> everyone(String action) async {
-    for (final h in ref.read(farmProvider)?.helpers ?? const <Helper>[]) {
+    for (final h in ref.read(farmProvider)?.workers ?? const <Worker>[]) {
       await (action == 'stop' ? stop(h.id) : dismiss(h.id));
     }
   }
 
-  void open(String id) => ref.read(debugHooksProvider)?.openHelper(id);
+  void open(String id) => ref.read(debugHooksProvider)?.openWorker(id);
 
   void tod(double t) => ref.read(debugHooksProvider)?.setTod(t);
   void daySpeed(double n) => ref.read(debugHooksProvider)?.setDaySpeed(n);

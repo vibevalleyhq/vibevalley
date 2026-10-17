@@ -8,25 +8,22 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import 'chat_composer.dart';
-import 'chat_rules.dart';
-import 'chat_state.dart';
-import 'chat_widgets.dart';
+import '../../chat/chat_rules.dart';
+import '../../chat/chat_state.dart';
+import '../../chat/chat_widgets.dart';
 import 'dialogs.dart';
+import '../../app/desk.dart' show deskHead;
 import 'message_list.dart';
 import '../../rules/chat.dart';
 import '../../rules/farm.dart';
-import '../../rules/schedules.dart';
 
-const _head = 66.0;
-
-const _line = BorderSide(color: Palette.bark900, width: 2);
 const _grey = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, color: Palette.bark500);
 
-String threadTitle(Chat? chat, Conversation thread, List<Helper> helpers) {
-  if (thread.subjectKind == SubjectKind.job) {
-    final helper = helpers.where((h) => h.id == thread.subjectId).firstOrNull;
+String threadTitle(Chat? chat, Conversation thread, List<Worker> workers) {
+  if (thread.subjectKind == SubjectKind.issue) {
+    final worker = workers.where((h) => h.id == thread.subjectId).firstOrNull;
     final said = messagesIn(chat, thread.id).where((m) => m.from == thread.subjectId).firstOrNull?.name;
-    return '${helper?.name ?? said ?? thread.subjectId ?? ''}的工单串';
+    return '${worker?.name ?? said ?? thread.subjectId ?? ''}的工单串';
   }
   if (thread.subjectKind == SubjectKind.playbook) return '计划 ${thread.subjectId ?? ''}';
   final parent = parentOf(chat, thread);
@@ -121,7 +118,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
     final pane = thread == null
         ? null
-        : _ThreadPane(thread: thread, onClose: () => _show(channel != null && channel.kind != ConversationKind.square ? channel.id : null));
+        : _ThreadPane(thread: thread, onClose: () => _show(channel != null && channel.kind != ConversationKind.general ? channel.id : null));
 
     return ColoredBox(
       color: Palette.cream50,
@@ -144,7 +141,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                               width: 416,
                               decoration: const BoxDecoration(
                                 color: Palette.cream50,
-                                border: Border(left: _line),
+                                border: Border(left: pxLine),
                               ),
                               child: pane,
                             ),
@@ -169,7 +166,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       : Container(
                           decoration: const BoxDecoration(
                             color: Palette.cream50,
-                            border: Border(left: _line),
+                            border: Border(left: pxLine),
                           ),
                           child: pane,
                         ),
@@ -183,13 +180,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   Widget _header(Conversation? channel, bool wideSidebar) {
     final about = [
-      if ((channel?.description ?? '').isNotEmpty) channel!.description! else if (channel?.kind == ConversationKind.square) '默认的频道：你、管家和帮工都在这儿',
+      if ((channel?.description ?? '').isNotEmpty) channel!.description! else if (channel?.kind == ConversationKind.general) '默认的频道：你、管家和帮工都在这儿',
       if ((channel?.project ?? '').isNotEmpty) '默认项目 ${channel!.project}',
     ].join(' · ');
     return Container(
-      height: _head,
+      height: deskHead,
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: const BoxDecoration(border: Border(bottom: _line)),
+      decoration: const BoxDecoration(border: Border(bottom: pxLine)),
       child: Row(
         children: [
           if (!wideSidebar) ...[
@@ -259,7 +256,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _tabs() => Container(
-    decoration: const BoxDecoration(border: Border(bottom: _line)),
+    decoration: const BoxDecoration(border: Border(bottom: pxLine)),
     child: Semantics(
       label: '频道里的',
       container: true,
@@ -289,7 +286,7 @@ class _TabButton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
         color: on ? Palette.wheat : (s.hovered ? Palette.cream100 : null),
-        border: const Border(right: _line),
+        border: const Border(right: pxLine),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -315,23 +312,23 @@ class _Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final channels = channelsOf(chat);
-    final helpers = ref.watch(farmProvider)?.helpers ?? const <Helper>[];
+    final workers = ref.watch(farmProvider)?.workers ?? const <Worker>[];
     return Semantics(
       label: '聊天',
       container: true,
       child: Container(
         decoration: const BoxDecoration(
           color: Palette.cream100,
-          border: Border(right: _line),
+          border: Border(right: pxLine),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              height: _head,
+              height: deskHead,
               padding: const EdgeInsets.symmetric(horizontal: 20),
               alignment: Alignment.centerLeft,
-              decoration: const BoxDecoration(border: Border(bottom: _line)),
+              decoration: const BoxDecoration(border: Border(bottom: pxLine)),
               child: const Text('聊天', style: KitText.xl),
             ),
             Expanded(
@@ -354,15 +351,15 @@ class _Sidebar extends ConsumerWidget {
                       ),
                     ),
                     children: [
-                      // Before the first word the square is not there yet: it is still where you talk.
-                      if (channels.isEmpty) const _ChannelRow(label: squareName, here: true, unread: 0, onTap: null),
+                      // Before the first word the general is not there yet: it is still where you talk.
+                      if (channels.isEmpty) const _ChannelRow(label: generalName, here: true, unread: 0, onTap: null),
                       for (final c in channels)
                         _ChannelRow(
                           label: channelName(c),
                           here: c.id == channel?.id,
                           unread: unreadUnder(chat, c),
                           onTap: () {
-                            onShow(c.kind == ConversationKind.square ? null : c.id);
+                            onShow(c.kind == ConversationKind.general ? null : c.id);
                             onPick();
                           },
                         ),
@@ -370,18 +367,18 @@ class _Sidebar extends ConsumerWidget {
                   ),
                   _Section(
                     title: '帮工',
-                    count: helpers.length,
+                    count: workers.length,
                     children: [
-                      if (helpers.isEmpty)
+                      if (workers.isEmpty)
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12),
                           child: Text('还没有帮工在地里：在频道里跟管家说一件活。', style: _grey),
                         ),
-                      for (final h in helpers)
-                        _HelperRow(
-                          helper: h,
+                      for (final h in workers)
+                        _WorkerRow(
+                          worker: h,
                           chat: chat,
-                          active: thread?.subjectKind == SubjectKind.job && thread?.subjectId == h.id,
+                          active: thread?.subjectKind == SubjectKind.issue && thread?.subjectId == h.id,
                           onShow: (id) {
                             onShow(id);
                             onPick();
@@ -545,16 +542,16 @@ class _Sliding extends StatelessWidget {
   );
 }
 
-class _HelperRow extends StatelessWidget {
-  const _HelperRow({required this.helper, required this.chat, required this.active, required this.onShow});
-  final Helper helper;
+class _WorkerRow extends StatelessWidget {
+  const _WorkerRow({required this.worker, required this.chat, required this.active, required this.onShow});
+  final Worker worker;
   final Chat? chat;
   final bool active;
   final void Function(double id) onShow;
 
   @override
   Widget build(BuildContext context) {
-    final h = helper;
+    final h = worker;
     final thread = jobThreadOf(chat, h.id);
     final unread = thread == null ? 0 : unreadIn(chat, thread);
     final phase = phaseText(h, nowMs());
@@ -594,22 +591,22 @@ class _HelperRow extends StatelessWidget {
   }
 }
 
-const _mood = {ForemanState.idle: '在歇着', ForemanState.listening: '在听', ForemanState.thinking: '在想', ForemanState.speaking: '在说'};
+const _mood = {ManagerState.idle: '在歇着', ManagerState.listening: '在听', ManagerState.thinking: '在想', ManagerState.speaking: '在说'};
 
 class _ManagerLine extends ConsumerWidget {
   const _ManagerLine();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mood = ref.watch(farmProvider)?.foreman ?? ForemanState.idle;
+    final mood = ref.watch(farmProvider)?.manager ?? ManagerState.idle;
     final dot = switch (mood) {
-      ForemanState.idle => Palette.cream300,
-      ForemanState.thinking => Palette.wheat,
+      ManagerState.idle => Palette.cream300,
+      ManagerState.thinking => Palette.wheat,
       _ => Palette.leaf500,
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(border: Border(top: _line)),
+      decoration: const BoxDecoration(border: Border(top: pxLine)),
       child: Row(
         children: [
           const ManagerHead(size: 32),
@@ -619,7 +616,7 @@ class _ManagerLine extends ConsumerWidget {
           Container(width: 8, height: 8, color: dot),
           const SizedBox(width: 6),
           Text(_mood[mood]!, style: _grey),
-          if (mood == ForemanState.thinking) ...[const SizedBox(width: 6), const ThinkingDots()],
+          if (mood == ManagerState.thinking) ...[const SizedBox(width: 6), const ThinkingDots()],
         ],
       ),
     );
@@ -655,7 +652,7 @@ class _Empty extends StatelessWidget {
   );
 }
 
-BoxDecoration get _card => const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(_line), boxShadow: kitDrop);
+BoxDecoration get _card => const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(pxLine), boxShadow: kitDrop);
 
 class _Jobs extends ConsumerWidget {
   const _Jobs({required this.channel, required this.onShow});
@@ -665,12 +662,12 @@ class _Jobs extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final farm = ref.watch(farmProvider);
-    final helpers = [...?farm?.helpers.where((h) => h.channel != null ? h.channel == channel.id : channel.kind == ConversationKind.square)];
-    if (helpers.isEmpty) return const _Empty('这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。', icon: 'icon-tasks');
+    final workers = [...?farm?.workers.where((h) => h.channel != null ? h.channel == channel.id : channel.kind == ConversationKind.general)];
+    if (workers.isEmpty) return const _Empty('这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。', icon: 'icon-tasks');
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        for (final h in helpers)
+        for (final h in workers)
           Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -757,7 +754,7 @@ class _SchedulesState extends ConsumerState<_Schedules> {
                           TextSpan(
                             children: [
                               TextSpan(text: s.name),
-                              TextSpan(text: '  ${whenText(s.when, s.tz)} · 下次 ${nextText(s)}${s.agent != null ? ' · 直接派 ${s.agent}' : ''}', style: _grey),
+                              TextSpan(text: '  ${s.whenText ?? ''} · 下次 ${s.nextText ?? ''}${s.agent != null ? ' · 直接派 ${s.agent}' : ''}', style: _grey),
                             ],
                           ),
                           style: KitText.sm,
@@ -811,11 +808,11 @@ class _ThreadPane extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final farm = ref.watch(farmProvider);
-    final helpers = farm?.helpers ?? const <Helper>[];
-    final helper = thread.subjectKind == SubjectKind.job ? helpers.where((h) => h.id == thread.subjectId).firstOrNull : null;
-    final status = helper != null
-        ? '@${helper.id} · ${phaseText(helper, nowMs())}'
-        : thread.subjectKind == SubjectKind.job
+    final workers = farm?.workers ?? const <Worker>[];
+    final worker = thread.subjectKind == SubjectKind.issue ? workers.where((h) => h.id == thread.subjectId).firstOrNull : null;
+    final status = worker != null
+        ? '@${worker.id} · ${phaseText(worker, nowMs())}'
+        : thread.subjectKind == SubjectKind.issue
         ? '它已经离开农场，串还留着'
         : '${idText(thread.replies)} 条回复';
     return Semantics(
@@ -825,14 +822,14 @@ class _ThreadPane extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            height: _head,
+            height: deskHead,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: const BoxDecoration(border: Border(bottom: _line)),
+            decoration: const BoxDecoration(border: Border(bottom: pxLine)),
             child: Row(
               children: [
                 SizedBox.square(
                   dimension: 32,
-                  child: Center(child: helper != null ? AgentHead(agent: helper.agent, size: 32) : const Glyph('button-thread')),
+                  child: Center(child: worker != null ? AgentHead(agent: worker.agent, size: 32) : const Glyph('button-thread')),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -840,10 +837,10 @@ class _ThreadPane extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(threadTitle(farm?.chat, thread, helpers), maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                      Text(threadTitle(farm?.chat, thread, workers), maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
                       Row(
                         children: [
-                          if (helper != null) ...[PhaseGlyph(helper.phase, size: 14), const SizedBox(width: 4)],
+                          if (worker != null) ...[PhaseGlyph(worker.phase, size: 14), const SizedBox(width: 4)],
                           Flexible(
                             child: Text(status, maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
                           ),
@@ -865,7 +862,7 @@ class _ThreadPane extends ConsumerWidget {
           Expanded(
             child: MessageList(conversation: thread, emptyText: '串里还没人说话。在这里说的话，它的帮工会看到。'),
           ),
-          ChatComposer(conversation: thread, placeholder: helper != null ? '在串里说，${helper.name}会看到' : '回复这个串'),
+          ChatComposer(conversation: thread, placeholder: worker != null ? '在串里说，${worker.name}会看到' : '回复这个串'),
         ],
       ),
     );

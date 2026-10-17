@@ -30,7 +30,7 @@ Status: implemented
 
 ## Consequences
 
-- 三个渠道各自有一份田头、帮工、账本和 `.env`：新装的 Alpha、Beta 要重新填语音凭据和帮工档案。
+- 三个渠道各自有一份田头、帮工、账本和 `vibevalley.yaml`：新装的 Alpha、Beta 要重新填语音凭据和帮工档案。
 - 语音快捷键一样，先开的占着，后开的在日志里说一声，没有另配。
 - 打包产物按渠道放在 `apps/desktop/release/<channel>/`。
 - 正式版的数据目录从 `@heybro/desktop` 换成了 `heybro`：页面存在浏览器里的小偏好（皮肤、看过的提示）会重来一次，农场的数据不在这里，不受影响。

@@ -5,12 +5,12 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
-import '../shared/faces.dart';
-import '../shared/state.dart';
+import '../../shared/faces.dart';
+import '../../data/remote.dart';
 import 'runtimes_state.dart';
-import '../../rules/index.dart';
 import '../../rules/quota.dart';
 import '../../rules/seeds.dart';
+import '../../rules/money.dart';
 
 Color quotaInk(double left) => switch (levelOf(left)) {
   QuotaLevel.plenty => Palette.leaf700,
@@ -80,8 +80,8 @@ class QuotaMachine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final quota = quotaOf(info.usage);
-    final stop = moneyStop(info);
+    final quota = quotaOf(info);
+    final stop = info.stop;
     final small = KitText.xs.copyWith(color: Palette.bark500);
     return Container(
       padding: const EdgeInsets.all(8),

@@ -4,7 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
-import '../../app/theme.dart';
+import '../theme.dart';
 import 'base.dart';
 import 'icons.dart';
 

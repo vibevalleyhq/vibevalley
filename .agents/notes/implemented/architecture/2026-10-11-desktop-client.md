@@ -15,7 +15,7 @@ Status: implemented
 - **服务端在里面**：客户端先看 8787 上有没有农场。有就用它；没有就在 Electron 的 utility process 里起打包好的 `apps/server`（`dist/main.mjs`，esbuild 只打进服务端和工作区的 TypeScript 包，别的包照常从它旁边的 `node_modules` 里 import）。Electron 44 带的 Node 是 24，和仓库要求的一样。
 - **窗口开服务端发的页面**：服务端设了 `VIBEVALLEY_WEB_DIR` 就在 `/` 发构建好的页面，窗口打开 `http://127.0.0.1:8787`。页面和接口同源，不用代理；本机地址是安全来源，麦克风照常能用。
 - **退出时等服务端存好**：客户端自己发 SIGTERM，最多等 8 秒再强杀。不用 `child.kill()`：Chromium 在那之后 2 秒就把还活着的进程杀掉，服务端来不及存盘。服务端停的时候先断掉还开着的连接（页面的事件流不会自己结束，`server.close()` 会一直等它们）。
-- **找得到农机**：从 Finder 或登录时打开的应用 PATH 很短，客户端问登录 shell 要 PATH 再交给服务端；凭据在 `$VIBEVALLEY_HOME/.env`。
+- **找得到农机**：从 Finder 或登录时打开的应用 PATH 很短，客户端问登录 shell 要 PATH 再交给服务端；凭据在首页「设置」或 `$VIBEVALLEY_HOME/vibevalley.yaml`。
 - **菜单栏和通知在主进程里**：主进程订阅同一个工地事件流，用 protocol 的 `reduce` 折出一份核心状态；弹哪些通知、菜单栏写什么是 `notify.ts` 的纯函数。点通知时主进程通过预加载脚本的桥（protocol 的 `DesktopCommand`）让页面打开那块地、那个对话或那个计划。窗口在面前时不弹，页面自己会说。
 - **语音快捷键是开关**：⌥⇧Space 按一下开始，再按一下挂断。语音还是页面里的那一套（Agora），窗口藏着也照常（不节流后台）。
 - **关窗口不退出**：农场留在菜单栏里，Dock 图标收起来；登录时打开的话只在菜单栏里。
@@ -51,7 +51,7 @@ Status: implemented
 ## Verification
 
 - `apps/desktop/test/notify.test.ts`：哪些事件弹通知、点开去哪（帮工做完没做成、计划里的帮工不单独说、@主人 只在说完时说一次、计划拆好熟了某步没做成、错误弹而提醒不弹），菜单栏的摘要。
-- 冒烟（`VIBEVALLEY_DESKTOP_SMOKE=1`，临时的家目录和端口）：仓库里跑和打包好的应用都起了自己的服务端、载入页面、桥在页面上；退出时服务端收到 SIGTERM，写了 `crew.json`、`spend.json`；把 PATH 换成 `/usr/bin:/bin`（像从 Finder 打开）也找到了 claude、codex、pi 等农机。
+- 冒烟（`VIBEVALLEY_DESKTOP_SMOKE=1`，临时的家目录和端口）：仓库里跑和打包好的应用都起了自己的服务端、载入页面、桥在页面上；退出时服务端收到 SIGTERM，写了 `workers.json`、`spend.json`；把 PATH 换成 `/usr/bin:/bin`（像从 Finder 打开）也找到了 claude、codex、pi 等农机。
 - dmg 挂载后有背景、卷图标、应用和「应用程序」的链接；应用是有效的临时签名。
 - 还没手动试过的：在真的桌面上点通知、按快捷键说话、登录时打开。
 

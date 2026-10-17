@@ -11,7 +11,7 @@ This product includes software from other projects:
 
 - agent-quickstart-nextjs
   (https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs),
-  MIT License. server/pkg/agora and server/internal/channels/voice_agora.go adapt its
+  MIT License. server/pkg/agora and server/internal/voice/agora.go adapt its
   token, invite and stop routes. Its notice:
 
     MIT License

@@ -11,17 +11,20 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"vibevalley/internal/base"
+	"vibevalley/internal/channel"
 	"vibevalley/internal/protocol"
+	"vibevalley/internal/worker"
 	"vibevalley/pkg/agent"
 	"vibevalley/pkg/agentcore"
 	"vibevalley/pkg/ai"
+	"vibevalley/pkg/x/clock"
+	"vibevalley/pkg/x/str"
 )
 
 // Every tool answers in a sentence, a refusal included: the manager passes it on.
 
 // JS's s.slice(-n), without splitting a character.
-func foremanTail(s string, n int) string {
+func managerTail(s string, n int) string {
 	units := 0
 	runes := []rune(s)
 	for i := len(runes) - 1; i >= 0; i-- {
@@ -33,9 +36,7 @@ func foremanTail(s string, n int) string {
 	return s
 }
 
-func foremanUnits(s string) int { return len(utf16.Encode([]rune(s))) }
-
-func foremanDescribeChanges(c protocol.Changes) string {
+func managerDescribeChanges(c protocol.Changes) string {
 	paths := func(items []protocol.UncommittedItem) string {
 		out := make([]string, len(items))
 		for i, f := range items {
@@ -79,19 +80,19 @@ func foremanDescribeChanges(c protocol.Changes) string {
 	return strings.Join(lines, "\n")
 }
 
-func foremanDescribeWorker(w base.Roster) string {
-	h := w.Helper
+func managerDescribeWorker(w worker.Roster) string {
+	h := w.Worker
 	last := ""
-	if h.Last != nil {
+	if h.LastRun != nil {
 		how := "停下了"
-		switch h.Last.Outcome {
+		switch h.LastRun.Outcome {
 		case protocol.OutcomeCompleted:
 			how = "做完了"
 		case protocol.OutcomeFailed:
 			how = "失败了"
 		case protocol.OutcomeInterrupted:
 		}
-		last = "；上一轮" + how + "：" + base.Head(h.Last.Summary, 80)
+		last = "；上一轮" + how + "：" + str.Head(h.LastRun.Summary, 80)
 	}
 	where := "在 " + w.Place.Project
 	if w.Place.Branch != "" {
@@ -107,13 +108,13 @@ func foremanDescribeWorker(w base.Roster) string {
 	}
 	spent := ""
 	if h.Spent != nil {
-		spent = "；花了" + protocol.SpentText(*h.Spent)
+		spent = "；花了" + spentText(*h.Spent)
 	}
 	return fmt.Sprintf("- %s（%s，%s，%s%s）工单「%s」，%s%s%s", h.Name, h.ID, protocol.RuntimeLabel(h.Runtime), where, plan,
-		base.Head(h.Task, 60), protocol.PhaseText(h, base.NowMs()), last, spent)
+		str.Head(h.Task, 60), protocol.PhaseText(h, clock.NowMs()), last, spent)
 }
 
-var foremanToolLabels = map[string]string{
+var managerToolLabels = map[string]string{
 	"dispatch":         "派活",
 	"projects":         "项目",
 	"channels":         "频道",
@@ -122,7 +123,7 @@ var foremanToolLabels = map[string]string{
 	"schedule":         "定时",
 	"list_schedules":   "看定时",
 	"cancel_schedule":  "取消定时",
-	"harvest":          "收获",
+	"merge":            "收获",
 	"changes":          "看改动",
 	"roster":           "花名册",
 	"check":            "看进度",
@@ -140,26 +141,26 @@ var foremanToolLabels = map[string]string{
 	"search_archive":   "翻旧账",
 }
 
-var foremanNamed = []string{"agent", "worker", "project", "name", "query", "note", "goal"}
+var managerNamed = []string{"agent", "worker", "project", "name", "query", "note", "goal"}
 
-func foremanToolStart(name string, args json.RawMessage) base.ToolStart {
+func managerToolStart(name string, args json.RawMessage) worker.ToolStart {
 	var fields map[string]any
 	_ = json.Unmarshal(args, &fields)
 	about := ""
-	for _, k := range foremanNamed {
+	for _, k := range managerNamed {
 		if v, ok := fields[k].(string); ok && strings.TrimSpace(v) != "" {
 			about = v
 			break
 		}
 	}
-	label := foremanToolLabels[name]
+	label := managerToolLabels[name]
 	if label == "" {
 		label = name
 	}
 	text := label
 	if about != "" {
-		if foremanUnits(about) > 40 {
-			about = base.Head(about, 40) + "…"
+		if str.Units(about) > 40 {
+			about = str.Head(about, 40) + "…"
 		}
 		text = label + "：" + about
 	}
@@ -172,10 +173,10 @@ func foremanToolStart(name string, args json.RawMessage) base.ToolStart {
 			input = string(args)
 		}
 	}
-	return base.ToolStart{Text: text, Action: protocol.ToolActionOther, Tool: name, Input: input}
+	return worker.ToolStart{Text: text, Action: protocol.ToolActionOther, Tool: name, Input: input}
 }
 
-func foremanThinkingOf(content []ai.Content) string {
+func managerThinkingOf(content []ai.Content) string {
 	var parts []string
 	for _, c := range content {
 		if c.Type == ai.TypeThinking && !c.Redacted && strings.TrimSpace(c.Thinking) != "" {
@@ -185,7 +186,7 @@ func foremanThinkingOf(content []ai.Content) string {
 	return strings.Join(parts, "\n\n")
 }
 
-func foremanScheduleLine(s protocol.FarmSchedule, channel string) string {
+func managerScheduleLine(s protocol.Schedule, channel string) string {
 	direct := ""
 	if s.Agent != nil {
 		direct = "，直接派给 " + *s.Agent
@@ -200,7 +201,7 @@ func foremanScheduleLine(s protocol.FarmSchedule, channel string) string {
 	return fmt.Sprintf("- %d 号「%s」#%s %s%s；%s\n  %s", s.ID, s.Name, channel, protocol.WhenText(s.When, s.TZ), direct, next, s.Text)
 }
 
-func foremanStr(description string) map[string]any {
+func managerStr(description string) map[string]any {
 	s := agentcore.StringSchema()
 	if description != "" {
 		s["description"] = description
@@ -208,7 +209,7 @@ func foremanStr(description string) map[string]any {
 	return s
 }
 
-func foremanEnum[T ~string](values []T) map[string]any {
+func managerEnum[T ~string](values []T) map[string]any {
 	s := agentcore.StringSchema()
 	enum := make([]any, len(values))
 	for i, v := range values {
@@ -218,29 +219,29 @@ func foremanEnum[T ~string](values []T) map[string]any {
 	return s
 }
 
-var foremanWorkerSchema = agentcore.ObjectSchema(map[string]any{"worker": foremanStr("帮工的名字或 id")}, "worker")
+var managerWorkerSchema = agentcore.ObjectSchema(map[string]any{"worker": managerStr("帮工的名字或 id")}, "worker")
 
-type foremanWorkerArgs struct {
+type managerWorkerArgs struct {
 	Worker string `json:"worker"`
 }
 
-type foremanNone struct{}
+type managerNone struct{}
 
-func foremanAnswered(text string, err error) (string, error) {
+func managerAnswered(text string, err error) (string, error) {
 	if err != nil {
 		return "没成：" + err.Error(), nil
 	}
 	return text, nil
 }
 
-func (fm *Foreman) tools() []agentcore.AgentTool {
+func (fm *manager) tools() []agentcore.AgentTool {
 	// The manager may say either.
-	findWorker := func(key string) *base.Roster {
-		all := fm.crew.Roster()
-		for _, pick := range []func(w base.Roster) bool{
-			func(w base.Roster) bool { return w.Helper.ID == key },
-			func(w base.Roster) bool { return w.Helper.Name == key },
-			func(w base.Roster) bool { return strings.Contains(key, w.Helper.Name) },
+	findWorker := func(key string) *worker.Roster {
+		all := fm.run.Roster()
+		for _, pick := range []func(w worker.Roster) bool{
+			func(w worker.Roster) bool { return w.Worker.ID == key },
+			func(w worker.Roster) bool { return w.Worker.Name == key },
+			func(w worker.Roster) bool { return strings.Contains(key, w.Worker.Name) },
 		} {
 			if i := slices.IndexFunc(all, pick); i >= 0 {
 				return &all[i]
@@ -248,22 +249,22 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		}
 		return nil
 	}
-	withWorker := func(key string, run func(w base.Roster) string) (string, error) {
+	withWorker := func(key string, run func(w worker.Roster) string) (string, error) {
 		w := findWorker(key)
 		if w == nil {
 			return "没有叫 " + key + " 的帮工", nil
 		}
 		return run(*w), nil
 	}
-	workerTool := func(name, description string, run func(w base.Roster) string) agentcore.AgentTool {
-		return agent.TextTool(agent.TextToolSpec[foremanWorkerArgs]{
-			Name: name, Label: foremanToolLabels[name], Description: description, Parameters: foremanWorkerSchema,
-			Run: func(_ context.Context, p foremanWorkerArgs, _ agent.ToolContext) (string, error) {
+	workerTool := func(name, description string, run func(w worker.Roster) string) agentcore.AgentTool {
+		return agent.TextTool(agent.TextToolSpec[managerWorkerArgs]{
+			Name: name, Label: managerToolLabels[name], Description: description, Parameters: managerWorkerSchema,
+			Run: func(_ context.Context, p managerWorkerArgs, _ agent.ToolContext) (string, error) {
 				return withWorker(p.Worker, run)
 			},
 		})
 	}
-	here := func() base.ChannelInfo { return fm.chat.ChannelOf(fm.here()) }
+	here := func() channel.Info { return fm.chat.ChannelOf(fm.here()) }
 
 	type dispatchArgs struct {
 		Task    string `json:"task"`
@@ -272,16 +273,16 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		Channel string `json:"channel"`
 	}
 	dispatch := agent.TextTool(agent.TextToolSpec[dispatchArgs]{
-		Name: "dispatch", Label: foremanToolLabels["dispatch"],
+		Name: "dispatch", Label: managerToolLabels["dispatch"],
 		Description: "派一个帮工去某个项目里做一件事。task 是工单：目标、做到什么程度算完。project 是工作目录下的项目文件夹名（新项目就起一个简短的英文名，会新建）；频道有默认项目时可以不填。agent 填帮工的名字或 id，或 runtime 名；不填就按农场的规则挑。活派在你正在回话的频道里（工单串开在那里），要派到别的频道就填 channel。",
 		Parameters: agentcore.ObjectSchema(map[string]any{
-			"task":    foremanStr("工单"),
-			"project": foremanStr("项目文件夹名，比如 clock-in"),
-			"agent":   foremanStr("帮工名字、id 或 runtime"),
-			"channel": foremanStr("派在哪个频道，比如 #clock-in；不填就是你正在回话的频道"),
+			"task":    managerStr("工单"),
+			"project": managerStr("项目文件夹名，比如 clock-in"),
+			"agent":   managerStr("帮工名字、id 或 runtime"),
+			"channel": managerStr("派在哪个频道，比如 #clock-in；不填就是你正在回话的频道"),
 		}, "task"),
 		Run: func(ctx context.Context, p dispatchArgs, _ agent.ToolContext) (string, error) {
-			var channel base.ChannelInfo
+			var channel channel.Info
 			if p.Channel != "" {
 				named := fm.chat.ChannelByName(p.Channel)
 				if named == nil {
@@ -303,12 +304,12 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 				return "没有能派的帮工：先去「帮工」页面建一个，或者把 runtime 装好。", nil
 			}
 			id := channel.ID
-			hired := fm.dispatch.Hire(ctx, *chosen, p.Task, project, base.HireOptions{Channel: &id})
-			if hired.Refused != "" || hired.Helper == nil {
-				fm.site.Notice(protocol.NoticeLevelWarn, hired.Refused)
+			hired := fm.issue.Hire(ctx, *chosen, p.Task, project, worker.HireOptions{Channel: &id})
+			if hired.Refused != "" || hired.Worker == nil {
+				fm.core.Notice(protocol.NoticeLevelWarn, hired.Refused)
 				return "派不出去：" + hired.Refused, nil
 			}
-			h := hired.Helper
+			h := hired.Worker
 			where := project
 			if h.Project != nil {
 				where = *h.Project
@@ -325,10 +326,10 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		},
 	})
 
-	projects := agent.TextTool(agent.TextToolSpec[foremanNone]{
-		Name: "projects", Label: foremanToolLabels["projects"], Description: "列出工作目录下的项目（每个文件夹是一个项目），以及是不是 git 仓库。",
+	projects := agent.TextTool(agent.TextToolSpec[managerNone]{
+		Name: "projects", Label: managerToolLabels["projects"], Description: "列出工作目录下的项目（每个文件夹是一个项目），以及是不是 git 仓库。",
 		Parameters: agentcore.ObjectSchema(nil),
-		Run: func(context.Context, foremanNone, agent.ToolContext) (string, error) {
+		Run: func(context.Context, managerNone, agent.ToolContext) (string, error) {
 			all := fm.projects.List()
 			if len(all) == 0 {
 				return "工作目录（" + fm.projects.Root() + "）下还没有项目。", nil
@@ -344,10 +345,10 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		},
 	})
 
-	channels := agent.TextTool(agent.TextToolSpec[foremanNone]{
-		Name: "channels", Label: foremanToolLabels["channels"], Description: "列出频道：名字、是做什么的、默认项目。频道是安排活的地方，田头是默认的那个。",
+	channels := agent.TextTool(agent.TextToolSpec[managerNone]{
+		Name: "channels", Label: managerToolLabels["channels"], Description: "列出频道：名字、是做什么的、默认项目。频道是安排活的地方，田头是默认的那个。",
 		Parameters: agentcore.ObjectSchema(nil),
-		Run: func(context.Context, foremanNone, agent.ToolContext) (string, error) {
+		Run: func(context.Context, managerNone, agent.ToolContext) (string, error) {
 			all := fm.chat.Channels()
 			lines := make([]string, len(all))
 			for i, c := range all {
@@ -377,23 +378,23 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		TZ      string    `json:"tz"`
 	}
 	schedule := agent.TextTool(agent.TextToolSpec[scheduleArgs]{
-		Name: "schedule", Label: foremanToolLabels["schedule"],
+		Name: "schedule", Label: managerToolLabels["schedule"],
 		Description: "定一件按时间来的事：到点时频道里出现一条「⏰ 定时」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）。text 写清楚到时候做什么、做完告诉谁。",
 		Parameters: agentcore.ObjectSchema(map[string]any{
-			"name":    foremanStr("简短的名字，比如 每日测试"),
-			"text":    foremanStr("到点时说的话：要做的事"),
-			"kind":    foremanEnum([]string{"once", "every", "daily", "weekly"}),
+			"name":    managerStr("简短的名字，比如 每日测试"),
+			"text":    managerStr("到点时说的话：要做的事"),
+			"kind":    managerEnum([]string{"once", "every", "daily", "weekly"}),
 			"at":      agentcore.StringSchema(),
 			"minutes": agentcore.NumberSchema(),
-			"time":    foremanStr("HH:MM"),
+			"time":    managerStr("HH:MM"),
 			"days":    map[string]any{"type": "array", "items": agentcore.NumberSchema()},
-			"channel": foremanStr("在哪个频道，比如 #clock-in；不填是你正在回话的频道"),
-			"agent":   foremanStr("直接派给哪个帮工档案（名字或 id）；不填就是到点交给你"),
-			"project": foremanStr("直接派活时的项目；不填用频道的默认项目"),
-			"tz":      foremanStr("时区，比如 Asia/Shanghai；不填是这台电脑的"),
+			"channel": managerStr("在哪个频道，比如 #clock-in；不填是你正在回话的频道"),
+			"agent":   managerStr("直接派给哪个帮工档案（名字或 id）；不填就是到点交给你"),
+			"project": managerStr("直接派活时的项目；不填用频道的默认项目"),
+			"tz":      managerStr("时区，比如 Asia/Shanghai；不填是这台电脑的"),
 		}, "name", "text", "kind"),
 		Run: func(_ context.Context, p scheduleArgs, _ agent.ToolContext) (string, error) {
-			return foremanAnswered(func() (string, error) {
+			return managerAnswered(func() (string, error) {
 				channel := here()
 				if p.Channel != "" {
 					named := fm.chat.ChannelByName(p.Channel)
@@ -405,7 +406,7 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 				var when protocol.ScheduleWhenValue
 				switch p.Kind {
 				case "once":
-					at, ok := foremanParseTime(p.At)
+					at, ok := managerParseTime(p.At)
 					if !ok {
 						shown := p.At
 						if shown == "" {
@@ -440,20 +441,20 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 				if p.TZ != "" {
 					req.TZ = &p.TZ
 				}
-				made, err := fm.schedules.Add(req)
+				made, err := fm.schedule.Add(req)
 				if err != nil {
 					return "", err
 				}
-				return "定好了：\n" + foremanScheduleLine(made, channel.Name), nil
+				return "定好了：\n" + managerScheduleLine(made, channel.Name), nil
 			}())
 		},
 	})
 
-	listSchedules := agent.TextTool(agent.TextToolSpec[foremanNone]{
-		Name: "list_schedules", Label: foremanToolLabels["list_schedules"], Description: "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。",
+	listSchedules := agent.TextTool(agent.TextToolSpec[managerNone]{
+		Name: "list_schedules", Label: managerToolLabels["list_schedules"], Description: "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。",
 		Parameters: agentcore.ObjectSchema(nil),
-		Run: func(context.Context, foremanNone, agent.ToolContext) (string, error) {
-			all := fm.schedules.List()
+		Run: func(context.Context, managerNone, agent.ToolContext) (string, error) {
+			all := fm.schedule.List()
 			if len(all) == 0 {
 				return "没有定时。", nil
 			}
@@ -467,7 +468,7 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 				if !ok {
 					name = "?"
 				}
-				lines[i] = foremanScheduleLine(s, name)
+				lines[i] = managerScheduleLine(s, name)
 			}
 			return strings.Join(lines, "\n"), nil
 		},
@@ -477,11 +478,11 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		ID float64 `json:"id"`
 	}
 	cancelSchedule := agent.TextTool(agent.TextToolSpec[idArgs]{
-		Name: "cancel_schedule", Label: foremanToolLabels["cancel_schedule"], Description: "删掉一个定时（编号从 list_schedules 看）。",
+		Name: "cancel_schedule", Label: managerToolLabels["cancel_schedule"], Description: "删掉一个定时（编号从 list_schedules 看）。",
 		Parameters: agentcore.ObjectSchema(map[string]any{"id": agentcore.NumberSchema()}, "id"),
 		Run: func(_ context.Context, p idArgs, _ agent.ToolContext) (string, error) {
-			s, err := fm.schedules.Remove(int64(p.ID))
-			return foremanAnswered("删掉了「"+s.Name+"」。", err)
+			s, err := fm.schedule.Remove(int64(p.ID))
+			return managerAnswered("删掉了「"+s.Name+"」。", err)
 		},
 	})
 
@@ -491,7 +492,7 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		Project     string `json:"project"`
 	}
 	openChannel := agent.TextTool(agent.TextToolSpec[openArgs]{
-		Name: "open_channel", Label: foremanToolLabels["open_channel"],
+		Name: "open_channel", Label: managerToolLabels["open_channel"],
 		Description: "开一个新频道：一件长期的事、一个项目，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，project 是它的默认项目（在这里派的活默认在这个项目里干）。主人要求了才开。",
 		Parameters: agentcore.ObjectSchema(map[string]any{
 			"name": agentcore.StringSchema(), "description": agentcore.StringSchema(), "project": agentcore.StringSchema(),
@@ -515,7 +516,7 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		Project     *string `json:"project"`
 	}
 	channelSettings := agent.TextTool(agent.TextToolSpec[settingsArgs]{
-		Name: "channel_settings", Label: foremanToolLabels["channel_settings"],
+		Name: "channel_settings", Label: managerToolLabels["channel_settings"],
 		Description: "改一个频道是做什么的（description），或它的默认项目（project，写空字符串就是不要默认项目）。",
 		Parameters: agentcore.ObjectSchema(map[string]any{
 			"channel": agentcore.StringSchema(), "description": agentcore.StringSchema(), "project": agentcore.StringSchema(),
@@ -532,14 +533,14 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		},
 	})
 
-	harvest := workerTool("harvest", "把一个帮工分支上的提交合进它所在项目的主分支，然后让它收工。会冲突时不合并，帮工留在地里，结果里有让它解决冲突的话。",
-		func(w base.Roster) string { return fm.merges.Harvest(w.Helper.ID) })
-	changes := agent.TextTool(agent.TextToolSpec[foremanWorkerArgs]{
-		Name: "changes", Label: foremanToolLabels["changes"], Parameters: foremanWorkerSchema,
+	merge := workerTool("merge", "把一个帮工分支上的提交合进它所在项目的主分支，然后让它收工。会冲突时不合并，帮工留在地里，结果里有让它解决冲突的话。",
+		func(w worker.Roster) string { return fm.issue.Merge(w.Worker.ID) })
+	changes := agent.TextTool(agent.TextToolSpec[managerWorkerArgs]{
+		Name: "changes", Label: managerToolLabels["changes"], Parameters: managerWorkerSchema,
 		Description: "看收获一个帮工会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者收获前想确认时用。",
-		Run: func(_ context.Context, p foremanWorkerArgs, _ agent.ToolContext) (string, error) {
-			return withWorker(p.Worker, func(w base.Roster) string {
-				c, err := fm.merges.Changes(w.Helper.ID)
+		Run: func(_ context.Context, p managerWorkerArgs, _ agent.ToolContext) (string, error) {
+			return withWorker(p.Worker, func(w worker.Roster) string {
+				c, err := fm.issue.Changes(w.Worker.ID)
 				if err != nil {
 					return "看不了改动：" + err.Error()
 				}
@@ -547,31 +548,31 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 					// Gone between the roster and the look: named as the manager named it.
 					return "没有叫 " + p.Worker + " 的帮工"
 				}
-				return foremanDescribeChanges(*c)
+				return managerDescribeChanges(*c)
 			})
 		},
 	})
-	roster := agent.TextTool(agent.TextToolSpec[foremanNone]{
-		Name: "roster", Label: foremanToolLabels["roster"], Description: "列出地里所有帮工：在做什么、上一轮的结果。",
+	roster := agent.TextTool(agent.TextToolSpec[managerNone]{
+		Name: "roster", Label: managerToolLabels["roster"], Description: "列出地里所有帮工：在做什么、上一轮的结果。",
 		Parameters: agentcore.ObjectSchema(nil),
-		Run: func(context.Context, foremanNone, agent.ToolContext) (string, error) {
-			all := fm.crew.Roster()
+		Run: func(context.Context, managerNone, agent.ToolContext) (string, error) {
+			all := fm.run.Roster()
 			if len(all) == 0 {
 				return "地里现在没有帮工。", nil
 			}
 			lines := make([]string, len(all))
 			for i, w := range all {
-				lines[i] = foremanDescribeWorker(w)
+				lines[i] = managerDescribeWorker(w)
 			}
 			return strings.Join(lines, "\n"), nil
 		},
 	})
-	check := workerTool("check", "看一个帮工的详细情况和上一轮的完整汇报。", func(w base.Roster) string {
+	check := workerTool("check", "看一个帮工的详细情况和上一轮的完整汇报。", func(w worker.Roster) string {
 		last := "还没有"
 		if w.LastText != "" {
-			last = foremanTail(w.LastText, 2000)
+			last = managerTail(w.LastText, 2000)
 		}
-		return foremanDescribeWorker(w) + "\n目录：" + w.Place.Cwd + "\n上一轮完整汇报（结尾部分）：\n" + last
+		return managerDescribeWorker(w) + "\n目录：" + w.Place.Cwd + "\n上一轮完整汇报（结尾部分）：\n" + last
 	})
 
 	type tellArgs struct {
@@ -579,14 +580,14 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		Message string `json:"message"`
 	}
 	tell := agent.TextTool(agent.TextToolSpec[tellArgs]{
-		Name: "tell", Label: foremanToolLabels["tell"], Description: "给一个帮工带话：发在它的工单串里。他正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
-		Parameters: agentcore.ObjectSchema(map[string]any{"worker": foremanStr("帮工的名字或 id"), "message": foremanStr("要带的话")}, "worker", "message"),
+		Name: "tell", Label: managerToolLabels["tell"], Description: "给一个帮工带话：发在它的工单串里。他正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
+		Parameters: agentcore.ObjectSchema(map[string]any{"worker": managerStr("帮工的名字或 id"), "message": managerStr("要带的话")}, "worker", "message"),
 		Run: func(_ context.Context, p tellArgs, _ agent.ToolContext) (string, error) {
-			return withWorker(p.Worker, func(w base.Roster) string {
-				if _, err := fm.chat.TellHelper("foreman", w.Helper.ID, p.Message); err != nil {
+			return withWorker(p.Worker, func(w worker.Roster) string {
+				if _, err := fm.chat.TellWorker(protocol.ManagerAgent, w.Worker.ID, p.Message); err != nil {
 					return "没带到：" + err.Error()
 				}
-				return "已经在 " + w.Helper.Name + " 的工单串里说了"
+				return "已经在 " + w.Worker.Name + " 的工单串里说了"
 			})
 		},
 	})
@@ -595,14 +596,14 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		Target string `json:"target"`
 	}
 	readChat := agent.TextTool(agent.TextToolSpec[readArgs]{
-		Name: "read_chat", Label: foremanToolLabels["read_chat"], Description: "读一个频道或一个串里最近说的话。target 写 #<频道>（比如 #田头），或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方。",
-		Parameters: agentcore.ObjectSchema(map[string]any{"target": foremanStr("#田头、#clock-in，或 #田头:<消息号>")}),
+		Name: "read_chat", Label: managerToolLabels["read_chat"], Description: "读一个频道或一个串里最近说的话。target 写 #<频道>（比如 #田头），或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方。",
+		Parameters: agentcore.ObjectSchema(map[string]any{"target": managerStr("#田头、#clock-in，或 #田头:<消息号>")}),
 		Run: func(_ context.Context, p readArgs, _ agent.ToolContext) (string, error) {
 			where := p.Target
 			if where == "" {
 				where = "#" + here().Name
 			}
-			r, err := fm.chat.Read("foreman", base.ReadOptions{Target: where})
+			r, err := fm.chat.Read(protocol.ManagerAgent, channel.ReadOptions{Target: where})
 			if err != nil {
 				return "读不了：" + err.Error(), nil
 			}
@@ -613,19 +614,19 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 			if r.Older {
 				older = "（更早的没列出）"
 			}
-			return r.Target + older + "：\n" + base.InboxLines(r.Messages), nil
+			return r.Target + older + "：\n" + protocol.InboxLines(r.Messages), nil
 		},
 	})
 
-	stop := workerTool("stop", "叫停一个帮工正在做的这一轮。", func(w base.Roster) string {
-		if fm.crew.Stop(w.Helper.ID) {
-			return w.Helper.Name + " 停下了"
+	stop := workerTool("stop", "叫停一个帮工正在做的这一轮。", func(w worker.Roster) string {
+		if fm.run.Stop(w.Worker.ID) {
+			return w.Worker.Name + " 停下了"
 		}
-		return w.Helper.Name + " 现在没在干活"
+		return w.Worker.Name + " 现在没在干活"
 	})
-	dismiss := workerTool("dismiss", "让一个帮工收工离开农场。", func(w base.Roster) string {
-		fm.crew.Dismiss(w.Helper.ID)
-		return w.Helper.Name + " 收工了"
+	dismiss := workerTool("dismiss", "让一个帮工收工离开农场。", func(w worker.Roster) string {
+		fm.run.Dismiss(w.Worker.ID)
+		return w.Worker.Name + " 收工了"
 	})
 
 	type planArgs struct {
@@ -634,15 +635,15 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		Agent   string `json:"agent"`
 	}
 	plan := agent.TextTool(agent.TextToolSpec[planArgs]{
-		Name: "plan", Label: foremanToolLabels["plan"],
+		Name: "plan", Label: managerToolLabels["plan"],
 		Description: "起一个种植计划：派一个帮工读代码，把一件很长的活拆成几步（每步一个帮工，有先后），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
 		Parameters: agentcore.ObjectSchema(map[string]any{
-			"goal":    foremanStr("要做的事，照主人的原话"),
-			"project": foremanStr("项目文件夹名"),
-			"agent":   foremanStr("让谁来拆：帮工名字或 id；不填按规则挑"),
+			"goal":    managerStr("要做的事，照主人的原话"),
+			"project": managerStr("项目文件夹名"),
+			"agent":   managerStr("让谁来拆：帮工名字或 id；不填按规则挑"),
 		}, "goal", "project"),
 		Run: func(_ context.Context, p planArgs, _ agent.ToolContext) (string, error) {
-			return foremanAnswered(fm.playbooks.Plan(p.Goal, p.Project, p.Agent, protocol.PlaybookActorForeman))
+			return managerAnswered(fm.playbooks.Plan(p.Goal, p.Project, p.Agent, protocol.PlaybookActorManager))
 		},
 	})
 
@@ -650,11 +651,11 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		ID string `json:"id"`
 	}
 	playbooks := agent.TextTool(agent.TextToolSpec[playbooksArgs]{
-		Name: "playbooks", Label: foremanToolLabels["playbooks"], Description: "列出种植计划：每一步的状态、谁在做、结论。",
-		Parameters: agentcore.ObjectSchema(map[string]any{"id": foremanStr("计划 id，比如 p1；不填列出所有没收完的")}),
+		Name: "playbooks", Label: managerToolLabels["playbooks"], Description: "列出种植计划：每一步的状态、谁在做、结论。",
+		Parameters: agentcore.ObjectSchema(map[string]any{"id": managerStr("计划 id，比如 p1；不填列出所有没收完的")}),
 		Run: func(_ context.Context, p playbooksArgs, _ agent.ToolContext) (string, error) {
 			var texts []string
-			for _, pb := range protocol.PlaybooksOf(fm.site.State()) {
+			for _, pb := range protocol.PlaybooksOf(fm.core.State()) {
 				if (p.ID != "" && pb.ID == p.ID) || (p.ID == "" && protocol.IsOpen(pb)) {
 					texts = append(texts, protocol.PlaybookText(pb))
 				}
@@ -681,24 +682,24 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		Remove   bool     `json:"remove"`
 	}
 	planEdit := agent.TextTool(agent.TextToolSpec[editArgs]{
-		Name: "plan_edit", Label: foremanToolLabels["plan_edit"],
+		Name: "plan_edit", Label: managerToolLabels["plan_edit"],
 		Description: "改计划里的一步：工单、标题、要等的步骤、谁来做、做完跑的检查命令；没有这一步就加上。remove 为 true 时删掉这一步。没开工的计划什么都能改；开工以后只能改还没开始或没做成的步骤。",
 		Parameters: agentcore.ObjectSchema(map[string]any{
-			"playbook": foremanStr("计划 id"),
-			"node":     foremanStr("步骤 id（新步骤就起一个简短的英文 id）"),
+			"playbook": managerStr("计划 id"),
+			"node":     managerStr("步骤 id（新步骤就起一个简短的英文 id）"),
 			"title":    agentcore.StringSchema(),
-			"task":     foremanStr("工单"),
+			"task":     managerStr("工单"),
 			"needs":    map[string]any{"type": "array", "items": agentcore.StringSchema(), "description": "要等哪些步骤做完"},
-			"agent":    foremanStr("帮工档案 id；空字符串表示按规则挑"),
-			"check":    foremanStr("做完跑的检查命令；空字符串表示不跑"),
+			"agent":    managerStr("帮工档案 id；空字符串表示按规则挑"),
+			"check":    managerStr("做完跑的检查命令；空字符串表示不跑"),
 			"remove":   agentcore.BooleanSchema(),
 		}, "playbook", "node"),
 		Run: func(_ context.Context, p editArgs, _ agent.ToolContext) (string, error) {
 			if p.Remove {
-				return foremanAnswered(fm.playbooks.RemoveNode(p.Playbook, p.Node, protocol.PlaybookActorForeman))
+				return managerAnswered(fm.playbooks.RemoveNode(p.Playbook, p.Node, protocol.PlaybookActorManager))
 			}
 			edit := protocol.NodeEdit{Title: p.Title, Task: p.Task, Needs: p.Needs, Agent: p.Agent, Check: p.Check}
-			return foremanAnswered(fm.playbooks.EditNode(p.Playbook, p.Node, edit, protocol.PlaybookActorForeman))
+			return managerAnswered(fm.playbooks.EditNode(p.Playbook, p.Node, edit, protocol.PlaybookActorManager))
 		},
 	})
 
@@ -707,11 +708,11 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		Action   string `json:"action"`
 	}
 	planAction := agent.TextTool(agent.TextToolSpec[actArgs]{
-		Name: "plan_action", Label: foremanToolLabels["plan_action"],
-		Description: "对整个计划：start 开工（主人看过、同意了才用），pause 暂停（正在做的做完，不开新的），resume 继续，abandon 放弃（分支留着），harvest 收获（都做完以后，把计划分支合进主分支）。",
-		Parameters:  agentcore.ObjectSchema(map[string]any{"playbook": foremanStr("计划 id"), "action": foremanEnum(protocol.PlaybookActionValues)}, "playbook", "action"),
+		Name: "plan_action", Label: managerToolLabels["plan_action"],
+		Description: "对整个计划：start 开工（主人看过、同意了才用），pause 暂停（正在做的做完，不开新的），resume 继续，abandon 放弃（分支留着），merge 收获（都做完以后，把计划分支合进主分支）。",
+		Parameters:  agentcore.ObjectSchema(map[string]any{"playbook": managerStr("计划 id"), "action": managerEnum(protocol.PlaybookActionValues)}, "playbook", "action"),
 		Run: func(_ context.Context, p actArgs, _ agent.ToolContext) (string, error) {
-			return foremanAnswered(fm.playbooks.Act(p.Playbook, protocol.PlaybookAction(p.Action), protocol.PlaybookActorForeman))
+			return managerAnswered(fm.playbooks.Act(p.Playbook, protocol.PlaybookAction(p.Action), protocol.PlaybookActorManager))
 		},
 	})
 
@@ -721,23 +722,23 @@ func (fm *Foreman) tools() []agentcore.AgentTool {
 		Action   string `json:"action"`
 	}
 	nodeAction := agent.TextTool(agent.TextToolSpec[nodeActArgs]{
-		Name: "node_action", Label: foremanToolLabels["node_action"], Description: "对计划里的一步：retry 重试没做成的步骤，skip 跳过它（后面的步骤照常开工）。",
+		Name: "node_action", Label: managerToolLabels["node_action"], Description: "对计划里的一步：retry 重试没做成的步骤，skip 跳过它（后面的步骤照常开工）。",
 		Parameters: agentcore.ObjectSchema(map[string]any{
-			"playbook": foremanStr("计划 id"), "node": foremanStr("步骤 id"), "action": foremanEnum(protocol.NodeActionValues),
+			"playbook": managerStr("计划 id"), "node": managerStr("步骤 id"), "action": managerEnum(protocol.NodeActionValues),
 		}, "playbook", "node", "action"),
 		Run: func(_ context.Context, p nodeActArgs, _ agent.ToolContext) (string, error) {
-			return foremanAnswered(fm.playbooks.NodeAct(p.Playbook, p.Node, protocol.NodeAction(p.Action), protocol.PlaybookActorForeman))
+			return managerAnswered(fm.playbooks.NodeAct(p.Playbook, p.Node, protocol.NodeAction(p.Action), protocol.PlaybookActorManager))
 		},
 	})
 
 	return []agentcore.AgentTool{
-		dispatch, projects, channels, schedule, listSchedules, cancelSchedule, openChannel, channelSettings, harvest, changes,
+		dispatch, projects, channels, schedule, listSchedules, cancelSchedule, openChannel, channelSettings, merge, changes,
 		roster, check, tell, readChat, stop, dismiss, plan, playbooks, planEdit, planAction, nodeAction,
 	}
 }
 
 // The way JS's Date reads the forms a model writes.
-func foremanParseTime(s string) (int64, bool) {
+func managerParseTime(s string) (int64, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, false

@@ -1,8 +1,8 @@
 import '../../gen/vibevalley.dart';
 
-/// The generated AgentProfile has no copyWith.
-extension AgentEdit on AgentProfile {
-  AgentProfile copyWith({
+/// The generated Agent has no copyWith.
+extension AgentEdit on Agent {
+  Agent copyWith({
     String? id,
     String? name,
     String? role,
@@ -20,7 +20,7 @@ extension AgentEdit on AgentProfile {
     bool? worktree,
     List<String>? tags,
     Look? look,
-  }) => AgentProfile(
+  }) => Agent(
     id: id ?? this.id,
     name: name ?? this.name,
     role: role ?? this.role,

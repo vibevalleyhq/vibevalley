@@ -11,9 +11,9 @@ Status: implemented
 经验就是工作目录（`VIBEVALLEY_WORK_ROOT`）下所有 git 仓库里你名下的 commit 数（`server/internal/game/commits.go`）：
 
 - 只算帮工干活的目录，所有分支都算（帮工在自己分支上的提交也算，它们用这台机器的 git 用户提交），同一仓库的多个 worktree 只算一次。
-- 「你名下」按作者邮箱：git 全局和各仓库的 user.email，加上 `VIBEVALLEY_GIT_EMAILS`。
+- 「你名下」按作者邮箱：git 全局和各仓库的 user.email，加上 `git_emails`。
 - 服务端启动时、每 2 分钟、帮工干完一轮 15 秒后各数一次，变了就施加 `commits` 事实。
-- 等级曲线：从 Lv.n 到 Lv.n+1 要 `10n` 个 commit；第一次数出 commit 数时只定下等级，不放升级横幅（protocol 的 `XPToNext`、`LevelUps`，`server/internal/protocol/view.go`）。
+- 等级曲线：从 Lv.n 到 Lv.n+1 要 `10n` 个 commit；第一次数出 commit 数时只定下等级，不放升级横幅（protocol 的 `XPToNext`、`LevelUps`，`server/internal/protocol/game_view.go`）。
 
 金币和连胜跟着收进主分支的活走（[achievements](2026-10-11-achievements.md)），不加经验（[farm-ui.md](../../../../docs/reference/farm-ui.md)「计分」）。
 

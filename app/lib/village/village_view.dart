@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import 'game.dart';
 import 'level.dart';
@@ -25,18 +24,6 @@ class VillageCanvas extends StatelessWidget {
 
 final villageProvider = FutureProvider<VillageWorld>((ref) async => VillageWorld(Level.parse(await rootBundle.loadString('assets/village.ldtk'))));
 
-final runtimesProvider = StreamProvider<List<RuntimeInfo>>((ref) async* {
-  final api = ref.watch(serverProvider).api;
-  while (true) {
-    try {
-      yield await api.farm.runtimes();
-    } catch (_) {
-      // The server is away: the pill waits for the next read.
-    }
-    await Future<void>.delayed(const Duration(minutes: 1));
-  }
-});
-
 ({int? lowest, bool any}) lowestQuota(List<RuntimeInfo> runtimes) {
   final usable = runtimes.where((r) => r.installation is InstallationAvailable && r.settings.enabled).toList();
   final lefts = [
@@ -46,9 +33,3 @@ final runtimesProvider = StreamProvider<List<RuntimeInfo>>((ref) async* {
   ];
   return (lowest: lefts.isEmpty ? null : lefts.reduce((a, b) => a < b ? a : b), any: usable.isNotEmpty);
 }
-
-/// Read once: a new agent shows with the default look until the next start.
-final agentsProvider = FutureProvider<Map<String, AgentProfile>>((ref) async {
-  final all = await ref.watch(serverProvider).api.farm.agents();
-  return {for (final a in all) a.id: a};
-});

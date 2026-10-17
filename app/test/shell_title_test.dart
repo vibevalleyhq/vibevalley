@@ -13,7 +13,7 @@ import 'package:vibevalley/shell/title/title_state.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'shell_fakes.dart';
+import 'support/shell.dart';
 
 void main() {
   late FakeServer server;
@@ -23,8 +23,8 @@ void main() {
   setUp(() {
     settings = settingsJson();
     server = FakeServer((r) async {
-      if (r.url.path == '/api/settings' && r.method == 'GET') return json(settings);
-      if (r.url.path == '/api/settings' && r.method == 'PUT') return json(settings);
+      if (r.url.path == '/api/settings' && r.method == 'GET') return jsonResponse(settings);
+      if (r.url.path == '/api/settings' && r.method == 'PUT') return jsonResponse(settings);
       return http.Response('', 204);
     });
     container = ProviderContainer(overrides: shellOverrides(server));
@@ -53,8 +53,8 @@ void main() {
 
   void farmWith({double coins = 0}) {
     server.frameFeed.add(
-      StateFrame(
-        SiteFrame(
+      ReceivedFrame(
+        StateFrame(
           state: farmState(coins: coins),
           inbox: const [],
           plans: const [],
@@ -89,9 +89,9 @@ void main() {
     expect(find.text('管家要 DeepSeek 的 API Key 才能干活：先在这里填上。'), findsOneWidget);
     expect(container.read(titleOpenProvider), isTrue);
 
-    settings = settingsJson(deepseek: 'env');
+    settings = settingsJson(deepseek: 'config');
     await loadSettings(tester);
-    expect(find.text('在用 sk-…abcd（来自环境变量）'), findsOneWidget);
+    expect(find.text('在用 sk-…abcd（来自配置（vibevalley.yaml 或环境变量））'), findsOneWidget);
     await tester.tap(find.text('开始游戏'));
     await tester.pump();
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));

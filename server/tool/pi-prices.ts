@@ -1,5 +1,5 @@
 /**
- * pi's price list, for the Go server: internal/runs/pi_prices.json, one row per model pi knows, [provider, id, input,
+ * pi's price list, for the Go server: internal/runtime/pi_prices.json, one row per model pi knows, [provider, id, input,
  * output, cacheRead, cacheWrite] in dollars per million tokens. The TypeScript server read these from pi's model
  * registry in process (@earendil-works/pi-coding-agent's ModelRuntime, which builds on @earendil-works/pi-ai's
  * MODELS); smith runs pi in a separate Node host and has no price list, so the Go server embeds this one. Run it again
@@ -26,6 +26,6 @@ for (const provider of Object.keys(MODELS).sort())
     if (c) rows.push([provider, model.id, c.input, c.output, c.cacheRead, c.cacheWrite])
   }
 
-const out = resolve(import.meta.dirname, '../internal/runs/pi_prices.json')
+const out = resolve(import.meta.dirname, '../internal/runtime/pi_prices.json')
 writeFileSync(out, `[\n${rows.map((r) => JSON.stringify(r)).join(',\n')}\n]\n`)
 console.log(`${rows.length} prices → ${out}`)

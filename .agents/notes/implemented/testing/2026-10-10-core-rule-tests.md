@@ -13,7 +13,7 @@ core 的规则都是纯函数（`plotOf`、`poseOf`、`aimTool`、`score`、`sco
 `pnpm --filter @heybro/core test`（`packages/core/test/`，vitest），不起页面：
 
 - `farm.test.ts`：每个阶段和「要你做什么」对应的作物和牌子；一轮里从发芽到开花；姿势；每个工具在空地、干活、成熟、歇着、失败、没开垦的地上的结果；开垦等级；杀虫的话只带一次原工单。
-- `rules.test.ts`：页面看到的进度（核心状态里的进度加上 commit 数算出的等级）；`progress` 事实带来的金币和成就变成哪些效果；第一次数 commit 不放升级，之后每升一级放一次。计分本身在 protocol，测在 `server/internal/protocol/progress_rules_test.go`（[achievements](../feature/2026-10-11-achievements.md)）。
+- `rules.test.ts`：页面看到的进度（核心状态里的进度加上 commit 数算出的等级）；`progress` 事实带来的金币和成就变成哪些效果；第一次数 commit 不放升级，之后每升一级放一次。计分本身在 protocol，测在 `server/internal/protocol/game_progress_rules_test.go`（[achievements](../feature/2026-10-11-achievements.md)）。
 - `site.test.ts`：一串工地事件经 `applySiteEvent` 折下来，地块怎么分、这一轮的历史和计数、汇报、一轮做完不给金币、进度事实放的效果、快照后地块不变、干活过程的一步长大后替换自己、提醒。每个测试一个新的 `AtomRegistry` 和 Effect 的 `TestClock`：离开的帮工走一会儿才消失、奖励的特效几秒后消失，都靠 `TestClock.adjust` 拨表，不真等。
 
 测试另有 `test/tsconfig.json`，带 Node 的类型；`src` 的 tsconfig 写明 `"types": []`，所以装了 `@types/node` 以后，core 的代码照样拿不到 `setTimeout` 这些。`pnpm typecheck` 两个都查，根目录的 `pnpm test` 跑服务端和 core 的测试。

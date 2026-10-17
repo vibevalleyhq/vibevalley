@@ -6,13 +6,13 @@ import 'package:http/http.dart' as http;
 
 import '../gen/vibevalley.dart';
 
-class StateFrame {
-  StateFrame(this.frame, {required this.bytes, required this.decodeMicros});
-  final SiteFrame frame;
+class ReceivedFrame {
+  ReceivedFrame(this.frame, {required this.bytes, required this.decodeMicros});
+  final StateFrame frame;
   final int bytes;
   final int decodeMicros;
 
-  FarmState get state => frame.state;
+  CoreState get state => frame.state;
 }
 
 class VibeValleyServer {
@@ -38,15 +38,15 @@ class VibeValleyServer {
   /// Each time an attempt fails for a reason other than "not up".
   final problems = StreamController<String>.broadcast();
 
-  late final Stream<StateFrame> frames = states().asBroadcastStream();
+  late final Stream<ReceivedFrame> frames = states().asBroadcastStream();
 
   /// Facts are left out: the state stream already brings them, folded.
-  late final Stream<SiteEvent> sideEvents = _events().where((e) => e is! Fact && e is! SiteEventSnapshot).asBroadcastStream();
+  late final Stream<SideEvent> sideEvents = _events().where((e) => e is! Fact && e is! SideEventSnapshot).asBroadcastStream();
 
-  Stream<SiteEvent> _events() async* {
-    await for (final text in _sse('/api/site/events')) {
+  Stream<SideEvent> _events() async* {
+    await for (final text in _sse('/api/events')) {
       try {
-        yield SiteEvent.fromJson(jsonDecode(text) as Map<String, dynamic>);
+        yield SideEvent.fromJson(jsonDecode(text) as Map<String, dynamic>);
       } on Object catch (e) {
         problems.add('$e');
       }
@@ -54,11 +54,11 @@ class VibeValleyServer {
   }
 
   /// Reconnects, and so starts from a fresh state, when the line drops.
-  Stream<StateFrame> states() async* {
-    await for (final text in _sse('/api/site/state')) {
+  Stream<ReceivedFrame> states() async* {
+    await for (final text in _sse('/api/state')) {
       final watch = Stopwatch()..start();
-      final frame = SiteFrame.fromJson(jsonDecode(text) as Map<String, dynamic>);
-      yield StateFrame(frame, bytes: utf8.encode(text).length, decodeMicros: watch.elapsedMicroseconds);
+      final frame = StateFrame.fromJson(jsonDecode(text) as Map<String, dynamic>);
+      yield ReceivedFrame(frame, bytes: utf8.encode(text).length, decodeMicros: watch.elapsedMicroseconds);
     }
   }
 
@@ -86,7 +86,7 @@ class VibeValleyServer {
       } on SocketException {
         // The server is not up (yet): try again shortly.
       } on Object catch (e) {
-        // An older server without /api/site/state, a bad frame, a key refused: said once per attempt, then tried again.
+        // An older server without /api/state, a bad frame, a key refused: said once per attempt, then tried again.
         if (!_closed) problems.add('$e');
       } finally {
         client.close(force: true);
@@ -98,7 +98,7 @@ class VibeValleyServer {
 
   Future<bool> healthy() async {
     try {
-      return (await api.farm.health().timeout(const Duration(seconds: 2))).ok;
+      return (await api.server.health().timeout(const Duration(seconds: 2))).ok;
     } catch (_) {
       return false;
     }

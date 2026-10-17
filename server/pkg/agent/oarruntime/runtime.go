@@ -47,18 +47,6 @@ func defaultHome() string {
 }
 
 // Read each session: a key saved meanwhile is used.
-func settingsKey(home string) string {
-	data, err := os.ReadFile(filepath.Join(home, "settings.json"))
-	if err != nil {
-		return ""
-	}
-	var settings struct {
-		DeepseekAPIKey string `json:"deepseekApiKey"`
-	}
-	_ = json.Unmarshal(data, &settings)
-	return settings.DeepseekAPIKey
-}
-
 func toMcp(s oar.McpServer) agent.McpServer {
 	if s.IsHTTP() || (s.URL != "" && s.Command == "") {
 		return agent.McpServer{Name: s.Name, URL: s.URL, Headers: s.Headers}
@@ -82,7 +70,7 @@ func VibeValleyRuntime(options Options) oar.Runtime {
 	llmOf := options.Llm
 	if llmOf == nil {
 		llmOf = func(_ context.Context, model string) (agent.LLM, error) {
-			return agent.Deepseek(model, settingsKey(home()))
+			return agent.Deepseek(model, os.Getenv("DEEPSEEK_API_KEY"))
 		}
 	}
 	base := ai.WithProviders(context.Background(), options.Providers...)
@@ -130,12 +118,12 @@ func VibeValleyRuntime(options Options) oar.Runtime {
 			instructions = strings.Join(parts, "\n\n")
 		}
 		s.agent = agent.NewAgent(life, agent.AgentOptions{
-			Name:          "helper",
+			Name:          "worker",
 			Instructions:  instructions,
 			Model:         llm.Model,
 			StreamOptions: llm.StreamOptions,
 			ThinkingLevel: o.Effort,
-			Home:          filepath.Join(home(), "helpers"),
+			Home:          filepath.Join(home(), "workers"),
 			Cwd:           o.Cwd,
 			Tools:         tools,
 			NoMemory:      true,
@@ -175,7 +163,7 @@ func VibeValleyRuntime(options Options) oar.Runtime {
 		ListModels: func(context.Context, oar.AvailableInstallation, oar.ListModelsOptions) (oar.ListModelsResult, error) {
 			models := make([]oar.ModelEntry, 0, len(ai.MODELS))
 			for _, m := range ai.MODELS {
-				models = append(models, oar.ModelEntry{ID: m.ID, DisplayName: m.Name, EffortLevels: append([]string(nil), EFFORTS...), Default: m.ID == agent.DefaultModelID()})
+				models = append(models, oar.ModelEntry{ID: m.ID, DisplayName: m.Name, EffortLevels: append([]string(nil), EFFORTS...), Default: m.ID == agent.DEFAULT_MODEL})
 			}
 			return oar.ListModelsResult{Kind: "ok", Models: models}, nil
 		},

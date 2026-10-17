@@ -3,7 +3,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../app/theme.dart';
+import '../ui/theme.dart';
 import '../desktop/desktop.dart';
 
 class DesktopTitleBar extends ConsumerWidget {

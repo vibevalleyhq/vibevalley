@@ -1,9 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/server.dart' show atlas;
 import 'package:go_router/go_router.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/data/server.dart';
@@ -12,9 +12,8 @@ import 'package:vibevalley/phone/blocks_game.dart';
 import 'package:vibevalley/phone/calls.dart';
 import 'package:vibevalley/phone/phone.dart';
 import 'package:vibevalley/phone/sokoban_game.dart';
-import 'package:vibevalley/sprites/atlas.dart';
-import 'package:vibevalley/village/village_view.dart';
 import 'package:vibevalley/voice/voice.dart';
+import 'package:vibevalley/data/remote.dart';
 
 class FakeInbox extends Notifier<List<InboxItem>> {
   @override
@@ -25,9 +24,9 @@ class FakeInbox extends Notifier<List<InboxItem>> {
 final fakeInbox = NotifierProvider<FakeInbox, List<InboxItem>>(FakeInbox.new);
 
 const ripe = InboxItem(
-  id: 'w1:harvest:2',
-  kind: InboxKind.harvest,
-  from: InboxFromHelper(id: 'w1', name: '阿郑', agent: 'zheng'),
+  id: 'w1:merge:2',
+  kind: InboxKind.merge,
+  from: InboxFromWorker(id: 'w1', name: '阿郑', agent: 'zheng'),
   text: '修好了登录页',
   at: 30,
   target: InboxTargetWorker(id: 'w1'),
@@ -35,7 +34,7 @@ const ripe = InboxItem(
 const failed = InboxItem(
   id: 'w2:fix:1',
   kind: InboxKind.fix,
-  from: InboxFromHelper(id: 'w2', name: '阿周', agent: 'zhou'),
+  from: InboxFromWorker(id: 'w2', name: '阿周', agent: 'zhou'),
   text: '测试没过',
   at: 20,
   target: InboxTargetWorker(id: 'w2'),
@@ -70,7 +69,6 @@ class Corner extends ConsumerWidget {
 }
 
 void main() {
-  final atlas = SpriteAtlas.parse(File('assets/pixel/sprites.json').readAsStringSync());
   late VoiceCall call;
   late ProviderContainer container;
   final targets = <PhoneTarget>[];
@@ -78,12 +76,12 @@ void main() {
 
   Future<void> farm(WidgetTester tester, {List<InboxItem> standing = const []}) async {
     await tester.binding.setSurfaceSize(const Size(900, 900));
-    call = VoiceCall(VibeValleyServer(Uri.parse('http://127.0.0.1:9')));
+    call = VoiceCall(VibeValleyServer(Uri.parse('http://127.0.0.1:9')).api);
     container = ProviderContainer(
       overrides: [
         inboxProvider.overrideWith((ref) => ref.watch(fakeInbox)),
         atlasProvider.overrideWith((ref) async => atlas),
-        agentsProvider.overrideWith((ref) async => const <String, AgentProfile>{}),
+        agentsProvider.overrideWithValue(AsyncData(const <String, Agent>{})),
       ],
     );
     container.read(fakeInbox.notifier).calls(standing);
@@ -136,8 +134,8 @@ void main() {
     await tester.tap(find.text('接听'));
     await tester.pump();
     expect(container.read(phoneOpenProvider), isFalse);
-    expect(targets.single, isA<PhoneTargetHelper>().having((t) => t.id, 'id', 'w2'));
-    expect(container.read(phoneProvider).missed.map((c) => c.id), ['w1:harvest:2']);
+    expect(targets.single, isA<PhoneTargetWorker>().having((t) => t.id, 'id', 'w2'));
+    expect(container.read(phoneProvider).missed.map((c) => c.id), ['w1:merge:2']);
     expect(container.read(phoneProvider).log.single, isA<PhoneLogCall>().having((e) => e.answered, 'answered', true));
     await done(tester);
   });

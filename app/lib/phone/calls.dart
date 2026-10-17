@@ -11,7 +11,7 @@ import '../shell/sfx.dart';
 import 'phone.dart' show phoneOpenProvider;
 
 String inboxKindLabel(InboxKind kind) => switch (kind) {
-  InboxKind.harvest => '活熟了',
+  InboxKind.merge => '活熟了',
   InboxKind.fix => '活没做成',
   InboxKind.conflict => '合不进去',
   InboxKind.quiet => '好久没动静',

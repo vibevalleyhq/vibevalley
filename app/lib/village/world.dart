@@ -164,29 +164,12 @@ bool isRipe(Crop crop) => crop == Crop.wheat || crop == Crop.carrot;
 
 const _handsOn = {WorkerAction.editFile, WorkerAction.runCommand, WorkerAction.mcp, WorkerAction.other};
 
-String poseOf(Helper h, Crop crop) {
+String poseOf(Worker h, Crop crop) {
   if (isRipe(crop)) return 'cheer';
   if (crop == Crop.withered || crop == Crop.dry) return 'worry';
   final phase = h.phase;
   if (phase is! PhaseWorking || phase.doing.action == WorkerAction.none) return 'idle';
   return _handsOn.contains(phase.doing.action) ? 'work' : 'think';
-}
-
-const _species = ['bear', 'rabbit', 'fox', 'cat', 'owl', 'hedgehog', 'raccoon'];
-
-int _hash(String s) {
-  var h = 0;
-  for (final c in s.runes) {
-    h = (h * 31 + c) & 0xFFFFFFFF;
-  }
-  return h;
-}
-
-/// Agents saved before the farm get an animal picked from their id, the same one every time.
-String lookOf(AgentProfile? agent, String agentId, bool Function(String) has) {
-  final species = agent?.look.species?.wire ?? _species[_hash(agentId) % _species.length];
-  final outfit = agent?.look.outfit?.wire ?? 'farmer';
-  return ['$species-$outfit', '$species-farmer', 'bear-farmer'].firstWhere((l) => has('$l-down'), orElse: () => 'bear-farmer');
 }
 
 String placeOfAction(WorkerAction action) => switch (action) {
@@ -199,7 +182,7 @@ String placeOfAction(WorkerAction action) => switch (action) {
 
 bool plotCalls(Crop crop) => isRipe(crop) || crop == Crop.withered || crop == Crop.dry;
 
-List<String> spotsFor(Helper h, Crop crop, String pose) {
+List<String> spotsFor(Worker h, Crop crop, String pose) {
   if (isRipe(crop) || crop == Crop.dry) return const ['front'];
   if (crop == Crop.withered) return const ['front', 'left', 'right'];
   return switch (h.phase) {

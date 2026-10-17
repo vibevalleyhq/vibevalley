@@ -1,33 +1,5 @@
 import '../../gen/vibevalley.dart';
 
-const actionLabel = <WorkerAction, String>{
-  WorkerAction.runCommand: '打桩',
-  WorkerAction.readFile: '看图纸',
-  WorkerAction.editFile: '砌砖',
-  WorkerAction.search: '翻材料',
-  WorkerAction.web: '收信号',
-  WorkerAction.mcp: '拧扳手',
-  WorkerAction.wait: '歇口气',
-  WorkerAction.other: '忙活',
-  WorkerAction.thinking: '琢磨',
-  WorkerAction.speakingText: '写报告',
-  WorkerAction.none: '',
-};
-
-const actionMeaning = <WorkerAction, String>{
-  WorkerAction.runCommand: '跑命令',
-  WorkerAction.readFile: '读文件',
-  WorkerAction.editFile: '改文件',
-  WorkerAction.search: '搜索',
-  WorkerAction.web: '查网页',
-  WorkerAction.mcp: '调 MCP 工具',
-  WorkerAction.wait: '等待',
-  WorkerAction.other: '其他工具',
-  WorkerAction.thinking: '思考',
-  WorkerAction.speakingText: '输出文字',
-  WorkerAction.none: '—',
-};
-
 String phaseLabel(Phase phase) => switch (phase) {
   PhaseArriving() => '进场',
   PhaseWorking() => '干活中',
@@ -36,7 +8,7 @@ String phaseLabel(Phase phase) => switch (phase) {
   PhaseResting() => '歇着',
 };
 
-const foremanLabel = <ForemanState, String>{ForemanState.idle: '没开工', ForemanState.listening: '在听', ForemanState.thinking: '在想', ForemanState.speaking: '在说'};
+const managerLabel = <ManagerState, String>{ManagerState.idle: '没开工', ManagerState.listening: '在听', ManagerState.thinking: '在想', ManagerState.speaking: '在说'};
 
 const outcomeLabel = <Outcome, String>{Outcome.completed: '完成', Outcome.failed: '失败', Outcome.interrupted: '叫停'};
 
@@ -51,3 +23,6 @@ String ago(num at, num now) {
   if (s < 86400) return '${s ~/ 3600} 小时前';
   return '${s ~/ 86400} 天前';
 }
+
+/// A whole number without its .0, as the server writes ids and counts.
+String numberText(num v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();

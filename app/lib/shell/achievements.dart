@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import '../rules/progress.dart';
 import '../sprites/atlas.dart';
+import '../gen/vibevalley.dart';
 
 String earnedText(AchievementDef a, int tier) {
   if (a.category == AchievementCategory.starter) return '新手任务做完了';

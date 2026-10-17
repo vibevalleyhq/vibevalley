@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（8 篇）
+## proposed（10 篇）
 
 ### feature
 
@@ -15,10 +15,12 @@
 
 ### architecture
 
+- 2026-10-16 [Run 是一次干活，Worker 跨好几次 run，小队（Crew）编排 agent](proposed/architecture/2026-10-16-runs-workers-crews.md)
+- 2026-10-16 [改完旧名字，主键用 uuidv7](proposed/architecture/2026-10-16-finish-the-renames.md)
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
 
-## implemented（77 篇）
+## implemented（90 篇）
 
 ### feature
 
@@ -67,6 +69,17 @@
 
 ### architecture
 
+- 2026-10-17 [收敛接缝：投影一处、死代码进检查、协议瘦身、异步有规矩、客户端一个入口](implemented/architecture/2026-10-17-converge-the-seams.md)
+- 2026-10-16 [客户端问服务端，不重写它的规则](implemented/architecture/2026-10-16-the-client-asks-the-server.md)
+- 2026-10-16 [规则跟着它的主人，黄金数据跟着规则](implemented/architecture/2026-10-16-rules-live-with-their-owner.md)
+- 2026-10-16 [一个包一个 Service](implemented/architecture/2026-10-16-one-service-per-package.md)
+- 2026-10-16 [只有一份表结构，不认旧数据](implemented/architecture/2026-10-16-one-schema-no-old-data.md)
+- 2026-10-16 [配置只有一份 YAML 和环境变量，由 viper 读](implemented/architecture/2026-10-16-one-config-file.md)
+- 2026-10-16 [服务端的游戏收在一处](implemented/architecture/2026-10-16-game-in-one-place.md)
+- 2026-10-16 [按业务分深模块，包名用单数和自己的词](implemented/architecture/2026-10-16-deep-modules-singular-names.md)
+- 2026-10-16 [通用的小封装收进 pkg/x](implemented/architecture/2026-10-16-common-wrappers-in-pkg-x.md)
+- 2026-10-16 [客户端分层：两张皮在上，共用的在下](implemented/architecture/2026-10-16-client-layers.md)
+- 2026-10-16 [定时是一张工单的触发，工单可以派给管家](implemented/architecture/2026-10-16-a-schedule-is-a-trigger.md)
 - 2026-10-16 [一个概念一个包](implemented/architecture/2026-10-16-a-package-per-concept.md)
 - 2026-10-15 [查询由 sqlc 生成](implemented/architecture/2026-10-15-sqlc-queries.md)
 - 2026-10-15 [官网放在 site/，用游戏自己的图，会动的部分是 React](implemented/architecture/2026-10-15-site.md)
@@ -99,6 +112,7 @@
 
 ### process
 
+- 2026-10-17 [文档里写的路径也查](implemented/process/2026-10-17-paths-in-docs-are-checked.md)
 - 2026-10-15 [改名 VibeValley（码农场物语）](implemented/process/2026-10-15-rename-to-vibevalley.md)
 - 2026-10-15 [Note 的目录由脚本生成，检查跑在 Bun 上](implemented/process/2026-10-15-notes-catalog.md)
 - 2026-10-13 [格式、lint、测试和页面构建都交给 Vite+](implemented/process/2026-10-13-vite-plus-toolchain.md)
@@ -108,6 +122,7 @@
 
 ### testing
 
+- 2026-10-17 [测试共用一套工具和一个替身](implemented/testing/2026-10-17-one-test-kit.md)
 - 2026-10-10 [服务端测试用脚本扮演帮工](implemented/testing/2026-10-10-scripted-runtime-server-tests.md)
 - 2026-10-10 [core 的规则有单元测试](implemented/testing/2026-10-10-core-rule-tests.md)
 - 2026-10-09 [页面里有一个按同样规则跑的模拟服务器和调试台](implemented/testing/2026-10-09-in-page-mock-and-debug-console.md)

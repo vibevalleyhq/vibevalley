@@ -23,12 +23,12 @@ Status: implemented
 
 代码落在这些地方：
 
-- **核心状态**：计划曾经整张放在 `FarmState.playbooks`，每变一次施加一条 `playbook` 事实；后来计划成了带子工单的父工单（[种植计划是带子工单的父工单](../architecture/2026-10-15-plans-are-parent-issues.md)），存在工单里，从核心状态里的工单拼出来。帮工带 `playbook`，说明它在哪个计划的哪一步。
-- **规则**：都是 protocol 的纯函数（`server/internal/protocol/playbook.go`）：`PlanProblems`、`ParsePlan`、`Startable`、`EditNode`、`NodeTask`、`LayersOf`。客户端的 `app/lib/rules/playbook.dart` 移植了画计划板要的几个（`layersOf`、`blockedBy`……）。（当时网页的模拟服务器也用这些，它随网页删掉了。）
-- **服务端**：`server/internal/tickets/playbooks.go` 听工地事实，一次只做一件事。管家多了五个工具（`plan`、`playbooks`、`plan_edit`、`plan_action`、`node_action`），计划里帮工的汇报不再转给管家，只在要人拿主意时由计划告诉它。
+- **核心状态**：计划曾经整张放在 `CoreState.playbooks`，每变一次施加一条 `playbook` 事实；后来计划成了带子工单的父工单（[种植计划是带子工单的父工单](../architecture/2026-10-15-plans-are-parent-issues.md)），存在工单里，从核心状态里的工单拼出来。帮工带 `playbook`，说明它在哪个计划的哪一步。
+- **规则**：都是纯函数。几个包都用的在 protocol（`server/internal/protocol/playbook.go`：`PlanProblems`、`LayersOf`、`BlockedBy`）；只有计划服务用的在 `server/internal/playbook/rules.go`（`parsePlan`、`startable`、`editNode`、`nodeTask`）。画计划板要的分层、每步在等谁、要不要主人看、花了多少，由 `PlaybooksOf` 填进计划（`layers`、`blockedBy`、`asksForYou`、`spent`、`settled`），动态的话由 `playbook.Events` 填进 `text`；客户端只读（[客户端问服务端](../architecture/2026-10-16-the-client-asks-the-server.md)）。（当时网页的模拟服务器也用这些，它随网页删掉了。）
+- **服务端**：`server/internal/playbook/playbook.go` 听工地事实，一次只做一件事。管家多了五个工具（`plan`、`playbooks`、`plan_edit`、`plan_action`、`node_action`），计划里帮工的汇报不再转给管家，只在要人拿主意时由计划告诉它。
 - **页面**：院子里的图纸桌（或农场手机上的「计划」）打开计划板，步骤按先后分列，每步一张卡片，最下面是计划的经过。
-- **经过**：计划只经服务端的一个 `put` 写。每写一次，和写之前比一比（protocol 的 `PlaybookChanges`），变了什么记一行，带是谁做的（主人、管家、农场）和为什么，存在田头的数据库里（`playbook_events`，`server/internal/tickets/playbook_log.go`）。事实里仍是整个计划的快照；经过是另存的，回答「这一步怎么走到这里的、工单被谁改过」。
-- **规划的规矩**（`server/internal/runs/rules.go` 的 `PlanningTask`）：不互相依赖的步骤改不同的文件；别拆成一条串行的长链，有先后的按阶段分组。
+- **经过**：计划只经服务端的一个 `put` 写。每写一次，和写之前比一比（protocol 的 `PlaybookChanges`），变了什么记一行，带是谁做的（主人、管家、农场）和为什么，存在田头的数据库里（`playbook_event`，`server/internal/playbook/log.go`）。事实里仍是整个计划的快照；经过是另存的，回答「这一步怎么走到这里的、工单被谁改过」。
+- **规划的规矩**（`server/internal/worker/rules.go` 的 `PlanningTask`）：不互相依赖的步骤改不同的文件；别拆成一条串行的长链，有先后的按阶段分组。
 
 行为细节见 [docs/reference/server.md](../../../../docs/reference/server.md)「种植计划」和 [docs/reference/farm-ui.md](../../../../docs/reference/farm-ui.md) 界面 18。
 
@@ -101,14 +101,14 @@ Raft（[源码](https://github.com/botiverse/raft-source)，对照的是 v1.21.2
 
 ## Verification
 
-- `server/internal/tickets/playbooks_test.go`，用脚本扮演帮工、用真的 git 仓库，跑了四种情况：
+- `server/internal/playbook/playbook_test.go`，用脚本扮演帮工、用真的 git 仓库，跑了四种情况：
   - 菱形的图：b、c 同时做；d 在两者合进去之后才开工，并且看得到它们的文件；收获前主分支不变；收获后计划分支和步骤分支都删掉。
   - 一步失败两次后停下，不相干的步骤照做；检查没过的一步被打回一次；跳过以后后面的步骤开工；放弃后分支留着。
   - 有环的计划打回给规划的帮工，重给的成为草稿。
   - 服务端重启后，计划暂停，继续后接着做完。
-- `server/internal/protocol/playbook_rules_test.go` 测纯函数：校验、分层、能开工的步骤、读规划的结果、改计划、`NodeTask`、`Reduce` 按家族只留最近 `KeepClosedIssues` 家关上的工单、两版计划之间比出的经过和它的说法。
+- `server/internal/protocol/playbook_rules_test.go` 和 `server/internal/playbook/rules_test.go` 测纯函数：校验、分层、能开工的步骤、读规划的结果、改计划、`NodeTask`、`Reduce` 按家族只留最近 `KeepClosedIssues` 家关上的工单、两版计划之间比出的经过和它的说法。
 - 菱形的那次跑完以后读经过：计划这一层依次是要拆（主人）、拆好了（农场）、开工（主人）、熟了（农场）、收获（主人）；管家改 d 的检查记成管家、只改了「检查」；每一步都是开工、合进去，合进去带帮工、提交号和结论。坏步那次里，检查没过的退回记下了为什么。
-- 计划里的帮工的地不能用收获工具：`app/test/farm_rules_test.dart`（`aimTool`）。收获整个计划给金币，合进去的步数到「五谷丰登」的档位：`server/internal/protocol/progress_rules_test.go` 的 `TestPlaybookHarvested`。（原来这两条在 `packages/core/test/`，随网页删掉了。）
+- 计划里的帮工的地不能用收获工具：`app/test/farm_rules_test.dart`（`aimTool`）。收获整个计划给金币，合进去的步数到「五谷丰登」的档位：`server/internal/protocol/game_progress_rules_test.go` 的 `TestPlaybookHarvested`。（原来这两条在 `packages/core/test/`，随网页删掉了。）
 
 ## Deferred
 

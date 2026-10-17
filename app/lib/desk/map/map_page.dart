@@ -5,27 +5,24 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
-import '../../farm/bits.dart' show AgentFace, Ticking;
+import '../shared/layout.dart' show sideBySideFrom;
 import '../../gen/vibevalley.dart';
 import '../../rules/farm.dart';
 import '../../rules/looks.dart';
-import '../../rules/tickets.dart' show workingBeds;
 import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
 import '../../ui/pixel_card.dart' show CardColors, PixelCard, Words;
-import '../../village/village_view.dart' show agentsProvider;
+import '../../data/remote.dart' show agentsProvider;
 import '../projects/codebase.dart' show growthOf;
 import '../projects/projects_page.dart' show since;
 import '../projects/projects_state.dart';
-import '../shared/faces.dart' show PoseSprite;
-import '../shared/looks.dart';
-import '../shared/widgets.dart';
+import '../../shared/faces.dart' show AgentFaceOf, PoseSprite;
+import '../../shared/looks.dart';
+import '../../shared/widgets.dart';
 import 'map_rules.dart';
 
 /// The issues and helpers come with the farm's state.
 const _pollEvery = Duration(seconds: 30);
-
-const _sideBySide = 1100.0;
 
 const _gap = 24.0;
 
@@ -64,16 +61,16 @@ class _MapPageState extends ConsumerState<MapPage> {
   Widget build(BuildContext context) {
     final atlas = ref.watch(atlasProvider).value;
     final farm = ref.watch(farmProvider);
-    final helpers = farm?.helpers ?? const <Helper>[];
+    final workers = farm?.workers ?? const <Worker>[];
     final plots = ref.watch(viewProvider)?.plots ?? const <String, PlotView>{};
     final projects = ref.watch(projectsProvider).list;
     if (atlas == null) return const SizedBox.shrink();
-    final islands = islandsOf(projects: projects ?? const [], helpers: helpers, plots: plots, issues: farm?.issues ?? const []);
+    final islands = islandsOf(projects: projects ?? const [], workers: workers, plots: plots, issues: farm?.issues ?? const []);
     final open = islands.where((i) => i.project == widget.project).firstOrNull;
     return LayoutBuilder(
       builder: (context, box) {
-        final wide = box.maxWidth >= _sideBySide;
-        final map = _MapView(atlas: atlas, islands: islands, homeless: homeless(helpers), loading: projects == null, selected: open?.project, onOpen: _open);
+        final wide = box.maxWidth >= sideBySideFrom;
+        final map = _MapView(atlas: atlas, islands: islands, homeless: homeless(workers), loading: projects == null, selected: open?.project, onOpen: _open);
         if (open == null) return map;
         final side = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -108,7 +105,7 @@ class _MapView extends StatelessWidget {
   const _MapView({required this.atlas, required this.islands, required this.homeless, required this.loading, required this.selected, required this.onOpen});
   final SpriteAtlas atlas;
   final List<Island> islands;
-  final List<Helper> homeless;
+  final List<Worker> homeless;
   final bool loading;
   final String? selected;
   final ValueChanged<String?> onOpen;
@@ -165,7 +162,7 @@ class _MapView extends StatelessWidget {
                                   ),
                               ],
                             ),
-                          if (homeless.isNotEmpty) ...[const SizedBox(height: 16), _Homeless(helpers: homeless)],
+                          if (homeless.isNotEmpty) ...[const SizedBox(height: 16), _Homeless(workers: homeless)],
                         ],
                       ),
                     ),
@@ -190,7 +187,7 @@ class _Toolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final tally = mapTally(islands);
     // So a narrow line breaks between them.
-    final pieces = ['${islands.length} 座岛', '${tally.peopled} 座有人', '在干 ${tally.working}/$workingBeds 块地', if (tally.queued > 0) '排队 ${tally.queued}'];
+    final pieces = ['${islands.length} 座岛', '${tally.peopled} 座有人', '在干 ${tally.working}/$maxRunning 块地', if (tally.queued > 0) '排队 ${tally.queued}'];
     final counts = Wrap(
       runSpacing: 2,
       children: [for (final (i, words) in pieces.indexed) Text(i < pieces.length - 1 ? '$words · ' : words, style: KitText.sm)],
@@ -345,7 +342,7 @@ class _IslandView extends ConsumerWidget {
     final pic = atlas.first([islandLook(island.project), ...islandLooks]);
     final yard = pic.yard ?? Rect.fromLTWH(pic.w * .25, pic.h * .25, pic.w * .5, pic.h * .4);
     final at = plotsIn(yard, island.spots.length);
-    final agents = ref.watch(agentsProvider).value ?? const <String, AgentProfile>{};
+    final agents = ref.watch(agentsProvider).value ?? const <String, Agent>{};
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     void go(String path) => deskGo(context, path);
     final newTicket = '/tickets/new?project=${Uri.encodeQueryComponent(island.project)}';
@@ -376,21 +373,21 @@ class _IslandView extends ConsumerWidget {
       final foot = at[i] + Offset(0, down);
       final tip = spotText(spot, now);
       switch (spot) {
-        case SpotTaken(:final helper, :final plot):
-          final open = '/tickets/${Uri.encodeComponent(helper.id)}';
-          final cast = castOf(agents[helper.agent]?.look, helper.agent);
-          final pose = mapPose(helper);
+        case SpotTaken(:final worker, :final plot):
+          final open = '/tickets/${Uri.encodeComponent(worker.id)}';
+          final cast = castOf(agents[worker.agent]?.look, worker.agent);
+          final pose = mapPose(worker);
           final body = castSprite(atlas, cast, pose);
           layers
-            ..add(place(atlas.first([cropSprite(plot.crop), 'plot-seeded']), foot, onTap: () => go(open), tip: tip, label: '${helper.name}的地'))
+            ..add(place(atlas.first([cropSprite(plot.crop), 'plot-seeded']), foot, onTap: () => go(open), tip: tip, label: '${worker.name}的地'))
             ..add(
               place(
                 body,
-                foot + helperInPlot,
+                foot + workerInPlot,
                 child: PoseSprite(cast: cast, pose: pose, scale: s),
                 onTap: () => go(open),
                 tip: tip,
-                label: helper.name,
+                label: worker.name,
               ),
             );
           if (plot.badge case final badge?) {
@@ -492,8 +489,8 @@ const _tone = {
 };
 
 class _Homeless extends StatelessWidget {
-  const _Homeless({required this.helpers});
-  final List<Helper> helpers;
+  const _Homeless({required this.workers});
+  final List<Worker> workers;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -506,11 +503,11 @@ class _Homeless extends StatelessWidget {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text('不在哪个项目里：', style: KitText.xs.copyWith(color: Palette.bark600)),
-          for (final h in helpers)
+          for (final h in workers)
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AgentFace(h.agent, size: 20),
+                AgentFaceOf(h.agent, size: 20),
                 const SizedBox(width: 4),
                 DefaultTextStyle(
                   style: KitText.xs,
@@ -588,7 +585,7 @@ class _IslandDetail extends StatelessWidget {
                         : island.open > 0
                         ? '还能再派 ${island.open} 件活，马上开工（这个项目最多同时 ${island.slots} 个帮工）。'
                         : shut > 0
-                        ? '农场的 $workingBeds 块地都有人在干活，派来的活先排队。'
+                        ? '农场的 $maxRunning 块地都有人在干活，派来的活先排队。'
                         : '满了：${island.slots} 个帮工都在干活，派来的活先排队。',
                     style: KitText.xs.copyWith(color: Palette.bark600),
                   ),
@@ -654,7 +651,7 @@ class _WorktreeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final h = spot.helper;
+    final h = spot.worker;
     return KitTappable(
       onTap: () => deskGo(context, '/tickets/${Uri.encodeComponent(h.id)}'),
       semanticLabel: '${h.name}：${phaseText(h, now)}',
@@ -663,7 +660,7 @@ class _WorktreeRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         child: Row(
           children: [
-            AgentFace(h.agent, size: 32),
+            AgentFaceOf(h.agent, size: 32),
             const SizedBox(width: 8),
             Expanded(
               child: Column(

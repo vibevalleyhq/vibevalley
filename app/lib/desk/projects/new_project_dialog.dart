@@ -3,11 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import 'codebase.dart';
 import 'projects_state.dart';
-import '../shared/widgets.dart';
+import '../../shared/widgets.dart';
 
 Future<void> showNewProjectDialog(BuildContext context) => showPxDialog<void>(
   context,
@@ -36,13 +37,22 @@ class _NewProjectFormState extends ConsumerState<NewProjectForm> {
 
   Future<void> _submit() async {
     if (_busy) return;
-    final problem = projectProblem(_request);
-    if (problem != null) return setState(() => _error = problem);
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
+      // The server says what it would refuse; the dialog only shows it.
+      final problem = (await ref.read(apiProvider).project.check(body: _request)).problem;
+      if (problem != null) {
+        if (mounted) {
+          setState(() {
+            _busy = false;
+            _error = problem;
+          });
+        }
+        return;
+      }
       final project = await ref.read(projectsProvider.notifier).create(_request);
       if (!mounted) return;
       Navigator.of(context).pop();

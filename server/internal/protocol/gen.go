@@ -9,14 +9,71 @@ import (
 	"net/http"
 )
 
+// AgentIssueLevelValues are every AgentIssueLevel, in the protocol's order.
+var AgentIssueLevelValues = []AgentIssueLevel{AgentIssueLevelError, AgentIssueLevelWarn}
+
+func (v AgentCheckRequest) MarshalJSON() ([]byte, error) {
+	type plain AgentCheckRequest
+	p := plain(v)
+	if p.Agents == nil {
+		p.Agents = []Agent{}
+	}
+	return json.Marshal(p)
+}
+
+func (v AgentCheck) MarshalJSON() ([]byte, error) {
+	type plain AgentCheck
+	p := plain(v)
+	if p.Issues == nil {
+		p.Issues = []AgentIssue{}
+	}
+	return json.Marshal(p)
+}
+
+func (v RecallPreview) MarshalJSON() ([]byte, error) {
+	type plain RecallPreview
+	p := plain(v)
+	if p.Lines == nil {
+		p.Lines = []string{}
+	}
+	return json.Marshal(p)
+}
+
+// AchievementCategoryValues are every AchievementCategory, in the protocol's order.
+var AchievementCategoryValues = []AchievementCategory{AchievementCategoryStarter, AchievementCategoryHarvest, AchievementCategoryCraft, AchievementCategoryThrift, AchievementCategoryTeam, AchievementCategorySecret}
+
+func (v AchievementDef) MarshalJSON() ([]byte, error) {
+	type plain AchievementDef
+	p := plain(v)
+	if p.Tiers == nil {
+		p.Tiers = []int64{}
+	}
+	if p.Coins == nil {
+		p.Coins = []int64{}
+	}
+	return json.Marshal(p)
+}
+
+func (v RuntimeFacts) MarshalJSON() ([]byte, error) {
+	type plain RuntimeFacts
+	p := plain(v)
+	if p.Refused == nil {
+		p.Refused = map[string]string{}
+	}
+	if p.Capabilities == nil {
+		p.Capabilities = []string{}
+	}
+	return json.Marshal(p)
+}
+
 // CallStateValues are every CallState, in the protocol's order.
 var CallStateValues = []CallState{CallStateIdle, CallStateConnecting, CallStateLive, CallStateEnding, CallStateError}
 
-// ForemanStateValues are every ForemanState, in the protocol's order.
-var ForemanStateValues = []ForemanState{ForemanStateIdle, ForemanStateListening, ForemanStateThinking, ForemanStateSpeaking}
+// ManagerStateValues are every ManagerState, in the protocol's order.
+var ManagerStateValues = []ManagerState{ManagerStateIdle, ManagerStateListening, ManagerStateThinking, ManagerStateSpeaking}
 
 // SenderKindValues are every SenderKind, in the protocol's order.
-var SenderKindValues = []SenderKind{SenderKindUser, SenderKindForeman, SenderKindHelper, SenderKindSystem}
+var SenderKindValues = []SenderKind{SenderKindUser, SenderKindManager, SenderKindWorker, SenderKindSystem}
 
 // MessageKindValues are every MessageKind, in the protocol's order.
 var MessageKindValues = []MessageKind{MessageKindChat, MessageKindDispatch, MessageKindReport, MessageKindNotice}
@@ -25,10 +82,10 @@ var MessageKindValues = []MessageKind{MessageKindChat, MessageKindDispatch, Mess
 var OutcomeValues = []Outcome{OutcomeCompleted, OutcomeFailed, OutcomeInterrupted}
 
 // ConversationKindValues are every ConversationKind, in the protocol's order.
-var ConversationKindValues = []ConversationKind{ConversationKindSquare, ConversationKindChannel, ConversationKindThread}
+var ConversationKindValues = []ConversationKind{ConversationKindGeneral, ConversationKindChannel, ConversationKindThread}
 
 // SubjectKindValues are every SubjectKind, in the protocol's order.
-var SubjectKindValues = []SubjectKind{SubjectKindJob, SubjectKindPlaybook, SubjectKindTalk}
+var SubjectKindValues = []SubjectKind{SubjectKindIssue, SubjectKindPlaybook, SubjectKindTalk}
 
 func (v Conflict) MarshalJSON() ([]byte, error) {
 	type plain Conflict
@@ -97,8 +154,8 @@ func (u *Phase) UnmarshalJSON(data []byte) error {
 // handle every one of them does.
 var PhaseMembers = []PhaseValue{PhaseArriving{}, PhaseWorking{}, PhaseRipe{}, PhaseFailed{}, PhaseResting{}}
 
-func (v HelperPlay) MarshalJSON() ([]byte, error) {
-	type plain HelperPlay
+func (v WorkerPlay) MarshalJSON() ([]byte, error) {
+	type plain WorkerPlay
 	p := plain(v)
 	if p.History == nil {
 		p.History = []ActionStep{}
@@ -223,17 +280,17 @@ func (v Chat) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-func (v FarmState) MarshalJSON() ([]byte, error) {
-	type plain FarmState
+func (v CoreState) MarshalJSON() ([]byte, error) {
+	type plain CoreState
 	p := plain(v)
-	if p.Helpers == nil {
-		p.Helpers = []Helper{}
+	if p.Workers == nil {
+		p.Workers = []Worker{}
 	}
 	return json.Marshal(p)
 }
 
-// StepKindValues are every StepKind, in the protocol's order.
-var StepKindValues = []StepKind{StepKindAsked, StepKindRecalled, StepKindThought, StepKindSaid, StepKindTool, StepKindRetry, StepKindProblem}
+// ActivityKindValues are every ActivityKind, in the protocol's order.
+var ActivityKindValues = []ActivityKind{ActivityKindPrompt, ActivityKindRecalled, ActivityKindThought, ActivityKindResponse, ActivityKindAction, ActivityKindRetry, ActivityKindError}
 
 // ToolActionValues are every ToolAction, in the protocol's order.
 var ToolActionValues = []ToolAction{ToolActionRunCommand, ToolActionReadFile, ToolActionEditFile, ToolActionSearch, ToolActionWeb, ToolActionMCP, ToolActionWait, ToolActionOther}
@@ -358,9 +415,9 @@ func (v RuntimeSettings) MarshalJSON() ([]byte, error) {
 }
 
 // InboxKindValues are every InboxKind, in the protocol's order.
-var InboxKindValues = []InboxKind{InboxKindHarvest, InboxKindFix, InboxKindConflict, InboxKindQuiet, InboxKindPlanDraft, InboxKindPlanRipe, InboxKindPlanFailed, InboxKindMention}
+var InboxKindValues = []InboxKind{InboxKindMerge, InboxKindFix, InboxKindConflict, InboxKindQuiet, InboxKindPlanDraft, InboxKindPlanRipe, InboxKindPlanFailed, InboxKindMention}
 
-// InboxFromValue is a member of InboxFrom: InboxFromHelper, InboxFromManager, told apart by "kind".
+// InboxFromValue is a member of InboxFrom: InboxFromWorker, InboxFromManager, told apart by "kind".
 type InboxFromValue interface{ isInboxFrom() }
 
 func (u InboxFrom) IsZero() bool { return u.Value == nil }
@@ -385,8 +442,8 @@ func (u *InboxFrom) UnmarshalJSON(data []byte) error {
 	}
 	var err error
 	switch head.Tag {
-	case "helper":
-		var v InboxFromHelper
+	case "worker":
+		var v InboxFromWorker
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "manager":
@@ -401,7 +458,7 @@ func (u *InboxFrom) UnmarshalJSON(data []byte) error {
 
 // InboxFromMembers are every member of InboxFrom, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var InboxFromMembers = []InboxFromValue{InboxFromHelper{}, InboxFromManager{}}
+var InboxFromMembers = []InboxFromValue{InboxFromWorker{}, InboxFromManager{}}
 
 // InboxTargetValue is a member of InboxTarget: InboxTargetWorker, InboxTargetPlans, InboxTargetChat, told apart by "kind".
 type InboxTargetValue interface{ isInboxTarget() }
@@ -516,8 +573,8 @@ func (u *GameEffect) UnmarshalJSON(data []byte) error {
 // handle every one of them does.
 var GameEffectMembers = []GameEffectValue{GameEffectReward{}, GameEffectPenalty{}, GameEffectLevelUp{}, GameEffectAchievement{}}
 
-func (v SiteFrame) MarshalJSON() ([]byte, error) {
-	type plain SiteFrame
+func (v StateFrame) MarshalJSON() ([]byte, error) {
+	type plain StateFrame
 	p := plain(v)
 	if p.Inbox == nil {
 		p.Inbox = []InboxItem{}
@@ -531,7 +588,7 @@ func (v SiteFrame) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-// LedgerEntryValue is a member of LedgerEntry: LedgerEntryHarvested, LedgerEntryFailed, LedgerEntryConflicted, LedgerEntryTold, LedgerEntryReviewed, LedgerEntryPlaybook, LedgerEntryHandoff, LedgerEntryCalled, LedgerEntryHired, LedgerEntryOpenedPlannedVoiceBusy6, LedgerEntryLevel, LedgerEntryTitled, LedgerEntryCarried, told apart by "kind".
+// LedgerEntryValue is a member of LedgerEntry: LedgerEntryHarvested, LedgerEntryFailed, LedgerEntryConflicted, LedgerEntryTold, LedgerEntryReviewed, LedgerEntryPlaybook, LedgerEntryHandoff, LedgerEntryCalled, LedgerEntryHired, LedgerEntryMoment, LedgerEntryLevel, LedgerEntryTitled, LedgerEntryCarried, told apart by "kind".
 type LedgerEntryValue interface{ isLedgerEntry() }
 
 func (u LedgerEntry) IsZero() bool { return u.Value == nil }
@@ -593,19 +650,19 @@ func (u *LedgerEntry) UnmarshalJSON(data []byte) error {
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "opened":
-		var v LedgerEntryOpenedPlannedVoiceBusy6
+		var v LedgerEntryMoment
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "planned":
-		var v LedgerEntryOpenedPlannedVoiceBusy6
+		var v LedgerEntryMoment
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "voice":
-		var v LedgerEntryOpenedPlannedVoiceBusy6
+		var v LedgerEntryMoment
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "busy6":
-		var v LedgerEntryOpenedPlannedVoiceBusy6
+		var v LedgerEntryMoment
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "level":
@@ -628,13 +685,13 @@ func (u *LedgerEntry) UnmarshalJSON(data []byte) error {
 
 // LedgerEntryMembers are every member of LedgerEntry, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var LedgerEntryMembers = []LedgerEntryValue{LedgerEntryHarvested{}, LedgerEntryFailed{}, LedgerEntryConflicted{}, LedgerEntryTold{}, LedgerEntryReviewed{}, LedgerEntryPlaybook{}, LedgerEntryHandoff{}, LedgerEntryCalled{}, LedgerEntryHired{}, LedgerEntryOpenedPlannedVoiceBusy6{}, LedgerEntryLevel{}, LedgerEntryTitled{}, LedgerEntryCarried{}}
+var LedgerEntryMembers = []LedgerEntryValue{LedgerEntryHarvested{}, LedgerEntryFailed{}, LedgerEntryConflicted{}, LedgerEntryTold{}, LedgerEntryReviewed{}, LedgerEntryPlaybook{}, LedgerEntryHandoff{}, LedgerEntryCalled{}, LedgerEntryHired{}, LedgerEntryMoment{}, LedgerEntryLevel{}, LedgerEntryTitled{}, LedgerEntryCarried{}}
 
 // PlaybookEventKindValues are every PlaybookEventKind, in the protocol's order.
-var PlaybookEventKindValues = []PlaybookEventKind{PlaybookEventKindPlanning, PlaybookEventKindDrafted, PlaybookEventKindStarted, PlaybookEventKindPaused, PlaybookEventKindResumed, PlaybookEventKindRipe, PlaybookEventKindHarvested, PlaybookEventKindAbandoned, PlaybookEventKindNoted, PlaybookEventKindNodeStarted, PlaybookEventKindNodeSentBack, PlaybookEventKindNodeMerged, PlaybookEventKindNodeFailed, PlaybookEventKindNodeRetried, PlaybookEventKindNodeRequeued, PlaybookEventKindNodeSkipped, PlaybookEventKindNodeEdited, PlaybookEventKindNodeAdded, PlaybookEventKindNodeRemoved}
+var PlaybookEventKindValues = []PlaybookEventKind{PlaybookEventKindPlanning, PlaybookEventKindDrafted, PlaybookEventKindStarted, PlaybookEventKindPaused, PlaybookEventKindResumed, PlaybookEventKindRipe, PlaybookEventKindMerged, PlaybookEventKindAbandoned, PlaybookEventKindNoted, PlaybookEventKindNodeStarted, PlaybookEventKindNodeSentBack, PlaybookEventKindNodeMerged, PlaybookEventKindNodeFailed, PlaybookEventKindNodeRetried, PlaybookEventKindNodeRequeued, PlaybookEventKindNodeSkipped, PlaybookEventKindNodeEdited, PlaybookEventKindNodeAdded, PlaybookEventKindNodeRemoved}
 
 // PlaybookActorValues are every PlaybookActor, in the protocol's order.
-var PlaybookActorValues = []PlaybookActor{PlaybookActorUser, PlaybookActorForeman, PlaybookActorFarm}
+var PlaybookActorValues = []PlaybookActor{PlaybookActorUser, PlaybookActorManager, PlaybookActorSystem}
 
 func (v LanStatus) MarshalJSON() ([]byte, error) {
 	type plain LanStatus
@@ -685,7 +742,7 @@ func (v ArchiveListing) MarshalJSON() ([]byte, error) {
 }
 
 // MemoryKindValues are every MemoryKind, in the protocol's order.
-var MemoryKindValues = []MemoryKind{MemoryKindNote, MemoryKindJob}
+var MemoryKindValues = []MemoryKind{MemoryKindNote, MemoryKindIssue}
 
 func (v ManagerMemory) MarshalJSON() ([]byte, error) {
 	type plain ManagerMemory
@@ -696,8 +753,8 @@ func (v ManagerMemory) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-func (v AgentProfile) MarshalJSON() ([]byte, error) {
-	type plain AgentProfile
+func (v Agent) MarshalJSON() ([]byte, error) {
+	type plain Agent
 	p := plain(v)
 	if p.Skills == nil {
 		p.Skills = []string{}
@@ -754,37 +811,49 @@ func (v Changes) MarshalJSON() ([]byte, error) {
 var NodeActionValues = []NodeAction{NodeActionRetry, NodeActionSkip}
 
 // PlaybookActionValues are every PlaybookAction, in the protocol's order.
-var PlaybookActionValues = []PlaybookAction{PlaybookActionStart, PlaybookActionPause, PlaybookActionResume, PlaybookActionAbandon, PlaybookActionHarvest}
+var PlaybookActionValues = []PlaybookAction{PlaybookActionStart, PlaybookActionPause, PlaybookActionResume, PlaybookActionAbandon, PlaybookActionMerge}
 
 func (v Issue) MarshalJSON() ([]byte, error) {
 	type plain Issue
 	p := plain(v)
-	if p.Runs == nil {
-		p.Runs = []string{}
+	if p.Workers == nil {
+		p.Workers = []string{}
 	}
 	return json.Marshal(p)
 }
 
 // IssueStatusValues are every IssueStatus, in the protocol's order.
-var IssueStatusValues = []IssueStatus{IssueStatusTodo, IssueStatusQueued, IssueStatusWorking, IssueStatusWaiting, IssueStatusClosed}
+var IssueStatusValues = []IssueStatus{IssueStatusBacklog, IssueStatusTodo, IssueStatusInProgress, IssueStatusInReview, IssueStatusDone, IssueStatusCanceled}
 
 // PriorityValues are every Priority, in the protocol's order.
-var PriorityValues = []Priority{PriorityUrgent, PriorityHigh, PriorityNormal, PriorityLow}
+var PriorityValues = []Priority{PriorityUrgent, PriorityHigh, PriorityMedium, PriorityLow}
 
 func (v Trajectory) MarshalJSON() ([]byte, error) {
 	type plain Trajectory
 	p := plain(v)
-	if p.Steps == nil {
-		p.Steps = []WorkStep{}
+	if p.Activities == nil {
+		p.Activities = []Activity{}
 	}
 	return json.Marshal(p)
 }
 
 // IssueCloseValues are every IssueClose, in the protocol's order.
-var IssueCloseValues = []IssueClose{IssueCloseHarvested, IssueCloseMerged, IssueCloseDismissed, IssueCloseLost}
+var IssueCloseValues = []IssueClose{IssueCloseMerged, IssueCloseMergedIntoPlan, IssueCloseDismissed, IssueCloseLost, IssueCloseAnswered}
+
+// RunTriggerKindValues are every RunTriggerKind, in the protocol's order.
+var RunTriggerKindValues = []RunTriggerKind{RunTriggerKindIssue, RunTriggerKindComment, RunTriggerKindPlaybook, RunTriggerKindSchedule, RunTriggerKindRuntime}
+
+func (v Run) MarshalJSON() ([]byte, error) {
+	type plain Run
+	p := plain(v)
+	if p.Heard == nil {
+		p.Heard = []int64{}
+	}
+	return json.Marshal(p)
+}
 
 // KeySourceValues are every KeySource, in the protocol's order.
-var KeySourceValues = []KeySource{KeySourceSettings, KeySourceEnv, KeySourcePi}
+var KeySourceValues = []KeySource{KeySourceSettings, KeySourceConfig}
 
 func (PhaseArriving) isPhase() {}
 
@@ -939,13 +1008,13 @@ func (v AccountUsageUnavailable) MarshalJSON() ([]byte, error) {
 	return withTag(p, "status", "unavailable")
 }
 
-func (InboxFromHelper) isInboxFrom() {}
+func (InboxFromWorker) isInboxFrom() {}
 
-func (v InboxFromHelper) MarshalJSON() ([]byte, error) {
-	type plain InboxFromHelper
+func (v InboxFromWorker) MarshalJSON() ([]byte, error) {
+	type plain InboxFromWorker
 	p := plain(v)
 
-	return withTag(p, "kind", "helper")
+	return withTag(p, "kind", "worker")
 }
 
 func (InboxFromManager) isInboxFrom() {}
@@ -1101,10 +1170,10 @@ func (v LedgerEntryHired) MarshalJSON() ([]byte, error) {
 	return withTag(p, "kind", "hired")
 }
 
-// LedgerEntryOpenedPlannedVoiceBusy6KindValues are every LedgerEntryOpenedPlannedVoiceBusy6Kind, in the protocol's order.
-var LedgerEntryOpenedPlannedVoiceBusy6KindValues = []LedgerEntryOpenedPlannedVoiceBusy6Kind{LedgerEntryOpenedPlannedVoiceBusy6KindOpened, LedgerEntryOpenedPlannedVoiceBusy6KindPlanned, LedgerEntryOpenedPlannedVoiceBusy6KindVoice, LedgerEntryOpenedPlannedVoiceBusy6KindBusy6}
+// LedgerEntryMomentKindValues are every LedgerEntryMomentKind, in the protocol's order.
+var LedgerEntryMomentKindValues = []LedgerEntryMomentKind{LedgerEntryMomentKindOpened, LedgerEntryMomentKindPlanned, LedgerEntryMomentKindVoice, LedgerEntryMomentKindBusy6}
 
-func (LedgerEntryOpenedPlannedVoiceBusy6) isLedgerEntry() {}
+func (LedgerEntryMoment) isLedgerEntry() {}
 
 func (LedgerEntryLevel) isLedgerEntry() {}
 
@@ -1460,7 +1529,7 @@ func (v VoiceTTSMicrosoft) MarshalJSON() ([]byte, error) {
 	return withTag(p, "vendor", "microsoft")
 }
 
-// FactValue is a member of Fact: FactCall, FactForeman, FactMessage, FactConversation, FactHired, FactTurn, FactDoing, FactQuiet, FactRetry, FactSpent, FactReport, FactConflict, FactLeft, FactCommits, FactIssue, FactIssueGone, FactProgress, FactSchedule, FactUnschedule, told apart by "type".
+// FactValue is a member of Fact: FactCall, FactManager, FactMessage, FactConversation, FactHired, FactStation, FactRun, FactDoing, FactQuiet, FactRetry, FactSpent, FactReport, FactConflict, FactLeft, FactCommits, FactIssue, FactIssueGone, FactProgress, FactSchedule, FactUnschedule, told apart by "type".
 type FactValue interface{ isFact() }
 
 func (u Fact) IsZero() bool { return u.Value == nil }
@@ -1489,8 +1558,8 @@ func (u *Fact) UnmarshalJSON(data []byte) error {
 		var v FactCall
 		err = json.Unmarshal(data, &v)
 		u.Value = v
-	case "foreman":
-		var v FactForeman
+	case "manager":
+		var v FactManager
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "message":
@@ -1505,8 +1574,12 @@ func (u *Fact) UnmarshalJSON(data []byte) error {
 		var v FactHired
 		err = json.Unmarshal(data, &v)
 		u.Value = v
-	case "turn":
-		var v FactTurn
+	case "station":
+		var v FactStation
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "run":
+		var v FactRun
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "doing":
@@ -1569,11 +1642,11 @@ func (u *Fact) UnmarshalJSON(data []byte) error {
 
 // FactMembers are every member of Fact, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var FactMembers = []FactValue{FactCall{}, FactForeman{}, FactMessage{}, FactConversation{}, FactHired{}, FactTurn{}, FactDoing{}, FactQuiet{}, FactRetry{}, FactSpent{}, FactReport{}, FactConflict{}, FactLeft{}, FactCommits{}, FactIssue{}, FactIssueGone{}, FactProgress{}, FactSchedule{}, FactUnschedule{}}
+var FactMembers = []FactValue{FactCall{}, FactManager{}, FactMessage{}, FactConversation{}, FactHired{}, FactStation{}, FactRun{}, FactDoing{}, FactQuiet{}, FactRetry{}, FactSpent{}, FactReport{}, FactConflict{}, FactLeft{}, FactCommits{}, FactIssue{}, FactIssueGone{}, FactProgress{}, FactSchedule{}, FactUnschedule{}}
 
 func (FactCall) isFact() {}
 
-func (FactCall) isSiteEvent() {}
+func (FactCall) isSideEvent() {}
 
 func (v FactCall) MarshalJSON() ([]byte, error) {
 	type plain FactCall
@@ -1582,20 +1655,20 @@ func (v FactCall) MarshalJSON() ([]byte, error) {
 	return withTag(p, "type", "call")
 }
 
-func (FactForeman) isFact() {}
+func (FactManager) isFact() {}
 
-func (FactForeman) isSiteEvent() {}
+func (FactManager) isSideEvent() {}
 
-func (v FactForeman) MarshalJSON() ([]byte, error) {
-	type plain FactForeman
+func (v FactManager) MarshalJSON() ([]byte, error) {
+	type plain FactManager
 	p := plain(v)
 
-	return withTag(p, "type", "foreman")
+	return withTag(p, "type", "manager")
 }
 
 func (FactMessage) isFact() {}
 
-func (FactMessage) isSiteEvent() {}
+func (FactMessage) isSideEvent() {}
 
 func (v FactMessage) MarshalJSON() ([]byte, error) {
 	type plain FactMessage
@@ -1606,7 +1679,7 @@ func (v FactMessage) MarshalJSON() ([]byte, error) {
 
 func (FactConversation) isFact() {}
 
-func (FactConversation) isSiteEvent() {}
+func (FactConversation) isSideEvent() {}
 
 func (v FactConversation) MarshalJSON() ([]byte, error) {
 	type plain FactConversation
@@ -1617,7 +1690,7 @@ func (v FactConversation) MarshalJSON() ([]byte, error) {
 
 func (FactHired) isFact() {}
 
-func (FactHired) isSiteEvent() {}
+func (FactHired) isSideEvent() {}
 
 func (v FactHired) MarshalJSON() ([]byte, error) {
 	type plain FactHired
@@ -1626,20 +1699,31 @@ func (v FactHired) MarshalJSON() ([]byte, error) {
 	return withTag(p, "type", "hired")
 }
 
-func (FactTurn) isFact() {}
+func (FactStation) isFact() {}
 
-func (FactTurn) isSiteEvent() {}
+func (FactStation) isSideEvent() {}
 
-func (v FactTurn) MarshalJSON() ([]byte, error) {
-	type plain FactTurn
+func (v FactStation) MarshalJSON() ([]byte, error) {
+	type plain FactStation
 	p := plain(v)
 
-	return withTag(p, "type", "turn")
+	return withTag(p, "type", "station")
+}
+
+func (FactRun) isFact() {}
+
+func (FactRun) isSideEvent() {}
+
+func (v FactRun) MarshalJSON() ([]byte, error) {
+	type plain FactRun
+	p := plain(v)
+
+	return withTag(p, "type", "run")
 }
 
 func (FactDoing) isFact() {}
 
-func (FactDoing) isSiteEvent() {}
+func (FactDoing) isSideEvent() {}
 
 func (v FactDoing) MarshalJSON() ([]byte, error) {
 	type plain FactDoing
@@ -1650,7 +1734,7 @@ func (v FactDoing) MarshalJSON() ([]byte, error) {
 
 func (FactQuiet) isFact() {}
 
-func (FactQuiet) isSiteEvent() {}
+func (FactQuiet) isSideEvent() {}
 
 func (v FactQuiet) MarshalJSON() ([]byte, error) {
 	type plain FactQuiet
@@ -1661,7 +1745,7 @@ func (v FactQuiet) MarshalJSON() ([]byte, error) {
 
 func (FactRetry) isFact() {}
 
-func (FactRetry) isSiteEvent() {}
+func (FactRetry) isSideEvent() {}
 
 func (v FactRetry) MarshalJSON() ([]byte, error) {
 	type plain FactRetry
@@ -1672,7 +1756,7 @@ func (v FactRetry) MarshalJSON() ([]byte, error) {
 
 func (FactSpent) isFact() {}
 
-func (FactSpent) isSiteEvent() {}
+func (FactSpent) isSideEvent() {}
 
 func (v FactSpent) MarshalJSON() ([]byte, error) {
 	type plain FactSpent
@@ -1683,7 +1767,7 @@ func (v FactSpent) MarshalJSON() ([]byte, error) {
 
 func (FactReport) isFact() {}
 
-func (FactReport) isSiteEvent() {}
+func (FactReport) isSideEvent() {}
 
 func (v FactReport) MarshalJSON() ([]byte, error) {
 	type plain FactReport
@@ -1694,7 +1778,7 @@ func (v FactReport) MarshalJSON() ([]byte, error) {
 
 func (FactConflict) isFact() {}
 
-func (FactConflict) isSiteEvent() {}
+func (FactConflict) isSideEvent() {}
 
 func (v FactConflict) MarshalJSON() ([]byte, error) {
 	type plain FactConflict
@@ -1705,7 +1789,7 @@ func (v FactConflict) MarshalJSON() ([]byte, error) {
 
 func (FactLeft) isFact() {}
 
-func (FactLeft) isSiteEvent() {}
+func (FactLeft) isSideEvent() {}
 
 func (v FactLeft) MarshalJSON() ([]byte, error) {
 	type plain FactLeft
@@ -1716,7 +1800,7 @@ func (v FactLeft) MarshalJSON() ([]byte, error) {
 
 func (FactCommits) isFact() {}
 
-func (FactCommits) isSiteEvent() {}
+func (FactCommits) isSideEvent() {}
 
 func (v FactCommits) MarshalJSON() ([]byte, error) {
 	type plain FactCommits
@@ -1727,7 +1811,7 @@ func (v FactCommits) MarshalJSON() ([]byte, error) {
 
 func (FactIssue) isFact() {}
 
-func (FactIssue) isSiteEvent() {}
+func (FactIssue) isSideEvent() {}
 
 func (v FactIssue) MarshalJSON() ([]byte, error) {
 	type plain FactIssue
@@ -1738,7 +1822,7 @@ func (v FactIssue) MarshalJSON() ([]byte, error) {
 
 func (FactIssueGone) isFact() {}
 
-func (FactIssueGone) isSiteEvent() {}
+func (FactIssueGone) isSideEvent() {}
 
 func (v FactIssueGone) MarshalJSON() ([]byte, error) {
 	type plain FactIssueGone
@@ -1749,7 +1833,7 @@ func (v FactIssueGone) MarshalJSON() ([]byte, error) {
 
 func (FactProgress) isFact() {}
 
-func (FactProgress) isSiteEvent() {}
+func (FactProgress) isSideEvent() {}
 
 func (v FactProgress) MarshalJSON() ([]byte, error) {
 	type plain FactProgress
@@ -1760,7 +1844,7 @@ func (v FactProgress) MarshalJSON() ([]byte, error) {
 
 func (FactSchedule) isFact() {}
 
-func (FactSchedule) isSiteEvent() {}
+func (FactSchedule) isSideEvent() {}
 
 func (v FactSchedule) MarshalJSON() ([]byte, error) {
 	type plain FactSchedule
@@ -1771,7 +1855,7 @@ func (v FactSchedule) MarshalJSON() ([]byte, error) {
 
 func (FactUnschedule) isFact() {}
 
-func (FactUnschedule) isSiteEvent() {}
+func (FactUnschedule) isSideEvent() {}
 
 func (v FactUnschedule) MarshalJSON() ([]byte, error) {
 	type plain FactUnschedule
@@ -1780,19 +1864,19 @@ func (v FactUnschedule) MarshalJSON() ([]byte, error) {
 	return withTag(p, "type", "unschedule")
 }
 
-// SiteEventValue is a member of SiteEvent: FactCall, FactForeman, FactMessage, FactConversation, FactHired, FactTurn, FactDoing, FactQuiet, FactRetry, FactSpent, FactReport, FactConflict, FactLeft, FactCommits, FactIssue, FactIssueGone, FactProgress, FactSchedule, FactUnschedule, SiteEventSnapshot, SiteEventStep, SiteEventNotice, SiteEventRuntime, told apart by "type".
-type SiteEventValue interface{ isSiteEvent() }
+// SideEventValue is a member of SideEvent: FactCall, FactManager, FactMessage, FactConversation, FactHired, FactStation, FactRun, FactDoing, FactQuiet, FactRetry, FactSpent, FactReport, FactConflict, FactLeft, FactCommits, FactIssue, FactIssueGone, FactProgress, FactSchedule, FactUnschedule, SideEventSnapshot, SideEventActivity, SideEventNotice, SideEventRuntime, told apart by "type".
+type SideEventValue interface{ isSideEvent() }
 
-func (u SiteEvent) IsZero() bool { return u.Value == nil }
+func (u SideEvent) IsZero() bool { return u.Value == nil }
 
-func (u SiteEvent) MarshalJSON() ([]byte, error) {
+func (u SideEvent) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}
 	return json.Marshal(u.Value)
 }
 
-func (u *SiteEvent) UnmarshalJSON(data []byte) error {
+func (u *SideEvent) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		u.Value = nil
 		return nil
@@ -1809,8 +1893,8 @@ func (u *SiteEvent) UnmarshalJSON(data []byte) error {
 		var v FactCall
 		err = json.Unmarshal(data, &v)
 		u.Value = v
-	case "foreman":
-		var v FactForeman
+	case "manager":
+		var v FactManager
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "message":
@@ -1825,8 +1909,12 @@ func (u *SiteEvent) UnmarshalJSON(data []byte) error {
 		var v FactHired
 		err = json.Unmarshal(data, &v)
 		u.Value = v
-	case "turn":
-		var v FactTurn
+	case "station":
+		var v FactStation
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "run":
+		var v FactRun
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "doing":
@@ -1882,83 +1970,83 @@ func (u *SiteEvent) UnmarshalJSON(data []byte) error {
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "snapshot":
-		var v SiteEventSnapshot
+		var v SideEventSnapshot
 		err = json.Unmarshal(data, &v)
 		u.Value = v
-	case "step":
-		var v SiteEventStep
+	case "activity":
+		var v SideEventActivity
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "notice":
-		var v SiteEventNotice
+		var v SideEventNotice
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "runtime":
-		var v SiteEventRuntime
+		var v SideEventRuntime
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	default:
-		return fmt.Errorf("SiteEvent: unknown type %q", head.Tag)
+		return fmt.Errorf("SideEvent: unknown type %q", head.Tag)
 	}
 	return err
 }
 
-// SiteEventMembers are every member of SiteEvent, each zero, in the protocol's order: a test can see that a switch meant to
+// SideEventMembers are every member of SideEvent, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var SiteEventMembers = []SiteEventValue{FactCall{}, FactForeman{}, FactMessage{}, FactConversation{}, FactHired{}, FactTurn{}, FactDoing{}, FactQuiet{}, FactRetry{}, FactSpent{}, FactReport{}, FactConflict{}, FactLeft{}, FactCommits{}, FactIssue{}, FactIssueGone{}, FactProgress{}, FactSchedule{}, FactUnschedule{}, SiteEventSnapshot{}, SiteEventStep{}, SiteEventNotice{}, SiteEventRuntime{}}
+var SideEventMembers = []SideEventValue{FactCall{}, FactManager{}, FactMessage{}, FactConversation{}, FactHired{}, FactStation{}, FactRun{}, FactDoing{}, FactQuiet{}, FactRetry{}, FactSpent{}, FactReport{}, FactConflict{}, FactLeft{}, FactCommits{}, FactIssue{}, FactIssueGone{}, FactProgress{}, FactSchedule{}, FactUnschedule{}, SideEventSnapshot{}, SideEventActivity{}, SideEventNotice{}, SideEventRuntime{}}
 
-func (SiteEventSnapshot) isSiteEvent() {}
+func (SideEventSnapshot) isSideEvent() {}
 
-func (v SiteEventSnapshot) MarshalJSON() ([]byte, error) {
-	type plain SiteEventSnapshot
+func (v SideEventSnapshot) MarshalJSON() ([]byte, error) {
+	type plain SideEventSnapshot
 	p := plain(v)
 
 	return withTag(p, "type", "snapshot")
 }
 
-func (SiteEventStep) isSiteEvent() {}
+func (SideEventActivity) isSideEvent() {}
 
-func (v SiteEventStep) MarshalJSON() ([]byte, error) {
-	type plain SiteEventStep
+func (v SideEventActivity) MarshalJSON() ([]byte, error) {
+	type plain SideEventActivity
 	p := plain(v)
 
-	return withTag(p, "type", "step")
+	return withTag(p, "type", "activity")
 }
 
-func (SiteEventNotice) isSiteEvent() {}
+func (SideEventNotice) isSideEvent() {}
 
-func (v SiteEventNotice) MarshalJSON() ([]byte, error) {
-	type plain SiteEventNotice
+func (v SideEventNotice) MarshalJSON() ([]byte, error) {
+	type plain SideEventNotice
 	p := plain(v)
 
 	return withTag(p, "type", "notice")
 }
 
-func (SiteEventRuntime) isSiteEvent() {}
+func (SideEventRuntime) isSideEvent() {}
 
-func (v SiteEventRuntime) MarshalJSON() ([]byte, error) {
-	type plain SiteEventRuntime
+func (v SideEventRuntime) MarshalJSON() ([]byte, error) {
+	type plain SideEventRuntime
 	p := plain(v)
 
 	return withTag(p, "type", "runtime")
 }
 
-func (e FarmRefused) Error() string { return e.Reason }
+func (e Refused) Error() string { return e.Reason }
 
-func (FarmRefused) HTTPStatus() int { return 409 }
+func (Refused) HTTPStatus() int { return 409 }
 
-func (e FarmRefused) MarshalJSON() ([]byte, error) {
-	type plain FarmRefused
-	return withTag(plain(e), "_tag", "FarmRefused")
+func (e Refused) MarshalJSON() ([]byte, error) {
+	type plain Refused
+	return withTag(plain(e), "_tag", "Refused")
 }
 
-func (e FarmMissing) Error() string { return e.What }
+func (e Missing) Error() string { return e.What }
 
-func (FarmMissing) HTTPStatus() int { return 404 }
+func (Missing) HTTPStatus() int { return 404 }
 
-func (e FarmMissing) MarshalJSON() ([]byte, error) {
-	type plain FarmMissing
-	return withTag(plain(e), "_tag", "FarmMissing")
+func (e Missing) MarshalJSON() ([]byte, error) {
+	type plain Missing
+	return withTag(plain(e), "_tag", "Missing")
 }
 
 func (e VoiceUnavailable) Error() string { return e.Reason }
@@ -2001,14 +2089,22 @@ func (e LanRefused) MarshalJSON() ([]byte, error) {
 // JSON, 204 when there is nothing to say, the error's own status).
 func Mount(mux *http.ServeMux, h Handlers) {
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.FarmHealth(r.Context())
+		out, err := h.ServerHealth(r.Context())
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/start", func(w http.ResponseWriter, r *http.Request) {
-		answer(w, nil, h.FarmStart(r.Context()))
+		answer(w, nil, h.ServerStart(r.Context()))
 	})
 	mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.FarmSettings(r.Context())
+		out, err := h.SettingLoad(r.Context())
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/settings/check", func(w http.ResponseWriter, r *http.Request) {
+		var body SettingsUpdate
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.SettingCheck(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/settings", func(w http.ResponseWriter, r *http.Request) {
@@ -2016,60 +2112,69 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmSaveSettings(r.Context(), body)
+		out, err := h.SettingSave(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/end", func(w http.ResponseWriter, r *http.Request) {
-		answer(w, nil, h.FarmEnd(r.Context()))
+		answer(w, nil, h.ServerEnd(r.Context()))
 	})
 	mux.HandleFunc("POST /api/say", func(w http.ResponseWriter, r *http.Request) {
 		var body SayRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.FarmSay(r.Context(), body))
+		answer(w, nil, h.ChannelSay(r.Context(), body))
 	})
 	mux.HandleFunc("POST /api/channels", func(w http.ResponseWriter, r *http.Request) {
 		var body ChannelRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.FarmOpenChannel(r.Context(), body))
+		answer(w, nil, h.ChannelOpen(r.Context(), body))
 	})
 	mux.HandleFunc("POST /api/schedules", func(w http.ResponseWriter, r *http.Request) {
 		var body ScheduleRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmAddSchedule(r.Context(), body)
+		out, err := h.ScheduleAdd(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/schedules/{id}", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
+		pID, ok := pathNumber(w, r, "id")
+		if !ok {
+			return
+		}
 		var body ToggleScheduleRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.FarmToggleSchedule(r.Context(), pID, body))
+		answer(w, nil, h.ScheduleToggle(r.Context(), pID, body))
 	})
 	mux.HandleFunc("DELETE /api/schedules/{id}", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		answer(w, nil, h.FarmRemoveSchedule(r.Context(), pID))
+		pID, ok := pathNumber(w, r, "id")
+		if !ok {
+			return
+		}
+		answer(w, nil, h.ScheduleRemove(r.Context(), pID))
 	})
 	mux.HandleFunc("PUT /api/channels/{id}", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
+		pID, ok := pathNumber(w, r, "id")
+		if !ok {
+			return
+		}
 		var body ChannelUpdate
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.FarmUpdateChannel(r.Context(), pID, body))
+		answer(w, nil, h.ChannelUpdate(r.Context(), pID, body))
 	})
 	mux.HandleFunc("POST /api/dispatch", func(w http.ResponseWriter, r *http.Request) {
 		var body SayRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.FarmDispatch(r.Context(), body))
+		answer(w, nil, h.IssueDispatch(r.Context(), body))
 	})
 	mux.HandleFunc("POST /api/workers/{id}/tell", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
@@ -2077,47 +2182,56 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.FarmTell(r.Context(), pID, body))
+		answer(w, nil, h.WorkerTell(r.Context(), pID, body))
 	})
 	mux.HandleFunc("POST /api/workers/{id}/stop", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		answer(w, nil, h.FarmStop(r.Context(), pID))
+		answer(w, nil, h.WorkerStop(r.Context(), pID))
 	})
 	mux.HandleFunc("POST /api/workers/{id}/dismiss", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		answer(w, nil, h.FarmDismiss(r.Context(), pID))
+		answer(w, nil, h.WorkerDismiss(r.Context(), pID))
 	})
-	mux.HandleFunc("POST /api/workers/{id}/harvest", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/workers/{id}/merge", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		answer(w, nil, h.FarmHarvest(r.Context(), pID))
+		answer(w, nil, h.WorkerMerge(r.Context(), pID))
+	})
+	mux.HandleFunc("POST /api/workers/{id}/resolve", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		answer(w, nil, h.WorkerResolve(r.Context(), pID))
 	})
 	mux.HandleFunc("GET /api/workers/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmChanges(r.Context(), pID)
+		out, err := h.WorkerChanges(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/workers/{id}/steps", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/workers/{id}/activities", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmSteps(r.Context(), pID)
+		out, err := h.WorkerActivities(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/trajectories", func(w http.ResponseWriter, r *http.Request) {
 		pAgent := query(r, "agent")
-		out, err := h.FarmTrajectories(r.Context(), pAgent)
+		out, err := h.TrajectoryList(r.Context(), pAgent)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/trajectories/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmTrajectory(r.Context(), pID)
+		out, err := h.TrajectoryFind(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/issues", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.FarmIssues(r.Context())
+		out, err := h.IssueList(r.Context())
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/issues/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmIssue(r.Context(), pID)
+		out, err := h.IssueFind(r.Context(), pID)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("GET /api/issues/{id}/runs", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		out, err := h.IssueRuns(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/issues", func(w http.ResponseWriter, r *http.Request) {
@@ -2125,7 +2239,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmAddIssue(r.Context(), body)
+		out, err := h.IssueAdd(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/issues/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -2134,12 +2248,12 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmEditIssue(r.Context(), pID, body)
+		out, err := h.IssueEdit(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("DELETE /api/issues/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		answer(w, nil, h.FarmRemoveIssue(r.Context(), pID))
+		answer(w, nil, h.IssueRemove(r.Context(), pID))
 	})
 	mux.HandleFunc("PUT /api/issues/{id}/place", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
@@ -2147,7 +2261,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmMoveIssue(r.Context(), pID, body)
+		out, err := h.IssueMove(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/issues/{id}/queue", func(w http.ResponseWriter, r *http.Request) {
@@ -2156,12 +2270,12 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmQueueIssue(r.Context(), pID, body)
+		out, err := h.IssueQueue(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/issues/{id}/start", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmStartIssue(r.Context(), pID)
+		out, err := h.IssueStart(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/issues/{id}/reopen", func(w http.ResponseWriter, r *http.Request) {
@@ -2170,7 +2284,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmReopen(r.Context(), pID, body)
+		out, err := h.IssueReopen(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/playbooks", func(w http.ResponseWriter, r *http.Request) {
@@ -2178,7 +2292,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmPlan(r.Context(), body)
+		out, err := h.PlaybookPlan(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/playbooks/{id}/nodes/{node}", func(w http.ResponseWriter, r *http.Request) {
@@ -2188,13 +2302,13 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmEditNode(r.Context(), pID, pNode, body)
+		out, err := h.PlaybookEditNode(r.Context(), pID, pNode, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("DELETE /api/playbooks/{id}/nodes/{node}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		pNode := r.PathValue("node")
-		out, err := h.FarmRemoveNode(r.Context(), pID, pNode)
+		out, err := h.PlaybookRemoveNode(r.Context(), pID, pNode)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/playbooks/{id}/act", func(w http.ResponseWriter, r *http.Request) {
@@ -2203,7 +2317,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmPlaybookAct(r.Context(), pID, body)
+		out, err := h.PlaybookAct(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/playbooks/{id}/nodes/{node}/act", func(w http.ResponseWriter, r *http.Request) {
@@ -2213,32 +2327,38 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmNodeAct(r.Context(), pID, pNode, body)
+		out, err := h.PlaybookNodeAct(r.Context(), pID, pNode, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/chat/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		pBefore := query(r, "before")
-		pLimit := query(r, "limit")
-		out, err := h.FarmChatHistory(r.Context(), pID, pBefore, pLimit)
+		pID, ok := pathNumber(w, r, "id")
+		if !ok {
+			return
+		}
+		pBefore := queryNumber(r, "before")
+		pLimit := queryNumber(r, "limit")
+		out, err := h.ChannelHistory(r.Context(), pID, pBefore, pLimit)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/chat/{id}/read", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
+		pID, ok := pathNumber(w, r, "id")
+		if !ok {
+			return
+		}
 		var body ChatReadRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.FarmChatRead(r.Context(), pID, body))
+		answer(w, nil, h.ChannelRead(r.Context(), pID, body))
 	})
 	mux.HandleFunc("GET /api/playbooks/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmPlaybookChanges(r.Context(), pID)
+		out, err := h.PlaybookChanges(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/playbooks/{id}/events", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmPlaybookEvents(r.Context(), pID)
+		out, err := h.PlaybookEvents(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/progress/carry", func(w http.ResponseWriter, r *http.Request) {
@@ -2246,7 +2366,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmCarryCoins(r.Context(), body)
+		out, err := h.ProgressCarryCoins(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/progress/title", func(w http.ResponseWriter, r *http.Request) {
@@ -2254,15 +2374,15 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.FarmChooseTitle(r.Context(), body))
+		answer(w, nil, h.ProgressChooseTitle(r.Context(), body))
 	})
 	mux.HandleFunc("GET /api/runtimes", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.FarmRuntimes(r.Context())
+		out, err := h.RuntimeList(r.Context())
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/runtimes/{id}/refresh", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmRefreshRuntime(r.Context(), pID)
+		out, err := h.RuntimeRefresh(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/runtimes/{id}/settings", func(w http.ResponseWriter, r *http.Request) {
@@ -2271,34 +2391,49 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmUpdateRuntime(r.Context(), pID, body)
+		out, err := h.RuntimeUpdate(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/runtimes/{id}/upgrade", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmUpgradeRuntime(r.Context(), pID)
+		out, err := h.RuntimeUpgrade(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/agents", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.FarmAgents(r.Context())
+		out, err := h.AgentList(r.Context())
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/agents/check", func(w http.ResponseWriter, r *http.Request) {
+		var body AgentCheckRequest
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.AgentCheck(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/agents/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		var body AgentProfile
+		var body Agent
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmSaveAgent(r.Context(), pID, body)
+		out, err := h.AgentSave(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("DELETE /api/agents/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		answer(w, nil, h.FarmDeleteAgent(r.Context(), pID))
+		answer(w, nil, h.AgentDelete(r.Context(), pID))
 	})
 	mux.HandleFunc("GET /api/agents/{id}/memories", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmMemories(r.Context(), pID)
+		out, err := h.AgentMemories(r.Context(), pID)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("GET /api/agents/{id}/recall", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		pProject := query(r, "project")
+		pText := query(r, "text")
+		out, err := h.AgentRecall(r.Context(), pID, pProject, pText)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/agents/{id}/memories", func(w http.ResponseWriter, r *http.Request) {
@@ -2307,16 +2442,16 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmRemember(r.Context(), pID, body)
+		out, err := h.AgentRemember(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("DELETE /api/agents/{id}/memories/{memory}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		pMemory := r.PathValue("memory")
-		answer(w, nil, h.FarmForget(r.Context(), pID, pMemory))
+		answer(w, nil, h.AgentForget(r.Context(), pID, pMemory))
 	})
 	mux.HandleFunc("GET /api/manager/memories", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.FarmManagerMemory(r.Context())
+		out, err := h.ManagerMemories(r.Context())
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/manager/memories", func(w http.ResponseWriter, r *http.Request) {
@@ -2324,25 +2459,25 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmManagerRemember(r.Context(), body)
+		out, err := h.ManagerRemember(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("DELETE /api/manager/memories/{memory}", func(w http.ResponseWriter, r *http.Request) {
 		pMemory := r.PathValue("memory")
-		answer(w, nil, h.FarmManagerForget(r.Context(), pMemory))
+		answer(w, nil, h.ManagerForget(r.Context(), pMemory))
 	})
 	mux.HandleFunc("GET /api/manager/archive", func(w http.ResponseWriter, r *http.Request) {
 		pQ := query(r, "q")
-		out, err := h.FarmManagerArchive(r.Context(), pQ)
+		out, err := h.ManagerArchive(r.Context(), pQ)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/manager/archive/{name}", func(w http.ResponseWriter, r *http.Request) {
 		pName := r.PathValue("name")
-		out, err := h.FarmManagerArchiveFile(r.Context(), pName)
+		out, err := h.ManagerArchiveFile(r.Context(), pName)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/skills", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.FarmSkills(r.Context())
+		out, err := h.SkillList(r.Context())
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/skills/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -2351,15 +2486,23 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmSaveSkill(r.Context(), pID, body)
+		out, err := h.SkillSave(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("DELETE /api/skills/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		answer(w, nil, h.FarmDeleteSkill(r.Context(), pID))
+		answer(w, nil, h.SkillDelete(r.Context(), pID))
 	})
 	mux.HandleFunc("GET /api/projects", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.FarmProjects(r.Context())
+		out, err := h.ProjectList(r.Context())
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/projects/check", func(w http.ResponseWriter, r *http.Request) {
+		var body NewProject
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.ProjectCheck(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/projects", func(w http.ResponseWriter, r *http.Request) {
@@ -2367,17 +2510,17 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.FarmCreateProject(r.Context(), body)
+		out, err := h.ProjectCreate(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/projects/{id}/languages", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmProjectLanguages(r.Context(), pID)
+		out, err := h.ProjectLanguages(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/projects/{id}/activity", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.FarmProjectActivity(r.Context(), pID)
+		out, err := h.ProjectActivity(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/voice/session", func(w http.ResponseWriter, r *http.Request) {
@@ -2408,7 +2551,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		answer(w, nil, h.VoiceStop(r.Context(), body))
 	})
 	mux.HandleFunc("GET /api/connectors", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.ConnectorsList(r.Context())
+		out, err := h.ConnectorList(r.Context())
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/connectors/{id}/login", func(w http.ResponseWriter, r *http.Request) {
@@ -2417,7 +2560,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.ConnectorsLogin(r.Context(), pID, body)
+		out, err := h.ConnectorLogin(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/connectors/{id}/verify", func(w http.ResponseWriter, r *http.Request) {
@@ -2426,12 +2569,12 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.ConnectorsVerify(r.Context(), pID, body)
+		out, err := h.ConnectorVerify(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/connectors/{id}/logout", func(w http.ResponseWriter, r *http.Request) {
 		pID := ConnectorID(r.PathValue("id"))
-		out, err := h.ConnectorsLogout(r.Context(), pID)
+		out, err := h.ConnectorLogout(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/connectors/{id}/channel", func(w http.ResponseWriter, r *http.Request) {
@@ -2440,7 +2583,7 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.ConnectorsChannel(r.Context(), pID, body)
+		out, err := h.ConnectorChannel(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/lan", func(w http.ResponseWriter, r *http.Request) {

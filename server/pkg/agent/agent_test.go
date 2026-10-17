@@ -506,13 +506,6 @@ func TestStoppedWhileAToolRuns(t *testing.T) {
 	}, nil)
 }
 
-func TestAPiKeyThatNamesAnEnvironmentVariable(t *testing.T) {
-	eq(t, EnvName("DEEPSEEK_API_KEY"), "DEEPSEEK_API_KEY")
-	eq(t, EnvName("$DEEPSEEK_API_KEY"), "DEEPSEEK_API_KEY")
-	eq(t, EnvName("${DEEPSEEK_API_KEY}"), "DEEPSEEK_API_KEY")
-	eq(t, EnvName("sk-0123abcd"), "")
-}
-
 func TestATSSessionFileReadsBack(t *testing.T) {
 	dir := home(t)
 	lines := []string{

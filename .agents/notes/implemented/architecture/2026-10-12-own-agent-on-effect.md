@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> 实现已被取代：VibeValley 自己的 agent 现在是 Go 写的（`server/pkg/ai`、`agentcore`、`agent`，`packages/ai`、`agent-core`、`agent` 的移植），管家在 `server/internal/manager/foreman.go`，帮工用的 `vibevalley` 农机（下文当时叫 `heybro`）是 smith 的 runtime（`server/pkg/agent/oarruntime`），命令行是 `server/cmd/vibevalley-agent`；`VIBEVALLEY_FOREMAN_RUNTIME=pi` 被拒绝（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)）。TypeScript 的包随 [一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md) 删掉了。「自己的 agent 当管家、也当帮工」这个决定照旧；下面「完全用 Effect 写」是当时的做法。
+> 实现已被取代：VibeValley 自己的 agent 现在是 Go 写的（`server/pkg/ai`、`agentcore`、`agent`，`packages/ai`、`agent-core`、`agent` 的移植），管家在 `server/internal/manager/manager.go`，帮工用的 `vibevalley` 农机（下文当时叫 `heybro`）是 smith 的 runtime（`server/pkg/agent/oarruntime`），命令行是 `server/cmd/vibevalley`；`manager.runtime=pi` 被拒绝（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)）。TypeScript 的包随 [一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md) 删掉了。「自己的 agent 当管家、也当帮工」这个决定照旧；下面「完全用 Effect 写」是当时的做法。
 
 ## Problem
 

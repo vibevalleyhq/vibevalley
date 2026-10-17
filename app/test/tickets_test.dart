@@ -3,22 +3,16 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/app/theme.dart';
+import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
-import 'package:vibevalley/desk/shared/state.dart';
 import 'package:vibevalley/desk/tickets/tickets_page.dart';
-import 'package:vibevalley/game/state.dart' show farmApiProvider;
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/rules/tickets.dart';
 import 'package:vibevalley/ui/kit/kit.dart' show toasts;
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'deska_fakes.dart' show settle;
-import 'farm_fakes.dart' as fakes;
-
-http.Response _json(Object? v, [int status = 200]) => http.Response(jsonEncode(v), status, headers: {'content-type': 'application/json; charset=utf-8'});
+import 'support/server.dart' show FakeServer, jsonResponse, settle;
+import 'support/farm.dart' as fakes;
 
 const _closed = TrajectoryHead(
   id: 'w1',
@@ -29,10 +23,10 @@ const _closed = TrajectoryHead(
   job: '写打卡\n细节在 README',
   startedAt: 0,
   endedAt: 60000,
-  closed: IssueClose.harvested,
+  closed: IssueClose.merged,
   outcome: Outcome.completed,
   summary: '打卡写好了，测试全过',
-  turns: 2,
+  runs: 2,
   cny: 0.42,
 );
 const _open = TrajectoryHead(id: 'w2', name: '小郑', agent: 'frontend', project: 'clock', job: '改登录页', startedAt: 70000);
@@ -40,8 +34,8 @@ const _open = TrajectoryHead(id: 'w2', name: '小郑', agent: 'frontend', projec
 Issue _issue(
   String id,
   String text, {
-  List<String> runs = const [],
-  IssueStatus status = IssueStatus.todo,
+  List<String> workers = const [],
+  IssueStatus status = IssueStatus.backlog,
   IssueClose? closed,
   String? parent,
   IssuePlan? plan,
@@ -49,10 +43,10 @@ Issue _issue(
   id: id,
   title: text,
   project: 'clock',
-  agent: 'backend',
-  priority: Priority.normal,
+  assignee: 'backend',
+  priority: Priority.medium,
   createdAt: 0,
-  runs: runs,
+  workers: workers,
   closedAt: closed == null ? null : 60000,
   closed: closed,
   parent: parent,
@@ -60,8 +54,8 @@ Issue _issue(
   status: status,
 );
 
-final _closedIssue = _issue('t1', '写打卡', runs: ['w1'], status: IssueStatus.closed, closed: IssueClose.harvested);
-final _openIssue = _issue('t2', '改登录页', runs: ['w2'], status: IssueStatus.waiting);
+final _closedIssue = _issue('t1', '写打卡', workers: ['w1'], status: IssueStatus.done, closed: IssueClose.merged);
+final _openIssue = _issue('t2', '改登录页', workers: ['w2'], status: IssueStatus.inReview);
 
 class _Issues extends Notifier<List<Issue>> {
   List<Issue> seed = const [];
@@ -73,21 +67,65 @@ class _Issues extends Notifier<List<Issue>> {
 final _issuesNow = NotifierProvider<_Issues, List<Issue>>(_Issues.new);
 
 void main() {
+  test("an issue for the manager: in 处理中 while the manager works on it, closed once it answered", () {
+    const working = Issue(id: 't9', title: '看进度', assignee: managerAgent, priority: Priority.medium, createdAt: 0, workers: [], status: IssueStatus.inProgress);
+    expect(isForManager(working), isTrue);
+    expect(laneOf(working.status), Lane.working);
+    const answered = Issue(
+      id: 't9',
+      title: '看进度',
+      assignee: managerAgent,
+      priority: Priority.medium,
+      createdAt: 0,
+      workers: [],
+      closedAt: 1,
+      closed: IssueClose.answered,
+      status: IssueStatus.done,
+    );
+    expect(ticketState(answered), TicketState.answered);
+    expect(laneOf(answered.status), Lane.closed);
+    expect(isForManager(_issue('t1', 'x')), isFalse);
+  });
+
+  test('a run in one line: what started it, how it went, how long, what it cost, what it heard', () {
+    String took(double ms) => '${(ms / 60000).round()} 分钟';
+    const done = Run(
+      id: 1,
+      worker: 'w1',
+      triggeredBy: RunTrigger(kind: RunTriggerKind.comment, message: 42),
+      heard: [43, 44],
+      startedAt: 0,
+      endedAt: 180000,
+      outcome: Outcome.completed,
+      spent: Spent(tokens: 10, cny: 0.5),
+    );
+    expect(runText(done, 999999, took), '带话（#42） · 做完了 · 3 分钟 · ¥0.50 · 中途听到 2 句');
+    const going = Run(
+      id: 2,
+      worker: 'w1',
+      triggeredBy: RunTrigger(kind: RunTriggerKind.schedule, missed: true),
+      heard: [],
+      startedAt: 0,
+    );
+    expect(runText(going, 120000, took), '定时（补跑） · 正在干 · 2 分钟');
+    expect(runTriggerText(const RunTrigger(kind: RunTriggerKind.runtime)), '农机自己');
+  });
+
   test("an issue's state: the server's status while open, how it closed after", () {
     expect(ticketState(_openIssue), TicketState.waiting);
-    expect(ticketState(_issue('t3', 'x', runs: ['w3'], status: IssueStatus.working)), TicketState.working);
+    expect(ticketState(_issue('t3', 'x', workers: ['w3'], status: IssueStatus.inProgress)), TicketState.working);
     expect(ticketState(_closedIssue), TicketState.harvested);
-    expect(ticketState(_issue('t0', 'x', runs: ['w0'], status: IssueStatus.closed)), TicketState.closed);
-    final step = _issue('p1.api', '写接口', runs: ['w4'], status: IssueStatus.closed, closed: IssueClose.merged, parent: 'p1');
+    expect(ticketState(_issue('t0', 'x', workers: ['w0'], status: IssueStatus.canceled)), TicketState.closed);
+    final step = _issue('p1.api', '写接口', workers: ['w4'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan, parent: 'p1');
     expect(ticketState(step), TicketState.merged);
     expect(ticketPlanned(step, null), isTrue);
     const greet = Playbook(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: PlaybookState.draft, nodes: [], parallel: 1, createdAt: 0);
     expect(ticketTitle(step, [greet]), '加 greet · 写接口');
     expect(ticketTitle(step), '写接口');
     expect(ticketTitle(_closedIssue), '写打卡');
-    expect(ticketIs(_issue('t5', 'x', runs: ['w1', 'w6']), 'w1'), isTrue);
-    expect(ticketIs(_issue('t5', 'x', runs: ['w1', 'w6']), 't5'), isTrue);
-    expect(ticketIs(_issue('t5', 'x', runs: ['w1', 'w6']), 'w2'), isFalse);
+    expect(ticketIs(_issue('t5', 'x', workers: ['w1', 'w6']), 'w1'), isTrue);
+    expect(ticketIs(_issue('t5', 'x', workers: ['w1', 'w6']), 't5'), isTrue);
+    expect(ticketIs(_issue('t5', 'x', workers: ['w1', 'w6']), 'w2'), isFalse);
   });
 
   test('what dragging between lanes does', () {
@@ -104,10 +142,11 @@ void main() {
     ]) {
       expect(moveOf(from, to), isNull, reason: '$from → $to');
     }
-    expect(laneOf(TicketState.dropped), Lane.closed);
+    expect(laneOf(IssueStatus.canceled), Lane.closed);
+    expect(laneOf(IssueStatus.todo), Lane.todo);
     expect(moveOf(Lane.waiting, Lane.closed, planned: true), isNull);
     expect(moveOf(Lane.closed, Lane.working, planned: true), isNull);
-    expect(ticketPlanned(_issue('t5', 'x', runs: ['w5'], status: IssueStatus.closed, closed: IssueClose.merged), null), isTrue);
+    expect(ticketPlanned(_issue('t5', 'x', workers: ['w5'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan), null), isTrue);
     expect(ticketPlanned(_closedIssue, null), isFalse);
   });
 
@@ -120,29 +159,26 @@ void main() {
     const conflicted = TrajectoryHead(id: 'w4', name: '省钱小工 2', agent: 'flash', project: 'demo', job: '改成 hey', startedAt: 0);
     const planner = TrajectoryHead(id: 'w5', name: '省钱小工', agent: 'flash', project: 'demo', job: '这一轮你是规划师：……', startedAt: 0, endedAt: 1);
     final issues = [
-      _issue('t4', '改成 hey', runs: ['w4'], status: IssueStatus.waiting),
+      _issue('t4', '改成 hey', workers: ['w4'], status: IssueStatus.inReview),
       _issue(
         'p1',
         '加 greet',
-        runs: ['w5'],
-        status: IssueStatus.waiting,
+        workers: ['w5'],
+        status: IssueStatus.inReview,
         plan: const IssuePlan(state: PlaybookState.draft, parallel: 1),
       ),
       _issue('p1.api', '写接口', parent: 'p1'),
     ];
-    final api = VibeValleyApi(
-      Uri.parse('http://farm.test'),
-      MockClient((r) async {
-        if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
-        return switch ((r.method, r.url.path)) {
-          ('GET', '/api/trajectories') => _json([conflicted.toJson(), planner.toJson()]),
-          ('GET', '/api/agents') => _json([]),
-          ('GET', '/api/trajectories/w4') => _json(const Trajectory(head: conflicted, steps: []).toJson()),
-          _ => _json(null, 204),
-        };
-      }),
-    );
-    final helper = fakes.helper(
+    final api = FakeServer((r) async {
+      if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
+      return switch ((r.method, r.url.path)) {
+        ('GET', '/api/trajectories') => jsonResponse([conflicted.toJson(), planner.toJson()]),
+        ('GET', '/api/agents') => jsonResponse([]),
+        ('GET', '/api/trajectories/w4') => jsonResponse(const Trajectory(head: conflicted, activities: []).toJson()),
+        _ => jsonResponse(null, 204),
+      };
+    }).api;
+    final worker = fakes.worker(
       'w4',
       phase: const PhaseRipe(),
       project: 'demo',
@@ -151,13 +187,12 @@ void main() {
     await t.pumpWidget(
       ProviderScope(
         overrides: [
-          deskApiProvider.overrideWithValue(api),
-          farmApiProvider.overrideWithValue(api.farm),
-          farmProvider.overrideWithValue(fakes.farm(helpers: [helper], issues: issues)),
+          apiProvider.overrideWithValue(api),
+          farmProvider.overrideWithValue(fakes.farm(workers: [worker], issues: issues)),
           plansProvider.overrideWithValue(const [
             Playbook(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: PlaybookState.draft, nodes: [], parallel: 1, createdAt: 0),
           ]),
-          sideEventsProvider.overrideWith((ref) => const Stream<SiteEvent>.empty()),
+          sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
         ],
         child: MaterialApp(
           theme: farmTheme(),
@@ -171,7 +206,7 @@ void main() {
     expect(find.text('写接口'), findsNothing);
     await t.tap(find.text('让它解决冲突'));
     await settle(t);
-    expect(writes.single, startsWith('POST /api/workers/w4/tell {"text":"把 main 合进你的分支时有冲突（hello.py）'));
+    expect(writes.single, startsWith('POST /api/workers/w4/resolve'));
   });
 
   testWidgets('a card per job in its lane; a 待办 dragged into 处理中 is sent; a closed one reopened', (t) async {
@@ -183,70 +218,76 @@ void main() {
     });
     final writes = <String>[];
     var issues = [
-      const Issue(id: 'a1', title: '加日志', project: 'clock', agent: 'backend', priority: Priority.urgent, createdAt: 0, runs: [], status: IssueStatus.todo),
-      const Issue(id: 'a2', title: '改文案', project: 'site', priority: Priority.normal, createdAt: 1, runs: [], status: IssueStatus.todo),
+      const Issue(
+        id: 'a1',
+        title: '加日志',
+        project: 'clock',
+        assignee: 'backend',
+        priority: Priority.urgent,
+        createdAt: 0,
+        workers: [],
+        status: IssueStatus.backlog,
+      ),
+      const Issue(id: 'a2', title: '改文案', project: 'site', priority: Priority.medium, createdAt: 1, workers: [], status: IssueStatus.backlog),
       _openIssue,
       _closedIssue,
     ];
     late ProviderContainer container;
     void changed() => container.read(_issuesNow.notifier).set(issues);
-    final api = VibeValleyApi(
-      Uri.parse('http://farm.test'),
-      MockClient((r) async {
-        if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
-        switch ((r.method, r.url.path)) {
-          case ('GET', '/api/trajectories'):
-            return _json([_open.toJson(), _closed.toJson()]);
-          case ('GET', '/api/agents'):
-            return _json([]);
-          case ('GET', '/api/trajectories/w1'):
-            return _json(
-              const Trajectory(
-                head: _closed,
-                steps: [
-                  WorkStep(n: 0, at: 0, kind: StepKind.asked, text: '写打卡'),
-                  WorkStep(n: 1, at: 5000, kind: StepKind.said, text: '打卡写好了'),
-                ],
-              ).toJson(),
-            );
-          case ('POST', '/api/issues'):
-            final body = IssueRequest.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
-            final item = Issue(
-              id: 'a9',
-              title: body.title,
-              project: body.project,
-              agent: body.agent,
-              priority: Priority.normal,
-              createdAt: 2,
-              runs: const [],
-              status: IssueStatus.todo,
-            );
-            issues = [item, ...issues];
-            changed();
-            return _json(item.toJson());
-          case ('PUT', '/api/issues/a2/place'):
-            issues = [issues[1], issues[0], ...issues.skip(2)];
-            changed();
-            return _json([for (final i in issues) i.toJson()]);
-          case ('POST', '/api/issues/a1/start'):
-            issues = [
-              for (final i in issues) i.id == 'a1' ? Issue.fromJson({...i.toJson(), 'queuedAt': 3, 'status': 'queued'}) : i,
-            ];
-            changed();
-            return _json(const Dispatched(queued: '已经有 6 个帮工在干活了：排上队了，有空地就自动开工').toJson());
-          case ('POST', '/api/issues/t1/reopen'):
-            return _json(const Dispatched(helper: 'w3').toJson());
-        }
-        return _json({'_tag': 'FarmMissing', 'what': r.url.path}, 404);
-      }),
-    );
+    final api = FakeServer((r) async {
+      if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
+      switch ((r.method, r.url.path)) {
+        case ('GET', '/api/trajectories'):
+          return jsonResponse([_open.toJson(), _closed.toJson()]);
+        case ('GET', '/api/agents'):
+          return jsonResponse([]);
+        case ('GET', '/api/trajectories/w1'):
+          return jsonResponse(
+            const Trajectory(
+              head: _closed,
+              activities: [
+                Activity(n: 0, at: 0, kind: ActivityKind.prompt, text: '写打卡'),
+                Activity(n: 1, at: 5000, kind: ActivityKind.response, text: '打卡写好了'),
+              ],
+            ).toJson(),
+          );
+        case ('POST', '/api/issues'):
+          final body = IssueRequest.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+          final item = Issue(
+            id: 'a9',
+            title: body.title,
+            project: body.project,
+            assignee: body.assignee,
+            priority: Priority.medium,
+            createdAt: 2,
+            workers: const [],
+            status: IssueStatus.backlog,
+          );
+          issues = [item, ...issues];
+          changed();
+          return jsonResponse(item.toJson());
+        case ('PUT', '/api/issues/a2/place'):
+          issues = [issues[1], issues[0], ...issues.skip(2)];
+          changed();
+          return jsonResponse([for (final i in issues) i.toJson()]);
+        case ('POST', '/api/issues/a1/start'):
+          issues = [
+            for (final i in issues) i.id == 'a1' ? Issue.fromJson({...i.toJson(), 'queuedAt': 3, 'status': 'todo'}) : i,
+          ];
+          changed();
+          return jsonResponse(const Dispatched(queued: '已经有 6 个帮工在干活了：排上队了，有空地就自动开工').toJson());
+        case ('POST', '/api/issues/t1/reopen'):
+          return jsonResponse(const Dispatched(worker: 'w3').toJson());
+      }
+      return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
+    }).api;
     await t.pumpWidget(
       ProviderScope(
         overrides: [
-          deskApiProvider.overrideWithValue(api),
+          apiProvider.overrideWithValue(api),
           _issuesNow.overrideWith(() => _Issues()..seed = issues),
           farmProvider.overrideWith((ref) => fakes.farm(issues: ref.watch(_issuesNow))),
-          sideEventsProvider.overrideWith((ref) => const Stream<SiteEvent>.empty()),
+          sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
         ],
         child: MaterialApp(
           theme: farmTheme(),
@@ -277,7 +318,7 @@ void main() {
     await t.enterText(find.descendant(of: find.bySemanticsLabel('写一张待办'), matching: find.byType(EditableText)), '补测试');
     await t.testTextInput.receiveAction(TextInputAction.done);
     await settle(t);
-    expect(writes.last, 'POST /api/issues {"title":"补测试","project":"clock","agent":"backend"}');
+    expect(writes.last, 'POST /api/issues {"title":"补测试","project":"clock","assignee":"backend"}');
     expect(find.text('补测试'), findsOneWidget);
 
     Future<void> drag(Offset from, Offset to) async {

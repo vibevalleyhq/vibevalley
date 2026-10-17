@@ -1,4 +1,4 @@
-export '../../app/theme.dart';
+export '../theme.dart';
 export '../px.dart';
 export 'base.dart';
 export 'button.dart';
@@ -8,6 +8,8 @@ export 'energy.dart';
 export 'field.dart';
 export 'forms.dart';
 export 'icons.dart';
+export 'link.dart';
+export 'ticking.dart';
 export 'labels.dart';
 export 'markdown.dart';
 export 'toast.dart';

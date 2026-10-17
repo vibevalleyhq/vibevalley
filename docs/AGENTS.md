@@ -12,7 +12,7 @@
 | 子目录 `AGENTS.md`（本文、`.agents/notes/README.md`） | 只对那个子目录的规矩 | 根目录已经有的 |
 | [README.md](README.md) | 文档地图和用语表 | 文档内容本身 |
 | 教程：[guide.md](guide.md)、[development.md](development.md) | 照着做走到一个结果：使用、开发 | 完整的清单和表（链接到参考）、理由 |
-| [architecture.md](architecture.md) | 按顺序的地图：分层、核心状态、工地事件、接口、存储、环境变量；改 `server/`、`app/` 之前读 | 各包的细节、决策理由 |
+| [architecture.md](architecture.md) | 按顺序的地图：分层、核心状态、事件流、接口、存储、配置；改 `server/`、`app/` 之前读 | 各包的细节、决策理由 |
 | [concepts.md](concepts.md) 和 `reference/` 下的各篇 | 一个子系统现在的行为和约定 | 教学步骤（→ 教程）、理由（→ Note）、历史、计划 |
 | `style/` 下的各篇（[code.md](style/code.md)、[writing.md](style/writing.md)） | 代码和文字怎么写 | 某个子系统的行为 |
 | [Agent Notes](../.agents/notes/README.md) | 决策：为什么、放弃了什么、怎么验证；提案 | 现在的行为说明（→ 文档）、上线后的计划和待办 |

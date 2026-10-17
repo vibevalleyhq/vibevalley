@@ -7,10 +7,9 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
-import '../runtimes/layout.dart';
+import '../shared/layout.dart';
 import 'qr.dart';
-import '../shared/widgets.dart';
-import '../shared/state.dart';
+import '../../shared/widgets.dart';
 import '../../rules/chat.dart';
 
 const connectorLabel = <ConnectorId, String>{ConnectorId.weixin: '微信', ConnectorId.feishu: '飞书', ConnectorId.qq: 'QQ'};
@@ -49,7 +48,7 @@ class ConnectorsNotifier extends Notifier<Map<ConnectorId, ConnectorStatus>?> {
   @override
   Map<ConnectorId, ConnectorStatus>? build() => null;
 
-  ConnectorsApi get _api => ref.read(deskApiProvider).connectors;
+  ConnectorApi get _api => ref.read(apiProvider).connector;
 
   void _keep(Iterable<ConnectorStatus> got) => state = {...?state, for (final s in got) s.id: s};
 
@@ -329,7 +328,7 @@ class _ChannelPickState extends ConsumerState<_ChannelPick> {
             placeholder: '接在哪个频道',
             semanticLabel: '接在哪个频道',
             options: [
-              for (final c in channels) PickOption(value: c.name ?? '田头', label: c.kind == ConversationKind.square ? '田头' : '#${c.name}'),
+              for (final c in channels) PickOption(value: c.name ?? '田头', label: c.kind == ConversationKind.general ? '田头' : '#${c.name}'),
               // The one it is in, even before the farm's chat has come.
               if (!channels.any((c) => (c.name ?? '田头') == widget.current)) PickOption(value: widget.current, label: widget.current),
             ],

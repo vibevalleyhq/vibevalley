@@ -1,6 +1,6 @@
 # ui/kit
 
-配置页和农场面板共用的像素控件。只要一行 `import 'package:vibevalley/ui/kit/kit.dart';` 就能全部拿到，`lib/app/theme.dart`（`Palette`、`pixelFont`、`monoFont`）和 `lib/ui/px.dart`（`PxFrame`、`pxInset`、管家和动物的脸）也一并导出了。
+配置页和农场面板共用的像素控件。只要一行 `import 'package:vibevalley/ui/kit/kit.dart';` 就能全部拿到，`lib/ui/theme.dart`（`Palette`、`pixelFont`、`monoFont`）和 `lib/ui/px.dart`（`PxFrame`、`pxInset`、管家和动物的脸）也一并导出了。
 
 | 部件 | 说明 |
 | --- | --- |
@@ -17,7 +17,7 @@
 | `PxChipsInput` | 自由填写的一串标签 |
 | `PxKeyValueEditor` | 一行一个 `KEY=value` |
 | `PxMarkdown`、`withMentions`、`plainText`、`parseMarkdown`、`parseInline` | 自己写的 GFM 子集解析器；`@w3` 这样的名字画成小标签；链接通过 `onOpenLink` 或 `kitOpenLink` 打开 |
-| `actionLabel`、`actionMeaning`、`phaseLabel`、`foremanLabel`、`outcomeLabel`、`runtimeLabel`、`ago` | 动作、阶段、管家状态、一轮的结果、农机的叫法，和「多久前」 |
+| `phaseLabel`、`managerLabel`、`outcomeLabel`、`runtimeLabel`、`ago` | 阶段、管家状态、一轮的结果、农机的叫法，和「多久前」 |
 | `SpriteIcon`、`ActionGlyph`、`PhaseGlyph`、`outcomeIcon`、`Marked` | 图标都是 `design/pixel` 生成的贴图，不用字符代替（像素字体里没有 ✓、✗、›） |
 | `EnergyBottle`、`StaminaBar`、`quotaOf`、`Quota`、`QuotaLevel`、`windowLabel`、`bottleSprite`、`quotaLeft`、`quotaText`、`quotaLow` | 精力瓶和体力条（[farm-ui.md](../../../../docs/reference/farm-ui.md#精力瓶)） |
 | `toasts`、`ToastManager`、`ToastViewport`、`ToastType`、`noticeTitle` | 提示。奖章和成就上方那行字由 FX 层通过 `leading`、`kicker` 传进来 |

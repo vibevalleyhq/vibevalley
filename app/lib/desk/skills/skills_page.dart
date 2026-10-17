@@ -5,9 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
-import '../shared/faces.dart';
-import '../shared/state.dart';
-import '../shared/widgets.dart';
+import '../../shared/faces.dart';
+import '../../data/remote.dart';
+import '../../shared/widgets.dart';
 import '../../rules/seeds.dart';
 
 const _installed = 'installed:';
@@ -310,7 +310,7 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
     final agents = ref.watch(deskConfigProvider.select((c) => c.agents));
     final draft = _draft;
     final dirty = skill == null || jsonEncode(skill.toJson()) != jsonEncode(draft.toJson());
-    final users = skill == null ? const <AgentProfile>[] : agents.where((a) => a.skills.contains(skill.id)).toList();
+    final users = skill == null ? const <Agent>[] : agents.where((a) => a.skills.contains(skill.id)).toList();
     return _sheet(
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

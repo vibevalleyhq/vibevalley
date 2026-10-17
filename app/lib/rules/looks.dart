@@ -24,7 +24,9 @@ int _hash(String s) {
   return h;
 }
 
-/// Agents saved before the farm get an animal picked from their id, the same one every time.
+/// A profile the client does not know (deleted while its workers are still about, or not loaded yet) gets an animal picked
+/// from its id, the same one every time. Saved profiles always have theirs: the server fills a missing one with this same
+/// pick (withCast in server/internal/agent/cast.go), so the two must agree.
 Cast castOf(Look? look, String agentId) =>
     (species: look?.species ?? Species.values[_hash(agentId) % Species.values.length], outfit: look?.outfit ?? Outfit.farmer);
 

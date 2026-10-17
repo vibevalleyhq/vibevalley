@@ -7,14 +7,14 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../shell/sfx.dart';
 import '../../ui/kit/kit.dart';
-import 'chat_state.dart';
+import '../../chat/chat_state.dart';
 import '../../rules/chat.dart';
 
 Future<void> showNewChannelDialog(BuildContext context) => showPxDialog<void>(context, title: const Text('创建频道'), builder: (_) => const NewChannelForm());
 
 Future<void> showChannelSettingsDialog(BuildContext context, Conversation channel) => showPxDialog<void>(
   context,
-  title: Text('${channel.kind == ConversationKind.square ? '# $squareName' : '# ${channel.name ?? ''}'} 的设置'),
+  title: Text('${channel.kind == ConversationKind.general ? '# $generalName' : '# ${channel.name ?? ''}'} 的设置'),
   builder: (_) => ChannelSettingsForm(channel: channel),
 );
 

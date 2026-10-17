@@ -212,19 +212,15 @@ Streaks streaksOf(Calendar calendar) {
 
 typedef Growth = ({String crop, String label});
 
-const _dayMs = 86400000;
-
 Growth growthOf(double? last, double now) {
   if (last == null) return (crop: 'empty', label: '还没动过土');
-  final days = (now - last) / _dayMs;
+  final days = (now - last) / dayMs;
   if (days <= 1) return (crop: 'flowering', label: '正旺');
   if (days <= 7) return (crop: 'leafy', label: '在长');
   if (days <= 30) return (crop: 'sprout', label: '冒着芽');
   if (days <= 90) return (crop: 'dry', label: '有点干了');
   return (crop: 'withered', label: '荒了');
 }
-
-final projectName = RegExp(r'^[A-Za-z0-9][\w.-]{0,63}$');
 
 /// Only repository home URLs, never credentials, arbitrary git transports or command-line options.
 ({String name, String url})? githubRepository(String input) {
@@ -233,12 +229,6 @@ final projectName = RegExp(r'^[A-Za-z0-9][\w.-]{0,63}$');
   final name = match[2]!.replaceFirst(RegExp(r'\.git$'), '');
   if (name.isEmpty || name == '.' || name == '..') return null;
   return (name: name, url: 'https://github.com/${match[1]}/$name.git');
-}
-
-String? projectProblem(NewProject req) {
-  if (!projectName.hasMatch(req.name)) return '项目名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符';
-  if (req.github != null && githubRepository(req.github!) == null) return '请填公开 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source';
-  return null;
 }
 
 List<ProjectSummary> sortProjects(List<ProjectSummary> list) => [...list]

@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
-import 'chat_rules.dart';
-import 'chat_state.dart';
-import 'chat_widgets.dart';
+import '../../chat/chat_rules.dart';
+import '../../chat/chat_state.dart';
+import '../../chat/chat_widgets.dart';
 
 class ChatComposer extends ConsumerStatefulWidget {
   const ChatComposer({super.key, required this.conversation, required this.placeholder});
@@ -40,7 +40,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     if (said.isEmpty) return;
     final c = widget.conversation;
     final actions = ref.read(chatActionsProvider);
-    final sent = c != null && c.kind != ConversationKind.square ? actions.sayIn(c.id, said) : actions.talk(said);
+    final sent = c != null && c.kind != ConversationKind.general ? actions.sayIn(c.id, said) : actions.talk(said);
     _naming.clear();
     setState(() => _problem = null);
     unawaited(
@@ -52,12 +52,10 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
 
   @override
   Widget build(BuildContext context) {
-    _naming.all = nameables(ref.watch(farmProvider)?.helpers ?? const [], nowMs());
+    _naming.all = nameables(ref.watch(farmProvider)?.workers ?? const [], nowMs());
     final empty = _naming.text.text.trim().isEmpty;
     return Container(
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Palette.bark900, width: 2)),
-      ),
+      decoration: const BoxDecoration(border: Border(top: pxLine)),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -67,11 +65,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             Container(
               margin: const EdgeInsets.only(bottom: 4),
               padding: const EdgeInsets.symmetric(vertical: 4),
-              decoration: const BoxDecoration(
-                color: Palette.cream50,
-                border: Border.fromBorderSide(BorderSide(color: Palette.bark900, width: 2)),
-                boxShadow: kitDrop,
-              ),
+              decoration: const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(pxLine), boxShadow: kitDrop),
               child: NamingMenu(naming: _naming, highlight: Palette.wheat, faceSize: 22, everyoneMark: false),
             ),
           if (_problem != null)
@@ -80,11 +74,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               child: Text(_problem!, style: KitText.xs.copyWith(color: Palette.berry)),
             ),
           Container(
-            decoration: const BoxDecoration(
-              color: Palette.cream50,
-              border: Border.fromBorderSide(BorderSide(color: Palette.bark900, width: 2)),
-              boxShadow: kitDrop,
-            ),
+            decoration: const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(pxLine), boxShadow: kitDrop),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

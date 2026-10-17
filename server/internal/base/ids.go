@@ -1,6 +1,8 @@
 package base
 
-import "crypto/rand"
+import (
+	"crypto/rand"
+)
 
 // codeAlphabet leaves out what reads alike (0 O, 1 I L).
 const codeAlphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"

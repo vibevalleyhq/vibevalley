@@ -37,7 +37,7 @@ DesktopNotice noticeForCall(InboxItem call) {
   final open = openFor(call.target);
   final text = clipLine(call.text);
   return switch (call.kind) {
-    InboxKind.harvest => DesktopNotice('$who 做完了', text, open),
+    InboxKind.merge => DesktopNotice('$who 做完了', text, open),
     InboxKind.fix => DesktopNotice('$who 没做成', text, open),
     InboxKind.conflict => DesktopNotice('$who 的活合进主分支会冲突', text, open),
     InboxKind.quiet => DesktopNotice('$who 好一阵没动静了', '可能在跑很久的命令，也可能卡住了：看看它的干活过程。', open),
@@ -79,8 +79,8 @@ DesktopNotice? noticeForEffect(GameEffect effect) {
   return DesktopNotice('$what：${tierTitle(a, tier)}', clipLine(a.detail), const DesktopOpenAchievements());
 }
 
-DesktopNotice? noticeForEvent(SiteEvent event) => switch (event) {
-  SiteEventNotice(level: NoticeLevel.error, :final text) => DesktopNotice('码农场物语', clipLine(text)),
+DesktopNotice? noticeForEvent(SideEvent event) => switch (event) {
+  SideEventNotice(level: NoticeLevel.error, :final text) => DesktopNotice('码农场物语', clipLine(text)),
   _ => null,
 };
 
@@ -101,7 +101,7 @@ class TraySummary {
 String? waitingLine(InboxItem call) {
   final who = callerName(call);
   return switch (call.kind) {
-    InboxKind.harvest => '$who 做完了，可以收',
+    InboxKind.merge => '$who 做完了，可以收',
     InboxKind.fix => '$who 没做成',
     InboxKind.conflict => '$who 的活会冲突',
     InboxKind.quiet => '$who 好一阵没动静',
@@ -112,8 +112,8 @@ String? waitingLine(InboxItem call) {
   };
 }
 
-TraySummary traySummary(FarmState state, List<InboxItem> inbox) {
-  final working = state.helpers.where((h) => h.phase is PhaseWorking).length;
+TraySummary traySummary(CoreState state, List<InboxItem> inbox) {
+  final working = state.workers.where((h) => h.phase is PhaseWorking).length;
   final waiting = [for (final c in inbox) ?waitingLine(c)];
   final unread = unreadTotal(state.chat);
   final lines = [state.call == CallState.live ? (working > 0 ? '$working 个帮工在干活' : '开工了，没有在干的活') : '还没开工', ...waiting, if (unread > 0) '田头 $unread 条没读'];

@@ -9,22 +9,23 @@ import (
 	"time"
 
 	"vibevalley/internal/base"
-	"vibevalley/internal/projects"
+	"vibevalley/internal/core"
+	"vibevalley/internal/project"
 	"vibevalley/internal/protocol"
 )
 
 // A repository with several worktrees counts once. "Yours" is by author email (git's global and each repository's user.email, and
-// VIBEVALLEY_GIT_EMAILS); helpers commit as you, so their commits count.
+// git_emails in the configuration); workers commit as you, so their commits count.
 
 const (
-	crewRepoDepth      = 3
-	crewCountEvery     = 2 * time.Minute
-	crewCountAfterTurn = 15 * time.Second
+	repoDepth     = 3
+	countEvery    = 2 * time.Minute
+	countAfterRun = 15 * time.Second
 )
 
-var crewSkipDirs = map[string]bool{"node_modules": true, ".git": true, ".venv": true, "vendor": true, "dist": true, "build": true, "target": true, ".next": true}
+var skipDirs = map[string]bool{"node_modules": true, ".git": true, ".venv": true, "vendor": true, "dist": true, "build": true, "target": true, ".next": true}
 
-func crewRepoDirs(root string, depth int) []string {
+func repoDirs(root string, depth int) []string {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil
@@ -39,28 +40,29 @@ func crewRepoDirs(root string, depth int) []string {
 	}
 	var out []string
 	for _, e := range entries {
-		if e.IsDir() && !crewSkipDirs[e.Name()] {
-			out = append(out, crewRepoDirs(filepath.Join(root, e.Name()), depth-1)...)
+		if e.IsDir() && !skipDirs[e.Name()] {
+			out = append(out, repoDirs(filepath.Join(root, e.Name()), depth-1)...)
 		}
 	}
 	return out
 }
 
-type Commits struct {
+type commits struct {
 	cfg   base.Config
-	site  *base.Site
+	core  *core.Service
 	extra []string
 
-	mu      sync.Mutex
-	pending *time.Timer
-	closed  bool
-	stop    func()
-	asked   int
+	counting sync.Mutex
+	mu       sync.Mutex
+	pending  *time.Timer
+	closed   bool
+	stop     func()
+	asked    int
 }
 
-func newCommits(cfg base.Config, site *base.Site) (*Commits, error) {
-	c := &Commits{cfg: cfg, site: site}
-	for _, e := range strings.Split(os.Getenv("VIBEVALLEY_GIT_EMAILS"), ",") {
+func newCommits(cfg base.Config, core *core.Service) (*commits, error) {
+	c := &commits{cfg: cfg, core: core}
+	for _, e := range cfg.GitEmails {
 		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
 			c.extra = append(c.extra, e)
 		}
@@ -68,8 +70,8 @@ func newCommits(cfg base.Config, site *base.Site) (*Commits, error) {
 	return c, nil
 }
 
-func (c *Commits) OnStart(ctx context.Context) error {
-	_, events, stop := c.site.Events()
+func (c *commits) OnStart(ctx context.Context) error {
+	_, events, stop := c.core.Events()
 	c.mu.Lock()
 	c.stop = stop
 	c.mu.Unlock()
@@ -91,9 +93,9 @@ func (c *Commits) OnStart(ctx context.Context) error {
 	return nil
 }
 
-func (c *Commits) OnReady(ctx context.Context) {
+func (c *commits) OnReady(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(crewCountEvery)
+		ticker := time.NewTicker(countEvery)
 		defer ticker.Stop()
 		for {
 			c.refresh(ctx)
@@ -106,7 +108,7 @@ func (c *Commits) OnReady(ctx context.Context) {
 	}()
 }
 
-func (c *Commits) OnStop() {
+func (c *commits) OnStop() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.closed = true
@@ -118,43 +120,46 @@ func (c *Commits) OnStop() {
 	}
 }
 
-func (c *Commits) refresh(ctx context.Context) {
+// The ticker and a run's end both count: one at a time, so an older count never lands after a newer one.
+func (c *commits) refresh(ctx context.Context) {
+	c.counting.Lock()
+	defer c.counting.Unlock()
 	count := c.Count(ctx)
 	c.mu.Lock()
 	closed := c.closed
 	c.mu.Unlock()
 	if !closed && ctx.Err() == nil {
-		c.site.SetCommits(count)
+		c.core.SetCommits(count)
 	}
 }
 
-func (c *Commits) Count(ctx context.Context) protocol.CommitCount {
-	global := strings.ToLower(projects.GitQuiet("", "config", "--global", "user.email"))
+func (c *commits) Count(ctx context.Context) protocol.CommitCount {
+	global := strings.ToLower(project.GitQuiet("", "config", "--global", "user.email"))
 	seen := map[string]bool{}
 	out := protocol.CommitCount{Repos: []protocol.Repo{}}
-	for _, dir := range crewRepoDirs(c.cfg.WorkRoot, crewRepoDepth) {
+	for _, dir := range repoDirs(c.cfg.WorkRoot, repoDepth) {
 		if ctx.Err() != nil {
 			break
 		}
 		// Worktrees share their repository's history: one count per repository.
-		common := projects.GitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+		common := project.GitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
 		if common == "" || seen[common] {
 			continue
 		}
 		seen[common] = true
 		mine := map[string]bool{}
-		for _, e := range append([]string{global, strings.ToLower(projects.GitQuiet("", "-C", dir, "config", "user.email"))}, c.extra...) {
+		for _, e := range append([]string{global, strings.ToLower(project.GitQuiet("", "-C", dir, "config", "user.email"))}, c.extra...) {
 			if e != "" {
 				mine[e] = true
 			}
 		}
 		n := int64(0)
-		for _, email := range strings.Split(projects.GitQuiet("", "-C", dir, "log", "--all", "--format=%ae"), "\n") {
+		for _, email := range strings.Split(project.GitQuiet("", "-C", dir, "log", "--all", "--format=%ae"), "\n") {
 			if email != "" && mine[strings.ToLower(email)] {
 				n++
 			}
 		}
-		top := projects.GitQuiet("", "-C", dir, "rev-parse", "--show-toplevel")
+		top := project.GitQuiet("", "-C", dir, "rev-parse", "--show-toplevel")
 		if top == "" {
 			top = dir
 		}
@@ -164,21 +169,21 @@ func (c *Commits) Count(ctx context.Context) protocol.CommitCount {
 	return out
 }
 
-func (c *Commits) Asked() int {
+func (c *commits) Asked() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.asked
 }
 
-// Several turns share one count.
-func (c *Commits) Soon() {
+// Several runs share one count.
+func (c *commits) Soon() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.asked++
 	if c.closed || c.pending != nil {
 		return
 	}
-	c.pending = time.AfterFunc(crewCountAfterTurn, func() {
+	c.pending = time.AfterFunc(countAfterRun, func() {
 		c.mu.Lock()
 		c.pending = nil
 		c.mu.Unlock()

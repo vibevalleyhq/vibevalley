@@ -1,5 +1,5 @@
 #!/bin/sh
-# vibevalley's desktop app for macOS, Flutter's: the Go server (server/cmd/vibevalley) built without cgo and put in
+# vibevalley's desktop app for macOS, Flutter's: the Go server (server/cmd/server) built without cgo and put in
 # the bundle beside the app's executable (Contents/MacOS/vibevalley-server; lib/desktop starts it), the app built in
 # release, signed ad hoc (no Developer ID, no notarization), and a DMG made of it.
 #
@@ -25,7 +25,7 @@ esac
 mkdir -p "$HERE/build"
 echo "== the Go server"
 (cd "$REPO/server" && env -u GOROOT -u GOTOOLDIR CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 \
-  go build -trimpath -ldflags='-s -w' -o "$HERE/build/vibevalley-server" ./cmd/vibevalley)
+  go build -trimpath -ldflags='-s -w' -o "$HERE/build/vibevalley-server" ./cmd/server)
 
 echo "== the app"
 (cd "$HERE" && flutter build macos --release --dart-define=VIBEVALLEY_CHANNEL="$CHANNEL")

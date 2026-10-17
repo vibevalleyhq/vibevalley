@@ -6,13 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
-import '../../village/village_view.dart' show agentsProvider;
-import 'chat_rules.dart';
-import 'chat_state.dart';
-import 'chat_widgets.dart';
+import '../../data/remote.dart' show agentsProvider;
+import '../../chat/chat_rules.dart';
+import '../../chat/chat_state.dart';
+import '../../chat/chat_widgets.dart';
 import '../../rules/chat.dart';
 import '../../rules/farm.dart';
-import '../../rules/index.dart';
+import '../../rules/money.dart';
 
 /// A sender's messages this close together share one header.
 const _runMs = 5 * 60000;
@@ -75,7 +75,8 @@ class _MessageListState extends ConsumerState<MessageList> {
               .toList();
     final parent = conversation?.kind == ConversationKind.thread ? parentOf(chat, conversation!, more) : null;
     final unread = conversation == null ? 0 : unreadIn(chat, conversation);
-    final waiting = farm?.foreman == ForemanState.thinking && conversation?.kind != ConversationKind.thread && all.isNotEmpty && all.last.sender != 'foreman';
+    final waiting =
+        farm?.manager == ManagerState.thinking && conversation?.kind != ConversationKind.thread && all.isNotEmpty && all.last.sender != managerAgent;
 
     // What is on screen is read.
     if (conversation != null && unread > 0) {
@@ -306,12 +307,12 @@ class _MessageRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final m = message;
     final agent = ref.watch(agentsProvider).value?[m.agent];
-    final helper = m.fromKind == SenderKind.helper ? ref.watch(farmProvider)?.helpers.where((h) => h.id == m.from).firstOrNull : null;
-    final dot = helper == null ? null : Color(phaseDot(helper.phase));
+    final worker = m.fromKind == SenderKind.worker ? ref.watch(farmProvider)?.workers.where((h) => h.id == m.from).firstOrNull : null;
+    final dot = worker == null ? null : Color(phaseDot(worker.phase));
     final who = switch (m.fromKind) {
-      SenderKind.helper => [
+      SenderKind.worker => [
         '@${m.from}',
-        if (helper != null) runtimeLabel[helper.runtime] ?? helper.runtime,
+        if (worker != null) runtimeLabel[worker.runtime] ?? worker.runtime,
         if (agent != null && agent.role.isNotEmpty) _roleShort(agent.role),
       ].where((s) => s.isNotEmpty).join(' '),
       _ => '',
@@ -325,9 +326,9 @@ class _MessageRow extends ConsumerWidget {
     final steps = chatTurnSteps;
     final turn = steps == null || !m.final_
         ? null
-        : m.fromKind == SenderKind.foreman && m.kind != MessageKind.dispatch
+        : m.fromKind == SenderKind.manager && m.kind != MessageKind.dispatch
         ? steps(context, managerAgent, m.at, manager: true)
-        : m.fromKind == SenderKind.helper && m.kind == MessageKind.report
+        : m.fromKind == SenderKind.worker && m.kind == MessageKind.report
         ? steps(context, m.from, m.at, manager: false)
         : null;
     return _Frame(
@@ -449,7 +450,7 @@ class ThreadPreview extends ConsumerWidget {
     final chat = farm?.chat;
     final unread = unreadIn(chat, thread);
     final last = messagesIn(chat, thread.id).lastOrNull;
-    final helper = thread.subjectKind == SubjectKind.job ? farm?.helpers.where((h) => h.id == thread.subjectId).firstOrNull : null;
+    final worker = thread.subjectKind == SubjectKind.issue ? farm?.workers.where((h) => h.id == thread.subjectId).firstOrNull : null;
     return KitTappable(
       onTap: () => unawaited(ref.read(chatActionsProvider).showChat(thread.id).catchError((Object _) {})),
       builder: (context, s) => Container(
@@ -476,9 +477,9 @@ class ThreadPreview extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(width: 8),
-                if (helper != null) ...[PhaseGlyph(helper.phase, size: 14), const SizedBox(width: 4)],
+                if (worker != null) ...[PhaseGlyph(worker.phase, size: 14), const SizedBox(width: 4)],
                 Expanded(
-                  child: helper == null ? const SizedBox() : Text(phaseText(helper, nowMs()), maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
+                  child: worker == null ? const SizedBox() : Text(phaseText(worker, nowMs()), maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
                 ),
                 Opacity(opacity: s.hovered || s.focused ? 1 : .6, child: const SpriteIcon('button-next', size: 12)),
               ],

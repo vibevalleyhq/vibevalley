@@ -62,13 +62,13 @@ final class ToolReview extends ToolResult {
 enum BedFxKind { water, spray, harvest, shovel, note }
 
 /// 0..5, or -1 while every bed is taken.
-int stationOfHelper(Helper h) => h.play?.station.round() ?? -1;
+int stationOfWorker(Worker h) => h.play?.station.round() ?? -1;
 
-Helper? stationOf(List<Helper> helpers, int station) => station < 0 ? null : helpers.where((h) => stationOfHelper(h) == station).firstOrNull;
+Worker? stationOf(List<Worker> workers, int station) => station < 0 ? null : workers.where((h) => stationOfWorker(h) == station).firstOrNull;
 
 int? nextClearing(int level) => beds.where((b) => b.unlockLevel != null && b.unlockLevel! > level).firstOrNull?.unlockLevel;
 
-PlotView plotOf(FarmView view, Helper? h) => h == null ? const PlotView(crop: Crop.empty) : (view.plots[h.id] ?? const PlotView(crop: Crop.empty));
+PlotView plotOf(FarmView view, Worker? h) => h == null ? const PlotView(crop: Crop.empty) : (view.plots[h.id] ?? const PlotView(crop: Crop.empty));
 
 PlotView lockedPlot(Bed bed, int level) => PlotView(crop: level >= (bed.unlockLevel ?? 1 << 30) ? Crop.flowering : Crop.locked);
 
@@ -87,7 +87,7 @@ const cropLabel = {
   Crop.locked: '没开垦',
 };
 
-Aim aimTool(Tool tool, Bed bed, Helper? worker, PlotView plot, int level) {
+Aim aimTool(Tool tool, Bed bed, Worker? worker, PlotView plot, int level) {
   final unlock = bed.unlockLevel;
   if (unlock != null) return Aim(false, level >= unlock ? '开垦好的花坛' : 'Lv.$unlock 开垦这块地');
   final crop = plot.crop;

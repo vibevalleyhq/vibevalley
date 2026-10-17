@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
-import '../desk/shared/faces.dart' show RuntimeIcon;
+import '../shared/faces.dart' show RuntimeIcon;
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
-import '../village/village_view.dart' show runtimesProvider;
+import '../data/remote.dart' show runtimesProvider;
 import 'popover.dart';
-import '../rules/index.dart';
 import '../rules/quota.dart';
 import '../rules/seeds.dart';
+import '../rules/money.dart';
 
 Color _textOf(double? left) => switch (levelOf(left)) {
   QuotaLevel.plenty => Palette.leaf700,
@@ -28,7 +28,7 @@ class QuotaPill extends ConsumerWidget {
     final atlas = ref.watch(atlasProvider).value;
     final runtimes = usableRuntimes(ref.watch(runtimesProvider).value ?? const []);
     if (runtimes.isEmpty || atlas == null) return const SizedBox.shrink();
-    final lefts = [for (final r in runtimes) ?quotaLeft(r.usage)];
+    final lefts = [for (final r in runtimes) ?r.quota?.left];
     final lowest = lefts.isEmpty ? null : lefts.reduce((a, b) => a < b ? a : b);
     final shown = lowest?.round();
     return FarmPopover(
@@ -106,8 +106,8 @@ class Machine extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final atlas = ref.watch(atlasProvider).value;
-    final quota = quotaOf(info.usage);
-    final stop = moneyStop(info);
+    final quota = quotaOf(info);
+    final stop = info.stop;
     final usage = info.usage;
     return Container(
       decoration: BoxDecoration(
@@ -270,7 +270,7 @@ class HudCard extends StatelessWidget {
       ),
       child: DefaultTextStyle(
         style: KitText.xs.copyWith(color: Palette.bark900),
-        // As tall as `height` when given, else as its content (a bare Center would fill a loose height: the crew's list).
+        // As tall as `height` when given, else as its content (a bare Center would fill a loose height: the helpers' list).
         child: Center(widthFactor: 1, heightFactor: height == null ? 1 : null, child: child),
       ),
     ),

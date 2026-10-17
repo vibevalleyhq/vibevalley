@@ -8,13 +8,13 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
-import '../runtimes/layout.dart';
-import '../shared/faces.dart';
-import '../shared/state.dart';
+import '../shared/layout.dart';
+import '../../shared/faces.dart';
+import '../../data/remote.dart';
 import 'codebase.dart';
 import 'new_project_dialog.dart';
 import 'projects_state.dart';
-import '../shared/widgets.dart';
+import '../../shared/widgets.dart';
 
 class ProjectsPage extends ConsumerStatefulWidget {
   const ProjectsPage({super.key, this.id});

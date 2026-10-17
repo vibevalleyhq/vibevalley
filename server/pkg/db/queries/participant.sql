@@ -1,0 +1,11 @@
+-- Who is in the chat: the owner, the manager, the workers, the farm (channel/db.go).
+
+-- name: UpsertParticipant :exec
+insert into participant (id, kind, name, agent_id, runtime, joined_at) values (?, ?, ?, ?, ?, ?)
+on conflict (id) do update set name = excluded.name, agent_id = excluded.agent_id, runtime = excluded.runtime, left_at = null;
+
+-- name: ParticipantLeft :exec
+update participant set left_at = ? where id = ? and left_at is null;
+
+-- name: Participants :many
+select * from participant order by joined_at, rowid;

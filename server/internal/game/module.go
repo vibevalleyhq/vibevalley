@@ -7,8 +7,8 @@ import (
 )
 
 func Module(r *base.Readies) fx.Option {
-	return fx.Module("game", fx.Provide(
-		base.Run[*Ledger](r, newLedger),
-		base.Run[*Commits](r, newCommits),
-	))
+	return fx.Module("game",
+		fx.Provide(fx.Private, newLedger, newCommits, newBeds),
+		fx.Provide(base.Run[*Service](r, newService)),
+	)
 }

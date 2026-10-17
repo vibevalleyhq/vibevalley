@@ -12,7 +12,7 @@ Status: implemented
 
 行为见 [server.md](../../../../docs/reference/server.md)「工单」。
 
-- **数据库是家，核心状态有一份**，和定时、田头一样：开着的工单和最近关上的 50 张（`KeepClosedIssues`）放在核心状态的 `issues` 里，按看板的顺序（`IssueOrder`：没派的按排的先后，其余新的在前）。`Issues` 每改一次数据库就施加一条 `issue` 事实（删掉的是 `issueGone`），开机时从数据库放回去；`farm.json` 不存工单。
+- **数据库是家，核心状态有一份**，和定时、田头一样：开着的工单和最近关上的 50 张（`KeepClosedIssues`）放在核心状态的 `issues` 里，按看板的顺序（`IssueOrder`：没派的按排的先后，其余新的在前）。`Issues` 每改一次数据库就施加一条 `issue` 事实（删掉的是 `issueGone`），开机时从数据库放回去；`state.json` 不存工单。
 - **状态由折叠算**：`Reduce` 每折一条事实，都按帮工现在的样子重算工单的状态（`IssueStatusOf`），帮工开工、做完一轮，工单的状态当场就跟着变。
 - **标题和说明**，和 Linear 一样：`title` 是一行，`description` 可以空。交给帮工的是标题加说明（`IssueJob`）；直接派出去的活（管家、计划）按第一行切成标题和说明（`SplitJob`）。迁移 `0007_issue_title.sql` 照同样的办法切开老工单。
 - **客户端**：看板和地图从核心状态读工单，不再轮询；看板只在工单的执行变了、关上了的时候重新读轨迹头。比核心状态里留着的更早的关单，打开「更早的」时才问 `GET /api/issues`。
@@ -34,5 +34,5 @@ Status: implemented
 ## Verification
 
 - `server/internal/protocol/issues_test.go`：核心状态里的顺序、状态跟着帮工变、同样的事实不算变、删掉、只留最近关的；标题和说明怎么切、交给帮工的是什么。
-- `server/internal/farm/crew_test.go`：写下就进核心状态，开工后核心状态跟着它的执行；重启后从数据库放回去。`server/internal/base/db_test.go`：老工单切成标题和说明，迁移前的样子另存一份。
-- `app/test/tickets_test.dart`、`deskb_map_test.dart`：看板和地图读的是核心状态里的工单。
+- `server/internal/workspace/work_test.go`：写下就进核心状态，开工后核心状态跟着它的执行；重启后从数据库放回去。`server/internal/base/db_test.go`：老工单切成标题和说明，迁移前的样子另存一份。
+- `app/test/tickets_test.dart`、`desk_map_test.dart`：看板和地图读的是核心状态里的工单。

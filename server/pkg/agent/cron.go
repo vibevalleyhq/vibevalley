@@ -5,6 +5,7 @@ package agent
 // weekday 7 is Sunday. When both day and weekday are restricted, either matching is enough (as cron does).
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -28,20 +29,20 @@ func parseField(field string, low, high int, names map[string]int) (map[int]bool
 		}
 		n, err := strconv.Atoi(s)
 		if err != nil {
-			return 0, fmt.Errorf("Invalid value %q", s)
+			return 0, fmt.Errorf("invalid value %q", s)
 		}
 		return n, nil
 	}
 	restricted := field != "*"
 	for _, part := range strings.Split(field, ",") {
 		if part == "" {
-			return nil, false, fmt.Errorf("Invalid expression %q", field)
+			return nil, false, fmt.Errorf("invalid expression %q", field)
 		}
 		step := 1
 		if base, s, ok := strings.Cut(part, "/"); ok {
 			n, err := strconv.Atoi(s)
 			if err != nil || n < 1 {
-				return nil, false, fmt.Errorf("Invalid step %q", s)
+				return nil, false, fmt.Errorf("invalid step %q", s)
 			}
 			step = n
 			part = base
@@ -69,7 +70,7 @@ func parseField(field string, low, high int, names map[string]int) (map[int]bool
 			}
 		}
 		if from < low || to > high || from > to {
-			return nil, false, fmt.Errorf("Value out of range (%d-%d) in %q", low, high, field)
+			return nil, false, fmt.Errorf("value out of range (%d-%d) in %q", low, high, field)
 		}
 		for n := from; n <= to; n += step {
 			set[n] = true
@@ -84,7 +85,7 @@ func ParseCronExpression(expr string, loc *time.Location) (*Cron, error) {
 		fields = append([]string{"0"}, fields...)
 	}
 	if len(fields) != 6 {
-		return nil, fmt.Errorf("Invalid number of segments in cron expression")
+		return nil, errors.New("invalid number of segments in cron expression")
 	}
 	c := &Cron{loc: loc}
 	var err error

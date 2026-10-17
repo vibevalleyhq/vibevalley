@@ -4,28 +4,28 @@ class Round {
   const Round(this.asked, this.steps);
 
   /// null for steps before the first one (a trajectory whose start was dropped).
-  final WorkStep? asked;
+  final Activity? asked;
 
-  final List<WorkStep> steps;
+  final List<Activity> steps;
 
   /// null while it has said nothing.
-  WorkStep? get answer {
+  Activity? get answer {
     for (final s in steps.reversed) {
-      if (s.kind == StepKind.said && s.under == null) return s;
+      if (s.kind == ActivityKind.response && s.under == null) return s;
     }
     return null;
   }
 
-  List<WorkStep> get all => [?asked, ...steps];
+  List<Activity> get all => [?asked, ...steps];
 }
 
 /// A sub-agent's told steps are part of the call.
-List<Round> roundsOf(List<WorkStep> steps) {
+List<Round> roundsOf(List<Activity> steps) {
   final rounds = <Round>[];
-  WorkStep? asked;
-  var current = <WorkStep>[];
+  Activity? asked;
+  var current = <Activity>[];
   for (final s in steps) {
-    if (s.kind == StepKind.asked && s.under == null) {
+    if (s.kind == ActivityKind.prompt && s.under == null) {
       if (asked != null || current.isNotEmpty) rounds.add(Round(asked, current));
       asked = s;
       current = [];
@@ -39,7 +39,7 @@ List<Round> roundsOf(List<WorkStep> steps) {
 
 class Span {
   const Span(this.step, this.ms);
-  final WorkStep step;
+  final Activity step;
   final double ms;
 }
 
@@ -63,16 +63,16 @@ String tookText(double ms) {
   return m % 60 == 0 ? '${m ~/ 60} 小时' : '${m ~/ 60} 小时 ${m % 60} 分';
 }
 
-Map<int, List<WorkStep>> commentsOf(List<WorkStep> steps) {
-  final out = <int, List<WorkStep>>{};
+Map<int, List<Activity>> commentsOf(List<Activity> steps) {
+  final out = <int, List<Activity>>{};
   for (final s in steps) {
-    if (s.kind == StepKind.asked && s.on != null) (out[s.on!.round()] ??= []).add(s);
+    if (s.kind == ActivityKind.prompt && s.on != null) (out[s.on!.round()] ??= []).add(s);
   }
   return out;
 }
 
-/// runs/steps.go CommentText puts the comment after this head.
-String commentWords(WorkStep asked) {
+/// worker/activities.go CommentText puts the comment after this head.
+String commentWords(Activity asked) {
   const head = '\n\n我的评论：';
   final text = asked.text;
   final at = text.lastIndexOf(head);

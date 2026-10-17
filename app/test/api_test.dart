@@ -17,7 +17,7 @@ void main() {
         return http.Response('', 204);
       }),
     );
-    await api.farm.say(body: const SayRequest(text: '种一垄萝卜', conversation: 3));
+    await api.channel.say(body: const SayRequest(text: '种一垄萝卜', conversation: 3));
     expect(seen.method, 'POST');
     expect(seen.url.path, '/api/say');
     expect(jsonDecode(seen.body), {'text': '种一垄萝卜', 'conversation': 3});
@@ -31,14 +31,14 @@ void main() {
         seen = r.url;
         return http.Response(
           jsonEncode([
-            {'seq': 7, 'conversation': 1, 'from': 'foreman', 'fromKind': 'foreman', 'name': '管家', 'kind': 'chat', 'text': '好', 'final': true, 'at': 1},
+            {'seq': 7, 'conversation': 1, 'from': 'manager', 'fromKind': 'manager', 'name': '管家', 'kind': 'chat', 'text': '好', 'final': true, 'at': 1},
           ]),
           200,
           headers: {'content-type': 'application/json; charset=utf-8'},
         );
       }),
     );
-    final page = await api.farm.chatHistory(id: '1', before: '10', limit: '20');
+    final page = await api.channel.history(id: 1, before: 10, limit: 20);
     expect(seen.path, '/api/chat/1/messages');
     expect(seen.queryParameters, {'before': '10', 'limit': '20'});
     expect(page.single, isA<ChatMessage>());
@@ -49,13 +49,13 @@ void main() {
     final api = VibeValleyApi(
       base,
       MockClient(
-        (_) async => http.Response(jsonEncode({'_tag': 'FarmRefused', 'reason': '这块地有人了'}), 409, headers: {'content-type': 'application/json; charset=utf-8'}),
+        (_) async => http.Response(jsonEncode({'_tag': 'Refused', 'reason': '这块地有人了'}), 409, headers: {'content-type': 'application/json; charset=utf-8'}),
       ),
     );
     await expectLater(
-      api.farm.say(body: const SayRequest(text: 'x')),
+      api.channel.say(body: const SayRequest(text: 'x')),
       throwsA(
-        isA<VibeValleyApiError>().having((e) => e.tag, 'tag', 'FarmRefused').having((e) => e.reason, 'reason', '这块地有人了').having((e) => e.status, 'status', 409),
+        isA<VibeValleyApiError>().having((e) => e.tag, 'tag', 'Refused').having((e) => e.reason, 'reason', '这块地有人了').having((e) => e.status, 'status', 409),
       ),
     );
   });

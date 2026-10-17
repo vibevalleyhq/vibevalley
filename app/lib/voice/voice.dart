@@ -14,20 +14,19 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'captions.dart';
 import '../gen/vibevalley.dart';
-import '../data/server.dart';
 
 enum CallPhase { idle, connecting, live, ending }
 
 class VoiceCall extends ChangeNotifier {
-  VoiceCall(this.server, {this.agentPick}) {
-    captions.onHeard = (text) => server.api.farm
+  VoiceCall(this.api, {this.agentPick}) {
+    captions.onHeard = (text) => api.issue
         .dispatch(
           body: SayRequest(text: text, agent: agentPick?.call()),
         )
         .catchError((Object _) {});
   }
 
-  final VibeValleyServer server;
+  final VibeValleyApi api;
 
   final String? Function()? agentPick;
   CallPhase phase = CallPhase.idle;
@@ -82,7 +81,7 @@ class VoiceCall extends ChangeNotifier {
         if (!(await Permission.microphone.request()).isGranted) throw VibeValleyApiError(0, null, '没有麦克风权限');
       }
       _note('call: asking for a session');
-      final session = await server.api.voice.session();
+      final session = await api.voice.session();
       _note('call: session for ${session.channel}, uid ${session.uid}');
       final engine = createAgoraRtcEngine();
       _engine = engine;
@@ -128,7 +127,7 @@ class VoiceCall extends ChangeNotifier {
           // The token lasts an hour: a fresh one for the same channel and uid before it runs out.
           onTokenPrivilegeWillExpire: (connection, _) async {
             try {
-              final fresh = await server.api.voice.renew(
+              final fresh = await api.voice.renew(
                 body: RenewRequest(channel: session.channel, uid: session.uid),
               );
               await _engine?.renewToken(fresh.token);
@@ -190,7 +189,7 @@ class VoiceCall extends ChangeNotifier {
       await engine.adjustRecordingSignalVolume(200);
       // Captions over the RTC data stream: Agora's Flutter RTM package is Android and iOS only.
       _note('call: asking for the voice agent');
-      _agentId = (await server.api.voice.start(
+      _agentId = (await api.voice.start(
         body: StartRequest(channel: session.channel, uid: session.uid, captions: VoiceCaptions.datastream),
       )).agentId;
       _note('call: agent $_agentId started after ${watch.elapsedMilliseconds} ms');
@@ -220,7 +219,7 @@ class VoiceCall extends ChangeNotifier {
   Future<void> _teardown() async {
     final agent = _agentId;
     _agentId = null;
-    if (agent != null) await server.api.voice.stop(body: VoiceAgent(agentId: agent)).catchError((_) {});
+    if (agent != null) await api.voice.stop(body: VoiceAgent(agentId: agent)).catchError((_) {});
     final engine = _engine;
     _engine = null;
     muted = false;

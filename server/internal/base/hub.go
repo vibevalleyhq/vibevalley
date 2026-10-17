@@ -1,9 +1,7 @@
 package base
 
 import (
-	"context"
 	"sync"
-	"time"
 )
 
 // A subscriber that falls behind gets a longer queue, never a dropped value.
@@ -82,16 +80,5 @@ func (h *Hub[T]) Subscribe() (<-chan T, func()) {
 			s.mu.Unlock()
 			close(done)
 		})
-	}
-}
-
-func Sleep(ctx context.Context, d time.Duration) bool {
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return false
-	case <-t.C:
-		return true
 	}
 }

@@ -9,7 +9,7 @@ import 'package:vibevalley/shell/fx_layer.dart';
 import 'package:vibevalley/shell/server_away.dart';
 import 'package:vibevalley/ui/kit/kit.dart';
 
-import 'shell_fakes.dart';
+import 'support/shell.dart';
 import 'package:vibevalley/rules/progress.dart';
 
 void main() {
@@ -27,7 +27,7 @@ void main() {
     testWidgets('says the server is away, and how to start it', (tester) async {
       await show(tester, reachable: false);
       expect(find.textContaining('连不上 VibeValley 服务端。', findRichText: true), findsOneWidget);
-      expect(find.textContaining('cd server && go run ./cmd/vibevalley', findRichText: true), findsOneWidget);
+      expect(find.textContaining('cd server && go run ./cmd/server', findRichText: true), findsOneWidget);
       expect(find.textContaining('连上后这里会自己好', findRichText: true), findsOneWidget);
     });
 
@@ -39,12 +39,12 @@ void main() {
 
   group('FxLayer', () {
     late StreamController<GameEffect> effects;
-    late StreamController<SiteEvent> notices;
+    late StreamController<SideEvent> notices;
     late ToastManager manager;
 
     setUp(() {
       effects = StreamController<GameEffect>.broadcast();
-      notices = StreamController<SiteEvent>.broadcast();
+      notices = StreamController<SideEvent>.broadcast();
       manager = ToastManager();
     });
 
@@ -99,8 +99,8 @@ void main() {
 
     testWidgets('notices become toasts titled by their level', (tester) async {
       await show(tester);
-      notices.add(SiteEventNotice(at: 0, level: NoticeLevel.fromJson('warn'), text: '地里种满了'));
-      notices.add(SiteEventNotice(at: 0, level: NoticeLevel.fromJson('error'), text: '模型调用失败'));
+      notices.add(SideEventNotice(at: 0, level: NoticeLevel.fromJson('warn'), text: '地里种满了'));
+      notices.add(SideEventNotice(at: 0, level: NoticeLevel.fromJson('error'), text: '模型调用失败'));
       await tester.pump();
       expect(manager.toasts.map((t) => (t.type, t.title, t.description)), [('error', '出错了', '模型调用失败'), ('warn', '没派成', '地里种满了')]);
       expect(manager.toasts.first.timeout, const Duration(milliseconds: 7000));

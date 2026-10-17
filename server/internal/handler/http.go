@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"vibevalley/internal/farm"
 	"vibevalley/internal/protocol"
+	"vibevalley/internal/workspace"
 )
 
 // Keeps proxies from closing a quiet event stream.
@@ -16,21 +16,21 @@ const heartbeat = 20 * time.Second
 
 // It hands the yard gate its part (apiMux) before the farm starts: the gate answers the API, and the API answers for every service, the gate's own
 // pages too.
-func New(f *farm.Farm) http.Handler {
-	f.Lan.API = apiMux(f)
+func New(f *workspace.Workspace) http.Handler {
+	f.Gate.API = apiMux(f)
 	mux := apiMux(f)
-	mux.Handle("/mcp", f.FarmTools.Handler())
-	mux.Handle("/mcp/", f.FarmTools.Handler())
+	mux.Handle("/mcp", f.MCP.Handler())
+	mux.Handle("/mcp/", f.MCP.Handler())
 	return mux
 }
 
 // All the yard gate lets through.
-func apiMux(f *farm.Farm) *http.ServeMux {
+func apiMux(f *workspace.Workspace) *http.ServeMux {
 	a := api{f}
 	mux := http.NewServeMux()
 	protocol.Mount(mux, a)
-	mux.HandleFunc("GET /api/site/events", a.siteEvents)
-	mux.HandleFunc("GET /api/site/state", a.siteStates)
+	mux.HandleFunc("GET /api/events", a.sideEvents)
+	mux.HandleFunc("GET /api/state", a.stateFrames)
 	return mux
 }
 
@@ -66,12 +66,12 @@ func sse(w http.ResponseWriter) (func(any) bool, func() bool, bool) {
 	return send, ping, true
 }
 
-func (a api) siteEvents(w http.ResponseWriter, r *http.Request) {
+func (a api) sideEvents(w http.ResponseWriter, r *http.Request) {
 	send, ping, ok := sse(w)
 	if !ok {
 		return
 	}
-	snapshot, events, stop := a.f.Site.Events()
+	snapshot, events, stop := a.f.Core.Events()
 	defer stop()
 	if !send(snapshot) {
 		return
@@ -94,12 +94,12 @@ func (a api) siteEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a api) siteStates(w http.ResponseWriter, r *http.Request) {
+func (a api) stateFrames(w http.ResponseWriter, r *http.Request) {
 	send, ping, ok := sse(w)
 	if !ok {
 		return
 	}
-	frames := a.f.Site.States(r.Context().Done())
+	frames := a.f.Core.States(r.Context().Done())
 	tick := time.NewTicker(heartbeat)
 	defer tick.Stop()
 	for {

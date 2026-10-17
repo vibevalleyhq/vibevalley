@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/router.dart';
 import '../data/farm_choice.dart';
 import '../data/providers.dart';
-import '../desk/runtimes/layout.dart' show TextLink;
 import '../ui/kit/kit.dart';
 
 const healthEvery = Duration(seconds: 4);
@@ -59,7 +58,7 @@ class ServerAway extends ConsumerWidget {
                         style: TextStyle(color: Palette.berry),
                       ),
                       const TextSpan(text: '先启动它（'),
-                      TextSpan(text: 'cd server && go run ./cmd/vibevalley', style: code),
+                      TextSpan(text: 'cd server && go run ./cmd/server', style: code),
                       const TextSpan(text: '，或者打开桌面客户端），连上后这里会自己好；要用别的电脑上的农场，到'),
                     ],
                     WidgetSpan(

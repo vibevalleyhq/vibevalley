@@ -3,6 +3,154 @@ package protocol
 // The shapes are the one source: tool/shapegen writes gen.go and the Flutter client's lib/gen/vibevalley.dart from them; its doc says what the
 // vibevalley: directives and the vibevalley:"null" tag mean.
 
+// Shared with the client: each //vibevalley:const reaches lib/gen under that name.
+const (
+	// The manager's participant id, and the agent of an issue for it. No agent profile has this id.
+	//vibevalley:const managerAgent
+	ManagerAgent = "manager"
+	// Who @所有人 is.
+	//vibevalley:const everyone
+	Everyone = "everyone"
+	// The channel everyone is in.
+	//vibevalley:const generalName
+	GeneralName = "田头"
+	// Workers working at once; also the beds on the farm.
+	//vibevalley:const maxRunning
+	MaxRunning = 6
+	// Times are Unix milliseconds.
+	//vibevalley:const dayMs
+	DayMs = 86_400_000
+	// The voice line's first words when the settings have none of their own; the voice samples say it.
+	//vibevalley:const defaultGreeting
+	DefaultGreeting = "来啦！今天想种点什么？"
+	// An agent's memories past this go, the longest unused first.
+	//vibevalley:const memoryKeep
+	MemoryKeep = 300
+)
+
+// The voice settings' numbers may be set within these (the voice page's sliders, the settings' check).
+const (
+	//vibevalley:const voiceSilenceMsMin
+	VoiceSilenceMsMin = 200
+	//vibevalley:const voiceSilenceMsMax
+	VoiceSilenceMsMax = 2000
+	//vibevalley:const voiceInterruptMsMin
+	VoiceInterruptMsMin = 80
+	//vibevalley:const voiceInterruptMsMax
+	VoiceInterruptMsMax = 1000
+	//vibevalley:const voiceIdleSecondsMin
+	VoiceIdleSecondsMin = 10
+	//vibevalley:const voiceIdleSecondsMax
+	VoiceIdleSecondsMax = 600
+)
+
+// The session options a runtime may refuse: the keys of RuntimeFacts.Refused.
+const (
+	//vibevalley:const sessionSystemPrompt
+	SessionSystemPrompt = "systemPrompt"
+	//vibevalley:const sessionAppendSystemPrompt
+	SessionAppendSystemPrompt = "appendSystemPrompt"
+	//vibevalley:const sessionEffort
+	SessionEffort = "effort"
+	//vibevalley:const sessionEnv
+	SessionEnv = "env"
+	//vibevalley:const sessionMcpServers
+	SessionMCPServers = "mcpServers"
+	//vibevalley:const sessionDisallowedTools
+	SessionDisallowedTools = "disallowedTools"
+)
+
+// Empty: nothing wrong.
+type SettingsCheck struct {
+	Problem string `json:"problem,omitzero"`
+}
+
+type ProjectCheck struct {
+	Problem string `json:"problem,omitzero"`
+}
+
+// What is left of a runtime's quota: the lowest window's percent (none without windows), and in words.
+type RuntimeQuota struct {
+	Left *float64 `json:"left,omitzero"`
+	Text string   `json:"text"`
+}
+
+type AgentIssueLevel string
+
+const (
+	AgentIssueLevelError AgentIssueLevel = "error"
+	AgentIssueLevelWarn  AgentIssueLevel = "warn"
+)
+
+// What stops an agent profile as it is (error), or may (warn), and which of its fields (AgentIssues): the checks oar makes
+// when a session opens, the runtime's money and models.
+type AgentIssue struct {
+	Field string          `json:"field"`
+	Level AgentIssueLevel `json:"level"`
+	Text  string          `json:"text"`
+}
+
+type AgentCheckRequest struct {
+	Agents []Agent `json:"agents"`
+}
+
+type AgentCheck struct {
+	ID     string       `json:"id"`
+	Issues []AgentIssue `json:"issues"`
+}
+
+// What a worker of an agent would be reminded of at the start of a run (Pick), without counting it: the lines it gets
+// and their length against RecallChars.
+type RecallPreview struct {
+	Lines []string `json:"lines"`
+	Chars int64    `json:"chars"`
+	Limit int64    `json:"limit"`
+}
+
+// An achievement as seeds.json defines it.
+type AchievementCategory string
+
+const (
+	AchievementCategoryStarter AchievementCategory = "starter"
+	AchievementCategoryHarvest AchievementCategory = "harvest"
+	AchievementCategoryCraft   AchievementCategory = "craft"
+	AchievementCategoryThrift  AchievementCategory = "thrift"
+	AchievementCategoryTeam    AchievementCategory = "team"
+	AchievementCategorySecret  AchievementCategory = "secret"
+)
+
+type AchievementDef struct {
+	ID       string              `json:"id"`
+	Category AchievementCategory `json:"category"`
+	// TierTitles: none, or three.
+	Title      string   `json:"title"`
+	TierTitles []string `json:"tierTitles,omitzero"`
+	Detail     string   `json:"detail"`
+	// Three for bronze, silver and gold; one for a one-off.
+	Tiers []int64 `json:"tiers"`
+	// What reaching each tier pays, one for each of Tiers.
+	Coins []int64 `json:"coins"`
+	Unit  string  `json:"unit,omitzero"`
+}
+
+// A runtime's name, blurb and look in the farm (seeds.json).
+type RuntimePreset struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Blurb string `json:"blurb"`
+	Look  Look   `json:"look"`
+}
+
+// What a runtime does with a session, from oar (seeds.json).
+type RuntimeFacts struct {
+	// A message while it works joins the turn; otherwise it waits for the turn to end.
+	Steer bool `json:"steer"`
+	// The options it refuses (Session*), with oar's reason.
+	Refused      map[string]string `json:"refused"`
+	Capabilities []string          `json:"capabilities"`
+	InProcess    bool              `json:"inProcess"`
+}
+
 type CallState string
 
 const (
@@ -13,21 +161,21 @@ const (
 	CallStateError      CallState = "error"
 )
 
-type ForemanState string
+type ManagerState string
 
 const (
-	ForemanStateIdle      ForemanState = "idle"
-	ForemanStateListening ForemanState = "listening"
-	ForemanStateThinking  ForemanState = "thinking"
-	ForemanStateSpeaking  ForemanState = "speaking"
+	ManagerStateIdle      ManagerState = "idle"
+	ManagerStateListening ManagerState = "listening"
+	ManagerStateThinking  ManagerState = "thinking"
+	ManagerStateSpeaking  ManagerState = "speaking"
 )
 
 type SenderKind string
 
 const (
 	SenderKindUser    SenderKind = "user"
-	SenderKindForeman SenderKind = "foreman"
-	SenderKindHelper  SenderKind = "helper"
+	SenderKindManager SenderKind = "manager"
+	SenderKindWorker  SenderKind = "worker"
 	SenderKindSystem  SenderKind = "system"
 )
 
@@ -64,7 +212,7 @@ type ChatMessage struct {
 	Text         string      `json:"text"`
 	Final        bool        `json:"final"`
 	Mentions     []string    `json:"mentions,omitzero"`
-	Helper       *string     `json:"helper,omitzero"`
+	Worker       *string     `json:"worker,omitzero"`
 	Outcome      *Outcome    `json:"outcome,omitzero"`
 	Spent        *Spent      `json:"spent,omitzero"`
 	At           int64       `json:"at"`
@@ -73,7 +221,7 @@ type ChatMessage struct {
 type ConversationKind string
 
 const (
-	ConversationKindSquare  ConversationKind = "square"
+	ConversationKindGeneral ConversationKind = "general"
 	ConversationKindChannel ConversationKind = "channel"
 	ConversationKindThread  ConversationKind = "thread"
 )
@@ -81,7 +229,7 @@ const (
 type SubjectKind string
 
 const (
-	SubjectKindJob      SubjectKind = "job"
+	SubjectKindIssue    SubjectKind = "issue"
 	SubjectKindPlaybook SubjectKind = "playbook"
 	SubjectKindTalk     SubjectKind = "talk"
 )
@@ -131,14 +279,14 @@ type Doing struct {
 //vibevalley:union _tag
 type Phase struct{ Value PhaseValue }
 
-type LastTurn struct {
+type LastRun struct {
 	Outcome Outcome `json:"outcome"`
 	Summary string  `json:"summary"`
 	At      int64   `json:"at"`
 	Spent   *Spent  `json:"spent,omitzero"`
 }
 
-type HelperPlaybook struct {
+type WorkerPlaybook struct {
 	ID   string  `json:"id"`
 	Node *string `json:"node,omitzero"`
 }
@@ -149,17 +297,17 @@ type ActionStep struct {
 	Label  string       `json:"label"`
 }
 
-type HelperPlay struct {
-	Station       int64            `json:"station"`
-	History       []ActionStep     `json:"history"`
-	ToolsThisTurn int64            `json:"toolsThisTurn"`
-	Counts        map[string]int64 `json:"counts"`
-	Files         []string         `json:"files"`
-	Commands      []string         `json:"commands"`
-	TurnStartedAt *int64           `json:"turnStartedAt,omitzero"`
+type WorkerPlay struct {
+	Station      int64            `json:"station"`
+	History      []ActionStep     `json:"history"`
+	ToolsThisRun int64            `json:"toolsThisRun"`
+	Counts       map[string]int64 `json:"counts"`
+	Files        []string         `json:"files"`
+	Commands     []string         `json:"commands"`
+	RunStartedAt *int64           `json:"runStartedAt,omitzero"`
 }
 
-type Helper struct {
+type Worker struct {
 	ID       string          `json:"id"`
 	Name     string          `json:"name"`
 	Agent    string          `json:"agent"`
@@ -170,14 +318,17 @@ type Helper struct {
 	Worktree *string         `json:"worktree,omitzero"`
 	Conflict *Conflict       `json:"conflict,omitzero"`
 	HiredAt  int64           `json:"hiredAt"`
-	Turns    int64           `json:"turns"`
+	Runs     int64           `json:"runs"`
 	Phase    Phase           `json:"phase"`
-	Last     *LastTurn       `json:"last,omitzero"`
+	LastRun  *LastRun        `json:"lastRun,omitzero"`
 	Spent    *Spent          `json:"spent,omitzero"`
-	Playbook *HelperPlaybook `json:"playbook,omitzero"`
+	Playbook *WorkerPlaybook `json:"playbook,omitzero"`
 	Channel  *int64          `json:"channel,omitzero"`
-	Play     *HelperPlay     `json:"play,omitzero"`
+	Play     *WorkerPlay     `json:"play,omitzero"`
 	Issue    *string         `json:"issue,omitzero"`
+	// What it is doing, in words (PhaseWords), filled by FrameOf: in frames only. {span} stands for how long it has been
+	// quiet, which the reader fills from the phase's quietSince by its own clock.
+	PhaseText string `json:"phaseText,omitzero"`
 }
 
 type CommitCount struct {
@@ -218,13 +369,15 @@ type PlaybookNode struct {
 	Acceptance *bool     `json:"acceptance,omitzero"`
 	Frozen     []string  `json:"frozen,omitzero"`
 	State      NodeState `json:"state"`
-	Helper     *string   `json:"helper,omitzero"`
+	Worker     *string   `json:"worker,omitzero"`
 	Conclusion *string   `json:"conclusion,omitzero"`
 	Commits    []string  `json:"commits,omitzero"`
 	Spent      *Spent    `json:"spent,omitzero"`
 	Tries      int64     `json:"tries"`
 	// A retry starts Tries over, not this.
 	Failures int64 `json:"failures,omitzero"`
+	// The needs not settled yet (BlockedBy), filled by PlaybooksOf.
+	BlockedBy []string `json:"blockedBy,omitzero"`
 }
 
 type Playbook struct {
@@ -238,6 +391,12 @@ type Playbook struct {
 	Parallel  int64          `json:"parallel"`
 	Note      *string        `json:"note,omitzero"`
 	CreatedAt int64          `json:"createdAt"`
+	// Filled by PlaybooksOf: the steps in the order they can run (LayersOf), whether it waits on the owner (AsksForYou), what
+	// the steps have spent (PlaybookSpent), how many are merged or skipped.
+	Layers     [][]string `json:"layers,omitzero"`
+	AsksForYou bool       `json:"asksForYou,omitzero"`
+	Spent      *Spent     `json:"spent,omitzero"`
+	Settled    int64      `json:"settled,omitzero"`
 }
 
 type Unlock struct {
@@ -260,18 +419,20 @@ type Progress struct {
 	Unlocked   []Unlock              `json:"unlocked"`
 	Title      *ProgressTitle        `json:"title,omitzero"`
 	Agents     map[string]AgentTally `json:"agents,omitzero"`
+	// What a harvest's coins are multiplied by now, for the streak (the game's streakMultiplier).
+	Multiplier float64 `json:"multiplier,omitzero"`
 }
 
 type ProgressNews struct {
 	Coins    *int64   `json:"coins,omitzero"`
-	Helper   *string  `json:"helper,omitzero"`
+	Worker   *string  `json:"worker,omitzero"`
 	Unlocked []Unlock `json:"unlocked,omitzero"`
 }
 
 //vibevalley:union kind
 type ScheduleWhen struct{ Value ScheduleWhenValue }
 
-type FarmSchedule struct {
+type Schedule struct {
 	ID      int64        `json:"id"`
 	Name    string       `json:"name"`
 	Text    string       `json:"text"`
@@ -283,6 +444,9 @@ type FarmSchedule struct {
 	Enabled bool         `json:"enabled"`
 	Created int64        `json:"created"`
 	LastRun *int64       `json:"lastRun,omitzero"`
+	// When it comes due and when it next will, in words (WhenText, NextText), filled by FrameOf: in frames only.
+	WhenText string `json:"whenText,omitzero"`
+	NextText string `json:"nextText,omitzero"`
 }
 
 type Chat struct {
@@ -290,29 +454,29 @@ type Chat struct {
 	Messages      []ChatMessage  `json:"messages"`
 }
 
-type FarmState struct {
-	Call       CallState      `json:"call"`
-	CallReason *string        `json:"callReason,omitzero"`
-	Foreman    ForemanState   `json:"foreman"`
-	Helpers    []Helper       `json:"helpers"`
-	Chat       *Chat          `json:"chat,omitzero"`
-	Commits    *CommitCount   `json:"commits,omitzero"`
-	Progress   *Progress      `json:"progress,omitzero"`
-	Schedules  []FarmSchedule `json:"schedules,omitzero"`
+type CoreState struct {
+	Call       CallState    `json:"call"`
+	CallReason *string      `json:"callReason,omitzero"`
+	Manager    ManagerState `json:"manager"`
+	Workers    []Worker     `json:"workers"`
+	Chat       *Chat        `json:"chat,omitzero"`
+	Commits    *CommitCount `json:"commits,omitzero"`
+	Progress   *Progress    `json:"progress,omitzero"`
+	Schedules  []Schedule   `json:"schedules,omitzero"`
 	// The open issues and the latest closed (KeepClosedIssues); the database keeps them all.
 	Issues []Issue `json:"issues,omitzero"`
 }
 
-type StepKind string
+type ActivityKind string
 
 const (
-	StepKindAsked    StepKind = "asked"
-	StepKindRecalled StepKind = "recalled"
-	StepKindThought  StepKind = "thought"
-	StepKindSaid     StepKind = "said"
-	StepKindTool     StepKind = "tool"
-	StepKindRetry    StepKind = "retry"
-	StepKindProblem  StepKind = "problem"
+	ActivityKindPrompt   ActivityKind = "prompt"
+	ActivityKindRecalled ActivityKind = "recalled"
+	ActivityKindThought  ActivityKind = "thought"
+	ActivityKindResponse ActivityKind = "response"
+	ActivityKindAction   ActivityKind = "action"
+	ActivityKindRetry    ActivityKind = "retry"
+	ActivityKindError    ActivityKind = "error"
 )
 
 type ToolAction string
@@ -328,18 +492,18 @@ const (
 	ToolActionOther      ToolAction = "other"
 )
 
-type WorkStep struct {
-	N      int64       `json:"n"`
-	At     int64       `json:"at"`
-	Kind   StepKind    `json:"kind"`
-	Under  *int64      `json:"under,omitzero"`
-	Text   string      `json:"text"`
-	Action *ToolAction `json:"action,omitzero"`
-	Tool   *string     `json:"tool,omitzero"`
-	Input  *string     `json:"input,omitzero"`
-	Output *string     `json:"output,omitzero"`
-	Ok     *bool       `json:"ok,omitzero"`
-	On     *int64      `json:"on,omitzero"`
+type Activity struct {
+	N      int64        `json:"n"`
+	At     int64        `json:"at"`
+	Kind   ActivityKind `json:"kind"`
+	Under  *int64       `json:"under,omitzero"`
+	Text   string       `json:"text"`
+	Action *ToolAction  `json:"action,omitzero"`
+	Tool   *string      `json:"tool,omitzero"`
+	Input  *string      `json:"input,omitzero"`
+	Output *string      `json:"output,omitzero"`
+	Ok     *bool        `json:"ok,omitzero"`
+	On     *int64       `json:"on,omitzero"`
 }
 
 type NoticeLevel string
@@ -402,7 +566,10 @@ type RuntimeInfo struct {
 	Tools        []InventoryEntry `json:"tools" vibevalley:"null"`
 	Settings     RuntimeSettings  `json:"settings"`
 	SpentToday   *float64         `json:"spentToday,omitzero"`
-	CheckedAt    int64            `json:"checkedAt"`
+	Quota        *RuntimeQuota    `json:"quota,omitzero"`
+	// Why no new work goes to it now (MoneyStop: quota, balance, the day's budget); empty when work can go.
+	Stop      string `json:"stop,omitzero"`
+	CheckedAt int64  `json:"checkedAt"`
 }
 
 type FarmLevel struct {
@@ -414,7 +581,7 @@ type FarmLevel struct {
 type InboxKind string
 
 const (
-	InboxKindHarvest    InboxKind = "harvest"
+	InboxKindMerge      InboxKind = "merge"
 	InboxKindFix        InboxKind = "fix"
 	InboxKindConflict   InboxKind = "conflict"
 	InboxKindQuiet      InboxKind = "quiet"
@@ -479,8 +646,8 @@ type FarmView struct {
 //vibevalley:union kind
 type GameEffect struct{ Value GameEffectValue }
 
-type SiteFrame struct {
-	State   FarmState    `json:"state"`
+type StateFrame struct {
+	State   CoreState    `json:"state"`
 	Inbox   []InboxItem  `json:"inbox"`
 	Plans   []Playbook   `json:"plans"`
 	View    FarmView     `json:"view"`
@@ -499,7 +666,7 @@ const (
 	PlaybookEventKindPaused       PlaybookEventKind = "paused"
 	PlaybookEventKindResumed      PlaybookEventKind = "resumed"
 	PlaybookEventKindRipe         PlaybookEventKind = "ripe"
-	PlaybookEventKindHarvested    PlaybookEventKind = "harvested"
+	PlaybookEventKindMerged       PlaybookEventKind = "merged"
 	PlaybookEventKindAbandoned    PlaybookEventKind = "abandoned"
 	PlaybookEventKindNoted        PlaybookEventKind = "noted"
 	PlaybookEventKindNodeStarted  PlaybookEventKind = "node_started"
@@ -518,8 +685,8 @@ type PlaybookActor string
 
 const (
 	PlaybookActorUser    PlaybookActor = "user"
-	PlaybookActorForeman PlaybookActor = "foreman"
-	PlaybookActorFarm    PlaybookActor = "farm"
+	PlaybookActorManager PlaybookActor = "manager"
+	PlaybookActorSystem  PlaybookActor = "system"
 )
 
 type NodeFieldChange struct {
@@ -534,11 +701,13 @@ type PlaybookEvent struct {
 	Node     *string           `json:"node,omitzero"`
 	Kind     PlaybookEventKind `json:"kind"`
 	Actor    PlaybookActor     `json:"actor"`
-	Helper   *string           `json:"helper,omitzero"`
+	Worker   *string           `json:"worker,omitzero"`
 	Detail   *string           `json:"detail,omitzero"`
 	Changes  []NodeFieldChange `json:"changes,omitzero"`
 	Commits  []string          `json:"commits,omitzero"`
 	At       int64             `json:"at"`
+	// What happened in words (PlaybookEventText), the steps by their titles now: filled by playbook.Events, not kept.
+	Text string `json:"text,omitzero"`
 }
 
 type LanDevice struct {
@@ -698,17 +867,19 @@ type Memory struct {
 	Kind       MemoryKind `json:"kind"`
 	Text       string     `json:"text"`
 	Project    *string    `json:"project,omitzero"`
-	Helper     *string    `json:"helper,omitzero"`
+	Worker     *string    `json:"worker,omitzero"`
 	At         int64      `json:"at"`
 	Recalled   int64      `json:"recalled"`
 	RecalledAt *int64     `json:"recalledAt,omitzero"`
+	// Among the first to go if a few more are kept (NextForgotten): the longest unused.
+	Fading bool `json:"fading,omitzero"`
 }
 
 type MemoryKind string
 
 const (
-	MemoryKindNote MemoryKind = "note"
-	MemoryKindJob  MemoryKind = "job"
+	MemoryKindNote  MemoryKind = "note"
+	MemoryKindIssue MemoryKind = "issue"
 )
 
 type MemoryRequest struct {
@@ -723,7 +894,7 @@ type ManagerMemory struct {
 	Carried  int64    `json:"carried"`
 }
 
-type AgentProfile struct {
+type Agent struct {
 	ID              string            `json:"id"`
 	Name            string            `json:"name"`
 	Role            string            `json:"role"`
@@ -836,7 +1007,7 @@ const (
 	PlaybookActionPause   PlaybookAction = "pause"
 	PlaybookActionResume  PlaybookAction = "resume"
 	PlaybookActionAbandon PlaybookAction = "abandon"
-	PlaybookActionHarvest PlaybookAction = "harvest"
+	PlaybookActionMerge   PlaybookAction = "merge"
 )
 
 type NodeEdit struct {
@@ -855,7 +1026,7 @@ type PlanRequest struct {
 }
 
 type Dispatched struct {
-	Helper *string `json:"helper,omitzero"`
+	Worker *string `json:"worker,omitzero"`
 	Queued *string `json:"queued,omitzero"`
 }
 
@@ -864,13 +1035,13 @@ type Issue struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description,omitzero"`
 	Project     *string  `json:"project,omitzero"`
-	Agent       *string  `json:"agent,omitzero"`
+	Assignee    *string  `json:"assignee,omitzero"`
 	Priority    Priority `json:"priority"`
 	// First lowest.
 	Rank      int64       `json:"rank,omitzero"`
 	CreatedAt int64       `json:"createdAt"`
 	QueuedAt  *int64      `json:"queuedAt,omitzero"`
-	Runs      []string    `json:"runs"`
+	Workers   []string    `json:"workers"`
 	ClosedAt  *int64      `json:"closedAt,omitzero"`
 	Closed    *IssueClose `json:"closed,omitzero"`
 	Parent    *string     `json:"parent,omitzero"`
@@ -895,7 +1066,7 @@ type IssueStep struct {
 	Scope      []string  `json:"scope,omitzero"`
 	Acceptance *bool     `json:"acceptance,omitzero"`
 	Frozen     []string  `json:"frozen,omitzero"`
-	Helper     *string   `json:"helper,omitzero"`
+	Worker     *string   `json:"worker,omitzero"`
 	Conclusion *string   `json:"conclusion,omitzero"`
 	Commits    []string  `json:"commits,omitzero"`
 	Spent      *Spent    `json:"spent,omitzero"`
@@ -906,11 +1077,12 @@ type IssueStep struct {
 type IssueStatus string
 
 const (
-	IssueStatusTodo    IssueStatus = "todo"
-	IssueStatusQueued  IssueStatus = "queued"
-	IssueStatusWorking IssueStatus = "working"
-	IssueStatusWaiting IssueStatus = "waiting"
-	IssueStatusClosed  IssueStatus = "closed"
+	IssueStatusBacklog    IssueStatus = "backlog"
+	IssueStatusTodo       IssueStatus = "todo"
+	IssueStatusInProgress IssueStatus = "in_progress"
+	IssueStatusInReview   IssueStatus = "in_review"
+	IssueStatusDone       IssueStatus = "done"
+	IssueStatusCanceled   IssueStatus = "canceled"
 )
 
 type Priority string
@@ -918,7 +1090,7 @@ type Priority string
 const (
 	PriorityUrgent Priority = "urgent"
 	PriorityHigh   Priority = "high"
-	PriorityNormal Priority = "normal"
+	PriorityMedium Priority = "medium"
 	PriorityLow    Priority = "low"
 )
 
@@ -926,13 +1098,13 @@ type IssueRequest struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description,omitzero"`
 	Project     *string   `json:"project,omitzero"`
-	Agent       *string   `json:"agent,omitzero"`
+	Assignee    *string   `json:"assignee,omitzero"`
 	Priority    *Priority `json:"priority,omitzero"`
 }
 
 type Trajectory struct {
-	Head  TrajectoryHead `json:"head"`
-	Steps []WorkStep     `json:"steps"`
+	Head       TrajectoryHead `json:"head"`
+	Activities []Activity     `json:"activities"`
 }
 
 type TrajectoryHead struct {
@@ -947,11 +1119,11 @@ type TrajectoryHead struct {
 	Closed       *IssueClose     `json:"closed,omitzero"`
 	Outcome      *Outcome        `json:"outcome,omitzero"`
 	Summary      *string         `json:"summary,omitzero"`
-	Turns        *int64          `json:"turns,omitzero"`
+	Runs         *int64          `json:"runs,omitzero"`
 	CNY          *float64        `json:"cny,omitzero"`
 	ReopenedFrom *string         `json:"reopenedFrom,omitzero"`
 	ReopenedAs   *string         `json:"reopenedAs,omitzero"`
-	Playbook     *HelperPlaybook `json:"playbook,omitzero"`
+	Playbook     *WorkerPlaybook `json:"playbook,omitzero"`
 	// ReopenedFrom and ReopenedAs are how runs told it before issues.
 	Issue *string `json:"issue,omitzero"`
 }
@@ -959,11 +1131,49 @@ type TrajectoryHead struct {
 type IssueClose string
 
 const (
-	IssueCloseHarvested IssueClose = "harvested"
-	IssueCloseMerged    IssueClose = "merged"
-	IssueCloseDismissed IssueClose = "dismissed"
-	IssueCloseLost      IssueClose = "lost"
+	IssueCloseMerged         IssueClose = "merged"
+	IssueCloseMergedIntoPlan IssueClose = "merged_into_plan"
+	IssueCloseDismissed      IssueClose = "dismissed"
+	IssueCloseLost           IssueClose = "lost"
+	// An issue for the manager, once it has answered.
+	IssueCloseAnswered IssueClose = "answered"
 )
+
+// What started a run: the issue sent out, a comment (a message in its thread, @ it, a comment on a step, 浇水, a word after the
+// server restarted), its playbook moving on, a schedule, or the runtime itself.
+type RunTriggerKind string
+
+const (
+	RunTriggerKindIssue    RunTriggerKind = "issue"
+	RunTriggerKindComment  RunTriggerKind = "comment"
+	RunTriggerKindPlaybook RunTriggerKind = "playbook"
+	RunTriggerKindSchedule RunTriggerKind = "schedule"
+	RunTriggerKindRuntime  RunTriggerKind = "runtime"
+)
+
+type RunTrigger struct {
+	Kind RunTriggerKind `json:"kind"`
+	// comment: the message that woke it.
+	Message *int64 `json:"message,omitzero"`
+	// schedule: which one, and whether this is the run it missed while the server was off.
+	Schedule *int64 `json:"schedule,omitzero"`
+	Missed   bool   `json:"missed,omitzero"`
+}
+
+// One go at the work, from the input that started it to its report.
+type Run struct {
+	ID          int64      `json:"id"`
+	Worker      string     `json:"worker"`
+	Issue       *string    `json:"issue,omitzero"`
+	TriggeredBy RunTrigger `json:"triggeredBy"`
+	// The messages steered into it while it ran.
+	Heard     []int64  `json:"heard"`
+	StartedAt int64    `json:"startedAt"`
+	EndedAt   *int64   `json:"endedAt,omitzero"`
+	Outcome   *Outcome `json:"outcome,omitzero"`
+	Summary   *string  `json:"summary,omitzero"`
+	Spent     *Spent   `json:"spent,omitzero"`
+}
 
 type TellRequest struct {
 	Text string `json:"text"`
@@ -1019,8 +1229,7 @@ type KeySource string
 
 const (
 	KeySourceSettings KeySource = "settings"
-	KeySourceEnv      KeySource = "env"
-	KeySourcePi       KeySource = "pi"
+	KeySourceConfig   KeySource = "config"
 )
 
 type VoiceSettings struct {
@@ -1163,8 +1372,8 @@ type Update struct {
 	Available bool   `json:"available"`
 }
 
-//vibevalley:member InboxFrom helper
-type InboxFromHelper struct {
+//vibevalley:member InboxFrom worker
+type InboxFromWorker struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Agent string `json:"agent"`
@@ -1221,38 +1430,38 @@ type GameEffectAchievement struct {
 //vibevalley:member LedgerEntry harvested
 type LedgerEntryHarvested struct {
 	At      int64    `json:"at"`
-	Helper  string   `json:"helper"`
+	Worker  string   `json:"worker"`
 	Agent   *string  `json:"agent,omitzero"`
 	Project string   `json:"project"`
 	Runtime string   `json:"runtime"`
 	Commits int64    `json:"commits"`
 	CNY     *float64 `json:"cny,omitzero"`
-	Turns   int64    `json:"turns"`
+	Runs    int64    `json:"runs"`
 }
 
 //vibevalley:member LedgerEntry failed
 type LedgerEntryFailed struct {
 	At     int64   `json:"at"`
-	Helper string  `json:"helper"`
+	Worker string  `json:"worker"`
 	Agent  *string `json:"agent,omitzero"`
 }
 
 //vibevalley:member LedgerEntry conflicted
 type LedgerEntryConflicted struct {
 	At     int64  `json:"at"`
-	Helper string `json:"helper"`
+	Worker string `json:"worker"`
 }
 
 //vibevalley:member LedgerEntry told
 type LedgerEntryTold struct {
 	At     int64  `json:"at"`
-	Helper string `json:"helper"`
+	Worker string `json:"worker"`
 }
 
 //vibevalley:member LedgerEntry reviewed
 type LedgerEntryReviewed struct {
 	At     int64  `json:"at"`
-	Helper string `json:"helper"`
+	Worker string `json:"worker"`
 }
 
 //vibevalley:member LedgerEntry playbook
@@ -1266,36 +1475,38 @@ type LedgerEntryPlaybook struct {
 //vibevalley:member LedgerEntry handoff
 type LedgerEntryHandoff struct {
 	At     int64  `json:"at"`
-	Helper string `json:"helper"`
+	Worker string `json:"worker"`
 	To     string `json:"to"`
 }
 
 //vibevalley:member LedgerEntry called
 type LedgerEntryCalled struct {
 	At     int64  `json:"at"`
-	Helper string `json:"helper"`
+	Worker string `json:"worker"`
 }
 
 //vibevalley:member LedgerEntry hired
 type LedgerEntryHired struct {
 	At     int64   `json:"at"`
-	Helper string  `json:"helper"`
+	Worker string  `json:"worker"`
 	Agent  *string `json:"agent,omitzero"`
 }
 
-type LedgerEntryOpenedPlannedVoiceBusy6Kind string
+type LedgerEntryMomentKind string
 
 const (
-	LedgerEntryOpenedPlannedVoiceBusy6KindOpened  LedgerEntryOpenedPlannedVoiceBusy6Kind = "opened"
-	LedgerEntryOpenedPlannedVoiceBusy6KindPlanned LedgerEntryOpenedPlannedVoiceBusy6Kind = "planned"
-	LedgerEntryOpenedPlannedVoiceBusy6KindVoice   LedgerEntryOpenedPlannedVoiceBusy6Kind = "voice"
-	LedgerEntryOpenedPlannedVoiceBusy6KindBusy6   LedgerEntryOpenedPlannedVoiceBusy6Kind = "busy6"
+	LedgerEntryMomentKindOpened  LedgerEntryMomentKind = "opened"
+	LedgerEntryMomentKindPlanned LedgerEntryMomentKind = "planned"
+	LedgerEntryMomentKindVoice   LedgerEntryMomentKind = "voice"
+	LedgerEntryMomentKindBusy6   LedgerEntryMomentKind = "busy6"
 )
 
+// A moment on the ledger with nothing more to it: the farm opened, a plan made, a talk with the voice manager, all six beds busy.
+//
 //vibevalley:member LedgerEntry opened planned voice busy6
-type LedgerEntryOpenedPlannedVoiceBusy6 struct {
-	Kind LedgerEntryOpenedPlannedVoiceBusy6Kind `json:"kind"`
-	At   int64                                  `json:"at"`
+type LedgerEntryMoment struct {
+	Kind LedgerEntryMomentKind `json:"kind"`
+	At   int64                 `json:"at"`
 }
 
 //vibevalley:member LedgerEntry level
@@ -1499,10 +1710,10 @@ type SettingsUpdateVoice struct {
 	IdleSeconds    *int64    `json:"idleSeconds,omitzero"`
 }
 
-type Site struct {
+type Roots struct {
 	Fact          Fact          `json:"fact"`
-	Event         SiteEvent     `json:"event"`
-	Frame         SiteFrame     `json:"frame"`
+	Event         SideEvent     `json:"event"`
+	Frame         StateFrame    `json:"frame"`
 	Ledger        LedgerEntry   `json:"ledger"`
 	PlaybookEvent PlaybookEvent `json:"playbookEvent"`
 }
@@ -1511,22 +1722,22 @@ type Site struct {
 type Fact struct{ Value FactValue }
 
 //vibevalley:member Fact call
-//vibevalley:member SiteEvent call
+//vibevalley:member SideEvent call
 type FactCall struct {
 	At     int64     `json:"at"`
 	State  CallState `json:"state"`
 	Reason *string   `json:"reason,omitzero"`
 }
 
-//vibevalley:member Fact foreman
-//vibevalley:member SiteEvent foreman
-type FactForeman struct {
+//vibevalley:member Fact manager
+//vibevalley:member SideEvent manager
+type FactManager struct {
 	At    int64        `json:"at"`
-	State ForemanState `json:"state"`
+	State ManagerState `json:"state"`
 }
 
 //vibevalley:member Fact message
-//vibevalley:member SiteEvent message
+//vibevalley:member SideEvent message
 type FactMessage struct {
 	At      int64       `json:"at"`
 	Message ChatMessage `json:"message"`
@@ -1536,30 +1747,39 @@ type FactMessage struct {
 }
 
 //vibevalley:member Fact conversation
-//vibevalley:member SiteEvent conversation
+//vibevalley:member SideEvent conversation
 type FactConversation struct {
 	At           int64        `json:"at"`
 	Conversation Conversation `json:"conversation"`
 }
 
 //vibevalley:member Fact hired
-//vibevalley:member SiteEvent hired
+//vibevalley:member SideEvent hired
 type FactHired struct {
-	At      int64  `json:"at"`
-	Helper  Helper `json:"helper"`
-	Station *int64 `json:"station,omitzero"`
+	At     int64  `json:"at"`
+	Worker Worker `json:"worker"`
 }
 
-//vibevalley:member Fact turn
-//vibevalley:member SiteEvent turn
-type FactTurn struct {
+// The person planted on this bed just before the worker was hired.
+//
+//vibevalley:member Fact station
+//vibevalley:member SideEvent station
+type FactStation struct {
+	At      int64  `json:"at"`
+	ID      string `json:"id"`
+	Station int64  `json:"station"`
+}
+
+//vibevalley:member Fact run
+//vibevalley:member SideEvent run
+type FactRun struct {
 	At   int64   `json:"at"`
 	ID   string  `json:"id"`
 	Task *string `json:"task,omitzero"`
 }
 
 //vibevalley:member Fact doing
-//vibevalley:member SiteEvent doing
+//vibevalley:member SideEvent doing
 type FactDoing struct {
 	At     int64        `json:"at"`
 	ID     string       `json:"id"`
@@ -1568,7 +1788,7 @@ type FactDoing struct {
 }
 
 //vibevalley:member Fact quiet
-//vibevalley:member SiteEvent quiet
+//vibevalley:member SideEvent quiet
 type FactQuiet struct {
 	At    int64  `json:"at"`
 	ID    string `json:"id"`
@@ -1576,7 +1796,7 @@ type FactQuiet struct {
 }
 
 //vibevalley:member Fact retry
-//vibevalley:member SiteEvent retry
+//vibevalley:member SideEvent retry
 type FactRetry struct {
 	At      int64  `json:"at"`
 	ID      string `json:"id"`
@@ -1585,7 +1805,7 @@ type FactRetry struct {
 }
 
 //vibevalley:member Fact spent
-//vibevalley:member SiteEvent spent
+//vibevalley:member SideEvent spent
 type FactSpent struct {
 	At    int64  `json:"at"`
 	ID    string `json:"id"`
@@ -1593,18 +1813,18 @@ type FactSpent struct {
 }
 
 //vibevalley:member Fact report
-//vibevalley:member SiteEvent report
+//vibevalley:member SideEvent report
 type FactReport struct {
 	At      int64   `json:"at"`
 	ID      string  `json:"id"`
 	Outcome Outcome `json:"outcome"`
 	Summary string  `json:"summary"`
-	Turns   int64   `json:"turns"`
+	Runs    int64   `json:"runs"`
 	Spent   *Spent  `json:"spent,omitzero"`
 }
 
 //vibevalley:member Fact conflict
-//vibevalley:member SiteEvent conflict
+//vibevalley:member SideEvent conflict
 type FactConflict struct {
 	At       int64     `json:"at"`
 	ID       string    `json:"id"`
@@ -1612,7 +1832,7 @@ type FactConflict struct {
 }
 
 //vibevalley:member Fact left
-//vibevalley:member SiteEvent left
+//vibevalley:member SideEvent left
 type FactLeft struct {
 	At     int64       `json:"at"`
 	ID     string      `json:"id"`
@@ -1621,28 +1841,28 @@ type FactLeft struct {
 }
 
 //vibevalley:member Fact commits
-//vibevalley:member SiteEvent commits
+//vibevalley:member SideEvent commits
 type FactCommits struct {
 	At      int64       `json:"at"`
 	Commits CommitCount `json:"commits"`
 }
 
 //vibevalley:member Fact issue
-//vibevalley:member SiteEvent issue
+//vibevalley:member SideEvent issue
 type FactIssue struct {
 	At    int64 `json:"at"`
 	Issue Issue `json:"issue"`
 }
 
 //vibevalley:member Fact issueGone
-//vibevalley:member SiteEvent issueGone
+//vibevalley:member SideEvent issueGone
 type FactIssueGone struct {
 	At int64  `json:"at"`
 	ID string `json:"id"`
 }
 
 //vibevalley:member Fact progress
-//vibevalley:member SiteEvent progress
+//vibevalley:member SideEvent progress
 type FactProgress struct {
 	At       int64         `json:"at"`
 	Progress Progress      `json:"progress"`
@@ -1650,44 +1870,44 @@ type FactProgress struct {
 }
 
 //vibevalley:member Fact schedule
-//vibevalley:member SiteEvent schedule
+//vibevalley:member SideEvent schedule
 type FactSchedule struct {
-	At       int64        `json:"at"`
-	Schedule FarmSchedule `json:"schedule"`
+	At       int64    `json:"at"`
+	Schedule Schedule `json:"schedule"`
 }
 
 //vibevalley:member Fact unschedule
-//vibevalley:member SiteEvent unschedule
+//vibevalley:member SideEvent unschedule
 type FactUnschedule struct {
 	At int64 `json:"at"`
 	ID int64 `json:"id"`
 }
 
 //vibevalley:union type
-type SiteEvent struct{ Value SiteEventValue }
+type SideEvent struct{ Value SideEventValue }
 
-//vibevalley:member SiteEvent snapshot
-type SiteEventSnapshot struct {
+//vibevalley:member SideEvent snapshot
+type SideEventSnapshot struct {
 	At    int64     `json:"at"`
-	State FarmState `json:"state"`
+	State CoreState `json:"state"`
 }
 
-//vibevalley:member SiteEvent step
-type SiteEventStep struct {
-	At   int64    `json:"at"`
-	ID   string   `json:"id"`
-	Step WorkStep `json:"step"`
+//vibevalley:member SideEvent activity
+type SideEventActivity struct {
+	At       int64    `json:"at"`
+	ID       string   `json:"id"`
+	Activity Activity `json:"activity"`
 }
 
-//vibevalley:member SiteEvent notice
-type SiteEventNotice struct {
+//vibevalley:member SideEvent notice
+type SideEventNotice struct {
 	At    int64       `json:"at"`
 	Level NoticeLevel `json:"level"`
 	Text  string      `json:"text"`
 }
 
-//vibevalley:member SiteEvent runtime
-type SiteEventRuntime struct {
+//vibevalley:member SideEvent runtime
+type SideEventRuntime struct {
 	At   int64       `json:"at"`
 	Info RuntimeInfo `json:"info"`
 }
@@ -1761,12 +1981,12 @@ type AnswerPairingRequest struct {
 }
 
 //vibevalley:error 409
-type FarmRefused struct {
+type Refused struct {
 	Reason string `json:"reason"`
 }
 
 //vibevalley:error 404
-type FarmMissing struct {
+type Missing struct {
 	What string `json:"what"`
 }
 

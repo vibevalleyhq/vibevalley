@@ -7,6 +7,7 @@ enum TicketState {
   merged('合进了计划'),
   dropped('没收就收工了'),
   lost('丢了'),
+  answered('管家答完了'),
   closed('已关');
 
   const TicketState(this.label);
@@ -17,21 +18,24 @@ enum TicketState {
 
 TicketState ticketState(Issue issue) {
   switch (issue.status) {
-    case IssueStatus.working:
+    case IssueStatus.inProgress:
       return TicketState.working;
-    case IssueStatus.waiting:
+    case IssueStatus.inReview:
       return TicketState.waiting;
-    case IssueStatus.todo || IssueStatus.queued || IssueStatus.closed:
+    case IssueStatus.backlog || IssueStatus.todo || IssueStatus.done || IssueStatus.canceled:
       break;
   }
   return switch (issue.closed) {
-    IssueClose.harvested => TicketState.harvested,
-    IssueClose.merged => TicketState.merged,
+    IssueClose.merged => TicketState.harvested,
+    IssueClose.mergedIntoPlan => TicketState.merged,
     IssueClose.dismissed => TicketState.dropped,
     IssueClose.lost => TicketState.lost,
+    IssueClose.answered => TicketState.answered,
     null => TicketState.closed,
   };
 }
+
+bool isForManager(Issue issue) => issue.assignee == managerAgent;
 
 String ticketTitle(Issue issue, [List<Playbook> plans = const []]) {
   final job = issue.title.trim();
@@ -40,12 +44,10 @@ String ticketTitle(Issue issue, [List<Playbook> plans = const []]) {
     final playbook = plans.where((p) => p.id == parent).firstOrNull;
     if (playbook != null) return '${playbook.title} · $job';
   }
-  final first = job.split('\n').first.trim();
-  final brief = RegExp(r'^这是种植计划「(.+?)」里的一步：(.+)$').firstMatch(first);
-  return brief == null ? first : '${brief.group(1)} · ${brief.group(2)}';
+  return job.split('\n').first.trim();
 }
 
-bool ticketIs(Issue issue, String id) => issue.id == id || issue.runs.contains(id);
+bool ticketIs(Issue issue, String id) => issue.id == id || issue.workers.contains(id);
 
 Lane? playbookLane(Playbook p) => switch (p.state) {
   PlaybookState.planning || PlaybookState.running => Lane.working,
@@ -56,15 +58,15 @@ Lane? playbookLane(Playbook p) => switch (p.state) {
 String playbookLine(Playbook p) => switch (p.state) {
   PlaybookState.planning => '在拆步骤',
   PlaybookState.draft => '拆好了，看过再开工',
-  PlaybookState.running => '做到 ${p.nodes.where((n) => n.state == NodeState.merged || n.state == NodeState.skipped).length} / ${p.nodes.length} 步',
+  PlaybookState.running => '做到 ${p.settled ?? 0} / ${p.nodes.length} 步',
   PlaybookState.paused => '暂停了',
   PlaybookState.ripe => '都做完了，等你收获',
   PlaybookState.done => '收获了',
   PlaybookState.abandoned => '放弃了',
 };
 
-Helper? ticketHelper(FarmState? farm, Issue issue) =>
-    farm == null || issue.runs.isEmpty || issue.closed != null ? null : farm.helpers.where((h) => h.id == issue.runs.last).firstOrNull;
+Worker? ticketWorker(CoreState? farm, Issue issue) =>
+    farm == null || issue.workers.isEmpty || issue.closed != null ? null : farm.workers.where((h) => h.id == issue.workers.last).firstOrNull;
 
 enum Lane {
   todo('待办'),
@@ -76,10 +78,11 @@ enum Lane {
   final String label;
 }
 
-Lane laneOf(TicketState s) => switch (s) {
-  TicketState.working => Lane.working,
-  TicketState.waiting => Lane.waiting,
-  _ => Lane.closed,
+Lane laneOf(IssueStatus s) => switch (s) {
+  IssueStatus.backlog || IssueStatus.todo => Lane.todo,
+  IssueStatus.inProgress => Lane.working,
+  IssueStatus.inReview => Lane.waiting,
+  IssueStatus.done || IssueStatus.canceled => Lane.closed,
 };
 
 enum Move { start, close, reopen }
@@ -92,7 +95,8 @@ Move? moveOf(Lane from, Lane to, {bool planned = false}) => switch ((from, to)) 
   _ => null,
 };
 
-bool ticketPlanned(Issue issue, Helper? helper) => issue.plan != null || issue.parent != null || helper?.playbook != null || issue.closed == IssueClose.merged;
+bool ticketPlanned(Issue issue, Worker? worker) =>
+    issue.plan != null || issue.parent != null || worker?.playbook != null || issue.closed == IssueClose.mergedIntoPlan;
 
 bool matchesQuery(String query, Iterable<String?> fields) {
   final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
@@ -103,4 +107,24 @@ bool matchesQuery(String query, Iterable<String?> fields) {
 
 const closedShown = 15;
 
-const workingBeds = 6;
+String runTriggerText(RunTrigger t) => switch (t.kind) {
+  RunTriggerKind.issue => '派出去',
+  RunTriggerKind.comment => t.message != null ? '带话（#${t.message!.round()}）' : '带话',
+  RunTriggerKind.playbook => '种植计划',
+  RunTriggerKind.schedule => t.missed == true ? '定时（补跑）' : '定时',
+  RunTriggerKind.runtime => '农机自己',
+};
+
+/// One line for a run: what started it, how it went, how long, what it cost, what it heard while it ran. `took` is tookText.
+String runText(Run r, double now, String Function(double ms) took) => [
+  runTriggerText(r.triggeredBy),
+  switch (r.outcome) {
+    null => '正在干',
+    Outcome.completed => '做完了',
+    Outcome.failed => '没做成',
+    Outcome.interrupted => '叫停了',
+  },
+  took((r.endedAt ?? now) - r.startedAt),
+  if (r.spent?.cny case final cny?) '¥${cny.toStringAsFixed(2)}',
+  if (r.heard.isNotEmpty) '中途听到 ${r.heard.length} 句',
+].join(' · ');

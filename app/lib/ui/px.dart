@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-import '../app/theme.dart';
+import 'theme.dart';
 import '../sprites/atlas.dart';
 
 class PxFrame extends StatelessWidget {
@@ -49,8 +49,6 @@ BoxDecoration pxInset({Color fill = Palette.cream200, Color line = Palette.cream
   color: fill,
   border: Border.all(color: line, width: 2),
 );
-
-const pxDropShadow = [BoxShadow(color: Palette.pxDrop, offset: Offset(2, 2))];
 
 class ManagerFace extends StatelessWidget {
   const ManagerFace({super.key, required this.atlas, required this.size, this.look = 'manager-face', this.fill = const Color(0xFFCFE6F5)});

@@ -11,10 +11,10 @@ Status: implemented
 行为见 [voice.md](../../../../docs/reference/voice.md)「语音线路」。
 
 - **「想」多一个选项：农场的管家**（`VoiceLLM` 的 `vibevalley`）。声网的对话式 AI 本来就能接 OpenAI 兼容的自定义接口，所以识别、断句、插话、合成都还用声网的，只把「想」换成我们的管家。管家跑在 VibeValley 自己的 agent 上（默认 DeepSeek V4.1 Flash），有工具、有记性、有轨迹。
-- **语音线路**（`server/internal/channels/voice_line.go`）：
+- **语音线路**（`server/internal/voice/line.go`）：
   - 单独一个监听，只听 127.0.0.1，只有 `POST /llm/<通话>/chat/completions` 这一个接口。
-  - 声网的云端经隧道访问它：设了 `VIBEVALLEY_VOICE_LINE_URL` 就用你自己的隧道，没设就在第一通电话时开一个 cloudflared 临时隧道，等到它的地址能应答再交给声网（新地址实测约 25 秒才通），最后一通挂了 10 分钟后关掉。
-  - 每通电话生成一把钥匙，请求不带钥匙返回 401，挂了电话钥匙作废。`channels/voice_agora.go` 开始通话时开线路，结束时关。
+  - 声网的云端经隧道访问它：设了 `voice.line.url` 就用你自己的隧道，没设就在第一通电话时开一个 cloudflared 临时隧道，等到它的地址能应答再交给声网（新地址实测约 25 秒才通），最后一通挂了 10 分钟后关掉。
+  - 每通电话生成一把钥匙，请求不带钥匙返回 401，挂了电话钥匙作废。`voice/agora.go` 开始通话时开线路，结束时关。
 - **对话以管家为准**：声网发来的 `messages` 只取最后一条主人说的话。`Foreman.Call` 把它交给管家，注明是电话里说的、回答要口语，再把管家这一轮说的字一边长出来一边流回去，这一轮结束就收尾。管家调工具前说的「我看一下」也会念出来，算是给沉默垫一句。说的话照样进田头。
 - **插话**：声网打断时会挂掉这次请求，这一轮剩下的字就不再送出。同一通电话的新一句会结束上一句的流。
 - **不重复处理**：「想」选了农场的管家时，托管语音管家那条转话的路（`Foreman.Heard`）不再交给管家。
@@ -39,8 +39,8 @@ Status: implemented
 
 ## Verification
 
-- `server/internal/channels/voice_line_test.go`：只有这通电话的钥匙进得来，别的路径都是 404；只取最后一条主人说的话；流回去的是 OpenAI 的块，第一块带 role，最后是 stop 和 `[DONE]`；请求被挂掉时，这一轮的字就不再送出。
-- `server/internal/manager/foreman_test.go`：电话里的一句话交给管家时注明是电话里说的，管家这一轮的话流回来；选了农场的管家以后，转话不再交给管家。
+- `server/internal/voice/line_test.go`：只有这通电话的钥匙进得来，别的路径都是 404；只取最后一条主人说的话；流回去的是 OpenAI 的块，第一块带 role，最后是 stop 和 `[DONE]`；请求被挂掉时，这一轮的字就不再送出。
+- `server/internal/manager/manager_test.go`：电话里的一句话交给管家时注明是电话里说的，管家这一轮的话流回来；选了农场的管家以后，转话不再交给管家。
 - 真人打一通电话、听到管家的声音，要主人自己试：当时的无头浏览器只能证明连接和字幕。
 
 ## Deferred

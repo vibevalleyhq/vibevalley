@@ -355,6 +355,338 @@
       "body": "文档用中文。短句，主动语态，一段一个意思。先说结论再说原因。术语第一次出现时解释一次，之后保持同一个叫法。"
     }
   ],
+  "fallbackPreset": {
+    "id": "",
+    "label": "",
+    "blurb": "VibeValley 还没有专属外形的 runtime。",
+    "look": {
+      "build": "biped",
+      "head": "rounded",
+      "body": "#f1e8d8",
+      "trim": "#5d5850",
+      "hat": "#f2b53a",
+      "eye": "#a6f4ff"
+    }
+  },
+  "achievements": [
+    {
+      "id": "s_open",
+      "category": "starter",
+      "title": "开门",
+      "detail": "开工",
+      "tiers": [
+        1
+      ],
+      "coins": [
+        20
+      ]
+    },
+    {
+      "id": "s_hire",
+      "category": "starter",
+      "title": "派活",
+      "detail": "派出第一个帮工",
+      "tiers": [
+        1
+      ],
+      "coins": [
+        20
+      ]
+    },
+    {
+      "id": "s_tell",
+      "category": "starter",
+      "title": "带话",
+      "detail": "给帮工带一句话：浇水，或者在它的工单串里说",
+      "tiers": [
+        1
+      ],
+      "coins": [
+        20
+      ]
+    },
+    {
+      "id": "s_review",
+      "category": "starter",
+      "title": "验收",
+      "detail": "看过收成清单，再收进主分支",
+      "tiers": [
+        1
+      ],
+      "coins": [
+        20
+      ]
+    },
+    {
+      "id": "s_voice",
+      "category": "starter",
+      "title": "说话",
+      "detail": "用语音和管家说一次话",
+      "tiers": [
+        1
+      ],
+      "coins": [
+        20
+      ]
+    },
+    {
+      "id": "s_plan",
+      "category": "starter",
+      "title": "规划",
+      "detail": "拆一张种植计划",
+      "tiers": [
+        1
+      ],
+      "coins": [
+        20
+      ]
+    },
+    {
+      "id": "s_call",
+      "category": "starter",
+      "title": "点名",
+      "detail": "在田头 @ 一个帮工",
+      "tiers": [
+        1
+      ],
+      "coins": [
+        20
+      ]
+    },
+    {
+      "id": "harvests",
+      "category": "harvest",
+      "title": "收成",
+      "tierTitles": [
+        "开张大吉",
+        "小有收成",
+        "粮仓满了"
+      ],
+      "detail": "收进主分支的活",
+      "tiers": [
+        1,
+        20,
+        100
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "件"
+    },
+    {
+      "id": "first_try",
+      "category": "harvest",
+      "title": "一气呵成",
+      "detail": "第一轮就做完、没带过话、没失败过就收进去的活",
+      "tiers": [
+        1,
+        10,
+        50
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "件"
+    },
+    {
+      "id": "big_playbook",
+      "category": "harvest",
+      "title": "五谷丰登",
+      "detail": "收获的种植计划里，合进去的步数最多的一张",
+      "tiers": [
+        3,
+        5,
+        10
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "步"
+    },
+    {
+      "id": "farm_level",
+      "category": "harvest",
+      "title": "农场规模",
+      "tierTitles": [
+        "小有规模",
+        "远近闻名",
+        "一方粮仓"
+      ],
+      "detail": "农场的等级（跟着你的 commit 数长）",
+      "tiers": [
+        5,
+        10,
+        20
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "级"
+    },
+    {
+      "id": "steady",
+      "category": "craft",
+      "title": "稳如老农",
+      "detail": "最长连胜：连着收进去，中间没有一轮失败",
+      "tiers": [
+        5,
+        15,
+        40
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "件"
+    },
+    {
+      "id": "untangle",
+      "category": "craft",
+      "title": "解铃人",
+      "detail": "冲突过、最后还是收进去的活",
+      "tiers": [
+        1,
+        5,
+        20
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "件"
+    },
+    {
+      "id": "comeback",
+      "category": "craft",
+      "title": "浴火重生",
+      "detail": "没做成过、修好以后收进去的活",
+      "tiers": [
+        1,
+        5,
+        20
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "件"
+    },
+    {
+      "id": "thrifty",
+      "category": "thrift",
+      "title": "一分钱一分货",
+      "detail": "花不到 ¥0.05 就收进去的活（只算知道花费的农机）",
+      "tiers": [
+        1,
+        10,
+        50
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "件"
+    },
+    {
+      "id": "every_machine",
+      "category": "thrift",
+      "title": "物尽其用",
+      "detail": "收进过活的农机种数",
+      "tiers": [
+        2,
+        3,
+        5
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "种"
+    },
+    {
+      "id": "handoff",
+      "category": "team",
+      "title": "交接",
+      "detail": "帮工在田头点名另一个帮工，对方回了话",
+      "tiers": [
+        1,
+        5,
+        20
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "次"
+    },
+    {
+      "id": "parallel_plan",
+      "category": "team",
+      "title": "运筹帷幄",
+      "detail": "有一批步骤同时做的种植计划，收获了",
+      "tiers": [
+        1,
+        3,
+        10
+      ],
+      "coins": [
+        10,
+        30,
+        60
+      ],
+      "unit": "张"
+    },
+    {
+      "id": "night_owl",
+      "category": "secret",
+      "title": "夜猫子",
+      "detail": "深夜（0–5 点）收进一件活",
+      "tiers": [
+        1
+      ],
+      "coins": [
+        50
+      ]
+    },
+    {
+      "id": "weekend",
+      "category": "secret",
+      "title": "周末农夫",
+      "detail": "周末收进一件活",
+      "tiers": [
+        1
+      ],
+      "coins": [
+        50
+      ]
+    },
+    {
+      "id": "full_house",
+      "category": "secret",
+      "title": "满园春色",
+      "detail": "六块地同时有帮工在干活",
+      "tiers": [
+        1
+      ],
+      "coins": [
+        50
+      ]
+    }
+  ],
   "runtimePresets": [
     {
       "id": "claude",
@@ -587,6 +919,19 @@
       ],
       "inProcess": false
     }
+  },
+  "actionText": {
+    "run_command": "跑命令",
+    "read_file": "读文件",
+    "edit_file": "改文件",
+    "search": "搜索",
+    "web": "查网页",
+    "mcp": "调 MCP 工具",
+    "wait": "等待",
+    "other": "用工具",
+    "thinking": "思考",
+    "speaking_text": "写汇报",
+    "none": ""
   },
   "runtimeIds": [
     "claude",

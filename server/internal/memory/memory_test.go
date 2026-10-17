@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -8,12 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
+	"vibevalley/internal/testkit"
+	"vibevalley/internal/testkit/fixture"
 	"vibevalley/pkg/agent"
 )
 
-func TestMemoryNotesOfATurn(t *testing.T) {
+func TestMemoryNotesOfARun(t *testing.T) {
 	said := strings.Join([]string{
 		"改好了，测试也过了。",
 		"",
@@ -38,7 +40,7 @@ func TestMemoryNotesOfATurn(t *testing.T) {
 	for i := range 9 {
 		many = append(many, "记住：第 "+string(rune('0'+i))+" 条")
 	}
-	if n := len(memoryNotesOf(strings.Join(many, "\n"))); n != memoryNotesPerTurn {
+	if n := len(memoryNotesOf(strings.Join(many, "\n"))); n != memoryNotesPerRun {
 		t.Fatalf("%d notes", n)
 	}
 	if len(memoryNotesOf("结论：做完了。")) != 0 {
@@ -70,23 +72,23 @@ func TestMemoryNearlyTheSameNoteIsNoNews(t *testing.T) {
 }
 
 func TestMemoriesKeepRecallWriteForget(t *testing.T) {
-	f, err := newWorld(base.Config{Home: t.TempDir(), WorkRoot: t.TempDir(), DBPath: ":memory:"})
+	f, err := newWorld(fixture.Config(t.TempDir(), t.TempDir(), ":memory:"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { f.DB.Close() })
-	m := f.Memories
-	m.Keep(base.FinishedTurn{Agent: "lab", Helper: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeCompleted,
+	m := f.Memory
+	m.Keep(FinishedRun{Agent: "lab", Worker: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeCompleted,
 		Said: "记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文\n结论：加好了", Summary: "加好了"})
-	m.Keep(base.FinishedTurn{Agent: "lab", Helper: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeFailed,
+	m.Keep(FinishedRun{Agent: "lab", Worker: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeFailed,
 		Said: "记住：这个项目用 pnpm test 跑测试", Summary: "测试没过"})
-	m.Keep(base.FinishedTurn{Agent: "lab", Helper: "w2", Project: "clock", Job: "不算", Outcome: protocol.OutcomeInterrupted, Said: "记住：停下的不算"})
+	m.Keep(FinishedRun{Agent: "lab", Worker: "w2", Project: "clock", Job: "不算", Outcome: protocol.OutcomeInterrupted, Said: "记住：停下的不算"})
 	all := m.List("lab")
 	var texts []string
 	for _, x := range all {
 		texts = append(texts, string(x.Kind)+":"+x.Text)
 	}
-	want := map[string]bool{"note:这个项目用 pnpm test 跑测试": true, "note:提交信息写中文": true, "job:加分页 → 没做成：测试没过": true}
+	want := map[string]bool{"note:这个项目用 pnpm test 跑测试": true, "note:提交信息写中文": true, "issue:加分页 → 没做成：测试没过": true}
 	if len(texts) != 3 {
 		t.Fatalf("%q", texts)
 	}
@@ -101,8 +103,8 @@ func TestMemoriesKeepRecallWriteForget(t *testing.T) {
 		}
 	}
 
-	picked := m.Recall(base.RecallCue{Agent: "lab", Helper: "w9", Project: "clock", Text: "跑测试"})
-	if len(picked) != 3 {
+	picked := m.Recall(RecallCue{Agent: "lab", Worker: "w9", Project: "clock", Text: "跑测试"})
+	if len(picked.IDs) != 3 || len(picked.Lines) != 3 || picked.Lines[0] != "- （这个项目）这个项目用 pnpm test 跑测试" {
 		t.Fatalf("recalled %+v", picked)
 	}
 	for _, x := range m.List("lab") {
@@ -129,27 +131,28 @@ func TestMemoriesKeepRecallWriteForget(t *testing.T) {
 	}
 }
 
-func foremanManagerMemory(t *testing.T, runtime string) (*ManagerMemory, string) {
+func openManagerMemory(t *testing.T, runtime string) (*managerMemory, string) {
 	t.Helper()
-	t.Setenv("VIBEVALLEY_FOREMAN_RUNTIME", runtime)
 	home := t.TempDir()
-	mm, err := newManagerMemory(base.Config{Home: home})
+	cfg := fixture.Config(home, "", "")
+	cfg.Manager.Runtime = runtime
+	mm, err := newManagerMemory(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return mm, filepath.Join(home, "foreman")
+	return mm, filepath.Join(home, protocol.ManagerAgent)
 }
 
 func TestManagerMemoryLines(t *testing.T) {
-	memory, folder := foremanManagerMemory(t, "")
-	if len(memory.View().Memories) != 0 {
+	memory, folder := openManagerMemory(t, "")
+	if len(memory.Manager().Memories) != 0 {
 		t.Fatal("remembers something already")
 	}
 	if err := agent.Remember(folder, "主人喜欢早上收到汇报", time.Date(2026, 10, 12, 9, 0, 0, 0, time.Local)); err != nil {
 		t.Fatal(err)
 	}
-	written, err := memory.Write("  周末别派夜班\n真的  ")
-	if err != nil || written.Text != "周末别派夜班 真的" || written.Helper != nil {
+	written, err := memory.WriteManager("  周末别派夜班\n真的  ")
+	if err != nil || written.Text != "周末别派夜班 真的" || written.Worker != nil {
 		t.Fatalf("%+v %v", written, err)
 	}
 	file, _ := os.ReadFile(filepath.Join(folder, "MEMORY.md"))
@@ -157,12 +160,12 @@ func TestManagerMemoryLines(t *testing.T) {
 		t.Fatalf("the manager does not read whose it is:\n%s", file)
 	}
 
-	view := memory.View()
+	view := memory.Manager()
 	if view.Runtime != protocol.RuntimeVibeValley || len(view.Memories) != 2 {
 		t.Fatalf("%+v", view)
 	}
-	if view.Memories[0].Text != "周末别派夜班 真的" || view.Memories[0].Helper != nil ||
-		view.Memories[1].Text != "主人喜欢早上收到汇报" || view.Memories[1].Helper == nil || *view.Memories[1].Helper != ManagerAgent {
+	if view.Memories[0].Text != "周末别派夜班 真的" || view.Memories[0].Worker != nil ||
+		view.Memories[1].Text != "主人喜欢早上收到汇报" || view.Memories[1].Worker == nil || *view.Memories[1].Worker != protocol.ManagerAgent {
 		t.Fatalf("%+v", view.Memories)
 	}
 	if view.Memories[1].At != time.Date(2026, 10, 12, 0, 0, 0, 0, time.Local).UnixMilli() {
@@ -171,13 +174,13 @@ func TestManagerMemoryLines(t *testing.T) {
 	if view.Carried != 2 {
 		t.Fatalf("carried %d", view.Carried)
 	}
-	if err := memory.Forget(view.Memories[1].ID); err != nil {
+	if err := memory.ForgetManager(view.Memories[1].ID); err != nil {
 		t.Fatal(err)
 	}
-	if left := memory.View().Memories; len(left) != 1 || left[0].Text != "周末别派夜班 真的" {
+	if left := memory.Manager().Memories; len(left) != 1 || left[0].Text != "周末别派夜班 真的" {
 		t.Fatalf("%+v", left)
 	}
-	if _, err := memory.Write("  "); err == nil || err.Error() != "要记的话是空的" {
+	if _, err := memory.WriteManager("  "); err == nil || err.Error() != "要记的话是空的" {
 		t.Fatalf("%v", err)
 	}
 }
@@ -196,8 +199,8 @@ func TestManagerMemoryCarriedLines(t *testing.T) {
 }
 
 func TestManagerMemoryArchive(t *testing.T) {
-	memory, folder := foremanManagerMemory(t, "pi")
-	if memory.View().Runtime != protocol.RuntimePi {
+	memory, folder := openManagerMemory(t, "pi")
+	if memory.Manager().Runtime != protocol.RuntimePi {
 		t.Fatal("not on pi")
 	}
 	if err := os.MkdirAll(filepath.Join(folder, "archive"), 0o755); err != nil {
@@ -221,4 +224,41 @@ func TestManagerMemoryArchive(t *testing.T) {
 	if _, ok := memory.ArchiveFile("../MEMORY.md"); ok {
 		t.Fatal("read outside the archive")
 	}
+}
+
+func TestPreviewPicksWithoutCountingAndTheLongestUnusedFade(t *testing.T) {
+	f, err := newWorld(fixture.Config(t.TempDir(), t.TempDir(), ":memory:"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { f.DB.Close() })
+	m := f.Memory
+	if _, err := m.Write("lab", "clock 的测试用 pnpm test", "clock"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Write("lab", "提交前跑 lint", ""); err != nil {
+		t.Fatal(err)
+	}
+	preview := m.Preview("lab", "clock", "")
+	testkit.Eq(t, preview.Lines, []string{"- （这个项目）clock 的测试用 pnpm test", "- （所有项目）提交前跑 lint"}, "picked")
+	testkit.Eq(t, preview.Limit, int64(recallChars), "limit")
+	for _, x := range m.List("lab") {
+		testkit.Eq(t, x.Recalled, int64(0), "a preview is no recall")
+		testkit.Eq(t, x.Fading, false, "far from full")
+	}
+	testkit.Eq(t, len(m.Preview("lab", "", "").Lines), 0, "no project, nothing")
+
+	for i := range protocol.MemoryKeep - memoryFadingSoon {
+		if _, err := m.Write("lab", fmt.Sprintf("第 %d 条，各不相同 %d", i, i*7919), ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var fading []string
+	for _, x := range m.List("lab") {
+		if x.Fading {
+			fading = append(fading, x.Text)
+		}
+	}
+	// Written in the same millisecond, any two of them are the longest unused.
+	testkit.Eq(t, len(fading), 2, "ten more would push out two")
 }

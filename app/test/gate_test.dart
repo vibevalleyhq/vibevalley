@@ -3,18 +3,15 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/app/theme.dart';
+import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/farm_choice.dart';
 import 'package:vibevalley/desk/gate/gate_page.dart';
-import 'package:vibevalley/desk/shared/state.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'deska_fakes.dart' show settle;
-
-http.Response _json(Object? v, [int status = 200]) => http.Response(jsonEncode(v), status, headers: {'content-type': 'application/json; charset=utf-8'});
+import 'support/server.dart' show jsonResponse, settle;
+import 'package:vibevalley/data/providers.dart';
 
 const _gate = 'http://192.168.1.5:8790';
 
@@ -70,16 +67,16 @@ void main() {
           switch ((r.method, r.url.path)) {
             case ('GET', '/api/lan/me'):
               return known.contains(key)
-                  ? _json(const LanDevice(id: 'd1', name: 'iPhone', pairedAt: 1).toJson())
-                  : _json({'_tag': 'LanRefused', 'reason': '没配对'}, 401);
+                  ? jsonResponse(const LanDevice(id: 'd1', name: 'iPhone', pairedAt: 1).toJson())
+                  : jsonResponse({'_tag': 'LanRefused', 'reason': '没配对'}, 401);
             case ('POST', '/api/lan/pair'):
               final body = LanPairRequest.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
               expect(body.code, 'ABC234');
               return allow
-                  ? _json(const LanPaired(device: 'd2', key: 'new-key', farm: 'lucas-mbp').toJson())
-                  : _json({'_tag': 'LanRefused', 'reason': '主人没让这台设备进来'}, 403);
+                  ? jsonResponse(const LanPaired(device: 'd2', key: 'new-key', farm: 'lucas-mbp').toJson())
+                  : jsonResponse({'_tag': 'LanRefused', 'reason': '主人没让这台设备进来'}, 403);
           }
-          return _json({'_tag': 'FarmMissing', 'what': r.url.path}, 404);
+          return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
         }),
       );
       return (apiFor, calls);
@@ -138,9 +135,9 @@ void main() {
           case ('DELETE', '/api/lan/devices/d2'):
             status = LanStatus(open: true, farm: 'lucas-mbp', url: _gate, devices: status.devices.where((d) => d.id != 'd2').toList());
           default:
-            return _json({'_tag': 'FarmMissing', 'what': r.url.path}, 404);
+            return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
         }
-        return _json(status.toJson());
+        return jsonResponse(status.toJson());
       }),
     );
 
@@ -150,7 +147,7 @@ void main() {
       addTearDown(t.view.reset);
       await t.pumpWidget(
         ProviderScope(
-          overrides: [deskApiProvider.overrideWithValue(server())],
+          overrides: [apiProvider.overrideWithValue(server())],
           child: MaterialApp(
             theme: farmTheme(),
             home: const Scaffold(body: GatePage()),

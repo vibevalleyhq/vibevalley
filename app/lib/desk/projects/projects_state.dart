@@ -3,7 +3,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
-import '../shared/state.dart';
+import '../../data/providers.dart';
 
 sealed class Asked<A> {
   const Asked();
@@ -46,13 +46,13 @@ class ProjectsNotifier extends Notifier<ProjectsState> {
   @override
   ProjectsState build() => const ProjectsState();
 
-  VibeValleyApi get _api => ref.read(deskApiProvider);
+  VibeValleyApi get _api => ref.read(apiProvider);
 
   Future<void> load() async {
     if (_loading) return;
     _loading = true;
     try {
-      final list = await _api.farm.projects();
+      final list = await _api.project.list();
       if (ref.mounted) state = ProjectsState(list: list, surveys: state.surveys);
     } finally {
       _loading = false;
@@ -66,8 +66,8 @@ class ProjectsNotifier extends Notifier<ProjectsState> {
   }
 
   Future<void> survey(String project) => Future.wait([
-    _ask<ProjectLanguages>(project, (s) => s.languages, (s, a) => Survey(languages: a, activity: s.activity), () => _api.farm.projectLanguages(id: project)),
-    _ask<ProjectActivity>(project, (s) => s.activity, (s, a) => Survey(languages: s.languages, activity: a), () => _api.farm.projectActivity(id: project)),
+    _ask<ProjectLanguages>(project, (s) => s.languages, (s, a) => Survey(languages: a, activity: s.activity), () => _api.project.languages(id: project)),
+    _ask<ProjectActivity>(project, (s) => s.activity, (s, a) => Survey(languages: s.languages, activity: a), () => _api.project.activity(id: project)),
   ]);
 
   Future<void> _ask<A>(String project, Asked<A>? Function(Survey) get, Survey Function(Survey, Asked<A>) set, Future<A> Function() request) async {
@@ -82,7 +82,7 @@ class ProjectsNotifier extends Notifier<ProjectsState> {
   }
 
   Future<ProjectSummary> create(NewProject req) async {
-    final project = await _api.farm.createProject(body: req);
+    final project = await _api.project.create(body: req);
     await load();
     return project;
   }

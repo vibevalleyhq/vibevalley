@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-种植计划（`Playbook`）是和工单并排的另一样东西：它整张放在核心状态的 `playbooks` 里、存在 `farm.json`，每一步是计划里的一个节点。派出去做某一步的帮工，又各自开一张工单；拆计划的帮工也开一张。于是看板上同一件事有好几个样子：计划卡、拆计划的那张工单、每一步各一张工单，它们之间只靠帮工身上的标签连着。
+种植计划（`Playbook`）是和工单并排的另一样东西：它整张放在核心状态的 `playbooks` 里、存在 `state.json`，每一步是计划里的一个节点。派出去做某一步的帮工，又各自开一张工单；拆计划的帮工也开一张。于是看板上同一件事有好几个样子：计划卡、拆计划的那张工单、每一步各一张工单，它们之间只靠帮工身上的标签连着。
 
 照 [概念先行](../../proposed/architecture/2026-10-15-concepts-first.md) 第 6 步，计划就是 Linear 里带子工单的父工单：子工单之间有先后（blocked by），合进父工单的分支，最后父工单合进主分支。
 
@@ -14,10 +14,10 @@ Status: implemented
 
 - **计划是父工单，每一步是子工单**：父工单的 id 就是计划的 id（`p1`……），标题和说明是计划的标题和目标，多一块 `plan`（计划的状态、计划分支、并行数、一句说明）。每一步是一张子工单，id 是 `<计划>.<步骤>`（`p1.api`），`parent` 指向父工单，`blockedBy` 是它要等的子工单，标题和说明是步骤的标题和工单，`step` 里是步骤的其余部分（状态、检查命令、该改的地方、是不是验收、冻结的文件、谁在做、结论、提交、花费、重试和失败的次数）。
 - **执行挂在工单下面**：拆计划的帮工是父工单的一次执行，做某一步的帮工是那张子工单的执行，和普通工单一样。
-- **计划的规则不变，读写换成工单**：protocol 的 `playbook.go` 仍按整张计划算（能开工的步骤、改计划、交给帮工的话、验收……）。`PlaybookOf`、`PlaybooksOf` 从核心状态里的工单把计划拼出来，`PlaybookIssues` 再拆回工单（`plan_issues.go`）；服务端的 `Playbooks` 每写一次计划，`Issues.PutPlaybook` 就在一个事务里写整家工单，先发子工单的事实、最后发父工单的，计划在核心状态里总是完整的。没有了 `playbook` 事实，`FarmState` 里也没有了 `playbooks`。
-- **状态跟着计划**：父工单在拆、在做时是 `working`，等你看、暂停、做完等收获是 `waiting`，收了或放弃了就关上（`harvested`、`dismissed`）。子工单没轮到是 `todo`，在做看它的帮工，没做成是 `waiting`，合进去了关成 `merged`，跳过或计划放弃了关成 `dismissed`。帮工离开不会关计划的工单，看板也不能改、开工、重开它们，都在计划里做。
+- **计划的规则不变，读写换成工单**：protocol 的 `playbook.go` 仍按整张计划算（能开工的步骤、改计划、交给帮工的话、验收……）。`PlaybookOf`、`PlaybooksOf` 从核心状态里的工单把计划拼出来，`PlaybookIssues` 再拆回工单（`plan_issues.go`）；服务端的 `Playbooks` 每写一次计划，`Issues.PutPlaybook` 就在一个事务里写整家工单，先发子工单的事实、最后发父工单的，计划在核心状态里总是完整的。没有了 `playbook` 事实，`CoreState` 里也没有了 `playbooks`。
+- **状态跟着计划**：父工单在拆、在做时是 `working`，等你看、暂停、做完等收获是 `waiting`，收了或放弃了就关上（`merged`、`dismissed`）。子工单没轮到是 `todo`，在做看它的帮工，没做成是 `waiting`，合进去了关成 `merged_into_plan`，跳过或计划放弃了关成 `dismissed`。帮工离开不会关计划的工单，看板也不能改、开工、重开它们，都在计划里做。
 - **客户端**：帧上多了 `plans`，是服务端拼好的计划（新的在后），计划板和农场读它。看板上计划是一张卡（就是父工单），子工单有人做过才出现，标题前加计划名。
-- **老数据**：开机时把 `farm.json` 里的计划变成它们的工单（`Issues.adoptPlaybooks`），把从前拆计划、做步骤的那些工单的执行挪过来，删掉那些工单；`farm.json` 当时的样子另存为 `farm.json.playbooks`。只做一次：父工单已经在了就跳过。
+- **老数据**：开机时把 `state.json` 里的计划变成它们的工单（`Issues.adoptPlaybooks`），把从前拆计划、做步骤的那些工单的执行挪过来，删掉那些工单；`state.json` 当时的样子另存为 `state.json.playbooks`。只做一次：父工单已经在了就跳过。
 
 ## Alternatives considered
 
@@ -32,12 +32,12 @@ Status: implemented
 ## Consequences
 
 - 看板、计划板、地图、管家看到的计划和工单是同一份数据。
-- 计划在数据库里有了家，不再占 `farm.json`；关了的计划和普通工单一样，核心状态只留最近的。
+- 计划在数据库里有了家，不再占 `state.json`；关了的计划和普通工单一样，核心状态只留最近的。
 - 一次写计划要写整家工单（最多 13 张），发多条事实；没变的不算变化。
-- 黄金数据（`parity.jsonl.gz`）里去掉了 `playbook` 事实；`play.jsonl.gz` 里录下的计划和 `playbook` 事实，测试时换成它们的工单再算。
+- 黄金数据（`reduce.jsonl.gz`）里去掉了 `playbook` 事实；`play.jsonl.gz` 里录下的计划和 `playbook` 事实，测试时换成它们的工单再算。
 
 ## Verification
 
 - `server/internal/protocol/playbook_rules_test.go`：计划拆成工单再拼回来不变，各张工单的状态，关上时保留什么时候关的，放弃时每步都关上，挤出核心状态时子工单跟着父工单走。
-- `server/internal/tickets/playbooks_test.go`：`TestPlanIsAParentIssue`（父工单和拆计划的执行、子工单和它等的、看板不能改和开工、步骤的帮工是子工单的执行、做完关成 merged、收获后父工单关上）；`TestPlanAdoptsPlaybooksOfBefore`（`farm.json` 里的计划搬过来、执行挪过来、旧工单删掉、`farm.json` 另存一份、下一个 id）；其余计划的测试照旧跑过。
+- `server/internal/playbook/playbook_test.go`：`TestPlanIsAParentIssue`（父工单和拆计划的执行、子工单和它等的、看板不能改和开工、步骤的帮工是子工单的执行、做完关成 merged、收获后父工单关上）；`TestPlanAdoptsPlaybooksOfBefore`（`state.json` 里的计划搬过来、执行挪过来、旧工单删掉、`state.json` 另存一份、下一个 id）；其余计划的测试照旧跑过。
 - `app/test/tickets_test.dart`：父工单是计划卡，没人做过的子工单不出现，子工单的标题带计划名；`farm_plans_test.dart`：计划板读帧上的 `plans`。

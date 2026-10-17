@@ -8,12 +8,13 @@ import '../game/state.dart';
 import '../gen/vibevalley.dart';
 import '../shell/prefs.dart';
 import '../ui/kit/kit.dart';
-import '../village/village_view.dart' show agentsProvider, runtimesProvider;
-import 'bits.dart';
+import '../data/remote.dart' show agentsProvider, runtimesProvider;
 import 'popover.dart';
 import 'quota.dart';
 import '../rules/farm.dart';
 import '../rules/seeds.dart';
+import '../shared/faces.dart';
+import '../shared/tags.dart';
 
 enum FriendStatus { bug, ripe, busy, rest, away }
 
@@ -25,7 +26,7 @@ const _status = {
   FriendStatus.away: (dot: Color(0x00000000), label: '没在农场'),
 };
 
-FriendStatus statusOf(List<Helper> mine, FarmView view) {
+FriendStatus statusOf(List<Worker> mine, FarmView view) {
   final crops = [for (final w in mine) plotOf(view, w).crop];
   if (crops.contains(Crop.withered)) return FriendStatus.bug;
   if (crops.any(isRipe)) return FriendStatus.ripe;
@@ -50,12 +51,12 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
   @override
   Widget build(BuildContext context) {
     final height = widget.height;
-    final agents = (ref.watch(agentsProvider).value ?? const <String, AgentProfile>{}).values.toList();
-    final helpers = ref.watch(farmProvider.select((s) => s?.helpers)) ?? const <Helper>[];
+    final agents = (ref.watch(agentsProvider).value ?? const <String, Agent>{}).values.toList();
+    final workers = ref.watch(farmProvider.select((s) => s?.workers)) ?? const <Worker>[];
     final view = ref.watch(viewProvider) ?? const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {});
     final open = ref.watch(friendsOpenProvider);
     final sorted = [...agents.where((a) => a.enabled), ...agents.where((a) => !a.enabled)];
-    final statuses = [for (final a in sorted) statusOf(helpers.where((h) => h.agent == a.id).toList(), view)];
+    final statuses = [for (final a in sorted) statusOf(workers.where((h) => h.agent == a.id).toList(), view)];
     final busy = statuses.where((s) => s == FriendStatus.busy).length;
     final attention = statuses.contains(FriendStatus.bug)
         ? FriendStatus.bug
@@ -63,7 +64,7 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
         ? FriendStatus.ripe
         : null;
     void toggle() => ref.read(friendsOpenProvider.notifier).set(!open);
-    // The crew, floating above the button rather than widening the row.
+    // The helpers, floating above the button rather than widening the row.
     final list = IgnorePointer(
       ignoring: !open,
       child: AnimatedOpacity(
@@ -144,7 +145,9 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
                         width: sorted.isEmpty ? 0 : 22 + (sorted.take(3).length - 1) * 12,
                         height: 22,
                         child: Stack(
-                          children: [for (var i = sorted.take(3).length - 1; i >= 0; i--) Positioned(left: i * 12.0, child: AgentFace(sorted[i].id, size: 22))],
+                          children: [
+                            for (var i = sorted.take(3).length - 1; i >= 0; i--) Positioned(left: i * 12.0, child: AgentFaceOf(sorted[i].id, size: 22)),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -193,7 +196,7 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
 
 class Friend extends ConsumerWidget {
   const Friend({super.key, required this.agent, required this.status});
-  final AgentProfile agent;
+  final Agent agent;
   final FriendStatus status;
 
   @override
@@ -201,8 +204,8 @@ class Friend extends ConsumerWidget {
     final pick = ref.watch(prefsProvider.select((p) => p.pick));
     final tally = ref.watch(farmProvider.select((s) => s?.progress?.agents?[agent.id]));
     final atlas = ref.watch(atlasProvider).value;
-    final usage = (ref.watch(runtimesProvider).value ?? const <RuntimeInfo>[]).where((r) => r.id == agent.runtime).firstOrNull?.usage;
-    final quota = quotaOf(usage);
+    final runtime = (ref.watch(runtimesProvider).value ?? const <RuntimeInfo>[]).where((r) => r.id == agent.runtime).firstOrNull;
+    final quota = quotaOf(runtime);
     final picked = pick == agent.id;
     final st = _status[status]!;
     return FarmPopover(
@@ -223,7 +226,7 @@ class Friend extends ConsumerWidget {
                   Container(
                     color: picked ? Palette.leaf500 : Palette.cream300,
                     padding: const EdgeInsets.all(2),
-                    child: AgentFace(agent.id, size: 46, muted: !agent.enabled),
+                    child: AgentFaceOf(agent.id, size: 46, muted: !agent.enabled),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -260,7 +263,7 @@ class Friend extends ConsumerWidget {
           children: [
             Row(
               children: [
-                AgentFace(agent.id, size: 60, muted: !agent.enabled),
+                AgentFaceOf(agent.id, size: 60, muted: !agent.enabled),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

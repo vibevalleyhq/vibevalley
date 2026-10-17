@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/remote.dart' show watchSettingsProblem;
 import '../../gen/vibevalley.dart';
 import '../../shell/title/title_state.dart' show settingsProvider;
 import '../../ui/kit/kit.dart';
-import '../runtimes/layout.dart';
+import '../shared/layout.dart';
 import 'voice_rules.dart';
 import 'voice_samples.dart';
-import '../shared/widgets.dart';
+import '../../shared/widgets.dart';
 
 const _areaLabel = <Area, String>{Area.uS: '美国', Area.eU: '欧洲', Area.aP: '亚太', Area.cN: '中国大陆'};
 const _languageLabel = <Language, String>{
@@ -148,7 +149,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
       if (value.trim().isNotEmpty) update[key.name] = value.trim();
     }
     // Only this part's fields, over the settings as they are now: the other part may have been saved meanwhile.
-    if (_voiceDirty) update['voice'] = voiceOverrides(_status.voiceDefaults, withPart(widget.part, _status.voice, _draft)).toJson();
+    if (_voiceDirty) update['voice'] = asOverrides(withPart(widget.part, _status.voice, _draft)).toJson();
     setState(() {
       _busy = true;
       _error = null;
@@ -223,7 +224,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
   Widget build(BuildContext context) {
     final part = widget.part;
     final status = _status;
-    final problem = voiceProblem(asOverrides(_draft));
+    final problem = watchSettingsProblem(ref, SettingsUpdate(voice: asOverrides(_draft)));
     final atDefaults = sameVoice(_draft, withPart(part, _draft, status.voiceDefaults));
     final bar = PxWindow(
       paper: Palette.cream50,

@@ -1,0 +1,168 @@
+package mcp
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"regexp"
+	"slices"
+	"sort"
+	"strings"
+	"testing"
+
+	"vibevalley/internal/protocol"
+	"vibevalley/internal/testkit"
+	"vibevalley/internal/testkit/fixture"
+	"vibevalley/internal/worker"
+)
+
+type rpcAnswer struct {
+	Result *struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+		Tools []struct {
+			Name string `json:"name"`
+		} `json:"tools"`
+	} `json:"result"`
+	Error json.RawMessage `json:"error"`
+}
+
+func (a rpcAnswer) text() string {
+	if a.Result == nil {
+		return ""
+	}
+	var out strings.Builder
+	for _, c := range a.Result.Content {
+		out.WriteString(c.Text)
+	}
+	return out.String()
+}
+
+func client(t *testing.T, url, token string) func(method string, params any) rpcAnswer {
+	t.Helper()
+	session := ""
+	id := 0
+	post := func(body map[string]any) (*http.Response, []byte) {
+		data, _ := json.Marshal(body)
+		req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(data))
+		req.Header.Set("content-type", "application/json")
+		req.Header.Set("accept", "application/json, text/event-stream")
+		if token != "" {
+			req.Header.Set("authorization", "Bearer "+token)
+		}
+		if session != "" {
+			req.Header.Set("mcp-session-id", session)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		raw, _ := io.ReadAll(res.Body)
+		if s := res.Header.Get("mcp-session-id"); s != "" {
+			session = s
+		}
+		return res, raw
+	}
+	call := func(method string, params any) rpcAnswer {
+		id++
+		res, raw := post(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
+		body := raw
+		if strings.Contains(res.Header.Get("content-type"), "text/event-stream") {
+			body = nil
+			for _, line := range strings.Split(string(raw), "\n") {
+				if strings.HasPrefix(line, "data:") {
+					body = []byte(strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+				}
+			}
+		}
+		var answer rpcAnswer
+		if err := json.Unmarshal(body, &answer); err != nil {
+			t.Fatalf("%s: %v: %s", method, err, raw)
+		}
+		return answer
+	}
+	init := call("initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "test", "version": "0"}})
+	if init.Result == nil {
+		t.Fatalf("initialize answered: %s", init.Error)
+	}
+	post(map[string]any{"jsonrpc": "2.0", "method": "notifications/initialized"})
+	return call
+}
+
+func TestToolsOverMcp(t *testing.T) {
+	w := open(t)
+	f := w
+	hired := f.Issue.Hire(w.ctx, fixture.Lab(t), "写 hello", "chat-j", worker.HireOptions{})
+	if hired.Worker == nil {
+		t.Fatalf("not hired: %s", hired.Refused)
+	}
+	id := hired.Worker.ID
+	token := testkit.Await(t, "the session's token", func() (string, bool) {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		for _, tk := range w.tokens {
+			return tk, true
+		}
+		return "", false
+	})
+	thread := testkit.Await(t, "its job thread", func() (protocol.Conversation, bool) {
+		tid := f.Channel.JobThread(id)
+		if tid == nil {
+			return protocol.Conversation{}, false
+		}
+		c := protocol.ConversationOf(f.Core.State().Chat, *tid)
+		if c == nil {
+			return protocol.Conversation{}, false
+		}
+		return *c, true
+	})
+	server := httptest.NewServer(f.MCP.Handler())
+	t.Cleanup(server.Close)
+	url := server.URL + "/mcp"
+
+	call := client(t, url, token)
+	var names []string
+	for _, tool := range call("tools/list", map[string]any{}).Result.Tools {
+		names = append(names, tool.Name)
+	}
+	sort.Strings(names)
+	if !slices.Equal(names, []string{"farm_inbox", "farm_read", "farm_say", "farm_who"}) {
+		t.Fatalf("tools %q", names)
+	}
+
+	who := call("tools/call", map[string]any{"name": "farm_who", "arguments": map[string]any{}}).text()
+	if !regexp.MustCompile(`(?m)^- ` + id + ` `).MatchString(who) {
+		t.Fatalf("who %q", who)
+	}
+	lines := strings.Split(who, "\n")
+	if strings.Contains(strings.Join(lines[:len(lines)-1], "\n"), "@") {
+		t.Fatal("names are listed with an @, and models copy a wake")
+	}
+	if said := call("tools/call", map[string]any{"name": "farm_say", "arguments": map[string]any{"text": "从 MCP 说一句", "anyway": true}}).text(); !strings.Contains(said, "发出去了") {
+		t.Fatalf("said %q", said)
+	}
+	i := slices.IndexFunc(protocol.MessagesIn(f.Core.State().Chat, thread.ID), func(m protocol.ChatMessage) bool { return m.Text == "从 MCP 说一句" })
+	if i < 0 {
+		t.Fatal("not in its job thread")
+	}
+	if m := protocol.MessagesIn(f.Core.State().Chat, thread.ID)[i]; m.From != id || m.FromKind != protocol.SenderKindWorker {
+		t.Fatalf("said as %s (%s)", m.From, m.FromKind)
+	}
+	if inbox := call("tools/call", map[string]any{"name": "farm_inbox", "arguments": map[string]any{}}).text(); inbox == "" {
+		t.Fatal("no answer from the inbox")
+	}
+	if read := call("tools/call", map[string]any{"name": "farm_read", "arguments": map[string]any{}}).text(); !strings.Contains(read, "从 MCP 说一句") {
+		t.Fatalf("read %q", read)
+	}
+
+	if text := client(t, url, "")("tools/call", map[string]any{"name": "farm_who", "arguments": map[string]any{}}).text(); !strings.Contains(text, "没认出你是谁") {
+		t.Fatalf("no token: %q", text)
+	}
+	if text := client(t, url, "hb_w1_forged")("tools/call", map[string]any{"name": "farm_say", "arguments": map[string]any{"text": "冒名"}}).text(); !strings.Contains(text, "没认出你是谁") {
+		t.Fatalf("forged: %q", text)
+	}
+}

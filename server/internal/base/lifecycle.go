@@ -50,3 +50,33 @@ func (r *Readies) hook(lc fx.Lifecycle) {
 		return nil
 	}})
 }
+
+// Parts are the pieces of one package's Service, run as one: started in order (those already started are stopped again when one fails), readied
+// in order, stopped in reverse.
+type Parts []Service
+
+func (p Parts) OnStart(ctx context.Context) error {
+	for i, s := range p {
+		if err := s.OnStart(ctx); err != nil {
+			for j := i - 1; j >= 0; j-- {
+				p[j].OnStop()
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (p Parts) OnReady(ctx context.Context) {
+	for _, s := range p {
+		if r, ok := s.(Readier); ok {
+			r.OnReady(ctx)
+		}
+	}
+}
+
+func (p Parts) OnStop() {
+	for i := len(p) - 1; i >= 0; i-- {
+		p[i].OnStop()
+	}
+}

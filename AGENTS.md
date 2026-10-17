@@ -5,12 +5,13 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ## 目录
 
 ```
-server/                    服务端，一个 Go 模块 vibevalley；cmd/vibevalley 单独跑它
-server/internal/           农场的服务，一个概念一个包：base、projects、memory、runs、chat、tickets、manager、channels、game；
-                           farm 把它们组装起来，handler 是全部 HTTP 处理
+server/                    服务端，一个 Go 模块 vibevalley；cmd/server 单独跑它，cmd/vibevalley 是自己的 agent 的命令行，cmd/migrate 管表结构
+server/internal/           农场的服务，一块业务一个包，名字用单数，每个包只导出一个 Service：core、setting、agent、project、
+                           memory、runtime、worker、channel、schedule、issue、playbook、manager、gate、voice、connector、game；
+                           base 是地基，workspace 把它们组装起来，handler 是全部 HTTP 处理，mcp 是给编码 agent 的工具
 server/migrations/         SQLite 的迁移，启动时按名字顺序跑；也是 sqlc 读的表结构
 server/internal/protocol/  形状（shapes.go、api.go）和规则的唯一来源；tool/shapegen 从它写出 gen.go 和 Flutter 的 lib/gen
-server/pkg/                能单独拿去用的库：smith（oar 的 Go 移植，驱动各家编码 agent）、VibeValley 自己的 agent（agent、agentcore、ai）、
+server/pkg/                能单独拿去用的库：x（通用的小封装：str 字符串、num 数字、ptr 指针、clock 时间）、smith（oar 的 Go 移植，驱动各家编码 agent）、VibeValley 自己的 agent（agent、agentcore、ai）、
                            agora（声网的令牌和语音 agent）、weixin、feishu、qq（三家聊天软件的机器人接口）
 server/pkg/db/             查询（queries/*.sql）和 sqlc 从它生成的 Go（generated/）
 app/                       客户端（Flutter）：读折好的核心状态，像素村用 Flame；macOS 版把 Go 服务端带在里面
@@ -26,11 +27,13 @@ scripts/                   文档和 Note 的检查
 ## 命令
 
 ```bash
-cd server && go run ./cmd/vibevalley                                # 服务端，127.0.0.1:8787
+cd server && go run ./cmd/server                                # 服务端，127.0.0.1:8787
+cd server && go run ./cmd/migrate status                        # 库在第几版；up 跑迁移（开机也会跑），new 名字 写下一个迁移
 cd server && go vet ./... && go test ./...                      # 改完服务端
+bun run go:deadcode                                             # 改完服务端：server/internal 里没有只靠测试活着的函数
 cd server && go run ./tool/shapegen                             # 改完 protocol/shapes.go 或 api.go：重写 gen.go 和 Flutter 的 lib/gen
 cd server && GOTOOLCHAIN=go1.27.2 go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate   # 改完 pkg/db/queries 或 migrations：重写 pkg/db/generated
-cd server && go test ./internal/protocol -update                         # 有意改了规则：用 Go 的结果重写黄金数据，再看 diff
+cd server && VIBEVALLEY_GOLDEN=update go test ./internal/...           # 有意改了规则：用 Go 的结果重写各包的黄金数据，再看 diff
 cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787   # 客户端连开着的服务端
 bun run flutter:check                                           # 改完 app 或形状：生成的是否最新、analyze、test
 bun run package:mac                                             # macOS 应用（带 Go 服务端）和 .dmg；--channel alpha|beta 见 app/README.md
@@ -39,25 +42,28 @@ bun run docs:verify                                             # 改完文档�
 bun run site:check && bun run site:build                       # 改完 site/：类型和模板，再生成到 site/dist（不开 astro dev）
 ```
 
-Go 1.27，Flutter 3.47，Bun 1.4（根目录的命令、文档和 Note 的检查），Node 24（只跑 `server/tool` 的两个脚本）。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `server/` 要重启它。
+Go 1.27，Flutter 3.47，Bun 1.4（根目录的命令、文档和 Note 的检查），Node 24（只跑 `server/tool` 的 `pi-prices.ts`）。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `server/` 要重启它。
 
-一件事的主线：smith 的会话事件 → `internal/runs/facts.go`（纯函数）读成事实和步骤 → `Site.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/site/state` 把折好的 `SiteFrame` 经 SSE 推给 Flutter；步骤由 `runs/steps.go`、`runs/trajectories.go` 记成每个帮工和管家的轨迹（[architecture.md](docs/architecture.md)、[server.md](docs/reference/server.md)）。
+一件事的主线：smith 的会话事件 → `internal/worker/facts.go`（纯函数）读成事实和步骤 → `Core.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/state` 把折好的 `StateFrame` 经 SSE 推给 Flutter；步骤由 `worker/activities.go`、`worker/trajectories.go` 记成每个帮工和管家的轨迹（[architecture.md](docs/architecture.md)、[server.md](docs/reference/server.md)）。
 
 ## 规矩
 
 - **先有概念，再有皮**：服务端按实际的概念分模块（工单、执行、项目、群聊……，[概念](docs/concepts.md)）；农场只画它们，每个农场里的东西都对得上一件实际的事；游戏规则只读事件、算画面，业务不调它（[提案](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）。
-- **核心状态只有一份**：帮工或农场的新状态，在 Go 的 `internal/protocol/shapes.go` 里加字段或事实，在 `internal/protocol/farm.go` 里折，只由服务端 `Site.Apply` 施加。不要在服务端、客户端里另存一份帮工的状态（[理由](.agents/notes/implemented/architecture/2026-10-11-farm-core-state.md)）。
-- **形状和规则只在 Go**：形状写在 `server/internal/protocol/shapes.go`、接口写在 `api.go`，规则是同一个包里的纯函数；改了形状，同一个改动里跑 `go run ./tool/shapegen`；有意改了规则，`go test ./internal/protocol -update` 重写黄金数据（[server](server/README.md#形状和规则从哪来)、[理由](.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。
+- **核心状态只有一份**：帮工或农场的新状态，在 Go 的 `internal/protocol/shapes.go` 里加字段或事实，在 `internal/protocol/core.go` 里折，只由服务端 `Core.Apply` 施加。不要在服务端、客户端里另存一份帮工的状态（[理由](.agents/notes/implemented/architecture/2026-10-11-farm-core-state.md)）。
+- **形状和规则只在 Go**：形状写在 `server/internal/protocol/shapes.go`、接口写在 `api.go`；核心状态的折法和它用到的、几个包都用的规则是 `protocol` 里的纯函数，只有一个主人的规则是主人包里不导出的纯函数，黄金数据（`testdata/*.jsonl.gz`，经 `internal/golden`）跟着规则走（[理由](.agents/notes/implemented/architecture/2026-10-16-rules-live-with-their-owner.md)）；改了形状，同一个改动里跑 `go run ./tool/shapegen`；有意改了规则，`VIBEVALLEY_GOLDEN=update go test ./internal/...` 重写黄金数据（[server](server/README.md#形状和规则从哪来)、[理由](.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。
 - **生成的不手改**：`internal/protocol/gen.go` 和 Flutter 的 `lib/gen/` 由 `tool/shapegen` 写，`bun run flutter:check` 查它们是不是最新；`pkg/db/generated` 由 sqlc 写（[理由](.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）。
-- **表名用单数**：`issue`、`issue_run`；老的复数表改到时在迁移里改名，查询一起搬进 sqlc。
-- **Flutter 不折事实**：它读 `GET /api/site/state` 折好的 `FarmState`；要新的数据就加进 protocol 的字段和 `Reduce`，Dart 里只写跟着时钟走的画面（[理由](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)）。
+- **表名用单数**：`issue`、`run`；SQL 只写在 `pkg/db/queries`，一张表一个文件，Go 里只调 sqlc 生成的（[理由](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。
+- **不留兼容**：存盘的格式（`vibevalley.db` 的表、家目录的文件、环境变量）只认现在的名字；改名就直接改，不在读的地方长期兜底旧数据；旧数据能在功能不变的前提下补齐、改成现在的样子的，就迁一次：表在 `server/migrations/` 的新文件里迁，家目录的文件在加载时改好写回（如档案缺的动物，`agent/cast.go`）（[理由](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。
+- **Flutter 不折事实**：它读 `GET /api/state` 折好的 `CoreState`；要新的数据就加进 protocol 的字段和 `Reduce`，Dart 里只写跟着时钟走的画面；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在 Dart 里重写，加一个字段或接口问服务端（[理由](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)、[客户端问服务端](.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
+- **客户端分层**：`gen`、`ui`、`data`、`chat`（田头）、`shared`（两张皮共用的画面）在下，工作台 `desk` 和农场 `farm`、`village` 两张皮在上；皮之间不互相 import，两张都用的放进 `shared`（[理由](.agents/notes/implemented/architecture/2026-10-16-client-layers.md)）。
+- **通用的小封装在 `pkg/x`**：字符串（按 UTF-16 数、JavaScript 的空白）、数字（照 JavaScript 写）、指针、时间各一个包；要用就 import，不在自己包里再写一份 `xxxPtr`、`chatTrim`（[理由](.agents/notes/implemented/architecture/2026-10-16-common-wrappers-in-pkg-x.md)）。
 - **封闭的联合穷尽处理**：要每种都处理的地方（按 `_tag` 或 `type` 分支），`switch` 覆盖每一种，加新成员时让编译器或测试报错：Dart 的 sealed class 由编译器查；Go 的编译器不查类型 `switch`，用生成的成员表（`XMembers`）写测试。
-- **服务端的服务**：一个服务是它所属概念的包（`internal/runs`、`internal/tickets`……）里的一个结构体，构造函数的参数是它用到的服务（不拿整个 `Farm`），在包的 `Module` 里用 `base.Run` 交给 fx，再加进 `farm.go` 的 `services`；包只 import 排在它前面的包，往上走 `base.Hub`；`OnStart(ctx)` 订阅和开后台的活，开机就要发布的放 `OnReady(ctx)`（[server](server/README.md#服务)）。
+- **服务端的服务**：每个包只导出一个服务 `<包>.Service`，一块业务里分开写的几部分是它嵌入的不导出的零件；`Workspace` 上的字段用单数概念名（`f.Issue.Merge`）。构造函数的参数是它用到的服务（不拿整个 `Workspace`），在包的 `Module` 里用 `base.Run` 交给 fx，再加进 `workspace.go` 的 `services`；包只 import 排在它前面的包，往上走 `base.Hub`；服务之间传的形状放在定义它的包里，`base` 只放地基；`OnStart(ctx)` 订阅和开后台的活，开机就要发布的放 `OnReady(ctx)`（[server](server/README.md#服务)）。
 - **处理函数要薄**：HTTP 处理（`internal/handler`）和界面（Flutter 的页面）只做转发和展示，规则在拥有它的服务或纯函数里。
 - **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](.agents/notes/implemented/architecture/2026-10-10-helpers-as-oar-subagents.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](.agents/notes/implemented/feature/2026-10-10-voice-through-our-manager.md)）；院门默认关着，只放主人在本机点过头的设备、每台一把钥匙，不放 `/mcp`（[理由](.agents/notes/implemented/feature/2026-10-14-yard-gate.md)）。
 - **图标是像素素材**：界面上的按钮图标用 `design/pixel` 生成的贴图（形状照 Hugeicons：`icons/ref.py`、`gen.sh`、`process.py`），不用 ▶、■ 这类字符代替（[流程](.agents/notes/implemented/process/2026-10-09-image-pipeline-with-codex.md)）。
-- **密钥**：`.env`（`$VIBEVALLEY_HOME/.env` 或 `--env-file` 给的）、`.agora/` 不进仓库；日志和文档里不出现密钥。
-- **工具链**：Go 用 `gofmt`、`go vet`，Dart 用 `dart format`、`flutter analyze`；`scripts/` 的检查用 Bun 跑，`server/tool/` 的两个脚本用 Node 跑，都不带构建。
+- **密钥**：写了钥匙的 `vibevalley.yaml`（`$VIBEVALLEY_HOME/vibevalley.yaml` 或 `--config` 给的）、`.agora/` 不进仓库；日志和文档里不出现密钥。
+- **工具链**：Go 用 `gofmt`、`go vet`，Dart 用 `dart format`、`flutter analyze`；`scripts/` 的检查用 Bun 跑，`server/tool/` 的脚本用 Node 跑，都不带构建。
 - **代码风格**：格式交给工具（`gofmt`、`dart format -l 160`），不手调；代码和接口用实际的概念，界面上的字用中文、用农场的叫法（[用语表](docs/README.md#用语)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。
 - **测试**：服务端的测试用 smith 的 `oartest` 扮演帮工、用真的 git 仓库、模型用 `ai.FauxProvider`，不连网；纯函数的规则直接测；Flutter 用 `flutter test`（服务端用 `MockClient` 假的）。改了帮工、项目、收获、核心状态或游戏规则的行为，补对应的测试。
 - **文档和 Note**：改了行为就在同一个改动里改文档；非平凡的决策（行为、模块边界、共享约定、持久化格式、流程、测试策略）新增或更新它的 Note；局部的、机械的改动和界面微调不用写（[规矩](.agents/notes/README.md#什么时候写)）。

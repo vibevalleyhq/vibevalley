@@ -57,7 +57,7 @@ class FxLayer extends ConsumerStatefulWidget {
 
   final Stream<GameEffect>? effects;
 
-  final Stream<SiteEvent>? notices;
+  final Stream<SideEvent>? notices;
 
   final VoiceCall? call;
 
@@ -79,9 +79,14 @@ class _FxLayerState extends ConsumerState<FxLayer> {
   void initState() {
     super.initState();
     final server = ref.read(serverProvider);
-    _subs
-      ..add((widget.effects ?? farmEffects(server)).listen(_effect))
-      ..add((widget.notices ?? server.sideEvents).listen(_notice));
+    _subs.add((widget.effects ?? farmEffects(server)).listen(_effect));
+    if (widget.notices case final notices?) {
+      _subs.add(notices.listen(_notice));
+    } else {
+      ref.listenManual(sideEventsProvider, (_, next) {
+        if (next.value case final e?) _notice(e);
+      });
+    }
     _problem = widget.call?.problem;
     widget.call?.addListener(_voice);
   }
@@ -95,8 +100,8 @@ class _FxLayerState extends ConsumerState<FxLayer> {
     super.dispose();
   }
 
-  void _notice(SiteEvent e) {
-    if (e is! SiteEventNotice) return;
+  void _notice(SideEvent e) {
+    if (e is! SideEventNotice) return;
     final level = e.level.wire;
     _toasts.add(
       type: level,

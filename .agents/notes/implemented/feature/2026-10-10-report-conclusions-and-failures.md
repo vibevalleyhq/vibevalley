@@ -26,4 +26,4 @@ Status: implemented
 
 ## Verification
 
-`server/internal/runs/rules_test.go` 的 `TestCrewSummaryIsTheVerdict`、`TestCrewFailedTurnLeadsWithWhy`；`server/internal/farm/crew_test.go` 的 `TestCrewFailedTurnSaysWhy`（经过真的会话）。
+`server/internal/worker/rules_test.go` 的 `TestCrewSummaryIsTheVerdict`、`TestCrewFailedTurnLeadsWithWhy`；`server/internal/workspace/work_test.go` 的 `TestCrewFailedTurnSaysWhy`（经过真的会话）。

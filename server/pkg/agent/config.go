@@ -3,12 +3,11 @@ package agent
 // MCP servers in the shape Claude Code and Cursor use: { "mcpServers": { name: { command, args, env } | { url } } }.
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -17,107 +16,27 @@ import (
 
 const DEFAULT_MODEL = "deepseek-flash"
 
-var envNamePattern = regexp.MustCompile(`^\$?\{?([A-Z][A-Z0-9_]*)\}?$`)
-
-func DefaultModelID() string {
-	if name := os.Getenv("VIBEVALLEY_AGENT_MODEL"); name != "" {
-		return name
-	}
-	return DEFAULT_MODEL
-}
-
 // Said for the command line; the farm says where to put one in the app.
-var ErrNoDeepSeekKey = errors.New("没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者先在 pi 里配好 deepseek。")
-
-func EnvName(key string) string {
-	if m := envNamePattern.FindStringSubmatch(key); m != nil {
-		return m[1]
-	}
-	return ""
-}
-
-type piDeepseek struct {
-	baseURL string
-	key     string
-}
-
-func fromPi() *piDeepseek {
-	home, _ := os.UserHomeDir()
-	data, err := os.ReadFile(filepath.Join(home, ".pi", "agent", "models.json"))
-	if err != nil {
-		return nil
-	}
-	var config struct {
-		Providers map[string]struct {
-			BaseURL string `json:"baseUrl"`
-			APIKey  string `json:"apiKey"`
-		} `json:"providers"`
-	}
-	if json.Unmarshal(data, &config) != nil {
-		return nil
-	}
-	p, ok := config.Providers["deepseek"]
-	if !ok {
-		return nil
-	}
-	key := p.APIKey
-	if name := EnvName(key); key != "" && name != "" {
-		key = os.Getenv(name)
-	}
-	if key == "" {
-		return nil
-	}
-	return &piDeepseek{baseURL: p.BaseURL, key: key}
-}
-
-func PiDeepseekKey() string {
-	if p := fromPi(); p != nil {
-		return p.key
-	}
-	return ""
-}
+var ErrNoDeepSeekKey = errors.New("没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者写进 vibevalley.yaml 的 deepseek.api_key。")
 
 type LLM struct {
 	Model         ai.Model
 	StreamOptions ai.StreamOptions
 }
 
-var trailingV1 = regexp.MustCompile(`/v1/?$`)
-
-func Deepseek(id, given string) (LLM, error) {
-	// A key the host was given (vibevalley's settings) first, then the environment's, then pi's.
-	key := given
-	if key == "" {
-		key = os.Getenv("DEEPSEEK_API_KEY")
-	}
-	var pi *piDeepseek
-	if key == "" {
-		pi = fromPi()
-		if pi != nil {
-			key = pi.key
-		}
-	}
+// id empty is DEFAULT_MODEL; the key is the caller's to find.
+func Deepseek(id, key string) (LLM, error) {
 	if key == "" {
 		return LLM{}, ErrNoDeepSeekKey
 	}
-	name := id
-	if name == "" {
-		name = DefaultModelID()
-	}
+	name := cmp.Or(id, DEFAULT_MODEL)
 	model, known := ai.GetModel("deepseek", name)
 	if !known {
 		model, _ = ai.GetModel("deepseek", DEFAULT_MODEL)
 		model.ID = name
 		model.Name = name
 	}
-	baseURL := os.Getenv("DEEPSEEK_BASE_URL")
-	if baseURL == "" && pi != nil {
-		baseURL = pi.baseURL
-	}
-	if baseURL == "" {
-		baseURL = "https://api.deepseek.com"
-	}
-	model.BaseURL = trailingV1.ReplaceAllString(baseURL, "")
+	model.BaseURL = "https://api.deepseek.com"
 	return LLM{Model: model, StreamOptions: ai.StreamOptions{APIKey: key}}, nil
 }
 

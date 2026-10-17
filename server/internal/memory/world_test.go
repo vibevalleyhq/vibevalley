@@ -5,8 +5,11 @@ import (
 
 	"go.uber.org/fx"
 
+	"vibevalley/internal/agent"
 	"vibevalley/internal/base"
-	"vibevalley/internal/projects"
+	"vibevalley/internal/core"
+	"vibevalley/internal/project"
+	"vibevalley/internal/setting"
 )
 
 // Without the packages above it: a test reaches only what is below.
@@ -18,19 +21,17 @@ type world struct {
 type worldServices struct {
 	fx.In
 
-	DB            *sql.DB
-	Site          *base.Site
-	Store         *base.Store
-	Settings      *base.Settings
-	Projects      *projects.Projects
-	Codebase      *projects.Codebase
-	Memories      *Memories
-	ManagerMemory *ManagerMemory
+	DB      *sql.DB
+	Core    *core.Service
+	Agent   *agent.Service
+	Setting *setting.Service
+	Project *project.Service
+	Memory  *Service
 }
 
 func newWorld(cfg base.Config, options ...fx.Option) (*world, error) {
 	w := &world{}
-	app, err := base.NewApp(cfg, []base.Layer{projects.Module, Module},
+	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, Module},
 		fx.Options(options...),
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),
 	)

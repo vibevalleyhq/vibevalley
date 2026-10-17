@@ -28,7 +28,7 @@ class TitleOpen extends Notifier<bool> {
 
   void enterFarm({required bool start}) {
     state = false;
-    if (start) unawaited(ref.read(serverProvider).api.farm.start().catchError((Object _) {}));
+    if (start) unawaited(ref.read(apiProvider).server.start().catchError((Object _) {}));
     unawaited(() async {
       try {
         await (await SharedPreferences.getInstance()).setBool(_seenKey, true);
@@ -41,7 +41,7 @@ class TitleOpen extends Notifier<bool> {
   void show() => state = true;
 }
 
-bool hasFarm(FarmState? farm) => farm != null && (farm.helpers.isNotEmpty || (farm.chat?.messages.length ?? 0) > 0 || (farm.progress?.coins ?? 0) > 0);
+bool hasFarm(CoreState? farm) => farm != null && (farm.workers.isNotEmpty || (farm.chat?.messages.length ?? 0) > 0 || (farm.progress?.coins ?? 0) > 0);
 
 bool managerReady(SettingsStatus? status) => status?.deepseekApiKey.source != null;
 
@@ -51,7 +51,7 @@ class SettingsNotifier extends Notifier<SettingsStatus?> {
   @override
   SettingsStatus? build() => null;
 
-  Future<void> load() async => state = await ref.read(serverProvider).api.farm.settings();
+  Future<void> load() async => state = await ref.read(apiProvider).setting.load();
 
-  Future<void> save(SettingsUpdate update) async => state = await ref.read(serverProvider).api.farm.saveSettings(body: update);
+  Future<void> save(SettingsUpdate update) async => state = await ref.read(apiProvider).setting.save(body: update);
 }

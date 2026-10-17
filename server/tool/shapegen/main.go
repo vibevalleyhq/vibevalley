@@ -14,6 +14,13 @@
 //	//vibevalley:error <status>          on a struct: an API error, answered with that status and tagged with its name
 //	//vibevalley:dart <Name>             the Dart name, when the Go one would clash with Flutter's (Badge)
 //	//vibevalley:route <group.op> <METHOD> <path>   on a Handlers method: its operation, method and path
+//	//vibevalley:const <dartName>        on an untyped constant (a string or a number): the client gets it under that name
+//
+// The client's part of seeds.json (the runtimes' presets and facts, the fallback preset) goes into the Dart file too, decoded
+// into the generated types.
+//
+// On a Handlers method, a path parameter typed int64 (a *int64 query one) is parsed by Mount: one that is not a number is a
+// 404 (a query one is none), and the Dart client takes a number.
 //
 // A field is optional with `json:",omitzero"`, and may be null as a pointer, or with `vibevalley:"null"` where it cannot be
 // one (a slice, a map, a union): neither is written as [] or {} when nil.
@@ -21,6 +28,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -123,7 +131,14 @@ type param struct {
 	typ  ast.Expr
 }
 
+type sharedConst struct {
+	dart  string
+	doc   []string
+	value string // as Dart writes it
+}
+
 type shapes struct {
+	consts []sharedConst
 	decls  []*decl
 	byName map[string]*decl
 	routes []route
@@ -156,6 +171,14 @@ func load(files ...string) *shapes {
 			case token.CONST:
 				for _, spec := range gd.Specs {
 					vs := spec.(*ast.ValueSpec)
+					groups := []*ast.CommentGroup{vs.Doc}
+					if len(gd.Specs) == 1 {
+						groups = append(groups, gd.Doc)
+					}
+					if dirs, doc := directives(groups...); len(dirs) > 0 && dirs[0][0] == "const" {
+						s.consts = append(s.consts, sharedConst{dart: dirs[0][1], doc: doc, value: dartLiteral(vs)})
+						continue
+					}
 					id, ok := vs.Type.(*ast.Ident)
 					if !ok || len(vs.Values) != 1 {
 						continue
@@ -284,6 +307,81 @@ func mustUnquote(s string) string {
 		fail(err)
 	}
 	return u
+}
+
+// An untyped constant's one value, a literal, as Dart writes it.
+func dartLiteral(vs *ast.ValueSpec) string {
+	lit, ok := vs.Values[0].(*ast.BasicLit)
+	if vs.Type != nil || len(vs.Values) != 1 || !ok {
+		fail(fmt.Errorf("//vibevalley:const %s: an untyped constant with a literal value", vs.Names[0].Name))
+	}
+	switch lit.Kind {
+	case token.STRING:
+		return dartStr(mustUnquote(lit.Value))
+	case token.INT:
+		n, err := strconv.ParseInt(lit.Value, 0, 64)
+		if err != nil {
+			fail(err)
+		}
+		return strconv.FormatInt(n, 10)
+	case token.FLOAT:
+		return strings.ReplaceAll(lit.Value, "_", "")
+	}
+	fail(fmt.Errorf("//vibevalley:const %s: a string or a number", vs.Names[0].Name))
+	return ""
+}
+
+func (s *shapes) dartConsts() string {
+	out := []string{"// The constants the server and the client share: //vibevalley:const in shapes.go."}
+	for _, c := range s.consts {
+		doc := ""
+		if len(c.doc) > 0 {
+			doc = "/// " + strings.Join(c.doc, "\n/// ") + "\n"
+		}
+		out = append(out, fmt.Sprintf("%sconst %s = %s;", doc, c.dart, c.value))
+	}
+	return strings.Join(out, "\n\n")
+}
+
+// The keys of seeds.json the client reads.
+var clientSeeds = []string{"achievements", "actionText", "runtimePresets", "runtimeFacts", "fallbackPreset"}
+
+func dartSeeds() string {
+	body, err := os.ReadFile("internal/protocol/seeds.json")
+	if err != nil {
+		fail(err)
+	}
+	var all map[string]json.RawMessage
+	if err := json.Unmarshal(body, &all); err != nil {
+		fail(fmt.Errorf("seeds.json: %w", err))
+	}
+	part := map[string]json.RawMessage{}
+	for _, k := range clientSeeds {
+		if all[k] == nil {
+			fail(fmt.Errorf("seeds.json has no %s", k))
+		}
+		part[k] = all[k]
+	}
+	compact, _ := json.Marshal(part)
+	const quotes = "'''"
+	if strings.Contains(string(compact), quotes) {
+		fail(fmt.Errorf("seeds.json: %s does not fit in a Dart raw string", quotes))
+	}
+	return "/// From internal/protocol/seeds.json (its achievements, actionText, runtimePresets, runtimeFacts and fallbackPreset), as the server reads them.\n" +
+		"final Map<String, dynamic> _seeds = jsonDecode(r" + quotes + string(compact) + quotes + ") as Map<String, dynamic>;\n\n" +
+		"/// In the order the page shows them.\n" +
+		"final List<AchievementDef> achievements = [for (final j in _seeds['achievements'] as List) AchievementDef.fromJson(j as Map<String, dynamic>)];\n\n" +
+		"/// What each action is, in words; the server says them the same way.\n" +
+		"final Map<WorkerAction, String> actionText = {\n" +
+		"  for (final e in (_seeds['actionText'] as Map<String, dynamic>).entries) WorkerAction.fromJson(e.key): e.value as String,\n" +
+		"};\n\n" +
+		"/// In seeds.json's order.\n" +
+		"final List<RuntimePreset> runtimePresets = [for (final j in _seeds['runtimePresets'] as List) RuntimePreset.fromJson(j as Map<String, dynamic>)];\n\n" +
+		"final Map<String, RuntimeFacts> runtimeFacts = {\n" +
+		"  for (final e in (_seeds['runtimeFacts'] as Map<String, dynamic>).entries) e.key: RuntimeFacts.fromJson(e.value as Map<String, dynamic>),\n" +
+		"};\n\n" +
+		"/// The look of a runtime with none of its own, under that runtime's id and name.\n" +
+		"final RuntimePreset fallbackPreset = RuntimePreset.fromJson(_seeds['fallbackPreset'] as Map<String, dynamic>);"
 }
 
 func slicesContain(xs []string, x string) bool {
@@ -436,8 +534,16 @@ func (e %[1]s) MarshalJSON() ([]byte, error) {
 			switch {
 			case p.name == "body":
 				reads = append(reads, fmt.Sprintf("\t\tvar body %s\n\t\tif !decode(w, r, &body) {\n\t\t\treturn\n\t\t}", s.text(p.typ)))
+			case isPointer(p.typ) && s.text(p.typ) == "*int64":
+				reads = append(reads, fmt.Sprintf("\t\t%s := queryNumber(r, %q)", p.name, queryName(p.name)))
 			case isPointer(p.typ):
 				reads = append(reads, fmt.Sprintf("\t\t%s := query(r, %q)", p.name, queryName(p.name)))
+			case s.text(p.typ) == "int64":
+				if i >= len(path) {
+					fail(fmt.Errorf("%s: more path parameters than %s has", r.goName, r.path))
+				}
+				reads = append(reads, fmt.Sprintf("\t\t%s, ok := pathNumber(w, r, %q)\n\t\tif !ok {\n\t\t\treturn\n\t\t}", p.name, path[i]))
+				i++
 			default:
 				if i >= len(path) {
 					fail(fmt.Errorf("%s: more path parameters than %s has", r.goName, r.path))
@@ -798,12 +904,19 @@ func (s *shapes) dartFile() string {
 				t, _ := s.dartTypeOf(p.typ)
 				f := dartField(q)
 				params = append(params, t.typ+"? "+f)
-				query = append(query, fmt.Sprintf("if (%s != null) %s: '${%s}'", f, dartStr(q), t.write(f+"!")))
+				written := t.write(f + "!")
+				if s.text(p.typ) == "*int64" {
+					written = f + "!.toInt()"
+				}
+				query = append(query, fmt.Sprintf("if (%s != null) %s: '${%s}'", f, dartStr(q), written))
 			default:
 				t, _ := s.dartTypeOf(p.typ)
 				f := dartField(names[i])
 				params = append(params, "required "+t.typ+" "+f)
 				pathParts[names[i]] = t.write(f)
+				if s.text(p.typ) == "int64" {
+					pathParts[names[i]] = f + ".toInt()"
+				}
 				i++
 			}
 		}
@@ -840,7 +953,7 @@ func (s *shapes) dartFile() string {
 	lates := join(groups, func(g *group) string {
 		return fmt.Sprintf("  late final %s = %sApi._(this);", camel(g.name), pascal(g.name))
 	}, "\n")
-	client := `/// A refusal from the server: its tagged error (FarmRefused, VoiceUnavailable…) and reason, or the bare status.
+	client := `/// A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status.
 class VibeValleyApiError implements Exception {
   VibeValleyApiError(this.status, this.tag, this.reason);
   final int status;
@@ -850,7 +963,7 @@ class VibeValleyApiError implements Exception {
   String toString() => reason;
 }
 
-/// The server's HTTP API (server/internal/protocol/api.go), one client per group: ` + "`api.farm.say(body: …)`" + `.
+/// The server's HTTP API (server/internal/protocol/api.go), one client per group: ` + "`api.channel.say(body: …)`" + `.
 class VibeValleyApi {
   VibeValleyApi(this.base, [http.Client? client]) : _http = client ?? http.Client();
 
@@ -887,7 +1000,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-SiteFrame siteFrameFromJson(String s) => SiteFrame.fromJson(jsonDecode(s) as Map<String, dynamic>);
+StateFrame stateFrameFromJson(String s) => StateFrame.fromJson(jsonDecode(s) as Map<String, dynamic>);
 `
+	blocks = append(append([]string{s.dartConsts()}, blocks...), dartSeeds())
 	return header + "\n" + strings.Join(blocks, "\n\n") + "\n\n" + strings.Join(clients, "\n\n") + "\n\n" + client + "\n"
 }

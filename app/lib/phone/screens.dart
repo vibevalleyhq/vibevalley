@@ -8,8 +8,7 @@ import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../sprites/atlas.dart';
 import '../ui/px.dart';
-import '../village/village_view.dart' show agentsProvider;
-import '../village/world.dart' show lookOf;
+import '../data/remote.dart' show agentsProvider;
 import '../voice/voice.dart';
 import 'calls.dart';
 import 'lcd.dart';
@@ -17,6 +16,7 @@ import 'widgets.dart';
 import '../rules/view.dart';
 import 'bug_snake_game.dart';
 import 'merge_game.dart';
+import '../shared/looks.dart';
 
 enum PhoneApp { home, missed, log, blocks, dino, sokoban, bugs, merge }
 
@@ -89,7 +89,7 @@ class CallerFace extends ConsumerWidget {
     final atlas = ref.watch(atlasProvider).value;
     if (atlas == null) return SizedBox.square(dimension: size);
     return switch (call.from) {
-      InboxFromHelper(:final id, :final agent) => AnimalFace(
+      InboxFromWorker(:final id, :final agent) => AnimalFace(
         atlas: atlas,
         look: lookOf((ref.watch(agentsProvider).value ?? const {})[agent], agent.isEmpty ? id : agent, atlas.has),
         size: size,

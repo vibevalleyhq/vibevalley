@@ -46,7 +46,7 @@ Raft（botiverse 的人机协作工作区，[源码](https://github.com/botivers
 
 ### 帮工怎么说话：农场的工具
 
-服务端在 `/mcp`（只听本机，MCP 官方 Go SDK 的 Streamable HTTP，`server/internal/chat/farmtools.go`）上给帮工四个工具：`farm_say`、`farm_read`、`farm_inbox`、`farm_who`。派帮工时，通过 smith 的 `mcpServers` 交给它的会话，带一个这次会话专用的令牌（`Authorization: Bearer …`），换会话、收工就作废；令牌只分清是谁，不防人。
+服务端在 `/mcp`（只听本机，MCP 官方 Go SDK 的 Streamable HTTP，`server/internal/channel/farmtools.go`）上给帮工四个工具：`farm_say`、`farm_read`、`farm_inbox`、`farm_who`。派帮工时，通过 smith 的 `mcpServers` 交给它的会话，带一个这次会话专用的令牌（`Authorization: Bearer …`），换会话、收工就作废；令牌只分清是谁，不防人。
 
 - **最后的汇报照旧自动贴出**：一轮的结论以帮工自己的名义贴进它的工单串，原文在「干活过程」里。`farm_say` 只用于一轮中间：确认、提问、交接。
 - **新鲜度拦截照 Raft 做**：`farm_say` 的目标里有它没看过的新消息，就先不发，把最多 3 条给它看，改了再发或 `anyway: true` 照发。
@@ -86,14 +86,14 @@ Raft 只靠提示词里的礼节。VibeValley 加了三道结构上的闸，模�
 
 ### 核心状态和存储
 
-- `FarmState.chat`：田头和最近的串（最多 100 个），以及它们最近的消息（总共 300 条）。新的事实 `message`（新消息，或管家在说的那条用同一个 `seq` 再发）和 `conversation`（新开或变了）取代原来的 `transcript`。更早的消息页面用 HTTP 取。
-- 聊天记录的家是数据库：一条消息先写库，成功了再施加事实。`farm.json` 不存田头，启动时从库里放回核心状态，两份不会对不上。
+- `CoreState.chat`：田头和最近的串（最多 100 个），以及它们最近的消息（总共 300 条）。新的事实 `message`（新消息，或管家在说的那条用同一个 `seq` 再发）和 `conversation`（新开或变了）取代原来的 `transcript`。更早的消息页面用 HTTP 取。
+- 聊天记录的家是数据库：一条消息先写库，成功了再施加事实。`state.json` 不存田头，启动时从库里放回核心状态，两份不会对不上。
 - 帮工的已读位置、跟着哪些串、投递，只有服务端用，只在库里。
 - 投给谁、叫不叫醒、帮工收到的话、核心状态里留哪些，都是 protocol 的纯函数，有单元测试。
 
 ## 数据表
 
-存储是 Go 服务端的 SQLite（modernc，纯 Go，一个文件 `$VIBEVALLEY_HOME/farm.db`），不另起数据库服务。表在 [`server/migrations/0001_farm.sql`](../../../../server/migrations/0001_farm.sql)，查询在 [`server/internal/chat/db.go`](../../../../server/internal/chat/db.go)。当初在 TypeScript 服务端上是 PGlite 加 effect-sqlc 生成的查询；换成 Go 时表照 PG 的迁移折成最后的样子，时间存毫秒（[服务端用 Go 重写](../architecture/2026-10-13-go-server-on-smith.md)）。
+存储是 Go 服务端的 SQLite（modernc，纯 Go，一个文件 `$VIBEVALLEY_HOME/vibevalley.db`），不另起数据库服务。表在 [`server/migrations/0001_schema.sql`](../../../../server/migrations/0001_schema.sql)，查询在 `server/pkg/db/queries/` 里每张表的文件，[`server/internal/channel/db.go`](../../../../server/internal/channel/db.go) 把它们读成田头的行。当初在 TypeScript 服务端上是 PGlite 加 effect-sqlc 生成的查询；换成 Go 时表照 PG 的迁移折成最后的样子，时间存毫秒（[服务端用 Go 重写](../architecture/2026-10-13-go-server-on-smith.md)）。
 
 写库排队一个一个来，消息、@、跟帖、投递、串的摘要在一个事务里。服务端只有一个写入方、数据库只有一个连接，所以 `seq` 的顺序就是提交的顺序；Raft 要等 3 秒「稳定」，是因为它有多个写入方。这是一个要守住的假设：不开连接池。
 
@@ -102,8 +102,8 @@ Raft 只靠提示词里的礼节。VibeValley 加了三道结构上的闸，模�
 | 表 | 一行是 | 对应 Raft 的 |
 |---|---|---|
 | `participants` | 对话里的一个人：主人、管家、一个帮工、农场（系统提示）。帮工收工后这一行留着 | 用户表、agent 表 |
-| `conversations` | 田头，或者一个串（挂在一条消息下，关联到工单） | `channels`（`thread` 类型） |
-| `messages` | 一条消息，`seq` 是全局顺序，也是对外的消息号 | `messages` |
+| `conversation` | 田头，或者一个串（挂在一条消息下，关联到工单） | `channels`（`thread` 类型） |
+| `message` | 一条消息，`seq` 是全局顺序，也是对外的消息号 | `messages` |
 | `mentions` | 一条消息里写到的一个 @，以及它解析成了什么 | `message_mentions` |
 | `follows` | 谁跟着哪个串，为什么 | `thread_follows` |
 | `read_cursors` | 一个人在一个对话里连续读到哪；主人的也在这里 | `agent_channel_read_cursors` |
@@ -157,7 +157,7 @@ Raft 的实现里有很多看起来繁琐的地方。逐条对照 VibeValley 的
 ### 数据
 
 - **频道**（`server/src/db/schema.ts` 的 `channels`）：`type` 是 `channel`、`private`、`joint`、`dm`、`thread` 之一。话题串也是一行频道，带 `parent_message_id`；第一次回复时在事务里建（`channelService.ts` 的 `getOrCreateThread`），不能嵌套。串没有自己的成员，能不能发言看父频道。
-- **消息**（`messages`）：
+- **消息**（`message`）：
   - `seq` 是全库一个 `bigserial`，到处当游标用。注释说明「seq 的顺序不是提交的顺序」，所以已读位置只推进到 3 秒内已经稳定的那一段（`READ_POSITION_SETTLE_MS`）。
   - `sender_type` 是 `user`、`agent` 或 `external_projection`。
   - agent 的每次发送带一个幂等键 `agent_send_key`，在（发送者, 键）上唯一：重发返回同一条，内容不同就报 409。
@@ -258,7 +258,7 @@ Raft 的实现里有很多看起来繁琐的地方。逐条对照 VibeValley 的
 
 **用 handle 和显示名来 @，像 Raft。** Raft 的手册花了大量篇幅讲显示名被当成 handle、有空格的名字只抽出第一个词、紧跟中文会被吞进 handle 里，这些都会 @ 错人或 @ 不到人。VibeValley 的帮工本来就有稳定的 id，用 id 来 @，页面上显示名字，就没有这些问题。
 
-**聊天记录继续存 JSON 文件**（像 `farm.json`、`steps/*.json`）。一条消息要同时改消息、@、投递、跟帖、已读好几处，还要按游标翻页、按人查未读；用文件就得自己保证一致和自己建索引。
+**聊天记录继续存 JSON 文件**（像 `state.json`、`steps/*.json`）。一条消息要同时改消息、@、投递、跟帖、已读好几处，还要按游标翻页、按人查未读；用文件就得自己保证一致和自己建索引。
 
 **用 SQLite（Node 24 自带 `node:sqlite`）。** 不加依赖，也够用；但主人自己的 effect-sqlc 只生成 PostgreSQL 的查询，用 PGlite 就能直接用它，表和查询都有类型。（这是 TypeScript 服务端时的取舍；服务端换成 Go 以后用的就是 SQLite。）
 
@@ -277,15 +277,15 @@ Raft 的实现里有很多看起来繁琐的地方。逐条对照 VibeValley 的
 - **花钱**：每次叫醒都是一轮。只用 @ 叫醒、冷却和来回上限是为了这个。模型会把读到的 @ 名单原样抄进自己的话，每个都叫醒一个人；名单不带 @、规矩写明 @ 就是叫醒，是对这一点的补救。
 - **结构上的闸不靠模型自觉**，但礼节还是靠：DeepSeek Flash 和 claude 守礼节的程度不同，第一次真跑里 pi 的帮工用 `sleep` 轮询等别人回话，没有等提示。
 - **claude 的一次「工单」可能是好几轮**：它在后台开的计时器到点会自己再开一轮，每轮结束都贴一次汇报，串里会多出几条进度。
-- **SQLite**：一个文件、一个连接，写库排队。备份就是拷贝 `$VIBEVALLEY_HOME/farm.db`。
+- **SQLite**：一个文件、一个连接，写库排队。备份就是拷贝 `$VIBEVALLEY_HOME/vibevalley.db`。
 - **状态多了**：投递有五个状态，交付和看到之间靠会话的事件推进；判断都写成纯函数，状态的转移用脚本扮演的帮工测「开口前死掉」「重启」两种情况。
-- **一次迁移**：没有库的旧农场，启动时把 `farm.json` 里的旧对话（`lines`）写进田头一次，只在库是空的时候做。
+- **一次迁移**：没有库的旧农场，启动时把 `state.json` 里的旧对话（`lines`）写进田头一次，只在库是空的时候做。
 
 ## Verification
 
 - `server/internal/protocol/chat_rules_test.go`：@ 的解析、对话的地址、给谁和叫不叫醒（含三道闸）、帮工收到的话、核心状态里留哪些，只测纯函数。
-- `server/internal/chat/chat_test.go`：smith 的 `oartest` 扮演帮工、真的 git 仓库、内存里的 SQLite。派活开串、汇报贴进串；串里的话叫醒帮工，开口才算看到；忙时只插一条提示；来回上限和冷却；叫醒熔断；重启后已交付没看到的再给一遍。`server/internal/manager/farmtools_test.go`：经 HTTP 调 `/mcp`，令牌认人，没有令牌或冒名的认不出，拦截、重试、防发错地方。
-- `farm.json` 不存田头（Go 的 `Site` 只存核心状态里田头以外的部分）。`app/test/chat_test.dart`：客户端把田头、语音的话、串、未读合成的样子。
+- `server/internal/channel/chat_test.go`：smith 的 `oartest` 扮演帮工、真的 git 仓库、内存里的 SQLite。派活开串、汇报贴进串；串里的话叫醒帮工，开口才算看到；忙时只插一条提示；来回上限和冷却；叫醒熔断；重启后已交付没看到的再给一遍。`server/internal/manager/farmtools_test.go`：经 HTTP 调 `/mcp`，令牌认人，没有令牌或冒名的认不出，拦截、重试、防发错地方。
+- `state.json` 不存田头（Go 的 `Site` 只存核心状态里田头以外的部分）。`app/test/chat_test.dart`：客户端把田头、语音的话、串、未读合成的样子。
 - 2026-10-11 用真的农机跑了一遍：pi 的帮工一轮中间用 `farm_say` 在自己的串里说话、用 `farm_who` 看地里有谁，汇报贴进串；claude 的帮工在自己的串里 @ pi 的帮工，pi 的帮工正忙，收到提示，读了以后在 claude 的串里回答，claude 的帮工读到回答写进结论。同一次里 pi 的帮工把 `farm_who` 的 @ 名单抄进回答，叫醒了管家，管家的转述又叫醒了 pi 的帮工，第 4 次 agent 叫醒 agent 被来回上限拦下，串里贴了提示；因此有了上面「名单不带 @」那一条。codex 还没在田头上真跑过。
 
 ## Deferred

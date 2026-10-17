@@ -20,7 +20,7 @@
 
 额度和花费见 [server.md](server.md)「额度、花费和上限」。各农机不接受哪些开会话的参数、能不能中途插话，写在 `seeds.json` 的 `runtimeFacts`（抄自 smith 各农机的 `RefusedSessionOptions`）；页面上不接受的选项是灰的。
 
-VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮手（`spawn_agent`）、读技能这些工具，对话存在 `$VIBEVALLEY_HOME/helpers/<会话 id>.jsonl`。
+VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮手（`spawn_agent`）、读技能这些工具，对话存在 `$VIBEVALLEY_HOME/workers/<会话 id>.jsonl`。
 
 ## 种子档案
 
@@ -34,7 +34,7 @@ VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮�
 
 管家不是帮工档案，只跑在 VibeValley 自己的 agent 上（[server.md](server.md)「管家」）。四个页签：
 
-- **记性**：`foreman/MEMORY.md`，整份放在每次请求的系统提示里（最多 8000 字，带不进去的变淡）。可以替它记、让它忘。
+- **记性**：`manager/MEMORY.md`，整份放在每次请求的系统提示里（最多 8000 字，带不进去的变淡）。可以替它记、让它忘。
 - **轨迹**：管家每一轮的经过。
 - **旧账**：压缩时存下的旧对话，能搜。
 - **声音**：打电话时的人设、开场白和音色（[voice.md](voice.md)「配置」）。
@@ -54,7 +54,7 @@ VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮�
 
 ## 派给谁
 
-`dispatch` 的 `agent` 按这个顺序落到一个档案（`runs/rules.go` 的 `ChooseAgent`，管家和计划共用）：
+`dispatch` 的 `agent` 按这个顺序落到一个档案（`worker/rules.go` 的 `ChooseAgent`，管家和计划共用）：
 
 1. 填的是档案的名字或 id：就是它。
 2. 填的是农机：这台农机上第一个能派的档案。

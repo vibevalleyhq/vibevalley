@@ -5,13 +5,21 @@ import 'package:vibevalley/game/state.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'farm_fakes.dart';
+import 'support/farm.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  PlaybookNode node(String id, String title, {List<String> needs = const [], NodeState state = NodeState.waiting, String? conclusion}) =>
-      PlaybookNode(id: id, title: title, task: '做$title', needs: needs, state: state, conclusion: conclusion, tries: 0);
+  PlaybookNode node(
+    String id,
+    String title, {
+    List<String> needs = const [],
+    List<String>? blockedBy,
+    NodeState state = NodeState.waiting,
+    String? conclusion,
+  }) => PlaybookNode(id: id, title: title, task: '做$title', needs: needs, blockedBy: blockedBy, state: state, conclusion: conclusion, tries: 0);
+
+  // What the server fills in (PlaybooksOf) is written out as it would.
 
   final draft = Playbook(
     id: 'p1',
@@ -21,11 +29,16 @@ void main() {
     state: PlaybookState.draft,
     nodes: [
       node('api', '接口'),
-      node('ui', '页面', needs: ['api']),
+      node('ui', '页面', needs: ['api'], blockedBy: ['api']),
       node('docs', '文档'),
     ],
     parallel: 2,
     createdAt: 0,
+    layers: [
+      ['api', 'docs'],
+      ['ui'],
+    ],
+    asksForYou: true,
   );
   final ripe = Playbook(
     id: 'p2',
@@ -37,6 +50,11 @@ void main() {
     nodes: [node('css', '样式', state: NodeState.merged, conclusion: '改好了')],
     parallel: 1,
     createdAt: 1,
+    layers: [
+      ['css'],
+    ],
+    asksForYou: true,
+    settled: 1,
   );
   final changes = {
     'project': 'farm',
@@ -53,7 +71,7 @@ void main() {
     'behind': 0,
   };
   final events = [
-    {'seq': 1, 'playbook': 'p1', 'kind': 'drafted', 'actor': 'farm', 'detail': '3 步', 'at': 0},
+    {'seq': 1, 'playbook': 'p1', 'kind': 'drafted', 'actor': 'system', 'detail': '3 步', 'at': 0, 'text': '拆好了，3 步，等主人看'},
     {
       'seq': 2,
       'playbook': 'p1',
@@ -64,18 +82,19 @@ void main() {
         {'field': '工单', 'from': '旧', 'to': '新'},
       ],
       'at': 1,
+      'text': '改了「接口」的工单',
     },
   ];
 
   testWidgets('a draft: its steps in columns, started; a step changed; its history', (tester) async {
-    final calls = Calls();
+    final routes = Routes();
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
       overrides: overrides(
         farm(),
         view(),
-        fakeApi(calls, {'GET /api/playbooks/p1/events': events, 'POST /api/playbooks/p1/act': '开工了', 'PUT /api/playbooks/p1/nodes/ui': '改好了「页面」'}),
+        fakeApi(routes, {'GET /api/playbooks/p1/events': events, 'POST /api/playbooks/p1/act': '开工了', 'PUT /api/playbooks/p1/nodes/ui': '改好了「页面」'}),
         agents: {'tester': agent('tester', '测试小吴')},
         plans: [draft],
       ),
@@ -91,7 +110,7 @@ void main() {
     expect(find.text('改了「接口」的工单'), findsOneWidget);
     await tester.tap(find.text('开工'));
     await settle(tester);
-    expect(calls.list.where((x) => x.path == '/api/playbooks/p1/act').single.body, {'action': 'start'});
+    expect(routes.calls.where((x) => x.path == '/api/playbooks/p1/act').single.body, {'action': 'start'});
     expect(find.text('开工了'), findsOneWidget);
     await tester.tap(find.text('改').at(2));
     await settle(tester);
@@ -100,21 +119,21 @@ void main() {
     await settle(tester);
     await tester.tap(find.text('改好了'));
     await settle(tester);
-    final put = calls.list.where((x) => x.method == 'PUT').single;
+    final put = routes.calls.where((x) => x.method == 'PUT').single;
     expect(put.path, '/api/playbooks/p1/nodes/ui');
     expect((put.body! as Map)['needs'], ['api']);
     expect(find.text('改好了「页面」'), findsOneWidget);
   });
 
   testWidgets('asking for a plan', (tester) async {
-    final calls = Calls();
+    final routes = Routes();
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
       overrides: overrides(
         farm(),
         view(),
-        fakeApi(calls, {
+        fakeApi(routes, {
           'GET /api/projects': [
             {'name': 'clock-in', 'path': '/work/clock-in', 'git': true, 'slots': 3},
           ],
@@ -129,20 +148,20 @@ void main() {
     await settle(tester);
     await tester.tap(find.text('拆计划'));
     await settle(tester);
-    final plan = calls.list.where((x) => x.path == '/api/playbooks').single;
+    final plan = routes.calls.where((x) => x.path == '/api/playbooks').single;
     expect(plan.body, {'goal': '给 clock-in 加按月查询', 'project': 'clock-in'});
     expect(c.read(planShownProvider), 'p3');
   });
 
   testWidgets('a ripe playbook: its changes looked over, then harvested', (tester) async {
-    final calls = Calls();
+    final routes = Routes();
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
       overrides: overrides(
         farm(),
         view(),
-        fakeApi(calls, {'GET /api/playbooks/p2/events': <Object>[], 'GET /api/playbooks/p2/changes': changes, 'POST /api/playbooks/p2/act': '收进了 main'}),
+        fakeApi(routes, {'GET /api/playbooks/p2/events': <Object>[], 'GET /api/playbooks/p2/changes': changes, 'POST /api/playbooks/p2/act': '收进了 main'}),
         plans: [ripe],
       ),
     );
@@ -156,17 +175,17 @@ void main() {
     expect(find.text('src/dark.css'), findsOneWidget);
     await tester.tap(find.text('确认收获，合进 main'));
     await settle(tester);
-    expect(calls.list.last.body, {'action': 'harvest'});
+    expect(routes.calls.last.body, {'action': 'merge'});
     expect(find.text('收进了 main'), findsOneWidget);
   });
 
   testWidgets("a helper's harvest: commits, files and a diff; then harvested", (tester) async {
-    final calls = Calls();
-    final w = helper('w3', name: '老李', station: 2, phase: const PhaseRipe());
+    final routes = Routes();
+    final w = worker('w3', name: '老李', station: 2, phase: const PhaseRipe());
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
-      overrides: overrides(farm(helpers: [w]), view(), fakeApi(calls, {'GET /api/workers/w3/changes': changes})),
+      overrides: overrides(farm(workers: [w]), view(), fakeApi(routes, {'GET /api/workers/w3/changes': changes})),
     );
     c.read(reviewingProvider.notifier).set('w3');
     await settle(tester);
@@ -178,14 +197,14 @@ void main() {
     expect(find.text('+body { color: #fff }'), findsOneWidget);
     await tester.tap(find.text('确认收获，合进 main'));
     await settle(tester);
-    expect(calls.list.last.path, '/api/workers/w3/harvest');
+    expect(routes.calls.last.path, '/api/workers/w3/merge');
     expect(c.read(reviewingProvider), isNull);
     await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('a harvest that would conflict asks the helper to resolve it', (tester) async {
-    final calls = Calls();
-    final w = helper('w3', name: '老李', station: 2, phase: const PhaseRipe());
+    final routes = Routes();
+    final w = worker('w3', name: '老李', station: 2, phase: const PhaseRipe());
     final conflicted = {
       ...changes,
       'conflicts': ['src/dark.css'],
@@ -193,7 +212,7 @@ void main() {
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
-      overrides: overrides(farm(helpers: [w]), view(), fakeApi(calls, {'GET /api/workers/w3/changes': conflicted})),
+      overrides: overrides(farm(workers: [w]), view(), fakeApi(routes, {'GET /api/workers/w3/changes': conflicted})),
     );
     c.read(reviewingProvider.notifier).set('w3');
     await settle(tester);
@@ -201,14 +220,14 @@ void main() {
     expect(find.text('冲突'), findsOneWidget);
     await tester.tap(find.text('让它解决冲突'));
     await settle(tester);
-    expect(calls.list.last.path, '/api/workers/w3/tell');
-    expect((calls.list.last.body! as Map)['text'], startsWith('把 main 合进你的分支时有冲突（src/dark.css）'));
+    // The server tells it which conflicts (ConflictTask).
+    expect(routes.calls.last.path, '/api/workers/w3/resolve');
     await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('changes that cannot be read say why', (tester) async {
-    final w = helper('w3', name: '老李', station: 2, phase: const PhaseRipe());
-    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(farm(helpers: [w]), view(), fakeApi(Calls())));
+    final w = worker('w3', name: '老李', station: 2, phase: const PhaseRipe());
+    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(farm(workers: [w]), view(), fakeApi(Routes())));
     c.read(reviewingProvider.notifier).set('w3');
     await settle(tester);
     expect(find.textContaining('看不了改动：'), findsOneWidget);

@@ -3,7 +3,6 @@
 // the game's stylesheet. The farm opens at dawn (data-scene on <html>); going down the page, the hero runs it to night.
 import '../styles/global.css'
 import type { Copy } from '../i18n/zh'
-import { cardOf } from '../lib/images'
 import type { Scene } from '../lib/scene'
 
 interface Props {
@@ -14,7 +13,8 @@ interface Props {
 const { copy, hero } = Astro.props
 const site = Astro.site ?? new URL('https://vibevalley.dev')
 const here = new URL(copy.home, site)
-const card = new URL(cardOf(), site)
+// Drawn by scripts/card.ts before the build, one for each language.
+const card = new URL(`/gen/card-${copy.lang}.jpg`, site)
 ---
 
 <!doctype html>
@@ -37,6 +37,9 @@ const card = new URL(cardOf(), site)
     <meta property="og:title" content={copy.title} />
     <meta property="og:description" content={copy.description} />
     <meta property="og:image" content={card} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={copy.title} />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" as="image" href={hero.morning} fetchpriority="high" />
   </head>

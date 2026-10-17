@@ -8,17 +8,6 @@ import (
 	"database/sql"
 )
 
-type Backlog struct {
-	ID        string
-	Text      string
-	Project   sql.NullString
-	Agent     sql.NullString
-	CreatedAt int64
-	Priority  string
-	Rank      int64
-	QueuedAt  sql.NullInt64
-}
-
 type ConnectorAccount struct {
 	Connector    string
 	Secrets      string
@@ -72,7 +61,7 @@ type Delivery struct {
 	RecipientID string
 	MessageSeq  int64
 	Reason      string
-	Wakes       int64
+	Wakes       bool
 	HeldBy      sql.NullString
 	State       string
 	Session     sql.NullString
@@ -93,26 +82,25 @@ type Follow struct {
 
 type Issue struct {
 	ID          string
+	Title       string
 	Description string
 	Project     sql.NullString
-	Agent       sql.NullString
+	Assignee    sql.NullString
 	Priority    string
 	Rank        int64
-	CreatedAt   int64
-	QueuedAt    sql.NullInt64
-	ClosedAt    sql.NullInt64
-	Closed      sql.NullString
-	Playbook    sql.NullString
-	Title       string
 	Parent      sql.NullString
 	BlockedBy   sql.NullString
 	Plan        sql.NullString
 	Step        sql.NullString
 	Schedule    sql.NullInt64
+	CreatedAt   int64
+	QueuedAt    sql.NullInt64
+	ClosedAt    sql.NullInt64
+	Closed      sql.NullString
 }
 
-type IssueRun struct {
-	Run       string
+type IssueWorker struct {
+	Worker    string
 	Issue     string
 	StartedAt int64
 }
@@ -127,7 +115,7 @@ type LanDevice struct {
 
 type LanGate struct {
 	ID   int64
-	Open int64
+	Open bool
 }
 
 type Ledger struct {
@@ -143,7 +131,7 @@ type Memory struct {
 	Kind       string
 	Body       string
 	Project    sql.NullString
-	Helper     sql.NullString
+	Worker     sql.NullString
 	CreatedAt  int64
 	Recalled   int64
 	RecalledAt sql.NullInt64
@@ -161,7 +149,7 @@ type Message struct {
 	SenderID       string
 	Kind           string
 	Body           string
-	Final          int64
+	Final          bool
 	Meta           sql.NullString
 	SendKey        sql.NullString
 	CreatedAt      int64
@@ -195,6 +183,19 @@ type ReadCursor struct {
 	UpdatedAt      int64
 }
 
+type Run struct {
+	ID          int64
+	Worker      string
+	Issue       sql.NullString
+	TriggeredBy string
+	Heard       sql.NullString
+	StartedAt   int64
+	EndedAt     sql.NullInt64
+	Outcome     sql.NullString
+	Summary     sql.NullString
+	Spent       sql.NullString
+}
+
 type Schedule struct {
 	ID        int64
 	Name      string
@@ -204,7 +205,7 @@ type Schedule struct {
 	Project   sql.NullString
 	Spec      string
 	Tz        string
-	Enabled   int64
+	Enabled   bool
 	CreatedAt int64
 	LastRun   sql.NullInt64
 }

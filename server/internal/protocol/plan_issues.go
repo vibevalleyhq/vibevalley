@@ -11,7 +11,7 @@ func StepIssueID(plan, key string) string { return plan + "." + key }
 func planClosed(s PlaybookState) *IssueClose {
 	switch s {
 	case PlaybookStateDone:
-		return new(IssueCloseHarvested)
+		return new(IssueCloseMerged)
 	case PlaybookStateAbandoned:
 		return new(IssueCloseDismissed)
 	}
@@ -21,7 +21,7 @@ func planClosed(s PlaybookState) *IssueClose {
 func stepClosed(plan PlaybookState, n PlaybookNode) *IssueClose {
 	switch {
 	case n.State == NodeStateMerged:
-		return new(IssueCloseMerged)
+		return new(IssueCloseMergedIntoPlan)
 	case n.State == NodeStateSkipped, plan == PlaybookStateDone, plan == PlaybookStateAbandoned:
 		return new(IssueCloseDismissed)
 	}
@@ -35,15 +35,15 @@ func PlaybookIssues(pb Playbook, before []Issue, now int64) []Issue {
 		was[t.ID] = t
 	}
 	keep := func(t Issue, closed *IssueClose) Issue {
-		t.Runs, t.Priority, t.CreatedAt = []string{}, PriorityNormal, pb.CreatedAt
+		t.Workers, t.Priority, t.CreatedAt = []string{}, PriorityMedium, pb.CreatedAt
 		if old, ok := was[t.ID]; ok {
-			t.Runs, t.Priority, t.CreatedAt, t.Status = old.Runs, old.Priority, old.CreatedAt, old.Status
+			t.Workers, t.Priority, t.CreatedAt, t.Status = old.Workers, old.Priority, old.CreatedAt, old.Status
 			if closed != nil && old.ClosedAt != nil {
 				t.ClosedAt = old.ClosedAt
 			}
 		}
-		if t.Runs == nil {
-			t.Runs = []string{}
+		if t.Workers == nil {
+			t.Workers = []string{}
 		}
 		t.Closed = closed
 		if closed != nil && t.ClosedAt == nil {
@@ -63,10 +63,10 @@ func PlaybookIssues(pb Playbook, before []Issue, now int64) []Issue {
 		}
 		parent := pb.ID
 		out = append(out, keep(Issue{
-			ID: StepIssueID(pb.ID, n.ID), Title: n.Title, Description: n.Task, Project: &project, Agent: n.Agent, Rank: int64(i),
+			ID: StepIssueID(pb.ID, n.ID), Title: n.Title, Description: n.Task, Project: &project, Assignee: n.Agent, Rank: int64(i),
 			Parent: &parent, BlockedBy: blocked,
 			Step: &IssueStep{
-				Key: n.ID, State: n.State, Check: n.Check, Scope: n.Scope, Acceptance: n.Acceptance, Frozen: n.Frozen, Helper: n.Helper,
+				Key: n.ID, State: n.State, Check: n.Check, Scope: n.Scope, Acceptance: n.Acceptance, Frozen: n.Frozen, Worker: n.Worker,
 				Conclusion: n.Conclusion, Commits: n.Commits, Spent: n.Spent, Tries: n.Tries, Failures: n.Failures,
 			},
 		}, stepClosed(pb.State, n)))
@@ -97,15 +97,24 @@ func playbookFrom(parent Issue, issues []Issue) Playbook {
 			needs = append(needs, strings.TrimPrefix(b, parent.ID+"."))
 		}
 		pb.Nodes = append(pb.Nodes, PlaybookNode{
-			ID: s.Key, Title: t.Title, Task: t.Description, Needs: needs, Agent: t.Agent, Check: s.Check, Scope: s.Scope,
-			Acceptance: s.Acceptance, Frozen: s.Frozen, State: s.State, Helper: s.Helper, Conclusion: s.Conclusion, Commits: s.Commits,
+			ID: s.Key, Title: t.Title, Task: t.Description, Needs: needs, Agent: t.Assignee, Check: s.Check, Scope: s.Scope,
+			Acceptance: s.Acceptance, Frozen: s.Frozen, State: s.State, Worker: s.Worker, Conclusion: s.Conclusion, Commits: s.Commits,
 			Spent: s.Spent, Tries: s.Tries, Failures: s.Failures,
 		})
 	}
+	for i, n := range pb.Nodes {
+		if blocked := BlockedBy(pb, n); len(blocked) > 0 {
+			pb.Nodes[i].BlockedBy = blocked
+		}
+		if IsSettled(n) {
+			pb.Settled++
+		}
+	}
+	pb.Layers, pb.AsksForYou, pb.Spent = LayersOf(pb.Nodes), AsksForYou(pb), PlaybookSpent(pb)
 	return pb
 }
 
-func PlaybooksOf(state FarmState) []Playbook {
+func PlaybooksOf(state CoreState) []Playbook {
 	out := []Playbook{}
 	for _, t := range state.Issues {
 		if t.Plan != nil {
@@ -116,7 +125,7 @@ func PlaybooksOf(state FarmState) []Playbook {
 	return out
 }
 
-func PlaybookOf(state FarmState, id string) *Playbook {
+func PlaybookOf(state CoreState, id string) *Playbook {
 	for _, t := range state.Issues {
 		if t.ID == id && t.Plan != nil {
 			pb := playbookFrom(t, state.Issues)

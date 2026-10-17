@@ -5,7 +5,7 @@ import 'package:vibevalley/farm/quota.dart' show HudCard;
 import 'package:vibevalley/ui/kit/kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'farm_fakes.dart';
+import 'support/farm.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -15,7 +15,7 @@ void main() {
     await pumpFarm(
       tester,
       const Align(alignment: Alignment.bottomLeft, child: FriendsDock(height: 48)),
-      overrides: overrides(farm(helpers: []), view(), fakeApi(Calls(), {}), agents: agents),
+      overrides: overrides(farm(workers: []), view(), fakeApi(Routes(), {}), agents: agents),
     );
     await tester.tap(find.text('帮工').first);
     await settle(tester);

@@ -6,17 +6,18 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/server.dart' show atlas;
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/sprites/atlas.dart';
 import 'package:vibevalley/village/game.dart';
 import 'package:vibevalley/village/level.dart';
 import 'package:vibevalley/village/world.dart';
 
-HelperPlay _play(int station) =>
-    HelperPlay(station: station.toDouble(), history: const [], toolsThisTurn: 0, counts: const {}, files: const [], commands: const [], turnStartedAt: 0);
+WorkerPlay _play(int station) =>
+    WorkerPlay(station: station.toDouble(), history: const [], toolsThisRun: 0, counts: const {}, files: const [], commands: const [], runStartedAt: 0);
 
-Helper _helper(String id, String agent, Phase phase, int station) =>
-    Helper(id: id, name: id, agent: agent, runtime: 'pi', task: '写打卡', hiredAt: 0, turns: 1, phase: phase, play: _play(station));
+Worker _worker(String id, String agent, Phase phase, int station) =>
+    Worker(id: id, name: id, agent: agent, runtime: 'pi', task: '写打卡', hiredAt: 0, runs: 1, phase: phase, play: _play(station));
 
 PhaseWorking _doing(WorkerAction action) => PhaseWorking(
   since: 0,
@@ -24,16 +25,16 @@ PhaseWorking _doing(WorkerAction action) => PhaseWorking(
 );
 
 VillageData _farm() {
-  final helpers = [
-    _helper('w1', 'lab', _doing(WorkerAction.editFile), 0),
-    _helper('w2', 'zhou', const PhaseRipe(), 1),
-    _helper('w3', 'kimi', _doing(WorkerAction.readFile), 2),
-    _helper('w4', 'codex', _doing(WorkerAction.runCommand), 3),
-    _helper('w5', 'pi', _doing(WorkerAction.web), 4),
-    _helper('w6', 'oar', _doing(WorkerAction.wait), 5),
-    _helper('w7', 'qwen', const PhaseArriving(), -1),
+  final workers = [
+    _worker('w1', 'lab', _doing(WorkerAction.editFile), 0),
+    _worker('w2', 'zhou', const PhaseRipe(), 1),
+    _worker('w3', 'kimi', _doing(WorkerAction.readFile), 2),
+    _worker('w4', 'codex', _doing(WorkerAction.runCommand), 3),
+    _worker('w5', 'pi', _doing(WorkerAction.web), 4),
+    _worker('w6', 'oar', _doing(WorkerAction.wait), 5),
+    _worker('w7', 'qwen', const PhaseArriving(), -1),
   ];
-  final state = FarmState(call: CallState.idle, foreman: ForemanState.speaking, helpers: helpers);
+  final state = CoreState(call: CallState.idle, manager: ManagerState.speaking, workers: workers);
   final view = FarmView(
     level: const FarmLevel(level: 6, xp: 0, need: 60),
     plots: {
@@ -55,7 +56,6 @@ VillageData _farm() {
 final _key = GlobalKey();
 
 Future<VillageGame> _start(WidgetTester tester) async {
-  final atlas = SpriteAtlas.parse(File('assets/pixel/sprites.json').readAsStringSync());
   final village = VillageWorld(Level.parse(File('assets/village.ldtk').readAsStringSync()));
   final game = VillageGame(atlas: atlas, village: village)..show(_farm());
   tester.view.physicalSize = Size(village.width * 3, village.height * 3);

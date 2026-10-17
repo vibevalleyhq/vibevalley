@@ -42,11 +42,7 @@ final friendsOpenProvider = _held(false);
 
 final menuOpenProvider = _held(false);
 
-final farmApiProvider = Provider<FarmApi>((ref) => ref.watch(serverProvider).api.farm);
-
 final farmEffectsProvider = Provider<Stream<GameEffect>>((ref) => farmEffects(ref.watch(serverProvider)));
-
-final farmNoticesProvider = Provider<Stream<SiteEvent>>((ref) => ref.watch(serverProvider).sideEvents);
 
 class BedFxEntry {
   const BedFxEntry(this.id, this.bed, this.kind, this.text);
@@ -93,14 +89,14 @@ final rewardsProvider = NotifierProvider<Timed<GameEffectReward>, List<GameEffec
 /// A message lands a moment after the step it ends: steps this much later still count as its turn.
 const _slackMs = 3000;
 
-List<WorkStep> turnEndingAt(List<WorkStep> steps, double at) {
+List<Activity> turnEndingAt(List<Activity> steps, double at) {
   var end = -1;
   for (var i = 0; i < steps.length; i++) {
     if (steps[i].at <= at + _slackMs) end = i;
   }
   if (end < 0) return const [];
   var start = end;
-  while (start > 0 && steps[start].kind != StepKind.asked) {
+  while (start > 0 && steps[start].kind != ActivityKind.prompt) {
     start--;
   }
   return steps.sublist(start, end + 1);
@@ -111,7 +107,7 @@ class PlaybookLog extends Notifier<Map<String, List<PlaybookEvent>>> {
   Map<String, List<PlaybookEvent>> build() => const {};
 
   Future<void> load(String id) async {
-    final events = await ref.read(farmApiProvider).playbookEvents(id: id);
+    final events = await ref.read(apiProvider).playbook.events(id: id);
     state = {...state, id: events};
   }
 }

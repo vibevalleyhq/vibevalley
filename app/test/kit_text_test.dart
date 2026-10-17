@@ -118,12 +118,10 @@ var a = 1;
   group('labels', () {
     test('every action and phase has its word', () {
       for (final a in WorkerAction.values) {
-        expect(actionLabel.containsKey(a), isTrue);
-        expect(actionMeaning.containsKey(a), isTrue);
+        expect(actionText.containsKey(a), isTrue, reason: 'seeds.json has every action\'s words');
       }
-      expect(actionLabel[WorkerAction.editFile], '砌砖');
       expect(phaseLabel(const PhaseRipe()), '完工');
-      expect(foremanLabel[ForemanState.listening], '在听');
+      expect(managerLabel[ManagerState.listening], '在听');
       expect(outcomeLabel[Outcome.interrupted], '叫停');
     });
 
@@ -137,49 +135,36 @@ var a = 1;
     });
   });
 
-  group('quota (protocol ports)', () {
-    test('quotaLeft takes the tightest window', () {
-      const u = AccountUsageOk(
-        windows: [
-          UsageWindow(label: 'a', usedPercent: 30),
-          UsageWindow(label: 'b', usedPercent: 90),
-        ],
-      );
-      expect(quotaLeft(u), 10);
-      expect(quotaLeft(const AccountUsageLoginRequired()), isNull);
-      expect(quotaLeft(const AccountUsageOk(windows: [])), isNull);
-    });
-
-    test('quotaText', () {
-      expect(quotaText(null), '不报额度');
-      expect(quotaText(const AccountUsageLoginRequired()), '没登录');
-      expect(quotaText(const AccountUsageUnavailable(reason: '超时')), '读不到额度（超时）');
-      expect(
-        quotaText(
-          const AccountUsageBalance(
-            provider: 'deepseek',
-            available: false,
-            balances: [Balance(currency: 'CNY', amount: 3.5)],
-          ),
-        ),
-        'deepseek 余额 ¥3.50，不够用了',
-      );
-      expect(quotaText(const AccountUsageOk(windows: [UsageWindow(label: 'Current session', usedPercent: 11)])), 'Current session 剩 89%');
-      expect(quotaText(const AccountUsageOk(plan: 'Pro', windows: [])), 'Pro');
-    });
-
+  group('quota', () {
     test('quotaOf and the bottle', () {
-      final plenty = quotaOf(const AccountUsageOk(windows: [UsageWindow(label: 'w', usedPercent: 11)]));
-      expect((plenty.level, plenty.short, bottleSprite(plenty)), (QuotaLevel.plenty, '89%', 'energy-plenty-100'));
-      final low = quotaOf(const AccountUsageOk(windows: [UsageWindow(label: 'w', usedPercent: 70)]));
+      // What is left and the words are the server's (RuntimeInfo.quota); the bottle is the client's.
+      RuntimeInfo at(AccountUsage? usage, {double? left, String text = ''}) => RuntimeInfo(
+        id: 'x',
+        installation: const InstallationNotFound(),
+        usage: usage,
+        settings: RuntimeSettings.fromJson(const {'enabled': true, 'binPath': '', 'defaultModel': '', 'defaultEffort': '', 'env': <String, String>{}}),
+        quota: RuntimeQuota(left: left, text: text),
+        checkedAt: 0,
+      );
+      final plenty = quotaOf(
+        at(
+          const AccountUsageOk(windows: [UsageWindow(label: 'w', usedPercent: 11)]),
+          left: 89,
+          text: 'w 剩 89%',
+        ),
+      );
+      expect((plenty.level, plenty.short, plenty.text, bottleSprite(plenty)), (QuotaLevel.plenty, '89%', 'w 剩 89%', 'energy-plenty-100'));
+      final low = quotaOf(at(const AccountUsageOk(windows: [UsageWindow(label: 'w', usedPercent: 70)]), left: 30));
       expect((low.level, bottleSprite(low)), (QuotaLevel.low, 'energy-low-25'));
-      final empty = quotaOf(const AccountUsageLoginRequired());
+      final empty = quotaOf(at(const AccountUsageLoginRequired(), text: '没登录'));
       expect((empty.level, empty.short, bottleSprite(empty)), (QuotaLevel.empty, '没登录', 'energy-empty-0'));
       final gold = quotaOf(
-        const AccountUsageBalance(
-          provider: 'p',
-          available: true,
-          balances: [Balance(currency: 'USD', amount: 2)],
+        at(
+          const AccountUsageBalance(
+            provider: 'p',
+            available: true,
+            balances: [Balance(currency: 'USD', amount: 2)],
+          ),
         ),
       );
       expect((gold.level, gold.short), (QuotaLevel.gold, r'$2.00'));

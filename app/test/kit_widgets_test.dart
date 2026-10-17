@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/server.dart' show atlas;
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/sprites/atlas.dart';
 import 'package:vibevalley/ui/kit/kit.dart';
@@ -428,10 +430,17 @@ void main() {
   });
 
   group('energy', () {
-    final atlas = SpriteAtlas.parse(File('assets/pixel/sprites.json').readAsStringSync());
-
     testWidgets('EnergyBottle draws the bottle at a whole scale; StaminaBar its size', (t) async {
-      final q = quotaOf(const AccountUsageOk(windows: [UsageWindow(label: 'Current session', usedPercent: 20)]));
+      final q = quotaOf(
+        RuntimeInfo(
+          id: 'x',
+          installation: const InstallationNotFound(),
+          usage: const AccountUsageOk(windows: [UsageWindow(label: 'Current session', usedPercent: 20)]),
+          settings: RuntimeSettings.fromJson(const {'enabled': true, 'binPath': '', 'defaultModel': '', 'defaultEffort': '', 'env': <String, String>{}}),
+          quota: const RuntimeQuota(left: 80, text: 'Current session 剩 80%'),
+          checkedAt: 0,
+        ),
+      );
       await t.pumpWidget(
         host(
           Row(

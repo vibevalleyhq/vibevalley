@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../app/theme.dart';
+import '../theme.dart';
 import 'base.dart';
 import 'field.dart' show kitBare;
 import 'icons.dart';

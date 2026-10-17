@@ -17,17 +17,19 @@ import (
 	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
 	"vibevalley/pkg/agent"
+	"vibevalley/pkg/db/generated"
+	"vibevalley/pkg/x/clock"
+	"vibevalley/pkg/x/str"
 )
 
-// A memory that cannot be read or written never stops a turn: it is logged, and the turn goes on without it. A note the person writes for the manager
+// A memory that cannot be read or written never stops a run: it is logged, and the run goes on without it. A note the person writes for the manager
 // starts with 「主人交代：」, so the manager reading it knows whose it is.
 
 const (
 	// In UTF-16 units.
-	memoryNoteMax      = 300
-	memoryNotesPerTurn = 5
-	memoryFromPerson   = "主人交代："
-	ManagerAgent       = "foreman"
+	memoryNoteMax     = 300
+	memoryNotesPerRun = 5
+	memoryFromPerson  = "主人交代："
 )
 
 // A list mark or bold around it is fine.
@@ -45,12 +47,12 @@ func memoryNotesOf(said string) []memoryNote {
 		if found == nil {
 			continue
 		}
-		text := base.ClipLine(found[2], memoryNoteMax)
+		text := str.Clip(found[2], memoryNoteMax)
 		if text == "" || slices.ContainsFunc(notes, func(n memoryNote) bool { return n.Text == text }) {
 			continue
 		}
 		notes = append(notes, memoryNote{Text: text, Everywhere: found[1] != ""})
-		if len(notes) == memoryNotesPerTurn {
+		if len(notes) == memoryNotesPerRun {
 			break
 		}
 	}
@@ -62,11 +64,11 @@ func memoryJobText(job, summary string, outcome protocol.Outcome) string {
 	if outcome != protocol.OutcomeCompleted {
 		how = "没做成："
 	}
-	return base.ClipLine(job, 100) + " → " + how + base.ClipLine(summary, 200)
+	return str.Clip(job, 100) + " → " + how + str.Clip(summary, 200)
 }
 
 func memoryLikeness(a, b map[string]bool) float64 {
-	shared := protocol.TermsInCommon(a, b)
+	shared := termsInCommon(a, b)
 	all := len(a) + len(b) - shared
 	if all == 0 {
 		return 1
@@ -76,41 +78,34 @@ func memoryLikeness(a, b map[string]bool) float64 {
 
 // project nil: every project.
 func memoryIsNewNote(memories []protocol.Memory, text string, project *string) bool {
-	terms := protocol.TermsOf(text)
+	terms := termsOf(text)
 	same := func(a, b *string) bool { return (a == nil && b == nil) || (a != nil && b != nil && *a == *b) }
 	return !slices.ContainsFunc(memories, func(m protocol.Memory) bool {
 		return m.Kind == protocol.MemoryKindNote && same(m.Project, project) &&
-			(m.Text == text || memoryLikeness(protocol.TermsOf(m.Text), terms) >= 0.8)
+			(m.Text == text || memoryLikeness(termsOf(m.Text), terms) >= 0.8)
 	})
 }
 
-type Memories struct {
-	db  *sql.DB
+type memories struct {
+	q   *generated.Queries
 	now func() int64
 }
 
-func newMemories(db *sql.DB) (*Memories, error) { return &Memories{db: db, now: base.NowMs}, nil }
-func (*Memories) OnStart(context.Context) error { return nil }
-func (*Memories) OnStop()                       {}
+func newMemories(db *sql.DB) (*memories, error) {
+	return &memories{q: generated.New(db), now: clock.NowMs}, nil
+}
+func (*memories) OnStart(context.Context) error { return nil }
+func (*memories) OnStop()                       {}
 
-func (m *Memories) list(agentID string) ([]protocol.Memory, error) {
-	rows, err := m.db.Query(`select id, kind, body, project, helper, created_at, recalled, recalled_at
-		from memories where agent = ? order by created_at desc, id desc`, agentID)
+func (m *memories) list(agentID string) ([]protocol.Memory, error) {
+	rows, err := m.q.MemoriesOf(context.Background(), agentID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	out := []protocol.Memory{}
-	for rows.Next() {
-		var (
-			id, at, recalled int64
-			kind, body       string
-			project, helper  sql.NullString
-			recalledAt       sql.NullInt64
-		)
-		if err := rows.Scan(&id, &kind, &body, &project, &helper, &at, &recalled, &recalledAt); err != nil {
-			return nil, err
-		}
+	for _, row := range rows {
+		id, at, recalled, kind, body := row.ID, row.CreatedAt, row.Recalled, row.Kind, row.Body
+		project, worker, recalledAt := row.Project, row.Worker, row.RecalledAt
 		// A row of a kind this code does not know is left out.
 		if !slices.Contains(protocol.MemoryKindValues, protocol.MemoryKind(kind)) {
 			continue
@@ -119,28 +114,27 @@ func (m *Memories) list(agentID string) ([]protocol.Memory, error) {
 		if project.Valid {
 			mem.Project = &project.String
 		}
-		if helper.Valid {
-			mem.Helper = &helper.String
+		if worker.Valid {
+			mem.Worker = &worker.String
 		}
 		if recalledAt.Valid {
 			mem.RecalledAt = &recalledAt.Int64
 		}
 		out = append(out, mem)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
-func memoryNullable(s *string) any {
+func memoryNullable(s *string) sql.NullString {
 	if s == nil {
-		return nil
+		return sql.NullString{}
 	}
-	return *s
+	return sql.NullString{String: *s, Valid: true}
 }
 
-func (m *Memories) insertNote(agentID, body string, project, helper *string) (int64, int64, error) {
-	at := base.NowMs()
-	res, err := m.db.Exec(`insert into memories (agent, kind, body, project, helper, created_at) values (?, 'note', ?, ?, ?, ?)`,
-		agentID, body, memoryNullable(project), memoryNullable(helper), at)
+func (m *memories) insertNote(agentID, body string, project, worker *string) (int64, int64, error) {
+	at := clock.NowMs()
+	res, err := m.q.AddNote(context.Background(), generated.AddNoteParams{Agent: agentID, Body: body, Project: memoryNullable(project), Worker: memoryNullable(worker), CreatedAt: at})
 	if err != nil {
 		return 0, 0, err
 	}
@@ -148,73 +142,109 @@ func (m *Memories) insertNote(agentID, body string, project, helper *string) (in
 	return id, at, err
 }
 
-func (m *Memories) Recall(cue base.RecallCue) []protocol.Memory {
+// What a run recalls: the memories' ids (not to give the same session again) and the lines it is told, as it is told them.
+type Recalled struct {
+	IDs   []string
+	Lines []string
+}
+
+func (m *memories) Recall(cue RecallCue) Recalled {
 	all, err := m.list(cue.Agent)
 	if err != nil {
 		log.Printf("vibevalley: %s could not recall: %v", cue.Agent, err)
-		return nil
+		return Recalled{}
 	}
-	now := base.NowMs()
-	picked := protocol.Pick(all, protocol.Cue{Helper: cue.Helper, Project: cue.Project, Text: cue.Text, Skip: cue.Skip, Now: now})
+	now := clock.NowMs()
+	picked := pick(all, pickCue{Worker: cue.Worker, Project: cue.Project, Text: cue.Text, Skip: cue.Skip, Now: now})
 	for _, p := range picked {
-		if _, err := m.db.Exec(`update memories set recalled = recalled + 1, recalled_at = ? where id = ?`, now, p.ID); err != nil {
+		id, _ := strconv.ParseInt(p.ID, 10, 64)
+		if err := m.q.Recalled(context.Background(), generated.RecalledParams{RecalledAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
 			log.Printf("vibevalley: %s could not recall: %v", cue.Agent, err)
-			return nil
+			return Recalled{}
 		}
 	}
-	return picked
+	var out Recalled
+	for _, p := range picked {
+		out.IDs = append(out.IDs, p.ID)
+		out.Lines = append(out.Lines, lineOf(p, cue.Project))
+	}
+	return out
 }
 
-// A stopped turn leaves nothing.
-func (m *Memories) Keep(turn base.FinishedTurn) {
-	if turn.Outcome == protocol.OutcomeInterrupted {
+// A stopped run leaves nothing.
+func (m *memories) Keep(run FinishedRun) {
+	if run.Outcome == protocol.OutcomeInterrupted {
 		return
 	}
-	if err := m.keep(turn); err != nil {
-		log.Printf("vibevalley: what %s learned was not kept: %v", turn.Helper, err)
+	if err := m.keep(run); err != nil {
+		log.Printf("vibevalley: what %s learned was not kept: %v", run.Worker, err)
 	}
 }
 
-func (m *Memories) keep(turn base.FinishedTurn) error {
-	known, err := m.list(turn.Agent)
+func (m *memories) keep(run FinishedRun) error {
+	known, err := m.list(run.Agent)
 	if err != nil {
 		return err
 	}
-	helper := turn.Helper
-	for _, note := range memoryNotesOf(turn.Said) {
+	worker := run.Worker
+	for _, note := range memoryNotesOf(run.Said) {
 		var project *string
 		if !note.Everywhere {
-			project = &turn.Project
+			project = &run.Project
 		}
 		if memoryIsNewNote(known, note.Text, project) {
-			if _, _, err := m.insertNote(turn.Agent, note.Text, project, &helper); err != nil {
+			if _, _, err := m.insertNote(run.Agent, note.Text, project, &worker); err != nil {
 				return err
 			}
 		}
 	}
-	if _, err := m.db.Exec(`insert into memories (agent, kind, body, project, helper, created_at) values (?, 'job', ?, ?, ?, ?)
-		on conflict (agent, helper) where kind = 'job'
-		do update set body = excluded.body, project = excluded.project, created_at = excluded.created_at`,
-		turn.Agent, memoryJobText(turn.Job, turn.Summary, turn.Outcome), turn.Project, turn.Helper, base.NowMs()); err != nil {
+	ctx := context.Background()
+	if err := m.q.KeepJob(ctx, generated.KeepJobParams{
+		Agent: run.Agent, Body: memoryJobText(run.Job, run.Summary, run.Outcome), Project: sql.NullString{String: run.Project, Valid: true},
+		Worker: sql.NullString{String: run.Worker, Valid: true}, CreatedAt: clock.NowMs(),
+	}); err != nil {
 		return err
 	}
-	_, err = m.db.Exec(`delete from memories where agent = ? and id not in (
-		select id from memories where agent = ? order by coalesce(recalled_at, created_at) desc limit ?)`,
-		turn.Agent, turn.Agent, protocol.MemoryKeep)
-	return err
+	return m.q.ForgetBeyond(ctx, generated.ForgetBeyondParams{Agent: run.Agent, Keep: protocol.MemoryKeep})
 }
 
-func (m *Memories) List(agentID string) []protocol.Memory {
+// Fading marks the ones that would go if this many more were kept.
+const memoryFadingSoon = 10
+
+func (m *memories) List(agentID string) []protocol.Memory {
 	all, err := m.list(agentID)
 	if err != nil {
 		log.Printf("vibevalley: memories of %s: %v", agentID, err)
 		return []protocol.Memory{}
 	}
+	fading := nextForgotten(all, memoryFadingSoon)
+	for i := range all {
+		all[i].Fading = slices.Contains(fading, all[i].ID)
+	}
 	return all
 }
 
-func (m *Memories) Write(agentID, text, project string) (protocol.Memory, error) {
-	body := base.ClipLine(text, memoryNoteMax)
+// What a worker of the agent would recall starting a run in project, told text; nothing is counted as recalled.
+func (m *memories) Preview(agentID, project, text string) protocol.RecallPreview {
+	out := protocol.RecallPreview{Lines: []string{}, Limit: recallChars}
+	if project == "" {
+		return out
+	}
+	all, err := m.list(agentID)
+	if err != nil {
+		log.Printf("vibevalley: memories of %s: %v", agentID, err)
+		return out
+	}
+	for _, picked := range pick(all, pickCue{Project: project, Text: text, Now: clock.NowMs()}) {
+		line := lineOf(picked, project)
+		out.Lines = append(out.Lines, line)
+		out.Chars += int64(str.Units(line) + 1)
+	}
+	return out
+}
+
+func (m *memories) Write(agentID, text, project string) (protocol.Memory, error) {
+	body := str.Clip(text, memoryNoteMax)
 	if body == "" {
 		return protocol.Memory{}, errors.New("要记的话是空的")
 	}
@@ -231,32 +261,31 @@ func (m *Memories) Write(agentID, text, project string) (protocol.Memory, error)
 }
 
 // An id that is not a number is none.
-func (m *Memories) Forget(agentID, id string) error {
+func (m *memories) Forget(agentID, id string) error {
 	n, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return nil
 	}
-	_, err = m.db.Exec(`delete from memories where agent = ? and id = ?`, agentID, n)
-	return err
+	return m.q.Forget(context.Background(), generated.ForgetParams{Agent: agentID, ID: n})
 }
 
-func ForemanRuntime() protocol.Runtime {
-	if os.Getenv("VIBEVALLEY_FOREMAN_RUNTIME") == string(protocol.RuntimePi) {
+func ManagerRuntime(cfg base.Config) protocol.Runtime {
+	if cfg.Manager.Runtime == string(protocol.RuntimePi) {
 		return protocol.RuntimePi
 	}
 	return protocol.RuntimeVibeValley
 }
 
-func ForemanHome(home string) string { return filepath.Join(home, "foreman") }
+func ManagerHome(home string) string { return filepath.Join(home, "manager") }
 
 func memoryLineOf(line agent.MemoryLine, fileTime int64) protocol.Memory {
 	person := strings.HasPrefix(line.Text, memoryFromPerson)
-	m := protocol.Memory{ID: line.ID, Agent: ManagerAgent, Kind: protocol.MemoryKindNote, Text: line.Text, At: fileTime}
+	m := protocol.Memory{ID: line.ID, Agent: protocol.ManagerAgent, Kind: protocol.MemoryKindNote, Text: line.Text, At: fileTime}
 	if person {
 		m.Text = strings.TrimSpace(strings.TrimPrefix(line.Text, memoryFromPerson))
 	} else {
-		helper := ManagerAgent
-		m.Helper = &helper
+		worker := protocol.ManagerAgent
+		m.Worker = &worker
 	}
 	if line.Date != "" {
 		if day, err := time.ParseInLocation("2006-01-02", line.Date, time.Local); err == nil {
@@ -284,27 +313,27 @@ func memoryCarriedLines(lines []agent.MemoryLine) int {
 	return n
 }
 
-type ManagerMemory struct {
+type managerMemory struct {
 	home    string
 	runtime protocol.Runtime
 }
 
-func newManagerMemory(cfg base.Config) (*ManagerMemory, error) {
-	return &ManagerMemory{home: ForemanHome(cfg.Home), runtime: ForemanRuntime()}, nil
+func newManagerMemory(cfg base.Config) (*managerMemory, error) {
+	return &managerMemory{home: ManagerHome(cfg.Home), runtime: ManagerRuntime(cfg)}, nil
 }
-func (*ManagerMemory) OnStart(context.Context) error { return nil }
-func (*ManagerMemory) OnStop()                       {}
+func (*managerMemory) OnStart(context.Context) error { return nil }
+func (*managerMemory) OnStop()                       {}
 
-func (mm *ManagerMemory) file() string { return filepath.Join(mm.home, "MEMORY.md") }
+func (mm *managerMemory) file() string { return agent.MemoryFile(mm.home) }
 
-func (mm *ManagerMemory) fileTime() int64 {
+func (mm *managerMemory) fileTime() int64 {
 	if st, err := os.Stat(mm.file()); err == nil {
 		return st.ModTime().UnixMilli()
 	}
-	return base.NowMs()
+	return clock.NowMs()
 }
 
-func (mm *ManagerMemory) View() protocol.ManagerMemory {
+func (mm *managerMemory) Manager() protocol.ManagerMemory {
 	lines := agent.MemoryLines(mm.home)
 	at := mm.fileTime()
 	memories := make([]protocol.Memory, len(lines))
@@ -316,8 +345,8 @@ func (mm *ManagerMemory) View() protocol.ManagerMemory {
 
 var memoryNewlines = regexp.MustCompile(`\s*\n\s*`)
 
-func (mm *ManagerMemory) Write(text string) (protocol.Memory, error) {
-	body := base.ClipLine(memoryNewlines.ReplaceAllString(text, " "), memoryNoteMax)
+func (mm *managerMemory) WriteManager(text string) (protocol.Memory, error) {
+	body := str.Clip(memoryNewlines.ReplaceAllString(text, " "), memoryNoteMax)
 	if body == "" {
 		return protocol.Memory{}, errors.New("要记的话是空的")
 	}
@@ -328,12 +357,12 @@ func (mm *ManagerMemory) Write(text string) (protocol.Memory, error) {
 	if len(lines) == 0 {
 		return protocol.Memory{}, errors.New("没记下来：MEMORY.md 写不进去")
 	}
-	return memoryLineOf(lines[len(lines)-1], base.NowMs()), nil
+	return memoryLineOf(lines[len(lines)-1], clock.NowMs()), nil
 }
 
-func (mm *ManagerMemory) Forget(id string) error { return agent.ForgetLine(mm.home, id) }
+func (mm *managerMemory) ForgetManager(id string) error { return agent.ForgetLine(mm.home, id) }
 
-func (mm *ManagerMemory) Archive(query string) protocol.ArchiveListing {
+func (mm *managerMemory) Archive(query string) protocol.ArchiveListing {
 	listing := protocol.ArchiveListing{Files: []protocol.ArchiveFile{}, Hits: []protocol.ArchiveHit{}}
 	for _, f := range agent.ArchiveFiles(mm.home) {
 		listing.Files = append(listing.Files, protocol.ArchiveFile{Name: f.Name, At: f.At, Chars: int64(f.Chars)})
@@ -346,6 +375,6 @@ func (mm *ManagerMemory) Archive(query string) protocol.ArchiveListing {
 	return listing
 }
 
-func (mm *ManagerMemory) ArchiveFile(name string) (string, bool) {
+func (mm *managerMemory) ArchiveFile(name string) (string, bool) {
 	return agent.ReadArchive(mm.home, name)
 }

@@ -4,22 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"os"
-	"path/filepath"
 	"slices"
 
 	"go.uber.org/fx"
 )
 
 type Layer func(r *Readies) fx.Option
-
-func Module(r *Readies) fx.Option {
-	return fx.Module("base", fx.Provide(
-		func(cfg Config) *Site { return NewSite(cfg.Home) },
-		func(cfg Config) (*Store, error) { return NewStore(cfg.Home) },
-		Run[*Settings](r, newSettings),
-	))
-}
 
 // Each service is built after the services it is built from; Start starts them in that order and then readies them in the same order; Close stops
 // them in reverse.
@@ -29,7 +21,6 @@ type App struct {
 	app     *fx.App
 	readies *Readies
 	db      *sql.DB
-	site    *Site
 	cancel  context.CancelFunc
 }
 
@@ -43,11 +34,9 @@ func NewApp(cfg Config, layers []Layer, options ...fx.Option) (*App, error) {
 	if err := os.MkdirAll(cfg.WorkRoot, 0o755); err != nil {
 		return nil, err
 	}
-	if cfg.DBPath == "" {
-		cfg.DBPath = filepath.Join(cfg.Home, "farm.db")
-	}
+	cfg.DBPath = cfg.DB()
 	a := &App{Config: cfg, readies: &Readies{}}
-	all := []fx.Option{Module(a.readies)}
+	var all []fx.Option
 	for _, layer := range layers {
 		all = append(all, layer(a.readies))
 	}
@@ -61,7 +50,6 @@ func NewApp(cfg Config, layers []Layer, options ...fx.Option) (*App, error) {
 			return a.db, err
 		}),
 		fx.Options(all...),
-		fx.Invoke(func(s *Site) { a.site = s }),
 		fx.Options(options...),
 		// Last, so its hook runs once every service has started.
 		fx.Invoke(a.readies.hook),
@@ -84,8 +72,9 @@ func (a *App) Close() {
 	if a.cancel != nil {
 		a.cancel()
 	}
-	_ = a.app.Stop(context.Background())
-	a.site.Close()
+	if err := a.app.Stop(context.Background()); err != nil {
+		log.Printf("vibevalley: stopping: %v", err)
+	}
 	a.db.Close()
 }
 

@@ -11,10 +11,11 @@ import '../../desktop/desktop.dart' show startLocalFarm;
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import '../connectors/qr.dart';
-import '../runtimes/layout.dart';
-import '../shared/state.dart';
-import '../shared/widgets.dart';
+import '../shared/layout.dart';
+import '../../data/remote.dart';
+import '../../shared/widgets.dart';
 import 'scan_page.dart';
+import '../../data/providers.dart';
 
 const _pollEvery = Duration(milliseconds: 1500);
 
@@ -50,7 +51,7 @@ class _GatePageState extends ConsumerState<GatePage> {
     super.dispose();
   }
 
-  LanApi get _api => ref.read(deskApiProvider).lan;
+  LanApi get _api => ref.read(apiProvider).lan;
 
   Future<void> _refresh() async {
     try {

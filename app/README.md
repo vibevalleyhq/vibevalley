@@ -4,9 +4,9 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 
 ## 和服务端
 
-- **状态**：读 `GET /api/site/state` 折好的 `SiteFrame`，自己不折事实（[architecture.md](../docs/architecture.md)「核心状态」）。
-- **状态以外的事**：从 `GET /api/site/events` 只取步骤、提醒、农机的变化（`sideEvents`）。
-- **命令**：`lib/gen/vibevalley.dart` 里生成的 `VibeValleyApi`。
+- **状态**：读 `GET /api/state` 折好的 `StateFrame`，自己不折事实（[architecture.md](../docs/architecture.md)「核心状态」）。
+- **状态以外的事**：从 `GET /api/events` 只取步骤、提醒、农机的变化（`sideEvents`）。
+- **命令**：`lib/gen/vibevalley.dart` 里生成的 `VibeValleyApi`，页面只从 `apiProvider` 拿它。
 - **规则**：帧里没有、要从状态推出来的，是 `lib/rules/` 的纯函数；客户端自己的游戏状态（工具、手机、偏好）在各自的目录。
 
 用哪个农场（本机，或经院门配对的另一台电脑）存在偏好里（`lib/data/farm_choice.dart`）。手机上不在屏幕前时按桌面版的规则弹系统通知（`lib/mobile/notices.dart`）。macOS 版见 [desktop.md](../docs/reference/desktop.md)。
@@ -16,11 +16,13 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 | 目录 | 管什么 |
 |---|---|
 | `lib/app/` | 路由、主题、工作台的外框 |
-| `lib/data/` | 服务端（状态流、工地事件、接口客户端）、Riverpod 的 provider、用哪个农场 |
+| `lib/data/` | 服务端（状态流、事件流、接口客户端）、Riverpod 的 provider、用哪个农场 |
 | `lib/gen/` | 生成的形状和接口客户端，不手改 |
 | `lib/rules/` | 读核心状态的纯函数 |
+| `lib/chat/` | 田头的数据和小部件：频道、消息、未读、发话；工作台的聊天页和农场的田头窗口都用它 |
+| `lib/shared/` | 农场和工作台都用的：帮工的样子、干活过程、收成清单、小部件 |
 | `lib/ui/kit/` | 像素控件：按钮、输入、选择、对话框、提示、Markdown……（[README](lib/ui/kit/README.md)） |
-| `lib/pages/farm_page.dart`、`lib/farm/`、`lib/game/` | 农场画面、面板（地块详情、播种袋、仓库、日志、商店、任务与成就、种植计划、收成清单）、田头窗口、帮工栏、精力瓶；工具和点地的规则 |
+| `lib/farm/`、`lib/game/` | 农场画面、面板（地块详情、播种袋、仓库、日志、商店、任务与成就、种植计划、收成清单）、田头窗口、帮工栏、精力瓶；工具和点地的规则 |
 | `lib/sprites/` | 按 `sprites.json` 读图（`atlas.dart`） |
 | `lib/village/` | 像素村（Flame）：地图、寻路、帮工和狗、光照、粒子、动静；`hud.dart` 是画在上面的 HUD |
 | `lib/phone/` | 手机、来电、五个小游戏 |
@@ -42,7 +44,7 @@ flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787   # �
 
 ## 形状从哪来
 
-`lib/gen/vibevalley.dart` 是生成的：形状在服务端的 `server/internal/protocol/shapes.go` 和 `api.go`，改了以后在 `server/` 跑 `go run ./tool/shapegen`，它同时写 Go 的 `internal/protocol/gen.go` 和这个文件（[server](../server/README.md#形状和规则从哪来)）。联合生成 sealed class，`switch` 能穷尽；既是事实又是工地事件的成员同时实现两个。数字都是 `double`。
+`lib/gen/vibevalley.dart` 是生成的：形状在服务端的 `server/internal/protocol/shapes.go` 和 `api.go`，改了以后在 `server/` 跑 `go run ./tool/shapegen`，它同时写 Go 的 `internal/protocol/gen.go` 和这个文件（[server](../server/README.md#形状和规则从哪来)）。联合生成 sealed class，`switch` 能穷尽；既是事实又是事件流的成员同时实现两个。数字都是 `double`。
 
 ## 测试和对照
 
@@ -50,6 +52,8 @@ flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787   # �
 flutter analyze && flutter test           # 不连网：服务端用 MockClient 假的
 VIBEVALLEY_SERVER=http://127.0.0.1:8899 flutter test tool/screens/live_screens_test.dart   # 每一页对着真服务端画成 build/live-*.png
 ```
+
+替身都在 `test/support/`：`server.dart` 是唯一的 `FakeServer`（继承 `VibeValleyServer`，每个请求交给一个处理函数并记下来）、按「方法 路径」回答的 `Routes`、`settle`、`atlas`；`desk.dart` 有工作台各页的 `DeskBackend` 和 `pumpPage`，`farm.dart`、`shell.dart` 是农场和外壳的。测试文件按 `lib` 的层起名（`desk_<页>_test.dart`、`farm_…`、`shell_…`）。
 
 音效合成的对照 `test/fixtures/sfx.json` 是冻结的，没有生成它的脚本；`lib/shell/synth.dart` 有意改了声音时，同一个改动里手改它。
 

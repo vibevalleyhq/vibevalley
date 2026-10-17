@@ -177,12 +177,11 @@ Future<void> startLocalFarm() async {
   }
   final home = desktopHome(env);
   await Directory(home).create(recursive: true);
-  final fromHome = await _readEnvFile('$home/.env');
   final path = await loginShellPath(env['PATH'] ?? '/usr/bin:/bin:/usr/sbin:/sbin');
   final launcher = ServerLauncher(
     binary: binary,
-    // Set values win over the home .env; the login shell's PATH goes on top.
-    environment: {...fromHome, ...env, 'PATH': path, 'VIBEVALLEY_HOME': home, 'VIBEVALLEY_WORK_ROOT': desktopWorkRoot(env)},
+    // The rest of the configuration is the home's vibevalley.yaml; the login shell's PATH goes on top.
+    environment: {...env, 'PATH': path, 'VIBEVALLEY_HOME': home, 'VIBEVALLEY_WORK_ROOT': desktopWorkRoot(env)},
     logFile: File('${env['HOME'] ?? ''}/Library/Logs/${desktopChannel.productName}/server.log'),
     workingDirectory: home,
   );
@@ -193,14 +192,6 @@ Future<void> startLocalFarm() async {
     await host._invoke('server', {'pid': server.pid, 'url': embeddedServerAddress});
   } on ServerFailed catch (e) {
     await host._invoke('fatal', {'title': desktopChannel.titled('码农场物语开不了门'), 'text': e.reason});
-  }
-}
-
-Future<Map<String, String>> _readEnvFile(String path) async {
-  try {
-    return parseEnv(await File(path).readAsString());
-  } on Object {
-    return const {};
   }
 }
 

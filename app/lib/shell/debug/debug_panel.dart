@@ -369,7 +369,7 @@ class _ControlTabState extends ConsumerState<_ControlTab> {
         ),
         _Section(
           title: '管家',
-          aside: farm == null ? null : '${farm.foreman.wire} · ${foremanLabel[farm.foreman]}',
+          aside: farm == null ? null : '${farm.manager.wire} · ${managerLabel[farm.manager]}',
           child: _TextAction(placeholder: '模拟你对管家说…（会走派活规则）', action: '听', onSubmit: (t) => _run(context, () => hb.hear(t))),
         ),
         _Section(
@@ -467,37 +467,37 @@ class _WorkersTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hb = ref.watch(hbProvider);
-    final helpers = ref.watch(farmProvider)?.helpers ?? const <Helper>[];
+    final workers = ref.watch(farmProvider)?.workers ?? const <Worker>[];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Section(
           title: '全部',
-          aside: '场上 ${helpers.length} 个',
+          aside: '场上 ${workers.length} 个',
           child: _Row([
             _Btn(label: '全部叫停', onTap: () => _run(context, () => hb.everyone('stop'))),
             _Btn(label: '全部收工', tone: _Tone.bad, onTap: () => _run(context, () => hb.everyone('dismiss'))),
           ]),
         ),
-        if (helpers.isEmpty)
+        if (workers.isEmpty)
           const Text(
             '地里没有帮工。先开工，再对管家说句话。',
             style: TextStyle(fontFamily: pixelFont, fontSize: 12, color: Palette.ink500),
           ),
-        for (final h in helpers) ...[_WorkerCard(helper: h, hb: hb), const SizedBox(height: 8)],
+        for (final h in workers) ...[_WorkerCard(worker: h, hb: hb), const SizedBox(height: 8)],
       ],
     );
   }
 }
 
 class _WorkerCard extends StatelessWidget {
-  const _WorkerCard({required this.helper, required this.hb});
-  final Helper helper;
+  const _WorkerCard({required this.worker, required this.hb});
+  final Worker worker;
   final Hb hb;
 
   @override
   Widget build(BuildContext context) {
-    final h = helper;
+    final h = worker;
     return Container(
       color: _ink850,
       padding: const EdgeInsets.all(10),
@@ -522,7 +522,7 @@ class _WorkerCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  '${h.id} · ${runtimeLabel[h.runtime] ?? h.runtime} · 第 ${h.turns.round()} 轮',
+                  '${h.id} · ${runtimeLabel[h.runtime] ?? h.runtime} · 第 ${h.runs.round()} 轮',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontFamily: pixelFont, fontSize: 12, color: Palette.ink500),
                 ),
@@ -594,7 +594,7 @@ class _SoundsTabState extends ConsumerState<_SoundsTab> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          '全部是实时合成的，没有音频文件。配方在 lib/shell/sfx.dart（和网页的 web/src/game/sfx.ts 一样）；关了音效就听不到。',
+          '全部是实时合成的，没有音频文件。配方在 lib/shell/sfx.dart；关了音效就听不到。',
           style: TextStyle(fontFamily: pixelFont, fontSize: 12, color: Palette.ink500),
         ),
         const SizedBox(height: 16),

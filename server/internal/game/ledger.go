@@ -8,46 +8,44 @@ import (
 	"reflect"
 	"sync"
 
-	"vibevalley/internal/base"
+	"vibevalley/internal/core"
 	"vibevalley/internal/protocol"
+	"vibevalley/pkg/db/generated"
+	"vibevalley/pkg/x/clock"
 )
 
-// Entries the farm's facts tell of are recorded here, watching them (protocol.EntriesFor); the rest where they happen.
+// Entries the farm's facts tell of are recorded here, watching them (entriesFor); the rest where they happen.
 
-type Ledger struct {
-	db   *sql.DB
-	site *base.Site
+type ledger struct {
+	q    *generated.Queries
+	core *core.Service
 	// One entry at a time, so the order in the table is the order of the fold.
-	mu     sync.Mutex
-	folded protocol.Folded
-	stop   func()
+	mu      sync.Mutex
+	folded  ledgerFolded
+	stop    func()
+	stopDid func()
 }
 
-func newLedger(db *sql.DB, site *base.Site) (*Ledger, error) {
-	l := &Ledger{db: db, site: site}
+func newLedger(db *sql.DB, core *core.Service) (*ledger, error) {
+	l := &ledger{q: generated.New(db), core: core}
 	entries, err := l.entries()
 	if err != nil {
 		return nil, err
 	}
-	l.folded = protocol.ProgressFold(entries, protocol.EmptyFolded())
-	site.Apply(protocol.FactProgress{Progress: l.folded.Progress})
+	l.folded = progressFold(entries, emptyFolded())
+	core.Apply(protocol.FactProgress{Progress: l.folded.Progress})
 	return l, nil
 }
 
 // A row this code cannot read any more is left out of the fold.
-func (l *Ledger) entries() ([]protocol.LedgerEntry, error) {
-	rows, err := l.db.Query("select kind, at, payload from ledger order by seq")
+func (l *ledger) entries() ([]protocol.LedgerEntry, error) {
+	rows, err := l.q.LedgerEntries(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	out := []protocol.LedgerEntry{}
-	for rows.Next() {
-		var kind, payload string
-		var at int64
-		if err := rows.Scan(&kind, &at, &payload); err != nil {
-			return nil, err
-		}
+	for _, row := range rows {
+		kind, at, payload := row.Kind, row.At, row.Payload
 		fields := map[string]any{}
 		if err := json.Unmarshal([]byte(payload), &fields); err != nil || fields == nil {
 			fields = map[string]any{}
@@ -60,15 +58,27 @@ func (l *Ledger) entries() ([]protocol.LedgerEntry, error) {
 		}
 		out = append(out, entry)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // Against a copy of the core state folded from the same events, to see each fact against what was before it.
-func (l *Ledger) OnStart(ctx context.Context) error {
-	snapshot, events, stop := l.site.Events()
+func (l *ledger) OnStart(ctx context.Context) error {
+	did, stopDid := l.core.OwnerDids().Subscribe()
+	l.stopDid = stopDid
+	go func() {
+		for d := range did {
+			switch d.Kind {
+			case core.OwnerReviewed:
+				l.Record(protocol.LedgerEntryReviewed{Worker: d.Worker})
+			case core.OwnerTalked:
+				l.Record(protocol.LedgerEntryMoment{Kind: protocol.LedgerEntryMomentKindVoice})
+			}
+		}
+	}()
+	snapshot, events, stop := l.core.Events()
 	l.stop = stop
-	state := snapshot.Value.(protocol.SiteEventSnapshot).State
-	for _, e := range protocol.CatchUp(state) {
+	state := snapshot.Value.(protocol.SideEventSnapshot).State
+	for _, e := range catchUp(state) {
 		l.Record(e.Value)
 	}
 	go func() {
@@ -90,7 +100,7 @@ func (l *Ledger) OnStart(ctx context.Context) error {
 				if _, own := fact.(protocol.FactProgress); own {
 					continue
 				}
-				for _, e := range protocol.EntriesFor(before, protocol.Fact{Value: fact}, state) {
+				for _, e := range entriesFor(before, protocol.Fact{Value: fact}, state) {
 					l.Record(e.Value)
 				}
 			}
@@ -99,7 +109,10 @@ func (l *Ledger) OnStart(ctx context.Context) error {
 	return nil
 }
 
-func (l *Ledger) OnStop() {
+func (l *ledger) OnStop() {
+	if l.stopDid != nil {
+		l.stopDid()
+	}
 	if l.stop != nil {
 		l.stop()
 	}
@@ -113,8 +126,8 @@ func planEntryAt(entry protocol.LedgerEntryValue, at int64) protocol.LedgerEntry
 }
 
 // Called with mu held.
-func (l *Ledger) write(input protocol.LedgerEntryValue) error {
-	at := base.NowMs()
+func (l *ledger) write(input protocol.LedgerEntryValue) error {
+	at := clock.NowMs()
 	entry := protocol.LedgerEntry{Value: planEntryAt(input, at)}
 	body, err := json.Marshal(entry)
 	if err != nil {
@@ -128,21 +141,21 @@ func (l *Ledger) write(input protocol.LedgerEntryValue) error {
 	delete(fields, "kind")
 	delete(fields, "at")
 	payload, _ := json.Marshal(fields)
-	if _, err := l.db.Exec("insert into ledger (kind, at, payload) values (?, ?, ?)", kind, at, string(payload)); err != nil {
+	if err := l.q.AddLedgerEntry(context.Background(), generated.AddLedgerEntryParams{Kind: kind, At: at, Payload: string(payload)}); err != nil {
 		return err
 	}
-	next, news := protocol.ProgressStep(l.folded, entry)
+	next, news := progressStep(l.folded, entry)
 	l.folded = next
 	fact := protocol.FactProgress{Progress: next.Progress}
 	if (news.Coins != nil && *news.Coins != 0) || len(news.Unlocked) > 0 {
 		fact.News = &news
 	}
-	l.site.Apply(fact)
+	l.core.Apply(fact)
 	return nil
 }
 
 // The ledger must never stop the farm: an entry that cannot be written is logged, and the farm goes on.
-func (l *Ledger) Record(entry protocol.LedgerEntryValue) {
+func (l *ledger) Record(entry protocol.LedgerEntryValue) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if err := l.write(entry); err != nil {
@@ -150,14 +163,25 @@ func (l *Ledger) Record(entry protocol.LedgerEntryValue) {
 	}
 }
 
-func (l *Ledger) Carry(coins int64) bool {
+// The title the owner wears: an achievement and its tier; none of either is the plain title.
+func (l *ledger) ChooseTitle(achievement *string, tier *int64) {
+	entry := protocol.LedgerEntryTitled{}
+	if achievement != nil && *achievement != "" {
+		entry.Achievement = achievement
+	}
+	if tier != nil && *tier != 0 {
+		entry.Tier = tier
+	}
+	l.Record(entry)
+}
+
+func (l *ledger) Carry(coins int64) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if coins <= 0 {
 		return false
 	}
-	var n int
-	if err := l.db.QueryRow("select count(*) from ledger where kind = 'carried'").Scan(&n); err != nil || n > 0 {
+	if n, err := l.q.CountLedgerKind(context.Background(), "carried"); err != nil || n > 0 {
 		return false
 	}
 	if err := l.write(protocol.LedgerEntryCarried{Coins: coins}); err != nil {

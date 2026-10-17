@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
 
 class LogEntry {
   LogEntry(this.seq, this.type, this.at, this.summary, this._json);
@@ -61,21 +60,21 @@ class DebugLogNotifier extends Notifier<DebugLog> {
   String export() => state.entries.map((e) => jsonEncode(e.json())).join('\n');
 }
 
-String sideType(SiteEvent e) => switch (e) {
-  SiteEventStep() => 'step',
-  SiteEventNotice() => 'notice',
-  SiteEventRuntime() => 'runtime',
-  SiteEventSnapshot() => 'snapshot',
+String sideType(SideEvent e) => switch (e) {
+  SideEventActivity() => 'step',
+  SideEventNotice() => 'notice',
+  SideEventRuntime() => 'runtime',
+  SideEventSnapshot() => 'snapshot',
   Fact() => 'fact',
 };
 
 String _cut(String s, int n) => s.length > n ? s.substring(0, n) : s;
 
-String frameSummary(SiteFrame f) {
+String frameSummary(StateFrame f) {
   final s = f.state;
-  final helpers = s.helpers.map((h) => '${h.id}:${_phaseTag(h.phase)}').join(' ');
+  final workers = s.workers.map((h) => '${h.id}:${_phaseTag(h.phase)}').join(' ');
   final effects = f.effects.isEmpty ? '' : ' · ${f.effects.map((e) => e.toJson()['kind']).join(' ')}';
-  return 'call=${s.call.wire} foreman=${s.foreman.wire} helpers=${helpers.isEmpty ? '0' : helpers}$effects';
+  return 'call=${s.call.wire} manager=${s.manager.wire} workers=${workers.isEmpty ? '0' : workers}$effects';
 }
 
 String _phaseTag(Phase p) => switch (p) {
@@ -86,10 +85,10 @@ String _phaseTag(Phase p) => switch (p) {
   PhaseResting() => 'resting',
 };
 
-String sideSummary(SiteEvent e) => switch (e) {
-  SiteEventStep(:final id, :final step) => '$id #${step.n.round()} ${step.kind.wire}: ${_cut(step.text, 80)}',
-  SiteEventNotice(:final level, :final text) => '${level.wire}: $text',
-  SiteEventRuntime(:final info) => '${info.id}: ${quotaText(info.usage)}',
-  SiteEventSnapshot() => 'snapshot',
+String sideSummary(SideEvent e) => switch (e) {
+  SideEventActivity(:final id, :final activity) => '$id #${activity.n.round()} ${activity.kind.wire}: ${_cut(activity.text, 80)}',
+  SideEventNotice(:final level, :final text) => '${level.wire}: $text',
+  SideEventRuntime(:final info) => '${info.id}: ${info.quota?.text ?? ''}',
+  SideEventSnapshot() => 'snapshot',
   Fact() => e.toJson()['type'].toString(),
 };

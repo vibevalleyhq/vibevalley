@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/providers.dart';
-import '../desk/shared/faces.dart';
+import '../shared/faces.dart';
 import '../gen/vibevalley.dart';
 import '../rules/looks.dart';
 import '../shell/title/title_state.dart';
@@ -57,7 +57,7 @@ class _Rail extends ConsumerWidget {
     width: 64,
     decoration: const BoxDecoration(
       color: Palette.bark600,
-      border: Border(right: BorderSide(color: Palette.bark900, width: 2)),
+      border: Border(right: pxLine),
     ),
     child: LayoutBuilder(
       builder: (context, box) => SingleChildScrollView(
@@ -144,7 +144,7 @@ class _ConfigDesk extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final farm = ref.watch(farmProvider);
     final live = farm?.call == CallState.live;
-    final working = farm?.helpers.where((h) => h.phase is PhaseWorking).length ?? 0;
+    final working = farm?.workers.where((h) => h.phase is PhaseWorking).length ?? 0;
     final p = place;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,9 +152,7 @@ class _ConfigDesk extends ConsumerWidget {
         Container(
           height: deskHead,
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Palette.bark900, width: 2)),
-          ),
+          decoration: const BoxDecoration(border: Border(bottom: pxLine)),
           child: Row(
             children: [
               if (p != null) ...[

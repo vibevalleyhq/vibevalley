@@ -9,7 +9,7 @@
 
 ## 服务端
 
-`server/internal/channels/voice_agora.go` 的 `Voice`；签令牌、拼语音管家的请求在 `server/pkg/agora`。
+`server/internal/voice/agora.go`（`Workspace` 上的 `Voice`）；签令牌、拼语音管家的请求在 `server/pkg/agora`。
 
 - `POST /api/voice/session` 开一个频道和数字 uid，签一个 RTC + RTM 通用的令牌，一小时过期；`/renew` 续一个。
 - `POST /api/voice/agent` 按语音设置请语音管家进频道；`/agent/stop` 请它离开，它已经在走也算成功。
@@ -23,23 +23,23 @@
 
 ## 凭据
 
-Agora 的 App ID 和 App Certificate 在首页「设置」或声音页里填，存在 `$VIBEVALLEY_HOME/settings.json`；也可以用环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`（写进 `$VIBEVALLEY_HOME/.env`，`agora project env write <文件>` 能写出来）。谁优先见 [server.md](server.md)「设置」。这些都不进仓库。
+Agora 的 App ID 和 App Certificate 在首页「设置」或声音页里填，存在 `$VIBEVALLEY_HOME/settings.json`；也可以写进配置的 `agora.app_id`、`agora.app_certificate`，或者设环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。谁优先见 [server.md](server.md)「设置」。这些都不进仓库。
 
 ## 配置（`/voice`、`/manager/voice`）
 
-语音设置存在 `settings.json` 的 `voice`，只存和默认不一样的，下一通电话生效。分两处改（[理由](../../.agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)）：
+语音设置存在 `settings.json` 的 `voice`，只存和默认不一样的（页面发整份，服务端存的时候自己去掉和默认一样的），下一通电话生效。页面上一边改一边问 `POST /api/settings/check`，说的就是保存时会被拒的理由。分两处改（[理由](../../.agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)）：
 
 - 工作台的「声音」（`/voice`）配**线路**：凭据和区域、怎么听（识别、语言、断句、打断）、用哪个大模型。
 - 管家页的「声音」（`/manager/voice`）配**电话上的管家**：人设、开场白、出错时说的话、音色。
 
-每一段可以用声网托管的，也可以换成自己的服务（微软 Azure、OpenAI 兼容的接口……），自己服务的 key 存在 `settings.json`，页面只看到最后四个字；缺 key 时开始通话就说缺哪个。字段在 `protocol/shapes.go`（`VoiceSettings`），默认和范围在 `protocol/voice.go`（`DefaultVoice`、`VoiceProblem`）。MiniMax 音色的样音在 `app/assets/voice-samples/`，试听不连网。
+每一段可以用声网托管的，也可以换成自己的服务（微软 Azure、OpenAI 兼容的接口……），自己服务的 key 存在 `settings.json`，页面只看到最后四个字；缺 key 时开始通话就说缺哪个。字段在 `protocol/shapes.go`（`VoiceSettings`），默认在 `protocol/voice.go`（`DefaultVoice`），几个数的范围是 `shapes.go` 开头的共用常量，保存前的检查在 `setting/voice_rules.go`。MiniMax 音色的样音在 `app/assets/voice-samples/`，试听不连网。
 
 ## 语音线路（「想」选农场的管家时）
 
-`server/internal/channels/voice_line.go` 的 `VoiceLine`：声网按 OpenAI Chat Completions 协议来问管家，管家的话边生成边以 SSE 流回去念。
+`server/internal/voice/line.go`：声网按 OpenAI Chat Completions 协议来问管家，管家的话边生成边以 SSE 流回去念。
 
-- **只有这一个接口对外**：另开一个监听（`VIBEVALLEY_VOICE_LINE_PORT`，默认 8788，只听 127.0.0.1），上面只有 `POST /llm/<通话>/chat/completions`。端口被占时只记日志，农场照常。
-- **隧道**：设了 `VIBEVALLEY_VOICE_LINE_URL` 就用它；没设时第一通电话开一个 cloudflared 临时隧道，等它能应答（最多 60 秒），最后一通挂了 10 分钟后关掉。
+- **只有这一个接口对外**：另开一个监听（配置的 `voice.line.port`，默认 8788，只听 127.0.0.1），上面只有 `POST /llm/<通话>/chat/completions`。端口被占时只记日志，农场照常。
+- **隧道**：设了 `voice.line.url` 就用它；没设时第一通电话开一个 cloudflared 临时隧道，等它能应答（最多 60 秒），最后一通挂了 10 分钟后关掉。
 - **每通电话一把钥匙**：声网的请求要带 `Authorization: Bearer <钥匙>`，挂了就作废。
-- 只取最新的一句交给管家（`Foreman.Call`），对话历史以管家自己的会话为准；声网打断时丢掉正在念的。
+- 只取最新的一句交给管家（`Manager.Call`），对话历史以管家自己的会话为准；声网打断时丢掉正在念的。
 - 这时 `/api/dispatch` 不再转给管家，免得一句话处理两次。

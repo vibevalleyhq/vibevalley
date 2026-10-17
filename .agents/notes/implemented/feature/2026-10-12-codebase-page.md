@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-一个配置页 `/projects`：左边是项目，右边把选中的项目当一块地。规则在客户端的 `app/lib/desk/projects/codebase.dart`（纯函数，有测试），数据由服务端的 `server/internal/projects/codebase.go`现算，页面在 `app/lib/desk/projects/projects_page.dart`。
+一个配置页 `/projects`：左边是项目，右边把选中的项目当一块地。规则在客户端的 `app/lib/desk/projects/codebase.dart`（纯函数，有测试），数据由服务端的 `server/internal/project/codebase.go`现算，页面在 `app/lib/desk/projects/projects_page.dart`。
 
 - **长势**：项目前面画一块地，按最近一次提交长成什么样（一天内开花，一周内长叶，一个月内冒芽，三个月内有点干，再久就荒了）。用的是农场现成的地块图，一眼看出哪个项目还有人在干。
 - **地契**：开垦于（第一个提交）、耕作（提交数）、庄稼（行数）、种了几样，和「统计」按钮。

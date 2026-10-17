@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> 已被取代：MyGo（连同它的 Swift 语音助手）随 [一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md) 删掉了。原生语音现在在 Flutter 应用里，用 Agora 的 Flutter SDK，macOS 上字幕走 RTC 的 data stream（[客户端迁到 Flutter](../architecture/2026-10-13-flutter-client-over-ts-server.md)）；云端管家的请求仍由 Go 服务端按农场的设置拼（`server/internal/channels/voice_agora.go`）。下面是 MyGo 当时的决策。
+> 已被取代：MyGo（连同它的 Swift 语音助手）随 [一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md) 删掉了。原生语音现在在 Flutter 应用里，用 Agora 的 Flutter SDK，macOS 上字幕走 RTC 的 data stream（[客户端迁到 Flutter](../architecture/2026-10-13-flutter-client-over-ts-server.md)）；云端管家的请求仍由 Go 服务端按农场的设置拼（`server/internal/voice/agora.go`）。下面是 MyGo 当时的决策。
 
 ## Problem
 
@@ -48,7 +48,7 @@ App ID/Certificate 从农场的设置取得（家目录的 settings.json，否�
 
 原生端先订阅 RTM Message 和 Presence，再加入 RTC；云端管家等待订阅确认。页面复用 Electron 的 Agora toolkit TEXT 解析器和字幕映射，删除 Go 自写的转写合并规则，补上此前遗漏的 Presence 状态通知。
 
-结束静音曾试调到 300 ms，但没有完整端到端证据支持改善。对齐时恢复 Electron 的实际配置。云端管家的请求现在由 Go 服务端按农场的设置拼（当时是 `farm.Voice.Native`，现在是 `server/internal/channels/voice_agora.go` 的 `Voice.Native`，和当时的网页语音同一份），几种配置的请求由 TypeScript 的 `voiceAgentFor` 生成过一次，存成 `server/internal/channels/testdata/voice-requests.json`，Go 测试逐字比对；TypeScript 服务端删掉以后这份对照冻结，Go 的 `Voice` 是唯一的来源，避免提示词、历史条数和模型参数漂移。Go 和 Node 的 MiniMax 内部标记名称不同，需要在边界转换；测试比较最终 SDK 请求，避免只比较工厂对象却遗漏托管 preset。
+结束静音曾试调到 300 ms，但没有完整端到端证据支持改善。对齐时恢复 Electron 的实际配置。云端管家的请求现在由 Go 服务端按农场的设置拼（当时是 `farm.Voice.Native`，现在是 `server/internal/voice/agora.go` 的 `Voice.Native`，和当时的网页语音同一份），几种配置的请求由 TypeScript 的 `voiceAgentFor` 生成过一次，存成 `server/internal/voice/testdata/voice-requests.json`，Go 测试逐字比对；TypeScript 服务端删掉以后这份对照冻结，Go 的 `Voice` 是唯一的来源，避免提示词、历史条数和模型参数漂移。Go 和 Node 的 MiniMax 内部标记名称不同，需要在边界转换；测试比较最终 SDK 请求，避免只比较工厂对象却遗漏托管 preset。
 
 内存诊断只记录时间、长度和数值，不含转写或密钥。请求对照与字幕／状态回放用于验证行为对齐；真实音频采集和播放仍由不同 SDK 负责，不能据此宣称延迟相同。
 

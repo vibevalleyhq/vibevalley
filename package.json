@@ -10,6 +10,7 @@
     "package:mac": "app/tool/build-macos.sh",
     "site:check": "cd site && bun install && bun run check",
     "site:build": "cd site && bun install && bun run build",
-    "site:deploy": "cd site && bun install && bun run deploy"
+    "site:deploy": "cd site && bun install && bun run deploy",
+    "go:deadcode": "bun scripts/deadcode.ts"
   }
 }

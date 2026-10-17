@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import '../../app/theme.dart';
+import '../theme.dart';
 
 /// Line heights are Tailwind's for each size: the skin changes the size, not the line height.
 abstract final class KitText {
@@ -246,5 +246,3 @@ class _DashPainter extends CustomPainter {
 
 /// Until the app sets it, a tap does nothing.
 void Function(Uri uri)? kitOpenLink;
-
-Color currentColor(BuildContext context) => DefaultTextStyle.of(context).style.color ?? Palette.bark900;

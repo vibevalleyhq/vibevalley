@@ -2,7 +2,7 @@
 
 import 'package:flutter/widgets.dart';
 
-import '../app/theme.dart';
+import 'theme.dart';
 import '../sprites/atlas.dart';
 import 'px.dart';
 

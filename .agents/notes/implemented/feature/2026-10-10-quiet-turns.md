@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-- 每隔一会儿（阈值的四分之一，最多 15 秒）看一次会话的状态（smith 的 `observe.StallOf`，`server/internal/runs/crew.go` 的 `watchStalls`）；一轮里超过 `VIBEVALLEY_STALL_SECONDS`（默认 240 秒）没有任何记录，就施加 `quiet` 事实：地块干裂、挂「没动静」，农场上提醒一次，记进干活过程，管家的「农场现状」里也会说。它一有动静（下一个 `doing` 事实）就结束。
+- 每隔一会儿（阈值的四分之一，最多 15 秒）看一次会话的状态（smith 的 `observe.StallOf`，`server/internal/worker/workers.go` 的 `watchStalls`）；一轮里超过 `worker.stall_seconds`（默认 240 秒）没有任何记录，就施加 `quiet` 事实：地块干裂、挂「没动静」，农场上提醒一次，记进干活过程，管家的「农场现状」里也会说。它一有动静（下一个 `doing` 事实）就结束。
 - 不自动叫停：可能只是在跑很久的命令，由主人决定。
 - runtime 自己重试模型调用时施加 `retry` 事实，地块挂「重试中」。
 
@@ -26,4 +26,4 @@ Status: implemented
 
 ## Verification
 
-`server/internal/farm/crew_test.go` 的 `TestCrewQuietHelperIsFlagged`（测试里把阈值设得很短）；`server/internal/runs/rules_test.go` 的 `TestCrewQuietEndsWithAWordNotWithUsage`。
+`server/internal/workspace/work_test.go` 的 `TestCrewQuietHelperIsFlagged`（测试里把阈值设得很短）；`server/internal/worker/rules_test.go` 的 `TestCrewQuietEndsWithAWordNotWithUsage`。

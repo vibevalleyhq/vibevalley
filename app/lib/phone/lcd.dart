@@ -1,6 +1,6 @@
 import 'package:flutter/painting.dart';
 
-import '../app/theme.dart';
+import '../ui/theme.dart';
 
 abstract final class Lcd {
   static const paper = Color(0xFFC9DC9A);

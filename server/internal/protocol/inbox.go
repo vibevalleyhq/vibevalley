@@ -1,76 +1,80 @@
 package protocol
 
-// A playbook's own helpers leave their finished, failed and conflicted work to the playbook, which asks in their place; a quiet one still asks.
+// A playbook's own workers leave their finished, failed and conflicted work to the playbook, which asks in their place; a quiet one still asks.
 
 import (
 	"cmp"
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
+
+	"vibevalley/pkg/x/str"
 )
 
-// channel nil: the square; began nil: when the patrol first saw it; {ago} is filled with how long.
-type inboxEntry struct {
-	item    InboxItem
-	channel *int64
-	since   *int64
-	brief   string
+// What is waiting on someone, as the inbox and the manager's patrol read it. Channel nil: the general channel; Since nil:
+// from when the reader first saw it. Brief is for the manager, {ago} filled with how long it has waited.
+type InboxEntry struct {
+	Item    InboxItem
+	Channel *int64
+	Since   *int64
+	Brief   string
 }
 
 // Newest first; items of the same moment in the order they are gathered.
-func Inbox(state FarmState) []InboxItem {
+func Inbox(state CoreState) []InboxItem {
 	items := []InboxItem{}
-	for _, e := range inboxEntries(state) {
-		items = append(items, e.item)
+	for _, e := range InboxEntries(state) {
+		items = append(items, e.Item)
 	}
 	slices.SortStableFunc(items, func(a, b InboxItem) int { return cmp.Compare(b.At, a.At) })
 	return items
 }
 
-func inboxEntries(state FarmState) []inboxEntry {
+func InboxEntries(state CoreState) []InboxEntry {
 	chat := state.Chat
-	square := patrolID(SquareOf(chat))
-	out := []inboxEntry{}
-	for _, h := range state.Helpers {
+	general := conversationID(GeneralOf(chat))
+	out := []InboxEntry{}
+	for _, h := range state.Workers {
 		need := NeedOf(h)
 		if need == nil || need.Kind == "retrying" || (h.Playbook != nil && need.Kind != "quiet") {
 			continue
 		}
-		channel := square
+		channel := general
 		if h.Channel != nil {
 			c := *h.Channel
 			channel = &c
 		}
-		from := InboxFrom{InboxFromHelper{ID: h.ID, Name: h.Name, Agent: h.Agent}}
+		from := InboxFrom{InboxFromWorker{ID: h.ID, Name: h.Name, Agent: h.Agent}}
 		target := InboxTarget{InboxTargetWorker{ID: h.ID}}
 		at := h.HiredAt
 		summary := h.Task
-		if h.Last != nil {
-			at = h.Last.At
-			if h.Last.Summary != "" {
-				summary = h.Last.Summary
+		if h.LastRun != nil {
+			at = h.LastRun.At
+			if h.LastRun.Summary != "" {
+				summary = h.LastRun.Summary
 			}
 		}
 		who := h.Name + "（" + h.ID + "）"
 		switch need.Kind {
 		case "harvest":
-			out = append(out, inboxEntry{
-				item:    InboxItem{ID: fmt.Sprintf("%s:harvest:%d", h.ID, h.Turns), Kind: InboxKindHarvest, From: from, Text: Clip(summary, 40), At: at, Target: target},
-				channel: channel, since: &at,
-				brief: who + "的活做完 {ago}了还没收：「" + playbookSlice(h.Task, 60) + "」",
+			out = append(out, InboxEntry{
+				Item:    InboxItem{ID: fmt.Sprintf("%s:merge:%d", h.ID, h.Runs), Kind: InboxKindMerge, From: from, Text: str.Cut(summary, 40), At: at, Target: target},
+				Channel: channel, Since: &at,
+				Brief: who + "的活做完 {ago}了还没收：「" + str.Slice(h.Task, 0, 60) + "」",
 			})
 		case "fix":
-			out = append(out, inboxEntry{
-				item:    InboxItem{ID: fmt.Sprintf("%s:fix:%d", h.ID, h.Turns), Kind: InboxKindFix, From: from, Text: Clip(summary, 40), At: at, Target: target},
-				channel: channel, since: &at,
-				brief: who + "这一轮没做成，{ago}没人管了：「" + playbookSlice(summary, 60) + "」",
+			out = append(out, InboxEntry{
+				Item:    InboxItem{ID: fmt.Sprintf("%s:fix:%d", h.ID, h.Runs), Kind: InboxKindFix, From: from, Text: str.Cut(summary, 40), At: at, Target: target},
+				Channel: channel, Since: &at,
+				Brief: who + "这一轮没做成，{ago}没人管了：「" + str.Slice(summary, 0, 60) + "」",
 			})
 		case "conflict":
-			out = append(out, inboxEntry{
-				item: InboxItem{ID: fmt.Sprintf("%s:conflict:%d", h.ID, h.Turns), Kind: InboxKindConflict, From: from,
+			out = append(out, InboxEntry{
+				Item: InboxItem{ID: fmt.Sprintf("%s:conflict:%d", h.ID, h.Runs), Kind: InboxKindConflict, From: from,
 					Text: fmt.Sprintf("%d 个文件和主分支冲突", len(need.Conflict.Files)), At: at, Target: target},
-				channel: channel, since: &at,
-				brief: who + fmt.Sprintf("的活合进主分支会冲突（%d 个文件），{ago}没人管了", len(need.Conflict.Files)),
+				Channel: channel, Since: &at,
+				Brief: who + fmt.Sprintf("的活合进主分支会冲突（%d 个文件），{ago}没人管了", len(need.Conflict.Files)),
 			})
 		case "quiet":
 			since := need.Since
@@ -78,10 +82,10 @@ func inboxEntries(state FarmState) []inboxEntry {
 			if p, ok := h.Phase.Value.(PhaseWorking); ok && p.Doing.Label != "" {
 				doing = "「" + p.Doing.Label + "」"
 			}
-			out = append(out, inboxEntry{
-				item:    InboxItem{ID: fmt.Sprintf("%s:quiet:%d", h.ID, since), Kind: InboxKindQuiet, From: from, Text: Clip(h.Task, 40), At: since, Target: target},
-				channel: channel, since: &since,
-				brief: who + "在干活，{ago}没动静了，最后在" + doing,
+			out = append(out, InboxEntry{
+				Item:    InboxItem{ID: fmt.Sprintf("%s:quiet:%d", h.ID, since), Kind: InboxKindQuiet, From: from, Text: str.Cut(h.Task, 40), At: since, Target: target},
+				Channel: channel, Since: &since,
+				Brief: who + "在干活，{ago}没动静了，最后在" + doing,
 			})
 		}
 	}
@@ -91,14 +95,14 @@ func inboxEntries(state FarmState) []inboxEntry {
 		target := InboxTarget{InboxTargetPlans{Playbook: pb.ID}}
 		switch pb.State {
 		case PlaybookStateDraft:
-			out = append(out, inboxEntry{
-				item:    InboxItem{ID: pb.ID + ":draft", Kind: InboxKindPlanDraft, From: manager, Text: Clip(pb.Title, 40), At: pb.CreatedAt, Target: target},
-				channel: square, brief: "种植计划「" + pb.Title + "」（" + pb.ID + "）拆好了，{ago}还没人看",
+			out = append(out, InboxEntry{
+				Item:    InboxItem{ID: pb.ID + ":draft", Kind: InboxKindPlanDraft, From: manager, Text: str.Cut(pb.Title, 40), At: pb.CreatedAt, Target: target},
+				Channel: general, Brief: "种植计划「" + pb.Title + "」（" + pb.ID + "）拆好了，{ago}还没人看",
 			})
 		case PlaybookStateRipe:
-			out = append(out, inboxEntry{
-				item:    InboxItem{ID: pb.ID + ":ripe", Kind: InboxKindPlanRipe, From: manager, Text: Clip(pb.Title, 40), At: pb.CreatedAt, Target: target},
-				channel: square, brief: "种植计划「" + pb.Title + "」（" + pb.ID + "）都做完了，{ago}还没收",
+			out = append(out, InboxEntry{
+				Item:    InboxItem{ID: pb.ID + ":ripe", Kind: InboxKindPlanRipe, From: manager, Text: str.Cut(pb.Title, 40), At: pb.CreatedAt, Target: target},
+				Channel: general, Brief: "种植计划「" + pb.Title + "」（" + pb.ID + "）都做完了，{ago}还没收",
 			})
 		case PlaybookStateRunning, PlaybookStatePaused:
 			for _, node := range pb.Nodes {
@@ -112,12 +116,12 @@ func inboxEntries(state FarmState) []inboxEntry {
 				}
 				why := ""
 				if node.Conclusion != nil && *node.Conclusion != "" {
-					why = "：" + playbookSlice(*node.Conclusion, 80)
+					why = "：" + str.Slice(*node.Conclusion, 0, 80)
 				}
-				out = append(out, inboxEntry{
-					item:    InboxItem{ID: id, Kind: InboxKindPlanFailed, From: manager, Text: Clip(pb.Title+"："+node.Title, 40), At: pb.CreatedAt, Target: target},
-					channel: square,
-					brief:   "种植计划「" + pb.Title + "」（" + pb.ID + "）的步骤 " + node.ID + "「" + node.Title + "」没做成，{ago}没人管了" + why,
+				out = append(out, InboxEntry{
+					Item:    InboxItem{ID: id, Kind: InboxKindPlanFailed, From: manager, Text: str.Cut(pb.Title+"："+node.Title, 40), At: pb.CreatedAt, Target: target},
+					Channel: general,
+					Brief:   "种植计划「" + pb.Title + "」（" + pb.ID + "）的步骤 " + node.ID + "「" + node.Title + "」没做成，{ago}没人管了" + why,
 				})
 			}
 		}
@@ -141,22 +145,48 @@ func inboxEntries(state FarmState) []inboxEntry {
 					continue
 				}
 				from := manager
-				if m.FromKind == SenderKindHelper {
+				if m.FromKind == SenderKindWorker {
 					agent := ""
 					if m.Agent != nil {
 						agent = *m.Agent
 					}
-					from = InboxFrom{InboxFromHelper{ID: m.From, Name: m.Name, Agent: agent}}
+					from = InboxFrom{InboxFromWorker{ID: m.From, Name: m.Name, Agent: agent}}
 				}
 				since := m.At
-				out = append(out, inboxEntry{
-					item: InboxItem{ID: "m" + strconv.FormatInt(m.Seq, 10), Kind: InboxKindMention, From: from, Text: Clip(m.Text, 40), At: m.At,
+				out = append(out, InboxEntry{
+					Item: InboxItem{ID: "m" + strconv.FormatInt(m.Seq, 10), Kind: InboxKindMention, From: from, Text: str.Cut(m.Text, 40), At: m.At,
 						Target: InboxTarget{InboxTargetChat{Conversation: c.ID}}},
-					channel: patrolID(ChannelOf(chat, &c)), since: &since,
-					brief: m.Name + " 在 " + AddressOf(chat, c) + " 问主人的话，{ago}没人回：「" + playbookSlice(patrolOneLine(m.Text), 80) + "」",
+					Channel: conversationID(ChannelOf(chat, &c)), Since: &since,
+					Brief: m.Name + " 在 " + AddressOf(chat, c) + " 问主人的话，{ago}没人回：「" + str.Slice(oneLine(m.Text), 0, 80) + "」",
 				})
 			}
 		}
 	}
 	return out
+}
+
+func conversationID(c *Conversation) *int64 {
+	if c == nil {
+		return nil
+	}
+	id := c.ID
+	return &id
+}
+
+// Runs of white space are one space.
+func oneLine(text string) string {
+	var b strings.Builder
+	space := false
+	for _, r := range text {
+		if str.IsSpace(r) {
+			if !space {
+				b.WriteByte(' ')
+			}
+			space = true
+			continue
+		}
+		space = false
+		b.WriteRune(r)
+	}
+	return b.String()
 }

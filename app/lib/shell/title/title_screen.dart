@@ -321,7 +321,7 @@ class _MenuButton extends StatelessWidget {
   }
 }
 
-const _from = {KeySource.settings: '存在设置里', KeySource.env: '来自环境变量', KeySource.pi: '用的是 pi 里配的'};
+const _from = {KeySource.settings: '存在设置里', KeySource.config: '来自配置（vibevalley.yaml 或环境变量）'};
 
 String _keyLine(KeyStatus k) => k.source != null ? '在用 ${k.hint ?? ''}（${_from[k.source]}）' : '还没有';
 

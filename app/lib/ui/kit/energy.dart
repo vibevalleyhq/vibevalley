@@ -4,35 +4,18 @@ import 'package:flutter/widgets.dart';
 
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
+import 'labels.dart';
 
 /// Below this much left, the farm warns and the manager sends someone else if it can (protocol.QuotaLow).
 const quotaLow = 15;
 
 /// 0..100; null when the usage has no percentages.
-double? quotaLeft(AccountUsage? usage) {
-  if (usage is! AccountUsageOk || usage.windows.isEmpty) return null;
-  return math.max(0, usage.windows.map((w) => 100 - w.usedPercent).reduce(math.min));
-}
-
 String _money(String currency, double amount) =>
     '${currency == 'CNY'
         ? '¥'
         : currency == 'USD'
         ? r'$'
         : '$currency '}${amount.toStringAsFixed(2)}';
-
-/// No ".0" on whole ones, as JavaScript prints a number.
-String _num(double n) => n == n.roundToDouble() ? n.toInt().toString() : n.toString();
-
-String quotaText(AccountUsage? usage) => switch (usage) {
-  null => '不报额度',
-  AccountUsageLoginRequired() => '没登录',
-  AccountUsageUnavailable(:final reason) => '读不到额度（$reason）',
-  AccountUsageBalance(:final provider, :final available, :final balances) =>
-    balances.isNotEmpty ? '$provider 余额 ${balances.map((b) => _money(b.currency, b.amount)).join('、')}${available ? '' : '，不够用了'}' : '$provider 读不到余额',
-  AccountUsageOk(:final plan, :final windows) =>
-    windows.isNotEmpty ? windows.map((w) => '${w.label} 剩 ${_num(100 - w.usedPercent)}%').join('，') : (plan ?? '有额度'),
-};
 
 enum QuotaLevel { plenty, low, empty, unknown, gold }
 
@@ -69,8 +52,11 @@ class Quota {
   final String text;
 }
 
-Quota quotaOf(AccountUsage? usage) {
-  final text = quotaText(usage);
+/// The bottle for a runtime: how full and in what colour from its usage, what is left and the words from the server
+/// (RuntimeInfo.quota).
+Quota quotaOf(RuntimeInfo? info) {
+  final usage = info?.usage;
+  final text = info?.quota?.text ?? '不报额度';
   // Not logged in: nothing to work with, which is an empty bottle, not an unknown one.
   if (usage is AccountUsageLoginRequired) return Quota(level: QuotaLevel.empty, fill: 0, short: '没登录', text: text);
   if (usage is AccountUsageBalance) {
@@ -82,8 +68,8 @@ Quota quotaOf(AccountUsage? usage) {
       text: text,
     );
   }
-  final left = quotaLeft(usage);
-  return Quota(level: levelOf(left), fill: left == null ? 0 : left / 100, short: left == null ? '' : '${_num(left)}%', text: text);
+  final left = info?.quota?.left;
+  return Quota(level: levelOf(left), fill: left == null ? 0 : left / 100, short: left == null ? '' : '${numberText(left)}%', text: text);
 }
 
 String bottleSprite(Quota q) => switch (q.level) {

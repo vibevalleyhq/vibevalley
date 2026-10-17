@@ -3,10 +3,12 @@ package protocol
 import (
 	"fmt"
 	"strings"
+
+	"vibevalley/pkg/x/num"
 )
 
 // It takes one of the places for those working at once.
-func IsBusy(h Helper) bool {
+func IsBusy(h Worker) bool {
 	switch h.Phase.Value.(type) {
 	case PhaseArriving, PhaseWorking:
 		return true
@@ -14,44 +16,37 @@ func IsBusy(h Helper) bool {
 	return false
 }
 
-func DoingOf(h Helper) Doing {
+func DoingOf(h Worker) Doing {
 	if p, ok := h.Phase.Value.(PhaseWorking); ok {
 		return p.Doing
 	}
 	return Doing{Action: WorkerActionNone, Label: ""}
 }
 
-// A stopped turn may have work too.
-func CanHarvest(h Helper) bool {
-	switch h.Phase.Value.(type) {
-	case PhaseRipe, PhaseResting:
-		return true
-	}
-	return false
-}
-
-var ActionText = map[WorkerAction]string{
-	WorkerActionRunCommand:   "跑命令",
-	WorkerActionReadFile:     "读文件",
-	WorkerActionEditFile:     "改文件",
-	WorkerActionSearch:       "搜索",
-	WorkerActionWeb:          "查网页",
-	WorkerActionMCP:          "调 MCP 工具",
-	WorkerActionWait:         "等待",
-	WorkerActionOther:        "用工具",
-	WorkerActionThinking:     "思考",
-	WorkerActionSpeakingText: "写汇报",
-	WorkerActionNone:         "",
-}
+// What each action is, in words: seeds.json's actionText, which the client reads too.
+var ActionText map[WorkerAction]string
 
 func coreSpan(ms int64) string {
 	if ms < 60_000 {
-		return fmt.Sprintf("%d 秒", int64(max(1, coreRound(float64(ms)/1000))))
+		return fmt.Sprintf("%d 秒", int64(max(1, num.Round(float64(ms)/1000))))
 	}
-	return fmt.Sprintf("%d 分钟", int64(coreRound(float64(ms)/60_000)))
+	return fmt.Sprintf("%d 分钟", int64(num.Round(float64(ms)/60_000)))
 }
 
-func PhaseText(h Helper, now int64) string {
+// The span placeholder in PhaseWords.
+const phaseSpan = "{span}"
+
+// PhaseText is PhaseWords as said at now.
+func PhaseText(h Worker, now int64) string {
+	words := PhaseWords(h)
+	if need := NeedOf(h); need != nil && need.Kind == "quiet" {
+		words = strings.ReplaceAll(words, phaseSpan, coreSpan(now-need.Since))
+	}
+	return words
+}
+
+// PhaseWords is what a worker is doing in words, how long it has been quiet left as {span}.
+func PhaseWords(h Worker) string {
 	need := NeedOf(h)
 	conflict := ""
 	if need != nil && need.Kind == "conflict" {
@@ -66,7 +61,7 @@ func PhaseText(h Helper, now int64) string {
 			what += "：" + p.Doing.Label
 		}
 		if need != nil && need.Kind == "quiet" {
-			return what + "（已经 " + coreSpan(now-need.Since) + "没动静了）"
+			return what + "（已经 " + phaseSpan + "没动静了）"
 		}
 		if need != nil && need.Kind == "retrying" {
 			of := ""
@@ -82,8 +77,8 @@ func PhaseText(h Helper, now int64) string {
 		return "这一轮失败了"
 	case PhaseResting:
 		last := "没做完"
-		if h.Last != nil {
-			switch h.Last.Outcome {
+		if h.LastRun != nil {
+			switch h.LastRun.Outcome {
 			case OutcomeInterrupted:
 				last = "被叫停"
 			case OutcomeCompleted:

@@ -1,20 +1,20 @@
-// The room is the project's slots less its working helpers, as far as the farm's beds go: what the server's crewNoRoom allows.
+// The room is the project's slots less its working helpers, as far as the farm's beds go. It only decides how many empty plots
+// are drawn; whether work may start is the server's (noRoom in server/internal/worker/rules.go), and the two must agree.
 
 import 'dart:math' as math;
 import 'dart:ui' show Offset, Rect;
 
 import '../../gen/vibevalley.dart';
 import '../../rules/farm.dart';
-import '../../rules/tickets.dart' show workingBeds;
-import '../shared/looks.dart' show Pose;
+import '../../shared/looks.dart' show Pose;
 
 sealed class Spot {
   const Spot();
 }
 
 final class SpotTaken extends Spot {
-  const SpotTaken(this.helper, this.plot);
-  final Helper helper;
+  const SpotTaken(this.worker, this.plot);
+  final Worker worker;
   final PlotView plot;
 }
 
@@ -40,30 +40,28 @@ class Island {
 
   final List<Issue> queued;
 
-  Iterable<Helper> get helpers => spots.whereType<SpotTaken>().map((s) => s.helper);
+  Iterable<Worker> get workers => spots.whereType<SpotTaken>().map((s) => s.worker);
   int get open => spots.whereType<SpotOpen>().length;
   bool get full => working >= slots;
 }
 
-const yardPlots = 6;
-
 List<Island> islandsOf({
   required List<ProjectSummary> projects,
-  required List<Helper> helpers,
+  required List<Worker> workers,
   required Map<String, PlotView> plots,
   required List<Issue> issues,
 }) {
-  final free = math.max(0, workingBeds - helpers.where(isBusy).length);
+  final free = math.max(0, maxRunning - workers.where(isBusy).length);
   final byName = {for (final p in projects) p.name: p};
-  final names = {...byName.keys, for (final h in helpers) ?h.project};
+  final names = {...byName.keys, for (final h in workers) ?h.project};
   final islands = [
     for (final name in names)
       _island(
         name,
         byName[name],
-        [...helpers.where((h) => h.project == name)]..sort((a, b) => a.hiredAt.compareTo(b.hiredAt)),
+        [...workers.where((h) => h.project == name)]..sort((a, b) => a.hiredAt.compareTo(b.hiredAt)),
         plots,
-        [...issues.where((i) => i.project == name && i.status == IssueStatus.queued)]..sort((a, b) => a.queuedAt!.compareTo(b.queuedAt!)),
+        [...issues.where((i) => i.project == name && i.status == IssueStatus.todo)]..sort((a, b) => a.queuedAt!.compareTo(b.queuedAt!)),
         free,
       ),
   ];
@@ -76,11 +74,11 @@ List<Island> islandsOf({
   });
 }
 
-Island _island(String name, ProjectSummary? summary, List<Helper> mine, Map<String, PlotView> plots, List<Issue> queued, int free) {
+Island _island(String name, ProjectSummary? summary, List<Worker> mine, Map<String, PlotView> plots, List<Issue> queued, int free) {
   final working = mine.where(isBusy).length;
   // A project the list does not have takes no more work: only its helpers show.
   final slots = summary == null ? working : summary.slots.round();
-  final room = math.max(0, math.min(slots - working, yardPlots - mine.length));
+  final room = math.max(0, math.min(slots - working, maxRunning - mine.length));
   final open = math.min(room, free);
   return Island(
     project: name,
@@ -96,8 +94,8 @@ Island _island(String name, ProjectSummary? summary, List<Helper> mine, Map<Stri
   );
 }
 
-List<Helper> homeless(List<Helper> helpers) => [
-  for (final h in helpers)
+List<Worker> homeless(List<Worker> workers) => [
+  for (final h in workers)
     if (h.project == null) h,
 ];
 
@@ -130,11 +128,10 @@ List<Offset> plotsIn(Rect yard, int n) {
   ];
 }
 
-const helperInPlot = Offset(0, -10);
+const workerInPlot = Offset(0, -10);
 
-Pose mapPose(Helper h) {
-  final need = needOf(h);
-  if (need is NeedConflict || need is NeedFix) return Pose.worry;
+Pose mapPose(Worker h) {
+  if ((canHarvest(h) && h.conflict != null) || h.phase is PhaseFailed) return Pose.worry;
   return switch (h.phase) {
     PhaseWorking(doing: Doing(action: WorkerAction.thinking || WorkerAction.speakingText)) => Pose.think,
     PhaseWorking() => Pose.work,
@@ -145,9 +142,9 @@ Pose mapPose(Helper h) {
 }
 
 String spotText(Spot spot, double now) => switch (spot) {
-  SpotTaken(:final helper) => '${helper.name} · ${phaseText(helper, now)}${helper.branch != null ? '\n分支 ${helper.branch}' : ''}',
+  SpotTaken(:final worker) => '${worker.name} · ${phaseText(worker, now)}${worker.branch != null ? '\n分支 ${worker.branch}' : ''}',
   SpotOpen() => '空位：派一件活来，马上开工',
-  SpotShut() => '农场的 $workingBeds 块地都有人在干活，等有人干完',
+  SpotShut() => '农场的 $maxRunning 块地都有人在干活，等有人干完',
 };
 
 String islandText(Island i) =>

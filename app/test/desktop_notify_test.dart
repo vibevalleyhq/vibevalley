@@ -6,7 +6,7 @@ import 'package:vibevalley/gen/vibevalley.dart';
 InboxItem _call(
   String id,
   InboxKind kind, {
-  InboxFrom from = const InboxFromHelper(id: 'h1', name: '阿土', agent: 'oar'),
+  InboxFrom from = const InboxFromWorker(id: 'h1', name: '阿土', agent: 'oar'),
   String text = '修好登录页',
   InboxTarget? target,
 }) => InboxItem(
@@ -18,18 +18,18 @@ InboxItem _call(
   target: target ?? const InboxTargetWorker(id: 'h1'),
 );
 
-FarmState _state({String call = 'live', List<Map<String, dynamic>> conversations = const [], List<Map<String, dynamic>> messages = const []}) =>
-    FarmState.fromJson({
+CoreState _state({String call = 'live', List<Map<String, dynamic>> conversations = const [], List<Map<String, dynamic>> messages = const []}) =>
+    CoreState.fromJson({
       'call': call,
-      'foreman': ForemanState.values.first.wire,
-      'helpers': const <Object>[],
+      'manager': ManagerState.values.first.wire,
+      'workers': const <Object>[],
       'chat': {'conversations': conversations, 'messages': messages},
     });
 
 void main() {
   test('the calls standing at start are known; a new one rings once', () {
     final bell = CallBell();
-    final old = _call('h1:harvest:1', InboxKind.harvest);
+    final old = _call('h1:harvest:1', InboxKind.merge);
     expect(bell.ring([old]), isEmpty);
     final fresh = _call('h1:fix:2', InboxKind.fix);
     expect(bell.ring([fresh, old]).map((c) => c.id), ['h1:fix:2']);
@@ -37,7 +37,7 @@ void main() {
   });
 
   test('calls become notifications in the Electron client words, opening what they are about', () {
-    expect(noticeForCall(_call('a', InboxKind.harvest)), const DesktopNotice('阿土 做完了', '修好登录页', DesktopOpenWorker('h1')));
+    expect(noticeForCall(_call('a', InboxKind.merge)), const DesktopNotice('阿土 做完了', '修好登录页', DesktopOpenWorker('h1')));
     expect(noticeForCall(_call('b', InboxKind.fix)).title, '阿土 没做成');
     expect(noticeForCall(_call('c', InboxKind.quiet)).body, '可能在跑很久的命令，也可能卡住了：看看它的干活过程。');
     expect(
@@ -66,14 +66,14 @@ void main() {
     expect(noticeForEffect(const GameEffectAchievement(achievement: 'steady', tier: 3))!.title, '升到金牌：金牌稳如老农');
     expect(noticeForEffect(const GameEffectAchievement(achievement: 's_hire', tier: 1))!.title, '新手任务做完了：派活');
     expect(noticeForEffect(const GameEffectAchievement(achievement: 'unknown', tier: 1)), isNull);
-    expect(noticeForEvent(const SiteEventNotice(at: 0, level: NoticeLevel.error, text: '数据库\n坏了')), const DesktopNotice('码农场物语', '数据库 坏了'));
-    expect(noticeForEvent(const SiteEventNotice(at: 0, level: NoticeLevel.info, text: 'hi')), isNull);
+    expect(noticeForEvent(const SideEventNotice(at: 0, level: NoticeLevel.error, text: '数据库\n坏了')), const DesktopNotice('码农场物语', '数据库 坏了'));
+    expect(noticeForEvent(const SideEventNotice(at: 0, level: NoticeLevel.info, text: 'hi')), isNull);
   });
 
   test('the menu bar: what goes on, what waits, what is unread', () {
     expect(traySummary(_state(call: 'idle'), const []), const TraySummary('', ['还没开工']));
     final inbox = [
-      _call('h1:harvest:1', InboxKind.harvest),
+      _call('h1:harvest:1', InboxKind.merge),
       _call(
         'pb:draft',
         InboxKind.planDraft,
@@ -85,7 +85,7 @@ void main() {
     ];
     final state = _state(
       conversations: [
-        {'id': 1, 'kind': 'square', 'replies': 0, 'read': 1, 'at': 0},
+        {'id': 1, 'kind': 'general', 'replies': 0, 'read': 1, 'at': 0},
       ],
       messages: [
         for (final (seq, from, kind) in [(1, 'manager', 'chat'), (2, 'manager', 'chat'), (3, 'user', 'chat'), (4, 'h1', 'notice'), (5, 'h1', 'chat')])
@@ -93,7 +93,7 @@ void main() {
             'seq': seq,
             'conversation': 1,
             'from': from,
-            'fromKind': from == 'user' ? 'user' : 'foreman',
+            'fromKind': from == 'user' ? 'user' : 'manager',
             'name': from,
             'kind': kind,
             'text': 't',

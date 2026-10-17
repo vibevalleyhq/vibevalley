@@ -7,8 +7,8 @@ import (
 )
 
 func Module(r *base.Readies) fx.Option {
-	return fx.Module("memory", fx.Provide(
-		base.Run[*Memories](r, newMemories),
-		base.Run[*ManagerMemory](r, newManagerMemory),
-	))
+	return fx.Module("memory",
+		fx.Provide(fx.Private, newMemories, newManagerMemory),
+		fx.Provide(base.Run[*Service](r, newService)),
+	)
 }

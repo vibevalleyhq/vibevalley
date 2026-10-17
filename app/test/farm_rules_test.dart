@@ -4,11 +4,12 @@ import 'package:vibevalley/game/farm.dart';
 import 'package:vibevalley/game/state.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
-import 'farm_fakes.dart';
+import 'support/farm.dart';
+import 'package:vibevalley/desk/map/map_rules.dart';
+import 'package:vibevalley/shared/looks.dart' show Pose;
 import 'package:vibevalley/rules/farm.dart';
-import 'package:vibevalley/rules/index.dart';
-import 'package:vibevalley/rules/playbook.dart';
 import 'package:vibevalley/rules/progress.dart';
+import 'package:vibevalley/rules/money.dart';
 
 void main() {
   const empty = PlotView(crop: Crop.empty);
@@ -17,31 +18,31 @@ void main() {
 
   test('aimTool: the hand plants an empty bed and looks at a worked one; a locked bed says when it opens', () {
     expect(aimTool(Tool.hand, bed0, null, empty, 1).text, '播种');
-    expect(aimTool(Tool.hand, bed0, helper('w1'), empty, 1).text, '看看这块地');
+    expect(aimTool(Tool.hand, bed0, worker('w1'), empty, 1).text, '看看这块地');
     final lockedAim = aimTool(Tool.hand, locked, null, empty, 1);
     expect((lockedAim.ok, lockedAim.text), (false, 'Lv.5 开垦这块地'));
     expect(aimTool(Tool.hand, locked, null, empty, 5).text, '开垦好的花坛');
   });
 
   test('aimTool: water needs a helper, bug a withered plot, harvest a finished turn not in a playbook, shovel stops or dismisses', () {
-    final w = helper('w1', name: '小吴');
+    final w = worker('w1', name: '小吴');
     expect(aimTool(Tool.water, bed0, w, empty, 1).text, '给小吴浇水（带句话）');
     expect(aimTool(Tool.water, bed0, null, empty, 1).ok, isFalse);
     expect(aimTool(Tool.bug, bed0, w, const PlotView(crop: Crop.withered), 1).ok, isTrue);
     expect(aimTool(Tool.bug, bed0, w, empty, 1).text, '这块地没有虫');
     expect(aimTool(Tool.weed, bed0, w, const PlotView(crop: Crop.weeds), 1).text, '批准还没接上');
-    final ripe = helper('w2', phase: const PhaseRipe());
+    final ripe = worker('w2', phase: const PhaseRipe());
     expect(aimTool(Tool.harvest, bed0, ripe, const PlotView(crop: Crop.wheat), 1).text, '收获，帮工收工');
-    expect(aimTool(Tool.harvest, bed0, helper('w3', phase: const PhaseResting()), empty, 1).text, '收获：看看它改了什么');
+    expect(aimTool(Tool.harvest, bed0, worker('w3', phase: const PhaseResting()), empty, 1).text, '收获：看看它改了什么');
     expect(aimTool(Tool.harvest, bed0, w, empty, 1).text, '还没熟，等它做完');
     expect(
       aimTool(
         Tool.harvest,
         bed0,
-        helper(
+        worker(
           'w4',
           phase: const PhaseRipe(),
-          playbook: const HelperPlaybook(id: 'p1'),
+          playbook: const WorkerPlaybook(id: 'p1'),
         ),
         empty,
         1,
@@ -76,83 +77,47 @@ void main() {
     expect(stageCursor(tool: Tool.hand, aim: const Aim(true, ''), overSpot: false, pressed: true), 'hand-press');
   });
 
-  test('needOf and phaseText say what is asked of you', () {
-    final quiet = helper(
+  test('phaseText fills the server\'s words with the clock', () {
+    final quiet = worker(
       'w1',
       phase: const PhaseWorking(
         since: 0,
         doing: Doing(action: WorkerAction.runCommand, label: 'pnpm test'),
         quietSince: 1000,
       ),
+      says: '在跑命令：pnpm test（已经 {span}没动静了）',
     );
-    expect(needOf(quiet), isA<NeedQuiet>());
     expect(phaseText(quiet, 1000 + 120000), '在跑命令：pnpm test（已经 2 分钟没动静了）');
-    final retrying = helper(
-      'w2',
-      phase: const PhaseWorking(
-        since: 0,
-        doing: Doing(action: WorkerAction.thinking, label: ''),
-        retry: Retry(attempt: 2, of: 5),
-      ),
-    );
-    expect(phaseText(retrying, 0), '在思考（模型调用失败，在重试第 2/5 次）');
-    final conflicted = helper(
+    final conflicted = worker(
       'w3',
       phase: const PhaseRipe(),
       conflict: const Conflict(base: 'main', files: ['a.ts']),
     );
-    expect(needOf(conflicted), isA<NeedConflict>());
-    expect(phaseText(conflicted, 0), '这一轮做完了，等收获，合进 main 会冲突（a.ts）');
+    expect(mapPose(conflicted), Pose.worry);
     expect(
-      phaseText(
-        helper(
-          'w4',
-          phase: const PhaseResting(),
-          last: const LastTurn(outcome: Outcome.interrupted, summary: '', at: 0),
-        ),
-        0,
-      ),
-      '歇着（上一轮被叫停）',
+      phaseText(worker('w3', phase: const PhaseRipe(), says: '这一轮做完了，等收获'), 0),
+      '这一轮做完了，等收获',
+      reason: 'not quiet: the words as they are',
     );
+    expect(phaseText(conflicted, 0), '', reason: 'before the server said anything');
     expect(spentText(const Spent(tokens: 26000, cny: 0.03)), '约 ¥0.03 · 2.6 万 token');
-  });
-
-  PlaybookNode node(String id, {List<String> needs = const [], NodeState state = NodeState.waiting}) =>
-      PlaybookNode(id: id, title: id.toUpperCase(), task: '做 $id', needs: needs, state: state, tries: 0);
-
-  test('layersOf puts each step after the steps it needs; blockedBy and asksForYou read the board', () {
-    final nodes = [
-      node('api'),
-      node('ui', needs: ['api']),
-      node('docs'),
-      node('e2e', needs: ['ui', 'docs']),
-    ];
-    expect(layersOf(nodes), [
-      ['api', 'docs'],
-      ['ui'],
-      ['e2e'],
-    ]);
-    final pb = Playbook(id: 'p1', title: '打卡', goal: '', project: 'clock-in', state: PlaybookState.running, nodes: nodes, parallel: 2, createdAt: 0);
-    expect(blockedBy(pb, nodes[3]), ['ui', 'docs']);
-    expect(asksForYou(pb), isFalse);
-    expect(asksForYou(Playbook(id: 'p2', title: '', goal: '', project: '', state: PlaybookState.draft, nodes: const [], parallel: 1, createdAt: 0)), isTrue);
-  });
-
-  test('playbookEventText names the step by its title', () {
-    final e = PlaybookEvent(seq: 1, playbook: 'p1', node: 'api', kind: PlaybookEventKind.nodeMerged, actor: PlaybookActor.farm, commits: const ['abc'], at: 0);
-    expect(playbookEventText(e, (id) => id.toUpperCase()), '「API」合进了计划分支（abc）');
   });
 
   test('standing: the tier reached, the count, what the next tier needs', () {
     final harvests = achievementOf('harvests')!;
     expect(standing(progress, harvests), (tier: 1, count: 4, next: 20));
     expect(isTitle(harvests), isTrue);
-    expect(streakMultiplier(3), closeTo(1.2, 1e-9));
   });
 
   test('turnEndingAt: from the last line it was told up to the message', () {
-    WorkStep s(int n, StepKind kind, double at) => WorkStep(n: n.toDouble(), at: at, kind: kind, text: '');
-    final steps = [s(1, StepKind.asked, 0), s(2, StepKind.tool, 10), s(3, StepKind.asked, 10000), s(4, StepKind.tool, 10010), s(5, StepKind.said, 10020)];
+    Activity s(int n, ActivityKind kind, double at) => Activity(n: n.toDouble(), at: at, kind: kind, text: '');
+    final steps = [
+      s(1, ActivityKind.prompt, 0),
+      s(2, ActivityKind.action, 10),
+      s(3, ActivityKind.prompt, 10000),
+      s(4, ActivityKind.action, 10010),
+      s(5, ActivityKind.response, 10020),
+    ];
     expect(turnEndingAt(steps, 50).map((x) => x.n), [1, 2]);
     expect(turnEndingAt(steps, 7500).map((x) => x.n), [3, 4, 5]);
   });
