@@ -5,7 +5,7 @@ import 'package:vibevalley/game/state.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/farm.dart';
-import 'package:vibevalley/desk/map/map_rules.dart';
+import 'package:vibevalley/workbench/map/map_rules.dart';
 import 'package:vibevalley/shared/swatches.dart' show Pose;
 import 'package:vibevalley/rules/sessions.dart';
 import 'package:vibevalley/rules/progress.dart';

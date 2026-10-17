@@ -382,7 +382,7 @@ class NamingMenu extends StatelessWidget {
 }
 
 /// zh-CN, 12-hour, two digits.
-String deskClock(double at) {
+String workbenchClock(double at) {
   final d = DateTime.fromMillisecondsSinceEpoch(at.round());
   final h12 = d.hour % 12 == 0 ? 12 : d.hour % 12;
   return '${d.hour < 12 ? '上午' : '下午'}${h12.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';

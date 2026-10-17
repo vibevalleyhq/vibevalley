@@ -1,6 +1,6 @@
 /**
  * The client's layers, and the one rule that keeps them layers: an import goes down, never up or sideways. Ranks are
- * the order in `app/lib`; `desk` and `farm` are the two skins, `village` draws the farm for them, `phone` is the phone
+ * the order in `app/lib`; `workbench` and `farm` are the two skins, `village` draws the farm for them, `phone` is the phone
  * inside the farm, `app` only composes and `shell` is the frame around everything.
  *
  * Run by `bun run flutter:check`; a bad edge names the file, the line, and both ends.
@@ -26,7 +26,7 @@ const RANK: Record<string, number> = {
   debug: 7,
   village: 8,
   title: 9,
-  desk: 9,
+  workbench: 9,
   farm: 9,
   shell: 10,
   app: 11,

@@ -12,8 +12,8 @@ import '../rules/playbook.dart';
 
 String reasonOf(Object e) => e is VibeValleyApiError ? e.reason : '$e';
 
-class DeskConfig {
-  const DeskConfig({this.loaded = false, this.runtimes = const [], this.agents = const [], this.manager, this.skills = const []});
+class WorkbenchConfig {
+  const WorkbenchConfig({this.loaded = false, this.runtimes = const [], this.agents = const [], this.manager, this.skills = const []});
   final bool loaded;
   final List<RuntimeInfo> runtimes;
   // The profiles work is sent to; the manager's is apart.
@@ -21,7 +21,7 @@ class DeskConfig {
   final Agent? manager;
   final List<Skill> skills;
 
-  DeskConfig copyWith({bool? loaded, List<RuntimeInfo>? runtimes, List<Agent>? agents, Agent? manager, List<Skill>? skills}) => DeskConfig(
+  WorkbenchConfig copyWith({bool? loaded, List<RuntimeInfo>? runtimes, List<Agent>? agents, Agent? manager, List<Skill>? skills}) => WorkbenchConfig(
     loaded: loaded ?? this.loaded,
     runtimes: runtimes ?? this.runtimes,
     agents: agents ?? this.agents,
@@ -33,18 +33,18 @@ class DeskConfig {
   RuntimeInfo? runtime(String id) => runtimes.where((r) => r.id == id).firstOrNull;
 }
 
-final deskConfigProvider = NotifierProvider<DeskConfigNotifier, DeskConfig>(DeskConfigNotifier.new);
+final workbenchConfigProvider = NotifierProvider<WorkbenchConfigNotifier, WorkbenchConfig>(WorkbenchConfigNotifier.new);
 
-class DeskConfigNotifier extends Notifier<DeskConfig> {
+class WorkbenchConfigNotifier extends Notifier<WorkbenchConfig> {
   @override
-  DeskConfig build() {
+  WorkbenchConfig build() {
     ref.listen(sideEventsProvider, (_, next) {
       if (next.value case SideEventRuntime(:final info) when state.runtimes.any((r) => r.id == info.id)) {
         state = state.copyWith(runtimes: [for (final r in state.runtimes) r.id == info.id ? info : r]);
       }
     });
     unawaited(Future.microtask(refresh));
-    return const DeskConfig();
+    return const WorkbenchConfig();
   }
 
   VibeValleyApi get _api => ref.read(apiProvider);
@@ -65,7 +65,7 @@ class DeskConfigNotifier extends Notifier<DeskConfig> {
   }
 
   /// agent.list has the manager's profile too: it is kept apart, so every list of profiles to send work to has none of it.
-  DeskConfig _withProfiles(List<Agent> all) => state.copyWith(
+  WorkbenchConfig _withProfiles(List<Agent> all) => state.copyWith(
     agents: [
       for (final a in all)
         if (a.id != managerAgent) a,
@@ -258,15 +258,15 @@ class ManagerMemoryNotifier extends Notifier<MemoryList?> {
   }
 }
 
-/// The runtimes as deskConfigProvider has them (pushed by the server as they change); loading until it has read them.
+/// The runtimes as workbenchConfigProvider has them (pushed by the server as they change); loading until it has read them.
 final runtimesProvider = Provider<AsyncValue<List<RuntimeInfo>>>((ref) {
-  final config = ref.watch(deskConfigProvider);
+  final config = ref.watch(workbenchConfigProvider);
   return config.loaded ? AsyncData(config.runtimes) : const AsyncLoading();
 });
 
-/// The profiles by id, as deskConfigProvider has them: an edit anywhere shows everywhere.
+/// The profiles by id, as workbenchConfigProvider has them: an edit anywhere shows everywhere.
 final agentsProvider = Provider<AsyncValue<Map<String, Agent>>>((ref) {
-  final config = ref.watch(deskConfigProvider);
+  final config = ref.watch(workbenchConfigProvider);
   return config.loaded ? AsyncData({for (final a in config.agents) a.id: a}) : const AsyncLoading();
 });
 

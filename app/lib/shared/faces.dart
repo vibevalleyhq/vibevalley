@@ -58,8 +58,8 @@ class CastFace extends ConsumerWidget {
   }
 }
 
-class DeskManagerFace extends ConsumerWidget {
-  const DeskManagerFace({super.key, required this.size});
+class WorkbenchManagerFace extends ConsumerWidget {
+  const WorkbenchManagerFace({super.key, required this.size});
   final double size;
 
   @override

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/farm_choice.dart';
-import '../desk/places.dart';
+import '../workbench/places.dart';
 import '../host/desktop.dart';
 import '../shell/app_frame.dart';
 import '../ui/kit/kit.dart';

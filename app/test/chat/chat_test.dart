@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/data/server.dart';
-import 'package:vibevalley/desk/chat/chat_page.dart';
+import 'package:vibevalley/workbench/chat/chat_page.dart';
 import 'package:vibevalley/chat/chat_rules.dart';
 import 'package:vibevalley/chat/chat_widgets.dart';
 import 'package:vibevalley/host/desktop.dart';
@@ -209,7 +209,7 @@ void main() {
     });
   });
 
-  group('the desk chat page', () {
+  group('the workbench chat page', () {
     testWidgets('channels with unread, the general shown and read, a thread preview under the dispatch', (t) async {
       final server = FakeServer(_answer);
       await _pump(t, const ChatPage(), server, _state());

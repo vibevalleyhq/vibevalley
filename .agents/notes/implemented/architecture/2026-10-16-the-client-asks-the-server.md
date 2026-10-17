@@ -21,7 +21,7 @@ Status: implemented
   - 每种动作怎么说（跑命令、读文件……）在 `seeds.json` 的 `actionText`，Go 的 `ActionText` 和 Dart 生成的 `actionText` 读同一份；原来 Dart 的 `actionMeaning` 抄了一份，已经和 Go 差了两个词。
   - 计划：`PlaybooksOf` 给计划填 `layers`、`asksForYou`、`spent`、`settled`，给每一步填 `blockedBy`；`playbook.Events` 给每条动态填 `text`（步骤用现在的标题）。
 - **Go 里不留「为了对照」的规则**：只给页面读帧用的小函数（哪些频道、某个帮工的工单串、未读几条、某档成就叫什么、离下一档还差多少、庄稼熟没熟、能不能收），开着的服务端不调，只在 Go 里录黄金数据，Dart 另有一份。这种删掉 Go 的，留在客户端：它们是读帧，不是折事实。判断用 `go run golang.org/x/tools/cmd/deadcode@latest ./...`：protocol 里导出却从 `main` 走不到的，要么让服务端用上（填进形状），要么删。
-- **客户端里一份数据一个来源**：档案和农机只从 `deskConfigProvider` 读（服务端推的 `SideEventRuntime` 让农机保持最新），`agentsProvider`、`runtimesProvider` 是从它派生的；看板不再自己读档案，农场不再每分钟轮询农机。工地事件只有 `sideEventsProvider` 一条。
+- **客户端里一份数据一个来源**：档案和农机只从 `workbenchConfigProvider` 读（服务端推的 `SideEventRuntime` 让农机保持最新），`agentsProvider`、`runtimesProvider` 是从它派生的；看板不再自己读档案，农场不再每分钟轮询农机。工地事件只有 `sideEventsProvider` 一条。
 - **两边都要的值由生成带过去**：`//vibevalley:const` 和 `seeds.json` 的客户端部分（[Go 拥有形状](2026-10-15-go-owns-the-shapes.md)）。这一篇管的是规则，那一篇管的是值。
 - **处理函数只转发**：`issue.comment` 拼评论，`game.ChooseTitle` 定称号的账，`core.Open` 是「主人一开口农场就开张」；路径参数的 id 是 `string`，生成的 `Mount` 统一解码；主人做的、不改状态的事由经手的服务说给 `core.Did`（`OwnerReviewed`、`OwnerTalked`），游戏订阅 `core.OwnerDids` 记账。不用事实：`Core.Apply` 不发不改状态的事实，事实就是状态的变化。不让游戏 import `issue`、`voice`：游戏要先于帮工准备好（帮工读它的提交数），依赖它们就排到后面去了。
 - **顺手修的**：主人给没有工单串的帮工带话，`TellSession` 报错、handler 吞掉了，话没到；现在没有串就直接交给帮工，handler 也把错误交回去。

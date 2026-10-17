@@ -28,7 +28,6 @@ import '../audio/sfx.dart';
 import '../data/ui_state.dart';
 import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
-import '../village/bursts.dart' show BedFx;
 import '../village/world.dart' show VillageWorld;
 import '../village/game.dart';
 import '../village/hud.dart';
@@ -164,7 +163,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     ref.read(panelProvider.notifier).set(FarmPanel.plans);
   }
 
-  /// The farm is brought in front first (from a desk page, from the title screen), else it would open where nobody sees it.
+  /// The farm is brought in front first (from a workbench page, from the title screen), else it would open where nobody sees it.
   void _toFarm() {
     ref.read(titleOpenProvider.notifier).enterFarm(start: false);
     final router = GoRouter.maybeOf(context);

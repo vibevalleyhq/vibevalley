@@ -8,9 +8,9 @@ Status: implemented
 
 ## Decision
 
-工作台加一页「声音」（`/voice`，`app/lib/desk/voice/`），行为见 [voice.md](../../../../docs/reference/voice.md)「配置」。
+工作台加一页「声音」（`/voice`，`app/lib/workbench/voice/`），行为见 [voice.md](../../../../docs/reference/voice.md)「配置」。
 
-- **形状只定义一次**：`VoiceSettings` 和存的形状 `SettingsUpdateVoice` 在 `server/internal/protocol/shapes.go`，默认值 `DefaultVoice`、范围和校验 `VoiceProblem` 在同一个包的 `voice.go`，Dart 的类型由它们生成。（当时存的形状 `VoiceOverrides` 由 `VoiceSettings` 每个字段变成可选得来，不另写一份；形状改在 Go 里写以后，`SettingsUpdateVoice` 是逐个字段写成可选的另一个结构体，见 [形状的源头是 Go](../architecture/2026-10-15-go-owns-the-shapes.md)。声音页在 `app/lib/desk/voice/voice_rules.dart` 照搬了一份 `voiceProblem`。）
+- **形状只定义一次**：`VoiceSettings` 和存的形状 `SettingsUpdateVoice` 在 `server/internal/protocol/shapes.go`，默认值 `DefaultVoice`、范围和校验 `VoiceProblem` 在同一个包的 `voice.go`，Dart 的类型由它们生成。（当时存的形状 `VoiceOverrides` 由 `VoiceSettings` 每个字段变成可选得来，不另写一份；形状改在 Go 里写以后，`SettingsUpdateVoice` 是逐个字段写成可选的另一个结构体，见 [形状的源头是 Go](../architecture/2026-10-15-go-owns-the-shapes.md)。声音页在 `app/lib/workbench/voice/voice_rules.dart` 照搬了一份 `voiceProblem`。）
 - **和钥匙放在一起**：存在同一个 `settings.json` 的 `voice` 里，走同一个 `GET/PUT /api/v1/settings`；`SettingsStatus` 带上 `voice`（在用的）和 `voiceDefaults`（内置默认，再叠环境变量 `voice.model`、`voice.id`）。
 - **只存改过的**：页面存的是和默认不同的字段（`voiceOverrides`），`voice` 整个替换，`{}` 就是恢复默认、从文件里删掉。以后默认的人设改进了，没改过的人自动用上。
 - **每通电话现取**：`voice/agora.go` 每次开始时从 `Settings.Voice()` 取，存了下一通生效，不用重启。

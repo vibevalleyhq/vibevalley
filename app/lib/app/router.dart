@@ -2,32 +2,32 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../farm/farm_page.dart';
-import '../desk/agents/agent_creator_page.dart';
-import '../desk/agents/agents_page.dart';
-import '../desk/catalog/catalog_page.dart';
-import '../desk/chat/chat_page.dart';
-import '../desk/connectors/connectors_page.dart';
-import '../desk/gate/gate_page.dart';
-import '../desk/map/map_page.dart';
-import '../desk/issues/issues_page.dart';
-import '../desk/manager/manager_page.dart';
-import '../desk/projects/projects_page.dart';
-import '../desk/runtimes/runtimes_page.dart';
-import '../desk/skills/skills_page.dart';
-import '../desk/voice/voice_page.dart';
-import '../desk/desk_shell.dart';
-import '../desk/places.dart';
+import '../workbench/agents/agent_creator_page.dart';
+import '../workbench/agents/agents_page.dart';
+import '../workbench/catalog/catalog_page.dart';
+import '../workbench/chat/chat_page.dart';
+import '../workbench/connectors/connectors_page.dart';
+import '../workbench/gate/gate_page.dart';
+import '../workbench/map/map_page.dart';
+import '../workbench/issues/issues_page.dart';
+import '../workbench/manager/manager_page.dart';
+import '../workbench/projects/projects_page.dart';
+import '../workbench/runtimes/runtimes_page.dart';
+import '../workbench/skills/skills_page.dart';
+import '../workbench/voice/voice_page.dart';
+import '../workbench/workbench_shell.dart';
+import '../workbench/places.dart';
 
 final router = GoRouter(
   routes: [
     GoRoute(path: '/pixel', redirect: (_, _) => '/'),
-    // The farm stays mounted beneath the desk pages, hidden and paused, so helpers keep their places.
+    // The farm stays mounted beneath the workbench pages, hidden and paused, so helpers keep their places.
     ShellRoute(
       builder: (_, state, child) => _KeepFarm(onFarm: state.uri.path == '/', child: child),
       routes: [
         GoRoute(path: '/', builder: (_, _) => const SizedBox.shrink()),
         ShellRoute(
-          builder: (_, state, child) => Desk(place: Place.of(state.uri.path), child: child),
+          builder: (_, state, child) => Workbench(place: Place.of(state.uri.path), child: child),
           routes: [
             GoRoute(path: '/chat', builder: (_, _) => const ChatPage()),
             GoRoute(

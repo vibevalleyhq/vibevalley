@@ -181,7 +181,7 @@ void main() {
     expect(later.read(titleOpenProvider), isFalse);
   });
 
-  testWidgets('the desk goes without the title screen', (tester) async {
+  testWidgets('the workbench goes without the title screen', (tester) async {
     await open(tester, onFarm: false);
     expect(find.text('开始游戏'), findsNothing);
     expect(find.text('农场'), findsOneWidget);

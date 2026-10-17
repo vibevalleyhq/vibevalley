@@ -35,7 +35,7 @@ Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏�
 
 ## 通知
 
-窗口不在你面前时，帧里新出现的来电（做完、没做成、没动静、冲突、@主人、计划的事）、成就和农场出错弹系统通知，点开回到对应的地方。规则在 `lib/host/notify.dart`（纯函数），点通知要做的事是 `lib/host/command.dart` 的 `DesktopCommand`。
+窗口不在你面前时，帧里新出现的来电（做完、没做成、没动静、冲突、@主人、计划的事）、成就和农场出错弹系统通知，点开回到对应的地方。规则在 `lib/host/notify.dart`（纯函数），点通知要做的事是 `lib/host/command.dart` 的 `HostCommand`。
 
 ## 快捷键
 

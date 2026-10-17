@@ -26,7 +26,7 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 | `lib/sprites/` | 按 `sprites.json` 读图（`atlas.dart`） |
 | `lib/village/` | 像素村（Flame）：地图、寻路、帮工和狗、光照、粒子、动静；`hud.dart` 是画在上面的 HUD |
 | `lib/phone/` | 手机、来电、五个小游戏 |
-| `lib/desk/<地方>/` | 工作台的各页：聊天、工单、地图、帮工和档案、管家、农具、技能书、连接器、项目、声音、院门、图鉴；`shared/` 是几页共用的 |
+| `lib/workbench/<地方>/` | 工作台的各页：聊天、工单、地图、帮工和档案、管家、农具、技能书、连接器、项目、声音、院门、图鉴；`shared/` 是几页共用的 |
 | `lib/shell/` | 外框：AppFrame、桌面标题栏 |
 | `lib/title/` | 首页：启动、场景和菜单 |
 | `lib/audio/` | 音效配方和合成 |
@@ -55,7 +55,7 @@ flutter analyze && flutter test           # 不连网：服务端用 MockClient 
 VIBEVALLEY_SERVER=http://127.0.0.1:8899 flutter test tool/screens/live_screens_test.dart   # 每一页对着真服务端画成 build/live-*.png
 ```
 
-替身都在 `test/support/`：`server.dart` 是唯一的 `FakeServer`（继承 `VibeValleyServer`，每个请求交给一个处理函数并记下来）、按「方法 路径」回答的 `Routes`、`settle`、`atlas`；`desk.dart` 有工作台各页的 `DeskBackend` 和 `pumpPage`，`farm.dart`、`shell.dart` 是农场和外壳的。测试目录跟着 `lib` 分层（`test/desk/`、`test/farm/`、`test/village/`……），`test/support/` 是替身，`test/fixtures/` 是冻结的对照。
+替身都在 `test/support/`：`server.dart` 是唯一的 `FakeServer`（继承 `VibeValleyServer`，每个请求交给一个处理函数并记下来）、按「方法 路径」回答的 `Routes`、`settle`、`atlas`；`workbench.dart` 有工作台各页的 `WorkbenchBackend` 和 `pumpPage`，`farm.dart`、`shell.dart` 是农场和外壳的。测试目录跟着 `lib` 分层（`test/workbench/`、`test/farm/`、`test/village/`……），`test/support/` 是替身，`test/fixtures/` 是冻结的对照。
 
 音效合成的对照 `test/fixtures/sfx.json` 是冻结的，没有生成它的脚本；`lib/audio/synth.dart` 有意改了声音时，同一个改动里手改它。
 

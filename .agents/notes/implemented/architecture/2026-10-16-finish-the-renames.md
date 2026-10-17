@@ -9,7 +9,7 @@ Status: implemented
 还剩两处：
 
 - **主键还是老的**：工单是 `t` 加 8 位随机码（`base.Code`），计划是 `p1`，频道、消息、定时、run、账本用 SQLite 自增整数；协议里一半 `string`、一半 `int64`；消息还有 `seq`。
-- **Flutter 还叫 tickets**：`desk/tickets`、`/tickets`、`TicketsPage`、`TicketCard`、`TicketState`，还有读核心状态的 `farmProvider`、`FarmApi`。
+- **Flutter 还叫 tickets**：`workbench/tickets`、`/tickets`、`TicketsPage`、`TicketCard`、`TicketState`，还有读核心状态的 `farmProvider`、`FarmApi`。
 
 没有护栏：旧名字回来时没有检查会报。
 
@@ -26,7 +26,7 @@ Status: implemented
 
 ### Flutter 的名字
 
-- `desk/tickets/` → `desk/issues/`，路由 `/tickets` → `/issues`，`TicketsPage` → `IssuesPage`，`TicketCard` → `IssueCard`，`ticket*()` → `issue*()`。
+- `workbench/tickets/` → `workbench/issues/`，路由 `/tickets` → `/issues`，`TicketsPage` → `IssuesPage`，`TicketCard` → `IssueCard`，`ticket*()` → `issue*()`。
 - `TicketState` → `IssueTag`，`ticketState()` → `issueTag()`：看板的列已经直接读 `Issue.status`，它只把状态和关单原因换成标签和颜色。
 - `farmProvider` → `stateProvider`，`FarmApi` → `Api`（`apiProvider` 已经叫这个名字了）；只改读核心状态和接口的，`FarmPanel` 这类画面不改。
 - 局部名 `helper`、`turn`、`foreman`、`crew` 的清理。
@@ -55,7 +55,7 @@ Status: implemented
 ## Consequences
 
 - 运行时新建的行都是 uuidv7；消息没有全局 `seq`，有对话内的 `number`；协议里没有 `int64` 的 id（`SessionEvent.seq` 是日志里的位置，不算）；工单有 `number`。
-- Flutter 没有 `desk/tickets`、`TicketState`、`farmProvider`、`FarmApi`，`scripts/stale-names.ts` 在 `docs:verify` 里。
+- Flutter 没有 `workbench/tickets`、`TicketState`、`farmProvider`、`FarmApi`，`scripts/stale-names.ts` 在 `docs:verify` 里。
 - **uuidv7 的先后**：已读位置和投递按 id 比先后。同一个进程里 `NewV7` 单调递增；如果系统时钟往回调，重启后新消息可能排在旧消息前面。只有一个人在本机用，接受这个风险。
 - **旧家目录打不开**：主键和消息的先后都变了；TypeScript 的农场用 `server/tool/import-ts` 重导（旧消息按旧顺序写下，uuidv7 的顺序因此不变），旧的 Go 家目录不搬。开工前把 `$VIBEVALLEY_HOME` 整个备份一份。
 - **漏掉字符串**：编译器和生成类型只管标识符；JSON 键、SQL 里的值、`switch` 里的字符串、界面上拼出来的路由都要用 `rg` 查。护栏兜底。

@@ -14,13 +14,13 @@ Status: implemented
 - **等会发生的事用 `Await`/`Until`，不用 `Sleep`**；只有查「不该再发生」的用 `Settle`。
 - **`Reduce` 自己判断「一样就不算变」**，通话、管家、提交数、进度也一样；`core` 里的预检删掉。
 - **`core` 和 `Mount` 有自己的测试**：`internal/core/core_test.go`、`internal/protocol/mount_test.go`（嵌入 `Handlers` 接口的假实现，只写用到的几个方法）。
-- **客户端一个 `FakeServer`**：`app/test/support/server.dart`，继承 `VibeValleyServer`，每个请求交给一个处理函数并记下来；按「方法 路径」回答的 `Routes`、`settle`、`atlas`、`jsonResponse` 也只在这里。`support/desk.dart`（工作台的 `DeskBackend`、`pumpPage`）、`farm.dart`、`shell.dart` 建在它上面。测试文件按 `lib` 的层起名：`desk_<页>_test.dart`。
+- **客户端一个 `FakeServer`**：`app/test/support/server.dart`，继承 `VibeValleyServer`，每个请求交给一个处理函数并记下来；按「方法 路径」回答的 `Routes`、`settle`、`atlas`、`jsonResponse` 也只在这里。`support/desk.dart`（工作台的 `WorkbenchBackend`、`pumpPage`）、`farm.dart`、`shell.dart` 建在它上面。测试文件按 `lib` 的层起名：`desk_<页>_test.dart`。
 
 ## Alternatives considered
 
 **各包留自己的断言，只统一名字。** 少动文件，但失败信息还是五种样子，`Errorf` 和 `Fatalf` 混着用；改一次要改五处。
 
-**客户端的替身按页面各写各的。** 每页的路由确实不同，所以保留了两种「后端」：`DeskBackend`（工作台的接口，写进去的能读回来）和 `Routes`（一张表）。但它们都只是处理函数，服务端只有一个替身，`VibeValleyServer` 加了方法只有它要跟。
+**客户端的替身按页面各写各的。** 每页的路由确实不同，所以保留了两种「后端」：`WorkbenchBackend`（工作台的接口，写进去的能读回来）和 `Routes`（一张表）。但它们都只是处理函数，服务端只有一个替身，`VibeValleyServer` 加了方法只有它要跟。
 
 ## Consequences
 

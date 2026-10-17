@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-- **App 活着的时候弹本地通知**（`app/lib/host/mobile_notices.dart`）：用 `flutter_local_notifications`，规则和桌面版是同一套（`noticeForCall`、`noticeForEffect`、`noticeForEvent`、`CallBell`）。只在 App 不在屏幕前时弹；在前台时农场自己会说。点一条通知，打开它说的那件事：经 `desktopProvider` 的 `commands` 交给画面，和 Mac 上点通知走同一条路。点通知启动 App 时，命令先存着，等画面开始听再交出去。
+- **App 活着的时候弹本地通知**（`app/lib/host/mobile_notices.dart`）：用 `flutter_local_notifications`，规则和桌面版是同一套（`noticeForCall`、`noticeForEffect`、`noticeForEvent`、`CallBell`）。只在 App 不在屏幕前时弹；在前台时农场自己会说。点一条通知，打开它说的那件事：经 `hostProvider` 的 `commands` 交给画面，和 Mac 上点通知走同一条路。点通知启动 App 时，命令先存着，等画面开始听再交出去。
 - **Android 用前台服务让 App 常驻**：App 进后台时开一个前台服务（类型 `remoteMessaging`，通知栏里一条低优先级的「VibeValley 连着农场」），回到前台就关掉。进程不被系统回收，状态流就一直连着，帮工做完活时能马上弹通知。服务跟着 App 的任务走，划掉 App 它也就停了。
 - **iOS 不常驻**：iOS 不让普通 App 在后台保持连接，离开屏幕以后只有挂起前的那一小会儿能收到通知。
 - **App 关着的时候靠连接器**：汇报本来就会发到微信、飞书、QQ（[连接器](2026-10-11-channels-and-schedules.md)）。要随时收到，用微信或飞书：汇报一出来就发，不用等主人先说话。
