@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'app/router.dart';
+import 'desk/places.dart';
 import 'data/farm_choice.dart';
 import 'desktop/desktop.dart';
 import 'mobile/notices.dart';

@@ -55,7 +55,7 @@ VIBEVALLEY_SERVER=http://127.0.0.1:8899 flutter test tool/screens/live_screens_t
 
 替身都在 `test/support/`：`server.dart` 是唯一的 `FakeServer`（继承 `VibeValleyServer`，每个请求交给一个处理函数并记下来）、按「方法 路径」回答的 `Routes`、`settle`、`atlas`；`desk.dart` 有工作台各页的 `DeskBackend` 和 `pumpPage`，`farm.dart`、`shell.dart` 是农场和外壳的。测试文件按 `lib` 的层起名（`desk_<页>_test.dart`、`farm_…`、`shell_…`）。
 
-音效合成的对照 `test/fixtures/sfx.json` 是冻结的，没有生成它的脚本；`lib/shell/synth.dart` 有意改了声音时，同一个改动里手改它。
+音效合成的对照 `test/fixtures/sfx.json` 是冻结的，没有生成它的脚本；`lib/audio/synth.dart` 有意改了声音时，同一个改动里手改它。
 
 ## 取舍
 

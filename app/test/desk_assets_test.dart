@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/desk/assets/assets_data.dart';
 import 'package:vibevalley/desk/assets/assets_page.dart';
-import 'package:vibevalley/shell/sfx.dart';
+import 'package:vibevalley/audio/sfx.dart';
 
 import 'support/desk.dart';
 

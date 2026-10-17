@@ -9,7 +9,7 @@ import 'package:vibevalley/data/server.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/shell/app_frame.dart';
 import 'package:vibevalley/shell/title/startup.dart';
-import 'package:vibevalley/shell/title/title_state.dart';
+import 'package:vibevalley/data/ui_state.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 

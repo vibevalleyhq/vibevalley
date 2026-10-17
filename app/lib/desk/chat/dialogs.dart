@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../shell/sfx.dart';
+import '../../audio/sfx.dart';
 import '../../ui/kit/kit.dart';
 import '../../chat/chat_state.dart';
 import '../../rules/chat.dart';

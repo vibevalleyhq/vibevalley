@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
+import '../data/ui_state.dart';
 import '../data/remote.dart' show projectNamesProvider;
 import '../game/commands.dart';
-import '../game/state.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider;

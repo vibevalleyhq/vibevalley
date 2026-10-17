@@ -5,9 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../data/remote.dart' show SessionIssue;
 import '../../gen/vibevalley.dart';
-import '../fx_layer.dart';
-import '../sfx.dart';
-import '../synth.dart';
+import '../../shared/fx.dart';
+import '../../audio/sfx.dart';
+import '../../audio/synth.dart';
 
 /// Null until the farm screen sets it.
 class DebugHooks {

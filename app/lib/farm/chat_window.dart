@@ -13,7 +13,7 @@ import '../chat/chat_rules.dart';
 import '../chat/chat_state.dart';
 import '../chat/chat_widgets.dart';
 import '../gen/vibevalley.dart';
-import '../shell/sfx.dart';
+import '../audio/sfx.dart';
 import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
 import '../voice/voice.dart';

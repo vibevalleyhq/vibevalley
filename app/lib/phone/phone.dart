@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../gen/vibevalley.dart';
-import '../shell/sfx.dart';
+import '../audio/sfx.dart';
 import '../ui/pixel_card.dart';
 import '../voice/voice.dart';
 import 'blocks_game.dart';

@@ -8,8 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../voice/voice.dart';
-import 'fx_layer.dart';
-import 'prefs.dart';
+import '../shared/fx.dart';
+import '../data/prefs.dart';
 import 'sfx.dart';
 
 typedef BedFx = ({Object id, String kind});

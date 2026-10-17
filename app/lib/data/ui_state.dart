@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../data/providers.dart';
-import '../../gen/vibevalley.dart';
+import './providers.dart';
+import '../gen/vibevalley.dart';
 
 final titleOpenProvider = NotifierProvider<TitleOpen, bool>(TitleOpen.new);
 
@@ -55,3 +55,25 @@ class SettingsNotifier extends Notifier<SettingsStatus?> {
 
   Future<void> save(SettingsUpdate update) async => state = await ref.read(apiProvider).setting.save(body: update);
 }
+
+/// A notifier that only holds a value: the UI's own state, not the farm's.
+class Held<T> extends Notifier<T> {
+  Held(this._initial);
+  final T _initial;
+
+  @override
+  T build() => _initial;
+
+  void set(T value) => state = value;
+}
+
+NotifierProvider<Held<T>, T> held<T>(T initial) => NotifierProvider<Held<T>, T>(() => Held<T>(initial));
+
+enum FarmPanel { shop, warehouse, tasks, log, manager, plans }
+
+final panelProvider = held<FarmPanel?>(null);
+
+final selectedProvider = held<String?>(null);
+
+/// null: the newest still open.
+final planShownProvider = held<String?>(null);

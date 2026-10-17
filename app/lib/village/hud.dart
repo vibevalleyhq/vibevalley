@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../rules/warehouse.dart' show harvestedOf;
 import '../data/providers.dart';
+import '../data/ui_state.dart';
 import '../chat/chat_state.dart' show chatOpenProvider, spokenProvider;
 import '../farm/friends.dart';
 import '../farm/quota.dart';
@@ -15,8 +16,8 @@ import '../game/farm.dart';
 import '../game/state.dart';
 import '../gen/vibevalley.dart';
 import '../phone/phone.dart';
-import '../shell/prefs.dart';
-import '../shell/sfx.dart';
+import '../data/prefs.dart';
+import '../audio/sfx.dart';
 import '../ui/kit/markdown.dart' show plainText;
 import '../ui/pixel_card.dart';
 import '../voice/voice.dart';

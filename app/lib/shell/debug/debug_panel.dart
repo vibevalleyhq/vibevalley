@@ -8,8 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
-import '../sfx.dart';
-import '../synth.dart';
+import '../../audio/sfx.dart';
+import '../../audio/synth.dart';
 import 'debug_commands.dart';
 import 'debug_log.dart';
 import '../../rules/clock.dart';
@@ -597,7 +597,7 @@ class _SoundsTabState extends ConsumerState<_SoundsTab> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          '全部是实时合成的，没有音频文件。配方在 lib/shell/sfx.dart；关了音效就听不到。',
+          '全部是实时合成的，没有音频文件。配方在 lib/audio/sfx.dart；关了音效就听不到。',
           style: TextStyle(fontFamily: pixelFont, fontSize: 12, color: Palette.ink500),
         ),
         const SizedBox(height: 16),

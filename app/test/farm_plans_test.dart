@@ -6,6 +6,7 @@ import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/farm.dart';
+import 'package:vibevalley/data/ui_state.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));

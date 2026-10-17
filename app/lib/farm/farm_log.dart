@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/providers.dart';
-import '../game/state.dart';
+import '../data/ui_state.dart';
 import '../gen/vibevalley.dart';
-import '../shell/prefs.dart';
+import '../data/prefs.dart';
 import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider;
 import 'bits.dart';

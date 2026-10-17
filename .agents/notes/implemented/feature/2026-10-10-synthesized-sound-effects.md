@@ -10,9 +10,9 @@ Status: implemented
 
 见 [pixel-village.md](../../../../docs/reference/pixel-village.md)「音效」：
 
-- 每个音效是一个配方（`app/lib/shell/sfx.dart`），在客户端里现合成：音调、滤过的噪声、铃声各有自己的起落。合成器是 `app/lib/shell/synth.dart`，算成样本、写成 WAV 再播放（网页时在浏览器里用 Web Audio 实时合成；Flutter 照搬成 Dart，和网页的合成逐样本对过）。
+- 每个音效是一个配方（`app/lib/audio/sfx.dart`），在客户端里现合成：音调、滤过的噪声、铃声各有自己的起落。合成器是 `app/lib/audio/synth.dart`，算成样本、写成 WAV 再播放（网页时在浏览器里用 Web Audio 实时合成；Flutter 照搬成 Dart，和网页的合成逐样本对过）。
 - 按人耳加权的响度（ITU-R BS.1770 的 K 计权，取最响的 100 毫秒）分三档：点击约 -28，干活和状态变化约 -24，奖励约 -20；改了配方要重新量。
-- 从状态里响，不从点击里响（`app/lib/shell/farm_sounds.dart`）：不管是你点的、帮工做的、服务端推的还是调试台改的都会响。
+- 从状态里响，不从点击里响（`app/lib/audio/farm_sounds.dart`）：不管是你点的、帮工做的、服务端推的还是调试台改的都会响。
 
 ## Alternatives considered
 

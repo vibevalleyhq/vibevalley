@@ -44,5 +44,5 @@ app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
 ## 素材、音效和官网
 
 - 贴图在 `design/pixel/` 里生成、切图（[pixel-village.md](reference/pixel-village.md)「素材」），不手改 `sprites.json`。
-- 音效配方在 `app/lib/shell/sfx.dart`（[pixel-village.md](reference/pixel-village.md)「音效」）。
+- 音效配方在 `app/lib/audio/sfx.dart`（[pixel-village.md](reference/pixel-village.md)「音效」）。
 - 官网见 [site/README.md](../site/README.md)；`bun run site:deploy` 构建并发到 Cloudflare。

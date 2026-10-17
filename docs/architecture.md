@@ -112,7 +112,7 @@ flowchart LR
 | `logs/` | smith 记的每个帮工会话的原始记录 |
 | `vibevalley.yaml` | 可选：配置（见下）；放钥匙时不进仓库 |
 
-客户端的偏好（宠物、静音……）存在本机（`lib/shell/prefs.dart`）。
+客户端的偏好（宠物、静音……）存在本机（`lib/data/prefs.dart`）。
 
 ## 配置
 

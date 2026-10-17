@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/providers.dart';
+import '../data/ui_state.dart';
 import '../chat/chat_state.dart' show chatActionsProvider, chatOpenProvider;
 import '../data/remote.dart' show workStepsProvider;
 import '../shared/work_log.dart' show WorkLog;

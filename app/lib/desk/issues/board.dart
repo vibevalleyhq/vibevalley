@@ -5,11 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
-import '../../game/state.dart' show FarmPanel, panelProvider, planShownProvider;
 import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart' show tookText;
 import '../../rules/issues.dart';
-import '../../shell/title/title_state.dart' show titleOpenProvider;
+import '../../data/ui_state.dart' show FarmPanel, panelProvider, planShownProvider, titleOpenProvider;
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import '../../data/remote.dart';

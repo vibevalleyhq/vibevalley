@@ -15,7 +15,7 @@ import 'package:vibevalley/game/farm.dart';
 import 'package:vibevalley/game/state.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/farm/farm_page.dart';
-import 'package:vibevalley/shell/title/title_state.dart';
+import 'package:vibevalley/data/ui_state.dart';
 import 'package:vibevalley/data/remote.dart';
 
 ChatMessage _said(int seq, SenderKind kind, String from, String name, String text) => ChatMessage(

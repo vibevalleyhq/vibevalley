@@ -5,42 +5,22 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
+import '../data/ui_state.dart';
 import '../gen/vibevalley.dart';
-import '../shell/fx_layer.dart' show farmEffects;
+import '../shared/fx.dart' show farmEffects;
 import 'farm.dart';
 
-class Held<T> extends Notifier<T> {
-  Held(this._initial);
-  final T _initial;
+final heldToolProvider = held(Tool.hand);
 
-  @override
-  T build() => _initial;
+final sowingProvider = held<int?>(null);
 
-  void set(T value) => state = value;
-}
+final wateringProvider = held<String?>(null);
 
-NotifierProvider<Held<T>, T> _held<T>(T initial) => NotifierProvider<Held<T>, T>(() => Held<T>(initial));
+final reviewingProvider = held<String?>(null);
 
-enum FarmPanel { shop, warehouse, tasks, log, manager, plans }
+final friendsOpenProvider = held(false);
 
-final heldToolProvider = _held(Tool.hand);
-
-final panelProvider = _held<FarmPanel?>(null);
-
-final selectedProvider = _held<String?>(null);
-
-final sowingProvider = _held<int?>(null);
-
-final wateringProvider = _held<String?>(null);
-
-final reviewingProvider = _held<String?>(null);
-
-/// null: the newest still open.
-final planShownProvider = _held<String?>(null);
-
-final friendsOpenProvider = _held(false);
-
-final menuOpenProvider = _held(false);
+final menuOpenProvider = held(false);
 
 final farmEffectsProvider = Provider<Stream<GameEffect>>((ref) => farmEffects(ref.watch(serverProvider)));
 

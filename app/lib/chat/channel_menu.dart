@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
-import '../shell/sfx.dart';
+import '../audio/sfx.dart';
 import '../ui/kit/kit.dart';
 import 'chat_rules.dart';
 import 'chat_state.dart';

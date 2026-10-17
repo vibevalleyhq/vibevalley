@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/phone/merge.dart';
 import 'package:vibevalley/phone/merge_game.dart';
 import 'package:vibevalley/phone/pad.dart';
-import 'package:vibevalley/shell/sfx.dart';
+import 'package:vibevalley/audio/sfx.dart';
 
 Merge on(List<int> board, [int seed = 1]) => newMerge(seed).copyWith(board: board);
 

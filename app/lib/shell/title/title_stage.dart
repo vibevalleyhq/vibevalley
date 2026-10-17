@@ -6,7 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../prefs.dart';
+import '../../data/prefs.dart';
 import 'layers.dart';
 import 'motion.dart';
 import 'scene.dart';

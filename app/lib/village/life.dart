@@ -6,7 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
 
-import '../shell/sfx.dart';
+import '../audio/sfx.dart';
 import 'critters.dart';
 import 'level.dart';
 import 'particles.dart';

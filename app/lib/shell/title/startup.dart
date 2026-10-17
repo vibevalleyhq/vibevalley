@@ -9,7 +9,7 @@ import '../../village/village_view.dart';
 import '../glyphs.dart';
 import '../server_away.dart';
 import 'scene.dart';
-import 'title_state.dart';
+import '../../data/ui_state.dart';
 
 const giveUpAfter = Duration(seconds: 20);
 

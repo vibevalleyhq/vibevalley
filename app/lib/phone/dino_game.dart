@@ -4,7 +4,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../shell/sfx.dart';
+import '../audio/sfx.dart';
 import 'dino.dart';
 import 'lcd.dart';
 import 'pad.dart';

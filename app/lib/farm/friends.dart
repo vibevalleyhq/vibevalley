@@ -6,7 +6,7 @@ import '../data/providers.dart';
 import '../game/farm.dart';
 import '../game/state.dart';
 import '../gen/vibevalley.dart';
-import '../shell/prefs.dart';
+import '../data/prefs.dart';
 import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider, runtimesProvider;
 import 'popover.dart';

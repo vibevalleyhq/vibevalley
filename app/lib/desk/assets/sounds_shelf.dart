@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../shell/sfx.dart';
+import '../../audio/sfx.dart';
 import '../../ui/kit/kit.dart';
 import 'assets_page.dart';
 
@@ -17,7 +17,7 @@ class SoundsShelf extends StatelessWidget {
             TextSpan(
               children: [
                 const TextSpan(text: '音效都是现合成的，没有音频文件：配方在 '),
-                TextSpan(text: 'lib/shell/sfx.dart', style: mono),
+                TextSpan(text: 'lib/audio/sfx.dart', style: mono),
                 const TextSpan(text: '。关了音效就听不到。背景音乐还没有，给 Suno 的提示词在 '),
                 TextSpan(text: 'design/music/suno-prompts.md', style: mono),
                 const TextSpan(text: '。'),

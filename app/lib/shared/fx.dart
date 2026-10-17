@@ -9,7 +9,7 @@ import '../gen/vibevalley.dart';
 import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
 import '../voice/voice.dart';
-import 'achievements.dart';
+import 'medals.dart';
 import '../rules/progress.dart';
 
 /// The debug console's 升一级 and 弹一个成就.

@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../chat/chat_rules.dart';
 import '../chat/chat_widgets.dart';
 import '../gen/vibevalley.dart';
-import '../shell/prefs.dart';
+import '../data/prefs.dart';
 import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider;
 import '../rules/money.dart';

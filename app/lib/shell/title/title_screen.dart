@@ -9,11 +9,11 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import '../glyphs.dart';
-import '../sfx.dart';
+import '../../audio/sfx.dart';
 import 'motion.dart';
 import 'scene.dart';
 import 'title_stage.dart';
-import 'title_state.dart';
+import '../../data/ui_state.dart';
 
 enum _Item { start, cont, settings }
 

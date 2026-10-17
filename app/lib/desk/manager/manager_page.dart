@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../shell/prefs.dart';
+import '../../data/prefs.dart';
 import '../../ui/kit/kit.dart';
 import '../../shared/faces.dart';
 import '../shared/memory_panels.dart';

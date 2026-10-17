@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
-import '../shell/sfx.dart';
+import '../audio/sfx.dart';
 import 'phone.dart' show phoneOpenProvider;
 
 String inboxKindLabel(InboxKind kind) => switch (kind) {

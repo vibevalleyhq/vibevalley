@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
-import '../shell/prefs.dart';
+import '../data/prefs.dart';
 import '../data/remote.dart' show agentsProvider, SessionIssue;
 import 'farm.dart';
 import 'state.dart';

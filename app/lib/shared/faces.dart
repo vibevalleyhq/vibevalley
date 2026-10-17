@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../ui/theme.dart';
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
-import '../shell/prefs.dart';
+import '../data/prefs.dart';
 import '../sprites/atlas.dart';
 import '../ui/px.dart';
 import 'looks.dart';

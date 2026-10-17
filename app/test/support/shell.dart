@@ -8,7 +8,7 @@ import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/desktop/desktop.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/shell/server_away.dart';
-import 'package:vibevalley/shell/sfx.dart';
+import 'package:vibevalley/audio/sfx.dart';
 import 'server.dart';
 
 export 'server.dart';

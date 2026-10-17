@@ -3,10 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
+import '../data/ui_state.dart';
 import '../game/farm.dart';
 import '../game/state.dart';
 import '../gen/vibevalley.dart';
-import '../shell/prefs.dart';
+import '../data/prefs.dart';
 import '../ui/kit/kit.dart';
 import 'achievements.dart';
 import '../shared/harvest.dart';

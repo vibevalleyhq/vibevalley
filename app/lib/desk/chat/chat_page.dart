@@ -12,7 +12,7 @@ import '../../chat/chat_rules.dart';
 import '../../chat/chat_state.dart';
 import '../../chat/chat_widgets.dart';
 import 'dialogs.dart';
-import '../../app/desk.dart' show deskHead;
+import '../desk_shell.dart' show deskHead;
 import 'message_list.dart';
 import '../../rules/chat.dart';
 import '../../rules/farm.dart';

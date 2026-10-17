@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../game/state.dart';
 import '../shell/debug/debug_panel.dart' show debugOpenProvider;
-import '../shell/prefs.dart';
-import '../shell/title/title_state.dart';
+import '../data/prefs.dart';
+import '../data/ui_state.dart';
 import '../ui/kit/kit.dart';
 import '../village/world.dart' show spotNames;
 

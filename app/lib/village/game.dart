@@ -11,7 +11,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/foundation.dart' show ValueNotifier;
 
 import '../gen/vibevalley.dart';
-import '../shell/sfx.dart';
+import '../audio/sfx.dart';
 import '../sprites/atlas.dart';
 import 'critters.dart' show PointLight;
 import 'dog.dart';

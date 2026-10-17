@@ -5,8 +5,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/shell/sfx.dart';
-import 'package:vibevalley/shell/synth.dart';
+import 'package:vibevalley/audio/sfx.dart';
+import 'package:vibevalley/audio/synth.dart';
 
 void main() {
   final fixture = jsonDecode(File('test/fixtures/sfx.json').readAsStringSync()) as Map<String, dynamic>;

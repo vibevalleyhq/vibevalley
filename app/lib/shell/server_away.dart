@@ -3,9 +3,9 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../app/router.dart';
 import '../data/farm_choice.dart';
 import '../data/providers.dart';
 import '../ui/kit/kit.dart';
@@ -64,7 +64,7 @@ class ServerAway extends ConsumerWidget {
                     WidgetSpan(
                       alignment: PlaceholderAlignment.baseline,
                       baseline: TextBaseline.alphabetic,
-                      child: TextLink('院门', underline: true, style: text, onTap: () => router.go('/gate')),
+                      child: TextLink('院门', underline: true, style: text, onTap: () => context.go('/gate')),
                     ),
                     TextSpan(text: remote != null ? '重新扫码。' : '扫码。'),
                   ],

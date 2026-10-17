@@ -6,10 +6,10 @@ import '../data/providers.dart';
 import '../shared/faces.dart';
 import '../gen/vibevalley.dart';
 import '../rules/looks.dart';
-import '../shell/title/title_state.dart';
+import '../data/ui_state.dart';
 import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
-import 'router.dart';
+import 'places.dart';
 
 const deskHead = 66.0;
 
