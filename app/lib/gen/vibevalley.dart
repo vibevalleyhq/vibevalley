@@ -1746,6 +1746,7 @@ class PlaybookEvent {
     this.commits,
     required this.at,
     this.text,
+    this.actorText,
   });
 
   factory PlaybookEvent.fromJson(Map<String, dynamic> j) => PlaybookEvent(
@@ -1760,6 +1761,7 @@ class PlaybookEvent {
     commits: j['commits'] == null ? null : [for (final e in j['commits'] as List) e as String],
     at: (j['at'] as num).toDouble(),
     text: j['text'] == null ? null : j['text'] as String,
+    actorText: j['actorText'] == null ? null : j['actorText'] as String,
   );
 
   final String id;
@@ -1773,6 +1775,7 @@ class PlaybookEvent {
   final List<String>? commits;
   final double at;
   final String? text;
+  final String? actorText;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -1786,6 +1789,7 @@ class PlaybookEvent {
     if (commits != null) 'commits': [for (final e in commits!) e],
     'at': at,
     if (text != null) 'text': text!,
+    if (actorText != null) 'actorText': actorText!,
   };
 }
 

@@ -728,6 +728,7 @@ func (p *playbooks) Events(id string) []protocol.PlaybookEvent {
 	}
 	for i := range events {
 		events[i].Text = protocol.PlaybookEventText(changeOf(events[i]), titleOf)
+		events[i].ActorText = protocol.ActorText[events[i].Actor]
 	}
 	return events
 }

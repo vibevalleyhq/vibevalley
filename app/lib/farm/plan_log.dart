@@ -121,7 +121,7 @@ class _PlanLogRowState extends State<PlanLogRow> {
             color: fill,
             padding: const EdgeInsets.symmetric(vertical: 2),
             alignment: Alignment.center,
-            child: Text(actorText[e.actor]!, style: KitText.xs.copyWith(fontSize: 10, color: ink)),
+            child: Text(e.actorText ?? '', style: KitText.xs.copyWith(fontSize: 10, color: ink)),
           ),
         ),
         const SizedBox(width: 8),

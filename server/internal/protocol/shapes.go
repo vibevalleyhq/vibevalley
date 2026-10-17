@@ -729,6 +729,8 @@ type PlaybookEvent struct {
 	At       int64             `json:"at"`
 	// What happened in words (PlaybookEventText), the steps by their titles now: filled by playbook.Events, not kept.
 	Text string `json:"text,omitzero"`
+	// The actor's word (ActorText): filled by playbook.Events, not kept.
+	ActorText string `json:"actorText,omitzero"`
 }
 
 type LanDevice struct {

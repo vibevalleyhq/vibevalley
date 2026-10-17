@@ -387,7 +387,7 @@ func TestPlanDiamond(t *testing.T) {
 		t.Fatalf("plan history: %v", plan)
 	}
 	edit := history[slices.IndexFunc(history, func(e protocol.PlaybookEvent) bool { return e.Kind == protocol.PlaybookEventKindNodeEdited })]
-	if planStr(edit.Node) != "d" || edit.Actor != protocol.PlaybookActorManager || len(edit.Changes) != 1 || edit.Changes[0].Field != "检查" {
+	if planStr(edit.Node) != "d" || edit.Actor != protocol.PlaybookActorManager || edit.ActorText != "管家" || len(edit.Changes) != 1 || edit.Changes[0].Field != "检查" {
 		t.Fatalf("edit: %+v", edit)
 	}
 	testkit.Match(t, edit.Text, `^改了「.+」的检查$`, "in words, the step by its title")
