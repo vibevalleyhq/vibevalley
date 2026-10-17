@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/providers.dart';
-import '../chat/chat_state.dart' show chatActionsProvider, chatOpenProvider;
+import '../chat/chat_state.dart' show chatOpenProvider;
 import '../data/remote.dart' show agentsProvider, workStepsProvider;
 import '../host/desktop.dart';
 import 'chat_window.dart';
@@ -75,7 +75,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
           if (e is GameEffectReward) ref.read(rewardsProvider.notifier).push(e);
         }),
       )
-      ..add(ref.read(hostProvider).commands.listen(_command));
+      ..add(ref.read(hostProvider).commands.where((c) => c is HostVoice).listen(_voiceCommand));
   }
 
   @override
@@ -158,29 +158,8 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     ref.read(panelProvider.notifier).set(FarmPanel.plans);
   }
 
-  /// The farm is brought in front first (from a workbench page, from the title screen), else it would open where nobody sees it.
-  void _toFarm() {
-    ref.read(titleOpenProvider.notifier).enterFarm(start: false);
-    final router = GoRouter.maybeOf(context);
-    if (router != null && router.routerDelegate.currentConfiguration.uri.path != '/') router.go('/');
-  }
-
-  void _command(HostCommand c) {
-    if (!mounted) return;
-    if (c is! HostVoice) _toFarm();
-    switch (c) {
-      case HostVoice():
-        unawaited(call.phase == CallPhase.idle ? call.start() : call.end());
-      case HostOpenSession(:final id):
-        _openSession(id);
-      case HostOpenChat(:final conversation):
-        ref.read(chatOpenProvider.notifier).set(true);
-        fire(ref.read(chatActionsProvider).showChat(conversation));
-      case HostOpenPlans(:final playbook):
-        _openPlans(playbook);
-      case HostOpenAchievements():
-        ref.read(panelProvider.notifier).set(FarmPanel.tasks);
-    }
+  void _voiceCommand(HostCommand command) {
+    if (command is HostVoice) unawaited(call.phase == CallPhase.idle ? call.start() : call.end());
   }
 
   bool get _anyLayer =>
