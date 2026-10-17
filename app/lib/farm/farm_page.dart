@@ -105,15 +105,16 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     final commands = ref.read(farmCommandsProvider);
     final aim = commands.aim(bed);
     if (aim.aim.ok) Sfx.play('tap');
-    final ToolResult result;
+    final PlotResult got;
     try {
-      result = await commands.act(aim);
+      got = await commands.act(aim);
     } on Object {
       // The server said no: its notice says why.
       return;
     }
     if (!mounted) return;
-    switch (result) {
+    applyBedEffects(ref, got.effects);
+    switch (got.result) {
       case ToolRefused() || ToolDone():
         return;
       case ToolSow(:final station):

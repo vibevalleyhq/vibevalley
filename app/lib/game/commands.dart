@@ -20,46 +20,46 @@ class FarmCommands {
   VibeValleyApi get _api => ref.read(apiProvider);
   CoreState? get _farm => ref.read(stateProvider);
 
-  void _burst(Session w, BedFxKind kind, [String? text]) {
+  List<BedEffect> _fx(Session w, BedFxKind kind, [String? text]) {
     final bed = bedOfStation(stationOfSession(w));
-    if (bed != null) burst(ref, bed.index, kind, text);
+    return bed == null ? const [] : [BedEffect(bed.index, kind, text)];
   }
 
   /// `on`: a comment on that step of its trajectory.
-  Future<void> water(Session w, String text, {int? on}) async {
+  Future<List<BedEffect>> water(Session w, String text, {int? on}) async {
     await _api.issue.comment(
       id: w.issueId,
       body: CommentRequest(text: text, on: on?.toDouble()),
     );
-    _burst(w, BedFxKind.water);
+    return _fx(w, BedFxKind.water);
   }
 
   /// The server tells it what its conflicts are and to settle them.
-  Future<void> resolve(Session w) async {
+  Future<List<BedEffect>> resolve(Session w) async {
     await _api.issue.resolve(id: w.issueId);
-    _burst(w, BedFxKind.water);
+    return _fx(w, BedFxKind.water);
   }
 
-  Future<void> cure(Session w) async {
+  Future<List<BedEffect>> cure(Session w) async {
     await _api.issue.comment(
       id: w.issueId,
       body: CommentRequest(text: bugText(w.task)),
     );
-    _burst(w, BedFxKind.spray);
+    return _fx(w, BedFxKind.spray);
   }
 
-  Future<void> harvest(Session w) async {
+  Future<List<BedEffect>> harvest(Session w) async {
     await _api.issue.merge(id: w.issueId);
-    _burst(w, BedFxKind.harvest, '收进仓库');
+    return _fx(w, BedFxKind.harvest, '收进仓库');
   }
 
-  Future<void> shovel(Session w) async {
+  Future<List<BedEffect>> shovel(Session w) async {
     if (w.phase is PhaseWorking) {
       await _api.session.stop(id: w.id);
     } else {
       await _api.issue.cancel(id: w.issueId);
     }
-    _burst(w, BedFxKind.shovel);
+    return _fx(w, BedFxKind.shovel);
   }
 
   Future<void> stop(String id) => _api.session.stop(id: id);
@@ -107,31 +107,29 @@ class FarmCommands {
   }
 
   /// When the tool does not apply, the reason is said over the bed.
-  Future<ToolResult> act(PlotAim plot) async {
+  Future<PlotResult> act(PlotAim plot) async {
     final bed = plot.bed;
     final tool = plot.tool;
     final session = plot.session;
     final aim = plot.aim;
     if (!aim.ok || session == null) {
-      if (aim.ok) return ToolSow(bed.station);
-      burst(ref, bed.index, BedFxKind.note, aim.text);
-      return ToolRefused(aim.text);
+      if (aim.ok) return PlotResult(ToolSow(bed.station), const []);
+      final effects = [BedEffect(bed.index, BedFxKind.note, aim.text)];
+      return PlotResult(ToolRefused(aim.text), effects);
     }
     switch (tool) {
       case Tool.hand:
-        return ToolInspect(session.id);
+        return PlotResult(ToolInspect(session.id), const []);
       case Tool.water:
-        return ToolWater(session.id);
+        return PlotResult(ToolWater(session.id), const []);
       case Tool.bug:
-        await cure(session);
-        return const ToolDone();
+        return PlotResult(const ToolDone(), await cure(session));
       case Tool.harvest:
-        return ToolReview(session.id);
+        return PlotResult(ToolReview(session.id), const []);
       case Tool.shovel:
-        await shovel(session);
-        return const ToolDone();
+        return PlotResult(const ToolDone(), await shovel(session));
       case Tool.weed:
-        return const ToolDone();
+        return PlotResult(const ToolDone(), const []);
     }
   }
 

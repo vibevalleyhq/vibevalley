@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../game/commands.dart';
+import '../game/state.dart' show fireBedEffects;
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 import '../data/providers.dart';
@@ -102,12 +103,12 @@ class _Ready extends ConsumerWidget {
     final conflicts = changes.conflicts;
     final commands = ref.read(farmCommandsProvider);
     void take() {
-      fire(commands.harvest(session));
+      fireBedEffects(ref, commands.harvest(session));
       onDone();
     }
 
     void resolve() {
-      fire(commands.resolve(session));
+      fireBedEffects(ref, commands.resolve(session));
       onDone();
     }
 

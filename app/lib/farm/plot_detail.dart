@@ -45,7 +45,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
 
   void _send() {
     if (_text.trim().isEmpty) return;
-    fire(ref.read(farmCommandsProvider).water(widget.session, _text));
+    fireBedEffects(ref, ref.read(farmCommandsProvider).water(widget.session, _text));
     setState(() => _text = '');
   }
 
@@ -228,7 +228,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  PxButton.text('让它解决冲突', tone: PxTone.danger, onPressed: () => fire(commands.resolve(session))),
+                  PxButton.text('让它解决冲突', tone: PxTone.danger, onPressed: () => fireBedEffects(ref, commands.resolve(session))),
                 ],
               ),
             ),
@@ -249,7 +249,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            if (plot.crop == Crop.withered) PxButton.text('杀虫：接着修', tone: PxTone.danger, onPressed: () => fire(commands.cure(session))),
+            if (plot.crop == Crop.withered) PxButton.text('杀虫：接着修', tone: PxTone.danger, onPressed: () => fireBedEffects(ref, commands.cure(session))),
             if (canHarvest(session) && session.playbook == null)
               PxButton.text(
                 '收获…',
@@ -308,7 +308,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                 steps: log,
                 now: now,
                 working: session.phase is PhaseWorking,
-                onComment: (step, text) => ref.read(farmCommandsProvider).water(session, text, on: step),
+                onComment: (step, text) async => applyBedEffects(ref, await ref.read(farmCommandsProvider).water(session, text, on: step)),
               ),
             ),
           )

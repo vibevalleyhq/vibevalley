@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../shared/harvest.dart' show HarvestReview;
 import '../../game/commands.dart' show farmCommandsProvider;
+import '../../game/state.dart' show BedEffect, applyBedEffects;
 import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart' show roundsOf, tookText;
 import '../../rules/issues.dart';
@@ -367,13 +368,22 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
     if (mounted) setState(() => _busy = false);
   }
 
+  Future<void> _actEffects(Future<List<BedEffect>> Function() act) async {
+    setState(() => _busy = true);
+    final effects = await runAction(act);
+    if (effects != null) applyBedEffects(ref, effects);
+    await widget.reload();
+    if (mounted) setState(() => _busy = false);
+  }
+
   Future<void> _tell() async {
     final session = widget.session;
     final text = _word.trim();
     if (session == null || text.isEmpty) return;
     setState(() => _busy = true);
     final done = await runAction(() async {
-      await ref.read(farmCommandsProvider).water(session, text);
+      final effects = await ref.read(farmCommandsProvider).water(session, text);
+      applyBedEffects(ref, effects);
       return true;
     });
     if (!mounted) return;
@@ -432,7 +442,12 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
         ?bed,
       ],
       (IssueTag.waiting, final h?) when h.conflict != null => [
-        PxButton.text('让它解决冲突', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).resolve(h))),
+        PxButton.text(
+          '让它解决冲突',
+          size: PxSize.sm,
+          tone: PxTone.primary,
+          onPressed: busy ? null : () => _actEffects(() => ref.read(farmCommandsProvider).resolve(h)),
+        ),
         PxButton.text('关上', size: PxSize.sm, tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
         ?bed,
       ],
@@ -442,7 +457,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
           '接着做',
           size: PxSize.sm,
           tone: PxTone.primary,
-          onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).water(h, '上一轮停在了半路，接着把它做完。')),
+          onPressed: busy ? null : () => _actEffects(() => ref.read(farmCommandsProvider).water(h, '上一轮停在了半路，接着把它做完。')),
         ),
         PxButton.text('收获', size: PxSize.sm, onPressed: busy ? null : () => _close(h)),
         PxButton.text('关上', size: PxSize.sm, tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
@@ -451,7 +466,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
       (IssueTag.waiting, final h?) => [
         if (h.lastRun?.outcome != Outcome.failed) PxButton.text('收获', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _close(h)),
         if (h.lastRun?.outcome == Outcome.failed)
-          PxButton.text('接着修', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).cure(h))),
+          PxButton.text('接着修', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _actEffects(() => ref.read(farmCommandsProvider).cure(h))),
         PxButton.text('关上', size: PxSize.sm, tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
         ?bed,
       ],
@@ -573,7 +588,9 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
                     now: now,
                     tall: true,
                     working: widget.state == IssueTag.working,
-                    onComment: open && session != null ? (step, text) => ref.read(farmCommandsProvider).water(session, text, on: step) : null,
+                    onComment: open && session != null
+                        ? (step, text) async => applyBedEffects(ref, await ref.read(farmCommandsProvider).water(session, text, on: step))
+                        : null,
                   ),
                 ),
         ),
