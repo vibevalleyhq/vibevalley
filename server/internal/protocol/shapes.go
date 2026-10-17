@@ -387,6 +387,8 @@ type PlaybookNode struct {
 	Failures int64 `json:"failures,omitzero"`
 	// The needs not settled yet (BlockedBy), filled by PlaybooksOf.
 	BlockedBy []string `json:"blockedBy,omitzero"`
+	// Filled by FrameOf: the client's word for State. The state and the file keep none.
+	StateText string `json:"stateText,omitzero"`
 }
 
 type Playbook struct {

@@ -18,7 +18,17 @@ void main() {
     List<String>? blockedBy,
     NodeState state = NodeState.waiting,
     String? conclusion,
-  }) => PlaybookNode(id: id, title: title, task: '做$title', needs: needs, blockedBy: blockedBy, state: state, conclusion: conclusion, tries: 0);
+  }) => PlaybookNode(
+    id: id,
+    title: title,
+    task: '做$title',
+    needs: needs,
+    blockedBy: blockedBy,
+    state: state,
+    conclusion: conclusion,
+    tries: 0,
+    stateText: state.wire,
+  );
 
   // What the server fills in (PlaybooksOf) is written out as it would.
 

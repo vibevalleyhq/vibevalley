@@ -7,7 +7,7 @@ import (
 )
 
 func TestTheFrameSaysTheWordsOnACopy(t *testing.T) {
-	state := EmptyCoreState()
+	state := withPlaybooks(EmptyCoreState(), Playbook{ID: "p1", CreatedAt: 1, Nodes: []PlaybookNode{{ID: "n1", Title: "一步", State: NodeStateWaiting}}})
 	state.Sessions = []Session{{ID: "w1", Phase: Phase{PhaseRipe{}}}}
 	state.Schedules = []Schedule{scheduleMake()}
 	frame := FrameOf(state, nil)
@@ -16,4 +16,5 @@ func TestTheFrameSaysTheWordsOnACopy(t *testing.T) {
 	testkit.Eq(t, [2]string{state.Sessions[0].PhaseText, state.Schedules[0].WhenText}, [2]string{"", ""}, "the state itself keeps none")
 	testkit.Eq(t, frame.Effects, []GameEffect{}, "no effects is []")
 	testkit.Eq(t, len(frame.Inbox), 1, "a ripe session asks for you")
+	testkit.Eq(t, frame.Plans[0].Nodes[0].StateText, "等着", "the node's words")
 }

@@ -164,7 +164,7 @@ class NodeCard extends ConsumerWidget {
                   ),
                   const SizedBox(width: 4),
                 ],
-                FarmTag(nodeStateText[node.state]!, fill: tone.tag, ink: tone.ink),
+                FarmTag(node.stateText ?? '', fill: tone.tag, ink: tone.ink),
               ],
             ),
             const SizedBox(height: 4),

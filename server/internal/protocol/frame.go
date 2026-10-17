@@ -8,7 +8,18 @@ func FrameOf(state CoreState, effects []GameEffect) StateFrame {
 	if effects == nil {
 		effects = []GameEffect{}
 	}
-	return StateFrame{State: withWords(state), Inbox: Inbox(state), Plans: PlaybooksOf(state), View: ViewOf(state), Effects: effects}
+	plans := PlaybooksOf(state)
+	for i := range plans {
+		if len(plans[i].Nodes) == 0 {
+			continue
+		}
+		nodes := slices.Clone(plans[i].Nodes)
+		for j := range nodes {
+			nodes[j].StateText = NodeStateText[nodes[j].State]
+		}
+		plans[i].Nodes = nodes
+	}
+	return StateFrame{State: withWords(state), Inbox: Inbox(state), Plans: plans, View: ViewOf(state), Effects: effects}
 }
 
 func withWords(state CoreState) CoreState {

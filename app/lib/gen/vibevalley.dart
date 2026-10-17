@@ -785,6 +785,7 @@ class PlaybookNode {
     required this.tries,
     this.failures,
     this.blockedBy,
+    this.stateText,
   });
 
   factory PlaybookNode.fromJson(Map<String, dynamic> j) => PlaybookNode(
@@ -805,6 +806,7 @@ class PlaybookNode {
     tries: (j['tries'] as num).toDouble(),
     failures: j['failures'] == null ? null : (j['failures'] as num).toDouble(),
     blockedBy: j['blockedBy'] == null ? null : [for (final e in j['blockedBy'] as List) e as String],
+    stateText: j['stateText'] == null ? null : j['stateText'] as String,
   );
 
   final String id;
@@ -824,6 +826,7 @@ class PlaybookNode {
   final double tries;
   final double? failures;
   final List<String>? blockedBy;
+  final String? stateText;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -843,6 +846,7 @@ class PlaybookNode {
     'tries': tries,
     if (failures != null) 'failures': failures!,
     if (blockedBy != null) 'blockedBy': [for (final e in blockedBy!) e],
+    if (stateText != null) 'stateText': stateText!,
   };
 }
 
