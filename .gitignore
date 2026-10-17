@@ -24,3 +24,6 @@ design/assets/raw
 design/mockups/v1
 design/mockups/v2
 
+
+# Claude Code session state
+.claude/scheduled_tasks.lock

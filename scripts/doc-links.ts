@@ -1,8 +1,8 @@
 /**
  * Relative Markdown links in the maintained docs resolve to a file in the repository, and so does a source path in
- * `inline code` in the current docs (not the Notes, which are history). Run as part of `bun run docs:verify`; anything
- * broken exits 1. External links (http, mailto) are not fetched; `#fragment`s are not checked; links inside code blocks
- * and `inline code` are examples.
+ * `inline code` in the current docs and skills (not the Notes, which are history). Run as part of `bun run docs:verify`;
+ * anything broken exits 1. External links (http, mailto) are not fetched; `#fragment`s are not checked; links inside code
+ * blocks and `inline code` are examples.
  */
 
 import { execFileSync } from 'node:child_process'
@@ -40,7 +40,7 @@ for (const file of files) {
       // macOS and Windows find a file whatever the case; Linux and git do not. agents.md is not AGENTS.md.
       else if (realpathSync.native(full) !== realpathSync(full)) broken.push(`${file}:${i + 1}: ${target} (the file is ${realpathSync.native(full)})`)
     }
-    if (file.startsWith('.agents/')) continue
+    if (file.startsWith('.agents/notes/')) continue
     for (const match of line.matchAll(CODE_PATH)) {
       const path = match[1] ?? ''
       if (!inRepo(path.replace(/^(\.\.?\/)+/, '')) && !existsSync(resolve(dirname(resolve(root, file)), path))) broken.push(`${file}:${i + 1}: \`${path}\` is not in the repository`)

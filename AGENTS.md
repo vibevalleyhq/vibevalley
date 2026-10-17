@@ -19,6 +19,7 @@ site/                      官网 vibevalley.dev（Astro 静态生成，Tailwind
 design/                    生图提示词、脚本和切图规则；原图和效果图在单独的仓库 vibevalley-art，design/art.sh 链接进来
 docs/                      当前的行为和约定（docs/AGENTS.md）
 .agents/notes/             Agent Notes：决策和提案
+.agents/skills/            项目自己的 skill，多是验证 skill（verify-*）；.claude/skills 链接到这里
 scripts/                   文档和 Note 的检查
 ```
 
@@ -38,13 +39,24 @@ cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:
 bun run flutter:check                                           # 改完 app 或形状：生成的是否最新、analyze、test
 bun run package:mac                                             # macOS 应用（带 Go 服务端）和 .dmg；--channel alpha|beta 见 app/README.md
 bun run notes:catalog                                           # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
-bun run docs:verify                                             # 改完文档或 Note：Note 的格式、目录是否最新、链接
+bun run docs:verify                                             # 改完文档、Note 或 skill：Note 和 skill 的格式、目录是否最新、链接
 bun run site:check && bun run site:build                       # 改完 site/：类型和模板，再生成到 site/dist（不开 astro dev）
 ```
 
 Go 1.27，Flutter 3.47，Bun 1.4（根目录的命令、文档和 Note 的检查），Node 24（只跑 `server/tool` 的 `pi-prices.ts`）。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `server/` 要重启它。
 
 一件事的主线：smith 的会话事件 → `internal/worker/facts.go`（纯函数）读成事实和步骤 → `Core.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/state` 把折好的 `StateFrame` 经 SSE 推给 Flutter；步骤由 `worker/activities.go`、`worker/trajectories.go` 记成每个帮工和管家的轨迹（[architecture.md](docs/architecture.md)、[server.md](docs/reference/server.md)）。
+
+## 怎么让 agent 做对
+
+agent 照着已有的代码抄，走最短的路，所以要让容易的写法就是对的写法。挡住一类问题，按下面的顺序选手段，能用前面的就不用后面的（[理由](.agents/notes/implemented/process/2026-10-17-make-the-easy-thing-the-right-thing.md)）：
+
+1. **代码**：更好的结构、更强的类型和不变量、清楚的边界；用代码把一类问题整个消掉，以后不用再想它。
+2. **静态检查**：lint 规则、测试、CI、形式化验证（如 TLA+）；花的 token 最少，问题在落地前就报出来。
+3. **文字**：注释、规矩、本文、skill，只写没法强制、要 agent 自己判断的；能少写就少写。只有跑起来才看得出对不对的，写成验证 skill（[.agents/skills](.agents/skills/README.md)，照 [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md) 写）。
+4. **人看**：最难扩展。agent 落代码太快，每个 PR 都细看做不到；人的精力花在杠杆最大的地方：设计让 agent 默认就做对的环境。
+
+一条新规矩，先问能不能写成代码或检查；只有写不成的，才进下面的列表。
 
 ## 规矩
 
@@ -66,6 +78,7 @@ Go 1.27，Flutter 3.47，Bun 1.4（根目录的命令、文档和 Note 的检查
 - **工具链**：Go 用 `gofmt`、`go vet`，Dart 用 `dart format`、`flutter analyze`；`scripts/` 的检查用 Bun 跑，`server/tool/` 的脚本用 Node 跑，都不带构建。
 - **代码风格**：格式交给工具（`gofmt`、`dart format -l 160`），不手调；代码和接口用实际的概念，界面上的字用中文、用农场的叫法（[用语表](docs/README.md#用语)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。
 - **测试**：服务端的测试用 smith 的 `oartest` 扮演帮工、用真的 git 仓库、模型用 `ai.FauxProvider`，不连网；纯函数的规则直接测；Flutter 用 `flutter test`（服务端用 `MockClient` 假的）。改了帮工、项目、收获、核心状态或游戏规则的行为，补对应的测试。
+- **改完要验证**：先跑最窄的检查；改了接口、服务或页面，照对应的验证 skill（`verify-server`、`verify-app`）在真的程序上看一遍，汇报时附上它要的证据；一类改动没有验证 skill，又花了工夫才验证完，就照 `create-verification-skill` 补一个（[.agents/skills](.agents/skills/README.md)）。
 - **文档和 Note**：改了行为就在同一个改动里改文档；非平凡的决策（行为、模块边界、共享约定、持久化格式、流程、测试策略）新增或更新它的 Note；局部的、机械的改动和界面微调不用写（[规矩](.agents/notes/README.md#什么时候写)）。
 
 ## 编辑本文

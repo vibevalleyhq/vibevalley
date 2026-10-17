@@ -6,7 +6,7 @@
     "flutter:check": "cd server && go run ./tool/shapegen -check && cd ../app && flutter analyze && flutter test",
     "notes:verify": "bun scripts/agent-notes.ts",
     "notes:catalog": "bun scripts/agent-notes.ts --write",
-    "docs:verify": "bun scripts/agent-notes.ts && bun scripts/doc-links.ts",
+    "docs:verify": "bun scripts/agent-notes.ts && bun scripts/skills.ts && bun scripts/doc-links.ts",
     "package:mac": "app/tool/build-macos.sh",
     "site:check": "cd site && bun install && bun run check",
     "site:build": "cd site && bun install && bun run build",

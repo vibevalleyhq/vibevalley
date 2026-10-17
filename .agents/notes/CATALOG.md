@@ -20,7 +20,7 @@
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
 
-## implemented（90 篇）
+## implemented（91 篇）
 
 ### feature
 
@@ -113,6 +113,7 @@
 ### process
 
 - 2026-10-17 [文档里写的路径也查](implemented/process/2026-10-17-paths-in-docs-are-checked.md)
+- 2026-10-17 [让容易的写法就是对的写法](implemented/process/2026-10-17-make-the-easy-thing-the-right-thing.md)
 - 2026-10-15 [改名 VibeValley（码农场物语）](implemented/process/2026-10-15-rename-to-vibevalley.md)
 - 2026-10-15 [Note 的目录由脚本生成，检查跑在 Bun 上](implemented/process/2026-10-15-notes-catalog.md)
 - 2026-10-13 [格式、lint、测试和页面构建都交给 Vite+](implemented/process/2026-10-13-vite-plus-toolchain.md)
