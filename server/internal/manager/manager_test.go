@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"vibevalley/internal/base"
+	"vibevalley/internal/channel"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
@@ -594,5 +595,35 @@ func TestManagerHearsASendKeyOnce(t *testing.T) {
 	testkit.Eq(t, heard, map[string]int{"地里怎么样": 1, "电话里问一句": 1}, "what the manager heard")
 	if err := f.Manager.Say(w.ctx, "早", "", nil, strings.Repeat("k", 65)); err == nil {
 		t.Fatal("a long key was taken")
+	}
+}
+
+func TestManagerHearsALongReportCut(t *testing.T) {
+	w := managerOpen(t)
+	f := w.f
+	w.enableLab(t)
+	hired := f.Issue.Hire(w.ctx, fixture.Lab(t), "写一份长汇报", "notes", session.HireOptions{})
+	if hired.Session == nil {
+		t.Fatal(hired.Refused)
+	}
+	testkit.Until(t, "its report", func() bool {
+		return slices.ContainsFunc(f.Core.State().Chat.Messages, func(m protocol.ChatMessage) bool {
+			return m.From == hired.Session.ID && m.Kind == protocol.MessageKindReport
+		})
+	})
+	spoken, err := f.Channel.Speak(hired.Session.ID, "@管家 "+strings.Repeat("长", 5000), channel.SpeakOptions{Anyway: true})
+	if err != nil || spoken.Kind != "sent" {
+		t.Fatalf("spoken %+v %v", spoken, err)
+	}
+	asked := testkit.Await(t, "the manager asked", func() (string, bool) {
+		for _, c := range w.seen() {
+			if line := managerLastLine(c); strings.HasPrefix(line, "【田头】") {
+				return line, true
+			}
+		}
+		return "", false
+	})
+	if strings.Contains(asked, strings.Repeat("长", 797)) || !strings.Contains(asked, "@管家 "+strings.Repeat("长", 796)+"…（这条有 5004 字，全文用 read_chat 读 "+spoken.Target+"）") {
+		t.Fatalf("asked %q", asked)
 	}
 }

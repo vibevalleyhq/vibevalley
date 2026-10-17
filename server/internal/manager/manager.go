@@ -349,7 +349,7 @@ func (fm *manager) news() string {
 	if len(digest) == 0 {
 		return ""
 	}
-	return "这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + protocol.InboxLines(digest)
+	return "这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + managerInboxLines(digest)
 }
 
 func managerDeepseekModel(configured string) (string, error) {
@@ -698,7 +698,7 @@ func (fm *manager) heardInChat(news channel.ManagerNews) {
 		fm.sendInput(fm.pickedNote(picked)+"主人说："+strings.Join(words, "\n"), managerInput{Conversation: news.Conversation, Agent: picked}, true)
 		return
 	}
-	fm.sendInput(fm.pickedNote(picked)+"【田头】"+news.Target+" 里有给你的话：\n"+protocol.InboxLines(news.Messages)+"\n\n你的回答会发在 "+news.Target+"。", managerInput{Conversation: news.Conversation, Agent: picked}, fromPerson)
+	fm.sendInput(fm.pickedNote(picked)+"【田头】"+news.Target+" 里有给你的话：\n"+managerInboxLines(news.Messages)+"\n\n你的回答会发在 "+news.Target+"。", managerInput{Conversation: news.Conversation, Agent: picked}, fromPerson)
 }
 
 // A run of an issue for the manager lasts until the manager's run that takes the line settles.

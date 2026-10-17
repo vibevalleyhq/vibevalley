@@ -21,7 +21,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 | 7 | 发消息不带唯一的键，重试会发两条 | 15:26 | 做了 | 本篇[第 7 节](#7-发消息带-sendkey) |
 | 8 | 关于主人的事实所有 agent 共享 | 32:50 | 归记忆的提案 | [记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)、[记性有多个来源](2026-10-18-memory-providers.md) |
 | 9 | 管家的错变成评测 | 36:05 | 待做 | [管家的错变成评测](2026-10-18-manager-evals.md) |
-| 10 | 帮工的长汇报整段进管家的上下文 | 28:46 | 待做（本次核对新发现） | 本篇[第 10 节](#10-长汇报不整段进管家) |
+| 10 | 帮工的长汇报整段进管家的上下文 | 28:46 | 做了 | 本篇[第 10 节](#10-长汇报不整段进管家) |
 | — | 主动找主人 | 00:49、11:13 | `cron` 和管家自己定回头看已做；`by` 等迁移 | 本篇[主动找主人：靠定时](#主动找主人靠定时) |
 
 ## 对照
@@ -189,7 +189,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 
 ### 10. 长汇报不整段进管家
 
-- `internal/manager` 加纯函数 `managerInboxLines(messages []protocol.InboxMessage) string`：照 `protocol.MessageLine` 的格式，正文超过 `managerLineMax = 800` 个 UTF-16 单位（`str.Units`）时只留前 800（`str.Head`），后面接「…（这条有 N 字，全文用 read_chat 读 <target>）」，`<target>` 是这条消息所在的频道或串，照 `read_chat` 的写法（`#<频道>` 或 `#<频道>:<消息号>`）。
+- `internal/manager` 加纯函数 `managerInboxLines(messages []protocol.InboxMessage) string`：照 `protocol.MessageLine` 的格式，不是主人说的（`From != "user"`）正文超过 `managerLineMax = 800` 个 UTF-16 单位（`str.Units`）时只留前 800（`str.Head`），后面接「…（这条有 N 字，全文用 read_chat 读 <target>）」，`<target>` 是这条消息所在的频道或串，照 `read_chat` 的写法（`#<频道>` 或 `#<频道>:<消息号>`）。主人在频道里的话照原样给：截的是汇报，主人的指令不能只听一半。
 - `heardInChat`（`manager.go:653`）和 `news()`（`manager.go:383`）改用它。`read_chat`（`tools.go:604`）是管家自己要读的，照旧给全文，条数由 `chatReadLimit = 30` 管（`internal/channel/chat.go:31`）；`check` 照旧给结尾 2000 字。
 - 规则只有管家一个主人，放在 `internal/manager`，不动 `protocol.InboxLines`（帮工经 MCP 读频道也用它）。
 - **测试**：`managerInboxLines` 的表驱动测试（799、800、801 个字、带中文和表情）；帮工在工单串里 @管家 写了 5000 字，`FauxProvider` 收到的输入里只有前 800 字和那句指引。
