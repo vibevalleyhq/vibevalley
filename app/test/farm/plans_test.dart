@@ -9,6 +9,8 @@ import '../support/farm.dart';
 import 'package:vibevalley/data/ui_state.dart';
 
 void main() {
+  const actions = {'start': '开工', 'pause': '暂停', 'resume': '继续', 'abandon': '放弃', 'merge': '收获'};
+
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   PlaybookNode node(
@@ -39,6 +41,7 @@ void main() {
     project: 'clock-in',
     state: PlaybookState.draft,
     stateTag: '等你看',
+    actionText: actions,
     nodes: [
       node('api', '接口'),
       node('ui', '页面', needs: ['api'], blockedBy: ['api']),
@@ -60,6 +63,7 @@ void main() {
     branch: 'vibevalley/p2',
     state: PlaybookState.ripe,
     stateTag: '可收获',
+    actionText: actions,
     nodes: [node('css', '样式', state: NodeState.merged, conclusion: '改好了')],
     parallel: 1,
     createdAt: 1,

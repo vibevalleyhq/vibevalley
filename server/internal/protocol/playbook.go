@@ -103,6 +103,15 @@ var PlaybookStateText = map[PlaybookState]string{
 	PlaybookStateAbandoned: "放弃了",
 }
 
+// What each plan action is called; the buttons and the refusals say the same word.
+var PlaybookActionText = map[PlaybookAction]string{
+	PlaybookActionStart:   "开工",
+	PlaybookActionPause:   "暂停",
+	PlaybookActionResume:  "继续",
+	PlaybookActionAbandon: "放弃",
+	PlaybookActionMerge:   "收获",
+}
+
 // The short tag beside a plan's state in the list; PlaybookStateText is the longer sentence.
 var PlaybookStateTag = map[PlaybookState]string{
 	PlaybookStatePlanning:  "在拆",

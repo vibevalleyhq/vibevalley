@@ -522,11 +522,6 @@ func (p *playbooks) resumeWorking(id string) {
 	}
 }
 
-var planActionText = map[protocol.PlaybookAction]string{
-	protocol.PlaybookActionStart: "开工", protocol.PlaybookActionPause: "暂停", protocol.PlaybookActionResume: "继续",
-	protocol.PlaybookActionAbandon: "放弃", protocol.PlaybookActionMerge: "收获",
-}
-
 func (p *playbooks) Act(id string, action protocol.PlaybookAction, by protocol.PlaybookActor) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -535,7 +530,7 @@ func (p *playbooks) Act(id string, action protocol.PlaybookAction, by protocol.P
 		return "", err
 	}
 	not := func() (string, error) {
-		return "", fmt.Errorf("计划「%s」%s，不能%s", pb.Title, protocol.PlaybookStateText[pb.State], planActionText[action])
+		return "", fmt.Errorf("计划「%s」%s，不能%s", pb.Title, protocol.PlaybookStateText[pb.State], protocol.PlaybookActionText[action])
 	}
 	switch action {
 	case protocol.PlaybookActionStart:

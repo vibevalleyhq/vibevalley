@@ -18,4 +18,5 @@ func TestTheFrameSaysTheWordsOnACopy(t *testing.T) {
 	testkit.Eq(t, len(frame.Inbox), 1, "a ripe session asks for you")
 	testkit.Eq(t, frame.Plans[0].Nodes[0].StateText, "等着", "the node's words")
 	testkit.Eq(t, frame.Plans[0].StateTag, "在做", "the plan's tag")
+	testkit.Eq(t, frame.Plans[0].ActionText["pause"], "暂停", "the action's word")
 }

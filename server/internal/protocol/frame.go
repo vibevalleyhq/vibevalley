@@ -11,6 +11,10 @@ func FrameOf(state CoreState, effects []GameEffect) StateFrame {
 	plans := PlaybooksOf(state)
 	for i := range plans {
 		plans[i].StateTag = PlaybookStateTag[plans[i].State]
+		plans[i].ActionText = make(map[string]string, len(PlaybookActionText))
+		for action, word := range PlaybookActionText {
+			plans[i].ActionText[string(action)] = word
+		}
 		if len(plans[i].Nodes) == 0 {
 			continue
 		}

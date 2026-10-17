@@ -28,6 +28,8 @@ const _stateTone = {
 
 FarmTag _tagOf(Playbook p) => FarmTag(p.stateTag ?? '', fill: _stateTone[p.state]!.$1, ink: _stateTone[p.state]!.$2);
 
+String _actionText(Playbook p, PlaybookAction a) => p.actionText?[a.wire] ?? '';
+
 class Plans extends ConsumerStatefulWidget {
   const Plans({super.key});
 
@@ -276,13 +278,19 @@ class _PlanViewState extends ConsumerState<PlanView> {
                     runSpacing: 8,
                     children: [
                       if (pb.state == PlaybookState.draft) ...[
-                        PxButton.text('开工', tone: PxTone.primary, onPressed: () => _act(PlaybookAction.start)),
+                        PxButton.text(_actionText(pb, PlaybookAction.start), tone: PxTone.primary, onPressed: () => _act(PlaybookAction.start)),
                         PxButton.text('加一步', icon: 'button-add', onPressed: () => setState(() => _adding = true)),
                       ],
-                      if (pb.state == PlaybookState.running) PxButton.text('暂停', onPressed: () => _act(PlaybookAction.pause)),
-                      if (pb.state == PlaybookState.paused) PxButton.text('继续', tone: PxTone.primary, onPressed: () => _act(PlaybookAction.resume)),
-                      if (pb.state == PlaybookState.ripe) PxButton.text('看改动，收获…', tone: PxTone.primary, onPressed: () => setState(() => _reviewing = true)),
-                      Confirm(label: '放弃这个计划', sure: '确定放弃？分支会留着', onConfirm: () => _act(PlaybookAction.abandon)),
+                      if (pb.state == PlaybookState.running) PxButton.text(_actionText(pb, PlaybookAction.pause), onPressed: () => _act(PlaybookAction.pause)),
+                      if (pb.state == PlaybookState.paused)
+                        PxButton.text(_actionText(pb, PlaybookAction.resume), tone: PxTone.primary, onPressed: () => _act(PlaybookAction.resume)),
+                      if (pb.state == PlaybookState.ripe)
+                        PxButton.text(
+                          '看改动，${_actionText(pb, PlaybookAction.merge)}…',
+                          tone: PxTone.primary,
+                          onPressed: () => setState(() => _reviewing = true),
+                        ),
+                      Confirm(label: '${_actionText(pb, PlaybookAction.abandon)}这个计划', sure: '确定放弃？分支会留着', onConfirm: () => _act(PlaybookAction.abandon)),
                     ],
                   ),
                 ),
