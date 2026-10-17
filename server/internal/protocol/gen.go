@@ -297,7 +297,7 @@ func (v CoreState) MarshalJSON() ([]byte, error) {
 }
 
 // SessionEventTypeValues are every SessionEventType, in the protocol's order.
-var SessionEventTypeValues = []SessionEventType{SessionEventTypeRunStart, SessionEventTypeUserMessage, SessionEventTypeMemoryRecalled, SessionEventTypeAssistantThinking, SessionEventTypeAssistantMessage, SessionEventTypeToolCall, SessionEventTypeLLMRetry, SessionEventTypeRunError, SessionEventTypeRunEnd}
+var SessionEventTypeValues = []SessionEventType{SessionEventTypeRunStart, SessionEventTypeUserMessage, SessionEventTypeMemoryRecalled, SessionEventTypeAssistantThinking, SessionEventTypeAssistantMessage, SessionEventTypeToolCall, SessionEventTypeToolResult, SessionEventTypeLLMRetry, SessionEventTypeRunError, SessionEventTypeRunEnd}
 
 // ToolActionValues are every ToolAction, in the protocol's order.
 var ToolActionValues = []ToolAction{ToolActionRunCommand, ToolActionReadFile, ToolActionEditFile, ToolActionSearch, ToolActionWeb, ToolActionMCP, ToolActionWait, ToolActionOther}

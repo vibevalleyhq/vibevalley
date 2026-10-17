@@ -542,7 +542,7 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 		return out
 	}
 	want := []protocol.SessionEventType{protocol.SessionEventTypeRunStart, protocol.SessionEventTypeUserMessage, protocol.SessionEventTypeToolCall,
-		protocol.SessionEventTypeAssistantMessage, protocol.SessionEventTypeRunEnd}
+		protocol.SessionEventTypeToolResult, protocol.SessionEventTypeAssistantMessage, protocol.SessionEventTypeRunEnd}
 	testkit.Eq(t, kinds(w.f.Session.Events(session.ID, 0)), want, "kept")
 	for _, e := range w.f.Session.Events(session.ID, 0) {
 		if e.Run == nil || *e.Run != *w.f.Session.Events(session.ID, 0)[0].Run {
@@ -555,9 +555,9 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	}
 	testkit.Eq(t, kinds(steps), want, "steps")
 	testkit.Eq(t, steps[1].Text, "看看目录", "asked")
-	testkit.Eq(t, []string{string(*steps[2].Action), steps[2].Text, *steps[2].Output}, []string{"run_command", "echo hi", "hi"}, "tool")
-	testkit.Eq(t, *steps[2].Ok, true, "ok")
-	testkit.Match(t, steps[3].Text, `做完了：看看目录`, "said")
+	testkit.Eq(t, []string{string(*steps[2].Action), steps[2].Text}, []string{"run_command", "echo hi"}, "the call")
+	testkit.Eq(t, []any{*steps[3].Call, *steps[3].Output, *steps[3].Ok}, []any{steps[2].Seq, "hi", true}, "its result")
+	testkit.Match(t, steps[4].Text, `做完了：看看目录`, "said")
 }
 
 func TestCommentOnAStep(t *testing.T) {
@@ -567,7 +567,10 @@ func TestCommentOnAStep(t *testing.T) {
 	w.nextReport(t)
 	steps := w.f.Session.Events(hired.ID, 0)
 	tool := steps[slices.IndexFunc(steps, func(e protocol.SessionEvent) bool { return e.Type == protocol.SessionEventTypeToolCall })]
-	told := session.CommentText(tool, "这里换成 ls -la 再看一遍")
+	told, err := w.f.Session.Comment(hired.ID, tool.Seq, "这里换成 ls -la 再看一遍")
+	if err != nil {
+		t.Fatal(err)
+	}
 	testkit.Match(t, told, fmt.Sprintf(`^【评论第 %d 步】关于你这一步的操作：echo hi`, tool.Seq), "names the step")
 	testkit.Match(t, told, `输出的结尾：hi\n\n我的评论：这里换成 ls -la 再看一遍$`, "the step's output, then the comment")
 	w.f.Session.Tell(hired.ID, told, protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})

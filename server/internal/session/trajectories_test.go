@@ -46,13 +46,13 @@ func TestLogKeptAndReadBack(t *testing.T) {
 		}
 		kinds = append(kinds, string(s.Type)+":"+out)
 	}
-	testkit.Eq(t, kinds, []string{"run/start:", "user/message:", "tool/call:a\nb", "run/end:"}, "read back")
-	testkit.Eq(t, len(tr.Events("w1", 7)), 4, "the run's")
+	testkit.Eq(t, kinds, []string{"run/start:", "user/message:", "tool/call:", "tool/result:a\nb", "run/end:"}, "read back: the output in the result")
+	testkit.Eq(t, len(tr.Events("w1", 7)), 5, "the run's")
 	testkit.Eq(t, len(tr.Events("w1", 8)), 0, "another run's")
 	if tr.Events("../w1", 0) != nil {
 		t.Fatal("nothing read from outside the folder")
 	}
-	testkit.Eq(t, len(tr.Open("w1", 0).Events()), 4, "taken up again")
+	testkit.Eq(t, len(tr.Open("w1", 0).Events()), 5, "taken up again")
 }
 
 func TestReasoningRunsOn(t *testing.T) {
@@ -91,17 +91,24 @@ func TestSubAgentStepsGoUnderTheirCall(t *testing.T) {
 		if s.Under != nil {
 			under = fmt.Sprint(*s.Under)
 		}
-		got = append(got, fmt.Sprintf("%d %s %s %s %s", s.Seq, s.Type, s.Text, out, under))
+		call := "-"
+		if s.Call != nil {
+			call = fmt.Sprint(*s.Call)
+		}
+		got = append(got, fmt.Sprintf("%d %s %s %s %s %s", s.Seq, s.Type, s.Text, out, under, call))
 	}
 	testkit.Eq(t, got, []string{
-		"0 tool/call 派个帮手 看完了 -",
-		"1 assistant/message 帮手先看看  0",
-		"2 tool/call ls a.ts 0",
-		"3 tool/call pwd /work -",
-		"4 assistant/message 帮手看完了  0",
-		"5 assistant/message 好  -",
-		"6 assistant/message ，就这样  -1",
-	}, "steps")
+		"0 tool/call 派个帮手  - -",
+		"1 assistant/message 帮手先看看  0 -",
+		"2 tool/call ls  0 -",
+		"3 tool/call pwd  - -",
+		"4 tool/result  a.ts 0 2",
+		"5 assistant/message 帮手看完了  0 -",
+		"6 tool/result  /work - 3",
+		"7 tool/result  看完了 - 0",
+		"8 assistant/message 好  - -",
+		"9 assistant/message ，就这样  -1 -",
+	}, "a result is its call's, and goes under the same call as it")
 }
 
 func TestJournalSendsAndWrites(t *testing.T) {
@@ -125,4 +132,28 @@ func TestJournalSendsAndWrites(t *testing.T) {
 	}
 	tr.Finish("w9")
 	testkit.Eq(t, len(readJournal(filepath.Join(home, "events", "w9.json"))), 1, "written")
+}
+
+// What is written stays as it was: later events only follow it. A draft (text still streaming) is not on disk until it is
+// done, and then under the seq it was pushed with.
+func TestLogOnlyGrows(t *testing.T) {
+	home := t.TempDir()
+	tr := sessionTrajectories(t, home)
+	file := filepath.Join(home, "events", "w1.json")
+	j := tr.Open("w1", 0)
+	j.Asked("加分页", nil)
+	j.ToolStarted("c1", ToolStart{Text: "ls", Action: protocol.ToolActionRunCommand, Tool: "bash", Input: `{"cmd":"ls"}`}, nil)
+	j.Said("先看", nil)
+	j.Said("看目录", nil)
+	tr.Finish("w1")
+	first := readJournal(file)
+	testkit.Eq(t, len(first), 3, "the draft sealed on finish")
+	testkit.Eq(t, first[2].Text, "先看看目录", "one message for the streamed text")
+	j = tr.Open("w1", 0)
+	j.Said("还没说完", nil)
+	j.Note(protocol.SessionEventTypeRunError, "停了", nil)
+	tr.Finish("w1")
+	after := readJournal(file)
+	testkit.Eq(t, after[:3], first, "what was written is unchanged")
+	testkit.Eq(t, len(after), 5, "the rest follows")
 }

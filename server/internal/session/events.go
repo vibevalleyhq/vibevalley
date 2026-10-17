@@ -55,11 +55,6 @@ func readJournal(file string) []protocol.SessionEvent {
 
 func callKey(from From, callID string) string { return strings.Join(from, "/") + "|" + callID }
 
-type runOn struct {
-	n    int64
-	from string
-}
-
 // All methods are safe for concurrent use.
 type journal struct {
 	file string
@@ -73,11 +68,15 @@ type journal struct {
 	// calls are tool calls not yet returned; started is every call started (a sub-agent's steps go under the call
 	// that started it). A tool call is known by its id within its agent, never by the id alone.
 	calls, started map[string]int64
-	// speaking and thinking are the steps said and thought run on into, with whose they are; any other step clears them.
-	speaking, thinking *runOn
-	dirty              []int64
-	pushing, saving    *time.Timer
-	closed             bool
+	// draft is the event still being written: text said or thought as it streams, or a tool call before its input. It has
+	// its seq and is pushed live, but is not in steps (nor on disk) until it is sealed, before any other event is added.
+	draft    *protocol.SessionEvent
+	draftWho string
+	// draftCall is the draft's call key when the draft is a tool call.
+	draftCall       string
+	dirty           []int64
+	pushing, saving *time.Timer
+	closed          bool
 	// run is the open run the events belong to, nil between runs.
 	run *int64
 }
@@ -94,10 +93,15 @@ func openJournal(file string, initial []protocol.SessionEvent, push func(protoco
 	return j
 }
 
+// Events are the written ones and, last, the draft as it is now.
 func (j *journal) Events() []protocol.SessionEvent {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	return append([]protocol.SessionEvent{}, j.steps...)
+	out := append([]protocol.SessionEvent{}, j.steps...)
+	if j.draft != nil {
+		out = append(out, *j.draft)
+	}
+	return out
 }
 
 func (j *journal) write() error {
@@ -121,6 +125,8 @@ func (j *journal) flush() {
 	for _, n := range j.dirty {
 		if i := j.indexLocked(n); i >= 0 {
 			out = append(out, j.steps[i])
+		} else if j.draft != nil && j.draft.Seq == n {
+			out = append(out, *j.draft)
 		}
 	}
 	j.dirty = nil
@@ -179,17 +185,43 @@ func (j *journal) underLocked(from From) *int64 {
 	return &parent
 }
 
-func (j *journal) addLocked(step protocol.SessionEvent, from From) int64 {
-	j.speaking, j.thinking = nil, nil
-	n := j.next
+// stampLocked gives an event the next seq, the time, the call it is under and the open run.
+func (j *journal) stampLocked(step *protocol.SessionEvent, from From) {
+	step.Seq, step.Time, step.Under, step.Run = j.next, clock.NowMs(), j.underLocked(from), j.run
 	j.next++
-	step.Seq, step.Time, step.Under, step.Run = n, clock.NowMs(), j.underLocked(from), j.run
+}
+
+// sealLocked writes the draft, as it is, after every event before it.
+func (j *journal) sealLocked() {
+	if j.draft == nil {
+		return
+	}
+	d := *j.draft
+	j.draft, j.draftWho, j.draftCall = nil, "", ""
+	j.appendLocked(d)
+}
+
+func (j *journal) addLocked(step protocol.SessionEvent, from From) int64 {
+	j.sealLocked()
+	j.stampLocked(&step, from)
+	j.appendLocked(step)
+	return step.Seq
+}
+
+func (j *journal) appendLocked(step protocol.SessionEvent) {
 	j.steps = append(j.steps, step)
 	if over := len(j.steps) - j.keep; over > 0 {
 		j.steps = append([]protocol.SessionEvent(nil), j.steps[over:]...)
 	}
-	j.changedLocked(n)
-	return n
+	j.changedLocked(step.Seq)
+}
+
+// draftLocked makes e the draft, sealing the one before; it is pushed live from now on.
+func (j *journal) draftLocked(e protocol.SessionEvent, from From, call string) {
+	j.sealLocked()
+	j.stampLocked(&e, from)
+	j.draft, j.draftWho, j.draftCall = &e, strings.Join(from, "/"), call
+	j.changedLocked(e.Seq)
 }
 
 func (j *journal) RunStarted(id int64) {
@@ -207,15 +239,6 @@ func (j *journal) RunEnded(id int64, outcome protocol.Outcome) {
 	}
 	j.addLocked(protocol.SessionEvent{Type: protocol.SessionEventTypeRunEnd, Text: string(outcome)}, nil)
 	j.run = nil
-}
-
-func (j *journal) patchLocked(n int64, change func(*protocol.SessionEvent)) {
-	i := j.indexLocked(n)
-	if i < 0 {
-		return
-	}
-	change(&j.steps[i])
-	j.changedLocked(n)
 }
 
 func (j *journal) Asked(text string, from From) {
@@ -276,23 +299,19 @@ func commentOn(text string) *int64 {
 	return &n
 }
 
+// runOn goes on with what is being said or thought, by the same one, in the draft; anything else starts a new one.
 func (j *journal) runOn(kind protocol.SessionEventType, text string, from From) {
 	if text == "" {
 		return
 	}
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	who := strings.Join(from, "/")
-	on := &j.speaking
-	if kind == protocol.SessionEventTypeAssistantThinking {
-		on = &j.thinking
-	}
-	if *on != nil && (*on).from == who && j.indexLocked((*on).n) >= 0 {
-		j.patchLocked((*on).n, func(s *protocol.SessionEvent) { s.Text = str.Cut(s.Text+text, textMax) })
+	if d := j.draft; d != nil && d.Type == kind && j.draftWho == strings.Join(from, "/") {
+		d.Text = str.Cut(d.Text+text, textMax)
+		j.changedLocked(d.Seq)
 		return
 	}
-	n := j.addLocked(protocol.SessionEvent{Type: kind, Text: str.Cut(text, textMax)}, from)
-	*on = &runOn{n: n, from: who}
+	j.draftLocked(protocol.SessionEvent{Type: kind, Text: str.Cut(text, textMax)}, from, "")
 }
 
 func (j *journal) Said(text string, from From) {
@@ -311,22 +330,28 @@ func (j *journal) ToolStarted(callID string, start ToolStart, from From) {
 		input := str.Cut(start.Input, inputMax)
 		step.Input = &input
 	}
-	n := j.addLocked(step, from)
-	j.calls[callKey(from, callID)] = n
-	j.started[callKey(from, callID)] = n
+	key := callKey(from, callID)
+	// Written once its input is known; one that came with it is.
+	if step.Input != nil {
+		n := j.addLocked(step, from)
+		j.calls[key], j.started[key] = n, n
+		return
+	}
+	j.draftLocked(step, from, key)
+	j.calls[key], j.started[key] = j.draft.Seq, j.draft.Seq
 }
 
 func (j *journal) ToolInput(callID, input, text string, from From) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	if n, ok := j.calls[callKey(from, callID)]; ok {
-		j.patchLocked(n, func(s *protocol.SessionEvent) {
-			clipped := str.Cut(input, inputMax)
-			s.Input = &clipped
-			if text != "" {
-				s.Text = text
-			}
-		})
+	// Only the draft takes it: a call already written is not changed (its input came too late to be in it).
+	if d := j.draft; d != nil && j.draftCall == callKey(from, callID) {
+		clipped := str.Cut(input, inputMax)
+		d.Input = &clipped
+		if text != "" {
+			d.Text = text
+		}
+		j.sealLocked()
 	}
 }
 
@@ -339,13 +364,12 @@ func (j *journal) ToolEnded(callID, output string, ok bool, from From) {
 		return
 	}
 	delete(j.calls, key)
-	j.patchLocked(n, func(s *protocol.SessionEvent) {
-		s.Ok = &ok
-		if str.Trim(output) != "" {
-			clipped := clipOutput(str.TrimEnd(output))
-			s.Output = &clipped
-		}
-	})
+	result := protocol.SessionEvent{Type: protocol.SessionEventTypeToolResult, Call: &n, Ok: &ok}
+	if str.Trim(output) != "" {
+		clipped := clipOutput(str.TrimEnd(output))
+		result.Output = &clipped
+	}
+	j.addLocked(result, from)
 }
 
 func (j *journal) Note(kind protocol.SessionEventType, text string, from From) {
@@ -355,6 +379,9 @@ func (j *journal) Note(kind protocol.SessionEventType, text string, from From) {
 }
 
 func (j *journal) Close() {
+	j.mu.Lock()
+	j.sealLocked()
+	j.mu.Unlock()
 	j.flush()
 	j.mu.Lock()
 	if j.saving != nil {

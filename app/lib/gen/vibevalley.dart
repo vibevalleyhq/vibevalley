@@ -1148,6 +1148,7 @@ enum SessionEventType {
   assistantThinking('assistant/thinking'),
   assistantMessage('assistant/message'),
   toolCall('tool/call'),
+  toolResult('tool/result'),
   llmRetry('llm/retry'),
   runError('run/error'),
   runEnd('run/end');
@@ -1181,6 +1182,7 @@ class SessionEvent {
     required this.time,
     required this.type,
     this.run,
+    this.call,
     this.under,
     required this.text,
     this.action,
@@ -1196,6 +1198,7 @@ class SessionEvent {
     time: (j['time'] as num).toDouble(),
     type: SessionEventType.fromJson(j['type']),
     run: j['run'] == null ? null : (j['run'] as num).toDouble(),
+    call: j['call'] == null ? null : (j['call'] as num).toDouble(),
     under: j['under'] == null ? null : (j['under'] as num).toDouble(),
     text: j['text'] as String,
     action: j['action'] == null ? null : ToolAction.fromJson(j['action']),
@@ -1210,6 +1213,7 @@ class SessionEvent {
   final double time;
   final SessionEventType type;
   final double? run;
+  final double? call;
   final double? under;
   final String text;
   final ToolAction? action;
@@ -1224,6 +1228,7 @@ class SessionEvent {
     'time': time,
     'type': type.wire,
     if (run != null) 'run': run!,
+    if (call != null) 'call': call!,
     if (under != null) 'under': under!,
     'text': text,
     if (action != null) 'action': action!.wire,

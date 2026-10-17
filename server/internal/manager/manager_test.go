@@ -186,12 +186,15 @@ func TestManagerDispatchesAndHearsVoiceInSilence(t *testing.T) {
 		events := f.Session.Events(protocol.ManagerAgent, 0)
 		return events, len(events) >= 3 && events[len(events)-1].Type == protocol.SessionEventTypeAssistantMessage
 	})
-	last := trail[len(trail)-3:]
-	asked, tool, answer := last[0], last[1], last[2]
+	last := trail[len(trail)-4:]
+	asked, tool, result, answer := last[0], last[1], last[2], last[3]
+	if result.Type != protocol.SessionEventTypeToolResult || result.Call == nil || *result.Call != tool.Seq || result.Ok == nil || !*result.Ok {
+		t.Fatalf("result %+v", result)
+	}
 	if asked.Type != protocol.SessionEventTypeUserMessage || !strings.Contains(asked.Text, "加个 README") {
 		t.Fatalf("asked %+v", asked)
 	}
-	if tool.Tool == nil || *tool.Tool != "dispatch" || tool.Text != "派活：demo" || tool.Ok == nil || !*tool.Ok ||
+	if tool.Tool == nil || *tool.Tool != "dispatch" || tool.Text != "派活：demo" ||
 		tool.Input == nil || !strings.Contains(*tool.Input, `"project":"demo"`) {
 		t.Fatalf("tool %+v", tool)
 	}

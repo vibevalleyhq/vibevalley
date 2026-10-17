@@ -477,6 +477,7 @@ const (
 	SessionEventTypeAssistantThinking SessionEventType = "assistant/thinking"
 	SessionEventTypeAssistantMessage  SessionEventType = "assistant/message"
 	SessionEventTypeToolCall          SessionEventType = "tool/call"
+	SessionEventTypeToolResult        SessionEventType = "tool/result"
 	SessionEventTypeLLMRetry          SessionEventType = "llm/retry"
 	SessionEventTypeRunError          SessionEventType = "run/error"
 	SessionEventTypeRunEnd            SessionEventType = "run/end"
@@ -495,13 +496,16 @@ const (
 	ToolActionOther      ToolAction = "other"
 )
 
-// One entry of a session's log, append-ordered by Seq: what came in, what the agent thought, said and did, and the run
-// boundaries. Every one after a run/start belongs to that run (Run) until its run/end.
+// One entry of a session's log, append-ordered by Seq and never changed once written: what came in, what the agent thought,
+// said and did, and the run boundaries. Every one after a run/start belongs to that run (Run) until its run/end. A
+// tool/result is its call's (Call), with the output and whether it went (Ok); text said or thought as it streams is pushed
+// live under the seq it will have, and written once it is done.
 type SessionEvent struct {
 	Seq    int64            `json:"seq"`
 	Time   int64            `json:"time"`
 	Type   SessionEventType `json:"type"`
 	Run    *int64           `json:"run,omitzero"`
+	Call   *int64           `json:"call,omitzero"`
 	Under  *int64           `json:"under,omitzero"`
 	Text   string           `json:"text"`
 	Action *ToolAction      `json:"action,omitzero"`

@@ -94,4 +94,16 @@ void main() {
     await t.pumpAndSettle();
     expect(sent, [(2, '换个思路')]);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  test('the work log shows a call with its result, and neither the result nor the run bounds as rows', () {
+    const log = [
+      SessionEvent(seq: 0, time: 0, type: SessionEventType.runStart, text: ''),
+      SessionEvent(seq: 1, time: 0, type: SessionEventType.toolCall, text: 'ls'),
+      SessionEvent(seq: 2, time: 0, type: SessionEventType.toolResult, text: '', call: 1, output: 'a.ts', ok: true),
+      SessionEvent(seq: 3, time: 0, type: SessionEventType.runEnd, text: 'completed'),
+    ];
+    final shown = shownEvents(log);
+    expect(shown.map((e) => e.seq), [1]);
+    expect((shown.single.output, shown.single.ok), ('a.ts', true));
+  });
 }

@@ -30,6 +30,9 @@ func newTrajectories(cfg base.Config, core *core.Service) (*trajectories, error)
 	if err := moveActivities(filepath.Join(cfg.Home, "activities"), t.dir); err != nil {
 		return nil, err
 	}
+	if err := splitAllResults(t.dir); err != nil {
+		return nil, err
+	}
 	return t, nil
 }
 

@@ -97,10 +97,7 @@ class _WorkLogState extends State<WorkLog> {
 
   @override
   Widget build(BuildContext context) {
-    final steps = [
-      for (final s in widget.steps)
-        if (s.type != SessionEventType.runStart && s.type != SessionEventType.runEnd) s,
-    ];
+    final steps = shownEvents(widget.steps);
     final rounds = roundsOf(steps);
     final comments = commentsOf(steps);
     final firstAsked = steps.where((s) => s.type == SessionEventType.userMessage && s.under == null).firstOrNull?.seq;
@@ -330,7 +327,7 @@ String spanLabel(SessionEvent step) => switch (step.type) {
   SessionEventType.assistantMessage => '说',
   SessionEventType.llmRetry => '重试',
   SessionEventType.runError => '出错',
-  SessionEventType.runStart || SessionEventType.runEnd => '',
+  SessionEventType.runStart || SessionEventType.runEnd || SessionEventType.toolResult => '',
   SessionEventType.toolCall => farmToolText(step.text) != null ? '田头' : actionText[SessionAction.fromJson((step.action ?? ToolAction.other).wire)] ?? '工具',
 };
 
@@ -341,7 +338,7 @@ Color spanColor(SessionEvent step) => switch (step.type) {
   SessionEventType.assistantMessage => Palette.leaf500,
   SessionEventType.llmRetry => Palette.wheatHover,
   SessionEventType.runError => Palette.berry,
-  SessionEventType.runStart || SessionEventType.runEnd => Palette.cream200,
+  SessionEventType.runStart || SessionEventType.runEnd || SessionEventType.toolResult => Palette.cream200,
   SessionEventType.toolCall when step.ok == false => Palette.berry,
   SessionEventType.toolCall => switch (step.action ?? ToolAction.other) {
     ToolAction.readFile || ToolAction.search || ToolAction.web => Palette.water,
@@ -467,8 +464,8 @@ class _Step extends StatelessWidget {
         return _Line(mark: 'button-replay', text: step.text, at: step.time, now: now, fill: Palette.wheat.withValues(alpha: .15), ink: Palette.bark800);
       case SessionEventType.runError:
         return _Line(mark: 'mark-warn', text: step.text, at: step.time, now: now, fill: Palette.berry.withValues(alpha: .12), ink: Palette.berry);
-      // A run's bounds are where the log's rounds split, not entries of their own (the list leaves them out).
-      case SessionEventType.runStart || SessionEventType.runEnd:
+      // Not rows: a run's bounds split the rounds, a result is shown in its call (shownEvents).
+      case SessionEventType.runStart || SessionEventType.runEnd || SessionEventType.toolResult:
         return const SizedBox.shrink();
     }
   }

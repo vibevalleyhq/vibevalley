@@ -985,5 +985,12 @@ func (c *sessions) Comment(id string, n int64, comment string) (string, error) {
 	if i < 0 {
 		return "", protocol.Missing{What: fmt.Sprintf("第 %d 步（太早的步骤不再保留）", n)}
 	}
-	return CommentText(steps[i], comment), nil
+	step := steps[i]
+	// A call's output is in its result.
+	if r := slices.IndexFunc(steps, func(s protocol.SessionEvent) bool {
+		return s.Type == protocol.SessionEventTypeToolResult && s.Call != nil && *s.Call == n
+	}); r >= 0 {
+		step.Output, step.Ok = steps[r].Output, steps[r].Ok
+	}
+	return CommentText(step, comment), nil
 }

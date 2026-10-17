@@ -18,7 +18,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 
 2026-10-17 做了第一半：`Activity` 是 `SessionEvent`（`seq`、`time`、`type`），类型照 DeepSeek Harness 写成 `<主体>/<做了什么>`（`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`、`llm/retry`、`run/error`）；每个 Run 由 `run/start` 和 `run/end`（带结果）围起来，中间的事件带 `run`；家目录 `activities/` 是 `events/`，旧的记录加载时改好（`session/moved.go`）。
 
-还没做的一半：日志只追加（现在一段话边流边改、工具的结果补进它的调用；照 DeepSeek Harness 是 `tool/result` 另一条、记录一旦写下不改），事件的内容放进按 `type` 分的 `data`；Step 这一层（一次调模型和它要的工具）等农机报得出这条边界再加（我们自己的 agent 有，外面的农机多半没有），事件带一个可空的 `step`。照 DeepSeek Harness 的规矩，每个事件都落在一个 Run 里：现在开工前想起的记忆（`memory/recalled`）还在第一个 `run/start` 之前。
+日志只追加也做了：写下的一条不再改，流式的话和还没拿到输入的调用是草稿，带着将来的 `seq` 实时推、下一条事件之前写下；工具的结果是另一条 `tool/result`（`call` 指它的调用）；旧日志里带着输出的调用拆开、重新编号一次（`splitAllResults`）。还没做：事件的内容放进按 `type` 分的 `data`；Step 这一层（一次调模型和它要的工具）等农机报得出这条边界再加（我们自己的 agent 有，外面的农机多半没有），事件带一个可空的 `step`。照 DeepSeek Harness 的规矩，每个事件都落在一个 Run 里：现在开工前想起的记忆（`memory/recalled`）还在第一个 `run/start` 之前。
 
 | 层 | 类型 | 存在哪 | 是什么 |
 |---|---|---|---|
@@ -46,7 +46,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 ### 顺序
 
 1. 管家成为内置档案（它的会话才能进 `session` 表）。
-2. `SessionEvent` 和 Run 的边界（已做）；`session` 表、`Phase` 的 `closed`、`session.list`/`get` 给 `Session`、`session.events`、搬头文件、删 `Trajectory`、`TrajectoryHead`（已做：`session/records.go`，迁移 `0005_session_table.sql`）；日志只追加（没做）。Flutter 的干活记录页和工单详情页改读 `Session` 和 `Run`。
+2. `SessionEvent` 和 Run 的边界（已做）；`session` 表、`Phase` 的 `closed`、`session.list`/`get` 给 `Session`、`session.events`、搬头文件、删 `Trajectory`、`TrajectoryHead`（已做：`session/records.go`，迁移 `0005_session_table.sql`）；日志只追加（已做）。Flutter 的干活记录页和工单详情页改读 `Session` 和 `Run`。
 3. 两个口子：投递带上文，交代里的 @ 投递出去；删 `farm_*` 和令牌，改 `session/rules.go` 给帮工的说明。
 
 ## Alternatives considered

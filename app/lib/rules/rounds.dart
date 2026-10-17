@@ -1,5 +1,21 @@
 import '../gen/vibevalley.dart';
 
+/// The log as the work log shows it: a call with its result's output and ok, the results and the run bounds left out (a
+/// run is where the rounds split). The log itself only grows: a result is an event of its own.
+List<SessionEvent> shownEvents(List<SessionEvent> log) {
+  final results = {
+    for (final e in log)
+      if (e.type == SessionEventType.toolResult && e.call != null) e.call!: e,
+  };
+  return [
+    for (final e in log)
+      if (e.type == SessionEventType.toolCall && results[e.seq] != null)
+        SessionEvent.fromJson({...e.toJson(), 'output': results[e.seq]!.output, 'ok': results[e.seq]!.ok})
+      else if (e.type != SessionEventType.toolResult && e.type != SessionEventType.runStart && e.type != SessionEventType.runEnd)
+        e,
+  ];
+}
+
 class Round {
   const Round(this.asked, this.steps);
 
