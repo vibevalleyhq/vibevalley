@@ -33,7 +33,7 @@ Status: implemented
 
 ## Verification
 
-- `test/village_framing_test.dart`：
+- `test/village/framing_test.dart`：
   - 1152×768 正好放下；
   - 1440×900 放大 4 倍、裁 48 和 62 像素；
   - 1920×1080 放大 5 倍、只裁上下；
@@ -41,5 +41,5 @@ Status: implemented
   - 1100×900 一边裁一边留边；
   - 竖着的手机放大 1 倍；
   - 在 320–2600 × 300–1600 的一片窗口尺寸里，裁掉的都不超过上限。
-- `test/screen_test.dart` 的 1440×900 整屏和 `tool/screens/live_screens_test.dart` 的截图看过：农场盖满窗口，HUD 在窗口的四边。390×844 的手机截图里，边上是压暗的农场。
+- `test/farm/screen_test.dart` 的 1440×900 整屏和 `tool/screens/live_screens_test.dart` 的截图看过：农场盖满窗口，HUD 在窗口的四边。390×844 的手机截图里，边上是压暗的农场。
 - `bun run flutter:check` 全部通过。

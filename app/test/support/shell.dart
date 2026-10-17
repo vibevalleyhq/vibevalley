@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/host/desktop.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/shell/server_away.dart';
+import 'package:vibevalley/shared/server_away.dart';
 import 'package:vibevalley/audio/sfx.dart';
 import 'server.dart';
 

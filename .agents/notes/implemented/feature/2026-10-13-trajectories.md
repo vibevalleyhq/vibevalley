@@ -61,7 +61,7 @@ Status: implemented
 - `server/internal/session/trajectories_test.go` 另测：思考接成一步、中间有别的就另起一步；帮手的步骤挂在派它的调用下面，编号相同的调用和话不串，派它的调用不在了标 -1。
 - `server/internal/manager/manager_test.go` 的 `TestForemanToolStart`：管家的工具标签；它的结果和思考怎么读，Go 里没有单独的测试。
 - `server/internal/session/rules_test.go`：有字的思考是一步，遮掉的不是；带 `agentPath` 的步骤说明是哪个子 agent 的。
-- `app/test/farm_rules_test.dart` 的 `turnEndingAt`：一条消息的这一轮，往回到开始的那句话，不含前一轮和后一轮。
+- `app/test/game/farm_test.dart` 的 `turnEndingAt`：一条消息的这一轮，往回到开始的那句话，不含前一轮和后一轮。
 - `server/internal/manager/manager_test.go`：管家派活以后，它的轨迹里依次是收到的话、`dispatch`（标签「派活：demo」，参数里有项目，成功）和它说的话。
 - `server/internal/workspace/work_test.go` 的 `TestCrewCommentOnAStep`：评论带着那一步的操作、输入和输出的结尾交给帮工，记下的那一步的 `on` 指回被评论的一步。
-- `app/test/rounds_test.dart`：步骤怎么分轮、时间条每段多长、评论挂在哪一步；之前的轮只显示最后说的话，点时间条展开那一步，评论按步号发出去。
+- `app/test/rules/rounds_test.dart`：步骤怎么分轮、时间条每段多长、评论挂在哪一步；之前的轮只显示最后说的话，点时间条展开那一步，评论按步号发出去。

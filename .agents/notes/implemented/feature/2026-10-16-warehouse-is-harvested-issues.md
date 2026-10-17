@@ -33,4 +33,4 @@ Status: implemented
 
 ## Verification
 
-- `app/test/farm_panels_test.dart`：仓库里是收获了的工单（标题、谁、项目、多久前收的），日志里是田头里的汇报消息，空着时各自的话；播种表单里排第一的是最近的工单标题。
+- `app/test/farm/panels_test.dart`：仓库里是收获了的工单（标题、谁、项目、多久前收的），日志里是田头里的汇报消息，空着时各自的话；播种表单里排第一的是最近的工单标题。

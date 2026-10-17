@@ -35,5 +35,5 @@ func TestStateFrameSample(t *testing.T) {
 		t.Fatal(err)
 	}
 	frame = FrameOf(frame.State, frame.Effects)
-	golden.File(t, "../../../app/schema/state-frame.sample.json", golden.Indented(t, frame))
+	golden.File(t, "../../../app/test/fixtures/state-frame.sample.json", golden.Indented(t, frame))
 }

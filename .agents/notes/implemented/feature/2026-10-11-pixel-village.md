@@ -22,7 +22,7 @@ Status: implemented
 - **界面换皮肤，不换组件**：面板、田头、配置页还是那一套组件。像素皮肤靠主题色、按名字替换素材、和一段整体覆盖圆角和阴影的 CSS 穿上去，两种画法共用所有的行为。像素是默认的皮肤；去过旧版的手绘农场，配置页才跟着换回手绘的。（皮肤后来拿掉了，只剩像素的一套，见 [只留像素村](../simplification/2026-10-12-pixel-only.md)；Flutter 的控件只有像素的样子，在 `app/lib/ui/kit/`。）
 - **入口放进院子**：左边那列入口变成院子里的东西（小摊、告示板、邮筒、图纸桌、路牌、工坊、书屋、管家），像风来之国和星露谷那样走过去点；常用的（工具、金币和时钟、精力、帮工栏）留在 HUD，但收进游戏画面的框里，像游戏机的屏幕；开关和去别处的路收进游戏菜单（Esc）。田头窗口怎么放还没定，暂时照旧。
 
-- **帮工去哪是一条规则**（当时是 core 的 `village.ts`，和 strolls 一样由 core 的时钟推、有测试；现在在 `app/lib/village/world.dart` 的 `goalOf`、`Whereabouts`，`app/test/village_render_test.dart` 查帮工走到了对应的地方）；画面只管坐标。要等一会儿才动身、待够才走，是规则的一部分，不是动画的。
+- **帮工去哪是一条规则**（当时是 core 的 `village.ts`，和 strolls 一样由 core 的时钟推、有测试；现在在 `app/lib/village/world.dart` 的 `goalOf`、`Whereabouts`，`app/test/village/render_test.dart` 查帮工走到了对应的地方）；画面只管坐标。要等一会儿才动身、待够才走，是规则的一部分，不是动画的。
 - **地图数据放进 LDtk**：能走的地方、地、地点、道具、灯都在 `village.ldtk`（`app/assets/village.ldtk`，`app/lib/village/level.dart` 读）里，游戏直接读，不再在代码里照图描矩形。地和道具会动，所以它们的占地由游戏扣，不画进 Ground。
 
 

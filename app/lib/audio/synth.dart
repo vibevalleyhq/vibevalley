@@ -1,6 +1,6 @@
 // It renders what Chromium's Web Audio nodes would: the biquads (Web Audio's formulas, coefficients per sample), the exponential envelopes and glides, the
 // oscillators (polyBLEP for Chromium's band-limited tables, square and sawtooth scaled to Chromium's peak), the limiter (Chromium's compressor kernel).
-// test/shell_synth_test.dart holds it to the frozen renders in test/fixtures/sfx.json.
+// test/audio/synth_test.dart holds it to the frozen renders in test/fixtures/sfx.json.
 
 import 'dart:math' as math;
 import 'dart:typed_data';

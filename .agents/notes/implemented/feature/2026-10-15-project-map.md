@@ -39,6 +39,6 @@ Status: implemented
 
 ## Verification
 
-- `test/desk_map_test.dart`：worktree 按帮工来的先后、空位和锁住的地怎么算（项目满了、农场的地都在干活、项目不在列表里了、一座岛最多 6 块），排队只算排上队的；三、四、五块地怎么摆；岛放大几倍；帮工在地里的样子；每座岛都有院子，院子 150 格宽。页面：岛、木牌上的「在干 1/3」、牌子；点空位去 `/tickets/new?project=…`，点帮工去它的工单，点木牌在旁边打开 worktree 清单。
+- `test/desk/map_test.dart`：worktree 按帮工来的先后、空位和锁住的地怎么算（项目满了、农场的地都在干活、项目不在列表里了、一座岛最多 6 块），排队只算排上队的；三、四、五块地怎么摆；岛放大几倍；帮工在地里的样子；每座岛都有院子，院子 150 格宽。页面：岛、木牌上的「在干 1/3」、牌子；点空位去 `/tickets/new?project=…`，点帮工去它的工单，点木牌在旁边打开 worktree 清单。
 - `server/internal/project/project_test.go`：项目带上 `slots`；上限是 0、比 6 大时是 6。
 - `tool/screens/live_screens_test.dart` 的 `map`、`map-island` 在 1440×900 和 390×844 下截图看过（`docs/images/map.png`）。

@@ -25,6 +25,7 @@ const RANK: Record<string, number> = {
   phone: 7,
   debug: 7,
   village: 8,
+  title: 9,
   desk: 9,
   farm: 9,
   shell: 10,

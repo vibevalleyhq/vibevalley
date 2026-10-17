@@ -16,7 +16,7 @@ Status: implemented
 - **删掉的**：`web/`、`packages/core`、`packages/engine`；Go 服务端不再发页面（当时的 `Farm.Handler` 没有了页面参数，没有 `VIBEVALLEY_WEB_DIR`；HTTP 处理现在是 `internal/handler` 的 `handler.New`）；根目录的 `build`、`test` 脚本和 `vite.config.ts` 里的测试、React 和 core 的 lint 规则；只给网页用的脚本 `app/tool/screens/web_shoot.mjs`、`app/tool/sfx_fixture.ts`（都已不在）。
 - **protocol 只有形状**：`packages/protocol` 删掉了全部规则（`farm.ts`、`chat.ts`、`playbook.ts`、`progress.ts`、`recall.ts`、`schedules.ts`、`patrol.ts`、`settings.ts`、`desktop.ts`，以及其余文件里的函数和只给规则用的常量），只留 schema、编解码、导出要的种子数据。导出的 OpenAPI、JSON Schema 和 `seeds.json` 和删之前一个字节不差（`schemas:check`），Go 和 Dart 的生成类型没变。（`packages/protocol` 后来整个删了，形状改写在 Go 里，见 [形状的源头是 Go](../architecture/2026-10-15-go-owns-the-shapes.md)。）
 - **规则只在 Go**：`server/internal/protocol` 是唯一的一份。原来由 TypeScript 算出期望的对照数据（`internal/protocol/testdata/*.jsonl.gz`）改成 Go 自己的黄金数据：`internal/protocol/golden_test.go` 逐条比，有意改了规则就 `go test ./internal/protocol -update` 用 Go 的结果重写，再看 diff。改写时验证过：用 Go 重写一遍，和 TypeScript 写的相比，只有原来的测试本来就容忍的差别（计划 JSON 读不了时报错的措辞、1e-12 以内的浮点、被切开的 emoji 半个代理字符写成 `�`）。
-- **示例帧由 Go 写**：Flutter 解码测试用的 `app/schema/state-frame.sample.json` 从 TypeScript 导出改成 Go 的编码器写（同一个测试文件），和原来的一字不差。
+- **示例帧由 Go 写**：Flutter 解码测试用的 `app/test/fixtures/state-frame.sample.json` 从 TypeScript 导出改成 Go 的编码器写（同一个测试文件），和原来的一字不差。
 - **冻结的对照**：Flutter 音效合成的对照 `app/test/fixtures/sfx.json` 是网页的合成器算的，留着、不再生成，改了声音就手改。
 - **还是 TypeScript 的**：`packages/protocol`（形状）和 `tools/`（导出形状、`go-contract.ts` 用 `HeybroApi` 的客户端检查正在跑的 Go 服务端、pi 的价目表）。这一条后来被 [形状的源头是 Go](../architecture/2026-10-15-go-owns-the-shapes.md) 取代：两样都删了，pi 的价目表改由 `server/tool/pi-prices.ts` 写。
 

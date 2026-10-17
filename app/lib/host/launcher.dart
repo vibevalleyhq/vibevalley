@@ -1,4 +1,4 @@
-// SIGTERM first: the server saves on the way out. Plain dart:io, no Flutter: test/desktop_launcher_test.dart drives it with a fake server script.
+// SIGTERM first: the server saves on the way out. Plain dart:io, no Flutter: test/host/launcher_test.dart drives it with a fake server script.
 
 import 'dart:async';
 import 'dart:io';
