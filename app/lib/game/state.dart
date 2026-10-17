@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../data/ui_state.dart';
 import '../gen/vibevalley.dart';
-import '../shared/fx.dart' show farmEffects;
+import './fx.dart' show farmEffects;
 import 'farm.dart';
 
 final heldToolProvider = held(Tool.hand);
@@ -17,8 +17,6 @@ final sowingProvider = held<int?>(null);
 final wateringProvider = held<String?>(null);
 
 final reviewingProvider = held<String?>(null);
-
-final friendsOpenProvider = held(false);
 
 final menuOpenProvider = held(false);
 

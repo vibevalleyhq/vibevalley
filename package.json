@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "flutter:check": "cd server && go run ./tool/shapegen -check && cd ../app && flutter analyze && flutter test",
+    "flutter:check": "cd server && go run ./tool/shapegen -check && cd ../app && flutter analyze && flutter test && cd .. && bun scripts/app-imports.ts",
     "notes:verify": "bun scripts/agent-notes.ts",
     "notes:catalog": "bun scripts/agent-notes.ts --write",
     "docs:verify": "bun scripts/agent-notes.ts && bun scripts/skills.ts && bun scripts/doc-links.ts && bun scripts/stale-names.ts",
@@ -12,6 +12,7 @@
     "site:build": "cd site && bun install && bun run build",
     "site:deploy": "cd site && bun install && bun run deploy",
     "go:deadcode": "bun scripts/deadcode.ts",
-    "names:verify": "bun scripts/stale-names.ts"
+    "names:verify": "bun scripts/stale-names.ts",
+    "app:imports": "bun scripts/app-imports.ts"
   }
 }

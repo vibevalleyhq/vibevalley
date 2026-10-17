@@ -11,7 +11,7 @@ import 'package:vibevalley/data/server.dart';
 import 'package:vibevalley/desk/chat/chat_page.dart';
 import 'package:vibevalley/chat/chat_rules.dart';
 import 'package:vibevalley/chat/chat_widgets.dart';
-import 'package:vibevalley/desktop/desktop.dart';
+import 'package:vibevalley/host/desktop.dart';
 import 'package:vibevalley/farm/chat_window.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/data/remote.dart' show agentsProvider;

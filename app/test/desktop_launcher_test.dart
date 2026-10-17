@@ -4,7 +4,7 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/desktop/launcher.dart';
+import 'package:vibevalley/host/launcher.dart';
 
 const _answering = r'''#!/bin/sh
 echo "fake farm: home=$VIBEVALLEY_HOME work=$VIBEVALLEY_WORK_ROOT port=$VIBEVALLEY_PORT"

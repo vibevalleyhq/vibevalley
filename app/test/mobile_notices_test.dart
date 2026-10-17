@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/desktop/command.dart';
-import 'package:vibevalley/mobile/notices.dart';
+import 'package:vibevalley/host/command.dart';
+import 'package:vibevalley/host/mobile_notices.dart';
 
 void main() {
   test('a tap waits for a screen, then opens what the notification was about', () async {

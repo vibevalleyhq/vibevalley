@@ -8,7 +8,7 @@ Status: implemented
 
 - 二十多个 `VIBEVALLEY_*` 环境变量，散在各个服务里用 `os.Getenv`、`base.EnvNumber` 读；`HOST`、`PORT` 没有前缀。
 - `--env-file` 给的 `.env`，再是 `$VIBEVALLEY_HOME/.env`，都只补还没设的变量；解析规则照 Node 的 `util.parseEnv` 自己写了一份（`base/env.go`）。
-- macOS 应用自己又读一遍家目录的 `.env`，合进环境再启动服务端（`app/lib/desktop/desktop.dart`）。
+- macOS 应用自己又读一遍家目录的 `.env`，合进环境再启动服务端（`app/lib/host/desktop.dart`）。
 - DeepSeek 的钥匙还会去 pi 的 `~/.pi/agent/models.json` 里找，那里的值又可能是 `$NAME`，再回到环境变量。
 - 应用里填的钥匙和语音设置在 `settings.json`，比环境变量优先。
 - `cmd/migrate` 和 `cmd/vibevalley` 各有自己的一套参数和环境变量。

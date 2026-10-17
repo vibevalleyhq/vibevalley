@@ -28,7 +28,7 @@ app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
 
 ## 检查和测试
 
-先跑和改动有关的最窄的那个（命令见 [AGENTS.md](../AGENTS.md#命令)）。服务端的测试怎么写见 [server](../server/README.md#测试)，Flutter 的见 [app](../app/README.md#测试和对照)。
+先跑和改动有关的最窄的那个（命令见 [AGENTS.md](../AGENTS.md#命令)）。服务端的测试怎么写见 [server](../server/README.md#测试)，Flutter 的见 [app](../app/README.md#测试和对照)。客户端分层用 `bun run app:imports` 查：`app/lib` 里的 import 只能往下一层走（`flutter:check` 也跑）。
 
 ## 改形状、规则和表
 
@@ -39,7 +39,7 @@ app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
 
 ## 调试台
 
-客户端里按 `` ` `` 打开（`app/lib/shell/debug/`），对着真的服务端：控制通话、管家和钟点，看帮工，试听音效，看收到的帧和事件。
+客户端里按 `` ` `` 打开（`app/lib/debug/`），对着真的服务端：控制通话、管家和钟点，看帮工，试听音效，看收到的帧和事件。
 
 ## 素材、音效和官网
 

@@ -18,7 +18,7 @@ import 'package:vibevalley/app/router.dart';
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/data/server.dart';
-import 'package:vibevalley/desktop/desktop.dart';
+import 'package:vibevalley/host/desktop.dart';
 import 'package:vibevalley/main.dart';
 import 'package:vibevalley/data/ui_state.dart';
 

@@ -7,7 +7,7 @@ import 'package:flutter/material.dart' hide Icon;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../chat/chat_widgets.dart';
-import '../desktop/desktop.dart';
+import '../host/desktop.dart';
 import '../ui/kit/kit.dart';
 import '../voice/voice.dart';
 

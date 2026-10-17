@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/farm_choice.dart';
 import '../../data/server.dart';
-import '../../desktop/desktop.dart' show startLocalFarm;
+import '../../host/desktop.dart' show startLocalFarm;
 import '../../gen/vibevalley.dart';
 import '../../ui/kit/kit.dart';
 import '../connectors/qr.dart';

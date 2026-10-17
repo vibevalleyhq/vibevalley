@@ -7,8 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'app/router.dart';
 import 'desk/places.dart';
 import 'data/farm_choice.dart';
-import 'desktop/desktop.dart';
-import 'mobile/notices.dart';
+import 'host/desktop.dart';
+import 'host/mobile_notices.dart';
 import 'shell/app_frame.dart';
 import 'ui/kit/kit.dart';
 

@@ -8,10 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
 import '../ui/kit/kit.dart';
-import 'debug/debug_log.dart';
-import 'debug/debug_panel.dart';
+import '../debug/debug_log.dart';
+import '../debug/debug_panel.dart';
 import 'desktop_title_bar.dart';
-import '../shared/fx.dart';
+import '../game/fx.dart';
 import 'server_away.dart';
 import 'title/startup.dart';
 import 'title/title_screen.dart';

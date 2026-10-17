@@ -10,7 +10,7 @@ Status: implemented
 
 三个渠道，同一套代码，打包时选（`app/tool/build-macos.sh --channel alpha|beta|release`，不写是 release）。行为见 [desktop.md](../../../../docs/reference/desktop.md)「渠道」，命令见 [development.md](../../../../docs/development.md)「macOS 应用」。
 
-- **三个应用，不是一个应用的三种设置**：应用名、bundle id 都不同，所以能同时装、同时开，单实例锁、登录时打开、通知各管各的。表在 `app/lib/desktop/channel.dart`：
+- **三个应用，不是一个应用的三种设置**：应用名、bundle id 都不同，所以能同时装、同时开，单实例锁、登录时打开、通知各管各的。表在 `app/lib/host/channel.dart`：
 
   | 渠道 | 应用 | bundle id | 家目录 |
   |---|---|---|---|

@@ -28,7 +28,7 @@ Status: implemented
 ## Consequences
 
 - 重开应用后，还没处理的事会回到未接（不响）。
-- Electron 桌面客户端的系统通知和手机曾各有一套「什么值得叫你」；现在桌面版是 Flutter 的，它的通知（`app/lib/desktop/notify.dart`）读服务端帧里的 `inbox`，和手机用同一套。
+- Electron 桌面客户端的系统通知和手机曾各有一套「什么值得叫你」；现在桌面版是 Flutter 的，它的通知（`app/lib/host/notify.dart`）读服务端帧里的 `inbox`，和手机用同一套。
 
 ## Verification
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/farm/friends.dart';
-import 'package:vibevalley/farm/quota.dart' show HudCard;
+import 'package:vibevalley/shared/friends.dart';
+import 'package:vibevalley/shared/quota.dart' show HudCard;
 import 'package:vibevalley/ui/kit/kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

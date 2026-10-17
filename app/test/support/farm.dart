@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/data/server.dart';
-import 'package:vibevalley/desktop/desktop.dart';
+import 'package:vibevalley/host/desktop.dart';
 import 'package:vibevalley/game/state.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'server.dart';

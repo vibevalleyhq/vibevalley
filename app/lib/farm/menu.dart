@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../game/state.dart';
-import '../shell/debug/debug_panel.dart' show debugOpenProvider;
+import '../debug/debug_panel.dart' show debugOpenProvider;
 import '../data/prefs.dart';
 import '../data/ui_state.dart';
 import '../ui/kit/kit.dart';

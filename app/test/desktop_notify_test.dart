@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/desktop/desktop.dart';
-import 'package:vibevalley/desktop/notify.dart';
+import 'package:vibevalley/host/desktop.dart';
+import 'package:vibevalley/host/notify.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
 InboxItem _call(

@@ -4,7 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../ui/theme.dart';
-import '../desktop/desktop.dart';
+import '../host/desktop.dart';
 
 class DesktopTitleBar extends ConsumerWidget {
   const DesktopTitleBar({super.key});

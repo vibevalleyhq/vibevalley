@@ -5,14 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/providers.dart';
-import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
-import '../../audio/sfx.dart';
-import '../../audio/synth.dart';
+import '../data/providers.dart';
+import '../gen/vibevalley.dart';
+import '../ui/kit/kit.dart';
+import '../audio/sfx.dart';
+import '../audio/synth.dart';
 import 'debug_commands.dart';
 import 'debug_log.dart';
-import '../../rules/clock.dart';
+import '../rules/clock.dart';
 
 final debugOpenProvider = NotifierProvider<DebugOpen, bool>(DebugOpen.new);
 

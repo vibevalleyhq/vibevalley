@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/providers.dart';
+import '../data/ui_state.dart';
 import '../game/farm.dart';
-import '../game/state.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../ui/kit/kit.dart';
@@ -13,8 +13,8 @@ import 'popover.dart';
 import 'quota.dart';
 import '../rules/farm.dart';
 import '../rules/seeds.dart';
-import '../shared/faces.dart';
-import '../shared/tags.dart';
+import './faces.dart';
+import './tags.dart';
 
 enum FriendStatus { bug, ripe, busy, rest, away }
 

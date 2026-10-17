@@ -77,3 +77,5 @@ final selectedProvider = held<String?>(null);
 
 /// null: the newest still open.
 final planShownProvider = held<String?>(null);
+
+final friendsOpenProvider = held(false);

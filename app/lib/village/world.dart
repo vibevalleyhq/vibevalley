@@ -1,22 +1,10 @@
 // The positions come from the LDtk level; this file names them and works out what follows.
 
 import '../gen/vibevalley.dart';
+import '../rules/beds.dart';
+export '../rules/beds.dart' show Bed, beds, bedOfStation, isRipe;
 import 'level.dart';
 import 'nav.dart';
-
-class Bed {
-  const Bed(this.index, this.station, [this.unlockLevel]);
-  final int index;
-
-  /// -1 for locked ones.
-  final int station;
-
-  final int? unlockLevel;
-}
-
-const beds = [Bed(0, 0), Bed(1, 1), Bed(2, 2), Bed(3, 3), Bed(4, 4), Bed(5, 5), Bed(6, -1, 5), Bed(7, -1, 8), Bed(8, -1, 12)];
-
-Bed? bedOfStation(int station) => station < 0 ? null : beds.where((b) => b.station == station).firstOrNull;
 
 const plotW = 34.0;
 const plotH = 26.0;
@@ -159,8 +147,6 @@ class VillageWorld {
     return Goal(key, Pt(at.x + dir * _reach + (n.isOdd ? -12 : 12) * ((n - 1) / 2).ceil(), at.y + 12), 'up');
   }
 }
-
-bool isRipe(Crop crop) => crop == Crop.wheat || crop == Crop.carrot;
 
 const _handsOn = {SessionAction.editFile, SessionAction.runCommand, SessionAction.mcp, SessionAction.other};
 

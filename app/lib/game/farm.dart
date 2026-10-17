@@ -1,10 +1,10 @@
 // aimTool is the rule: the screen shows it while pointing and follows it on a click.
 
 import '../gen/vibevalley.dart';
-import '../village/world.dart';
+import '../rules/beds.dart';
 import '../rules/farm.dart';
 
-export '../village/world.dart' show Bed, beds, bedOfStation, isRipe;
+export '../rules/beds.dart' show Bed, beds, bedOfStation, isRipe;
 
 enum Tool {
   hand('手', '点一块地看详情，点空地播种', 'icon-hand'),

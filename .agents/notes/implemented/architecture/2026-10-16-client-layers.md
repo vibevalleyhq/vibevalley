@@ -15,11 +15,14 @@ Status: implemented
   - `ui/`：像素控件、主题、通用的 `Ticking`、`TextLink`，不懂业务；
   - `audio/`：`sfx`、`synth`、`farm_sounds`，谁都能用，不 import 皮；
   - `chat/`、`voice/`：田头和语音的状态、规则和控件；
-  - `shared/`：几张皮都用的画面和效果（脸、外形、干活记录、收获单、`fx`、奖章）；
-  - `game/`：客户端的动作和特效状态（收、浇水、面板之外的状态），不 import 皮。
-- **`village/` 是像素渲染层，不是皮**：`farm/` 和 `title/` 都用它；它不 import `desk/`、`farm/`、`phone/`。
-- **皮是 `desk/`、`farm/`、`phone/`、`title/`**：皮之间不互相 import；一张皮用的放皮里，两张以上用的放 `shared/`。
+  - `game/`：客户端的动作和特效（收、浇水、`fx`、`bedFx`），不 import 皮；
+  - `shared/`：几张皮都用的画面和状态转换（脸、外形、干活记录、收获单、朋友、配额、音效配方、`farmSounds`）；
+  - `phone/`：手机和小游戏；`debug/`：调试台；`title/` 的启动画面仍在外壳里。
+- **`village/` 是像素渲染层，不是皮**：`farm/` 和 `title/` 都用它；它不 import `desk/`、`farm/`。
+- **`phone/` 是农场里的手机，不是第三张皮**：它画在农场左下角，`farm` 和 `village` 都可以用；它不 import 皮。
+- **皮是 `desk/`、`farm/`（`title/` 由外壳出）**：皮之间不互相 import；一张皮用的放皮里，两张以上用的放 `shared/`。
 - **`app/` 只做组合**（`router.dart`、`main.dart`），`shell/` 是外壳（frame、桌面标题栏、连不上时的横幅）；下面的层不 import `app/`，`shell` 也不。
+- **次序由 `scripts/app-imports.ts` 强制**：每个目录一个 rank，import 只能去 rank 更小的目录；`bun run app:imports` 挂在 `flutter:check` 里，反向、同层跨目录都会报。
 - **一样东西一个来源**：档案和农机从 `deskConfigProvider` 读（[客户端问服务端](2026-10-16-the-client-asks-the-server.md)）；一个 `apiProvider`；工地事件一个 `sideEventsProvider`。
 - **服务端地址归数据层**：`data/providers.dart` 的 `embeddedServerAddress`，桌面外壳开起服务端以后写进去。
 
@@ -33,12 +36,12 @@ Status: implemented
 
 ## Consequences
 
-- `desk/`、`farm/`、`phone/` 之间没有 import；`village` 只剩三处反过来依赖 `farm/friends`、`farm/quota`、`phone/phone`（下一步把它们搬进 `shared/`）。
+- `desk/`、`farm/` 之间没有 import；`village` 不 import 皮；`game` 不 import `village`（床位的纯数据在 `rules/beds.dart`）；图层没有环。
 - 「这个控件该放哪」有了答案：只一张皮用的放皮里，两张都用的放 `shared/`，和皮无关的放 `ui/`，本机状态放 `data/`，声音放 `audio/`。
 - 顺带合掉了两份重复：两个 `AgentFace`、两套挑动物的规则（像素村的 `lookOf` 自己有一份物种表和哈希，和 `castOf` 对表情符号的 id 会挑出不同的动物）。
 
 ## Verification
 
-- 2026-10-17 的整理：`shell/prefs.dart` → `data/prefs.dart`，`shell/sfx.dart`、`synth.dart`、`farm_sounds.dart` → `audio/`，`shell/title/title_state.dart` 和 `game/state.dart` 的面板/选中状态 → `data/ui_state.dart`，`shell/fx_layer.dart` → `shared/fx.dart`，`shell/achievements.dart` → `shared/medals.dart`，`app/desk.dart` 的 `Place`/`Desk` → `desk/places.dart`、`desk/desk_shell.dart`；`server_away` 不再 import `app/router`。
-- `bun run flutter:check`：analyze 干净，284 个测试通过。
-- 依赖：`grep` 各目录的 import，`desk`/`farm`/`phone` 之间没有互相引用；`chat`、`shared`、`ui`、`data`、`audio`、`game` 不 import 任何一张皮；下层不 import `app`。
+- 2026-10-17 的整理：`shell/prefs.dart` → `data/prefs.dart`，`shell/sfx.dart`、`synth.dart` → `audio/`，`shell/title/title_state.dart` 和 `game/state.dart` 的面板/选中状态 → `data/ui_state.dart`，`shell/achievements.dart` → `ui/medals.dart`，`shell/fx_layer.dart` → `game/fx.dart`，`app/desk.dart` 的 `Place`/`Desk` → `desk/places.dart`、`desk/desk_shell.dart`；`server_away` 不再 import `app/router`。第二轮：`farm/friends.dart`、`quota.dart`、`popover.dart` → `shared/`，`audio/farm_sounds.dart` → `shared/farm_sounds.dart`，`village/world.dart` 的 `Bed`/`beds`/`bedOfStation`/`isRipe` → `rules/beds.dart`，`shell/debug/` → `debug/`，`mobile/notices.dart` → `desktop/mobile_notices.dart`。
+- `bun run flutter:check`：analyze 干净，284 个测试通过；`bun run app:imports` 172 个文件没有反向 import。
+- 依赖：`bun run app:imports` 按 rank 检查 `app/lib` 的每一条 import；`village` 不 import `desk`/`farm`，`game` 不 import `village`，下层不 import `app`。

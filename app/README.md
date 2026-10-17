@@ -9,7 +9,7 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 - **命令**：`lib/gen/vibevalley.dart` 里生成的 `VibeValleyApi`，页面只从 `apiProvider` 拿它。
 - **规则**：帧里没有、要从状态推出来的，是 `lib/rules/` 的纯函数；客户端自己的游戏状态（工具、手机、偏好）在各自的目录。
 
-用哪个农场（本机，或经院门配对的另一台电脑）存在偏好里（`lib/data/farm_choice.dart`）。手机上不在屏幕前时按桌面版的规则弹系统通知（`lib/mobile/notices.dart`）。macOS 版见 [desktop.md](../docs/reference/desktop.md)。
+用哪个农场（本机，或经院门配对的另一台电脑）存在偏好里（`lib/data/farm_choice.dart`）。手机上不在屏幕前时按桌面版的规则弹系统通知（`lib/host/mobile_notices.dart`）。macOS 版见 [desktop.md](../docs/reference/desktop.md)。
 
 ## 目录
 
@@ -28,7 +28,7 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 | `lib/phone/` | 手机、来电、五个小游戏 |
 | `lib/desk/<地方>/` | 工作台的各页：聊天、工单、地图、帮工和档案、管家、农具、技能书、连接器、项目、声音、院门、图鉴；`shared/` 是几页共用的 |
 | `lib/shell/` | 外框：首页、启动、服务端不在、桌面标题栏、特效层、音效合成、调试台、偏好 |
-| `lib/desktop/` | macOS 桌面：拉起服务端、菜单栏、通知、快捷键、渠道 |
+| `lib/host/` | 本机外壳：macOS 桌面（拉起服务端、菜单栏、快捷键、渠道）和手机的系统通知 |
 | `lib/mobile/` | 手机：系统通知，安卓的前台服务 |
 | `lib/voice/` | 语音：Agora 的 Flutter SDK，字幕走 RTC 的 data stream |
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
-import '../shared/faces.dart' show RuntimeIcon;
+import './faces.dart' show RuntimeIcon;
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';

@@ -34,6 +34,6 @@ Flutter 客户端里和 VibeValley 本身无关的那一半：像素画怎么放
 
 音效是现合成的，没有音频文件（[理由](../../.agents/notes/implemented/feature/2026-10-10-synthesized-sound-effects.md)）：配方在 `lib/audio/sfx.dart`，合成器在 `lib/audio/synth.dart`。
 
-- **从状态里响**（`lib/audio/farm_sounds.dart`）：不管是谁让状态变的，变了就响。
+- **从状态里响**（`lib/shared/farm_sounds.dart`）：不管是谁让状态变的，变了就响。
 - **音量分三档**（按人耳加权的响度）：点击约 -28，干活和状态变化约 -24，奖励约 -20。改了配方要重新量。
 - 调试台的「音效」页逐个试听；`test/shell_synth_test.dart` 拿 `test/fixtures/sfx.json` 比对合成结果。

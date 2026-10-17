@@ -1,6 +1,6 @@
 # macOS 应用
 
-Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏、系统通知和语音快捷键。Dart 这一半在 `app/lib/desktop/`，Swift 那一半在 `app/macos/Runner/`，两边经方法通道 `vibevalley/desktop` 说话（[理由](../../.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)）。
+Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏、系统通知和语音快捷键。Dart 这一半在 `app/lib/host/`，Swift 那一半在 `app/macos/Runner/`，两边经方法通道 `vibevalley/desktop` 说话（[理由](../../.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)）。
 
 ## 服务端在里面
 
@@ -13,7 +13,7 @@ Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏�
 
 ## 渠道
 
-三个渠道可以同时装、同时开，打包时定（`build-macos.sh --channel`；`lib/desktop/channel.dart`；[理由](../../.agents/notes/implemented/process/2026-10-12-release-channels.md)）：
+三个渠道可以同时装、同时开，打包时定（`build-macos.sh --channel`；`lib/host/channel.dart`；[理由](../../.agents/notes/implemented/process/2026-10-12-release-channels.md)）：
 
 | 渠道 | 应用 | bundle id | 家目录 |
 |---|---|---|---|
@@ -31,11 +31,11 @@ Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏�
 
 ## 菜单栏
 
-图标是一棵苗，旁边写在干活的帮工数和等你处理的事数（`2 · 1!`）。菜单里是现在的情况、每件等你的事、打开农场、和管家说话、登录时打开、退出。摘要和等你的事都从帧里的 `inbox` 算（`lib/desktop/notify.dart` 的 `traySummary`）。
+图标是一棵苗，旁边写在干活的帮工数和等你处理的事数（`2 · 1!`）。菜单里是现在的情况、每件等你的事、打开农场、和管家说话、登录时打开、退出。摘要和等你的事都从帧里的 `inbox` 算（`lib/host/notify.dart` 的 `traySummary`）。
 
 ## 通知
 
-窗口不在你面前时，帧里新出现的来电（做完、没做成、没动静、冲突、@主人、计划的事）、成就和农场出错弹系统通知，点开回到对应的地方。规则在 `lib/desktop/notify.dart`（纯函数），点通知要做的事是 `lib/desktop/command.dart` 的 `DesktopCommand`。
+窗口不在你面前时，帧里新出现的来电（做完、没做成、没动静、冲突、@主人、计划的事）、成就和农场出错弹系统通知，点开回到对应的地方。规则在 `lib/host/notify.dart`（纯函数），点通知要做的事是 `lib/host/command.dart` 的 `DesktopCommand`。
 
 ## 快捷键
 

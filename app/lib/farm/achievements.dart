@@ -6,7 +6,7 @@ import '../game/commands.dart';
 import '../game/farm.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
-import 'popover.dart';
+import '../shared/popover.dart';
 import '../rules/progress.dart';
 import '../shared/tags.dart';
 

@@ -20,7 +20,7 @@ Status: implemented
 4. **形状不手抄**（后来改由 Go 的形状生成，[形状的源头是 Go](2026-10-15-go-owns-the-shapes.md)）：当时 `tools/export-schemas.ts` 从 protocol 导出 OpenAPI 和 `CoreState` 的 JSON Schema，`app/tool/dart_types.ts` 生成 Dart 的类型；现在服务端的 `tool/shapegen` 写 `lib/gen/vibevalley.dart`，`bun run flutter:check` 检查它是否最新、跑 `flutter analyze` 和 `flutter test`。
 5. **帧里没有的规则移植成 Dart**：网页从核心状态推出来、服务端帧里没给的（阶段的说法、计划的规则、成就和称号、未读、额度……）照 protocol 移植，集中在 `lib/rules/`，每个文件写明 TypeScript 出处。
 6. **语音用 Agora 的 Flutter SDK**，只链语音要的部分（`tool/agora-voice-only.sh`）；macOS 上字幕和 agent 的状态走 RTC 的 data stream（`/api/v1/voice/agent` 带 `captions: 'datastream'`）。
-7. **macOS 版把服务端带在应用里**：Go 服务端放在 `Contents/MacOS/vibevalley-server`，开机在一个空闲的回环端口作为子进程拉起，退出时停掉；家目录 `~/Library/Application Support/vibevalley`；alpha、beta、release 三个渠道照 [release-channels](../process/2026-10-12-release-channels.md) 的规矩各是一个应用（`tool/build-macos.sh --channel`）。菜单栏、通知、语音快捷键、登录时打开在 `lib/desktop/` 和 `macos/Runner`。
+7. **macOS 版把服务端带在应用里**：Go 服务端放在 `Contents/MacOS/vibevalley-server`，开机在一个空闲的回环端口作为子进程拉起，退出时停掉；家目录 `~/Library/Application Support/vibevalley`；alpha、beta、release 三个渠道照 [release-channels](../process/2026-10-12-release-channels.md) 的规矩各是一个应用（`tool/build-macos.sh --channel`）。菜单栏、通知、语音快捷键、登录时打开在 `lib/host/` 和 `macos/Runner`。
 
 ### 怎么落的
 

@@ -37,7 +37,8 @@ cd server && go run ./tool/shapegen                             # 改完 protoco
 cd server && GOTOOLCHAIN=go1.27.2 go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate   # 改完 pkg/db/queries 或 migrations：重写 pkg/db/generated
 cd server && VIBEVALLEY_GOLDEN=update go test ./internal/...           # 有意改了规则：用 Go 的结果重写各包的黄金数据，再看 diff
 cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787   # 客户端连开着的服务端
-bun run flutter:check                                           # 改完 app 或形状：生成的是否最新、analyze、test
+bun run flutter:check                                           # 改完 app 或形状：生成的是否最新、analyze、test、import 分层
+bun run app:imports                                             # 改完 app/lib 的 import：只能往下一层走（flutter:check 也跑）
 bun run package:mac                                             # macOS 应用（带 Go 服务端）和 .dmg；--channel alpha|beta 见 app/README.md
 bun run notes:catalog                                           # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
 bun run docs:verify                                             # 改完文档、Note 或 skill：Note 和 skill 的格式、目录是否最新、链接
@@ -68,7 +69,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `server/internal` 包（`issue`、`issue_session`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `pkg/db/queries/<表>.sql`，一张表一个文件，Go 里只调 sqlc 生成的；`migrations` 的测试查这几条（[理由](.agents/notes/implemented/architecture/2026-10-17-names-by-module.md)）。
 - **不留兼容**：存盘的格式（`vibevalley.db` 的表、家目录的文件、环境变量）只认现在的名字；改名就直接改，不在读的地方长期兜底旧数据；旧数据在升级前用一次性的导入搬（TypeScript 的农场跑过一次，搬完连同旧文件和导入器一起删），启动时只读今天的名字，不读、不改写旧文件（[理由](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)、[一次性迁移](.agents/notes/implemented/architecture/2026-10-17-one-way-migration.md)）。
 - **Flutter 不折事实**：它读 `GET /api/v1/state` 折好的 `CoreState`；要新的数据就加进 protocol 的字段和 `Reduce`，Dart 里只写跟着时钟走的画面；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在 Dart 里重写，加一个字段或接口问服务端（[理由](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)、[客户端问服务端](.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
-- **客户端分层**：`gen`、`data`（服务端状态、偏好、界面的选中/面板）、`rules`（只读的纯函数）、`ui`、`audio`、`chat`（田头）、`voice`、`shared`（几张皮共用的画面）、`game`（客户端的动作）在下；`village` 是像素渲染层，`desk`、`farm`、`phone` 是皮；`app` 只做组合，`shell` 是外壳。皮之间不互相 import，两张都用的放进 `shared`；下层不 import `app`（[理由](.agents/notes/implemented/architecture/2026-10-16-client-layers.md)）。
+- **客户端分层**：`gen`、`sprites`、`audio`、`rules`（只读的纯函数）、`ui`、`data`（服务端状态、偏好、界面的选中/面板）、`host`（本机外壳）、`game`（客户端的动作）、`shared`（几张皮共用的画面）、`chat`（田头）、`voice`、`phone`（农场里的手机和小游戏）、`debug`（调试台）在下；`village` 是像素渲染层；`desk`、`farm` 是两张皮；`app` 只做组合，`shell` 是外壳。依赖只能往下走（次序在 `scripts/app-imports.ts`，`bun run app:imports` 查），皮之间不互相 import，两张都用的放进 `shared`；下层不 import `app`（[理由](.agents/notes/implemented/architecture/2026-10-16-client-layers.md)）。
 - **通用的小封装在 `pkg/x`**：字符串（按 UTF-16 数、JavaScript 的空白）、数字（照 JavaScript 写）、指针、时间各一个包；要用就 import，不在自己包里再写一份 `xxxPtr`、`chatTrim`（[理由](.agents/notes/implemented/architecture/2026-10-16-common-wrappers-in-pkg-x.md)）。
 - **封闭的联合穷尽处理**：要每种都处理的地方（按 `_tag` 或 `type` 分支），`switch` 覆盖每一种，加新成员时让编译器或测试报错：Dart 的 sealed class 由编译器查；Go 的编译器不查类型 `switch`，用生成的成员表（`XMembers`）写测试。
 - **服务端的服务**：每个包只导出一个服务 `<包>.Service`，一块业务里分开写的几部分是它嵌入的不导出的零件；`Workspace` 上的字段用单数概念名（`f.Issue.Merge`）。构造函数的参数是它用到的服务（不拿整个 `Workspace`），在包的 `Module` 里用 `base.Run` 交给 fx，再加进 `workspace.go` 的 `services`；包只 import 排在它前面的包，往上走 `base.Hub`；服务之间传的形状放在定义它的包里，`base` 只放地基；`OnStart(ctx)` 订阅和开后台的活，开机就要发布的放 `OnReady(ctx)`（[server](server/README.md#服务)）。

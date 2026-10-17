@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/shared/medals.dart';
-import 'package:vibevalley/shared/fx.dart';
+import 'package:vibevalley/ui/medals.dart';
+import 'package:vibevalley/game/fx.dart';
 import 'package:vibevalley/shell/server_away.dart';
 import 'package:vibevalley/ui/kit/kit.dart';
 

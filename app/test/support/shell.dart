@@ -5,7 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/data/providers.dart';
-import 'package:vibevalley/desktop/desktop.dart';
+import 'package:vibevalley/host/desktop.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/shell/server_away.dart';
 import 'package:vibevalley/audio/sfx.dart';
