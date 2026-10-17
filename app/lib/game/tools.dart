@@ -1,5 +1,7 @@
 // aimTool is the rule: the screen shows it while pointing and follows it on a click.
 
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
+
 import '../gen/vibevalley.dart';
 import '../rules/beds.dart';
 import '../rules/sessions.dart';
@@ -159,3 +161,9 @@ String managerSprite(String look, String suffix, bool Function(String) has) => h
 bool lookReady(String look, bool Function(String) has) => look == 'farmer' || has('manager-$look');
 
 const petName = {'dog': '小狗', 'ragdoll': '重点色布偶猫', 'bluecat': '蓝猫'};
+
+Tool? toolForKey(LogicalKeyboardKey key) {
+  final n = LogicalKeyboardKey.digit1.keyId;
+  final i = key.keyId - n;
+  return i >= 0 && i < Tool.values.length ? Tool.values[i] : null;
+}

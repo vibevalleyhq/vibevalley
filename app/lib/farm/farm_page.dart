@@ -29,6 +29,7 @@ import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
 import '../village/world.dart' show VillageWorld;
 import '../village/game.dart';
+import 'input.dart';
 import '../village/hud.dart';
 import '../village/framing.dart';
 import '../village/village_view.dart';
@@ -172,28 +173,35 @@ class _FarmPageState extends ConsumerState<FarmPage> {
       ref.read(reviewingProvider) != null;
 
   bool _onKey(KeyEvent e) {
-    if (!_active) return false;
     final keys = HardwareKeyboard.instance;
-    if (e.logicalKey == LogicalKeyboardKey.altLeft || e.logicalKey == LogicalKeyboardKey.altRight || e.logicalKey == LogicalKeyboardKey.alt) {
-      _game?.revealNames.value = keys.isAltPressed;
-      return false;
-    }
-    if (e is! KeyDownEvent || keys.isMetaPressed || keys.isControlPressed || keys.isAltPressed || typing()) return false;
-    if (e.logicalKey == LogicalKeyboardKey.escape) {
-      // A dialog takes its own Esc; then the tool goes down; then the menu opens.
-      if (_anyLayer) return false;
-      if (ref.read(heldToolProvider) != Tool.hand) {
+    final action = farmKey(
+      key: e.logicalKey,
+      keyDown: e is KeyDownEvent,
+      active: _active,
+      typing: typing(),
+      meta: keys.isMetaPressed,
+      control: keys.isControlPressed,
+      alt: keys.isAltPressed,
+      layersOpen: _anyLayer,
+      held: ref.read(heldToolProvider),
+    );
+    switch (action) {
+      case null:
+        return false;
+      case FarmReveal(:final down):
+        _game?.revealNames.value = down;
+        return false;
+      case FarmCloseTool():
         ref.read(heldToolProvider.notifier).set(Tool.hand);
-      } else {
+        return true;
+      case FarmOpenMenu():
         Sfx.play('open');
         ref.read(menuOpenProvider.notifier).set(true);
-      }
-      return true;
+        return true;
+      case FarmPickTool(:final tool):
+        ref.read(heldToolProvider.notifier).set(tool);
+        return true;
     }
-    final tool = toolForKey(e.logicalKey);
-    if (tool == null) return false;
-    ref.read(heldToolProvider.notifier).set(tool);
-    return true;
   }
 
   void _hideNames() => _game?.revealNames.value = false;

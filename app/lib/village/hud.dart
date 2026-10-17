@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart' hide Icon;
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -633,10 +632,4 @@ class _Tap extends StatelessWidget {
       ),
     ),
   );
-}
-
-Tool? toolForKey(LogicalKeyboardKey key) {
-  final n = LogicalKeyboardKey.digit1.keyId;
-  final i = key.keyId - n;
-  return i >= 0 && i < Tool.values.length ? Tool.values[i] : null;
 }
