@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../chat/channel_menu.dart';
 import '../chat/chat_rules.dart';
 import '../chat/chat_state.dart';
+import '../chat/turn_steps.dart';
 import '../chat/chat_widgets.dart';
 import '../gen/vibevalley.dart';
 import '../audio/sfx.dart';
@@ -495,20 +496,19 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
             child: Text(m.text, textAlign: TextAlign.center, style: chatSmall.copyWith(height: 1.625)),
           );
         }
-        final steps = chatTurnSteps;
         if (m.kind == MessageKind.report) {
           return ChatReportMessage(
             message: m,
             first: first,
             face: _face(m, 30),
-            steps: steps != null && m.final_ && m.fromKind == SenderKind.agent ? steps(context, m.from, m.at, manager: false) : null,
+            steps: m.final_ && m.fromKind == SenderKind.agent ? TurnSteps(id: m.from, at: m.at) : null,
           );
         }
         final chip = thread == null ? null : ChatThreadChip(thread: thread, unread: unreadIn(widget.state.chat, thread), onTap: () => _show(thread.id));
         if (m.fromKind == SenderKind.user) return ChatBubble(mine: true, first: first, text: m.text, final_: m.final_, at: m.at, after: chip);
         // The dispatch note is the farm's, under the manager's name: its words say the same turn.
-        final turn = steps != null && m.final_ && m.fromKind == SenderKind.manager && m.kind != MessageKind.dispatch
-            ? steps(context, managerAgent, m.at, manager: true)
+        final turn = m.final_ && m.fromKind == SenderKind.manager && m.kind != MessageKind.dispatch
+            ? TurnSteps(id: managerAgent, at: m.at, manager: true)
             : null;
         return ChatBubble(
           mine: false,

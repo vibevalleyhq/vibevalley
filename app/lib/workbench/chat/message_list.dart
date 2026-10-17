@@ -9,6 +9,7 @@ import '../../ui/kit/kit.dart';
 import '../../data/remote.dart' show agentsProvider;
 import '../../chat/chat_rules.dart';
 import '../../chat/chat_state.dart';
+import '../../chat/turn_steps.dart';
 import '../../chat/chat_widgets.dart';
 import '../../rules/chat.dart';
 import '../../rules/sessions.dart';
@@ -323,13 +324,12 @@ class _MessageRow extends ConsumerWidget {
       MessageKind.report => _Tag(icon: outcomeIcon[outcome]!, label: _outcome[outcome]!.$1, fill: _outcome[outcome]!.$2),
       _ => null,
     };
-    final steps = chatTurnSteps;
-    final turn = steps == null || !m.final_
+    final turn = !m.final_
         ? null
         : m.fromKind == SenderKind.manager && m.kind != MessageKind.dispatch
-        ? steps(context, managerAgent, m.at, manager: true)
+        ? TurnSteps(id: managerAgent, at: m.at, manager: true)
         : m.fromKind == SenderKind.agent && m.kind == MessageKind.report
-        ? steps(context, m.from, m.at, manager: false)
+        ? TurnSteps(id: m.from, at: m.at)
         : null;
     return _Frame(
       face: senderFace(m, 36),

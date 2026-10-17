@@ -2,7 +2,6 @@
 
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
@@ -49,10 +48,6 @@ final chatProjectNamesProvider = FutureProvider<List<String>>((ref) async {
   });
   return [for (final p in all) p.name];
 });
-
-/// The work log's port sets this; until then nothing shows.
-typedef TurnStepsBuilder = Widget? Function(BuildContext context, String id, double at, {required bool manager});
-TurnStepsBuilder? chatTurnSteps;
 
 /// Each caption keeps one id and the time it was first seen.
 class SpokenLines extends Notifier<List<Line>> {

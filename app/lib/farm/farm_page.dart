@@ -13,7 +13,6 @@ import '../host/desktop.dart';
 import 'chat_window.dart';
 import 'cursors.dart';
 import 'panels.dart';
-import 'turn_steps.dart';
 import '../game/commands.dart';
 import '../game/tools.dart';
 import '../game/state.dart';
@@ -67,7 +66,6 @@ class _FarmPageState extends ConsumerState<FarmPage> {
   @override
   void initState() {
     super.initState();
-    installTurnSteps();
     HardwareKeyboard.instance.addHandler(_onKey);
     _life = AppLifecycleListener(onInactive: _hideNames, onHide: _hideNames);
     _subs

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../chat/chat_state.dart' show chatTurnSteps;
 import '../data/remote.dart' show workStepsProvider;
 import '../shared/work_log.dart';
 import '../game/state.dart' show turnEndingAt;
@@ -81,5 +80,3 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
     );
   }
 }
-
-void installTurnSteps() => chatTurnSteps = (context, id, at, {required manager}) => TurnSteps(id: id, at: at, manager: manager);

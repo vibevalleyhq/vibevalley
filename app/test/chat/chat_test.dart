@@ -139,6 +139,7 @@ Future<void> _pump(WidgetTester t, Widget child, FakeServer server, CoreState st
     ProviderScope(
       overrides: [
         stateFrameProvider.overrideWith((ref) => frames()),
+        sideEventsProvider.overrideWith((ref) => const Stream<SideEvent>.empty()),
         atlasProvider.overrideWith((ref) async => atlas),
         agentsProvider.overrideWithValue(AsyncData(const <String, Agent>{})),
         apiProvider.overrideWithValue(server.api),
