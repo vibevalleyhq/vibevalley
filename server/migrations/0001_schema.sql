@@ -144,17 +144,40 @@ CREATE TABLE game_ledger (
 );
 CREATE TABLE memory (
   id           text primary key,
-  agent        text not null,
-  kind         text not null,
+  scope        text not null check (scope in ('owner', 'agent')),
+  agent        text,                -- the profile id; null for scope owner
+  kind         text not null check (kind in ('profile', 'note', 'issue', 'episode')),
+  title        text,
   body         text not null,
-  project      text,
-  session      text,
+  terms        text not null default '',   -- body cut by gse, space-joined, lower case
+  terms_of     integer not null default 0, -- which cut: memory.TermsVersion
+  labels       text not null default '[]', -- JSON array
+  importance   integer not null default 0 check (importance between 0 and 3),
+  project      text,                -- null: every project
+  session      text,                -- the Session it came from
+  author       text not null check (author in ('owner', 'agent', 'farm')),
+  replaced_by  text,                -- the memory that superseded it; never recalled again
   created_at   integer not null,
+  updated_at   integer not null,
   recalled     integer not null default 0,
-  recalled_at  integer
+  recalled_at  integer,
+  check ((scope = 'owner') = (agent is null))
 );
-CREATE INDEX memory_by_agent on memory (agent, created_at desc);
-CREATE UNIQUE INDEX memory_one_issue on memory (agent, session) where kind = 'issue';
+CREATE INDEX memory_by_agent ON memory (agent, created_at desc);
+CREATE INDEX memory_by_scope ON memory (scope, kind) WHERE replaced_by IS NULL;
+CREATE UNIQUE INDEX memory_one_issue ON memory (agent, session) WHERE kind = 'issue';
+-- External content: the text lives once, in memory; the index holds only the terms.
+CREATE VIRTUAL TABLE memory_term USING fts5(terms, content = 'memory', content_rowid = 'rowid', tokenize = 'unicode61');
+CREATE TRIGGER memory_term_insert AFTER INSERT ON memory BEGIN
+  INSERT INTO memory_term (rowid, terms) VALUES (new.rowid, new.terms);
+END;
+CREATE TRIGGER memory_term_delete AFTER DELETE ON memory BEGIN
+  INSERT INTO memory_term (memory_term, rowid, terms) VALUES ('delete', old.rowid, old.terms);
+END;
+CREATE TRIGGER memory_term_update AFTER UPDATE OF terms ON memory BEGIN
+  INSERT INTO memory_term (memory_term, rowid, terms) VALUES ('delete', old.rowid, old.terms);
+  INSERT INTO memory_term (rowid, terms) VALUES (new.rowid, new.terms);
+END;
 CREATE TABLE connector_account (
   connector      text primary key check (connector in ('weixin', 'feishu', 'qq')),
   secrets        text not null,

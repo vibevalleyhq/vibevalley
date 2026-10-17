@@ -58,7 +58,7 @@ func newProviders(local *memories, store *agent.Service, settings *setting.Servi
 		}
 		return ids
 	}
-	own := localProvider{local, profiles}
+	own := &localProvider{m: local, profiles: profiles}
 	return &providers{memories: local, local: own, settings: settings, all: []provider{own}, timeout: prefetchTimeout, build: newSource}, nil
 }
 

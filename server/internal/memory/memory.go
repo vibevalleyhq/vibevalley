@@ -133,7 +133,15 @@ func memoryNullable(s *string) sql.NullString {
 func (m *memories) insertNote(agentID, body string, project, session *string) (string, int64, error) {
 	at := clock.NowMs()
 	id := base.NewID()
-	_, err := m.q.AddNote(context.Background(), generated.AddNoteParams{ID: id, Agent: agentID, Body: body, Project: memoryNullable(project), Session: memoryNullable(session), CreatedAt: at})
+	// A note with no session is the owner's, from the 记性 tab; one from a run is the agent's own.
+	author := "agent"
+	if session == nil {
+		author = "owner"
+	}
+	_, err := m.q.AddNote(context.Background(), generated.AddNoteParams{
+		ID: id, Agent: agentID, Body: body, Terms: termsText(body), TermsOf: TermsVersion, Project: memoryNullable(project), Session: memoryNullable(session),
+		Author: author, CreatedAt: at,
+	})
 	if err != nil {
 		return "", 0, err
 	}
@@ -147,7 +155,7 @@ func (m *memories) recallable(cue RecallCue) []protocol.Memory {
 		log.Printf("vibevalley: %s could not recall: %v", cue.Agent, err)
 		return nil
 	}
-	return pick(all, pickCue{Session: cue.Session, Project: cue.Project, Text: cue.Text, Skip: cue.Skip, Now: clock.NowMs()})
+	return pick(all, pickCue{Session: cue.Session, Project: cue.Project, Text: cue.Text, Skip: cue.Skip, Now: clock.NowMs(), Matches: m.matches(cue.Agent, cue.Text)})
 }
 
 func (m *memories) markRecalled(ids []string) {
@@ -196,8 +204,9 @@ func (m *memories) keep(run FinishedRun) error {
 		}
 	}
 	ctx := context.Background()
+	job := memoryJobText(run.Job, run.Summary, run.Outcome)
 	if err := m.q.KeepJob(ctx, generated.KeepJobParams{
-		ID: base.NewID(), Agent: run.Agent, Body: memoryJobText(run.Job, run.Summary, run.Outcome), Project: sql.NullString{String: run.Project, Valid: true},
+		ID: base.NewID(), Agent: run.Agent, Body: job, Terms: termsText(job), TermsOf: TermsVersion, Project: sql.NullString{String: run.Project, Valid: true},
 		Session: sql.NullString{String: run.Session, Valid: true}, CreatedAt: clock.NowMs(),
 	}); err != nil {
 		return err

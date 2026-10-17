@@ -41,6 +41,23 @@ func TestNamesFollowTheModules(t *testing.T) {
 		}
 		return false
 	}
+	// A full-text table keeps its index in tables of its own (<table>_data, _idx, _content, _docsize, _config): SQLite's, not
+	// a module's, and never queried.
+	shadow := map[string]bool{}
+	virtual, err := db.Query("select name from sqlite_master where type = 'table' and sql like 'CREATE VIRTUAL TABLE%'")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for virtual.Next() {
+		var name string
+		if err := virtual.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		for _, part := range []string{"data", "idx", "content", "docsize", "config"} {
+			shadow[name+"_"+part] = true
+		}
+	}
+	virtual.Close()
 	rows, err := db.Query("select type, name, tbl_name from sqlite_master where type in ('table', 'index') and name not like 'sqlite_%'")
 	if err != nil {
 		t.Fatal(err)
@@ -50,6 +67,9 @@ func TestNamesFollowTheModules(t *testing.T) {
 		var kind, name, table string
 		if err := rows.Scan(&kind, &name, &table); err != nil {
 			t.Fatal(err)
+		}
+		if shadow[name] || shadow[table] {
+			continue
 		}
 		switch kind {
 		case "table":

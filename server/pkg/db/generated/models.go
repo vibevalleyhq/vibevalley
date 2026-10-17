@@ -179,14 +179,27 @@ type IssueSession struct {
 
 type Memory struct {
 	ID         string
-	Agent      string
+	Scope      string
+	Agent      sql.NullString
 	Kind       string
+	Title      sql.NullString
 	Body       string
+	Terms      string
+	TermsOf    int64
+	Labels     string
+	Importance int64
 	Project    sql.NullString
 	Session    sql.NullString
+	Author     string
+	ReplacedBy sql.NullString
 	CreatedAt  int64
+	UpdatedAt  int64
 	Recalled   int64
 	RecalledAt sql.NullInt64
+}
+
+type MemoryTerm struct {
+	Terms string
 }
 
 type Schedule struct {

@@ -39,6 +39,12 @@ This product includes software from other projects:
 - Fusion Pixel Font (https://github.com/TakWolf/fusion-pixel-font),
   SIL Open Font License 1.1; app/assets/fonts/fusion-pixel-OFL.txt.
 
+- gse (https://github.com/go-ego/gse, v1.1.0), Apache License 2.0.
+  server/internal/memory cuts Chinese with it; server/internal/memory/dict/zh_s.txt.gz is its
+  data/dict/zh/s_1.txt, compressed. That dictionary comes from jieba
+  (https://github.com/fxsjy/jieba), MIT License, Copyright (c) 2013 Sun Junyi; the MIT
+  terms are below.
+
 - openclaw-weixin (@tencent-weixin/openclaw-weixin 2.4.10), MIT License.
   server/pkg/weixin is written from it (iLink bot login, getupdates, sendmessage).
   Copyright (C) 2026 Tencent. All rights reserved.

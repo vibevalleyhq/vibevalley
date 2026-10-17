@@ -181,6 +181,17 @@ type MemoryStore interface {
 4. 画像和管家：`internal/agent/brain.MemoryStore`、管家改用它、页签。
 5. 经过：收工写 `episode`、管家压缩时写归档的段、`excerpt.go`、`search_archive` 并进 `memory_search`。
 
+### 做到哪了
+
+2026-10-18 做了前三步，在分支 `memory-sqlite` 上：
+
+- 迁移是 `server/migrations/0005_memory.sql`（序号接在另一个改动还没提交的 `0002`–`0004` 后面；迁移按位置计数，`PRAGMA user_version` 是跑过几个，所以它要等那三个先进主分支再合）。`names_test` 跳过 FTS5 的影子表；查询在 `queries/memory.sql`、`queries/memory_term.sql`。
+- `memory/terms.go`：中文用 gse，**只取含汉字的词**；英文、数字、路径、版本号用原来的整词正则。只用 gse 时 `db/migrations` 被切成 `db`、`migrations`，`v1.2.3` 被切成 `v1`、`2.3` 还另算一个整词，一个版本号就是三个共有的词，别的项目的记忆因此更容易过「共有三个词」那道门槛（黄金数据里 7 条挑出来的不一样了）；分开以后是 0 条，只有 15 条顺序变了。
+- 共有一个词的分从 0.4 改成 0.5：以前的「词」是相邻两个汉字，一个四字词算三个，现在一个词就是一个；`bm25()` 的相关度最多加 1.5（`recallMatchMost`、`recallMatchWeight`）。
+- 写入时当场切词（第一次切要加载词典，约 350 ms）；开机后在后台补切迁移搬来的和 `TermsVersion` 变了的行（真库的拷贝上 3 条，640 ms）。
+- 服务端二进制 30.4 MB 到 32.8 MB。
+- 接在[记性有多个来源](2026-10-18-memory-providers.md)的管理器后面：本地来源的 `Prefetch`（开工想起和页签的预览）把 `bm25()` 交给 `pick`；`memory_search` 的本地那一半（`recall.go` 的 `search`）换成全文索引的 `bm25()` 加上共有的词和整句出现，取代原来只数共有的词；想起过的照旧由管理器在合并之后才记。第 5 节的「FTS 取前 50 个候选」和 `rank.go` 没做：`pick` 和 `search` 仍在档案的全部记忆上打分（每个档案最多 300 条），`bm25()` 是分数里的一项。
+
 前四步就是[记性有多个来源](2026-10-18-memory-providers.md)第 1 步「接口和本地来源」里的本地那一半。
 
 ## Alternatives considered
@@ -203,7 +214,7 @@ type MemoryStore interface {
 
 ## Acceptance criteria
 
-- 迁移在一份主人家里 `vibevalley.db` 的拷贝上跑过：3 条都在，那条 `job` 成了 `issue`；`go test ./migrations` 过（含跳过影子表）；开机前留下了库的备份。
+- 迁移在一份主人家里 `vibevalley.db` 的拷贝上跑过：3 条都在，那条 `job` 成了 `issue`；`go test ./migrations` 过（含跳过影子表）。
 - 「测试」「提交」「refreshSession」「表名单数」都搜得到对应的记忆，别的档案的 `note` 搜不到，主人的 `profile` 每个 agent 都在画像里。
 - 记一条几乎一样的，旧的被取代，不再被想起；页签看得到前后。
 - 帮工收工以后，用它汇报里的一句话 `memory_search`（`kind = episode`）能翻到这一次，回的是原文的那一段，不是切开的词；管家归档过的原文同样翻得到。
@@ -214,7 +225,7 @@ type MemoryStore interface {
 
 ## Risks
 
-- 迁移改表不能回退。现在开机跑迁移前不备份库，这一条要新加：有待跑的迁移时先把 `vibevalley.db` 复制成 `vibevalley.db.before-<序号>`，迁移在一个事务里，出错时开机失败、库不动。
+- 迁移改表不能回退：开机跑迁移前，`migrations.Up` 已经把库复制成 `vibevalley.db.v<版本>`（2026-10-18 在真库的拷贝上看到了 `vibevalley.db.v1`），每个迁移在一个事务里，出错时开机失败、库不动。
 - 画像共享给所有帮工以后，一条错的偏好会影响每个帮工；页签上画像单独一块，改和删都在那里。
 - 词典没加载完时检索退回按新旧列出，开机后头一秒左右的想起会差一点。
 - 取代靠相似度阈值，可能把两条不同的事实当成一条；被取代的保留 30 天，页签能看到、能撤回。

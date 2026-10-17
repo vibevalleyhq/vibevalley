@@ -5,7 +5,6 @@ package memory
 import (
 	"cmp"
 	"math"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -28,30 +27,6 @@ func init() {
 	}
 }
 
-var (
-	recallWord = regexp.MustCompile(`[a-z0-9_][a-z0-9_.\-/]*`)
-	recallHan  = regexp.MustCompile(`[\x{3400}-\x{9fff}]+`)
-)
-
-// Latin words and numbers in lower case, and each pair of Chinese characters in a row.
-func termsOf(text string) map[string]bool {
-	terms := map[string]bool{}
-	for _, word := range recallWord.FindAllString(str.Lower(text), -1) {
-		if len(word) >= 2 && !recallStop[word] {
-			terms[word] = true
-		}
-	}
-	for _, run := range recallHan.FindAllString(text, -1) {
-		chars := []rune(run)
-		for i := 0; i+1 < len(chars); i++ {
-			if pair := string(chars[i : i+2]); !recallStop[pair] {
-				terms[pair] = true
-			}
-		}
-	}
-	return terms
-}
-
 func termsInCommon(a, b map[string]bool) int {
 	n := 0
 	for t := range a {
@@ -69,9 +44,22 @@ type pickCue struct {
 	Text    string          `json:"text"`
 	Skip    map[string]bool `json:"-"`
 	Now     int64           `json:"now"`
+	// How well each memory matched the turn's words in the full-text index (memories.matches): BM25, higher is better.
+	Matches map[string]float64 `json:"matches,omitempty"`
 }
 
 const recallElsewhere = 3
+
+// BM25 is not bounded and depends on what else is indexed: past this it adds nothing, so one long match cannot outweigh the
+// kind and the place.
+const (
+	recallMatchMost   = 5
+	recallMatchWeight = 0.3
+)
+
+// A shared word is a word now (terms.go), not a pair of characters: a four-character word was three pairs, so a word weighs
+// more than a pair did (0.4).
+const recallSharedWeight = 0.5
 
 // Another project's note only when it plainly shares the turn's words; another project's job never.
 func relevance(m protocol.Memory, cue pickCue, terms map[string]bool) (float64, bool) {
@@ -104,7 +92,8 @@ func relevance(m protocol.Memory, cue pickCue, terms map[string]bool) (float64, 
 		place = 1
 	}
 	// The conversion stops a fused multiply-add (arm64), so the order does not depend on the machine.
-	return kind + place + float64(float64(min(shared, 8))*0.4) + math.Exp(-age/30), true
+	matched := float64(math.Min(cue.Matches[m.ID], recallMatchMost) * recallMatchWeight)
+	return kind + place + float64(float64(min(shared, 8))*recallSharedWeight) + matched + math.Exp(-age/30), true
 }
 
 func lineOf(m protocol.Memory, project string) string {
@@ -183,9 +172,10 @@ func nextForgotten(memories []protocol.Memory, coming int) []string {
 // How many memories memory_search gives when not told.
 const searchLimit = 10
 
-// The memories matching q.Text best first: words in common, the whole query as written, then this project's before the rest
-// and the newest first. A query with no words lists the newest.
-func search(memories []protocol.Memory, q SearchQuery) []Found {
+// The memories matching q.Text best first: the full-text index's BM25 (matches, as memories.matches gives it), words in
+// common, the whole query as written, then this project's before the rest and the newest first. The shared words still count
+// where the index cannot say (a row not cut yet). A query with no words lists the newest.
+func search(memories []protocol.Memory, q SearchQuery, matches map[string]float64) []Found {
 	limit := q.Limit
 	if limit <= 0 {
 		limit = searchLimit
@@ -197,7 +187,7 @@ func search(memories []protocol.Memory, q SearchQuery) []Found {
 		if (q.Kind != "" && m.Kind != q.Kind) || (q.Project != "" && m.Project != nil && *m.Project != q.Project) {
 			continue
 		}
-		score := float64(termsInCommon(termsOf(m.Text), terms))
+		score := matches[m.ID] + float64(float64(termsInCommon(termsOf(m.Text), terms))*recallSharedWeight)
 		if whole != "" && strings.Contains(str.Lower(m.Text), whole) {
 			score += 2
 		}

@@ -11,15 +11,20 @@ import (
 )
 
 const addNote = `-- name: AddNote :execresult
-insert into memory (id, agent, kind, body, project, session, created_at) values (?, ?, 'note', ?, ?, ?, ?)
+insert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)
+values (?1, 'agent', cast(?2 as text), 'note', ?3, ?4, ?5, ?6,
+        ?7, ?8, ?9, ?9)
 `
 
 type AddNoteParams struct {
 	ID        string
 	Agent     string
 	Body      string
+	Terms     string
+	TermsOf   int64
 	Project   sql.NullString
 	Session   sql.NullString
+	Author    string
 	CreatedAt int64
 }
 
@@ -28,14 +33,17 @@ func (q *Queries) AddNote(ctx context.Context, arg AddNoteParams) (sql.Result, e
 		arg.ID,
 		arg.Agent,
 		arg.Body,
+		arg.Terms,
+		arg.TermsOf,
 		arg.Project,
 		arg.Session,
+		arg.Author,
 		arg.CreatedAt,
 	)
 }
 
 const forget = `-- name: Forget :exec
-delete from memory where agent = ? and id = ?
+delete from memory where agent = cast(?1 as text) and id = ?2
 `
 
 type ForgetParams struct {
@@ -49,15 +57,20 @@ func (q *Queries) Forget(ctx context.Context, arg ForgetParams) error {
 }
 
 const keepJob = `-- name: KeepJob :exec
-insert into memory (id, agent, kind, body, project, session, created_at) values (?, ?, 'issue', ?, ?, ?, ?)
+insert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)
+values (?1, 'agent', cast(?2 as text), 'issue', ?3, ?4, ?5, ?6,
+        ?7, 'farm', ?8, ?8)
 on conflict (agent, session) where kind = 'issue'
-do update set body = excluded.body, project = excluded.project, created_at = excluded.created_at
+do update set body = excluded.body, terms = excluded.terms, terms_of = excluded.terms_of, project = excluded.project,
+              created_at = excluded.created_at, updated_at = excluded.updated_at
 `
 
 type KeepJobParams struct {
 	ID        string
 	Agent     string
 	Body      string
+	Terms     string
+	TermsOf   int64
 	Project   sql.NullString
 	Session   sql.NullString
 	CreatedAt int64
@@ -69,6 +82,8 @@ func (q *Queries) KeepJob(ctx context.Context, arg KeepJobParams) error {
 		arg.ID,
 		arg.Agent,
 		arg.Body,
+		arg.Terms,
+		arg.TermsOf,
 		arg.Project,
 		arg.Session,
 		arg.CreatedAt,
@@ -78,10 +93,11 @@ func (q *Queries) KeepJob(ctx context.Context, arg KeepJobParams) error {
 
 const memoriesOf = `-- name: MemoriesOf :many
 
-select id, agent, kind, body, project, session, created_at, recalled, recalled_at from memory where agent = ? order by created_at desc, id desc
+select id, scope, agent, kind, title, body, terms, terms_of, labels, importance, project, session, author, replaced_by, created_at, updated_at, recalled, recalled_at from memory where agent = cast(?1 as text) and replaced_by is null order by created_at desc, id desc
 `
 
-// What agents remember (memory/memory.go).
+// What agents remember (memory/memory.go): the four kinds in .agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md.
+// An agent's own, the superseded ones left out.
 func (q *Queries) MemoriesOf(ctx context.Context, agent string) ([]Memory, error) {
 	rows, err := q.db.QueryContext(ctx, memoriesOf, agent)
 	if err != nil {
@@ -93,12 +109,21 @@ func (q *Queries) MemoriesOf(ctx context.Context, agent string) ([]Memory, error
 		var i Memory
 		if err := rows.Scan(
 			&i.ID,
+			&i.Scope,
 			&i.Agent,
 			&i.Kind,
+			&i.Title,
 			&i.Body,
+			&i.Terms,
+			&i.TermsOf,
+			&i.Labels,
+			&i.Importance,
 			&i.Project,
 			&i.Session,
+			&i.Author,
+			&i.ReplacedBy,
 			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.Recalled,
 			&i.RecalledAt,
 		); err != nil {
@@ -127,4 +152,57 @@ type RecalledParams struct {
 func (q *Queries) Recalled(ctx context.Context, arg RecalledParams) error {
 	_, err := q.db.ExecContext(ctx, recalled, arg.RecalledAt, arg.ID)
 	return err
+}
+
+const setTerms = `-- name: SetTerms :exec
+update memory set terms = ?1, terms_of = ?2 where id = ?3
+`
+
+type SetTermsParams struct {
+	Terms   string
+	Version int64
+	ID      string
+}
+
+func (q *Queries) SetTerms(ctx context.Context, arg SetTermsParams) error {
+	_, err := q.db.ExecContext(ctx, setTerms, arg.Terms, arg.Version, arg.ID)
+	return err
+}
+
+const staleTerms = `-- name: StaleTerms :many
+select id, body from memory where terms_of < ?1 order by rowid limit ?2
+`
+
+type StaleTermsParams struct {
+	Version int64
+	N       int64
+}
+
+type StaleTermsRow struct {
+	ID   string
+	Body string
+}
+
+// What an older cut (or none: a migration moved it) left; memory.recutTerms cuts it again.
+func (q *Queries) StaleTerms(ctx context.Context, arg StaleTermsParams) ([]StaleTermsRow, error) {
+	rows, err := q.db.QueryContext(ctx, staleTerms, arg.Version, arg.N)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []StaleTermsRow
+	for rows.Next() {
+		var i StaleTermsRow
+		if err := rows.Scan(&i.ID, &i.Body); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

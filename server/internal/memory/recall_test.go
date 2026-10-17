@@ -16,7 +16,7 @@ func TestTermsOf(t *testing.T) {
 		terms = append(terms, term)
 	}
 	slices.Sort(terms)
-	want := []string{"pnpm", "test", "测试", "跑测"}
+	want := []string{"pnpm", "test", "测试"}
 	slices.Sort(want)
 	testkit.Eq(t, terms, want)
 	if termsOf("我们需要一个接口")["一个"] {

@@ -75,7 +75,7 @@ func TestFadingForecastMatchesActualEviction(t *testing.T) {
 	for i := range protocol.MemoryKeep {
 		id := fmt.Sprintf("old-%03d", i)
 		if i%2 == 0 {
-			_, err = q.AddNote(context.Background(), generated.AddNoteParams{ID: id, Agent: "lab", Body: id, CreatedAt: 1})
+			_, err = q.AddNote(context.Background(), generated.AddNoteParams{ID: id, Agent: "lab", Body: id, Author: "agent", CreatedAt: 1})
 		} else {
 			err = q.KeepJob(context.Background(), generated.KeepJobParams{ID: id, Agent: "lab", Body: id, CreatedAt: 1, Session: sql.NullString{String: id, Valid: true}})
 		}
