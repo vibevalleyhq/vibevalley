@@ -58,7 +58,7 @@
 | 一次干活（run） | `Session`（`session/runs.go`）；`session/facts.go` 把会话事件读成事实 | `run` 表 | 一个 oar turn（`TurnStarted` 到 `TurnEnded`），结束时交一份 `SubagentReport` |
 | 干活过程 | `Session`（`session/trajectories.go`、`activities.go`） | `activities/<id>.json`、`activities/<id>.head.json`；原始记录在 `logs/` | oar 的事件：`TextDelta`、`Reasoning`、`ToolCallStarted`、`ToolCallEnded`…… |
 | 收成清单、收获 | `Issue`（`issue/merges.go`） | 帮工的分支和 worktree | |
-| 田头、频道、工单串 | `Channel`；帮工在频道里说话经 `MCP`（`/mcp`） | `conversation`、`message`、`participant`、`delivery`、`read_cursor`、`mention`、`follow`、`seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
+| 田头、频道、工单串 | `Channel`；帮工在频道里说话经 `MCP`（`/mcp`） | `conversation`、`message`、`participant`、`message_delivery`、`read_cursor`、`mention`、`follow`、`seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
 | 定时 | `Schedule` | `schedule` 表 | |
 | 巡查 | `Manager`（`manager/patrol.go`） | 不存：每轮从核心状态算 | |
 | 来电 | 不存：`protocol.Inbox` 从核心状态算 | | |

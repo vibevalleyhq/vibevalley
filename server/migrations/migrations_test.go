@@ -41,7 +41,7 @@ func TestSessionMigrationKeepsTheRows(t *testing.T) {
 		"select session from issue_session where issue = 't1'": &session,
 		"select session from run":                              &run,
 		"select session from memory":                           &memory,
-		"select launch from delivery":                          &launch,
+		"select launch from message_delivery":                  &launch,
 		"select payload from ledger":                           &ledger,
 		"select meta from message":                             &meta,
 	} {

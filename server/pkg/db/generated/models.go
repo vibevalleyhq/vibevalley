@@ -57,21 +57,6 @@ type Conversation struct {
 	ChannelID   sql.NullInt64
 }
 
-type Delivery struct {
-	RecipientID string
-	MessageSeq  int64
-	Reason      string
-	Wakes       bool
-	HeldBy      sql.NullString
-	State       string
-	Launch      sql.NullString
-	AnnouncedAt sql.NullInt64
-	HandedAt    sql.NullInt64
-	SeenAt      sql.NullInt64
-	DroppedWhy  sql.NullString
-	CreatedAt   int64
-}
-
 type Follow struct {
 	ConversationID int64
 	ParticipantID  string
@@ -154,6 +139,21 @@ type Message struct {
 	SendKey        sql.NullString
 	CreatedAt      int64
 	UpdatedAt      sql.NullInt64
+}
+
+type MessageDelivery struct {
+	RecipientID string
+	MessageSeq  int64
+	Reason      string
+	Wakes       bool
+	HeldBy      sql.NullString
+	State       string
+	Launch      sql.NullString
+	AnnouncedAt sql.NullInt64
+	HandedAt    sql.NullInt64
+	SeenAt      sql.NullInt64
+	DroppedWhy  sql.NullString
+	CreatedAt   int64
 }
 
 type Participant struct {
