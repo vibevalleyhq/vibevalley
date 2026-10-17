@@ -42,17 +42,17 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final remote = RemoteFarm(url: Uri.parse(_gate), key: 'k1', farm: 'lucas-mbp', device: 'd1');
     await saveFarmChoice(FarmChoice(remote: remote, useRemote: true));
-    farmChoice.value = const FarmChoice();
+    farmConnection.value = const FarmConnection(choice: FarmChoice());
     await loadFarmChoice();
-    expect(farmChoice.value.using?.url, Uri.parse(_gate));
-    expect(farmChoice.value.using?.key, 'k1');
+    expect(farmConnection.value.choice.using?.url, Uri.parse(_gate));
+    expect(farmConnection.value.choice.using?.key, 'k1');
 
     await saveFarmChoice(FarmChoice(remote: remote));
-    farmChoice.value = const FarmChoice();
+    farmConnection.value = const FarmConnection(choice: FarmChoice());
     await loadFarmChoice();
-    expect(farmChoice.value.using, isNull);
-    expect(farmChoice.value.remote?.farm, 'lucas-mbp');
-    farmChoice.value = const FarmChoice();
+    expect(farmConnection.value.choice.using, isNull);
+    expect(farmConnection.value.choice.remote?.farm, 'lucas-mbp');
+    farmConnection.value = const FarmConnection(choice: FarmChoice());
   });
 
   group('pairWith', () {

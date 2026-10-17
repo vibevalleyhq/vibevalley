@@ -8,14 +8,10 @@ import 'server.dart';
 
 const serverAddress = String.fromEnvironment('VIBEVALLEY_SERVER', defaultValue: 'http://127.0.0.1:8787');
 
-/// The server the macOS app started itself, which wins over serverAddress; null otherwise. Set by the desktop shell
-/// (startDesktop) before the app's first frame.
-String? embeddedServerAddress;
+final farmConnectionProvider = Provider<FarmConnection>((ref) => farmConnection.value);
 
-/// Read once: the app is rebuilt when the choice changes.
 final serverProvider = Provider<VibeValleyServer>((ref) {
-  final remote = farmChoice.value.using;
-  final server = remote != null ? VibeValleyServer(remote.url, key: remote.key) : VibeValleyServer(Uri.parse(embeddedServerAddress ?? serverAddress));
+  final server = ref.watch(farmConnectionProvider).open(serverAddress);
   ref.onDispose(server.close);
   return server;
 });

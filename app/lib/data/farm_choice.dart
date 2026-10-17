@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../gen/vibevalley.dart';
+import 'server.dart';
 
 class RemoteFarm {
   const RemoteFarm({required this.url, required this.key, required this.farm, required this.device});
@@ -41,7 +42,22 @@ class FarmChoice {
 
 const _key = 'vibevalley.farm';
 
-final farmChoice = ValueNotifier<FarmChoice>(const FarmChoice());
+/// The destination and the server it opens: one place for local/remote, the embedded address and the scope key.
+class FarmConnection {
+  const FarmConnection({required this.choice, this.localAddress});
+  final FarmChoice choice;
+  final String? localAddress;
+
+  RemoteFarm? get remote => choice.using;
+  FarmConnection withLocal(String address) => FarmConnection(choice: choice, localAddress: address);
+  VibeValleyServer open(String fallback) =>
+      remote != null ? VibeValleyServer(remote!.url, key: remote!.key) : VibeValleyServer(Uri.parse(localAddress ?? fallback));
+
+  /// Anything that changes here must rebuild the ProviderScope.
+  String get scopeKey => remote == null ? 'local:${localAddress ?? ''}' : 'remote:${remote!.url} ${remote!.device} ${remote!.key}';
+}
+
+final farmConnection = ValueNotifier<FarmConnection>(const FarmConnection(choice: FarmChoice()));
 
 Future<void> loadFarmChoice() async {
   try {
@@ -50,14 +66,17 @@ Future<void> loadFarmChoice() async {
     final json = jsonDecode(raw);
     if (json is! Map) return;
     final remote = RemoteFarm.fromJson(json['remote']);
-    farmChoice.value = FarmChoice(remote: remote, useRemote: remote != null && json['use'] == 'remote');
+    farmConnection.value = FarmConnection(
+      choice: FarmChoice(remote: remote, useRemote: remote != null && json['use'] == 'remote'),
+      localAddress: farmConnection.value.localAddress,
+    );
   } on Object {
     // No storage, or a choice that does not read: this machine's farm.
   }
 }
 
 Future<void> saveFarmChoice(FarmChoice choice) async {
-  farmChoice.value = choice;
+  farmConnection.value = FarmConnection(choice: choice, localAddress: farmConnection.value.localAddress);
   try {
     await (await SharedPreferences.getInstance()).setString(
       _key,

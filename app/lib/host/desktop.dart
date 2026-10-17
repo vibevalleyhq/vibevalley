@@ -160,12 +160,12 @@ Future<void> startDesktop() async {
   if (!isMacDesktop) return;
   final host = DesktopHostChannel.instance.._listen();
   await host._invoke('setup', {'title': desktopChannel.titled('码农场物语')});
-  if (farmChoice.value.useRemote) return;
+  if (farmConnection.value.choice.useRemote) return;
   await startLocalFarm();
 }
 
 Future<void> startLocalFarm() async {
-  if (!isMacDesktop || embeddedServerAddress != null) return;
+  if (!isMacDesktop || farmConnection.value.localAddress != null) return;
   final host = DesktopHostChannel.instance.._listen();
   if (const String.fromEnvironment('VIBEVALLEY_SERVER').isNotEmpty) return;
   final env = Platform.environment;
@@ -187,8 +187,9 @@ Future<void> startLocalFarm() async {
   try {
     final server = await launcher.start();
     host._server = server;
-    embeddedServerAddress = server.url.toString();
-    await host._invoke('server', {'pid': server.pid, 'url': embeddedServerAddress});
+    final address = server.url.toString();
+    farmConnection.value = farmConnection.value.withLocal(address);
+    await host._invoke('server', {'pid': server.pid, 'url': address});
   } on ServerFailed catch (e) {
     await host._invoke('fatal', {'title': desktopChannel.titled('码农场物语开不了门'), 'text': e.reason});
   }

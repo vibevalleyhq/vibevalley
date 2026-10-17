@@ -15,10 +15,10 @@ class OnChosenFarm extends StatelessWidget {
   const OnChosenFarm({super.key});
 
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder<FarmChoice>(
-    valueListenable: farmChoice,
-    builder: (_, choice, _) => ProviderScope(
-      key: ValueKey(choice.using == null ? 'local' : '${choice.using!.url} ${choice.using!.device} ${choice.using!.key}'),
+  Widget build(BuildContext context) => ValueListenableBuilder<FarmConnection>(
+    valueListenable: farmConnection,
+    builder: (_, connection, _) => ProviderScope(
+      key: ValueKey(connection.scopeKey),
       child: const DesktopHost(child: VibeValleyApp()),
     ),
   );

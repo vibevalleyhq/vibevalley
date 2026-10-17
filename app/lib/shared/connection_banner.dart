@@ -31,7 +31,7 @@ class ConnectionBanner extends ConsumerWidget {
     if (watchReachable(ref)) return const SizedBox.shrink();
     const text = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 20 / 14, color: Palette.bark900);
     final code = KitText.mono.copyWith(color: Palette.bark900);
-    final remote = farmChoice.value.using;
+    final remote = farmConnection.value.remote;
     return Semantics(
       liveRegion: true,
       child: Align(

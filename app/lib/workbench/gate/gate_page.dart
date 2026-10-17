@@ -34,7 +34,7 @@ class _GatePageState extends ConsumerState<GatePage> {
   Timer? _poll;
 
   /// The gate is managed from the machine whose farm it is: not while this app uses another's.
-  bool get _ownFarm => farmChoice.value.using == null;
+  bool get _ownFarm => farmConnection.value.remote == null;
 
   @override
   void initState() {
@@ -315,7 +315,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
       final remote = await pairWith(
         link,
         name: deviceName(),
-        known: farmChoice.value.remote,
+        known: farmConnection.value.remote,
         apiFor: (url, key) => VibeValleyServer(url, key: key).api,
       );
       toasts.add(type: ToastType.info, title: '进院门了', description: '现在用的是 ${remote.farm} 的农场。');
@@ -339,13 +339,13 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
 
   Future<void> _useOwn() async {
     await startLocalFarm();
-    await saveFarmChoice(FarmChoice(remote: farmChoice.value.remote));
+    await saveFarmChoice(FarmChoice(remote: farmConnection.value.remote));
   }
 
   @override
   Widget build(BuildContext context) {
     final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.625);
-    final choice = farmChoice.value;
+    final choice = farmConnection.value.choice;
     final using = choice.using;
     final own = canScan ? '断开' : '回到这台电脑的农场';
     return PxCard(
