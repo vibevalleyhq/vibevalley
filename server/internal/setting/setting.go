@@ -63,8 +63,8 @@ func New(cfg base.Config) *Service {
 	s.config.appID = cfg.Agora.AppID
 	s.config.certificate = cfg.Agora.AppCertificate
 	s.voiceDefaults = protocol.DefaultVoice()
-	if model := protocol.VoiceLLMAgoraModel(cfg.Voice.Model); slices.Contains(protocol.VoiceLLMAgoraModelValues, model) {
-		s.voiceDefaults.LLM = protocol.VoiceLLM{Value: protocol.VoiceLLMAgora{Model: model}}
+	if model := protocol.VoiceAnswerAgoraModel(cfg.Voice.Model); slices.Contains(protocol.VoiceAnswerAgoraModelValues, model) {
+		s.voiceDefaults.Answer = protocol.VoiceAnswer{Value: protocol.VoiceAnswerAgora{Model: model}}
 	}
 	if id := cfg.Voice.ID; id != "" {
 		// The default voice's model when it is MiniMax's, else MiniMax's turbo.

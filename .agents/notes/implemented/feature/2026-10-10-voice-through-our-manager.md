@@ -10,7 +10,7 @@ Status: implemented
 
 行为见 [voice.md](../../../../docs/reference/voice.md)「语音线路」。
 
-- **「想」多一个选项：农场的管家**（`VoiceLLM` 的 `vibevalley`）。声网的对话式 AI 本来就能接 OpenAI 兼容的自定义接口，所以识别、断句、插话、合成都还用声网的，只把「想」换成我们的管家。管家跑在 VibeValley 自己的 agent 上（默认 DeepSeek V4.1 Flash），有工具、有记性、有轨迹。
+- **「想」多一个选项：农场的管家**（`VoiceAnswer` 的 `manager`）。声网的对话式 AI 本来就能接 OpenAI 兼容的自定义接口，所以识别、断句、插话、合成都还用声网的，只把「想」换成我们的管家。管家跑在 VibeValley 自己的 agent 上（默认 DeepSeek V4.1 Flash），有工具、有记性、有轨迹。
 - **语音线路**（`server/internal/voice/line.go`）：
   - 单独一个监听，只听 127.0.0.1，只有 `POST /llm/<通话>/chat/completions` 这一个接口。
   - 声网的云端经隧道访问它：设了 `voice.line.url` 就用你自己的隧道，没设就在第一通电话时开一个 cloudflared 临时隧道，等到它的地址能应答再交给声网（新地址实测约 25 秒才通），最后一通挂了 10 分钟后关掉。

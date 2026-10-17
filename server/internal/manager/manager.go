@@ -685,7 +685,7 @@ func (fm *manager) Say(ctx context.Context, text, agentID string, conversation *
 
 // When the manager answers calls itself, what was said reached it on the voice line already.
 func (fm *manager) Heard(text, agentID string) {
-	if _, ok := fm.settings.Voice().LLM.Value.(protocol.VoiceLLMVibeValley); ok {
+	if _, ok := fm.settings.Voice().Answer.Value.(protocol.VoiceAnswerManager); ok {
 		return
 	}
 	fm.chat.Spoken("user", text)

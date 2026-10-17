@@ -22,7 +22,7 @@ const _languageLabel = <Language, String>{
 
 /// What each starts with when picked: the one in use if it is the same vendor, else these.
 const _asrLabel = {'ares': '声网 ARES', 'deepgram': 'Deepgram', 'microsoft': '微软'};
-const _llmLabel = {'vibevalley': '农场的管家', 'agora': '声网托管', 'deepseek': 'DeepSeek', 'openai': '自己的接口'};
+const _answerLabel = {'manager': '农场的管家', 'agora': '声网托管', 'deepseek': 'DeepSeek', 'openai': '自己的接口'};
 const _ttsLabel = {'minimax': 'MiniMax', 'openai': 'OpenAI', 'microsoft': '微软'};
 
 const _asrStart = <String, VoiceAsr>{
@@ -30,11 +30,11 @@ const _asrStart = <String, VoiceAsr>{
   'deepgram': VoiceAsrDeepgram(model: Model.nova3),
   'microsoft': VoiceAsrMicrosoft(region: 'eastasia'),
 };
-const _llmStart = <String, VoiceLlm>{
-  'vibevalley': VoiceLlmVibeValley(),
-  'agora': VoiceLlmAgora(model: VoiceLlmAgoraModel.gpt41Mini),
-  'deepseek': VoiceLlmDeepseek(model: 'deepseek-chat'),
-  'openai': VoiceLlmOpenai(url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini'),
+const _answerStart = <String, VoiceAnswer>{
+  'manager': VoiceAnswerManager(),
+  'agora': VoiceAnswerAgora(model: VoiceAnswerAgoraModel.gpt41Mini),
+  'deepseek': VoiceAnswerDeepseek(model: 'deepseek-chat'),
+  'openai': VoiceAnswerOpenai(url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini'),
 };
 const _ttsStart = <String, VoiceTts>{
   'minimax': VoiceTtsMinimax(model: VoiceTtsMinimaxModel.speech26Turbo, voiceId: 'Chinese (Mandarin)_Gentle_Youth'),
@@ -44,7 +44,7 @@ const _ttsStart = <String, VoiceTts>{
 
 String _vendor(Object stage) => switch (stage) {
   VoiceAsr a => a.toJson()['vendor'] as String,
-  VoiceLlm l => l.toJson()['vendor'] as String,
+  VoiceAnswer l => l.toJson()['vendor'] as String,
   VoiceTts t => t.toJson()['vendor'] as String,
   _ => '',
 };
@@ -62,7 +62,7 @@ VoiceSettings withPart(VoicePart part, VoiceSettings onto, VoiceSettings from) =
     area: from.area,
     language: from.language,
     asr: from.asr,
-    llm: from.llm,
+    answer: from.answer,
     silenceMs: from.silenceMs,
     interruptMs: from.interruptMs,
     idleSeconds: from.idleSeconds,
@@ -281,7 +281,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
     final status = _status;
     final draft = _draft;
     final asr = draft.asr;
-    final llm = draft.llm;
+    final answer = draft.answer;
     final ready = status.agoraAppId.source != null && status.agoraAppCertificate.source != null;
     final muted = KitText.xs.copyWith(color: Palette.bark500);
     return [
@@ -433,53 +433,53 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
       const SizedBox(height: 12),
       PxCard(
         title: '想',
-        aside: Text(_llmLabel[_vendor(llm)]!),
+        aside: Text(_answerLabel[_vendor(answer)]!),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
             PxField(
-              label: VoiceLabel.llm,
-              hint: Text(_llmHint(llm, status)),
+              label: VoiceLabel.answer,
+              hint: Text(_answerHint(answer, status)),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: PxSegmented<String>(
-                  value: _vendor(llm),
-                  options: _options(_llmLabel),
-                  onChanged: (v) => _set(voiceWith(draft, llm: _vendor(llm) == v ? llm : _llmStart[v])),
+                  value: _vendor(answer),
+                  options: _options(_answerLabel),
+                  onChanged: (v) => _set(voiceWith(draft, answer: _vendor(answer) == v ? answer : _answerStart[v])),
                 ),
               ),
             ),
-            ...switch (llm) {
-              VoiceLlmAgora(:final model) => [
+            ...switch (answer) {
+              VoiceAnswerAgora(:final model) => [
                 const SizedBox(height: 16),
                 PxField(
                   label: '模型',
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: PxSegmented<VoiceLlmAgoraModel>(
+                    child: PxSegmented<VoiceAnswerAgoraModel>(
                       value: model,
                       options: [for (final m in voiceModels) SegmentOption(value: m, label: m.wire)],
-                      onChanged: (model) => _set(voiceWith(draft, llm: VoiceLlmAgora(model: model))),
+                      onChanged: (model) => _set(voiceWith(draft, answer: VoiceAnswerAgora(model: model))),
                     ),
                   ),
                 ),
               ],
-              VoiceLlmDeepseek(:final model) => [
+              VoiceAnswerDeepseek(:final model) => [
                 const SizedBox(height: 16),
                 PxField(
                   label: '模型',
                   hint: const Text('DeepSeek 的模型名。'),
                   child: PxTextInput(
                     value: model,
-                    onChanged: (model) => _set(voiceWith(draft, llm: VoiceLlmDeepseek(model: model))),
+                    onChanged: (model) => _set(voiceWith(draft, answer: VoiceAnswerDeepseek(model: model))),
                     mono: true,
                     semanticLabel: 'DeepSeek 模型',
                     suggestions: const ['deepseek-chat'],
                   ),
                 ),
               ],
-              VoiceLlmOpenai(:final url, :final model) => [
+              VoiceAnswerOpenai(:final url, :final model) => [
                 const SizedBox(height: 16),
                 Cols(
                   columns: 2,
@@ -492,7 +492,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                         onChanged: (url) => _set(
                           voiceWith(
                             draft,
-                            llm: VoiceLlmOpenai(url: url, model: model),
+                            answer: VoiceAnswerOpenai(url: url, model: model),
                           ),
                         ),
                         mono: true,
@@ -506,18 +506,18 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                         onChanged: (model) => _set(
                           voiceWith(
                             draft,
-                            llm: VoiceLlmOpenai(url: url, model: model),
+                            answer: VoiceAnswerOpenai(url: url, model: model),
                           ),
                         ),
                         mono: true,
                         semanticLabel: '大模型名',
                       ),
                     ),
-                    if (needsLlmKey(llm)) _secret(_Key.llmKey, '接口的 key', status.llmKey),
+                    if (needsLlmKey(answer)) _secret(_Key.llmKey, '接口的 key', status.llmKey),
                   ],
                 ),
               ],
-              VoiceLlmVibeValley() => const <Widget>[],
+              VoiceAnswerManager() => const <Widget>[],
             },
           ],
         ),
@@ -557,7 +557,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
           children: [
             PxField(
               label: VoiceLabel.persona,
-              hint: Text(draft.llm is VoiceLlmVibeValley ? '「想」选了农场的管家：它自己接电话，用的是它自己的提示词，这段人设不用。' : '语音管家是谁、怎么说话。他看不到地里，派活由本机的管家做；写明别编进度。'),
+              hint: Text(draft.answer is VoiceAnswerManager ? '「想」选了农场的管家：它自己接电话，用的是它自己的提示词，这段人设不用。' : '语音管家是谁、怎么说话。他看不到地里，派活由本机的管家做；写明别编进度。'),
               child: PxTextArea(
                 value: draft.persona,
                 onChanged: (persona) => _set(voiceWith(draft, persona: persona)),
@@ -729,12 +729,12 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
 
 String _int(double n) => n == n.roundToDouble() ? n.toInt().toString() : n.toString();
 
-String _llmHint(VoiceLlm llm, SettingsStatus status) => switch (llm) {
-  VoiceLlmVibeValley() => '田头上那个管家本人接电话：看得到地里，自己派活，记得你们说过的话。声网经隧道（cloudflared）访问本机的一个接口，只有这一个接口对外，每通电话一把钥匙。',
-  VoiceLlmAgora() => '声网托管的模型，不用别的 key。',
-  VoiceLlmDeepseek() =>
+String _answerHint(VoiceAnswer answer, SettingsStatus status) => switch (answer) {
+  VoiceAnswerManager() => '田头上那个管家本人接电话：看得到地里，自己派活，记得你们说过的话。声网经隧道（cloudflared）访问本机的一个接口，只有这一个接口对外，每通电话一把钥匙。',
+  VoiceAnswerAgora() => '声网托管的模型，不用别的 key。',
+  VoiceAnswerDeepseek() =>
     status.deepseekApiKey.source != null ? '用农场的 DeepSeek key（${keyFrom[status.deepseekApiKey.source]}）。' : '用农场的 DeepSeek key，现在还没有：去首页「设置」填。',
-  VoiceLlmOpenai() => '任何 OpenAI 兼容的接口：通义、Kimi、自己部署的……',
+  VoiceAnswerOpenai() => '任何 OpenAI 兼容的接口：通义、Kimi、自己部署的……',
 };
 
 class SecretInput extends StatefulWidget {

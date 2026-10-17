@@ -823,14 +823,8 @@ type VoiceAgent struct {
 	AgentID string `json:"agentId"`
 }
 
-type VoiceCaptions string
-
-const (
-	VoiceCaptionsRtm        VoiceCaptions = "rtm"
-	VoiceCaptionsDatastream VoiceCaptions = "datastream"
-)
-
-type VoiceSession struct {
+// Agora's: what a client joins a call's channel with, one token for RTC and RTM.
+type AgoraTicket struct {
 	AppID   string `json:"appId"`
 	Channel string `json:"channel"`
 	UID     string `json:"uid"`
@@ -1260,17 +1254,17 @@ const (
 )
 
 type VoiceSettings struct {
-	Area           Area     `json:"area"`
-	Language       Language `json:"language"`
-	ASR            VoiceASR `json:"asr"`
-	LLM            VoiceLLM `json:"llm"`
-	TTS            VoiceTTS `json:"tts"`
-	Persona        string   `json:"persona"`
-	Greeting       string   `json:"greeting"`
-	FailureMessage string   `json:"failureMessage"`
-	SilenceMs      int64    `json:"silenceMs"`
-	InterruptMs    int64    `json:"interruptMs"`
-	IdleSeconds    int64    `json:"idleSeconds"`
+	Area           Area        `json:"area"`
+	Language       Language    `json:"language"`
+	ASR            VoiceASR    `json:"asr"`
+	Answer         VoiceAnswer `json:"answer"`
+	TTS            VoiceTTS    `json:"tts"`
+	Persona        string      `json:"persona"`
+	Greeting       string      `json:"greeting"`
+	FailureMessage string      `json:"failureMessage"`
+	SilenceMs      int64       `json:"silenceMs"`
+	InterruptMs    int64       `json:"interruptMs"`
+	IdleSeconds    int64       `json:"idleSeconds"`
 }
 
 type SettingsUpdate struct {
@@ -1649,34 +1643,39 @@ type VoiceASRMicrosoft struct {
 	Region string `json:"region"`
 }
 
+// Who answers a call. The manager answers it itself over the voice line, with its own model, tools and memory; any other
+// member is a quick model that only speaks, while the manager hears what was said and dispatches.
+//
 //vibevalley:union vendor
-type VoiceLLM struct{ Value VoiceLLMValue }
+type VoiceAnswer struct{ Value VoiceAnswerValue }
 
-//vibevalley:member VoiceLLM vibevalley
-type VoiceLLMVibeValley struct {
+//vibevalley:member VoiceAnswer manager
+type VoiceAnswerManager struct {
 }
 
-type VoiceLLMAgoraModel string
+// Hosted by Agora: no key of our own.
+
+type VoiceAnswerAgoraModel string
 
 const (
-	VoiceLLMAgoraModelGpt4oMini VoiceLLMAgoraModel = "gpt-4o-mini"
-	VoiceLLMAgoraModelGpt41Mini VoiceLLMAgoraModel = "gpt-4.1-mini"
-	VoiceLLMAgoraModelGpt5Nano  VoiceLLMAgoraModel = "gpt-5-nano"
-	VoiceLLMAgoraModelGpt5Mini  VoiceLLMAgoraModel = "gpt-5-mini"
+	VoiceAnswerAgoraModelGpt4oMini VoiceAnswerAgoraModel = "gpt-4o-mini"
+	VoiceAnswerAgoraModelGpt41Mini VoiceAnswerAgoraModel = "gpt-4.1-mini"
+	VoiceAnswerAgoraModelGpt5Nano  VoiceAnswerAgoraModel = "gpt-5-nano"
+	VoiceAnswerAgoraModelGpt5Mini  VoiceAnswerAgoraModel = "gpt-5-mini"
 )
 
-//vibevalley:member VoiceLLM agora
-type VoiceLLMAgora struct {
-	Model VoiceLLMAgoraModel `json:"model"`
+//vibevalley:member VoiceAnswer agora
+type VoiceAnswerAgora struct {
+	Model VoiceAnswerAgoraModel `json:"model"`
 }
 
-//vibevalley:member VoiceLLM deepseek
-type VoiceLLMDeepseek struct {
+//vibevalley:member VoiceAnswer deepseek
+type VoiceAnswerDeepseek struct {
 	Model string `json:"model"`
 }
 
-//vibevalley:member VoiceLLM openai
-type VoiceLLMOpenai struct {
+//vibevalley:member VoiceAnswer openai
+type VoiceAnswerOpenai struct {
 	URL   string `json:"url"`
 	Model string `json:"model"`
 }
@@ -1720,17 +1719,17 @@ type VoiceTTSMicrosoft struct {
 }
 
 type SettingsUpdateVoice struct {
-	Area           *Area     `json:"area,omitzero"`
-	Language       *Language `json:"language,omitzero"`
-	ASR            VoiceASR  `json:"asr,omitzero"`
-	LLM            VoiceLLM  `json:"llm,omitzero"`
-	TTS            VoiceTTS  `json:"tts,omitzero"`
-	Persona        *string   `json:"persona,omitzero"`
-	Greeting       *string   `json:"greeting,omitzero"`
-	FailureMessage *string   `json:"failureMessage,omitzero"`
-	SilenceMs      *int64    `json:"silenceMs,omitzero"`
-	InterruptMs    *int64    `json:"interruptMs,omitzero"`
-	IdleSeconds    *int64    `json:"idleSeconds,omitzero"`
+	Area           *Area       `json:"area,omitzero"`
+	Language       *Language   `json:"language,omitzero"`
+	ASR            VoiceASR    `json:"asr,omitzero"`
+	Answer         VoiceAnswer `json:"answer,omitzero"`
+	TTS            VoiceTTS    `json:"tts,omitzero"`
+	Persona        *string     `json:"persona,omitzero"`
+	Greeting       *string     `json:"greeting,omitzero"`
+	FailureMessage *string     `json:"failureMessage,omitzero"`
+	SilenceMs      *int64      `json:"silenceMs,omitzero"`
+	InterruptMs    *int64      `json:"interruptMs,omitzero"`
+	IdleSeconds    *int64      `json:"idleSeconds,omitzero"`
 }
 
 type Roots struct {
@@ -1976,9 +1975,8 @@ type VoiceSaid struct {
 }
 
 type StartRequest struct {
-	Channel  string         `json:"channel"`
-	UID      string         `json:"uid"`
-	Captions *VoiceCaptions `json:"captions,omitzero"`
+	Channel string `json:"channel"`
+	UID     string `json:"uid"`
 }
 
 type VerifyRequest struct {

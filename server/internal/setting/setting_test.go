@@ -111,7 +111,7 @@ func TestSettingsVoiceKeepsOnlyWhatDiffers(t *testing.T) {
 	home := t.TempDir()
 	s := settingsAt(home, func(c *base.Config) { c.Voice.Model, c.Voice.ID = "gpt-5-mini", "English_captivating_female1" })
 	before := s.Status()
-	voiceSame(t, before.VoiceDefaults.LLM, protocol.VoiceLLM{Value: protocol.VoiceLLMAgora{Model: "gpt-5-mini"}}, "the configuration's model")
+	voiceSame(t, before.VoiceDefaults.Answer, protocol.VoiceAnswer{Value: protocol.VoiceAnswerAgora{Model: "gpt-5-mini"}}, "the configuration's model")
 	voiceSame(t, before.VoiceDefaults.TTS, protocol.VoiceTTS{Value: protocol.VoiceTTSMinimax{Model: "speech_2_6_turbo", VoiceID: "English_captivating_female1"}}, "the configuration's voice")
 	if before.VoiceDefaults.Greeting != protocol.DefaultVoice().Greeting {
 		t.Fatal("greeting")
@@ -180,7 +180,7 @@ func TestSettingsVoiceVendorKeysAreHints(t *testing.T) {
 		t.Fatalf("keys: %+v", got)
 	}
 	voiceSame(t, voiceReadSettings(filepath.Join(home, "settings.json")).Voice, map[string]any{"tts": map[string]any{"vendor": "microsoft", "region": "eastasia", "voiceName": "zh-CN-XiaoxiaoNeural"}}, "the file")
-	bad := protocol.SettingsUpdateVoice{LLM: protocol.VoiceLLM{Value: protocol.VoiceLLMOpenai{URL: "not a url", Model: "x"}}}
+	bad := protocol.SettingsUpdateVoice{Answer: protocol.VoiceAnswer{Value: protocol.VoiceAnswerOpenai{URL: "not a url", Model: "x"}}}
 	if _, err := s.Save(protocol.SettingsUpdate{Voice: &bad}); err == nil || !strings.Contains(err.Error(), "http") {
 		t.Fatalf("bad url: %v", err)
 	}

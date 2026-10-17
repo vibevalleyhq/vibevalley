@@ -9,7 +9,7 @@ Map<String, dynamic> voiceJson({String area = 'US'}) => {
   'area': area,
   'language': 'zh-CN',
   'asr': {'vendor': 'ares'},
-  'llm': {'vendor': 'agora', 'model': 'gpt-4.1-mini'},
+  'answer': {'vendor': 'agora', 'model': 'gpt-4.1-mini'},
   'tts': {'vendor': 'minimax', 'model': 'speech_2_6_turbo', 'voiceId': 'Chinese (Mandarin)_Gentle_Youth'},
   'persona': '你是管家',
   'greeting': '来啦！今天想种点什么？',

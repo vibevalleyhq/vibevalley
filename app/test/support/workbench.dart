@@ -62,7 +62,7 @@ VoiceSettings voice({String greeting = '来啦！今天想种点什么？'}) => 
   area: Area.uS,
   language: Language.zhCN,
   asr: const VoiceAsrAres(),
-  llm: const VoiceLlmAgora(model: VoiceLlmAgoraModel.gpt41Mini),
+  answer: const VoiceAnswerAgora(model: VoiceAnswerAgoraModel.gpt41Mini),
   tts: const VoiceTtsMinimax(model: VoiceTtsMinimaxModel.speech26Turbo, voiceId: 'Chinese (Mandarin)_Gentle_Youth'),
   persona: '你是管家。',
   greeting: greeting,

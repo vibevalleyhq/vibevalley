@@ -108,17 +108,15 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 ### 4. 形状
 
-`VoiceSettings` 按块分，只有 `call` 里能有 Agora 的东西：
+`VoiceSettings` 就是通话的设置，也就是 Agora 实现的设置；听写的设置以后是它旁边单独的 `dictation`，不放进 `voice`。
 
-- **`call`**：通话，也就是 Agora 实现的设置。
-  - `asr`、`tts`：Agora 能接的厂商（今天的 `VoiceASR`、`VoiceTTS`），名字照实写。
-  - `answer`：谁接电话。`manager` 是管家自己接（今天的 `vibevalley`），模型归管家的档案（[管家是一份内置档案](2026-10-17-manager-is-an-agent.md)）；`quick` 是快嘴，模型可选 Agora 托管、DeepSeek、自己的 OpenAI 兼容接口（今天 `VoiceLLM` 的其余成员）。
-  - 人设、开场白、出错时说的话、`Area`、`SilenceMs`、`InterruptMs`、`IdleSeconds`。人设只对 `quick` 有用，声音页上要标明。
-- **`dictation`**：听写。`asr`（我们接的厂商，和 `call.asr` 是两个联合类型）、`language`、`tidy`（整理一遍，开或关）。
-- `VoiceCaptions` 删掉：客户端只发 `datastream`（`app/lib/voice/voice.dart:221`），`rtm` 没人用。字幕走 data stream 固定写在 Agora 实现里。
-- `VoiceSession` 改名，写明是 Agora 进频道的票；不做成联合类型。
+- `answer`（原来的 `llm`）：谁接电话，`VoiceAnswer`。`manager` 是管家自己接（原来的 `vibevalley`），模型归管家的档案（[管家是一份内置档案](2026-10-17-manager-is-an-agent.md)）；`agora`、`deepseek`、`openai` 是快嘴，只会说话，管家旁听派活。
+- `asr`、`tts`：Agora 能接的厂商，名字照实写；听写的识别是另一个联合类型。
+- 人设、开场白、出错时说的话、`Area`、`SilenceMs`、`InterruptMs`、`IdleSeconds` 都留在 `voice` 里。人设只对快嘴有用，声音页上标明了。
+- `VoiceCaptions` 删掉：字幕固定走 RTC 的 data stream，写在 `voice/agora.go` 里（`pkg/agora` 还认 RTM，给别的用法）。
+- `VoiceSession` 改名 `AgoraTicket`：Agora 进频道的票，不做成联合类型。
 - 凭据：`AgoraAppID`、`AgoraAppCertificate` 名字不变；听写厂商的 key 和 `ASRKey` 这类分开放，各自写明是哪一块的。
-- `settings.json` 里旧的 `voice`：加载时一次性改写成 `call`（像 `agent/cast.go`），不长期兜底。
+- 存盘：只认新的名字。主人的家里 `settings.json` 没有 `voice`（2026-10-18 看过），不用搬。
 
 ### 步骤
 
@@ -127,18 +125,18 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 1. **OpenAI 协议层**（第 1 节）：从 `line.go` 搬进 `pkg/agent`，语音线路改用它，加 `/v1/chat/completions`。语音的行为不变。
 2. **守住 Agora 的边界**（第 2 节的表）：加 import 检查，代码不挪。
 3. **电话进田头**（第 2 节的后半）：只改行为；改完更新 voice.md。
-4. **拆形状**（第 4 节的 `call`）：改 `protocol`、跑 `shapegen`、改声音页、改写旧的 `settings.json`。
-5. **听写**（第 3 节、第 4 节的 `dictation`）：先接一家云上的厂商和热词，再做整理，最后做本机的识别。
+4. **改形状**（第 4 节）：改 `protocol`、跑 `shapegen`、改声音页。
+5. **听写**（第 3 节，和 `voice` 并列的 `dictation`）：先接一家云上的厂商和热词，再做整理，最后做本机的识别。
 
 量过真实通话的延迟以后，再决定 `call.answer` 的默认值。这一步不在本提案里。
 
 ### 做到哪了
 
-2026-10-18 做了第 1 步：`pkg/agent/openai.go` 的 `ChatCompletions`，语音线路（`voice/line.go`）只剩路由和钥匙；主服务挂了 `protocol.ChatCompletionsPath`（`/v1/chat/completions`），模型名是 `protocol.ManagerModel`。同一天做了第 2 步：Agora 本来就只在上表的几处，加了两条检查守住它。第 3 步也做了：消息多了 `spoken`（`ChatMessage.Spoken`，存在 `chatMeta`），`chatAudience` 见到它不投给任何人；主人的话由 `Manager.Heard`（快嘴）或 `Manager.Call`（管家）记，快嘴的回答由客户端的 `LiveCaptions.onAnswered` 交给 `POST /api/v1/voice/agent/said`，服务端只收还没挂、开始时「想」不是管家的那一通，开场白不记。管家旁听不再 `Quiet`，提示里让它派了活才说一句。管家的 `Call`（电话里的话，带语音的提示）和 `Answerer`（本机的 chat/completions，当作田头里的话）共用一个 `answer`：同一时间只流一个回答，新的一句结束上一个的流。
+2026-10-18 做了第 1 步：`pkg/agent/openai.go` 的 `ChatCompletions`，语音线路（`voice/line.go`）只剩路由和钥匙；主服务挂了 `protocol.ChatCompletionsPath`（`/v1/chat/completions`），模型名是 `protocol.ManagerModel`。同一天做了第 2 步：Agora 本来就只在上表的几处，加了两条检查守住它。第 3 步也做了：消息多了 `spoken`（`ChatMessage.Spoken`，存在 `chatMeta`），`chatAudience` 见到它不投给任何人；主人的话由 `Manager.Heard`（快嘴）或 `Manager.Call`（管家）记，快嘴的回答由客户端的 `LiveCaptions.onAnswered` 交给 `POST /api/v1/voice/agent/said`，服务端只收还没挂、开始时「想」不是管家的那一通，开场白不记。管家旁听不再 `Quiet`，提示里让它派了活才说一句。第 4 步也做了，见第 4 节。管家的 `Call`（电话里的话，带语音的提示）和 `Answerer`（本机的 chat/completions，当作田头里的话）共用一个 `answer`：同一时间只流一个回答，新的一句结束上一个的流。
 
 待定：
 
-- 名字（`call`、`dictation`、`answer`、`quick`、`tidy`）要对一下[用语表](../../../../docs/README.md#用语)；界面上通话仍叫「听」「想」「说」，听写叫什么另定。
+- 听写的名字（`dictation`、`tidy`）和界面上叫什么，做第 5 步时定；通话在界面上仍叫「听」「想」「说」，「想」里的那一项叫「谁接电话」。
 
 ## Alternatives considered
 
@@ -161,10 +159,9 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 - `curl` 主服务的 `/v1/chat/completions`（`model: vibevalley-manager`、`stream: true`）能拿到管家的回答，SSE 以 `finish_reason: stop` 和 `[DONE]` 结束；`stream: false` 回一个完整的 `chat.completion`；不认识的 `model` 回 404。
 - `server/internal/voice/line.go` 里没有 OpenAI 协议的代码；语音线路的测试照旧通过。
 - `github.com/AgoraIO/` 只在 `server/pkg/agora` 和 `server/internal/voice/agora.go`，`package:agora_rtc_engine` 只在 `app/lib/voice/`；在别处加一行 import，`go test ./...` 或 `bun run app:imports` 报错。
-- `protocol` 里带 Agora 名字、或只有 Agora 才懂的字段，都在 `VoiceSettings.call` 下（和那张票、凭据）；`VoiceCaptions` 不在了。
+- `protocol` 里带 Agora 名字、或只有 Agora 才懂的字段，都在 `VoiceSettings` 下（和 `AgoraTicket`、凭据）；`VoiceCaptions` 不在了，「想」是 `answer`。
 - 两种 `answer` 下打一通电话，挂了以后田头主频道里有主人说的每一句和对应的回答（照 `verify-server` 查频道的消息；真人说话照 `verify-app`）。
 - 听写：对着 WebSocket 送一段录好的中英混说的 PCM，`final` 里的项目名、档案名和农场里的写法一致；识别失败时输入框保留已有的字，并说明原因。
-- 旧的 `settings.json` 打开一次后是新形状，声音页显示的选项和改之前一致。
 - `go vet ./... && go test ./...`、`bun run go:deadcode`、`bun run flutter:check` 通过。
 
 ## Risks
@@ -174,6 +171,6 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 - 语音线路以外，任何本机程序都能经 `/v1/chat/completions` 让管家派活。这和本机能调 `/api` 是同一个信任边界，有意接受。
 - 协议只取最后一句：Agora 重发同一个请求时，管家会听到两遍。要在真实通话里看是否发生。
 - 听写把主人的声音送到第三方厂商。声音页上要写明送给了谁；本机识别做出来以前，不想上传的只能不用听写。
-- 第 4 步改了存盘的格式：改写前先备份成 `settings.json.bak`，失败就用默认值并记日志。
+- 第 4 步改了存盘的名字（`llm` → `answer`，`vibevalley` → `manager`），不搬旧的：别的机器上存过「想」的 `settings.json`，「想」会回到默认，要在声音页重选一次。
 - 快嘴的回答由客户端上报，客户端挂得太快会少一条；有意接受，不加重试。
 - 有意放弃的：不支持第二家实时平台的 Go 接口，不做不实时的合成；能换平台靠 OpenAI 接口，合成等[帮工各自的音色](../feature/2026-10-13-helper-voices.md)来用。

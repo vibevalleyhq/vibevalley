@@ -18,7 +18,7 @@ Map<String, dynamic> settingsJson({String? deepseek}) {
     'area': 'CN',
     'language': 'zh-CN',
     'asr': {'vendor': 'ares'},
-    'llm': {'vendor': 'vibevalley'},
+    'answer': {'vendor': 'manager'},
     'tts': {'vendor': 'microsoft', 'region': 'eastasia', 'voiceName': 'zh-CN-YunxiNeural'},
     'persona': '',
     'greeting': '',

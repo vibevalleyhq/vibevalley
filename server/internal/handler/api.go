@@ -369,26 +369,22 @@ func (a api) ProjectActivity(ctx context.Context, id string) (protocol.ProjectAc
 // The voice endpoints log each step of a call and why one failed (never a token or a key): a call that goes wrong is
 // read back from the server's log.
 
-func (a api) VoiceSession(ctx context.Context) (protocol.VoiceSession, error) {
+func (a api) VoiceSession(ctx context.Context) (protocol.AgoraTicket, error) {
 	s, err := a.f.Voice.Session(ctx)
 	voiceLog("session", s.Channel, err)
 	return s, err
 }
 
-func (a api) VoiceRenew(ctx context.Context, body protocol.RenewRequest) (protocol.VoiceSession, error) {
+func (a api) VoiceRenew(ctx context.Context, body protocol.RenewRequest) (protocol.AgoraTicket, error) {
 	s, err := a.f.Voice.Renew(ctx, body.Channel, body.UID)
 	voiceLog("renew", body.Channel, err)
 	return s, err
 }
 
 func (a api) VoiceStart(ctx context.Context, body protocol.StartRequest) (protocol.VoiceAgent, error) {
-	captions := "rtm"
-	if body.Captions != nil {
-		captions = string(*body.Captions)
-	}
 	started := time.Now()
-	agent, err := a.f.Voice.Start(ctx, body.Channel, body.UID, body.Captions)
-	voiceLog(fmt.Sprintf("agent start (captions %s, %d ms) %s", captions, time.Since(started).Milliseconds(), agent.AgentID), body.Channel, err)
+	agent, err := a.f.Voice.Start(ctx, body.Channel, body.UID)
+	voiceLog(fmt.Sprintf("agent start (%d ms) %s", time.Since(started).Milliseconds(), agent.AgentID), body.Channel, err)
 	return agent, err
 }
 

@@ -200,7 +200,7 @@ class VoiceCall extends ChangeNotifier {
       // Captions over the RTC data stream: Agora's Flutter RTM package is Android and iOS only.
       _note('call: asking for the voice agent');
       _agentId = (await api.voice.start(
-        body: StartRequest(channel: session.channel, uid: session.uid, captions: VoiceCaptions.datastream),
+        body: StartRequest(channel: session.channel, uid: session.uid),
       )).agentId;
       _note('call: agent $_agentId started after ${watch.elapsedMilliseconds} ms');
       _set(CallPhase.live);

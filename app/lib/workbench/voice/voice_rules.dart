@@ -9,7 +9,7 @@ import '../../gen/vibevalley.dart';
 const deepgramModels = Model.values;
 const voiceTtsModels = VoiceTtsMinimaxModel.values;
 const openaiVoices = Voice.values;
-const voiceModels = VoiceLlmAgoraModel.values;
+const voiceModels = VoiceAnswerAgoraModel.values;
 const voiceLanguages = Language.values;
 
 /// Any other id can be typed.
@@ -33,7 +33,7 @@ const minimaxVoices = <({String id, String label})>[
 const microsoftVoices = ['zh-CN-XiaoxiaoNeural', 'zh-CN-YunxiNeural', 'zh-CN-XiaoyiNeural', 'zh-CN-YunjianNeural', 'en-US-JennyNeural', 'en-US-GuyNeural'];
 
 bool needsAsrKey(VoiceAsr asr) => asr is VoiceAsrMicrosoft;
-bool needsLlmKey(VoiceLlm llm) => llm is VoiceLlmOpenai;
+bool needsLlmKey(VoiceAnswer answer) => answer is VoiceAnswerOpenai;
 bool needsTtsKey(VoiceTts tts) => tts is VoiceTtsMicrosoft;
 
 enum VoiceNumber { silenceMs, interruptMs, idleSeconds }
@@ -48,7 +48,7 @@ abstract final class VoiceLabel {
   static const area = '区域';
   static const language = '语言';
   static const asr = '识别';
-  static const llm = '大模型';
+  static const answer = '谁接电话';
   static const tts = '合成';
   static const persona = '人设';
   static const greeting = '开场白';
@@ -71,7 +71,7 @@ VoiceSettings voiceWith(
   Area? area,
   Language? language,
   VoiceAsr? asr,
-  VoiceLlm? llm,
+  VoiceAnswer? answer,
   VoiceTts? tts,
   String? persona,
   String? greeting,
@@ -83,7 +83,7 @@ VoiceSettings voiceWith(
   area: area ?? v.area,
   language: language ?? v.language,
   asr: asr ?? v.asr,
-  llm: llm ?? v.llm,
+  answer: answer ?? v.answer,
   tts: tts ?? v.tts,
   persona: persona ?? v.persona,
   greeting: greeting ?? v.greeting,

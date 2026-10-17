@@ -38,7 +38,7 @@ func voiceAreaOf(area protocol.Area) option.Area {
 	return option.AreaUS
 }
 
-// For a member added to VoiceASR, VoiceLLM or VoiceTTS and not to voiceVendorsFor; TestVoiceVendorsKnowEveryVendor catches it (Go does not check a
+// For a member added to VoiceASR, VoiceAnswer or VoiceTTS and not to voiceVendorsFor; TestVoiceVendorsKnowEveryVendor catches it (Go does not check a
 // type switch for every member).
 const voiceUnknown = "服务端还不会用"
 
@@ -68,20 +68,20 @@ func voiceVendorsFor(voice protocol.VoiceSettings, keys setting.VoiceKeys, deeps
 	default:
 		return agora.Vendors{}, fmt.Sprintf("识别用的 %T %s", asr, voiceUnknown)
 	}
-	switch llm := voice.LLM.Value.(type) {
-	case protocol.VoiceLLMVibeValley:
+	switch llm := voice.Answer.Value.(type) {
+	case protocol.VoiceAnswerManager:
 		if line == nil {
 			return agora.Vendors{}, "管家的语音线路没接通"
 		}
 		v.LLM = speech(vendors.OpenAIOptions{APIKey: line.Key, BaseURL: line.URL, Model: protocol.ManagerModel})
-	case protocol.VoiceLLMAgora:
+	case protocol.VoiceAnswerAgora:
 		v.LLM = speech(vendors.OpenAIOptions{Model: string(llm.Model)})
-	case protocol.VoiceLLMDeepseek:
+	case protocol.VoiceAnswerDeepseek:
 		if deepseekKey == "" {
 			return agora.Vendors{}, "用 DeepSeek 要先有 DeepSeek 的 key：在首页「设置」里填"
 		}
 		v.LLM = speech(vendors.OpenAIOptions{APIKey: deepseekKey, BaseURL: voiceDeepseekChat, Model: llm.Model})
-	case protocol.VoiceLLMOpenai:
+	case protocol.VoiceAnswerOpenai:
 		if keys.LLMKey == "" {
 			return agora.Vendors{}, "自己的大模型还没有 key：在声音页的「想」里填"
 		}
@@ -109,11 +109,12 @@ func voiceVendorsFor(voice protocol.VoiceSettings, keys setting.VoiceKeys, deeps
 	return v, ""
 }
 
-// Read at each start: a change takes effect on the next call. Empty captions is rtm.
-func voiceAgentFor(client *agentkit.AgoraClient, voice protocol.VoiceSettings, v agora.Vendors, captions protocol.VoiceCaptions) *agentkit.Agent {
+// Read at each start: a change takes effect on the next call. Captions go over the RTC data stream: Agora's Flutter RTM is
+// Android and iOS only, and the client runs on macOS.
+func voiceAgentFor(client *agentkit.AgoraClient, voice protocol.VoiceSettings, v agora.Vendors) *agentkit.Agent {
 	return agora.NewAgent(client, agora.Agent{
 		Language: string(voice.Language), Persona: voice.Persona, InterruptMs: voice.InterruptMs, SilenceMs: voice.SilenceMs,
-		Captions: agora.Captions(captions),
+		Captions: agora.CaptionsDataStream,
 	}, v)
 }
 
@@ -156,23 +157,23 @@ func (v *voice) creds() (agora.Credentials, error) {
 	return *c, nil
 }
 
-func (v *voice) issue(channel, uid string) (protocol.VoiceSession, error) {
+func (v *voice) issue(channel, uid string) (protocol.AgoraTicket, error) {
 	c, err := v.creds()
 	if err != nil {
-		return protocol.VoiceSession{}, err
+		return protocol.AgoraTicket{}, err
 	}
 	token, err := agora.Token(c, channel, uid)
 	if err != nil {
-		return protocol.VoiceSession{}, protocol.VoiceUnavailable{Reason: "签不出语音令牌：" + err.Error()}
+		return protocol.AgoraTicket{}, protocol.VoiceUnavailable{Reason: "签不出语音令牌：" + err.Error()}
 	}
-	return protocol.VoiceSession{AppID: c.AppID, Channel: channel, UID: uid, Token: token}, nil
+	return protocol.AgoraTicket{AppID: c.AppID, Channel: channel, UID: uid, Token: token}, nil
 }
 
-func (v *voice) Session(ctx context.Context) (protocol.VoiceSession, error) {
+func (v *voice) Session(ctx context.Context) (protocol.AgoraTicket, error) {
 	return v.issue(agora.NewChannel("vibevalley"), agora.NewUID())
 }
 
-func (v *voice) Renew(ctx context.Context, channel, uid string) (protocol.VoiceSession, error) {
+func (v *voice) Renew(ctx context.Context, channel, uid string) (protocol.AgoraTicket, error) {
 	return v.issue(channel, uid)
 }
 
@@ -183,7 +184,7 @@ func (v *voice) client(c agora.Credentials, area protocol.Area) *agentkit.AgoraC
 func (v *voice) prepare() (protocol.VoiceSettings, *CallLine, agora.Vendors, error) {
 	voice := v.settings.Voice()
 	var line *CallLine
-	if _, ok := voice.LLM.Value.(protocol.VoiceLLMVibeValley); ok {
+	if _, ok := voice.Answer.Value.(protocol.VoiceAnswerManager); ok {
 		opened, err := v.voiceLine.Open()
 		if err != nil {
 			return voice, nil, agora.Vendors{}, protocol.VoiceUnavailable{Reason: "管家的语音线路接不通：" + err.Error()}
@@ -200,15 +201,15 @@ func (v *voice) prepare() (protocol.VoiceSettings, *CallLine, agora.Vendors, err
 	return voice, line, vendors, nil
 }
 
-func (v *voice) Start(ctx context.Context, channel, uid string, captions *protocol.VoiceCaptions) (protocol.VoiceAgent, error) {
-	agent, err := v.start(ctx, channel, uid, captions)
+func (v *voice) Start(ctx context.Context, channel, uid string) (protocol.VoiceAgent, error) {
+	agent, err := v.start(ctx, channel, uid)
 	if err == nil {
 		v.core.Did(core.OwnerDid{Kind: core.OwnerTalked})
 	}
 	return agent, err
 }
 
-func (v *voice) start(ctx context.Context, channel, uid string, captions *protocol.VoiceCaptions) (protocol.VoiceAgent, error) {
+func (v *voice) start(ctx context.Context, channel, uid string) (protocol.VoiceAgent, error) {
 	c, err := v.creds()
 	if err != nil {
 		return protocol.VoiceAgent{}, err
@@ -217,12 +218,8 @@ func (v *voice) start(ctx context.Context, channel, uid string, captions *protoc
 	if err != nil {
 		return protocol.VoiceAgent{}, err
 	}
-	var mode protocol.VoiceCaptions
-	if captions != nil {
-		mode = *captions
-	}
 	idle := int(voice.IdleSeconds)
-	session := voiceAgentFor(v.client(c, voice.Area), voice, vendors, mode).CreateSession(agentkit.CreateSessionOptions{
+	session := voiceAgentFor(v.client(c, voice.Area), voice, vendors).CreateSession(agentkit.CreateSessionOptions{
 		Channel:     channel,
 		AgentUID:    protocol.VoiceAgentUID,
 		RemoteUIDs:  []string{uid},
@@ -285,7 +282,7 @@ func (v *voice) Stop(ctx context.Context, agentID string) error {
 }
 
 // No caller since MyGo was removed.
-func (v *voice) Native(captions protocol.VoiceCaptions) (VoiceNative, error) {
+func (v *voice) Native() (VoiceNative, error) {
 	c, err := v.creds()
 	if err != nil {
 		return VoiceNative{}, err
@@ -300,7 +297,7 @@ func (v *voice) Native(captions protocol.VoiceCaptions) (VoiceNative, error) {
 		Area:        voiceAreaOf(voice.Area),
 		IdleSeconds: int(voice.IdleSeconds),
 		Agent: func(client *agentkit.AgoraClient) *agentkit.Agent {
-			return voiceAgentFor(client, voice, vendors, captions)
+			return voiceAgentFor(client, voice, vendors)
 		},
 		Done: func() {
 			once.Do(func() {

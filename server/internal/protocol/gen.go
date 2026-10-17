@@ -708,9 +708,6 @@ func (v LanStatus) MarshalJSON() ([]byte, error) {
 // ConnectorStateValues are every ConnectorState, in the protocol's order.
 var ConnectorStateValues = []ConnectorState{ConnectorStateOff, ConnectorStateWaiting, ConnectorStateScanned, ConnectorStateVerify, ConnectorStatePairing, ConnectorStateConnected, ConnectorStatePaused}
 
-// VoiceCaptionsValues are every VoiceCaptions, in the protocol's order.
-var VoiceCaptionsValues = []VoiceCaptions{VoiceCaptionsRtm, VoiceCaptionsDatastream}
-
 func (v ProjectActivity) MarshalJSON() ([]byte, error) {
 	type plain ProjectActivity
 	p := plain(v)
@@ -1350,19 +1347,19 @@ func (v VoiceASRMicrosoft) MarshalJSON() ([]byte, error) {
 	return withTag(p, "vendor", "microsoft")
 }
 
-// VoiceLLMValue is a member of VoiceLLM: VoiceLLMVibeValley, VoiceLLMAgora, VoiceLLMDeepseek, VoiceLLMOpenai, told apart by "vendor".
-type VoiceLLMValue interface{ isVoiceLLM() }
+// VoiceAnswerValue is a member of VoiceAnswer: VoiceAnswerManager, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai, told apart by "vendor".
+type VoiceAnswerValue interface{ isVoiceAnswer() }
 
-func (u VoiceLLM) IsZero() bool { return u.Value == nil }
+func (u VoiceAnswer) IsZero() bool { return u.Value == nil }
 
-func (u VoiceLLM) MarshalJSON() ([]byte, error) {
+func (u VoiceAnswer) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}
 	return json.Marshal(u.Value)
 }
 
-func (u *VoiceLLM) UnmarshalJSON(data []byte) error {
+func (u *VoiceAnswer) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		u.Value = nil
 		return nil
@@ -1375,66 +1372,66 @@ func (u *VoiceLLM) UnmarshalJSON(data []byte) error {
 	}
 	var err error
 	switch head.Tag {
-	case "vibevalley":
-		var v VoiceLLMVibeValley
+	case "manager":
+		var v VoiceAnswerManager
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "agora":
-		var v VoiceLLMAgora
+		var v VoiceAnswerAgora
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "deepseek":
-		var v VoiceLLMDeepseek
+		var v VoiceAnswerDeepseek
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "openai":
-		var v VoiceLLMOpenai
+		var v VoiceAnswerOpenai
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	default:
-		return fmt.Errorf("VoiceLLM: unknown vendor %q", head.Tag)
+		return fmt.Errorf("VoiceAnswer: unknown vendor %q", head.Tag)
 	}
 	return err
 }
 
-// VoiceLLMMembers are every member of VoiceLLM, each zero, in the protocol's order: a test can see that a switch meant to
+// VoiceAnswerMembers are every member of VoiceAnswer, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var VoiceLLMMembers = []VoiceLLMValue{VoiceLLMVibeValley{}, VoiceLLMAgora{}, VoiceLLMDeepseek{}, VoiceLLMOpenai{}}
+var VoiceAnswerMembers = []VoiceAnswerValue{VoiceAnswerManager{}, VoiceAnswerAgora{}, VoiceAnswerDeepseek{}, VoiceAnswerOpenai{}}
 
-func (VoiceLLMVibeValley) isVoiceLLM() {}
+func (VoiceAnswerManager) isVoiceAnswer() {}
 
-func (v VoiceLLMVibeValley) MarshalJSON() ([]byte, error) {
-	type plain VoiceLLMVibeValley
+func (v VoiceAnswerManager) MarshalJSON() ([]byte, error) {
+	type plain VoiceAnswerManager
 	p := plain(v)
 
-	return withTag(p, "vendor", "vibevalley")
+	return withTag(p, "vendor", "manager")
 }
 
-// VoiceLLMAgoraModelValues are every VoiceLLMAgoraModel, in the protocol's order.
-var VoiceLLMAgoraModelValues = []VoiceLLMAgoraModel{VoiceLLMAgoraModelGpt4oMini, VoiceLLMAgoraModelGpt41Mini, VoiceLLMAgoraModelGpt5Nano, VoiceLLMAgoraModelGpt5Mini}
+// VoiceAnswerAgoraModelValues are every VoiceAnswerAgoraModel, in the protocol's order.
+var VoiceAnswerAgoraModelValues = []VoiceAnswerAgoraModel{VoiceAnswerAgoraModelGpt4oMini, VoiceAnswerAgoraModelGpt41Mini, VoiceAnswerAgoraModelGpt5Nano, VoiceAnswerAgoraModelGpt5Mini}
 
-func (VoiceLLMAgora) isVoiceLLM() {}
+func (VoiceAnswerAgora) isVoiceAnswer() {}
 
-func (v VoiceLLMAgora) MarshalJSON() ([]byte, error) {
-	type plain VoiceLLMAgora
+func (v VoiceAnswerAgora) MarshalJSON() ([]byte, error) {
+	type plain VoiceAnswerAgora
 	p := plain(v)
 
 	return withTag(p, "vendor", "agora")
 }
 
-func (VoiceLLMDeepseek) isVoiceLLM() {}
+func (VoiceAnswerDeepseek) isVoiceAnswer() {}
 
-func (v VoiceLLMDeepseek) MarshalJSON() ([]byte, error) {
-	type plain VoiceLLMDeepseek
+func (v VoiceAnswerDeepseek) MarshalJSON() ([]byte, error) {
+	type plain VoiceAnswerDeepseek
 	p := plain(v)
 
 	return withTag(p, "vendor", "deepseek")
 }
 
-func (VoiceLLMOpenai) isVoiceLLM() {}
+func (VoiceAnswerOpenai) isVoiceAnswer() {}
 
-func (v VoiceLLMOpenai) MarshalJSON() ([]byte, error) {
-	type plain VoiceLLMOpenai
+func (v VoiceAnswerOpenai) MarshalJSON() ([]byte, error) {
+	type plain VoiceAnswerOpenai
 	p := plain(v)
 
 	return withTag(p, "vendor", "openai")
@@ -3186,14 +3183,14 @@ func (c *Client) ProjectActivity(ctx context.Context, pID string) (ProjectActivi
 	return out, err
 }
 
-func (c *Client) VoiceSession(ctx context.Context) (VoiceSession, error) {
-	var out VoiceSession
+func (c *Client) VoiceSession(ctx context.Context) (AgoraTicket, error) {
+	var out AgoraTicket
 	err := c.call(ctx, "POST", "/api/v1/voice/session", nil, nil, &out)
 	return out, err
 }
 
-func (c *Client) VoiceRenew(ctx context.Context, body RenewRequest) (VoiceSession, error) {
-	var out VoiceSession
+func (c *Client) VoiceRenew(ctx context.Context, body RenewRequest) (AgoraTicket, error) {
+	var out AgoraTicket
 	err := c.call(ctx, "POST", "/api/v1/voice/renew", nil, body, &out)
 	return out, err
 }

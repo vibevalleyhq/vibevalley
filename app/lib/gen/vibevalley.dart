@@ -2010,21 +2010,11 @@ class VoiceAgent {
   Map<String, dynamic> toJson() => {'agentId': agentId};
 }
 
-enum VoiceCaptions {
-  rtm('rtm'),
-  datastream('datastream');
+class AgoraTicket {
+  const AgoraTicket({required this.appId, required this.channel, required this.uid, required this.token});
 
-  const VoiceCaptions(this.wire);
-  final String wire;
-
-  static VoiceCaptions fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('VoiceCaptions: unknown value', v));
-}
-
-class VoiceSession {
-  const VoiceSession({required this.appId, required this.channel, required this.uid, required this.token});
-
-  factory VoiceSession.fromJson(Map<String, dynamic> j) =>
-      VoiceSession(appId: j['appId'] as String, channel: j['channel'] as String, uid: j['uid'] as String, token: j['token'] as String);
+  factory AgoraTicket.fromJson(Map<String, dynamic> j) =>
+      AgoraTicket(appId: j['appId'] as String, channel: j['channel'] as String, uid: j['uid'] as String, token: j['token'] as String);
 
   final String appId;
   final String channel;
@@ -3142,7 +3132,7 @@ class VoiceSettings {
     required this.area,
     required this.language,
     required this.asr,
-    required this.llm,
+    required this.answer,
     required this.tts,
     required this.persona,
     required this.greeting,
@@ -3156,7 +3146,7 @@ class VoiceSettings {
     area: Area.fromJson(j['area']),
     language: Language.fromJson(j['language']),
     asr: VoiceAsr.fromJson(j['asr'] as Map<String, dynamic>),
-    llm: VoiceLlm.fromJson(j['llm'] as Map<String, dynamic>),
+    answer: VoiceAnswer.fromJson(j['answer'] as Map<String, dynamic>),
     tts: VoiceTts.fromJson(j['tts'] as Map<String, dynamic>),
     persona: j['persona'] as String,
     greeting: j['greeting'] as String,
@@ -3169,7 +3159,7 @@ class VoiceSettings {
   final Area area;
   final Language language;
   final VoiceAsr asr;
-  final VoiceLlm llm;
+  final VoiceAnswer answer;
   final VoiceTts tts;
   final String persona;
   final String greeting;
@@ -3182,7 +3172,7 @@ class VoiceSettings {
     'area': area.wire,
     'language': language.wire,
     'asr': asr.toJson(),
-    'llm': llm.toJson(),
+    'answer': answer.toJson(),
     'tts': tts.toJson(),
     'persona': persona,
     'greeting': greeting,
@@ -4033,57 +4023,57 @@ final class VoiceAsrMicrosoft extends VoiceAsr {
 }
 
 /// Told apart by `vendor`; switch over the subclasses.
-sealed class VoiceLlm {
-  const VoiceLlm();
+sealed class VoiceAnswer {
+  const VoiceAnswer();
 
-  factory VoiceLlm.fromJson(Map<String, dynamic> j) => switch (j['vendor']) {
-    'vibevalley' => VoiceLlmVibeValley.fromJson(j),
-    'agora' => VoiceLlmAgora.fromJson(j),
-    'deepseek' => VoiceLlmDeepseek.fromJson(j),
-    'openai' => VoiceLlmOpenai.fromJson(j),
-    final other => throw FormatException('VoiceLlm: unknown vendor', other),
+  factory VoiceAnswer.fromJson(Map<String, dynamic> j) => switch (j['vendor']) {
+    'manager' => VoiceAnswerManager.fromJson(j),
+    'agora' => VoiceAnswerAgora.fromJson(j),
+    'deepseek' => VoiceAnswerDeepseek.fromJson(j),
+    'openai' => VoiceAnswerOpenai.fromJson(j),
+    final other => throw FormatException('VoiceAnswer: unknown vendor', other),
   };
 
   Map<String, dynamic> toJson();
 }
 
-final class VoiceLlmVibeValley extends VoiceLlm {
-  const VoiceLlmVibeValley();
+final class VoiceAnswerManager extends VoiceAnswer {
+  const VoiceAnswerManager();
 
-  factory VoiceLlmVibeValley.fromJson(Map<String, dynamic> j) => VoiceLlmVibeValley();
+  factory VoiceAnswerManager.fromJson(Map<String, dynamic> j) => VoiceAnswerManager();
 
   @override
-  Map<String, dynamic> toJson() => {'vendor': 'vibevalley'};
+  Map<String, dynamic> toJson() => {'vendor': 'manager'};
 }
 
-enum VoiceLlmAgoraModel {
+enum VoiceAnswerAgoraModel {
   gpt4oMini('gpt-4o-mini'),
   gpt41Mini('gpt-4.1-mini'),
   gpt5Nano('gpt-5-nano'),
   gpt5Mini('gpt-5-mini');
 
-  const VoiceLlmAgoraModel(this.wire);
+  const VoiceAnswerAgoraModel(this.wire);
   final String wire;
 
-  static VoiceLlmAgoraModel fromJson(Object? v) =>
-      values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('VoiceLlmAgoraModel: unknown value', v));
+  static VoiceAnswerAgoraModel fromJson(Object? v) =>
+      values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('VoiceAnswerAgoraModel: unknown value', v));
 }
 
-final class VoiceLlmAgora extends VoiceLlm {
-  const VoiceLlmAgora({required this.model});
+final class VoiceAnswerAgora extends VoiceAnswer {
+  const VoiceAnswerAgora({required this.model});
 
-  factory VoiceLlmAgora.fromJson(Map<String, dynamic> j) => VoiceLlmAgora(model: VoiceLlmAgoraModel.fromJson(j['model']));
+  factory VoiceAnswerAgora.fromJson(Map<String, dynamic> j) => VoiceAnswerAgora(model: VoiceAnswerAgoraModel.fromJson(j['model']));
 
-  final VoiceLlmAgoraModel model;
+  final VoiceAnswerAgoraModel model;
 
   @override
   Map<String, dynamic> toJson() => {'vendor': 'agora', 'model': model.wire};
 }
 
-final class VoiceLlmDeepseek extends VoiceLlm {
-  const VoiceLlmDeepseek({required this.model});
+final class VoiceAnswerDeepseek extends VoiceAnswer {
+  const VoiceAnswerDeepseek({required this.model});
 
-  factory VoiceLlmDeepseek.fromJson(Map<String, dynamic> j) => VoiceLlmDeepseek(model: j['model'] as String);
+  factory VoiceAnswerDeepseek.fromJson(Map<String, dynamic> j) => VoiceAnswerDeepseek(model: j['model'] as String);
 
   final String model;
 
@@ -4091,10 +4081,10 @@ final class VoiceLlmDeepseek extends VoiceLlm {
   Map<String, dynamic> toJson() => {'vendor': 'deepseek', 'model': model};
 }
 
-final class VoiceLlmOpenai extends VoiceLlm {
-  const VoiceLlmOpenai({required this.url, required this.model});
+final class VoiceAnswerOpenai extends VoiceAnswer {
+  const VoiceAnswerOpenai({required this.url, required this.model});
 
-  factory VoiceLlmOpenai.fromJson(Map<String, dynamic> j) => VoiceLlmOpenai(url: j['url'] as String, model: j['model'] as String);
+  factory VoiceAnswerOpenai.fromJson(Map<String, dynamic> j) => VoiceAnswerOpenai(url: j['url'] as String, model: j['model'] as String);
 
   final String url;
   final String model;
@@ -4183,7 +4173,7 @@ class SettingsUpdateVoice {
     this.area,
     this.language,
     this.asr,
-    this.llm,
+    this.answer,
     this.tts,
     this.persona,
     this.greeting,
@@ -4197,7 +4187,7 @@ class SettingsUpdateVoice {
     area: j['area'] == null ? null : Area.fromJson(j['area']),
     language: j['language'] == null ? null : Language.fromJson(j['language']),
     asr: j['asr'] == null ? null : VoiceAsr.fromJson(j['asr'] as Map<String, dynamic>),
-    llm: j['llm'] == null ? null : VoiceLlm.fromJson(j['llm'] as Map<String, dynamic>),
+    answer: j['answer'] == null ? null : VoiceAnswer.fromJson(j['answer'] as Map<String, dynamic>),
     tts: j['tts'] == null ? null : VoiceTts.fromJson(j['tts'] as Map<String, dynamic>),
     persona: j['persona'] == null ? null : j['persona'] as String,
     greeting: j['greeting'] == null ? null : j['greeting'] as String,
@@ -4210,7 +4200,7 @@ class SettingsUpdateVoice {
   final Area? area;
   final Language? language;
   final VoiceAsr? asr;
-  final VoiceLlm? llm;
+  final VoiceAnswer? answer;
   final VoiceTts? tts;
   final String? persona;
   final String? greeting;
@@ -4223,7 +4213,7 @@ class SettingsUpdateVoice {
     if (area != null) 'area': area!.wire,
     if (language != null) 'language': language!.wire,
     if (asr != null) 'asr': asr!.toJson(),
-    if (llm != null) 'llm': llm!.toJson(),
+    if (answer != null) 'answer': answer!.toJson(),
     if (tts != null) 'tts': tts!.toJson(),
     if (persona != null) 'persona': persona!,
     if (greeting != null) 'greeting': greeting!,
@@ -4790,16 +4780,14 @@ class VoiceSaid {
 }
 
 class StartRequest {
-  const StartRequest({required this.channel, required this.uid, this.captions});
+  const StartRequest({required this.channel, required this.uid});
 
-  factory StartRequest.fromJson(Map<String, dynamic> j) =>
-      StartRequest(channel: j['channel'] as String, uid: j['uid'] as String, captions: j['captions'] == null ? null : VoiceCaptions.fromJson(j['captions']));
+  factory StartRequest.fromJson(Map<String, dynamic> j) => StartRequest(channel: j['channel'] as String, uid: j['uid'] as String);
 
   final String channel;
   final String uid;
-  final VoiceCaptions? captions;
 
-  Map<String, dynamic> toJson() => {'channel': channel, 'uid': uid, if (captions != null) 'captions': captions!.wire};
+  Map<String, dynamic> toJson() => {'channel': channel, 'uid': uid};
 }
 
 class VerifyRequest {
@@ -5359,14 +5347,14 @@ class VoiceApi {
   VoiceApi._(this._api);
   final VibeValleyApi _api;
 
-  Future<VoiceSession> session() async {
+  Future<AgoraTicket> session() async {
     final j = await _api._call('POST', '/api/v1/voice/session', query: {}, body: null);
-    return VoiceSession.fromJson(j as Map<String, dynamic>);
+    return AgoraTicket.fromJson(j as Map<String, dynamic>);
   }
 
-  Future<VoiceSession> renew({required RenewRequest body}) async {
+  Future<AgoraTicket> renew({required RenewRequest body}) async {
     final j = await _api._call('POST', '/api/v1/voice/renew', query: {}, body: body.toJson());
-    return VoiceSession.fromJson(j as Map<String, dynamic>);
+    return AgoraTicket.fromJson(j as Map<String, dynamic>);
   }
 
   Future<VoiceAgent> start({required StartRequest body}) async {

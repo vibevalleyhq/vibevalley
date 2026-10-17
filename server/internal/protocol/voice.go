@@ -17,7 +17,7 @@ func DefaultVoice() VoiceSettings {
 		Area:           AreaUS,
 		Language:       LanguageZhCN,
 		ASR:            VoiceASR{VoiceASRAres{}},
-		LLM:            VoiceLLM{VoiceLLMAgora{Model: VoiceLLMAgoraModelGpt41Mini}},
+		Answer:         VoiceAnswer{VoiceAnswerAgora{Model: VoiceAnswerAgoraModelGpt41Mini}},
 		TTS:            VoiceTTS{VoiceTTSMinimax{Model: VoiceTTSMinimaxModelSpeech26Turbo, VoiceID: "Chinese (Mandarin)_Gentle_Youth"}},
 		Persona:        voiceManagerPersona,
 		Greeting:       DefaultGreeting,

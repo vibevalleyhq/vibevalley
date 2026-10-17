@@ -74,7 +74,9 @@ void main() {
   });
 
   test('a tagged union in a body is written with its tag (voice vendors)', () {
-    final start = const StartRequest(channel: 'c', uid: '7', captions: VoiceCaptions.datastream).toJson();
-    expect(start, {'channel': 'c', 'uid': '7', 'captions': 'datastream'});
+    final voice = const SettingsUpdateVoice(answer: VoiceAnswerManager()).toJson();
+    expect(voice, {
+      'answer': {'vendor': 'manager'},
+    });
   });
 }

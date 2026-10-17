@@ -214,10 +214,10 @@ type Handlers interface {
 	ProjectActivity(ctx context.Context, pID string) (ProjectActivity, error)
 	//vibevalley:route voice.session POST /api/v1/voice/session
 	//vibevalley:can owner remote
-	VoiceSession(ctx context.Context) (VoiceSession, error)
+	VoiceSession(ctx context.Context) (AgoraTicket, error)
 	//vibevalley:route voice.renew POST /api/v1/voice/renew
 	//vibevalley:can owner remote
-	VoiceRenew(ctx context.Context, body RenewRequest) (VoiceSession, error)
+	VoiceRenew(ctx context.Context, body RenewRequest) (AgoraTicket, error)
 	//vibevalley:route voice.start POST /api/v1/voice/agent
 	//vibevalley:can owner remote
 	VoiceStart(ctx context.Context, body StartRequest) (VoiceAgent, error)

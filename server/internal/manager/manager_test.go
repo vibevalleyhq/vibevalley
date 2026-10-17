@@ -274,7 +274,7 @@ func TestManagerCallStreamsItsWords(t *testing.T) {
 	if kept := testkit.Await(t, "the call in 田头", func() ([]string, bool) { k := call(); return k, len(k) == 2 }); !slices.Equal(kept, []string{"user：现在地里怎么样", "manager：收到"}) {
 		t.Fatalf("田头 %q", kept)
 	}
-	if _, err := f.Setting.Save(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{LLM: protocol.VoiceLLM{Value: protocol.VoiceLLMVibeValley{}}}}); err != nil {
+	if _, err := f.Setting.Save(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{Answer: protocol.VoiceAnswer{Value: protocol.VoiceAnswerManager{}}}}); err != nil {
 		t.Fatal(err)
 	}
 	f.Manager.Heard("随便说一句", "")

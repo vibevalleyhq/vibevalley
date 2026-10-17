@@ -73,11 +73,10 @@ func TestVoiceRequestsMatchGolden(t *testing.T) {
 		Name        string                 `json:"name"`
 		Voice       protocol.VoiceSettings `json:"voice"`
 		Keys        struct{ AsrKey, LlmKey, TtsKey string }
-		DeepseekKey string                 `json:"deepseekKey"`
-		Line        *CallLine              `json:"line"`
-		Captions    protocol.VoiceCaptions `json:"captions"`
-		Request     map[string]any         `json:"request"`
-		RequestURL  string                 `json:"requestUrl"`
+		DeepseekKey string         `json:"deepseekKey"`
+		Line        *CallLine      `json:"line"`
+		Request     map[string]any `json:"request"`
+		RequestURL  string         `json:"requestUrl"`
 	}
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		t.Fatal(err)
@@ -94,7 +93,7 @@ func TestVoiceRequestsMatchGolden(t *testing.T) {
 			capture := &voiceCapture{}
 			client := agentkit.NewAgoraClient(agentkit.AgoraClientOptions{Area: voiceAreaOf(c.Voice.Area), AppID: voiceTestAppID, AppCertificate: voiceTestCert, HTTPClient: capture})
 			idle := int(c.Voice.IdleSeconds)
-			session := voiceAgentFor(client, c.Voice, vendors, c.Captions).CreateSession(agentkit.CreateSessionOptions{
+			session := voiceAgentFor(client, c.Voice, vendors).CreateSession(agentkit.CreateSessionOptions{
 				Name: "parity", Channel: "parity-channel", AgentUID: protocol.VoiceAgentUID, RemoteUIDs: []string{"10001"}, IdleTimeout: &idle, ExpiresIn: 3600,
 			})
 			id, err := session.Start(context.Background())
@@ -127,7 +126,7 @@ func TestVoiceVendorsSayWhichKeyIsMissing(t *testing.T) {
 		t.Fatalf("Agora-hosted vendors need no key: %s", problem)
 	}
 	deepseek := with(func(v *protocol.VoiceSettings) {
-		v.LLM = protocol.VoiceLLM{Value: protocol.VoiceLLMDeepseek{Model: "deepseek-chat"}}
+		v.Answer = protocol.VoiceAnswer{Value: protocol.VoiceAnswerDeepseek{Model: "deepseek-chat"}}
 	})
 	if _, problem := voiceVendorsFor(deepseek, setting.VoiceKeys{}, "", nil); !strings.Contains(problem, "DeepSeek") {
 		t.Fatalf("deepseek: %q", problem)
@@ -142,7 +141,7 @@ func TestVoiceVendorsSayWhichKeyIsMissing(t *testing.T) {
 		t.Fatalf("microsoft asr: %q", problem)
 	}
 	llm := with(func(v *protocol.VoiceSettings) {
-		v.LLM = protocol.VoiceLLM{Value: protocol.VoiceLLMOpenai{URL: "https://x/v1/chat/completions", Model: "m"}}
+		v.Answer = protocol.VoiceAnswer{Value: protocol.VoiceAnswerOpenai{URL: "https://x/v1/chat/completions", Model: "m"}}
 	})
 	if _, problem := voiceVendorsFor(llm, setting.VoiceKeys{}, "", nil); !strings.Contains(problem, "大模型") {
 		t.Fatalf("own llm: %q", problem)
@@ -160,13 +159,13 @@ func TestVoiceVendorsSayWhichKeyIsMissing(t *testing.T) {
 	if _, problem := voiceVendorsFor(hosted, setting.VoiceKeys{}, "", nil); problem != "" {
 		t.Fatalf("deepgram and openai tts: %q", problem)
 	}
-	vibevalley := with(func(v *protocol.VoiceSettings) { v.LLM = protocol.VoiceLLM{Value: protocol.VoiceLLMVibeValley{}} })
+	vibevalley := with(func(v *protocol.VoiceSettings) { v.Answer = protocol.VoiceAnswer{Value: protocol.VoiceAnswerManager{}} })
 	if _, problem := voiceVendorsFor(vibevalley, setting.VoiceKeys{}, "", nil); !strings.Contains(problem, "语音线路") {
 		t.Fatalf("vibevalley without a line: %q", problem)
 	}
 }
 
-// Go does not check a type switch for every member: a member added to VoiceASR, VoiceLLM or VoiceTTS fails here until it is handled.
+// Go does not check a type switch for every member: a member added to VoiceASR, VoiceAnswer or VoiceTTS fails here until it is handled.
 func TestVoiceVendorsKnowEveryVendor(t *testing.T) {
 	keys := setting.VoiceKeys{ASRKey: "k", LLMKey: "k", TTSKey: "k"}
 	line := &CallLine{ID: "l", URL: "http://127.0.0.1:1/v1/chat/completions", Key: "k"}
@@ -180,9 +179,9 @@ func TestVoiceVendorsKnowEveryVendor(t *testing.T) {
 		v.ASR = protocol.VoiceASR{Value: m}
 		knows(m, v)
 	}
-	for _, m := range protocol.VoiceLLMMembers {
+	for _, m := range protocol.VoiceAnswerMembers {
 		v := protocol.DefaultVoice()
-		v.LLM = protocol.VoiceLLM{Value: m}
+		v.Answer = protocol.VoiceAnswer{Value: m}
 		knows(m, v)
 	}
 	for _, m := range protocol.VoiceTTSMembers {
@@ -236,11 +235,10 @@ func TestVoiceStartAndStopTheManagerOnHisLine(t *testing.T) {
 	f.Voice.http = capture
 	ctx := context.Background()
 	if _, err := f.Setting.Save(protocol.SettingsUpdate{AgoraAppID: ptr.To(voiceTestAppID), AgoraAppCertificate: ptr.To(voiceTestCert),
-		Voice: &protocol.SettingsUpdateVoice{LLM: protocol.VoiceLLM{Value: protocol.VoiceLLMVibeValley{}}}}); err != nil {
+		Voice: &protocol.SettingsUpdateVoice{Answer: protocol.VoiceAnswer{Value: protocol.VoiceAnswerManager{}}}}); err != nil {
 		t.Fatal(err)
 	}
-	captions := protocol.VoiceCaptionsDatastream
-	agent, err := f.Voice.Start(ctx, "ch1", "4242", &captions)
+	agent, err := f.Voice.Start(ctx, "ch1", "4242")
 	if err != nil || agent.AgentID != "parity-agent" {
 		t.Fatalf("start: %+v %v", agent, err)
 	}
@@ -274,14 +272,14 @@ func TestVoiceStartAndStopTheManagerOnHisLine(t *testing.T) {
 
 func TestVoiceNativeIsTheFarmsAgent(t *testing.T) {
 	f := voiceTestFarm(t)
-	if _, err := f.Voice.Native(protocol.VoiceCaptionsRtm); err == nil {
+	if _, err := f.Voice.Native(); err == nil {
 		t.Fatal("no credentials, no agent")
 	}
 	if _, err := f.Setting.Save(protocol.SettingsUpdate{AgoraAppID: ptr.To(voiceTestAppID), AgoraAppCertificate: ptr.To(voiceTestCert),
 		Voice: &protocol.SettingsUpdateVoice{Area: ptr.To(protocol.AreaEU), IdleSeconds: ptr.To(int64(90))}}); err != nil {
 		t.Fatal(err)
 	}
-	native, err := f.Voice.Native(protocol.VoiceCaptionsRtm)
+	native, err := f.Voice.Native()
 	if err != nil {
 		t.Fatal(err)
 	}

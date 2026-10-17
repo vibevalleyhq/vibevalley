@@ -21,7 +21,7 @@ var voiceFieldLabel = map[string]string{
 	"area":           "区域",
 	"language":       "语言",
 	"asr":            "识别",
-	"llm":            "大模型",
+	"answer":         "谁接电话",
 	"tts":            "合成",
 	"persona":        "人设",
 	"greeting":       "开场白",
@@ -37,12 +37,12 @@ func voiceProblem(v protocol.SettingsUpdateVoice) string {
 	if asr, ok := v.ASR.Value.(protocol.VoiceASRMicrosoft); ok && str.Trim(asr.Region) == "" {
 		return "微软识别要填区域，比如 eastasia"
 	}
-	switch llm := v.LLM.Value.(type) {
-	case protocol.VoiceLLMDeepseek:
+	switch llm := v.Answer.Value.(type) {
+	case protocol.VoiceAnswerDeepseek:
 		if str.Trim(llm.Model) == "" {
 			return "大模型要填模型名"
 		}
-	case protocol.VoiceLLMOpenai:
+	case protocol.VoiceAnswerOpenai:
 		if str.Trim(llm.Model) == "" {
 			return "大模型要填模型名"
 		}
@@ -86,8 +86,8 @@ func voiceSettingsOver(defaults protocol.VoiceSettings, overrides protocol.Setti
 	if overrides.ASR.Value != nil {
 		s.ASR = overrides.ASR
 	}
-	if overrides.LLM.Value != nil {
-		s.LLM = overrides.LLM
+	if overrides.Answer.Value != nil {
+		s.Answer = overrides.Answer
 	}
 	if overrides.TTS.Value != nil {
 		s.TTS = overrides.TTS
@@ -130,8 +130,8 @@ func voiceOverrides(defaults, settings protocol.VoiceSettings) protocol.Settings
 	if differs(settings.ASR, defaults.ASR) {
 		out.ASR = settings.ASR
 	}
-	if differs(settings.LLM, defaults.LLM) {
-		out.LLM = settings.LLM
+	if differs(settings.Answer, defaults.Answer) {
+		out.Answer = settings.Answer
 	}
 	if differs(settings.TTS, defaults.TTS) {
 		out.TTS = settings.TTS

@@ -17,7 +17,7 @@ func TestSettingsProblem(t *testing.T) {
 	testkit.Match(t, settingsProblem(protocol.SettingsUpdate{TTSKey: ptr.To(" a b ")}), "空格")
 	testkit.Match(t, settingsProblem(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{SilenceMs: ptr.To[int64](50)}}), "200 到 2000")
 	testkit.Match(t, settingsProblem(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{Persona: ptr.To("  ")}}), "人设")
-	testkit.Match(t, settingsProblem(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{LLM: protocol.VoiceLLM{Value: protocol.VoiceLLMOpenai{URL: "not a url", Model: "x"}}}}), "http")
+	testkit.Match(t, settingsProblem(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{Answer: protocol.VoiceAnswer{Value: protocol.VoiceAnswerOpenai{URL: "not a url", Model: "x"}}}}), "http")
 	testkit.Eq(t, keyHint("sk-saved-in-settings-1234"), "…1234")
 	testkit.Eq(t, keyHint("ab"), "…ab")
 }
