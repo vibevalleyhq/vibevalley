@@ -13,6 +13,7 @@ import (
 	"vibevalley/internal/testkit/fixture"
 	vvagent "vibevalley/pkg/agent"
 	"vibevalley/pkg/ai"
+	"vibevalley/pkg/x/clock"
 )
 
 func TestQueuedManagerInputKeepsItsReplyChannelAndSelection(t *testing.T) {
@@ -228,4 +229,28 @@ func TestTheSituationIsWholeOnlyAfterAFold(t *testing.T) {
 	if fourth := ask("四"); !strings.Contains(fourth, "【农场现状】") {
 		t.Fatalf("after a fold %q", fourth)
 	}
+}
+
+func TestOnlyItsOwnScheduleSoonKeepsTheManagerFromFoldingIdle(t *testing.T) {
+	w := managerOpen(t)
+	fm := w.f.Manager.manager
+	in := func(minutes int64) protocol.ScheduleWhen {
+		return protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + minutes*60_000}}
+	}
+	if _, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "晚些", Text: "看看", When: in(30)}); err != nil {
+		t.Fatal(err)
+	}
+	ops, err := w.f.Channel.OpenChannel("ops", "", "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lab := "lab"
+	if _, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "巡检", Text: "跑一遍", Channel: &ops.ID, Agent: &lab, When: in(5)}); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, fm.wakeSoon(10*time.Minute), false, "a helper's, and its own far off")
+	if _, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "回头看", Text: "看进度", When: in(5)}); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, fm.wakeSoon(10*time.Minute), true, "its own in 5 minutes")
 }

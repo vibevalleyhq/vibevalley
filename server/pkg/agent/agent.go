@@ -1,7 +1,7 @@
 package agent
 
 // A message is saved before its message_end is passed on. Past its budget the older part of the conversation is folded into a summary: for a request
-// as soon as it is too long, in the file once the run is over. The system prompt is made when the agent starts and after each fold, never per
+// as soon as it is too long, in the file once the run is over; past IdleFoldAt, once it has been idle IdleFoldAfter. The system prompt is made when the agent starts and after each fold, never per
 // request: what changes meanwhile (the time, the host's situation, new memory) goes in the newest input, so the start of every request stays
 // the cached one.
 
@@ -26,7 +26,8 @@ const (
 )
 
 // AgentEvent is an agentcore event, or one of this agent's own: agent_settled (Aborted), compaction_start
-// (Reason "threshold"), compaction_end (Reason, Compaction: nil when nothing was folded), prefix_changed (Reason: the
+// (Reason "threshold" or "idle"), compaction_end (Reason, Compaction: nil when nothing was folded, Usage: the summary
+// request's, nil when none was made), prefix_changed (Reason: the
 // parts of the prompt's start that changed since the request before, with no compaction between, as PromptParts names
 // them, joined by commas).
 type AgentEvent struct {
@@ -35,6 +36,7 @@ type AgentEvent struct {
 	Reason  string
 	// Not Result: agentcore.AgentEvent has a Result of its own.
 	Compaction *CompactionSummaryMessage
+	Usage      *ai.Usage
 }
 
 type AgentOptions struct {
@@ -61,6 +63,13 @@ type AgentOptions struct {
 	ContextTokens int
 	// 12 when 0.
 	KeepRecent int
+	// Tokens (estimated) past which a conversation idle IdleFoldAfter is folded; four fifths of ContextTokens when 0.
+	IdleFoldAt int
+	// 10 minutes when 0; below 0, never folded idle.
+	IdleFoldAfter time.Duration
+	// Asked before an idle fold: true when the agent will be woken within that long anyway, and its first request
+	// folds if it must.
+	WakeSoon func(within time.Duration) bool
 	// "": Name. NoSession keeps nothing on disk (a helper).
 	Session   string
 	NoSession bool
@@ -102,6 +111,8 @@ type Agent struct {
 	parts  []promptPart
 	// The lines of MEMORY.md the model knows: the snapshot's, then as MemoryNews told it.
 	knownMemory []string
+	// Under mu.
+	idle *time.Timer
 }
 
 // ctx's values (ai.WithProviders) reach every request, and its end stops the agent.
@@ -135,7 +146,7 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 	if keepRecent == 0 {
 		keepRecent = 12
 	}
-	a.folding = CompactionOptions{Home: options.Home, Session: sessionName, Model: options.Model, StreamOptions: options.StreamOptions, Budget: budget, KeepRecent: keepRecent}
+	a.folding = CompactionOptions{Home: options.Home, Session: sessionName, Model: options.Model, StreamOptions: options.StreamOptions, Budget: budget, KeepRecent: keepRecent, KeepSaid: 3}
 
 	own := SelfTools(SelfOptions{Home: options.Home, Skills: a.skills, Memory: !options.NoMemory})
 	if !options.NoSubagents {
@@ -186,8 +197,11 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 			// The fold before the prompt: a fold makes the prompt anew, and this request is the first to start with it.
 			PrepareRequest: func(ctx context.Context, p agentcore.PrepareRequestContext) *agentcore.AgentRequestUpdate {
 				c := p.Context
-				if result := a.fold(ctx, c.Messages); result != nil {
+				if result, fresh := a.fold(ctx, c.Messages, c.Tools, a.folding, "threshold"); result != nil {
 					c.Messages = result.messages
+					if fresh {
+						a.refreshPrefix()
+					}
 				}
 				a.foldMu.Lock()
 				prefix, parts := a.prefix, a.parts
@@ -338,42 +352,51 @@ func foldKey(messages []agentcore.AgentMessage, cut int) string {
 	return fmt.Sprintf("%d:%d", cut, at)
 }
 
-func (a *Agent) fold(ctx context.Context, messages []agentcore.AgentMessage) *compacted {
-	plan := planCompaction(messages, a.folding)
+// The summary is asked with the request's own start, the one the request before was sent with: its cache is read.
+// fresh: the summary was made now, not taken from an earlier request; whoever uses it makes the prompt anew.
+func (a *Agent) fold(ctx context.Context, messages []agentcore.AgentMessage, tools []agentcore.AgentTool, folding CompactionOptions, reason string) (result *compacted, fresh bool) {
+	plan := planCompaction(messages, folding)
 	if plan == nil {
-		return nil
+		return nil, false
 	}
 	key := foldKey(messages, plan.cut)
 	a.foldMu.Lock()
 	known, ok := a.folds[key]
+	prefix := a.prefix
 	a.foldMu.Unlock()
 	if ok {
-		return plan.apply(known)
+		return plan.apply(known), false
 	}
-	a.publish(AgentEvent{AgentEvent: agentcore.AgentEvent{Type: EventCompactionStart}, Reason: "threshold"})
-	folding := a.folding
+	a.publish(AgentEvent{AgentEvent: agentcore.AgentEvent{Type: EventCompactionStart}, Reason: reason})
 	if a.options.GetApiKey != nil {
 		if key := a.options.GetApiKey(ctx, a.options.Model.Provider); key != "" {
 			folding.StreamOptions.APIKey = key
 		}
 	}
-	summary := compact(ctx, *plan, folding)
-	a.publish(AgentEvent{AgentEvent: agentcore.AgentEvent{Type: EventCompactionEnd}, Reason: "threshold", Compaction: summary})
+	llmTools := make([]ai.Tool, len(tools))
+	for i, t := range tools {
+		llmTools[i] = agentcore.ToolOf(t)
+	}
+	summary, usage := compactInPlace(ctx, *plan, folding, prefix, llmTools)
+	a.publish(AgentEvent{AgentEvent: agentcore.AgentEvent{Type: EventCompactionEnd}, Reason: reason, Compaction: summary, Usage: usage})
 	if summary == nil {
-		return nil
+		return nil, false
 	}
 	a.foldMu.Lock()
 	a.folds[key] = *summary
 	a.foldMu.Unlock()
-	a.refreshPrefix()
-	return plan.apply(*summary)
+	return plan.apply(*summary), true
 }
 
+// A run that folded for a request keeps the fold: the summary it was answered with is saved.
 func (a *Agent) settleFold() {
 	messages := a.Core.State().Messages
-	result := a.fold(a.ctx, messages)
+	result, fresh := a.fold(a.ctx, messages, a.Core.State().Tools, a.folding, "threshold")
 	if result == nil {
 		return
+	}
+	if fresh {
+		a.refreshPrefix()
 	}
 	a.foldMu.Lock()
 	a.folds = map[string]CompactionSummaryMessage{}
@@ -408,7 +431,14 @@ func (a *Agent) ended() {
 		a.run(a.Core.Continue)
 		return
 	}
-	a.settleFold()
+	a.foldMu.Lock()
+	folded := len(a.folds) > 0
+	a.foldMu.Unlock()
+	if folded {
+		a.settleFold()
+	} else {
+		a.idleLater()
+	}
 	messages := a.Core.State().Messages
 	a.mu.Lock()
 	// Stopped while a tool ran, the last message is that tool's result: `stopping` says it was stopped.
@@ -436,6 +466,7 @@ func (a *Agent) busyRuns() int {
 
 func (a *Agent) deliver(message agentcore.AgentMessage, steer bool) {
 	a.mu.Lock()
+	a.stopIdleLocked()
 	done, started := a.Core.Submit(message, steer)
 	if started {
 		a.runs++
@@ -492,6 +523,9 @@ func (a *Agent) History() []agentcore.AgentMessage { return a.Core.State().Messa
 
 // The memory stays.
 func (a *Agent) Reset() error {
+	a.mu.Lock()
+	a.stopIdleLocked()
+	a.mu.Unlock()
 	a.Core.Reset()
 	if a.session != nil {
 		return a.session.Clear()
@@ -502,6 +536,9 @@ func (a *Agent) Reset() error {
 func (a *Agent) Skills() []SkillInfo { return a.skills() }
 
 func (a *Agent) Close() {
+	a.mu.Lock()
+	a.stopIdleLocked()
+	a.mu.Unlock()
 	a.cancel()
 	a.Core.Close()
 	a.done.Wait()

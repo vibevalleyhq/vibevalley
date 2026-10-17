@@ -356,6 +356,7 @@ func (fm *manager) brainOf() (*vvagent.Agent, error) {
 		NoSkills:     true,
 		NoSubagents:  true,
 		Schedules:    new(false),
+		WakeSoon:     fm.wakeSoon,
 	}
 	if fm.llm != nil {
 		options.Model, options.StreamOptions = fm.llm.Model, fm.llm.StreamOptions
@@ -443,6 +444,10 @@ func (fm *manager) event(e vvagent.AgentEvent) {
 			fm.core.Notice(protocol.NoticeLevelError, "管家出错了："+why)
 		}
 	case vvagent.EventCompactionEnd:
+		if e.Usage != nil {
+			tokens := managerTokens(*e.Usage)
+			fm.trace.Usage(tokens, "整理对话，"+managerUsageText(tokens, ""), nil)
+		}
 		if e.Compaction != nil {
 			fm.mu.Lock()
 			fm.shown = ""
@@ -464,6 +469,15 @@ func (fm *manager) event(e vvagent.AgentEvent) {
 		}
 		fm.trace.ToolEnded(e.ToolCallID, result, !e.IsError, nil)
 	}
+}
+
+// One of its own schedules (not a helper's) comes due within that long: it will be woken then.
+func (fm *manager) wakeSoon(within time.Duration) bool {
+	by := clock.NowMs() + within.Milliseconds()
+	return slices.ContainsFunc(fm.schedule.List(), func(s protocol.Schedule) bool {
+		next, ok := protocol.NextRun(s)
+		return ok && (s.Agent == nil || *s.Agent == protocol.ManagerAgent) && next <= by
+	})
 }
 
 // An answer that failed before any token came has none to tell.

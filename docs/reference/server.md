@@ -7,9 +7,9 @@
 管家是 VibeValley 自己的 agent（`server/pkg/agent`；`manager/manager.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-12-own-agent.md)），带管家的提示词和工具，第一句话到了才起来。它没有读写文件、跑命令的工具，自己不写代码。
 
 - **模型**：只接 DeepSeek，在管家的档案里（档案 `manager`，每个农场都有、删不了、只在 VibeValley 自己的 agent 上跑；`vibevalley agent save manager --json …` 改，管家下次开口时用上），没写是 `deepseek-flash`。钥匙先取首页「设置」，再取配置的 `deepseek.api_key`（`DEEPSEEK_API_KEY`）；每次请求前现取。都没有时它在田头说起不来；同一个原因在一个对话里只说一次，管家起来了才会再说。
-- **对话**：存在 `manager/manager.jsonl`，太长时把早先的压成摘要，原文归档在 `manager/archive/`。
+- **对话**：存在 `manager/manager.jsonl`，太长时把早先的压成摘要，原文归档在 `manager/archive/`。一次请求估出超过 12 万 token 就在请求前压，这一轮停下时存下；一轮停下时超过 9.6 万，10 分钟里没有新的输入、10 分钟内也没有管家自己的定时要到点，就在没人时压（`pkg/agent/idle.go`）。摘要用和平常请求一样的开头请求（同一份系统提示和工具，对话之后加一句要摘要，不许调工具），读得到缓存；没要到就退回单独的摘要请求。最近的 12 条和管家最后 3 句带字的话原样留下。摘要请求的用量也记一条 `llm/usage`（「整理对话，…」）。
 - **记性**：主人让它记的用 `remember` 记在 `manager/MEMORY.md`，在系统提示的快照里，快照之后的变化写在下一条输入开头（[agents-and-runtimes.md](agents-and-runtimes.md)「管家页」）。
-- **系统提示**：说明、工作目录、记性的快照，在管家起来时和每次压缩之后拼一次，其间一字不变，DeepSeek 的前缀缓存才命中得了（[理由](../../.agents/notes/proposed/architecture/2026-10-18-stable-prompt-prefix.md)）。
+- **系统提示**：说明、工作目录、记性的快照，在管家起来时和每次压缩之后拼一次，其间一字不变，DeepSeek 的前缀缓存才命中得了（[理由](../../.agents/notes/implemented/architecture/2026-10-18-stable-prompt-prefix.md)）。
 - **每条输入的开头**（`manager/manager.go` 的 `sendInput`）：`【现在】`（到分钟）；农场现状：项目、能派的档案（额度、花费、派不出去的原因）、各频道地里的帮工、没收完的计划和这条输入回在哪个频道，起来后、压缩后和管家忙着时收到的那条带全文（`【农场现状】`），其余只带和上一条比变了的行（`【农场变了】`，`manager/situation.go`；变了一大半也带全文，没变就不写）；快照之后记下或忘掉的记性（`【记性有更新】`）；这期间田头上的汇报；最后是这次的话。整条和对话一起存下。
 - **用量**：每次回答在它的日志里记一条 `llm/usage`，写着缓存命中多少（读缓存 ÷ 读缓存加没命中）。提示的开头（工具和系统提示）在两次压缩之间变了，`pkg/agent` 发 `prefix_changed`（按段比 sha256：`instructions`、`env`、`skills`、`memory`、`situation`、`tools`），那一条后面写明是哪几段，服务端日志也记一行。
 - **说话**：中文、口语、一两句，只说工具结果和汇报里有的；在串里被问就回在串里。语音管家转来的话（`/api/v1/manager/hear`）已经在电话里答过了：它按需派活，派了就说一句派给了谁，没派就不说（[voice.md](voice.md)「客户端」）。

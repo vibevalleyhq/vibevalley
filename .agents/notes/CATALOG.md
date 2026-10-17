@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（19 篇）
+## proposed（18 篇）
 
 ### feature
 
@@ -14,7 +14,6 @@
 
 ### architecture
 
-- 2026-10-18 [管家的提示开头不变：时间和农场现状挪进最新那条输入，空闲时用同一个开头压缩](proposed/architecture/2026-10-18-stable-prompt-prefix.md)
 - 2026-10-18 [管家分清话是谁说的：来源跟着输入走，帮工和仓库里的字是信息不是指令，收获和管家起的定时要主人点头](proposed/architecture/2026-10-18-source-is-not-instruction.md)
 - 2026-10-18 [记性有多个来源：照 Hermes 的接口，统一的工具，本地用 SQLite 全文检索](proposed/architecture/2026-10-18-memory-providers.md)
 - 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](proposed/architecture/2026-10-18-memory-in-sqlite.md)
@@ -29,7 +28,7 @@
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
 
-## implemented（87 篇）
+## implemented（88 篇）
 
 ### feature
 
@@ -77,6 +76,7 @@
 
 ### architecture
 
+- 2026-10-18 [管家的提示开头不变：时间和农场现状挪进最新那条输入，空闲时用同一个开头压缩](implemented/architecture/2026-10-18-stable-prompt-prefix.md)
 - 2026-10-17 [动作结果和资源生命周期由拥有它的模块保证](implemented/architecture/2026-10-17-operation-results-and-lifetimes.md)
 - 2026-10-17 [迁移是一次性的，启动只认今天的名字](implemented/architecture/2026-10-17-one-way-migration.md)
 - 2026-10-17 [表按模块命名](implemented/architecture/2026-10-17-names-by-module.md)

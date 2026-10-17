@@ -307,10 +307,12 @@ func TestARestartedAgentContinuesCurrentSessionAndIgnoresLegacy(t *testing.T) {
 	eq(t, names, []string{"test.json", "test.jsonl"})
 }
 
+func summarizing(c ai.Context) bool { return lastUser(c) == SUMMARY_IN_PLACE }
+
 func TestALongConversationIsFolded(t *testing.T) {
 	dir := home(t)
 	long := step(func(c ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ ai.Model) ai.AssistantMessage {
-		if strings.HasPrefix(c.SystemPrompt, "把下面这段对话压成") {
+		if summarizing(c) {
 			return ai.FauxAssistantMessage("摘要：说了五件事")
 		}
 		return ai.FauxAssistantMessage(strings.Repeat("好的。", 150))
@@ -338,7 +340,7 @@ func TestALongConversationIsFolded(t *testing.T) {
 		contexts := r.faux.State().Contexts
 		var last ai.Context
 		for _, c := range contexts {
-			if !strings.HasPrefix(c.SystemPrompt, "把下面") {
+			if !summarizing(c) {
 				last = c
 			}
 		}
@@ -470,7 +472,7 @@ func TestTheSystemPromptStaysTheSameBetweenFolds(t *testing.T) {
 func TestAFoldMakesTheSystemPromptAnew(t *testing.T) {
 	dir := home(t)
 	long := step(func(c ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ ai.Model) ai.AssistantMessage {
-		if strings.HasPrefix(c.SystemPrompt, "把下面这段对话压成") {
+		if summarizing(c) {
 			return ai.FauxAssistantMessage("摘要")
 		}
 		return ai.FauxAssistantMessage(strings.Repeat("好的。", 150))
@@ -492,7 +494,7 @@ func TestAFoldMakesTheSystemPromptAnew(t *testing.T) {
 		r.ask("折叠之后")
 		var prompts []string
 		for _, c := range r.faux.State().Contexts {
-			if !strings.HasPrefix(c.SystemPrompt, "把下面") {
+			if !summarizing(c) {
 				prompts = append(prompts, c.SystemPrompt)
 			}
 		}
@@ -591,4 +593,119 @@ func TestAChangedToolIsToldAsAChangedPrefix(t *testing.T) {
 			t.Fatalf("changed %q", got)
 		}
 	}, nil)
+}
+
+func idleRig(t *testing.T, wakeSoon func(time.Duration) bool, summary ai.FauxResponseFactory, body func(r *rig, choices *sync.Map)) {
+	dir := home(t)
+	var choices sync.Map
+	answer := step(func(c ai.Context, o ai.StreamOptions, s ai.FauxProviderState, m ai.Model) ai.AssistantMessage {
+		if summarizing(c) {
+			choices.Store(s.CallCount, o.ToolChoice)
+			return summary(c, o, s, m)
+		}
+		if strings.HasPrefix(c.SystemPrompt, SUMMARY_INSTRUCTIONS) {
+			return ai.FauxAssistantMessage("另起的摘要")
+		}
+		return ai.FauxAssistantMessage(strings.Repeat("好的。", 150))
+	})
+	steps := make([]ai.FauxResponseStep, 8)
+	for i := range steps {
+		steps[i] = answer
+	}
+	withAgent(t, dir, steps, func(r *rig) { body(r, &choices) }, func(o *AgentOptions) {
+		o.KeepRecent = 2
+		o.IdleFoldAt = 300
+		o.IdleFoldAfter = 50 * time.Millisecond
+		o.WakeSoon = wakeSoon
+	})
+}
+
+func idleFolded(events []AgentEvent) bool {
+	return slices.ContainsFunc(events, func(e AgentEvent) bool {
+		return e.Type == EventCompactionEnd && e.Reason == "idle" && e.Compaction != nil
+	})
+}
+
+func TestAnIdleConversationIsFoldedWithTheSameStart(t *testing.T) {
+	idleRig(t, nil, func(ai.Context, ai.StreamOptions, ai.FauxProviderState, ai.Model) ai.AssistantMessage {
+		return ai.FauxAssistantMessage("就地的摘要")
+	}, func(r *rig, choices *sync.Map) {
+		for _, words := range []string{"一", "二", "三"} {
+			r.ask(words)
+		}
+		eq(t, r.faux.State().CallCount, 3)
+		r.until(idleFolded)
+		contexts := r.faux.State().Contexts
+		eq(t, len(contexts), 4)
+		before, folding := contexts[2], contexts[3]
+		eq(t, folding.SystemPrompt, before.SystemPrompt)
+		eq(t, ai.Stringify(folding.Tools), ai.Stringify(before.Tools))
+		eq(t, ai.Stringify(folding.Messages[:len(before.Messages)]), ai.Stringify(before.Messages))
+		eq(t, len(folding.Messages), len(before.Messages)+2)
+		choice, _ := choices.Load(4)
+		eq(t, choice, "none")
+		history := r.agent.History()
+		eq(t, history[0].(CompactionSummaryMessage).Summary, "就地的摘要")
+		eq(t, said(history[1:]), []string{"user:三", "assistant:" + strings.Repeat("好的。", 150)})
+	})
+}
+
+func TestAToolCalledInsteadOfASummaryIsAskedAgainOnItsOwn(t *testing.T) {
+	idleRig(t, nil, func(ai.Context, ai.StreamOptions, ai.FauxProviderState, ai.Model) ai.AssistantMessage {
+		return ai.FauxAssistantMessage([]ai.Content{ai.FauxToolCall("list_dir", nil, "")})
+	}, func(r *rig, _ *sync.Map) {
+		for _, words := range []string{"一", "二", "三"} {
+			r.ask(words)
+		}
+		r.until(idleFolded)
+		eq(t, r.agent.History()[0].(CompactionSummaryMessage).Summary, "另起的摘要")
+	})
+}
+
+func TestNoIdleFoldWhenItWillBeWokenSoon(t *testing.T) {
+	var asked atomic.Int32
+	idleRig(t, func(within time.Duration) bool {
+		eq(t, within, 50*time.Millisecond)
+		asked.Add(1)
+		return true
+	}, func(ai.Context, ai.StreamOptions, ai.FauxProviderState, ai.Model) ai.AssistantMessage {
+		return ai.FauxAssistantMessage("摘要")
+	}, func(r *rig, _ *sync.Map) {
+		for _, words := range []string{"一", "二", "三"} {
+			r.ask(words)
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		for asked.Load() == 0 && time.Now().Before(deadline) {
+			time.Sleep(5 * time.Millisecond)
+		}
+		time.Sleep(50 * time.Millisecond)
+		eq(t, asked.Load(), int32(1))
+		eq(t, r.faux.State().CallCount, 3)
+		eq(t, r.agent.History()[0].Role(), "user")
+	})
+}
+
+func TestCutPointKeepsTheLastWords(t *testing.T) {
+	u := func(text string) agentcore.AgentMessage { return UserMessage(text) }
+	a := func(text string) agentcore.AgentMessage { return ai.FauxAssistantMessage(text) }
+	call := ai.FauxAssistantMessage([]ai.Content{ai.FauxToolCall("x", nil, "")})
+	result := ai.ToolResultMessage{ToolName: "x"}
+	tools := []agentcore.AgentMessage{u("1"), a("一"), u("2"), a("二"), u("3"), call, result, call, result, call, result, a("三"), u("4"), call, result, a("四")}
+	for _, c := range []struct {
+		name                 string
+		messages             []agentcore.AgentMessage
+		keepRecent, keepSaid int
+		want                 int
+	}{
+		{"recent only", tools, 3, 0, 12},
+		{"back to three words", tools, 3, 3, 2},
+		{"back to two", tools, 3, 2, 4},
+		{"one is there already", tools, 3, 1, 12},
+		{"not enough words: nowhere", tools, 3, 5, 0},
+		{"nothing", nil, 2, 3, 0},
+	} {
+		if got := CutPoint(c.messages, c.keepRecent, c.keepSaid); got != c.want {
+			t.Fatalf("%s: cut at %d, want %d", c.name, got, c.want)
+		}
+	}
 }

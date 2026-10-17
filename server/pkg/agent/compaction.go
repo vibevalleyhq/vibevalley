@@ -5,6 +5,7 @@ package agent
 import (
 	"context"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -22,13 +23,29 @@ func EstimateTokens(messages []agentcore.AgentMessage) int {
 
 const SUMMARY_INSTRUCTIONS = "把下面这段对话压成一份摘要，给接下来继续这段对话的你自己看。保留：用户要的是什么、做出的决定、已经完成的事和结果、改过的文件和关键内容、还没做完的事、要注意的坑。去掉寒暄和已经没用的工具输出。用中文，条理清楚，不超过 1500 字。"
 
-// 0 for nowhere.
-func CutPoint(messages []agentcore.AgentMessage, keepRecent int) int {
+const SUMMARY_IN_PLACE = "上面的对话要压成一份摘要，给接下来继续这段对话的你自己看；只写摘要，不调工具。保留：用户要的是什么、做出的决定、已经完成的事和结果、改过的文件和关键内容、还没做完的事、要注意的坑。去掉寒暄和已经没用的工具输出。用中文，条理清楚，不超过 1500 字。"
+
+// Where a user's (or custom) message begins, at least keepRecent messages from the end, and further back until at least
+// keepSaid assistant messages with words in them follow; 0 for nowhere.
+func CutPoint(messages []agentcore.AgentMessage, keepRecent, keepSaid int) int {
 	cut := len(messages) - keepRecent
-	for cut > 0 && (cut >= len(messages) || (messages[cut].Role() != "user" && messages[cut].Role() != "custom")) {
+	said := 0
+	for _, m := range messages[max(cut, 0):] {
+		if spoke(m) {
+			said++
+		}
+	}
+	for cut > 0 && (cut >= len(messages) || (messages[cut].Role() != "user" && messages[cut].Role() != "custom") || said < keepSaid) {
 		cut--
+		if cut >= 0 && cut < len(messages) && spoke(messages[cut]) {
+			said++
+		}
 	}
 	return max(cut, 0)
+}
+
+func spoke(m agentcore.AgentMessage) bool {
+	return m.Role() == "assistant" && strings.TrimSpace(MessageText(m)) != ""
 }
 
 type CompactionOptions struct {
@@ -38,6 +55,8 @@ type CompactionOptions struct {
 	StreamOptions ai.StreamOptions
 	Budget        int
 	KeepRecent    int
+	// The assistant's last words kept as they were, when that keeps the kept part under half the budget.
+	KeepSaid int
 }
 
 type compactionPlan struct {
@@ -51,7 +70,11 @@ func planCompaction(messages []agentcore.AgentMessage, options CompactionOptions
 	if tokens <= options.Budget || len(messages) <= options.KeepRecent+2 {
 		return nil
 	}
-	cut := CutPoint(messages, options.KeepRecent)
+	cut := CutPoint(messages, options.KeepRecent, options.KeepSaid)
+	// Keeping the words would keep too much, or all of it: then fold as if they did not count.
+	if cut <= 0 || EstimateTokens(messages[cut:]) > options.Budget/2 {
+		cut = CutPoint(messages, options.KeepRecent, 0)
+	}
 	if cut <= 0 {
 		return nil
 	}
@@ -82,10 +105,36 @@ func Compact(ctx context.Context, messages []agentcore.AgentMessage, options Com
 	if plan == nil {
 		return nil
 	}
-	return compact(ctx, *plan, options)
+	summary, _ := compact(ctx, *plan, options)
+	return summary
 }
 
-func compact(ctx context.Context, plan compactionPlan, options CompactionOptions) *CompactionSummaryMessage {
+func summaryOf(plan compactionPlan, said, where string) *CompactionSummaryMessage {
+	if said == "" {
+		said = "（摘要没生成出来，原文见归档。）"
+	}
+	return &CompactionSummaryMessage{Summary: said, TokensBefore: plan.tokens, Timestamp: time.Now().UnixMilli(), Archive: where, Kept: len(plan.messages) - plan.cut}
+}
+
+// The summary of the whole conversation, asked after it with the same start (prefix, tools) its requests have, so the
+// cache covers all but the last message; with nothing to call. An answer that failed, is empty or called a tool anyway
+// is asked again on its own (compact).
+func compactInPlace(ctx context.Context, plan compactionPlan, options CompactionOptions, prefix string, tools []ai.Tool) (*CompactionSummaryMessage, *ai.Usage) {
+	streamOptions := options.StreamOptions
+	streamOptions.Reasoning = ""
+	streamOptions.ToolChoice = "none"
+	messages := append(ConvertToLlm(ctx, plan.messages), ai.UserMessage{Content: ai.StringContent(SUMMARY_IN_PLACE), Timestamp: time.Now().UnixMilli()})
+	answer := ai.Complete(ctx, options.Model, ai.Context{SystemPrompt: prefix, Messages: messages, Tools: tools}, streamOptions)
+	said := strings.TrimSpace(MessageText(answer))
+	called := slices.ContainsFunc(answer.Content, func(c ai.Content) bool { return c.Type == ai.TypeToolCall })
+	if answer.StopReason == ai.StopError || answer.StopReason == ai.StopAborted || said == "" || called {
+		return compact(ctx, plan, options)
+	}
+	where, _ := Archive(options.Home, options.Session, Transcript(plan.messages[:plan.cut]), time.Now())
+	return summaryOf(plan, said, where), &answer.Usage
+}
+
+func compact(ctx context.Context, plan compactionPlan, options CompactionOptions) (*CompactionSummaryMessage, *ai.Usage) {
 	text := Transcript(plan.messages[:plan.cut])
 	where, _ := Archive(options.Home, options.Session, text, time.Now())
 	streamOptions := options.StreamOptions
@@ -95,9 +144,8 @@ func compact(ctx context.Context, plan compactionPlan, options CompactionOptions
 		Messages:     []ai.Message{ai.UserMessage{Content: ai.StringContent(text), Timestamp: time.Now().UnixMilli()}},
 	}, streamOptions)
 	said := strings.TrimSpace(MessageText(answer))
-	summary := said
-	if answer.StopReason == ai.StopError || said == "" {
-		summary = "（摘要没生成出来，原文见归档。）"
+	if answer.StopReason == ai.StopError {
+		said = ""
 	}
-	return &CompactionSummaryMessage{Summary: summary, TokensBefore: plan.tokens, Timestamp: time.Now().UnixMilli(), Archive: where, Kept: len(plan.messages) - plan.cut}
+	return summaryOf(plan, said, where), &answer.Usage
 }

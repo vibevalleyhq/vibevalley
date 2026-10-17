@@ -6,6 +6,10 @@ VibeValley 自己的 agent：把模型循环、工具、持久化对话、记忆
 
 `SessionAt` 只读指定的 JSONL 文件；压缩摘要替换之前的上下文，并保留摘要指定的最近消息。读到截断或无法解码的行时跳过该行。它不读取、改写或重命名同名的 `.json` 文件。
 
+## 压缩
+
+估出的 token 超过 `ContextTokens`（默认 12 万）就在请求前压，一轮停下时把这次的摘要写进对话文件；一轮停下时超过 `IdleFoldAt`（默认预算的八成），就等 `IdleFoldAfter`（默认 10 分钟，小于 0 不等也不压）：其间有输入就不压，到时问 `WakeSoon`，快要被叫醒也不压。在没人时压出的摘要，若这期间对话变了就丢掉。摘要请求带着和平常请求一样的系统提示、工具和全部对话，最后一句是 `SUMMARY_IN_PLACE`，`ToolChoice` 是 `none`；出错、空的或调了工具，退回 `SUMMARY_INSTRUCTIONS` 加拼好的文字的请求。切点（`CutPoint`）在用户的话开头，至少留 `KeepRecent` 条，再往前挪到留下至少 3 条带字的 `assistant` 消息；这样留下的超过预算的一半，或者挪到了头，就不管这一条。
+
 ## 提示的开头
 
 系统提示（`instructions`、只有工作目录的 `env`、`skills`、`memory`）在 `NewAgent` 和每次压缩之后由 `refreshPrefix` 拼一次，请求时只读它；时间和别的会变的东西由宿主拼进最新那条输入（`LocaleMinute` 给到分钟的时间，`MemoryNews` 给快照之后 `MEMORY.md` 多了和少了的行，给过的不再给）。每次请求按段和工具定义算 sha256，和上一次请求比；两次之间没有压缩、却有一段变了，发 `prefix_changed`，`Reason` 是变了的段名。
