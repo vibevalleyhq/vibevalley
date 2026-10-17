@@ -29,9 +29,14 @@ func apiMux(f *workspace.Workspace) *http.ServeMux {
 	a := api{f}
 	mux := http.NewServeMux()
 	protocol.Mount(mux, a)
-	mux.HandleFunc("GET /api/v1/events", a.sideEvents)
-	mux.HandleFunc("GET /api/v1/live", a.liveEvents)
-	mux.HandleFunc("GET /api/v1/state", a.stateFrames)
+	streams := map[string]http.HandlerFunc{"state": a.stateFrames, "events": a.sideEvents, "live": a.liveEvents}
+	for _, s := range protocol.Streams {
+		h, ok := streams[s.Name]
+		if !ok {
+			panic("no handler for stream " + s.Name)
+		}
+		mux.HandleFunc("GET "+s.Path, h)
+	}
 	return mux
 }
 

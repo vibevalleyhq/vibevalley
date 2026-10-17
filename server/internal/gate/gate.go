@@ -514,9 +514,11 @@ var remoteRoutes = func() *http.ServeMux {
 			mux.Handle(e.Method+" "+e.Path, ok)
 		}
 	}
-	mux.Handle("GET /api/v1/state", ok)
-	mux.Handle("GET /api/v1/events", ok)
-	mux.Handle("GET /api/v1/live", ok)
+	for _, s := range protocol.Streams {
+		if slices.Contains(s.Can, protocol.CallerRemote) {
+			mux.Handle("GET "+s.Path, ok)
+		}
+	}
 	return mux
 }()
 

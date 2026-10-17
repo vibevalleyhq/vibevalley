@@ -199,7 +199,7 @@ func stream(ctx context.Context, path string, raw []string) error {
 	if err != nil {
 		return err
 	}
-	watch := path == "/api/v1/events" || a.flags["watch"] == "true"
+	watch := path == protocol.EventsPath || a.flags["watch"] == "true"
 	req, err := http.NewRequestWithContext(ctx, "GET", strings.TrimRight(client(a).Base, "/")+path, nil)
 	if err != nil {
 		return err

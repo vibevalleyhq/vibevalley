@@ -26,6 +26,13 @@ const (
 	// An agent's memories past this go, the longest unused first.
 	//vibevalley:const memoryKeep
 	MemoryKeep = 300
+	// The three long-lived streams; the client asks for them by path.
+	//vibevalley:const statePath
+	StatePath = "/api/v1/state"
+	//vibevalley:const eventsPath
+	EventsPath = "/api/v1/events"
+	//vibevalley:const livePath
+	LivePath = "/api/v1/live"
 )
 
 // The voice settings' numbers may be set within these (the voice page's sliders, the settings' check).

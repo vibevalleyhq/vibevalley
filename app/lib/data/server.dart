@@ -44,7 +44,7 @@ class VibeValleyServer {
   late final Stream<LiveEvent> sideEvents = _live().asBroadcastStream();
 
   Stream<LiveEvent> _live() async* {
-    await for (final text in _sse('/api/v1/live')) {
+    await for (final text in _sse(livePath)) {
       try {
         yield LiveEvent.fromJson(jsonDecode(text) as Map<String, dynamic>);
       } on Object catch (e) {
@@ -55,7 +55,7 @@ class VibeValleyServer {
 
   /// Reconnects, and so starts from a fresh state, when the line drops.
   Stream<ReceivedFrame> states() async* {
-    await for (final text in _sse('/api/v1/state')) {
+    await for (final text in _sse(statePath)) {
       final watch = Stopwatch()..start();
       final frame = StateFrame.fromJson(jsonDecode(text) as Map<String, dynamic>);
       yield ReceivedFrame(frame, bytes: utf8.encode(text).length, decodeMicros: watch.elapsedMicroseconds);
