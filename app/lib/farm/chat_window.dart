@@ -21,6 +21,7 @@ import '../ui/kit/kit.dart';
 import '../voice/voice.dart';
 import '../rules/chat.dart';
 import '../rules/sessions.dart';
+import '../chat/dictation_button.dart';
 import '../shared/swatches.dart';
 import 'chat_messages.dart';
 import 'chat_voice.dart';
@@ -613,6 +614,10 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
                         ),
                       ),
                     ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: DictationButton(size: 24, onWords: (words) => insertDictated(_naming.text, words)),
                   ),
                   KitTappable(
                     onTap: empty ? null : () => _send(conversation),

@@ -8,6 +8,7 @@ import '../../chat/chat_rules.dart';
 import '../../chat/chat_state.dart' show problemOf;
 import '../../data/messages.dart';
 import '../../chat/chat_widgets.dart';
+import '../../chat/dictation_button.dart';
 
 class ChatComposer extends ConsumerStatefulWidget {
   const ChatComposer({super.key, required this.conversation, required this.placeholder});
@@ -114,6 +115,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                       Expanded(
                         child: Text('回车发送 · Shift+回车换行 · @ 叫人', style: KitText.xs.copyWith(color: Palette.bark400)),
                       ),
+                      DictationButton(onWords: (words) => insertDictated(_naming.text, words)),
+                      const SizedBox(width: 6),
                       PxButton(
                         size: PxSize.custom,
                         tone: PxTone.primary,

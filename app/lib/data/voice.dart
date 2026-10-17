@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/legacy.dart';
 
+import '../voice/dictation.dart';
 import '../voice/voice.dart';
 import 'prefs.dart';
 import 'providers.dart';
@@ -14,3 +15,5 @@ final voiceCallProvider = ChangeNotifierProvider<VoiceCall>((ref) {
     },
   );
 });
+
+final dictationProvider = ChangeNotifierProvider<Dictation>((ref) => Dictation(ref.watch(apiProvider)));

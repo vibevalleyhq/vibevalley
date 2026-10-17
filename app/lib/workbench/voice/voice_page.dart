@@ -51,7 +51,7 @@ String _vendor(Object stage) => switch (stage) {
 
 List<SegmentOption<String>> _options(Map<String, String> labels) => [for (final e in labels.entries) SegmentOption(value: e.key, label: e.value)];
 
-enum _Key { agoraAppId, agoraAppCertificate, asrKey, llmKey, ttsKey }
+enum _Key { agoraAppId, agoraAppCertificate, asrKey, llmKey, ttsKey, dictationKey }
 
 enum VoicePart { line, agent }
 
@@ -121,6 +121,7 @@ class _VoiceForm extends ConsumerStatefulWidget {
 class _VoiceFormState extends ConsumerState<_VoiceForm> {
   late VoiceSettings _draft = widget.status.voice;
   late String _appId = widget.status.agoraAppId.value ?? '';
+  late Dictation _dictation = widget.status.dictation;
   final _secrets = <_Key, String>{};
   final _cleared = <_Key>{};
   String? _error;
@@ -137,7 +138,8 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
 
   bool get _voiceDirty => !sameVoice(_draft, _status.voice);
   bool get _appIdDirty => _appId.trim() != (_status.agoraAppId.value ?? '');
-  bool get _dirty => _voiceDirty || _appIdDirty || _secrets.values.any((v) => v.trim().isNotEmpty) || _cleared.isNotEmpty;
+  bool get _dictationDirty => _dictation.url.trim() != _status.dictation.url || _dictation.model.trim() != _status.dictation.model;
+  bool get _dirty => _voiceDirty || _appIdDirty || _dictationDirty || _secrets.values.any((v) => v.trim().isNotEmpty) || _cleared.isNotEmpty;
 
   Future<void> _save() async {
     final update = <String, Object?>{};
@@ -150,6 +152,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
     }
     // Only this part's fields, over the settings as they are now: the other part may have been saved meanwhile.
     if (_voiceDirty) update['voice'] = asOverrides(withPart(widget.part, _status.voice, _draft)).toJson();
+    if (_dictationDirty) update['dictation'] = _dictation.toJson();
     setState(() {
       _busy = true;
       _error = null;
@@ -176,6 +179,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
   void _undo() => setState(() {
     _draft = _status.voice;
     _appId = _status.agoraAppId.value ?? '';
+    _dictation = _status.dictation;
     _secrets.clear();
     _cleared.clear();
     _error = null;
@@ -224,7 +228,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
   Widget build(BuildContext context) {
     final part = widget.part;
     final status = _status;
-    final problem = watchSettingsProblem(ref, SettingsUpdate(voice: asOverrides(_draft)));
+    final problem = watchSettingsProblem(ref, SettingsUpdate(voice: asOverrides(_draft), dictation: _dictationDirty ? _dictation : null));
     final atDefaults = sameVoice(_draft, withPart(part, _draft, status.voiceDefaults));
     final bar = PxWindow(
       paper: Palette.cream50,
@@ -296,7 +300,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
             Text.rich(
               TextSpan(
                 children: [
-                  const TextSpan(text: '管家用声网的对话式 AI 听你说话、开口回答。这里配线路：凭据、怎么听、用哪个大模型，都可以用声网托管的（不用别的 key），也可以换成自己的服务。管家的人设、开场白和音色在'),
+                  const TextSpan(text: '管家用声网的对话式 AI 听你说话、开口回答。这里配线路：凭据、怎么听、谁接电话，都可以用声网托管的（不用别的 key），也可以换成自己的服务。管家的人设、开场白和音色在'),
                   WidgetSpan(
                     alignment: PlaceholderAlignment.baseline,
                     baseline: TextBaseline.alphabetic,
@@ -522,6 +526,57 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
           ],
         ),
       ),
+      const SizedBox(height: 12),
+      PxCard(
+        title: '听写',
+        aside: TextLink('本机的 speech-server →', onTap: () => openLink('https://github.com/soniqo/speech-swift')),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '田头输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。服务端把录音原样转给下面这个 OpenAI 兼容的转写地址；'
+              '填本机的 speech-server，声音就不出这台电脑。',
+              style: KitText.xs.copyWith(color: Palette.bark600),
+            ),
+            const SizedBox(height: 8),
+            Cols(
+              columns: 2,
+              children: [
+                PxField(
+                  label: '地址',
+                  hint: const Text('到 /v1 为止。本机：http://127.0.0.1:8080/v1；OpenAI：https://api.openai.com/v1。空着就不用听写。'),
+                  child: PxTextInput(
+                    value: _dictation.url,
+                    onChanged: (url) => setState(() {
+                      _dictation = Dictation(url: url, model: _dictation.model);
+                      _touched();
+                    }),
+                    placeholder: 'http://127.0.0.1:8080/v1',
+                    mono: true,
+                    semanticLabel: '听写的地址',
+                  ),
+                ),
+                PxField(
+                  label: '模型',
+                  hint: const Text('本机的 speech-server 填 qwen3；OpenAI 填 gpt-4o-mini-transcribe。'),
+                  child: PxTextInput(
+                    value: _dictation.model,
+                    onChanged: (model) => setState(() {
+                      _dictation = Dictation(url: _dictation.url, model: model);
+                      _touched();
+                    }),
+                    placeholder: 'qwen3',
+                    mono: true,
+                    semanticLabel: '听写的模型',
+                  ),
+                ),
+                _secret(_Key.dictationKey, '凭据（本机可以空着）', status.dictationKey),
+              ],
+            ),
+          ],
+        ),
+      ),
     ];
   }
 
@@ -535,7 +590,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
         child: Text.rich(
           TextSpan(
             children: [
-              const TextSpan(text: '打电话时管家怎么开口、用什么声音。凭据、怎么听、用哪个大模型在'),
+              const TextSpan(text: '打电话时管家怎么开口、用什么声音。凭据、怎么听、谁接电话在'),
               WidgetSpan(
                 alignment: PlaceholderAlignment.baseline,
                 baseline: TextBaseline.alphabetic,

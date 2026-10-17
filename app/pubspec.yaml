@@ -21,6 +21,7 @@ dependencies:
   audioplayers: ^6.8.1
   mobile_scanner: ^7.4.2
   flutter_local_notifications: ^22.3.2
+  record: ^7.1.2
 
 # Voice only: the plugin without the video extensions (tool/agora-voice-only.sh writes third_party/).
 dependency_overrides:

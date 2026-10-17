@@ -8,7 +8,7 @@ import (
 
 func Module(r *base.Readies) fx.Option {
 	return fx.Module("voice",
-		fx.Provide(fx.Private, newVoiceLine, newVoice),
+		fx.Provide(fx.Private, newVoiceLine, newVoice, newDictation),
 		fx.Provide(base.Run[*Service](r, newService)),
 	)
 }

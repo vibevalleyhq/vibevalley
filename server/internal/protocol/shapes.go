@@ -1239,6 +1239,16 @@ type SettingsStatus struct {
 	ASRKey              KeyStatus     `json:"asrKey"`
 	LLMKey              KeyStatus     `json:"llmKey"`
 	TTSKey              KeyStatus     `json:"ttsKey"`
+	Dictation           Dictation     `json:"dictation"`
+	DictationKey        KeyStatus     `json:"dictationKey"`
+}
+
+// Where dictation sends what was said: an OpenAI-compatible transcription endpoint, on this Mac (speech-swift's speech-server) or a
+// cloud's. The server only passes the recording on.
+type Dictation struct {
+	// Up to /v1, as an OpenAI client's base_url; empty is off.
+	URL   string `json:"url"`
+	Model string `json:"model"`
 }
 
 type KeyStatus struct {
@@ -1275,6 +1285,9 @@ type SettingsUpdate struct {
 	ASRKey              *string              `json:"asrKey,omitzero"`
 	LLMKey              *string              `json:"llmKey,omitzero"`
 	TTSKey              *string              `json:"ttsKey,omitzero"`
+	// Whole: it replaces the saved one.
+	Dictation    *Dictation `json:"dictation,omitzero"`
+	DictationKey *string    `json:"dictationKey,omitzero"`
 }
 
 type Health struct {
@@ -1966,6 +1979,16 @@ type ChooseTitleRequest struct {
 type RenewRequest struct {
 	Channel string `json:"channel"`
 	UID     string `json:"uid"`
+}
+
+// One recording; audio is base64, format the file's extension (wav, m4a, mp3, webm, ogg, flac).
+type DictateRequest struct {
+	Audio  string `json:"audio"`
+	Format string `json:"format"`
+}
+
+type Dictated struct {
+	Text string `json:"text"`
 }
 
 // What Agora's model said in one turn of a call (the client reads it off the captions): kept in 田头, since only the client hears it.

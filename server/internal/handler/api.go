@@ -342,6 +342,10 @@ func (a api) VoiceStart(ctx context.Context, body protocol.StartRequest) (protoc
 	return agent, err
 }
 
+func (a api) VoiceDictate(ctx context.Context, body protocol.DictateRequest) (protocol.Dictated, error) {
+	return a.f.Voice.Dictate(ctx, body.Audio, body.Format)
+}
+
 func (a api) VoiceSaid(ctx context.Context, body protocol.VoiceSaid) error {
 	return a.f.Voice.Said(body.AgentID, body.Text)
 }

@@ -25,6 +25,19 @@
 - 你说的：字幕定稿时交给农场（`POST /api/v1/manager/hear`），服务端记成你的发言，再交给管家派活。管家派了活就用一句话说派给了谁，没派就不说话。「想」选农场的管家时不走这条，由语音线路记（见下面「语音线路」）。
 - 托管模型说的：一轮说完或被你打断时，客户端把它说到的部分交给 `/voice/agent/said`。
 
+## 听写
+
+田头输入框旁的录音按钮（`app/lib/chat/dictation_button.dart`，录音在 `app/lib/voice/dictation.dart`）：点一下开始说，再点一下停；录好的一段（16 kHz 单声道 WAV）交给 `POST /api/v1/voice/dictate`，识别出的字插进输入框的光标处，看过再发。不经过 Agora，也不叫醒谁。
+
+服务端（`server/internal/voice/dictate.go`）只转交：把录音原样发给设置里的 OpenAI 兼容转写地址（`POST {url}/audio/transcriptions`，带 `model`，有凭据就带 `Authorization`），把回来的 `text` 交回去。不加提示、不改声音。没配地址、连不上、对方拒绝，都回带原因的 `VoiceUnavailable`；录音格式不认识、是空的、超过 25 MB 回 `Refused`。
+
+设置在工作台「声音」页的「听写」，存在 `settings.json` 的 `dictation`（`url`、`model`）和 `dictationKey`：
+
+- 本机：开着 [speech-swift](https://github.com/soniqo/speech-swift) 的 `speech-server`（`brew install speech`），地址 `http://127.0.0.1:8080/v1`，模型 `qwen3`，凭据空着；声音不出这台电脑。
+- 云上：OpenAI 是 `https://api.openai.com/v1` 和 `gpt-4o-mini-transcribe`，填 key；别家 OpenAI 兼容的同理。
+
+经院门连进来的手机也能用：录音交给 Mac 上的服务端，由它转给这个地址。
+
 ## 凭据
 
 Agora 的 App ID 和 App Certificate 在首页「设置」或声音页里填，存在 `$VIBEVALLEY_HOME/settings.json`；也可以写进配置的 `agora.app_id`、`agora.app_certificate`，或者设环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。谁优先见 [server.md](server.md)「设置」。这些都不进仓库。

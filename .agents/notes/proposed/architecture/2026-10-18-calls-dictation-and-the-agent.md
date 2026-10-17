@@ -31,14 +31,14 @@ Agora 的说法也进了我们的形状和各层：
 | 块 | 做什么 | 用谁 | 进来的字去哪 |
 |---|---|---|---|
 | **通话** | 和管家实时说话 | Agora：传输、识别、断句、打断、合成 | 「想」这一格调管家的 OpenAI 接口（或一张快嘴），说的话进田头 |
-| **听写** | 说一段话，变成输入框里的字 | 我们自己接的识别厂商，不经过 Agora | 输入框，主人看过再发；不叫醒管家 |
+| **听写** | 说一段话，变成输入框里的字 | 主人填的一个 OpenAI 兼容的转写地址（本机或云上），不经过 Agora | 输入框，主人看过再发；不叫醒管家 |
 | **agent 的 OpenAI 接口** | 让任何说 chat/completions 的程序和管家说话 | `pkg/agent` 的协议层 + 管家 | 管家的会话 |
 
 ```
   通话                                      听写
-  App ─RTC─ Agora 云（识别·断句·合成）       App ─WebSocket─ 服务端 ─ 识别厂商
-                  │ chat/completions                   │ 热词取自农场
-                  ▼ 经隧道                              ▼ 可选：整理一遍
+  App ─RTC─ Agora 云（识别·断句·合成）       App ─录好的一段─ 服务端 ─ {url}/audio/transcriptions
+                  │ chat/completions                   │ 本机的 speech-server，或云上的
+                  ▼ 经隧道                              ▼
   语音线路 127.0.0.1:8788（每通电话一把钥匙）           输入框
                   │
                   ▼
@@ -92,19 +92,17 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 ### 3. 听写：普通的识别，不经过 Agora
 
-- **接口**：`GET /api/v1/voice/dictate` 升级成 WebSocket。客户端送 16 kHz 单声道 PCM 和一个 `end`，服务端回 `partial`（还在变）和 `final`（定了）。走服务端，不在客户端直连厂商：key 只在服务端，热词要用服务端的农场状态。
-- **识别厂商**：`internal/voice` 里一个不导出的接口，消费方定义：
+服务端只转交声音：识别跑在哪、用什么模型，是主人填的一个地址的事。
 
-  ```go
-  type recognizer interface {
-  	Recognize(ctx context.Context, audio <-chan []byte, hints []string) <-chan protocol.DictationText
-  }
-  ```
+- **设置**：`dictation` 和 `voice` 并列，只有地址（`url`，到 `/v1` 为止）和模型名（`model`）；凭据是 `dictationKey`，和别的 key 一样只给页面看最后四位，可以空着。
+  - 本机：自己开着 [speech-swift](https://github.com/soniqo/speech-swift) 的 `speech-server`，地址填 `http://127.0.0.1:8080/v1`，模型填 `qwen3`（Qwen3-ASR），凭据空着。
+  - 云上：OpenAI 填 `https://api.openai.com/v1` 和 `gpt-4o-mini-transcribe`，Groq 之类同理，填 key。
+- **接口**：`POST /api/v1/voice/dictate`，带一段录好的声音（base64）和它的格式，回识别出的字。服务端把它原样转给 `POST {url}/audio/transcriptions`（OpenAI 的转写协议），不改声音、不加提示。没配地址、连不上、对方拒绝，都回带原因的 `VoiceUnavailable`。
+- **为什么经服务端转一手**：key 留在服务端；经院门连进来的手机，也能把声音交给 Mac 上的本地模型。除此之外服务端什么都不做：不打包、不拉起、不管模型。
+- **说完一段再出字**：OpenAI 的转写接口是整段的；边说边出字要走 `/v1/realtime`，等真需要再做。
+- **字去输入框**：点一下开始录，再点一下停；识别出的字插进输入框，主人看过再发，发出去就是一条普通的消息，不叫醒谁。
 
-  每家的封装在 `server/pkg/<厂商>`，适配在 `internal/voice/dictate_<厂商>.go`。这里一开始就用接口，因为至少有两种：云上的一家，和本机的一种（SenseVoice / Paraformer 经 sherpa-onnx，不联网也能用）。先接哪家另定，候选是阿里 Fun-ASR / Paraformer 实时和豆包流式，两家都能流式出字、带热词。
-- **热词取自农场**：项目名、档案名（阿郑、小吴）、正在干的工单标题，由 `voice` 里一个纯函数从 `CoreState` 算出来，直接测。这是通用输入法给不了的。
-- **整理一遍**（可选，默认关）：识别定稿以后，用 DeepSeek 做一次补标点、改错字、改正术语。这一次不走管家：管家的会话是对话的历史，听写的草稿不应进去，也不应叫醒它。所以「这一格是 agent」只说通话，听写的整理是一次普通的模型调用。
-- **字去输入框**：田头、工单串、派活的输入框都能用；主人发出去以后，就是一条普通的消息。
+先不做的：热词（项目名、档案名放进 `prompt`）等实测 speech-server 真用这个字段再加；识别后的「整理一遍」等用起来觉得要再加。
 
 ### 4. 形状
 
@@ -126,17 +124,17 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 2. **守住 Agora 的边界**（第 2 节的表）：加 import 检查，代码不挪。
 3. **电话进田头**（第 2 节的后半）：只改行为；改完更新 voice.md。
 4. **改形状**（第 4 节）：改 `protocol`、跑 `shapegen`、改声音页。
-5. **听写**（第 3 节，和 `voice` 并列的 `dictation`）：先接一家云上的厂商和热词，再做整理，最后做本机的识别。
+5. **听写**（第 3 节）：设置、转交声音的接口、输入框上的录音按钮。
 
 量过真实通话的延迟以后，再决定 `call.answer` 的默认值。这一步不在本提案里。
 
 ### 做到哪了
 
-2026-10-18 做了第 1 步：`pkg/agent/openai.go` 的 `ChatCompletions`，语音线路（`voice/line.go`）只剩路由和钥匙；主服务挂了 `protocol.ChatCompletionsPath`（`/v1/chat/completions`），模型名是 `protocol.ManagerModel`。同一天做了第 2 步：Agora 本来就只在上表的几处，加了两条检查守住它。第 3 步也做了：消息多了 `spoken`（`ChatMessage.Spoken`，存在 `chatMeta`），`chatAudience` 见到它不投给任何人；主人的话由 `Manager.Heard`（快嘴）或 `Manager.Call`（管家）记，快嘴的回答由客户端的 `LiveCaptions.onAnswered` 交给 `POST /api/v1/voice/agent/said`，服务端只收还没挂、开始时「想」不是管家的那一通，开场白不记。管家旁听不再 `Quiet`，提示里让它派了活才说一句。第 4 步也做了，见第 4 节。管家的 `Call`（电话里的话，带语音的提示）和 `Answerer`（本机的 chat/completions，当作田头里的话）共用一个 `answer`：同一时间只流一个回答，新的一句结束上一个的流。
+2026-10-18 做了第 1 步：`pkg/agent/openai.go` 的 `ChatCompletions`，语音线路（`voice/line.go`）只剩路由和钥匙；主服务挂了 `protocol.ChatCompletionsPath`（`/v1/chat/completions`），模型名是 `protocol.ManagerModel`。同一天做了第 2 步：Agora 本来就只在上表的几处，加了两条检查守住它。第 3 步也做了：消息多了 `spoken`（`ChatMessage.Spoken`，存在 `chatMeta`），`chatAudience` 见到它不投给任何人；主人的话由 `Manager.Heard`（快嘴）或 `Manager.Call`（管家）记，快嘴的回答由客户端的 `LiveCaptions.onAnswered` 交给 `POST /api/v1/voice/agent/said`，服务端只收还没挂、开始时「想」不是管家的那一通，开场白不记。管家旁听不再 `Quiet`，提示里让它派了活才说一句。第 4 步也做了，见第 4 节。第 5 步做了第 3 节写的那些：`voice/dictate.go` 转交录音，`app/lib/voice/dictation.dart` 录一段，`app/lib/chat/dictation_button.dart` 的按钮在工作台和农场的田头输入框里，设置在「声音」页的「听写」。录音依赖 `record`。管家的 `Call`（电话里的话，带语音的提示）和 `Answerer`（本机的 chat/completions，当作田头里的话）共用一个 `answer`：同一时间只流一个回答，新的一句结束上一个的流。
 
 待定：
 
-- 听写的名字（`dictation`、`tidy`）和界面上叫什么，做第 5 步时定；通话在界面上仍叫「听」「想」「说」，「想」里的那一项叫「谁接电话」。
+- 界面上听写叫「听写」；通话仍叫「听」「想」「说」，「想」里的那一项叫「谁接电话」。
 
 ## Alternatives considered
 
@@ -150,9 +148,11 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 **协议层照 OpenAI 的语义，每次读全部 `messages`。** 那样管家的会话和 Agora 那边的历史是两份，会对不上：插话时没念完的字、田头里说的话，Agora 都不知道。以管家的会话为准，只取最后一句。
 
-**听写的整理交给管家。** 管家能看到农场，改术语会更准；但每段草稿都会进管家的会话、叫醒它一轮。热词已经带上了农场的名字，整理只要补标点、改错字。
+**听写的整理交给管家。** 管家能看到农场，改术语会更准；但每段草稿都会进管家的会话、叫醒它一轮。要整理时用一次普通的模型调用。
 
-**现在就抽出 `Transport`、`TTS` 接口。** 只有一个实现，形状会照着 Agora 长。只有听写的识别一开始就有两种实现（云上和本机），所以只给它接口。
+**服务端打包并管着本机的识别。** 把 `speech-server` 打进应用、由服务端拉起和回收，主人不用自己开。可服务端就要管一个约 1 GB 的模型、它的下载和生命周期，只为一种部署方式；填一个地址，本机和云上就是同一份代码。也考虑过用 cgo 把 Swift 链进服务端，模型一崩整个农场跟着挂，否决。
+
+**现在就抽出 `Transport`、`TTS` 接口。** 只有一个实现，形状会照着 Agora 长。听写也不要接口：本机和云上都说 OpenAI 的转写协议，区别只是地址。
 
 ## Acceptance criteria
 
@@ -161,7 +161,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 - `github.com/AgoraIO/` 只在 `server/pkg/agora` 和 `server/internal/voice/agora.go`，`package:agora_rtc_engine` 只在 `app/lib/voice/`；在别处加一行 import，`go test ./...` 或 `bun run app:imports` 报错。
 - `protocol` 里带 Agora 名字、或只有 Agora 才懂的字段，都在 `VoiceSettings` 下（和 `AgoraTicket`、凭据）；`VoiceCaptions` 不在了，「想」是 `answer`。
 - 两种 `answer` 下打一通电话，挂了以后田头主频道里有主人说的每一句和对应的回答（照 `verify-server` 查频道的消息；真人说话照 `verify-app`）。
-- 听写：对着 WebSocket 送一段录好的中英混说的 PCM，`final` 里的项目名、档案名和农场里的写法一致；识别失败时输入框保留已有的字，并说明原因。
+- 听写：配好地址以后，`POST /api/v1/voice/dictate` 送一段录音，回的是转写地址给的字；没配、连不上、对方拒绝时回 `VoiceUnavailable` 和原因，输入框里已有的字不丢。
 - `go vet ./... && go test ./...`、`bun run go:deadcode`、`bun run flutter:check` 通过。
 
 ## Risks
@@ -170,7 +170,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 - 本机的 `/v1/chat/completions` 和电话共用一个回答的流：打着电话时本机来一个请求，电话里那一句的流会被结束。只有一个主人，有意接受；要并行时再给每个请求一个自己的 `managerCaller`。
 - 语音线路以外，任何本机程序都能经 `/v1/chat/completions` 让管家派活。这和本机能调 `/api` 是同一个信任边界，有意接受。
 - 协议只取最后一句：Agora 重发同一个请求时，管家会听到两遍。要在真实通话里看是否发生。
-- 听写把主人的声音送到第三方厂商。声音页上要写明送给了谁；本机识别做出来以前，不想上传的只能不用听写。
+- 填了云上的地址，主人的声音就送到那一家；填本机的 `speech-server` 就不出本机。设置里写明。
 - 第 4 步改了存盘的名字（`llm` → `answer`，`vibevalley` → `manager`），不搬旧的：别的机器上存过「想」的 `settings.json`，「想」会回到默认，要在声音页重选一次。
 - 快嘴的回答由客户端上报，客户端挂得太快会少一条；有意接受，不加重试。
 - 有意放弃的：不支持第二家实时平台的 Go 接口，不做不实时的合成；能换平台靠 OpenAI 接口，合成等[帮工各自的音色](../feature/2026-10-13-helper-voices.md)来用。

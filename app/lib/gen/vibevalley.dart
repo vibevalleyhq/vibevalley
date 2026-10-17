@@ -3068,6 +3068,8 @@ class SettingsStatus {
     required this.asrKey,
     required this.llmKey,
     required this.ttsKey,
+    required this.dictation,
+    required this.dictationKey,
   });
 
   factory SettingsStatus.fromJson(Map<String, dynamic> j) => SettingsStatus(
@@ -3080,6 +3082,8 @@ class SettingsStatus {
     asrKey: KeyStatus.fromJson(j['asrKey'] as Map<String, dynamic>),
     llmKey: KeyStatus.fromJson(j['llmKey'] as Map<String, dynamic>),
     ttsKey: KeyStatus.fromJson(j['ttsKey'] as Map<String, dynamic>),
+    dictation: Dictation.fromJson(j['dictation'] as Map<String, dynamic>),
+    dictationKey: KeyStatus.fromJson(j['dictationKey'] as Map<String, dynamic>),
   );
 
   final String file;
@@ -3091,6 +3095,8 @@ class SettingsStatus {
   final KeyStatus asrKey;
   final KeyStatus llmKey;
   final KeyStatus ttsKey;
+  final Dictation dictation;
+  final KeyStatus dictationKey;
 
   Map<String, dynamic> toJson() => {
     'file': file,
@@ -3102,7 +3108,20 @@ class SettingsStatus {
     'asrKey': asrKey.toJson(),
     'llmKey': llmKey.toJson(),
     'ttsKey': ttsKey.toJson(),
+    'dictation': dictation.toJson(),
+    'dictationKey': dictationKey.toJson(),
   };
+}
+
+class Dictation {
+  const Dictation({required this.url, required this.model});
+
+  factory Dictation.fromJson(Map<String, dynamic> j) => Dictation(url: j['url'] as String, model: j['model'] as String);
+
+  final String url;
+  final String model;
+
+  Map<String, dynamic> toJson() => {'url': url, 'model': model};
 }
 
 class KeyStatus {
@@ -3184,7 +3203,17 @@ class VoiceSettings {
 }
 
 class SettingsUpdate {
-  const SettingsUpdate({this.deepseekApiKey, this.agoraAppId, this.agoraAppCertificate, this.voice, this.asrKey, this.llmKey, this.ttsKey});
+  const SettingsUpdate({
+    this.deepseekApiKey,
+    this.agoraAppId,
+    this.agoraAppCertificate,
+    this.voice,
+    this.asrKey,
+    this.llmKey,
+    this.ttsKey,
+    this.dictation,
+    this.dictationKey,
+  });
 
   factory SettingsUpdate.fromJson(Map<String, dynamic> j) => SettingsUpdate(
     deepseekApiKey: j['deepseekApiKey'] == null ? null : j['deepseekApiKey'] as String,
@@ -3194,6 +3223,8 @@ class SettingsUpdate {
     asrKey: j['asrKey'] == null ? null : j['asrKey'] as String,
     llmKey: j['llmKey'] == null ? null : j['llmKey'] as String,
     ttsKey: j['ttsKey'] == null ? null : j['ttsKey'] as String,
+    dictation: j['dictation'] == null ? null : Dictation.fromJson(j['dictation'] as Map<String, dynamic>),
+    dictationKey: j['dictationKey'] == null ? null : j['dictationKey'] as String,
   );
 
   final String? deepseekApiKey;
@@ -3203,6 +3234,8 @@ class SettingsUpdate {
   final String? asrKey;
   final String? llmKey;
   final String? ttsKey;
+  final Dictation? dictation;
+  final String? dictationKey;
 
   Map<String, dynamic> toJson() => {
     if (deepseekApiKey != null) 'deepseekApiKey': deepseekApiKey!,
@@ -3212,6 +3245,8 @@ class SettingsUpdate {
     if (asrKey != null) 'asrKey': asrKey!,
     if (llmKey != null) 'llmKey': llmKey!,
     if (ttsKey != null) 'ttsKey': ttsKey!,
+    if (dictation != null) 'dictation': dictation!.toJson(),
+    if (dictationKey != null) 'dictationKey': dictationKey!,
   };
 }
 
@@ -4768,6 +4803,27 @@ class RenewRequest {
   Map<String, dynamic> toJson() => {'channel': channel, 'uid': uid};
 }
 
+class DictateRequest {
+  const DictateRequest({required this.audio, required this.format});
+
+  factory DictateRequest.fromJson(Map<String, dynamic> j) => DictateRequest(audio: j['audio'] as String, format: j['format'] as String);
+
+  final String audio;
+  final String format;
+
+  Map<String, dynamic> toJson() => {'audio': audio, 'format': format};
+}
+
+class Dictated {
+  const Dictated({required this.text});
+
+  factory Dictated.fromJson(Map<String, dynamic> j) => Dictated(text: j['text'] as String);
+
+  final String text;
+
+  Map<String, dynamic> toJson() => {'text': text};
+}
+
 class VoiceSaid {
   const VoiceSaid({required this.agentId, required this.text});
 
@@ -5368,6 +5424,11 @@ class VoiceApi {
 
   Future<void> said({required VoiceSaid body}) async {
     await _api._call('POST', '/api/v1/voice/agent/said', query: {}, body: body.toJson());
+  }
+
+  Future<Dictated> dictate({required DictateRequest body}) async {
+    final j = await _api._call('POST', '/api/v1/voice/dictate', query: {}, body: body.toJson());
+    return Dictated.fromJson(j as Map<String, dynamic>);
   }
 }
 

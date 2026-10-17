@@ -37,7 +37,7 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 | `lib/audio/` | 音效配方和合成 |
 | `lib/debug/` | 调试台 |
 | `lib/host/` | 本机外壳：macOS 桌面（拉起服务端、菜单栏、快捷键、渠道）和手机的系统通知、前台服务 |
-| `lib/voice/` | 语音：Agora 的 Flutter SDK，字幕走 RTC 的 data stream |
+| `lib/voice/` | 语音：通话用 Agora 的 Flutter SDK，字幕走 RTC 的 data stream；听写录一段交给服务端（`dictation.dart`） |
 
 ## 跑和打包
 

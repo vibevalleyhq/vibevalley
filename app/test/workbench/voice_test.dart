@@ -29,6 +29,8 @@ Map<String, dynamic> settingsJson({Map<String, dynamic>? voice}) => {
   'asrKey': <String, Object>{},
   'llmKey': <String, Object>{},
   'ttsKey': <String, Object>{},
+  'dictation': {'url': '', 'model': ''},
+  'dictationKey': <String, Object>{},
 };
 
 /// problem: what setting.check answers (the checks themselves are the Go's, tested there).

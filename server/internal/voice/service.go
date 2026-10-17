@@ -10,11 +10,12 @@ import (
 type Service struct {
 	*voiceLine
 	*voice
+	*dictation
 	parts base.Parts
 }
 
-func newService(a *voiceLine, b *voice) (*Service, error) {
-	return &Service{a, b, base.Parts{a, b}}, nil
+func newService(a *voiceLine, b *voice, c *dictation) (*Service, error) {
+	return &Service{a, b, c, base.Parts{a, b, c}}, nil
 }
 
 func (s *Service) OnStart(ctx context.Context) error { return s.parts.OnStart(ctx) }

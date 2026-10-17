@@ -37,6 +37,8 @@ Map<String, dynamic> settingsJson({String? deepseek}) {
     'asrKey': <String, dynamic>{},
     'llmKey': <String, dynamic>{},
     'ttsKey': <String, dynamic>{},
+    'dictation': {'url': '', 'model': ''},
+    'dictationKey': <String, dynamic>{},
   };
 }
 

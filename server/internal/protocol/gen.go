@@ -2237,6 +2237,7 @@ var Endpoints = []Endpoint{
 	{"voice.start", "POST", "/api/v1/voice/agent", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"voice.stop", "POST", "/api/v1/voice/agent/stop", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"voice.said", "POST", "/api/v1/voice/agent/said", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"voice.dictate", "POST", "/api/v1/voice/dictate", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"connector.list", "GET", "/api/v1/connectors", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"connector.login", "POST", "/api/v1/connectors/{id}/login", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"connector.verify", "POST", "/api/v1/connectors/{id}/verify", nil, true, []Caller{CallerOwner, CallerRemote}},
@@ -2682,6 +2683,14 @@ func Mount(mux *http.ServeMux, h Handlers) {
 			return
 		}
 		answer(w, nil, h.VoiceSaid(r.Context(), body))
+	})
+	mux.HandleFunc("POST /api/v1/voice/dictate", func(w http.ResponseWriter, r *http.Request) {
+		var body DictateRequest
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.VoiceDictate(r.Context(), body)
+		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/v1/connectors", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.ConnectorList(r.Context())
@@ -3207,6 +3216,12 @@ func (c *Client) VoiceStop(ctx context.Context, body VoiceAgent) error {
 
 func (c *Client) VoiceSaid(ctx context.Context, body VoiceSaid) error {
 	return c.call(ctx, "POST", "/api/v1/voice/agent/said", nil, body, nil)
+}
+
+func (c *Client) VoiceDictate(ctx context.Context, body DictateRequest) (Dictated, error) {
+	var out Dictated
+	err := c.call(ctx, "POST", "/api/v1/voice/dictate", nil, body, &out)
+	return out, err
 }
 
 func (c *Client) ConnectorList(ctx context.Context) ([]ConnectorStatus, error) {

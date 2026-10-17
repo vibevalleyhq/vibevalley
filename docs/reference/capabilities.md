@@ -154,6 +154,7 @@
 | `voice.start` | `POST /api/v1/voice/agent` | ✓ | ✓ |  |  |
 | `voice.stop` | `POST /api/v1/voice/agent/stop` | ✓ | ✓ |  |  |
 | `voice.said` | `POST /api/v1/voice/agent/said` | ✓ | ✓ |  |  |
+| `voice.dictate` | `POST /api/v1/voice/dictate` | ✓ | ✓ |  |  |
 
 ## connector
 

@@ -75,6 +75,8 @@ WorkbenchBackend _server() => WorkbenchBackend(
     asrKey: const KeyStatus(),
     llmKey: const KeyStatus(),
     ttsKey: const KeyStatus(),
+    dictation: const Dictation(url: '', model: ''),
+    dictationKey: const KeyStatus(),
   ),
 );
 

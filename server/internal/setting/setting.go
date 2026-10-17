@@ -26,6 +26,8 @@ type voiceStored struct {
 	LLMKey              string                        `json:"llmKey,omitempty"`
 	TTSKey              string                        `json:"ttsKey,omitempty"`
 	Voice               *protocol.SettingsUpdateVoice `json:"voice,omitempty"`
+	DictationKey        string                        `json:"dictationKey,omitempty"`
+	Dictation           *protocol.Dictation           `json:"dictation,omitempty"`
 }
 
 func voiceReadSettings(file string) voiceStored {
@@ -111,6 +113,10 @@ func (s *Service) Status() protocol.SettingsStatus {
 		ASRKey:        voiceSecret(stored.ASRKey, protocol.KeySourceSettings),
 		LLMKey:        voiceSecret(stored.LLMKey, protocol.KeySourceSettings),
 		TTSKey:        voiceSecret(stored.TTSKey, protocol.KeySourceSettings),
+		DictationKey:  voiceSecret(stored.DictationKey, protocol.KeySourceSettings),
+	}
+	if stored.Dictation != nil {
+		status.Dictation = *stored.Dictation
 	}
 	if key, source := s.pick(stored.DeepseekAPIKey, s.config.deepseek); key != "" {
 		status.DeepseekAPIKey = voiceSecret(key, source)
@@ -149,6 +155,14 @@ func (s *Service) Save(u protocol.SettingsUpdate) (protocol.SettingsStatus, erro
 	given(&next.ASRKey, u.ASRKey)
 	given(&next.LLMKey, u.LLMKey)
 	given(&next.TTSKey, u.TTSKey)
+	given(&next.DictationKey, u.DictationKey)
+	if u.Dictation != nil {
+		d := protocol.Dictation{URL: strings.TrimRight(strings.TrimSpace(u.Dictation.URL), "/"), Model: strings.TrimSpace(u.Dictation.Model)}
+		next.Dictation = &d
+		if d.URL == "" && d.Model == "" {
+			next.Dictation = nil
+		}
+	}
 	if u.Voice != nil {
 		kept := voiceOverrides(s.voiceDefaults, voiceSettingsOver(s.voiceDefaults, *u.Voice))
 		next.Voice = &kept
@@ -193,6 +207,16 @@ func (s *Service) Voice() protocol.VoiceSettings {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.voiceOf(s.stored)
+}
+
+// Off when no address is set.
+func (s *Service) Dictation() (DictationConfig, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.stored.Dictation == nil || s.stored.Dictation.URL == "" {
+		return DictationConfig{}, false
+	}
+	return DictationConfig{Dictation: *s.stored.Dictation, Key: s.stored.DictationKey}, true
 }
 
 func (s *Service) VoiceConfig() VoiceConfig {
