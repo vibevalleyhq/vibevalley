@@ -8,8 +8,9 @@
 
 - **模型**：只接 DeepSeek，在管家的档案里（档案 `manager`，每个农场都有、删不了、只在 VibeValley 自己的 agent 上跑；`vibevalley agent save manager --json …` 改，管家下次开口时用上），没写是 `deepseek-flash`。钥匙先取首页「设置」，再取配置的 `deepseek.api_key`（`DEEPSEEK_API_KEY`）；每次请求前现取。都没有时它在田头说起不来；同一个原因在一个对话里只说一次，管家起来了才会再说。
 - **对话**：存在 `manager/manager.jsonl`，太长时把早先的压成摘要，原文归档在 `manager/archive/`。
-- **记性**：主人让它记的用 `remember` 记在 `manager/MEMORY.md`，每一句都带着（[agents-and-runtimes.md](agents-and-runtimes.md)「管家页」）。
-- **农场现状**：每次请求的系统提示里带着项目、能派的档案（额度、花费、派不出去的原因）、地里的帮工和没收完的计划，不存进对话。
+- **记性**：主人让它记的用 `remember` 记在 `manager/MEMORY.md`，在系统提示的快照里，快照之后的变化写在下一条输入开头（[agents-and-runtimes.md](agents-and-runtimes.md)「管家页」）。
+- **系统提示**：说明、工作目录、记性的快照，在管家起来时和每次压缩之后拼一次，其间一字不变，DeepSeek 的前缀缓存才命中得了（[理由](../../.agents/notes/proposed/architecture/2026-10-18-stable-prompt-prefix.md)）。
+- **每条输入的开头**（`manager/manager.go` 的 `sendInput`）：`【现在】`（到分钟）；农场现状：项目、能派的档案（额度、花费、派不出去的原因）、各频道地里的帮工、没收完的计划和这条输入回在哪个频道，起来后、压缩后和管家忙着时收到的那条带全文（`【农场现状】`），其余只带和上一条比变了的行（`【农场变了】`，`manager/situation.go`；变了一大半也带全文，没变就不写）；快照之后记下或忘掉的记性（`【记性有更新】`）；这期间田头上的汇报；最后是这次的话。整条和对话一起存下。
 - **用量**：每次回答在它的日志里记一条 `llm/usage`，写着缓存命中多少（读缓存 ÷ 读缓存加没命中）。提示的开头（工具和系统提示）在两次压缩之间变了，`pkg/agent` 发 `prefix_changed`（按段比 sha256：`instructions`、`env`、`skills`、`memory`、`situation`、`tools`），那一条后面写明是哪几段，服务端日志也记一行。
 - **说话**：中文、口语、一两句，只说工具结果和汇报里有的；在串里被问就回在串里。语音管家转来的话（`/api/v1/manager/hear`）已经在电话里答过了：它按需派活，派了就说一句派给了谁，没派就不说（[voice.md](voice.md)「客户端」）。
 - **OpenAI 的协议**：`POST /v1/chat/completions`（只听 127.0.0.1，院门不放），`model` 是 `vibevalley-manager`，`stream` 为真时回 `chat.completion.chunk` 的 SSE，否则回一个 `chat.completion`。只取最后一条 `user` 的话，当作主人在田头说的，回答也进田头；`system`、前面的几轮和 `tools` 不读，回的只有字。同一时间只流一个回答：新的请求（或一通电话里的新一句）结束上一个的流。协议在 `pkg/agent/openai.go`，语音线路也用它（[voice.md](voice.md)「语音线路」）。

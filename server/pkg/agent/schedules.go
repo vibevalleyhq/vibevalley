@@ -107,6 +107,9 @@ func DueJobs(jobs []Job, now time.Time) []Job {
 // toLocaleString('zh-CN', { hour12: false }).
 func localeTime(t time.Time) string { return t.Local().Format("2006/1/2 15:04:05") }
 
+// To the minute: what an input says the time is, so that it does not change between two requests a few seconds apart.
+func LocaleMinute(t time.Time) string { return t.Local().Format("2006/1/2 15:04") }
+
 func formatMinutes(n float64) string { return strconv.FormatFloat(n, 'f', -1, 64) }
 
 func DescribeJob(j Job) string {

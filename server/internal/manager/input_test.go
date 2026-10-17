@@ -11,6 +11,7 @@ import (
 	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
+	vvagent "vibevalley/pkg/agent"
 	"vibevalley/pkg/ai"
 )
 
@@ -155,7 +156,7 @@ func TestFarmNewsAndInstructionAreOneModelInput(t *testing.T) {
 	w.f.Manager.sendInput("用户的唯一指令", managerInput{Conversation: w.f.Channel.General(), Quiet: true}, true)
 	c := <-entered
 	close(release)
-	line := managerLastLine(c)
+	line := managerLastInput(c)
 	if !strings.Contains(line, "这期间田头上的汇报") || !strings.Contains(line, "做完了") || !strings.Contains(line, "用户的唯一指令") {
 		t.Fatalf("first request split the input: %q", line)
 	}
@@ -191,4 +192,40 @@ func TestEachAnswerLeavesItsTokensInTheLog(t *testing.T) {
 func TestUsageText(t *testing.T) {
 	testkit.Eq(t, managerUsageText(protocol.EventTokens{Input: 1_000, CacheRead: 1_000, Output: 1_234_567}, "memory,tools"), "缓存命中 50%：读缓存 1 000，没命中 1 000，输出 1 234 567；开头变了：记性、工具", "changed")
 	testkit.Eq(t, managerUsageText(protocol.EventTokens{Output: 12}, ""), "没报读了多少：输出 12", "no input")
+}
+
+func TestTheSituationIsWholeOnlyAfterAFold(t *testing.T) {
+	w := managerOpen(t)
+	fm := w.f.Manager.manager
+	ask := func(words string) string {
+		t.Helper()
+		before := len(w.seen())
+		fm.send(words, w.f.Channel.General(), true)
+		c := testkit.Await(t, "the request", func() (ai.Context, bool) {
+			seen := w.seen()
+			if len(seen) <= before {
+				return ai.Context{}, false
+			}
+			return seen[before], true
+		})
+		testkit.Until(t, "idle", func() bool { return !fm.brain.Busy() })
+		return managerLastInput(c)
+	}
+	if first := ask("一"); !strings.Contains(first, "【农场现状】") {
+		t.Fatalf("first %q", first)
+	}
+	if _, err := w.f.Channel.OpenChannel("clock-in", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	second := ask("二")
+	if strings.Contains(second, "【农场现状】") || !strings.HasSuffix(second, "【农场变了】\n+ #clock-in\n+   （没有帮工）\n\n二") {
+		t.Fatalf("second %q", second)
+	}
+	if third := ask("三"); strings.Contains(third, "【农场") {
+		t.Fatalf("third %q", third)
+	}
+	fm.event(vvagent.AgentEvent{AgentEvent: agentcore.AgentEvent{Type: vvagent.EventCompactionEnd}, Compaction: &vvagent.CompactionSummaryMessage{Summary: "摘要"}})
+	if fourth := ask("四"); !strings.Contains(fourth, "【农场现状】") {
+		t.Fatalf("after a fold %q", fourth)
+	}
 }

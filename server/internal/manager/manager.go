@@ -32,9 +32,6 @@ import (
 	"vibevalley/pkg/x/clock"
 )
 
-// The farm's situation goes in the system prompt of every request, never in the conversation; what reached the manager without waking it goes in as
-// hidden farmNews messages, kept. The manager on pi is refused.
-
 const (
 	keepManagerEvents  = 1000
 	managerStreamEvery = 120 * time.Millisecond
@@ -51,7 +48,7 @@ const managerSystemPrompt = `你是码农场物语的管家。主人跟你说要
 - 收获时会冲突：照结果告诉主人哪些文件冲突；主人同意就用 tell 把结果里那段话转给帮工，让它在自己的分支上解决，做完再收。
 - 派不出去说「满了」（地里、这个 runtime 或这个项目同时干活的人数到了上限）：告诉主人，等有人干完再派，或者问主人要不要先收掉谁。
 - 挑谁：主人点了帮工的名字就派给他；点了 runtime（比如「让 codex……」）就派给用这个 runtime 的帮工；主人在对话框里选定了帮工，就优先派给他；都没有就按每个帮工「适合的活」挑。挑不准时可以不填 agent，农场会按规则挑。
-- 问进度：先看每条消息开头的「农场现状」，要细节再用 check。
+- 问进度：每条输入开头有现在的时间和农场现状（或者变了什么），先看它，要细节再用 check。
 - 给帮工带话、叫停这一轮、让他收工：用 tell、stop、dismiss。tell 会把话发在那个帮工的工单串里，它会收到。
 - 频道是安排活的地方：「田头」是默认的频道，主人还可以开别的（#clock-in 这样），各有说明和默认项目。你在哪个频道被叫，就在哪个频道回话、派活（dispatch 不填 project 时用频道的默认项目）；主人要开新频道就用 open_channel，看有哪些用 channels。
 - 对话在频道里（田头就是一个频道）：主人、你和帮工都在里面说话。每件活有自己的工单串，帮工在串里自己汇报、自己提问，主人看得到，你不用转述。主人在某个串里 @管家 问你，你的回答就发在那个串里。要看一个串里说过什么，用 read_chat。写 @ 就是叫醒那个人（帮工每被叫醒一次都花钱）；只是提到谁、转述谁说了什么，写名字或编号，不带 @。
@@ -71,7 +68,7 @@ const managerSystemPrompt = `你是码农场物语的管家。主人跟你说要
 
 const managerAgentPrompt = `
 记性：
-- 主人说「记住」「以后都」，或者告诉你一个以后还用得上的偏好、约定：用 remember 记一句。记下的每次都在你的系统提示里。`
+- 主人说「记住」「以后都」，或者告诉你一个以后还用得上的偏好、约定：用 remember 记一句。记下的在下一次整理对话后进系统提示；在那之前，新记下的、忘掉的会写在输入开头的「【记性有更新】」里。`
 
 type managerCaller struct {
 	mu     sync.Mutex
@@ -165,6 +162,10 @@ type manager struct {
 	lastPush time.Time
 	// The parts of the prompt's start the next answer was asked with changed, as prefix_changed says them.
 	prefixChanged string
+	// The farm's situation as the model last saw it in an input; "" when it should see the whole of it next.
+	shown string
+	// Held from reading the situation to handing the input over, so that each input's changes follow the one before.
+	inputs sync.Mutex
 
 	// A brain that could not start (no key yet) is tried again on the next line.
 	starting sync.Mutex
@@ -309,75 +310,6 @@ func managerQuota(info *protocol.RuntimeInfo) string {
 	return "额度：" + words + low + today
 }
 
-func (fm *manager) situation() string {
-	var sessions []string
-	for _, a := range fm.agentsWithIssues() {
-		line := fmt.Sprintf("- %s（id %s，%s）适合：%s", a.agent.Name, a.agent.ID, protocol.RuntimeLabel(a.agent.Runtime), a.agent.Role)
-		if len(a.agent.Tags) > 0 {
-			line += "；关键词：" + strings.Join(a.agent.Tags, "、")
-		}
-		switch {
-		case managerUsable(a):
-			line += "；" + managerQuota(a.info)
-		case len(a.blocking) > 0:
-			line += "；现在派不了：" + a.blocking[0].Text
-		default:
-			line += "；现在派不了：停用了"
-		}
-		sessions = append(sessions, line)
-	}
-	roster := fm.run.Roster()
-	here := fm.chat.ChannelOf(fm.here())
-	var byChannel []string
-	for _, c := range fm.chat.Channels() {
-		var theirs []string
-		for _, w := range roster {
-			channel := fm.chat.General()
-			if w.Session.Channel != nil {
-				channel = *w.Session.Channel
-			}
-			if channel == c.ID {
-				theirs = append(theirs, managerDescribeSession(w))
-			}
-		}
-		head := "#" + c.Name
-		if c.ID == here.ID {
-			head += "（你正在回话的频道）"
-		}
-		if c.Description != "" {
-			head += "：" + c.Description
-		}
-		if c.Project != "" {
-			head += "；默认项目 " + c.Project
-		}
-		body := "  （没有帮工）"
-		if len(theirs) > 0 {
-			body = strings.Join(theirs, "\n")
-		}
-		byChannel = append(byChannel, head+"\n"+body)
-	}
-	folders := "（还没有）"
-	if all := fm.projects.List(); len(all) > 0 {
-		names := make([]string, len(all))
-		for i, p := range all {
-			names[i] = p.Name
-		}
-		folders = strings.Join(names, "、")
-	}
-	plans := ""
-	var open []string
-	for _, pb := range protocol.PlaybooksOf(fm.core.State()) {
-		if protocol.IsOpen(pb) {
-			open = append(open, protocol.PlaybookText(pb))
-		}
-	}
-	if len(open) > 0 {
-		plans = "\n种植计划：\n" + strings.Join(open, "\n")
-	}
-	return "【农场现状】\n项目（工作目录 " + fm.projects.Root() + " 下的文件夹）：" + folders + "\n可以派的帮工：\n" + strings.Join(sessions, "\n") +
-		"\n各频道和地里的帮工：\n" + strings.Join(byChannel, "\n") + plans
-}
-
 func (fm *manager) news() string {
 	digest := fm.chat.ManagerDigest()
 	if len(digest) == 0 {
@@ -424,7 +356,6 @@ func (fm *manager) brainOf() (*vvagent.Agent, error) {
 		NoSkills:     true,
 		NoSubagents:  true,
 		Schedules:    new(false),
-		Situation:    func(context.Context) string { return fm.situation() },
 	}
 	if fm.llm != nil {
 		options.Model, options.StreamOptions = fm.llm.Model, fm.llm.StreamOptions
@@ -445,6 +376,9 @@ func (fm *manager) brainOf() (*vvagent.Agent, error) {
 		options.GetApiKey = func(context.Context, string) string { return fm.settings.DeepseekAPIKey() }
 	}
 	a := vvagent.NewAgent(fm.ctx, options)
+	fm.mu.Lock()
+	fm.shown = ""
+	fm.mu.Unlock()
 	// The subscription is open before the first line is sent.
 	events := a.Subscribe()
 	go fm.follow(events)
@@ -507,6 +441,12 @@ func (fm *manager) event(e vvagent.AgentEvent) {
 		fm.done(text)
 		if m.StopReason == ai.StopError {
 			fm.core.Notice(protocol.NoticeLevelError, "管家出错了："+why)
+		}
+	case vvagent.EventCompactionEnd:
+		if e.Compaction != nil {
+			fm.mu.Lock()
+			fm.shown = ""
+			fm.mu.Unlock()
 		}
 	case vvagent.EventPrefixChanged:
 		log.Printf("vibevalley: the manager's prompt start changed between compactions: %s", e.Reason)
@@ -636,11 +576,30 @@ func (fm *manager) sendInput(line string, input managerInput, now bool) bool {
 	if now {
 		deliver = brain.Send
 	}
-	if heard := fm.news(); heard != "" {
-		line += "\n\n" + heard
-	}
-	deliver(vvagent.NewCustomMessage("managerInput", ai.StringContent(line), vvagent.CustomMessageOptions{Details: input}))
+	fm.inputs.Lock()
+	defer fm.inputs.Unlock()
+	text := strings.Join(slices.DeleteFunc([]string{"【现在】" + vvagent.LocaleMinute(time.Now()), fm.farmNow(brain, conversation), brain.MemoryNews(), fm.news(), line},
+		func(part string) bool { return part == "" }), "\n\n")
+	deliver(vvagent.NewCustomMessage("managerInput", ai.StringContent(text), vvagent.CustomMessageOptions{Details: input}))
 	return true
+}
+
+// The situation for the next input: the whole of it, or what changed since the input before. An input given while the
+// brain is busy may be taken after one given later, so it carries the whole, and the one after it does too.
+func (fm *manager) farmNow(brain *vvagent.Agent, conversation string) string {
+	now := fm.situation(conversation)
+	busy := brain.Busy() || brain.Core.HasQueuedMessages()
+	fm.mu.Lock()
+	defer fm.mu.Unlock()
+	said := now
+	if !busy && fm.shown != "" {
+		said = situationDelta(fm.shown, now)
+	}
+	fm.shown = now
+	if busy {
+		fm.shown = ""
+	}
+	return said
 }
 
 func (fm *manager) pickedNote(picked string) string {

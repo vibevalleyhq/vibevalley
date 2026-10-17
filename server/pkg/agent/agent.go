@@ -1,7 +1,9 @@
 package agent
 
 // A message is saved before its message_end is passed on. Past its budget the older part of the conversation is folded into a summary: for a request
-// as soon as it is too long, in the file once the run is over.
+// as soon as it is too long, in the file once the run is over. The system prompt is made when the agent starts and after each fold, never per
+// request: what changes meanwhile (the time, the host's situation, new memory) goes in the newest input, so the start of every request stays
+// the cached one.
 
 import (
 	"context"
@@ -62,8 +64,6 @@ type AgentOptions struct {
 	// "": Name. NoSession keeps nothing on disk (a helper).
 	Session   string
 	NoSession bool
-	// Not kept.
-	Situation func(ctx context.Context) string
 	// A helper never can.
 	NoSubagents bool
 	// nil: when it keeps a session.
@@ -97,6 +97,11 @@ type Agent struct {
 	foldMu sync.Mutex
 	// What the last request's prompt start hashed to, per part; nil before the first request and after a compaction.
 	sent map[string]string
+	// The system prompt and its parts, as refreshPrefix made them.
+	prefix string
+	parts  []promptPart
+	// The lines of MEMORY.md the model knows: the snapshot's, then as MemoryNews told it.
+	knownMemory []string
 }
 
 // ctx's values (ai.WithProviders) reach every request, and its end stops the agent.
@@ -166,6 +171,7 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 		}))
 	}
 
+	a.refreshPrefix()
 	var messages []agentcore.AgentMessage
 	if a.session != nil {
 		messages = a.session.Load()
@@ -177,16 +183,16 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 			StreamOptions: options.StreamOptions,
 			GetApiKey:     options.GetApiKey,
 			ConvertToLlm:  ConvertToLlm,
-			TransformContext: func(ctx context.Context, messages []agentcore.AgentMessage) []agentcore.AgentMessage {
-				if result := a.fold(ctx, messages); result != nil {
-					return result.messages
-				}
-				return messages
-			},
+			// The fold before the prompt: a fold makes the prompt anew, and this request is the first to start with it.
 			PrepareRequest: func(ctx context.Context, p agentcore.PrepareRequestContext) *agentcore.AgentRequestUpdate {
 				c := p.Context
-				parts := a.promptParts(ctx)
-				c.SystemPrompt = joinParts(parts)
+				if result := a.fold(ctx, c.Messages); result != nil {
+					c.Messages = result.messages
+				}
+				a.foldMu.Lock()
+				prefix, parts := a.prefix, a.parts
+				a.foldMu.Unlock()
+				c.SystemPrompt = prefix
 				a.noteChanges(parts, c.Tools)
 				return &agentcore.AgentRequestUpdate{Context: &c}
 			},
@@ -264,20 +270,16 @@ func NewAgent(ctx context.Context, options AgentOptions) *Agent {
 
 func (a *Agent) publish(e AgentEvent) { a.events.Publish(e) }
 
-// The parts of the system prompt, in order, named instructions, env, skills, memory, situation; an empty one is left out.
-func (a *Agent) promptParts(ctx context.Context) []promptPart {
+// The parts of the system prompt, in order, named instructions, env, skills, memory; an empty one is left out.
+func (a *Agent) promptParts() []promptPart {
 	found := a.skills()
 	memory := ""
 	if !a.options.NoMemory {
 		memory = ReadMemory(a.options.Home)
 	}
-	situation := ""
-	if a.options.Situation != nil {
-		situation = a.options.Situation(ctx)
-	}
 	parts := []promptPart{
 		{"instructions", strings.TrimSpace(a.options.Instructions)},
-		{"env", "## 环境\n- 工作目录：" + a.options.Cwd + "\n- 现在：" + localeTime(time.Now())},
+		{"env", "## 环境\n- 工作目录：" + a.options.Cwd},
 	}
 	if len(found) > 0 {
 		parts = append(parts, promptPart{"skills", "## 技能\n要用哪个先用 load_skill 读它的全文，再照着做：\n" + SkillIndex(found, 0)})
@@ -285,8 +287,47 @@ func (a *Agent) promptParts(ctx context.Context) []promptPart {
 	if memory != "" {
 		parts = append(parts, promptPart{"memory", "## 记性（你以前记下的）\n" + memory})
 	}
-	parts = append(parts, promptPart{"situation", situation})
 	return slices.DeleteFunc(parts, func(p promptPart) bool { return p.text == "" })
+}
+
+// When the agent starts and after a fold: the prompt changes only where the cache is lost anyway.
+func (a *Agent) refreshPrefix() {
+	parts := a.promptParts()
+	var known []string
+	if !a.options.NoMemory {
+		known = memoryFileLines(a.options.Home)
+	}
+	a.foldMu.Lock()
+	a.parts, a.prefix, a.knownMemory, a.sent = parts, joinParts(parts), known, nil
+	a.foldMu.Unlock()
+}
+
+// What MEMORY.md gained (+) and lost (−) since the model last knew it, as one block for the newest input; "" when
+// nothing. What it returns counts as known from then on.
+func (a *Agent) MemoryNews() string {
+	if a.options.NoMemory {
+		return ""
+	}
+	now := memoryFileLines(a.options.Home)
+	a.foldMu.Lock()
+	before := a.knownMemory
+	a.knownMemory = now
+	a.foldMu.Unlock()
+	var lines []string
+	for _, l := range now {
+		if !slices.Contains(before, l) {
+			lines = append(lines, "+ "+l)
+		}
+	}
+	for _, l := range before {
+		if !slices.Contains(now, l) {
+			lines = append(lines, "− "+l)
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	return "【记性有更新】\n" + strings.Join(lines, "\n")
 }
 
 func foldKey(messages []agentcore.AgentMessage, cut int) string {
@@ -324,7 +365,7 @@ func (a *Agent) fold(ctx context.Context, messages []agentcore.AgentMessage) *co
 	a.foldMu.Lock()
 	a.folds[key] = *summary
 	a.foldMu.Unlock()
-	a.forgetSent()
+	a.refreshPrefix()
 	return plan.apply(*summary)
 }
 

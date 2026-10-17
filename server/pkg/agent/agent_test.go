@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -443,22 +444,66 @@ func TestAScheduleThatComesDueWakesTheAgent(t *testing.T) {
 	eq(t, len(jobs), 0)
 }
 
-func TestTheHostsSituationIsNeverSaved(t *testing.T) {
+func TestTheSystemPromptStaysTheSameBetweenFolds(t *testing.T) {
 	dir := home(t)
-	var n atomic.Int32
+	_ = os.WriteFile(MemoryFile(dir), []byte("- 2026-10-01 主人叫阿周\n- 2026-10-02 用中文\n"), 0o644)
 	withAgent(t, dir, []ai.FauxResponseStep{ai.FauxAssistantMessage("一"), ai.FauxAssistantMessage("二")}, func(r *rig) {
+		eq(t, r.agent.MemoryNews(), "")
 		r.ask("a")
-		r.ask("b")
+		_ = Remember(dir, "主人喜欢短句", time.Date(2026, 10, 18, 9, 0, 0, 0, time.Local))
+		_ = ForgetLine(dir, lineID("- 2026-10-02 用中文"))
+		news := r.agent.MemoryNews()
+		eq(t, news, "【记性有更新】\n+ 2026-10-18 主人喜欢短句\n− 2026-10-02 用中文")
+		eq(t, r.agent.MemoryNews(), "")
+		r.ask(news + "\n\nb")
 		contexts := r.faux.State().Contexts
-		match(t, `【现状】第 1 次`, contexts[0].SystemPrompt)
-		match(t, `【现状】第 2 次`, contexts[1].SystemPrompt)
-	}, func(o *AgentOptions) {
-		o.Situation = func(context.Context) string { return fmt.Sprintf("【现状】第 %d 次", n.Add(1)) }
+		eq(t, contexts[1].SystemPrompt, contexts[0].SystemPrompt)
+		match(t, `主人叫阿周\n- 2026-10-02 用中文$`, contexts[0].SystemPrompt)
+		if strings.Contains(contexts[0].SystemPrompt, "现在：") {
+			t.Fatal(contexts[0].SystemPrompt)
+		}
+		match(t, `^【记性有更新】`, lastUser(contexts[1]))
+		eq(t, len(prefixChanges(r)), 0)
+	}, nil)
+}
+
+func TestAFoldMakesTheSystemPromptAnew(t *testing.T) {
+	dir := home(t)
+	long := step(func(c ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ ai.Model) ai.AssistantMessage {
+		if strings.HasPrefix(c.SystemPrompt, "把下面这段对话压成") {
+			return ai.FauxAssistantMessage("摘要")
+		}
+		return ai.FauxAssistantMessage(strings.Repeat("好的。", 150))
 	})
-	data, _ := os.ReadFile(filepath.Join(dir, "test.jsonl"))
-	if strings.Contains(string(data), "【现状】") {
-		t.Fatal("the situation was saved")
+	steps := make([]ai.FauxResponseStep, 12)
+	for i := range steps {
+		steps[i] = long
 	}
+	withAgent(t, dir, steps, func(r *rig) {
+		r.ask("第 1 件事")
+		_ = Remember(dir, "记在折叠之前", time.Now())
+		folded := func(events []AgentEvent) bool {
+			return slices.ContainsFunc(events, func(e AgentEvent) bool { return e.Type == EventCompactionEnd && e.Compaction != nil })
+		}
+		for n := 2; n <= 5 && !folded(r.all()); n++ {
+			r.ask(fmt.Sprintf("第 %d 件事", n))
+		}
+		r.until(folded)
+		r.ask("折叠之后")
+		var prompts []string
+		for _, c := range r.faux.State().Contexts {
+			if !strings.HasPrefix(c.SystemPrompt, "把下面") {
+				prompts = append(prompts, c.SystemPrompt)
+			}
+		}
+		if strings.Contains(prompts[0], "记在折叠之前") || !strings.Contains(prompts[len(prompts)-1], "记在折叠之前") {
+			t.Fatalf("prompts %q", prompts)
+		}
+		eq(t, len(prefixChanges(r)), 0)
+	}, func(o *AgentOptions) {
+		o.ContextTokens = 900
+		o.KeepRecent = 2
+	})
 }
 
 func settledEvent(r *rig) AgentEvent {

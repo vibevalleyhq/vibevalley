@@ -32,7 +32,7 @@ func digest(text string) string {
 }
 
 // In the order told. Tools last: they are sent before the system prompt, but are told after its own parts.
-var prefixParts = []string{"instructions", "env", "skills", "memory", "situation", "tools"}
+var prefixParts = []string{"instructions", "env", "skills", "memory", "tools"}
 
 func prefixHashes(parts []promptPart, tools []agentcore.AgentTool) map[string]string {
 	hashes := map[string]string{}
@@ -67,10 +67,4 @@ func (a *Agent) noteChanges(parts []promptPart, tools []agentcore.AgentTool) {
 	if len(changed) > 0 {
 		a.publish(AgentEvent{AgentEvent: agentcore.AgentEvent{Type: EventPrefixChanged}, Reason: strings.Join(changed, ",")})
 	}
-}
-
-func (a *Agent) forgetSent() {
-	a.foldMu.Lock()
-	a.sent = nil
-	a.foldMu.Unlock()
 }

@@ -6,6 +6,10 @@ VibeValley 自己的 agent：把模型循环、工具、持久化对话、记忆
 
 `SessionAt` 只读指定的 JSONL 文件；压缩摘要替换之前的上下文，并保留摘要指定的最近消息。读到截断或无法解码的行时跳过该行。它不读取、改写或重命名同名的 `.json` 文件。
 
+## 提示的开头
+
+系统提示（`instructions`、只有工作目录的 `env`、`skills`、`memory`）在 `NewAgent` 和每次压缩之后由 `refreshPrefix` 拼一次，请求时只读它；时间和别的会变的东西由宿主拼进最新那条输入（`LocaleMinute` 给到分钟的时间，`MemoryNews` 给快照之后 `MEMORY.md` 多了和少了的行，给过的不再给）。每次请求按段和工具定义算 sha256，和上一次请求比；两次之间没有压缩、却有一段变了，发 `prefix_changed`，`Reason` 是变了的段名。
+
 ## OpenAI 的协议
 
 `ChatCompletions` 是一个 `http.Handler`，让一个有自己对话的 agent 答 OpenAI 的 `chat/completions`：只读最后一条 `user` 的话（历史以 agent 的对话为准），不读 `system`、`tools`，只回字，不填 `usage`。`stream` 为真时回 SSE（`chat.completion.chunk`，最后是空 `delta` 加 `finish_reason: stop` 和 `[DONE]`），否则回一个 `chat.completion`。`model` 交给 `Answerer` 选谁答，没有就回 404 `model_not_found`；出错都用 OpenAI 的 `{"error":{…}}`。请求断开就不再读字。谁能问（路径、钥匙）由挂它的一方管。

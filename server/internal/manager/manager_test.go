@@ -39,13 +39,26 @@ func managerUserText(m ai.Message) (string, bool) {
 	return u.Content.Words("\n"), true
 }
 
-func managerLastLine(c ai.Context) string {
+func managerLastInput(c ai.Context) string {
 	for i := len(c.Messages) - 1; i >= 0; i-- {
 		if text, ok := managerUserText(c.Messages[i]); ok {
 			return text
 		}
 	}
 	return ""
+}
+
+var managerInputHeads = []string{"【现在】", "【农场现状】", "【农场变了】", "【记性有更新】", "这期间田头上的汇报"}
+
+func managerLastLine(c ai.Context) string { return managerWords(managerLastInput(c)) }
+
+// An input without what sendInput puts before the words.
+func managerWords(input string) string {
+	blocks := strings.Split(input, "\n\n")
+	for len(blocks) > 1 && slices.ContainsFunc(managerInputHeads, func(head string) bool { return strings.HasPrefix(blocks[0], head) }) {
+		blocks = blocks[1:]
+	}
+	return strings.Join(blocks, "\n\n")
 }
 
 func managerAnsweredCtx(c ai.Context) (string, bool) {
@@ -176,8 +189,8 @@ func TestManagerDispatchesAndHearsVoiceInChat(t *testing.T) {
 		t.Fatalf("said %q", said)
 	}
 	first := w.seen()[0]
-	if !regexp.MustCompile(`【农场现状】[\s\S]*可以派的帮工：\n- `).MatchString(first.SystemPrompt) {
-		t.Fatalf("system prompt: %s", first.SystemPrompt)
+	if !regexp.MustCompile(`^【现在】\d{4}/\d+/\d+ \d\d:\d\d\n\n【农场现状】[\s\S]*可以派的帮工：\n- `).MatchString(managerLastInput(first)) || strings.Contains(first.SystemPrompt, "【农场现状】") {
+		t.Fatalf("input: %s", managerLastInput(first))
 	}
 	if line := managerLastLine(first); line != "主人说：帮我在 demo 里加个 README" {
 		t.Fatalf("line %q", line)
@@ -239,11 +252,11 @@ func TestManagerDispatchesAndHearsVoiceInChat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !regexp.MustCompile(`"customType":"managerInput"[^\n]*语音那边已经回答了[^\n]*这期间田头上的汇报[^\n]*做完了`).Match(kept) {
+	if !regexp.MustCompile(`"customType":"managerInput"[^\n]*这期间田头上的汇报[^\n]*做完了[^\n]*语音那边已经回答了`).Match(kept) {
 		t.Fatalf("no farm news kept:\n%s", kept)
 	}
-	if strings.Contains(string(kept), "【农场现状】") {
-		t.Fatal("the situation was kept in the conversation")
+	if !strings.Contains(string(kept), "【农场现状】") {
+		t.Fatal("the situation is not in the conversation")
 	}
 }
 
@@ -309,7 +322,7 @@ func TestManagerSchedulesComeDue(t *testing.T) {
 		t.Fatal("never woken")
 	}
 	if c := w.seen()[woke]; !regexp.MustCompile(`^【定时任务「看进度」到点了】\n看看帮工们的进度\n\n这是 #田头 的定时`).MatchString(managerLastLine(c)) ||
-		!strings.Contains(c.SystemPrompt, "【农场现状】") {
+		!strings.Contains(managerLastInput(c), "【农场") {
 		t.Fatalf("woken with %q", managerLastLine(c))
 	}
 	if i := slices.IndexFunc(f.Schedule.List(), func(s protocol.Schedule) bool { return s.ID == made.ID }); i < 0 || f.Schedule.List()[i].Enabled {
@@ -400,7 +413,7 @@ func TestManagerHearsThePatrol(t *testing.T) {
 	latest := w.seen()[len(w.seen())-1]
 	n := 0
 	for _, m := range latest.Messages {
-		if text, ok := managerUserText(m); ok && patrol.MatchString(text) {
+		if text, ok := managerUserText(m); ok && patrol.MatchString(managerWords(text)) {
 			n++
 		}
 	}

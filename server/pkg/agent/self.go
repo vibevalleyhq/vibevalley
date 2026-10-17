@@ -37,7 +37,7 @@ func SelfTools(o SelfOptions) []agentcore.AgentTool {
 		Note string `json:"note"`
 	}]{
 		Name:        "remember",
-		Description: "记下一条以后的对话也要知道的事：用户的偏好、约定、项目的关键事实。一句话，不记临时的事。记下的会出现在你以后每次的系统提示里。",
+		Description: "记下一条以后的对话也要知道的事：用户的偏好、约定、项目的关键事实。一句话，不记临时的事。记下的在下一次整理对话后进系统提示；在那之前，这次的结果就在对话里。",
 		Parameters:  agentcore.ObjectSchema(map[string]any{"note": agentcore.StringSchema()}, "note"),
 		Run: func(_ context.Context, p struct {
 			Note string `json:"note"`

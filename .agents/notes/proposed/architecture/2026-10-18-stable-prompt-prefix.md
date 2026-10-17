@@ -27,7 +27,7 @@ Status: proposed
 
 `pkg/agent` 的改动：
 
-- `Agent` 加 `prefix string` 和 `parts []promptPart`（`{name, text}`，名字是 `instructions`、`env`、`skills`、`memory`）。`refreshPrefix()` 重拼它们；`NewAgent` 末尾调一次，`settleFold`、空闲压缩（第 3 节）和 `fold` 真的换了消息之后各调一次。`PrepareRequest` 只读 `a.prefix`，不再调 `systemPrompt`。
+- `Agent` 加 `prefix string` 和 `parts []promptPart`（`{name, text}`，名字是 `instructions`、`env`、`skills`、`memory`）。`refreshPrefix()` 重拼它们；`NewAgent` 里调一次，`fold` 做出新的摘要之后（请求前的压缩、一轮结束时落盘的压缩、空闲压缩都经过它）调一次。`PrepareRequest` 只读 `a.prefix`，不再调 `systemPrompt`。请求前的压缩从 `TransformContext` 挪进 `PrepareRequest`、排在读 `a.prefix` 之前：`agentcore` 先调 `PrepareRequest` 再调 `TransformContext`，留在后者里，压缩后的第一次请求会带着旧的开头、第二次才换，多命不中一次。
 - `## 环境` 去掉「现在」。`localeTime` 留给定时的描述（`schedules.go` 的 `DescribeJob`），另加 `localeMinute`（`2006/1/2 15:04`）给管家的输入用，放在 `pkg/agent`，管家经导出的 `vvagent.LocaleMinute` 用。
 - `AgentOptions.Situation` 删掉：唯一的用法是管家（`manager.go:424`），农场现状改由管家拼进输入。
 - 加 `func (a *Agent) MemoryNews() string`：比较 `ReadMemory` 现在的内容和快照加上已经告诉过模型的部分，返回多出来的行（`+ `）和没了的行（`− `），并把它们记成已经告诉过；没有变化返回 `""`。快照刷新时清空「已经告诉过」。记忆搬进 SQLite 以后，快照换成本地来源的 `SystemPromptBlock`，这个方法照旧（[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)第 5 节）。
@@ -35,8 +35,8 @@ Status: proposed
 
 `internal/manager` 的改动：
 
-- 新文件 `internal/manager/situation.go`：现在的 `situation()` 挪进来，加纯函数 `situationDelta(before, now string) string`：按行比较，`now` 里多的行前面加 `+ `，`before` 里有、`now` 里没的加 `− `；变了的行超过 `now` 的一半行数时返回 `now` 全文（这时差异比全文还难读）。
-- `manager` 加 `shown string`：上一次放进输入的农场现状全文。`""` 时放全文，否则放 `situationDelta(shown, now)`，差异为空就不写这一段；放完 `shown = now`。`brainOf` 新建大脑时、收到 `EventCompactionEnd` 且 `Compaction != nil` 时把 `shown` 清空，所以压缩之后的第一条输入又带全文。
+- 新文件 `internal/manager/situation.go`：现在的 `situation()` 挪进来，改成 `situation(conversation)`：拼的时候还不知道这条输入会在哪次请求里被读，「你正在回话的频道」不能再取当前那一轮的，改由这条输入的频道给，并从频道那行挪到末尾单独一行（`你正在回话的频道：#…`），换个频道回话只变一行。加纯函数 `situationDelta(before, now string) string`：按行比较，`now` 里多的行前面加 `+ `，`before` 里有、`now` 里没的加 `− `；列表项（`- ` 开头或缩进的行）连同它上面那个标题一起比，「（没有帮工）」在两个频道下是两行，差异里列表项前面先写它的标题；变了的行超过 `now` 的一半行数时返回 `now` 全文（这时差异比全文还难读）。
+- `manager` 加 `shown string`：上一次放进输入的农场现状全文。`""` 时放全文，否则放 `situationDelta(shown, now)`，差异为空就不写这一段；放完 `shown = now`。`brainOf` 新建大脑时、收到 `EventCompactionEnd` 且 `Compaction != nil` 时把 `shown` 清空，所以压缩之后的第一条输入又带全文。管家忙着（在跑或有排着的输入）时交进去的输入，可能排在后交的输入后面才被读（插话先于排队的），差异的底就不对了：这时放全文，并把 `shown` 清空，下一条也放全文；从读现状到交进去由一把锁（`inputs`）连着，两条输入的先后和差异的先后一致。
 - `sendInput`（`manager.go:583-622`）按上表的顺序拼输入：时间、现状、`brain.MemoryNews()`、`news()`、这次的话。`managerSystemPrompt` 里「先看每条消息开头的『农场现状』」（`manager.go:54`）改成「每条输入开头有现在的时间和农场现状（或者变了什么）」。
 - 删掉 `manager.go:35-36` 过时的注释。
 
@@ -44,7 +44,7 @@ Status: proposed
 
 - `internal/protocol/shapes.go` 加事件类型 `SessionEventTypeLLMUsage = "llm/usage"`，`SessionEvent` 加 `Tokens *EventTokens`；`EventTokens{Input, CacheRead, Output int64}`。跑 `go run ./tool/shapegen`。
 - 管家的 `event` 在 `EventMessageEnd` 上（`manager.go:486`）记一条：`fm.trace.Note(protocol.SessionEventTypeLLMUsage, text, nil)`，带上 `Tokens`。`text` 是「缓存命中 82%：读缓存 41 200，没命中 8 900，输出 310」，命中率 = `CacheRead / (CacheRead + Input)`。`Journal.Note` 现在不带 `Tokens`，加一个 `Usage(tokens EventTokens, text string, from From)` 方法到 `session.Journal`（`internal/session/types.go:61-74`）。
-- 开头变了要看得出是哪一段：`pkg/agent` 每次请求对 `parts` 的每一段和工具定义（名字、描述、参数的 JSON）各算一个 sha256，和上一次请求比；两次请求之间没有压缩、某段却变了，就发一个 `AgentEvent{Type: EventPrefixChanged, Reason: "memory,tools"}`。管家把它接在那一条用量的字后面（「；开头变了：工具」），并 `log.Printf`。服务端换版本后的第一次请求会报一次「工具」或「说明」，这是预期的（[有意不同的](2026-10-18-always-on-manager.md#有意不同的)）。
+- 开头变了要看得出是哪一段：`pkg/agent` 每次请求对 `parts` 的每一段和工具定义（名字、描述、参数的 JSON）各算一个 sha256，和上一次请求比；两次请求之间没有压缩、某段却变了，就发一个 `AgentEvent{Type: EventPrefixChanged, Reason: "memory,tools"}`。管家把它接在下一条用量的字后面（「；开头变了：工具」），并 `log.Printf`。哈希只记在内存里，比的是同一个进程里的上一次请求：重启后的第一次请求不比（重启本来就从头建缓存，那一条的命中率看得出来）。`prefix_changed` 在请求前直接发，用量在回答的 `message_end` 经 `agentcore` 的事件转一手再发，两条在管家那里的先后靠的是转发跟得上，没有更强的保证；接错一条也只是字落在相邻的那条用量上。
 - Flutter：`app/lib/shared/work_log.dart` 里按 `SessionEventType` 分支的三处（`work_log.dart:328`、`339`、`463`）加 `llmUsage`，标签「缓存」，颜色和 `llmRetry` 一档；生成的枚举一变，编译器会指出这三处。管家页的日志里每次回答下面一行小字。
 
 ### 3. 不在场时压缩，用同一个开头
@@ -57,7 +57,7 @@ Status: proposed
 
 ### 4. 步骤
 
-1. 第 2 节（量），先在真实使用里记一周，作为基准。
+1. 第 2 节（量），先在真实使用里记一周，作为基准。（第 2 节和第 1 节是一前一后两个提交；中间没有真实使用的一周，基准要从第 2 节的提交单独跑一周得到，或者用改之前的会话文件里各次回答的 `usage` 算。）
 2. 第 1 节（开头不变、现状进输入），和 `pkg/agent` 的测试一起改。
 3. 第 3 节（空闲压缩、复用开头的摘要）。
 4. 再记一周，和基准比命中率和花费；结果写回本篇。

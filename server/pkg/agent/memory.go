@@ -28,6 +28,18 @@ func ReadMemory(home string) string {
 	return t
 }
 
+// MEMORY.md's lines as the model is told them: neither blank nor headings, without their bullet.
+func memoryFileLines(home string) []string {
+	data, _ := os.ReadFile(MemoryFile(home))
+	var out []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if t := strings.TrimSpace(line); t != "" && !strings.HasPrefix(t, "#") {
+			out = append(out, bulletHead.ReplaceAllString(t, ""))
+		}
+	}
+	return out
+}
+
 // `- YYYY-MM-DD note`, or whatever the agent wrote when it tidied.
 type MemoryLine struct {
 	// Stable while the line is unchanged, so a page can forget the one it showed.
