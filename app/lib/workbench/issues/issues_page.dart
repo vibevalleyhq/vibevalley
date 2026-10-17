@@ -294,7 +294,13 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         reload: _load,
       ),
       ManagerCard(:final issue) => ManagerIssueDetail(key: ValueKey(issue.id), issue: issue),
-      PlaybookCard() || null => null,
+      PlaybookCard() => null,
+      // A link to an issue the farm does not have says so, instead of quietly showing the board.
+      null when id != null && farm != null => PxCard(
+        title: '找不到这张工单',
+        child: Text('农场里没有 $id：可能已经删掉了，或者链接写错了。', style: KitText.sm.copyWith(color: Palette.bark600)),
+      ),
+      null => null,
     };
     return LayoutBuilder(
       builder: (context, box) {

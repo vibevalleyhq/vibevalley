@@ -568,7 +568,7 @@ class _IslandDetail extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Text('Worktree · ${taken.length} 个', style: KitText.sm),
+            Text('worktree · ${taken.length} 个', style: KitText.sm),
             const SizedBox(height: 6),
             if (taken.isEmpty) const EmptyNote('岛上还没有帮工：每派一件活来，就多一个 worktree。') else for (final t in taken) _WorktreeRow(spot: t, now: now),
             const SizedBox(height: 12),

@@ -442,6 +442,23 @@ func TestManagerTellsItsStartFailure(t *testing.T) {
 	if !strings.HasPrefix(said, "我这边起不来：") {
 		t.Fatalf("said %q", said)
 	}
+	words = nil
+	for piece := range f.Manager.Call(context.Background(), "还在吗") {
+		words = append(words, piece)
+	}
+	if len(words) != 1 {
+		t.Fatalf("the call hears why again: %q", words)
+	}
+	testkit.Settle()
+	refusals := 0
+	for _, m := range protocol.MessagesIn(f.Core.State().Chat, f.Channel.General()) {
+		if m.From == protocol.ManagerAgent {
+			refusals++
+		}
+	}
+	if refusals != 1 {
+		t.Fatalf("田头 hears the same refusal %d times", refusals)
+	}
 }
 
 func TestManagerDeepseekModel(t *testing.T) {

@@ -140,16 +140,19 @@ class PxCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (title != null) ...[
-          Row(
+          // The aside goes under the title when both do not fit, instead of squeezing the title to a letter a line.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
-              Expanded(child: Text(title!, style: KitText.sm)),
-              if (aside != null) ...[
-                const SizedBox(width: 8),
+              Text(title!, style: KitText.sm),
+              if (aside != null)
                 DefaultTextStyle(
                   style: KitText.xs.copyWith(color: Palette.bark500),
                   child: aside!,
                 ),
-              ],
             ],
           ),
           const SizedBox(height: 12),

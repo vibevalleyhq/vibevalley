@@ -31,12 +31,13 @@ class RuntimesPage extends ConsumerWidget {
     final runtimes = config.runtimes;
     final selected = runtimes.where((r) => r.id == id).firstOrNull ?? runtimes.firstOrNull;
     return ListDetail(
+      opened: id != null,
       detailMaxWidth: 896,
       detailScrolls: true,
       list: ListCard(
         title: '农具',
-        subtitle: 'Runtime',
-        semanticLabel: 'runtime 列表',
+        subtitle: '机器上的编码 agent',
+        semanticLabel: '农具列表',
         children: [for (final p in runtimePresets) _ListItem(preset: p, config: config, active: selected?.id == p.id)],
       ),
       detail: selected == null
@@ -64,7 +65,8 @@ class _ListItem extends StatelessWidget {
     final using = config.agents.where((a) => a.runtime == preset.id).length;
     final status = switch (r?.installation) {
       InstallationAvailable(:final version) => r!.settings.enabled ? (version ?? '可用') : '已停用',
-      InstallationUnsupported() => '不支持',
+      // The reason, not just 不支持: for vibevalley it is a missing DeepSeek key, which is the owner's to fix.
+      InstallationUnsupported(:final reason) => reason.isEmpty ? '不支持' : reason,
       _ => '没找到',
     };
     return ListRow(

@@ -6,7 +6,7 @@
 
 管家是 VibeValley 自己的 agent（`server/pkg/agent`；`manager/manager.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-12-own-agent.md)），带管家的提示词和工具，第一句话到了才起来。它没有读写文件、跑命令的工具，自己不写代码。
 
-- **模型**：只接 DeepSeek，在管家的档案里（档案 `manager`，每个农场都有、删不了、只在 VibeValley 自己的 agent 上跑；`vibevalley agent save manager --json …` 改，管家下次开口时用上），没写是 `deepseek-flash`。钥匙先取首页「设置」，再取配置的 `deepseek.api_key`（`DEEPSEEK_API_KEY`）；每次请求前现取。都没有时它在田头说起不来。
+- **模型**：只接 DeepSeek，在管家的档案里（档案 `manager`，每个农场都有、删不了、只在 VibeValley 自己的 agent 上跑；`vibevalley agent save manager --json …` 改，管家下次开口时用上），没写是 `deepseek-flash`。钥匙先取首页「设置」，再取配置的 `deepseek.api_key`（`DEEPSEEK_API_KEY`）；每次请求前现取。都没有时它在田头说起不来；同一个原因在一个对话里只说一次，管家起来了才会再说。
 - **对话**：存在 `manager/manager.jsonl`，太长时把早先的压成摘要，原文归档在 `manager/archive/`。
 - **记性**：主人让它记的用 `remember` 记在 `manager/MEMORY.md`，每一句都带着（[agents-and-runtimes.md](agents-and-runtimes.md)「管家页」）。
 - **农场现状**：每次请求的系统提示里带着项目、能派的档案（额度、花费、派不出去的原因）、地里的帮工和没收完的计划，不存进对话。

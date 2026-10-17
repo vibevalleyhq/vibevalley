@@ -25,7 +25,7 @@
 | 技能书 | 技能书 | `/skills`（`workbench/skills`） | `Skill` | `/api/v1/skills` |
 | 记性 | 记性 | 档案页和管家页（`workbench/shared/memory_panels.dart`） | `Memory`、`MemoryList` | `/api/v1/memories/{agent}`（管家是 `manager`） |
 | 管家 | 管家 | `/manager`（`workbench/manager`） | `CoreState.Manager`（管家的状态） | `/api/v1/say`、`/api/v1/manager/...` |
-| 工单 | 看板上的卡片 | `/tickets`（`workbench/tickets`） | `Issue`、`Issue.Sessions`（这张工单用过的帮工） | `/api/v1/issues` |
+| 工单 | 看板上的卡片 | `/issues`（`workbench/issues`） | `Issue`、`Issue.Sessions`（这张工单用过的帮工） | `/api/v1/issues` |
 | 种植计划 | 图纸桌、计划板 | `farm/plans.dart` | `Playbook`（从父工单拼回，`StateFrame.Plans`） | `/api/v1/playbooks` |
 | 帮工 | 地里干活的小动物 | 地块和地块详情（`farm/plot_detail.dart`） | `Session`（`CoreState.Sessions`） | `/api/v1/sessions/{id}/stop`；别的按工单：`/api/v1/issues/{id}/...` |
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.Phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `FactRun` 到 `FactReport`、`Session.Runs`、`LastRun` | `/api/v1/issues/{id}/runs` |

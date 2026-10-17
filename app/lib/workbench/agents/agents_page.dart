@@ -62,7 +62,7 @@ class AgentsPage extends ConsumerWidget {
                               text: '帮工 ',
                               children: [
                                 TextSpan(
-                                  text: 'Agent',
+                                  text: '档案',
                                   style: KitText.sm.copyWith(color: Palette.bark500),
                                 ),
                               ],

@@ -52,6 +52,7 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
     final now = _now.millisecondsSinceEpoch.toDouble();
     if (atlas == null) return const SizedBox.shrink();
     return ListDetail(
+      opened: widget.id != null,
       list: ListCard(
         title: '项目',
         subtitle: '代码库',
@@ -202,15 +203,18 @@ class _Deed extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                // Wraps on a narrow window instead of squeezing each stat to a letter a line.
+                Wrap(
+                  spacing: 24,
+                  runSpacing: 8,
                   children: [
-                    for (final (i, stat) in [
+                    for (final stat in [
                       _Stat('开垦于', worked?.first != null ? _dateText(worked!.first!) : (worked != null ? '还没动过土' : '…')),
                       _Stat('耕作', worked != null ? '${number(worked.total)} 次提交' : '…'),
                       _Stat('庄稼', lines != null ? '${number(lines)} 行' : (notCounted ? '没数' : '…')),
                       _Stat('种了', crops != null ? '$crops 样' : (notCounted ? '没数' : '…')),
-                    ].indexed) ...[if (i > 0) const SizedBox(width: 24), Expanded(child: stat)],
+                    ])
+                      ConstrainedBox(constraints: const BoxConstraints(minWidth: 72), child: stat),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -219,7 +223,15 @@ class _Deed extends ConsumerWidget {
                     const SpriteIcon('button-folder', size: 14),
                     const SizedBox(width: 6),
                     Flexible(
-                      child: SelectableText(project.path, maxLines: 1, style: KitText.mono.copyWith(fontSize: 11, color: Palette.bark600)),
+                      child: Tooltip(
+                        message: project.path,
+                        child: Text(
+                          project.path,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: KitText.mono.copyWith(fontSize: 11, color: Palette.bark600),
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 4),
                     PxButton(
@@ -273,7 +285,7 @@ class _Stat extends StatelessWidget {
     mainAxisSize: MainAxisSize.min,
     children: [
       Text(label, style: KitText.fine.copyWith(color: Palette.bark500)),
-      Text(value, style: KitText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
+      Text(value, style: KitText.sm, maxLines: 2, overflow: TextOverflow.ellipsis),
     ],
   );
 }

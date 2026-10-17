@@ -315,7 +315,7 @@ void main() {
     await t.tap(find.text('docs'));
     await settle(t);
     expect(router.routerDelegate.currentConfiguration.uri.toString(), '/map/docs');
-    expect(find.text('Worktree · 1 个'), findsOneWidget);
+    expect(find.text('worktree · 1 个'), findsOneWidget);
     expect(find.text('排队 · 1 件'), findsOneWidget);
     expect(find.text('写周报'), findsOneWidget);
     expect(find.textContaining('还能再派 2 件活'), findsOneWidget);

@@ -140,6 +140,7 @@ class _ConnectorsPageState extends ConsumerState<ConnectorsPage> {
     final atlas = ref.watch(atlasProvider).value;
     final selected = ConnectorId.values.where((c) => c.wire == widget.id).firstOrNull ?? ConnectorId.weixin;
     return ListDetail(
+      opened: widget.id != null,
       list: ListCard(
         title: '连接器',
         note: '在聊天软件里和农场说话：派活、问进度、收汇报。',

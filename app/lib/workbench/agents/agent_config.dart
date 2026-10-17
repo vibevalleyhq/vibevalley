@@ -181,8 +181,8 @@ class _RuntimeChoice extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final runtimes = ref.watch(workbenchConfigProvider.select((c) => c.runtimes));
     return PxField(
-      label: 'Runtime',
-      hint: const Text('换 runtime 会清掉模型和推理强度；长相（动物和衣服）不变。'),
+      label: '农机',
+      hint: const Text('换农机会清掉模型和推理强度；长相（动物和衣服）不变。'),
       child: LayoutBuilder(
         builder: (context, box) {
           final w = (box.maxWidth - 6) / 2;

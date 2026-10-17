@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../host/desktop.dart';
 import '../rules/warehouse.dart' show harvestedOf;
 import '../data/providers.dart';
 import '../data/ui_state.dart';
@@ -416,6 +417,7 @@ class VillageHud extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final desktop = ref.watch(hostProvider).isDesktop;
     final atlas = game.atlas;
     final view = ref.watch(viewProvider);
     final state = ref.watch(stateProvider);
@@ -547,11 +549,12 @@ class VillageHud extends ConsumerWidget {
                   Sfx.play('open');
                   ref.read(menuOpenProvider.notifier).set(true);
                 },
-                label: '菜单（Esc）',
-                child: const PixelCard(
+                label: desktop ? '菜单（Esc）' : '菜单',
+                // A phone has no Esc key to hint at.
+                child: PixelCard(
                   height: hudTop,
                   rows: [
-                    [Words('菜单'), Words('Esc', color: CardColors.muted)],
+                    [const Words('菜单'), if (desktop) const Words('Esc', color: CardColors.muted)],
                   ],
                 ),
               ),

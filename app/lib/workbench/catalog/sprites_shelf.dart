@@ -68,20 +68,28 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
     final search = PxWindow(
       paper: Palette.cream50,
       padding: const EdgeInsets.all(10),
-      child: Row(
-        children: [
-          Expanded(
-            child: PxTextInput(
-              value: _query,
-              onChanged: (q) => setState(() => _query = q),
-              placeholder: '找：名字、类别、动物、衣服（熊、雨衣、lang-、icon-……）',
-              icon: 'button-search',
-              semanticLabel: '找素材',
-            ),
-          ),
-          const SizedBox(width: 8),
-          GroundPick(value: _ground, onChanged: (g) => setState(() => _ground = g)),
-        ],
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final find = PxTextInput(
+            value: _query,
+            onChanged: (q) => setState(() => _query = q),
+            placeholder: '找：名字、类别、动物、衣服（熊、雨衣、lang-、icon-……）',
+            icon: 'button-search',
+            semanticLabel: '找素材',
+          );
+          final ground = GroundPick(value: _ground, onChanged: (g) => setState(() => _ground = g));
+          // The ground picker needs about 200 px; under it on a phone.
+          if (box.maxWidth < 480) {
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [find, const SizedBox(height: 8), ground]);
+          }
+          return Row(
+            children: [
+              Expanded(child: find),
+              const SizedBox(width: 8),
+              ground,
+            ],
+          );
+        },
       ),
     );
 

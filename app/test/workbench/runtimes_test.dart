@@ -74,7 +74,7 @@ void main() {
   testWidgets('lists every runtime and shows the selected one', (t) async {
     final b = backend();
     await pumpPage(t, const RuntimesPage(), b.handle);
-    expect(find.text('农具 Runtime', findRichText: true), findsOneWidget);
+    expect(find.text('农具 机器上的编码 agent', findRichText: true), findsOneWidget);
     for (final p in runtimePresets) {
       expect(find.text(p.label), findsWidgets);
     }

@@ -9,7 +9,15 @@ const wideFrom = 1024.0;
 const sideBySideFrom = 1100.0;
 
 class ListDetail extends StatelessWidget {
-  const ListDetail({super.key, required this.list, required this.detail, this.listWidth = 288, this.detailMaxWidth, this.detailScrolls = false});
+  const ListDetail({
+    super.key,
+    required this.list,
+    required this.detail,
+    this.listWidth = 288,
+    this.detailMaxWidth,
+    this.detailScrolls = false,
+    this.opened = false,
+  });
   final Widget list;
 
   final List<Widget> detail;
@@ -20,6 +28,9 @@ class ListDetail extends StatelessWidget {
   /// A scroll container of its own cuts the outline of the frame at its top; else the frames at its edges show whole.
   final bool detailScrolls;
 
+  /// The route names one item: on a narrow window its detail comes first, or a link to it would land on the list.
+  final bool opened;
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
@@ -29,7 +40,7 @@ class ListDetail extends StatelessWidget {
         return Padding(
           padding: side,
           child: PxScrollView(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _spaced([list, ...detail])),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _spaced(opened ? [...detail, list] : [list, ...detail])),
           ),
         );
       }

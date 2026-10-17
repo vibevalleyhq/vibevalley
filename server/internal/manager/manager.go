@@ -155,6 +155,8 @@ type manager struct {
 	input      managerInput
 	selected   map[string]string
 	latestCall *managerCaller
+	// What the manager last said it cannot start for, per conversation: said once, not to every line, until it starts.
+	cannot map[string]string
 	// In bytes.
 	toCaller int
 	said     int
@@ -589,13 +591,25 @@ func (fm *manager) sendInput(line string, input managerInput, now bool) bool {
 		if errors.Is(err, vvagent.ErrNoDeepSeekKey) {
 			said = "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。"
 		}
-		fm.chat.ManagerSays(conversation, fmt.Sprintf("failed%d", clock.NowMs()), said, true)
+		fm.mu.Lock()
+		again := fm.cannot[conversation] == said
+		if fm.cannot == nil {
+			fm.cannot = map[string]string{}
+		}
+		fm.cannot[conversation] = said
+		fm.mu.Unlock()
+		if !again {
+			fm.chat.ManagerSays(conversation, fmt.Sprintf("failed%d", clock.NowMs()), said, true)
+		}
 		if input.caller != nil {
 			input.caller.push("我这边起不来：" + err.Error())
 			input.caller.end()
 		}
 		return false
 	}
+	fm.mu.Lock()
+	clear(fm.cannot)
+	fm.mu.Unlock()
 	deliver := brain.Later
 	if now {
 		deliver = brain.Send
