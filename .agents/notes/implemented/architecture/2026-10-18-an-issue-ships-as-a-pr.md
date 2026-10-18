@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-[先只用服务端和命令行](../../proposed/process/2026-10-18-a-feature-through-server-and-cli.md)走通以后，还剩三处别扭：
+[只用服务端和命令行](../../proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)走通以后，还剩三处别扭：
 
 - **worktree 和分支跟着帮工，不跟着工单。** 名字是 `<项目>.<帮工>-<时间>`、`vibevalley/<帮工>-<时间>`（`project.Workplace`）。同一个帮工接着干几轮没问题，但工单关了再挪回待办，农场派一个新帮工，从主分支另开一条分支：取消时留下的提交（`project.Release` 留着有提交的分支）没人接着做；取消时还有没提交的改动，旧 worktree 也留着，一张工单就有了两个 worktree。
 - **合进的是农场那份克隆的 main。** 推到 origin、主人的检出拉下来，都得手动，农场的克隆和 origin 会分叉。

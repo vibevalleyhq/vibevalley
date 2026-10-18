@@ -39,16 +39,18 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 |---|---|---|---|
 | 管家 | manager | 你直接说话的 agent，替你派活 | 工头、主 agent |
 | 帮工 | Session（[concepts](concepts.md#session-和-oar-会话)） | 在一块地上干活的：一个档案为一张工单接的活，跨好几次干活；重开的工单换一个帮工，地不换 | 工人、子 agent、worker |
-| 一次干活 | run | 一次触发到一次汇报：派出去、带话、计划、定时、农机自己 | 一轮、turn |
+| 一次干活 | run | 一次触发到一次汇报：派出去、带话、计划、定时、农机自己；农场里是一季庄稼 | 一轮、turn |
 | 帮工档案 | agent（`Agent`） | 一份配置：农机、模型、人设、技能、哪种小动物 | 角色、profile |
 | 农机 | runtime | 机器上的一种编码 agent 程序（pi、claude、codex……） | harness、引擎 |
 | 工单 | issue（`Issue`） | 一件活，从写下到关上一个 id；在做时是一块地，每派一次是一个帮工 | job、ticket |
 | 项目 | project | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
+| 大地图 | Workspace（`Config.WorkRoot`、`Config.Home`） | 全部项目、工单、群聊和档案；工作台「项目」页的「全部」 | 世界、全图 |
 | 地 | issue（`Issue`；`FarmView.Plots` 按工单做键）；代码活的 worktree 是 `project.IssueBranch`；像素村里的位置是 station、bed | 一张工单；代码相关的带一个 worktree。帮工在上面干活；一座岛上的空位是这个项目同时在做的工单数 | 工位、帮工的地、并发位 |
 | 种子袋 | 待办的工单（todo，`queued_at`） | 排队等空地的工单，有空地自动开工 | 队列 |
 | 阶段 | phase | 到场、干活、成熟、失败、歇着 | 状态 |
 | 核心状态 | `CoreState` | 农场上的一切，只有服务端持有 | |
 | 事实 | fact | 改核心状态的一件事 | patch |
+| 收成清单 | `Changes`（`issue.changes`） | 工单分支上的提交、改的文件和 diff，合进去会不会冲突 | 差异、PR 详情 |
 | 收获 | harvest；工单挪到 `done` | 过了验收的工单收下：代码活合进主分支（`github.pr_projects` 里的项目是推分支、开 PR，PR 合了才关），别的直接关上 | |
 | 聊清楚、安排活、完成 | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` | 一块地的三段 | |
 | 验收 | acceptance（`Issue.Acceptance`、`issue.accept`） | 每张工单都有：判交回来的活过没过；`glance` 是收获就算，`required` 是先过验收才能收获 | 审核、review |
@@ -57,7 +59,9 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 仓库 | warehouse | 收获了的工单 | |
 | 账本 | ledger | 值得记的事；金币、连胜、成就由它折出来 | 事件日志 |
 | 轨迹 | trajectory | 一个 agent 干活的每一步 | 日志、trace |
+| 干活过程 | `SessionEvent`（一个帮工的日志） | 帮工每一轮收到的话、想、说、工具调用和结果 | 日志、trace |
 | 记性 | memory | 一个帮工档案记得的事 | 记忆库 |
+| 技能书 | skill（`Skill`） | 帮工档案能带的技能 | 插件 |
 | 种植计划 | task graph（`TaskGraph`，带 `graph` 的父工单） | 一件长活拆成的有先后的几件，按 DAG 推进 | 工作流、playbook、plan |
 | 一件 | task（`Task`，带 `task` 的子工单） | 种植计划里的一件，一个帮工做 | 步骤、step、节点、node |
 | 主人 | user | 你 | |

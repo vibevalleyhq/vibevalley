@@ -32,26 +32,28 @@ Workspace（工作目录，一张大地图）
 
 ## 东西
 
-| 概念 | 代码里 | 是什么 | 农场里 |
-|---|---|---|---|
-| Workspace | `Config.WorkRoot`、`Config.Home` | 全部项目、工单、群聊、档案；同时干活的上限（6）是它的 | 大地图（`/projects` 的「全部」） |
-| 管家 | `Manager` | 主人的助理 agent：听主人说，拆成工单，派出去，转告结果 | 管家 |
-| agent 档案 | `Agent` | 能派活的「同事」：runtime、模型、人设、技能、MCP、环境变量、长相 | 一种小动物 |
-| runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 smith 驱动 | 农机 |
-| 项目 | `Project` | 一个 git 仓库，和能同时在里面做的工单数（`slots`） | 岛，也是一张小地图 |
-| 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，主人挪状态就是派活；代码相关的有自己的分支和 worktree；每张都有验收（`Acceptance`）；关上的能重开 | 一块地，也是看板上的卡片 |
-| Session | `Session`（服务是 `session.Service`，派活是 `Issue.Hire`） | 档案为一张工单接的活，在工单的 worktree 和分支上干，直到收获或收工；跨好几次 run，重启后还是同一个 | 帮工：在一块地上干活的小动物 |
-| Run | `Run`（`session_run` 表）；核心状态里是 `FactRun` 到 `FactReport` | 一次干活：一次触发到一次汇报，包着一个 oar turn | 一季庄稼 |
-| 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` | 干活过程 |
-| 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 | 收成清单 |
-| 合并 | `Issue.SetStatus`（挪到 `done`；`issue/merges.go`） | 把工单的分支合进主分支（`github.pr_projects` 里的项目是提 PR，PR 合了才关），关上工单 | 收获 |
-| 频道 | `Conversation`（`kind: general`、`channel`） | 说话的地方；默认的是田头，主人可以再开；外面的聊天软件经连接器接到一个频道上 | 田头和别的频道 |
-| 工单串 | `kind: thread`、`subjectKind: issue` | 一张工单下的对话，相当于 Linear 的评论 | 工单串 |
-| 计划 | `TaskGraph`：带 `graph` 的父工单 | 一件大活拆成的一张 DAG：每件是带 `task` 的子工单，先后是 `blockedBy`；每件合进计划分支，最后合进主分支 | 种植计划 |
-| 定时 | `Schedule` | 一张工单的一种触发：一个定时一张工单，派给一个档案或管家，每次到点是它的一次 run | 定时 |
-| Inbox | `InboxItem` | 要你处理的事，从核心状态现算 | 手机来电 |
-| 记忆 | `Memory` | 一个档案记得的事 | 记性 |
-| 技能 | `Skill` | 档案能带的技能 | 技能书 |
+农场里各叫什么、界面上用哪个字，见[用语表](README.md#用语)，这里不再写一遍。
+
+| 概念 | 代码里 | 是什么 |
+|---|---|---|
+| Workspace | `Config.WorkRoot`、`Config.Home` | 全部项目、工单、群聊、档案；同时干活的上限（6）是它的 |
+| 管家 | `Manager` | 主人的助理 agent：听主人说，拆成工单，派出去，转告结果 |
+| agent 档案 | `Agent` | 能派活的「同事」：runtime、模型、人设、技能、MCP、环境变量、长相 |
+| runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 smith 驱动 |
+| 项目 | `Project` | 一个 git 仓库，和能同时在里面做的工单数（`slots`） |
+| 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，主人挪状态就是派活；代码相关的有自己的分支和 worktree；每张都有验收（`Acceptance`）；关上的能重开 |
+| Session | `Session`（服务是 `session.Service`，派活是 `Issue.Hire`） | 档案为一张工单接的活，在工单的 worktree 和分支上干，直到收获或收工；跨好几次 run，重启后还是同一个 |
+| Run | `Run`（`session_run` 表）；核心状态里是 `FactRun` 到 `FactReport` | 一次干活：一次触发到一次汇报，包着一个 oar turn |
+| 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |
+| 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 |
+| 合并 | `Issue.SetStatus`（挪到 `done`；`issue/merges.go`） | 把工单的分支合进主分支（`github.pr_projects` 里的项目是提 PR，PR 合了才关），关上工单 |
+| 频道 | `Conversation`（`kind: general`、`channel`） | 说话的地方；默认的是田头，主人可以再开；外面的聊天软件经连接器接到一个频道上 |
+| 工单串 | `kind: thread`、`subjectKind: issue` | 一张工单下的对话，相当于 Linear 的评论 |
+| 计划 | `TaskGraph`：带 `graph` 的父工单 | 一件大活拆成的一张 DAG：每件是带 `task` 的子工单，先后是 `blockedBy`；每件合进计划分支，最后合进主分支 |
+| 定时 | `Schedule` | 一张工单的一种触发：一个定时一张工单，派给一个档案或管家，每次到点是它的一次 run |
+| Inbox | `InboxItem` | 要你处理的事，从核心状态现算 |
+| 记忆 | `Memory` | 一个档案记得的事 |
+| 技能 | `Skill` | 档案能带的技能 |
 
 ## 农场是皮
 
@@ -62,13 +64,8 @@ Workspace（工作目录，一张大地图）
 | 岛 | 一个项目 |
 | 一块地 | 一张工单；代码相关的带一个 worktree（岛上围着篱笆的那块）。一座岛上的空位是这个项目同时在做的工单数 |
 | 院门外的种子袋 | 排队等空地的工单（待办） |
-| 三段：聊清楚、安排活、完成 | 工单的一生：说清楚要什么（`backlog`），派人去做（`todo`、`in_progress`），验收和收获（`in_review` 到 `done`） |
-| 缺肥 | 帮工问了主人、还没回答（`Issue.Asks`）；施肥就是回答 |
-| 抽穗 | 交回来了，等验收（`in_review`） |
-| 长草 | 没过验收：每条意见一棵草（`Issue.Findings`），修好、下次验收通过才拔 |
-| 结果 | 验收过了（`Issue.AcceptedAt`），等收获 |
 | 地里的小动物 | 在这块地上干活的帮工（Session），可以换人 |
-| 庄稼 | 这一轮做到哪了（[farm-ui.md](reference/farm-ui.md)「地里长什么」）；熟了就是工单等你看 |
+| 庄稼 | 这一轮做到哪了；交回来以后看工单：干裂是缺肥，开花是等验收，杂草是没过验收，结出来是验收过了（[farm-ui.md](reference/farm-ui.md)「地里长什么」；叫法见[用语表](README.md#用语)） |
 | 一季庄稼 | 一次干活（run） |
 | 小动物走去哪 | 它正在用的工具 |
 | 手、浇水、施肥、杀虫、验收、收获、铲除 | 派活（挪到待办）、带话、回答它问的、让它修、验收（`issue.accept`）、收获（挪到已完成）、叫停或请走（挪到已取消） |
