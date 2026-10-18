@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"vibevalley/internal/agent"
 	"vibevalley/internal/protocol"
 	"vibevalley/pkg/x/str"
 )
@@ -26,8 +27,15 @@ type providers struct {
 	timeout time.Duration
 }
 
-func newProviders(local *memories) (*providers, error) {
-	return &providers{memories: local, all: []provider{localProvider{local}}, timeout: prefetchTimeout}, nil
+func newProviders(local *memories, store *agent.Service) (*providers, error) {
+	profiles := func() []string {
+		var ids []string
+		for _, a := range store.Agents() {
+			ids = append(ids, a.ID)
+		}
+		return ids
+	}
+	return &providers{memories: local, all: []provider{localProvider{local, profiles}}, timeout: prefetchTimeout}, nil
 }
 
 // A provider that cannot start is left out with a line in the log; the farm and the other providers go on.
@@ -96,9 +104,10 @@ func cueFor(one provider, cue RecallCue) RecallCue {
 	return cue
 }
 
-// Asks every provider at once; the local one is waited for, any other only up to the timeout.
-func (p *providers) prefetchAll(cue RecallCue) [][]recalledLine {
-	found := make([][]recalledLine, len(p.all))
+// Asks every provider at once; the local one is waited for, any other only up to the timeout. A provider that fails or is
+// too slow gives nothing, with a line in the log.
+func askAll[T any](p *providers, what string, ask func(ctx context.Context, one provider) ([]T, error)) [][]T {
+	found := make([][]T, len(p.all))
 	var wg sync.WaitGroup
 	for i, one := range p.all {
 		wg.Add(1)
@@ -110,23 +119,69 @@ func (p *providers) prefetchAll(cue RecallCue) [][]recalledLine {
 				ctx, cancel = context.WithTimeout(ctx, p.timeout)
 				defer cancel()
 			}
-			lines, err := one.Prefetch(ctx, cueFor(one, cue))
+			got, err := ask(ctx, one)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
-					log.Printf("vibevalley: memory from %s took longer than %s; %s starts without it", one.Name(), p.timeout, cue.Agent)
+					log.Printf("vibevalley: memory from %s took longer than %s; %s goes on without it", one.Name(), p.timeout, what)
 				} else {
-					log.Printf("vibevalley: memory from %s: %v", one.Name(), err)
+					log.Printf("vibevalley: memory from %s for %s: %v", one.Name(), what, err)
 				}
 				return
 			}
-			for j := range lines {
-				lines[j].ID = idOf(one, lines[j].ID)
-			}
-			found[i] = lines
+			found[i] = got
 		}()
 	}
 	wg.Wait()
 	return found
+}
+
+func (p *providers) prefetchAll(cue RecallCue) [][]recalledLine {
+	return askAll(p, cue.Agent, func(ctx context.Context, one provider) ([]recalledLine, error) {
+		lines, err := one.Prefetch(ctx, cueFor(one, cue))
+		for j := range lines {
+			lines[j].ID = idOf(one, lines[j].ID)
+		}
+		return lines, err
+	})
+}
+
+// Behind memory_search: every provider's best, taken in turns (their scores do not compare), the same memory once.
+func (p *providers) Search(q SearchQuery) []Found {
+	limit := q.Limit
+	if limit <= 0 {
+		limit = searchLimit
+	}
+	q.Limit = limit
+	groups := askAll(p, "a search", func(ctx context.Context, one provider) ([]Found, error) {
+		found, err := one.Search(ctx, q)
+		for j := range found {
+			found[j].ID = idOf(one, found[j].ID)
+			found[j].Source = one.Name()
+		}
+		return found, err
+	})
+	out := []Found{}
+	var seen []map[string]bool
+	for rank := 0; len(out) < limit; rank++ {
+		more := false
+		for _, g := range groups {
+			if rank >= len(g) || len(out) == limit {
+				continue
+			}
+			more = true
+			terms := termsOf(g[rank].Text)
+			if slices.ContainsFunc(seen, func(t map[string]bool) bool { return memoryLikeness(t, terms) >= 0.8 }) ||
+				slices.ContainsFunc(out, func(f Found) bool { return f.Text == g[rank].Text }) {
+				continue
+			}
+			seen = append(seen, terms)
+			out = append(out, g[rank])
+		}
+		if !more {
+			break
+		}
+	}
+	return out
 }
 
 // One provider's lines go as it gave them (it has bounded them already); several are merged best first, the same line once,

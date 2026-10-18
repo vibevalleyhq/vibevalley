@@ -43,6 +43,7 @@ type worldServices struct {
 	Runtime *runtime.Service
 	Channel *channel.Service
 	Issue   *issue.Service
+	Memory  *memory.Service
 	MCP     *Service
 }
 

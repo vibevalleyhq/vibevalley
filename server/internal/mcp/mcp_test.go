@@ -130,7 +130,7 @@ func TestToolsOverMcp(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	sort.Strings(names)
-	if !slices.Equal(names, []string{"channel_inbox", "channel_read", "channel_say", "session_list"}) {
+	if !slices.Equal(names, []string{"channel_inbox", "channel_read", "channel_say", "memory_add", "memory_search", "session_list"}) {
 		t.Fatalf("tools %q", names)
 	}
 
@@ -196,7 +196,7 @@ func TestEveryMcpToolRequiresAuthenticatedSession(t *testing.T) {
 	for _, tool := range call("tools/list", map[string]any{}).Result.Tools {
 		t.Run(tool.Name, func(t *testing.T) {
 			args := map[string]any{}
-			if tool.Name == "channel_say" {
+			if tool.Name == "channel_say" || tool.Name == "memory_add" {
 				args["text"] = "must not be posted"
 			}
 			text := call("tools/call", map[string]any{"name": tool.Name, "arguments": args}).text()
@@ -204,5 +204,46 @@ func TestEveryMcpToolRequiresAuthenticatedSession(t *testing.T) {
 				t.Fatalf("unauthenticated result: %s", text)
 			}
 		})
+	}
+}
+
+func TestAHelperSearchesAndWritesOnlyItsOwnMemory(t *testing.T) {
+	w := open(t)
+	w.MCP.who = func(token string) string { return token }
+	demo := "demo"
+	w.Core.Apply(protocol.FactHired{Session: protocol.Session{ID: "w1", Name: "一号", Agent: "lab", Project: &demo, Phase: protocol.Phase{Value: protocol.PhaseWorking{}}}})
+	if _, err := w.Memory.Write("scout", "这个项目测试用 make check", "demo"); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(w.MCP.Handler())
+	defer server.Close()
+	call := client(t, server.URL, "w1")
+	tool := func(name string, args map[string]any) string {
+		return call("tools/call", map[string]any{"name": name, "arguments": args}).text()
+	}
+
+	if added := tool("memory_add", map[string]any{"text": "这个项目测试用 pnpm test"}); !strings.Contains(added, "记下了（项目 demo）") {
+		t.Fatalf("added %q", added)
+	}
+	if added := tool("memory_add", map[string]any{"text": "提交信息写中文", "all_projects": true}); !strings.Contains(added, "记下了（所有项目）") {
+		t.Fatalf("added %q", added)
+	}
+	if refused := tool("memory_add", map[string]any{"text": "冒名记一条", "agent": "scout"}); !strings.Contains(refused, "只能记进你自己的档案") {
+		t.Fatalf("wrote another profile: %q", refused)
+	}
+	for _, m := range w.Memory.List("scout") {
+		if m.Text == "冒名记一条" {
+			t.Fatal("it reached scout's memory")
+		}
+	}
+	found := tool("memory_search", map[string]any{"query": "测试"})
+	if !strings.Contains(found, "pnpm test") || strings.Contains(found, "make check") {
+		t.Fatalf("found %q", found)
+	}
+	if none := tool("memory_search", map[string]any{"query": "部署"}); !strings.Contains(none, "没有搜到「部署」") {
+		t.Fatalf("found %q", none)
+	}
+	if away := client(t, server.URL, "w9")("tools/call", map[string]any{"name": "memory_search", "arguments": map[string]any{"query": "测试"}}).text(); !strings.Contains(away, "地里没有你") {
+		t.Fatalf("a session not on the farm: %q", away)
 	}
 }

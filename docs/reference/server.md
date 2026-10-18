@@ -21,7 +21,7 @@
 - **叫停**：管家在想或在说时，田头的输入框旁边有停止键（`POST /api/v1/manager/stop`，`vibevalley manager stop`）。它停掉正在跑的这一轮、丢掉排着等它的话（巡查过后还会再报，计划的状态在计划板上）；已经说出来的半句留在田头，派出去的帮工照常干活；交给管家的工单那一轮记成叫停了（`interrupted`），管家的日志里记一条「主人叫停了」。管家闲着时什么也不做。
 - **做错的一轮**：主人在管家页的轨迹里把一轮标成做错了，写一句应该怎样（`manager.markWrong`，`POST /api/v1/manager/evals`，`on` 是那一轮收到的话在轨迹里的第几步）。服务端从 `manager.jsonl` 找到这句话成了哪条输入，存成一个样例 `manager/evals/<id>.json`：这一轮开始时模型看到的对话（`before`，压缩照算）、这条输入（`input`）、这一轮的消息（`did`，到下一条输入为止）、那时的 `MEMORY.md`、工具名和模型，`expect` 空着。话没进对话（管家那时没起来）的不收。样例怎么写判断、怎么用真模型重放见 [verify-manager-evals](../../.agents/skills/verify-manager-evals/SKILL.md)。
 
-工具在 `manager/tools.go`：派活（`dispatch`，挑谁见 [agents-and-runtimes.md](agents-and-runtimes.md)「派给谁」）、看和收获（`changes`、`merge`）、看帮工（`roster`、`check`）、带话叫停收工（`tell`、`stop`、`dismiss`）、频道、定时、记性和种植计划。
+工具在 `manager/tools.go`：派活（`dispatch`，挑谁见 [agents-and-runtimes.md](agents-and-runtimes.md)「派给谁」）、看和收获（`changes`、`merge`）、看帮工（`roster`、`check`）、带话叫停收工（`tell`、`stop`、`dismiss`）、频道、定时、记性（`memory_search`、`memory_add`，下文「记性」）和种植计划。
 
 **帮工汇报**以帮工自己的名义贴进它的工单串，管家不转述；没做成的叫醒管家。叫停的不贴。
 
@@ -117,7 +117,7 @@
 
 **重发不成两条**：主人的话（`POST /api/v1/say`、`/api/v1/manager/hear`）带客户端为这一次发送生成的 `sendKey`（至多 64 个字，长了拒绝）。同一个人带同一个键再发，就是已经说过的那一条：不另写、不再送，管家也不再听一遍（`channel_message` 的 `send_key`，唯一索引在发送者和键上）。客户端为一份草稿生成一个键，发成功才换；发送失败时草稿留在输入框里，重发用同一个键。连接器那条路按外部消息 id 去重，不带键。
 
-**帮工的工具**（`mcp/mcp.go`，在 `/mcp` 上；`mcp` 是给编码 agent 的入口，和 HTTP 并排）：`channel_say`、`channel_read`、`channel_inbox`、`session_list`。每个会话带一个自己的令牌（`session/tokens.go`），只用来分清是谁在说话。`channel_say` 发出前会拦下：目标里有它没看过的新消息、读的是串却发到顶层、60 秒内重复同一句。
+**帮工的工具**（`mcp/mcp.go`，在 `/mcp` 上；`mcp` 是给编码 agent 的入口，和 HTTP 并排）：`channel_say`、`channel_read`、`channel_inbox`、`session_list`，和记性的 `memory_search`、`memory_add`（下文「记性」）。每个会话带一个自己的令牌（`session/tokens.go`），只用来分清是谁在说话。`channel_say` 发出前会拦下：目标里有它没看过的新消息、读的是串却发到顶层、60 秒内重复同一句。
 
 ## 连接器：微信、飞书、QQ
 
@@ -167,6 +167,7 @@
 - **想起**：帮工新开一轮时，protocol 的 `Pick`（不调模型）挑出有关的几条（最多 8 条），以「【你记得的】」开头放在话前面，写明是以前的信息、不是要它照做的指令。
 - **记下**：汇报里「记住：」开头的行记成这个项目的，「记住（所有项目）：」记成所有项目的；差不多的不重复记。叫停的一轮不记。
 - 读不出、写不进只记日志，不拦着那一轮。
+- **主动查、主动记**：开工想起和收「记住：」之外，帮工经 `/mcp` 的 `memory_search`、`memory_add` 查和记自己档案的记性：档案和项目由会话的令牌定（查这个项目的和所有项目的，`all_projects` 也查别的项目；记成这个项目的，`all_projects` 记成所有项目的），写别的档案被拒。管家的同名工具能查任何档案（不填就是所有档案）、替任何档案记一句；管家自己的记性照旧用 `remember`。两边都经管理器的 `Search`、`Write`，问遍所有来源，各来源的结果轮流取、几乎一样的只留一条，默认 10 条。
 - **来源**：记性经 `memory/providers.go` 的管理器读写，现在只有一个来源，是本地的这张表（`memory/local.go`）。接口在 `memory/provider.go`，照 Hermes 的 `MemoryProvider`（[提案](../../.agents/notes/proposed/architecture/2026-10-18-memory-providers.md)）。本地记忆的 id 照旧，别的来源的 id 带上它的名字（`名字:id`）；开工想起时外面的来源最多等 2 秒，等不到就不等。
 - 一轮的笔记、总结和过量记忆的清理在同一个事务里；失败不留下半份记性。提不出关键词的不同短句仍分别保留。
 

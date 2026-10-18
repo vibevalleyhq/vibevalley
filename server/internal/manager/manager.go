@@ -143,6 +143,7 @@ type manager struct {
 	chat      *channel.Service
 	playbooks *playbook.Service
 	schedule  *schedule.Service
+	memory    *memory.Service
 	patrol    *patrol
 	ctx       context.Context
 
@@ -190,13 +191,15 @@ type managerIn struct {
 	Channel  *channel.Service
 	Playbook *playbook.Service
 	Schedule *schedule.Service
+	Memory   *memory.Service
 }
 
 func newManager(in managerIn) (*manager, error) {
 	return &manager{
 		cfg: in.Config, core: in.Core, store: in.Agent, settings: in.Setting, runtimes: in.Runtime,
 		projects: in.Project, run: in.Run, issue: in.Issue, chat: in.Channel, playbooks: in.Playbook, schedule: in.Schedule,
-		ctx: context.Background(),
+		memory: in.Memory,
+		ctx:    context.Background(),
 	}, nil
 }
 

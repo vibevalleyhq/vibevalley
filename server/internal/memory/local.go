@@ -7,7 +7,11 @@ import (
 )
 
 // This farm's own memories, in the memory table, picked by recall.go. Always there and always first.
-type localProvider struct{ m *memories }
+type localProvider struct {
+	m *memories
+	// The profiles a search for every one looks through.
+	profiles func() []string
+}
 
 const localName = "local"
 
@@ -52,4 +56,20 @@ func (l localProvider) Add(_ context.Context, n Note) (protocol.Memory, error) {
 
 func (l localProvider) Forget(_ context.Context, agent, id string) error {
 	return l.m.Forget(agent, id)
+}
+
+func (l localProvider) Search(_ context.Context, q SearchQuery) ([]Found, error) {
+	agents := []string{q.Agent}
+	if q.Agent == "" {
+		agents = l.profiles()
+	}
+	var all []protocol.Memory
+	for _, agent := range agents {
+		listed, err := l.m.list(agent)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, listed...)
+	}
+	return search(all, q), nil
 }

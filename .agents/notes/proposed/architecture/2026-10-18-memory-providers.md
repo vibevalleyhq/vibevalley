@@ -122,6 +122,8 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 
 2026-10-18 做了第 1 步的接口那一半：`server/internal/memory/provider.go` 是接口，`providers.go` 是管理器，`local.go` 把原来的 `memories` 包成本地来源，行为不变（`internal/session` 和处理函数没改）。接口里只放了现在有人调的方法（`Name`、`Available`、`OnStart`、`OnStop`、`Prefetch`、`SyncTurn`、`List`、`Add`、`Forget`），其余的等第一个调用的人来了再加：`go:deadcode` 不留只靠测试活着的方法。已知的缺口：几个来源一起想起时，本地挑出、合并时又被挤掉的那几条，也记成了想起过；只有本地一个来源时不会发生，接第二个来源时改成合并之后再记。本地的存法（迁移、FTS5、gse）还没做，见[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)。
 
+第 2 步做了：接口多了 `Search`，管理器的 `Search` 并行问所有来源（外面的照样最多等 2 秒），各来源的分数不能比，所以按名次轮流取，几乎一样的（`memoryLikeness` ≥ 0.8）只留一条，默认 10 条；本地的检索是 `recall.go` 的纯函数 `search`（共有的词、整句出现，同项目的在前），等 FTS5 来了换掉。管家的 `memory_search`、`memory_add` 在 `manager/tools.go`，帮工的在 `mcp/mcp.go`，回给模型的话都由 `memory.FoundText` 拼。和提案不一样的：管家的 `memory_add` 只替帮工档案记，管家自己的照旧 `remember`（管家的记性还在 `MEMORY.md`，等[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)第 4 步）；`memory_replace`、`memory_remove` 也等那一步；`SearchQuery` 有 `Kind`，工具还没给模型这个参数。
+
 ## Alternatives considered
 
 **只能开一个外接来源（Hermes 的做法）。** 它这样限制，是因为每个来源都带自己的工具。我们对 agent 只给一套统一的工具，来源多了工具也不变；而 EverOS 和 Nowledge 主人都要。

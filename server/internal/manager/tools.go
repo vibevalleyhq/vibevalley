@@ -12,6 +12,7 @@ import (
 	"unicode/utf16"
 
 	"vibevalley/internal/channel"
+	"vibevalley/internal/memory"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/pkg/agent"
@@ -143,6 +144,8 @@ var managerToolLabels = map[string]string{
 	"remember":         "记一条",
 	"rewrite_memory":   "整理记性",
 	"search_archive":   "翻旧账",
+	"memory_search":    "翻记性",
+	"memory_add":       "替帮工记",
 }
 
 var managerNamed = []string{"agent", "session", "project", "name", "query", "note", "goal"}
@@ -751,9 +754,79 @@ func (fm *manager) tools() []agentcore.AgentTool {
 		},
 	})
 
+	// The manager may say a profile's name or id; its own memory is MEMORY.md (remember), not one of these.
+	profile := func(key string) (string, error) {
+		key = strings.TrimSpace(key)
+		if key == protocol.ManagerAgent || key == "管家" {
+			return "", errors.New("你自己的记性在系统提示里：要记用 remember，要找旧对话用 search_archive")
+		}
+		for _, a := range fm.store.Agents() {
+			if a.ID == key || a.Name == key {
+				return a.ID, nil
+			}
+		}
+		return "", errors.New("没有叫 " + key + " 的帮工档案")
+	}
+
+	type memorySearchArgs struct {
+		Query   string `json:"query"`
+		Agent   string `json:"agent"`
+		Project string `json:"project"`
+	}
+	memorySearch := agent.TextTool(agent.TextToolSpec[memorySearchArgs]{
+		Name: "memory_search", Label: managerToolLabels["memory_search"],
+		Description: "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
+		Parameters: agentcore.ObjectSchema(map[string]any{
+			"query":   managerStr("要找什么，几个词或一句话；不填就列出最新的"),
+			"agent":   managerStr("帮工档案的名字或 id"),
+			"project": managerStr("项目文件夹名"),
+		}),
+		Run: func(_ context.Context, p memorySearchArgs, _ agent.ToolContext) (string, error) {
+			q := memory.SearchQuery{Text: p.Query, Project: strings.TrimSpace(p.Project)}
+			if strings.TrimSpace(p.Agent) != "" {
+				id, err := profile(p.Agent)
+				if err != nil {
+					return managerAnswered("", err)
+				}
+				q.Agent = id
+			}
+			return memory.FoundText(fm.memory.Search(q), q), nil
+		},
+	})
+
+	type memoryAddArgs struct {
+		Agent   string `json:"agent"`
+		Text    string `json:"text"`
+		Project string `json:"project"`
+	}
+	memoryAdd := agent.TextTool(agent.TextToolSpec[memoryAddArgs]{
+		Name: "memory_add", Label: managerToolLabels["memory_add"],
+		Description: "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 project 就是所有项目都用。主人对你自己说的偏好用 remember。",
+		Parameters: agentcore.ObjectSchema(map[string]any{
+			"agent":   managerStr("帮工档案的名字或 id"),
+			"text":    managerStr("要它记住的一句话"),
+			"project": managerStr("只在这个项目里用：项目文件夹名"),
+		}, "agent", "text"),
+		Run: func(_ context.Context, p memoryAddArgs, _ agent.ToolContext) (string, error) {
+			id, err := profile(p.Agent)
+			if err != nil {
+				return managerAnswered("", err)
+			}
+			m, err := fm.memory.Remember(id, p.Text, p.Project)
+			if err != nil {
+				return managerAnswered("", err)
+			}
+			where := "所有项目"
+			if m.Project != nil {
+				where = "项目 " + *m.Project
+			}
+			return "替 " + id + " 记下了（" + where + "）〔" + m.ID + "〕", nil
+		},
+	})
+
 	return []agentcore.AgentTool{
 		dispatch, projects, channels, schedule, listSchedules, cancelSchedule, openChannel, channelSettings, merge, changes,
-		roster, check, tell, readChat, stop, dismiss, plan, playbooks, planEdit, planAction, nodeAction,
+		roster, check, tell, readChat, stop, dismiss, plan, playbooks, planEdit, planAction, nodeAction, memorySearch, memoryAdd,
 	}
 }
 

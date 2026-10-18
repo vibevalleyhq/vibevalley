@@ -13,9 +13,11 @@ import (
 	"vibevalley/internal/base"
 	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
+	"vibevalley/internal/memory"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/pkg/x/clock"
+	"vibevalley/pkg/x/ptr"
 	"vibevalley/pkg/x/str"
 )
 
@@ -25,13 +27,14 @@ type Service struct {
 	core    *core.Service
 	tokens  *session.Service
 	chat    *channel.Service
+	memory  *memory.Service
 	handler http.Handler
 	// nil: the farm's Tokens. Tests may put their own.
 	who func(token string) string
 }
 
-func newService(cfg base.Config, core *core.Service, tokens *session.Service, chat *channel.Service) (*Service, error) {
-	t := &Service{core: core, tokens: tokens, chat: chat}
+func newService(cfg base.Config, core *core.Service, tokens *session.Service, chat *channel.Service, memory *memory.Service) (*Service, error) {
+	t := &Service{core: core, tokens: tokens, chat: chat, memory: memory}
 	server := sdk.NewServer(&sdk.Implementation{Name: "vibevalley", Version: cfg.Version}, nil)
 	t.add(server)
 	t.handler = sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return server }, nil)
@@ -106,6 +109,27 @@ type sayArgs struct {
 	Target  string `json:"target,omitempty"`
 	Anyway  bool   `json:"anyway,omitempty" jsonschema:"看过新消息、仍要原样发"`
 	Confirm bool   `json:"confirm,omitempty" jsonschema:"确实要发到田头顶层，而不是刚读的那个串"`
+}
+
+type memorySearchArgs struct {
+	Query       string `json:"query,omitempty" jsonschema:"要找什么，几个词或一句话；不填就列出最新的"`
+	AllProjects bool   `json:"all_projects,omitempty" jsonschema:"也找别的项目里记下的"`
+}
+
+type memoryAddArgs struct {
+	Text        string `json:"text" jsonschema:"一句以后还用得上的话：约定、坑、命令"`
+	AllProjects bool   `json:"all_projects,omitempty" jsonschema:"所有项目都用得上，不只是这个项目"`
+	Agent       string `json:"agent,omitempty" jsonschema:"不用填：只能记进你自己的档案"`
+}
+
+// A session's memory is its profile's, and its project is where it works: neither is the caller's to choose.
+func (t *Service) workingAs(id string) (agent, project string, err error) {
+	for _, h := range t.core.State().Sessions {
+		if h.ID == id {
+			return h.Agent, ptr.Value(h.Project), nil
+		}
+	}
+	return "", "", errors.New("地里没有你：记性只给在干活的帮工用")
 }
 
 type readArgs struct {
@@ -201,5 +225,45 @@ func (t *Service) add(server *sdk.Server) {
 		}
 		lines = append(lines, "要叫醒谁，就在 channel_say 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。")
 		return strings.Join(lines, "\n"), nil
+	})
+
+	addAuthenticatedTool(t, server, &sdk.Tool{
+		Name:        "memory_search",
+		Description: "在你的记性里找：你和主人以前替你的档案记下的话、做过的活。只找这个项目的和所有项目都用的；all_projects 也找别的项目的。干到一半想知道「这个项目的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
+	}, func(id string, p memorySearchArgs) (string, error) {
+		agent, project, err := t.workingAs(id)
+		if err != nil {
+			return "", err
+		}
+		q := memory.SearchQuery{Agent: agent, Project: project, Text: p.Query}
+		if p.AllProjects {
+			q.Project = ""
+		}
+		return memory.FoundText(t.memory.Search(q), q), nil
+	})
+
+	addAuthenticatedTool(t, server, &sdk.Tool{
+		Name:        "memory_add",
+		Description: "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。记这个项目的；all_projects 记成所有项目都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
+	}, func(id string, p memoryAddArgs) (string, error) {
+		agent, project, err := t.workingAs(id)
+		if err != nil {
+			return "", err
+		}
+		if p.Agent != "" && p.Agent != agent {
+			return "", errors.New("只能记进你自己的档案（" + agent + "），" + p.Agent + " 的记性不归你写")
+		}
+		if p.AllProjects {
+			project = ""
+		}
+		m, err := t.memory.Remember(agent, p.Text, project)
+		if err != nil {
+			return "", err
+		}
+		where := "所有项目"
+		if m.Project != nil {
+			where = "项目 " + *m.Project
+		}
+		return "记下了（" + where + "）〔" + m.ID + "〕", nil
 	})
 }
