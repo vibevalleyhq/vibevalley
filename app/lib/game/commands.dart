@@ -48,7 +48,10 @@ class FarmCommands {
   }
 
   Future<void> harvest(Session w) async {
-    await _api.issue.merge(id: w.issueId);
+    await _api.issue.status(
+      id: w.issueId,
+      body: const IssueStatusRequest(status: IssueStatus.done),
+    );
     _fx(w, BedFxKind.harvest, '收进仓库');
   }
 
@@ -56,14 +59,20 @@ class FarmCommands {
     if (w.phase is PhaseWorking) {
       await _api.session.stop(id: w.id);
     } else {
-      await _api.issue.cancel(id: w.issueId);
+      await _api.issue.status(
+        id: w.issueId,
+        body: const IssueStatusRequest(status: IssueStatus.canceled),
+      );
     }
     _fx(w, BedFxKind.shovel);
   }
 
   Future<void> stop(String id) => _api.session.stop(id: id);
   Future<void> stopManager() => _api.manager.stop();
-  Future<void> dismiss(String id) => _api.issue.cancel(id: _issueOf(id));
+  Future<void> dismiss(String id) => _api.issue.status(
+    id: _issueOf(id),
+    body: const IssueStatusRequest(status: IssueStatus.canceled),
+  );
 
   String _issueOf(String session) => (_farm?.sessions ?? const <Session>[]).firstWhere((w) => w.id == session).issueId;
 

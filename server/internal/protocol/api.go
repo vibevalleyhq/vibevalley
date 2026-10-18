@@ -60,17 +60,10 @@ type Handlers interface {
 	//vibevalley:route issue.changes GET /api/v1/issues/{id}/changes
 	//vibevalley:can owner remote manager
 	IssueChanges(ctx context.Context, pID string) (Changes, error)
-	//vibevalley:route issue.merge POST /api/v1/issues/{id}/merge
-	//vibevalley:can owner remote manager
-	IssueMerge(ctx context.Context, pID string) error
 	// Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
 	//vibevalley:route issue.resolve POST /api/v1/issues/{id}/resolve
 	//vibevalley:can owner remote
 	IssueResolve(ctx context.Context, pID string) error
-	// Sends the newest session home without merging: the issue closes as dismissed.
-	//vibevalley:route issue.cancel POST /api/v1/issues/{id}/cancel
-	//vibevalley:can owner remote manager
-	IssueCancel(ctx context.Context, pID string) error
 	// Stops a session's turn; it stays, and a comment starts the next.
 	//vibevalley:route session.stop POST /api/v1/sessions/{id}/stop
 	//vibevalley:can owner remote manager
@@ -110,16 +103,11 @@ type Handlers interface {
 	//vibevalley:route issue.move PUT /api/v1/issues/{id}/move
 	//vibevalley:can owner remote
 	IssueMove(ctx context.Context, pID string, body MoveIssueRequest) ([]Issue, error)
-	// Back to the backlog; an issue is queued by issue.start when there is no room.
-	//vibevalley:route issue.unqueue POST /api/v1/issues/{id}/unqueue
+	// Moving an issue is what it does: todo sends it out (or waits for room), done merges, canceled sends its session home,
+	// todo again after a round or a close is another round with text. Issue.moves lists where it may go.
+	//vibevalley:route issue.status PUT /api/v1/issues/{id}/status
 	//vibevalley:can owner remote
-	IssueUnqueue(ctx context.Context, pID string) (Issue, error)
-	//vibevalley:route issue.start POST /api/v1/issues/{id}/start
-	//vibevalley:can owner remote manager
-	IssueStart(ctx context.Context, pID string) (Dispatched, error)
-	//vibevalley:route issue.reopen POST /api/v1/issues/{id}/reopen
-	//vibevalley:can owner remote
-	IssueReopen(ctx context.Context, pID string, body ReopenRequest) (Dispatched, error)
+	IssueStatus(ctx context.Context, pID string, body IssueStatusRequest) (Issue, error)
 	//vibevalley:route graph.split POST /api/v1/graphs
 	//vibevalley:can owner remote manager
 	GraphSplit(ctx context.Context, body GraphSplitRequest) (string, error)

@@ -1159,6 +1159,8 @@ type Issue struct {
 	Task      *IssueTask  `json:"task,omitzero"`
 	Schedule  *string     `json:"schedule,omitzero"`
 	Status    IssueStatus `json:"status"`
+	// Where the owner may move it now (issue.status); the server's rule, so the board does not guess.
+	Moves []IssueStatus `json:"moves"`
 }
 
 type IssueGraph struct {
@@ -2074,8 +2076,10 @@ type MoveIssueRequest struct {
 	Before *string `json:"before,omitzero"`
 }
 
-type ReopenRequest struct {
-	Text string `json:"text"`
+// Text is what the session hears when the move is another round (todo after in_review, done or canceled).
+type IssueStatusRequest struct {
+	Status IssueStatus `json:"status"`
+	Text   string      `json:"text,omitzero"`
 }
 
 type GraphActRequest struct {

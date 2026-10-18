@@ -26,14 +26,14 @@ vv project create --json '{"name":"vibevalley","github":"https://github.com/vibe
 vv issue create --json '{"title":"…","description":"要做什么、怎么算做完、跑哪些检查","project":"vibevalley","assignee":"codex"}'
 vv issue run <issue>                               # 开工，等它交回来，打出改动
 vv session events <session>                        # 看它这一轮做了什么、跑了哪些检查
-vv issue comment <issue> --json '{"text":"…"}'     # 不满意就说，帮工接着干一轮
+vv issue status <issue> --json '{"status":"todo","text":"…"}'  # 不满意就说，帮工接着干一轮
 vv issue get <issue>                               # 轮询 status：先变成 in_progress，再回到 in_review 就是这一轮交回来了
-vv issue merge <issue>                             # 合进克隆的 main（合并前的检查还没有，见下）
+vv issue status <issue> --json '{"status":"done"}'  # 收下，合进克隆的 main（合并前的检查还没有，见下）
 git -C ~/vibevalley-dev/projects/vibevalley push   # 推到 origin（先手动）
 git -C ~/orca/projects/heybro pull                 # 主人拉下来，重启农场，新功能就在了
 ```
 
-[改状态就是派活](../architecture/2026-10-18-status-is-the-dispatch.md)做了以后，开工、再干一轮、收下都换成 `issue status <id> todo|done`，流程不变。
+开工、再干一轮、收下都是挪工单的状态（[改状态就是派活](../../implemented/architecture/2026-10-18-status-is-the-dispatch.md)）：`issue run` 把备选挪到待办并等它交回来，`issue status <id> --json '{"status":"todo","text":"…"}'` 再干一轮，`{"status":"done"}` 收下。
 
 ### 要补的
 
@@ -62,9 +62,9 @@ git -C ~/orca/projects/heybro pull                 # 主人拉下来，重启农
 
 ## Acceptance criteria
 
-- 照上面的命令，从空的 `~/vibevalley-dev` 开始，codex 加完一个小功能，`issue merge` 合进克隆的 main，推到 origin 后主人能拉到。整个过程不开客户端。
+- 照上面的命令，从空的 `~/vibevalley-dev` 开始，codex 加完一个小功能，挪到 done 合进克隆的 main，推到 origin 后主人能拉到。整个过程不开客户端。
 - 评论一次，轮询 `issue get` 能看到 `in_progress` 再回到 `in_review`，`issue changes` 里有新的提交。
-- 第 1 件做完以后：故意让检查失败，`issue merge` 不合，帮工收到检查的输出作为评论。
+- 第 1 件做完以后：故意让检查失败，挪到 done 不合，帮工收到检查的输出作为评论。
 - 走通以后写一个验证 skill（`verify-feature-loop`），照 [create-verification-skill](../../../skills/create-verification-skill/SKILL.md) 把这串命令写成能反复跑的样子，汇报时附上工单号、合进去的提交和检查的输出。
 
 ## Risks

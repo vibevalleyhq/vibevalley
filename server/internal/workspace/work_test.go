@@ -981,3 +981,54 @@ func mustMerge(t *testing.T, f *Workspace, id string) string {
 	}
 	return said
 }
+
+// The owner only moves the issue: todo sends it out, todo again is another round, done merges; the dropped one comes back.
+func TestMovingAnIssueIsTheWork(t *testing.T) {
+	home, work := dirs(t)
+	w := openWorld(t, home, work)
+	lab := fixture.Lab(t)
+	w.f.Agent.SaveAgent(lab)
+	move := func(id string, to protocol.IssueStatus, text string) (protocol.Issue, error) {
+		return w.f.Issue.SetStatus(context.Background(), id, to, text, "")
+	}
+	project := "clock"
+	issue, err := w.f.Issue.Add(protocol.IssueRequest{Title: "写打卡并提交", Project: &project, Assignee: &lab.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, issue.Moves, []protocol.IssueStatus{protocol.IssueStatusTodo, protocol.IssueStatusCanceled}, "from the backlog")
+	var refused protocol.Refused
+	if _, err := move(issue.ID, protocol.IssueStatusInProgress, ""); !errors.As(err, &refused) {
+		t.Fatalf("in progress is the session's: %v", err)
+	}
+	if issue, err = move(issue.ID, protocol.IssueStatusTodo, ""); err != nil {
+		t.Fatal(err)
+	}
+	w.nextReport(t)
+	issue, _ = w.f.Issue.Get(issue.ID)
+	testkit.Eq(t, issue.Status, protocol.IssueStatusInReview, "its round handed back")
+	testkit.Eq(t, issue.Moves, []protocol.IssueStatus{protocol.IssueStatusTodo, protocol.IssueStatusDone, protocol.IssueStatusCanceled}, "in review")
+	if _, err := move(issue.ID, protocol.IssueStatusTodo, " "); !errors.As(err, &refused) {
+		t.Fatalf("another round without a word: %v", err)
+	}
+	if _, err := move(issue.ID, protocol.IssueStatusTodo, "再写版本B"); err != nil {
+		t.Fatal(err)
+	}
+	w.nextReport(t)
+	if issue, err = move(issue.ID, protocol.IssueStatusDone, ""); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, issue.Status, protocol.IssueStatusDone, "merged")
+	testkit.Match(t, testkit.Git(t, filepath.Join(work, "projects", "clock"), "log", "--format=%s", "main"), `版本 B`, "both rounds on main")
+	testkit.Eq(t, issue.Moves, []protocol.IssueStatus{protocol.IssueStatusTodo}, "a closed one only reopens")
+
+	dropped, _ := w.f.Issue.Add(protocol.IssueRequest{Title: "算了"})
+	if dropped, err = move(dropped.ID, protocol.IssueStatusCanceled, ""); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, []any{dropped.Status, *dropped.Closed}, []any{protocol.IssueStatusCanceled, protocol.IssueCloseDismissed}, "dropped unsent")
+	if dropped, err = move(dropped.ID, protocol.IssueStatusBacklog, ""); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, dropped.Status, protocol.IssueStatusBacklog, "back in the backlog")
+}

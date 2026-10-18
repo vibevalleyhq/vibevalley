@@ -33,6 +33,7 @@ void main() {
     closedAt: DateTime.now().millisecondsSinceEpoch - 60000.0,
     closed: IssueClose.merged,
     status: IssueStatus.done,
+    moves: [],
   );
   const chat = Chat(
     conversations: [
@@ -122,7 +123,7 @@ void main() {
     expect(routes.calls.last.body, {'text': '先别动测试'});
     await tester.tap(find.text('请它收工'));
     await settle(tester);
-    expect(routes.paths, contains('POST /api/v1/issues/tw1/cancel'));
+    expect(routes.paths, contains('PUT /api/v1/issues/tw1/status'));
     expect(c.read(selectedProvider), isNull);
     expect(find.text('小吴的地'), findsNothing);
     await tester.pump(const Duration(seconds: 3));

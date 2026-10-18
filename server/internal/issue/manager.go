@@ -35,9 +35,10 @@ func (is *issues) OfSchedule(id string) (protocol.Issue, bool) {
 	return issue, err == nil
 }
 
-func (is *issues) answered(id string) error {
-	answered := protocol.IssueCloseAnswered
-	if err := is.q.CloseIssue(context.Background(), generated.CloseIssueParams{ClosedAt: issueAt(clock.NowMs()), Closed: issueClosed(&answered), ID: id}); err != nil {
+func (is *issues) answered(id string) error { return is.closeAs(id, protocol.IssueCloseAnswered) }
+
+func (is *issues) closeAs(id string, how protocol.IssueClose) error {
+	if err := is.q.CloseIssue(context.Background(), generated.CloseIssueParams{ClosedAt: issueAt(clock.NowMs()), Closed: issueClosed(&how), ID: id}); err != nil {
 		return err
 	}
 	is.publish(id)

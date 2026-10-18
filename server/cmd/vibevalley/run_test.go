@@ -12,15 +12,22 @@ import (
 	"time"
 )
 
-// issue run starts the issue, waits while it is in progress, and prints the changes once it is in review.
+// issue run moves a backlog issue to todo, waits while it is in progress, and prints the changes once it is in review.
 func TestIssueRunWaitsForTheReview(t *testing.T) {
 	runPoll = time.Millisecond
 	var looks atomic.Int32
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v1/issues/t1/start", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, `{"session":"w1"}`) })
+	var moved atomic.Bool
+	mux.HandleFunc("PUT /api/v1/issues/t1/status", func(w http.ResponseWriter, r *http.Request) {
+		moved.Store(true)
+		io.WriteString(w, `{"id":"t1","title":"x","priority":"medium","createdAt":1,"sessions":["w1"],"status":"in_progress","moves":[]}`)
+	})
 	mux.HandleFunc("GET /api/v1/issues/t1", func(w http.ResponseWriter, r *http.Request) {
 		status := "in_progress"
-		if looks.Add(1) > 2 {
+		switch n := looks.Add(1); {
+		case n == 1:
+			status = "backlog"
+		case n > 3:
 			status = "in_review"
 		}
 		io.WriteString(w, `{"id":"t1","title":"x","priority":"medium","rank":1,"createdAt":1,"sessions":["w1"],"status":"`+status+`"}`)
@@ -31,7 +38,7 @@ func TestIssueRunWaitsForTheReview(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	out := capture(t, func() error { return issueRun(context.Background(), []string{"t1", "--server", srv.URL}) })
-	if !strings.Contains(out, `"project": "demo"`) || looks.Load() != 3 {
+	if !strings.Contains(out, `"project": "demo"`) || looks.Load() != 4 || !moved.Load() {
 		t.Fatalf("looked %d times, printed %s", looks.Load(), out)
 	}
 }

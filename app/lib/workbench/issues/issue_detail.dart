@@ -55,7 +55,15 @@ class _CloseIssueState extends ConsumerState<CloseIssue> {
               working ? '叫停并收工' : '不收，直接收工',
               tone: PxTone.danger,
               onPressed: () async {
-                await runAction(() => ref.read(apiProvider).issue.cancel(id: session.issueId));
+                await runAction(
+                  () => ref
+                      .read(apiProvider)
+                      .issue
+                      .status(
+                        id: session.issueId,
+                        body: const IssueStatusRequest(status: IssueStatus.canceled),
+                      ),
+                );
                 done();
               },
             ),
@@ -175,9 +183,8 @@ class _TodoState extends ConsumerState<TodoDetail> {
 
   Future<void> _start() => _run(() async {
     final got = await _submission.start(_request);
-    final id = _submission.saved!.id;
-    dispatchedNotice(got, id, widget.onDone);
-    if (got.session == null && widget.item == null) widget.onDone(id);
+    dispatchedNotice(got, widget.onDone);
+    if (got.status == IssueStatus.todo && widget.item == null) widget.onDone(got.id);
   });
 
   @override
@@ -277,7 +284,17 @@ class _TodoState extends ConsumerState<TodoDetail> {
                   PxButton.text(
                     '不排了',
                     size: PxSize.sm,
-                    onPressed: _busy ? null : () => _run(() => ref.read(apiProvider).issue.unqueue(id: widget.item!.id)),
+                    onPressed: _busy
+                        ? null
+                        : () => _run(
+                            () => ref
+                                .read(apiProvider)
+                                .issue
+                                .status(
+                                  id: widget.item!.id,
+                                  body: const IssueStatusRequest(status: IssueStatus.backlog),
+                                ),
+                          ),
                   ),
                 ],
               ),
@@ -355,14 +372,14 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
   Future<void> _reopen() async {
     setState(() => _busy = true);
     final got = await runAction(
-      () => _api.issue.reopen(
+      () => _api.issue.status(
         id: widget.issue.id,
-        body: ReopenRequest(text: _word.trim()),
+        body: IssueStatusRequest(status: IssueStatus.todo, text: _word.trim()),
       ),
     );
     if (!mounted) return;
     setState(() => _busy = false);
-    if (got?.session case final session?) {
+    if (got?.sessions.lastOrNull case final session?) {
       toasts.add(type: ToastType.info, title: '工单重开了', description: '$session 接着做。');
       await widget.reload();
     }

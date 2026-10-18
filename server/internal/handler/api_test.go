@@ -59,8 +59,8 @@ func TestIssueLifecycleNeedsASession(t *testing.T) {
 	var refused protocol.Refused
 	for name, err := range map[string]error{
 		"comment": c.IssueComment(ctx, issue.ID, protocol.CommentRequest{Text: "快点"}),
-		"merge":   c.IssueMerge(ctx, issue.ID),
-		"cancel":  c.IssueCancel(ctx, issue.ID),
+		"done":    status(c, issue.ID, protocol.IssueStatusDone),
+		"working": status(c, issue.ID, protocol.IssueStatusInProgress),
 		"resolve": c.IssueResolve(ctx, issue.ID),
 	} {
 		if !errors.As(err, &refused) {
@@ -71,9 +71,14 @@ func TestIssueLifecycleNeedsASession(t *testing.T) {
 		t.Errorf("changes before a start: %v", err)
 	}
 	var missing protocol.Missing
-	if err := c.IssueMerge(ctx, "nope"); !errors.As(err, &missing) {
+	if err := status(c, "nope", protocol.IssueStatusDone); !errors.As(err, &missing) {
 		t.Errorf("an issue that is not there: %v", err)
 	}
+}
+
+func status(c *protocol.Client, id string, to protocol.IssueStatus) error {
+	_, err := c.IssueStatus(context.Background(), id, protocol.IssueStatusRequest{Status: to})
+	return err
 }
 
 func TestFreshAgentListHasValidRequiredEnums(t *testing.T) {

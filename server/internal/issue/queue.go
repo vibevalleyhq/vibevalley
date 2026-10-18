@@ -66,3 +66,32 @@ func (is *issues) queuedDispatch(id string) (string, protocol.RunTrigger, error)
 	}
 	return row.Channel, by, nil
 }
+
+// Canceled before it was ever sent: out of the queue and closed as dismissed, in one write.
+func (is *issues) drop(id string) error {
+	if _, err := is.unsent(id); err != nil {
+		return err
+	}
+	ctx := context.Background()
+	tx, err := is.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	q := is.q.WithTx(tx)
+	if err := q.DequeueIssue(ctx, id); err != nil {
+		return err
+	}
+	if err := q.UnqueueIssue(ctx, id); err != nil {
+		return err
+	}
+	dismissed := protocol.IssueCloseDismissed
+	if err := q.CloseIssue(ctx, generated.CloseIssueParams{ClosedAt: issueAt(clock.NowMs()), Closed: issueClosed(&dismissed), ID: id}); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	is.publish(id)
+	return nil
+}

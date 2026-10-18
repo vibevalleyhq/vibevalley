@@ -841,6 +841,9 @@ func (v Issue) MarshalJSON() ([]byte, error) {
 	if p.Sessions == nil {
 		p.Sessions = []string{}
 	}
+	if p.Moves == nil {
+		p.Moves = []IssueStatus{}
+	}
 	return json.Marshal(p)
 }
 
@@ -2227,9 +2230,7 @@ var Endpoints = []Endpoint{
 	{"manager.hear", "POST", "/api/v1/manager/hear", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.comment", "POST", "/api/v1/issues/{id}/comment", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"issue.changes", "GET", "/api/v1/issues/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"issue.merge", "POST", "/api/v1/issues/{id}/merge", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"issue.resolve", "POST", "/api/v1/issues/{id}/resolve", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"issue.cancel", "POST", "/api/v1/issues/{id}/cancel", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"session.stop", "POST", "/api/v1/sessions/{id}/stop", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"session.list", "GET", "/api/v1/sessions", []string{"agent"}, false, []Caller{CallerOwner, CallerRemote}},
 	{"session.get", "GET", "/api/v1/sessions/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2242,9 +2243,7 @@ var Endpoints = []Endpoint{
 	{"issue.update", "PUT", "/api/v1/issues/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.delete", "DELETE", "/api/v1/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.move", "PUT", "/api/v1/issues/{id}/move", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"issue.unqueue", "POST", "/api/v1/issues/{id}/unqueue", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"issue.start", "POST", "/api/v1/issues/{id}/start", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"issue.reopen", "POST", "/api/v1/issues/{id}/reopen", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.status", "PUT", "/api/v1/issues/{id}/status", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"graph.split", "POST", "/api/v1/graphs", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"graph.updateTask", "PUT", "/api/v1/graphs/{id}/tasks/{task}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"graph.deleteTask", "DELETE", "/api/v1/graphs/{id}/tasks/{task}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
@@ -2402,17 +2401,9 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.IssueChanges(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/v1/issues/{id}/merge", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		answer(w, nil, h.IssueMerge(r.Context(), pID))
-	})
 	mux.HandleFunc("POST /api/v1/issues/{id}/resolve", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		answer(w, nil, h.IssueResolve(r.Context(), pID))
-	})
-	mux.HandleFunc("POST /api/v1/issues/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		answer(w, nil, h.IssueCancel(r.Context(), pID))
 	})
 	mux.HandleFunc("POST /api/v1/sessions/{id}/stop", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
@@ -2482,23 +2473,13 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.IssueMove(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/v1/issues/{id}/unqueue", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/issues/{id}/status", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.IssueUnqueue(r.Context(), pID)
-		answer(w, out, err)
-	})
-	mux.HandleFunc("POST /api/v1/issues/{id}/start", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		out, err := h.IssueStart(r.Context(), pID)
-		answer(w, out, err)
-	})
-	mux.HandleFunc("POST /api/v1/issues/{id}/reopen", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		var body ReopenRequest
+		var body IssueStatusRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.IssueReopen(r.Context(), pID, body)
+		out, err := h.IssueStatus(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/v1/graphs", func(w http.ResponseWriter, r *http.Request) {
@@ -2986,16 +2967,8 @@ func (c *Client) IssueChanges(ctx context.Context, pID string) (Changes, error) 
 	return out, err
 }
 
-func (c *Client) IssueMerge(ctx context.Context, pID string) error {
-	return c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/merge", nil, nil, nil)
-}
-
 func (c *Client) IssueResolve(ctx context.Context, pID string) error {
 	return c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/resolve", nil, nil, nil)
-}
-
-func (c *Client) IssueCancel(ctx context.Context, pID string) error {
-	return c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/cancel", nil, nil, nil)
 }
 
 func (c *Client) SessionStop(ctx context.Context, pID string) error {
@@ -3074,21 +3047,9 @@ func (c *Client) IssueMove(ctx context.Context, pID string, body MoveIssueReques
 	return out, err
 }
 
-func (c *Client) IssueUnqueue(ctx context.Context, pID string) (Issue, error) {
+func (c *Client) IssueStatus(ctx context.Context, pID string, body IssueStatusRequest) (Issue, error) {
 	var out Issue
-	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/unqueue", nil, nil, &out)
-	return out, err
-}
-
-func (c *Client) IssueStart(ctx context.Context, pID string) (Dispatched, error) {
-	var out Dispatched
-	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/start", nil, nil, &out)
-	return out, err
-}
-
-func (c *Client) IssueReopen(ctx context.Context, pID string, body ReopenRequest) (Dispatched, error) {
-	var out Dispatched
-	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/reopen", nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/issues/"+url.PathEscape(pID)+"/status", nil, body, &out)
 	return out, err
 }
 

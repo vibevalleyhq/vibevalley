@@ -49,8 +49,14 @@ class Hb {
     body: CommentRequest(text: text),
   );
   Future<void> stop(String id) => _api.session.stop(id: id);
-  Future<void> dismiss(String id) => _api.issue.cancel(id: _issueOf(id));
-  Future<void> harvest(String id) => _api.issue.merge(id: _issueOf(id));
+  Future<void> dismiss(String id) => _api.issue.status(
+    id: _issueOf(id),
+    body: const IssueStatusRequest(status: IssueStatus.canceled),
+  );
+  Future<void> harvest(String id) => _api.issue.status(
+    id: _issueOf(id),
+    body: const IssueStatusRequest(status: IssueStatus.done),
+  );
 
   String _issueOf(String session) => (ref.read(stateProvider)?.sessions ?? const <Session>[]).firstWhere((w) => w.id == session).issueId;
 

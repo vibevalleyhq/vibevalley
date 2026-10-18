@@ -212,7 +212,8 @@ void main() {
     expect(find.text('+body { color: #fff }'), findsOneWidget);
     await tester.tap(find.text('确认收获，合进 main'));
     await settle(tester);
-    expect(routes.calls.last.path, '/api/v1/issues/tw3/merge');
+    expect(routes.calls.last.path, '/api/v1/issues/tw3/status');
+    expect(routes.calls.last.body, {'status': 'done'});
     expect(c.read(reviewingProvider), isNull);
     await tester.pump(const Duration(seconds: 3));
   });

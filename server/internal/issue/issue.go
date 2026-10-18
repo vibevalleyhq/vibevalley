@@ -174,6 +174,7 @@ func issueOf(row generated.Issue, runs []string, state protocol.CoreState) proto
 		out.Rank = row.Rank
 	}
 	out.Status = protocol.IssueStatusOf(out, state)
+	out.Moves = statusMoves(out)
 	return out
 }
 

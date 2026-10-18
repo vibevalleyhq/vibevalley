@@ -40,6 +40,7 @@ Issue _issue(
   IssueClose? closed,
   String? parent,
   IssueGraph? graph,
+  List<IssueStatus> moves = const [],
 }) => Issue(
   id: id,
   number: 1,
@@ -54,6 +55,7 @@ Issue _issue(
   parent: parent,
   graph: graph,
   status: status,
+  moves: moves,
 );
 
 final _closedIssue = _issue('t1', '写打卡', sessions: ['w1'], status: IssueStatus.done, closed: IssueClose.merged);
@@ -83,7 +85,7 @@ Object historyOf(List<Issue> issues, List<Session> sessions) => [
 void main() {
   for (final exists in [true, false]) {
     testWidgets('issue lookup waits for a successful history response before deciding missing: $exists', (t) async {
-      const issue = Issue(id: 'delayed', number: 1, title: '延迟工单', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.todo);
+      const issue = Issue(id: 'delayed', number: 1, title: '延迟工单', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.todo, moves: []);
       final response = Completer<http.Response>();
       final backend = WorkbenchBackend();
       await pumpPage(
@@ -110,6 +112,7 @@ void main() {
       createdAt: 1,
       sessions: ['lost-session'],
       status: IssueStatus.inReview,
+      moves: [],
     );
     final backend = WorkbenchBackend();
     await pumpPage(t, const IssuesPage(id: 'missing'), (r) async {
@@ -135,6 +138,7 @@ void main() {
       createdAt: 0,
       sessions: [],
       status: IssueStatus.inProgress,
+      moves: [],
     );
     expect(isForManager(working), isTrue);
     expect(laneOf(working.status), Lane.working);
@@ -149,6 +153,7 @@ void main() {
       closedAt: 1,
       closed: IssueClose.answered,
       status: IssueStatus.done,
+      moves: [],
     );
     expect(issueTag(answered), IssueTag.answered);
     expect(laneOf(answered.status), Lane.closed);
@@ -196,11 +201,12 @@ void main() {
     expect(issueIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 'w2'), isFalse);
   });
 
-  test('what dragging between lanes does', () {
-    expect(moveOf(Lane.todo, Lane.working), Move.start);
-    expect(moveOf(Lane.waiting, Lane.closed), Move.close);
-    expect(moveOf(Lane.working, Lane.closed), Move.close);
-    expect(moveOf(Lane.closed, Lane.working), Move.reopen);
+  test('what dragging between lanes does: only where the server lets it go', () {
+    const all = IssueStatus.values;
+    expect(moveOf(Lane.todo, Lane.working, all), Move.start);
+    expect(moveOf(Lane.waiting, Lane.closed, all), Move.close);
+    expect(moveOf(Lane.working, Lane.closed, all), Move.close);
+    expect(moveOf(Lane.closed, Lane.working, all), Move.reopen);
     for (final (from, to) in [
       (Lane.todo, Lane.closed),
       (Lane.working, Lane.waiting),
@@ -208,12 +214,13 @@ void main() {
       (Lane.closed, Lane.todo),
       (Lane.todo, Lane.todo),
     ]) {
-      expect(moveOf(from, to), isNull, reason: '$from → $to');
+      expect(moveOf(from, to, all), isNull, reason: '$from → $to');
     }
     expect(laneOf(IssueStatus.canceled), Lane.closed);
     expect(laneOf(IssueStatus.todo), Lane.todo);
-    expect(moveOf(Lane.waiting, Lane.closed, split: true), isNull);
-    expect(moveOf(Lane.closed, Lane.working, split: true), isNull);
+    expect(moveOf(Lane.waiting, Lane.closed, const []), isNull);
+    expect(moveOf(Lane.closed, Lane.working, const [IssueStatus.backlog]), isNull);
+    expect(moveOf(Lane.working, Lane.closed, const [IssueStatus.canceled]), Move.close);
     expect(issueInTask(_issue('t5', 'x', sessions: ['w5'], status: IssueStatus.done, closed: IssueClose.mergedIntoGraph), null), isTrue);
     expect(issueInTask(_closedIssue, null), isFalse);
   });
@@ -317,10 +324,21 @@ void main() {
         createdAt: 0,
         sessions: [],
         status: IssueStatus.backlog,
+        moves: [IssueStatus.todo, IssueStatus.canceled],
       ),
-      const Issue(id: 'a2', number: 1, title: '改文案', project: 'site', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.backlog),
+      const Issue(
+        id: 'a2',
+        number: 1,
+        title: '改文案',
+        project: 'site',
+        priority: Priority.medium,
+        createdAt: 1,
+        sessions: [],
+        status: IssueStatus.backlog,
+        moves: [IssueStatus.todo, IssueStatus.canceled],
+      ),
       _openIssue,
-      _closedIssue,
+      _issue('t1', '写打卡', sessions: ['w1'], status: IssueStatus.done, closed: IssueClose.merged, moves: [IssueStatus.todo]),
     ];
     late ProviderContainer container;
     void changed() => container.read(_issuesNow.notifier).set(issues);
@@ -352,6 +370,7 @@ void main() {
             createdAt: 2,
             sessions: const [],
             status: IssueStatus.backlog,
+            moves: [],
           );
           issues = [item, ...issues];
           changed();
@@ -360,14 +379,20 @@ void main() {
           issues = [issues[1], issues[0], ...issues.skip(2)];
           changed();
           return jsonResponse([for (final i in issues) i.toJson()]);
-        case ('POST', '/api/v1/issues/a1/start'):
+        case ('PUT', '/api/v1/issues/a1/status'):
           issues = [
             for (final i in issues) i.id == 'a1' ? Issue.fromJson({...i.toJson(), 'queuedAt': 3, 'status': 'todo'}) : i,
           ];
           changed();
-          return jsonResponse(const Dispatched(queued: '已经有 6 个帮工在干活了：排上队了，有空地就自动开工').toJson());
-        case ('POST', '/api/v1/issues/t1/reopen'):
-          return jsonResponse(const Dispatched(session: 'w3').toJson());
+          return jsonResponse(issues.firstWhere((i) => i.id == 'a1').toJson());
+        case ('PUT', '/api/v1/issues/t1/status'):
+          return jsonResponse(
+            Issue.fromJson({
+              ...issues.last.toJson(),
+              'status': 'in_progress',
+              'sessions': ['w1', 'w3'],
+            }).toJson(),
+          );
       }
       return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
     }).api;
@@ -432,7 +457,7 @@ void main() {
     expect(toasts.toasts.first.title, '还差一点');
 
     await drag(t.getCenter(find.text('加日志')), t.getCenter(find.text('处理中')) + const Offset(0, 120));
-    expect(writes.last, 'POST /api/v1/issues/a1/start ');
+    expect(writes.last, 'PUT /api/v1/issues/a1/status {"status":"todo"}');
     expect(toasts.toasts.first.title, '排上队了');
     expect(find.text('排队中'), findsOneWidget);
 
@@ -440,7 +465,7 @@ void main() {
     await t.pump();
     await t.tap(find.text('重开').last);
     await settle(t);
-    expect(writes.last, 'POST /api/v1/issues/t1/reopen {"text":"打卡还要记时区"}');
+    expect(writes.last, 'PUT /api/v1/issues/t1/status {"status":"todo","text":"打卡还要记时区"}');
     await t.pumpWidget(const SizedBox.shrink());
     await t.pump(const Duration(seconds: 6));
   });

@@ -87,11 +87,12 @@ Lane laneOf(IssueStatus s) => switch (s) {
 
 enum Move { start, close, reopen }
 
-/// A task's step (`split`) goes with its task: never closed or reopened alone.
-Move? moveOf(Lane from, Lane to, {bool split = false}) => switch ((from, to)) {
-  (Lane.todo, Lane.working) => Move.start,
-  (Lane.working, Lane.closed) || (Lane.waiting, Lane.closed) when !split => Move.close,
-  (Lane.closed, Lane.working) when !split => Move.reopen,
+/// A drop between lanes, if the server lets the issue go there (`Issue.moves`): todo starts or reopens it, done or
+/// canceled closes it. A task's issue has no moves: it goes with its task.
+Move? moveOf(Lane from, Lane to, List<IssueStatus> moves) => switch ((from, to)) {
+  (Lane.todo, Lane.working) when moves.contains(IssueStatus.todo) => Move.start,
+  (Lane.working || Lane.waiting, Lane.closed) when moves.contains(IssueStatus.done) || moves.contains(IssueStatus.canceled) => Move.close,
+  (Lane.closed, Lane.working) when moves.contains(IssueStatus.todo) => Move.reopen,
   _ => null,
 };
 

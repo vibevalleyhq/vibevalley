@@ -25,7 +25,18 @@ void main() {
   );
 
   Future<(ProviderContainer, Routes)> setUpFarm() async {
-    final routes = Routes();
+    final routes = Routes({
+      'PUT /api/v1/issues/tw3/status': const Issue(
+        id: 'tw3',
+        number: 3,
+        title: 'x',
+        priority: Priority.medium,
+        createdAt: 0,
+        sessions: ['w3'],
+        status: IssueStatus.canceled,
+        moves: [],
+      ).toJson(),
+    });
     final c = ProviderContainer(overrides: overrides(state, v, fakeApi(routes)));
     addTearDown(c.dispose);
     c.listen(stateProvider, (_, _) {});
@@ -82,7 +93,7 @@ void main() {
     final (c, routes) = await setUpFarm();
     await use(c, Tool.shovel, 0);
     await use(c, Tool.shovel, 2);
-    expect(routes.paths, ['POST /api/v1/sessions/w1/stop', 'POST /api/v1/issues/tw3/cancel']);
+    expect(routes.paths, ['POST /api/v1/sessions/w1/stop', 'PUT /api/v1/issues/tw3/status']);
     expect(c.read(bedFxProvider).map((f) => f.kind), [BedFxKind.shovel, BedFxKind.shovel]);
   });
 

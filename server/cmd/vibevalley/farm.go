@@ -209,7 +209,7 @@ func usage(w io.Writer, only string) error {
   vibevalley runtime chat <runtime> [--model --effort --resume --cwd -p]
                                              和一个农机直接聊，不经过农场
   vibevalley oar <command> [args...]         smith 的 oar 命令行，农机和农场的一样（oar help 列出命令）
-  vibevalley issue run <id>                  开工，等它交回来，打出改动
+  vibevalley issue run <id>                  备选的挪到待办，等它交回来，打出改动
   vibevalley state [--watch]                 核心状态（GET /api/v1/state）
   vibevalley events                          副作用（GET /api/v1/events）
   vibevalley <group> <op> [参数…] [--json 请求体|-]

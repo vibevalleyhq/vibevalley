@@ -86,7 +86,7 @@ func TestClientErrorsKeepTheirType(t *testing.T) {
 		io.WriteString(w, `{"_tag":"Refused","reason":"排上队了"}`)
 	}))
 	defer srv.Close()
-	_, err := (&protocol.Client{Base: srv.URL}).IssueStart(context.Background(), "t1")
+	_, err := (&protocol.Client{Base: srv.URL}).IssueStatus(context.Background(), "t1", protocol.IssueStatusRequest{Status: protocol.IssueStatusTodo})
 	var refused protocol.Refused
 	if !errors.As(err, &refused) || refused.Reason != "排上队了" {
 		t.Fatalf("%T %v", err, err)

@@ -27,14 +27,14 @@ void main() {
       binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
       SharedPreferences.resetStatic();
     });
-    const issue = Issue(id: 'i', number: 1, title: 'work', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.todo);
-    final server = FakeServer((r) async => jsonResponse(r.url.path.endsWith('/start') ? const Dispatched(session: 's').toJson() : issue.toJson()));
+    const issue = Issue(id: 'i', number: 1, title: 'work', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.todo, moves: []);
+    final server = FakeServer((r) async => jsonResponse(issue.toJson()));
     addTearDown(server.close);
     final sending = IssueSubmission(server.api.issue).start(const IssueRequest(title: 'work', assignee: 'helper'));
     await entered.future.timeout(const Duration(seconds: 2));
     try {
-      expect((await sending.timeout(const Duration(seconds: 1))).session, 's');
-      expect(server.requests.last.url.path, '/api/v1/issues/i/start');
+      expect((await sending.timeout(const Duration(seconds: 1))).id, 'i');
+      expect(server.requests.last.url.path, '/api/v1/issues/i/status');
     } finally {
       release.complete(true);
     }

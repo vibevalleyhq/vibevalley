@@ -93,12 +93,10 @@ void main() {
   });
 
   test('dispatch failure keeps the saved issue and retry updates that same issue', () async {
-    const issue = Issue(id: 'i', number: 1, title: '工作', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.todo);
+    const issue = Issue(id: 'i', number: 1, title: '工作', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.todo, moves: []);
     var starts = 0;
     final server = FakeServer((r) async {
-      if (r.url.path.endsWith('/start')) {
-        return ++starts == 1 ? jsonResponse({'reason': 'dispatch failed'}, 503) : jsonResponse(const Dispatched(session: 's').toJson());
-      }
+      if (r.url.path.endsWith('/status') && ++starts == 1) return jsonResponse({'reason': 'dispatch failed'}, 503);
       return jsonResponse(issue.toJson());
     });
     addTearDown(server.close);
@@ -106,12 +104,12 @@ void main() {
     const request = IssueRequest(title: '工作', project: 'p', assignee: 'helper');
     await expectLater(submission.start(request), throwsA(isA<VibeValleyApiError>()));
     expect(submission.saved?.id, 'i');
-    expect((await submission.start(request)).session, 's');
+    expect((await submission.start(request)).id, 'i');
     expect(server.requests.map((r) => '${r.method} ${r.url.path}'), [
       'POST /api/v1/issues',
-      'POST /api/v1/issues/i/start',
+      'PUT /api/v1/issues/i/status',
       'PUT /api/v1/issues/i',
-      'POST /api/v1/issues/i/start',
+      'PUT /api/v1/issues/i/status',
     ]);
     expect(await IssueSubmission.remembered(), (agent: 'helper', project: 'p'));
   });

@@ -33,11 +33,12 @@ Color? priorityColor(Priority p) => switch (p) {
   Priority.low => Palette.cream300,
 };
 
-void dispatchedNotice(Dispatched got, String issue, ValueChanged<String?> open) {
-  if (got.session != null) {
-    open(issue);
-  } else if (got.queued case final why?) {
-    toasts.add(type: ToastType.info, title: '排上队了', description: why);
+/// Moved to todo: it is either worked already, or waits there for room.
+void dispatchedNotice(Issue got, ValueChanged<String?> open) {
+  if (got.status == IssueStatus.todo) {
+    toasts.add(type: ToastType.info, title: '排上队了', description: '地都满了，有空地就自动开工。');
+  } else {
+    open(got.id);
   }
 }
 
@@ -183,9 +184,14 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         _open(item.id);
         toasts.add(type: ToastType.info, title: '还差一点', description: '选好派哪个帮工、在哪个项目里做，再点「开工」。');
       case (Move.start, TodoCard(:final item)):
-        final got = await runAction(() => _api.issue.start(id: item.id));
+        final got = await runAction(
+          () => _api.issue.status(
+            id: item.id,
+            body: const IssueStatusRequest(status: IssueStatus.todo),
+          ),
+        );
         await _load();
-        if (got != null) dispatchedNotice(got, item.id, _open);
+        if (got != null) dispatchedNotice(got, _open);
       case (Move.close, IssueCard(:final issue, :final session?)):
         await showFarmDialog<void>(
           context,
@@ -203,13 +209,13 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         );
         if (text == null) return;
         final got = await runAction(
-          () => _api.issue.reopen(
+          () => _api.issue.status(
             id: issue.id,
-            body: ReopenRequest(text: text),
+            body: IssueStatusRequest(status: IssueStatus.todo, text: text),
           ),
         );
         await _load();
-        if (got?.session != null) _open(issue.id);
+        if (got != null) _open(issue.id);
       default:
         return;
     }

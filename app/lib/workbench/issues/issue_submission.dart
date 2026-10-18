@@ -60,8 +60,11 @@ class IssueSubmission {
     }
   }
 
-  Future<Dispatched> start(IssueRequest draft) async {
+  Future<Issue> start(IssueRequest draft) async {
     final issue = await save(draft);
-    return api.start(id: issue.id);
+    return api.status(
+      id: issue.id,
+      body: const IssueStatusRequest(status: IssueStatus.todo),
+    );
   }
 }

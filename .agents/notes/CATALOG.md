@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（21 篇）
+## proposed（20 篇）
 
 ### feature
 
@@ -15,7 +15,6 @@
 ### architecture
 
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](proposed/architecture/2026-10-18-tasks-are-dags.md)
-- 2026-10-18 [改工单的状态就是派活](proposed/architecture/2026-10-18-status-is-the-dispatch.md)
 - 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
 - 2026-10-18 [记性有多个来源：照 Hermes 的接口，统一的工具，本地用 SQLite 全文检索](proposed/architecture/2026-10-18-memory-providers.md)
 - 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](proposed/architecture/2026-10-18-memory-in-sqlite.md)
@@ -34,7 +33,7 @@
 - 2026-10-18 [用 VibeValley 开发 VibeValley：Beta 干活，源码试改，Alpha 试包](proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
 - 2026-10-18 [先只用服务端和命令行，让 codex 给 VibeValley 加完一个功能](proposed/process/2026-10-18-a-feature-through-server-and-cli.md)
 
-## implemented（102 篇）
+## implemented（103 篇）
 
 ### feature
 
@@ -83,6 +82,7 @@
 ### architecture
 
 - 2026-10-18 [电话的字幕归这通电话](implemented/architecture/2026-10-18-voice-transcripts-belong-to-call.md)
+- 2026-10-18 [改工单的状态就是派活](implemented/architecture/2026-10-18-status-is-the-dispatch.md)
 - 2026-10-18 [管家的提示开头不变：时间和农场现状挪进最新那条输入，空闲时用同一个开头压缩](implemented/architecture/2026-10-18-stable-prompt-prefix.md)
 - 2026-10-18 [管家分清话是谁说的：来源跟着输入走，帮工和仓库里的字是信息不是指令，收获和管家起的定时要主人点头](implemented/architecture/2026-10-18-source-is-not-instruction.md)
 - 2026-10-18 [扫码登录由平台 SDK 拥有](implemented/architecture/2026-10-18-sdk-owns-login-attempt.md)

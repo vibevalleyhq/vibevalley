@@ -61,9 +61,7 @@
 |---|---|---|---|---|---|
 | `issue.comment` | `POST /api/v1/issues/{id}/comment` | ✓ | ✓ | ✓ |  |
 | `issue.changes` | `GET /api/v1/issues/{id}/changes` | ✓ | ✓ | ✓ |  |
-| `issue.merge` | `POST /api/v1/issues/{id}/merge` | ✓ | ✓ | ✓ |  |
 | `issue.resolve` | `POST /api/v1/issues/{id}/resolve` | ✓ | ✓ |  |  |
-| `issue.cancel` | `POST /api/v1/issues/{id}/cancel` | ✓ | ✓ | ✓ |  |
 | `issue.history` | `GET /api/v1/issues/history` | ✓ | ✓ | ✓ |  |
 | `issue.list` | `GET /api/v1/issues` | ✓ | ✓ |  |  |
 | `issue.get` | `GET /api/v1/issues/{id}` | ✓ | ✓ |  |  |
@@ -72,9 +70,7 @@
 | `issue.update` | `PUT /api/v1/issues/{id}` | ✓ | ✓ |  |  |
 | `issue.delete` | `DELETE /api/v1/issues/{id}` | ✓ | ✓ |  |  |
 | `issue.move` | `PUT /api/v1/issues/{id}/move` | ✓ | ✓ |  |  |
-| `issue.unqueue` | `POST /api/v1/issues/{id}/unqueue` | ✓ | ✓ |  |  |
-| `issue.start` | `POST /api/v1/issues/{id}/start` | ✓ | ✓ | ✓ |  |
-| `issue.reopen` | `POST /api/v1/issues/{id}/reopen` | ✓ | ✓ |  |  |
+| `issue.status` | `PUT /api/v1/issues/{id}/status` | ✓ | ✓ |  |  |
 
 ## session
 

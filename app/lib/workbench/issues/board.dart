@@ -18,8 +18,8 @@ import 'issues_page.dart';
 
 Move? cardMove(BoardCard card, Lane to) => switch (card) {
   TaskCard() || ManagerCard() || MissingSessionCard() => null,
-  TodoCard() => moveOf(card.lane, to),
-  IssueCard(:final issue, :final session) => moveOf(card.lane, to, split: issueInTask(issue, session)),
+  TodoCard(:final item) => moveOf(card.lane, to, item.moves),
+  IssueCard(:final issue) => moveOf(card.lane, to, issue.moves),
 };
 
 class IssueBoard extends StatefulWidget {

@@ -2783,6 +2783,7 @@ class Issue {
     this.task,
     this.schedule,
     required this.status,
+    required this.moves,
   });
 
   factory Issue.fromJson(Map<String, dynamic> j) => Issue(
@@ -2805,6 +2806,7 @@ class Issue {
     task: j['task'] == null ? null : IssueTask.fromJson(j['task'] as Map<String, dynamic>),
     schedule: j['schedule'] == null ? null : j['schedule'] as String,
     status: IssueStatus.fromJson(j['status']),
+    moves: [for (final e in j['moves'] as List) IssueStatus.fromJson(e)],
   );
 
   final String id;
@@ -2826,6 +2828,7 @@ class Issue {
   final IssueTask? task;
   final String? schedule;
   final IssueStatus status;
+  final List<IssueStatus> moves;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -2847,6 +2850,7 @@ class Issue {
     if (task != null) 'task': task!.toJson(),
     if (schedule != null) 'schedule': schedule!,
     'status': status.wire,
+    'moves': [for (final e in moves) e.wire],
   };
 }
 
@@ -5003,14 +5007,16 @@ class MoveIssueRequest {
   Map<String, dynamic> toJson() => {if (before != null) 'before': before!};
 }
 
-class ReopenRequest {
-  const ReopenRequest({required this.text});
+class IssueStatusRequest {
+  const IssueStatusRequest({required this.status, this.text});
 
-  factory ReopenRequest.fromJson(Map<String, dynamic> j) => ReopenRequest(text: j['text'] as String);
+  factory IssueStatusRequest.fromJson(Map<String, dynamic> j) =>
+      IssueStatusRequest(status: IssueStatus.fromJson(j['status']), text: j['text'] == null ? null : j['text'] as String);
 
-  final String text;
+  final IssueStatus status;
+  final String? text;
 
-  Map<String, dynamic> toJson() => {'text': text};
+  Map<String, dynamic> toJson() => {'status': status.wire, if (text != null) 'text': text!};
 }
 
 class GraphActRequest {
@@ -5389,18 +5395,9 @@ class IssueApi {
     return Changes.fromJson(j as Map<String, dynamic>);
   }
 
-  Future<void> merge({required String id}) async {
-    await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/merge', query: {}, body: null);
-  }
-
   /// Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask).
   Future<void> resolve({required String id}) async {
     await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/resolve', query: {}, body: null);
-  }
-
-  /// Sends the newest session home without merging: the issue closes as dismissed.
-  Future<void> cancel({required String id}) async {
-    await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/cancel', query: {}, body: null);
   }
 
   /// One joined read of issues and their real sessions, including explicit missing records.
@@ -5443,20 +5440,11 @@ class IssueApi {
     return [for (final e in j as List) Issue.fromJson(e as Map<String, dynamic>)];
   }
 
-  /// Back to the backlog; an issue is queued by issue.start when there is no room.
-  Future<Issue> unqueue({required String id}) async {
-    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/unqueue', query: {}, body: null);
+  /// Moving an issue is what it does: todo sends it out (or waits for room), done merges, canceled sends its session home,
+  /// todo again after a round or a close is another round with text. Issue.moves lists where it may go.
+  Future<Issue> status({required String id, required IssueStatusRequest body}) async {
+    final j = await _api._call('PUT', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/status', query: {}, body: body.toJson());
     return Issue.fromJson(j as Map<String, dynamic>);
-  }
-
-  Future<Dispatched> start({required String id}) async {
-    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/start', query: {}, body: null);
-    return Dispatched.fromJson(j as Map<String, dynamic>);
-  }
-
-  Future<Dispatched> reopen({required String id, required ReopenRequest body}) async {
-    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/reopen', query: {}, body: body.toJson());
-    return Dispatched.fromJson(j as Map<String, dynamic>);
   }
 }
 

@@ -109,17 +109,8 @@ func (a api) IssueChanges(_ context.Context, id string) (protocol.Changes, error
 	return changes, refused(err)
 }
 
-func (a api) IssueMerge(_ context.Context, id string) error {
-	_, err := a.f.Issue.Merge(id)
-	return refused(err)
-}
-
 func (a api) IssueResolve(_ context.Context, id string) error {
 	return refused(a.f.Issue.Resolve(id))
-}
-
-func (a api) IssueCancel(_ context.Context, id string) error {
-	return refused(a.f.Issue.Cancel(id))
 }
 
 func (a api) SessionStop(_ context.Context, id string) error {
@@ -433,14 +424,6 @@ func (a api) GatePair(ctx context.Context, body protocol.LanPairRequest) (protoc
 
 func (a api) GateMe(ctx context.Context) (protocol.LanDevice, error) { return a.f.Gate.Me(ctx) }
 
-func (a api) IssueReopen(ctx context.Context, id string, body protocol.ReopenRequest) (protocol.Dispatched, error) {
-	session, err := a.f.Issue.Reopen(context.WithoutCancel(ctx), id, body.Text, a.f.Channel.General())
-	if err != nil {
-		return protocol.Dispatched{}, refused(err)
-	}
-	return protocol.Dispatched{Session: &session}, nil
-}
-
 func (a api) IssueList(context.Context) ([]protocol.Issue, error) { return a.f.Issue.List() }
 
 func (a api) IssueHistory(context.Context) ([]protocol.IssueHistory, error) {
@@ -472,11 +455,7 @@ func (a api) IssueMove(_ context.Context, id string, body protocol.MoveIssueRequ
 
 func (a api) IssueDelete(_ context.Context, id string) error { return a.f.Issue.Remove(id) }
 
-func (a api) IssueStart(ctx context.Context, id string) (protocol.Dispatched, error) {
-	got, err := a.f.Issue.Start(context.WithoutCancel(ctx), id, a.f.Channel.General())
+func (a api) IssueStatus(ctx context.Context, id string, body protocol.IssueStatusRequest) (protocol.Issue, error) {
+	got, err := a.f.Issue.SetStatus(context.WithoutCancel(ctx), id, body.Status, body.Text, a.f.Channel.General())
 	return got, refused(err)
-}
-
-func (a api) IssueUnqueue(_ context.Context, id string) (protocol.Issue, error) {
-	return a.f.Issue.Queue(id, false)
 }

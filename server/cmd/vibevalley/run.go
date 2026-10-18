@@ -13,8 +13,9 @@ import (
 // How often `issue run` looks at the issue while it is worked.
 var runPoll = 2 * time.Second
 
-// issueRun is `vibevalley issue run <id>`: start the issue, wait while it is worked, then print its changes. It ends
-// when the issue is queued (no room yet), in review, done or canceled; the issue's last status goes to stderr.
+// issueRun is `vibevalley issue run <id>`: move a backlog issue to todo (issue.status), wait while it waits for room or is
+// worked, then print its changes. One already sent is only waited for. It ends in review, done or canceled; each status
+// it passes goes to stderr.
 func issueRun(ctx context.Context, raw []string) error {
 	a, err := parseArgs(raw)
 	if err != nil {
@@ -24,18 +25,15 @@ func issueRun(ctx context.Context, raw []string) error {
 		return fmt.Errorf("用法：vibevalley issue run <id>")
 	}
 	c, id := client(a), a.words[0]
-	got, err := c.IssueStart(ctx, id)
+	issue, err := c.IssueGet(ctx, id)
 	if err != nil {
 		return err
 	}
-	if got.Queued != nil {
-		fmt.Fprintln(os.Stderr, *got.Queued)
-		return nil
+	if issue.Status == protocol.IssueStatusBacklog {
+		if _, err := c.IssueStatus(ctx, id, protocol.IssueStatusRequest{Status: protocol.IssueStatusTodo}); err != nil {
+			return err
+		}
 	}
-	if got.Session == nil {
-		return fmt.Errorf("%s 交给了管家，看田头", id)
-	}
-	fmt.Fprintf(os.Stderr, "开工了：%s\n", *got.Session)
 	last := protocol.IssueStatus("")
 	for {
 		issue, err := c.IssueGet(ctx, id)
