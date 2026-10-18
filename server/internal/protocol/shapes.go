@@ -713,7 +713,8 @@ type PlotView struct {
 }
 
 type FarmView struct {
-	Level FarmLevel           `json:"level"`
+	Level FarmLevel `json:"level"`
+	// A plot is an issue being worked: keyed by its issue (PlotKey), whoever works it now.
 	Plots map[string]PlotView `json:"plots"`
 }
 

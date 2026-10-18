@@ -79,7 +79,7 @@ Session? stationOf(List<Session> sessions, int station) => station < 0 ? null : 
 
 int? nextClearing(int level) => beds.where((b) => b.unlockLevel != null && b.unlockLevel! > level).firstOrNull?.unlockLevel;
 
-PlotView plotOf(FarmView view, Session? h) => h == null ? const PlotView(crop: Crop.empty) : (view.plots[h.id] ?? const PlotView(crop: Crop.empty));
+PlotView plotOf(FarmView view, Session? h) => h == null ? const PlotView(crop: Crop.empty) : (view.plots[plotKey(h)] ?? const PlotView(crop: Crop.empty));
 
 PlotView lockedPlot(Bed bed, int level) => PlotView(crop: level >= (bed.unlockLevel ?? 1 << 30) ? Crop.flowering : Crop.locked);
 

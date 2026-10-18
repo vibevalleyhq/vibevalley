@@ -73,4 +73,4 @@ Workspace（工作目录，一张大地图）
 
 核心状态里还混着金币和成就；见[提案](../.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)。
 
-还没对上的：核心状态里地的编号还跟着帮工走（`SessionPlay.Station`、`PlotOfSession`），地块详情和工单详情还是两页，项目页还把项目画成一块地；见[一块地是一张在做的工单](../.agents/notes/proposed/architecture/2026-10-18-a-plot-is-an-issue.md)。
+还没对上的：地块详情和工单详情还是两页，项目页还把项目画成一块地；见[一块地是一张在做的工单](../.agents/notes/proposed/architecture/2026-10-18-a-plot-is-an-issue.md)。

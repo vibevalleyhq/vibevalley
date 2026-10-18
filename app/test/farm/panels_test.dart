@@ -71,8 +71,8 @@ void main() {
   final state = farm(sessions: [working, failed], progress: progress, chat: chat, issues: [harvested]);
   final v = view(
     plots: {
-      'w1': const PlotView(crop: Crop.leafy),
-      'w2': const PlotView(
+      'tw1': const PlotView(crop: Crop.leafy),
+      'tw2': const PlotView(
         crop: Crop.withered,
         badge: PlotViewBadge(text: '有虫', tone: BadgeTone.bug),
       ),

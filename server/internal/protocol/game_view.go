@@ -170,10 +170,18 @@ func EffectsOf(before CoreState, fact Fact) []GameEffect {
 	return nil
 }
 
+// The issue a session works is its plot; a session with none (not sent for an issue) is its own.
+func PlotKey(h Session) string {
+	if h.Issue != nil && *h.Issue != "" {
+		return *h.Issue
+	}
+	return h.ID
+}
+
 func ViewOf(state CoreState) FarmView {
 	plots := make(map[string]PlotView, len(state.Sessions))
 	for _, h := range state.Sessions {
-		plots[h.ID] = PlotOfSession(h)
+		plots[PlotKey(h)] = PlotOfSession(h)
 	}
 	return FarmView{Level: FarmLevelOf(state), Plots: plots}
 }

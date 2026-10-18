@@ -4,6 +4,9 @@ import 'dart:math' as math;
 
 import '../gen/vibevalley.dart';
 
+/// A plot is an issue being worked: the farm view keys it by the issue (protocol.PlotKey; keep the two the same).
+String plotKey(Session h) => (h.issue ?? '').isNotEmpty ? h.issue! : h.id;
+
 bool isBusy(Session h) => h.phase is PhaseArriving || h.phase is PhaseWorking;
 
 const _nothing = Doing(action: SessionAction.none, label: '');

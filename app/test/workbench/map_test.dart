@@ -52,6 +52,7 @@ Session _hired(String id, String? project, Phase phase, {double at = 0, Conflict
     hiredAt: at,
     runs: h.runs,
     phase: h.phase,
+    issue: h.issue,
   );
 }
 
@@ -78,7 +79,7 @@ void main() {
           _hired('w5', 'docs', _working),
           _hired('w3', null, const PhaseFailed()),
         ],
-        plots: const {'w1': PlotView(crop: Crop.leafy)},
+        plots: const {'tw1': PlotView(crop: Crop.leafy)},
         issues: [_todo('b2', 'docs', queuedAt: 8), _todo('b1', 'docs', queuedAt: 3), _todo('b3', 'clock-in')],
       );
       expect([for (final i in islands) i.project], ['clock-in', 'docs', 'task-smoke']);
@@ -299,8 +300,8 @@ void main() {
           state,
           view(
             plots: const {
-              'w1': PlotView(crop: Crop.leafy),
-              'w2': PlotView(
+              'tw1': PlotView(crop: Crop.leafy),
+              'tw2': PlotView(
                 crop: Crop.wheat,
                 badge: PlotViewBadge(text: '可收获', tone: BadgeTone.ripe),
               ),
