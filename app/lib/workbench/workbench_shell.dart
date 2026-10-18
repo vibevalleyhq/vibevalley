@@ -6,7 +6,6 @@ import '../data/providers.dart';
 import '../shared/faces.dart';
 import '../gen/vibevalley.dart';
 import '../rules/cast.dart';
-import '../data/ui_state.dart';
 import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
 import 'places.dart';
@@ -78,21 +77,20 @@ class _Rail extends ConsumerWidget {
                     ),
                   ),
                 ),
-                for (final p in Place.values) ...[
+                for (final p in Place.values.where((p) => p != Place.settings)) ...[
                   _Slot(label: '${p.label} · ${p.hint}', framed: p == here, fill: Palette.cream50, onTap: () => context.go(p.path), child: placeIcon(p)),
                   const SizedBox(height: 8),
                 ],
                 const Spacer(),
-                _Slot(label: '回农场', onTap: () => context.go('/'), child: const _Pix('icon-seeds')),
-                const SizedBox(height: 8),
                 _Slot(
-                  label: '设置（钥匙）',
-                  onTap: () {
-                    context.go('/');
-                    ref.read(titleOpenProvider.notifier).show();
-                  },
-                  child: const _Pix('icon-wrench'),
+                  label: '${Place.settings.label} · ${Place.settings.hint}',
+                  framed: here == Place.settings,
+                  fill: Palette.cream50,
+                  onTap: () => context.go(Place.settings.path),
+                  child: placeIcon(Place.settings),
                 ),
+                const SizedBox(height: 8),
+                _Slot(label: '回农场', onTap: () => context.go('/'), child: const _Pix('icon-seeds')),
                 const SizedBox(height: 12),
               ],
             ),

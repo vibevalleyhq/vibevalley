@@ -84,7 +84,7 @@ class PxButton extends StatelessWidget {
           padding: pad,
           decoration: BoxDecoration(
             color: s.hovered ? hover : fill,
-            border: Border.all(color: Palette.bark900, width: 2),
+            border: Border.all(color: pxEdge, width: 2),
             boxShadow: sunk ? null : kitDrop,
           ),
           child: Center(

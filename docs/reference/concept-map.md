@@ -22,7 +22,7 @@
 | 项目 | 大地图上的一座岛 | `/projects`（`workbench/projects`）、`/map/:project` | `ProjectSummary`、`ProjectActivity`、`ProjectLanguages`；帮工在哪个项目、目录、分支是服务端的 `project.Workplace` | `/api/v1/projects` |
 | 帮工档案 | 一种小动物 | `/agents`（`workbench/agents`） | `Agent` | `/api/v1/agents` |
 | 农机 | 农具 | `/runtimes`（`workbench/runtimes`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtimes` |
-| 技能书 | 技能书 | `/skills`（`workbench/skills`） | `Skill` | `/api/v1/skills` |
+| 技能书 | 技能书 | `/settings/skills`（`workbench/skills`） | `Skill` | `/api/v1/skills` |
 | 记性 | 记性 | 档案页和管家页（`workbench/shared/memory_panels.dart`） | `Memory`、`MemoryList` | `/api/v1/memories/{agent}`（管家是 `manager`） |
 | 管家 | 管家 | `/manager`（`workbench/manager`） | `CoreState.Manager`（管家的状态） | `/api/v1/say`、`/api/v1/manager/...` |
 | 工单 | 看板上的卡片 | `/issues`（`workbench/issues`） | `Issue`、`Issue.Sessions`（这张工单用过的帮工） | `/api/v1/issues` |
@@ -35,9 +35,9 @@
 | 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Conversation`（`kind: thread`）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channels/{id}/messages`、`/api/v1/issues/{id}/comment` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Schedule`；它的工单是 `Issue.Schedule` 指着它的那张 | `/api/v1/schedules` |
 | 来电 | 手机来电 | `phone/calls.dart` | `InboxItem`（`StateFrame.Inbox`，从核心状态现算） | |
-| 连接器 | 连接器 | `/connectors`（`workbench/connectors`） | `ConnectorStatus` | `/api/v1/connectors` |
-| 院门 | 院门 | `/gate`（`workbench/gate`） | `LanStatus`、`LanDevice` | `/api/v1/gate` |
-| 语音 | 麦克风 | `/voice`（`workbench/voice`）、`voice/` | `VoiceSettings` | `/api/v1/voice/...` |
+| 连接器 | 连接器 | `/settings/connectors`（`workbench/connectors`） | `ConnectorStatus` | `/api/v1/connectors` |
+| 院门 | 院门 | `/settings/gate`（`workbench/gate`） | `LanStatus`、`LanDevice` | `/api/v1/gate` |
+| 语音 | 麦克风 | `/settings/voice`（`workbench/voice`）、`voice/` | `VoiceSettings` | `/api/v1/voice/...` |
 | 进度、成就 | 金币、连胜、任务与成就 | `farm/achievements.dart` | `Progress`、`LedgerEntry`、`CoreState.Progress` | 帧里的 `progress`，没有单独的接口 |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.Level` | |
 | 地 | 一块地 | 像素村（`village/`） | `SessionPlay.Station`、`PlotView`（`StateFrame.View`） | `/api/v1/say` 的 `bed` |

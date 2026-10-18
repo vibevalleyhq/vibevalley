@@ -10,8 +10,11 @@ import '../shared/widgets.dart';
 import 'catalog_page.dart';
 
 class SpritesShelf extends ConsumerStatefulWidget {
-  const SpritesShelf({super.key, this.id});
+  const SpritesShelf({super.key, this.id, this.tabs});
   final String? id;
+
+  /// The shelf picker, atop the kinds.
+  final Widget? tabs;
 
   @override
   ConsumerState<SpritesShelf> createState() => _SpritesShelfState();
@@ -47,50 +50,25 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
     final nav = Semantics(
       label: '分类',
       container: true,
-      child: PxWindow(
-        paper: Palette.cream50,
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ShelfButton(active: _shelf == 'all', label: '全部', count: pictures.all.length, onTap: () => setState(() => _shelf = 'all')),
-            for (final s in present) _ShelfButton(active: _shelf == s.id, label: s.label, count: counts[s.id] ?? 0, onTap: () => setState(() => _shelf = s.id)),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-              child: Text('${pictures.all.length} 张，切自 design/pixel/raw。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark500)),
-            ),
-          ],
-        ),
+      child: ShelfColumn(
+        tabs: widget.tabs,
+        below: [
+          _ShelfButton(active: _shelf == 'all', label: '全部', count: pictures.all.length, onTap: () => setState(() => _shelf = 'all')),
+          for (final s in present) _ShelfButton(active: _shelf == s.id, label: s.label, count: counts[s.id] ?? 0, onTap: () => setState(() => _shelf = s.id)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Text('${pictures.all.length} 张，切自 design/pixel/raw。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark500)),
+          ),
+        ],
       ),
     );
 
-    final search = PxWindow(
-      paper: Palette.cream50,
-      padding: const EdgeInsets.all(10),
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final find = PxTextInput(
-            value: _query,
-            onChanged: (q) => setState(() => _query = q),
-            placeholder: '找：名字、类别、动物、衣服（熊、雨衣、lang-、icon-……）',
-            icon: 'button-search',
-            semanticLabel: '找素材',
-          );
-          final ground = GroundPick(value: _ground, onChanged: (g) => setState(() => _ground = g));
-          // The ground picker needs about 200 px; under it on a phone.
-          if (box.maxWidth < 480) {
-            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [find, const SizedBox(height: 8), ground]);
-          }
-          return Row(
-            children: [
-              Expanded(child: find),
-              const SizedBox(width: 8),
-              ground,
-            ],
-          );
-        },
-      ),
+    final search = ShelfSearch(
+      query: _query,
+      onChanged: (q) => setState(() => _query = q),
+      placeholder: '找：名字、类别、动物、衣服（熊、雨衣、lang-、icon-……）',
+      ground: _ground,
+      onGround: (g) => setState(() => _ground = g),
     );
 
     final cards = <Widget>[
@@ -135,11 +113,19 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: 240, child: SingleChildScrollView(child: nav)),
+              SizedBox(
+                width: 240,
+                child: SingleChildScrollView(padding: catalogFramed, child: nav),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: ListView(children: gapped([search, ...cards]))),
+              Expanded(
+                child: ListView(padding: catalogFramed, children: gapped([search, ...cards])),
+              ),
               const SizedBox(width: 12),
-              SizedBox(width: 352, child: SingleChildScrollView(child: detail)),
+              SizedBox(
+                width: 352,
+                child: SingleChildScrollView(padding: catalogFramed, child: detail),
+              ),
             ],
           );
         }
@@ -147,13 +133,18 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: 240, child: SingleChildScrollView(child: nav)),
+              SizedBox(
+                width: 240,
+                child: SingleChildScrollView(padding: catalogFramed, child: nav),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: ListView(children: gapped([if (selected != null) detail, search, ...cards]))),
+              Expanded(
+                child: ListView(padding: catalogFramed, children: gapped([if (selected != null) detail, search, ...cards])),
+              ),
             ],
           );
         }
-        return ListView(children: gapped([nav, if (selected != null) detail, search, ...cards]));
+        return ListView(padding: catalogFramed, children: gapped([nav, if (selected != null) detail, search, ...cards]));
       },
     );
   }
@@ -185,8 +176,8 @@ class _ShelfButton extends StatelessWidget {
     onTap: onTap,
     selected: active,
     builder: (context, s) => Container(
+      // No ring per row: stacked rows doubled their lines into a thick bar over the text.
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      foregroundDecoration: pxRing,
       color: active
           ? Palette.leaf300.withValues(alpha: .7)
           : s.hovered

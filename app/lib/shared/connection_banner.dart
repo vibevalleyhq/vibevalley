@@ -64,7 +64,7 @@ class ConnectionBanner extends ConsumerWidget {
                     WidgetSpan(
                       alignment: PlaceholderAlignment.baseline,
                       baseline: TextBaseline.alphabetic,
-                      child: TextLink('院门', underline: true, style: text, onTap: () => context.go('/gate')),
+                      child: TextLink('院门', underline: true, style: text, onTap: () => context.go('/settings/gate')),
                     ),
                     TextSpan(text: remote != null ? '重新扫码。' : '扫码。'),
                   ],

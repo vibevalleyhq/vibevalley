@@ -149,7 +149,7 @@ class _ConnectorsPageState extends ConsumerState<ConnectorsPage> {
           for (final c in ConnectorId.values)
             ListRow(
               active: c == selected,
-              onTap: () => workbenchGo(context, '/connectors/${c.wire}'),
+              onTap: () => workbenchGo(context, '/settings/connectors/${c.wire}'),
               child: Row(
                 children: [
                   if (atlas != null) SpriteIcon('connector-${c.wire}', size: 36),

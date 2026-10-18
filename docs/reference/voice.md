@@ -45,13 +45,13 @@
 
 ## 凭据
 
-Agora 的 App ID 和 App Certificate 在首页「设置」或声音页里填，存在 `$VIBEVALLEY_HOME/settings.json`；也可以写进配置的 `agora.app_id`、`agora.app_certificate`，或者设环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。谁优先见 [server.md](server.md)「设置」。这些都不进仓库。
+Agora 的 App ID 和 App Certificate 在「设置」的「Agora 语音」或「声音」里填，存在 `$VIBEVALLEY_HOME/settings.json`；也可以写进配置的 `agora.app_id`、`agora.app_certificate`，或者设环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。谁优先见 [server.md](server.md)「设置」。这些都不进仓库。
 
-## 配置（`/voice`、`/manager/voice`）
+## 配置（`/settings/voice`、`/manager/voice`）
 
 语音设置存在 `settings.json` 的 `voice`，只存和默认不一样的（页面发整份，服务端存的时候自己去掉和默认一样的），下一通电话生效。页面上一边改一边问 `POST /api/v1/settings/check`，说的就是保存时会被拒的理由。分两处改（[理由](../../.agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)）：
 
-- 工作台的「声音」（`/voice`）配**线路**：凭据和区域、怎么听（识别、语言、断句、打断）、谁接电话（`answer`：管家自己接，或者一个快嘴模型先答、管家旁听派活）。
+- 「设置」里的「声音」（`/settings/voice`）配**线路**：凭据和区域、怎么听（识别、语言、断句、打断）、谁接电话（`answer`：管家自己接，或者一个快嘴模型先答、管家旁听派活）。
 - 管家页的「声音」（`/manager/voice`）配**电话上的管家**：人设、开场白、出错时说的话、音色。
 
 每一段可以用声网托管的，也可以换成自己的服务（微软 Azure、OpenAI 兼容的接口……），自己服务的 key 存在 `settings.json`，页面只看到最后四个字；缺 key 时开始通话就说缺哪个。字段在 `protocol/shapes.go`（`VoiceSettings`，「想」是 `answer`，`VoiceAnswer`），默认在 `protocol/voice.go`（`DefaultVoice`），几个数的范围是 `shapes.go` 开头的共用常量，保存前的检查在 `setting/voice_rules.go`。MiniMax 音色的样音在 `app/assets/voice-samples/`，试听不连网。

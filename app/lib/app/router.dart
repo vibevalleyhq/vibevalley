@@ -13,6 +13,7 @@ import '../workbench/issues/issues_page.dart';
 import '../workbench/manager/manager_page.dart';
 import '../workbench/projects/projects_page.dart';
 import '../workbench/runtimes/runtimes_page.dart';
+import '../workbench/settings/settings_page.dart';
 import '../workbench/skills/skills_page.dart';
 import '../workbench/voice/voice_page.dart';
 import '../workbench/workbench_shell.dart';
@@ -59,23 +60,35 @@ final router = GoRouter(
               path: '/runtimes/:id',
               builder: (_, s) => RuntimesPage(id: s.pathParameters['id']),
             ),
-            GoRoute(path: '/skills', builder: (_, _) => const SkillsPage()),
-            GoRoute(
-              path: '/skills/:id',
-              builder: (_, s) => SkillsPage(id: s.pathParameters['id']),
-            ),
-            GoRoute(path: '/connectors', builder: (_, _) => const ConnectorsPage()),
-            GoRoute(
-              path: '/connectors/:id',
-              builder: (_, s) => ConnectorsPage(id: s.pathParameters['id']),
-            ),
             GoRoute(path: '/projects', builder: (_, _) => const ProjectsPage()),
             GoRoute(
               path: '/projects/:id',
               builder: (_, s) => ProjectsPage(id: s.pathParameters['id']),
             ),
-            GoRoute(path: '/voice', builder: (_, _) => const VoiceSettingsPage()),
-            GoRoute(path: '/gate', builder: (_, _) => const GatePage()),
+            // 设置 holds the server's settings and the pages that are settings too: connectors, skills, voice, the gate.
+            GoRoute(path: '/settings', redirect: (_, _) => SettingsSection.deepseek.path),
+            ShellRoute(
+              builder: (_, state, child) => SettingsShell(section: SettingsSection.of(state.uri.path), child: child),
+              routes: [
+                for (final part in [SettingsSection.deepseek, SettingsSection.agora, SettingsSection.memory, SettingsSection.github])
+                  GoRoute(
+                    path: part.path,
+                    builder: (_, _) => SettingsPartPage(section: part),
+                  ),
+                GoRoute(path: '/settings/connectors', builder: (_, _) => const ConnectorsPage()),
+                GoRoute(
+                  path: '/settings/connectors/:id',
+                  builder: (_, s) => ConnectorsPage(id: s.pathParameters['id']),
+                ),
+                GoRoute(path: '/settings/skills', builder: (_, _) => const SkillsPage()),
+                GoRoute(
+                  path: '/settings/skills/:id',
+                  builder: (_, s) => SkillsPage(id: s.pathParameters['id']),
+                ),
+                GoRoute(path: '/settings/voice', builder: (_, _) => const VoiceSettingsPage()),
+                GoRoute(path: '/settings/gate', builder: (_, _) => const GatePage()),
+              ],
+            ),
             GoRoute(
               path: '/catalog/cursors',
               builder: (_, _) => const CatalogPage(shelf: 'cursors'),

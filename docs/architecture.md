@@ -107,7 +107,7 @@ flowchart LR
 |---|---|
 | `.vibevalley.lock` | 家目录排他租约；同一目录只允许一个服务端，进程退出释放内核锁，文件保留 |
 | `config.json` | 帮工档案、技能书、每台农机的设置。第一次启动时用 protocol 的种子（`server/internal/protocol/seeds.json`） |
-| `settings.json` | 首页「设置」里存的钥匙、语音设置和记性的来源（Nowledge Mem、EverOS 的地址和 key）；只有你能读 |
+| `settings.json` | 「设置」里存的钥匙、语音设置和记性的来源（Nowledge Mem、EverOS 的地址和 key）；只有你能读 |
 | `state.json` | 核心状态，田头、进度、定时和工单除外：帮工、commit 数 |
 | `vibevalley.db` | SQLite：田头、工单和它们的帮工、每次干活（`session_run`）、计划的经过、账本、记性、定时、连接器、院门的设备；运行时新建的行主键是 uuidv7，工单和每条消息另有自己的顺序号（表名是「模块_概念」、单数，结构在 `server/migrations/0001_schema.sql`，一个基线，改表直接改它，旧库删掉重建；库比服务端认识的新就不开）。查询都在 `server/pkg/db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
 | `sessions.json` | 只有服务端需要的：每个帮工的项目目录或 worktree、农机自己的会话 id、最后一轮的完整原话 |
@@ -126,7 +126,7 @@ flowchart LR
 1. `$VIBEVALLEY_HOME/vibevalley.yaml`，或 `--config` 给的文件；
 2. 环境变量，比文件优先：`VIBEVALLEY_` 加上键名，点换成下划线，比如 `session.stall_seconds` 是 `VIBEVALLEY_SESSION_STALL_SECONDS`。三个外家的钥匙用它们自己的名字：`DEEPSEEK_API_KEY`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。
 
-家目录不在文件里：它由 `VIBEVALLEY_HOME` 定，默认 `~/.vibevalley`。写错的数字、不是端口的端口、`--config` 给了却找不到的文件，服务端都不起来。首页「设置」里存的钥匙和语音设置比配置优先。
+家目录不在文件里：它由 `VIBEVALLEY_HOME` 定，默认 `~/.vibevalley`。写错的数字、不是端口的端口、`--config` 给了却找不到的文件，服务端都不起来。「设置」里存的钥匙和语音设置比配置优先。
 
 | 键 | 用途 | 默认 |
 |---|---|---|

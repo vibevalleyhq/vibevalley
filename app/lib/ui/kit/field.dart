@@ -143,19 +143,9 @@ class _InputBox extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: Palette.creamInput,
-        border: Border.all(color: focused ? Palette.leaf500 : Palette.bark900, width: 2),
+        border: Border.all(color: focused ? Palette.leaf500 : pxEdge, width: 2),
       ),
-      child: Container(
-        alignment: height == null ? null : Alignment.centerLeft,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        foregroundDecoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Palette.cream300, width: 2),
-            left: BorderSide(color: Palette.cream300, width: 2),
-          ),
-        ),
-        child: child,
-      ),
+      child: Container(alignment: height == null ? null : Alignment.centerLeft, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), child: child),
     ),
   );
 }

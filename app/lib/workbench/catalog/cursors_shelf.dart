@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ui/kit/kit.dart';
 import 'catalog_page.dart';
-import 'sprites_shelf.dart';
 
 /// Null when the app was built without them.
 final cursorsProvider = FutureProvider<Map<String, ({double hx, double hy})>?>((ref) async {
@@ -22,7 +21,8 @@ final cursorsProvider = FutureProvider<Map<String, ({double hx, double hy})>?>((
 });
 
 class CursorsShelf extends ConsumerStatefulWidget {
-  const CursorsShelf({super.key});
+  const CursorsShelf({super.key, this.tabs});
+  final Widget? tabs;
 
   @override
   ConsumerState<CursorsShelf> createState() => _CursorsShelfState();
@@ -30,16 +30,39 @@ class CursorsShelf extends ConsumerStatefulWidget {
 
 class _CursorsShelfState extends ConsumerState<CursorsShelf> {
   Ground _ground = Ground.check;
+  String _query = '';
 
   @override
   Widget build(BuildContext context) {
     final cursors = ref.watch(cursorsProvider);
-    final all = cursors.value;
-    return ListView(
-      children: [
+    final q = _query.trim().toLowerCase();
+    final all = cursors.value == null
+        ? null
+        : {
+            for (final e in cursors.value!.entries)
+              if (q.isEmpty || e.key.toLowerCase().contains(q)) e.key: e.value,
+          };
+    return shelfLayout(
+      context,
+      left: ShelfColumn(
+        tabs: widget.tabs,
+        below: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Text('鼠标在农场里的样子：平时、指着能点的、拿着工具时。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark500)),
+          ),
+        ],
+      ),
+      body: [
+        ShelfSearch(
+          query: _query,
+          onChanged: (v) => setState(() => _query = v),
+          placeholder: '找：指针的名字（glove、water、harvest……）',
+          ground: _ground,
+          onGround: (g) => setState(() => _ground = g),
+        ),
         PxCard(
           title: '指针 · ${all?.length ?? 0}',
-          aside: GroundPick(value: _ground, onChanged: (g) => setState(() => _ground = g)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,

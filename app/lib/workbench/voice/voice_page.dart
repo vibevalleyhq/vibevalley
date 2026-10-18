@@ -594,7 +594,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
               WidgetSpan(
                 alignment: PlaceholderAlignment.baseline,
                 baseline: TextBaseline.alphabetic,
-                child: TextLink('声音', style: KitText.xs, onTap: () => workbenchGo(context, '/voice')),
+                child: TextLink('声音', style: KitText.xs, onTap: () => workbenchGo(context, '/settings/voice')),
               ),
               const TextSpan(text: '页。'),
             ],

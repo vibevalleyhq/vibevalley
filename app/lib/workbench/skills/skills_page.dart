@@ -13,7 +13,7 @@ import '../../rules/seeds.dart';
 
 const _installed = 'installed:';
 
-String _skillPath([String? id]) => id == null ? '/skills' : '/skills/${Uri.encodeComponent(id)}';
+String _skillPath([String? id]) => id == null ? '/settings/skills' : '/settings/skills/${Uri.encodeComponent(id)}';
 
 bool _matches(String query, List<String?> texts) {
   final hay = texts.whereType<String>().join('\n').toLowerCase();

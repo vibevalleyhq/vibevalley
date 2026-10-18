@@ -4,14 +4,38 @@ import '../../audio/sfx.dart';
 import '../../ui/kit/kit.dart';
 import 'catalog_page.dart';
 
-class SoundsShelf extends StatelessWidget {
-  const SoundsShelf({super.key});
+class SoundsShelf extends StatefulWidget {
+  const SoundsShelf({super.key, this.tabs});
+  final Widget? tabs;
+
+  @override
+  State<SoundsShelf> createState() => _SoundsShelfState();
+}
+
+class _SoundsShelfState extends State<SoundsShelf> {
+  String _query = '';
+
+  bool _matches(String group, String name) {
+    final q = _query.trim().toLowerCase();
+    return q.isEmpty || [group, name, soundLabel[name] ?? ''].any((w) => w.toLowerCase().contains(q));
+  }
 
   @override
   Widget build(BuildContext context) {
     final mono = KitText.mono.copyWith(fontSize: 12, color: Palette.bark800);
-    return ListView(
-      children: gapped([
+    return shelfLayout(
+      context,
+      left: ShelfColumn(
+        tabs: widget.tabs,
+        below: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Text('农场里的每个声音，点一下就能听。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark500)),
+          ),
+        ],
+      ),
+      body: [
+        ShelfSearch(query: _query, onChanged: (v) => setState(() => _query = v), placeholder: '找：声音的名字或分组（浇水、院子、coin……）'),
         PxCard(
           child: Text.rich(
             TextSpan(
@@ -27,11 +51,16 @@ class SoundsShelf extends StatelessWidget {
           ),
         ),
         for (final g in soundGroups)
-          PxCard(
-            title: g.title,
-            child: Wrap(spacing: 8, runSpacing: 8, children: [for (final name in g.names) _SoundButton(name: name)]),
-          ),
-      ]),
+          if ([
+                for (final name in g.names)
+                  if (_matches(g.title, name)) name,
+              ]
+              case final names when names.isNotEmpty)
+            PxCard(
+              title: g.title,
+              child: Wrap(spacing: 8, runSpacing: 8, children: [for (final name in names) _SoundButton(name: name)]),
+            ),
+      ],
     );
   }
 }

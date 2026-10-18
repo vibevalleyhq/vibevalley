@@ -6,12 +6,10 @@ enum Place {
   map('地图', '每个项目一座岛', 'icon-map', '/map'),
   agents('帮工', '帮工档案', 'raccoon-farmer-down', '/agents'),
   runtimes('农具', '机器上的编码 agent', 'machine-tractor', '/runtimes'),
-  skills('技能书', '技能', 'icon-skillbook', '/skills'),
-  connectors('连接器', '微信 飞书 QQ', 'icon-pigeon', '/connectors'),
   projects('项目', '代码库', 'icon-deed', '/projects'),
-  voice('声音', 'Agora 语音', 'act-speaking_text', '/voice'),
-  gate('院门', '手机和别的电脑', 'icon-shed', '/gate'),
-  catalog('图鉴', '素材', 'icon-log', '/catalog');
+  catalog('图鉴', '素材：农场用的每张图、每个指针、每个声音', 'icon-log', '/catalog'),
+  // Last, and drawn at the bottom of the bar (workbench_shell) rather than with the others.
+  settings('设置', '钥匙、记性、连接器、技能、声音、院门', 'icon-wrench', '/settings');
 
   const Place(this.label, this.hint, this.icon, this.path);
   final String label;
