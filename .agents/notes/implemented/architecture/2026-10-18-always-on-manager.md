@@ -19,7 +19,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 | 5 | 来源和指令分开；收获、新定时要主人点头 | 26:28、11:13 | 做了：第 1–4 节；第 5 节（管家不是主人叫醒时定的重复定时、直接派帮工的定时，等主人点「同意」）和 `by` 一起，迁移是 `0006_schedule_by.sql` | [分清话是谁说的](../../implemented/architecture/2026-10-18-source-is-not-instruction.md) |
 | 6 | 一轮做到一半时重启，接着做 | 16:17 | 做了：开机时对话没做完、不到 30 分钟就接着那一轮，做到一半的工具补「不知道做没做成」；叫停的不接 | 本篇[第 6 节](#6-重启后接着做完那一轮) |
 | 7 | 发消息不带唯一的键，重试会发两条 | 15:26 | 做了 | 本篇[第 7 节](#7-发消息带-sendkey) |
-| 8 | 关于主人的事实所有 agent 共享 | 32:50 | 归记忆的提案 | [记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)、[记性有多个来源](../../proposed/architecture/2026-10-18-memory-providers.md) |
+| 8 | 关于主人的事实所有 agent 共享 | 32:50 | 归记忆的提案 | [记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)、[记性有多个来源](2026-10-18-memory-providers.md) |
 | 9 | 管家的错变成评测 | 36:05 | 做了 | [管家的错变成评测](../../implemented/architecture/2026-10-18-manager-evals.md) |
 | 10 | 帮工的长汇报整段进管家的上下文 | 28:46 | 做了 | 本篇[第 10 节](#10-长汇报不整段进管家) |
 | — | 主动找主人 | 00:49、11:13 | 做了：`cron`、管家自己定回头看、`by` 和待批的定时 | 本篇[主动找主人：靠定时](#主动找主人靠定时) |
@@ -181,7 +181,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 
 ### 8. 共享的主人画像
 
-归[记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)（画像的表、上限、只在会话打开和压缩后取一次）和[记性有多个来源](../../proposed/architecture/2026-10-18-memory-providers.md)（`SystemPromptBlock`），本篇不另设计。两条和本篇有关的约束已经写在那里或本篇：画像在两次压缩之间不改系统提示（[提示开头不变](../../implemented/architecture/2026-10-18-stable-prompt-prefix.md)第 1 节的 `MemoryNews`）；画像的标题写明是信息、不是指令（[分清话是谁说的](../../implemented/architecture/2026-10-18-source-is-not-instruction.md)第 4 节）。
+归[记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)（画像的表、上限、只在会话打开和压缩后取一次）和[记性有多个来源](2026-10-18-memory-providers.md)（`SystemPromptBlock`），本篇不另设计。两条和本篇有关的约束已经写在那里或本篇：画像在两次压缩之间不改系统提示（[提示开头不变](../../implemented/architecture/2026-10-18-stable-prompt-prefix.md)第 1 节的 `MemoryNews`）；画像的标题写明是信息、不是指令（[分清话是谁说的](../../implemented/architecture/2026-10-18-source-is-not-instruction.md)第 4 节）。
 
 ### 9. 管家的错变成评测
 

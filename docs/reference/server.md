@@ -197,7 +197,7 @@
 - **记下**：汇报里「记住：」开头的行记成这个项目的，「记住（所有项目）：」记成所有项目的；差不多的不重复记。叫停的一轮不记。
 - 读不出、写不进只记日志，不拦着那一轮。
 - **主动查、主动记**：开工想起和收「记住：」之外，帮工经 `/mcp` 的 `memory_search`、`memory_add` 查和记自己档案的记性：档案和项目由会话的令牌定（查这个项目的和所有项目的，`all_projects` 也查别的项目；记成这个项目的，`all_projects` 记成所有项目的），写别的档案被拒。管家的同名工具能查任何档案（不填就是所有档案）、替任何档案记一句；管家自己的记性照旧用 `remember`。两边都经管理器的 `Search`、`Write`，问遍所有来源，各来源的结果轮流取、几乎一样的只留一条，默认 10 条；本地的按全文索引的 `bm25()`、共有的词和整句出现排，同项目的在前。
-- **来源**：记性经 `memory/providers.go` 的管理器读写：本地的这张表（`memory/local.go`）一直在，外面的来源在「设置」的「记性」里接（`settings.json` 的 `memorySources`，一种一个：地址、key、接没接上、读、写），存了就用上，不用重启。接口在 `memory/provider.go`，照 Hermes 的 `MemoryProvider`（[提案](../../.agents/notes/proposed/architecture/2026-10-18-memory-providers.md)）。本地记忆的 id 照旧，别的来源的 id 带上它的名字（`名字:id`）。
+- **来源**：记性经 `memory/providers.go` 的管理器读写：本地的这张表（`memory/local.go`）一直在，外面的来源在「设置」的「记性」里接（`settings.json` 的 `memorySources`，一种一个：地址、key、接没接上、读、写），存了就用上，不用重启。接口在 `memory/provider.go`，照 Hermes 的 `MemoryProvider`（[提案](../../.agents/notes/implemented/architecture/2026-10-18-memory-providers.md)）。本地记忆的 id 照旧，别的来源的 id 带上它的名字（`名字:id`）。
   - **读**（开工想起、`memory_search`、记性页签）同时问所有来源，外面的最多等 2 秒，等不到就不等，日志里记一句跳过了它。几个来源的结果轮流取（各家的分数比不了），几乎一样的只留一条，开工想起照旧最多 8 条、1600 字；只有合并后真放进话里的本地记忆才算想起过一次。
   - **写**：本地的当场写好；外面的放在后台一个接一个地送，收工和记一条都不等它们，送不成只记日志。送出去的字先过 `base.Redact`（和服务端日志同一份规则，上文「设置」）。
   - **Nowledge Mem**（`memory/nowledge.go`，本机 `http://127.0.0.1:14242/mcp/`，MCP）：读用它的 `memory_search`，写用 `memory_add`（汇报里「记住：」的那几行，和主人、管家、帮工经 `memory_add` 记的），别的工具不调。写进去的带 label：`vibevalley`、`vibevalley-agent-<档案>`、这个项目的再加 `vibevalley-project-<项目>`，`source_app` 是 `vibevalley`；读的时候只读这个档案的 label。设置里打开「读全部」才读主人在它里面的全部记忆，每个档案读到的都一样。它里面的记忆页签上列得出、忘不掉：要删到 Nowledge Mem 里删。

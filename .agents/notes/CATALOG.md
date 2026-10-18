@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（15 篇）
+## proposed（14 篇）
 
 ### feature
 
@@ -16,7 +16,6 @@
 
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](proposed/architecture/2026-10-18-tasks-are-dags.md)
 - 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
-- 2026-10-18 [记性有多个来源：照 Hermes 的接口，统一的工具，本地用 SQLite 全文检索](proposed/architecture/2026-10-18-memory-providers.md)
 - 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](proposed/architecture/2026-10-18-memory-in-sqlite.md)
 - 2026-10-17 [Session、Run、事件：一个 agent loop 的日志，和消息之间只有两个口子](proposed/architecture/2026-10-17-session-run-step.md)
 - 2026-10-17 [管家是一份档案，只是能力多](proposed/architecture/2026-10-17-manager-is-an-agent.md)
@@ -28,7 +27,7 @@
 
 - 2026-10-18 [用 VibeValley 开发 VibeValley](proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
 
-## implemented（110 篇）
+## implemented（111 篇）
 
 ### feature
 
@@ -84,6 +83,7 @@
 - 2026-10-18 [RTC 授予拥有这通电话的应用身份](implemented/architecture/2026-10-18-rtc-grant-owns-application.md)
 - 2026-10-18 [查询带齐真实关联，创建返回自己的身份](implemented/architecture/2026-10-18-query-results-and-created-identities.md)
 - 2026-10-18 [档案事务拥有可修改的工作集](implemented/architecture/2026-10-18-profile-transactions-own-snapshots.md)
+- 2026-10-18 [记性有多个来源：照 Hermes 的接口，统一的工具，本地用 SQLite 全文检索](implemented/architecture/2026-10-18-memory-providers.md)
 - 2026-10-18 [管家的错变成评测：主人标出做错的一轮，存成样例，改提示前后用真模型重放](implemented/architecture/2026-10-18-manager-evals.md)
 - 2026-10-18 [主接口的本机身份和就绪顺序归宿主](implemented/architecture/2026-10-18-local-server-lifetime.md)
 - 2026-10-18 [安装选择是探测输入，执行沿用已接受的身份](implemented/architecture/2026-10-18-installation-identity-is-explicit.md)

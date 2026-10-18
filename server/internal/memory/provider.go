@@ -8,7 +8,7 @@ import (
 
 // One place memories live: this farm's database, or a memory service outside it (Nowledge Mem, EverOS). Modeled on Hermes's
 // MemoryProvider (agent/memory_provider.py); its names are in the comments. Only what something calls is here: a hook comes with
-// its first caller (.agents/notes/proposed/architecture/2026-10-18-memory-providers.md lists the rest).
+// its first caller (.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md lists the rest).
 type provider interface {
 	// name. Prefixes the ids of the memories it gives, except the local one's: theirs were there before any other.
 	Name() string

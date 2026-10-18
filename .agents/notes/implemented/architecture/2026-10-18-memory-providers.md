@@ -1,6 +1,6 @@
 # Agent Note: 记性有多个来源：照 Hermes 的接口，统一的工具，本地用 SQLite 全文检索
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
@@ -19,7 +19,7 @@ Status: proposed
 - 帮工只在开工时被动拿到几条，干到一半想查「这个项目的测试怎么跑」没有办法。原来否决过给帮工记忆工具，理由是「要靠它记得去调」；可自动想起和工具并不冲突，而管家本来就有 `remember`、`search_archive`。
 - `pick` 按「相邻的两个汉字」和拉丁字母的词数共有的词，不看词频，也分不出「测试」是一个词。
 
-## Proposal
+## Decision
 
 ### 1. 一个来源的接口，照 Hermes 的 `MemoryProvider`
 
@@ -55,7 +55,7 @@ type provider interface {
 - `Scope` 是 `Owner`、`Agent`、`Project`、`Session`，各来源自己翻译：EverOS 是 `user_id`、`agent_id`、`project_id`、`session_id`，`app_id` 固定 `vibevalley`；Nowledge 是 `agent_id`，项目做 label，`source_app` 固定 `vibevalley`。
 - `SyncTurn` 给全部材料：「记住：」的行、汇报、这一轮的对话。各来源拿自己要的：本地收那几行和做过的活，Nowledge 用 `memory_add` 收那几行，EverOS 把对话交给 `memory/add`，会话结束时在 `OnSessionEnd` 里 `flush`。
 - `Recalled` 带来源的名字和分数，供合并和页签显示。
-- 记忆分四类，和 Hermes 一样（[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)第 1 节）：精选记忆（`profile`、`note`）、经过（`issue`、`episode`）、技能、外接来源。`SearchQuery` 带 `Kind`，各来源照自己的东西翻译：
+- 记忆分四类，和 Hermes 一样（[记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)第 1 节）：精选记忆（`profile`、`note`）、经过（`issue`、`episode`）、技能、外接来源。`SearchQuery` 带 `Kind`，各来源照自己的东西翻译：
 
   | 我们的种类 | 本地 | Nowledge Mem | EverOS |
   |---|---|---|---|
@@ -64,7 +64,7 @@ type provider interface {
   | `issue`、`episode` | `memory` 表 | `thread_search`、`thread_fetch_messages` | episodes |
   | 技能 | 技能书（不经这个接口） | `find_skills`（不经这个接口） | agent 的 skills（不经这个接口） |
 
-  某一类一家没有，就对那一类回空。技能不经这个接口：它要主人批才生效，走技能书（[先采样，再验收](2026-10-14-sample-then-verify.md)第 4 步）。
+  某一类一家没有，就对那一类回空。技能不经这个接口：它要主人批才生效，走技能书（[先采样，再验收](../../proposed/architecture/2026-10-14-sample-then-verify.md)第 4 步）。
 - 现有的 `RecallCue`、`FinishedRun`（`server/internal/memory/types.go`）扩成这里的形状。
 
 Hermes 有、这次不要的：`on_turn_start`（我们的单位是 run，不是对话的一轮）、`on_pre_compress`（压缩是各家农机自己的事，服务端看不到）、`on_session_switch` 和 `identity_signature`（一个进程服务多个会话、多个人是 Hermes 网关的场景）、`on_delegation`（计划拆出的是子工单，各有自己的 run）、`recall_status`（`Recalled` 带来源就够）、`save_config` 和 `backup_paths`（配置在 `settings.json`，备份就是家目录）。
@@ -94,7 +94,7 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 
 ### 4. 本地来源：SQLite，FTS5 的 `bm25()`，gse 切词
 
-表结构、索引、排序和搬家写在[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)；这里只留选型。
+表结构、索引、排序和搬家写在[记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)；这里只留选型。
 
 - **还用 SQLite**，形状照 Nowledge 扩：`title`、`labels`、`importance`、类型（记下的话、做过的活、偏好、流程……）、谁记的、取代了哪条（`supersede`，原来「差不多就不记」改成新的取代旧的）。表结构的改动照规矩加一个迁移，表名照「模块_概念」。
 - **检索**：一张 FTS5 的虚表放切好的词，`bm25()` 排序，再叠上现有的偏好（这个项目先于所有项目，新的先于旧的）。`modernc.org/sqlite` v1.60.1（SQLite 3.53.4）自带 FTS5 和 `bm25()`，2026-10-18 测过。
@@ -107,7 +107,7 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 
 ### 5. 管家的记性和主人画像也进本地来源
 
-本地来源的表、索引、查询和搬家见[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)：管家的 `MEMORY.md` 拆成所有 agent 共享的主人画像和管家自己的记忆，都在同一张表里，由本地来源的 `SystemPromptBlock` 给出（对应 Hermes 内置的 `USER.md` 和 `MEMORY.md`）。以后把外面来源里关于主人的部分（Nowledge 的 `read_context_bundle`、EverOS 的 user profile）也经 `SystemPromptBlock` 拼进去，那一步不在本提案里。
+本地来源的表、索引、查询和搬家见[记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)：管家的 `MEMORY.md` 拆成所有 agent 共享的主人画像和管家自己的记忆，都在同一张表里，由本地来源的 `SystemPromptBlock` 给出（对应 Hermes 内置的 `USER.md` 和 `MEMORY.md`）。以后把外面来源里关于主人的部分（Nowledge 的 `read_context_bundle`、EverOS 的 user profile）也经 `SystemPromptBlock` 拼进去，那一步不在本提案里。
 
 ### 步骤
 
@@ -120,9 +120,9 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 
 ### 做到哪了
 
-2026-10-18 做了第 1 步的接口那一半：`server/internal/memory/provider.go` 是接口，`providers.go` 是管理器，`local.go` 把原来的 `memories` 包成本地来源，行为不变（`internal/session` 和处理函数没改）。接口里只放了现在有人调的方法（`Name`、`Available`、`OnStart`、`OnStop`、`Prefetch`、`SyncTurn`、`List`、`Add`、`Forget`），其余的等第一个调用的人来了再加：`go:deadcode` 不留只靠测试活着的方法。已知的缺口：几个来源一起想起时，本地挑出、合并时又被挤掉的那几条，也记成了想起过；只有本地一个来源时不会发生，接第二个来源时改成合并之后再记。本地的存法（迁移、FTS5、gse）还没做，见[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)。
+2026-10-18 做了第 1 步的接口那一半：`server/internal/memory/provider.go` 是接口，`providers.go` 是管理器，`local.go` 把原来的 `memories` 包成本地来源，行为不变（`internal/session` 和处理函数没改）。接口里只放了现在有人调的方法（`Name`、`Available`、`OnStart`、`OnStop`、`Prefetch`、`SyncTurn`、`List`、`Add`、`Forget`），其余的等第一个调用的人来了再加：`go:deadcode` 不留只靠测试活着的方法。已知的缺口：几个来源一起想起时，本地挑出、合并时又被挤掉的那几条，也记成了想起过；只有本地一个来源时不会发生，接第二个来源时改成合并之后再记。本地的存法（迁移、FTS5、gse）还没做，见[记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)。
 
-第 2 步做了：接口多了 `Search`，管理器的 `Search` 并行问所有来源（外面的照样最多等 2 秒），各来源的分数不能比，所以按名次轮流取，几乎一样的（`memoryLikeness` ≥ 0.8）只留一条，默认 10 条；本地的检索是 `recall.go` 的纯函数 `search`（共有的词、整句出现，同项目的在前）；后来加上了全文索引的 `bm25()`（[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)的「做到哪了」）。管家的 `memory_search`、`memory_add` 在 `manager/tools.go`，帮工的在 `mcp/mcp.go`，回给模型的话都由 `memory.FoundText` 拼。和提案不一样的：管家的 `memory_add` 只替帮工档案记，管家自己的照旧 `remember`（管家的记性还在 `MEMORY.md`，等[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)第 4 步）；`memory_replace`、`memory_remove` 也等那一步；`SearchQuery` 有 `Kind`，工具还没给模型这个参数。
+第 2 步做了：接口多了 `Search`，管理器的 `Search` 并行问所有来源（外面的照样最多等 2 秒），各来源的分数不能比，所以按名次轮流取，几乎一样的（`memoryLikeness` ≥ 0.8）只留一条，默认 10 条；本地的检索是 `recall.go` 的纯函数 `search`（共有的词、整句出现，同项目的在前）；后来加上了全文索引的 `bm25()`（[记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)的「做到哪了」）。管家和帮工的 `memory_search`、`memory_add` 都在 `internal/tool/memory.go`（按调用者选写法），回给模型的话都由 `memory.FoundText` 拼。和提案不一样的：管家的 `memory_add` 只替帮工档案记，管家自己的照旧 `remember`（管家的记性还在 `MEMORY.md`，等[记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)第 4 步）；`memory_replace`、`memory_remove` 也等那一步；`SearchQuery` 有 `Kind`，工具还没给模型这个参数。
 
 第 3 步做了：`memory/nowledge.go` 用 go-sdk 的 MCP 客户端（Streamable HTTP，不开常驻的 SSE），第一次用时才连，连不上下次再连；SDK 的请求不随 ctx 结束（它把连接的 ctx 摘开了），所以调用方到点就不等，请求本身由 HTTP 客户端的 30 秒超时收掉。2026-10-18 对主人本机的 Nowledge Mem 0.10.103 只调过 `initialize`、`tools/list` 和只读的 `memory_search`：它有 75 个工具，我们只用 `memory_search`（`query`、`limit` ≤ 20、`filter_labels`、`source_app`；回 `results[]` 的 `memory_id`、`title`、`content_preview`、`relevance_score`）和 `memory_add`（`content`、`title`、`labels`、`source_app`）。来源在设置里（`settings.json` 的 `memorySources`），存了就用上；接口加了 `Can()`，记性页签按它显示，`MemoryList` 多了 `sources`、`Memory` 多了 `source`。抹密钥的规则在 `base/redact.go`，服务端日志（`cmd/server` 的 `log.SetOutput`）和发往外面来源的字都过它：原来服务端日志并没有抹密钥的规则，这一步一起加上。「做到哪了」里的缺口修了：本地来源的 `Prefetch` 不再记想起过，管理器合并以后只给真放进话里的本地记忆记一次；合并也从按分数排改成各来源轮流取，因为各家的分数比不了（本地的是名次，Nowledge 的是 0 到 1）。
 
@@ -140,7 +140,7 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 - 一轮之外记的一句（页签、`memory_add`）也送：当成主人和档案的两句对话，马上 flush，不然 EverOS 不提炼。
 - 没照它的 `/health` 调检索方法（没有向量模型时改 keyword）：检索出错就跳过、记日志；它的 profile 和 skills 不读（profile 等 `SystemPromptBlock`，skills 走技能书）。
 
-还没做的：Nowledge 的 `read_context_bundle`、EverOS 的 user profile 拼进 `SystemPromptBlock`（第 5 节说过不在本提案里）；设置里每个来源按农机排除（风险第一条）；本地来源的 SQLite 改造做了迁移、FTS5 和 gse（第 4 节），画像、管家的记性和经过还没做（[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)第 4、5 步）。
+四步都做了。还没做的并进了[记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)「还要做的」：画像、管家的记性和经过，`SystemPromptBlock`，来源自带的工具，按农机排除来源。
 
 ## Alternatives considered
 
@@ -158,7 +158,7 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 
 **给帮工的记忆工具也取代自动想起。** 那就要靠帮工记得去查，接不了 MCP 的农机就没有记性了；两条都留。
 
-## Acceptance criteria
+## Verification
 
 - `internal/session`、`internal/manager`、`internal/mcp` 和记性页签只经管理器碰记性，不知道有几个来源、存在哪。
 - 本地来源：「测试」「提交」「refreshSession」「表名单数」都能搜到对应的记忆，`bm25()` 排在前面的是更相关的；`go test ./internal/memory` 覆盖这几条。
@@ -168,7 +168,7 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 - 接上本机的 Nowledge Mem：帮工收工时它的「记住：」进了 Nowledge，下回开工 `memory_search` 能从 Nowledge 取回（照 `verify-server`）。
 - `go vet ./... && go test ./...`、`bun run go:deadcode`、`bun run flutter:check`、`bun run docs:verify` 通过。
 
-## Risks
+## Consequences
 
 - 帮工的农机自己也接了同一个记忆服务（EverOS 给 DeepSeek Harness、Hermes 都做了插件）时，农场再写一份就记两遍。设置里每个来源可以按农机排除。
 - 发往外面来源的对话里可能有密钥；抹密钥的规则漏了，就会存进别人的库。规则和服务端日志共用一份，并补测试。

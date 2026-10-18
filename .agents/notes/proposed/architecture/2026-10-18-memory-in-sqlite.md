@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-[记性有多个来源](2026-10-18-memory-providers.md)定了本地来源用 SQLite，没写到表、索引、查询和搬家这一层。记忆现在分在两处：
+[记性有多个来源](../../implemented/architecture/2026-10-18-memory-providers.md)定了本地来源用 SQLite，没写到表、索引、查询和搬家这一层。记忆现在分在两处：
 
 | 什么 | 存在哪 | 怎么进提示 |
 |---|---|---|
@@ -27,7 +27,7 @@ Status: proposed
 | 精选记忆：`USER.md`（主人画像）、`MEMORY.md`（agent 的笔记），冻结着拼进提示 | `profile` 和 `note` | 本篇的 `memory` 表 |
 | 翻以前的会话：`session_search`，FTS5 检索历史会话，再调一次 LLM 总结 | `issue`（每个 Session 一份总结）和 `episode`（每次干活的经过），`memory_search` 带 `kind` 翻；不另调模型 | 本篇的 `memory` 表 |
 | 技能（程序性记忆）：复杂的活做完后 agent 自己写技能，用的时候改进 | 帮工起草、主人批，批了进技能书（[先采样，再验收](2026-10-14-sample-then-verify.md)第 4 步） | 草稿和用过几次在 SQLite；批了的技能照旧在 `config.json` 的技能书里 |
-| 外接的记忆来源：实现 `MemoryProvider`，只能开一个 | 同一个接口，能同时开多个（[记性有多个来源](2026-10-18-memory-providers.md)） | 各家自己那里 |
+| 外接的记忆来源：实现 `MemoryProvider`，只能开一个 | 同一个接口，能同时开多个（[记性有多个来源](../../implemented/architecture/2026-10-18-memory-providers.md)） | 各家自己那里 |
 
 ### 2. 存什么、不存什么
 
@@ -190,9 +190,19 @@ type MemoryStore interface {
 - 共有一个词的分从 0.4 改成 0.5：以前的「词」是相邻两个汉字，一个四字词算三个，现在一个词就是一个；`bm25()` 的相关度最多加 1.5（`recallMatchMost`、`recallMatchWeight`）。
 - 写入时当场切词（第一次切要加载词典，约 350 ms）；开机后在后台补切迁移搬来的和 `TermsVersion` 变了的行（真库的拷贝上 3 条，640 ms）。
 - 服务端二进制 30.4 MB 到 32.8 MB。
-- 接在[记性有多个来源](2026-10-18-memory-providers.md)的管理器后面：本地来源的 `Prefetch`（开工想起和页签的预览）把 `bm25()` 交给 `pick`；`memory_search` 的本地那一半（`recall.go` 的 `search`）换成全文索引的 `bm25()` 加上共有的词和整句出现，取代原来只数共有的词；想起过的照旧由管理器在合并之后才记。第 5 节的「FTS 取前 50 个候选」和 `rank.go` 没做：`pick` 和 `search` 仍在档案的全部记忆上打分（每个档案最多 300 条），`bm25()` 是分数里的一项。
+- 接在[记性有多个来源](../../implemented/architecture/2026-10-18-memory-providers.md)的管理器后面：本地来源的 `Prefetch`（开工想起和页签的预览）把 `bm25()` 交给 `pick`；`memory_search` 的本地那一半（`recall.go` 的 `search`）换成全文索引的 `bm25()` 加上共有的词和整句出现，取代原来只数共有的词；想起过的照旧由管理器在合并之后才记。第 5 节的「FTS 取前 50 个候选」和 `rank.go` 没做：`pick` 和 `search` 仍在档案的全部记忆上打分（每个档案最多 300 条），`bm25()` 是分数里的一项。
 
-前四步就是[记性有多个来源](2026-10-18-memory-providers.md)第 1 步「接口和本地来源」里的本地那一半。
+前四步就是[记性有多个来源](../../implemented/architecture/2026-10-18-memory-providers.md)第 1 步「接口和本地来源」里的本地那一半。
+
+### 还要做的
+
+记性还没做的都在这里，包括从[记性有多个来源](../../implemented/architecture/2026-10-18-memory-providers.md)并过来的：
+
+1. **画像和管家**（第 4 步）：`internal/agent/brain.MemoryStore`，管家的记性从 `MEMORY.md` 搬进本地来源，记性页签跟着改；管家的 `remember` 并进 `memory_add`，加上 `memory_replace`、`memory_remove`。
+2. **经过**（第 5 步）：收工写 `episode`、管家压缩时写归档的段、`excerpt.go`、`search_archive` 并进 `memory_search`；`SearchQuery.Kind` 给模型这个参数。EverOS 的 `SyncTurn` 现在只送工单和最后的汇报，要整段得从事件日志取。
+3. **画像拼进系统提示**：`SystemPromptBlock`，Nowledge 的 `read_context_bundle`、EverOS 的 user profile。
+4. **来源自带的工具**：`ConfigSchema`、`ToolSchemas`、`HandleTool`，等第一个调用的人；设置里每个来源按农机排除。
+5. **Nowledge 写的一半**：对真的 Nowledge Mem 只验证了读，写要主人点头再试。
 
 ## Alternatives considered
 
@@ -210,7 +220,7 @@ type MemoryStore interface {
 
 **`episode` 也进开工想起。** 想起的预算只有 8 条、1600 字，经过一条就能占满；开工时给 `issue` 的总结，要细节让它自己翻。
 
-**每条记忆一个 Markdown 文件。** 见[记性有多个来源](2026-10-18-memory-providers.md)的同一条。
+**每条记忆一个 Markdown 文件。** 见[记性有多个来源](../../implemented/architecture/2026-10-18-memory-providers.md)的同一条。
 
 ## Acceptance criteria
 
