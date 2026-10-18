@@ -176,7 +176,8 @@ void main() {
 
   testWidgets('the list, newest-worked first, and the selected project surveyed', (t) async {
     final b = backend();
-    await pumpPage(t, const ProjectsPage(), b.handle);
+    await pumpPage(t, const ProjectsPage(id: 'farm'), b.handle);
+    expect(find.text('全部'), findsOneWidget, reason: '全部, the whole map, heads the list');
     final names = [
       for (final n in ['farm', 'old', 'notes']) t.getTopLeft(find.text(n).first).dy,
     ];
@@ -218,6 +219,6 @@ void main() {
     await settle(t); // the check, then the making, then the dialog closing
     expect(b.named('POST', '/api/v1/projects').single.body, {'name': 'patch'});
     expect(find.text('创建项目'), findsNothing);
-    expect(find.text('patch'), findsOneWidget);
+    expect(find.text('patch'), findsWidgets, reason: 'in the list, and as an island on the map');
   });
 }

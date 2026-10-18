@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -93,7 +94,11 @@ func (p *Service) SubmitPullRequest(ctx context.Context, place Workplace, issue 
 		pr.State = protocol.PullRequestStateOpen
 		return &pr, nil
 	}
-	body := fmt.Sprintf("工单 #%d\n\n%s\n\n检查通过（没有 .vibevalley/check 时按项目默认规则放行）。", issue.Number, conclusion)
+	check := ".vibevalley/check 通过。"
+	if _, err := os.Lstat(filepath.Join(place.Cwd, ".vibevalley/check")); errors.Is(err, os.ErrNotExist) {
+		check = "这个项目没有 .vibevalley/check，没跑检查。"
+	}
+	body := fmt.Sprintf("工单 #%d\n\n%s\n\n%s", issue.Number, conclusion, check)
 	out, err = p.github(ctx, "pr", "create", "--repo", repo, "--head", place.Branch, "--base", main, "--title", issue.Title, "--body", body)
 	if err != nil {
 		return nil, fmt.Errorf("创建 PR 失败；分支已推送，可重试")
@@ -142,6 +147,9 @@ func (p *Service) issueWorkplace(name string, number int64) Workplace {
 
 func (p *Service) FinishPullRequest(name string, number int64) (Merged, error) {
 	defer p.serially(name)()
+	if p.UsesPullRequests(name) {
+		p.syncMain(name)
+	}
 	place := p.issueWorkplace(name, number)
 	path := filepath.Join(p.root, name)
 	if _, err := os.Stat(place.Cwd); err == nil {
@@ -157,4 +165,54 @@ func (p *Service) FinishPullRequest(name string, number int64) (Merged, error) {
 		}
 	}
 	return Merged{}, nil
+}
+
+// Called under the project lock. Failure preserves the local branch as the next issue's base.
+func (p *Service) syncMain(name string) string {
+	path := filepath.Join(p.root, name)
+	main, err := git(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+	if err == nil {
+		main = strings.TrimPrefix(main, "origin/")
+	} else {
+		main, _ = git(path, "symbolic-ref", "--short", "HEAD")
+	}
+	failed := func() string {
+		log.Printf("vibevalley: project %s: 无法从 origin 快进主分支，保留本地主分支", name)
+		return main
+	}
+	if main == "" {
+		return failed()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), cloneTimeout)
+	defer cancel()
+	if p.GitFetch != nil {
+		err = p.GitFetch(ctx, path, main)
+	} else {
+		_, _, err = gitRun(ctx, path, "fetch", "origin", main)
+	}
+	if err != nil {
+		return failed()
+	}
+	status, err := git(path, "status", "--porcelain")
+	if err != nil || status != "" {
+		return failed()
+	}
+	local, err := git(path, "rev-parse", "refs/heads/"+main)
+	if err != nil {
+		return failed()
+	}
+	remote, err := git(path, "rev-parse", "FETCH_HEAD")
+	if err != nil || !gitOk(path, "merge-base", "--is-ancestor", local, remote) {
+		return failed()
+	}
+	current, _ := git(path, "symbolic-ref", "--short", "HEAD")
+	if current == main {
+		_, err = git(path, "merge", "--ff-only", remote)
+	} else {
+		_, err = git(path, "update-ref", "refs/heads/"+main, remote, local)
+	}
+	if err != nil {
+		return failed()
+	}
+	return main
 }

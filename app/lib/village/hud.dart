@@ -499,7 +499,7 @@ class VillageHud extends ConsumerWidget {
                 _Tap(
                   onTap: () {
                     Sfx.play('open');
-                    context.go('/map');
+                    context.go('/projects');
                   },
                   label: '地图：每个项目一座岛',
                   child: HudCard(

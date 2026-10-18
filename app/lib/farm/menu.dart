@@ -50,7 +50,6 @@ class GameMenu extends ConsumerWidget {
             runSpacing: 8,
             children: [
               PxButton.text('田头（频道）', onPressed: () => leave('/chat')),
-              PxButton.text('地图', onPressed: () => leave('/map')),
               PxButton.text('帮工名册', onPressed: () => leave('/agents')),
               PxButton.text('农具', onPressed: () => leave('/runtimes')),
               PxButton.text('技能书', onPressed: () => leave('/settings/skills')),

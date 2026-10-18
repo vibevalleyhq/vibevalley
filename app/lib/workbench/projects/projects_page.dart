@@ -11,6 +11,8 @@ import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
+import '../map/map_page.dart' show IslandDetail, ProjectMap, islandsNow, projectsPollEvery;
+import '../map/map_rules.dart' show islandLook;
 import 'codebase.dart';
 import 'new_project_dialog.dart';
 import 'projects_state.dart';
@@ -29,16 +31,20 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
   /// A minute at a time: enough for 「3 小时前」.
   DateTime _now = DateTime.now();
   Timer? _clock;
+  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
     _clock = Timer.periodic(const Duration(minutes: 1), (_) => setState(() => _now = DateTime.now()));
+    // The islands' plots come with the state; which projects there are, only by asking.
+    _poll = Timer.periodic(projectsPollEvery, (_) => unawaited(ref.read(projectCatalogProvider.notifier).refresh().catchError((Object _) {})));
   }
 
   @override
   void dispose() {
     _clock?.cancel();
+    _poll?.cancel();
     super.dispose();
   }
 
@@ -47,57 +53,108 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
     final atlas = ref.watch(atlasProvider).value;
     final list = ref.watch(projectCatalogProvider).value;
     final sorted = sortProjects(list ?? const []);
-    final selected = sorted.where((p) => p.name == widget.id).firstOrNull ?? sorted.firstOrNull;
+    // No project named: 全部, the whole map.
+    final selected = sorted.where((p) => p.name == widget.id).firstOrNull;
+    final island = selected == null ? null : islandsNow(ref).where((i) => i.project == selected.name).firstOrNull;
     final survey = selected == null ? null : ref.watch(projectSurveyProvider(selected.name));
     final now = _now.millisecondsSinceEpoch.toDouble();
     if (atlas == null) return const SizedBox.shrink();
-    return ListDetail(
-      opened: widget.id != null,
-      list: ListCard(
-        title: '项目',
-        subtitle: '代码库',
-        semanticLabel: '项目列表',
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: PxButton(
-              onPressed: () async {
-                final project = await showNewProjectDialog(context);
-                if (project != null && context.mounted) workbenchGo(context, '/projects/${Uri.encodeComponent(project.name)}');
-              },
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-add', size: 16), SizedBox(width: 6), Text('新增项目')]),
-            ),
+    final menu = ListCard(
+      title: '项目',
+      subtitle: '代码库',
+      semanticLabel: '项目列表',
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: PxButton(
+            onPressed: () async {
+              final project = await showNewProjectDialog(context);
+              if (project != null && context.mounted) workbenchGo(context, '/projects/${Uri.encodeComponent(project.name)}');
+            },
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-add', size: 16), SizedBox(width: 6), Text('新增项目')]),
           ),
-          if (list == null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              child: Text('在找……', style: KitText.sm.copyWith(color: Palette.bark500)),
-            )
-          else if (sorted.isEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              child: Text('工作目录下还没有项目。点「新增项目」开一块地，或从 GitHub 下载一个。', style: KitText.sm.copyWith(color: Palette.bark600, height: 1.625)),
-            )
-          else
-            for (final p in sorted)
-              ListRow(
-                active: p.name == selected?.name,
-                onTap: () => workbenchGo(context, '/projects/${Uri.encodeComponent(p.name)}'),
-                child: _ProjectRow(project: p, now: now),
-              ),
+        ),
+        if (list == null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: Text('在找……', style: KitText.sm.copyWith(color: Palette.bark500)),
+          )
+        else if (sorted.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: Text('工作目录下还没有项目。点「新增项目」开一块地，或从 GitHub 下载一个。', style: KitText.sm.copyWith(color: Palette.bark600, height: 1.625)),
+          )
+        else ...[
+          ListRow(active: selected == null, onTap: () => workbenchGo(context, '/projects'), child: const RowText('全部', '整张地图：每个项目一座岛')),
+          for (final p in sorted)
+            ListRow(
+              active: p.name == selected?.name,
+              onTap: () => workbenchGo(context, '/projects/${Uri.encodeComponent(p.name)}'),
+              child: _ProjectRow(project: p, now: now),
+            ),
         ],
-      ),
-      detail: selected == null
-          ? [if (list != null) const PxCard(child: Text('工作目录下还没有项目。'))]
-          : [
-              _Deed(project: selected, survey: survey, now: now),
-              _Planted(counted: survey?.languages),
-              _TillingCalendar(activity: survey?.activity, now: _now),
-              _Hands(atlas: atlas, activity: survey?.activity),
+      ],
+    );
+    final details = selected == null
+        ? const <Widget>[]
+        : [
+            if (island != null) IslandDetail(island: island),
+            _Deed(project: selected, survey: survey, now: now),
+            _Planted(counted: survey?.languages),
+            _TillingCalendar(activity: survey?.activity, now: _now),
+            _Hands(atlas: atlas, activity: survey?.activity),
+          ];
+    return LayoutBuilder(
+      builder: (context, box) {
+        final gap = box.maxWidth >= 640 ? 12.0 : 8.0;
+        final side = EdgeInsets.fromLTRB(gap, 0, gap, 12);
+        final detail = PxScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _spaced(details)),
+        );
+        if (box.maxWidth < wideFrom) {
+          if (selected != null) {
+            return Padding(
+              padding: side,
+              child: PxScrollView(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _spaced([...details, menu])),
+              ),
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: side,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  child: PxScrollView(child: menu),
+                ),
+              ),
+              const Expanded(child: ProjectMap()),
             ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(gap, 0, 0, 12),
+              child: SizedBox(width: 288, child: PxScrollView(child: menu)),
+            ),
+            // The map draws its own margin; the details sit in the page's.
+            Expanded(
+              child: selected == null ? const ProjectMap() : Padding(padding: side, child: detail),
+            ),
+          ],
+        );
+      },
     );
   }
 }
+
+List<Widget> _spaced(List<Widget> items) => [
+  for (var i = 0; i < items.length; i++) ...[if (i > 0) const SizedBox(height: 12), items[i]],
+];
 
 String since(double at, double now) {
   final minutes = (now - at) / 60000 < 0 ? 0.0 : (now - at) / 60000;
@@ -145,7 +202,8 @@ class _ProjectRow extends StatelessWidget {
         : growth.label;
     return Row(
       children: [
-        SpriteIcon('plot-${growth.crop}', size: 40),
+        // A project is an island (the same one the map draws), not a plot: plots are its issues.
+        SpriteIcon(islandLook(project.name), size: 40),
         const SizedBox(width: 10),
         Expanded(child: RowText(project.name, line)),
       ],

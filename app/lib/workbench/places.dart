@@ -3,10 +3,9 @@
 enum Place {
   chat('聊天', '频道和串', 'icon-board', '/chat'),
   issues('工单', '每次种植的全过程', 'icon-tasks', '/issues'),
-  map('地图', '每个项目一座岛', 'icon-map', '/map'),
   agents('帮工', '帮工档案', 'raccoon-farmer-down', '/agents'),
   runtimes('农具', '机器上的编码 agent', 'machine-tractor', '/runtimes'),
-  projects('项目', '代码库', 'icon-deed', '/projects'),
+  projects('项目', '每个项目一座岛', 'icon-map', '/projects'),
   catalog('图鉴', '素材：农场用的每张图、每个指针、每个声音', 'icon-log', '/catalog'),
   // Last, and drawn at the bottom of the bar (workbench_shell) rather than with the others.
   settings('设置', '钥匙、记性、连接器、技能、声音、院门', 'icon-wrench', '/settings');
