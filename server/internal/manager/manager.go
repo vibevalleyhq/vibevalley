@@ -9,25 +9,27 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"go.uber.org/fx"
 
 	"vibevalley/internal/agent"
+	vvagent "vibevalley/internal/agent/brain"
 	"vibevalley/internal/base"
 	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
 	"vibevalley/internal/issue"
 	"vibevalley/internal/memory"
-	"vibevalley/internal/playbook"
 	"vibevalley/internal/project"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/runtime"
 	"vibevalley/internal/schedule"
 	"vibevalley/internal/session"
 	"vibevalley/internal/setting"
-	vvagent "vibevalley/pkg/agent"
+	"vibevalley/internal/task"
+	"vibevalley/internal/tool"
 	"vibevalley/pkg/agentcore"
 	"vibevalley/pkg/ai"
 	"vibevalley/pkg/x/clock"
@@ -60,9 +62,9 @@ const managerSystemPrompt = `你是码农场物语的管家。主人跟你说要
 - 额度：「农场现状」里写着每个帮工的 runtime 还剩多少、今天花了多少。剩得不多（标着「快用完了」）的，能换别的帮工就换，并告诉主人；都快用完了就先问主人。余额或每日预算用完了派不出去，照直告诉主人，等主人处理。
 - 帮工标着「没动静」：告诉主人它多久没动静、最后在做什么，问要不要叫停。
 - 派不出去（没装、停用、满了）：照工具给的原因直说。
-- 很长的活（要改好几处、要几个人分工、一轮做不完）：用 plan 起一个种植计划。农场派一个帮工读代码，把它拆成几步，每步一个帮工，有先后；拆好了放在「计划」里等主人看。主人同意了才用 plan_action start 开工；主人想改某一步，用 plan_edit。
-- 计划开工以后由农场自己调度：前面的步骤合进计划分支，后面的才开工。计划里的帮工不要用 dispatch、merge、dismiss 去管。有步骤没做成，问主人是重试（node_action retry）、改工单，还是跳过（node_action skip）。
-- 计划都做完了（等收获）：主人说收，就用 plan_action merge 把整个计划合进主分支。
+- 很长的活（要改好几处、要几个人分工、一轮做不完）：用 graph_split 起一个种植计划。农场派一个帮工读代码，把它拆成几件，每件一个帮工，有先后；拆好了放在「计划」里等主人看。主人同意了才用 graph_action start 开工；主人想改某一件，用 task_edit。
+- 计划开工以后由农场自己调度：前面的步骤合进计划分支，后面的才开工。计划里的帮工不要用 dispatch、merge、dismiss 去管。有一件没做成，问主人是重试（task_action retry）、改工单，还是跳过（task_action skip）。
+- 计划都做完了（等收获）：主人说收，就用 graph_action merge 把整个计划合进主分支。
 - 收到「【种植计划】」开头的消息：照里面说的，用一两句话告诉主人。
 - 收到「【巡查】」开头的消息：那是农场自己看出来放着没人管的事。值得提醒就在那个频道里用一两句话提醒主人（问题没人回、活做完了没收、步骤没做成），帮工没动静就看看要不要叫停；不值得就什么也别说。
 - 定时：主人说「每天」「每周几」「到点」「过一会儿」「每隔多久」，用 schedule 定在一个频道里（不填就是你正在回话的频道）。到点时频道里先出现一条「⏰ 定时……」，然后你会收到「【定时任务……】」开头的那句话，照着做（派活、看进度、提醒主人），做完说一两句。写了 agent 的定时到点直接派活，不经过你。看有哪些用 list_schedules，不要了用 cancel_schedule。
@@ -132,20 +134,20 @@ func (c *managerCaller) pump(ctx context.Context, out chan<- string) {
 }
 
 type manager struct {
-	cfg       base.Config
-	core      *core.Service
-	store     *agent.Service
-	settings  *setting.Service
-	runtimes  *runtime.Service
-	projects  *project.Service
-	run       *session.Service
-	issue     *issue.Service
-	chat      *channel.Service
-	playbooks *playbook.Service
-	schedule  *schedule.Service
-	memory    *memory.Service
-	patrol    *patrol
-	ctx       context.Context
+	cfg      base.Config
+	core     *core.Service
+	store    *agent.Service
+	settings *setting.Service
+	runtimes *runtime.Service
+	projects *project.Service
+	run      *session.Service
+	issue    *issue.Service
+	chat     *channel.Service
+	tasks    *task.Service
+	schedule *schedule.Service
+	tool     *tool.Service
+	patrol   *patrol
+	ctx      context.Context
 
 	// Stand-ins for tests: llm nil is DeepSeek; trace nil is opened at start.
 	llm   *vvagent.LLM
@@ -153,8 +155,8 @@ type manager struct {
 
 	// Guards what the lines handled and the words said share.
 	mu sync.Mutex
-	// The runs of issues for it under way, ended when its run settles.
-	working    []managerRun
+	// The execution owns persisted runs and journals, independently of output routing.
+	execution  *session.AgentExecution
 	input      managerInput
 	selected   map[string]string
 	latestCall *managerCaller
@@ -166,7 +168,7 @@ type manager struct {
 	open     bool
 	lastPush time.Time
 	// The parts of the prompt's start the next answer was asked with changed, as prefix_changed says them.
-	prefixChanged string
+	prefixChanged []string
 	// The farm's situation as the model last saw it in an input; "" when it should see the whole of it next.
 	shown string
 	// Held from reading the situation to handing the input over, so that each input's changes follow the one before.
@@ -176,30 +178,31 @@ type manager struct {
 	starting sync.Mutex
 	brain    *vvagent.Agent
 	stops    []func()
+	closing  atomic.Bool
 }
 
 type managerIn struct {
 	fx.In
-	Config   base.Config
-	Core     *core.Service
-	Agent    *agent.Service
-	Setting  *setting.Service
-	Runtime  *runtime.Service
-	Project  *project.Service
-	Run      *session.Service
-	Issue    *issue.Service
-	Channel  *channel.Service
-	Playbook *playbook.Service
-	Schedule *schedule.Service
-	Memory   *memory.Service
+	Config    base.Config
+	Core      *core.Service
+	Agent     *agent.Service
+	Setting   *setting.Service
+	Runtime   *runtime.Service
+	Project   *project.Service
+	Run       *session.Service
+	Issue     *issue.Service
+	Channel   *channel.Service
+	TaskGraph *task.Service
+	Schedule  *schedule.Service
+	Tool      *tool.Service
 }
 
 func newManager(in managerIn) (*manager, error) {
 	return &manager{
 		cfg: in.Config, core: in.Core, store: in.Agent, settings: in.Setting, runtimes: in.Runtime,
-		projects: in.Project, run: in.Run, issue: in.Issue, chat: in.Channel, playbooks: in.Playbook, schedule: in.Schedule,
-		memory: in.Memory,
-		ctx:    context.Background(),
+		projects: in.Project, run: in.Run, issue: in.Issue, chat: in.Channel, tasks: in.TaskGraph, schedule: in.Schedule,
+		tool: in.Tool,
+		ctx:  context.Background(),
 	}, nil
 }
 
@@ -210,6 +213,7 @@ func (fm *manager) OnStart(ctx context.Context) error {
 	if fm.trace == nil {
 		fm.trace = fm.run.Open(protocol.ManagerAgent, keepManagerEvents)
 	}
+	fm.execution = fm.run.AgentExecution(protocol.ManagerAgent, fm.trace, fm.tool.Start)
 	// In a test that gave the manager no model, it hears nothing: the other services' tests run as without it, and
 	// nothing reaches DeepSeek (a key in the environment would be used otherwise).
 	if fm.llm == nil && testing.Testing() {
@@ -218,7 +222,7 @@ func (fm *manager) OnStart(ctx context.Context) error {
 	managerListen(fm, ctx, fm.chat.ForManager(), fm.heardInChat)
 	managerListen(fm, ctx, fm.issue.ForManager(), fm.onWork)
 	managerListen(fm, ctx, fm.patrol.News(), func(n PatrolNews) { fm.send(sourcePatrol, n.Text, n.Channel, false) })
-	managerListen(fm, ctx, fm.playbooks.News(), func(line string) { fm.send(sourcePlaybook, line, fm.chat.General(), false) })
+	managerListen(fm, ctx, fm.tasks.News(), func(line string) { fm.send(sourceGraph, line, fm.chat.General(), false) })
 	if vvagent.SessionUnfinished(filepath.Join(memory.ManagerHome(fm.cfg.Home), protocol.ManagerAgent+".jsonl")) && (fm.llm != nil || fm.settings.DeepseekAPIKey() != "") {
 		go fm.resume()
 	}
@@ -226,8 +230,8 @@ func (fm *manager) OnStart(ctx context.Context) error {
 }
 
 // The run the last start was cut off in goes on, answering where its input came from. Its first message is in the
-// conversation already, so the input is read back from there; a run of an issue ends that issue's run as it settles
-// (the run itself was closed as interrupted when the farm started).
+// conversation already, so the input is read back from there; the run it makes is linked to that input's issue, which is
+// answered when it completes (the issue was closed as lost when the farm started).
 func (fm *manager) resume() {
 	brain, err := fm.brainOf()
 	if err != nil {
@@ -237,17 +241,12 @@ func (fm *manager) resume() {
 	input := fm.requestInput()
 	fm.mu.Lock()
 	fm.input, fm.toCaller = input, 0
-	before := len(fm.working)
-	if input.Issue != "" {
-		fm.working = append(fm.working, managerRun{issue: input.Issue})
-	}
 	fm.mu.Unlock()
+	fm.execution.Resuming(&session.RunInput{Issue: input.Issue, By: protocol.RunTrigger{Kind: managerTrigger(input.Source)}})
 	if brain.Resume(managerResumeWithin) {
 		return
 	}
-	fm.mu.Lock()
-	fm.working = slices.Delete(fm.working, before, len(fm.working))
-	fm.mu.Unlock()
+	fm.execution.Resuming(nil)
 	if !brain.Busy() {
 		fm.trace.Note(protocol.SessionEventTypeRunError, "上一轮停在了半路，太久了，没有接着做", nil)
 	}
@@ -275,46 +274,34 @@ func (fm *manager) OnStop() {
 	for _, stop := range fm.stops {
 		stop()
 	}
+	fm.closing.Store(true)
 	fm.starting.Lock()
 	brain := fm.brain
 	fm.starting.Unlock()
 	if brain != nil {
 		brain.Close()
 	}
-}
-
-func (fm *manager) here() string { return fm.requestInput().Conversation }
-
-type managerAgentInfo struct {
-	agent    protocol.Agent
-	info     *protocol.RuntimeInfo
-	blocking []protocol.AgentIssue
-}
-
-func (fm *manager) agentsWithIssues() []managerAgentInfo {
-	var out []managerAgentInfo
-	for _, a := range fm.store.Agents() {
-		info := fm.runtimes.Info(fm.ctx, a.Runtime)
-		var blocking []protocol.AgentIssue
-		for _, i := range fm.runtimes.Check(fm.ctx, a) {
-			if i.Level == "error" {
-				blocking = append(blocking, i)
-			}
+	if fm.execution != nil {
+		if err := fm.execution.Close(); err != nil {
+			log.Printf("manager execution: %v", err)
 		}
-		out = append(out, managerAgentInfo{a, info, blocking})
+	}
+}
+
+func (fm *manager) agentsWithIssues() []runtime.Assessment {
+	var out []runtime.Assessment
+	for _, a := range fm.store.Agents() {
+		out = append(out, fm.runtimes.Assess(fm.ctx, a))
 	}
 	return out
 }
 
-func managerUsable(a managerAgentInfo) bool { return a.agent.Enabled && len(a.blocking) == 0 }
-
-func (fm *manager) choose(task, named string) *protocol.Agent {
-	var candidates []session.Candidate
-	for _, a := range fm.agentsWithIssues() {
-		candidates = append(candidates, session.Candidate{Agent: a.agent, Usable: managerUsable(a)})
-	}
-	picked := fm.requestInput().Agent
-	return session.ChooseAgent(candidates, task, named, picked)
+// The manager's tools; each call reads who is calling from the input being answered then.
+func (fm *manager) tools() []agentcore.AgentTool {
+	return fm.tool.Manager(func(context.Context) (tool.Caller, error) {
+		in := fm.requestInput()
+		return tool.Caller{Agent: protocol.ManagerAgent, Here: in.Conversation, Picked: in.Agent, Owner: in.Owner}, nil
+	})
 }
 
 func managerQuota(info *protocol.RuntimeInfo) string {
@@ -348,12 +335,16 @@ func managerQuota(info *protocol.RuntimeInfo) string {
 	return "额度：" + words + low + today
 }
 
-func (fm *manager) news() string {
+func (fm *manager) news() (string, []string) {
 	digest := fm.chat.ManagerDigest()
 	if len(digest) == 0 {
-		return ""
+		return "", nil
 	}
-	return "这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + managerInboxLines(digest)
+	ids := make([]string, len(digest))
+	for i, m := range digest {
+		ids[i] = m.ID
+	}
+	return "这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + managerInboxLines(digest), ids
 }
 
 func managerDeepseekModel(configured string) (string, error) {
@@ -442,70 +433,61 @@ func (fm *manager) follow(events *agentcore.Subscription[vvagent.AgentEvent]) {
 }
 
 func (fm *manager) event(e vvagent.AgentEvent) {
-	switch e.Type {
-	case agentcore.EventMessageStart:
+	var runInput *session.RunInput
+	if message, ok := e.(agentcore.MessageStarted); ok {
+		if input, ok := managerInputOf(message.Message); ok {
+			runInput = &input.run
+		}
+	}
+	if err := fm.execution.Observe(e, runInput); err != nil {
+		fm.core.Notice(protocol.NoticeLevelError, "管家的执行没能记下："+err.Error())
+	}
+	switch e := e.(type) {
+	case agentcore.MessageStarted:
 		if input, ok := managerInputOf(e.Message); ok {
 			fm.mu.Lock()
 			fm.input = input
 			fm.toCaller = 0
 			fm.mu.Unlock()
 		}
-	case agentcore.EventAgentStart:
+	case agentcore.AgentStarted:
 		fm.core.SetManager(protocol.ManagerStateThinking)
-	case agentcore.EventMessageUpdate:
-		if e.Message == nil || e.Message.Role() != "assistant" {
-			return
-		}
+	case agentcore.MessageUpdated:
 		if text := vvagent.MessageText(e.Message); text != "" {
 			fm.grow(text)
 		}
-	case agentcore.EventMessageEnd:
+	case agentcore.MessageEnded:
 		m, ok := e.Message.(ai.AssistantMessage)
 		if !ok {
 			return
 		}
 		text := strings.TrimSpace(vvagent.MessageText(m))
-		if thinking := managerThinkingOf(m.Content); thinking != "" {
-			fm.trace.Thought(thinking, nil)
-		}
-		fm.trace.Said(text, nil)
 		fm.noteUsage(m.Usage)
 		why := m.ErrorMessage
 		if why == "" {
 			why = "模型出错了"
 		}
-		if m.StopReason == ai.StopError {
-			fm.trace.Note(protocol.SessionEventTypeRunError, why, nil)
-		}
 		fm.done(text)
 		if m.StopReason == ai.StopError {
 			fm.core.Notice(protocol.NoticeLevelError, "管家出错了："+why)
 		}
-	case vvagent.EventCompactionEnd:
+	case vvagent.CompactionEnded:
 		if e.Usage != nil {
 			tokens := managerTokens(*e.Usage)
-			fm.trace.Usage(tokens, "整理对话，"+managerUsageText(tokens, ""), nil)
+			fm.trace.Usage(tokens, "整理对话，"+managerUsageText(tokens, nil), nil)
 		}
 		if e.Compaction != nil {
 			fm.mu.Lock()
 			fm.shown = ""
 			fm.mu.Unlock()
 		}
-	case vvagent.EventPrefixChanged:
-		log.Printf("vibevalley: the manager's prompt start changed between compactions: %s", e.Reason)
+	case vvagent.PrefixChanged:
+		log.Printf("vibevalley: the manager's prompt start changed between compactions: %s", strings.Join(e.Parts, ","))
 		fm.mu.Lock()
-		fm.prefixChanged = e.Reason
+		fm.prefixChanged = e.Parts
 		fm.mu.Unlock()
-	case vvagent.EventAgentSettled:
-		fm.settled(e.Aborted)
-	case agentcore.EventToolExecutionStart:
-		fm.trace.ToolStarted(e.ToolCallID, managerToolStart(e.ToolName, e.Args), nil)
-	case agentcore.EventToolExecutionEnd:
-		result := ""
-		if e.Result != nil {
-			result = agentcore.ResultText(e.Result.Content)
-		}
-		fm.trace.ToolEnded(e.ToolCallID, result, !e.IsError, nil)
+	case vvagent.AgentSettled:
+		fm.settled(e.Run.Aborted)
 	}
 }
 
@@ -525,7 +507,7 @@ func (fm *manager) noteUsage(u ai.Usage) {
 	}
 	fm.mu.Lock()
 	changed := fm.prefixChanged
-	fm.prefixChanged = ""
+	fm.prefixChanged = nil
 	fm.mu.Unlock()
 	tokens := managerTokens(u)
 	fm.trace.Usage(tokens, managerUsageText(tokens, changed), nil)
@@ -554,7 +536,7 @@ func (fm *manager) grow(text string) {
 	to := fm.input.Conversation
 	fm.mu.Unlock()
 	fm.core.SetManager(protocol.ManagerStateSpeaking)
-	fm.chat.ManagerSays(to, key, text, false)
+	fm.chat.ManagerSays(to, key, text, false, fm.execution.CurrentRun())
 }
 
 func (fm *manager) done(text string) {
@@ -571,13 +553,13 @@ func (fm *manager) done(text string) {
 	quiet, to := fm.input.Quiet, fm.input.Conversation
 	fm.mu.Unlock()
 	if text != "" && !quiet {
-		fm.chat.ManagerSays(to, key, text, true)
+		fm.chat.ManagerSays(to, key, text, true, fm.execution.CurrentRun())
 	}
 }
 
-// Only Stop aborts a run: the brain's own context ending publishes no settle.
+// Only Stop aborts a run while the farm is up; the settle Close publishes is the farm stopping.
 func (fm *manager) settled(aborted bool) {
-	if aborted {
+	if aborted && !fm.closing.Load() {
 		fm.trace.Note(protocol.SessionEventTypeRunError, "主人叫停了", nil)
 	}
 	fm.mu.Lock()
@@ -589,15 +571,10 @@ func (fm *manager) settled(aborted bool) {
 	fm.input.Agent = ""
 	fm.open = false
 	fm.mu.Unlock()
-	outcome := protocol.OutcomeCompleted
-	if aborted {
-		outcome = protocol.OutcomeInterrupted
-	}
-	fm.answered(outcome)
 	fm.core.SetManager(protocol.ManagerStateListening)
 }
 
-// The lines waiting for the manager are dropped with the run: the patrol tells again, and a plan's state is on its board. The
+// The lines waiting for the manager are dropped with the run: the patrol tells again, and a task's state is on its board. The
 // sessions it sent keep working.
 func (fm *manager) Stop() {
 	fm.starting.Lock()
@@ -610,7 +587,7 @@ func (fm *manager) Stop() {
 
 // now joins the run under way; otherwise the line waits until the run would stop. false: the manager could not start.
 func (fm *manager) send(source managerSource, line string, conversation string, now bool) bool {
-	return fm.ask(line, managerInput{Conversation: conversation, Source: source}, now)
+	return fm.ask(line, managerInput{Conversation: conversation, Source: source, run: session.RunInput{By: protocol.RunTrigger{Kind: protocol.RunTriggerKindRuntime}}}, now)
 }
 
 // Every input goes in under the head of its source.
@@ -619,11 +596,16 @@ func (fm *manager) ask(line string, input managerInput, now bool) bool {
 }
 
 func (fm *manager) sendInput(line string, input managerInput, now bool) bool {
+	if input.run.By.Kind == "" {
+		input.run.By.Kind = protocol.RunTriggerKindComment
+	}
 	conversation := input.Conversation
-	fm.trace.Asked(line, nil)
 	brain, err := fm.brainOf()
 	if err != nil {
-		fm.trace.Note(protocol.SessionEventTypeRunError, "起不来："+err.Error(), nil)
+		run, recordErr := fm.execution.FailedStart(input.run, line, "起不来："+err.Error())
+		if recordErr != nil {
+			fm.core.Notice(protocol.NoticeLevelError, "管家的执行没能记下："+recordErr.Error())
+		}
 		fm.core.Notice(protocol.NoticeLevelError, "管家起不来："+err.Error())
 		said := "我这边起不来：" + err.Error()
 		if errors.Is(err, vvagent.ErrNoDeepSeekKey) {
@@ -637,7 +619,7 @@ func (fm *manager) sendInput(line string, input managerInput, now bool) bool {
 		fm.cannot[conversation] = said
 		fm.mu.Unlock()
 		if !again {
-			fm.chat.ManagerSays(conversation, fmt.Sprintf("failed%d", clock.NowMs()), said, true)
+			fm.chat.ManagerSays(conversation, fmt.Sprintf("failed%d", clock.NowMs()), said, true, run)
 		}
 		if input.caller != nil {
 			input.caller.push("我这边起不来：" + err.Error())
@@ -654,7 +636,11 @@ func (fm *manager) sendInput(line string, input managerInput, now bool) bool {
 	}
 	fm.inputs.Lock()
 	defer fm.inputs.Unlock()
-	text := strings.Join(slices.DeleteFunc([]string{"【现在】" + vvagent.LocaleMinute(time.Now()), fm.farmNow(brain, conversation), brain.MemoryNews(), fm.news(), line},
+	heard, ids := fm.news()
+	input.run.Heard = ids
+	// The log shows the line; the model also gets the time, the farm and the news before it.
+	input.run.Asked = line
+	text := strings.Join(slices.DeleteFunc([]string{"【现在】" + vvagent.LocaleMinute(time.Now()), fm.farmNow(brain, conversation), brain.MemoryNews(), heard, line},
 		func(part string) bool { return part == "" }), "\n\n")
 	deliver(vvagent.NewCustomMessage("managerInput", ai.StringContent(text), vvagent.CustomMessageOptions{Details: input}))
 	return true
@@ -727,35 +713,11 @@ func (fm *manager) onWork(w issue.ManagerWork) {
 		}
 		line = fmt.Sprintf("【定时任务「%s」到点了%s】\n%s\n\n这是 #%s 的定时（%s），你的回答会发在那里；照着做，做完说一两句。", s.Name, missed, s.Text, channel.Name, s.ID)
 	}
-	run := fm.run.OpenRun(protocol.ManagerAgent, w.Issue.ID, w.By)
-	fm.mu.Lock()
-	fm.working = append(fm.working, managerRun{run: run, issue: w.Issue.ID})
-	fm.mu.Unlock()
 	source := sourceIssue
 	if w.Schedule != nil {
 		source = sourceSchedule
 	}
-	if !fm.ask(line, managerInput{Conversation: channel.ID, Source: source, Issue: w.Issue.ID}, false) {
-		fm.answered(protocol.OutcomeFailed)
-	}
-}
-
-type managerRun struct {
-	run   string
-	issue string
-}
-
-func (fm *manager) answered(outcome protocol.Outcome) {
-	fm.mu.Lock()
-	done := fm.working
-	fm.working = nil
-	fm.mu.Unlock()
-	for _, w := range done {
-		fm.run.CloseRun(w.run, outcome, "")
-		if err := fm.issue.Answered(w.issue); err != nil {
-			log.Printf("vibevalley: issue %s: %v", w.issue, err)
-		}
-	}
+	fm.ask(line, managerInput{Conversation: channel.ID, Source: source, Issue: w.Issue.ID, run: session.RunInput{Issue: w.Issue.ID, By: w.By}}, false)
 }
 
 // sendKey: the client's key for this send, "" for none; a retry with the same key is the message already said.
@@ -773,12 +735,8 @@ func (fm *manager) Say(ctx context.Context, text, agentID string, conversation *
 	return err
 }
 
-// When the manager answers calls itself, what was said reached it on the voice line already (Call keeps it in 田头). Otherwise
-// Agora's model answered it; the manager hears it here to dispatch, and what it says goes to 田头 like any answer.
+// The call owner has selected a quick-model transcript for the manager to overhear.
 func (fm *manager) Heard(text, agentID, sendKey string) error {
-	if _, ok := fm.settings.Voice().Answer.Value.(protocol.VoiceAnswerManager); ok {
-		return nil
-	}
 	if again, err := fm.chat.Spoken("user", text, sendKey); err != nil || again {
 		return err
 	}

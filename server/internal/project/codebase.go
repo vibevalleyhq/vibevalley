@@ -121,7 +121,7 @@ func activityOf(log string, dayOf func(int64) string) (days []protocol.DayCount,
 	return days, authors
 }
 
-func GitQuiet(cwd string, args ...string) string {
+func gitQuiet(cwd string, args ...string) string {
 	out, err := git(cwd, args...)
 	if err != nil {
 		return ""
@@ -158,7 +158,7 @@ func (p *Service) Summaries(ctx context.Context) []protocol.ProjectSummary {
 func (p *Service) Summary(project Project) protocol.ProjectSummary {
 	s := protocol.ProjectSummary{Name: project.Name, Path: project.Path, Git: project.Git, Slots: p.Slots()}
 	if project.Git {
-		if last := seconds(GitQuiet(project.Path, "log", "--all", "-1", "--format=%at")); last > 0 {
+		if last := seconds(gitQuiet(project.Path, "log", "--all", "-1", "--format=%at")); last > 0 {
 			s.Last = &last
 		}
 	}
@@ -202,10 +202,10 @@ func (p *Service) Activity(ctx context.Context, name string) *protocol.ProjectAc
 		return out
 	}
 	since := time.UnixMilli(now - yearDays*protocol.DayMs).UTC().Format("2006-01-02T15:04:05.000Z")
-	log := GitQuiet(project.Path, "log", "--all", "--no-merges", "--since="+since, "--format=%at%x09%aN")
-	total := GitQuiet(project.Path, "rev-list", "--all", "--no-merges", "--count")
-	roots := GitQuiet(project.Path, "log", "--all", "--max-parents=0", "--format=%at")
-	last := GitQuiet(project.Path, "log", "--all", "-1", "--format=%at")
+	log := gitQuiet(project.Path, "log", "--all", "--no-merges", "--since="+since, "--format=%at%x09%aN")
+	total := gitQuiet(project.Path, "rev-list", "--all", "--no-merges", "--count")
+	roots := gitQuiet(project.Path, "log", "--all", "--max-parents=0", "--format=%at")
+	last := gitQuiet(project.Path, "log", "--all", "-1", "--format=%at")
 	out.Days, out.Authors = activityOf(log, localDay)
 	out.Total, _ = strconv.ParseInt(total, 10, 64)
 	first := int64(0)

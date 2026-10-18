@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../game/state.dart';
 import '../debug/debug_panel.dart' show debugOpenProvider;
 import '../data/prefs.dart';
 import '../data/ui_state.dart';
 import '../ui/kit/kit.dart';
-import '../village/world.dart' show spotNames;
+import '../game/destinations.dart';
 
 class GameMenu extends ConsumerWidget {
   const GameMenu({super.key});
@@ -16,7 +15,7 @@ class GameMenu extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final muted = ref.watch(prefsProvider.select((p) => p.muted));
     final debug = ref.watch(debugOpenProvider);
-    void close() => ref.read(menuOpenProvider.notifier).set(false);
+    void close() => ref.read(farmOverlaysProvider.notifier).menu(false);
     void leave(String to) {
       close();
       context.go(to);
@@ -68,18 +67,18 @@ class GameMenu extends ConsumerWidget {
               spacing: 12,
               runSpacing: 4,
               children: [
-                for (final MapEntry(key: _, value: (label, hint)) in spotNames.entries)
+                for (final place in YardPlace.values)
                   SizedBox(
                     width: (box.maxWidth - 12) / 2,
                     child: Text.rich(
                       TextSpan(
                         children: [
                           TextSpan(
-                            text: label,
+                            text: place.label,
                             style: const TextStyle(color: Palette.bark900),
                           ),
                           TextSpan(
-                            text: ' · $hint',
+                            text: ' · ${place.hint}',
                             style: const TextStyle(color: Palette.bark500),
                           ),
                         ],

@@ -40,6 +40,11 @@ type heldQueueEntry struct {
 
 func (e heldQueueEntry) HeldInputID() string { return e.inputID }
 
+type pendingInterrupt struct {
+	control *kernel.PendingControl
+	refuse  func()
+}
+
 type claudeSession struct {
 	mu    sync.Mutex
 	k     *kernel.Kernel
@@ -61,7 +66,7 @@ type claudeSession struct {
 	canCancelQueued bool
 	abortFallback   *shared.AbortFallback
 	// Pending interrupts by request id, in arrival order (a JS Map).
-	pendingInterrupts     map[string]func()
+	pendingInterrupts     map[string]pendingInterrupt
 	pendingInterruptOrder []string
 	disposeRequest        *oar.RawEvent
 	readback              *openSettings
@@ -95,7 +100,7 @@ func openClaudeSession(ctx context.Context, installation oar.AvailableInstallati
 		k:                 credentials.Kernel(sessionID),
 		child:             child,
 		writtenQueues:     map[string]oar.RawEvent{},
-		pendingInterrupts: map[string]func(){},
+		pendingInterrupts: map[string]pendingInterrupt{},
 	}
 	if options.Resume == "" {
 		s.projection = initialClaudeProjection()
@@ -209,12 +214,12 @@ func (s *claudeSession) onLine(line string) {
 				}
 			}
 		case "respond":
-			if refused, ok := s.pendingInterrupts[command.RequestID]; ok {
+			if pending, ok := s.pendingInterrupts[command.RequestID]; ok {
 				s.forgetInterrupt(command.RequestID)
 				if command.Response.Kind == oar.ResponseRejected {
-					refused()
+					pending.refuse()
 				}
-				s.k.Respond(command.RequestID, command.Response, kernel.RecordAt{})
+				pending.control.Settle(command.Response)
 			} else {
 				// Exit may precede the last stdout bytes. Preserve a late or
 				// duplicate native reply, but never answer a request twice.
@@ -269,8 +274,9 @@ func (s *claudeSession) onExit(code *int) {
 	s.active = nil
 	s.spontaneous = false
 	for _, id := range append([]string(nil), s.pendingInterruptOrder...) {
+		pending := s.pendingInterrupts[id]
 		s.forgetInterrupt(id)
-		s.k.Respond(id, oar.Rejected(oar.CodeRuntimeExited, "runtime exited"), kernel.RecordAt{})
+		pending.control.Settle(oar.Rejected(oar.CodeRuntimeExited, "runtime exited"))
 	}
 	s.readback.exited(code)
 	s.breakdown.exited()
@@ -349,30 +355,24 @@ func (s *claudeSession) Abort(ctx context.Context) (oar.ControlResult, error) {
 	s.mu.Lock()
 	s.interruptCounter++
 	requestID := fmt.Sprintf("interrupt-%d", s.interruptCounter)
-	blocked := s.k.Unreachable()
-	request := s.k.Request(oar.ToRuntime, oar.RequestBody{Kind: oar.RequestAbort}, kernel.RecordAt{ID: requestID})
+	pending := s.k.BeginControl(oar.RequestBody{Kind: oar.RequestAbort}, kernel.RecordAt{ID: requestID})
 	cancelQueued := s.canCancelQueued && len(s.projection.UnstartedInputs) > 0
-	if blocked != nil || (!s.busy() && !cancelQueued) {
-		body := oar.Rejected(oar.CodeNoActiveTurn, "no active turn")
-		if blocked != nil {
-			body = *blocked
-		}
-		response := s.k.Respond(request.ID, body, kernel.RecordAt{})
+	if pending.Settled() || (!s.busy() && !cancelQueued) {
+		pending.Settle(oar.Rejected(oar.CodeNoActiveTurn, "no active turn"))
 		s.mu.Unlock()
-		return oar.ControlResult{Request: request, Response: response}, nil
+		return pending.Wait(ctx)
 	}
-	from := s.k.Len()
 	s.projection = claudeAbortRequested(s.projection)
 	// A repeated abort during termination is taken over synchronously too.
-	s.pendingInterrupts[requestID] = func() {}
+	s.pendingInterrupts[requestID] = pendingInterrupt{control: pending, refuse: func() {}}
 	s.pendingInterruptOrder = append(s.pendingInterruptOrder, requestID)
 	refuse := s.abortFallback.Arm(func() {
 		if s.forgetInterrupt(requestID) {
-			s.k.Respond(requestID, oar.Accepted(), kernel.RecordAt{})
+			pending.Settle(oar.Accepted())
 		}
 	})
 	if _, ok := s.pendingInterrupts[requestID]; ok {
-		s.pendingInterrupts[requestID] = refuse
+		s.pendingInterrupts[requestID] = pendingInterrupt{control: pending, refuse: refuse}
 	}
 	interrupt := map[string]any{"subtype": "interrupt"}
 	if cancelQueued {
@@ -380,13 +380,7 @@ func (s *claudeSession) Abort(ctx context.Context) (oar.ControlResult, error) {
 	}
 	s.child.Write(jsonText(controlRequest{Type: "control_request", RequestID: requestID, Request: interrupt}) + "\n")
 	s.mu.Unlock()
-	response, err := s.k.WaitFor(ctx, from, func(record oar.RawEvent) bool {
-		return record.Kind == oar.KindResponse && record.RequestID == requestID
-	})
-	if err != nil {
-		return oar.ControlResult{}, err
-	}
-	return oar.ControlResult{Request: request, Response: response}, nil
+	return pending.Wait(ctx)
 }
 
 func (s *claudeSession) RawEvents(observer oar.RawEventObserver, cursor *oar.Cursor) oar.Unsubscribe {

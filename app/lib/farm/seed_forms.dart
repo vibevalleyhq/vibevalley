@@ -167,7 +167,7 @@ class _WaterFormState extends ConsumerState<WaterForm> {
         const SizedBox(height: 4),
         Text('这句话记在它的工单串里，它回的话也在那儿。', style: xs),
         const SizedBox(height: 4),
-        Text('现在的活：${w.task}', style: xs),
+        Text('现在的活：${w.brief}', style: xs),
         const SizedBox(height: 12),
         Wrap(
           spacing: 6,

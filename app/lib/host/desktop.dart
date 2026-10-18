@@ -107,7 +107,9 @@ class DesktopHostChannel {
 
   static const _channel = MethodChannel('vibevalley/desktop');
   final _commands = StreamController<HostCommand>.broadcast();
-  RunningServer? _server;
+  ServerLauncher? _launcher;
+  Future<void>? _localStart;
+  bool _quitting = false;
   bool _listening = false;
 
   Stream<HostCommand> get commands => _commands.stream;
@@ -122,7 +124,14 @@ class DesktopHostChannel {
           if (command != null) _commands.add(command);
           return null;
         case 'quit':
-          await _server?.stop();
+          _quitting = true;
+          final starting = _localStart;
+          await _launcher?.stop();
+          try {
+            await starting;
+          } on Object {
+            /* A failed preparation owns no running farm. */
+          }
           return null;
       }
       throw MissingPluginException(call.method);
@@ -156,19 +165,25 @@ String? bundledServer(Map<String, String> env) {
   return File(beside).existsSync() ? beside : null;
 }
 
-Future<void> startDesktop() async {
+Future<void> startDesktop({Map<String, String>? environment}) async {
   if (!isMacDesktop) return;
   final host = DesktopHostChannel.instance.._listen();
   await host._invoke('setup', {'title': desktopChannel.titled('码农场物语')});
   if (farmConnection.value.choice.useRemote) return;
-  await _startLocalFarm();
+  await _startLocalFarm(environment);
 }
 
-Future<void> _startLocalFarm() async {
-  if (!isMacDesktop || farmConnection.value.localAddress != null) return;
+Future<void> _startLocalFarm([Map<String, String>? environment]) {
+  if (!isMacDesktop || farmConnection.value.localAddress != null) return Future.value();
   final host = DesktopHostChannel.instance.._listen();
+  if (host._quitting) return Future.value();
+  return host._localStart ??= _launchLocalFarm(host, environment ?? Platform.environment).whenComplete(() {
+    host._localStart = null;
+  });
+}
+
+Future<void> _launchLocalFarm(DesktopHostChannel host, Map<String, String> env) async {
   if (const String.fromEnvironment('VIBEVALLEY_SERVER').isNotEmpty) return;
-  final env = Platform.environment;
   final binary = bundledServer(env);
   if (binary == null) {
     debugPrint('vibevalley desktop: no server in the bundle; using $serverAddress');
@@ -176,7 +191,8 @@ Future<void> _startLocalFarm() async {
   }
   final home = desktopHome(env);
   await Directory(home).create(recursive: true);
-  final path = await loginShellPath(env['PATH'] ?? '/usr/bin:/bin:/usr/sbin:/sbin');
+  final path = await loginShellPath(env['PATH'] ?? '/usr/bin:/bin:/usr/sbin:/sbin', shell: env['SHELL']);
+  if (host._quitting) return;
   final launcher = ServerLauncher(
     binary: binary,
     // The rest of the configuration is the home's vibevalley.yaml; the login shell's PATH goes on top.
@@ -184,12 +200,18 @@ Future<void> _startLocalFarm() async {
     logFile: File('${env['HOME'] ?? ''}/Library/Logs/${desktopChannel.productName}/server.log'),
     workingDirectory: home,
   );
+  host._launcher = launcher;
   try {
     final server = await launcher.start();
-    host._server = server;
+    if (host._quitting) {
+      await launcher.stop();
+      return;
+    }
     final address = server.url.toString();
     farmConnection.value = farmConnection.value.withLocal(address);
     await host._invoke('server', {'pid': server.pid, 'url': address});
+  } on ServerStartCanceled {
+    return;
   } on ServerFailed catch (e) {
     await host._invoke('fatal', {'title': desktopChannel.titled('码农场物语开不了门'), 'text': e.reason});
   }

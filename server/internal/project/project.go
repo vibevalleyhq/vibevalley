@@ -22,7 +22,7 @@ import (
 	"vibevalley/pkg/x/str"
 )
 
-// A harvest that would conflict is not attempted: the session is asked to merge the main branch in and resolve it. Merging into a playbook's branch
+// A harvest that would conflict is not attempted: the session is asked to merge the main branch in and resolve it. Merging into a task's branch
 // never checks it out: merge-tree writes the tree, commit-tree and update-ref put it on the branch.
 
 const (

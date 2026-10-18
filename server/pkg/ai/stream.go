@@ -44,19 +44,14 @@ func Stream(ctx context.Context, model Model, c Context, options StreamOptions) 
 }
 
 func Complete(ctx context.Context, model Model, c Context, options StreamOptions) AssistantMessage {
-	var last *AssistantMessage
-	for e := range Stream(ctx, model, c, options) {
-		if m, ok := e.Final(); ok {
-			last = &m
-		}
+	response := NewResponse(model)
+	for event := range Stream(ctx, model, c, options) {
+		response.Observe(event)
 	}
-	if last != nil {
-		return *last
+	if ctx.Err() != nil {
+		return response.Aborted()
 	}
-	m := NewAnswer(model, "").Partial()
-	m.StopReason = StopError
-	m.ErrorMessage = "没有回答"
-	return m
+	return response.Result()
 }
 
 func FromEvents(ctx context.Context, events []AssistantMessageEvent) <-chan AssistantMessageEvent {

@@ -10,10 +10,10 @@ Status: implemented
 - `channel` 一份（`chatIsSpace`、`chatTrim`、`chatUnits`、`chatClip`，正则里还把空白字符类手写了三遍）；
 - `base` 的 `ClipLine`（用的是 Go 的空白，和别处不一样）、`Head`；
 - `worker` 的 `Cut`、`clip`；
-- `protocol` 的 `Clip`、`playbookSlice`；
+- `protocol` 的 `Clip`、`taskSlice`；
 - `manager` 的 `managerUnits`。
 
-照 JavaScript 写数字的有 `protocol` 的 `NumberText`、`ToFixed`，计划和定时里另有一份简写的 `playbookNumberText`。可选字段要的指针，有 `testkit.Ptr`、`voicePtr`、`lanPtr`、`corePtr`、`rulesPtr`，解引用的 `str()` 写了三遍。`base.NowMs`、`base.Sleep` 和农场无关，却放在地基里。
+照 JavaScript 写数字的有 `protocol` 的 `NumberText`、`ToFixed`，计划和定时里另有一份简写的 `taskNumberText`。可选字段要的指针，有 `testkit.Ptr`、`voicePtr`、`lanPtr`、`corePtr`、`rulesPtr`，解引用的 `str()` 写了三遍。`base.NowMs`、`base.Sleep` 和农场无关，却放在地基里。
 
 ## Decision
 
@@ -22,7 +22,7 @@ Status: implemented
   - `num`：`Text`（`String(n)`）、`Fixed`（`toFixed`）、`Round`（`Math.round`）；
   - `ptr`：`To`、`Or`、`Value`；
   - `clock`：`NowMs`、`Sleep`。
-- **别处的副本都删掉**，调用方改用它们。`base.ClipLine` 并进 `str.Clip`：空白统一按 JavaScript 的算，也就是客户端的算法。`playbookNumberText` 换成 `num.Text`。
+- **别处的副本都删掉**，调用方改用它们。`base.ClipLine` 并进 `str.Clip`：空白统一按 JavaScript 的算，也就是客户端的算法。`taskNumberText` 换成 `num.Text`。
 - **农场的说法留在农场**：`Yuan`（钱怎么说）留在 `protocol`；`DayMs` 是要生成到 Dart 的共用常量，留在 `shapes.go`。
 
 ## Alternatives considered

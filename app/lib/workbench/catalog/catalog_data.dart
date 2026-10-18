@@ -97,16 +97,16 @@ class Group {
 int naturalCompare(String a, String b) {
   final re = RegExp(r'\d+|\D+');
   final pa = re.allMatches(a.toLowerCase()).map((m) => m[0]!).toList();
-  final pb = re.allMatches(b.toLowerCase()).map((m) => m[0]!).toList();
-  for (var i = 0; i < pa.length && i < pb.length; i++) {
+  final graph = re.allMatches(b.toLowerCase()).map((m) => m[0]!).toList();
+  for (var i = 0; i < pa.length && i < graph.length; i++) {
     final x = pa[i];
-    final y = pb[i];
+    final y = graph[i];
     final nx = int.tryParse(x);
     final ny = int.tryParse(y);
     final c = nx != null && ny != null ? nx.compareTo(ny) : x.compareTo(y);
     if (c != 0) return c;
   }
-  final byLength = pa.length.compareTo(pb.length);
+  final byLength = pa.length.compareTo(graph.length);
   return byLength != 0 ? byLength : a.compareTo(b);
 }
 

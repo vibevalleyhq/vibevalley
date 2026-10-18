@@ -16,7 +16,7 @@ Status: implemented
 - **管家的记性不换存法，页面直接读写那个文件**（`server/internal/memory/memory.go`，接口 `/api/v1/manager/...`）：
   - `MEMORY.md` 一行算一条，按这一行的 hash 认，用来忘掉某一条。
   - 主人替它记的写成「主人交代：……」。这样页面分得清是谁记的，管家读的时候也知道。
-  - 文件的读写和搜法放在 VibeValley 自己的 agent（`server/pkg/agent/memory.go`：`MemoryLines`、`ForgetLine`、`ArchiveFiles`、`ReadArchive`、`SearchArchive`）。管家自己的 `search_archive` 工具和页面用的是同一套。
+  - 文件的读写和搜法放在 VibeValley 自己的 agent（`server/internal/agent/brain/memory.go`：`MemoryLines`、`ForgetLine`、`ArchiveFiles`、`ReadArchive`、`SearchArchive`）。管家自己的 `search_archive` 工具和页面用的是同一套。
   - 页面显示系统提示还带得下几条，带不下的旧条目在列表里变淡。
 - **帮工的记性面板分三块**（`app/lib/workbench/shared/memory_panels.dart`）：
   - **手上的活**：放在最上面，因为它是现在的状态，不是一条笔记。

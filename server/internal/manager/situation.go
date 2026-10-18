@@ -13,15 +13,15 @@ import (
 func (fm *manager) situation(conversation string) string {
 	var sessions []string
 	for _, a := range fm.agentsWithIssues() {
-		line := fmt.Sprintf("- %s（id %s，%s）适合：%s", a.agent.Name, a.agent.ID, protocol.RuntimeLabel(a.agent.Runtime), a.agent.Role)
-		if len(a.agent.Tags) > 0 {
-			line += "；关键词：" + strings.Join(a.agent.Tags, "、")
+		line := fmt.Sprintf("- %s（id %s，%s）适合：%s", a.Agent.Name, a.Agent.ID, protocol.RuntimeLabel(a.Agent.Runtime), a.Agent.Role)
+		if len(a.Agent.Tags) > 0 {
+			line += "；关键词：" + strings.Join(a.Agent.Tags, "、")
 		}
 		switch {
-		case managerUsable(a):
-			line += "；" + managerQuota(a.info)
-		case len(a.blocking) > 0:
-			line += "；现在派不了：" + a.blocking[0].Text
+		case a.Usable():
+			line += "；" + managerQuota(a.Info)
+		case len(a.Blocking) > 0:
+			line += "；现在派不了：" + a.Blocking[0].Text
 		default:
 			line += "；现在派不了：停用了"
 		}
@@ -38,7 +38,7 @@ func (fm *manager) situation(conversation string) string {
 				channel = *w.Session.Channel
 			}
 			if channel == c.ID {
-				theirs = append(theirs, managerDescribeSession(w))
+				theirs = append(theirs, fm.tool.SessionLine(w))
 			}
 		}
 		head := "#" + c.Name
@@ -62,18 +62,18 @@ func (fm *manager) situation(conversation string) string {
 		}
 		folders = strings.Join(names, "、")
 	}
-	plans := ""
+	tasks := ""
 	var open []string
-	for _, pb := range protocol.PlaybooksOf(fm.core.State()) {
-		if protocol.IsOpen(pb) {
-			open = append(open, protocol.PlaybookText(pb))
+	for _, graph := range protocol.GraphsOf(fm.core.State()) {
+		if protocol.IsOpen(graph) {
+			open = append(open, protocol.GraphText(graph))
 		}
 	}
 	if len(open) > 0 {
-		plans = "\n种植计划：\n" + strings.Join(open, "\n")
+		tasks = "\n种植计划：\n" + strings.Join(open, "\n")
 	}
 	return "【农场现状】\n项目（工作目录 " + fm.projects.Root() + " 下的文件夹）：" + folders + "\n可以派的帮工：\n" + strings.Join(sessions, "\n") +
-		"\n各频道和地里的帮工：\n" + strings.Join(byChannel, "\n") + plans + "\n你正在回话的频道：#" + here.Name
+		"\n各频道和地里的帮工：\n" + strings.Join(byChannel, "\n") + tasks + "\n你正在回话的频道：#" + here.Name
 }
 
 type situationLine struct{ head, line string }

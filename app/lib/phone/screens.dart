@@ -458,12 +458,12 @@ class _Meter extends StatelessWidget {
 }
 
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key, required this.missed, required this.onOpen, required this.onCall, required this.onChannels, required this.onPlans});
+  const HomeScreen({super.key, required this.missed, required this.onOpen, required this.onCall, required this.onChannels, required this.onTaskBoard});
   final int missed;
   final ValueChanged<PhoneApp> onOpen;
   final VoidCallback onCall;
   final VoidCallback onChannels;
-  final VoidCallback onPlans;
+  final VoidCallback onTaskBoard;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -474,7 +474,7 @@ class HomeScreen extends ConsumerWidget {
       ('记录', sprite('icon-log'), 0, () => onOpen(PhoneApp.log)),
       ('管家', const _Manager(28), 0, onCall),
       ('频道', sprite('icon-board'), 0, onChannels),
-      ('计划', sprite('icon-plan'), 0, onPlans),
+      ('计划', sprite('icon-task-board'), 0, onTaskBoard),
       ('方块', const _BlocksIcon(), 0, () => onOpen(PhoneApp.blocks)),
       (
         '推箱子',

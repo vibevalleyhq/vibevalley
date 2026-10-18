@@ -61,9 +61,10 @@ type Subagent struct {
 	// The child's own session, for everything the subagent surface does not cover.
 	Session oar.Session
 
-	identity subagentIdentity
-	hooks    subagentHooks
-	seen     *progress
+	identity  subagentIdentity
+	hooks     subagentHooks
+	seen      *progress
+	following following
 
 	mu      sync.Mutex
 	state   SubagentState
@@ -75,12 +76,14 @@ type Subagent struct {
 }
 
 func newSubagent(identity subagentIdentity, session oar.Session, hooks subagentHooks) *Subagent {
-	agent := &Subagent{ID: identity.id, Name: identity.name, Runtime: identity.runtime, Session: session, identity: identity, hooks: hooks, seen: newProgress(), state: "idle"}
+	agent := &Subagent{ID: identity.id, Name: identity.name, Runtime: identity.runtime, Session: session, identity: identity, hooks: hooks, seen: newProgress(), state: "idle", following: following{wake: make(chan struct{})}}
 	reader := observe.EventsReader(agent.observe)
-	session.RawEvents(func(record oar.RawEvent) {
+	// Replay must not call crew hooks while register holds the crew lock. The cursor also covers records produced
+	// before this goroutine subscribes, so Prompt may safely start immediately after registration.
+	go session.RawEvents(func(record oar.RawEvent) {
 		reader(record)
 		agent.seen.done(record.Seq)
-	}, nil)
+	}, &oar.Cursor{SessionID: session.ID(), AfterSeq: -1})
 	return agent
 }
 
@@ -94,12 +97,13 @@ func (a *Subagent) settleLocked(report *SubagentReport) {
 
 // endedLocked closes the open turn's report; the caller runs the returned
 // hooks after releasing the lock.
-func (a *Subagent) endedLocked(outcome oar.TurnOutcome, at int64) func() {
+func (a *Subagent) endedLocked(outcome oar.TurnOutcome, at, afterSeq int64) func() {
 	a.turns++
 	if a.state == "running" {
 		a.state = "idle"
 	}
 	report := SubagentReport{ID: a.identity.id, Name: a.identity.name, Runtime: a.identity.runtime, SessionID: a.Session.ID(), Turn: a.turns, Outcome: outcome, Text: a.text, Log: a.identity.log, EndedAt: at}
+	a.following.append(afterSeq, report)
 	a.text = ""
 	a.lastEnd = endStatus(outcome)
 	copied := report
@@ -128,7 +132,7 @@ func (a *Subagent) observe(event oar.Event) {
 	a.mu.Lock()
 	switch body := event.Body.(type) {
 	case oar.TurnEnded:
-		after = append(after, a.endedLocked(body.Outcome, event.ReceivedAt))
+		after = append(after, a.endedLocked(body.Outcome, event.ReceivedAt, event.Seq))
 	case oar.Exited:
 		if !a.closing {
 			// A runtime that died mid-turn reported no end of its own; the parent still gets one.
@@ -137,7 +141,7 @@ func (a *Subagent) observe(event oar.Event) {
 				if body.Code != nil {
 					code = fmt.Sprint(*body.Code)
 				}
-				after = append(after, a.endedLocked(oar.Failed(oar.FailureRuntimeExited, fmt.Sprintf("the runtime exited (%s)", code)), event.ReceivedAt))
+				after = append(after, a.endedLocked(oar.Failed(oar.FailureRuntimeExited, fmt.Sprintf("the runtime exited (%s)", code)), event.ReceivedAt, event.Seq))
 			}
 			after = append(after, a.shutLocked())
 		}
@@ -339,7 +343,7 @@ func (a *Subagent) Close(ctx context.Context) (err error) {
 	a.mu.Lock()
 	if open != -1 && a.turns == open {
 		// Disposed mid-turn and the runtime reported no end for it.
-		after = append(after, a.endedLocked(oar.AbortedOutcome(), time.Now().UnixMilli()))
+		after = append(after, a.endedLocked(oar.AbortedOutcome(), time.Now().UnixMilli(), target))
 	}
 	after = append(after, a.shutLocked())
 	a.mu.Unlock()

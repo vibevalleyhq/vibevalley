@@ -45,7 +45,7 @@ func (e *SendError) Error() string { return e.Reason }
 
 type API interface {
 	Check(ctx context.Context, app App) error
-	Listen(ctx context.Context, app App, got func(Message)) error
+	Listen(ctx context.Context, app App, got func(Message) error) error
 	SendText(ctx context.Context, app App, openID, text, msgID string) (string, *SendError)
 }
 
@@ -136,7 +136,7 @@ func (q *Client) Check(ctx context.Context, app App) error {
 	return err
 }
 
-func (q *Client) Listen(ctx context.Context, app App, got func(Message)) error {
+func (q *Client) Listen(ctx context.Context, app App, got func(Message) error) error {
 	ctx, cancel := context.WithCancel(ctx)
 	var workers sync.WaitGroup
 	defer workers.Wait()
@@ -256,7 +256,9 @@ func (q *Client) Listen(ctx context.Context, app App, got func(Message)) error {
 				Attachments []any `json:"attachments"`
 			}
 			if json.Unmarshal(msg.D, &d) == nil && d.ID != "" && d.Author.UserOpenID != "" {
-				got(Message{ID: d.ID, From: d.Author.UserOpenID, Content: d.Content, Attachments: len(d.Attachments)})
+				if err := got(Message{ID: d.ID, From: d.Author.UserOpenID, Content: d.Content, Attachments: len(d.Attachments)}); err != nil {
+					return err
+				}
 			}
 		case 7:
 			return errors.New("QQ 网关：QQ 让重新连接")

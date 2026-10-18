@@ -548,7 +548,7 @@ class _SessionCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            h.task,
+            h.brief,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: _mono.copyWith(color: Palette.ink300),

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"slices"
+	"sync"
 
 	"go.uber.org/fx"
 )
@@ -18,10 +19,12 @@ type Layer func(r *Readies) fx.Option
 type App struct {
 	Config
 
-	app     *fx.App
-	readies *Readies
-	db      *sql.DB
-	cancel  context.CancelFunc
+	app       *fx.App
+	readies   *Readies
+	db        *sql.DB
+	cancel    context.CancelFunc
+	homeLease *os.File
+	closing   sync.Once
 }
 
 func NewApp(cfg Config, layers []Layer, options ...fx.Option) (*App, error) {
@@ -31,11 +34,21 @@ func NewApp(cfg Config, layers []Layer, options ...fx.Option) (*App, error) {
 	if err := os.MkdirAll(cfg.Home, 0o755); err != nil {
 		return nil, err
 	}
+	lease, err := leaseHome(cfg.Home)
+	if err != nil {
+		return nil, err
+	}
+	constructed := false
+	defer func() {
+		if !constructed {
+			lease.Close()
+		}
+	}()
 	if err := os.MkdirAll(cfg.WorkRoot, 0o755); err != nil {
 		return nil, err
 	}
 	cfg.DBPath = cfg.DB()
-	a := &App{Config: cfg, readies: &Readies{}}
+	a := &App{Config: cfg, readies: &Readies{}, homeLease: lease}
 	var all []fx.Option
 	for _, layer := range layers {
 		all = append(all, layer(a.readies))
@@ -43,6 +56,7 @@ func NewApp(cfg Config, layers []Layer, options ...fx.Option) (*App, error) {
 	a.app = fx.New(
 		fx.NopLogger,
 		fx.Supply(cfg),
+		fx.Supply(a.readies),
 		fx.Provide(func() (*sql.DB, error) {
 			var err error
 			// Kept as soon as it is open: closed again when a service cannot be built.
@@ -60,6 +74,7 @@ func NewApp(cfg Config, layers []Layer, options ...fx.Option) (*App, error) {
 		}
 		return nil, err
 	}
+	constructed = true
 	return a, nil
 }
 
@@ -73,15 +88,19 @@ func (a *App) Start(ctx context.Context) error {
 }
 
 func (a *App) Close() {
-	if a.cancel != nil {
-		a.cancel()
-	}
-	if err := a.app.Stop(context.Background()); err != nil {
-		log.Printf("vibevalley: stopping: %v", err)
-	}
-	if a.db != nil {
-		a.db.Close()
-	}
+	a.closing.Do(func() {
+		if a.cancel != nil {
+			a.cancel()
+		}
+		if err := a.app.Stop(context.Background()); err != nil {
+			log.Printf("vibevalley: stopping: %v", err)
+		}
+		if a.db != nil {
+			a.db.Close()
+		}
+		// Every service's final write and the database close happen before another farm can open this home.
+		a.homeLease.Close()
+	})
 }
 
 func (a *App) Readied() []Readier {

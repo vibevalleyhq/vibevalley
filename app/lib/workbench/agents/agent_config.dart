@@ -42,7 +42,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
   Widget build(BuildContext context) {
     final draft = widget.draft;
     final patch = widget.patch;
-    final facts = factsOf(draft.runtime);
+    final facts = factsOf(draft.runtime, widget.runtime);
     final tabs = [
       (_Tab.who, '身份'),
       (_Tab.runtime, '能力'),
@@ -93,8 +93,12 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
           hint: '停用后管家不会派它，名字点到也会拒绝。',
         ),
       ],
-      _Tab.runtime => [_RuntimeChoice(draft: draft, patch: patch), ..._modelAndEffort(draft, widget.runtime, patch), _RuntimeFacts(runtime: draft.runtime)],
-      _Tab.persona => _personaEditor(draft, patch),
+      _Tab.runtime => [
+        _RuntimeChoice(draft: draft, patch: patch),
+        ..._modelAndEffort(draft, widget.runtime, patch),
+        _RuntimeFacts(runtime: draft.runtime, info: widget.runtime),
+      ],
+      _Tab.persona => _personaEditor(draft, widget.runtime, patch),
       _Tab.skills => [_SkillPicker(draft: draft, runtime: widget.runtime, patch: patch)],
       _Tab.tools => _toolsEditor(draft, widget.runtime, patch),
       _Tab.env => [
@@ -163,8 +167,8 @@ class _RuntimeChoice extends ConsumerWidget {
   final Agent draft;
   final ValueChanged<Agent> patch;
 
-  void _choose(String id) {
-    final facts = factsOf(id);
+  void _choose(String id, RuntimeInfo? info) {
+    final facts = factsOf(id, info);
     final cannotTakeSystemPrompt = facts.refused[sessionAppendSystemPrompt] != null || facts.refused[sessionSystemPrompt] != null;
     // A persona the new runtime can't take as a system prompt goes into each job instead.
     patch(
@@ -179,7 +183,7 @@ class _RuntimeChoice extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final runtimes = ref.watch(workbenchConfigProvider.select((c) => c.runtimes));
+    final runtimes = ref.watch(runtimesProvider).value ?? const <RuntimeInfo>[];
     return PxField(
       label: '农机',
       hint: const Text('换农机会清掉模型和推理强度；长相（动物和衣服）不变。'),
@@ -202,7 +206,7 @@ class _RuntimeChoice extends ConsumerWidget {
                     final status = available ? (info!.settings.enabled ? (installation.version ?? '可用') : '已停用') : '这台机器上没有';
                     return WorkbenchChoice(
                       active: active,
-                      onTap: () => _choose(p.id),
+                      onTap: () => _choose(p.id, info),
                       semanticLabel: p.label,
                       padding: const EdgeInsets.all(8),
                       child: Row(
@@ -247,7 +251,7 @@ List<Widget> _modelAndEffort(Agent draft, RuntimeInfo? runtime, ValueChanged<Age
   final fallback = defaultModel.isNotEmpty ? defaultModel : (models.where((m) => m.isDefault).firstOrNull?.id ?? '');
   final want = draft.model.isNotEmpty ? draft.model : fallback;
   final model = models.where((m) => m.id == want).firstOrNull;
-  final refusedEffort = factsOf(draft.runtime).refused[sessionEffort];
+  final refusedEffort = factsOf(draft.runtime, runtime).refused[sessionEffort];
   final levels = model?.effortLevels ?? const <String>[];
   return [
     PxField(
@@ -278,12 +282,13 @@ List<Widget> _modelAndEffort(Agent draft, RuntimeInfo? runtime, ValueChanged<Age
 }
 
 class _RuntimeFacts extends StatelessWidget {
-  const _RuntimeFacts({required this.runtime});
+  const _RuntimeFacts({required this.runtime, this.info});
   final String runtime;
+  final RuntimeInfo? info;
 
   @override
   Widget build(BuildContext context) {
-    final facts = factsOf(runtime);
+    final facts = factsOf(runtime, info);
     final line = KitText.xs.copyWith(color: Palette.bark600);
     return PxCard(
       title: '${runtimeName(runtime)} 能做什么',
@@ -321,8 +326,8 @@ const _personaModes = [
   (value: PersonaMode.prompt, label: '写进工单开头', detail: '每张工单前面加上人设。所有 runtime 都能用，但会被长对话冲淡。', option: null),
 ];
 
-List<Widget> _personaEditor(Agent draft, ValueChanged<Agent> patch) {
-  final facts = factsOf(draft.runtime);
+List<Widget> _personaEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent> patch) {
+  final facts = factsOf(draft.runtime, runtime);
   final mode = _personaModes.where((m) => m.value == draft.personaMode).firstOrNull;
   return [
     PxField(
@@ -433,7 +438,7 @@ class _SkillPicker extends ConsumerWidget {
 }
 
 List<Widget> _toolsEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent> patch) {
-  final facts = factsOf(draft.runtime);
+  final facts = factsOf(draft.runtime, runtime);
   final mcpRefused = facts.refused[sessionMcpServers];
   final toolsRefused = facts.refused[sessionDisallowedTools];
   final tools = runtime?.tools;

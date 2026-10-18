@@ -119,11 +119,11 @@ func TestStarterTasks(t *testing.T) {
 	}
 }
 
-func TestPlaybookHarvested(t *testing.T) {
-	p := progressOf([]protocol.LedgerEntry{{Value: protocol.LedgerEntryPlaybook{At: progressAt, Playbook: "p1", Merged: 5, Parallel: true}}})
-	testkit.Eq(t, p.Counts["big_playbook"], int64(5))
-	testkit.Eq(t, p.Counts["parallel_plan"], int64(1))
-	testkit.Eq(t, progressUnlockIDs(p.Unlocked, ""), []string{"big_playbook#1", "big_playbook#2", "parallel_plan#1"})
+func TestTaskHarvested(t *testing.T) {
+	p := progressOf([]protocol.LedgerEntry{{Value: protocol.LedgerEntryGraph{At: progressAt, Graph: "p1", Merged: 5, Parallel: true}}})
+	testkit.Eq(t, p.Counts["big_graph"], int64(5))
+	testkit.Eq(t, p.Counts["parallel_graph"], int64(1))
+	testkit.Eq(t, progressUnlockIDs(p.Unlocked, ""), []string{"big_graph#1", "big_graph#2", "parallel_graph#1"})
 	testkit.Eq(t, p.Coins, int64(80+40+10))
 }
 
@@ -175,7 +175,7 @@ func TestCarried(t *testing.T) {
 }
 
 func progressSession(id string, phase protocol.PhaseValue) protocol.Session {
-	return protocol.Session{ID: id, Name: id, Agent: "lab", Runtime: "pi", Task: "…", HiredAt: 0, Runs: 0, Phase: protocol.Phase{Value: phase}}
+	return protocol.Session{ID: id, Name: id, Agent: "lab", Runtime: "pi", Brief: "…", HiredAt: 0, Runs: 0, Phase: protocol.Phase{Value: phase}}
 }
 
 var progressWorkingPhase = protocol.PhaseWorking{Since: 0, Doing: protocol.Doing{Action: protocol.SessionActionThinking, Label: ""}}
@@ -260,21 +260,21 @@ func TestEntriesWithAgent(t *testing.T) {
 	testkit.Eq(t, entriesFor(farm, came, after), []protocol.LedgerEntry{{Value: protocol.LedgerEntryHired{Session: "w2", Agent: ptr.To("lab")}}})
 }
 
-func TestEntriesPlaybooksLevelsBeds(t *testing.T) {
-	pb := protocol.Playbook{ID: "p1", Title: "菱形", Goal: "", Project: "x", State: protocol.PlaybookStatePlanning, Parallel: 3, CreatedAt: 0, Nodes: []protocol.PlaybookNode{
-		{ID: "a", Title: "a", Task: "a", Needs: []string{}, State: protocol.NodeStateMerged},
-		{ID: "b", Title: "b", Task: "b", Needs: []string{}, State: protocol.NodeStateMerged},
+func TestEntriesTasksLevelsBeds(t *testing.T) {
+	graph := protocol.TaskGraph{ID: "p1", Title: "菱形", Goal: "", Project: "x", State: protocol.GraphStateSplitting, Parallel: 3, CreatedAt: 0, Tasks: []protocol.Task{
+		{ID: "a", Title: "a", Brief: "a", Needs: []string{}, State: protocol.TaskStateMerged},
+		{ID: "b", Title: "b", Brief: "b", Needs: []string{}, State: protocol.TaskStateMerged},
 	}}
-	in := func(s protocol.PlaybookState) protocol.Playbook { p := pb; p.State = s; return p }
-	parent := func(state protocol.CoreState, s protocol.PlaybookState) protocol.Fact {
-		return protocol.Fact{Value: protocol.FactIssue{At: 2, Issue: protocol.PlaybookIssues(in(s), state.Issues, 2)[0]}}
+	in := func(s protocol.GraphState) protocol.TaskGraph { p := graph; p.State = s; return p }
+	parent := func(state protocol.CoreState, s protocol.GraphState) protocol.Fact {
+		return protocol.Fact{Value: protocol.FactIssue{At: 2, Issue: protocol.GraphIssues(in(s), state.Issues, 2)[0]}}
 	}
-	planning := progressWithPlaybooks(protocol.EmptyCoreState(), pb)
-	testkit.Eq(t, progressTold(planning, parent(planning, protocol.PlaybookStateDraft)), []string{"planned"})
-	ripe := progressWithPlaybooks(protocol.EmptyCoreState(), in(protocol.PlaybookStateRipe))
-	done := parent(ripe, protocol.PlaybookStateDone)
+	splitting := progressWithGraphs(protocol.EmptyCoreState(), graph)
+	testkit.Eq(t, progressTold(splitting, parent(splitting, protocol.GraphStateDraft)), []string{"split"})
+	ripe := progressWithGraphs(protocol.EmptyCoreState(), in(protocol.GraphStateRipe))
+	done := parent(ripe, protocol.GraphStateDone)
 	after, _ := protocol.Reduce(ripe, done)
-	testkit.Eq(t, entriesFor(ripe, done, after), []protocol.LedgerEntry{{Value: protocol.LedgerEntryPlaybook{Playbook: "p1", Merged: 2, Parallel: true}}})
+	testkit.Eq(t, entriesFor(ripe, done, after), []protocol.LedgerEntry{{Value: protocol.LedgerEntryGraph{Graph: "p1", Merged: 2, Parallel: true}}})
 	testkit.Eq(t, progressTold(after, done), []string{})
 
 	counted, _ := protocol.Reduce(protocol.EmptyCoreState(), protocol.Fact{Value: protocol.FactCommits{At: 1, Commits: protocol.CommitCount{Total: 95}}})
@@ -320,9 +320,9 @@ func TestStreakIsJavaScriptsNumber(t *testing.T) {
 	}
 }
 
-func progressWithPlaybooks(state protocol.CoreState, playbooks ...protocol.Playbook) protocol.CoreState {
-	for _, pb := range playbooks {
-		for _, issue := range protocol.PlaybookIssues(pb, nil, pb.CreatedAt) {
+func progressWithGraphs(state protocol.CoreState, graphs ...protocol.TaskGraph) protocol.CoreState {
+	for _, graph := range graphs {
+		for _, issue := range protocol.GraphIssues(graph, nil, graph.CreatedAt) {
 			state, _ = protocol.Reduce(state, protocol.Fact{Value: protocol.FactIssue{Issue: issue}})
 		}
 	}

@@ -2,6 +2,8 @@
 
 import 'dart:ui' show Offset, Rect;
 
+import '../game/destinations.dart';
+
 import 'level.dart' show Box;
 
 sealed class VillageHit {
@@ -29,7 +31,7 @@ final class VillageHitDog extends VillageHit {
 
 final class VillageHitSpot extends VillageHit {
   const VillageHitSpot(this.spot);
-  final String spot;
+  final YardPlace spot;
 
   @override
   bool operator ==(Object other) => other is VillageHitSpot && other.spot == spot;
@@ -51,7 +53,7 @@ class VillageHitData {
   const VillageHitData({required this.sessions, required this.dog, required this.spots, required this.plots});
   final Map<String, Rect> sessions;
   final Rect dog;
-  final Map<String, Box> spots;
+  final Map<YardPlace, Box> spots;
   final Map<int, Box> plots;
 }
 

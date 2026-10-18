@@ -140,9 +140,13 @@ func versionSnapshot(ctx context.Context, located LocatedExecutable, options Exe
 // pinned env var. A readiness or version run that never ran to an exit code
 // of its own (a spawn failure, a timeout) is an error.
 func ExecutableInstallation(envVar, command string, fallbacks func() []string, readiness []string, options ExecutableInstallationOptions) oar.InstallationProbe {
-	return func(ctx context.Context) (oar.InstallationSnapshot, error) {
+	return func(ctx context.Context, request oar.InstallationOptions) (oar.InstallationSnapshot, error) {
 		var found []LocatedExecutable
-		if pinned := os.Getenv(envVar); pinned != "" {
+		pinned := os.Getenv(envVar)
+		if request.Binary != nil {
+			pinned = strings.TrimSpace(*request.Binary)
+		}
+		if pinned != "" {
 			if located := LocateExecutable(pinned); located != "" {
 				found = append(found, LocatedExecutable{Command: located})
 			}

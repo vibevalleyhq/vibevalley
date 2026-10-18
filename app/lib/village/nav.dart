@@ -138,8 +138,8 @@ class NavMap {
           if (_free[j] == 0 || _closed[j] == 1) continue;
           // No squeezing diagonally between two blocked cells.
           if (dr != 0 && dc != 0 && (_free[r * _cols + nc] == 0 || _free[nr * _cols + c] == 0)) continue;
-          final step = (dr != 0 && dc != 0 ? _sqrt2 : 1) * (_weight[i] + _weight[j]) * 0.5;
-          final tentative = _g[i] + step;
+          final task = (dr != 0 && dc != 0 ? _sqrt2 : 1) * (_weight[i] + _weight[j]) * 0.5;
+          final tentative = _g[i] + task;
           if (tentative < _g[j]) {
             _g[j] = tentative;
             _came[j] = i;
@@ -153,14 +153,14 @@ class NavMap {
 
   double _lineCost(Pt a, Pt b) {
     final length = math.sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
-    final steps = math.max(1, (length / (_cell * 0.5)).ceil());
+    final tasks = math.max(1, (length / (_cell * 0.5)).ceil());
     var sum = 0.0;
-    for (var s = 0; s <= steps; s++) {
-      final i = _index(Pt(a.x + (b.x - a.x) * s / steps, a.y + (b.y - a.y) * s / steps));
+    for (var s = 0; s <= tasks; s++) {
+      final i = _index(Pt(a.x + (b.x - a.x) * s / tasks, a.y + (b.y - a.y) * s / tasks));
       if (_free[i] == 0) return double.infinity;
       sum += _weight[i];
     }
-    return (sum / (steps + 1)) * (length / _cell);
+    return (sum / (tasks + 1)) * (length / _cell);
   }
 
   /// The ends may sit off the grid's walkable cells (they were snapped there), so never infinity.
@@ -268,7 +268,7 @@ class Walker {
     _path = _route(Pt(x, y), to).skip(1).toList();
   }
 
-  void step(double dt) {
+  void task(double dt) {
     var left = speed * dt;
     while (left > 0 && _path.isNotEmpty) {
       final next = _path.first;

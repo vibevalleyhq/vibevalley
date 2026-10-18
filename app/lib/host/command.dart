@@ -10,7 +10,7 @@ sealed class HostCommand {
       'voice' => const HostVoice(),
       'session' when j['id'] is String => HostOpenSession(j['id'] as String),
       'chat' when j['conversation'] is String => HostOpenChat(j['conversation'] as String),
-      'plans' when j['playbook'] is String => HostOpenPlans(j['playbook'] as String),
+      'taskBoard' when j['task'] is String => HostOpenTaskBoard(j['task'] as String),
       'achievements' => const HostOpenAchievements(),
       _ => null,
     };
@@ -47,15 +47,15 @@ final class HostOpenChat extends HostCommand {
   int get hashCode => conversation.hashCode;
 }
 
-final class HostOpenPlans extends HostCommand {
-  const HostOpenPlans(this.playbook);
-  final String playbook;
+final class HostOpenTaskBoard extends HostCommand {
+  const HostOpenTaskBoard(this.graph);
+  final String graph;
   @override
-  Map<String, Object> toJson() => {'type': 'plans', 'playbook': playbook};
+  Map<String, Object> toJson() => {'type': 'taskBoard', 'task': graph};
   @override
-  bool operator ==(Object other) => other is HostOpenPlans && other.playbook == playbook;
+  bool operator ==(Object other) => other is HostOpenTaskBoard && other.graph == graph;
   @override
-  int get hashCode => playbook.hashCode;
+  int get hashCode => graph.hashCode;
 }
 
 final class HostOpenAchievements extends HostCommand {

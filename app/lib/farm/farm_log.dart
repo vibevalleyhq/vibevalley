@@ -23,7 +23,7 @@ class Warehouse extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final stored = harvestedOf(ref.watch(stateProvider));
     if (stored.isEmpty) return const FarmEmpty('仓库还空着。收获进主分支的活会放在这里。');
-    final plans = ref.watch(plansProvider);
+    final graphs = ref.watch(graphsProvider);
     final agents = ref.watch(agentsProvider).value ?? const <String, Agent>{};
     final now = DateTime.now().millisecondsSinceEpoch;
     return LayoutBuilder(
@@ -38,31 +38,31 @@ class Warehouse extends ConsumerWidget {
                 width: w,
                 child: KitTappable(
                   onTap: () {
-                    if (i.plan != null) {
-                      ref.read(planShownProvider.notifier).set(i.id);
-                      ref.read(panelProvider.notifier).set(FarmPanel.plans);
+                    if (i.graph != null) {
+                      ref.read(graphShownProvider.notifier).set(i.id);
+                      ref.read(farmOverlaysProvider.notifier).panel(FarmPanel.taskBoard);
                     } else {
                       context.go('/issues/${Uri.encodeComponent(i.id)}');
                     }
                   },
-                  semanticLabel: issueTitle(i, plans),
+                  semanticLabel: issueTitle(i, graphs),
                   builder: (context, s) => Container(
                     color: s.hovered ? Palette.cream200 : Palette.cream100,
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SpriteIcon(i.plan != null ? 'icon-plan' : 'icon-harvest', size: 40),
+                        SpriteIcon(i.graph != null ? 'icon-task-board' : 'icon-harvest', size: 40),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(issueTitle(i, plans), maxLines: 2, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                              Text(issueTitle(i, graphs), maxLines: 2, overflow: TextOverflow.ellipsis, style: KitText.sm),
                               const SizedBox(height: 4),
                               Text(
                                 [
-                                  if (i.plan != null) '种植计划',
+                                  if (i.graph != null) '种植计划',
                                   if (i.assignee case final a?) agents[a]?.name ?? a,
                                   ?i.project,
                                   if (i.closedAt case final at?) '${ago(at, now)}收的',

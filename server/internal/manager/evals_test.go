@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	vvagent "vibevalley/internal/agent/brain"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/testkit"
-	vvagent "vibevalley/pkg/agent"
 	"vibevalley/pkg/agentcore"
 	"vibevalley/pkg/ai"
 )
@@ -162,7 +162,7 @@ func TestManagerMarkWrongRefusesALineItNeverHeard(t *testing.T) {
 
 func TestEvalCheckJudgesEveryKind(t *testing.T) {
 	turn := []agentcore.AgentMessage{
-		ai.AssistantMessage{Content: []ai.Content{ai.NewToolCall("c1", "dispatch", json.RawMessage(`{"project":"demo","task":"加个 README"}`))}},
+		ai.AssistantMessage{Content: []ai.Content{ai.NewToolCall("c1", "dispatch", json.RawMessage(`{"project":"demo","brief":"加个 README"}`))}},
 		ai.ToolResultMessage{ToolCallID: "c1", ToolName: "dispatch", Content: []ai.Content{ai.NewText("派了")}},
 		ai.AssistantMessage{Content: []ai.Content{ai.NewText("派给了 Kimi")}},
 	}
@@ -176,8 +176,8 @@ func TestEvalCheckJudgesEveryKind(t *testing.T) {
 		{evalExpect{Kind: evalCalled, Tool: "dispatch"}, turn, true},
 		{evalExpect{Kind: evalCalled, Tool: "dispatch", ArgContains: `"project":"demo"`}, turn, true},
 		{evalExpect{Kind: evalCalled, Tool: "dispatch", ArgContains: `"project":"notes"`}, turn, false},
-		{evalExpect{Kind: evalCalled, Tool: "plan"}, turn, false},
-		{evalExpect{Kind: evalNotCalled, Tool: "plan"}, turn, true},
+		{evalExpect{Kind: evalCalled, Tool: "task"}, turn, false},
+		{evalExpect{Kind: evalNotCalled, Tool: "task"}, turn, true},
 		{evalExpect{Kind: evalNotCalled, Tool: "dispatch"}, turn, false},
 		{evalExpect{Kind: evalSilent}, quiet, true},
 		{evalExpect{Kind: evalSilent}, turn, false},

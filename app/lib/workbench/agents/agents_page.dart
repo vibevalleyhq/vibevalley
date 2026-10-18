@@ -29,7 +29,7 @@ class AgentsPage extends ConsumerWidget {
       for (final a in config.agents)
         _AgentCard(
           agent: a,
-          runtime: config.runtime(a.runtime),
+          runtime: ref.watch(runtimeInfoProvider(a.runtime)),
           tally: tallies[a.id],
           here: sessions.where((h) => h.agent == a.id).length,
           skillName: skillName,

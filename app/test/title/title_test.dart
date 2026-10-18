@@ -57,7 +57,7 @@ void main() {
         StateFrame(
           state: farmState(coins: coins),
           inbox: const [],
-          plans: const [],
+          graphs: const [],
           view: const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {}),
           effects: const [],
         ),

@@ -5,17 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"log"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"time"
-	"unicode/utf8"
 
+	"vibevalley/internal/agent/brain"
 	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
-	"vibevalley/pkg/agent"
 	"vibevalley/pkg/db/generated"
 	"vibevalley/pkg/x/clock"
 	"vibevalley/pkg/x/str"
@@ -255,7 +253,7 @@ func (m *memories) Forget(agentID, id string) error {
 
 func ManagerHome(home string) string { return filepath.Join(home, "manager") }
 
-func memoryLineOf(line agent.MemoryLine, fileTime int64) protocol.Memory {
+func memoryLineOf(line brain.MemoryLine, fileTime int64) protocol.Memory {
 	person := strings.HasPrefix(line.Text, memoryFromPerson)
 	m := protocol.Memory{ID: line.ID, Agent: protocol.ManagerAgent, Kind: protocol.MemoryKindNote, Text: line.Text, At: fileTime}
 	if person {
@@ -272,24 +270,6 @@ func memoryLineOf(line agent.MemoryLine, fileTime int64) protocol.Memory {
 	return m
 }
 
-// memoryCarriedLines is how many of the newest lines the system prompt carries: agent.ReadMemory keeps the last
-// MEMORY_PROMPT_CHARS characters.
-func memoryCarriedLines(lines []agent.MemoryLine) int {
-	chars, n := 0, 0
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := "- " + lines[i].Text + "\n"
-		if lines[i].Date != "" {
-			line = "- " + lines[i].Date + " " + lines[i].Text + "\n"
-		}
-		chars += utf8.RuneCountInString(line)
-		if chars > agent.MEMORY_PROMPT_CHARS {
-			break
-		}
-		n++
-	}
-	return n
-}
-
 type managerMemory struct {
 	home string
 }
@@ -300,23 +280,14 @@ func newManagerMemory(cfg base.Config) (*managerMemory, error) {
 func (*managerMemory) OnStart(context.Context) error { return nil }
 func (*managerMemory) OnStop()                       {}
 
-func (mm *managerMemory) file() string { return agent.MemoryFile(mm.home) }
-
-func (mm *managerMemory) fileTime() int64 {
-	if st, err := os.Stat(mm.file()); err == nil {
-		return st.ModTime().UnixMilli()
-	}
-	return clock.NowMs()
-}
-
 func (mm *managerMemory) Manager() protocol.MemoryList {
-	lines := agent.MemoryLines(mm.home)
-	at := mm.fileTime()
+	snapshot := brain.ReadMemory(mm.home)
+	lines, at := snapshot.Lines, snapshot.UpdatedAt
 	memories := make([]protocol.Memory, len(lines))
 	for i, l := range lines {
 		memories[len(lines)-1-i] = memoryLineOf(l, at)
 	}
-	file, carried := mm.file(), int64(memoryCarriedLines(lines))
+	file, carried := snapshot.File, int64(snapshot.Carried)
 	return protocol.MemoryList{File: &file, Memories: memories, Carried: &carried, Sources: []protocol.MemorySourceInfo{}}
 }
 
@@ -327,25 +298,22 @@ func (mm *managerMemory) WriteManager(text string) (protocol.Memory, error) {
 	if body == "" {
 		return protocol.Memory{}, errors.New("要记的话是空的")
 	}
-	if err := agent.Remember(mm.home, memoryFromPerson+body, time.Now()); err != nil {
+	written, err := brain.Remember(mm.home, memoryFromPerson+body, time.Now())
+	if err != nil {
 		return protocol.Memory{}, errors.New("没记下来：MEMORY.md 写不进去")
 	}
-	lines := agent.MemoryLines(mm.home)
-	if len(lines) == 0 {
-		return protocol.Memory{}, errors.New("没记下来：MEMORY.md 写不进去")
-	}
-	return memoryLineOf(lines[len(lines)-1], clock.NowMs()), nil
+	return memoryLineOf(written, clock.NowMs()), nil
 }
 
-func (mm *managerMemory) ForgetManager(id string) error { return agent.ForgetLine(mm.home, id) }
+func (mm *managerMemory) ForgetManager(id string) error { return brain.ForgetLine(mm.home, id) }
 
 func (mm *managerMemory) Archive(query string) protocol.ArchiveListing {
 	listing := protocol.ArchiveListing{Files: []protocol.ArchiveFile{}, Hits: []protocol.ArchiveHit{}}
-	for _, f := range agent.ArchiveFiles(mm.home) {
+	for _, f := range brain.ArchiveFiles(mm.home) {
 		listing.Files = append(listing.Files, protocol.ArchiveFile{Name: f.Name, At: f.At, Chars: int64(f.Chars)})
 	}
 	if strings.TrimSpace(query) != "" {
-		for _, h := range agent.SearchArchive(mm.home, query, 0) {
+		for _, h := range brain.SearchArchive(mm.home, query, 0) {
 			listing.Hits = append(listing.Hits, protocol.ArchiveHit{File: h.File, Line: int64(h.Line), Text: h.Text})
 		}
 	}
@@ -353,5 +321,5 @@ func (mm *managerMemory) Archive(query string) protocol.ArchiveListing {
 }
 
 func (mm *managerMemory) ArchiveFile(name string) (string, bool) {
-	return agent.ReadArchive(mm.home, name)
+	return brain.ReadArchive(mm.home, name)
 }

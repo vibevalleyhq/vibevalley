@@ -20,7 +20,7 @@ import (
 func recordedSession(t *testing.T) oar.Session {
 	t.Helper()
 	runtime := oartest.Runtime(oartest.Options{Turn: func(turn *oartest.Turn) error { turn.Say("hello"); return nil }})
-	install, err := runtime.Installation(context.Background())
+	install, err := runtime.Installation(context.Background(), oar.InstallationOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

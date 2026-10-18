@@ -1,6 +1,6 @@
 ---
 name: verify-manager-evals
-description: 改了管家的提示（server/internal/manager/manager.go 的 managerSystemPrompt、managerAgentPrompt）、管家的工具和它们的描述（server/internal/manager/tools.go）、或 server/pkg/agent 拼提示和压缩的办法之后，用真的 DeepSeek 模型把 server/internal/manager/testdata/evals 里的样例各重放 5 次，证明以前修好的错没有回来、新修的错修好了。也用在：把主人标出的做错的一轮（家目录的 manager/evals/）做成样例进仓库；主人说「跑一下管家的评测」「管家又犯这个错了」「改了提示看看有没有变坏」。
+description: 改了管家的提示（server/internal/manager/manager.go 的 managerSystemPrompt、managerAgentPrompt）、管家的工具和它们的描述（server/internal/tool）、或 server/internal/agent/brain 拼提示和压缩的办法之后，用真的 DeepSeek 模型把 server/internal/manager/testdata/evals 里的样例各重放 5 次，证明以前修好的错没有回来、新修的错修好了。也用在：把主人标出的做错的一轮（家目录的 manager/evals/）做成样例进仓库；主人说「跑一下管家的评测」「管家又犯这个错了」「改了提示看看有没有变坏」。
 ---
 
 # 验证管家的评测
@@ -9,8 +9,8 @@ description: 改了管家的提示（server/internal/manager/manager.go 的 mana
 
 ## 什么时候用
 
-- 改了 `managerSystemPrompt`、`managerAgentPrompt`、`tools.go` 里工具的名字、描述或参数。
-- 改了 `server/pkg/agent` 里系统提示怎么拼、对话怎么压缩（`agent.go` 的 `systemPrompt`、`compaction.go`）。
+- 改了 `managerSystemPrompt`、`managerAgentPrompt`、`internal/tool` 里管家工具的名字、描述、参数或顺序。
+- 改了 `server/internal/agent/brain` 里系统提示怎么拼、对话怎么压缩（`agent.go` 的 `systemPrompt`、`compaction.go`）。
 - 往 `server/internal/manager/testdata/evals/` 加了样例。
 
 不用它：只改了管家的 harness（输入怎么排队、话发到哪个频道、工具怎么调农场），`go test ./internal/manager` 就够。

@@ -61,7 +61,7 @@ var byRuntime = map[string]map[string]ToolActionKind{
 		"Task": ToolSubagent,
 	},
 	"codex": {"commandExecution": ToolRunCommand, "fileChange": ToolEditFile, "webSearch": ToolWeb, "mcpToolCall": ToolMCP, "sleep": ToolWait},
-	// VibeValley's own agent (vibevalley/agent coding tools), run as the oar runtime "vibevalley" (vibevalley/agent/oarruntime).
+	// VibeValley's own agent (internal/agent/brain coding tools), run as the oar runtime "vibevalley" (internal/agent/brain/oarruntime).
 	"vibevalley": {
 		"bash": ToolRunCommand, "read_file": ToolReadFile, "list_dir": ToolReadFile, "write_file": ToolEditFile, "edit_file": ToolEditFile,
 		"grep": ToolSearch, "web_fetch": ToolWeb,

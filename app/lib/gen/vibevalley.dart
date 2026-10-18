@@ -62,6 +62,17 @@ const sessionMcpServers = 'mcpServers';
 
 const sessionDisallowedTools = 'disallowedTools';
 
+class ServerReady {
+  const ServerReady({required this.url, required this.pid});
+
+  factory ServerReady.fromJson(Map<String, dynamic> j) => ServerReady(url: j['url'] as String, pid: (j['pid'] as num).toDouble());
+
+  final String url;
+  final double pid;
+
+  Map<String, dynamic> toJson() => {'url': url, 'pid': pid};
+}
+
 class SettingsCheck {
   const SettingsCheck({this.problem});
 
@@ -343,6 +354,7 @@ class ChatMessage {
     required this.final_,
     this.mentions,
     this.session,
+    this.run,
     this.outcome,
     this.spent,
     this.spoken,
@@ -362,6 +374,7 @@ class ChatMessage {
     final_: j['final'] as bool,
     mentions: j['mentions'] == null ? null : [for (final e in j['mentions'] as List) e as String],
     session: j['session'] == null ? null : j['session'] as String,
+    run: j['run'] == null ? null : j['run'] as String,
     outcome: j['outcome'] == null ? null : Outcome.fromJson(j['outcome']),
     spent: j['spent'] == null ? null : Spent.fromJson(j['spent'] as Map<String, dynamic>),
     spoken: j['spoken'] == null ? null : j['spoken'] as bool,
@@ -380,6 +393,7 @@ class ChatMessage {
   final bool final_;
   final List<String>? mentions;
   final String? session;
+  final String? run;
   final Outcome? outcome;
   final Spent? spent;
   final bool? spoken;
@@ -398,6 +412,7 @@ class ChatMessage {
     'final': final_,
     if (mentions != null) 'mentions': [for (final e in mentions!) e],
     if (session != null) 'session': session!,
+    if (run != null) 'run': run!,
     if (outcome != null) 'outcome': outcome!.wire,
     if (spent != null) 'spent': spent!.toJson(),
     if (spoken != null) 'spoken': spoken!,
@@ -419,7 +434,7 @@ enum ConversationKind {
 
 enum SubjectKind {
   issue('issue'),
-  playbook('playbook'),
+  graph('graph'),
   talk('talk');
 
   const SubjectKind(this.wire);
@@ -575,15 +590,15 @@ class LastRun {
   Map<String, dynamic> toJson() => {'outcome': outcome.wire, 'summary': summary, 'at': at, if (spent != null) 'spent': spent!.toJson()};
 }
 
-class SessionPlaybook {
-  const SessionPlaybook({required this.id, this.node});
+class SessionGraph {
+  const SessionGraph({required this.id, this.task});
 
-  factory SessionPlaybook.fromJson(Map<String, dynamic> j) => SessionPlaybook(id: j['id'] as String, node: j['node'] == null ? null : j['node'] as String);
+  factory SessionGraph.fromJson(Map<String, dynamic> j) => SessionGraph(id: j['id'] as String, task: j['task'] == null ? null : j['task'] as String);
 
   final String id;
-  final String? node;
+  final String? task;
 
-  Map<String, dynamic> toJson() => {'id': id, if (node != null) 'node': node!};
+  Map<String, dynamic> toJson() => {'id': id, if (task != null) 'task': task!};
 }
 
 class ActionStep {
@@ -645,7 +660,7 @@ class Session {
     required this.name,
     required this.agent,
     required this.runtime,
-    required this.task,
+    required this.brief,
     this.project,
     this.branch,
     this.worktree,
@@ -655,7 +670,7 @@ class Session {
     required this.phase,
     this.lastRun,
     this.spent,
-    this.playbook,
+    this.graph,
     this.channel,
     this.play,
     this.issue,
@@ -667,7 +682,7 @@ class Session {
     name: j['name'] as String,
     agent: j['agent'] as String,
     runtime: j['runtime'] as String,
-    task: j['task'] as String,
+    brief: j['brief'] as String,
     project: j['project'] == null ? null : j['project'] as String,
     branch: j['branch'] == null ? null : j['branch'] as String,
     worktree: j['worktree'] == null ? null : j['worktree'] as String,
@@ -677,7 +692,7 @@ class Session {
     phase: Phase.fromJson(j['phase'] as Map<String, dynamic>),
     lastRun: j['lastRun'] == null ? null : LastRun.fromJson(j['lastRun'] as Map<String, dynamic>),
     spent: j['spent'] == null ? null : Spent.fromJson(j['spent'] as Map<String, dynamic>),
-    playbook: j['playbook'] == null ? null : SessionPlaybook.fromJson(j['playbook'] as Map<String, dynamic>),
+    graph: j['graph'] == null ? null : SessionGraph.fromJson(j['graph'] as Map<String, dynamic>),
     channel: j['channel'] == null ? null : j['channel'] as String,
     play: j['play'] == null ? null : SessionPlay.fromJson(j['play'] as Map<String, dynamic>),
     issue: j['issue'] == null ? null : j['issue'] as String,
@@ -688,7 +703,7 @@ class Session {
   final String name;
   final String agent;
   final String runtime;
-  final String task;
+  final String brief;
   final String? project;
   final String? branch;
   final String? worktree;
@@ -698,7 +713,7 @@ class Session {
   final Phase phase;
   final LastRun? lastRun;
   final Spent? spent;
-  final SessionPlaybook? playbook;
+  final SessionGraph? graph;
   final String? channel;
   final SessionPlay? play;
   final String? issue;
@@ -709,7 +724,7 @@ class Session {
     'name': name,
     'agent': agent,
     'runtime': runtime,
-    'task': task,
+    'brief': brief,
     if (project != null) 'project': project!,
     if (branch != null) 'branch': branch!,
     if (worktree != null) 'worktree': worktree!,
@@ -719,7 +734,7 @@ class Session {
     'phase': phase.toJson(),
     if (lastRun != null) 'lastRun': lastRun!.toJson(),
     if (spent != null) 'spent': spent!.toJson(),
-    if (playbook != null) 'playbook': playbook!.toJson(),
+    if (graph != null) 'graph': graph!.toJson(),
     if (channel != null) 'channel': channel!,
     if (play != null) 'play': play!.toJson(),
     if (issue != null) 'issue': issue!,
@@ -742,8 +757,8 @@ class CommitCount {
   };
 }
 
-enum PlaybookState {
-  planning('planning'),
+enum GraphState {
+  splitting('splitting'),
   draft('draft'),
   running('running'),
   paused('paused'),
@@ -751,30 +766,30 @@ enum PlaybookState {
   done('done'),
   abandoned('abandoned');
 
-  const PlaybookState(this.wire);
+  const GraphState(this.wire);
   final String wire;
 
-  static PlaybookState fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('PlaybookState: unknown value', v));
+  static GraphState fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('GraphState: unknown value', v));
 }
 
-enum NodeState {
+enum TaskState {
   waiting('waiting'),
   working('working'),
   merged('merged'),
   failed('failed'),
   skipped('skipped');
 
-  const NodeState(this.wire);
+  const TaskState(this.wire);
   final String wire;
 
-  static NodeState fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('NodeState: unknown value', v));
+  static TaskState fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('TaskState: unknown value', v));
 }
 
-class PlaybookNode {
-  const PlaybookNode({
+class Task {
+  const Task({
     required this.id,
     required this.title,
-    required this.task,
+    required this.brief,
     required this.needs,
     this.agent,
     this.check,
@@ -796,17 +811,17 @@ class PlaybookNode {
     this.canRemove,
   });
 
-  factory PlaybookNode.fromJson(Map<String, dynamic> j) => PlaybookNode(
+  factory Task.fromJson(Map<String, dynamic> j) => Task(
     id: j['id'] as String,
     title: j['title'] as String,
-    task: j['task'] as String,
+    brief: j['brief'] as String,
     needs: [for (final e in j['needs'] as List) e as String],
     agent: j['agent'] == null ? null : j['agent'] as String,
     check: j['check'] == null ? null : j['check'] as String,
     scope: j['scope'] == null ? null : [for (final e in j['scope'] as List) e as String],
     acceptance: j['acceptance'] == null ? null : j['acceptance'] as bool,
     frozen: j['frozen'] == null ? null : [for (final e in j['frozen'] as List) e as String],
-    state: NodeState.fromJson(j['state']),
+    state: TaskState.fromJson(j['state']),
     session: j['session'] == null ? null : j['session'] as String,
     conclusion: j['conclusion'] == null ? null : j['conclusion'] as String,
     commits: j['commits'] == null ? null : [for (final e in j['commits'] as List) e as String],
@@ -815,7 +830,7 @@ class PlaybookNode {
     failures: j['failures'] == null ? null : (j['failures'] as num).toDouble(),
     blockedBy: j['blockedBy'] == null ? null : [for (final e in j['blockedBy'] as List) e as String],
     stateText: j['stateText'] == null ? null : j['stateText'] as String,
-    actions: j['actions'] == null ? null : [for (final e in j['actions'] as List) NodeAction.fromJson(e)],
+    actions: j['actions'] == null ? null : [for (final e in j['actions'] as List) TaskAction.fromJson(e)],
     actionText: j['actionText'] == null ? null : {for (final e in (j['actionText'] as Map<String, dynamic>).entries) e.key: e.value as String},
     canEdit: j['canEdit'] == null ? null : j['canEdit'] as bool,
     canRemove: j['canRemove'] == null ? null : j['canRemove'] as bool,
@@ -823,14 +838,14 @@ class PlaybookNode {
 
   final String id;
   final String title;
-  final String task;
+  final String brief;
   final List<String> needs;
   final String? agent;
   final String? check;
   final List<String>? scope;
   final bool? acceptance;
   final List<String>? frozen;
-  final NodeState state;
+  final TaskState state;
   final String? session;
   final String? conclusion;
   final List<String>? commits;
@@ -839,7 +854,7 @@ class PlaybookNode {
   final double? failures;
   final List<String>? blockedBy;
   final String? stateText;
-  final List<NodeAction>? actions;
+  final List<TaskAction>? actions;
   final Map<String, String>? actionText;
   final bool? canEdit;
   final bool? canRemove;
@@ -847,7 +862,7 @@ class PlaybookNode {
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
-    'task': task,
+    'brief': brief,
     'needs': [for (final e in needs) e],
     if (agent != null) 'agent': agent!,
     if (check != null) 'check': check!,
@@ -870,8 +885,8 @@ class PlaybookNode {
   };
 }
 
-class Playbook {
-  const Playbook({
+class TaskGraph {
+  const TaskGraph({
     required this.id,
     required this.title,
     required this.goal,
@@ -881,7 +896,7 @@ class Playbook {
     this.stateTag,
     this.actionText,
     this.actions,
-    required this.nodes,
+    required this.tasks,
     required this.parallel,
     this.note,
     required this.createdAt,
@@ -891,17 +906,17 @@ class Playbook {
     this.settled,
   });
 
-  factory Playbook.fromJson(Map<String, dynamic> j) => Playbook(
+  factory TaskGraph.fromJson(Map<String, dynamic> j) => TaskGraph(
     id: j['id'] as String,
     title: j['title'] as String,
     goal: j['goal'] as String,
     project: j['project'] as String,
     branch: j['branch'] == null ? null : j['branch'] as String,
-    state: PlaybookState.fromJson(j['state']),
+    state: GraphState.fromJson(j['state']),
     stateTag: j['stateTag'] == null ? null : j['stateTag'] as String,
     actionText: j['actionText'] == null ? null : {for (final e in (j['actionText'] as Map<String, dynamic>).entries) e.key: e.value as String},
-    actions: j['actions'] == null ? null : [for (final e in j['actions'] as List) PlaybookAction.fromJson(e)],
-    nodes: [for (final e in j['nodes'] as List) PlaybookNode.fromJson(e as Map<String, dynamic>)],
+    actions: j['actions'] == null ? null : [for (final e in j['actions'] as List) GraphAction.fromJson(e)],
+    tasks: [for (final e in j['tasks'] as List) Task.fromJson(e as Map<String, dynamic>)],
     parallel: (j['parallel'] as num).toDouble(),
     note: j['note'] == null ? null : j['note'] as String,
     createdAt: (j['createdAt'] as num).toDouble(),
@@ -920,11 +935,11 @@ class Playbook {
   final String goal;
   final String project;
   final String? branch;
-  final PlaybookState state;
+  final GraphState state;
   final String? stateTag;
   final Map<String, String>? actionText;
-  final List<PlaybookAction>? actions;
-  final List<PlaybookNode> nodes;
+  final List<GraphAction>? actions;
+  final List<Task> tasks;
   final double parallel;
   final String? note;
   final double createdAt;
@@ -943,7 +958,7 @@ class Playbook {
     if (stateTag != null) 'stateTag': stateTag!,
     if (actionText != null) 'actionText': {for (final e in actionText!.entries) e.key: e.value},
     if (actions != null) 'actions': [for (final e in actions!) e.wire],
-    'nodes': [for (final e in nodes) e.toJson()],
+    'tasks': [for (final e in tasks) e.toJson()],
     'parallel': parallel,
     if (note != null) 'note': note!,
     'createdAt': createdAt,
@@ -1465,6 +1480,7 @@ class RuntimeSettings {
 
 class RuntimeInfo {
   const RuntimeInfo({
+    this.refused,
     required this.id,
     required this.installation,
     this.models,
@@ -1481,6 +1497,7 @@ class RuntimeInfo {
   });
 
   factory RuntimeInfo.fromJson(Map<String, dynamic> j) => RuntimeInfo(
+    refused: j['refused'] == null ? null : {for (final e in (j['refused'] as Map<String, dynamic>).entries) e.key: e.value as String},
     id: j['id'] as String,
     installation: Installation.fromJson(j['installation'] as Map<String, dynamic>),
     models: j['models'] == null ? null : [for (final e in j['models'] as List) ModelEntry.fromJson(e as Map<String, dynamic>)],
@@ -1496,6 +1513,7 @@ class RuntimeInfo {
     checkedAt: (j['checkedAt'] as num).toDouble(),
   );
 
+  final Map<String, String>? refused;
   final String id;
   final Installation installation;
   final List<ModelEntry>? models;
@@ -1511,6 +1529,7 @@ class RuntimeInfo {
   final double checkedAt;
 
   Map<String, dynamic> toJson() => {
+    if (refused != null) 'refused': {for (final e in refused!.entries) e.key: e.value},
     'id': id,
     'installation': installation.toJson(),
     if (models != null) 'models': [for (final e in models!) e.toJson()],
@@ -1545,9 +1564,9 @@ enum InboxKind {
   fix('fix'),
   conflict('conflict'),
   quiet('quiet'),
-  planDraft('plan-draft'),
-  planRipe('plan-ripe'),
-  planFailed('plan-failed'),
+  graphDraft('graph-draft'),
+  graphRipe('graph-ripe'),
+  taskFailed('task-failed'),
   mention('mention');
 
   const InboxKind(this.wire);
@@ -1575,7 +1594,7 @@ sealed class InboxTarget {
 
   factory InboxTarget.fromJson(Map<String, dynamic> j) => switch (j['kind']) {
     'session' => InboxTargetSession.fromJson(j),
-    'plans' => InboxTargetPlans.fromJson(j),
+    'graph' => InboxTargetGraph.fromJson(j),
     'chat' => InboxTargetChat.fromJson(j),
     final other => throw FormatException('InboxTarget: unknown kind', other),
   };
@@ -1682,26 +1701,26 @@ sealed class GameEffect {
 }
 
 class StateFrame {
-  const StateFrame({required this.state, required this.inbox, required this.plans, required this.view, required this.effects});
+  const StateFrame({required this.state, required this.inbox, required this.graphs, required this.view, required this.effects});
 
   factory StateFrame.fromJson(Map<String, dynamic> j) => StateFrame(
     state: CoreState.fromJson(j['state'] as Map<String, dynamic>),
     inbox: [for (final e in j['inbox'] as List) InboxItem.fromJson(e as Map<String, dynamic>)],
-    plans: [for (final e in j['plans'] as List) Playbook.fromJson(e as Map<String, dynamic>)],
+    graphs: [for (final e in j['graphs'] as List) TaskGraph.fromJson(e as Map<String, dynamic>)],
     view: FarmView.fromJson(j['view'] as Map<String, dynamic>),
     effects: [for (final e in j['effects'] as List) GameEffect.fromJson(e as Map<String, dynamic>)],
   );
 
   final CoreState state;
   final List<InboxItem> inbox;
-  final List<Playbook> plans;
+  final List<TaskGraph> graphs;
   final FarmView view;
   final List<GameEffect> effects;
 
   Map<String, dynamic> toJson() => {
     'state': state.toJson(),
     'inbox': [for (final e in inbox) e.toJson()],
-    'plans': [for (final e in plans) e.toJson()],
+    'graphs': [for (final e in graphs) e.toJson()],
     'view': view.toJson(),
     'effects': [for (final e in effects) e.toJson()],
   };
@@ -1717,12 +1736,12 @@ sealed class LedgerEntry {
     'conflicted' => LedgerEntryConflicted.fromJson(j),
     'told' => LedgerEntryTold.fromJson(j),
     'reviewed' => LedgerEntryReviewed.fromJson(j),
-    'playbook' => LedgerEntryPlaybook.fromJson(j),
+    'graph' => LedgerEntryGraph.fromJson(j),
     'handoff' => LedgerEntryHandoff.fromJson(j),
     'called' => LedgerEntryCalled.fromJson(j),
     'hired' => LedgerEntryHired.fromJson(j),
     'opened' => LedgerEntryMoment.fromJson(j),
-    'planned' => LedgerEntryMoment.fromJson(j),
+    'split' => LedgerEntryMoment.fromJson(j),
     'voice' => LedgerEntryMoment.fromJson(j),
     'busy6' => LedgerEntryMoment.fromJson(j),
     'level' => LedgerEntryLevel.fromJson(j),
@@ -1733,8 +1752,8 @@ sealed class LedgerEntry {
   Map<String, dynamic> toJson();
 }
 
-enum PlaybookEventKind {
-  planning('planning'),
+enum GraphEventKind {
+  splitting('splitting'),
   drafted('drafted'),
   started('started'),
   paused('paused'),
@@ -1743,39 +1762,38 @@ enum PlaybookEventKind {
   merged('merged'),
   abandoned('abandoned'),
   noted('noted'),
-  nodeStarted('node_started'),
-  nodeSentBack('node_sent_back'),
-  nodeMerged('node_merged'),
-  nodeFailed('node_failed'),
-  nodeRetried('node_retried'),
-  nodeRequeued('node_requeued'),
-  nodeSkipped('node_skipped'),
-  nodeEdited('node_edited'),
-  nodeAdded('node_added'),
-  nodeRemoved('node_removed');
+  taskStarted('task_started'),
+  taskSentBack('task_sent_back'),
+  taskMerged('task_merged'),
+  taskFailed('task_failed'),
+  taskRetried('task_retried'),
+  taskRequeued('task_requeued'),
+  taskSkipped('task_skipped'),
+  taskEdited('task_edited'),
+  taskAdded('task_added'),
+  taskRemoved('task_removed');
 
-  const PlaybookEventKind(this.wire);
+  const GraphEventKind(this.wire);
   final String wire;
 
-  static PlaybookEventKind fromJson(Object? v) =>
-      values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('PlaybookEventKind: unknown value', v));
+  static GraphEventKind fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('GraphEventKind: unknown value', v));
 }
 
-enum PlaybookActor {
+enum GraphActor {
   user('user'),
   manager('manager'),
   system('system');
 
-  const PlaybookActor(this.wire);
+  const GraphActor(this.wire);
   final String wire;
 
-  static PlaybookActor fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('PlaybookActor: unknown value', v));
+  static GraphActor fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('GraphActor: unknown value', v));
 }
 
-class NodeFieldChange {
-  const NodeFieldChange({required this.field, required this.from, required this.to});
+class TaskFieldChange {
+  const TaskFieldChange({required this.field, required this.from, required this.to});
 
-  factory NodeFieldChange.fromJson(Map<String, dynamic> j) => NodeFieldChange(field: j['field'] as String, from: j['from'] as String, to: j['to'] as String);
+  factory TaskFieldChange.fromJson(Map<String, dynamic> j) => TaskFieldChange(field: j['field'] as String, from: j['from'] as String, to: j['to'] as String);
 
   final String field;
   final String from;
@@ -1784,11 +1802,11 @@ class NodeFieldChange {
   Map<String, dynamic> toJson() => {'field': field, 'from': from, 'to': to};
 }
 
-class PlaybookEvent {
-  const PlaybookEvent({
+class GraphEvent {
+  const GraphEvent({
     required this.id,
-    required this.playbook,
-    this.node,
+    required this.graph,
+    this.task,
     required this.kind,
     required this.actor,
     this.session,
@@ -1800,15 +1818,15 @@ class PlaybookEvent {
     this.actorText,
   });
 
-  factory PlaybookEvent.fromJson(Map<String, dynamic> j) => PlaybookEvent(
+  factory GraphEvent.fromJson(Map<String, dynamic> j) => GraphEvent(
     id: j['id'] as String,
-    playbook: j['playbook'] as String,
-    node: j['node'] == null ? null : j['node'] as String,
-    kind: PlaybookEventKind.fromJson(j['kind']),
-    actor: PlaybookActor.fromJson(j['actor']),
+    graph: j['graph'] as String,
+    task: j['task'] == null ? null : j['task'] as String,
+    kind: GraphEventKind.fromJson(j['kind']),
+    actor: GraphActor.fromJson(j['actor']),
     session: j['session'] == null ? null : j['session'] as String,
     detail: j['detail'] == null ? null : j['detail'] as String,
-    changes: j['changes'] == null ? null : [for (final e in j['changes'] as List) NodeFieldChange.fromJson(e as Map<String, dynamic>)],
+    changes: j['changes'] == null ? null : [for (final e in j['changes'] as List) TaskFieldChange.fromJson(e as Map<String, dynamic>)],
     commits: j['commits'] == null ? null : [for (final e in j['commits'] as List) e as String],
     at: (j['at'] as num).toDouble(),
     text: j['text'] == null ? null : j['text'] as String,
@@ -1816,13 +1834,13 @@ class PlaybookEvent {
   );
 
   final String id;
-  final String playbook;
-  final String? node;
-  final PlaybookEventKind kind;
-  final PlaybookActor actor;
+  final String graph;
+  final String? task;
+  final GraphEventKind kind;
+  final GraphActor actor;
   final String? session;
   final String? detail;
-  final List<NodeFieldChange>? changes;
+  final List<TaskFieldChange>? changes;
   final List<String>? commits;
   final double at;
   final String? text;
@@ -1830,8 +1848,8 @@ class PlaybookEvent {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'playbook': playbook,
-    if (node != null) 'node': node!,
+    'graph': graph,
+    if (task != null) 'task': task!,
     'kind': kind.wire,
     'actor': actor.wire,
     if (session != null) 'session': session!,
@@ -2029,11 +2047,11 @@ class VoiceAgent {
   Map<String, dynamic> toJson() => {'agentId': agentId};
 }
 
-class AgoraTicket {
-  const AgoraTicket({required this.appId, required this.channel, required this.uid, required this.token});
+class AgoraGrant {
+  const AgoraGrant({required this.appId, required this.channel, required this.uid, required this.token});
 
-  factory AgoraTicket.fromJson(Map<String, dynamic> j) =>
-      AgoraTicket(appId: j['appId'] as String, channel: j['channel'] as String, uid: j['uid'] as String, token: j['token'] as String);
+  factory AgoraGrant.fromJson(Map<String, dynamic> j) =>
+      AgoraGrant(appId: j['appId'] as String, channel: j['channel'] as String, uid: j['uid'] as String, token: j['token'] as String);
 
   final String appId;
   final String channel;
@@ -2628,35 +2646,35 @@ class ChangedFile {
   Map<String, dynamic> toJson() => {'path': path, 'status': status, 'added': added, 'removed': removed, if (patch != null) 'patch': patch!};
 }
 
-enum NodeAction {
+enum TaskAction {
   retry('retry'),
   skip('skip');
 
-  const NodeAction(this.wire);
+  const TaskAction(this.wire);
   final String wire;
 
-  static NodeAction fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('NodeAction: unknown value', v));
+  static TaskAction fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('TaskAction: unknown value', v));
 }
 
-enum PlaybookAction {
+enum GraphAction {
   start('start'),
   pause('pause'),
   resume('resume'),
   abandon('abandon'),
   merge('merge');
 
-  const PlaybookAction(this.wire);
+  const GraphAction(this.wire);
   final String wire;
 
-  static PlaybookAction fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('PlaybookAction: unknown value', v));
+  static GraphAction fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('GraphAction: unknown value', v));
 }
 
-class NodeEdit {
-  const NodeEdit({this.title, this.task, this.needs, this.agent, this.check, this.scope});
+class TaskEdit {
+  const TaskEdit({this.title, this.brief, this.needs, this.agent, this.check, this.scope});
 
-  factory NodeEdit.fromJson(Map<String, dynamic> j) => NodeEdit(
+  factory TaskEdit.fromJson(Map<String, dynamic> j) => TaskEdit(
     title: j['title'] == null ? null : j['title'] as String,
-    task: j['task'] == null ? null : j['task'] as String,
+    brief: j['brief'] == null ? null : j['brief'] as String,
     needs: j['needs'] == null ? null : [for (final e in j['needs'] as List) e as String],
     agent: j['agent'] == null ? null : j['agent'] as String,
     check: j['check'] == null ? null : j['check'] as String,
@@ -2664,7 +2682,7 @@ class NodeEdit {
   );
 
   final String? title;
-  final String? task;
+  final String? brief;
   final List<String>? needs;
   final String? agent;
   final String? check;
@@ -2672,7 +2690,7 @@ class NodeEdit {
 
   Map<String, dynamic> toJson() => {
     if (title != null) 'title': title!,
-    if (task != null) 'task': task!,
+    if (brief != null) 'brief': brief!,
     if (needs != null) 'needs': [for (final e in needs!) e],
     if (agent != null) 'agent': agent!,
     if (check != null) 'check': check!,
@@ -2680,11 +2698,11 @@ class NodeEdit {
   };
 }
 
-class PlanRequest {
-  const PlanRequest({required this.goal, required this.project, this.agent});
+class GraphSplitRequest {
+  const GraphSplitRequest({required this.goal, required this.project, this.agent});
 
-  factory PlanRequest.fromJson(Map<String, dynamic> j) =>
-      PlanRequest(goal: j['goal'] as String, project: j['project'] as String, agent: j['agent'] == null ? null : j['agent'] as String);
+  factory GraphSplitRequest.fromJson(Map<String, dynamic> j) =>
+      GraphSplitRequest(goal: j['goal'] as String, project: j['project'] as String, agent: j['agent'] == null ? null : j['agent'] as String);
 
   final String goal;
   final String project;
@@ -2705,6 +2723,26 @@ class Dispatched {
   Map<String, dynamic> toJson() => {if (session != null) 'session': session!, if (queued != null) 'queued': queued!};
 }
 
+class IssueHistory {
+  const IssueHistory({required this.issue, required this.sessions, required this.missingSessions});
+
+  factory IssueHistory.fromJson(Map<String, dynamic> j) => IssueHistory(
+    issue: Issue.fromJson(j['issue'] as Map<String, dynamic>),
+    sessions: [for (final e in j['sessions'] as List) Session.fromJson(e as Map<String, dynamic>)],
+    missingSessions: [for (final e in j['missingSessions'] as List) e as String],
+  );
+
+  final Issue issue;
+  final List<Session> sessions;
+  final List<String> missingSessions;
+
+  Map<String, dynamic> toJson() => {
+    'issue': issue.toJson(),
+    'sessions': [for (final e in sessions) e.toJson()],
+    'missingSessions': [for (final e in missingSessions) e],
+  };
+}
+
 class Issue {
   const Issue({
     required this.id,
@@ -2722,8 +2760,8 @@ class Issue {
     this.closed,
     this.parent,
     this.blockedBy,
-    this.plan,
-    this.step,
+    this.graph,
+    this.task,
     this.schedule,
     required this.status,
   });
@@ -2744,8 +2782,8 @@ class Issue {
     closed: j['closed'] == null ? null : IssueClose.fromJson(j['closed']),
     parent: j['parent'] == null ? null : j['parent'] as String,
     blockedBy: j['blockedBy'] == null ? null : [for (final e in j['blockedBy'] as List) e as String],
-    plan: j['plan'] == null ? null : IssuePlan.fromJson(j['plan'] as Map<String, dynamic>),
-    step: j['step'] == null ? null : IssueStep.fromJson(j['step'] as Map<String, dynamic>),
+    graph: j['graph'] == null ? null : IssueGraph.fromJson(j['graph'] as Map<String, dynamic>),
+    task: j['task'] == null ? null : IssueTask.fromJson(j['task'] as Map<String, dynamic>),
     schedule: j['schedule'] == null ? null : j['schedule'] as String,
     status: IssueStatus.fromJson(j['status']),
   );
@@ -2765,8 +2803,8 @@ class Issue {
   final IssueClose? closed;
   final String? parent;
   final List<String>? blockedBy;
-  final IssuePlan? plan;
-  final IssueStep? step;
+  final IssueGraph? graph;
+  final IssueTask? task;
   final String? schedule;
   final IssueStatus status;
 
@@ -2786,24 +2824,24 @@ class Issue {
     if (closed != null) 'closed': closed!.wire,
     if (parent != null) 'parent': parent!,
     if (blockedBy != null) 'blockedBy': [for (final e in blockedBy!) e],
-    if (plan != null) 'plan': plan!.toJson(),
-    if (step != null) 'step': step!.toJson(),
+    if (graph != null) 'graph': graph!.toJson(),
+    if (task != null) 'task': task!.toJson(),
     if (schedule != null) 'schedule': schedule!,
     'status': status.wire,
   };
 }
 
-class IssuePlan {
-  const IssuePlan({required this.state, this.branch, required this.parallel, this.note});
+class IssueGraph {
+  const IssueGraph({required this.state, this.branch, required this.parallel, this.note});
 
-  factory IssuePlan.fromJson(Map<String, dynamic> j) => IssuePlan(
-    state: PlaybookState.fromJson(j['state']),
+  factory IssueGraph.fromJson(Map<String, dynamic> j) => IssueGraph(
+    state: GraphState.fromJson(j['state']),
     branch: j['branch'] == null ? null : j['branch'] as String,
     parallel: (j['parallel'] as num).toDouble(),
     note: j['note'] == null ? null : j['note'] as String,
   );
 
-  final PlaybookState state;
+  final GraphState state;
   final String? branch;
   final double parallel;
   final String? note;
@@ -2811,8 +2849,8 @@ class IssuePlan {
   Map<String, dynamic> toJson() => {'state': state.wire, if (branch != null) 'branch': branch!, 'parallel': parallel, if (note != null) 'note': note!};
 }
 
-class IssueStep {
-  const IssueStep({
+class IssueTask {
+  const IssueTask({
     required this.key,
     required this.state,
     this.check,
@@ -2827,9 +2865,9 @@ class IssueStep {
     this.failures,
   });
 
-  factory IssueStep.fromJson(Map<String, dynamic> j) => IssueStep(
+  factory IssueTask.fromJson(Map<String, dynamic> j) => IssueTask(
     key: j['key'] as String,
-    state: NodeState.fromJson(j['state']),
+    state: TaskState.fromJson(j['state']),
     check: j['check'] == null ? null : j['check'] as String,
     scope: j['scope'] == null ? null : [for (final e in j['scope'] as List) e as String],
     acceptance: j['acceptance'] == null ? null : j['acceptance'] as bool,
@@ -2843,7 +2881,7 @@ class IssueStep {
   );
 
   final String key;
-  final NodeState state;
+  final TaskState state;
   final String? check;
   final List<String>? scope;
   final bool? acceptance;
@@ -2951,7 +2989,7 @@ class IssueRequest {
 
 enum IssueClose {
   merged('merged'),
-  mergedIntoPlan('merged_into_plan'),
+  mergedIntoGraph('merged_into_graph'),
   dismissed('dismissed'),
   lost('lost'),
   answered('answered');
@@ -2965,7 +3003,7 @@ enum IssueClose {
 enum RunTriggerKind {
   issue('issue'),
   comment('comment'),
-  playbook('playbook'),
+  task('task'),
   schedule('schedule'),
   runtime('runtime');
 
@@ -3671,20 +3709,20 @@ final class InstallationUnsupported extends Installation {
 }
 
 final class AccountUsageOk extends AccountUsage {
-  const AccountUsageOk({this.plan, required this.windows});
+  const AccountUsageOk({this.subscription, required this.windows});
 
   factory AccountUsageOk.fromJson(Map<String, dynamic> j) => AccountUsageOk(
-    plan: j['plan'] == null ? null : j['plan'] as String,
+    subscription: j['subscription'] == null ? null : j['subscription'] as String,
     windows: [for (final e in j['windows'] as List) UsageWindow.fromJson(e as Map<String, dynamic>)],
   );
 
-  final String? plan;
+  final String? subscription;
   final List<UsageWindow> windows;
 
   @override
   Map<String, dynamic> toJson() => {
     'status': 'ok',
-    if (plan != null) 'plan': plan!,
+    if (subscription != null) 'subscription': subscription!,
     'windows': [for (final e in windows) e.toJson()],
   };
 }
@@ -3776,15 +3814,15 @@ final class InboxTargetSession extends InboxTarget {
   Map<String, dynamic> toJson() => {'kind': 'session', 'id': id};
 }
 
-final class InboxTargetPlans extends InboxTarget {
-  const InboxTargetPlans({required this.playbook});
+final class InboxTargetGraph extends InboxTarget {
+  const InboxTargetGraph({required this.graph});
 
-  factory InboxTargetPlans.fromJson(Map<String, dynamic> j) => InboxTargetPlans(playbook: j['playbook'] as String);
+  factory InboxTargetGraph.fromJson(Map<String, dynamic> j) => InboxTargetGraph(graph: j['graph'] as String);
 
-  final String playbook;
+  final String graph;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'plans', 'playbook': playbook};
+  Map<String, dynamic> toJson() => {'kind': 'graph', 'graph': graph};
 }
 
 final class InboxTargetChat extends InboxTarget {
@@ -3954,23 +3992,19 @@ final class LedgerEntryReviewed extends LedgerEntry {
   Map<String, dynamic> toJson() => {'kind': 'reviewed', 'at': at, 'session': session};
 }
 
-final class LedgerEntryPlaybook extends LedgerEntry {
-  const LedgerEntryPlaybook({required this.at, required this.playbook, required this.merged, required this.parallel});
+final class LedgerEntryGraph extends LedgerEntry {
+  const LedgerEntryGraph({required this.at, required this.graph, required this.merged, required this.parallel});
 
-  factory LedgerEntryPlaybook.fromJson(Map<String, dynamic> j) => LedgerEntryPlaybook(
-    at: (j['at'] as num).toDouble(),
-    playbook: j['playbook'] as String,
-    merged: (j['merged'] as num).toDouble(),
-    parallel: j['parallel'] as bool,
-  );
+  factory LedgerEntryGraph.fromJson(Map<String, dynamic> j) =>
+      LedgerEntryGraph(at: (j['at'] as num).toDouble(), graph: j['graph'] as String, merged: (j['merged'] as num).toDouble(), parallel: j['parallel'] as bool);
 
   final double at;
-  final String playbook;
+  final String graph;
   final double merged;
   final bool parallel;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'playbook', 'at': at, 'playbook': playbook, 'merged': merged, 'parallel': parallel};
+  Map<String, dynamic> toJson() => {'kind': 'graph', 'at': at, 'graph': graph, 'merged': merged, 'parallel': parallel};
 }
 
 final class LedgerEntryHandoff extends LedgerEntry {
@@ -4015,7 +4049,7 @@ final class LedgerEntryHired extends LedgerEntry {
 
 enum LedgerEntryMomentKind {
   opened('opened'),
-  planned('planned'),
+  split('split'),
   voice('voice'),
   busy6('busy6');
 
@@ -4469,28 +4503,28 @@ class SettingsUpdateVoice {
 }
 
 class Roots {
-  const Roots({required this.fact, required this.event, required this.frame, required this.ledger, required this.playbookEvent});
+  const Roots({required this.fact, required this.event, required this.frame, required this.ledger, required this.taskEvent});
 
   factory Roots.fromJson(Map<String, dynamic> j) => Roots(
     fact: Fact.fromJson(j['fact'] as Map<String, dynamic>),
     event: SideEvent.fromJson(j['event'] as Map<String, dynamic>),
     frame: StateFrame.fromJson(j['frame'] as Map<String, dynamic>),
     ledger: LedgerEntry.fromJson(j['ledger'] as Map<String, dynamic>),
-    playbookEvent: PlaybookEvent.fromJson(j['playbookEvent'] as Map<String, dynamic>),
+    taskEvent: GraphEvent.fromJson(j['taskEvent'] as Map<String, dynamic>),
   );
 
   final Fact fact;
   final SideEvent event;
   final StateFrame frame;
   final LedgerEntry ledger;
-  final PlaybookEvent playbookEvent;
+  final GraphEvent taskEvent;
 
   Map<String, dynamic> toJson() => {
     'fact': fact.toJson(),
     'event': event.toJson(),
     'frame': frame.toJson(),
     'ledger': ledger.toJson(),
-    'playbookEvent': playbookEvent.toJson(),
+    'taskEvent': taskEvent.toJson(),
   };
 }
 
@@ -4617,17 +4651,17 @@ final class FactStation extends Fact implements SideEvent {
 }
 
 final class FactRun extends Fact implements SideEvent {
-  const FactRun({required this.at, required this.id, this.task});
+  const FactRun({required this.at, required this.id, this.brief});
 
   factory FactRun.fromJson(Map<String, dynamic> j) =>
-      FactRun(at: (j['at'] as num).toDouble(), id: j['id'] as String, task: j['task'] == null ? null : j['task'] as String);
+      FactRun(at: (j['at'] as num).toDouble(), id: j['id'] as String, brief: j['brief'] == null ? null : j['brief'] as String);
 
   final double at;
   final String id;
-  final String? task;
+  final String? brief;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'run', 'at': at, 'id': id, if (task != null) 'task': task!};
+  Map<String, dynamic> toJson() => {'type': 'run', 'at': at, 'id': id, if (brief != null) 'brief': brief!};
 }
 
 final class FactDoing extends Fact implements SideEvent {
@@ -4693,11 +4727,12 @@ final class FactSpent extends Fact implements SideEvent {
 }
 
 final class FactReport extends Fact implements SideEvent {
-  const FactReport({required this.at, required this.id, required this.outcome, required this.summary, required this.runs, this.spent});
+  const FactReport({required this.at, required this.id, this.run, required this.outcome, required this.summary, required this.runs, this.spent});
 
   factory FactReport.fromJson(Map<String, dynamic> j) => FactReport(
     at: (j['at'] as num).toDouble(),
     id: j['id'] as String,
+    run: j['run'] == null ? null : j['run'] as String,
     outcome: Outcome.fromJson(j['outcome']),
     summary: j['summary'] as String,
     runs: (j['runs'] as num).toDouble(),
@@ -4706,6 +4741,7 @@ final class FactReport extends Fact implements SideEvent {
 
   final double at;
   final String id;
+  final String? run;
   final Outcome outcome;
   final String summary;
   final double runs;
@@ -4716,6 +4752,7 @@ final class FactReport extends Fact implements SideEvent {
     'type': 'report',
     'at': at,
     'id': id,
+    if (run != null) 'run': run!,
     'outcome': outcome.wire,
     'summary': summary,
     'runs': runs,
@@ -4957,22 +4994,22 @@ class ReopenRequest {
   Map<String, dynamic> toJson() => {'text': text};
 }
 
-class PlaybookActRequest {
-  const PlaybookActRequest({required this.action});
+class GraphActRequest {
+  const GraphActRequest({required this.action});
 
-  factory PlaybookActRequest.fromJson(Map<String, dynamic> j) => PlaybookActRequest(action: PlaybookAction.fromJson(j['action']));
+  factory GraphActRequest.fromJson(Map<String, dynamic> j) => GraphActRequest(action: GraphAction.fromJson(j['action']));
 
-  final PlaybookAction action;
+  final GraphAction action;
 
   Map<String, dynamic> toJson() => {'action': action.wire};
 }
 
-class NodeActRequest {
-  const NodeActRequest({required this.action});
+class TaskActRequest {
+  const TaskActRequest({required this.action});
 
-  factory NodeActRequest.fromJson(Map<String, dynamic> j) => NodeActRequest(action: NodeAction.fromJson(j['action']));
+  factory TaskActRequest.fromJson(Map<String, dynamic> j) => TaskActRequest(action: TaskAction.fromJson(j['action']));
 
-  final NodeAction action;
+  final TaskAction action;
 
   Map<String, dynamic> toJson() => {'action': action.wire};
 }
@@ -5042,6 +5079,24 @@ class VoiceSaid {
   final String text;
 
   Map<String, dynamic> toJson() => {'agentId': agentId, 'text': text};
+}
+
+class VoiceHeard {
+  const VoiceHeard({required this.agentId, required this.text, this.agent, this.sendKey});
+
+  factory VoiceHeard.fromJson(Map<String, dynamic> j) => VoiceHeard(
+    agentId: j['agentId'] as String,
+    text: j['text'] as String,
+    agent: j['agent'] == null ? null : j['agent'] as String,
+    sendKey: j['sendKey'] == null ? null : j['sendKey'] as String,
+  );
+
+  final String agentId;
+  final String text;
+  final String? agent;
+  final String? sendKey;
+
+  Map<String, dynamic> toJson() => {'agentId': agentId, 'text': text, if (agent != null) 'agent': agent!, if (sendKey != null) 'sendKey': sendKey!};
 }
 
 class StartRequest {
@@ -5152,7 +5207,7 @@ final class LiveEventRuntime extends LiveEvent {
 
 /// From internal/protocol/seeds.json (its achievements, actionText, runtimePresets, runtimeFacts and fallbackPreset), as the server reads them.
 final Map<String, dynamic> _seeds = jsonDecode(
-  r'''{"achievements":[{"id":"s_open","category":"starter","title":"开门","detail":"开工","tiers":[1],"coins":[20]},{"id":"s_hire","category":"starter","title":"派活","detail":"派出第一个帮工","tiers":[1],"coins":[20]},{"id":"s_tell","category":"starter","title":"带话","detail":"给帮工带一句话：浇水，或者在它的工单串里说","tiers":[1],"coins":[20]},{"id":"s_review","category":"starter","title":"验收","detail":"看过收成清单，再收进主分支","tiers":[1],"coins":[20]},{"id":"s_voice","category":"starter","title":"说话","detail":"用语音和管家说一次话","tiers":[1],"coins":[20]},{"id":"s_plan","category":"starter","title":"规划","detail":"拆一张种植计划","tiers":[1],"coins":[20]},{"id":"s_call","category":"starter","title":"点名","detail":"在田头 @ 一个帮工","tiers":[1],"coins":[20]},{"id":"harvests","category":"harvest","title":"收成","tierTitles":["开张大吉","小有收成","粮仓满了"],"detail":"收进主分支的活","tiers":[1,20,100],"coins":[10,30,60],"unit":"件"},{"id":"first_try","category":"harvest","title":"一气呵成","detail":"第一轮就做完、没带过话、没失败过就收进去的活","tiers":[1,10,50],"coins":[10,30,60],"unit":"件"},{"id":"big_playbook","category":"harvest","title":"五谷丰登","detail":"收获的种植计划里，合进去的步数最多的一张","tiers":[3,5,10],"coins":[10,30,60],"unit":"步"},{"id":"farm_level","category":"harvest","title":"农场规模","tierTitles":["小有规模","远近闻名","一方粮仓"],"detail":"农场的等级（跟着你的 commit 数长）","tiers":[5,10,20],"coins":[10,30,60],"unit":"级"},{"id":"steady","category":"craft","title":"稳如老农","detail":"最长连胜：连着收进去，中间没有一轮失败","tiers":[5,15,40],"coins":[10,30,60],"unit":"件"},{"id":"untangle","category":"craft","title":"解铃人","detail":"冲突过、最后还是收进去的活","tiers":[1,5,20],"coins":[10,30,60],"unit":"件"},{"id":"comeback","category":"craft","title":"浴火重生","detail":"没做成过、修好以后收进去的活","tiers":[1,5,20],"coins":[10,30,60],"unit":"件"},{"id":"thrifty","category":"thrift","title":"一分钱一分货","detail":"花不到 ¥0.05 就收进去的活（只算知道花费的农机）","tiers":[1,10,50],"coins":[10,30,60],"unit":"件"},{"id":"every_machine","category":"thrift","title":"物尽其用","detail":"收进过活的农机种数","tiers":[2,3,5],"coins":[10,30,60],"unit":"种"},{"id":"handoff","category":"team","title":"交接","detail":"帮工在田头点名另一个帮工，对方回了话","tiers":[1,5,20],"coins":[10,30,60],"unit":"次"},{"id":"parallel_plan","category":"team","title":"运筹帷幄","detail":"有一批步骤同时做的种植计划，收获了","tiers":[1,3,10],"coins":[10,30,60],"unit":"张"},{"id":"night_owl","category":"secret","title":"夜猫子","detail":"深夜（0–5 点）收进一件活","tiers":[1],"coins":[50]},{"id":"weekend","category":"secret","title":"周末农夫","detail":"周末收进一件活","tiers":[1],"coins":[50]},{"id":"full_house","category":"secret","title":"满园春色","detail":"六块地同时有帮工在干活","tiers":[1],"coins":[50]}],"actionText":{"run_command":"跑命令","read_file":"读文件","edit_file":"改文件","search":"搜索","web":"查网页","mcp":"调 MCP 工具","wait":"等待","other":"用工具","thinking":"思考","speaking_text":"写汇报","none":""},"fallbackPreset":{"id":"","label":"","blurb":"VibeValley 还没有专属外形的 runtime。","look":{"build":"biped","head":"rounded","body":"#f1e8d8","trim":"#5d5850","hat":"#f2b53a","eye":"#a6f4ff"}},"runtimeFacts":{"claude":{"steer":true,"refused":{},"capabilities":["listModels","accountUsage","checkUpdate","upgrade","skills","mcpServers","tools"],"inProcess":false},"vibevalley":{"steer":true,"refused":{},"capabilities":["listModels"],"inProcess":true},"codex":{"steer":true,"refused":{},"capabilities":["listModels","accountUsage","checkUpdate","upgrade","skills","mcpServers","tools"],"inProcess":false},"opencode":{"steer":true,"refused":{"disallowedTools":"opencode ACP 没有会话级的工具黑名单"},"capabilities":["listModels"],"inProcess":false},"pi":{"steer":true,"refused":{},"capabilities":["listModels","skills","tools"],"inProcess":true},"cursor":{"steer":true,"refused":{"systemPrompt":"Cursor SDK 的本地 agent 不支持覆盖系统提示","appendSystemPrompt":"Cursor SDK 的本地 agent 不支持追加系统提示","env":"Cursor 跑在 server 进程里，工具拿不到单独的环境变量","mcpServers":"oar 还没给 cursor 接 MCP 服务器"},"capabilities":["listModels"],"inProcess":true},"grok":{"steer":true,"refused":{"disallowedTools":"grok agent stdio 不转发工具黑名单"},"capabilities":["listModels","accountUsage","checkUpdate","upgrade","skills","mcpServers"],"inProcess":false},"kimi":{"steer":false,"refused":{"systemPrompt":"kimi acp 没有会话级的系统提示输入","appendSystemPrompt":"kimi acp 没有会话级的系统提示追加","disallowedTools":"kimi ACP 没有会话级的工具黑名单"},"capabilities":["listModels","accountUsage","checkUpdate","upgrade"],"inProcess":false},"antigravity":{"steer":false,"refused":{"systemPrompt":"Antigravity ACP 没有系统提示覆盖","appendSystemPrompt":"Antigravity ACP 没有系统提示追加","effort":"Antigravity 没有推理强度通道"},"capabilities":["listModels","checkUpdate"],"inProcess":false},"dsh":{"steer":false,"refused":{"systemPrompt":"dsh acp 没有会话级的系统提示输入","appendSystemPrompt":"dsh acp 没有会话级的系统提示追加","disallowedTools":"dsh acp 没有会话级的工具黑名单"},"capabilities":["listModels"],"inProcess":false}},"runtimePresets":[{"id":"claude","label":"Claude Code","blurb":"Anthropic 的命令行编码 agent。","look":{"eye":"#a6f4ff","build":"biped","head":"rounded","body":"#f3e9da","trim":"#d9774f","hat":"#e8804f"}},{"id":"codex","label":"Codex","blurb":"OpenAI 的编码 agent，走 app-server。","look":{"eye":"#a6f4ff","build":"treads","head":"terminal","body":"#3d434a","trim":"#d8dadc","hat":"#f4f3ee"}},{"id":"opencode","label":"opencode","blurb":"开源的终端编码 agent，走 ACP。","look":{"eye":"#a6f4ff","build":"biped","head":"terminal","body":"#e9e6de","trim":"#24282d","hat":"#2f3438"}},{"id":"vibevalley","label":"vibevalley","blurb":"VibeValley 自己的 agent（DeepSeek），跑在 server 进程里。","look":{"eye":"#a6f4ff","build":"hopper","head":"orb","body":"#fbe7c6","trim":"#4f9a5a","hat":"#f2b53a"}},{"id":"pi","label":"Pi","blurb":"跑在 server 进程里的编码 agent SDK。","look":{"eye":"#a6f4ff","build":"hopper","head":"dome","body":"#f4e6d4","trim":"#b0503f","hat":"#d9534f"}},{"id":"cursor","label":"Cursor","blurb":"Cursor 的 agent SDK，跑在 server 进程里。","look":{"eye":"#a6f4ff","build":"wheel","head":"saucer","body":"#dfe4ea","trim":"#5b6470","hat":"#a9b4c2"}},{"id":"grok","label":"Grok","blurb":"xAI 的 grok CLI，走 ACP。","look":{"eye":"#a6f4ff","build":"wheel","head":"dome","body":"#b9c4d1","trim":"#3a404a","hat":"#4f86d9"}},{"id":"kimi","label":"Kimi","blurb":"Moonshot 的 kimi CLI，走 ACP。","look":{"eye":"#a6f4ff","build":"hopper","head":"orb","body":"#e7e6fb","trim":"#6c70d8","hat":"#9580e6"}},{"id":"antigravity","label":"Antigravity","blurb":"Google 的 Antigravity agent，走 ACP。","look":{"eye":"#a6f4ff","build":"hover","head":"saucer","body":"#d3efe8","trim":"#2f9d8f","hat":"#45bf8c"}},{"id":"dsh","label":"DeepSeek Harness","blurb":"DeepSeek 的 dsh，走 ACP。","look":{"eye":"#a6f4ff","build":"treads","head":"orb","body":"#dce6fb","trim":"#3b5bdb","hat":"#4d6bfe"}}]}''',
+  r'''{"achievements":[{"id":"s_open","category":"starter","title":"开门","detail":"开工","tiers":[1],"coins":[20]},{"id":"s_hire","category":"starter","title":"派活","detail":"派出第一个帮工","tiers":[1],"coins":[20]},{"id":"s_tell","category":"starter","title":"带话","detail":"给帮工带一句话：浇水，或者在它的工单串里说","tiers":[1],"coins":[20]},{"id":"s_review","category":"starter","title":"验收","detail":"看过收成清单，再收进主分支","tiers":[1],"coins":[20]},{"id":"s_voice","category":"starter","title":"说话","detail":"用语音和管家说一次话","tiers":[1],"coins":[20]},{"id":"s_split","category":"starter","title":"规划","detail":"拆一张种植计划","tiers":[1],"coins":[20]},{"id":"s_call","category":"starter","title":"点名","detail":"在田头 @ 一个帮工","tiers":[1],"coins":[20]},{"id":"harvests","category":"harvest","title":"收成","tierTitles":["开张大吉","小有收成","粮仓满了"],"detail":"收进主分支的活","tiers":[1,20,100],"coins":[10,30,60],"unit":"件"},{"id":"first_try","category":"harvest","title":"一气呵成","detail":"第一轮就做完、没带过话、没失败过就收进去的活","tiers":[1,10,50],"coins":[10,30,60],"unit":"件"},{"id":"big_graph","category":"harvest","title":"五谷丰登","detail":"收获的种植计划里，合进去的步数最多的一张","tiers":[3,5,10],"coins":[10,30,60],"unit":"步"},{"id":"farm_level","category":"harvest","title":"农场规模","tierTitles":["小有规模","远近闻名","一方粮仓"],"detail":"农场的等级（跟着你的 commit 数长）","tiers":[5,10,20],"coins":[10,30,60],"unit":"级"},{"id":"steady","category":"craft","title":"稳如老农","detail":"最长连胜：连着收进去，中间没有一轮失败","tiers":[5,15,40],"coins":[10,30,60],"unit":"件"},{"id":"untangle","category":"craft","title":"解铃人","detail":"冲突过、最后还是收进去的活","tiers":[1,5,20],"coins":[10,30,60],"unit":"件"},{"id":"comeback","category":"craft","title":"浴火重生","detail":"没做成过、修好以后收进去的活","tiers":[1,5,20],"coins":[10,30,60],"unit":"件"},{"id":"thrifty","category":"thrift","title":"一分钱一分货","detail":"花不到 ¥0.05 就收进去的活（只算知道花费的农机）","tiers":[1,10,50],"coins":[10,30,60],"unit":"件"},{"id":"every_machine","category":"thrift","title":"物尽其用","detail":"收进过活的农机种数","tiers":[2,3,5],"coins":[10,30,60],"unit":"种"},{"id":"handoff","category":"team","title":"交接","detail":"帮工在田头点名另一个帮工，对方回了话","tiers":[1,5,20],"coins":[10,30,60],"unit":"次"},{"id":"parallel_graph","category":"team","title":"运筹帷幄","detail":"有一批步骤同时做的种植计划，收获了","tiers":[1,3,10],"coins":[10,30,60],"unit":"张"},{"id":"night_owl","category":"secret","title":"夜猫子","detail":"深夜（0–5 点）收进一件活","tiers":[1],"coins":[50]},{"id":"weekend","category":"secret","title":"周末农夫","detail":"周末收进一件活","tiers":[1],"coins":[50]},{"id":"full_house","category":"secret","title":"满园春色","detail":"六块地同时有帮工在干活","tiers":[1],"coins":[50]}],"actionText":{"run_command":"跑命令","read_file":"读文件","edit_file":"改文件","search":"搜索","web":"查网页","mcp":"调 MCP 工具","wait":"等待","other":"用工具","thinking":"思考","speaking_text":"写汇报","none":""},"fallbackPreset":{"id":"","label":"","blurb":"VibeValley 还没有专属外形的 runtime。","look":{"build":"biped","head":"rounded","body":"#f1e8d8","trim":"#5d5850","hat":"#f2b53a","eye":"#a6f4ff"}},"runtimeFacts":{"claude":{"steer":true,"refused":{},"capabilities":["listModels","accountUsage","checkUpdate","upgrade","skills","mcpServers","tools"],"inProcess":false},"vibevalley":{"steer":true,"refused":{},"capabilities":["listModels"],"inProcess":true},"codex":{"steer":true,"refused":{},"capabilities":["listModels","accountUsage","checkUpdate","upgrade","skills","mcpServers","tools"],"inProcess":false},"opencode":{"steer":true,"refused":{"disallowedTools":"opencode ACP 没有会话级的工具黑名单"},"capabilities":["listModels"],"inProcess":false},"pi":{"steer":true,"refused":{},"capabilities":["listModels","skills","tools"],"inProcess":true},"cursor":{"steer":true,"refused":{"systemPrompt":"Cursor SDK 的本地 agent 不支持覆盖系统提示","appendSystemPrompt":"Cursor SDK 的本地 agent 不支持追加系统提示","env":"Cursor 跑在 server 进程里，工具拿不到单独的环境变量","mcpServers":"oar 还没给 cursor 接 MCP 服务器"},"capabilities":["listModels"],"inProcess":true},"grok":{"steer":true,"refused":{"disallowedTools":"grok agent stdio 不转发工具黑名单"},"capabilities":["listModels","accountUsage","checkUpdate","upgrade","skills","mcpServers"],"inProcess":false},"kimi":{"steer":false,"refused":{"systemPrompt":"kimi acp 没有会话级的系统提示输入","appendSystemPrompt":"kimi acp 没有会话级的系统提示追加","disallowedTools":"kimi ACP 没有会话级的工具黑名单"},"capabilities":["listModels","accountUsage","checkUpdate","upgrade"],"inProcess":false},"antigravity":{"steer":false,"refused":{"systemPrompt":"Antigravity ACP 没有系统提示覆盖","appendSystemPrompt":"Antigravity ACP 没有系统提示追加","effort":"Antigravity 没有推理强度通道"},"capabilities":["listModels","checkUpdate"],"inProcess":false},"dsh":{"steer":false,"refused":{"systemPrompt":"dsh acp 没有会话级的系统提示输入","appendSystemPrompt":"dsh acp 没有会话级的系统提示追加","disallowedTools":"dsh acp 没有会话级的工具黑名单"},"capabilities":["listModels"],"inProcess":false}},"runtimePresets":[{"id":"claude","label":"Claude Code","blurb":"Anthropic 的命令行编码 agent。","look":{"eye":"#a6f4ff","build":"biped","head":"rounded","body":"#f3e9da","trim":"#d9774f","hat":"#e8804f"}},{"id":"codex","label":"Codex","blurb":"OpenAI 的编码 agent，走 app-server。","look":{"eye":"#a6f4ff","build":"treads","head":"terminal","body":"#3d434a","trim":"#d8dadc","hat":"#f4f3ee"}},{"id":"opencode","label":"opencode","blurb":"开源的终端编码 agent，走 ACP。","look":{"eye":"#a6f4ff","build":"biped","head":"terminal","body":"#e9e6de","trim":"#24282d","hat":"#2f3438"}},{"id":"vibevalley","label":"vibevalley","blurb":"VibeValley 自己的 agent（DeepSeek），跑在 server 进程里。","look":{"eye":"#a6f4ff","build":"hopper","head":"orb","body":"#fbe7c6","trim":"#4f9a5a","hat":"#f2b53a"}},{"id":"pi","label":"Pi","blurb":"跑在 server 进程里的编码 agent SDK。","look":{"eye":"#a6f4ff","build":"hopper","head":"dome","body":"#f4e6d4","trim":"#b0503f","hat":"#d9534f"}},{"id":"cursor","label":"Cursor","blurb":"Cursor 的 agent SDK，跑在 server 进程里。","look":{"eye":"#a6f4ff","build":"wheel","head":"saucer","body":"#dfe4ea","trim":"#5b6470","hat":"#a9b4c2"}},{"id":"grok","label":"Grok","blurb":"xAI 的 grok CLI，走 ACP。","look":{"eye":"#a6f4ff","build":"wheel","head":"dome","body":"#b9c4d1","trim":"#3a404a","hat":"#4f86d9"}},{"id":"kimi","label":"Kimi","blurb":"Moonshot 的 kimi CLI，走 ACP。","look":{"eye":"#a6f4ff","build":"hopper","head":"orb","body":"#e7e6fb","trim":"#6c70d8","hat":"#9580e6"}},{"id":"antigravity","label":"Antigravity","blurb":"Google 的 Antigravity agent，走 ACP。","look":{"eye":"#a6f4ff","build":"hover","head":"saucer","body":"#d3efe8","trim":"#2f9d8f","hat":"#45bf8c"}},{"id":"dsh","label":"DeepSeek Harness","blurb":"DeepSeek 的 dsh，走 ACP。","look":{"eye":"#a6f4ff","build":"treads","head":"orb","body":"#dce6fb","trim":"#3b5bdb","hat":"#4d6bfe"}}]}''',
 ) as Map<String, dynamic>;
 
 /// In the order the page shows them.
@@ -5198,6 +5253,7 @@ class ManagerApi {
     await _api._call('POST', '/api/v1/manager/stop', query: {}, body: null);
   }
 
+  /// The v1 caption relay without a call id is accepted only with one active call.
   Future<void> hear({required SayRequest body}) async {
     await _api._call('POST', '/api/v1/manager/hear', query: {}, body: body.toJson());
   }
@@ -5250,8 +5306,9 @@ class ChannelApi {
     await _api._call('POST', '/api/v1/say', query: {}, body: body.toJson());
   }
 
-  Future<void> create({required ChannelRequest body}) async {
-    await _api._call('POST', '/api/v1/channels', query: {}, body: body.toJson());
+  Future<String> create({required ChannelRequest body}) async {
+    final j = await _api._call('POST', '/api/v1/channels', query: {}, body: body.toJson());
+    return j as String;
   }
 
   Future<void> update({required String id, required ChannelUpdate body}) async {
@@ -5325,6 +5382,12 @@ class IssueApi {
   /// Sends the newest session home without merging: the issue closes as dismissed.
   Future<void> cancel({required String id}) async {
     await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/cancel', query: {}, body: null);
+  }
+
+  /// One joined read of issues and their real sessions, including explicit missing records.
+  Future<List<IssueHistory>> history() async {
+    final j = await _api._call('GET', '/api/v1/issues/history', query: {}, body: null);
+    return [for (final e in j as List) IssueHistory.fromJson(e as Map<String, dynamic>)];
   }
 
   Future<List<Issue>> list() async {
@@ -5410,45 +5473,45 @@ class SessionApi {
   }
 }
 
-/// The `playbook` endpoints of VibeValleyApi.
-class PlaybookApi {
-  PlaybookApi._(this._api);
+/// The `graph` endpoints of VibeValleyApi.
+class GraphApi {
+  GraphApi._(this._api);
   final VibeValleyApi _api;
 
-  Future<String> plan({required PlanRequest body}) async {
-    final j = await _api._call('POST', '/api/v1/playbooks', query: {}, body: body.toJson());
+  Future<String> split({required GraphSplitRequest body}) async {
+    final j = await _api._call('POST', '/api/v1/graphs', query: {}, body: body.toJson());
     return j as String;
   }
 
-  Future<String> updateNode({required String id, required String node, required NodeEdit body}) async {
+  Future<String> updateTask({required String id, required String task, required TaskEdit body}) async {
     final j = await _api._call(
       'PUT',
-      '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/nodes/${Uri.encodeComponent((node).toString())}',
+      '/api/v1/graphs/${Uri.encodeComponent((id).toString())}/tasks/${Uri.encodeComponent((task).toString())}',
       query: {},
       body: body.toJson(),
     );
     return j as String;
   }
 
-  Future<String> deleteNode({required String id, required String node}) async {
+  Future<String> deleteTask({required String id, required String task}) async {
     final j = await _api._call(
       'DELETE',
-      '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/nodes/${Uri.encodeComponent((node).toString())}',
+      '/api/v1/graphs/${Uri.encodeComponent((id).toString())}/tasks/${Uri.encodeComponent((task).toString())}',
       query: {},
       body: null,
     );
     return j as String;
   }
 
-  Future<String> act({required String id, required PlaybookActRequest body}) async {
-    final j = await _api._call('POST', '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/act', query: {}, body: body.toJson());
+  Future<String> act({required String id, required GraphActRequest body}) async {
+    final j = await _api._call('POST', '/api/v1/graphs/${Uri.encodeComponent((id).toString())}/act', query: {}, body: body.toJson());
     return j as String;
   }
 
-  Future<String> nodeAct({required String id, required String node, required NodeActRequest body}) async {
+  Future<String> taskAct({required String id, required String task, required TaskActRequest body}) async {
     final j = await _api._call(
       'POST',
-      '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/nodes/${Uri.encodeComponent((node).toString())}/act',
+      '/api/v1/graphs/${Uri.encodeComponent((id).toString())}/tasks/${Uri.encodeComponent((task).toString())}/act',
       query: {},
       body: body.toJson(),
     );
@@ -5456,13 +5519,13 @@ class PlaybookApi {
   }
 
   Future<Changes> changes({required String id}) async {
-    final j = await _api._call('GET', '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/changes', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/graphs/${Uri.encodeComponent((id).toString())}/changes', query: {}, body: null);
     return Changes.fromJson(j as Map<String, dynamic>);
   }
 
-  Future<List<PlaybookEvent>> events({required String id}) async {
-    final j = await _api._call('GET', '/api/v1/playbooks/${Uri.encodeComponent((id).toString())}/events', query: {}, body: null);
-    return [for (final e in j as List) PlaybookEvent.fromJson(e as Map<String, dynamic>)];
+  Future<List<GraphEvent>> events({required String id}) async {
+    final j = await _api._call('GET', '/api/v1/graphs/${Uri.encodeComponent((id).toString())}/events', query: {}, body: null);
+    return [for (final e in j as List) GraphEvent.fromJson(e as Map<String, dynamic>)];
   }
 }
 
@@ -5516,6 +5579,12 @@ class AgentApi {
   Future<List<AgentCheck>> check({required AgentCheckRequest body}) async {
     final j = await _api._call('POST', '/api/v1/agents/check', query: {}, body: body.toJson());
     return [for (final e in j as List) AgentCheck.fromJson(e as Map<String, dynamic>)];
+  }
+
+  /// Create allocates an identity; callers with an existing identity use save.
+  Future<Agent> create({required Agent body}) async {
+    final j = await _api._call('POST', '/api/v1/agents', query: {}, body: body.toJson());
+    return Agent.fromJson(j as Map<String, dynamic>);
   }
 
   Future<Agent> save({required String id, required Agent body}) async {
@@ -5576,6 +5645,12 @@ class SkillApi {
     return [for (final e in j as List) Skill.fromJson(e as Map<String, dynamic>)];
   }
 
+  /// Create allocates an identity; callers with an existing identity use save.
+  Future<Skill> create({required Skill body}) async {
+    final j = await _api._call('POST', '/api/v1/skills', query: {}, body: body.toJson());
+    return Skill.fromJson(j as Map<String, dynamic>);
+  }
+
   Future<Skill> save({required String id, required Skill body}) async {
     final j = await _api._call('PUT', '/api/v1/skills/${Uri.encodeComponent((id).toString())}', query: {}, body: body.toJson());
     return Skill.fromJson(j as Map<String, dynamic>);
@@ -5623,14 +5698,14 @@ class VoiceApi {
   VoiceApi._(this._api);
   final VibeValleyApi _api;
 
-  Future<AgoraTicket> session() async {
+  Future<AgoraGrant> session() async {
     final j = await _api._call('POST', '/api/v1/voice/session', query: {}, body: null);
-    return AgoraTicket.fromJson(j as Map<String, dynamic>);
+    return AgoraGrant.fromJson(j as Map<String, dynamic>);
   }
 
-  Future<AgoraTicket> renew({required RenewRequest body}) async {
+  Future<AgoraGrant> renew({required RenewRequest body}) async {
     final j = await _api._call('POST', '/api/v1/voice/renew', query: {}, body: body.toJson());
-    return AgoraTicket.fromJson(j as Map<String, dynamic>);
+    return AgoraGrant.fromJson(j as Map<String, dynamic>);
   }
 
   Future<VoiceAgent> start({required StartRequest body}) async {
@@ -5640,6 +5715,10 @@ class VoiceApi {
 
   Future<void> stop({required VoiceAgent body}) async {
     await _api._call('POST', '/api/v1/voice/agent/stop', query: {}, body: body.toJson());
+  }
+
+  Future<void> heard({required VoiceHeard body}) async {
+    await _api._call('POST', '/api/v1/voice/agent/heard', query: {}, body: body.toJson());
   }
 
   Future<void> said({required VoiceSaid body}) async {
@@ -5754,7 +5833,7 @@ class VibeValleyApi {
   late final schedule = ScheduleApi._(this);
   late final issue = IssueApi._(this);
   late final session = SessionApi._(this);
-  late final playbook = PlaybookApi._(this);
+  late final graph = GraphApi._(this);
   late final game = GameApi._(this);
   late final runtime = RuntimeApi._(this);
   late final agent = AgentApi._(this);

@@ -24,11 +24,11 @@ class RuntimesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(workbenchConfigProvider);
-    if (config.error != null) return const ConfigProblem();
+    if (ref.watch(runtimesProvider).hasError) return const RuntimeProblem();
     final busy = ref.watch(runtimeBusyProvider);
     final atlas = ref.watch(atlasProvider).value;
     if (atlas == null) return const SizedBox.shrink();
-    final runtimes = config.runtimes;
+    final runtimes = ref.watch(runtimesProvider).value ?? const <RuntimeInfo>[];
     final selected = runtimes.where((r) => r.id == id).firstOrNull ?? runtimes.firstOrNull;
     return ListDetail(
       opened: id != null,
@@ -38,7 +38,10 @@ class RuntimesPage extends ConsumerWidget {
         title: '农具',
         subtitle: '机器上的编码 agent',
         semanticLabel: '农具列表',
-        children: [for (final p in runtimePresets) _ListItem(preset: p, config: config, active: selected?.id == p.id)],
+        children: [
+          for (final p in runtimePresets)
+            _ListItem(preset: p, runtime: runtimes.where((r) => r.id == p.id).firstOrNull, config: config, active: selected?.id == p.id),
+        ],
       ),
       detail: selected == null
           ? [
@@ -53,14 +56,15 @@ class RuntimesPage extends ConsumerWidget {
 }
 
 class _ListItem extends StatelessWidget {
-  const _ListItem({required this.preset, required this.config, required this.active});
+  const _ListItem({required this.preset, required this.runtime, required this.config, required this.active});
+  final RuntimeInfo? runtime;
   final RuntimePreset preset;
   final WorkbenchConfig config;
   final bool active;
 
   @override
   Widget build(BuildContext context) {
-    final r = config.runtime(preset.id);
+    final r = runtime;
     final ok = r?.installation is InstallationAvailable;
     final using = config.agents.where((a) => a.runtime == preset.id).length;
     final status = switch (r?.installation) {
@@ -109,7 +113,7 @@ class _ListStamina extends StatelessWidget {
 }
 
 List<Widget> _detail(SpriteAtlas atlas, RuntimeInfo info, WorkbenchConfig config, RuntimeBusy? busy) {
-  final facts = factsOf(info.id);
+  final facts = factsOf(info.id, info);
   final agents = config.agents.where((a) => a.runtime == info.id).toList();
   return [
     _Header(info: info, busy: busy),
@@ -378,7 +382,7 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
     final models = info.models ?? const <ModelEntry>[];
     final wanted = _draft.defaultModel.isNotEmpty ? _draft.defaultModel : models.where((m) => m.isDefault).firstOrNull?.id;
     final model = models.where((m) => m.id == wanted).firstOrNull;
-    final facts = factsOf(info.id);
+    final facts = factsOf(info.id, info);
     final refusedEffort = facts.refused[sessionEffort];
     final refusedEnv = facts.refused[sessionEnv];
     final envVar = 'OAR_${info.id.toUpperCase()}_BIN';
@@ -571,8 +575,8 @@ class RuntimeUsage extends StatelessWidget {
                   style: KitText.xs.copyWith(color: Palette.bark600),
                 ),
               ],
-              AccountUsageOk(:final plan, :final windows) => [
-                if (plan != null && plan.isNotEmpty) Text('套餐：$plan', style: KitText.xs.copyWith(color: Palette.bark600)),
+              AccountUsageOk(:final subscription, :final windows) => [
+                if (subscription != null && subscription.isNotEmpty) Text('套餐：$subscription', style: KitText.xs.copyWith(color: Palette.bark600)),
                 for (final w in windows) _Window(window: w),
               ].indexed.expand((e) => [if (e.$1 > 0) const SizedBox(height: 10), e.$2]).toList(),
               _ => const <Widget>[],

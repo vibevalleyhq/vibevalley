@@ -45,9 +45,9 @@ final class PhoneTargetSession extends PhoneTarget {
   final String id;
 }
 
-final class PhoneTargetPlans extends PhoneTarget {
-  const PhoneTargetPlans([this.playbook]);
-  final String? playbook;
+final class PhoneTargetTaskBoard extends PhoneTarget {
+  const PhoneTargetTaskBoard([this.graph]);
+  final String? graph;
 }
 
 final phoneTargetProvider = NotifierProvider<PhoneTargets, PhoneTarget?>(PhoneTargets.new);
@@ -60,8 +60,6 @@ class PhoneTargets extends Notifier<PhoneTarget?> {
 }
 
 bool _live(VoiceCall call) => call.phase == CallPhase.connecting || call.phase == CallPhase.live;
-
-void _report(WidgetRef ref, VoiceCall call) => ref.read(phoneProvider.notifier).voice(live: _live(call), connected: call.phase == CallPhase.live);
 
 class PhoneButton extends ConsumerStatefulWidget {
   const PhoneButton({super.key, required this.call, this.height = 36});
@@ -95,7 +93,6 @@ class _PhoneButtonState extends ConsumerState<PhoneButton> {
   }
 
   void _voice() {
-    _report(ref, widget.call);
     setState(() {});
   }
 
@@ -181,7 +178,6 @@ class _FarmPhoneState extends ConsumerState<FarmPhone> {
   }
 
   void _voice() {
-    _report(ref, widget.call);
     setState(() {});
   }
 
@@ -201,8 +197,8 @@ class _FarmPhoneState extends ConsumerState<FarmPhone> {
     switch (call.target) {
       case InboxTargetSession(:final id):
         ref.read(phoneTargetProvider.notifier).go(PhoneTargetSession(id));
-      case InboxTargetPlans(:final playbook):
-        ref.read(phoneTargetProvider.notifier).go(PhoneTargetPlans(playbook));
+      case InboxTargetGraph(:final graph):
+        ref.read(phoneTargetProvider.notifier).go(PhoneTargetTaskBoard(graph));
       case InboxTargetChat(:final conversation):
         router?.go('/chat/$conversation');
     }
@@ -233,9 +229,9 @@ class _FarmPhoneState extends ConsumerState<FarmPhone> {
             _put();
             router?.go('/chat');
           },
-          onPlans: () {
+          onTaskBoard: () {
             _put();
-            ref.read(phoneTargetProvider.notifier).go(const PhoneTargetPlans());
+            ref.read(phoneTargetProvider.notifier).go(const PhoneTargetTaskBoard());
           },
         ),
         PhoneApp.blocks => BlocksGame(pad: _pad, big: true),

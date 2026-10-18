@@ -1,6 +1,6 @@
 package protocol
 
-// A playbook's own sessions leave their finished, failed and conflicted work to the playbook, which asks in their place; a quiet one still asks.
+// A task's own sessions leave their finished, failed and conflicted work to the task, which asks in their place; a quiet one still asks.
 
 import (
 	"cmp"
@@ -36,7 +36,7 @@ func InboxEntries(state CoreState) []InboxEntry {
 	out := []InboxEntry{}
 	for _, h := range state.Sessions {
 		need := NeedOf(h)
-		if need == nil || need.Kind == "retrying" || (h.Playbook != nil && need.Kind != "quiet") {
+		if need == nil || need.Kind == "retrying" || (h.Graph != nil && need.Kind != "quiet") {
 			continue
 		}
 		channel := general
@@ -47,7 +47,7 @@ func InboxEntries(state CoreState) []InboxEntry {
 		from := InboxFrom{InboxFromSession{ID: h.ID, Name: h.Name, Agent: h.Agent}}
 		target := InboxTarget{InboxTargetSession{ID: h.ID}}
 		at := h.HiredAt
-		summary := h.Task
+		summary := h.Brief
 		if h.LastRun != nil {
 			at = h.LastRun.At
 			if h.LastRun.Summary != "" {
@@ -60,7 +60,7 @@ func InboxEntries(state CoreState) []InboxEntry {
 			out = append(out, InboxEntry{
 				Item:    InboxItem{ID: fmt.Sprintf("%s:merge:%d", h.ID, h.Runs), Kind: InboxKindMerge, From: from, Text: str.Cut(summary, 40), At: at, Target: target},
 				Channel: channel, Since: &at,
-				Brief: who + "的活做完 {ago}了还没收：「" + str.Slice(h.Task, 0, 60) + "」",
+				Brief: who + "的活做完 {ago}了还没收：「" + str.Slice(h.Brief, 0, 60) + "」",
 			})
 		case "fix":
 			out = append(out, InboxEntry{
@@ -82,7 +82,7 @@ func InboxEntries(state CoreState) []InboxEntry {
 				doing = "「" + p.Doing.Label + "」"
 			}
 			out = append(out, InboxEntry{
-				Item:    InboxItem{ID: fmt.Sprintf("%s:quiet:%d", h.ID, since), Kind: InboxKindQuiet, From: from, Text: str.Cut(h.Task, 40), At: since, Target: target},
+				Item:    InboxItem{ID: fmt.Sprintf("%s:quiet:%d", h.ID, since), Kind: InboxKindQuiet, From: from, Text: str.Cut(h.Brief, 40), At: since, Target: target},
 				Channel: channel, Since: &since,
 				Brief: who + "在干活，{ago}没动静了，最后在" + doing,
 			})
@@ -90,37 +90,37 @@ func InboxEntries(state CoreState) []InboxEntry {
 	}
 
 	manager := InboxFrom{InboxFromManager{}}
-	for _, pb := range PlaybooksOf(state) {
-		target := InboxTarget{InboxTargetPlans{Playbook: pb.ID}}
-		switch pb.State {
-		case PlaybookStateDraft:
+	for _, graph := range GraphsOf(state) {
+		target := InboxTarget{InboxTargetGraph{Graph: graph.ID}}
+		switch graph.State {
+		case GraphStateDraft:
 			out = append(out, InboxEntry{
-				Item:    InboxItem{ID: pb.ID + ":draft", Kind: InboxKindPlanDraft, From: manager, Text: str.Cut(pb.Title, 40), At: pb.CreatedAt, Target: target},
-				Channel: general, Brief: "种植计划「" + pb.Title + "」（" + pb.ID + "）拆好了，{ago}还没人看",
+				Item:    InboxItem{ID: graph.ID + ":draft", Kind: InboxKindGraphDraft, From: manager, Text: str.Cut(graph.Title, 40), At: graph.CreatedAt, Target: target},
+				Channel: general, Brief: "种植计划「" + graph.Title + "」（" + graph.ID + "）拆好了，{ago}还没人看",
 			})
-		case PlaybookStateRipe:
+		case GraphStateRipe:
 			out = append(out, InboxEntry{
-				Item:    InboxItem{ID: pb.ID + ":ripe", Kind: InboxKindPlanRipe, From: manager, Text: str.Cut(pb.Title, 40), At: pb.CreatedAt, Target: target},
-				Channel: general, Brief: "种植计划「" + pb.Title + "」（" + pb.ID + "）都做完了，{ago}还没收",
+				Item:    InboxItem{ID: graph.ID + ":ripe", Kind: InboxKindGraphRipe, From: manager, Text: str.Cut(graph.Title, 40), At: graph.CreatedAt, Target: target},
+				Channel: general, Brief: "种植计划「" + graph.Title + "」（" + graph.ID + "）都做完了，{ago}还没收",
 			})
-		case PlaybookStateRunning, PlaybookStatePaused:
-			for _, node := range pb.Nodes {
-				if node.State != NodeStateFailed {
+		case GraphStateRunning, GraphStatePaused:
+			for _, task := range graph.Tasks {
+				if task.State != TaskStateFailed {
 					continue
 				}
 				// A step retried and failed again asks again: from its second failure the id counts them.
-				id := pb.ID + ":failed:" + node.ID
-				if node.Failures > 1 {
-					id += fmt.Sprintf(":%d", node.Failures)
+				id := graph.ID + ":failed:" + task.ID
+				if task.Failures > 1 {
+					id += fmt.Sprintf(":%d", task.Failures)
 				}
 				why := ""
-				if node.Conclusion != nil && *node.Conclusion != "" {
-					why = "：" + str.Slice(*node.Conclusion, 0, 80)
+				if task.Conclusion != nil && *task.Conclusion != "" {
+					why = "：" + str.Slice(*task.Conclusion, 0, 80)
 				}
 				out = append(out, InboxEntry{
-					Item:    InboxItem{ID: id, Kind: InboxKindPlanFailed, From: manager, Text: str.Cut(pb.Title+"："+node.Title, 40), At: pb.CreatedAt, Target: target},
+					Item:    InboxItem{ID: id, Kind: InboxKindTaskFailed, From: manager, Text: str.Cut(graph.Title+"："+task.Title, 40), At: graph.CreatedAt, Target: target},
 					Channel: general,
-					Brief:   "种植计划「" + pb.Title + "」（" + pb.ID + "）的步骤 " + node.ID + "「" + node.Title + "」没做成，{ago}没人管了" + why,
+					Brief:   "种植计划「" + graph.Title + "」（" + graph.ID + "）的步骤 " + task.ID + "「" + task.Title + "」没做成，{ago}没人管了" + why,
 				})
 			}
 		}

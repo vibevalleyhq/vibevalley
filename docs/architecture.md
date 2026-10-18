@@ -36,7 +36,7 @@ flowchart LR
   API --> CHAT & FM & TK & CREW & PRJ & RT
   CHAT <-->|给它的话 / 它说的话| FM
   CHAT -->|叫醒、提示| CREW
-  CREW -->|channel_say、channel_read……<br/>带自己的令牌| MCP
+  CREW -->|channel_say、read_chat……<br/>带自己的令牌| MCP
   MCP --> CHAT
   FM -->|写工单、派活、收获、拆计划| TK
   TK -->|开执行、叫走| CREW
@@ -62,7 +62,7 @@ flowchart LR
 仓库的目录见根目录 [AGENTS.md](../AGENTS.md#目录)，服务端每个包管什么见 [server/README.md](../server/README.md#目录)。
 
 - **形状和规则**：Go 的 `server/internal/protocol` 是唯一的来源。形状写在 `shapes.go`、接口写在 `api.go`，`server/tool/shapegen` 从它们写出 Go 的胶水代码（`internal/protocol/gen.go`）和 Flutter 的类型与接口客户端（`app/lib/gen/vibevalley.dart`）；规则是同一个包里的纯函数（[server](../server/README.md#形状和规则从哪来)、[理由](../.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。
-- **服务**：`server/internal/` 下一块业务一个包，包名用单数，从下往上是 `base`（地基）、`core`（核心状态）、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`playbook`、`manager`、`gate`、`voice`、`connector`、`game`；一个包只 import 排在它前面的包，反方向的消息走 `base.Hub`。每个服务是包里的一个结构体，由 fx 组装；`workspace` 把全部包装在一个生命周期上（[server/README.md](../server/README.md#服务)、[理由](../.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)、[包名](../.agents/notes/implemented/architecture/2026-10-16-deep-modules-singular-names.md)）。执行由 smith 驱动，管家是 VibeValley 自己的 agent（[agents-and-runtimes.md](reference/agents-and-runtimes.md)）。
+- **服务**：`server/internal/` 下一块业务一个包，包名用单数，从下往上是 `base`（地基）、`core`（核心状态）、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`gate`、`voice`、`connector`、`game`；一个包只 import 排在它前面的包，反方向的消息走 `base.Hub`。每个服务是包里的一个结构体，由 fx 组装；`workspace` 把全部包装在一个生命周期上（[server/README.md](../server/README.md#服务)、[理由](../.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)、[包名](../.agents/notes/implemented/architecture/2026-10-16-deep-modules-singular-names.md)）。执行由 smith 驱动，管家是 VibeValley 自己的 agent（[agents-and-runtimes.md](reference/agents-and-runtimes.md)）。
 - **HTTP 和 MCP**：`server/internal/handler` 在最上面，答 `VibeValleyApi`、两条事件流；`server/internal/mcp` 是给编码 agent 的另一个入口，挂在 `/mcp`；`cmd/server` 单独跑它（[server.md](reference/server.md)；[理由](../.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](../.agents/notes/implemented/architecture/2026-10-10-site-events-over-sse.md)）。
 - **存盘**：SQLite，表在 `server/migrations/`，查询在 `server/pkg/db/queries/`、由 sqlc 生成成 `server/pkg/db/generated/`（[理由](../.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）；下文「存了什么」。
 - **客户端**：Flutter 只连服务端的接口，用 Riverpod 管状态（[理由](../.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)）；macOS 版把服务端打进应用（[desktop.md](reference/desktop.md)）。
@@ -83,9 +83,9 @@ flowchart LR
 
 在做什么、要你做什么、能不能收都由阶段推出来（protocol 的纯函数）。`play` 是地里那一层（在哪块地、最近的步骤、碰过的文件），`conflict` 是最近一次 git 检查的结果，不属于阶段。帮工离开就从状态里删掉。
 
-工单（`Issue`）里开着的和最近关的 50 家（`KeepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `IssueStatusOf` 算。种植计划是带 `plan` 的父工单，步骤是带 `step` 的子工单，`PlaybooksOf` 读成 `Playbook`（[server.md](reference/server.md)「种植计划」）。田头在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时、账本折出来的进度也在里面（[server.md](reference/server.md)「定时」「游戏」）。
+工单（`Issue`）里开着的和最近关的 50 家（`KeepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `IssueStatusOf` 算。种植计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，`GraphsOf` 读成 `TaskGraph`（[server.md](reference/server.md)「种植计划」）。田头在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时、账本折出来的进度也在里面（[server.md](reference/server.md)「定时」「游戏」）。
 
-给 Flutter 的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`plans`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `protocol.FrameOf` 拼：给人看的话（帮工在干什么、定时什么时候跑、计划是哪个状态、节点是什么状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`Reduce` 和 `state.json` 里没有。`app/lib/rules/` 只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在客户端。
+给 Flutter 的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`tasks`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `protocol.FrameOf` 拼：给人看的话（帮工在干什么、定时什么时候跑、计划是哪个状态、节点是什么状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`Reduce` 和 `state.json` 里没有。`app/lib/rules/` 只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在客户端。
 
 ## 事件流
 
@@ -105,10 +105,11 @@ flowchart LR
 
 | 文件 | 内容 |
 |---|---|
+| `.vibevalley.lock` | 家目录排他租约；同一目录只允许一个服务端，进程退出释放内核锁，文件保留 |
 | `config.json` | 帮工档案、技能书、每台农机的设置。第一次启动时用 protocol 的种子（`server/internal/protocol/seeds.json`） |
 | `settings.json` | 首页「设置」里存的钥匙、语音设置和记性的来源（Nowledge Mem、EverOS 的地址和 key）；只有你能读 |
 | `state.json` | 核心状态，田头、进度、定时和工单除外：帮工、commit 数 |
-| `vibevalley.db` | SQLite：田头、工单和它们的帮工、每次干活（`session_run`）、计划的经过、账本、记性、定时、连接器、院门的设备；运行时新建的行主键是 uuidv7，工单和每条消息另有自己的顺序号（表名是「模块_概念」、单数，结构在 `server/migrations/`：`0001_schema.sql` 和它后面的改动，启动时按名字顺序各跑一次，跑之前把库留一份 `vibevalley.db.v<n>`；库比服务端认识的新就不开）。查询都在 `server/pkg/db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
+| `vibevalley.db` | SQLite：田头、工单和它们的帮工、每次干活（`session_run`）、计划的经过、账本、记性、定时、连接器、院门的设备；运行时新建的行主键是 uuidv7，工单和每条消息另有自己的顺序号（表名是「模块_概念」、单数，结构在 `server/migrations/0001_schema.sql`，一个基线，改表直接改它，旧库删掉重建；库比服务端认识的新就不开）。查询都在 `server/pkg/db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
 | `sessions.json` | 只有服务端需要的：每个帮工的项目目录或 worktree、农机自己的会话 id、最后一轮的完整原话 |
 | `events/<id>.json` | 每个 Session 的事件日志（走了留 30 天；是谁、为哪张工单、怎么关的在库里的 `session` 表，一直留着）；管家的是 `manager.json` |
 | `spend.json` | 今天每台农机花了多少 |
@@ -131,7 +132,7 @@ flowchart LR
 |---|---|---|
 | `work_root` | 工作目录：每个子文件夹是一个项目，帮工只在这里面干活；也是算经验的范围 | `~/vibevalley-work` |
 | `db` | 数据库：SQLite 文件，给的是文件夹就用里面的 `vibevalley.db`；`memory` 是只在内存里 | `$VIBEVALLEY_HOME/vibevalley.db` |
-| `host`、`port` | 只听本机：帮工没有权限确认，服务端不能对外。帮工拿到的 `/mcp` 地址也由它们拼出 | `127.0.0.1`、`8787` |
+| `port` | 主接口固定听 `127.0.0.1`，只能选端口；0 由系统分配。HTTP 和帮工的 `/mcp` 使用同一实际监听地址 | 8787 |
 | `agent.model` | 单独跑 `cmd/vibevalley` 时用的模型 | `deepseek-flash` |
 | `deepseek.api_key` | 管家和 VibeValley 农机用的 DeepSeek 钥匙（`DEEPSEEK_API_KEY`） | |
 | `agora.app_id`、`agora.app_certificate` | 语音：签 RTC 和 RTM 令牌、请语音管家（`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`）；都没有时语音不可用，别的照常 | |

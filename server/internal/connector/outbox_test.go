@@ -37,13 +37,13 @@ func TestOutboxOwnsDeliveryWithoutBlockingFarmEvents(t *testing.T) {
 	b.adapter = blocked
 	defer close(blocked.release)
 	voiceWeixinConnected(t, f)
-	f.Channel.ManagerSays(f.Channel.General(), "first", "第一条", true)
+	f.Channel.ManagerSays(f.Channel.General(), "first", "第一条", true, "")
 	select {
 	case <-blocked.entered:
 	case <-time.After(5 * time.Second):
 		t.Fatal("delivery did not start")
 	}
-	f.Channel.ManagerSays(f.Channel.General(), "second", "第二条", true)
+	f.Channel.ManagerSays(f.Channel.General(), "second", "第二条", true, "")
 	testkit.Until(t, "second event queued while delivery is blocked", func() bool { return voiceStatusOf(f, protocol.ConnectorIDWeixin).Pending == 2 })
 	if len(s.sentBy(protocol.ConnectorIDWeixin)) != 0 {
 		t.Fatal("blocked adapter unexpectedly sent")

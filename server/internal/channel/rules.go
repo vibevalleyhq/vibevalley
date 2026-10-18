@@ -93,7 +93,7 @@ const (
 	reasonGeneral   chatDeliveryReason = "general"
 	reasonDispatch  chatDeliveryReason = "dispatch"
 	reasonAddressed chatDeliveryReason = "addressed"
-	reasonPlaybook  chatDeliveryReason = "playbook"
+	reasonGraph     chatDeliveryReason = "graph"
 )
 
 type chatHeldBy string
@@ -120,14 +120,14 @@ type chatAudienceInput struct {
 	Conversation protocol.Conversation `json:"conversation"`
 	Sessions     []string              `json:"sessions"`
 	// Sessions when nil.
-	OnFarm      []string          `json:"onFarm"`
-	Followers   []string          `json:"followers"`
-	Hops        int64             `json:"hops"`
-	Cooling     []string          `json:"cooling"`
-	Broken      []string          `json:"broken"`
-	Outcome     *protocol.Outcome `json:"outcome,omitzero"`
-	ForPlaybook bool              `json:"forPlaybook,omitzero"`
-	Spoken      bool              `json:"spoken,omitzero"`
+	OnFarm    []string          `json:"onFarm"`
+	Followers []string          `json:"followers"`
+	Hops      int64             `json:"hops"`
+	Cooling   []string          `json:"cooling"`
+	Broken    []string          `json:"broken"`
+	Outcome   *protocol.Outcome `json:"outcome,omitzero"`
+	ForTask   bool              `json:"forTask,omitzero"`
+	Spoken    bool              `json:"spoken,omitzero"`
 }
 
 func chatAudience(i chatAudienceInput) []chatDelivery {
@@ -164,7 +164,7 @@ func chatAudience(i chatAudienceInput) []chatDelivery {
 	}
 
 	if i.Kind == protocol.MessageKindReport {
-		if !i.ForPlaybook {
+		if !i.ForTask {
 			add(protocol.ManagerAgent, reasonAddressed, i.Outcome != nil && *i.Outcome == protocol.OutcomeFailed)
 		}
 		return out
@@ -246,7 +246,7 @@ func wakeInput(messages []protocol.InboxMessage, others []chatUnreadRow) string 
 			lines = append(lines, "- "+chatRowText(r))
 		}
 	}
-	lines = append(lines, "", "要回就用 channel_say，target 照抄；要看前面的上下文用 channel_read。不用回的就不回。")
+	lines = append(lines, "", "要回就用 channel_say，target 照抄；要看前面的上下文用 read_chat。不用回的就不回。")
 	return strings.Join(lines, "\n")
 }
 
@@ -255,5 +255,5 @@ func busyNotice(rows []chatUnreadRow) string {
 	for _, r := range rows[:min(len(rows), protocol.SummaryConversations)] {
 		texts = append(texts, chatRowText(r))
 	}
-	return fmt.Sprintf("[%s提示] 有新消息还没读：%s。方便的时候用 channel_read 读；不读不代表没事。", protocol.GeneralName, strings.Join(texts, "；"))
+	return fmt.Sprintf("[%s提示] 有新消息还没读：%s。方便的时候用 read_chat 读；不读不代表没事。", protocol.GeneralName, strings.Join(texts, "；"))
 }

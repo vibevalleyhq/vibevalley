@@ -157,7 +157,7 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 		Cooling:      cooling,
 		Broken:       broken,
 		Outcome:      meta.Outcome,
-		ForPlaybook:  meta.ForPlaybook,
+		ForTask:      meta.ForTask,
 		Spoken:       meta.Spoken,
 	}
 	if in.Conversation.SubjectID != nil && *in.Conversation.SubjectID == "" {
@@ -532,7 +532,7 @@ func (c *Service) onFact(e protocol.SideEvent) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		if !c.closed {
-			c.postReport(f.ID, f.Outcome, f.Summary, f.Spent)
+			c.postReport(f.ID, f.Outcome, f.Summary, f.Spent, f.Run)
 		}
 	}
 }
@@ -593,12 +593,12 @@ func (c *Service) openedJob(h protocol.Session) error {
 	}
 	var what string
 	switch {
-	case h.Playbook != nil && h.Playbook.Node != nil:
-		what = fmt.Sprintf("做种植计划 %s 的「%s」", h.Playbook.ID, *h.Playbook.Node)
-	case h.Playbook != nil:
-		what = "拆种植计划 " + h.Playbook.ID
+	case h.Graph != nil && h.Graph.Task != nil:
+		what = fmt.Sprintf("做种植计划 %s 的「%s」", h.Graph.ID, *h.Graph.Task)
+	case h.Graph != nil:
+		what = "拆种植计划 " + h.Graph.ID
 	default:
-		what = str.Head(str.Spaces.ReplaceAllString(h.Task, " "), 80)
+		what = str.Head(str.Spaces.ReplaceAllString(h.Brief, " "), 80)
 	}
 	project := "项目"
 	if h.Project != nil {
@@ -610,7 +610,7 @@ func (c *Service) openedJob(h protocol.Session) error {
 	return err
 }
 
-func (c *Service) postReport(id string, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
+func (c *Service) postReport(id string, outcome protocol.Outcome, summary string, spent *protocol.Spent, run *string) {
 	w := c.sessionOf(id)
 	if w == nil || outcome == protocol.OutcomeInterrupted {
 		return
@@ -630,7 +630,10 @@ func (c *Service) postReport(id string, outcome protocol.Outcome, summary string
 		text = summary
 	}
 	o := outcome
-	meta := &chatMeta{Outcome: &o, Spent: spent, ForPlaybook: w.Playbook != nil}
+	meta := &chatMeta{Outcome: &o, Spent: spent, ForTask: w.Graph != nil}
+	if run != nil {
+		meta.Run = *run
+	}
 	if _, err := c.write(chatWrite{conversation: *thread, from: id, kind: protocol.MessageKindReport, text: str.Head(text, chatReportMax), final: true, meta: meta}); err != nil {
 		log.Printf("chat: %s's report: %v", id, err)
 	}

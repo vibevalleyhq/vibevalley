@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/workbench/issues/issues_page.dart';
@@ -13,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/server.dart' show FakeServer, jsonResponse, settle;
 import '../support/farm.dart' as fakes;
+import '../support/workbench.dart' show pumpPage, WorkbenchBackend;
 
 const _closed = Session(
   id: 'w1',
@@ -20,14 +23,14 @@ const _closed = Session(
   agent: 'backend',
   runtime: 'claude',
   project: 'clock',
-  task: '写打卡\n细节在 README',
+  brief: '写打卡\n细节在 README',
   hiredAt: 0,
   runs: 2,
   phase: PhaseClosed(at: 60000, closed: IssueClose.merged),
   lastRun: LastRun(outcome: Outcome.completed, summary: '打卡写好了，测试全过', at: 60000),
   spent: Spent(tokens: 0, cny: 0.42),
 );
-const _open = Session(id: 'w2', name: '小郑', agent: 'frontend', runtime: '', project: 'clock', task: '改登录页', hiredAt: 70000, runs: 0, phase: PhaseResting());
+const _open = Session(id: 'w2', name: '小郑', agent: 'frontend', runtime: '', project: 'clock', brief: '改登录页', hiredAt: 70000, runs: 0, phase: PhaseResting());
 
 Issue _issue(
   String id,
@@ -36,7 +39,7 @@ Issue _issue(
   IssueStatus status = IssueStatus.backlog,
   IssueClose? closed,
   String? parent,
-  IssuePlan? plan,
+  IssueGraph? graph,
 }) => Issue(
   id: id,
   number: 1,
@@ -49,7 +52,7 @@ Issue _issue(
   closedAt: closed == null ? null : 60000,
   closed: closed,
   parent: parent,
-  plan: plan,
+  graph: graph,
   status: status,
 );
 
@@ -65,7 +68,63 @@ class _Issues extends Notifier<List<Issue>> {
 
 final _issuesNow = NotifierProvider<_Issues, List<Issue>>(_Issues.new);
 
+Object historyOf(List<Issue> issues, List<Session> sessions) => [
+  for (final issue in issues)
+    IssueHistory(
+      issue: issue,
+      sessions: [for (final id in issue.sessions) ...sessions.where((s) => s.id == id)],
+      missingSessions: [
+        for (final id in issue.sessions)
+          if (!sessions.any((s) => s.id == id)) id,
+      ],
+    ).toJson(),
+];
+
 void main() {
+  for (final exists in [true, false]) {
+    testWidgets('issue lookup waits for a successful history response before deciding missing: $exists', (t) async {
+      const issue = Issue(id: 'delayed', number: 1, title: '延迟工单', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.todo);
+      final response = Completer<http.Response>();
+      final backend = WorkbenchBackend();
+      await pumpPage(
+        t,
+        const IssuesPage(id: 'delayed'),
+        (r) => r.url.path == '/api/v1/issues/history' ? response.future : backend.handle(r),
+        farm: fakes.farm(issues: const [issue]),
+      );
+      expect(find.text('找不到这张工单'), findsNothing);
+      response.complete(jsonResponse([if (exists) const IssueHistory(issue: issue, sessions: [], missingSessions: []).toJson()]));
+      await settle(t);
+      expect(find.text('找不到这张工单'), exists ? findsNothing : findsOneWidget);
+      if (exists) expect(find.text('延迟工单'), findsWidgets);
+      expect(backend.calls.where((c) => c.path == '/api/v1/sessions'), isEmpty);
+    });
+  }
+
+  testWidgets('missing execution records remain explicit and do not invent a resting helper', (t) async {
+    const issue = Issue(
+      id: 'missing',
+      number: 1,
+      title: '历史工单',
+      priority: Priority.medium,
+      createdAt: 1,
+      sessions: ['lost-session'],
+      status: IssueStatus.inReview,
+    );
+    final backend = WorkbenchBackend();
+    await pumpPage(t, const IssuesPage(id: 'missing'), (r) async {
+      if (r.url.path == '/api/v1/issues/history') {
+        return jsonResponse([
+          const IssueHistory(issue: issue, sessions: [], missingSessions: ['lost-session']).toJson(),
+        ]);
+      }
+      return backend.handle(r);
+    }, farm: fakes.farm(issues: const [issue]));
+    expect(find.textContaining('执行记录缺失：lost-session'), findsOneWidget);
+    expect(find.text('收获'), findsNothing);
+    expect(backend.calls.where((c) => c.path == '/api/v1/sessions'), isEmpty);
+  });
+
   test("an issue for the manager: in 处理中 while the manager works on it, closed once it answered", () {
     const working = Issue(
       id: 't9',
@@ -125,12 +184,12 @@ void main() {
     expect(issueTag(_issue('t3', 'x', sessions: ['w3'], status: IssueStatus.inProgress)), IssueTag.working);
     expect(issueTag(_closedIssue), IssueTag.harvested);
     expect(issueTag(_issue('t0', 'x', sessions: ['w0'], status: IssueStatus.canceled)), IssueTag.closed);
-    final step = _issue('p1.api', '写接口', sessions: ['w4'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan, parent: 'p1');
-    expect(issueTag(step), IssueTag.merged);
-    expect(issuePlanned(step, null), isTrue);
-    const greet = Playbook(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: PlaybookState.draft, nodes: [], parallel: 1, createdAt: 0);
-    expect(issueTitle(step, [greet]), '加 greet · 写接口');
-    expect(issueTitle(step), '写接口');
+    final task = _issue('p1.api', '写接口', sessions: ['w4'], status: IssueStatus.done, closed: IssueClose.mergedIntoGraph, parent: 'p1');
+    expect(issueTag(task), IssueTag.merged);
+    expect(issueInTask(task, null), isTrue);
+    const greet = TaskGraph(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: GraphState.draft, tasks: [], parallel: 1, createdAt: 0);
+    expect(issueTitle(task, [greet]), '加 greet · 写接口');
+    expect(issueTitle(task), '写接口');
     expect(issueTitle(_closedIssue), '写打卡');
     expect(issueIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 'w1'), isTrue);
     expect(issueIs(_issue('t5', 'x', sessions: ['w1', 'w6']), 't5'), isTrue);
@@ -153,13 +212,13 @@ void main() {
     }
     expect(laneOf(IssueStatus.canceled), Lane.closed);
     expect(laneOf(IssueStatus.todo), Lane.todo);
-    expect(moveOf(Lane.waiting, Lane.closed, planned: true), isNull);
-    expect(moveOf(Lane.closed, Lane.working, planned: true), isNull);
-    expect(issuePlanned(_issue('t5', 'x', sessions: ['w5'], status: IssueStatus.done, closed: IssueClose.mergedIntoPlan), null), isTrue);
-    expect(issuePlanned(_closedIssue, null), isFalse);
+    expect(moveOf(Lane.waiting, Lane.closed, split: true), isNull);
+    expect(moveOf(Lane.closed, Lane.working, split: true), isNull);
+    expect(issueInTask(_issue('t5', 'x', sessions: ['w5'], status: IssueStatus.done, closed: IssueClose.mergedIntoGraph), null), isTrue);
+    expect(issueInTask(_closedIssue, null), isFalse);
   });
 
-  testWidgets("an issue whose harvest would conflict offers to have it solved, not to harvest; a planner's issue reads as the playbook's", (t) async {
+  testWidgets("an issue whose harvest would conflict offers to have it solved, not to harvest; a splitter's issue reads as the task's", (t) async {
     t.view.physicalSize = const Size(1600, 1000);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
@@ -171,18 +230,18 @@ void main() {
       agent: 'flash',
       runtime: '',
       project: 'demo',
-      task: '改成 hey',
+      brief: '改成 hey',
       hiredAt: 0,
       runs: 0,
       phase: PhaseResting(),
     );
-    const planner = Session(
+    const splitter = Session(
       id: 'w5',
       name: '省钱小工',
       agent: 'flash',
       runtime: '',
       project: 'demo',
-      task: '这一轮你是规划师：……',
+      brief: '这一轮你是规划师：……',
       hiredAt: 0,
       runs: 0,
       phase: PhaseClosed(at: 1, closed: IssueClose.merged),
@@ -194,14 +253,14 @@ void main() {
         '加 greet',
         sessions: ['w5'],
         status: IssueStatus.inReview,
-        plan: const IssuePlan(state: PlaybookState.draft, parallel: 1),
+        graph: const IssueGraph(state: GraphState.draft, parallel: 1),
       ),
       _issue('p1.api', '写接口', parent: 'p1'),
     ];
     final api = FakeServer((r) async {
       if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
       return switch ((r.method, r.url.path)) {
-        ('GET', '/api/v1/sessions') => jsonResponse([conflicted.toJson(), planner.toJson()]),
+        ('GET', '/api/v1/issues/history') => jsonResponse(historyOf(issues, [conflicted, splitter])),
         ('GET', '/api/v1/agents') || ('GET', '/api/v1/skills') || ('GET', '/api/v1/runtimes') => jsonResponse([]),
         ('GET', '/api/v1/sessions/w4') => jsonResponse(conflicted.toJson()),
         ('GET', '/api/v1/sessions/w4/events') => jsonResponse([]),
@@ -219,8 +278,8 @@ void main() {
         overrides: [
           apiProvider.overrideWithValue(api),
           stateProvider.overrideWithValue(fakes.farm(sessions: [session], issues: issues)),
-          plansProvider.overrideWithValue(const [
-            Playbook(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: PlaybookState.draft, nodes: [], parallel: 1, createdAt: 0),
+          graphsProvider.overrideWithValue(const [
+            TaskGraph(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: GraphState.draft, tasks: [], parallel: 1, createdAt: 0),
           ]),
           sideEventsProvider.overrideWith((ref) => const Stream<LiveEvent>.empty()),
         ],
@@ -268,8 +327,8 @@ void main() {
     final api = FakeServer((r) async {
       if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
       switch ((r.method, r.url.path)) {
-        case ('GET', '/api/v1/sessions'):
-          return jsonResponse([_open.toJson(), _closed.toJson()]);
+        case ('GET', '/api/v1/issues/history'):
+          return jsonResponse(historyOf(issues, [_open, _closed]));
         case ('GET', '/api/v1/agents'):
         case ('GET', '/api/v1/skills'):
         case ('GET', '/api/v1/runtimes'):

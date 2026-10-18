@@ -104,16 +104,16 @@ func (j *journal) Events() []protocol.SessionEvent {
 	return out
 }
 
-func (j *journal) write() error {
-	return j.disk.Write(func() ([]byte, error) {
-		j.mu.Lock()
-		defer j.mu.Unlock()
-		if j.steps == nil {
-			return []byte("[]"), nil
-		}
-		return json.Marshal(j.steps)
-	})
+func (j *journal) body() ([]byte, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.steps == nil {
+		return []byte("[]"), nil
+	}
+	return json.Marshal(j.steps)
 }
+
+func (j *journal) write() error { return j.disk.Write(j.body) }
 
 func (j *journal) flush() {
 	j.mu.Lock()
@@ -395,7 +395,7 @@ func (j *journal) Close() {
 	}
 	j.closed = true
 	j.mu.Unlock()
-	if err := j.write(); err != nil {
+	if err := j.disk.Finish(j.body); err != nil {
 		log.Printf("vibevalley: could not save %s: %v", j.file, err)
 	}
 }

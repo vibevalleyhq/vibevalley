@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"vibevalley/internal/agent/brain"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
-	"vibevalley/pkg/agent"
 )
 
 func TestMemoryNotesOfARun(t *testing.T) {
@@ -76,7 +76,7 @@ func TestMemoriesKeepRecallWriteForget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { f.DB.Close() })
+	t.Cleanup(func() { f.Close() })
 	m := f.Memory
 	m.Keep(FinishedRun{Agent: "lab", Session: "w1", Project: "clock", Job: "加分页", Outcome: protocol.OutcomeCompleted,
 		Said: "记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文\n结论：加好了", Summary: "加好了"})
@@ -147,7 +147,7 @@ func TestManagerMemoryLines(t *testing.T) {
 	if len(memory.Manager().Memories) != 0 {
 		t.Fatal("remembers something already")
 	}
-	if err := agent.Remember(folder, "主人喜欢早上收到汇报", time.Date(2026, 10, 12, 9, 0, 0, 0, time.Local)); err != nil {
+	if _, err := brain.Remember(folder, "主人喜欢早上收到汇报", time.Date(2026, 10, 12, 9, 0, 0, 0, time.Local)); err != nil {
 		t.Fatal(err)
 	}
 	written, err := memory.WriteManager("  周末别派夜班\n真的  ")
@@ -185,14 +185,18 @@ func TestManagerMemoryLines(t *testing.T) {
 }
 
 func TestManagerMemoryCarriedLines(t *testing.T) {
-	lines := make([]agent.MemoryLine, 100)
-	for i := range lines {
-		lines[i] = agent.MemoryLine{ID: string(rune('a' + i%26)), Date: "2026-10-13", Text: strings.Repeat("字", 100)}
+	memory, folder := openManagerMemory(t)
+	text := strings.Repeat("- 2026-10-13 "+strings.Repeat("字", 100)+"\n", 100)
+	if _, err := brain.RewriteMemory(folder, text); err != nil {
+		t.Fatal(err)
 	}
-	if n := memoryCarriedLines(lines); n <= 0 || n >= 100 {
+	if n := *memory.Manager().Carried; n <= 0 || n >= 100 {
 		t.Fatalf("carried %d", n)
 	}
-	if n := memoryCarriedLines(lines[:3]); n != 3 {
+	if _, err := brain.RewriteMemory(folder, "# header\n- first\n* second\nplain third\n"); err != nil {
+		t.Fatal(err)
+	}
+	if n := *memory.Manager().Carried; n != 3 {
 		t.Fatalf("carried %d", n)
 	}
 }
@@ -227,7 +231,7 @@ func TestPreviewPicksWithoutCountingAndTheLongestUnusedFade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { f.DB.Close() })
+	t.Cleanup(func() { f.Close() })
 	m := f.Memory
 	if _, err := m.Write("lab", "clock 的测试用 pnpm test", "clock"); err != nil {
 		t.Fatal(err)

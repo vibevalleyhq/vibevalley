@@ -50,16 +50,16 @@ where closed_at is null or id in (select id from latest) or parent in (select id
 select * from issue where id = sqlc.arg(id) or parent = sqlc.arg(id);
 
 -- name: PutIssue :exec
--- An issue as its playbook has it now; its sessions and its queue are not the playbook's.
-insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, closed_at, closed, parent, blocked_by, plan, step)
+-- An issue as its task graph has it now; its sessions and its queue are not the graph's.
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, closed_at, closed, parent, blocked_by, graph, task)
 values (?, (select coalesce(max(number), 0) + 1 from issue), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 on conflict (id) do update set
   title = excluded.title, description = excluded.description, project = excluded.project, assignee = excluded.assignee, rank = excluded.rank,
   closed_at = excluded.closed_at, closed = excluded.closed, parent = excluded.parent, blocked_by = excluded.blocked_by,
-  plan = excluded.plan, step = excluded.step;
+  graph = excluded.graph, task = excluded.task;
 
--- name: PlanIDs :many
-select id from issue where plan is not null;
+-- name: GraphIDs :many
+select id from issue where graph is not null;
 
 -- name: LatestOfSchedule :one
 -- A schedule's issue: the one it made last.

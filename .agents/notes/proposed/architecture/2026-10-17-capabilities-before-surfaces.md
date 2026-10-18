@@ -9,11 +9,11 @@ Status: proposed
 | 入口 | 谁用 | 能做的事从哪来 |
 |---|---|---|
 | HTTP 接口 | Flutter、院门后的设备 | `protocol/api.go` 的 86 个 `//vibevalley:route`，shapegen 生成，handler 一个方法转给一个服务 |
-| 管家的工具 | 管家（DeepSeek） | `manager/tools.go` 手写的 21 个，再加 `pkg/agent` 自带的 `remember`、`rewrite_memory`、`search_archive`、`load_skill` |
+| 管家的工具 | 管家（DeepSeek） | `manager/tools.go` 手写的 21 个，再加 `internal/agent/brain` 自带的 `remember`、`rewrite_memory`、`search_archive`、`load_skill` |
 | MCP | 帮工（Claude Code、Codex、pi……） | `mcp/mcp.go` 手写的 4 个：`channel_say`、`channel_read`、`channel_inbox`、`session_list` |
 | 聊天软件、语音 | 主人在外面说话 | 不是工具：文字交给 `Manager.Say`，语音交给 `Manager.Call`，之后由管家的工具干活 |
 | 院门 | 主人配对过的设备 | 整套 HTTP 接口，`gate.go` 里写死不放 `lan.*` 的管理 |
-| 定时、计划 | 服务端自己 | 直接调服务（`issue/dispatch.go` 的 `scheduled`、`playbook.go` 的 `follow`） |
+| 定时、计划 | 服务端自己 | 直接调服务（`issue/dispatch.go` 的 `scheduled`、`task.go` 的 `follow`） |
 | 命令行 | 终端、脚本、编码 agent | **没有**。`cmd/vibevalley` 是另一个 agent 的对话程序，不连服务端 |
 
 后果：
@@ -42,6 +42,8 @@ Status: proposed
 | `manager` | 管家 | 管家的工具 |
 | `session` | 帮工（一个 Session） | 暂不用：Session 不调农场的接口（「帮工的子集」） |
 
+`manager` 和 `session` 要去掉：`can` 只管农场往外给出哪些接口、给谁；agent 能调哪些工具写在档案的 `Can` 和工具表上，不经能力表，见 [管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md) 第 3 节。
+
 例：
 
 ```go
@@ -52,7 +54,7 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 
 - shapegen 读它，没写 `can` 的操作生成失败。
 - 读的操作和写的操作不另外标：HTTP 方法已经说明了。
-- 给模型看的说明（管家的工具、MCP 的工具要的中文 description）也写在这里，用 `//vibevalley:tool <名字> <说明>`；没有它的操作不给模型用。
+- 给模型看的工具不写在这里：模型的工具和接口不是一个形状，工具表在 `internal/tool`（[管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md)）。
 
 ### 2. 入口从能力表来
 
@@ -61,8 +63,8 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 | HTTP | 和现在一样 | 不变 |
 | 命令行 | shapegen 写出 Go 的 `protocol.Client`（实现同一个 `Handlers` 接口）和命令表 | 新增，见下面第 3 节 |
 | 院门 | 只放 `can` 里有 `remote` 的操作 | 替掉 `gate.go` 里写死的 `lan.*` |
-| 管家的工具 | 先**检查**：管家的每个工具都对得上一个 `can manager` 的操作；`can manager` 的操作都有工具 | 以后再看要不要直接生成 |
-| MCP | 只对外：主人机器上的 agent 用农场的能力，工具从能力表来 | 帮工不再用 MCP（[Session、Run、事件](2026-10-17-session-run-step.md)） |
+| 管家的工具 | 不从能力表来：和帮工共用 `internal/tool` 的工具表，按档案的 `Can` 放行 | 见 [管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md) |
+| MCP | 外部农机上的 Session 经它拿 `internal/tool` 的工具表，按档案的 `Can` 过滤 | 见 [管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md) |
 | 聊天软件、语音 | 不变：说话交给管家 | 以后可以加斜杠命令，一条命令对一个 `owner` 操作 |
 | 定时、计划 | 不变：服务端自己调服务 | — |
 
@@ -87,7 +89,7 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 86 个操作按下面五条收敛成约 80 个。改名和 [Worker 改叫 Session](2026-10-17-worker-is-a-session.md) 一起做，路由只改一次。
 
 1. **组是概念**：不用皮和传输层的叫法。`lan` 是院门的包 `gate`；`progress` 是 `internal/game`；频道的路径 `/api/chat/{id}/messages` 和 `/api/channels` 统一成 `channels`；`server.start`、`server.end` 管的是管家这条线（`CallState`）和请走全部帮工，不是服务端。
-2. **动词一套**：`list`、`get`、`create`、`update`、`delete`；`save` 只给 id 由客户端定的整份写入（档案、技能、设置）；`check` 只校验不保存（现在三处都是）。领域动词只留给不是增删改查的：`start`、`merge`、`reopen`、`stop`、`resolve`、`plan`、`pair`。现在同一件事有 `add`/`create`/`open`、`edit`/`update`、`remove`/`delete`、`find`/`get`。
+2. **动词一套**：`list`、`get`、`create`、`update`、`delete`；`save` 只给 id 由客户端定的整份写入（档案、技能、设置）；`check` 只校验不保存（现在三处都是）。领域动词只留给不是增删改查的：`start`、`merge`、`reopen`、`stop`、`resolve`、`task`、`pair`。现在同一件事有 `add`/`create`/`open`、`edit`/`update`、`remove`/`delete`、`find`/`get`。
 3. **工单的生命周期挂在工单上**：合并关上工单、请走以 dismissed 关上工单，改的是工单的状态，现在却挂在 `/api/workers/{id}` 下。改成按工单 id，服务端找这张工单最新的 Session（重开一次多一个；旧的经 `trajectory` 看）。`session` 下只留管这一次会话的 `stop`（打断这一轮）。
 4. **一个意图一个操作，不用布尔开关兼两件**：`issue.queue {queued}` 的 `true` 只有 `Issue.Start` 没空地时自己调（`dispatch.go:183`），Flutter 只传 `false`（「不排了」），所以换成 `issue.unqueue`，排队只经 `issue.start`。`schedule.toggle {enabled}` 并进 `schedule.update`，`lan.setOpen {open}` 是 `gate.update`。
 5. **`update` 只改给出的字段，路径的 id 算数**：`issue.edit` 现在整张替换，没给的 `project`、`assignee` 清空、`priority` 回到 medium（`issue.go:246`）；`PUT /api/agents/{id}` 不看路径的 id，用请求体的（`handler/api.go:259`）。
@@ -111,8 +113,8 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 | `agent.memories` / `remember` / `forget`、`manager.memories` / `remember` / `forget` | `memory.list` / `create` / `delete`，带 `agent`（档案 id 或 `manager`） | 6 个收成 3 个；管家本来是一个档案 id（`protocol.ManagerAgent`）；`ManagerMemory` 多出的部分要放进 `list` 的返回 |
 | `agent.recall` | `memory.recall` | 预览的是记忆 |
 | `manager.archive` / `archiveFile` | `manager.listArchive` / `getArchive` | 2；操作名只有一段，它也是 Dart 客户端的方法名 |
-| `playbook.editNode` / `removeNode` | `playbook.updateNode` / `deleteNode` | 2 |
-| `playbook.act`、`playbook.nodeAct` | 不变 | 动作是封闭的枚举（start、pause、resume、abandon、merge；retry、skip），一个操作加枚举比拆成七个清楚 |
+| `task.editNode` / `removeNode` | `task.updateNode` / `deleteNode` | 2 |
+| `task.act`、`task.nodeAct` | 不变 | 动作是封闭的枚举（start、pause、resume、abandon、merge；retry、skip），一个操作加枚举比拆成七个清楚 |
 | `progress.carryCoins` | 删，连同 `ledger.Carry` | 只有这个接口调 `Game.Carry`，Flutter 和别的入口都不调 |
 | `progress.chooseTitle` | `game.chooseTitle` | 1 |
 | `lan.*` | `gate.status` / `update` / `startPairing` / `stopPairing` / `answerPairing` / `deleteDevice` / `pair` / `me`，路径 `/api/gate…` | 1、4 |
@@ -124,7 +126,7 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 
 **一条规则，差别传进服务**：
 
-- 「谁在做」作为参数传进服务，像计划已经在用的 `protocol.PlaybookActor`：`Issue.Changes(id, by)` 由服务决定主人看算不算进游戏，去掉 `Review` 和 `Changes` 两个方法。
+- 「谁在做」作为参数传进服务，像计划已经在用的 `protocol.TaskActor`：`Issue.Changes(id, by)` 由服务决定主人看算不算进游戏，去掉 `Review` 和 `Changes` 两个方法。
 - 派活一条规则：管家的 `dispatch` 先写下工单，再走 `Issue.Start`，和主人派的一样排队；「满了先请走最久没干活的」留在 `Hire` 里，两条路都经过它。
 - 每个操作至少有一个入口用它（Flutter 的生成客户端里有调用，或者 `can` 里有 `manager`、`session`），加一个检查。
 
@@ -137,7 +139,8 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 | Session 读自己的工单、工单串 | 做不到，只能读频道 | 进的口子带进来：派活时带工单，投递时带串里它没看过的上文 | 帮工不知道工单写了什么就开工，是现在汇报跑题的来源之一 |
 | Session 报「卡住了，要主人拿主意」 | 汇报里的 `NeedsYou` 进 Inbox | 已经有：出的口子做（[Session、Run、事件](2026-10-17-session-run-step.md)） |
 | Session 记事 | 一轮结束时服务端记下这件活（`memory.Keep`）；VibeValley 自己的农机关着 `NoMemory` | 出的口子做，不给 Session 工具；`NoMemory` 保持 | 记忆归档案，任何农机都走同一条路 |
-| 管家建项目、改档案、改设置、改农机 | 做不到 | 不给 | 主人的配置，管家改了主人不知道 |
+| 管家建项目、改设置、改农机 | 做不到 | 不给 | 主人的配置，管家改了主人不知道 |
+| 管家建档案、改档案 | 做不到 | 改由 `hire` 能力给，建出来的停用、在频道里说一声 | 见 [管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md) 第 5 节 |
 | 管家看、改别的档案的记忆 | 只能记自己的 | 不给 | 档案的记忆由它自己的 Session 和主人写；派活时 `memory.recall` 已经自动挑给 Session |
 | 院门后的设备管院门 | 不给 | 保持不给 | |
 
@@ -147,10 +150,10 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 
 ### 做的顺序
 
-1. `//vibevalley:can` 和 `//vibevalley:tool`，给全部操作都写上；生成能力表的文档；院门改成按 `remote` 放。（`can`、`protocol.Endpoints`、能力表、院门已做；85 个操作，不是 86；`tool` 留到第 4 步，和管家工具的检查一起做。）
+1. `//vibevalley:can` 和 `//vibevalley:tool`，给全部操作都写上；生成能力表的文档；院门改成按 `remote` 放。（`can`、`protocol.Endpoints`、能力表、院门已做；85 个操作，不是 86；`tool` 不做了。）
 2. 生成 `Client` 和命令表，做命令行；写 `verify-dispatch`，步骤就是命令行的几条命令，真的派一次活。（`protocol.Client`、`Endpoints` 带查询参数和请求体、`cmd/vibevalley` 的农场命令、`state`、`events`、`runtime chat`、`issue run <id>`（开工、等到等你看、打出改动；不要 `--wait`，它总是等）已做，`verify-server` 改用命令行；`verify-dispatch` 还没做：要真的派一次活。）
 3. 第 4 节的改名和收敛，和 Worker 改叫 Session 一个改动做完（只改名、不改行为的那些已做：`get`、`create`、`update`、`delete`、`markRead`、`manager.hear`、`manager.open`、`gate.*`、`game.chooseTitle`、频道的路径；删掉没人调的 `worker.activities`、`progress.carryCoins`、`server.end` 已做；`issue.unqueue`、`schedule.update`、`schedule.list`、保存档案和技能时路径的 id 算数、`issue.update` 只改给出的字段（`IssueUpdate`，空的项目或档案是清掉）、记忆合成 `memory.*` 已做；工单的生命周期按工单 id（`issue.comment`、`changes`、`merge`、`resolve`、`cancel`，`session.stop`；`Issue.Latest` 找最新的帮工，`Changes(id, by)` 只把主人看的算进游戏）已做）；派活一个入口、`Changes` 带上「谁在看」、`update` 只改给出的字段。
-4. 检查管家的工具、MCP 和能力表对得上；按第 5 节主人定的补帮工的能力。
+4. 管家和帮工的工具不对能力表检查，由 [管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md) 的工具表做。
 
 ## 命令行清单
 
@@ -208,13 +211,13 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 
 | 命令 | 管家 | 备注 |
 |---|---|---|
-| `playbook plan --json` | ✓ `plan` | |
-| `playbook update-node <id> <node> --json` | ✓ `plan_edit` | |
-| `playbook delete-node <id> <node>` | ✓ `plan_edit` | |
-| `playbook act <id> --json` | ✓ `plan_action` | |
-| `playbook node-act <id> <node> --json` | ✓ `node_action` | |
-| `playbook changes <id>` | | |
-| `playbook events <id>` | | |
+| `graph split --json` | ✓ `graph_split` | |
+| `graph update-task <id> <task> --json` | ✓ `task_edit` | |
+| `graph delete-task <id> <task>` | ✓ `task_edit` | |
+| `graph act <id> --json` | ✓ `graph_action` | |
+| `graph task-act <id> <task> --json` | ✓ `task_action` | |
+| `graph changes <id>` | | |
+| `graph events <id>` | | |
 | `schedule list` | ✓ `list_schedules` | 新补 |
 | `schedule create --json` | ✓ `schedule` | |
 | `schedule update <id> --json` | | 含开关 |
@@ -280,7 +283,7 @@ shapegen 另写一份 `docs/reference/capabilities.md`：每个能力一行，�
 - `docs/reference/capabilities.md` 由 shapegen 写出，`-check` 查它最新。
 - 院门放行的操作和 `can remote` 一致，有测试。
 - `vibevalley issue create`、`issue start`、`state`、`issue merge` 能对着一个临时的服务端用；测试经 `Client` 走一遍每个操作。
-- 管家的工具和 MCP 的工具都对得上 `can` 里的 `manager`、`session`，有测试；加一个 `can manager` 的操作不加工具，测试失败。
+- `can` 里只有 `owner`、`remote`；agent 的工具不经能力表（[管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md)）。
 - 派活只剩一条规则：管家派的也先有工单，满了排队。
 - 每个操作至少有一个入口用它。
 - `mcp.go` 里没有 `farm_*`，`/mcp` 的工具从能力表来（[Session、Run、事件](2026-10-17-session-run-step.md)）。

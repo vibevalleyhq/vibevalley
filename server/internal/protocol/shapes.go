@@ -73,6 +73,12 @@ const (
 	SessionDisallowedTools = "disallowedTools"
 )
 
+// ServerReady is written once to stdout by cmd/server --ready-json after the listener and workspace are ready.
+type ServerReady struct {
+	URL string `json:"url"`
+	PID int64  `json:"pid"`
+}
+
 // Empty: nothing wrong.
 type SettingsCheck struct {
 	Problem string `json:"problem,omitzero"`
@@ -227,8 +233,10 @@ type ChatMessage struct {
 	Final        bool        `json:"final"`
 	Mentions     []string    `json:"mentions,omitzero"`
 	Session      *string     `json:"session,omitzero"`
-	Outcome      *Outcome    `json:"outcome,omitzero"`
-	Spent        *Spent      `json:"spent,omitzero"`
+	// The producing run, absent for user messages and history without a recorded association.
+	Run     *string  `json:"run,omitzero"`
+	Outcome *Outcome `json:"outcome,omitzero"`
+	Spent   *Spent   `json:"spent,omitzero"`
 	// Said on a call rather than typed.
 	Spoken bool  `json:"spoken,omitzero"`
 	At     int64 `json:"at"`
@@ -245,9 +253,9 @@ const (
 type SubjectKind string
 
 const (
-	SubjectKindIssue    SubjectKind = "issue"
-	SubjectKindPlaybook SubjectKind = "playbook"
-	SubjectKindTalk     SubjectKind = "talk"
+	SubjectKindIssue SubjectKind = "issue"
+	SubjectKindGraph SubjectKind = "graph"
+	SubjectKindTalk  SubjectKind = "talk"
 )
 
 type Conversation struct {
@@ -303,9 +311,9 @@ type LastRun struct {
 	Spent   *Spent  `json:"spent,omitzero"`
 }
 
-type SessionPlaybook struct {
+type SessionGraph struct {
 	ID   string  `json:"id"`
-	Node *string `json:"node,omitzero"`
+	Task *string `json:"task,omitzero"`
 }
 
 type ActionStep struct {
@@ -325,24 +333,24 @@ type SessionPlay struct {
 }
 
 type Session struct {
-	ID       string           `json:"id"`
-	Name     string           `json:"name"`
-	Agent    string           `json:"agent"`
-	Runtime  string           `json:"runtime"`
-	Task     string           `json:"task"`
-	Project  *string          `json:"project,omitzero"`
-	Branch   *string          `json:"branch,omitzero"`
-	Worktree *string          `json:"worktree,omitzero"`
-	Conflict *Conflict        `json:"conflict,omitzero"`
-	HiredAt  int64            `json:"hiredAt"`
-	Runs     int64            `json:"runs"`
-	Phase    Phase            `json:"phase"`
-	LastRun  *LastRun         `json:"lastRun,omitzero"`
-	Spent    *Spent           `json:"spent,omitzero"`
-	Playbook *SessionPlaybook `json:"playbook,omitzero"`
-	Channel  *string          `json:"channel,omitzero"`
-	Play     *SessionPlay     `json:"play,omitzero"`
-	Issue    *string          `json:"issue,omitzero"`
+	ID       string        `json:"id"`
+	Name     string        `json:"name"`
+	Agent    string        `json:"agent"`
+	Runtime  string        `json:"runtime"`
+	Brief    string        `json:"brief"`
+	Project  *string       `json:"project,omitzero"`
+	Branch   *string       `json:"branch,omitzero"`
+	Worktree *string       `json:"worktree,omitzero"`
+	Conflict *Conflict     `json:"conflict,omitzero"`
+	HiredAt  int64         `json:"hiredAt"`
+	Runs     int64         `json:"runs"`
+	Phase    Phase         `json:"phase"`
+	LastRun  *LastRun      `json:"lastRun,omitzero"`
+	Spent    *Spent        `json:"spent,omitzero"`
+	Graph    *SessionGraph `json:"graph,omitzero"`
+	Channel  *string       `json:"channel,omitzero"`
+	Play     *SessionPlay  `json:"play,omitzero"`
+	Issue    *string       `json:"issue,omitzero"`
 	// What it is doing, in words (PhaseWords), filled by FrameOf: in frames only. {span} stands for how long it has been
 	// quiet, which the reader fills from the phase's quietSince by its own clock.
 	PhaseText string `json:"phaseText,omitzero"`
@@ -353,39 +361,39 @@ type CommitCount struct {
 	Repos []Repo `json:"repos"`
 }
 
-type PlaybookState string
+type GraphState string
 
 const (
-	PlaybookStatePlanning  PlaybookState = "planning"
-	PlaybookStateDraft     PlaybookState = "draft"
-	PlaybookStateRunning   PlaybookState = "running"
-	PlaybookStatePaused    PlaybookState = "paused"
-	PlaybookStateRipe      PlaybookState = "ripe"
-	PlaybookStateDone      PlaybookState = "done"
-	PlaybookStateAbandoned PlaybookState = "abandoned"
+	GraphStateSplitting GraphState = "splitting"
+	GraphStateDraft     GraphState = "draft"
+	GraphStateRunning   GraphState = "running"
+	GraphStatePaused    GraphState = "paused"
+	GraphStateRipe      GraphState = "ripe"
+	GraphStateDone      GraphState = "done"
+	GraphStateAbandoned GraphState = "abandoned"
 )
 
-type NodeState string
+type TaskState string
 
 const (
-	NodeStateWaiting NodeState = "waiting"
-	NodeStateWorking NodeState = "working"
-	NodeStateMerged  NodeState = "merged"
-	NodeStateFailed  NodeState = "failed"
-	NodeStateSkipped NodeState = "skipped"
+	TaskStateWaiting TaskState = "waiting"
+	TaskStateWorking TaskState = "working"
+	TaskStateMerged  TaskState = "merged"
+	TaskStateFailed  TaskState = "failed"
+	TaskStateSkipped TaskState = "skipped"
 )
 
-type PlaybookNode struct {
+type Task struct {
 	ID         string    `json:"id"`
 	Title      string    `json:"title"`
-	Task       string    `json:"task"`
+	Brief      string    `json:"brief"`
 	Needs      []string  `json:"needs"`
 	Agent      *string   `json:"agent,omitzero"`
 	Check      *string   `json:"check,omitzero"`
 	Scope      []string  `json:"scope,omitzero"`
 	Acceptance *bool     `json:"acceptance,omitzero"`
 	Frozen     []string  `json:"frozen,omitzero"`
-	State      NodeState `json:"state"`
+	State      TaskState `json:"state"`
 	Session    *string   `json:"session,omitzero"`
 	Conclusion *string   `json:"conclusion,omitzero"`
 	Commits    []string  `json:"commits,omitzero"`
@@ -393,37 +401,37 @@ type PlaybookNode struct {
 	Tries      int64     `json:"tries"`
 	// A retry starts Tries over, not this.
 	Failures int64 `json:"failures,omitzero"`
-	// The needs not settled yet (BlockedBy), filled by PlaybooksOf.
+	// The needs not settled yet (BlockedBy), filled by GraphsOf.
 	BlockedBy []string `json:"blockedBy,omitzero"`
 	// Filled by FrameOf: the client's word for State. The state and the file keep none.
 	StateText string `json:"stateText,omitzero"`
-	// Filled by FrameOf: what the node's state and the plan allow now.
-	Actions []NodeAction `json:"actions,omitzero"`
+	// Filled by FrameOf: what the node's state and the task allow now.
+	Actions []TaskAction `json:"actions,omitzero"`
 	// Filled by FrameOf: each allowed action's word.
 	ActionText map[string]string `json:"actionText,omitzero"`
 	CanEdit    bool              `json:"canEdit,omitzero"`
 	CanRemove  bool              `json:"canRemove,omitzero"`
 }
 
-type Playbook struct {
-	ID      string        `json:"id"`
-	Title   string        `json:"title"`
-	Goal    string        `json:"goal"`
-	Project string        `json:"project"`
-	Branch  *string       `json:"branch,omitzero"`
-	State   PlaybookState `json:"state"`
+type TaskGraph struct {
+	ID      string     `json:"id"`
+	Title   string     `json:"title"`
+	Goal    string     `json:"goal"`
+	Project string     `json:"project"`
+	Branch  *string    `json:"branch,omitzero"`
+	State   GraphState `json:"state"`
 	// Filled by FrameOf: the short tag for State. The state and the file keep none.
 	StateTag string `json:"stateTag,omitzero"`
 	// Filled by FrameOf: each action's word. The state and the file keep none.
 	ActionText map[string]string `json:"actionText,omitzero"`
 	// Filled by FrameOf: what the state allows now. The state and the file keep none.
-	Actions   []PlaybookAction `json:"actions,omitzero"`
-	Nodes     []PlaybookNode   `json:"nodes"`
-	Parallel  int64            `json:"parallel"`
-	Note      *string          `json:"note,omitzero"`
-	CreatedAt int64            `json:"createdAt"`
-	// Filled by PlaybooksOf: the steps in the order they can run (LayersOf), whether it waits on the owner (AsksForYou), what
-	// the steps have spent (PlaybookSpent), how many are merged or skipped.
+	Actions   []GraphAction `json:"actions,omitzero"`
+	Tasks     []Task        `json:"tasks"`
+	Parallel  int64         `json:"parallel"`
+	Note      *string       `json:"note,omitzero"`
+	CreatedAt int64         `json:"createdAt"`
+	// Filled by GraphsOf: the steps in the order they can run (LayersOf), whether it waits on the owner (AsksForYou), what
+	// the steps have spent (GraphSpent), how many are merged or skipped.
 	Layers     [][]string `json:"layers,omitzero"`
 	AsksForYou bool       `json:"asksForYou,omitzero"`
 	Spent      *Spent     `json:"spent,omitzero"`
@@ -607,17 +615,19 @@ type RuntimeSettings struct {
 }
 
 type RuntimeInfo struct {
-	ID           string           `json:"id"`
-	Installation Installation     `json:"installation"`
-	Models       []ModelEntry     `json:"models" vibevalley:"null"`
-	Usage        AccountUsage     `json:"usage" vibevalley:"null"`
-	Update       *Update          `json:"update"`
-	Skills       []InventoryEntry `json:"skills" vibevalley:"null"`
-	MCPServers   []InventoryEntry `json:"mcpServers" vibevalley:"null"`
-	Tools        []InventoryEntry `json:"tools" vibevalley:"null"`
-	Settings     RuntimeSettings  `json:"settings"`
-	SpentToday   *float64         `json:"spentToday,omitzero"`
-	Quota        *RuntimeQuota    `json:"quota,omitzero"`
+	// Actual adapter refusals plus farm policy; clients do not infer support from seeded labels.
+	Refused      map[string]string `json:"refused,omitzero"`
+	ID           string            `json:"id"`
+	Installation Installation      `json:"installation"`
+	Models       []ModelEntry      `json:"models" vibevalley:"null"`
+	Usage        AccountUsage      `json:"usage" vibevalley:"null"`
+	Update       *Update           `json:"update"`
+	Skills       []InventoryEntry  `json:"skills" vibevalley:"null"`
+	MCPServers   []InventoryEntry  `json:"mcpServers" vibevalley:"null"`
+	Tools        []InventoryEntry  `json:"tools" vibevalley:"null"`
+	Settings     RuntimeSettings   `json:"settings"`
+	SpentToday   *float64          `json:"spentToday,omitzero"`
+	Quota        *RuntimeQuota     `json:"quota,omitzero"`
 	// Why no new work goes to it now (MoneyStop: quota, balance, the day's budget); empty when work can go.
 	Stop      string `json:"stop,omitzero"`
 	CheckedAt int64  `json:"checkedAt"`
@@ -636,9 +646,9 @@ const (
 	InboxKindFix        InboxKind = "fix"
 	InboxKindConflict   InboxKind = "conflict"
 	InboxKindQuiet      InboxKind = "quiet"
-	InboxKindPlanDraft  InboxKind = "plan-draft"
-	InboxKindPlanRipe   InboxKind = "plan-ripe"
-	InboxKindPlanFailed InboxKind = "plan-failed"
+	InboxKindGraphDraft InboxKind = "graph-draft"
+	InboxKindGraphRipe  InboxKind = "graph-ripe"
+	InboxKindTaskFailed InboxKind = "task-failed"
 	InboxKindMention    InboxKind = "mention"
 )
 
@@ -700,7 +710,7 @@ type GameEffect struct{ Value GameEffectValue }
 type StateFrame struct {
 	State   CoreState    `json:"state"`
 	Inbox   []InboxItem  `json:"inbox"`
-	Plans   []Playbook   `json:"plans"`
+	Graphs  []TaskGraph  `json:"graphs"`
 	View    FarmView     `json:"view"`
 	Effects []GameEffect `json:"effects"`
 }
@@ -708,58 +718,58 @@ type StateFrame struct {
 //vibevalley:union kind
 type LedgerEntry struct{ Value LedgerEntryValue }
 
-type PlaybookEventKind string
+type GraphEventKind string
 
 const (
-	PlaybookEventKindPlanning     PlaybookEventKind = "planning"
-	PlaybookEventKindDrafted      PlaybookEventKind = "drafted"
-	PlaybookEventKindStarted      PlaybookEventKind = "started"
-	PlaybookEventKindPaused       PlaybookEventKind = "paused"
-	PlaybookEventKindResumed      PlaybookEventKind = "resumed"
-	PlaybookEventKindRipe         PlaybookEventKind = "ripe"
-	PlaybookEventKindMerged       PlaybookEventKind = "merged"
-	PlaybookEventKindAbandoned    PlaybookEventKind = "abandoned"
-	PlaybookEventKindNoted        PlaybookEventKind = "noted"
-	PlaybookEventKindNodeStarted  PlaybookEventKind = "node_started"
-	PlaybookEventKindNodeSentBack PlaybookEventKind = "node_sent_back"
-	PlaybookEventKindNodeMerged   PlaybookEventKind = "node_merged"
-	PlaybookEventKindNodeFailed   PlaybookEventKind = "node_failed"
-	PlaybookEventKindNodeRetried  PlaybookEventKind = "node_retried"
-	PlaybookEventKindNodeRequeued PlaybookEventKind = "node_requeued"
-	PlaybookEventKindNodeSkipped  PlaybookEventKind = "node_skipped"
-	PlaybookEventKindNodeEdited   PlaybookEventKind = "node_edited"
-	PlaybookEventKindNodeAdded    PlaybookEventKind = "node_added"
-	PlaybookEventKindNodeRemoved  PlaybookEventKind = "node_removed"
+	GraphEventKindSplitting    GraphEventKind = "splitting"
+	GraphEventKindDrafted      GraphEventKind = "drafted"
+	GraphEventKindStarted      GraphEventKind = "started"
+	GraphEventKindPaused       GraphEventKind = "paused"
+	GraphEventKindResumed      GraphEventKind = "resumed"
+	GraphEventKindRipe         GraphEventKind = "ripe"
+	GraphEventKindMerged       GraphEventKind = "merged"
+	GraphEventKindAbandoned    GraphEventKind = "abandoned"
+	GraphEventKindNoted        GraphEventKind = "noted"
+	GraphEventKindTaskStarted  GraphEventKind = "task_started"
+	GraphEventKindTaskSentBack GraphEventKind = "task_sent_back"
+	GraphEventKindTaskMerged   GraphEventKind = "task_merged"
+	GraphEventKindTaskFailed   GraphEventKind = "task_failed"
+	GraphEventKindTaskRetried  GraphEventKind = "task_retried"
+	GraphEventKindTaskRequeued GraphEventKind = "task_requeued"
+	GraphEventKindTaskSkipped  GraphEventKind = "task_skipped"
+	GraphEventKindTaskEdited   GraphEventKind = "task_edited"
+	GraphEventKindTaskAdded    GraphEventKind = "task_added"
+	GraphEventKindTaskRemoved  GraphEventKind = "task_removed"
 )
 
-type PlaybookActor string
+type GraphActor string
 
 const (
-	PlaybookActorUser    PlaybookActor = "user"
-	PlaybookActorManager PlaybookActor = "manager"
-	PlaybookActorSystem  PlaybookActor = "system"
+	GraphActorUser    GraphActor = "user"
+	GraphActorManager GraphActor = "manager"
+	GraphActorSystem  GraphActor = "system"
 )
 
-type NodeFieldChange struct {
+type TaskFieldChange struct {
 	Field string `json:"field"`
 	From  string `json:"from"`
 	To    string `json:"to"`
 }
 
-type PlaybookEvent struct {
-	ID       string            `json:"id"`
-	Playbook string            `json:"playbook"`
-	Node     *string           `json:"node,omitzero"`
-	Kind     PlaybookEventKind `json:"kind"`
-	Actor    PlaybookActor     `json:"actor"`
-	Session  *string           `json:"session,omitzero"`
-	Detail   *string           `json:"detail,omitzero"`
-	Changes  []NodeFieldChange `json:"changes,omitzero"`
-	Commits  []string          `json:"commits,omitzero"`
-	At       int64             `json:"at"`
-	// What happened in words (PlaybookEventText), the steps by their titles now: filled by playbook.Events, not kept.
+type GraphEvent struct {
+	ID      string            `json:"id"`
+	Graph   string            `json:"graph"`
+	Task    *string           `json:"task,omitzero"`
+	Kind    GraphEventKind    `json:"kind"`
+	Actor   GraphActor        `json:"actor"`
+	Session *string           `json:"session,omitzero"`
+	Detail  *string           `json:"detail,omitzero"`
+	Changes []TaskFieldChange `json:"changes,omitzero"`
+	Commits []string          `json:"commits,omitzero"`
+	At      int64             `json:"at"`
+	// What happened in words (GraphEventText), the steps by their titles now: filled by task.Events, not kept.
 	Text string `json:"text,omitzero"`
-	// The actor's word (ActorText): filled by playbook.Events, not kept.
+	// The actor's word (ActorText): filled by task.Events, not kept.
 	ActorText string `json:"actorText,omitzero"`
 }
 
@@ -834,7 +844,7 @@ type VoiceAgent struct {
 }
 
 // Agora's: what a client joins a call's channel with, one token for RTC and RTM.
-type AgoraTicket struct {
+type AgoraGrant struct {
 	AppID   string `json:"appId"`
 	Channel string `json:"channel"`
 	UID     string `json:"uid"`
@@ -1071,33 +1081,33 @@ type ChangedFile struct {
 	Patch   *string `json:"patch,omitzero"`
 }
 
-type NodeAction string
+type TaskAction string
 
 const (
-	NodeActionRetry NodeAction = "retry"
-	NodeActionSkip  NodeAction = "skip"
+	TaskActionRetry TaskAction = "retry"
+	TaskActionSkip  TaskAction = "skip"
 )
 
-type PlaybookAction string
+type GraphAction string
 
 const (
-	PlaybookActionStart   PlaybookAction = "start"
-	PlaybookActionPause   PlaybookAction = "pause"
-	PlaybookActionResume  PlaybookAction = "resume"
-	PlaybookActionAbandon PlaybookAction = "abandon"
-	PlaybookActionMerge   PlaybookAction = "merge"
+	GraphActionStart   GraphAction = "start"
+	GraphActionPause   GraphAction = "pause"
+	GraphActionResume  GraphAction = "resume"
+	GraphActionAbandon GraphAction = "abandon"
+	GraphActionMerge   GraphAction = "merge"
 )
 
-type NodeEdit struct {
+type TaskEdit struct {
 	Title *string  `json:"title,omitzero"`
-	Task  *string  `json:"task,omitzero"`
+	Brief *string  `json:"brief,omitzero"`
 	Needs []string `json:"needs,omitzero"`
 	Agent *string  `json:"agent,omitzero"`
 	Check *string  `json:"check,omitzero"`
 	Scope []string `json:"scope,omitzero"`
 }
 
-type PlanRequest struct {
+type GraphSplitRequest struct {
 	Goal    string  `json:"goal"`
 	Project string  `json:"project"`
 	Agent   *string `json:"agent,omitzero"`
@@ -1106,6 +1116,13 @@ type PlanRequest struct {
 type Dispatched struct {
 	Session *string `json:"session,omitzero"`
 	Queued  *string `json:"queued,omitzero"`
+}
+
+// IssueHistory is a query result, not core state; absent records are named rather than synthesized.
+type IssueHistory struct {
+	Issue           Issue     `json:"issue"`
+	Sessions        []Session `json:"sessions"`
+	MissingSessions []string  `json:"missingSessions"`
 }
 
 type Issue struct {
@@ -1125,22 +1142,22 @@ type Issue struct {
 	Closed    *IssueClose `json:"closed,omitzero"`
 	Parent    *string     `json:"parent,omitzero"`
 	BlockedBy []string    `json:"blockedBy,omitzero"`
-	Plan      *IssuePlan  `json:"plan,omitzero"`
-	Step      *IssueStep  `json:"step,omitzero"`
+	Graph     *IssueGraph `json:"graph,omitzero"`
+	Task      *IssueTask  `json:"task,omitzero"`
 	Schedule  *string     `json:"schedule,omitzero"`
 	Status    IssueStatus `json:"status"`
 }
 
-type IssuePlan struct {
-	State    PlaybookState `json:"state"`
-	Branch   *string       `json:"branch,omitzero"`
-	Parallel int64         `json:"parallel"`
-	Note     *string       `json:"note,omitzero"`
+type IssueGraph struct {
+	State    GraphState `json:"state"`
+	Branch   *string    `json:"branch,omitzero"`
+	Parallel int64      `json:"parallel"`
+	Note     *string    `json:"note,omitzero"`
 }
 
-type IssueStep struct {
+type IssueTask struct {
 	Key        string    `json:"key"`
-	State      NodeState `json:"state"`
+	State      TaskState `json:"state"`
 	Check      *string   `json:"check,omitzero"`
 	Scope      []string  `json:"scope,omitzero"`
 	Acceptance *bool     `json:"acceptance,omitzero"`
@@ -1193,22 +1210,22 @@ type IssueRequest struct {
 type IssueClose string
 
 const (
-	IssueCloseMerged         IssueClose = "merged"
-	IssueCloseMergedIntoPlan IssueClose = "merged_into_plan"
-	IssueCloseDismissed      IssueClose = "dismissed"
-	IssueCloseLost           IssueClose = "lost"
+	IssueCloseMerged          IssueClose = "merged"
+	IssueCloseMergedIntoGraph IssueClose = "merged_into_graph"
+	IssueCloseDismissed       IssueClose = "dismissed"
+	IssueCloseLost            IssueClose = "lost"
 	// An issue for the manager, once it has answered.
 	IssueCloseAnswered IssueClose = "answered"
 )
 
 // What started a run: the issue sent out, a comment (a message in its thread, @ it, a comment on a step, 浇水, a word after the
-// server restarted), its playbook moving on, a schedule, or the runtime itself.
+// server restarted), its task moving on, a schedule, or the runtime itself.
 type RunTriggerKind string
 
 const (
 	RunTriggerKindIssue    RunTriggerKind = "issue"
 	RunTriggerKindComment  RunTriggerKind = "comment"
-	RunTriggerKindPlaybook RunTriggerKind = "playbook"
+	RunTriggerKindTask     RunTriggerKind = "task"
 	RunTriggerKindSchedule RunTriggerKind = "schedule"
 	RunTriggerKindRuntime  RunTriggerKind = "runtime"
 )
@@ -1477,8 +1494,8 @@ type InstallationUnsupported struct {
 
 //vibevalley:member AccountUsage ok
 type AccountUsageOk struct {
-	Plan    *string       `json:"plan"`
-	Windows []UsageWindow `json:"windows"`
+	Subscription *string       `json:"subscription"`
+	Windows      []UsageWindow `json:"windows"`
 }
 
 //vibevalley:member AccountUsage balance
@@ -1519,9 +1536,9 @@ type InboxTargetSession struct {
 	ID string `json:"id"`
 }
 
-//vibevalley:member InboxTarget plans
-type InboxTargetPlans struct {
-	Playbook string `json:"playbook"`
+//vibevalley:member InboxTarget graph
+type InboxTargetGraph struct {
+	Graph string `json:"graph"`
 }
 
 //vibevalley:member InboxTarget chat
@@ -1595,10 +1612,10 @@ type LedgerEntryReviewed struct {
 	Session string `json:"session"`
 }
 
-//vibevalley:member LedgerEntry playbook
-type LedgerEntryPlaybook struct {
+//vibevalley:member LedgerEntry graph
+type LedgerEntryGraph struct {
 	At       int64  `json:"at"`
-	Playbook string `json:"playbook"`
+	Graph    string `json:"graph"`
 	Merged   int64  `json:"merged"`
 	Parallel bool   `json:"parallel"`
 }
@@ -1626,15 +1643,15 @@ type LedgerEntryHired struct {
 type LedgerEntryMomentKind string
 
 const (
-	LedgerEntryMomentKindOpened  LedgerEntryMomentKind = "opened"
-	LedgerEntryMomentKindPlanned LedgerEntryMomentKind = "planned"
-	LedgerEntryMomentKindVoice   LedgerEntryMomentKind = "voice"
-	LedgerEntryMomentKindBusy6   LedgerEntryMomentKind = "busy6"
+	LedgerEntryMomentKindOpened LedgerEntryMomentKind = "opened"
+	LedgerEntryMomentKindSplit  LedgerEntryMomentKind = "split"
+	LedgerEntryMomentKindVoice  LedgerEntryMomentKind = "voice"
+	LedgerEntryMomentKindBusy6  LedgerEntryMomentKind = "busy6"
 )
 
-// A moment on the ledger with nothing more to it: the farm opened, a plan made, a talk with the voice manager, all six beds busy.
+// A moment on the ledger with nothing more to it: the farm opened, a task made, a talk with the voice manager, all six beds busy.
 //
-//vibevalley:member LedgerEntry opened planned voice busy6
+//vibevalley:member LedgerEntry opened split voice busy6
 type LedgerEntryMoment struct {
 	Kind LedgerEntryMomentKind `json:"kind"`
 	At   int64                 `json:"at"`
@@ -1834,11 +1851,11 @@ type SettingsUpdateVoice struct {
 }
 
 type Roots struct {
-	Fact          Fact          `json:"fact"`
-	Event         SideEvent     `json:"event"`
-	Frame         StateFrame    `json:"frame"`
-	Ledger        LedgerEntry   `json:"ledger"`
-	PlaybookEvent PlaybookEvent `json:"playbookEvent"`
+	Fact       Fact        `json:"fact"`
+	Event      SideEvent   `json:"event"`
+	Frame      StateFrame  `json:"frame"`
+	Ledger     LedgerEntry `json:"ledger"`
+	GraphEvent GraphEvent  `json:"taskEvent"`
 }
 
 //vibevalley:union type
@@ -1896,9 +1913,9 @@ type FactStation struct {
 //vibevalley:member Fact run
 //vibevalley:member SideEvent run
 type FactRun struct {
-	At   int64   `json:"at"`
-	ID   string  `json:"id"`
-	Task *string `json:"task,omitzero"`
+	At    int64   `json:"at"`
+	ID    string  `json:"id"`
+	Brief *string `json:"brief,omitzero"`
 }
 
 //vibevalley:member Fact doing
@@ -1940,6 +1957,7 @@ type FactSpent struct {
 type FactReport struct {
 	At      int64   `json:"at"`
 	ID      string  `json:"id"`
+	Run     *string `json:"run,omitzero"`
 	Outcome Outcome `json:"outcome"`
 	Summary string  `json:"summary"`
 	Runs    int64   `json:"runs"`
@@ -2047,12 +2065,12 @@ type ReopenRequest struct {
 	Text string `json:"text"`
 }
 
-type PlaybookActRequest struct {
-	Action PlaybookAction `json:"action"`
+type GraphActRequest struct {
+	Action GraphAction `json:"action"`
 }
 
-type NodeActRequest struct {
-	Action NodeAction `json:"action"`
+type TaskActRequest struct {
+	Action TaskAction `json:"action"`
 }
 
 type ChatReadRequest struct {
@@ -2083,6 +2101,15 @@ type Dictated struct {
 type VoiceSaid struct {
 	AgentID string `json:"agentId"`
 	Text    string `json:"text"`
+}
+
+// The owner's final transcript, scoped to the call that heard it.
+type VoiceHeard struct {
+	AgentID string  `json:"agentId"`
+	Text    string  `json:"text"`
+	Agent   *string `json:"agent,omitempty"`
+	// As SayRequest's: a retry with the same key is the words already heard.
+	SendKey *string `json:"sendKey,omitzero"`
 }
 
 type StartRequest struct {

@@ -127,9 +127,9 @@ func TestAgentsWakingAgents(t *testing.T) {
 }
 
 func TestReportsDispatchesNotices(t *testing.T) {
-	report := func(outcome protocol.Outcome, forPlaybook bool) func(*chatAudienceInput) {
+	report := func(outcome protocol.Outcome, forTask bool) func(*chatAudienceInput) {
 		return func(i *chatAudienceInput) {
-			i.From, i.FromKind, i.Kind, i.Conversation, i.Outcome, i.ForPlaybook = "w1", protocol.SenderKindAgent, protocol.MessageKindReport, rulesJobOf("w1"), &outcome, forPlaybook
+			i.From, i.FromKind, i.Kind, i.Conversation, i.Outcome, i.ForTask = "w1", protocol.SenderKindAgent, protocol.MessageKindReport, rulesJobOf("w1"), &outcome, forTask
 		}
 	}
 	testkit.Eq(t, rulesAudience(report(protocol.OutcomeCompleted, false)), [][4]any{rulesRow(protocol.ManagerAgent, "addressed", false, "")})

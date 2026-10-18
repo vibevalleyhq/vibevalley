@@ -17,7 +17,7 @@ func TestStartedAgainFromStateJSON(t *testing.T) {
 	home := t.TempDir()
 	was := protocol.EmptyCoreState()
 	was.Call, was.CallReason, was.Manager = protocol.CallStateLive, ptr.To("挂了"), protocol.ManagerStateSpeaking
-	was.Sessions = []protocol.Session{{ID: "w1", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "写", Phase: protocol.Phase{Value: protocol.PhaseRipe{}}}}
+	was.Sessions = []protocol.Session{{ID: "w1", Name: "帮工", Agent: "lab", Runtime: "pi", Brief: "写", Phase: protocol.Phase{Value: protocol.PhaseRipe{}}}}
 	was.Progress = ptr.To(protocol.EmptyProgress())
 	was.Schedules = []protocol.Schedule{{ID: "x1", Name: "日报"}}
 	was.Issues = []protocol.Issue{{ID: "i1"}}
@@ -38,7 +38,7 @@ func TestApplyStampsAndKeepsNoNewsBack(t *testing.T) {
 	s := New(home)
 	_, events, stop := s.Events()
 	defer stop()
-	s.Apply(protocol.FactHired{Session: protocol.Session{ID: "w1", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "写", Phase: protocol.Phase{Value: protocol.PhaseArriving{}}}})
+	s.Apply(protocol.FactHired{Session: protocol.Session{ID: "w1", Name: "帮工", Agent: "lab", Runtime: "pi", Brief: "写", Phase: protocol.Phase{Value: protocol.PhaseArriving{}}}})
 	<-events
 	s.SetManager(protocol.ManagerStateThinking)
 	select {

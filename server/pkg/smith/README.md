@@ -13,7 +13,7 @@ import (
 )
 
 claude, _ := defaults.Registry().Require("claude")
-installation, _ := claude.Installation(ctx)
+installation, _ := claude.Installation(ctx, oar.InstallationOptions{})
 session, err := claude.Session(ctx, installation.Available, oar.SessionOptions{Cwd: dir, Model: "sonnet"})
 if err != nil { ... }
 defer session.Dispose(context.Background())
@@ -50,6 +50,10 @@ run, _ := observe.PromptAndWait(ctx, session, "Find and fix the flaky test", obs
 - **Not ported:** Cursor, Pi Durable, the browser entry, `ModelCatalogFacade` and `ProviderAuthFacade`: they need a JS host or pi's in-process `ModelRuntime`.
 - **Pi runs its SDK in a Node host.** The TS package loads pi's SDK in process; smith runs the same SDK, from the pi you installed, in a small embedded Node host (`runtimes/pi/host`).
 - **Observers are asynchronous.** Each subscription has its own delivery goroutine. Records arrive in order, one at a time, with no loss or duplication. Cursor replay runs synchronously inside the subscribing call.
+- **Explicit installation input.** `InstallationOptions.Binary` pins an executable for that probe without changing process environment. `nil` keeps the runtime’s `OAR_*_BIN` default; an explicit empty string uses PATH and fallback candidates. A missing nonempty pin does not fall back. `SpawnOptions.Installation` carries an already accepted installation into the session without probing a different executable; normal runtime and subagent admission checks still apply.
+- **Ordered subagent completion.** Go hosts can use `Subagent.Follow(events, reports)` to replay and consume events and completion reports together. Reports wait for the consumer to finish every event in their source record, including trailing usage. Canceling a follower leaves `OnReport`, `Wait`, and other subscribers intact. Only completion anchors are retained in addition to the session’s existing record log.
+- **Asynchronous controls.** Runtime adapters can use `Kernel.BeginControl` for reachability checks, request identity, a single response and a cancelable waiter; native reply parsing and fallback policy remain in the adapter.
+- **Consumer completion.** `observe.SubscribeEvents` and `SubscribeRecords` own delivery progress. After disposing the source, `Close(ctx)` drains its tail and flushes coalesced text; `Cancel` abandons pending output. `Session.Events` keeps its unsubscribe API and cancels its text timer with the raw subscription.
 - **Waiting helpers.** For code that waits on the stream, use `kernel.Kernel.WaitFor` or the `observe` helpers instead of observer timing.
 - **Absent controls.** A control the runtime lacks returns `oar.ErrControlUnsupported`, where the TS member is absent. Check with `CanSteer` / `CanWithdraw` before calling.
 

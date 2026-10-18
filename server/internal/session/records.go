@@ -16,11 +16,11 @@ import (
 // ended its row says when and how its issue took it, and its runs are session_run.
 
 func (c *sessions) keep(s protocol.Session) {
-	params := generated.KeepSessionParams{ID: s.ID, Agent: s.Agent, Name: s.Name, Runtime: s.Runtime, Task: s.Task, Project: recordText(s.Project),
+	params := generated.KeepSessionParams{ID: s.ID, Agent: s.Agent, Name: s.Name, Runtime: s.Runtime, Brief: s.Brief, Project: recordText(s.Project),
 		Issue: recordText(s.Issue), HiredAt: s.HiredAt}
-	if s.Playbook != nil {
-		body, _ := json.Marshal(s.Playbook)
-		params.Playbook = sql.NullString{String: string(body), Valid: true}
+	if s.Graph != nil {
+		body, _ := json.Marshal(s.Graph)
+		params.Graph = sql.NullString{String: string(body), Valid: true}
 	}
 	if err := c.q.KeepSession(context.Background(), params); err != nil {
 		log.Printf("vibevalley: session %s not kept: %v", s.ID, err)
@@ -36,7 +36,7 @@ func (c *sessions) ended(id string, closed protocol.IssueClose) {
 }
 
 // List is every session of the agent, or of every agent when it is empty: on the farm and ended, newest first.
-func (c *sessions) List(agent string) []protocol.Session {
+func (c *sessions) List(agent string) ([]protocol.Session, error) {
 	out := []protocol.Session{}
 	for _, s := range c.core.State().Sessions {
 		if agent == "" || s.Agent == agent {
@@ -45,11 +45,11 @@ func (c *sessions) List(agent string) []protocol.Session {
 	}
 	rows, err := c.q.EndedSessions(context.Background(), agent)
 	if err != nil {
-		log.Printf("vibevalley: sessions: %v", err)
+		return nil, err
 	}
 	runs, err := c.q.RunsOfEndedSessions(context.Background())
 	if err != nil {
-		log.Printf("vibevalley: sessions' runs: %v", err)
+		return nil, err
 	}
 	bySession := map[string][]generated.SessionRun{}
 	for _, r := range runs {
@@ -61,7 +61,7 @@ func (c *sessions) List(agent string) []protocol.Session {
 		}
 	}
 	slices.SortStableFunc(out, func(a, b protocol.Session) int { return int(b.HiredAt - a.HiredAt) })
-	return out
+	return out, nil
 }
 
 // Get is a session on the farm, or one that has ended; nil when there is none.
@@ -80,13 +80,13 @@ func (c *sessions) Get(id string) *protocol.Session {
 
 // An ended session as the core state would have had it: its runs counted, its last one's word, what it spent in all.
 func endedSession(r generated.Session, runs []generated.SessionRun) protocol.Session {
-	s := protocol.Session{ID: r.ID, Name: r.Name, Agent: r.Agent, Runtime: r.Runtime, Task: r.Task, HiredAt: r.HiredAt, Runs: int64(len(runs)),
+	s := protocol.Session{ID: r.ID, Name: r.Name, Agent: r.Agent, Runtime: r.Runtime, Brief: r.Brief, HiredAt: r.HiredAt, Runs: int64(len(runs)),
 		Project: recordPtr(r.Project), Issue: recordPtr(r.Issue),
 		Phase: protocol.Phase{Value: protocol.PhaseClosed{At: r.EndedAt.Int64, Closed: protocol.IssueClose(r.Closed.String)}}}
-	if r.Playbook.Valid {
-		var p protocol.SessionPlaybook
-		if json.Unmarshal([]byte(r.Playbook.String), &p) == nil {
-			s.Playbook = &p
+	if r.Graph.Valid {
+		var p protocol.SessionGraph
+		if json.Unmarshal([]byte(r.Graph.String), &p) == nil {
+			s.Graph = &p
 		}
 	}
 	var spent protocol.Spent

@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"time"
 
+	vvagent "vibevalley/internal/agent/brain"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/workspace"
-	vvagent "vibevalley/pkg/agent"
 )
 
 // Keeps proxies from closing a quiet event stream.

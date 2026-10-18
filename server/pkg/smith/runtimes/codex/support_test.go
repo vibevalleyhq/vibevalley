@@ -40,7 +40,7 @@ func TestCodexProbesThroughItsPinEnvVar(t *testing.T) {
 		t.Skip("node is not on PATH")
 	}
 	t.Setenv("OAR_CODEX_BIN", node)
-	snapshot, err := Installation(testContext(t))
+	snapshot, err := Installation(testContext(t), oar.InstallationOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,13 +14,9 @@ import '../../rules/seeds.dart';
 import 'agent_config.dart';
 import 'agent_look.dart';
 
-Agent newAgent(String runtime, Set<String> taken, [Look? look]) {
-  var n = 1;
-  while (taken.contains('agent-$n')) {
-    n++;
-  }
+Agent newAgent(String runtime, [Look? look]) {
   return Agent(
-    id: 'agent-$n',
+    id: '',
     name: '新的 ${runtimeName(runtime)}',
     role: '',
     enabled: true,
@@ -60,7 +56,7 @@ class _AgentCreatorPageState extends ConsumerState<AgentCreatorPage> {
   void _start(WorkbenchConfig config) {
     if (!config.loaded) return;
     if (_isNew) {
-      _draft = newAgent(widget.runtime ?? 'claude', {for (final a in config.agents) a.id});
+      _draft = newAgent(widget.runtime ?? 'claude');
     } else {
       _draft = config.agent(widget.id);
     }
@@ -135,13 +131,10 @@ class _CreatorState extends ConsumerState<_Creator> {
     final draft = widget.draft;
     setState(() => _saving = true);
     final name = draft.name.trim();
-    final ok = await runAction(() async {
-      await ref.read(workbenchConfigProvider.notifier).saveAgent(draft.copyWith(name: name.isEmpty ? '无名 agent' : name));
-      return true;
-    });
+    final saved = await runAction(() => ref.read(workbenchConfigProvider.notifier).saveAgent(draft.copyWith(name: name.isEmpty ? '无名 agent' : name)));
     if (!mounted) return;
     setState(() => _saving = false);
-    if (ok == true && widget.isNew) workbenchGo(context, '/agents/${Uri.encodeComponent(draft.id)}');
+    if (saved != null && widget.isNew) workbenchGo(context, '/agents/${Uri.encodeComponent(saved.id)}');
   }
 
   @override
@@ -149,7 +142,7 @@ class _CreatorState extends ConsumerState<_Creator> {
     final config = ref.watch(workbenchConfigProvider);
     final draft = widget.draft;
     final saved = widget.saved;
-    final runtime = config.runtime(draft.runtime);
+    final runtime = ref.watch(runtimeInfoProvider(draft.runtime));
     final issues = watchAgentIssues(ref, [draft])[draft.id] ?? const <AgentIssue>[];
     final dirty = widget.isNew || _json(saved) != _json(draft);
     final nameTaken = config.agents.any((a) => a.id != draft.id && a.name == draft.name.trim());

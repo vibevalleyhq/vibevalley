@@ -17,7 +17,7 @@ var callsManager = InboxFrom{InboxFromManager{}}
 
 func callsSession(id string, phase PhaseValue, change ...func(*Session)) Session {
 	h := Session{
-		ID: id, Name: "后端老周", Agent: "lab", Runtime: "pi", Task: "加个打卡接口", HiredAt: callsT, Runs: 2, Phase: Phase{phase},
+		ID: id, Name: "后端老周", Agent: "lab", Runtime: "pi", Brief: "加个打卡接口", HiredAt: callsT, Runs: 2, Phase: Phase{phase},
 		LastRun: &LastRun{Outcome: OutcomeCompleted, Summary: "接口加好了", At: callsT + 10},
 	}
 	for _, c := range change {
@@ -44,19 +44,19 @@ func callsFarm(sessions ...Session) CoreState {
 	return s
 }
 
-func callsStep(id, title string, state NodeState) PlaybookNode {
-	return PlaybookNode{ID: id, Title: title, Task: "做" + title, Needs: []string{}, State: state}
+func callsTask(id, title string, state TaskState) Task {
+	return Task{ID: id, Title: title, Brief: "做" + title, Needs: []string{}, State: state}
 }
 
-func callsPlaybook(id, title string, state PlaybookState, steps ...PlaybookNode) Playbook {
-	if steps == nil {
-		steps = []PlaybookNode{}
+func callsGraph(id, title string, state GraphState, tasks ...Task) TaskGraph {
+	if tasks == nil {
+		tasks = []Task{}
 	}
-	return Playbook{ID: id, Title: title, Goal: title, Project: "clock", State: state, Nodes: steps, Parallel: 2, CreatedAt: callsT}
+	return TaskGraph{ID: id, Title: title, Goal: title, Project: "clock", State: state, Tasks: tasks, Parallel: 2, CreatedAt: callsT}
 }
 
-func callsWithPlaybooks(playbooks ...Playbook) CoreState {
-	return withPlaybooks(EmptyCoreState(), playbooks...)
+func callsWithGraphs(graphs ...TaskGraph) CoreState {
+	return withGraphs(EmptyCoreState(), graphs...)
 }
 
 func callsMessage(seq int64, change ...func(*ChatMessage)) ChatMessage {
@@ -94,8 +94,8 @@ func callsFromSession(id, name, agent string) InboxFrom {
 
 func callsToSession(id string) InboxTarget { return InboxTarget{InboxTargetSession{ID: id}} }
 
-func callsToPlans(playbook string) InboxTarget {
-	return InboxTarget{InboxTargetPlans{Playbook: playbook}}
+func callsToGraphs(task string) InboxTarget {
+	return InboxTarget{InboxTargetGraph{Graph: task}}
 }
 
 func callsToChat(conversation string) InboxTarget {
@@ -186,23 +186,23 @@ func TestInboxSessionsWithNothingToAskDoNotCall(t *testing.T) {
 	}
 }
 
-func TestInboxPlaybookSessionsLeaveItToThePlaybook(t *testing.T) {
-	inPlaybook := func(h *Session) { h.Playbook = &SessionPlaybook{ID: "p1", Node: ptr.To("api")} }
+func TestInboxTaskSessionsLeaveItToTheTask(t *testing.T) {
+	inGraph := func(h *Session) { h.Graph = &SessionGraph{ID: "p1", Task: ptr.To("api")} }
 	for _, c := range []struct {
 		name    string
 		session Session
 	}{
-		{"ripe", callsSession("w1", PhaseRipe{}, inPlaybook)},
-		{"failed", callsSession("w1", PhaseFailed{}, callsFailedRun, inPlaybook)},
-		{"conflicted", callsSession("w1", PhaseResting{}, callsConflict("a.go"), inPlaybook)},
+		{"ripe", callsSession("w1", PhaseRipe{}, inGraph)},
+		{"failed", callsSession("w1", PhaseFailed{}, callsFailedRun, inGraph)},
+		{"conflicted", callsSession("w1", PhaseResting{}, callsConflict("a.go"), inGraph)},
 	} {
 		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, Inbox(callsFarm(c.session)), []InboxItem{}) })
 	}
-	testkit.Eq(t, callsIDs(Inbox(callsFarm(callsSession("w1", callsQuiet(callsT+90), inPlaybook)))), []string{"w1:quiet:1800000000090"})
-	state := callsFarm(callsSession("w1", PhaseFailed{}, callsFailedRun, inPlaybook))
-	state = withPlaybooks(state, callsPlaybook("p1", "打卡", PlaybookStateRunning, callsStep("api", "接口", NodeStateFailed)))
+	testkit.Eq(t, callsIDs(Inbox(callsFarm(callsSession("w1", callsQuiet(callsT+90), inGraph)))), []string{"w1:quiet:1800000000090"})
+	state := callsFarm(callsSession("w1", PhaseFailed{}, callsFailedRun, inGraph))
+	state = withGraphs(state, callsGraph("p1", "打卡", GraphStateRunning, callsTask("api", "接口", TaskStateFailed)))
 	testkit.Eq(t, Inbox(state), []InboxItem{{
-		ID: "p1:failed:api", Kind: InboxKindPlanFailed, From: callsManager, Text: "打卡：接口", At: callsT, Target: callsToPlans("p1"),
+		ID: "p1:failed:api", Kind: InboxKindTaskFailed, From: callsManager, Text: "打卡：接口", At: callsT, Target: callsToGraphs("p1"),
 	}})
 }
 
@@ -239,63 +239,63 @@ func TestInboxSessionCallIDs(t *testing.T) {
 	testkit.Eq(t, idsOf(callsSession("w1", PhaseRipe{}), callsSession("w2", PhaseRipe{})), []string{"w1:merge:2", "w2:merge:2"})
 }
 
-func TestInboxPlaybookCalls(t *testing.T) {
-	madeAt := func(pb Playbook, ms int64) Playbook {
-		pb.CreatedAt = callsT + ms
-		return pb
+func TestInboxTaskCalls(t *testing.T) {
+	madeAt := func(graph TaskGraph, ms int64) TaskGraph {
+		graph.CreatedAt = callsT + ms
+		return graph
 	}
-	state := callsWithPlaybooks(
-		madeAt(callsPlaybook("p1", "打卡", PlaybookStateDraft, callsStep("db", "建表", NodeStateWaiting)), 1),
-		madeAt(callsPlaybook("p2", "导出", PlaybookStateRipe, callsStep("csv", "导出 CSV", NodeStateMerged), callsStep("pdf", "导出 PDF", NodeStateSkipped)), 2),
-		madeAt(callsPlaybook("p3", "报表", PlaybookStateRunning,
-			callsStep("db", "建表", NodeStateMerged),
-			callsStep("api", "接口", NodeStateFailed),
-			callsStep("job", "定时任务", NodeStateWorking),
-			callsStep("ui", "页面", NodeStateFailed),
-			callsStep("docs", "文档", NodeStateWaiting),
+	state := callsWithGraphs(
+		madeAt(callsGraph("p1", "打卡", GraphStateDraft, callsTask("db", "建表", TaskStateWaiting)), 1),
+		madeAt(callsGraph("p2", "导出", GraphStateRipe, callsTask("csv", "导出 CSV", TaskStateMerged), callsTask("pdf", "导出 PDF", TaskStateSkipped)), 2),
+		madeAt(callsGraph("p3", "报表", GraphStateRunning,
+			callsTask("db", "建表", TaskStateMerged),
+			callsTask("api", "接口", TaskStateFailed),
+			callsTask("job", "定时任务", TaskStateWorking),
+			callsTask("ui", "页面", TaskStateFailed),
+			callsTask("docs", "文档", TaskStateWaiting),
 		), 3),
-		madeAt(callsPlaybook("p4", "迁移", PlaybookStatePaused, callsStep("copy", "拷数据", NodeStateFailed), callsStep("drop", "删旧表", NodeStateSkipped)), 4),
+		madeAt(callsGraph("p4", "迁移", GraphStatePaused, callsTask("copy", "拷数据", TaskStateFailed), callsTask("drop", "删旧表", TaskStateSkipped)), 4),
 	)
 	testkit.Eq(t, Inbox(state), []InboxItem{
-		{ID: "p4:failed:copy", Kind: InboxKindPlanFailed, From: callsManager, Text: "迁移：拷数据", At: callsT + 4, Target: callsToPlans("p4")},
-		{ID: "p3:failed:api", Kind: InboxKindPlanFailed, From: callsManager, Text: "报表：接口", At: callsT + 3, Target: callsToPlans("p3")},
-		{ID: "p3:failed:ui", Kind: InboxKindPlanFailed, From: callsManager, Text: "报表：页面", At: callsT + 3, Target: callsToPlans("p3")},
-		{ID: "p2:ripe", Kind: InboxKindPlanRipe, From: callsManager, Text: "导出", At: callsT + 2, Target: callsToPlans("p2")},
-		{ID: "p1:draft", Kind: InboxKindPlanDraft, From: callsManager, Text: "打卡", At: callsT + 1, Target: callsToPlans("p1")},
+		{ID: "p4:failed:copy", Kind: InboxKindTaskFailed, From: callsManager, Text: "迁移：拷数据", At: callsT + 4, Target: callsToGraphs("p4")},
+		{ID: "p3:failed:api", Kind: InboxKindTaskFailed, From: callsManager, Text: "报表：接口", At: callsT + 3, Target: callsToGraphs("p3")},
+		{ID: "p3:failed:ui", Kind: InboxKindTaskFailed, From: callsManager, Text: "报表：页面", At: callsT + 3, Target: callsToGraphs("p3")},
+		{ID: "p2:ripe", Kind: InboxKindGraphRipe, From: callsManager, Text: "导出", At: callsT + 2, Target: callsToGraphs("p2")},
+		{ID: "p1:draft", Kind: InboxKindGraphDraft, From: callsManager, Text: "打卡", At: callsT + 1, Target: callsToGraphs("p1")},
 	})
 }
 
-func TestInboxPlaybooksThatDoNotCall(t *testing.T) {
+func TestInboxTasksThatDoNotCall(t *testing.T) {
 	for _, c := range []struct {
-		name     string
-		playbook Playbook
+		name string
+		task TaskGraph
 	}{
-		{"still being planned", callsPlaybook("p1", "打卡", PlaybookStatePlanning)},
-		{"running with no step failed", callsPlaybook("p1", "打卡", PlaybookStateRunning,
-			callsStep("db", "建表", NodeStateMerged), callsStep("api", "接口", NodeStateWorking), callsStep("ui", "页面", NodeStateWaiting), callsStep("docs", "文档", NodeStateSkipped))},
-		{"paused with no step failed", callsPlaybook("p1", "打卡", PlaybookStatePaused, callsStep("api", "接口", NodeStateWaiting))},
-		{"harvested", callsPlaybook("p1", "打卡", PlaybookStateDone, callsStep("api", "接口", NodeStateMerged))},
-		{"abandoned with a step failed", callsPlaybook("p1", "打卡", PlaybookStateAbandoned, callsStep("api", "接口", NodeStateFailed))},
+		{"still being split", callsGraph("p1", "打卡", GraphStateSplitting)},
+		{"running with no step failed", callsGraph("p1", "打卡", GraphStateRunning,
+			callsTask("db", "建表", TaskStateMerged), callsTask("api", "接口", TaskStateWorking), callsTask("ui", "页面", TaskStateWaiting), callsTask("docs", "文档", TaskStateSkipped))},
+		{"paused with no step failed", callsGraph("p1", "打卡", GraphStatePaused, callsTask("api", "接口", TaskStateWaiting))},
+		{"harvested", callsGraph("p1", "打卡", GraphStateDone, callsTask("api", "接口", TaskStateMerged))},
+		{"abandoned with a step failed", callsGraph("p1", "打卡", GraphStateAbandoned, callsTask("api", "接口", TaskStateFailed))},
 	} {
-		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, Inbox(callsWithPlaybooks(c.playbook)), []InboxItem{}) })
+		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, Inbox(callsWithGraphs(c.task)), []InboxItem{}) })
 	}
 }
 
-func TestInboxPlaybookCallIDs(t *testing.T) {
-	draft := callsPlaybook("p1", "打卡", PlaybookStateDraft, callsStep("api", "接口", NodeStateWaiting))
-	edited := callsPlaybook("p1", "打卡和导出", PlaybookStateDraft, callsStep("api", "接口和导出", NodeStateWaiting), callsStep("csv", "导出", NodeStateWaiting))
-	testkit.Eq(t, callsIDs(Inbox(callsWithPlaybooks(draft))), []string{"p1:draft"})
-	testkit.Eq(t, callsIDs(Inbox(callsWithPlaybooks(edited))), []string{"p1:draft"})
-	stuck := func(id string) Playbook {
-		return callsPlaybook(id, "打卡", PlaybookStateRunning, callsStep("api", "接口", NodeStateFailed))
+func TestInboxTaskCallIDs(t *testing.T) {
+	draft := callsGraph("p1", "打卡", GraphStateDraft, callsTask("api", "接口", TaskStateWaiting))
+	edited := callsGraph("p1", "打卡和导出", GraphStateDraft, callsTask("api", "接口和导出", TaskStateWaiting), callsTask("csv", "导出", TaskStateWaiting))
+	testkit.Eq(t, callsIDs(Inbox(callsWithGraphs(draft))), []string{"p1:draft"})
+	testkit.Eq(t, callsIDs(Inbox(callsWithGraphs(edited))), []string{"p1:draft"})
+	stuck := func(id string) TaskGraph {
+		return callsGraph(id, "打卡", GraphStateRunning, callsTask("api", "接口", TaskStateFailed))
 	}
-	testkit.Eq(t, callsIDs(Inbox(callsWithPlaybooks(stuck("p1"), stuck("p2")))), []string{"p1:failed:api", "p2:failed:api"})
+	testkit.Eq(t, callsIDs(Inbox(callsWithGraphs(stuck("p1"), stuck("p2")))), []string{"p1:failed:api", "p2:failed:api"})
 	again := stuck("p1")
-	again.Nodes[0].Failures = 2
-	testkit.Eq(t, callsIDs(Inbox(callsWithPlaybooks(again))), []string{"p1:failed:api:2"})
+	again.Tasks[0].Failures = 2
+	testkit.Eq(t, callsIDs(Inbox(callsWithGraphs(again))), []string{"p1:failed:api:2"})
 	once := stuck("p1")
-	once.Nodes[0].Failures = 1
-	testkit.Eq(t, callsIDs(Inbox(callsWithPlaybooks(once))), []string{"p1:failed:api"})
+	once.Tasks[0].Failures = 1
+	testkit.Eq(t, callsIDs(Inbox(callsWithGraphs(once))), []string{"p1:failed:api"})
 }
 
 func TestInboxMentionCalls(t *testing.T) {
@@ -353,7 +353,7 @@ func TestInboxClipTheirWords(t *testing.T) {
 	fits, long := strings.Repeat("改", 40), strings.Repeat("改", 41)
 	clipped := fits + "…"
 	said := func(summary string) func(*Session) { return func(h *Session) { h.LastRun.Summary = summary } }
-	task := func(task string) func(*Session) { return func(h *Session) { h.Task = task } }
+	task := func(task string) func(*Session) { return func(h *Session) { h.Brief = task } }
 	for _, c := range []struct {
 		name  string
 		state CoreState
@@ -366,10 +366,10 @@ func TestInboxClipTheirWords(t *testing.T) {
 		{"two-unit characters, 40 units", callsFarm(callsSession("w1", PhaseRipe{}, said(strings.Repeat("🌾", 20)))), strings.Repeat("🌾", 20)},
 		{"two-unit characters, 42 units", callsFarm(callsSession("w1", PhaseRipe{}, said(strings.Repeat("🌾", 21)))), strings.Repeat("🌾", 20) + "…"},
 		{"a quiet session's long task", callsFarm(callsSession("w1", callsQuiet(callsT+90), task(long))), clipped},
-		{"a draft's long title", callsWithPlaybooks(callsPlaybook("p1", long, PlaybookStateDraft)), clipped},
-		{"a ripe playbook's long title", callsWithPlaybooks(callsPlaybook("p1", long, PlaybookStateRipe)), clipped},
-		{"a stuck step with its playbook's title", callsWithPlaybooks(callsPlaybook("p1", strings.Repeat("计", 30), PlaybookStateRunning,
-			callsStep("api", strings.Repeat("步", 10), NodeStateFailed))), strings.Repeat("计", 30) + "：" + strings.Repeat("步", 9) + "…"},
+		{"a draft's long title", callsWithGraphs(callsGraph("p1", long, GraphStateDraft)), clipped},
+		{"a ripe task's long title", callsWithGraphs(callsGraph("p1", long, GraphStateRipe)), clipped},
+		{"a stuck step with its task's title", callsWithGraphs(callsGraph("p1", strings.Repeat("计", 30), GraphStateRunning,
+			callsTask("api", strings.Repeat("步", 10), TaskStateFailed))), strings.Repeat("计", 30) + "：" + strings.Repeat("步", 9) + "…"},
 		{"a long message", callsWithChat(callsChat(nil, nil, callsMessage(5, func(m *ChatMessage) { m.Text = long }))), clipped},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -391,11 +391,11 @@ func TestInboxNewestFirst(t *testing.T) {
 		callsSession("w4", callsQuiet(callsT+40)),
 		callsSession("w5", PhaseArriving{}),
 	)
-	draft := callsPlaybook("p1", "打卡", PlaybookStateDraft)
+	draft := callsGraph("p1", "打卡", GraphStateDraft)
 	draft.CreatedAt = callsT + 5
-	stuck := callsPlaybook("p2", "导出", PlaybookStateRunning, callsStep("csv", "导出 CSV", NodeStateFailed))
+	stuck := callsGraph("p2", "导出", GraphStateRunning, callsTask("csv", "导出 CSV", TaskStateFailed))
 	stuck.CreatedAt = callsT + 25
-	state = withPlaybooks(state, draft, stuck)
+	state = withGraphs(state, draft, stuck)
 	state.Chat = callsChat(nil, nil, callsMessage(50))
 	timeline := [][2]any{}
 	for _, c := range Inbox(state) {
@@ -416,9 +416,9 @@ func TestInboxTiesKeepTheirOrder(t *testing.T) {
 	endedNow := func(h *Session) { h.LastRun.At = callsT }
 	saidNow := func(m *ChatMessage) { m.At = callsT }
 	state := callsFarm(callsSession("w2", PhaseRipe{}, endedNow), callsSession("w1", PhaseFailed{}, callsFailedRun, endedNow))
-	state = withPlaybooks(state,
-		callsPlaybook("p2", "导出", PlaybookStateDraft),
-		callsPlaybook("p1", "报表", PlaybookStateRunning, callsStep("b", "页面", NodeStateFailed), callsStep("a", "接口", NodeStateFailed)),
+	state = withGraphs(state,
+		callsGraph("p2", "导出", GraphStateDraft),
+		callsGraph("p1", "报表", GraphStateRunning, callsTask("b", "页面", TaskStateFailed), callsTask("a", "接口", TaskStateFailed)),
 	)
 	state.Chat = callsChat(nil, nil, callsMessage(3, callsInThread, saidNow), callsMessage(4, saidNow))
 	testkit.Eq(t, callsIDs(Inbox(state)), []string{"w2:merge:2", "w1:fix:2", "p1:failed:b", "p1:failed:a", "p2:draft", "m4", "m3"})

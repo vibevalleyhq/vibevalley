@@ -7,14 +7,42 @@ import '../ui/kit/kit.dart';
 import 'chat_widgets.dart';
 import '../voice/dictation.dart';
 
-/// Tap to start talking, tap again to stop: the words go where [onWords] puts them, for the owner to read before sending.
-class DictationButton extends ConsumerWidget {
-  const DictationButton({super.key, required this.onWords, this.size = 28});
-  final void Function(String text) onWords;
+/// Tap to start talking, tap again to stop: the words go into the original input field, for the owner to read before sending.
+class DictationButton extends ConsumerStatefulWidget {
+  const DictationButton({super.key, required this.controller, this.size = 28});
+  final TextEditingController controller;
   final double size;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DictationButton> createState() => _DictationButtonState();
+}
+
+class _DictationButtonState extends ConsumerState<DictationButton> {
+  late DictationTarget _target;
+  DictationTarget _forController(TextEditingController controller) => DictationTarget((words) => insertDictated(controller, words));
+  @override
+  void initState() {
+    super.initState();
+    _target = _forController(widget.controller);
+  }
+
+  @override
+  void didUpdateWidget(covariant DictationButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      _target.dispose();
+      _target = _forController(widget.controller);
+    }
+  }
+
+  @override
+  void dispose() {
+    _target.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final dictation = ref.watch(dictationProvider);
     // Unknown until the settings are read; the server says what is missing then.
     final settings = ref.watch(settingsProvider);
@@ -30,9 +58,9 @@ class DictationButton extends ConsumerWidget {
       tone: dictation.phase == DictationPhase.recording ? PxTone.danger : PxTone.plain,
       tooltip: tip,
       semanticLabel: '听写',
-      onPressed: off || dictation.phase == DictationPhase.transcribing ? null : () => dictation.toggle(onWords),
+      onPressed: off || dictation.phase == DictationPhase.transcribing ? null : () => dictation.toggle(_target),
       child: SizedBox.square(
-        dimension: size,
+        dimension: widget.size,
         child: Center(child: Glyph(glyph)),
       ),
     );

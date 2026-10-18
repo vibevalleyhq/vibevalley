@@ -155,3 +155,69 @@ func TestLoadedProfilesHaveRequiredAppearanceEnums(t *testing.T) {
 		t.Fatalf("default appearance not persisted: %+v", saved.Agents[0].Look)
 	}
 }
+
+func TestChangeOwnsNestedRollbackAndPublishedRevision(t *testing.T) {
+	s, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := protocol.Agent{ID: "nested", Runtime: "pi", Skills: []string{"first"}, Tags: []string{"tag"}, Env: map[string]string{"key": "old"}, MCPServers: []protocol.MCPServer{{Value: protocol.MCPServerStdio{Args: []string{"arg"}, Env: map[string]string{"key": "old"}}}, {Value: protocol.MCPServerHTTP{Headers: map[string]string{"key": "old"}}}}}
+	if _, err := s.SaveAgent(a); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SaveSettings("pi", protocol.RuntimeSettings{Env: map[string]string{"key": "old"}, DailyBudget: ptr.To(10.0)}); err != nil {
+		t.Fatal(err)
+	}
+	before := cloneStored(s.s)
+	disk := s.disk
+	s.disk = base.NewFileWriter(t.TempDir(), 0600)
+	var held *stored
+	mutate := func(work *stored) {
+		held = work
+		i := slices.IndexFunc(work.Agents, func(a protocol.Agent) bool { return a.ID == "nested" })
+		agent := &work.Agents[i]
+		agent.Env["key"] = "new"
+		agent.Skills[0] = "new"
+		agent.Tags[0] = "new"
+		*agent.Look.Species = protocol.SpeciesOwl
+		agent.MCPServers[0].Value.(protocol.MCPServerStdio).Args[0] = "new"
+		agent.MCPServers[0].Value.(protocol.MCPServerStdio).Env["key"] = "new"
+		agent.MCPServers[1].Value.(protocol.MCPServerHTTP).Headers["key"] = "new"
+		work.Settings["pi"].Env["key"] = "new"
+		*work.Settings["pi"].DailyBudget = 20
+	}
+	if err := s.change(mutate); err == nil {
+		t.Fatal("expected disk failure")
+	}
+	if !reflect.DeepEqual(s.s, before) {
+		t.Fatal("nested mutation escaped failed transaction")
+	}
+	s.disk = disk
+	if err := s.change(mutate); err != nil {
+		t.Fatal(err)
+	}
+	committed := cloneStored(s.s)
+	held.Settings["pi"].Env["key"] = "retained callback"
+	held.Agents[0].Name = "retained callback"
+	if !reflect.DeepEqual(s.s, committed) {
+		t.Fatal("callback retained ownership of committed revision")
+	}
+}
+
+func TestCreatedProfileDetachesBothInputAndReturnedDraft(t *testing.T) {
+	s, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	draft := protocol.Agent{Name: "created", Runtime: "pi", Env: map[string]string{"key": "original"}, Skills: []string{"skill"}}
+	created, err := s.CreateAgent(draft)
+	if err != nil {
+		t.Fatal(err)
+	}
+	draft.Env["key"] = "input"
+	created.Skills[0] = "output"
+	got := s.Agent(created.ID)
+	if got.Env["key"] != "original" || got.Skills[0] != "skill" {
+		t.Fatalf("created profile aliases caller: %+v", got)
+	}
+}

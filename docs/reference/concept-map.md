@@ -26,7 +26,7 @@
 | 记性 | 记性 | 档案页和管家页（`workbench/shared/memory_panels.dart`） | `Memory`、`MemoryList` | `/api/v1/memories/{agent}`（管家是 `manager`） |
 | 管家 | 管家 | `/manager`（`workbench/manager`） | `CoreState.Manager`（管家的状态） | `/api/v1/say`、`/api/v1/manager/...` |
 | 工单 | 看板上的卡片 | `/issues`（`workbench/issues`） | `Issue`、`Issue.Sessions`（这张工单用过的帮工） | `/api/v1/issues` |
-| 种植计划 | 图纸桌、计划板 | `farm/plans.dart` | `Playbook`（从父工单拼回，`StateFrame.Plans`） | `/api/v1/playbooks` |
+| 种植计划 | 图纸桌、计划板 | `farm/task_board.dart` | `TaskGraph`（从父工单拼回，`StateFrame.Graphs`），每件是 `Task` | `/api/v1/graphs` |
 | 帮工 | 地里干活的小动物 | 地块和地块详情（`farm/plot_detail.dart`） | `Session`（`CoreState.Sessions`） | `/api/v1/sessions/{id}/stop`；别的按工单：`/api/v1/issues/{id}/...` |
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.Phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `FactRun` 到 `FactReport`、`Session.Runs`、`LastRun` | `/api/v1/issues/{id}/runs` |
 | 干活过程 | 干活过程 | `chat/turn_steps.dart` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/sessions`、`/api/v1/sessions/{id}`、`/api/v1/sessions/{id}/events` |
@@ -51,9 +51,9 @@
 | 帮工档案、技能书 | `Agent` | `config.json` | |
 | 农机 | `Runtime` | `config.json` 里每台农机的设置、`spend.json` | `oar.Runtime`、`AvailableInstallation` |
 | 记性 | `Memory` | `memory` 表；管家的在 `manager/MEMORY.md` | |
-| 管家 | `Manager` | `manager/` | 不经 oar：跑在 VibeValley 自己的 agent 上（`pkg/agent`） |
+| 管家 | `Manager` | `manager/` | 不经 oar：跑在 VibeValley 自己的 agent 上（`internal/agent/brain`） |
 | 工单 | `Issue`（`issue/issue.go`、`dispatch.go`；派给管家的在 `manager.go`） | `issue`、`issue_session` 表（一行是一个帮工） | |
-| 种植计划 | `Playbook` | `issue` 表（带 `plan` 的父工单）、`playbook_event` 表 | |
+| 种植计划 | `TaskGraph`、`Task` | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
 | 帮工 | `Session`（`session/sessions.go`） | `state.json`（核心状态里的帮工）、`sessions.json`（目录、农机的会话 id、最后一轮的原话） | 一个帮工是一个 `agents.Subagent`，包着一个 `oar.Session`；每个帮工有自己的 `agents.Subagents` |
 | 一次干活（run） | `Session`（`session/runs.go`）；`session/facts.go` 把会话事件读成事实 | `session_run` 表 | 一个 oar turn（`TurnStarted` 到 `TurnEnded`），结束时交一份 `SubagentReport` |
 | 干活过程 | `Session`（`session/trajectories.go`、`events.go`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：`TextDelta`、`Reasoning`、`ToolCallStarted`、`ToolCallEnded`…… |

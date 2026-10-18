@@ -18,13 +18,25 @@ interface Rule {
   readonly pattern: RegExp
   /** What to write instead. */
   readonly says: string
-  /** Only these directories, when the word is fine elsewhere (a project named tickets). */
+  /** Only these directories, when the word is fine elsewhere. */
   readonly dirs?: readonly string[]
   /** Files where the same words name something else (another service's API). */
   readonly except?: RegExp
 }
 
 const RULES: readonly Rule[] = [
+  {
+    name: 'playbook or plan for a task',
+    pattern: /[Pp]laybook|\b[a-z_]*[Pp]lan(s|ner|ners|ning|ned)?\b|\b[A-Z][A-Za-z]*Plan(?![te])[A-Za-z]*\b/,
+    says: 'a task (Task, task.*, task_split …), split for breaking one into steps, step for one of its steps',
+    // A compaction's plan of what to fold, and oar's own usage.Plan: other meanings of the word.
+    except: /^server\/internal\/(agent\/brain\/(compaction|.*_test)\.go|runtime\/runtime\.go)$/,
+  },
+  {
+    name: 'a task graph\'s task under its old name',
+    pattern: /\b(StepState|StepAction|StepEdit|StepActRequest|StepFieldChange|IssueStep|SessionTask|ReadySteps|CanEditStep|step_action|task_step)\b|\/steps\/\{/,
+    says: 'a task graph is TaskGraph (graph.*, GraphState, IssueGraph, SessionGraph); each of its nodes is a Task (TaskState, TaskAction, TaskEdit, IssueTask, task_edit, task_action)',
+  },
   {
     name: 'an API path without its version',
     pattern: /["'`]\/api\/(?!v1\/)/,
@@ -34,14 +46,13 @@ const RULES: readonly Rule[] = [
   },
   {
     name: 'the word ticket',
-    pattern: /\btickets?\b/,
-    says: 'issues and the issue board',
-    dirs: ['app/lib', 'app/test'],
+    pattern: /[Tt]ickets?/,
+    says: 'issues and the issue board; a voice call\'s credential is a grant (AgoraGrant)',
   },
   {
     name: 'ticket in the client',
     pattern: /\b(TicketState|TicketsPage|TicketCard|TicketDetail|TicketBoard|CloseTicket|ticketState|ticketTitle|ticketPlanned|ticketIs|ticketColor|ticketSession)\b/,
-    says: 'the client says issue: IssueTag, IssuesPage, IssueCard, IssueDetail, IssueBoard, CloseIssue, issueTag, issueTitle, issuePlanned, issueIs, issueTagColor, issueSession',
+    says: 'the client says issue: IssueTag, IssuesPage, IssueCard, IssueDetail, IssueBoard, CloseIssue, issueTag, issueTitle, issueInTask, issueIs, issueTagColor, issueSession',
   },
   {
     name: 'a ticket path or route',

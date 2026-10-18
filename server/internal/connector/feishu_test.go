@@ -2,121 +2,65 @@ package connector
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"reflect"
-	"sync"
 	"testing"
 	"time"
 
-	"vibevalley/internal/testkit"
 	"vibevalley/pkg/feishu"
 )
 
 type voiceSDKFeishu struct {
 	voiceScriptedFeishu
-	deliver  [][]feishu.Message
-	returned chan time.Duration
-	fail     error
+	gotError chan error
 }
 
-func (a voiceSDKFeishu) Listen(ctx context.Context, _ feishu.App, got func(feishu.Message)) error {
-	for _, wave := range a.deliver {
-		var wg sync.WaitGroup
-		for _, m := range wave {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				began := time.Now()
-				got(m)
-				a.returned <- time.Since(began)
-			}()
-		}
-		wg.Wait()
-	}
-	if a.fail != nil {
-		return a.fail
+func (a voiceSDKFeishu) Listen(ctx context.Context, _ feishu.App, got func(feishu.Message) error) error {
+	err := got(feishu.Message{MessageID: "message", From: "owner", ChatType: "p2p", MessageType: "text", Content: `{"text":"hello"}`})
+	a.gotError <- err
+	if err != nil {
+		return err
 	}
 	<-ctx.Done()
 	return nil
 }
-
-func TestFeishuReceivingQueuesWhatTheSDKHandsOver(t *testing.T) {
-	msg := func(id, text string) feishu.Message {
-		content, _ := json.Marshal(map[string]string{"text": text})
-		return feishu.Message{MessageID: id, From: "ou_owner", ChatType: "p2p", MessageType: "text", Content: string(content)}
-	}
-	first, second := msg("om1", "第一句"), msg("om2", "第二句")
-	api := voiceSDKFeishu{
-		deliver:  [][]feishu.Message{{first}, {second, second, second}},
-		returned: make(chan time.Duration, 8),
-	}
-	adapter := voiceFeishuAdapter{c: &Service{feishu: api}}
-	release := make(chan struct{})
-	var (
-		mu    sync.Mutex
-		taken []voiceInbound
-		busy  int
-		worst int
-	)
-	io := voiceReceiving{Got: func(m voiceInbound) error {
-		mu.Lock()
-		busy++
-		worst = max(worst, busy)
-		taken = append(taken, m)
-		mu.Unlock()
-		if m.ID == "om1" {
-			<-release
-		}
-		mu.Lock()
-		busy--
-		mu.Unlock()
-		return nil
-	}}
-	ctx, cancel := context.WithCancel(context.Background())
-	stopped := make(chan *voiceFailure)
-	go func() { stopped <- adapter.Receive(ctx, map[string]string{"appId": "cli_1", "appSecret": "s"}, io) }()
-	for range 4 {
+func TestFeishuAcknowledgesOnlyAfterAcceptance(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		api := voiceSDKFeishu{gotError: make(chan error, 1)}
+		entered, release := make(chan struct{}), make(chan struct{})
+		adapter := voiceFeishuAdapter{c: &Service{feishu: api}}
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan *voiceFailure, 1)
+		go func() {
+			done <- adapter.Receive(ctx, nil, voiceReceiving{Accept: func(ms []voiceInbound, cursor string) error {
+				if len(ms) != 1 || ms[0].ID != "message" || cursor != "" {
+					t.Error("adapter changed acceptance envelope")
+				}
+				close(entered)
+				<-release
+				if fail {
+					return errors.New("disk unavailable")
+				}
+				return nil
+			}})
+		}()
+		<-entered
 		select {
-		case took := <-api.returned:
-			if took > time.Second {
-				t.Fatalf("the handler waited %s for the bridge", took)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatal("the handler did not return while the bridge was busy")
+		case <-api.gotError:
+			t.Fatal("SDK acknowledged before durable acceptance")
+		case <-time.After(20 * time.Millisecond):
 		}
-	}
-	close(release)
-	testkit.Await(t, "everything taken", func() (int, bool) {
-		mu.Lock()
-		defer mu.Unlock()
-		return len(taken), len(taken) == 4
-	})
-	cancel()
-	if failure := <-stopped; failure != nil {
-		t.Fatalf("stopped with %+v", failure)
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	if worst != 1 {
-		t.Fatalf("the bridge took %d at once", worst)
-	}
-	ids := []string{}
-	for _, m := range taken {
-		ids = append(ids, m.ID)
-	}
-	if want := []string{"om1", "om2", "om2", "om2"}; !reflect.DeepEqual(ids, want) {
-		t.Fatalf("taken: %v", ids)
-	}
-	if taken[0].Text != "第一句" || taken[1].Text != "第二句" {
-		t.Fatalf("texts: %+v", taken)
-	}
-}
-
-func TestFeishuReceivingFailsWhenTheConnectionDrops(t *testing.T) {
-	api := voiceSDKFeishu{fail: errors.New("飞书长连接断了：bye"), returned: make(chan time.Duration, 1)}
-	failure := voiceFeishuAdapter{c: &Service{feishu: api}}.Receive(context.Background(), map[string]string{}, voiceReceiving{Got: func(voiceInbound) error { return nil }})
-	if failure == nil || failure.Kind != "failed" || failure.Reason != "飞书长连接断了：bye" {
-		t.Fatalf("failure: %+v", failure)
+		close(release)
+		err := <-api.gotError
+		if (err != nil) != fail {
+			t.Fatalf("SDK result %v; fail %v", err, fail)
+		}
+		if !fail {
+			cancel()
+		}
+		result := <-done
+		cancel()
+		if (result != nil) != fail {
+			t.Fatalf("receive result: %+v", result)
+		}
 	}
 }

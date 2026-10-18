@@ -3,6 +3,7 @@ package observe
 import (
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"vibevalley/pkg/smith/oar"
@@ -154,10 +155,26 @@ func sameLane(held, next oar.Event) bool {
 // flush are serialized, so the wrapped observer never runs concurrently
 // with itself.
 func CoalesceText(observer oar.EventObserver, maxHold time.Duration) oar.EventObserver {
+	input, _, _ := coalesceText(observer, maxHold)
+	return input
+}
+
+func coalesceText(observer oar.EventObserver, maxHold time.Duration) (input oar.EventObserver, flush, cancel func()) {
 	var mu sync.Mutex
 	var held *oar.Event
+	var canceled atomic.Bool
 	var timer *time.Timer
 	generation := 0
+	unlock := func() {
+		if canceled.Load() {
+			if timer != nil {
+				timer.Stop()
+				timer = nil
+			}
+			held = nil
+		}
+		mu.Unlock()
+	}
 	flushLocked := func() {
 		if timer != nil {
 			timer.Stop()
@@ -166,7 +183,9 @@ func CoalesceText(observer oar.EventObserver, maxHold time.Duration) oar.EventOb
 		if held != nil {
 			event := *held
 			held = nil
-			observer(event)
+			if !canceled.Load() {
+				observer(event)
+			}
 		}
 	}
 	arm := func() {
@@ -180,15 +199,18 @@ func CoalesceText(observer oar.EventObserver, maxHold time.Duration) oar.EventOb
 		mine := generation
 		timer = time.AfterFunc(maxHold, func() {
 			mu.Lock()
-			defer mu.Unlock()
+			defer unlock()
 			if generation == mine {
 				flushLocked()
 			}
 		})
 	}
-	return func(event oar.Event) {
+	input = func(event oar.Event) {
 		mu.Lock()
-		defer mu.Unlock()
+		defer unlock()
+		if canceled.Load() {
+			return
+		}
 		if text, ok := textOf(event); ok {
 			if held != nil {
 				if previous, heldText := textOf(*held); heldText && sameLane(*held, event) {
@@ -205,6 +227,26 @@ func CoalesceText(observer oar.EventObserver, maxHold time.Duration) oar.EventOb
 			return
 		}
 		flushLocked()
-		observer(event)
+		if !canceled.Load() {
+			observer(event)
+		}
 	}
+	flush = func() {
+		mu.Lock()
+		defer unlock()
+		flushLocked()
+	}
+	cancel = func() {
+		canceled.Store(true)
+		// Cancellation is also safe inside the consumer callback.
+		if mu.TryLock() {
+			if timer != nil {
+				timer.Stop()
+				timer = nil
+			}
+			held = nil
+			mu.Unlock()
+		}
+	}
+	return input, flush, cancel
 }

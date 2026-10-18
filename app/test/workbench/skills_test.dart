@@ -57,7 +57,7 @@ void main() {
     expect(put.body, {'id': 'tests-first', 'name': '先写测试', 'description': '改行为之前，先补一个会失败的测试。', 'body': '先写测试，再改代码。'});
   });
 
-  testWidgets('a new skill gets its id from its name', (t) async {
+  testWidgets('a new skill gets its identity from the server', (t) async {
     final server = _server();
     await pumpPage(t, const SkillsPage(id: 'new'), server.handle);
     expect(find.text('新技能'), findsWidgets);
@@ -65,7 +65,9 @@ void main() {
     await typeInto(t, '正文', '表驱动测试。');
     await t.tap(find.text('保存'));
     await settle(t);
-    expect(server.writes.single.path, '/api/v1/skills/go-style');
+    expect(server.writes.single.method, 'POST');
+    expect(server.writes.single.path, '/api/v1/skills');
+    expect((server.writes.single.body! as Map)['id'], '');
     expect((server.writes.single.body! as Map)['name'], 'Go Style');
   });
 

@@ -189,7 +189,12 @@ func (s *InstallationSnapshot) UnmarshalJSON(data []byte) error {
 }
 
 // InstallationProbe is a local-only installation observation.
-type InstallationProbe func(ctx context.Context) (InstallationSnapshot, error)
+type InstallationOptions struct {
+	// Nil uses the runtime's OAR_*_BIN environment default; an explicit empty value ignores it.
+	Binary *string
+}
+
+type InstallationProbe func(ctx context.Context, options InstallationOptions) (InstallationSnapshot, error)
 
 // ─── Models ────────────────────────────────────────────────────────────────
 

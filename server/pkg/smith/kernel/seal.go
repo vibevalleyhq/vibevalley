@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"regexp"
-	"time"
 
 	"vibevalley/pkg/smith/oar"
 	"vibevalley/pkg/smith/observe"
@@ -133,11 +132,7 @@ func (s *sealed) RawEvents(observer oar.RawEventObserver, cursor *oar.Cursor) oa
 }
 
 func (s *sealed) Events(observer oar.EventObserver, options oar.EventsOptions) oar.Unsubscribe {
-	target := observer
-	if options.CoalesceText {
-		target = observe.CoalesceText(observer, time.Duration(options.MaxHoldMs)*time.Millisecond)
-	}
-	return s.adapter.RawEvents(observe.EventsReader(target), options.Cursor)
+	return observe.SubscribeEvents(s.adapter, observer, options).Cancel
 }
 
 func (s *sealed) Records() []oar.RawEvent { return s.adapter.Records() }

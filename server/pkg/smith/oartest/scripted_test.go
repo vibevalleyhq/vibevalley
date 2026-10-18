@@ -30,7 +30,7 @@ func echo() oar.Runtime {
 func open(t *testing.T) oar.Session {
 	t.Helper()
 	runtime := echo()
-	installation, err := runtime.Installation(context.Background())
+	installation, err := runtime.Installation(context.Background(), oar.InstallationOptions{})
 	if err != nil || installation.Kind != "available" {
 		t.Fatalf("installation: %v %v", installation, err)
 	}
@@ -223,7 +223,7 @@ func TestCoalescedEvents(t *testing.T) {
 		turn.Say("c")
 		return nil
 	}})
-	installation, _ := runtime.Installation(context.Background())
+	installation, _ := runtime.Installation(context.Background(), oar.InstallationOptions{})
 	session, err := runtime.Session(context.Background(), installation.Available, oar.SessionOptions{Cwd: "."})
 	if err != nil {
 		t.Fatal(err)

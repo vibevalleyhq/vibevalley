@@ -18,7 +18,7 @@ func TestNamesFollowTheModules(t *testing.T) {
 	}
 	defer db.Close()
 	db.SetMaxOpenConns(1)
-	if _, err := Up(db, ":memory:"); err != nil {
+	if _, err := Up(db); err != nil {
 		t.Fatal(err)
 	}
 	entries, err := os.ReadDir("../internal")
@@ -64,5 +64,23 @@ func TestNamesFollowTheModules(t *testing.T) {
 				t.Errorf("index %s: start it with its table's name, %s_", name, table)
 			}
 		}
+	}
+}
+
+// While the architecture is still taking shape, the schema is changed in place, not migrated: the old database is thrown
+// away (AGENTS.md「不留兼容」). A second file here would be a migration someone wrote anyway.
+func TestTheSchemaIsOneBaseline(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sqlFiles []string
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".sql") {
+			sqlFiles = append(sqlFiles, e.Name())
+		}
+	}
+	if len(sqlFiles) != 1 || sqlFiles[0] != "0001_schema.sql" {
+		t.Fatalf("migrations: %v; change 0001_schema.sql in place and delete the old database instead of adding a migration", sqlFiles)
 	}
 }

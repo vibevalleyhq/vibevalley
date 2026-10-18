@@ -21,7 +21,7 @@ Status: implemented
 - **家目录不在 YAML 里**：YAML 在家目录里，所以家目录只由 `VIBEVALLEY_HOME` 或默认值（`~/.vibevalley`）定。
 - **三个外家的名字照旧**：`DEEPSEEK_API_KEY`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE` 是那几家自己的约定，绑定到 `deepseek.api_key`、`agora.app_id`、`agora.app_certificate`，YAML 里也能写。
 - **一个有类型的 `base.Config`**：开机读一次（`base.LoadConfig`），经 fx 交给服务；服务只读它的字段，不调 `os.Getenv`。`base.Defaults()` 是全部默认值的唯一出处，零就是零：端口 0 是随便一个，`patrol.heartbeat_minutes` 0 是关掉。测试从 `base.ConfigAt(home, work, db)` 出发再改字段，不用 `t.Setenv`。
-- **删掉的**：`.env` 的读取和解析（`base/env.go`、`--env-file`、家目录的 `.env`，Go 和 Dart 两边）；从 pi 的 `models.json` 找 DeepSeek 钥匙（`setting` 和 `pkg/agent` 两处），`pkg/agent.Deepseek` 只用调用方给的钥匙；`DEEPSEEK_BASE_URL`；`HOST`、`PORT` 改叫 `VIBEVALLEY_HOST`、`VIBEVALLEY_PORT`。三个命令（`cmd/server`、`cmd/migrate`、`cmd/vibevalley`）都用 `--config` 指一个别的文件。
+- **删掉的**：`.env` 的读取和解析（`base/env.go`、`--env-file`、家目录的 `.env`，Go 和 Dart 两边）；从 pi 的 `models.json` 找 DeepSeek 钥匙（`setting` 和 `internal/agent/brain` 两处），`internal/agent/brain.Deepseek` 只用调用方给的钥匙；`DEEPSEEK_BASE_URL`。端口用 `VIBEVALLEY_PORT`，主接口的地址固定为 `127.0.0.1`，没有 `host` 配置。三个命令（`cmd/server`、`cmd/migrate`、`cmd/vibevalley`）都用 `--config` 指一个别的文件。
 - **还读 pi 的**：`runtime` 算 pi 那台农机的余额时，照 pi 自己的规则找它的钥匙（`piDeepseek`）；那是 pi 的配置，不是我们的。
 - **`settings.json` 不是配置**：它是应用里填的钥匙和语音设置，照旧比 YAML 和环境变量优先，钥匙的来源（`KeySource`）只剩 `settings` 和 `config` 两种。
 - smith 自己的 `OAR_*` 和各家农机的环境变量（`CODEX_HOME`……）不归这里管。
@@ -31,7 +31,6 @@ Status: implemented
 ```yaml
 work_root: ~/vibevalley-work
 db: ""                  # 空：家目录的 vibevalley.db；memory：内存
-host: 127.0.0.1
 port: 8787
 agent: { model: "" }    # cmd/vibevalley 单独跑时
 deepseek: { api_key: "" }

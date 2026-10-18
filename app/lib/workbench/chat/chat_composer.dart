@@ -119,7 +119,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                         child: Text('回车发送 · Shift+回车换行 · @ 叫人', style: KitText.xs.copyWith(color: Palette.bark400)),
                       ),
                       const ManagerStopButton(),
-                      DictationButton(onWords: (words) => insertDictated(_naming.text, words)),
+                      DictationButton(controller: _naming.text),
                       const SizedBox(width: 6),
                       PxButton(
                         size: PxSize.custom,

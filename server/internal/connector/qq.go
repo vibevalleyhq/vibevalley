@@ -35,7 +35,7 @@ func (a voiceQQAdapter) Login(ctx context.Context, in protocol.ConnectorLogin, _
 }
 
 func (a voiceQQAdapter) Receive(ctx context.Context, secrets map[string]string, io voiceReceiving) *voiceFailure {
-	err := a.c.qq.Listen(ctx, voiceQQAppOf(secrets), func(m qq.Message) {
+	err := a.c.qq.Listen(ctx, voiceQQAppOf(secrets), func(m qq.Message) error {
 		var parts []string
 		if t := strings.TrimSpace(m.Content); t != "" {
 			parts = append(parts, t)
@@ -43,7 +43,7 @@ func (a voiceQQAdapter) Receive(ctx context.Context, secrets map[string]string, 
 		if m.Attachments > 0 {
 			parts = append(parts, "[附件]")
 		}
-		io.take(ctx, voiceInbound{ID: m.ID, From: m.From, Text: strings.Join(parts, "\n"), Reply: m.ID})
+		return io.Accept([]voiceInbound{{ID: m.ID, From: m.From, Text: strings.Join(parts, "\n"), Reply: m.ID}}, "")
 	})
 	if err == nil || ctx.Err() != nil {
 		return nil

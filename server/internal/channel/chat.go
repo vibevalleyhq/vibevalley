@@ -32,8 +32,10 @@ const (
 )
 
 type chatSessions interface {
+	CurrentRun(id string) string
 	Deliver(id, text string, by protocol.RunTrigger) session.Delivered
 	Launches() *base.Hub[session.LaunchActivity]
+	InputsConsumed() *base.Hub[session.InputConsumed]
 	Find(id string) *session.Roster
 }
 
@@ -145,6 +147,7 @@ func (c *Service) restore() error {
 func (c *Service) OnStart(ctx context.Context) error {
 	_, events, stopEvents := c.core.Events()
 	activity, stopActivity := c.sessions.Launches().Subscribe()
+	consumed, stopConsumed := c.sessions.InputsConsumed().Subscribe()
 	go func() {
 		defer stopEvents()
 		for {
@@ -161,10 +164,16 @@ func (c *Service) OnStart(ctx context.Context) error {
 	}()
 	go func() {
 		defer stopActivity()
+		defer stopConsumed()
 		for {
 			select {
 			case <-ctx.Done():
 				return
+			case input, ok := <-consumed:
+				if !ok {
+					return
+				}
+				c.consumedInput(input)
 			case a, ok := <-activity:
 				if !ok {
 					return
@@ -236,7 +245,7 @@ func chatSubjectKind(kind *string) *protocol.SubjectKind {
 		return nil
 	}
 	switch k := protocol.SubjectKind(*kind); k {
-	case protocol.SubjectKindIssue, protocol.SubjectKindPlaybook, protocol.SubjectKindTalk:
+	case protocol.SubjectKindIssue, protocol.SubjectKindGraph, protocol.SubjectKindTalk:
 		return &k
 	}
 	return nil
@@ -259,6 +268,11 @@ func chatToMessage(row chatMsgRow) protocol.ChatMessage {
 		Spoken:       meta.Spoken,
 		At:           row.CreatedAt,
 	}
+	if meta.Run != "" {
+		run := meta.Run
+		m.Run = &run
+	}
+
 	if row.AgentID != nil && *row.AgentID != "" {
 		m.Agent = row.AgentID
 	}
@@ -553,7 +567,7 @@ func (c *Service) TellSession(from, session, text string) (protocol.ChatMessage,
 		c.sessions.Deliver(session, str.Trim(text), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
 		return protocol.ChatMessage{}, nil
 	}
-	written, err := c.write(chatWrite{conversation: *thread, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true})
+	written, err := c.write(chatWrite{conversation: *thread, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true, meta: &chatMeta{Run: c.sessions.CurrentRun(from)}})
 	if err != nil {
 		return protocol.ChatMessage{}, err
 	}
@@ -651,7 +665,7 @@ func (c *Service) Speak(from, text string, opt SpeakOptions) (Spoken, error) {
 			return Spoken{}, err
 		}
 	}
-	written, err := c.write(chatWrite{conversation: conversation, from: from, kind: protocol.MessageKindChat, text: words, final: true, answers: answers})
+	written, err := c.write(chatWrite{conversation: conversation, from: from, kind: protocol.MessageKindChat, text: words, final: true, answers: answers, meta: &chatMeta{Run: c.sessions.CurrentRun(from)}})
 	if err != nil {
 		return Spoken{}, err
 	}
@@ -701,14 +715,14 @@ func (c *Service) Spoken(from, text, sendKey string) (again bool, err error) {
 }
 
 // The same key again replaces the words until final; delivered once final.
-func (c *Service) ManagerSays(conversation string, key, text string, final bool) {
+func (c *Service) ManagerSays(conversation string, key, text string, final bool, run string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	id := c.streaming[key]
 	if id == "" && str.Trim(text) == "" && !final {
 		return
 	}
-	written, err := c.write(chatWrite{id: id, conversation: conversation, from: protocol.ManagerAgent, kind: protocol.MessageKindChat, text: text, final: final})
+	written, err := c.write(chatWrite{id: id, conversation: conversation, from: protocol.ManagerAgent, kind: protocol.MessageKindChat, text: text, final: final, meta: &chatMeta{Run: run}})
 	if err != nil {
 		log.Printf("chat: the manager's words: %v", err)
 		return
@@ -764,9 +778,6 @@ func (c *Service) Read(who string, opt ReadOptions) (ReadResult, error) {
 			before = opt.Before
 		}
 		rows, err = s.messagesBefore(conversation, before, limit)
-		for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
-			rows[i], rows[j] = rows[j], rows[i]
-		}
 	}
 	if err != nil {
 		return ReadResult{}, err
@@ -816,7 +827,7 @@ func (c *Service) History(conversation string, before, limit *int64) ([]protocol
 	}
 	out := make([]protocol.ChatMessage, len(rows))
 	for i, r := range rows {
-		out[len(rows)-1-i] = chatToMessage(r)
+		out[i] = chatToMessage(r)
 	}
 	return out, nil
 }
@@ -853,13 +864,9 @@ func (c *Service) ManagerDigest() []protocol.InboxMessage {
 		return nil
 	}
 	out := []protocol.InboxMessage{}
-	now := clock.NowMs()
 	for _, r := range rows {
 		if r.Wakes && r.HeldBy == nil {
 			continue
-		}
-		if err := s.seenOne(protocol.ManagerAgent, r.Message, now); err != nil {
-			log.Printf("chat: the manager's digest: %v", err)
 		}
 		out = append(out, c.asInbox(r))
 	}

@@ -6,6 +6,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
+import '../data/voice.dart';
+import '../voice/voice.dart';
 import '../gen/vibevalley.dart';
 import '../audio/sfx.dart';
 import 'phone.dart' show phoneOpenProvider;
@@ -15,9 +17,9 @@ String inboxKindLabel(InboxKind kind) => switch (kind) {
   InboxKind.fix => '活没做成',
   InboxKind.conflict => '合不进去',
   InboxKind.quiet => '好久没动静',
-  InboxKind.planDraft => '计划拆好了',
-  InboxKind.planRipe => '计划能收了',
-  InboxKind.planFailed => '计划卡住了',
+  InboxKind.graphDraft => '计划拆好了',
+  InboxKind.graphRipe => '计划能收了',
+  InboxKind.taskFailed => '计划卡住了',
   InboxKind.mention => '找你',
 };
 
@@ -95,6 +97,16 @@ class PhoneCalls extends Notifier<PhoneState> {
         follow();
       }
     });
+    final call = ref.watch(voiceCallProvider.notifier);
+    void projectVoice() {
+      final phase = call.phase;
+      scheduleMicrotask(() {
+        if (ref.mounted) _voice(live: phase == CallPhase.connecting || phase == CallPhase.live, connected: phase == CallPhase.live);
+      });
+    }
+
+    call.addListener(projectVoice);
+    ref.onDispose(() => call.removeListener(projectVoice));
     ref.onCancel(() {
       _active = false;
       _activation++;
@@ -185,8 +197,7 @@ class PhoneCalls extends Notifier<PhoneState> {
     if (answered) ref.read(phoneOpenProvider.notifier).set(false);
   }
 
-  /// Repeating a phase is harmless, so the phone and its button may both report it.
-  void voice({required bool live, required bool connected}) {
+  void _voice({required bool live, required bool connected}) {
     final was = _voiceLive;
     _voiceLive = live;
     if (live && !was && !ref.read(phoneOpenProvider)) {

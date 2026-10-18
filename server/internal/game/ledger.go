@@ -76,9 +76,8 @@ func (l *ledger) OnStart(ctx context.Context) error {
 			}
 		}
 	}()
-	snapshot, events, stop := l.core.Events()
+	state, events, stop := l.core.Transitions()
 	l.stop = stop
-	state := snapshot.Value.(protocol.SideEventSnapshot).State
 	for _, e := range catchUp(state) {
 		l.Record(e.Value)
 	}
@@ -91,17 +90,10 @@ func (l *ledger) OnStart(ctx context.Context) error {
 				if !ok {
 					return
 				}
-				fact, isFact := event.Value.(protocol.FactValue)
-				if !isFact {
+				if _, own := event.Fact.Value.(protocol.FactProgress); own {
 					continue
 				}
-				before := state
-				state, _ = protocol.Reduce(before, protocol.Fact{Value: fact})
-				// Its own progress facts are no news to it.
-				if _, own := fact.(protocol.FactProgress); own {
-					continue
-				}
-				for _, e := range entriesFor(before, protocol.Fact{Value: fact}, state) {
+				for _, e := range entriesFor(event.Before, event.Fact, event.After) {
 					l.Record(e.Value)
 				}
 			}
@@ -119,7 +111,7 @@ func (l *ledger) OnStop() {
 	}
 }
 
-func planEntryAt(entry protocol.LedgerEntryValue, at int64) protocol.LedgerEntryValue {
+func taskEntryAt(entry protocol.LedgerEntryValue, at int64) protocol.LedgerEntryValue {
 	v := reflect.New(reflect.TypeOf(entry)).Elem()
 	v.Set(reflect.ValueOf(entry))
 	v.FieldByName("At").SetInt(at)
@@ -129,7 +121,7 @@ func planEntryAt(entry protocol.LedgerEntryValue, at int64) protocol.LedgerEntry
 // Called with mu held.
 func (l *ledger) write(input protocol.LedgerEntryValue) error {
 	at := clock.NowMs()
-	entry := protocol.LedgerEntry{Value: planEntryAt(input, at)}
+	entry := protocol.LedgerEntry{Value: taskEntryAt(input, at)}
 	body, err := json.Marshal(entry)
 	if err != nil {
 		return err

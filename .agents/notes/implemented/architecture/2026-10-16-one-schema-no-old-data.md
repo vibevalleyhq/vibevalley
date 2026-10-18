@@ -8,9 +8,10 @@ Status: implemented
 
 ## Decision
 
-- **不留兼容**：存盘的格式只有现在这一种。`vibevalley.db` 的表、家目录里的文件（`state.json`、`workers.json`、`manager/`、`activities/`）、环境变量（`VIBEVALLEY_MANAGER_*`）都只认现在的名字，没有读旧名字、改写旧文件、搬旧数据的代码。`internal/migrate`、`vibevalley migrate`、`vibevalley import` 和 `tool/dump-pglite.ts` 删了。改名就直接改代码和存盘的名字。
-- **能迁就迁一次**（后来改成一次性）：旧数据在**升级前**用一次性的工具搬成今天的形状，启动时只认今天的名字，不读、不改写旧文件。TypeScript 的农场用 `server/tool/import-ts` 跑一次：读旧的 `farm.db` 和 `steps/`，写今天的库和 `events/`，旧文件由主人归档，跑完导入器删掉。Go 时代的旧家（`workers.json`、`activities/`、`*.head.json`）也是迁移搬过一次，那几个启动搬家器在这次改动里删了（[一次性迁移](2026-10-17-one-way-migration.md)）。改不成今天的形状的旧数据，仍然不读。
-- **一份表结构**：`server/migrations/0001_schema.sql` 是整个库，按主人分段（田头、工单和执行、计划的经过、定时、账本、记性、连接器、院门）。以后改表是它后面的新文件（`go run ./cmd/migrate new 名字` 写出下一个），按名字顺序各跑一次：服务端开机时跑，也可以 `cmd/migrate up` 手动跑，`cmd/migrate status` 看库在第几版。跑的是 `migrations.Up`：跑之前把库留一份 `vibevalley.db.v<n>`，遇到 `user_version` 比它认识的迁移还多的库就不开，免得旧的服务端写坏新的库。`cmd/migrate` 只跑这些迁移文件。
+- **不留兼容，架构成形期不为兼容放慢**：存盘的格式只有现在这一种。`vibevalley.db` 的表、家目录里的文件（`state.json`、`workers.json`、`manager/`、`activities/`）、环境变量（`VIBEVALLEY_MANAGER_*`）都只认现在的名字，没有读旧名字、改写旧文件、搬旧数据的代码。`internal/migrate`、`vibevalley migrate`、`vibevalley import` 和 `tool/dump-pglite.ts` 删了。改名就直接改代码和存盘的名字。
+- **不搬旧数据**：改了存盘的格式，旧数据作废：本机的 `vibevalley.db` 和家目录里的旧文件删掉重建，不写导入器、不写迁移里的数据搬运，启动时只认今天的名字。2026-10-18 主人定的：架构还在成形，搬数据的代码会让每一步都更小心、更慢。以前 TypeScript 的农场用 `server/tool/import-ts` 跑过一次导入、Go 时代的旧家也搬过一次（[一次性迁移](2026-10-17-one-way-migration.md)），那是这条之前的事。
+- **一份表结构，就地改**：`server/migrations/0001_schema.sql` 是整个库，按主人分段（田头、工单和执行、任务的经过、定时、账本、记性、连接器、院门）。改表直接改它，不另加迁移；`migrations` 的 `TestTheSchemaIsOneBaseline` 查这个目录只有它一个 `.sql`。2026-10-18 把当时的 `0002`–`0006` 并了进来，`cmd/migrate new` 删了。服务端开机时跑 `migrations.Up`，也可以 `cmd/migrate up` 手动跑，`cmd/migrate status` 看库在第几版；遇到 `user_version` 比它认识的迁移还多的库就不开（旧库就是这样作废的）。`Up` 升级前留备份、失败回滚这条路径，测试换一套自己的迁移（`migrations.FS` 是可换的 `fs.FS`）来测。
+- **迁移只接数据库连接**：`Up(db)` 从实际 SQLite `main` 识别文件，备份、版本和迁移固定在同一连接；不让启动入口与命令行各自保证 `db` 和另一个路径参数指向同一份数据。具体约定见 [migrations](../../../../server/migrations/README.md)。
 - **表名用单数**，开关的列写 `boolean`。
 - **SQL 只在 sqlc**：全部查询在 `server/pkg/db/queries/`，一张表一个文件（[查询由 sqlc 生成](2026-10-15-sqlc-queries.md)）；服务里不手写 SQL，只有 `base/db.go` 跑迁移。
 
@@ -18,9 +19,13 @@ Status: implemented
 
 **照旧每次改名写一个迁移和一段搬文件的代码。** 有了外部用户以后就得这样，但现在付出的是每条启动路径上的分支和测试，换来的是几份可以重开的开发用农场。
 
+**改表写迁移、搬数据只跑一次（这条的上一版）。** 比长期兜底好，但每次改名仍要写重建表、改 `check`、改存下的取值的 SQL，还要测它；2026-10-18 把种植计划改成 Task 时，光是搬数据的迁移就要重建四张表。架构还在变，这份成本不值得，改成作废重建。
+
 **把迁移压成一份，但留着 `migrate`、`import`。** 两个命令只认 heybro、vibefarm 和 TypeScript 服务端留下的家，那些家已经搬完了；留着它们，代码里就一直有旧名字，`import` 还得跟着每次表结构的改动一起改。
 
 **库是旧的就整个删掉重建。** 不用写迁移，但改表就丢掉田头、账本和记性；有了以后的迁移文件，重建只是第一次建库。
+
+**保留 `Up(db, path)`。** 看起来只多一个字符串，实际要求每个调用者保证备份目标与连接数据源一致；URI 内存库、转义路径和工作目录变化会把这份配对知识继续散在入口。SQLite 已经知道实际主库身份，迁移直接使用它。
 
 ## Consequences
 

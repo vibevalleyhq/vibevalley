@@ -179,8 +179,16 @@ func (d *dispatch) start(ctx context.Context, id string, channel string, by *pro
 	if err != nil {
 		return protocol.Dispatched{}, err
 	}
+	if issue.QueuedAt != nil {
+		var queued protocol.RunTrigger
+		channel, queued, err = d.issues.queuedDispatch(id)
+		if err != nil {
+			return protocol.Dispatched{}, err
+		}
+		by = &queued
+	}
 	if full := d.run.NoRoom(agent.Runtime, project); full != "" {
-		if _, err := d.issues.Queue(issue.ID, true); err != nil {
+		if _, err := d.issues.queue(issue.ID, true, d.chat.ChannelOf(channel).ID, by); err != nil {
 			return protocol.Dispatched{}, err
 		}
 		why := full + "：排上队了，有空地就自动开工"
@@ -240,10 +248,14 @@ func (d *dispatch) TryQueued(ctx context.Context) {
 		}
 		var session string
 		if err == nil {
-			session, err = d.send(ctx, issue, agent, project, d.chat.General(), nil)
+			channel, by, queuedErr := d.issues.queuedDispatch(issue.ID)
+			err = queuedErr
+			if err == nil {
+				session, err = d.send(ctx, issue, agent, project, channel, &by)
+			}
 		}
 		if err != nil {
-			if _, unqueue := d.issues.Queue(issue.ID, false); unqueue != nil {
+			if _, unqueue := d.Queue(issue.ID, false); unqueue != nil {
 				log.Printf("vibevalley: issue %s could not leave the queue: %v", issue.ID, unqueue)
 				d.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("排队的「%s」开不了工：%v；也没能退回待办，还在队里", title, err))
 				continue
@@ -266,7 +278,7 @@ func (d *dispatch) reopen(ctx context.Context, id, text string, channel string, 
 	if err != nil {
 		return "", err
 	}
-	if issue.Plan != nil || issue.Step != nil || (issue.Closed != nil && *issue.Closed == protocol.IssueCloseMergedIntoPlan) {
+	if issue.Graph != nil || issue.Task != nil || (issue.Closed != nil && *issue.Closed == protocol.IssueCloseMergedIntoGraph) {
 		return "", protocol.Refused{Reason: "这是种植计划的工单，跟着计划走：在计划里重试这一步，或者重开整个计划"}
 	}
 	if len(issue.Sessions) == 0 {
@@ -314,10 +326,10 @@ func reopenTask(issue protocol.Issue, last protocol.Session, text string) string
 }
 
 var closedText = map[protocol.IssueClose]string{
-	protocol.IssueCloseMerged:         "收获了，改动已经合进项目的主分支",
-	protocol.IssueCloseMergedIntoPlan: "做完了，改动合进了种植计划的分支",
-	protocol.IssueCloseDismissed:      "没收获就收工了，改动没有合进主分支",
-	protocol.IssueCloseLost:           "干活的目录丢了，改动可能不在了",
+	protocol.IssueCloseMerged:          "收获了，改动已经合进项目的主分支",
+	protocol.IssueCloseMergedIntoGraph: "做完了，改动合进了种植计划的分支",
+	protocol.IssueCloseDismissed:       "没收获就收工了，改动没有合进主分支",
+	protocol.IssueCloseLost:            "干活的目录丢了，改动可能不在了",
 }
 
 var outcomeText = map[protocol.Outcome]string{

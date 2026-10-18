@@ -1,3 +1,4 @@
+export '../data/overlays.dart' show farmOverlaysProvider, sowingProvider, wateringProvider, reviewingProvider, menuOpenProvider;
 // The farm itself is the server's (stateProvider); nothing here copies it.
 
 import 'dart:async';
@@ -11,14 +12,6 @@ import './effects.dart' show farmEffects;
 import 'tools.dart';
 
 final heldToolProvider = held(Tool.hand);
-
-final sowingProvider = held<int?>(null);
-
-final wateringProvider = held<String?>(null);
-
-final reviewingProvider = held<String?>(null);
-
-final menuOpenProvider = held(false);
 
 final farmEffectsProvider = Provider<Stream<GameEffect>>((ref) => farmEffects(ref.watch(serverProvider)));
 
@@ -67,30 +60,14 @@ final bedFxProvider = NotifierProvider<BedEffects, List<BedFxEntry>>(BedEffects.
 
 final rewardsProvider = NotifierProvider<Timed<GameEffectReward>, List<GameEffectReward>>(() => Timed(const Duration(milliseconds: 4000)));
 
-/// A message lands a moment after the step it ends: steps this much later still count as its turn.
-const _slackMs = 3000;
-
-List<SessionEvent> turnEndingAt(List<SessionEvent> steps, double at) {
-  var end = -1;
-  for (var i = 0; i < steps.length; i++) {
-    if (steps[i].time <= at + _slackMs) end = i;
-  }
-  if (end < 0) return const [];
-  var start = end;
-  while (start > 0 && steps[start].type != SessionEventType.userMessage) {
-    start--;
-  }
-  return steps.sublist(start, end + 1);
-}
-
-class PlaybookLog extends Notifier<Map<String, List<PlaybookEvent>>> {
+class GraphHistory extends Notifier<Map<String, List<GraphEvent>>> {
   @override
-  Map<String, List<PlaybookEvent>> build() => const {};
+  Map<String, List<GraphEvent>> build() => const {};
 
   Future<void> load(String id) async {
-    final events = await ref.read(apiProvider).playbook.events(id: id);
+    final events = await ref.read(apiProvider).graph.events(id: id);
     state = {...state, id: events};
   }
 }
 
-final playbookLogProvider = NotifierProvider<PlaybookLog, Map<String, List<PlaybookEvent>>>(PlaybookLog.new);
+final graphLogProvider = NotifierProvider<GraphHistory, Map<String, List<GraphEvent>>>(GraphHistory.new);

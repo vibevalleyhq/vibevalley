@@ -17,8 +17,12 @@ func TestSessionsCommitsCountedOncePerRepository(t *testing.T) {
 	testkit.Git(t, filepath.Join(root, "app"), "worktree", "add", "-q", "-b", "vibevalley/w1", tree)
 	testkit.Git(t, tree, "commit", "-q", "--allow-empty", "-m", "session work")
 	testkit.Repo(t, filepath.Join(root, "tools", "cli"), 1, 0)
-	c, _ := newCommits(fixture.Config("", root, ""), nil)
-	count := c.Count(context.Background())
+	w, err := newWorld(fixture.Config(t.TempDir(), root, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	count := w.Game.Count(context.Background())
 	testkit.Eq(t, len(count.Repos), 2, "the worktree is not a second repository")
 	testkit.Eq(t, count.Total, int64(5), "3 + 1 on the worktree branch in app, 1 in cli; the colleague's 2 do not count")
 	got := []int64{count.Repos[0].Commits, count.Repos[1].Commits}

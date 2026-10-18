@@ -107,7 +107,7 @@ func installedRows(ctx context.Context, runtimes []oar.Runtime) []any {
 	rows := readEach(runtimes, func(runtime oar.Runtime) (any, error) {
 		row := map[string]any{"runtime": runtime.ID, "installation": "unknown"}
 		if runtime.Installation != nil {
-			installation, err := runtime.Installation(ctx)
+			installation, err := runtime.Installation(ctx, oar.InstallationOptions{})
 			if err != nil {
 				return nil, err
 			}

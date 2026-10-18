@@ -125,11 +125,13 @@ func (q *Queries) RunsOfEndedSessions(ctx context.Context) ([]SessionRun, error)
 }
 
 const runsOfIssue = `-- name: RunsOfIssue :many
-select id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from session_run where issue = ? order by started_at, id
+select id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from session_run
+where session_run.issue = ?1 or session_run.id in (select run from session_run_issue where session_run_issue.issue = ?1)
+order by started_at, id
 `
 
-func (q *Queries) RunsOfIssue(ctx context.Context, issue sql.NullString) ([]SessionRun, error) {
-	rows, err := q.db.QueryContext(ctx, runsOfIssue, issue)
+func (q *Queries) RunsOfIssue(ctx context.Context, issueID sql.NullString) ([]SessionRun, error) {
+	rows, err := q.db.QueryContext(ctx, runsOfIssue, issueID)
 	if err != nil {
 		return nil, err
 	}

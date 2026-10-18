@@ -33,8 +33,8 @@ Status: proposed
 | 现在 | 改成 |
 |---|---|
 | 协议 `Worker`、`CoreState.Workers`、`Issue.Workers`、`WorkerOf` | `Session`、`CoreState.Sessions`、`Issue.Sessions`、`SessionOf` |
-| `WorkerAction*`、`WorkerPlay`、`WorkerPlaybook`、`GameEffect.WorkerID` | `SessionAction*`、`SessionPlay`、`SessionPlaybook`、`GameEffect.SessionID` |
-| `SenderKindWorker`（`"worker"`）、`participant.kind` 的 `'worker'` | `agent`，带档案 id：在频道里说话的是档案。`'manager'` 留着：管家在频道里是另一种参与者（[管家是一份内置档案](2026-10-17-manager-is-an-agent.md) 的 Alternatives） |
+| `WorkerAction*`、`WorkerPlay`、`WorkerTask`、`GameEffect.WorkerID` | `SessionAction*`、`SessionPlay`、`SessionTask`、`GameEffect.SessionID` |
+| `SenderKindWorker`（`"worker"`）、`participant.kind` 的 `'worker'` | `agent`，带档案 id：在频道里说话的是档案。`'manager'` 留着：管家在频道里是另一种参与者（[管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md) 的 Alternatives） |
 | 包 `internal/worker`、`Workspace.Worker`、`worker.Service` | `internal/session`、`Workspace.Session`、`session.Service` |
 | 表 `issue_worker`（列 `worker`） | `issue_session`（列 `session`），一个迁移 |
 | 家目录 `workers.json` | `sessions.json`，加载时改名写回 |

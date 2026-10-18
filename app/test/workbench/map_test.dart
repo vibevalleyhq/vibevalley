@@ -37,7 +37,7 @@ Session _hired(String id, String? project, Phase phase, {double at = 0, Conflict
     name: h.name,
     agent: h.agent,
     runtime: h.runtime,
-    task: h.task,
+    brief: h.brief,
     project: h.project,
     branch: h.branch,
     conflict: h.conflict,
@@ -58,7 +58,7 @@ List<String> _kinds(Island i) => [
 
 void main() {
   group('islands', () {
-    final projects = [_project('clock-in', last: 9), _project('docs', last: 5), _project('pb-smoke', last: 7)];
+    final projects = [_project('clock-in', last: 9), _project('docs', last: 5), _project('task-smoke', last: 7)];
 
     test('worktrees in the order the helpers came, then the room the project and the farm leave', () {
       final islands = islandsOf(
@@ -73,7 +73,7 @@ void main() {
         plots: const {'w1': PlotView(crop: Crop.leafy)},
         issues: [_todo('b2', 'docs', queuedAt: 8), _todo('b1', 'docs', queuedAt: 3), _todo('b3', 'clock-in')],
       );
-      expect([for (final i in islands) i.project], ['clock-in', 'docs', 'pb-smoke']);
+      expect([for (final i in islands) i.project], ['clock-in', 'docs', 'task-smoke']);
       final clock = islands.first;
       expect(_kinds(clock), ['w1', 'w2', 'w4', 'open', 'open']);
       expect((clock.working, clock.slots, clock.open), (1, 3, 2));
@@ -111,7 +111,7 @@ void main() {
         plots: const {},
         issues: const [],
       );
-      expect(_kinds(busyFarm.firstWhere((i) => i.project == 'pb-smoke')), ['shut', 'shut', 'shut']);
+      expect(_kinds(busyFarm.firstWhere((i) => i.project == 'task-smoke')), ['shut', 'shut', 'shut']);
     });
 
     test('a project gone from the list keeps its helpers and takes no more', () {
@@ -216,7 +216,7 @@ void main() {
       'GET /api/v1/projects': [
         {'name': 'clock-in', 'path': '/work/clock-in', 'git': true, 'last': now - 3600000, 'slots': 3},
         {'name': 'docs', 'path': '/work/docs', 'git': true, 'last': now - 3 * 86400000, 'slots': 3},
-        {'name': 'pb-smoke', 'path': '/work/pb-smoke', 'git': false, 'slots': 2},
+        {'name': 'task-smoke', 'path': '/work/task-smoke', 'git': false, 'slots': 2},
       ],
     });
     final state = farm(
@@ -300,9 +300,9 @@ void main() {
     }
     expect(find.text('可收获'), findsOneWidget);
 
-    await t.tap(find.bySemanticsLabel('空位，派一件活到 pb-smoke').first);
+    await t.tap(find.bySemanticsLabel('空位，派一件活到 task-smoke').first);
     await settle(t);
-    expect(went, ['/issues/new?project=pb-smoke']);
+    expect(went, ['/issues/new?project=task-smoke']);
 
     router.go('/map');
     await settle(t);

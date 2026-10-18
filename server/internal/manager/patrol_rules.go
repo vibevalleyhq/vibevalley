@@ -11,14 +11,14 @@ import (
 	"vibevalley/pkg/x/num"
 )
 
-// In ms. Kinds not here the manager does not hear of from the patrol: a failed run reaches it as it happens, a playbook waiting is the person's to
+// In ms. Kinds not here the manager does not hear of from the patrol: a failed run reaches it as it happens, a task waiting is the person's to
 // look at.
 var patrolGrace = map[protocol.InboxKind]int64{
 	protocol.InboxKindMention:    15 * 60_000,
 	protocol.InboxKindQuiet:      20 * 60_000,
 	protocol.InboxKindMerge:      2 * 60 * 60_000,
 	protocol.InboxKindConflict:   2 * 60 * 60_000,
-	protocol.InboxKindPlanFailed: 30 * 60_000,
+	protocol.InboxKindTaskFailed: 30 * 60_000,
 }
 
 type patrolNote struct {

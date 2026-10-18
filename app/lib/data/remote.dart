@@ -8,81 +8,49 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'providers.dart';
 import '../gen/vibevalley.dart';
-import '../rules/playbook.dart';
+import '../rules/task.dart';
 
 String reasonOf(Object e) => e is VibeValleyApiError ? e.reason : '$e';
 
 class WorkbenchConfig {
-  const WorkbenchConfig({this.loaded = false, this.error, this.runtimes = const [], this.agents = const [], this.manager, this.skills = const []});
+  const WorkbenchConfig({this.loaded = false, this.error, this.agents = const [], this.manager, this.skills = const []});
   final bool loaded;
   final String? error;
-  final List<RuntimeInfo> runtimes;
   // The profiles work is sent to; the manager's is apart.
   final List<Agent> agents;
   final Agent? manager;
   final List<Skill> skills;
 
-  WorkbenchConfig copyWith({bool? loaded, String? error, List<RuntimeInfo>? runtimes, List<Agent>? agents, Agent? manager, List<Skill>? skills}) =>
-      WorkbenchConfig(
-        loaded: loaded ?? this.loaded,
-        error: error,
-        runtimes: runtimes ?? this.runtimes,
-        agents: agents ?? this.agents,
-        manager: manager ?? this.manager,
-        skills: skills ?? this.skills,
-      );
+  WorkbenchConfig copyWith({bool? loaded, String? error, List<Agent>? agents, Agent? manager, List<Skill>? skills}) => WorkbenchConfig(
+    loaded: loaded ?? this.loaded,
+    error: error,
+    agents: agents ?? this.agents,
+    manager: manager ?? this.manager,
+    skills: skills ?? this.skills,
+  );
 
   Agent? agent(String? id) => id == null ? null : agents.where((a) => a.id == id).firstOrNull;
-  RuntimeInfo? runtime(String id) => runtimes.where((r) => r.id == id).firstOrNull;
 }
 
 final workbenchConfigProvider = NotifierProvider<WorkbenchConfigNotifier, WorkbenchConfig>(WorkbenchConfigNotifier.new);
 
 class WorkbenchConfigNotifier extends Notifier<WorkbenchConfig> {
   var _generation = 0;
-  var _runtimeRevision = 0;
-  final _runtimeChanges = <String, int>{};
-
   @override
   WorkbenchConfig build() {
-    ref.listen(sideEventsProvider, (_, next) {
-      if (next.value case LiveEventRuntime(:final info)) {
-        _runtimeChanges[info.id] = ++_runtimeRevision;
-        state = state.copyWith(
-          runtimes: [for (final r in state.runtimes) r.id == info.id ? info : r, if (!state.runtimes.any((r) => r.id == info.id)) info],
-          error: state.error,
-        );
-      }
-    });
     unawaited(Future.microtask(refresh));
     return const WorkbenchConfig();
   }
 
   VibeValleyApi get _api => ref.read(apiProvider);
 
-  /// A newer refresh owns the result; runtime pushes received during a read win over its snapshot.
   Future<void> refresh() async {
     if (!ref.mounted) return;
     final generation = ++_generation;
-    final runtimeRevision = _runtimeRevision;
     final api = _api;
     try {
-      await Future.wait([
-        () async {
-          final (agents, skills) = (await api.agent.list(), await api.skill.list());
-          if (ref.mounted && generation == _generation) state = _withProfiles(agents).copyWith(skills: skills);
-        }(),
-        () async {
-          final runtimes = await api.runtime.list();
-          if (!ref.mounted || generation != _generation) return;
-          final pushed = {
-            for (final r in state.runtimes)
-              if ((_runtimeChanges[r.id] ?? 0) > runtimeRevision) r.id: r,
-          };
-          state = state.copyWith(runtimes: [for (final r in runtimes) pushed.remove(r.id) ?? r, ...pushed.values]);
-        }(),
-      ]);
-      if (ref.mounted && generation == _generation) state = state.copyWith(loaded: true);
+      final (agents, skills) = (await api.agent.list(), await api.skill.list());
+      if (ref.mounted && generation == _generation) state = _withProfiles(agents).copyWith(skills: skills, loaded: true);
     } on Object catch (e) {
       if (ref.mounted && generation == _generation) state = state.copyWith(error: reasonOf(e));
     }
@@ -97,9 +65,10 @@ class WorkbenchConfigNotifier extends Notifier<WorkbenchConfig> {
     manager: all.where((a) => a.id == managerAgent).firstOrNull,
   );
 
-  Future<void> saveAgent(Agent agent) async {
-    await _api.agent.save(id: agent.id, body: agent);
+  Future<Agent> saveAgent(Agent agent) async {
+    final saved = agent.id.isEmpty ? await _api.agent.create(body: agent) : await _api.agent.save(id: agent.id, body: agent);
     await refresh();
+    return saved;
   }
 
   Future<void> deleteAgent(String id) async {
@@ -107,9 +76,10 @@ class WorkbenchConfigNotifier extends Notifier<WorkbenchConfig> {
     await refresh();
   }
 
-  Future<void> saveSkill(Skill skill) async {
-    await _api.skill.save(id: skill.id, body: skill);
+  Future<Skill> saveSkill(Skill skill) async {
+    final saved = skill.id.isEmpty ? await _api.skill.create(body: skill) : await _api.skill.save(id: skill.id, body: skill);
     await refresh();
+    return saved;
   }
 
   /// Deleting a skill also takes it off the agents that carried it, so both lists come back.
@@ -171,8 +141,8 @@ final projectNamesProvider = FutureProvider.autoDispose<List<String>>((ref) asyn
 const stepLimit = 240;
 
 /// By number, in order.
-List<SessionEvent> mergeSteps(List<SessionEvent> steps, List<SessionEvent> incoming) {
-  final byN = {for (final s in steps) s.seq: s};
+List<SessionEvent> mergeSteps(List<SessionEvent> tasks, List<SessionEvent> incoming) {
+  final byN = {for (final s in tasks) s.seq: s};
   for (final s in incoming) {
     byN[s.seq] = s;
   }
@@ -180,7 +150,26 @@ List<SessionEvent> mergeSteps(List<SessionEvent> steps, List<SessionEvent> incom
   return all.length > stepLimit ? all.sublist(all.length - stepLimit) : all;
 }
 
-final playbookChangesProvider = FutureProvider.autoDispose.family<Changes, String>((ref, id) => ref.watch(apiProvider).playbook.changes(id: id));
+final issueHistoryProvider = FutureProvider.autoDispose<List<IssueHistory>>((ref) {
+  ref.watch(stateProvider.select((state) => jsonEncode([for (final issue in state?.issues ?? const <Issue>[]) issue.toJson()])));
+  return ref.watch(apiProvider).issue.history();
+});
+
+final visibleIssueHistoryProvider = Provider.autoDispose.family<AsyncValue<List<IssueHistory>>, bool>((ref, older) {
+  final kept = ref.watch(stateProvider.select((s) => s?.issues?.map((i) => i.id).toSet()));
+  return ref
+      .watch(issueHistoryProvider)
+      .whenData(
+        (rows) => older
+            ? rows
+            : [
+                for (final row in rows)
+                  if (kept?.contains(row.issue.id) ?? false) row,
+              ],
+      );
+});
+
+final graphChangesProvider = FutureProvider.autoDispose.family<Changes, String>((ref, id) => ref.watch(apiProvider).graph.changes(id: id));
 
 final issueChangesProvider = FutureProvider.autoDispose.family<Changes, String>((ref, id) => ref.watch(apiProvider).issue.changes(id: id));
 
@@ -211,6 +200,17 @@ class SessionEvents extends AsyncNotifier<List<SessionEvent>> {
     }
   }
 }
+
+final runEventsProvider = Provider.autoDispose.family<AsyncValue<List<SessionEvent>>, ({String session, String run})>(
+  (ref, key) => ref
+      .watch(sessionEventsProvider(key.session))
+      .whenData(
+        (events) => [
+          for (final event in events)
+            if (event.run == key.run) event,
+        ],
+      ),
+);
 
 final memoryProvider = AsyncNotifierProvider.autoDispose.family<MemoriesNotifier, MemoryList, String>(MemoriesNotifier.new);
 
@@ -248,12 +248,40 @@ class MemoriesNotifier extends AsyncNotifier<MemoryList> {
   }
 }
 
-/// The runtimes as workbenchConfigProvider has them (pushed by the server as they change); loading until it has read them.
-final runtimesProvider = Provider<AsyncValue<List<RuntimeInfo>>>((ref) {
-  final config = ref.watch(workbenchConfigProvider);
-  if (config.error != null) return AsyncError(config.error!, StackTrace.current);
-  return config.loaded ? AsyncData(config.runtimes) : const AsyncLoading();
-});
+final runtimeCatalogProvider = AsyncNotifierProvider<RuntimeCatalog, List<RuntimeInfo>>(RuntimeCatalog.new, retry: (_, _) => null);
+
+class RuntimeCatalog extends AsyncNotifier<List<RuntimeInfo>> {
+  final _newer = <String, RuntimeInfo>{};
+
+  @override
+  Future<List<RuntimeInfo>> build() async {
+    _newer.clear();
+    ref.listen(sideEventsProvider, (_, next) {
+      if (next.value case LiveEventRuntime(:final info)) _put(info);
+    });
+    final list = await ref.watch(apiProvider).runtime.list();
+    return [for (final r in list) _newer.remove(r.id) ?? r, ..._newer.values];
+  }
+
+  void _put(RuntimeInfo info) {
+    if (!ref.mounted) return;
+    _newer[info.id] = info;
+    final list = state.value;
+    if (list != null) state = AsyncData([for (final r in list) r.id == info.id ? info : r, if (!list.any((r) => r.id == info.id)) info]);
+  }
+
+  Future<void> reload() async {
+    ref.invalidateSelf();
+    await future;
+  }
+
+  Future<void> refresh(String id) async => _put(await ref.read(apiProvider).runtime.refresh(id: id));
+  Future<void> upgrade(String id) async => _put(await ref.read(apiProvider).runtime.upgrade(id: id));
+  Future<void> saveSettings(String id, RuntimeSettings settings) async => _put(await ref.read(apiProvider).runtime.update(id: id, body: settings));
+}
+
+final runtimesProvider = Provider<AsyncValue<List<RuntimeInfo>>>((ref) => ref.watch(runtimeCatalogProvider));
+final runtimeInfoProvider = Provider.family<RuntimeInfo?, String>((ref, id) => ref.watch(runtimesProvider).value?.where((r) => r.id == id).firstOrNull);
 
 /// The profiles by id, as workbenchConfigProvider has them: an edit anywhere shows everywhere.
 final agentsProvider = Provider<AsyncValue<Map<String, Agent>>>((ref) {

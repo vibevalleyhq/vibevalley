@@ -21,7 +21,7 @@ func runLogout(ctx context.Context, runtime oar.Runtime, timeout int64) logoutRe
 		report.Unsupported = runtime.ID + " exposes no installation probe"
 		return report
 	}
-	installation, err := runtime.Installation(ctx)
+	installation, err := runtime.Installation(ctx, oar.InstallationOptions{})
 	if err != nil {
 		return logoutReport{RuntimeID: runtime.ID, Error: err.Error()}
 	}

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/app/app.dart';
 import 'package:vibevalley/data/ui_state.dart';
+import 'package:vibevalley/game/destinations.dart';
 import 'package:vibevalley/village/village_view.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -29,7 +30,7 @@ void main() {
     final village = container.read(villageProvider).value!;
     final canvas = tester.getRect(find.byType(VillageCanvas));
     final scale = canvas.width / village.width;
-    final b = village.spotBoxes['manager']!;
+    final b = village.spotBoxes[YardPlace.manager]!;
     final at = canvas.topLeft + Offset((b.x0 + b.x1) / 2 * scale, (b.y0 + b.y1) / 2 * scale);
     await tester.tapAt(at);
     for (var i = 0; i < 5; i++) {

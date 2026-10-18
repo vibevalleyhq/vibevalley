@@ -117,27 +117,14 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
       ..onNaming = () {
         if (!ref.read(chatOpenProvider)) _setOpen(true);
       };
-    widget.call.addListener(_syncLines);
-  }
-
-  @override
-  void didUpdateWidget(ChatWindow old) {
-    super.didUpdateWidget(old);
-    if (old.call != widget.call) {
-      old.call.removeListener(_syncLines);
-      widget.call.addListener(_syncLines);
-    }
   }
 
   @override
   void dispose() {
-    widget.call.removeListener(_syncLines);
     _naming.dispose();
     _scroll.dispose();
     super.dispose();
   }
-
-  void _syncLines() => ref.read(spokenProvider.notifier).sync(widget.call.captions.turns);
 
   void _setOpen(bool open) {
     Sfx.play(open ? 'open' : 'close');
@@ -498,14 +485,14 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
             message: m,
             first: first,
             face: _face(m, 30),
-            steps: m.final_ && m.fromKind == SenderKind.agent ? TurnSteps(id: m.from, at: m.at) : null,
+            steps: m.final_ && m.fromKind == SenderKind.agent ? TurnSteps(id: m.from, run: m.run) : null,
           );
         }
         final chip = thread == null ? null : ChatThreadChip(thread: thread, unread: unreadIn(widget.state.chat, thread), onTap: () => _show(thread.id));
         if (m.fromKind == SenderKind.user) return ChatBubble(mine: true, first: first, text: m.text, final_: m.final_, at: m.at, after: chip);
         // The dispatch note is the farm's, under the manager's name: its words say the same turn.
         final turn = m.final_ && m.fromKind == SenderKind.manager && m.kind != MessageKind.dispatch
-            ? TurnSteps(id: managerAgent, at: m.at, manager: true)
+            ? TurnSteps(id: managerAgent, run: m.run, manager: true)
             : null;
         return ChatBubble(
           mine: false,
@@ -634,7 +621,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
                   const ManagerStopButton(size: 24),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: DictationButton(size: 24, onWords: (words) => insertDictated(_naming.text, words)),
+                    child: DictationButton(size: 24, controller: _naming.text),
                   ),
                   KitTappable(
                     onTap: empty ? null : () => _send(conversation),

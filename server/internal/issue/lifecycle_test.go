@@ -110,18 +110,18 @@ func TestConcurrentSendHonorsProjectCapacity(t *testing.T) {
 	}
 }
 
-func TestMoveDoesNotRewritePlaybookRanks(t *testing.T) {
+func TestMoveDoesNotRewriteTaskRanks(t *testing.T) {
 	f := lifecycleWorld(t)
 	one, err := f.Issue.Add(protocol.IssueRequest{Title: "one"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	pb := protocol.Playbook{ID: "p1", Title: "plan", Project: "demo", State: protocol.PlaybookStateDraft, Nodes: []protocol.PlaybookNode{{ID: "a", Title: "first", State: protocol.NodeStateWaiting}, {ID: "b", Title: "second", State: protocol.NodeStateWaiting}}}
-	if err := f.Issue.PutPlaybook(pb); err != nil {
+	graph := protocol.TaskGraph{ID: "p1", Title: "task", Project: "demo", State: protocol.GraphStateDraft, Tasks: []protocol.Task{{ID: "a", Title: "first", State: protocol.TaskStateWaiting}, {ID: "b", Title: "second", State: protocol.TaskStateWaiting}}}
+	if err := f.Issue.PutTask(graph); err != nil {
 		t.Fatal(err)
 	}
 	q := generated.New(f.DB)
-	before, err := q.Family(context.Background(), pb.ID)
+	before, err := q.Family(context.Background(), graph.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

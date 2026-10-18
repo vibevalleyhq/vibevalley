@@ -24,13 +24,13 @@ void main() {
         skills: const [Skill(id: 'test', name: '恢复后的技能书', description: '', body: '')],
       );
       await pumpPage(t, entry.value, (request) async {
-        if (failing && request.url.path == '/api/v1/agents') return jsonResponse({'reason': '连接暂时中断'}, 503);
+        if (failing && request.url.path == (entry.key == 'runtimes' ? '/api/v1/runtimes' : '/api/v1/agents')) return jsonResponse({'reason': '连接暂时中断'}, 503);
         return backend.handle(request);
       });
-      expect(find.text('配置没读到：连接暂时中断'), findsOneWidget);
+      expect(find.text('${entry.key == 'runtimes' ? '农具' : '配置'}没读到：连接暂时中断'), findsOneWidget);
       expect(find.text('读取配置…'), findsNothing);
       failing = false;
-      await t.tap(find.text('重新读取配置'));
+      await t.tap(find.text(entry.key == 'runtimes' ? '重新读取农具' : '重新读取配置'));
       await settle(t);
       expect(find.textContaining('配置没读到'), findsNothing);
       expect(find.text('重新读取配置'), findsNothing);

@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（17 篇）
+## proposed（19 篇）
 
 ### feature
 
@@ -14,20 +14,22 @@
 
 ### architecture
 
+- 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](proposed/architecture/2026-10-18-tasks-are-dags.md)
 - 2026-10-18 [管家分清话是谁说的：来源跟着输入走，帮工和仓库里的字是信息不是指令，收获和管家起的定时要主人点头](proposed/architecture/2026-10-18-source-is-not-instruction.md)
+- 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
 - 2026-10-18 [记性有多个来源：照 Hermes 的接口，统一的工具，本地用 SQLite 全文检索](proposed/architecture/2026-10-18-memory-providers.md)
 - 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](proposed/architecture/2026-10-18-memory-in-sqlite.md)
 - 2026-10-18 [通话走 Agora，听写走识别，管家说 OpenAI 的协议](proposed/architecture/2026-10-18-calls-dictation-and-the-agent.md)
 - 2026-10-18 [对照 Grok Bot 的常驻 agent：管家还差什么](proposed/architecture/2026-10-18-always-on-manager.md)
 - 2026-10-17 [Worker 改叫 Session](proposed/architecture/2026-10-17-worker-is-a-session.md)
 - 2026-10-17 [Session、Run、事件：一个 agent loop 的日志，和消息之间只有两个口子](proposed/architecture/2026-10-17-session-run-step.md)
-- 2026-10-17 [管家是一份内置档案](proposed/architecture/2026-10-17-manager-is-an-agent.md)
+- 2026-10-17 [管家是一份档案，只是能力多](proposed/architecture/2026-10-17-manager-is-an-agent.md)
 - 2026-10-17 [先有能力，再有入口：一张能力表，接口、命令行、管家、帮工都从它来](proposed/architecture/2026-10-17-capabilities-before-surfaces.md)
 - 2026-10-16 [Run 是一次干活，Session 跨好几次 run，小队（Crew）编排 agent](proposed/architecture/2026-10-16-runs-sessions-crews.md)
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
 
-## implemented（89 篇）
+## implemented（101 篇）
 
 ### feature
 
@@ -47,7 +49,7 @@
 - 2026-10-12 [农场手机：要你处理的事当来电，从核心状态现算](implemented/feature/2026-10-12-farm-phone.md)
 - 2026-10-12 [项目页：把代码库当一块地看](implemented/feature/2026-10-12-codebase-page.md)
 - 2026-10-12 [图鉴：一页看全农场的素材](implemented/feature/2026-10-12-asset-browser.md)
-- 2026-10-11 [种植计划：把长任务拆成一张图，交给不同的帮工](implemented/feature/2026-10-11-playbooks.md)
+- 2026-10-11 [种植计划：把长任务拆成一张图，交给不同的帮工](implemented/feature/2026-10-11-tasks.md)
 - 2026-10-11 [像素村：风来之国那样的画面](implemented/feature/2026-10-11-pixel-village.md)
 - 2026-10-11 [农场群聊：主人、管家和帮工在同一个对话里](implemented/feature/2026-10-11-farm-group-chat.md)
 - 2026-10-11 [接回 claude 和 codex](implemented/feature/2026-10-11-claude-and-codex.md)
@@ -75,8 +77,20 @@
 
 ### architecture
 
+- 2026-10-18 [电话的字幕归这通电话](implemented/architecture/2026-10-18-voice-transcripts-belong-to-call.md)
 - 2026-10-18 [管家的提示开头不变：时间和农场现状挪进最新那条输入，空闲时用同一个开头压缩](implemented/architecture/2026-10-18-stable-prompt-prefix.md)
+- 2026-10-18 [扫码登录由平台 SDK 拥有](implemented/architecture/2026-10-18-sdk-owns-login-attempt.md)
+- 2026-10-18 [RTC 授予拥有这通电话的应用身份](implemented/architecture/2026-10-18-rtc-grant-owns-application.md)
+- 2026-10-18 [查询带齐真实关联，创建返回自己的身份](implemented/architecture/2026-10-18-query-results-and-created-identities.md)
+- 2026-10-18 [档案事务拥有可修改的工作集](implemented/architecture/2026-10-18-profile-transactions-own-snapshots.md)
 - 2026-10-18 [管家的错变成评测：主人标出做错的一轮，存成样例，改提示前后用真模型重放](implemented/architecture/2026-10-18-manager-evals.md)
+- 2026-10-18 [主接口的本机身份和就绪顺序归宿主](implemented/architecture/2026-10-18-local-server-lifetime.md)
+- 2026-10-18 [安装选择是探测输入，执行沿用已接受的身份](implemented/architecture/2026-10-18-installation-identity-is-explicit.md)
+- 2026-10-18 [执行拥有实际消费的输入、Run 和终结](implemented/architecture/2026-10-18-execution-owns-consumed-inputs.md)
+- 2026-10-18 [一段听写拥有录音和输入目标](implemented/architecture/2026-10-18-dictation-attempts-own-targets.md)
+- 2026-10-18 [连接器的持久收件与账号代际](implemented/architecture/2026-10-18-connector-inbox-and-generation.md)
+- 2026-10-18 [子进程发布自己的就绪地址](implemented/architecture/2026-10-18-child-publishes-readiness.md)
+- 2026-10-18 [Core 提交完整状态，订阅者读取对应的因果变化](implemented/architecture/2026-10-18-atomic-core-transitions.md)
 - 2026-10-17 [动作结果和资源生命周期由拥有它的模块保证](implemented/architecture/2026-10-17-operation-results-and-lifetimes.md)
 - 2026-10-17 [迁移是一次性的，启动只认今天的名字](implemented/architecture/2026-10-17-one-way-migration.md)
 - 2026-10-17 [表按模块命名](implemented/architecture/2026-10-17-names-by-module.md)
@@ -95,12 +109,12 @@
 - 2026-10-16 [客户端分层：两张皮在上，共用的在下](implemented/architecture/2026-10-16-client-layers.md)
 - 2026-10-16 [定时是一张工单的触发，工单可以派给管家](implemented/architecture/2026-10-16-a-schedule-is-a-trigger.md)
 - 2026-10-16 [一个概念一个包](implemented/architecture/2026-10-16-a-package-per-concept.md)
+- 2026-10-15 [种植计划是带子工单的父工单](implemented/architecture/2026-10-15-tasks-are-parent-issues.md)
 - 2026-10-15 [查询由 sqlc 生成](implemented/architecture/2026-10-15-sqlc-queries.md)
 - 2026-10-15 [官网放在 site/，用游戏自己的图，会动的部分是 React](implemented/architecture/2026-10-15-site.md)
 - 2026-10-15 [服务由 fx 组装](implemented/architecture/2026-10-15-services-assembled-by-fx.md)
 - 2026-10-15 [服务端一个模块：internal 和 pkg，smith 并进来](implemented/architecture/2026-10-15-server-internal-and-pkg.md)
 - 2026-10-15 [仓库就两块：server/ 和 app/](implemented/architecture/2026-10-15-server-and-app.md)
-- 2026-10-15 [种植计划是带子工单的父工单](implemented/architecture/2026-10-15-plans-are-parent-issues.md)
 - 2026-10-15 [工单进核心状态，有标题和说明](implemented/architecture/2026-10-15-issues-in-core-state.md)
 - 2026-10-15 [工单是一样东西](implemented/architecture/2026-10-15-issue-is-one-thing.md)
 - 2026-10-15 [要你处理的事是一个 Inbox](implemented/architecture/2026-10-15-inbox.md)

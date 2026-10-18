@@ -102,3 +102,32 @@ func TestFreshAgentListHasValidRequiredEnums(t *testing.T) {
 		t.Fatal("manager missing from list")
 	}
 }
+
+func TestChannelCreationReturnsItsIdentity(t *testing.T) {
+	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
+	cfg.Voice.Line.Port, cfg.Lan.Port = 0, 0
+	f, err := workspace.New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(f.Close)
+	srv := httptest.NewServer(handler.New(f))
+	defer srv.Close()
+	c := &protocol.Client{Base: srv.URL}
+	id, err := c.ChannelCreate(context.Background(), protocol.ChannelRequest{Name: " #hello "})
+	if err != nil || id == "" {
+		t.Fatalf("create: id=%q err=%v", id, err)
+	}
+	found := false
+	for _, channel := range f.Channel.Channels() {
+		if channel.ID == id && channel.Name == "hello" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("returned identity is not the created channel: %q", id)
+	}
+	if _, err := c.ChannelHistory(context.Background(), id, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+}

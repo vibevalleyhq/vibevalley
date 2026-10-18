@@ -236,7 +236,7 @@ func PlanInstaller(probe oar.InstallationProbe, plan oar.InstallPlanner, lineOf 
 		return lineOf(installation)
 	}
 	return func(ctx context.Context, options oar.InstallOptions) (oar.InstallResult, error) {
-		before, err := probe(ctx)
+		before, err := probe(ctx, oar.InstallationOptions{})
 		if err != nil {
 			return oar.InstallResult{}, err
 		}
@@ -255,7 +255,7 @@ func PlanInstaller(probe oar.InstallationProbe, plan oar.InstallPlanner, lineOf 
 			timeout = DefaultInstallTimeout
 		}
 		exitCode, output := runSteps(ctx, planned.Steps, timeout)
-		after, err := probe(ctx)
+		after, err := probe(ctx, oar.InstallationOptions{})
 		note := ""
 		if err != nil {
 			note = "\n[oar: the installation probe after the installer failed: " + err.Error() + "]\n"

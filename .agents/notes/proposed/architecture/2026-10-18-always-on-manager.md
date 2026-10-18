@@ -39,10 +39,10 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 | 15:05 什么都存在服务端 | 电脑随时能重建 | 会话、轨迹、工单、记性都在家目录和 `vibevalley.db`；worktree 坏了能重开 |
 | 15:26 推给 app 的 | 只推「变了」，带序号，缺了从数据库重读 | 状态流推整帧（`StateFrame`），丢了一帧下一帧就补上，比它简单，不改 |
 | 19:14 工具配专门的界面 | 登录表单、付款批准、邮件草稿 | 收成清单（看过改动再合）、计划板（看过再开工）就是这种界面 |
-| 25:12、29:51 工具设计 | 轮与轮之间不增减工具，用不了就返回写明下一步的错；每个工具的描述和参数不超过 4000 字；存状态用专门的工具 | 管家的工具表在大脑建好时定下，之后不变（`pkg/agent/agent.go:168-170`）；派不出去返回原因和下一步（`tools.go` 的 `dispatch`）；最长的描述不到 500 字；`remember`、`plan_edit` 是专门的工具 |
+| 25:12、29:51 工具设计 | 轮与轮之间不增减工具，用不了就返回写明下一步的错；每个工具的描述和参数不超过 4000 字；存状态用专门的工具 | 管家的工具表在大脑建好时定下，之后不变（`internal/agent/brain/agent.go:168-170`）；派不出去返回原因和下一步（`tools.go` 的 `dispatch`）；最长的描述不到 500 字；`remember`、`task_step` 是专门的工具 |
 | 26:28 密钥不给模型 | 密码进环境变量，不进对话 | DeepSeek 的钥匙每次请求经 `GetApiKey` 取（`manager.go:442`），不进提示 |
 | 28:46 主上下文要小 | 重活给 helper、截图给 helper、旧消息压成摘要、旧记忆可检索、说明变成技能 | 帮工在自己的会话里干活，管家只拿汇报；压缩到摘要、原文进 `archive/` 可用 `search_archive` 找回；技能用 `load_skill` 按需读全文。长输出那一条不一样，见第 10 项 |
-| 34:29 主 agent 要快 | 主 agent 调成几秒内回答，helper 调成能干几小时 | 管家默认用 `deepseek-flash`（`pkg/agent/config.go:17`），帮工用各家农机 |
+| 34:29 主 agent 要快 | 主 agent 调成几秒内回答，helper 调成能干几小时 | 管家默认用 `deepseek-flash`（`internal/agent/brain/config.go:17`），帮工用各家农机 |
 | 42:04 新的积木 | 持久工作流、记忆和技能、触发和定时、连接器、文字和语音、评测和可观测 | 都有一版：工单和 Session、记性、定时、微信飞书 QQ、田头和语音、轨迹和花费；评测见第 9 项 |
 
 ### 有差距的
@@ -51,9 +51,9 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 
 **2. 有话才说（幻灯片 18:20、11:13）。** 它的主 agent 只有一个对外说话的工具 `SendToUser`：模型平常的文字不给人看，没新东西就不说；路由后面有一步「有没有值得说的」。我们的管家每一轮说的字都进田头（`manager.go:528-562` 的 `grow`、`done`），说了空话就不发（`done` 只发非空的）。本项暂不做，见第 2 节。
 
-**3. 主人叫不停管家（幻灯片 17:19）。** 它的停止键插队、直接停掉正在跑的一轮。我们能叫停帮工（`session.stop`），`pkg/agent` 也能停（`Agent.Stop`，`agent.go:437-445`），但接口里没有叫停管家的口子，界面上也没有。电话里插话也停不了它：电话那头断开只关掉自己的输出流（`manager.go:747-755`），新说的话 `Send` 进同一轮，正在跑的这一轮照样做完、照样在田头说。
+**3. 主人叫不停管家（幻灯片 17:19）。** 它的停止键插队、直接停掉正在跑的一轮。我们能叫停帮工（`session.stop`），`internal/agent/brain` 也能停（`Agent.Stop`，`agent.go:437-445`），但接口里没有叫停管家的口子，界面上也没有。电话里插话也停不了它：电话那头断开只关掉自己的输出流（`manager.go:747-755`），新说的话 `Send` 进同一轮，正在跑的这一轮照样做完、照样在田头说。
 
-**4. 不在场时压缩（幻灯片 31:31）。** 它在一大轮结束、提示超过 10 万 token 后，等大约 10 分钟（缓存还热）就压，复用同一个开头；后台的活马上要叫醒它就跳过；最后几句对主人说的原样保留；一轮太长也能在中途压。我们在请求前（`agent.go:175-180`）和一轮刚结束时（`agent.go:367`）估出超过 12 万 token 就压；摘要请求换了系统提示（`pkg/agent/compaction.go:88-96`），十几万 token 全价；刚结束就压，主人一分钟后接着问拿到的已经是摘要。
+**4. 不在场时压缩（幻灯片 31:31）。** 它在一大轮结束、提示超过 10 万 token 后，等大约 10 分钟（缓存还热）就压，复用同一个开头；后台的活马上要叫醒它就跳过；最后几句对主人说的原样保留；一轮太长也能在中途压。我们在请求前（`agent.go:175-180`）和一轮刚结束时（`agent.go:367`）估出超过 12 万 token 就压；摘要请求换了系统提示（`internal/agent/brain/compaction.go:88-96`），十几万 token 全价；刚结束就压，主人一分钟后接着问拿到的已经是摘要。
 
 **5. 来源和指令要分开（幻灯片 26:28）。** 它把邮件和 webhook 来的字标成不可信；记忆当作信息，不当指令；不经你同意不替你给人发消息，新的定时要你点头。我们的连接器只认配对过的主人，引用的原文不进管家（核对时改正，见下）；可帮工的汇报、`check`、`read_chat`、`changes` 的结果里转述的网页和代码，和主人的话没有分开，`merge` 也不看是谁让合的；管家自己建的定时马上生效。
 
@@ -75,7 +75,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 - 第 1 项原来说「这期间田头上的汇报」跟着输入走、不存进对话：它拼在这条输入后面，一起存进 `manager.jsonl`（`manager.go:617-620`）。`manager.go:35-36` 注释里的 `farmNews` 消息在代码里没有。
 - 第 3 项原来说「电话里插话本来就会停」：插话只关掉电话那头的输出流，那一轮不停（见上）。
 - 第 4 项原来说只在请求前压：一轮结束时也压（`agent.go:367` 的 `settleFold`）。
-- 重启后读回的 `managerInput` 认不出来：`Details` 存成 JSON，读回来是 `map[string]any`（`pkg/agent/messages.go:103-106`），`managerInputOf` 的类型断言（`internal/manager/input.go:22`）失败，重启后第一轮之前 `requestInput` 退回到 `fm.input`。第 6 节一起修。
+- 重启后读回的 `managerInput` 认不出来：`Details` 存成 JSON，读回来是 `map[string]any`（`internal/agent/brain/messages.go:103-106`），`managerInputOf` 的类型断言（`internal/manager/input.go:22`）失败，重启后第一轮之前 `requestInput` 退回到 `fm.input`。第 6 节一起修。
 
 ### 有意不同的
 
@@ -126,7 +126,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
   ```
 
   跑 `go run ./tool/shapegen`（Flutter 得到 `api.manager.stop`，命令行得到 `vibevalley manager stop`）。处理函数在 `internal/handler/api.go`：`func (a api) ManagerStop(context.Context) error { a.f.Manager.Stop(); return nil }`。
-- **服务**：`internal/manager/manager.go` 加 `func (fm *manager) Stop()`：大脑还没建（`fm.brain == nil`）就什么也不做；否则 `brain.Stop()`（`pkg/agent/agent.go:437-445`：清空排着的输入，中止这一轮）。已经派出去的帮工不动。
+- **服务**：`internal/manager/manager.go` 加 `func (fm *manager) Stop()`：大脑还没建（`fm.brain == nil`）就什么也不做；否则 `brain.Stop()`（`internal/agent/brain/agent.go:437-445`：清空排着的输入，中止这一轮）。已经派出去的帮工不动。
 - **停下以后**：`event` 收到 `EventAgentSettled` 时把 `e.Aborted` 传给 `settled(aborted bool)`（`manager.go:507-508`、`564-576`）：
   - `aborted` 为真时 `answered(protocol.OutcomeInterrupted)`，交给管家的工单的那一轮记成「被叫停了」，否则照旧 `OutcomeCompleted`；
   - 轨迹记一条 `run/error`「主人叫停了」；
@@ -149,20 +149,20 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 ### 6. 重启后接着做完那一轮
 
 - **读回来的输入认得出**：`managerInputOf`（`input.go:17-24`）在 `Details` 是 `map[string]any` 时，把它 `json.Marshal` 再 `json.Unmarshal` 进 `managerInput`。`managerInput` 加 `Issue string`（`json:"issue,omitempty"`），`onWork` 填上交给管家的工单 id。
-- **`pkg/agent` 加 `func (a *Agent) Resume(maxAge time.Duration) bool`**：
+- **`internal/agent/brain` 加 `func (a *Agent) Resume(maxAge time.Duration) bool`**：
   1. 看会话最后一条消息：
      - 是带工具调用的 `assistant`、后面缺了某些调用的结果（工具做到一半就断了）：给每个缺的调用补一条 `ToolResultMessage`，`IsError: true`，字是「服务端在这个工具做完之前重启了，不知道它做没做成：先查一下现状，再决定要不要再做一遍。」，写进会话文件，然后接着做；
      - 是 `toolResult`、`custom` 或 `user`（工具做完了、模型还没回，或者输入还没人回）：接着做；
      - 是 `assistant` 且没有待做的工具调用：返回 false。
   2. 最后一条比 `maxAge` 还旧，就不接：返回 false。
   3. 接着做就是 `a.run(a.Core.Continue)`：`agentcore.Agent.Continue` 在最后一条不是 `assistant` 时从这里接着跑（`pkg/agentcore/agent.go:290-311`）。
-- **`pkg/agent` 加 `func SessionUnfinished(file string) bool`**：只读会话文件，不建大脑，按上面第 1 步判断。读的是整个文件按 `Replay` 读出来的最后一条，不是文件的最后一行：一轮停下时存下的压缩摘要是文件的最后一行，它后面没有消息，只看那一行会把做完的一轮当成没做完。
+- **`internal/agent/brain` 加 `func SessionUnfinished(file string) bool`**：只读会话文件，不建大脑，按上面第 1 步判断。读的是整个文件按 `Replay` 读出来的最后一条，不是文件的最后一行：一轮停下时存下的压缩摘要是文件的最后一行，它后面没有消息，只看那一行会把做完的一轮当成没做完。
 - **叫停的不接**：主人叫停时（`Stop`），最后一条是被叫停的回答或工具的「已停下」（`agentcore.STOPPED`），第 1 步都算做完了。可服务端正常关掉时，`Close` 取消那一轮，`agentcore` 照样造出这些消息，一样会写进文件，重启后就分不出是谁停的；所以 `Close` 之后造出的消息不写进对话文件，文件停在被打断的地方，和崩溃一样。
 - **管家**：`OnStart`（`manager.go:195-212`）在订阅之后，`SessionUnfinished(manager.jsonl)` 为真、DeepSeek 的钥匙也有，就在后台 `brainOf()` 再 `Resume(30 * time.Minute)`。接着做的那一轮，`EventMessageStart` 不会再来（输入已经在对话里），所以 `Resume` 返回 true 之前，管家用 `requestInput()` 读回最后那条输入，设成 `fm.input`，回答发回原来的频道；它带着 `Issue` 时，往 `fm.working` 加一条 `managerRun{issue: Issue}`（`run` 为空：原来那一轮已经被开机记成停在半路，`CloseRun("")` 什么也不做，`runs.go:124-125`），这一轮停下时 `answered` 把工单关上。返回 false 时轨迹记一条 `run/error`「上一轮停在了半路，太久了，没有接着做」。
 - **不会派两次活**：已经有结果的工具不重跑（结果在会话里）；做到一半的那个工具，模型拿到的是「不知道做没做成，先查一下」，它要先 `roster`、`check`、`list_schedules` 看过再决定。
 - **帮工**：保持现在的「停在了半路」，有人带话再接；帮工的会话在各家农机里，我们只能接回会话，不能接着某一步。
 - **测试**：
-  - `pkg/agent`：会话文件分别以 `toolResult`、缺结果的工具调用、模型的回答、两小时前的 `toolResult` 结尾，`Resume` 分别接着跑（`FauxProvider` 收到一次请求，缺结果的那次请求里有补上的错误结果）、接着跑、不跑、不跑；`SessionUnfinished` 同样四种。
+  - `internal/agent/brain`：会话文件分别以 `toolResult`、缺结果的工具调用、模型的回答、两小时前的 `toolResult` 结尾，`Resume` 分别接着跑（`FauxProvider` 收到一次请求，缺结果的那次请求里有补上的错误结果）、接着跑、不跑、不跑；`SessionUnfinished` 同样四种。
   - `internal/manager`：`FauxProvider` 让管家在 #clock-in 调 `dispatch`，工具结果写进会话后关掉服务；新开一个管家（同一个家目录），`OnStart` 后它接着那一轮、回答发在 #clock-in，地里只有一个帮工。
   - `internal/manager`：`managerInputOf` 读一条从 JSON 解出来的输入，频道和选定的帮工都对。
 

@@ -10,9 +10,10 @@ import (
 // Each write goes to a temporary file and is renamed over the file, so a crash never leaves half a file; writes to one
 // file run one after another, so the last one asked for is the one left on disk.
 type FileWriter struct {
-	path string
-	mode os.FileMode
-	mu   sync.Mutex
+	path     string
+	mode     os.FileMode
+	mu       sync.Mutex
+	finished bool
 }
 
 func NewFileWriter(path string, mode os.FileMode) *FileWriter {
@@ -26,6 +27,24 @@ func NewFileWriter(path string, mode os.FileMode) *FileWriter {
 func (w *FileWriter) Write(body func() ([]byte, error)) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.finished {
+		return nil
+	}
+	return w.write(body)
+}
+
+// Finish writes the last snapshot and seals the writer; timer callbacks already in flight cannot write after it returns.
+func (w *FileWriter) Finish(body func() ([]byte, error)) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.finished {
+		return nil
+	}
+	w.finished = true
+	return w.write(body)
+}
+
+func (w *FileWriter) write(body func() ([]byte, error)) error {
 	data, err := body()
 	if err != nil {
 		return err

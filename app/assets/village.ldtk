@@ -1741,14 +1741,14 @@
         {
          "__identifier": "spot",
          "__type": "String",
-         "__value": "plans",
+         "__value": "taskBoard",
          "__tile": null,
          "defUid": 7,
          "realEditorValues": [
           {
            "id": "V_String",
            "params": [
-            "plans"
+            "taskBoard"
            ]
           }
          ]

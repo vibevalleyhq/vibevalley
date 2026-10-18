@@ -35,6 +35,9 @@ type Options struct {
 // SpawnOptions is one child to start.
 type SpawnOptions struct {
 	Runtime string
+	// An accepted installation may be reused without probing a different command at spawn time.
+	Installation        *oar.AvailableInstallation
+	InstallationOptions oar.InstallationOptions
 	// The first input: the task.
 	Task string
 	// A name the parent can use for it; the id is Name when free, else derived. "" is no name.
@@ -44,8 +47,12 @@ type SpawnOptions struct {
 	Effort      string
 	ServiceTier string
 	// Resume this runtime-native session (a previous report's SessionID) instead of starting one.
-	Resume string
-	Env    map[string]*string
+	Resume             string
+	Env                map[string]*string
+	SystemPrompt       *string
+	AppendSystemPrompt *string
+	MCPServers         []oar.McpServer
+	DisallowedTools    []string
 }
 
 // SpawnRefusalCode: "unknown_runtime" | "not_installed" | "depth_limit" |

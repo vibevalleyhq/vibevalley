@@ -15,7 +15,7 @@ Issue? issueOfSession(CoreState? s, String session) => (s?.issues ?? const <Issu
 List<String> askedOf(CoreState? s) {
   final all = [
     for (final i in s?.issues ?? const <Issue>[])
-      if (i.plan == null && i.parent == null) i,
+      if (i.graph == null && i.parent == null) i,
   ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   return [for (final i in all) i.title];
 }

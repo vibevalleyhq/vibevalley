@@ -45,3 +45,30 @@ func TestFileWriterCleansUpWhenRenameFails(t *testing.T) {
 		t.Fatalf("left temporary files: %v %v", files, err)
 	}
 }
+
+func TestFileWriterFinishExcludesLateCallbacks(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "state.json")
+	writer := NewFileWriter(file, 0600)
+	entered, release := make(chan struct{}), make(chan struct{})
+	running := make(chan error, 1)
+	go func() {
+		running <- writer.Write(func() ([]byte, error) { close(entered); <-release; return []byte("old"), nil })
+	}()
+	<-entered
+	final := make(chan error, 1)
+	go func() { final <- writer.Finish(func() ([]byte, error) { return []byte("final"), nil }) }()
+	close(release)
+	if err := <-running; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-final; err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Write(func() ([]byte, error) { t.Error("late callback invoked after finish"); return []byte("late"), nil }); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(file)
+	if err != nil || string(body) != "final" {
+		t.Fatalf("final snapshot: %q %v", body, err)
+	}
+}

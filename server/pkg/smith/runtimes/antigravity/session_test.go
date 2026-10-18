@@ -214,7 +214,7 @@ func TestReadsItsReleaseFromTheBuildLabelLine(t *testing.T) {
 	// Node's `--version` has no Build label, so the snapshot carries no version rather than a wrong one.
 	node := nodePath(t)
 	t.Setenv("OAR_ANTIGRAVITY_BIN", node)
-	snapshot, err := Installation(context.Background())
+	snapshot, err := Installation(context.Background(), oar.InstallationOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

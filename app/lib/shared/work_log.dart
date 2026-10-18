@@ -914,9 +914,9 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
                                   Text('${ago(h.endedAt!, now)}走的', style: KitText.xs.copyWith(color: Palette.bark500)),
                               ],
                             ),
-                            if (h.task.isNotEmpty)
+                            if (h.brief.isNotEmpty)
                               Text(
-                                h.task,
+                                h.brief,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: KitText.sm.copyWith(color: Palette.bark900),

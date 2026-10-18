@@ -93,7 +93,7 @@ func (m *merges) resolve(id string) error {
 	if conflict == nil {
 		return protocol.Refused{Reason: session.Name + " 和主分支没有冲突"}
 	}
-	_, err := m.chat.TellSession("user", id, protocol.ConflictTask(conflict.Base, conflict.Files))
+	_, err := m.chat.TellSession("user", id, protocol.ConflictBrief(conflict.Base, conflict.Files))
 	return err
 }
 
@@ -143,7 +143,7 @@ func (m *merges) merge(id string) (string, error) {
 	if failure.Kind == "conflict" {
 		files := strings.Join(failure.Files, "、")
 		m.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 的分支合进 %s 会冲突（%s），先没收。可以让它自己把冲突解决掉", session.Name, failure.Base, files))
-		return "", protocol.Refused{Reason: fmt.Sprintf("没收：合进 %s 会冲突（%s）。%s 还在地里，分支和 worktree 都在。要它解决就用 tell 告诉它：%s", failure.Base, files, session.Name, protocol.ConflictTask(failure.Base, failure.Files))}
+		return "", protocol.Refused{Reason: fmt.Sprintf("没收：合进 %s 会冲突（%s）。%s 还在地里，分支和 worktree 都在。要它解决就用 tell 告诉它：%s", failure.Base, files, session.Name, protocol.ConflictBrief(failure.Base, failure.Files))}
 	}
 	m.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 的活没收进去：%s", session.Name, failure.Reason))
 	return "", protocol.Refused{Reason: fmt.Sprintf("没收进去：%s。%s 还在地里", failure.Reason, session.Name)}

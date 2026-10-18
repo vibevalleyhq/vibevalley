@@ -297,10 +297,10 @@ int _list(List<String> lines, int start, List<MdBlock> out) {
     }
     if (sawBlank && i < lines.length && itemAt(lines[i]) != null) tight = false;
     bool? checked;
-    final task = _task.firstMatch(body.first);
-    if (task != null) {
-      checked = task[1] != ' ';
-      body[0] = body.first.substring(task.end);
+    final graph = _task.firstMatch(body.first);
+    if (graph != null) {
+      checked = graph[1] != ' ';
+      body[0] = body.first.substring(graph.end);
     }
     items.add(MdItem(_blocks(body), checked: checked));
     if (sawBlank && (i >= lines.length || itemAt(lines[i]) == null)) break;

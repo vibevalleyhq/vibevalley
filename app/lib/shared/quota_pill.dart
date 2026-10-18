@@ -127,11 +127,11 @@ class Machine extends ConsumerWidget {
                 Row(
                   children: [
                     Text(runtimeName(info.id), style: KitText.sm),
-                    if (usage case AccountUsageOk(:final plan?)) ...[
+                    if (usage case AccountUsageOk(:final subscription?)) ...[
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          plan,
+                          subscription,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: KitText.xs.copyWith(color: Palette.bark500),

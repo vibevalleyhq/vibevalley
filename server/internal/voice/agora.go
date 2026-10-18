@@ -16,6 +16,7 @@ import (
 
 	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
+	"vibevalley/internal/manager"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/setting"
 	"vibevalley/pkg/agora"
@@ -120,25 +121,30 @@ type voice struct {
 	chat      *channel.Service
 	voiceLine *voiceLine
 	http      sdkcore.HTTPClient
+	heard     func(text, agent, sendKey string) error
 
-	mu    sync.Mutex
-	calls map[string]voiceCall
+	mu      sync.Mutex
+	calls   map[string]voiceCall
+	grants  map[rtcIdentity]*rtcGrant
+	now     func() time.Time
+	stopped bool
 }
 
 type voiceCall struct {
+	grant   rtcIdentity
 	client  *agora.Client
 	release func()
 	// Agora's model answers, so its words reach 田头 only through Said; the manager's own reach it as it says them.
 	quick bool
 	// Said at every pickup; not worth keeping in 田头.
 	greeting string
+	ending   bool
 }
 
-func newVoice(core *core.Service, settings *setting.Service, chat *channel.Service, line *voiceLine) (*voice, error) {
-	return &voice{core: core, settings: settings, chat: chat, voiceLine: line, http: &http.Client{Timeout: 25 * time.Second}, calls: map[string]voiceCall{}}, nil
+func newVoice(core *core.Service, settings *setting.Service, chat *channel.Service, mgr *manager.Service, line *voiceLine) (*voice, error) {
+	return &voice{core: core, settings: settings, chat: chat, voiceLine: line, heard: mgr.Heard, http: &http.Client{Timeout: 25 * time.Second}, calls: map[string]voiceCall{}, grants: map[rtcIdentity]*rtcGrant{}, now: time.Now}, nil
 }
 func (*voice) OnStart(context.Context) error { return nil }
-func (*voice) OnStop()                       {}
 
 var voiceMissing = protocol.VoiceUnavailable{Reason: "还没有 Agora 的凭据：在首页的「设置」里填 App ID 和 App Certificate"}
 
@@ -149,26 +155,6 @@ func (v *voice) creds() (agora.Credentials, error) {
 		return agora.Credentials{}, voiceMissing
 	}
 	return *c, nil
-}
-
-func (v *voice) issue(channel, uid string) (protocol.AgoraTicket, error) {
-	c, err := v.creds()
-	if err != nil {
-		return protocol.AgoraTicket{}, err
-	}
-	token, err := agora.Token(c, channel, uid)
-	if err != nil {
-		return protocol.AgoraTicket{}, protocol.VoiceUnavailable{Reason: "签不出语音令牌：" + err.Error()}
-	}
-	return protocol.AgoraTicket{AppID: c.AppID, Channel: channel, UID: uid, Token: token}, nil
-}
-
-func (v *voice) Session(ctx context.Context) (protocol.AgoraTicket, error) {
-	return v.issue(agora.NewChannel("vibevalley"), agora.NewUID())
-}
-
-func (v *voice) Renew(ctx context.Context, channel, uid string) (protocol.AgoraTicket, error) {
-	return v.issue(channel, uid)
 }
 
 func (v *voice) client(c agora.Credentials, area protocol.Area) *agora.Client {
@@ -184,10 +170,17 @@ func (v *voice) Start(ctx context.Context, channel, uid string) (protocol.VoiceA
 }
 
 func (v *voice) start(ctx context.Context, channel, uid string) (result protocol.VoiceAgent, err error) {
-	c, err := v.creds()
+	key := rtcIdentity{channel, uid}
+	grant, err := v.takeGrant(key)
 	if err != nil {
 		return result, err
 	}
+	defer func() {
+		if err != nil {
+			v.revokeGrant(key, grant)
+		}
+	}()
+	c := grant.credentials
 	config := v.settings.VoiceConfig()
 	settings := config.Voice
 	var line *CallLine
@@ -216,9 +209,53 @@ func (v *voice) start(ctx context.Context, channel, uid string) (result protocol
 		return result, protocol.VoiceAgentFailed{Reason: "请管家进频道失败：" + err.Error()}
 	}
 	v.mu.Lock()
-	v.calls[id] = voiceCall{client: client, release: release, quick: line == nil, greeting: strings.TrimSpace(settings.Greeting)}
+	if v.stopped || v.grants[key] != grant {
+		v.mu.Unlock()
+		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = client.Stop(cleanup, id)
+		return result, protocol.VoiceUnavailable{Reason: "语音服务已经停下"}
+	}
+	grant.agent, grant.starting = id, false
+	v.calls[id] = voiceCall{grant: key, client: client, release: release, quick: line == nil, greeting: strings.TrimSpace(settings.Greeting)}
 	v.mu.Unlock()
 	return protocol.VoiceAgent{AgentID: id}, nil
+}
+
+// The v1 relay has no call id. Ambiguous or absent call identity cannot be inferred from current settings.
+func (v *voice) HeardCurrent(text, picked, sendKey string) error {
+	v.mu.Lock()
+	id := ""
+	for key, call := range v.calls {
+		if call.ending {
+			continue
+		}
+		if id != "" {
+			v.mu.Unlock()
+			return protocol.VoiceAgentFailed{Reason: "有几通电话正在接通，请升级客户端后重试"}
+		}
+		id = key
+	}
+	v.mu.Unlock()
+	if id == "" {
+		return protocol.VoiceAgentFailed{Reason: "没有正在接通的电话"}
+	}
+	return v.Heard(id, text, picked, sendKey)
+}
+
+// Both transcript directions use the answer mode captured by this call, never the current settings.
+func (v *voice) Heard(agentID, text, picked, sendKey string) error {
+	v.mu.Lock()
+	call, ok := v.calls[agentID]
+	v.mu.Unlock()
+	if !ok || call.ending {
+		return protocol.VoiceAgentFailed{Reason: "这通电话已经挂了"}
+	}
+	if call.quick {
+		v.core.Open()
+		return v.heard(text, picked, sendKey)
+	}
+	return nil
 }
 
 // Only a call still on, that Agora's model answers: a late turn after hangup, or the manager's words, are not kept twice.
@@ -226,7 +263,7 @@ func (v *voice) Said(agentID, text string) error {
 	v.mu.Lock()
 	call, ok := v.calls[agentID]
 	v.mu.Unlock()
-	if !ok {
+	if !ok || call.ending {
 		return protocol.VoiceAgentFailed{Reason: "这通电话已经挂了"}
 	}
 	if call.quick && strings.TrimSpace(text) != call.greeting {
@@ -239,6 +276,11 @@ func (v *voice) Said(agentID, text string) error {
 func (v *voice) Stop(ctx context.Context, agentID string) error {
 	v.mu.Lock()
 	call, ok := v.calls[agentID]
+	if ok {
+		delete(v.grants, call.grant)
+		call.ending = true
+		v.calls[agentID] = call
+	}
 	v.mu.Unlock()
 	if ok {
 		defer call.release()

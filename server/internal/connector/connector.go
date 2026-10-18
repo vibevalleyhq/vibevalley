@@ -59,9 +59,8 @@ type voiceProgress struct {
 }
 
 type voiceReceiving struct {
-	Cursor     string
-	SaveCursor func(cursor string) error
-	Got        func(m voiceInbound) error
+	Cursor string
+	Accept func(messages []voiceInbound, cursor string) error
 }
 
 type voiceAdapter interface {
@@ -122,8 +121,10 @@ func newService(db *sql.DB, core *core.Service, chat *channel.Service, mgr *mana
 	}
 	adapters := []voiceAdapter{voiceWeixinAdapter{c}, voiceFeishuAdapter{c}, voiceQQAdapter{c}}
 	for _, a := range adapters {
-		b := &voiceBridge{c: c, adapter: a, id: a.ID(), fibers: map[string]context.CancelFunc{}, ctx: context.Background(), progressed: make(chan struct{}, 1)}
+		b := &voiceBridge{c: c, adapter: a, id: a.ID(), progressed: make(chan struct{}, 1)}
 		b.outbox = &voiceOutbox{bridge: b, wake: make(chan struct{}, 1)}
+		b.inbox = &voiceInbox{bridge: b, wake: make(chan struct{}, 1)}
+		b.connection = newVoiceConnection(b)
 		if err := b.reload(); err != nil {
 			return nil, err
 		}
@@ -139,9 +140,7 @@ func (c *Service) OnStart(ctx context.Context) error {
 	c.done = make(chan struct{})
 	for _, id := range c.order {
 		b := c.bridges[id]
-		b.mu.Lock()
-		b.ctx = ctx
-		b.mu.Unlock()
+		b.connection.start(ctx)
 	}
 	// The snapshot is what was before: not news.
 	state := snapshot.Value.(protocol.SideEventSnapshot).State
@@ -158,7 +157,7 @@ func (c *Service) OnStart(ctx context.Context) error {
 				switch v := e.Value.(type) {
 				case protocol.FactMessage:
 					for _, id := range c.order {
-						c.bridges[id].outbox.offer(v.Message, &state)
+						c.bridges[id].connection.offer(v.Message, &state)
 					}
 					state = c.core.State()
 				case protocol.FactConversation:
@@ -173,7 +172,7 @@ func (c *Service) OnStart(ctx context.Context) error {
 func (c *Service) OnReady(context.Context) {
 	for _, id := range c.order {
 		if b := c.bridges[id]; b.accountNow() != nil {
-			b.connect()
+			b.connection.resume()
 		}
 	}
 }
@@ -185,7 +184,7 @@ func (c *Service) OnStop() {
 	c.stop()
 	<-c.done
 	for _, b := range c.bridges {
-		b.stopAll()
+		b.connection.stop()
 	}
 }
 
@@ -247,7 +246,6 @@ type voiceBridge struct {
 	id      protocol.ConnectorID
 
 	mu         sync.Mutex
-	ctx        context.Context
 	account    *voiceAccount
 	progress   *voiceProgress
 	verifyCode string
@@ -255,12 +253,11 @@ type voiceBridge struct {
 	attempt    int
 	progressed chan struct{}
 	err        string
-	fibers     map[string]context.CancelFunc
 
 	// The outbox goes out in order.
 	outbox     *voiceOutbox
-	inbound    sync.Mutex
-	transition sync.Mutex
+	inbox      *voiceInbox
+	connection *voiceConnection
 }
 
 func voiceNullable(s string) sql.NullString { return sql.NullString{String: s, Valid: s != ""} }
@@ -402,18 +399,7 @@ func (b *voiceBridge) saveReplyContext(ctx context.Context, reply string) error 
 		ReplyContext: voiceNullable(reply), ReplyAt: sql.NullInt64{Int64: now, Valid: true}, LastInbound: sql.NullInt64{Int64: now, Valid: true}, Connector: string(b.id)})
 }
 
-func (b *voiceBridge) got(ctx context.Context, m voiceInbound) (err error) {
-	b.inbound.Lock()
-	defer b.inbound.Unlock()
-	handled := false
-	defer func() {
-		if err == nil && handled && m.ID != "" {
-			err = b.c.q.AddInbound(ctx, generated.AddInboundParams{Connector: string(b.id), ExtID: m.ID, CreatedAt: clock.NowMs()})
-		}
-		if err != nil {
-			b.setErr(err.Error())
-		}
-	}()
+func (b *voiceBridge) got(ctx context.Context, m voiceInbound) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -421,14 +407,6 @@ func (b *voiceBridge) got(ctx context.Context, m voiceInbound) (err error) {
 	if a == nil {
 		return nil
 	}
-	if m.ID != "" {
-		if _, err := b.c.q.InboundSeen(ctx, generated.InboundSeenParams{Connector: string(b.id), ExtID: m.ID}); err == nil {
-			return nil
-		} else if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-	}
-	handled = true
 	if a.owner == "" {
 		if a.pairCode == "" || !isPairing(m.Text, a.pairCode) {
 			return nil
@@ -444,12 +422,11 @@ func (b *voiceBridge) got(ctx context.Context, m voiceInbound) (err error) {
 			if m.ID == "" {
 				return nil
 			}
-			return q.AddInbound(ctx, generated.AddInboundParams{Connector: string(b.id), ExtID: m.ID, CreatedAt: now})
+			return q.DeliverInbound(ctx, generated.DeliverInboundParams{Connector: string(b.id), ExtID: m.ID})
 		})
 		if err != nil {
 			return err
 		}
-		handled = false
 		if err := b.reload(); err != nil {
 			return err
 		}
@@ -496,17 +473,7 @@ func (b *voiceBridge) receiving(ctx context.Context) {
 			b.mustReload()
 			continue
 		}
-		io := voiceReceiving{
-			Cursor: a.cursor,
-			SaveCursor: func(cursor string) error {
-				if err := b.c.q.AccountCursor(ctx, generated.AccountCursorParams{Cursor: cursor, Connector: string(b.id)}); err != nil {
-					return err
-				}
-				return b.reload()
-			},
-			Got: func(m voiceInbound) error { return b.got(ctx, m) },
-		}
-		stopped := b.adapter.Receive(ctx, a.secrets, io)
+		stopped := b.inbox.receive(ctx, a.secrets)
 		if ctx.Err() != nil {
 			return
 		}
@@ -529,43 +496,6 @@ func (b *voiceBridge) receiving(ctx context.Context) {
 	}
 }
 
-func (b *voiceBridge) run(name string, work func(ctx context.Context)) {
-	b.mu.Lock()
-	if stop := b.fibers[name]; stop != nil {
-		stop()
-	}
-	ctx, cancel := context.WithCancel(b.ctx)
-	b.fibers[name] = cancel
-	b.mu.Unlock()
-	go func() {
-		defer cancel()
-		work(ctx)
-	}()
-}
-
-func (b *voiceBridge) remove(name string) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if stop := b.fibers[name]; stop != nil {
-		stop()
-		delete(b.fibers, name)
-	}
-}
-
-func (b *voiceBridge) stopAll() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	for name, stop := range b.fibers {
-		stop()
-		delete(b.fibers, name)
-	}
-}
-
-func (b *voiceBridge) connect() {
-	b.run("receive", b.receiving)
-	b.run("outbox", b.outbox.run)
-}
-
 func voicePairCode() string {
 	n, err := rand.Int(rand.Reader, big.NewInt(900_000))
 	if err != nil {
@@ -574,76 +504,12 @@ func voicePairCode() string {
 	return fmt.Sprint(100_000 + n.Int64())
 }
 
-func (b *voiceBridge) loggingIn(ctx context.Context, attempt int, in protocol.ConnectorLogin) {
-	defer func() {
-		b.mu.Lock()
-		if b.attempt == attempt {
-			b.progress, b.verifyCode = nil, ""
-		}
-		b.mu.Unlock()
-		b.signal()
-	}()
-	progress := func(p voiceProgress) {
-		b.mu.Lock()
-		if b.attempt == attempt {
-			b.progress = &p
-		}
-		b.mu.Unlock()
-		b.signal()
-	}
-	verifyCode := func() string {
-		b.mu.Lock()
-		defer b.mu.Unlock()
-		return b.verifyCode
-	}
-	linked, err := b.adapter.Login(ctx, in, progress, verifyCode)
-	if ctx.Err() != nil {
-		return
-	}
+func (b *voiceBridge) login(in protocol.ConnectorLogin) protocol.ConnectorStatus {
+	attempt, err := b.connection.login(in)
 	if err != nil {
 		b.setErr(err.Error())
-		return
-	}
-	b.transition.Lock()
-	defer b.transition.Unlock()
-	if ctx.Err() != nil {
-		return
-	}
-	secrets, _ := json.Marshal(linked.Secrets)
-	pair := ""
-	if linked.Owner == "" {
-		pair = voicePairCode()
-	}
-	if err := b.accountChange(ctx, func(q *generated.Queries) error {
-		if err := q.ConnectAccount(ctx, generated.ConnectAccountParams{Connector: string(b.id), Secrets: string(secrets), OwnerID: voiceNullable(linked.Owner), PairCode: voiceNullable(pair), ConnectedAt: clock.NowMs()}); err != nil {
-			return err
-		}
-		return b.outbox.retire(ctx, q, "换了账号")
-	}); err != nil {
-		b.setErr(err.Error())
-		return
-	}
-	b.remove("receive")
-	b.mustReload()
-	b.setErr("")
-	b.connect()
-}
-
-func (b *voiceBridge) login(in protocol.ConnectorLogin) protocol.ConnectorStatus {
-	b.mu.Lock()
-	busy := b.progress != nil
-	b.mu.Unlock()
-	if busy && (in.Force == nil || !*in.Force) {
 		return b.status()
 	}
-	b.remove("login")
-	b.mu.Lock()
-	b.err = ""
-	b.attempt++
-	attempt := b.attempt
-	b.progress = &voiceProgress{State: protocol.ConnectorStateWaiting}
-	b.mu.Unlock()
-	b.run("login", func(ctx context.Context) { b.loggingIn(ctx, attempt, in) })
 	wait := time.NewTimer(1500 * time.Millisecond)
 	defer wait.Stop()
 	for {
@@ -651,7 +517,7 @@ func (b *voiceBridge) login(in protocol.ConnectorLogin) protocol.ConnectorStatus
 		shown := b.attempt != attempt || b.progress == nil || b.progress.Qr != ""
 		b.mu.Unlock()
 		if shown {
-			break
+			return b.status()
 		}
 		select {
 		case <-b.progressed:
@@ -659,7 +525,6 @@ func (b *voiceBridge) login(in protocol.ConnectorLogin) protocol.ConnectorStatus
 			return b.status()
 		}
 	}
-	return b.status()
 }
 
 func (b *voiceBridge) signal() {
@@ -680,23 +545,9 @@ func (b *voiceBridge) verify(code string) protocol.ConnectorStatus {
 }
 
 func (b *voiceBridge) logout() protocol.ConnectorStatus {
-	b.transition.Lock()
-	defer b.transition.Unlock()
-	ctx := context.Background()
-	if err := b.accountChange(ctx, func(q *generated.Queries) error {
-		if err := q.DisconnectAccount(ctx, string(b.id)); err != nil {
-			return err
-		}
-		return b.outbox.retire(ctx, q, "断开了")
-	}); err != nil {
+	if err := b.connection.logout(); err != nil {
 		b.setErr(err.Error())
-		return b.status()
 	}
-	b.stopAll()
-	b.mu.Lock()
-	b.account, b.progress, b.err = nil, nil, ""
-	b.attempt++
-	b.mu.Unlock()
 	return b.status()
 }
 
@@ -722,15 +573,4 @@ func (b *voiceBridge) accountChange(ctx context.Context, change func(*generated.
 		return err
 	}
 	return tx.Commit()
-}
-
-func (r voiceReceiving) take(ctx context.Context, m voiceInbound) {
-	for ctx.Err() == nil {
-		if r.Got(m) == nil {
-			return
-		}
-		if !clock.Sleep(ctx, time.Second) {
-			return
-		}
-	}
 }

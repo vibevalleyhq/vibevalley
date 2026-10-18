@@ -17,7 +17,7 @@ SessionPlay _play(int station) =>
     SessionPlay(station: station.toDouble(), history: const [], toolsThisRun: 0, counts: const {}, files: const [], commands: const [], runStartedAt: 0);
 
 Session _session(String id, String agent, Phase phase, int station) =>
-    Session(id: id, name: id, agent: agent, runtime: 'pi', task: '写打卡', hiredAt: 0, runs: 1, phase: phase, play: _play(station));
+    Session(id: id, name: id, agent: agent, runtime: 'pi', brief: '写打卡', hiredAt: 0, runs: 1, phase: phase, play: _play(station));
 
 PhaseWorking _doing(SessionAction action) => PhaseWorking(
   since: 0,
@@ -111,13 +111,13 @@ void main() {
     expect(game.hoverBed.value, 6);
     game
       ..play(const GameEffectReward(sessionId: 'w1', coins: 20, streak: 1))
-      ..burst(BedFx.water, 6);
+      ..burst(BedFxKind.water, 6);
     await _run(tester, 0.3);
     await _save(tester, 'day');
-    final shop = game.village.spotBoxes['shop']!;
+    final shop = game.village.spotBoxes[YardPlace.shop]!;
     await mouse.moveTo(Offset((shop.x0 + shop.x1) / 2 * 3, (shop.y0 + shop.y1) / 2 * 3));
     await tester.pump(const Duration(milliseconds: 50));
-    expect(game.hoverSpot.value, 'shop');
+    expect(game.hoverSpot.value, YardPlace.shop);
     expect(game.hoverBed.value, isNull);
   });
 
@@ -131,7 +131,7 @@ void main() {
   testWidgets('a click on a plot, a thing in the yard, a helper and the yard itself', (tester) async {
     final game = await _start(tester);
     final plots = <int>[];
-    final spots = <String>[];
+    final spots = <YardPlace>[];
     game
       ..onPlot = plots.add
       ..onSpot = spots.add;
@@ -141,10 +141,10 @@ void main() {
     await tester.tapAt(Offset(locked.x * 3, (locked.y - 3) * 3));
     await tester.pump(const Duration(milliseconds: 50));
     expect(plots, [8]);
-    final warehouse = v.spotBoxes['warehouse']!;
+    final warehouse = v.spotBoxes[YardPlace.warehouse]!;
     await tester.tapAt(Offset((warehouse.x0 + warehouse.x1) / 2 * 3, (warehouse.y1 - 2) * 3));
     await tester.pump(const Duration(milliseconds: 50));
-    expect(spots, ['warehouse']);
+    expect(spots, [YardPlace.warehouse]);
     final head = game.heads['w2']!;
     await tester.tapAt(Offset(head.x * 3, (head.y + 18) * 3));
     await tester.pump(const Duration(milliseconds: 50));
@@ -153,6 +153,6 @@ void main() {
     await tester.tapAt(const Offset(30 * 3, 240 * 3));
     await tester.pump(const Duration(milliseconds: 50));
     expect(plots, [8, 1]);
-    expect(spots, ['warehouse']);
+    expect(spots, [YardPlace.warehouse]);
   });
 }

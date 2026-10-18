@@ -7,7 +7,7 @@ CREATE TABLE channel_conversation (
   kind          text not null check (kind in ('general', 'channel', 'thread')),
   parent_id     text unique references channel_message (id),
   parent_number integer,
-  subject_kind  text check (subject_kind in ('issue', 'playbook', 'talk')),
+  subject_kind  text check (subject_kind in ('issue', 'graph', 'talk')),
   subject_id    text,
   last_number   integer,
   reply_count   integer not null default 0,
@@ -62,7 +62,7 @@ CREATE TABLE channel_seen_mark (
 CREATE TABLE channel_delivery (
   recipient_id   text not null references channel_participant (id),
   message_id     text not null references channel_message (id) on delete cascade,
-  reason         text not null check (reason in ('mention', 'everyone', 'own_thread', 'follower', 'general', 'dispatch', 'addressed', 'playbook')),
+  reason         text not null check (reason in ('mention', 'everyone', 'own_thread', 'follower', 'general', 'dispatch', 'addressed', 'graph')),
   wakes          boolean not null,
   held_by        text check (held_by in ('hop_limit', 'cooldown', 'wake_breaker')),
   state          text not null default 'pending' check (state in ('pending', 'announced', 'handed', 'seen', 'dropped')),
@@ -87,13 +87,13 @@ CREATE TABLE issue (
   rank        integer not null default 0,
   parent      text references issue (id) on delete cascade,
   blocked_by  text,
-  plan        text,
-  step        text,
+  graph       text,
+  task        text,
   schedule    text,
   created_at  integer not null,
   queued_at   integer,
   closed_at   integer,
-  closed      text check (closed in ('merged', 'merged_into_plan', 'dismissed', 'lost', 'answered'))
+  closed      text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered'))
 );
 CREATE INDEX issue_by_parent on issue (parent);
 CREATE TABLE issue_session (
@@ -113,16 +113,16 @@ CREATE TABLE session_run (
   summary      text,
   spent        text
 );
-CREATE TABLE playbook_event (
+CREATE TABLE task_event (
   id          text primary key,
-  playbook_id text not null,
-  node_id     text,
+  graph_id    text not null,
+  task_id     text,
   kind        text not null,
   actor       text not null check (actor in ('user', 'manager', 'system')),
   payload     text not null default '{}',
   created_at  integer not null
 );
-CREATE INDEX playbook_event_by_playbook on playbook_event (playbook_id, id);
+CREATE INDEX task_event_by_graph on task_event (graph_id, id);
 CREATE TABLE schedule (
   id          text primary key,
   name        text not null,
@@ -173,8 +173,11 @@ CREATE TABLE connector_inbound (
   ext_id      text not null,
   message_id  text references channel_message (id) on delete set null,
   created_at  integer not null,
+  payload     text not null default '',
+  delivered   integer not null default 1 check (delivered in (0, 1)),
   primary key (connector, ext_id)
 );
+CREATE INDEX connector_inbound_pending ON connector_inbound (connector, delivered) WHERE delivered = 0;
 CREATE TABLE connector_outbox (
   id          text primary key,
   connector   text not null,
@@ -226,12 +229,40 @@ CREATE TABLE session (
   agent     text not null,
   name      text not null,
   runtime   text not null,
-  task      text not null,
+  brief     text not null,
   project   text,
   issue     text,
-  playbook  text,
+  graph     text,
   hired_at  integer not null,
   ended_at  integer,
-  closed    text check (closed in ('merged', 'merged_into_plan', 'dismissed', 'lost', 'answered'))
+  closed    text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered'))
 );
 CREATE INDEX session_by_agent on session (agent, hired_at);
+CREATE TABLE session_run_issue (
+  run text not null references session_run(id) on delete cascade,
+  issue text not null references issue(id) on delete cascade,
+  primary key (run, issue)
+);
+CREATE INDEX session_run_issue_by_issue on session_run_issue(issue, run);
+CREATE TABLE issue_queue (
+  issue text primary key references issue(id) on delete cascade,
+  channel text not null,
+  triggered_by text not null
+);
+CREATE TABLE task_graph (
+  graph text not null,
+  owner text not null,
+  id text not null,
+  position integer not null,
+  title text not null,
+  brief text not null,
+  after text not null,
+  executor text not null,
+  state text not null,
+  result text not null,
+  tries integer not null,
+  updated_at integer not null,
+  finished_at integer,
+  primary key (graph, id)
+);
+CREATE INDEX task_graph_by_owner on task_graph (owner, finished_at);

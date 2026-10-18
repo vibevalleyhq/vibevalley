@@ -22,7 +22,7 @@ import '../ui/kit/markdown.dart' show plainText;
 import '../ui/pixel_card.dart';
 import '../voice/voice.dart';
 import 'game.dart';
-import 'world.dart' show plotH, spotNames;
+import 'world.dart' show plotH, YardPlace;
 import '../rules/chat.dart';
 import '../rules/clock.dart';
 import '../rules/sessions.dart';
@@ -53,7 +53,7 @@ const _sign = {
   'warehouse': 'icon-crate',
   'tasks': 'icon-tasks',
   'log': 'icon-log',
-  'plans': 'icon-plan',
+  'taskBoard': 'icon-task-board',
   'agents': 'icon-board',
   'runtimes': 'machine-tractor',
   'skills': 'icon-skillbook',
@@ -244,7 +244,8 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     for (final MapEntry(key: spot, value: box) in village.spotBoxes.entries) {
       final top = box.y0 < _topEdge ? box.y0 + _signInside : box.y0;
       final cx = (box.x0 + box.x1) / 2;
-      final (label, hint) = spotNames[spot]!;
+      final label = spot.label;
+      final hint = spot.hint;
       if (hoverSpot == spot) {
         tips.add(
           _Pin(
@@ -274,7 +275,7 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
             ),
           ),
         );
-      } else if (_sign[spot] case final icon? when atlas.has(icon)) {
+      } else if (_sign[spot.id] case final icon? when atlas.has(icon)) {
         final hop = ((game.t * 1000 / 350 + i * 2.3).floor() % 9 == 0) ? 1.0 : 0.0;
         back.add(
           _Pin(
@@ -293,8 +294,8 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
       }
       i++;
       final count = switch (spot) {
-        'warehouse' => harvestedOf(state).length,
-        'plans' => ref.watch(plansProvider).where((p) => p.asksForYou ?? false).length,
+        YardPlace.warehouse => harvestedOf(state).length,
+        YardPlace.taskBoard => ref.watch(graphsProvider).where((p) => p.asksForYou ?? false).length,
         _ => 0,
       };
       if (count > 0) {
@@ -433,7 +434,7 @@ class VillageHud extends ConsumerWidget {
     final phoneOpen = ref.watch(phoneOpenProvider);
     void open(FarmPanel which) {
       Sfx.play('open');
-      ref.read(panelProvider.notifier).set(which);
+      ref.read(farmOverlaysProvider.notifier).panel(which);
     }
 
     return Stack(
@@ -460,7 +461,7 @@ class VillageHud extends ConsumerWidget {
               ),
               const SizedBox(width: hudGap),
               _Tap(
-                onTap: () => open(FarmPanel.tasks),
+                onTap: () => open(FarmPanel.graphs),
                 label: '任务与成就',
                 child: TweenAnimationBuilder<double>(
                   tween: Tween(end: coins),
@@ -547,7 +548,7 @@ class VillageHud extends ConsumerWidget {
               _Tap(
                 onTap: () {
                   Sfx.play('open');
-                  ref.read(menuOpenProvider.notifier).set(true);
+                  ref.read(farmOverlaysProvider.notifier).menu(true);
                 },
                 label: desktop ? '菜单（Esc）' : '菜单',
                 // A phone has no Esc key to hint at.

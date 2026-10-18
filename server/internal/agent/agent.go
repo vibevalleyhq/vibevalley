@@ -112,12 +112,14 @@ func (st *Service) persist() error {
 func (st *Service) change(f func(*stored)) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	next := st.s
+	// The callback owns its work set; retained inputs or outputs cannot mutate the published revision.
+	next := cloneStored(st.s)
 	f(&next)
-	if err := st.disk.Write(func() ([]byte, error) { return json.Marshal(next) }); err != nil {
+	committed := cloneStored(next)
+	if err := st.disk.Write(func() ([]byte, error) { return json.Marshal(committed) }); err != nil {
 		return err
 	}
-	st.s = next
+	st.s = committed
 	return nil
 }
 
@@ -163,7 +165,7 @@ func (st *Service) Settings(runtime string) protocol.RuntimeSettings {
 }
 
 func upsert[T any](list []T, item T, id func(T) string) []T {
-	out := slices.Clone(list)
+	out := list
 	if i := slices.IndexFunc(out, func(x T) bool { return id(x) == id(item) }); i >= 0 {
 		out[i] = item
 		return out
@@ -177,7 +179,7 @@ func (st *Service) SaveAgent(agent protocol.Agent) (protocol.Agent, error) {
 	}
 	agent = withCast(agent)
 	return agent, st.change(func(s *stored) {
-		s.Agents = upsert(s.Agents, cloneAgent(agent), func(a protocol.Agent) string { return a.ID })
+		s.Agents = upsert(s.Agents, agent, func(a protocol.Agent) string { return a.ID })
 	})
 }
 
@@ -186,7 +188,7 @@ func (st *Service) DeleteAgent(id string) error {
 		return protocol.Refused{Reason: "管家是每个农场都有的，删不了"}
 	}
 	return st.change(func(s *stored) {
-		s.Agents = slices.DeleteFunc(slices.Clone(s.Agents), func(a protocol.Agent) bool { return a.ID == id })
+		s.Agents = slices.DeleteFunc(s.Agents, func(a protocol.Agent) bool { return a.ID == id })
 	})
 }
 
@@ -196,19 +198,25 @@ func (st *Service) SaveSkill(skill protocol.Skill) (protocol.Skill, error) {
 
 func (st *Service) DeleteSkill(id string) error {
 	return st.change(func(s *stored) {
-		s.Skills = slices.DeleteFunc(slices.Clone(s.Skills), func(k protocol.Skill) bool { return k.ID == id })
+		s.Skills = slices.DeleteFunc(s.Skills, func(k protocol.Skill) bool { return k.ID == id })
 	})
 }
 
 func (st *Service) SaveSettings(runtime string, settings protocol.RuntimeSettings) (protocol.RuntimeSettings, error) {
 	return settings, st.change(func(s *stored) {
-		next := make(map[string]protocol.RuntimeSettings, len(s.Settings)+1)
-		for k, v := range s.Settings {
-			next[k] = v
-		}
-		next[runtime] = cloneSettings(settings)
-		s.Settings = next
+		s.Settings[runtime] = settings
 	})
+}
+
+func cloneStored(s stored) stored {
+	out := stored{Agents: slices.Clone(s.Agents), Skills: slices.Clone(s.Skills), Settings: make(map[string]protocol.RuntimeSettings, len(s.Settings))}
+	for i, a := range out.Agents {
+		out.Agents[i] = cloneAgent(a)
+	}
+	for id, settings := range s.Settings {
+		out.Settings[id] = cloneSettings(settings)
+	}
+	return out
 }
 
 func cloneAgent(a protocol.Agent) protocol.Agent {

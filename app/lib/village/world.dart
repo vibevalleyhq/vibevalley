@@ -1,6 +1,8 @@
 // The positions come from the LDtk level; this file names them and works out what follows.
 
 import '../gen/vibevalley.dart';
+import '../game/destinations.dart';
+export '../game/destinations.dart' show YardPlace;
 import '../rules/beds.dart';
 export '../rules/beds.dart' show Bed, beds, bedOfStation, isRipe;
 import 'level.dart';
@@ -22,18 +24,6 @@ class Prop {
   final Pt at;
   final Box box;
 }
-
-const spotNames = {
-  'shop': ('商店', '种子、装饰、开垦新地'),
-  'warehouse': ('仓库', '收进来的成果'),
-  'tasks': ('任务与成就', '新手任务、开垦、成就墙'),
-  'log': ('农场日志', '说过的话和收成，按时间倒着排'),
-  'plans': ('种植计划', '一件长活拆成几步，交给几个帮工'),
-  'agents': ('帮工名册', '每个帮工用哪台农机、带什么人设和技能、长什么样'),
-  'manager': ('管家', '换管家的样子'),
-  'runtimes': ('工坊 · 农具', '每台农机是一种 runtime：装没装、用量'),
-  'skills': ('书屋 · 技能书', '帮工能带的技能'),
-};
 
 class Goal {
   const Goal(this.key, this.at, [this.facing]);
@@ -74,9 +64,11 @@ class VillageWorld {
       ],
   };
 
-  late final Map<String, Box> spotBoxes = {
-    for (final spot in spotNames.keys)
-      spot: (level.thingsOf('Prop').where((t) => t.field('spot') == spot).firstOrNull ?? level.thingsOf('Area').firstWhere((t) => t.field('spot') == spot)).box,
+  late final Map<YardPlace, Box> spotBoxes = {
+    for (final spot in YardPlace.values)
+      spot:
+          (level.thingsOf('Prop').where((t) => t.field('spot') == spot.id).firstOrNull ?? level.thingsOf('Area').firstWhere((t) => t.field('spot') == spot.id))
+              .box,
   };
 
   Pt plotAt(int index) => plots[index] ?? (throw StateError('village.ldtk: no Plot $index'));

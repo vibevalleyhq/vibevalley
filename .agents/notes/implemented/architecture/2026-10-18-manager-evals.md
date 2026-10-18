@@ -13,7 +13,7 @@ Grok Bot 的内循环：bot 做错一次，就变成一条评测；修 harness�
 - 改 `managerSystemPrompt`（`internal/manager/manager.go`）或工具描述时，没有办法知道上次修好的错会不会又出现。
 - [先采样，再验收](../../proposed/architecture/2026-10-14-sample-then-verify.md)第 2 步说的「故障回流成样本」是帮工改代码的故障，样本是仓库里的测试；管家的错（派错了人、不该说时说了、该问主人时自己合了）不在那里。
 
-做错的那一轮，证据本来都在：`manager.jsonl` 只往后加，压缩也只是追加一行摘要（`pkg/agent/session.go`），原文都留着；管家的轨迹（`session.events`）里每一轮有 `user/message`，带 `seq` 和时间。缺的是把它们存成能重放的样例，和重放它的办法。
+做错的那一轮，证据本来都在：`manager.jsonl` 只往后加，压缩也只是追加一行摘要（`internal/agent/brain/session.go`），原文都留着；管家的轨迹（`session.events`）里每一轮有 `user/message`，带 `seq` 和时间。缺的是把它们存成能重放的样例，和重放它的办法。
 
 ## Decision
 
@@ -29,9 +29,9 @@ Grok Bot 的内循环：bot 做错一次，就变成一条评测；修 harness�
 `internal/manager/evals.go` 的 `MarkWrong`：
 
 1. 按 `On` 从管家的轨迹里找到那条 `user/message`，取它的时间和字。
-2. 读 `manager/manager.jsonl` 的全部行（`pkg/agent.ReadLines`，不经 `Replay`，压缩前的原文也在），找第一条**时间不早于这一步、字以这一步的字开头**的 `managerInput`：`sendInput` 先记轨迹、后建消息，所以消息不早于这一步；轨迹里的字修剪过、超过 2000 字会截断，消息后面可能还拼着「这期间田头上的汇报」，所以比开头。
+2. 读 `manager/manager.jsonl` 的全部行（`internal/agent/brain.ReadLines`，不经 `Replay`，压缩前的原文也在），找第一条**时间不早于这一步、字以这一步的字开头**的 `managerInput`：`sendInput` 先记轨迹、后建消息，所以消息不早于这一步；轨迹里的字修剪过、超过 2000 字会截断，消息后面可能还拼着「这期间田头上的汇报」，所以比开头。
 3. `before` = 它之前的那些行经 `Replay` 得到的消息（模型这一轮开始时看到的对话，不含请求前的临时压缩）；`input` = 这条输入；`did` = 从它起到下一条 `managerInput` 之前的消息，去掉轮后追加的压缩摘要。
-4. 写 `manager/evals/<id>.json`（`id` 是 uuidv7，只有主人能读）：`id`、`created`、`model`、`want`、`memory`（标记时 `MEMORY.md` 的全文，不一定是那一轮时的）、`tools`（管家的工具和 `pkg/agent` 自带的，`remember`、`search_archive` 这些）、`before`、`input`、`did`（都是 `manager.jsonl` 里的原样一行）、空的 `expect`。缩进、不转义 HTML，方便人读和手写 `expect`。
+4. 写 `manager/evals/<id>.json`（`id` 是 uuidv7，只有主人能读）：`id`、`created`、`model`、`want`、`memory`（标记时 `MEMORY.md` 的全文，不一定是那一轮时的）、`tools`（管家的工具和 `internal/agent/brain` 自带的，`remember`、`search_archive` 这些）、`before`、`input`、`did`（都是 `manager.jsonl` 里的原样一行）、空的 `expect`。缩进、不转义 HTML，方便人读和手写 `expect`。
 
 农场现状不另存：[提示开头不变](2026-10-18-stable-prompt-prefix.md)以后，时间和农场现状（全文或变了的行）在每条输入里，`input` 和 `before` 就带着它们。样例是家目录里的私人文件，不进仓库。
 
@@ -81,7 +81,7 @@ Grok Bot 的内循环：bot 做错一次，就变成一条评测；修 harness�
 ## Consequences
 
 - 管家的一次错从此有地方放：主人点一下、写一句，样例就在家目录里；修的人有现成的输入和录下的那一轮，不用再从日志里拼。
-- 离线的那半跟着 `go test` 跑，改了工具名、写了抓不住错的 `expect` 都马上红；联网的那半要钥匙、花钱，只在改了提示、工具描述或 `pkg/agent` 的提示拼法时跑（[verify-manager-evals](../../../skills/verify-manager-evals/SKILL.md)），跑之前问主人。
+- 离线的那半跟着 `go test` 跑，改了工具名、写了抓不住错的 `expect` 都马上红；联网的那半要钥匙、花钱，只在改了提示、工具描述或 `internal/agent/brain` 的提示拼法时跑（[verify-manager-evals](../../../skills/verify-manager-evals/SKILL.md)），跑之前问主人。
 - 模型的输出是采样：5 次过 4 次也可能是运气；样例多了以后看整体的通过率，不看单个。一个样例约等于管家一轮的 token 乘 N；样例多了以后按改动挑着跑，发版前跑全部。
 - `before` 是在旧提示下形成的对话，提示改了以后，对话里管家以前的说法可能和新规矩不一致；重放考的是「在这段历史之后这一轮做不做得对」，接受这个偏差。
 - 输入里的农场现状可能只是「变了的行」，全文在更早的输入里；`before` 带着那段对话，重放时模型看到的和当时一样。

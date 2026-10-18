@@ -21,7 +21,7 @@ func TestResolveOwnsDefaultsOverridesAndModelFallback(t *testing.T) {
 	}
 	c := core.New(cfg.Home)
 	defer c.Close()
-	r, err := newService(cfg, c, store, setting.New(cfg))
+	r, err := newService(cfg, nil, c, store, setting.New(cfg))
 	if err != nil {
 		t.Fatal(err)
 	}

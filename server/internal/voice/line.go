@@ -19,10 +19,10 @@ import (
 	"sync"
 	"time"
 
+	vvagent "vibevalley/internal/agent/brain"
 	"vibevalley/internal/base"
 	"vibevalley/internal/manager"
 	"vibevalley/internal/protocol"
-	vvagent "vibevalley/pkg/agent"
 )
 
 // Only this one endpoint is reachable through the tunnel, and only with the call's own key.

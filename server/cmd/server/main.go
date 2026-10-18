@@ -1,7 +1,7 @@
 // The vibevalley server: the workspace (package workspace) over HTTP on loopback. The Flutter
 // macOS app (app) bundles this command as vibevalley-server and starts it on a free loopback port; run alone, it is the server.
 //
-//	go run ./cmd/server                          # host:port from the configuration (127.0.0.1:8787)
+//	go run ./cmd/server                          # port from the configuration (127.0.0.1:8787)
 //	go run ./cmd/server --config dev.yaml        # this file, not $VIBEVALLEY_HOME/vibevalley.yaml
 //	go run ./cmd/server --log ~/.vibevalley/logs/server.log
 //
@@ -10,28 +10,24 @@ package main
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"flag"
-	"fmt"
 	"io"
 	"log"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"syscall"
-	"time"
 
 	"vibevalley/internal/base"
 	"vibevalley/internal/handler"
-	"vibevalley/internal/workspace"
+	"vibevalley/internal/protocol"
 )
 
 func main() {
 	configFile := flag.String("config", "", "the YAML configuration (default $VIBEVALLEY_HOME/vibevalley.yaml, if it is there)")
 	logFile := flag.String("log", "", "also append the log to this file")
+	readyJSON := flag.Bool("ready-json", false, "write the ready address and process identity as one JSON line on stdout")
 	flag.Parse()
 	// A key in a line from a helper or a service never reaches the terminal or the file.
 	log.SetOutput(base.RedactingWriter(os.Stderr))
@@ -50,40 +46,21 @@ func main() {
 		defer out.Close()
 		log.SetOutput(base.RedactingWriter(io.MultiWriter(os.Stderr, out)))
 	}
-	f, err := workspace.New(cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// Before the farm starts: it hands the yard gate the API.
-	answer := handler.New(f)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if err := f.Start(ctx); err != nil {
-		log.Fatal(err)
-	}
-	// host is 127.0.0.1 unless set: sessions run without permission prompts, so the farm is never for the network.
-	listener, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)))
+	server, err := handler.Listen(ctx, cfg)
 	if err != nil {
-		log.Fatal(fmt.Errorf("vibevalley: %w", err))
-	}
-	f.Session.SetAddress(listener.Addr().String())
-	// Requests share the server's context: stopping ends the pages' event streams, which never end on their own, so
-	// the farm saves (state.json, sessions.json, the database) without waiting for them.
-	server := &http.Server{Handler: answer, BaseContext: func(net.Listener) context.Context { return ctx }}
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		<-ctx.Done()
-		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := server.Shutdown(shutdown); err != nil {
-			log.Printf("vibevalley: the HTTP server did not close cleanly: %v", err)
-		}
-	}()
-	log.Printf("vibevalley: listening on http://%s", listener.Addr())
-	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
-	<-done
-	f.Close()
+	log.Printf("vibevalley: listening on http://%s", server.Address())
+	if *readyJSON {
+		if err := json.NewEncoder(os.Stdout).Encode(protocol.ServerReady{URL: "http://" + server.Address(), PID: int64(os.Getpid())}); err != nil {
+			stop()
+			_ = server.Wait()
+			log.Fatalf("vibevalley: publish readiness: %v", err)
+		}
+	}
+	if err := server.Wait(); err != nil {
+		log.Fatal(err)
+	}
 }

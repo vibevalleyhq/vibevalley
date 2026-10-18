@@ -47,8 +47,8 @@ func whileWorking(state CoreState, id string, change func(PhaseWorking) PhaseWor
 	})
 }
 
-func IsOpen(pb Playbook) bool {
-	return pb.State != PlaybookStateDone && pb.State != PlaybookStateAbandoned
+func IsOpen(graph TaskGraph) bool {
+	return graph.State != GraphStateDone && graph.State != GraphStateAbandoned
 }
 
 func ended(outcome Outcome) Phase {
@@ -135,8 +135,8 @@ func reduce(state CoreState, fact Fact) (CoreState, bool) {
 		return stationed(state, f)
 	case FactRun:
 		return withSession(state, f.ID, func(h Session) Session {
-			if f.Task != nil && *f.Task != "" {
-				h.Task = *f.Task
+			if f.Brief != nil && *f.Brief != "" {
+				h.Brief = *f.Brief
 			}
 			h.Phase = Phase{PhaseWorking{Since: f.At, Doing: Doing{Action: SessionActionThinking, Label: ""}}}
 			play := playedRun(PlayOf(h), f.At)

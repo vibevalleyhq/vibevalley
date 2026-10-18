@@ -430,7 +430,7 @@
       ]
     },
     {
-      "id": "s_plan",
+      "id": "s_split",
       "category": "starter",
       "title": "规划",
       "detail": "拆一张种植计划",
@@ -493,7 +493,7 @@
       "unit": "件"
     },
     {
-      "id": "big_playbook",
+      "id": "big_graph",
       "category": "harvest",
       "title": "五谷丰登",
       "detail": "收获的种植计划里，合进去的步数最多的一张",
@@ -634,7 +634,7 @@
       "unit": "次"
     },
     {
-      "id": "parallel_plan",
+      "id": "parallel_graph",
       "category": "team",
       "title": "运筹帷幄",
       "detail": "有一批步骤同时做的种植计划，收获了",

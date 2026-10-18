@@ -19,8 +19,8 @@ import (
 	"vibevalley/pkg/x/str"
 )
 
-// An issue closes when its last session leaves, as the fact that the session left says how, and opens again with another session. A playbook's issues
-// open and close as the plan says, not as their sessions leave.
+// An issue closes when its last session leaves, as the fact that the session left says how, and opens again with another session. A task's issues
+// open and close as the task says, not as their sessions leave.
 
 type issues struct {
 	db           *sql.DB
@@ -70,12 +70,24 @@ func (is *issues) publish(id string) {
 func (is *issues) OnStart(ctx context.Context) error {
 	is.closeManagersOpen(ctx)
 	_, events, stop := is.core.Events()
-	is.stop = stop
+	finished, stopFinished := is.trajectories.FinishedRuns().Subscribe()
+	is.stop = func() { stop(); stopFinished() }
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
+			case run, ok := <-finished:
+				if !ok {
+					return
+				}
+				if run.Outcome == protocol.OutcomeCompleted {
+					for _, id := range run.Issues {
+						if err := is.answered(id); err != nil {
+							log.Printf("vibevalley: run %s finished but issue %s could not close: %v", run.ID, id, err)
+						}
+					}
+				}
 			case e, ok := <-events:
 				if !ok {
 					return
@@ -100,7 +112,7 @@ func (is *issues) left(ctx context.Context, f protocol.FactLeft) {
 	if err != nil {
 		return
 	}
-	if row, err := is.q.GetIssue(ctx, issue); err != nil || row.Plan.Valid || row.Step.Valid {
+	if row, err := is.q.GetIssue(ctx, issue); err != nil || row.Graph.Valid || row.Task.Valid {
 		return
 	}
 	if runs, err := is.q.SessionsOf(ctx, issue); err != nil || len(runs) == 0 || runs[len(runs)-1] != f.ID {
@@ -143,22 +155,22 @@ func issueOf(row generated.Issue, runs []string, state protocol.CoreState) proto
 			log.Printf("vibevalley: issue %s: what blocks it cannot be read: %v", row.ID, err)
 		}
 	}
-	if row.Plan.Valid {
-		var plan protocol.IssuePlan
-		if json.Unmarshal([]byte(row.Plan.String), &plan) == nil {
-			out.Plan = &plan
+	if row.Graph.Valid {
+		var graph protocol.IssueGraph
+		if json.Unmarshal([]byte(row.Graph.String), &graph) == nil {
+			out.Graph = &graph
 		}
 	}
-	if row.Step.Valid {
-		var step protocol.IssueStep
-		if json.Unmarshal([]byte(row.Step.String), &step) == nil {
-			out.Step = &step
+	if row.Task.Valid {
+		var task protocol.IssueTask
+		if json.Unmarshal([]byte(row.Task.String), &task) == nil {
+			out.Task = &task
 		}
 	}
 	if runs != nil {
 		out.Sessions = runs
 	}
-	if len(out.Sessions) == 0 || out.Step != nil {
+	if len(out.Sessions) == 0 || out.Task != nil {
 		out.Rank = row.Rank
 	}
 	out.Status = protocol.IssueStatusOf(out, state)
@@ -225,7 +237,7 @@ func (is *issues) unsent(id string) (protocol.Issue, error) {
 	if err != nil {
 		return issue, err
 	}
-	if issue.Plan != nil || issue.Step != nil {
+	if issue.Graph != nil || issue.Task != nil {
 		return issue, protocol.Refused{Reason: "这是种植计划的工单：在计划里改"}
 	}
 	if len(issue.Sessions) > 0 {
@@ -312,7 +324,7 @@ func (is *issues) Move(id, before string) ([]protocol.Issue, error) {
 	}
 	order := []string{}
 	for _, issue := range all {
-		if len(issue.Sessions) == 0 && issue.Plan == nil && issue.Step == nil && issue.ID != id {
+		if len(issue.Sessions) == 0 && issue.Graph == nil && issue.Task == nil && issue.ID != id {
 			order = append(order, issue.ID)
 		}
 	}
@@ -341,25 +353,7 @@ func (is *issues) Move(id, before string) ([]protocol.Issue, error) {
 	return is.List()
 }
 
-func (is *issues) Queue(id string, queued bool) (protocol.Issue, error) {
-	if _, err := is.unsent(id); err != nil {
-		return protocol.Issue{}, err
-	}
-	ctx := context.Background()
-	var err error
-	if queued {
-		err = is.q.QueueIssue(ctx, generated.QueueIssueParams{At: issueAt(clock.NowMs()), ID: id})
-	} else {
-		err = is.q.UnqueueIssue(ctx, id)
-	}
-	if err != nil {
-		return protocol.Issue{}, err
-	}
-	is.publish(id)
-	return is.Get(id)
-}
-
-// An issue not written down first (the manager sending someone at once, a playbook's step) is made from the session's job.
+// An issue not written down first (the manager sending someone at once, a task's step) is made from the session's job.
 func (is *issues) Ran(id string, session protocol.Session) error {
 	tx, err := is.db.Begin()
 	if err != nil {
@@ -367,13 +361,16 @@ func (is *issues) Ran(id string, session protocol.Session) error {
 	}
 	defer tx.Rollback()
 	ctx, q := context.Background(), is.q.WithTx(tx)
-	title, description := splitJob(session.Task)
+	title, description := splitJob(session.Brief)
 	if err := q.OpenIssue(ctx, generated.OpenIssueParams{
 		ID: id, Title: title, Description: description, Project: issueNull(session.Project), Assignee: issueNull(&session.Agent), CreatedAt: session.HiredAt,
 	}); err != nil {
 		return err
 	}
 	if err := q.AddSession(ctx, generated.AddSessionParams{Session: session.ID, Issue: id, StartedAt: session.HiredAt}); err != nil {
+		return err
+	}
+	if err := q.DequeueIssue(ctx, id); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -410,8 +407,8 @@ func putFamily(ctx context.Context, q *generated.Queries, issues, before []proto
 		params := generated.PutIssueParams{
 			ID: t.ID, Title: t.Title, Description: t.Description, Project: issueNull(t.Project), Assignee: issueNull(t.Assignee),
 			Priority: string(t.Priority), Rank: t.Rank, CreatedAt: t.CreatedAt, Closed: issueClosed(t.Closed),
-			Parent: issueNull(t.Parent), BlockedBy: issueJSON(t.BlockedBy, len(t.BlockedBy) > 0), Plan: issueJSON(t.Plan, t.Plan != nil),
-			Step: issueJSON(t.Step, t.Step != nil),
+			Parent: issueNull(t.Parent), BlockedBy: issueJSON(t.BlockedBy, len(t.BlockedBy) > 0), Graph: issueJSON(t.Graph, t.Graph != nil),
+			Task: issueJSON(t.Task, t.Task != nil),
 		}
 		if t.ClosedAt != nil {
 			params.ClosedAt = issueAt(*t.ClosedAt)
@@ -432,14 +429,14 @@ func putFamily(ctx context.Context, q *generated.Queries, issues, before []proto
 	return gone, nil
 }
 
-// The steps first, so that the playbook is whole when its parent issue changes.
-func (is *issues) PutPlaybook(pb protocol.Playbook) error {
+// Publish the family as one core commit after its database transaction succeeds.
+func (is *issues) PutTask(graph protocol.TaskGraph) error {
 	ctx := context.Background()
-	before, err := is.family(ctx, is.q, pb.ID)
+	before, err := is.family(ctx, is.q, graph.ID)
 	if err != nil {
 		return err
 	}
-	issues := protocol.PlaybookIssues(pb, before, clock.NowMs())
+	issues := protocol.GraphIssues(graph, before, clock.NowMs())
 	tx, err := is.db.Begin()
 	if err != nil {
 		return err
@@ -452,21 +449,28 @@ func (is *issues) PutPlaybook(pb protocol.Playbook) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	var facts []protocol.FactValue
 	for _, id := range gone {
-		is.core.Apply(protocol.FactIssueGone{ID: id})
+		facts = append(facts, protocol.FactIssueGone{ID: id})
 	}
 	for _, t := range append(issues[1:], issues[0]) {
-		is.publish(t.ID)
+		updated, err := is.Get(t.ID)
+		if err != nil {
+			return err
+		}
+		facts = append(facts, protocol.FactIssue{Issue: updated})
 	}
+	is.core.ApplyBatch(facts...)
+
 	return nil
 }
 
-func (is *issues) NextPlaybookID() (string, error) {
-	ids, err := is.q.PlanIDs(context.Background())
+func (is *issues) NextTaskID() (string, error) {
+	ids, err := is.q.GraphIDs(context.Background())
 	if err != nil {
 		return "", err
 	}
-	return nextPlaybookID(ids), nil
+	return nextTaskID(ids), nil
 }
 
 func issueTitle(issue protocol.Issue) string { return str.Cut(issue.Title, 40) }

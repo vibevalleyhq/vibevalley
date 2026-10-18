@@ -53,7 +53,7 @@ void main() {
       ),
     );
     const view = FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {});
-    final frame = ReceivedFrame(StateFrame(state: state, inbox: const [], plans: const [], view: view, effects: const []), bytes: 0, decodeMicros: 0);
+    final frame = ReceivedFrame(StateFrame(state: state, inbox: const [], graphs: const [], view: view, effects: const []), bytes: 0, decodeMicros: 0);
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1;
     final key = GlobalKey();
@@ -122,12 +122,12 @@ void main() {
     await tester.pump();
     expect(container.read(menuOpenProvider), isTrue);
     expect(find.text('院子里能点的'), findsOneWidget);
-    container.read(menuOpenProvider.notifier).set(false);
+    container.read(farmOverlaysProvider.notifier).menu(false);
     await tester.pump();
     await tester.tap(find.bySemanticsLabel('任务与成就'));
     await tester.pump();
-    expect(container.read(panelProvider), FarmPanel.tasks);
-    container.read(panelProvider.notifier).set(null);
+    expect(container.read(panelProvider), FarmPanel.graphs);
+    container.read(farmOverlaysProvider.notifier).panel(null);
     await tester.pumpWidget(const SizedBox());
   });
 }

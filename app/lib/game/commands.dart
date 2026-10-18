@@ -8,7 +8,7 @@ import '../gen/vibevalley.dart';
 import '../data/remote.dart' show SessionIssue;
 import 'tools.dart';
 import 'state.dart';
-import '../rules/playbook.dart';
+import '../rules/task.dart';
 
 final farmCommandsProvider = Provider<FarmCommands>(FarmCommands.new);
 
@@ -42,7 +42,7 @@ class FarmCommands {
   Future<void> cure(Session w) async {
     await _api.issue.comment(
       id: w.issueId,
-      body: CommentRequest(text: bugText(w.task)),
+      body: CommentRequest(text: bugText(w.brief)),
     );
     _fx(w, BedFxKind.spray);
   }
@@ -119,20 +119,20 @@ class FarmCommands {
     }
   }
 
-  Future<Answer> plan(PlanRequest request) => _answer(() => _api.playbook.plan(body: request));
-  Future<Answer> editNode(String id, String node, NodeEdit edit) => _answer(() => _api.playbook.updateNode(id: id, node: node, body: edit));
-  Future<Answer> removeNode(String id, String node) => _answer(() => _api.playbook.deleteNode(id: id, node: node));
-  Future<Answer> actOnPlaybook(String id, PlaybookAction action) => _answer(
-    () => _api.playbook.act(
+  Future<Answer> split(GraphSplitRequest request) => _answer(() => _api.graph.split(body: request));
+  Future<Answer> editTask(String id, String task, TaskEdit edit) => _answer(() => _api.graph.updateTask(id: id, task: task, body: edit));
+  Future<Answer> removeTask(String id, String task) => _answer(() => _api.graph.deleteTask(id: id, task: task));
+  Future<Answer> actOnGraph(String id, GraphAction action) => _answer(
+    () => _api.graph.act(
       id: id,
-      body: PlaybookActRequest(action: action),
+      body: GraphActRequest(action: action),
     ),
   );
-  Future<Answer> actOnNode(String id, String node, NodeAction action) => _answer(
-    () => _api.playbook.nodeAct(
+  Future<Answer> actOnTask(String id, String task, TaskAction action) => _answer(
+    () => _api.graph.taskAct(
       id: id,
-      node: node,
-      body: NodeActRequest(action: action),
+      task: task,
+      body: TaskActRequest(action: action),
     ),
   );
 

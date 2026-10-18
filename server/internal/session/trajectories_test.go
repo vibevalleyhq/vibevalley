@@ -72,7 +72,7 @@ func TestReasoningRunsOn(t *testing.T) {
 
 func TestSubAgentStepsGoUnderTheirCall(t *testing.T) {
 	j := sessionTrajectories(t, t.TempDir()).Open("w1", 0)
-	j.ToolStarted("task-1", ToolStart{Text: "派个帮手", Action: protocol.ToolActionOther, Tool: "Task"}, nil)
+	j.ToolStarted("task-1", ToolStart{Text: "派个帮手", Action: protocol.ToolActionOther, Tool: "TaskGraph"}, nil)
 	j.Said("帮手先看看", From{"task-1"})
 	j.ToolStarted("c1", ToolStart{Text: "ls", Action: protocol.ToolActionRunCommand, Tool: "bash"}, From{"task-1"})
 	j.ToolStarted("c1", ToolStart{Text: "pwd", Action: protocol.ToolActionRunCommand, Tool: "bash"}, nil)

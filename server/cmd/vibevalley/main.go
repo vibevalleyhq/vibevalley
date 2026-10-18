@@ -19,9 +19,10 @@ import (
 	"strings"
 	"sync"
 
+	"vibevalley/internal/agent/brain"
 	"vibevalley/internal/base"
 	"vibevalley/internal/protocol"
-	"vibevalley/pkg/agent"
+	"vibevalley/internal/task/engine"
 	"vibevalley/pkg/agentcore"
 	"vibevalley/pkg/ai"
 )
@@ -43,12 +44,10 @@ func short(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-type spent struct{ input, cached, output int }
-
-func show(e agent.AgentEvent, total *spent, prompt func()) {
-	switch e.Type {
-	case agentcore.EventMessageUpdate:
-		d := e.AssistantMessageEvent
+func show(e brain.AgentEvent, prompt func()) {
+	switch e := e.(type) {
+	case agentcore.MessageUpdated:
+		d := e.Delta
 		switch d.Type {
 		case ai.EventThinkingDelta:
 			fmt.Print(dim(d.Delta))
@@ -57,37 +56,33 @@ func show(e agent.AgentEvent, total *spent, prompt func()) {
 		case ai.EventTextDelta:
 			fmt.Print(d.Delta)
 		}
-	case agentcore.EventMessageEnd:
+	case agentcore.MessageEnded:
 		m, ok := e.Message.(ai.AssistantMessage)
 		if !ok {
 			return
 		}
-		total.input += m.Usage.Input
-		total.cached += m.Usage.CacheRead
-		total.output += m.Usage.Output
 		if m.StopReason == ai.StopError {
 			fmt.Print("\n出错了：" + m.ErrorMessage)
 		}
 		fmt.Print("\n")
-	case agentcore.EventToolExecutionStart:
+	case agentcore.ToolStarted:
 		fmt.Println(dim("→ " + e.ToolName + " " + short(string(e.Args))))
-	case agentcore.EventToolExecutionEnd:
+	case agentcore.ToolEnded:
 		mark := "✓"
 		if e.IsError {
 			mark = "✗"
 		}
 		fmt.Println(dim(mark + " " + short(agentcore.ResultText(e.Result.Content))))
-	case agent.EventCompactionEnd:
+	case brain.CompactionEnded:
 		if e.Compaction != nil {
 			fmt.Println(dim("（前面的对话压成了摘要，原文在 " + e.Compaction.Archive + "）"))
 		}
-	case agent.EventAgentSettled:
+	case brain.AgentSettled:
 		stopped := ""
-		if e.Aborted {
+		if e.Run.Aborted {
 			stopped = "停下了，"
 		}
-		fmt.Print(dim(fmt.Sprintf("（%s输入 %d，缓存 %d，输出 %d）\n", stopped, total.input, total.cached, total.output)))
-		*total = spent{}
+		fmt.Print(dim(fmt.Sprintf("（%s输入 %d，缓存 %d，输出 %d）\n", stopped, e.Run.Usage.Input, e.Run.Usage.CacheRead, e.Run.Usage.Output)))
 		if prompt != nil {
 			prompt()
 		}
@@ -154,7 +149,7 @@ func run(cwdFlag, name, model, mcpFile, once string, asked bool) error {
 	if err != nil {
 		return err
 	}
-	llm, err := agent.Deepseek(cmp.Or(model, cfg.Agent.Model), cfg.DeepSeek.APIKey)
+	llm, err := brain.Deepseek(cmp.Or(model, cfg.Agent.Model), cfg.DeepSeek.APIKey)
 	if err != nil {
 		return err
 	}
@@ -169,40 +164,40 @@ func run(cwdFlag, name, model, mcpFile, once string, asked bool) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	servers, err := agent.ReadMcpConfig(mcpFile)
+	servers, err := brain.ReadMcpConfig(mcpFile)
 	if err != nil {
 		return err
 	}
-	mcp := agent.ConnectAll(ctx, servers)
-	defer mcp.Close()
-	for _, why := range mcp.Failed {
-		fmt.Fprintln(os.Stderr, dim(why))
-	}
 	// A one-off question keeps no schedules running.
 	schedules := !asked
-	a := agent.NewAgent(ctx, agent.AgentOptions{
+	a := brain.NewAgent(ctx, brain.AgentOptions{
 		Name:          name,
 		Instructions:  INSTRUCTIONS,
 		Model:         llm.Model,
 		StreamOptions: llm.StreamOptions,
 		Home:          home,
 		Cwd:           cwd,
-		Tools:         append(agent.CodingTools(agent.CodingOptions{Cwd: cwd}), mcp.Tools...),
+		Tools:         brain.CodingTools(brain.CodingOptions{Cwd: cwd}),
+		McpServers:    servers,
 		Schedules:     &schedules,
+		Tasks:         &engine.MemoryStore{},
 	})
 	defer a.Close()
+	mcp := a.McpStatus()
+	for _, why := range mcp.Failed {
+		fmt.Fprintln(os.Stderr, dim(why))
+	}
 
 	var mu sync.Mutex
 	prompt := func() {}
 	events := a.Subscribe()
 	defer events.Close()
 	go func() {
-		total := &spent{}
 		for e := range events.C {
 			mu.Lock()
 			p := prompt
 			mu.Unlock()
-			show(e, total, p)
+			show(e, p)
 		}
 	}()
 
@@ -211,14 +206,14 @@ func run(cwdFlag, name, model, mcpFile, once string, asked bool) error {
 		mu.Lock()
 		prompt = func() { printed <- struct{}{} }
 		mu.Unlock()
-		if _, err := a.Ask(ctx, agent.UserMessage(once)); err != nil {
+		if _, err := a.Ask(ctx, brain.UserMessage(once)); err != nil {
 			return err
 		}
 		<-printed
 		return nil
 	}
 
-	fmt.Println(dim(fmt.Sprintf("vibevalley agent · %s · %s\n%d 个技能，%d 个 MCP 工具。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。", cwd, home, len(a.Skills()), len(mcp.Tools))))
+	fmt.Println(dim(fmt.Sprintf("vibevalley agent · %s · %s\n%d 个技能，%d 个 MCP 工具。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。", cwd, home, len(a.Skills()), mcp.ToolCount)))
 	mu.Lock()
 	prompt = func() { fmt.Print("› ") }
 	mu.Unlock()
@@ -252,7 +247,7 @@ func run(cwdFlag, name, model, mcpFile, once string, asked bool) error {
 				fmt.Println(dim("忘掉了。"))
 				fmt.Print("› ")
 			case text != "":
-				a.Send(agent.UserMessage(text))
+				a.Send(brain.UserMessage(text))
 			default:
 				fmt.Print("› ")
 			}

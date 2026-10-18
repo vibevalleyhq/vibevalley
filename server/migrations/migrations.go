@@ -7,16 +7,20 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"io/fs"
 	"os"
 	"slices"
 )
 
 //go:embed *.sql
-var FS embed.FS
+var embedded embed.FS
+
+// The migrations Up runs, in name order: the files here. A test of the upgrade path puts its own.
+var FS fs.FS = embedded
 
 // In the order they run.
 func Names() []string {
-	entries, _ := FS.ReadDir(".")
+	entries, _ := fs.ReadDir(FS, ".")
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
 		names = append(names, e.Name())
@@ -32,41 +36,47 @@ func Version(db *sql.DB) (int, error) {
 	return done, err
 }
 
-// Runs the ones db has not had, each in its own transaction, and says which ran. path is db's file (":memory:" for none): a
-// database about to change is copied beside it first, as it was (vibevalley.db.v5 at version 5).
-func Up(db *sql.DB, path string) ([]string, error) {
-	names := Names()
-	done, err := Version(db)
-	if err != nil {
-		return nil, err
-	}
-	if done > len(names) {
-		return nil, fmt.Errorf("%s is from a schema this server does not know (version %d, it knows %d): start with another home or VIBEVALLEY_DB", path, done, len(names))
-	}
-	if done > 0 && done < len(names) && path != ":memory:" {
-		copied := fmt.Sprintf("%s.v%d", path, done)
-		if _, err := os.Stat(copied); err != nil {
-			if _, err := db.Exec("vacuum into ?", copied); err != nil {
-				return nil, fmt.Errorf("copy before migrating: %w", err)
-			}
-		}
-	}
-	// Foreign keys are off while a migration runs, as SQLite's way to build a table again asks (a rename would rewrite the
-	// references to it): on one connection, since the pragma is the connection's and cannot change inside a transaction.
-	// Each migration is checked before it commits.
+// Up backs up and migrates SQLite's actual main database on one connection.
+// An empty main filename denotes a memory or temporary database and has no adjacent backup.
+func Up(db *sql.DB) ([]string, error) {
 	ctx := context.Background()
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
+	path, err := mainFile(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+	names := Names()
+	var done int
+	if err := conn.QueryRowContext(ctx, "pragma main.user_version").Scan(&done); err != nil {
+		return nil, err
+	}
+	if done > len(names) {
+		label := path
+		if label == "" {
+			label = ":memory:"
+		}
+		return nil, fmt.Errorf("%s is from a schema this server does not know (version %d, it knows %d): start with another home or VIBEVALLEY_DB", label, done, len(names))
+	}
+	if done > 0 && done < len(names) && path != "" {
+		copied := fmt.Sprintf("%s.v%d", path, done)
+		if _, err := os.Stat(copied); err != nil {
+			if _, err := conn.ExecContext(ctx, "vacuum main into ?", copied); err != nil {
+				return nil, fmt.Errorf("copy before migrating: %w", err)
+			}
+		}
+	}
+	// Foreign-key pragmas and migrations use this same connection; each migration is checked before commit.
 	if _, err := conn.ExecContext(ctx, "pragma foreign_keys = off"); err != nil {
 		return nil, err
 	}
 	defer conn.ExecContext(ctx, "pragma foreign_keys = on")
 	var ran []string
 	for i, name := range names[done:] {
-		body, err := FS.ReadFile(name)
+		body, err := fs.ReadFile(FS, name)
 		if err != nil {
 			return ran, err
 		}
@@ -92,6 +102,29 @@ func Up(db *sql.DB, path string) ([]string, error) {
 		ran = append(ran, name)
 	}
 	return ran, nil
+}
+
+// SQLite resolves URI escapes, relative paths and in-memory names for the opened connection.
+func mainFile(ctx context.Context, conn *sql.Conn) (string, error) {
+	rows, err := conn.QueryContext(ctx, "pragma database_list")
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var seq int
+		var name, path string
+		if err := rows.Scan(&seq, &name, &path); err != nil {
+			return "", err
+		}
+		if name == "main" {
+			return path, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+	return "", fmt.Errorf("SQLite connection has no main database")
 }
 
 // foreignKeysBroken names the first row whose reference points nowhere, "" when there is none.

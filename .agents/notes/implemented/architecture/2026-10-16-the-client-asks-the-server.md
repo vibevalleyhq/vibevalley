@@ -19,7 +19,7 @@ Status: implemented
   - 额度：`RuntimeInfo.quota` 带剩几成和那句话（`runtime/quota.go`），管家和额度条都读它。
   - 成就表、每档的金币在 `seeds.json`，经生成到 `lib/gen` 的 `achievements`；Dart 不再手抄一份成就表和金币。
   - 每种动作怎么说（跑命令、读文件……）在 `seeds.json` 的 `actionText`，Go 的 `ActionText` 和 Dart 生成的 `actionText` 读同一份；原来 Dart 的 `actionMeaning` 抄了一份，已经和 Go 差了两个词。
-  - 计划：`PlaybooksOf` 给计划填 `layers`、`asksForYou`、`spent`、`settled`，给每一步填 `blockedBy`；`playbook.Events` 给每条动态填 `text`（步骤用现在的标题）。
+  - 计划：`TasksOf` 给计划填 `layers`、`asksForYou`、`spent`、`settled`，给每一步填 `blockedBy`；`task.Events` 给每条动态填 `text`（步骤用现在的标题）。
 - **Go 里不留「为了对照」的规则**：只给页面读帧用的小函数（哪些频道、某个帮工的工单串、未读几条、某档成就叫什么、离下一档还差多少、庄稼熟没熟、能不能收），开着的服务端不调，只在 Go 里录黄金数据，Dart 另有一份。这种删掉 Go 的，留在客户端：它们是读帧，不是折事实。判断用 `go run golang.org/x/tools/cmd/deadcode@latest ./...`：protocol 里导出却从 `main` 走不到的，要么让服务端用上（填进形状），要么删。
 - **客户端里一份数据一个来源**：档案和农机只从 `workbenchConfigProvider` 读（服务端推的 `SideEventRuntime` 让农机保持最新），`agentsProvider`、`runtimesProvider` 是从它派生的；看板不再自己读档案，农场不再每分钟轮询农机。工地事件只有 `sideEventsProvider` 一条。
 - **两边都要的值由生成带过去**：`//vibevalley:const` 和 `seeds.json` 的客户端部分（[Go 拥有形状](2026-10-15-go-owns-the-shapes.md)）。这一篇管的是规则，那一篇管的是值。
@@ -38,7 +38,7 @@ Status: implemented
 
 - 页面上的这几句要等服务端回答，第一次打开时晚一下才出现；本机的服务端很快，可以接受。
 - 测试替身要回答这几个接口（`test/support/desk.dart` 只回最简单的那一条，其余规则在 Go 测）。
-- 少了 `recall.dart`、`recall_parity_test.dart`、`recall.sample.json` 和它的生成，以及 Dart 里 `moneyStop`、`agentIssues`、`conflictTask`、`voiceProblem`、`settingsProblem`、`voiceOverrides`、`keyHint`、`actionText`、`quotaText`、`quotaLeft`、`streakMultiplier`、`xpToNext`、手抄的成就表、`whenText`、`nextRun`、`nextText`、按正则认 @ 的 `mentionsIn`、`addressOf`、`layersOf`、`blockedBy`、`asksForYou`、`playbookSpent`、`isSettled`、`playbookEventText`、`Need` 和 `needOf` 和它们的测试；Go 里少了 `ChannelsOf`、`JobThreadOf`、`ThreadUnder`、`UnreadIn`、`TierTitle`、`Standing`、`IsRipe`、`CanMerge`、`EmptyChat`、`RuntimePresets`、`CanSteer`、`base.Placeholders`。
+- 少了 `recall.dart`、`recall_parity_test.dart`、`recall.sample.json` 和它的生成，以及 Dart 里 `moneyStop`、`agentIssues`、`conflictTask`、`voiceProblem`、`settingsProblem`、`voiceOverrides`、`keyHint`、`actionText`、`quotaText`、`quotaLeft`、`streakMultiplier`、`xpToNext`、手抄的成就表、`whenText`、`nextRun`、`nextText`、按正则认 @ 的 `mentionsIn`、`addressOf`、`layersOf`、`blockedBy`、`asksForYou`、`taskSpent`、`isSettled`、`taskEventText`、`Need` 和 `needOf` 和它们的测试；Go 里少了 `ChannelsOf`、`JobThreadOf`、`ThreadUnder`、`UnreadIn`、`TierTitle`、`Standing`、`IsRipe`、`CanMerge`、`EmptyChat`、`RuntimePresets`、`CanSteer`、`base.Placeholders`。
 - 计划的 id 不再照 JavaScript 的 `Number` 读（`p0x10`、`p1.5` 以前算数），只认 `p` 加整数；庄稼选麦子还是胡萝卜改用 FNV 哈希，不再模仿 JavaScript 的 UTF-16。黄金数据重录：只有 `nextId` 和地块的 `crop` 变了。
 - 定时的「下次几点」以前按这台机器的时区算，现在按定时自己的时区（Go 有时区库，Dart 没有）。
 
@@ -48,7 +48,7 @@ Status: implemented
 - `server/internal/game`：`TestTheOwnersReviewAndCallAreCounted`。
 - `server/internal/protocol`：`TestReduceKeepsSchedules` 查定时的两句话只在帧里；`TestTheFrameSaysTheWordsOnACopy`；`reduce.jsonl.gz`、`play.jsonl.gz` 重录后只多了 `phaseText`、`whenText`、`nextText`、`multiplier`。
 - `server/internal/runtime`：`TestQuotaWords`。
-- `server/internal/protocol`：`TestPlaybookAsIssues` 查读回来的计划带上分层和在等谁；`server/internal/issue` 的 `TestNextPlaybookID`。
-- `server/internal/playbook`：动态的 `text` 用步骤的标题。
+- `server/internal/protocol`：`TestTaskAsIssues` 查读回来的计划带上分层和在等谁；`server/internal/issue` 的 `TestNextTaskID`。
+- `server/internal/task`：动态的 `text` 用步骤的标题。
 - `server/internal/workspace`：`TestConflictingBranchStaysUntilResolved` 用 `Issue.Resolve` 交代冲突，没有冲突的帮工被拒绝。
 - `bun run flutter:check`：档案页、编辑页、派活、记性面板、两处冲突按钮的测试改成读服务端的回答。

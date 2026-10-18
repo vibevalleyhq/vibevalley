@@ -125,7 +125,7 @@ SHEETS: dict[str, Sheet] = {
         "icon-tasks", "icon-log", "icon-coin", "icon-clock",
     ], height=24, reference=list(range(12))),
     "ui-icons-more": Sheet(4, 3, [
-        "icon-plan", "icon-skillbook", "icon-shed", "icon-trophy",
+        "icon-task-board", "icon-skillbook", "icon-shed", "icon-trophy",
         "icon-scarecrow", "icon-seeds", "icon-bunting", "icon-doghouse",
         "icon-wrench", "icon-bell", "icon-board", "icon-star",
     ], height=24, reference=list(range(12))),
@@ -133,9 +133,9 @@ SHEETS: dict[str, Sheet] = {
     "ui-medals": Sheet(4, 2, ["medal-bronze", "medal-silver", "medal-gold", "medal-wood", "medal-locked", "stamp-done", "coins-stack", "banner-title"], height=40, reference=[0, 1, 2]),
     "ui-emblems": Sheet(5, 3, [
         f"emblem-{a}"
-        for a in ["harvests", "first_try", "big_playbook", "farm_level", "steady", "untangle", "comeback", "thrifty", "every_machine", "handoff", "parallel_plan", "night_owl", "weekend", "full_house", "wreath"]
+        for a in ["harvests", "first_try", "big_graph", "farm_level", "steady", "untangle", "comeback", "thrifty", "every_machine", "handoff", "parallel_graph", "night_owl", "weekend", "full_house", "wreath"]
     ], height=24, reference=list(range(15))),
-    "ui-starter": Sheet(4, 2, [f"emblem-{a}" for a in ["s_open", "s_hire", "s_tell", "s_review", "s_voice", "s_plan", "s_call", "starter"]], height=24, reference=list(range(8))),
+    "ui-starter": Sheet(4, 2, [f"emblem-{a}" for a in ["s_open", "s_hire", "s_tell", "s_review", "s_voice", "s_split", "s_call", "starter"]], height=24, reference=list(range(8))),
     # Language logos, redrawn from design/assets/raw/langs-<n>.png; the letters in them stay (gen.sh, prompts/ui-langs.txt).
     **{f"ui-langs-{n}": Sheet(4, 3, [f"lang-{lang}" for lang in langs], height=24, reference=list(range(12)), logos=True) for n, langs in enumerate(LANGS, start=1)},
     # The runtimes' logos (logos/, LobeHub Icons) as pixel art: logo-<runtime id>, pinned on the machines.

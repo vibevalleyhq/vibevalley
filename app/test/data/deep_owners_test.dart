@@ -126,6 +126,21 @@ void main() {
     second.close();
   });
 
+  test('run identity keeps adjacent turns separate and excludes legacy events', () async {
+    final events = [
+      const SessionEvent(seq: 1, time: 1000, type: SessionEventType.toolCall, run: 'first', text: 'first tool'),
+      const SessionEvent(seq: 2, time: 1100, type: SessionEventType.toolCall, run: 'second', text: 'second tool'),
+      const SessionEvent(seq: 3, time: 1200, type: SessionEventType.toolCall, text: 'legacy'),
+    ];
+    final server = FakeServer((_) async => jsonResponse(events.map((e) => e.toJson()).toList()));
+    final c = container(server);
+    final keep = c.listen(runEventsProvider((session: 's', run: 'first')), (_, _) {});
+    await c.read(sessionEventsProvider('s').future);
+    expect(c.read(runEventsProvider((session: 's', run: 'first'))).requireValue.map((e) => e.text), ['first tool']);
+    expect(c.read(runEventsProvider((session: 's', run: 'second'))).requireValue.map((e) => e.text), ['second tool']);
+    keep.close();
+  });
+
   test('a chat feed combines history with the server frame without duplicate messages', () {
     final server = FakeServer();
     const general = Conversation(id: 'general', kind: ConversationKind.general, replies: 0, at: 0);

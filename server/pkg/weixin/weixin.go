@@ -44,7 +44,7 @@ type Account struct {
 	Token   string
 }
 
-type QrStatus struct {
+type qrStatus struct {
 	Status       string `json:"status"` // wait, scaned, confirmed, expired, scaned_but_redirect, need_verifycode, verify_code_blocked, binded_redirect
 	BotToken     string `json:"bot_token,omitempty"`
 	IlinkBotID   string `json:"ilink_bot_id,omitempty"`
@@ -90,9 +90,7 @@ type Updates struct {
 }
 
 type API interface {
-	QrCode(ctx context.Context) (qrcode, url string, err error)
-	// A network hiccup reads as wait.
-	QrStatus(ctx context.Context, baseURL, qrcode, verifyCode string) QrStatus
+	Login(context.Context, func(LoginProgress), func() string) (LoginAccount, error)
 	// Nothing within timeout reads as an empty answer.
 	GetUpdates(ctx context.Context, account Account, buf string, timeout time.Duration) (Updates, error)
 	// Rides on the context of the user's latest message.
@@ -188,7 +186,7 @@ func (l *Client) request(ctx context.Context, label, method, target string, body
 	return nil
 }
 
-func (l *Client) QrCode(ctx context.Context) (string, string, error) {
+func (l *Client) qrCode(ctx context.Context) (string, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	var body struct {
@@ -209,16 +207,16 @@ func (l *Client) QrCode(ctx context.Context) (string, string, error) {
 	return body.Qrcode, body.QrcodeImgContent, nil
 }
 
-func (l *Client) QrStatus(ctx context.Context, baseURL, qrcode, verifyCode string) QrStatus {
+func (l *Client) qrStatus(ctx context.Context, baseURL, qrcode, verifyCode string) qrStatus {
 	ctx, cancel := context.WithTimeout(ctx, 35*time.Second)
 	defer cancel()
 	q := "ilink/bot/get_qrcode_status?qrcode=" + url.QueryEscape(qrcode)
 	if verifyCode != "" {
 		q += "&verify_code=" + url.QueryEscape(verifyCode)
 	}
-	var s QrStatus
+	var s qrStatus
 	if err := l.request(ctx, "get_qrcode_status", http.MethodGet, endpointURL(baseURL, q), nil, "", false, &s); err != nil || s.Status == "" {
-		return QrStatus{Status: "wait"}
+		return qrStatus{Status: "wait"}
 	}
 	return s
 }

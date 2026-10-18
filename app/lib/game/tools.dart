@@ -112,8 +112,8 @@ Aim aimTool(Tool tool, Bed bed, Session? session, PlotView plot, int level) {
     case Tool.weed:
       return Aim(false, crop == Crop.weeds ? '批准还没接上' : '没有杂草');
     case Tool.harvest:
-      // A playbook's step goes into the playbook's branch by itself; the whole playbook is harvested on its board.
-      if (session?.playbook != null) return const Aim(false, '计划里的一步：做完自动合进计划分支');
+      // A task's step goes into the task's branch by itself; the whole task is harvested on its board.
+      if (session?.graph != null) return const Aim(false, '计划里的一步：做完自动合进计划分支');
       return session != null && canHarvest(session)
           ? Aim(true, isRipe(crop) ? '收获，帮工收工' : '收获：看看它改了什么')
           : Aim(false, session != null ? '还没熟，等它做完' : '空地没有东西可收');
@@ -129,7 +129,7 @@ String bugText(String task) {
 
 const seedCount = 8;
 
-/// A job longer than this is a playbook step's brief or a long instruction, not a seed to sow again.
+/// A job longer than this is a task step's brief or a long instruction, not a seed to sow again.
 const seedLength = 60;
 
 final _projectSeeds = <String Function(String)>[

@@ -28,21 +28,8 @@ String _sendKey() => List.generate(16, (_) => _keys.nextInt(256).toRadixString(1
 
 class VoiceCall extends ChangeNotifier {
   VoiceCall(this.api, {this.agentPick, RtcEngine Function()? createEngine}) : _createEngine = createEngine ?? createAgoraRtcEngine {
-    captions.onHeard = (text) => api.manager
-        .hear(
-          body: SayRequest(text: text, agent: agentPick?.call(), sendKey: _sendKey()),
-        )
-        .catchError((Object _) {});
-    // The server keeps it only while the call is on, and only when Agora's model answered.
-    captions.onAnswered = (text) {
-      final agent = _agentId;
-      if (agent == null) return;
-      api.voice
-          .said(
-            body: VoiceSaid(agentId: agent, text: text),
-          )
-          .catchError((Object _) {});
-    };
+    captions.onHeard = (text) => _caption(text, owner: true);
+    captions.onAnswered = (text) => _caption(text, owner: false);
   }
 
   final VibeValleyApi api;
@@ -96,6 +83,29 @@ class VoiceCall extends ChangeNotifier {
   }
 
   String? _agentId;
+  final _pendingCaptions = <({String text, bool owner, String? picked, String? key})>[];
+
+  void _caption(String text, {required bool owner}) {
+    if (_cancelled || phase == CallPhase.idle) return;
+    final caption = (text: text, owner: owner, picked: owner ? agentPick?.call() : null, key: owner ? _sendKey() : null);
+    final agent = _agentId;
+    if (agent == null) {
+      _pendingCaptions.add(caption);
+    } else {
+      _sendCaption(agent, caption);
+    }
+  }
+
+  void _sendCaption(String agent, ({String text, bool owner, String? picked, String? key}) caption) {
+    final sent = caption.owner
+        ? api.voice.heard(
+            body: VoiceHeard(agentId: agent, text: caption.text, agent: caption.picked, sendKey: caption.key),
+          )
+        : api.voice.said(
+            body: VoiceSaid(agentId: agent, text: caption.text),
+          );
+    unawaited(sent.catchError((Object _) {}));
+  }
 
   Future<void> start() {
     if (_disposed || phase != CallPhase.idle) return Future.value();
@@ -242,6 +252,10 @@ class VoiceCall extends ChangeNotifier {
               throw _CallCancelled();
             }
             _agentId = agent.agentId;
+            for (final caption in _pendingCaptions) {
+              _sendCaption(agent.agentId, caption);
+            }
+            _pendingCaptions.clear();
             return agent;
           });
       await _untilCancelled(agent, cancellation);
@@ -293,6 +307,7 @@ class VoiceCall extends ChangeNotifier {
   Future<void> _teardown() async {
     final agent = _agentId;
     _agentId = null;
+    _pendingCaptions.clear();
     if (agent != null) await _stopAgent(agent);
     final engine = _engine;
     _engine = null;

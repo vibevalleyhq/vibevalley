@@ -25,7 +25,7 @@ String threadTitle(Chat? chat, Conversation thread, List<Session> sessions) {
     final said = messagesIn(chat, thread.id).where((m) => m.from == thread.subjectId).firstOrNull?.name;
     return '${session?.name ?? said ?? thread.subjectId ?? ''}的工单串';
   }
-  if (thread.subjectKind == SubjectKind.playbook) return '计划 ${thread.subjectId ?? ''}';
+  if (thread.subjectKind == SubjectKind.graph) return '计划 ${thread.subjectId ?? ''}';
   final parent = parentOf(chat, thread);
   if (parent == null) return '串';
   final flat = parent.text.replaceAll(RegExp(r'\s+'), ' ');
@@ -689,7 +689,7 @@ class _Jobs extends ConsumerWidget {
                         ),
                         style: KitText.sm,
                       ),
-                      Text(h.task, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                      Text(h.brief, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
                       Row(
                         children: [
                           PhaseGlyph(h.phase, size: 14),

@@ -50,11 +50,14 @@ func sessionOf(ctx context.Context, runtime oar.Runtime, installation oar.Availa
 }
 
 // installationOf probes the runtime; a missing installation comes back as a reason.
-func installationOf(ctx context.Context, runtime oar.Runtime) (oar.AvailableInstallation, string, error) {
+func installationOf(ctx context.Context, runtime oar.Runtime, accepted *oar.AvailableInstallation, options oar.InstallationOptions) (oar.AvailableInstallation, string, error) {
+	if accepted != nil {
+		return *accepted, "", nil
+	}
 	if runtime.Installation == nil {
 		return oar.AvailableInstallation{}, runtime.ID + " exposes no installation probe", nil
 	}
-	snapshot, err := runtime.Installation(ctx)
+	snapshot, err := runtime.Installation(ctx, options)
 	if err != nil {
 		return oar.AvailableInstallation{}, "", err
 	}

@@ -7,14 +7,10 @@ import (
 	"vibevalley/internal/protocol"
 )
 
-// How the manager words what was spent and what its patrol finds, over the recorded cases (testdata/rules.jsonl.gz).
+// What the manager's patrol finds, over the recorded cases (testdata/rules.jsonl.gz).
 func TestRulesGolden(t *testing.T) {
 	seen := golden.Rules(t, "testdata/rules.jsonl.gz", func(c golden.Case) any {
 		switch c.Fn {
-		case "spentText":
-			var spent protocol.Spent
-			c.Decode(t, c.In, &spent)
-			return spentText(spent)
 		case "patrol":
 			// Every fifth round the farm is empty: what was hanging is forgotten.
 			var in struct {
@@ -37,7 +33,7 @@ func TestRulesGolden(t *testing.T) {
 		t.Fatalf("line %d: unknown fn %q", c.Line, c.Fn)
 		return nil
 	})
-	if len(seen) != 2 {
+	if len(seen) != 1 {
 		t.Fatalf("rules seen: %v", seen)
 	}
 }

@@ -16,13 +16,13 @@ const giveUpAfter = Duration(seconds: 20);
 typedef LoadStep = ({String label, bool done});
 
 class Loading {
-  const Loading(this.steps, {required this.gaveUp});
-  final List<LoadStep> steps;
+  const Loading(this.tasks, {required this.gaveUp});
+  final List<LoadStep> tasks;
   final bool gaveUp;
 
-  double get fraction => steps.where((s) => s.done).length / steps.length;
+  double get fraction => tasks.where((s) => s.done).length / tasks.length;
   bool get finished => fraction == 1 || gaveUp;
-  LoadStep? get now => steps.where((s) => !s.done).firstOrNull;
+  LoadStep? get now => tasks.where((s) => !s.done).firstOrNull;
 }
 
 class Startup extends ConsumerStatefulWidget {
@@ -162,7 +162,7 @@ class LoadingBar extends StatelessWidget {
               alignment: WrapAlignment.center,
               spacing: 12,
               children: [
-                for (final s in loading.steps)
+                for (final s in loading.tasks)
                   Opacity(
                     opacity: s.done ? 1 : 0.6,
                     child: Row(

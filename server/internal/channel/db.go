@@ -16,12 +16,13 @@ import (
 type chatStore struct{ q *generated.Queries }
 
 type chatMeta struct {
-	Mentions    []string          `json:"mentions,omitempty"`
-	Session     string            `json:"session,omitempty"`
-	Outcome     *protocol.Outcome `json:"outcome,omitempty"`
-	Spent       *protocol.Spent   `json:"spent,omitempty"`
-	ForPlaybook bool              `json:"forPlaybook,omitempty"`
-	Code        string            `json:"code,omitempty"`
+	Run      string            `json:"run,omitempty"`
+	Mentions []string          `json:"mentions,omitempty"`
+	Session  string            `json:"session,omitempty"`
+	Outcome  *protocol.Outcome `json:"outcome,omitempty"`
+	Spent    *protocol.Spent   `json:"spent,omitempty"`
+	ForTask  bool              `json:"forTask,omitempty"`
+	Code     string            `json:"code,omitempty"`
 	// Said on a call: the manager heard it there, so it wakes no one here.
 	Spoken bool `json:"spoken,omitempty"`
 }
@@ -324,7 +325,7 @@ func (s chatStore) recentMessages(limit int) ([]chatMsgRow, error) {
 	return out, nil
 }
 
-// Newest first.
+// A page is chronological regardless of which cursor selected it.
 func (s chatStore) messagesBefore(conversation string, before int64, limit int) ([]chatMsgRow, error) {
 	list, err := s.q.MessagesBefore(bg, generated.MessagesBeforeParams{ConversationID: conversation, Number: before, Limit: int64(limit)})
 	if err != nil {
@@ -332,7 +333,7 @@ func (s chatStore) messagesBefore(conversation string, before int64, limit int) 
 	}
 	out := make([]chatMsgRow, len(list))
 	for i, r := range list {
-		out[i] = chatMsgOf(r.ChannelMessage, r.ChannelParticipant)
+		out[len(list)-1-i] = chatMsgOf(r.ChannelMessage, r.ChannelParticipant)
 	}
 	return out, nil
 }

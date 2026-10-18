@@ -75,20 +75,20 @@ func TestClientRegistersAndSends(t *testing.T) {
 	live.accounts = map[Domain]string{"feishu": server.URL, "lark": server.URL}
 	live.open = map[Domain]string{"feishu": server.URL, "lark": server.URL}
 	ctx := context.Background()
-	reg, err := live.Register(ctx)
+	reg, err := live.register(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if u, _ := url.Parse(reg.URL); u.Path != "/page/cli" || u.Query().Get("user_code") != "AB" || reg.Interval != 2*time.Second || reg.Expires != 300*time.Second {
 		t.Fatalf("registration: %+v", reg)
 	}
-	if p := live.Poll(ctx, "dev", "feishu"); p.Status != "pending" || p.Domain != "lark" {
+	if p := live.poll(ctx, "dev", "feishu"); p.Status != "pending" || p.Domain != "lark" {
 		t.Fatalf("pending: %+v", p)
 	}
-	if p := live.Poll(ctx, "dev", "lark"); p.Status != "succeeded" || p.AppID != "cli_1" || p.OpenID != "ou_owner" || p.Domain != "lark" {
+	if p := live.poll(ctx, "dev", "lark"); p.Status != "succeeded" || p.AppID != "cli_1" || p.OpenID != "ou_owner" || p.Domain != "lark" {
 		t.Fatalf("succeeded: %+v", p)
 	}
-	if p := live.Poll(ctx, "denied", "feishu"); p.Status != "failed" || p.Reason != "在飞书里拒绝了。" {
+	if p := live.poll(ctx, "denied", "feishu"); p.Status != "failed" || p.Reason != "在飞书里拒绝了。" {
 		t.Fatalf("denied: %+v", p)
 	}
 	id, err := live.SendText(ctx, App{AppID: "cli_1", AppSecret: "s", Domain: "feishu"}, "ou_owner", "好")

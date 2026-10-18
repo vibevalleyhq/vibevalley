@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/remote.dart' show sessionEventsProvider;
+import '../data/remote.dart' show runEventsProvider;
 import '../shared/work_log.dart';
-import '../game/state.dart' show turnEndingAt;
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 
 class TurnSteps extends ConsumerStatefulWidget {
-  const TurnSteps({super.key, required this.id, required this.at, this.manager = false});
+  const TurnSteps({super.key, required this.id, required this.run, this.manager = false});
   final String id;
-  final double at;
+  final String? run;
   final bool manager;
 
   @override
@@ -22,8 +21,10 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
 
   @override
   Widget build(BuildContext context) {
-    final steps = ref.watch(sessionEventsProvider(widget.id)).value;
-    final turn = steps == null ? const <SessionEvent>[] : turnEndingAt(steps, widget.at);
+    final run = widget.run;
+    if (run == null) return Text('这条消息没有记录执行轮次', style: KitText.xs.copyWith(color: Palette.bark500));
+    final steps = ref.watch(runEventsProvider((session: widget.id, run: run))).value;
+    final turn = steps ?? const <SessionEvent>[];
     final tools = turn.where((s) => s.type == SessionEventType.toolCall).length;
     if (widget.manager && tools == 0) return const SizedBox.shrink();
     final label = tools > 0 ? '用了 $tools 个工具' : '这一轮的干活过程';

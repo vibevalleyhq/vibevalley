@@ -36,7 +36,13 @@ type chatFakeSessions struct {
 	n       int
 }
 
+func (x *chatFakeSessions) InputsConsumed() *base.Hub[session.InputConsumed] {
+	return base.NewHub[session.InputConsumed]()
+}
+
 func (x *chatFakeSessions) Launches() *base.Hub[session.LaunchActivity] { return x.hub }
+
+func (x *chatFakeSessions) CurrentRun(id string) string { return "" }
 
 func (x *chatFakeSessions) Find(id string) *session.Roster {
 	h := x.f.Core.Session(id)
@@ -197,7 +203,7 @@ func chatDeliveryOf(t *testing.T, f *world, recipient string, message string) *c
 func (x *chatFakeSessions) hire(t *testing.T, id, task, project string, channel *string) protocol.Conversation {
 	t.Helper()
 	x.f.Core.Apply(protocol.FactHired{Session: protocol.Session{
-		ID: id, Name: "帮工" + id, Agent: "lab", Runtime: "pi", Task: task, Project: &project, HiredAt: clock.NowMs(),
+		ID: id, Name: "帮工" + id, Agent: "lab", Runtime: "pi", Brief: task, Project: &project, HiredAt: clock.NowMs(),
 		Phase: protocol.Phase{Value: protocol.PhaseResting{}}, Channel: channel,
 	}})
 	thread := testkit.Await(t, "a job thread", func() (protocol.Conversation, bool) {
@@ -402,7 +408,7 @@ func TestChatBusySessionGetsOneNotice(t *testing.T) {
 	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
 	project := "chat-d"
 	f.Core.Apply(protocol.FactHired{Session: protocol.Session{
-		ID: "w6", Name: "帮工w6", Agent: "lab", Runtime: "pi", Task: "慢慢做一个大活", Project: &project, HiredAt: clock.NowMs(),
+		ID: "w6", Name: "帮工w6", Agent: "lab", Runtime: "pi", Brief: "慢慢做一个大活", Project: &project, HiredAt: clock.NowMs(),
 		Phase: protocol.Phase{Value: protocol.PhaseResting{}},
 	}})
 	thread := testkit.Await(t, "a job thread", func() (protocol.Conversation, bool) {
@@ -571,9 +577,9 @@ func TestChatManagerSaysGrowsThenDelivers(t *testing.T) {
 	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
 	x.hire(t, "w11", "写 hello", "chat-k", nil)
 	general := f.Channel.General()
-	f.Channel.ManagerSays(general, "k1", "", false)
-	f.Channel.ManagerSays(general, "k1", "好的，", false)
-	f.Channel.ManagerSays(general, "k1", "好的，我叫 @w11 去", false)
+	f.Channel.ManagerSays(general, "k1", "", false, "")
+	f.Channel.ManagerSays(general, "k1", "好的，", false, "")
+	f.Channel.ManagerSays(general, "k1", "好的，我叫 @w11 去", false, "")
 	ours := func() []protocol.ChatMessage {
 		var out []protocol.ChatMessage
 		for _, m := range chatMessagesIn(f, general) {
@@ -589,7 +595,7 @@ func TestChatManagerSaysGrowsThenDelivers(t *testing.T) {
 	if d := chatDeliveryOf(t, f, "w11", ours()[0].ID); d != nil {
 		t.Fatalf("delivered before final: %+v", d)
 	}
-	f.Channel.ManagerSays(general, "k1", "好的，我叫 @w11 去看看", true)
+	f.Channel.ManagerSays(general, "k1", "好的，我叫 @w11 去看看", true, "")
 	got := ours()
 	if len(got) != 1 || !got[0].Final || !slices.Equal(got[0].Mentions, []string{"w11"}) {
 		t.Fatalf("final: %+v", got)
@@ -625,6 +631,15 @@ func TestChatHistoryAndMarkRead(t *testing.T) {
 	if err != nil || len(got) != 2 || got[0].Number != seqs[2] || got[1].Number != seqs[3] {
 		t.Fatalf("history: %+v %v", got, err)
 	}
+	read, err := f.Channel.Read("user", ReadOptions{Target: "#田头", Before: before, Limit: limit})
+	if err != nil || len(read.Messages) != 2 || read.Messages[0].Number != seqs[2] || read.Messages[1].Number != seqs[3] || !read.Older {
+		t.Fatalf("read page: %+v %v", read, err)
+	}
+	older, err := f.Channel.Read("user", ReadOptions{Target: "#田头", Before: read.Messages[0].Number, Limit: limit})
+	if err != nil || len(older.Messages) != 2 || older.Messages[0].Number != seqs[0] || older.Messages[1].Number != seqs[1] || older.Older {
+		t.Fatalf("older page: %+v %v", older, err)
+	}
+
 	if err := f.Channel.MarkRead(general, seqs[1]); err != nil {
 		t.Fatal(err)
 	}
@@ -650,8 +665,12 @@ func TestChatInboxAndDigest(t *testing.T) {
 	if len(digest) != 1 || digest[0].From != "w12" || digest[0].Target != fmt.Sprintf("#田头:%d", *thread.ParentNumber) {
 		t.Fatalf("digest: %+v", digest)
 	}
+	if again := f.Channel.ManagerDigest(); len(again) != len(digest) {
+		t.Fatalf("reading consumed the digest: %+v", again)
+	}
+	f.Channel.consumedInput(session.InputConsumed{Session: protocol.ManagerAgent, Messages: []string{digest[0].ID}})
 	if again := f.Channel.ManagerDigest(); len(again) != 0 {
-		t.Fatalf("digest again: %+v", again)
+		t.Fatalf("consumed digest remains: %+v", again)
 	}
 	general := f.Channel.General()
 	if _, _, err := f.Channel.Say("大家看一下", &general, ""); err != nil {
@@ -746,6 +765,44 @@ func TestChatSummaryOf(t *testing.T) {
 	if got := str.Head("😀abc", 1); got != "" {
 		t.Errorf("clip: %q", got)
 	}
+}
+
+func TestMessagesKeepTheProducingRunRatherThanMatchingTime(t *testing.T) {
+	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	general := f.Channel.General()
+	f.Channel.ManagerSays(general, "first-run", "partial", false, "run-first")
+	f.Channel.ManagerSays(general, "first-run", "complete", true, "run-second")
+	f.Channel.ManagerSays(general, "legacy", "unlinked", true, "")
+	messages, err := f.Channel.History(general, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("want two stored messages, got %d", len(messages))
+	}
+	for _, m := range messages {
+		if m.Text == "complete" && (m.Run == nil || *m.Run != "run-first") {
+			t.Fatalf("stream changed run: %+v", m)
+		}
+		if m.Text == "unlinked" && m.Run != nil {
+			t.Fatalf("legacy message acquired a run: %+v", m)
+		}
+	}
+	x.hire(t, "run-helper", "test run metadata", "chat-k", nil)
+	run := "finished-run"
+	f.Core.Apply(protocol.FactReport{ID: "run-helper", Outcome: protocol.OutcomeCompleted, Summary: "done", Run: &run, Runs: 2})
+	testkit.Until(t, "report carries the ended run", func() bool {
+		for _, m := range f.Core.State().Chat.Messages {
+			if m.From == "run-helper" && m.Run != nil && *m.Run == run {
+				saved, err := f.Channel.History(m.Conversation, nil, nil)
+				if err != nil {
+					return false
+				}
+				return slices.ContainsFunc(saved, func(s protocol.ChatMessage) bool { return s.ID == m.ID && s.Run != nil && *s.Run == run })
+			}
+		}
+		return false
+	})
 }
 
 func TestChatSendKeyWritesOnce(t *testing.T) {

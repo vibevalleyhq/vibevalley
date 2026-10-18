@@ -13,7 +13,7 @@ import (
 const sampleState = `{
   "call": "live", "manager": "speaking", "reports": [],
   "sessions": [{
-    "id": "w1", "name": "Pi 实验员", "agent": "lab", "runtime": "pi", "task": "写打卡", "hiredAt": 1, "runs": 1,
+    "id": "w1", "name": "Pi 实验员", "agent": "lab", "runtime": "pi", "brief": "写打卡", "hiredAt": 1, "runs": 1,
     "phase": {"_tag": "working", "since": 2, "doing": {"action": "edit_file", "label": "改 checkin.ts"}},
     "play": {
       "station": 2, "history": [{"at": 2, "action": "edit_file", "label": "src/checkin.ts"}], "toolsThisRun": 1,

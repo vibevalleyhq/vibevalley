@@ -24,7 +24,7 @@ func nodeVersion(t *testing.T, node string) string {
 
 func probe(t *testing.T, installation oar.InstallationProbe) oar.InstallationSnapshot {
 	t.Helper()
-	snapshot, err := installation(context.Background())
+	snapshot, err := installation(context.Background(), oar.InstallationOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,13 +111,13 @@ func TestReadinessFailuresAreErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("OAR_DIAGNOSTIC_FIXTURE_BIN", "")
-	_, err := ExecutableInstallation("OAR_DIAGNOSTIC_FIXTURE_BIN", inert, nil, []string{"--ready"}, ExecutableInstallationOptions{})(context.Background())
+	_, err := ExecutableInstallation("OAR_DIAGNOSTIC_FIXTURE_BIN", inert, nil, []string{"--ready"}, ExecutableInstallationOptions{})(context.Background(), oar.InstallationOptions{})
 	if err == nil || !strings.HasPrefix(err.Error(), "Failed to run "+inert+" --ready: exit code unavailable; signal none; spawn "+inert) {
 		t.Fatalf("err = %v", err)
 	}
 	t.Setenv("OAR_KILL_GRACE_MS", "100")
 	slow := script(t, dir, "slow", "sleep 10\n")
-	_, err = ExecutableInstallation("OAR_DIAGNOSTIC_FIXTURE_BIN", slow, nil, []string{"--ready"}, ExecutableInstallationOptions{ReadinessTimeout: 100 * time.Millisecond})(context.Background())
+	_, err = ExecutableInstallation("OAR_DIAGNOSTIC_FIXTURE_BIN", slow, nil, []string{"--ready"}, ExecutableInstallationOptions{ReadinessTimeout: 100 * time.Millisecond})(context.Background(), oar.InstallationOptions{})
 	if err == nil || !strings.Contains(err.Error(), "timeout after 100 ms") {
 		t.Fatalf("an installation timeout exposes its cause without extending the deadline: %v", err)
 	}
@@ -304,5 +304,51 @@ func TestOverrideOrFallbackOutsidePathReportsNoShadowedCopies(t *testing.T) {
 	t.Setenv(shadowEnv, "")
 	if got := probe(t, ExecutableInstallation(shadowEnv, "oar-shadow-missing", Fallbacks(copyOutside), nil, ExecutableInstallationOptions{})); !reflect.DeepEqual(got, available(copyOutside, "fixture 1.0.0")) {
 		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestInstallationOptionsOwnBinaryWithoutMutatingEnvironment(t *testing.T) {
+	posixOnly(t)
+	dir := t.TempDir()
+	binary := func(name string) string {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf '"+name+" 1.0.0\\n'\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	first, second := binary("first"), binary("second")
+	missing := filepath.Join(dir, "missing")
+	t.Setenv("OAR_EXPLICIT_INSTALL_BIN", missing)
+	resolver := ExecutableInstallation("OAR_EXPLICIT_INSTALL_BIN", "not-on-path", Fallbacks(first), nil, ExecutableInstallationOptions{})
+	ordinary, err := resolver(context.Background(), oar.InstallationOptions{})
+	if err != nil || ordinary.Kind != "not_found" {
+		t.Fatalf("SDK environment default changed: %+v %v", ordinary, err)
+	}
+	empty := ""
+	fallback, err := resolver(context.Background(), oar.InstallationOptions{Binary: &empty})
+	if err != nil || fallback.Available.Command != first {
+		t.Fatalf("explicit empty did not use candidates: %+v %v", fallback, err)
+	}
+	result := make(chan oar.InstallationSnapshot, 2)
+	for _, path := range []string{first, second} {
+		go func() {
+			got, err := resolver(context.Background(), oar.InstallationOptions{Binary: &path})
+			if err != nil {
+				t.Error(err)
+			}
+			result <- got
+		}()
+	}
+	commands := map[string]bool{}
+	for range 2 {
+		commands[(<-result).Available.Command] = true
+	}
+	if !commands[first] || !commands[second] || os.Getenv("OAR_EXPLICIT_INSTALL_BIN") != missing {
+		t.Fatalf("binary requests interfered: %v", commands)
+	}
+	absent, err := resolver(context.Background(), oar.InstallationOptions{Binary: &missing})
+	if err != nil || absent.Kind != "not_found" {
+		t.Fatalf("missing explicit binary fell back: %+v %v", absent, err)
 	}
 }

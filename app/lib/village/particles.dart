@@ -212,7 +212,7 @@ class Particles {
   }) => _items.add(_Ring(layer, x, y, from, to, squash, color, life));
 
   /// `wind` is 0..1.
-  void step(double dt, [double wind = 0]) {
+  void task(double dt, [double wind = 0]) {
     _items.removeWhere((i) {
       i.age += dt;
       if (i.age >= i.life) return true;

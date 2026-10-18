@@ -22,7 +22,7 @@
 | 写什么 | 例子 |
 |---|---|
 | 为什么这样做 | `// A worktree with changes stays where it is: removing it would lose them.` |
-| 顺序和锁 | `// Called with h.mu held.`<br>`// The steps first, so that the playbook is whole when its parent issue changes.` |
+| 顺序和锁 | `// Called with h.mu held.`<br>`// The tasks first, so that the graph is whole when its parent issue changes.` |
 | 安全边界 | `// Only repository home URLs: never credentials, other git transports or command-line options.` |
 | 格式、单位、取值，`nil`、`0`、`""` 的意思 | `// As the chat names it: <id>#<n>; "" when it has none.`<br>`// 0..1, 0.5 is noon.` |
 | 要和别处保持一致的 | `// As Node's util.parseEnv: …`<br>`// A port of server/internal/protocol/voice.go: change them there and here together.` |

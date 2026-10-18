@@ -380,9 +380,9 @@ class _Builder {
   List<int> _alignmentPositions() {
     if (version == 1) return const [];
     final numAlign = version ~/ 7 + 2;
-    final step = version == 32 ? 26 : ((version * 4 + 4) / (numAlign * 2 - 2)).ceil() * 2;
+    final task = version == 32 ? 26 : ((version * 4 + 4) / (numAlign * 2 - 2)).ceil() * 2;
     final result = [6];
-    for (var pos = size - 7; result.length < numAlign; pos -= step) {
+    for (var pos = size - 7; result.length < numAlign; pos -= task) {
       result.insert(1, pos);
     }
     return result;

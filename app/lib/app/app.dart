@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/farm_choice.dart';
 import '../workbench/places.dart';
 import '../host/host.dart';
+import '../phone/calls.dart';
 import '../shell/app_frame.dart';
 import '../ui/kit/kit.dart';
 import 'host_router.dart';
@@ -32,6 +33,7 @@ class VibeValleyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(hostCommandRouterProvider);
+    ref.read(phoneProvider);
     return MaterialApp.router(
       title: '码农场物语',
       theme: farmTheme(),

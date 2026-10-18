@@ -17,16 +17,16 @@ Run 和 Session 这两层已经落了（2026-10-17），差的最后一层是**�
 | Session | 一个档案为一张工单接的活：worktree、分支，跨好几次 run，重启后还是同一个 | `protocol.Session`、`session` 表（`issue_session` 记谁在哪张工单上干过）、`sessions.json` |
 | Run | 一次干活：一次触发到一次汇报，包着一个 oar turn | `protocol.Run`（`session_run` 表）；核心状态里是 `FactRun` 到 `FactReport` |
 
-- **触发**是 `RunTrigger`：工单（第一次派出去）、comment（说话、@ 它、浇水）、Playbook 走到下一步、定时、农机自己（后台任务做完以后接着干）。
+- **触发**是 `RunTrigger`：工单（第一次派出去）、comment（说话、@ 它、浇水）、Task 模板 走到下一步、定时、农机自己（后台任务做完以后接着干）。
 - 四种边界：干活时来的 comment 用 steer 插进这次 run，不另开；不能 steer 的农机排队，下一次 run；没开成的（叫不醒、钱用完、档案删了）不算 run，原因记在那条 comment 的投递结果上；重启后接不上旧会话，换一个 oar 会话，还是同一次 run。
 - 包着 oar 的那部分在 `runtime` 的 `subagents`（开子 agent、发话、叫停、收报告）；事件读成事实在 `session`。
 
 ### 还没做：小队（Crew）
 
-- **小队**是配好的一组 agent，照一份 **Playbook** 干活：谁先、谁接着、谁检查、什么时候交回主人。
-- 派给小队时，照 Playbook 开 Session、触发 run，底下还是 `runtime` 开的 oar 子 agent；每一次 run 的记录和单派一样。
-- 现在的种植计划就是一份 Playbook，只是管家临时拆、用一次；以后可以存下来，给小队反复用。
-- 小队怎么配、Playbook 怎么存，另写一篇 Note（上面这些做完再设计）。
+- **小队**是配好的一组 agent，照一份 **Task 模板** 干活：谁先、谁接着、谁检查、什么时候交回主人。
+- 派给小队时，照 Task 模板 开 Session、触发 run，底下还是 `runtime` 开的 oar 子 agent；每一次 run 的记录和单派一样。
+- 现在的种植计划就是一份 Task，只是管家临时拆、用一次；以后可以存成 Task 模板，给小队反复用。
+- 小队怎么配、Task 模板 怎么存，另写一篇 Note（上面这些做完再设计）。
 
 ### 词
 
@@ -59,13 +59,13 @@ Run 和 Session 这两层已经落了（2026-10-17），差的最后一层是**�
 
 ## Acceptance criteria
 
-- 派活可以派给一支小队；照 Playbook 开 Session、触发 run，每一步的记录和单派一样。
-- 小队的 Playbook 能存下来，下一次复用。
-- `docs/concepts.md` 和用语表里有小队、Playbook 和其余概念的对照，每个对得上代码里的一样东西。
+- 派活可以派给一支小队；照 Task 模板 开 Session、触发 run，每一步的记录和单派一样。
+- 小队的 Task 模板 能存下来，下一次复用。
+- `docs/concepts.md` 和用语表里有小队、Task 模板 和其余概念的对照，每个对得上代码里的一样东西。
 - `go vet ./... && go test ./...`、`go run ./tool/shapegen -check`、`bun run flutter:check` 通过。
 
 ## Risks
 
-- **和种植计划重叠**：现在的计划（父工单、`step`、`blockedBy`）已经是一份临时的 Playbook；不抽出来，小队会有两套编排。
+- **和种植计划重叠**：现在的计划（父工单、`step`、`blockedBy`）已经是一份临时的 Task 模板；不抽出来，小队会有两套编排。
 - **上限**：一支小队同时开几个 Session 要受农场的上限和项目的槽约束。
 - **旧的轮不补记**：Run 的记录从 2026-10-17 开始有，以前的轮只在事件日志里。

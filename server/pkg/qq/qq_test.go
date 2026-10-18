@@ -98,7 +98,7 @@ func TestClientSpeaksQQsProtocol(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got []Message
-	err := live.Listen(ctx, app, func(m Message) { got = append(got, m) })
+	err := live.Listen(ctx, app, func(m Message) error { got = append(got, m); return nil })
 	if err == nil || !strings.Contains(err.Error(), "QQ 让重新连接") {
 		t.Fatalf("listen ends: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestRequestsHaveBoundedLifetime(t *testing.T) {
 	client.http.Transport = deadlineTransport{t}
 	app := App{AppID: "app", Secret: "secret"}
 	client.tokens[app] = cachedToken{token: "T", until: time.Now().Add(time.Hour)}
-	if err := client.Listen(context.Background(), app, func(Message) {}); err == nil {
+	if err := client.Listen(context.Background(), app, func(Message) error { return nil }); err == nil {
 		t.Fatal("gateway failure hidden")
 	}
 	if _, err := client.SendText(context.Background(), app, "owner", "text", ""); err == nil {

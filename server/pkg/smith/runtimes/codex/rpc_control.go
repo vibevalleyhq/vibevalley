@@ -42,28 +42,18 @@ func rejected(code oar.RejectionCode, reason string) *oar.ResponseBody {
 func (s *codexSession) rpcControl(ctx context.Context, build func() rpcControlPlan) (oar.ControlResult, error) {
 	s.mu.Lock()
 	plan := build()
-	blocked := s.k.Unreachable()
-	request := s.k.Request(oar.ToRuntime, plan.body, kernel.RecordAt{})
-	refused := blocked
-	if refused == nil {
-		refused = kernel.EmptyInputRefusal(plan.body)
-	}
-	if refused == nil {
-		refused = plan.gate(request)
-	}
-	if refused != nil {
-		response := s.k.Respond(request.ID, *refused, kernel.RecordAt{})
+	pending := s.k.BeginControl(plan.body, kernel.RecordAt{})
+	request := pending.Request()
+	if pending.Settled() {
 		s.mu.Unlock()
-		return oar.ControlResult{Request: request, Response: response}, nil
+		return pending.Wait(ctx)
 	}
-	from := s.k.Len()
-	recorded := false
-	record := func(decided oar.ResponseBody) {
-		if !recorded {
-			recorded = true
-			s.k.Respond(request.ID, decided, kernel.RecordAt{})
-		}
+	if refused := plan.gate(request); refused != nil {
+		pending.Settle(*refused)
+		s.mu.Unlock()
+		return pending.Wait(ctx)
 	}
+	record := func(decided oar.ResponseBody) { pending.Settle(decided) }
 	if plan.onPending != nil {
 		plan.onPending(func() { record(oar.Accepted()) })
 	}
@@ -76,7 +66,7 @@ func (s *codexSession) rpcControl(ctx context.Context, build func() rpcControlPl
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			switch {
-			case recorded:
+			case pending.Settled():
 				if outcome.kind == "result" {
 					s.k.Frame(oar.FrameBody{Type: plan.method, Native: outcome.result.raw}, kernel.RecordAt{})
 				} else if outcome.kind == "error" && outcome.native != nil {
@@ -92,19 +82,13 @@ func (s *codexSession) rpcControl(ctx context.Context, build func() rpcControlPl
 		})
 		if err != nil {
 			s.mu.Lock()
-			if !recorded {
+			if !pending.Settled() {
 				record(plan.onError(err.Error()))
 			}
 			s.mu.Unlock()
 		}
 	}()
-	response, err := s.k.WaitFor(ctx, from, func(candidate oar.RawEvent) bool {
-		return candidate.Kind == oar.KindResponse && candidate.RequestID == request.ID
-	})
-	if err != nil {
-		return oar.ControlResult{}, err
-	}
-	return oar.ControlResult{Request: request, Response: response}, nil
+	return pending.Wait(ctx)
 }
 
 var archivedSession = regexp.MustCompile(`^session \S+ is archived\.`)

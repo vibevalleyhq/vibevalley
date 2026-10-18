@@ -35,7 +35,7 @@ func (c *cli) run(ctx context.Context, raw []string) error {
 		c.exitCode = 1
 		return nil
 	}
-	installation, err := runtime.Installation(ctx)
+	installation, err := runtime.Installation(ctx, oar.InstallationOptions{})
 	if err != nil {
 		return err
 	}
@@ -69,22 +69,18 @@ func (c *cli) run(ctx context.Context, raw []string) error {
 	var outMu sync.Mutex
 	// Replay the output from the start, including records stamped while opening.
 	cursor := &oar.Cursor{SessionID: session.ID(), AfterSeq: -1}
-	recordsDone := make(chan struct{})
-	total := 0
-	session.RawEvents(func(record oar.RawEvent) {
-		if json {
+	var output *observe.RecordSubscription
+	if json {
+		output = observe.SubscribeRecords(session, func(record oar.RawEvent) {
 			outMu.Lock()
 			fmt.Fprintln(c.stdout, compact(record))
 			outMu.Unlock()
-		}
-		outMu.Lock()
-		total++
-		outMu.Unlock()
-	}, cursor)
+		}, cursor)
+	}
 	if !json {
 		fmt.Fprintln(c.stdout, observe.RenderOpened(observe.OpenedSession{SessionID: session.ID(), Resumed: options.Resume != "", Model: session.Model().Value, Effort: session.Effort().Value, ServiceTier: session.ServiceTier().Value}))
 		render := observe.ProgressRenderer(id)
-		session.Events(func(event oar.Event) {
+		output = observe.SubscribeEvents(session, func(event oar.Event) {
 			lines := render(event)
 			outMu.Lock()
 			defer outMu.Unlock()
@@ -119,19 +115,9 @@ func (c *cli) run(ctx context.Context, raw []string) error {
 	}
 	run, err := observe.PromptAndWait(ctx, session, prompt, observe.PromptRunOptions{Cancel: cancel, Images: images})
 	dispose()
-	close(recordsDone)
-	// Let the delivery goroutines print what the dispose recorded.
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
-		outMu.Lock()
-		caughtUp := total >= len(session.Records())
-		outMu.Unlock()
-		if caughtUp {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	time.Sleep(300 * time.Millisecond) // the coalesced text's hold
+	settle, stopOutput := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	err = errors.Join(err, output.Close(settle))
+	stopOutput()
 	if recording != nil {
 		settle, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		err = errors.Join(err, recording.Close(settle))

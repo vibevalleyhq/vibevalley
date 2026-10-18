@@ -3,16 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
-import '../data/ui_state.dart';
+import '../data/overlays.dart';
 import '../game/tools.dart';
-import '../game/state.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../ui/kit/kit.dart';
 import 'achievements.dart';
 import '../shared/harvest.dart';
 import 'menu.dart';
-import 'plans.dart';
+import 'task_board.dart';
 import '../rules/cast.dart';
 import '../shared/tags.dart';
 import 'farm_log.dart';
@@ -25,52 +24,54 @@ class FarmPanels extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessions = ref.watch(stateProvider.select((s) => s?.sessions)) ?? const <Session>[];
-    Session? byId(String? id) => id == null ? null : sessions.where((h) => h.id == id).firstOrNull;
-    final selected = byId(ref.watch(selectedProvider));
-    final reviewing = byId(ref.watch(reviewingProvider));
-    final sowing = ref.watch(sowingProvider);
-    final watering = byId(ref.watch(wateringProvider));
-    final panel = ref.watch(panelProvider);
-    final menu = ref.watch(menuOpenProvider);
-    return Stack(
-      children: [
-        if (selected != null)
-          FarmLayer(
+    final overlays = ref.watch(farmOverlaysProvider);
+    final actions = ref.read(farmOverlaysProvider.notifier);
+    Session? byId(String id) => sessions.where((h) => h.id == id).firstOrNull;
+    Widget layer(FarmOverlay overlay) {
+      switch (overlay) {
+        case InspectOverlay(:final id):
+          final session = byId(id);
+          if (session == null) return const SizedBox.shrink();
+          return FarmLayer(
             key: const ValueKey('plot'),
-            title: '${selected.name}的地',
+            title: '${session.name}的地',
             size: FarmDialogSize.lg,
-            onClose: () => ref.read(selectedProvider.notifier).set(null),
-            child: PlotDetail(session: selected, onDone: () => ref.read(selectedProvider.notifier).set(null)),
-          ),
-        if (reviewing != null)
-          FarmLayer(
+            onClose: () => actions.select(null),
+            child: PlotDetail(session: session, onDone: () => actions.select(null)),
+          );
+        case ReviewOverlay(:final id):
+          final session = byId(id);
+          if (session == null) return const SizedBox.shrink();
+          return FarmLayer(
             key: const ValueKey('harvest'),
-            title: '收获${reviewing.name}的地',
+            title: '收获${session.name}的地',
             icon: 'icon-harvest',
             size: FarmDialogSize.lg,
-            onClose: () => ref.read(reviewingProvider.notifier).set(null),
-            child: HarvestReview(key: ValueKey(reviewing.id), session: reviewing, onDone: () => ref.read(reviewingProvider.notifier).set(null)),
-          ),
-        if (sowing != null)
-          FarmLayer(
+            onClose: () => actions.review(null),
+            child: HarvestReview(key: ValueKey(id), session: session, onDone: () => actions.review(null)),
+          );
+        case SowOverlay(:final station):
+          return FarmLayer(
             key: const ValueKey('sow'),
-            title: '播种 · 第 ${sowing + 1} 块地',
+            title: '播种 · 第 ${station + 1} 块地',
             icon: 'icon-harvest',
             size: FarmDialogSize.md,
-            onClose: () => ref.read(sowingProvider.notifier).set(null),
-            child: SeedForm(station: sowing, onDone: () => ref.read(sowingProvider.notifier).set(null)),
-          ),
-        if (watering != null)
-          FarmLayer(
+            onClose: () => actions.sow(null),
+            child: SeedForm(station: station, onDone: () => actions.sow(null)),
+          );
+        case WaterOverlay(:final id):
+          final session = byId(id);
+          if (session == null) return const SizedBox.shrink();
+          return FarmLayer(
             key: const ValueKey('water'),
-            title: '给${watering.name}浇水',
+            title: '给${session.name}浇水',
             icon: 'icon-water',
             size: FarmDialogSize.sm,
-            onClose: () => ref.read(wateringProvider.notifier).set(null),
-            child: WaterForm(session: watering, onDone: () => ref.read(wateringProvider.notifier).set(null)),
-          ),
-        if (panel != null)
-          FarmLayer(
+            onClose: () => actions.water(null),
+            child: WaterForm(session: session, onDone: () => actions.water(null)),
+          );
+        case PanelOverlay(:final panel):
+          return FarmLayer(
             key: ValueKey('panel-${panel.name}'),
             title: _panelTitle[panel]!.$1,
             icon: _panelTitle[panel]!.$2,
@@ -79,37 +80,39 @@ class FarmPanels extends ConsumerWidget {
                 : panel == FarmPanel.manager
                 ? FarmDialogSize.md
                 : FarmDialogSize.lg,
-            onClose: () => ref.read(panelProvider.notifier).set(null),
+            onClose: () => actions.panel(null),
             child: switch (panel) {
               FarmPanel.warehouse => const Warehouse(),
-              FarmPanel.tasks => const Tasks(),
+              FarmPanel.graphs => const Tasks(),
               FarmPanel.log => const FarmLog(),
               FarmPanel.shop => const Shop(),
               FarmPanel.manager => const ManagerLooks(),
-              FarmPanel.plans => const Plans(),
+              FarmPanel.taskBoard => const TaskBoard(),
             },
-          ),
-        if (menu)
-          FarmLayer(
+          );
+        case MenuOverlay():
+          return FarmLayer(
             key: const ValueKey('menu'),
             title: '菜单',
             icon: 'icon-wrench',
             size: FarmDialogSize.md,
-            onClose: () => ref.read(menuOpenProvider.notifier).set(false),
+            onClose: () => actions.menu(false),
             child: const GameMenu(),
-          ),
-      ],
-    );
+          );
+      }
+    }
+
+    return Stack(children: [for (final overlay in overlays.layers) layer(overlay)]);
   }
 }
 
 const _panelTitle = {
   FarmPanel.shop: ('商店', 'icon-shop'),
   FarmPanel.warehouse: ('仓库', 'icon-crate'),
-  FarmPanel.tasks: ('任务与成就', 'icon-tasks'),
+  FarmPanel.graphs: ('任务与成就', 'icon-tasks'),
   FarmPanel.log: ('农场日志', 'icon-log'),
   FarmPanel.manager: ('管家和宠物', 'manager-face'),
-  FarmPanel.plans: ('种植计划', 'machine-seeder'),
+  FarmPanel.taskBoard: ('种植计划', 'machine-seeder'),
 };
 
 /// A click on the backdrop closes it.

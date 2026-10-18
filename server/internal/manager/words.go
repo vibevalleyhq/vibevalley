@@ -2,32 +2,11 @@ package manager
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"vibevalley/internal/protocol"
-	"vibevalley/pkg/x/num"
 	"vibevalley/pkg/x/str"
 )
-
-func wan(n int64) string {
-	if n >= 10_000 {
-		digits := 1
-		if n >= 100_000 {
-			digits = 0
-		}
-		return num.Fixed(float64(n)/10_000, digits) + " 万"
-	}
-	return strconv.FormatInt(n, 10)
-}
-
-func spentText(spent protocol.Spent) string {
-	tokens := wan(spent.Tokens) + " token"
-	if spent.CNY != nil {
-		return "约 " + protocol.Yuan(*spent.CNY) + " · " + tokens
-	}
-	return tokens
-}
 
 // In UTF-16 units: enough for a report's conclusion; the rest stays in the chat for read_chat.
 const managerLineMax = 800

@@ -37,5 +37,5 @@ Status: implemented
 
 - `server/internal/setting/setting_test.go`：存进 `settings.json`、权限 0600、比环境变量优先、页面看不到钥匙本身、空字符串清掉后露出环境变量的、格式不对的不存。
 - `server/pkg/agentcore/agentcore_test.go`：`GetApiKey` 每次请求前都问，中途换的钥匙下一次请求就用上。
-- `server/pkg/agent/agent_test.go`：pi 钥匙的三种环境变量写法。
+- `server/internal/agent/brain/agent_test.go`：pi 钥匙的三种环境变量写法。
 - 在临时家目录上起服务端：`GET /api/settings` 报出钥匙的来源和末四位，填错的 App ID 得到 409；当时的网页在 1440 和 390 宽下截图看过首页、设置、开始游戏后的农场。

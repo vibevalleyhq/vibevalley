@@ -8,7 +8,7 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart' show tookText;
 import '../../rules/issues.dart';
-import '../../data/ui_state.dart' show FarmPanel, panelProvider, planShownProvider, titleOpenProvider;
+import '../../data/ui_state.dart' show FarmPanel, graphShownProvider, titleOpenProvider, farmOverlaysProvider;
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import '../../data/remote.dart';
@@ -17,9 +17,9 @@ import '../../shared/faces.dart';
 import 'issues_page.dart';
 
 Move? cardMove(BoardCard card, Lane to) => switch (card) {
-  PlaybookCard() || ManagerCard() => null,
+  TaskCard() || ManagerCard() || MissingSessionCard() => null,
   TodoCard() => moveOf(card.lane, to),
-  IssueCard(:final issue, :final session) => moveOf(card.lane, to, planned: issuePlanned(issue, session)),
+  IssueCard(:final issue, :final session) => moveOf(card.lane, to, split: issueInTask(issue, session)),
 };
 
 class IssueBoard extends StatefulWidget {
@@ -276,17 +276,20 @@ class _CardView extends ConsumerWidget {
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     final xs = KitText.xs.copyWith(color: Palette.bark500);
     final (title, who, stripe) = switch (card) {
-      PlaybookCard(:final playbook) => ('计划：${playbook.title}', '${playbook.nodes.length} 步', null),
+      TaskCard(:final graph) => ('计划：${graph.title}', '${graph.tasks.length} 步', null),
       TodoCard(:final item) => (item.title, agents.where((a) => a.id == item.assignee).firstOrNull?.name ?? '还没选帮工', priorityColor(item.priority)),
-      IssueCard(:final issue, :final head) => (issueTitle(issue, ref.watch(plansProvider)), head.name, null),
+      IssueCard(:final issue, :final head) => (issueTitle(issue, ref.watch(graphsProvider)), head.name, null),
       ManagerCard(:final issue) => (issue.title, '管家', null),
+      MissingSessionCard(:final issue) => (issue.title, '执行记录缺失', null),
     };
     final tags = <Widget>[];
     final lines = <Widget>[];
     switch (card) {
-      case PlaybookCard(:final playbook):
+      case MissingSessionCard(:final history):
+        lines.add(Text('缺少：${history.missingSessions.join('、')}', style: xs.copyWith(color: Palette.berry)));
+      case TaskCard(:final graph):
         tags.add(const _Tag('种植计划', Palette.leaf500));
-        lines.add(Text(playbookLine(playbook), style: KitText.xs.copyWith(color: playbook.state == PlaybookState.ripe ? Palette.leaf700 : Palette.bark800)));
+        lines.add(Text(taskLine(graph), style: KitText.xs.copyWith(color: graph.state == GraphState.ripe ? Palette.leaf700 : Palette.bark800)));
       case TodoCard(:final item):
         if (item.queuedAt != null) tags.add(const _Tag('排队中', Palette.water));
         if (item.schedule != null) tags.add(const _Tag('定时', Palette.cream300));
@@ -305,7 +308,7 @@ class _CardView extends ConsumerWidget {
         if (state == IssueTag.lost) tags.add(const _Tag('丢了', Palette.berry));
         if (sessions.length > 1) tags.add(_Tag('第 ${sessions.length} 次', Palette.water));
         if (issue.schedule != null) tags.add(const _Tag('定时', Palette.cream300));
-        if (issuePlanned(issue, session)) tags.add(const _Tag('种植计划', Palette.leaf500));
+        if (issueInTask(issue, session)) tags.add(const _Tag('种植计划', Palette.leaf500));
         final turns = (session ?? head).runs.round();
         final cny = (session ?? head).spent?.cny;
         final took = state.open ? '开了 ${tookText(now - head.hiredAt)}' : '用了 ${tookText((issue.closedAt ?? head.endedAt ?? now) - sessions.first.hiredAt)}';
@@ -353,7 +356,7 @@ class _CardView extends ConsumerWidget {
                   Padding(padding: const EdgeInsets.only(top: 4), child: StateDot(issueTagColor(issueTag(issue)))),
                   const SizedBox(width: 6),
                 ],
-                if (card is PlaybookCard) ...[const Padding(padding: EdgeInsets.only(top: 4), child: StateDot(Palette.leaf500)), const SizedBox(width: 6)],
+                if (card is TaskCard) ...[const Padding(padding: EdgeInsets.only(top: 4), child: StateDot(Palette.leaf500)), const SizedBox(width: 6)],
                 Expanded(
                   child: Text(
                     title,
@@ -395,11 +398,11 @@ class _CardView extends ConsumerWidget {
         ),
       ),
     );
-    if (card case PlaybookCard(:final playbook)) {
+    if (card case TaskCard(:final graph)) {
       return KitTappable(
         onTap: () {
-          ref.read(planShownProvider.notifier).set(playbook.id);
-          ref.read(panelProvider.notifier).set(FarmPanel.plans);
+          ref.read(graphShownProvider.notifier).set(graph.id);
+          ref.read(farmOverlaysProvider.notifier).panel(FarmPanel.taskBoard);
           ref.read(titleOpenProvider.notifier).enterFarm(start: false);
           workbenchGo(context, '/');
         },
@@ -434,7 +437,7 @@ class _Tag extends StatelessWidget {
 
 double _closedAt(BoardCard c) => switch (c) {
   IssueCard(:final issue, :final head) => issue.closedAt ?? head.hiredAt,
-  ManagerCard(:final issue) => issue.closedAt ?? issue.createdAt,
+  ManagerCard(:final issue) || MissingSessionCard(:final issue) => issue.closedAt ?? issue.createdAt,
   TodoCard(:final item) => item.closedAt ?? item.createdAt,
-  PlaybookCard() => 0,
+  TaskCard() => 0,
 };

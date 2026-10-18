@@ -55,7 +55,7 @@ func harvestCoins(commits, streak int64) int64 {
 	return int64(num.Round(float64(30+min(commits*5, 30)) * streakMultiplier(streak)))
 }
 
-func playbookCoins(merged int64) int64 { return 30 + 10*merged }
+func taskCoins(merged int64) int64 { return 30 + 10*merged }
 
 // cheapCNY: under this, a harvested job is cheap (一分钱一分货).
 const cheapCNY = 0.05
@@ -144,7 +144,7 @@ func progressAtOf(e protocol.LedgerEntryValue) int64 {
 		return v.At
 	case protocol.LedgerEntryReviewed:
 		return v.At
-	case protocol.LedgerEntryPlaybook:
+	case protocol.LedgerEntryGraph:
 		return v.At
 	case protocol.LedgerEntryHandoff:
 		return v.At
@@ -213,11 +213,11 @@ func progressStep(folded ledgerFolded, entry protocol.LedgerEntry) (ledgerFolded
 		counts = progressAtLeast(counts, "s_tell", 1)
 	case protocol.LedgerEntryReviewed:
 		seen.Reviewed = progressAdd(seen.Reviewed, e.Session)
-	case protocol.LedgerEntryPlaybook:
-		coins += playbookCoins(e.Merged)
-		counts = progressAtLeast(counts, "big_playbook", e.Merged)
+	case protocol.LedgerEntryGraph:
+		coins += taskCoins(e.Merged)
+		counts = progressAtLeast(counts, "big_graph", e.Merged)
 		if e.Parallel {
-			counts = progressBump(counts, "parallel_plan", 1)
+			counts = progressBump(counts, "parallel_graph", 1)
 		}
 	case protocol.LedgerEntryHandoff:
 		counts = progressBump(counts, "handoff", 1)
@@ -229,8 +229,8 @@ func progressStep(folded ledgerFolded, entry protocol.LedgerEntry) (ledgerFolded
 		switch e.Kind {
 		case protocol.LedgerEntryMomentKindOpened:
 			counts = progressAtLeast(counts, "s_open", 1)
-		case protocol.LedgerEntryMomentKindPlanned:
-			counts = progressAtLeast(counts, "s_plan", 1)
+		case protocol.LedgerEntryMomentKindSplit:
+			counts = progressAtLeast(counts, "s_split", 1)
 		case protocol.LedgerEntryMomentKindVoice:
 			counts = progressAtLeast(counts, "s_voice", 1)
 		case protocol.LedgerEntryMomentKindBusy6:
@@ -298,14 +298,14 @@ func progressWorking(state protocol.CoreState) int {
 	return n
 }
 
-func progressPlaybookEntry(pb protocol.Playbook) protocol.LedgerEntry {
+func progressTaskEntry(graph protocol.TaskGraph) protocol.LedgerEntry {
 	merged := map[string]bool{}
-	for _, n := range pb.Nodes {
-		if n.State == protocol.NodeStateMerged {
+	for _, n := range graph.Tasks {
+		if n.State == protocol.TaskStateMerged {
 			merged[n.ID] = true
 		}
 	}
-	parallel := slices.ContainsFunc(protocol.LayersOf(pb.Nodes), func(layer []string) bool {
+	parallel := slices.ContainsFunc(protocol.LayersOf(graph.Tasks), func(layer []string) bool {
 		n := 0
 		for _, id := range layer {
 			if merged[id] {
@@ -314,7 +314,7 @@ func progressPlaybookEntry(pb protocol.Playbook) protocol.LedgerEntry {
 		}
 		return n >= 2
 	})
-	return protocol.LedgerEntry{Value: protocol.LedgerEntryPlaybook{Playbook: pb.ID, Merged: int64(len(merged)), Parallel: parallel}}
+	return protocol.LedgerEntry{Value: protocol.LedgerEntryGraph{Graph: graph.ID, Merged: int64(len(merged)), Parallel: parallel}}
 }
 
 // Only what the person does in the app (a voice call, a review, a title) is recorded where it happens: everything the farm does is
@@ -347,20 +347,20 @@ func entriesFor(before protocol.CoreState, fact protocol.Fact, after protocol.Co
 		agent := f.Session.Agent
 		out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryHired{Session: f.Session.ID, Agent: &agent}})
 	case protocol.FactIssue:
-		if f.Issue.Plan == nil {
+		if f.Issue.Graph == nil {
 			break
 		}
-		var was *protocol.PlaybookState
-		if pb := protocol.PlaybookOf(before, f.Issue.ID); pb != nil {
-			was = &pb.State
+		var was *protocol.GraphState
+		if graph := protocol.GraphOf(before, f.Issue.ID); graph != nil {
+			was = &graph.State
 		}
-		now := f.Issue.Plan.State
-		if now == protocol.PlaybookStateDraft && was != nil && *was == protocol.PlaybookStatePlanning {
-			out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryMoment{Kind: protocol.LedgerEntryMomentKindPlanned}})
+		now := f.Issue.Graph.State
+		if now == protocol.GraphStateDraft && was != nil && *was == protocol.GraphStateSplitting {
+			out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryMoment{Kind: protocol.LedgerEntryMomentKindSplit}})
 		}
-		if now == protocol.PlaybookStateDone && (was == nil || *was != protocol.PlaybookStateDone) {
-			if pb := protocol.PlaybookOf(after, f.Issue.ID); pb != nil {
-				out = append(out, progressPlaybookEntry(*pb))
+		if now == protocol.GraphStateDone && (was == nil || *was != protocol.GraphStateDone) {
+			if graph := protocol.GraphOf(after, f.Issue.ID); graph != nil {
+				out = append(out, progressTaskEntry(*graph))
 			}
 		}
 	case protocol.FactLeft:

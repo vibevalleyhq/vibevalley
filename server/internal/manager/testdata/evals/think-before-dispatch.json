@@ -21,11 +21,11 @@
     "read_chat",
     "stop",
     "dismiss",
-    "plan",
-    "playbooks",
-    "plan_edit",
-    "plan_action",
-    "node_action",
+    "graph_split",
+    "graphs",
+    "task_edit",
+    "graph_action",
+    "task_action",
     "load_skill",
     "remember",
     "rewrite_memory",
@@ -52,7 +52,7 @@
           "name": "dispatch",
           "arguments": {
             "project": "demo",
-            "task": "给 demo 写 README：项目简介、怎么跑起来、目录结构。写完提交。"
+            "brief": "给 demo 写 README：项目简介、怎么跑起来、目录结构。写完提交。"
           }
         }
       ],
@@ -128,7 +128,7 @@
     },
     {
       "kind": "notCalled",
-      "tool": "plan"
+      "tool": "graph_split"
     },
     {
       "kind": "says",

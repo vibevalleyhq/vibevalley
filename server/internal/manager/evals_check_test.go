@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	vvagent "vibevalley/pkg/agent"
+	vvagent "vibevalley/internal/agent/brain"
 	"vibevalley/pkg/agentcore"
 	"vibevalley/pkg/ai"
 )

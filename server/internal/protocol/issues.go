@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// A run gone without saying how closes the issue all the same. A playbook's issue stands as its plan does, a step's as the step does.
+// A run gone without saying how closes the issue all the same. A task's issue stands as its task does, a step's as the step does.
 func IsForManager(t Issue) bool { return t.Assignee != nil && *t.Assignee == ManagerAgent }
 
 // An issue for the manager is open only while the manager works on it.
@@ -18,31 +18,31 @@ func IssueStatusOf(t Issue, state CoreState) IssueStatus {
 	if IsForManager(t) {
 		return IssueStatusInProgress
 	}
-	if t.Plan != nil {
-		switch t.Plan.State {
-		case PlaybookStatePlanning, PlaybookStateRunning:
+	if t.Graph != nil {
+		switch t.Graph.State {
+		case GraphStateSplitting, GraphStateRunning:
 			return IssueStatusInProgress
-		case PlaybookStateDraft, PlaybookStatePaused, PlaybookStateRipe:
+		case GraphStateDraft, GraphStatePaused, GraphStateRipe:
 			return IssueStatusInReview
-		case PlaybookStateDone:
+		case GraphStateDone:
 			return IssueStatusDone
 		}
 		return IssueStatusCanceled
 	}
-	if t.Step != nil {
-		switch t.Step.State {
-		case NodeStateWaiting:
+	if t.Task != nil {
+		switch t.Task.State {
+		case TaskStateWaiting:
 			return IssueStatusBacklog
-		case NodeStateFailed:
+		case TaskStateFailed:
 			return IssueStatusInReview
-		case NodeStateWorking:
-			if t.Step.Session != nil {
-				if h := SessionOf(state, *t.Step.Session); h != nil && IsBusy(*h) {
+		case TaskStateWorking:
+			if t.Task.Session != nil {
+				if h := SessionOf(state, *t.Task.Session); h != nil && IsBusy(*h) {
 					return IssueStatusInProgress
 				}
 			}
 			return IssueStatusInReview
-		case NodeStateMerged:
+		case TaskStateMerged:
 			return IssueStatusDone
 		}
 		return IssueStatusCanceled
@@ -68,7 +68,7 @@ func IssueStatusOf(t Issue, state CoreState) IssueStatus {
 func closedStatus(c *IssueClose) IssueStatus {
 	if c != nil {
 		switch *c {
-		case IssueCloseMerged, IssueCloseMergedIntoPlan, IssueCloseAnswered:
+		case IssueCloseMerged, IssueCloseMergedIntoGraph, IssueCloseAnswered:
 			return IssueStatusDone
 		}
 	}
@@ -131,7 +131,7 @@ func withIssueStatuses(state CoreState) CoreState {
 	return state
 }
 
-// What a session is told when merging its base in would conflict: the owner's resolve, the plan sending a step back.
-func ConflictTask(base string, files []string) string {
+// What a session is told when merging its base in would conflict: the owner's resolve, the task sending a step back.
+func ConflictBrief(base string, files []string) string {
 	return fmt.Sprintf("把 %s 合进你的分支时有冲突（%s）。请在你的分支上运行 git merge %s，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。", base, strings.Join(files, "、"), base)
 }

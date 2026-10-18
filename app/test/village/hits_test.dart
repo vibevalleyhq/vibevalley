@@ -1,3 +1,4 @@
+import 'package:vibevalley/game/destinations.dart';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,7 @@ const _spot = (x0: 0.0, y0: 0.0, x1: 40.0, y1: 40.0);
 VillageHitData _scene() => VillageHitData(
   sessions: {'w1': const Rect.fromLTWH(10, 10, 20, 20)},
   dog: const Rect.fromLTWH(0, 0, 50, 50),
-  spots: const {'shop': _spot},
+  spots: const {YardPlace.shop: _spot},
   plots: const {0: _plot},
 );
 
@@ -22,7 +23,7 @@ void main() {
     expect(villageHitAt(_scene(), const Offset(45, 45)), const VillageHitDog());
     expect(villageHitAt(_scene(), const Offset(5, 5)), const VillageHitDog());
     final withoutDog = VillageHitData(sessions: const {}, dog: Rect.zero, spots: _scene().spots, plots: _scene().plots);
-    expect(villageHitAt(withoutDog, const Offset(5, 5)), const VillageHitSpot('shop'));
+    expect(villageHitAt(withoutDog, const Offset(5, 5)), const VillageHitSpot(YardPlace.shop));
     final plotOnly = VillageHitData(sessions: const {}, dog: Rect.zero, spots: const {}, plots: _scene().plots);
     expect(villageHitAt(plotOnly, const Offset(5, 15)), const VillageHitPlot(0));
     // The plot's top edge has a few pixels of slack for its sign.

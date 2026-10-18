@@ -9,35 +9,81 @@ import (
 	"context"
 )
 
-const addInbound = `-- name: AddInbound :exec
-insert into connector_inbound (connector, ext_id, message_id, created_at) values (?, ?, null, ?) on conflict (connector, ext_id) do nothing
+const acceptInbound = `-- name: AcceptInbound :exec
+
+insert into connector_inbound (connector, ext_id, message_id, created_at, payload, delivered)
+values (?, ?, null, ?, ?, 0) on conflict (connector, ext_id) do nothing
 `
 
-type AddInboundParams struct {
+type AcceptInboundParams struct {
 	Connector string
 	ExtID     string
 	CreatedAt int64
+	Payload   string
 }
 
-func (q *Queries) AddInbound(ctx context.Context, arg AddInboundParams) error {
-	_, err := q.db.ExecContext(ctx, addInbound, arg.Connector, arg.ExtID, arg.CreatedAt)
+// Durable platform acceptance and manager delivery, owned by connector/inbox.go.
+func (q *Queries) AcceptInbound(ctx context.Context, arg AcceptInboundParams) error {
+	_, err := q.db.ExecContext(ctx, acceptInbound,
+		arg.Connector,
+		arg.ExtID,
+		arg.CreatedAt,
+		arg.Payload,
+	)
 	return err
 }
 
-const inboundSeen = `-- name: InboundSeen :one
-
-select ext_id from connector_inbound where connector = ? and ext_id = ?
+const clearInbound = `-- name: ClearInbound :exec
+delete from connector_inbound where connector = ?
 `
 
-type InboundSeenParams struct {
+func (q *Queries) ClearInbound(ctx context.Context, connector string) error {
+	_, err := q.db.ExecContext(ctx, clearInbound, connector)
+	return err
+}
+
+const deliverInbound = `-- name: DeliverInbound :exec
+update connector_inbound set delivered = 1, payload = '' where connector = ? and ext_id = ?
+`
+
+type DeliverInboundParams struct {
 	Connector string
 	ExtID     string
 }
 
-// The messages each chat app sent in, so one is heard once (connector/connector.go).
-func (q *Queries) InboundSeen(ctx context.Context, arg InboundSeenParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, inboundSeen, arg.Connector, arg.ExtID)
-	var ext_id string
-	err := row.Scan(&ext_id)
-	return ext_id, err
+func (q *Queries) DeliverInbound(ctx context.Context, arg DeliverInboundParams) error {
+	_, err := q.db.ExecContext(ctx, deliverInbound, arg.Connector, arg.ExtID)
+	return err
+}
+
+const pendingInbound = `-- name: PendingInbound :many
+select ext_id, payload from connector_inbound where connector = ? and delivered = 0 order by rowid
+`
+
+type PendingInboundRow struct {
+	ExtID   string
+	Payload string
+}
+
+func (q *Queries) PendingInbound(ctx context.Context, connector string) ([]PendingInboundRow, error) {
+	rows, err := q.db.QueryContext(ctx, pendingInbound, connector)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PendingInboundRow
+	for rows.Next() {
+		var i PendingInboundRow
+		if err := rows.Scan(&i.ExtID, &i.Payload); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

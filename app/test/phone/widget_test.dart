@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/server.dart' show atlas;
 import 'package:go_router/go_router.dart';
 import 'package:vibevalley/data/providers.dart';
+import 'package:vibevalley/data/voice.dart';
 import 'package:vibevalley/data/server.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/phone/blocks_game.dart';
@@ -41,11 +42,11 @@ const failed = InboxItem(
 );
 const draft = InboxItem(
   id: 'pb1:draft',
-  kind: InboxKind.planDraft,
+  kind: InboxKind.graphDraft,
   from: InboxFromManager(),
   text: '登录改版',
   at: 40,
-  target: InboxTargetPlans(playbook: 'pb1'),
+  target: InboxTargetGraph(graph: 'pb1'),
 );
 const mention = InboxItem(
   id: 'm4',
@@ -86,6 +87,7 @@ void main() {
     call = VoiceCall(VibeValleyServer(Uri.parse('http://127.0.0.1:9')).api);
     container = ProviderContainer(
       overrides: [
+        voiceCallProvider.overrideWith((ref) => call),
         inboxProvider.overrideWith((ref) => ref.watch(fakeInbox)),
         atlasProvider.overrideWith((ref) async => atlas),
         agentsProvider.overrideWithValue(AsyncData(const <String, Agent>{})),
@@ -147,7 +149,7 @@ void main() {
     await done(tester);
   });
 
-  testWidgets('hung up, the call leaves the missed list and the phone goes back; a plan call opens the plans', (tester) async {
+  testWidgets('hung up, the call leaves the missed list and the phone goes back; a task call opens the task board', (tester) async {
     await farm(tester);
     container.read(fakeInbox.notifier).calls([failed]);
     await tester.pump();
@@ -164,7 +166,7 @@ void main() {
     expect(find.text('计划拆好了'), findsOneWidget);
     await tester.tap(find.text('接听'));
     await tester.pump();
-    expect(targets.single, isA<PhoneTargetPlans>().having((t) => t.playbook, 'playbook', 'pb1'));
+    expect(targets.single, isA<PhoneTargetTaskBoard>().having((t) => t.graph, 'task', 'pb1'));
     await done(tester);
   });
 

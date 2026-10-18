@@ -18,7 +18,7 @@ func OpenDB(path string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := migrations.Up(db, path); err != nil {
+	if _, err := migrations.Up(db); err != nil {
 		db.Close()
 		return nil, err
 	}

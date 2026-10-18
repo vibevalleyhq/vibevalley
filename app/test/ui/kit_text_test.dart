@@ -45,9 +45,9 @@ var a = 1;
         'MdTable',
         'MdHeading',
       ]);
-      final tasks = blocks[2] as MdList;
-      expect(tasks.items.map((i) => i.checked), [true, false]);
-      expect(tasks.items[1].children.last, isA<MdList>());
+      final graphs = blocks[2] as MdList;
+      expect(graphs.items.map((i) => i.checked), [true, false]);
+      expect(graphs.items[1].children.last, isA<MdList>());
       expect((blocks[3] as MdList).ordered, isTrue);
       expect((blocks[4] as MdCode).text, 'var a = 1;');
       expect((blocks[4] as MdCode).lang, 'dart');

@@ -161,7 +161,7 @@ func openWorldAt(t *testing.T, home, work, db string, change ...func(*base.Confi
 			}
 			stopEvents()
 			f.Core.Close()
-			f.DB.Close()
+			f.Close()
 		})
 	}
 	t.Cleanup(w.stop)
@@ -319,7 +319,7 @@ func TestIssueClosesAndReopens(t *testing.T) {
 	w := openWorld(t, home, work)
 	lab := fixture.Lab(t)
 	w.f.Agent.SaveAgent(lab)
-	session := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "写打卡并提交", "tickets", session.HireOptions{}))
+	session := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "写打卡并提交", "clock-in", session.HireOptions{}))
 	if session.Issue == nil || *session.Issue == "" {
 		t.Fatalf("sent at once, it works an issue of its own: %+v", session.Issue)
 	}
@@ -352,8 +352,8 @@ func TestIssueClosesAndReopens(t *testing.T) {
 	testkit.Eq(t, issue.Sessions, []string{session.ID, again}, "its runs")
 	testkit.Eq(t, issue.Closed == nil && issue.ClosedAt == nil, true, "open again")
 	reopened := w.f.Session.Get(again)
-	testkit.Match(t, reopened.Task, `^打卡还要记下时区\n\n（这张工单重开了，上一次是 .+（`+session.ID+`）做的。）`, "what to do now comes first")
-	testkit.Match(t, reopened.Task, `这张工单原来是：写打卡并提交\n它是怎么关的：收获了`, "the job and how its last run closed")
+	testkit.Match(t, reopened.Brief, `^打卡还要记下时区\n\n（这张工单重开了，上一次是 .+（`+session.ID+`）做的。）`, "what to do now comes first")
+	testkit.Match(t, reopened.Brief, `这张工单原来是：写打卡并提交\n它是怎么关的：收获了`, "the job and how its last run closed")
 	if _, err := w.f.Issue.Reopen(context.Background(), *session.Issue, "", ""); !errors.As(err, &refused) {
 		t.Fatalf("reopened while open: %v", err)
 	}
@@ -364,12 +364,12 @@ func TestIssueClosesAndReopens(t *testing.T) {
 	w.f.Session.Dismiss(again)
 	testkit.Until(t, "sent home", closedAs(protocol.IssueCloseDismissed))
 	if err := generated.New(w.f.DB).CloseIssue(context.Background(), generated.CloseIssueParams{
-		ClosedAt: sql.NullInt64{Int64: clock.NowMs(), Valid: true}, Closed: sql.NullString{String: string(protocol.IssueCloseMergedIntoPlan), Valid: true}, ID: issue.ID,
+		ClosedAt: sql.NullInt64{Int64: clock.NowMs(), Valid: true}, Closed: sql.NullString{String: string(protocol.IssueCloseMergedIntoGraph), Valid: true}, ID: issue.ID,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.f.Issue.Reopen(context.Background(), issue.ID, "", ""); !errors.As(err, &refused) || !strings.Contains(refused.Reason, "种植计划") {
-		t.Fatalf("a playbook's step: %v", err)
+		t.Fatalf("a task's step: %v", err)
 	}
 }
 
@@ -409,7 +409,7 @@ func TestIssueWrittenDownStarts(t *testing.T) {
 		t.Fatalf("started: %+v %v", got, err)
 	}
 	w.nextReport(t)
-	testkit.Eq(t, w.f.Session.Get(*got.Session).Task, "写打卡并提交", "its run's job")
+	testkit.Eq(t, w.f.Session.Get(*got.Session).Brief, "写打卡并提交", "its run's job")
 	started, _ := w.f.Issue.Get(issue.ID)
 	testkit.Eq(t, started.Sessions, []string{*got.Session}, "the same issue, its run on it")
 	testkit.Eq(t, started.Status, protocol.IssueStatusInReview, "its turn over")
@@ -456,7 +456,7 @@ func TestIssueWaitsForAFreeBed(t *testing.T) {
 	w.f.Agent.SaveAgent(lab)
 	project, agent := "queue", lab.ID
 	w.f.Core.Apply(protocol.FactHired{Session: protocol.Session{
-		ID: "w90", Name: "占地的", Agent: lab.ID, Runtime: lab.Runtime, Task: "先干着", Project: &project,
+		ID: "w90", Name: "占地的", Agent: lab.ID, Runtime: lab.Runtime, Brief: "先干着", Project: &project,
 		Phase: protocol.Phase{Value: protocol.PhaseWorking{Since: clock.NowMs(), Doing: protocol.Doing{}}},
 	}})
 	issue, _ := w.f.Issue.Add(protocol.IssueRequest{Title: "等空地的活", Project: &project, Assignee: &agent})
@@ -475,7 +475,11 @@ func TestIssueWaitsForAFreeBed(t *testing.T) {
 	w.f.Issue.TryQueued(context.Background())
 	w.nextReport(t)
 	testkit.Eq(t, status(), protocol.IssueStatusInReview, "started, its turn over")
-	if !slices.ContainsFunc(w.f.Session.List(lab.ID), func(s protocol.Session) bool { return s.Task == "等空地的活" }) {
+	records, err := w.f.Session.List(lab.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(records, func(s protocol.Session) bool { return s.Brief == "等空地的活" }) {
 		t.Fatal("its run")
 	}
 	other, _ := w.f.Issue.Add(protocol.IssueRequest{Title: "别排了"})
@@ -486,14 +490,14 @@ func TestIssueWaitsForAFreeBed(t *testing.T) {
 	}
 }
 
-func TestIssueKnowsItsPlaybook(t *testing.T) {
+func TestIssueKnowsItsTask(t *testing.T) {
 	home, work := dirs(t)
 	w := openWorld(t, home, work)
 	node := "impl"
-	session := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "做一步", "planned", session.HireOptions{Playbook: &protocol.SessionPlaybook{ID: "p1", Node: &node}}))
+	session := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "做一步", "split", session.HireOptions{TaskGraph: &protocol.SessionGraph{ID: "p1", Task: &node}}))
 	head := w.f.Session.Get(session.ID)
-	if head.Playbook == nil || head.Playbook.ID != "p1" || head.Playbook.Node == nil || *head.Playbook.Node != "impl" {
-		t.Fatalf("the issue's playbook: %+v", head.Playbook)
+	if head.Graph == nil || head.Graph.ID != "p1" || head.Graph.Task == nil || *head.Graph.Task != "impl" {
+		t.Fatalf("the issue's task: %+v", head.Graph)
 	}
 }
 
@@ -534,7 +538,7 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	if after == nil {
 		t.Fatal("the trajectory outlives the session")
 	}
-	testkit.Eq(t, []string{after.Task, after.Agent, *after.Project}, []string{"看看目录", lab.ID, "steps"}, "who it was")
+	testkit.Eq(t, []string{after.Brief, after.Agent, *after.Project}, []string{"看看目录", lab.ID, "steps"}, "who it was")
 	if _, ok := after.Phase.Value.(protocol.PhaseClosed); !ok {
 		t.Fatal("ended")
 	}
@@ -554,7 +558,11 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 		}
 	}
 	testkit.Eq(t, w.f.Session.Events(session.ID, "")[len(w.f.Session.Events(session.ID, ""))-1].Text, string(protocol.OutcomeCompleted), "the run's end says how it ended")
-	if !slices.ContainsFunc(w.f.Session.List(lab.ID), func(s protocol.Session) bool { return s.ID == session.ID }) {
+	records, err := w.f.Session.List(lab.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(records, func(s protocol.Session) bool { return s.ID == session.ID }) {
 		t.Fatal("listed")
 	}
 	testkit.Eq(t, kinds(steps), want, "steps")
@@ -624,13 +632,13 @@ func TestNobodySentWhenMoneyRunsOut(t *testing.T) {
 	resets := time.Date(2026, 10, 14, 8, 0, 0, 0, time.Local).UnixMilli()
 	week := protocol.UsageWindow{Label: "Codex · 1 week", UsedPercent: 100, ResetsAt: &resets}
 	used := info
-	used.Usage = protocol.AccountUsage{Value: protocol.AccountUsageOk{Plan: ptr.To("pro"), Windows: []protocol.UsageWindow{{Label: "5h", UsedPercent: 40}, week}}}
+	used.Usage = protocol.AccountUsage{Value: protocol.AccountUsageOk{Subscription: ptr.To("pro"), Windows: []protocol.UsageWindow{{Label: "5h", UsedPercent: 40}, week}}}
 	w.setInfo(used)
 	testkit.Match(t, hire().Refused, `额度用完了（Codex · 1 week），10 月 14 日 08:00重置`, "window")
 
 	week.UsedPercent = 99
 	almost := info
-	almost.Usage = protocol.AccountUsage{Value: protocol.AccountUsageOk{Plan: ptr.To("pro"), Windows: []protocol.UsageWindow{week}}}
+	almost.Usage = protocol.AccountUsage{Value: protocol.AccountUsageOk{Subscription: ptr.To("pro"), Windows: []protocol.UsageWindow{week}}}
 	w.setInfo(almost)
 	testkit.Eq(t, hire().Refused, "", "a window not quite used up is fine")
 
@@ -950,11 +958,19 @@ func TestEndedSessionsAreRows(t *testing.T) {
 		t.Fatalf("ended: %+v", got)
 	}
 	var ids []string
-	for _, x := range w.f.Session.List("") {
+	all, err := w.f.Session.List("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, x := range all {
 		ids = append(ids, x.ID)
 	}
 	testkit.Eq(t, ids, []string{s.ID}, "newest first")
-	testkit.Eq(t, len(w.f.Session.List(lab.ID)), 1, "by agent")
+	matching, err := w.f.Session.List(lab.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, len(matching), 1, "by agent")
 }
 
 func mustMerge(t *testing.T, f *Workspace, id string) string {

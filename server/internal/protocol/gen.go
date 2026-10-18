@@ -88,7 +88,7 @@ var OutcomeValues = []Outcome{OutcomeCompleted, OutcomeFailed, OutcomeInterrupte
 var ConversationKindValues = []ConversationKind{ConversationKindGeneral, ConversationKindChannel, ConversationKindThread}
 
 // SubjectKindValues are every SubjectKind, in the protocol's order.
-var SubjectKindValues = []SubjectKind{SubjectKindIssue, SubjectKindPlaybook, SubjectKindTalk}
+var SubjectKindValues = []SubjectKind{SubjectKindIssue, SubjectKindGraph, SubjectKindTalk}
 
 func (v Conflict) MarshalJSON() ([]byte, error) {
 	type plain Conflict
@@ -188,14 +188,14 @@ func (v CommitCount) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-// PlaybookStateValues are every PlaybookState, in the protocol's order.
-var PlaybookStateValues = []PlaybookState{PlaybookStatePlanning, PlaybookStateDraft, PlaybookStateRunning, PlaybookStatePaused, PlaybookStateRipe, PlaybookStateDone, PlaybookStateAbandoned}
+// GraphStateValues are every GraphState, in the protocol's order.
+var GraphStateValues = []GraphState{GraphStateSplitting, GraphStateDraft, GraphStateRunning, GraphStatePaused, GraphStateRipe, GraphStateDone, GraphStateAbandoned}
 
-// NodeStateValues are every NodeState, in the protocol's order.
-var NodeStateValues = []NodeState{NodeStateWaiting, NodeStateWorking, NodeStateMerged, NodeStateFailed, NodeStateSkipped}
+// TaskStateValues are every TaskState, in the protocol's order.
+var TaskStateValues = []TaskState{TaskStateWaiting, TaskStateWorking, TaskStateMerged, TaskStateFailed, TaskStateSkipped}
 
-func (v PlaybookNode) MarshalJSON() ([]byte, error) {
-	type plain PlaybookNode
+func (v Task) MarshalJSON() ([]byte, error) {
+	type plain Task
 	p := plain(v)
 	if p.Needs == nil {
 		p.Needs = []string{}
@@ -203,11 +203,11 @@ func (v PlaybookNode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-func (v Playbook) MarshalJSON() ([]byte, error) {
-	type plain Playbook
+func (v TaskGraph) MarshalJSON() ([]byte, error) {
+	type plain TaskGraph
 	p := plain(v)
-	if p.Nodes == nil {
-		p.Nodes = []PlaybookNode{}
+	if p.Tasks == nil {
+		p.Tasks = []Task{}
 	}
 	return json.Marshal(p)
 }
@@ -426,7 +426,7 @@ func (v RuntimeSettings) MarshalJSON() ([]byte, error) {
 }
 
 // InboxKindValues are every InboxKind, in the protocol's order.
-var InboxKindValues = []InboxKind{InboxKindMerge, InboxKindFix, InboxKindConflict, InboxKindQuiet, InboxKindPlanDraft, InboxKindPlanRipe, InboxKindPlanFailed, InboxKindMention}
+var InboxKindValues = []InboxKind{InboxKindMerge, InboxKindFix, InboxKindConflict, InboxKindQuiet, InboxKindGraphDraft, InboxKindGraphRipe, InboxKindTaskFailed, InboxKindMention}
 
 // InboxFromValue is a member of InboxFrom: InboxFromSession, InboxFromManager, told apart by "kind".
 type InboxFromValue interface{ isInboxFrom() }
@@ -471,7 +471,7 @@ func (u *InboxFrom) UnmarshalJSON(data []byte) error {
 // handle every one of them does.
 var InboxFromMembers = []InboxFromValue{InboxFromSession{}, InboxFromManager{}}
 
-// InboxTargetValue is a member of InboxTarget: InboxTargetSession, InboxTargetPlans, InboxTargetChat, told apart by "kind".
+// InboxTargetValue is a member of InboxTarget: InboxTargetSession, InboxTargetGraph, InboxTargetChat, told apart by "kind".
 type InboxTargetValue interface{ isInboxTarget() }
 
 func (u InboxTarget) IsZero() bool { return u.Value == nil }
@@ -500,8 +500,8 @@ func (u *InboxTarget) UnmarshalJSON(data []byte) error {
 		var v InboxTargetSession
 		err = json.Unmarshal(data, &v)
 		u.Value = v
-	case "plans":
-		var v InboxTargetPlans
+	case "graph":
+		var v InboxTargetGraph
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "chat":
@@ -516,7 +516,7 @@ func (u *InboxTarget) UnmarshalJSON(data []byte) error {
 
 // InboxTargetMembers are every member of InboxTarget, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var InboxTargetMembers = []InboxTargetValue{InboxTargetSession{}, InboxTargetPlans{}, InboxTargetChat{}}
+var InboxTargetMembers = []InboxTargetValue{InboxTargetSession{}, InboxTargetGraph{}, InboxTargetChat{}}
 
 // CropValues are every Crop, in the protocol's order.
 var CropValues = []Crop{CropEmpty, CropSeeded, CropSprout, CropLeafy, CropFlowering, CropWheat, CropCarrot, CropWithered, CropWeeds, CropDry, CropHarvested, CropLocked}
@@ -590,8 +590,8 @@ func (v StateFrame) MarshalJSON() ([]byte, error) {
 	if p.Inbox == nil {
 		p.Inbox = []InboxItem{}
 	}
-	if p.Plans == nil {
-		p.Plans = []Playbook{}
+	if p.Graphs == nil {
+		p.Graphs = []TaskGraph{}
 	}
 	if p.Effects == nil {
 		p.Effects = []GameEffect{}
@@ -599,7 +599,7 @@ func (v StateFrame) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-// LedgerEntryValue is a member of LedgerEntry: LedgerEntryHarvested, LedgerEntryFailed, LedgerEntryConflicted, LedgerEntryTold, LedgerEntryReviewed, LedgerEntryPlaybook, LedgerEntryHandoff, LedgerEntryCalled, LedgerEntryHired, LedgerEntryMoment, LedgerEntryLevel, LedgerEntryTitled, told apart by "kind".
+// LedgerEntryValue is a member of LedgerEntry: LedgerEntryHarvested, LedgerEntryFailed, LedgerEntryConflicted, LedgerEntryTold, LedgerEntryReviewed, LedgerEntryGraph, LedgerEntryHandoff, LedgerEntryCalled, LedgerEntryHired, LedgerEntryMoment, LedgerEntryLevel, LedgerEntryTitled, told apart by "kind".
 type LedgerEntryValue interface{ isLedgerEntry() }
 
 func (u LedgerEntry) IsZero() bool { return u.Value == nil }
@@ -644,8 +644,8 @@ func (u *LedgerEntry) UnmarshalJSON(data []byte) error {
 		var v LedgerEntryReviewed
 		err = json.Unmarshal(data, &v)
 		u.Value = v
-	case "playbook":
-		var v LedgerEntryPlaybook
+	case "graph":
+		var v LedgerEntryGraph
 		err = json.Unmarshal(data, &v)
 		u.Value = v
 	case "handoff":
@@ -664,7 +664,7 @@ func (u *LedgerEntry) UnmarshalJSON(data []byte) error {
 		var v LedgerEntryMoment
 		err = json.Unmarshal(data, &v)
 		u.Value = v
-	case "planned":
+	case "split":
 		var v LedgerEntryMoment
 		err = json.Unmarshal(data, &v)
 		u.Value = v
@@ -692,13 +692,13 @@ func (u *LedgerEntry) UnmarshalJSON(data []byte) error {
 
 // LedgerEntryMembers are every member of LedgerEntry, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var LedgerEntryMembers = []LedgerEntryValue{LedgerEntryHarvested{}, LedgerEntryFailed{}, LedgerEntryConflicted{}, LedgerEntryTold{}, LedgerEntryReviewed{}, LedgerEntryPlaybook{}, LedgerEntryHandoff{}, LedgerEntryCalled{}, LedgerEntryHired{}, LedgerEntryMoment{}, LedgerEntryLevel{}, LedgerEntryTitled{}}
+var LedgerEntryMembers = []LedgerEntryValue{LedgerEntryHarvested{}, LedgerEntryFailed{}, LedgerEntryConflicted{}, LedgerEntryTold{}, LedgerEntryReviewed{}, LedgerEntryGraph{}, LedgerEntryHandoff{}, LedgerEntryCalled{}, LedgerEntryHired{}, LedgerEntryMoment{}, LedgerEntryLevel{}, LedgerEntryTitled{}}
 
-// PlaybookEventKindValues are every PlaybookEventKind, in the protocol's order.
-var PlaybookEventKindValues = []PlaybookEventKind{PlaybookEventKindPlanning, PlaybookEventKindDrafted, PlaybookEventKindStarted, PlaybookEventKindPaused, PlaybookEventKindResumed, PlaybookEventKindRipe, PlaybookEventKindMerged, PlaybookEventKindAbandoned, PlaybookEventKindNoted, PlaybookEventKindNodeStarted, PlaybookEventKindNodeSentBack, PlaybookEventKindNodeMerged, PlaybookEventKindNodeFailed, PlaybookEventKindNodeRetried, PlaybookEventKindNodeRequeued, PlaybookEventKindNodeSkipped, PlaybookEventKindNodeEdited, PlaybookEventKindNodeAdded, PlaybookEventKindNodeRemoved}
+// GraphEventKindValues are every GraphEventKind, in the protocol's order.
+var GraphEventKindValues = []GraphEventKind{GraphEventKindSplitting, GraphEventKindDrafted, GraphEventKindStarted, GraphEventKindPaused, GraphEventKindResumed, GraphEventKindRipe, GraphEventKindMerged, GraphEventKindAbandoned, GraphEventKindNoted, GraphEventKindTaskStarted, GraphEventKindTaskSentBack, GraphEventKindTaskMerged, GraphEventKindTaskFailed, GraphEventKindTaskRetried, GraphEventKindTaskRequeued, GraphEventKindTaskSkipped, GraphEventKindTaskEdited, GraphEventKindTaskAdded, GraphEventKindTaskRemoved}
 
-// PlaybookActorValues are every PlaybookActor, in the protocol's order.
-var PlaybookActorValues = []PlaybookActor{PlaybookActorUser, PlaybookActorManager, PlaybookActorSystem}
+// GraphActorValues are every GraphActor, in the protocol's order.
+var GraphActorValues = []GraphActor{GraphActorUser, GraphActorManager, GraphActorSystem}
 
 func (v LanStatus) MarshalJSON() ([]byte, error) {
 	type plain LanStatus
@@ -814,11 +814,23 @@ func (v Changes) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-// NodeActionValues are every NodeAction, in the protocol's order.
-var NodeActionValues = []NodeAction{NodeActionRetry, NodeActionSkip}
+// TaskActionValues are every TaskAction, in the protocol's order.
+var TaskActionValues = []TaskAction{TaskActionRetry, TaskActionSkip}
 
-// PlaybookActionValues are every PlaybookAction, in the protocol's order.
-var PlaybookActionValues = []PlaybookAction{PlaybookActionStart, PlaybookActionPause, PlaybookActionResume, PlaybookActionAbandon, PlaybookActionMerge}
+// GraphActionValues are every GraphAction, in the protocol's order.
+var GraphActionValues = []GraphAction{GraphActionStart, GraphActionPause, GraphActionResume, GraphActionAbandon, GraphActionMerge}
+
+func (v IssueHistory) MarshalJSON() ([]byte, error) {
+	type plain IssueHistory
+	p := plain(v)
+	if p.Sessions == nil {
+		p.Sessions = []Session{}
+	}
+	if p.MissingSessions == nil {
+		p.MissingSessions = []string{}
+	}
+	return json.Marshal(p)
+}
 
 func (v Issue) MarshalJSON() ([]byte, error) {
 	type plain Issue
@@ -836,10 +848,10 @@ var IssueStatusValues = []IssueStatus{IssueStatusBacklog, IssueStatusTodo, Issue
 var PriorityValues = []Priority{PriorityUrgent, PriorityHigh, PriorityMedium, PriorityLow}
 
 // IssueCloseValues are every IssueClose, in the protocol's order.
-var IssueCloseValues = []IssueClose{IssueCloseMerged, IssueCloseMergedIntoPlan, IssueCloseDismissed, IssueCloseLost, IssueCloseAnswered}
+var IssueCloseValues = []IssueClose{IssueCloseMerged, IssueCloseMergedIntoGraph, IssueCloseDismissed, IssueCloseLost, IssueCloseAnswered}
 
 // RunTriggerKindValues are every RunTriggerKind, in the protocol's order.
-var RunTriggerKindValues = []RunTriggerKind{RunTriggerKindIssue, RunTriggerKindComment, RunTriggerKindPlaybook, RunTriggerKindSchedule, RunTriggerKindRuntime}
+var RunTriggerKindValues = []RunTriggerKind{RunTriggerKindIssue, RunTriggerKindComment, RunTriggerKindTask, RunTriggerKindSchedule, RunTriggerKindRuntime}
 
 func (v Run) MarshalJSON() ([]byte, error) {
 	type plain Run
@@ -1063,13 +1075,13 @@ func (v InboxTargetSession) MarshalJSON() ([]byte, error) {
 	return withTag(p, "kind", "session")
 }
 
-func (InboxTargetPlans) isInboxTarget() {}
+func (InboxTargetGraph) isInboxTarget() {}
 
-func (v InboxTargetPlans) MarshalJSON() ([]byte, error) {
-	type plain InboxTargetPlans
+func (v InboxTargetGraph) MarshalJSON() ([]byte, error) {
+	type plain InboxTargetGraph
 	p := plain(v)
 
-	return withTag(p, "kind", "plans")
+	return withTag(p, "kind", "graph")
 }
 
 func (InboxTargetChat) isInboxTarget() {}
@@ -1162,13 +1174,13 @@ func (v LedgerEntryReviewed) MarshalJSON() ([]byte, error) {
 	return withTag(p, "kind", "reviewed")
 }
 
-func (LedgerEntryPlaybook) isLedgerEntry() {}
+func (LedgerEntryGraph) isLedgerEntry() {}
 
-func (v LedgerEntryPlaybook) MarshalJSON() ([]byte, error) {
-	type plain LedgerEntryPlaybook
+func (v LedgerEntryGraph) MarshalJSON() ([]byte, error) {
+	type plain LedgerEntryGraph
 	p := plain(v)
 
-	return withTag(p, "kind", "playbook")
+	return withTag(p, "kind", "graph")
 }
 
 func (LedgerEntryHandoff) isLedgerEntry() {}
@@ -1199,7 +1211,7 @@ func (v LedgerEntryHired) MarshalJSON() ([]byte, error) {
 }
 
 // LedgerEntryMomentKindValues are every LedgerEntryMomentKind, in the protocol's order.
-var LedgerEntryMomentKindValues = []LedgerEntryMomentKind{LedgerEntryMomentKindOpened, LedgerEntryMomentKindPlanned, LedgerEntryMomentKindVoice, LedgerEntryMomentKindBusy6}
+var LedgerEntryMomentKindValues = []LedgerEntryMomentKind{LedgerEntryMomentKindOpened, LedgerEntryMomentKindSplit, LedgerEntryMomentKindVoice, LedgerEntryMomentKindBusy6}
 
 func (LedgerEntryMoment) isLedgerEntry() {}
 
@@ -2219,6 +2231,7 @@ var Endpoints = []Endpoint{
 	{"session.list", "GET", "/api/v1/sessions", []string{"agent"}, false, []Caller{CallerOwner, CallerRemote}},
 	{"session.get", "GET", "/api/v1/sessions/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"session.events", "GET", "/api/v1/sessions/{id}/events", []string{"run"}, false, []Caller{CallerOwner, CallerRemote}},
+	{"issue.history", "GET", "/api/v1/issues/history", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"issue.list", "GET", "/api/v1/issues", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.get", "GET", "/api/v1/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.runs", "GET", "/api/v1/issues/{id}/runs", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2229,15 +2242,15 @@ var Endpoints = []Endpoint{
 	{"issue.unqueue", "POST", "/api/v1/issues/{id}/unqueue", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.start", "POST", "/api/v1/issues/{id}/start", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"issue.reopen", "POST", "/api/v1/issues/{id}/reopen", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"playbook.plan", "POST", "/api/v1/playbooks", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.updateNode", "PUT", "/api/v1/playbooks/{id}/nodes/{node}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.deleteNode", "DELETE", "/api/v1/playbooks/{id}/nodes/{node}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.act", "POST", "/api/v1/playbooks/{id}/act", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"playbook.nodeAct", "POST", "/api/v1/playbooks/{id}/nodes/{node}/act", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"graph.split", "POST", "/api/v1/graphs", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"graph.updateTask", "PUT", "/api/v1/graphs/{id}/tasks/{task}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"graph.deleteTask", "DELETE", "/api/v1/graphs/{id}/tasks/{task}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"graph.act", "POST", "/api/v1/graphs/{id}/act", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
+	{"graph.taskAct", "POST", "/api/v1/graphs/{id}/tasks/{task}/act", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"channel.history", "GET", "/api/v1/channels/{id}/messages", []string{"before", "limit"}, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"channel.markRead", "POST", "/api/v1/channels/{id}/read", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"playbook.changes", "GET", "/api/v1/playbooks/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"playbook.events", "GET", "/api/v1/playbooks/{id}/events", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"graph.changes", "GET", "/api/v1/graphs/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"graph.events", "GET", "/api/v1/graphs/{id}/events", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"game.chooseTitle", "POST", "/api/v1/game/title", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"runtime.list", "GET", "/api/v1/runtimes", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"runtime.refresh", "POST", "/api/v1/runtimes/{id}/refresh", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2245,6 +2258,7 @@ var Endpoints = []Endpoint{
 	{"runtime.upgrade", "POST", "/api/v1/runtimes/{id}/upgrade", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"agent.list", "GET", "/api/v1/agents", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"agent.check", "POST", "/api/v1/agents/check", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"agent.create", "POST", "/api/v1/agents", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"agent.save", "PUT", "/api/v1/agents/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"agent.delete", "DELETE", "/api/v1/agents/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"memory.list", "GET", "/api/v1/memories/{agent}", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2255,6 +2269,7 @@ var Endpoints = []Endpoint{
 	{"manager.getArchive", "GET", "/api/v1/manager/archive/{name}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"manager.markWrong", "POST", "/api/v1/manager/evals", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"skill.list", "GET", "/api/v1/skills", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"skill.create", "POST", "/api/v1/skills", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"skill.save", "PUT", "/api/v1/skills/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"skill.delete", "DELETE", "/api/v1/skills/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"project.list", "GET", "/api/v1/projects", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
@@ -2266,6 +2281,7 @@ var Endpoints = []Endpoint{
 	{"voice.renew", "POST", "/api/v1/voice/renew", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"voice.start", "POST", "/api/v1/voice/agent", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"voice.stop", "POST", "/api/v1/voice/agent/stop", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"voice.heard", "POST", "/api/v1/voice/agent/heard", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"voice.said", "POST", "/api/v1/voice/agent/said", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"voice.dictate", "POST", "/api/v1/voice/dictate", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"connector.list", "GET", "/api/v1/connectors", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2328,7 +2344,8 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		if !decode(w, r, &body) {
 			return
 		}
-		answer(w, nil, h.ChannelCreate(r.Context(), body))
+		out, err := h.ChannelCreate(r.Context(), body)
+		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/v1/schedules", func(w http.ResponseWriter, r *http.Request) {
 		var body ScheduleRequest
@@ -2414,6 +2431,10 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.SessionEvents(r.Context(), pID, pRun)
 		answer(w, out, err)
 	})
+	mux.HandleFunc("GET /api/v1/issues/history", func(w http.ResponseWriter, r *http.Request) {
+		out, err := h.IssueHistory(r.Context())
+		answer(w, out, err)
+	})
 	mux.HandleFunc("GET /api/v1/issues", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.IssueList(r.Context())
 		answer(w, out, err)
@@ -2477,47 +2498,47 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.IssueReopen(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/v1/playbooks", func(w http.ResponseWriter, r *http.Request) {
-		var body PlanRequest
+	mux.HandleFunc("POST /api/v1/graphs", func(w http.ResponseWriter, r *http.Request) {
+		var body GraphSplitRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.PlaybookPlan(r.Context(), body)
+		out, err := h.GraphSplit(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/v1/playbooks/{id}/nodes/{node}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/graphs/{id}/tasks/{task}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		pNode := r.PathValue("node")
-		var body NodeEdit
+		pTask := r.PathValue("task")
+		var body TaskEdit
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.PlaybookUpdateNode(r.Context(), pID, pNode, body)
+		out, err := h.GraphUpdateTask(r.Context(), pID, pTask, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/v1/playbooks/{id}/nodes/{node}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/graphs/{id}/tasks/{task}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		pNode := r.PathValue("node")
-		out, err := h.PlaybookDeleteNode(r.Context(), pID, pNode)
+		pTask := r.PathValue("task")
+		out, err := h.GraphDeleteTask(r.Context(), pID, pTask)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/v1/playbooks/{id}/act", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/graphs/{id}/act", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		var body PlaybookActRequest
+		var body GraphActRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.PlaybookAct(r.Context(), pID, body)
+		out, err := h.GraphAct(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/v1/playbooks/{id}/nodes/{node}/act", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/graphs/{id}/tasks/{task}/act", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		pNode := r.PathValue("node")
-		var body NodeActRequest
+		pTask := r.PathValue("task")
+		var body TaskActRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.PlaybookNodeAct(r.Context(), pID, pNode, body)
+		out, err := h.GraphTaskAct(r.Context(), pID, pTask, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/v1/channels/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
@@ -2535,14 +2556,14 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		}
 		answer(w, nil, h.ChannelMarkRead(r.Context(), pID, body))
 	})
-	mux.HandleFunc("GET /api/v1/playbooks/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/graphs/{id}/changes", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.PlaybookChanges(r.Context(), pID)
+		out, err := h.GraphChanges(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/v1/playbooks/{id}/events", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/graphs/{id}/events", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.PlaybookEvents(r.Context(), pID)
+		out, err := h.GraphEvents(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/v1/game/title", func(w http.ResponseWriter, r *http.Request) {
@@ -2585,6 +2606,14 @@ func Mount(mux *http.ServeMux, h Handlers) {
 			return
 		}
 		out, err := h.AgentCheck(r.Context(), body)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/v1/agents", func(w http.ResponseWriter, r *http.Request) {
+		var body Agent
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.AgentCreate(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/v1/agents/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -2646,6 +2675,14 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	})
 	mux.HandleFunc("GET /api/v1/skills", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.SkillList(r.Context())
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/v1/skills", func(w http.ResponseWriter, r *http.Request) {
+		var body Skill
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.SkillCreate(r.Context(), body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("PUT /api/v1/skills/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -2717,6 +2754,13 @@ func Mount(mux *http.ServeMux, h Handlers) {
 			return
 		}
 		answer(w, nil, h.VoiceStop(r.Context(), body))
+	})
+	mux.HandleFunc("POST /api/v1/voice/agent/heard", func(w http.ResponseWriter, r *http.Request) {
+		var body VoiceHeard
+		if !decode(w, r, &body) {
+			return
+		}
+		answer(w, nil, h.VoiceHeard(r.Context(), body))
 	})
 	mux.HandleFunc("POST /api/v1/voice/agent/said", func(w http.ResponseWriter, r *http.Request) {
 		var body VoiceSaid
@@ -2895,8 +2939,10 @@ func (c *Client) ChannelSay(ctx context.Context, body SayRequest) error {
 	return c.call(ctx, "POST", "/api/v1/say", nil, body, nil)
 }
 
-func (c *Client) ChannelCreate(ctx context.Context, body ChannelRequest) error {
-	return c.call(ctx, "POST", "/api/v1/channels", nil, body, nil)
+func (c *Client) ChannelCreate(ctx context.Context, body ChannelRequest) (string, error) {
+	var out string
+	err := c.call(ctx, "POST", "/api/v1/channels", nil, body, &out)
+	return out, err
 }
 
 func (c *Client) ScheduleCreate(ctx context.Context, body ScheduleRequest) (Schedule, error) {
@@ -2979,6 +3025,12 @@ func (c *Client) SessionEvents(ctx context.Context, pID string, pRun *string) ([
 	return out, err
 }
 
+func (c *Client) IssueHistory(ctx context.Context) ([]IssueHistory, error) {
+	var out []IssueHistory
+	err := c.call(ctx, "GET", "/api/v1/issues/history", nil, nil, &out)
+	return out, err
+}
+
 func (c *Client) IssueList(ctx context.Context) ([]Issue, error) {
 	var out []Issue
 	err := c.call(ctx, "GET", "/api/v1/issues", nil, nil, &out)
@@ -3037,33 +3089,33 @@ func (c *Client) IssueReopen(ctx context.Context, pID string, body ReopenRequest
 	return out, err
 }
 
-func (c *Client) PlaybookPlan(ctx context.Context, body PlanRequest) (string, error) {
+func (c *Client) GraphSplit(ctx context.Context, body GraphSplitRequest) (string, error) {
 	var out string
-	err := c.call(ctx, "POST", "/api/v1/playbooks", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/graphs", nil, body, &out)
 	return out, err
 }
 
-func (c *Client) PlaybookUpdateNode(ctx context.Context, pID string, pNode string, body NodeEdit) (string, error) {
+func (c *Client) GraphUpdateTask(ctx context.Context, pID string, pTask string, body TaskEdit) (string, error) {
 	var out string
-	err := c.call(ctx, "PUT", "/api/v1/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode), nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/graphs/"+url.PathEscape(pID)+"/tasks/"+url.PathEscape(pTask), nil, body, &out)
 	return out, err
 }
 
-func (c *Client) PlaybookDeleteNode(ctx context.Context, pID string, pNode string) (string, error) {
+func (c *Client) GraphDeleteTask(ctx context.Context, pID string, pTask string) (string, error) {
 	var out string
-	err := c.call(ctx, "DELETE", "/api/v1/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode), nil, nil, &out)
+	err := c.call(ctx, "DELETE", "/api/v1/graphs/"+url.PathEscape(pID)+"/tasks/"+url.PathEscape(pTask), nil, nil, &out)
 	return out, err
 }
 
-func (c *Client) PlaybookAct(ctx context.Context, pID string, body PlaybookActRequest) (string, error) {
+func (c *Client) GraphAct(ctx context.Context, pID string, body GraphActRequest) (string, error) {
 	var out string
-	err := c.call(ctx, "POST", "/api/v1/playbooks/"+url.PathEscape(pID)+"/act", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/graphs/"+url.PathEscape(pID)+"/act", nil, body, &out)
 	return out, err
 }
 
-func (c *Client) PlaybookNodeAct(ctx context.Context, pID string, pNode string, body NodeActRequest) (string, error) {
+func (c *Client) GraphTaskAct(ctx context.Context, pID string, pTask string, body TaskActRequest) (string, error) {
 	var out string
-	err := c.call(ctx, "POST", "/api/v1/playbooks/"+url.PathEscape(pID)+"/nodes/"+url.PathEscape(pNode)+"/act", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/graphs/"+url.PathEscape(pID)+"/tasks/"+url.PathEscape(pTask)+"/act", nil, body, &out)
 	return out, err
 }
 
@@ -3084,15 +3136,15 @@ func (c *Client) ChannelMarkRead(ctx context.Context, pID string, body ChatReadR
 	return c.call(ctx, "POST", "/api/v1/channels/"+url.PathEscape(pID)+"/read", nil, body, nil)
 }
 
-func (c *Client) PlaybookChanges(ctx context.Context, pID string) (Changes, error) {
+func (c *Client) GraphChanges(ctx context.Context, pID string) (Changes, error) {
 	var out Changes
-	err := c.call(ctx, "GET", "/api/v1/playbooks/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/graphs/"+url.PathEscape(pID)+"/changes", nil, nil, &out)
 	return out, err
 }
 
-func (c *Client) PlaybookEvents(ctx context.Context, pID string) ([]PlaybookEvent, error) {
-	var out []PlaybookEvent
-	err := c.call(ctx, "GET", "/api/v1/playbooks/"+url.PathEscape(pID)+"/events", nil, nil, &out)
+func (c *Client) GraphEvents(ctx context.Context, pID string) ([]GraphEvent, error) {
+	var out []GraphEvent
+	err := c.call(ctx, "GET", "/api/v1/graphs/"+url.PathEscape(pID)+"/events", nil, nil, &out)
 	return out, err
 }
 
@@ -3133,6 +3185,12 @@ func (c *Client) AgentList(ctx context.Context) ([]Agent, error) {
 func (c *Client) AgentCheck(ctx context.Context, body AgentCheckRequest) ([]AgentCheck, error) {
 	var out []AgentCheck
 	err := c.call(ctx, "POST", "/api/v1/agents/check", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) AgentCreate(ctx context.Context, body Agent) (Agent, error) {
+	var out Agent
+	err := c.call(ctx, "POST", "/api/v1/agents", nil, body, &out)
 	return out, err
 }
 
@@ -3203,6 +3261,12 @@ func (c *Client) SkillList(ctx context.Context) ([]Skill, error) {
 	return out, err
 }
 
+func (c *Client) SkillCreate(ctx context.Context, body Skill) (Skill, error) {
+	var out Skill
+	err := c.call(ctx, "POST", "/api/v1/skills", nil, body, &out)
+	return out, err
+}
+
 func (c *Client) SkillSave(ctx context.Context, pID string, body Skill) (Skill, error) {
 	var out Skill
 	err := c.call(ctx, "PUT", "/api/v1/skills/"+url.PathEscape(pID), nil, body, &out)
@@ -3243,14 +3307,14 @@ func (c *Client) ProjectActivity(ctx context.Context, pID string) (ProjectActivi
 	return out, err
 }
 
-func (c *Client) VoiceSession(ctx context.Context) (AgoraTicket, error) {
-	var out AgoraTicket
+func (c *Client) VoiceSession(ctx context.Context) (AgoraGrant, error) {
+	var out AgoraGrant
 	err := c.call(ctx, "POST", "/api/v1/voice/session", nil, nil, &out)
 	return out, err
 }
 
-func (c *Client) VoiceRenew(ctx context.Context, body RenewRequest) (AgoraTicket, error) {
-	var out AgoraTicket
+func (c *Client) VoiceRenew(ctx context.Context, body RenewRequest) (AgoraGrant, error) {
+	var out AgoraGrant
 	err := c.call(ctx, "POST", "/api/v1/voice/renew", nil, body, &out)
 	return out, err
 }
@@ -3263,6 +3327,10 @@ func (c *Client) VoiceStart(ctx context.Context, body StartRequest) (VoiceAgent,
 
 func (c *Client) VoiceStop(ctx context.Context, body VoiceAgent) error {
 	return c.call(ctx, "POST", "/api/v1/voice/agent/stop", nil, body, nil)
+}
+
+func (c *Client) VoiceHeard(ctx context.Context, body VoiceHeard) error {
+	return c.call(ctx, "POST", "/api/v1/voice/agent/heard", nil, body, nil)
 }
 
 func (c *Client) VoiceSaid(ctx context.Context, body VoiceSaid) error {

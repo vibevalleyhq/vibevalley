@@ -101,7 +101,7 @@ func TestCandidatesAreTheNativeInstallersLauncher(t *testing.T) {
 func TestProbesThroughItsPinEnvVar(t *testing.T) {
 	node := loginNodeOrSkip(t)
 	t.Setenv("OAR_CLAUDE_BIN", node)
-	snapshot, err := Installation(context.Background())
+	snapshot, err := Installation(context.Background(), oar.InstallationOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/data/remote.dart';
-import 'package:vibevalley/workbench/skills/skills_page.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/workbench.dart';
@@ -42,14 +41,8 @@ void main() {
   });
 
   test('mergeSteps lays new steps over old by number, in order', () {
-    SessionEvent step(double n, String text) => SessionEvent(seq: n, time: n, type: SessionEventType.assistantMessage, text: text);
-    final merged = mergeSteps([step(1, 'a'), step(2, 'b')], [step(2, 'B'), step(3, 'c')]);
+    SessionEvent task(double n, String text) => SessionEvent(seq: n, time: n, type: SessionEventType.assistantMessage, text: text);
+    final merged = mergeSteps([task(1, 'a'), task(2, 'b')], [task(2, 'B'), task(3, 'c')]);
     expect(merged.map((s) => s.text), ['a', 'B', 'c']);
-  });
-
-  test('slug makes an id from the name, numbered when taken', () {
-    expect(slug('Tests First!', {}), 'tests-first');
-    expect(slug('先写测试', {}), 'skill');
-    expect(slug('先写测试', {'skill', 'skill-2'}), 'skill-3');
   });
 }

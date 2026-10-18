@@ -91,7 +91,7 @@ func (r *rig) settled() []AgentEvent {
 	last := -1
 	for time.Now().Before(deadline) {
 		events := r.all()
-		if len(events) > 0 && events[len(events)-1].Type == EventAgentEnd && len(events) == last {
+		if len(events) > 0 && events[len(events)-1].Kind() == EventAgentEnd && len(events) == last {
 			return events
 		}
 		last = len(events)
@@ -151,14 +151,22 @@ func withAgent(t *testing.T, o rigOptions, script func(*ai.FauxProviderHandle), 
 func kinds(events []AgentEvent) []string {
 	out := []string{}
 	for _, e := range events {
-		switch {
-		case strings.HasPrefix(e.Type, "message_"):
-			out = append(out, e.Type+":"+e.Message.Role())
-		case strings.HasPrefix(e.Type, "tool_execution"):
-			out = append(out, e.Type+":"+e.ToolName)
-		default:
-			out = append(out, e.Type)
+		suffix := ""
+		switch e := e.(type) {
+		case MessageStarted:
+			suffix = ":" + e.Message.Role()
+		case MessageUpdated:
+			suffix = ":" + e.Message.Role()
+		case MessageEnded:
+			suffix = ":" + e.Message.Role()
+		case ToolStarted:
+			suffix = ":" + e.ToolName
+		case ToolUpdated:
+			suffix = ":" + e.ToolName
+		case ToolEnded:
+			suffix = ":" + e.ToolName
 		}
+		out = append(out, string(e.Kind())+suffix)
 	}
 	return out
 }
@@ -245,7 +253,7 @@ func TestToolsOverTwoTurns(t *testing.T) {
 			"message_update:assistant", "message_end:assistant", "turn_end", "agent_end",
 		})
 		for _, e := range events {
-			if e.Type == EventTurnEnd {
+			if e, ok := e.(TurnEnded); ok {
 				eq(t, len(e.ToolResults), 1)
 				eq(t, ai.ContentText(e.ToolResults[0].Content, ""), "回声：哈")
 				break
@@ -257,7 +265,7 @@ func TestToolsOverTwoTurns(t *testing.T) {
 		second := state.Contexts[1].Messages
 		eq(t, second[len(second)-1].Role(), "toolResult")
 		eq(t, state.Contexts[0].SystemPrompt, "你是测试")
-		end := events[len(events)-1]
+		end := events[len(events)-1].(AgentEnded)
 		eq(t, roles(end.Messages), []string{"user", "assistant", "toolResult", "assistant"})
 	})
 }
@@ -290,7 +298,7 @@ func TestSteeringJoinsBeforeTheNextRequestAFollowUpWaits(t *testing.T) {
 		count := func(kind string) int {
 			n := 0
 			for _, e := range events {
-				if e.Type == kind {
+				if e.Kind() == EventKind(kind) {
 					n++
 				}
 			}
@@ -319,7 +327,7 @@ func TestQueueModes(t *testing.T) {
 }
 
 func TestBeforeToolCallBlocksAfterToolCallRewrites(t *testing.T) {
-	options := AgentOptions{AgentLoopConfig: AgentLoopConfig{
+	options := AgentOptions{AgentConfig: AgentConfig{
 		BeforeToolCall: func(_ context.Context, c BeforeToolCallContext) *BeforeToolCallResult {
 			var args struct{ Text string }
 			_ = json.Unmarshal(c.ToolCall.Args(), &args)
@@ -367,7 +375,7 @@ func TestTerminateOnlyWhenEveryResultSaysSo(t *testing.T) {
 }
 
 func TestFinishTurn(t *testing.T) {
-	end := AgentOptions{AgentLoopConfig: AgentLoopConfig{FinishTurn: func(context.Context, AgentTurnContext) *AgentTurnDecision { return TurnEnd }}}
+	end := AgentOptions{AgentConfig: AgentConfig{FinishTurn: func(context.Context, AgentTurnContext) *AgentTurnDecision { return TurnEnd }}}
 	withAgent(t, rigOptions{options: end}, func(f *ai.FauxProviderHandle) {
 		f.SetResponses(ai.FauxAssistantMessage([]ai.Content{ai.FauxToolCall("echo", `{"text":"x"}`, "")}), ai.FauxAssistantMessage("不该有"))
 	}, func(r *rig) {
@@ -376,7 +384,7 @@ func TestFinishTurn(t *testing.T) {
 		eq(t, r.faux.State().CallCount, 1)
 		n := 0
 		for _, e := range r.settled() {
-			if e.Type == EventTurnEnd {
+			if _, ok := e.(TurnEnded); ok {
 				n++
 			}
 		}
@@ -384,7 +392,7 @@ func TestFinishTurn(t *testing.T) {
 		eq(t, r.agent.HasQueuedMessages(), true)
 	})
 	asked := 0
-	more := AgentOptions{AgentLoopConfig: AgentLoopConfig{FinishTurn: func(context.Context, AgentTurnContext) *AgentTurnDecision {
+	more := AgentOptions{AgentConfig: AgentConfig{FinishTurn: func(context.Context, AgentTurnContext) *AgentTurnDecision {
 		asked++
 		if asked == 1 {
 			return TurnContinue
@@ -403,14 +411,14 @@ func TestFinishTurn(t *testing.T) {
 func TestParallelAndSequentialTools(t *testing.T) {
 	for _, mode := range []ToolExecutionMode{ToolParallel, ToolSequential} {
 		probe.most.Store(0)
-		withAgent(t, rigOptions{options: AgentOptions{AgentLoopConfig: AgentLoopConfig{ToolExecution: mode}}, tools: []AgentTool{sleepy("slow", 60*time.Millisecond, "", ""), sleepy("fast", 5*time.Millisecond, "", "")}},
+		withAgent(t, rigOptions{options: AgentOptions{AgentConfig: AgentConfig{ToolExecution: mode}}, tools: []AgentTool{sleepy("slow", 60*time.Millisecond, "", ""), sleepy("fast", 5*time.Millisecond, "", "")}},
 			func(f *ai.FauxProviderHandle) {
 				f.SetResponses(ai.FauxAssistantMessage([]ai.Content{ai.FauxToolCall("slow", nil, ""), ai.FauxToolCall("fast", nil, "")}), ai.FauxAssistantMessage("好"))
 			}, func(r *rig) {
 				_ = r.agent.PromptText(r.ctx, "go")
 				var ends []string
 				for _, e := range r.settled() {
-					if e.Type == EventToolExecutionEnd {
+					if e, ok := e.(ToolEnded); ok {
 						ends = append(ends, e.ToolName)
 					}
 				}
@@ -450,7 +458,7 @@ func TestAbortWhileAnswering(t *testing.T) {
 		go func() { done <- r.agent.PromptText(r.ctx, "说") }()
 		r.until(func(events []AgentEvent) bool {
 			for _, e := range events {
-				if e.Type == EventMessageUpdate && e.AssistantMessageEvent.Type == ai.EventTextDelta {
+				if e, ok := e.(MessageUpdated); ok && e.Delta.Type == ai.EventTextDelta {
 					return true
 				}
 			}
@@ -482,7 +490,7 @@ func TestAbortWhileAToolRuns(t *testing.T) {
 		go func() { done <- r.agent.PromptText(r.ctx, "go") }()
 		r.until(func(events []AgentEvent) bool {
 			for _, e := range events {
-				if e.Type == EventToolExecutionEnd {
+				if _, ok := e.(ToolEnded); ok {
 					return true
 				}
 			}
@@ -499,8 +507,24 @@ func TestAbortWhileAToolRuns(t *testing.T) {
 		}
 		eq(t, got, []string{"s|已停下", "f|fast 好了"})
 		eq(t, len(s.PendingToolCalls), 0)
-		k := kinds(r.settled())
+		events := r.settled()
+		k := kinds(events)
 		eq(t, k[len(k)-2:], []string{"turn_end", "agent_end"})
+		terminals := map[string]int{}
+		for _, event := range events {
+			switch event := event.(type) {
+			case ToolEnded:
+				terminals[event.ToolCallID]++
+				if event.IsError != event.Result.IsError {
+					t.Fatal("terminal payload disagrees with tool result")
+				}
+			case AgentEnded:
+				if !event.Aborted {
+					t.Fatal("tool cancellation lost the aborted outcome")
+				}
+			}
+		}
+		eq(t, terminals, map[string]int{"s": 1, "f": 1})
 	})
 }
 
@@ -542,7 +566,7 @@ func TestToolsThatFailAndAnAnswerThatFails(t *testing.T) {
 }
 
 func TestTheApplicationsOwnMessages(t *testing.T) {
-	options := AgentOptions{AgentLoopConfig: AgentLoopConfig{
+	options := AgentOptions{AgentConfig: AgentConfig{
 		ConvertToLlm: func(_ context.Context, messages []AgentMessage) []ai.Message {
 			out := []ai.Message{}
 			for _, m := range messages {
@@ -569,7 +593,7 @@ func TestTheApplicationsOwnMessages(t *testing.T) {
 		eq(t, roles(r.agent.State().Messages), []string{"note", "user", "assistant"})
 		found := false
 		for _, e := range r.settled() {
-			if e.Type == EventMessageEnd && e.Message.Role() == "note" {
+			if e, ok := e.(MessageEnded); ok && e.Message.Role() == "note" {
 				found = true
 			}
 		}
@@ -580,7 +604,7 @@ func TestTheApplicationsOwnMessages(t *testing.T) {
 func TestPrepareRequestChangesTheThinking(t *testing.T) {
 	var mu sync.Mutex
 	var levels []string
-	options := AgentOptions{AgentLoopConfig: AgentLoopConfig{PrepareRequest: func(_ context.Context, p PrepareRequestContext) *AgentRequestUpdate {
+	options := AgentOptions{AgentConfig: AgentConfig{PrepareRequest: func(_ context.Context, p PrepareRequestContext) *AgentRequestUpdate {
 		if len(p.Context.Messages) > 2 {
 			return &AgentRequestUpdate{ThinkingLevel: "high"}
 		}
@@ -647,7 +671,7 @@ func TestGetApiKeyIsAskedBeforeEveryRequest(t *testing.T) {
 	var mu sync.Mutex
 	var keys []string
 	key := "sk-first"
-	options := AgentOptions{AgentLoopConfig: AgentLoopConfig{
+	options := AgentOptions{AgentConfig: AgentConfig{
 		StreamOptions: ai.StreamOptions{APIKey: "sk-fixed"},
 		GetApiKey: func(context.Context, string) string {
 			mu.Lock()

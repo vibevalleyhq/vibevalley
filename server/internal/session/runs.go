@@ -83,7 +83,7 @@ func (c *sessions) endRun(h *hand, outcome protocol.Outcome, summary string, spe
 	}
 }
 
-func (c *sessions) finishRun(id string, outcome protocol.Outcome, summary string, spent *protocol.Spent) {
+func (c *sessions) finishRun(id string, outcome protocol.Outcome, summary string, spent *protocol.Spent) error {
 	params := generated.EndRunParams{
 		EndedAt: sql.NullInt64{Int64: clock.NowMs(), Valid: true}, Outcome: sql.NullString{String: string(outcome), Valid: true},
 		Summary: sql.NullString{String: summary, Valid: summary != ""}, ID: id,
@@ -94,7 +94,9 @@ func (c *sessions) finishRun(id string, outcome protocol.Outcome, summary string
 	}
 	if err := c.q.EndRun(context.Background(), params); err != nil {
 		log.Printf("vibevalley: run %s: %v", id, err)
+		return err
 	}
+	return nil
 }
 
 // The runs still going when the server stopped stopped with it.
@@ -106,24 +108,6 @@ func (c *sessions) endOpenRuns() {
 	}
 	for _, r := range open {
 		c.finishRun(r.ID, protocol.OutcomeInterrupted, "VibeValley 重启了，这一轮停在了半路", nil)
-	}
-}
-
-// A run that is no session's: the manager's, on an issue for it.
-func (c *sessions) OpenRun(session, issue string, by protocol.RunTrigger) string {
-	trigger, _ := json.Marshal(by)
-	id := base.NewID()
-	err := c.q.StartRun(context.Background(), generated.StartRunParams{ID: id, Session: session, Issue: sql.NullString{String: issue, Valid: issue != ""}, TriggeredBy: string(trigger), StartedAt: clock.NowMs()})
-	if err != nil {
-		log.Printf("vibevalley: %s's run not kept: %v", session, err)
-		return ""
-	}
-	return id
-}
-
-func (c *sessions) CloseRun(id string, outcome protocol.Outcome, summary string) {
-	if id != "" {
-		c.finishRun(id, outcome, summary, nil)
 	}
 }
 
@@ -169,4 +153,20 @@ func runOf(r generated.SessionRun) protocol.Run {
 		}
 	}
 	return run
+}
+
+func (c *sessions) CurrentRun(id string) string {
+	h := c.hand(id)
+	if h == nil {
+		c.mu.Lock()
+		execution := c.executions[id]
+		c.mu.Unlock()
+		if execution != nil {
+			return execution.CurrentRun()
+		}
+		return ""
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.run
 }

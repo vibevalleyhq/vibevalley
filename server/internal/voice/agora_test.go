@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -234,7 +235,11 @@ func TestVoiceStartAndStopTheManagerOnHisLine(t *testing.T) {
 		Voice: &protocol.SettingsUpdateVoice{Answer: protocol.VoiceAnswer{Value: protocol.VoiceAnswerManager{}}}}); err != nil {
 		t.Fatal(err)
 	}
-	agent, err := f.Voice.Start(ctx, "ch1", "4242")
+	grant, err := f.Voice.Session(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agent, err := f.Voice.Start(ctx, grant.Channel, grant.UID)
 	if err != nil || agent.AgentID != "parity-agent" {
 		t.Fatalf("start: %+v %v", agent, err)
 	}
@@ -246,7 +251,7 @@ func TestVoiceStartAndStopTheManagerOnHisLine(t *testing.T) {
 	if props["parameters"].(map[string]any)["data_channel"] != "datastream" || props["advanced_features"].(map[string]any)["enable_rtm"] != false {
 		t.Fatalf("captions: %v %v", props["parameters"], props["advanced_features"])
 	}
-	if got := props["remote_rtc_uids"]; !reflect.DeepEqual(got, []any{"4242"}) {
+	if got := props["remote_rtc_uids"]; !reflect.DeepEqual(got, []any{grant.UID}) {
 		t.Fatalf("only the page's user is listened to: %v", got)
 	}
 	if n := len(f.Voice.keys); n != 1 {
@@ -276,7 +281,11 @@ func TestVoiceCallOwnsItsCredentialsAndLine(t *testing.T) {
 	if _, err := f.Setting.Save(protocol.SettingsUpdate{AgoraAppID: ptr.To(voiceTestAppID), AgoraAppCertificate: ptr.To(voiceTestCert), Voice: &protocol.SettingsUpdateVoice{Area: ptr.To(protocol.AreaEU), Answer: protocol.VoiceAnswer{Value: protocol.VoiceAnswerManager{}}}}); err != nil {
 		t.Fatal(err)
 	}
-	agent, err := f.Voice.Start(context.Background(), "ch1", "42")
+	grant, err := f.Voice.Session(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	agent, err := f.Voice.Start(context.Background(), grant.Channel, grant.UID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,5 +314,89 @@ func TestVoiceCallOwnsItsCredentialsAndLine(t *testing.T) {
 	}
 	if len(f.Voice.calls) != 0 {
 		t.Fatal("successfully stopped call retained its lease")
+	}
+}
+
+func TestCallOwnsBothTranscriptDirectionsAcrossSettingsChanges(t *testing.T) {
+	for _, managerAnswers := range []bool{false, true} {
+		t.Run(fmt.Sprint("manager=", managerAnswers), func(t *testing.T) {
+			f := voiceTestFarm(t)
+			if err := f.Start(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			capture := &voiceCapture{}
+			f.Voice.http = capture
+			answer := protocol.DefaultVoice().Answer
+			if managerAnswers {
+				answer = protocol.VoiceAnswer{Value: protocol.VoiceAnswerManager{}}
+			}
+			if _, err := f.Setting.Save(protocol.SettingsUpdate{AgoraAppID: ptr.To(voiceTestAppID), AgoraAppCertificate: ptr.To(voiceTestCert), Voice: &protocol.SettingsUpdateVoice{Answer: answer}}); err != nil {
+				t.Fatal(err)
+			}
+			grant, err := f.Voice.Session(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			call, err := f.Voice.Start(context.Background(), grant.Channel, grant.UID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			next := protocol.VoiceAnswer{Value: protocol.VoiceAnswerManager{}}
+			if managerAnswers {
+				next = protocol.DefaultVoice().Answer
+			}
+			if _, err := f.Setting.Save(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{Answer: next}}); err != nil {
+				t.Fatal(err)
+			}
+			heard := 0
+			f.Voice.heard = func(text, picked, _ string) error {
+				heard++
+				if text != "hello" || picked != "chosen" {
+					t.Errorf("heard %q for %q", text, picked)
+				}
+				return nil
+			}
+			if err := f.Voice.Heard(call.AgentID, "hello", "chosen", ""); err != nil {
+				t.Fatal(err)
+			}
+			want := 1
+			if managerAnswers {
+				want = 0
+			}
+			if heard != want {
+				t.Fatalf("heard=%d want=%d", heard, want)
+			}
+			capture.status, capture.body = 500, `{"detail":"stop failed"}`
+			if err := f.Voice.Stop(context.Background(), call.AgentID); err == nil {
+				t.Fatal("expected stop failure")
+			}
+			if err := f.Voice.Heard(call.AgentID, "late", "", ""); err == nil {
+				t.Fatal("hanging-up call accepted owner transcript")
+			}
+			if err := f.Voice.Said(call.AgentID, "late"); err == nil {
+				t.Fatal("hanging-up call accepted assistant transcript")
+			}
+		})
+	}
+}
+
+func TestV1RelayRequiresOneActiveCall(t *testing.T) {
+	f := voiceTestFarm(t)
+	heard := 0
+	f.Voice.heard = func(string, string, string) error { heard++; return nil }
+	if err := f.Voice.HeardCurrent("none", "", ""); err == nil {
+		t.Fatal("unscoped relay accepted without a call")
+	}
+	f.Voice.calls["one"] = voiceCall{quick: true}
+	if err := f.Voice.HeardCurrent("single", "", ""); err != nil || heard != 1 {
+		t.Fatalf("single call: %d %v", heard, err)
+	}
+	f.Voice.calls["two"] = voiceCall{quick: false}
+	if err := f.Voice.HeardCurrent("ambiguous", "", ""); err == nil || heard != 1 {
+		t.Fatalf("ambiguous relay: %d %v", heard, err)
+	}
+	f.Voice.calls["two"] = voiceCall{ending: true}
+	if err := f.Voice.HeardCurrent("single active", "", ""); err != nil || heard != 2 {
+		t.Fatalf("ending call counted: %d %v", heard, err)
 	}
 }

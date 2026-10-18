@@ -313,9 +313,9 @@ class _MessageRow extends ConsumerWidget {
     final turn = !m.final_
         ? null
         : m.fromKind == SenderKind.manager && m.kind != MessageKind.dispatch
-        ? TurnSteps(id: managerAgent, at: m.at, manager: true)
+        ? TurnSteps(id: managerAgent, run: m.run, manager: true)
         : m.fromKind == SenderKind.agent && m.kind == MessageKind.report
-        ? TurnSteps(id: m.from, at: m.at)
+        ? TurnSteps(id: m.from, run: m.run)
         : null;
     return _Frame(
       face: senderFace(m, 36),

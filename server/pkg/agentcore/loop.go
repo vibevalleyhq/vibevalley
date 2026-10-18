@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"vibevalley/pkg/ai"
@@ -64,9 +63,9 @@ type prepared struct {
 }
 
 func prepare(ctx context.Context, toolCall ai.Content, options RunToolCallOptions) prepared {
-	options.Emit(AgentEvent{Type: EventToolExecutionStart, ToolCallID: toolCall.ID, ToolName: toolCall.Name, Args: toolCall.Args()})
+	options.Emit(ToolStarted{ToolCallID: toolCall.ID, ToolName: toolCall.Name, Args: toolCall.Args()})
 	answered := func(result AgentToolResult) prepared {
-		options.Emit(AgentEvent{Type: EventToolExecutionEnd, ToolCallID: toolCall.ID, ToolName: toolCall.Name, Result: &result, IsError: true})
+		options.Emit(ToolEnded{ToolCallID: toolCall.ID, ToolName: toolCall.Name, Result: result, IsError: true})
 		return prepared{toolCall: toolCall, outcome: AgentToolCallOutcome{ToolCall: toolCall, Result: result, IsError: true}}
 	}
 	var tool *AgentTool
@@ -133,7 +132,7 @@ func execute(ctx context.Context, p prepared, options RunToolCallOptions) (Agent
 		if ctx.Err() != nil {
 			return
 		}
-		options.Emit(AgentEvent{Type: EventToolExecutionUpdate, ToolCallID: p.toolCall.ID, ToolName: p.toolCall.Name, Args: p.args, PartialResult: &partial})
+		options.Emit(ToolUpdated{ToolCallID: p.toolCall.ID, ToolName: p.toolCall.Name, Args: p.args, PartialResult: partial})
 	}
 	result, isError := runTool(ctx, p.tool, p.toolCall.ID, p.args, onUpdate)
 	if ctx.Err() != nil {
@@ -165,7 +164,7 @@ func execute(ctx context.Context, p prepared, options RunToolCallOptions) (Agent
 	}
 	result.IsError = isError
 	duration := time.Since(started).Milliseconds()
-	options.Emit(AgentEvent{Type: EventToolExecutionEnd, ToolCallID: p.toolCall.ID, ToolName: p.toolCall.Name, Result: &result, IsError: isError, DurationMs: &duration})
+	options.Emit(ToolEnded{ToolCallID: p.toolCall.ID, ToolName: p.toolCall.Name, Result: result, IsError: isError, DurationMs: &duration})
 	return AgentToolCallOutcome{ToolCall: p.toolCall, Result: result, IsError: isError, DurationMs: &duration}, true
 }
 
@@ -216,15 +215,8 @@ func reasoningOf(level ThinkingLevel) ThinkingLevel {
 }
 
 type answering struct {
-	partial   *ai.AssistantMessage
+	response  *ai.Response
 	announced bool
-}
-
-type toolsState struct {
-	calls     []ai.Content
-	announced map[string]bool
-	mu        sync.Mutex
-	finished  map[string]AgentToolCallOutcome
 }
 
 type loopRun struct {
@@ -240,7 +232,7 @@ type loopRun struct {
 	// Where the run is, for a stop to end it properly.
 	answering     *answering
 	lastAssistant *ai.AssistantMessage
-	toolsOf       *toolsState
+	toolsOf       *toolBatch
 	inTurn        bool
 }
 
@@ -254,8 +246,8 @@ func (r *loopRun) append(m AgentMessage) {
 }
 
 func (r *loopRun) say(m AgentMessage) {
-	r.emit(AgentEvent{Type: EventMessageStart, Message: m})
-	r.emit(AgentEvent{Type: EventMessageEnd, Message: m})
+	r.emit(MessageStarted{Message: m})
+	r.emit(MessageEnded{Message: m})
 	r.append(m)
 }
 
@@ -280,10 +272,6 @@ func (r *loopRun) followUps() []AgentMessage {
 }
 
 func (r *loopRun) stopping() bool { return r.ctx.Err() != nil }
-
-func emptyAnswer(model ai.Model) ai.AssistantMessage {
-	return ai.AssistantMessage{Content: []ai.Content{}, API: model.API, Provider: model.Provider, Model: model.ID, Usage: ai.EmptyUsage(), StopReason: ai.StopStop, Timestamp: now()}
-}
 
 func (r *loopRun) respond() (ai.AssistantMessage, bool) {
 	ctx := r.ctx
@@ -343,52 +331,35 @@ func (r *loopRun) respond() (ai.AssistantMessage, bool) {
 	if streamFn == nil {
 		streamFn = ai.Stream
 	}
-	r.answering = &answering{}
-	var final *ai.AssistantMessage
+	r.answering = &answering{response: ai.NewResponse(model)}
 	for e := range streamFn(ctx, model, ai.Context{SystemPrompt: request.SystemPrompt, Messages: llm, Tools: tools}, options) {
 		if r.stopping() {
 			// Drained, not said: the stop says what came so far.
 			continue
 		}
+		r.answering.response.Observe(e)
 		switch e.Type {
 		case ai.EventStart:
 			partial := e.Partial
-			r.answering = &answering{partial: &partial, announced: true}
-			r.emit(AgentEvent{Type: EventMessageStart, Message: partial})
-		case ai.EventDone:
-			m := e.Message
-			final = &m
-		case ai.EventError:
-			m := e.Error
-			final = &m
+			r.answering.announced = true
+			r.emit(MessageStarted{Message: partial})
+		case ai.EventDone, ai.EventError:
 		default:
 			partial := e.Partial
-			r.answering = &answering{partial: &partial, announced: r.answering.announced}
 			event := e
-			r.emit(AgentEvent{Type: EventMessageUpdate, Message: partial, AssistantMessageEvent: &event})
+			r.emit(MessageUpdated{Message: partial, Delta: event})
 		}
 	}
 	if r.stopping() {
 		return ai.AssistantMessage{}, false
 	}
-	var message ai.AssistantMessage
-	if final != nil {
-		message = *final
-	} else {
-		if r.answering.partial != nil {
-			message = *r.answering.partial
-		} else {
-			message = emptyAnswer(model)
-		}
-		message.StopReason = ai.StopError
-		message.ErrorMessage = "模型没有回答完"
-	}
+	message := r.answering.response.Result()
 	if !r.answering.announced {
-		r.emit(AgentEvent{Type: EventMessageStart, Message: message})
+		r.emit(MessageStarted{Message: message})
 	}
 	r.answering = nil
 	r.lastAssistant = &message
-	r.emit(AgentEvent{Type: EventMessageEnd, Message: message})
+	r.emit(MessageEnded{Message: message})
 	r.append(message)
 	return message, true
 }
@@ -398,77 +369,22 @@ type ranTools struct {
 	terminate bool
 }
 
-// Results go in the model's order.
 func (r *loopRun) runTools(assistantMessage ai.AssistantMessage, calls []ai.Content) (ranTools, bool) {
-	ctx := r.ctx
-	state := &toolsState{calls: calls, announced: map[string]bool{}, finished: map[string]AgentToolCallOutcome{}}
-	r.toolsOf = state
-	options := RunToolCallOptions{Tools: r.requestTools, AssistantMessage: assistantMessage, Context: r.snapshot(), Config: r.config, Emit: r.emit}
-	var runnable []prepared
-	for _, call := range calls {
-		if r.stopping() {
-			return ranTools{}, false
-		}
-		state.announced[call.ID] = true
-		p := prepare(ctx, call, options)
-		if p.tool == nil {
-			state.finished[call.ID] = p.outcome
-		} else {
-			runnable = append(runnable, p)
-		}
-	}
-	sequential := r.config.ToolExecution == ToolSequential
-	for _, p := range runnable {
-		if p.tool.ExecutionMode == ToolSequential {
-			sequential = true
-		}
-	}
-	finish := func(p prepared) {
-		if outcome, ok := execute(ctx, p, options); ok {
-			state.mu.Lock()
-			state.finished[p.toolCall.ID] = outcome
-			state.mu.Unlock()
-		}
-	}
-	if sequential {
-		for _, p := range runnable {
-			if r.stopping() {
-				break
-			}
-			finish(p)
-		}
-	} else {
-		var wg sync.WaitGroup
-		for _, p := range runnable {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				finish(p)
-			}()
-		}
-		wg.Wait()
-	}
-	if r.stopping() {
+	batch := newToolBatch(calls, RunToolCallOptions{Tools: r.requestTools, AssistantMessage: assistantMessage, Context: r.snapshot(), Config: r.config, Emit: r.emit})
+	r.toolsOf = batch
+	result, ok := batch.run(r.ctx)
+	if !ok {
 		return ranTools{}, false
 	}
-	results := make([]ai.ToolResultMessage, 0, len(calls))
-	terminate := len(calls) > 0
-	for _, call := range calls {
-		outcome := state.finished[call.ID]
-		results = append(results, resultMessage(outcome))
-		if !outcome.Result.Terminate {
-			terminate = false
-		}
-	}
 	r.toolsOf = nil
-	for _, m := range results {
-		r.say(m)
+	for _, message := range result.results {
+		r.say(message)
 	}
-	return ranTools{results: results, terminate: terminate}, true
+	return result, true
 }
 
 func (r *loopRun) run(prompts []AgentMessage, steerFirst bool) []AgentMessage {
-	r.emit(AgentEvent{Type: EventAgentStart})
+	r.emit(AgentStarted{})
 	pending := prompts
 	if steerFirst {
 		pending = r.steering()
@@ -481,7 +397,7 @@ outer:
 			}
 			r.inTurn = true
 			r.lastAssistant = nil
-			r.emit(AgentEvent{Type: EventTurnStart})
+			r.emit(TurnStarted{})
 			for _, m := range pending {
 				r.say(m)
 			}
@@ -509,7 +425,7 @@ outer:
 				return r.stopped()
 			}
 			r.inTurn = false
-			r.emit(AgentEvent{Type: EventTurnEnd, Message: answer, ToolResults: ran.results})
+			r.emit(TurnEnded{Message: answer, ToolResults: ran.results})
 			// An error or an abort ends the run, whatever was decided or is waiting.
 			if failed || (decision != nil && decision.Action == "end") {
 				break outer
@@ -531,53 +447,33 @@ outer:
 			break
 		}
 	}
-	r.emit(AgentEvent{Type: EventAgentEnd, Messages: r.freshCopy()})
+	r.emit(AgentEnded{Messages: r.freshCopy()})
 	return r.freshCopy()
 }
 
 func (r *loopRun) stopped() []AgentMessage {
 	if r.answering != nil {
-		var message ai.AssistantMessage
-		if r.answering.partial != nil {
-			message = *r.answering.partial
-		} else {
-			message = emptyAnswer(r.config.Model)
-		}
-		message.StopReason = ai.StopAborted
-		message.ErrorMessage = STOPPED
+		message := r.answering.response.Aborted()
 		if !r.answering.announced {
-			r.emit(AgentEvent{Type: EventMessageStart, Message: message})
+			r.emit(MessageStarted{Message: message})
 		}
-		r.emit(AgentEvent{Type: EventMessageEnd, Message: message})
+		r.emit(MessageEnded{Message: message})
 		r.append(message)
 		r.lastAssistant = &message
 		r.answering = nil
 	}
 	results := []ai.ToolResultMessage{}
 	if state := r.toolsOf; state != nil {
-		state.mu.Lock()
-		finished := state.finished
-		state.mu.Unlock()
-		for _, call := range state.calls {
-			outcome, ok := finished[call.ID]
-			if !ok {
-				outcome = AgentToolCallOutcome{ToolCall: call, Result: errorResult(STOPPED), IsError: true}
-				if state.announced[call.ID] {
-					result := outcome.Result
-					r.emit(AgentEvent{Type: EventToolExecutionEnd, ToolCallID: call.ID, ToolName: call.Name, Result: &result, IsError: true})
-				}
-			}
-			results = append(results, resultMessage(outcome))
-		}
+		results = state.complete().results
 		r.toolsOf = nil
 		for _, m := range results {
 			r.say(m)
 		}
 	}
 	if r.inTurn && r.lastAssistant != nil {
-		r.emit(AgentEvent{Type: EventTurnEnd, Message: *r.lastAssistant, ToolResults: results})
+		r.emit(TurnEnded{Message: *r.lastAssistant, ToolResults: results})
 	}
 	r.inTurn = false
-	r.emit(AgentEvent{Type: EventAgentEnd, Messages: r.freshCopy()})
+	r.emit(AgentEnded{Messages: r.freshCopy(), Aborted: true})
 	return r.freshCopy()
 }

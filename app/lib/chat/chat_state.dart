@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/widgets.dart';
 
 import '../data/providers.dart';
+import '../data/voice.dart';
 import '../gen/vibevalley.dart';
 import '../voice/captions.dart';
 import '../rules/chat.dart';
@@ -71,10 +72,15 @@ class SpokenLines extends Notifier<List<Line>> {
   var _next = 1;
 
   @override
-  List<Line> build() => const [];
+  List<Line> build() {
+    ref.listen(voiceCallProvider, (_, call) => sync(call.captions.turns));
+    return _merge(const [], ref.read(voiceCallProvider).captions.turns);
+  }
 
-  void sync(List<Caption> turns) {
-    final byId = {for (final l in state) l.id: l};
+  void sync(List<Caption> turns) => state = _merge(state, turns);
+
+  List<Line> _merge(List<Line> before, List<Caption> turns) {
+    final byId = {for (final l in before) l.id: l};
     var changed = false;
     for (final c in turns) {
       final id = _ids[c] ??= _next++;
@@ -86,7 +92,7 @@ class SpokenLines extends Notifier<List<Line>> {
         changed = true;
       }
     }
-    if (changed) state = byId.values.toList()..sort((a, b) => a.id.compareTo(b.id));
+    return changed ? (byId.values.toList()..sort((a, b) => a.id.compareTo(b.id))) : before;
   }
 }
 
@@ -138,16 +144,8 @@ class ChatActions {
   );
 
   Future<void> openChannel(ChannelRequest req) async {
-    final name = req.name.trim().replaceFirst(RegExp('^#'), '');
-    await _api.channel.create(
-      body: ChannelRequest(name: name, description: req.description, project: req.project),
-    );
-    for (var i = 0; i < 40; i++) {
-      if (!_ref.mounted) return;
-      final found = channelsOf(_chat).where((c) => c.name == name).firstOrNull;
-      if (found != null) return showChat(found.kind == ConversationKind.general ? null : found.id);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    }
+    final id = await _api.channel.create(body: req);
+    if (_ref.mounted) await showChat(id);
   }
 
   Future<void> updateChannel(String id, ChannelUpdate update) => _api.channel.update(id: id, body: update);

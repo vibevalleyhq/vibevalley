@@ -12,4 +12,9 @@ String runtimeName(String runtime) => presetOf(runtime).label;
 final _unknownFacts = RuntimeFacts(steer: false, refused: const {}, capabilities: const [], inProcess: false);
 
 /// What the runtime takes (seeds.json's runtimeFacts); one not there takes nothing.
-RuntimeFacts factsOf(String runtime) => runtimeFacts[runtime] ?? _unknownFacts;
+RuntimeFacts factsOf(String runtime, [RuntimeInfo? observed]) {
+  final base = runtimeFacts[runtime] ?? _unknownFacts;
+  return observed?.refused == null
+      ? base
+      : RuntimeFacts(steer: base.steer, refused: observed!.refused!, capabilities: base.capabilities, inProcess: base.inProcess);
+}

@@ -23,15 +23,15 @@ final hostCommandRouterProvider = Provider<void>((ref) {
       case HostVoice():
         return;
       case HostOpenSession(:final id):
-        ref.read(selectedProvider.notifier).set(id);
+        ref.read(farmOverlaysProvider.notifier).select(id);
       case HostOpenChat(:final conversation):
         ref.read(chatOpenProvider.notifier).set(true);
         unawaited(ref.read(chatActionsProvider).showChat(conversation).catchError((Object _) {}));
-      case HostOpenPlans(:final playbook):
-        ref.read(planShownProvider.notifier).set(playbook);
-        ref.read(panelProvider.notifier).set(FarmPanel.plans);
+      case HostOpenTaskBoard(:final graph):
+        ref.read(graphShownProvider.notifier).set(graph);
+        ref.read(farmOverlaysProvider.notifier).panel(FarmPanel.taskBoard);
       case HostOpenAchievements():
-        ref.read(panelProvider.notifier).set(FarmPanel.tasks);
+        ref.read(farmOverlaysProvider.notifier).panel(FarmPanel.graphs);
     }
   });
   ref.onDispose(sub.cancel);

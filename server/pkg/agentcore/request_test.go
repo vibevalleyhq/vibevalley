@@ -32,12 +32,12 @@ func TestAfterToolCallClearsBothErrorFlags(t *testing.T) {
 	tool := AgentTool{Name: "read", Execute: func(context.Context, string, json.RawMessage, AgentToolUpdateCallback) (AgentToolResult, error) {
 		return TextResult("not found", TextResultOptions{IsError: true}), nil
 	}}
-	var ended AgentEvent
-	outcome, ok := RunToolCall(context.Background(), ai.FauxToolCall("read", "{}", "c1"), RunToolCallOptions{Tools: []AgentTool{tool}, Config: AgentLoopConfig{AfterToolCall: func(context.Context, AfterToolCallContext) *AfterToolCallResult {
+	var ended ToolEnded
+	outcome, ok := RunToolCall(context.Background(), ai.FauxToolCall("read", "{}", "c1"), RunToolCallOptions{Tools: []AgentTool{tool}, Config: AgentLoopConfig{AgentConfig: AgentConfig{AfterToolCall: func(context.Context, AfterToolCallContext) *AfterToolCallResult {
 		success := false
 		return &AfterToolCallResult{IsError: &success, Content: []ai.Content{ai.NewText("fallback")}}
-	}}, Emit: func(e AgentEvent) {
-		if e.Type == EventToolExecutionEnd {
+	}}}, Emit: func(e AgentEvent) {
+		if e, ok := e.(ToolEnded); ok {
 			ended = e
 		}
 	}})
@@ -56,12 +56,11 @@ func TestPreparedToolSetIsTheExecutionToolSet(t *testing.T) {
 		newRuns++
 		return TextResult("new", TextResultOptions{Terminate: true}), nil
 	}}
-	config := AgentLoopConfig{
-		PrepareRequest: func(_ context.Context, p PrepareRequestContext) *AgentRequestUpdate {
-			c := p.Context
-			c.Tools = []AgentTool{replacement}
-			return &AgentRequestUpdate{Context: &c}
-		},
+	config := AgentLoopConfig{AgentConfig: AgentConfig{PrepareRequest: func(_ context.Context, p PrepareRequestContext) *AgentRequestUpdate {
+		c := p.Context
+		c.Tools = []AgentTool{replacement}
+		return &AgentRequestUpdate{Context: &c}
+	},
 		StreamFn: func(ctx context.Context, m ai.Model, c ai.Context, o ai.StreamOptions) <-chan ai.AssistantMessageEvent {
 			answer := ai.NewAnswer(m, "")
 			events := answer.Start()
@@ -69,7 +68,7 @@ func TestPreparedToolSetIsTheExecutionToolSet(t *testing.T) {
 			events = append(events, answer.Done(ai.StopToolUse, ai.RawUsage{})...)
 			return ai.FromEvents(ctx, events)
 		},
-		FinishTurn: func(context.Context, AgentTurnContext) *AgentTurnDecision { return TurnEnd },
+		FinishTurn: func(context.Context, AgentTurnContext) *AgentTurnDecision { return TurnEnd }},
 	}
 	messages := RunAgentLoop(context.Background(), []AgentMessage{user("read")}, AgentContext{Tools: []AgentTool{old}}, config, func(AgentEvent) {})
 	if oldRuns != 0 || newRuns != 1 {
@@ -81,7 +80,7 @@ func TestSubmitOwnsIdleAndBusyAdmission(t *testing.T) {
 	entered := make(chan struct{}, 1)
 	release := make(chan struct{})
 	calls := 0
-	a := NewAgent(context.Background(), AgentOptions{AgentLoopConfig: AgentLoopConfig{StreamFn: func(ctx context.Context, m ai.Model, c ai.Context, o ai.StreamOptions) <-chan ai.AssistantMessageEvent {
+	a := NewAgent(context.Background(), AgentOptions{AgentConfig: AgentConfig{StreamFn: func(ctx context.Context, m ai.Model, c ai.Context, o ai.StreamOptions) <-chan ai.AssistantMessageEvent {
 		calls++
 		out := make(chan ai.AssistantMessageEvent)
 		first := calls == 1

@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart' hide Retry;
 import 'package:vibevalley/farm/cursors.dart';
 import 'package:vibevalley/game/tools.dart';
-import 'package:vibevalley/game/state.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/farm.dart';
@@ -24,7 +23,7 @@ void main() {
     expect(aimTool(Tool.hand, locked, null, empty, 5).text, '开垦好的花坛');
   });
 
-  test('aimTool: water needs a helper, bug a withered plot, harvest a finished turn not in a playbook, shovel stops or dismisses', () {
+  test('aimTool: water needs a helper, bug a withered plot, harvest a finished turn not in a task, shovel stops or dismisses', () {
     final w = session('w1', name: '小吴');
     expect(aimTool(Tool.water, bed0, w, empty, 1).text, '给小吴浇水（带句话）');
     expect(aimTool(Tool.water, bed0, null, empty, 1).ok, isFalse);
@@ -42,7 +41,7 @@ void main() {
         session(
           'w4',
           phase: const PhaseRipe(),
-          playbook: const SessionPlaybook(id: 'p1'),
+          graph: const SessionGraph(id: 'p1'),
         ),
         empty,
         1,
@@ -107,18 +106,5 @@ void main() {
     final harvests = achievementOf('harvests')!;
     expect(standing(progress, harvests), (tier: 1, count: 4, next: 20));
     expect(isTitle(harvests), isTrue);
-  });
-
-  test('turnEndingAt: from the last line it was told up to the message', () {
-    SessionEvent s(int n, SessionEventType kind, double at) => SessionEvent(seq: n.toDouble(), time: at, type: kind, text: '');
-    final steps = [
-      s(1, SessionEventType.userMessage, 0),
-      s(2, SessionEventType.toolCall, 10),
-      s(3, SessionEventType.userMessage, 10000),
-      s(4, SessionEventType.toolCall, 10010),
-      s(5, SessionEventType.assistantMessage, 10020),
-    ];
-    expect(turnEndingAt(steps, 50).map((x) => x.seq), [1, 2]);
-    expect(turnEndingAt(steps, 7500).map((x) => x.seq), [3, 4, 5]);
   });
 }

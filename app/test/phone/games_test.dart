@@ -13,10 +13,10 @@ List<PieceKind> dealt(int seed, int n) {
   return out;
 }
 
-Dino runFor(Dino d, double ms, [double step = 16]) {
+Dino runFor(Dino d, double ms, [double task = 16]) {
   var x = d;
-  for (var t = 0.0; t < ms; t += step) {
-    x = run(x, step);
+  for (var t = 0.0; t < ms; t += task) {
+    x = run(x, task);
   }
   return x;
 }

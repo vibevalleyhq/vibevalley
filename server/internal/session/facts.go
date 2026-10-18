@@ -314,7 +314,7 @@ func eventFacts(event oar.Event, session *protocol.Session, tracking tracking, c
 		}
 	}
 
-	// A sub-agent's steps (a claude Task, a codex sub-thread) say whose they are: smith's AgentPath.
+	// A sub-agent's steps (a claude TaskGraph, a codex sub-thread) say whose they are: smith's AgentPath.
 	if len(event.AgentPath) > 0 {
 		for i := range journal {
 			journal[i].From = From(event.AgentPath)

@@ -13,6 +13,9 @@ enum DesktopChannel {
   final String productName;
   final String bundleId;
 
+  String get displayName => label.isEmpty ? '码农场物语' : '码农场物语 $label';
+  String get dmgFileName => name == 'release' ? 'vibevalley-arm64.dmg' : 'vibevalley-$name-arm64.dmg';
+
   /// The channel the build was given; an unknown name is a mistake in the build, not a release.
   static DesktopChannel named(String name) {
     for (final channel in values) {

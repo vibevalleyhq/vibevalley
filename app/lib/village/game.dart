@@ -17,6 +17,7 @@ import 'critters.dart' show PointLight;
 import 'hits.dart';
 import 'dog.dart';
 import 'bursts.dart';
+import '../game/tools.dart' show BedFxKind;
 import 'level.dart';
 import 'life.dart';
 import 'nav.dart';
@@ -29,7 +30,7 @@ import '../rules/cast.dart';
 import '../shared/swatches.dart';
 
 export 'critters.dart' show PointLight;
-export 'bursts.dart' show BedFx;
+export '../game/tools.dart' show BedFxKind;
 
 /// Art pixels a second, and frames of the walk cycle a second.
 const _walkSpeed = 42.0;
@@ -264,12 +265,12 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
 
   void show(VillageData data) => _data = data;
 
-  /// A bed by index (0..8: its plot or the helper on it), or a thing in the yard by its spot id (world.dart spotNames).
+  /// A bed by index (0..8: its plot or the helper on it), or a thing in the yard by its YardPlace.
   void Function(int bed)? onPlot;
-  void Function(String spot)? onSpot;
+  void Function(YardPlace spot)? onSpot;
 
   final hoverBed = ValueNotifier<int?>(null);
-  final hoverSpot = ValueNotifier<String?>(null);
+  final hoverSpot = ValueNotifier<YardPlace?>(null);
 
   final pressing = ValueNotifier<bool>(false);
 
@@ -305,7 +306,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     }
   }
 
-  void burst(BedFx kind, int bed) => _fx.burst(kind, bed);
+  void burst(BedFxKind kind, int bed) => _fx.burst(kind, bed);
 
   void pointerExit() {
     _pointer = null;
@@ -574,9 +575,9 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
   @override
   void update(double dt) {
     super.update(dt);
-    final step = dt.clamp(0, 0.1).toDouble();
-    _t += step;
-    if (daySpeed > 0) _tod = (_tod + step * daySpeed / _daySeconds) % 1;
+    final task = dt.clamp(0, 0.1).toDouble();
+    _t += task;
+    if (daySpeed > 0) _tod = (_tod + task * daySpeed / _daySeconds) % 1;
     final data = _data;
     if (data == null) return;
     final state = data.state;
@@ -611,10 +612,10 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     final spot = hoverSpot.value;
     for (final p in _props) {
       p.sprite
-        ..filter = p.spot == spot ? _brighter : null
-        ..y = p.y - (p.spot == spot ? 1 : 0);
+        ..filter = p.spot == spot?.id ? _brighter : null
+        ..y = p.y - (p.spot == spot?.id ? 1 : 0);
     }
-    _manager.filter = spot == 'manager' ? _brighter : null;
+    _manager.filter = spot == YardPlace.manager ? _brighter : null;
 
     final moveOn = _t - _whereAt >= _whereTick;
     if (moveOn) _whereAt = _t;
@@ -669,7 +670,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
         ..goal = goal;
       actor.walker
         ..go(goal.at)
-        ..step(step);
+        ..task(task);
       _draw(actor, pose, station);
     }
     for (final MapEntry(key: id, value: actor) in _actors.entries.toList()) {
@@ -683,16 +684,16 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
       actor.goal = Goal('gate', village.gate);
       actor.walker
         ..go(village.gate)
-        ..step(step);
+        ..task(task);
       _draw(actor, 'idle', actor.station);
-      if (!actor.walker.walking) actor.goneFor += step;
+      if (!actor.walker.walking) actor.goneFor += task;
     }
     for (final a in _actors.values) {
       a.alpha = math.max(0, 1 - a.goneFor / _fadeS);
       a.body.opacity = a.alpha;
     }
 
-    _fx.step(step);
+    _fx.task(task);
 
     final mood = state.manager;
     final chosen = managerLook.value;
@@ -752,7 +753,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     ];
 
     // The plants in front of the camera are out of the light's reach: they take the sky's colour, a little darker.
-    final k = math.min(1.0, step * 2.5);
+    final k = math.min(1.0, task * 2.5);
     _lean.x += (_aim.x * 0.7 + math.sin(_t * 0.13) * 0.3 - _lean.x) * k;
     _lean.y += (_aim.y * 0.7 + math.sin(_t * 0.09 + 1.3) * 0.3 - _lean.y) * k;
     final flat = flatLight(_sky);
@@ -765,7 +766,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     }
     _lights
       ..addAll(_fx.lights)
-      ..addAll(_life.step(LifeFrame(t: _t, dt: step, night: night, walkers: walkers, busy: busy, ripe: ripe, dogAsleep: !awake)));
+      ..addAll(_life.task(LifeFrame(t: _t, dt: task, night: night, walkers: walkers, busy: busy, ripe: ripe, dogAsleep: !awake)));
 
     heads
       ..clear()

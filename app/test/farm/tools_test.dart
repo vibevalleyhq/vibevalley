@@ -13,7 +13,7 @@ import '../support/farm.dart';
 
 void main() {
   final working = session('w1', name: '小吴', station: 0);
-  final failed = session('w2', name: '阿郑', station: 1, phase: const PhaseFailed(), task: '修登录');
+  final failed = session('w2', name: '阿郑', station: 1, phase: const PhaseFailed(), brief: '修登录');
   final ripe = session('w3', name: '老李', station: 2, phase: const PhaseRipe());
   final state = farm(sessions: [working, failed, ripe]);
   final v = view(
@@ -112,15 +112,15 @@ void main() {
     expect(routes.calls.single.body, {'text': '给 README 补上怎么启动', 'bed': 3, 'agent': 'tester', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
   });
 
-  test('playbook commands answer with the server\'s words, or why not', () async {
+  test('task commands answer with the server\'s words, or why not', () async {
     final routes = Routes();
     final c = ProviderContainer(
       overrides: overrides(
         state,
         v,
         fakeApi(routes, {
-          'POST /api/v1/playbooks/p1/act': '开工了',
-          'POST /api/v1/playbooks/p1/nodes/api/act': http.Response(
+          'POST /api/v1/graphs/p1/act': '开工了',
+          'POST /api/v1/graphs/p1/tasks/api/act': http.Response(
             jsonEncode({'_tag': 'Refused', 'reason': '这一步没失败，不用重试'}),
             409,
             headers: {'content-type': 'application/json; charset=utf-8'},
@@ -129,10 +129,10 @@ void main() {
       ),
     );
     addTearDown(c.dispose);
-    final ok = await c.read(farmCommandsProvider).actOnPlaybook('p1', PlaybookAction.start);
+    final ok = await c.read(farmCommandsProvider).actOnGraph('p1', GraphAction.start);
     expect((ok.ok, ok.text), (true, '开工了'));
     expect(routes.calls.single.body, {'action': 'start'});
-    final no = await c.read(farmCommandsProvider).actOnNode('p1', 'api', NodeAction.retry);
+    final no = await c.read(farmCommandsProvider).actOnTask('p1', 'api', TaskAction.retry);
     expect((no.ok, no.text), (false, '这一步没失败，不用重试'));
   });
 }

@@ -19,7 +19,7 @@ var ctx = factContext{ID: "w1", Runtime: "pi", Cwd: "/work/clock-in"}
 
 func sessionBase() protocol.Session {
 	project := "clock-in"
-	return protocol.Session{ID: "w1", Name: "老周", Agent: "zhou", Runtime: "pi", Task: "加接口", Project: &project, Phase: protocol.Phase{Value: protocol.PhaseArriving{}}}
+	return protocol.Session{ID: "w1", Name: "老周", Agent: "zhou", Runtime: "pi", Brief: "加接口", Project: &project, Phase: protocol.Phase{Value: protocol.PhaseArriving{}}}
 }
 
 func working(doing protocol.Doing) *protocol.Session {

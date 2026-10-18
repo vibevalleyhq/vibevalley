@@ -15,7 +15,7 @@ cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:
 - 帮工在 `~/vibevalley-work`（`VIBEVALLEY_WORK_ROOT`）下干活，设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见 [architecture.md](architecture.md)「配置」。
 - 语音的凭据见 [voice.md](reference/voice.md)；没有也能打字用。
 - 服务端改了代码要重启。
-- 改表结构：`cd server && go run ./cmd/migrate new 名字` 在 `migrations/` 写下一个迁移，写好以后跑 sqlc（命令在 [AGENTS.md](../AGENTS.md)），服务端下次开机时跑它；`go run ./cmd/migrate status` 看本机的库在第几版，`up` 不起服务端也能跑。
+- 改表结构：直接改 `server/migrations/0001_schema.sql`，跑 sqlc（命令在 [AGENTS.md](../AGENTS.md)），删掉本机的 `vibevalley.db` 让服务端重建；不加迁移，也不写数据搬运（AGENTS.md「不留兼容」）。`go run ./cmd/migrate status` 看本机的库在第几版。
 
 ## macOS 应用
 
@@ -34,7 +34,7 @@ app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
 
 - **形状**：改 `server/internal/protocol` 的 `shapes.go` 或 `api.go`，同一个改动里跑 `go run ./tool/shapegen`（[server](../server/README.md#形状和规则从哪来)）。
 - **规则**：改拥有它的包里的纯函数（几个包都用的在 `protocol`），`VIBEVALLEY_GOLDEN=update go test ./internal/...` 重写黄金数据，看 diff。客户端不重写服务端的规则（[客户端问服务端](../.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
-- **表和查询**：迁移在 `server/migrations/`（一个改动一个新文件，跑过的不再改），查询在 `server/pkg/db/queries/`；改完重跑 sqlc（[理由](../.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）。新表用单数名。
+- **表和查询**：表结构是 `server/migrations/0001_schema.sql` 一个文件（直接改），查询在 `server/pkg/db/queries/`；改完重跑 sqlc（[理由](../.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）。新表用单数名。
 - **旧名字**：`bun run names:verify` 查 `server/internal`、`server/cmd`、`app/lib`、`app/test` 里有没有已经改掉的旧名（挂在 `docs:verify` 里）；加了新名字就把它写进 `scripts/stale-names.ts`。
 
 ## 调试台

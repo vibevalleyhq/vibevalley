@@ -58,6 +58,16 @@ void main() {
     expect(server.requests.where((r) => r.method == 'GET'), hasLength(1));
   });
 
+  test('channel creation selects its returned identity without waiting for a state frame', () async {
+    final server = FakeServer((r) async => r.method == 'POST' ? jsonResponse('new-channel-id') : jsonResponse([]));
+    final c = ProviderContainer(overrides: [apiProvider.overrideWithValue(server.api), stateProvider.overrideWithValue(null)]);
+    addTearDown(c.dispose);
+    addTearDown(server.close);
+    await c.read(chatActionsProvider).openChannel(const ChannelRequest(name: ' #name '));
+    expect(c.read(chatShownProvider), 'new-channel-id');
+    expect(server.requests.map((r) => r.url.path), ['/api/v1/channels', '/api/v1/channels/new-channel-id/messages']);
+  });
+
   test('chat shares an in-flight history read and discards it after disposal', () async {
     final pending = Completer<http.Response>();
     final entered = Completer<void>();

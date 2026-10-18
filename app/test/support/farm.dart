@@ -27,13 +27,13 @@ Session session(
     since: 0,
     doing: Doing(action: SessionAction.editFile, label: 'src/a.ts'),
   ),
-  String task = '跑一遍测试',
+  String brief = '跑一遍测试',
   String? project,
   String? branch,
   String? worktree,
   Conflict? conflict,
   LastRun? last,
-  SessionPlaybook? playbook,
+  SessionGraph? graph,
   List<String> files = const [],
   List<String> commands = const [],
   String? says,
@@ -44,7 +44,7 @@ Session session(
   name: name,
   agent: agent,
   runtime: 'claude',
-  task: task,
+  brief: brief,
   project: project,
   branch: branch,
   worktree: worktree,
@@ -53,7 +53,7 @@ Session session(
   runs: 1,
   phase: phase,
   lastRun: last,
-  playbook: playbook,
+  graph: graph,
   play: play(station, files: files, commands: commands),
   phaseText: says,
 );
@@ -101,8 +101,8 @@ FarmView view({Map<String, PlotView> plots = const {}, int level = 3, int xp = 4
 /// The api of a FakeServer over routes, with more answers on top: what it was asked is routes.calls.
 VibeValleyApi fakeApi(Routes routes, [Map<String, Object?> answers = const {}]) => FakeServer((routes..answers.addAll(answers)).handle).api;
 
-List<Override> overrides(CoreState state, FarmView v, VibeValleyApi api, {Map<String, Agent> agents = const {}, List<Playbook> plans = const []}) {
-  final frame = ReceivedFrame(StateFrame(state: state, inbox: const [], plans: plans, view: v, effects: const []), bytes: 0, decodeMicros: 0);
+List<Override> overrides(CoreState state, FarmView v, VibeValleyApi api, {Map<String, Agent> agents = const {}, List<TaskGraph> graphs = const []}) {
+  final frame = ReceivedFrame(StateFrame(state: state, inbox: const [], graphs: graphs, view: v, effects: const []), bytes: 0, decodeMicros: 0);
   return [
     stateFrameProvider.overrideWith((ref) => Stream.value(frame)),
     agentsProvider.overrideWithValue(AsyncData(agents)),

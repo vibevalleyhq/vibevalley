@@ -11,10 +11,12 @@ import (
 
 // Resolved is what smith needs after profile overrides and runtime defaults have been reconciled.
 type Resolved struct {
-	Runtime oar.Runtime
-	Model   string
-	Effort  string
-	Env     map[string]*string
+	Runtime             oar.Runtime
+	Installation        *oar.AvailableInstallation
+	InstallationOptions oar.InstallationOptions
+	Model               string
+	Effort              string
+	Env                 map[string]*string
 }
 
 func (r *Service) Resolve(ctx context.Context, agent protocol.Agent) (Resolved, error) {
@@ -44,5 +46,14 @@ func (r *Service) Resolve(ctx context.Context, agent protocol.Agent) (Resolved, 
 			env[k] = &v
 		}
 	}
-	return Resolved{Runtime: adapter, Model: model, Effort: effort, Env: env}, nil
+	r.mu.Lock()
+	observed := r.cache[agent.Runtime]
+	var installation *oar.AvailableInstallation
+	if observed.Info.Settings.BinPath == settings.BinPath && observed.Found != nil {
+		copy := *observed.Found
+		copy.Shadowed = slices.Clone(copy.Shadowed)
+		installation = &copy
+	}
+	r.mu.Unlock()
+	return Resolved{Runtime: adapter, Model: model, Effort: effort, Env: env, Installation: installation, InstallationOptions: oar.InstallationOptions{Binary: &settings.BinPath}}, nil
 }

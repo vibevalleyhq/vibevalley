@@ -325,7 +325,7 @@ class _DetailState extends State<_Detail> {
     final frames = _frames;
     final shown = (frames != null && _playing ? widget.all[frames[_frame % frames.length]] : null) ?? picture;
     final remake = remakeOf(picture);
-    final steps = {1.0, 2.0, 4.0, 8.0, _scale}.toList()..sort();
+    final tasks = {1.0, 2.0, 4.0, 8.0, _scale}.toList()..sort();
     return PxCard(
       title: picture.name,
       aside: CopyButton(text: picture.name),
@@ -362,7 +362,7 @@ class _DetailState extends State<_Detail> {
                 value: _scale,
                 onChanged: (v) => setState(() => _scale = v),
                 options: [
-                  for (final s in steps) SegmentOption(value: s, label: '${s < 1 ? s.toStringAsFixed(2).replaceFirst(RegExp(r'0$'), '') : numberText(s)}×'),
+                  for (final s in tasks) SegmentOption(value: s, label: '${s < 1 ? s.toStringAsFixed(2).replaceFirst(RegExp(r'0$'), '') : numberText(s)}×'),
                 ],
               ),
               _CheckBox(label: '落脚点和头', value: _marks, onChanged: (v) => setState(() => _marks = v)),

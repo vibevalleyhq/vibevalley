@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
+	vvagent "vibevalley/internal/agent/brain"
 	"vibevalley/internal/protocol"
-	vvagent "vibevalley/pkg/agent"
 	"vibevalley/pkg/agentcore"
 	"vibevalley/pkg/ai"
 )
@@ -107,8 +107,8 @@ func evalReplay(t *testing.T, c evalCase, llm vvagent.LLM) ([]agentcore.AgentMes
 			if !ok {
 				t.Fatal("the agent closed")
 			}
-			switch e.Type {
-			case agentcore.EventMessageEnd:
+			switch e := e.(type) {
+			case agentcore.MessageEnded:
 				if managerIsInput(e.Message) {
 					continue
 				}
@@ -119,7 +119,7 @@ func evalReplay(t *testing.T, c evalCase, llm vvagent.LLM) ([]agentcore.AgentMes
 					}
 				}
 				turn = append(turn, e.Message)
-			case vvagent.EventAgentSettled:
+			case vvagent.AgentSettled:
 				return turn, tokens
 			}
 		case <-ctx.Done():

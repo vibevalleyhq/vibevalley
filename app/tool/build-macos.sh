@@ -8,6 +8,10 @@
 set -eu
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 REPO=$(CDPATH= cd -- "$HERE/.." && pwd)
+mkdir -p "$HERE/build"
+if [ "${VIBEVALLEY_PACKAGE_LOCKED:-}" != 1 ]; then
+  exec sh "$HERE/tool/with-lock.sh" "$HERE/build/.package-macos.lock" env VIBEVALLEY_PACKAGE_LOCKED=1 sh "$0" "$@"
+fi
 CHANNEL=release
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -15,26 +19,38 @@ while [ $# -gt 0 ]; do
     *) echo "usage: $0 [--channel alpha|beta|release]" >&2; exit 2 ;;
   esac
 done
-case "$CHANNEL" in
-  release) NAME='vibevalley'; SHOWN='码农场物语'; ID='dev.vibevalley.app'; DMG="$HERE/build/vibevalley-arm64.dmg" ;;
-  beta) NAME='vibevalley Beta'; SHOWN='码农场物语 Beta'; ID='dev.vibevalley.app.beta'; DMG="$HERE/build/vibevalley-beta-arm64.dmg" ;;
-  alpha) NAME='vibevalley Alpha'; SHOWN='码农场物语 Alpha'; ID='dev.vibevalley.app.alpha'; DMG="$HERE/build/vibevalley-alpha-arm64.dmg" ;;
-  *) echo "unknown channel: $CHANNEL" >&2; exit 2 ;;
-esac
+sh "$HERE/tool/agora-voice-only.sh"
+META=$(dart "$HERE/tool/channel.dart" "$CHANNEL")
+TAB=$(printf '\t')
+IFS="$TAB" read -r NAME SHOWN ID DMG_NAME <<EOF
+$META
+EOF
 
 mkdir -p "$HERE/build"
+WORK=$(mktemp -d "$HERE/build/package-$CHANNEL.XXXXXX")
+PUBLISHING=0
+cleanup() {
+  if [ "$PUBLISHING" = 1 ]; then
+    echo "publication interrupted or failed; staging preserved at $WORK" >&2
+  else
+    rm -rf "$WORK"
+  fi
+}
+trap cleanup EXIT
+trap 'exit 130' HUP INT TERM
+APP="$WORK/$NAME.app"
+DMG="$WORK/$DMG_NAME"
+
 echo "== the Go server"
 (cd "$REPO/server" && env -u GOROOT -u GOTOOLDIR CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 \
-  go build -trimpath -ldflags='-s -w' -o "$HERE/build/vibevalley-server" ./cmd/server)
+  go build -trimpath -ldflags='-s -w' -o "$WORK/vibevalley-server" ./cmd/server)
 
 echo "== the app"
 (cd "$HERE" && flutter build macos --release --dart-define=VIBEVALLEY_CHANNEL="$CHANNEL")
 
 BUILT="$HERE/build/macos/Build/Products/Release/vibevalley.app"
-APP="$HERE/build/$NAME.app"
-rm -rf "$APP"
 cp -R "$BUILT" "$APP"
-cp "$HERE/build/vibevalley-server" "$APP/Contents/MacOS/vibevalley-server"
+cp "$WORK/vibevalley-server" "$APP/Contents/MacOS/vibevalley-server"
 # Apache 2.0: the app carries vibevalley's license and the notices of what it includes.
 cp "$REPO/LICENSE" "$REPO/NOTICE" "$APP/Contents/Resources/"
 PLIST="$APP/Contents/Info.plist"
@@ -46,11 +62,17 @@ codesign --force --deep --sign - --timestamp=none --entitlements "$HERE/macos/Ru
 codesign --verify --deep --strict "$APP"
 
 echo "== the DMG"
-STAGE="$HERE/build/dmg-stage"
-rm -rf "$STAGE" "$DMG"
+STAGE="$WORK/dmg-stage"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 hdiutil create -volname "$NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
-rm -rf "$STAGE"
-ls -lh "$DMG" "$APP/Contents/MacOS/vibevalley-server"
+hdiutil verify "$DMG" >/dev/null
+xcrun clang -Wall -Wextra -Werror "$HERE/tool/publish-macos.c" -o "$WORK/publish"
+PUBLISHING=1
+if ! "$WORK/publish" "$APP" "$HERE/build/$NAME.app" "$DMG" "$HERE/build/$DMG_NAME"; then
+  # A failed rollback must never let the cleanup trap delete the previous artifacts.
+  exit 1
+fi
+PUBLISHING=0
+ls -lh "$HERE/build/$DMG_NAME" "$HERE/build/$NAME.app/Contents/MacOS/vibevalley-server"

@@ -19,11 +19,11 @@ Status: implemented
 
 | 段 | 放什么 | 什么时候变 |
 |---|---|---|
-| 开头 | 工具定义（管家的固定列表加 `pkg/agent` 自己的 `load_skill`、`remember`、`rewrite_memory`、`search_archive`）；系统提示：说明（`managerSystemPrompt + managerAgentPrompt`）、`## 环境`（只有工作目录）、技能清单、记性的快照 | 大脑起来时、每次压缩之后；服务端换了版本（工具描述、说明改了）时 |
+| 开头 | 工具定义（管家的固定列表加 `internal/agent/brain` 自己的 `load_skill`、`remember`、`rewrite_memory`、`search_archive`）；系统提示：说明（`managerSystemPrompt + managerAgentPrompt`）、`## 环境`（只有工作目录）、技能清单、记性的快照 | 大脑起来时、每次压缩之后；服务端换了版本（工具描述、说明改了）时 |
 | 对话 | `manager.jsonl` 里的消息，只往后加 | 每条消息 |
 | 最新那条输入 | 按这个顺序：`【现在】2026/10/18 02:15`（到分）、`【农场现状】`（全文）或 `【农场变了】`（只有变了的行）、`【记性有更新】`、「这期间田头上的汇报」、最后是这次的话（「主人说：……」「【巡查】……」） | 每条输入；和对话一起存下，以后就是对话的一部分 |
 
-`pkg/agent`：
+`internal/agent/brain`：
 
 - `Agent` 有 `prefix` 和 `parts []promptPart`（名字是 `instructions`、`env`、`skills`、`memory`）。`refreshPrefix()` 重拼它们：`NewAgent` 里一次；`fold` 做出新的摘要之后一次（请求前的压缩、一轮停下时存下的压缩、空闲压缩，空闲压缩只在摘要真的换上之后）。`PrepareRequest` 只读 `a.prefix`。
 - 请求前的压缩在 `PrepareRequest` 里、读 `a.prefix` 之前，不在 `TransformContext` 里：`agentcore` 先调 `PrepareRequest` 再调 `TransformContext`，放在后者里，压缩后的第一次请求会带着旧的开头、第二次才换，多命不中一次。
@@ -42,13 +42,13 @@ Status: implemented
 ### 量出来
 
 - 事件类型 `llm/usage`，`SessionEvent.Tokens` 是 `EventTokens{Input, CacheRead, Output}`；`session.Journal.Usage` 记它。管家在每次回答的 `message_end` 上记一条，字是「缓存命中 82%：读缓存 41 200，没命中 8 900，输出 310」（命中率 = `CacheRead / (CacheRead + Input)`）；一个 token 都没有的（还没开口就出错）不记。摘要请求的用量也记一条，字前面加「整理对话，」，`compaction_end` 带着它的 `Usage`。
-- `pkg/agent` 每次请求对每一段和工具定义（名字、描述、参数的 JSON）各算一个 sha256（`prefix.go`），和上一次请求比；两次之间没有压缩、某段却变了，发 `prefix_changed`，`Reason` 是变了的段名，用逗号连起来。管家把它接在下一条用量的字后面（「；开头变了：工具」），并 `log.Printf`。
+- `internal/agent/brain` 每次请求对每一段和工具定义（名字、描述、参数的 JSON）各算一个 sha256（`prefix.go`），和上一次请求比；两次之间没有压缩、某段却变了，发 `PrefixChanged`，`Parts` 是变了的段名。管家把它接在下一条用量的字后面（「；开头变了：工具」），并 `log.Printf`。
 - 哈希只在内存里，比的是同一个进程里的上一次请求：重启后的第一次请求不比，重启本来就从头建缓存，那一条的命中率看得出来。`prefix_changed` 在请求前直接发，用量经 `agentcore` 的事件转一手再发，在管家那里两条的先后靠转发跟得上；接错也只是字落在相邻的那条用量上。
 - Flutter 的工作日志（`app/lib/shared/work_log.dart`）把 `llm/usage` 画成一行小字，标签「缓存」，颜色和 `llm/retry` 一档。
 
 ### 不在场时压缩，用同一个开头
 
-- **时机**：一轮停下时，这一轮里请求前压过的，把那次的摘要存下（多半就是缓存里那份，不再请求）：对话本来已经超了预算，这一轮用的就是摘要。没压过的，估出超过 `IdleFoldAt` 就开一个 `IdleFoldAfter` 的计时器（`pkg/agent/idle.go`）。交进输入、`Reset`、`Close` 停掉它。到点时大脑在忙或有排着的输入就不压，`WakeSoon(IdleFoldAfter)` 为真也不压；否则压缩。摘要要花几秒，其间可能有输入进来、开了一轮：换消息之前在 `a.mu` 下再看一次，大脑不闲或消息变了，这份摘要就丢掉，对话文件和开头都不动，下次闲下来再压。
+- **时机**：一轮停下时，这一轮里请求前压过的，把那次的摘要存下（多半就是缓存里那份，不再请求）：对话本来已经超了预算，这一轮用的就是摘要。没压过的，估出超过 `IdleFoldAt` 就开一个 `IdleFoldAfter` 的计时器（`internal/agent/brain/idle.go`）。交进输入、`Reset`、`Close` 停掉它。到点时大脑在忙或有排着的输入就不压，`WakeSoon(IdleFoldAfter)` 为真也不压；否则压缩。摘要要花几秒，其间可能有输入进来、开了一轮：换消息之前在 `a.mu` 下再看一次，大脑不闲或消息变了，这份摘要就丢掉，对话文件和开头都不动，下次闲下来再压。
 - **默认值**：`IdleFoldAt` 是预算的八成（96 000），`IdleFoldAfter` 是 10 分钟（照 Grok Bot；DeepSeek 的缓存在磁盘上，留得比 10 分钟久，这里取的是「主人多半不会马上接着说」的时长，不是缓存的寿命）；0 用默认值，`IdleFoldAfter < 0` 关掉。
 - **管家的 `WakeSoon`**：管家自己的定时（`agent` 为空或是 `manager`、开着）有一个在这段时间内到点（`protocol.NextRun`），就为真：反正马上要醒，醒来那次请求超了预算会照旧在请求前压。
 - **复用开头的摘要请求**：`compactInPlace` 发 `SystemPrompt: a.prefix`、同一份工具、全部消息加一条 `SUMMARY_IN_PLACE`，`ToolChoice` 是 `none`。回答出错、为空或带了工具调用，退回 `compact`（`SUMMARY_INSTRUCTIONS`、拼成文字）。归档照旧。请求前的压缩也走它。
@@ -56,7 +56,7 @@ Status: implemented
 
 ## Verification
 
-- `pkg/agent`：`TestTheSystemPromptStaysTheSameBetweenFolds`（中间记了一条、忘了一条，两次请求的系统提示一字不差，`MemoryNews` 报一次、第二次为空，没有 `prefix_changed`）；`TestAFoldMakesTheSystemPromptAnew`（压缩之后的请求带新的快照，不报 `prefix_changed`）；`TestAChangedToolIsToldAsAChangedPrefix`；`TestAnIdleConversationIsFoldedWithTheSameStart`（计时到了才压，摘要请求的系统提示和工具和上一次请求一样、消息是上一次请求的消息加上回答和一条要摘要的话，`ToolChoice` 是 `none`；三次连着问，中间没有摘要请求）；`TestAToolCalledInsteadOfASummaryIsAskedAgainOnItsOwn`；`TestNoIdleFoldWhenItWillBeWokenSoon`；`TestCutPointKeepsTheLastWords`；`TestALongConversationIsFolded` 按新的摘要请求认。
+- `internal/agent/brain`：`TestTheSystemPromptStaysTheSameBetweenFolds`（中间记了一条、忘了一条，两次请求的系统提示一字不差，`MemoryNews` 报一次、第二次为空，没有 `prefix_changed`）；`TestAFoldMakesTheSystemPromptAnew`（压缩之后的请求带新的快照，不报 `prefix_changed`）；`TestAChangedToolIsToldAsAChangedPrefix`；`TestAnIdleConversationIsFoldedWithTheSameStart`（计时到了才压，摘要请求的系统提示和工具和上一次请求一样、消息是上一次请求的消息加上回答和一条要摘要的话，`ToolChoice` 是 `none`；三次连着问，中间没有摘要请求）；`TestAToolCalledInsteadOfASummaryIsAskedAgainOnItsOwn`；`TestNoIdleFoldWhenItWillBeWokenSoon`；`TestCutPointKeepsTheLastWords`；`TestALongConversationIsFolded` 按新的摘要请求认。
 - `internal/manager`：`TestSituationDelta`；`TestTheSituationIsWholeOnlyAfterAFold`（第一条全文，第二条只有变了的行，第三条没有这一段，压缩之后又是全文）；`TestEachAnswerLeavesItsTokensInTheLog`、`TestUsageText`；`TestOnlyItsOwnScheduleSoonKeepsTheManagerFromFoldingIdle`。
 
 ## Alternatives considered

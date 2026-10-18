@@ -52,7 +52,7 @@ Status: implemented
 ## Verification
 
 - `server/internal/game/progress_test.go`：收获的金币和连胜加成、失败断连胜、一气呵成的条件、解铃人、浴火重生、一分钱一分货、物尽其用、新手任务各一次、计划的步数和同时做的一批、档位按顺序各一次、彩蛋、称号只能挂拿到的档位且不挂新手任务、旧金币；`entriesFor` 对每种事实记什么、计划只记一次、跨级、六块地填满；`catchUp`。
-- `server/internal/workspace/work_test.go` 的 `TestMergeGoesInTheLedger`：脚本扮演的帮工收获后，账本里有这一笔。`server/internal/game/ledger_test.go` 的 `TestPlanLedger`：记一笔收获，进度事实带着金币；派活、没做成、升级由事实记下；旧金币只记一次；重启后折回同样的进度。
+- `server/internal/workspace/work_test.go` 的 `TestMergeGoesInTheLedger`：脚本扮演的帮工收获后，账本里有这一笔。`server/internal/game/ledger_test.go` 的 `TestTaskLedger`：记一笔收获，进度事实带着金币；派活、没做成、升级由事实记下；旧金币只记一次；重启后折回同样的进度。
 - `news` 变成什么效果（金币、成就）、commit 数带来的升级：protocol 的黄金数据逐条比（`server/internal/protocol/reduce_golden_test.go` 的 `TestReduceGolden`）。原来测页面这一半的 `packages/core/test/` 随网页删掉了。
 - `app/test/host/notify_test.dart`：到了一档弹通知、点开任务与成就。
 - 模拟农场里截图看过：收获后金币从帮工头上飘起、成就提示里是奖章、面板的新手任务、成就墙、彩蛋、称号的选单和农场卡上的称号。

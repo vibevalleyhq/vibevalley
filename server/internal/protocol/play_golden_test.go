@@ -39,39 +39,39 @@ func TestPlayRulesGolden(t *testing.T) {
 		_ = json.Unmarshal(row.Output, &want)
 		same := func(what string, got any) { playSame(t, line, row.Kind+" "+what, got, want[what], "output", what) }
 		switch row.Kind {
-		case "playbook":
+		case "task":
 			var in struct {
-				PB    Playbook `json:"pb"`
-				After Playbook `json:"after"`
-				Fresh bool     `json:"fresh"`
+				TaskGraph TaskGraph `json:"task"`
+				After     TaskGraph `json:"after"`
+				Fresh     bool      `json:"fresh"`
 			}
 			playDecode(t, line, row.Input, &in)
-			pb := in.PB
-			ids := func(nodes []PlaybookNode) []string { return rulesIDs(nodes) }
-			same("problems", PlanProblems(pb.Nodes))
-			same("layers", LayersOf(pb.Nodes))
-			same("ready", ids(ReadyNodes(pb)))
-			same("asks", AsksForYou(pb))
-			same("spent", PlaybookSpent(pb))
-			same("text", PlaybookText(pb))
+			graph := in.TaskGraph
+			ids := func(tasks []Task) []string { return rulesIDs(tasks) }
+			same("problems", GraphProblems(graph.Tasks))
+			same("layers", LayersOf(graph.Tasks))
+			same("ready", ids(ReadyTasks(graph)))
+			same("asks", AsksForYou(graph))
+			same("spent", GraphSpent(graph))
+			same("text", GraphText(graph))
 			blocked := [][]string{}
-			for _, n := range pb.Nodes {
-				blocked = append(blocked, BlockedBy(pb, n))
+			for _, n := range graph.Tasks {
+				blocked = append(blocked, BlockedBy(graph, n))
 			}
 			same("blocked", blocked)
 			checks := [][]string{}
-			for _, n := range pb.Nodes {
-				checks = append(checks, AcceptanceChecks(pb, n))
+			for _, n := range graph.Tasks {
+				checks = append(checks, AcceptanceChecks(graph, n))
 			}
 			same("acceptanceChecks", checks)
-			before := &pb
+			before := &graph
 			if in.Fresh {
 				before = nil
 			}
-			changes := PlaybookChanges(before, in.After)
+			changes := GraphChanges(before, in.After)
 			same("changes", changes)
 			titles := map[string]string{}
-			for _, n := range pb.Nodes {
+			for _, n := range graph.Tasks {
 				titles[n.ID] = "T" + n.Title
 			}
 			titleOf := func(id string) string {
@@ -82,7 +82,7 @@ func TestPlayRulesGolden(t *testing.T) {
 			}
 			texts := [][2]string{}
 			for _, c := range changes {
-				texts = append(texts, [2]string{PlaybookEventText(c, nil), PlaybookEventText(c, titleOf)})
+				texts = append(texts, [2]string{GraphEventText(c, nil), GraphEventText(c, titleOf)})
 			}
 			same("eventTexts", texts)
 		case "schedule":
@@ -121,7 +121,7 @@ func TestPlayRulesGolden(t *testing.T) {
 		cases.End()
 	}
 	cases.Close()
-	for _, kind := range []string{"playbook", "schedule", "patrol"} {
+	for _, kind := range []string{"task", "schedule", "patrol"} {
 		if seen[kind] < 20 {
 			t.Fatalf("only %d %s cases", seen[kind], kind)
 		}

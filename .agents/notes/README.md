@@ -86,7 +86,7 @@ Status: <状态>
 ## Consequences
 ```
 
-`## Decision` 用现在时描述上线的样子，整篇跟着它保持最新。`## Consequences` 写这个取舍付出了什么、换来了什么。提案时期的章节在这里不允许出现，校验会拒绝：`## Proposal`、`## Plan`、`## Migration plan`、`## Acceptance criteria`。写现状的 `## Verification`、`## Deferred`、`## Related` 可以有。
+`## Decision` 用现在时描述上线的样子，整篇跟着它保持最新。`## Consequences` 写这个取舍付出了什么、换来了什么。提案时期的章节在这里不允许出现，校验会拒绝：`## Proposal`、`## Task`、`## Migration task`、`## Acceptance criteria`。写现状的 `## Verification`、`## Deferred`、`## Related` 可以有。
 
 `rejected/`：就是冻结的提案，保留提案时的章节，结论写在 `Status:` 行。只要求开头、`## Problem`、`## Proposal` 和下面的「Alternatives considered」。
 

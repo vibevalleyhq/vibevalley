@@ -29,8 +29,18 @@ func Run[T Service](r *Readies, ctor any) any {
 }
 
 type Readies struct {
-	mu  sync.Mutex
-	all []Readier
+	mu     sync.Mutex
+	all    []Readier
+	before []func(context.Context) error
+}
+
+// BeforeReady installs infrastructure after subscriptions start but before services publish or dispatch startup work.
+func BeforeReady(prepare func(context.Context) error) fx.Option {
+	return fx.Invoke(func(r *Readies) {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		r.before = append(r.before, prepare)
+	})
 }
 
 func (r *Readies) add(s Readier) {
@@ -43,7 +53,13 @@ func (r *Readies) hook(lc fx.Lifecycle) {
 	lc.Append(fx.Hook{OnStart: func(ctx context.Context) error {
 		r.mu.Lock()
 		all := r.all
+		before := r.before
 		r.mu.Unlock()
+		for _, prepare := range before {
+			if err := prepare(ctx); err != nil {
+				return err
+			}
+		}
 		for _, s := range all {
 			s.OnReady(ctx)
 		}

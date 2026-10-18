@@ -28,7 +28,7 @@ func TestKeepRollsBackNotesWhenJobWriteFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.DB.Close()
+	defer f.Close()
 	if _, err := f.DB.Exec(`CREATE TRIGGER fail_job BEFORE INSERT ON memory WHEN NEW.kind = 'issue' BEGIN SELECT RAISE(FAIL, 'write failed'); END`); err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestKeepDeduplicatesSimilarNotesWithinOneRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.DB.Close()
+	defer f.Close()
 	run := FinishedRun{Agent: "lab", Session: "s1", Project: "demo", Job: "work", Said: "记住：use pnpm test\n记住：use pnpm test!", Outcome: protocol.OutcomeCompleted}
 	if err := f.Memory.keep(run); err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestFadingForecastMatchesActualEviction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.DB.Close()
+	defer f.Close()
 	q := generated.New(f.DB)
 	for i := range protocol.MemoryKeep {
 		id := fmt.Sprintf("old-%03d", i)

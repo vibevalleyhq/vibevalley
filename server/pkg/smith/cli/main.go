@@ -235,7 +235,7 @@ func (c *cli) installation(ctx context.Context, raw []string) error {
 	c.printEach(readEach(runtimes, func(runtime oar.Runtime) (any, error) {
 		report := map[string]any{"runtimeId": runtime.ID, "installation": nil}
 		if runtime.Installation != nil {
-			snapshot, err := runtime.Installation(ctx)
+			snapshot, err := runtime.Installation(ctx, oar.InstallationOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -260,7 +260,7 @@ func (c *cli) usage(ctx context.Context, raw []string) error {
 		if runtime.AccountUsage == nil || runtime.Installation == nil {
 			return map[string]any{"runtimeId": runtime.ID, "accountUsage": oar.AccountUsageSnapshot{Kind: "unsupported", Reason: "capability_unavailable"}}, nil
 		}
-		installation, err := runtime.Installation(ctx)
+		installation, err := runtime.Installation(ctx, oar.InstallationOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -295,7 +295,7 @@ func (c *cli) inventory(ctx context.Context, command string, raw []string) error
 	c.printEach(readEach(runtimes, func(runtime oar.Runtime) (any, error) {
 		var snapshot *oar.InstallationSnapshot
 		if runtime.Installation != nil {
-			read, err := runtime.Installation(ctx)
+			read, err := runtime.Installation(ctx, oar.InstallationOptions{})
 			if err != nil {
 				return nil, err
 			}

@@ -42,7 +42,7 @@ smith 原先是单独的模块，后来并进来（[internal 和 pkg](2026-10-15
 
 ### 管家和帮工
 
-管家跑在 VibeValley 自己的 agent 上（`ai`、`agentcore`、`agent`，`packages/ai`、`agent-core`、`agent` 的移植），同一个 agent 包成 smith 的农机 `vibevalley`（`pkg/agent/oarruntime`；改名前叫 `heybro`，[改名 VibeValley](../process/2026-10-15-rename-to-vibevalley.md)）。帮工是 smith `agents` 的子会话。
+管家跑在 VibeValley 自己的 agent 上（`ai`、`agentcore`、`agent`，`packages/ai`、`agent-core`、`agent` 的移植），同一个 agent 包成 smith 的农机 `vibevalley`（`internal/agent/brain/oarruntime`；改名前叫 `heybro`，[改名 VibeValley](../process/2026-10-15-rename-to-vibevalley.md)）。帮工是 smith `agents` 的子会话。
 
 ## Alternatives considered
 

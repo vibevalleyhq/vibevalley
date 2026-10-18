@@ -42,13 +42,13 @@ func TestSessionsReachTheFarmWhereItAnswers(t *testing.T) {
 	testkit.Eq(t, urls, []string{"http://127.0.0.1:8787/mcp", "http://127.0.0.1:54321/mcp"}, "the farm's tools")
 }
 
-func TestFarmURLFollowsHostAndPort(t *testing.T) {
+func TestFarmURLKeepsTheLocalIdentity(t *testing.T) {
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
-	cfg.Host, cfg.Port = "localhost", 9100
+	cfg.Port = 9100
 	f, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.DB.Close()
-	testkit.Eq(t, f.Session.FarmURL(), "http://localhost:9100/mcp", "host and port")
+	defer f.Close()
+	testkit.Eq(t, f.Session.FarmURL(), "http://127.0.0.1:9100/mcp", "local port")
 }

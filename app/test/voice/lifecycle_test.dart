@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/foundation.dart';
@@ -32,6 +33,38 @@ class Engine extends Fake implements RtcEngine {
 void main() {
   setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.macOS);
   tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+  test('captions wait for their agent id and stop at hangup', () async {
+    final entered = Completer<void>(), ready = Completer<void>();
+    final server = FakeServer((r) async {
+      if (r.url.path == '/api/v1/voice/session') return jsonResponse(session);
+      if (r.url.path == '/api/v1/voice/agent') {
+        entered.complete();
+        await ready.future;
+        return jsonResponse({'agentId': 'call-1'});
+      }
+      return jsonResponse(null);
+    });
+    final call = VoiceCall(server.api, createEngine: Engine.new, agentPick: () => 'chosen');
+    final starting = call.start();
+    await entered.future;
+    call.captions.onHeard!('hello');
+    call.captions.onAnswered!('answer');
+    expect(server.requests.where((r) => r.url.path.endsWith('/heard') || r.url.path.endsWith('/said')), isEmpty);
+    ready.complete();
+    await starting;
+    await pumpEventQueue();
+    final heard = server.requests.singleWhere((r) => r.url.path.endsWith('/heard'));
+    final body = jsonDecode(heard.body) as Map<String, dynamic>;
+    expect((body['sendKey'] as String).length, 32);
+    expect(body..remove('sendKey'), {'agentId': 'call-1', 'text': 'hello', 'agent': 'chosen'});
+    expect(jsonDecode(server.requests.singleWhere((r) => r.url.path.endsWith('/said')).body), {'agentId': 'call-1', 'text': 'answer'});
+    await call.end();
+    call.captions.onHeard!('late');
+    await pumpEventQueue();
+    expect(server.requests.where((r) => r.url.path.endsWith('/heard')).length, 1);
+    call.dispose();
+  });
 
   test('toggle from connecting hangs up without creating an engine', () async {
     final reply = Completer<void>();

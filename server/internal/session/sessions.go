@@ -8,7 +8,6 @@ import (
 	"log"
 	"maps"
 	"math"
-	"net"
 	"os"
 	"path/filepath"
 	"slices"
@@ -36,16 +35,13 @@ import (
 )
 
 // smith runs sessions without permission prompts or a sandbox: the only fence is where a session starts, inside VIBEVALLEY_WORK_ROOT in its own
-// worktree. The chat calls Deliver holding its own lock, so nothing here calls back into the chat. smith's spawn takes only model, effort, env and
-// cwd, and its runtime registry is fixed once made, so each session gets a Subagents of its own over a one-runtime registry that carries the agent's
-// persona, MCP servers and disallowed tools (withOptions).
+// worktree. The chat calls Deliver holding its own lock, so nothing here calls back into the chat. Each farm session owns its Subagents lifetime;
+// per-session options travel through Spawn without modifying the shared runtime registry.
 
 const (
 	// A burst of changes is one write.
 	saveAfter = 300 * time.Millisecond
-	// A report waits at most this long for its turn's last events (what it spent).
-	reportWait = 2 * time.Second
-	closeWait  = 15 * time.Second
+	closeWait = 15 * time.Second
 )
 
 type sessionSaved struct {
@@ -62,55 +58,12 @@ type savedHand struct {
 	Recalled []string `json:"recalled,omitzero"`
 }
 
-// Applied only once the session's events up to last are read.
-type pendingReport struct {
-	report agents.SubagentReport
-	until  int64
-}
-
 type oarSession struct {
 	subagents *agents.Subagents
 	agent     *agents.Subagent
-	processed atomic.Int64
 	detached  atomic.Bool
-
-	mu      sync.Mutex
-	reports []pendingReport
-	wake    chan struct{}
-	stop    func()
-}
-
-func (s *oarSession) received(report agents.SubagentReport) {
-	until := int64(-1)
-	if a := s.subagents.Get(report.ID); a != nil {
-		if records := a.Session.Records(); len(records) > 0 {
-			until = records[len(records)-1].Seq
-		}
-	}
-	s.mu.Lock()
-	s.reports = append(s.reports, pendingReport{report, until})
-	close(s.wake)
-	s.wake = make(chan struct{})
-	s.mu.Unlock()
-}
-
-func (s *oarSession) next(done <-chan struct{}) (pendingReport, bool) {
-	for {
-		s.mu.Lock()
-		if len(s.reports) > 0 {
-			r := s.reports[0]
-			s.reports = s.reports[1:]
-			s.mu.Unlock()
-			return r, true
-		}
-		wake := s.wake
-		s.mu.Unlock()
-		select {
-		case <-wake:
-		case <-done:
-			return pendingReport{}, false
-		}
-	}
+	mu        sync.Mutex
+	stop      func()
 }
 
 type hand struct {
@@ -127,7 +80,6 @@ type hand struct {
 	launch   string
 	spoke    bool
 	recalled map[string]bool
-	released chan struct{}
 	// The triggers of the turns asked for and not opened yet, oldest first; the run of the open turn and what it heard (runs.go).
 	triggers []protocol.RunTrigger
 	run      string
@@ -135,6 +87,7 @@ type hand struct {
 }
 
 type sessions struct {
+	executions   map[string]*AgentExecution
 	core         *core.Service
 	store        *agent.Service
 	tokens       *tokens
@@ -152,6 +105,9 @@ type sessions struct {
 	activity *base.Hub[LaunchActivity]
 	disk     *base.FileWriter
 	q        *generated.Queries
+	db       *sql.DB
+	finished *base.Hub[RunFinished]
+	consumed *base.Hub[InputConsumed]
 
 	// Admission includes opening a turn and publishing it, so concurrent callers cannot claim the same capacity.
 	admission sync.Mutex
@@ -186,13 +142,14 @@ func newSessions(in sessionsIn) (*sessions, error) {
 		projects: in.Projects, runtimes: in.Runtimes,
 		root:     root,
 		file:     filepath.Join(in.Config.Home, "sessions.json"),
-		farmURL:  "http://" + net.JoinHostPort(in.Config.Host, strconv.Itoa(in.Config.Port)) + "/mcp",
+		farmURL:  "http://" + in.Config.ServerAddress() + "/mcp",
 		logDir:   filepath.Join(in.Config.Home, "logs"),
 		stallMs:  int64(in.Config.Session.StallSeconds * 1000),
 		logDays:  in.Config.Session.TrajectoryDays,
 		activity: base.NewHub[LaunchActivity](),
 		hands:    map[string]*hand{},
 		q:        generated.New(in.DB),
+		db:       in.DB, finished: base.NewHub[RunFinished](), consumed: base.NewHub[InputConsumed](),
 	}
 	c.disk = base.NewFileWriter(c.file, 0o644)
 	return c, nil
@@ -224,7 +181,7 @@ func (c *sessions) OnStop() {
 	}
 	hands := slices.Collect(maps.Values(c.hands))
 	c.mu.Unlock()
-	if err := c.disk.Write(c.body); err != nil {
+	if err := c.disk.Finish(c.body); err != nil {
 		log.Printf("vibevalley: could not save sessions.json: %v", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), closeWait)
@@ -453,6 +410,12 @@ func (c *sessions) watch(h *hand, s *oarSession, runtime string) oar.EventObserv
 			if _, starts := fact.(protocol.FactRun); opened && starts {
 				continue
 			}
+			if report, ok := fact.(protocol.FactReport); ok {
+				if run := c.CurrentRun(h.id); run != "" {
+					report.Run = &run
+				}
+				fact = report
+			}
 			c.core.Apply(fact)
 			if r, ok := fact.(protocol.FactReport); ok {
 				c.endRun(h, r.Outcome, r.Summary, r.Spent)
@@ -484,11 +447,15 @@ func (c *sessions) applyReport(h *hand, report agents.SubagentReport) {
 	h.lastText = read.Text
 	h.tracking.RunFrom = nil
 	launch, spoke := h.launch, h.spoke
+	var run *string
+	if h.run != "" {
+		run = new(h.run)
+	}
 	h.mu.Unlock()
-	c.core.Apply(protocol.FactReport{ID: h.id, Outcome: read.Outcome, Summary: read.Summary, Runs: int64(report.Turn), Spent: spent})
+	c.core.Apply(protocol.FactReport{ID: h.id, Outcome: read.Outcome, Summary: read.Summary, Runs: int64(report.Turn), Spent: spent, Run: run})
 	c.endRun(h, read.Outcome, read.Summary, spent)
 	project := h.place.Project
-	go c.memories.Keep(memory.FinishedRun{Agent: session.Agent, Session: h.id, Project: project, Job: session.Task, Outcome: read.Outcome, Said: read.Text, Summary: read.Summary})
+	go c.memories.Keep(memory.FinishedRun{Agent: session.Agent, Session: h.id, Project: project, Job: session.Brief, Outcome: read.Outcome, Said: read.Text, Summary: read.Summary})
 	if read.NeedsYou {
 		c.core.Notice(protocol.NoticeLevelError, fmt.Sprintf("%s 停下了：%s", session.Name, read.Failure))
 	}
@@ -497,24 +464,6 @@ func (c *sessions) applyReport(h *hand, report agents.SubagentReport) {
 	}
 	c.runtimes.UsageSoon(session.Runtime)
 	c.save()
-}
-
-// Each report waits until its turn's events are read: what the turn spent arrives in the same frame as its end.
-func (c *sessions) reports(h *hand, s *oarSession, released <-chan struct{}) {
-	for {
-		r, ok := s.next(released)
-		if !ok {
-			return
-		}
-		deadline := time.Now().Add(reportWait)
-		for s.processed.Load() < r.until && time.Now().Before(deadline) && !s.detached.Load() {
-			time.Sleep(5 * time.Millisecond)
-		}
-		if s.detached.Load() {
-			return
-		}
-		c.applyReport(h, r.report)
-	}
 }
 
 func (c *sessions) stalled(h *hand, silentForMs int64) {
@@ -552,8 +501,7 @@ func (c *sessions) attach(h *hand, s *oarSession, runtime string) {
 	if old != nil {
 		c.releaseLocked(h)
 	}
-	released := make(chan struct{})
-	h.sess, h.released = s, released
+	h.sess = s
 	h.launch = fmt.Sprintf("%s#%d", h.id, launch)
 	h.spoke = false
 	if id := s.agent.Info().SessionID; id != "" {
@@ -565,11 +513,11 @@ func (c *sessions) attach(h *hand, s *oarSession, runtime string) {
 		go func() { _ = old.subagents.Close(context.Background()) }()
 	}
 	// From the session's first record: its turn may have started (or ended) before this line runs.
-	reader := observe.EventsReader(c.watch(h, s, runtime))
-	stopEvents := s.agent.Session.RawEvents(func(record oar.RawEvent) {
-		reader(record)
-		s.processed.Store(record.Seq)
-	}, &oar.Cursor{SessionID: s.agent.Session.ID(), AfterSeq: -1})
+	stopEvents := s.agent.Follow(c.watch(h, s, runtime), func(report agents.SubagentReport) {
+		if !s.detached.Load() {
+			c.applyReport(h, report)
+		}
+	})
 	stopStalls := observe.ObserveStalls(s.agent.Session, observe.StallOptions{
 		StallAfter: time.Duration(c.stallMs) * time.Millisecond,
 		OnStall: func(info observe.StallInfo) {
@@ -584,7 +532,6 @@ func (c *sessions) attach(h *hand, s *oarSession, runtime string) {
 		s.stop()
 	}
 	s.mu.Unlock()
-	go c.reports(h, s, released)
 	c.save()
 }
 
@@ -600,10 +547,6 @@ func (c *sessions) releaseLocked(h *hand) {
 		s.stop()
 	}
 	s.mu.Unlock()
-	if h.released != nil {
-		close(h.released)
-		h.released = nil
-	}
 }
 
 func (c *sessions) open(ctx context.Context, agent protocol.Agent, id string, place project.Workplace, input, resume string) (*oarSession, string) {
@@ -617,26 +560,22 @@ func (c *sessions) open(ctx context.Context, agent protocol.Agent, id string, pl
 	farmURL := c.farmURL
 	c.mu.Unlock()
 	farm := oar.McpServer{Name: "vibevalley", Type: "http", URL: farmURL, Headers: map[string]string{"authorization": "Bearer " + c.tokens.Issue(id)}}
-	extra := extra{MCPServers: []oar.McpServer{farm}}
+	options := agents.SpawnOptions{MCPServers: []oar.McpServer{farm}}
 	for _, m := range agent.MCPServers {
-		extra.MCPServers = append(extra.MCPServers, toOarMcp(m))
+		options.MCPServers = append(options.MCPServers, toOarMcp(m))
 	}
 	if text != "" && agent.PersonaMode == protocol.PersonaModeAppend {
-		extra.AppendSystemPrompt = &text
+		options.AppendSystemPrompt = &text
 	}
 	if text != "" && agent.PersonaMode == protocol.PersonaModeReplace {
-		extra.SystemPrompt = &text
+		options.SystemPrompt = &text
 	}
 	if len(agent.DisallowedTools) > 0 {
-		extra.DisallowedTools = agent.DisallowedTools
+		options.DisallowedTools = agent.DisallowedTools
 	}
-	registry, err := oar.NewRuntimeRegistry(withOptions(base, extra))
-	if err != nil {
-		return nil, err.Error()
-	}
-	s := &oarSession{wake: make(chan struct{}), subagents: agents.New(agents.Options{Runtimes: registry, MaxRunning: protocol.MaxRunning, MaxDepth: 1, Cwd: c.root, LogDir: c.logDir})}
-	s.subagents.OnReport(func(report agents.SubagentReport) error {
-		s.received(report)
+	s := &oarSession{subagents: agents.New(agents.Options{Runtimes: c.runtimes.Registry, MaxRunning: protocol.MaxRunning, MaxDepth: 1, Cwd: c.root, LogDir: c.logDir})}
+	// Follow owns delivery; this host does not keep a second unread report inbox.
+	s.subagents.OnReport(func(agents.SubagentReport) error {
 		return nil
 	})
 	model, effort, env := resolved.Model, resolved.Effort, resolved.Env
@@ -644,7 +583,10 @@ func (c *sessions) open(ctx context.Context, agent protocol.Agent, id string, pl
 	if text != "" && agent.PersonaMode == protocol.PersonaModePrompt {
 		task = text + JobBreak + input
 	}
-	result, err := s.subagents.Spawn(ctx, agents.SpawnOptions{Runtime: base.ID, Name: id, Task: task, Cwd: place.Cwd, Model: model, Effort: effort, Resume: resume, Env: env})
+	options.Runtime, options.Name, options.Task, options.Cwd = base.ID, id, task, place.Cwd
+	options.Model, options.Effort, options.Resume, options.Env = model, effort, resume, env
+	options.Installation, options.InstallationOptions = resolved.Installation, resolved.InstallationOptions
+	result, err := s.subagents.Spawn(ctx, options)
 	if err == nil && result.Kind != "spawned" {
 		err = fmt.Errorf("%s（%s）", result.Reason, result.Code)
 	}
@@ -899,8 +841,8 @@ func (c *sessions) Send(ctx context.Context, agent protocol.Agent, task, where s
 	}
 
 	projectName := place.Project
-	session := protocol.Session{ID: id, Name: sessionName(c.onFarm(), agent.ID, agent.Name), Agent: agent.ID, Runtime: agent.Runtime, Task: task, Project: &projectName,
-		HiredAt: clock.NowMs(), Phase: protocol.Phase{Value: protocol.PhaseArriving{}}, Playbook: opt.Playbook, Channel: opt.Channel}
+	session := protocol.Session{ID: id, Name: sessionName(c.onFarm(), agent.ID, agent.Name), Agent: agent.ID, Runtime: agent.Runtime, Brief: task, Project: &projectName,
+		HiredAt: clock.NowMs(), Phase: protocol.Phase{Value: protocol.PhaseArriving{}}, Graph: opt.TaskGraph, Channel: opt.Channel}
 	if opt.Issue != "" {
 		issue := opt.Issue
 		session.Issue = &issue

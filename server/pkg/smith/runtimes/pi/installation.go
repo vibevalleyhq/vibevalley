@@ -19,7 +19,7 @@ func executableOf(ctx context.Context, installation oar.AvailableInstallation) (
 	if installation.IsExecutable() {
 		return installation, nil
 	}
-	snapshot, err := Installation(ctx)
+	snapshot, err := Installation(ctx, oar.InstallationOptions{})
 	if err != nil {
 		return installation, err
 	}

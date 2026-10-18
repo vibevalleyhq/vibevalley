@@ -9,4 +9,4 @@
 | [create-verification-skill](create-verification-skill/SKILL.md) | 一类改动没有现成的验证办法 | 写出下一个 agent 照着就能做的验证步骤 |
 | [verify-server](verify-server/SKILL.md) | 改了 `server/` 的接口、服务、迁移、开机 | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动 |
 | [verify-app](verify-app/SKILL.md) | 改了 `app/` 的页面、组件、贴图 | 对着真的服务端，页面画出来是对的（截图） |
-| [verify-manager-evals](verify-manager-evals/SKILL.md) | 改了管家的提示、工具描述或 `pkg/agent` 的提示拼法；加了管家的样例 | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了（花钱，先问主人） |
+| [verify-manager-evals](verify-manager-evals/SKILL.md) | 改了管家的提示、工具描述或 `internal/agent/brain` 的提示拼法；加了管家的样例 | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了（花钱，先问主人） |

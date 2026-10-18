@@ -6,7 +6,7 @@ Status: proposed
 
 Session 是一个 agent loop（harness）的会话：agent 在这里想、动手，一轮一轮（Run），每轮里是一条条事件。消息是对人说的话，在频道和串里。两者是两套东西；现在的代码把它们搅在一起，Session 自己的三层又存了好几份。
 
-**Session 存了两份。** 活着时是核心状态里的 `Session`，走了以后是 `activities/<id>.head.json` 里的 `TrajectoryHead`。头的 16 个字段里，`ID`、`Name`、`Agent`、`Runtime`、`Project`、`Issue`、`Playbook` 和 `Session` 同名，`Job`、`StartedAt` 是 `Session.Task`、`HiredAt` 换了名字；`Outcome`、`Summary` 是最后一个 Run 的，`Runs`、`CNY` 是 `session_run` 的行数和花费之和；`ReopenedFrom`、`ReopenedAs` 的注释自己说是「工单出现之前的做法」，现在 `issue_session` 的先后就是。只有 `EndedAt`、`Closed` 是它自己的。`Trajectory` 只是把头和步骤包在一起。
+**Session 存了两份。** 活着时是核心状态里的 `Session`，走了以后是 `activities/<id>.head.json` 里的 `TrajectoryHead`。头的 16 个字段里，`ID`、`Name`、`Agent`、`Runtime`、`Project`、`Issue`、`Task` 和 `Session` 同名，`Job`、`StartedAt` 是 `Session.Task`、`HiredAt` 换了名字；`Outcome`、`Summary` 是最后一个 Run 的，`Runs`、`CNY` 是 `session_run` 的行数和花费之和；`ReopenedFrom`、`ReopenedAs` 的注释自己说是「工单出现之前的做法」，现在 `issue_session` 的先后就是。只有 `EndedAt`、`Closed` 是它自己的。`Trajectory` 只是把头和步骤包在一起。
 
 **事件不知道自己属于哪一轮。** `Activity` 没有 Run：一个 Session 的记录是一长串，第二层要靠时间猜。它其实是事件不是步：照 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`packages/core/session/src/types.ts`），Session 是一份只追加的 `SessionEvent{type, seq, time, data}` 日志，turn 和 step 是事件标出的边界（`turn/start`…`turn/end`、`step/start`…`step/end`，step 是「one model call plus the tool executions it requested」），一条 `Activity`（一段话、一次工具调用）只是其中一个事件。
 
@@ -28,7 +28,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 
 - 删掉 `Trajectory`、`TrajectoryHead` 和 `*.head.json`。已有的头文件搬进 `session` 表一次；旧的事件没有 Run，按时间落进对应的 Run，落不进的留空。走了的 Session 也是 `Session`：`Phase` 加一个 `closed`（结束的时间和怎么关的）。
 - 接口：`session.list` 返回 `[]Session`（活的和走了的）；`session.get <id>` 返回它和它的 Run；新的 `session.events <id> [--run]` 返回事件。
-- 管家也是一个 agent loop，按 [管家是一份内置档案](2026-10-17-manager-is-an-agent.md) 它是档案 `manager`，它的会话是一个 Session，进同一张表；它的事件现在只留最近 1000 条，照旧。
+- 管家也是一个 agent loop，按 [管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md) 它是档案 `manager`，它的会话是一个 Session，进同一张表；它的事件现在只留最近 1000 条，照旧。
 
 ### 和消息之间只有两个口子，都在服务端
 

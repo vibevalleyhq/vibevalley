@@ -52,7 +52,7 @@ WorkbenchBackend _server() => WorkbenchBackend(
       agent: 'backend',
       runtime: 'claude',
       project: 'clock',
-      task: '改登录',
+      brief: '改登录',
       hiredAt: _now,
       runs: 1,
       phase: PhaseClosed(at: _now, closed: IssueClose.dismissed),

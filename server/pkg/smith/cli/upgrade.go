@@ -31,7 +31,7 @@ func readUpgrade(ctx context.Context, runtime oar.Runtime, upgrade bool, timeout
 		report.Unsupported = runtime.ID + " exposes no installation probe"
 		return report
 	}
-	installation, err := runtime.Installation(ctx)
+	installation, err := runtime.Installation(ctx, oar.InstallationOptions{})
 	if err != nil {
 		return fail(err)
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 func TestASlowProbeDoesNotOverwriteANewerOne(t *testing.T) {
-	r := &Service{core: core.New(t.TempDir()), cache: map[string]protocol.RuntimeInfo{}, reads: map[string]uint64{}, readOf: map[string]uint64{}}
+	r := &Service{core: core.New(t.TempDir()), cache: map[string]observation{}, reads: map[string]uint64{}}
 	release := make(chan struct{})
 	var probes atomic.Int64
 	r.Probe = func(_ context.Context, id string) protocol.RuntimeInfo {

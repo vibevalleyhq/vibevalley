@@ -22,90 +22,83 @@ func (p *replayPage) GetUpdates(_ context.Context, _ weixin.Account, cursor stri
 	return weixin.Updates{Msgs: []weixin.Message{p.message}, GetUpdatesBuf: "next-page"}, nil
 }
 
-func TestWeixinRetriesFailedPageWithoutAdvancingCursor(t *testing.T) {
-	for _, failure := range []string{"database", "say", "cursor"} {
-		t.Run(failure, func(t *testing.T) {
-			f := connectorTestFarm(t)
-			b := f.Connector.bridges[protocol.ConnectorIDWeixin]
-			ctx := context.Background()
-			if err := f.Connector.q.ConnectAccount(ctx, generated.ConnectAccountParams{Connector: string(b.id), Secrets: `{}`, OwnerID: voiceNullable(voiceOwner)}); err != nil {
-				t.Fatal(err)
+func TestWeixinPageAcceptanceIsAtomicAndDeliveryRetries(t *testing.T) {
+	f := connectorTestFarm(t)
+	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
+	ctx := context.Background()
+	if err := f.Connector.q.ConnectAccount(ctx, generated.ConnectAccountParams{Connector: string(b.id), Secrets: `{}`, OwnerID: voiceNullable(voiceOwner)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.reload(); err != nil {
+		t.Fatal(err)
+	}
+	page := &replayPage{message: voiceWx(voiceOwner, "work", "reply")}
+	f.Connector.ilink = page
+	if _, err := f.DB.Exec(`CREATE TRIGGER fail_cursor BEFORE UPDATE OF cursor ON connector_account BEGIN SELECT RAISE(ABORT,'disk failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	run := func() *voiceFailure {
+		receive, cancel := context.WithCancel(ctx)
+		defer cancel()
+		row, err := f.Connector.q.ConnectorAccount(ctx, string(b.id))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b.adapter.Receive(receive, nil, voiceReceiving{Cursor: row.Cursor, Accept: func(ms []voiceInbound, cursor string) error {
+			err := b.inbox.accept(receive, ms, cursor)
+			if err == nil {
+				cancel()
 			}
-			if err := b.reload(); err != nil {
-				t.Fatal(err)
-			}
-			page := &replayPage{message: voiceWx(voiceOwner, "do work", "reply")}
-			f.Connector.ilink = page
-			calls := 0
-			broken := true
-			f.Connector.say = func(context.Context, string, *string) error {
-				calls++
-				if failure == "say" && broken {
-					return errors.New("manager unavailable")
-				}
-				return nil
-			}
-			if failure == "database" {
-				if _, err := f.DB.Exec(`ALTER TABLE connector_inbound RENAME TO saved_inbound`); err != nil {
-					t.Fatal(err)
-				}
-			}
-			saved := "old-page"
-			run := func() *voiceFailure {
-				receive, cancel := context.WithCancel(ctx)
-				defer cancel()
-				return b.adapter.Receive(receive, map[string]string{}, voiceReceiving{
-					Cursor: saved,
-					Got:    func(m voiceInbound) error { return b.got(receive, m) },
-					SaveCursor: func(cursor string) error {
-						if failure == "cursor" && broken {
-							return errors.New("cursor write failed")
-						}
-						saved = cursor
-						cancel()
-						return nil
-					},
-				})
-			}
-			if err := run(); err == nil {
-				t.Fatal("page failure was hidden")
-			}
-			if saved != "old-page" {
-				t.Fatal("failed page was acknowledged")
-			}
-			if failure == "database" {
-				if calls != 0 {
-					t.Fatal("ran command without duplicate check")
-				}
-				if _, err := f.DB.Exec(`ALTER TABLE saved_inbound RENAME TO connector_inbound`); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if failure == "say" {
-				if _, err := f.Connector.q.InboundSeen(ctx, generated.InboundSeenParams{Connector: string(b.id), ExtID: page.message.MessageID}); err == nil {
-					t.Fatal("failed handoff was marked consumed")
-				}
-			}
-			broken = false
-			if err := run(); err != nil {
-				t.Fatal(err)
-			}
-			if saved != "next-page" {
-				t.Fatalf("recovered cursor: %s", saved)
-			}
-			if len(page.cursors) != 2 || page.cursors[0] != "old-page" || page.cursors[1] != "old-page" {
-				t.Fatalf("replayed cursors: %v", page.cursors)
-			}
-			want := 1
-			if failure == "say" {
-				want = 2
-			}
-			if calls != want {
-				t.Fatalf("handoffs: got %d want %d", calls, want)
-			}
-			if _, err := f.Connector.q.InboundSeen(ctx, generated.InboundSeenParams{Connector: string(b.id), ExtID: page.message.MessageID}); err != nil {
-				t.Fatal(err)
-			}
-		})
+			return err
+		}})
+	}
+	if err := run(); err == nil {
+		t.Fatal("cursor failure hidden")
+	}
+	rows, err := f.Connector.q.PendingInbound(ctx, string(b.id))
+	if err != nil || len(rows) != 0 {
+		t.Fatalf("partial page: %v %v", rows, err)
+	}
+	if _, err := f.DB.Exec(`DROP TRIGGER fail_cursor`); err != nil {
+		t.Fatal(err)
+	}
+	if err := run(); err != nil {
+		t.Fatal(err)
+	}
+	row, _ := f.Connector.q.ConnectorAccount(ctx, string(b.id))
+	if row.Cursor != "next-page" {
+		t.Fatal(row.Cursor)
+	}
+	if len(page.cursors) != 2 || page.cursors[0] != "" || page.cursors[1] != "" {
+		t.Fatal(page.cursors)
+	}
+	if err := run(); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ = f.Connector.q.PendingInbound(ctx, string(b.id))
+	if len(rows) != 1 {
+		t.Fatal("duplicate page created duplicate inbox rows")
+	}
+	attempts := 0
+	f.Connector.say = func(context.Context, string, *string) error {
+		attempts++
+		if attempts == 1 {
+			return errors.New("manager down")
+		}
+		return nil
+	}
+	if err := b.inbox.drain(ctx); err == nil {
+		t.Fatal("delivery failure hidden")
+	}
+	rows, _ = f.Connector.q.PendingInbound(ctx, string(b.id))
+	if len(rows) != 1 {
+		t.Fatal("failed delivery was acknowledged")
+	}
+	if err := b.inbox.drain(ctx); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ = f.Connector.q.PendingInbound(ctx, string(b.id))
+	if len(rows) != 0 || attempts != 2 {
+		t.Fatalf("pending %d attempts %d", len(rows), attempts)
 	}
 }

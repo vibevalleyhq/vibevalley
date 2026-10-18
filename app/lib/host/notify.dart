@@ -28,7 +28,7 @@ String clipLine(String text, [int max = 140]) {
 
 HostCommand openFor(InboxTarget target) => switch (target) {
   InboxTargetSession(:final id) => HostOpenSession(id),
-  InboxTargetPlans(:final playbook) => HostOpenPlans(playbook),
+  InboxTargetGraph(:final graph) => HostOpenTaskBoard(graph),
   InboxTargetChat(:final conversation) => HostOpenChat(conversation),
 };
 
@@ -41,9 +41,9 @@ HostNotice noticeForCall(InboxItem call) {
     InboxKind.fix => HostNotice('$who 没做成', text, open),
     InboxKind.conflict => HostNotice('$who 的活合进主分支会冲突', text, open),
     InboxKind.quiet => HostNotice('$who 好一阵没动静了', '可能在跑很久的命令，也可能卡住了：看看它的干活过程。', open),
-    InboxKind.planDraft => HostNotice('计划「$text」拆好了', '看过再开工', open),
-    InboxKind.planRipe => HostNotice('计划「$text」都做完了', '看看改动，收获进主分支', open),
-    InboxKind.planFailed => HostNotice('计划卡住了：$text', '重试、改工单，或者跳过', open),
+    InboxKind.graphDraft => HostNotice('计划「$text」拆好了', '看过再开工', open),
+    InboxKind.graphRipe => HostNotice('计划「$text」都做完了', '看看改动，收获进主分支', open),
+    InboxKind.taskFailed => HostNotice('计划卡住了：$text', '重试、改工单，或者跳过', open),
     InboxKind.mention => HostNotice('$who 叫你', text, open),
   };
 }
@@ -105,9 +105,9 @@ String? waitingLine(InboxItem call) {
     InboxKind.fix => '$who 没做成',
     InboxKind.conflict => '$who 的活会冲突',
     InboxKind.quiet => '$who 好一阵没动静',
-    InboxKind.planDraft => '计划「${call.text}」等你看',
-    InboxKind.planRipe => '计划「${call.text}」可以收获',
-    InboxKind.planFailed => '计划「${call.text}」没做成',
+    InboxKind.graphDraft => '计划「${call.text}」等你看',
+    InboxKind.graphRipe => '计划「${call.text}」可以收获',
+    InboxKind.taskFailed => '计划「${call.text}」没做成',
     InboxKind.mention => null,
   };
 }

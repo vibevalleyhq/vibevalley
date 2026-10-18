@@ -1,7 +1,7 @@
 package issue
 
 // An issue for the manager (protocol.ManagerAgent) is handed to the manager, not to a session. It is open while the manager works on it and
-// closed as answered once it has; a run of it is the manager's (session.Service.OpenRun).
+// closed as answered after the execution owner publishes a successfully completed run.
 
 import (
 	"context"
@@ -35,7 +35,7 @@ func (is *issues) OfSchedule(id string) (protocol.Issue, bool) {
 	return issue, err == nil
 }
 
-func (is *issues) Answered(id string) error {
+func (is *issues) answered(id string) error {
 	answered := protocol.IssueCloseAnswered
 	if err := is.q.CloseIssue(context.Background(), generated.CloseIssueParams{ClosedAt: issueAt(clock.NowMs()), Closed: issueClosed(&answered), ID: id}); err != nil {
 		return err

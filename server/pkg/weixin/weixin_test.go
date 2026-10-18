@@ -70,14 +70,14 @@ func TestClientSpeaksWeChatsProtocol(t *testing.T) {
 	ctx := context.Background()
 	live := NewClient()
 	live.base = server.URL
-	code, show, err := live.QrCode(ctx)
+	code, show, err := live.qrCode(ctx)
 	if err != nil || code != "q1" || show != "https://liteapp.weixin.qq.com/q/q1" {
 		t.Fatalf("qr: %s %s %v", code, show, err)
 	}
-	if s := live.QrStatus(ctx, server.URL, "q1", ""); s.Status != "wait" {
+	if s := live.qrStatus(ctx, server.URL, "q1", ""); s.Status != "wait" {
 		t.Fatalf("a hiccup reads as wait: %+v", s)
 	}
-	if s := live.QrStatus(ctx, server.URL, "q1", "42"); s.Status != "confirmed" || s.BotToken != "tok" {
+	if s := live.qrStatus(ctx, server.URL, "q1", "42"); s.Status != "confirmed" || s.BotToken != "tok" {
 		t.Fatalf("confirmed: %+v", s)
 	}
 	account := Account{BaseURL: server.URL, Token: "tok"}

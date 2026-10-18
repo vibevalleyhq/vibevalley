@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
-import '../rules/playbook.dart';
+import '../rules/task.dart';
 
 class FarmEmpty extends StatelessWidget {
   const FarmEmpty(this.text, {super.key});

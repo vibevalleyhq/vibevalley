@@ -1773,7 +1773,7 @@
   "ay": 39,
   "sheet": "design/pixel/raw/dog.png"
  },
- "emblem-big_playbook": {
+ "emblem-big_graph": {
   "ax": 26,
   "ay": 49,
   "h": 50,
@@ -1836,7 +1836,7 @@
   "sheet": "design/pixel/raw/ui-emblems.png",
   "w": 49
  },
- "emblem-parallel_plan": {
+ "emblem-parallel_graph": {
   "ax": 27,
   "ay": 41,
   "h": 42,
@@ -1864,7 +1864,7 @@
   "sheet": "design/pixel/raw/ui-starter.png",
   "w": 49
  },
- "emblem-s_plan": {
+ "emblem-s_split": {
   "ax": 25,
   "ay": 47,
   "h": 48,
@@ -3344,7 +3344,7 @@
   "sheet": "design/pixel/raw/ui-icons-extra.png",
   "w": 50
  },
- "icon-plan": {
+ "icon-task-board": {
   "ax": 29,
   "ay": 44,
   "h": 45,

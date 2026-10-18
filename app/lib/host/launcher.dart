@@ -4,6 +4,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../gen/vibevalley.dart' show ServerReady;
+
 class ServerFailed implements Exception {
   ServerFailed(this.reason);
   final String reason;
@@ -12,43 +14,39 @@ class ServerFailed implements Exception {
   String toString() => reason;
 }
 
-/// Another process may take it before the server binds it: `ServerLauncher.start` tries again with a new one when the server exits early.
-Future<int> freeLoopbackPort() async {
-  final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-  final port = socket.port;
-  await socket.close();
-  return port;
-}
-
-Future<bool> answersHealth(Uri base, {Duration timeout = const Duration(milliseconds: 1500)}) async {
-  final client = HttpClient()..connectionTimeout = timeout;
-  try {
-    final request = await client.getUrl(base.resolve('/api/v1/health')).timeout(timeout);
-    final response = await request.close().timeout(timeout);
-    await response.drain<void>().timeout(timeout);
-    return response.statusCode == 200;
-  } on Object {
-    return false;
-  } finally {
-    client.close(force: true);
-  }
+class ServerStartCanceled extends ServerFailed {
+  ServerStartCanceled() : super('服务端启动已取消');
 }
 
 class RunningServer {
-  RunningServer._(this.process, this.url, this._log, this._drained, this._stopTimeout) {
+  RunningServer._(this.process, this._log, this._stopTimeout) {
     process.exitCode.then((code) => _exit.complete(code));
   }
 
   final Process process;
 
   /// No trailing slash.
-  final Uri url;
+  late final Uri url;
+  final _ready = Completer<void>();
   final IOSink _log;
 
-  final Future<void> _drained;
+  late final Future<void> _drained;
   final Duration _stopTimeout;
   final _exit = Completer<int>();
   Future<void>? _stopping;
+
+  void _acceptReady(String line) {
+    if (_ready.isCompleted) return;
+    try {
+      final ready = ServerReady.fromJson(jsonDecode(line) as Map<String, dynamic>);
+      final address = Uri.parse(ready.url);
+      if (ready.pid != process.pid || address.scheme != 'http' || address.host != '127.0.0.1' || address.port <= 0 || address.port > 65535) return;
+      url = address;
+      _ready.complete();
+    } on Object {
+      // A child may write unrelated output; only its readiness receipt starts the farm.
+    }
+  }
 
   int get pid => process.pid;
 
@@ -81,9 +79,6 @@ class ServerLauncher {
     required this.workingDirectory,
     this.startTimeout = const Duration(seconds: 40),
     this.stopTimeout = const Duration(seconds: 8),
-    this.pollInterval = const Duration(milliseconds: 300),
-    this.attempts = 3,
-    this.pickPort = freeLoopbackPort,
   });
 
   final String binary;
@@ -96,43 +91,68 @@ class ServerLauncher {
   /// The first start builds the database: it may take a while.
   final Duration startTimeout;
   final Duration stopTimeout;
-  final Duration pollInterval;
+  RunningServer? _server;
+  Future<RunningServer>? _starting;
+  Future<void>? _stopping;
+  final _canceled = Completer<void>();
 
-  /// The port may be taken in between.
-  final int attempts;
-  final Future<int> Function() pickPort;
+  Future<RunningServer> start() => _starting ??= _start();
 
-  Future<RunningServer> start() async {
-    ServerFailed? last;
-    for (var i = 0; i < attempts; i++) {
-      final port = await pickPort();
-      final server = await _spawn(port);
-      final failure = await _waitUntilUp(server);
-      if (failure == null) return server;
-      final exitedEarly = server.hasExited;
-      await server.stop();
-      last = failure;
-      // Only an early exit is worth another port; a server that never answers will not answer on another.
-      if (!exitedEarly) break;
+  /// The same owner can be stopped before spawn, while waiting for readiness, or after startup.
+  Future<void> stop() => _stopping ??= _stop();
+
+  Future<void> _stop() async {
+    _canceled.complete();
+    await _server?.stop();
+    try {
+      await _starting;
+    } on Object {
+      /* Cancellation still waits for a pending spawn to release its process. */
     }
-    throw last ?? ServerFailed('服务端没起来，日志在 ${logFile.path}');
   }
 
-  Future<RunningServer> _spawn(int port) async {
+  Future<RunningServer> _start() async {
+    if (_canceled.isCompleted) throw ServerStartCanceled();
+    final RunningServer server;
+    try {
+      server = await _spawn();
+    } on Object {
+      if (_canceled.isCompleted) throw ServerStartCanceled();
+      rethrow;
+    }
+    _server = server;
+    final failure = await Future.any<ServerFailed?>([
+      server._ready.future.then((_) => null),
+      _canceled.future.then((_) => ServerStartCanceled()),
+      server.exited.then((code) => ServerFailed('服务端退出了（$code），日志在 ${logFile.path}')),
+    ]).timeout(startTimeout, onTimeout: () => ServerFailed('服务端 ${startTimeout.inSeconds} 秒内没有发布就绪地址，日志在 ${logFile.path}'));
+    if (failure == null && !_canceled.isCompleted) return server;
+    await server.stop();
+    throw _canceled.isCompleted ? ServerStartCanceled() : failure!;
+  }
+
+  Future<RunningServer> _spawn() async {
     await logFile.parent.create(recursive: true);
     final log = logFile.openWrite(mode: FileMode.append);
-    log.writeln('--- ${DateTime.now().toIso8601String()} vibevalley: starting $binary on 127.0.0.1:$port');
+    log.writeln('--- ${DateTime.now().toIso8601String()} vibevalley: starting $binary with a server-assigned port');
     try {
       await log.flush();
       final process = await Process.start(
         binary,
-        const [],
+        const ['--ready-json'],
         workingDirectory: workingDirectory,
-        environment: {...environment, 'VIBEVALLEY_PORT': '$port'},
+        environment: {...environment, 'VIBEVALLEY_PORT': '0'},
         includeParentEnvironment: false,
       );
-      final drained = Future.wait([process.stdout.forEach(log.add), process.stderr.forEach(log.add)]).then<void>((_) {}, onError: (_) {});
-      return RunningServer._(process, Uri.parse('http://127.0.0.1:$port'), log, drained, stopTimeout);
+      final server = RunningServer._(process, log, stopTimeout);
+      server._drained = Future.wait([
+        process.stdout.transform(utf8.decoder).transform(const LineSplitter()).forEach((line) {
+          log.writeln(line);
+          server._acceptReady(line);
+        }),
+        process.stderr.forEach(log.add),
+      ]).then<void>((_) {}, onError: (_) {});
+      return server;
     } on Object catch (error) {
       try {
         await log.close();
@@ -140,16 +160,6 @@ class ServerLauncher {
         // Report the launch failure even when the log cannot be closed.
       }
       throw ServerFailed('服务端启动失败：$error，日志在 ${logFile.path}');
-    }
-  }
-
-  Future<ServerFailed?> _waitUntilUp(RunningServer server) async {
-    final deadline = DateTime.now().add(startTimeout);
-    while (true) {
-      if (server.hasExited) return ServerFailed('服务端退出了（${await server.exited}），日志在 ${logFile.path}');
-      if (await answersHealth(server.url)) return null;
-      if (DateTime.now().isAfter(deadline)) return ServerFailed('服务端 ${startTimeout.inSeconds} 秒内没起来，日志在 ${logFile.path}');
-      await Future.any([Future<void>.delayed(pollInterval), server.exited]);
     }
   }
 }

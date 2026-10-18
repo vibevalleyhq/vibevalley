@@ -344,9 +344,9 @@ func TestNextCancelledLeavesReportUnread(t *testing.T) {
 
 func slowToProbe(runtime oar.Runtime) oar.Runtime {
 	probe := runtime.Installation
-	runtime.Installation = func(ctx context.Context) (oar.InstallationSnapshot, error) {
+	runtime.Installation = func(ctx context.Context, options oar.InstallationOptions) (oar.InstallationSnapshot, error) {
 		time.Sleep(50 * time.Millisecond)
-		return probe(ctx)
+		return probe(ctx, options)
 	}
 	return runtime
 }

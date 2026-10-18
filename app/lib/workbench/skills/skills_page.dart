@@ -20,17 +20,6 @@ bool _matches(String query, List<String?> texts) {
   return query.toLowerCase().split(RegExp(r'\s+')).every(hay.contains);
 }
 
-/// Lower-case ASCII words joined by '-', 'skill' when none, numbered when taken.
-String slug(String name, Set<String> taken) {
-  final words = name.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-|-$'), '');
-  final base = words.isEmpty ? 'skill' : words;
-  var id = base;
-  for (var n = 2; taken.contains(id); n++) {
-    id = '$base-$n';
-  }
-  return id;
-}
-
 class SkillsPage extends ConsumerStatefulWidget {
   const SkillsPage({super.key, this.id});
   final String? id;
@@ -45,7 +34,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
   @override
   void initState() {
     super.initState();
-    // The runtimes' inventories are read on the server: ask again whenever the page opens.
+    ref.invalidate(runtimeCatalogProvider);
     Future.microtask(() => ref.read(workbenchConfigProvider.notifier).refresh());
   }
 
@@ -54,7 +43,8 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
     final config = ref.watch(workbenchConfigProvider);
     if (config.error != null) return const ConfigProblem();
     final skills = config.skills;
-    final installed = installedSkills(config.runtimes);
+    final runtimeState = ref.watch(runtimesProvider);
+    final installed = installedSkills(runtimeState.value ?? const []);
     final id = widget.id;
     final shownInstalled = id != null && id.startsWith(_installed) ? installed.where((s) => s.name == id.substring(_installed.length)).firstOrNull : null;
     final creating = id == 'new';
@@ -95,6 +85,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
     final listColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (runtimeState.hasError) const RuntimeProblem(),
         const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
@@ -289,13 +280,8 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
       Skill(id: _draft.id, name: name ?? _draft.name, description: description ?? _draft.description, body: body ?? _draft.body);
 
   Future<void> _save() async {
-    final skills = ref.read(workbenchConfigProvider).skills;
-    final id = _draft.id.isNotEmpty ? _draft.id : slug(_draft.name, {for (final s in skills) s.id});
-    final done = await runAction(() async {
-      await ref.read(workbenchConfigProvider.notifier).saveSkill(Skill(id: id, name: _draft.name.trim(), description: _draft.description, body: _draft.body));
-      return true;
-    });
-    if (done == true && widget.skill == null && mounted) workbenchGo(context, _skillPath(id));
+    final saved = await runAction(() => ref.read(workbenchConfigProvider.notifier).saveSkill(_with(name: _draft.name.trim())));
+    if (saved != null && widget.skill == null && mounted) workbenchGo(context, _skillPath(saved.id));
   }
 
   Future<void> _delete(Skill skill) async {

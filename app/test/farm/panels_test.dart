@@ -79,7 +79,7 @@ void main() {
   );
   final agents = {'tester': agent('tester', '测试小吴'), 'front': agent('front', '前端阿郑')};
 
-  final steps = [
+  final tasks = [
     {'seq': 1, 'time': 0, 'type': 'user/message', 'text': '跑一遍测试'},
     {
       'seq': 2,
@@ -99,9 +99,9 @@ void main() {
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
-      overrides: overrides(state, v, fakeApi(routes, {'GET /api/v1/sessions/w1/events': steps}), agents: agents),
+      overrides: overrides(state, v, fakeApi(routes, {'GET /api/v1/sessions/w1/events': tasks}), agents: agents),
     );
-    c.read(selectedProvider.notifier).set('w1');
+    c.read(farmOverlaysProvider.notifier).select('w1');
     await settle(tester);
     expect(find.text('小吴的地'), findsOneWidget);
     expect(find.text('项目 clock-in'), findsOneWidget);
@@ -131,7 +131,7 @@ void main() {
   testWidgets('a failed bed: its last word, and 杀虫 to go on', (tester) async {
     final routes = Routes();
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes), agents: agents));
-    c.read(selectedProvider.notifier).set('w2');
+    c.read(farmOverlaysProvider.notifier).select('w2');
     await settle(tester);
     expect(find.text('失败：测试挂了'), findsOneWidget);
     await tester.tap(find.text('杀虫：接着修'));
@@ -143,7 +143,7 @@ void main() {
   testWidgets('the seed bag sows a seed on its bed, by the agent picked', (tester) async {
     final routes = Routes();
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes, {'GET /api/v1/projects': []}), agents: agents));
-    c.read(sowingProvider.notifier).set(3);
+    c.read(farmOverlaysProvider.notifier).sow(3);
     await settle(tester);
     expect(find.text('播种 · 第 4 块地'), findsOneWidget);
     await tester.tap(find.text('给 README 补上怎么启动'));
@@ -160,7 +160,7 @@ void main() {
   testWidgets('the watering can takes a drop of advice to the helper', (tester) async {
     final routes = Routes();
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes), agents: agents));
-    c.read(wateringProvider.notifier).set('w1');
+    c.read(farmOverlaysProvider.notifier).water('w1');
     await settle(tester);
     expect(find.text('给小吴浇水'), findsOneWidget);
     expect(find.text('它正在干活，这句话会在下一步之前收到。'), findsOneWidget);
@@ -175,17 +175,17 @@ void main() {
 
   testWidgets('the warehouse, the log and the shop', (tester) async {
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(Routes()), agents: agents));
-    c.read(panelProvider.notifier).set(FarmPanel.warehouse);
+    c.read(farmOverlaysProvider.notifier).panel(FarmPanel.warehouse);
     await settle(tester);
     expect(find.text('仓库'), findsOneWidget);
     expect(find.text('给 README 补上怎么启动'), findsOneWidget);
     expect(find.text('测试小吴 · clock-in · 1 分钟前收的'), findsOneWidget);
-    c.read(panelProvider.notifier).set(FarmPanel.log);
+    c.read(farmOverlaysProvider.notifier).panel(FarmPanel.log);
     await settle(tester);
     expect(find.text('农场日志'), findsOneWidget);
     expect(find.text('做完'), findsOneWidget);
     expect(find.text('补好了'), findsOneWidget);
-    c.read(panelProvider.notifier).set(FarmPanel.shop);
+    c.read(farmOverlaysProvider.notifier).panel(FarmPanel.shop);
     await settle(tester);
     expect(find.text('商店还在装修，下一版开张。现在有 120 金币，先攒着。'), findsOneWidget);
     expect(find.text('稻草人'), findsOneWidget);
@@ -193,10 +193,10 @@ void main() {
 
   testWidgets('an empty warehouse and log say so', (tester) async {
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(farm(), view(), fakeApi(Routes())));
-    c.read(panelProvider.notifier).set(FarmPanel.warehouse);
+    c.read(farmOverlaysProvider.notifier).panel(FarmPanel.warehouse);
     await settle(tester);
     expect(find.text('仓库还空着。收获进主分支的活会放在这里。'), findsOneWidget);
-    c.read(panelProvider.notifier).set(FarmPanel.log);
+    c.read(farmOverlaysProvider.notifier).panel(FarmPanel.log);
     await settle(tester);
     expect(find.text('还没有事。开工以后，你和管家说的话、谁做完了什么，都记在这里。'), findsOneWidget);
   });
@@ -204,7 +204,7 @@ void main() {
   testWidgets('tasks and achievements: the level, the coins, the walls; a title to wear', (tester) async {
     final routes = Routes();
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes), agents: agents));
-    c.read(panelProvider.notifier).set(FarmPanel.tasks);
+    c.read(farmOverlaysProvider.notifier).panel(FarmPanel.graphs);
     await settle(tester);
     expect(find.text('任务与成就'), findsOneWidget);
     expect(find.text('Lv.3'), findsOneWidget);
@@ -224,19 +224,19 @@ void main() {
 
   testWidgets('the game menu; Esc and the backdrop close a panel', (tester) async {
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(Routes()), agents: agents));
-    c.read(menuOpenProvider.notifier).set(true);
+    c.read(farmOverlaysProvider.notifier).menu(true);
     await settle(tester);
     expect(find.text('继续'), findsOneWidget);
     expect(find.text('院子里能点的'), findsOneWidget);
     await tester.tap(find.text('继续'));
     await settle(tester);
     expect(c.read(menuOpenProvider), isFalse);
-    c.read(panelProvider.notifier).set(FarmPanel.shop);
+    c.read(farmOverlaysProvider.notifier).panel(FarmPanel.shop);
     await settle(tester);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
     expect(c.read(panelProvider), isNull);
-    c.read(panelProvider.notifier).set(FarmPanel.shop);
+    c.read(farmOverlaysProvider.notifier).panel(FarmPanel.shop);
     await settle(tester);
     await tester.tapAt(const Offset(10, 10));
     await settle(tester);
@@ -245,7 +245,7 @@ void main() {
 
   testWidgets("the manager's looks and the pet", (tester) async {
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(Routes()), agents: agents));
-    c.read(panelProvider.notifier).set(FarmPanel.manager);
+    c.read(farmOverlaysProvider.notifier).panel(FarmPanel.manager);
     await settle(tester);
     expect(find.text('管家和宠物'), findsOneWidget);
     expect(find.text('青年农夫'), findsOneWidget);

@@ -10,7 +10,7 @@ description: 改了 VibeValley 服务端（server/internal/**、server/cmd/serve
 ## 什么时候用
 
 - 改了 `server/internal/handler`、`server/internal/protocol/api.go`：新的或改过的接口。
-- 改了某个服务的行为（`issue`、`channel`、`setting`、`schedule`、`playbook`……），想看它经接口和 `/api/v1/state` 出来的样子。
+- 改了某个服务的行为（`issue`、`channel`、`setting`、`schedule`、`task`……），想看它经接口和 `/api/v1/state` 出来的样子。
 - 改了 `server/migrations` 或 `server/pkg/db/queries`：新库能建、能读写。
 - 改了开机的流程（`server/cmd/server`、`server/internal/workspace`）。
 
@@ -20,77 +20,45 @@ description: 改了 VibeValley 服务端（server/internal/**、server/cmd/serve
 
 ## 准备
 
-1. 先过检查，失败就不用往下走：
-
-   ```bash
-   cd server && go vet ./... && go test ./...
-   ```
-
-2. 改了 `shapes.go` 或 `api.go`，先生成：`cd server && go run ./tool/shapegen`。改了 `pkg/db/queries` 或 `migrations`，先跑 sqlc（命令见 [AGENTS.md](../../../AGENTS.md#命令)）。
-3. 选一个空着的端口，下面用 8899。`lsof -iTCP:8899 -sTCP:LISTEN` 没有输出就是空的。
+1. 先跑 `cd server && go vet ./... && go test ./...`。
+2. 改了形状或查询，先按 [AGENTS.md](../../../AGENTS.md#命令) 生成代码。
 
 ## 步骤
 
-1. 建临时目录，编出服务端和命令行。用 `go build` 而不是 `go run`，这样停的时候能按路径找到进程：
+1. 在仓库根目录跑隔离的健康检查：
 
    ```bash
-   V=$(mktemp -d) && mkdir -p $V/home $V/work && echo $V
-   cd server && go build -o $V/server ./cmd/server && go build -o $V/vv ./cmd/vibevalley
+   bun scripts/verify-server.ts
    ```
 
-   如果每条命令跑在新的 shell 里（agent 的 Bash 工具就是这样），`$V` 不会留下来：记下 `echo` 出的路径，后面每条命令前面都加上 `V=<这个路径>`。
+   脚本编出服务端和命令行，用临时家目录、工作目录和回环地址的空闲端口启动，收到子进程的 JSON 就绪收据后再做健康检查。结束时停服务端、删临时数据和 binary，打印证据目录；不用选端口、后台挂进程或跨 shell 记 PID。
 
-2. 在后台起服务端，等它答健康检查：
+2. 把本轮验证作为子命令交给同一脚本：
 
    ```bash
-   VIBEVALLEY_HOME=$V/home VIBEVALLEY_WORK_ROOT=$V/work VIBEVALLEY_PORT=8899 $V/server --log $V/server.log > $V/stdout.log 2>&1 & disown
-   for i in $(seq 1 30); do curl -sf http://127.0.0.1:8899/api/v1/health && break; sleep 0.5; done
+   bun scripts/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" issue list && "$VIBEVALLEY_VERIFY_CLI" state'
    ```
 
-   `disown` 让服务端在这条命令的 shell 退出后还活着。成功时输出 `{"ok":true,"version":"…"}`，`$V/server.log` 里有 `vibevalley: listening on http://127.0.0.1:8899`。
+   子命令得到 `VIBEVALLEY_SERVER` 和 `VIBEVALLEY_VERIFY_CLI`。需要造数据或断言时，把这些步骤写进同一个验证脚本再作为子命令传入；每次调用都是一个新农场。子命令失败仍会停止服务端，并保留它的退出码。
 
-3. 用命令行调改动涉及的接口。`$V/vv help` 列出全部命令，一个接口一条（[能力表](../../../docs/reference/capabilities.md)），请求和返回的形状在 `server/internal/protocol/shapes.go`。例如新建一张工单：
-
-   ```bash
-   export VIBEVALLEY_SERVER=http://127.0.0.1:8899
-   $V/vv issue create --json '{"title":"verify smoke"}'
-   ```
-
-   打出新工单，`"status": "backlog"`。服务端拒绝时打出它的原话，退出码 1。
-
-4. 读折好的核心状态，确认改动出现在该出现的字段里：
-
-   ```bash
-   $V/vv state
-   ```
-
-   打出一帧 `StateFrame`：`state`、`inbox`、`plans`、`view`、`effects`。上一步的工单在 `state.issues` 里。
-
-5. 要看副作用（声音、提示）的，跑 `$V/vv events`（一直跟着，Ctrl+C 停）。要看库里的，用 `sqlite3 $V/home/vibevalley.db`。
-6. 改了服务端的代码要再看一次：先停（见「收拾」），重新 `go build`，再从第 2 步起。服务端不自动重载。
-7. 要连客户端一起看，服务端开着，接着用 [verify-app](../verify-app/SKILL.md)。
+3. 读证据目录的 `command.stdout.log`、`command.stderr.log` 和 `server.log`，核对接口结果、状态及错误。只有启动成功的 `health.json` 不能证明业务改动生效。
+4. 要看客户端，在同一个子命令中先造数据、再运行 [verify-app](../verify-app/SKILL.md) 的截图命令。
 
 ## 证据
 
-说「验证过了」时，给主人看：
-
-- 第 2 步健康检查的输出。
-- 第 3 步的命令和打出的结果（去掉无关的字段）。
-- 第 4 步 `/api/v1/state` 里和改动有关的那一段。
-- 服务端日志里有没有 `error`、`panic`：`grep -iE 'error|panic' $V/server.log`。
+- 本轮执行的命令。
+- 证据目录的 `ready.json`、`health.json`、`result.json`，以及与改动有关的接口或状态片段。
+- `result.json` 的退出码应为 0，`stopped` 应为 true；业务断言应在子命令里完成。
+- `server.log` 中的错误、panic 及其结论。
 
 ## 出错时
 
-- **健康检查一直不答**：看 `$V/stdout.log` 和 `$V/server.log`。`address already in use` 是端口被占，换一个端口。迁移失败会在开机时报出来，修迁移。
-- **「没有 xx 这个命令」或接口返回 404**：路由没注册，或者服务端、命令行还是旧的二进制。确认 `api.go` 里有这个 `//vibevalley:route`、跑过 `shapegen`、两个都重新 `go build` 过。
-- **状态里没有新字段**：新字段要在 `shapes.go` 里加、在 `protocol` 的 `Reduce` 里折（[AGENTS.md](../../../AGENTS.md#规矩)「核心状态只有一份」）。
-- **读到了主人的数据**：`VIBEVALLEY_HOME` 没设上。停掉，检查第 2 步的命令。
+- **编译失败**：看 `build.stderr.log`，修好再跑。
+- **启动失败或健康检查超时**：看 `server.log`、`server.stderr.log`。脚本已经停止它启动的进程。
+- **清理失败**：看 `result.json` 的 `cleanupErrors`；`stopped` 为 false 时临时目录会保留，不应把它当成已收拾。
+- **验证失败**：看 `command.stderr.log` 和 `command.stdout.log`；脚本不会把非零退出码改成成功。
+- **接口或形状对不上**：重跑生成和构建检查；脚本每次重新编译，不复用旧 binary。
 
 ## 收拾
 
-```bash
-pkill -f "$V/server"
-rm -rf "$V"
-```
-
-`pgrep -f "$V/server"` 没有输出，`curl -s --max-time 1 http://127.0.0.1:8899/api/v1/health` 也没有输出，就是停了。
+脚本自动停掉自己的服务端并删除临时 `home`、`work`、`bin`，不碰主人的农场。证据日志留在打印的临时目录，交付后可删。截图在 `app/build/`，照 verify-app 交付。

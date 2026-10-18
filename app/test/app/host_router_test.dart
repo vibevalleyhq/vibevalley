@@ -42,12 +42,12 @@ void main() {
     commands.add(const HostOpenAchievements());
     await Future<void>.delayed(Duration.zero);
     expect(c.read(selectedProvider), 'w1');
-    expect(c.read(panelProvider), FarmPanel.tasks);
+    expect(c.read(panelProvider), FarmPanel.graphs);
 
-    commands.add(const HostOpenPlans('pb1'));
+    commands.add(const HostOpenTaskBoard('pb1'));
     await Future<void>.delayed(Duration.zero);
-    expect(c.read(planShownProvider), 'pb1');
-    expect(c.read(panelProvider), FarmPanel.plans);
+    expect(c.read(graphShownProvider), 'pb1');
+    expect(c.read(panelProvider), FarmPanel.taskBoard);
 
     final before = c.read(selectedProvider);
     commands.add(const HostVoice());

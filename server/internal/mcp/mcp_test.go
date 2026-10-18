@@ -130,7 +130,7 @@ func TestToolsOverMcp(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	sort.Strings(names)
-	if !slices.Equal(names, []string{"channel_inbox", "channel_read", "channel_say", "memory_add", "memory_search", "session_list"}) {
+	if !slices.Equal(names, []string{"channel_inbox", "channel_say", "memory_add", "memory_search", "read_chat", "session_list"}) {
 		t.Fatalf("tools %q", names)
 	}
 
@@ -155,7 +155,7 @@ func TestToolsOverMcp(t *testing.T) {
 	if inbox := call("tools/call", map[string]any{"name": "channel_inbox", "arguments": map[string]any{}}).text(); inbox == "" {
 		t.Fatal("no answer from the inbox")
 	}
-	if read := call("tools/call", map[string]any{"name": "channel_read", "arguments": map[string]any{}}).text(); !strings.Contains(read, "从 MCP 说一句") {
+	if read := call("tools/call", map[string]any{"name": "read_chat", "arguments": map[string]any{}}).text(); !strings.Contains(read, "从 MCP 说一句") {
 		t.Fatalf("read %q", read)
 	}
 

@@ -204,7 +204,7 @@ func (c *Subagents) open(ctx context.Context, spawn SpawnOptions, runtime oar.Ru
 		env[key] = value
 	}
 	env[SubagentDepthEnv] = oar.String(fmt.Sprint(hostDepth() + 1))
-	session, failure := sessionOf(ctx, runtime, installation, oar.SessionOptions{Cwd: cwd, Model: spawn.Model, Effort: spawn.Effort, ServiceTier: spawn.ServiceTier, Resume: spawn.Resume, Env: env})
+	session, failure := sessionOf(ctx, runtime, installation, oar.SessionOptions{Cwd: cwd, Model: spawn.Model, Effort: spawn.Effort, ServiceTier: spawn.ServiceTier, Resume: spawn.Resume, Env: env, SystemPrompt: spawn.SystemPrompt, AppendSystemPrompt: spawn.AppendSystemPrompt, MCPServers: spawn.MCPServers, DisallowedTools: spawn.DisallowedTools})
 	if session == nil {
 		return SpawnResult{Kind: "refused", Code: "open_failed", Reason: failure}, nil
 	}
@@ -309,7 +309,7 @@ func (c *Subagents) Spawn(ctx context.Context, spawn SpawnOptions) (SpawnResult,
 		})
 	}
 	defer release()
-	installation, missing, err := installationOf(ctx, runtime)
+	installation, missing, err := installationOf(ctx, runtime, spawn.Installation, spawn.InstallationOptions)
 	if err != nil {
 		return SpawnResult{}, err
 	}

@@ -28,7 +28,7 @@ func readModels(ctx context.Context, runtime oar.Runtime, options oar.ListModels
 		}
 		return modelsReport{RuntimeID: runtime.ID, Models: &oar.ListModelsResult{Kind: "unsupported", Reason: reason}}, nil
 	}
-	installation, err := runtime.Installation(ctx)
+	installation, err := runtime.Installation(ctx, oar.InstallationOptions{})
 	if err != nil {
 		return modelsReport{}, err
 	}

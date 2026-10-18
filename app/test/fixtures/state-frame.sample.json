@@ -8,7 +8,7 @@
         "name": "Pi 实验员",
         "agent": "lab",
         "runtime": "pi",
-        "task": "写打卡",
+        "brief": "写打卡",
         "hiredAt": 1,
         "runs": 1,
         "phase": {
@@ -79,7 +79,7 @@
     }
   },
   "inbox": [],
-  "plans": [],
+  "graphs": [],
   "view": {
     "level": {
       "level": 1,

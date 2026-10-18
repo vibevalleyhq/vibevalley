@@ -65,9 +65,9 @@ func (a api) ChannelSay(ctx context.Context, body protocol.SayRequest) error {
 	return refused(a.f.Manager.Say(ctx, body.Text, ptr.Value(body.Agent), body.Conversation, ptr.Value(body.SendKey)))
 }
 
-func (a api) ChannelCreate(_ context.Context, body protocol.ChannelRequest) error {
-	_, err := a.f.Channel.OpenChannel(body.Name, ptr.Value(body.Description), ptr.Value(body.Project))
-	return refused(err)
+func (a api) ChannelCreate(_ context.Context, body protocol.ChannelRequest) (string, error) {
+	channel, err := a.f.Channel.OpenChannel(body.Name, ptr.Value(body.Description), ptr.Value(body.Project))
+	return channel.ID, refused(err)
 }
 
 func (a api) ScheduleCreate(_ context.Context, body protocol.ScheduleRequest) (protocol.Schedule, error) {
@@ -97,8 +97,7 @@ func (a api) ChannelUpdate(_ context.Context, id string, body protocol.ChannelUp
 }
 
 func (a api) ManagerHear(_ context.Context, body protocol.SayRequest) error {
-	a.f.Core.Open()
-	return refused(a.f.Manager.Heard(body.Text, ptr.Value(body.Agent), ptr.Value(body.SendKey)))
+	return refused(a.f.Voice.HeardCurrent(body.Text, ptr.Value(body.Agent), ptr.Value(body.SendKey)))
 }
 
 func (a api) IssueComment(_ context.Context, id string, body protocol.CommentRequest) error {
@@ -132,7 +131,7 @@ func (a api) SessionStop(_ context.Context, id string) error {
 }
 
 func (a api) SessionList(_ context.Context, agent *string) ([]protocol.Session, error) {
-	return a.f.Session.List(ptr.Value(agent)), nil
+	return a.f.Session.List(ptr.Value(agent))
 }
 
 func (a api) SessionGet(_ context.Context, id string) (protocol.Session, error) {
@@ -146,28 +145,28 @@ func (a api) SessionEvents(_ context.Context, id string, run *string) ([]protoco
 	return a.f.Session.Events(id, ptr.Value(run)), nil
 }
 
-func (a api) PlaybookPlan(_ context.Context, body protocol.PlanRequest) (string, error) {
-	s, err := a.f.Playbook.Plan(body.Goal, body.Project, ptr.Value(body.Agent), protocol.PlaybookActorUser)
+func (a api) GraphSplit(_ context.Context, body protocol.GraphSplitRequest) (string, error) {
+	s, err := a.f.TaskGraph.Split(body.Goal, body.Project, ptr.Value(body.Agent), protocol.GraphActorUser)
 	return s, refused(err)
 }
 
-func (a api) PlaybookUpdateNode(_ context.Context, id, node string, body protocol.NodeEdit) (string, error) {
-	s, err := a.f.Playbook.EditNode(id, node, body, protocol.PlaybookActorUser)
+func (a api) GraphUpdateTask(_ context.Context, id, node string, body protocol.TaskEdit) (string, error) {
+	s, err := a.f.TaskGraph.EditTask(id, node, body, protocol.GraphActorUser)
 	return s, refused(err)
 }
 
-func (a api) PlaybookDeleteNode(_ context.Context, id, node string) (string, error) {
-	s, err := a.f.Playbook.RemoveNode(id, node, protocol.PlaybookActorUser)
+func (a api) GraphDeleteTask(_ context.Context, id, node string) (string, error) {
+	s, err := a.f.TaskGraph.RemoveTask(id, node, protocol.GraphActorUser)
 	return s, refused(err)
 }
 
-func (a api) PlaybookAct(_ context.Context, id string, body protocol.PlaybookActRequest) (string, error) {
-	s, err := a.f.Playbook.Act(id, body.Action, protocol.PlaybookActorUser)
+func (a api) GraphAct(_ context.Context, id string, body protocol.GraphActRequest) (string, error) {
+	s, err := a.f.TaskGraph.Act(id, body.Action, protocol.GraphActorUser)
 	return s, refused(err)
 }
 
-func (a api) PlaybookNodeAct(_ context.Context, id, node string, body protocol.NodeActRequest) (string, error) {
-	s, err := a.f.Playbook.NodeAct(id, node, body.Action, protocol.PlaybookActorUser)
+func (a api) GraphTaskAct(_ context.Context, id, node string, body protocol.TaskActRequest) (string, error) {
+	s, err := a.f.TaskGraph.TaskAct(id, node, body.Action, protocol.GraphActorUser)
 	return s, refused(err)
 }
 
@@ -186,13 +185,13 @@ func (a api) ChannelMarkRead(_ context.Context, id string, body protocol.ChatRea
 	return nil
 }
 
-func (a api) PlaybookChanges(_ context.Context, id string) (protocol.Changes, error) {
-	c, err := a.f.Playbook.Changes(id)
+func (a api) GraphChanges(_ context.Context, id string) (protocol.Changes, error) {
+	c, err := a.f.TaskGraph.Changes(id)
 	return c, refused(err)
 }
 
-func (a api) PlaybookEvents(_ context.Context, id string) ([]protocol.PlaybookEvent, error) {
-	return a.f.Playbook.Events(id), nil
+func (a api) GraphEvents(_ context.Context, id string) ([]protocol.GraphEvent, error) {
+	return a.f.TaskGraph.Events(id), nil
 }
 
 func (a api) GameChooseTitle(_ context.Context, body protocol.ChooseTitleRequest) error {
@@ -228,6 +227,14 @@ func (a api) RuntimeUpgrade(context.Context, string) (protocol.RuntimeInfo, erro
 
 func (a api) AgentList(context.Context) ([]protocol.Agent, error) {
 	return a.f.Agent.All(), nil
+}
+
+func (a api) AgentCreate(_ context.Context, body protocol.Agent) (protocol.Agent, error) {
+	return a.f.Agent.CreateAgent(body)
+}
+
+func (a api) SkillCreate(_ context.Context, body protocol.Skill) (protocol.Skill, error) {
+	return a.f.Agent.CreateSkill(body)
 }
 
 func (a api) AgentSave(_ context.Context, id string, body protocol.Agent) (protocol.Agent, error) {
@@ -329,13 +336,13 @@ func (a api) ProjectActivity(ctx context.Context, id string) (protocol.ProjectAc
 // The voice endpoints log each step of a call and why one failed (never a token or a key): a call that goes wrong is
 // read back from the server's log.
 
-func (a api) VoiceSession(ctx context.Context) (protocol.AgoraTicket, error) {
+func (a api) VoiceSession(ctx context.Context) (protocol.AgoraGrant, error) {
 	s, err := a.f.Voice.Session(ctx)
 	voiceLog("session", s.Channel, err)
 	return s, err
 }
 
-func (a api) VoiceRenew(ctx context.Context, body protocol.RenewRequest) (protocol.AgoraTicket, error) {
+func (a api) VoiceRenew(ctx context.Context, body protocol.RenewRequest) (protocol.AgoraGrant, error) {
 	s, err := a.f.Voice.Renew(ctx, body.Channel, body.UID)
 	voiceLog("renew", body.Channel, err)
 	return s, err
@@ -350,6 +357,10 @@ func (a api) VoiceStart(ctx context.Context, body protocol.StartRequest) (protoc
 
 func (a api) VoiceDictate(ctx context.Context, body protocol.DictateRequest) (protocol.Dictated, error) {
 	return a.f.Voice.Dictate(ctx, body.Audio, body.Format)
+}
+
+func (a api) VoiceHeard(_ context.Context, body protocol.VoiceHeard) error {
+	return refused(a.f.Voice.Heard(body.AgentID, body.Text, ptr.Value(body.Agent), ptr.Value(body.SendKey)))
 }
 
 func (a api) VoiceSaid(ctx context.Context, body protocol.VoiceSaid) error {
@@ -431,6 +442,10 @@ func (a api) IssueReopen(ctx context.Context, id string, body protocol.ReopenReq
 }
 
 func (a api) IssueList(context.Context) ([]protocol.Issue, error) { return a.f.Issue.List() }
+
+func (a api) IssueHistory(context.Context) ([]protocol.IssueHistory, error) {
+	return a.f.Issue.History()
+}
 
 func (a api) IssueGet(_ context.Context, id string) (protocol.Issue, error) {
 	return a.f.Issue.Get(id)

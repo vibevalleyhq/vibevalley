@@ -1,7 +1,6 @@
 package session
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -284,7 +283,7 @@ func farmRules(place project.Workplace, house, id string) string {
 		"- 你这件活有自己的工单串：这一轮最后的汇报会自动贴进去，不用另发。一轮中间要说话（确认收到、提问、交接），用 channel_say；target 不填就是你的工单串。",
 		"- 收到点名给你的消息，先用一句话确认或问清楚，再埋头干。回复照抄消息里的 target，在原来的串里接着说。",
 		"- 只在有实际内容时说话，不报「我在等」「我还在做」。别人做完的活不替他汇报。",
-		"- 在一个串里被 @，先用 channel_read 读这个串，再回。刚醒来看到的旧消息只读不回，除非直接问到你。",
+		"- 在一个串里被 @，先用 read_chat 读这个串，再回。刚醒来看到的旧消息只读不回，除非直接问到你。",
 		"- 要别的帮工做什么就 @ 他，说清楚要什么；不要和他来回闲聊，拿不准就 @主人。停下之前，看看有没有欠别人的回复。",
 	}
 	if house := str.Trim(house); house != "" {
@@ -293,37 +292,11 @@ func farmRules(place project.Workplace, house, id string) string {
 	return strings.Join(lines, "\n")
 }
 
-type extra struct {
-	SystemPrompt       *string
-	AppendSystemPrompt *string
-	MCPServers         []oar.McpServer
-	DisallowedTools    []string
-}
-
-// smith's spawn takes only model, effort, env and cwd, so the rest rides on a runtime of this session's own.
-func withOptions(base oar.Runtime, extra extra) oar.Runtime {
-	out := base
-	out.Session = func(ctx context.Context, installation oar.AvailableInstallation, options oar.SessionOptions) (oar.Session, error) {
-		if extra.SystemPrompt != nil {
-			options.SystemPrompt = extra.SystemPrompt
-		}
-		if extra.AppendSystemPrompt != nil {
-			options.AppendSystemPrompt = extra.AppendSystemPrompt
-		}
-		options.MCPServers = extra.MCPServers
-		if extra.DisallowedTools != nil {
-			options.DisallowedTools = extra.DisallowedTools
-		}
-		return base.Session(ctx, installation, options)
-	}
-	return out
-}
-
-func PlanningTask(goal, project string, agents []protocol.Agent) string {
+func SplitBrief(goal, project string, agents []protocol.Agent) string {
 	type node struct {
 		ID         string   `json:"id"`
 		Title      string   `json:"title"`
-		Task       string   `json:"task"`
+		Brief      string   `json:"brief"`
 		Needs      []string `json:"needs"`
 		Agent      string   `json:"agent,omitempty"`
 		Scope      []string `json:"scope"`
@@ -336,11 +309,11 @@ func PlanningTask(goal, project string, agents []protocol.Agent) string {
 	}
 	example := struct {
 		Title string `json:"title"`
-		Nodes []node `json:"nodes"`
+		Tasks []node `json:"tasks"`
 	}{"按月查询打卡记录", []node{
-		{ID: "accept", Title: "验收", Task: "……", Needs: []string{}, Scope: []string{"test/month.test.ts"}, Check: "pnpm test test/month.test.ts", Acceptance: true},
-		{ID: "schema", Title: "数据层", Task: "……", Needs: []string{"accept"}, Scope: []string{"src/db"}, Check: "pnpm test"},
-		{ID: "api", Title: "查询接口", Task: "……", Needs: []string{"schema"}, Agent: agent, Scope: []string{"src/api"}, Check: "pnpm test"},
+		{ID: "accept", Title: "验收", Brief: "……", Needs: []string{}, Scope: []string{"test/month.test.ts"}, Check: "pnpm test test/month.test.ts", Acceptance: true},
+		{ID: "schema", Title: "数据层", Brief: "……", Needs: []string{"accept"}, Scope: []string{"src/db"}, Check: "pnpm test"},
+		{ID: "api", Title: "查询接口", Brief: "……", Needs: []string{"schema"}, Agent: agent, Scope: []string{"src/api"}, Check: "pnpm test"},
 	}}
 	pretty, _ := json.MarshalIndent(example, "", "  ")
 	lines := []string{
@@ -350,8 +323,8 @@ func PlanningTask(goal, project string, agents []protocol.Agent) string {
 		fmt.Sprintf("项目：%s（你现在就在它的目录里）", project),
 		"",
 		"先读代码，弄清现状，再拆。拆的规矩：",
-		fmt.Sprintf("- 最多 %d 步，一般三到六步。一步是一个帮工在自己的分支上能做完、提交、单独验证的一件事，不要拆得太碎。", protocol.MaxNodes),
-		"- 工单写清：目标、要改哪里、做到什么程度算完、要留下什么给后面的步骤（接口签名、文件位置、数据格式）。帮工只看得到它自己这一步的工单和前面步骤的结论。",
+		fmt.Sprintf("- 最多 %d 步，一般三到六步。一步是一个帮工在自己的分支上能做完、提交、单独验证的一件事，不要拆得太碎。", protocol.MaxTasks),
+		"- brief 是这一步的工单，写清：目标、要改哪里、做到什么程度算完、要留下什么给后面的步骤（接口签名、文件位置、数据格式）。帮工只看得到它自己这一步的工单和前面步骤的结论。",
 		"- needs 写这一步要等哪些步骤做完。不互相依赖的步骤会同时做：尽量让它们改不同的文件，写在 scope 里。",
 		"- 别拆成一条串行的长链（每一步都等上一步，就只能一个一个做）。有先后的按阶段分组，同一阶段里的步骤互不依赖。",
 		"- 项目里有测试或构建命令的，写进 check（比如 pnpm test），这一步做完会在它的分支上跑，过了才合。",

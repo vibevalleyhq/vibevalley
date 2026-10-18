@@ -1,0 +1,423 @@
+{
+  "cancel_schedule": {
+    "additionalProperties": true,
+    "properties": {
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "changes": {
+    "additionalProperties": true,
+    "properties": {
+      "session": {
+        "description": "帮工的名字或 id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session"
+    ],
+    "type": "object"
+  },
+  "channel_settings": {
+    "additionalProperties": true,
+    "properties": {
+      "channel": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "project": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "channel"
+    ],
+    "type": "object"
+  },
+  "channels": {
+    "properties": {},
+    "type": "object"
+  },
+  "check": {
+    "additionalProperties": true,
+    "properties": {
+      "session": {
+        "description": "帮工的名字或 id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session"
+    ],
+    "type": "object"
+  },
+  "dismiss": {
+    "additionalProperties": true,
+    "properties": {
+      "session": {
+        "description": "帮工的名字或 id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session"
+    ],
+    "type": "object"
+  },
+  "dispatch": {
+    "additionalProperties": true,
+    "properties": {
+      "agent": {
+        "description": "帮工名字、id 或 runtime",
+        "type": "string"
+      },
+      "channel": {
+        "description": "派在哪个频道，比如 #clock-in；不填就是你正在回话的频道",
+        "type": "string"
+      },
+      "project": {
+        "description": "项目文件夹名，比如 clock-in",
+        "type": "string"
+      },
+      "brief": {
+        "description": "工单",
+        "type": "string"
+      }
+    },
+    "required": [
+      "brief"
+    ],
+    "type": "object"
+  },
+  "list_schedules": {
+    "properties": {},
+    "type": "object"
+  },
+  "memory_add": {
+    "additionalProperties": true,
+    "properties": {
+      "agent": {
+        "description": "帮工档案的名字或 id",
+        "type": "string"
+      },
+      "project": {
+        "description": "只在这个项目里用：项目文件夹名",
+        "type": "string"
+      },
+      "text": {
+        "description": "要它记住的一句话",
+        "type": "string"
+      }
+    },
+    "required": [
+      "agent",
+      "text"
+    ],
+    "type": "object"
+  },
+  "memory_search": {
+    "additionalProperties": true,
+    "properties": {
+      "agent": {
+        "description": "帮工档案的名字或 id",
+        "type": "string"
+      },
+      "project": {
+        "description": "项目文件夹名",
+        "type": "string"
+      },
+      "query": {
+        "description": "要找什么，几个词或一句话；不填就列出最新的",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "merge": {
+    "additionalProperties": true,
+    "properties": {
+      "session": {
+        "description": "帮工的名字或 id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session"
+    ],
+    "type": "object"
+  },
+  "task_action": {
+    "additionalProperties": true,
+    "properties": {
+      "action": {
+        "enum": [
+          "retry",
+          "skip"
+        ],
+        "type": "string"
+      },
+      "task": {
+        "description": "这件的 id",
+        "type": "string"
+      },
+      "graph": {
+        "description": "计划 id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "graph",
+      "task",
+      "action"
+    ],
+    "type": "object"
+  },
+  "open_channel": {
+    "additionalProperties": true,
+    "properties": {
+      "description": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "project": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "type": "object"
+  },
+  "graph_action": {
+    "additionalProperties": true,
+    "properties": {
+      "action": {
+        "enum": [
+          "start",
+          "pause",
+          "resume",
+          "abandon",
+          "merge"
+        ],
+        "type": "string"
+      },
+      "graph": {
+        "description": "计划 id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "graph",
+      "action"
+    ],
+    "type": "object"
+  },
+  "task_edit": {
+    "additionalProperties": true,
+    "properties": {
+      "agent": {
+        "description": "帮工档案 id；空字符串表示按规则挑",
+        "type": "string"
+      },
+      "check": {
+        "description": "做完跑的检查命令；空字符串表示不跑",
+        "type": "string"
+      },
+      "needs": {
+        "description": "要等哪几件做完",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "task": {
+        "description": "这件的 id（新加的就起一个简短的英文 id）",
+        "type": "string"
+      },
+      "brief": {
+        "description": "工单",
+        "type": "string"
+      },
+      "remove": {
+        "type": "boolean"
+      },
+      "title": {
+        "type": "string"
+      },
+      "graph": {
+        "description": "计划 id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "graph",
+      "task"
+    ],
+    "type": "object"
+  },
+  "graphs": {
+    "additionalProperties": true,
+    "properties": {
+      "id": {
+        "description": "计划 id，比如 p1；不填列出所有没收完的",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "projects": {
+    "properties": {},
+    "type": "object"
+  },
+  "read_chat": {
+    "additionalProperties": true,
+    "properties": {
+      "target": {
+        "description": "#田头、#clock-in，或 #田头:<消息号>",
+        "type": "string"
+      },
+      "unread": {
+        "type": "boolean"
+      },
+      "before": {
+        "type": "number"
+      },
+      "limit": {
+        "type": "number"
+      }
+    },
+    "type": "object"
+  },
+  "roster": {
+    "properties": {},
+    "type": "object"
+  },
+  "schedule": {
+    "additionalProperties": true,
+    "properties": {
+      "agent": {
+        "description": "直接派给哪个帮工档案（名字或 id）；不填就是到点交给你",
+        "type": "string"
+      },
+      "at": {
+        "type": "string"
+      },
+      "channel": {
+        "description": "在哪个频道，比如 #clock-in；不填是你正在回话的频道",
+        "type": "string"
+      },
+      "cron": {
+        "description": "五段 cron：分 时 日 月 周几",
+        "type": "string"
+      },
+      "days": {
+        "items": {
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "kind": {
+        "enum": [
+          "once",
+          "every",
+          "daily",
+          "weekly",
+          "cron"
+        ],
+        "type": "string"
+      },
+      "minutes": {
+        "type": "number"
+      },
+      "name": {
+        "description": "简短的名字，比如 每日测试",
+        "type": "string"
+      },
+      "project": {
+        "description": "直接派活时的项目；不填用频道的默认项目",
+        "type": "string"
+      },
+      "text": {
+        "description": "到点时说的话：要做的事",
+        "type": "string"
+      },
+      "time": {
+        "description": "HH:MM",
+        "type": "string"
+      },
+      "tz": {
+        "description": "时区，比如 Asia/Shanghai；不填是这台电脑的",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "text",
+      "kind"
+    ],
+    "type": "object"
+  },
+  "stop": {
+    "additionalProperties": true,
+    "properties": {
+      "session": {
+        "description": "帮工的名字或 id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session"
+    ],
+    "type": "object"
+  },
+  "tell": {
+    "additionalProperties": true,
+    "properties": {
+      "message": {
+        "description": "要带的话",
+        "type": "string"
+      },
+      "session": {
+        "description": "帮工的名字或 id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session",
+      "message"
+    ],
+    "type": "object"
+  },
+  "graph_split": {
+    "additionalProperties": true,
+    "properties": {
+      "agent": {
+        "description": "让谁来拆：帮工名字或 id；不填按规则挑",
+        "type": "string"
+      },
+      "goal": {
+        "description": "要做的事，照主人的原话",
+        "type": "string"
+      },
+      "project": {
+        "description": "项目文件夹名",
+        "type": "string"
+      }
+    },
+    "required": [
+      "goal",
+      "project"
+    ],
+    "type": "object"
+  }
+}

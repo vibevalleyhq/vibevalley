@@ -19,12 +19,13 @@ import (
 	"vibevalley/internal/manager"
 	"vibevalley/internal/mcp"
 	"vibevalley/internal/memory"
-	"vibevalley/internal/playbook"
 	"vibevalley/internal/project"
 	"vibevalley/internal/runtime"
 	"vibevalley/internal/schedule"
 	"vibevalley/internal/session"
 	"vibevalley/internal/setting"
+	"vibevalley/internal/task"
+	"vibevalley/internal/tool"
 	"vibevalley/internal/voice"
 )
 
@@ -48,8 +49,9 @@ type services struct {
 	Session   *session.Service
 	Issue     *issue.Service
 	Channel   *channel.Service
-	Playbook  *playbook.Service
+	TaskGraph *task.Service
 	Schedule  *schedule.Service
+	Tool      *tool.Service
 	Manager   *manager.Service
 	Voice     *voice.Service
 	Connector *connector.Service
@@ -66,7 +68,8 @@ var layers = []base.Layer{
 	channel.Module,
 	schedule.Module,
 	issue.Module,
-	playbook.Module,
+	task.Module,
+	tool.Module,
 	manager.Module,
 	gate.Module,
 	voice.Module,

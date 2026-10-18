@@ -43,7 +43,7 @@ func runtimeChat(ctx context.Context, raw []string) error {
 	if runtime.Installation == nil {
 		return fmt.Errorf("%s 看不出装没装", id)
 	}
-	installation, err := runtime.Installation(ctx)
+	installation, err := runtime.Installation(ctx, oar.InstallationOptions{})
 	if err != nil {
 		return err
 	}

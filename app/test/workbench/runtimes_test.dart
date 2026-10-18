@@ -20,7 +20,7 @@ Routes backend() {
         'claude',
         usage: {
           'status': 'ok',
-          'plan': 'Max',
+          'subscription': 'Max',
           'windows': [
             {'label': 'Current session', 'usedPercent': 30},
             {'label': 'Current week (all models)', 'usedPercent': 90, 'resetsAt': DateTime(2026, 10, 20).millisecondsSinceEpoch},

@@ -13,7 +13,7 @@ func (c *sessions) Merge(id string) (project.Merged, error) {
 }
 
 func (c *sessions) MergeInto(id, target string) ([]string, error) {
-	merged, err := c.harvest(id, protocol.IssueCloseMergedIntoPlan, func(place project.Workplace) (project.Merged, error) {
+	merged, err := c.harvest(id, protocol.IssueCloseMergedIntoGraph, func(place project.Workplace) (project.Merged, error) {
 		return c.projects.MergeInto(place, target)
 	})
 	return merged.Hashes, err
@@ -28,8 +28,8 @@ func (c *sessions) harvest(id string, closed protocol.IssueClose, merge func(pro
 	if h == nil || current == nil {
 		return project.Merged{}, protocol.Missing{What: "帮工 " + id}
 	}
-	if closed == protocol.IssueCloseMerged && current.Playbook != nil {
-		return project.Merged{}, protocol.Refused{Reason: fmt.Sprintf("%s 在做种植计划 %s 里的活：做完会自动合进计划分支，收获整个计划时再进主分支", current.Name, current.Playbook.ID)}
+	if closed == protocol.IssueCloseMerged && current.Graph != nil {
+		return project.Merged{}, protocol.Refused{Reason: fmt.Sprintf("%s 在做种植计划 %s 里的活：做完会自动合进计划分支，收获整个计划时再进主分支", current.Name, current.Graph.ID)}
 	}
 	h.mu.Lock()
 	pending := len(h.triggers) > 0

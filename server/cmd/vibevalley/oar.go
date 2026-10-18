@@ -13,7 +13,7 @@ func runtimes() (*oar.RuntimeRegistry, error) {
 	if err != nil {
 		return nil, err
 	}
-	return runtime.Registry(cfg.Home, func() string { return cfg.DeepSeek.APIKey }), nil
+	return runtime.Registry(cfg.Home, func() string { return cfg.DeepSeek.APIKey }, nil), nil
 }
 
 // oarCommand is `vibevalley oar …`: smith's oar command line over the farm's runtimes, on this machine.

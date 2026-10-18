@@ -24,7 +24,7 @@ final stateProvider = Provider<CoreState?>((ref) => ref.watch(stateFrameProvider
 
 final inboxProvider = Provider<List<InboxItem>>((ref) => ref.watch(stateFrameProvider).value?.frame.inbox ?? const []);
 
-final plansProvider = Provider<List<Playbook>>((ref) => ref.watch(stateFrameProvider).value?.frame.plans ?? const []);
+final graphsProvider = Provider<List<TaskGraph>>((ref) => ref.watch(stateFrameProvider).value?.frame.graphs ?? const []);
 
 final viewProvider = Provider<FarmView?>((ref) => ref.watch(stateFrameProvider).value?.frame.view);
 

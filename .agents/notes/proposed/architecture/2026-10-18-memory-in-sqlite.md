@@ -9,7 +9,7 @@ Status: proposed
 | 什么 | 存在哪 | 怎么进提示 |
 |---|---|---|
 | 帮工档案的记忆（记下的话、做过的活） | `vibevalley.db` 的 `memory` 表（`migrations/0001_schema.sql`） | 开工时 `pick` 挑 8 条、1600 字 |
-| 管家的记性（主人交代的、它自己记的） | 家目录的 `manager/MEMORY.md`（`pkg/agent/memory.go`） | 每次请求整份拼进系统提示，超过 8000 字留最新的 |
+| 管家的记性（主人交代的、它自己记的） | 家目录的 `manager/MEMORY.md`（`internal/agent/brain/memory.go`） | 每次请求整份拼进系统提示，超过 8000 字留最新的 |
 | 关于主人的事实 | 只在管家的 `MEMORY.md` 里 | 帮工拿不到 |
 
 两处存法、两套增删、两种拼法；`MEMORY.md` 每记一条就改系统提示，管家每次请求都命不中缓存（[对照 Grok Bot](2026-10-18-always-on-manager.md)第 1 项）；帮工不知道主人的偏好。
@@ -42,7 +42,7 @@ Status: proposed
 
 不进的是**原样的上下文和日志**：管家的会话 `manager.jsonl`、归档原文的文件 `archive/`、轨迹、帮工的事件。它们照旧是文件，按会话存、按会话读；`episode` 里是从它们抄出来、为了检索的那一部分，文件还是原样的那份。`search_archive` 并进 `memory_search`（`kind = episode`、`agent = manager`），旧工具名留到管家的提示改完。
 
-管家的 `MEMORY.md` 没有了：主人交代的变成 `profile`，管家自己记的变成 `agent = manager` 的 `note`。`pkg/agent` 是能单独用的库，它自己的 `MEMORY.md` 留着给命令行用；管家经第 6 节的接口改用这张表。
+管家的 `MEMORY.md` 没有了：主人交代的变成 `profile`，管家自己记的变成 `agent = manager` 的 `note`。`internal/agent/brain` 是能单独用的库，它自己的 `MEMORY.md` 留着给命令行用；管家经第 6 节的接口改用这张表。
 
 ### 3. 表
 
@@ -141,7 +141,7 @@ score = -bm25                    (FTS 的相关度，越大越好)
 
 ### 6. 写：一个口子
 
-所有写入经 `memory` 服务，`pkg/agent` 和 `internal/session` 不碰表：
+所有写入经 `memory` 服务，`internal/agent/brain` 和 `internal/session` 不碰表：
 
 - **记一条**（`memory_add`、帮工的「记住：」、主人替它记、管家的 `remember`）：先算 `terms`，再在同一个范围（`scope`、`agent`、`project`）里找几乎一样的（沿用 `memoryLikeness` ≥ 0.8）。有就在一个事务里插新的、把旧的 `replaced_by` 设成新的 id；没有就只插。帮工的「记住（主人）：」写成 `profile`。
 - **做过的活**：照现在的 `KeepJob`，一个 Session 一条，改写。
@@ -149,10 +149,10 @@ score = -bm25                    (FTS 的相关度，越大越好)
 - **改一条、忘掉一条**：`replace`、`remove` 按 id，取代 `rewrite_memory` 的整份重写（Hermes 的 memory 工具也是 add、replace、remove）。agent 只能改、删它看到过的那几条：工具只认这一次检索或画像里出现过的 id。
 - **上限**：每个档案的 `note` 和 `issue` 最多 300 条（现在的 `MemoryKeep`），超了删最久没想起的；`episode` 每个档案留 180 天、最多 2000 条，超了删最旧的；被取代的旧行保留 30 天给页签看历史，然后删掉；画像不按条数删，只按第 5 节的字数截。
 
-`pkg/agent` 加一个可选的接口，管家传进去，没传就照旧用 `MEMORY.md`：
+`internal/agent/brain` 加一个可选的接口，管家传进去，没传就照旧用 `MEMORY.md`：
 
 ```go
-// pkg/agent: where an agent's memory lives, when not its home's MEMORY.md.
+// internal/agent/brain: where an agent's memory lives, when not its home's MEMORY.md.
 type MemoryStore interface {
 	Block(ctx context.Context) string // the system prompt's 记性, read when the session opens and after a summary
 	Add(ctx context.Context, text string) error
@@ -178,7 +178,7 @@ type MemoryStore interface {
 1. 迁移、`names_test` 跳过影子表、`queries/memory.sql` 和 `queries/memory_term.sql`、sqlc 重新生成。
 2. `terms.go`（gse 和嵌入的词典）、开机后台补切。
 3. `rank.go` 取代 `pick`，重写黄金数据；`Prefetch`、`memory_search` 走 FTS。
-4. 画像和管家：`pkg/agent.MemoryStore`、管家改用它、页签。
+4. 画像和管家：`internal/agent/brain.MemoryStore`、管家改用它、页签。
 5. 经过：收工写 `episode`、管家压缩时写归档的段、`excerpt.go`、`search_archive` 并进 `memory_search`。
 
 前四步就是[记性有多个来源](2026-10-18-memory-providers.md)第 1 步「接口和本地来源」里的本地那一半。
@@ -218,4 +218,4 @@ type MemoryStore interface {
 - 画像共享给所有帮工以后，一条错的偏好会影响每个帮工；页签上画像单独一块，改和删都在那里。
 - 词典没加载完时检索退回按新旧列出，开机后头一秒左右的想起会差一点。
 - 取代靠相似度阈值，可能把两条不同的事实当成一条；被取代的保留 30 天，页签能看到、能撤回。
-- 有意放弃的：本地不做语义检索；`MEMORY.md` 不再是管家记性的来源，只是 `pkg/agent` 单独用时的默认。
+- 有意放弃的：本地不做语义检索；`MEMORY.md` 不再是管家记性的来源，只是 `internal/agent/brain` 单独用时的默认。

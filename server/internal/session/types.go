@@ -19,10 +19,10 @@ type Hired struct {
 
 type HireOptions struct {
 	// Base is the branch its own branch starts from; empty: the project's main branch.
-	Base     string
-	Worktree *bool
-	Playbook *protocol.SessionPlaybook
-	Channel  *string
+	Base      string
+	Worktree  *bool
+	TaskGraph *protocol.SessionGraph
+	Channel   *string
 	// Empty: Dispatch makes one from the job.
 	Issue string
 	// What its first run is for; nil: the issue sent out.

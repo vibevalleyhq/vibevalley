@@ -20,7 +20,7 @@ func TestPatrolWakesTheManagerOnce(t *testing.T) {
 	clock.Store(start)
 	f.Manager.PatrolNow = clock.Load
 
-	f.Core.Apply(protocol.FactHired{Session: protocol.Session{ID: "w7", Name: "实验员", Agent: "lab", Runtime: "pi", Task: "加个 CHANGELOG", HiredAt: start, Phase: protocol.Phase{Value: protocol.PhaseWorking{Since: start}}}})
+	f.Core.Apply(protocol.FactHired{Session: protocol.Session{ID: "w7", Name: "实验员", Agent: "lab", Runtime: "pi", Brief: "加个 CHANGELOG", HiredAt: start, Phase: protocol.Phase{Value: protocol.PhaseWorking{Since: start}}}})
 	f.Core.Apply(protocol.FactReport{ID: "w7", Outcome: protocol.OutcomeCompleted, Summary: "加好了", Runs: 1})
 	quiet := func(why string) {
 		t.Helper()

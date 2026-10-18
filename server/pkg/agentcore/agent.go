@@ -25,10 +25,9 @@ type AgentInitialState struct {
 	Messages      []AgentMessage
 }
 
-// The loop config's Model and ThinkingLevel come from the state, its steering and follow-up getters from the agent's queues: those set here are not
-// used.
+// The Agent owns its model and queues; its options expose only request and tool hooks.
 type AgentOptions struct {
-	AgentLoopConfig
+	AgentConfig
 	InitialState AgentInitialState
 	SteeringMode QueueMode
 	FollowUpMode QueueMode
@@ -61,32 +60,34 @@ type Agent struct {
 
 // The transcript grows at message_end; the answer being said is shown until then.
 func ApplyEvent(state AgentState, event AgentEvent) AgentState {
-	switch event.Type {
-	case EventAgentStart:
+	switch event := event.(type) {
+	case AgentStarted:
 		state.ErrorMessage = ""
 		state.IsStreaming = true
-	case EventAgentEnd:
+	case AgentEnded:
 		state.StreamingMessage = nil
 		state.IsStreaming = false
 		state.PendingToolCalls = map[string]bool{}
-	case EventMessageStart, EventMessageUpdate:
+	case MessageStarted:
 		if event.Message.Role() == "assistant" {
 			state.StreamingMessage = event.Message
 		}
-	case EventMessageEnd:
+	case MessageUpdated:
+		state.StreamingMessage = event.Message
+	case MessageEnded:
 		state.StreamingMessage = nil
 		state.Messages = append(append([]AgentMessage(nil), state.Messages...), event.Message)
 		if m, ok := event.Message.(ai.AssistantMessage); ok && (m.StopReason == ai.StopError || m.StopReason == ai.StopAborted) && m.ErrorMessage != "" {
 			state.ErrorMessage = m.ErrorMessage
 		}
-	case EventToolExecutionStart:
+	case ToolStarted:
 		pending := make(map[string]bool, len(state.PendingToolCalls)+1)
 		for k := range state.PendingToolCalls {
 			pending[k] = true
 		}
 		pending[event.ToolCallID] = true
 		state.PendingToolCalls = pending
-	case EventToolExecutionEnd:
+	case ToolEnded:
 		pending := make(map[string]bool, len(state.PendingToolCalls))
 		for k := range state.PendingToolCalls {
 			if k != event.ToolCallID {
@@ -94,7 +95,7 @@ func ApplyEvent(state AgentState, event AgentEvent) AgentState {
 			}
 		}
 		state.PendingToolCalls = pending
-	case EventTurnStart, EventTurnEnd, EventToolExecutionUpdate:
+	case TurnStarted, TurnEnded, ToolUpdated:
 	}
 	return state
 }
@@ -190,9 +191,7 @@ func take(queue *[]AgentMessage, mode QueueMode) []AgentMessage {
 }
 
 func (a *Agent) config(s AgentState) AgentLoopConfig {
-	loop := a.options.AgentLoopConfig
-	loop.Model = s.Model
-	loop.ThinkingLevel = s.ThinkingLevel
+	loop := AgentLoopConfig{AgentConfig: a.options.AgentConfig, Model: s.Model, ThinkingLevel: s.ThinkingLevel}
 	loop.GetSteeringMessages = func() []AgentMessage {
 		a.mu.Lock()
 		defer a.mu.Unlock()

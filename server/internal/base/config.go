@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -24,9 +26,7 @@ type Config struct {
 	WorkRoot string `mapstructure:"work_root"`
 	// Empty: Home/vibevalley.db; "memory" (":memory:" once loaded) keeps it in memory; a folder holds vibevalley.db.
 	DBPath string `mapstructure:"db"`
-	// The server listens on Host only; it is never for the network.
-	Host string `mapstructure:"host"`
-	Port int    `mapstructure:"port"`
+	Port   int    `mapstructure:"port"`
 
 	// cmd/vibevalley on its own; empty is the agent's default model.
 	Agent struct {
@@ -89,7 +89,7 @@ func Defaults() Config {
 	c.Home = filepath.Join(home, ".vibevalley")
 	c.Version = "0.1.0"
 	c.WorkRoot = filepath.Join(home, "vibevalley-work")
-	c.Host, c.Port = "127.0.0.1", 8787
+	c.Port = 8787
 	c.Voice.Line.Port = 8788
 	c.Lan.Port = 8790
 	c.GitEmails = []string{}
@@ -102,6 +102,11 @@ func Defaults() Config {
 	c.Chat.NoticeBatchMs = protocol.NoticeBatchMs
 	c.Chat.RetryWakeMs = 3_000
 	return c
+}
+
+// The main API and its MCP endpoint share a fixed local identity; remote devices use the separate yard gate.
+func (c Config) ServerAddress() string {
+	return net.JoinHostPort("127.0.0.1", strconv.Itoa(c.Port))
 }
 
 // file: the YAML to read, which must be there; empty is Home/vibevalley.yaml, read if it is there.

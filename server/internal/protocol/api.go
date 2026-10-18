@@ -32,7 +32,7 @@ type Handlers interface {
 	ChannelSay(ctx context.Context, body SayRequest) error
 	//vibevalley:route channel.create POST /api/v1/channels
 	//vibevalley:can owner remote manager
-	ChannelCreate(ctx context.Context, body ChannelRequest) error
+	ChannelCreate(ctx context.Context, body ChannelRequest) (string, error)
 	//vibevalley:route schedule.create POST /api/v1/schedules
 	//vibevalley:can owner remote manager
 	ScheduleCreate(ctx context.Context, body ScheduleRequest) (Schedule, error)
@@ -49,6 +49,7 @@ type Handlers interface {
 	//vibevalley:route channel.update PUT /api/v1/channels/{id}
 	//vibevalley:can owner remote manager
 	ChannelUpdate(ctx context.Context, pID string, body ChannelUpdate) error
+	// The v1 caption relay without a call id is accepted only with one active call.
 	//vibevalley:route manager.hear POST /api/v1/manager/hear
 	//vibevalley:can owner remote
 	ManagerHear(ctx context.Context, body SayRequest) error
@@ -84,6 +85,10 @@ type Handlers interface {
 	//vibevalley:route session.events GET /api/v1/sessions/{id}/events
 	//vibevalley:can owner remote
 	SessionEvents(ctx context.Context, pID string, pRun *string) ([]SessionEvent, error)
+	// One joined read of issues and their real sessions, including explicit missing records.
+	//vibevalley:route issue.history GET /api/v1/issues/history
+	//vibevalley:can owner remote manager
+	IssueHistory(ctx context.Context) ([]IssueHistory, error)
 	//vibevalley:route issue.list GET /api/v1/issues
 	//vibevalley:can owner remote
 	IssueList(ctx context.Context) ([]Issue, error)
@@ -115,33 +120,33 @@ type Handlers interface {
 	//vibevalley:route issue.reopen POST /api/v1/issues/{id}/reopen
 	//vibevalley:can owner remote
 	IssueReopen(ctx context.Context, pID string, body ReopenRequest) (Dispatched, error)
-	//vibevalley:route playbook.plan POST /api/v1/playbooks
+	//vibevalley:route graph.split POST /api/v1/graphs
 	//vibevalley:can owner remote manager
-	PlaybookPlan(ctx context.Context, body PlanRequest) (string, error)
-	//vibevalley:route playbook.updateNode PUT /api/v1/playbooks/{id}/nodes/{node}
+	GraphSplit(ctx context.Context, body GraphSplitRequest) (string, error)
+	//vibevalley:route graph.updateTask PUT /api/v1/graphs/{id}/tasks/{task}
 	//vibevalley:can owner remote manager
-	PlaybookUpdateNode(ctx context.Context, pID string, pNode string, body NodeEdit) (string, error)
-	//vibevalley:route playbook.deleteNode DELETE /api/v1/playbooks/{id}/nodes/{node}
+	GraphUpdateTask(ctx context.Context, pID string, pTask string, body TaskEdit) (string, error)
+	//vibevalley:route graph.deleteTask DELETE /api/v1/graphs/{id}/tasks/{task}
 	//vibevalley:can owner remote manager
-	PlaybookDeleteNode(ctx context.Context, pID string, pNode string) (string, error)
-	//vibevalley:route playbook.act POST /api/v1/playbooks/{id}/act
+	GraphDeleteTask(ctx context.Context, pID string, pTask string) (string, error)
+	//vibevalley:route graph.act POST /api/v1/graphs/{id}/act
 	//vibevalley:can owner remote manager
-	PlaybookAct(ctx context.Context, pID string, body PlaybookActRequest) (string, error)
-	//vibevalley:route playbook.nodeAct POST /api/v1/playbooks/{id}/nodes/{node}/act
+	GraphAct(ctx context.Context, pID string, body GraphActRequest) (string, error)
+	//vibevalley:route graph.taskAct POST /api/v1/graphs/{id}/tasks/{task}/act
 	//vibevalley:can owner remote manager
-	PlaybookNodeAct(ctx context.Context, pID string, pNode string, body NodeActRequest) (string, error)
+	GraphTaskAct(ctx context.Context, pID string, pTask string, body TaskActRequest) (string, error)
 	//vibevalley:route channel.history GET /api/v1/channels/{id}/messages
 	//vibevalley:can owner remote manager
 	ChannelHistory(ctx context.Context, pID string, pBefore *int64, pLimit *int64) ([]ChatMessage, error)
 	//vibevalley:route channel.markRead POST /api/v1/channels/{id}/read
 	//vibevalley:can owner remote
 	ChannelMarkRead(ctx context.Context, pID string, body ChatReadRequest) error
-	//vibevalley:route playbook.changes GET /api/v1/playbooks/{id}/changes
+	//vibevalley:route graph.changes GET /api/v1/graphs/{id}/changes
 	//vibevalley:can owner remote
-	PlaybookChanges(ctx context.Context, pID string) (Changes, error)
-	//vibevalley:route playbook.events GET /api/v1/playbooks/{id}/events
+	GraphChanges(ctx context.Context, pID string) (Changes, error)
+	//vibevalley:route graph.events GET /api/v1/graphs/{id}/events
 	//vibevalley:can owner remote
-	PlaybookEvents(ctx context.Context, pID string) ([]PlaybookEvent, error)
+	GraphEvents(ctx context.Context, pID string) ([]GraphEvent, error)
 	//vibevalley:route game.chooseTitle POST /api/v1/game/title
 	//vibevalley:can owner remote
 	GameChooseTitle(ctx context.Context, body ChooseTitleRequest) error
@@ -164,6 +169,10 @@ type Handlers interface {
 	//vibevalley:route agent.check POST /api/v1/agents/check
 	//vibevalley:can owner remote
 	AgentCheck(ctx context.Context, body AgentCheckRequest) ([]AgentCheck, error)
+	// Create allocates an identity; callers with an existing identity use save.
+	//vibevalley:route agent.create POST /api/v1/agents
+	//vibevalley:can owner remote manager
+	AgentCreate(ctx context.Context, body Agent) (Agent, error)
 	//vibevalley:route agent.save PUT /api/v1/agents/{id}
 	//vibevalley:can owner remote
 	AgentSave(ctx context.Context, pID string, body Agent) (Agent, error)
@@ -198,6 +207,10 @@ type Handlers interface {
 	//vibevalley:route skill.list GET /api/v1/skills
 	//vibevalley:can owner remote
 	SkillList(ctx context.Context) ([]Skill, error)
+	// Create allocates an identity; callers with an existing identity use save.
+	//vibevalley:route skill.create POST /api/v1/skills
+	//vibevalley:can owner remote manager
+	SkillCreate(ctx context.Context, body Skill) (Skill, error)
 	//vibevalley:route skill.save PUT /api/v1/skills/{id}
 	//vibevalley:can owner remote
 	SkillSave(ctx context.Context, pID string, body Skill) (Skill, error)
@@ -222,16 +235,19 @@ type Handlers interface {
 	ProjectActivity(ctx context.Context, pID string) (ProjectActivity, error)
 	//vibevalley:route voice.session POST /api/v1/voice/session
 	//vibevalley:can owner remote
-	VoiceSession(ctx context.Context) (AgoraTicket, error)
+	VoiceSession(ctx context.Context) (AgoraGrant, error)
 	//vibevalley:route voice.renew POST /api/v1/voice/renew
 	//vibevalley:can owner remote
-	VoiceRenew(ctx context.Context, body RenewRequest) (AgoraTicket, error)
+	VoiceRenew(ctx context.Context, body RenewRequest) (AgoraGrant, error)
 	//vibevalley:route voice.start POST /api/v1/voice/agent
 	//vibevalley:can owner remote
 	VoiceStart(ctx context.Context, body StartRequest) (VoiceAgent, error)
 	//vibevalley:route voice.stop POST /api/v1/voice/agent/stop
 	//vibevalley:can owner remote
 	VoiceStop(ctx context.Context, body VoiceAgent) error
+	//vibevalley:route voice.heard POST /api/v1/voice/agent/heard
+	//vibevalley:can owner remote
+	VoiceHeard(ctx context.Context, body VoiceHeard) error
 	//vibevalley:route voice.said POST /api/v1/voice/agent/said
 	//vibevalley:can owner remote
 	VoiceSaid(ctx context.Context, body VoiceSaid) error

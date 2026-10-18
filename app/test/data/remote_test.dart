@@ -56,20 +56,22 @@ void main() {
       return answer(r);
     });
     final c = container(server);
-    await initial(c);
+    final keeping = c.listen(runtimeCatalogProvider, (_, _) {});
+    addTearDown(keeping.close);
+    await c.read(runtimeCatalogProvider.future);
     pending = Completer<http.Response>();
-    final refresh = c.read(workbenchConfigProvider.notifier).refresh();
+    final refresh = c.read(runtimeCatalogProvider.notifier).reload();
     await entered.future;
     final pushed = runtime('claude', available: false);
     final observed = Completer<void>();
-    final sub = c.listen(workbenchConfigProvider, (_, next) {
-      if (next.runtime('claude')?.installation is InstallationNotFound && !observed.isCompleted) observed.complete();
+    final sub = c.listen(runtimesProvider, (_, next) {
+      if (next.value?.where((r) => r.id == 'claude').firstOrNull?.installation is InstallationNotFound && !observed.isCompleted) observed.complete();
     });
     server.sideFeed.add(LiveEventRuntime(at: 1, info: pushed));
     await observed.future.timeout(const Duration(seconds: 3));
     pending.complete(jsonResponse([baseRuntime.toJson()]));
     await refresh;
-    expect(c.read(workbenchConfigProvider).runtime('claude')?.installation, isA<InstallationNotFound>());
+    expect(c.read(runtimeInfoProvider('claude'))?.installation, isA<InstallationNotFound>());
     sub.close();
   });
 
@@ -108,5 +110,25 @@ void main() {
     expect(c.read(workbenchConfigProvider).loaded, isTrue);
     expect(c.read(workbenchConfigProvider).error, isNull);
     expect(c.read(agentsProvider).requireValue.keys, ['helper']);
+  });
+  test('runtime failure does not poison loaded profiles and a runtime command only updates its owner', () async {
+    var runtimeFailed = true;
+    final next = runtime('claude', available: false);
+    final server = FakeServer((r) async {
+      if (r.url.path == '/api/v1/runtimes') return runtimeFailed ? jsonResponse({'reason': 'probe failed'}, 503) : answer(r);
+      if (r.url.path == '/api/v1/runtimes/claude/refresh') return jsonResponse(next.toJson());
+      return answer(r);
+    });
+    final c = container(server);
+    await initial(c);
+    await expectLater(c.read(runtimeCatalogProvider.future), throwsA(isA<VibeValleyApiError>()));
+    expect(c.read(agentsProvider).requireValue.keys, ['helper']);
+    expect(c.read(workbenchConfigProvider).error, isNull);
+    runtimeFailed = false;
+    await c.read(runtimeCatalogProvider.notifier).reload();
+    final before = server.requests.length;
+    await c.read(runtimeCatalogProvider.notifier).refresh('claude');
+    expect(server.requests.skip(before).map((r) => r.url.path), ['/api/v1/runtimes/claude/refresh']);
+    expect(c.read(runtimeInfoProvider('claude'))?.installation, isA<InstallationNotFound>());
   });
 }

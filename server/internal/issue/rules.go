@@ -1,6 +1,6 @@
 package issue
 
-// An issue's text as a job and back, whether it is closed, and the next plan's id.
+// An issue's text as a job and back, whether it is closed, and the next task's id.
 
 import (
 	"strconv"
@@ -31,7 +31,7 @@ func splitJob(job string) (title, description string) {
 }
 
 // One more than the largest p<number> among ids; the rest do not count.
-func nextPlaybookID(ids []string) string {
+func nextTaskID(ids []string) string {
 	var top int64
 	for _, id := range ids {
 		if digits, ok := strings.CutPrefix(id, "p"); ok {

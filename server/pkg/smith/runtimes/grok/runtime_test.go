@@ -26,7 +26,7 @@ func TestCandidatesMatchTheOfficialScriptAndNpmLayouts(t *testing.T) {
 
 func TestGrokGatesItsACPEntrypoint(t *testing.T) {
 	t.Setenv("OAR_GROK_BIN", nodePath(t))
-	snapshot, err := Installation(context.Background())
+	snapshot, err := Installation(context.Background(), oar.InstallationOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

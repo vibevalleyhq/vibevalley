@@ -100,8 +100,8 @@ class _TitleScreenState extends ConsumerState<TitleScreen> with SingleTickerProv
     final open = _items(canContinue).where((i) => i.enabled).toList();
     final here = open.indexWhere((i) => i.id == _current(canContinue));
     if (e.logicalKey == LogicalKeyboardKey.arrowDown || e.logicalKey == LogicalKeyboardKey.arrowUp) {
-      final step = e.logicalKey == LogicalKeyboardKey.arrowDown ? 1 : open.length - 1;
-      setState(() => _at = open[(here + step) % open.length].id);
+      final task = e.logicalKey == LogicalKeyboardKey.arrowDown ? 1 : open.length - 1;
+      setState(() => _at = open[(here + task) % open.length].id);
       Sfx.play('pick');
       return true;
     }

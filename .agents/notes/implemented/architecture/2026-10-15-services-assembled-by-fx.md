@@ -7,7 +7,7 @@ Status: implemented
 服务端的 25 个服务都在 `internal/farm` 一个包里，每个都拿着整个 `*Farm`（`newX(f)`），用到谁就去 `f.X` 找。
 
 - **依赖是隐式的**：一个服务用了哪些别的服务，只能读它的代码才知道。测试里手搭半个 `Farm`，少放一个就空指针。地图页给项目加 `slots` 时就碰上了：`Codebase` 开始用 `Crew`，测试里搭的 `Farm` 没有 Crew。
-- **顺序是手排的**：`New` 里按「谁先建好别人才能用」排一遍，`services()` 再抄一遍，开和停都跟着这张表。有些顺序上的要求在表上看不出来，比如 `Playbooks.start` 在重启时改计划的状态，要账本先在听，现在只是因为它在表里排得靠后。
+- **顺序是手排的**：`New` 里按「谁先建好别人才能用」排一遍，`services()` 再抄一遍，开和停都跟着这张表。有些顺序上的要求在表上看不出来，比如 `Tasks.start` 在重启时改计划的状态，要账本先在听，现在只是因为它在表里排得靠后。
 - **没有边界**：在同一个包里，一个服务能碰到任何别的服务，连没导出的字段也能碰。
 
 主人要的是：先把整体架构理清楚，再用 fx 组装。
@@ -23,7 +23,7 @@ Status: implemented
   - memory：`Memories`、`ManagerMemory`；
   - runs：`Runtimes`、`Crew`、`Trajectories`、`Tokens`；
   - chat：`Chat`、`FarmTools`；
-  - tickets：`Dispatch`、`Merges`、`Issues`、`PlaybookLog`、`Playbooks`、`Schedules`、`Heartbeat`；
+  - tickets：`Dispatch`、`Merges`、`Issues`、`TaskLog`、`Tasks`、`Schedules`、`Heartbeat`；
   - manager：`Foreman`；
   - channels：`VoiceLine`、`Voice`、`Connectors`、`Lan`；
   - game：`Ledger`、`Commits`。
@@ -46,14 +46,14 @@ Status: implemented
 
 **先拆包，再组装。** 按层拆成 Go 包，越界和成环就成了编译错误。可是服务之间共用很多包内的小函数，测试都是在同一个包里跑整座农场的，一起拆的话，改动要翻几倍，风险也大。依赖写进构造函数、按层排好以后，拆包就成了机械活，可以一层一层来。后来就这样拆了：[一个概念一个包](2026-10-16-a-package-per-concept.md)。
 
-**把开机时发布的活都挪进 `OnReady`，让开的顺序完全无关紧要。** 按约定，`Playbooks.OnStart` 在重启时放弃规划中的计划、暂停在做的计划，这些该放在 `OnReady`。但挪过去以后，它会在 `Crew` 接回帮工之后才跑，行为会变（见 Consequences）。这次只改组装，不改行为。它现在发的事实只有计划状态的变化，账本不记这两种变化，田头和连接器也不听，所以谁先开不影响结果。
+**把开机时发布的活都挪进 `OnReady`，让开的顺序完全无关紧要。** 按约定，`Tasks.OnStart` 在重启时放弃规划中的计划、暂停在做的计划，这些该放在 `OnReady`。但挪过去以后，它会在 `Crew` 接回帮工之后才跑，行为会变（见 Consequences）。这次只改组装，不改行为。它现在发的事实只有计划状态的变化，账本不记这两种变化，田头和连接器也不听，所以谁先开不影响结果。
 
 ## Consequences
 
 - 加一个服务不用再排顺序，但要在它的包的 `Module` 和 `farm.go` 的 `services` 各加一行。漏了 `services`，又没有别的服务用它，它就不会被建，fx 也不报错。
 - 依赖成环、缺了谁，`New` 会报错。
 - 一个服务拿着的，是建的时候给它的那几个。建好以后改 `Farm` 上的字段，别的服务看不到。
-- 重启时，规划中的计划会被放弃，同时本该请走规划的帮工，但请走这一步不生效：`Crew.Dismiss` 只认已经接回来的帮工，而接回帮工在 `OnReady`，比 `Playbooks.OnStart` 晚。这在组装以前就是这样，这次没改。
+- 重启时，规划中的计划会被放弃，同时本该请走规划的帮工，但请走这一步不生效：`Crew.Dismiss` 只认已经接回来的帮工，而接回帮工在 `OnReady`，比 `Tasks.OnStart` 晚。这在组装以前就是这样，这次没改。
 - 服务端多了 fx、dig、zap 几个依赖。
 
 ## Verification

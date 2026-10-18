@@ -14,8 +14,8 @@ Status: implemented
   - `memory/recall.go`：怎么挑、怎么写成一行、快忘了的；`memory.Recall` 交给帮工的是写好的行和它们的 id，帮工只加开头那句；
   - `runtime/rules.go`：农机能不能派、档案有什么问题；管家、计划、派活都问 `runtime.Check`；
   - `manager/words.go`：管家怎么说花费；
-  - 后来又挪了一批（见[收敛接缝](2026-10-17-converge-the-seams.md)阶段 3）：`channel/rules.go`（给谁、叫不叫醒，读 @ 和地址，叫醒时怎么说）、`game/progress.go`（账本怎么折）、`playbook/rules.go`（读规划的回答、改步骤、步骤的工单、能开工的）、`issue/rules.go`（工单和活的文字互转、关没关、下一张计划的 id）、`schedule/rules.go`（到没到点、错没错过）、`manager/patrol_rules.go`（巡查的宽限和记性，读 protocol 的 `InboxEntries`）、`runtime/quota.go`（额度怎么说）。
-  - 留在 protocol 的单一用户函数，各有理由：核心状态的初值和折法要用的（`EmptyCoreState`、`EmptyProgress`、`WithStations`、`EffectsOf`）、种子和默认值（`FactsOf`、`DefaultVoice`）、读 `Phase` 的（`DoingOf`）、和 `NextRun` 共用时区解析的 `ScheduleProblem`、和 `PlaybooksOf` 互为反向的 `PlaybookIssues`。
+  - 后来又挪了一批（见[收敛接缝](2026-10-17-converge-the-seams.md)阶段 3）：`channel/rules.go`（给谁、叫不叫醒，读 @ 和地址，叫醒时怎么说）、`game/progress.go`（账本怎么折）、`task/rules.go`（读规划的回答、改步骤、步骤的工单、能开工的）、`issue/rules.go`（工单和活的文字互转、关没关、下一张计划的 id）、`schedule/rules.go`（到没到点、错没错过）、`manager/patrol_rules.go`（巡查的宽限和记性，读 protocol 的 `InboxEntries`）、`runtime/quota.go`（额度怎么说）。
+  - 留在 protocol 的单一用户函数，各有理由：核心状态的初值和折法要用的（`EmptyCoreState`、`EmptyProgress`、`WithStations`、`EffectsOf`）、种子和默认值（`FactsOf`、`DefaultVoice`）、读 `Phase` 的（`DoingOf`）、和 `NextRun` 共用时区解析的 `ScheduleProblem`、和 `TasksOf` 互为反向的 `TaskIssues`。
 - **黄金数据跟着规则**：读写 `testdata/*.jsonl.gz` 的工具是 `internal/golden`（不依赖任何业务包，`protocol` 自己的测试也能用）。每个包的 `TestRulesGolden` 用 `golden.Rules` 跑自己的用例。重写全部：`VIBEVALLEY_GOLDEN=update go test ./internal/...`；用环境变量，不用 `-update`，因为 `go test ./...` 会把旗子发给每个测试二进制，没注册它的包会报错。
 - **顺手清掉的**：`base.InboxLines`（田头的规矩放在地基里）挪到 `protocol` 的田头规则；`voice.go` 里没人用的语音选项列表和 `Needs*Key`，没人用的 `ConnectorLabel`；`helpers.go` 剩下的是字符串和数字的规则，改名 `text.go`。
 

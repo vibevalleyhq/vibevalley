@@ -105,42 +105,42 @@ func TestSessionsCloneOffline(t *testing.T) {
 	}
 }
 
-func TestSessionsPlaybookBranchMerges(t *testing.T) {
+func TestSessionsTaskBranchMerges(t *testing.T) {
 	root := t.TempDir()
 	p := projects(t, root)
-	if err := p.OpenBranch("plan", "vibevalley/plan-1"); err != nil {
+	if err := p.OpenBranch("task", "vibevalley/task-1"); err != nil {
 		t.Fatal(err)
 	}
-	place, err := p.Workplace("plan", "w1", true, "vibevalley/plan-1")
+	place, err := p.Workplace("task", "w1", true, "vibevalley/task-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(place.Cwd, "a.txt"), []byte("a\n"), 0o644)
-	brought, err := p.MergeInto(place, "vibevalley/plan-1")
+	brought, err := p.MergeInto(place, "vibevalley/task-1")
 	if err != nil || len(brought.Hashes) != 1 {
 		t.Fatalf("merged: %v %v", brought, err)
 	}
-	changes, err := p.BranchChanges("plan", "vibevalley/plan-1")
+	changes, err := p.BranchChanges("task", "vibevalley/task-1")
 	if err != nil || len(changes.Files) != 1 || changes.Files[0].Path != "a.txt" {
 		t.Fatalf("changes: %+v %v", changes, err)
 	}
-	said, err := p.MergeBranch("plan", "vibevalley/plan-1")
+	said, err := p.MergeBranch("task", "vibevalley/task-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	testkit.Match(t, said, `1 个提交合进了 plan 的 main`, "merged")
-	ok, out := p.Run(context.Background(), filepath.Join(root, "plan"), "cat a.txt && exit 3")
+	testkit.Match(t, said, `1 个提交合进了 task 的 main`, "merged")
+	ok, out := p.Run(context.Background(), filepath.Join(root, "task"), "cat a.txt && exit 3")
 	testkit.Eq(t, []any{ok, out}, []any{false, "a"}, "run")
 }
 
 func TestSessionsChangedFilesSinceTheBase(t *testing.T) {
 	root := t.TempDir()
 	p := projects(t, root)
-	if err := p.OpenBranch("plan", "vibevalley/plan-1"); err != nil {
+	if err := p.OpenBranch("task", "vibevalley/task-1"); err != nil {
 		t.Fatal(err)
 	}
 	work := func(id string, files ...string) Workplace {
-		place, err := p.Workplace("plan", id, true, "vibevalley/plan-1")
+		place, err := p.Workplace("task", id, true, "vibevalley/task-1")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,17 +149,17 @@ func TestSessionsChangedFilesSinceTheBase(t *testing.T) {
 		}
 		return place
 	}
-	if _, err := p.MergeInto(work("w1", "a.txt", "b.txt"), "vibevalley/plan-1"); err != nil {
+	if _, err := p.MergeInto(work("w1", "a.txt", "b.txt"), "vibevalley/task-1"); err != nil {
 		t.Fatal(err)
 	}
 	mine := work("w2", "a.txt")
 	testkit.Git(t, mine.Cwd, "-c", "user.name=t", "-c", "user.email=t@vibevalley.test", "commit", "-qam", "a")
 	testkit.Git(t, mine.Cwd, "mv", "b.txt", "c.txt")
 	os.WriteFile(filepath.Join(mine.Cwd, "new.txt"), []byte("new\n"), 0o644)
-	if _, err := p.MergeInto(work("w3", "later.txt"), "vibevalley/plan-1"); err != nil {
+	if _, err := p.MergeInto(work("w3", "later.txt"), "vibevalley/task-1"); err != nil {
 		t.Fatal(err)
 	}
-	got, err := p.ChangedFiles(mine.Cwd, "vibevalley/plan-1")
+	got, err := p.ChangedFiles(mine.Cwd, "vibevalley/task-1")
 	testkit.Eq(t, []any{got, err}, []any{[]string{"a.txt", "b.txt", "c.txt", "new.txt"}, nil}, "changed")
 }
 
@@ -335,13 +335,13 @@ func TestCheckSaysWhatCreateWouldRefuse(t *testing.T) {
 }
 
 func TestPublishedMergeKeepsReceiptWhenWorktreeCleanupFails(t *testing.T) {
-	for _, intoPlan := range []bool{false, true} {
-		t.Run(fmt.Sprint(intoPlan), func(t *testing.T) {
+	for _, intoTask := range []bool{false, true} {
+		t.Run(fmt.Sprint(intoTask), func(t *testing.T) {
 			root := t.TempDir()
 			p := projects(t, root)
 			target := "main"
-			if intoPlan {
-				target = "plan"
+			if intoTask {
+				target = "task"
 				if err := p.OpenBranch("demo", target); err != nil {
 					t.Fatal(err)
 				}
@@ -356,7 +356,7 @@ func TestPublishedMergeKeepsReceiptWhenWorktreeCleanupFails(t *testing.T) {
 			repo := filepath.Join(root, "demo")
 			testkit.Git(t, repo, "worktree", "lock", place.Cwd)
 			var merged Merged
-			if intoPlan {
+			if intoTask {
 				merged, err = p.MergeInto(place, target)
 			} else {
 				merged, err = p.Merge(place)

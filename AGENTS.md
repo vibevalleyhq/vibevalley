@@ -7,11 +7,11 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ```
 server/                    服务端，一个 Go 模块 vibevalley；cmd/server 单独跑它，cmd/vibevalley 是命令行（农场的每个接口、和农机直接聊、自己的 agent），cmd/migrate 管表结构
 server/internal/           农场的服务，一块业务一个包，名字用单数，每个包只导出一个 Service：core、setting、agent、project、
-                           memory、runtime、session、channel、schedule、issue、playbook、manager、gate、voice、connector、game；
-                           base 是地基，workspace 把它们组装起来，handler 是全部 HTTP 处理，mcp 是给编码 agent 的工具
-server/migrations/         SQLite 的迁移，启动时按名字顺序跑；也是 sqlc 读的表结构
+                           memory、runtime、session、channel、schedule、issue、task、tool、manager、gate、voice、connector、game；
+                           agent 的子包 brain 是 VibeValley 自己的 agent，task 的子包 engine 是任务图的引擎；base 是地基，workspace 把它们组装起来，handler 是全部 HTTP 处理，mcp 把 tool 里的工具交给编码 agent
+server/migrations/         SQLite 的表结构：一个基线 0001_schema.sql，直接改它；也是 sqlc 读的表结构
 server/internal/protocol/  形状（shapes.go、api.go）和规则的唯一来源；tool/shapegen 从它写出 gen.go 和 Flutter 的 lib/gen
-server/pkg/                能单独拿去用的库：x（通用的小封装：str 字符串、num 数字、ptr 指针、clock 时间）、smith（oar 的 Go 移植，驱动各家编码 agent）、VibeValley 自己的 agent（agent、agentcore、ai）、
+server/pkg/                能单独拿去用的库：x（通用的小封装：str 字符串、num 数字、ptr 指针、clock 时间）、smith（oar 的 Go 移植，驱动各家编码 agent）、agent 的底层（agentcore 循环、ai 调模型）、
                            agora（声网的令牌和语音 agent）、weixin、feishu、qq（三家聊天软件的机器人接口）
 server/pkg/db/             查询（queries/*.sql）和 sqlc 从它生成的 Go（generated/）
 app/                       客户端（Flutter）：读折好的核心状态，像素村用 Flame；macOS 版把 Go 服务端带在里面
@@ -30,7 +30,7 @@ scripts/                   文档和 Note 的检查
 ```bash
 cd server && go run ./cmd/server                                # 服务端，127.0.0.1:8787
 cd server && go run ./cmd/vibevalley issue list                 # 命令行：调农场的接口（help 列出全部），runtime chat <农机> 直接聊，oar <命令> 是 smith 的 oar 命令行
-cd server && go run ./cmd/migrate status                        # 库在第几版；up 跑迁移（开机也会跑），new 名字 写下一个迁移
+cd server && go run ./cmd/migrate status                        # 库在第几版；up 跑迁移（开机也会跑）；改了 0001_schema.sql 就删掉本机的库重建
 cd server && go vet ./... && go test ./...                      # 改完服务端
 bun run go:deadcode                                             # 改完服务端：server/internal 里没有只靠测试活着的函数
 cd server && go run ./tool/shapegen                             # 改完 protocol/shapes.go 或 api.go：重写 gen.go 和 Flutter 的 lib/gen
@@ -68,7 +68,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **形状和规则只在 Go**：形状写在 `server/internal/protocol/shapes.go`、接口写在 `api.go`；核心状态的折法和它用到的、几个包都用的规则是 `protocol` 里的纯函数，只有一个主人的规则是主人包里不导出的纯函数，黄金数据（`testdata/*.jsonl.gz`，经 `internal/golden`）跟着规则走（[理由](.agents/notes/implemented/architecture/2026-10-16-rules-live-with-their-owner.md)）；改了形状，同一个改动里跑 `go run ./tool/shapegen`；有意改了规则，`VIBEVALLEY_GOLDEN=update go test ./internal/...` 重写黄金数据（[server](server/README.md#形状和规则从哪来)、[理由](.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。
 - **生成的不手改**：`internal/protocol/gen.go` 和 Flutter 的 `lib/gen/` 由 `tool/shapegen` 写，`bun run flutter:check` 查它们是不是最新；`pkg/db/generated` 由 sqlc 写（[理由](.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）。
 - **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `server/internal` 包（`issue`、`issue_session`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `pkg/db/queries/<表>.sql`，一张表一个文件，Go 里只调 sqlc 生成的；`migrations` 的测试查这几条（[理由](.agents/notes/implemented/architecture/2026-10-17-names-by-module.md)）。
-- **不留兼容**：存盘的格式（`vibevalley.db` 的表、家目录的文件、环境变量）只认现在的名字；改名就直接改，不在读的地方长期兜底旧数据；旧数据在升级前用一次性的导入搬（TypeScript 的农场跑过一次，搬完连同旧文件和导入器一起删），启动时只读今天的名字，不读、不改写旧文件（[理由](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)、[一次性迁移](.agents/notes/implemented/architecture/2026-10-17-one-way-migration.md)）。
+- **不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（`vibevalley.db` 的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `server/migrations/0001_schema.sql`，不另加迁移（`migrations` 的测试查这条），本机的旧库和旧文件作废，删掉重建；启动时只认今天的名字（[理由](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。
 - **Flutter 不折事实**：它读 `GET /api/v1/state` 折好的 `CoreState`；要新的数据就加进 protocol 的字段和 `Reduce`，Dart 里只写跟着时钟走的画面；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在 Dart 里重写，加一个字段或接口问服务端（[理由](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)、[客户端问服务端](.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
 - **客户端分层**：`gen`、`sprites`、`audio`、`rules`（只读的纯函数）、`ui`、`data`（服务端状态、偏好、界面的选中/面板）、`host`（本机外壳）、`game`（客户端的动作）、`shared`（几张皮共用的画面）、`chat`（田头）、`voice`、`phone`（农场里的手机和小游戏）、`debug`（调试台）在下；`village` 是像素渲染层；`workbench`、`farm` 是两张皮；`app` 只做组合，`shell` 是外壳。依赖只能往下走（次序在 `scripts/app-imports.ts`，`bun run app:imports` 查），皮之间不互相 import，两张都用的放进 `shared`；下层不 import `app`（[理由](.agents/notes/implemented/architecture/2026-10-16-client-layers.md)）。
 - **通用的小封装在 `pkg/x`**：字符串（按 UTF-16 数、JavaScript 的空白）、数字（照 JavaScript 写）、指针、时间各一个包；要用就 import，不在自己包里再写一份 `xxxPtr`、`chatTrim`（[理由](.agents/notes/implemented/architecture/2026-10-16-common-wrappers-in-pkg-x.md)）。

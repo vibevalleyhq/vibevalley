@@ -177,7 +177,7 @@ class VillageLife extends Component {
     return p == null ? fallback : Picture(p.image, p.w, p.h, name: p.name, dir: dir);
   }
 
-  bool _workshopChimney(Box b) => inBox(Pt((b.x0 + b.x1) / 2, b.y0), village.spotBoxes['runtimes']!);
+  bool _workshopChimney(Box b) => inBox(Pt((b.x0 + b.x1) / 2, b.y0), village.spotBoxes[YardPlace.runtimes]!);
 
   void _zzz(double x, double y) => bits.add(Layer.marks, const Glyph(_zed, ui.Color(0xFFF4EFE0)), x: x, y: y, vx: 3, vy: -5, sway: 1.5, alpha: 0.85, life: 2.2);
 
@@ -249,7 +249,7 @@ class VillageLife extends Component {
     }
   }
 
-  List<PointLight> step(LifeFrame f) {
+  List<PointLight> task(LifeFrame f) {
     final t = f.t;
     final dt = f.dt;
     final night = f.night;
@@ -408,7 +408,7 @@ class VillageLife extends Component {
     _birds.update(t, dt);
     lights.addAll(_fireflies.update(t, night > 0.4 ? (night - 0.4) / 0.6 : 0));
 
-    bits.step(dt, wind);
+    bits.task(dt, wind);
     return lights;
   }
 

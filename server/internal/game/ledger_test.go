@@ -70,7 +70,7 @@ func TestLedger(t *testing.T) {
 		t.Fatalf("progress: %+v", progress)
 	}
 
-	f.Core.Apply(protocol.FactHired{Session: protocol.Session{ID: "w2", Name: "帮工", Agent: "lab", Runtime: "pi", Task: "试试", Phase: protocol.Phase{Value: protocol.PhaseWorking{}}}})
+	f.Core.Apply(protocol.FactHired{Session: protocol.Session{ID: "w2", Name: "帮工", Agent: "lab", Runtime: "pi", Brief: "试试", Phase: protocol.Phase{Value: protocol.PhaseWorking{}}}})
 	f.Core.Apply(protocol.FactReport{ID: "w2", Outcome: protocol.OutcomeFailed, Summary: "坏了", Runs: 1})
 	f.Core.Apply(protocol.FactCommits{Commits: protocol.CommitCount{Total: 1000}})
 	want := []string{"harvested", "hired", "failed", "level"}

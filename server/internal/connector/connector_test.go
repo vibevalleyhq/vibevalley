@@ -33,10 +33,10 @@ type voiceSent struct {
 }
 
 type voiceScript struct {
-	mu          sync.Mutex
-	qr          []weixin.QrStatus
-	feishuPolls []feishu.RegistrationPoll
-	sent        []voiceSent
+	mu            sync.Mutex
+	weixinAccount weixin.LoginAccount
+	feishuAccount feishu.LoginAccount
+	sent          []voiceSent
 	// restricted: while set, sending fails as the apps do when a reply's window has passed.
 	restricted atomic.Bool
 
@@ -66,20 +66,16 @@ func (s *voiceScript) sentBy(app protocol.ConnectorID) []voiceSent {
 
 type voiceScriptedIlink struct{ s *voiceScript }
 
-func (voiceScriptedIlink) QrCode(context.Context) (string, string, error) {
-	return "q1", "https://liteapp.weixin.qq.com/q/q1", nil
-}
-
-func (a voiceScriptedIlink) QrStatus(ctx context.Context, _, _, _ string) weixin.QrStatus {
-	clock.Sleep(ctx, 20*time.Millisecond)
-	a.s.mu.Lock()
-	defer a.s.mu.Unlock()
-	if len(a.s.qr) == 0 {
-		return weixin.QrStatus{Status: "wait"}
+func (a voiceScriptedIlink) Login(ctx context.Context, progress func(weixin.LoginProgress), _ func() string) (weixin.LoginAccount, error) {
+	progress(weixin.LoginProgress{State: weixin.LoginWaiting, URL: "https://liteapp.weixin.qq.com/q/q1"})
+	if !clock.Sleep(ctx, 20*time.Millisecond) {
+		return weixin.LoginAccount{}, ctx.Err()
 	}
-	next := a.s.qr[0]
-	a.s.qr = a.s.qr[1:]
-	return next
+	progress(weixin.LoginProgress{State: weixin.LoginScanned, URL: "https://liteapp.weixin.qq.com/q/q1"})
+	if !clock.Sleep(ctx, 20*time.Millisecond) {
+		return weixin.LoginAccount{}, ctx.Err()
+	}
+	return a.s.weixinAccount, nil
 }
 
 func (a voiceScriptedIlink) GetUpdates(ctx context.Context, _ weixin.Account, buf string, _ time.Duration) (weixin.Updates, error) {
@@ -103,26 +99,21 @@ func (a voiceScriptedIlink) SendText(_ context.Context, _ weixin.Account, to, te
 
 type voiceScriptedFeishu struct{ s *voiceScript }
 
-func (voiceScriptedFeishu) Register(context.Context) (feishu.Registration, error) {
-	return feishu.Registration{DeviceCode: "dev1", URL: "https://open.feishu.cn/page/cli?user_code=AB", Interval: 20 * time.Millisecond, Expires: 5 * time.Second}, nil
-}
-
-func (a voiceScriptedFeishu) Poll(context.Context, string, feishu.Domain) feishu.RegistrationPoll {
-	a.s.mu.Lock()
-	defer a.s.mu.Unlock()
-	if len(a.s.feishuPolls) == 0 {
-		return feishu.RegistrationPoll{Status: "pending", Domain: "feishu"}
+func (a voiceScriptedFeishu) Login(ctx context.Context, progress func(feishu.LoginProgress)) (feishu.LoginAccount, error) {
+	progress(feishu.LoginProgress{URL: "https://open.feishu.cn/page/cli?user_code=AB"})
+	if !clock.Sleep(ctx, 40*time.Millisecond) {
+		return feishu.LoginAccount{}, ctx.Err()
 	}
-	next := a.s.feishuPolls[0]
-	a.s.feishuPolls = a.s.feishuPolls[1:]
-	return next
+	return a.s.feishuAccount, nil
 }
 
-func (a voiceScriptedFeishu) Listen(ctx context.Context, _ feishu.App, got func(feishu.Message)) error {
+func (a voiceScriptedFeishu) Listen(ctx context.Context, _ feishu.App, got func(feishu.Message) error) error {
 	for {
 		select {
 		case m := <-a.s.feishu:
-			got(m)
+			if err := got(m); err != nil {
+				return err
+			}
 		case <-ctx.Done():
 			return nil
 		}
@@ -142,11 +133,13 @@ func (voiceScriptedQQ) Check(_ context.Context, app qq.App) error {
 	return fmt.Errorf("QQ 鉴权：AppID 或 AppSecret 不对")
 }
 
-func (a voiceScriptedQQ) Listen(ctx context.Context, _ qq.App, got func(qq.Message)) error {
+func (a voiceScriptedQQ) Listen(ctx context.Context, _ qq.App, got func(qq.Message) error) error {
 	for {
 		select {
 		case m := <-a.s.qq:
-			got(m)
+			if err := got(m); err != nil {
+				return err
+			}
 		case <-ctx.Done():
 			return nil
 		}
@@ -164,17 +157,11 @@ func voiceConnectorsFarm(t *testing.T) (*world, *voiceScript) {
 	t.Helper()
 	f := connectorTestFarm(t)
 	s := &voiceScript{
-		qr: []weixin.QrStatus{
-			{Status: "scaned"},
-			{Status: "confirmed", BotToken: "tok", IlinkBotID: "bot1@im.bot", BaseURL: "https://ilinkai.weixin.qq.com", IlinkUserID: voiceOwner},
-		},
-		feishuPolls: []feishu.RegistrationPoll{
-			{Status: "pending", Domain: "feishu"},
-			{Status: "succeeded", AppID: "cli_1", AppSecret: "s", Domain: "feishu"},
-		},
-		weixin: make(chan weixin.Message, 16),
-		feishu: make(chan feishu.Message, 16),
-		qq:     make(chan qq.Message, 16),
+		weixinAccount: weixin.LoginAccount{Account: weixin.Account{BaseURL: weixin.BaseURL, Token: "tok"}, BotID: "bot1@im.bot", Owner: voiceOwner},
+		feishuAccount: feishu.LoginAccount{App: feishu.App{AppID: "cli_1", AppSecret: "s", Domain: "feishu"}},
+		weixin:        make(chan weixin.Message, 16),
+		feishu:        make(chan feishu.Message, 16),
+		qq:            make(chan qq.Message, 16),
 	}
 	c := f.Connector
 	c.ilink, c.feishu, c.qq = voiceScriptedIlink{s}, voiceScriptedFeishu{s}, voiceScriptedQQ{s}
@@ -184,7 +171,7 @@ func voiceConnectorsFarm(t *testing.T) (*world, *voiceScript) {
 		if err != nil {
 			return err
 		}
-		f.Channel.ManagerSays(said.Conversation, fmt.Sprintf("k%d", n.Add(1)), "收到：**"+text+"**", true)
+		f.Channel.ManagerSays(said.Conversation, fmt.Sprintf("k%d", n.Add(1)), "收到：**"+text+"**", true, "")
 		return nil
 	}
 	if err := f.Start(context.Background()); err != nil {
@@ -309,7 +296,7 @@ func TestConnectorsWeixinInAnotherChannel(t *testing.T) {
 	if _, err := f.Connector.SetChannel(protocol.ConnectorIDWeixin, "#nowhere"); err == nil || !strings.Contains(err.Error(), "没有叫") {
 		t.Fatalf("nowhere: %v", err)
 	}
-	f.Channel.ManagerSays(f.Channel.General(), "sq", "田头上的话", true)
+	f.Channel.ManagerSays(f.Channel.General(), "sq", "田头上的话", true, "")
 	s.weixin <- voiceWx(voiceOwner, "打卡页怎么样了", "ctx-c")
 	reply := voiceNth(t, s, protocol.ConnectorIDWeixin, 0, "the answer in WeChat")
 	if want := (voiceSent{App: protocol.ConnectorIDWeixin, To: voiceOwner, Text: "【管家】\n收到：打卡页怎么样了", Reply: "ctx-c"}); reply != want {
@@ -509,7 +496,7 @@ func TestConnectorsResumeAfterRestart(t *testing.T) {
 			t.Fatal(err)
 		}
 		s := &voiceScript{weixin: make(chan weixin.Message, 4), feishu: make(chan feishu.Message, 4), qq: make(chan qq.Message, 4)}
-		s.qr = []weixin.QrStatus{{Status: "confirmed", BotToken: "tok", IlinkBotID: "bot1", IlinkUserID: voiceOwner}}
+		s.weixinAccount = weixin.LoginAccount{Account: weixin.Account{BaseURL: weixin.BaseURL, Token: "tok"}, BotID: "bot1", Owner: voiceOwner}
 		f.Connector.ilink, f.Connector.feishu, f.Connector.qq = voiceScriptedIlink{s}, voiceScriptedFeishu{s}, voiceScriptedQQ{s}
 		f.Connector.say = func(_ context.Context, text string, conversation *string) error {
 			_, _, err := f.Channel.Say(text, conversation, "")
@@ -535,27 +522,30 @@ func TestConnectorsResumeAfterRestart(t *testing.T) {
 	})
 }
 
-func TestInboundDeduplicationFailureDoesNotExecute(t *testing.T) {
+func TestInboundAcceptanceCancellationDoesNotExecute(t *testing.T) {
 	f := connectorTestFarm(t)
 	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
-	b.account = &voiceAccount{owner: voiceOwner}
 	var heard atomic.Int32
 	f.Connector.say = func(context.Context, string, *string) error { heard.Add(1); return nil }
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	b.got(ctx, voiceInbound{ID: "failed-read", From: voiceOwner, Text: "do work"})
-	if heard.Load() != 0 {
-		t.Fatal("executed despite failed duplicate check")
+	if err := b.inbox.accept(ctx, []voiceInbound{{ID: "failed-read", From: voiceOwner, Text: "do work"}}, ""); err == nil {
+		t.Fatal("cancelled acceptance succeeded")
 	}
-	if b.err == "" {
-		t.Fatal("duplicate-check failure was hidden")
+	if heard.Load() != 0 {
+		t.Fatal("executed cancelled input")
 	}
 }
 
 func TestConcurrentInboundIsTakenOnce(t *testing.T) {
 	f := connectorTestFarm(t)
 	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
-	b.account = &voiceAccount{owner: voiceOwner}
+	if err := f.Connector.q.ConnectAccount(context.Background(), generated.ConnectAccountParams{Connector: string(b.id), Secrets: `{}`, OwnerID: voiceNullable(voiceOwner)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.reload(); err != nil {
+		t.Fatal(err)
+	}
 	var heard atomic.Int32
 	f.Connector.say = func(context.Context, string, *string) error { heard.Add(1); return nil }
 	var workers sync.WaitGroup
@@ -563,10 +553,15 @@ func TestConcurrentInboundIsTakenOnce(t *testing.T) {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			b.got(context.Background(), voiceInbound{ID: "same-message", From: voiceOwner, Text: "do work"})
+			if err := b.inbox.accept(context.Background(), []voiceInbound{{ID: "same-message", From: voiceOwner, Text: "do work"}}, ""); err != nil {
+				t.Error(err)
+			}
 		}()
 	}
 	workers.Wait()
+	if err := b.inbox.drain(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	if heard.Load() != 1 {
 		t.Fatalf("heard %d times", heard.Load())
 	}

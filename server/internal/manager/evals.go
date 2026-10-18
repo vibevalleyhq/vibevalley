@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	vvagent "vibevalley/internal/agent/brain"
 	"vibevalley/internal/base"
 	"vibevalley/internal/memory"
 	"vibevalley/internal/protocol"
-	vvagent "vibevalley/pkg/agent"
 	"vibevalley/pkg/agentcore"
 	"vibevalley/pkg/ai"
 	"vibevalley/pkg/x/clock"
@@ -92,17 +92,19 @@ func (fm *manager) MarkWrong(on int64, want string) (protocol.ManagerEval, error
 	return protocol.ManagerEval{ID: eval.ID, File: file}, nil
 }
 
-// The input that began the turn asked: sendInput logs the line before it makes the message, so the message is no older than the
-// step, and it holds the step's words (the step is trimmed and may be cut; the message puts the time, the farm and the news before them).
-// Later inputs are written when taken, not when made, so time alone could pick another. -1 when none is.
+// The input that began the turn asked: the run's journal logs the line when the input is taken, after sendInput made the
+// message, so the message is no newer than the step, and it holds the step's words (the step is trimmed and may be cut; the
+// message puts the time, the farm and the news before them). Of those, the newest: an older one with the same words was taken
+// before. -1 when none is.
 func managerTurnAt(lines []agentcore.AgentMessage, asked protocol.SessionEvent) int {
 	head := strings.TrimSuffix(asked.Text, "…")
+	at := -1
 	for i, m := range lines {
-		if managerIsInput(m) && m.Time() >= asked.Time && strings.Contains(vvagent.MessageText(m), head) {
-			return i
+		if managerIsInput(m) && m.Time() <= asked.Time && strings.Contains(vvagent.MessageText(m), head) && (at < 0 || m.Time() >= lines[at].Time()) {
+			at = i
 		}
 	}
-	return -1
+	return at
 }
 
 func managerIsInput(m agentcore.AgentMessage) bool {
@@ -155,7 +157,7 @@ func (fm *manager) modelID() string {
 	return fm.modelOf()
 }
 
-// The brain's tools: the manager's and pkg/agent's own, as brainOf gives them (no skills' folder, no subagents, no schedules).
+// The brain's tools: the manager's and internal/agent/brain's own, as brainOf gives them (no skills' folder, no subagents, no schedules).
 func (fm *manager) toolNames() []string {
 	tools := append(fm.tools(), vvagent.SelfTools(vvagent.SelfOptions{Memory: true})...)
 	names := make([]string, len(tools))

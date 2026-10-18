@@ -3,7 +3,9 @@ package manager
 import (
 	"encoding/json"
 
-	vvagent "vibevalley/pkg/agent"
+	vvagent "vibevalley/internal/agent/brain"
+	"vibevalley/internal/protocol"
+	"vibevalley/internal/session"
 	"vibevalley/pkg/agentcore"
 )
 
@@ -19,6 +21,7 @@ type managerInput struct {
 	// The owner's own words are in this input: only then may the manager merge into a main branch.
 	Owner  bool `json:"owner,omitempty"`
 	caller *managerCaller
+	run    session.RunInput
 }
 
 // Who woke the manager: what the input's words are worth.
@@ -32,10 +35,10 @@ const (
 	sourceIssue    managerSource = "issue"
 	sourceSchedule managerSource = "schedule"
 	sourcePatrol   managerSource = "patrol"
-	sourcePlaybook managerSource = "playbook"
+	sourceGraph    managerSource = "graph"
 )
 
-var managerSources = []managerSource{sourceOwner, sourceChat, sourceIssue, sourceSchedule, sourcePatrol, sourcePlaybook}
+var managerSources = []managerSource{sourceOwner, sourceChat, sourceIssue, sourceSchedule, sourcePatrol, sourceGraph}
 
 // The first words of every input, fixed per source so that the conversation's prefix stays the same; also how its log names the round.
 func managerHead(source managerSource) string {
@@ -50,10 +53,24 @@ func managerHead(source managerSource) string {
 		return "[来源：定时]\n"
 	case sourcePatrol:
 		return "[来源：巡查]\n"
-	case sourcePlaybook:
+	case sourceGraph:
 		return "[来源：种植计划]\n"
 	}
 	panic("manager: an input from nowhere: " + string(source))
+}
+
+// What started a run going on with an input of this source, when only the transcript is left to say.
+func managerTrigger(source managerSource) protocol.RunTriggerKind {
+	switch source {
+	case sourceOwner, sourceChat:
+		return protocol.RunTriggerKindComment
+	case sourceIssue:
+		return protocol.RunTriggerKindIssue
+	case sourceSchedule:
+		return protocol.RunTriggerKindSchedule
+	}
+	// As send gives the patrol's and the tasks' lines.
+	return protocol.RunTriggerKindRuntime
 }
 
 func managerInputOf(message agentcore.AgentMessage) (managerInput, bool) {

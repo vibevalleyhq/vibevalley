@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"vibevalley/internal/agent/brain"
 	"vibevalley/internal/base"
 	"vibevalley/internal/channel"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
-	"vibevalley/pkg/agent"
 	"vibevalley/pkg/ai"
 	"vibevalley/pkg/smith/oar"
 	"vibevalley/pkg/smith/oartest"
@@ -97,9 +97,9 @@ func managerRespond(c ai.Context, _ ai.StreamOptions, _ ai.FauxProviderState, _ 
 		return ai.FauxAssistantMessage("好，" + str.Head(result, 2) + "了")
 	}
 	if asked := managerAsked.FindString(managerSinceAnswer(c)); asked != "" {
-		args := map[string]any{"task": asked, "project": "demo"}
+		args := map[string]any{"brief": asked, "project": "demo"}
 		if strings.Contains(asked, "CHANGELOG") {
-			args = map[string]any{"task": asked, "project": "notes", "agent": "lab"}
+			args = map[string]any{"brief": asked, "project": "notes", "agent": "lab"}
 		}
 		return ai.FauxAssistantMessage(ai.FauxToolCall("dispatch", args, ""))
 	}
@@ -158,7 +158,7 @@ func managerStart(t *testing.T, cfg base.Config, faux *ai.FauxProviderHandle) *m
 		return fixture.Pi()
 	}
 	w.faux = faux
-	f.Manager.llm = &agent.LLM{Model: w.faux.GetModel()}
+	f.Manager.llm = &brain.LLM{Model: w.faux.GetModel()}
 	w.ctx = ai.WithProviders(context.Background(), w.faux.Provider)
 	if err := f.Start(w.ctx); err != nil {
 		t.Fatal(err)
@@ -210,9 +210,9 @@ func TestManagerDispatchesAndHearsVoiceInChat(t *testing.T) {
 	}
 	trail := testkit.Await(t, "its log", func() ([]protocol.SessionEvent, bool) {
 		events := slices.DeleteFunc(f.Session.Events(protocol.ManagerAgent, ""), func(e protocol.SessionEvent) bool { return e.Type == protocol.SessionEventTypeLLMUsage })
-		return events, len(events) >= 3 && events[len(events)-1].Type == protocol.SessionEventTypeAssistantMessage
+		return events, len(events) >= 6 && events[len(events)-1].Type == protocol.SessionEventTypeRunEnd
 	})
-	last := trail[len(trail)-4:]
+	last := trail[len(trail)-5 : len(trail)-1]
 	asked, tool, result, answer := last[0], last[1], last[2], last[3]
 	if result.Type != protocol.SessionEventTypeToolResult || result.Call == nil || *result.Call != tool.Seq || result.Ok == nil || !*result.Ok {
 		t.Fatalf("result %+v", result)
@@ -303,17 +303,6 @@ func TestManagerCallStreamsItsWords(t *testing.T) {
 	if kept := testkit.Await(t, "the call in 田头", func() ([]string, bool) { k := call(); return k, len(k) == 2 }); !slices.Equal(kept, []string{"user：现在地里怎么样", "manager：收到"}) {
 		t.Fatalf("田头 %q", kept)
 	}
-	if _, err := f.Setting.Save(protocol.SettingsUpdate{Voice: &protocol.SettingsUpdateVoice{Answer: protocol.VoiceAnswer{Value: protocol.VoiceAnswerManager{}}}}); err != nil {
-		t.Fatal(err)
-	}
-	f.Manager.Heard("随便说一句", "", "")
-	testkit.Settle()
-	if len(w.seen()) != before+1 {
-		t.Fatal("the relay reached the manager")
-	}
-	if kept := call(); len(kept) != 2 {
-		t.Fatalf("what the voice line already kept is kept again: %q", kept)
-	}
 }
 
 func TestManagerSchedulesComeDue(t *testing.T) {
@@ -370,7 +359,7 @@ func TestManagerSchedulesComeDue(t *testing.T) {
 	}
 	sent := testkit.Await(t, "the session sent", func() (session.Roster, bool) {
 		for _, r := range f.Session.Roster() {
-			if r.Session.Task == "巡检\n\n跑一遍检查" {
+			if r.Session.Brief == "巡检\n\n跑一遍检查" {
 				return r, true
 			}
 		}
@@ -402,7 +391,7 @@ func TestManagerHearsThePatrol(t *testing.T) {
 	testkit.Until(t, "the work ripe", func() bool {
 		return slices.ContainsFunc(f.Session.Roster(), func(r session.Roster) bool {
 			_, ripe := r.Session.Phase.Value.(protocol.PhaseRipe)
-			return r.Session.Task == "加个 CHANGELOG" && ripe
+			return r.Session.Brief == "加个 CHANGELOG" && ripe
 		})
 	})
 	hoursOn := func(h float64) func() int64 {
@@ -501,20 +490,6 @@ func TestManagerDeepseekModel(t *testing.T) {
 	}
 }
 
-func TestManagerToolStart(t *testing.T) {
-	start := managerToolStart("dispatch", []byte(`{ "task": "加个 README", "project": "demo" }`))
-	if start.Text != "派活：demo" || start.Input != `{"task":"加个 README","project":"demo"}` || start.Action != protocol.ToolActionOther {
-		t.Fatalf("%+v", start)
-	}
-	long := managerToolStart("plan", []byte(`{"goal":"`+strings.Repeat("长", 50)+`"}`))
-	if long.Text != "拆计划："+strings.Repeat("长", 40)+"…" {
-		t.Fatalf("%q", long.Text)
-	}
-	if managerToolStart("unknown", nil).Text != "unknown" {
-		t.Fatal("an unknown tool is named by its name")
-	}
-}
-
 func TestManagerStopsItsRun(t *testing.T) {
 	long := strings.Repeat("我看一下地里的情况，", 40)
 	w := managerOpenWith(t, ai.FauxProviderOptions{Delay: 5 * time.Millisecond}, func(c ai.Context, o ai.StreamOptions, s ai.FauxProviderState, m ai.Model) ai.AssistantMessage {
@@ -534,14 +509,15 @@ func TestManagerStopsItsRun(t *testing.T) {
 	})
 	f.Manager.Stop()
 	testkit.Until(t, "the manager listening", func() bool { return f.Core.State().Manager == protocol.ManagerStateListening })
-	answered := testkit.Await(t, "its issue answered", func() (protocol.Issue, bool) {
-		i, ok := f.Issue.OfSchedule(made.ID)
-		return i, ok && i.Closed != nil
-	})
-	runs, err := f.Session.Runs(answered.ID)
-	if err != nil || len(runs) != 1 || runs[0].Outcome == nil {
-		t.Fatalf("runs %+v %v", runs, err)
+	// An interrupted run leaves its issue open: only a completed one answers it.
+	ran, ok := f.Issue.OfSchedule(made.ID)
+	if !ok {
+		t.Fatal("no issue of the schedule")
 	}
+	runs := testkit.Await(t, "its run ended", func() ([]protocol.Run, bool) {
+		runs, err := f.Session.Runs(ran.ID)
+		return runs, err == nil && len(runs) == 1 && runs[0].Outcome != nil
+	})
 	testkit.Eq(t, *runs[0].Outcome, protocol.OutcomeInterrupted, "the manager's run")
 	if roster := f.Session.Roster(); len(roster) != 1 || roster[0].Place.Project != "demo" {
 		t.Fatalf("the session it sent: %+v", roster)
@@ -666,7 +642,7 @@ func TestManagerMergesOnlyWhenTheOwnerAsks(t *testing.T) {
 		}
 		return "", false
 	})
-	testkit.Eq(t, refused, "合并："+managerMergeNotAsked, "a helper's words")
+	testkit.Eq(t, refused, "合并：没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。", "a helper's words")
 	if i, err := f.Issue.Get(*hired.Session.Issue); err != nil || i.Closed != nil {
 		t.Fatalf("the issue: %+v %v", i, err)
 	}

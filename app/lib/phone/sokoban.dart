@@ -92,19 +92,19 @@ WarehouseGame moveWarehouse(WarehouseGame g, WarehouseDirection direction) {
     WarehouseDirection.up => -width,
     WarehouseDirection.down => width,
   };
-  int? step(int from) {
+  int? task(int from) {
     final next = from + offset;
     if (next < 0 || next >= cells.length || cells[next] == '#') return null;
     if ((direction == WarehouseDirection.left || direction == WarehouseDirection.right) && from ~/ width != next ~/ width) return null;
     return next;
   }
 
-  final player = step(g.player);
+  final player = task(g.player);
   if (player == null) return g;
   final box = g.boxes.indexOf(player);
   var boxes = g.boxes;
   if (box >= 0) {
-    final target = step(player);
+    final target = task(player);
     if (target == null || g.boxes.contains(target)) return g;
     boxes = [for (var i = 0; i < g.boxes.length; i++) i == box ? target : g.boxes[i]];
   }

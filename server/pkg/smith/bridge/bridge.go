@@ -2,9 +2,8 @@
 // stdio, so a host in another language (and the TS behavior suite,
 // sea-trial/harness/go-bridge.ts) can drive Go sessions. Every record a
 // session appends is pushed as a `session.record` notification, in seq
-// order; a control's result arrives as the RPC response, which may overtake
-// the notification of its own records, so a client mirrors records and
-// waits for the response's seq before resolving.
+// order. Control replies follow the notifications through their response seq, so
+// clients can apply the reply against their mirror without another progress barrier.
 package bridge
 
 import (
@@ -19,6 +18,7 @@ import (
 	"time"
 
 	"vibevalley/pkg/smith/oar"
+	"vibevalley/pkg/smith/observe"
 )
 
 type request struct {
@@ -38,6 +38,7 @@ type Server struct {
 	registry *oar.RuntimeRegistry
 	writeMu  sync.Mutex
 	out      *bufio.Writer
+	writeErr error
 
 	mu       sync.Mutex
 	sessions map[string]*openSession
@@ -45,12 +46,28 @@ type Server struct {
 }
 
 type openSession struct {
-	session     oar.Session
-	unsubscribe oar.Unsubscribe
+	session oar.Session
+	records *observe.RecordSubscription
+	mu      sync.Mutex
+	closed  bool
+	err     error
+}
+
+func (s *openSession) close(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return s.err
+	}
+	s.closed = true
+	s.err = errors.Join(s.session.Dispose(ctx), s.records.Close(ctx))
+	return s.err
 }
 
 // Serve answers requests from in until it ends, then disposes every open session.
 func Serve(ctx context.Context, registry *oar.RuntimeRegistry, in io.Reader, out io.Writer) error {
+	requestCtx, stopRequests := context.WithCancel(ctx)
+	defer stopRequests()
 	server := &Server{registry: registry, out: bufio.NewWriter(out), sessions: map[string]*openSession{}}
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 1024*1024), 256*1024*1024)
@@ -67,10 +84,11 @@ func Serve(ctx context.Context, registry *oar.RuntimeRegistry, in io.Reader, out
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			result, err := server.handle(ctx, req.Method, req.Params)
+			result, err := server.handle(requestCtx, req.Method, req.Params)
 			server.reply(req.ID, result, err)
 		}()
 	}
+	stopRequests()
 	wg.Wait()
 	server.mu.Lock()
 	open := server.sessions
@@ -78,22 +96,39 @@ func Serve(ctx context.Context, registry *oar.RuntimeRegistry, in io.Reader, out
 	server.mu.Unlock()
 	disposeCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	err := scanner.Err()
 	for _, entry := range open {
-		_ = entry.session.Dispose(disposeCtx)
+		err = errors.Join(err, entry.close(disposeCtx))
 	}
-	return scanner.Err()
+	return errors.Join(err, server.outputError())
 }
 
-func (s *Server) write(message any) {
+func (s *Server) write(message any) error {
 	encoded, err := json.Marshal(message)
 	if err != nil {
 		encoded, _ = json.Marshal(map[string]any{"jsonrpc": "2.0", "method": "bridge.error", "params": map[string]any{"message": err.Error()}})
 	}
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
-	_, _ = s.out.Write(encoded)
-	_ = s.out.WriteByte('\n')
-	_ = s.out.Flush()
+	if s.writeErr != nil {
+		return s.writeErr
+	}
+	if _, err := s.out.Write(encoded); err != nil {
+		s.writeErr = err
+		return err
+	}
+	if err := s.out.WriteByte('\n'); err != nil {
+		s.writeErr = err
+		return err
+	}
+	s.writeErr = s.out.Flush()
+	return s.writeErr
+}
+
+func (s *Server) outputError() error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	return s.writeErr
 }
 
 func (s *Server) reply(id json.RawMessage, result any, err error) {
@@ -268,7 +303,7 @@ func (s *Server) handle(ctx context.Context, method string, params json.RawMessa
 		if runtime.Installation == nil {
 			return nil, oar.ErrControlUnsupported
 		}
-		return runtime.Installation(ctx)
+		return runtime.Installation(ctx, oar.InstallationOptions{})
 	case "runtime.listModels", "runtime.accountUsage", "runtime.checkUpdate", "runtime.authStatus", "runtime.skills", "runtime.commands", "runtime.mcpServers", "runtime.tools", "runtime.installPlan", "runtime.logout", "runtime.upgrade", "runtime.install":
 		return s.utility(ctx, method, params)
 	case "session.open":
@@ -295,7 +330,7 @@ func (s *Server) handle(ctx context.Context, method string, params json.RawMessa
 		if err != nil {
 			return nil, err
 		}
-		return controlResult(outcome), nil
+		return s.controlResult(ctx, p.Session, outcome)
 	case "session.withdraw":
 		p, err := decode[inputParams](params)
 		if err != nil {
@@ -309,7 +344,7 @@ func (s *Server) handle(ctx context.Context, method string, params json.RawMessa
 		if err != nil {
 			return nil, err
 		}
-		return controlResult(outcome), nil
+		return s.controlResult(ctx, p.Session, outcome)
 	case "session.abort":
 		p, err := decode[inputParams](params)
 		if err != nil {
@@ -323,7 +358,7 @@ func (s *Server) handle(ctx context.Context, method string, params json.RawMessa
 		if err != nil {
 			return nil, err
 		}
-		return controlResult(outcome), nil
+		return s.controlResult(ctx, p.Session, outcome)
 	case "session.resources":
 		p, err := decode[inputParams](params)
 		if err != nil {
@@ -356,7 +391,13 @@ func (s *Server) handle(ctx context.Context, method string, params json.RawMessa
 		if err := session.Dispose(ctx); err != nil {
 			return nil, err
 		}
-		return map[string]any{"records": len(session.Records())}, nil
+		records := session.Records()
+		if len(records) > 0 {
+			if err := s.confirm(ctx, p.Session, records[len(records)-1].Seq); err != nil {
+				return nil, err
+			}
+		}
+		return map[string]any{"records": len(records)}, nil
 	case "session.close":
 		p, err := decode[inputParams](params)
 		if err != nil {
@@ -367,15 +408,33 @@ func (s *Server) handle(ctx context.Context, method string, params json.RawMessa
 		delete(s.sessions, p.Session)
 		s.mu.Unlock()
 		if ok {
-			entry.unsubscribe()
+			if err := entry.close(ctx); err != nil {
+				return nil, err
+			}
 		}
 		return map[string]any{}, nil
 	}
 	return nil, fmt.Errorf("unknown method %q", method)
 }
 
-func controlResult(outcome oar.ControlOutcome) map[string]any {
-	return map[string]any{"request": outcome.Request, "response": outcome.Response}
+func (s *Server) confirm(ctx context.Context, handle string, seq int64) error {
+	s.mu.Lock()
+	entry := s.sessions[handle]
+	s.mu.Unlock()
+	if entry == nil {
+		return fmt.Errorf("unknown session %q", handle)
+	}
+	if err := entry.records.Through(ctx, seq); err != nil {
+		return err
+	}
+	return s.outputError()
+}
+
+func (s *Server) controlResult(ctx context.Context, handle string, outcome oar.ControlOutcome) (any, error) {
+	if err := s.confirm(ctx, handle, outcome.Response.Seq); err != nil {
+		return nil, err
+	}
+	return map[string]any{"request": outcome.Request, "response": outcome.Response}, nil
 }
 
 func (s *Server) open(ctx context.Context, params json.RawMessage) (any, error) {
@@ -400,11 +459,11 @@ func (s *Server) open(ctx context.Context, params json.RawMessage) (any, error) 
 	s.next++
 	handle := fmt.Sprintf("s%d", s.next)
 	s.mu.Unlock()
-	unsubscribe := session.RawEvents(func(record oar.RawEvent) {
+	records := observe.SubscribeRecords(session, func(record oar.RawEvent) {
 		s.write(map[string]any{"jsonrpc": "2.0", "method": "session.record", "params": map[string]any{"session": handle, "record": record}})
 	}, &oar.Cursor{SessionID: session.ID(), AfterSeq: -1})
 	s.mu.Lock()
-	s.sessions[handle] = &openSession{session: session, unsubscribe: unsubscribe}
+	s.sessions[handle] = &openSession{session: session, records: records}
 	s.mu.Unlock()
 	return map[string]any{
 		"session":          handle,

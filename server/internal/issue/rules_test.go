@@ -16,8 +16,8 @@ func TestIssueTitleAndJob(t *testing.T) {
 	testkit.Eq(t, [2]string{title, description}, [2]string{"", ""})
 }
 
-func TestNextPlaybookID(t *testing.T) {
-	testkit.Eq(t, nextPlaybookID(nil), "p1")
-	testkit.Eq(t, nextPlaybookID([]string{"p3", "p12", "p9"}), "p13")
-	testkit.Eq(t, nextPlaybookID([]string{"p3", "px", "p 7 ", "p-9", "p0x10", "p1.5", "q40"}), "p4", "only p and a whole number count")
+func TestNextTaskID(t *testing.T) {
+	testkit.Eq(t, nextTaskID(nil), "p1")
+	testkit.Eq(t, nextTaskID([]string{"p3", "p12", "p9"}), "p13")
+	testkit.Eq(t, nextTaskID([]string{"p3", "px", "p 7 ", "p-9", "p0x10", "p1.5", "q40"}), "p4", "only p and a whole number count")
 }

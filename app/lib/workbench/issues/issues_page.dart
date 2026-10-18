@@ -8,7 +8,6 @@ import '../../gen/vibevalley.dart';
 import '../../rules/issues.dart';
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
-import '../shared/resource.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
@@ -71,7 +70,7 @@ class IssueCard extends BoardCard {
   const IssueCard(this.issue, this.sessions, this.state, this.session);
   final Issue issue;
 
-  // Its sessions, oldest first: the ones on the farm and the ended (session.list).
+  // Real live and ended sessions, in the issue history query's order.
   final List<Session> sessions;
   final IssueTag state;
   final Session? session;
@@ -89,22 +88,21 @@ class IssueCard extends BoardCard {
   List<String?> get words => [issue.title, issue.description, head.name, issue.project, issue.id, head.lastRun?.summary];
 }
 
-/// A session session.list has not answered for yet stands in with what the issue knows.
-List<Session> sessionsOf(Issue issue, Map<String, Session> heads) => [
-  for (final id in issue.sessions)
-    heads[id] ??
-        Session(
-          id: id,
-          name: id,
-          agent: issue.assignee ?? '',
-          runtime: '',
-          task: issue.title,
-          project: issue.project,
-          hiredAt: issue.createdAt,
-          runs: 0,
-          phase: const PhaseResting(),
-        ),
-];
+class MissingSessionCard extends BoardCard {
+  const MissingSessionCard(this.history);
+  final IssueHistory history;
+  Issue get issue => history.issue;
+  @override
+  String get id => issue.id;
+  @override
+  Lane get lane => laneOf(issue.status);
+  @override
+  String? get project => issue.project;
+  @override
+  String? get agent => issue.assignee;
+  @override
+  List<String?> get words => [issue.title, issue.description, issue.project];
+}
 
 /// An issue for the manager: open while the manager works on it, closed once it has answered; never dragged.
 class ManagerCard extends BoardCard {
@@ -122,19 +120,19 @@ class ManagerCard extends BoardCard {
   List<String?> get words => [issue.title, issue.description, issue.project, issue.id, '管家'];
 }
 
-class PlaybookCard extends BoardCard {
-  const PlaybookCard(this.playbook, this.lane);
-  final Playbook playbook;
+class TaskCard extends BoardCard {
+  const TaskCard(this.graph, this.lane);
+  final TaskGraph graph;
   @override
   final Lane lane;
   @override
-  String get id => 'playbook:${playbook.id}';
+  String get id => 'task:${graph.id}';
   @override
-  String? get project => playbook.project;
+  String? get project => graph.project;
   @override
   String? get agent => null;
   @override
-  List<String?> get words => [playbook.title, playbook.goal, playbook.project, playbook.id];
+  List<String?> get words => [graph.title, graph.goal, graph.project, graph.id];
 }
 
 class BoardFilter {
@@ -162,45 +160,18 @@ class IssuesPage extends ConsumerStatefulWidget {
   ConsumerState<IssuesPage> createState() => _IssuesPageState();
 }
 
-String _sessionsKey(CoreState? farm) => [for (final i in farm?.issues ?? const <Issue>[]) '${i.id}:${i.sessions.join(',')}:${i.closedAt}'].join(';');
-
 class _IssuesPageState extends ConsumerState<IssuesPage> {
-  late final WorkbenchResource<Map<String, Session>> _sessions;
-  List<Issue>? _history;
   BoardFilter _filter = const BoardFilter();
   bool _older = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _sessions = WorkbenchResource(_fetchSessions)..addListener(_changed);
-    unawaited(_sessions.refresh());
-  }
-
-  @override
-  void dispose() {
-    _sessions
-      ..removeListener(_changed)
-      ..dispose();
-    super.dispose();
-  }
-
-  void _changed() {
-    if (mounted) setState(() {});
-  }
-
   VibeValleyApi get _api => ref.read(apiProvider);
 
-  Future<Map<String, Session>> _fetchSessions() async => {for (final h in await _api.session.list()) h.id: h};
-
-  Future<void> _load() => _sessions.refresh();
-
-  Future<void> _toggleOlder() async {
-    setState(() => _older = !_older);
-    if (!_older) return;
-    final all = await runAction(_api.issue.list);
-    if (all != null && mounted) setState(() => _history = all);
+  Future<void> _load() async {
+    ref.invalidate(issueHistoryProvider);
+    await ref.read(issueHistoryProvider.future);
   }
+
+  void _toggleOlder() => setState(() => _older = !_older);
 
   void _open(String? id) => workbenchGo(context, id == null ? '/issues' : '/issues/${Uri.encodeComponent(id)}');
 
@@ -261,24 +232,22 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
   @override
   Widget build(BuildContext context) {
     final farm = ref.watch(stateProvider);
-    ref.listen(stateProvider.select(_sessionsKey), (_, _) => unawaited(_load()));
-    final heads = _sessions.value;
-    final kept = farm?.issues ?? const <Issue>[];
-    final issues = [
-      ...kept,
-      for (final old in _history ?? const <Issue>[])
-        if (old.closedAt != null && !kept.any((i) => i.id == old.id)) old,
-    ];
-    final plans = ref.watch(plansProvider);
+    final history = ref.watch(visibleIssueHistoryProvider(_older));
+    final entries = history.value ?? const <IssueHistory>[];
+    final graphs = ref.watch(graphsProvider);
     final all = <BoardCard>[
-      // A playbook is its own card (below); a step of one is on the board once a helper has worked it.
-      for (final issue in issues)
-        if (isForManager(issue))
-          ManagerCard(issue)
-        else if (issue.plan == null && (issue.parent == null || issue.sessions.isNotEmpty))
-          issue.sessions.isEmpty ? TodoCard(issue) : IssueCard(issue, sessionsOf(issue, heads ?? const {}), issueTag(issue), issueSession(farm, issue)),
-      for (final p in plans)
-        if (playbookLane(p) case final lane?) PlaybookCard(p, lane),
+      // A task is its own card (below); a step of one is on the board once a helper has worked it.
+      for (final row in entries)
+        if (isForManager(row.issue))
+          ManagerCard(row.issue)
+        else if (row.issue.graph == null && (row.issue.parent == null || row.issue.sessions.isNotEmpty))
+          row.issue.sessions.isEmpty
+              ? TodoCard(row.issue)
+              : row.missingSessions.isNotEmpty || row.sessions.isEmpty
+              ? MissingSessionCard(row)
+              : IssueCard(row.issue, row.sessions, issueTag(row.issue), issueSession(farm, row.issue)),
+      for (final p in graphs)
+        if (taskLane(p) case final lane?) TaskCard(p, lane),
     ];
     final id = widget.id;
     final open = id == null ? null : all.where((c) => c.id == id || (c is IssueCard && issueIs(c.issue, id))).firstOrNull;
@@ -294,9 +263,13 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         reload: _load,
       ),
       ManagerCard(:final issue) => ManagerIssueDetail(key: ValueKey(issue.id), issue: issue),
-      PlaybookCard() => null,
+      MissingSessionCard(:final history) => PxCard(
+        title: history.issue.title,
+        child: Text('执行记录缺失：${history.missingSessions.join('、')}。执行动作暂不可用。', style: KitText.sm),
+      ),
+      TaskCard() => null,
       // A link to an issue the farm does not have says so, instead of quietly showing the board.
-      null when id != null && farm != null => PxCard(
+      null when id != null && farm != null && history.hasValue && !history.isLoading && !history.hasError => PxCard(
         title: '找不到这张工单',
         child: Text('农场里没有 $id：可能已经删掉了，或者链接写错了。', style: KitText.sm.copyWith(color: Palette.bark600)),
       ),
@@ -307,15 +280,16 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         final board = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (history.hasError) Text('工单记录没读到：${reasonOf(history.error!)}', style: KitText.sm),
             _Toolbar(filter: _filter, cards: all, shown: all.where(_filter.shows).length, onChanged: (f) => setState(() => _filter = f)),
             const SizedBox(height: 8),
             Expanded(
               child: IssueBoard(
                 cards: all.where(_filter.shows).toList(),
-                loading: farm == null,
+                loading: farm == null || history.isLoading,
                 selected: open?.id ?? id,
                 older: _older,
-                onOlder: () => unawaited(_toggleOlder()),
+                onOlder: _toggleOlder,
                 onOpen: _open,
                 onDrop: _drop,
                 onPlace: _place,

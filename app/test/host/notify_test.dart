@@ -44,13 +44,13 @@ void main() {
       noticeForCall(
         _call(
           'd',
-          InboxKind.planRipe,
+          InboxKind.graphRipe,
           from: const InboxFromManager(),
           text: '登录改版',
-          target: const InboxTargetPlans(playbook: 'pb1'),
+          target: const InboxTargetGraph(graph: 'pb1'),
         ),
       ),
-      const HostNotice('计划「登录改版」都做完了', '看看改动，收获进主分支', HostOpenPlans('pb1')),
+      const HostNotice('计划「登录改版」都做完了', '看看改动，收获进主分支', HostOpenTaskBoard('pb1')),
     );
     expect(
       noticeForCall(
@@ -80,11 +80,11 @@ void main() {
     final inbox = [
       _call('h1:harvest:1', InboxKind.merge),
       _call(
-        'pb:draft',
-        InboxKind.planDraft,
+        'task:draft',
+        InboxKind.graphDraft,
         from: const InboxFromManager(),
         text: '登录改版',
-        target: const InboxTargetPlans(playbook: 'pb'),
+        target: const InboxTargetGraph(graph: 'task'),
       ),
       _call('m9', InboxKind.mention, target: const InboxTargetChat(conversation: 'c1')),
     ];
@@ -112,7 +112,7 @@ void main() {
   });
 
   test('commands round-trip the protocol JSON; unknown ones are dropped', () {
-    for (final c in const <HostCommand>[HostVoice(), HostOpenSession('h1'), HostOpenChat('c3'), HostOpenPlans('pb'), HostOpenAchievements()]) {
+    for (final c in const <HostCommand>[HostVoice(), HostOpenSession('h1'), HostOpenChat('c3'), HostOpenTaskBoard('task'), HostOpenAchievements()]) {
       expect(HostCommand.fromJson(c.toJson())?.toJson(), c.toJson());
     }
     expect(HostCommand.fromJson({'type': 'session'}), isNull);

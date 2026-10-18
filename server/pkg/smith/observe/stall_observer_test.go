@@ -21,7 +21,7 @@ func soHangingSession(t *testing.T) oar.Session {
 		<-turn.Context.Done()
 		return nil
 	}})
-	installation, err := runtime.Installation(context.Background())
+	installation, err := runtime.Installation(context.Background(), oar.InstallationOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,7 +6,7 @@ Status: implemented
 
 第 7–11 轮的修补反复落在同几类地方（盘点见本次会话的回顾）：
 
-1. **给人看的结论没有固定的家**。客户端一遍遍重写服务端的规则（`needOf`、`layersOf`、`whenText`、`quotaText`、`actionMeaning`……）；收回服务端时又放在了三处：`Reduce` 里（`phaseText`、`whenText`、`nextText`）、出帧时（`PlaybooksOf` 的 `layers` 等）、服务里（`playbook.Events` 的 `text`、`runtime` 的 `quota`）。`phaseText` 跟着帮工写进了 `state.json`，事实和画面混在一起。
+1. **给人看的结论没有固定的家**。客户端一遍遍重写服务端的规则（`needOf`、`layersOf`、`whenText`、`quotaText`、`actionMeaning`……）；收回服务端时又放在了三处：`Reduce` 里（`phaseText`、`whenText`、`nextText`）、出帧时（`TasksOf` 的 `layers` 等）、服务里（`task.Events` 的 `text`、`runtime` 的 `quota`）。`phaseText` 跟着帮工写进了 `state.json`，事实和画面混在一起。
 2. **黄金数据成了代码存在的理由**。十几个 protocol 导出函数服务端从不调，只被黄金数据录着；移植时冻结的 JavaScript 语义（`Number()`、UTF-16 哈希）没人敢动。
 3. **`protocol` 是杂物间**。形状、折法、游戏、计划、田头、文字、种子都在里面，只有一个包用的规则也放在这里。
 4. **服务里的异步没有规矩**。缓存被晚到的旧读数覆盖（农机）、锁外读改写、后台 goroutine 没有完成信号，测试只能 `Sleep`。
@@ -20,7 +20,7 @@ Status: implemented
 
 派生的、给人看的字段只在出帧那一步算：`protocol.FrameOf(state, effects) StateFrame` 是纯函数，`core.frame` 只调它。`Reduce` 只折事实和服务端规则要用的派生状态（工单的状态由服务读，留在 `Reduce`）。
 
-- [x] `protocol.FrameOf`：在状态的副本上填帮工的 `phaseText`、定时的 `whenText`、`nextText`，再算 `Inbox`、`Plans`、`View`
+- [x] `protocol.FrameOf`：在状态的副本上填帮工的 `phaseText`、定时的 `whenText`、`nextText`，再算 `Inbox`、`Tasks`、`View`
 - [x] `Reduce` 里删掉 `withPhaseWords` 和定时的两句话；`state.json` 不再存它们
 - [x] `core.frame` 改调 `FrameOf`；黄金数据重录，diff 只少了这三个字段
 - [x] `FrameOf` 的直接测试；`state-frame.sample.json` 由它写
@@ -35,8 +35,8 @@ Status: implemented
 ### 阶段 3：`protocol` 瘦身
 
 - [x] 列出 protocol 每个导出函数的调用方（包）
-- [x] 只有一个包调的，挪进那个包、不导出（计划的检查和排队给 `playbook`，账本的折法给 `game`……，先列再定）
-- [x] 黄金数据的用例跟着挪（顺手把黄金输入里的旧形状——状态里的 `playbooks`、`playbook` 事实——一次转成现在的形状，删掉测试里现转的 `playState`、`playFact`）
+- [x] 只有一个包调的，挪进那个包、不导出（计划的检查和排队给 `task`，账本的折法给 `game`……，先列再定）
+- [x] 黄金数据的用例跟着挪（顺手把黄金输入里的旧形状——状态里的 `tasks`、`task` 事实——一次转成现在的形状，删掉测试里现转的 `playState`、`playFact`）
 - [x] 更新「规则跟着主人走」的 Note
 
 ### 阶段 4：服务里的异步有规矩

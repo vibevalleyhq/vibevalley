@@ -108,6 +108,8 @@ type ConnectorInbound struct {
 	ExtID     string
 	MessageID sql.NullString
 	CreatedAt int64
+	Payload   string
+	Delivered int64
 }
 
 type ConnectorOutbox struct {
@@ -154,13 +156,19 @@ type Issue struct {
 	Rank        int64
 	Parent      sql.NullString
 	BlockedBy   sql.NullString
-	Plan        sql.NullString
-	Step        sql.NullString
+	Graph       sql.NullString
+	Task        sql.NullString
 	Schedule    sql.NullString
 	CreatedAt   int64
 	QueuedAt    sql.NullInt64
 	ClosedAt    sql.NullInt64
 	Closed      sql.NullString
+}
+
+type IssueQueue struct {
+	Issue       string
+	Channel     string
+	TriggeredBy string
 }
 
 type IssueSession struct {
@@ -181,16 +189,6 @@ type Memory struct {
 	RecalledAt sql.NullInt64
 }
 
-type PlaybookEvent struct {
-	ID         string
-	PlaybookID string
-	NodeID     sql.NullString
-	Kind       string
-	Actor      string
-	Payload    string
-	CreatedAt  int64
-}
-
 type Schedule struct {
 	ID        string
 	Name      string
@@ -206,17 +204,17 @@ type Schedule struct {
 }
 
 type Session struct {
-	ID       string
-	Agent    string
-	Name     string
-	Runtime  string
-	Task     string
-	Project  sql.NullString
-	Issue    sql.NullString
-	Playbook sql.NullString
-	HiredAt  int64
-	EndedAt  sql.NullInt64
-	Closed   sql.NullString
+	ID      string
+	Agent   string
+	Name    string
+	Runtime string
+	Brief   string
+	Project sql.NullString
+	Issue   sql.NullString
+	Graph   sql.NullString
+	HiredAt int64
+	EndedAt sql.NullInt64
+	Closed  sql.NullString
 }
 
 type SessionRun struct {
@@ -230,4 +228,35 @@ type SessionRun struct {
 	Outcome     sql.NullString
 	Summary     sql.NullString
 	Spent       sql.NullString
+}
+
+type SessionRunIssue struct {
+	Run   string
+	Issue string
+}
+
+type TaskEvent struct {
+	ID        string
+	GraphID   string
+	TaskID    sql.NullString
+	Kind      string
+	Actor     string
+	Payload   string
+	CreatedAt int64
+}
+
+type TaskGraph struct {
+	Graph      string
+	Owner      string
+	ID         string
+	Position   int64
+	Title      string
+	Brief      string
+	After      string
+	Executor   string
+	State      string
+	Result     string
+	Tries      int64
+	UpdatedAt  int64
+	FinishedAt sql.NullInt64
 }

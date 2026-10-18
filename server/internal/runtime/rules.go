@@ -64,6 +64,9 @@ func agentIssues(agent protocol.Agent, runtime *protocol.RuntimeInfo) []protocol
 		issues = append(issues, protocol.AgentIssue{Field: field, Level: level, Text: text})
 	}
 	facts := protocol.FactsOf(agent.Runtime)
+	if runtime != nil && runtime.Refused != nil {
+		facts.Refused = runtime.Refused
+	}
 	if runtime == nil {
 		add("runtime", "error", "不认识的 runtime："+agent.Runtime)
 	} else if _, ok := runtime.Installation.Value.(protocol.InstallationAvailable); !ok {

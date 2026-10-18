@@ -53,8 +53,8 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 账本 | ledger | 值得记的事；金币、连胜、成就由它折出来 | 事件日志 |
 | 轨迹 | trajectory | 一个 agent 干活的每一步 | 日志、trace |
 | 记性 | memory | 一个帮工档案记得的事 | 记忆库 |
-| 种植计划 | playbook（带 `plan` 的父工单） | 一件长活拆成的有先后的子工单 | 工作流、DAG |
-| 步骤 | node（带 `step` 的子工单） | 种植计划里的一步 | 节点 |
+| 种植计划 | task graph（`TaskGraph`，带 `graph` 的父工单） | 一件长活拆成的有先后的几件，按 DAG 推进 | 工作流、playbook、plan |
+| 一件 | task（`Task`，带 `task` 的子工单） | 种植计划里的一件，一个帮工做 | 步骤、step、节点、node |
 | 主人 | user | 你 | |
 | 田头 | general | 默认的频道：你、管家和帮工都在 | 群 |
 | 频道 | channel | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群 |

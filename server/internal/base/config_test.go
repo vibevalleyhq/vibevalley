@@ -57,3 +57,16 @@ func TestConfigRefusesWhatItCannotRead(t *testing.T) {
 		t.Fatal("a port that is not a number")
 	}
 }
+
+func TestServerIdentityCannotBeConfiguredOutsideLoopback(t *testing.T) {
+	t.Setenv("VIBEVALLEY_HOME", t.TempDir())
+	t.Setenv("VIBEVALLEY_HOST", "0.0.0.0")
+	t.Setenv("VIBEVALLEY_PORT", "9100")
+	c, err := LoadConfig("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.ServerAddress(); got != "127.0.0.1:9100" {
+		t.Fatal(got)
+	}
+}

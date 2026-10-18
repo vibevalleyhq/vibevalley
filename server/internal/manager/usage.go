@@ -9,7 +9,7 @@ import (
 	"vibevalley/pkg/ai"
 )
 
-// As vvagent's prefix_changed names the parts.
+// As vvagent's PrefixChanged names the parts.
 var managerPrefixParts = map[string]string{
 	"instructions": "说明", "env": "环境", "skills": "技能", "memory": "记性", "situation": "农场现状", "tools": "工具",
 }
@@ -31,15 +31,15 @@ func managerDigits(n int64) string {
 	return b.String()
 }
 
-// changed is a prefix_changed's Reason, "" when the prompt's start was as before.
-func managerUsageText(t protocol.EventTokens, changed string) string {
+// changed is a PrefixChanged's parts, none when the prompt's start was as before.
+func managerUsageText(t protocol.EventTokens, changed []string) string {
 	text := "没报读了多少：输出 " + managerDigits(t.Output)
 	if prompt := t.CacheRead + t.Input; prompt > 0 {
 		text = fmt.Sprintf("缓存命中 %d%%：读缓存 %s，没命中 %s，输出 %s", t.CacheRead*100/prompt, managerDigits(t.CacheRead), managerDigits(t.Input), managerDigits(t.Output))
 	}
-	if changed != "" {
+	if len(changed) > 0 {
 		var parts []string
-		for _, name := range strings.Split(changed, ",") {
+		for _, name := range changed {
 			if label, ok := managerPrefixParts[name]; ok {
 				parts = append(parts, label)
 			} else {

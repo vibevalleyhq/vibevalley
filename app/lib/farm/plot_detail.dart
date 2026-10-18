@@ -10,7 +10,6 @@ import '../data/remote.dart' show sessionEventsProvider;
 import '../shared/work_log.dart' show WorkLog;
 import '../game/commands.dart';
 import '../game/tools.dart';
-import '../game/state.dart';
 import '../gen/vibevalley.dart';
 import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
@@ -18,7 +17,7 @@ import '../data/remote.dart' show agentsProvider;
 import '../rules/chat.dart';
 import '../rules/sessions.dart';
 import '../rules/cast.dart';
-import '../rules/playbook.dart';
+import '../rules/task.dart';
 import '../rules/seeds.dart';
 import '../shared/swatches.dart';
 import '../shared/tags.dart';
@@ -157,8 +156,8 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
               ),
             ),
           ),
-        if (session.playbook != null) PlanLine(session: session, onDone: widget.onDone),
-        Text(session.task, style: KitText.sm),
+        if (session.graph != null) TaskLine(session: session, onDone: widget.onDone),
+        Text(session.brief, style: KitText.sm),
         if (current.action != SessionAction.none)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -243,12 +242,12 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
           runSpacing: 8,
           children: [
             if (plot.crop == Crop.withered) PxButton.text('杀虫：接着修', tone: PxTone.danger, onPressed: () => fire(commands.cure(session))),
-            if (canHarvest(session) && session.playbook == null)
+            if (canHarvest(session) && session.graph == null)
               PxButton.text(
                 '收获…',
                 tone: PxTone.primary,
                 onPressed: () {
-                  ref.read(reviewingProvider.notifier).set(session.id);
+                  ref.read(farmOverlaysProvider.notifier).review(session.id);
                   widget.onDone();
                 },
               ),
@@ -301,7 +300,7 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
                 steps: log,
                 now: now,
                 working: session.phase is PhaseWorking,
-                onComment: (step, text) => ref.read(farmCommandsProvider).water(session, text, on: step),
+                onComment: (task, text) => ref.read(farmCommandsProvider).water(session, text, on: task),
               ),
             ),
           )
@@ -421,17 +420,17 @@ class _Link extends StatelessWidget {
   );
 }
 
-class PlanLine extends ConsumerWidget {
-  const PlanLine({super.key, required this.session, required this.onDone});
+class TaskLine extends ConsumerWidget {
+  const TaskLine({super.key, required this.session, required this.onDone});
   final Session session;
   final VoidCallback onDone;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tag = session.playbook;
-    final pb = tag == null ? null : playbookOf(ref.watch(plansProvider), tag.id);
-    if (tag == null || pb == null) return const SizedBox.shrink();
-    final node = tag.node == null ? null : nodeOf(pb, tag.node!);
+    final tag = session.graph;
+    final graph = tag == null ? null : graphOf(ref.watch(graphsProvider), tag.id);
+    if (tag == null || graph == null) return const SizedBox.shrink();
+    final node = tag.task == null ? null : taskOf(graph, tag.task!);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Tinted(
@@ -443,20 +442,20 @@ class PlanLine extends ConsumerWidget {
                   ? Text.rich(
                       TextSpan(
                         children: [
-                          TextSpan(text: '种植计划「${pb.title}」的一步：'),
+                          TextSpan(text: '种植计划「${graph.title}」的一步：'),
                           TextSpan(text: node.title),
                           const TextSpan(text: '。做完自动合进计划分支，收获整个计划时才进主分支。'),
                         ],
                       ),
                       style: KitText.xs,
                     )
-                  : Text('在拆种植计划「${pb.title}」：只读代码，不改文件。', style: KitText.xs),
+                  : Text('在拆种植计划「${graph.title}」：只读代码，不改文件。', style: KitText.xs),
             ),
             const SizedBox(width: 8),
             KitTappable(
               onTap: () {
-                ref.read(planShownProvider.notifier).set(pb.id);
-                ref.read(panelProvider.notifier).set(FarmPanel.plans);
+                ref.read(graphShownProvider.notifier).set(graph.id);
+                ref.read(farmOverlaysProvider.notifier).panel(FarmPanel.taskBoard);
                 onDone();
               },
               builder: (context, s) => FarmTag('看计划', fill: s.hovered ? Palette.cream100 : Palette.cream50, ink: Palette.leaf700),

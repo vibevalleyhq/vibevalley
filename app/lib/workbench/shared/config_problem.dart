@@ -38,3 +38,35 @@ class _ConfigProblemState extends ConsumerState<ConfigProblem> {
     ),
   );
 }
+
+class RuntimeProblem extends ConsumerWidget {
+  const RuntimeProblem({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final result = ref.watch(runtimesProvider);
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('农具没读到：${result.error == null ? '正在重试' : reasonOf(result.error!)}', style: KitText.sm.copyWith(color: Palette.berry)),
+          const SizedBox(height: 8),
+          PxButton(
+            onPressed: result.isLoading
+                ? null
+                : () async {
+                    try {
+                      await ref.read(runtimeCatalogProvider.notifier).reload();
+                    } on Object {
+                      /* The catalog exposes the refusal. */
+                    }
+                  },
+            child: const Text('重新读取农具'),
+          ),
+        ],
+      ),
+    );
+  }
+}

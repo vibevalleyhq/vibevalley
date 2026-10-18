@@ -12,7 +12,7 @@ import (
 
 func TestCachedBudgetResetsWithTheDay(t *testing.T) {
 	info := protocol.RuntimeInfo{ID: "pi", Settings: protocol.RuntimeSettings{DailyBudget: ptr.To(10.0)}, SpentToday: ptr.To(12.0), Stop: "yesterday's budget"}
-	r := &Service{cache: map[string]protocol.RuntimeInfo{"pi": info}, spent: spend{Day: "2000-01-01", ByRuntime: map[string]float64{"pi": 12}}}
+	r := &Service{cache: map[string]observation{"pi": {Info: info}}, spent: spend{Day: "2000-01-01", ByRuntime: map[string]float64{"pi": 12}}}
 	got := r.Info(context.Background(), "pi")
 	if got.SpentToday != nil || got.Stop != "" {
 		t.Fatalf("yesterday still blocks dispatch: %+v", got)

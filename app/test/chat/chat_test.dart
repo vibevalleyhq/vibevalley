@@ -54,7 +54,7 @@ const _session = Session(
   name: '测试小吴',
   agent: 'tester',
   runtime: 'claude',
-  task: '跑一遍测试',
+  brief: '跑一遍测试',
   hiredAt: 0,
   runs: 1,
   phase: PhaseWorking(
@@ -144,7 +144,7 @@ ReceivedFrame _frame(CoreState state) => ReceivedFrame(
   StateFrame(
     state: state,
     inbox: const [],
-    plans: const [],
+    graphs: const [],
     view: const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {}),
     effects: const [],
   ),

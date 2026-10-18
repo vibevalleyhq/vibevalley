@@ -133,6 +133,14 @@ class WorkbenchBackend {
               ],
             },
         ]);
+      case ('POST', ['api', 'agents']):
+        final created = Agent.fromJson({...body as Map<String, dynamic>, 'id': 'created-agent'});
+        agents.add(created);
+        return jsonResponse(created.toJson());
+      case ('POST', ['api', 'skills']):
+        final created = Skill.fromJson({...body as Map<String, dynamic>, 'id': 'created-skill'});
+        skills.add(created);
+        return jsonResponse(created.toJson());
       case ('GET', ['api', 'agents']):
         return jsonResponse([for (final a in agents) a.toJson()]);
       case ('PUT', ['api', 'agents', final id]):

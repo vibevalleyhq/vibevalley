@@ -2,8 +2,6 @@ package game
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,39 +16,14 @@ import (
 // git_emails in the configuration); sessions commit as you, so their commits count.
 
 const (
-	repoDepth     = 3
 	countEvery    = 2 * time.Minute
 	countAfterRun = 15 * time.Second
 )
 
-var skipDirs = map[string]bool{"node_modules": true, ".git": true, ".venv": true, "vendor": true, "dist": true, "build": true, "target": true, ".next": true}
-
-func repoDirs(root string, depth int) []string {
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return nil
-	}
-	for _, e := range entries {
-		if e.Name() == ".git" {
-			return []string{root}
-		}
-	}
-	if depth == 0 {
-		return nil
-	}
-	var out []string
-	for _, e := range entries {
-		if e.IsDir() && !skipDirs[e.Name()] {
-			out = append(out, repoDirs(filepath.Join(root, e.Name()), depth-1)...)
-		}
-	}
-	return out
-}
-
 type commits struct {
-	cfg   base.Config
-	core  *core.Service
-	extra []string
+	projects *project.Service
+	core     *core.Service
+	extra    []string
 
 	counting sync.Mutex
 	mu       sync.Mutex
@@ -60,8 +33,8 @@ type commits struct {
 	asked    int
 }
 
-func newCommits(cfg base.Config, core *core.Service) (*commits, error) {
-	c := &commits{cfg: cfg, core: core}
+func newCommits(cfg base.Config, core *core.Service, projects *project.Service) (*commits, error) {
+	c := &commits{projects: projects, core: core}
 	for _, e := range cfg.GitEmails {
 		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
 			c.extra = append(c.extra, e)
@@ -134,37 +107,10 @@ func (c *commits) refresh(ctx context.Context) {
 }
 
 func (c *commits) Count(ctx context.Context) protocol.CommitCount {
-	global := strings.ToLower(project.GitQuiet("", "config", "--global", "user.email"))
-	seen := map[string]bool{}
-	out := protocol.CommitCount{Repos: []protocol.Repo{}}
-	for _, dir := range repoDirs(c.cfg.WorkRoot, repoDepth) {
-		if ctx.Err() != nil {
-			break
-		}
-		// Worktrees share their repository's history: one count per repository.
-		common := project.GitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
-		if common == "" || seen[common] {
-			continue
-		}
-		seen[common] = true
-		mine := map[string]bool{}
-		for _, e := range append([]string{global, strings.ToLower(project.GitQuiet("", "-C", dir, "config", "user.email"))}, c.extra...) {
-			if e != "" {
-				mine[e] = true
-			}
-		}
-		n := int64(0)
-		for _, email := range strings.Split(project.GitQuiet("", "-C", dir, "log", "--all", "--format=%ae"), "\n") {
-			if email != "" && mine[strings.ToLower(email)] {
-				n++
-			}
-		}
-		top := project.GitQuiet("", "-C", dir, "rev-parse", "--show-toplevel")
-		if top == "" {
-			top = dir
-		}
-		out.Repos = append(out.Repos, protocol.Repo{Path: top, Commits: n})
-		out.Total += n
+	repos := c.projects.Contributions(ctx, c.extra)
+	out := protocol.CommitCount{Repos: repos}
+	for _, repo := range repos {
+		out.Total += repo.Commits
 	}
 	return out
 }

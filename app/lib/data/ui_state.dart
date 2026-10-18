@@ -1,4 +1,5 @@
 import 'dart:async';
+export 'overlays.dart' show FarmPanel, farmOverlaysProvider, panelProvider, selectedProvider;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,13 +70,7 @@ class Held<T> extends Notifier<T> {
 
 NotifierProvider<Held<T>, T> held<T>(T initial) => NotifierProvider<Held<T>, T>(() => Held<T>(initial));
 
-enum FarmPanel { shop, warehouse, tasks, log, manager, plans }
-
-final panelProvider = held<FarmPanel?>(null);
-
-final selectedProvider = held<String?>(null);
-
 /// null: the newest still open.
-final planShownProvider = held<String?>(null);
+final graphShownProvider = held<String?>(null);
 
 final friendsOpenProvider = held(false);

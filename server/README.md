@@ -4,6 +4,8 @@ VibeValley 唯一的服务端：答 VibeValleyApi、`/api/v1/events`、`/api/v1/
 
 Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite`）。
 
+作为应用或验证脚本的子进程启动时，设 `VIBEVALLEY_PORT=0` 并传 `--ready-json`：监听与工作区就绪后，stdout 只发布一行 `protocol.ServerReady`（实际 `url`、当前 `pid`），普通日志仍写 stderr。宿主不预占端口，也不把日志文字当协议；[桌面启动](../docs/reference/desktop.md)按这个收据连接。
+
 ## 目录
 
 `internal/` 是只给本模块用的（农场的服务和协议），`pkg/` 是能单独拿去用的库，`cmd/` 是命令，`tool/` 是开发时的工具。
@@ -12,18 +14,18 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 |---|---|
 | `internal/protocol` | 形状和接口的唯一来源（`shapes.go`、`api.go`）和生成的 `gen.go`；核心状态的全部规则（`Reduce` 和各种纯函数）；`seeds.json`（种子档案、默认设置、农机的能力、成就） |
 | `internal/base` | 地基，不放业务：数据库和迁移、`Hub`、存文件、id、`Config`（viper 读 YAML 和环境变量）、生命周期 |
-| `internal/core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`playbook`、`manager`、`gate`、`voice`、`connector`、`game` | 服务，一块业务一个包（见「服务」） |
+| `internal/core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`gate`、`voice`、`connector`、`game` | 服务，一块业务一个包（见「服务」） |
 | `internal/workspace` | 把全部包组装成一个 Workspace（`workspace.go`：`Workspace` 握着全部服务） |
 | `internal/handler` | 全部 HTTP 处理：`VibeValleyApi`（`api.go`，每个处理只转给拥有它的服务）、事件流和状态流；`/mcp` 挂的是 `mcp` 包的处理（`http.go`） |
 | `internal/testkit` | 各包的测试共用的：比较（`Eq`、`Match`）、等待（`Until`、`Await` 等会发生的事，`Settle` 查不该发生的）、一次性的 git 仓库；只给测试 import，不 import 农场的包，`protocol` 自己的测试也用它。测试的起点（临时目录里的配置 `fixture.Config`、种子里的 lab 档案和 pi 农机）在 `testkit/fixture` |
-| `migrations` | SQLite 的表结构：`0001_schema.sql` 是整个库，以后的改动是它后面的新文件；编进二进制，`Up` 按名字顺序跑，每个一次（服务端开机时，或 `cmd/migrate up`） |
+| `migrations` | SQLite 的表结构：`0001_schema.sql` 是整个库，改表直接改它，不另加迁移（旧库删掉重建）；编进二进制，`Up` 在服务端开机时（或 `cmd/migrate up`）跑它 |
 | `pkg/db` | sqlc 的查询（`queries/`，一张表一个文件）和从它生成的 Go（`generated/`）；配置和生成命令在 `sqlc.yaml` |
-| `pkg/ai`、`pkg/agentcore`、`pkg/agent` | VibeValley 自己的 agent：管家用它；`pkg/agent/oarruntime` 把它包成 oar 农机 `vibevalley`，帮工也能用 |
+| `pkg/ai`、`pkg/agentcore` | agent 的底层：调模型、agent 循环；不认识农场。上面那层（VibeValley 自己的 agent）在 `internal/agent/brain` |
 | `pkg/x` | 通用的小封装，一类一个包，不认识农场：`str`（按 JavaScript 和 Dart 的算法数字符串：UTF-16 长度、截取、trim、空白、截断加省略号）、`num`（照 JavaScript 写数字：`toFixed`、`String(n)`、`Math.round`）、`ptr`（可选字段的指针）、`clock`（毫秒时间、可取消的等待）。哪个包要这类东西用它，不在自己包里再写一份 |
 | `pkg/agora` | 声网（Agora）：签令牌、拼语音 agent 的请求；不认识农场 |
 | `pkg/weixin`、`pkg/feishu`、`pkg/qq` | 微信、飞书、QQ 机器人的接口：登录、收、发；每个有 `API` 接口（测试换成假的）和真的 `Client`。不认识农场，账号和谁是主人在 `connector` 里 |
 | `pkg/smith` | oar 的 Go 移植（[README](pkg/smith/README.md)），驱动各家编码 agent |
-| `cmd/server` | 单独跑的服务端：听配置的 `host`、`port`（默认 `127.0.0.1:8787`）；配置来自 `$VIBEVALLEY_HOME/vibevalley.yaml` 和 `VIBEVALLEY_*` 环境变量（`--config` 指别的文件）；`--log 文件` 把日志也追加到文件里 |
+| `cmd/server` | 单独跑的服务端：固定听 `127.0.0.1`，端口来自配置（默认 8787）；配置来自 `$VIBEVALLEY_HOME/vibevalley.yaml` 和 `VIBEVALLEY_*` 环境变量（`--config` 指别的文件）；`--log 文件` 把日志也追加到文件里 |
 | `cmd/vibevalley` | 命令行：`<组> <操作>` 调农场的一个接口（从 `protocol.Endpoints` 来，经 `protocol.Client`），`state`、`events` 读两条流，`runtime chat <农机>` 在本机和一个农机直接聊（不经农场），`oar <命令>` 是 smith 的 oar 命令行（`pkg/smith/cli`，`detect`、`models`、`login`、`run`……），这两个的农机和服务端的一样（`runtime.Registry`），不带命令是 VibeValley 自己的 agent |
 | `cmd/migrate` | 表结构：`status` 看库在第几版、`up` 跑没跑过的、`new 名字` 在 `migrations/` 写下一个 `000N_名字.sql`；库和服务端读的是同一个（`--config`、`VIBEVALLEY_HOME`、`VIBEVALLEY_DB`）。服务端开机照旧自己跑 |
 | `tool` | 开发时的工具，不进产品：`shapegen`（Go）从 `protocol` 的形状写出 `gen.go` 和 Flutter 的 `lib/gen`；Node 脚本 `pi-prices.ts`（自己的 `package.json`）写 pi 的价目表 `internal/runtime/pi_prices.json` |
@@ -34,13 +36,15 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 
 构造函数的参数就是它用到的服务和配置（多的用带 `fx.In` 的参数结构体，如 `sessionsIn`、`managerIn`），一个包的 `Service` 只要一个；没有服务拿整个 `Workspace`。每个包的 `Module`（`func(*base.Readies) fx.Option`）把零件的构造函数设成 `fx.Private`，只把 `Service` 交给 fx（`go.uber.org/fx`）；`base.App` 把给它的各包装在一个生命周期上：`NewApp` 建，`Start` 开，`Close` 停。`workspace.New` 是带全部包的 App（[理由](../.agents/notes/implemented/architecture/2026-10-15-services-assembled-by-fx.md)、[分包](../.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)）。
 
+`NewApp` 独占传入的 Home，第二个 App 在构造服务前失败；调用方应以 `Close` 结束整个 App，不能只关闭数据库。租约覆盖所有服务的最后写入（[理由](../.agents/notes/implemented/architecture/2026-10-18-local-server-lifetime.md)）。
+
 服务按业务分包（[概念](../docs/concepts.md)）：一个包是一块业务，接口窄、里面深；包名用单数，用[用语表](../docs/README.md#用语)里的词。先是活本身，最后是画在上面的游戏。一个包只 import 表里排在它前面的包，编译器替我们守着；反方向的消息走 `base.Hub[T]`（`base/hub.go`：核心状态的事实、执行的动静、群聊和计划给管家的消息），只送给当时在订阅的，慢的排长队，不丢：
 
 | 包 | `Workspace` 上的字段 | 管什么 |
 |---|---|---|
 | core | `Core` | 核心状态和它的事实、帧、事件流（`state.json`）；最先建、最后关 |
 | setting | `Setting` | 钥匙和语音设置（`settings.json`，0600） |
-| agent | `Agent` | 帮工档案、技能书、农机设置（`config.json`） |
+| agent | `Agent` | 帮工档案、技能书、农机设置（`config.json`）；子包 `brain` 是 VibeValley 自己的 agent（会话、压缩、技能、记性、定时、帮手、编码工具；管家用它，`brain/oarruntime` 把它包成农机 `vibevalley`） |
 | project | `Project` | 仓库、worktree、每个项目同时能有几个执行，和项目页要的统计（`codebase.go`：最近一次提交、语言、一年的提交） |
 | memory | `Memory` | 档案记得的事（`memory.go`）和管家记得的事（`WriteManager`、`ForgetManager`、`Archive`） |
 | runtime | `Runtime` | 农机的探测、额度、花费、价目表 |
@@ -48,13 +52,14 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 | channel | `Channel` | 频道、对话、串、消息、投递 |
 | schedule | `Schedule` | 定时 |
 | issue | `Issue` | 工单（`issue.go`）、派活、排队、重开工单（`dispatch.go`）、收成清单、收获（`merges.go`） |
-| playbook | `Playbook` | 种植计划和它的经过（`log.go`） |
-| manager | `Manager` | 管家（`manager.go`、`tools.go`）和巡查（`patrol.go`：看 Inbox，放久了叫醒管家） |
+| task | `Task` | 种植计划（Task）和它的经过（`task.go`、`log.go`）；子包 `engine` 是 agent 自己的任务图：形状、规则、存储（表 `task_graph`） |
+| tool | `Tool` | agent 能调的工具，各定义一次：管家在进程里拿，Session 经 `/mcp` 拿 |
+| manager | `Manager` | 管家（`manager.go`）和巡查（`patrol.go`：看 Inbox，放久了叫醒管家） |
 | gate | `Gate` | 院门 |
 | voice | `Voice` | 声网（`agora.go`）和语音线路（`line.go`） |
 | connector | `Connector` | 微信、飞书、QQ 接到频道 |
 | game | `Game` | 服务端的全部游戏：账本（`ledger.go`：金币、连胜、成就）、等级（`commits.go`）、主人刚点的空地（`beds.go`）。只听别的包的事实，业务的服务不调它；只有 HTTP 那一层为主人在应用里做的事调它。账本的折法在 `progress.go`；出帧要用的（地里长什么、帮工在哪块地）在 protocol 的 `game_view.go`、`game_play.go` |
-| mcp | `MCP` | `/mcp`：给编码 agent 的工具（现在是帮工在频道里说话、读、看未读、看谁在）。和 HTTP 一样是入口，只转给拥有它的服务 |
+| mcp | `MCP` | `/mcp`：把 `tool` 给 Session 的工具交给编码 agent（在频道里说话、读、看未读、看谁在、记性）。和 HTTP 一样是入口，只认是谁、转给工具 |
 
 服务之间传的形状放在定义它的包的 `types.go`（`project.Workplace`、`session.HireOptions`、`channel.Info`……）；`base` 不放形状。
 
@@ -79,7 +84,7 @@ go run ./tool/shapegen          # 写 protocol/gen.go 和 ../app/lib/gen/vibeval
 
 可选的字段写 `omitzero`；能是 null 的写成指针，切片、表、联合写不成指针的加 `vibevalley:"null"`；别的必填的切片和表，空的时候写成 `[]`、`{}`（客户端的解码不收 null）。两边都要的普通常量（管家的 id、同时干活的上限、会话选项的名字……）写在 `shapes.go` 开头，带 `//vibevalley:const <Dart 名>`，生成到 Dart；Dart 里不再手抄 Go 的值。种子数据（`seeds.json`）直接改，客户端要的那部分（成就表和每档的金币、每种动作怎么说，农机的名字、外形和能力，没见过的农机的兜底外形）也由 shapegen 写进 `lib/gen`。
 
-规则在它的主人那里：核心状态的折法和它用到的、几个包都用的（田头、阶段、计划、游戏的画面……）在 `protocol`；只有一个包用的在那个包里、不导出（连接器的文字在 `connector/text.go`，设置和语音的检查在 `setting/rules.go`，记性怎么挑在 `memory/recall.go`，农机能不能派在 `runtime/rules.go`，管家怎么说钱在 `manager/words.go`，额度怎么说在 `runtime/quota.go`，田头给谁、叫不叫醒在 `channel/rules.go`，账本怎么折在 `game/progress.go`，计划的读、改、派在 `playbook/rules.go`，工单的文字在 `issue/rules.go`，到点和错过在 `schedule/rules.go`，巡查在 `manager/patrol_rules.go`）。规则的测试有两种：直接写的，和黄金数据（各包的 `testdata/*.jsonl.gz`：成千上万条带种子的随机输入和规则的结果，`internal/golden` 读写）。`golden.Rules` 逐条比；有意改了规则，`VIBEVALLEY_GOLDEN=update go test ./internal/...` 用 Go 的结果重写，再看 diff 是不是只改了该改的。黄金数据守的是折法和大量组合的规则，不是一段代码存在的理由：服务端不调、只被它录着的函数，`bun run go:deadcode` 会报，要么让服务端用上，要么删。Flutter 解码测试用的那一帧 `app/test/fixtures/state-frame.sample.json` 也由它写。声网请求的对照 `internal/voice/testdata/voice-requests.json` 是手写的：改了 `Voice` 就手改它。
+规则在它的主人那里：核心状态的折法和它用到的、几个包都用的（田头、阶段、计划、游戏的画面……）在 `protocol`；只有一个包用的在那个包里、不导出（连接器的文字在 `connector/text.go`，设置和语音的检查在 `setting/rules.go`，记性怎么挑在 `memory/recall.go`，农机能不能派在 `runtime/rules.go`，管家怎么说钱在 `manager/words.go`，额度怎么说在 `runtime/quota.go`，田头给谁、叫不叫醒在 `channel/rules.go`，账本怎么折在 `game/progress.go`，计划的读、改、派在 `task/rules.go`，工单的文字在 `issue/rules.go`，到点和错过在 `schedule/rules.go`，巡查在 `manager/patrol_rules.go`）。规则的测试有两种：直接写的，和黄金数据（各包的 `testdata/*.jsonl.gz`：成千上万条带种子的随机输入和规则的结果，`internal/golden` 读写）。`golden.Rules` 逐条比；有意改了规则，`VIBEVALLEY_GOLDEN=update go test ./internal/...` 用 Go 的结果重写，再看 diff 是不是只改了该改的。黄金数据守的是折法和大量组合的规则，不是一段代码存在的理由：服务端不调、只被它录着的函数，`bun run go:deadcode` 会报，要么让服务端用上，要么删。Flutter 解码测试用的那一帧 `app/test/fixtures/state-frame.sample.json` 也由它写。声网请求的对照 `internal/voice/testdata/voice-requests.json` 是手写的：改了 `Voice` 就手改它。
 
 ## 取舍
 

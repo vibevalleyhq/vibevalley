@@ -142,9 +142,7 @@ type PrepareRequest func(ctx context.Context, request PrepareRequestContext) *Ag
 type StreamFn func(ctx context.Context, model ai.Model, c ai.Context, options ai.StreamOptions) <-chan ai.AssistantMessageEvent
 
 // Every hook may be nil.
-type AgentLoopConfig struct {
-	Model         ai.Model
-	ThinkingLevel ThinkingLevel
+type AgentConfig struct {
 	// Reasoning comes from ThinkingLevel.
 	StreamOptions ai.StreamOptions
 	// The key for each request, asked anew every time (a key changed while it runs is used at once); "":
@@ -156,13 +154,20 @@ type AgentLoopConfig struct {
 	TransformContext func(ctx context.Context, messages []AgentMessage) []AgentMessage
 	FinishTurn       FinishTurn
 	PrepareRequest   PrepareRequest
+	ToolExecution    ToolExecutionMode
+	BeforeToolCall   func(ctx context.Context, c BeforeToolCallContext) *BeforeToolCallResult
+	AfterToolCall    func(ctx context.Context, c AfterToolCallContext) *AfterToolCallResult
+}
+
+// A standalone loop owns its model and queues; a stateful Agent supplies these itself.
+type AgentLoopConfig struct {
+	AgentConfig
+	Model         ai.Model
+	ThinkingLevel ThinkingLevel
 	// Asked after each turn: messages to put in before the next request.
 	GetSteeringMessages func() []AgentMessage
 	// Asked when the agent would stop: messages to go on with.
 	GetFollowUpMessages func() []AgentMessage
-	ToolExecution       ToolExecutionMode
-	BeforeToolCall      func(ctx context.Context, c BeforeToolCallContext) *BeforeToolCallResult
-	AfterToolCall       func(ctx context.Context, c AfterToolCallContext) *AfterToolCallResult
 }
 
 const (
@@ -178,28 +183,53 @@ const (
 	EventToolExecutionEnd    = "tool_execution_end"
 )
 
-// The fields its Type has are set.
-type AgentEvent struct {
-	Type string
-	// message_start / message_update / message_end; turn_end (the answer).
-	Message AgentMessage
-	// message_update.
-	AssistantMessageEvent *ai.AssistantMessageEvent
-	// tool_execution_*.
-	ToolCallID string
-	ToolName   string
-	Args       json.RawMessage
-	// tool_execution_update.
-	PartialResult *AgentToolResult
-	// tool_execution_end.
-	Result     *AgentToolResult
-	IsError    bool
-	DurationMs *int64
-	// agent_end: the messages the run added.
+type EventKind string
+
+// AgentEvent is open so higher-level agents can add domain events without nullable payload fields.
+type AgentEvent interface{ Kind() EventKind }
+
+type AgentStarted struct{}
+type AgentEnded struct {
 	Messages []AgentMessage
-	// turn_end.
+	Aborted  bool
+}
+type TurnStarted struct{}
+type TurnEnded struct {
+	Message     ai.AssistantMessage
 	ToolResults []ai.ToolResultMessage
 }
+type MessageStarted struct{ Message AgentMessage }
+type MessageUpdated struct {
+	Message ai.AssistantMessage
+	Delta   ai.AssistantMessageEvent
+}
+type MessageEnded struct{ Message AgentMessage }
+type ToolStarted struct {
+	ToolCallID, ToolName string
+	Args                 json.RawMessage
+}
+type ToolUpdated struct {
+	ToolCallID, ToolName string
+	Args                 json.RawMessage
+	PartialResult        AgentToolResult
+}
+type ToolEnded struct {
+	ToolCallID, ToolName string
+	Result               AgentToolResult
+	IsError              bool
+	DurationMs           *int64
+}
+
+func (AgentStarted) Kind() EventKind   { return EventAgentStart }
+func (AgentEnded) Kind() EventKind     { return EventAgentEnd }
+func (TurnStarted) Kind() EventKind    { return EventTurnStart }
+func (TurnEnded) Kind() EventKind      { return EventTurnEnd }
+func (MessageStarted) Kind() EventKind { return EventMessageStart }
+func (MessageUpdated) Kind() EventKind { return EventMessageUpdate }
+func (MessageEnded) Kind() EventKind   { return EventMessageEnd }
+func (ToolStarted) Kind() EventKind    { return EventToolExecutionStart }
+func (ToolUpdated) Kind() EventKind    { return EventToolExecutionUpdate }
+func (ToolEnded) Kind() EventKind      { return EventToolExecutionEnd }
 
 // State() gives a copy.
 type AgentState struct {

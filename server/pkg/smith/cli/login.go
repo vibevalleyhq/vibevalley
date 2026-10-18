@@ -38,7 +38,7 @@ func readAuthStatus(ctx context.Context, runtime oar.Runtime, timeout int64) aut
 		report.Unsupported = runtime.ID + " exposes no installation probe"
 		return report
 	}
-	installation, err := runtime.Installation(ctx)
+	installation, err := runtime.Installation(ctx, oar.InstallationOptions{})
 	if err != nil {
 		return authStatusReport{RuntimeID: runtime.ID, Error: err.Error()}
 	}
@@ -64,7 +64,7 @@ func runLogin(ctx context.Context, runtime oar.Runtime, interaction oar.Provider
 		report.Unsupported = runtime.ID + " exposes no installation probe"
 		return report
 	}
-	installation, err := runtime.Installation(ctx)
+	installation, err := runtime.Installation(ctx, oar.InstallationOptions{})
 	if err != nil {
 		return loginReport{RuntimeID: runtime.ID, Error: err.Error()}
 	}

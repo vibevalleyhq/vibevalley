@@ -16,8 +16,8 @@ var versionLine = regexp.MustCompile(`(?m)^(?:morph|mistermorph)\s+(\S+)`)
 
 // Installation probes morph. `morph` rejects `--version`; its version is the
 // `version` subcommand's "morph <version>" line.
-func Installation(ctx context.Context) (oar.InstallationSnapshot, error) {
-	snapshot, err := probe(ctx)
+func Installation(ctx context.Context, options oar.InstallationOptions) (oar.InstallationSnapshot, error) {
+	snapshot, err := probe(ctx, options)
 	if err != nil || snapshot.Kind != "available" || !snapshot.Available.IsExecutable() || snapshot.Available.Version != "" {
 		return snapshot, err
 	}

@@ -7,20 +7,26 @@
 
 派活派的是档案；一个档案可以同时派出好几个帮工，各自一个 worktree。
 
+新建档案走 `POST /api/v1/agents`，新建技能走 `POST /api/v1/skills`；请求里的 `id` 留空，服务端在提交时分配并返回。档案用下一个未占用的 `agent-N`，技能用名字的 ASCII 小写 slug（没有就用 `skill`），重名加数字。两个设备同时创建不会覆盖彼此。编辑或导入指定 ID 仍走原有 `PUT` 保存接口。
+
+客户端分别读取农机目录与档案、技能配置；农机探测失败只影响农具信息，档案和技能仍可读取、编辑。
+
 跑通了的是四台：VibeValley、pi（DeepSeek 按量付费）、claude 和 codex（订阅套餐）。其余几台 smith 也能驱动，但还没在真实项目里跑通（[提案](../../.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)）；cursor 要单独装的 SDK，smith 没接，总是「不支持」。
+
+农机页指定的命令路径是本次探测的输入，不改服务端进程的环境变量。路径留空时，服务端按 PATH 和农机的默认候选查找；填了但不存在就报没找到，不回退到另一份。开执行沿用已接受的安装身份。独立 `oar` 命令行未指定路径时仍认 `OAR_<RUNTIME>_BIN`。
 
 ## 在用的农机
 
 | | VibeValley | pi | claude | codex |
 |---|---|---|---|---|
-| 怎么跑 | 服务端进程里（`server/pkg/agent/oarruntime`） | pi 的 SDK，跑在 smith 内嵌的 Node 宿主里，要有 Node | `claude` 命令行 | `codex` 的 app-server |
+| 怎么跑 | 服务端进程里（`server/internal/agent/brain/oarruntime`） | pi 的 SDK，跑在 smith 内嵌的 Node 宿主里，要有 Node | `claude` 命令行 | `codex` 的 app-server |
 | 登录 | DeepSeek 的钥匙（同管家） | pi 自己的配置 | 本机 Claude Code 的登录 | 本机 codex 的登录 |
 | 额度 | 不报 | DeepSeek 余额 | 套餐的窗口 | 套餐的窗口 |
 | 花费 | 按 `server/pkg/ai/models.go` 折成人民币 | 按 pi 价目表折成人民币 | 只记 token | 只记 token |
 
 额度和花费见 [server.md](server.md)「额度、花费和上限」。各农机不接受哪些开会话的参数、能不能中途插话，写在 `seeds.json` 的 `runtimeFacts`（抄自 smith 各农机的 `RefusedSessionOptions`）；页面上不接受的选项是灰的。
 
-VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮手（`spawn_agent`）、读技能这些工具，对话存在 `$VIBEVALLEY_HOME/sessions/<会话 id>.jsonl`。
+VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮手（`spawn_agent`）、读技能、自己的任务图（`task_add`、`task_update`、`task_graph`：一件活拆成有先后的几件，每件自己做或交给帮手；交给帮手的等前面的做完就自动派，最多三个同时做，做完把结果交回；图存在农场的库里（`task_graph`），一个会话一张）这些工具，对话存在 `$VIBEVALLEY_HOME/sessions/<会话 id>.jsonl`。
 
 ## 种子档案
 

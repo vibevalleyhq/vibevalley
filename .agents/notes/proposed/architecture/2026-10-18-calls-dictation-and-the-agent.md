@@ -32,7 +32,7 @@ Agora 的说法也进了我们的形状和各层：
 |---|---|---|---|
 | **通话** | 和管家实时说话 | Agora：传输、识别、断句、打断、合成 | 「想」这一格调管家的 OpenAI 接口（或一张快嘴），说的话进田头 |
 | **听写** | 说一段话，变成输入框里的字 | 主人填的一个 OpenAI 兼容的转写地址（本机或云上），不经过 Agora | 输入框，主人看过再发；不叫醒管家 |
-| **agent 的 OpenAI 接口** | 让任何说 chat/completions 的程序和管家说话 | `pkg/agent` 的协议层 + 管家 | 管家的会话 |
+| **agent 的 OpenAI 接口** | 让任何说 chat/completions 的程序和管家说话 | `internal/agent/brain` 的协议层 + 管家 | 管家的会话 |
 
 ```
   通话                                      听写
@@ -42,12 +42,12 @@ Agora 的说法也进了我们的形状和各层：
   语音线路 127.0.0.1:8788（每通电话一把钥匙）           输入框
                   │
                   ▼
-  pkg/agent 的 OpenAI 协议层 ──► 管家（会话·工具·记性）◄── 田头、工单串、巡查
+  internal/agent/brain 的 OpenAI 协议层 ──► 管家（会话·工具·记性）◄── 田头、工单串、巡查
 ```
 
 ### 1. agent 说 OpenAI 的协议
 
-`server/pkg/agent` 加一个只管协议的处理函数，从 `voice/line.go` 里搬出来：解析 `POST …/chat/completions`，按 `stream` 回 `chat.completion.chunk` 的 SSE 或一个完整的 `chat.completion`。它不知道管家、不知道钥匙，只接一个按模型名选谁答的函数：
+`server/internal/agent/brain` 加一个只管协议的处理函数，从 `voice/line.go` 里搬出来：解析 `POST …/chat/completions`，按 `stream` 回 `chat.completion.chunk` 的 SSE 或一个完整的 `chat.completion`。它不知道管家、不知道钥匙，只接一个按模型名选谁答的函数：
 
 ```go
 // One turn's words as they come; the channel closes when the turn is over. nil: no such model.
@@ -108,7 +108,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 `VoiceSettings` 就是通话的设置，也就是 Agora 实现的设置；听写的设置以后是它旁边单独的 `dictation`，不放进 `voice`。
 
-- `answer`（原来的 `llm`）：谁接电话，`VoiceAnswer`。`manager` 是管家自己接（原来的 `vibevalley`），模型归管家的档案（[管家是一份内置档案](2026-10-17-manager-is-an-agent.md)）；`agora`、`deepseek`、`openai` 是快嘴，只会说话，管家旁听派活。
+- `answer`（原来的 `llm`）：谁接电话，`VoiceAnswer`。`manager` 是管家自己接（原来的 `vibevalley`），模型归管家的档案（[管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md)）；`agora`、`deepseek`、`openai` 是快嘴，只会说话，管家旁听派活。
 - `asr`、`tts`：Agora 能接的厂商，名字照实写；听写的识别是另一个联合类型。
 - 人设、开场白、出错时说的话、`Area`、`SilenceMs`、`InterruptMs`、`IdleSeconds` 都留在 `voice` 里。人设只对快嘴有用，声音页上标明了。
 - `VoiceCaptions` 删掉：字幕固定走 RTC 的 data stream，写在 `voice/agora.go` 里（`pkg/agora` 还认 RTM，给别的用法）。
@@ -120,7 +120,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 每步单独一个改动，各自能过检查：
 
-1. **OpenAI 协议层**（第 1 节）：从 `line.go` 搬进 `pkg/agent`，语音线路改用它，加 `/v1/chat/completions`。语音的行为不变。
+1. **OpenAI 协议层**（第 1 节）：从 `line.go` 搬进 `internal/agent/brain`，语音线路改用它，加 `/v1/chat/completions`。语音的行为不变。
 2. **守住 Agora 的边界**（第 2 节的表）：加 import 检查，代码不挪。
 3. **电话进田头**（第 2 节的后半）：只改行为；改完更新 voice.md。
 4. **改形状**（第 4 节）：改 `protocol`、跑 `shapegen`、改声音页。
@@ -130,7 +130,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 ### 做到哪了
 
-2026-10-18 做了第 1 步：`pkg/agent/openai.go` 的 `ChatCompletions`，语音线路（`voice/line.go`）只剩路由和钥匙；主服务挂了 `protocol.ChatCompletionsPath`（`/v1/chat/completions`），模型名是 `protocol.ManagerModel`。同一天做了第 2 步：Agora 本来就只在上表的几处，加了两条检查守住它。第 3 步也做了：消息多了 `spoken`（`ChatMessage.Spoken`，存在 `chatMeta`），`chatAudience` 见到它不投给任何人；主人的话由 `Manager.Heard`（快嘴）或 `Manager.Call`（管家）记，快嘴的回答由客户端的 `LiveCaptions.onAnswered` 交给 `POST /api/v1/voice/agent/said`，服务端只收还没挂、开始时「想」不是管家的那一通，开场白不记。管家旁听不再 `Quiet`，提示里让它派了活才说一句。第 4 步也做了，见第 4 节。第 5 步做了第 3 节写的那些：`voice/dictate.go` 转交录音，`app/lib/voice/dictation.dart` 录一段，`app/lib/chat/dictation_button.dart` 的按钮在工作台和农场的田头输入框里，设置在「声音」页的「听写」。录音依赖 `record`。管家的 `Call`（电话里的话，带语音的提示）和 `Answerer`（本机的 chat/completions，当作田头里的话）共用一个 `answer`：同一时间只流一个回答，新的一句结束上一个的流。
+2026-10-18 做了第 1 步：`internal/agent/brain/openai.go` 的 `ChatCompletions`，语音线路（`voice/line.go`）只剩路由和钥匙；主服务挂了 `protocol.ChatCompletionsPath`（`/v1/chat/completions`），模型名是 `protocol.ManagerModel`。同一天做了第 2 步：Agora 本来就只在上表的几处，加了两条检查守住它。第 3 步也做了：消息多了 `spoken`（`ChatMessage.Spoken`，存在 `chatMeta`），`chatAudience` 见到它不投给任何人；主人的话由 `Manager.Heard`（快嘴）或 `Manager.Call`（管家）记，快嘴的回答由客户端的 `LiveCaptions.onAnswered` 交给 `POST /api/v1/voice/agent/said`，服务端只收还没挂、开始时「想」不是管家的那一通，开场白不记。管家旁听不再 `Quiet`，提示里让它派了活才说一句。第 4 步也做了，见第 4 节。第 5 步做了第 3 节写的那些：`voice/dictate.go` 转交录音，`app/lib/voice/dictation.dart` 录一段，`app/lib/chat/dictation_button.dart` 的按钮在工作台和农场的田头输入框里，设置在「声音」页的「听写」。录音依赖 `record`。管家的 `Call`（电话里的话，带语音的提示）和 `Answerer`（本机的 chat/completions，当作田头里的话）共用一个 `answer`：同一时间只流一个回答，新的一句结束上一个的流。
 
 待定：
 
@@ -144,7 +144,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 **通话的识别也换成我们自己的。** 识别和断句、打断绑在一起，换掉就要自己做实时链路，[照官方示例搬](../../implemented/feature/2026-10-10-voice-through-agora-quickstart.md)时否决过。
 
-**OpenAI 协议层留在 `voice` 里。** 只有语音线路用它的时候没问题；可主服务的本机接口、以后给帮工打电话都要用。协议和管家无关，放在 `pkg/agent`，任何一个 `vvagent.Agent` 都能挂。
+**OpenAI 协议层留在 `voice` 里。** 只有语音线路用它的时候没问题；可主服务的本机接口、以后给帮工打电话都要用。协议和管家无关，放在 `internal/agent/brain`，任何一个 `vvagent.Agent` 都能挂。
 
 **协议层照 OpenAI 的语义，每次读全部 `messages`。** 那样管家的会话和 Agora 那边的历史是两份，会对不上：插话时没念完的字、田头里说的话，Agora 都不知道。以管家的会话为准，只取最后一句。
 

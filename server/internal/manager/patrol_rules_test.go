@@ -14,7 +14,7 @@ const (
 )
 
 func patrolSession(change func(*protocol.Session)) protocol.Session {
-	h := protocol.Session{ID: "w1", Name: "后端老周", Agent: "lab", Runtime: "pi", Task: "加个接口", HiredAt: patrolT, Runs: 1, Phase: protocol.Phase{Value: protocol.PhaseResting{}}}
+	h := protocol.Session{ID: "w1", Name: "后端老周", Agent: "lab", Runtime: "pi", Brief: "加个接口", HiredAt: patrolT, Runs: 1, Phase: protocol.Phase{Value: protocol.PhaseResting{}}}
 	change(&h)
 	return h
 }
@@ -64,11 +64,11 @@ func TestPatrolAsk(t *testing.T) {
 }
 
 func TestPatrolQuietRipeStep(t *testing.T) {
-	pb := protocol.Playbook{ID: "p1", Title: "打卡", Project: "demo", State: protocol.PlaybookStateRunning, Parallel: 2, CreatedAt: patrolT,
-		Nodes: []protocol.PlaybookNode{{ID: "api", Title: "接口", Needs: []string{}, State: protocol.NodeStateFailed, Tries: 1, Conclusion: ptr.To("测试没过")}}}
-	draft := protocol.Playbook{ID: "p2", Title: "导出", Project: "demo", State: protocol.PlaybookStateDraft, Parallel: 1, CreatedAt: patrolT}
+	graph := protocol.TaskGraph{ID: "p1", Title: "打卡", Project: "demo", State: protocol.GraphStateRunning, Parallel: 2, CreatedAt: patrolT,
+		Tasks: []protocol.Task{{ID: "api", Title: "接口", Needs: []string{}, State: protocol.TaskStateFailed, Tries: 1, Conclusion: ptr.To("测试没过")}}}
+	draft := protocol.TaskGraph{ID: "p2", Title: "导出", Project: "demo", State: protocol.GraphStateDraft, Parallel: 1, CreatedAt: patrolT}
 	state := patrolFarm(patrolChat())
-	state = patrolWithPlaybooks(state, pb, draft)
+	state = patrolWithTasks(state, graph, draft)
 	state.Sessions = []protocol.Session{
 		patrolSession(func(h *protocol.Session) {
 			h.Phase = protocol.Phase{Value: protocol.PhaseWorking{Since: patrolT, Doing: protocol.Doing{Action: protocol.SessionActionRunCommand, Label: "pnpm test"}, QuietSince: ptr.To(patrolT + patrolMin)}}
@@ -113,15 +113,15 @@ func TestPatrolGraceAndMemory(t *testing.T) {
 
 func TestPatrolCountsFromFirstSeen(t *testing.T) {
 	// A failed step has no time of its own: its grace counts from when the patrol first saw it.
-	pb := protocol.Playbook{ID: "p1", Title: "打卡", Project: "demo", State: protocol.PlaybookStatePaused, Parallel: 1, CreatedAt: patrolT,
-		Nodes: []protocol.PlaybookNode{{ID: "api", Title: "接口", Needs: []string{}, State: protocol.NodeStateFailed}}}
+	graph := protocol.TaskGraph{ID: "p1", Title: "打卡", Project: "demo", State: protocol.GraphStatePaused, Parallel: 1, CreatedAt: patrolT,
+		Tasks: []protocol.Task{{ID: "api", Title: "接口", Needs: []string{}, State: protocol.TaskStateFailed}}}
 	state := protocol.EmptyCoreState()
-	state = patrolWithPlaybooks(state, pb)
+	state = patrolWithTasks(state, graph)
 	first, memory := patrolStep(state, patrolT, emptyPatrol())
 	testkit.Eq(t, first, []patrolNote{})
-	early, _ := patrolStep(state, patrolT+patrolGrace[protocol.InboxKindPlanFailed]-patrolMin, memory)
+	early, _ := patrolStep(state, patrolT+patrolGrace[protocol.InboxKindTaskFailed]-patrolMin, memory)
 	testkit.Eq(t, early, []patrolNote{})
-	due, _ := patrolStep(state, patrolT+patrolGrace[protocol.InboxKindPlanFailed], memory)
+	due, _ := patrolStep(state, patrolT+patrolGrace[protocol.InboxKindTaskFailed], memory)
 	testkit.Eq(t, len(due), 1)
 }
 
@@ -130,9 +130,9 @@ func TestPatrolText(t *testing.T) {
 	testkit.Eq(t, text, "【巡查】#ops 里有几件事放着没人管：\n- 一\n- 二\n\n看看要不要提醒主人（一两句，说在 #ops）、催帮工或者叫停；都不用管就什么也别说。")
 }
 
-func patrolWithPlaybooks(state protocol.CoreState, playbooks ...protocol.Playbook) protocol.CoreState {
-	for _, pb := range playbooks {
-		for _, issue := range protocol.PlaybookIssues(pb, nil, pb.CreatedAt) {
+func patrolWithTasks(state protocol.CoreState, graphs ...protocol.TaskGraph) protocol.CoreState {
+	for _, graph := range graphs {
+		for _, issue := range protocol.GraphIssues(graph, nil, graph.CreatedAt) {
 			state, _ = protocol.Reduce(state, protocol.Fact{Value: protocol.FactIssue{Issue: issue}})
 		}
 	}

@@ -8,13 +8,14 @@ import (
 	"testing"
 	"time"
 	"vibevalley/pkg/agentcore"
+	"vibevalley/pkg/db/generated"
 
+	vvagent "vibevalley/internal/agent/brain"
 	"vibevalley/internal/memory"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
-	vvagent "vibevalley/pkg/agent"
 	"vibevalley/pkg/ai"
 	"vibevalley/pkg/x/clock"
 )
@@ -118,7 +119,7 @@ func TestManagerShutdownDoesNotHoldInputReadLock(t *testing.T) {
 		Execute: func(ctx context.Context, _ string, _ struct{}, _ agentcore.AgentToolUpdateCallback) (agentcore.AgentToolResult, error) {
 			close(entered)
 			<-ctx.Done()
-			_ = fm.here()
+			_ = fm.requestInput()
 			return agentcore.TextResult("stopped"), nil
 		},
 	})})
@@ -175,6 +176,59 @@ func TestFarmNewsAndInstructionAreOneModelInput(t *testing.T) {
 	}
 }
 
+func TestCanceledQueuedInputLeavesDigestForNextConsumedInput(t *testing.T) {
+	w := managerOpen(t)
+	started, release := make(chan struct{}), make(chan struct{})
+	w.faux.SetResponses(ai.FauxResponseFactory(func(ai.Context, ai.StreamOptions, ai.FauxProviderState, ai.Model) ai.AssistantMessage {
+		close(started)
+		<-release
+		return ai.FauxAssistantMessage("old response")
+	}))
+	fm := w.f.Manager.manager
+	fm.send(sourceOwner, "hold", w.f.Channel.General(), true)
+	<-started
+	w.enableLab(t)
+	hired := w.f.Issue.Hire(w.ctx, fixture.Lab(t), "digest source", "digest", session.HireOptions{})
+	if hired.Session == nil {
+		close(release)
+		t.Fatal(hired.Refused)
+	}
+	digest := testkit.Await(t, "pending report", func() ([]protocol.InboxMessage, bool) { d := w.f.Channel.ManagerDigest(); return d, len(d) > 0 })
+	fm.sendInput("cancel this", managerInput{Conversation: w.f.Channel.General()}, false)
+	fm.starting.Lock()
+	brain := fm.brain
+	fm.starting.Unlock()
+	stopped := make(chan struct{})
+	go func() { brain.Stop(); close(stopped) }()
+	testkit.Until(t, "queued input discarded", func() bool { return !brain.Core.HasQueuedMessages() })
+	close(release)
+	<-stopped
+	if err := brain.Core.WaitForIdle(w.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if d := w.f.Channel.ManagerDigest(); len(d) != len(digest) {
+		t.Fatalf("queued input consumed report: %+v", d)
+	}
+	w.faux.SetResponses(ai.FauxResponseFactory(func(ai.Context, ai.StreamOptions, ai.FauxProviderState, ai.Model) ai.AssistantMessage {
+		return ai.FauxAssistantMessage("read now")
+	}))
+	fm.sendInput("consume this", managerInput{Conversation: w.f.Channel.General()}, true)
+	testkit.Until(t, "execution acknowledges report", func() bool { return len(w.f.Channel.ManagerDigest()) == 0 })
+	runs, err := generated.New(w.f.DB).RunsOfSession(context.Background(), protocol.ManagerAgent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, r := range runs {
+		if r.Heard.Valid && strings.Contains(r.Heard.String, digest[0].ID) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("receipt is not attached to a persisted run")
+	}
+}
+
 func TestEachAnswerLeavesItsTokensInTheLog(t *testing.T) {
 	w := managerOpen(t)
 	answer := ai.FauxAssistantMessage("收到")
@@ -194,8 +248,8 @@ func TestEachAnswerLeavesItsTokensInTheLog(t *testing.T) {
 }
 
 func TestUsageText(t *testing.T) {
-	testkit.Eq(t, managerUsageText(protocol.EventTokens{Input: 1_000, CacheRead: 1_000, Output: 1_234_567}, "memory,tools"), "缓存命中 50%：读缓存 1 000，没命中 1 000，输出 1 234 567；开头变了：记性、工具", "changed")
-	testkit.Eq(t, managerUsageText(protocol.EventTokens{Output: 12}, ""), "没报读了多少：输出 12", "no input")
+	testkit.Eq(t, managerUsageText(protocol.EventTokens{Input: 1_000, CacheRead: 1_000, Output: 1_234_567}, []string{"memory", "tools"}), "缓存命中 50%：读缓存 1 000，没命中 1 000，输出 1 234 567；开头变了：记性、工具", "changed")
+	testkit.Eq(t, managerUsageText(protocol.EventTokens{Output: 12}, nil), "没报读了多少：输出 12", "no input")
 }
 
 func TestTheSituationIsWholeOnlyAfterAFold(t *testing.T) {
@@ -228,7 +282,7 @@ func TestTheSituationIsWholeOnlyAfterAFold(t *testing.T) {
 	if third := ask("三"); strings.Contains(third, "【农场") {
 		t.Fatalf("third %q", third)
 	}
-	fm.event(vvagent.AgentEvent{AgentEvent: agentcore.AgentEvent{Type: vvagent.EventCompactionEnd}, Compaction: &vvagent.CompactionSummaryMessage{Summary: "摘要"}})
+	fm.event(vvagent.CompactionEnded{Compaction: &vvagent.CompactionSummaryMessage{Summary: "摘要"}})
 	if fourth := ask("四"); !strings.Contains(fourth, "【农场现状】") {
 		t.Fatalf("after a fold %q", fourth)
 	}
@@ -274,7 +328,7 @@ func TestARestartGoesOnWithTheRunItCut(t *testing.T) {
 	// Slow enough that the second answer is still coming when the farm stops.
 	before := ai.FauxProvider(ai.FauxProviderOptions{Delay: 5 * time.Millisecond})
 	before.SetResponses(
-		ai.FauxAssistantMessage(ai.FauxToolCall("dispatch", map[string]any{"task": "加个 README", "project": "demo"}, "")),
+		ai.FauxAssistantMessage(ai.FauxToolCall("dispatch", map[string]any{"brief": "加个 README", "project": "demo"}, "")),
 		ai.FauxAssistantMessage(strings.Repeat("还在说", 400)),
 	)
 	w := managerStart(t, cfg, before)

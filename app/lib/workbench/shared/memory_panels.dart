@@ -11,7 +11,7 @@ import '../../ui/kit/field.dart';
 import '../../ui/kit/labels.dart';
 import '../../data/remote.dart';
 import './widgets.dart';
-import '../../rules/playbook.dart';
+import '../../rules/task.dart';
 
 /// Notes its helpers could still add before the oldest are dropped: those are marked 快忘了.
 const _everywhere = '*';

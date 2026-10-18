@@ -25,8 +25,8 @@ class QuotaPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(workbenchConfigProvider).error != null) return const ConfigProblem();
-    final runtimes = usableRuntimes(ref.watch(workbenchConfigProvider).runtimes);
+    if (ref.watch(runtimesProvider).hasError) return const RuntimeProblem();
+    final runtimes = usableRuntimes(ref.watch(runtimesProvider).value ?? const []);
     final atlas = ref.watch(atlasProvider).value;
     if (runtimes.isEmpty || atlas == null) return const SizedBox.shrink();
     return SizedBox(
@@ -101,10 +101,10 @@ class QuotaMachine extends StatelessWidget {
                 Row(
                   children: [
                     Text(runtimeName(info.id), style: KitText.sm),
-                    if (info.usage case AccountUsageOk(:final plan?)) ...[
+                    if (info.usage case AccountUsageOk(:final subscription?)) ...[
                       const SizedBox(width: 6),
                       Flexible(
-                        child: Text(plan, style: small, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(subscription, style: small, maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                     ],
                   ],

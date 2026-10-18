@@ -8,31 +8,31 @@ func FrameOf(state CoreState, effects []GameEffect) StateFrame {
 	if effects == nil {
 		effects = []GameEffect{}
 	}
-	plans := PlaybooksOf(state)
-	for i := range plans {
-		plans[i].StateTag = PlaybookStateTag[plans[i].State]
-		plans[i].ActionText = make(map[string]string, len(PlaybookActionText))
-		for action, word := range PlaybookActionText {
-			plans[i].ActionText[string(action)] = word
+	graphs := GraphsOf(state)
+	for i := range graphs {
+		graphs[i].StateTag = GraphStateTag[graphs[i].State]
+		graphs[i].ActionText = make(map[string]string, len(GraphActionText))
+		for action, word := range GraphActionText {
+			graphs[i].ActionText[string(action)] = word
 		}
-		plans[i].Actions = PlaybookActions(plans[i])
-		if len(plans[i].Nodes) == 0 {
+		graphs[i].Actions = GraphActions(graphs[i])
+		if len(graphs[i].Tasks) == 0 {
 			continue
 		}
-		nodes := slices.Clone(plans[i].Nodes)
-		for j := range nodes {
-			nodes[j].StateText = NodeStateText[nodes[j].State]
-			nodes[j].Actions = NodeActions(plans[i], nodes[j])
-			nodes[j].ActionText = make(map[string]string, len(nodes[j].Actions))
-			for _, action := range nodes[j].Actions {
-				nodes[j].ActionText[string(action)] = NodeActionText[action]
+		tasks := slices.Clone(graphs[i].Tasks)
+		for j := range tasks {
+			tasks[j].StateText = TaskStateText[tasks[j].State]
+			tasks[j].Actions = TaskActions(graphs[i], tasks[j])
+			tasks[j].ActionText = make(map[string]string, len(tasks[j].Actions))
+			for _, action := range tasks[j].Actions {
+				tasks[j].ActionText[string(action)] = TaskActionText[action]
 			}
-			nodes[j].CanEdit = CanEditNode(plans[i], &nodes[j])
-			nodes[j].CanRemove = CanRemoveNode(plans[i], &nodes[j])
+			tasks[j].CanEdit = CanEditTask(graphs[i], &tasks[j])
+			tasks[j].CanRemove = CanRemoveTask(graphs[i], &tasks[j])
 		}
-		plans[i].Nodes = nodes
+		graphs[i].Tasks = tasks
 	}
-	return StateFrame{State: withWords(state), Inbox: Inbox(state), Plans: plans, View: ViewOf(state), Effects: effects}
+	return StateFrame{State: withWords(state), Inbox: Inbox(state), Graphs: graphs, View: ViewOf(state), Effects: effects}
 }
 
 func withWords(state CoreState) CoreState {

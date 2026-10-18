@@ -5,6 +5,8 @@ import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
 
+import '../game/tools.dart' show BedFxKind;
+
 import 'critters.dart' show PointLight;
 import 'particles.dart';
 import 'pass.dart';
@@ -12,9 +14,6 @@ import 'world.dart';
 
 final _random = math.Random();
 double _rand(double lo, double hi) => lo + _random.nextDouble() * (hi - lo);
-
-/// note: why it did nothing (only words, the overlay's).
-enum BedFx { water, spray, harvest, shovel, note }
 
 class _Flash {
   _Flash(this.x, this.y, this.radius, this.color, this.strength, this.life);
@@ -49,11 +48,11 @@ class PlotFx extends Component {
   void _add(Look look, {required double x, required double y, required double vx, required double vy, required double fall, required double life}) =>
       _bits.add(Layer.lit, look, x: x, y: y, vx: vx, vy: vy, fall: fall, life: life);
 
-  void burst(BedFx kind, int bed) {
+  void burst(BedFxKind kind, int bed) {
     final c = _centre(bed);
     pressedAt[bed] = _clock;
     switch (kind) {
-      case BedFx.water:
+      case BedFxKind.water:
         for (var i = 0; i < 14; i++) {
           _add(
             Dot(i % 3 != 0 ? const ui.Color(0xFF6FB3E0) : const ui.Color(0xFFC8E6F7)),
@@ -65,11 +64,11 @@ class PlotFx extends Component {
             life: _rand(0.35, 0.6),
           );
         }
-      case BedFx.spray:
+      case BedFxKind.spray:
         for (var i = 0; i < 12; i++) {
           _add(const Dot(ui.Color(0xFFF4F1E6), 2), x: c.x + _rand(-4, 4), y: c.y - 4, vx: _rand(-24, 24), vy: _rand(-26, -6), fall: 0, life: _rand(0.5, 0.9));
         }
-      case BedFx.shovel:
+      case BedFxKind.shovel:
         for (var i = 0; i < 12; i++) {
           _add(
             Dot(i.isOdd ? const ui.Color(0xFF8A6A45) : const ui.Color(0xFF5D4429), 2),
@@ -81,14 +80,14 @@ class PlotFx extends Component {
             life: _rand(0.4, 0.7),
           );
         }
-      case BedFx.harvest:
+      case BedFxKind.harvest:
         final icon = picture('icon-harvest', ax: 0.5, ay: 1);
         if (icon != null) _add(icon, x: c.x, y: c.y, vx: 0, vy: -38, fall: 30, life: 1.1);
         _flashes.add(_Flash(c.x, c.y - 6, 46, const ui.Color(0xFFFFD36A), 1.3, 0.8));
         for (var i = 0; i < 10; i++) {
           _add(const Dot(ui.Color(0xFFF2C14E)), x: c.x + _rand(-6, 6), y: c.y - 4, vx: _rand(-30, 30), vy: _rand(-60, -30), fall: 150, life: _rand(0.5, 0.8));
         }
-      case BedFx.note:
+      case BedFxKind.note:
         return;
     }
   }
@@ -104,10 +103,10 @@ class PlotFx extends Component {
     }
   }
 
-  void step(double dt) {
+  void task(double dt) {
     _clock += dt;
     _flashes.removeWhere((f) => (f.age += dt) >= f.life);
-    _bits.step(dt);
+    _bits.task(dt);
   }
 
   double get clock => _clock;

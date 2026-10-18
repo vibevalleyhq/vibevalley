@@ -44,7 +44,7 @@ func TestRolledBackMessageDoesNotResetWakeBreaker(t *testing.T) {
 func TestReadingReceiptRollsBackAsAUnit(t *testing.T) {
 	f, _ := chatTestFarm(t, t.TempDir(), ":memory:")
 	c := f.Channel
-	c.ManagerSays(c.general, "read", "hello", true)
+	c.ManagerSays(c.general, "read", "hello", true, "")
 	history, err := c.History(c.general, nil, nil)
 	if err != nil || len(history) != 1 {
 		t.Fatal(history, err)
@@ -76,7 +76,7 @@ func TestReadingReceiptRollsBackAsAUnit(t *testing.T) {
 func TestThreadOwnerFailureLeavesNoDispatch(t *testing.T) {
 	f, _ := chatTestFarm(t, t.TempDir(), ":memory:")
 	c := f.Channel
-	h := protocol.Session{ID: "unopened", Name: "helper", Task: "work", Agent: "lab", Runtime: "fake"}
+	h := protocol.Session{ID: "unopened", Name: "helper", Brief: "work", Agent: "lab", Runtime: "fake"}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, err := f.DB.Exec(`CREATE TRIGGER fail_owner BEFORE INSERT ON channel_follow WHEN NEW.reason = 'owner' BEGIN SELECT RAISE(FAIL,'owner failed'); END`); err != nil {
@@ -115,11 +115,11 @@ func TestThreadOwnerFailureLeavesNoDispatch(t *testing.T) {
 func TestStreamingCommitCanRetryWithoutAnotherMessage(t *testing.T) {
 	f, _ := chatTestFarm(t, t.TempDir(), ":memory:")
 	c := f.Channel
-	c.ManagerSays(c.general, "stream", "partial", false)
+	c.ManagerSays(c.general, "stream", "partial", false, "")
 	if _, err := f.DB.Exec(`CREATE TRIGGER fail_final BEFORE UPDATE ON channel_message WHEN NEW.final = 1 BEGIN SELECT RAISE(FAIL,'final failed'); END`); err != nil {
 		t.Fatal(err)
 	}
-	c.ManagerSays(c.general, "stream", "complete", true)
+	c.ManagerSays(c.general, "stream", "complete", true, "")
 	history, err := c.History(c.general, nil, nil)
 	if err != nil || len(history) != 1 || history[0].Final || history[0].Text != "partial" {
 		t.Fatal(history, err)
@@ -127,7 +127,7 @@ func TestStreamingCommitCanRetryWithoutAnotherMessage(t *testing.T) {
 	if _, err := f.DB.Exec(`DROP TRIGGER fail_final`); err != nil {
 		t.Fatal(err)
 	}
-	c.ManagerSays(c.general, "stream", "complete", true)
+	c.ManagerSays(c.general, "stream", "complete", true, "")
 	history, err = c.History(c.general, nil, nil)
 	if err != nil || len(history) != 1 || !history[0].Final || history[0].Text != "complete" {
 		t.Fatal(history, err)

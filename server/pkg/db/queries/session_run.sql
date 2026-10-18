@@ -14,7 +14,9 @@ update session_run set ended_at = ?, outcome = ?, summary = ?, spent = ? where i
 select * from session_run where ended_at is null order by id;
 
 -- name: RunsOfIssue :many
-select * from session_run where issue = ? order by started_at, id;
+select * from session_run
+where session_run.issue = sqlc.arg(issue_id) or session_run.id in (select run from session_run_issue where session_run_issue.issue = sqlc.arg(issue_id))
+order by started_at, id;
 
 -- name: RunsOfSession :many
 select * from session_run where session = ? order by id;

@@ -27,7 +27,7 @@ IssueTag issueTag(Issue issue) {
   }
   return switch (issue.closed) {
     IssueClose.merged => IssueTag.harvested,
-    IssueClose.mergedIntoPlan => IssueTag.merged,
+    IssueClose.mergedIntoGraph => IssueTag.merged,
     IssueClose.dismissed => IssueTag.dropped,
     IssueClose.lost => IssueTag.lost,
     IssueClose.answered => IssueTag.answered,
@@ -37,32 +37,32 @@ IssueTag issueTag(Issue issue) {
 
 bool isForManager(Issue issue) => issue.assignee == managerAgent;
 
-String issueTitle(Issue issue, [List<Playbook> plans = const []]) {
+String issueTitle(Issue issue, [List<TaskGraph> graphs = const []]) {
   final job = issue.title.trim();
   if (job.isEmpty) return issue.id;
   if (issue.parent case final parent?) {
-    final playbook = plans.where((p) => p.id == parent).firstOrNull;
-    if (playbook != null) return '${playbook.title} · $job';
+    final graph = graphs.where((p) => p.id == parent).firstOrNull;
+    if (graph != null) return '${graph.title} · $job';
   }
   return job.split('\n').first.trim();
 }
 
 bool issueIs(Issue issue, String id) => issue.id == id || issue.sessions.contains(id);
 
-Lane? playbookLane(Playbook p) => switch (p.state) {
-  PlaybookState.planning || PlaybookState.running => Lane.working,
-  PlaybookState.draft || PlaybookState.paused || PlaybookState.ripe => Lane.waiting,
-  PlaybookState.done || PlaybookState.abandoned => null,
+Lane? taskLane(TaskGraph p) => switch (p.state) {
+  GraphState.splitting || GraphState.running => Lane.working,
+  GraphState.draft || GraphState.paused || GraphState.ripe => Lane.waiting,
+  GraphState.done || GraphState.abandoned => null,
 };
 
-String playbookLine(Playbook p) => switch (p.state) {
-  PlaybookState.planning => '在拆步骤',
-  PlaybookState.draft => '拆好了，看过再开工',
-  PlaybookState.running => '做到 ${p.settled ?? 0} / ${p.nodes.length} 步',
-  PlaybookState.paused => '暂停了',
-  PlaybookState.ripe => '都做完了，等你收获',
-  PlaybookState.done => '收获了',
-  PlaybookState.abandoned => '放弃了',
+String taskLine(TaskGraph p) => switch (p.state) {
+  GraphState.splitting => '在拆步骤',
+  GraphState.draft => '拆好了，看过再开工',
+  GraphState.running => '做到 ${p.settled ?? 0} / ${p.tasks.length} 步',
+  GraphState.paused => '暂停了',
+  GraphState.ripe => '都做完了，等你收获',
+  GraphState.done => '收获了',
+  GraphState.abandoned => '放弃了',
 };
 
 Session? issueSession(CoreState? farm, Issue issue) =>
@@ -87,16 +87,16 @@ Lane laneOf(IssueStatus s) => switch (s) {
 
 enum Move { start, close, reopen }
 
-/// A playbook's step (`planned`) goes with its playbook: never closed or reopened alone.
-Move? moveOf(Lane from, Lane to, {bool planned = false}) => switch ((from, to)) {
+/// A task's step (`split`) goes with its task: never closed or reopened alone.
+Move? moveOf(Lane from, Lane to, {bool split = false}) => switch ((from, to)) {
   (Lane.todo, Lane.working) => Move.start,
-  (Lane.working, Lane.closed) || (Lane.waiting, Lane.closed) when !planned => Move.close,
-  (Lane.closed, Lane.working) when !planned => Move.reopen,
+  (Lane.working, Lane.closed) || (Lane.waiting, Lane.closed) when !split => Move.close,
+  (Lane.closed, Lane.working) when !split => Move.reopen,
   _ => null,
 };
 
-bool issuePlanned(Issue issue, Session? session) =>
-    issue.plan != null || issue.parent != null || session?.playbook != null || issue.closed == IssueClose.mergedIntoPlan;
+bool issueInTask(Issue issue, Session? session) =>
+    issue.graph != null || issue.parent != null || session?.graph != null || issue.closed == IssueClose.mergedIntoGraph;
 
 bool matchesQuery(String query, Iterable<String?> fields) {
   final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
@@ -110,7 +110,7 @@ const closedShown = 15;
 String runTriggerText(RunTrigger t) => switch (t.kind) {
   RunTriggerKind.issue => '派出去',
   RunTriggerKind.comment => t.message != null ? '带话（#${t.message!.length > 8 ? t.message!.substring(0, 8) : t.message!}）' : '带话',
-  RunTriggerKind.playbook => '种植计划',
+  RunTriggerKind.task => '种植计划',
   RunTriggerKind.schedule => t.missed == true ? '定时（补跑）' : '定时',
   RunTriggerKind.runtime => '农机自己',
 };

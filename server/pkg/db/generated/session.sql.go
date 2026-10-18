@@ -26,7 +26,7 @@ func (q *Queries) EndSession(ctx context.Context, arg EndSessionParams) error {
 }
 
 const endedSessions = `-- name: EndedSessions :many
-select id, agent, name, runtime, task, project, issue, playbook, hired_at, ended_at, closed from session where ended_at is not null and (?1 = '' or agent = ?1) order by hired_at desc
+select id, agent, name, runtime, brief, project, issue, graph, hired_at, ended_at, closed from session where ended_at is not null and (?1 = '' or agent = ?1) order by hired_at desc
 `
 
 // Newest first; agent ” is every agent's.
@@ -44,10 +44,10 @@ func (q *Queries) EndedSessions(ctx context.Context, agent interface{}) ([]Sessi
 			&i.Agent,
 			&i.Name,
 			&i.Runtime,
-			&i.Task,
+			&i.Brief,
 			&i.Project,
 			&i.Issue,
-			&i.Playbook,
+			&i.Graph,
 			&i.HiredAt,
 			&i.EndedAt,
 			&i.Closed,
@@ -67,20 +67,20 @@ func (q *Queries) EndedSessions(ctx context.Context, agent interface{}) ([]Sessi
 
 const keepSession = `-- name: KeepSession :exec
 
-insert into session (id, agent, name, runtime, task, project, issue, playbook, hired_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+insert into session (id, agent, name, runtime, brief, project, issue, graph, hired_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
 on conflict (id) do nothing
 `
 
 type KeepSessionParams struct {
-	ID       string
-	Agent    string
-	Name     string
-	Runtime  string
-	Task     string
-	Project  sql.NullString
-	Issue    sql.NullString
-	Playbook sql.NullString
-	HiredAt  int64
+	ID      string
+	Agent   string
+	Name    string
+	Runtime string
+	Brief   string
+	Project sql.NullString
+	Issue   sql.NullString
+	Graph   sql.NullString
+	HiredAt int64
 }
 
 // Every session, on the farm or ended (session/records.go).
@@ -90,17 +90,17 @@ func (q *Queries) KeepSession(ctx context.Context, arg KeepSessionParams) error 
 		arg.Agent,
 		arg.Name,
 		arg.Runtime,
-		arg.Task,
+		arg.Brief,
 		arg.Project,
 		arg.Issue,
-		arg.Playbook,
+		arg.Graph,
 		arg.HiredAt,
 	)
 	return err
 }
 
 const sessionByID = `-- name: SessionByID :one
-select id, agent, name, runtime, task, project, issue, playbook, hired_at, ended_at, closed from session where id = ?
+select id, agent, name, runtime, brief, project, issue, graph, hired_at, ended_at, closed from session where id = ?
 `
 
 func (q *Queries) SessionByID(ctx context.Context, id string) (Session, error) {
@@ -111,10 +111,10 @@ func (q *Queries) SessionByID(ctx context.Context, id string) (Session, error) {
 		&i.Agent,
 		&i.Name,
 		&i.Runtime,
-		&i.Task,
+		&i.Brief,
 		&i.Project,
 		&i.Issue,
-		&i.Playbook,
+		&i.Graph,
 		&i.HiredAt,
 		&i.EndedAt,
 		&i.Closed,

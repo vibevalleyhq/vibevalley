@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"database/sql"
 
 	"vibevalley/internal/base"
 
@@ -25,11 +26,12 @@ import (
 	"time"
 
 	"vibevalley/internal/agent"
+	vvagent "vibevalley/internal/agent/brain"
+	"vibevalley/internal/agent/brain/oarruntime"
 	"vibevalley/internal/core"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/setting"
-	vvagent "vibevalley/pkg/agent"
-	"vibevalley/pkg/agent/oarruntime"
+	"vibevalley/internal/task/engine"
 	"vibevalley/pkg/ai"
 	"vibevalley/pkg/smith/community/dsh"
 	"vibevalley/pkg/smith/oar"
@@ -74,13 +76,15 @@ var piPrices = func() map[string]map[string]Price {
 }()
 
 // Registry is the farm's runtimes: smith's built-ins, vibevalley's own agent (it reads deepseekKey each session) and
-// DeepSeek Harness. The server and the command line (`vibevalley oar`, `runtime chat`) know the same ones.
-func Registry(home string, deepseekKey func() string) *oar.RuntimeRegistry {
+// DeepSeek Harness. The server and the command line (`vibevalley oar`, `runtime chat`) know the same ones; tasks is
+// where a vibevalley session keeps its task graph (the farm's database; nil on the command line, which never opens it).
+func Registry(home string, deepseekKey func() string, tasks func(session string) engine.Store) *oar.RuntimeRegistry {
 	vibevalley := oarruntime.VibeValleyRuntime(oarruntime.Options{
 		Home: func() string { return home },
 		Llm: func(_ context.Context, model string) (vvagent.LLM, error) {
 			return vvagent.Deepseek(model, deepseekKey())
 		},
+		Tasks: tasks,
 	})
 	registry, err := oar.NewRuntimeRegistry(append(defaults.Runtimes(), vibevalley, dsh.Runtime())...)
 	if err != nil {
@@ -90,11 +94,6 @@ func Registry(home string, deepseekKey func() string) *oar.RuntimeRegistry {
 }
 
 func today() string { return time.Now().Format("2006-01-02") }
-
-// binVar is smith's override of where a runtime's command lives: OAR_<RUNTIME>_BIN.
-func binVar(id string) string {
-	return "OAR_" + strings.ReplaceAll(strings.ToUpper(id), "-", "_") + "_BIN"
-}
 
 type spend struct {
 	Day       string             `json:"day"`
@@ -110,10 +109,8 @@ type Service struct {
 	Probe     func(ctx context.Context, id string) protocol.RuntimeInfo
 	usageOf   func(ctx context.Context, id string, runtime oar.Runtime, found oar.AvailableInstallation, settings protocol.RuntimeSettings) protocol.AccountUsage
 
-	mu    sync.Mutex
-	cache map[string]protocol.RuntimeInfo
-	// So a usage refresh need not look for the command again.
-	found   map[string]oar.AvailableInstallation
+	mu      sync.Mutex
+	cache   map[string]observation
 	pending map[string]*time.Timer
 	pushes  map[string]*time.Timer
 	spent   spend
@@ -123,17 +120,15 @@ type Service struct {
 	asked   map[string]int
 	// Each read of a runtime takes the next number when it starts (begin); the cache keeps the number of the read it
 	// holds, and a read that started before it is dropped, so a slow probe never overwrites a newer one.
-	reads  map[string]uint64
-	readOf map[string]uint64
+	reads map[string]uint64
 }
 
-func newService(cfg base.Config, core *core.Service, store *agent.Service, settings *setting.Service) (*Service, error) {
+func newService(cfg base.Config, db *sql.DB, core *core.Service, store *agent.Service, settings *setting.Service) (*Service, error) {
 	spendFile := filepath.Join(cfg.Home, "spend.json")
-	r := &Service{cfg: cfg, core: core, store: store, Registry: Registry(cfg.Home, settings.DeepseekAPIKey), cnyPerUsd: cfg.CNYPerUSD, cache: map[string]protocol.RuntimeInfo{}, found: map[string]oar.AvailableInstallation{},
+	r := &Service{cfg: cfg, core: core, store: store, Registry: Registry(cfg.Home, settings.DeepseekAPIKey, func(session string) engine.Store { return engine.NewDBStore(db, session) }), cnyPerUsd: cfg.CNYPerUSD, cache: map[string]observation{},
 		pending: map[string]*time.Timer{}, pushes: map[string]*time.Timer{}, asked: map[string]int{},
-		reads: map[string]uint64{}, readOf: map[string]uint64{},
-		disk: base.NewFileWriter(spendFile, 0o644)}
-	r.Probe = r.probe
+		reads: map[string]uint64{},
+		disk:  base.NewFileWriter(spendFile, 0o644)}
 	if testing.Testing() {
 		// Tests never ask this machine's runtimes (their commands, their accounts): a test that wants one puts its own probe.
 		r.Probe = func(_ context.Context, id string) protocol.RuntimeInfo {
@@ -198,7 +193,7 @@ func (r *Service) OnStop() {
 		t.Stop()
 	}
 	r.mu.Unlock()
-	if err := r.disk.Write(r.spendBody); err != nil {
+	if err := r.disk.Finish(r.spendBody); err != nil {
 		log.Printf("vibevalley: could not save spend.json: %v", err)
 	}
 }
@@ -389,8 +384,8 @@ func fromOar(usage oar.AccountUsageSnapshot) protocol.AccountUsage {
 	}
 	ok := protocol.AccountUsageOk{Windows: []protocol.UsageWindow{}}
 	if usage.Plan != "" {
-		plan := usage.Plan
-		ok.Plan = &plan
+		subscription := usage.Plan
+		ok.Subscription = &subscription
 	}
 	for _, w := range usage.Windows {
 		window := protocol.UsageWindow{Label: w.Label, UsedPercent: math.Round(w.UsedRatio * 100)}
@@ -443,13 +438,8 @@ func optional(s string) *string {
 	return &s
 }
 
-func (r *Service) probe(ctx context.Context, id string) protocol.RuntimeInfo {
+func (r *Service) probe(ctx context.Context, id string) observation {
 	settings := r.store.Settings(id)
-	if bin := strings.TrimSpace(settings.BinPath); bin != "" {
-		os.Setenv(binVar(id), bin)
-	} else {
-		os.Unsetenv(binVar(id))
-	}
 	info := protocol.RuntimeInfo{ID: id, Settings: settings, CheckedAt: clock.NowMs()}
 	runtime, ok := r.Runtime(id)
 	if !ok {
@@ -458,29 +448,23 @@ func (r *Service) probe(ctx context.Context, id string) protocol.RuntimeInfo {
 			reason = "Cursor 要单独装它的 SDK（@cursor/sdk），VibeValley 还没接"
 		}
 		info.Installation = protocol.Installation{Value: protocol.InstallationUnsupported{Reason: reason}}
-		return info
+		return observation{Info: info}
 	}
 	var snapshot oar.InstallationSnapshot
 	if runtime.Installation != nil {
 		probeCtx, cancel := context.WithTimeout(ctx, probeTimeout)
-		snapshot, _ = runtime.Installation(probeCtx)
+		snapshot, _ = runtime.Installation(probeCtx, oar.InstallationOptions{Binary: &settings.BinPath})
 		cancel()
 	}
 	if snapshot.Kind != "available" {
-		r.mu.Lock()
-		delete(r.found, id)
-		r.mu.Unlock()
 		if snapshot.Kind == "unsupported" {
 			info.Installation = protocol.Installation{Value: protocol.InstallationUnsupported{Reason: snapshot.Reason}}
 		} else {
 			info.Installation = protocol.Installation{Value: protocol.InstallationNotFound{}}
 		}
-		return info
+		return observation{Info: info}
 	}
 	found := snapshot.Available
-	r.mu.Lock()
-	r.found[id] = found
-	r.mu.Unlock()
 	if found.Via == "executable" {
 		info.Installation = protocol.Installation{Value: protocol.InstallationAvailable{Via: protocol.ViaExecutable, Command: found.Command, Version: optional(found.Version)}}
 	} else {
@@ -542,7 +526,7 @@ func (r *Service) probe(ctx context.Context, id string) protocol.RuntimeInfo {
 		})
 	})
 	group.Wait()
-	return info
+	return observation{Info: info, Found: &found}
 }
 
 // Called with mu held.
@@ -551,19 +535,21 @@ func (r *Service) beginLocked(id string) uint64 {
 	return r.reads[id]
 }
 
-func (r *Service) remember(raw protocol.RuntimeInfo, read uint64) protocol.RuntimeInfo {
+func (r *Service) remember(next observation, read uint64) protocol.RuntimeInfo {
 	r.mu.Lock()
-	if read < r.readOf[raw.ID] {
-		info := r.cache[raw.ID]
+	id := next.Info.ID
+	if read < r.cache[id].Read {
+		info := r.cache[id].Info
 		r.mu.Unlock()
 		return info
 	}
-	r.readOf[raw.ID] = read
-	info := r.withSpendLocked(raw)
-	r.cache[info.ID] = info
+	next.Read = read
+	next.Info.Refused = r.refusals(id)
+	next.Info = r.withSpendLocked(next.Info)
+	r.cache[id] = next
 	r.mu.Unlock()
-	r.core.Runtime(info)
-	return info
+	r.core.Runtime(next.Info)
+	return next.Info
 }
 
 func knownRuntime(id string) bool {
@@ -582,7 +568,13 @@ func (r *Service) Refresh(ctx context.Context, id string) *protocol.RuntimeInfo 
 	r.mu.Lock()
 	read := r.beginLocked(id)
 	r.mu.Unlock()
-	info := r.remember(r.Probe(ctx, id), read)
+	var next observation
+	if r.Probe != nil {
+		next.Info = r.Probe(ctx, id)
+	} else {
+		next = r.probe(ctx, id)
+	}
+	info := r.remember(next, read)
 	return &info
 }
 
@@ -590,11 +582,11 @@ func (r *Service) Info(ctx context.Context, id string) *protocol.RuntimeInfo {
 	r.mu.Lock()
 	hit, ok := r.cache[id]
 	if ok {
-		hit = r.withSpendLocked(hit)
+		hit.Info = r.withSpendLocked(hit.Info)
 	}
 	r.mu.Unlock()
 	if ok {
-		return &hit
+		return &hit.Info
 	}
 	return r.Refresh(ctx, id)
 }
@@ -639,20 +631,19 @@ func (r *Service) Update(ctx context.Context, id string, s protocol.RuntimeSetti
 func (r *Service) refreshUsage(ctx context.Context, id string) {
 	runtime, ok := r.Runtime(id)
 	r.mu.Lock()
-	found, hasFound := r.found[id]
 	before, cached := r.cache[id]
 	closed := r.closed
 	read := r.beginLocked(id)
 	r.mu.Unlock()
 	// A runtime switched off is not asked: claude's reading, for one, calls its API every time.
-	if closed || !ok || !hasFound || !cached || !before.Settings.Enabled {
+	if closed || !ok || !cached || before.Found == nil || !before.Info.Settings.Enabled {
 		return
 	}
-	usage := r.usageOf(ctx, id, runtime, found, before.Settings)
-	if reflect.DeepEqual(usage, before.Usage) {
+	usage := r.usageOf(ctx, id, runtime, *before.Found, before.Info.Settings)
+	if reflect.DeepEqual(usage, before.Info.Usage) {
 		return
 	}
-	before.Usage, before.CheckedAt = usage, clock.NowMs()
+	before.Info.Usage, before.Info.CheckedAt = usage, clock.NowMs()
 	r.remember(before, read)
 }
 
@@ -733,7 +724,7 @@ func (r *Service) Spend(id string, cny float64) {
 			r.mu.Lock()
 			delete(r.pushes, id)
 			info, ok := r.cache[id]
-			read := r.readOf[id]
+			read := info.Read
 			closed := r.closed
 			r.mu.Unlock()
 			if ok && !closed {

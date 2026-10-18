@@ -192,7 +192,7 @@ func Runtime(options Options) oar.Runtime {
 		ID:      options.ID,
 		Brand:   options.Brand,
 		Session: start,
-		Installation: func(context.Context) (oar.InstallationSnapshot, error) {
+		Installation: func(context.Context, oar.InstallationOptions) (oar.InstallationSnapshot, error) {
 			return oar.Available(oar.AvailableInstallation{Via: "bundled"}), nil
 		},
 	})

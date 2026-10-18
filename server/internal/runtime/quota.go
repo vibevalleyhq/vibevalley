@@ -55,8 +55,8 @@ func quotaText(usage protocol.AccountUsage) string {
 		return u.Provider + " 余额 " + strings.Join(parts, "、") + short
 	case protocol.AccountUsageOk:
 		if len(u.Windows) == 0 {
-			if u.Plan != nil {
-				return *u.Plan
+			if u.Subscription != nil {
+				return *u.Subscription
 			}
 			return "有额度"
 		}

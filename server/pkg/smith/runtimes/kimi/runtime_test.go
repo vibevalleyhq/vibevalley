@@ -30,7 +30,7 @@ func TestCandidatesMatchTheOfficialNativeInstallerLayouts(t *testing.T) {
 
 func TestKimiGatesItsACPEntrypoint(t *testing.T) {
 	t.Setenv("OAR_KIMI_BIN", nodePath(t))
-	snapshot, err := Installation(context.Background())
+	snapshot, err := Installation(context.Background(), oar.InstallationOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -24,16 +24,17 @@ const (
 )
 
 type Service struct {
-	mu      sync.Mutex
-	state   protocol.CoreState
-	events  *base.Hub[protocol.SideEvent]
-	facts   *base.Hub[protocol.Fact]
-	live    *base.Hub[protocol.LiveEvent]
-	effects *base.Hub[protocol.GameEffect]
-	did     *base.Hub[OwnerDid]
-	disk    *base.FileWriter
-	pending *time.Timer
-	closed  bool
+	mu          sync.Mutex
+	state       protocol.CoreState
+	events      *base.Hub[protocol.SideEvent]
+	transitions *base.Hub[Transition]
+	facts       *base.Hub[protocol.Fact]
+	live        *base.Hub[protocol.LiveEvent]
+	effects     *base.Hub[protocol.GameEffect]
+	did         *base.Hub[OwnerDid]
+	disk        *base.FileWriter
+	pending     *time.Timer
+	closed      bool
 }
 
 // What state.json keeps: the chat, progress, schedules and issues are the database's.
@@ -64,13 +65,14 @@ func New(home string) *Service {
 		kept.Sessions = []protocol.Session{}
 	}
 	return &Service{
-		state:   restored(kept),
-		events:  base.NewHub[protocol.SideEvent](),
-		facts:   base.NewHub[protocol.Fact](),
-		live:    base.NewHub[protocol.LiveEvent](),
-		did:     base.NewHub[OwnerDid](),
-		effects: base.NewHub[protocol.GameEffect](),
-		disk:    base.NewFileWriter(file, 0o644),
+		state:       restored(kept),
+		events:      base.NewHub[protocol.SideEvent](),
+		transitions: base.NewHub[Transition](),
+		facts:       base.NewHub[protocol.Fact](),
+		live:        base.NewHub[protocol.LiveEvent](),
+		did:         base.NewHub[OwnerDid](),
+		effects:     base.NewHub[protocol.GameEffect](),
+		disk:        base.NewFileWriter(file, 0o644),
 	}
 }
 
@@ -106,7 +108,7 @@ func (s *Service) Close() {
 		s.pending.Stop()
 	}
 	s.mu.Unlock()
-	if err := s.disk.Write(s.body); err != nil {
+	if err := s.disk.Finish(s.body); err != nil {
 		log.Printf("vibevalley: could not save state.json: %v", err)
 	}
 }
@@ -118,22 +120,51 @@ func withAt(fact protocol.FactValue, at int64) protocol.FactValue {
 	return v.Interface().(protocol.FactValue)
 }
 
-// A fact that changes nothing is not news.
-func (s *Service) Apply(fact protocol.FactValue) {
+// Transition binds a fact to exactly the state it changed, even when consumption is delayed.
+type Transition struct {
+	Before protocol.CoreState
+	Fact   protocol.Fact
+	After  protocol.CoreState
+}
+
+func (s *Service) Apply(fact protocol.FactValue) { s.ApplyBatch(fact) }
+
+// Readers see the whole commit; each event retains its own causal before/after state.
+func (s *Service) ApplyBatch(facts ...protocol.FactValue) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	f := protocol.Fact{Value: withAt(fact, clock.NowMs())}
-	next, changed := protocol.Reduce(s.state, f)
-	if !changed {
+	next := s.state
+	var transitions []Transition
+	var effects []protocol.GameEffect
+	for _, fact := range facts {
+		f := protocol.Fact{Value: withAt(fact, clock.NowMs())}
+		after, changed := protocol.Reduce(next, f)
+		if !changed {
+			continue
+		}
+		transitions = append(transitions, Transition{Before: next, Fact: f, After: after})
+		effects = append(effects, protocol.EffectsOf(next, f)...)
+		next = after
+	}
+	if len(transitions) == 0 {
 		return
 	}
-	brought := protocol.EffectsOf(s.state, f)
 	s.state = next
 	s.save()
-	s.publish(protocol.SideEvent{Value: f.Value.(protocol.SideEventValue)})
-	for _, e := range brought {
-		s.effects.Publish(e)
+	for _, change := range transitions {
+		s.publish(protocol.SideEvent{Value: change.Fact.Value.(protocol.SideEventValue)})
+		s.transitions.Publish(change)
 	}
+	for _, effect := range effects {
+		s.effects.Publish(effect)
+	}
+}
+
+func (s *Service) Transitions() (protocol.CoreState, <-chan Transition, func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	changes, stop := s.transitions.Subscribe()
+	return s.state, changes, stop
 }
 
 func (s *Service) Events() (snapshot protocol.SideEvent, events <-chan protocol.SideEvent, stop func()) {

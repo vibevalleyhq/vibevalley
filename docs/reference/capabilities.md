@@ -64,6 +64,7 @@
 | `issue.merge` | `POST /api/v1/issues/{id}/merge` | ✓ | ✓ | ✓ |  |
 | `issue.resolve` | `POST /api/v1/issues/{id}/resolve` | ✓ | ✓ |  |  |
 | `issue.cancel` | `POST /api/v1/issues/{id}/cancel` | ✓ | ✓ | ✓ |  |
+| `issue.history` | `GET /api/v1/issues/history` | ✓ | ✓ | ✓ |  |
 | `issue.list` | `GET /api/v1/issues` | ✓ | ✓ |  |  |
 | `issue.get` | `GET /api/v1/issues/{id}` | ✓ | ✓ |  |  |
 | `issue.runs` | `GET /api/v1/issues/{id}/runs` | ✓ | ✓ |  |  |
@@ -84,17 +85,17 @@
 | `session.get` | `GET /api/v1/sessions/{id}` | ✓ | ✓ |  |  |
 | `session.events` | `GET /api/v1/sessions/{id}/events` | ✓ | ✓ |  |  |
 
-## playbook
+## graph
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
-| `playbook.plan` | `POST /api/v1/playbooks` | ✓ | ✓ | ✓ |  |
-| `playbook.updateNode` | `PUT /api/v1/playbooks/{id}/nodes/{node}` | ✓ | ✓ | ✓ |  |
-| `playbook.deleteNode` | `DELETE /api/v1/playbooks/{id}/nodes/{node}` | ✓ | ✓ | ✓ |  |
-| `playbook.act` | `POST /api/v1/playbooks/{id}/act` | ✓ | ✓ | ✓ |  |
-| `playbook.nodeAct` | `POST /api/v1/playbooks/{id}/nodes/{node}/act` | ✓ | ✓ | ✓ |  |
-| `playbook.changes` | `GET /api/v1/playbooks/{id}/changes` | ✓ | ✓ |  |  |
-| `playbook.events` | `GET /api/v1/playbooks/{id}/events` | ✓ | ✓ |  |  |
+| `graph.split` | `POST /api/v1/graphs` | ✓ | ✓ | ✓ |  |
+| `graph.updateTask` | `PUT /api/v1/graphs/{id}/tasks/{task}` | ✓ | ✓ | ✓ |  |
+| `graph.deleteTask` | `DELETE /api/v1/graphs/{id}/tasks/{task}` | ✓ | ✓ | ✓ |  |
+| `graph.act` | `POST /api/v1/graphs/{id}/act` | ✓ | ✓ | ✓ |  |
+| `graph.taskAct` | `POST /api/v1/graphs/{id}/tasks/{task}/act` | ✓ | ✓ | ✓ |  |
+| `graph.changes` | `GET /api/v1/graphs/{id}/changes` | ✓ | ✓ |  |  |
+| `graph.events` | `GET /api/v1/graphs/{id}/events` | ✓ | ✓ |  |  |
 
 ## game
 
@@ -117,6 +118,7 @@
 |---|---|---|---|---|---|
 | `agent.list` | `GET /api/v1/agents` | ✓ | ✓ |  |  |
 | `agent.check` | `POST /api/v1/agents/check` | ✓ | ✓ |  |  |
+| `agent.create` | `POST /api/v1/agents` | ✓ | ✓ | ✓ |  |
 | `agent.save` | `PUT /api/v1/agents/{id}` | ✓ | ✓ |  |  |
 | `agent.delete` | `DELETE /api/v1/agents/{id}` | ✓ | ✓ |  |  |
 
@@ -134,6 +136,7 @@
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
 |---|---|---|---|---|---|
 | `skill.list` | `GET /api/v1/skills` | ✓ | ✓ |  |  |
+| `skill.create` | `POST /api/v1/skills` | ✓ | ✓ | ✓ |  |
 | `skill.save` | `PUT /api/v1/skills/{id}` | ✓ | ✓ |  |  |
 | `skill.delete` | `DELETE /api/v1/skills/{id}` | ✓ | ✓ |  |  |
 
@@ -155,6 +158,7 @@
 | `voice.renew` | `POST /api/v1/voice/renew` | ✓ | ✓ |  |  |
 | `voice.start` | `POST /api/v1/voice/agent` | ✓ | ✓ |  |  |
 | `voice.stop` | `POST /api/v1/voice/agent/stop` | ✓ | ✓ |  |  |
+| `voice.heard` | `POST /api/v1/voice/agent/heard` | ✓ | ✓ |  |  |
 | `voice.said` | `POST /api/v1/voice/agent/said` | ✓ | ✓ |  |  |
 | `voice.dictate` | `POST /api/v1/voice/dictate` | ✓ | ✓ |  |  |
 

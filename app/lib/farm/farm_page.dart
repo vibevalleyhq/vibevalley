@@ -13,13 +13,14 @@ import 'chat_window.dart';
 import 'cursors.dart';
 import 'panels.dart';
 import '../game/commands.dart';
+import '../game/destinations.dart';
 import '../game/tools.dart';
 import '../game/state.dart';
 import '../gen/vibevalley.dart';
 import '../phone/phone.dart';
 import '../debug/debug_commands.dart';
 import '../debug/debug_panel.dart' show typing;
-import '../shared/farm_sounds.dart' hide BedFx;
+import '../shared/farm_sounds.dart';
 import '../game/effects.dart';
 import '../data/prefs.dart';
 import '../audio/sfx.dart';
@@ -98,54 +99,30 @@ class _FarmPageState extends ConsumerState<FarmPage> {
       case ToolRefused() || ToolDone():
         return;
       case ToolSow(:final station):
-        ref.read(sowingProvider.notifier).set(station);
+        ref.read(farmOverlaysProvider.notifier).sow(station);
       case ToolInspect(:final sessionId):
-        ref.read(selectedProvider.notifier).set(sessionId);
+        ref.read(farmOverlaysProvider.notifier).select(sessionId);
       case ToolWater(:final sessionId):
-        ref.read(wateringProvider.notifier).set(sessionId);
+        ref.read(farmOverlaysProvider.notifier).water(sessionId);
       case ToolReview(:final sessionId):
-        ref.read(reviewingProvider.notifier).set(sessionId);
+        ref.read(farmOverlaysProvider.notifier).review(sessionId);
     }
   }
 
-  void _openSpot(String spot) {
+  void _openSpot(YardPlace place) {
     Sfx.play('open');
-    switch (spot) {
-      case 'shop':
-        ref.read(panelProvider.notifier).set(FarmPanel.shop);
-      case 'warehouse':
-        ref.read(panelProvider.notifier).set(FarmPanel.warehouse);
-      case 'tasks':
-        ref.read(panelProvider.notifier).set(FarmPanel.tasks);
-      case 'log':
-        ref.read(panelProvider.notifier).set(FarmPanel.log);
-      case 'plans':
-        ref.read(panelProvider.notifier).set(FarmPanel.plans);
-      case 'manager':
-        ref.read(panelProvider.notifier).set(FarmPanel.manager);
-      case 'agents':
-        context.go('/agents');
-      case 'runtimes':
-        context.go('/runtimes');
-      case 'skills':
-        context.go('/skills');
-    }
+    if (place.panel case final panel?) ref.read(farmOverlaysProvider.notifier).panel(panel);
+    if (place.route case final route?) context.go(route);
   }
 
-  void _openSession(String id) => ref.read(selectedProvider.notifier).set(id);
+  void _openSession(String id) => ref.read(farmOverlaysProvider.notifier).select(id);
 
-  void _openPlans(String? playbook) {
-    if (playbook != null) ref.read(planShownProvider.notifier).set(playbook);
-    ref.read(panelProvider.notifier).set(FarmPanel.plans);
+  void _openTaskBoard(String? graph) {
+    if (graph != null) ref.read(graphShownProvider.notifier).set(graph);
+    ref.read(farmOverlaysProvider.notifier).panel(FarmPanel.taskBoard);
   }
 
-  bool get _anyLayer =>
-      ref.read(menuOpenProvider) ||
-      ref.read(panelProvider) != null ||
-      ref.read(selectedProvider) != null ||
-      ref.read(sowingProvider) != null ||
-      ref.read(wateringProvider) != null ||
-      ref.read(reviewingProvider) != null;
+  bool get _anyLayer => ref.read(farmOverlaysProvider).any;
 
   bool _onKey(KeyEvent e) {
     final keys = HardwareKeyboard.instance;
@@ -171,7 +148,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
         return true;
       case FarmOpenMenu():
         Sfx.play('open');
-        ref.read(menuOpenProvider.notifier).set(true);
+        ref.read(farmOverlaysProvider.notifier).menu(true);
         return true;
       case FarmPickTool(:final tool):
         ref.read(heldToolProvider.notifier).set(tool);
@@ -228,15 +205,15 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     ref.listen(bedFxProvider, (prev, next) {
       final seen = {for (final f in prev ?? const <BedFxEntry>[]) f.id};
       for (final f in next) {
-        if (!seen.contains(f.id)) _game?.burst(BedFx.values[f.kind.index], f.bed);
+        if (!seen.contains(f.id)) _game?.burst(f.kind, f.bed);
       }
     });
     ref.listen(phoneTargetProvider, (_, target) {
       switch (target) {
         case PhoneTargetSession(:final id):
           _openSession(id);
-        case PhoneTargetPlans(:final playbook):
-          _openPlans(playbook);
+        case PhoneTargetTaskBoard(:final graph):
+          _openTaskBoard(graph);
         case null:
           break;
       }
@@ -265,14 +242,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     final held = ref.watch(heldToolProvider);
     final fx = ref.watch(bedFxProvider);
     final hotspots = ref.watch(cursorHotspotsProvider).value;
-    final open = {
-      'panel': ref.watch(panelProvider) != null,
-      'selected': ref.watch(selectedProvider) != null,
-      'sowing': ref.watch(sowingProvider) != null,
-      'watering': ref.watch(wateringProvider) != null,
-      'friends': ref.watch(friendsOpenProvider),
-      'chat': ref.watch(chatOpenProvider),
-    };
+    final open = {...ref.watch(farmOverlaysProvider).soundFlags, 'friends': ref.watch(friendsOpenProvider), 'chat': ref.watch(chatOpenProvider)};
 
     return FarmSounds(
       tool: held.name,
@@ -288,7 +258,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
           child: LayoutBuilder(
             builder: (context, window) {
               final chat = ChatWindow(state: state, atlas: atlas, agents: agents, call: call);
-              return _farm(window, game, village, atlas, state, view, held, hotspots, chat);
+              return _farm(window, game, village, atlas, held, hotspots, chat);
             },
           ),
         ),
@@ -296,17 +266,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     );
   }
 
-  Widget _farm(
-    BoxConstraints box,
-    VillageGame game,
-    VillageWorld village,
-    SpriteAtlas atlas,
-    CoreState state,
-    FarmView view,
-    Tool held,
-    Map<String, Offset>? hotspots,
-    Widget chat,
-  ) {
+  Widget _farm(BoxConstraints box, VillageGame game, VillageWorld village, SpriteAtlas atlas, Tool held, Map<String, Offset>? hotspots, Widget chat) {
     final framing = frameVillage(box.biggest, Size(village.width, village.height));
     final scale = framing.scale;
     final shown = framing.shown;
@@ -326,7 +286,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
                   child: ListenableBuilder(
                     listenable: Listenable.merge([game.hoverBed, game.hoverSpot, game.pressing]),
                     builder: (context, _) {
-                      final name = _cursorName(game, state, view, held);
+                      final name = _cursorName(game, held);
                       return VillageCanvas(game: game, cursor: hotspots?[name] != null ? SystemMouseCursors.none : systemCursorOf(name));
                     },
                   ),
@@ -342,7 +302,7 @@ class _FarmPageState extends ConsumerState<FarmPage> {
                       listenable: Listenable.merge([_pointer, game.hoverBed, game.hoverSpot, game.pressing]),
                       builder: (context, _) {
                         final at = _pointer.value;
-                        final name = _cursorName(game, state, view, held);
+                        final name = _cursorName(game, held);
                         final spot = hotspots[name];
                         return Stack(
                           children: [if (at != null && spot != null) CursorPicture(name: name, at: at, hotspot: spot)],
@@ -367,16 +327,11 @@ class _FarmPageState extends ConsumerState<FarmPage> {
     );
   }
 
-  String _cursorName(VillageGame game, CoreState state, FarmView view, Tool tool) {
+  String _cursorName(VillageGame game, Tool tool) {
     final index = game.hoverBed.value;
     final bed = index == null || index < 0 || index >= beds.length ? null : beds[index];
-    Aim? aim;
-    if (bed != null) {
-      final level = view.level.level.round();
-      final session = bed.unlockLevel == null ? stationOf(state.sessions, bed.station) : null;
-      aim = aimTool(tool, bed, session, bed.unlockLevel != null ? lockedPlot(bed, level) : plotOf(view, session), level);
-    }
-    return stageCursor(tool: tool, aim: aim, overSpot: game.hoverSpot.value != null, pressed: game.pressing.value);
+    final aim = bed == null ? null : ref.read(farmCommandsProvider).aim(bed);
+    return stageCursor(tool: aim?.tool ?? tool, aim: aim?.aim, overSpot: game.hoverSpot.value != null, pressed: game.pressing.value);
   }
 }
 

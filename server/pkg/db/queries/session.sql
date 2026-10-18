@@ -1,7 +1,7 @@
 -- Every session, on the farm or ended (session/records.go).
 
 -- name: KeepSession :exec
-insert into session (id, agent, name, runtime, task, project, issue, playbook, hired_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+insert into session (id, agent, name, runtime, brief, project, issue, graph, hired_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
 on conflict (id) do nothing;
 
 -- name: EndSession :exec

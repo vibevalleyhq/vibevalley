@@ -9,7 +9,7 @@ import '../../game/commands.dart' show farmCommandsProvider;
 import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart' show roundsOf, tookText;
 import '../../rules/issues.dart';
-import '../../data/ui_state.dart' show selectedProvider, titleOpenProvider;
+import '../../data/ui_state.dart' show titleOpenProvider, farmOverlaysProvider;
 import '../../ui/kit/kit.dart';
 import '../shared/layout.dart';
 import '../projects/new_project_dialog.dart' show showNewProjectDialog;
@@ -381,15 +381,15 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
 
   void _toBed(Session session) {
     ref.read(titleOpenProvider.notifier).enterFarm(start: false);
-    ref.read(selectedProvider.notifier).set(session.id);
+    ref.read(farmOverlaysProvider.notifier).select(session.id);
     workbenchGo(context, '/');
   }
 
-  /// A playbook's step has none of its own: it goes with its playbook.
+  /// A task's step has none of its own: it goes with its task.
   List<Widget> _actions(Session? session) {
     final busy = _busy;
     final bed = session == null ? null : PxButton.text('去农场看这块地', icon: 'button-open', size: PxSize.sm, onPressed: () => _toBed(session));
-    if (issuePlanned(widget.issue, session)) return [?bed];
+    if (issueInTask(widget.issue, session)) return [?bed];
     return switch ((widget.state, session)) {
       (IssueTag.working, final h?) => [
         PxButton.text(
@@ -448,7 +448,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
       mainAxisSize: MainAxisSize.min,
       children: [
         PxCard(
-          title: issueTitle(issue, ref.watch(plansProvider)),
+          title: issueTitle(issue, ref.watch(graphsProvider)),
           aside: Text(widget.state.label),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -474,11 +474,11 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
                 ),
               ),
               if (summary != null && summary.isNotEmpty) _Row('最后一轮', Text(summary, style: body)),
-              if (issuePlanned(issue, session))
+              if (issueInTask(issue, session))
                 _Row(
                   '种植计划',
                   Text(
-                    session?.playbook != null ? '这是计划 ${session!.playbook!.id} 里的一步：做完自动合进计划分支，收获整个计划时再进主分支。在农场的「计划」里管它。' : '这是种植计划里的一步，已经合进了计划分支，跟着计划走。',
+                    session?.graph != null ? '这是计划 ${session!.graph!.id} 里的一步：做完自动合进计划分支，收获整个计划时再进主分支。在农场的「计划」里管它。' : '这是种植计划里的一步，已经合进了计划分支，跟着计划走。',
                     style: body,
                   ),
                 ),
@@ -542,7 +542,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
                     now: now,
                     tall: true,
                     working: widget.state == IssueTag.working,
-                    onComment: open && session != null ? (step, text) => ref.read(farmCommandsProvider).water(session, text, on: step) : null,
+                    onComment: open && session != null ? (task, text) => ref.read(farmCommandsProvider).water(session, text, on: task) : null,
                   ),
                 ),
         ),
@@ -567,7 +567,7 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
               ],
             ),
           )
-        else if (!open && !issuePlanned(issue, session))
+        else if (!open && !issueInTask(issue, session))
           PxCard(
             title: '重开',
             child: Column(

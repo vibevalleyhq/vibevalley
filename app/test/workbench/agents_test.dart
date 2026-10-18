@@ -64,7 +64,7 @@ void main() {
   });
 
   group('AgentCreatorPage', () {
-    testWidgets('a new agent starts on the runtime asked for and saves under the first free id', (t) async {
+    testWidgets('a new agent starts on the runtime asked for and uses the identity assigned by the server', (t) async {
       final server = _server();
       await pumpPage(t, const AgentCreatorPage(id: 'new', runtime: 'claude'), server.handle);
       expect(find.text('新的 Claude Code'), findsWidgets);
@@ -73,13 +73,14 @@ void main() {
       await t.tap(find.text('捏好了，保存'));
       await settle(t);
       final put = server.writes.single;
-      expect(put.path, '/api/v1/agents/agent-1');
+      expect(put.method, 'POST');
+      expect(put.path, '/api/v1/agents');
       final body = put.body! as Map<String, dynamic>;
       expect(body['runtime'], 'claude');
       expect(body['role'], '跑测试');
       expect(body['personaMode'], 'append');
       expect((body['look'] as Map)['outfit'], 'farmer');
-      expect(server.agents.map((a) => a.id), contains('agent-1'));
+      expect(server.agents.map((a) => a.id), contains('created-agent'));
     });
 
     testWidgets('editing a saved one marks it unsaved; 保存 sends the edit; the skills tab toggles a skill', (t) async {
