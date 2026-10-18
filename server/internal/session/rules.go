@@ -269,7 +269,7 @@ func farmRules(place project.Workplace, house, id string) string {
 	lines := []string{
 		"## 在码农场物语干活的规矩",
 		"- " + where,
-		"- 做完一轮：git add 你改的文件，git commit，提交信息用一句中文说清楚做了什么。",
+		"- 做完一轮：git add 你改的文件，git commit。提交信息照项目的约定写（看它的 AGENTS.md 和 git log）；项目没约定的，用一句中文说清楚做了什么；主人这一轮另有说法的，照主人说的。",
 		"- 汇报时写上 commit 号，以及你是怎么验证的（跑了什么命令、结果如何）。",
 		"- 汇报的最后一段以「结论：」开头，一两句话说清做成了什么（或卡在哪、需要主人定什么）；有提交就带上 commit 号。补充说明写在结论前面。",
 		"",
