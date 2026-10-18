@@ -299,15 +299,15 @@ func (d *dispatch) reopen(ctx context.Context, id, text string, channel string, 
 	if agent == nil {
 		return "", protocol.Refused{Reason: "派它的帮工档案 " + last.Agent + " 不在了"}
 	}
-	project := ""
+	where := ""
 	if issue.Project != nil {
-		project = *issue.Project
+		where = *issue.Project
 	}
 	previous := false
-	if changes, err := d.projects.BranchChanges(project, fmt.Sprintf("vibevalley/issue-%d", issue.Number)); err == nil {
+	if changes, err := d.projects.BranchChanges(where, project.IssueBranch(issue.Number)); err == nil {
 		previous = len(changes.Commits) > 0
 	}
-	hired := d.Hire(ctx, *agent, reopenTask(issue, *last, text, previous), project, session.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: &by})
+	hired := d.Hire(ctx, *agent, reopenTask(issue, *last, text, previous), where, session.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: &by})
 	if hired.Refused != "" || hired.Session == nil {
 		return "", protocol.Refused{Reason: hired.Refused}
 	}
@@ -330,7 +330,7 @@ func reopenTask(issue protocol.Issue, last protocol.Session, text string, previo
 		b.WriteString(fmt.Sprintf("\n最后一轮%s：%s", outcomeText[r.Outcome], str.Cut(str.Trim(r.Summary), session.AskedMax)))
 	}
 	if previous {
-		b.WriteString("\n这条分支上已经有上次的提交，接着做")
+		b.WriteString("\n这条分支上已经有上次的提交，接着做。")
 	}
 	b.WriteString("\n先看看项目现在的样子，再接着做。")
 	return b.String()

@@ -1102,7 +1102,7 @@ func TestIssueWorktreeSurvivesCancellationAndReopen(t *testing.T) {
 	testkit.Eq(t, *reopened.Branch, *first.Branch, "same branch")
 	testkit.Eq(t, *reopened.Worktree, *first.Worktree, "same worktree")
 	testkit.Eq(t, testkit.Git(t, *reopened.Worktree, "rev-parse", "HEAD"), before, "previous commit")
-	if !strings.Contains(reopened.Brief, "这条分支上已经有上次的提交，接着做") {
+	if !strings.Contains(reopened.Brief, "这条分支上已经有上次的提交，接着做。") {
 		t.Fatal(reopened.Brief)
 	}
 	if _, err := w.f.Issue.Merge(issue.ID); err != nil {
@@ -1117,7 +1117,7 @@ func TestIssueWorktreeSurvivesCancellationAndReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.nextReport(t)
-	if strings.Contains(w.f.Session.Get(again).Brief, "这条分支上已经有上次的提交，接着做") {
+	if strings.Contains(w.f.Session.Get(again).Brief, "这条分支上已经有上次的提交，接着做。") {
 		t.Fatal("merged commits must not be described as unmerged")
 	}
 }

@@ -345,6 +345,10 @@ func (p *Service) List() []Project {
 	return out
 }
 
+func IssueBranch(number int64) string {
+	return fmt.Sprintf("vibevalley/issue-%d", number)
+}
+
 func (p *Service) Workplace(project, session string, worktree bool, baseBranch string, issueNumber int64) (Workplace, error) {
 	defer p.serially(project)()
 	path, err := p.ensure(project)
@@ -358,7 +362,7 @@ func (p *Service) Workplace(project, session string, worktree bool, baseBranch s
 	branch := "vibevalley/" + session + "-" + stamp
 	cwd := filepath.Join(p.trees, project+"."+session+"-"+stamp)
 	if issueNumber > 0 {
-		branch = fmt.Sprintf("vibevalley/issue-%d", issueNumber)
+		branch = IssueBranch(issueNumber)
 		cwd = filepath.Join(p.trees, fmt.Sprintf("%s.%d", project, issueNumber))
 		if _, err := os.Stat(cwd); err == nil {
 			return Workplace{Project: project, Cwd: cwd, Branch: branch}, nil
