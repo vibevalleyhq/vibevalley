@@ -23,7 +23,8 @@ type Config struct {
 	Home    string `mapstructure:"-"`
 	Version string `mapstructure:"-"`
 
-	// The farm's own folder: projects/<name> are its projects, worktrees/<project>.<session>-<stamp> its sessions' worktrees.
+	// The farm's own folder: projects/<name> are its projects, worktrees/<project>.<issue number> the issues' worktrees
+	// (worktrees/<project>.<session>-<stamp> for a dispatch without an issue).
 	WorkRoot string `mapstructure:"work_root"`
 	// Empty: Home/vibevalley.db; "memory" (":memory:" once loaded) keeps it in memory; a folder holds vibevalley.db.
 	DBPath string `mapstructure:"db"`

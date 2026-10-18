@@ -76,7 +76,7 @@ type Caller struct {
 
 下面这些不是「工具多少」，并进档案以后照样不同，代码里保留，但都按「这份档案是不是常驻的」判断一次，不再散着写 `== ManagerAgent`：
 
-- **在哪跑**：管家跑在服务端进程里的 `internal/agent/brain`，常驻、不绑工单、不进 worktree；电话、听写、`/v1/chat/completions` 要它低延迟地插话，也要它的提示开头不变（[提示开头不变](../../implemented/architecture/2026-10-18-stable-prompt-prefix.md)）。普通档案每次为一张工单开一个 Session，经 smith 驱动外部农机。所以管家的农机仍然只能是 `vibevalley`。
+- **在哪跑**：管家跑在服务端进程里的 `internal/agent/brain`，常驻、不绑工单、不进 worktree；电话、听写、`/v1/chat/completions` 要它低延迟地插话，也要它的提示开头不变（[提示开头不变](../../../../docs/subsystems/manager.md)）。普通档案每次为一张工单开一个 Session，经 smith 驱动外部农机。所以管家的农机仍然只能是 `vibevalley`。
 - **在频道里是谁**：`channel_participant.kind` 留着 `manager`：不在地里、不离开、田头的话都给它（见 Alternatives）。
 - **不能派给它**：工单派给管家走管家的输入，不开 Session（`Issue.Hire` 拒绝派给管家）。
 
@@ -87,7 +87,7 @@ type Caller struct {
 `hire` 是管家第一次能改主人的配置，按「谁写的谁负责、主人要看得见」：
 
 - 管家建或改了一份档案，在它正在回话的频道里说一条，写明改了什么；档案页标出「管家建的」。
-- 建出来的档案是 `Enabled: false`，主人点一下才能派活。理由和[分清话是谁说的](../../implemented/architecture/2026-10-18-source-is-not-instruction.md)里收获要主人点头一样：一句外面传进来的话不该直接变成一个能花钱、能改仓库的帮工。
+- 建出来的档案是 `Enabled: false`，主人点一下才能派活。理由和[分清话是谁说的](../../../../docs/subsystems/manager.md)里收获要主人点头一样：一句外面传进来的话不该直接变成一个能花钱、能改仓库的帮工。
 
 ### 做的顺序
 

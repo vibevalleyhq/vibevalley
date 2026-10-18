@@ -21,7 +21,7 @@ Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏�
 | beta | `vibevalley Beta.app` | `dev.vibevalley.app.beta` | `…/vibevalley Beta` | `~/vibevalley-beta` |
 | alpha | `vibevalley Alpha.app` | `dev.vibevalley.app.alpha` | `…/vibevalley Alpha` | `~/vibevalley-alpha` |
 
-家目录和工作目录都各是各的：Alpha 的库碰不到你天天用的农场，它的帮工也碰不到那边的项目和 worktree。终端里跑的服务端用 `~/vibevalley-dev`。工作目录里 `projects/` 是项目，`worktrees/` 是帮工的 worktree；`VIBEVALLEY_WORK_ROOT` 能改。
+家目录和工作目录都各是各的：Alpha 的库碰不到你天天用的农场，它的帮工也碰不到那边的项目和 worktree。终端里跑的服务端用 `~/vibevalley-dev`。工作目录的结构见 [项目](../subsystems/project.md)；`VIBEVALLEY_WORK_ROOT` 能改。
 
 ## 窗口
 

@@ -6,12 +6,12 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 工单的模型、状态和能挪到哪 | 帮工怎么跑一轮、事件日志（[帮工](../reference/server.md#帮工)） |
+| 工单的模型、状态和能挪到哪 | 帮工怎么跑一轮、事件日志（[帮工](session.md)） |
 | 派活、排队、重开、取消 | 挑哪个档案（管家，[agents-and-runtimes.md](../reference/agents-and-runtimes.md)「派给谁」） |
 | 验收、草、缺肥 | 汇报怎么读（`session/rules.go` 读出「结论：」和「要问主人：」交给它） |
-| 收获：查冲突、跑检查、本地合或提 PR | 项目和工作目录、worktree 的 git 操作（`internal/project`，[项目和收获](../reference/server.md#项目和收获)） |
+| 收获：查冲突、跑检查、本地合或提 PR | 项目和工作目录、worktree 的 git 操作（`internal/project`，[项目](project.md)） |
 | 工单在看板和农场上的样子由它的状态决定 | 怎么画（[farm-ui.md](../reference/farm-ui.md)「地里长什么」、`shared/issue_view.dart`） |
-| | 种植计划里的工单（跟着计划走，[种植计划](../reference/server.md#种植计划)）；派给管家的工单（管家答完就关） |
+| | 种植计划里的工单（跟着计划走，[种植计划](task.md)）；派给管家的工单（管家答完就关） |
 
 ## 在哪
 
@@ -77,7 +77,7 @@
 - **帮工（`session`）**：派活经 `Session.Send` 开一个 Session；帮工离开（`FactLeft`）时，离开的是最后一个就关上工单；汇报（`FactReport`）带来缺肥的问题。
 - **项目（`project`）**：worktree、分支、冲突预检（`git merge-tree`，不碰工作区）、检查和合并、推送和 `gh`；工单服务只决定什么时候做。
 - **田头（`channel`）**：派活时在频道里开工单串，带话和验收没过的意见经它交给帮工。
-- **定时（`schedule`）**：一个定时一张工单，到点是它的一次干活（[定时](../reference/server.md#定时)）。
+- **定时（`schedule`）**：一个定时一张工单，到点是它的一次干活（[定时](schedule.md)）。
 - **种植计划（`task`）**：计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，跟着计划走，不归这里的转换表。
 - **管家（`tool`）**：派活、带话、验收、收获都是同一个服务的方法，收获要主人说一声。
 - **GitHub 检测（`setting`、`project`）**：开机查 `gh` 装没装、登没登录（`github.status`、`github.refresh`），项目查 origin 是不是 GitHub、有没有写权限，结果缓存在 `Project.pullRequest`；收获只读缓存决定走哪条路。

@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-行为见 [farm-ui.md](../../../../docs/reference/farm-ui.md) 界面 19「地图」和 [server.md](../../../../docs/reference/server.md)「项目的地契」。
+行为见 [farm-ui.md](../../../../docs/reference/farm-ui.md) 界面 19「地图」和 [项目](../../../../docs/subsystems/project.md)。
 
 - **地图是工作台的一页**（原来是 `/map`；2026-10-18 起是「项目」页的「全部」，选一个项目是它的岛，见[工单](../../../../docs/subsystems/issue.md)；`app/lib/workbench/map/`）：一张旧地图，每个项目一座小岛，岛中间围着篱笆的院子里是它的地。入口在工作台左栏、农场右上角（窗口不窄于 640 时）和农场菜单。
 - **一块地是一个 worktree 或一个空位**（`map_rules.dart`，纯函数）：项目里的每个帮工一块，不管在干活、熟了还是歇着，因为它的 worktree 都还在；后面是空位，个数照服务端的 `crewNoRoom`：项目的上限减去在干活的，也不超过农场空着的地。项目还剩的位置被农场的地挡住时，画成锁住的地。一座岛最多 6 块，和农场的地一样多。

@@ -8,7 +8,7 @@ Status: proposed
 
 - **@ 谁就是叫谁下地**：在田头 @ 另一个档案，它就来这块地上帮忙，不用另开工单。
 - **分工**：一个写代码，一个写测试，一个看改动挑毛病；验收不一定是主人或管家，可以派一个「看地的」帮工。
-- **配好的一班人反复用**：主人早就说过要有「小队」，照一份方案组织不同的 agent 干活（原来写在 [Run 和 Session](../../implemented/architecture/2026-10-16-runs-and-sessions.md) 的提案里，那两层落了，小队没做）。
+- **配好的一班人反复用**：主人早就说过要有「小队」，照一份方案组织不同的 agent 干活（原来写在 [Run 和 Session](../../../../docs/subsystems/session.md) 的提案里，那两层落了，小队没做）。
 
 设计稿第四、五节画过（`design/issue-farming/index.html`）。
 

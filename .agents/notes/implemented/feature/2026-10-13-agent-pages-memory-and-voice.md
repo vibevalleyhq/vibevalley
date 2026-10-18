@@ -12,7 +12,7 @@ Status: implemented
 
 行为见 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「管家页」「捏帮工」和 [voice.md](../../../../docs/reference/voice.md)「配置」。
 
-- **管家有自己的页面**（`/manager`，`app/lib/workbench/manager/manager_page.dart`），是帮工页的第一张卡片。管家不是帮工档案（`Agent`，当时叫 `AgentProfile`）：它没有农机、技能和地可配，硬塞进捏帮工页只会多出一堆用不上的页签。它有三个页签：记性、旧账、声音（后来又加了「轨迹」，见 [轨迹](2026-10-13-trajectories.md)）。
+- **管家有自己的页面**（`/manager`，`app/lib/workbench/manager/manager_page.dart`），是帮工页的第一张卡片。管家不是帮工档案（`Agent`，当时叫 `AgentProfile`）：它没有农机、技能和地可配，硬塞进捏帮工页只会多出一堆用不上的页签。它有三个页签：记性、旧账、声音（后来又加了「轨迹」，见 [轨迹](../../../../docs/subsystems/session.md)）。
 - **管家的记性不换存法，页面直接读写那个文件**（`server/internal/memory/memory.go`，接口 `/api/v1/manager/...`）：
   - `MEMORY.md` 一行算一条，按这一行的 hash 认，用来忘掉某一条。
   - 主人替它记的写成「主人交代：……」。这样页面分得清是谁记的，管家读的时候也知道。

@@ -66,7 +66,7 @@ type Task struct {
 - **工具**：`task_add`（写图或往图里加）、`task_update`（改一件）、`task_graph`（看全图）；每次调用回整张图（Hermes `todo`）。
 - **帮手**：ready 的 `helper` 节点自动派，后台并行跑，最多 `MaxHelpers`（默认 3），帮手不能再派；失败重试一次；做完的结果交回 agent，agent 闲着就开一轮，忙着就排到这一轮之后（Hermes `delegate_task`，但不同步等）。agent 被叫停时帮手一起停，节点退回 `waiting`；有帮手在跑时新来的话不打断这一轮，和 [编排层](2026-10-18-one-mailbox-per-agent.md) 同一条规则。
 - **提醒**：一轮停下时还有 ready 的 `self` 节点、又没有别的输入，提醒一次；图连续 `MaxNudges`（默认 3）次没变就不再提醒。不用另一个模型判断做没做完（Hermes `judge_goal` 不取）。
-- **看得见**：图不进系统提示（[提示开头不变](../../implemented/architecture/2026-10-18-stable-prompt-prefix.md)）。模型每次调任务工具、每个帮手交回都拿到整张图，所以不另拼变化；压缩时把打开的图接在摘要后面，被压掉的那几轮里的图由它接上；`brain` 发 `TasksChanged` 事件，`oarruntime` 写成原始记录里的一帧，帮工的轨迹里看得到。
+- **看得见**：图不进系统提示（[提示开头不变](../../../../docs/subsystems/manager.md)）。模型每次调任务工具、每个帮手交回都拿到整张图，所以不另拼变化；压缩时把打开的图接在摘要后面，被压掉的那几轮里的图由它接上；`brain` 发 `TasksChanged` 事件，`oarruntime` 写成原始记录里的一帧，帮工的轨迹里看得到。
 - **谁开**：农机 `vibevalley` 和命令行；管家先不开（开了要改它的工具，要重放评测），以后只开 `self`，派活仍用 `dispatch`。
 
 ### 6. 种植计划并进 Task（第二阶段）

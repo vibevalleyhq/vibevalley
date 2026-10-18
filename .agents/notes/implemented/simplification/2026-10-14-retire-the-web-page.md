@@ -20,7 +20,7 @@ Status: implemented
 - **冻结的对照**：Flutter 音效合成的对照 `app/test/fixtures/sfx.json` 是网页的合成器算的，留着、不再生成，改了声音就手改。
 - **还是 TypeScript 的**：`packages/protocol`（形状）和 `tools/`（导出形状、`go-contract.ts` 用 `HeybroApi` 的客户端检查正在跑的 Go 服务端、pi 的价目表）。这一条后来被 [形状的源头是 Go](../architecture/2026-10-15-go-owns-the-shapes.md) 取代：两样都删了，pi 的价目表改由 `server/tool/pi-prices.ts` 写。
 
-这一篇取代了 [一个服务端、一个客户端](2026-10-14-one-server-one-client.md) 里「网页冻结」的部分，和 [核心状态](../architecture/2026-10-11-farm-core-state.md)、[规则是纯函数](../architecture/2026-10-11-session-rules-as-pure-functions.md) 里「同一个函数在服务端和页面上跑」的部分：核心状态仍然只有一份、规则仍然是纯函数，只是只在 Go 里。
+这一篇取代了 [一个服务端、一个客户端](2026-10-14-one-server-one-client.md) 里「网页冻结」的部分，和 [核心状态](../architecture/2026-10-11-farm-core-state.md)、[规则是纯函数](../../../../docs/subsystems/session.md) 里「同一个函数在服务端和页面上跑」的部分：核心状态仍然只有一份、规则仍然是纯函数，只是只在 Go 里。
 
 ## Alternatives considered
 

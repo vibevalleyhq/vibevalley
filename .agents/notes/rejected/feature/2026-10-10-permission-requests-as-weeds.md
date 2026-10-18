@@ -4,7 +4,7 @@ Status: rejected — 帮工不做权限确认是常驻规矩：靠本机、工�
 
 ## Problem
 
-帮工现在不要权限确认（[helpers-as-oar-subagents](../../implemented/architecture/2026-10-10-helpers-as-oar-subagents.md)），能在这台机器上执行任意命令。有些操作主人想先看一眼再放行（删文件、装依赖、联网）。农场里的「除草」工具一直留着位置，没有接上。
+帮工现在不要权限确认（[帮工](../../../../docs/subsystems/session.md)），能在这台机器上执行任意命令。有些操作主人想先看一眼再放行（删文件、装依赖、联网）。农场里的「除草」工具一直留着位置，没有接上。
 
 ## Proposal
 

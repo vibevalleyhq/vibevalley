@@ -16,6 +16,13 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 内容 |
 |---|---|
 | [issue.md](subsystems/issue.md) | 工单：一块地的模型、状态和派活、验收、收获 |
+| [session.md](subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
+| [project.md](subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测 |
+| [channel.md](subsystems/channel.md) | 田头：频道、连接器、Inbox |
+| [manager.md](subsystems/manager.md) | 管家：自己的 agent、工具、巡查、评测 |
+| [schedule.md](subsystems/schedule.md) | 定时 |
+| [task.md](subsystems/task.md) | 种植计划和 agent 的任务图 |
+| [memory.md](subsystems/memory.md) | 记性 |
 
 各部分现在怎么工作（`reference/`）：
 
@@ -23,7 +30,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 |---|---|
 | [concept-map.md](reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
 | [capabilities.md](reference/capabilities.md) | 每个接口谁能调：主人、院门、管家、Session；shapegen 写出 |
-| [server.md](reference/server.md) | 服务端的各个服务 |
+| [server.md](reference/server.md) | 还没拆成子系统的服务：设置、院门、游戏、重启 |
 | [agents-and-runtimes.md](reference/agents-and-runtimes.md) | 帮工档案、农机、技能书 |
 | [farm-ui.md](reference/farm-ui.md) | 农场界面和玩法 |
 | [pixel-village.md](reference/pixel-village.md) | 像素村、素材和音效 |

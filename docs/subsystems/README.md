@@ -5,8 +5,15 @@
 | 子系统 | 管什么 |
 |---|---|
 | [工单](issue.md) | 一块地：工单的模型、生命周期、派活和排队、验收、收获（本地合或提 PR） |
+| [帮工](session.md) | Session 和 Run：派出去、一轮一轮干活、规矩和汇报、事件日志、额度和上限 |
+| [项目](project.md) | 项目和工作目录、按工单的 worktree、冲突预检、检查、GitHub 检测、地契 |
+| [田头](channel.md) | 群聊：频道、谁听见、叫不叫醒、工单串、连接器（微信、飞书、QQ）、Inbox |
+| [管家](manager.md) | 替主人派活的 agent：自己的 agent、提示和工具、来源、巡查、评测 |
+| [定时](schedule.md) | 一张工单的触发：间隔和 cron、补跑、管家定的回头看 |
+| [种植计划](task.md) | 带子工单的父工单：拆、按图推进、合进计划分支；agent 自己的任务图 |
+| [记性](memory.md) | 每个档案的记性：想起、记下、主动查、外面的来源 |
 
-还没拆出来的部分仍在 [reference/server.md](../reference/server.md) 和对应的 Note 里。
+还没拆出来的（设置、院门、游戏、语音、客户端）仍在 [reference/](../reference/server.md) 和对应的 Note 里。
 
 ## 一篇怎么写
 

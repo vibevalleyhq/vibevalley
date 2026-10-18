@@ -53,7 +53,7 @@ flowchart LR
 
 三条线：
 
-- **命令**：客户端通过 HTTP 调 `VibeValleyApi`（Flutter 用 `lib/gen/vibevalley.dart` 里生成的客户端）：在田头说话、写和派工单、带话、叫停、收工、收获、种植计划、读配置。帮工在田头说话走另一个入口：服务端的 MCP 端点 `/mcp`（[server.md](reference/server.md)「田头」）。
+- **命令**：客户端通过 HTTP 调 `VibeValleyApi`（Flutter 用 `lib/gen/vibevalley.dart` 里生成的客户端）：在田头说话、写和派工单、带话、叫停、收工、收获、种植计划、读配置。帮工在田头说话走另一个入口：服务端的 MCP 端点 `/mcp`（[田头](subsystems/channel.md)）。
 - **状态**：服务端的核心状态每变一次就是一条事实。Flutter 收折好的帧（`GET /api/v1/state`），自己不折。
 - **语音**：客户端和 Agora 频道之间是音频和字幕，服务端只签令牌、请语音管家进出频道（[voice.md](reference/voice.md)）。
 
@@ -83,7 +83,7 @@ flowchart LR
 
 在做什么、要你做什么、能不能收都由阶段推出来（protocol 的纯函数）。`play` 是地里那一层（在哪块地、最近的步骤、碰过的文件），`conflict` 是最近一次 git 检查的结果，不属于阶段。帮工离开就从状态里删掉。
 
-工单（`Issue`）里开着的和最近关的 50 家（`KeepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `IssueStatusOf` 算。种植计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，`GraphsOf` 读成 `TaskGraph`（[server.md](reference/server.md)「种植计划」）。田头在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时、账本折出来的进度也在里面（[server.md](reference/server.md)「定时」「游戏」）。
+工单（`Issue`）里开着的和最近关的 50 家（`KeepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `IssueStatusOf` 算。种植计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，`GraphsOf` 读成 `TaskGraph`（[种植计划](subsystems/task.md)）。田头在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时、账本折出来的进度也在里面（[定时](subsystems/schedule.md)「游戏」）。
 
 给 Flutter 的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`tasks`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `protocol.FrameOf` 拼：给人看的话（帮工在干什么、定时什么时候跑、计划是哪个状态、节点是什么状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`Reduce` 和 `state.json` 里没有。`app/lib/rules/` 只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在客户端。
 
@@ -91,13 +91,13 @@ flowchart LR
 
 `GET /api/v1/events`（server-sent events）：连上先发一条 `snapshot`（整份核心状态），之后发事实，以及几样核心状态之外的：轨迹的一步（`step`）、提醒（`notice`）、农机变了（`runtime`）。断线重连又从快照开始。这条流留给命令行和调试。
 
-`GET /api/v1/live`（server-sent events）是 Flutter 的窄流：只发 `LiveEvent` 的三种成员（`SessionEvent`、`Notice`、`Runtime`），不发事实、不发快照；状态仍由 `/api/v1/state` 给。事实的种类见 `shapes.go` 的 `Fact`；帮工的会话事件怎么变成事实见 [server.md](reference/server.md)「帮工」。
+`GET /api/v1/live`（server-sent events）是 Flutter 的窄流：只发 `LiveEvent` 的三种成员（`SessionEvent`、`Notice`、`Runtime`），不发事实、不发快照；状态仍由 `/api/v1/state` 给。事实的种类见 `shapes.go` 的 `Fact`；帮工的会话事件怎么变成事实见 [帮工](subsystems/session.md)。
 
 流的每次写入限时 20 秒；写入或刷新失败就结束订阅。核心状态按首个变化起算的 500 毫秒窗口合并落盘，持续收到事实不会推迟这次保存；关闭时再保存最后的状态。
 
 ## HTTP 接口
 
-接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](../.agents/notes/implemented/architecture/2026-10-17-api-versioned-paths.md)）。不在里面的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[server.md](reference/server.md)「田头」）。`//vibevalley:can` 写谁能调，院门只放 `remote` 的（[能力表](reference/capabilities.md)、[server.md](reference/server.md)「院门」）。
+接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](../.agents/notes/implemented/architecture/2026-10-17-api-versioned-paths.md)）。不在里面的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[田头](subsystems/channel.md)）。`//vibevalley:can` 写谁能调，院门只放 `remote` 的（[能力表](reference/capabilities.md)、[server.md](reference/server.md)「院门」）。
 
 ## 存了什么
 
@@ -130,7 +130,7 @@ flowchart LR
 
 | 键 | 用途 | 默认 |
 |---|---|---|
-| `work_root` | 工作目录：`projects/` 下每个子文件夹是一个项目（也是算经验的范围），`worktrees/<项目>.<工单号>` 是工单的 worktree，不挂工单的直接派活用 `worktrees/<项目>.<帮工>-<时间>`；帮工只在这里面干活 | `~/vibevalley-dev` |
+| `work_root` | 工作目录：`projects/` 是项目，`worktrees/` 是 worktree，帮工只在这里面干活（[项目](subsystems/project.md)） | `~/vibevalley-dev` |
 | `db` | 数据库：SQLite 文件，给的是文件夹就用里面的 `vibevalley.db`；`memory` 是只在内存里 | `$VIBEVALLEY_HOME/vibevalley.db` |
 | `port` | 主接口固定听 `127.0.0.1`，只能选端口；0 由系统分配。HTTP 和帮工的 `/mcp` 使用同一实际监听地址 | 8787 |
 | `agent.model` | 单独跑 `cmd/vibevalley` 时用的模型 | `deepseek-flash` |

@@ -16,7 +16,7 @@ Go 服务端（[服务端用 Go 重写](../architecture/2026-10-13-go-server-on-
 - **还是 TypeScript 的**：`packages/protocol`（形状的唯一来源，TypeScript 的 `reduce` 和规则是对照的基准）、冻结的网页、`tools/`（`@heybro/tools`：导出形状给 Go 和 Flutter 生成类型、算对照数据、`go-contract.ts` 检查正在跑的 Go 服务端）。Effect v4 的规矩只管这几处。这一条后来被 [网页退役](2026-10-14-retire-the-web-page.md) 和 [形状的源头是 Go](../architecture/2026-10-15-go-owns-the-shapes.md) 取代：这几处都删了，仓库里不再有 TypeScript 的包和 Effect，剩下的几个脚本直接用 Bun 或 Node 跑。
 - **原来的农场当时搬了过来**：`vibevalley import` 把 TypeScript 服务端的 PGlite 倒进 SQLite，id 和 seq 不变。搬完以后这个命令删了，存盘只认现在的格式（[只有一份表结构，不认旧数据](../architecture/2026-10-16-one-schema-no-old-data.md)）。
 
-这一篇取代了多端时期几篇决策里「用哪个服务端、哪个桌面客户端」的部分：Electron 桌面版、MyGo 原型和它的原生语音、TypeScript 和 Effect 写的服务端、ai 和 agent-core 两个包、跑在 pi 上的管家。这些 Note 随替换删掉了，理由留在 git；「自己的 agent」这一条还成立，见 [自己的 agent](../architecture/2026-10-12-own-agent.md)。
+这一篇取代了多端时期几篇决策里「用哪个服务端、哪个桌面客户端」的部分：Electron 桌面版、MyGo 原型和它的原生语音、TypeScript 和 Effect 写的服务端、ai 和 agent-core 两个包、跑在 pi 上的管家。这些 Note 随替换删掉了，理由留在 git；「自己的 agent」这一条还成立，见 [自己的 agent](../../../../docs/subsystems/manager.md)。
 
 ## Alternatives considered
 

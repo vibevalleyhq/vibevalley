@@ -94,7 +94,7 @@ cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:
 
 1. 在首页「设置」里填 DeepSeek 的钥匙。
 2. 在「农具」页里启用本机装好的农机。
-3. 把项目放进工作目录（默认 `~/vibevalley-work`，`VIBEVALLEY_WORK_ROOT`），一个文件夹一个项目。没有也行，管家会帮你建。
+3. 把项目放进工作目录（默认 `~/vibevalley-dev`，`VIBEVALLEY_WORK_ROOT`），一个文件夹一个项目。没有也行，管家会帮你建。
 4. 在田头对管家说要做什么。
 
 从派第一张工单到收获、处理冲突和失败、管住花费，见 [使用指南](docs/guide.md)。
