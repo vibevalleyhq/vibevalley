@@ -199,7 +199,13 @@ func (h nowledgeHit) text() string {
 // run's words may carry a key.
 func (n *nowledge) search(ctx context.Context, agent, query string, limit int, everything bool) ([]nowledgeHit, error) {
 	args := map[string]any{"limit": max(1, min(limit, nowledgeMost)), "source_app": nowledgeApp}
-	if q := str.Head(strings.TrimSpace(base.Redact(query)), nowledgeQuery); q != "" {
+	q := str.Head(strings.TrimSpace(base.Redact(query)), nowledgeQuery)
+	if q == "" && !everything {
+		// Its search without a query lists nothing (0.10.103), whatever its docs say; filtered by labels, any query finds all
+		// they hold.
+		q = "*"
+	}
+	if q != "" {
 		args["query"] = q
 	}
 	if !everything {

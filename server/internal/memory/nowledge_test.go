@@ -23,7 +23,8 @@ import (
 )
 
 // Nowledge Mem played over MCP: memory_search and memory_add as its tools/list gives them (2026-10-18, 0.10.103), on what it
-// was given; any other tool it has (memory_delete here) must never be called.
+// was given; any other tool it has (memory_delete here) must never be called. As the real one does, a search without a query
+// finds nothing, and with labels to filter by any query finds all they hold ("*" here).
 type fakeNowledge struct {
 	mu       sync.Mutex
 	memories []fakeNowledgeMemory
@@ -62,7 +63,7 @@ func (n *fakeNowledge) serve(t *testing.T) string {
 			if label != "" && !slices.Contains(m.labels, label) {
 				continue
 			}
-			if query != "" && !strings.Contains(m.content, query) && !strings.Contains(m.title, query) {
+			if query == "" || query != "*" && !strings.Contains(m.content, query) && !strings.Contains(m.title, query) {
 				continue
 			}
 			results = append(results, map[string]any{"id": m.id, "memory_id": m.id, "title": m.title, "content": m.content, "content_preview": m.content, "relevance_score": 0.9})
