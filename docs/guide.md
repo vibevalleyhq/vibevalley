@@ -6,7 +6,7 @@
 
 - 打开 macOS 应用（[desktop.md](reference/desktop.md)），服务端在里面；或者在终端里跑服务端，再用 Flutter 客户端连上（[development.md](development.md)「跑起来」）。
 - 管家要 DeepSeek 的钥匙：首页「设置」里填，或者本机的 pi 已经配好。帮工用本机登录好的农机（pi、Claude Code、codex……），在「农具」页启用。
-- 项目放在工作目录（默认 `~/vibevalley-work`）下，一个文件夹一个；没有的管家会建。
+- 项目放在工作目录的 `projects/` 下，一个文件夹一个；没有的管家会建。macOS 应用的工作目录是 `~/vibevalley`（Beta 是 `~/vibevalley-beta`，Alpha 是 `~/vibevalley-alpha`），终端里跑的服务端是 `~/vibevalley-dev`。
 
 ## 1. 派第一张工单
 

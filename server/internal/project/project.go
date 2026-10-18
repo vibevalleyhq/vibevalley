@@ -167,8 +167,10 @@ func reason(err error) string {
 }
 
 type Service struct {
+	// root is the projects folder; trees and the house rules are beside it, in the work root.
 	root  string
 	trees string
+	house string
 	// More than a few sessions in one project start changing the same files.
 	perProject int
 
@@ -180,16 +182,17 @@ type Service struct {
 }
 
 func newService(cfg base.Config) (*Service, error) {
-	root, err := filepath.Abs(cfg.WorkRoot)
+	work, err := filepath.Abs(cfg.WorkRoot)
 	if err != nil {
 		return nil, err
 	}
+	root := filepath.Join(work, "projects")
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, err
 	}
 	tokei := cmp.Or(cfg.Tokei, "tokei")
 	return &Service{
-		root: root, trees: filepath.Join(root, ".worktrees"), perProject: cfg.Project.MaxSessions, tokei: tokei,
+		root: root, trees: filepath.Join(work, "worktrees"), house: work, perProject: cfg.Project.MaxSessions, tokei: tokei,
 		queues: map[string]*sync.Mutex{}, pending: map[string]bool{},
 	}, nil
 }
@@ -351,7 +354,7 @@ func (p *Service) Workplace(project, session string, worktree bool, baseBranch s
 	}
 	stamp := strconv.FormatInt(clock.NowMs(), 36)
 	branch := "vibevalley/" + session + "-" + stamp
-	cwd := filepath.Join(p.trees, project+"-"+session+"-"+stamp)
+	cwd := filepath.Join(p.trees, project+"."+session+"-"+stamp)
 	if err := os.MkdirAll(p.trees, 0o755); err != nil {
 		return Workplace{}, err
 	}
@@ -737,7 +740,7 @@ func (p *Service) Run(ctx context.Context, cwd, command string) (bool, string) {
 }
 
 func (p *Service) HouseRules() string {
-	body, err := os.ReadFile(filepath.Join(p.root, "AGENTS.md"))
+	body, err := os.ReadFile(filepath.Join(p.house, "AGENTS.md"))
 	if err != nil {
 		return ""
 	}

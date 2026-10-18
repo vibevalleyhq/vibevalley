@@ -23,6 +23,7 @@ type Config struct {
 	Home    string `mapstructure:"-"`
 	Version string `mapstructure:"-"`
 
+	// The farm's own folder: projects/<name> are its projects, worktrees/<project>.<session>-<stamp> its sessions' worktrees.
 	WorkRoot string `mapstructure:"work_root"`
 	// Empty: Home/vibevalley.db; "memory" (":memory:" once loaded) keeps it in memory; a folder holds vibevalley.db.
 	DBPath string `mapstructure:"db"`
@@ -88,7 +89,7 @@ func Defaults() Config {
 	var c Config
 	c.Home = filepath.Join(home, ".vibevalley")
 	c.Version = "0.1.0"
-	c.WorkRoot = filepath.Join(home, "vibevalley-work")
+	c.WorkRoot = filepath.Join(home, "vibevalley-dev")
 	c.Port = 8787
 	c.Voice.Line.Port = 8788
 	c.Lan.Port = 8790
@@ -194,3 +195,6 @@ func dbPathFrom(v string) string {
 	}
 	return v
 }
+
+// Where the projects are: each folder in it is one.
+func (c Config) ProjectsDir() string { return filepath.Join(c.WorkRoot, "projects") }

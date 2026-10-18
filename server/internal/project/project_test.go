@@ -22,9 +22,10 @@ import (
 
 // The test that runs tokei itself is skipped on a machine without it.
 
+// root is the projects folder, as projectsDir makes it; the work root is its parent.
 func projects(t *testing.T, root string, change ...func(*base.Config)) *Service {
 	t.Helper()
-	cfg := fixture.Config("", root, "")
+	cfg := fixture.Config("", filepath.Dir(root), "")
 	for _, f := range change {
 		f(&cfg)
 	}
@@ -51,7 +52,7 @@ func TestSessionsProjectNamesAndAddresses(t *testing.T) {
 }
 
 func TestSessionsNewProjectsAndDuplicates(t *testing.T) {
-	root := t.TempDir()
+	root := projectsDir(t)
 	os.Mkdir(filepath.Join(root, "existing"), 0o755)
 	os.WriteFile(filepath.Join(root, "existing", "keep"), []byte("mine"), 0o644)
 	p := projects(t, root)
@@ -77,7 +78,7 @@ func TestSessionsNewProjectsAndDuplicates(t *testing.T) {
 }
 
 func TestSessionsCloneOffline(t *testing.T) {
-	root := t.TempDir()
+	root := projectsDir(t)
 	source := filepath.Join(root, ".source")
 	os.Mkdir(source, 0o755)
 	testkit.Git(t, root, "init", "-q", "-b", "main", source)
@@ -106,7 +107,7 @@ func TestSessionsCloneOffline(t *testing.T) {
 }
 
 func TestSessionsTaskBranchMerges(t *testing.T) {
-	root := t.TempDir()
+	root := projectsDir(t)
 	p := projects(t, root)
 	if err := p.OpenBranch("task", "vibevalley/task-1"); err != nil {
 		t.Fatal(err)
@@ -134,7 +135,7 @@ func TestSessionsTaskBranchMerges(t *testing.T) {
 }
 
 func TestSessionsChangedFilesSinceTheBase(t *testing.T) {
-	root := t.TempDir()
+	root := projectsDir(t)
 	p := projects(t, root)
 	if err := p.OpenBranch("task", "vibevalley/task-1"); err != nil {
 		t.Fatal(err)
@@ -219,7 +220,7 @@ func TestSessionsActivityOf(t *testing.T) {
 }
 
 func workRoot(t *testing.T) string {
-	root := t.TempDir()
+	root := projectsDir(t)
 	app := filepath.Join(root, "app")
 	os.Mkdir(app, 0o755)
 	testkit.Git(t, app, "init", "-q", "-b", "main")
@@ -337,7 +338,7 @@ func TestCheckSaysWhatCreateWouldRefuse(t *testing.T) {
 func TestPublishedMergeKeepsReceiptWhenWorktreeCleanupFails(t *testing.T) {
 	for _, intoTask := range []bool{false, true} {
 		t.Run(fmt.Sprint(intoTask), func(t *testing.T) {
-			root := t.TempDir()
+			root := projectsDir(t)
 			p := projects(t, root)
 			target := "main"
 			if intoTask {
@@ -372,4 +373,12 @@ func TestPublishedMergeKeepsReceiptWhenWorktreeCleanupFails(t *testing.T) {
 			}
 		})
 	}
+}
+
+func projectsDir(t *testing.T) string {
+	root := filepath.Join(t.TempDir(), "projects")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return root
 }

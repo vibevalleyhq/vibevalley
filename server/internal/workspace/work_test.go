@@ -289,7 +289,7 @@ func TestMergeClearsTheWorktree(t *testing.T) {
 		t.Fatal("it worked on a branch of its own")
 	}
 	testkit.Match(t, said, `1 个提交合进了 clock 的 main`, "said")
-	project := filepath.Join(work, "clock")
+	project := filepath.Join(work, "projects", "clock")
 	testkit.Match(t, testkit.Git(t, project, "log", "--format=%s", "main"), `加上打卡`, "log")
 	if _, err := os.Stat(filepath.Join(project, "clock.ts")); err != nil {
 		t.Fatal("the file is in the project now")
@@ -724,7 +724,7 @@ func TestConflictingBranchStaysUntilResolved(t *testing.T) {
 	}
 	w.nextReport(t)
 	testkit.Match(t, mustMerge(t, w.f, *b.Issue), `合进了 clash 的 main`, "third")
-	project := filepath.Join(work, "clash")
+	project := filepath.Join(work, "projects", "clash")
 	testkit.Eq(t, testkit.Git(t, project, "show", "main:same.ts"), "export const v = 'A+B'", "both versions")
 	testkit.Eq(t, testkit.Git(t, project, "status", "--porcelain"), "", "main is clean: nothing half-merged")
 }

@@ -156,7 +156,7 @@ class DesktopHostChannel {
 
 String desktopHome(Map<String, String> env) => env['VIBEVALLEY_HOME'] ?? '${env['HOME'] ?? ''}/Library/Application Support/${desktopChannel.productName}';
 
-String desktopWorkRoot(Map<String, String> env) => env['VIBEVALLEY_WORK_ROOT'] ?? '${env['HOME'] ?? ''}/vibevalley-work';
+String desktopWorkRoot(Map<String, String> env) => env['VIBEVALLEY_WORK_ROOT'] ?? '${env['HOME'] ?? ''}/${desktopChannel.workFolder}';
 
 String? bundledServer(Map<String, String> env) {
   final given = env['VIBEVALLEY_SERVER_BIN'];

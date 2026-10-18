@@ -381,7 +381,7 @@ func (fm *manager) brainOf() (*vvagent.Agent, error) {
 		Name:         protocol.ManagerAgent,
 		Instructions: managerSystemPrompt + managerAgentPrompt,
 		Home:         memory.ManagerHome(fm.cfg.Home),
-		Cwd:          fm.cfg.WorkRoot,
+		Cwd:          fm.cfg.ProjectsDir(),
 		Tools:        fm.tools(),
 		NoSkills:     true,
 		NoSubagents:  true,

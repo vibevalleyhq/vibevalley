@@ -20,7 +20,7 @@ Status: implemented
 
 - **渠道在构建时定死**：`build-macos.sh` 把渠道放进 `flutter build --dart-define=VIBEVALLEY_CHANNEL`，打出来的应用不读环境里的渠道，不会被一个环境变量换了身份。`channel.dart` 的映射是唯一的表。
 - **每个应用带自己的服务端**：Go 服务端编成 `Contents/MacOS/vibevalley-server` 放进包里，开机在一个空闲的回环端口拉起。端口不按渠道分，两个渠道同时开也不抢。
-- **工作目录共用**：项目是主人的，哪个农场干都一样；`VIBEVALLEY_HOME` 仍然能改。
+- **工作目录也分开**（2026-10-18 改）：原来共用，后来要拿 Beta 开发 VibeValley、Alpha 试新包，两个农场的帮工不能在同一份项目和 worktree 里干活。现在每个渠道一个 `~/vibevalley-<渠道>`（release 是 `~/vibevalley`），里面 `projects/` 和 `worktrees/`（`channel.dart` 的 `workFolder`；[用 VibeValley 开发 VibeValley](../../proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)）。
 - **版本号**：用 `app/pubspec.yaml` 的版本，发版时手改；打包不改版本号。
 - **签名**：临时签名（`codesign --sign -`），没有 Developer ID，也不公证。
 

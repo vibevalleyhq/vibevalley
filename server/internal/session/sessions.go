@@ -133,7 +133,7 @@ type sessionsIn struct {
 }
 
 func newSessions(in sessionsIn) (*sessions, error) {
-	root, err := filepath.Abs(in.Config.WorkRoot)
+	root, err := filepath.Abs(in.Config.ProjectsDir())
 	if err != nil {
 		return nil, err
 	}

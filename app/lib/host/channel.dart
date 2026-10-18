@@ -14,6 +14,9 @@ enum DesktopChannel {
   final String bundleId;
 
   String get displayName => label.isEmpty ? '码农场物语' : '码农场物语 $label';
+
+  /// The farm's work root under ~: projects/ and worktrees/ are in it; source runs use ~/vibevalley-dev (the server's default).
+  String get workFolder => name == 'release' ? 'vibevalley' : 'vibevalley-$name';
   String get dmgFileName => name == 'release' ? 'vibevalley-arm64.dmg' : 'vibevalley-$name-arm64.dmg';
 
   /// The channel the build was given; an unknown name is a mistake in the build, not a release.

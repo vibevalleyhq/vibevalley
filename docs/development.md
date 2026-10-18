@@ -12,7 +12,7 @@ cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:
 ```
 
 - 第一次跑 Flutter（和升级 `agora_rtc_engine` 以后）先跑 `app/tool/agora-voice-only.sh`。
-- 帮工在 `~/vibevalley-work`（`VIBEVALLEY_WORK_ROOT`）下干活，设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见 [architecture.md](architecture.md)「配置」。
+- 帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活：项目在 `projects/`，worktree 在 `worktrees/`，打包的应用各用自己的（[desktop.md](reference/desktop.md)「渠道」）；设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见 [architecture.md](architecture.md)「配置」。
 - 语音的凭据见 [voice.md](reference/voice.md)；没有也能打字用。
 - 服务端改了代码要重启。
 - 改表结构：直接改 `server/migrations/0001_schema.sql`，跑 sqlc（命令在 [AGENTS.md](../AGENTS.md)），删掉本机的 `vibevalley.db` 让服务端重建；不加迁移，也不写数据搬运（AGENTS.md「不留兼容」）。`go run ./cmd/migrate status` 看本机的库在第几版。

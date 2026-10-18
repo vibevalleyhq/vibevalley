@@ -130,7 +130,7 @@ flowchart LR
 
 | 键 | 用途 | 默认 |
 |---|---|---|
-| `work_root` | 工作目录：每个子文件夹是一个项目，帮工只在这里面干活；也是算经验的范围 | `~/vibevalley-work` |
+| `work_root` | 工作目录：`projects/` 下每个子文件夹是一个项目（也是算经验的范围），`worktrees/<项目>.<帮工>-<时间>` 是帮工的 worktree；帮工只在这里面干活 | `~/vibevalley-dev` |
 | `db` | 数据库：SQLite 文件，给的是文件夹就用里面的 `vibevalley.db`；`memory` 是只在内存里 | `$VIBEVALLEY_HOME/vibevalley.db` |
 | `port` | 主接口固定听 `127.0.0.1`，只能选端口；0 由系统分配。HTTP 和帮工的 `/mcp` 使用同一实际监听地址 | 8787 |
 | `agent.model` | 单独跑 `cmd/vibevalley` 时用的模型 | `deepseek-flash` |

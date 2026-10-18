@@ -470,7 +470,7 @@ func (r *Service) probe(ctx context.Context, id string) observation {
 	} else {
 		info.Installation = protocol.Installation{Value: protocol.InstallationAvailable{Via: protocol.ViaBundled, Command: id}}
 	}
-	cwd := r.cfg.WorkRoot
+	cwd := r.cfg.ProjectsDir()
 	var group sync.WaitGroup
 	group.Go(func() {
 		if runtime.ListModels == nil {

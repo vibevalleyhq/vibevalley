@@ -38,7 +38,7 @@ func lifecycleWorld(t *testing.T) *workspace.Workspace {
 func noWorktree(t *testing.T, f *workspace.Workspace) {
 	t.Helper()
 	cmd := exec.Command("git", "worktree", "list", "--porcelain")
-	cmd.Dir = filepath.Join(f.WorkRoot, "demo")
+	cmd.Dir = filepath.Join(f.ProjectsDir(), "demo")
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +47,7 @@ func noWorktree(t *testing.T, f *workspace.Workspace) {
 		t.Fatalf("orphan worktree: %s", out)
 	}
 	cmd = exec.Command("git", "branch", "--list", "vibevalley/*")
-	cmd.Dir = filepath.Join(f.WorkRoot, "demo")
+	cmd.Dir = filepath.Join(f.ProjectsDir(), "demo")
 	out, err = cmd.Output()
 	if err != nil || strings.TrimSpace(string(out)) != "" {
 		t.Fatalf("orphan branch: %s (%v)", out, err)
@@ -145,7 +145,7 @@ func TestResolveReturnsGitFailure(t *testing.T) {
 	if got.Session == nil {
 		t.Fatal(got.Refused)
 	}
-	repo := filepath.Join(f.WorkRoot, "demo")
+	repo := filepath.Join(f.ProjectsDir(), "demo")
 	if err := os.Rename(filepath.Join(repo, ".git"), filepath.Join(repo, ".git-hidden")); err != nil {
 		t.Fatal(err)
 	}

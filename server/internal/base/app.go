@@ -44,7 +44,7 @@ func NewApp(cfg Config, layers []Layer, options ...fx.Option) (*App, error) {
 			lease.Close()
 		}
 	}()
-	if err := os.MkdirAll(cfg.WorkRoot, 0o755); err != nil {
+	if err := os.MkdirAll(cfg.ProjectsDir(), 0o755); err != nil {
 		return nil, err
 	}
 	cfg.DBPath = cfg.DB()

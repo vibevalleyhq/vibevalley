@@ -12,11 +12,11 @@ import (
 
 func TestSessionsCommitsCountedOncePerRepository(t *testing.T) {
 	root := t.TempDir()
-	testkit.Repo(t, filepath.Join(root, "app"), 3, 2)
-	tree := filepath.Join(root, ".worktrees", "w1")
-	testkit.Git(t, filepath.Join(root, "app"), "worktree", "add", "-q", "-b", "vibevalley/w1", tree)
+	testkit.Repo(t, filepath.Join(root, "projects", "app"), 3, 2)
+	tree := filepath.Join(root, "worktrees", "w1")
+	testkit.Git(t, filepath.Join(root, "projects", "app"), "worktree", "add", "-q", "-b", "vibevalley/w1", tree)
 	testkit.Git(t, tree, "commit", "-q", "--allow-empty", "-m", "session work")
-	testkit.Repo(t, filepath.Join(root, "tools", "cli"), 1, 0)
+	testkit.Repo(t, filepath.Join(root, "projects", "tools", "cli"), 1, 0)
 	w, err := newWorld(fixture.Config(t.TempDir(), root, ""))
 	if err != nil {
 		t.Fatal(err)

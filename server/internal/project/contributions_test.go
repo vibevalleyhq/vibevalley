@@ -8,10 +8,10 @@ import (
 )
 
 func TestContributionObservationOwnsNestedRepositoriesAndWorktreeIdentity(t *testing.T) {
-	root := t.TempDir()
+	root := projectsDir(t)
 	repo := filepath.Join(root, "nested", "repo")
 	testkit.Repo(t, repo, 2, 1)
-	tree := filepath.Join(root, ".worktrees", "copy")
+	tree := filepath.Join(filepath.Dir(root), "worktrees", "copy")
 	testkit.Git(t, repo, "worktree", "add", "-q", "-b", "side", tree)
 	p := projects(t, root)
 	repos := p.Contributions(context.Background(), nil)

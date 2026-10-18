@@ -15,13 +15,13 @@ Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏�
 
 三个渠道可以同时装、同时开，打包时定（`build-macos.sh --channel`；`lib/host/channel.dart`；[理由](../../.agents/notes/implemented/process/2026-10-12-release-channels.md)）：
 
-| 渠道 | 应用 | bundle id | 家目录 |
-|---|---|---|---|
-| release | `vibevalley.app` | `dev.vibevalley.app` | `~/Library/Application Support/vibevalley` |
-| beta | `vibevalley Beta.app` | `dev.vibevalley.app.beta` | `…/vibevalley Beta` |
-| alpha | `vibevalley Alpha.app` | `dev.vibevalley.app.alpha` | `…/vibevalley Alpha` |
+| 渠道 | 应用 | bundle id | 家目录 | 工作目录 |
+|---|---|---|---|---|
+| release | `vibevalley.app` | `dev.vibevalley.app` | `~/Library/Application Support/vibevalley` | `~/vibevalley` |
+| beta | `vibevalley Beta.app` | `dev.vibevalley.app.beta` | `…/vibevalley Beta` | `~/vibevalley-beta` |
+| alpha | `vibevalley Alpha.app` | `dev.vibevalley.app.alpha` | `…/vibevalley Alpha` | `~/vibevalley-alpha` |
 
-家目录各是各的，Alpha 的数据库迁移碰不到你天天用的农场；工作目录共用。
+家目录和工作目录都各是各的：Alpha 的库碰不到你天天用的农场，它的帮工也碰不到那边的项目和 worktree。终端里跑的服务端用 `~/vibevalley-dev`。工作目录里 `projects/` 是项目，`worktrees/` 是帮工的 worktree；`VIBEVALLEY_WORK_ROOT` 能改。
 
 ## 窗口
 

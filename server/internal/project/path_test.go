@@ -7,7 +7,7 @@ import (
 )
 
 func TestWorkplaceRefusesProjectSymlinkOutsideRoot(t *testing.T) {
-	root, outside := t.TempDir(), t.TempDir()
+	root, outside := projectsDir(t), t.TempDir()
 	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
 		t.Fatal(err)
 	}

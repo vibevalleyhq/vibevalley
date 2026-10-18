@@ -15,7 +15,7 @@ Workspace（工作目录，一张大地图）
         └── run（一次干活：一次触发到一次汇报）
 ```
 
-现在只有一个 Workspace：工作目录 `VIBEVALLEY_WORK_ROOT` 和家目录 `VIBEVALLEY_HOME`。
+现在只有一个 Workspace：工作目录 `VIBEVALLEY_WORK_ROOT`（项目在 `projects/`，worktree 在 `worktrees/`）和家目录 `VIBEVALLEY_HOME`。
 
 ## 一件活怎么走
 
