@@ -2351,13 +2351,14 @@ class SeedBlank {
 }
 
 class IssueDispatchRequest {
-  const IssueDispatchRequest({this.bed});
+  const IssueDispatchRequest({this.station});
 
-  factory IssueDispatchRequest.fromJson(Map<String, dynamic> j) => IssueDispatchRequest(bed: j['bed'] == null ? null : (j['bed'] as num).toDouble());
+  factory IssueDispatchRequest.fromJson(Map<String, dynamic> j) =>
+      IssueDispatchRequest(station: j['station'] == null ? null : (j['station'] as num).toDouble());
 
-  final double? bed;
+  final double? station;
 
-  Map<String, dynamic> toJson() => {if (bed != null) 'bed': bed!};
+  Map<String, dynamic> toJson() => {if (station != null) 'station': station!};
 }
 
 class LanguageCount {
@@ -3506,11 +3507,11 @@ class CommentRequest {
 }
 
 class SayRequest {
-  const SayRequest({required this.text, this.bed, this.conversation, this.agent, this.project, this.sendKey});
+  const SayRequest({required this.text, this.station, this.conversation, this.agent, this.project, this.sendKey});
 
   factory SayRequest.fromJson(Map<String, dynamic> j) => SayRequest(
     text: j['text'] as String,
-    bed: j['bed'] == null ? null : (j['bed'] as num).toDouble(),
+    station: j['station'] == null ? null : (j['station'] as num).toDouble(),
     conversation: j['conversation'] == null ? null : j['conversation'] as String,
     agent: j['agent'] == null ? null : j['agent'] as String,
     project: j['project'] == null ? null : j['project'] as String,
@@ -3518,7 +3519,7 @@ class SayRequest {
   );
 
   final String text;
-  final double? bed;
+  final double? station;
   final String? conversation;
   final String? agent;
   final String? project;
@@ -3526,7 +3527,7 @@ class SayRequest {
 
   Map<String, dynamic> toJson() => {
     'text': text,
-    if (bed != null) 'bed': bed!,
+    if (station != null) 'station': station!,
     if (conversation != null) 'conversation': conversation!,
     if (agent != null) 'agent': agent!,
     if (project != null) 'project': project!,

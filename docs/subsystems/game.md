@@ -19,7 +19,7 @@
 - 规则在 protocol：`game_view.go` 等级（`XPToNext`、`LevelForCommits`、`FarmLevelOf`、`LevelUps`）、地块（`PlotOfSession`、`PlotOf`、`PlotKey`、`ViewOf`）、特效（`EffectsOf`）；`game_play.go` 帮工的 `SessionPlay`（地块号、最近 30 步动作、工具次数、最近的文件和命令）、空地（`FreeStation`、`WithStations`）、`FactStation` 的折法；`game_achievement.go` 成就的说法（`AchievementsInWords`：每档叫什么、到了叫什么、给多少金币、能不能当称号）和进度（`ViewOf` 里每个成就到了第几档、计数、下一档要多少）。成就单在 `seeds.json` 的 `achievements`（`protocol.Achievements`），客户端不带它的副本。
 - 核心状态里的游戏字段：`CoreState.Progress`、`Commits`、`Session.Play`；帧里的 `view`（地块、等级、每个成就的进度 `achievements`）和 `effects`。`Progress` 只在账本里有，`state.json` 不存它。
 - 表：`game_ledger`（`id` 是 UUIDv7，`kind`、`at`、其余字段放进 `payload` 的 JSON），查询在 `pkg/db/queries/game_ledger.sql`。
-- 接口：`game.achievements`（成就的说法，页面的顺序）、`game.chooseTitle`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.say` 带的 `bed`。
+- 接口：`game.achievements`（成就的说法，页面的顺序）、`game.chooseTitle`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.say` 带的 `station`。
 - 客户端：`data/remote.dart` 的 `achievementsProvider`（连上一个服务端读一次 `game.achievements`）、`rules/warehouse.dart`（仓库）、`game/effects.dart`（把特效变成飘字、横幅、提示）、`farm/achievements.dart`（任务与成就页、奖章，只显示说法和帧里的进度）。
 
 ## 模型和不变量
@@ -70,14 +70,14 @@
 
 **数 commit**（`commits`）：开机就绪后数一次，之后每 2 分钟一次；每个 `report` 事实（一轮结束）后 15 秒再数一次，几轮共用一次。数和写回由 `counting` 锁成一次一个，旧的数不会盖掉新的；停机以后数完的不写。结果经 `Core.SetCommits` 施加 `commits` 事实。
 
-**点空地**（`beds`）：主人点一块空地再说话，`channel.say` 带上 `bed`，`Game.Want` 记下这块地 10 秒。这期间雇的第一个帮工先由 `FactHired` 站到第一块空地，`beds` 听到 `hired` 再施加 `FactStation` 把它挪过去；地已有人就不挪。记下的地用一次就清掉，不管挪没挪成。两个事实相隔不到 200 毫秒，通常在同一帧里。
+**点空地**（`stations.go`）：主人点一块空地再说话，`channel.say` 带上这块地的 `station`，`Game.Want` 记下这块地 10 秒。这期间雇的第一个帮工先由 `FactHired` 站到第一块空地，`stations` 听到 `hired` 再施加 `FactStation` 把它挪过去；地已有人就不挪。记下的地用一次就清掉，不管挪没挪成。两个事实相隔不到 200 毫秒，通常在同一帧里。
 
 ## 和谁打交道
 
 - **核心状态（`core`）**：游戏只经 `core.Facts()`、`core.Transitions()`、`core.OwnerDids()` 听，经 `Core.Apply` 施加 `progress`、`station`、`commits`。
 - **项目（`project`）**：`commits` 调 `project.Contributions`，带上配置的 `git_emails`。
 - **工单（`issue`）、语音（`voice`）**：只经 `core.Did` 说主人做了什么，不 import `game`。
-- **HTTP（`handler`）**：只为游戏自己的事调 `Game`：`game.achievements`、`game.chooseTitle`、`channel.say` 的 `bed`。
+- **HTTP（`handler`）**：只为游戏自己的事调 `Game`：`game.achievements`、`game.chooseTitle`、`channel.say` 的 `station`。
 - **客户端**：读 `game.achievements`、`progress`、`view`、`effects`，不折、不另存，也不照成就单算档和进度；调试台只能放一遍横幅和提示（说法取自 `game.achievements`），改不了金币、等级和成就。
 
 ## 为什么这样
@@ -86,7 +86,7 @@
 - **一本账本，在服务端，折出结果。** 在页面里算，页面关着时的事漏掉，几个客户端各算一份互相覆盖。直接存计数最简单，但规则一改旧数就对不上，也说不清某一档是哪天、因为哪件活拿到的；账本按顺序折，结果总能重算，还带着每档的日期。
 - **哪些事实记账是一个纯函数 `entriesFor`，游戏只听事实。** 写在各个业务里记，业务就认识了游戏；收获、带话、点名、交接都从帮工离开和田头消息的事实里读出来。只有主人做的、不改状态的事从 `core.Did` 来，经手的服务说一声，不管从哪个入口进来都记得到。
 - **服务收在 `game` 一个包。** 名字只叫 `ledger` 时，它装的其实是全部游戏；`game` 也是主人和概念里的词。规则留在 protocol、文件名带 `game_`，没拆成 `protocol/game` 子包：shapegen、黄金数据和 Flutter 的生成都按 `protocol` 一个包来，游戏的形状和事实、帧在同一个联合里，拆开要倒转依赖。账本的折法只有 `game` 读，所以在 `game/progress.go` 不导出。
-- **核心状态不替游戏做决定。** 主人点的地要经过管家（模型）才雇到帮工，中间隔着一句话和 10 秒；把地块一路带过管家和派活（`FactHired` 带地块），业务就认识了游戏。所以 `beds` 听到 `hired` 再施加 `station`，代价是分在两帧时客户端看到帮工挪一下。
+- **核心状态不替游戏做决定。** 主人点的地要经过管家（模型）才雇到帮工，中间隔着一句话和 10 秒；把地块一路带过管家和派活（`FactHired` 带地块），业务就认识了游戏。所以 `stations` 听到 `hired` 再施加 `station`，代价是分在两帧时客户端看到帮工挪一下。
 - **特效在 `Core.Apply` 里算，不搬进 `game`。** `EffectsOf` 要折之前的状态：`game` 要么自己存一份，违反核心状态只有一份；要么等事件发出再算，特效晚一帧。`Core` 只跑一个纯函数，不做游戏的决定。
 - **经验只算工作目录里你名下的 commit。** 算这台机器上所有仓库会把和 VibeValley 无关的工作算进来，算所有作者会把别人的提交算成你的；代价是要定期扫目录、跑 git。
 - **仓库装收获了的工单，不装每一轮的汇报。** 汇报在看板、干活过程、工单串里都有；收获需要一个看得见的去处，看板的「已关」里还有没收就收工的。读工单，不另存。
@@ -103,7 +103,7 @@
 - `game/progress_test.go`：`TestLevels`、`TestHarvestPays`（金币和连胜加成）、`TestFailedEndsStreak`、`TestFirstTry`、`TestConflictsCheapRuntimes`（解铃人、浴火重生、一分钱一分货、物尽其用）、`TestStarterTasks`、`TestTaskHarvested`、`TestTiersInOrder`、`TestSecrets`、`TestTitles`、`TestAgentRecords`；`entriesFor` 的 `TestEntriesForFacts`、`TestEntriesFromLeavingAndMessages`、`TestEntriesWithAgent`、`TestEntriesTasksLevelsBeds`（计划只记一次、跨级、六块地填满）；`TestCatchUp`；`TestStreakIsJavaScriptsNumber`。
 - `game/rules_golden_test.go` 的 `TestRulesGolden`：账本逐步折和整本折一致，`entriesFor`、`catchUp` 对 `testdata/rules.jsonl.gz` 逐条比。
 - `game/ledger_test.go`：`TestLedger`（记一笔收获带着金币的 `news`；派出、没做成、升级由事实记下；重启后折回同样的进度、不重复补记等级）、`TestTheOwnersReviewAndCallAreCounted`。
-- `game/beds_test.go` 的 `TestBedsTheNextSessionTakesThePlantedBed`；`game/commits_test.go` 的 `TestSessionsCommitsCountedOncePerRepository`。
+- `game/stations_test.go` 的 `TestTheNextSessionTakesThePlantedStation`；`game/commits_test.go` 的 `TestSessionsCommitsCountedOncePerRepository`。
 - protocol：`game_achievement_test.go` 的 `TestAchievementsInWords`（称号、到了叫什么、金币、能不能挂）、`TestTheViewSaysHowFarEachAchievementIs`（档、计数、下一档，全到了没有下一档）、`TestAnAchievementsEffectSaysIt`；`game_play_rules_test.go` 的 `TestStationOnlyToAFreeBed`、`TestPlotsAreKeyedByTheirIssue`、`TestAPlotShowsItsIssuesAcceptance`；`play_golden_test.go` 的 `TestPlayRulesGolden`；`reduce_golden_test.go` 的 `TestReduceGolden`（特效和升级逐条比）。
 - `workspace/work_test.go` 的 `TestMergeGoesInTheLedger`：扮演的帮工收获后账本里有这一笔。
 - `handler/api_test.go` 的 `TestAchievementsComeInWordsAndTheFrameSaysHowFar`。

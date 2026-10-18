@@ -72,8 +72,8 @@ func (a api) SettingSave(_ context.Context, body protocol.SettingsUpdate) (proto
 }
 
 func (a api) ChannelSay(ctx context.Context, body protocol.SayRequest) error {
-	if body.Bed != nil {
-		a.f.Game.Want(*body.Bed)
+	if body.Station != nil {
+		a.f.Game.Want(*body.Station)
 	}
 	a.f.Core.Open()
 	pick := manager.Pick{Agent: ptr.Value(body.Agent), Project: ptr.Value(body.Project)}
@@ -480,8 +480,8 @@ func (a api) IssueAccept(ctx context.Context, id string, body protocol.IssueAcce
 }
 
 func (a api) IssueDispatch(ctx context.Context, id string, body protocol.IssueDispatchRequest) (protocol.Dispatched, error) {
-	if body.Bed != nil {
-		a.f.Game.Want(*body.Bed)
+	if body.Station != nil {
+		a.f.Game.Want(*body.Station)
 	}
 	got, err := a.f.Issue.DispatchQueued(context.WithoutCancel(ctx), id)
 	return got, refused(err)

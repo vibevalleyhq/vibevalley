@@ -993,9 +993,9 @@ type SeedBlank struct {
 	End   int64 `json:"end"`
 }
 
-// Bed: the empty bed it is started from, the one its session takes when it gets one.
+// Station: the empty plot it is started from, the one its session takes when it gets one.
 type IssueDispatchRequest struct {
-	Bed *int64 `json:"bed,omitzero"`
+	Station *int64 `json:"station,omitzero"`
 }
 
 type LanguageCount struct {
@@ -1467,7 +1467,7 @@ type CommentRequest struct {
 
 type SayRequest struct {
 	Text         string  `json:"text"`
-	Bed          *int64  `json:"bed,omitzero"`
+	Station      *int64  `json:"station,omitzero"`
 	Conversation *string `json:"conversation,omitzero"`
 	Agent        *string `json:"agent,omitzero"`
 	// The project the owner chose to sow it in; the manager is told.

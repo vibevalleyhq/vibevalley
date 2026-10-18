@@ -16,11 +16,11 @@ import 'tags.dart';
 /// The sowing bag: the server's seeds for the project (project.seeds), its queued todos, or the owner's own words.
 /// Both skins open it: the farm on one of its beds, the project map on an island's empty spot.
 class SeedForm extends ConsumerStatefulWidget {
-  const SeedForm({super.key, required this.onDone, this.bed, this.project});
+  const SeedForm({super.key, required this.onDone, this.station, this.project});
   final VoidCallback onDone;
 
-  /// The farm bed it sows on; null from the map, where the server picks the bed.
-  final int? bed;
+  /// The farm plot it sows on; null from the map, where the server picks the plot.
+  final int? station;
 
   /// Where it sows (the island's project). Without one: the project last sown in, the only one, or it asks first.
   final String? project;
@@ -119,7 +119,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
 
   Widget _queuedList(List<Issue> queued, String project, TextStyle label) {
     Future<void> start(Issue i) async {
-      final got = await ref.read(farmCommandsProvider).startQueued(i.id, bed: widget.bed);
+      final got = await ref.read(farmCommandsProvider).startQueued(i.id, station: widget.station);
       if (!mounted) return;
       if (got.ok) {
         ref.read(prefsProvider.notifier).setLastProject(project);
@@ -169,7 +169,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
       if (_text.trim().isEmpty) return;
       Sfx.play('plant');
       ref.read(prefsProvider.notifier).setLastProject(project);
-      fire(ref.read(farmCommandsProvider).plant(_text, bed: widget.bed, agent: who == 'auto' ? null : who, project: project));
+      fire(ref.read(farmCommandsProvider).plant(_text, station: widget.station, agent: who == 'auto' ? null : who, project: project));
       widget.onDone();
     }
 

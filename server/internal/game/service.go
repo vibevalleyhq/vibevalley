@@ -10,11 +10,11 @@ import (
 type Service struct {
 	*ledger
 	*commits
-	*beds
+	*stations
 	parts base.Parts
 }
 
-func newService(a *ledger, b *commits, c *beds) (*Service, error) {
+func newService(a *ledger, b *commits, c *stations) (*Service, error) {
 	return &Service{a, b, c, base.Parts{a, b, c}}, nil
 }
 

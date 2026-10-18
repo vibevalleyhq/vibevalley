@@ -8,7 +8,7 @@ import (
 	"vibevalley/internal/testkit"
 )
 
-func TestBedsTheNextSessionTakesThePlantedBed(t *testing.T) {
+func TestTheNextSessionTakesThePlantedStation(t *testing.T) {
 	f := gameOpen(t, t.TempDir())
 	defer f.Close()
 	if err := f.Start(context.Background()); err != nil {
@@ -27,17 +27,17 @@ func TestBedsTheNextSessionTakesThePlantedBed(t *testing.T) {
 
 	f.Game.Want(4)
 	hire("w1")
-	testkit.Until(t, "w1 on bed 4", func() bool { return stationOf("w1") == 4 })
+	testkit.Until(t, "w1 on station 4", func() bool { return stationOf("w1") == 4 })
 
 	hire("w2")
-	testkit.Until(t, "w2 on the first free bed", func() bool { return stationOf("w2") == 0 })
+	testkit.Until(t, "w2 on the first free station", func() bool { return stationOf("w2") == 0 })
 
 	f.Game.Want(4)
 	hire("w3")
 	testkit.Until(t, "w3 hired", func() bool { return stationOf("w3") >= 0 })
 	hire("w4")
 	testkit.Until(t, "w4 hired", func() bool { return stationOf("w4") >= 0 })
-	testkit.Eq(t, stationOf("w1"), int64(4), "w1 keeps its bed")
-	testkit.Eq(t, stationOf("w3"), int64(1), "a taken bed is not given again")
+	testkit.Eq(t, stationOf("w1"), int64(4), "w1 keeps its station")
+	testkit.Eq(t, stationOf("w3"), int64(1), "a taken station is not given again")
 	testkit.Eq(t, stationOf("w4"), int64(2), "the wish is used once")
 }

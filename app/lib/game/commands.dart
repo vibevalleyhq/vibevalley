@@ -77,16 +77,16 @@ class FarmCommands {
   String _issueOf(String session) => (_farm?.sessions ?? const <Session>[]).firstWhere((w) => w.id == session).issueId;
 
   /// `project`: the one the owner chose on the sowing form; the manager is told to sow it there.
-  /// `bed`: the farm bed it was sown on; none from the project map.
-  Future<void> plant(String text, {int? bed, String? agent, String? project}) =>
-      ref.read(messagesProvider).send(text, sendKey: newSendKey(), bed: bed, agent: agent, project: project);
+  /// `station`: the farm plot it was sown on; none from the project map.
+  Future<void> plant(String text, {int? station, String? agent, String? project}) =>
+      ref.read(messagesProvider).send(text, sendKey: newSendKey(), station: station, agent: agent, project: project);
 
-  /// A queued todo started, on this bed if there is one. Not ok: still waiting, or refused; the text is the server's why.
-  Future<Answer> startQueued(String issue, {int? bed}) async {
+  /// A queued todo started, on this plot if there is one. Not ok: still waiting, or refused; the text is the server's why.
+  Future<Answer> startQueued(String issue, {int? station}) async {
     final got = await _answer(() async {
       final d = await _api.issue.dispatch(
         id: issue,
-        body: IssueDispatchRequest(bed: bed?.toDouble()),
+        body: IssueDispatchRequest(station: station?.toDouble()),
       );
       return d.queued ?? '';
     });

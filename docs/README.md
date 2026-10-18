@@ -66,7 +66,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 工单 | issue（`Issue`） | 一件活，从写下到关上一个 id；在做时是一块地，每派一次是一个帮工 | job、ticket |
 | 项目 | project | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
 | 大地图 | Workspace（`Config.WorkRoot`、`Config.Home`） | 全部项目、工单、群聊和档案；工作台「项目」页的「全部」 | 世界、全图 |
-| 地 | issue（`Issue`；`FarmView.Plots` 按工单做键）；代码活的 worktree 是 `project.IssueBranch`；像素村里的位置是 station、bed | 一张工单；代码相关的带一个 worktree。帮工在上面干活；一座岛上的空位是这个项目同时在做的工单数 | 工位、帮工的地、并发位 |
+| 地 | issue（`Issue`；`FarmView.Plots` 按工单做键）；代码活的 worktree 是 `project.IssueBranch`；像素村里的位置是 station（画出来的那块地在客户端叫 `Bed`） | 一张工单；代码相关的带一个 worktree。帮工在上面干活；一座岛上的空位是这个项目同时在做的工单数 | 工位、帮工的地、并发位 |
 | 种子袋 | 待办的工单（todo，`queued_at`） | 排队等空地的工单，有空地自动开工 | 队列 |
 | 阶段 | phase | 到场、干活、成熟、失败、歇着 | 状态 |
 | 核心状态 | `CoreState` | 农场上的一切，只有服务端持有 | |

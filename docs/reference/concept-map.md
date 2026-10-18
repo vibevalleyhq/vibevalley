@@ -69,7 +69,7 @@
 | 钥匙和语音设置 | `Setting` | `settings.json`（只有你能读） | 会话的 `Env` |
 | 进度、成就 | `Game`（`game/ledger.go`） | `game_ledger` 表；进度从它折出来 | |
 | 等级 | `Game`（`game/commits.go`） | `state.json` 里的 commit 数 | |
-| 地 | `Game`（`game/beds.go`）；规则在 `protocol/game_play.go` | `state.json` 里的 `play.station` | |
+| 地 | `Game`（`game/stations.go`）；规则在 `protocol/game_play.go` | `state.json` 里的 `play.station` | |
 | 核心状态 | `Core` | `state.json`（聊天、进度、定时和工单除外） | |
 
 ## oar 那一层

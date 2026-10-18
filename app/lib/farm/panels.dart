@@ -58,7 +58,7 @@ class FarmPanels extends ConsumerWidget {
             icon: 'icon-seeds',
             size: FarmDialogSize.lg,
             onClose: () => actions.sow(null),
-            child: SeedForm(bed: station, onDone: () => actions.sow(null)),
+            child: SeedForm(station: station, onDone: () => actions.sow(null)),
           );
         case WaterOverlay(:final id):
           final session = byId(id);

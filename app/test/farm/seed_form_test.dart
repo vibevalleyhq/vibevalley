@@ -132,7 +132,7 @@ void main() {
     final say = r.calls.where((x) => x.path == '/api/v1/say').single;
     expect(say.body, {
       'text': '修一个 bug：打卡按钮没反应\n做到什么程度算完：先复现它；`go test ./...` 通过',
-      'bed': 3,
+      'station': 3,
       'agent': 'front',
       'project': 'clock-in',
       'sendKey': matches(RegExp(r'^[0-9a-f]{32}$')),
@@ -158,7 +158,7 @@ void main() {
     await tester.tap(find.text('播种').last);
     await settle(tester);
     final say = r.calls.where((x) => x.path == '/api/v1/say').single;
-    expect(say.body, {'text': '把打卡记录导出成 CSV', 'bed': 3, 'project': 'clock-in', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
+    expect(say.body, {'text': '把打卡记录导出成 CSV', 'station': 3, 'project': 'clock-in', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
   });
 
   testWidgets('one project is picked without asking', (tester) async {
@@ -176,7 +176,7 @@ void main() {
     expect(tester.getTopLeft(find.text('#5 先排上的')).dy, lessThan(tester.getTopLeft(find.text('#7 给打卡页加导出')).dy));
     await tester.tap(find.text('开工').first);
     await settle(tester);
-    expect(r.named('POST', '/api/v1/issues/t5/dispatch').single.body, {'bed': 3});
+    expect(r.named('POST', '/api/v1/issues/t5/dispatch').single.body, {'station': 3});
     expect(r.paths, isNot(contains('POST /api/v1/say')));
     expect(find.text('播种 · 第 4 块地'), findsNothing, reason: 'started: the bag closes');
   });
