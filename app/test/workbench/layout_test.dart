@@ -26,7 +26,7 @@ WorkbenchBackend _server() => WorkbenchBackend(
       ],
     ),
   ],
-  managerMemory: const MemoryList(file: '/m.md', memories: [], carried: 0),
+  managerMemory: const MemoryList(file: '/m.md', memories: [], sources: [], carried: 0),
 );
 
 void main() {

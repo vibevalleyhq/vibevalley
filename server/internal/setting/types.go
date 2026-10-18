@@ -20,3 +20,14 @@ type VoiceConfig struct {
 	Keys           VoiceKeys
 	DeepseekAPIKey string
 }
+
+// A memory source as settings.json keeps it, with its key: read together, so an address is never paired with another one's key.
+type MemorySourceConfig struct {
+	Kind       protocol.MemorySourceKind `json:"kind"`
+	URL        string                    `json:"url"`
+	Enabled    bool                      `json:"enabled,omitempty"`
+	Read       bool                      `json:"read,omitempty"`
+	Write      bool                      `json:"write,omitempty"`
+	Everything bool                      `json:"everything,omitempty"`
+	Key        string                    `json:"key,omitempty"`
+}

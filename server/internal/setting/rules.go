@@ -2,6 +2,7 @@ package setting
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"vibevalley/internal/protocol"
@@ -42,8 +43,50 @@ func settingsProblem(u protocol.SettingsUpdate) string {
 			return "听写要填模型名，比如本机 speech-server 的 qwen3，或 OpenAI 的 gpt-4o-mini-transcribe"
 		}
 	}
+	if problem := memorySourcesProblem(u.MemorySources); problem != "" {
+		return problem
+	}
 	if u.Voice == nil {
 		return ""
 	}
 	return voiceProblem(*u.Voice)
+}
+
+func memorySourcesProblem(sources []protocol.MemorySourceUpdate) string {
+	seen := map[protocol.MemorySourceKind]bool{}
+	for _, m := range sources {
+		if !slices.Contains(protocol.MemorySourceKindValues, m.Kind) {
+			return "不认识的记性来源：" + string(m.Kind)
+		}
+		if seen[m.Kind] {
+			return "同一种记性来源只能接一个：" + string(m.Kind)
+		}
+		seen[m.Kind] = true
+		url := str.Trim(m.URL)
+		if m.Enabled && url == "" {
+			return "要接上记性来源，先填它的地址"
+		}
+		if url != "" && !voiceURL.MatchString(url) {
+			return "记性来源的地址要是 http(s) 开头的完整地址，比如 Nowledge Mem 的 http://127.0.0.1:14242/mcp/"
+		}
+		if m.Key != nil && strings.ContainsFunc(str.Trim(*m.Key), str.IsSpace) {
+			return "记性来源的 key 里不该有空格"
+		}
+	}
+	return ""
+}
+
+// The list given replaces the saved one; a source given without a key keeps the key saved for its kind.
+func memorySourcesOver(saved []MemorySourceConfig, given []protocol.MemorySourceUpdate) []MemorySourceConfig {
+	out := []MemorySourceConfig{}
+	for _, m := range given {
+		next := MemorySourceConfig{Kind: m.Kind, URL: str.Trim(m.URL), Enabled: m.Enabled, Read: m.Read, Write: m.Write, Everything: m.Everything}
+		if m.Key != nil {
+			next.Key = str.Trim(*m.Key)
+		} else if i := slices.IndexFunc(saved, func(c MemorySourceConfig) bool { return c.Kind == m.Kind }); i >= 0 {
+			next.Key = saved[i].Key
+		}
+		out = append(out, next)
+	}
+	return out
 }

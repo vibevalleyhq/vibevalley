@@ -68,7 +68,7 @@ void main() {
           notes.clear();
           return http.Response('', 204);
         }
-        return jsonResponse(MemoryList(memories: notes, file: '/memory', carried: notes.length.toDouble()).toJson());
+        return jsonResponse(MemoryList(memories: notes, sources: const [], file: '/memory', carried: notes.length.toDouble()).toJson());
       });
       final c = container(server);
       expect((await c.read(memoryProvider(agent).future)).memories, isEmpty);
@@ -84,7 +84,7 @@ void main() {
     var reads = 0;
     final server = FakeServer((r) async {
       reads++;
-      if (r.url.path.startsWith('/api/v1/memories')) return jsonResponse(MemoryList(memories: const [], carried: reads.toDouble()).toJson());
+      if (r.url.path.startsWith('/api/v1/memories')) return jsonResponse(MemoryList(memories: const [], sources: const [], carried: reads.toDouble()).toJson());
       return jsonResponse([ProjectSummary(name: 'project-$reads', path: '/p', git: true, slots: 1).toJson()]);
     });
     final c = container(server);

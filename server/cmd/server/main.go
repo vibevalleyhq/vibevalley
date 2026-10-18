@@ -33,6 +33,8 @@ func main() {
 	configFile := flag.String("config", "", "the YAML configuration (default $VIBEVALLEY_HOME/vibevalley.yaml, if it is there)")
 	logFile := flag.String("log", "", "also append the log to this file")
 	flag.Parse()
+	// A key in a line from a helper or a service never reaches the terminal or the file.
+	log.SetOutput(base.RedactingWriter(os.Stderr))
 	cfg, err := base.LoadConfig(*configFile)
 	if err != nil {
 		log.Fatalf("vibevalley: %v", err)
@@ -46,7 +48,7 @@ func main() {
 			log.Fatal(err)
 		}
 		defer out.Close()
-		log.SetOutput(io.MultiWriter(os.Stderr, out))
+		log.SetOutput(base.RedactingWriter(io.MultiWriter(os.Stderr, out)))
 	}
 	f, err := workspace.New(cfg)
 	if err != nil {

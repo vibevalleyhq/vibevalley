@@ -108,6 +108,7 @@ class WorkbenchBackend {
 
   /// What agent.recall answers for an agent: the server's Pick is the Go's, tested there.
   final recalls = <String, List<String>>{};
+  final memorySources = <String, List<MemorySourceInfo>>{};
 
   /// What changed something: the checks are questions, though they are POSTs.
   List<Call> get writes => calls.where((c) => c.method != 'GET' && !const {'/api/v1/agents/check', '/api/v1/settings/check'}.contains(c.path)).toList();
@@ -172,7 +173,7 @@ class WorkbenchBackend {
         final lines = recalls[id] ?? const <String>[];
         return jsonResponse({'lines': lines, 'chars': lines.fold<int>(0, (n, l) => n + l.length + 1), 'limit': 1600});
       case ('GET', ['api', 'memories', final id]) when id != managerAgent:
-        return jsonResponse(MemoryList(memories: memories[id] ?? const <Memory>[]).toJson());
+        return jsonResponse(MemoryList(memories: memories[id] ?? const <Memory>[], sources: memorySources[id] ?? const []).toJson());
       case ('POST', ['api', 'memories', final id]) when id != managerAgent:
         final req = MemoryRequest.fromJson(body as Map<String, dynamic>);
         final m = memory('m${calls.length}', req.text, agent: id, project: req.project, at: 1);
@@ -187,11 +188,11 @@ class WorkbenchBackend {
         final req = MemoryRequest.fromJson(body as Map<String, dynamic>);
         final m = memory('mm${calls.length}', req.text, agent: 'manager', at: 1);
         final mm = managerMemory!;
-        managerMemory = MemoryList(file: mm.file, memories: [m, ...mm.memories], carried: (mm.carried ?? 0) + 1);
+        managerMemory = MemoryList(file: mm.file, sources: const [], memories: [m, ...mm.memories], carried: (mm.carried ?? 0) + 1);
         return jsonResponse(m.toJson());
       case ('DELETE', ['api', 'memories', managerAgent, final mid]):
         final mm = managerMemory!;
-        managerMemory = MemoryList(file: mm.file, memories: mm.memories.where((m) => m.id != mid).toList(), carried: mm.carried);
+        managerMemory = MemoryList(file: mm.file, sources: const [], memories: mm.memories.where((m) => m.id != mid).toList(), carried: mm.carried);
         return http.Response('', 204);
       case ('GET', ['api', 'manager', 'archive']):
         final q = r.url.queryParameters['q'];

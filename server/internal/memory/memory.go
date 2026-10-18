@@ -142,32 +142,24 @@ func (m *memories) insertNote(agentID, body string, project, session *string) (s
 	return id, at, nil
 }
 
-// What a run recalls: the memories' ids (not to give the same session again) and the lines it is told, as it is told them.
-type Recalled struct {
-	IDs   []string
-	Lines []string
-}
-
-func (m *memories) Recall(cue RecallCue) Recalled {
+// What a run would recall, as recall.go picks it; nothing is counted as recalled until markRecalled.
+func (m *memories) recallable(cue RecallCue) []protocol.Memory {
 	all, err := m.list(cue.Agent)
 	if err != nil {
 		log.Printf("vibevalley: %s could not recall: %v", cue.Agent, err)
-		return Recalled{}
+		return nil
 	}
-	now := clock.NowMs()
-	picked := pick(all, pickCue{Session: cue.Session, Project: cue.Project, Text: cue.Text, Skip: cue.Skip, Now: now})
-	for _, p := range picked {
-		if err := m.q.Recalled(context.Background(), generated.RecalledParams{RecalledAt: sql.NullInt64{Int64: now, Valid: true}, ID: p.ID}); err != nil {
-			log.Printf("vibevalley: %s could not recall: %v", cue.Agent, err)
-			return Recalled{}
+	return pick(all, pickCue{Session: cue.Session, Project: cue.Project, Text: cue.Text, Skip: cue.Skip, Now: clock.NowMs()})
+}
+
+func (m *memories) markRecalled(ids []string) {
+	now := sql.NullInt64{Int64: clock.NowMs(), Valid: true}
+	for _, id := range ids {
+		if err := m.q.Recalled(context.Background(), generated.RecalledParams{RecalledAt: now, ID: id}); err != nil {
+			log.Printf("vibevalley: a memory was recalled but not marked: %v", err)
+			return
 		}
 	}
-	var out Recalled
-	for _, p := range picked {
-		out.IDs = append(out.IDs, p.ID)
-		out.Lines = append(out.Lines, lineOf(p, cue.Project))
-	}
-	return out
 }
 
 // A stopped run leaves nothing.
@@ -238,25 +230,6 @@ func (m *memories) List(agentID string) []protocol.Memory {
 		all[i].Fading = slices.Contains(fading, all[i].ID)
 	}
 	return all
-}
-
-// What a session of the agent would recall starting a run in project, told text; nothing is counted as recalled.
-func (m *memories) Preview(agentID, project, text string) protocol.RecallPreview {
-	out := protocol.RecallPreview{Lines: []string{}, Limit: recallChars}
-	if project == "" {
-		return out
-	}
-	all, err := m.list(agentID)
-	if err != nil {
-		log.Printf("vibevalley: memories of %s: %v", agentID, err)
-		return out
-	}
-	for _, picked := range pick(all, pickCue{Project: project, Text: text, Now: clock.NowMs()}) {
-		line := lineOf(picked, project)
-		out.Lines = append(out.Lines, line)
-		out.Chars += int64(str.Units(line) + 1)
-	}
-	return out
 }
 
 func (m *memories) Write(agentID, text, project string) (protocol.Memory, error) {
@@ -344,7 +317,7 @@ func (mm *managerMemory) Manager() protocol.MemoryList {
 		memories[len(lines)-1-i] = memoryLineOf(l, at)
 	}
 	file, carried := mm.file(), int64(memoryCarriedLines(lines))
-	return protocol.MemoryList{File: &file, Memories: memories, Carried: &carried}
+	return protocol.MemoryList{File: &file, Memories: memories, Carried: &carried, Sources: []protocol.MemorySourceInfo{}}
 }
 
 var memoryNewlines = regexp.MustCompile(`\s*\n\s*`)

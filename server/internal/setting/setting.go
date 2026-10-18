@@ -28,6 +28,7 @@ type voiceStored struct {
 	Voice               *protocol.SettingsUpdateVoice `json:"voice,omitempty"`
 	DictationKey        string                        `json:"dictationKey,omitempty"`
 	Dictation           *protocol.Dictation           `json:"dictation,omitempty"`
+	MemorySources       []MemorySourceConfig          `json:"memorySources,omitempty"`
 }
 
 func voiceReadSettings(file string) voiceStored {
@@ -118,6 +119,13 @@ func (s *Service) Status() protocol.SettingsStatus {
 	if stored.Dictation != nil {
 		status.Dictation = *stored.Dictation
 	}
+	status.MemorySources = []protocol.MemorySource{}
+	for _, m := range stored.MemorySources {
+		status.MemorySources = append(status.MemorySources, protocol.MemorySource{
+			Kind: m.Kind, URL: m.URL, Enabled: m.Enabled, Read: m.Read, Write: m.Write, Everything: m.Everything,
+			Key: voiceSecret(m.Key, protocol.KeySourceSettings),
+		})
+	}
 	if key, source := s.pick(stored.DeepseekAPIKey, s.config.deepseek); key != "" {
 		status.DeepseekAPIKey = voiceSecret(key, source)
 	}
@@ -162,6 +170,9 @@ func (s *Service) Save(u protocol.SettingsUpdate) (protocol.SettingsStatus, erro
 		if d.URL == "" && d.Model == "" {
 			next.Dictation = nil
 		}
+	}
+	if u.MemorySources != nil {
+		next.MemorySources = memorySourcesOver(next.MemorySources, u.MemorySources)
 	}
 	if u.Voice != nil {
 		kept := voiceOverrides(s.voiceDefaults, voiceSettingsOver(s.voiceDefaults, *u.Voice))
@@ -217,6 +228,12 @@ func (s *Service) Dictation() (DictationConfig, bool) {
 		return DictationConfig{}, false
 	}
 	return DictationConfig{Dictation: *s.stored.Dictation, Key: s.stored.DictationKey}, true
+}
+
+func (s *Service) MemorySources() []MemorySourceConfig {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.stored.MemorySources)
 }
 
 func (s *Service) VoiceConfig() VoiceConfig {

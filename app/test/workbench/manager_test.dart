@@ -25,6 +25,7 @@ SessionEvent _step(double n, SessionEventType kind, String text, {String? input,
 WorkbenchBackend _server() => WorkbenchBackend(
   managerMemory: MemoryList(
     file: '/home/me/.vibevalley/MEMORY.md',
+    sources: const [],
     memories: [
       memory('n1', '提交信息写中文', agent: 'manager', session: 'manager', at: _now),
       memory('n0', '很旧的一条', agent: 'manager', at: _now),
@@ -77,6 +78,7 @@ WorkbenchBackend _server() => WorkbenchBackend(
     ttsKey: const KeyStatus(),
     dictation: const Dictation(url: '', model: ''),
     dictationKey: const KeyStatus(),
+    memorySources: const [],
   ),
 );
 
@@ -198,6 +200,24 @@ void main() {
       final post = server.writes.single;
       expect(post.path, '/api/v1/memories/backend');
       expect(post.body, {'text': '用 pnpm', 'project': 'clock'});
+    });
+
+    testWidgets('MemoryPanel shows where its memories live, and offers to forget only where that can be done', (t) async {
+      final server = _server()
+        ..memorySources['backend'] = const [
+          MemorySourceInfo(name: 'local', label: '本地', on: true, canList: true, canForget: true, transcripts: false),
+          MemorySourceInfo(name: 'nowledge', label: 'Nowledge Mem', on: true, canList: true, canForget: false, transcripts: false),
+        ]
+        ..memories['backend']!.add(
+          const Memory(id: 'nowledge:nm-1', agent: 'backend', kind: MemoryKind.note, text: '部署用 make deploy', at: 0, recalled: 0, source: 'nowledge'),
+        );
+      await pumpPage(t, const SingleChildScrollView(child: MemoryPanel(agent: 'backend')), server.handle);
+      expect(find.textContaining('记性从哪来', findRichText: true), findsOneWidget);
+      expect(find.text('Nowledge Mem'), findsOneWidget);
+      expect(find.text('要删到它那里删'), findsOneWidget);
+      expect(find.text('部署用 make deploy'), findsOneWidget);
+      expect(find.text('在 Nowledge Mem 里'), findsOneWidget);
+      expect(labelled('忘掉'), findsNWidgets(2));
     });
 
     testWidgets('TrajectoryList lists the helpers it sent and opens one', (t) async {

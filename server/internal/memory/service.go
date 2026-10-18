@@ -27,7 +27,7 @@ func (s *Service) MemoriesOf(agent string) protocol.MemoryList {
 	if agent == protocol.ManagerAgent {
 		return s.Manager()
 	}
-	return protocol.MemoryList{Memories: s.List(agent)}
+	return protocol.MemoryList{Memories: s.List(agent), Sources: s.Sources()}
 }
 
 func (s *Service) Remember(agent, text, project string) (protocol.Memory, error) {

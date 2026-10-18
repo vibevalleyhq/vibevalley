@@ -124,6 +124,14 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 
 第 2 步做了：接口多了 `Search`，管理器的 `Search` 并行问所有来源（外面的照样最多等 2 秒），各来源的分数不能比，所以按名次轮流取，几乎一样的（`memoryLikeness` ≥ 0.8）只留一条，默认 10 条；本地的检索是 `recall.go` 的纯函数 `search`（共有的词、整句出现，同项目的在前），等 FTS5 来了换掉。管家的 `memory_search`、`memory_add` 在 `manager/tools.go`，帮工的在 `mcp/mcp.go`，回给模型的话都由 `memory.FoundText` 拼。和提案不一样的：管家的 `memory_add` 只替帮工档案记，管家自己的照旧 `remember`（管家的记性还在 `MEMORY.md`，等[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)第 4 步）；`memory_replace`、`memory_remove` 也等那一步；`SearchQuery` 有 `Kind`，工具还没给模型这个参数。
 
+第 3 步做了：`memory/nowledge.go` 用 go-sdk 的 MCP 客户端（Streamable HTTP，不开常驻的 SSE），第一次用时才连，连不上下次再连；SDK 的请求不随 ctx 结束（它把连接的 ctx 摘开了），所以调用方到点就不等，请求本身由 HTTP 客户端的 30 秒超时收掉。2026-10-18 对主人本机的 Nowledge Mem 0.10.103 只调过 `initialize`、`tools/list` 和只读的 `memory_search`：它有 75 个工具，我们只用 `memory_search`（`query`、`limit` ≤ 20、`filter_labels`、`source_app`；回 `results[]` 的 `memory_id`、`title`、`content_preview`、`relevance_score`）和 `memory_add`（`content`、`title`、`labels`、`source_app`）。来源在设置里（`settings.json` 的 `memorySources`），存了就用上；接口加了 `Can()`，记性页签按它显示，`MemoryList` 多了 `sources`、`Memory` 多了 `source`。抹密钥的规则在 `base/redact.go`，服务端日志（`cmd/server` 的 `log.SetOutput`）和发往外面来源的字都过它：原来服务端日志并没有抹密钥的规则，这一步一起加上。「做到哪了」里的缺口修了：本地来源的 `Prefetch` 不再记想起过，管理器合并以后只给真放进话里的本地记忆记一次；合并也从按分数排改成各来源轮流取，因为各家的分数比不了（本地的是名次，Nowledge 的是 0 到 1）。
+
+和提案不一样的：
+- Nowledge 的范围不用 `agent_id`：试过，它不认识的 agent_id 就退回默认的空间，隔不开档案；改用 label（`vibevalley-agent-<档案>`、`vibevalley-project-<项目>`），读的时候按档案的 label 过滤。主人自己的记忆默认不读，设置里打开「读全部」才读，那时每个档案读到的一样。
+- Nowledge 里的记忆在页签上列得出、忘不掉（`Can().Forget` 是假）：那是主人自己的知识库，农场只往里加，删到 Nowledge Mem 里删。
+- 写进 Nowledge 只在测试里对着假的 MCP 服务端做过（`memory/nowledge_test.go`）；验收里「收工时「记住：」进了 Nowledge、下回 `memory_search` 能取回」，对真的那一家只验证了读的一半（照 `verify-server`，经 `GET /api/v1/memories/{agent}/recall` 读回了它的记忆），写的一半要主人点头再试。
+- 没做 `ConfigSchema`、`ToolSchemas`、`HandleTool`：还没人调；来源自带的工具也就还没法在设置里打开。
+
 ## Alternatives considered
 
 **只能开一个外接来源（Hermes 的做法）。** 它这样限制，是因为每个来源都带自己的工具。我们对 agent 只给一套统一的工具，来源多了工具也不变；而 EverOS 和 Nowledge 主人都要。

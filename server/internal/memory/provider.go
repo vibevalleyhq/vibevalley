@@ -30,6 +30,15 @@ type provider interface {
 	List(ctx context.Context, agent string) ([]protocol.Memory, error)
 	Add(ctx context.Context, n Note) (protocol.Memory, error)
 	Forget(ctx context.Context, agent, id string) error
+	// What the 记性 tab may offer for it.
+	Can() abilities
+}
+
+type abilities struct {
+	List   bool
+	Forget bool
+	// It wants whole runs (EverOS), not only the 「记住：」 lines.
+	Transcripts bool
 }
 
 // One line a provider would have the agent recall, with how good a match it is (only to order lines from several providers).

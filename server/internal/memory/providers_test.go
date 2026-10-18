@@ -3,14 +3,19 @@ package memory
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"vibevalley/internal/protocol"
+	"vibevalley/internal/setting"
+	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
+	"vibevalley/pkg/x/ptr"
 )
 
 // A provider outside the farm, played: what it gives and what it was given.
@@ -22,6 +27,7 @@ type fakeProvider struct {
 	found     []Found
 	slow      bool
 	failSync  bool
+	noForget  bool
 
 	mu       sync.Mutex
 	cues     []RecallCue
@@ -72,9 +78,12 @@ func (f *fakeProvider) Search(ctx context.Context, q SearchQuery) ([]Found, erro
 }
 func (f *fakeProvider) List(context.Context, string) ([]protocol.Memory, error) { return f.listed, nil }
 func (f *fakeProvider) Add(_ context.Context, n Note) (protocol.Memory, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.added = append(f.added, n)
 	return protocol.Memory{ID: "n1"}, nil
 }
+func (f *fakeProvider) Can() abilities { return abilities{List: true, Forget: !f.noForget} }
 func (f *fakeProvider) Forget(_ context.Context, _, id string) error {
 	f.forgot = append(f.forgot, id)
 	return nil
@@ -135,7 +144,7 @@ func TestAnotherProvidersIDsCarryItsName(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := f.Memory.Recall(RecallCue{Agent: "lab", Project: "demo", Text: "测试 提交", Skip: map[string]bool{"nowledge:m1": true, "other:m2": true, local.ID + "x": true}})
-	if got.IDs[0] != "nowledge:m9" || got.Lines[0] != "主人要中文的提交信息" {
+	if len(got.IDs) != 2 || got.IDs[0] != local.ID || got.IDs[1] != "nowledge:m9" || got.Lines[1] != "主人要中文的提交信息" {
 		t.Fatalf("merged %+v", got)
 	}
 	if skip := fake.cues[0].Skip; !reflect.DeepEqual(skip, map[string]bool{"m1": true}) {
@@ -156,27 +165,119 @@ func TestAnotherProvidersIDsCarryItsName(t *testing.T) {
 	}
 }
 
+func (f *fakeProvider) got() ([]FinishedRun, []Note) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.synced), slices.Clone(f.added)
+}
+
 func TestAProviderFailingToKeepLeavesTheOthersTheirs(t *testing.T) {
 	fake := &fakeProvider{name: "everos", available: true, failSync: true}
 	f := withFake(t, fake)
 	run := FinishedRun{Agent: "lab", Session: "w1", Project: "demo", Job: "修登录页", Said: "改好了。\n记住：登录态统一走 refreshSession()", Summary: "改好了", Outcome: protocol.OutcomeCompleted}
 	f.Memory.Keep(run)
-	if len(fake.synced) != 1 || fake.synced[0].Said != run.Said {
-		t.Fatalf("the provider got %+v", fake.synced)
-	}
 	if got := f.Memory.List("lab"); len(got) != 2 {
-		t.Fatalf("kept locally: %+v", got)
+		t.Fatalf("kept locally before Keep returned: %+v", got)
 	}
-	if _, err := f.Memory.Write("lab", "替它记一条", ""); err != nil || len(fake.added) != 1 || fake.added[0].Text != "替它记一条" {
-		t.Fatalf("a note: %v %+v", err, fake.added)
+	synced := testkit.Await(t, "the run at the other provider", func() ([]FinishedRun, bool) {
+		synced, _ := fake.got()
+		return synced, len(synced) == 1
+	})
+	if synced[0].Said != run.Said {
+		t.Fatalf("the provider got %+v", synced)
+	}
+	if _, err := f.Memory.Write("lab", "替它记一条", ""); err != nil {
+		t.Fatal(err)
+	}
+	added := testkit.Await(t, "the note at the other provider", func() ([]Note, bool) {
+		_, added := fake.got()
+		return added, len(added) == 1
+	})
+	if added[0].Text != "替它记一条" {
+		t.Fatalf("a note: %+v", added)
 	}
 }
 
-func TestAProviderThatIsNotSetUpIsLeftOut(t *testing.T) {
-	off := &fakeProvider{name: "off"}
-	p := &providers{all: []provider{off}}
-	if err := p.OnStart(context.Background()); err != nil || off.started || len(p.all) != 0 {
-		t.Fatalf("%v started=%v kept=%d", err, off.started, len(p.all))
+func TestSourcesFollowTheSettings(t *testing.T) {
+	f := memoryWorld(t)
+	fake := &fakeProvider{name: "nowledge"}
+	built := 0
+	f.Memory.build = func(c setting.MemorySourceConfig) provider {
+		built++
+		fake.available = c.URL != "http://down/"
+		return fake
+	}
+	save := func(s protocol.MemorySourceUpdate) {
+		t.Helper()
+		if _, err := f.Setting.Save(protocol.SettingsUpdate{MemorySources: []protocol.MemorySourceUpdate{s}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	save(protocol.MemorySourceUpdate{Kind: protocol.MemorySourceKindNowledge, URL: "http://down/", Enabled: true, Read: true})
+	if err := f.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(f.Close)
+	sources := f.Memory.Sources()
+	if len(sources) != 2 || sources[0].Name != localName || !sources[0].On || sources[1].On || ptr.Value(sources[1].Off) != "no address" {
+		t.Fatalf("sources %+v", sources)
+	}
+	save(protocol.MemorySourceUpdate{Kind: protocol.MemorySourceKindNowledge, URL: "http://up/", Enabled: true, Read: true})
+	if sources := f.Memory.Sources(); !sources[1].On || !fake.started || sources[1].Label != "Nowledge Mem" {
+		t.Fatalf("saved without a restart: %+v", sources)
+	}
+	f.Memory.Sources()
+	if built != 2 {
+		t.Fatalf("built %d times: only a change builds again", built)
+	}
+	save(protocol.MemorySourceUpdate{Kind: protocol.MemorySourceKindNowledge, URL: "http://up/"})
+	if sources := f.Memory.Sources(); sources[1].On || ptr.Value(sources[1].Off) != "没打开" {
+		t.Fatalf("switched off: %+v", sources)
+	}
+}
+
+func TestOnlyWhatIsToldIsCountedAsRecalled(t *testing.T) {
+	words := strings.Fields("alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa")
+	var lines []recalledLine
+	for i := range recallCount {
+		lines = append(lines, recalledLine{ID: fmt.Sprintf("m%d", i), Line: "- （Nowledge）外面的 " + words[i], Score: 1})
+	}
+	f := withFake(t, &fakeProvider{name: "nowledge", available: true, lines: lines})
+	for i := range recallCount {
+		if _, err := f.Memory.Write("lab", "测试用 "+words[recallCount+i], "demo"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := f.Memory.Recall(RecallCue{Agent: "lab", Project: "demo", Text: "测试"})
+	local := 0
+	for _, id := range got.IDs {
+		if !strings.Contains(id, ":") {
+			local++
+		}
+	}
+	if len(got.IDs) != recallCount || local != recallCount/2 {
+		t.Fatalf("recalled %v", got.IDs)
+	}
+	marked := 0
+	for _, m := range f.Memory.memories.List("lab") {
+		if m.Recalled > 0 {
+			marked++
+			if !slices.Contains(got.IDs, m.ID) {
+				t.Fatalf("%s was merged out but marked recalled", m.ID)
+			}
+		}
+	}
+	if marked != local {
+		t.Fatalf("marked %d, told %d", marked, local)
+	}
+}
+
+func TestASourceThatCannotForgetIsNotAsked(t *testing.T) {
+	fake := &fakeProvider{name: "nowledge", available: true, noForget: true}
+	f := withFake(t, fake)
+	var refused protocol.Refused
+	if err := f.Memory.Forget("lab", "nowledge:m1"); !errors.As(err, &refused) || len(fake.forgot) != 0 {
+		t.Fatalf("forgot: %v %v", err, fake.forgot)
 	}
 }
 
@@ -191,7 +292,7 @@ func TestMergingKeepsTheBestOnceWithinTheBudget(t *testing.T) {
 	for _, l := range got {
 		ids = append(ids, l.ID)
 	}
-	if !reflect.DeepEqual(ids, []string{"x:d", "a"}) {
+	if !reflect.DeepEqual(ids, []string{"a", "x:d"}) {
 		t.Fatalf("merged %v", ids)
 	}
 	one := [][]recalledLine{nil, {{ID: "a", Line: long, Score: 1}, {ID: "b", Line: long, Score: 1}}}

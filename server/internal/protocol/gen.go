@@ -754,6 +754,9 @@ func (v MemoryList) MarshalJSON() ([]byte, error) {
 	if p.Memories == nil {
 		p.Memories = []Memory{}
 	}
+	if p.Sources == nil {
+		p.Sources = []MemorySourceInfo{}
+	}
 	return json.Marshal(p)
 }
 
@@ -846,6 +849,18 @@ func (v Run) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(p)
 }
+
+func (v SettingsStatus) MarshalJSON() ([]byte, error) {
+	type plain SettingsStatus
+	p := plain(v)
+	if p.MemorySources == nil {
+		p.MemorySources = []MemorySource{}
+	}
+	return json.Marshal(p)
+}
+
+// MemorySourceKindValues are every MemorySourceKind, in the protocol's order.
+var MemorySourceKindValues = []MemorySourceKind{MemorySourceKindNowledge}
 
 // KeySourceValues are every KeySource, in the protocol's order.
 var KeySourceValues = []KeySource{KeySourceSettings, KeySourceConfig}

@@ -185,3 +185,41 @@ func TestSettingsVoiceVendorKeysAreHints(t *testing.T) {
 		t.Fatalf("bad url: %v", err)
 	}
 }
+
+func TestMemorySourcesKeepTheirKeyUntilCleared(t *testing.T) {
+	home := t.TempDir()
+	s := settingsAt(home)
+	if got := s.Status().MemorySources; got == nil || len(got) != 0 {
+		t.Fatalf("none yet: %#v", got)
+	}
+	nowledge := protocol.MemorySourceUpdate{Kind: protocol.MemorySourceKindNowledge, URL: " http://127.0.0.1:14242/mcp/ ", Enabled: true, Read: true, Write: true, Key: ptr.To("nmem-secret-9876")}
+	after, err := s.Save(protocol.SettingsUpdate{MemorySources: []protocol.MemorySourceUpdate{nowledge}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	voiceSame(t, after.MemorySources[0].Key, voiceHint(protocol.KeySourceSettings, "…9876"), "only the key's end is shown")
+	nowledge.Key, nowledge.Write = nil, false
+	if _, err := s.Save(protocol.SettingsUpdate{MemorySources: []protocol.MemorySourceUpdate{nowledge}}); err != nil {
+		t.Fatal(err)
+	}
+	got := settingsAt(home).MemorySources()
+	if len(got) != 1 || got[0].Key != "nmem-secret-9876" || got[0].URL != "http://127.0.0.1:14242/mcp/" || got[0].Write {
+		t.Fatalf("saved %+v", got)
+	}
+	if _, err := s.Save(protocol.SettingsUpdate{DeepseekAPIKey: ptr.To("sk-other-key-0000")}); err != nil || len(s.MemorySources()) != 1 {
+		t.Fatalf("an update without the list keeps it: %v", err)
+	}
+	if _, err := s.Save(protocol.SettingsUpdate{MemorySources: []protocol.MemorySourceUpdate{}}); err != nil || len(s.MemorySources()) != 0 {
+		t.Fatalf("an empty list clears it: %v", err)
+	}
+}
+
+func TestMemorySourcesProblem(t *testing.T) {
+	on := protocol.MemorySourceUpdate{Kind: protocol.MemorySourceKindNowledge, URL: "http://127.0.0.1:14242/mcp/", Enabled: true}
+	testkit.Eq(t, memorySourcesProblem([]protocol.MemorySourceUpdate{on}), "")
+	testkit.Match(t, memorySourcesProblem([]protocol.MemorySourceUpdate{on, on}), "只能接一个")
+	testkit.Match(t, memorySourcesProblem([]protocol.MemorySourceUpdate{{Kind: "mem0"}}), "不认识")
+	testkit.Match(t, memorySourcesProblem([]protocol.MemorySourceUpdate{{Kind: protocol.MemorySourceKindNowledge, Enabled: true}}), "先填它的地址")
+	testkit.Match(t, memorySourcesProblem([]protocol.MemorySourceUpdate{{Kind: protocol.MemorySourceKindNowledge, URL: "127.0.0.1:14242"}}), "http")
+	testkit.Match(t, settingsProblem(protocol.SettingsUpdate{MemorySources: []protocol.MemorySourceUpdate{{Kind: protocol.MemorySourceKindNowledge, Key: ptr.To("a b")}}}), "空格")
+}

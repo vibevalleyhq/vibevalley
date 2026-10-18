@@ -932,6 +932,8 @@ type Memory struct {
 	RecalledAt *int64     `json:"recalledAt,omitzero"`
 	// Among the first to go if a few more are kept (NextForgotten): the longest unused.
 	Fading bool `json:"fading,omitzero"`
+	// The memory source it is from (MemorySourceInfo.Name); none: this farm's own.
+	Source *string `json:"source,omitzero"`
 }
 
 type MemoryKind string
@@ -948,9 +950,26 @@ type MemoryRequest struct {
 
 type MemoryList struct {
 	Memories []Memory `json:"memories"`
+	// Where an agent's memories live, this farm's own first; the manager's list has none.
+	Sources []MemorySourceInfo `json:"sources"`
 	// The manager's only: the file it reads, and how many of the newest lines its prompt carries.
 	File    *string `json:"file,omitzero"`
 	Carried *int64  `json:"carried,omitzero"`
+}
+
+// One place memories live, as the 记性 tab shows it.
+type MemorySourceInfo struct {
+	// local, or a MemorySourceKind.
+	Name  string `json:"name"`
+	Label string `json:"label"`
+	On    bool   `json:"on"`
+	// Why it is not on.
+	Off *string `json:"off,omitzero"`
+	// It can list an agent's memories, and forget one of them, from here.
+	CanList   bool `json:"canList"`
+	CanForget bool `json:"canForget"`
+	// It is handed whole runs, not only the 「记住：」 lines.
+	Transcripts bool `json:"transcripts"`
 }
 
 type Agent struct {
@@ -1254,17 +1273,49 @@ type ChannelRequest struct {
 }
 
 type SettingsStatus struct {
-	File                string        `json:"file"`
-	DeepseekAPIKey      KeyStatus     `json:"deepseekApiKey"`
-	AgoraAppID          AgoraAppID    `json:"agoraAppId"`
-	AgoraAppCertificate KeyStatus     `json:"agoraAppCertificate"`
-	Voice               VoiceSettings `json:"voice"`
-	VoiceDefaults       VoiceSettings `json:"voiceDefaults"`
-	ASRKey              KeyStatus     `json:"asrKey"`
-	LLMKey              KeyStatus     `json:"llmKey"`
-	TTSKey              KeyStatus     `json:"ttsKey"`
-	Dictation           Dictation     `json:"dictation"`
-	DictationKey        KeyStatus     `json:"dictationKey"`
+	File                string         `json:"file"`
+	DeepseekAPIKey      KeyStatus      `json:"deepseekApiKey"`
+	AgoraAppID          AgoraAppID     `json:"agoraAppId"`
+	AgoraAppCertificate KeyStatus      `json:"agoraAppCertificate"`
+	Voice               VoiceSettings  `json:"voice"`
+	VoiceDefaults       VoiceSettings  `json:"voiceDefaults"`
+	ASRKey              KeyStatus      `json:"asrKey"`
+	LLMKey              KeyStatus      `json:"llmKey"`
+	TTSKey              KeyStatus      `json:"ttsKey"`
+	Dictation           Dictation      `json:"dictation"`
+	DictationKey        KeyStatus      `json:"dictationKey"`
+	MemorySources       []MemorySource `json:"memorySources"`
+}
+
+// A memory service outside the farm it reads and writes beside its own (internal/memory); one of each kind at most.
+type MemorySource struct {
+	Kind    MemorySourceKind `json:"kind"`
+	URL     string           `json:"url"`
+	Enabled bool             `json:"enabled"`
+	// What a run recalls and memory_search also come from it.
+	Read bool `json:"read"`
+	// What is kept also goes to it.
+	Write bool `json:"write"`
+	// Nowledge Mem: read all that is in it, not only what the farm wrote for the profile; every profile then reads the same.
+	Everything bool      `json:"everything,omitzero"`
+	Key        KeyStatus `json:"key"`
+}
+
+type MemorySourceKind string
+
+const (
+	MemorySourceKindNowledge MemorySourceKind = "nowledge"
+)
+
+// A source as the settings page saves it: the key missing keeps the saved one, empty clears it.
+type MemorySourceUpdate struct {
+	Kind       MemorySourceKind `json:"kind"`
+	URL        string           `json:"url"`
+	Enabled    bool             `json:"enabled"`
+	Read       bool             `json:"read"`
+	Write      bool             `json:"write"`
+	Everything bool             `json:"everything,omitzero"`
+	Key        *string          `json:"key,omitzero"`
 }
 
 // Where dictation sends what was said: an OpenAI-compatible transcription endpoint, on this Mac (speech-swift's speech-server) or a
@@ -1312,6 +1363,8 @@ type SettingsUpdate struct {
 	// Whole: it replaces the saved one.
 	Dictation    *Dictation `json:"dictation,omitzero"`
 	DictationKey *string    `json:"dictationKey,omitzero"`
+	// Whole: it replaces the saved list.
+	MemorySources []MemorySourceUpdate `json:"memorySources,omitzero"`
 }
 
 type Health struct {

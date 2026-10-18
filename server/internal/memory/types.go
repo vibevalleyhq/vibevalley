@@ -43,3 +43,9 @@ type Found struct {
 	Source string
 	Score  float64
 }
+
+// What a run recalls: the memories' ids (not to give the same session again) and the lines it is told, as it is told them.
+type Recalled struct {
+	IDs   []string
+	Lines []string
+}

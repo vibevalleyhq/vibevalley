@@ -341,6 +341,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
   final _certificate = TextEditingController();
   TextEditingController? _appId;
   final _cleared = <_Key>{};
+  final _sources = <MemorySourceKind, _SourceDraft>{};
   String? _error;
   bool _saved = false;
   bool _busy = false;
@@ -350,6 +351,9 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
     _deepseek.dispose();
     _certificate.dispose();
     _appId?.dispose();
+    for (final d in _sources.values) {
+      d.dispose();
+    }
     super.dispose();
   }
 
@@ -366,6 +370,21 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
       deepseekApiKey: value(_Key.deepseekApiKey, _deepseek.text),
       agoraAppId: appId != null && appId != (status.agoraAppId.value ?? '') ? appId : (_cleared.contains(_Key.agoraAppId) ? '' : null),
       agoraAppCertificate: value(_Key.agoraAppCertificate, _certificate.text),
+      memorySources: !_sources.values.any((d) => d.changed)
+          ? null
+          : [
+              for (final d in _sources.values)
+                if (d.url.text.trim().isNotEmpty || d.enabled)
+                  MemorySourceUpdate(
+                    kind: d.kind,
+                    url: d.url.text.trim(),
+                    enabled: d.enabled,
+                    read: d.read,
+                    write: d.write,
+                    everything: d.everything ? true : null,
+                    key: d.key.text.trim().isNotEmpty ? d.key.text.trim() : (d.keyCleared ? '' : null),
+                  ),
+            ],
     );
     setState(() {
       _busy = true;
@@ -391,6 +410,10 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
       _appId?.dispose();
       _appId = null;
       _cleared.clear();
+      for (final d in _sources.values) {
+        d.dispose();
+      }
+      _sources.clear();
       _saved = true;
     });
   }
@@ -458,6 +481,14 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
             onClear: () => _clear(_Key.agoraAppCertificate),
             child: _SecretInput(controller: _certificate, placeholder: '不改就空着', label: 'Agora App Certificate', onChanged: changed),
           ),
+          const SizedBox(height: 16),
+          for (final kind in MemorySourceKind.values) ...[
+            _MemorySourceField(
+              draft: _sources[kind] ??= _SourceDraft(kind, status.memorySources.where((m) => m.kind == kind).firstOrNull),
+              onChanged: () => setState(() => _saved = false),
+            ),
+            const SizedBox(height: 16),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 16),
             Text(
@@ -514,6 +545,118 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
   }
 }
 
+const _sourceLabels = {MemorySourceKind.nowledge: 'Nowledge Mem'};
+const _sourceAddress = {MemorySourceKind.nowledge: 'http://127.0.0.1:14242/mcp/'};
+
+/// One memory source as the panel edits it, from what is saved until it is saved again.
+class _SourceDraft {
+  _SourceDraft(this.kind, MemorySource? saved)
+    : url = TextEditingController(text: saved?.url ?? ''),
+      saved = saved,
+      enabled = saved?.enabled ?? false,
+      read = saved?.read ?? true,
+      write = saved?.write ?? true,
+      everything = saved?.everything ?? false;
+  final MemorySourceKind kind;
+  final MemorySource? saved;
+  final TextEditingController url;
+  final key = TextEditingController();
+  bool enabled;
+  bool read;
+  bool write;
+  bool everything;
+  bool keyCleared = false;
+  // Only a source touched is sent: the list goes whole, and an untouched one must not undo a change made elsewhere.
+  bool changed = false;
+  bool open = false;
+
+  void dispose() {
+    url.dispose();
+    key.dispose();
+  }
+}
+
+class _MemorySourceField extends StatelessWidget {
+  const _MemorySourceField({required this.draft, required this.onChanged});
+  final _SourceDraft draft;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = draft;
+    final label = _sourceLabels[d.kind] ?? d.kind.wire;
+    void set(void Function() change) {
+      change();
+      d.changed = true;
+      onChanged();
+    }
+
+    void typed(String _) => set(() {});
+
+    final savedKey = d.saved?.key;
+    if (!d.open) {
+      final saved = d.saved;
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              '记性的来源：$label（${saved == null
+                  ? '没接'
+                  : saved.enabled
+                  ? '接上了'
+                  : '关着'}）',
+              style: const TextStyle(fontFamily: pixelFont, fontSize: 12, color: Palette.bark900),
+            ),
+          ),
+          KitTappable(
+            onTap: () {
+              d.open = true;
+              onChanged();
+            },
+            semanticLabel: '改 $label',
+            builder: (context, _) => const Text(
+              '改',
+              style: TextStyle(
+                fontFamily: pixelFont,
+                fontSize: 12,
+                color: Palette.bark500,
+                decoration: TextDecoration.underline,
+                decorationColor: Palette.bark500,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return _KeyField(
+      label: '记性的来源：$label',
+      help: PxSwitchField(label: '接上', checked: d.enabled, onChanged: (on) => set(() => d.enabled = on)),
+      line: d.keyCleared ? 'key 存的时候清掉' : (savedKey?.source != null ? 'key ${_keyLine(savedKey!)}' : '本机的不用 key'),
+      canClear: savedKey?.source == KeySource.settings && !d.keyCleared,
+      onClear: () => set(() => d.keyCleared = true),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Input(controller: d.url, placeholder: _sourceAddress[d.kind] ?? 'http://…', label: '$label 的地址', onChanged: typed),
+          const SizedBox(height: 4),
+          _SecretInput(controller: d.key, placeholder: 'key（不用或不改就空着）', label: '$label 的 key', onChanged: typed),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              PxSwitchField(label: '读', hint: '开工想起、帮工翻记性时也问它', checked: d.read, onChanged: (on) => set(() => d.read = on)),
+              PxSwitchField(label: '写', hint: '记下的也送一份过去', checked: d.write, onChanged: (on) => set(() => d.write = on)),
+              if (d.kind == MemorySourceKind.nowledge)
+                PxSwitchField(label: '读全部', hint: '不只读农场替帮工记的，主人在里面的记忆每个帮工都读得到', checked: d.everything, onChanged: (on) => set(() => d.everything = on)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Panel extends StatelessWidget {
   const _Panel({required this.child, required this.onClose});
   final Widget child;
@@ -553,7 +696,11 @@ class _Panel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          child,
+          // The memory sources make it taller than a small window: it scrolls instead of pushing 保存 off.
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .7),
+            child: SingleChildScrollView(child: child),
+          ),
         ],
       ),
     ),

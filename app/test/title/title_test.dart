@@ -165,6 +165,30 @@ void main() {
     await unmount(tester);
   });
 
+  testWidgets('设置 connects Nowledge Mem as a memory source', (tester) async {
+    await open(tester);
+    await loadSettings(tester);
+    await tester.tap(find.text('设置'));
+    await tester.pump();
+    expect(find.text('记性的来源：Nowledge Mem（没接）'), findsOneWidget);
+    await tester.tap(find.text('改'));
+    await tester.pump();
+    await tester.enterText(find.bySemanticsLabel('Nowledge Mem 的地址'), 'http://127.0.0.1:14242/mcp/');
+    await tester.tap(find.text('接上'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('保存'));
+    await tester.pump();
+    await tester.tap(find.text('保存'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+    await tester.pump();
+    expect(jsonDecode(server.requests.lastWhere((r) => r.method == 'PUT').body), {
+      'memorySources': [
+        {'kind': 'nowledge', 'url': 'http://127.0.0.1:14242/mcp/', 'enabled': true, 'read': true, 'write': true},
+      ],
+    });
+    await unmount(tester);
+  });
+
   test('the title screen is for the first opening: once the farm was entered, later openings go straight to it', () async {
     SharedPreferences.setMockInitialValues({});
     final first = ProviderContainer(overrides: [serverProvider.overrideWithValue(VibeValleyServer(Uri.parse('http://farm.test')))]);

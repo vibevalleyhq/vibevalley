@@ -2247,6 +2247,7 @@ class Memory {
     required this.recalled,
     this.recalledAt,
     this.fading,
+    this.source,
   });
 
   factory Memory.fromJson(Map<String, dynamic> j) => Memory(
@@ -2260,6 +2261,7 @@ class Memory {
     recalled: (j['recalled'] as num).toDouble(),
     recalledAt: j['recalledAt'] == null ? null : (j['recalledAt'] as num).toDouble(),
     fading: j['fading'] == null ? null : j['fading'] as bool,
+    source: j['source'] == null ? null : j['source'] as String,
   );
 
   final String id;
@@ -2272,6 +2274,7 @@ class Memory {
   final double recalled;
   final double? recalledAt;
   final bool? fading;
+  final String? source;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -2284,6 +2287,7 @@ class Memory {
     'recalled': recalled,
     if (recalledAt != null) 'recalledAt': recalledAt!,
     if (fading != null) 'fading': fading!,
+    if (source != null) 'source': source!,
   };
 }
 
@@ -2310,22 +2314,65 @@ class MemoryRequest {
 }
 
 class MemoryList {
-  const MemoryList({required this.memories, this.file, this.carried});
+  const MemoryList({required this.memories, required this.sources, this.file, this.carried});
 
   factory MemoryList.fromJson(Map<String, dynamic> j) => MemoryList(
     memories: [for (final e in j['memories'] as List) Memory.fromJson(e as Map<String, dynamic>)],
+    sources: [for (final e in j['sources'] as List) MemorySourceInfo.fromJson(e as Map<String, dynamic>)],
     file: j['file'] == null ? null : j['file'] as String,
     carried: j['carried'] == null ? null : (j['carried'] as num).toDouble(),
   );
 
   final List<Memory> memories;
+  final List<MemorySourceInfo> sources;
   final String? file;
   final double? carried;
 
   Map<String, dynamic> toJson() => {
     'memories': [for (final e in memories) e.toJson()],
+    'sources': [for (final e in sources) e.toJson()],
     if (file != null) 'file': file!,
     if (carried != null) 'carried': carried!,
+  };
+}
+
+class MemorySourceInfo {
+  const MemorySourceInfo({
+    required this.name,
+    required this.label,
+    required this.on,
+    this.off,
+    required this.canList,
+    required this.canForget,
+    required this.transcripts,
+  });
+
+  factory MemorySourceInfo.fromJson(Map<String, dynamic> j) => MemorySourceInfo(
+    name: j['name'] as String,
+    label: j['label'] as String,
+    on: j['on'] as bool,
+    off: j['off'] == null ? null : j['off'] as String,
+    canList: j['canList'] as bool,
+    canForget: j['canForget'] as bool,
+    transcripts: j['transcripts'] as bool,
+  );
+
+  final String name;
+  final String label;
+  final bool on;
+  final String? off;
+  final bool canList;
+  final bool canForget;
+  final bool transcripts;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'label': label,
+    'on': on,
+    if (off != null) 'off': off!,
+    'canList': canList,
+    'canForget': canForget,
+    'transcripts': transcripts,
   };
 }
 
@@ -3114,6 +3161,7 @@ class SettingsStatus {
     required this.ttsKey,
     required this.dictation,
     required this.dictationKey,
+    required this.memorySources,
   });
 
   factory SettingsStatus.fromJson(Map<String, dynamic> j) => SettingsStatus(
@@ -3128,6 +3176,7 @@ class SettingsStatus {
     ttsKey: KeyStatus.fromJson(j['ttsKey'] as Map<String, dynamic>),
     dictation: Dictation.fromJson(j['dictation'] as Map<String, dynamic>),
     dictationKey: KeyStatus.fromJson(j['dictationKey'] as Map<String, dynamic>),
+    memorySources: [for (final e in j['memorySources'] as List) MemorySource.fromJson(e as Map<String, dynamic>)],
   );
 
   final String file;
@@ -3141,6 +3190,7 @@ class SettingsStatus {
   final KeyStatus ttsKey;
   final Dictation dictation;
   final KeyStatus dictationKey;
+  final List<MemorySource> memorySources;
 
   Map<String, dynamic> toJson() => {
     'file': file,
@@ -3154,6 +3204,89 @@ class SettingsStatus {
     'ttsKey': ttsKey.toJson(),
     'dictation': dictation.toJson(),
     'dictationKey': dictationKey.toJson(),
+    'memorySources': [for (final e in memorySources) e.toJson()],
+  };
+}
+
+class MemorySource {
+  const MemorySource({
+    required this.kind,
+    required this.url,
+    required this.enabled,
+    required this.read,
+    required this.write,
+    this.everything,
+    required this.key,
+  });
+
+  factory MemorySource.fromJson(Map<String, dynamic> j) => MemorySource(
+    kind: MemorySourceKind.fromJson(j['kind']),
+    url: j['url'] as String,
+    enabled: j['enabled'] as bool,
+    read: j['read'] as bool,
+    write: j['write'] as bool,
+    everything: j['everything'] == null ? null : j['everything'] as bool,
+    key: KeyStatus.fromJson(j['key'] as Map<String, dynamic>),
+  );
+
+  final MemorySourceKind kind;
+  final String url;
+  final bool enabled;
+  final bool read;
+  final bool write;
+  final bool? everything;
+  final KeyStatus key;
+
+  Map<String, dynamic> toJson() => {
+    'kind': kind.wire,
+    'url': url,
+    'enabled': enabled,
+    'read': read,
+    'write': write,
+    if (everything != null) 'everything': everything!,
+    'key': key.toJson(),
+  };
+}
+
+enum MemorySourceKind {
+  nowledge('nowledge');
+
+  const MemorySourceKind(this.wire);
+  final String wire;
+
+  static MemorySourceKind fromJson(Object? v) =>
+      values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('MemorySourceKind: unknown value', v));
+}
+
+class MemorySourceUpdate {
+  const MemorySourceUpdate({required this.kind, required this.url, required this.enabled, required this.read, required this.write, this.everything, this.key});
+
+  factory MemorySourceUpdate.fromJson(Map<String, dynamic> j) => MemorySourceUpdate(
+    kind: MemorySourceKind.fromJson(j['kind']),
+    url: j['url'] as String,
+    enabled: j['enabled'] as bool,
+    read: j['read'] as bool,
+    write: j['write'] as bool,
+    everything: j['everything'] == null ? null : j['everything'] as bool,
+    key: j['key'] == null ? null : j['key'] as String,
+  );
+
+  final MemorySourceKind kind;
+  final String url;
+  final bool enabled;
+  final bool read;
+  final bool write;
+  final bool? everything;
+  final String? key;
+
+  Map<String, dynamic> toJson() => {
+    'kind': kind.wire,
+    'url': url,
+    'enabled': enabled,
+    'read': read,
+    'write': write,
+    if (everything != null) 'everything': everything!,
+    if (key != null) 'key': key!,
   };
 }
 
@@ -3257,6 +3390,7 @@ class SettingsUpdate {
     this.ttsKey,
     this.dictation,
     this.dictationKey,
+    this.memorySources,
   });
 
   factory SettingsUpdate.fromJson(Map<String, dynamic> j) => SettingsUpdate(
@@ -3269,6 +3403,7 @@ class SettingsUpdate {
     ttsKey: j['ttsKey'] == null ? null : j['ttsKey'] as String,
     dictation: j['dictation'] == null ? null : Dictation.fromJson(j['dictation'] as Map<String, dynamic>),
     dictationKey: j['dictationKey'] == null ? null : j['dictationKey'] as String,
+    memorySources: j['memorySources'] == null ? null : [for (final e in j['memorySources'] as List) MemorySourceUpdate.fromJson(e as Map<String, dynamic>)],
   );
 
   final String? deepseekApiKey;
@@ -3280,6 +3415,7 @@ class SettingsUpdate {
   final String? ttsKey;
   final Dictation? dictation;
   final String? dictationKey;
+  final List<MemorySourceUpdate>? memorySources;
 
   Map<String, dynamic> toJson() => {
     if (deepseekApiKey != null) 'deepseekApiKey': deepseekApiKey!,
@@ -3291,6 +3427,7 @@ class SettingsUpdate {
     if (ttsKey != null) 'ttsKey': ttsKey!,
     if (dictation != null) 'dictation': dictation!.toJson(),
     if (dictationKey != null) 'dictationKey': dictationKey!,
+    if (memorySources != null) 'memorySources': [for (final e in memorySources!) e.toJson()],
   };
 }
 

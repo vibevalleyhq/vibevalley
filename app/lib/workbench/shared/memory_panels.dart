@@ -38,7 +38,9 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final list = ref.watch(memoryProvider(widget.agent)).value?.memories;
+    final view = ref.watch(memoryProvider(widget.agent)).value;
+    final list = view?.memories;
+    final sources = {for (final src in view?.sources ?? const <MemorySourceInfo>[]) src.name: src};
     final sessions = {for (final h in ref.watch(stateProvider)?.sessions ?? const <Session>[]) h.id: h.name};
     final now = _now();
     final all = list ?? const <Memory>[];
@@ -47,12 +49,14 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
     final projectsInMemory = {for (final m in all) ?m.project}.toList()..sort();
     final filtered = notes.where((m) => _shown == '' || (_shown == _everywhere ? m.project == null : m.project == _shown)).toList();
     String whose(Memory m) => m.session != null ? '${sessions[m.session] ?? m.session} 记的' : '你记的';
+    MemorySourceInfo? from(Memory m) => m.source == null ? null : sources[m.source];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: _gap([
         Text('这个 agent 派出去的帮工共用一份记性。每一轮开始，和这一轮有关的几条放在它收到的话前面；一轮结束，它在汇报里写的「记住：」那几行，和这件活做到哪了，记进来。', style: _lead),
+        if (sources.length > 1) _SourcesSection(sources: sources.values.toList()),
         WorkbenchSection(
           title: '手上的活',
           count: jobs.length,
@@ -112,24 +116,68 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                 EmptyNote(notes.isNotEmpty ? '这一栏没有。' : '还没记下什么。帮工在汇报里写「记住：」，或者你在上面替它记。')
               else
                 for (final m in filtered)
-                  MemoryItem(
-                    memory: m,
-                    faded: m.fading == true,
-                    onForget: () => runAction(() => ref.read(memoryProvider(widget.agent).notifier).forget(m.id)),
-                    meta: [
-                      m.project ?? '所有项目',
-                      whose(m),
-                      ago(m.at, now),
-                      m.recalled > 0 ? '想起过 ${m.recalled.round()} 次${m.recalledAt != null ? '，上次 ${ago(m.recalledAt!, now)}' : ''}' : '还没想起过',
-                    ],
-                    warning: m.fading == true ? '快忘了：记满 $memoryKeep 条时最先丢' : null,
-                  ),
+                  if (from(m) case final src?)
+                    MemoryItem(
+                      memory: m,
+                      onForget: src.canForget ? () => runAction(() => ref.read(memoryProvider(widget.agent).notifier).forget(m.id)) : null,
+                      meta: ['在 ${src.label} 里', if (!src.canForget) '要删到 ${src.label} 里删'],
+                    )
+                  else
+                    MemoryItem(
+                      memory: m,
+                      faded: m.fading == true,
+                      onForget: () => runAction(() => ref.read(memoryProvider(widget.agent).notifier).forget(m.id)),
+                      meta: [
+                        m.project ?? '所有项目',
+                        whose(m),
+                        ago(m.at, now),
+                        m.recalled > 0 ? '想起过 ${m.recalled.round()} 次${m.recalledAt != null ? '，上次 ${ago(m.recalledAt!, now)}' : ''}' : '还没想起过',
+                      ],
+                      warning: m.fading == true ? '快忘了：记满 $memoryKeep 条时最先丢' : null,
+                    ),
             ],
           ),
         ),
       ]),
     );
   }
+}
+
+/// Where its memories live besides the farm's own, and what each lets the tab do (the server's Can()).
+class _SourcesSection extends StatelessWidget {
+  const _SourcesSection({required this.sources});
+  final List<MemorySourceInfo> sources;
+
+  @override
+  Widget build(BuildContext context) => WorkbenchSection(
+    title: '记性从哪来',
+    count: sources.where((src) => src.on).length,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final src in sources)
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: Palette.cream100,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 2,
+              children: [
+                Text(src.label, style: KitText.sm.copyWith(color: Palette.bark900)),
+                Text(src.on ? '在用' : '没接上：${src.off ?? ''}', style: _meta.copyWith(color: src.on ? Palette.leaf700 : Palette.berry)),
+                if (src.on) ...[
+                  Text(src.canList ? '记下的列在下面' : '不在这里列出', style: _meta),
+                  Text(src.canForget ? '能在这里忘掉' : '要删到它那里删', style: _meta),
+                  if (src.transcripts) Text('收整段干活的对话', style: _meta),
+                ],
+              ],
+            ),
+          ),
+        Text('在开头的「设置」里接上、关掉，或改读写。', style: _meta),
+      ],
+    ),
+  );
 }
 
 /// The pick the server would make, without counting it (agent.recall).
@@ -445,7 +493,8 @@ class _WriteNoteState extends ConsumerState<WriteNote> {
 class MemoryItem extends StatefulWidget {
   const MemoryItem({super.key, required this.memory, required this.onForget, required this.meta, this.faded = false, this.warning});
   final Memory memory;
-  final VoidCallback onForget;
+  // null: the place it lives does not let it be forgotten from here.
+  final VoidCallback? onForget;
   final List<String> meta;
   final bool faded;
 
@@ -487,19 +536,21 @@ class _MemoryItemState extends State<MemoryItem> {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            KitTappable(
-              onTap: widget.onForget,
-              semanticLabel: '忘掉',
-              builder: (context, s) => Opacity(
-                opacity: _hover || s.focused ? 1 : 0,
-                child: Container(
-                  color: s.hovered ? Palette.cream200 : null,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  child: Text('忘掉', style: _meta.copyWith(color: s.hovered ? Palette.berry : Palette.bark500)),
+            if (widget.onForget != null) ...[
+              const SizedBox(width: 8),
+              KitTappable(
+                onTap: widget.onForget,
+                semanticLabel: '忘掉',
+                builder: (context, s) => Opacity(
+                  opacity: _hover || s.focused ? 1 : 0,
+                  child: Container(
+                    color: s.hovered ? Palette.cream200 : null,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    child: Text('忘掉', style: _meta.copyWith(color: s.hovered ? Palette.berry : Palette.bark500)),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

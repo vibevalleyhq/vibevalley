@@ -106,7 +106,7 @@ flowchart LR
 | 文件 | 内容 |
 |---|---|
 | `config.json` | 帮工档案、技能书、每台农机的设置。第一次启动时用 protocol 的种子（`server/internal/protocol/seeds.json`） |
-| `settings.json` | 首页「设置」里存的钥匙和语音设置；只有你能读 |
+| `settings.json` | 首页「设置」里存的钥匙、语音设置和记性的来源（Nowledge Mem 的地址和 key）；只有你能读 |
 | `state.json` | 核心状态，田头、进度、定时和工单除外：帮工、commit 数 |
 | `vibevalley.db` | SQLite：田头、工单和它们的帮工、每次干活（`session_run`）、计划的经过、账本、记性、定时、连接器、院门的设备；运行时新建的行主键是 uuidv7，工单和每条消息另有自己的顺序号（表名是「模块_概念」、单数，结构在 `server/migrations/`：`0001_schema.sql` 和它后面的改动，启动时按名字顺序各跑一次，跑之前把库留一份 `vibevalley.db.v<n>`；库比服务端认识的新就不开）。查询都在 `server/pkg/db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
 | `sessions.json` | 只有服务端需要的：每个帮工的项目目录或 worktree、农机自己的会话 id、最后一轮的完整原话 |

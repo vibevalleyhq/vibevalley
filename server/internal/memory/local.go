@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"vibevalley/internal/protocol"
+	"vibevalley/pkg/x/clock"
 )
 
 // This farm's own memories, in the memory table, picked by recall.go. Always there and always first.
@@ -21,22 +22,24 @@ func (localProvider) Available() (bool, string) { return true, "" }
 func (l localProvider) OnStart(ctx context.Context) error { return l.m.OnStart(ctx) }
 func (l localProvider) OnStop()                           { l.m.OnStop() }
 
-// pick has already ordered and bounded them: the score only keeps that order when lines from several providers meet.
+// pick has already ordered and bounded them; nothing is marked recalled here: the manager marks those kept after merging.
 func (l localProvider) Prefetch(_ context.Context, cue RecallCue) ([]recalledLine, error) {
-	var lines []string
-	var ids []string
+	var picked []protocol.Memory
 	if cue.Peek {
-		lines = l.m.Preview(cue.Agent, cue.Project, cue.Text).Lines
-	} else {
-		found := l.m.Recall(cue)
-		lines, ids = found.Lines, found.IDs
-	}
-	out := make([]recalledLine, len(lines))
-	for i, line := range lines {
-		out[i] = recalledLine{Line: line, Score: float64(len(lines) - i)}
-		if i < len(ids) {
-			out[i].ID = ids[i]
+		if cue.Project == "" {
+			return nil, nil
 		}
+		all, err := l.m.list(cue.Agent)
+		if err != nil {
+			return nil, err
+		}
+		picked = pick(all, pickCue{Project: cue.Project, Text: cue.Text, Now: clock.NowMs()})
+	} else {
+		picked = l.m.recallable(cue)
+	}
+	out := make([]recalledLine, len(picked))
+	for i, m := range picked {
+		out[i] = recalledLine{ID: m.ID, Line: lineOf(m, cue.Project), Score: float64(len(picked) - i)}
 	}
 	return out, nil
 }
@@ -73,3 +76,5 @@ func (l localProvider) Search(_ context.Context, q SearchQuery) ([]Found, error)
 	}
 	return search(all, q), nil
 }
+
+func (localProvider) Can() abilities { return abilities{List: true, Forget: true} }
