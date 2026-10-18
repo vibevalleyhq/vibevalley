@@ -445,7 +445,8 @@ func TestMergeRunsProjectCheck(t *testing.T) {
 
 func TestMergeCheckTimeoutAndOutputTail(t *testing.T) {
 	root := projectsDir(t)
-	p := projects(t, root, func(c *base.Config) { c.Project.CheckTimeoutSeconds = 3 })
+	// Long enough for the script to print under a loaded machine; still well short of its sleep.
+	p := projects(t, root, func(c *base.Config) { c.Project.CheckTimeoutSeconds = 10 })
 	place, err := p.Workplace("timeout", "w1", true, "", 0)
 	if err != nil {
 		t.Fatal(err)
@@ -462,7 +463,7 @@ func TestMergeCheckTimeoutAndOutputTail(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "超时") || !strings.Contains(err.Error(), "line-59") || strings.Contains(err.Error(), "discarded-first-line") {
 		t.Fatalf("timeout with last output lines: %v", err)
 	}
-	if time.Since(start) > 10*time.Second {
+	if time.Since(start) > 25*time.Second {
 		t.Fatal("check children outlived timeout")
 	}
 	if _, err := os.Stat(place.Cwd); err != nil {

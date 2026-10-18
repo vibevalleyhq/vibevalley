@@ -37,6 +37,12 @@ Status: proposed
 - 工单记 PR（链接、编号、状态）。PR 开着时工单是 in_review，帮工不走：按审查意见挪回待办再干一轮，交回来再挪到 done，就推一次更新 PR。
 - 农场隔几分钟用 `gh pr view` 看开着的 PR：合了，工单关成 merged，worktree 清掉，帮工离开；被关掉，算取消。主人的检出从 origin 拉。
 
+### 走第 1、2 步时发现的
+
+- **检查跑的是帮工的分支，不是合并以后的结果。** w3、w4 并行做第 1、2 步，各自过了检查，w4 合进来时 git 自动合并，没人检查合在一起的 main。第 3 步提 PR 时 CI 跑的是合并结果；本地合的项目，检查前先把主分支合进帮工的分支（在它的 worktree 里），检查的就是合并以后的样子。
+- **新克隆的仓库要先装依赖才查得准格式。** `dart format` 从 `.dart_tool/package_config.json` 读语言版本，没跑过 `flutter pub get` 的克隆或 worktree 会按另一种风格排版，误报 18 个文件没格式化。`app/tool/format-check.sh` 先跑 `flutter pub get`。
+- **私有仓库建不了项目。** `project create` 克隆时关掉了凭据（`credential.helper=`），私有仓库一律失败。第 3 步顺手：`gh` 登录了就用 `gh repo clone`。
+
 ## Alternatives considered
 
 **本地合和提 PR 都可选。** 灵活，但两条路各有一套状态和失败方式，主分支有时在本地动、有时在 GitHub 上动，农场的克隆和 origin 迟早分叉。
