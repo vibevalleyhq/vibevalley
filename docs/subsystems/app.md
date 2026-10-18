@@ -29,7 +29,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 ## 模型和不变量
 
 - **服务端是核心状态唯一的持有者。** 客户端经 `GET /api/v1/state` 收整份 `StateFrame`（`state`、`inbox`、`graphs`、`view`、`effects`），状态变了就再推一份，至多每 200 毫秒一份；经 `GET /api/v1/live` 收 `LiveEvent`（干活过程的一步、提醒、农机变了）。客户端不读事实，`/api/v1/events` 留给命令行和调试。
-- **Flutter 不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Schedule.whenText`、`nextText`、`Progress.multiplier`，`{span}` 由客户端按自己的钟填），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agents/check`、新项目会被拒的第一处 `POST /api/v1/projects/check`、设置会被拒的第一处 `POST /api/v1/settings/check`、记性的预览 `GET /api/v1/memories/{agent}/recall`、交代冲突 `POST /api/v1/issues/{id}/resolve`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里。成就表、金币、动作的说法这类两边都要的值经 `seeds.json` 生成进 `lib/gen`。
+- **Flutter 不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Schedule.whenText`、`nextText`、`Progress.multiplier`，`{span}` 由客户端按自己的钟填），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agents/check`、新项目会被拒的第一处 `POST /api/v1/projects/check`、设置会被拒的第一处 `POST /api/v1/settings/check`、记性的预览 `GET /api/v1/memories/{agent}/recall`、交代冲突 `POST /api/v1/issues/{id}/resolve`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里，农机叫什么、长什么样、接受什么在 `RuntimeInfo.preset`、`RuntimeInfo.facts` 里（[档案和农机](docs/subsystems/agent.md)）。成就表和动作的说法还经 `seeds.json` 生成进 `lib/gen`。
 - **`lib/rules/` 只是读帧的纯函数**：哪些频道、未读几条、某档成就叫什么、庄稼熟没熟、能不能收这类，只给页面用，服务端不调，所以只在 Dart 有一份；跟着墙上时钟走的画面（走路、动画、小游戏的局面）也只在 Dart。
 - **只给真实数据。** 没有模拟服务器：连不上就在顶上一条横幅（`shared/connection_banner.dart`）说「连不上 VibeValley 服务端」（「连接到本机」那头的农场说连不上哪台、去「连接到本机」重新配对），每 4 秒问一次 `GET /api/v1/health`，连上自己消失；页面是空的，不换成假数据。
 - **分层**：`lib/` 下每个目录一个 rank，import 只能去 rank 更小的目录，同 rank 的不同目录之间也不行：

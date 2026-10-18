@@ -12,7 +12,6 @@ import '../data/remote.dart' show agentsProvider, runtimesProvider;
 import 'popover.dart';
 import 'quota_pill.dart';
 import '../rules/sessions.dart';
-import '../rules/seeds.dart';
 import './faces.dart';
 import './tags.dart';
 
@@ -271,7 +270,7 @@ class Friend extends ConsumerWidget {
                     children: [
                       Text(agent.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.lg),
                       Text(
-                        '${runtimeName(agent.runtime)}${agent.model.isNotEmpty ? ' · ${agent.model}' : ''}',
+                        '${runtime?.preset.label ?? agent.runtime}${agent.model.isNotEmpty ? ' · ${agent.model}' : ''}',
                         style: KitText.xs.copyWith(color: Palette.bark600),
                       ),
                       Text(
@@ -299,7 +298,7 @@ class Friend extends ConsumerWidget {
                         Tooltip(
                           message: quota.text,
                           child: Text(
-                            '${runtimeName(agent.runtime)}：${quota.text}',
+                            '${runtime?.preset.label ?? agent.runtime}：${quota.text}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: KitText.xs.copyWith(color: Palette.bark500),

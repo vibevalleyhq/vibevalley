@@ -8,7 +8,6 @@ import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/workbench.dart';
 import 'package:vibevalley/rules/quota.dart';
-import 'package:vibevalley/rules/seeds.dart';
 import 'package:vibevalley/rules/money.dart';
 
 Routes backend() {
@@ -35,6 +34,7 @@ Routes backend() {
         ],
       )..addAll({'settings': ?saved}),
       runtimeJson('pi', spentToday: 1.5, dailyBudget: 5),
+      runtimeJson('codex', available: false),
     ],
     'GET /api/v1/agents': (_) => [agentJson('a1', '阿郑', 'claude')],
     'GET /api/v1/skills': (_) => <Object>[],
@@ -52,15 +52,6 @@ void main() {
       expect(yuan(12.345), '¥12.35');
     });
 
-    test('capabilities and presets', () {
-      expect(factsOf('claude').capabilities, RuntimeCapability.values);
-      expect(factsOf('pi').capabilities, [RuntimeCapability.listModels, RuntimeCapability.skills, RuntimeCapability.tools]);
-      expect(factsOf('dsh').capabilities, [RuntimeCapability.listModels]);
-      expect(factsOf('nope').capabilities, isEmpty);
-      expect(runtimeName('claude'), 'Claude Code');
-      expect(runtimeName('mystery'), 'mystery');
-    });
-
     test('resetText', () {
       final now = DateTime(2026, 10, 14, 12);
       expect(resetText(now.millisecondsSinceEpoch - 1.0, now: now), '马上重置');
@@ -74,9 +65,13 @@ void main() {
     final b = backend();
     await pumpPage(t, const RuntimesPage(), b.handle);
     expect(find.text('农具 机器上的编码 agent', findRichText: true), findsOneWidget);
-    for (final p in runtimePresets) {
-      expect(find.text(p.label), findsWidgets);
+    // In runtime.list's order, each under the name it gives.
+    final names = ['Claude Code', 'Pi', 'Codex'];
+    for (final n in names) {
+      expect(find.text(n), findsWidgets);
     }
+    final ys = [for (final n in names) t.getTopLeft(find.text(n).first).dy];
+    expect(ys, [...ys]..sort());
     expect(find.text('1.2.3 · 1 个 agent'), findsOneWidget);
     expect(find.text('没找到'), findsWidgets);
     expect(find.text('Anthropic 的命令行编码 agent。'), findsOneWidget);

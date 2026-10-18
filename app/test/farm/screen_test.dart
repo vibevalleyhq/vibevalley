@@ -73,6 +73,13 @@ void main() {
               AsyncData([
                 RuntimeInfo(
                   id: 'claude',
+                  preset: const RuntimePreset(
+                    id: 'claude',
+                    label: 'claude',
+                    blurb: '',
+                    look: Look(build: Build.biped, head: Head.rounded, body: '#fff', trim: '#000', hat: '#f00', eye: '#0ff'),
+                  ),
+                  facts: const RuntimeFacts(steer: false, refused: {}, capabilities: [], inProcess: false),
                   installation: const InstallationAvailable(via: Via.executable, command: 'claude'),
                   usage: const AccountUsageOk(windows: [UsageWindow(label: '5 小时', usedPercent: 61)]),
                   settings: RuntimeSettings.fromJson(const {

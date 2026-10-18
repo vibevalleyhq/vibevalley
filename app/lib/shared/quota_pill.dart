@@ -9,7 +9,6 @@ import '../ui/kit/kit.dart';
 import '../data/remote.dart' show runtimesProvider;
 import 'popover.dart';
 import '../rules/quota.dart';
-import '../rules/seeds.dart';
 import '../rules/money.dart';
 
 Color _textOf(double? left) => switch (levelOf(left)) {
@@ -126,7 +125,7 @@ class Machine extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    Text(runtimeName(info.id), style: KitText.sm),
+                    Text(info.preset.label, style: KitText.sm),
                     if (usage case AccountUsageOk(:final subscription?)) ...[
                       const SizedBox(width: 6),
                       Flexible(

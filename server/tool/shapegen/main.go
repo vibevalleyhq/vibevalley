@@ -19,8 +19,8 @@
 //
 // The endpoints and their callers also go into docs/reference/capabilities.md.
 //
-// The client's part of seeds.json (the runtimes' presets and facts, the fallback preset) goes into the Dart file too, decoded
-// into the generated types.
+// The client's part of seeds.json (the achievements and the actions' words) goes into the Dart file too, decoded into the
+// generated types.
 //
 // On a Handlers method, a path parameter typed int64 (a *int64 query one) is parsed by Mount: one that is not a number is a
 // 404 (a query one is none), and the Dart client takes a number.
@@ -401,7 +401,7 @@ func (s *shapes) dartConsts() string {
 }
 
 // The keys of seeds.json the client reads.
-var clientSeeds = []string{"achievements", "actionText", "runtimePresets", "runtimeFacts", "fallbackPreset"}
+var clientSeeds = []string{"achievements", "actionText"}
 
 func dartSeeds() string {
 	body, err := os.ReadFile("internal/protocol/seeds.json")
@@ -424,21 +424,14 @@ func dartSeeds() string {
 	if strings.Contains(string(compact), quotes) {
 		fail(fmt.Errorf("seeds.json: %s does not fit in a Dart raw string", quotes))
 	}
-	return "/// From internal/protocol/seeds.json (its achievements, actionText, runtimePresets, runtimeFacts and fallbackPreset), as the server reads them.\n" +
+	return "/// From internal/protocol/seeds.json (its achievements and actionText), as the server reads them.\n" +
 		"final Map<String, dynamic> _seeds = jsonDecode(r" + quotes + string(compact) + quotes + ") as Map<String, dynamic>;\n\n" +
 		"/// In the order the page shows them.\n" +
 		"final List<AchievementDef> achievements = [for (final j in _seeds['achievements'] as List) AchievementDef.fromJson(j as Map<String, dynamic>)];\n\n" +
 		"/// What each action is, in words; the server says them the same way.\n" +
 		"final Map<SessionAction, String> actionText = {\n" +
 		"  for (final e in (_seeds['actionText'] as Map<String, dynamic>).entries) SessionAction.fromJson(e.key): e.value as String,\n" +
-		"};\n\n" +
-		"/// In seeds.json's order.\n" +
-		"final List<RuntimePreset> runtimePresets = [for (final j in _seeds['runtimePresets'] as List) RuntimePreset.fromJson(j as Map<String, dynamic>)];\n\n" +
-		"final Map<String, RuntimeFacts> runtimeFacts = {\n" +
-		"  for (final e in (_seeds['runtimeFacts'] as Map<String, dynamic>).entries) e.key: RuntimeFacts.fromJson(e.value as Map<String, dynamic>),\n" +
-		"};\n\n" +
-		"/// The look of a runtime with none of its own, under that runtime's id and name.\n" +
-		"final RuntimePreset fallbackPreset = RuntimePreset.fromJson(_seeds['fallbackPreset'] as Map<String, dynamic>);"
+		"};"
 }
 
 func slicesContain(xs []string, x string) bool {

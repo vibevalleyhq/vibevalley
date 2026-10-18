@@ -83,6 +83,25 @@ void main() {
       expect(server.agents.map((a) => a.id), contains('created-agent'));
     });
 
+    testWidgets('the runtimes to choose from are runtime.list\'s, named as it names them; a new one takes a persona the way its runtime can', (t) async {
+      final server = _server();
+      server.runtimes.addAll([runtime('cursor'), runtime('codex', available: false)]);
+      await pumpPage(t, const AgentCreatorPage(id: 'new', runtime: 'cursor'), server.handle);
+      expect(find.text('新的 Cursor'), findsWidgets);
+      await t.tap(find.text('能力'));
+      await t.pump();
+      expect(labelled('Claude Code'), findsOneWidget);
+      expect(labelled('Cursor'), findsOneWidget);
+      expect(labelled('Codex'), findsOneWidget);
+      expect(labelled('Kimi'), findsNothing);
+      expect(find.text('这台机器上没有'), findsOneWidget);
+      expect(find.text('Cursor 能做什么'), findsOneWidget);
+      expect(find.textContaining('Cursor 不支持追加系统提示'), findsOneWidget);
+      await t.tap(find.text('捏好了，保存'));
+      await settle(t);
+      expect((server.writes.single.body! as Map<String, dynamic>)['personaMode'], 'prompt');
+    });
+
     testWidgets('editing a saved one marks it unsaved; 保存 sends the edit; the skills tab toggles a skill', (t) async {
       final server = _server();
       await pumpPage(t, const AgentCreatorPage(id: 'backend'), server.handle);

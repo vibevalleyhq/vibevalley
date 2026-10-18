@@ -153,7 +153,7 @@ type AchievementDef struct {
 	Unit  string  `json:"unit,omitzero"`
 }
 
-// A runtime's name, blurb and look in the farm (seeds.json).
+// A runtime's name, blurb and look in the farm (seeds.json); the client reads it off RuntimeInfo.
 type RuntimePreset struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
@@ -161,7 +161,7 @@ type RuntimePreset struct {
 	Look  Look   `json:"look"`
 }
 
-// What a runtime does with a session, from oar (seeds.json).
+// What a runtime does with a session, from oar (seeds.json); the client reads it off RuntimeInfo.
 type RuntimeFacts struct {
 	// A message while it works joins the turn; otherwise it waits for the turn to end.
 	Steer bool `json:"steer"`
@@ -640,18 +640,20 @@ type RuntimeSettings struct {
 }
 
 type RuntimeInfo struct {
-	// Actual adapter refusals plus farm policy; clients do not infer support from seeded labels.
-	Refused      map[string]string `json:"refused,omitzero"`
-	ID           string            `json:"id"`
-	Installation Installation      `json:"installation"`
-	Models       []ModelEntry      `json:"models" vibevalley:"null"`
-	Usage        AccountUsage      `json:"usage" vibevalley:"null"`
-	Skills       []InventoryEntry  `json:"skills" vibevalley:"null"`
-	MCPServers   []InventoryEntry  `json:"mcpServers" vibevalley:"null"`
-	Tools        []InventoryEntry  `json:"tools" vibevalley:"null"`
-	Settings     RuntimeSettings   `json:"settings"`
-	SpentToday   *float64          `json:"spentToday,omitzero"`
-	Quota        *RuntimeQuota     `json:"quota,omitzero"`
+	ID string `json:"id"`
+	// Its name and look (seeds.json's, or the fallback's under its id).
+	Preset RuntimePreset `json:"preset"`
+	// seeds.json's, with Refused the adapter's own refusals and the farm's policy laid over them (refusals).
+	Facts        RuntimeFacts     `json:"facts"`
+	Installation Installation     `json:"installation"`
+	Models       []ModelEntry     `json:"models" vibevalley:"null"`
+	Usage        AccountUsage     `json:"usage" vibevalley:"null"`
+	Skills       []InventoryEntry `json:"skills" vibevalley:"null"`
+	MCPServers   []InventoryEntry `json:"mcpServers" vibevalley:"null"`
+	Tools        []InventoryEntry `json:"tools" vibevalley:"null"`
+	Settings     RuntimeSettings  `json:"settings"`
+	SpentToday   *float64         `json:"spentToday,omitzero"`
+	Quota        *RuntimeQuota    `json:"quota,omitzero"`
 	// Why no new work goes to it now (MoneyStop: quota, balance, the day's budget); empty when work can go.
 	Stop      string `json:"stop,omitzero"`
 	CheckedAt int64  `json:"checkedAt"`

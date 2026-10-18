@@ -9,7 +9,7 @@ import '../shared/rules.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../../shared/work_log.dart';
-import '../../rules/seeds.dart';
+import '../../rules/runtimes.dart';
 
 enum _Tab { who, runtime, persona, skills, tools, env, memory, trajectories }
 
@@ -42,7 +42,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
   Widget build(BuildContext context) {
     final draft = widget.draft;
     final patch = widget.patch;
-    final facts = factsOf(draft.runtime, widget.runtime);
+    final facts = factsOf(widget.runtime);
     final tabs = [
       (_Tab.who, '身份'),
       (_Tab.runtime, '能力'),
@@ -168,7 +168,7 @@ class _RuntimeChoice extends ConsumerWidget {
   final ValueChanged<Agent> patch;
 
   void _choose(String id, RuntimeInfo? info) {
-    final facts = factsOf(id, info);
+    final facts = factsOf(info);
     final cannotTakeSystemPrompt = facts.refused[sessionAppendSystemPrompt] != null || facts.refused[sessionSystemPrompt] != null;
     // A persona the new runtime can't take as a system prompt goes into each job instead.
     patch(
@@ -194,31 +194,30 @@ class _RuntimeChoice extends ConsumerWidget {
             spacing: 6,
             runSpacing: 6,
             children: [
-              for (final p in runtimePresets)
+              for (final info in runtimes)
                 SizedBox(
                   width: w,
                   child: () {
-                    final info = runtimes.where((r) => r.id == p.id).firstOrNull;
-                    final installation = info?.installation;
+                    final installation = info.installation;
                     final available = installation is InstallationAvailable;
-                    final ok = available && info!.settings.enabled;
-                    final active = draft.runtime == p.id;
-                    final status = available ? (info!.settings.enabled ? (installation.version ?? '可用') : '已停用') : '这台机器上没有';
+                    final ok = available && info.settings.enabled;
+                    final active = draft.runtime == info.id;
+                    final status = available ? (info.settings.enabled ? (installation.version ?? '可用') : '已停用') : '这台机器上没有';
                     return WorkbenchChoice(
                       active: active,
-                      onTap: () => _choose(p.id, info),
-                      semanticLabel: p.label,
+                      onTap: () => _choose(info.id, info),
+                      semanticLabel: info.preset.label,
                       padding: const EdgeInsets.all(8),
                       child: Row(
                         children: [
-                          RuntimeIcon(runtime: p.id, size: 32, muted: !ok),
+                          RuntimeIcon(runtime: info.id, size: 32, muted: !ok),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  p.label,
+                                  info.preset.label,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: KitText.sm.copyWith(color: active ? Palette.leaf700 : Palette.bark900),
@@ -251,7 +250,7 @@ List<Widget> _modelAndEffort(Agent draft, RuntimeInfo? runtime, ValueChanged<Age
   final fallback = defaultModel.isNotEmpty ? defaultModel : (models.where((m) => m.isDefault).firstOrNull?.id ?? '');
   final want = draft.model.isNotEmpty ? draft.model : fallback;
   final model = models.where((m) => m.id == want).firstOrNull;
-  final refusedEffort = factsOf(draft.runtime, runtime).refused[sessionEffort];
+  final refusedEffort = factsOf(runtime).refused[sessionEffort];
   final levels = model?.effortLevels ?? const <String>[];
   return [
     PxField(
@@ -288,10 +287,10 @@ class _RuntimeFacts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final facts = factsOf(runtime, info);
+    final facts = factsOf(info);
     final line = KitText.xs.copyWith(color: Palette.bark600);
     return PxCard(
-      title: '${runtimeName(runtime)} 能做什么',
+      title: '${info?.preset.label ?? runtime} 能做什么',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -327,7 +326,7 @@ const _personaModes = [
 ];
 
 List<Widget> _personaEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent> patch) {
-  final facts = factsOf(draft.runtime, runtime);
+  final facts = factsOf(runtime);
   final mode = _personaModes.where((m) => m.value == draft.personaMode).firstOrNull;
   return [
     PxField(
@@ -428,7 +427,7 @@ class _SkillPicker extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
         PxField(
-          label: '${runtimeName(draft.runtime)} 自己装的技能',
+          label: '${runtime?.preset.label ?? draft.runtime} 自己装的技能',
           tip: 'runtime 自己报告的，在这台机器上已经能用，不用在这里勾。',
           child: _Inventory(entries: runtime?.skills),
         ),
@@ -438,7 +437,7 @@ class _SkillPicker extends ConsumerWidget {
 }
 
 List<Widget> _toolsEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent> patch) {
-  final facts = factsOf(draft.runtime, runtime);
+  final facts = factsOf(runtime);
   final mcpRefused = facts.refused[sessionMcpServers];
   final toolsRefused = facts.refused[sessionDisallowedTools];
   final tools = runtime?.tools;
@@ -490,7 +489,7 @@ List<Widget> _toolsEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent>
       ),
     ),
     PxField(
-      label: '${runtimeName(draft.runtime)} 自己连的 MCP',
+      label: '${runtime?.preset.label ?? draft.runtime} 自己连的 MCP',
       tip: 'runtime 自己报告的，和上面加的叠在一起。',
       child: _Inventory(entries: runtime?.mcpServers),
     ),

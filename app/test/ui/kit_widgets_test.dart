@@ -436,6 +436,13 @@ void main() {
       final q = quotaOf(
         RuntimeInfo(
           id: 'x',
+          preset: const RuntimePreset(
+            id: 'x',
+            label: 'x',
+            blurb: '',
+            look: Look(build: Build.biped, head: Head.rounded, body: '#fff', trim: '#000', hat: '#f00', eye: '#0ff'),
+          ),
+          facts: const RuntimeFacts(steer: false, refused: {}, capabilities: [], inProcess: false),
           installation: const InstallationNotFound(),
           usage: const AccountUsageOk(windows: [UsageWindow(label: 'Current session', usedPercent: 20)]),
           settings: RuntimeSettings.fromJson(const {'enabled': true, 'binPath': '', 'defaultModel': '', 'defaultEffort': '', 'env': <String, String>{}}),

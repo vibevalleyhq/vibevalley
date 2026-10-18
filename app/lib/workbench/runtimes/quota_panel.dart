@@ -10,7 +10,6 @@ import '../../data/remote.dart';
 import '../shared/config_problem.dart';
 import 'runtimes_state.dart';
 import '../../rules/quota.dart';
-import '../../rules/seeds.dart';
 import '../../rules/money.dart';
 
 Color quotaInk(double left) => switch (levelOf(left)) {
@@ -100,7 +99,7 @@ class QuotaMachine extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(runtimeName(info.id), style: KitText.sm),
+                    Text(info.preset.label, style: KitText.sm),
                     if (info.usage case AccountUsageOk(:final subscription?)) ...[
                       const SizedBox(width: 6),
                       Flexible(
