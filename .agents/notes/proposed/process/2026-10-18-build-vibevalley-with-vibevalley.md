@@ -10,7 +10,6 @@ Status: proposed
 - 表结构只有一个基线，直接改（[不留兼容](../../implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。`user_version` 数的是文件，基线改了它还是 1：新版本的服务端打开旧库不报错，跑到某条查询才炸。
 - 合并在项目的检出里做：`project.go` 的 `mergeMain` 把检出当前的 HEAD 当主分支，直接在里面 `git merge`，不看工作区干不干净。
 - 合并前不跑检查：普通工单收获时只看冲突，`go test`、`flutter:check`、`docs:verify` 没人跑。
-- 新开的 worktree 什么都没装：没有 `flutter pub get`、`bun install`，帮工一跑检查就失败。
 - 三个渠道原来共用一个工作目录 `~/vibevalley-work`，项目和 worktree 混在一起：两个农场的帮工会在同一份项目里干活。
 
 ## Proposal
@@ -27,11 +26,11 @@ Status: proposed
 
 Alpha 用下来没问题，就用同一个提交打 Beta，换掉旧的。Beta 只在这个时候换，平时不动，所以帮工干到一半不会被重启打断。
 
-光有渠道不够，下面几件要先做，做完再打第一个 Beta：
+光有渠道不够，下面几件要先做。打 Beta 之前，先只用服务端和命令行走通一遍（[先只用服务端和命令行](2026-10-18-a-feature-through-server-and-cli.md)），这几件也在那条路上做：
 
 1. **库认得出自己的表结构**：服务端把 `0001_schema.sql` 的指纹记在库里（比如一张只有一行的 `core_schema` 表）。开机时指纹对不上，就把旧库挪成 `vibevalley.db.<旧指纹>`，按今天的表结构建一个新的，并在日志和田头说一声。旧数据不搬，挪开只是为了能回头看一眼。换 Beta 时工单板和田头会清空，代码和分支都在 git 里，丢不了。改表结构的提交攒着一起换，不要每次都换。
 2. **合并认准主分支、不卷进没提交的改动**：农场的项目是自己的克隆，主人不在里面干活，但直接在项目里干的帮工（不开 worktree 的）会留下改动。主分支用项目定的名字，不用检出当前的 HEAD；合并在没有工作区的地方算（`git merge-tree --write-tree` 加 `commit-tree`，再改 `refs/heads/<主分支>`）。检出停在主分支上时，工作区干净就跟着快进，不干净就不合，说出哪几个文件。冲突照旧交回帮工。
-3. **项目自己的准备和检查命令**：项目设置里加两条命令。准备命令在新 worktree 开好后跑，例如 `cd app && flutter pub get`。检查命令在合并前、帮工的分支变基到主分支以后跑。检查没过就不合，输出交回帮工，和冲突一样处理。heybro 的检查用 `AGENTS.md` 里那几条：`go vet`、`go test`、`go:deadcode`、`flutter:check`、`docs:verify`。
+3. **合并前的检查**：合并前在帮工的分支变基到主分支以后跑项目的检查；没过就不合，输出交回帮工，和冲突一样处理。检查放在哪见[那篇](2026-10-18-a-feature-through-server-and-cli.md)。新开的 worktree 不用另外准备：实测 `flutter analyze` 会自己装依赖，Go 用本机的模块缓存。
 
 ## Alternatives considered
 
