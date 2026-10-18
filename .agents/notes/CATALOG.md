@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（18 篇）
+## proposed（19 篇）
 
 ### feature
 
@@ -27,6 +27,10 @@
 - 2026-10-16 [Run 是一次干活，Session 跨好几次 run，小队（Crew）编排 agent](proposed/architecture/2026-10-16-runs-sessions-crews.md)
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
+
+### process
+
+- 2026-10-18 [用 VibeValley 开发 VibeValley：Beta 干活，源码试改，Alpha 试包](proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
 
 ## implemented（102 篇）
 
