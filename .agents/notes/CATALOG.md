@@ -17,9 +17,9 @@
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](proposed/architecture/2026-10-18-tasks-are-dags.md)
 - 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
 - 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](proposed/architecture/2026-10-18-memory-in-sqlite.md)
+- 2026-10-18 [一块地上几个人一起种](proposed/architecture/2026-10-18-a-crew-on-one-plot.md)
 - 2026-10-17 [Session、Run、事件：一个 agent loop 的日志，和消息之间只有两个口子](proposed/architecture/2026-10-17-session-run-step.md)
 - 2026-10-17 [管家是一份档案，只是能力多](proposed/architecture/2026-10-17-manager-is-an-agent.md)
-- 2026-10-16 [Run 是一次干活，Session 跨好几次 run，小队（Crew）编排 agent](proposed/architecture/2026-10-16-runs-sessions-crews.md)
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
 
@@ -27,7 +27,7 @@
 
 - 2026-10-18 [用 VibeValley 开发 VibeValley](proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
 
-## implemented（111 篇）
+## implemented（112 篇）
 
 ### feature
 
@@ -106,6 +106,7 @@
 - 2026-10-17 [先有能力，再有入口：一张能力表，接口、命令行、院门都从它来](implemented/architecture/2026-10-17-capabilities-before-surfaces.md)
 - 2026-10-17 [接口带版本，都在 /api/v1 下](implemented/architecture/2026-10-17-api-versioned-paths.md)
 - 2026-10-16 [客户端问服务端，不重写它的规则](implemented/architecture/2026-10-16-the-client-asks-the-server.md)
+- 2026-10-16 [Run 是一次干活，Session 跨好几次 run](implemented/architecture/2026-10-16-runs-and-sessions.md)
 - 2026-10-16 [规则跟着它的主人，黄金数据跟着规则](implemented/architecture/2026-10-16-rules-live-with-their-owner.md)
 - 2026-10-16 [一个包一个 Service](implemented/architecture/2026-10-16-one-service-per-package.md)
 - 2026-10-16 [只有一份表结构，不认旧数据](implemented/architecture/2026-10-16-one-schema-no-old-data.md)

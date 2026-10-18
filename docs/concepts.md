@@ -75,4 +75,4 @@ Workspace（工作目录，一张大地图）
 
 核心状态里还混着金币和成就；见[提案](../.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)。
 
-一块地上可以有几个帮工（做过这块地的都在「地上的人」里），锄头在现在干活的那个手上；@ 谁就让谁下地、几个人分工，还没做（[每张工单都有验收](../.agents/notes/implemented/architecture/2026-10-18-every-issue-has-an-acceptance.md)「还没做的」）。
+一块地上可以有几个帮工（做过这块地的都在「地上的人」里），锄头在现在干活的那个手上；@ 谁就让谁下地、几个人分工、派一个看地的，还没做（[一块地上几个人一起种](../.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)）。

@@ -1,6 +1,6 @@
 # 概念在各层的名字
 
-一个概念在每一层叫什么：从农场里看到的，到界面、协议、HTTP、服务端、存储，最后到 oar。概念本身是什么见 [concepts.md](../concepts.md)，叫法见[用语表](../README.md#用语)。小队还没做，见[提案](../../.agents/notes/proposed/architecture/2026-10-16-runs-sessions-crews.md)。
+一个概念在每一层叫什么：从农场里看到的，到界面、协议、HTTP、服务端、存储，最后到 oar。概念本身是什么见 [concepts.md](../concepts.md)，叫法见[用语表](../README.md#用语)。小队还没做，见[提案](../../.agents/notes/implemented/architecture/2026-10-16-runs-and-sessions.md)。
 
 ## 各层
 
