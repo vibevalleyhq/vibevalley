@@ -11,6 +11,7 @@ import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
 import '../../rules/seeds.dart';
+import '../../shared/trajectory.dart';
 import 'agent_config.dart';
 import 'agent_look.dart';
 
@@ -127,6 +128,9 @@ class _CreatorState extends ConsumerState<_Creator> {
   Pose _pose = Pose.idle;
   bool _saving = false;
 
+  /// Its trajectories over the whole page in place of the profile; the draft stays as it was.
+  bool _trajectories = false;
+
   Future<void> _save() async {
     final draft = widget.draft;
     setState(() => _saving = true);
@@ -237,6 +241,41 @@ class _CreatorState extends ConsumerState<_Creator> {
       ),
     );
 
+    if (_trajectories) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            bar,
+            const SizedBox(height: 12),
+            Expanded(
+              child: PxWindow(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        DefaultTextStyle(
+                          style: KitText.sm.copyWith(color: Palette.bark600),
+                          child: InlineLink('← 回到档案', color: Palette.bark600, onTap: () => setState(() => _trajectories = false)),
+                        ),
+                        const SizedBox(width: 12),
+                        const Flexible(child: TrajectoryTitle('轨迹', about: '它派出去的每个帮工，从接活起的每一步：收到的话、用的每个工具（点一行看输入和输出）、说的话。收工以后步骤留 30 天，帮工本身一直列着。')),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(child: TrajectoryList(agent: draft.id)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, box) {
         final wide = box.maxWidth >= 1024;
@@ -246,7 +285,15 @@ class _CreatorState extends ConsumerState<_Creator> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: wide ? MainAxisSize.max : MainAxisSize.min,
             children: [
-              AgentConfigTabs(draft: draft, runtime: runtime, patch: patch, nameTaken: nameTaken, isNew: widget.isNew, fill: wide),
+              AgentConfigTabs(
+                draft: draft,
+                runtime: runtime,
+                patch: patch,
+                nameTaken: nameTaken,
+                isNew: widget.isNew,
+                fill: wide,
+                onTrajectories: () => setState(() => _trajectories = true),
+              ),
               _Issues(issues: issues),
             ],
           ),

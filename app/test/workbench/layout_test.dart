@@ -37,11 +37,13 @@ void main() {
       expect(find.text('后端老周'), findsOneWidget);
 
       await pumpPage(t, const AgentCreatorPage(id: 'backend'), server.handle, size: size);
-      for (final tab in ['能力', '人设', '技能', '工具', '环境', '记性', '轨迹', '身份']) {
+      for (final tab in ['能力', '人设', '技能', '工具', '环境', '记性', '轨迹', '← 回到档案', '身份']) {
         await t.ensureVisible(find.text(tab).last);
         await t.tap(find.text(tab).last);
         await settle(t);
       }
+      await pumpPage(t, const ManagerPage(tab: 'trajectory'), server.handle, size: size);
+      expect(find.text('管家还没开过口。'), findsOneWidget);
       await pumpPage(t, const ManagerPage(), server.handle, size: size);
       expect(find.textContaining('管家开工时'), findsOneWidget);
       await pumpPage(t, const SkillsPage(id: 's'), server.handle, size: size);

@@ -1,31 +1,20 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../ui/theme.dart';
 import '../gen/vibevalley.dart';
 import '../rules/rounds.dart';
 import '../ui/kit/base.dart';
-import '../ui/kit/button.dart';
-import '../ui/kit/field.dart';
 import '../ui/kit/icons.dart';
 import '../ui/kit/labels.dart';
 import '../ui/kit/markdown.dart';
-import '../data/remote.dart';
-import '../data/providers.dart';
 import 'widgets.dart';
 
 const _nearBottom = 48.0;
 
-double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
-
-/// Saves the round its user/message `step` began as a case of the manager's evals; `want` is what it should have done.
-typedef MarkWrong = Future<ManagerEval> Function(int step, String want);
-
 class WorkLog extends StatefulWidget {
-  const WorkLog({super.key, required this.steps, required this.now, this.asked, this.tall = false, this.working = false, this.onMarkWrong});
+  const WorkLog({super.key, required this.steps, required this.now, this.asked, this.tall = false, this.working = false});
   final List<SessionEvent> steps;
   final double now;
 
@@ -34,8 +23,6 @@ class WorkLog extends StatefulWidget {
   final bool tall;
 
   final bool working;
-
-  final MarkWrong? onMarkWrong;
 
   @override
   State<WorkLog> createState() => _WorkLogState();
@@ -50,9 +37,6 @@ class _WorkLogState extends State<WorkLog> {
   final _toggled = <int, bool>{};
 
   int? _marked;
-
-  /// The rounds marked wrong here, by their asked step's `n`: the case's file.
-  final _wrong = <int, String>{};
 
   @override
   void initState() {
@@ -190,15 +174,11 @@ class _WorkLogState extends State<WorkLog> {
   }
 
   Widget _askedView(SessionEvent asked) {
-    final box = Container(
+    return Container(
       color: Palette.wheat.withValues(alpha: .25),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: _Folded(text: asked.text, lines: 4, markdown: false),
     );
-    final mark = widget.onMarkWrong;
-    if (mark == null) return box;
-    final n = asked.seq.round();
-    return _Markable(step: n, send: mark, file: _wrong[n], onMarked: (file) => setState(() => _wrong[n] = file), child: box);
   }
 
   Widget _keyed(SessionEvent step, Widget child) {
@@ -224,125 +204,6 @@ class _WorkLogState extends State<WorkLog> {
       );
     }
     return item;
-  }
-}
-
-bool get _touchOnly => defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android;
-
-/// 这一轮做错了 floats over what began the round.
-class _Markable extends StatefulWidget {
-  const _Markable({required this.step, required this.send, required this.file, required this.onMarked, required this.child});
-  final int step;
-  final MarkWrong send;
-
-  /// The saved case; null until it is marked.
-  final String? file;
-  final ValueChanged<String> onMarked;
-  final Widget child;
-
-  @override
-  State<_Markable> createState() => _MarkableState();
-}
-
-class _MarkableState extends State<_Markable> {
-  bool _hover = false;
-  bool _tapped = false;
-  bool _writing = false;
-  bool _busy = false;
-  String _want = '';
-
-  Future<void> _submit() async {
-    final want = _want.trim();
-    if (want.isEmpty || _busy) return;
-    setState(() => _busy = true);
-    final eval = await runAction(() => widget.send(widget.step, want));
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      if (eval != null) _writing = false;
-    });
-    if (eval != null) widget.onMarked(eval.file);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final file = widget.file;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: Listener(
-        onPointerUp: _touchOnly ? (_) => setState(() => _tapped = true) : null,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              children: [
-                widget.child,
-                if (file == null && !_writing && (_hover || _tapped))
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      color: Palette.cream50,
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SpriteIcon('icon-bug', size: 12),
-                          const SizedBox(width: 4),
-                          InlineLink('这一轮做错了', onTap: () => setState(() => _writing = true)),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            if (file != null)
-              Tooltip(
-                message: file,
-                child: Container(
-                  margin: const EdgeInsets.only(top: 2),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  color: Palette.berry.withValues(alpha: .12),
-                  child: Row(
-                    children: [
-                      const SpriteIcon('icon-bug', size: 12),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text('标成了做错的一轮，存成了一条评测', style: KitText.xs.copyWith(color: Palette.bark800)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (_writing)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: PxTextInput(
-                        value: _want,
-                        onChanged: (v) => setState(() => _want = v),
-                        onSubmitted: (_) => _submit(),
-                        autofocus: true,
-                        enabled: !_busy,
-                        placeholder: '它应该怎样：比如「先问我是哪个项目，别直接派活」',
-                        semanticLabel: '这一轮应该怎样',
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    PxButton.text('记下', tone: PxTone.primary, size: PxSize.sm, onPressed: _busy || _want.trim().isEmpty ? null : _submit),
-                    const SizedBox(width: 6),
-                    PxButton.text('算了', size: PxSize.sm, onPressed: _busy ? null : () => setState(() => _writing = false)),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -702,119 +563,6 @@ class _Pre extends StatelessWidget {
       child: SelectableText(text, style: KitText.mono.copyWith(color: ink, height: 1.625)),
     ),
   );
-}
-
-class TrajectoryLog extends ConsumerWidget {
-  const TrajectoryLog({super.key, required this.id, this.asked, this.empty = '还没有动静。', this.onMarkWrong});
-  final String id;
-  final String? asked;
-  final String empty;
-  final MarkWrong? onMarkWrong;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final log = ref.watch(sessionEventsProvider(id));
-    final steps = log.value;
-    if (steps == null) return EmptyNote(log.hasError ? reasonOf(log.error!) : '在读……');
-    if (steps.isEmpty) return EmptyNote(empty);
-    return WorkLog(steps: steps, now: _now(), asked: asked, tall: true, onMarkWrong: onMarkWrong);
-  }
-}
-
-class TrajectoryList extends ConsumerStatefulWidget {
-  const TrajectoryList({super.key, required this.agent});
-  final String agent;
-
-  @override
-  ConsumerState<TrajectoryList> createState() => _TrajectoryListState();
-}
-
-class _TrajectoryListState extends ConsumerState<TrajectoryList> {
-  List<Session>? _heads;
-  String? _open;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final heads = await runAction(() => ref.read(apiProvider).session.list(agent: widget.agent));
-    if (mounted) setState(() => _heads = heads ?? const []);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final now = _now();
-    final heads = _heads;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('它派出去的每个帮工，从接活起的每一步：收到的话、用的每个工具（点开看输入和输出）、说的话。收工以后步骤留 30 天，帮工本身一直列着。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark600)),
-        const SizedBox(height: 16),
-        if (heads == null)
-          const EmptyNote('在读……')
-        else if (heads.isEmpty)
-          const EmptyNote('还没派出去过。')
-        else
-          for (final h in heads)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Container(
-                color: Palette.cream100,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    KitTappable(
-                      onTap: () => setState(() => _open = _open == h.id ? null : h.id),
-                      selected: _open == h.id,
-                      semanticLabel: h.name,
-                      builder: (context, s) => Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 8,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(h.name, style: KitText.xs.copyWith(color: Palette.bark800)),
-                                if (h.project != null) Text(h.project!, style: KitText.xs.copyWith(color: Palette.bark500)),
-                                Text('${ago(h.hiredAt, now)}接活', style: KitText.xs.copyWith(color: Palette.bark500)),
-                                if (h.endedAt == null)
-                                  const BadgeLabel('在场', hat: true)
-                                else
-                                  Text('${ago(h.endedAt!, now)}走的', style: KitText.xs.copyWith(color: Palette.bark500)),
-                              ],
-                            ),
-                            if (h.brief.isNotEmpty)
-                              Text(
-                                h.brief,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: KitText.sm.copyWith(color: Palette.bark900),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (_open == h.id)
-                      Container(
-                        decoration: const BoxDecoration(
-                          border: Border(top: BorderSide(color: Palette.cream300)),
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        child: TrajectoryLog(id: h.id),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-      ],
-    );
-  }
 }
 
 /// 干活过程 starts folded to one line: the steps are there to look into, not to read through every time.

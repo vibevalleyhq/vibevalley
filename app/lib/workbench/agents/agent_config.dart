@@ -8,7 +8,6 @@ import '../shared/memory_panels.dart';
 import '../shared/rules.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
-import '../../shared/work_log.dart';
 import '../../rules/seeds.dart';
 
 enum _Tab { who, runtime, persona, skills, tools, env, memory, trajectories }
@@ -22,6 +21,7 @@ class AgentConfigTabs extends StatefulWidget {
     required this.nameTaken,
     required this.isNew,
     required this.fill,
+    this.onTrajectories,
   });
   final Agent draft;
   final RuntimeInfo? runtime;
@@ -30,6 +30,9 @@ class AgentConfigTabs extends StatefulWidget {
   final bool isNew;
 
   final bool fill;
+
+  /// 轨迹 is not a tab of its own: it opens over the whole page.
+  final VoidCallback? onTrajectories;
 
   @override
   State<AgentConfigTabs> createState() => _ConfigTabsState();
@@ -51,7 +54,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
       (_Tab.tools, '工具'),
       (_Tab.env, '环境'),
       if (!widget.isNew) (_Tab.memory, '记性'),
-      if (!widget.isNew) (_Tab.trajectories, '轨迹'),
+      if (!widget.isNew && widget.onTrajectories != null) (_Tab.trajectories, '轨迹'),
     ];
     final tab = tabs.any((t) => t.$1 == _tab) ? _tab : _Tab.who;
     final envRefused = facts.refused[sessionEnv];
@@ -131,7 +134,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
         ),
       ],
       _Tab.memory => [MemoryPanel(agent: draft.id)],
-      _Tab.trajectories => [TrajectoryList(agent: draft.id)],
+      _Tab.trajectories => const <Widget>[],
     };
     final panel = Padding(
       padding: const EdgeInsets.all(16),
@@ -147,7 +150,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Palette.cream300)),
       ),
-      child: WorkbenchTabs<_Tab>(value: tab, tabs: tabs, onChanged: (t) => setState(() => _tab = t)),
+      child: WorkbenchTabs<_Tab>(value: tab, tabs: tabs, onChanged: (t) => t == _Tab.trajectories ? widget.onTrajectories?.call() : setState(() => _tab = t)),
     );
     if (!widget.fill) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [head, panel]);
     return Expanded(

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/workbench/manager/manager_page.dart';
 import 'package:vibevalley/workbench/shared/memory_panels.dart';
-import 'package:vibevalley/shared/work_log.dart';
+import 'package:vibevalley/shared/trajectory.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/workbench.dart';
@@ -123,10 +123,11 @@ void main() {
     testWidgets('轨迹 shows the manager\'s steps; a tool opens to its input and output', (t) async {
       final server = _server();
       await pumpPage(t, const ManagerPage(tab: 'trajectory'), server.handle);
-      expect(find.text('收到'), findsOneWidget);
+      expect(find.text('第 1 轮'), findsOneWidget);
       expect(find.text('帮我跑测试'), findsOneWidget);
-      expect(find.text('测试都过了。', findRichText: true), findsOneWidget);
-      await t.tap(find.text('pnpm test'));
+      expect(find.text('测试都过了。'), findsOneWidget);
+      expect(find.text('pnpm test {"command":"pnpm test"} → 12 passed', findRichText: true), findsOneWidget);
+      await t.tap(find.text('pnpm test {"command":"pnpm test"} → 12 passed', findRichText: true));
       await t.pump();
       expect(find.text('\$ pnpm test'), findsOneWidget);
       expect(find.text('12 passed'), findsOneWidget);
@@ -231,10 +232,12 @@ void main() {
 
     testWidgets('TrajectoryList lists the helpers it sent and opens one', (t) async {
       final server = _server();
-      await pumpPage(t, const SingleChildScrollView(child: TrajectoryList(agent: 'backend')), server.handle);
+      await pumpPage(t, const TrajectoryList(agent: 'backend'), server.handle);
       expect(server.calls.first.path, '/api/v1/sessions?agent=backend');
       expect(find.text('老周一号'), findsOneWidget);
-      expect(find.text('改登录'), findsOneWidget);
+      // The latest is open from the start.
+      expect(find.text('工单'), findsOneWidget);
+      expect(find.text('老周一号 · 改登录'), findsOneWidget);
       await t.tap(labelled('老周一号'));
       await settle(t);
       expect(find.text('工单'), findsOneWidget);
