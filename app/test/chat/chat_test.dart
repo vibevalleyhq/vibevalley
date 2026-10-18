@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
+import 'package:vibevalley/data/prefs.dart';
 import 'package:vibevalley/data/server.dart';
 import 'package:vibevalley/workbench/chat/chat_page.dart';
 import 'package:vibevalley/chat/chat_rules.dart';
@@ -18,6 +19,7 @@ import 'package:vibevalley/data/remote.dart' show agentsProvider;
 import 'package:vibevalley/voice/voice.dart';
 import 'package:http/http.dart' as http;
 
+import '../support/farm.dart' show agent;
 import '../support/server.dart' show FakeServer, atlas, jsonResponse;
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -166,7 +168,15 @@ ReceivedFrame _frame(CoreState state) => ReceivedFrame(
   decodeMicros: 0,
 );
 
-Future<void> _pump(WidgetTester t, Widget child, FakeServer server, CoreState state, {Stream<CoreState>? later, bool still = false}) async {
+Future<void> _pump(
+  WidgetTester t,
+  Widget child,
+  FakeServer server,
+  CoreState state, {
+  Stream<CoreState>? later,
+  bool still = false,
+  Map<String, Agent> agents = const {},
+}) async {
   t.view.physicalSize = const Size(1440, 900);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
@@ -181,7 +191,7 @@ Future<void> _pump(WidgetTester t, Widget child, FakeServer server, CoreState st
         stateFrameProvider.overrideWith((ref) => frames()),
         sideEventsProvider.overrideWith((ref) => const Stream<LiveEvent>.empty()),
         atlasProvider.overrideWith((ref) async => atlas),
-        agentsProvider.overrideWithValue(AsyncData(const <String, Agent>{})),
+        agentsProvider.overrideWithValue(AsyncData(agents)),
         apiProvider.overrideWithValue(server.api),
         hostProvider.overrideWithValue(Desktop.none),
       ],
@@ -456,6 +466,21 @@ void main() {
       await t.pump(const Duration(milliseconds: 50));
       expect(find.text('测试小吴的工单串'), findsNothing);
       expect(_rich('农场开门了'), findsOneWidget);
+    });
+
+    testWidgets('a picked helper leaves the field wide: in the narrow window its chip is the head, its name a tooltip', (t) async {
+      final server = FakeServer(_answer);
+      await _pump(t, window(server, _state(), []), server, _state(), agents: {'lab': agent('lab', '后端老周')});
+      ProviderScope.containerOf(t.element(find.byType(ChatWindow))).read(prefsProvider.notifier).setPick('lab');
+      await t.pump(const Duration(milliseconds: 50));
+      expect(find.byTooltip('派给后端老周'), findsOneWidget);
+      expect(find.text('派给后端老周'), findsNothing);
+      final open = t.getSize(find.byType(TextField));
+      expect(open.width, greaterThan(100));
+      await t.tap(find.bySemanticsLabel('收起对话').first);
+      await t.pump(const Duration(milliseconds: 300));
+      expect(t.takeException(), isNull);
+      expect(t.getSize(find.byType(TextField)), open, reason: 'one line of hint, folded or not');
     });
 
     testWidgets('an empty general greets; folding leaves the input row', (t) async {

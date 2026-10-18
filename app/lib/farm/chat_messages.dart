@@ -272,16 +272,19 @@ class ChatThreadChip extends StatelessWidget {
   );
 }
 
+/// Who the next line goes to. [named] shows the name beside the head; without it the name is a tooltip. The composer decides from
+/// its own width, not the screen's: a narrow window on a wide screen must keep its field wide.
 class ChatPickChip extends ConsumerWidget {
-  const ChatPickChip({super.key});
+  const ChatPickChip({super.key, this.named = true});
+
+  final bool named;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pick = ref.watch(prefsProvider).pick;
     final agent = ref.watch(agentsProvider).value?[pick];
     if (pick == 'auto' || agent == null || !agent.enabled) return const SizedBox.shrink();
-    final wide = MediaQuery.sizeOf(context).width >= 640;
-    return Container(
+    final chip = Container(
       height: 32,
       margin: const EdgeInsets.only(right: 4),
       padding: const EdgeInsets.only(left: 2, right: 4),
@@ -290,7 +293,7 @@ class ChatPickChip extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           AgentHead(agent: agent.id, size: 26),
-          if (wide) ...[
+          if (named) ...[
             const SizedBox(width: 4),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 80),
@@ -316,5 +319,6 @@ class ChatPickChip extends ConsumerWidget {
         ],
       ),
     );
+    return named ? chip : Tooltip(message: '派给${agent.name}', child: chip);
   }
 }

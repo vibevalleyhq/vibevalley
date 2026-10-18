@@ -37,6 +37,8 @@ const _body = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 1.625, colo
 
 /// About four lines.
 const _composerMax = 96.0;
+// Below this the picked helper's chip is its head alone: with the name (about 150) the field would go under the width of its hint.
+const _pickNamedFrom = 360.0;
 
 enum ChatPhase { off, connecting, arriving, listening, thinking, speaking, leaving, error }
 
@@ -595,54 +597,58 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
               padding: const EdgeInsets.all(4),
               color: Palette.cream100,
               foregroundDecoration: pxRing,
-              child: Row(
-                children: [
-                  if (thread == null) const ChatPickChip(),
-                  Expanded(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: _composerMax),
-                      child: Focus(
-                        onKeyEvent: (_, e) => _naming.key(e, () => _send(conversation)),
-                        child: TextField(
-                          controller: _naming.text,
-                          focusNode: _naming.focus,
-                          minLines: 1,
-                          maxLines: null,
-                          style: KitText.sm.copyWith(height: 2),
-                          cursorColor: Palette.bark900,
-                          decoration: InputDecoration(
-                            hintText: placeholder,
-                            hintStyle: KitText.sm.copyWith(color: Palette.bark400, height: 2),
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            filled: false,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            semanticCounterText: '',
+              child: LayoutBuilder(
+                builder: (context, box) => Row(
+                  children: [
+                    if (thread == null) ChatPickChip(named: box.maxWidth >= _pickNamedFrom),
+                    Expanded(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: _composerMax),
+                        child: Focus(
+                          onKeyEvent: (_, e) => _naming.key(e, () => _send(conversation)),
+                          child: TextField(
+                            controller: _naming.text,
+                            focusNode: _naming.focus,
+                            minLines: 1,
+                            maxLines: null,
+                            style: KitText.sm.copyWith(height: 2),
+                            cursorColor: Palette.bark900,
+                            decoration: InputDecoration(
+                              hintText: placeholder,
+                              // A hint that wraps grows the field; folded, the window has no room for that.
+                              hintMaxLines: 1,
+                              hintStyle: KitText.sm.copyWith(color: Palette.bark400, height: 2),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              filled: false,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              semanticCounterText: '',
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const ManagerStopButton(size: 24),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: DictationButton(size: 24, controller: _naming.text),
-                  ),
-                  KitTappable(
-                    onTap: empty ? null : () => _send(conversation),
-                    semanticLabel: '发送',
-                    builder: (context, st) => Container(
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      color: st.hovered ? Palette.cream200 : null,
-                      foregroundDecoration: pxRing,
-                      child: Opacity(opacity: empty ? .35 : 1, child: const Glyph('button-send')),
+                    const ManagerStopButton(size: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: DictationButton(size: 24, controller: _naming.text),
                     ),
-                  ),
-                ],
+                    KitTappable(
+                      onTap: empty ? null : () => _send(conversation),
+                      semanticLabel: '发送',
+                      builder: (context, st) => Container(
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.center,
+                        color: st.hovered ? Palette.cream200 : null,
+                        foregroundDecoration: pxRing,
+                        child: Opacity(opacity: empty ? .35 : 1, child: const Glyph('button-send')),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
