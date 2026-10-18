@@ -187,59 +187,61 @@ class _RuntimeChoice extends ConsumerWidget {
     return PxField(
       label: '农机',
       tip: '换农机会清掉模型和推理强度；长相（动物和衣服）不变。',
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final w = (box.maxWidth - 6) / 2;
-          return Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final info in runtimes)
-                SizedBox(
-                  width: w,
-                  child: () {
-                    final installation = info.installation;
-                    final available = installation is InstallationAvailable;
-                    final ok = available && info.settings.enabled;
-                    final active = draft.runtime == info.id;
-                    final status = available ? (info.settings.enabled ? (installation.version ?? '可用') : '已停用') : '这台机器上没有';
-                    return WorkbenchChoice(
-                      active: active,
-                      onTap: () => _choose(info.id, info),
-                      semanticLabel: info.preset.label,
-                      padding: const EdgeInsets.all(8),
-                      child: Row(
-                        children: [
-                          RuntimeIcon(runtime: info.id, size: 32, muted: !ok),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+      child: runtimes.isEmpty
+          ? Text('读取农机…', style: KitText.xs.copyWith(color: Palette.bark500))
+          : LayoutBuilder(
+              builder: (context, box) {
+                final w = (box.maxWidth - 6) / 2;
+                return Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final info in runtimes)
+                      SizedBox(
+                        width: w,
+                        child: () {
+                          final installation = info.installation;
+                          final available = installation is InstallationAvailable;
+                          final ok = available && info.settings.enabled;
+                          final active = draft.runtime == info.id;
+                          final status = available ? (info.settings.enabled ? (installation.version ?? '可用') : '已停用') : '这台机器上没有';
+                          return WorkbenchChoice(
+                            active: active,
+                            onTap: () => _choose(info.id, info),
+                            semanticLabel: info.preset.label,
+                            padding: const EdgeInsets.all(8),
+                            child: Row(
                               children: [
-                                Text(
-                                  info.preset.label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: KitText.sm.copyWith(color: active ? Palette.leaf700 : Palette.bark900),
-                                ),
-                                Text(
-                                  status,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: KitText.fine.copyWith(color: ok ? Palette.bark500 : Palette.berry),
+                                RuntimeIcon(runtime: info.id, size: 32, muted: !ok),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        info.preset.label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: KitText.sm.copyWith(color: active ? Palette.leaf700 : Palette.bark900),
+                                      ),
+                                      Text(
+                                        status,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: KitText.fine.copyWith(color: ok ? Palette.bark500 : Palette.berry),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                          );
+                        }(),
                       ),
-                    );
-                  }(),
-                ),
-            ],
-          );
-        },
-      ),
+                  ],
+                );
+              },
+            ),
     );
   }
 }
@@ -287,10 +289,18 @@ class _RuntimeFacts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final info = this.info;
     final facts = factsOf(info);
     final line = KitText.xs.copyWith(color: Palette.bark600);
+    // What it takes comes with runtime.list: until then, nothing is said rather than a guess.
+    if (info == null) {
+      return PxCard(
+        title: '$runtime 能做什么',
+        child: Text('读取农机…', style: line),
+      );
+    }
     return PxCard(
-      title: '${info?.preset.label ?? runtime} 能做什么',
+      title: '${info.preset.label} 能做什么',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

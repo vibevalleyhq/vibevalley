@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
+import '../data/remote.dart' show achievementsProvider;
 import '../game/commands.dart';
 import '../game/tools.dart';
 import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 import '../shared/popover.dart';
-import '../rules/progress.dart';
 import '../shared/tags.dart';
 
 class Medal extends StatelessWidget {
   const Medal({super.key, required this.achievement, required this.tier, required this.size});
-  final AchievementDef achievement;
+  final Achievement achievement;
   final int tier;
   final double size;
 
@@ -92,6 +92,32 @@ String _day(double at) {
 double? _reachedAt(Progress p, String id, int tier) => p.unlocked.where((u) => u.id == id && u.tier == tier).firstOrNull?.at;
 
 const _tierText = {1: '铜', 2: '银', 3: '金'};
+
+const _categoryText = {
+  AchievementCategory.starter: '新手任务',
+  AchievementCategory.harvest: '收成',
+  AchievementCategory.craft: '手艺',
+  AchievementCategory.thrift: '精打细算',
+  AchievementCategory.team: '协作',
+  AchievementCategory.secret: '彩蛋',
+};
+
+const _emptyProgress = Progress(coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: []);
+
+/// The tier's name; the achievement's own before the first.
+String _tierTitle(Achievement a, int tier) => tier >= 1 && tier <= a.tiers.length ? a.tiers[tier - 1].title : a.title;
+
+/// How far the farm is with each achievement, as the frame's view says; nothing before the first frame.
+class _Standings {
+  _Standings(List<AchievementStanding> list) : _by = {for (final s in list) s.id: s};
+  final Map<String, AchievementStanding> _by;
+
+  ({int tier, int count, int? next}) of(Achievement a) {
+    final s = _by[a.id];
+    return (tier: s?.tier.round() ?? 0, count: s?.count.round() ?? 0, next: s?.next?.round());
+  }
+}
+
 const _pip = {1: Color(0xFFC07A43), 2: Color(0xFFA9B4BF), 3: Palette.wheat};
 
 class Tasks extends ConsumerWidget {
@@ -99,15 +125,17 @@ class Tasks extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final p = ref.watch(stateProvider.select((s) => s?.progress)) ?? emptyProgress;
+    final p = ref.watch(stateProvider.select((s) => s?.progress)) ?? _emptyProgress;
     final level = ref.watch(viewProvider.select((v) => v?.level.level.round())) ?? 1;
-    List<AchievementDef> of(AchievementCategory c) => achievements.where((a) => a.category == c).toList();
+    final catalog = ref.watch(achievementsProvider).value ?? const <Achievement>[];
+    final st = _Standings(ref.watch(viewProvider.select((v) => v?.achievements)) ?? const []);
+    List<Achievement> of(AchievementCategory c) => catalog.where((a) => a.category == c).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const _Standing(),
         const SizedBox(height: 20),
-        _Starter(list: of(AchievementCategory.starter), p: p),
+        _Starter(list: of(AchievementCategory.starter), st: st),
         const SizedBox(height: 20),
         _Heading('开垦'),
         Wrap(
@@ -128,9 +156,9 @@ class Tasks extends ConsumerWidget {
               ),
           ],
         ),
-        for (final c in _walls) ...[const SizedBox(height: 20), _Wall(category: c, list: of(c), p: p)],
+        for (final c in _walls) ...[const SizedBox(height: 20), _Wall(category: c, list: of(c), p: p, st: st)],
         const SizedBox(height: 20),
-        _Secrets(list: of(AchievementCategory.secret), p: p),
+        _Secrets(list: of(AchievementCategory.secret), p: p, st: st),
       ],
     );
   }
@@ -161,7 +189,7 @@ class _Standing extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final p = ref.watch(stateProvider.select((s) => s?.progress)) ?? emptyProgress;
+    final p = ref.watch(stateProvider.select((s) => s?.progress)) ?? _emptyProgress;
     final lv = ref.watch(viewProvider.select((v) => v?.level)) ?? const FarmLevel(level: 1, xp: 0, need: 10);
     final commits = ref.watch(stateProvider.select((s) => s?.commits?.total)) ?? 0;
     final level = lv.level.round();
@@ -225,9 +253,10 @@ class _TitlePicker extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final title = p.title;
-    final worn = title == null ? null : achievementOf(title.id);
+    final catalog = ref.watch(achievementsProvider).value ?? const <Achievement>[];
+    final worn = title == null ? null : catalog.where((a) => a.id == title.id).firstOrNull;
     final earned = [
-      for (final a in achievements.where(isTitle))
+      for (final a in catalog.where((a) => a.wearable))
         for (var i = 0; i < a.tiers.length; i++)
           if (p.unlocked.any((u) => u.id == a.id && u.tier == i + 1)) (a: a, tier: i + 1),
     ];
@@ -261,7 +290,7 @@ class _TitlePicker extends ConsumerWidget {
                     Text('称号', style: KitText.xs.copyWith(color: Palette.bark600)),
                     Text(
                       worn != null && title != null
-                          ? tierTitle(worn, title.tier.round())
+                          ? _tierTitle(worn, title.tier.round())
                           : earned.isNotEmpty
                           ? '挑一个'
                           : '拿到成就就有',
@@ -303,7 +332,7 @@ class _TitlePicker extends ConsumerWidget {
                             Medal(achievement: a, tier: tier, size: 28),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(tierTitle(a, tier), style: KitText.sm.copyWith(color: on ? Palette.leaf700 : null)),
+                              child: Text(_tierTitle(a, tier), style: KitText.sm.copyWith(color: on ? Palette.leaf700 : null)),
                             ),
                             if (on) Semantics(label: '挂着', child: const SpriteIcon('mark-check', size: 14)),
                           ],
@@ -333,13 +362,13 @@ class _TitlePicker extends ConsumerWidget {
 }
 
 class _Starter extends StatelessWidget {
-  const _Starter({required this.list, required this.p});
-  final List<AchievementDef> list;
-  final Progress p;
+  const _Starter({required this.list, required this.st});
+  final List<Achievement> list;
+  final _Standings st;
 
   @override
   Widget build(BuildContext context) {
-    final done = list.where((a) => standing(p, a).tier > 0).length;
+    final done = list.where((a) => st.of(a).tier > 0).length;
     if (done == list.length) {
       return Tinted(
         color: tint(Palette.leaf300, .4),
@@ -355,14 +384,14 @@ class _Starter extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Heading('新手任务 $done/${list.length}', aside: list.isEmpty ? null : '每做完一个 +${tierCoins(list.first, 1)} 金币'),
+        _Heading('新手任务 $done/${list.length}', aside: list.isEmpty ? null : '每做完一个 +${list.first.tiers.first.coins.round()} 金币'),
         _Grid(
           spacing: 6,
           children: [
             for (final a in list)
               Builder(
                 builder: (context) {
-                  final ok = standing(p, a).tier > 0;
+                  final ok = st.of(a).tier > 0;
                   Widget emblem = Image.asset(
                     'assets/pixel/emblem-${a.id}.png',
                     width: 36,
@@ -411,7 +440,7 @@ class _Starter extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const SpriteIcon('icon-coin', size: 16),
-                              Text('+${tierCoins(a, 1)}', style: KitText.xs.copyWith(color: Palette.bark600)),
+                              Text('+${a.tiers.first.coins.round()}', style: KitText.xs.copyWith(color: Palette.bark600)),
                             ],
                           ),
                       ],
@@ -446,34 +475,36 @@ class _Grid extends StatelessWidget {
 }
 
 class _Wall extends StatelessWidget {
-  const _Wall({required this.category, required this.list, required this.p});
+  const _Wall({required this.category, required this.list, required this.p, required this.st});
   final AchievementCategory category;
-  final List<AchievementDef> list;
+  final List<Achievement> list;
   final Progress p;
+  final _Standings st;
 
   @override
   Widget build(BuildContext context) {
-    final got = list.where((a) => standing(p, a).tier > 0).length;
+    final got = list.where((a) => st.of(a).tier > 0).length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Heading('${categoryText[category]} $got/${list.length}'),
+        _Heading('${_categoryText[category]} $got/${list.length}'),
         _Grid(
-          children: [for (final a in list) AchievementCard(a: a, p: p)],
+          children: [for (final a in list) _AchievementCard(a: a, p: p, st: st)],
         ),
       ],
     );
   }
 }
 
-class AchievementCard extends StatelessWidget {
-  const AchievementCard({super.key, required this.a, required this.p});
-  final AchievementDef a;
+class _AchievementCard extends StatelessWidget {
+  const _AchievementCard({required this.a, required this.p, required this.st});
+  final Achievement a;
   final Progress p;
+  final _Standings st;
 
   @override
   Widget build(BuildContext context) {
-    final (:tier, :count, :next) = standing(p, a);
+    final (:tier, :count, :next) = st.of(a);
     final at = tier > 0 ? _reachedAt(p, a.id, tier) : null;
     final unit = a.unit ?? '';
     return Container(
@@ -495,7 +526,7 @@ class AchievementCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        tierTitle(a, tier < 1 ? 1 : tier),
+                        _tierTitle(a, tier < 1 ? 1 : tier),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: KitText.sm.copyWith(color: tier > 0 ? Palette.bark900 : Palette.bark600),
@@ -507,9 +538,9 @@ class AchievementCard extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            for (final (i, need) in a.tiers.indexed)
+                            for (final (i, t) in a.tiers.indexed)
                               Tooltip(
-                                message: '${_tierText[i + 1]}：${numberText(need)} $unit',
+                                message: '${_tierText[i + 1]}：${numberText(t.need)} $unit',
                                 child: Container(width: 8, height: 8, margin: const EdgeInsets.only(left: 4), color: i < tier ? _pip[i + 1] : Palette.cream300),
                               ),
                           ],
@@ -552,21 +583,22 @@ class AchievementCard extends StatelessWidget {
 }
 
 class _Secrets extends StatelessWidget {
-  const _Secrets({required this.list, required this.p});
-  final List<AchievementDef> list;
+  const _Secrets({required this.list, required this.p, required this.st});
+  final List<Achievement> list;
   final Progress p;
+  final _Standings st;
 
   @override
   Widget build(BuildContext context) {
-    final found = list.where((a) => standing(p, a).tier > 0).toList();
+    final found = list.where((a) => st.of(a).tier > 0).toList();
     final left = list.length - found.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Heading('${categoryText[AchievementCategory.secret]} ${found.length}/${list.length}'),
+        _Heading('${_categoryText[AchievementCategory.secret]} ${found.length}/${list.length}'),
         _Grid(
           children: [
-            for (final a in found) AchievementCard(a: a, p: p),
+            for (final a in found) _AchievementCard(a: a, p: p, st: st),
             if (left > 0)
               Container(
                 color: Palette.cream100,

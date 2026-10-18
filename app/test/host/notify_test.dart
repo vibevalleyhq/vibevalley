@@ -76,10 +76,16 @@ void main() {
   });
 
   test('achievements and errors', () {
-    expect(noticeForEffect(const GameEffectAchievement(achievement: 'harvests', tier: 2)), const HostNotice('升到银牌：小有收成', '收进主分支的活', HostOpenAchievements()));
-    expect(noticeForEffect(const GameEffectAchievement(achievement: 'steady', tier: 3))!.title, '升到金牌：金牌稳如老农');
-    expect(noticeForEffect(const GameEffectAchievement(achievement: 's_hire', tier: 1))!.title, '新手任务做完了：派活');
-    expect(noticeForEffect(const GameEffectAchievement(achievement: 'unknown', tier: 1)), isNull);
+    // The words are the server's, as the effect carries them.
+    expect(
+      noticeForEffect(const GameEffectAchievement(achievement: 'harvests', tier: 2, title: '小有收成', reached: '升到银牌', detail: '收进主分支的活', coins: 30)),
+      const HostNotice('升到银牌：小有收成', '收进主分支的活', HostOpenAchievements()),
+    );
+    expect(
+      noticeForEffect(const GameEffectAchievement(achievement: 's_hire', tier: 1, title: '派活', reached: '新手任务做完了', detail: '派出第一个帮工', coins: 20))!.title,
+      '新手任务做完了：派活',
+    );
+    expect(noticeForEffect(const GameEffectLevelUp(level: 2)), isNull);
     expect(noticeForEvent(const LiveEventNotice(at: 0, level: NoticeLevel.error, text: '数据库\n坏了')), const HostNotice('码农场物语', '数据库 坏了'));
     expect(noticeForEvent(const LiveEventNotice(at: 0, level: NoticeLevel.info, text: 'hi')), isNull);
   });

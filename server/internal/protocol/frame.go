@@ -40,6 +40,19 @@ func withWords(state CoreState) CoreState {
 		sessions := slices.Clone(state.Sessions)
 		for i := range sessions {
 			sessions[i].PhaseText = PhaseWords(sessions[i])
+			// The phase and the play are the state's: changed on copies.
+			if p, ok := sessions[i].Phase.Value.(PhaseWorking); ok {
+				p.Doing.ActionText = ActionText[p.Doing.Action]
+				sessions[i].Phase = Phase{p}
+			}
+			if play := sessions[i].Play; play != nil && len(play.History) > 0 {
+				copied := *play
+				copied.History = slices.Clone(play.History)
+				for j := range copied.History {
+					copied.History[j].ActionText = ActionText[copied.History[j].Action]
+				}
+				sessions[i].Play = &copied
+			}
 		}
 		state.Sessions = sessions
 	}

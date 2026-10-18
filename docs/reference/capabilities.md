@@ -100,6 +100,7 @@
 
 | 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
+| `game.achievements` | `GET /api/v1/game/achievements` | ✓ | ✓ |  |  |
 | `game.chooseTitle` | `POST /api/v1/game/title` | ✓ | ✓ |  |  |
 
 ## runtime

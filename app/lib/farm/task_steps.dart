@@ -213,7 +213,7 @@ class NodeCard extends ConsumerWidget {
                   color: Palette.cream50.withValues(alpha: .7),
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                   child: Text(
-                    '${session.name} · 第 ${stationOfSession(session) + 1} 块地${doing != null && doing.action != SessionAction.none ? ' · 在${actionText[doing.action]}' : ''}',
+                    '${session.name} · 第 ${stationOfSession(session) + 1} 块地${doing != null && doing.action != SessionAction.none ? ' · 在${doing.actionText ?? ''}' : ''}',
                     style: KitText.xs.copyWith(color: Palette.bark800),
                   ),
                 ),

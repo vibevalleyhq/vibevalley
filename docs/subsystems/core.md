@@ -36,7 +36,7 @@
 - **一批是一次提交**（`ApplyBatch(facts...)`）：先在局部状态上逐条折、收集 `Transition` 和特效，再一次换掉可见的状态、安排存盘，最后按原顺序逐条发事实、再发特效。每条 `Transition` 的 `After` 是这一条的结果，不是整批的最终状态；`State()` 和 `/state` 只看得到整批。HTTP 的事件格式不变，仍是一条一条的 `Fact`。种植计划的父子工单（`issue.go` 一次写完的那组）走这条路。
 - **一批不代替数据库事务**：拥有者先提交数据库事务，再发核心状态；两者之间的恢复归拥有持久化的那个模块。
 - **主人做了、但不改状态的事不是事实**：看收成清单、语音接上，由经手的服务调 `Core.Did(OwnerDid)`，只有游戏的账本听（`OwnerDids()`）。
-- **给人看的话只在出帧时填**：`FrameOf(state, effects)` 在状态的副本上填帮工在干什么（`phaseText`）、定时什么时候跑、计划和节点的状态、动作叫什么、现在能做什么，再算 `inbox`、`graphs`、`view`；`Reduce` 和 `state.json` 里没有这些话。特效由 `EffectsOf(折之前的状态, fact)` 算。
+- **给人看的话只在出帧时填**：`FrameOf(state, effects)` 在状态的副本上填帮工在干什么（`phaseText`，在做的动作 `Doing.actionText`、这一轮每一步的 `ActionStep.actionText`）、定时什么时候跑、计划和节点的状态、动作叫什么、现在能做什么，再算 `inbox`、`graphs`、`view`（地块、等级、每个成就的进度）；`Reduce` 和 `state.json` 里没有这些话。改的是副本：阶段和 `Play` 的历史复制一份再填，`Transition` 拿着的旧状态不变。特效由 `EffectsOf(折之前的状态, fact)` 算，到一档成就的特效带着它的说法。动作的说法（`seeds.json` 的 `actionText`）客户端没有副本：帧里的这两处，加上干活过程里每个 `tool/call` 写下时带的 `actionText`（[帮工](docs/subsystems/session.md)），就是它全部的来源。
 
 **`state.json`**
 
@@ -115,7 +115,7 @@
 
 - **核心状态只有一份，只因事实而变。** 一个帮工的状态曾经拆在服务端的行、站点里的一份行副本、页面从行推出来的作物、管家读的名册四处：每加一个功能（花费、冲突）就在几处各补一个字段；「没动静」只有管家看得到；冲突标记靠「开始干活时顺手清掉」这种副作用维持；页面比较前后两行来猜「开始了新一轮」。一份状态、一个纯函数折，新加一种状态只在 `shapes.go` 加字段或事实、在 `Reduce` 里折，编译器逼每个视图都处理到；服务端和客户端不会对不上，重启只是读回上一份。放弃了「保留行模型、只补字段」：这正是要解决的问题。代价是拿一个状态要经过 `Reduce`，不能随手改一个字段。
 - **线上发事实，不发 JSON patch。** patch 只说哪个字段变了，看不出发生了什么（开始一轮还是改了标签）；账本、特效、种植计划要的正是「发生了什么」。
-- **Flutter 读折好的帧，不折事实。** 客户端再折一遍就是 Dart 里第二份 `Reduce`，迟早和 Go 的对不上（[客户端迁到 Flutter](docs/subsystems/app.md)）。给人看的话在出帧时填，不进 `Reduce`：话随时会改，存进 `state.json` 就要兼容旧话。
+- **Flutter 读折好的帧，不折事实。** 客户端再折一遍就是 Dart 里第二份 `Reduce`，迟早和 Go 的对不上（[客户端迁到 Flutter](docs/subsystems/app.md)）。给人看的话在出帧时填，不进 `Reduce`：话随时会改，存进 `state.json` 就要兼容旧话。动作的说法也一样在帧里带好，不再由 `shapegen` 把 `seeds.json` 的一份写进客户端：「连接到本机」的设备和服务端版本不同时，客户端那份会和服务端说的不一样。不变的大块说法（成就的定义）不进帧，帧每个事实都出，一次性的接口给一次就够（[游戏](docs/subsystems/game.md)）。
 - **每条事实带自己的前后状态，一批一次提交。** 放弃了「子工单先发、父工单最后发」的约定：排序不能把几次可见的更新变成一次，读的人仍会看见半个计划。放弃了每条事实都附整批的最终状态：第一条事实会背上后面事实的变化，按事件做的规则失去因果。放弃了对外的 `FactBatch` 类型：现有的消费者都认得单条事实，内部的提交和订阅保证就够，不必扩大生成的协议和客户端的类型。
 - **命令走 HTTP，状态走 SSE。** 放弃了 WebSocket：命令已经有类型化的 HTTP 接口，事件只往一个方向走；SSE 重连又从快照开始，不用写补发。放弃了轮询：帮工的动作一秒好几次，轮询要么慢要么费。代价是事件里不能顺带回复命令。三条流分开：`/state` 让客户端不折事实；`/live` 让客户端不必收它用不上的快照和事实；`/events` 保留整份事实流给命令行和调试。
 - **重启不丢农场，也不自动接着干。** 见[帮工](docs/subsystems/session.md#为什么这样)：全部收工丢掉没合的活，自动接着干可能重复执行和花钱。核心状态在这里的部分是：读回 `state.json` 就是重启，不另写一套恢复。
@@ -132,7 +132,7 @@
 ## 怎么验证
 
 - `core`：`core_test.go` 的 `TestStartedAgainFromStateJSON`（读回、通话和管家回到 `idle`、库的部分不进文件）、`TestApplyStampsAndKeepsNoNewsBack`、`TestStatesGatherABurstIntoOneFrame`、`TestContinuousFactsStillReachDisk`；`transitions_test.go` 的 `TestBatchPublishesFinalStateWithPerFactTransitions`；`streams_test.go` 的 `TestNarrowStreamsHideSnapshotAndUnrelatedEvents`。批次和消费者：`go test -race ./internal/core ./internal/game ./internal/task`。
-- `protocol`：`reduce_golden_test.go` 的 `TestReduceGolden`（几千个随机事实逐个比状态、特效和视图）、`rules_core_test.go` 的 `TestTheSameAgainIsNoNews`、`frame_test.go` 的 `TestTheFrameSaysTheWordsOnACopy`、`golden_test.go` 的 `TestStateFrameSample`、`live_test.go` 的 `TestLiveEventKeepsOnlyTheClientsSideEvents`、`streams_test.go` 的 `TestStreamsHaveOneNameAndPathEach`、`mount_test.go` 的 `TestMountKeepsTheContract`、`client_test.go` 的 `TestClientCallsEveryEndpoint`、`client_stream_test.go`。
+- `protocol`：`reduce_golden_test.go` 的 `TestReduceGolden`（几千个随机事实逐个比状态、特效和视图）、`rules_core_test.go` 的 `TestTheSameAgainIsNoNews`、`frame_test.go` 的 `TestTheFrameSaysTheWordsOnACopy`、`game_achievement_test.go` 的 `TestTheFrameSaysWhatEachActionIs`（在做的动作和每一步的说法，状态本身不带）、`golden_test.go` 的 `TestStateFrameSample`、`live_test.go` 的 `TestLiveEventKeepsOnlyTheClientsSideEvents`、`streams_test.go` 的 `TestStreamsHaveOneNameAndPathEach`、`mount_test.go` 的 `TestMountKeepsTheContract`、`client_test.go` 的 `TestClientCallsEveryEndpoint`、`client_stream_test.go`。
 - `handler`：`http_test.go` 的 `TestStreamStopsOnFlushFailure`、`TestStreamDoesNotExpireBetweenWrites`、`TestStreamRejectsUnencodableEvent`、`TestStreamOwnsInitialAndLiveDelivery`；`server_test.go` 的 `TestServerIsReachableBeforeReadyWork`、`TestFailedReadyReleasesTransportAndFarm`；`api_test.go` 的 `TestSaveTakesThePathsID`、`TestChannelCreationReturnsItsIdentity`。
 - 能力表和入口：`go run ./tool/shapegen -check`（`gen.go`、`lib/gen`、`capabilities.md` 最新，没写 `can` 就失败）、`tool/shapegen/routes_test.go` 的 `TestRouteOwnsParameterBindings`、`gate/remote_test.go` 的 `TestRemoteMayFollowsCan`、`cmd/vibevalley/farm_test.go` 的 `TestEveryEndpointHasACommand`、`run_test.go` 的 `TestIssueRunWaitsForTheReview`。
 - 身份和查询：`agent/create_test.go` 的 `TestCreationAllocatesDistinctIdentitiesInsideTheCommit`、`TestCreateRejectsExplicitIdentityButSaveKeepsImportSemantics`；`issue/history_test.go` 的 `TestHistoryReturnsRealSessionsAndExplicitMissingRecords`。

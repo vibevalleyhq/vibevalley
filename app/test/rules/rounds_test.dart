@@ -6,8 +6,20 @@ import 'package:vibevalley/shared/work_log.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/rules/rounds.dart';
 
-SessionEvent step(int n, double at, SessionEventType kind, String text, {ToolAction? action, bool? ok, int? under, String? output}) =>
-    SessionEvent(seq: n.toDouble(), time: at, type: kind, text: text, action: action, ok: ok, under: under?.toDouble(), output: output);
+/// A call says its action in words, as the server writes it.
+const _said = {ToolAction.search: '搜索', ToolAction.runCommand: '跑命令', ToolAction.editFile: '改文件', ToolAction.mcp: '调 MCP 工具'};
+
+SessionEvent step(int n, double at, SessionEventType kind, String text, {ToolAction? action, bool? ok, int? under, String? output}) => SessionEvent(
+  seq: n.toDouble(),
+  time: at,
+  type: kind,
+  text: text,
+  action: action,
+  actionText: _said[action],
+  ok: ok,
+  under: under?.toDouble(),
+  output: output,
+);
 
 final trajectory = [
   step(0, 0, SessionEventType.userMessage, '修登录'),

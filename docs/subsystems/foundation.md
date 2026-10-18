@@ -51,8 +51,8 @@
 **形状和规则**
 
 - **形状和接口只写在 Go**：`shapes.go`（核心状态、事实、事件、帧、请求和回答、两边共用的常量）和 `api.go`（`Handlers`，一个接口一个方法）。Go 的类型系统说不出的用注释指令：`//vibevalley:union`、`member`、`error`、`route`、`can`、`dart`、`const`。字段上 `omitzero` 是可选，指针是可空，切片、表、联合写不成指针的用 `vibevalley:"null"`；别的必填的切片和表，空时写成 `[]`、`{}`。
-- **`tool/shapegen` 用 `go/ast` 读这两个文件**，写出 `gen.go`（联合的编解码和成员表 `XMembers`、枚举的值、错误类型、`Mount`）、`app/lib/gen/vibevalley.dart`（类型、sealed class、`VibeValleyApi`、共用常量、`seeds.json` 里客户端要的部分，经 `dart format`）和 [capabilities.md](docs/reference/capabilities.md)。`-check` 只查是不是最新，`bun run flutter:check` 先跑它。形状里用了它不认识的写法（匿名结构体、别的基本类型），它报错，不猜。Dart 名由 Go 名推出（`MCPServer` → `McpServer`），撞名的用 `//vibevalley:dart`。Dart 的数字一律是 `double`。
-- **生成的不手改**：`gen.go`、`lib/gen/`、`capabilities.md`、`pkg/db/generated/`。`seeds.json` 是直接改的数据文件。
+- **`tool/shapegen` 用 `go/ast` 读这两个文件**，写出 `gen.go`（联合的编解码和成员表 `XMembers`、枚举的值、错误类型、`Mount`）、`app/lib/gen/vibevalley.dart`（类型、sealed class、`VibeValleyApi`、共用常量，经 `dart format`；`seeds.json` 不进客户端，它的说法和名字随接口和帧给）和 [capabilities.md](docs/reference/capabilities.md)。`-check` 只查是不是最新，`bun run flutter:check` 先跑它。形状里用了它不认识的写法（匿名结构体、别的基本类型），它报错，不猜。Dart 名由 Go 名推出（`MCPServer` → `McpServer`），撞名的用 `//vibevalley:dart`。Dart 的数字一律是 `double`。
+- **生成的不手改**：`gen.go`、`lib/gen/`、`capabilities.md`、`pkg/db/generated/`。`seeds.json` 是直接改的数据文件，只有服务端读。
 - **要每种都处理的地方穷尽**：Go 的编译器不查类型 `switch` 漏没漏成员，用生成的成员表写测试（`agent` 的 `TestProfileSnapshotCoversEveryMCPMember`）；Dart 的 sealed class 由编译器查。
 - **规则在它的主人那里**：核心状态的折法（`Reduce`、`FrameOf`）和它用到的、几个包都用的规则在 `protocol`；只有一个包用的在那个包里、不导出：`connector/text.go`、`setting/rules.go`、`memory/recall.go`、`runtime/rules.go`、`runtime/quota.go`、`manager/words.go`、`manager/patrol_rules.go`、`channel/rules.go`、`game/progress.go`、`task/rules.go`、`issue/rules.go`、`schedule/rules.go`。别的包要用一条单一主人的规则，问它的服务（`runtime.Check`），或者挪回 `protocol`。留在 `protocol` 的单一用户函数都有理由：核心状态的初值和折法要用的、种子和默认值（`DefaultVoice`）、和别的规则共用解析的。
 - **黄金数据跟着规则**：每个有规则的包有 `testdata/*.jsonl.gz`（成千上万条带种子的随机输入和结果）和 `TestRulesGolden`，经 `golden.Rules` 逐条比。黄金数据守折法和大量组合的规则，不是一段代码存在的理由：服务端不调、只被它录着的函数，`go:deadcode` 报。

@@ -127,7 +127,6 @@ type RecallPreview struct {
 	Limit int64    `json:"limit"`
 }
 
-// An achievement as seeds.json defines it.
 type AchievementCategory string
 
 const (
@@ -139,6 +138,7 @@ const (
 	AchievementCategorySecret  AchievementCategory = "secret"
 )
 
+// An achievement as seeds.json defines it; the client gets it in words (Achievement).
 type AchievementDef struct {
 	ID       string              `json:"id"`
 	Category AchievementCategory `json:"category"`
@@ -151,6 +151,40 @@ type AchievementDef struct {
 	// What reaching each tier pays, one for each of Tiers.
 	Coins []int64 `json:"coins"`
 	Unit  string  `json:"unit,omitzero"`
+}
+
+// An achievement as the page shows it (game.achievements, in the page's order): its definition with each tier in words.
+// The same for every frame; how far the farm is with it is FarmView.Achievements.
+type Achievement struct {
+	ID       string              `json:"id"`
+	Category AchievementCategory `json:"category"`
+	Title    string              `json:"title"`
+	Detail   string              `json:"detail"`
+	Unit     string              `json:"unit,omitzero"`
+	// Its tiers can be worn as a title (game.chooseTitle): any but a starter task's.
+	Wearable bool `json:"wearable"`
+	// Bronze, silver and gold; one for a one-off.
+	Tiers []AchievementTier `json:"tiers"`
+}
+
+type AchievementTier struct {
+	// The count it takes.
+	Need int64 `json:"need"`
+	// Its name, worn as a title: seeds.json's tierTitles, else 银牌 or 金牌 before the achievement's.
+	Title string `json:"title"`
+	Coins int64  `json:"coins"`
+	// What reaching it is called (解锁成就, 升到银牌, 新手任务做完了, 发现一个彩蛋).
+	Reached string `json:"reached"`
+}
+
+// How far the farm is with one achievement, from the ledger's progress.
+type AchievementStanding struct {
+	ID string `json:"id"`
+	// The highest tier reached; 0: none yet.
+	Tier  int64 `json:"tier"`
+	Count int64 `json:"count"`
+	// What the next tier takes; none once all are reached.
+	Next *int64 `json:"next,omitzero"`
 }
 
 // A runtime's name, blurb and look in the farm (seeds.json); the client reads it off RuntimeInfo.
@@ -314,6 +348,8 @@ const (
 type Doing struct {
 	Action SessionAction `json:"action"`
 	Label  string        `json:"label"`
+	// Action in words (ActionText), filled by FrameOf: in frames only.
+	ActionText string `json:"actionText,omitzero"`
 }
 
 //vibevalley:union _tag
@@ -335,6 +371,8 @@ type ActionStep struct {
 	At     int64         `json:"at"`
 	Action SessionAction `json:"action"`
 	Label  string        `json:"label"`
+	// Action in words (ActionText), filled by FrameOf: in frames only.
+	ActionText string `json:"actionText,omitzero"`
 }
 
 type SessionPlay struct {
@@ -575,10 +613,12 @@ type SessionEvent struct {
 	Under  *int64           `json:"under,omitzero"`
 	Text   string           `json:"text"`
 	Action *ToolAction      `json:"action,omitzero"`
-	Tool   *string          `json:"tool,omitzero"`
-	Input  *string          `json:"input,omitzero"`
-	Output *string          `json:"output,omitzero"`
-	Ok     *bool            `json:"ok,omitzero"`
+	// On a tool/call: its Action in words (ActionText).
+	ActionText *string `json:"actionText,omitzero"`
+	Tool       *string `json:"tool,omitzero"`
+	Input      *string `json:"input,omitzero"`
+	Output     *string `json:"output,omitzero"`
+	Ok         *bool   `json:"ok,omitzero"`
 	// On an llm/usage.
 	Tokens *EventTokens `json:"tokens,omitzero"`
 }
@@ -733,6 +773,8 @@ type FarmView struct {
 	Level FarmLevel `json:"level"`
 	// A plot is an issue being worked: keyed by its issue (PlotKey), whoever works it now.
 	Plots map[string]PlotView `json:"plots"`
+	// Each achievement, in the page's order (game.achievements).
+	Achievements []AchievementStanding `json:"achievements"`
 }
 
 //vibevalley:union kind
@@ -1678,6 +1720,13 @@ type GameEffectLevelUp struct {
 type GameEffectAchievement struct {
 	Achievement string `json:"achievement"`
 	Tier        int64  `json:"tier"`
+	// The tier's, in words (AchievementTier), and the achievement's detail.
+	Title   string `json:"title"`
+	Reached string `json:"reached"`
+	Detail  string `json:"detail"`
+	Coins   int64  `json:"coins"`
+	// A one-off's medal is gold.
+	OneOff bool `json:"oneOff,omitzero"`
 }
 
 //vibevalley:member LedgerEntry harvested

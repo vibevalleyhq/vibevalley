@@ -10,7 +10,6 @@ import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
 import '../voice/voice.dart';
 import '../ui/medals.dart';
-import '../rules/progress.dart';
 
 /// The debug console's 升一级 and 弹一个成就.
 final localEffects = StreamController<GameEffect>.broadcast();
@@ -36,20 +35,16 @@ Stream<GameEffect> farmEffects(VibeValleyServer server) {
 
 const clearingLevels = {5, 8, 12};
 
-typedef Earned = ({String achievement, int tier});
-
 Widget? Function(ToastData) toastLeading(SpriteAtlas? atlas) => (toast) {
   final data = toast.data;
-  if (toast.type != ToastType.achievement || data is! Earned || atlas == null) return null;
-  final a = achievementOf(data.achievement);
-  return a == null ? null : EarnedMedal(atlas: atlas, achievement: a, tier: data.tier);
+  if (toast.type != ToastType.achievement || data is! GameEffectAchievement || atlas == null) return null;
+  return EarnedMedal(atlas: atlas, achievement: data.achievement, tier: data.tier.round(), oneOff: data.oneOff ?? false);
 };
 
 String? toastKicker(ToastData toast) {
   final data = toast.data;
-  if (toast.type != ToastType.achievement || data is! Earned) return null;
-  final a = achievementOf(data.achievement);
-  return a == null ? null : earnedText(a, data.tier);
+  if (toast.type != ToastType.achievement || data is! GameEffectAchievement) return null;
+  return data.reached;
 }
 
 class FxLayer extends ConsumerStatefulWidget {
@@ -126,18 +121,15 @@ class _FxLayerState extends ConsumerState<FxLayer> {
         break;
       case GameEffectLevelUp(:final level):
         setState(() => _banner = (id: ++_bannerId, level: level.round()));
-      case GameEffectAchievement(:final achievement, :final tier):
-        final a = achievementOf(achievement);
-        final t = tier.round();
-        if (a != null) {
-          _toasts.add(
-            type: ToastType.achievement,
-            title: tierTitle(a, t),
-            description: '${a.detail} · +${tierCoins(a, t)} 金币',
-            timeout: const Duration(milliseconds: 5000),
-            data: (achievement: a.id, tier: t),
-          );
-        }
+      case GameEffectAchievement(:final title, :final detail, :final coins):
+        // The words are the server's (the effect carries them).
+        _toasts.add(
+          type: ToastType.achievement,
+          title: title,
+          description: '$detail · +${coins.round()} 金币',
+          timeout: const Duration(milliseconds: 5000),
+          data: f,
+        );
     }
   }
 

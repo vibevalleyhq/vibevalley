@@ -49,6 +49,7 @@ VillageData _farm() {
       'tw6': const PlotView(crop: Crop.flowering),
       'tw7': const PlotView(crop: Crop.empty),
     },
+    achievements: const [],
   );
   return VillageData(state, view, const {});
 }

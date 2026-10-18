@@ -23,7 +23,8 @@ func DoingOf(h Session) Doing {
 	return Doing{Action: SessionActionNone, Label: ""}
 }
 
-// What each action is, in words: seeds.json's actionText, which the client reads too.
+// What each action is, in words: seeds.json's actionText. The client has no copy: frames (FrameOf) and tool/call events
+// carry them.
 var ActionText map[SessionAction]string
 
 func coreSpan(ms int64) string {

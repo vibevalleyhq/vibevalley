@@ -3,7 +3,7 @@ import 'dart:isolate';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
-import '../data/remote.dart' show SessionIssue;
+import '../data/remote.dart' show SessionIssue, achievementsProvider;
 import '../gen/vibevalley.dart';
 import '../game/effects.dart';
 import '../audio/sfx.dart';
@@ -74,10 +74,23 @@ class Hb {
   /// Nothing is earned: the level is the server's.
   void levelUp() => localEffects.add(GameEffectLevelUp(level: (ref.read(viewProvider)?.level.level ?? 1) + 1));
 
-  /// Nothing is earned.
+  /// Nothing is earned; the words are the server's list's (nothing before it is read).
   void achieve([String? id, int tier = 1]) {
-    final shown = achievements[_achieved++ % achievements.length];
-    localEffects.add(GameEffectAchievement(achievement: id ?? shown.id, tier: tier.toDouble()));
+    final all = ref.read(achievementsProvider).value ?? const <Achievement>[];
+    if (all.isEmpty) return;
+    final a = all.where((a) => a.id == id).firstOrNull ?? all[_achieved++ % all.length];
+    final t = a.tiers[(tier - 1).clamp(0, a.tiers.length - 1)];
+    localEffects.add(
+      GameEffectAchievement(
+        achievement: a.id,
+        tier: tier.toDouble(),
+        title: t.title,
+        reached: t.reached,
+        detail: a.detail,
+        coins: t.coins,
+        oneOff: a.tiers.length == 1,
+      ),
+    );
   }
 
   void play(String name) => Sfx.play(name);

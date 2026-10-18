@@ -1,6 +1,6 @@
 # 游戏
 
-服务端的游戏是 `game` 包（`Workspace` 上的 `Game`）加 protocol 里带 `game_` 的两个文件：一本只增不减的账本（`game_ledger` 表）折出金币、连胜、成就、称号和每个档案的战绩；工作目录里你名下的 commit 数折出等级；主人刚点的空地决定下一个帮工站哪块地；每个事实带出要放的特效。游戏只读事实、算画面和账本，业务的服务不 import `game`，也不因为它改变怎么干活。
+服务端的游戏是 `game` 包（`Workspace` 上的 `Game`）加 protocol 里带 `game_` 的三个文件：一本只增不减的账本（`game_ledger` 表）折出金币、连胜、成就、称号和每个档案的战绩；工作目录里你名下的 commit 数折出等级；主人刚点的空地决定下一个帮工站哪块地；每个事实带出要放的特效。游戏只读事实、算画面和账本，业务的服务不 import `game`，也不因为它改变怎么干活。
 
 ## 管什么，不管什么
 
@@ -16,11 +16,11 @@
 ## 在哪
 
 - 服务端 `server/internal/game`（`game.Service`，嵌入三个零件）：`ledger.go` 账本的存取、订阅和 `ChooseTitle`；`progress.go` 账本的折法（`progressStep`、`progressFold`）和哪些事实记账（`entriesFor`、`catchUp`），只有 `game` 读，不导出；`commits.go` 什么时候数 commit；`beds.go` 主人点的空地。
-- 规则在 protocol：`game_view.go` 等级（`XPToNext`、`LevelForCommits`、`FarmLevelOf`、`LevelUps`）、地块（`PlotOfSession`、`PlotOf`、`PlotKey`、`ViewOf`）、特效（`EffectsOf`）；`game_play.go` 帮工的 `SessionPlay`（地块号、最近 30 步动作、工具次数、最近的文件和命令）、空地（`FreeStation`、`WithStations`）、`FactStation` 的折法。成就单在 `seeds.json` 的 `achievements`（`protocol.Achievements`）。
-- 核心状态里的游戏字段：`CoreState.Progress`、`Commits`、`Session.Play`；帧里的 `view`（地块、等级）和 `effects`。`Progress` 只在账本里有，`state.json` 不存它。
+- 规则在 protocol：`game_view.go` 等级（`XPToNext`、`LevelForCommits`、`FarmLevelOf`、`LevelUps`）、地块（`PlotOfSession`、`PlotOf`、`PlotKey`、`ViewOf`）、特效（`EffectsOf`）；`game_play.go` 帮工的 `SessionPlay`（地块号、最近 30 步动作、工具次数、最近的文件和命令）、空地（`FreeStation`、`WithStations`）、`FactStation` 的折法；`game_achievement.go` 成就的说法（`AchievementsInWords`：每档叫什么、到了叫什么、给多少金币、能不能当称号）和进度（`ViewOf` 里每个成就到了第几档、计数、下一档要多少）。成就单在 `seeds.json` 的 `achievements`（`protocol.Achievements`），客户端不带它的副本。
+- 核心状态里的游戏字段：`CoreState.Progress`、`Commits`、`Session.Play`；帧里的 `view`（地块、等级、每个成就的进度 `achievements`）和 `effects`。`Progress` 只在账本里有，`state.json` 不存它。
 - 表：`game_ledger`（`id` 是 UUIDv7，`kind`、`at`、其余字段放进 `payload` 的 JSON），查询在 `pkg/db/queries/game_ledger.sql`。
-- 接口：`game.chooseTitle`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.say` 带的 `bed`。
-- 客户端：`app/lib/rules/progress.dart`（只读成就单和 `progress`）、`rules/warehouse.dart`（仓库）、`game/effects.dart`（把特效变成飘字、横幅、提示）、`farm/achievements.dart`（奖章）。
+- 接口：`game.achievements`（成就的说法，页面的顺序）、`game.chooseTitle`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.say` 带的 `bed`。
+- 客户端：`data/remote.dart` 的 `achievementsProvider`（连上一个服务端读一次 `game.achievements`）、`rules/warehouse.dart`（仓库）、`game/effects.dart`（把特效变成飘字、横幅、提示）、`farm/achievements.dart`（任务与成就页、奖章，只显示说法和帧里的进度）。
 
 ## 模型和不变量
 
@@ -56,7 +56,8 @@
 - **升级横幅只给数出来的增长**：`LevelUps` 每跨一级放一个 `levelUp`；农场第一次数出 commit 数（之前 `Commits` 是空的）只定下等级，不放横幅，但账本照样记 `level`。开机时 `catchUp` 比较 commit 的等级和账本里的 `farm_level`，落下的补记一条。
 - **仓库是关成 `merged` 的工单**，一张一格（整个计划也是一格），最近收的在前；不另存，客户端从 `CoreState.Issues` 读。
 - **地块号**：`SessionPlay.Station` 是 0–5（`MaxRunning` 6），`-1` 是不在地里。新雇的帮工站第一块空着的地；已经有 `Play` 的帮工再雇不换地；读回的 `state.json` 里没有地块的帮工由 `WithStations` 补上。`FactStation` 只挪到空着的地：帮工不在、已经在那块地、那块地有人、超出范围都不改状态。
-- **特效是纯函数** `EffectsOf(折之前的状态, 事实)`：`commits` 给 `levelUp`；`progress` 的 `news` 给 `reward`（金币、帮工、连胜）和每档一个 `achievement`；一个已知帮工的 `report` 是 `failed` 给 `penalty`。
+- **特效是纯函数** `EffectsOf(折之前的状态, 事实)`：`commits` 给 `levelUp`；`progress` 的 `news` 给 `reward`（金币、帮工、连胜）和每档一个 `achievement`（带着这一档的说法：叫什么、到了叫什么、成就的介绍、金币、是不是一次性的）；一个已知帮工的 `report` 是 `failed` 给 `penalty`。
+- **成就的说法**（`AchievementsInWords`）：每档的称号是 `tierTitles` 里的，没有就是成就名，第二、三档前面加「银牌」「金牌」；到了一档叫「新手任务做完了」（新手任务）、「发现一个彩蛋」（彩蛋）、「升到金牌」「升到银牌」「解锁成就」；新手任务以外的都能当称号（`wearable`）。说法不进帧，客户端读一次 `game.achievements`；每帧的 `view.achievements` 只有进度（成就、档、计数、下一档要多少，全到了就没有下一档），和说法一样按页面的顺序。
 
 ## 怎么走
 
@@ -76,8 +77,8 @@
 - **核心状态（`core`）**：游戏只经 `core.Facts()`、`core.Transitions()`、`core.OwnerDids()` 听，经 `Core.Apply` 施加 `progress`、`station`、`commits`。
 - **项目（`project`）**：`commits` 调 `project.Contributions`，带上配置的 `git_emails`。
 - **工单（`issue`）、语音（`voice`）**：只经 `core.Did` 说主人做了什么，不 import `game`。
-- **HTTP（`handler`）**：只为游戏自己的事调 `Game`：`game.chooseTitle`、`channel.say` 的 `bed`。
-- **客户端**：读 `progress`、`view`、`effects`，不折、不另存；调试台只能放一遍横幅和提示，改不了金币、等级和成就。
+- **HTTP（`handler`）**：只为游戏自己的事调 `Game`：`game.achievements`、`game.chooseTitle`、`channel.say` 的 `bed`。
+- **客户端**：读 `game.achievements`、`progress`、`view`、`effects`，不折、不另存，也不照成就单算档和进度；调试台只能放一遍横幅和提示（说法取自 `game.achievements`），改不了金币、等级和成就。
 
 ## 为什么这样
 
@@ -90,6 +91,7 @@
 - **经验只算工作目录里你名下的 commit。** 算这台机器上所有仓库会把和 VibeValley 无关的工作算进来，算所有作者会把别人的提交算成你的；代价是要定期扫目录、跑 git。
 - **仓库装收获了的工单，不装每一轮的汇报。** 汇报在看板、干活过程、工单串里都有；收获需要一个看得见的去处，看板的「已关」里还有没收就收工的。读工单，不另存。
 - **称号不挂新手任务**：「开门」「派活」挂在农场卡上没有意思。奖章是框加图案叠起来，不为每档画一张（21 个成就 × 3 档）。
+- **成就的说法和进度由服务端给，客户端不带成就单。** 原来 `shapegen` 把成就单写进 `lib/gen`，进度在客户端的规则里照它现算：「连接到本机」的手机和那台电脑的服务端版本不一样时，门槛和服务端的账本对不上，算档的规则也在 Dart 里多了一份。说法（约 5KB）每帧都带太浪费，帧每个事实都出，所以拆成两半：说法是一次性的接口 `game.achievements`，进度（约 1KB）跟着 `view` 每帧走，特效自己带着说法，通知和提示不用等接口。放弃了整份种子给一个 `GET /api/v1/seeds`：客户端拿到还要自己拼进度和称号，规则又回到 Dart。
 
 ## 还没做的
 
@@ -102,6 +104,7 @@
 - `game/rules_golden_test.go` 的 `TestRulesGolden`：账本逐步折和整本折一致，`entriesFor`、`catchUp` 对 `testdata/rules.jsonl.gz` 逐条比。
 - `game/ledger_test.go`：`TestLedger`（记一笔收获带着金币的 `news`；派出、没做成、升级由事实记下；重启后折回同样的进度、不重复补记等级）、`TestTheOwnersReviewAndCallAreCounted`。
 - `game/beds_test.go` 的 `TestBedsTheNextSessionTakesThePlantedBed`；`game/commits_test.go` 的 `TestSessionsCommitsCountedOncePerRepository`。
-- protocol：`game_play_rules_test.go` 的 `TestStationOnlyToAFreeBed`、`TestPlotsAreKeyedByTheirIssue`、`TestAPlotShowsItsIssuesAcceptance`；`play_golden_test.go` 的 `TestPlayRulesGolden`；`reduce_golden_test.go` 的 `TestReduceGolden`（特效和升级逐条比）。
+- protocol：`game_achievement_test.go` 的 `TestAchievementsInWords`（称号、到了叫什么、金币、能不能挂）、`TestTheViewSaysHowFarEachAchievementIs`（档、计数、下一档，全到了没有下一档）、`TestAnAchievementsEffectSaysIt`；`game_play_rules_test.go` 的 `TestStationOnlyToAFreeBed`、`TestPlotsAreKeyedByTheirIssue`、`TestAPlotShowsItsIssuesAcceptance`；`play_golden_test.go` 的 `TestPlayRulesGolden`；`reduce_golden_test.go` 的 `TestReduceGolden`（特效和升级逐条比）。
 - `workspace/work_test.go` 的 `TestMergeGoesInTheLedger`：扮演的帮工收获后账本里有这一笔。
-- 客户端：`test/host/notify_test.dart`（到一档弹通知）、`test/farm/panels_test.dart`（仓库是收获了的工单）。
+- `handler/api_test.go` 的 `TestAchievementsComeInWordsAndTheFrameSaysHowFar`。
+- 客户端：`test/host/notify_test.dart`（到一档弹通知，用特效带的说法）、`test/game/fx_test.dart`（提示的称号、介绍、金币、到了叫什么）、`test/farm/panels_test.dart`（仓库是收获了的工单；任务与成就页用 `game.achievements` 的说法和帧里的进度，挑称号）。

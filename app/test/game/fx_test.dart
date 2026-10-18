@@ -4,13 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/ui/medals.dart';
 import 'package:vibevalley/game/effects.dart';
 import 'package:vibevalley/shared/connection_banner.dart';
 import 'package:vibevalley/ui/kit/kit.dart';
 
 import '../support/shell.dart';
-import 'package:vibevalley/rules/progress.dart';
 
 void main() {
   group('ConnectionBanner', () {
@@ -82,9 +80,9 @@ void main() {
 
     testWidgets('an achievement becomes a toast: its tier\'s title, what it was for, its coins, its medal line', (tester) async {
       await show(tester);
-      effects.add(const GameEffectAchievement(achievement: 'harvests', tier: 2));
-      effects.add(const GameEffectAchievement(achievement: 's_open', tier: 1));
-      effects.add(const GameEffectAchievement(achievement: 'no_such', tier: 1));
+      // The words are the server's, as the effect carries them.
+      effects.add(const GameEffectAchievement(achievement: 'harvests', tier: 2, title: '小有收成', reached: '升到银牌', detail: '收进主分支的活', coins: 30));
+      effects.add(const GameEffectAchievement(achievement: 's_open', tier: 1, title: '开门', reached: '新手任务做完了', detail: '开工', coins: 20, oneOff: true));
       effects.add(const GameEffectReward(sessionId: 'w1', coins: 30, streak: 1));
       await tester.pump();
       final list = manager.toasts;
@@ -107,14 +105,5 @@ void main() {
       expect(manager.toasts.last.timeout, const Duration(milliseconds: 4500));
       manager.dispose();
     });
-  });
-
-  test('the achievement rules are the protocol\'s', () {
-    final harvests = achievementOf('harvests')!;
-    expect(tierTitle(harvests, 1), '开张大吉');
-    expect(tierTitle(achievementOf('steady')!, 3), '金牌稳如老农');
-    expect(tierCoins(harvests, 3), 60);
-    expect(tierCoins(achievementOf('night_owl')!, 1), 50);
-    expect(earnedText(achievementOf('weekend')!, 1), '发现一个彩蛋');
   });
 }

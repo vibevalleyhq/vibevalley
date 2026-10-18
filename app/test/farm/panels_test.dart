@@ -12,7 +12,16 @@ import 'package:vibevalley/data/ui_state.dart';
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  final working = session('w1', name: '小吴', station: 0, project: 'clock-in', branch: 'vibevalley/w1', files: ['src/a.ts'], commands: ['pnpm test']);
+  final working = session(
+    'w1',
+    name: '小吴',
+    station: 0,
+    project: 'clock-in',
+    branch: 'vibevalley/w1',
+    files: ['src/a.ts'],
+    commands: ['pnpm test'],
+    history: const [ActionStep(at: 0, action: SessionAction.readFile, label: 'src/b.ts', actionText: '读文件')],
+  );
   final failed = session(
     'w2',
     name: '阿郑',
@@ -91,6 +100,7 @@ void main() {
       'type': 'tool/call',
       'text': 'pnpm test',
       'action': 'run_command',
+      'actionText': '跑命令',
       'tool': 'Bash',
       'input': '{"command":"pnpm test"}',
       'output': 'ok',
@@ -123,7 +133,8 @@ void main() {
     await settle(tester);
     expect(find.text('小吴的地'), findsOneWidget);
     expect(find.text('clock-in'), findsOneWidget);
-    expect(find.text('正在改文件'), findsOneWidget);
+    expect(find.text('正在改文件'), findsOneWidget, reason: 'what it is doing, in the frame\'s words');
+    expect(find.text('读文件'), findsOneWidget, reason: 'each step of this round, in the frame\'s words');
     expect(find.text('干活过程'), findsOneWidget);
     expect(find.text('工单'), findsNothing, reason: '干活过程 starts folded');
     await tester.tap(find.textContaining('· 展开'));
@@ -131,6 +142,7 @@ void main() {
     expect(find.text('工单'), findsOneWidget);
     expect(find.text('碰过的文件'), findsOneWidget);
     expect(find.text('\$ pnpm test'), findsOneWidget);
+    expect(find.text('跑命令'), findsWidgets, reason: 'the call says its action as the server wrote it');
     expect(routes.paths, contains('GET /api/v1/sessions/w1/events'));
     await tester.ensureVisible(find.text('叫停这一轮'));
     await tester.tap(find.text('叫停这一轮'));
@@ -226,24 +238,32 @@ void main() {
   });
 
   testWidgets('tasks and achievements: the level, the coins, the walls; a title to wear', (tester) async {
-    final routes = Routes();
-    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes), agents: agents));
+    // The achievements in words are game.achievements'; how far each is, the frame's view.
+    final routes = Routes({
+      'GET /api/v1/game/achievements': [for (final a in achievementList) a.toJson()],
+    });
+    final withStandings = view(plots: v.plots, achievements: standings);
+    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, withStandings, fakeApi(routes), agents: agents));
     c.read(farmOverlaysProvider.notifier).panel(FarmPanel.graphs);
     await settle(tester);
     expect(find.text('任务与成就'), findsOneWidget);
     expect(find.text('Lv.3'), findsOneWidget);
     expect(find.text('120'), findsOneWidget);
     expect(find.text('连胜 3 · 收成金币 ×1.2'), findsOneWidget);
-    expect(find.textContaining('新手任务 1/7', findRichText: true), findsOneWidget);
-    expect(find.text('收成 1/4'), findsOneWidget);
+    expect(find.textContaining('新手任务 1/2', findRichText: true), findsOneWidget);
+    expect(find.textContaining('每做完一个 +20 金币', findRichText: true), findsOneWidget);
+    expect(find.text('收成 1/2'), findsOneWidget);
+    expect(find.text('开张大吉'), findsOneWidget, reason: 'the tier reached, by its name');
+    expect(find.text('4/20 件'), findsOneWidget, reason: 'the count and what the next tier takes');
+    expect(find.text('3/5 件'), findsOneWidget);
     expect(find.text('Lv.5 开垦一块地'), findsOneWidget);
-    expect(find.text('还有 3 个彩蛋'), findsOneWidget);
+    expect(find.text('还有 2 个彩蛋'), findsOneWidget);
     await tester.tap(find.text('挑一个'));
     await settle(tester);
     await tester.tap(find.text('开张大吉').first);
     await settle(tester);
-    expect(routes.calls.single.path, '/api/v1/game/title');
-    expect(routes.calls.single.body, {'achievement': 'harvests', 'tier': 1});
+    final chosen = routes.named('POST', '/api/v1/game/title');
+    expect(chosen.single.body, {'achievement': 'harvests', 'tier': 1});
   });
 
   testWidgets('the game menu; Esc and the backdrop close a panel', (tester) async {

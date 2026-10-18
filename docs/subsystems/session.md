@@ -43,7 +43,7 @@
 - **一次 run 记着为什么开的**（`RunTrigger`）：`issue`（第一次派出去）、`comment`（带话，带着那条消息的号）、`task`（种植计划）、`schedule`（带着哪个定时、是不是补跑）；没人发话就开的一轮是 `runtime`（农机自己）。发话的一方先把触发放在 Session 上（`expect`），农机开了这一轮，run 取最早的那个。
 - **干活时插进来的话不开新的 run**，记在这一轮的 `heard` 里；不能插话的农机排队，是下一次 run 的触发。叫不醒、被拒的不算 run。
 - **一次 run 的花费从这一次算**：`FactSpent` 是这个 Session 的累计，按 oar 报的 token 总数和上一次的差算；换了 oar 会话从零算。汇报带上这一轮开始以来的差（`Spent`）。
-- **日志只追加**：一条 `SessionEvent`（`seq`、`time`、`type`）写下后不再改；类型照 DeepSeek Harness：`run/start`、`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 token：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`、`run/end`（带结果）。`run/start` 和 `run/end` 之间的事件都带这个 `run`。流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给客户端（合并到 0.3 秒一次），下一条事件之前写下。
+- **日志只追加**：一条 `SessionEvent`（`seq`、`time`、`type`）写下后不再改；类型照 DeepSeek Harness：`run/start`、`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入，和动作的说法 `actionText`，写下时取 `protocol.ActionText`，客户端不带这份说法）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 token：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`、`run/end`（带结果）。`run/start` 和 `run/end` 之间的事件都带这个 `run`。流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给客户端（合并到 0.3 秒一次），下一条事件之前写下。
 - **日志的大小**：一个 Session 留最近 240 条，管家（id `manager`）留 1000 条；工具输入留 4000 字，输出留开头 2000、结尾 4000 字（按 UTF-16 数）。日志不进核心状态。
 - **走了的 Session 一直是 `session` 表的一行**；它的日志在走了 `session.trajectory_days` 天（默认 30，0 是一直留）后、下次开机时删掉。
 - **评论对整张工单说**（`issue.comment`），不挂在某一条事件上。
@@ -145,7 +145,7 @@
 ## 怎么验证
 
 - `session/rules_test.go`（纯函数，不开会话）：`TestSessionsRunStartsWithTheJobAndCountsFromWhatWasSpent`、`TestSessionsSpendingCountedFromTheLastTotal`、`TestSessionsQuietEndsWithAWordNotWithUsage`、`TestSessionsRetriesModelFailuresAndExitsAreSaid`、`TestSessionsSubAgentStepsSayWhose`、`TestSummaryIsTheVerdict`、`TestCompletedRunRead`、`TestFailedRunLeadsWithWhy`、`TestRoomOnTheFarm`；`shell_test.go` 的 `TestAsksAreTheLinesForTheOwner`。
-- `session/trajectories_test.go`：`TestLogKeptAndReadBack`、`TestSubAgentStepsGoUnderTheirCall`、`TestJournalSendsAndWrites`、`TestLogOnlyGrows`；`admission_test.go` 的 `TestPendingTurnReservesCapacityUntilWorkingFact`。
+- `session/trajectories_test.go`：`TestLogKeptAndReadBack`（读回，调用带着动作的说法）、`TestSubAgentStepsGoUnderTheirCall`、`TestJournalSendsAndWrites`、`TestLogOnlyGrows`；`admission_test.go` 的 `TestPendingTurnReservesCapacityUntilWorkingFact`。
 - `workspace/work_test.go`（smith 的 `oartest` 扮演帮工、真的 git 仓库）：`TestHiredSessionWorksReportsAndGoesHome`、`TestRunsKeepWhatStartedEachRun`、`TestRestartSessionsComeBackResting`、`TestEveryStepKeptInItsTrajectory`、`TestEndedSessionsAreRows`、`TestFailedRunSaysWhy`、`TestQuietSessionIsFlagged`、`TestNobodySentWhenMoneyRunsOut`、`TestLimitsOnProjectAndRuntime`、`TestTwoSentToANewProjectAtOnce`、`TestActivityAndTokens`。
 - `issue/lifecycle_test.go`：`TestFailedSpawnReleasesWorktree`、`TestFailedIssueLinkDoesNotPublishOrKeepSession`、`TestConcurrentSendHonorsProjectCapacity`。
 - `manager/execution_test.go`：`TestMergedManagerInputsShareOnlyTheirConsumedRun`、`TestInterruptedManagerRunDoesNotConsumeQueuedWork`、`TestFailedStartRetriesPreviousFinishWithoutMergingInputs`、`TestShutdownPreservesPendingFailedRunOutcome`；`manager/input_test.go` 的 `TestCanceledQueuedInputLeavesDigestForNextConsumedInput`。

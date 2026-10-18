@@ -2,7 +2,6 @@
 
 import '../gen/vibevalley.dart';
 import '../rules/chat.dart';
-import '../rules/progress.dart';
 import '../rules/view.dart';
 import 'command.dart';
 
@@ -69,15 +68,7 @@ class CallBell {
 
 HostNotice? noticeForEffect(GameEffect effect) {
   if (effect is! GameEffectAchievement) return null;
-  final a = achievementOf(effect.achievement);
-  if (a == null) return null;
-  final tier = effect.tier.round();
-  final what = switch (a.category) {
-    AchievementCategory.starter => '新手任务做完了',
-    AchievementCategory.secret => '发现一个彩蛋',
-    _ => tier == 3 ? '升到金牌' : (tier == 2 ? '升到银牌' : '解锁成就'),
-  };
-  return HostNotice('$what：${tierTitle(a, tier)}', clipLine(a.detail), const HostOpenAchievements());
+  return HostNotice('${effect.reached}：${effect.title}', clipLine(effect.detail), const HostOpenAchievements());
 }
 
 HostNotice? noticeForEvent(LiveEvent event) => switch (event) {

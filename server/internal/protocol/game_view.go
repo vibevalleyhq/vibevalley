@@ -210,7 +210,7 @@ func EffectsOf(before CoreState, fact Fact) []GameEffect {
 			out = append(out, GameEffect{GameEffectReward{SessionID: session, Coins: *f.News.Coins, Streak: f.Progress.Streak}})
 		}
 		for _, u := range f.News.Unlocked {
-			out = append(out, GameEffect{GameEffectAchievement{Achievement: u.ID, Tier: u.Tier}})
+			out = append(out, GameEffect{achievementEffect(u.ID, u.Tier)})
 		}
 		return out
 	case FactReport:
@@ -238,5 +238,5 @@ func ViewOf(state CoreState) FarmView {
 		}
 		plots[PlotKey(h)] = PlotOf(h, issue)
 	}
-	return FarmView{Level: FarmLevelOf(state), Plots: plots}
+	return FarmView{Level: FarmLevelOf(state), Plots: plots, Achievements: standingsOf(state.Progress)}
 }

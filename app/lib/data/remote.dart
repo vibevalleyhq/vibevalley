@@ -279,6 +279,10 @@ class RuntimeCatalog extends AsyncNotifier<List<RuntimeInfo>> {
   Future<void> saveSettings(String id, RuntimeSettings settings) async => _put(await ref.read(apiProvider).runtime.update(id: id, body: settings));
 }
 
+/// The achievements in words, read once from the server the client talks to; how far the farm is with each comes in
+/// every frame (FarmView.achievements).
+final achievementsProvider = FutureProvider<List<Achievement>>((ref) => ref.watch(apiProvider).game.achievements());
+
 final runtimesProvider = Provider<AsyncValue<List<RuntimeInfo>>>((ref) => ref.watch(runtimeCatalogProvider));
 final runtimeInfoProvider = Provider.family<RuntimeInfo?, String>((ref, id) => ref.watch(runtimesProvider).value?.where((r) => r.id == id).firstOrNull);
 

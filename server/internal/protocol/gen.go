@@ -57,6 +57,15 @@ func (v AchievementDef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
+func (v Achievement) MarshalJSON() ([]byte, error) {
+	type plain Achievement
+	p := plain(v)
+	if p.Tiers == nil {
+		p.Tiers = []AchievementTier{}
+	}
+	return json.Marshal(p)
+}
+
 func (v RuntimeFacts) MarshalJSON() ([]byte, error) {
 	type plain RuntimeFacts
 	p := plain(v)
@@ -535,6 +544,9 @@ func (v FarmView) MarshalJSON() ([]byte, error) {
 	p := plain(v)
 	if p.Plots == nil {
 		p.Plots = map[string]PlotView{}
+	}
+	if p.Achievements == nil {
+		p.Achievements = []AchievementStanding{}
 	}
 	return json.Marshal(p)
 }
@@ -2272,6 +2284,7 @@ var Endpoints = []Endpoint{
 	{"channel.markRead", "POST", "/api/v1/channels/{id}/read", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"graph.changes", "GET", "/api/v1/graphs/{id}/changes", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"graph.events", "GET", "/api/v1/graphs/{id}/events", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"game.achievements", "GET", "/api/v1/game/achievements", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"game.chooseTitle", "POST", "/api/v1/game/title", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"runtime.list", "GET", "/api/v1/runtimes", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"github.status", "GET", "/api/v1/github", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2577,6 +2590,10 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	mux.HandleFunc("GET /api/v1/graphs/{id}/events", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.GraphEvents(r.Context(), pID)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("GET /api/v1/game/achievements", func(w http.ResponseWriter, r *http.Request) {
+		out, err := h.GameAchievements(r.Context())
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/v1/game/title", func(w http.ResponseWriter, r *http.Request) {
@@ -3147,6 +3164,12 @@ func (c *Client) GraphChanges(ctx context.Context, pID string) (Changes, error) 
 func (c *Client) GraphEvents(ctx context.Context, pID string) ([]GraphEvent, error) {
 	var out []GraphEvent
 	err := c.call(ctx, "GET", "/api/v1/graphs/"+url.PathEscape(pID)+"/events", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) GameAchievements(ctx context.Context) ([]Achievement, error) {
+	var out []Achievement
+	err := c.call(ctx, "GET", "/api/v1/game/achievements", nil, nil, &out)
 	return out, err
 }
 

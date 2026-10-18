@@ -52,7 +52,7 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
     final height = widget.height;
     final agents = (ref.watch(agentsProvider).value ?? const <String, Agent>{}).values.toList();
     final sessions = ref.watch(stateProvider.select((s) => s?.sessions)) ?? const <Session>[];
-    final view = ref.watch(viewProvider) ?? const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {});
+    final view = ref.watch(viewProvider) ?? const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {}, achievements: []);
     final open = ref.watch(friendsOpenProvider);
     final sorted = [...agents.where((a) => a.enabled), ...agents.where((a) => !a.enabled)];
     final statuses = [for (final a in sorted) statusOf(sessions.where((h) => h.agent == a.id).toList(), view)];
