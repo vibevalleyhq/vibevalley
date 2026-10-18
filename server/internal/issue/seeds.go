@@ -31,7 +31,7 @@ func (d *dispatch) Seeds(name string) (protocol.ProjectSeeds, error) {
 }
 
 // Only a queued todo starts here, under the queue's lock; without room it keeps its place (start would queue it anew).
-func (d *dispatch) StartQueued(ctx context.Context, id string) (protocol.Dispatched, error) {
+func (d *dispatch) DispatchQueued(ctx context.Context, id string) (protocol.Dispatched, error) {
 	d.trying.Lock()
 	defer d.trying.Unlock()
 	issue, err := d.issues.Get(id)

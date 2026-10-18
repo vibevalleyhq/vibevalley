@@ -83,9 +83,9 @@ class FarmCommands {
   /// A queued todo started on this bed. Not ok: still waiting, or refused; the text is the server's why.
   Future<Answer> startQueued(String issue, int station) async {
     final got = await _answer(() async {
-      final d = await _api.issue.start(
+      final d = await _api.issue.dispatch(
         id: issue,
-        body: IssueStartRequest(bed: station.toDouble()),
+        body: IssueDispatchRequest(bed: station.toDouble()),
       );
       return d.queued ?? '';
     });

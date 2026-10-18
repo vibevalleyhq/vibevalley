@@ -18,7 +18,7 @@ Status: implemented
 - **认栈在 `project`**（`stack.go` 的 `stackOf`，只看项目根目录，第一个对上的算）：`go.mod` → `go test ./...`；`Cargo.toml` → `cargo test`；`pubspec.yaml` → `flutter test`（不带 flutter 的是 `dart test`）；`package.json` → 有 `test` 脚本才写，包管理器看锁文件（`bun.lock`/`bun.lockb` → bun，`pnpm-lock.yaml` → pnpm，`yarn.lock` → yarn，否则 npm），一律 `<pm> run test`；`pyproject.toml`、`requirements.txt`、`setup.py` → `pytest`。lint、build 同理，认不出的留空。
 - **填模板和「最近」在 `issue`**（`seeds.go`，不导出的纯函数）：知道的命令写成代码样式，不知道的写「测试」「代码检查」「构建」；`Text` 是标题加「做到什么程度算完：」那一行，`Blank` 是第一个空在 `Text` 里的位置（UTF-16，和客户端的文本框一致）。「最近」是这个项目里主人自己派出去过的工单标题（不算计划里的、定时的、给管家的），新的在前、不重复、最多 5 条、超过 60 字的不算，从数据库里读，不止核心状态里的 50 张。
 - **播种照旧经田头**：选的或写的那段话原样发 `channel.say`，`SayRequest` 多带一个 `project`；管家的输入前面多一句「主人选定了项目：X」，和选定档案那句一样（`manager.Pick`）。客户端不在话里拼项目名。
-- **开工待办**：同一个袋子的另一页，是这个项目排着队的待办（核心状态里的工单，`rules/issues.dart` 的 `queuedIn`，地图上院门外的种子袋用同一条）。点开工调 `issue.start`：只收排着队的待办，和后台重试共用一把锁；有空就照排队时的来源开工，没空就说为什么、留在原位。
+- **开工待办**：同一个袋子的另一页，是这个项目排着队的待办（核心状态里的工单，`rules/issues.dart` 的 `queuedIn`，地图上院门外的种子袋用同一条）。点开工调 `issue.dispatch`：只收排着队的待办，和后台重试共用一把锁；有空就照排队时的来源开工，没空就说为什么、留在原位。
 - **空地先问项目**：农场的地不分项目，所以表单先问；只有一个项目时直接用它。
 
 ## Alternatives considered
@@ -29,7 +29,7 @@ Status: implemented
 
 **「做到什么程度算完」作为工单的单独字段（验收标准）发给管家。** 更结构化；但播种走的是田头的一句话，管家照话建工单，新字段要改 `say`、管家的工具和工单的表。现在它就是话里的一行，帮工照样看得到；逐条验收另有提案（[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)）。
 
-**开工待办走 `issue.status`。** 排着队的待办已经是 `todo`，再挪到 `todo` 是「已经是这个状态了」；先挪回备选再挪回待办会丢掉排队时记下的来源。单开 `issue.start` 只做一件事：现在有空就开。
+**开工待办走 `issue.status`。** 排着队的待办已经是 `todo`，再挪到 `todo` 是「已经是这个状态了」；先挪回备选再挪回待办会丢掉排队时记下的来源。单开 `issue.dispatch` 只做一件事：现在有空就开。
 
 **最近用客户端核心状态里的工单。** 核心状态只有开着的和最近关的 50 张，派得多的项目「最近」会是空的；服务端读库更准，也是同一条规则只有一份。
 

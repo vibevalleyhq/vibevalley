@@ -72,7 +72,7 @@ void main() {
   Routes routes({List<String> projects = const ['clock-in', 'notes']}) => Routes({
     'GET /api/v1/projects': [for (final p in projects) _project(p).toJson()],
     'GET /api/v1/projects/clock-in/seeds': _seeds.toJson(),
-    'POST /api/v1/issues/t5/start': const Dispatched(session: 's9').toJson(),
+    'POST /api/v1/issues/t5/dispatch': const Dispatched(session: 's9').toJson(),
   });
 
   Future<void> open(WidgetTester tester, Routes r) async {
@@ -167,13 +167,13 @@ void main() {
     expect(tester.getTopLeft(find.text('#5 先排上的')).dy, lessThan(tester.getTopLeft(find.text('#7 给打卡页加导出')).dy));
     await tester.tap(find.text('开工').first);
     await settle(tester);
-    expect(r.named('POST', '/api/v1/issues/t5/start').single.body, {'bed': 3});
+    expect(r.named('POST', '/api/v1/issues/t5/dispatch').single.body, {'bed': 3});
     expect(r.paths, isNot(contains('POST /api/v1/say')));
     expect(find.text('播种 · 第 4 块地'), findsNothing, reason: 'started: the bag closes');
   });
 
   testWidgets('a queued issue still without room says why and the bag stays', (tester) async {
-    final r = routes()..answers['POST /api/v1/issues/t5/start'] = const Dispatched(queued: 'clock-in 已经有 3 个在干：还在排队，有空地就自动开工').toJson();
+    final r = routes()..answers['POST /api/v1/issues/t5/dispatch'] = const Dispatched(queued: 'clock-in 已经有 3 个在干：还在排队，有空地就自动开工').toJson();
     await open(tester, r);
     await pickClockIn(tester);
     await tester.tap(find.text('开工待办 2'));

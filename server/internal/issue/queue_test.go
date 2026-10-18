@@ -128,14 +128,14 @@ func TestAQueuedTodoStartsFromTheSowingForm(t *testing.T) {
 		t.Fatal(err)
 	}
 	var refused protocol.Refused
-	if _, err := f.Issue.StartQueued(context.Background(), issue.ID); !errors.As(err, &refused) {
+	if _, err := f.Issue.DispatchQueued(context.Background(), issue.ID); !errors.As(err, &refused) {
 		t.Fatalf("a backlog issue started: %v", err)
 	}
 	if got, err := f.Issue.Start(context.Background(), issue.ID, f.Channel.General()); err != nil || got.Queued == nil {
 		t.Fatalf("queue: %+v %v", got, err)
 	}
 	queued, _ := f.Issue.Get(issue.ID)
-	still, err := f.Issue.StartQueued(context.Background(), issue.ID)
+	still, err := f.Issue.DispatchQueued(context.Background(), issue.ID)
 	if err != nil || still.Queued == nil || still.Session != nil {
 		t.Fatalf("no room: %+v %v", still, err)
 	}
@@ -143,7 +143,7 @@ func TestAQueuedTodoStartsFromTheSowingForm(t *testing.T) {
 		t.Fatalf("lost its place: %v, was %v", again.QueuedAt, *queued.QueuedAt)
 	}
 	f.Core.Apply(protocol.FactLeft{ID: "occupied"})
-	started, err := f.Issue.StartQueued(context.Background(), issue.ID)
+	started, err := f.Issue.DispatchQueued(context.Background(), issue.ID)
 	if err != nil || started.Session == nil {
 		t.Fatalf("with room: %+v %v", started, err)
 	}

@@ -994,7 +994,7 @@ type SeedBlank struct {
 }
 
 // Bed: the empty bed it is started from, the one its session takes when it gets one.
-type IssueStartRequest struct {
+type IssueDispatchRequest struct {
 	Bed *int64 `json:"bed,omitzero"`
 }
 

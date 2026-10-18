@@ -2308,7 +2308,7 @@ var Endpoints = []Endpoint{
 	{"issue.delete", "DELETE", "/api/v1/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.move", "PUT", "/api/v1/issues/{id}/move", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.status", "PUT", "/api/v1/issues/{id}/status", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"issue.start", "POST", "/api/v1/issues/{id}/start", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.dispatch", "POST", "/api/v1/issues/{id}/dispatch", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.accept", "POST", "/api/v1/issues/{id}/accept", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"graph.split", "POST", "/api/v1/graphs", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"graph.updateTask", "PUT", "/api/v1/graphs/{id}/tasks/{task}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
@@ -2551,13 +2551,13 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.IssueStatus(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/v1/issues/{id}/start", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/issues/{id}/dispatch", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		var body IssueStartRequest
+		var body IssueDispatchRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.IssueStart(r.Context(), pID, body)
+		out, err := h.IssueDispatch(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/v1/issues/{id}/accept", func(w http.ResponseWriter, r *http.Request) {
@@ -3152,9 +3152,9 @@ func (c *Client) IssueStatus(ctx context.Context, pID string, body IssueStatusRe
 	return out, err
 }
 
-func (c *Client) IssueStart(ctx context.Context, pID string, body IssueStartRequest) (Dispatched, error) {
+func (c *Client) IssueDispatch(ctx context.Context, pID string, body IssueDispatchRequest) (Dispatched, error) {
 	var out Dispatched
-	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/start", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/dispatch", nil, body, &out)
 	return out, err
 }
 

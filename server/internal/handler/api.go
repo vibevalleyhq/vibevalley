@@ -479,11 +479,11 @@ func (a api) IssueAccept(ctx context.Context, id string, body protocol.IssueAcce
 	return got, refused(err)
 }
 
-func (a api) IssueStart(ctx context.Context, id string, body protocol.IssueStartRequest) (protocol.Dispatched, error) {
+func (a api) IssueDispatch(ctx context.Context, id string, body protocol.IssueDispatchRequest) (protocol.Dispatched, error) {
 	if body.Bed != nil {
 		a.f.Game.Want(*body.Bed)
 	}
-	got, err := a.f.Issue.StartQueued(context.WithoutCancel(ctx), id)
+	got, err := a.f.Issue.DispatchQueued(context.WithoutCancel(ctx), id)
 	return got, refused(err)
 }
 

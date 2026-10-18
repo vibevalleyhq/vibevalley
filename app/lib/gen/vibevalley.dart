@@ -2350,10 +2350,10 @@ class SeedBlank {
   Map<String, dynamic> toJson() => {'start': start, 'end': end};
 }
 
-class IssueStartRequest {
-  const IssueStartRequest({this.bed});
+class IssueDispatchRequest {
+  const IssueDispatchRequest({this.bed});
 
-  factory IssueStartRequest.fromJson(Map<String, dynamic> j) => IssueStartRequest(bed: j['bed'] == null ? null : (j['bed'] as num).toDouble());
+  factory IssueDispatchRequest.fromJson(Map<String, dynamic> j) => IssueDispatchRequest(bed: j['bed'] == null ? null : (j['bed'] as num).toDouble());
 
   final double? bed;
 
@@ -5839,8 +5839,8 @@ class IssueApi {
   }
 
   /// Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue.
-  Future<Dispatched> start({required String id, required IssueStartRequest body}) async {
-    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/start', query: {}, body: body.toJson());
+  Future<Dispatched> dispatch({required String id, required IssueDispatchRequest body}) async {
+    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/dispatch', query: {}, body: body.toJson());
     return Dispatched.fromJson(j as Map<String, dynamic>);
   }
 

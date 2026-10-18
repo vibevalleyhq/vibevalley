@@ -215,7 +215,7 @@ func TestProjectSeedsAreFilledForItsStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	var refused protocol.Refused
-	if _, err := c.IssueStart(ctx, issue.ID, protocol.IssueStartRequest{}); !errors.As(err, &refused) {
+	if _, err := c.IssueDispatch(ctx, issue.ID, protocol.IssueDispatchRequest{}); !errors.As(err, &refused) {
 		t.Fatalf("a backlog issue started from the form: %v", err)
 	}
 }

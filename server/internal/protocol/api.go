@@ -109,9 +109,9 @@ type Handlers interface {
 	//vibevalley:can owner remote
 	IssueStatus(ctx context.Context, pID string, body IssueStatusRequest) (Issue, error)
 	// Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue.
-	//vibevalley:route issue.start POST /api/v1/issues/{id}/start
+	//vibevalley:route issue.dispatch POST /api/v1/issues/{id}/dispatch
 	//vibevalley:can owner remote
-	IssueStart(ctx context.Context, pID string, body IssueStartRequest) (Dispatched, error)
+	IssueDispatch(ctx context.Context, pID string, body IssueDispatchRequest) (Dispatched, error)
 	// The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
 	// another round.
 	//vibevalley:route issue.accept POST /api/v1/issues/{id}/accept
