@@ -95,7 +95,7 @@ func TestThreadOwnerFailureLeavesNoDispatch(t *testing.T) {
 	if err := c.openedJob(h); err != nil {
 		t.Fatal(err)
 	}
-	thread := c.issueThreadOf(h.ID)
+	thread := c.threadOf(jobOf(h))
 	if thread == nil {
 		t.Fatal("missing thread")
 	}

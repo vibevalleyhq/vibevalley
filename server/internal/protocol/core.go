@@ -21,6 +21,17 @@ func SessionOf(state CoreState, id string) *Session {
 	return nil
 }
 
+// The session working the issue now: the latest hired of those on it, nil when none is.
+func SessionOnIssue(state CoreState, issue string) *Session {
+	var on *Session
+	for i := range state.Sessions {
+		if h := &state.Sessions[i]; h.Issue != nil && *h.Issue == issue && (on == nil || h.HiredAt >= on.HiredAt) {
+			on = h
+		}
+	}
+	return on
+}
+
 // The very same state when there is no such session.
 func withSession(state CoreState, id string, change func(Session) Session) (CoreState, bool) {
 	i := slices.IndexFunc(state.Sessions, func(h Session) bool { return h.ID == id })

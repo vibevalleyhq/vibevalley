@@ -343,13 +343,12 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
   Widget _threadHeader(Chat? chat, Conversation thread, bool large) {
     final channel = channelOf(chat, thread);
     final backTo = channel?.kind == ConversationKind.channel ? channel!.id : null;
-    final session = thread.subjectKind == SubjectKind.issue ? widget.state.sessions.where((h) => h.id == thread.subjectId).firstOrNull : null;
-    final said = messagesIn(chat, thread.id).where((m) => m.from == thread.subjectId).firstOrNull?.name;
-    final title = thread.subjectKind == SubjectKind.issue ? '${session?.name ?? said ?? thread.subjectId ?? ''}的工单串' : '串';
+    final session = threadOwnerOf(thread, widget.state.sessions);
+    final title = threadTitle(chat, thread, issues: widget.state.issues ?? const [], sessions: widget.state.sessions);
     final status = session != null
         ? phaseText(session, nowMs())
         : thread.subjectKind == SubjectKind.issue
-        ? '它已经离开农场，串还留着'
+        ? '现在没有帮工在干，串还留着'
         : '${idText(thread.replies)} 条回复';
     return _headerFrame(
       large: large,
@@ -551,7 +550,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
 
   Widget _composer(Conversation? conversation, Conversation? thread, ChatPhase phase, {required bool open, required bool unread}) {
     final voiceOn = widget.call.phase == CallPhase.live;
-    final owner = thread?.subjectKind == SubjectKind.issue ? widget.state.sessions.where((h) => h.id == thread!.subjectId).firstOrNull : null;
+    final owner = thread == null ? null : threadOwnerOf(thread, widget.state.sessions);
     final placeholder = thread != null
         ? (owner != null ? '在串里说，${owner.name}会看到…' : '在串里说…')
         : voiceOn

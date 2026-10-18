@@ -64,74 +64,88 @@ const _session = Session(
     doing: Doing(action: SessionAction.runCommand, label: 'pnpm test'),
   ),
   channel: 'c1',
+  issue: 'i1',
   phaseText: '在跑命令：pnpm test',
 );
 
-CoreState _state({CallState call = CallState.live, ManagerState manager = ManagerState.listening, double generalRead = 0, List<ChatMessage> more = const []}) =>
-    CoreState(
-      call: call,
-      manager: manager,
-      sessions: const [_session],
-      chat: Chat(
-        conversations: [
-          Conversation(id: 'c1', kind: ConversationKind.general, name: '田头', replies: 0, read: generalRead, at: 0, lastNumber: 2),
-          const Conversation(
-            id: 'c2',
-            kind: ConversationKind.channel,
-            name: 'clock-in',
-            description: '打卡',
-            project: 'clock-in',
-            replies: 0,
-            at: 1,
-            lastNumber: 4,
-          ),
-          const Conversation(
-            id: 'c3',
-            kind: ConversationKind.thread,
-            parent: 'm2',
-            channel: 'c1',
-            subjectKind: SubjectKind.issue,
-            subjectId: 'w1',
-            replies: 1,
-            at: 2,
-            lastNumber: 3,
-          ),
-        ],
-        messages: [
-          _msg(1, 1, 'manager', SenderKind.manager, '农场开门了'),
-          _msg(2, 1, 'manager', SenderKind.manager, '派给 @w1 跑测试', type: MessageKind.dispatch),
-          _msg(3, 3, 'w1', SenderKind.agent, '测试都过了', type: MessageKind.report),
-          _msg(4, 2, 'w1', SenderKind.agent, '打卡页改好了'),
-          ...more,
-        ],
+const _issue = Issue(
+  id: 'i1',
+  number: 1,
+  title: '修好打卡的测试',
+  project: 'clock-in',
+  assignee: 'tester',
+  priority: Priority.medium,
+  createdAt: 0,
+  sessions: ['w1'],
+  status: IssueStatus.inProgress,
+  moves: [],
+  acceptance: Acceptance.glance,
+  findings: [],
+  asks: [],
+);
+
+CoreState _state({
+  CallState call = CallState.live,
+  ManagerState manager = ManagerState.listening,
+  double generalRead = 0,
+  List<ChatMessage> more = const [],
+  List<Session> sessions = const [_session],
+}) => CoreState(
+  call: call,
+  manager: manager,
+  sessions: sessions,
+  issues: const [_issue],
+  chat: Chat(
+    conversations: [
+      Conversation(id: 'c1', kind: ConversationKind.general, name: '田头', replies: 0, read: generalRead, at: 0, lastNumber: 2),
+      const Conversation(id: 'c2', kind: ConversationKind.channel, name: 'clock-in', description: '打卡', project: 'clock-in', replies: 0, at: 1, lastNumber: 4),
+      const Conversation(
+        id: 'c3',
+        kind: ConversationKind.thread,
+        parent: 'm2',
+        channel: 'c1',
+        subjectKind: SubjectKind.issue,
+        subjectId: 'i1',
+        replies: 1,
+        at: 2,
+        lastNumber: 3,
       ),
-      schedules: const [
-        Schedule(
-          id: 's5',
-          name: '早测',
-          text: '跑一遍测试',
-          channel: 'c2',
-          when: ScheduleWhenDaily(time: '09:00'),
-          tz: 'Asia/Shanghai',
-          enabled: true,
-          created: 0,
-          by: ScheduleBy.owner,
-        ),
-        Schedule(
-          id: 's6',
-          name: '早会',
-          text: '看看昨天的活',
-          channel: 'c2',
-          when: ScheduleWhenDaily(time: '09:30'),
-          tz: 'Asia/Shanghai',
-          enabled: false,
-          created: 0,
-          by: ScheduleBy.manager,
-          pending: true,
-          nextText: '等主人同意',
-        ),
-      ],
-    );
+    ],
+    messages: [
+      _msg(1, 1, 'manager', SenderKind.manager, '农场开门了'),
+      _msg(2, 1, 'manager', SenderKind.manager, '派给 @w1 跑测试', type: MessageKind.dispatch),
+      _msg(3, 3, 'w1', SenderKind.agent, '测试都过了', type: MessageKind.report),
+      _msg(4, 2, 'w1', SenderKind.agent, '打卡页改好了'),
+      ...more,
+    ],
+  ),
+  schedules: const [
+    Schedule(
+      id: 's5',
+      name: '早测',
+      text: '跑一遍测试',
+      channel: 'c2',
+      when: ScheduleWhenDaily(time: '09:00'),
+      tz: 'Asia/Shanghai',
+      enabled: true,
+      created: 0,
+      by: ScheduleBy.owner,
+    ),
+    Schedule(
+      id: 's6',
+      name: '早会',
+      text: '看看昨天的活',
+      channel: 'c2',
+      when: ScheduleWhenDaily(time: '09:30'),
+      tz: 'Asia/Shanghai',
+      enabled: false,
+      created: 0,
+      by: ScheduleBy.manager,
+      pending: true,
+      nextText: '等主人同意',
+    ),
+  ],
+);
 
 /// The chat's history for conversation 3; anything else is nothing.
 Future<http.Response> _answer(http.Request r) async {
@@ -227,10 +241,23 @@ void main() {
       expect(unreadUnder(chat, chat.conversations[1]), 1);
       expect(unreadTotal(chat), 4);
       expect(newestUnread(chat, chat.conversations[0]), 2);
-      expect(jobThreadOf(chat, 'w1')?.id, 'c3');
+      expect(jobThreadOf(chat, _session)?.id, 'c3');
+      expect(issueThreadOf(chat, 'i1')?.id, 'c3');
       expect(channelOf(chat, chat.conversations[2])?.id, 'c1');
       expect(channelLabel(chat.conversations[1]), '#clock-in');
       expect(channelLabel(chat.conversations[0]), '田头');
+    });
+
+    test('an issue\'s thread is titled by the issue and owned by whoever works it now; neither changes when its session leaves', () {
+      final thread = chat!.conversations[2];
+      expect(threadTitle(chat, thread, issues: const [_issue], sessions: const [_session]), '修好打卡的测试');
+      expect(threadTitle(chat, thread, issues: const [_issue]), '修好打卡的测试');
+      expect(threadTitle(chat, thread), '工单串');
+      expect(threadOwnerOf(thread, const [_session])?.id, 'w1');
+      expect(threadOwnerOf(thread, const []), isNull);
+      final talk = Conversation(id: 'c9', kind: ConversationKind.thread, subjectKind: SubjectKind.talk, subjectId: 'w1', replies: 0, at: 0);
+      expect(threadTitle(chat, talk, sessions: const [_session]), '测试小吴的串');
+      expect(threadOwnerOf(talk, const [_session])?.id, 'w1');
     });
 
     test('the @word at the caret; whom it offers', () {
@@ -397,7 +424,7 @@ void main() {
       await _pump(t, const ChatPage(), server, _state());
       await t.tap(_rich('1 条回复'));
       await t.pump(const Duration(milliseconds: 50));
-      expect(find.text('测试小吴的工单串'), findsOneWidget);
+      expect(find.text('修好打卡的测试'), findsOneWidget);
       expect(server.to('GET', '/api/v1/channels/c3/messages'), hasLength(1));
       expect(_rich('测试都过了'), findsWidgets);
       expect(find.text('做完了'), findsOneWidget);
@@ -454,7 +481,7 @@ void main() {
 
       await t.tap(find.text('1 条回复'));
       await t.pump(const Duration(milliseconds: 50));
-      expect(find.text('测试小吴的工单串'), findsOneWidget);
+      expect(find.text('修好打卡的测试'), findsOneWidget);
       expect(find.text('@w1'), findsWidgets);
       expect(_rich('测试都过了'), findsOneWidget);
       await t.enterText(find.byType(TextField), '再跑一次');
@@ -464,8 +491,18 @@ void main() {
 
       await t.tap(find.bySemanticsLabel('回到田头').first);
       await t.pump(const Duration(milliseconds: 50));
-      expect(find.text('测试小吴的工单串'), findsNothing);
+      expect(find.text('修好打卡的测试'), findsNothing);
       expect(_rich('农场开门了'), findsOneWidget);
+    });
+
+    testWidgets('an issue\'s thread keeps the issue\'s title after its session has left', (t) async {
+      final server = FakeServer(_answer);
+      final gone = _state(sessions: const []);
+      await _pump(t, window(server, gone, []), server, gone);
+      await t.tap(find.text('1 条回复'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(find.text('修好打卡的测试'), findsOneWidget);
+      expect(find.text('现在没有帮工在干，串还留着'), findsOneWidget);
     });
 
     testWidgets('a picked helper leaves the field wide: in the narrow window its chip is the head, its name a tooltip', (t) async {

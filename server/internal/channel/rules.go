@@ -116,9 +116,11 @@ type chatAudienceInput struct {
 	FromKind protocol.SenderKind  `json:"fromKind"`
 	Kind     protocol.MessageKind `json:"kind"`
 	Mentions []string             `json:"mentions"`
-	// Only its Kind, SubjectKind and SubjectID are read.
+	// Only its Kind is read.
 	Conversation protocol.Conversation `json:"conversation"`
-	Sessions     []string              `json:"sessions"`
+	// In a thread, the session its words are for: the one working the thread's issue now, "" when none is.
+	ThreadOwner string   `json:"threadOwner,omitzero"`
+	Sessions    []string `json:"sessions"`
 	// Sessions when nil.
 	OnFarm    []string          `json:"onFarm"`
 	Followers []string          `json:"followers"`
@@ -183,8 +185,8 @@ func chatAudience(i chatAudienceInput) []chatDelivery {
 	}
 	thread := i.Conversation.Kind == protocol.ConversationKindThread
 	owner := ""
-	if thread && i.Conversation.SubjectKind != nil && *i.Conversation.SubjectKind == protocol.SubjectKindIssue && i.Conversation.SubjectID != nil {
-		owner = *i.Conversation.SubjectID
+	if thread {
+		owner = i.ThreadOwner
 	}
 	if i.FromKind == protocol.SenderKindUser {
 		if owner != "" {

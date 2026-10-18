@@ -7,11 +7,11 @@ import (
 
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/testkit"
-	"vibevalley/pkg/x/ptr"
 )
 
-func rulesJobOf(session string) protocol.Conversation {
-	return protocol.Conversation{Kind: protocol.ConversationKindThread, SubjectKind: ptr.To(protocol.SubjectKindIssue), SubjectID: ptr.To(session)}
+// A message in an issue's thread, owner the session working the issue now ("" for none).
+func rulesJobOf(i *chatAudienceInput, owner string) {
+	i.Conversation, i.ThreadOwner = protocol.Conversation{Kind: protocol.ConversationKindThread}, owner
 }
 
 var rulesAudienceBase = chatAudienceInput{
@@ -89,23 +89,29 @@ func TestThePersonOnTheGeneral(t *testing.T) {
 }
 
 func TestThePersonInAJobThread(t *testing.T) {
-	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) { i.Conversation, i.Followers = rulesJobOf("w1"), []string{"w1", "w2"} }), [][4]any{
+	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) { rulesJobOf(i, "w1"); i.Followers = []string{"w1", "w2"} }), [][4]any{
 		rulesRow("w1", "own_thread", true, ""),
 		rulesRow("w2", "follower", true, ""),
 	})
 	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) {
-		i.Conversation, i.Mentions = rulesJobOf("w1"), []string{protocol.ManagerAgent}
+		rulesJobOf(i, "w1")
+		i.Mentions = []string{protocol.ManagerAgent}
 	}), [][4]any{
 		rulesRow(protocol.ManagerAgent, "mention", true, ""),
 		rulesRow("w1", "own_thread", true, ""),
 	})
-	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) { i.Conversation = rulesJobOf("w9") }), [][4]any{}, "a session that left is no one's to wake")
+	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) { rulesJobOf(i, "w9") }), [][4]any{}, "a session that left is no one's to wake")
+	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) { rulesJobOf(i, ""); i.Followers = []string{"w2"} }), [][4]any{
+		rulesRow("w2", "follower", true, ""),
+	}, "an issue no session works: only those who follow its thread hear the person")
+	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) { rulesJobOf(i, "") }), [][4]any{}, "and with no one following, the words are only kept")
 }
 
 func TestAgentsWakingAgents(t *testing.T) {
 	bySession := func(change func(*chatAudienceInput)) func(*chatAudienceInput) {
 		return func(i *chatAudienceInput) {
-			i.From, i.FromKind, i.Conversation = "w1", protocol.SenderKindAgent, rulesJobOf("w1")
+			i.From, i.FromKind = "w1", protocol.SenderKindAgent
+			rulesJobOf(i, "w1")
 			change(i)
 		}
 	}
@@ -122,14 +128,16 @@ func TestAgentsWakingAgents(t *testing.T) {
 	})[0], rulesRow("w2", "mention", true, ""))
 	testkit.Eq(t, rulesAudience(bySession(func(i *chatAudienceInput) { i.Mentions = []string{"everyone", "w1"} })), [][4]any{})
 	testkit.Eq(t, rulesAudience(func(i *chatAudienceInput) {
-		i.From, i.FromKind, i.Conversation = protocol.ManagerAgent, protocol.SenderKindManager, rulesJobOf("w1")
+		i.From, i.FromKind = protocol.ManagerAgent, protocol.SenderKindManager
+		rulesJobOf(i, "w1")
 	}), [][4]any{rulesRow("w1", "own_thread", true, "")})
 }
 
 func TestReportsDispatchesNotices(t *testing.T) {
 	report := func(outcome protocol.Outcome, forTask bool) func(*chatAudienceInput) {
 		return func(i *chatAudienceInput) {
-			i.From, i.FromKind, i.Kind, i.Conversation, i.Outcome, i.ForTask = "w1", protocol.SenderKindAgent, protocol.MessageKindReport, rulesJobOf("w1"), &outcome, forTask
+			i.From, i.FromKind, i.Kind, i.Outcome, i.ForTask = "w1", protocol.SenderKindAgent, protocol.MessageKindReport, &outcome, forTask
+			rulesJobOf(i, "w1")
 		}
 	}
 	testkit.Eq(t, rulesAudience(report(protocol.OutcomeCompleted, false)), [][4]any{rulesRow(protocol.ManagerAgent, "addressed", false, "")})

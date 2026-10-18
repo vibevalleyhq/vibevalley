@@ -434,15 +434,6 @@ func (c *Service) publishMessage(id string, answers *string) {
 	c.core.Apply(fact)
 }
 
-func (c *Service) issueThreadOf(session string) *string {
-	id, err := c.store().threadOfSubject(string(protocol.SubjectKindIssue), session)
-	if err != nil {
-		log.Printf("chat: job thread of %s: %v", session, err)
-		return nil
-	}
-	return id
-}
-
 // A refusal's words are for the person.
 func chatFail(format string, args ...any) error { return fmt.Errorf(format, args...) }
 
@@ -450,7 +441,7 @@ func (c *Service) resolveTarget(who, target string) (string, error) {
 	s := c.store()
 	if str.Trim(target) == "" {
 		if who != protocol.ManagerAgent && who != "user" {
-			if own := c.issueThreadOf(who); own != nil {
+			if own := c.threadOfSession(who); own != nil {
 				return *own, nil
 			}
 		}
@@ -558,7 +549,7 @@ func (c *Service) Say(text string, conversation *string, sendKey string) (messag
 func (c *Service) TellSession(from, session, text string) (protocol.ChatMessage, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	thread := c.issueThreadOf(session)
+	thread := c.threadOfSession(session)
 	if thread == nil {
 		// Hired with no channel, so no thread to say it in: the session hears it straight.
 		if c.sessions.Find(session) == nil {
@@ -850,7 +841,8 @@ func (c *Service) MarkRead(conversation string, seq int64) error {
 	return nil
 }
 
-func (c *Service) JobThread(session string) *string { return c.issueThreadOf(session) }
+// The thread of the issue the session works (a talk thread of its own when it works none).
+func (c *Service) JobThread(session string) *string { return c.threadOfSession(session) }
 
 func (c *Service) ForManager() *base.Hub[ManagerNews] { return c.manager }
 

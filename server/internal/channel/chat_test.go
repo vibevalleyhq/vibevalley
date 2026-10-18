@@ -17,6 +17,7 @@ import (
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
 	"vibevalley/pkg/x/clock"
+	"vibevalley/pkg/x/ptr"
 	"vibevalley/pkg/x/str"
 )
 
@@ -274,6 +275,35 @@ func TestChatJobOpensThreadUnderDispatch(t *testing.T) {
 	if got := f.Channel.JobThread("w1"); got == nil || *got != thread.ID {
 		t.Fatalf("JobThread: %v", got)
 	}
+}
+
+// A session sent for no issue talks in a talk thread of its own, never in an issue's; the person's words there still wake it.
+func TestChatSessionSentForNoIssueHasATalkThread(t *testing.T) {
+	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	talk := x.hire(t, "w1", "写 hello", "chat-t", nil)
+	if talk.SubjectKind == nil || *talk.SubjectKind != protocol.SubjectKindTalk || talk.SubjectID == nil || *talk.SubjectID != "w1" {
+		t.Fatalf("a talk thread: %+v", talk)
+	}
+	f.Core.Apply(protocol.FactHired{Session: protocol.Session{
+		ID: "w2", Name: "帮工w2", Agent: "lab", Runtime: "pi", Brief: "写 world", Project: ptr.To("chat-t"), Issue: ptr.To("i1"), HiredAt: clock.NowMs(),
+		Phase: protocol.Phase{Value: protocol.PhaseResting{}},
+	}})
+	job := testkit.Await(t, "the issue's thread", func() (protocol.Conversation, bool) {
+		c := chatConversation(f, f.Channel.JobThread("w2"))
+		return ptr.Value(c), c != nil
+	})
+	if job.SubjectKind == nil || *job.SubjectKind != protocol.SubjectKindIssue || job.SubjectID == nil || *job.SubjectID != "i1" || job.ID == talk.ID {
+		t.Fatalf("the issue's thread: %+v", job)
+	}
+	for _, c := range f.Core.State().Chat.Conversations {
+		if c.SubjectKind != nil && *c.SubjectKind == protocol.SubjectKindIssue && c.SubjectID != nil && *c.SubjectID == "w1" {
+			t.Fatalf("an issue thread for a session sent for no issue: %+v", c)
+		}
+	}
+	if _, _, err := f.Channel.Say("把输出改成中文", &talk.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Until(t, "a second turn", func() bool { return len(x.runsOf("w1")) >= 2 })
 }
 
 func TestChatPersonInJobThreadWakesSession(t *testing.T) {
