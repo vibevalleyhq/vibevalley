@@ -270,13 +270,17 @@ class _CommentableState extends State<_Commentable> {
             Stack(
               children: [
                 widget.child,
+                // Covers the mark and the time whole, so the row reads 评论 there instead of half a time.
                 if (send != null && !_writing && (_hover || _tapped))
                   Positioned(
                     top: 0,
+                    bottom: 0,
                     right: 0,
                     child: Container(
+                      width: 104,
                       color: Palette.cream50,
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.only(right: 10),
+                      alignment: Alignment.centerRight,
                       child: InlineLink('评论', onTap: () => setState(() => _writing = true)),
                     ),
                   ),
@@ -770,15 +774,13 @@ class _ToolStepState extends State<_ToolStep> {
                     child: Text(farm != null ? '田头' : actionText[action] ?? '', style: KitText.sm.copyWith(color: Palette.bark800)),
                   ),
                   const SizedBox(width: 8),
+                  // The whole command is one tap away (the row opens), not a tooltip as wide as the window.
                   Expanded(
-                    child: Tooltip(
-                      message: step.text,
-                      child: Text(
-                        what,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: KitText.mono.copyWith(color: Palette.bark600),
-                      ),
+                    child: Text(
+                      what,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: KitText.mono.copyWith(color: Palette.bark600),
                     ),
                   ),
                   const SizedBox(width: 8),

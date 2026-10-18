@@ -126,6 +126,8 @@ ThemeData farmTheme() {
     chipTheme: const ChipThemeData(backgroundColor: Palette.cream50, shape: square, side: pxLine),
     dividerTheme: const DividerThemeData(color: Palette.bark900, thickness: 2),
     tooltipTheme: const TooltipThemeData(
+      // A long message wraps instead of running the width of the window.
+      constraints: BoxConstraints(maxWidth: 480),
       decoration: BoxDecoration(color: Palette.bark900),
       textStyle: TextStyle(color: Palette.cream50, fontFamily: pixelFont),
     ),
