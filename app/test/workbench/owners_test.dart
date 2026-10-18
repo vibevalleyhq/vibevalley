@@ -136,7 +136,7 @@ void main() {
           sendKey: 'k1',
           conversation: const Conversation(id: 'c', kind: ConversationKind.channel, replies: 0, at: 0),
         );
-    await c.read(farmCommandsProvider).plant(2, 'seed', 'helper');
+    await c.read(farmCommandsProvider).plant(2, 'seed', agent: 'helper');
     expect(server.requests.map((r) => jsonDecode(r.body)), [
       {'text': 'hello', 'conversation': 'c', 'sendKey': 'k1'},
       {'text': 'seed', 'bed': 2, 'agent': 'helper', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))},

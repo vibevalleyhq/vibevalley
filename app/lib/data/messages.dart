@@ -35,7 +35,7 @@ class Messages {
   }
 
   /// [sendKey] names this one send: a retry with the same key is the message already said, not a second one.
-  Future<void> send(String text, {required String sendKey, Conversation? conversation, int? bed, String? agent}) async {
+  Future<void> send(String text, {required String sendKey, Conversation? conversation, int? bed, String? agent, String? project}) async {
     final said = text.trim();
     if (said.isEmpty || !await _ready()) return;
     final pick = ref.read(prefsProvider).pick;
@@ -50,6 +50,7 @@ class Messages {
             conversation: conversation?.kind == ConversationKind.general ? null : conversation?.id,
             bed: bed?.toDouble(),
             agent: agent ?? chosen,
+            project: project,
             sendKey: sendKey,
           ),
         );

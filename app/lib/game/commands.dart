@@ -76,7 +76,21 @@ class FarmCommands {
 
   String _issueOf(String session) => (_farm?.sessions ?? const <Session>[]).firstWhere((w) => w.id == session).issueId;
 
-  Future<void> plant(int station, String text, [String? agent]) => ref.read(messagesProvider).send(text, sendKey: newSendKey(), bed: station, agent: agent);
+  /// `project`: the one the owner chose on the sowing form; the manager is told to sow it there.
+  Future<void> plant(int station, String text, {String? agent, String? project}) =>
+      ref.read(messagesProvider).send(text, sendKey: newSendKey(), bed: station, agent: agent, project: project);
+
+  /// A queued todo started on this bed. Not ok: still waiting, or refused; the text is the server's why.
+  Future<Answer> startQueued(String issue, int station) async {
+    final got = await _answer(() async {
+      final d = await _api.issue.start(
+        id: issue,
+        body: IssueStartRequest(bed: station.toDouble()),
+      );
+      return d.queued ?? '';
+    });
+    return (ok: got.ok && got.text.isEmpty, text: got.text);
+  }
 
   /// The click's decision: read the farm once, so the page's sound and the command use the same aim.
   PlotAim aim(Bed bed) {

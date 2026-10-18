@@ -4,6 +4,7 @@ import 'package:vibevalley/game/tools.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/farm.dart';
+
 import 'package:vibevalley/workbench/map/map_rules.dart';
 import 'package:vibevalley/shared/swatches.dart' show Pose;
 import 'package:vibevalley/rules/sessions.dart';
@@ -55,15 +56,6 @@ void main() {
   test('bugText does not stack its own words', () {
     expect(bugText('修登录'), '接着修：修登录。看一下报错，修好再跑一遍测试');
     expect(bugText(bugText('修登录')), '接着修：修登录。看一下报错，修好再跑一遍测试');
-  });
-
-  test('seedsFor: past jobs first, each once and short, then jobs for projects, then any; eight at most', () {
-    final seeds = seedsFor(['修登录', '修登录', 'x' * 61], ['clock-in']);
-    expect(seeds.first, '修登录');
-    expect(seeds.where((s) => s == '修登录'), hasLength(1));
-    expect(seeds, isNot(contains('x' * 61)));
-    expect(seeds[1], '看看 clock-in 的测试有没有挂，挂了就修');
-    expect(seeds, hasLength(seedCount));
   });
 
   test('stageCursor: the tool, its ok, no and press forms; the glove over a thing in the yard', () {

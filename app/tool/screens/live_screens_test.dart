@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/app/router.dart';
+import 'package:vibevalley/audio/sfx.dart';
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/data/server.dart';
@@ -23,8 +24,9 @@ import 'package:vibevalley/app/app.dart';
 import 'package:vibevalley/data/ui_state.dart';
 
 // name: route, or 'route|text' to tap the (last) widget showing that text once the page is up: a tab, a panel's
-// button; with no such text, the one with it as its tooltip or semantic label (an icon button). VIBEVALLEY_PAGES=name,
-// name… draws only those.
+// button; with no such text, the one with it as its tooltip or semantic label (an icon button); 'route|a|b' taps a, then
+// b. VIBEVALLEY_PAGES=name,name… draws only those. A sow… page opens the farm's sowing bag on the first bed before its
+// taps: it wants a project in the farm's work root (the others pick clock-in).
 const pages = {
   'title': '/',
   'farm': '/',
@@ -64,6 +66,10 @@ const pages = {
   'assets': '/catalog',
   'assets-cursors': '/catalog/cursors',
   'assets-sounds': '/catalog/sounds',
+  'sow': '/',
+  'sow-bag': '/|clock-in',
+  'sow-seed': '/|clock-in|修一个 bug：〔现象〕',
+  'sow-queued': '/|clock-in|开工待办',
 };
 
 void main() {
@@ -71,6 +77,8 @@ void main() {
   testWidgets('every page against a live server', (tester) async {
     if (address == null) return markTestSkipped('VIBEVALLEY_SERVER is not set');
     final semantics = tester.ensureSemantics();
+    // No audio plugin under flutter_test: a panel's sound would fail the run.
+    Sfx.output = _Quiet();
     // Real sockets: flutter_test answers every HTTP request with 400 unless told otherwise.
     HttpOverrides.global = null;
     await tester.runAsync(() async {
@@ -114,6 +122,15 @@ void main() {
           await tester.pump(const Duration(milliseconds: 50));
         }
         expect(router.routeInformationProvider.value.uri.path, path, reason: '$name must render its requested route');
+        if (name.startsWith('sow')) {
+          container.read(farmOverlaysProvider.notifier).sow(null);
+          await tester.pump();
+          container.read(farmOverlaysProvider.notifier).sow(0);
+          for (var i = 0; i < 20; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+        }
         Future<void> shoot(String file) async {
           final boundary = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
           final image = await boundary.toImage();
@@ -122,8 +139,17 @@ void main() {
           File(file).writeAsBytesSync(png!.buffer.asUint8List());
         }
 
+        for (final text in tap.isEmpty ? const <String>[] : tap.sublist(0, tap.length - 1)) {
+          final target = _target(text).last;
+          await tester.ensureVisible(target);
+          await tester.tap(target);
+          for (var i = 0; i < 20; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+        }
         if (tap.isNotEmpty) {
-          final target = _target(tap.first).last;
+          final target = _target(tap.last).last;
           await tester.ensureVisible(target);
           await tester.tap(target);
           var at = 0;
@@ -153,4 +179,9 @@ Finder _target(String text) {
     if (found.evaluate().isNotEmpty) return found;
   }
   return find.text(text);
+}
+
+class _Quiet implements SfxOutput {
+  @override
+  Future<void> play(String name, Uint8List wav) async {}
 }

@@ -136,6 +136,9 @@ class ProjectCatalog extends AsyncNotifier<List<ProjectSummary>> {
   }
 }
 
+/// The sowing form's seeds for one project, as the server fills them (project.seeds).
+final projectSeedsProvider = FutureProvider.autoDispose.family<ProjectSeeds, String>((ref, project) => ref.watch(apiProvider).project.seeds(id: project));
+
 final projectNamesProvider = FutureProvider.autoDispose<List<String>>((ref) async => [for (final p in await ref.watch(projectCatalogProvider.future)) p.name]);
 
 const stepLimit = 240;

@@ -120,11 +120,12 @@ class _Synced {
   _Synced(String value) : controller = TextEditingController(text: value);
   final TextEditingController controller;
 
-  void follow(String value) {
+  /// `at`: where the cursor goes when the text is replaced from outside; the end when not given.
+  void follow(String value, [TextSelection? at]) {
     if (controller.text == value) return;
     controller.value = TextEditingValue(
       text: value,
-      selection: TextSelection.collapsed(offset: value.length),
+      selection: at ?? TextSelection.collapsed(offset: value.length),
     );
   }
 }
@@ -353,11 +354,15 @@ class PxTextArea extends StatefulWidget {
     this.semanticLabel,
     this.focusNode,
     this.autofocus = false,
+    this.selection,
   });
 
   final String value;
   final ValueChanged<String> onChanged;
   final int rows;
+
+  /// What is selected when [value] is replaced from outside (a blank to fill in); the cursor goes to the end without it.
+  final TextSelection? selection;
   final String? placeholder;
   final bool enabled;
   final bool readOnly;
@@ -390,7 +395,7 @@ class _PxTextAreaState extends State<PxTextArea> {
       (old.focusNode ?? _own)?.removeListener(_refocus);
       _focus.addListener(_refocus);
     }
-    _text.follow(widget.value);
+    _text.follow(widget.value, widget.selection);
   }
 
   @override

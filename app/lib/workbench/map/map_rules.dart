@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:ui' show Offset, Rect;
 
 import '../../gen/vibevalley.dart';
+import '../../rules/issues.dart' show queuedIn;
 import '../../rules/sessions.dart';
 import '../../shared/swatches.dart' show Pose;
 
@@ -61,7 +62,7 @@ List<Island> islandsOf({
         byName[name],
         [...sessions.where((h) => h.project == name)]..sort((a, b) => a.hiredAt.compareTo(b.hiredAt)),
         plots,
-        [...issues.where((i) => i.project == name && i.status == IssueStatus.todo)]..sort((a, b) => a.queuedAt!.compareTo(b.queuedAt!)),
+        queuedIn(issues, name),
         free,
       ),
   ];

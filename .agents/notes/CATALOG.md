@@ -27,6 +27,12 @@
 
 - 2026-10-18 [用 VibeValley 开发 VibeValley](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
 
+## implemented（1 篇）
+
+### feature
+
+- 2026-10-18 [播种袋的种子由服务端给](.agents/notes/implemented/feature/2026-10-18-seed-catalog-from-the-server.md)
+
 ## rejected（2 篇）
 
 ### feature

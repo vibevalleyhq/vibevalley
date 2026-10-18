@@ -37,6 +37,10 @@ IssueTag issueTag(Issue issue) {
 
 bool isForManager(Issue issue) => issue.assignee == managerAgent;
 
+/// The project's todos waiting for room, first queued first: the seed bags at its gate.
+List<Issue> queuedIn(List<Issue> issues, String project) =>
+    [...issues.where((i) => i.project == project && i.status == IssueStatus.todo && i.queuedAt != null)]..sort((a, b) => a.queuedAt!.compareTo(b.queuedAt!));
+
 String issueTitle(Issue issue, [List<TaskGraph> graphs = const []]) {
   final job = issue.title.trim();
   if (job.isEmpty) return issue.id;

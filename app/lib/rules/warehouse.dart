@@ -11,11 +11,3 @@ List<ChatMessage> turnReportsOf(CoreState? s) => [
 ]..sort((a, b) => b.at.compareTo(a.at));
 
 Issue? issueOfSession(CoreState? s, String session) => (s?.issues ?? const <Issue>[]).where((i) => i.sessions.contains(session)).firstOrNull;
-
-List<String> askedOf(CoreState? s) {
-  final all = [
-    for (final i in s?.issues ?? const <Issue>[])
-      if (i.graph == null && i.parent == null) i,
-  ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-  return [for (final i in all) i.title];
-}

@@ -54,8 +54,8 @@ class FarmPanels extends ConsumerWidget {
           return FarmLayer(
             key: const ValueKey('sow'),
             title: '播种 · 第 ${station + 1} 块地',
-            icon: 'icon-harvest',
-            size: FarmDialogSize.md,
+            icon: 'icon-seeds',
+            size: FarmDialogSize.lg,
             onClose: () => actions.sow(null),
             child: SeedForm(station: station, onDone: () => actions.sow(null)),
           );

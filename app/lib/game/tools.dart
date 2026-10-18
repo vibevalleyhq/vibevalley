@@ -127,34 +127,6 @@ String bugText(String task) {
   return '接着修：$original。看一下报错，修好再跑一遍测试';
 }
 
-const seedCount = 8;
-
-/// A job longer than this is a task step's brief or a long instruction, not a seed to sow again.
-const seedLength = 60;
-
-final _projectSeeds = <String Function(String)>[
-  (p) => '看看 $p 的测试有没有挂，挂了就修',
-  (p) => '给 $p 的 README 补上怎么启动',
-  (p) => '给 $p 最近改的地方补上测试',
-  (p) => '把 $p 里没用的代码和依赖清一清',
-];
-const _anySeeds = ['看看测试有没有挂，挂了就修', '给 README 补上怎么启动', '给最近改的地方补上测试', '把没用的代码和依赖清一清'];
-
-List<String> seedsFor(List<String> asked, List<String> projects, [int count = seedCount]) {
-  final seeds = <String>[];
-  void add(String text) {
-    final t = text.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (t.isNotEmpty && t.runes.length <= seedLength && !seeds.contains(t) && seeds.length < count) seeds.add(t);
-  }
-
-  asked.forEach(add);
-  for (final seed in _projectSeeds) {
-    projects.map(seed).forEach(add);
-  }
-  _anySeeds.forEach(add);
-  return seeds;
-}
-
 /// The young farmer stands in for a look not painted.
 String managerSprite(String look, String suffix, bool Function(String) has) => has('manager-$look$suffix') ? 'manager-$look$suffix' : 'manager$suffix';
 

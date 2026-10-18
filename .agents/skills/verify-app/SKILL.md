@@ -39,6 +39,7 @@ description: 改了 VibeValley 的客户端（app/lib/**、app/assets）之后�
    - `VIBEVALLEY_SCREEN=390x844`：手机大小；默认 1440×900。
    - `VIBEVALLEY_EXTRA='名字=/路由,…'`：额外页面。路由里的 `|文字` 会点击对应文本或 tooltip。
    - `VIBEVALLEY_FRAMES=40,90,150`：点击后这些毫秒各画一帧。
+   - 播种袋（`sow`、`sow-bag`、`sow-seed`、`sow-queued`）：先在 `$VIBEVALLEY_WORK_ROOT/projects/clock-in` 放一个 `go.mod`（再放一个别的项目，`sow` 才是「种在哪个项目？」）。
 4. 改代码后重新执行同一条命令；脚本会重新编译和启动服务端。
 
 ## 证据

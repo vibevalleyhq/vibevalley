@@ -176,23 +176,6 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
   });
 
-  testWidgets('the seed bag sows a seed on its bed, by the agent picked', (tester) async {
-    final routes = Routes();
-    final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes, {'GET /api/v1/projects': []}), agents: agents));
-    c.read(farmOverlaysProvider.notifier).sow(3);
-    await settle(tester);
-    expect(find.text('播种 · 第 4 块地'), findsOneWidget);
-    await tester.tap(find.text('给 README 补上怎么启动'));
-    await tester.pump();
-    await tester.tap(find.text('前端阿郑'));
-    await tester.pump();
-    await tester.tap(find.text('播种').last);
-    await settle(tester);
-    final say = routes.calls.where((x) => x.path == '/api/v1/say').single;
-    expect(say.body, {'text': '给 README 补上怎么启动', 'bed': 3, 'agent': 'front', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
-    expect(c.read(sowingProvider), isNull);
-  });
-
   testWidgets('the watering can takes a drop of advice to the helper', (tester) async {
     final routes = Routes();
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes), agents: agents));
