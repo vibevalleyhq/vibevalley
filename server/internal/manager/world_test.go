@@ -30,19 +30,19 @@ type world struct {
 type worldServices struct {
 	fx.In
 
-	DB        *sql.DB
-	Core      *core.Service
-	Agent     *agent.Service
-	Setting   *setting.Service
-	Project   *project.Service
-	Memory    *memory.Service
-	Runtime   *runtime.Service
-	Session   *session.Service
-	Channel   *channel.Service
-	Issue     *issue.Service
-	TaskGraph *task.Service
-	Schedule  *schedule.Service
-	Manager   *Service
+	DB       *sql.DB
+	Core     *core.Service
+	Agent    *agent.Service
+	Setting  *setting.Service
+	Project  *project.Service
+	Memory   *memory.Service
+	Runtime  *runtime.Service
+	Session  *session.Service
+	Channel  *channel.Service
+	Issue    *issue.Service
+	Task     *task.Service
+	Schedule *schedule.Service
+	Manager  *Service
 }
 
 func newWorld(cfg base.Config, options ...fx.Option) (*world, error) {

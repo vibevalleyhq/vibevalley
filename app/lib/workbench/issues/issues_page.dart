@@ -252,8 +252,10 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
               : row.missingSessions.isNotEmpty || row.sessions.isEmpty
               ? MissingSessionCard(row)
               : IssueCard(row.issue, row.sessions, issueTag(row.issue), issueSession(farm, row.issue)),
-      for (final p in graphs)
-        if (taskLane(p) case final lane?) TaskCard(p, lane),
+      // A task's lane is its parent issue's status, which the server works out from the task's state.
+      for (final row in entries)
+        if (row.issue.graph != null && laneOf(row.issue.status) != Lane.closed)
+          if (graphs.where((p) => p.id == row.issue.id).firstOrNull case final p?) TaskCard(p, laneOf(row.issue.status)),
     ];
     final id = widget.id;
     final open = id == null ? null : all.where((c) => c.id == id || (c is IssueCard && issueIs(c.issue, id))).firstOrNull;

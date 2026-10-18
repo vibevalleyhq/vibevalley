@@ -245,7 +245,7 @@ func TestOnlyWhatIsToldIsCountedAsRecalled(t *testing.T) {
 	}
 	f := withFake(t, &fakeProvider{name: "nowledge", available: true, lines: lines})
 	for i := range recallCount {
-		if _, err := f.Memory.Write(Note{Agent: "lab", Text: "测试用 "+words[recallCount+i], Project: "demo", By: protocol.MemoryAuthorOwner}); err != nil {
+		if _, err := f.Memory.Write(Note{Agent: "lab", Text: "测试用 " + words[recallCount+i], Project: "demo", By: protocol.MemoryAuthorOwner}); err != nil {
 			t.Fatal(err)
 		}
 	}

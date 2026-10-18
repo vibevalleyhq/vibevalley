@@ -29,7 +29,7 @@ void main() {
     expect(aimTool(Tool.water, bed0, null, empty, 1).ok, isFalse);
     expect(aimTool(Tool.bug, bed0, w, const PlotView(crop: Crop.withered), 1).ok, isTrue);
     expect(aimTool(Tool.bug, bed0, w, empty, 1).text, '这块地没有虫');
-    expect(aimTool(Tool.weed, bed0, w, const PlotView(crop: Crop.weeds), 1).text, '批准还没接上');
+    expect(aimTool(Tool.weed, bed0, w, const PlotView(crop: Crop.weeds), 1).text, '帮工修完、验收通过草就拔了');
     final ripe = session('w2', phase: const PhaseRipe());
     expect(aimTool(Tool.harvest, bed0, ripe, const PlotView(crop: Crop.wheat), 1).text, '收获，帮工收工');
     expect(aimTool(Tool.harvest, bed0, session('w3', phase: const PhaseResting()), empty, 1).text, '收获：看看它改了什么');

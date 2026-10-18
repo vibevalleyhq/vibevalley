@@ -49,12 +49,6 @@ String issueTitle(Issue issue, [List<TaskGraph> graphs = const []]) {
 
 bool issueIs(Issue issue, String id) => issue.id == id || issue.sessions.contains(id);
 
-Lane? taskLane(TaskGraph p) => switch (p.state) {
-  GraphState.splitting || GraphState.running => Lane.working,
-  GraphState.draft || GraphState.paused || GraphState.ripe => Lane.waiting,
-  GraphState.done || GraphState.abandoned => null,
-};
-
 String taskLine(TaskGraph p) => switch (p.state) {
   GraphState.splitting => '在拆步骤',
   GraphState.draft => '拆好了，看过再开工',

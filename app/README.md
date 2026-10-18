@@ -68,4 +68,4 @@ VIBEVALLEY_SERVER=http://127.0.0.1:8899 flutter test tool/screens/live_screens_t
 
 - 没有模拟服务器：调试台的命令都对着真服务端。
 - Flutter 没有图片鼠标指针：农场里的工具指针画在画面上，图鉴的「指针」只展示图。
-- 每天的时间和定时的下次运行按这台机器的时区算。
+- 定时什么时候、下次什么时候，由服务端按定时自己的时区写好（`whenText`、`nextText`），客户端只显示。

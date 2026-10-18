@@ -11,7 +11,7 @@ import (
 
 // As vvagent's PrefixChanged names the parts.
 var managerPrefixParts = map[string]string{
-	"instructions": "说明", "env": "环境", "skills": "技能", "memory": "记性", "situation": "农场现状", "tools": "工具",
+	"instructions": "说明", "env": "环境", "skills": "技能", "memory": "记性", "tools": "工具",
 }
 
 func managerTokens(u ai.Usage) protocol.EventTokens {

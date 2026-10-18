@@ -62,7 +62,7 @@ func (l *ledger) entries() ([]protocol.LedgerEntry, error) {
 	return out, nil
 }
 
-// Against a copy of the core state folded from the same events, to see each fact against what was before it.
+// Reads core.Transitions: each fact with the state before it, so the ledger folds nothing itself.
 func (l *ledger) OnStart(ctx context.Context) error {
 	did, stopDid := l.core.OwnerDids().Subscribe()
 	l.stopDid = stopDid

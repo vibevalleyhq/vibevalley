@@ -36,7 +36,7 @@ void main() {
     expect(bell.ring([fresh, old]), isEmpty);
   });
 
-  test('calls become notifications in the Electron client words, opening what they are about', () {
+  test('calls become notifications in the farm words, opening what they are about', () {
     expect(noticeForCall(_call('a', InboxKind.merge)), const HostNotice('阿土 做完了', '修好登录页', HostOpenSession('h1')));
     expect(noticeForCall(_call('b', InboxKind.fix)).title, '阿土 没做成');
     expect(noticeForCall(_call('c', InboxKind.quiet)).body, '可能在跑很久的命令，也可能卡住了：看看它的干活过程。');

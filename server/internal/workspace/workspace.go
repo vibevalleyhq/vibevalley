@@ -49,7 +49,7 @@ type services struct {
 	Session   *session.Service
 	Issue     *issue.Service
 	Channel   *channel.Service
-	TaskGraph *task.Service
+	Task      *task.Service
 	Schedule  *schedule.Service
 	Tool      *tool.Service
 	Manager   *manager.Service

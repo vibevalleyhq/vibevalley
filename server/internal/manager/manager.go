@@ -184,24 +184,24 @@ type manager struct {
 
 type managerIn struct {
 	fx.In
-	Config    base.Config
-	Core      *core.Service
-	Agent     *agent.Service
-	Setting   *setting.Service
-	Runtime   *runtime.Service
-	Project   *project.Service
-	Run       *session.Service
-	Issue     *issue.Service
-	Channel   *channel.Service
-	TaskGraph *task.Service
-	Schedule  *schedule.Service
-	Tool      *tool.Service
+	Config   base.Config
+	Core     *core.Service
+	Agent    *agent.Service
+	Setting  *setting.Service
+	Runtime  *runtime.Service
+	Project  *project.Service
+	Run      *session.Service
+	Issue    *issue.Service
+	Channel  *channel.Service
+	Task     *task.Service
+	Schedule *schedule.Service
+	Tool     *tool.Service
 }
 
 func newManager(in managerIn) (*manager, error) {
 	return &manager{
 		cfg: in.Config, core: in.Core, store: in.Agent, settings: in.Setting, runtimes: in.Runtime,
-		projects: in.Project, run: in.Run, issue: in.Issue, chat: in.Channel, tasks: in.TaskGraph, schedule: in.Schedule,
+		projects: in.Project, run: in.Run, issue: in.Issue, chat: in.Channel, tasks: in.Task, schedule: in.Schedule,
 		tool: in.Tool,
 		ctx:  context.Background(),
 	}, nil

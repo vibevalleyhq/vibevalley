@@ -5,7 +5,7 @@ import FlutterMacOS
 import ServiceManagement
 import UserNotifications
 
-// vibevalley's desktop app, the Swift half (the Dart half is lib/desktop/desktop.dart, over the method channel
+// vibevalley's desktop app, the Swift half (the Dart half is lib/host/desktop.dart, over the method channel
 // `vibevalley/desktop`): one instance, the menu bar icon and its menu, system notifications, the global voice shortcut
 // (⌥⇧Space), opening at login, and quitting only after Dart has stopped the farm it started. Closing the window
 // leaves the farm in the menu bar, out of the Dock (docs/subsystems/app.md).

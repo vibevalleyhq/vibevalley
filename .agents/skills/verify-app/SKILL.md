@@ -9,7 +9,7 @@ description: 改了 VibeValley 的客户端（app/lib/**、app/assets）之后�
 
 ## 什么时候用
 
-- 改了 `app/lib/desk`、`app/lib/farm`、`app/lib/village`、`app/lib/chat`、`app/lib/shared`、`app/lib/ui` 的画面。
+- 改了 `app/lib/workbench`、`app/lib/farm`、`app/lib/village`、`app/lib/chat`、`app/lib/shared`、`app/lib/ui` 的画面。
 - 改了 `app/assets` 的贴图、字体。
 - 改了形状，想看服务端的新字段在页面上画出来。
 

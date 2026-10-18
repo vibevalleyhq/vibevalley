@@ -1,4 +1,4 @@
-// The game's title scene (app/lib/shell/title/: scene.dart, layers.dart; first written for the retired web page):
+// The game's title scene (app/lib/title/: scene.dart, layers.dart; first written for the retired web page):
 // the farm at an hour of the day, clouds crossing, smoke from the chimney, plants swaying along the bottom, seeds
 // blowing off the dandelions, fireflies at dusk and night, and the farmer with his pet on the hill. Everything is
 // placed in shares of the scene's own pixels (1536 x 1024), so it stays put on the picture however the page crops it.

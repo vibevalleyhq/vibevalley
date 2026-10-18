@@ -1,6 +1,6 @@
-// The voice line's choices and rules, a port of server/internal/protocol/voice.go and settings.go: what each stage
-// offers, the limits on the numbers, why settings cannot be saved, the overrides over the defaults and how a key is
-// shown. Change them there and here together.
+// The voice form's choices: what each stage offers, the limits on the numbers, the overrides over the defaults and how
+// a key is shown. The limits mirror server/internal/setting/voice_rules.go; change them there and here together. Why
+// settings cannot be saved is the server's answer (setting.check), not worked out here.
 
 import 'dart:convert';
 

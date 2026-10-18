@@ -14,14 +14,14 @@ func TestTaskLog(t *testing.T) {
 	}
 	defer f.Close()
 	graph := protocol.TaskGraph{ID: "p1", Title: "打卡", Goal: "做打卡", Project: "demo", State: protocol.GraphStateSplitting, Parallel: 3}
-	f.TaskGraph.Record(nil, graph, protocol.GraphActorUser, "")
+	f.Task.Record(nil, graph, protocol.GraphActorUser, "")
 	next := graph
 	next.State = protocol.GraphStateAbandoned
-	f.TaskGraph.Record(&graph, next, protocol.GraphActorSystem, "重启了")
+	f.Task.Record(&graph, next, protocol.GraphActorSystem, "重启了")
 	if _, err := f.DB.Exec("insert into task_event (id, graph_id, kind, actor, created_at) values ('pe-gone', 'p1', 'gone', 'system', 1)"); err != nil {
 		t.Fatal(err)
 	}
-	events := f.TaskGraph.List("p1")
+	events := f.Task.List("p1")
 	if len(events) != 2 {
 		t.Fatalf("events: %+v", events)
 	}
@@ -31,7 +31,7 @@ func TestTaskLog(t *testing.T) {
 	if events[1].Kind != protocol.GraphEventKindAbandoned || taskStr(events[1].Detail) != "重启了" || events[1].ID <= events[0].ID {
 		t.Fatalf("second: %+v", events[1])
 	}
-	if len(f.TaskGraph.List("p2")) != 0 {
+	if len(f.Task.List("p2")) != 0 {
 		t.Fatal("another task's history")
 	}
 }

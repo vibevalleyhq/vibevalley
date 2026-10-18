@@ -250,7 +250,7 @@ func newTaskTestFarm(t *testing.T, home string, release chan struct{}, before fu
 	}
 	tf := &taskTestFarm{world: f, sessions: newTaskFakeSessions(f, release)}
 	tf.projects = &taskFakeProjects{sessions: tf.sessions}
-	f.TaskGraph.sessions, f.TaskGraph.projects, f.TaskGraph.check = tf.sessions, tf.projects, func(a protocol.Agent) runtime.Assessment { return runtime.Assessment{Agent: a} }
+	f.Task.sessions, f.Task.projects, f.Task.check = tf.sessions, tf.projects, func(a protocol.Agent) runtime.Assessment { return runtime.Assessment{Agent: a} }
 	for _, a := range f.Agent.Agents() {
 		a.Effort = ""
 		if _, err := f.Agent.SaveAgent(a); err != nil {
@@ -298,7 +298,7 @@ var taskIDIn = regexp.MustCompile(`（(p\d+)）`)
 
 func (tf *taskTestFarm) split(t *testing.T, goal, project string) string {
 	t.Helper()
-	said, err := tf.TaskGraph.Split(goal, project, "", protocol.GraphActorUser)
+	said, err := tf.Task.Split(goal, project, "", protocol.GraphActorUser)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func (tf *taskTestFarm) split(t *testing.T, goal, project string) string {
 
 func (tf *taskTestFarm) act(t *testing.T, id string, action protocol.GraphAction) string {
 	t.Helper()
-	said, err := tf.TaskGraph.Act(id, action, protocol.GraphActorUser)
+	said, err := tf.Task.Act(id, action, protocol.GraphActorUser)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +331,7 @@ func taskState(graph protocol.TaskGraph, id string) protocol.TaskState {
 
 func TestTaskDiamond(t *testing.T) {
 	tf := newTaskTestFarm(t, t.TempDir(), nil, nil)
-	news, stopNews := tf.TaskGraph.News().Subscribe()
+	news, stopNews := tf.Task.News().Subscribe()
 	defer stopNews()
 	id := tf.split(t, "菱形", "diamond")
 	draft := tf.until(t, id, func(graph protocol.TaskGraph) bool {
@@ -353,7 +353,7 @@ func TestTaskDiamond(t *testing.T) {
 		t.Fatalf("news: %s", got)
 	}
 	check := "test -f steps/b.txt && test -f steps/c.txt && test -f steps/d.txt"
-	if _, err := tf.TaskGraph.EditTask(id, "d", protocol.TaskEdit{Check: &check}, protocol.GraphActorManager); err != nil {
+	if _, err := tf.Task.EditTask(id, "d", protocol.TaskEdit{Check: &check}, protocol.GraphActorManager); err != nil {
 		t.Fatal(err)
 	}
 
@@ -383,7 +383,7 @@ func TestTaskDiamond(t *testing.T) {
 	}
 	tf.until(t, id, func(graph protocol.TaskGraph) bool { return graph.State == protocol.GraphStateDone })
 
-	history := tf.TaskGraph.Events(id)
+	history := tf.Task.Events(id)
 	var task []string
 	for _, e := range history {
 		if e.Task == nil {
@@ -475,7 +475,7 @@ func TestGraphFailingTask(t *testing.T) {
 	if taskIn(stuck, "flaky").Tries != 1 {
 		t.Fatalf("flaky: its check failed once: %+v", taskIn(stuck, "flaky"))
 	}
-	if !slices.ContainsFunc(tf.TaskGraph.Events(id), func(e protocol.GraphEvent) bool {
+	if !slices.ContainsFunc(tf.Task.Events(id), func(e protocol.GraphEvent) bool {
 		return e.Kind == protocol.GraphEventKindTaskSentBack && taskStr(e.Task) == "flaky" && e.Actor == protocol.GraphActorSystem &&
 			strings.Contains(taskStr(e.Detail), "没通过")
 	}) {
@@ -484,7 +484,7 @@ func TestGraphFailingTask(t *testing.T) {
 	if taskIn(stuck, "boom").Failures != 1 {
 		t.Fatalf("boom failed once: %+v", taskIn(stuck, "boom"))
 	}
-	if _, err := tf.TaskGraph.TaskAct(id, "boom", protocol.TaskActionRetry, protocol.GraphActorUser); err != nil {
+	if _, err := tf.Task.TaskAct(id, "boom", protocol.TaskActionRetry, protocol.GraphActorUser); err != nil {
 		t.Fatal(err)
 	}
 	stuck = tf.until(t, id, func(graph protocol.TaskGraph) bool {
@@ -501,10 +501,10 @@ func TestGraphFailingTask(t *testing.T) {
 	if after.State != protocol.TaskStateWaiting || fmt.Sprint(protocol.BlockedBy(stuck, after)) != "[boom]" || stuck.State != protocol.GraphStateRunning {
 		t.Fatalf("after: %+v, task %s", after, stuck.State)
 	}
-	if _, err := tf.TaskGraph.TaskAct(id, "nope", protocol.TaskActionSkip, protocol.GraphActorUser); err == nil || !strings.Contains(err.Error(), "没有「nope」") {
+	if _, err := tf.Task.TaskAct(id, "nope", protocol.TaskActionSkip, protocol.GraphActorUser); err == nil || !strings.Contains(err.Error(), "没有「nope」") {
 		t.Fatal(err)
 	}
-	skipped, err := tf.TaskGraph.TaskAct(id, "boom", protocol.TaskActionSkip, protocol.GraphActorUser)
+	skipped, err := tf.Task.TaskAct(id, "boom", protocol.TaskActionSkip, protocol.GraphActorUser)
 	if err != nil || !strings.Contains(skipped, "跳过了") {
 		t.Fatal(skipped, err)
 	}
@@ -521,7 +521,7 @@ func TestGraphFailingTask(t *testing.T) {
 	if gone.Branch == nil || !strings.Contains(said, "分支 "+*gone.Branch+" 留着") {
 		t.Fatal(said)
 	}
-	if _, err := tf.TaskGraph.Act(id, protocol.GraphActionMerge, protocol.GraphActorUser); err == nil || !strings.Contains(err.Error(), "不能收获") {
+	if _, err := tf.Task.Act(id, protocol.GraphActionMerge, protocol.GraphActorUser); err == nil || !strings.Contains(err.Error(), "不能收获") {
 		t.Fatal(err)
 	}
 }
@@ -533,15 +533,15 @@ func TestTaskSentBackOnce(t *testing.T) {
 	if draft.Title != "改好了" || len(draft.Tasks) != 1 || draft.Tasks[0].ID != "fixed" {
 		t.Fatalf("draft: %+v", draft)
 	}
-	_, err := tf.TaskGraph.EditTask(id, "fixed", protocol.TaskEdit{Needs: []string{"fixed"}}, protocol.GraphActorUser)
+	_, err := tf.Task.EditTask(id, "fixed", protocol.TaskEdit{Needs: []string{"fixed"}}, protocol.GraphActorUser)
 	if err == nil || !strings.Contains(err.Error(), "不能等自己") {
 		t.Fatal(err)
 	}
-	if _, err := tf.TaskGraph.Changes(id); err == nil || !strings.Contains(err.Error(), "没有分支") {
+	if _, err := tf.Task.Changes(id); err == nil || !strings.Contains(err.Error(), "没有分支") {
 		t.Fatal(err)
 	}
 	tf.act(t, id, protocol.GraphActionAbandon)
-	if _, err := tf.TaskGraph.Split(" ", "x", "", protocol.GraphActorUser); err == nil {
+	if _, err := tf.Task.Split(" ", "x", "", protocol.GraphActorUser); err == nil {
 		t.Fatal("an empty goal is refused")
 	}
 }
@@ -573,7 +573,7 @@ func TestTaskRestart(t *testing.T) {
 	if taskState(ripe, "slow") != protocol.TaskStateMerged {
 		t.Fatal(ripe)
 	}
-	if events := second.TaskGraph.Events(id); events[0].Kind != protocol.GraphEventKindSplitting {
+	if events := second.Task.Events(id); events[0].Kind != protocol.GraphEventKindSplitting {
 		t.Fatal(events)
 	}
 }

@@ -42,7 +42,7 @@ type worldServices struct {
 	Session   *session.Service
 	Channel   *channel.Service
 	Issue     *issue.Service
-	TaskGraph *task.Service
+	Task      *task.Service
 	Schedule  *schedule.Service
 	Manager   *manager.Service
 	Connector *Service

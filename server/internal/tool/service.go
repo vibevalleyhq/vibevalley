@@ -34,22 +34,22 @@ type Service struct {
 
 type serviceIn struct {
 	fx.In
-	Core      *core.Service
-	Agent     *agent.Service
-	Project   *project.Service
-	Memory    *memory.Service
-	Runtime   *runtime.Service
-	Run       *session.Service
-	Channel   *channel.Service
-	Schedule  *schedule.Service
-	Issue     *issue.Service
-	TaskGraph *task.Service
+	Core     *core.Service
+	Agent    *agent.Service
+	Project  *project.Service
+	Memory   *memory.Service
+	Runtime  *runtime.Service
+	Run      *session.Service
+	Channel  *channel.Service
+	Schedule *schedule.Service
+	Issue    *issue.Service
+	Task     *task.Service
 }
 
 func newService(in serviceIn) (*Service, error) {
 	return &Service{
 		core: in.Core, agents: in.Agent, projects: in.Project, memory: in.Memory, runtimes: in.Runtime, run: in.Run,
-		chat: in.Channel, schedule: in.Schedule, issue: in.Issue, tasks: in.TaskGraph,
+		chat: in.Channel, schedule: in.Schedule, issue: in.Issue, tasks: in.Task,
 	}, nil
 }
 

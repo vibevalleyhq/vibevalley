@@ -19,8 +19,6 @@ import (
 
 const MinEveryMinutes = 1
 
-const MissedAfterMS = 5 * 60_000
-
 var scheduleTime = regexp.MustCompile(`^([01]?\d|2[0-3]):([0-5]\d)$`)
 
 var Weekdays = [7]string{"日", "一", "二", "三", "四", "五", "六"}

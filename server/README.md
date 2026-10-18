@@ -12,7 +12,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 
 | 包 | 管什么 |
 |---|---|
-| `internal/protocol` | 形状和接口的唯一来源（`shapes.go`、`api.go`）和生成的 `gen.go`；核心状态的全部规则（`Reduce` 和各种纯函数）；`seeds.json`（种子档案、默认设置、农机的能力、成就） |
+| `internal/protocol` | 形状和接口的唯一来源（`shapes.go`、`api.go`）和生成的 `gen.go`；核心状态的折法（`Reduce`）和几个包都用的纯规则（只有一个主人的规则在主人包里）；`seeds.json`（种子档案、默认设置、农机的能力、成就） |
 | `internal/base` | 地基，不放业务：数据库和迁移、`Hub`、存文件、id、`Config`（viper 读 YAML 和环境变量）、生命周期 |
 | `internal/core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`gate`、`voice`、`connector`、`game` | 服务，一块业务一个包（见「服务」） |
 | `internal/workspace` | 把全部包组装成一个 Workspace（`workspace.go`：`Workspace` 握着全部服务） |
@@ -27,7 +27,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 | `pkg/smith` | oar 的 Go 移植（[README](server/pkg/smith/README.md)），驱动各家编码 agent |
 | `cmd/server` | 单独跑的服务端：固定听 `127.0.0.1`，端口来自配置（默认 8787）；配置来自 `$VIBEVALLEY_HOME/vibevalley.yaml` 和 `VIBEVALLEY_*` 环境变量（`--config` 指别的文件）；`--log 文件` 把日志也追加到文件里 |
 | `cmd/vibevalley` | 命令行：`<组> <操作>` 调农场的一个接口（从 `protocol.Endpoints` 来，经 `protocol.Client`），`state`、`events` 读两条流，`runtime chat <农机>` 在本机和一个农机直接聊（不经农场），`oar <命令>` 是 smith 的 oar 命令行（`pkg/smith/cli`，`detect`、`models`、`login`、`run`……），这两个的农机和服务端的一样（`runtime.Registry`），不带命令是 VibeValley 自己的 agent |
-| `cmd/migrate` | 表结构：`status` 看库在第几版、`up` 跑没跑过的、`new 名字` 在 `migrations/` 写下一个 `000N_名字.sql`；库和服务端读的是同一个（`--config`、`VIBEVALLEY_HOME`、`VIBEVALLEY_DB`）。服务端开机照旧自己跑 |
+| `cmd/migrate` | 表结构：`status` 看库在第几版、`up` 跑基线；库和服务端读的是同一个（`--config`、`VIBEVALLEY_HOME`、`VIBEVALLEY_DB`）。服务端开机照旧自己跑 |
 | `tool` | 开发时的工具，不进产品：`shapegen`（Go）从 `protocol` 的形状写出 `gen.go` 和 Flutter 的 `lib/gen`；Node 脚本 `pi-prices.ts`（自己的 `package.json`）写 pi 的价目表 `internal/runtime/pi_prices.json` |
 
 ## 服务
@@ -72,11 +72,11 @@ HTTP（`handler`）在最上面，经 `Workspace` 用全部服务；`workspace` 
 
 拒绝是普通的 `error`，文字给主人看；`handler/api.go` 把它变成 `Refused`。
 
-核心状态只经 `Core.Apply(protocol.FactX{…})` 改。数据库是 SQLite（`vibevalley.db`，一个连接，所以 seq 的顺序就是提交的顺序；时间存毫秒），表在 `migrations/`；工单的查询由 sqlc 生成（`pkg/db`），别的服务直接写 SQL。
+核心状态只经 `Core.Apply(protocol.FactX{…})` 改。数据库是 SQLite（`vibevalley.db`，一个连接，所以 seq 的顺序就是提交的顺序；时间存毫秒），表在 `migrations/`；SQL 只写在 `pkg/db/queries/<表>.sql`，Go 里只调 sqlc 生成的（`pkg/db/generated`）。
 
 ## 形状和规则从哪来
 
-形状和规则都只在这里的 `protocol` 包（[理由](docs/subsystems/foundation.md)）。形状写在 `shapes.go`：结构体、`type X string` 加常量的枚举、带标签的联合（`//vibevalley:union` 和成员上的 `//vibevalley:member`）、接口的错误（`//vibevalley:error`）；接口写在 `api.go` 的 `Handlers` 里，每个方法带 `//vibevalley:route` 和 `//vibevalley:can`（谁能调：`owner`、`remote`、`manager`、`session`，写成 `protocol.Endpoints` 和 [能力表](docs/reference/capabilities.md)，院门按它放行）；数字 id 的路径参数写 `int64`（查询参数 `*int64`），生成的 `Mount` 解析，处理函数拿到的就是数字。改了它们跑：
+形状和规则都只在这里的 `protocol` 包（[理由](docs/subsystems/foundation.md)）。形状写在 `shapes.go`：结构体、`type X string` 加常量的枚举、带标签的联合（`//vibevalley:union` 和成员上的 `//vibevalley:member`）、接口的错误（`//vibevalley:error`）；接口写在 `api.go` 的 `Handlers` 里，每个方法带 `//vibevalley:route` 和 `//vibevalley:can`（谁能调：`owner`、`remote`、`manager`、`session`，写成 `protocol.Endpoints` 和 [能力表](docs/reference/capabilities.md)，院门按它放行）；id 都是 uuid 字符串；数字的查询参数写 `*int64`，生成的 `Mount` 解析。改了它们跑：
 
 ```bash
 go run ./tool/shapegen          # 写 protocol/gen.go 和 ../app/lib/gen/vibevalley.dart；-check 只查是不是最新

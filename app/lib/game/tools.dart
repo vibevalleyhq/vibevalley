@@ -12,7 +12,7 @@ enum Tool {
   hand('手', '点一块地看详情，点空地播种', 'icon-hand'),
   water('浇水', '给帮工带句话，正在干活的会中途收到', 'icon-water'),
   bug('杀虫', '活没做成（地里有虫）：让它接着修', 'icon-bug'),
-  weed('除草', '帮工请你批准的事会长成杂草', 'icon-weed'),
+  weed('除草', '没过验收的意见会长成杂草：帮工修完、下一次验收通过就拔掉', 'icon-weed'),
   harvest('收获', '熟了的地：收下成果，帮工收工', 'icon-harvest'),
   shovel('铲除', '正在干活的叫停；没在干活的请它收工', 'icon-shovel');
 
@@ -110,7 +110,7 @@ Aim aimTool(Tool tool, Bed bed, Session? session, PlotView plot, int level) {
     case Tool.bug:
       return session != null && crop == Crop.withered ? const Aim(true, '杀虫：让它接着修') : const Aim(false, '这块地没有虫');
     case Tool.weed:
-      return Aim(false, crop == Crop.weeds ? '批准还没接上' : '没有杂草');
+      return Aim(false, crop == Crop.weeds ? '帮工修完、验收通过草就拔了' : '没有杂草');
     case Tool.harvest:
       // A task's step goes into the task's branch by itself; the whole task is harvested on its board.
       if (session?.graph != null) return const Aim(false, '计划里的一步：做完自动合进计划分支');

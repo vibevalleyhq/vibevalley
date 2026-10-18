@@ -150,27 +150,27 @@ func (a api) SessionEvents(_ context.Context, id string, run *string) ([]protoco
 }
 
 func (a api) GraphSplit(_ context.Context, body protocol.GraphSplitRequest) (string, error) {
-	s, err := a.f.TaskGraph.Split(body.Goal, body.Project, ptr.Value(body.Agent), protocol.GraphActorUser)
+	s, err := a.f.Task.Split(body.Goal, body.Project, ptr.Value(body.Agent), protocol.GraphActorUser)
 	return s, refused(err)
 }
 
 func (a api) GraphUpdateTask(_ context.Context, id, node string, body protocol.TaskEdit) (string, error) {
-	s, err := a.f.TaskGraph.EditTask(id, node, body, protocol.GraphActorUser)
+	s, err := a.f.Task.EditTask(id, node, body, protocol.GraphActorUser)
 	return s, refused(err)
 }
 
 func (a api) GraphDeleteTask(_ context.Context, id, node string) (string, error) {
-	s, err := a.f.TaskGraph.RemoveTask(id, node, protocol.GraphActorUser)
+	s, err := a.f.Task.RemoveTask(id, node, protocol.GraphActorUser)
 	return s, refused(err)
 }
 
 func (a api) GraphAct(_ context.Context, id string, body protocol.GraphActRequest) (string, error) {
-	s, err := a.f.TaskGraph.Act(id, body.Action, protocol.GraphActorUser)
+	s, err := a.f.Task.Act(id, body.Action, protocol.GraphActorUser)
 	return s, refused(err)
 }
 
 func (a api) GraphTaskAct(_ context.Context, id, node string, body protocol.TaskActRequest) (string, error) {
-	s, err := a.f.TaskGraph.TaskAct(id, node, body.Action, protocol.GraphActorUser)
+	s, err := a.f.Task.TaskAct(id, node, body.Action, protocol.GraphActorUser)
 	return s, refused(err)
 }
 
@@ -190,12 +190,12 @@ func (a api) ChannelMarkRead(_ context.Context, id string, body protocol.ChatRea
 }
 
 func (a api) GraphChanges(_ context.Context, id string) (protocol.Changes, error) {
-	c, err := a.f.TaskGraph.Changes(id)
+	c, err := a.f.Task.Changes(id)
 	return c, refused(err)
 }
 
 func (a api) GraphEvents(_ context.Context, id string) ([]protocol.GraphEvent, error) {
-	return a.f.TaskGraph.Events(id), nil
+	return a.f.Task.Events(id), nil
 }
 
 func (a api) GameChooseTitle(_ context.Context, body protocol.ChooseTitleRequest) error {

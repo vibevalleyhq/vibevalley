@@ -6,9 +6,9 @@ export const FACTS = [
   { key: 'machines', n: 4, icon: 'machine-tractor' },
   // 7 species × 4 outfits (server/internal/protocol/shapes.go).
   { key: 'looks', n: 28, icon: 'bear-farmer-side' },
-  // Helpers at work at once (MaxRunning, server/internal/protocol/farm.go).
+  // Helpers at work at once (MaxRunning, server/internal/protocol/shapes.go).
   { key: 'plots', n: 6, icon: 'plot-wheat' },
-  // server/internal/protocol/progress.go.
+  // The achievements in server/internal/protocol/seeds.json.
   { key: 'achievements', n: 21, icon: 'icon-trophy' },
   // The games on the farm phone (app/lib/phone/screens.dart).
   { key: 'games', n: 5, icon: 'icon-star' },

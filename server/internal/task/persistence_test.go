@@ -32,7 +32,7 @@ func TestFailedTaskCommitStopsActions(t *testing.T) {
 	for _, action := range []string{"pause", "resume", "abandon", "retry", "skip", "edit", "sendBack"} {
 		t.Run(action, func(t *testing.T) {
 			tf := newTaskTestFarm(t, t.TempDir(), nil, nil)
-			p := tf.TaskGraph.tasks
+			p := tf.Task.tasks
 			graph := protocol.TaskGraph{ID: "p900", Title: "保存失败", Project: "test", State: protocol.GraphStateRunning, Parallel: 1,
 				Tasks: []protocol.Task{{ID: "a", Title: "步骤", Brief: "做事", State: protocol.TaskStateFailed, Session: new("w900")}}}
 			if action == "resume" {

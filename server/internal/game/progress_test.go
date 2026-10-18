@@ -171,9 +171,6 @@ func TestTitles(t *testing.T) {
 	testkit.Eq(t, progressOf([]protocol.LedgerEntry{progressKind(protocol.LedgerEntryMomentKindOpened), titled("s_open", 1)}).Title, (*protocol.ProgressTitle)(nil))
 }
 
-func TestCarried(t *testing.T) {
-}
-
 func progressSession(id string, phase protocol.PhaseValue) protocol.Session {
 	return protocol.Session{ID: id, Name: id, Agent: "lab", Runtime: "pi", Brief: "…", HiredAt: 0, Runs: 0, Phase: protocol.Phase{Value: phase}}
 }

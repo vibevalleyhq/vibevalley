@@ -2,7 +2,7 @@ import Cocoa
 import FlutterMacOS
 
 // The farm's window: the system's title bar hidden (its traffic lights stay) and the farm drawing its own 28 px bar
-// (lib/desktop/desktop.dart desktopTitleBar), which moves the window when dragged. Sized to the pixel farm's screen
+// (lib/host/desktop.dart desktopTitleBar), which moves the window when dragged. Sized to the pixel farm's screen
 // (protocol GAME_SCREEN, 384×256) at the largest whole multiple the screen has room for, and snapped back to a whole
 // multiple after a resize. Closing it keeps the farm
 // running in the menu bar (AppDelegate).

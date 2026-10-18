@@ -963,17 +963,17 @@ type ArchiveFile struct {
 }
 
 type Memory struct {
-	ID         string     `json:"id"`
-	Agent      string     `json:"agent"`
-	Kind       MemoryKind `json:"kind"`
-	Text       string     `json:"text"`
+	ID    string     `json:"id"`
+	Agent string     `json:"agent"`
+	Kind  MemoryKind `json:"kind"`
+	Text  string     `json:"text"`
 	// Who wrote it; an agent's own note carries the Session that wrote it. None: not known (an outside source, the manager's MEMORY.md).
-	Author *MemoryAuthor `json:"author,omitzero"`
-	Project    *string    `json:"project,omitzero"`
-	Session    *string    `json:"session,omitzero"`
-	At         int64      `json:"at"`
-	Recalled   int64      `json:"recalled"`
-	RecalledAt *int64     `json:"recalledAt,omitzero"`
+	Author     *MemoryAuthor `json:"author,omitzero"`
+	Project    *string       `json:"project,omitzero"`
+	Session    *string       `json:"session,omitzero"`
+	At         int64         `json:"at"`
+	Recalled   int64         `json:"recalled"`
+	RecalledAt *int64        `json:"recalledAt,omitzero"`
 	// Among the first to go if a few more are kept (NextForgotten): the longest unused.
 	Fading bool `json:"fading,omitzero"`
 	// The memory source it is from (MemorySourceInfo.Name); none: this farm's own.
