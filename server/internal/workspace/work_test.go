@@ -576,7 +576,6 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	testkit.Match(t, steps[4].Text, `做完了：看看目录`, "said")
 }
 
-
 func TestFailedRunSaysWhy(t *testing.T) {
 	home, work := dirs(t)
 	w := openWorld(t, home, work)

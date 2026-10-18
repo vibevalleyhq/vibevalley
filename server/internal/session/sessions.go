@@ -922,4 +922,3 @@ func (c *sessions) Find(id string) *Roster {
 	}
 	return nil
 }
-

@@ -245,7 +245,6 @@ func (j *journal) Asked(text string, from From) {
 	j.addLocked(protocol.SessionEvent{Type: protocol.SessionEventTypeUserMessage, Text: str.Cut(str.Trim(text), AskedMax)}, from)
 }
 
-
 // runOn goes on with what is being said or thought, by the same one, in the draft; anything else starts a new one.
 func (j *journal) runOn(kind protocol.SessionEventType, text string, from From) {
 	if text == "" {
