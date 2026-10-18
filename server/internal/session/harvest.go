@@ -65,7 +65,7 @@ func (c *sessions) SubmitPullRequest(ctx context.Context, id string, issue proto
 	return c.harvest(id, protocol.IssueCloseMerged, func(place project.Workplace) (project.Merged, error) {
 		h := c.hand(id)
 		h.mu.Lock()
-		conclusion := h.lastText
+		conclusion := pullRequestConclusion(h.lastText)
 		h.mu.Unlock()
 		pr, err := c.projects.SubmitPullRequest(ctx, place, issue, conclusion)
 		if err != nil {

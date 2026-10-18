@@ -77,6 +77,7 @@ func TestPullRequestHarvest(t *testing.T) {
 				return nil, fmt.Errorf("unexpected gh %v", args)
 			}
 			w.f.Project.GitHubProbe = probe
+			w.f.Project.GitFetch = func(_ context.Context, cwd, branch string) error { return sessionGit(cwd, "fetch", bare, branch) }
 			w.f.Project.GitPush = func(ctx context.Context, cwd, branch string) error {
 				pushes++
 				return sessionGit(cwd, "push", "-u", "origin", branch)
@@ -108,6 +109,7 @@ func TestPullRequestHarvest(t *testing.T) {
 			w = openWorldAt(t, home, work, db, configure)
 			w.f.Project.RefreshGitHub(context.Background())
 			w.f.Project.GitHubProbe = probe
+			w.f.Project.GitFetch = func(_ context.Context, cwd, branch string) error { return sessionGit(cwd, "fetch", bare, branch) }
 			restored, e := w.f.Issue.Get(issue.ID)
 			if e != nil || restored.PullRequest == nil || restored.PullRequest.Number != 7 {
 				t.Fatalf("restored: %+v %v", restored, e)

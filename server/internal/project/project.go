@@ -169,6 +169,7 @@ func reason(err error) string {
 type Service struct {
 	githubDetection
 	GitPush    func(context.Context, string, string) error
+	GitFetch   func(context.Context, string, string) error
 	prProjects []string
 	// root is the projects folder; trees and the house rules are beside it, in the work root.
 	root  string
@@ -389,6 +390,12 @@ func (p *Service) Workplace(project, session string, worktree bool, baseBranch s
 	}
 	if err := os.MkdirAll(p.trees, 0o755); err != nil {
 		return Workplace{}, err
+	}
+	if !gitOk(path, "show-ref", "--verify", "refs/heads/"+branch) && p.UsesPullRequests(project) {
+		main := p.syncMain(project)
+		if baseBranch == "" {
+			baseBranch = main
+		}
 	}
 	if baseBranch == "" {
 		baseBranch = "HEAD"

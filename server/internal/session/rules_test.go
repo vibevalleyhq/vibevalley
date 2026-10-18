@@ -253,3 +253,9 @@ func TestCommentOnlyFromItsMark(t *testing.T) {
 		t.Fatalf("a comment on step 3: %v", on)
 	}
 }
+
+func TestPullRequestConclusion(t *testing.T) {
+	testkit.Eq(t, pullRequestConclusion("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明"), "已完成 abc123\n第二行", "verdict paragraph")
+	text := strings.Repeat("完整的最后一轮回复。", 20) + "\n\n最后一段"
+	testkit.Eq(t, pullRequestConclusion(text), text, "full reply without verdict")
+}

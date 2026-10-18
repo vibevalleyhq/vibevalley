@@ -174,11 +174,11 @@
 
 检查失败不会把工单关成 `done`：拒绝收获时仍是 `in_review`，帮工、分支和 worktree 都保留；帮工收到带话开始修以后，状态照常变成 `in_progress`，交回来再回到 `in_review`。帮工合进种植计划分支也先跑同一检查。种植计划和 PR 路径检查帮工当前分支；本地收获检查包含主分支的合并结果。
 
-**提 PR**：项目名列在 `github.pr_projects` 且 `pullRequest.available` 为真时，收获照旧提交剩余改动、查冲突，并在项目锁外跑 `.vibevalley/check`。检查通过后取得项目锁，核对检查过的提交，再由农场执行 `git push -u origin <工单分支>`，用工单标题、编号、帮工最后一轮原话和检查结果创建 PR；已记录开着的 PR 时只推分支。创建后未收到或未存下回执，重试会先查询已有 PR。推送或 gh 失败会拒绝本次收获，保留工单和帮工。
+**提 PR**：项目名列在 `github.pr_projects` 且 `pullRequest.available` 为真时，收获照旧提交剩余改动、查冲突，并在项目锁外跑 `.vibevalley/check`。检查通过后取得项目锁，核对检查过的提交，再由农场执行 `git push -u origin <工单分支>`，用工单标题、编号、帮工最后一轮的「结论：」段落和检查结果创建 PR；找不到结论时放完整的最后一轮原话。有 `.vibevalley/check` 且通过时写「.vibevalley/check 通过。」；没有时写「这个项目没有 .vibevalley/check，没跑检查。」已记录开着的 PR 时只推分支。创建后未收到或未存下回执，重试会先查询已有 PR。推送或 gh 失败会拒绝本次收获，保留工单和帮工。
 
 工单的 `pullRequest` 保存 `url`、`number`、`state`（`open`、`merged`、`closed`）。PR 开着时工单留在 `in_review`，帮工、worktree 和分支保留；挪到待办带话再干一轮，再收获会更新同一个 PR。已有开着的 PR 时，即使检测暂时不可用也继续这条路径。
 
-农场每 `github.pr_poll_seconds` 秒（默认 180）查询开着的 PR；`github refresh` 可手动触发。合并后工单关成 `merged`，未合并就关闭则关成 `dismissed`，清掉 worktree 和本地分支，帮工离开。帮工仍在干活或有待开始的一轮时保留现场，下次轮询再结束；查询失败保持原状态并报告。远端分支由 GitHub 管，农场不删除；主人的检出从 origin 拉取。
+农场每 `github.pr_poll_seconds` 秒（默认 180）查询开着的 PR；`github refresh` 可手动触发。合并后工单关成 `merged`，未合并就关闭则关成 `dismissed`，清掉 worktree 和本地分支，帮工离开。帮工仍在干活或有待开始的一轮时保留现场，下次轮询再结束；查询失败保持原状态并报告。远端分支由 GitHub 管，农场不删除；走 PR 的项目在结束 PR、创建新的工单分支前，在项目目录执行 `git fetch origin <主分支>`；工作区干净且能快进时，检出在主分支用 `git merge --ff-only`，否则用 `git update-ref` 更新主分支。fetch 失败、工作区不干净或无法快进时保留本地主分支并记日志，新工单照旧从本地主分支开；已有工单分支和 worktree 直接复用。
 
 **收工和铲除**：关掉会话、帮工离开；分支上有没合的提交就留着，没有就删。
 

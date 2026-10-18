@@ -81,7 +81,7 @@ func conclusion(text string, min int) string {
 	return tail
 }
 
-func SummaryOf(text string) string {
+func reportVerdict(text string) string {
 	if all := verdict.FindAllStringIndex(text, -1); len(all) > 0 {
 		last := all[len(all)-1]
 		// The verdict's own paragraph: a note written after it is not part of it.
@@ -90,7 +90,21 @@ func SummaryOf(text string) string {
 			return verdict
 		}
 	}
+	return ""
+}
+
+func SummaryOf(text string) string {
+	if verdict := reportVerdict(text); verdict != "" {
+		return verdict
+	}
 	return conclusion(text, 80)
+}
+
+func pullRequestConclusion(text string) string {
+	if verdict := reportVerdict(text); verdict != "" {
+		return verdict
+	}
+	return text
 }
 
 // Said out loud on the farm, not only in the report.
