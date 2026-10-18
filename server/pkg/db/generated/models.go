@@ -146,6 +146,7 @@ type GateDevice struct {
 }
 
 type Issue struct {
+	PullRequest sql.NullString
 	ID          string
 	Number      int64
 	Title       string

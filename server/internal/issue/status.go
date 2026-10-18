@@ -129,7 +129,11 @@ func (s *Service) SetStatus(ctx context.Context, id string, to protocol.IssueSta
 	// The session's leaving closes the issue too, but later (issues.left): closed here, the answer already says so.
 	case moveMerge:
 		if _, err = s.Merge(id); err == nil {
-			err = s.issues.closeAs(id, protocol.IssueCloseMerged)
+			var updated protocol.Issue
+			updated, err = s.Get(id)
+			if err == nil && (updated.PullRequest == nil || updated.PullRequest.State != protocol.PullRequestStateOpen) {
+				err = s.issues.closeAs(id, protocol.IssueCloseMerged)
+			}
 		}
 	case moveCancel:
 		if err = s.Cancel(id); err == nil {

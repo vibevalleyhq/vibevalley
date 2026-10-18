@@ -1154,14 +1154,29 @@ type IssueHistory struct {
 	MissingSessions []string  `json:"missingSessions"`
 }
 
+type PullRequestState string
+
+const (
+	PullRequestStateOpen   PullRequestState = "open"
+	PullRequestStateMerged PullRequestState = "merged"
+	PullRequestStateClosed PullRequestState = "closed"
+)
+
+type PullRequest struct {
+	URL    string           `json:"url"`
+	Number int64            `json:"number"`
+	State  PullRequestState `json:"state"`
+}
+
 type Issue struct {
-	ID          string   `json:"id"`
-	Number      int64    `json:"number"`
-	Title       string   `json:"title"`
-	Description string   `json:"description,omitzero"`
-	Project     *string  `json:"project,omitzero"`
-	Assignee    *string  `json:"assignee,omitzero"`
-	Priority    Priority `json:"priority"`
+	PullRequest *PullRequest `json:"pullRequest,omitzero"`
+	ID          string       `json:"id"`
+	Number      int64        `json:"number"`
+	Title       string       `json:"title"`
+	Description string       `json:"description,omitzero"`
+	Project     *string      `json:"project,omitzero"`
+	Assignee    *string      `json:"assignee,omitzero"`
+	Priority    Priority     `json:"priority"`
 	// First lowest.
 	Rank      int64       `json:"rank,omitzero"`
 	CreatedAt int64       `json:"createdAt"`

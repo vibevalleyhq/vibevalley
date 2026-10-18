@@ -2822,8 +2822,34 @@ class IssueHistory {
   };
 }
 
+enum PullRequestState {
+  open('open'),
+  merged('merged'),
+  closed('closed');
+
+  const PullRequestState(this.wire);
+  final String wire;
+
+  static PullRequestState fromJson(Object? v) =>
+      values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('PullRequestState: unknown value', v));
+}
+
+class PullRequest {
+  const PullRequest({required this.url, required this.number, required this.state});
+
+  factory PullRequest.fromJson(Map<String, dynamic> j) =>
+      PullRequest(url: j['url'] as String, number: (j['number'] as num).toDouble(), state: PullRequestState.fromJson(j['state']));
+
+  final String url;
+  final double number;
+  final PullRequestState state;
+
+  Map<String, dynamic> toJson() => {'url': url, 'number': number, 'state': state.wire};
+}
+
 class Issue {
   const Issue({
+    this.pullRequest,
     required this.id,
     required this.number,
     required this.title,
@@ -2847,6 +2873,7 @@ class Issue {
   });
 
   factory Issue.fromJson(Map<String, dynamic> j) => Issue(
+    pullRequest: j['pullRequest'] == null ? null : PullRequest.fromJson(j['pullRequest'] as Map<String, dynamic>),
     id: j['id'] as String,
     number: (j['number'] as num).toDouble(),
     title: j['title'] as String,
@@ -2869,6 +2896,7 @@ class Issue {
     moves: [for (final e in j['moves'] as List) IssueStatus.fromJson(e)],
   );
 
+  final PullRequest? pullRequest;
   final String id;
   final double number;
   final String title;
@@ -2891,6 +2919,7 @@ class Issue {
   final List<IssueStatus> moves;
 
   Map<String, dynamic> toJson() => {
+    if (pullRequest != null) 'pullRequest': pullRequest!.toJson(),
     'id': id,
     'number': number,
     'title': title,

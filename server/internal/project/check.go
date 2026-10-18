@@ -99,3 +99,27 @@ func unchangedBranch(path, branch, checked string) error {
 	}
 	return nil
 }
+
+func (p *Service) checkLocalMerge(place Workplace) (string, error) {
+	if err := commitLeft(place.Cwd, "合并前把没提交的改动一并提交"); err != nil {
+		return "", err
+	}
+	path := filepath.Join(p.root, place.Project)
+	unlock := p.serially(place.Project)
+	main, err := git(path, "symbolic-ref", "--short", "HEAD")
+	if err == nil {
+		var files []string
+		files, err = conflictsOf(path, main, place.Branch)
+		if err == nil && len(files) > 0 {
+			err = MergeFailure{Kind: "conflict", Base: main, Files: files}
+		}
+	}
+	if err == nil {
+		_, err = git(place.Cwd, "-c", "user.name=vibevalley", "-c", "user.email=vibevalley@localhost", "merge", "--no-edit", main)
+	}
+	unlock()
+	if err != nil {
+		return "", err
+	}
+	return p.checkMerge(place, main)
+}

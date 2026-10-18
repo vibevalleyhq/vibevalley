@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -46,6 +47,9 @@ func (c *sessions) harvest(id string, closed protocol.IssueClose, merge func(pro
 		}
 		return project.Merged{}, err
 	}
+	if merged.PullRequest != nil {
+		return merged, nil
+	}
 	commits := int64(0)
 	if closed == protocol.IssueCloseMerged {
 		commits = int64(merged.Commits)
@@ -55,4 +59,28 @@ func (c *sessions) harvest(id string, closed protocol.IssueClose, merge func(pro
 		c.core.Notice(protocol.NoticeLevelWarn, merged.Warning)
 	}
 	return merged, nil
+}
+
+func (c *sessions) SubmitPullRequest(ctx context.Context, id string, issue protocol.Issue, save func(*protocol.PullRequest) error) (project.Merged, error) {
+	return c.harvest(id, protocol.IssueCloseMerged, func(place project.Workplace) (project.Merged, error) {
+		h := c.hand(id)
+		h.mu.Lock()
+		conclusion := h.lastText
+		h.mu.Unlock()
+		pr, err := c.projects.SubmitPullRequest(ctx, place, issue, conclusion)
+		if err != nil {
+			return project.Merged{}, err
+		}
+		if err := save(pr); err != nil {
+			return project.Merged{}, err
+		}
+		return project.Merged{PullRequest: pr, Text: "PR：" + pr.URL}, nil
+	})
+}
+
+func (c *sessions) FinishPullRequest(id string, number int64, closed protocol.IssueClose) error {
+	_, err := c.harvest(id, closed, func(place project.Workplace) (project.Merged, error) {
+		return c.projects.FinishPullRequest(place.Project, number)
+	})
+	return err
 }

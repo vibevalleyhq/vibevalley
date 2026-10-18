@@ -630,3 +630,21 @@ func TestMergeCheckOutsideProjectLock(t *testing.T) {
 		}
 	}
 }
+
+func TestLocalHarvestChecksTheCombinedTree(t *testing.T) {
+	root := projectsDir(t)
+	p := projects(t, root)
+	place, err := p.Workplace("combined", "w1", true, "", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "combined")
+	os.WriteFile(filepath.Join(path, "main-only"), []byte("main"), 0o644)
+	testkit.Git(t, path, "add", ".")
+	testkit.Git(t, path, "-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-qm", "main advanced")
+	os.MkdirAll(filepath.Join(place.Cwd, ".vibevalley"), 0o755)
+	os.WriteFile(filepath.Join(place.Cwd, ".vibevalley/check"), []byte("#!/bin/sh\ntest -f main-only\n"), 0o755)
+	if _, err := p.Merge(place); err != nil {
+		t.Fatalf("check must see main's changes: %v", err)
+	}
+}

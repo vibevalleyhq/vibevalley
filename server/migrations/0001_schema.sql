@@ -77,6 +77,7 @@ CREATE TABLE channel_delivery (
   check ((state in ('announced', 'handed')) = (launch is not null) or state in ('seen', 'dropped'))
 );
 CREATE TABLE issue (
+  pull_request text,
   id          text primary key,
   number      integer not null unique,
   title       text not null default '',

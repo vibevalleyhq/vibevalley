@@ -62,7 +62,7 @@ func projectProblem(req protocol.NewProject) string {
 	}
 	if req.Github != nil {
 		if _, _, ok := githubRepository(*req.Github); !ok {
-			return "请填公开 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source"
+			return "请填 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source"
 		}
 	}
 	return ""
@@ -168,6 +168,8 @@ func reason(err error) string {
 
 type Service struct {
 	githubDetection
+	GitPush    func(context.Context, string, string) error
+	prProjects []string
 	// root is the projects folder; trees and the house rules are beside it, in the work root.
 	root  string
 	trees string
@@ -194,7 +196,8 @@ func newService(cfg base.Config) (*Service, error) {
 	}
 	tokei := cmp.Or(cfg.Tokei, "tokei")
 	return &Service{
-		root: root, trees: filepath.Join(work, "worktrees"), house: work, perProject: cfg.Project.MaxSessions, tokei: tokei,
+		prProjects: slices.Clone(cfg.GitHub.PRProjects),
+		root:       root, trees: filepath.Join(work, "worktrees"), house: work, perProject: cfg.Project.MaxSessions, tokei: tokei,
 		queues: map[string]*sync.Mutex{}, pending: map[string]bool{},
 		checkTimeout: time.Duration(cfg.Project.CheckTimeoutSeconds) * time.Second,
 	}, nil
@@ -311,11 +314,21 @@ func (p *Service) Create(req protocol.NewProject) (Project, error) {
 		_, url, _ := githubRepository(*req.Github)
 		ctx, cancel := context.WithTimeout(context.Background(), cloneTimeout)
 		defer cancel()
-		cmd := exec.CommandContext(ctx, "git", "-c", "credential.helper=", "-c", "core.askPass=", "clone", "--", url, path)
-		cmd.Dir = p.root
-		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_LFS_SKIP_SMUDGE=1")
-		if err := cmd.Run(); err != nil {
-			return fail(errors.New("下载失败：请确认仓库公开、地址正确且网络可用；超过 3 分钟会停止，可重试"))
+		status := p.GitHubStatus()
+		if status.CheckedAt == 0 {
+			status = probeGitHub(ctx, p.github)
+		}
+		if status.LoggedIn {
+			if _, err := p.github(ctx, "repo", "clone", githubOrigin(url), path); err != nil {
+				return fail(errors.New("下载失败：请确认 GitHub 登录、仓库权限和网络后重试"))
+			}
+		} else {
+			cmd := exec.CommandContext(ctx, "git", "-c", "credential.helper=", "-c", "core.askPass=", "clone", "--", url, path)
+			cmd.Dir = p.root
+			cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_LFS_SKIP_SMUDGE=1")
+			if err := cmd.Run(); err != nil {
+				return fail(errors.New("下载失败：请确认仓库公开、地址正确且网络可用；超过 3 分钟会停止，可重试"))
+			}
 		}
 	} else if _, err := p.ensure(req.Name); err != nil {
 		return fail(errors.New(reason(err)))
@@ -366,8 +379,8 @@ func (p *Service) Workplace(project, session string, worktree bool, baseBranch s
 	branch := "vibevalley/" + session + "-" + stamp
 	cwd := filepath.Join(p.trees, project+"."+session+"-"+stamp)
 	if issueNumber > 0 {
-		branch = IssueBranch(issueNumber)
-		cwd = filepath.Join(p.trees, fmt.Sprintf("%s.%d", project, issueNumber))
+		issuePlace := p.issueWorkplace(project, issueNumber)
+		branch, cwd = issuePlace.Branch, issuePlace.Cwd
 		if _, err := os.Stat(cwd); err == nil {
 			return Workplace{Project: project, Cwd: cwd, Branch: branch}, nil
 		} else if !errors.Is(err, os.ErrNotExist) {
@@ -621,13 +634,20 @@ func (p *Service) Merge(place Workplace) (Merged, error) {
 		return Merged{Text: "它直接在项目里干活，没有要合并的分支"}, nil
 	}
 	path := filepath.Join(p.root, place.Project)
-	checked, err := p.checkMerge(place, "")
+	checked, err := p.checkLocalMerge(place)
 	if err != nil {
 		return Merged{}, failed(err)
 	}
 	defer p.serially(place.Project)()
 	if err := unchangedBranch(path, place.Branch, checked); err != nil {
 		return Merged{}, failed(err)
+	}
+	mainHead, err := git(path, "symbolic-ref", "--short", "HEAD")
+	if err != nil {
+		return Merged{}, failed(err)
+	}
+	if !gitOk(path, "merge-base", "--is-ancestor", mainHead, checked) {
+		return Merged{}, MergeFailure{Kind: "check", Reason: "主分支在检查期间又变了，请重新检查再收获"}
 	}
 	main, ahead, err := p.mergeMain(path, place.Branch, place.Branch+" 分支和 worktree 都留着")
 	if err != nil {

@@ -2,6 +2,8 @@ package issue
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"vibevalley/internal/base"
 )
@@ -11,12 +13,31 @@ type Service struct {
 	*issues
 	*dispatch
 	*merges
-	parts base.Parts
+	parts      base.Parts
+	prMu       sync.Mutex
+	poll       time.Duration
+	pollCancel context.CancelFunc
+	pollDone   chan struct{}
 }
 
-func newService(a *issues, b *dispatch, c *merges) (*Service, error) {
-	return &Service{a, b, c, base.Parts{a, b, c}}, nil
+func newService(a *issues, b *dispatch, c *merges, cfg base.Config) (*Service, error) {
+	return &Service{issues: a, dispatch: b, merges: c, parts: base.Parts{a, b, c}, poll: time.Duration(cfg.GitHub.PRPollSeconds) * time.Second}, nil
 }
 
-func (s *Service) OnStart(ctx context.Context) error { return s.parts.OnStart(ctx) }
-func (s *Service) OnStop()                           { s.parts.OnStop() }
+func (s *Service) OnStart(ctx context.Context) error {
+	if err := s.parts.OnStart(ctx); err != nil {
+		return err
+	}
+	life, cancel := context.WithCancel(ctx)
+	s.pollCancel = cancel
+	s.pollDone = make(chan struct{})
+	go func() { defer close(s.pollDone); s.pollPullRequests(life) }()
+	return nil
+}
+func (s *Service) OnStop() {
+	if s.pollCancel != nil {
+		s.pollCancel()
+		<-s.pollDone
+	}
+	s.parts.OnStop()
+}

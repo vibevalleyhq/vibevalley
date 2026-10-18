@@ -40,7 +40,11 @@ func githubOrigin(origin string) string {
 }
 
 func runGitHub(ctx context.Context, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	timeout := 15 * time.Second
+	if len(args) > 1 && args[0] == "repo" && args[1] == "clone" {
+		timeout = cloneTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	// Auth status writes to stderr; raw output must never escape the probe.
 	cmd := exec.CommandContext(ctx, "gh", args...)

@@ -70,3 +70,6 @@ update issue set closed_at = null, closed = null, queued_at = null where id = ?;
 
 -- name: OpenOf :many
 select id from issue where assignee = ? and closed_at is null;
+
+-- name: SetIssuePullRequest :exec
+update issue set pull_request = ? where id = ?;

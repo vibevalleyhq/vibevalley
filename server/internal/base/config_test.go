@@ -71,3 +71,21 @@ func TestServerIdentityCannotBeConfiguredOutsideLoopback(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestPullRequestConfiguration(t *testing.T) {
+	t.Setenv("VIBEVALLEY_HOME", t.TempDir())
+	c, err := LoadConfig("")
+	if err != nil || len(c.GitHub.PRProjects) != 0 || c.GitHub.PRPollSeconds != 180 {
+		t.Fatalf("defaults: %+v %v", c.GitHub, err)
+	}
+	t.Setenv("VIBEVALLEY_GITHUB_PR_PROJECTS", "one,two")
+	t.Setenv("VIBEVALLEY_GITHUB_PR_POLL_SECONDS", "12")
+	c, err = LoadConfig("")
+	if err != nil || len(c.GitHub.PRProjects) != 2 || c.GitHub.PRProjects[0] != "one" || c.GitHub.PRPollSeconds != 12 {
+		t.Fatalf("environment: %+v %v", c.GitHub, err)
+	}
+	t.Setenv("VIBEVALLEY_GITHUB_PR_POLL_SECONDS", "0")
+	if _, err := LoadConfig(""); err == nil {
+		t.Fatal("zero polling interval accepted")
+	}
+}

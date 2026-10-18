@@ -70,9 +70,9 @@
 
 ## GitHub 检测
 
-服务端开机在后台检测 `gh --version`、`gh auth status --hostname github.com --active`；`github.status` 读缓存，`github.refresh` 手动重查，`setting.check` 的 `github` 返回同一份状态。结果只含安装、版本、登录、账号、检测时间和中文原因，不返回命令原文或 token。
+服务端开机在后台检测 `gh --version`、`gh auth status --hostname github.com --active`；`github.status` 读缓存，`github.refresh` 手动重查并刷新开着的 PR，`setting.check` 的 `github` 返回同一份状态。结果只含安装、版本、登录、账号、检测时间和中文原因，不返回命令原文或 token。
 
-`project list` 的 `pullRequest` 给出能否提 PR 和原因。刷新同时检查各项目的 `origin`（GitHub 的 HTTPS、SSH 地址）及 `gh repo view <owner/repo> --json viewerPermission`，`ADMIN`、`MAINTAIN`、`WRITE` 算有写权限。列表不调用 gh；新建项目或修改远端后用 `github refresh` 更新。检测中的首次读取标为尚未检测；命令失败或超时不能判为可提 PR，每条 gh 命令限时 15 秒。
+`project list` 的 `pullRequest` 给出能否提 PR 和原因。刷新同时检查各项目的 `origin`（GitHub 的 HTTPS、SSH 地址）及 `gh repo view <owner/repo> --json viewerPermission`，`ADMIN`、`MAINTAIN`、`WRITE` 算有写权限。列表不调用 gh；新建项目或修改远端后用 `github refresh` 更新。检测中的首次读取标为尚未检测；命令失败或超时不能判为可提 PR，检测及 PR 命令限时 15 秒，克隆限时 3 分钟。
 
 ## 帮工
 
@@ -96,7 +96,7 @@
 - 交给帮工的是标题，空一行，再是说明。
 - **状态**由 `protocol.IssueStatusOf` 算：`backlog`（写下没派）、`todo`（排队等空地）、`in_progress`、`in_review`（等你看）、`done`（合进主分支、合进计划、管家答完）、`canceled`（收工、丢了、放弃、跳过，或没说怎么关的）。看板按它分列。
 - 还没派的能改、能删、能排先后；派出去以后不能。
-- **改状态就是派活**（`issue/status.go`；`PUT /api/v1/issues/{id}/status`，`vibevalley issue status <id> --json`；[理由](../../.agents/notes/implemented/architecture/2026-10-18-status-is-the-dispatch.md)）：主人只能挪到 `backlog`、`todo`、`done`、`canceled`，`in_progress`、`in_review` 是帮工干出来的。备选挪到待办就开工，地都占满了就在待办排队，服务端每 5 秒按先后试一遍；待办挪回备选是不排了；等你看挪到待办是带一句话（`text`，必填）再干一轮；挪到已完成是收获，合进主分支；挪到已取消是叫帮工回家（没派过的直接关上）；关上的挪回待办是带一句话重开；没派过就取消的挪回备选。每张工单的 `moves` 列出它现在能挪到哪，看板照它决定能不能拖；派给管家的和种植计划里的工单 `moves` 是空的。
+- **改状态就是派活**（`issue/status.go`；`PUT /api/v1/issues/{id}/status`，`vibevalley issue status <id> --json`；[理由](../../.agents/notes/implemented/architecture/2026-10-18-status-is-the-dispatch.md)）：主人只能挪到 `backlog`、`todo`、`done`、`canceled`，`in_progress`、`in_review` 是帮工干出来的。备选挪到待办就开工，地都占满了就在待办排队，服务端每 5 秒按先后试一遍；待办挪回备选是不排了；等你看挪到待办是带一句话（`text`，必填）再干一轮；挪到已完成是收获，按项目配置提 PR 或本地合进主分支；挪到已取消是叫帮工回家（没派过的直接关上）；关上的挪回待办是带一句话重开；没派过就取消的挪回备选。每张工单的 `moves` 列出它现在能挪到哪，看板照它决定能不能拖；派给管家的和种植计划里的工单 `moves` 是空的。
 - 帮工离开时，离开的是最后一次执行，工单就跟着关上。
 - **重开**：同一个档案派一个新帮工到同一个项目，带上原来要做什么和上一次怎么关的。
 - **子工单**：带 `parent`、`blockedBy`。种植计划用它，计划里的工单跟着计划走，看板不能单独开工、重开。
@@ -160,17 +160,25 @@
 
 **项目**（`project/project.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-10-projects-worktrees-and-harvest.md)）：工作目录 `projects/` 下的每个文件夹是一个项目。派到不存在的项目就新建（`git init -b main`、`.gitignore`、初始提交）。派给工单的帮工共用这张工单的 worktree：`<工作目录>/worktrees/<项目>.<工单号>`，分支为 `vibevalley/issue-<工单号>`。worktree 已在就复用；只有分支时在原分支上重建 worktree；两者都没有时从主分支或种植计划指定的基分支新开。不挂工单的直接派活仍用 `<项目>.<帮工>-<时间>` 和 `vibevalley/<帮工>-<时间>`。取消时保留有提交的分支和有未提交改动的 worktree，重开接着做；合并后删掉分支和 worktree，再重开从主分支开始。同一个项目的 worktree 创建和合并串行执行，项目检查在锁外运行。
 
+给 `project create` 提供 GitHub 地址时，已登录 gh 的农场用 `gh repo clone <owner/repo> <路径>`，可克隆当前账号有权访问的私有仓库；否则用禁用凭据的 `git clone`。
+
 **收成清单**（`GET /api/v1/issues/{id}/changes`，看的是这张工单最新的帮工）：提交、改的文件和 diff、没提交的、主分支多了几个提交、会不会冲突（`git merge-tree`，不碰工作区）。
 
-**收获**：
+**本地收获**（未列入 `github.pr_projects` 或 `pullRequest.available` 为假）：
 
 1. 还在干活的不收。
 2. 关掉会话，没提交的改动替它提交（缓存和依赖目录不提交）。
 3. 会冲突就不合并：标上 `conflict`；「让它解决冲突」发一句固定的话（`ConflictTask`），它下一轮结束时再查一次。
-4. 没有冲突时，在帮工 worktree 根目录运行它分支上的 `.vibevalley/check` 可执行文件；没有这个文件就跳过。退出码非 0、无法执行或超时都不合并，拒绝原因附上输出的最后 40 行（最多保留 64 KiB），并把这段话交给帮工修。时限由 `project.check_timeout_seconds` 配置，默认 1200 秒。
-5. 检查通过后取得项目锁，确认分支提交与检查前一致，并重新检查冲突；分支在检查以后又变了就拒绝合并，要求重新检查。通过才合进主分支，删掉 worktree 和分支，帮工离开，账本记 `harvested`。
+4. 没有冲突时，先把主分支合进帮工分支，再在帮工 worktree 根目录运行它分支上的 `.vibevalley/check` 可执行文件；没有这个文件就跳过。退出码非 0、无法执行或超时都不合并，拒绝原因附上输出的最后 40 行（最多保留 64 KiB），并把这段话交给帮工修。时限由 `project.check_timeout_seconds` 配置，默认 1200 秒。
+5. 检查通过后取得项目锁，确认分支提交与检查前一致，并重新检查冲突；帮工分支在检查以后变了，或主分支有尚未检查的提交，就拒绝合并，要求重新检查。通过才合进主分支，删掉 worktree 和分支，帮工离开，账本记 `harvested`。
 
-检查失败不会把工单关成 `done`：拒绝收获时仍是 `in_review`，帮工、分支和 worktree 都保留；帮工收到带话开始修以后，状态照常变成 `in_progress`，交回来再回到 `in_review`。帮工合进种植计划分支也先跑同一检查。检查运行的是帮工当前分支，不自动变基或合入主分支。
+检查失败不会把工单关成 `done`：拒绝收获时仍是 `in_review`，帮工、分支和 worktree 都保留；帮工收到带话开始修以后，状态照常变成 `in_progress`，交回来再回到 `in_review`。帮工合进种植计划分支也先跑同一检查。种植计划和 PR 路径检查帮工当前分支；本地收获检查包含主分支的合并结果。
+
+**提 PR**：项目名列在 `github.pr_projects` 且 `pullRequest.available` 为真时，收获照旧提交剩余改动、查冲突，并在项目锁外跑 `.vibevalley/check`。检查通过后取得项目锁，核对检查过的提交，再由农场执行 `git push -u origin <工单分支>`，用工单标题、编号、帮工最后一轮原话和检查结果创建 PR；已记录开着的 PR 时只推分支。创建后未收到或未存下回执，重试会先查询已有 PR。推送或 gh 失败会拒绝本次收获，保留工单和帮工。
+
+工单的 `pullRequest` 保存 `url`、`number`、`state`（`open`、`merged`、`closed`）。PR 开着时工单留在 `in_review`，帮工、worktree 和分支保留；挪到待办带话再干一轮，再收获会更新同一个 PR。已有开着的 PR 时，即使检测暂时不可用也继续这条路径。
+
+农场每 `github.pr_poll_seconds` 秒（默认 180）查询开着的 PR；`github refresh` 可手动触发。合并后工单关成 `merged`，未合并就关闭则关成 `dismissed`，清掉 worktree 和本地分支，帮工离开。帮工仍在干活或有待开始的一轮时保留现场，下次轮询再结束；查询失败保持原状态并报告。远端分支由 GitHub 管，农场不删除；主人的检出从 origin 拉取。
 
 **收工和铲除**：关掉会话、帮工离开；分支上有没合的提交就留着，没有就删。
 

@@ -132,3 +132,20 @@ func TestGitHubRefreshClearsPermissionsWhenLoggedOut(t *testing.T) {
 		}
 	}
 }
+
+func TestPrivateCloneUsesLoggedInGitHub(t *testing.T) {
+	p := projects(t, projectsDir(t))
+	p.githubStatus = protocol.GitHubStatus{LoggedIn: true, CheckedAt: 1}
+	p.GitHubProbe = func(_ context.Context, args ...string) ([]byte, error) {
+		if len(args) != 4 || args[0] != "repo" || args[1] != "clone" || args[2] != "owner/private" {
+			t.Fatalf("clone: %v", args)
+		}
+		testkit.Git(t, p.root, "init", "-q", "-b", "main", args[3])
+		return nil, nil
+	}
+	url := "https://github.com/owner/private"
+	got, err := p.Create(protocol.NewProject{Name: "private", Github: &url})
+	if err != nil || !got.Git {
+		t.Fatalf("clone: %+v %v", got, err)
+	}
+}

@@ -60,7 +60,8 @@ func (a api) GithubStatus(context.Context) (protocol.GitHubStatus, error) {
 }
 
 func (a api) GithubRefresh(ctx context.Context) (protocol.GitHubStatus, error) {
-	return a.f.Project.RefreshGitHub(ctx), nil
+	status := a.f.Project.RefreshGitHub(ctx)
+	return status, a.f.Issue.RefreshPullRequests(ctx)
 }
 
 func (a api) SettingSave(_ context.Context, body protocol.SettingsUpdate) (protocol.SettingsStatus, error) {

@@ -79,6 +79,10 @@ type Config struct {
 		MaxSessions         int `mapstructure:"max_sessions"`
 		CheckTimeoutSeconds int `mapstructure:"check_timeout_seconds"`
 	} `mapstructure:"project"`
+	GitHub struct {
+		PRProjects    []string `mapstructure:"pr_projects"`
+		PRPollSeconds int      `mapstructure:"pr_poll_seconds"`
+	} `mapstructure:"github"`
 	Chat struct {
 		NoticeBatchMs int `mapstructure:"notice_batch_ms"`
 		RetryWakeMs   int `mapstructure:"retry_wake_ms"`
@@ -99,6 +103,8 @@ func Defaults() Config {
 	c.Patrol.HeartbeatMinutes = 10
 	c.Schedule.TickMs = 20_000
 	c.Session.StallSeconds = 240
+	c.GitHub.PRProjects = []string{}
+	c.GitHub.PRPollSeconds = 180
 	c.Project.MaxSessions = 3
 	c.Project.CheckTimeoutSeconds = 1200
 	c.Session.TrajectoryDays = 30
@@ -144,6 +150,9 @@ func LoadConfig(file string) (Config, error) {
 		if port < 0 || port > 65535 {
 			return Config{}, fmt.Errorf("%s: %s 不是端口：%d", file, name, port)
 		}
+	}
+	if c.GitHub.PRPollSeconds <= 0 {
+		return Config{}, fmt.Errorf("github.pr_poll_seconds 必须大于 0")
 	}
 	c.WorkRoot, c.Tokei = expandHome(c.WorkRoot), expandHome(c.Tokei)
 	c.DBPath = dbPathFrom(expandHome(c.DBPath))

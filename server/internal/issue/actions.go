@@ -1,6 +1,9 @@
 package issue
 
-import "vibevalley/internal/protocol"
+import (
+	"context"
+	"vibevalley/internal/protocol"
+)
 
 func (s *Service) liveSession(id string) (string, error) {
 	session, err := s.issues.latest(id)
@@ -52,9 +55,22 @@ func (s *Service) Changes(id string, by protocol.Caller) (protocol.Changes, erro
 }
 
 func (s *Service) Merge(id string) (string, error) {
+	s.prMu.Lock()
+	defer s.prMu.Unlock()
+	issue, err := s.Get(id)
+	if err != nil {
+		return "", err
+	}
 	session, err := s.liveSession(id)
 	if err != nil {
 		return "", err
+	}
+	if issue.Project != nil && issue.Graph == nil && issue.Task == nil && ((issue.PullRequest != nil && issue.PullRequest.State == protocol.PullRequestStateOpen) || s.merges.projects.UsesPullRequests(*issue.Project)) {
+		merged, err := s.merges.sessions.SubmitPullRequest(context.Background(), session, issue, func(pr *protocol.PullRequest) error { return s.savePullRequest(issue.ID, pr) })
+		if err != nil {
+			return "", s.merges.mergeError(session, err)
+		}
+		return merged.Text, nil
 	}
 	return s.merges.merge(session)
 }

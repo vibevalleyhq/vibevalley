@@ -128,6 +128,11 @@ func issueOf(row generated.Issue, runs []string, state protocol.CoreState) proto
 		ID: row.ID, Number: row.Number, Title: row.Title, Description: row.Description, Priority: protocol.Priority(row.Priority),
 		CreatedAt: row.CreatedAt, Sessions: []string{},
 	}
+	if row.PullRequest.Valid {
+		if err := json.Unmarshal([]byte(row.PullRequest.String), &out.PullRequest); err != nil {
+			log.Printf("vibevalley: issue %s: cannot read pull request: %v", row.ID, err)
+		}
+	}
 	if row.Project.Valid {
 		out.Project = &row.Project.String
 	}

@@ -1,5 +1,7 @@
 package project
 
+import "vibevalley/internal/protocol"
+
 type Workplace struct {
 	Project string `json:"project"`
 	Cwd     string `json:"cwd"`
@@ -14,9 +16,10 @@ type Project struct {
 }
 
 type Merged struct {
-	Text    string
-	Commits int
-	Hashes  []string
+	PullRequest *protocol.PullRequest
+	Text        string
+	Commits     int
+	Hashes      []string
 	// Publication succeeded; these resources could not be removed.
 	Warning string
 }

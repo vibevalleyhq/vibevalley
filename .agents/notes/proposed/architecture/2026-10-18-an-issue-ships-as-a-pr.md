@@ -32,7 +32,9 @@ Status: proposed
 
 ### 3. 收获就是提 PR
 
-- 能提 PR 的项目，挪到 done 一律提 PR，不在本地合；不能的照旧本地合。一条路，主分支只在 GitHub 上动。
+进展：已实现按 `github.pr_projects` 开关提 PR、持久化、轮询及 `github refresh` 手动刷新，私有仓库走已登录的 gh；离线回归用本地 bare origin，真实推送和 PR 由主人在测试仓库验证。
+
+- 列在 `github.pr_projects` 且能提 PR 的项目，挪到 done 提 PR，不在本地合；不能的照旧本地合。一条路，主分支只在 GitHub 上动。
 - 挪到 done：先跑 `.vibevalley/check`，过了农场推工单的分支（帮工照旧不 push），`gh pr create`：标题是工单标题，正文是工单号、帮工的结论和检查结果。已经有 PR 就只推，PR 跟着更新。
 - 工单记 PR（链接、编号、状态）。PR 开着时工单是 in_review，帮工不走：按审查意见挪回待办再干一轮，交回来再挪到 done，就推一次更新 PR。
 - 农场隔几分钟用 `gh pr view` 看开着的 PR：合了，工单关成 merged，worktree 清掉，帮工离开；被关掉，算取消。主人的检出从 origin 拉。

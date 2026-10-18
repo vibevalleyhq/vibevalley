@@ -835,6 +835,9 @@ func (v IssueHistory) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
+// PullRequestStateValues are every PullRequestState, in the protocol's order.
+var PullRequestStateValues = []PullRequestState{PullRequestStateOpen, PullRequestStateMerged, PullRequestStateClosed}
+
 func (v Issue) MarshalJSON() ([]byte, error) {
 	type plain Issue
 	p := plain(v)

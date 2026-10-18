@@ -136,6 +136,14 @@ func (m *merges) merge(id string) (string, error) {
 		m.core.Notice(protocol.NoticeLevelInfo, fmt.Sprintf("收了 %s 的活：%s", session.Name, merged.Text))
 		return merged.Text, nil
 	}
+	return "", m.mergeError(id, err)
+}
+
+func (m *merges) mergeError(id string, err error) error {
+	session := m.core.Session(id)
+	if session == nil {
+		return err
+	}
 	failure, ok := err.(project.MergeFailure)
 	if !ok {
 		failure = project.MergeFailure{Kind: "error", Reason: err.Error()}
@@ -143,7 +151,7 @@ func (m *merges) merge(id string) (string, error) {
 	if failure.Kind == "conflict" {
 		files := strings.Join(failure.Files, "、")
 		m.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 的分支合进 %s 会冲突（%s），先没收。可以让它自己把冲突解决掉", session.Name, failure.Base, files))
-		return "", protocol.Refused{Reason: fmt.Sprintf("没收：合进 %s 会冲突（%s）。%s 还在地里，分支和 worktree 都在。要它解决就用 tell 告诉它：%s", failure.Base, files, session.Name, protocol.ConflictBrief(failure.Base, failure.Files))}
+		return protocol.Refused{Reason: fmt.Sprintf("没收：合进 %s 会冲突（%s）。%s 还在地里，分支和 worktree 都在。要它解决就用 tell 告诉它：%s", failure.Base, files, session.Name, protocol.ConflictBrief(failure.Base, failure.Files))}
 	}
 	if failure.Kind == "check" {
 		if _, tellErr := m.chat.TellSession("user", id, failure.Reason+"\n请修好检查，再交回来。"); tellErr != nil {
@@ -151,5 +159,5 @@ func (m *merges) merge(id string) (string, error) {
 		}
 	}
 	m.core.Notice(protocol.NoticeLevelWarn, fmt.Sprintf("%s 的活没收进去：%s", session.Name, failure.Reason))
-	return "", protocol.Refused{Reason: fmt.Sprintf("没收进去：%s。%s 还在地里", failure.Reason, session.Name)}
+	return protocol.Refused{Reason: fmt.Sprintf("没收进去：%s。%s 还在地里", failure.Reason, session.Name)}
 }
