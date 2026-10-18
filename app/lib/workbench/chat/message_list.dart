@@ -11,6 +11,7 @@ import '../../chat/chat_rules.dart';
 import '../../chat/chat_state.dart';
 import '../../chat/turn_steps.dart';
 import '../../chat/chat_widgets.dart';
+import '../../chat/dispatch_note.dart';
 import '../../rules/chat.dart';
 import '../../rules/sessions.dart';
 import '../../rules/money.dart';
@@ -329,7 +330,9 @@ class _MessageRow extends ConsumerWidget {
           ?tag,
           Opacity(
             opacity: m.final_ ? 1 : .7,
-            child: PxMarkdown(m.text, mentions: true, style: const TextStyle(height: 1.625)),
+            child: m.kind == MessageKind.dispatch
+                ? DispatchNote(m.text, style: const TextStyle(height: 1.625))
+                : PxMarkdown(m.text, mentions: true, style: const TextStyle(height: 1.625)),
           ),
           if (!m.final_) const StreamingCaret(),
           if (m.spent != null && m.kind == MessageKind.report)

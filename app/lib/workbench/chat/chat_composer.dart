@@ -115,9 +115,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                   child: Row(
                     children: [
-                      Expanded(
-                        child: Text('回车发送 · Shift+回车换行 · @ 叫人', style: KitText.xs.copyWith(color: Palette.bark400)),
-                      ),
+                      const Spacer(),
                       const ManagerStopButton(),
                       DictationButton(controller: _naming.text),
                       const SizedBox(width: 6),
@@ -125,6 +123,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                         size: PxSize.custom,
                         tone: PxTone.primary,
                         semanticLabel: '发送',
+                        tooltip: '回车发送 · Shift+回车换行 · @ 叫人',
                         onPressed: empty || _sending ? null : _send,
                         child: const SizedBox.square(dimension: 28, child: Center(child: Glyph('button-send'))),
                       ),

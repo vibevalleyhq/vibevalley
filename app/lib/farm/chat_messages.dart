@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../chat/chat_rules.dart';
 import '../chat/chat_widgets.dart';
+import '../chat/dispatch_note.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../ui/kit/kit.dart';
@@ -83,6 +84,7 @@ class ChatBubble extends StatelessWidget {
     this.at,
     this.aloud = false,
     this.tag,
+    this.folded = false,
     this.after,
   });
   final bool mine;
@@ -95,6 +97,9 @@ class ChatBubble extends StatelessWidget {
 
   final bool aloud;
   final String? tag;
+
+  /// One clipped line until tapped, as a dispatch note is.
+  final bool folded;
 
   final Widget? after;
 
@@ -118,7 +123,10 @@ class ChatBubble extends StatelessWidget {
               color: Palette.wheat.withValues(alpha: .4),
               child: Text(tag!, style: KitText.xs.copyWith(color: Palette.bark800)),
             ),
-          PxMarkdown(text, mentions: true, style: TextStyle(color: mine ? Palette.cream50 : Palette.bark900)),
+          if (folded)
+            DispatchNote(text, style: const TextStyle(color: Palette.bark900))
+          else
+            PxMarkdown(text, mentions: true, style: TextStyle(color: mine ? Palette.cream50 : Palette.bark900)),
           if (!final_) const StreamingCaret(),
           ?after,
         ],

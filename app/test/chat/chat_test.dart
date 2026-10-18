@@ -247,9 +247,33 @@ void main() {
       expect(_rich('农场开门了'), findsOneWidget);
       expect(_rich('1 条回复'), findsOneWidget);
       expect(find.text('派活'), findsOneWidget);
+      expect(_rich('默认的频道'), findsNothing);
+      expect(find.byTooltip('默认的频道：你、管家和帮工都在这儿'), findsOneWidget);
+      expect(_rich('回车发送'), findsNothing);
+      expect(find.byTooltip('回车发送 · Shift+回车换行 · @ 叫人'), findsOneWidget);
       final read = server.to('POST', '/api/v1/channels/c1/read');
       expect(read, hasLength(1));
       expect(jsonDecode(read.single.body), {'number': 2});
+    });
+
+    testWidgets('a report with no run behind it shows no run line', (t) async {
+      final server = FakeServer((r) async => r.url.path == '/api/v1/sessions/w1/events' ? jsonResponse([]) : _answer(r));
+      await _pump(t, const ChatPage(), server, _state(more: [_msg(5, 1, 'w1', SenderKind.agent, '活干完了', type: MessageKind.report)]));
+      expect(_rich('活干完了'), findsOneWidget);
+      expect(server.to('GET', '/api/v1/sessions/w1/events'), isNotEmpty);
+      expect(_rich('这一轮的干活过程'), findsNothing);
+      expect(_rich('用了'), findsNothing);
+    });
+
+    testWidgets('the dispatch note is one line until opened, then the whole task once', (t) async {
+      const task = '派 @w1（测试小吴）去 clock-in：跑一遍测试\n\n然后把失败的列出来';
+      await _pump(t, const ChatPage(), FakeServer(_answer), _state(more: [_msg(5, 1, 'manager', SenderKind.manager, task, type: MessageKind.dispatch)]));
+      expect(find.text('派 @w1（测试小吴）去 clock-in：跑一遍测试 然后把失败的列出来'), findsOneWidget);
+      expect(_rich('然后把失败的列出来'), findsOneWidget);
+      await t.tap(find.text('派 @w1（测试小吴）去 clock-in：跑一遍测试 然后把失败的列出来'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(find.text('派 @w1（测试小吴）去 clock-in：跑一遍测试 然后把失败的列出来'), findsNothing);
+      expect(_rich('然后把失败的列出来'), findsOneWidget);
     });
 
     for (final still in [false, true]) {
@@ -422,7 +446,7 @@ void main() {
       await _pump(t, window(server, empty, []), server, empty);
       expect(_rich('这里是田头'), findsOneWidget);
       expect(find.text('打字或者按麦克风，就开工'), findsOneWidget);
-      expect(find.text('让测试小吴跑一遍测试'), findsOneWidget);
+      expect(find.text('让小吴跑测试'), findsOneWidget);
       await t.tap(find.bySemanticsLabel('收起对话').first);
       await t.pump(const Duration(milliseconds: 300));
       expect(_rich('这里是田头'), findsNothing);

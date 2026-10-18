@@ -180,9 +180,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   Widget _header(Conversation? channel, bool wideSidebar) {
     final about = [
-      if ((channel?.description ?? '').isNotEmpty) channel!.description! else if (channel?.kind == ConversationKind.general) '默认的频道：你、管家和帮工都在这儿',
+      if ((channel?.description ?? '').isNotEmpty) channel!.description!,
       if ((channel?.project ?? '').isNotEmpty) '默认项目 ${channel!.project}',
     ].join(' · ');
+    final title = Text(channelName(channel), maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.lg.copyWith(height: 1.25));
     return Container(
       height: workbenchHead,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -214,8 +215,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(channelName(channel), maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.lg.copyWith(height: 1.25)),
-                Text(about.isEmpty ? '在这里叫管家，活就派在这里' : about, maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
+                if (channel?.kind == ConversationKind.general) Tooltip(message: '默认的频道：你、管家和帮工都在这儿', child: title) else title,
+                if (about.isNotEmpty) Text(about, maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
               ],
             ),
           ),

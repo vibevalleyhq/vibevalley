@@ -26,7 +26,8 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
     final steps = ref.watch(runEventsProvider((session: widget.id, run: run))).value;
     final turn = steps ?? const <SessionEvent>[];
     final tools = turn.where((s) => s.type == SessionEventType.toolCall).length;
-    if (widget.manager && tools == 0) return const SizedBox.shrink();
+    // A message with no run behind it (or one not loaded yet) says nothing about one.
+    if (turn.isEmpty || (widget.manager && tools == 0)) return const SizedBox.shrink();
     final label = tools > 0 ? '用了 $tools 个工具' : '这一轮的干活过程';
     return Padding(
       padding: const EdgeInsets.only(top: 4),
@@ -59,9 +60,7 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
           if (_open)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: turn.isNotEmpty
-                  ? WorkLog(steps: turn, now: DateTime.now().millisecondsSinceEpoch.toDouble(), asked: '收到')
-                  : Text(steps != null ? '这一轮没有记下步骤：可能已经过了保留的日子。' : '在读……', style: KitText.xs.copyWith(color: Palette.bark500)),
+              child: WorkLog(steps: turn, now: DateTime.now().millisecondsSinceEpoch.toDouble(), asked: '收到'),
             ),
         ],
       ),

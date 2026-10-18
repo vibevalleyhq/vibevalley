@@ -27,7 +27,7 @@ import '../shared/swatches.dart';
 import 'chat_messages.dart';
 import 'chat_voice.dart';
 
-const _suggestions = ['让前端阿郑把字幕面板做了', '让测试小吴跑一遍测试', '现在进度怎么样？', '大家收工'];
+const _suggestions = ['让阿郑做字幕面板', '让小吴跑测试', '进度怎么样？', '大家收工'];
 
 const _greeting = '这里是田头，你、管家和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每个活下面挂着它的工单串。按右下角的麦克风，可以直接跟我说话。';
 
@@ -503,6 +503,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
           final_: m.final_,
           at: m.at,
           tag: m.kind == MessageKind.dispatch ? '派活' : null,
+          folded: m.kind == MessageKind.dispatch,
           after: turn == null && chip == null ? null : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [?turn, ?chip]),
         );
     }
@@ -530,7 +531,13 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
                   builder: (context, st) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                     color: st.hovered ? Palette.leaf300 : Palette.cream200,
-                    child: Text(line, style: KitText.xs.copyWith(color: st.hovered ? Palette.bark900 : Palette.bark800)),
+                    constraints: const BoxConstraints(maxWidth: 160),
+                    child: Text(
+                      line,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: KitText.xs.copyWith(color: st.hovered ? Palette.bark900 : Palette.bark800),
+                    ),
                   ),
                 ),
               ),
