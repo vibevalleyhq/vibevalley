@@ -1,5 +1,5 @@
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/widgets.dart' hide Icon;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
@@ -8,7 +8,7 @@ import '../../rules/sessions.dart';
 import '../../rules/cast.dart';
 import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
-import '../../ui/pixel_card.dart' show CardColors, PixelCard, Words, badgeColors;
+import '../../ui/pixel_card.dart' show CardColors, Icon, PixelCard, Words, badgeColors;
 import '../../data/remote.dart' show agentsProvider, projectCatalogProvider;
 import '../projects/codebase.dart' show growthOf;
 import '../projects/projects_page.dart' show since;
@@ -432,6 +432,8 @@ class _IslandView extends ConsumerWidget {
             rows: [
               [Words(island.project, size: 14)],
               [Words(islandText(island), color: CardColors.muted)],
+              // The way onto the island, said and pointed at, not only the island to click.
+              if (!selected) [Words('进岛', color: CardColors.good), if (atlas.has('button-next')) Icon(atlas['button-next'], 12)],
             ],
           ),
         ),

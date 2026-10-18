@@ -371,6 +371,20 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
           ink: ink,
           rows: [
             [Words(badge.text)],
+            if (session?.project case final project?) [Words(project, color: ink)],
+          ],
+        ),
+      );
+    }
+    // Plots of several projects share the farm: each says whose it is.
+    if (session?.project case final project?) {
+      return (
+        at: 'rail',
+        card: PixelCard(
+          padX: 3,
+          padY: 0,
+          rows: [
+            [Words(project, color: CardColors.muted)],
           ],
         ),
       );

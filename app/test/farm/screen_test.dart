@@ -18,6 +18,8 @@ import 'package:vibevalley/farm/farm_page.dart';
 import 'package:vibevalley/data/ui_state.dart';
 import 'package:vibevalley/data/remote.dart';
 
+import '../support/farm.dart' as fakes;
+
 ChatMessage _said(int seq, SenderKind kind, String from, String name, String text) => ChatMessage(
   id: 'm$seq',
   number: seq.toDouble(),
@@ -41,7 +43,7 @@ void main() {
     final state = CoreState(
       call: CallState.live,
       manager: ManagerState.listening,
-      sessions: const [],
+      sessions: [fakes.session('w1', project: 'vibevalley-sandbox')],
       progress: const Progress(coins: 20, streak: 0, bestStreak: 0, counts: {}, unlocked: []),
       chat: Chat(
         conversations: const [Conversation(id: 'c1', kind: ConversationKind.general, name: '田头', replies: 0, at: 0)],
@@ -111,6 +113,8 @@ void main() {
     final container = ProviderScope.containerOf(tester.element(find.byType(FarmPage)));
     container.read(titleOpenProvider.notifier).enterFarm(start: false);
     await tester.pump();
+    // A plot says whose project it is.
+    expect(find.text('vibevalley-sandbox'), findsWidgets);
     await tester.tap(find.bySemanticsLabel(RegExp('^杀虫：')));
     await tester.pump();
     expect(container.read(heldToolProvider), Tool.bug);
