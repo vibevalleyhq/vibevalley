@@ -368,13 +368,17 @@ func SplitBrief(goal, project string, agents []protocol.Agent) string {
 		"- id 用简短的英文小写单词，比如 schema、api、ui。",
 	}
 	if len(agents) > 0 {
-		lines = append(lines, "- 能派的帮工（agent 填 id；不填就按「适合」挑）：")
+		lines = append(lines, "- 能派的帮工（agent 填 id；不填就按「适合的活」挑）：")
 		for _, a := range agents {
-			tags := ""
-			if len(a.Tags) > 0 {
-				tags = "（" + strings.Join(a.Tags, "、") + "）"
+			// 职责 is the profile's Role; 适合的活 its Tags, which ChooseAgent matches.
+			about := []string{}
+			if a.Role != "" {
+				about = append(about, "职责："+a.Role)
 			}
-			lines = append(lines, fmt.Sprintf("  - %s：%s，适合：%s%s", a.ID, a.Name, a.Role, tags))
+			if len(a.Tags) > 0 {
+				about = append(about, "适合的活："+strings.Join(a.Tags, "、"))
+			}
+			lines = append(lines, fmt.Sprintf("  - %s：%s，%s", a.ID, a.Name, strings.Join(about, "；")))
 		}
 	}
 	lines = append(lines, "", "汇报的最后，用一个 json 代码块给出整张计划，格式照这个：", "```json", string(pretty), "```", "代码块之后写一句结论：拆成了几步、为什么这样拆。")

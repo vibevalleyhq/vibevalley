@@ -13,9 +13,16 @@ import (
 func (fm *manager) situation(conversation string) string {
 	var sessions []string
 	for _, a := range fm.agentsWithIssues() {
-		line := fmt.Sprintf("- %s（id %s，%s）适合：%s", a.Agent.Name, a.Agent.ID, protocol.RuntimeLabel(a.Agent.Runtime), a.Agent.Role)
+		// 职责 is the profile's Role; 适合的活 its Tags, which ChooseAgent matches and the prompt tells it to pick by.
+		line := fmt.Sprintf("- %s（id %s，%s）", a.Agent.Name, a.Agent.ID, protocol.RuntimeLabel(a.Agent.Runtime))
+		if a.Agent.Role != "" {
+			line += "职责：" + a.Agent.Role
+		}
 		if len(a.Agent.Tags) > 0 {
-			line += "；关键词：" + strings.Join(a.Agent.Tags, "、")
+			if a.Agent.Role != "" {
+				line += "；"
+			}
+			line += "适合的活：" + strings.Join(a.Agent.Tags, "、")
 		}
 		switch {
 		case a.Usable():

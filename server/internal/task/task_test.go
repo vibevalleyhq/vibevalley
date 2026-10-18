@@ -602,7 +602,7 @@ func TestTaskChooseAgent(t *testing.T) {
 		t.Error(got)
 	}
 	task := session.SplitBrief("做个打卡", "clock", []protocol.Agent{a("lab", "pi", "实验")})
-	if !strings.Contains(task, "要做的事：做个打卡") || !strings.Contains(task, `"agent": "lab"`) || !strings.Contains(task, "  - lab：名lab，适合：（实验）") {
+	if !strings.Contains(task, "要做的事：做个打卡") || !strings.Contains(task, `"agent": "lab"`) || !strings.Contains(task, "  - lab：名lab，适合的活：实验") {
 		t.Error(task)
 	}
 	if task := parseSplit(task); !task.OK || !protocol.IsAcceptance(task.Tasks[0]) {
