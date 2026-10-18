@@ -37,6 +37,8 @@ Status: proposed
 
 - 第 1 步（2026-10-18）：`FarmView.Plots` 按工单做键（`protocol.PlotKey`，没挂工单的帮工按它自己），客户端经 `plotKey` 找地。一张在做的工单只有一个帮工在上面，帮工跨重启也是同一个，所以地的位置照旧由帮工的 `SessionPlay.Station` 给，没有另存一份。
 
+- 第 2 步（2026-10-18）：农场与看板共用 `shared/issue_view.dart` 的 `IssueView`，内容和状态按钮只写一次，按外框分节，收获和导航由两张皮传回调。
+
 ## Alternatives considered
 
 **地还是帮工的位置。** 不用改核心状态，但重开的工单换地、两个详情页、工具绕一圈都留着；而且和「工单拥有分支和 worktree」说的是两回事。

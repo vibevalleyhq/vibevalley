@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:vibevalley/shared/issue_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -351,6 +352,19 @@ void main() {
         case ('GET', '/api/v1/skills'):
         case ('GET', '/api/v1/runtimes'):
           return jsonResponse([]);
+        case ('GET', '/api/v1/issues/t1/runs'):
+          return jsonResponse([
+            const Run(
+              id: 'r1',
+              issue: 't1',
+              session: 'w1',
+              triggeredBy: RunTrigger(kind: RunTriggerKind.issue),
+              heard: [],
+              startedAt: 0,
+              endedAt: 60000,
+              outcome: Outcome.completed,
+            ).toJson(),
+          ]);
         case ('GET', '/api/v1/sessions/w1'):
           return jsonResponse(_closed.toJson());
         case ('GET', '/api/v1/sessions/w1/events'):
@@ -450,6 +464,8 @@ void main() {
     expect(writes.last, 'PUT /api/v1/issues/a2/move {"before":"a1"}');
     expect(find.text('2 轮 · 1 分 · 花了 ¥0.42'), findsOneWidget);
     expect(find.text('打卡写好了，测试全过'), findsOneWidget);
+    expect(find.byType(IssueView), findsOneWidget);
+    expect(find.text('每次干活'), findsOneWidget);
 
     final before = writes.length;
     await drag(t.getCenter(find.text('改文案')), t.getCenter(find.text('处理中')) + const Offset(0, 120));

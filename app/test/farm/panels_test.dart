@@ -96,7 +96,18 @@ void main() {
   ];
 
   testWidgets('a bed: what it is doing, its project, its steps, and its buttons', (tester) async {
-    final routes = Routes();
+    final routes = Routes({
+      'PUT /api/v1/issues/tw1/status': Issue(
+        id: 'tw1',
+        number: 1,
+        title: working.brief,
+        priority: Priority.medium,
+        createdAt: 0,
+        status: IssueStatus.canceled,
+        sessions: ['w1'],
+        moves: [],
+      ).toJson(),
+    });
     final c = await pumpFarm(
       tester,
       const FarmPanels(),
@@ -105,7 +116,7 @@ void main() {
     c.read(farmOverlaysProvider.notifier).select('w1');
     await settle(tester);
     expect(find.text('小吴的地'), findsOneWidget);
-    expect(find.text('项目 clock-in'), findsOneWidget);
+    expect(find.text('clock-in'), findsOneWidget);
     expect(find.text('正在改文件'), findsOneWidget);
     expect(find.text('干活过程'), findsOneWidget);
     expect(find.text('工单'), findsNothing, reason: '干活过程 starts folded');
@@ -115,16 +126,19 @@ void main() {
     expect(find.text('碰过的文件'), findsOneWidget);
     expect(find.text('\$ pnpm test'), findsOneWidget);
     expect(routes.paths, contains('GET /api/v1/sessions/w1/events'));
-    await tester.tap(find.text('叫停'));
+    await tester.ensureVisible(find.text('叫停这一轮'));
+    await tester.tap(find.text('叫停这一轮'));
     await settle(tester);
     expect(routes.paths, contains('POST /api/v1/sessions/w1/stop'));
     await tester.enterText(find.byType(EditableText).first, '先别动测试');
     await tester.pump();
-    await tester.tap(find.text('浇水').last);
+    await tester.ensureVisible(find.text('带话').last);
+    await tester.tap(find.text('带话').last);
     await settle(tester);
     expect(routes.calls.last.path, '/api/v1/issues/tw1/comment');
     expect(routes.calls.last.body, {'text': '先别动测试'});
-    await tester.tap(find.text('请它收工'));
+    await tester.ensureVisible(find.text('关上'));
+    await tester.tap(find.text('关上'));
     await settle(tester);
     expect(routes.paths, contains('PUT /api/v1/issues/tw1/status'));
     expect(c.read(selectedProvider), isNull);
@@ -137,8 +151,8 @@ void main() {
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(routes), agents: agents));
     c.read(farmOverlaysProvider.notifier).select('w2');
     await settle(tester);
-    expect(find.text('失败：测试挂了'), findsOneWidget);
-    await tester.tap(find.text('杀虫：接着修'));
+    expect(find.text('测试挂了'), findsOneWidget);
+    await tester.tap(find.text('接着修'));
     await settle(tester);
     expect(routes.calls.last.path, '/api/v1/issues/tw2/comment');
     await tester.pump(const Duration(seconds: 3));
