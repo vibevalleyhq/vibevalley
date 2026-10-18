@@ -324,7 +324,7 @@ var ToolActionValues = []ToolAction{ToolActionRunCommand, ToolActionReadFile, To
 // NoticeLevelValues are every NoticeLevel, in the protocol's order.
 var NoticeLevelValues = []NoticeLevel{NoticeLevelInfo, NoticeLevelWarn, NoticeLevelError}
 
-// InstallationValue is a member of Installation: InstallationAvailable, InstallationNotFound, InstallationUnsupported, told apart by "status".
+// InstallationValue is a member of Installation: InstallationAvailable, InstallationNotFound, InstallationChecking, InstallationUnsupported, told apart by "status".
 type InstallationValue interface{ isInstallation() }
 
 func (u Installation) IsZero() bool { return u.Value == nil }
@@ -357,6 +357,10 @@ func (u *Installation) UnmarshalJSON(data []byte) error {
 		var v InstallationNotFound
 		err = json.Unmarshal(data, &v)
 		u.Value = v
+	case "checking":
+		var v InstallationChecking
+		err = json.Unmarshal(data, &v)
+		u.Value = v
 	case "unsupported":
 		var v InstallationUnsupported
 		err = json.Unmarshal(data, &v)
@@ -369,7 +373,7 @@ func (u *Installation) UnmarshalJSON(data []byte) error {
 
 // InstallationMembers are every member of Installation, each zero, in the protocol's order: a test can see that a switch meant to
 // handle every one of them does.
-var InstallationMembers = []InstallationValue{InstallationAvailable{}, InstallationNotFound{}, InstallationUnsupported{}}
+var InstallationMembers = []InstallationValue{InstallationAvailable{}, InstallationNotFound{}, InstallationChecking{}, InstallationUnsupported{}}
 
 func (v ModelEntry) MarshalJSON() ([]byte, error) {
 	type plain ModelEntry
@@ -1033,6 +1037,15 @@ func (v InstallationNotFound) MarshalJSON() ([]byte, error) {
 	p := plain(v)
 
 	return withTag(p, "status", "not_found")
+}
+
+func (InstallationChecking) isInstallation() {}
+
+func (v InstallationChecking) MarshalJSON() ([]byte, error) {
+	type plain InstallationChecking
+	p := plain(v)
+
+	return withTag(p, "status", "checking")
 }
 
 func (InstallationUnsupported) isInstallation() {}

@@ -1460,6 +1460,7 @@ sealed class Installation {
   factory Installation.fromJson(Map<String, dynamic> j) => switch (j['status']) {
     'available' => InstallationAvailable.fromJson(j),
     'not_found' => InstallationNotFound.fromJson(j),
+    'checking' => InstallationChecking.fromJson(j),
     'unsupported' => InstallationUnsupported.fromJson(j),
     final other => throw FormatException('Installation: unknown status', other),
   };
@@ -3986,6 +3987,15 @@ final class InstallationNotFound extends Installation {
 
   @override
   Map<String, dynamic> toJson() => {'status': 'not_found'};
+}
+
+final class InstallationChecking extends Installation {
+  const InstallationChecking();
+
+  factory InstallationChecking.fromJson(Map<String, dynamic> j) => InstallationChecking();
+
+  @override
+  Map<String, dynamic> toJson() => {'status': 'checking'};
 }
 
 final class InstallationUnsupported extends Installation {

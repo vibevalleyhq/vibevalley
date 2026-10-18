@@ -596,24 +596,30 @@ func (r *Service) Check(ctx context.Context, agent protocol.Agent) []protocol.Ag
 	return agentIssues(agent, r.Info(ctx, agent.Runtime))
 }
 
-func (r *Service) List(ctx context.Context) []protocol.RuntimeInfo {
-	ids := protocol.RuntimeIDs()
-	all := make([]*protocol.RuntimeInfo, len(ids))
-	slots := make(chan struct{}, 4)
-	var group sync.WaitGroup
-	for i, id := range ids {
-		slots <- struct{}{}
-		group.Go(func() {
-			defer func() { <-slots }()
-			all[i] = r.Info(ctx, id)
-		})
-	}
-	group.Wait()
+// Answers at once: a runtime not looked at yet comes as checking, with its name, look and facts, and its probe's answer
+// follows as a runtime event (remember). A cold server probes every runtime from OnStart; one nobody has started on is
+// started here, in the background.
+func (r *Service) List(context.Context) []protocol.RuntimeInfo {
 	out := []protocol.RuntimeInfo{}
-	for _, info := range all {
-		if info != nil {
-			out = append(out, *info)
+	for _, id := range protocol.RuntimeIDs() {
+		r.mu.Lock()
+		hit, ok := r.cache[id]
+		if ok {
+			hit.Info = r.withSpendLocked(hit.Info)
 		}
+		started := r.reads[id] > 0
+		r.mu.Unlock()
+		if ok {
+			out = append(out, hit.Info)
+			continue
+		}
+		if !started {
+			go r.Refresh(context.Background(), id)
+		}
+		out = append(out, protocol.RuntimeInfo{
+			ID: id, Preset: protocol.PresetOf(id), Facts: r.facts(id),
+			Installation: protocol.Installation{Value: protocol.InstallationChecking{}}, Settings: r.store.Settings(id),
+		})
 	}
 	return out
 }

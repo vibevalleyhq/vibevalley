@@ -109,7 +109,23 @@ func TestTheListCarriesEveryRuntimesPresetAndFacts(t *testing.T) {
 	r := observing(t, oar.Runtime{ID: "opencode", RefusedSessionOptions: oar.RefusedSessionOptions{oar.OptionEnv: "test env"}, Installation: func(context.Context, oar.InstallationOptions) (oar.InstallationSnapshot, error) {
 		return oar.InstallationSnapshot{Kind: "not_found"}, nil
 	}})
-	list := r.List(context.Background())
+	// The first answer does not wait for a probe: every runtime is checking, already with its name, look and facts.
+	for _, info := range r.List(context.Background()) {
+		if _, ok := info.Installation.Value.(protocol.InstallationChecking); !ok {
+			t.Fatalf("%s before its probe: %+v", info.ID, info.Installation)
+		}
+		testkit.Eq(t, info.Preset, protocol.PresetOf(info.ID), info.ID+"'s preset while checking")
+	}
+	var list []protocol.RuntimeInfo
+	testkit.Until(t, "every runtime looked at", func() bool {
+		list = r.List(context.Background())
+		for _, info := range list {
+			if _, checking := info.Installation.Value.(protocol.InstallationChecking); checking {
+				return false
+			}
+		}
+		return true
+	})
 	ids := []string{}
 	for _, info := range list {
 		ids = append(ids, info.ID)

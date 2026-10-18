@@ -207,7 +207,11 @@ class _RuntimeChoice extends ConsumerWidget {
                           final available = installation is InstallationAvailable;
                           final ok = available && info.settings.enabled;
                           final active = draft.runtime == info.id;
-                          final status = available ? (info.settings.enabled ? (installation.version ?? '可用') : '已停用') : '这台机器上没有';
+                          final status = available
+                              ? (info.settings.enabled ? (installation.version ?? '可用') : '已停用')
+                              : installation is InstallationChecking
+                              ? '检测中…'
+                              : '这台机器上没有';
                           return WorkbenchChoice(
                             active: active,
                             onTap: () => _choose(info.id, info),

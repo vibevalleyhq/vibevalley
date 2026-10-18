@@ -68,6 +68,7 @@ class _ListItem extends StatelessWidget {
       // The reason, not just 不支持: for vibevalley it is a missing DeepSeek key, which is the owner's to fix.
       InstallationUnsupported(:final reason) => reason.isEmpty ? '不支持' : reason,
       InstallationNotFound() => '没找到',
+      InstallationChecking() => '检测中…',
     };
     return ListRow(
       active: active,
@@ -191,8 +192,9 @@ class _Header extends ConsumerWidget {
                       ],
                       InstallationUnsupported(:final reason) => [TintTag('不支持：$reason', fill: badTag.fill, ink: badTag.ink)],
                       InstallationNotFound() => [TintTag('这台机器上没找到', fill: badTag.fill, ink: badTag.ink)],
+                      InstallationChecking() => [Text('检测中…', style: KitText.xs.copyWith(color: Palette.bark500))],
                     },
-                    Text('检测于 ${wallClockText(info.checkedAt)}', style: KitText.xs.copyWith(color: Palette.bark500)),
+                    if (inst is! InstallationChecking) Text('检测于 ${wallClockText(info.checkedAt)}', style: KitText.xs.copyWith(color: Palette.bark500)),
                   ],
                 ),
               ],

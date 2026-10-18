@@ -128,6 +128,24 @@ void main() {
     expect(find.textContaining('今天已经花了 ¥1.50'), findsOneWidget);
   });
 
+  testWidgets('a runtime the server has not looked at yet says 检测中, then its answer replaces it', (t) async {
+    final events = StreamController<LiveEvent>();
+    addTearDown(events.close);
+    final b = Routes({
+      'GET /api/v1/runtimes': (_) => [
+        runtimeJson('codex')..['installation'] = {'status': 'checking'},
+      ],
+      'GET /api/v1/agents': (_) => <Object>[],
+      'GET /api/v1/skills': (_) => <Object>[],
+    });
+    await pumpPage(t, const RuntimesPage(id: 'codex'), b.handle, events: events.stream);
+    expect(find.text('检测中…'), findsWidgets);
+    expect(find.textContaining('检测于'), findsNothing);
+    events.add(LiveEventRuntime(at: 0, info: RuntimeInfo.fromJson(runtimeJson('codex'))));
+    await settle(t);
+    expect(find.text('检测中…'), findsNothing);
+  });
+
   testWidgets('the quota panel lists the usable runtimes', (t) async {
     await pumpPage(t, const Center(child: QuotaPanel()), backend().handle);
     expect(find.text('剩余额度'), findsOneWidget);

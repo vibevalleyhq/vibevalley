@@ -37,7 +37,7 @@
 - **外观缺的字段在读和存时补上**（`withCast`）：体型 `biped`、头 `rounded`、衣服 `farmer`，动物按 id 的 hash（每个码点取第一个 UTF-16 单元，`h*31+u`，32 位回绕）对 `SpeciesValues` 取模。客户端 `rules/cast.dart` 的 `castOf` 用同一个 hash，所以没存长相的档案补上以后画面不变；接口给出去的必填枚举不会是空字符串。
 - **农场认的农机是 `runtimeIds` 的十个**：`claude`、`codex`、`opencode`、`vibevalley`、`pi`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`；`runtime.list` 照这个顺序给，农具页和捏帮工的农机列表也照它列。每台都有一份 `runtimePresets`，顺序一样（`TestEveryRuntimeHasItsPresetAndFacts`）。注册表（`runtime.Registry`）是 smith 的内置农机（`defaults.Runtimes()`）加 VibeValley 自己的 agent（`oarruntime`，每次开会话现取 DeepSeek 的钥匙；种植计划存在农场的库里）加 DeepSeek Harness（`dsh`）。注册表里没有的报「不支持」：cursor 写明要单独装它的 SDK（`@cursor/sdk`），其余写「oar 不认识这个 runtime」。不认识的 id，`runtime.refresh`、`runtime.update` 回 404。
 - **农机接受什么**（`RuntimeFacts`）：`steer`（干活时能不能插话）、`refused`（不接受的开会话选项：`systemPrompt`、`appendSystemPrompt`、`effort`、`env`、`mcpServers`、`disallowedTools`，带原因）、`capabilities`（`RuntimeCapability`：smith 的适配器能问它什么，农具页照它列）、`inProcess`。探测时 `refusals` 先取适配器自己的 `RefusedSessionOptions`，再用 `seeds.json` 的 `runtimeFacts` 盖上去（农场的说法更严时以它为准），结果和种子的其余几项一起放在 `RuntimeInfo.facts`；`agentIssues` 优先用探测到的这份，没探测到才用种子。客户端的 `factsOf(info)` 只读 `info.facts`，目录里没有的农机什么都不接受。
-- **农机的样子**（`RuntimeInfo`）：名字、介绍和长相（`preset`，种子里没有的取 `fallbackPreset`、名字是 id）、接受什么（`facts`）、安装（`available` 带经由 `executable` 或 `bundled`、命令、版本；`not_found`；`unsupported` 带原因）、模型（去掉 `Disabled` 的，带思考强度的档和默认）、额度、清单（技能、MCP、工具）、设置、今天的花费、额度的字（`quota`）、为什么现在不派（`stop`）、检测时间。读不到的模型和清单是 `null`，不是空列表。每次给出去前现算今天的花费、`stop` 和 `quota`。没装、不支持的农机也在 `runtime.list` 里，带着 `preset` 和 `facts`。
+- **农机的样子**（`RuntimeInfo`）：名字、介绍和长相（`preset`，种子里没有的取 `fallbackPreset`、名字是 id）、接受什么（`facts`）、安装（`available` 带经由 `executable` 或 `bundled`、命令、版本；`not_found`；`unsupported` 带原因；`checking` 是服务端刚起来、还没探到）、模型（去掉 `Disabled` 的，带思考强度的档和默认）、额度、清单（技能、MCP、工具）、设置、今天的花费、额度的字（`quota`）、为什么现在不派（`stop`）、检测时间。读不到的模型和清单是 `null`，不是空列表。每次给出去前现算今天的花费、`stop` 和 `quota`。没装、不支持的农机也在 `runtime.list` 里，带着 `preset` 和 `facts`。
 - **一份缓存，新的读不被旧的盖掉**：每台农机每次读（探测或读额度）开始时取下一个号，缓存记着自己那份的号；开始得早的读晚到了就丢掉（`TestASlowProbeDoesNotOverwriteANewerOne`）。缓存里同时存着这次接受的安装（`Found`），之后读额度、`Resolve` 都用它。
 - **清单在工作目录 `projects/` 下读**（`ProjectsDir`）：农机自己装的技能、MCP 服务器、工具，各最多等 10 秒，读不到或不是 `ok` 就是 `null`。MCP 的说明拼成「状态 · N 个工具」；技能和工具的来源取路径、MCP 的 id，没有就取 `source`。
 - **这台电脑上装的技能**：客户端把各农机清单里的技能按名字合成一份（`installedSkills`：第一个非空的说明，加上每台带着它的农机和来源，按名字排），只读；用这些农机的帮工自己按需加载。VibeValley 不复制它们。
@@ -64,7 +64,7 @@
 
 - 开机后在后台把十台各探一遍（最多 4 台同时），第一次打开页面不等它；之后每 5 分钟只重读额度，停用的、没装的、没探测过的不读（claude 读一次额度要调一次它的 API）。
 - 一轮干完，`session` 调 `UsageSoon`：20 秒后重读这台的额度，几轮共用一次。额度没变就不推。
-- `runtime.list` 有缓存给缓存，没有就探（最多 4 台同时）；`runtime.refresh` 总是重探（农具页的「重新检测」）。
+- `runtime.list` 马上答：有缓存给缓存，还没探到的给 `checking`（已带名字、长相和接受什么），探完经 `LiveEventRuntime` 推过来替换；服务端开机就在后台探全部（最多 4 台同时），没人开始探的那台由 `runtime.list` 在后台开始。页面上写「检测中…」，不等探测。`runtime.refresh` 总是重探（农具页的「重新检测」）。
 - `runtime.update` 先存设置，存不成就回错、不探；存成了重探一次，回新的样子。
 - 花了钱（`Spend`）以后 3 秒把这台的样子再推一次，期间花的一起带上。
 
@@ -102,6 +102,7 @@
 - **只给真实数据：清单从农机读，装了的技能不复制进技能库。** 两份会对不上，农机那边改了、删了，VibeValley 不知道；所以只读地列出来，帮工按需自己加载。示例技能也不预置：示例和真装的混在一页，主人分不清哪些真在起作用。连不上服务端时的横幅见[客户端](docs/subsystems/app.md)。
 - **「派不出去」只有服务端一份，页面问 `agent.check`。** Dart 里再写一份，页面说能派、派的时候被拒；草稿也能问，不用先存。
 - **农机拒绝的选项以探测到的适配器为准，农场的说法盖在上面。** 只抄 `seeds.json` 会和 smith 漂开；只用适配器的，农场要更严、要中文原因时没有地方写。客户端不从种子的标签推断能不能用。
+- **`runtime.list` 不等探测。** 探一台要问命令行、读模型和额度，冷启动时全部探完要十秒左右；列表等它，农具页和捏帮工就空着。没探到的先给 `checking`，名字和能力已经在里面，探完靠侧事件替换。放弃了「客户端自带名字先画」：那是种子的副本，见下一条。
 - **农机的名字、长相和能做什么挂在 `runtime.list` 上，客户端不带种子的副本。** 原来 `shapegen` 把它们写进 `lib/gen`，「连接到本机」的手机和那台电脑的服务端版本不一样时，名字和能力就对不上，`factsOf` 也成了客户端的一份规则输入。放弃了两条路：`shapegen` 改写一个资源文件（diff 好看了，客户端照样带副本，还要把二十来处改成等它异步读）；加一个 `GET /api/v1/seeds` 整份给（种子成了单独的东西，客户端拿到还要自己拼）。挂在页面本来就在等的目录上，拿到的就是要显示的；目录到之前列表是空的，新帮工等目录到了再起草（名字和人设的方式都看农机）。
 - **农机的样子不进核心状态，走窄事件流。** 它是从机器读来的观察，不是农场的事实；变得频繁（额度、花费），放进核心状态每次都要整份写盘、推全帧。
 - **安装是显式的输入，不经进程环境变量。** 两份配置共用一个进程时，写 `OAR_<RUNTIME>_BIN` 会互相覆盖（`TestTwoRuntimeConfigurationsDoNotCommunicateThroughEnvironment`）；`Resolve` 带回探测时接受的安装，派活时不再探一次，指定的路径失效也不会悄悄换一台。

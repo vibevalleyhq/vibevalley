@@ -1640,6 +1640,12 @@ type InstallationAvailable struct {
 type InstallationNotFound struct {
 }
 
+// Not looked for yet: the server has just started. The answer follows as a LiveEventRuntime.
+//
+//vibevalley:member Installation checking
+type InstallationChecking struct {
+}
+
 //vibevalley:member Installation unsupported
 type InstallationUnsupported struct {
 	Reason string `json:"reason"`
