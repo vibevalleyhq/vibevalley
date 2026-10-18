@@ -122,7 +122,7 @@ func (s *Service) Status() protocol.SettingsStatus {
 	status.MemorySources = []protocol.MemorySource{}
 	for _, m := range stored.MemorySources {
 		status.MemorySources = append(status.MemorySources, protocol.MemorySource{
-			Kind: m.Kind, URL: m.URL, Enabled: m.Enabled, Read: m.Read, Write: m.Write, Everything: m.Everything,
+			Kind: m.Kind, URL: m.URL, Enabled: m.Enabled, Read: m.Read, Write: m.Write, Everything: m.Everything, User: m.User,
 			Key: voiceSecret(m.Key, protocol.KeySourceSettings),
 		})
 	}

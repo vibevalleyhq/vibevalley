@@ -49,3 +49,9 @@ type Recalled struct {
 	IDs   []string
 	Lines []string
 }
+
+type EndedSession struct {
+	Agent   string
+	Session string
+	Project string
+}

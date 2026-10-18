@@ -29,5 +29,6 @@ type MemorySourceConfig struct {
 	Read       bool                      `json:"read,omitempty"`
 	Write      bool                      `json:"write,omitempty"`
 	Everything bool                      `json:"everything,omitempty"`
+	User       string                    `json:"user,omitempty"`
 	Key        string                    `json:"key,omitempty"`
 }

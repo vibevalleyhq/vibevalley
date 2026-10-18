@@ -172,6 +172,7 @@
   - **读**（开工想起、`memory_search`、记性页签）同时问所有来源，外面的最多等 2 秒，等不到就不等，日志里记一句跳过了它。几个来源的结果轮流取（各家的分数比不了），几乎一样的只留一条，开工想起照旧最多 8 条、1600 字；只有合并后真放进话里的本地记忆才算想起过一次。
   - **写**：本地的当场写好；外面的放在后台一个接一个地送，收工和记一条都不等它们，送不成只记日志。送出去的字先过 `base.Redact`（和服务端日志同一份规则，上文「设置」）。
   - **Nowledge Mem**（`memory/nowledge.go`，本机 `http://127.0.0.1:14242/mcp/`，MCP）：读用它的 `memory_search`，写用 `memory_add`（汇报里「记住：」的那几行，和主人、管家、帮工经 `memory_add` 记的），别的工具不调。写进去的带 label：`vibevalley`、`vibevalley-agent-<档案>`、这个项目的再加 `vibevalley-project-<项目>`，`source_app` 是 `vibevalley`；读的时候只读这个档案的 label。设置里打开「读全部」才读主人在它里面的全部记忆，每个档案读到的都一样。它里面的记忆页签上列得出、忘不掉：要删到 Nowledge Mem 里删。
+  - **EverOS**（`memory/everos.go`，HTTP 的 `/api/v2`）：收整段干活，自己用模型提炼。每一轮收工把这一轮交给 `memory/add`：第一轮带上工单（主人的话，`sender_id` 是设置里的 user_id，没填是 `owner`），每一轮带上帮工最后的汇报（`sender_id` 是 `vibevalley-<档案>`，没做成的写明）；`session_id` 是 `vibevalley-<Session>`，`app_id` 是 `vibevalley`，`project_id` 是项目。叫停的一轮不送。Session 离开农场时 `memory/flush` 让它提炼；农场停下时，送过却还没 flush 的也 flush 一次。主人或帮工在一轮之外记的一句，当成一段两句的对话送过去，马上 flush。读用 `memory/search`：开工想起和 `memory_search` 查这个档案的 cases（`agent_id`），带 `kind = issue` 的查主人的 episodes（`user_id`）；它一次只认一个主人，所以管家不填档案的查询不问它。它的记忆页签上不列、也忘不掉。
   - **记性页签**按每个来源能做的（`Can()`：列不列得出、能不能在这里忘掉、收不收整段对话）显示，`MemoryList.sources` 列出每个来源和没接上的原因。
 - 一轮的笔记、总结和过量记忆的清理在同一个事务里；失败不留下半份记性。提不出关键词的不同短句仍分别保留。
 

@@ -1297,14 +1297,17 @@ type MemorySource struct {
 	// What is kept also goes to it.
 	Write bool `json:"write"`
 	// Nowledge Mem: read all that is in it, not only what the farm wrote for the profile; every profile then reads the same.
-	Everything bool      `json:"everything,omitzero"`
-	Key        KeyStatus `json:"key"`
+	Everything bool `json:"everything,omitzero"`
+	// EverOS: the user_id the owner's words are kept under; empty is owner.
+	User string    `json:"user,omitzero"`
+	Key  KeyStatus `json:"key"`
 }
 
 type MemorySourceKind string
 
 const (
 	MemorySourceKindNowledge MemorySourceKind = "nowledge"
+	MemorySourceKindEveros   MemorySourceKind = "everos"
 )
 
 // A source as the settings page saves it: the key missing keeps the saved one, empty clears it.
@@ -1315,6 +1318,7 @@ type MemorySourceUpdate struct {
 	Read       bool             `json:"read"`
 	Write      bool             `json:"write"`
 	Everything bool             `json:"everything,omitzero"`
+	User       string           `json:"user,omitzero"`
 	Key        *string          `json:"key,omitzero"`
 }
 

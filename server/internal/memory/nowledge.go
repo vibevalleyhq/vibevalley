@@ -317,6 +317,8 @@ func (n *nowledge) SyncTurn(ctx context.Context, run FinishedRun) error {
 	return nil
 }
 
+func (*nowledge) OnSessionEnd(context.Context, EndedSession) error { return nil }
+
 func (n *nowledge) Add(ctx context.Context, note Note) (protocol.Memory, error) {
 	if !n.c.Write {
 		return protocol.Memory{}, nil

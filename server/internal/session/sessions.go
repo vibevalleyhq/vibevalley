@@ -678,6 +678,9 @@ func (c *sessions) leave(h *hand, closed protocol.IssueClose, merged int64) {
 	c.mu.Lock()
 	delete(c.hands, h.id)
 	c.mu.Unlock()
+	if session := c.core.Session(h.id); session != nil {
+		c.memories.EndSession(memory.EndedSession{Agent: session.Agent, Session: h.id, Project: h.place.Project})
+	}
 	left := protocol.FactLeft{ID: h.id, Closed: &closed}
 	if merged > 0 {
 		left.Merged = &merged

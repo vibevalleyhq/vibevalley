@@ -132,6 +132,16 @@ Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自
 - 写进 Nowledge 只在测试里对着假的 MCP 服务端做过（`memory/nowledge_test.go`）；验收里「收工时「记住：」进了 Nowledge、下回 `memory_search` 能取回」，对真的那一家只验证了读的一半（照 `verify-server`，经 `GET /api/v1/memories/{agent}/recall` 读回了它的记忆），写的一半要主人点头再试。
 - 没做 `ConfigSchema`、`ToolSchemas`、`HandleTool`：还没人调；来源自带的工具也就还没法在设置里打开。
 
+第 4 步做了：`memory/everos.go` 照 Raven 的 everos-memory 插件说的那一套（`raven_everos/backend.py`，EverOS 1.2）：`POST /api/v2/memory/add`（`session_id`、`messages[]` 的 `sender_id`、`role`、`timestamp` 毫秒、`content`，`app_id`、`project_id`）、`/memory/flush`（`session_id`）、`/memory/search`（`query`、`top_k` 1..100，`user_id` 和 `agent_id` 二选一；回 `data.agent_cases`、`data.episodes`）。接口加了 `OnSessionEnd`，`session` 在 Session 离开农场时经 `memory.EndSession` 告诉管理器，它在后台转给外面的来源。测试对着 httptest 的假 EverOS（`memory/everos_test.go`），没碰真的 EverOS。
+
+和提案不一样的：
+- `SyncTurn` 给的「这一轮的对话」只有工单和帮工最后的汇报：`FinishedRun` 里没有这一轮中间的工具调用和带的话（`session` 只存了它们的消息 id），要整段得另开一条从事件日志取的路。
+- 档案的 `agent_id` 写成 `vibevalley-<档案>`、会话写成 `vibevalley-<Session>`：同一个 EverOS 里还有别的应用的 agent（Raven 的），农场的 Session 编号（w1、w2）也只在一个家目录里不重。
+- 一轮之外记的一句（页签、`memory_add`）也送：当成主人和档案的两句对话，马上 flush，不然 EverOS 不提炼。
+- 没照它的 `/health` 调检索方法（没有向量模型时改 keyword）：检索出错就跳过、记日志；它的 profile 和 skills 不读（profile 等 `SystemPromptBlock`，skills 走技能书）。
+
+还没做的：Nowledge 的 `read_context_bundle`、EverOS 的 user profile 拼进 `SystemPromptBlock`（第 5 节说过不在本提案里）；设置里每个来源按农机排除（风险第一条）；本地来源的 SQLite 改造（[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)，等迁移）。
+
 ## Alternatives considered
 
 **只能开一个外接来源（Hermes 的做法）。** 它这样限制，是因为每个来源都带自己的工具。我们对 agent 只给一套统一的工具，来源多了工具也不变；而 EverOS 和 Nowledge 主人都要。

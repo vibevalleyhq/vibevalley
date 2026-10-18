@@ -382,6 +382,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                     read: d.read,
                     write: d.write,
                     everything: d.everything ? true : null,
+                    user: d.user.text.trim().isEmpty ? null : d.user.text.trim(),
                     key: d.key.text.trim().isNotEmpty ? d.key.text.trim() : (d.keyCleared ? '' : null),
                   ),
             ],
@@ -545,13 +546,14 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
   }
 }
 
-const _sourceLabels = {MemorySourceKind.nowledge: 'Nowledge Mem'};
-const _sourceAddress = {MemorySourceKind.nowledge: 'http://127.0.0.1:14242/mcp/'};
+const _sourceLabels = {MemorySourceKind.nowledge: 'Nowledge Mem', MemorySourceKind.everos: 'EverOS'};
+const _sourceAddress = {MemorySourceKind.nowledge: 'http://127.0.0.1:14242/mcp/', MemorySourceKind.everos: 'http://127.0.0.1:18791'};
 
 /// One memory source as the panel edits it, from what is saved until it is saved again.
 class _SourceDraft {
   _SourceDraft(this.kind, MemorySource? saved)
     : url = TextEditingController(text: saved?.url ?? ''),
+      user = TextEditingController(text: saved?.user ?? ''),
       saved = saved,
       enabled = saved?.enabled ?? false,
       read = saved?.read ?? true,
@@ -560,6 +562,7 @@ class _SourceDraft {
   final MemorySourceKind kind;
   final MemorySource? saved;
   final TextEditingController url;
+  final TextEditingController user;
   final key = TextEditingController();
   bool enabled;
   bool read;
@@ -572,6 +575,7 @@ class _SourceDraft {
 
   void dispose() {
     url.dispose();
+    user.dispose();
     key.dispose();
   }
 }
@@ -640,6 +644,10 @@ class _MemorySourceField extends StatelessWidget {
           _Input(controller: d.url, placeholder: _sourceAddress[d.kind] ?? 'http://…', label: '$label 的地址', onChanged: typed),
           const SizedBox(height: 4),
           _SecretInput(controller: d.key, placeholder: 'key（不用或不改就空着）', label: '$label 的 key', onChanged: typed),
+          if (d.kind == MemorySourceKind.everos) ...[
+            const SizedBox(height: 4),
+            _Input(controller: d.user, placeholder: '你在 EverOS 里的 user_id（空着就是 owner）', label: '$label 的 user_id', onChanged: typed),
+          ],
           const SizedBox(height: 8),
           Wrap(
             spacing: 16,

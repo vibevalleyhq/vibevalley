@@ -3216,6 +3216,7 @@ class MemorySource {
     required this.read,
     required this.write,
     this.everything,
+    this.user,
     required this.key,
   });
 
@@ -3226,6 +3227,7 @@ class MemorySource {
     read: j['read'] as bool,
     write: j['write'] as bool,
     everything: j['everything'] == null ? null : j['everything'] as bool,
+    user: j['user'] == null ? null : j['user'] as String,
     key: KeyStatus.fromJson(j['key'] as Map<String, dynamic>),
   );
 
@@ -3235,6 +3237,7 @@ class MemorySource {
   final bool read;
   final bool write;
   final bool? everything;
+  final String? user;
   final KeyStatus key;
 
   Map<String, dynamic> toJson() => {
@@ -3244,12 +3247,14 @@ class MemorySource {
     'read': read,
     'write': write,
     if (everything != null) 'everything': everything!,
+    if (user != null) 'user': user!,
     'key': key.toJson(),
   };
 }
 
 enum MemorySourceKind {
-  nowledge('nowledge');
+  nowledge('nowledge'),
+  everos('everos');
 
   const MemorySourceKind(this.wire);
   final String wire;
@@ -3259,7 +3264,16 @@ enum MemorySourceKind {
 }
 
 class MemorySourceUpdate {
-  const MemorySourceUpdate({required this.kind, required this.url, required this.enabled, required this.read, required this.write, this.everything, this.key});
+  const MemorySourceUpdate({
+    required this.kind,
+    required this.url,
+    required this.enabled,
+    required this.read,
+    required this.write,
+    this.everything,
+    this.user,
+    this.key,
+  });
 
   factory MemorySourceUpdate.fromJson(Map<String, dynamic> j) => MemorySourceUpdate(
     kind: MemorySourceKind.fromJson(j['kind']),
@@ -3268,6 +3282,7 @@ class MemorySourceUpdate {
     read: j['read'] as bool,
     write: j['write'] as bool,
     everything: j['everything'] == null ? null : j['everything'] as bool,
+    user: j['user'] == null ? null : j['user'] as String,
     key: j['key'] == null ? null : j['key'] as String,
   );
 
@@ -3277,6 +3292,7 @@ class MemorySourceUpdate {
   final bool read;
   final bool write;
   final bool? everything;
+  final String? user;
   final String? key;
 
   Map<String, dynamic> toJson() => {
@@ -3286,6 +3302,7 @@ class MemorySourceUpdate {
     'read': read,
     'write': write,
     if (everything != null) 'everything': everything!,
+    if (user != null) 'user': user!,
     if (key != null) 'key': key!,
   };
 }

@@ -860,7 +860,7 @@ func (v SettingsStatus) MarshalJSON() ([]byte, error) {
 }
 
 // MemorySourceKindValues are every MemorySourceKind, in the protocol's order.
-var MemorySourceKindValues = []MemorySourceKind{MemorySourceKindNowledge}
+var MemorySourceKindValues = []MemorySourceKind{MemorySourceKindNowledge, MemorySourceKindEveros}
 
 // KeySourceValues are every KeySource, in the protocol's order.
 var KeySourceValues = []KeySource{KeySourceSettings, KeySourceConfig}

@@ -80,7 +80,7 @@ func memorySourcesProblem(sources []protocol.MemorySourceUpdate) string {
 func memorySourcesOver(saved []MemorySourceConfig, given []protocol.MemorySourceUpdate) []MemorySourceConfig {
 	out := []MemorySourceConfig{}
 	for _, m := range given {
-		next := MemorySourceConfig{Kind: m.Kind, URL: str.Trim(m.URL), Enabled: m.Enabled, Read: m.Read, Write: m.Write, Everything: m.Everything}
+		next := MemorySourceConfig{Kind: m.Kind, URL: str.Trim(m.URL), Enabled: m.Enabled, Read: m.Read, Write: m.Write, Everything: m.Everything, User: str.Trim(m.User)}
 		if m.Key != nil {
 			next.Key = str.Trim(*m.Key)
 		} else if i := slices.IndexFunc(saved, func(c MemorySourceConfig) bool { return c.Kind == m.Kind }); i >= 0 {

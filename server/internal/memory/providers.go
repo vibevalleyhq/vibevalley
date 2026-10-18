@@ -66,11 +66,13 @@ func newSource(c setting.MemorySourceConfig) provider {
 	switch c.Kind {
 	case protocol.MemorySourceKindNowledge:
 		return newNowledge(c)
+	case protocol.MemorySourceKindEveros:
+		return newEveros(c)
 	}
 	return nil
 }
 
-var sourceLabels = map[string]string{localName: "本地", string(protocol.MemorySourceKindNowledge): "Nowledge Mem"}
+var sourceLabels = map[string]string{localName: "本地", string(protocol.MemorySourceKindNowledge): "Nowledge Mem", string(protocol.MemorySourceKindEveros): "EverOS"}
 
 func (p *providers) OnStart(ctx context.Context) error {
 	if err := p.local.OnStart(ctx); err != nil {
@@ -372,6 +374,12 @@ func (p *providers) Keep(run FinishedRun) {
 	}
 	for _, one := range all[1:] {
 		p.queue(one.Name()+" did not keep what "+run.Session+" learned", func(ctx context.Context) error { return one.SyncTurn(ctx, run) })
+	}
+}
+
+func (p *providers) EndSession(s EndedSession) {
+	for _, one := range p.current()[1:] {
+		p.queue(one.Name()+" did not take the end of "+s.Session, func(ctx context.Context) error { return one.OnSessionEnd(ctx, s) })
 	}
 }
 

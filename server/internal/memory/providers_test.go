@@ -83,7 +83,8 @@ func (f *fakeProvider) Add(_ context.Context, n Note) (protocol.Memory, error) {
 	f.added = append(f.added, n)
 	return protocol.Memory{ID: "n1"}, nil
 }
-func (f *fakeProvider) Can() abilities { return abilities{List: true, Forget: !f.noForget} }
+func (f *fakeProvider) OnSessionEnd(context.Context, EndedSession) error { return nil }
+func (f *fakeProvider) Can() abilities                                   { return abilities{List: true, Forget: !f.noForget} }
 func (f *fakeProvider) Forget(_ context.Context, _, id string) error {
 	f.forgot = append(f.forgot, id)
 	return nil

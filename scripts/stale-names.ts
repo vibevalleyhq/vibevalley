@@ -20,6 +20,8 @@ interface Rule {
   readonly says: string
   /** Only these directories, when the word is fine elsewhere (a project named tickets). */
   readonly dirs?: readonly string[]
+  /** Files where the same words name something else (another service's API). */
+  readonly except?: RegExp
 }
 
 const RULES: readonly Rule[] = [
@@ -27,6 +29,8 @@ const RULES: readonly Rule[] = [
     name: 'an API path without its version',
     pattern: /["'`]\/api\/(?!v1\/)/,
     says: 'every route is under /api/v1',
+    // EverOS's own API, which the memory source speaks: its versions are its own.
+    except: /^server\/internal\/memory\/everos(_test)?\.go$/,
   },
   {
     name: 'the word ticket',
@@ -78,6 +82,7 @@ for (const file of files) {
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
       if (rule.dirs && !rule.dirs.some((dir) => file.startsWith(dir + '/'))) continue
+      if (rule.except?.test(file)) continue
       if (rule.pattern.test(line)) hits.push(`${file}:${i + 1}: ${rule.name} — ${rule.says}`)
     }
   }

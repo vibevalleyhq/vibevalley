@@ -78,3 +78,5 @@ func (l localProvider) Search(_ context.Context, q SearchQuery) ([]Found, error)
 }
 
 func (localProvider) Can() abilities { return abilities{List: true, Forget: true} }
+
+func (localProvider) OnSessionEnd(context.Context, EndedSession) error { return nil }

@@ -23,6 +23,8 @@ type provider interface {
 	Prefetch(ctx context.Context, cue RecallCue) ([]recalledLine, error)
 	// sync_turn: one finished run, everything about it; each provider keeps what it uses.
 	SyncTurn(ctx context.Context, run FinishedRun) error
+	// on_session_end: the session has left the farm; EverOS extracts what it was given (flush) here.
+	OnSessionEnd(ctx context.Context, s EndedSession) error
 	// Behind memory_search: at most q.Limit, best first; Score orders only this provider's own.
 	Search(ctx context.Context, q SearchQuery) ([]Found, error)
 

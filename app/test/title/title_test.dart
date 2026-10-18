@@ -171,7 +171,7 @@ void main() {
     await tester.tap(find.text('设置'));
     await tester.pump();
     expect(find.text('记性的来源：Nowledge Mem（没接）'), findsOneWidget);
-    await tester.tap(find.text('改'));
+    await tester.tap(find.text('改').first);
     await tester.pump();
     await tester.enterText(find.bySemanticsLabel('Nowledge Mem 的地址'), 'http://127.0.0.1:14242/mcp/');
     await tester.tap(find.text('接上'));
