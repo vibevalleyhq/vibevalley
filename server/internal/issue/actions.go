@@ -28,14 +28,7 @@ func (s *Service) Comment(id string, body protocol.CommentRequest) error {
 	if err != nil {
 		return err
 	}
-	text := body.Text
-	if body.On != nil {
-		text, err = s.merges.sessions.Comment(session, *body.On, text)
-		if err != nil {
-			return err
-		}
-	}
-	_, err = s.merges.chat.TellSession("user", session, text)
+	_, err = s.merges.chat.TellSession("user", session, body.Text)
 	return err
 }
 

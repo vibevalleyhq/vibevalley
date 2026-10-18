@@ -245,11 +245,3 @@ func TestChooseAgent(t *testing.T) {
 	testkit.Eq(t, ChooseAgent(candidates, "随便", "", "").ID, "a", "first of equals")
 }
 
-func TestCommentOnlyFromItsMark(t *testing.T) {
-	if commentOn("随便说一句") != nil {
-		t.Fatal("a plain message comments on nothing")
-	}
-	if on := commentOn(CommentText(protocol.SessionEvent{Seq: 3, Type: protocol.SessionEventTypeAssistantMessage, Text: "好"}, "再想想")); on == nil || *on != 3 {
-		t.Fatalf("a comment on step 3: %v", on)
-	}
-}

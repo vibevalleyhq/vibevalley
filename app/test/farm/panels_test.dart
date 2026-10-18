@@ -108,6 +108,9 @@ void main() {
     expect(find.text('项目 clock-in'), findsOneWidget);
     expect(find.text('正在改文件'), findsOneWidget);
     expect(find.text('干活过程'), findsOneWidget);
+    expect(find.text('工单'), findsNothing, reason: '干活过程 starts folded');
+    await tester.tap(find.textContaining('· 展开'));
+    await settle(tester);
     expect(find.text('工单'), findsOneWidget);
     expect(find.text('碰过的文件'), findsOneWidget);
     expect(find.text('\$ pnpm test'), findsOneWidget);

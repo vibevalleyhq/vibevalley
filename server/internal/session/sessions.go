@@ -923,23 +923,3 @@ func (c *sessions) Find(id string) *Roster {
 	return nil
 }
 
-// What the session is told for a comment on step n of its trajectory: the step, then the comment. A step gone (only the
-// latest are kept) is Missing.
-func (c *sessions) Comment(id string, n int64, comment string) (string, error) {
-	var steps []protocol.SessionEvent
-	if h := c.hand(id); h != nil {
-		steps = h.journal.Events()
-	}
-	i := slices.IndexFunc(steps, func(s protocol.SessionEvent) bool { return s.Seq == n })
-	if i < 0 {
-		return "", protocol.Missing{What: fmt.Sprintf("第 %d 步（太早的步骤不再保留）", n)}
-	}
-	step := steps[i]
-	// A call's output is in its result.
-	if r := slices.IndexFunc(steps, func(s protocol.SessionEvent) bool {
-		return s.Type == protocol.SessionEventTypeToolResult && s.Call != nil && *s.Call == n
-	}); r >= 0 {
-		step.Output, step.Ok = steps[r].Output, steps[r].Ok
-	}
-	return CommentText(step, comment), nil
-}

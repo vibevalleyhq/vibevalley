@@ -84,7 +84,7 @@
 
 **每次干活**（run，`session/runs.go`）：农机开一轮就是一次 run，到这一轮的汇报结束，记在 `session_run` 表。发话的一方先说清这一轮是为什么开的，农机开了这一轮，run 就记下它：派出去（`issue`）、带话（`comment`，带着那条消息的号）、种植计划（`task`）、定时（`schedule`，带着哪个定时、是不是补跑）；没人发话就开的一轮记成农机自己（`runtime`）。干活时插进来的话不开新的 run，记在这一轮读到的话里（`heard`）；排队的话是下一次 run 的触发。叫不醒、被拒的不算 run。服务端重启时还开着的 run 记成叫停了。一张工单的 run 用 `GET /api/v1/issues/{id}/runs` 取，不在核心状态里。
 
-**干活过程**（`session/events.go`）：一个 Session 的日志，一条一个 `SessionEvent`（`seq`、`time`、`type`，照 DeepSeek Harness 的会话事件）：`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 `tokens`：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`，记在 `events/<id>.json`。日志只追加：写下的一条不再改；流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给客户端，下一条事件之前写下（`session/events.go`）。每个 Run 由 `run/start` 和 `run/end`（带它的结果）围起来，中间的事件都带着这个 `run`。带话时可以评论某一条（`on` 是它的 `seq`），服务端把那一条写在话前面交给帮工。
+**干活过程**（`session/events.go`）：一个 Session 的日志，一条一个 `SessionEvent`（`seq`、`time`、`type`，照 DeepSeek Harness 的会话事件）：`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 `tokens`：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`，记在 `events/<id>.json`。日志只追加：写下的一条不再改；流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给客户端，下一条事件之前写下（`session/events.go`）。每个 Run 由 `run/start` 和 `run/end`（带它的结果）围起来，中间的事件都带着这个 `run`。评论是对整张工单说的（`issue.comment`），不挂在某一步上。
 
 **工单的执行历史**：`GET /api/v1/issues/history` 一次返回工单、它关联的真实 Session 和缺失记录的号（`missingSessions`）。查库失败时报错；记录不存在时列出缺失号，客户端显示「记录缺失」，不补造歇着的帮工。
 

@@ -573,29 +573,6 @@ func TestEveryStepKeptInItsTrajectory(t *testing.T) {
 	testkit.Match(t, steps[4].Text, `做完了：看看目录`, "said")
 }
 
-func TestCommentOnAStep(t *testing.T) {
-	home, work := dirs(t)
-	w := openWorld(t, home, work)
-	hired := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "看看目录", "comments", session.HireOptions{}))
-	w.nextReport(t)
-	steps := w.f.Session.Events(hired.ID, "")
-	tool := steps[slices.IndexFunc(steps, func(e protocol.SessionEvent) bool { return e.Type == protocol.SessionEventTypeToolCall })]
-	told, err := w.f.Session.Comment(hired.ID, tool.Seq, "这里换成 ls -la 再看一遍")
-	if err != nil {
-		t.Fatal(err)
-	}
-	testkit.Match(t, told, fmt.Sprintf(`^【评论第 %d 步】关于你这一步的操作：echo hi`, tool.Seq), "names the step")
-	testkit.Match(t, told, `输出的结尾：hi\n\n我的评论：这里换成 ls -la 再看一遍$`, "the step's output, then the comment")
-	w.f.Session.Tell(hired.ID, told, protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
-	w.nextReport(t)
-	steps = w.f.Session.Events(hired.ID, "")
-	i := slices.IndexFunc(steps, func(s protocol.SessionEvent) bool {
-		return s.Type == protocol.SessionEventTypeUserMessage && s.Seq > tool.Seq
-	})
-	if i < 0 || steps[i].On == nil || *steps[i].On != tool.Seq {
-		t.Fatalf("the comment is tied to step %d: %+v", tool.Seq, steps)
-	}
-}
 
 func TestFailedRunSaysWhy(t *testing.T) {
 	home, work := dirs(t)
