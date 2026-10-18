@@ -116,6 +116,7 @@ func openWorldAt(t *testing.T, home, work, db string, change ...func(*base.Confi
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.Project.GitHubProbe = fixture.NoGitHub
 	w := &testWorld{f: f, current: fixture.Pi()}
 	registry, _ := oar.NewRuntimeRegistry(scripted())
 	f.Runtime.Registry = registry

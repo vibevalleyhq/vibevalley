@@ -33,6 +33,7 @@ func projects(t *testing.T, root string, change ...func(*base.Config)) *Service 
 	if err != nil {
 		t.Fatal(err)
 	}
+	p.GitHubProbe = fixture.NoGitHub
 	return p
 }
 

@@ -10,6 +10,7 @@ import (
 	"vibevalley/internal/core"
 	"vibevalley/internal/project"
 	"vibevalley/internal/setting"
+	"vibevalley/internal/testkit/fixture"
 )
 
 // Without the packages above it: a test reaches only what is below.
@@ -33,6 +34,7 @@ func newWorld(cfg base.Config, options ...fx.Option) (*world, error) {
 	w := &world{}
 	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, Module},
 		fx.Options(options...),
+		fx.Invoke(func(p *project.Service) { p.GitHubProbe = fixture.NoGitHub }),
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),
 	)
 	if err != nil {

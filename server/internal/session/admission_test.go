@@ -21,7 +21,7 @@ func TestPendingTurnReservesCapacityUntilWorkingFact(t *testing.T) {
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
 	cfg.Project.MaxSessions = 1
 	var c *Service
-	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, Module}, fx.Populate(&c))
+	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, Module}, fx.Invoke(func(p *project.Service) { p.GitHubProbe = fixture.NoGitHub }), fx.Populate(&c))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -55,6 +55,7 @@ func open(t *testing.T) *world {
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
 	cfg.Patrol.HeartbeatMinutes = 0
 	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, session.Module, channel.Module, schedule.Module, issue.Module, task.Module, tool.Module, Module},
+		fx.Invoke(func(p *project.Service) { p.GitHubProbe = fixture.NoGitHub }),
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),
 	)
 	if err != nil {

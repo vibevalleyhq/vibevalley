@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	"vibevalley/internal/protocol"
@@ -94,9 +93,6 @@ func (p *Service) RefreshGitHub(ctx context.Context) protocol.GitHubStatus {
 	run := p.GitHubProbe
 	if run == nil {
 		run = runGitHub
-		if testing.Testing() {
-			run = func(context.Context, ...string) ([]byte, error) { return nil, exec.ErrNotFound }
-		}
 	}
 	status := probeGitHub(ctx, run)
 	projects := map[string]protocol.PullRequestCapability{}

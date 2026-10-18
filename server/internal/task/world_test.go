@@ -16,6 +16,7 @@ import (
 	"vibevalley/internal/schedule"
 	"vibevalley/internal/session"
 	"vibevalley/internal/setting"
+	"vibevalley/internal/testkit/fixture"
 )
 
 // Without the packages above it: a test reaches only what is below.
@@ -46,6 +47,7 @@ func newWorldWith(cfg base.Config, above []base.Layer, options ...fx.Option) (*w
 	layers := append([]base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, session.Module, channel.Module, schedule.Module, issue.Module, Module}, above...)
 	app, err := base.NewApp(cfg, layers,
 		fx.Options(options...),
+		fx.Invoke(func(p *project.Service) { p.GitHubProbe = fixture.NoGitHub }),
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),
 	)
 	if err != nil {

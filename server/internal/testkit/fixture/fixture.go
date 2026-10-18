@@ -3,6 +3,8 @@
 package fixture
 
 import (
+	"context"
+	"os/exec"
 	"testing"
 
 	"vibevalley/internal/base"
@@ -34,4 +36,9 @@ func Lab(t testing.TB) protocol.Agent {
 	}
 	t.Fatal("the seeds have the pi agent")
 	return protocol.Agent{}
+}
+
+// NoGitHub keeps service tests independent of the machine's GitHub installation and account.
+func NoGitHub(context.Context, ...string) ([]byte, error) {
+	return nil, exec.ErrNotFound
 }

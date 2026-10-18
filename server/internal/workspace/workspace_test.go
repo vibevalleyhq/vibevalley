@@ -17,6 +17,7 @@ func TestReadiesInTheOrderItsServicesStarted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.Project.GitHubProbe = fixture.NoGitHub
 	t.Cleanup(f.Close)
 	if err := f.Start(context.Background()); err != nil {
 		t.Fatal(err)

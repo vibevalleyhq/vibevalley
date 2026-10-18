@@ -26,6 +26,7 @@ func lifecycleWorld(t *testing.T) *workspace.Workspace {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.Project.GitHubProbe = fixture.NoGitHub
 	f.Runtime.Registry, err = oar.NewRuntimeRegistry(oartest.Runtime(oartest.Options{ID: "pi", Turn: func(turn *oartest.Turn) error { <-turn.Context.Done(); return nil }}))
 	if err != nil {
 		t.Fatal(err)
