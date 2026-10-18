@@ -22,3 +22,9 @@ func TestShellCommandUnwrapsTheShell(t *testing.T) {
 		testkit.Eq(t, shellCommand(in), want, in)
 	}
 }
+
+func TestAsksAreTheLinesForTheOwner(t *testing.T) {
+	said := "看了一下。\n\n要问主人：用 8787 还是 8797？\n- **要问主人**：要不要顺手改文档？\n\n结论：先停下等回答。"
+	testkit.Eq(t, asksOf(said), []string{"用 8787 还是 8797？", "要不要顺手改文档？"}, "two asks")
+	testkit.Eq(t, len(asksOf("结论：做完了")), 0, "none")
+}

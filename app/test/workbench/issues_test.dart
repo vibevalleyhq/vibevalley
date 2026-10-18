@@ -57,6 +57,9 @@ Issue _issue(
   graph: graph,
   status: status,
   moves: moves,
+  acceptance: Acceptance.glance,
+  findings: [],
+  asks: [],
 );
 
 final _closedIssue = _issue('t1', '写打卡', sessions: ['w1'], status: IssueStatus.done, closed: IssueClose.merged);
@@ -86,7 +89,19 @@ Object historyOf(List<Issue> issues, List<Session> sessions) => [
 void main() {
   for (final exists in [true, false]) {
     testWidgets('issue lookup waits for a successful history response before deciding missing: $exists', (t) async {
-      const issue = Issue(id: 'delayed', number: 1, title: '延迟工单', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.todo, moves: []);
+      const issue = Issue(
+        id: 'delayed',
+        number: 1,
+        title: '延迟工单',
+        priority: Priority.medium,
+        createdAt: 1,
+        sessions: [],
+        status: IssueStatus.todo,
+        moves: [],
+        acceptance: Acceptance.glance,
+        findings: [],
+        asks: [],
+      );
       final response = Completer<http.Response>();
       final backend = WorkbenchBackend();
       await pumpPage(
@@ -114,6 +129,9 @@ void main() {
       sessions: ['lost-session'],
       status: IssueStatus.inReview,
       moves: [],
+      acceptance: Acceptance.glance,
+      findings: [],
+      asks: [],
     );
     final backend = WorkbenchBackend();
     await pumpPage(t, const IssuesPage(id: 'missing'), (r) async {
@@ -140,6 +158,9 @@ void main() {
       sessions: [],
       status: IssueStatus.inProgress,
       moves: [],
+      acceptance: Acceptance.glance,
+      findings: [],
+      asks: [],
     );
     expect(isForManager(working), isTrue);
     expect(laneOf(working.status), Lane.working);
@@ -155,6 +176,9 @@ void main() {
       closed: IssueClose.answered,
       status: IssueStatus.done,
       moves: [],
+      acceptance: Acceptance.glance,
+      findings: [],
+      asks: [],
     );
     expect(issueTag(answered), IssueTag.answered);
     expect(laneOf(answered.status), Lane.closed);
@@ -326,6 +350,9 @@ void main() {
         sessions: [],
         status: IssueStatus.backlog,
         moves: [IssueStatus.todo, IssueStatus.canceled],
+        acceptance: Acceptance.glance,
+        findings: [],
+        asks: [],
       ),
       const Issue(
         id: 'a2',
@@ -337,6 +364,9 @@ void main() {
         sessions: [],
         status: IssueStatus.backlog,
         moves: [IssueStatus.todo, IssueStatus.canceled],
+        acceptance: Acceptance.glance,
+        findings: [],
+        asks: [],
       ),
       _openIssue,
       _issue('t1', '写打卡', sessions: ['w1'], status: IssueStatus.done, closed: IssueClose.merged, moves: [IssueStatus.todo]),
@@ -385,6 +415,9 @@ void main() {
             sessions: const [],
             status: IssueStatus.backlog,
             moves: [],
+            acceptance: Acceptance.glance,
+            findings: [],
+            asks: [],
           );
           issues = [item, ...issues];
           changed();

@@ -1,19 +1,19 @@
-# Agent Note: 一块地是一张在做的工单
+# Agent Note: 一块地是一张工单
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
-农场里的「一块地」原来定义成「一个执行占着的并发位」：一个帮工（Session）占一块，地的编号在核心状态里跟着帮工走（`SessionPlay.Station`，`PlotOfSession` 按帮工的阶段算地里长什么）。工单拥有了自己的分支和 worktree 以后（[收获就是提 PR](2026-10-18-an-issue-ships-as-a-pr.md) 第 1 步），这个定义和事实对不上了：
+农场里的「一块地」原来定义成「一个执行占着的并发位」：一个帮工（Session）占一块，地的编号在核心状态里跟着帮工走（`SessionPlay.Station`，`PlotOfSession` 按帮工的阶段算地里长什么）。工单拥有了自己的分支和 worktree 以后（[收获就是提 PR](../../proposed/architecture/2026-10-18-an-issue-ships-as-a-pr.md) 第 1 步），这个定义和事实对不上了：
 
 - **代码一直在同一块地上，地却换了。** 工单关了再重开，农场派一个新帮工；worktree 和分支还是 `worktrees/<项目>.<工单号>`、`vibevalley/issue-<工单号>`，像素村里它却站到另一块地上。
 - **同一张工单两个详情页。** 地块详情（`farm/plot_detail.dart`）和工单详情（`workbench/issues/issue_detail.dart`）各写一遍干活过程、浇水、收获、收工；去掉「评论某一步」、干活过程默认折叠，都得两边一起改。
 - **点地块要先找帮工再找工单。** 收获、铲子这些工具先找到地上的帮工，再找它的工单去挪状态（`issue.status`）。
 - **项目页把项目画成一块地。** 项目页（`/projects`）每个项目一块地，地图（`/map`）上项目是一座岛，地是岛上的 worktree：同一个词指了两样东西。
 
-## Proposal
+## Decision
 
-**一块地 = 一张在做的工单：它的分支和 worktree。帮工是在这块地上干活的。** 文档和用语表已经按这个改了（[concepts.md](../../../../docs/concepts.md)「农场是皮」、[用语](../../../../docs/README.md#用语)），下面是还没做的。
+**一块地 = 一张工单；代码相关的带一个 worktree。帮工是在这块地上干活的。**（原来写的是「一张在做的工单」，后来主人澄清：不在做的、不是代码活的工单也是一块地；三段和验收见[每张工单都有验收](2026-10-18-every-issue-has-an-acceptance.md)。） 文档和用语表按这个改了（[concepts.md](../../../../docs/concepts.md)「农场是皮」、[用语](../../../../docs/README.md#用语)），下面四步都做了，进展在后面。
 
 农场的说法和工单的状态一一对上：
 
@@ -47,15 +47,15 @@ Status: proposed
 
 **地是 worktree，不说工单。** 和磁盘上的样子一致，但主人派的、看的、收的都是工单；worktree 是工单的一部分，用工单说更直。
 
-## Acceptance criteria
+## Verification
 
 - 一张工单重开、换帮工、农场重启，像素村里还在同一块地上；`protocol` 的测试覆盖地的编号按工单走。
 - 农场点地和看板点卡片打开的是同一个组件；干活过程、浇水、收获只有一份实现。
 - 农场的工具在测试里只调 `issue.status`、`issue.comment`。
 - 侧栏没有「地图」；`/projects` 是整张地图，`/projects/<名字>` 是这座岛和项目详情。
-- `docs/concepts.md`、用语表、`concept-map.md` 里「地」的代码名改成按工单的那一个，去掉「还按帮工编号」的说明。
+- `docs/concepts.md`、用语表、`concept-map.md` 里「地」的代码名是按工单的那一个（`FarmView.Plots` 按工单做键）。
 
-## Risks
+## Consequences
 
 - 改核心状态的形状，客户端和像素村要一起改，黄金数据要重写。
 - 地块详情和工单详情合并时，农场那张皮（像素风的弹窗）和工作台那张皮（卡片）的样子要统一成一份，或者一份组件两种外框。

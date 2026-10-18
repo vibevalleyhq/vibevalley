@@ -21,7 +21,7 @@
 - **叫停**：管家在想或在说时，田头的输入框旁边有停止键（`POST /api/v1/manager/stop`，`vibevalley manager stop`）。它停掉正在跑的这一轮、丢掉排着等它的话（巡查过后还会再报，计划的状态在计划板上）；已经说出来的半句留在田头，派出去的帮工照常干活；交给管家的工单那一轮记成叫停了（`interrupted`），管家的日志里记一条「主人叫停了」。管家闲着时什么也不做。
 - **做错的一轮**：主人在管家页的轨迹里把一轮标成做错了，写一句应该怎样（`manager.markWrong`，`POST /api/v1/manager/evals`，`on` 是那一轮收到的话在轨迹里的第几步）。服务端从 `manager.jsonl` 找到这句话成了哪条输入，存成一个样例 `manager/evals/<id>.json`：这一轮开始时模型看到的对话（`before`，压缩照算）、这条输入（`input`）、这一轮的消息（`did`，到下一条输入为止）、那时的 `MEMORY.md`、工具名和模型，`expect` 空着。话没进对话（管家那时没起来）的不收。样例怎么写判断、怎么用真模型重放见 [verify-manager-evals](../../.agents/skills/verify-manager-evals/SKILL.md)。
 
-工具在 `internal/tool`（和帮工的工具同一处定义）：派活（`dispatch`，挑谁见 [agents-and-runtimes.md](agents-and-runtimes.md)「派给谁」）、看和收获（`changes`、`merge`）、看帮工（`roster`、`check`）、带话叫停收工（`tell`、`stop`、`dismiss`）、频道、定时、记性（`memory_search`、`memory_add`，下文「记性」）和种植计划。
+工具在 `internal/tool`（和帮工的工具同一处定义）：派活（`dispatch`，挑谁见 [agents-and-runtimes.md](agents-and-runtimes.md)「派给谁」）、看、验收和收获（`changes`、`accept`、`merge`；`accept` 判帮工交回来的活过没过，没过的意见交回去再修一轮；`merge` 碰到必须过验收、还没过的工单就不合）、看帮工（`roster`、`check`）、带话叫停收工（`tell`、`stop`、`dismiss`）、频道、定时、记性（`memory_search`、`memory_add`，下文「记性」）和种植计划。
 
 **帮工汇报**以帮工自己的名义贴进它的工单串，管家不转述；没做成的叫醒管家。叫停的不贴。
 
@@ -97,6 +97,8 @@
 - **状态**由 `protocol.IssueStatusOf` 算：`backlog`（写下没派）、`todo`（排队等空地）、`in_progress`、`in_review`（等你看）、`done`（合进主分支、合进计划、管家答完）、`canceled`（收工、丢了、放弃、跳过，或没说怎么关的）。看板按它分列。
 - 还没派的能改、能删、能排先后；派出去以后不能。
 - **改状态就是派活**（`issue/status.go`；`PUT /api/v1/issues/{id}/status`，`vibevalley issue status <id> --json`；[理由](../../.agents/notes/implemented/architecture/2026-10-18-status-is-the-dispatch.md)）：主人只能挪到 `backlog`、`todo`、`done`、`canceled`，`in_progress`、`in_review` 是帮工干出来的。备选挪到待办就开工，地都占满了就在待办排队，服务端每 5 秒按先后试一遍；待办挪回备选是不排了；等你看挪到待办是带一句话（`text`，必填）再干一轮；挪到已完成是收获，按项目配置提 PR 或本地合进主分支；挪到已取消是叫帮工回家（没派过的直接关上）；关上的挪回待办是带一句话重开；没派过就取消的挪回备选。每张工单的 `moves` 列出它现在能挪到哪，看板照它决定能不能拖；派给管家的和种植计划里的工单 `moves` 是空的。
+- **验收**（`issue/acceptance.go`；`POST /api/v1/issues/{id}/accept`，`vibevalley issue accept <id> --json`；[理由](../../.agents/notes/implemented/architecture/2026-10-18-every-issue-has-an-acceptance.md)：每张工单都有验收，`in_review` 就是「等验收」。验收方式在工单上（`acceptance`）：`glance`（默认）是主人收获本身就算验收；`required` 是没验收通过（`acceptedAt`）以前 `moves` 里没有 `done`，收获被拒。验收通过记下 `acceptedAt`，原来没拔的草都拔掉；没过要至少一条意见，每条记成一棵草（`findings`），再把还没拔的草编号写成一句话交给帮工，接着修一轮。新的一轮开始（带话、再干一轮）验收作废，草留着，等下一次验收通过才拔。验收方式在工单开着时都能改（`issue.update` 只给 `acceptance`）。
+- **缺肥**：帮工汇报里以「要问主人：」开头的行（农场的规矩教它这么写），记成工单上没回答的问题（`asks`）；下一轮汇报照它的新问题改写，主人带一句话（评论）就算回答，问题清掉。
 - 帮工离开时，离开的是最后一次执行，工单就跟着关上。
 - **重开**：同一个档案派一个新帮工到同一个项目，带上原来要做什么和上一次怎么关的。
 - **子工单**：带 `parent`、`blockedBy`。种植计划用它，计划里的工单跟着计划走，看板不能单独开工、重开。

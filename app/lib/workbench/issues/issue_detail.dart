@@ -130,6 +130,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
   late String _project = widget.item?.project ?? widget.project ?? '';
   late String _agent = widget.item?.assignee ?? '';
   late Priority _priority = widget.item?.priority ?? Priority.medium;
+  late Acceptance _acceptance = widget.item?.acceptance ?? Acceptance.glance;
   bool _busy = false;
   late final IssueSubmission _submission;
 
@@ -144,6 +145,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
     project: _project.isEmpty ? null : _project,
     assignee: _agent.isEmpty ? null : _agent,
     priority: _priority,
+    acceptance: _acceptance,
   );
 
   Future<void> _run(Future<void> Function() act) async {
@@ -228,6 +230,19 @@ class _TodoState extends ConsumerState<TodoDetail> {
               value: _priority,
               options: [for (final p in Priority.values) SegmentOption(value: p, label: priorityLabel[p]!)],
               onChanged: (v) => setState(() => _priority = v),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Every issue has an acceptance; this is who must pass it before the harvest.
+          PxField(
+            label: '验收',
+            child: PxSegmented<Acceptance>(
+              value: _acceptance,
+              options: const [
+                SegmentOption(value: Acceptance.glance, label: '看一眼就收'),
+                SegmentOption(value: Acceptance.required, label: '必须过验收'),
+              ],
+              onChanged: (v) => setState(() => _acceptance = v),
             ),
           ),
           const SizedBox(height: 12),

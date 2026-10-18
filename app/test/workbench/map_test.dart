@@ -36,6 +36,9 @@ Issue _todo(String id, String project, {double? queuedAt}) => Issue(
   sessions: const [],
   status: queuedAt == null ? IssueStatus.backlog : IssueStatus.todo,
   moves: [],
+  acceptance: Acceptance.glance,
+  findings: [],
+  asks: [],
 );
 
 Session _hired(String id, String? project, Phase phase, {double at = 0, Conflict? conflict, String? branch, String? name}) {
@@ -266,6 +269,9 @@ void main() {
           sessions: [],
           status: IssueStatus.todo,
           moves: [],
+          acceptance: Acceptance.glance,
+          findings: [],
+          asks: [],
         ),
       ],
     );

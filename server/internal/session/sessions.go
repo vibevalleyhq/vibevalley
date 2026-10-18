@@ -452,7 +452,7 @@ func (c *sessions) applyReport(h *hand, report agents.SubagentReport) {
 		run = new(h.run)
 	}
 	h.mu.Unlock()
-	c.core.Apply(protocol.FactReport{ID: h.id, Outcome: read.Outcome, Summary: read.Summary, Runs: int64(report.Turn), Spent: spent, Run: run})
+	c.core.Apply(protocol.FactReport{ID: h.id, Outcome: read.Outcome, Summary: read.Summary, Runs: int64(report.Turn), Spent: spent, Run: run, Asks: read.Asks})
 	c.endRun(h, read.Outcome, read.Summary, spent)
 	project := h.place.Project
 	go c.memories.Keep(memory.FinishedRun{Agent: session.Agent, Session: h.id, Project: project, Job: session.Brief, Outcome: read.Outcome, Said: read.Text, Summary: read.Summary})

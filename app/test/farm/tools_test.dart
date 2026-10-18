@@ -35,6 +35,9 @@ void main() {
         sessions: ['w3'],
         status: IssueStatus.canceled,
         moves: [],
+        acceptance: Acceptance.glance,
+        findings: [],
+        asks: [],
       ).toJson(),
     });
     final c = ProviderContainer(overrides: overrides(state, v, fakeApi(routes)));

@@ -63,6 +63,10 @@ func statusMove(t protocol.Issue, to protocol.IssueStatus) (move, string) {
 		case protocol.IssueStatusTodo:
 			return moveRound, ""
 		case protocol.IssueStatusDone:
+			// Every issue has an acceptance; a glance one is passed by this harvest itself.
+			if t.Acceptance == protocol.AcceptanceRequired && t.AcceptedAt == nil {
+				return moveNone, "这张工单要先过验收：验收通过才能收获"
+			}
 			return moveMerge, ""
 		case protocol.IssueStatusCanceled:
 			return moveCancel, ""

@@ -28,8 +28,14 @@ func (s *Service) Comment(id string, body protocol.CommentRequest) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.merges.chat.TellSession("user", session, body.Text)
-	return err
+	if _, err = s.merges.chat.TellSession("user", session, body.Text); err != nil {
+		return err
+	}
+	// The owner's word answers what it asked, and starts a round that the last acceptance did not see.
+	if err := s.issues.asked(id, nil); err != nil {
+		return err
+	}
+	return s.issues.unaccept(id)
 }
 
 func (s *Service) Changes(id string, by protocol.Caller) (protocol.Changes, error) {

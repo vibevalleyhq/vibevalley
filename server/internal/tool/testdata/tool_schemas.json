@@ -1,4 +1,32 @@
 {
+  "accept": {
+    "properties": {
+      "findings": {
+        "description": "没过时，每条要修的一句话",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "pass": {
+        "description": "验收过了就是 true",
+        "type": "boolean"
+      },
+      "session": {
+        "description": "帮工的名字或 id",
+        "type": "string"
+      },
+      "text": {
+        "description": "没过时，还要交代的话",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session",
+      "pass"
+    ],
+    "type": "object"
+  },
   "cancel_schedule": {
     "additionalProperties": true,
     "properties": {

@@ -77,6 +77,9 @@ func scripted() oar.Runtime {
 			})
 		}
 		notes := ""
+		if strings.Contains(input, "先问清楚") && !strings.Contains(input, "用 8797") {
+			notes += "\n\n要问主人：用 8787 还是 8797？"
+		}
 		if strings.Contains(input, "记一笔") {
 			notes = "\n\n记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文"
 		}
@@ -1098,4 +1101,67 @@ func TestIssueWorktreeSurvivesCancellationAndReopen(t *testing.T) {
 	if strings.Contains(w.f.Session.Get(again).Brief, "这条分支上已经有上次的提交，接着做。") {
 		t.Fatal("merged commits must not be described as unmerged")
 	}
+}
+
+// Every issue has an acceptance: one that must pass waits for it; a fail grows weeds and another round; a pass is ripe.
+// A question in a report leaves the plot short of fertilizer until the owner answers.
+func TestAPlotGrowsThroughItsAcceptance(t *testing.T) {
+	home, work := dirs(t)
+	w := openWorld(t, home, work)
+	lab := fixture.Lab(t)
+	w.f.Agent.SaveAgent(lab)
+	project, required := "clock", protocol.AcceptanceRequired
+	issue, err := w.f.Issue.Add(protocol.IssueRequest{Title: "先问清楚，再写打卡并提交", Project: &project, Assignee: &lab.ID, Acceptance: &required})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, issue.Acceptance, protocol.AcceptanceRequired, "kept")
+	if _, err := w.f.Issue.SetStatus(context.Background(), issue.ID, protocol.IssueStatusTodo, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	w.nextReport(t)
+	issue = testkit.Await(t, "its question kept", func() (protocol.Issue, bool) {
+		got, _ := w.f.Issue.Get(issue.ID)
+		return got, len(got.Asks) == 1
+	})
+	testkit.Eq(t, issue.Asks, []string{"用 8787 还是 8797？"}, "what it asks")
+	testkit.Until(t, "缺肥", func() bool { return protocol.ViewOf(w.f.Core.State()).Plots[issue.ID].Crop == protocol.CropDry })
+
+	if err := w.f.Issue.Comment(issue.ID, protocol.CommentRequest{Text: "用 8797"}); err != nil {
+		t.Fatal(err)
+	}
+	issue, _ = w.f.Issue.Get(issue.ID)
+	testkit.Eq(t, len(issue.Asks), 0, "answered")
+	w.nextReport(t)
+	testkit.Until(t, "handed back", func() bool {
+		got, _ := w.f.Issue.Get(issue.ID)
+		return got.Status == protocol.IssueStatusInReview
+	})
+	testkit.Until(t, "抽穗：等验收", func() bool { return protocol.ViewOf(w.f.Core.State()).Plots[issue.ID].Crop == protocol.CropFlowering })
+	var refused protocol.Refused
+	if _, err := w.f.Issue.SetStatus(context.Background(), issue.ID, protocol.IssueStatusDone, "", ""); !errors.As(err, &refused) {
+		t.Fatalf("harvest before acceptance: %v", err)
+	}
+
+	if _, err := w.f.Issue.Accept(context.Background(), issue.ID, protocol.IssueAcceptRequest{Findings: []string{"再写版本B"}}); err != nil {
+		t.Fatal(err)
+	}
+	issue, _ = w.f.Issue.Get(issue.ID)
+	testkit.Eq(t, protocol.OpenFindings(issue), 1, "one weed")
+	w.nextReport(t)
+	testkit.Until(t, "the weed worked on and handed back", func() bool {
+		got, _ := w.f.Issue.Get(issue.ID)
+		return got.Status == protocol.IssueStatusInReview
+	})
+	testkit.Until(t, "the weed stands until a pass", func() bool { return protocol.ViewOf(w.f.Core.State()).Plots[issue.ID].Crop == protocol.CropWeeds })
+
+	if issue, err = w.f.Issue.Accept(context.Background(), issue.ID, protocol.IssueAcceptRequest{Pass: true}); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, []any{issue.AcceptedAt != nil, protocol.OpenFindings(issue), slices.Contains(issue.Moves, protocol.IssueStatusDone)}, []any{true, 0, true}, "the answer: passed, weed pulled, ready to harvest")
+	if issue, err = w.f.Issue.SetStatus(context.Background(), issue.ID, protocol.IssueStatusDone, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, issue.Status, protocol.IssueStatusDone, "harvested")
+	testkit.Match(t, testkit.Git(t, filepath.Join(work, "projects", "clock"), "log", "--format=%s", "main"), `版本 B`, "the fix is on main")
 }

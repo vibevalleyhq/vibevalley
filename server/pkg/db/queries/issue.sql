@@ -10,12 +10,19 @@ select * from issue where id = ?;
 select * from issue where number = ?;
 
 -- name: AddIssue :exec
-insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, schedule)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, schedule, acceptance)
 values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.arg(project), sqlc.arg(assignee),
-        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.arg(schedule));
+        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.arg(schedule), sqlc.arg(acceptance));
 
 -- name: EditIssue :exec
-update issue set title = ?, description = ?, project = ?, assignee = ?, priority = ? where id = ?;
+update issue set title = ?, description = ?, project = ?, assignee = ?, priority = ?, acceptance = ? where id = ?;
+
+-- name: AcceptIssue :exec
+-- A verdict on what was handed back: passed (accepted_at set) or not (cleared), with the weeds as they stand now.
+update issue set accepted_at = sqlc.narg(accepted_at), findings = sqlc.narg(findings) where id = sqlc.arg(id);
+
+-- name: SetIssueAsks :exec
+update issue set asks = sqlc.narg(asks) where id = sqlc.arg(id);
 
 -- name: RemoveIssue :exec
 delete from issue where id = ?;

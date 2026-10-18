@@ -71,6 +71,7 @@
 | `issue.delete` | `DELETE /api/v1/issues/{id}` | ✓ | ✓ |  |  |
 | `issue.move` | `PUT /api/v1/issues/{id}/move` | ✓ | ✓ |  |  |
 | `issue.status` | `PUT /api/v1/issues/{id}/status` | ✓ | ✓ |  |  |
+| `issue.accept` | `POST /api/v1/issues/{id}/accept` | ✓ | ✓ | ✓ |  |
 
 ## session
 

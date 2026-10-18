@@ -164,6 +164,10 @@ type Issue struct {
 	ClosedAt    sql.NullInt64
 	Closed      sql.NullString
 	PullRequest sql.NullString
+	Acceptance  string
+	AcceptedAt  sql.NullInt64
+	Findings    sql.NullString
+	Asks        sql.NullString
 }
 
 type IssueQueue struct {

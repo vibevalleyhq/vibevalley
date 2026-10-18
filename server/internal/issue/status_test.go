@@ -35,6 +35,12 @@ func TestStatusMoves(t *testing.T) {
 			}
 		}
 	}
+	// An acceptance that must pass first: no harvest until it has.
+	required := protocol.Issue{Status: protocol.IssueStatusInReview, Sessions: []string{"w1"}, Acceptance: protocol.AcceptanceRequired}
+	testkit.Eq(t, statusMoves(required), []protocol.IssueStatus{todo, canceled}, "required, not yet passed")
+	at := int64(1)
+	required.AcceptedAt = &at
+	testkit.Eq(t, statusMoves(required), []protocol.IssueStatus{todo, done, canceled}, "required and passed")
 	manager, graph := protocol.ManagerAgent, protocol.IssueGraph{State: protocol.GraphStateDraft}
 	for name, issue := range map[string]protocol.Issue{
 		"the manager's":  {Status: protocol.IssueStatusInProgress, Assignee: &manager},

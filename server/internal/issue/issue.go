@@ -92,8 +92,11 @@ func (is *issues) OnStart(ctx context.Context) error {
 				if !ok {
 					return
 				}
-				if left, ok := e.Value.(protocol.FactLeft); ok {
-					is.left(ctx, left)
+				switch f := e.Value.(type) {
+				case protocol.FactLeft:
+					is.left(ctx, f)
+				case protocol.FactReport:
+					is.reported(ctx, f)
 				}
 			}
 		}
@@ -120,6 +123,17 @@ func (is *issues) left(ctx context.Context, f protocol.FactLeft) {
 	}
 	if is.q.CloseIssue(ctx, generated.CloseIssueParams{ClosedAt: issueAt(clock.NowMs()), Closed: issueClosed(f.Closed), ID: issue}) == nil {
 		is.publish(issue)
+	}
+}
+
+// A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
+func (is *issues) reported(ctx context.Context, f protocol.FactReport) {
+	issue, err := is.q.IssueOfSession(ctx, f.ID)
+	if err != nil {
+		return
+	}
+	if err := is.asked(issue, f.Asks); err != nil {
+		log.Printf("vibevalley: issue %s: what it asks was not kept: %v", issue, err)
 	}
 }
 
@@ -170,6 +184,20 @@ func issueOf(row generated.Issue, runs []string, state protocol.CoreState) proto
 		var task protocol.IssueTask
 		if json.Unmarshal([]byte(row.Task.String), &task) == nil {
 			out.Task = &task
+		}
+	}
+	out.Acceptance, out.Findings, out.Asks = protocol.Acceptance(row.Acceptance), []protocol.Finding{}, []string{}
+	if row.AcceptedAt.Valid {
+		out.AcceptedAt = &row.AcceptedAt.Int64
+	}
+	if row.Findings.Valid {
+		if err := json.Unmarshal([]byte(row.Findings.String), &out.Findings); err != nil {
+			log.Printf("vibevalley: issue %s: its weeds cannot be read: %v", row.ID, err)
+		}
+	}
+	if row.Asks.Valid {
+		if err := json.Unmarshal([]byte(row.Asks.String), &out.Asks); err != nil {
+			log.Printf("vibevalley: issue %s: what it asks cannot be read: %v", row.ID, err)
 		}
 	}
 	if runs != nil {
@@ -266,7 +294,7 @@ func (is *issues) add(in protocol.IssueRequest, schedule *string) (protocol.Issu
 	id := base.NewID()
 	if err := is.q.AddIssue(context.Background(), generated.AddIssueParams{
 		ID: id, Title: title, Description: description, Project: issueNull(in.Project), Assignee: issueNull(in.Assignee), Priority: string(issuePriority(in.Priority)),
-		CreatedAt: clock.NowMs(), Schedule: issueSchedule(schedule),
+		CreatedAt: clock.NowMs(), Schedule: issueSchedule(schedule), Acceptance: string(issueAcceptance(in.Acceptance)),
 	}); err != nil {
 		return protocol.Issue{}, err
 	}
@@ -274,13 +302,22 @@ func (is *issues) add(in protocol.IssueRequest, schedule *string) (protocol.Issu
 	return is.Get(id)
 }
 
-// Edit changes what upd gives and keeps the rest.
+// Edit changes what upd gives and keeps the rest. The words and who does it only before it is sent; how it is accepted
+// while it is open, since that is decided by looking at what came back.
 func (is *issues) Edit(id string, upd protocol.IssueUpdate) (protocol.Issue, error) {
-	was, err := is.unsent(id)
+	var was protocol.Issue
+	var err error
+	if upd.Title == nil && upd.Description == nil && upd.Project == nil && upd.Assignee == nil && upd.Priority == nil {
+		if was, err = is.Get(id); err == nil && isClosed(was.Status) {
+			err = protocol.Refused{Reason: "这张工单关上了"}
+		}
+	} else {
+		was, err = is.unsent(id)
+	}
 	if err != nil {
 		return protocol.Issue{}, err
 	}
-	in := protocol.IssueRequest{Title: was.Title, Description: was.Description, Project: was.Project, Assignee: was.Assignee, Priority: &was.Priority}
+	in := protocol.IssueRequest{Title: was.Title, Description: was.Description, Project: was.Project, Assignee: was.Assignee, Priority: &was.Priority, Acceptance: &was.Acceptance}
 	if upd.Title != nil {
 		in.Title = *upd.Title
 	}
@@ -296,12 +333,16 @@ func (is *issues) Edit(id string, upd protocol.IssueUpdate) (protocol.Issue, err
 	if upd.Priority != nil {
 		in.Priority = upd.Priority
 	}
+	if upd.Acceptance != nil {
+		in.Acceptance = upd.Acceptance
+	}
 	title, description, err := issueWords(in)
 	if err != nil {
 		return protocol.Issue{}, err
 	}
 	if err := is.q.EditIssue(context.Background(), generated.EditIssueParams{
-		Title: title, Description: description, Project: issueNull(in.Project), Assignee: issueNull(in.Assignee), Priority: string(issuePriority(in.Priority)), ID: id,
+		Title: title, Description: description, Project: issueNull(in.Project), Assignee: issueNull(in.Assignee), Priority: string(issuePriority(in.Priority)),
+		Acceptance: string(issueAcceptance(in.Acceptance)), ID: id,
 	}); err != nil {
 		return protocol.Issue{}, err
 	}
@@ -498,6 +539,13 @@ func issuePriority(p *protocol.Priority) protocol.Priority {
 		return protocol.PriorityMedium
 	}
 	return *p
+}
+
+func issueAcceptance(a *protocol.Acceptance) protocol.Acceptance {
+	if a == nil || *a == "" {
+		return protocol.AcceptanceGlance
+	}
+	return *a
 }
 
 func issueNull(s *string) sql.NullString {

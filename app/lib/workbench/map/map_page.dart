@@ -8,7 +8,7 @@ import '../../rules/sessions.dart';
 import '../../rules/cast.dart';
 import '../../sprites/atlas.dart';
 import '../../ui/kit/kit.dart';
-import '../../ui/pixel_card.dart' show CardColors, PixelCard, Words;
+import '../../ui/pixel_card.dart' show CardColors, PixelCard, Words, badgeColors;
 import '../../data/remote.dart' show agentsProvider, projectCatalogProvider;
 import '../projects/codebase.dart' show growthOf;
 import '../projects/projects_page.dart' show since;
@@ -350,7 +350,7 @@ class _IslandView extends ConsumerWidget {
               ),
             );
           if (plot.badge case final badge?) {
-            final (paper, ink) = _tone[badge.tone]!;
+            final (paper, ink) = badgeColors(badge.tone);
             layers.add(
               Positioned(
                 left: foot.dx * s,
@@ -439,13 +439,6 @@ class _IslandView extends ConsumerWidget {
     );
   }
 }
-
-const _tone = {
-  BadgeTone.ripe: (CardColors.ripe, CardColors.ink),
-  BadgeTone.bug: (CardColors.bug, CardColors.lightInk),
-  BadgeTone.stuck: (CardColors.stuck, CardColors.lightInk),
-  BadgeTone.rest: (CardColors.rest, CardColors.ink),
-};
 
 class _Homeless extends StatelessWidget {
   const _Homeless({required this.sessions});

@@ -126,6 +126,23 @@ type sessionRead struct {
 	Summary  string
 	Failure  string
 	NeedsYou bool
+	// The 要问主人： lines: what it cannot go on without.
+	Asks []string
+}
+
+// A line the session wrote to ask the owner (the farm's rules tell it to): 「要问主人：…」, with markdown around it allowed.
+var askLine = regexp.MustCompile(`^[` + str.SpaceClass + `>*#_-]*(?:\*\*)?要问主人(?:\*\*)?[` + str.SpaceClass + `]*[:：][` + str.SpaceClass + `]*(?:\*\*)?(.+)$`)
+
+func asksOf(said string) []string {
+	var out []string
+	for _, line := range strings.Split(said, "\n") {
+		if m := askLine.FindStringSubmatch(line); m != nil {
+			if q := str.Trim(strings.TrimSuffix(str.Trim(m[1]), "**")); q != "" {
+				out = append(out, q)
+			}
+		}
+	}
+	return out
 }
 
 func readReport(outcome oar.TurnOutcome, said string) sessionRead {
@@ -155,6 +172,9 @@ func readReport(outcome oar.TurnOutcome, said string) sessionRead {
 		}
 	}
 	r.Summary = str.Clip(summary, summaryMax)
+	if r.Outcome == protocol.OutcomeCompleted {
+		r.Asks = asksOf(said)
+	}
 	return r
 }
 
@@ -289,6 +309,7 @@ func farmRules(place project.Workplace, house, id string) string {
 		"",
 		"## 记性",
 		"- 你有记性：同一个 agent 的帮工共用。每一轮开头「【你记得的】」那段是以前记下的，用得上就用；和眼前的代码、主人这次说的对不上时，以眼前的为准。",
+		"- 缺信息、要主人定的、没有主人回答就做不下去的，在结论前面写，每行以「要问主人：」开头，一行问一件事；主人回答以前，这块地标着缺肥。能自己查到的不要问。",
 		"- 这一轮学到下次还用得上的（这个项目的约定和命令、踩过的坑、主人的偏好），在结论前面写几行，每行以「记住：」开头，一行一条，写成下次一看就懂的一句话；对所有项目都成立的写「记住（所有项目）：」。没有就不写。这一轮做了什么不用写进去，农场会自己记。",
 		"",
 		"## 在田头说话（农场的群聊）",

@@ -1,6 +1,10 @@
 package protocol
 
-import "hash/fnv"
+import (
+	"fmt"
+	"hash/fnv"
+	"slices"
+)
 
 func XPToNext(level int64) int64 { return 10 * level }
 
@@ -90,9 +94,56 @@ var (
 	badgeQuiet    = Badge{Text: "没动静", Tone: BadgeToneStuck}
 	badgeRetrying = Badge{Text: "重试中", Tone: BadgeToneStuck}
 	badgeRest     = Badge{Text: "歇着", Tone: BadgeToneRest}
+	badgeReview   = Badge{Text: "等验收", Tone: BadgeToneWait}
+	badgeAsks     = Badge{Text: "缺肥", Tone: BadgeToneWait}
 )
 
 func badge(b Badge) *Badge { return &b }
+
+// The weeds a failed acceptance left standing.
+func OpenFindings(t Issue) int {
+	n := 0
+	for _, f := range t.Findings {
+		if !f.Pulled {
+			n++
+		}
+	}
+	return n
+}
+
+// A plot is an issue: what the session on it is doing, then where the issue stands — waiting on the owner's answer
+// (缺肥), its acceptance (抽穗, or weeds after a failed one), or passed (ripe).
+func PlotOf(h Session, issue *Issue) PlotView {
+	plot := PlotOfSession(h)
+	if issue == nil {
+		return plot
+	}
+	need := NeedOf(h)
+	if need != nil && need.Kind == "conflict" {
+		return plot
+	}
+	weeds := OpenFindings(*issue)
+	switch h.Phase.Value.(type) {
+	case PhaseWorking:
+		if weeds > 0 && plot.Badge == nil {
+			return PlotView{Crop: CropWeeds, Badge: badge(Badge{Text: fmt.Sprintf("除草中 %d", weeds), Tone: BadgeToneBug})}
+		}
+	case PhaseRipe, PhaseResting:
+		switch {
+		case len(issue.Asks) > 0:
+			return PlotView{Crop: CropDry, Badge: badge(badgeAsks)}
+		case issue.AcceptedAt != nil:
+			return PlotView{Crop: ripeCrop(h), Badge: badge(badgeRipe)}
+		case weeds > 0:
+			return PlotView{Crop: CropWeeds, Badge: badge(Badge{Text: fmt.Sprintf("%d 棵草", weeds), Tone: BadgeToneBug})}
+		case isRipe(h):
+			return PlotView{Crop: CropFlowering, Badge: badge(badgeReview)}
+		}
+	}
+	return plot
+}
+
+func isRipe(h Session) bool { _, ok := h.Phase.Value.(PhaseRipe); return ok }
 
 func PlotOfSession(h Session) PlotView {
 	need := NeedOf(h)
@@ -181,7 +232,11 @@ func PlotKey(h Session) string {
 func ViewOf(state CoreState) FarmView {
 	plots := make(map[string]PlotView, len(state.Sessions))
 	for _, h := range state.Sessions {
-		plots[PlotKey(h)] = PlotOfSession(h)
+		var issue *Issue
+		if i := slices.IndexFunc(state.Issues, func(t Issue) bool { return t.ID == PlotKey(h) }); i >= 0 {
+			issue = &state.Issues[i]
+		}
+		plots[PlotKey(h)] = PlotOf(h, issue)
 	}
 	return FarmView{Level: FarmLevelOf(state), Plots: plots}
 }

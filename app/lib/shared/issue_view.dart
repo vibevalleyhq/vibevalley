@@ -118,6 +118,74 @@ class _IssueViewState extends ConsumerState<IssueView> {
   }
 
   Future<void> _close(Session session) => _act(() => widget.onClose(session));
+
+  Future<void> _accept(bool pass) async {
+    final issue = widget.issue;
+    if (issue == null) return;
+    if (pass) return _act(() => _api.issue.accept(id: issue.id, body: const IssueAcceptRequest(pass: true)));
+    final lines = await showPxDialog<List<String>>(context, title: const Text('没过验收：哪里要修'), builder: (_) => const _FindingsForm());
+    if (lines == null || lines.isEmpty) return;
+    await _act(
+      () => _api.issue.accept(
+        id: issue.id,
+        body: IssueAcceptRequest(pass: false, findings: lines),
+      ),
+    );
+  }
+
+  Future<void> _setAcceptance(Acceptance a) async {
+    final issue = widget.issue;
+    if (issue == null) return;
+    await _act(
+      () => _api.issue.update(
+        id: issue.id,
+        body: IssueUpdate(acceptance: a),
+      ),
+    );
+  }
+
+  /// The one thing this plot waits on you for, from what the server keeps on the issue; nothing when it waits on no one.
+  Widget? _needYou(Issue issue, Session? session) {
+    final body = KitText.sm.copyWith(color: Palette.bark800);
+    Widget box(String head, String line, List<Widget> actions, {Widget? extra}) => Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      color: tint(Palette.wheat, .3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('这块地现在需要你：$head', style: KitText.sm),
+          Text(line, style: KitText.xs.copyWith(color: Palette.bark600)),
+          ?extra,
+          if (actions.isNotEmpty) ...[const SizedBox(height: 8), Wrap(spacing: 8, runSpacing: 8, children: actions)],
+        ],
+      ),
+    );
+    if (issue.asks.isNotEmpty && session != null) {
+      return box(
+        '施肥',
+        '它在等你回答，回答以前地里缺肥。在下面带话里回答就行。',
+        const [],
+        extra: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [for (final a in issue.asks) Text('· $a', style: body)],
+          ),
+        ),
+      );
+    }
+    if (widget.state != IssueTag.waiting || session == null || session.conflict != null || session.lastRun?.outcome == Outcome.failed) return null;
+    if (issue.acceptedAt != null) {
+      return box('收获', '验收过了。', [PxButton.text('收获', tone: PxTone.primary, onPressed: _busy ? null : () => _act(() => widget.onHarvest(session)))]);
+    }
+    return box('验收', issue.acceptance == Acceptance.required ? '这张工单要先过验收才能收获。' : '这张工单看一眼就算验收：直接收获也行，没过就写意见让它修。', [
+      PxButton.text('验收通过', tone: PxTone.primary, onPressed: _busy ? null : () => _accept(true)),
+      PxButton.text('没过，写意见', tone: PxTone.danger, onPressed: _busy ? null : () => _accept(false)),
+    ]);
+  }
+
   bool get _inTask => widget.issue != null ? issueInTask(widget.issue!, widget.session) : widget.session?.graph != null;
   Widget _section({required String title, Widget? aside, required Widget child}) =>
       _IssueSection(frame: widget.frame, title: title, aside: aside, child: child);
@@ -153,7 +221,8 @@ class _IssueViewState extends ConsumerState<IssueView> {
         ?bed,
       ],
       (IssueTag.waiting, final h?) => [
-        if (h.lastRun?.outcome != Outcome.failed)
+        // Every issue has an acceptance; the server leaves done out of moves until a required one has passed.
+        if (h.lastRun?.outcome != Outcome.failed && (widget.issue?.moves.contains(IssueStatus.done) ?? true))
           PxButton.text('收获', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _act(() => widget.onHarvest(h))),
         if (h.lastRun?.outcome == Outcome.failed)
           PxButton.text('接着修', size: PxSize.sm, tone: PxTone.primary, onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).cure(h))),
@@ -199,10 +268,17 @@ class _IssueViewState extends ConsumerState<IssueView> {
     final history = play?.history ?? const <ActionStep>[];
     final recentSteps = history.skip(history.length > 12 ? history.length - 12 : 0).toList().reversed.toList();
     final xs = KitText.xs.copyWith(color: Palette.bark600);
+    final need = issue == null ? null : _needYou(issue, session);
+    final crew = [
+      for (final s in sessions)
+        if (!sessions.takeWhile((x) => x != s).any((x) => x.agent == s.agent)) s,
+    ];
     final main = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (issue != null) _StageRail(stageOf(issue.status)),
+        ?need,
         _section(
           title: title,
           aside: Text(widget.state.label),
@@ -212,6 +288,54 @@ class _IssueViewState extends ConsumerState<IssueView> {
             children: [
               if (actions.isNotEmpty) ...[Wrap(spacing: 8, runSpacing: 8, children: actions), const SizedBox(height: 12)],
               _Row('谁在做', Text('${head.name}${head.runtime.isNotEmpty ? '（${head.runtime}）' : ''}', style: body)),
+              if (crew.length > 1 || (session != null && head.worktree != null))
+                _Row(
+                  '地上的人',
+                  Text(
+                    [
+                      crew.map((s) => s.name).join('、'),
+                      // One plot, one worktree: only the session on it now changes the code.
+                      if (session != null && head.worktree != null) '锄头在${session.name}手上',
+                    ].join(' · '),
+                    style: body,
+                  ),
+                ),
+              if (issue != null && !_inTask)
+                _Row(
+                  '验收',
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      for (final (a, label) in const [(Acceptance.glance, '看一眼就收'), (Acceptance.required, '必须过验收')])
+                        PxButton.text(
+                          label,
+                          size: PxSize.sm,
+                          tone: issue.acceptance == a ? PxTone.primary : PxTone.plain,
+                          onPressed: _busy || issue.acceptance == a || !widget.state.open ? null : () => _setAcceptance(a),
+                        ),
+                      if (issue.acceptedAt != null) Text('已验收 ${wallClockText(issue.acceptedAt!)}', style: KitText.xs.copyWith(color: Palette.leaf700)),
+                    ],
+                  ),
+                ),
+              if (issue != null && issue.findings.isNotEmpty)
+                _Row(
+                  '草',
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final f in issue.findings)
+                        Text(
+                          f.pulled == true ? '已拔 · ${f.text}' : '· ${f.text}',
+                          style: body.copyWith(
+                            color: f.pulled == true ? Palette.bark400 : Palette.berry,
+                            decoration: f.pulled == true ? TextDecoration.lineThrough : null,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
 
               if (agent?.model case final model? when model.isNotEmpty) _Row('模型', Text(model, style: body)),
               _Row('档案', _Link('看${agent?.name ?? head.name}的档案', onTap: () => context.go('/agents/${Uri.encodeComponent(head.agent)}'))),
@@ -653,3 +777,69 @@ class _Link extends StatelessWidget {
 }
 
 List<String> _last(List<String> all, int n) => all.length > n ? all.sublist(all.length - n) : all;
+
+/// 聊清楚 → 安排活 → 完成, the one it is at marked.
+class _StageRail extends StatelessWidget {
+  const _StageRail(this.at);
+  final Stage at;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    decoration: const BoxDecoration(border: Border.fromBorderSide(pxLine)),
+    child: Row(
+      children: [
+        for (final s in Stage.values)
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              alignment: Alignment.center,
+              color: s == at
+                  ? tint(Palette.wheat, .45)
+                  : s.index < at.index
+                  ? tint(Palette.leaf300, .5)
+                  : null,
+              child: Text(s.index < at.index ? '${s.label} ✓' : s.label, style: KitText.sm.copyWith(color: s == at ? Palette.bark900 : Palette.bark500)),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+/// One finding a line: what did not pass.
+class _FindingsForm extends StatefulWidget {
+  const _FindingsForm();
+
+  @override
+  State<_FindingsForm> createState() => _FindingsFormState();
+}
+
+class _FindingsFormState extends State<_FindingsForm> {
+  String _text = '';
+
+  List<String> get _lines => [
+    for (final l in _text.split('\n'))
+      if (l.trim().isNotEmpty) l.trim(),
+  ];
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text('一行一条：每条是一棵草，它会带着这些接着修一轮。', style: KitText.xs.copyWith(color: Palette.bark600)),
+      const SizedBox(height: 8),
+      PxTextArea(value: _text, onChanged: (v) => setState(() => _text = v), rows: 5, placeholder: '比如：看板拖卡还在调旧接口', semanticLabel: '验收意见'),
+      const SizedBox(height: 12),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          PxButton.text('算了', onPressed: () => Navigator.of(context).pop()),
+          const SizedBox(width: 8),
+          PxButton.text('交回去修', tone: PxTone.danger, onPressed: _lines.isEmpty ? null : () => Navigator.of(context).pop(_lines)),
+        ],
+      ),
+    ],
+  );
+}

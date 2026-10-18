@@ -78,6 +78,24 @@ enum Lane {
   final String label;
 }
 
+/// The three acts of a plot (docs/concepts.md): talk it through, get it worked, finish it (acceptance and harvest).
+enum Stage {
+  talk('聊清楚'),
+  work('安排活'),
+  finish('完成');
+
+  const Stage(this.label);
+  final String label;
+}
+
+Stage stageOf(IssueStatus s) => switch (s) {
+  IssueStatus.backlog => Stage.talk,
+  IssueStatus.todo || IssueStatus.inProgress => Stage.work,
+  IssueStatus.inReview || IssueStatus.done || IssueStatus.canceled => Stage.finish,
+};
+
+int openFindings(Issue issue) => issue.findings.where((f) => f.pulled != true).length;
+
 Lane laneOf(IssueStatus s) => switch (s) {
   IssueStatus.backlog || IssueStatus.todo => Lane.todo,
   IssueStatus.inProgress => Lane.working,

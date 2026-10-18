@@ -34,6 +34,9 @@ void main() {
     closed: IssueClose.merged,
     status: IssueStatus.done,
     moves: [],
+    acceptance: Acceptance.glance,
+    findings: [],
+    asks: [],
   );
   const chat = Chat(
     conversations: [
@@ -106,6 +109,9 @@ void main() {
         status: IssueStatus.canceled,
         sessions: ['w1'],
         moves: [],
+        acceptance: Acceptance.glance,
+        findings: [],
+        asks: [],
       ).toJson(),
     });
     final c = await pumpFarm(

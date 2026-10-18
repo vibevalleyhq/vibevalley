@@ -108,6 +108,11 @@ type Handlers interface {
 	//vibevalley:route issue.status PUT /api/v1/issues/{id}/status
 	//vibevalley:can owner remote
 	IssueStatus(ctx context.Context, pID string, body IssueStatusRequest) (Issue, error)
+	// The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
+	// another round.
+	//vibevalley:route issue.accept POST /api/v1/issues/{id}/accept
+	//vibevalley:can owner remote manager
+	IssueAccept(ctx context.Context, pID string, body IssueAcceptRequest) (Issue, error)
 	//vibevalley:route graph.split POST /api/v1/graphs
 	//vibevalley:can owner remote manager
 	GraphSplit(ctx context.Context, body GraphSplitRequest) (string, error)

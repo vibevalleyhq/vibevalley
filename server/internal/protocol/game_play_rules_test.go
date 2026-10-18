@@ -43,3 +43,33 @@ func TestPlotsAreKeyedByTheirIssue(t *testing.T) {
 		t.Fatalf("the next session on it draws on the same plot: %v", got)
 	}
 }
+
+// Where the issue stands decides the handed-back plot: waiting on an answer, its acceptance, weeds, or ripe.
+func TestAPlotShowsItsIssuesAcceptance(t *testing.T) {
+	id := "i1"
+	ripe := Session{ID: "w1", Issue: &id, Phase: Phase{Value: PhaseRipe{}}}
+	working := Session{ID: "w1", Issue: &id, Phase: Phase{Value: PhaseWorking{}}}
+	at := int64(5)
+	weed := []Finding{{ID: "f1", Text: "缺测试"}}
+	for name, c := range map[string]struct {
+		h     Session
+		issue *Issue
+		crop  Crop
+		badge string
+	}{
+		"no issue: as the session":     {ripe, nil, ripeCrop(ripe), "可收获"},
+		"handed back: its acceptance":  {ripe, &Issue{ID: id}, CropFlowering, "等验收"},
+		"waiting on an answer":         {ripe, &Issue{ID: id, Asks: []string{"用哪个端口？"}}, CropDry, "缺肥"},
+		"passed":                       {ripe, &Issue{ID: id, AcceptedAt: &at}, ripeCrop(ripe), "可收获"},
+		"failed: its weeds":            {ripe, &Issue{ID: id, Findings: weed}, CropWeeds, "1 棵草"},
+		"weeds pulled: its acceptance": {ripe, &Issue{ID: id, Findings: []Finding{{ID: "f1", Pulled: true}}}, CropFlowering, "等验收"},
+		"working on the weeds":         {working, &Issue{ID: id, Findings: weed}, CropWeeds, "除草中 1"},
+	} {
+		got := PlotOf(c.h, c.issue)
+		text := ""
+		if got.Badge != nil {
+			text = got.Badge.Text
+		}
+		testkit.Eq(t, []any{got.Crop, text}, []any{c.crop, c.badge}, name)
+	}
+}

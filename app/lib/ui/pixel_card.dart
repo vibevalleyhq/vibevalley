@@ -2,6 +2,7 @@
 
 import 'package:flutter/widgets.dart';
 
+import '../gen/vibevalley.dart' show BadgeTone;
 import 'theme.dart';
 import '../sprites/atlas.dart';
 import 'pixels.dart';
@@ -19,6 +20,8 @@ abstract final class CardColors {
   static const bug = Color(0xFFC8543C);
   static const stuck = Color(0xFF5D8FB0);
   static const rest = Color(0xFFCDBB92);
+  // Handed back and waiting: on its acceptance, or on the owner's answer.
+  static const wait = Color(0xFFB4CB7C);
   static const barFill = Color(0xFF7EA64F);
   static const barTrack = Color(0xFFE2C995);
 }
@@ -194,3 +197,12 @@ class _GlyphPainter extends CustomPainter {
   @override
   bool shouldRepaint(_GlyphPainter old) => false;
 }
+
+/// A plot sign's paper and ink by its tone; every tone has one (a new tone fails here at compile time).
+(Color, Color) badgeColors(BadgeTone tone) => switch (tone) {
+  BadgeTone.ripe => (CardColors.ripe, CardColors.ink),
+  BadgeTone.bug => (CardColors.bug, CardColors.lightInk),
+  BadgeTone.stuck => (CardColors.stuck, CardColors.lightInk),
+  BadgeTone.rest => (CardColors.rest, CardColors.ink),
+  BadgeTone.wait => (CardColors.wait, CardColors.ink),
+};

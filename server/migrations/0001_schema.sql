@@ -94,7 +94,11 @@ CREATE TABLE issue (
   queued_at   integer,
   closed_at   integer,
   closed      text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered')),
-  pull_request text
+  pull_request text,
+  acceptance  text not null default 'glance' check (acceptance in ('glance', 'required')),
+  accepted_at integer,
+  findings    text,
+  asks        text
 );
 CREATE INDEX issue_by_parent on issue (parent);
 CREATE TABLE issue_session (

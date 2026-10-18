@@ -31,10 +31,14 @@ void main() {
         createdAt: 0,
         status: IssueStatus.inReview,
         sessions: ['w0', 'w1'],
-        moves: [],
+        moves: [IssueStatus.todo, IssueStatus.done, IssueStatus.canceled],
+        acceptance: Acceptance.glance,
+        findings: [Finding(id: 'f0', text: '少了边界测试', at: 0, pulled: true)],
+        asks: [],
       );
       final previous = f.session('w0', name: '前一位');
       final routes = f.Routes({
+        'POST /api/v1/issues/tw1/accept': issue.toJson(),
         'GET /api/v1/issues/tw1/runs': [
           const Run(
             id: 'r1',
@@ -108,12 +112,22 @@ void main() {
         '这一轮做了什么',
         '碰过的文件',
         '跑过的命令',
+        '聊清楚 ✓',
+        '安排活 ✓',
+        '这块地现在需要你：验收',
+        '看一眼就收',
+        '必须过验收',
+        '已拔 · 少了边界测试',
       ]) {
         expect(find.text(text), findsOneWidget, reason: '$frame: $text');
       }
       expect(find.byType(frame == IssueFrame.farm ? FarmSection : PxCard), findsWidgets);
       await t.tap(find.text('复制路径'));
       expect(copied, '/worktrees/demo.3');
+      // Acceptance is the server's: a pass goes to issue.accept.
+      await t.tap(find.text('验收通过'));
+      await f.settle(t);
+      expect(routes.named('POST', '/api/v1/issues/tw1/accept').single.body, {'pass': true});
       await t.tap(find.text('收获'));
       await f.settle(t);
       expect(harvested, 1);

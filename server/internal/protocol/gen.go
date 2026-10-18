@@ -525,7 +525,7 @@ var InboxTargetMembers = []InboxTargetValue{InboxTargetSession{}, InboxTargetGra
 var CropValues = []Crop{CropEmpty, CropSeeded, CropSprout, CropLeafy, CropFlowering, CropWheat, CropCarrot, CropWithered, CropWeeds, CropDry, CropHarvested, CropLocked}
 
 // BadgeToneValues are every BadgeTone, in the protocol's order.
-var BadgeToneValues = []BadgeTone{BadgeToneRipe, BadgeToneBug, BadgeToneStuck, BadgeToneRest}
+var BadgeToneValues = []BadgeTone{BadgeToneRipe, BadgeToneBug, BadgeToneStuck, BadgeToneRest, BadgeToneWait}
 
 func (v FarmView) MarshalJSON() ([]byte, error) {
 	type plain FarmView
@@ -847,6 +847,12 @@ func (v Issue) MarshalJSON() ([]byte, error) {
 	if p.Moves == nil {
 		p.Moves = []IssueStatus{}
 	}
+	if p.Findings == nil {
+		p.Findings = []Finding{}
+	}
+	if p.Asks == nil {
+		p.Asks = []string{}
+	}
 	return json.Marshal(p)
 }
 
@@ -855,6 +861,9 @@ var IssueStatusValues = []IssueStatus{IssueStatusBacklog, IssueStatusTodo, Issue
 
 // PriorityValues are every Priority, in the protocol's order.
 var PriorityValues = []Priority{PriorityUrgent, PriorityHigh, PriorityMedium, PriorityLow}
+
+// AcceptanceValues are every Acceptance, in the protocol's order.
+var AcceptanceValues = []Acceptance{AcceptanceGlance, AcceptanceRequired}
 
 // IssueCloseValues are every IssueClose, in the protocol's order.
 var IssueCloseValues = []IssueClose{IssueCloseMerged, IssueCloseMergedIntoGraph, IssueCloseDismissed, IssueCloseLost, IssueCloseAnswered}
@@ -2247,6 +2256,7 @@ var Endpoints = []Endpoint{
 	{"issue.delete", "DELETE", "/api/v1/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.move", "PUT", "/api/v1/issues/{id}/move", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.status", "PUT", "/api/v1/issues/{id}/status", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.accept", "POST", "/api/v1/issues/{id}/accept", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"graph.split", "POST", "/api/v1/graphs", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"graph.updateTask", "PUT", "/api/v1/graphs/{id}/tasks/{task}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"graph.deleteTask", "DELETE", "/api/v1/graphs/{id}/tasks/{task}", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
@@ -2485,6 +2495,15 @@ func Mount(mux *http.ServeMux, h Handlers) {
 			return
 		}
 		out, err := h.IssueStatus(r.Context(), pID, body)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/v1/issues/{id}/accept", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		var body IssueAcceptRequest
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.IssueAccept(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/v1/graphs", func(w http.ResponseWriter, r *http.Request) {
@@ -3063,6 +3082,12 @@ func (c *Client) IssueMove(ctx context.Context, pID string, body MoveIssueReques
 func (c *Client) IssueStatus(ctx context.Context, pID string, body IssueStatusRequest) (Issue, error) {
 	var out Issue
 	err := c.call(ctx, "PUT", "/api/v1/issues/"+url.PathEscape(pID)+"/status", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) IssueAccept(ctx context.Context, pID string, body IssueAcceptRequest) (Issue, error) {
+	var out Issue
+	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/accept", nil, body, &out)
 	return out, err
 }
 

@@ -43,6 +43,7 @@ class IssueSubmission {
               project: draft.project ?? '',
               assignee: draft.assignee ?? '',
               priority: draft.priority,
+              acceptance: draft.acceptance,
             ),
           );
     _saved = issue;

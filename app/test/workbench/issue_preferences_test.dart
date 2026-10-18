@@ -27,7 +27,19 @@ void main() {
       binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
       SharedPreferences.resetStatic();
     });
-    const issue = Issue(id: 'i', number: 1, title: 'work', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.todo, moves: []);
+    const issue = Issue(
+      id: 'i',
+      number: 1,
+      title: 'work',
+      priority: Priority.medium,
+      createdAt: 1,
+      sessions: [],
+      status: IssueStatus.todo,
+      moves: [],
+      acceptance: Acceptance.glance,
+      findings: [],
+      asks: [],
+    );
     final server = FakeServer((r) async => jsonResponse(issue.toJson()));
     addTearDown(server.close);
     final sending = IssueSubmission(server.api.issue).start(const IssueRequest(title: 'work', assignee: 'helper'));

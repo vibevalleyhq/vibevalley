@@ -41,13 +41,6 @@ const _signInside = 30.0;
 
 const _speechMs = 9000;
 
-const _tone = {
-  BadgeTone.ripe: (CardColors.ripe, CardColors.ink),
-  BadgeTone.bug: (CardColors.bug, CardColors.lightInk),
-  BadgeTone.stuck: (CardColors.stuck, CardColors.lightInk),
-  BadgeTone.rest: (CardColors.rest, CardColors.ink),
-};
-
 const _sign = {
   'shop': 'icon-shop',
   'warehouse': 'icon-crate',
@@ -370,7 +363,7 @@ class _VillageOverlayState extends ConsumerState<VillageOverlay> {
     }
     final badge = plot.badge;
     if (badge != null) {
-      final (paper, ink) = _tone[badge.tone]!;
+      final (paper, ink) = badgeColors(badge.tone);
       return (
         at: 'rail',
         card: PixelCard(

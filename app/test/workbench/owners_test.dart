@@ -93,7 +93,19 @@ void main() {
   });
 
   test('dispatch failure keeps the saved issue and retry updates that same issue', () async {
-    const issue = Issue(id: 'i', number: 1, title: '工作', priority: Priority.medium, createdAt: 1, sessions: [], status: IssueStatus.todo, moves: []);
+    const issue = Issue(
+      id: 'i',
+      number: 1,
+      title: '工作',
+      priority: Priority.medium,
+      createdAt: 1,
+      sessions: [],
+      status: IssueStatus.todo,
+      moves: [],
+      acceptance: Acceptance.glance,
+      findings: [],
+      asks: [],
+    );
     var starts = 0;
     final server = FakeServer((r) async {
       if (r.url.path.endsWith('/status') && ++starts == 1) return jsonResponse({'reason': 'dispatch failed'}, 503);

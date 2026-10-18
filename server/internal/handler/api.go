@@ -467,6 +467,11 @@ func (a api) IssueMove(_ context.Context, id string, body protocol.MoveIssueRequ
 
 func (a api) IssueDelete(_ context.Context, id string) error { return a.f.Issue.Remove(id) }
 
+func (a api) IssueAccept(ctx context.Context, id string, body protocol.IssueAcceptRequest) (protocol.Issue, error) {
+	got, err := a.f.Issue.Accept(context.WithoutCancel(ctx), id, body)
+	return got, refused(err)
+}
+
 func (a api) IssueStatus(ctx context.Context, id string, body protocol.IssueStatusRequest) (protocol.Issue, error) {
 	got, err := a.f.Issue.SetStatus(context.WithoutCancel(ctx), id, body.Status, body.Text, a.f.Channel.General())
 	return got, refused(err)

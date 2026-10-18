@@ -31,6 +31,7 @@
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.Phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `FactRun` 到 `FactReport`、`Session.Runs`、`LastRun` | `/api/v1/issues/{id}/runs` |
 | 干活过程 | 干活过程 | `chat/turn_steps.dart` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/sessions`、`/api/v1/sessions/{id}`、`/api/v1/sessions/{id}/events` |
 | 收成清单、收获 | 收获 | `shared/harvest.dart` | `Changes` | `/api/v1/issues/{id}/changes`、`/api/v1/issues/{id}/status`（挪到 `done`） |
+| 验收、草、缺肥 | 抽穗、长草、结果、缺肥 | 工单详情（`shared/issue_view.dart`）的「这块地现在需要你」、验收、草 | `Issue.Acceptance`、`AcceptedAt`、`Findings`、`Asks`；地的样子是 `protocol.PlotOf` | `/api/v1/issues/{id}/accept`；`asks` 来自帮工汇报（`FactReport.Asks`） |
 | 田头、频道 | 田头 | 田头窗口（`farm/chat_window.dart`）、`/chat`（`workbench/chat`） | `Conversation`（`kind`：`general`、`channel`）、`ChatMessage`、`CoreState.Chat` | `/api/v1/channels`、`/api/v1/channels/{id}/messages` |
 | 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Conversation`（`kind: thread`）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channels/{id}/messages`、`/api/v1/issues/{id}/comment` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Schedule`；它的工单是 `Issue.Schedule` 指着它的那张 | `/api/v1/schedules` |
@@ -40,7 +41,7 @@
 | 语音 | 麦克风 | `/settings/voice`（`workbench/voice`）、`voice/` | `VoiceSettings` | `/api/v1/voice/...` |
 | 进度、成就 | 金币、连胜、任务与成就 | `farm/achievements.dart` | `Progress`、`LedgerEntry`、`CoreState.Progress` | 帧里的 `progress`，没有单独的接口 |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.Level` | |
-| 地 | 一块地：一张在做的工单 | 像素村（`village/`）、地块详情（`farm/plot_detail.dart`） | 工单的分支和 worktree（服务端 `project.IssueBranch`、`worktrees/<项目>.<工单号>`）；地里长什么按工单做键（`FarmView.Plots`、`protocol.PlotKey`）；帮工站在哪块地是 `SessionPlay.Station` | `/api/v1/say` 的 `bed` |
+| 地 | 一块地：一张工单 | 像素村（`village/`）、地块详情（`farm/plot_detail.dart`） | 工单的分支和 worktree（服务端 `project.IssueBranch`、`worktrees/<项目>.<工单号>`）；地里长什么按工单做键（`FarmView.Plots`、`protocol.PlotKey`）；帮工站在哪块地是 `SessionPlay.Station` | `/api/v1/say` 的 `bed` |
 
 ## 服务端以下
 

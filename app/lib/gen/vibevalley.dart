@@ -1667,7 +1667,8 @@ enum BadgeTone {
   ripe('ripe'),
   bug('bug'),
   stuck('stuck'),
-  rest('rest');
+  rest('rest'),
+  wait('wait');
 
   const BadgeTone(this.wire);
   final String wire;
@@ -2866,6 +2867,10 @@ class Issue {
     required this.status,
     required this.moves,
     this.pullRequest,
+    required this.acceptance,
+    this.acceptedAt,
+    required this.findings,
+    required this.asks,
   });
 
   factory Issue.fromJson(Map<String, dynamic> j) => Issue(
@@ -2890,6 +2895,10 @@ class Issue {
     status: IssueStatus.fromJson(j['status']),
     moves: [for (final e in j['moves'] as List) IssueStatus.fromJson(e)],
     pullRequest: j['pullRequest'] == null ? null : PullRequest.fromJson(j['pullRequest'] as Map<String, dynamic>),
+    acceptance: Acceptance.fromJson(j['acceptance']),
+    acceptedAt: j['acceptedAt'] == null ? null : (j['acceptedAt'] as num).toDouble(),
+    findings: [for (final e in j['findings'] as List) Finding.fromJson(e as Map<String, dynamic>)],
+    asks: [for (final e in j['asks'] as List) e as String],
   );
 
   final String id;
@@ -2913,6 +2922,10 @@ class Issue {
   final IssueStatus status;
   final List<IssueStatus> moves;
   final PullRequest? pullRequest;
+  final Acceptance acceptance;
+  final double? acceptedAt;
+  final List<Finding> findings;
+  final List<String> asks;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -2936,6 +2949,10 @@ class Issue {
     'status': status.wire,
     'moves': [for (final e in moves) e.wire],
     if (pullRequest != null) 'pullRequest': pullRequest!.toJson(),
+    'acceptance': acceptance.wire,
+    if (acceptedAt != null) 'acceptedAt': acceptedAt!,
+    'findings': [for (final e in findings) e.toJson()],
+    'asks': [for (final e in asks) e],
   };
 }
 
@@ -3044,7 +3061,7 @@ enum Priority {
 }
 
 class IssueUpdate {
-  const IssueUpdate({this.title, this.description, this.project, this.assignee, this.priority});
+  const IssueUpdate({this.title, this.description, this.project, this.assignee, this.priority, this.acceptance});
 
   factory IssueUpdate.fromJson(Map<String, dynamic> j) => IssueUpdate(
     title: j['title'] == null ? null : j['title'] as String,
@@ -3052,6 +3069,7 @@ class IssueUpdate {
     project: j['project'] == null ? null : j['project'] as String,
     assignee: j['assignee'] == null ? null : j['assignee'] as String,
     priority: j['priority'] == null ? null : Priority.fromJson(j['priority']),
+    acceptance: j['acceptance'] == null ? null : Acceptance.fromJson(j['acceptance']),
   );
 
   final String? title;
@@ -3059,6 +3077,7 @@ class IssueUpdate {
   final String? project;
   final String? assignee;
   final Priority? priority;
+  final Acceptance? acceptance;
 
   Map<String, dynamic> toJson() => {
     if (title != null) 'title': title!,
@@ -3066,11 +3085,56 @@ class IssueUpdate {
     if (project != null) 'project': project!,
     if (assignee != null) 'assignee': assignee!,
     if (priority != null) 'priority': priority!.wire,
+    if (acceptance != null) 'acceptance': acceptance!.wire,
+  };
+}
+
+enum Acceptance {
+  glance('glance'),
+  required('required');
+
+  const Acceptance(this.wire);
+  final String wire;
+
+  static Acceptance fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('Acceptance: unknown value', v));
+}
+
+class Finding {
+  const Finding({required this.id, required this.text, required this.at, this.pulled});
+
+  factory Finding.fromJson(Map<String, dynamic> j) =>
+      Finding(id: j['id'] as String, text: j['text'] as String, at: (j['at'] as num).toDouble(), pulled: j['pulled'] == null ? null : j['pulled'] as bool);
+
+  final String id;
+  final String text;
+  final double at;
+  final bool? pulled;
+
+  Map<String, dynamic> toJson() => {'id': id, 'text': text, 'at': at, if (pulled != null) 'pulled': pulled!};
+}
+
+class IssueAcceptRequest {
+  const IssueAcceptRequest({required this.pass, this.findings, this.text});
+
+  factory IssueAcceptRequest.fromJson(Map<String, dynamic> j) => IssueAcceptRequest(
+    pass: j['pass'] as bool,
+    findings: j['findings'] == null ? null : [for (final e in j['findings'] as List) e as String],
+    text: j['text'] == null ? null : j['text'] as String,
+  );
+
+  final bool pass;
+  final List<String>? findings;
+  final String? text;
+
+  Map<String, dynamic> toJson() => {
+    'pass': pass,
+    if (findings != null) 'findings': [for (final e in findings!) e],
+    if (text != null) 'text': text!,
   };
 }
 
 class IssueRequest {
-  const IssueRequest({required this.title, this.description, this.project, this.assignee, this.priority});
+  const IssueRequest({required this.title, this.description, this.project, this.assignee, this.priority, this.acceptance});
 
   factory IssueRequest.fromJson(Map<String, dynamic> j) => IssueRequest(
     title: j['title'] as String,
@@ -3078,6 +3142,7 @@ class IssueRequest {
     project: j['project'] == null ? null : j['project'] as String,
     assignee: j['assignee'] == null ? null : j['assignee'] as String,
     priority: j['priority'] == null ? null : Priority.fromJson(j['priority']),
+    acceptance: j['acceptance'] == null ? null : Acceptance.fromJson(j['acceptance']),
   );
 
   final String title;
@@ -3085,6 +3150,7 @@ class IssueRequest {
   final String? project;
   final String? assignee;
   final Priority? priority;
+  final Acceptance? acceptance;
 
   Map<String, dynamic> toJson() => {
     'title': title,
@@ -3092,6 +3158,7 @@ class IssueRequest {
     if (project != null) 'project': project!,
     if (assignee != null) 'assignee': assignee!,
     if (priority != null) 'priority': priority!.wire,
+    if (acceptance != null) 'acceptance': acceptance!.wire,
   };
 }
 
@@ -4833,7 +4900,7 @@ final class FactSpent extends Fact implements SideEvent {
 }
 
 final class FactReport extends Fact implements SideEvent {
-  const FactReport({required this.at, required this.id, this.run, required this.outcome, required this.summary, required this.runs, this.spent});
+  const FactReport({required this.at, required this.id, this.run, required this.outcome, required this.summary, required this.runs, this.spent, this.asks});
 
   factory FactReport.fromJson(Map<String, dynamic> j) => FactReport(
     at: (j['at'] as num).toDouble(),
@@ -4843,6 +4910,7 @@ final class FactReport extends Fact implements SideEvent {
     summary: j['summary'] as String,
     runs: (j['runs'] as num).toDouble(),
     spent: j['spent'] == null ? null : Spent.fromJson(j['spent'] as Map<String, dynamic>),
+    asks: j['asks'] == null ? null : [for (final e in j['asks'] as List) e as String],
   );
 
   final double at;
@@ -4852,6 +4920,7 @@ final class FactReport extends Fact implements SideEvent {
   final String summary;
   final double runs;
   final Spent? spent;
+  final List<String>? asks;
 
   @override
   Map<String, dynamic> toJson() => {
@@ -4863,6 +4932,7 @@ final class FactReport extends Fact implements SideEvent {
     'summary': summary,
     'runs': runs,
     if (spent != null) 'spent': spent!.toJson(),
+    if (asks != null) 'asks': [for (final e in asks!) e],
   };
 }
 
@@ -5527,6 +5597,13 @@ class IssueApi {
   /// todo again after a round or a close is another round with text. Issue.moves lists where it may go.
   Future<Issue> status({required String id, required IssueStatusRequest body}) async {
     final j = await _api._call('PUT', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/status', query: {}, body: body.toJson());
+    return Issue.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
+  /// another round.
+  Future<Issue> accept({required String id, required IssueAcceptRequest body}) async {
+    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/accept', query: {}, body: body.toJson());
     return Issue.fromJson(j as Map<String, dynamic>);
   }
 }

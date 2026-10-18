@@ -705,6 +705,8 @@ const (
 	BadgeToneBug   BadgeTone = "bug"
 	BadgeToneStuck BadgeTone = "stuck"
 	BadgeToneRest  BadgeTone = "rest"
+	// Handed back, waiting on its acceptance, or on the owner's answer.
+	BadgeToneWait BadgeTone = "wait"
 )
 
 type PlotView struct {
@@ -1194,6 +1196,12 @@ type Issue struct {
 	Moves []IssueStatus `json:"moves"`
 	// Set once its harvest opened a pull request (github.pr_projects); open keeps the issue in review.
 	PullRequest *PullRequest `json:"pullRequest,omitzero"`
+	Acceptance  Acceptance   `json:"acceptance"`
+	// When what was handed back passed its acceptance; cleared when another round starts.
+	AcceptedAt *int64    `json:"acceptedAt,omitzero"`
+	Findings   []Finding `json:"findings"`
+	// What its helper asked the owner and is waiting on (要问主人：); a comment answers them.
+	Asks []string `json:"asks"`
 }
 
 type IssueGraph struct {
@@ -1240,19 +1248,45 @@ const (
 
 // IssueUpdate changes only what it gives; an empty project or assignee is none.
 type IssueUpdate struct {
-	Title       *string   `json:"title,omitzero"`
-	Description *string   `json:"description,omitzero"`
-	Project     *string   `json:"project,omitzero"`
-	Assignee    *string   `json:"assignee,omitzero"`
-	Priority    *Priority `json:"priority,omitzero"`
+	Title       *string     `json:"title,omitzero"`
+	Description *string     `json:"description,omitzero"`
+	Project     *string     `json:"project,omitzero"`
+	Assignee    *string     `json:"assignee,omitzero"`
+	Priority    *Priority   `json:"priority,omitzero"`
+	Acceptance  *Acceptance `json:"acceptance,omitzero"`
+}
+
+// How an issue's acceptance is passed: every issue has one. glance: the owner's harvest is the acceptance itself;
+// required: harvest is refused until someone passes it (issue.accept).
+type Acceptance string
+
+const (
+	AcceptanceGlance   Acceptance = "glance"
+	AcceptanceRequired Acceptance = "required"
+)
+
+// A weed: one point an acceptance did not pass. Pulled once a later acceptance passes.
+type Finding struct {
+	ID     string `json:"id"`
+	Text   string `json:"text"`
+	At     int64  `json:"at"`
+	Pulled bool   `json:"pulled,omitzero"`
+}
+
+// Pass sets the issue accepted (its open weeds pulled); a fail adds Findings as weeds and sends another round with Text.
+type IssueAcceptRequest struct {
+	Pass     bool     `json:"pass"`
+	Findings []string `json:"findings,omitzero"`
+	Text     string   `json:"text,omitzero"`
 }
 
 type IssueRequest struct {
-	Title       string    `json:"title"`
-	Description string    `json:"description,omitzero"`
-	Project     *string   `json:"project,omitzero"`
-	Assignee    *string   `json:"assignee,omitzero"`
-	Priority    *Priority `json:"priority,omitzero"`
+	Title       string      `json:"title"`
+	Description string      `json:"description,omitzero"`
+	Project     *string     `json:"project,omitzero"`
+	Assignee    *string     `json:"assignee,omitzero"`
+	Priority    *Priority   `json:"priority,omitzero"`
+	Acceptance  *Acceptance `json:"acceptance,omitzero"`
 }
 
 type IssueClose string
@@ -2009,6 +2043,8 @@ type FactReport struct {
 	Summary string  `json:"summary"`
 	Runs    int64   `json:"runs"`
 	Spent   *Spent  `json:"spent,omitzero"`
+	// The report's 要问主人： lines: what the session waits on the owner for.
+	Asks []string `json:"asks,omitzero"`
 }
 
 //vibevalley:member Fact conflict

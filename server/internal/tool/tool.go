@@ -29,7 +29,7 @@ const (
 func (s *Service) Manager(who Who) []agentcore.AgentTool {
 	return []agentcore.AgentTool{
 		s.dispatch(who), s.projectsTool(), s.channelsTool(), s.scheduleTool(who), s.listSchedules(), s.cancelSchedule(), s.openChannel(),
-		s.channelSettings(), s.merge(who), s.changes(), s.roster(), s.check(), s.tell(who), s.readChat(who), s.stop(), s.dismiss(),
+		s.channelSettings(), s.merge(who), s.accept(), s.changes(), s.roster(), s.check(), s.tell(who), s.readChat(who), s.stop(), s.dismiss(),
 		s.graphSplit(), s.graphsTool(), s.taskEdit(), s.graphAction(who), s.taskAction(), s.memorySearch(who, forManager),
 		s.memoryAdd(who, forManager),
 	}
@@ -52,6 +52,7 @@ var labels = map[string]string{
 	"list_schedules":   "看定时",
 	"cancel_schedule":  "取消定时",
 	"merge":            "收获",
+	"accept":           "验收",
 	"changes":          "看改动",
 	"roster":           "花名册",
 	"check":            "看进度",

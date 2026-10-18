@@ -104,11 +104,46 @@ func (s *Service) merge(who Who) agentcore.AgentTool {
 				if w.Session.Issue == nil {
 					return "这个帮工没有工单"
 				}
+				// Every issue has an acceptance; a required one must have passed before anything is harvested.
+				if t, err := s.issue.Get(*w.Session.Issue); err == nil && t.Acceptance == protocol.AcceptanceRequired && t.AcceptedAt == nil {
+					return "这张工单要先过验收：先用 accept 验收通过，才能收获"
+				}
 				said, err := s.issue.Merge(*w.Session.Issue)
 				if err != nil {
 					return err.Error()
 				}
 				return said
+			})
+		},
+	})
+}
+
+type acceptArgs struct {
+	Session  string   `json:"session" jsonschema:"帮工的名字或 id"`
+	Pass     bool     `json:"pass" jsonschema:"验收过了就是 true"`
+	Findings []string `json:"findings,omitempty" jsonschema:"没过时，每条要修的一句话"`
+	Text     string   `json:"text,omitempty" jsonschema:"没过时，还要交代的话"`
+}
+
+// Acceptance is judging what came back against what the issue asked for; a pass only makes it ready, the harvest
+// stays the owner's (merge).
+func (s *Service) accept() agentcore.AgentTool {
+	return brain.TextTool(brain.TextToolSpec[acceptArgs]{
+		Name: "accept", Label: labels["accept"], Parameters: schemaOf[acceptArgs](),
+		Description: "验收一个帮工交回来的活：先用 changes 看改动，对着工单要的逐条看。过了（pass: true）就能收获；没过就把每条要修的写进 findings，它会带着这些接着修一轮。",
+		Run: func(ctx context.Context, p acceptArgs, _ brain.ToolContext) (string, error) {
+			return s.withSession(p.Session, func(w session.Roster) string {
+				if w.Session.Issue == nil {
+					return "这个帮工没有工单"
+				}
+				t, err := s.issue.Accept(ctx, *w.Session.Issue, protocol.IssueAcceptRequest{Pass: p.Pass, Findings: p.Findings, Text: p.Text})
+				if err != nil {
+					return err.Error()
+				}
+				if p.Pass {
+					return fmt.Sprintf("「%s」验收过了，等主人收获", t.Title)
+				}
+				return fmt.Sprintf("「%s」没过验收，%d 处要修，已经交回给它", t.Title, protocol.OpenFindings(t))
 			})
 		},
 	})

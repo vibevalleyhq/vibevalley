@@ -44,12 +44,16 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 农机 | runtime | 机器上的一种编码 agent 程序（pi、claude、codex……） | harness、引擎 |
 | 工单 | issue（`Issue`） | 一件活，从写下到关上一个 id；在做时是一块地，每派一次是一个帮工 | job、ticket |
 | 项目 | project | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
-| 地 | 工单的分支和 worktree（`project.IssueBranch`）；像素村里的位置是 station、bed | 一张在做的工单，帮工在上面干活；一座岛上的地和空位是这个项目同时在做的工单数（[还没对上的](concepts.md#农场是皮)） | 工位、帮工的地、并发位 |
+| 地 | issue（`Issue`；`FarmView.Plots` 按工单做键）；代码活的 worktree 是 `project.IssueBranch`；像素村里的位置是 station、bed | 一张工单；代码相关的带一个 worktree。帮工在上面干活；一座岛上的空位是这个项目同时在做的工单数 | 工位、帮工的地、并发位 |
 | 种子袋 | 待办的工单（todo，`queued_at`） | 排队等空地的工单，有空地自动开工 | 队列 |
 | 阶段 | phase | 到场、干活、成熟、失败、歇着 | 状态 |
 | 核心状态 | `CoreState` | 农场上的一切，只有服务端持有 | |
 | 事实 | fact | 改核心状态的一件事 | patch |
-| 收获 | harvest；工单挪到 `done` | 把工单的分支合进主分支，工单关上；`github.pr_projects` 里的项目是推分支、开 PR，PR 合了工单才关 | |
+| 收获 | harvest；工单挪到 `done` | 过了验收的工单收下：代码活合进主分支（`github.pr_projects` 里的项目是推分支、开 PR，PR 合了才关），别的直接关上 | |
+| 聊清楚、安排活、完成 | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` | 一块地的三段 | |
+| 验收 | acceptance（`Issue.Acceptance`、`issue.accept`） | 每张工单都有：判交回来的活过没过；`glance` 是收获就算，`required` 是先过验收才能收获 | 审核、review |
+| 草 | finding（`Issue.Findings`） | 没过验收的一条意见；下次验收通过才拔 | |
+| 缺肥 | asks（`Issue.Asks`） | 帮工问了主人、还没回答的；施肥是回答它 | |
 | 仓库 | warehouse | 收获了的工单 | |
 | 账本 | ledger | 值得记的事；金币、连胜、成就由它折出来 | 事件日志 |
 | 轨迹 | trajectory | 一个 agent 干活的每一步 | 日志、trace |

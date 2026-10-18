@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（22 篇）
+## proposed（21 篇）
 
 ### feature
 
@@ -21,7 +21,6 @@
 - 2026-10-18 [通话走 Agora，听写走识别，管家说 OpenAI 的协议](proposed/architecture/2026-10-18-calls-dictation-and-the-agent.md)
 - 2026-10-18 [一张工单一条分支、一个 worktree，收获就是提 PR](proposed/architecture/2026-10-18-an-issue-ships-as-a-pr.md)
 - 2026-10-18 [对照 Grok Bot 的常驻 agent：管家还差什么](proposed/architecture/2026-10-18-always-on-manager.md)
-- 2026-10-18 [一块地是一张在做的工单](proposed/architecture/2026-10-18-a-plot-is-an-issue.md)
 - 2026-10-17 [Worker 改叫 Session](proposed/architecture/2026-10-17-worker-is-a-session.md)
 - 2026-10-17 [Session、Run、事件：一个 agent loop 的日志，和消息之间只有两个口子](proposed/architecture/2026-10-17-session-run-step.md)
 - 2026-10-17 [管家是一份档案，只是能力多](proposed/architecture/2026-10-17-manager-is-an-agent.md)
@@ -35,7 +34,7 @@
 - 2026-10-18 [用 VibeValley 开发 VibeValley：Beta 干活，源码试改，Alpha 试包](proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
 - 2026-10-18 [先只用服务端和命令行，让 codex 给 VibeValley 加完一个功能](proposed/process/2026-10-18-a-feature-through-server-and-cli.md)
 
-## implemented（103 篇）
+## implemented（105 篇）
 
 ### feature
 
@@ -95,10 +94,12 @@
 - 2026-10-18 [主接口的本机身份和就绪顺序归宿主](implemented/architecture/2026-10-18-local-server-lifetime.md)
 - 2026-10-18 [安装选择是探测输入，执行沿用已接受的身份](implemented/architecture/2026-10-18-installation-identity-is-explicit.md)
 - 2026-10-18 [执行拥有实际消费的输入、Run 和终结](implemented/architecture/2026-10-18-execution-owns-consumed-inputs.md)
+- 2026-10-18 [一块地就是一张工单，每张工单都有验收](implemented/architecture/2026-10-18-every-issue-has-an-acceptance.md)
 - 2026-10-18 [一段听写拥有录音和输入目标](implemented/architecture/2026-10-18-dictation-attempts-own-targets.md)
 - 2026-10-18 [连接器的持久收件与账号代际](implemented/architecture/2026-10-18-connector-inbox-and-generation.md)
 - 2026-10-18 [子进程发布自己的就绪地址](implemented/architecture/2026-10-18-child-publishes-readiness.md)
 - 2026-10-18 [Core 提交完整状态，订阅者读取对应的因果变化](implemented/architecture/2026-10-18-atomic-core-transitions.md)
+- 2026-10-18 [一块地是一张工单](implemented/architecture/2026-10-18-a-plot-is-an-issue.md)
 - 2026-10-17 [动作结果和资源生命周期由拥有它的模块保证](implemented/architecture/2026-10-17-operation-results-and-lifetimes.md)
 - 2026-10-17 [迁移是一次性的，启动只认今天的名字](implemented/architecture/2026-10-17-one-way-migration.md)
 - 2026-10-17 [表按模块命名](implemented/architecture/2026-10-17-names-by-module.md)

@@ -10,10 +10,26 @@ import (
 	"database/sql"
 )
 
+const acceptIssue = `-- name: AcceptIssue :exec
+update issue set accepted_at = ?1, findings = ?2 where id = ?3
+`
+
+type AcceptIssueParams struct {
+	AcceptedAt sql.NullInt64
+	Findings   sql.NullString
+	ID         string
+}
+
+// A verdict on what was handed back: passed (accepted_at set) or not (cleared), with the weeds as they stand now.
+func (q *Queries) AcceptIssue(ctx context.Context, arg AcceptIssueParams) error {
+	_, err := q.db.ExecContext(ctx, acceptIssue, arg.AcceptedAt, arg.Findings, arg.ID)
+	return err
+}
+
 const addIssue = `-- name: AddIssue :exec
-insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, schedule)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, schedule, acceptance)
 values (?1, (select coalesce(max(number), 0) + 1 from issue), ?2, ?3, ?4, ?5,
-        ?6, (select coalesce(max(rank), 0) + 1 from issue), ?7, ?8)
+        ?6, (select coalesce(max(rank), 0) + 1 from issue), ?7, ?8, ?9)
 `
 
 type AddIssueParams struct {
@@ -25,6 +41,7 @@ type AddIssueParams struct {
 	Priority    string
 	CreatedAt   int64
 	Schedule    sql.NullString
+	Acceptance  string
 }
 
 func (q *Queries) AddIssue(ctx context.Context, arg AddIssueParams) error {
@@ -37,6 +54,7 @@ func (q *Queries) AddIssue(ctx context.Context, arg AddIssueParams) error {
 		arg.Priority,
 		arg.CreatedAt,
 		arg.Schedule,
+		arg.Acceptance,
 	)
 	return err
 }
@@ -57,7 +75,7 @@ func (q *Queries) CloseIssue(ctx context.Context, arg CloseIssueParams) error {
 }
 
 const editIssue = `-- name: EditIssue :exec
-update issue set title = ?, description = ?, project = ?, assignee = ?, priority = ? where id = ?
+update issue set title = ?, description = ?, project = ?, assignee = ?, priority = ?, acceptance = ? where id = ?
 `
 
 type EditIssueParams struct {
@@ -66,6 +84,7 @@ type EditIssueParams struct {
 	Project     sql.NullString
 	Assignee    sql.NullString
 	Priority    string
+	Acceptance  string
 	ID          string
 }
 
@@ -76,13 +95,14 @@ func (q *Queries) EditIssue(ctx context.Context, arg EditIssueParams) error {
 		arg.Project,
 		arg.Assignee,
 		arg.Priority,
+		arg.Acceptance,
 		arg.ID,
 	)
 	return err
 }
 
 const family = `-- name: Family :many
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue where id = ?1 or parent = ?1
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue where id = ?1 or parent = ?1
 `
 
 // An issue and its sub-issues.
@@ -114,6 +134,10 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 			&i.ClosedAt,
 			&i.Closed,
 			&i.PullRequest,
+			&i.Acceptance,
+			&i.AcceptedAt,
+			&i.Findings,
+			&i.Asks,
 		); err != nil {
 			return nil, err
 		}
@@ -129,7 +153,7 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 }
 
 const getIssue = `-- name: GetIssue :one
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue where id = ?
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue where id = ?
 `
 
 func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
@@ -154,6 +178,10 @@ func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
 		&i.ClosedAt,
 		&i.Closed,
 		&i.PullRequest,
+		&i.Acceptance,
+		&i.AcceptedAt,
+		&i.Findings,
+		&i.Asks,
 	)
 	return i, err
 }
@@ -186,7 +214,7 @@ func (q *Queries) GraphIDs(ctx context.Context) ([]string, error) {
 }
 
 const issueByNumber = `-- name: IssueByNumber :one
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue where number = ?
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue where number = ?
 `
 
 func (q *Queries) IssueByNumber(ctx context.Context, number int64) (Issue, error) {
@@ -211,13 +239,17 @@ func (q *Queries) IssueByNumber(ctx context.Context, number int64) (Issue, error
 		&i.ClosedAt,
 		&i.Closed,
 		&i.PullRequest,
+		&i.Acceptance,
+		&i.AcceptedAt,
+		&i.Findings,
+		&i.Asks,
 	)
 	return i, err
 }
 
 const keptIssues = `-- name: KeptIssues :many
 with latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit ?1)
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue
 where closed_at is null or id in (select id from latest) or parent in (select id from latest)
    or parent in (select id from issue where closed_at is null)
 `
@@ -251,6 +283,10 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 			&i.ClosedAt,
 			&i.Closed,
 			&i.PullRequest,
+			&i.Acceptance,
+			&i.AcceptedAt,
+			&i.Findings,
+			&i.Asks,
 		); err != nil {
 			return nil, err
 		}
@@ -266,7 +302,7 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 }
 
 const latestOfSchedule = `-- name: LatestOfSchedule :one
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue where schedule = ? order by created_at desc, id desc limit 1
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue where schedule = ? order by created_at desc, id desc limit 1
 `
 
 // A schedule's issue: the one it made last.
@@ -292,13 +328,17 @@ func (q *Queries) LatestOfSchedule(ctx context.Context, schedule sql.NullString)
 		&i.ClosedAt,
 		&i.Closed,
 		&i.PullRequest,
+		&i.Acceptance,
+		&i.AcceptedAt,
+		&i.Findings,
+		&i.Asks,
 	)
 	return i, err
 }
 
 const listIssues = `-- name: ListIssues :many
 
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue order by rank, created_at, id
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue order by rank, created_at, id
 `
 
 // Issues (issue/issue.go).
@@ -330,6 +370,10 @@ func (q *Queries) ListIssues(ctx context.Context) ([]Issue, error) {
 			&i.ClosedAt,
 			&i.Closed,
 			&i.PullRequest,
+			&i.Acceptance,
+			&i.AcceptedAt,
+			&i.Findings,
+			&i.Asks,
 		); err != nil {
 			return nil, err
 		}
@@ -489,6 +533,20 @@ update issue set closed_at = null, closed = null, queued_at = null where id = ?
 
 func (q *Queries) ReopenIssue(ctx context.Context, id string) error {
 	_, err := q.db.ExecContext(ctx, reopenIssue, id)
+	return err
+}
+
+const setIssueAsks = `-- name: SetIssueAsks :exec
+update issue set asks = ?1 where id = ?2
+`
+
+type SetIssueAsksParams struct {
+	Asks sql.NullString
+	ID   string
+}
+
+func (q *Queries) SetIssueAsks(ctx context.Context, arg SetIssueAsksParams) error {
+	_, err := q.db.ExecContext(ctx, setIssueAsks, arg.Asks, arg.ID)
 	return err
 }
 
