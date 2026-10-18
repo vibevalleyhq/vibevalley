@@ -18,9 +18,9 @@ void main() {
   final state = farm(sessions: [working, failed, ripe]);
   final v = view(
     plots: {
-      'w1': const PlotView(crop: Crop.leafy),
-      'w2': const PlotView(crop: Crop.withered),
-      'w3': const PlotView(crop: Crop.carrot),
+      'tw1': const PlotView(crop: Crop.leafy),
+      'tw2': const PlotView(crop: Crop.withered),
+      'tw3': const PlotView(crop: Crop.carrot),
     },
   );
 

@@ -7,7 +7,7 @@ import '../data/providers.dart';
 import '../data/ui_state.dart';
 import '../chat/chat_state.dart' show chatActionsProvider, chatOpenProvider;
 import '../data/remote.dart' show sessionEventsProvider;
-import '../shared/work_log.dart' show WorkLog;
+import '../shared/work_log.dart' show FoldedWorkLog, WorkLog;
 import '../game/commands.dart';
 import '../game/tools.dart';
 import '../gen/vibevalley.dart';
@@ -295,12 +295,10 @@ class _PlotDetailState extends ConsumerState<PlotDetail> {
         if (log != null && log.isNotEmpty)
           FarmSection(
             title: '干活过程',
-            child: Ticking(
-              builder: (context, now) => WorkLog(
-                steps: log,
-                now: now,
-                working: session.phase is PhaseWorking,
-                onComment: (task, text) => ref.read(farmCommandsProvider).water(session, text, on: task),
+            child: FoldedWorkLog(
+              steps: log,
+              child: Ticking(
+                builder: (context, now) => WorkLog(steps: log, now: now, working: session.phase is PhaseWorking),
               ),
             ),
           )

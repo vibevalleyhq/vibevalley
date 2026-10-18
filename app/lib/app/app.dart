@@ -33,6 +33,7 @@ class VibeValleyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(hostCommandRouterProvider);
+    ref.watch(leaveForRouterProvider);
     ref.read(phoneProvider);
     return MaterialApp.router(
       title: '码农场物语',

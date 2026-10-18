@@ -565,7 +565,6 @@ type SessionEvent struct {
 	Input  *string          `json:"input,omitzero"`
 	Output *string          `json:"output,omitzero"`
 	Ok     *bool            `json:"ok,omitzero"`
-	On     *int64           `json:"on,omitzero"`
 	// On an llm/usage.
 	Tokens *EventTokens `json:"tokens,omitzero"`
 }
@@ -714,7 +713,8 @@ type PlotView struct {
 }
 
 type FarmView struct {
-	Level FarmLevel           `json:"level"`
+	Level FarmLevel `json:"level"`
+	// A plot is an issue being worked: keyed by its issue (PlotKey), whoever works it now.
 	Plots map[string]PlotView `json:"plots"`
 }
 
@@ -1304,7 +1304,6 @@ type Run struct {
 
 type CommentRequest struct {
 	Text string `json:"text"`
-	On   *int64 `json:"on,omitzero"`
 }
 
 type SayRequest struct {

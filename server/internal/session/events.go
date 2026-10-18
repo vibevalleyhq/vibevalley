@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -244,60 +242,9 @@ func (j *journal) RunEnded(id string, outcome protocol.Outcome) {
 func (j *journal) Asked(text string, from From) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	j.addLocked(protocol.SessionEvent{Type: protocol.SessionEventTypeUserMessage, Text: str.Cut(str.Trim(text), AskedMax), On: commentOn(text)}, from)
+	j.addLocked(protocol.SessionEvent{Type: protocol.SessionEventTypeUserMessage, Text: str.Cut(str.Trim(text), AskedMax)}, from)
 }
 
-// The journal reads the mark back to tie the step it was asked to the step it comments on.
-var commentMark = regexp.MustCompile(`【评论第 (\d+) 步】`)
-
-const (
-	commentAbout  = 300
-	commentOutput = 800
-	// The client shows what follows it.
-	commentSays = "我的评论："
-)
-
-func CommentText(step protocol.SessionEvent, comment string) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "【评论第 %d 步】", step.Seq)
-	switch step.Type {
-	case protocol.SessionEventTypeToolCall:
-		b.WriteString("关于你这一步的操作：" + str.Cut(str.Trim(step.Text), commentAbout))
-		if step.Input != nil && str.Trim(*step.Input) != "" {
-			b.WriteString("\n输入：" + str.Cut(str.Trim(*step.Input), commentAbout))
-		}
-		if step.Ok != nil && !*step.Ok {
-			b.WriteString("\n（这一步失败了）")
-		}
-		if step.Output != nil && str.Trim(*step.Output) != "" {
-			out := str.Trim(*step.Output)
-			if n := str.Units(out); n > commentOutput {
-				out = "…" + str.Slice(out, n-commentOutput, n)
-			}
-			b.WriteString("\n输出的结尾：" + out)
-		}
-	case protocol.SessionEventTypeAssistantMessage:
-		b.WriteString("关于你说的这段话：" + str.Cut(str.Trim(step.Text), commentAbout))
-	case protocol.SessionEventTypeAssistantThinking:
-		b.WriteString("关于你这段思考：" + str.Cut(str.Trim(step.Text), commentAbout))
-	default:
-		b.WriteString("关于这一步：" + str.Cut(str.Trim(step.Text), commentAbout))
-	}
-	b.WriteString("\n\n" + commentSays + str.Trim(comment))
-	return b.String()
-}
-
-func commentOn(text string) *int64 {
-	m := commentMark.FindStringSubmatch(text)
-	if m == nil {
-		return nil
-	}
-	n, err := strconv.ParseInt(m[1], 10, 64)
-	if err != nil {
-		return nil
-	}
-	return &n
-}
 
 // runOn goes on with what is being said or thought, by the same one, in the draft; anything else starts a new one.
 func (j *journal) runOn(kind protocol.SessionEventType, text string, from From) {

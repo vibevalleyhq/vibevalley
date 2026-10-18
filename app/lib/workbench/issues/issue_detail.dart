@@ -553,13 +553,10 @@ class _IssueDetailState extends ConsumerState<IssueDetail> {
           title: '干活过程',
           child: steps.isEmpty
               ? EmptyNote(head.endedAt == null ? '还没有步骤。' : '干活过程只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了；它是谁做的、怎么关的还在上面。')
-              : Ticking(
-                  builder: (context, now) => WorkLog(
-                    steps: steps,
-                    now: now,
-                    tall: true,
-                    working: widget.state == IssueTag.working,
-                    onComment: open && session != null ? (task, text) => ref.read(farmCommandsProvider).water(session, text, on: task) : null,
+              : FoldedWorkLog(
+                  steps: steps,
+                  child: Ticking(
+                    builder: (context, now) => WorkLog(steps: steps, now: now, tall: true, working: widget.state == IssueTag.working),
                   ),
                 ),
         ),

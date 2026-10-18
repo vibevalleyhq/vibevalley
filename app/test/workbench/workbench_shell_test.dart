@@ -25,7 +25,7 @@ void main() {
       expect(t.takeException(), isNull);
     });
   }
-  for (final place in [Place.agents, Place.runtimes, Place.skills, Place.connectors, Place.gate]) {
+  for (final place in [Place.agents, Place.runtimes, Place.settings]) {
     testWidgets('${place.name}: the configuration header fits 390 pixels while the farm is open', (t) async {
       await pumpPage(
         t,

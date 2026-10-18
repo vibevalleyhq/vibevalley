@@ -78,19 +78,3 @@ String tookText(double ms) {
   if (m < 60) return s % 60 == 0 ? '$m 分' : '$m 分 ${s % 60} 秒';
   return m % 60 == 0 ? '${m ~/ 60} 小时' : '${m ~/ 60} 小时 ${m % 60} 分';
 }
-
-Map<int, List<SessionEvent>> commentsOf(List<SessionEvent> steps) {
-  final out = <int, List<SessionEvent>>{};
-  for (final s in steps) {
-    if (s.type == SessionEventType.userMessage && s.on != null) (out[s.on!.round()] ??= []).add(s);
-  }
-  return out;
-}
-
-/// session/activities.go CommentText puts the comment after this head.
-String commentWords(SessionEvent asked) {
-  const head = '\n\n我的评论：';
-  final text = asked.text;
-  final at = text.lastIndexOf(head);
-  return at < 0 ? text : text.substring(at + head.length).trim();
-}

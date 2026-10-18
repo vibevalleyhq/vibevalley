@@ -27,6 +27,7 @@ import 'pass.dart';
 import 'sky.dart';
 import 'world.dart';
 import '../rules/cast.dart';
+import '../rules/sessions.dart' show plotKey;
 import '../shared/swatches.dart';
 
 export 'critters.dart' show PointLight;
@@ -588,7 +589,7 @@ class VillageGame extends FlameGame with PointerMoveCallbacks {
     if (_pointer != null && _downOn == null) _setHover(_hitAt(_pointer!));
     final hovered = hoverBed.value;
 
-    Crop cropOf(Session h) => view.plots[h.id]?.crop ?? Crop.sprout;
+    Crop cropOf(Session h) => view.plots[plotKey(h)]?.crop ?? Crop.sprout;
 
     for (final p in _plots) {
       final bed = p.bed;

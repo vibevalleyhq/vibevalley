@@ -201,6 +201,9 @@ func eventFacts(event oar.Event, session *protocol.Session, tracking tracking, c
 		if detail == "" {
 			detail = e.Tool
 		}
+		if action.Kind == observe.ToolRunCommand {
+			detail = shellCommand(detail)
+		}
 		label := near(ctx.Cwd, detail)
 		next.ShownCall = &shownCall{ID: e.CallID, Tool: e.Tool}
 		start := ToolStart{Text: label, Action: kind, Tool: e.Tool}
@@ -215,6 +218,9 @@ func eventFacts(event oar.Event, session *protocol.Session, tracking tracking, c
 		if tracking.ShownCall != nil && e.CallID == tracking.ShownCall.ID {
 			input := e.Input
 			if call := observe.ClassifyTool(ctx.Runtime, tracking.ShownCall.Tool, &input); call.Detail != "" {
+				if call.Kind == observe.ToolRunCommand {
+					call.Detail = shellCommand(call.Detail)
+				}
 				detail = near(ctx.Cwd, call.Detail)
 			}
 		}

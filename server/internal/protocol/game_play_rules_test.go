@@ -25,3 +25,21 @@ func TestStationOnlyToAFreeBed(t *testing.T) {
 		}
 	}
 }
+
+// A plot is an issue being worked: the view keys it by the issue, so another session on the same issue is the same plot.
+func TestPlotsAreKeyedByTheirIssue(t *testing.T) {
+	issue := "i1"
+	first := Session{ID: "w1", Issue: &issue, Phase: Phase{Value: PhaseRipe{}}}
+	loose := Session{ID: "w2", Phase: Phase{Value: PhaseArriving{}}}
+	plots := ViewOf(CoreState{Sessions: []Session{first, loose}}).Plots
+	if _, ok := plots["i1"]; !ok {
+		t.Fatalf("the issue's plot: %v", plots)
+	}
+	if _, ok := plots["w2"]; !ok {
+		t.Fatalf("a session with no issue is its own plot: %v", plots)
+	}
+	again := Session{ID: "w3", Issue: &issue, Phase: Phase{Value: PhaseArriving{}}}
+	if got := ViewOf(CoreState{Sessions: []Session{again}}).Plots["i1"].Crop; got != CropSeeded {
+		t.Fatalf("the next session on it draws on the same plot: %v", got)
+	}
+}

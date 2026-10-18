@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/data/server.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
+import 'package:vibevalley/shared/settings_form.dart';
 import 'package:vibevalley/shell/app_frame.dart';
 import 'package:vibevalley/title/startup.dart';
 import 'package:vibevalley/data/ui_state.dart';
@@ -46,6 +47,21 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
   }
 
+  /// The settings form by itself, as the workbench's 设置 shows it (every part).
+  Future<void> openForm(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: Scaffold(body: SingleChildScrollView(child: SettingsForm())),
+        ),
+      ),
+    );
+  }
+
   Future<void> loadSettings(WidgetTester tester) async {
     await tester.runAsync(() => container.read(settingsProvider.notifier).load());
     await tester.pump();
@@ -81,23 +97,28 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('开始游戏 without DeepSeek\'s key asks for it; with one it goes in and starts the day', (tester) async {
+  testWidgets('开始游戏 without DeepSeek\'s key goes to 设置 for it; with one it goes in and starts the day', (tester) async {
     await open(tester);
     await loadSettings(tester);
     await tester.tap(find.text('开始游戏'));
     await tester.pump();
-    expect(find.text('管家要 DeepSeek 的 API Key 才能干活：先在这里填上。'), findsOneWidget);
-    expect(container.read(titleOpenProvider), isTrue);
+    expect(container.read(leaveForProvider), '/settings/deepseek');
+    expect(container.read(titleOpenProvider), isFalse);
+    expect(server.requests.where((r) => r.url.path == '/api/v1/manager/open'), isEmpty);
 
+    container.read(leaveForProvider.notifier).set(null);
+    container.read(titleOpenProvider.notifier).show();
+    await tester.pump(const Duration(milliseconds: 600));
     settings = settingsJson(deepseek: 'config');
     await loadSettings(tester);
-    expect(find.text('在用 sk-…abcd（来自配置（vibevalley.yaml 或环境变量））'), findsOneWidget);
     await tester.tap(find.text('开始游戏'));
     await tester.pump();
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
     expect(container.read(titleOpenProvider), isFalse);
     expect(find.text('开始游戏'), findsNothing);
     expect(server.requests.map((r) => '${r.method} ${r.url.path}'), contains('POST /api/v1/manager/open'));
+    // The 先填钥匙 toast goes away on its own timer.
+    await tester.pump(const Duration(seconds: 10));
     await unmount(tester);
   });
 
@@ -113,30 +134,21 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('the arrow keys move between what can be chosen; Escape closes 设置', (tester) async {
+  testWidgets('the arrow keys move between what can be chosen; 设置 goes to the workbench\'s 设置', (tester) async {
     await open(tester);
     await loadSettings(tester);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
-    expect(find.text('DeepSeek API Key'), findsOneWidget);
-    expect(find.text('/home/me/.vibevalley/settings.json'), findsOneWidget);
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pump();
-    expect(find.text('DeepSeek API Key'), findsNothing);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pump();
-    expect(find.text('管家要 DeepSeek 的 API Key 才能干活：先在这里填上。'), findsOneWidget);
+    expect(container.read(leaveForProvider), '/settings');
+    expect(container.read(titleOpenProvider), isFalse);
     await unmount(tester);
   });
 
-  testWidgets('设置 saves a typed key and says so', (tester) async {
+  testWidgets('the settings form saves a typed key and says so', (tester) async {
     settings = settingsJson(deepseek: 'settings');
-    await open(tester);
+    await openForm(tester);
     await loadSettings(tester);
-    await tester.tap(find.text('设置'));
-    await tester.pump();
     expect(find.text('在用 sk-…abcd（存在设置里）'), findsOneWidget);
     expect(find.text('清掉'), findsOneWidget);
     await tester.enterText(find.byType(TextField).first, 'sk-new');
@@ -151,10 +163,8 @@ void main() {
 
   testWidgets('a key kept in settings can be cleared: it goes as nothing', (tester) async {
     settings = settingsJson(deepseek: 'settings');
-    await open(tester);
+    await openForm(tester);
     await loadSettings(tester);
-    await tester.tap(find.text('设置'));
-    await tester.pump();
     await tester.tap(find.text('清掉'));
     await tester.pump();
     expect(find.text('存的时候清掉'), findsOneWidget);
@@ -165,11 +175,9 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('设置 connects Nowledge Mem as a memory source', (tester) async {
-    await open(tester);
+  testWidgets('the settings form connects Nowledge Mem as a memory source', (tester) async {
+    await openForm(tester);
     await loadSettings(tester);
-    await tester.tap(find.text('设置'));
-    await tester.pump();
     expect(find.text('记性的来源：Nowledge Mem（没接）'), findsOneWidget);
     await tester.tap(find.text('改').first);
     await tester.pump();

@@ -131,8 +131,9 @@ class _WindowPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
     final p = Paint();
-    canvas.drawRect(Rect.fromLTWH(2, 4, w, h), p..color = Palette.pxDrop);
-    p.color = Palette.pxInk;
+    // One edge and one soft drop: an inner rim and a thick bottom band on top of them read as a double, heavy frame.
+    canvas.drawRect(Rect.fromLTWH(2, 2, w, h), p..color = Palette.pxDrop);
+    p.color = pxEdge;
     canvas
       ..drawRect(Rect.fromLTWH(0, -2, w, 2), p)
       ..drawRect(Rect.fromLTWH(0, h, w, 2), p)
@@ -141,18 +142,11 @@ class _WindowPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), p..color = paper);
     if (border > 0) {
       final b = Paint()
-        ..color = Palette.bark900
+        ..color = pxEdge
         ..style = PaintingStyle.stroke
         ..strokeWidth = border;
       canvas.drawRect(Rect.fromLTWH(border / 2, border / 2, w - border, h - border), b);
     }
-    final inner = Rect.fromLTWH(border, border, w - 2 * border, h - 2 * border);
-    canvas.drawRect(Rect.fromLTWH(inner.left, inner.bottom - 4, inner.width, 4), p..color = Palette.cream300);
-    final rim = Paint()
-      ..color = Palette.rim
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    canvas.drawRect(inner.deflate(1), rim);
   }
 
   @override

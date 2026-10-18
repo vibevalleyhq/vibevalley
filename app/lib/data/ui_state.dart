@@ -40,6 +40,22 @@ class TitleOpen extends Notifier<bool> {
   }
 
   void show() => state = true;
+
+  /// Leaves the title screen for a workbench page; the app routes there (leaveForProvider), since this sits above the router.
+  void leaveFor(String path) {
+    ref.read(leaveForProvider.notifier).set(path);
+    enterFarm(start: false);
+  }
+}
+
+/// A page the title screen asked for; the app goes there and clears it.
+final leaveForProvider = NotifierProvider<LeaveFor, String?>(LeaveFor.new);
+
+class LeaveFor extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String? path) => state = path;
 }
 
 bool hasFarm(CoreState? farm) => farm != null && (farm.sessions.isNotEmpty || (farm.chat?.messages.length ?? 0) > 0 || (farm.progress?.coins ?? 0) > 0);

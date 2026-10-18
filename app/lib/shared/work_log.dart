@@ -21,13 +21,11 @@ const _nearBottom = 48.0;
 
 double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
 
-typedef CommentOn = Future<void> Function(int step, String text);
-
 /// Saves the round its user/message `step` began as a case of the manager's evals; `want` is what it should have done.
 typedef MarkWrong = Future<ManagerEval> Function(int step, String want);
 
 class WorkLog extends StatefulWidget {
-  const WorkLog({super.key, required this.steps, required this.now, this.asked, this.tall = false, this.working = false, this.onComment, this.onMarkWrong});
+  const WorkLog({super.key, required this.steps, required this.now, this.asked, this.tall = false, this.working = false, this.onMarkWrong});
   final List<SessionEvent> steps;
   final double now;
 
@@ -36,8 +34,6 @@ class WorkLog extends StatefulWidget {
   final bool tall;
 
   final bool working;
-
-  final CommentOn? onComment;
 
   final MarkWrong? onMarkWrong;
 
@@ -107,7 +103,6 @@ class _WorkLogState extends State<WorkLog> {
   Widget build(BuildContext context) {
     final steps = shownEvents(widget.steps);
     final rounds = roundsOf(steps);
-    final comments = commentsOf(steps);
     final firstAsked = steps.where((s) => s.type == SessionEventType.userMessage && s.under == null).firstOrNull?.seq;
     return Container(
       constraints: BoxConstraints(maxHeight: widget.tall ? 576 : 352),
@@ -120,7 +115,7 @@ class _WorkLogState extends State<WorkLog> {
           children: [
             for (var i = 0; i < rounds.length; i++) ...[
               if (i > 0) const SizedBox(height: 10),
-              _roundView(rounds[i], last: i == rounds.length - 1, firstAsked: firstAsked, comments: comments),
+              _roundView(rounds[i], last: i == rounds.length - 1, firstAsked: firstAsked),
             ],
           ],
         ),
@@ -128,7 +123,7 @@ class _WorkLogState extends State<WorkLog> {
     );
   }
 
-  Widget _roundView(Round round, {required bool last, required double? firstAsked, required Map<int, List<SessionEvent>> comments}) {
+  Widget _roundView(Round round, {required bool last, required double? firstAsked}) {
     final live = last && widget.working;
     final end = live ? widget.now : (round.all.lastOrNull?.time ?? widget.now);
     final open = _open(round, last);
@@ -137,8 +132,6 @@ class _WorkLogState extends State<WorkLog> {
     final asked = round.asked;
     final label = asked == null
         ? '更早的步骤'
-        : asked.on != null
-        ? '评论第 ${asked.on!.round()} 步'
         : asked.under != null
         ? '帮手接到'
         : (widget.asked ?? (asked.seq == firstAsked ? '工单' : '带话'));
@@ -185,7 +178,7 @@ class _WorkLogState extends State<WorkLog> {
               onPick: (step) => _show(round, step),
             ),
           ],
-          for (final step in shown) ...[const SizedBox(height: 6), _keyed(step, _withComments(step, comments[step.seq.round()]))],
+          for (final step in shown) ...[const SizedBox(height: 6), _keyed(step, _indented(step))],
           if (!open && round.steps.length > shown.length)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -200,7 +193,7 @@ class _WorkLogState extends State<WorkLog> {
     final box = Container(
       color: Palette.wheat.withValues(alpha: .25),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: _Folded(text: asked.on != null ? commentWords(asked) : asked.text, lines: 4, markdown: false),
+      child: _Folded(text: asked.text, lines: 4, markdown: false),
     );
     final mark = widget.onMarkWrong;
     if (mark == null) return box;
@@ -218,10 +211,10 @@ class _WorkLogState extends State<WorkLog> {
     );
   }
 
-  Widget _withComments(SessionEvent step, List<SessionEvent>? on) {
-    Widget item = _Step(step: step, now: widget.now, job: false, asked: widget.asked);
+  Widget _indented(SessionEvent step) {
+    final item = _Step(step: step, now: widget.now, job: false, asked: widget.asked);
     if (step.under != null) {
-      item = Container(
+      return Container(
         margin: const EdgeInsets.only(left: 20),
         padding: const EdgeInsets.only(left: 8),
         decoration: BoxDecoration(
@@ -230,74 +223,13 @@ class _WorkLogState extends State<WorkLog> {
         child: item,
       );
     }
-    final comment = widget.onComment;
-    if ((on == null || on.isEmpty) && comment == null) return item;
-    return _Commentable(step: step.seq.round(), send: comment, comments: on ?? const [], child: item);
+    return item;
   }
 }
 
 bool get _touchOnly => defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android;
 
-/// 评论 floats over the step instead of a line per step: a long trajectory is not one 评论 line per step.
-class _Commentable extends StatefulWidget {
-  const _Commentable({required this.step, required this.send, required this.comments, required this.child});
-  final int step;
-  final CommentOn? send;
-  final List<SessionEvent> comments;
-  final Widget child;
-
-  @override
-  State<_Commentable> createState() => _CommentableState();
-}
-
-class _CommentableState extends State<_Commentable> {
-  bool _hover = false;
-  bool _tapped = false;
-  bool _writing = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final send = widget.send;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: Listener(
-        onPointerUp: _touchOnly ? (_) => setState(() => _tapped = true) : null,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              children: [
-                widget.child,
-                if (send != null && !_writing && (_hover || _tapped))
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      color: Palette.cream50,
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: InlineLink('评论', onTap: () => setState(() => _writing = true)),
-                    ),
-                  ),
-              ],
-            ),
-            for (final c in widget.comments)
-              Container(
-                margin: const EdgeInsets.only(left: 20, top: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                color: Palette.water.withValues(alpha: .12),
-                child: Text('你评论：${commentWords(c)}', style: KitText.xs.copyWith(color: Palette.bark800)),
-              ),
-            if (send != null && _writing) _CommentBox(step: widget.step, send: send, onDone: () => setState(() => _writing = false)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 这一轮做错了 floats over what began the round, as 评论 does over a step.
+/// 这一轮做错了 floats over what began the round.
 class _Markable extends StatefulWidget {
   const _Markable({required this.step, required this.send, required this.file, required this.onMarked, required this.child});
   final int step;
@@ -476,61 +408,6 @@ Color spanColor(SessionEvent step) => switch (step.type) {
     ToolAction.mcp || ToolAction.other => Palette.bark400,
   },
 };
-
-class _CommentBox extends StatefulWidget {
-  const _CommentBox({required this.step, required this.send, required this.onDone});
-  final int step;
-  final CommentOn send;
-
-  final VoidCallback onDone;
-
-  @override
-  State<_CommentBox> createState() => _CommentBoxState();
-}
-
-class _CommentBoxState extends State<_CommentBox> {
-  bool _busy = false;
-  String _text = '';
-
-  Future<void> _submit() async {
-    final text = _text.trim();
-    if (text.isEmpty || _busy) return;
-    setState(() => _busy = true);
-    final sent = await runAction(() async {
-      await widget.send(widget.step, text);
-      return true;
-    });
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (sent == true) widget.onDone();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 20, top: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: PxTextInput(
-              value: _text,
-              onChanged: (v) => setState(() => _text = v),
-              onSubmitted: (_) => _submit(),
-              autofocus: true,
-              enabled: !_busy,
-              placeholder: '哪里不对、还差什么：它会带着这一步接着做',
-              semanticLabel: '评论第 ${widget.step} 步',
-            ),
-          ),
-          const SizedBox(width: 6),
-          PxButton.text('发给它', tone: PxTone.primary, size: PxSize.sm, onPressed: _busy || _text.trim().isEmpty ? null : _submit),
-          const SizedBox(width: 6),
-          PxButton.text('算了', size: PxSize.sm, onPressed: _busy ? null : widget.onDone),
-        ],
-      ),
-    );
-  }
-}
 
 class _Step extends StatelessWidget {
   const _Step({required this.step, required this.now, required this.job, this.asked});
@@ -770,15 +647,13 @@ class _ToolStepState extends State<_ToolStep> {
                     child: Text(farm != null ? '田头' : actionText[action] ?? '', style: KitText.sm.copyWith(color: Palette.bark800)),
                   ),
                   const SizedBox(width: 8),
+                  // The whole command is one tap away (the row opens), not a tooltip as wide as the window.
                   Expanded(
-                    child: Tooltip(
-                      message: step.text,
-                      child: Text(
-                        what,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: KitText.mono.copyWith(color: Palette.bark600),
-                      ),
+                    child: Text(
+                      what,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: KitText.mono.copyWith(color: Palette.bark600),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -937,6 +812,37 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
                 ),
               ),
             ),
+      ],
+    );
+  }
+}
+
+/// 干活过程 starts folded to one line: the steps are there to look into, not to read through every time.
+class FoldedWorkLog extends StatefulWidget {
+  const FoldedWorkLog({super.key, required this.steps, required this.child});
+  final List<SessionEvent> steps;
+  final Widget child;
+
+  @override
+  State<FoldedWorkLog> createState() => _FoldedWorkLogState();
+}
+
+class _FoldedWorkLogState extends State<FoldedWorkLog> {
+  var _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final tools = widget.steps.where((s) => s.type == SessionEventType.toolCall).length;
+    final label = tools > 0 ? '用了 $tools 个工具' : '${widget.steps.length} 条记录';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: InlineLink(_open ? '$label · 收起' : '$label · 展开', onTap: () => setState(() => _open = !_open)),
+        ),
+        if (_open) ...[const SizedBox(height: 6), widget.child],
       ],
     );
   }

@@ -1280,7 +1280,6 @@ class SessionEvent {
     this.input,
     this.output,
     this.ok,
-    this.on,
     this.tokens,
   });
 
@@ -1297,7 +1296,6 @@ class SessionEvent {
     input: j['input'] == null ? null : j['input'] as String,
     output: j['output'] == null ? null : j['output'] as String,
     ok: j['ok'] == null ? null : j['ok'] as bool,
-    on: j['on'] == null ? null : (j['on'] as num).toDouble(),
     tokens: j['tokens'] == null ? null : EventTokens.fromJson(j['tokens'] as Map<String, dynamic>),
   );
 
@@ -1313,7 +1311,6 @@ class SessionEvent {
   final String? input;
   final String? output;
   final bool? ok;
-  final double? on;
   final EventTokens? tokens;
 
   Map<String, dynamic> toJson() => {
@@ -1329,7 +1326,6 @@ class SessionEvent {
     if (input != null) 'input': input!,
     if (output != null) 'output': output!,
     if (ok != null) 'ok': ok!,
-    if (on != null) 'on': on!,
     if (tokens != null) 'tokens': tokens!.toJson(),
   };
 }
@@ -3201,15 +3197,13 @@ class Run {
 }
 
 class CommentRequest {
-  const CommentRequest({required this.text, this.on});
+  const CommentRequest({required this.text});
 
-  factory CommentRequest.fromJson(Map<String, dynamic> j) =>
-      CommentRequest(text: j['text'] as String, on: j['on'] == null ? null : (j['on'] as num).toDouble());
+  factory CommentRequest.fromJson(Map<String, dynamic> j) => CommentRequest(text: j['text'] as String);
 
   final String text;
-  final double? on;
 
-  Map<String, dynamic> toJson() => {'text': text, if (on != null) 'on': on!};
+  Map<String, dynamic> toJson() => {'text': text};
 }
 
 class SayRequest {
@@ -5474,7 +5468,7 @@ class IssueApi {
   IssueApi._(this._api);
   final VibeValleyApi _api;
 
-  /// To the issue's newest session, as the owner: on is a step of its trajectory to comment on. A closed issue is refused: reopen it.
+  /// To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it.
   Future<void> comment({required String id, required CommentRequest body}) async {
     await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/comment', query: {}, body: body.toJson());
   }

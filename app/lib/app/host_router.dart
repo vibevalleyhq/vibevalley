@@ -37,6 +37,15 @@ final hostCommandRouterProvider = Provider<void>((ref) {
   ref.onDispose(sub.cancel);
 });
 
+/// The title screen asks for a page (leaveForProvider): go there.
+final leaveForRouterProvider = Provider<void>((ref) {
+  ref.listen(leaveForProvider, (_, path) {
+    if (path == null) return;
+    router.go(path);
+    ref.read(leaveForProvider.notifier).set(null);
+  });
+});
+
 void _toFarm(Ref ref) {
   ref.read(titleOpenProvider.notifier).enterFarm(start: false);
   if (router.routerDelegate.currentConfiguration.uri.path != '/') router.go('/');

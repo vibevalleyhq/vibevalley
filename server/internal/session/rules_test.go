@@ -245,15 +245,6 @@ func TestChooseAgent(t *testing.T) {
 	testkit.Eq(t, ChooseAgent(candidates, "随便", "", "").ID, "a", "first of equals")
 }
 
-func TestCommentOnlyFromItsMark(t *testing.T) {
-	if commentOn("随便说一句") != nil {
-		t.Fatal("a plain message comments on nothing")
-	}
-	if on := commentOn(CommentText(protocol.SessionEvent{Seq: 3, Type: protocol.SessionEventTypeAssistantMessage, Text: "好"}, "再想想")); on == nil || *on != 3 {
-		t.Fatalf("a comment on step 3: %v", on)
-	}
-}
-
 func TestPullRequestConclusion(t *testing.T) {
 	testkit.Eq(t, pullRequestConclusion("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明"), "已完成 abc123\n第二行", "verdict paragraph")
 	text := strings.Repeat("完整的最后一轮回复。", 20) + "\n\n最后一段"

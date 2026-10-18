@@ -53,7 +53,7 @@ type Handlers interface {
 	//vibevalley:route manager.hear POST /api/v1/manager/hear
 	//vibevalley:can owner remote
 	ManagerHear(ctx context.Context, body SayRequest) error
-	// To the issue's newest session, as the owner: on is a step of its trajectory to comment on. A closed issue is refused: reopen it.
+	// To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it.
 	//vibevalley:route issue.comment POST /api/v1/issues/{id}/comment
 	//vibevalley:can owner remote manager
 	IssueComment(ctx context.Context, pID string, body CommentRequest) error

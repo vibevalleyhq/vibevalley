@@ -38,16 +38,16 @@ VillageData _farm() {
   final view = FarmView(
     level: const FarmLevel(level: 6, xp: 0, need: 60),
     plots: {
-      'w1': const PlotView(crop: Crop.leafy),
-      'w2': const PlotView(
+      'tw1': const PlotView(crop: Crop.leafy),
+      'tw2': const PlotView(
         crop: Crop.wheat,
         badge: PlotViewBadge(text: '可收获', tone: BadgeTone.ripe),
       ),
-      'w3': const PlotView(crop: Crop.sprout),
-      'w4': const PlotView(crop: Crop.sprout),
-      'w5': const PlotView(crop: Crop.seeded),
-      'w6': const PlotView(crop: Crop.flowering),
-      'w7': const PlotView(crop: Crop.empty),
+      'tw3': const PlotView(crop: Crop.sprout),
+      'tw4': const PlotView(crop: Crop.sprout),
+      'tw5': const PlotView(crop: Crop.seeded),
+      'tw6': const PlotView(crop: Crop.flowering),
+      'tw7': const PlotView(crop: Crop.empty),
     },
   );
   return VillageData(state, view, const {});

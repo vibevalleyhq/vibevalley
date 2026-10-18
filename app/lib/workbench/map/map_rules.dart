@@ -84,7 +84,7 @@ Island _island(String name, ProjectSummary? summary, List<Session> mine, Map<Str
     project: name,
     summary: summary,
     spots: [
-      for (final h in mine) SpotTaken(h, plots[h.id] ?? const PlotView(crop: Crop.seeded)),
+      for (final h in mine) SpotTaken(h, plots[plotKey(h)] ?? const PlotView(crop: Crop.seeded)),
       for (var i = 0; i < open; i++) const SpotOpen(),
       for (var i = open; i < room; i++) const SpotShut(),
     ],

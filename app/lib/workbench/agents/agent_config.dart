@@ -385,7 +385,7 @@ class _SkillPicker extends ConsumerWidget {
       children: [
         PxField(
           label: '技能库',
-          aside: InlineLink('管理技能库 →', onTap: () => workbenchGo(context, '/skills')),
+          aside: InlineLink('管理技能库 →', onTap: () => workbenchGo(context, '/settings/skills')),
           tip: '选中的技能跟人设一起交给帮工，每个技能一节。',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

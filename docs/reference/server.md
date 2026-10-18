@@ -6,7 +6,7 @@
 
 管家是 VibeValley 自己的 agent（`server/internal/agent/brain`；`manager/manager.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-12-own-agent.md)），带管家的提示词和工具，第一句话到了才起来。它没有读写文件、跑命令的工具，自己不写代码。
 
-- **模型**：只接 DeepSeek，在管家的档案里（档案 `manager`，每个农场都有、删不了、只在 VibeValley 自己的 agent 上跑；`vibevalley agent save manager --json …` 改，管家下次开口时用上），没写是 `deepseek-flash`。钥匙先取首页「设置」，再取配置的 `deepseek.api_key`（`DEEPSEEK_API_KEY`）；每次请求前现取。都没有时它在田头说起不来；同一个原因在一个对话里只说一次，管家起来了才会再说。
+- **模型**：只接 DeepSeek，在管家的档案里（档案 `manager`，每个农场都有、删不了、只在 VibeValley 自己的 agent 上跑；`vibevalley agent save manager --json …` 改，管家下次开口时用上），没写是 `deepseek-flash`。钥匙先取「设置」里存的，再取配置的 `deepseek.api_key`（`DEEPSEEK_API_KEY`）；每次请求前现取。都没有时它在田头说起不来；同一个原因在一个对话里只说一次，管家起来了才会再说。
 - **对话**：存在 `manager/manager.jsonl`，太长时把早先的压成摘要，原文归档在 `manager/archive/`。一次请求估出超过 12 万 token 就在请求前压，这一轮停下时存下；一轮停下时超过 9.6 万，10 分钟里没有新的输入、10 分钟内也没有管家自己的定时要到点，就在没人时压（`internal/agent/brain/idle.go`）。摘要用和平常请求一样的开头请求（同一份系统提示和工具，对话之后加一句要摘要，不许调工具），读得到缓存；没要到就退回单独的摘要请求。最近的 12 条和管家最后 3 句带字的话原样留下。摘要请求的用量也记一条 `llm/usage`（「整理对话，…」）。
 - **记性**：主人让它记的用 `remember` 记在 `manager/MEMORY.md`，在系统提示的快照里，快照之后的变化写在下一条输入开头（[agents-and-runtimes.md](agents-and-runtimes.md)「管家页」）。
 - **系统提示**：说明、工作目录、记性的快照，在管家起来时和每次压缩之后拼一次，其间一字不变，DeepSeek 的前缀缓存才命中得了（[理由](../../.agents/notes/implemented/architecture/2026-10-18-stable-prompt-prefix.md)）。
@@ -66,7 +66,7 @@
 
 ## 设置
 
-首页的「设置」（`setting/setting.go`；[理由](../../.agents/notes/implemented/feature/2026-10-12-title-screen-and-settings.md)）存 DeepSeek 的钥匙、Agora 的 App ID 和 Certificate，和语音设置（[voice.md](voice.md)「配置」）。存在 `$VIBEVALLEY_HOME/settings.json`（0600）。设置里的优先于配置（[architecture.md](../architecture.md)「配置」）；每次用时现取。页面只看到每样从哪来和最后四个字，钥匙不出服务端、不进日志。设置里还有记性的来源（下文「记性」）。服务端的日志整行过一遍 `base.Redact`（`base/redact.go`）：长得像钥匙的（`sk-…`、`ghp_…`、`xoxb-…`、`AKIA…`、JWT、私钥块、农场自己的会话令牌）和跟在 `api_key=`、`token:`、`password=`、`Bearer` 这类名字后面的值，写成 `[redacted]`。
+工作台的「设置」（`/settings`，`setting/setting.go`；[理由](../../.agents/notes/implemented/feature/2026-10-12-title-screen-and-settings.md)）存 DeepSeek 的钥匙、Agora 的 App ID 和 Certificate，和语音设置（[voice.md](voice.md)「配置」）。存在 `$VIBEVALLEY_HOME/settings.json`（0600）。设置里的优先于配置（[architecture.md](../architecture.md)「配置」）；每次用时现取。页面只看到每样从哪来和最后四个字，钥匙不出服务端、不进日志。设置里还有记性的来源（下文「记性」）。服务端的日志整行过一遍 `base.Redact`（`base/redact.go`）：长得像钥匙的（`sk-…`、`ghp_…`、`xoxb-…`、`AKIA…`、JWT、私钥块、农场自己的会话令牌）和跟在 `api_key=`、`token:`、`password=`、`Bearer` 这类名字后面的值，写成 `[redacted]`。
 
 ## GitHub 检测
 
@@ -84,7 +84,7 @@
 
 **每次干活**（run，`session/runs.go`）：农机开一轮就是一次 run，到这一轮的汇报结束，记在 `session_run` 表。发话的一方先说清这一轮是为什么开的，农机开了这一轮，run 就记下它：派出去（`issue`）、带话（`comment`，带着那条消息的号）、种植计划（`task`）、定时（`schedule`，带着哪个定时、是不是补跑）；没人发话就开的一轮记成农机自己（`runtime`）。干活时插进来的话不开新的 run，记在这一轮读到的话里（`heard`）；排队的话是下一次 run 的触发。叫不醒、被拒的不算 run。服务端重启时还开着的 run 记成叫停了。一张工单的 run 用 `GET /api/v1/issues/{id}/runs` 取，不在核心状态里。
 
-**干活过程**（`session/events.go`）：一个 Session 的日志，一条一个 `SessionEvent`（`seq`、`time`、`type`，照 DeepSeek Harness 的会话事件）：`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 `tokens`：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`，记在 `events/<id>.json`。日志只追加：写下的一条不再改；流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给客户端，下一条事件之前写下（`session/events.go`）。每个 Run 由 `run/start` 和 `run/end`（带它的结果）围起来，中间的事件都带着这个 `run`。带话时可以评论某一条（`on` 是它的 `seq`），服务端把那一条写在话前面交给帮工。
+**干活过程**（`session/events.go`）：一个 Session 的日志，一条一个 `SessionEvent`（`seq`、`time`、`type`，照 DeepSeek Harness 的会话事件）：`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 `tokens`：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`，记在 `events/<id>.json`。日志只追加：写下的一条不再改；流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给客户端，下一条事件之前写下（`session/events.go`）。每个 Run 由 `run/start` 和 `run/end`（带它的结果）围起来，中间的事件都带着这个 `run`。评论是对整张工单说的（`issue.comment`），不挂在某一步上。
 
 **工单的执行历史**：`GET /api/v1/issues/history` 一次返回工单、它关联的真实 Session 和缺失记录的号（`missingSessions`）。查库失败时报错；记录不存在时列出缺失号，客户端显示「记录缺失」，不补造歇着的帮工。
 
@@ -134,7 +134,7 @@
 
 ## 连接器：微信、飞书、QQ
 
-主人可以在微信、飞书、QQ 里和农场说话，在「连接器」页（`/connectors`）连上（`connector/connector.go`；三家的接口在 `server/pkg/weixin`、`feishu`、`qq`；[理由](../../.agents/notes/implemented/feature/2026-10-11-channels-and-schedules.md)）。微信扫码，飞书扫码建一个个人机器人，QQ 填机器人的 AppID 和 AppSecret。扫码的完整尝试在各自 SDK：微信拿到二维码后最多等 8 分钟，过期或验证码被禁用累计 3 次后结束；飞书按返回的间隔和有效期轮询，SDK 跟随租户跳转到 Lark。连接器只展示进度并保存完成后的账号。
+主人可以在微信、飞书、QQ 里和农场说话，在「设置」的「连接器」（`/settings/connectors`）连上（`connector/connector.go`；三家的接口在 `server/pkg/weixin`、`feishu`、`qq`；[理由](../../.agents/notes/implemented/feature/2026-10-11-channels-and-schedules.md)）。微信扫码，飞书扫码建一个个人机器人，QQ 填机器人的 AppID 和 AppSecret。扫码的完整尝试在各自 SDK：微信拿到二维码后最多等 8 分钟，过期或验证码被禁用累计 3 次后结束；飞书按返回的间隔和有效期轮询，SDK 跟随租户跳转到 Lark。连接器只展示进度并保存完成后的账号。
 
 入站消息先存进 SQLite，再交给管家；微信的一页消息与下一页游标一起提交，飞书和 QQ 的回调等消息落库后才返回。相同平台消息编号只接受一次，未完成的收件在重启后继续交付；管家成功但完成标记写入失败时，重试可能重复交付。成功后清空收件正文、保留去重标记。
 
@@ -148,7 +148,7 @@
 
 ## 院门
 
-手机、另一台 Mac 和这台电脑用同一个农场（`gate/gate.go`；[理由](../../.agents/notes/implemented/feature/2026-10-14-yard-gate.md)），在「院门」页（`/gate`）管。
+手机、另一台 Mac 和这台电脑用同一个农场（`gate/gate.go`；[理由](../../.agents/notes/implemented/feature/2026-10-14-yard-gate.md)），在「设置」的「院门」（`/settings/gate`）管。
 
 - **另一个监听**：在所有网卡上听 `lan.port`（默认 8790），默认关着。
 - **只放这些**：[能力表](capabilities.md)里院门一列打了 ✓ 的接口（`api.go` 的 `//vibevalley:can remote`，`internal/gate` 按 `protocol.Endpoints` 匹配）和两条流，不放 `/mcp`；别的答 403。每个请求要带 `Authorization: Bearer <钥匙>`；只有 `POST /api/v1/gate/pair` 不要。院门自己的管理接口没有 `remote`，只在本机能用。
@@ -182,7 +182,7 @@
 
 **收工和铲除**：关掉会话、帮工离开；分支上有没合的提交就留着，没有就删。
 
-## 项目是一块地
+## 项目的地契
 
 `project/codebase.go` 给项目页（[farm-ui.md](farm-ui.md) 界面 12；[理由](../../.agents/notes/implemented/feature/2026-10-12-codebase-page.md)）：有哪些项目和能同时干活的帮工数（`slots`）；种了什么（tokei 现数，锁文件、压缩文件和依赖目录不算，没装 tokei 就说怎么装）；一年的提交（`git log --all --no-merges`，按天、按作者）。
 
@@ -195,7 +195,7 @@
 - **记下**：汇报里「记住：」开头的行记成这个项目的，「记住（所有项目）：」记成所有项目的；差不多的不重复记。叫停的一轮不记。
 - 读不出、写不进只记日志，不拦着那一轮。
 - **主动查、主动记**：开工想起和收「记住：」之外，帮工经 `/mcp` 的 `memory_search`、`memory_add` 查和记自己档案的记性：档案和项目由会话的令牌定（查这个项目的和所有项目的，`all_projects` 也查别的项目；记成这个项目的，`all_projects` 记成所有项目的），写别的档案被拒。管家的同名工具能查任何档案（不填就是所有档案）、替任何档案记一句；管家自己的记性照旧用 `remember`。两边都经管理器的 `Search`、`Write`，问遍所有来源，各来源的结果轮流取、几乎一样的只留一条，默认 10 条；本地的按全文索引的 `bm25()`、共有的词和整句出现排，同项目的在前。
-- **来源**：记性经 `memory/providers.go` 的管理器读写：本地的这张表（`memory/local.go`）一直在，外面的来源在首页「设置」里接（`settings.json` 的 `memorySources`，一种一个：地址、key、接没接上、读、写），存了就用上，不用重启。接口在 `memory/provider.go`，照 Hermes 的 `MemoryProvider`（[提案](../../.agents/notes/proposed/architecture/2026-10-18-memory-providers.md)）。本地记忆的 id 照旧，别的来源的 id 带上它的名字（`名字:id`）。
+- **来源**：记性经 `memory/providers.go` 的管理器读写：本地的这张表（`memory/local.go`）一直在，外面的来源在「设置」的「记性」里接（`settings.json` 的 `memorySources`，一种一个：地址、key、接没接上、读、写），存了就用上，不用重启。接口在 `memory/provider.go`，照 Hermes 的 `MemoryProvider`（[提案](../../.agents/notes/proposed/architecture/2026-10-18-memory-providers.md)）。本地记忆的 id 照旧，别的来源的 id 带上它的名字（`名字:id`）。
   - **读**（开工想起、`memory_search`、记性页签）同时问所有来源，外面的最多等 2 秒，等不到就不等，日志里记一句跳过了它。几个来源的结果轮流取（各家的分数比不了），几乎一样的只留一条，开工想起照旧最多 8 条、1600 字；只有合并后真放进话里的本地记忆才算想起过一次。
   - **写**：本地的当场写好；外面的放在后台一个接一个地送，收工和记一条都不等它们，送不成只记日志。送出去的字先过 `base.Redact`（和服务端日志同一份规则，上文「设置」）。
   - **Nowledge Mem**（`memory/nowledge.go`，本机 `http://127.0.0.1:14242/mcp/`，MCP）：读用它的 `memory_search`，写用 `memory_add`（汇报里「记住：」的那几行，和主人、管家、帮工经 `memory_add` 记的），别的工具不调。写进去的带 label：`vibevalley`、`vibevalley-agent-<档案>`、这个项目的再加 `vibevalley-project-<项目>`，`source_app` 是 `vibevalley`；读的时候只读这个档案的 label。设置里打开「读全部」才读主人在它里面的全部记忆，每个档案读到的都一样。它里面的记忆页签上列得出、忘不掉：要删到 Nowledge Mem 里删。

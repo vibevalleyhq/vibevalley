@@ -35,14 +35,16 @@ abstract final class Palette {
   static const water = Color(0xFF4F8FBD);
 
   static const pxInk = Color(0xFF2F1F13);
-  static const pxDrop = Color(0x731E140A);
+  static const pxDrop = Color(0x401E140A);
   static const rim = Color(0xFFFFF4D8);
 
   static const ground = Color(0xFF2B3320);
 }
 
 /// The ink line every frame and divider is drawn with.
-const pxLine = BorderSide(color: Palette.bark900, width: 2);
+/// A control's edge: mid brown, not near-black, so a row of buttons and fields does not read as heavy.
+const pxEdge = Palette.bark500;
+const pxLine = BorderSide(color: pxEdge, width: 2);
 
 const pixelFont = 'FusionPixel';
 
@@ -126,6 +128,8 @@ ThemeData farmTheme() {
     chipTheme: const ChipThemeData(backgroundColor: Palette.cream50, shape: square, side: pxLine),
     dividerTheme: const DividerThemeData(color: Palette.bark900, thickness: 2),
     tooltipTheme: const TooltipThemeData(
+      // A long message wraps instead of running the width of the window.
+      constraints: BoxConstraints(maxWidth: 480),
       decoration: BoxDecoration(color: Palette.bark900),
       textStyle: TextStyle(color: Palette.cream50, fontFamily: pixelFont),
     ),

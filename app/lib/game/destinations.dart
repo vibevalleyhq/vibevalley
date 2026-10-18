@@ -10,7 +10,7 @@ enum YardPlace {
   agents('agents', '帮工名册', '每个帮工用哪台农机、带什么人设和技能、长什么样', route: '/agents'),
   manager('manager', '管家', '换管家的样子', panel: FarmPanel.manager),
   runtimes('runtimes', '工坊 · 农具', '每台农机是一种 runtime：装没装、用量', route: '/runtimes'),
-  skills('skills', '书屋 · 技能书', '帮工能带的技能', route: '/skills');
+  skills('skills', '书屋 · 技能书', '帮工能带的技能', route: '/settings/skills');
 
   const YardPlace(this.id, this.label, this.hint, {this.panel, this.route});
   final String id;
