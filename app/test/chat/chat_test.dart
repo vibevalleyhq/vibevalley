@@ -260,8 +260,9 @@ void main() {
       final server = FakeServer((r) async => r.url.path == '/api/v1/sessions/w1/events' ? jsonResponse([]) : _answer(r));
       await _pump(t, const ChatPage(), server, _state(more: [_msg(5, 1, 'w1', SenderKind.agent, '活干完了', type: MessageKind.report)]));
       expect(_rich('活干完了'), findsOneWidget);
-      expect(server.to('GET', '/api/v1/sessions/w1/events'), isNotEmpty);
+      expect(server.to('GET', '/api/v1/sessions/w1/events'), isEmpty, reason: 'no run, nothing to read');
       expect(_rich('这一轮的干活过程'), findsNothing);
+      expect(_rich('没有记录执行轮次'), findsNothing);
       expect(_rich('用了'), findsNothing);
     });
 

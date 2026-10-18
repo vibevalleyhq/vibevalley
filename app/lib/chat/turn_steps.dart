@@ -22,11 +22,11 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
   @override
   Widget build(BuildContext context) {
     final run = widget.run;
-    if (run == null) return Text('这条消息没有记录执行轮次', style: KitText.xs.copyWith(color: Palette.bark500));
+    // A message with no run behind it (or one not loaded yet) says nothing about one.
+    if (run == null) return const SizedBox.shrink();
     final steps = ref.watch(runEventsProvider((session: widget.id, run: run))).value;
     final turn = steps ?? const <SessionEvent>[];
     final tools = turn.where((s) => s.type == SessionEventType.toolCall).length;
-    // A message with no run behind it (or one not loaded yet) says nothing about one.
     if (turn.isEmpty || (widget.manager && tools == 0)) return const SizedBox.shrink();
     final label = tools > 0 ? '用了 $tools 个工具' : '这一轮的干活过程';
     return Padding(
