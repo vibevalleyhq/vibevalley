@@ -56,16 +56,14 @@ class _AppFrameState extends ConsumerState<AppFrame> {
     super.dispose();
   }
 
-  /// The router can say so while the tree is building (its first route): rebuild after that frame.
+  /// The router can say so while the tree is building (its first route, or the whole tree again after a hot restart,
+  /// which builds outside a frame's build phase): always rebuild after the frame, and ask for one.
   void _routed() {
     if (!mounted) return;
-    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
-      });
-      return;
-    }
-    setState(() {});
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+    SchedulerBinding.instance.ensureVisualUpdate();
   }
 
   bool _onKey(KeyEvent e) => debugHotkey(e, ref.read(debugOpenProvider.notifier).toggle);
