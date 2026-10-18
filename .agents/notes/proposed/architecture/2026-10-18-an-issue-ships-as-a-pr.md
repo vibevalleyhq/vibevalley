@@ -45,6 +45,14 @@ Status: proposed
 - **新克隆的仓库要先装依赖才查得准格式。** `dart format` 从 `.dart_tool/package_config.json` 读语言版本，没跑过 `flutter pub get` 的克隆或 worktree 会按另一种风格排版，误报 18 个文件没格式化。`app/tool/format-check.sh` 先跑 `flutter pub get`。
 - **私有仓库建不了项目。** `project create` 克隆时关掉了凭据（`credential.helper=`），私有仓库一律失败。第 3 步顺手：`gh` 登录了就用 `gh repo clone`。
 
+### 在沙盒上真跑第 3 步
+
+2026-10-18 在 `hylarucoder/vibevalley-sandbox`（`github.pr_projects` 只放它）上走通：codex 做完挪到 done，农场推 `vibevalley/issue-1`、开出 PR #1，工单留在 in_review；带话再干一轮再挪到 done，只推、同一个 PR 多了一个提交；在 GitHub 上合掉以后十秒内农场查到，工单关成 merged，worktree、本地分支清掉，帮工离开。跑出来三件要修的：
+
+- **PR 在 GitHub 上合了，农场克隆的主分支没跟上。** 下一张工单会从旧的主分支开分支。PR 合了以后、开新 worktree 之前，农场要从 origin 快进主分支。
+- **PR 正文搬了帮工整段最后的话**，连「我会先查看……」这种开场白也在里面；应该只放「结论：」那一段（`session` 里汇报摘要已经是这么取的）。
+- **没有 `.vibevalley/check` 的项目，正文也写「检查通过」。** 应该照实写「这个项目没有 `.vibevalley/check`」。
+
 ## Alternatives considered
 
 **本地合和提 PR 都可选。** 灵活，但两条路各有一套状态和失败方式，主分支有时在本地动、有时在 GitHub 上动，农场的克隆和 origin 迟早分叉。
