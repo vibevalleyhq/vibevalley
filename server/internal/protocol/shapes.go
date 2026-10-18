@@ -909,13 +909,14 @@ type PullRequestCapability struct {
 }
 
 type ProjectSummary struct {
-	PullRequest PullRequestCapability `json:"pullRequest"`
-	Name        string                `json:"name"`
-	Path        string                `json:"path"`
-	Git         bool                  `json:"git"`
-	Last        *int64                `json:"last,omitzero"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+	Git  bool   `json:"git"`
+	Last *int64 `json:"last,omitzero"`
 	// Never more than the farm's beds.
 	Slots int64 `json:"slots"`
+	// Whether its harvests could go out as pull requests, and why not (github.status).
+	PullRequest PullRequestCapability `json:"pullRequest"`
 }
 
 type NewProject struct {
@@ -1169,14 +1170,13 @@ type PullRequest struct {
 }
 
 type Issue struct {
-	PullRequest *PullRequest `json:"pullRequest,omitzero"`
-	ID          string       `json:"id"`
-	Number      int64        `json:"number"`
-	Title       string       `json:"title"`
-	Description string       `json:"description,omitzero"`
-	Project     *string      `json:"project,omitzero"`
-	Assignee    *string      `json:"assignee,omitzero"`
-	Priority    Priority     `json:"priority"`
+	ID          string   `json:"id"`
+	Number      int64    `json:"number"`
+	Title       string   `json:"title"`
+	Description string   `json:"description,omitzero"`
+	Project     *string  `json:"project,omitzero"`
+	Assignee    *string  `json:"assignee,omitzero"`
+	Priority    Priority `json:"priority"`
 	// First lowest.
 	Rank      int64       `json:"rank,omitzero"`
 	CreatedAt int64       `json:"createdAt"`
@@ -1192,6 +1192,8 @@ type Issue struct {
 	Status    IssueStatus `json:"status"`
 	// Where the owner may move it now (issue.status); the server's rule, so the board does not guess.
 	Moves []IssueStatus `json:"moves"`
+	// Set once its harvest opened a pull request (github.pr_projects); open keeps the issue in review.
+	PullRequest *PullRequest `json:"pullRequest,omitzero"`
 }
 
 type IssueGraph struct {

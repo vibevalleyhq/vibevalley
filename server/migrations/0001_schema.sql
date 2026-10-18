@@ -77,7 +77,6 @@ CREATE TABLE channel_delivery (
   check ((state in ('announced', 'handed')) = (launch is not null) or state in ('seen', 'dropped'))
 );
 CREATE TABLE issue (
-  pull_request text,
   id          text primary key,
   number      integer not null unique,
   title       text not null default '',
@@ -94,7 +93,8 @@ CREATE TABLE issue (
   created_at  integer not null,
   queued_at   integer,
   closed_at   integer,
-  closed      text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered'))
+  closed      text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered')),
+  pull_request text
 );
 CREATE INDEX issue_by_parent on issue (parent);
 CREATE TABLE issue_session (

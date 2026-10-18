@@ -2215,31 +2215,31 @@ class PullRequestCapability {
 }
 
 class ProjectSummary {
-  const ProjectSummary({required this.pullRequest, required this.name, required this.path, required this.git, this.last, required this.slots});
+  const ProjectSummary({required this.name, required this.path, required this.git, this.last, required this.slots, required this.pullRequest});
 
   factory ProjectSummary.fromJson(Map<String, dynamic> j) => ProjectSummary(
-    pullRequest: PullRequestCapability.fromJson(j['pullRequest'] as Map<String, dynamic>),
     name: j['name'] as String,
     path: j['path'] as String,
     git: j['git'] as bool,
     last: j['last'] == null ? null : (j['last'] as num).toDouble(),
     slots: (j['slots'] as num).toDouble(),
+    pullRequest: PullRequestCapability.fromJson(j['pullRequest'] as Map<String, dynamic>),
   );
 
-  final PullRequestCapability pullRequest;
   final String name;
   final String path;
   final bool git;
   final double? last;
   final double slots;
+  final PullRequestCapability pullRequest;
 
   Map<String, dynamic> toJson() => {
-    'pullRequest': pullRequest.toJson(),
     'name': name,
     'path': path,
     'git': git,
     if (last != null) 'last': last!,
     'slots': slots,
+    'pullRequest': pullRequest.toJson(),
   };
 }
 
@@ -2849,7 +2849,6 @@ class PullRequest {
 
 class Issue {
   const Issue({
-    this.pullRequest,
     required this.id,
     required this.number,
     required this.title,
@@ -2870,10 +2869,10 @@ class Issue {
     this.schedule,
     required this.status,
     required this.moves,
+    this.pullRequest,
   });
 
   factory Issue.fromJson(Map<String, dynamic> j) => Issue(
-    pullRequest: j['pullRequest'] == null ? null : PullRequest.fromJson(j['pullRequest'] as Map<String, dynamic>),
     id: j['id'] as String,
     number: (j['number'] as num).toDouble(),
     title: j['title'] as String,
@@ -2894,9 +2893,9 @@ class Issue {
     schedule: j['schedule'] == null ? null : j['schedule'] as String,
     status: IssueStatus.fromJson(j['status']),
     moves: [for (final e in j['moves'] as List) IssueStatus.fromJson(e)],
+    pullRequest: j['pullRequest'] == null ? null : PullRequest.fromJson(j['pullRequest'] as Map<String, dynamic>),
   );
 
-  final PullRequest? pullRequest;
   final String id;
   final double number;
   final String title;
@@ -2917,9 +2916,9 @@ class Issue {
   final String? schedule;
   final IssueStatus status;
   final List<IssueStatus> moves;
+  final PullRequest? pullRequest;
 
   Map<String, dynamic> toJson() => {
-    if (pullRequest != null) 'pullRequest': pullRequest!.toJson(),
     'id': id,
     'number': number,
     'title': title,
@@ -2940,6 +2939,7 @@ class Issue {
     if (schedule != null) 'schedule': schedule!,
     'status': status.wire,
     'moves': [for (final e in moves) e.wire],
+    if (pullRequest != null) 'pullRequest': pullRequest!.toJson(),
   };
 }
 

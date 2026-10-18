@@ -82,7 +82,7 @@ func (q *Queries) EditIssue(ctx context.Context, arg EditIssueParams) error {
 }
 
 const family = `-- name: Family :many
-select pull_request, id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed from issue where id = ?1 or parent = ?1
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue where id = ?1 or parent = ?1
 `
 
 // An issue and its sub-issues.
@@ -96,7 +96,6 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 	for rows.Next() {
 		var i Issue
 		if err := rows.Scan(
-			&i.PullRequest,
 			&i.ID,
 			&i.Number,
 			&i.Title,
@@ -114,6 +113,7 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 			&i.QueuedAt,
 			&i.ClosedAt,
 			&i.Closed,
+			&i.PullRequest,
 		); err != nil {
 			return nil, err
 		}
@@ -129,14 +129,13 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 }
 
 const getIssue = `-- name: GetIssue :one
-select pull_request, id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed from issue where id = ?
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue where id = ?
 `
 
 func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
 	row := q.db.QueryRowContext(ctx, getIssue, id)
 	var i Issue
 	err := row.Scan(
-		&i.PullRequest,
 		&i.ID,
 		&i.Number,
 		&i.Title,
@@ -154,6 +153,7 @@ func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
 		&i.QueuedAt,
 		&i.ClosedAt,
 		&i.Closed,
+		&i.PullRequest,
 	)
 	return i, err
 }
@@ -186,14 +186,13 @@ func (q *Queries) GraphIDs(ctx context.Context) ([]string, error) {
 }
 
 const issueByNumber = `-- name: IssueByNumber :one
-select pull_request, id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed from issue where number = ?
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue where number = ?
 `
 
 func (q *Queries) IssueByNumber(ctx context.Context, number int64) (Issue, error) {
 	row := q.db.QueryRowContext(ctx, issueByNumber, number)
 	var i Issue
 	err := row.Scan(
-		&i.PullRequest,
 		&i.ID,
 		&i.Number,
 		&i.Title,
@@ -211,13 +210,14 @@ func (q *Queries) IssueByNumber(ctx context.Context, number int64) (Issue, error
 		&i.QueuedAt,
 		&i.ClosedAt,
 		&i.Closed,
+		&i.PullRequest,
 	)
 	return i, err
 }
 
 const keptIssues = `-- name: KeptIssues :many
 with latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit ?1)
-select pull_request, id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed from issue
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue
 where closed_at is null or id in (select id from latest) or parent in (select id from latest)
    or parent in (select id from issue where closed_at is null)
 `
@@ -233,7 +233,6 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 	for rows.Next() {
 		var i Issue
 		if err := rows.Scan(
-			&i.PullRequest,
 			&i.ID,
 			&i.Number,
 			&i.Title,
@@ -251,6 +250,7 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 			&i.QueuedAt,
 			&i.ClosedAt,
 			&i.Closed,
+			&i.PullRequest,
 		); err != nil {
 			return nil, err
 		}
@@ -266,7 +266,7 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 }
 
 const latestOfSchedule = `-- name: LatestOfSchedule :one
-select pull_request, id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed from issue where schedule = ? order by created_at desc, id desc limit 1
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue where schedule = ? order by created_at desc, id desc limit 1
 `
 
 // A schedule's issue: the one it made last.
@@ -274,7 +274,6 @@ func (q *Queries) LatestOfSchedule(ctx context.Context, schedule sql.NullString)
 	row := q.db.QueryRowContext(ctx, latestOfSchedule, schedule)
 	var i Issue
 	err := row.Scan(
-		&i.PullRequest,
 		&i.ID,
 		&i.Number,
 		&i.Title,
@@ -292,13 +291,14 @@ func (q *Queries) LatestOfSchedule(ctx context.Context, schedule sql.NullString)
 		&i.QueuedAt,
 		&i.ClosedAt,
 		&i.Closed,
+		&i.PullRequest,
 	)
 	return i, err
 }
 
 const listIssues = `-- name: ListIssues :many
 
-select pull_request, id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed from issue order by rank, created_at, id
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request from issue order by rank, created_at, id
 `
 
 // Issues (issue/issue.go).
@@ -312,7 +312,6 @@ func (q *Queries) ListIssues(ctx context.Context) ([]Issue, error) {
 	for rows.Next() {
 		var i Issue
 		if err := rows.Scan(
-			&i.PullRequest,
 			&i.ID,
 			&i.Number,
 			&i.Title,
@@ -330,6 +329,7 @@ func (q *Queries) ListIssues(ctx context.Context) ([]Issue, error) {
 			&i.QueuedAt,
 			&i.ClosedAt,
 			&i.Closed,
+			&i.PullRequest,
 		); err != nil {
 			return nil, err
 		}

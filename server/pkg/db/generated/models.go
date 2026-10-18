@@ -146,7 +146,6 @@ type GateDevice struct {
 }
 
 type Issue struct {
-	PullRequest sql.NullString
 	ID          string
 	Number      int64
 	Title       string
@@ -164,6 +163,7 @@ type Issue struct {
 	QueuedAt    sql.NullInt64
 	ClosedAt    sql.NullInt64
 	Closed      sql.NullString
+	PullRequest sql.NullString
 }
 
 type IssueQueue struct {
