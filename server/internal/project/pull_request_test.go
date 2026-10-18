@@ -71,3 +71,90 @@ func TestPullRequestFailuresAndRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPullRequestCheckDescription(t *testing.T) {
+	for _, hasCheck := range []bool{false, true} {
+		t.Run(fmt.Sprint(hasCheck), func(t *testing.T) {
+			p := projects(t, projectsDir(t))
+			place, err := p.Workplace("sample", "w1", true, "", 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testkit.Git(t, filepath.Join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git")
+			want := "这个项目没有 .vibevalley/check，没跑检查。"
+			if hasCheck {
+				os.MkdirAll(filepath.Join(place.Cwd, ".vibevalley"), 0o755)
+				os.WriteFile(filepath.Join(place.Cwd, ".vibevalley/check"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+				want = ".vibevalley/check 通过。"
+			}
+			p.GitPush = func(context.Context, string, string) error { return nil }
+			p.GitHubProbe = func(_ context.Context, args ...string) ([]byte, error) {
+				if args[1] == "list" {
+					return []byte("[]"), nil
+				}
+				testkit.Eq(t, args[len(args)-1], "工单 #1\n\ndone\n\n"+want, "body")
+				return []byte("https://github.com/test/sample/pull/1"), nil
+			}
+			if _, err := p.SubmitPullRequest(context.Background(), place, protocol.Issue{Number: 1, Title: "sample"}, "done"); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestPullRequestSyncMain(t *testing.T) {
+	for _, mode := range []string{"checked-out", "other-branch", "dirty", "diverged", "fetch-failure", "not-enabled"} {
+		t.Run(mode, func(t *testing.T) {
+			p := projects(t, projectsDir(t), func(c *base.Config) { c.GitHub.PRProjects = []string{"sample"} })
+			if _, err := p.ensure("sample"); err != nil {
+				t.Fatal(err)
+			}
+			p.githubProjects = map[string]protocol.PullRequestCapability{"sample": {Available: mode != "not-enabled"}}
+			path := filepath.Join(p.root, "sample")
+			origin := filepath.Join(t.TempDir(), "origin.git")
+			testkit.Git(t, path, "clone", "--bare", path, origin)
+			testkit.Git(t, path, "remote", "add", "origin", origin)
+			testkit.Git(t, path, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+			old := testkit.Git(t, path, "rev-parse", "main")
+			remote := filepath.Join(t.TempDir(), "remote")
+			testkit.Git(t, path, "clone", origin, remote)
+			testkit.Git(t, remote, "-c", "user.name=test", "-c", "user.email=test@test", "commit", "--allow-empty", "-m", "remote change")
+			testkit.Git(t, remote, "push", "origin", "main")
+			latest := testkit.Git(t, remote, "rev-parse", "HEAD")
+			want := latest
+			switch mode {
+			case "other-branch":
+				testkit.Git(t, path, "checkout", "-b", "personal")
+			case "dirty":
+				os.WriteFile(filepath.Join(path, "dirty"), []byte("keep"), 0o644)
+				want = old
+			case "diverged":
+				testkit.Git(t, path, "commit", "--allow-empty", "-m", "local change")
+				want = testkit.Git(t, path, "rev-parse", "HEAD")
+			case "fetch-failure":
+				p.GitFetch = func(_ context.Context, cwd, branch string) error {
+					testkit.Eq(t, cwd, path, "fetch directory")
+					testkit.Eq(t, branch, "main", "fetch branch")
+					return fmt.Errorf("offline")
+				}
+				want = old
+			case "not-enabled":
+				want = old
+			}
+			place, err := p.Workplace("sample", "w1", true, "", 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testkit.Eq(t, testkit.Git(t, place.Cwd, "rev-parse", "HEAD"), want, "new issue base")
+			testkit.Eq(t, testkit.Git(t, path, "rev-parse", "main"), want, "local main")
+			if mode == "checked-out" {
+				testkit.Git(t, remote, "-c", "user.name=test", "-c", "user.email=test@test", "commit", "--allow-empty", "-m", "merged PR")
+				testkit.Git(t, remote, "push", "origin", "main")
+				if _, err := p.FinishPullRequest("sample", 1); err != nil {
+					t.Fatal(err)
+				}
+				testkit.Eq(t, testkit.Git(t, path, "rev-parse", "main"), testkit.Git(t, remote, "rev-parse", "HEAD"), "finished PR updates main")
+			}
+		})
+	}
+}
