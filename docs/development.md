@@ -85,7 +85,7 @@ export VIBEVALLEY_SERVER=http://127.0.0.1:8787
    vibevalley issue status <id> --json '{"status":"done"}'
    ```
 
-状态规则见 [server.md「改状态就是派活」](reference/server.md#帮工)，设计理由见 [status-is-the-dispatch](../.agents/notes/implemented/architecture/2026-10-18-status-is-the-dispatch.md)。
+状态规则和理由见子系统 [工单](subsystems/issue.md#怎么走)。
 
 ## 素材、音效和官网
 

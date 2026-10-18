@@ -39,7 +39,7 @@
 | 歇着 | 停在当时的样子 | 歇着，或有冲突 |
 | 离开 | 麦茬 | |
 
-帮工交回来以后，地还看它的工单（`PlotOf`，[每张工单都有验收](../../.agents/notes/implemented/architecture/2026-10-18-every-issue-has-an-acceptance.md)），按先后：
+帮工交回来以后，地还看它的工单（`PlotOf`，[工单](../subsystems/issue.md)），按先后：
 
 | 工单 | 地里 | 牌子 |
 |---|---|---|

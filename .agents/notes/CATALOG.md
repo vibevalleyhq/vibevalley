@@ -27,7 +27,7 @@
 
 - 2026-10-18 [用 VibeValley 开发 VibeValley](proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
 
-## implemented（112 篇）
+## implemented（105 篇）
 
 ### feature
 
@@ -36,7 +36,6 @@
 - 2026-10-15 [地图：每个项目一座岛，地是它的 worktree 和空位](implemented/feature/2026-10-15-project-map.md)
 - 2026-10-15 [农场盖满窗口，裁一点边](implemented/feature/2026-10-15-farm-fills-the-window.md)
 - 2026-10-14 [院门：局域网里别的设备用同一个农场](implemented/feature/2026-10-14-yard-gate.md)
-- 2026-10-14 [一次种植是一张工单](implemented/feature/2026-10-14-tickets.md)
 - 2026-10-14 [手机上的通知](implemented/feature/2026-10-14-phone-notifications.md)
 - 2026-10-13 [每个帮工和管家都有一条轨迹，帮工走了也留着](implemented/feature/2026-10-13-trajectories.md)
 - 2026-10-13 [管家有自己的页面；记性按「手上的活、下回会想起、记下的」展示；语音设置分线路和管家两处](implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)
@@ -76,7 +75,6 @@
 ### architecture
 
 - 2026-10-18 [电话的字幕归这通电话](implemented/architecture/2026-10-18-voice-transcripts-belong-to-call.md)
-- 2026-10-18 [改工单的状态就是派活](implemented/architecture/2026-10-18-status-is-the-dispatch.md)
 - 2026-10-18 [管家的提示开头不变：时间和农场现状挪进最新那条输入，空闲时用同一个开头压缩](implemented/architecture/2026-10-18-stable-prompt-prefix.md)
 - 2026-10-18 [管家分清话是谁说的：来源跟着输入走，帮工和仓库里的字是信息不是指令，收获和管家起的定时要主人点头](implemented/architecture/2026-10-18-source-is-not-instruction.md)
 - 2026-10-18 [扫码登录由平台 SDK 拥有](implemented/architecture/2026-10-18-sdk-owns-login-attempt.md)
@@ -88,15 +86,12 @@
 - 2026-10-18 [主接口的本机身份和就绪顺序归宿主](implemented/architecture/2026-10-18-local-server-lifetime.md)
 - 2026-10-18 [安装选择是探测输入，执行沿用已接受的身份](implemented/architecture/2026-10-18-installation-identity-is-explicit.md)
 - 2026-10-18 [执行拥有实际消费的输入、Run 和终结](implemented/architecture/2026-10-18-execution-owns-consumed-inputs.md)
-- 2026-10-18 [一块地就是一张工单，每张工单都有验收](implemented/architecture/2026-10-18-every-issue-has-an-acceptance.md)
 - 2026-10-18 [一段听写拥有录音和输入目标](implemented/architecture/2026-10-18-dictation-attempts-own-targets.md)
 - 2026-10-18 [连接器的持久收件与账号代际](implemented/architecture/2026-10-18-connector-inbox-and-generation.md)
 - 2026-10-18 [子进程发布自己的就绪地址](implemented/architecture/2026-10-18-child-publishes-readiness.md)
 - 2026-10-18 [通话走 Agora，听写走识别，管家说 OpenAI 的协议](implemented/architecture/2026-10-18-calls-dictation-and-the-agent.md)
 - 2026-10-18 [Core 提交完整状态，订阅者读取对应的因果变化](implemented/architecture/2026-10-18-atomic-core-transitions.md)
-- 2026-10-18 [一张工单一条分支、一个 worktree，收获就是提 PR](implemented/architecture/2026-10-18-an-issue-ships-as-a-pr.md)
 - 2026-10-18 [对照 Grok Bot 的常驻 agent：管家还差什么](implemented/architecture/2026-10-18-always-on-manager.md)
-- 2026-10-18 [一块地是一张工单](implemented/architecture/2026-10-18-a-plot-is-an-issue.md)
 - 2026-10-17 [Worker 改叫 Session](implemented/architecture/2026-10-17-worker-is-a-session.md)
 - 2026-10-17 [动作结果和资源生命周期由拥有它的模块保证](implemented/architecture/2026-10-17-operation-results-and-lifetimes.md)
 - 2026-10-17 [迁移是一次性的，启动只认今天的名字](implemented/architecture/2026-10-17-one-way-migration.md)
@@ -124,8 +119,6 @@
 - 2026-10-15 [服务由 fx 组装](implemented/architecture/2026-10-15-services-assembled-by-fx.md)
 - 2026-10-15 [服务端一个模块：internal 和 pkg，smith 并进来](implemented/architecture/2026-10-15-server-internal-and-pkg.md)
 - 2026-10-15 [仓库就两块：server/ 和 app/](implemented/architecture/2026-10-15-server-and-app.md)
-- 2026-10-15 [工单进核心状态，有标题和说明](implemented/architecture/2026-10-15-issues-in-core-state.md)
-- 2026-10-15 [工单是一样东西](implemented/architecture/2026-10-15-issue-is-one-thing.md)
 - 2026-10-15 [要你处理的事是一个 Inbox](implemented/architecture/2026-10-15-inbox.md)
 - 2026-10-15 [形状的源头是 Go：TypeScript 退出](implemented/architecture/2026-10-15-go-owns-the-shapes.md)
 - 2026-10-13 [服务端用 Go 重写，帮工建在 smith 上](implemented/architecture/2026-10-13-go-server-on-smith.md)

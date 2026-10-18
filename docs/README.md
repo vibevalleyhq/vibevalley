@@ -11,6 +11,12 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [concepts.md](concepts.md) | 概念：实际是什么，农场怎么画它们 |
 | [architecture.md](architecture.md) | 架构：分层、核心状态、事件流、接口、存储、配置。改 `server/`、`app/` 之前读 |
 
+子系统（`subsystems/`，从架构的角度写一个子系统沉淀下来的样子，[怎么写](subsystems/README.md)）：
+
+| 文档 | 内容 |
+|---|---|
+| [issue.md](subsystems/issue.md) | 工单：一块地的模型、状态和派活、验收、收获 |
+
 各部分现在怎么工作（`reference/`）：
 
 | 文档 | 讲什么 |

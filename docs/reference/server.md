@@ -90,18 +90,7 @@
 
 **Session 的记录**（`session/records.go`、`session/trajectories.go`；[理由](../../.agents/notes/implemented/feature/2026-10-13-trajectories.md)、[提案](../../.agents/notes/proposed/architecture/2026-10-17-session-run-step.md)）：每个 Session 派出去时在 `session` 表里写一行：谁、哪个档案、哪张工单、哪个项目、什么时候开始；走的时候记上什么时候、怎么关的，一直留着。`session.list` 和 `session.get` 给的都是 `Session`：在地里的从核心状态来，走了的从这张表来，阶段是 `closed`，轮数、最后一轮的结果和花费从 `session_run` 算。事件日志在走了 `session.trajectory_days` 天后删，`session.events` 读它；管家一条，留最近 1000 条。帮工自己派的子 agent 的事件挂在派它的那一条下面（`under`）。
 
-**工单**（`issue/issue.go`、`issue/dispatch.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-15-issue-is-one-thing.md)）：
-
-- 存在 `issue` 和 `issue_session` 表；开着的和最近关的 50 家在核心状态里。
-- 交给帮工的是标题，空一行，再是说明。
-- **状态**由 `protocol.IssueStatusOf` 算：`backlog`（写下没派）、`todo`（排队等空地）、`in_progress`、`in_review`（等你看）、`done`（合进主分支、合进计划、管家答完）、`canceled`（收工、丢了、放弃、跳过，或没说怎么关的）。看板按它分列。
-- 还没派的能改、能删、能排先后；派出去以后不能。
-- **改状态就是派活**（`issue/status.go`；`PUT /api/v1/issues/{id}/status`，`vibevalley issue status <id> --json`；[理由](../../.agents/notes/implemented/architecture/2026-10-18-status-is-the-dispatch.md)）：主人只能挪到 `backlog`、`todo`、`done`、`canceled`，`in_progress`、`in_review` 是帮工干出来的。备选挪到待办就开工，地都占满了就在待办排队，服务端每 5 秒按先后试一遍；待办挪回备选是不排了；等你看挪到待办是带一句话（`text`，必填）再干一轮；挪到已完成是收获，按项目配置提 PR 或本地合进主分支；挪到已取消是叫帮工回家（没派过的直接关上）；关上的挪回待办是带一句话重开；没派过就取消的挪回备选。每张工单的 `moves` 列出它现在能挪到哪，看板照它决定能不能拖；派给管家的和种植计划里的工单 `moves` 是空的。
-- **验收**（`issue/acceptance.go`；`POST /api/v1/issues/{id}/accept`，`vibevalley issue accept <id> --json`；[理由](../../.agents/notes/implemented/architecture/2026-10-18-every-issue-has-an-acceptance.md)：每张工单都有验收，`in_review` 就是「等验收」。验收方式在工单上（`acceptance`）：`glance`（默认）是主人收获本身就算验收；`required` 是没验收通过（`acceptedAt`）以前 `moves` 里没有 `done`，收获被拒。验收通过记下 `acceptedAt`，原来没拔的草都拔掉；没过要至少一条意见，每条记成一棵草（`findings`），再把还没拔的草编号写成一句话交给帮工，接着修一轮。新的一轮开始（带话、再干一轮）验收作废，草留着，等下一次验收通过才拔。验收方式在工单开着时都能改（`issue.update` 只给 `acceptance`）。
-- **缺肥**：帮工汇报里以「要问主人：」开头的行（农场的规矩教它这么写），记成工单上没回答的问题（`asks`）；下一轮汇报照它的新问题改写，主人带一句话（评论）就算回答，问题清掉。
-- 帮工离开时，离开的是最后一次执行，工单就跟着关上。
-- **重开**：同一个档案派一个新帮工到同一个项目，带上原来要做什么和上一次怎么关的。
-- **子工单**：带 `parent`、`blockedBy`。种植计划用它，计划里的工单跟着计划走，看板不能单独开工、重开。
+**工单**：模型、状态和转换、派活和排队、验收、缺肥、重开、子工单见子系统 [工单](../subsystems/issue.md)。
 
 **汇报的摘要**取「结论：」那一段。失败按 smith 的分类说人话并说怎么办，要你处理的（登录、余额、额度、模型）另发一条提醒。
 
@@ -166,23 +155,7 @@
 
 **收成清单**（`GET /api/v1/issues/{id}/changes`，看的是这张工单最新的帮工）：提交、改的文件和 diff、没提交的、主分支多了几个提交、会不会冲突（`git merge-tree`，不碰工作区）。
 
-**本地收获**（未列入 `github.pr_projects` 或 `pullRequest.available` 为假）：
-
-1. 还在干活的不收。
-2. 关掉会话，没提交的改动替它提交（缓存和依赖目录不提交）。
-3. 会冲突就不合并：标上 `conflict`；「让它解决冲突」发一句固定的话（`ConflictTask`），它下一轮结束时再查一次。
-4. 没有冲突时，先把主分支合进帮工分支，再在帮工 worktree 根目录运行它分支上的 `.vibevalley/check` 可执行文件；没有这个文件就跳过。退出码非 0、无法执行或超时都不合并，拒绝原因附上输出的最后 40 行（最多保留 64 KiB），并把这段话交给帮工修。时限由 `project.check_timeout_seconds` 配置，默认 1200 秒。
-5. 检查通过后取得项目锁，确认分支提交与检查前一致，并重新检查冲突；帮工分支在检查以后变了，或主分支有尚未检查的提交，就拒绝合并，要求重新检查。通过才合进主分支，删掉 worktree 和分支，帮工离开，账本记 `harvested`。
-
-检查失败不会把工单关成 `done`：拒绝收获时仍是 `in_review`，帮工、分支和 worktree 都保留；帮工收到带话开始修以后，状态照常变成 `in_progress`，交回来再回到 `in_review`。帮工合进种植计划分支也先跑同一检查。种植计划和 PR 路径检查帮工当前分支；本地收获检查包含主分支的合并结果。
-
-**提 PR**：项目名列在 `github.pr_projects` 且 `pullRequest.available` 为真时，收获照旧提交剩余改动、查冲突，并在项目锁外跑 `.vibevalley/check`。检查通过后取得项目锁，核对检查过的提交，再由农场执行 `git push -u origin <工单分支>`，用工单标题、编号、帮工最后一轮的「结论：」段落和检查结果创建 PR；找不到结论时放完整的最后一轮原话。有 `.vibevalley/check` 且通过时写「.vibevalley/check 通过。」；没有时写「这个项目没有 .vibevalley/check，没跑检查。」已记录开着的 PR 时只推分支。创建后未收到或未存下回执，重试会先查询已有 PR。推送或 gh 失败会拒绝本次收获，保留工单和帮工。
-
-工单的 `pullRequest` 保存 `url`、`number`、`state`（`open`、`merged`、`closed`）。PR 开着时工单留在 `in_review`，帮工、worktree 和分支保留；挪到待办带话再干一轮，再收获会更新同一个 PR。已有开着的 PR 时，即使检测暂时不可用也继续这条路径。
-
-农场每 `github.pr_poll_seconds` 秒（默认 180）查询开着的 PR；`github refresh` 可手动触发。合并后工单关成 `merged`，未合并就关闭则关成 `dismissed`，清掉 worktree 和本地分支，帮工离开。帮工仍在干活或有待开始的一轮时保留现场，下次轮询再结束；查询失败保持原状态并报告。远端分支由 GitHub 管，农场不删除；走 PR 的项目在结束 PR、创建新的工单分支前，在项目目录执行 `git fetch origin <主分支>`；工作区干净且能快进时，检出在主分支用 `git merge --ff-only`，否则用 `git update-ref` 更新主分支。fetch 失败、工作区不干净或无法快进时保留本地主分支并记日志，新工单照旧从本地主分支开；已有工单分支和 worktree 直接复用。
-
-**收工和铲除**：关掉会话、帮工离开；分支上有没合的提交就留着，没有就删。
+**收获**：查冲突、跑 `.vibevalley/check`、本地合或提 PR、PR 的轮询见子系统 [工单](../subsystems/issue.md#怎么走)。
 
 ## 项目的地契
 

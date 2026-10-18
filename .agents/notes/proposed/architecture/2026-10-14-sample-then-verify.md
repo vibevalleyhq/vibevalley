@@ -2,7 +2,7 @@
 
 Status: proposed
 
-这里的「验收」指种植计划里先写好、写好就冻结的那一步检查（`protocol.AcceptancesOf`）；工单交回来以后主人或管家判过没过的「验收」是另一件事，见[每张工单都有验收](../../implemented/architecture/2026-10-18-every-issue-has-an-acceptance.md)。
+这里的「验收」指种植计划里先写好、写好就冻结的那一步检查（`protocol.AcceptancesOf`）；工单交回来以后主人或管家判过没过的「验收」是另一件事，见[工单](../../../../docs/subsystems/issue.md)。
 
 ## Problem
 

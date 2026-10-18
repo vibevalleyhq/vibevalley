@@ -30,7 +30,7 @@ VibeValley 是从农场往里长的：先有农场、地、帮工、收获，再
    - 派活：档案能不能派、在哪个项目、满了请走谁、重开，成了 tickets 里的 `Dispatch`；
    - 会话：smith 的会话、投递、叫停，还有同时干活的上限（叫醒歇着的也要查），留在 runs 的 `Crew`；
    - 合并：改动、合进主分支、合进计划分支，成了 tickets 里的 `Merges`：它既要动项目的分支，也要让执行离开，放在两者之上。
-4. **工单变成一个东西（这一步已经做了，[工单是一样东西](../../implemented/architecture/2026-10-15-issue-is-one-thing.md)）**：
+4. **工单变成一个东西（这一步已经做了，[工单](../../../../docs/subsystems/issue.md)）**：
    - 服务端有工单（代码里叫 `Issue`），从写下到关上始终是同一个 id，带着做什么、项目、档案、优先级、状态；
    - 执行挂在工单下面，重开就是同一张工单的下一次执行；
    - 看板直接读服务端给的状态，不再自己推；
@@ -65,7 +65,7 @@ VibeValley 是 AI 版的 Linear，穿农场的皮。概念收成下面几样，�
 
 5. **Inbox（这一步已经做了，[要你处理的事是一个 Inbox](../../implemented/architecture/2026-10-15-inbox.md)）**：需要你的事和巡查的发现并成一样，巡查只看它。
 6. **计划并进工单（这一步已经做了）**：父工单和子工单、先后关系；`Task` 的状态和节点迁过去；定时派活改成周期工单。
-   - 6a：工单进了核心状态，有标题和说明（[工单进核心状态](../../implemented/architecture/2026-10-15-issues-in-core-state.md)）；
+   - 6a：工单进了核心状态，有标题和说明（[工单](../../../../docs/subsystems/issue.md)）；
    - 6b、6c：计划是带子工单的父工单（[种植计划是带子工单的父工单](../../implemented/architecture/2026-10-15-tasks-are-parent-issues.md)）；收获过的工单就是仓库（[仓库是收获过的工单](../../implemented/feature/2026-10-16-warehouse-is-harvested-issues.md)）；
    - 6d：写了帮工档案的定时是周期工单，到点写一张新工单开工。
 7. **管家是一个 agent**：能被派工单；定时「发一句话」改成派给管家的周期工单。

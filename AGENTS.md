@@ -1,6 +1,6 @@
 # AGENTS.md
 
-VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：工单派给 agent 档案，服务端为它开一次执行（smith 的子 agent，smith 是 oar 的 Go 移植），在 `VIBEVALLEY_WORK_ROOT` 下项目的 worktree 里一轮一轮干活，主人看改动、合进主分支；主人、管家（替主人派活的 agent）和执行在群聊里说话。外面画成一座农场：项目是岛，在做的工单是一块地，执行是在地上干活的帮工，群聊是田头（[概念](docs/concepts.md)）。仓库是两块加一个官网：服务端 `server/`（Go）、客户端 `app/`（Flutter），和官网 `site/`（Astro）；形状和规则都在 Go 的 `server/internal/protocol`，Flutter 的类型从它生成。改 `server/`、`app/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；决策和提案记在 [Agent Notes](.agents/notes/README.md)。
+VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：工单派给 agent 档案，服务端为它开一次执行（smith 的子 agent，smith 是 oar 的 Go 移植），在 `VIBEVALLEY_WORK_ROOT` 下项目的 worktree 里一轮一轮干活，主人看改动、合进主分支；主人、管家（替主人派活的 agent）和执行在群聊里说话。外面画成一座农场：项目是岛，在做的工单是一块地，执行是在地上干活的帮工，群聊是田头（[概念](docs/concepts.md)）。仓库是两块加一个官网：服务端 `server/`（Go）、客户端 `app/`（Flutter），和官网 `site/`（Astro）；形状和规则都在 Go 的 `server/internal/protocol`，Flutter 的类型从它生成。改 `server/`、`app/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
 
 ## 目录
 
@@ -17,8 +17,8 @@ server/pkg/db/             查询（queries/*.sql）和 sqlc 从它生成的 Go�
 app/                       客户端（Flutter）：读折好的核心状态，像素村用 Flame；macOS 版把 Go 服务端带在里面
 site/                      官网 vibevalley.dev（Astro 静态生成，Tailwind，会动的部分是 React island）：图和像素字直接用 app/assets 的
 design/                    生图提示词、脚本和切图规则；原图和效果图在单独的仓库 vibevalley-art，design/art.sh 链接进来
-docs/                      当前的行为和约定（docs/AGENTS.md）
-.agents/notes/             Agent Notes：决策和提案
+docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
+.agents/notes/             Agent Notes：具体的计划，做完沉淀进 docs/subsystems
 .agents/skills/            项目自己的 skill，多是验证 skill（verify-*）；.claude/skills 链接到这里
 scripts/                   文档和 Note 的检查
 ```
@@ -82,7 +82,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **代码风格**：格式交给工具（`gofmt`、`dart format -l 160`），不手调；代码和接口用实际的概念，界面上的字用中文、用农场的叫法（[用语表](docs/README.md#用语)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。
 - **测试**：服务端的测试用 smith 的 `oartest` 扮演帮工、用真的 git 仓库、模型用 `ai.FauxProvider`，不连网；纯函数的规则直接测；Flutter 用 `flutter test`（服务端用 `MockClient` 假的）。改了帮工、项目、收获、核心状态或游戏规则的行为，补对应的测试。
 - **改完要验证**：先跑最窄的检查；改了接口、服务或页面，照对应的验证 skill（`verify-server`、`verify-app`）在真的程序上看一遍，汇报时附上它要的证据；一类改动没有验证 skill，又花了工夫才验证完，就照 `create-verification-skill` 补一个（[.agents/skills](.agents/skills/README.md)）。
-- **文档和 Note**：改了行为就在同一个改动里改文档；非平凡的决策（行为、模块边界、共享约定、持久化格式、流程、测试策略）新增或更新它的 Note；局部的、机械的改动和界面微调不用写（[规矩](.agents/notes/README.md#什么时候写)）。
+- **文档和 Note**：改了行为就在同一个改动里改文档；有子系统文档（`docs/subsystems/`）的，改它，不在 `reference/` 另写一份；非平凡的工作先写计划 Note（行为、模块边界、共享约定、持久化格式、流程、测试策略），做完把仍然成立的沉淀进子系统、删掉 Note；局部的、机械的改动和界面微调不用写（[规矩](.agents/notes/README.md#什么时候写)）。
 
 ## 编辑本文
 

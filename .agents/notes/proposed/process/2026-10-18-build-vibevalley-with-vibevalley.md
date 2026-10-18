@@ -48,8 +48,8 @@ vv issue status <issue> --json '{"status":"done"}'              # 收获
 - **命令行这条路走通了**（2026-10-18）：从空的 `~/vibevalley-dev`，codex 照工单改文档、改服务端，合进 main；之后一天里 codex 做了合并前的检查、工单拥有分支和 worktree、检测 `gh`、收获提 PR、地块详情合一，都是这样派、这样收的。
 - **工作目录分开**：服务端默认 `~/vibevalley-dev`，打包的应用按渠道（`channel.dart` 的 `workFolder`）。
 - **合并前的检查**：仓库里的 `.vibevalley/check`，合并前在帮工的 worktree 里、锁外跑，没过就不合，输出交回帮工（[server.md](../../../../docs/reference/server.md)「项目和收获」）。
-- **合并不碰主人的检出**：合进农场自己的克隆；走 PR 的项目在 GitHub 上合，农场再从 origin 快进（[收获就是提 PR](../../implemented/architecture/2026-10-18-an-issue-ships-as-a-pr.md)）。
-- **验收**：每张工单都有，过了才算结果（[每张工单都有验收](../../implemented/architecture/2026-10-18-every-issue-has-an-acceptance.md)）。
+- **合并不碰主人的检出**：合进农场自己的克隆；走 PR 的项目在 GitHub 上合，农场再从 origin 快进（[工单](../../../../docs/subsystems/issue.md)）。
+- **验收**：每张工单都有，过了才算结果（[工单](../../../../docs/subsystems/issue.md)）。
 
 跑的时候学到的：
 

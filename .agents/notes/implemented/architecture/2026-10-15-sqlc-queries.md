@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-Go 服务端的 SQL 都是手写在服务里的字符串（像当时的 `channel/db.go`，和待办的 `backlog.go`，待办并进工单以后删了），列和 Go 字段靠手对，表改了编译器不知道。TypeScript 时期用过 effect-sqlc，主人以为现在还在用 sqlc。工单变成一样东西（[工单是一样东西](2026-10-15-issue-is-one-thing.md)）要新写一批查询，是改过来的时机。
+Go 服务端的 SQL 都是手写在服务里的字符串（像当时的 `channel/db.go`，和待办的 `backlog.go`，待办并进工单以后删了），列和 Go 字段靠手对，表改了编译器不知道。TypeScript 时期用过 effect-sqlc，主人以为现在还在用 sqlc。工单变成一样东西（[工单](../../../../docs/subsystems/issue.md)）要新写一批查询，是改过来的时机。
 
 ## Decision
 
