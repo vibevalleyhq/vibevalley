@@ -63,9 +63,10 @@ func agentIssues(agent protocol.Agent, runtime *protocol.RuntimeInfo) []protocol
 	add := func(field string, level protocol.AgentIssueLevel, text string) {
 		issues = append(issues, protocol.AgentIssue{Field: field, Level: level, Text: text})
 	}
+	// The probed facts; seeds.json's for a runtime not probed.
 	facts := protocol.FactsOf(agent.Runtime)
-	if runtime != nil && runtime.Refused != nil {
-		facts.Refused = runtime.Refused
+	if runtime != nil && runtime.Facts.Refused != nil {
+		facts = runtime.Facts
 	}
 	if runtime == nil {
 		add("runtime", "error", "不认识的 runtime："+agent.Runtime)

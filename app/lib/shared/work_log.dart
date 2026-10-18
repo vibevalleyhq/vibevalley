@@ -249,7 +249,7 @@ String spanLabel(SessionEvent step) => switch (step.type) {
   SessionEventType.llmUsage => '缓存',
   SessionEventType.runError => '出错',
   SessionEventType.runStart || SessionEventType.runEnd || SessionEventType.toolResult => '',
-  SessionEventType.toolCall => farmToolText(step.text) != null ? '田头' : actionText[SessionAction.fromJson((step.action ?? ToolAction.other).wire)] ?? '工具',
+  SessionEventType.toolCall => farmToolText(step.text) != null ? '田头' : step.actionText ?? '工具',
 };
 
 Color spanColor(SessionEvent step) => switch (step.type) {
@@ -495,7 +495,7 @@ class _ToolStepState extends State<_ToolStep> {
         children: [
           KitTappable(
             onTap: () => setState(() => _open = !_open),
-            semanticLabel: '${farm != null ? '田头' : actionText[action]} $what',
+            semanticLabel: '${farm != null ? '田头' : step.actionText ?? ''} $what',
             builder: (context, s) => Container(
               color: s.hovered ? Palette.cream50 : null,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -505,7 +505,7 @@ class _ToolStepState extends State<_ToolStep> {
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 56,
-                    child: Text(farm != null ? '田头' : actionText[action] ?? '', style: KitText.sm.copyWith(color: Palette.bark800)),
+                    child: Text(farm != null ? '田头' : step.actionText ?? '', style: KitText.sm.copyWith(color: Palette.bark800)),
                   ),
                   const SizedBox(width: 8),
                   // The whole command is one tap away (the row opens), not a tooltip as wide as the window.

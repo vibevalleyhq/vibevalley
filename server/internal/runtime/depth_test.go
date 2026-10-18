@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"sync/atomic"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"vibevalley/internal/core"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/setting"
+	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
 	"vibevalley/pkg/smith/oar"
 )
@@ -79,8 +81,8 @@ func TestAssessmentUsesTheAdvertisedAdapterRestrictions(t *testing.T) {
 	}
 	a := protocol.Agent{ID: "worker", Name: "worker", Runtime: "pi", Enabled: true, Env: map[string]string{"TEST": "value"}}
 	assessment := r.Assess(context.Background(), a)
-	if assessment.Info.Refused[protocol.SessionEnv] != "test adapter refuses env" {
-		t.Fatalf("refusal missing: %+v", assessment.Info.Refused)
+	if assessment.Info.Facts.Refused[protocol.SessionEnv] != "test adapter refuses env" {
+		t.Fatalf("refusal missing: %+v", assessment.Info.Facts.Refused)
 	}
 	if assessment.Usable() || len(assessment.Blocking) == 0 {
 		t.Fatalf("adapter refusal not enforced: %+v", assessment)
@@ -101,6 +103,41 @@ func TestFarmPolicyRefusalsRemainAlongsideAdapterConstraints(t *testing.T) {
 	if refused[protocol.SessionDisallowedTools] != protocol.FactsOf("opencode").Refused[protocol.SessionDisallowedTools] || refused[protocol.SessionEnv] != "test env" {
 		t.Fatalf("lost policy or capability: %v", refused)
 	}
+}
+
+func TestTheListCarriesEveryRuntimesPresetAndFacts(t *testing.T) {
+	r := observing(t, oar.Runtime{ID: "opencode", RefusedSessionOptions: oar.RefusedSessionOptions{oar.OptionEnv: "test env"}, Installation: func(context.Context, oar.InstallationOptions) (oar.InstallationSnapshot, error) {
+		return oar.InstallationSnapshot{Kind: "not_found"}, nil
+	}})
+	list := r.List(context.Background())
+	ids := []string{}
+	for _, info := range list {
+		ids = append(ids, info.ID)
+	}
+	testkit.Eq(t, ids, protocol.RuntimeIDs(), "every runtime, installed or not")
+	byID := map[string]protocol.RuntimeInfo{}
+	for _, info := range list {
+		byID[info.ID] = info
+	}
+	opencode := byID["opencode"]
+	if _, ok := opencode.Installation.Value.(protocol.InstallationNotFound); !ok {
+		t.Fatalf("opencode: %+v", opencode.Installation)
+	}
+	testkit.Eq(t, opencode.Preset, protocol.PresetOf("opencode"), "opencode's preset")
+	testkit.Eq(t, opencode.Facts.Refused, map[string]string{protocol.SessionEnv: "test env", protocol.SessionDisallowedTools: protocol.FactsOf("opencode").Refused[protocol.SessionDisallowedTools]}, "the adapter's refusals under the farm's")
+	testkit.Eq(t, opencode.Facts.Steer, protocol.FactsOf("opencode").Steer, "steer")
+	claude := byID["claude"]
+	if _, ok := claude.Installation.Value.(protocol.InstallationUnsupported); !ok {
+		t.Fatalf("claude: %+v", claude.Installation)
+	}
+	testkit.Eq(t, claude.Preset.Label, "Claude Code", "claude's name")
+	testkit.Eq(t, claude.Facts.Capabilities, protocol.FactsOf("claude").Capabilities, "claude's capabilities")
+	body, err := json.Marshal(claude)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.Match(t, string(body), `"preset":\{"id":"claude","label":"Claude Code"`, "on the wire")
+	testkit.Match(t, string(body), `"facts":\{"steer":true,"refused":\{\}`, "on the wire")
 }
 
 func TestTwoRuntimeConfigurationsDoNotCommunicateThroughEnvironment(t *testing.T) {

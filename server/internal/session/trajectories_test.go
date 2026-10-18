@@ -47,6 +47,8 @@ func TestLogKeptAndReadBack(t *testing.T) {
 		kinds = append(kinds, string(s.Type)+":"+out)
 	}
 	testkit.Eq(t, kinds, []string{"run/start:", "user/message:", "tool/call:", "tool/result:a\nb", "run/end:"}, "read back: the output in the result")
+	call := tr.Events("w1", "")[2]
+	testkit.Eq(t, *call.ActionText, "跑命令", "a call says what its action is")
 	testkit.Eq(t, len(tr.Events("w1", "r7")), 5, "the run's")
 	testkit.Eq(t, len(tr.Events("w1", "r8")), 0, "another run's")
 	if tr.Events("../w1", "") != nil {

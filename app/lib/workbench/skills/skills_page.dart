@@ -9,7 +9,7 @@ import '../../shared/faces.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
-import '../../rules/seeds.dart';
+import '../../rules/runtimes.dart';
 
 const _installed = 'installed:';
 
@@ -44,7 +44,8 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
     if (config.error != null) return const ConfigProblem();
     final skills = config.skills;
     final runtimeState = ref.watch(runtimesProvider);
-    final installed = installedSkills(runtimeState.value ?? const []);
+    final catalog = runtimeState.value ?? const <RuntimeInfo>[];
+    final installed = installedSkills(catalog);
     final id = widget.id;
     final shownInstalled = id != null && id.startsWith(_installed) ? installed.where((s) => s.name == id.substring(_installed.length)).firstOrNull : null;
     final creating = id == 'new';
@@ -55,7 +56,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
     final q = _query.trim();
     final shownList = q.isEmpty
         ? installed
-        : installed.where((s) => _matches(q, [s.name, s.description, ...s.runtimes.map((x) => runtimeName(x.runtime))])).toList();
+        : installed.where((s) => _matches(q, [s.name, s.description, ...s.runtimes.map((x) => runtimeName(catalog, x.runtime))])).toList();
     final shownSkills = q.isEmpty ? skills : skills.where((s) => _matches(q, [s.name, s.description, s.body])).toList();
     final small = KitText.xs.copyWith(color: Palette.bark500);
 
@@ -111,7 +112,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
               on: shownInstalled?.name == s.name || first?.name == s.name,
               path: _skillPath('$_installed${s.name}'),
               title: s.name,
-              detail: s.runtimes.map((x) => runtimeName(x.runtime)).join('、'),
+              detail: s.runtimes.map((x) => runtimeName(catalog, x.runtime)).join('、'),
               vertical: 6,
             ),
           ),
@@ -156,7 +157,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
     if (creating) {
       main = const _SkillEditor(key: ValueKey('new'));
     } else if ((shownInstalled ?? first) case final s?) {
-      main = _InstalledCard(skill: s);
+      main = _InstalledCard(skill: s, catalog: catalog);
     } else if (selected != null) {
       main = _SkillEditor(key: ValueKey(selected.id), skill: selected);
     } else {
@@ -209,8 +210,9 @@ Widget _sheet(Widget child) => Center(
 
 /// Read-only: it lives with the runtime.
 class _InstalledCard extends StatelessWidget {
-  const _InstalledCard({required this.skill});
+  const _InstalledCard({required this.skill, required this.catalog});
   final InstalledSkill skill;
+  final List<RuntimeInfo> catalog;
 
   @override
   Widget build(BuildContext context) => _sheet(
@@ -236,7 +238,7 @@ class _InstalledCard extends StatelessWidget {
               children: [
                 RuntimeIcon(runtime: x.runtime, size: 28),
                 const SizedBox(width: 10),
-                SizedBox(width: 80, child: Text(runtimeName(x.runtime), style: KitText.sm)),
+                SizedBox(width: 80, child: Text(runtimeName(catalog, x.runtime), style: KitText.sm)),
                 Expanded(
                   child: Tooltip(
                     message: x.source ?? '',

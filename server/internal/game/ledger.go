@@ -156,6 +156,9 @@ func (l *ledger) Record(entry protocol.LedgerEntryValue) {
 	}
 }
 
+// The achievements in words, in the page's order; how far the farm is with each goes in every frame's view.
+func (l *ledger) Achievements() []protocol.Achievement { return protocol.AchievementsInWords() }
+
 // The title the owner wears: an achievement and its tier; none of either is the plain title.
 func (l *ledger) ChooseTitle(achievement *string, tier *int64) {
 	entry := protocol.LedgerEntryTitled{}

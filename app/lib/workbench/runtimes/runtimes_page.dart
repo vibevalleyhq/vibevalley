@@ -14,7 +14,6 @@ import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
 import '../shared/layout.dart';
 import 'runtimes_state.dart';
-import '../../rules/seeds.dart';
 import '../../rules/money.dart';
 
 class RuntimesPage extends ConsumerWidget {
@@ -38,10 +37,7 @@ class RuntimesPage extends ConsumerWidget {
         title: '农具',
         subtitle: '机器上的编码 agent',
         semanticLabel: '农具列表',
-        children: [
-          for (final p in runtimePresets)
-            _ListItem(preset: p, runtime: runtimes.where((r) => r.id == p.id).firstOrNull, config: config, active: selected?.id == p.id),
-        ],
+        children: [for (final r in runtimes) _ListItem(runtime: r, config: config, active: selected?.id == r.id)],
       ),
       detail: selected == null
           ? [
@@ -56,35 +52,35 @@ class RuntimesPage extends ConsumerWidget {
 }
 
 class _ListItem extends StatelessWidget {
-  const _ListItem({required this.preset, required this.runtime, required this.config, required this.active});
-  final RuntimeInfo? runtime;
-  final RuntimePreset preset;
+  const _ListItem({required this.runtime, required this.config, required this.active});
+  final RuntimeInfo runtime;
   final WorkbenchConfig config;
   final bool active;
 
   @override
   Widget build(BuildContext context) {
     final r = runtime;
-    final ok = r?.installation is InstallationAvailable;
-    final using = config.agents.where((a) => a.runtime == preset.id).length;
-    final status = switch (r?.installation) {
-      InstallationAvailable(:final version) => r!.settings.enabled ? (version ?? '可用') : '已停用',
+    final preset = r.preset;
+    final ok = r.installation is InstallationAvailable;
+    final using = config.agents.where((a) => a.runtime == r.id).length;
+    final status = switch (r.installation) {
+      InstallationAvailable(:final version) => r.settings.enabled ? (version ?? '可用') : '已停用',
       // The reason, not just 不支持: for vibevalley it is a missing DeepSeek key, which is the owner's to fix.
       InstallationUnsupported(:final reason) => reason.isEmpty ? '不支持' : reason,
-      _ => '没找到',
+      InstallationNotFound() => '没找到',
     };
     return ListRow(
       active: active,
-      onTap: () => workbenchGo(context, '/runtimes/${preset.id}'),
+      onTap: () => workbenchGo(context, '/runtimes/${r.id}'),
       child: Row(
         children: [
-          RuntimeIcon(runtime: preset.id, size: 36, muted: !ok),
+          RuntimeIcon(runtime: r.id, size: 36, muted: !ok),
           const SizedBox(width: 10),
           Expanded(
-            child: RowText(preset.label, '$status${using > 0 ? ' · $using 个 agent' : ''}', extra: ok ? _ListStamina(info: r!) : null),
+            child: RowText(preset.label, '$status${using > 0 ? ' · $using 个 agent' : ''}', extra: ok ? _ListStamina(info: r) : null),
           ),
           const SizedBox(width: 10),
-          StateDot(ok ? (r!.settings.enabled ? Palette.leaf500 : Palette.cream300) : Palette.berry),
+          StateDot(ok ? (r.settings.enabled ? Palette.leaf500 : Palette.cream300) : Palette.berry),
         ],
       ),
     );
@@ -113,7 +109,7 @@ class _ListStamina extends StatelessWidget {
 }
 
 List<Widget> _detail(SpriteAtlas atlas, RuntimeInfo info, WorkbenchConfig config, RuntimeBusy? busy) {
-  final facts = factsOf(info.id, info);
+  final facts = info.facts;
   final agents = config.agents.where((a) => a.runtime == info.id).toList();
   return [
     _Header(info: info, busy: busy),
@@ -156,7 +152,7 @@ class _Header extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final preset = presetOf(info.id);
+    final preset = info.preset;
     final inst = info.installation;
     return PxWindow(
       paper: Palette.cream50,
@@ -337,7 +333,7 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
     final models = info.models ?? const <ModelEntry>[];
     final wanted = _draft.defaultModel.isNotEmpty ? _draft.defaultModel : models.where((m) => m.isDefault).firstOrNull?.id;
     final model = models.where((m) => m.id == wanted).firstOrNull;
-    final facts = factsOf(info.id, info);
+    final facts = info.facts;
     final refusedEffort = facts.refused[sessionEffort];
     final refusedEnv = facts.refused[sessionEnv];
     final envVar = 'OAR_${info.id.toUpperCase()}_BIN';
@@ -496,9 +492,9 @@ class RuntimeUsage extends StatelessWidget {
     final usage = info.usage;
     switch (usage) {
       case null:
-        return Text(factsOf(info.id).capabilities.contains(RuntimeCapability.accountUsage) ? '装好以后才能读到。' : '这个 runtime 不报告账户用量。', style: muted);
+        return Text(info.facts.capabilities.contains(RuntimeCapability.accountUsage) ? '装好以后才能读到。' : '这个 runtime 不报告账户用量。', style: muted);
       case AccountUsageLoginRequired():
-        return Text('没登录。在这台机器上运行 ${runtimeName(info.id)} 登录一次。', style: KitText.xs.copyWith(color: const Color(0xFFB8682A)));
+        return Text('没登录。在这台机器上运行 ${info.preset.label} 登录一次。', style: KitText.xs.copyWith(color: const Color(0xFFB8682A)));
       case AccountUsageUnavailable(:final reason):
         return Text('读不到：$reason', style: muted);
       case AccountUsageBalance() || AccountUsageOk():

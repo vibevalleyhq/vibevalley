@@ -9,6 +9,7 @@ import (
 
 	"vibevalley/internal/handler"
 	"vibevalley/internal/protocol"
+	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
 	"vibevalley/internal/workspace"
 )
@@ -109,6 +110,31 @@ func TestFreshAgentListHasValidRequiredEnums(t *testing.T) {
 	if !manager {
 		t.Fatal("manager missing from list")
 	}
+}
+
+func TestAchievementsComeInWordsAndTheFrameSaysHowFar(t *testing.T) {
+	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
+	cfg.Voice.Line.Port, cfg.Lan.Port = 0, 0
+	f, err := workspace.New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Project.GitHubProbe = fixture.NoGitHub
+	t.Cleanup(f.Close)
+	srv := httptest.NewServer(handler.New(f))
+	defer srv.Close()
+	c := &protocol.Client{Base: srv.URL}
+	all, err := c.GameAchievements(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, all, protocol.AchievementsInWords(), "every achievement in words")
+	testkit.Eq(t, all[0].Tiers[0].Reached, "新手任务做完了", "a starter task")
+	done := make(chan struct{})
+	defer close(done)
+	frame := <-f.Core.States(done)
+	testkit.Eq(t, len(frame.View.Achievements), len(all), "the frame says how far each is")
+	testkit.Eq(t, frame.View.Achievements[0].ID, all[0].ID, "in the same order")
 }
 
 func TestChannelCreationReturnsItsIdentity(t *testing.T) {

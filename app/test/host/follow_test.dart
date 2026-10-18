@@ -26,7 +26,7 @@ StateFrame _frame(List<InboxItem> inbox) => StateFrame(
   }),
   inbox: inbox,
   graphs: const [],
-  view: const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {}),
+  view: const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {}, achievements: []),
   effects: const [],
 );
 
@@ -62,7 +62,7 @@ void main() {
     expect(notices.map((n) => n.title), ['阿土 做完了']);
     expect(trays.last.title, '1!');
 
-    effects.add(const GameEffectAchievement(achievement: 'harvests', tier: 2));
+    effects.add(const GameEffectAchievement(achievement: 'harvests', tier: 2, title: '小有收成', reached: '升到银牌', detail: '收进主分支的活', coins: 30));
     await Future<void>.delayed(Duration.zero);
     expect(notices.last.title, '升到银牌：小有收成');
 

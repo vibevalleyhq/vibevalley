@@ -48,6 +48,17 @@ func TestTheSameAgainIsNoNews(t *testing.T) {
 	testkit.Eq(t, changed, true, "a new reason is news")
 }
 
+// The runtimes page lists runtime.list in runtimeIds' order, each under its own preset.
+func TestEveryRuntimeHasItsPresetAndFacts(t *testing.T) {
+	for i, id := range RuntimeIDs() {
+		testkit.Eq(t, seeds.RuntimePresets[i].ID, id, "preset", i)
+		if _, ok := seeds.RuntimeFacts[id]; !ok {
+			t.Errorf("seeds.json's runtimeFacts has no %s", id)
+		}
+	}
+	testkit.Eq(t, len(seeds.RuntimePresets), len(RuntimeIDs()), "presets")
+}
+
 func TestEveryActionHasWords(t *testing.T) {
 	for _, a := range SessionActionValues {
 		if _, ok := ActionText[a]; !ok {

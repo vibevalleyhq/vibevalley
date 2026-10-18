@@ -4,7 +4,6 @@ import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/workbench.dart';
 import 'package:vibevalley/rules/cast.dart';
-import 'package:vibevalley/rules/seeds.dart';
 
 void main() {
   test('castOf picks the same animal from an id every time', () {
@@ -13,12 +12,6 @@ void main() {
     expect(castOf(null, 'agent-7').species, Species.fox);
     expect(castOf(null, '老周').species, Species.hedgehog);
     expect(castOf(look(species: Species.owl, outfit: Outfit.rain), 'backend'), (species: Species.owl, outfit: Outfit.rain));
-  });
-
-  test('runtimeName names the presets and falls back to the id', () {
-    expect(runtimeName('claude'), 'Claude Code');
-    expect(runtimeName('pi'), 'Pi');
-    expect(runtimeName('mystery'), 'mystery');
   });
 
   test('installedSkills groups the runtimes\' skills by name, A to Z', () {

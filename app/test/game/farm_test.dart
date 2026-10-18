@@ -7,7 +7,6 @@ import '../support/farm.dart';
 import 'package:vibevalley/workbench/map/map_rules.dart';
 import 'package:vibevalley/shared/swatches.dart' show Pose;
 import 'package:vibevalley/rules/sessions.dart';
-import 'package:vibevalley/rules/progress.dart';
 import 'package:vibevalley/rules/money.dart';
 
 void main() {
@@ -100,11 +99,5 @@ void main() {
     );
     expect(phaseText(conflicted, 0), '', reason: 'before the server said anything');
     expect(spentText(const Spent(tokens: 26000, cny: 0.03)), '约 ¥0.03 · 2.6 万 token');
-  });
-
-  test('standing: the tier reached, the count, what the next tier needs', () {
-    final harvests = achievementOf('harvests')!;
-    expect(standing(progress, harvests), (tier: 1, count: 4, next: 20));
-    expect(isTitle(harvests), isTrue);
   });
 }

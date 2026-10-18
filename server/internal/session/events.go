@@ -271,7 +271,8 @@ func (j *journal) ToolStarted(callID string, start ToolStart, from From) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	action, tool := start.Action, start.Tool
-	step := protocol.SessionEvent{Type: protocol.SessionEventTypeToolCall, Text: start.Text, Action: &action, Tool: &tool}
+	words := protocol.ActionText[protocol.SessionAction(action)]
+	step := protocol.SessionEvent{Type: protocol.SessionEventTypeToolCall, Text: start.Text, Action: &action, ActionText: &words, Tool: &tool}
 	if start.Input != "" {
 		input := str.Cut(start.Input, inputMax)
 		step.Input = &input

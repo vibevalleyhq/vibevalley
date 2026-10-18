@@ -140,6 +140,9 @@ type Handlers interface {
 	//vibevalley:route graph.events GET /api/v1/graphs/{id}/events
 	//vibevalley:can owner remote
 	GraphEvents(ctx context.Context, pID string) ([]GraphEvent, error)
+	//vibevalley:route game.achievements GET /api/v1/game/achievements
+	//vibevalley:can owner remote
+	GameAchievements(ctx context.Context) ([]Achievement, error)
 	//vibevalley:route game.chooseTitle POST /api/v1/game/title
 	//vibevalley:can owner remote
 	GameChooseTitle(ctx context.Context, body ChooseTitleRequest) error

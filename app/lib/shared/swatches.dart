@@ -11,7 +11,7 @@ final swatches = (
   body: ['#f3e9da', '#e9e6de', '#e7e6fb', '#d3efe8', '#dfe4ea', '#f4e6d4', '#b9c4d1', '#3d434a', '#2a2e33', '#f6d8c8'],
   trim: ['#d9774f', '#24282d', '#6c70d8', '#2f9d8f', '#5b6470', '#b0503f', '#3a404a', '#d8dadc', '#c79a2e', '#8a5cc4'],
   hat: ['#f2b53a', '#e8804f', '#f4f3ee', '#2f3438', '#d9534f', '#4f86d9', '#9580e6', '#45bf8c', '#a9b4c2', '#ff8fb1'],
-  eye: [fallbackPreset.look.eye, '#ffd25e', '#9dffb0', '#ff9de2', '#ffffff', '#ff7a5c'],
+  eye: ['#a6f4ff', '#ffd25e', '#9dffb0', '#ff9de2', '#ffffff', '#ff7a5c'],
 );
 
 T _one<T>(math.Random rand, List<T> items) => items[rand.nextInt(items.length)];

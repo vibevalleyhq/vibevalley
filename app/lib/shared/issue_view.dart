@@ -456,7 +456,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
                 children: [
                   ActionGlyph(current.action, size: 22),
                   const SizedBox(width: 8),
-                  Text('正在${actionText[current.action]}', style: KitText.sm),
+                  Text('正在${current.actionText ?? ''}', style: KitText.sm),
                   if (current.label.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     Flexible(
@@ -516,7 +516,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
                               const SizedBox(width: 8),
                               SizedBox(
                                 width: 56,
-                                child: Text(actionText[s.action]!, style: KitText.sm.copyWith(color: Palette.bark800)),
+                                child: Text(s.actionText ?? '', style: KitText.sm.copyWith(color: Palette.bark800)),
                               ),
                               const SizedBox(width: 8),
                               Expanded(

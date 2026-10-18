@@ -19,9 +19,6 @@
 //
 // The endpoints and their callers also go into docs/reference/capabilities.md.
 //
-// The client's part of seeds.json (the runtimes' presets and facts, the fallback preset) goes into the Dart file too, decoded
-// into the generated types.
-//
 // On a Handlers method, a path parameter typed int64 (a *int64 query one) is parsed by Mount: one that is not a number is a
 // 404 (a query one is none), and the Dart client takes a number.
 //
@@ -31,7 +28,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -398,47 +394,6 @@ func (s *shapes) dartConsts() string {
 		out = append(out, fmt.Sprintf("%sconst %s = %s;", doc, c.dart, c.value))
 	}
 	return strings.Join(out, "\n\n")
-}
-
-// The keys of seeds.json the client reads.
-var clientSeeds = []string{"achievements", "actionText", "runtimePresets", "runtimeFacts", "fallbackPreset"}
-
-func dartSeeds() string {
-	body, err := os.ReadFile("internal/protocol/seeds.json")
-	if err != nil {
-		fail(err)
-	}
-	var all map[string]json.RawMessage
-	if err := json.Unmarshal(body, &all); err != nil {
-		fail(fmt.Errorf("seeds.json: %w", err))
-	}
-	part := map[string]json.RawMessage{}
-	for _, k := range clientSeeds {
-		if all[k] == nil {
-			fail(fmt.Errorf("seeds.json has no %s", k))
-		}
-		part[k] = all[k]
-	}
-	compact, _ := json.Marshal(part)
-	const quotes = "'''"
-	if strings.Contains(string(compact), quotes) {
-		fail(fmt.Errorf("seeds.json: %s does not fit in a Dart raw string", quotes))
-	}
-	return "/// From internal/protocol/seeds.json (its achievements, actionText, runtimePresets, runtimeFacts and fallbackPreset), as the server reads them.\n" +
-		"final Map<String, dynamic> _seeds = jsonDecode(r" + quotes + string(compact) + quotes + ") as Map<String, dynamic>;\n\n" +
-		"/// In the order the page shows them.\n" +
-		"final List<AchievementDef> achievements = [for (final j in _seeds['achievements'] as List) AchievementDef.fromJson(j as Map<String, dynamic>)];\n\n" +
-		"/// What each action is, in words; the server says them the same way.\n" +
-		"final Map<SessionAction, String> actionText = {\n" +
-		"  for (final e in (_seeds['actionText'] as Map<String, dynamic>).entries) SessionAction.fromJson(e.key): e.value as String,\n" +
-		"};\n\n" +
-		"/// In seeds.json's order.\n" +
-		"final List<RuntimePreset> runtimePresets = [for (final j in _seeds['runtimePresets'] as List) RuntimePreset.fromJson(j as Map<String, dynamic>)];\n\n" +
-		"final Map<String, RuntimeFacts> runtimeFacts = {\n" +
-		"  for (final e in (_seeds['runtimeFacts'] as Map<String, dynamic>).entries) e.key: RuntimeFacts.fromJson(e.value as Map<String, dynamic>),\n" +
-		"};\n\n" +
-		"/// The look of a runtime with none of its own, under that runtime's id and name.\n" +
-		"final RuntimePreset fallbackPreset = RuntimePreset.fromJson(_seeds['fallbackPreset'] as Map<String, dynamic>);"
 }
 
 func slicesContain(xs []string, x string) bool {
@@ -1084,6 +1039,6 @@ import 'package:http/http.dart' as http;
 
 StateFrame stateFrameFromJson(String s) => StateFrame.fromJson(jsonDecode(s) as Map<String, dynamic>);
 `
-	blocks = append(append([]string{s.dartConsts()}, blocks...), dartSeeds())
+	blocks = append([]string{s.dartConsts()}, blocks...)
 	return header + "\n" + strings.Join(blocks, "\n\n") + "\n\n" + strings.Join(clients, "\n\n") + "\n\n" + client + "\n"
 }

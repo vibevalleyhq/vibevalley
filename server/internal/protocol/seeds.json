@@ -922,9 +922,9 @@
   },
   "runtimeIds": [
     "claude",
-    "vibevalley",
     "codex",
     "opencode",
+    "vibevalley",
     "pi",
     "cursor",
     "grok",

@@ -39,7 +39,7 @@
 | 连接器 | 连接器 | `/settings/connectors`（`workbench/connectors`） | `ConnectorStatus` | `/api/v1/connectors` |
 | （不画） | 连接到本机 | `/settings/gate`（`workbench/gate`） | `LanStatus`、`LanDevice` | `/api/v1/gate` |
 | 语音 | 麦克风 | `/settings/voice`（`workbench/voice`）、`voice/` | `VoiceSettings` | `/api/v1/voice/...` |
-| 进度、成就 | 金币、连胜、任务与成就 | `farm/achievements.dart` | `Progress`、`LedgerEntry`、`CoreState.Progress` | 帧里的 `progress`，没有单独的接口 |
+| 进度、成就 | 金币、连胜、任务与成就 | `farm/achievements.dart` | `Progress`、`LedgerEntry`、`CoreState.Progress` | 帧里的 `progress` 和 `view.achievements`；成就的说法 `game.achievements` |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.Level` | |
 | 地 | 一块地：一张工单 | 像素村（`village/`）、地块详情（`farm/plot_detail.dart`） | 工单的分支和 worktree（服务端 `project.IssueBranch`、`worktrees/<项目>.<工单号>`）；地里长什么按工单做键（`FarmView.Plots`、`protocol.PlotKey`）；帮工站在哪块地是 `SessionPlay.Station` | `/api/v1/say` 的 `bed` |
 

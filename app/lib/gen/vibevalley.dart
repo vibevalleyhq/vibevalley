@@ -236,6 +236,78 @@ class AchievementDef {
   };
 }
 
+class Achievement {
+  const Achievement({
+    required this.id,
+    required this.category,
+    required this.title,
+    required this.detail,
+    this.unit,
+    required this.wearable,
+    required this.tiers,
+  });
+
+  factory Achievement.fromJson(Map<String, dynamic> j) => Achievement(
+    id: j['id'] as String,
+    category: AchievementCategory.fromJson(j['category']),
+    title: j['title'] as String,
+    detail: j['detail'] as String,
+    unit: j['unit'] == null ? null : j['unit'] as String,
+    wearable: j['wearable'] as bool,
+    tiers: [for (final e in j['tiers'] as List) AchievementTier.fromJson(e as Map<String, dynamic>)],
+  );
+
+  final String id;
+  final AchievementCategory category;
+  final String title;
+  final String detail;
+  final String? unit;
+  final bool wearable;
+  final List<AchievementTier> tiers;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'category': category.wire,
+    'title': title,
+    'detail': detail,
+    if (unit != null) 'unit': unit!,
+    'wearable': wearable,
+    'tiers': [for (final e in tiers) e.toJson()],
+  };
+}
+
+class AchievementTier {
+  const AchievementTier({required this.need, required this.title, required this.coins, required this.reached});
+
+  factory AchievementTier.fromJson(Map<String, dynamic> j) =>
+      AchievementTier(need: (j['need'] as num).toDouble(), title: j['title'] as String, coins: (j['coins'] as num).toDouble(), reached: j['reached'] as String);
+
+  final double need;
+  final String title;
+  final double coins;
+  final String reached;
+
+  Map<String, dynamic> toJson() => {'need': need, 'title': title, 'coins': coins, 'reached': reached};
+}
+
+class AchievementStanding {
+  const AchievementStanding({required this.id, required this.tier, required this.count, this.next});
+
+  factory AchievementStanding.fromJson(Map<String, dynamic> j) => AchievementStanding(
+    id: j['id'] as String,
+    tier: (j['tier'] as num).toDouble(),
+    count: (j['count'] as num).toDouble(),
+    next: j['next'] == null ? null : (j['next'] as num).toDouble(),
+  );
+
+  final String id;
+  final double tier;
+  final double count;
+  final double? next;
+
+  Map<String, dynamic> toJson() => {'id': id, 'tier': tier, 'count': count, if (next != null) 'next': next!};
+}
+
 class RuntimePreset {
   const RuntimePreset({required this.id, required this.label, required this.blurb, required this.look});
 
@@ -565,14 +637,16 @@ enum SessionAction {
 }
 
 class Doing {
-  const Doing({required this.action, required this.label});
+  const Doing({required this.action, required this.label, this.actionText});
 
-  factory Doing.fromJson(Map<String, dynamic> j) => Doing(action: SessionAction.fromJson(j['action']), label: j['label'] as String);
+  factory Doing.fromJson(Map<String, dynamic> j) =>
+      Doing(action: SessionAction.fromJson(j['action']), label: j['label'] as String, actionText: j['actionText'] == null ? null : j['actionText'] as String);
 
   final SessionAction action;
   final String label;
+  final String? actionText;
 
-  Map<String, dynamic> toJson() => {'action': action.wire, 'label': label};
+  Map<String, dynamic> toJson() => {'action': action.wire, 'label': label, if (actionText != null) 'actionText': actionText!};
 }
 
 /// Told apart by `_tag`; switch over the subclasses.
@@ -622,16 +696,21 @@ class SessionGraph {
 }
 
 class ActionStep {
-  const ActionStep({required this.at, required this.action, required this.label});
+  const ActionStep({required this.at, required this.action, required this.label, this.actionText});
 
-  factory ActionStep.fromJson(Map<String, dynamic> j) =>
-      ActionStep(at: (j['at'] as num).toDouble(), action: SessionAction.fromJson(j['action']), label: j['label'] as String);
+  factory ActionStep.fromJson(Map<String, dynamic> j) => ActionStep(
+    at: (j['at'] as num).toDouble(),
+    action: SessionAction.fromJson(j['action']),
+    label: j['label'] as String,
+    actionText: j['actionText'] == null ? null : j['actionText'] as String,
+  );
 
   final double at;
   final SessionAction action;
   final String label;
+  final String? actionText;
 
-  Map<String, dynamic> toJson() => {'at': at, 'action': action.wire, 'label': label};
+  Map<String, dynamic> toJson() => {'at': at, 'action': action.wire, 'label': label, if (actionText != null) 'actionText': actionText!};
 }
 
 class SessionPlay {
@@ -1292,6 +1371,7 @@ class SessionEvent {
     this.under,
     required this.text,
     this.action,
+    this.actionText,
     this.tool,
     this.input,
     this.output,
@@ -1308,6 +1388,7 @@ class SessionEvent {
     under: j['under'] == null ? null : (j['under'] as num).toDouble(),
     text: j['text'] as String,
     action: j['action'] == null ? null : ToolAction.fromJson(j['action']),
+    actionText: j['actionText'] == null ? null : j['actionText'] as String,
     tool: j['tool'] == null ? null : j['tool'] as String,
     input: j['input'] == null ? null : j['input'] as String,
     output: j['output'] == null ? null : j['output'] as String,
@@ -1323,6 +1404,7 @@ class SessionEvent {
   final double? under;
   final String text;
   final ToolAction? action;
+  final String? actionText;
   final String? tool;
   final String? input;
   final String? output;
@@ -1338,6 +1420,7 @@ class SessionEvent {
     if (under != null) 'under': under!,
     'text': text,
     if (action != null) 'action': action!.wire,
+    if (actionText != null) 'actionText': actionText!,
     if (tool != null) 'tool': tool!,
     if (input != null) 'input': input!,
     if (output != null) 'output': output!,
@@ -1514,8 +1597,9 @@ class RuntimeSettings {
 
 class RuntimeInfo {
   const RuntimeInfo({
-    this.refused,
     required this.id,
+    required this.preset,
+    required this.facts,
     required this.installation,
     this.models,
     this.usage,
@@ -1530,8 +1614,9 @@ class RuntimeInfo {
   });
 
   factory RuntimeInfo.fromJson(Map<String, dynamic> j) => RuntimeInfo(
-    refused: j['refused'] == null ? null : {for (final e in (j['refused'] as Map<String, dynamic>).entries) e.key: e.value as String},
     id: j['id'] as String,
+    preset: RuntimePreset.fromJson(j['preset'] as Map<String, dynamic>),
+    facts: RuntimeFacts.fromJson(j['facts'] as Map<String, dynamic>),
     installation: Installation.fromJson(j['installation'] as Map<String, dynamic>),
     models: j['models'] == null ? null : [for (final e in j['models'] as List) ModelEntry.fromJson(e as Map<String, dynamic>)],
     usage: j['usage'] == null ? null : AccountUsage.fromJson(j['usage'] as Map<String, dynamic>),
@@ -1545,8 +1630,9 @@ class RuntimeInfo {
     checkedAt: (j['checkedAt'] as num).toDouble(),
   );
 
-  final Map<String, String>? refused;
   final String id;
+  final RuntimePreset preset;
+  final RuntimeFacts facts;
   final Installation installation;
   final List<ModelEntry>? models;
   final AccountUsage? usage;
@@ -1560,8 +1646,9 @@ class RuntimeInfo {
   final double checkedAt;
 
   Map<String, dynamic> toJson() => {
-    if (refused != null) 'refused': {for (final e in refused!.entries) e.key: e.value},
     'id': id,
+    'preset': preset.toJson(),
+    'facts': facts.toJson(),
     'installation': installation.toJson(),
     if (models != null) 'models': [for (final e in models!) e.toJson()],
     if (usage != null) 'usage': usage!.toJson(),
@@ -1701,19 +1788,22 @@ class PlotView {
 }
 
 class FarmView {
-  const FarmView({required this.level, required this.plots});
+  const FarmView({required this.level, required this.plots, required this.achievements});
 
   factory FarmView.fromJson(Map<String, dynamic> j) => FarmView(
     level: FarmLevel.fromJson(j['level'] as Map<String, dynamic>),
     plots: {for (final e in (j['plots'] as Map<String, dynamic>).entries) e.key: PlotView.fromJson(e.value as Map<String, dynamic>)},
+    achievements: [for (final e in j['achievements'] as List) AchievementStanding.fromJson(e as Map<String, dynamic>)],
   );
 
   final FarmLevel level;
   final Map<String, PlotView> plots;
+  final List<AchievementStanding> achievements;
 
   Map<String, dynamic> toJson() => {
     'level': level.toJson(),
     'plots': {for (final e in plots.entries) e.key: e.value.toJson()},
+    'achievements': [for (final e in achievements) e.toJson()],
   };
 }
 
@@ -4073,16 +4163,45 @@ final class GameEffectLevelUp extends GameEffect {
 }
 
 final class GameEffectAchievement extends GameEffect {
-  const GameEffectAchievement({required this.achievement, required this.tier});
+  const GameEffectAchievement({
+    required this.achievement,
+    required this.tier,
+    required this.title,
+    required this.reached,
+    required this.detail,
+    required this.coins,
+    this.oneOff,
+  });
 
-  factory GameEffectAchievement.fromJson(Map<String, dynamic> j) =>
-      GameEffectAchievement(achievement: j['achievement'] as String, tier: (j['tier'] as num).toDouble());
+  factory GameEffectAchievement.fromJson(Map<String, dynamic> j) => GameEffectAchievement(
+    achievement: j['achievement'] as String,
+    tier: (j['tier'] as num).toDouble(),
+    title: j['title'] as String,
+    reached: j['reached'] as String,
+    detail: j['detail'] as String,
+    coins: (j['coins'] as num).toDouble(),
+    oneOff: j['oneOff'] == null ? null : j['oneOff'] as bool,
+  );
 
   final String achievement;
   final double tier;
+  final String title;
+  final String reached;
+  final String detail;
+  final double coins;
+  final bool? oneOff;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'achievement', 'achievement': achievement, 'tier': tier};
+  Map<String, dynamic> toJson() => {
+    'kind': 'achievement',
+    'achievement': achievement,
+    'tier': tier,
+    'title': title,
+    'reached': reached,
+    'detail': detail,
+    'coins': coins,
+    if (oneOff != null) 'oneOff': oneOff!,
+  };
 }
 
 final class LedgerEntryHarvested extends LedgerEntry {
@@ -5399,29 +5518,6 @@ final class LiveEventRuntime extends LiveEvent {
   Map<String, dynamic> toJson() => {'type': 'runtime', 'at': at, 'info': info.toJson()};
 }
 
-/// From internal/protocol/seeds.json (its achievements, actionText, runtimePresets, runtimeFacts and fallbackPreset), as the server reads them.
-final Map<String, dynamic> _seeds = jsonDecode(
-  r'''{"achievements":[{"id":"s_open","category":"starter","title":"开门","detail":"开工","tiers":[1],"coins":[20]},{"id":"s_hire","category":"starter","title":"派活","detail":"派出第一个帮工","tiers":[1],"coins":[20]},{"id":"s_tell","category":"starter","title":"带话","detail":"给帮工带一句话：浇水，或者在它的工单串里说","tiers":[1],"coins":[20]},{"id":"s_review","category":"starter","title":"验收","detail":"看过收成清单，再收进主分支","tiers":[1],"coins":[20]},{"id":"s_voice","category":"starter","title":"说话","detail":"用语音和管家说一次话","tiers":[1],"coins":[20]},{"id":"s_split","category":"starter","title":"规划","detail":"拆一张种植计划","tiers":[1],"coins":[20]},{"id":"s_call","category":"starter","title":"点名","detail":"在田头 @ 一个帮工","tiers":[1],"coins":[20]},{"id":"harvests","category":"harvest","title":"收成","tierTitles":["开张大吉","小有收成","粮仓满了"],"detail":"收进主分支的活","tiers":[1,20,100],"coins":[10,30,60],"unit":"件"},{"id":"first_try","category":"harvest","title":"一气呵成","detail":"第一轮就做完、没带过话、没失败过就收进去的活","tiers":[1,10,50],"coins":[10,30,60],"unit":"件"},{"id":"big_graph","category":"harvest","title":"五谷丰登","detail":"收获的种植计划里，合进去的步数最多的一张","tiers":[3,5,10],"coins":[10,30,60],"unit":"步"},{"id":"farm_level","category":"harvest","title":"农场规模","tierTitles":["小有规模","远近闻名","一方粮仓"],"detail":"农场的等级（跟着你的 commit 数长）","tiers":[5,10,20],"coins":[10,30,60],"unit":"级"},{"id":"steady","category":"craft","title":"稳如老农","detail":"最长连胜：连着收进去，中间没有一轮失败","tiers":[5,15,40],"coins":[10,30,60],"unit":"件"},{"id":"untangle","category":"craft","title":"解铃人","detail":"冲突过、最后还是收进去的活","tiers":[1,5,20],"coins":[10,30,60],"unit":"件"},{"id":"comeback","category":"craft","title":"浴火重生","detail":"没做成过、修好以后收进去的活","tiers":[1,5,20],"coins":[10,30,60],"unit":"件"},{"id":"thrifty","category":"thrift","title":"一分钱一分货","detail":"花不到 ¥0.05 就收进去的活（只算知道花费的农机）","tiers":[1,10,50],"coins":[10,30,60],"unit":"件"},{"id":"every_machine","category":"thrift","title":"物尽其用","detail":"收进过活的农机种数","tiers":[2,3,5],"coins":[10,30,60],"unit":"种"},{"id":"handoff","category":"team","title":"交接","detail":"帮工在田头点名另一个帮工，对方回了话","tiers":[1,5,20],"coins":[10,30,60],"unit":"次"},{"id":"parallel_graph","category":"team","title":"运筹帷幄","detail":"有一批步骤同时做的种植计划，收获了","tiers":[1,3,10],"coins":[10,30,60],"unit":"张"},{"id":"night_owl","category":"secret","title":"夜猫子","detail":"深夜（0–5 点）收进一件活","tiers":[1],"coins":[50]},{"id":"weekend","category":"secret","title":"周末农夫","detail":"周末收进一件活","tiers":[1],"coins":[50]},{"id":"full_house","category":"secret","title":"满园春色","detail":"六块地同时有帮工在干活","tiers":[1],"coins":[50]}],"actionText":{"run_command":"跑命令","read_file":"读文件","edit_file":"改文件","search":"搜索","web":"查网页","mcp":"调 MCP 工具","wait":"等待","other":"用工具","thinking":"思考","speaking_text":"写汇报","none":""},"fallbackPreset":{"id":"","label":"","blurb":"VibeValley 还没有专属外形的 runtime。","look":{"build":"biped","head":"rounded","body":"#f1e8d8","trim":"#5d5850","hat":"#f2b53a","eye":"#a6f4ff"}},"runtimeFacts":{"claude":{"steer":true,"refused":{},"capabilities":["listModels","accountUsage","checkUpdate","upgrade","skills","mcpServers","tools"],"inProcess":false},"vibevalley":{"steer":true,"refused":{},"capabilities":["listModels"],"inProcess":true},"codex":{"steer":true,"refused":{},"capabilities":["listModels","accountUsage","checkUpdate","upgrade","skills","mcpServers","tools"],"inProcess":false},"opencode":{"steer":true,"refused":{"disallowedTools":"opencode ACP 没有会话级的工具黑名单"},"capabilities":["listModels"],"inProcess":false},"pi":{"steer":true,"refused":{},"capabilities":["listModels","skills","tools"],"inProcess":true},"cursor":{"steer":true,"refused":{"systemPrompt":"Cursor SDK 的本地 agent 不支持覆盖系统提示","appendSystemPrompt":"Cursor SDK 的本地 agent 不支持追加系统提示","env":"Cursor 跑在 server 进程里，工具拿不到单独的环境变量","mcpServers":"oar 还没给 cursor 接 MCP 服务器"},"capabilities":["listModels"],"inProcess":true},"grok":{"steer":true,"refused":{"disallowedTools":"grok agent stdio 不转发工具黑名单"},"capabilities":["listModels","accountUsage","checkUpdate","upgrade","skills","mcpServers"],"inProcess":false},"kimi":{"steer":false,"refused":{"systemPrompt":"kimi acp 没有会话级的系统提示输入","appendSystemPrompt":"kimi acp 没有会话级的系统提示追加","disallowedTools":"kimi ACP 没有会话级的工具黑名单"},"capabilities":["listModels","accountUsage","checkUpdate","upgrade"],"inProcess":false},"antigravity":{"steer":false,"refused":{"systemPrompt":"Antigravity ACP 没有系统提示覆盖","appendSystemPrompt":"Antigravity ACP 没有系统提示追加","effort":"Antigravity 没有推理强度通道"},"capabilities":["listModels","checkUpdate"],"inProcess":false},"dsh":{"steer":false,"refused":{"systemPrompt":"dsh acp 没有会话级的系统提示输入","appendSystemPrompt":"dsh acp 没有会话级的系统提示追加","disallowedTools":"dsh acp 没有会话级的工具黑名单"},"capabilities":["listModels"],"inProcess":false}},"runtimePresets":[{"id":"claude","label":"Claude Code","blurb":"Anthropic 的命令行编码 agent。","look":{"eye":"#a6f4ff","build":"biped","head":"rounded","body":"#f3e9da","trim":"#d9774f","hat":"#e8804f"}},{"id":"codex","label":"Codex","blurb":"OpenAI 的编码 agent，走 app-server。","look":{"eye":"#a6f4ff","build":"treads","head":"terminal","body":"#3d434a","trim":"#d8dadc","hat":"#f4f3ee"}},{"id":"opencode","label":"opencode","blurb":"开源的终端编码 agent，走 ACP。","look":{"eye":"#a6f4ff","build":"biped","head":"terminal","body":"#e9e6de","trim":"#24282d","hat":"#2f3438"}},{"id":"vibevalley","label":"vibevalley","blurb":"VibeValley 自己的 agent（DeepSeek），跑在 server 进程里。","look":{"eye":"#a6f4ff","build":"hopper","head":"orb","body":"#fbe7c6","trim":"#4f9a5a","hat":"#f2b53a"}},{"id":"pi","label":"Pi","blurb":"跑在 server 进程里的编码 agent SDK。","look":{"eye":"#a6f4ff","build":"hopper","head":"dome","body":"#f4e6d4","trim":"#b0503f","hat":"#d9534f"}},{"id":"cursor","label":"Cursor","blurb":"Cursor 的 agent SDK，跑在 server 进程里。","look":{"eye":"#a6f4ff","build":"wheel","head":"saucer","body":"#dfe4ea","trim":"#5b6470","hat":"#a9b4c2"}},{"id":"grok","label":"Grok","blurb":"xAI 的 grok CLI，走 ACP。","look":{"eye":"#a6f4ff","build":"wheel","head":"dome","body":"#b9c4d1","trim":"#3a404a","hat":"#4f86d9"}},{"id":"kimi","label":"Kimi","blurb":"Moonshot 的 kimi CLI，走 ACP。","look":{"eye":"#a6f4ff","build":"hopper","head":"orb","body":"#e7e6fb","trim":"#6c70d8","hat":"#9580e6"}},{"id":"antigravity","label":"Antigravity","blurb":"Google 的 Antigravity agent，走 ACP。","look":{"eye":"#a6f4ff","build":"hover","head":"saucer","body":"#d3efe8","trim":"#2f9d8f","hat":"#45bf8c"}},{"id":"dsh","label":"DeepSeek Harness","blurb":"DeepSeek 的 dsh，走 ACP。","look":{"eye":"#a6f4ff","build":"treads","head":"orb","body":"#dce6fb","trim":"#3b5bdb","hat":"#4d6bfe"}}]}''',
-) as Map<String, dynamic>;
-
-/// In the order the page shows them.
-final List<AchievementDef> achievements = [for (final j in _seeds['achievements'] as List) AchievementDef.fromJson(j as Map<String, dynamic>)];
-
-/// What each action is, in words; the server says them the same way.
-final Map<SessionAction, String> actionText = {
-  for (final e in (_seeds['actionText'] as Map<String, dynamic>).entries) SessionAction.fromJson(e.key): e.value as String,
-};
-
-/// In seeds.json's order.
-final List<RuntimePreset> runtimePresets = [for (final j in _seeds['runtimePresets'] as List) RuntimePreset.fromJson(j as Map<String, dynamic>)];
-
-final Map<String, RuntimeFacts> runtimeFacts = {
-  for (final e in (_seeds['runtimeFacts'] as Map<String, dynamic>).entries) e.key: RuntimeFacts.fromJson(e.value as Map<String, dynamic>),
-};
-
-/// The look of a runtime with none of its own, under that runtime's id and name.
-final RuntimePreset fallbackPreset = RuntimePreset.fromJson(_seeds['fallbackPreset'] as Map<String, dynamic>);
-
 /// The `server` endpoints of VibeValleyApi.
 class ServerApi {
   ServerApi._(this._api);
@@ -5716,6 +5812,11 @@ class GraphApi {
 class GameApi {
   GameApi._(this._api);
   final VibeValleyApi _api;
+
+  Future<List<Achievement>> achievements() async {
+    final j = await _api._call('GET', '/api/v1/game/achievements', query: {}, body: null);
+    return [for (final e in j as List) Achievement.fromJson(e as Map<String, dynamic>)];
+  }
 
   Future<void> chooseTitle({required ChooseTitleRequest body}) async {
     await _api._call('POST', '/api/v1/game/title', query: {}, body: body.toJson());

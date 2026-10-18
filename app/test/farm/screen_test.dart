@@ -54,7 +54,7 @@ void main() {
         ],
       ),
     );
-    const view = FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {});
+    const view = FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {}, achievements: []);
     final frame = ReceivedFrame(StateFrame(state: state, inbox: const [], graphs: const [], view: view, effects: const []), bytes: 0, decodeMicros: 0);
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1;
@@ -73,6 +73,13 @@ void main() {
               AsyncData([
                 RuntimeInfo(
                   id: 'claude',
+                  preset: const RuntimePreset(
+                    id: 'claude',
+                    label: 'claude',
+                    blurb: '',
+                    look: Look(build: Build.biped, head: Head.rounded, body: '#fff', trim: '#000', hat: '#f00', eye: '#0ff'),
+                  ),
+                  facts: const RuntimeFacts(steer: false, refused: {}, capabilities: [], inProcess: false),
                   installation: const InstallationAvailable(via: Via.executable, command: 'claude'),
                   usage: const AccountUsageOk(windows: [UsageWindow(label: '5 小时', usedPercent: 61)]),
                   settings: RuntimeSettings.fromJson(const {

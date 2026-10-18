@@ -45,8 +45,41 @@ Agent agent(
   look: look(),
 );
 
-RuntimeInfo runtime(String id, {bool available = true, List<ModelEntry>? models, List<InventoryEntry>? skills, List<InventoryEntry>? tools}) => RuntimeInfo(
+/// What runtime.list says each runtime is called (its preset), as the server has it.
+const runtimeLabels = {
+  'claude': 'Claude Code',
+  'codex': 'Codex',
+  'opencode': 'opencode',
+  'vibevalley': 'vibevalley',
+  'pi': 'Pi',
+  'cursor': 'Cursor',
+  'grok': 'Grok',
+  'kimi': 'Kimi',
+  'antigravity': 'Antigravity',
+  'dsh': 'DeepSeek Harness',
+};
+
+/// The facts runtime.list gives: cursor refuses a system prompt; claude can be asked anything.
+RuntimeFacts runtimeFacts(String id, {Map<String, String>? refused}) => RuntimeFacts(
+  steer: id != 'kimi',
+  refused: refused ?? (id == 'cursor' ? const {sessionSystemPrompt: 'Cursor 不支持覆盖系统提示', sessionAppendSystemPrompt: 'Cursor 不支持追加系统提示'} : const {}),
+  capabilities: id == 'claude' ? RuntimeCapability.values : const [RuntimeCapability.listModels],
+  inProcess: id == 'cursor' || id == 'pi',
+);
+
+RuntimePreset runtimePreset(String id) => RuntimePreset(id: id, label: runtimeLabels[id] ?? id, blurb: '$id 的介绍。', look: look());
+
+RuntimeInfo runtime(
+  String id, {
+  bool available = true,
+  List<ModelEntry>? models,
+  List<InventoryEntry>? skills,
+  List<InventoryEntry>? tools,
+  Map<String, String>? refused,
+}) => RuntimeInfo(
   id: id,
+  preset: runtimePreset(id),
+  facts: runtimeFacts(id, refused: refused),
   installation: available ? const InstallationAvailable(via: Via.executable, command: 'x', version: '1.0.0') : const InstallationNotFound(),
   models: models,
   skills: skills,
@@ -273,6 +306,8 @@ Map<String, dynamic> runtimeJson(
   double? dailyBudget,
 }) => {
   'id': id,
+  'preset': {...runtimePreset(id).toJson(), if (id == 'claude') 'blurb': 'Anthropic 的命令行编码 agent。'},
+  'facts': runtimeFacts(id).toJson(),
   'installation': available ? {'status': 'available', 'via': 'executable', 'command': '/usr/local/bin/$id', 'version': '1.2.3'} : {'status': 'not_found'},
   'models': ?models,
   'usage': ?usage,

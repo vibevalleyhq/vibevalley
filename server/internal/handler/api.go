@@ -198,6 +198,10 @@ func (a api) GraphEvents(_ context.Context, id string) ([]protocol.GraphEvent, e
 	return a.f.Task.Events(id), nil
 }
 
+func (a api) GameAchievements(context.Context) ([]protocol.Achievement, error) {
+	return a.f.Game.Achievements(), nil
+}
+
 func (a api) GameChooseTitle(_ context.Context, body protocol.ChooseTitleRequest) error {
 	a.f.Game.ChooseTitle(body.Achievement, body.Tier)
 	return nil

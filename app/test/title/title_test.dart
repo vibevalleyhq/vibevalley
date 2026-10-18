@@ -74,7 +74,7 @@ void main() {
           state: farmState(coins: coins),
           inbox: const [],
           graphs: const [],
-          view: const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {}),
+          view: const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {}, achievements: []),
           effects: const [],
         ),
         bytes: 0,

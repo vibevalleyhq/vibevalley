@@ -29,8 +29,8 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 ## 模型和不变量
 
 - **服务端是核心状态唯一的持有者。** 客户端经 `GET /api/v1/state` 收整份 `StateFrame`（`state`、`inbox`、`graphs`、`view`、`effects`），状态变了就再推一份，至多每 200 毫秒一份；经 `GET /api/v1/live` 收 `LiveEvent`（干活过程的一步、提醒、农机变了）。客户端不读事实，`/api/v1/events` 留给命令行和调试。
-- **Flutter 不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Schedule.whenText`、`nextText`、`Progress.multiplier`，`{span}` 由客户端按自己的钟填），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agents/check`、新项目会被拒的第一处 `POST /api/v1/projects/check`、设置会被拒的第一处 `POST /api/v1/settings/check`、记性的预览 `GET /api/v1/memories/{agent}/recall`、交代冲突 `POST /api/v1/issues/{id}/resolve`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里。成就表、金币、动作的说法这类两边都要的值经 `seeds.json` 生成进 `lib/gen`。
-- **`lib/rules/` 只是读帧的纯函数**：哪些频道、未读几条、某档成就叫什么、庄稼熟没熟、能不能收这类，只给页面用，服务端不调，所以只在 Dart 有一份；跟着墙上时钟走的画面（走路、动画、小游戏的局面）也只在 Dart。
+- **Flutter 不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Schedule.whenText`、`nextText`、`Progress.multiplier`，`{span}` 由客户端按自己的钟填），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agents/check`、新项目会被拒的第一处 `POST /api/v1/projects/check`、设置会被拒的第一处 `POST /api/v1/settings/check`、记性的预览 `GET /api/v1/memories/{agent}/recall`、交代冲突 `POST /api/v1/issues/{id}/resolve`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里，农机叫什么、长什么样、接受什么在 `RuntimeInfo.preset`、`RuntimeInfo.facts` 里（[档案和农机](docs/subsystems/agent.md)）；成就的说法是一次性的接口 `game.achievements`，进度在每帧的 `view.achievements`，到一档的特效带着说法（[游戏](docs/subsystems/game.md)）；帮工在做什么、这一轮的每一步在帧里带 `actionText`，干活过程里每个工具调用也带着（[核心状态](docs/subsystems/core.md)）。客户端不带 `seeds.json` 的任何一份，`lib/gen` 里只有形状和接口。
+- **`lib/rules/` 只是读帧的纯函数**：哪些频道、未读几条、庄稼熟没熟、能不能收、目录里的农机叫什么这类，只给页面用，服务端不调，所以只在 Dart 有一份；跟着墙上时钟走的画面（走路、动画、小游戏的局面）也只在 Dart。
 - **只给真实数据。** 没有模拟服务器：连不上就在顶上一条横幅（`shared/connection_banner.dart`）说「连不上 VibeValley 服务端」（「连接到本机」那头的农场说连不上哪台、去「连接到本机」重新配对），每 4 秒问一次 `GET /api/v1/health`，连上自己消失；页面是空的，不换成假数据。
 - **分层**：`lib/` 下每个目录一个 rank，import 只能去 rank 更小的目录，同 rank 的不同目录之间也不行：
 
@@ -105,6 +105,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 
 - **一个客户端，用 Flutter。** 一套 Dart 出 macOS、iOS、Android 的原生应用，Agora 有官方的 Flutter SDK。放弃了 Tauri 或 Capacitor 包网页（手感和 WebView 里的语音正是要换掉的）、React Native（像素村要套 WebView，桌面端弱）、留着 Electron 或 MyGo（三个 macOS 应用把菜单栏、通知、快捷键、渠道各写一遍，家目录还不同）。网页也删了：它冻结以后只为对照留着一份 TypeScript 规则，每改一条规则写两遍；对照的参照已经落后，模拟服务器只服务它。代价是没有不起服务端就能看的画面。
 - **推折好的整份状态，客户端不折。** 客户端再写一份 `Reduce` 就是第二份核心状态，两边改规则靠自觉对齐。推整份的代价是带宽：一份真实状态几十 KB，管家逐字说话时每 200 毫秒一份，本机和局域网没问题，手机走蜂窝网偏重；要换增量时，增量格式又是一份两端都要遵守的约定。
+- **种子数据挂在服务端已经给的东西上，客户端不带副本。** 原来 `shapegen` 把 `seeds.json` 里客户端要的五样压成一行约 35KB 的字符串写进 `lib/gen`：「连接到本机」的手机和那台电脑的服务端版本不一样时，农机的名字和能力、成就的门槛就对不上，成就进度和农机能做什么在 Dart 里也成了一份规则的输入；改一个成就整行都变，难审。现在每样挂在页面本来就在等的东西上：农机随 `runtime.list`，成就的说法随一次性的 `game.achievements`、进度随帧，动作的说法随帧和事件。放弃了 `shapegen` 改写资源文件（客户端照样带副本，二十来处改成等异步读）和一个整份的 `GET /api/v1/seeds`（客户端拿到还要自己拼进度、名字，规则回到 Dart）。
 - **客户端问服务端，不移植规则。** 移植一份再用 Go 写样本、Dart 读样本守着两边一致，守得住，但每条规则两份实现、两套测试，页面要的只是结论。没把这些结论都塞进核心状态：档案的问题依赖没存的草稿，记性的预览依赖主人正在打的字，都不是农场的状态。代价是这几句要等服务端回答，第一次打开晚一下出现。反过来，只给页面读帧的小函数（未读、熟没熟）不留在 Go：开着的服务端不调它们，留着只是为了对照。
 - **两张皮在上，共用的在下，次序由脚本查。** 共用的东西放在先有的那张皮里，后来的那张就反过来借，依赖成了双向的。没放进一个 `common/`：田头是一整块功能（状态、规则、控件），和几张脸、几个小控件不是一回事。没拆成多个 Dart package：一个包加 `app:imports` 已经挡得住，真要编译器挡再拆。
 - **只给真实数据。** 服务端没开时换成模拟农场，提示再大也会被当成真的；没有服务端就说没有。
@@ -123,9 +124,10 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 ## 怎么验证
 
 - 分层：`bun run app:imports`（`flutter:check` 也跑），反向、同层跨目录和在 `lib/voice/` 以外 import Agora 都报出文件和行。
+- 读服务端的形状：`test/farm/panels_test.dart`（任务与成就页、地块详情的「正在…」和这一轮的每一步、干活过程的每个工具调用都用服务端给的说法）、`test/workbench/runtimes_test.dart`（农具页照目录列）、`test/workbench/agents_test.dart`（捏帮工的农机列表照目录列和叫）、`test/game/fx_test.dart`、`test/host/notify_test.dart`（特效带的说法）。
 - 数据层：`test/data/server_test.dart`（关闭时两条流和 `problems` 都停；坏帧之后下一帧照收）、`test/data/remote_test.dart`（农机推送胜过旧的列表、乱序的刷新新的赢、首次失败是错误）、`test/data/deep_owners_test.dart`（按对象的读取、干活过程先历史再增量、两个可见的视图共用一次已读）、`test/data/api_test.dart`；`test/app/widget_test.dart` 解码 Go 写的示例帧（`server/internal/protocol/golden_test.go` 的 `TestStateFrameSample`）。
 - 宿主：`test/host/launcher_test.dart`（子进程分配的端口和收据、日志噪声不算收据、没有收据或 pid 不符超时并停掉、提前退出、等收据时退出、spawn 没完成就取消、不理 SIGTERM 的被杀、登录 shell 超时）、`desktop_start_test.dart`、`desktop_prepare_cancel_test.dart`（并发启动共用一个、准备中退出不再生成进程）、`folders_test.dart`（家目录和工作目录、切回本机保留配对）、`follow_test.dart`、`notify_test.dart`（开机的来电不响、通知的说法、菜单栏摘要、命令的 JSON 来回）、`mobile_notices_test.dart`、`phone_lifecycle_test.dart`；`test/app/host_router_test.dart`。
 - 首页：`test/title/title_test.dart`（第一次之后直接进农场、没钥匙的开始游戏去设置、继续游戏要有农场、启动进度）。
 - 服务端那一半：`internal/handler/server_test.go` 的 `TestServerIsReachableBeforeReadyWork`、`TestFailedReadyReleasesTransportAndFarm`；`internal/base/ready_test.go` 的 `TestTransportPreparationPrecedesServiceReadyRequests`；`internal/base/home_lease_test.go`（`TestHomeLeaseRejectsAnotherAppBeforeConstructingServices`、`TestHomeLeaseLastsThroughStopWritesAndReleasesOnce`、`TestHomeLeaseReleasesOnConstructionFailure`、`TestHomeLeaseRejectsSymlinkAlias`）；`internal/base/files_test.go` 的 `TestFileWriterFinishExcludesLateCallbacks`。
-- 服务端替客户端算的结论：`TestTheFrameSaysTheWordsOnACopy`（protocol）、`TestPreviewPicksWithoutCountingAndTheLongestUnusedFade`（memory）、`TestQuotaWords`（runtime）、`TestCheckSaysWhatCreateWouldRefuse`（project）、`TestConflictingBranchStaysUntilResolved`（workspace）、`TestTheOwnersReviewAndCallAreCounted`（game）。
+- 服务端替客户端算的结论：`TestTheFrameSaysTheWordsOnACopy`、`TestTheFrameSaysWhatEachActionIs`、`TestTheViewSaysHowFarEachAchievementIs`、`TestAchievementsInWords`（protocol）、`TestTheListCarriesEveryRuntimesPresetAndFacts`（runtime）、`TestPreviewPicksWithoutCountingAndTheLongestUnusedFade`（memory）、`TestQuotaWords`（runtime）、`TestCheckSaysWhatCreateWouldRefuse`（project）、`TestConflictingBranchStaysUntilResolved`（workspace）、`TestTheOwnersReviewAndCallAreCounted`（game）。
 - 真程序：`verify-app`（`app/tool/screens/live_screens_test.dart` 对着 `scripts/verify-server.ts` 起的服务端画每一页）；渠道：`app/tool/build-macos.sh --channel alpha|beta|release` 后 `Info.plist` 的 `CFBundleIdentifier`、`CFBundleName` 和 dmg 名跟着变，两个渠道同时开各自答 `GET /api/v1/health`。

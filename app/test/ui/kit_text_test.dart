@@ -116,10 +116,7 @@ var a = 1;
   });
 
   group('labels', () {
-    test('every action and phase has its word', () {
-      for (final a in SessionAction.values) {
-        expect(actionText.containsKey(a), isTrue, reason: 'seeds.json has every action\'s words');
-      }
+    test('every phase has its word', () {
       expect(phaseLabel(const PhaseRipe()), '完工');
       expect(managerLabel[ManagerState.listening], '在听');
       expect(outcomeLabel[Outcome.interrupted], '叫停');
@@ -140,6 +137,13 @@ var a = 1;
       // What is left and the words are the server's (RuntimeInfo.quota); the bottle is the client's.
       RuntimeInfo at(AccountUsage? usage, {double? left, String text = ''}) => RuntimeInfo(
         id: 'x',
+        preset: const RuntimePreset(
+          id: 'x',
+          label: 'x',
+          blurb: '',
+          look: Look(build: Build.biped, head: Head.rounded, body: '#fff', trim: '#000', hat: '#f00', eye: '#0ff'),
+        ),
+        facts: const RuntimeFacts(steer: false, refused: {}, capabilities: [], inProcess: false),
         installation: const InstallationNotFound(),
         usage: usage,
         settings: RuntimeSettings.fromJson(const {'enabled': true, 'binPath': '', 'defaultModel': '', 'defaultEffort': '', 'env': <String, String>{}}),

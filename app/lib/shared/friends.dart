@@ -12,7 +12,6 @@ import '../data/remote.dart' show agentsProvider, runtimesProvider;
 import 'popover.dart';
 import 'quota_pill.dart';
 import '../rules/sessions.dart';
-import '../rules/seeds.dart';
 import './faces.dart';
 import './tags.dart';
 
@@ -53,7 +52,7 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
     final height = widget.height;
     final agents = (ref.watch(agentsProvider).value ?? const <String, Agent>{}).values.toList();
     final sessions = ref.watch(stateProvider.select((s) => s?.sessions)) ?? const <Session>[];
-    final view = ref.watch(viewProvider) ?? const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {});
+    final view = ref.watch(viewProvider) ?? const FarmView(level: FarmLevel(level: 1, xp: 0, need: 10), plots: {}, achievements: []);
     final open = ref.watch(friendsOpenProvider);
     final sorted = [...agents.where((a) => a.enabled), ...agents.where((a) => !a.enabled)];
     final statuses = [for (final a in sorted) statusOf(sessions.where((h) => h.agent == a.id).toList(), view)];
@@ -271,7 +270,7 @@ class Friend extends ConsumerWidget {
                     children: [
                       Text(agent.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.lg),
                       Text(
-                        '${runtimeName(agent.runtime)}${agent.model.isNotEmpty ? ' · ${agent.model}' : ''}',
+                        '${runtime?.preset.label ?? agent.runtime}${agent.model.isNotEmpty ? ' · ${agent.model}' : ''}',
                         style: KitText.xs.copyWith(color: Palette.bark600),
                       ),
                       Text(
@@ -299,7 +298,7 @@ class Friend extends ConsumerWidget {
                         Tooltip(
                           message: quota.text,
                           child: Text(
-                            '${runtimeName(agent.runtime)}：${quota.text}',
+                            '${runtime?.preset.label ?? agent.runtime}：${quota.text}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: KitText.xs.copyWith(color: Palette.bark500),

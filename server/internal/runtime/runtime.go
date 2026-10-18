@@ -544,7 +544,7 @@ func (r *Service) remember(next observation, read uint64) protocol.RuntimeInfo {
 		return info
 	}
 	next.Read = read
-	next.Info.Refused = r.refusals(id)
+	next.Info.Preset, next.Info.Facts = protocol.PresetOf(id), r.facts(id)
 	next.Info = r.withSpendLocked(next.Info)
 	r.cache[id] = next
 	r.mu.Unlock()

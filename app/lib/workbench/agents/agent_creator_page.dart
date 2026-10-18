@@ -10,22 +10,22 @@ import '../shared/rules.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
-import '../../rules/seeds.dart';
+import '../../rules/runtimes.dart';
 import '../../shared/trajectory.dart';
 import 'agent_config.dart';
 import 'agent_look.dart';
 
-Agent newAgent(String runtime, [Look? look]) {
+Agent newAgent(String runtime, List<RuntimeInfo> catalog, [Look? look]) {
   return Agent(
     id: '',
-    name: '新的 ${runtimeName(runtime)}',
+    name: '新的 ${runtimeName(catalog, runtime)}',
     role: '',
     enabled: true,
     runtime: runtime,
     model: '',
     effort: '',
     persona: '',
-    personaMode: factsOf(runtime).refused[sessionAppendSystemPrompt] != null ? PersonaMode.prompt : PersonaMode.append,
+    personaMode: factsOf(runtimeOf(catalog, runtime)).refused[sessionAppendSystemPrompt] != null ? PersonaMode.prompt : PersonaMode.append,
     skills: const [],
     mcpServers: const [],
     disallowedTools: const [],
@@ -57,7 +57,10 @@ class _AgentCreatorPageState extends ConsumerState<AgentCreatorPage> {
   void _start(WorkbenchConfig config) {
     if (!config.loaded) return;
     if (_isNew) {
-      _draft = newAgent(widget.runtime ?? 'claude');
+      // Named after its runtime, and given the persona the way that runtime takes it: both come with runtime.list.
+      final catalog = ref.read(runtimesProvider).value;
+      if (catalog == null) return;
+      _draft = newAgent(widget.runtime ?? 'claude', catalog);
     } else {
       _draft = config.agent(widget.id);
     }
@@ -84,7 +87,11 @@ class _AgentCreatorPageState extends ConsumerState<AgentCreatorPage> {
     ref.listen(workbenchConfigProvider.select((c) => c.loaded), (was, loaded) {
       if (loaded && _draft == null) setState(() => _start(ref.read(workbenchConfigProvider)));
     });
+    ref.listen(runtimesProvider.select((r) => r.hasValue), (was, has) {
+      if (has && _draft == null) setState(() => _start(ref.read(workbenchConfigProvider)));
+    });
     if (config.error != null) return const ConfigProblem();
+    if (_isNew && _draft == null && ref.watch(runtimesProvider.select((r) => r.hasError))) return const RuntimeProblem();
     final note = KitText.sm.copyWith(color: Palette.bark500);
     if (!config.loaded) {
       return Padding(

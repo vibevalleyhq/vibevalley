@@ -10,7 +10,6 @@ import '../shared/rules.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
-import '../../rules/seeds.dart';
 
 class AgentsPage extends ConsumerWidget {
   const AgentsPage({super.key});
@@ -293,7 +292,7 @@ class _AgentCard extends ConsumerWidget {
                         children: [
                           Container(width: 6, height: 6, color: available ? Palette.leaf500 : Palette.berry),
                           const SizedBox(width: 6),
-                          Text(runtimeName(a.runtime)),
+                          Text(runtime?.preset.label ?? a.runtime),
                           if (a.model.isNotEmpty) Flexible(child: Text(' · ${a.model}', maxLines: 1, overflow: TextOverflow.ellipsis)),
                           if (a.effort.isNotEmpty) Text(' · ${a.effort}'),
                         ],
