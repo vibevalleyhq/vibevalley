@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
-import 'package:vibevalley/workbench/map/map_page.dart';
+import 'package:vibevalley/workbench/projects/projects_page.dart';
 import 'package:vibevalley/workbench/map/map_rules.dart';
 import 'package:vibevalley/shared/swatches.dart' show Pose;
 import 'package:vibevalley/gen/vibevalley.dart';
@@ -271,17 +271,17 @@ void main() {
     );
     final went = <String>[];
     final router = GoRouter(
-      initialLocation: '/map',
+      initialLocation: '/projects',
       routes: [
         GoRoute(
-          path: '/map',
-          builder: (_, _) => const Scaffold(body: MapPage()),
+          path: '/projects',
+          builder: (_, _) => const Scaffold(body: ProjectsPage()),
         ),
         GoRoute(
-          path: '/map/:project',
-          builder: (_, s) => Scaffold(body: MapPage(project: s.pathParameters['project'])),
+          path: '/projects/:project',
+          builder: (_, s) => Scaffold(body: ProjectsPage(id: s.pathParameters['project'])),
         ),
-        for (final path in ['/issues/:id', '/projects/:id'])
+        for (final path in ['/issues/:id'])
           GoRoute(
             path: path,
             builder: (_, s) {
@@ -321,7 +321,8 @@ void main() {
     );
     await settle(t);
 
-    expect(find.text('clock-in'), findsOneWidget);
+    // In the list, and as its island on the map.
+    expect(find.text('clock-in'), findsNWidgets(2));
     expect(find.text('在干 1/3'), findsOneWidget);
     expect(find.text('在干 1/3 · 排队 1'), findsOneWidget);
     expect(find.text('在干 0/2'), findsOneWidget);
@@ -334,17 +335,18 @@ void main() {
     await settle(t);
     expect(went, ['/issues/new?project=task-smoke']);
 
-    router.go('/map');
+    router.go('/projects');
     await settle(t);
     await t.tap(find.bySemanticsLabel('测试小吴'));
     await settle(t);
     expect(went.last, '/issues/w1');
 
-    router.go('/map');
+    router.go('/projects');
     await settle(t);
-    await t.tap(find.text('docs'));
+    // The island, not its row in the list.
+    await t.tap(find.text('docs').last);
     await settle(t);
-    expect(router.routerDelegate.currentConfiguration.uri.toString(), '/map/docs');
+    expect(router.routerDelegate.currentConfiguration.uri.toString(), '/projects/docs');
     expect(find.text('worktree · 1 个'), findsOneWidget);
     expect(find.text('排队 · 1 件'), findsOneWidget);
     expect(find.text('写周报'), findsOneWidget);

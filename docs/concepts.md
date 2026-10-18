@@ -34,7 +34,7 @@ Workspace（工作目录，一张大地图）
 
 | 概念 | 代码里 | 是什么 | 农场里 |
 |---|---|---|---|
-| Workspace | `Config.WorkRoot`、`Config.Home` | 全部项目、工单、群聊、档案；同时干活的上限（6）是它的 | 大地图（`/map`） |
+| Workspace | `Config.WorkRoot`、`Config.Home` | 全部项目、工单、群聊、档案；同时干活的上限（6）是它的 | 大地图（`/projects` 的「全部」） |
 | 管家 | `Manager` | 主人的助理 agent：听主人说，拆成工单，派出去，转告结果 | 管家 |
 | agent 档案 | `Agent` | 能派活的「同事」：runtime、模型、人设、技能、MCP、环境变量、长相 | 一种小动物 |
 | runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 smith 驱动 | 农机 |
@@ -73,4 +73,4 @@ Workspace（工作目录，一张大地图）
 
 核心状态里还混着金币和成就；见[提案](../.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)。
 
-还没对上的：地块详情和工单详情还是两页，项目页还把项目画成一块地；见[一块地是一张在做的工单](../.agents/notes/proposed/architecture/2026-10-18-a-plot-is-an-issue.md)。
+还没对上的：地块详情和工单详情还是两页；见[一块地是一张在做的工单](../.agents/notes/proposed/architecture/2026-10-18-a-plot-is-an-issue.md)。

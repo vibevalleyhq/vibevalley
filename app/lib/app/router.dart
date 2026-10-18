@@ -8,7 +8,6 @@ import '../workbench/catalog/catalog_page.dart';
 import '../workbench/chat/chat_page.dart';
 import '../workbench/connectors/connectors_page.dart';
 import '../workbench/gate/gate_page.dart';
-import '../workbench/map/map_page.dart';
 import '../workbench/issues/issues_page.dart';
 import '../workbench/manager/manager_page.dart';
 import '../workbench/projects/projects_page.dart';
@@ -39,11 +38,6 @@ final router = GoRouter(
             GoRoute(
               path: '/issues/:id',
               builder: (_, s) => IssuesPage(id: s.pathParameters['id'], project: s.uri.queryParameters['project']),
-            ),
-            GoRoute(path: '/map', builder: (_, _) => const MapPage()),
-            GoRoute(
-              path: '/map/:project',
-              builder: (_, s) => MapPage(project: s.pathParameters['project']),
             ),
             GoRoute(path: '/agents', builder: (_, _) => const AgentsPage()),
             GoRoute(

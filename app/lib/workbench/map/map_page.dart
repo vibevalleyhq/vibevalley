@@ -1,11 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
-import '../shared/layout.dart' show sideBySideFrom;
 import '../../gen/vibevalley.dart';
 import '../../rules/sessions.dart';
 import '../../rules/cast.dart';
@@ -27,77 +24,41 @@ const _gap = 24.0;
 
 const _parchment = Color(0xFFEBD9AE);
 
-class MapPage extends ConsumerStatefulWidget {
-  const MapPage({super.key, this.project});
-
-  final String? project;
-
-  @override
-  ConsumerState<MapPage> createState() => _MapPageState();
-}
-
-class _MapPageState extends ConsumerState<MapPage> {
-  Timer? _poll;
+/// The whole map: every project an island; a tap on one opens it on the projects page.
+class ProjectMap extends ConsumerWidget {
+  const ProjectMap({super.key});
 
   @override
-  void initState() {
-    super.initState();
-    _poll = Timer.periodic(_pollEvery, (_) => unawaited(_load()));
-  }
-
-  @override
-  void dispose() {
-    _poll?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _load() => ref.read(projectCatalogProvider.notifier).refresh().catchError((Object _) {});
-
-  void _open(String? project) => workbenchGo(context, project == null ? '/map' : '/map/${Uri.encodeComponent(project)}');
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final atlas = ref.watch(atlasProvider).value;
     final farm = ref.watch(stateProvider);
     final sessions = farm?.sessions ?? const <Session>[];
-    final plots = ref.watch(viewProvider)?.plots ?? const <String, PlotView>{};
     final projects = ref.watch(projectCatalogProvider).value;
     if (atlas == null) return const SizedBox.shrink();
-    final islands = islandsOf(projects: projects ?? const [], sessions: sessions, plots: plots, issues: farm?.issues ?? const []);
-    final open = islands.where((i) => i.project == widget.project).firstOrNull;
-    return LayoutBuilder(
-      builder: (context, box) {
-        final wide = box.maxWidth >= sideBySideFrom;
-        final map = _MapView(atlas: atlas, islands: islands, homeless: homeless(sessions), loading: projects == null, selected: open?.project, onOpen: _open);
-        if (open == null) return map;
-        final side = Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: InlineLink(wide ? '收起' : '回地图', onTap: () => _open(null)),
-            ),
-            const SizedBox(height: 6),
-            Expanded(
-              child: PxScrollView(child: _IslandDetail(island: open)),
-            ),
-          ],
-        );
-        if (!wide) return Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 12), child: side);
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(child: map),
-            SizedBox(
-              width: 420,
-              child: Padding(padding: const EdgeInsets.fromLTRB(0, 0, 12, 12), child: side),
-            ),
-          ],
-        );
-      },
+    return _MapView(
+      atlas: atlas,
+      islands: islandsNow(ref),
+      homeless: homeless(sessions),
+      loading: projects == null,
+      selected: null,
+      onOpen: (project) => workbenchGo(context, project == null ? '/projects' : '/projects/${Uri.encodeComponent(project)}'),
     );
   }
 }
+
+/// The islands as the farm stands now.
+List<Island> islandsNow(WidgetRef ref) {
+  final farm = ref.watch(stateProvider);
+  return islandsOf(
+    projects: ref.watch(projectCatalogProvider).value ?? const [],
+    sessions: farm?.sessions ?? const <Session>[],
+    plots: ref.watch(viewProvider)?.plots ?? const <String, PlotView>{},
+    issues: farm?.issues ?? const [],
+  );
+}
+
+/// How often the projects page asks again what projects there are.
+const projectsPollEvery = _pollEvery;
 
 class _MapView extends StatelessWidget {
   const _MapView({required this.atlas, required this.islands, required this.homeless, required this.loading, required this.selected, required this.onOpen});
@@ -537,8 +498,9 @@ class _NoProjects extends StatelessWidget {
   );
 }
 
-class _IslandDetail extends StatelessWidget {
-  const _IslandDetail({required this.island});
+/// One island: its plots (the issues being worked), the room left, what waits.
+class IslandDetail extends StatelessWidget {
+  const IslandDetail({super.key, required this.island});
   final Island island;
 
   @override
@@ -548,7 +510,6 @@ class _IslandDetail extends StatelessWidget {
       final growth = growthOf(last, now);
       final shut = island.spots.whereType<SpotShut>().length;
       final taken = island.spots.whereType<SpotTaken>().toList();
-      final project = Uri.encodeComponent(island.project);
       return PxCard(
         title: island.project,
         aside: Text(islandText(island)),
@@ -627,13 +588,6 @@ class _IslandDetail extends StatelessWidget {
                     ],
                   ),
                 ),
-            ],
-            if (island.summary != null) ...[
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: PxButton.text('项目详情', icon: 'button-open', onPressed: () => workbenchGo(context, '/projects/$project')),
-              ),
             ],
           ],
         ),

@@ -18,8 +18,8 @@
 
 | 概念 | 农场里 | 界面 | 协议 | HTTP |
 |---|---|---|---|---|
-| Workspace | 大地图 | `/map`（`workbench/map`） | `Config.WorkRoot`、`Config.Home`（服务端的配置，不进协议） | |
-| 项目 | 大地图上的一座岛 | `/projects`（`workbench/projects`）、`/map/:project` | `ProjectSummary`、`ProjectActivity`、`ProjectLanguages`；帮工在哪个项目、目录、分支是服务端的 `project.Workplace` | `/api/v1/projects` |
+| Workspace | 大地图 | `/projects` 的「全部」（`workbench/map` 的 `ProjectMap`） | `Config.WorkRoot`、`Config.Home`（服务端的配置，不进协议） | |
+| 项目 | 大地图上的一座岛 | `/projects/:project`（`workbench/projects`；岛的地和空位是 `workbench/map` 的 `IslandDetail`） | `ProjectSummary`、`ProjectActivity`、`ProjectLanguages`；帮工在哪个项目、目录、分支是服务端的 `project.Workplace` | `/api/v1/projects` |
 | 帮工档案 | 一种小动物 | `/agents`（`workbench/agents`） | `Agent` | `/api/v1/agents` |
 | 农机 | 农具 | `/runtimes`（`workbench/runtimes`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtimes` |
 | 技能书 | 技能书 | `/settings/skills`（`workbench/skills`） | `Skill` | `/api/v1/skills` |

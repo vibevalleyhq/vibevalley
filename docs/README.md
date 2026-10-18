@@ -43,7 +43,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 帮工档案 | agent（`Agent`） | 一份配置：农机、模型、人设、技能、哪种小动物 | 角色、profile |
 | 农机 | runtime | 机器上的一种编码 agent 程序（pi、claude、codex……） | harness、引擎 |
 | 工单 | issue（`Issue`） | 一件活，从写下到关上一个 id；在做时是一块地，每派一次是一个帮工 | job、ticket |
-| 项目 | project | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛 | 一块地 |
+| 项目 | project | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
 | 地 | 工单的分支和 worktree（`project.IssueBranch`）；像素村里的位置是 station、bed | 一张在做的工单，帮工在上面干活；一座岛上的地和空位是这个项目同时在做的工单数（[还没对上的](concepts.md#农场是皮)） | 工位、帮工的地、并发位 |
 | 种子袋 | 待办的工单（todo，`queued_at`） | 排队等空地的工单，有空地自动开工 | 队列 |
 | 阶段 | phase | 到场、干活、成熟、失败、歇着 | 状态 |
