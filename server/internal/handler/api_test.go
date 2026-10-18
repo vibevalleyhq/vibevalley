@@ -21,6 +21,7 @@ func TestSaveTakesThePathsID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.Project.GitHubProbe = fixture.NoGitHub
 	t.Cleanup(f.Close)
 	srv := httptest.NewServer(handler.New(f))
 	defer srv.Close()
@@ -47,6 +48,7 @@ func TestIssueLifecycleNeedsASession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.Project.GitHubProbe = fixture.NoGitHub
 	t.Cleanup(f.Close)
 	srv := httptest.NewServer(handler.New(f))
 	defer srv.Close()
@@ -88,6 +90,7 @@ func TestFreshAgentListHasValidRequiredEnums(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.Project.GitHubProbe = fixture.NoGitHub
 	t.Cleanup(f.Close)
 	srv := httptest.NewServer(handler.New(f))
 	defer srv.Close()
@@ -115,6 +118,7 @@ func TestChannelCreationReturnsItsIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.Project.GitHubProbe = fixture.NoGitHub
 	t.Cleanup(f.Close)
 	srv := httptest.NewServer(handler.New(f))
 	defer srv.Close()

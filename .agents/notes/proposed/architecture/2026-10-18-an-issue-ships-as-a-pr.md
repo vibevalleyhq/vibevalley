@@ -25,6 +25,8 @@ Status: proposed
 
 ### 2. 检测 `gh` 和登录
 
+进展：已实现开机检测、`github.status` / `github.refresh` 和 `setting.check` 的 GitHub 状态；项目的提 PR 能力随检测一起缓存，列表只读缓存。
+
 - 照农机的检测（`runtime` 的 probe）：农场级查 `gh --version`、`gh auth status --hostname github.com`，结果进设置检查（`setting.check`），只说「装了、登录了、哪个账号」，不出现 token。用 `gh`，不用早就不维护的 `hub`。
 - 项目级：`origin` 是不是 github.com，`gh repo view --json viewerPermission` 有没有写权限。`Project` 带一个字段：能不能提 PR，不能的话为什么（没装 gh、没登录、不是 GitHub、没有写权限）。
 

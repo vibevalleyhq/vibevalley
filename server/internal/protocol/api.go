@@ -141,6 +141,12 @@ type Handlers interface {
 	//vibevalley:route runtime.list GET /api/v1/runtimes
 	//vibevalley:can owner remote
 	RuntimeList(ctx context.Context) ([]RuntimeInfo, error)
+	//vibevalley:route github.status GET /api/v1/github
+	//vibevalley:can owner remote
+	GithubStatus(ctx context.Context) (GitHubStatus, error)
+	//vibevalley:route github.refresh POST /api/v1/github/refresh
+	//vibevalley:can owner remote
+	GithubRefresh(ctx context.Context) (GitHubStatus, error)
 	//vibevalley:route runtime.refresh POST /api/v1/runtimes/{id}/refresh
 	//vibevalley:can owner remote
 	RuntimeRefresh(ctx context.Context, pID string) (RuntimeInfo, error)

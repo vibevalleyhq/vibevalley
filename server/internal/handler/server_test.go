@@ -13,6 +13,7 @@ import (
 	"go.uber.org/fx"
 	"vibevalley/internal/base"
 	"vibevalley/internal/handler"
+	"vibevalley/internal/project"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/internal/testkit/fixture"
@@ -25,7 +26,7 @@ func TestServerIsReachableBeforeReadyWork(t *testing.T) {
 	seen := ""
 	life, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	running, err := handler.Listen(life, cfg, fx.Populate(&sessions), base.BeforeReady(func(ctx context.Context) error {
+	running, err := handler.Listen(life, cfg, fx.Invoke(func(p *project.Service) { p.GitHubProbe = fixture.NoGitHub }), fx.Populate(&sessions), base.BeforeReady(func(ctx context.Context) error {
 		seen = sessions.FarmURL()
 		client := &http.Client{Timeout: 2 * time.Second}
 		req, err := http.NewRequestWithContext(ctx, "POST", seen, strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"ready-test","version":"1"}}}`))
@@ -78,7 +79,7 @@ func TestFailedReadyReleasesTransportAndFarm(t *testing.T) {
 	reserved.Close()
 	failed := errors.New("cannot prepare")
 	var db *sql.DB
-	if _, err := handler.Listen(context.Background(), cfg, fx.Populate(&db), base.BeforeReady(func(context.Context) error { return failed })); !errors.Is(err, failed) {
+	if _, err := handler.Listen(context.Background(), cfg, fx.Invoke(func(p *project.Service) { p.GitHubProbe = fixture.NoGitHub }), fx.Populate(&db), base.BeforeReady(func(context.Context) error { return failed })); !errors.Is(err, failed) {
 		t.Fatal(err)
 	}
 	if db == nil || db.Ping() == nil {

@@ -81,7 +81,8 @@ type ServerReady struct {
 
 // Empty: nothing wrong.
 type SettingsCheck struct {
-	Problem string `json:"problem,omitzero"`
+	GitHub  *GitHubStatus `json:"github,omitzero"`
+	Problem string        `json:"problem,omitzero"`
 }
 
 type ProjectCheck struct {
@@ -893,11 +894,26 @@ type LanguageCount struct {
 	Blanks   int64  `json:"blanks"`
 }
 
+type GitHubStatus struct {
+	Installed bool   `json:"installed"`
+	Version   string `json:"version"`
+	LoggedIn  bool   `json:"loggedIn"`
+	Account   string `json:"account"`
+	Reason    string `json:"reason"`
+	CheckedAt int64  `json:"checkedAt"`
+}
+
+type PullRequestCapability struct {
+	Available bool   `json:"available"`
+	Reason    string `json:"reason"`
+}
+
 type ProjectSummary struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-	Git  bool   `json:"git"`
-	Last *int64 `json:"last,omitzero"`
+	PullRequest PullRequestCapability `json:"pullRequest"`
+	Name        string                `json:"name"`
+	Path        string                `json:"path"`
+	Git         bool                  `json:"git"`
+	Last        *int64                `json:"last,omitzero"`
 	// Never more than the farm's beds.
 	Slots int64 `json:"slots"`
 }

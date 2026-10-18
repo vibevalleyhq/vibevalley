@@ -167,6 +167,7 @@ func reason(err error) string {
 }
 
 type Service struct {
+	githubDetection
 	// root is the projects folder; trees and the house rules are beside it, in the work root.
 	root  string
 	trees string
@@ -208,8 +209,11 @@ func (p *Service) Slots() int64 {
 	return int64(p.perProject)
 }
 
-func (*Service) OnStart(context.Context) error { return nil }
-func (*Service) OnStop()                       {}
+func (p *Service) OnStart(ctx context.Context) error {
+	go p.RefreshGitHub(ctx)
+	return nil
+}
+func (*Service) OnStop() {}
 
 func (p *Service) Root() string { return p.root }
 

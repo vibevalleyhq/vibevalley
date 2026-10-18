@@ -36,8 +36,22 @@ void main() {
   }
 
   test('project creation refreshes every directory reader and returns the exact created project', () async {
-    const a = ProjectSummary(name: 'a', path: '/a', git: true, slots: 2, last: 1);
-    const z = ProjectSummary(name: 'z', path: '/z', git: true, slots: 2, last: 2);
+    const a = ProjectSummary(
+      pullRequest: PullRequestCapability(available: false, reason: "尚未检测 GitHub"),
+      name: 'a',
+      path: '/a',
+      git: true,
+      slots: 2,
+      last: 1,
+    );
+    const z = ProjectSummary(
+      pullRequest: PullRequestCapability(available: false, reason: "尚未检测 GitHub"),
+      name: 'z',
+      path: '/z',
+      git: true,
+      slots: 2,
+      last: 2,
+    );
     final list = [a];
     final server = FakeServer((r) async {
       if (r.method == 'POST') {
@@ -85,7 +99,15 @@ void main() {
     final server = FakeServer((r) async {
       reads++;
       if (r.url.path.startsWith('/api/v1/memories')) return jsonResponse(MemoryList(memories: const [], sources: const [], carried: reads.toDouble()).toJson());
-      return jsonResponse([ProjectSummary(name: 'project-$reads', path: '/p', git: true, slots: 1).toJson()]);
+      return jsonResponse([
+        ProjectSummary(
+          pullRequest: PullRequestCapability(available: false, reason: "尚未检测 GitHub"),
+          name: 'project-$reads',
+          path: '/p',
+          git: true,
+          slots: 1,
+        ).toJson(),
+      ]);
     });
     final c = container(server);
     final first = c.listen(memoryProvider('helper'), (_, _) {});

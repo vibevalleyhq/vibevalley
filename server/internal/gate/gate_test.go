@@ -31,6 +31,7 @@ func lanTestFarm(t *testing.T, db string) *workspace.Workspace {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.Project.GitHubProbe = fixture.NoGitHub
 	handler.New(f)
 	gate.LanOnLoopback(f.Gate)
 	if err := f.Gate.OnStart(context.Background()); err != nil {

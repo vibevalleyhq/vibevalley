@@ -37,6 +37,7 @@ func open(t *testing.T, home string) *world {
 	t.Helper()
 	w := &world{}
 	app, err := base.NewApp(fixture.Config(home, t.TempDir(), ""), []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, session.Module, channel.Module, Module},
+		fx.Invoke(func(p *project.Service) { p.GitHubProbe = fixture.NoGitHub }),
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),
 	)
 	if err != nil {
