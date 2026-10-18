@@ -118,7 +118,7 @@ func TestEverosGetsRunsAndExtractsWhenTheSessionEnds(t *testing.T) {
 func TestANoteOutsideARunIsExtractedAtOnce(t *testing.T) {
 	fake := &fakeEveros{}
 	f := withSource(t, protocol.MemorySourceUpdate{Kind: protocol.MemorySourceKindEveros, URL: fake.serve(t), Enabled: true, Read: true, Write: true})
-	if _, err := f.Memory.Write("lab", "提交信息写中文", ""); err != nil {
+	if _, err := f.Memory.Write(Note{Agent: "lab", Text: "提交信息写中文", Project: "", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	flushes := testkit.Await(t, "the note extracted", func() ([]fakeEverosRequest, bool) {

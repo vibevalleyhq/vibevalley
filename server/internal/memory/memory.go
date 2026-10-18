@@ -16,6 +16,7 @@ import (
 	"vibevalley/internal/protocol"
 	"vibevalley/pkg/db/generated"
 	"vibevalley/pkg/x/clock"
+	"vibevalley/pkg/x/ptr"
 	"vibevalley/pkg/x/str"
 )
 
@@ -108,7 +109,7 @@ func (m *memories) list(agentID string) ([]protocol.Memory, error) {
 		if !slices.Contains(protocol.MemoryKindValues, protocol.MemoryKind(kind)) {
 			continue
 		}
-		mem := protocol.Memory{ID: id, Agent: agentID, Kind: protocol.MemoryKind(kind), Text: body, At: at, Recalled: recalled}
+		mem := protocol.Memory{ID: id, Agent: agentID, Kind: protocol.MemoryKind(kind), Text: body, Author: ptr.To(protocol.MemoryAuthor(row.Author)), At: at, Recalled: recalled}
 		if project.Valid {
 			mem.Project = &project.String
 		}
@@ -130,17 +131,12 @@ func memoryNullable(s *string) sql.NullString {
 	return sql.NullString{String: *s, Valid: true}
 }
 
-func (m *memories) insertNote(agentID, body string, project, session *string) (string, int64, error) {
+func (m *memories) insertNote(agentID, body string, project, session *string, author protocol.MemoryAuthor) (string, int64, error) {
 	at := clock.NowMs()
 	id := base.NewID()
-	// A note with no session is the owner's, from the 记性 tab; one from a run is the agent's own.
-	author := "agent"
-	if session == nil {
-		author = "owner"
-	}
 	_, err := m.q.AddNote(context.Background(), generated.AddNoteParams{
 		ID: id, Agent: agentID, Body: body, Terms: termsText(body), TermsOf: TermsVersion, Project: memoryNullable(project), Session: memoryNullable(session),
-		Author: author, CreatedAt: at,
+		Author: string(author), CreatedAt: at,
 	})
 	if err != nil {
 		return "", 0, err
@@ -197,7 +193,7 @@ func (m *memories) keep(run FinishedRun) error {
 			project = &run.Project
 		}
 		if memoryIsNewNote(known, note.Text, project) {
-			if _, _, err := m.insertNote(run.Agent, note.Text, project, &session); err != nil {
+			if _, _, err := m.insertNote(run.Agent, note.Text, project, &session, protocol.MemoryAuthorAgent); err != nil {
 				return err
 			}
 			known = append(known, protocol.Memory{Kind: protocol.MemoryKindNote, Text: note.Text, Project: project})
@@ -239,21 +235,26 @@ func (m *memories) List(agentID string) []protocol.Memory {
 	return all
 }
 
-func (m *memories) Write(agentID, text, project string) (protocol.Memory, error) {
-	body := str.Clip(text, memoryNoteMax)
+func (m *memories) Write(n Note) (protocol.Memory, error) {
+	agentID := n.Agent
+	body := str.Clip(n.Text, memoryNoteMax)
 	if body == "" {
 		return protocol.Memory{}, errors.New("要记的话是空的")
 	}
 	var where *string
-	if p := strings.TrimSpace(project); p != "" {
+	if p := strings.TrimSpace(n.Project); p != "" {
 		where = &p
 	}
-	id, at, err := m.insertNote(agentID, body, where, nil)
+	var session *string
+	if n.Session != "" {
+		session = &n.Session
+	}
+	id, at, err := m.insertNote(agentID, body, where, session, n.By)
 	if err != nil {
 		log.Printf("vibevalley: a note for %s: %v", agentID, err)
 		return protocol.Memory{}, errors.New("没记下来：数据库写不进去")
 	}
-	return protocol.Memory{ID: id, Agent: agentID, Kind: protocol.MemoryKindNote, Text: body, Project: where, At: at}, nil
+	return protocol.Memory{ID: id, Agent: agentID, Kind: protocol.MemoryKindNote, Text: body, Author: &n.By, Project: where, Session: session, At: at}, nil
 }
 
 func (m *memories) Forget(agentID, id string) error {

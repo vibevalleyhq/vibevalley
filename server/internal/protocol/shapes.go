@@ -967,6 +967,8 @@ type Memory struct {
 	Agent      string     `json:"agent"`
 	Kind       MemoryKind `json:"kind"`
 	Text       string     `json:"text"`
+	// Who wrote it; an agent's own note carries the Session that wrote it. None: not known (an outside source, the manager's MEMORY.md).
+	Author *MemoryAuthor `json:"author,omitzero"`
 	Project    *string    `json:"project,omitzero"`
 	Session    *string    `json:"session,omitzero"`
 	At         int64      `json:"at"`
@@ -977,6 +979,19 @@ type Memory struct {
 	// The memory source it is from (MemorySourceInfo.Name); none: this farm's own.
 	Source *string `json:"source,omitzero"`
 }
+
+type MemoryAuthor string
+
+const (
+	// From the 记性 tab.
+	MemoryAuthorOwner MemoryAuthor = "owner"
+	// The agent itself: a 记住： line in a report, or its own memory_add.
+	MemoryAuthorAgent MemoryAuthor = "agent"
+	// The manager's memory_add for that agent.
+	MemoryAuthorManager MemoryAuthor = "manager"
+	// The farm's record of a finished job (kind issue).
+	MemoryAuthorFarm MemoryAuthor = "farm"
+)
 
 type MemoryKind string
 

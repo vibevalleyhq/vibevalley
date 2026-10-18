@@ -55,4 +55,7 @@ type Note struct {
 	Agent   string
 	Text    string
 	Project string
+	By      protocol.MemoryAuthor
+	// The session writing it, when By is MemoryAuthorAgent.
+	Session string
 }

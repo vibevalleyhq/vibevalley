@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"vibevalley/internal/memory"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/workspace"
 	"vibevalley/pkg/x/ptr"
@@ -271,7 +272,7 @@ func (a api) MemoryRecall(_ context.Context, agent string, project, text *string
 }
 
 func (a api) MemoryCreate(_ context.Context, agent string, body protocol.MemoryRequest) (protocol.Memory, error) {
-	m, err := a.f.Memory.Remember(agent, body.Text, ptr.Value(body.Project))
+	m, err := a.f.Memory.Remember(memory.Note{Agent: agent, Text: body.Text, Project: ptr.Value(body.Project), By: protocol.MemoryAuthorOwner})
 	return m, refused(err)
 }
 

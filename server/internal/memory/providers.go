@@ -420,8 +420,8 @@ func (p *providers) Sources() []protocol.MemorySourceInfo {
 }
 
 // The local provider's answer is the one returned; the others get the note in the background and only log a failure.
-func (p *providers) Write(agentID, text, project string) (protocol.Memory, error) {
-	n := Note{Agent: agentID, Text: text, Project: project}
+func (p *providers) Write(n Note) (protocol.Memory, error) {
+	agentID := n.Agent
 	all := p.current()
 	kept, err := all[0].Add(context.Background(), n)
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"vibevalley/internal/memory"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
@@ -212,7 +213,7 @@ func TestAHelperSearchesAndWritesOnlyItsOwnMemory(t *testing.T) {
 	w.MCP.who = func(token string) string { return token }
 	demo := "demo"
 	w.Core.Apply(protocol.FactHired{Session: protocol.Session{ID: "w1", Name: "一号", Agent: "lab", Project: &demo, Phase: protocol.Phase{Value: protocol.PhaseWorking{}}}})
-	if _, err := w.Memory.Write("scout", "这个项目测试用 make check", "demo"); err != nil {
+	if _, err := w.Memory.Write(memory.Note{Agent: "scout", Text: "这个项目测试用 make check", Project: "demo", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(w.MCP.Handler())
@@ -234,6 +235,12 @@ func TestAHelperSearchesAndWritesOnlyItsOwnMemory(t *testing.T) {
 	for _, m := range w.Memory.List("scout") {
 		if m.Text == "冒名记一条" {
 			t.Fatal("it reached scout's memory")
+		}
+	}
+	// What it wrote is its own, not the owner's: the 记性 tab says which helper wrote it.
+	for _, m := range w.Memory.List("lab") {
+		if m.Author == nil || *m.Author != protocol.MemoryAuthorAgent || m.Session == nil || *m.Session != "w1" {
+			t.Fatalf("a helper's note reads as written by %v (session %v)", m.Author, m.Session)
 		}
 	}
 	found := tool("memory_search", map[string]any{"query": "测试"})

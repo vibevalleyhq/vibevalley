@@ -76,7 +76,7 @@ func (l *localProvider) List(_ context.Context, agent string) ([]protocol.Memory
 }
 
 func (l *localProvider) Add(_ context.Context, n Note) (protocol.Memory, error) {
-	return l.m.Write(n.Agent, n.Text, n.Project)
+	return l.m.Write(n)
 }
 
 func (l *localProvider) Forget(_ context.Context, agent, id string) error {

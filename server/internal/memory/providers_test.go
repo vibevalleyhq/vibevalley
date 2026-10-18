@@ -110,7 +110,7 @@ func withFake(t *testing.T, fake *fakeProvider) *world {
 
 func TestOneProviderRecallsAsBefore(t *testing.T) {
 	f := memoryWorld(t)
-	if _, err := f.Memory.Write("lab", "这个项目测试用 pnpm test", "demo"); err != nil {
+	if _, err := f.Memory.Write(Note{Agent: "lab", Text: "这个项目测试用 pnpm test", Project: "demo", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	preview := f.Memory.Preview("lab", "demo", "跑测试")
@@ -122,7 +122,7 @@ func TestOneProviderRecallsAsBefore(t *testing.T) {
 
 func TestASlowProviderDoesNotHoldARunUp(t *testing.T) {
 	f := withFake(t, &fakeProvider{name: "slow", available: true, slow: true})
-	if _, err := f.Memory.Write("lab", "迁移文件放 db/migrations", "demo"); err != nil {
+	if _, err := f.Memory.Write(Note{Agent: "lab", Text: "迁移文件放 db/migrations", Project: "demo", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	start := time.Now()
@@ -140,7 +140,7 @@ func TestAnotherProvidersIDsCarryItsName(t *testing.T) {
 		lines:  []recalledLine{{ID: "m9", Line: "主人要中文的提交信息", Score: 100}},
 		listed: []protocol.Memory{{ID: "m9", Agent: "lab", Kind: protocol.MemoryKindNote, Text: "主人要中文的提交信息"}}}
 	f := withFake(t, fake)
-	local, err := f.Memory.Write("lab", "这个项目测试用 pnpm test", "demo")
+	local, err := f.Memory.Write(Note{Agent: "lab", Text: "这个项目测试用 pnpm test", Project: "demo", By: protocol.MemoryAuthorOwner})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestAProviderFailingToKeepLeavesTheOthersTheirs(t *testing.T) {
 	if synced[0].Said != run.Said {
 		t.Fatalf("the provider got %+v", synced)
 	}
-	if _, err := f.Memory.Write("lab", "替它记一条", ""); err != nil {
+	if _, err := f.Memory.Write(Note{Agent: "lab", Text: "替它记一条", Project: "", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	added := testkit.Await(t, "the note at the other provider", func() ([]Note, bool) {
@@ -245,7 +245,7 @@ func TestOnlyWhatIsToldIsCountedAsRecalled(t *testing.T) {
 	}
 	f := withFake(t, &fakeProvider{name: "nowledge", available: true, lines: lines})
 	for i := range recallCount {
-		if _, err := f.Memory.Write("lab", "测试用 "+words[recallCount+i], "demo"); err != nil {
+		if _, err := f.Memory.Write(Note{Agent: "lab", Text: "测试用 "+words[recallCount+i], Project: "demo", By: protocol.MemoryAuthorOwner}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -311,7 +311,7 @@ func TestSearchFindsTheAgentsOwnBestFirst(t *testing.T) {
 		{Agent: "lab", Text: "提交信息写中文"},
 		{Agent: "scout", Text: "测试前先 pnpm install", Project: "demo"},
 	} {
-		if _, err := f.Memory.Write(n.Agent, n.Text, n.Project); err != nil {
+		if _, err := f.Memory.Write(Note{Agent: n.Agent, Text: n.Text, Project: n.Project, By: protocol.MemoryAuthorOwner}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -346,7 +346,7 @@ func TestSearchAsksEveryProviderAndTakesThemInTurns(t *testing.T) {
 		{Memory: protocol.Memory{ID: "m2", Agent: "lab", Kind: protocol.MemoryKindNote, Text: "测试要先起数据库"}, Score: 0.5},
 	}}
 	f := withFake(t, fake)
-	if _, err := f.Memory.Write("lab", "这个项目测试用 pnpm test", "demo"); err != nil {
+	if _, err := f.Memory.Write(Note{Agent: "lab", Text: "这个项目测试用 pnpm test", Project: "demo", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	got := f.Memory.Search(SearchQuery{Agent: "lab", Project: "demo", Text: "测试"})
@@ -360,7 +360,7 @@ func TestSearchAsksEveryProviderAndTakesThemInTurns(t *testing.T) {
 
 func TestASlowProviderDoesNotHoldASearchUp(t *testing.T) {
 	f := withFake(t, &fakeProvider{name: "slow", available: true, slow: true})
-	if _, err := f.Memory.Write("lab", "迁移文件放 db/migrations", ""); err != nil {
+	if _, err := f.Memory.Write(Note{Agent: "lab", Text: "迁移文件放 db/migrations", Project: "", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.Memory.Search(SearchQuery{Agent: "lab", Text: "迁移"}); len(got) != 1 {

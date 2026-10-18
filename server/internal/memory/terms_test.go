@@ -36,11 +36,11 @@ func TestTermsAreWordsAndWholeCode(t *testing.T) {
 
 func TestTheSearchIndexFollowsTheTable(t *testing.T) {
 	f := memoryWorld(t)
-	note, err := f.Memory.Write("lab", "这个项目测试用 pnpm test", "demo")
+	note, err := f.Memory.Write(Note{Agent: "lab", Text: "这个项目测试用 pnpm test", Project: "demo", By: protocol.MemoryAuthorOwner})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Memory.Write("other", "测试前先装依赖", "demo"); err != nil {
+	if _, err := f.Memory.Write(Note{Agent: "other", Text: "测试前先装依赖", Project: "demo", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.Memory.matches("lab", "跑一遍测试"); len(got) != 1 || got[note.ID] <= 0 {

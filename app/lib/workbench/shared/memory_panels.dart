@@ -48,7 +48,11 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
     final jobs = all.where((m) => m.kind == MemoryKind.issue).toList();
     final projectsInMemory = {for (final m in all) ?m.project}.toList()..sort();
     final filtered = notes.where((m) => _shown == '' || (_shown == _everywhere ? m.project == null : m.project == _shown)).toList();
-    String whose(Memory m) => m.session != null ? '${sessions[m.session] ?? m.session} 记的' : '你记的';
+    String whose(Memory m) => switch (m.author) {
+      MemoryAuthor.owner => '你记的',
+      MemoryAuthor.manager => '管家替它记的',
+      MemoryAuthor.agent || MemoryAuthor.farm || null => m.session != null ? '${sessions[m.session] ?? m.session} 记的' : '它自己记的',
+    };
     MemorySourceInfo? from(Memory m) => m.source == null ? null : sources[m.source];
 
     return Column(

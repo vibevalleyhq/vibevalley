@@ -2335,6 +2335,7 @@ class Memory {
     required this.agent,
     required this.kind,
     required this.text,
+    this.author,
     this.project,
     this.session,
     required this.at,
@@ -2349,6 +2350,7 @@ class Memory {
     agent: j['agent'] as String,
     kind: MemoryKind.fromJson(j['kind']),
     text: j['text'] as String,
+    author: j['author'] == null ? null : MemoryAuthor.fromJson(j['author']),
     project: j['project'] == null ? null : j['project'] as String,
     session: j['session'] == null ? null : j['session'] as String,
     at: (j['at'] as num).toDouble(),
@@ -2362,6 +2364,7 @@ class Memory {
   final String agent;
   final MemoryKind kind;
   final String text;
+  final MemoryAuthor? author;
   final String? project;
   final String? session;
   final double at;
@@ -2375,6 +2378,7 @@ class Memory {
     'agent': agent,
     'kind': kind.wire,
     'text': text,
+    if (author != null) 'author': author!.wire,
     if (project != null) 'project': project!,
     if (session != null) 'session': session!,
     'at': at,
@@ -2383,6 +2387,18 @@ class Memory {
     if (fading != null) 'fading': fading!,
     if (source != null) 'source': source!,
   };
+}
+
+enum MemoryAuthor {
+  owner('owner'),
+  agent('agent'),
+  manager('manager'),
+  farm('farm');
+
+  const MemoryAuthor(this.wire);
+  final String wire;
+
+  static MemoryAuthor fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('MemoryAuthor: unknown value', v));
 }
 
 enum MemoryKind {

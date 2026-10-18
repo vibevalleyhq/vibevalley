@@ -30,11 +30,11 @@ func (s *Service) MemoriesOf(agent string) protocol.MemoryList {
 	return protocol.MemoryList{Memories: s.List(agent), Sources: s.Sources()}
 }
 
-func (s *Service) Remember(agent, text, project string) (protocol.Memory, error) {
-	if agent == protocol.ManagerAgent {
-		return s.WriteManager(text)
+func (s *Service) Remember(n Note) (protocol.Memory, error) {
+	if n.Agent == protocol.ManagerAgent {
+		return s.WriteManager(n.Text)
 	}
-	return s.Write(agent, text, project)
+	return s.Write(n)
 }
 
 func (s *Service) ForgetOf(agent, id string) error {

@@ -104,7 +104,7 @@ func (s *Service) memoryAdd(who Who, k kind) agentcore.AgentTool {
 				if err != nil {
 					return answered("", err)
 				}
-				m, err := s.memory.Remember(id, p.Text, p.Project)
+				m, err := s.memory.Remember(memory.Note{Agent: id, Text: p.Text, Project: p.Project, By: protocol.MemoryAuthorManager})
 				if err != nil {
 					return answered("", err)
 				}
@@ -131,7 +131,7 @@ func (s *Service) memoryAdd(who Who, k kind) agentcore.AgentTool {
 			if p.AllProjects {
 				project = ""
 			}
-			m, err := s.memory.Remember(c.Agent, p.Text, project)
+			m, err := s.memory.Remember(memory.Note{Agent: c.Agent, Text: p.Text, Project: project, By: protocol.MemoryAuthorAgent, Session: c.Session})
 			if err != nil {
 				return "", err
 			}

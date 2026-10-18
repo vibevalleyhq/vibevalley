@@ -178,7 +178,7 @@ func TestNowledgeReadsEverythingOnlyWhenTold(t *testing.T) {
 	if len(got) != 1 || got[0].Text != "主人的偏好：测试要写成可观察的结果" {
 		t.Fatalf("found %+v", got)
 	}
-	f.Memory.Write("lab", "不写进去", "")
+	f.Memory.Write(Note{Agent: "lab", Text: "不写进去", Project: "", By: protocol.MemoryAuthorOwner})
 	time.Sleep(50 * time.Millisecond)
 	if _, adds, _ := fake.seen(); len(adds) != 0 {
 		t.Fatalf("wrote with Write off: %v", adds)
@@ -198,7 +198,7 @@ func TestANowledgeThatDoesNotAnswerIsSkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(f.Close)
-	if _, err := f.Memory.Write("lab", "迁移文件放 db/migrations", "demo"); err != nil {
+	if _, err := f.Memory.Write(Note{Agent: "lab", Text: "迁移文件放 db/migrations", Project: "demo", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	logged := captureLog(t)

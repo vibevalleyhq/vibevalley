@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"vibevalley/internal/memory"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/session"
 	"vibevalley/internal/testkit"
@@ -149,7 +150,7 @@ func TestMemoryKeptAndRecalled(t *testing.T) {
 		[]any{protocol.SessionEventTypeUserMessage, "再加一个下班打卡", protocol.SessionEventTypeMemoryRecalled, strings.Join(recalled, "\n")}, "its steps")
 
 	memo := "memo"
-	if _, err := w.f.Memory.Write(scribe.ID, "下班打卡也要有测试", memo); err != nil {
+	if _, err := w.f.Memory.Write(memory.Note{Agent: scribe.ID, Text: "下班打卡也要有测试", Project: memo, By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	testkit.Eq(t, w.f.Session.Deliver(second.ID, "顺手把下班打卡的测试也补上", protocol.RunTrigger{Kind: protocol.RunTriggerKindComment}).Kind, "run", "a new run")

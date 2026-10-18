@@ -113,11 +113,11 @@ func TestMemoriesKeepRecallWriteForget(t *testing.T) {
 		}
 	}
 
-	note, err := m.Write("lab", "  周末别派夜班  ", " clock ")
+	note, err := m.Write(Note{Agent: "lab", Text: "  周末别派夜班  ", Project: " clock ", By: protocol.MemoryAuthorOwner})
 	if err != nil || note.Text != "周末别派夜班" || note.Project == nil || *note.Project != "clock" || note.Kind != protocol.MemoryKindNote {
 		t.Fatalf("%+v %v", note, err)
 	}
-	if _, err := m.Write("lab", "  ", ""); err == nil || err.Error() != "要记的话是空的" {
+	if _, err := m.Write(Note{Agent: "lab", Text: "  ", Project: "", By: protocol.MemoryAuthorOwner}); err == nil || err.Error() != "要记的话是空的" {
 		t.Fatalf("%v", err)
 	}
 	if err := m.Forget("lab", note.ID); err != nil {
@@ -233,10 +233,10 @@ func TestPreviewPicksWithoutCountingAndTheLongestUnusedFade(t *testing.T) {
 	}
 	t.Cleanup(func() { f.Close() })
 	m := f.Memory
-	if _, err := m.Write("lab", "clock 的测试用 pnpm test", "clock"); err != nil {
+	if _, err := m.Write(Note{Agent: "lab", Text: "clock 的测试用 pnpm test", Project: "clock", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.Write("lab", "提交前跑 lint", ""); err != nil {
+	if _, err := m.Write(Note{Agent: "lab", Text: "提交前跑 lint", Project: "", By: protocol.MemoryAuthorOwner}); err != nil {
 		t.Fatal(err)
 	}
 	preview := m.Preview("lab", "clock", "")
@@ -249,7 +249,7 @@ func TestPreviewPicksWithoutCountingAndTheLongestUnusedFade(t *testing.T) {
 	testkit.Eq(t, len(m.Preview("lab", "", "").Lines), 0, "no project, nothing")
 
 	for i := range protocol.MemoryKeep - memoryFadingSoon {
-		if _, err := m.Write("lab", fmt.Sprintf("第 %d 条，各不相同 %d", i, i*7919), ""); err != nil {
+		if _, err := m.Write(Note{Agent: "lab", Text: fmt.Sprintf("第 %d 条，各不相同 %d", i, i*7919), Project: "", By: protocol.MemoryAuthorOwner}); err != nil {
 			t.Fatal(err)
 		}
 	}
