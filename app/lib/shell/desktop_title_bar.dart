@@ -22,7 +22,9 @@ class DesktopTitleBar extends ConsumerWidget {
       ),
       child: Text(
         desktop.title,
-        style: const TextStyle(fontFamily: pixelFont, fontSize: 12, color: Color(0xFFE8D5A8)),
+        // Above the app's Material, so nothing gives it a text style to inherit: without a decoration of its own it gets the
+        // fallback's double underline.
+        style: const TextStyle(fontFamily: pixelFont, fontSize: 12, color: Color(0xFFE8D5A8), decoration: TextDecoration.none),
       ),
     );
   }
