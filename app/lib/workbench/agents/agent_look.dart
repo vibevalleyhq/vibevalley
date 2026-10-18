@@ -51,7 +51,7 @@ class AgentLookPanel extends ConsumerWidget {
         const SizedBox(height: 20),
         PxField(
           label: '在农场里是',
-          hint: const Text('只是长相：同一个 runtime 可以是不同的动物。'),
+          tip: '只是长相：同一个 runtime 可以是不同的动物。',
           child: grid([
             for (final species in Species.values)
               _Tile(
@@ -204,7 +204,7 @@ class AgentStage extends ConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 color: pill.withValues(alpha: .7),
-                child: Text('${speciesLabel[cast.species]} · ${outfitLabel[cast.outfit]} · 下面换动作', style: KitText.fine.copyWith(color: Palette.bark800)),
+                child: Text('${speciesLabel[cast.species]} · ${outfitLabel[cast.outfit]}', style: KitText.fine.copyWith(color: Palette.bark800)),
               ),
             ),
           ),

@@ -250,15 +250,11 @@ class ManagerMemoryPanel extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: _gap([
-        Text('管家每次开口前，整份记性都放在系统提示里；太长时只带最新的（最多 8000 字）。它自己用 remember 记、用 rewrite_memory 整理，你也可以替它记一条。', style: _lead),
+        Text('管家开工时和每次压缩后读一遍记性；中间记下、忘掉的，它下一句就知道。', style: _lead),
         WriteNote(onWrite: (text, _) => ref.read(memoryProvider(managerAgent).notifier).write(text)),
         WorkbenchSection(
           title: '记下的',
           count: view.memories.length,
-          aside: Tooltip(
-            message: view.file ?? '',
-            child: Text(view.file ?? '', style: KitText.mono.copyWith(color: Palette.bark500)),
-          ),
           child: view.memories.isEmpty
               ? const EmptyNote('还没记下什么。跟管家说「记住……」，或者你在上面替它记。')
               : Column(

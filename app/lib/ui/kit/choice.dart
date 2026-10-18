@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../theme.dart';
 import 'base.dart';
+import 'field.dart' show PxTip;
 import 'icons.dart';
 
 class SegmentOption<T> {
@@ -293,11 +294,12 @@ class _PickPopup extends StatelessWidget {
 }
 
 class PxSwitchField extends StatelessWidget {
-  const PxSwitchField({super.key, required this.label, required this.checked, required this.onChanged, this.hint, this.enabled = true});
+  const PxSwitchField({super.key, required this.label, required this.checked, required this.onChanged, this.hint, this.tip, this.enabled = true});
   final String label;
   final bool checked;
   final ValueChanged<bool> onChanged;
   final String? hint;
+  final String? tip;
   final bool enabled;
 
   @override
@@ -335,7 +337,10 @@ class PxSwitchField extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: KitText.sm),
+                  PxTip(
+                    tip: tip,
+                    child: Text(label, style: KitText.sm),
+                  ),
                   if (hint != null) Text(hint!, style: KitText.fine.copyWith(color: Palette.bark500)),
                 ],
               ),

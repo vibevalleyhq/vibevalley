@@ -5,10 +5,23 @@ import 'base.dart';
 import 'icons.dart';
 
 class PxField extends StatelessWidget {
-  const PxField({super.key, required this.label, required this.child, this.hint, this.error, this.aside, this.required = false, this.optional = false});
+  const PxField({
+    super.key,
+    required this.label,
+    required this.child,
+    this.hint,
+    this.tip,
+    this.error,
+    this.aside,
+    this.required = false,
+    this.optional = false,
+  });
   final String label;
   final Widget child;
   final Widget? hint;
+
+  /// What the field is for, shown when the label is hovered instead of a line under the field.
+  final String? tip;
   final String? error;
   final Widget? aside;
   final bool required;
@@ -29,8 +42,15 @@ class PxField extends StatelessWidget {
             Expanded(
               child: Text.rich(
                 TextSpan(
-                  text: label,
                   children: [
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.baseline,
+                      baseline: TextBaseline.alphabetic,
+                      child: PxTip(
+                        tip: tip,
+                        child: Text(label, style: KitText.xs.copyWith(color: Palette.bark600)),
+                      ),
+                    ),
                     if (required)
                       const TextSpan(
                         text: ' *',
@@ -65,6 +85,32 @@ class PxField extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// [child] with a dotted underline that shows [tip] on hover; just [child] without one.
+class PxTip extends StatelessWidget {
+  const PxTip({super.key, required this.tip, required this.child});
+  final String? tip;
+  final Text child;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tip;
+    if (t == null || t.isEmpty) return child;
+    final style = (child.style ?? const TextStyle()).copyWith(
+      decoration: TextDecoration.underline,
+      decorationStyle: TextDecorationStyle.dotted,
+      decorationColor: Palette.bark600,
+      decorationThickness: 2,
+    );
+    return Tooltip(
+      message: t,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.help,
+        child: Text(child.data ?? '', style: style),
+      ),
     );
   }
 }

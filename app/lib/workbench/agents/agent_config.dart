@@ -60,7 +60,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
         PxField(
           label: '名字',
           error: widget.nameTaken ? '已经有同名的 agent 了' : null,
-          hint: const Text('管家和字幕里都叫这个名字，说话时也可以直接点名。'),
+          tip: '管家和字幕里都叫这个名字，说话时也可以直接点名。',
           child: PxTextInput(
             value: draft.name,
             onChanged: (name) => patch(draft.copyWith(name: name)),
@@ -69,7 +69,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
         ),
         PxField(
           label: '职责',
-          hint: const Text('一句话。管家挑人时会读。'),
+          tip: '一句话。管家挑人时会读。',
           child: PxTextInput(
             value: draft.role,
             onChanged: (role) => patch(draft.copyWith(role: role)),
@@ -79,7 +79,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
         ),
         PxField(
           label: '适合的活',
-          hint: const Text('用户的话里出现这些词，管家选「自动」时就优先派它。回车添加。'),
+          tip: '用户的话里出现这些词，管家选「自动」时就优先派它。回车添加。',
           child: PxChipsInput(
             value: draft.tags,
             onChanged: (tags) => patch(draft.copyWith(tags: tags)),
@@ -90,7 +90,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
           label: '启用',
           checked: draft.enabled,
           onChanged: (enabled) => patch(draft.copyWith(enabled: enabled)),
-          hint: '停用后管家不会派它，名字点到也会拒绝。',
+          tip: '停用后管家不会派它，名字点到也会拒绝。',
         ),
       ],
       _Tab.runtime => [
@@ -104,7 +104,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
       _Tab.env => [
         PxField(
           label: '默认项目',
-          hint: const Text('工作目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。管家派活没说项目时用它；留空时派活必须说在哪个项目。'),
+          tip: '工作目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。管家派活没说项目时用它；留空时派活必须说在哪个项目。',
           child: PxTextInput(
             value: draft.workdir,
             onChanged: (workdir) => patch(draft.copyWith(workdir: workdir)),
@@ -117,7 +117,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
           label: '每个帮工一个 git worktree',
           checked: draft.worktree,
           onChanged: (worktree) => patch(draft.copyWith(worktree: worktree)),
-          hint: '每个帮工在自己的分支上改，几个帮工不会互相覆盖；收获时合进项目。关掉就直接在项目里改，没有分支可合。',
+          tip: '每个帮工在自己的分支上改，几个帮工不会互相覆盖；收获时合进项目。关掉就直接在项目里改，没有分支可合。',
         ),
         PxField(
           label: '环境变量',
@@ -186,7 +186,7 @@ class _RuntimeChoice extends ConsumerWidget {
     final runtimes = ref.watch(runtimesProvider).value ?? const <RuntimeInfo>[];
     return PxField(
       label: '农机',
-      hint: const Text('换农机会清掉模型和推理强度；长相（动物和衣服）不变。'),
+      tip: '换农机会清掉模型和推理强度；长相（动物和衣服）不变。',
       child: LayoutBuilder(
         builder: (context, box) {
           final w = (box.maxWidth - 6) / 2;
@@ -332,7 +332,7 @@ List<Widget> _personaEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agen
   return [
     PxField(
       label: '人设',
-      hint: const Text('它是谁、怎么干活、什么不做。会按下面的方式交给 runtime。'),
+      tip: '它是谁、怎么干活、什么不做。会按下面的方式交给 runtime。',
       child: PxTextArea(
         value: draft.persona,
         onChanged: (persona) => patch(draft.copyWith(persona: persona)),
@@ -386,7 +386,7 @@ class _SkillPicker extends ConsumerWidget {
         PxField(
           label: '技能库',
           aside: InlineLink('管理技能库 →', onTap: () => workbenchGo(context, '/skills')),
-          hint: const Text('选中的技能跟人设一起交给帮工，每个技能一节。'),
+          tip: '选中的技能跟人设一起交给帮工，每个技能一节。',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -429,7 +429,7 @@ class _SkillPicker extends ConsumerWidget {
         const SizedBox(height: 16),
         PxField(
           label: '${runtimeName(draft.runtime)} 自己装的技能',
-          hint: const Text('runtime 自己报告的，在这台机器上已经能用，不用在这里勾。'),
+          tip: 'runtime 自己报告的，在这台机器上已经能用，不用在这里勾。',
           child: _Inventory(entries: runtime?.skills),
         ),
       ],
@@ -491,7 +491,7 @@ List<Widget> _toolsEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent>
     ),
     PxField(
       label: '${runtimeName(draft.runtime)} 自己连的 MCP',
-      hint: const Text('runtime 自己报告的，和上面加的叠在一起。'),
+      tip: 'runtime 自己报告的，和上面加的叠在一起。',
       child: _Inventory(entries: runtime?.mcpServers),
     ),
   ];

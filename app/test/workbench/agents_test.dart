@@ -156,6 +156,15 @@ void main() {
       expect(server.writes.single.path, '/api/v1/agents/backend');
     });
 
+    testWidgets('what each field is for is on hover, not under it', (t) async {
+      await pumpPage(t, const AgentCreatorPage(id: 'backend'), _server().handle);
+      expect(find.text('一句话。管家挑人时会读。'), findsNothing);
+      expect(find.byTooltip('一句话。管家挑人时会读。'), findsOneWidget);
+      expect(find.byTooltip('停用后管家不会派它，名字点到也会拒绝。'), findsOneWidget);
+      expect(find.byTooltip('只是长相：同一个 runtime 可以是不同的动物。'), findsOneWidget);
+      await t.pumpWidget(const SizedBox());
+    });
+
     testWidgets('an id nobody has says so', (t) async {
       await pumpPage(t, const AgentCreatorPage(id: 'ghost'), _server().handle);
       expect(find.text('没有这个帮工。'), findsOneWidget);
@@ -163,10 +172,10 @@ void main() {
 
     testWidgets('the stage shows the animal and its poses switch', (t) async {
       await pumpPage(t, const AgentCreatorPage(id: 'backend'), _server().handle);
-      expect(find.text('熊 · 农夫 · 下面换动作'), findsOneWidget);
+      expect(find.text('熊 · 农夫'), findsOneWidget);
       await t.tap(labelled('兔子'));
       await t.pump();
-      expect(find.text('兔子 · 农夫 · 下面换动作'), findsOneWidget);
+      expect(find.text('兔子 · 农夫'), findsOneWidget);
       await t.tap(find.text('干活'));
       await t.pump(const Duration(milliseconds: 100));
       expect(find.text('没保存'), findsOneWidget);

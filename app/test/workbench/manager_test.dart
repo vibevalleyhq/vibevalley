@@ -90,7 +90,7 @@ void main() {
       expect(find.text('提交信息写中文'), findsOneWidget);
       expect(find.text('管家自己记的'), findsOneWidget);
       expect(find.text('太旧了，带不进系统提示'), findsOneWidget);
-      expect(find.text('/home/me/.vibevalley/MEMORY.md'), findsOneWidget);
+      expect(find.text('/home/me/.vibevalley/MEMORY.md'), findsNothing);
       await typeInto(t, '替它记一条', '周末别派夜班');
       await t.tap(find.text('记下'));
       await settle(t);
