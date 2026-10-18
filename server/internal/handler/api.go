@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"vibevalley/internal/manager"
 	"vibevalley/internal/memory"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/workspace"
@@ -75,7 +76,8 @@ func (a api) ChannelSay(ctx context.Context, body protocol.SayRequest) error {
 		a.f.Game.Want(*body.Bed)
 	}
 	a.f.Core.Open()
-	return refused(a.f.Manager.Say(ctx, body.Text, ptr.Value(body.Agent), body.Conversation, ptr.Value(body.SendKey)))
+	pick := manager.Pick{Agent: ptr.Value(body.Agent), Project: ptr.Value(body.Project)}
+	return refused(a.f.Manager.Say(ctx, body.Text, pick, body.Conversation, ptr.Value(body.SendKey)))
 }
 
 func (a api) ChannelCreate(_ context.Context, body protocol.ChannelRequest) (string, error) {
@@ -330,6 +332,10 @@ func (a api) ProjectLanguages(ctx context.Context, id string) (protocol.ProjectL
 	return *langs, nil
 }
 
+func (a api) ProjectSeeds(_ context.Context, id string) (protocol.ProjectSeeds, error) {
+	return a.f.Issue.Seeds(id)
+}
+
 func (a api) ProjectActivity(ctx context.Context, id string) (protocol.ProjectActivity, error) {
 	if act := a.f.Project.Activity(ctx, id); act != nil {
 		return *act, nil
@@ -470,6 +476,14 @@ func (a api) IssueDelete(_ context.Context, id string) error { return a.f.Issue.
 
 func (a api) IssueAccept(ctx context.Context, id string, body protocol.IssueAcceptRequest) (protocol.Issue, error) {
 	got, err := a.f.Issue.Accept(context.WithoutCancel(ctx), id, body)
+	return got, refused(err)
+}
+
+func (a api) IssueStart(ctx context.Context, id string, body protocol.IssueStartRequest) (protocol.Dispatched, error) {
+	if body.Bed != nil {
+		a.f.Game.Want(*body.Bed)
+	}
+	got, err := a.f.Issue.StartQueued(context.WithoutCancel(ctx), id)
 	return got, refused(err)
 }
 

@@ -73,6 +73,7 @@
 | `issue.delete` | `DELETE /api/v1/issues/{id}` | ✓ | ✓ |  |  |
 | `issue.move` | `PUT /api/v1/issues/{id}/move` | ✓ | ✓ |  |  |
 | `issue.status` | `PUT /api/v1/issues/{id}/status` | ✓ | ✓ |  |  |
+| `issue.start` | `POST /api/v1/issues/{id}/start` | ✓ | ✓ |  |  |
 | `issue.accept` | `POST /api/v1/issues/{id}/accept` | ✓ | ✓ | ✓ |  |
 
 ## session
@@ -154,6 +155,7 @@
 | `project.check` | `POST /api/v1/projects/check` | ✓ | ✓ |  |  |
 | `project.create` | `POST /api/v1/projects` | ✓ | ✓ |  |  |
 | `project.languages` | `GET /api/v1/projects/{id}/languages` | ✓ | ✓ |  |  |
+| `project.seeds` | `GET /api/v1/projects/{id}/seeds` | ✓ | ✓ |  |  |
 | `project.activity` | `GET /api/v1/projects/{id}/activity` | ✓ | ✓ |  |  |
 
 ## voice

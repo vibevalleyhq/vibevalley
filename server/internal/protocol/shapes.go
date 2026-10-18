@@ -945,6 +945,59 @@ type ProjectLanguages struct {
 	Languages []LanguageCount `json:"languages"`
 }
 
+// What can be sown in one project (project.seeds): what it is built with, what was sown there before, and the common
+// jobs filled in for it.
+type ProjectSeeds struct {
+	Project string       `json:"project"`
+	Stack   ProjectStack `json:"stack"`
+	// Titles of the issues sent out in this project, newest first, each once; at most 5.
+	Recent []string   `json:"recent"`
+	Kinds  []SeedKind `json:"kinds"`
+}
+
+// What a project is built with, read off the marker files at its root. A command is empty when it is not known.
+type ProjectStack struct {
+	// go, rust, flutter, dart, node, python; empty when nothing is recognized.
+	Name string `json:"name"`
+	// How the sowing form names it ("Go", "Node（bun）"); empty with the name.
+	Label string `json:"label"`
+	Test  string `json:"test,omitzero"`
+	Lint  string `json:"lint,omitzero"`
+	Build string `json:"build,omitzero"`
+}
+
+// One shelf of the seed catalog (internal/protocol/seed_catalog.json).
+type SeedKind struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// A sprite in app/assets/pixel.
+	Icon  string `json:"icon"`
+	Seeds []Seed `json:"seeds"`
+}
+
+// A common job. In the catalog Done holds {test}, {lint} and {build}; project.seeds gives it filled for the stack.
+type Seed struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	// 做到什么程度算完.
+	Done string `json:"done"`
+	// The words to sow: the title, then the done line. Each 〔…〕 is a blank the owner fills.
+	Text string `json:"text"`
+	// The first blank in Text, in UTF-16 code units; absent when there is none.
+	Blank *SeedBlank `json:"blank,omitzero"`
+}
+
+// Where a blank is, as the client's text field counts.
+type SeedBlank struct {
+	Start int64 `json:"start"`
+	End   int64 `json:"end"`
+}
+
+// Bed: the empty bed it is started from, the one its session takes when it gets one.
+type IssueStartRequest struct {
+	Bed *int64 `json:"bed,omitzero"`
+}
+
 type LanguageCount struct {
 	Name     string `json:"name"`
 	Files    int64  `json:"files"`
@@ -1417,6 +1470,8 @@ type SayRequest struct {
 	Bed          *int64  `json:"bed,omitzero"`
 	Conversation *string `json:"conversation,omitzero"`
 	Agent        *string `json:"agent,omitzero"`
+	// The project the owner chose to sow it in; the manager is told.
+	Project *string `json:"project,omitzero"`
 	// The client's key for this one send, up to 64 characters: sent again (a retry), it is the message already said, not a second.
 	SendKey *string `json:"sendKey,omitzero"`
 }

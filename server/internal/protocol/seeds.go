@@ -65,3 +65,26 @@ func FactsOf(runtime string) RuntimeFacts {
 	}
 	return RuntimeFacts{Refused: map[string]string{}}
 }
+
+//go:embed seed_catalog.json
+var seedCatalogJSON []byte
+
+var seedCatalog struct {
+	Kinds []SeedKind `json:"kinds"`
+}
+
+func init() {
+	if err := json.Unmarshal(seedCatalogJSON, &seedCatalog); err != nil {
+		panic("protocol: seed_catalog.json: " + err.Error())
+	}
+}
+
+// The common jobs on the sowing form, in its order, as written: Done still holds {test}, {lint} and {build}. A copy each call.
+func SeedCatalog() []SeedKind {
+	out := make([]SeedKind, len(seedCatalog.Kinds))
+	for i, k := range seedCatalog.Kinds {
+		out[i] = k
+		out[i].Seeds = append([]Seed(nil), k.Seeds...)
+	}
+	return out
+}

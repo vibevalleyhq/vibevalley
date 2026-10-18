@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"vibevalley/internal/handler"
@@ -164,5 +167,55 @@ func TestChannelCreationReturnsItsIdentity(t *testing.T) {
 	}
 	if _, err := c.ChannelHistory(context.Background(), id, nil, nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The sowing form's seeds are the project's: its stack read off its folder, the catalog filled with its commands.
+func TestProjectSeedsAreFilledForItsStack(t *testing.T) {
+	work := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(work, "projects", "clock-in"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(work, "projects", "clock-in", "go.mod"), []byte("module clockin\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := fixture.Config(t.TempDir(), work, ":memory:")
+	cfg.Voice.Line.Port, cfg.Lan.Port = 0, 0
+	f, err := workspace.New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Project.GitHubProbe = fixture.NoGitHub
+	t.Cleanup(f.Close)
+	srv := httptest.NewServer(handler.New(f))
+	defer srv.Close()
+	c := &protocol.Client{Base: srv.URL}
+	ctx := context.Background()
+	seeds, err := c.ProjectSeeds(ctx, "clock-in")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if seeds.Project != "clock-in" || seeds.Stack.Name != "go" || seeds.Stack.Test != "go test ./..." || len(seeds.Recent) != 0 {
+		t.Fatalf("seeds %+v", seeds)
+	}
+	if len(seeds.Kinds) != len(protocol.SeedCatalog()) || seeds.Kinds[0].Name != "修问题" {
+		t.Fatalf("kinds %+v", seeds.Kinds)
+	}
+	bug := seeds.Kinds[0].Seeds[0]
+	if !strings.Contains(bug.Text, "`go test ./...` 通过") || bug.Blank == nil {
+		t.Fatalf("first seed %+v", bug)
+	}
+	var missing protocol.Missing
+	if _, err := c.ProjectSeeds(ctx, "nope"); !errors.As(err, &missing) {
+		t.Fatalf("a project that is not there: %v", err)
+	}
+	// Only a queued todo starts from the form: one never queued is refused.
+	issue, err := c.IssueCreate(ctx, protocol.IssueRequest{Title: "写打卡"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var refused protocol.Refused
+	if _, err := c.IssueStart(ctx, issue.ID, protocol.IssueStartRequest{}); !errors.As(err, &refused) {
+		t.Fatalf("a backlog issue started from the form: %v", err)
 	}
 }

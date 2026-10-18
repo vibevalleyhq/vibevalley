@@ -108,6 +108,10 @@ type Handlers interface {
 	//vibevalley:route issue.status PUT /api/v1/issues/{id}/status
 	//vibevalley:can owner remote
 	IssueStatus(ctx context.Context, pID string, body IssueStatusRequest) (Issue, error)
+	// Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue.
+	//vibevalley:route issue.start POST /api/v1/issues/{id}/start
+	//vibevalley:can owner remote
+	IssueStart(ctx context.Context, pID string, body IssueStartRequest) (Dispatched, error)
 	// The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
 	// another round.
 	//vibevalley:route issue.accept POST /api/v1/issues/{id}/accept
@@ -229,6 +233,10 @@ type Handlers interface {
 	//vibevalley:route project.languages GET /api/v1/projects/{id}/languages
 	//vibevalley:can owner remote
 	ProjectLanguages(ctx context.Context, pID string) (ProjectLanguages, error)
+	// What to sow in the project: its stack, what was sown there before, and the seed catalog filled in for it.
+	//vibevalley:route project.seeds GET /api/v1/projects/{id}/seeds
+	//vibevalley:can owner remote
+	ProjectSeeds(ctx context.Context, pID string) (ProjectSeeds, error)
 	//vibevalley:route project.activity GET /api/v1/projects/{id}/activity
 	//vibevalley:can owner remote
 	ProjectActivity(ctx context.Context, pID string) (ProjectActivity, error)

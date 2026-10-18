@@ -755,6 +755,27 @@ func (v ProjectLanguages) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
+func (v ProjectSeeds) MarshalJSON() ([]byte, error) {
+	type plain ProjectSeeds
+	p := plain(v)
+	if p.Recent == nil {
+		p.Recent = []string{}
+	}
+	if p.Kinds == nil {
+		p.Kinds = []SeedKind{}
+	}
+	return json.Marshal(p)
+}
+
+func (v SeedKind) MarshalJSON() ([]byte, error) {
+	type plain SeedKind
+	p := plain(v)
+	if p.Seeds == nil {
+		p.Seeds = []Seed{}
+	}
+	return json.Marshal(p)
+}
+
 func (v ArchiveListing) MarshalJSON() ([]byte, error) {
 	type plain ArchiveListing
 	p := plain(v)
@@ -2287,6 +2308,7 @@ var Endpoints = []Endpoint{
 	{"issue.delete", "DELETE", "/api/v1/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.move", "PUT", "/api/v1/issues/{id}/move", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.status", "PUT", "/api/v1/issues/{id}/status", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.start", "POST", "/api/v1/issues/{id}/start", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.accept", "POST", "/api/v1/issues/{id}/accept", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"graph.split", "POST", "/api/v1/graphs", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"graph.updateTask", "PUT", "/api/v1/graphs/{id}/tasks/{task}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
@@ -2324,6 +2346,7 @@ var Endpoints = []Endpoint{
 	{"project.check", "POST", "/api/v1/projects/check", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"project.create", "POST", "/api/v1/projects", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"project.languages", "GET", "/api/v1/projects/{id}/languages", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"project.seeds", "GET", "/api/v1/projects/{id}/seeds", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"project.activity", "GET", "/api/v1/projects/{id}/activity", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"voice.session", "POST", "/api/v1/voice/session", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"voice.renew", "POST", "/api/v1/voice/renew", nil, true, []Caller{CallerOwner, CallerRemote}},
@@ -2526,6 +2549,15 @@ func Mount(mux *http.ServeMux, h Handlers) {
 			return
 		}
 		out, err := h.IssueStatus(r.Context(), pID, body)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/v1/issues/{id}/start", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		var body IssueStartRequest
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.IssueStart(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/v1/issues/{id}/accept", func(w http.ResponseWriter, r *http.Request) {
@@ -2767,6 +2799,11 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	mux.HandleFunc("GET /api/v1/projects/{id}/languages", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
 		out, err := h.ProjectLanguages(r.Context(), pID)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("GET /api/v1/projects/{id}/seeds", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		out, err := h.ProjectSeeds(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/v1/projects/{id}/activity", func(w http.ResponseWriter, r *http.Request) {
@@ -3115,6 +3152,12 @@ func (c *Client) IssueStatus(ctx context.Context, pID string, body IssueStatusRe
 	return out, err
 }
 
+func (c *Client) IssueStart(ctx context.Context, pID string, body IssueStartRequest) (Dispatched, error) {
+	var out Dispatched
+	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/start", nil, body, &out)
+	return out, err
+}
+
 func (c *Client) IssueAccept(ctx context.Context, pID string, body IssueAcceptRequest) (Issue, error) {
 	var out Issue
 	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/accept", nil, body, &out)
@@ -3342,6 +3385,12 @@ func (c *Client) ProjectCreate(ctx context.Context, body NewProject) (ProjectSum
 func (c *Client) ProjectLanguages(ctx context.Context, pID string) (ProjectLanguages, error) {
 	var out ProjectLanguages
 	err := c.call(ctx, "GET", "/api/v1/projects/"+url.PathEscape(pID)+"/languages", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) ProjectSeeds(ctx context.Context, pID string) (ProjectSeeds, error) {
+	var out ProjectSeeds
+	err := c.call(ctx, "GET", "/api/v1/projects/"+url.PathEscape(pID)+"/seeds", nil, nil, &out)
 	return out, err
 }
 

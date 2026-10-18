@@ -66,11 +66,11 @@ func TestManagerMarkWrongSavesTheTurnAsACase(t *testing.T) {
 	if _, err := f.Memory.WriteManager("提交信息写中文"); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Manager.Say(w.ctx, "帮我在 demo 里加个 README", "", nil, ""); err != nil {
+	if err := f.Manager.Say(w.ctx, "帮我在 demo 里加个 README", Pick{}, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	w.managerSaid(t, 1)
-	if err := f.Manager.Say(w.ctx, "今天怎么样", "", nil, ""); err != nil {
+	if err := f.Manager.Say(w.ctx, "今天怎么样", Pick{}, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	w.managerSaid(t, 2)
@@ -149,7 +149,7 @@ func TestManagerMarkWrongSavesTheTurnAsACase(t *testing.T) {
 func TestManagerMarkWrongRefusesALineItNeverHeard(t *testing.T) {
 	w := managerOpen(t)
 	f := w.f
-	if err := f.Manager.Say(w.ctx, "第一句", "", nil, ""); err != nil {
+	if err := f.Manager.Say(w.ctx, "第一句", Pick{}, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	w.managerSaid(t, 1)

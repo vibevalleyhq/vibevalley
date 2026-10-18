@@ -2247,6 +2247,119 @@ class ProjectLanguages {
   };
 }
 
+class ProjectSeeds {
+  const ProjectSeeds({required this.project, required this.stack, required this.recent, required this.kinds});
+
+  factory ProjectSeeds.fromJson(Map<String, dynamic> j) => ProjectSeeds(
+    project: j['project'] as String,
+    stack: ProjectStack.fromJson(j['stack'] as Map<String, dynamic>),
+    recent: [for (final e in j['recent'] as List) e as String],
+    kinds: [for (final e in j['kinds'] as List) SeedKind.fromJson(e as Map<String, dynamic>)],
+  );
+
+  final String project;
+  final ProjectStack stack;
+  final List<String> recent;
+  final List<SeedKind> kinds;
+
+  Map<String, dynamic> toJson() => {
+    'project': project,
+    'stack': stack.toJson(),
+    'recent': [for (final e in recent) e],
+    'kinds': [for (final e in kinds) e.toJson()],
+  };
+}
+
+class ProjectStack {
+  const ProjectStack({required this.name, required this.label, this.test, this.lint, this.build});
+
+  factory ProjectStack.fromJson(Map<String, dynamic> j) => ProjectStack(
+    name: j['name'] as String,
+    label: j['label'] as String,
+    test: j['test'] == null ? null : j['test'] as String,
+    lint: j['lint'] == null ? null : j['lint'] as String,
+    build: j['build'] == null ? null : j['build'] as String,
+  );
+
+  final String name;
+  final String label;
+  final String? test;
+  final String? lint;
+  final String? build;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'label': label,
+    if (test != null) 'test': test!,
+    if (lint != null) 'lint': lint!,
+    if (build != null) 'build': build!,
+  };
+}
+
+class SeedKind {
+  const SeedKind({required this.id, required this.name, required this.icon, required this.seeds});
+
+  factory SeedKind.fromJson(Map<String, dynamic> j) => SeedKind(
+    id: j['id'] as String,
+    name: j['name'] as String,
+    icon: j['icon'] as String,
+    seeds: [for (final e in j['seeds'] as List) Seed.fromJson(e as Map<String, dynamic>)],
+  );
+
+  final String id;
+  final String name;
+  final String icon;
+  final List<Seed> seeds;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'icon': icon,
+    'seeds': [for (final e in seeds) e.toJson()],
+  };
+}
+
+class Seed {
+  const Seed({required this.id, required this.title, required this.done, required this.text, this.blank});
+
+  factory Seed.fromJson(Map<String, dynamic> j) => Seed(
+    id: j['id'] as String,
+    title: j['title'] as String,
+    done: j['done'] as String,
+    text: j['text'] as String,
+    blank: j['blank'] == null ? null : SeedBlank.fromJson(j['blank'] as Map<String, dynamic>),
+  );
+
+  final String id;
+  final String title;
+  final String done;
+  final String text;
+  final SeedBlank? blank;
+
+  Map<String, dynamic> toJson() => {'id': id, 'title': title, 'done': done, 'text': text, if (blank != null) 'blank': blank!.toJson()};
+}
+
+class SeedBlank {
+  const SeedBlank({required this.start, required this.end});
+
+  factory SeedBlank.fromJson(Map<String, dynamic> j) => SeedBlank(start: (j['start'] as num).toDouble(), end: (j['end'] as num).toDouble());
+
+  final double start;
+  final double end;
+
+  Map<String, dynamic> toJson() => {'start': start, 'end': end};
+}
+
+class IssueStartRequest {
+  const IssueStartRequest({this.bed});
+
+  factory IssueStartRequest.fromJson(Map<String, dynamic> j) => IssueStartRequest(bed: j['bed'] == null ? null : (j['bed'] as num).toDouble());
+
+  final double? bed;
+
+  Map<String, dynamic> toJson() => {if (bed != null) 'bed': bed!};
+}
+
 class LanguageCount {
   const LanguageCount({required this.name, required this.files, required this.code, required this.comments, required this.blanks});
 
@@ -3393,13 +3506,14 @@ class CommentRequest {
 }
 
 class SayRequest {
-  const SayRequest({required this.text, this.bed, this.conversation, this.agent, this.sendKey});
+  const SayRequest({required this.text, this.bed, this.conversation, this.agent, this.project, this.sendKey});
 
   factory SayRequest.fromJson(Map<String, dynamic> j) => SayRequest(
     text: j['text'] as String,
     bed: j['bed'] == null ? null : (j['bed'] as num).toDouble(),
     conversation: j['conversation'] == null ? null : j['conversation'] as String,
     agent: j['agent'] == null ? null : j['agent'] as String,
+    project: j['project'] == null ? null : j['project'] as String,
     sendKey: j['sendKey'] == null ? null : j['sendKey'] as String,
   );
 
@@ -3407,6 +3521,7 @@ class SayRequest {
   final double? bed;
   final String? conversation;
   final String? agent;
+  final String? project;
   final String? sendKey;
 
   Map<String, dynamic> toJson() => {
@@ -3414,6 +3529,7 @@ class SayRequest {
     if (bed != null) 'bed': bed!,
     if (conversation != null) 'conversation': conversation!,
     if (agent != null) 'agent': agent!,
+    if (project != null) 'project': project!,
     if (sendKey != null) 'sendKey': sendKey!,
   };
 }
@@ -5722,6 +5838,12 @@ class IssueApi {
     return Issue.fromJson(j as Map<String, dynamic>);
   }
 
+  /// Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue.
+  Future<Dispatched> start({required String id, required IssueStartRequest body}) async {
+    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/start', query: {}, body: body.toJson());
+    return Dispatched.fromJson(j as Map<String, dynamic>);
+  }
+
   /// The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
   /// another round.
   Future<Issue> accept({required String id, required IssueAcceptRequest body}) async {
@@ -5990,6 +6112,12 @@ class ProjectApi {
   Future<ProjectLanguages> languages({required String id}) async {
     final j = await _api._call('GET', '/api/v1/projects/${Uri.encodeComponent((id).toString())}/languages', query: {}, body: null);
     return ProjectLanguages.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// What to sow in the project: its stack, what was sown there before, and the seed catalog filled in for it.
+  Future<ProjectSeeds> seeds({required String id}) async {
+    final j = await _api._call('GET', '/api/v1/projects/${Uri.encodeComponent((id).toString())}/seeds', query: {}, body: null);
+    return ProjectSeeds.fromJson(j as Map<String, dynamic>);
   }
 
   Future<ProjectActivity> activity({required String id}) async {

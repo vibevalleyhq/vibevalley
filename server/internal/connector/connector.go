@@ -112,7 +112,7 @@ func newService(db *sql.DB, core *core.Service, chat *channel.Service, mgr *mana
 		feishu: feishu.NewClient(),
 		qq:     qq.NewClient(),
 		say: func(ctx context.Context, text string, conversation *string) error {
-			return mgr.Say(ctx, text, "", conversation, "")
+			return mgr.Say(ctx, text, manager.Pick{}, conversation, "")
 		},
 		channelByName: chat.ChannelByName,
 		general:       chat.General,

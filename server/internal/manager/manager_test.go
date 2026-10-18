@@ -195,7 +195,7 @@ func TestManagerDispatchesAndHearsVoiceInChat(t *testing.T) {
 	w := managerOpen(t)
 	f := w.f
 	w.enableLab(t)
-	if err := f.Manager.Say(w.ctx, "帮我在 demo 里加个 README", "", nil, ""); err != nil {
+	if err := f.Manager.Say(w.ctx, "帮我在 demo 里加个 README", Pick{}, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	if said := w.managerSaid(t, 1); !slices.Equal(said, []string{"好，已在了"}) {
@@ -385,7 +385,7 @@ func TestManagerHearsThePatrol(t *testing.T) {
 	w := managerOpen(t)
 	f := w.f
 	w.enableLab(t)
-	if err := f.Manager.Say(w.ctx, "帮我在 notes 里加个 CHANGELOG", "", nil, ""); err != nil {
+	if err := f.Manager.Say(w.ctx, "帮我在 notes 里加个 CHANGELOG", Pick{}, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	testkit.Until(t, "the work ripe", func() bool {
@@ -550,7 +550,7 @@ func TestManagerHearsASendKeyOnce(t *testing.T) {
 	w := managerOpen(t)
 	f := w.f
 	for range 2 {
-		if err := f.Manager.Say(w.ctx, "地里怎么样", "", nil, "k1"); err != nil {
+		if err := f.Manager.Say(w.ctx, "地里怎么样", Pick{}, nil, "k1"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -572,8 +572,24 @@ func TestManagerHearsASendKeyOnce(t *testing.T) {
 		}
 	}
 	testkit.Eq(t, heard, map[string]int{"地里怎么样": 1, "电话里问一句": 1}, "what the manager heard")
-	if err := f.Manager.Say(w.ctx, "早", "", nil, strings.Repeat("k", 65)); err == nil {
+	if err := f.Manager.Say(w.ctx, "早", Pick{}, nil, strings.Repeat("k", 65)); err == nil {
 		t.Fatal("a long key was taken")
+	}
+}
+
+// A seed sown from the farm's form carries its profile and project: the manager is told both, beside the words.
+func TestManagerIsToldTheSowingFormsPick(t *testing.T) {
+	w := managerOpen(t)
+	f := w.f
+	w.enableLab(t)
+	if err := f.Manager.Say(w.ctx, "修一个 bug：登录闪退", Pick{Agent: fixture.Lab(t).ID, Project: " notes "}, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	w.managerSaid(t, 1)
+	line := managerLastLine(w.seen()[0])
+	want := "（主人在对话框里选定了帮工：" + fixture.Lab(t).Name + "）\n（主人选定了项目：notes，派活就派在这个项目里）\n主人说：修一个 bug：登录闪退"
+	if !strings.HasSuffix(line, want) {
+		t.Fatalf("line %q", line)
 	}
 }
 
@@ -646,7 +662,7 @@ func TestManagerMergesOnlyWhenTheOwnerAsks(t *testing.T) {
 	if i, err := f.Issue.Get(*hired.Session.Issue); err != nil || i.Closed != nil {
 		t.Fatalf("the issue: %+v %v", i, err)
 	}
-	if err := f.Manager.Say(w.ctx, "收下", "", nil, ""); err != nil {
+	if err := f.Manager.Say(w.ctx, "收下", Pick{}, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	merged := testkit.Await(t, "the issue merged", func() (protocol.Issue, bool) {
@@ -695,7 +711,7 @@ func TestManagerSchedulesWaitForTheOwnerUnlessTheOwnerAsked(t *testing.T) {
 	if got := mine(false); len(got) != 1 || !got[0].Pending || got[0].By != protocol.ScheduleByManager {
 		t.Fatalf("waiting: %+v", got)
 	}
-	if err := f.Manager.Say(w.ctx, "每天九点跑一遍测试", "", nil, ""); err != nil {
+	if err := f.Manager.Say(w.ctx, "每天九点跑一遍测试", Pick{}, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	on := testkit.Await(t, "the owner's schedule on", func() ([]protocol.Schedule, bool) { got := mine(true); return got, len(got) == 1 })

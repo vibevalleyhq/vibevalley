@@ -33,6 +33,7 @@ import (
 	"vibevalley/pkg/agentcore"
 	"vibevalley/pkg/ai"
 	"vibevalley/pkg/x/clock"
+	"vibevalley/pkg/x/str"
 )
 
 const (
@@ -159,7 +160,7 @@ type manager struct {
 	// The execution owns persisted runs and journals, independently of output routing.
 	execution  *session.AgentExecution
 	input      managerInput
-	selected   map[string]string
+	selected   map[string]Pick
 	latestCall *managerCaller
 	// What the manager last said it cannot start for, per conversation: said once, not to every line, until it starts.
 	cannot map[string]string
@@ -210,7 +211,7 @@ func newManager(in managerIn) (*manager, error) {
 func (fm *manager) OnStart(ctx context.Context) error {
 	fm.ctx = ctx
 	fm.input.Conversation = fm.chat.General()
-	fm.selected = map[string]string{}
+	fm.selected = map[string]Pick{}
 	if fm.trace == nil {
 		fm.trace = fm.run.Open(protocol.ManagerAgent, keepManagerEvents)
 	}
@@ -665,14 +666,15 @@ func (fm *manager) farmNow(brain *vvagent.Agent, conversation string) string {
 	return said
 }
 
-func (fm *manager) pickedNote(picked string) string {
-	if picked == "" {
-		return ""
+func (fm *manager) pickedNote(picked Pick) string {
+	note := ""
+	if a := fm.store.Agent(picked.Agent); picked.Agent != "" && a != nil {
+		note += "（主人在对话框里选定了帮工：" + a.Name + "）\n"
 	}
-	if a := fm.store.Agent(picked); a != nil {
-		return "（主人在对话框里选定了帮工：" + a.Name + "）\n"
+	if picked.Project != "" {
+		note += "（主人选定了项目：" + picked.Project + "，派活就派在这个项目里）\n"
 	}
-	return ""
+	return note
 }
 
 func (fm *manager) heardInChat(news channel.ManagerNews) {
@@ -683,10 +685,10 @@ func (fm *manager) heardInChat(news channel.ManagerNews) {
 		source = sourceOwner
 	}
 	fm.mu.Lock()
-	picked := ""
+	var picked Pick
 	for _, m := range news.Messages {
-		if agent, ok := fm.selected[m.ID]; ok {
-			picked = agent
+		if p, ok := fm.selected[m.ID]; ok {
+			picked = p
 			delete(fm.selected, m.ID)
 		}
 	}
@@ -696,11 +698,11 @@ func (fm *manager) heardInChat(news channel.ManagerNews) {
 		for i, m := range news.Messages {
 			words[i] = m.Text
 		}
-		fm.ask(fm.pickedNote(picked)+"主人说："+strings.Join(words, "\n"), managerInput{Conversation: news.Conversation, Agent: picked, Source: source, Owner: owner}, true)
+		fm.ask(fm.pickedNote(picked)+"主人说："+strings.Join(words, "\n"), managerInput{Conversation: news.Conversation, Agent: picked.Agent, Source: source, Owner: owner}, true)
 		return
 	}
 	fm.ask(fm.pickedNote(picked)+"【田头】"+news.Target+" 里有给你的话：\n"+managerInboxLines(news.Messages)+"\n\n你的回答会发在 "+news.Target+"。",
-		managerInput{Conversation: news.Conversation, Agent: picked, Source: source, Owner: owner}, fromPerson)
+		managerInput{Conversation: news.Conversation, Agent: picked.Agent, Source: source, Owner: owner}, fromPerson)
 }
 
 // A run of an issue for the manager lasts until the manager's run that takes the line settles.
@@ -722,15 +724,21 @@ func (fm *manager) onWork(w issue.ManagerWork) {
 }
 
 // sendKey: the client's key for this send, "" for none; a retry with the same key is the message already said.
-func (fm *manager) Say(ctx context.Context, text, agentID string, conversation *string, sendKey string) error {
-	picked := ""
-	if a := fm.store.Agent(agentID); agentID != "" && a != nil {
-		picked = a.ID
+// What the owner chose beside the words (the sowing form, the chat's profile pick); empty for none.
+type Pick struct {
+	Agent   string
+	Project string
+}
+
+func (fm *manager) Say(ctx context.Context, text string, pick Pick, conversation *string, sendKey string) error {
+	picked := Pick{Project: str.Trim(pick.Project)}
+	if a := fm.store.Agent(pick.Agent); pick.Agent != "" && a != nil {
+		picked.Agent = a.ID
 	}
 	fm.mu.Lock()
 	defer fm.mu.Unlock()
 	message, again, err := fm.chat.Say(text, conversation, sendKey)
-	if err == nil && !again && picked != "" {
+	if err == nil && !again && picked != (Pick{}) {
 		fm.selected[message.ID] = picked
 	}
 	return err
@@ -745,7 +753,7 @@ func (fm *manager) Heard(text, agentID, sendKey string) error {
 	if a := fm.store.Agent(agentID); agentID != "" && a != nil {
 		picked = a.ID
 	}
-	fm.ask(fm.pickedNote(picked)+"（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说："+text, managerInput{Conversation: fm.chat.General(), Agent: picked, Source: sourceOwner, Owner: true}, true)
+	fm.ask(fm.pickedNote(Pick{Agent: picked})+"（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说："+text, managerInput{Conversation: fm.chat.General(), Agent: picked, Source: sourceOwner, Owner: true}, true)
 	return nil
 }
 

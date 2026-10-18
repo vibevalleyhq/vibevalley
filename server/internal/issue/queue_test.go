@@ -113,3 +113,38 @@ func TestQueuedScheduleKeepsTriggerAndMissedFlag(t *testing.T) {
 		t.Fatalf("wrong channel: %+v", got)
 	}
 }
+
+// The sowing form's 开工待办: a queued todo starts now when there is room, and keeps its place in the queue when there is none.
+func TestAQueuedTodoStartsFromTheSowingForm(t *testing.T) {
+	f := lifecycleWorld(t)
+	agent := fixture.Lab(t)
+	if _, err := f.Agent.SaveAgent(agent); err != nil {
+		t.Fatal(err)
+	}
+	project := "demo"
+	f.Core.Apply(protocol.FactHired{Session: protocol.Session{ID: "occupied", Project: &project, Runtime: agent.Runtime, Phase: protocol.Phase{Value: protocol.PhaseWorking{}}}})
+	issue, err := f.Issue.Add(protocol.IssueRequest{Title: "queued", Assignee: &agent.ID, Project: &project})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var refused protocol.Refused
+	if _, err := f.Issue.StartQueued(context.Background(), issue.ID); !errors.As(err, &refused) {
+		t.Fatalf("a backlog issue started: %v", err)
+	}
+	if got, err := f.Issue.Start(context.Background(), issue.ID, f.Channel.General()); err != nil || got.Queued == nil {
+		t.Fatalf("queue: %+v %v", got, err)
+	}
+	queued, _ := f.Issue.Get(issue.ID)
+	still, err := f.Issue.StartQueued(context.Background(), issue.ID)
+	if err != nil || still.Queued == nil || still.Session != nil {
+		t.Fatalf("no room: %+v %v", still, err)
+	}
+	if again, _ := f.Issue.Get(issue.ID); again.QueuedAt == nil || *again.QueuedAt != *queued.QueuedAt {
+		t.Fatalf("lost its place: %v, was %v", again.QueuedAt, *queued.QueuedAt)
+	}
+	f.Core.Apply(protocol.FactLeft{ID: "occupied"})
+	started, err := f.Issue.StartQueued(context.Background(), issue.ID)
+	if err != nil || started.Session == nil {
+		t.Fatalf("with room: %+v %v", started, err)
+	}
+}
