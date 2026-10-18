@@ -12,7 +12,7 @@ func TestWorkplaceRefusesProjectSymlinkOutsideRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := projects(t, root)
-	if _, err := p.Workplace("escape", "session", false, ""); err == nil {
+	if _, err := p.Workplace("escape", "session", false, "", 0); err == nil {
 		t.Fatal("accepted project outside work root")
 	}
 	entries, err := os.ReadDir(outside)

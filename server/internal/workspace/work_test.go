@@ -1073,3 +1073,51 @@ func TestMovingToDoneRefusesFailedProjectCheck(t *testing.T) {
 	}
 	testkit.Git(t, project, "rev-parse", "--verify", place.Branch)
 }
+
+func TestIssueWorktreeSurvivesCancellationAndReopen(t *testing.T) {
+	home, work := dirs(t)
+	w := openWorld(t, home, work)
+	lab := fixture.Lab(t)
+	w.f.Agent.SaveAgent(lab)
+	issue, err := w.f.Issue.Add(protocol.IssueRequest{Title: "写打卡并提交", Project: ptr.To("resume"), Assignee: &lab.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent, err := w.f.Issue.Start(context.Background(), issue.ID, "")
+	if err != nil || sent.Session == nil {
+		t.Fatalf("start: %+v %v", sent, err)
+	}
+	w.nextReport(t)
+	first := w.f.Session.Get(*sent.Session)
+	testkit.Eq(t, *first.Branch, fmt.Sprintf("vibevalley/issue-%d", issue.Number), "issue branch")
+	before := testkit.Git(t, *first.Worktree, "rev-parse", "HEAD")
+	w.f.Session.Dismiss(first.ID)
+	testkit.Until(t, "cancelled", func() bool { i, e := w.f.Issue.Get(issue.ID); return e == nil && i.Closed != nil })
+	again, err := w.f.Issue.Reopen(context.Background(), issue.ID, "接着做", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.nextReport(t)
+	reopened := w.f.Session.Get(again)
+	testkit.Eq(t, *reopened.Branch, *first.Branch, "same branch")
+	testkit.Eq(t, *reopened.Worktree, *first.Worktree, "same worktree")
+	testkit.Eq(t, testkit.Git(t, *reopened.Worktree, "rev-parse", "HEAD"), before, "previous commit")
+	if !strings.Contains(reopened.Brief, "这条分支上已经有上次的提交，接着做") {
+		t.Fatal(reopened.Brief)
+	}
+	if _, err := w.f.Issue.Merge(issue.ID); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Until(t, "merged", func() bool {
+		i, e := w.f.Issue.Get(issue.ID)
+		return e == nil && i.Closed != nil && *i.Closed == protocol.IssueCloseMerged
+	})
+	again, err = w.f.Issue.Reopen(context.Background(), issue.ID, "再看看", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.nextReport(t)
+	if strings.Contains(w.f.Session.Get(again).Brief, "这条分支上已经有上次的提交，接着做") {
+		t.Fatal("merged commits must not be described as unmerged")
+	}
+}

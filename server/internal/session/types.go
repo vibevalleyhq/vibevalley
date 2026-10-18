@@ -24,7 +24,8 @@ type HireOptions struct {
 	TaskGraph *protocol.SessionGraph
 	Channel   *string
 	// Empty: Dispatch makes one from the job.
-	Issue string
+	Issue       string
+	IssueNumber int64
 	// What its first run is for; nil: the issue sent out.
 	Trigger *protocol.RunTrigger
 	// Called with the session just before it goes on the farm, so what must know of it first (its issue's link) is

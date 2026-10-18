@@ -58,3 +58,44 @@ func (p *Service) check(cwd string) error {
 	}
 	return MergeFailure{Kind: "check", Reason: why + "\n" + strings.Join(lines, "\n")}
 }
+
+// Commit and check outside the project lock; publication rechecks both the head and conflicts under it.
+func (p *Service) checkMerge(place Workplace, target string) (string, error) {
+	if err := commitLeft(place.Cwd, "合并前把没提交的改动一并提交"); err != nil {
+		return "", err
+	}
+	path := filepath.Join(p.root, place.Project)
+	if target == "" {
+		var err error
+		target, err = git(path, "symbolic-ref", "--short", "HEAD")
+		if err != nil {
+			return "", err
+		}
+	}
+	checked, err := git(path, "rev-parse", "refs/heads/"+place.Branch)
+	if err != nil {
+		return "", err
+	}
+	conflicts, err := conflictsOf(path, target, checked)
+	if err != nil {
+		return "", err
+	}
+	if len(conflicts) > 0 {
+		return "", MergeFailure{Kind: "conflict", Base: target, Files: conflicts}
+	}
+	if err := p.check(place.Cwd); err != nil {
+		return "", err
+	}
+	return checked, nil
+}
+
+func unchangedBranch(path, branch, checked string) error {
+	current, err := git(path, "rev-parse", "refs/heads/"+branch)
+	if err != nil {
+		return err
+	}
+	if current != checked {
+		return MergeFailure{Kind: "check", Reason: "分支在检查以后又变了，请重新检查再收获"}
+	}
+	return nil
+}

@@ -152,7 +152,7 @@
 
 ## 项目和收获
 
-**项目**（`project/project.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-10-projects-worktrees-and-harvest.md)）：工作目录 `projects/` 下的每个文件夹是一个项目。派到不存在的项目就新建（`git init -b main`、`.gitignore`、初始提交）。每个帮工在 `<工作目录>/worktrees/<项目>.<帮工>-<时间>` 有自己的 worktree，分支 `vibevalley/<帮工>-<时间>`。同一个项目里改仓库的操作一个一个来。
+**项目**（`project/project.go`；[理由](../../.agents/notes/implemented/architecture/2026-10-10-projects-worktrees-and-harvest.md)）：工作目录 `projects/` 下的每个文件夹是一个项目。派到不存在的项目就新建（`git init -b main`、`.gitignore`、初始提交）。派给工单的帮工共用这张工单的 worktree：`<工作目录>/worktrees/<项目>.<工单号>`，分支为 `vibevalley/issue-<工单号>`。worktree 已在就复用；只有分支时在原分支上重建 worktree；两者都没有时从主分支或种植计划指定的基分支新开。不挂工单的直接派活仍用 `<项目>.<帮工>-<时间>` 和 `vibevalley/<帮工>-<时间>`。取消时保留有提交的分支和有未提交改动的 worktree，重开接着做；合并后删掉分支和 worktree，再重开从主分支开始。同一个项目的 worktree 创建和合并串行执行，项目检查在锁外运行。
 
 **收成清单**（`GET /api/v1/issues/{id}/changes`，看的是这张工单最新的帮工）：提交、改的文件和 diff、没提交的、主分支多了几个提交、会不会冲突（`git merge-tree`，不碰工作区）。
 
@@ -162,7 +162,7 @@
 2. 关掉会话，没提交的改动替它提交（缓存和依赖目录不提交）。
 3. 会冲突就不合并：标上 `conflict`；「让它解决冲突」发一句固定的话（`ConflictTask`），它下一轮结束时再查一次。
 4. 没有冲突时，在帮工 worktree 根目录运行它分支上的 `.vibevalley/check` 可执行文件；没有这个文件就跳过。退出码非 0、无法执行或超时都不合并，拒绝原因附上输出的最后 40 行（最多保留 64 KiB），并把这段话交给帮工修。时限由 `project.check_timeout_seconds` 配置，默认 1200 秒。
-5. 检查通过才合进主分支，删掉 worktree 和分支，帮工离开，账本记 `harvested`。
+5. 检查通过后取得项目锁，确认分支提交与检查前一致，并重新检查冲突；分支在检查以后又变了就拒绝合并，要求重新检查。通过才合进主分支，删掉 worktree 和分支，帮工离开，账本记 `harvested`。
 
 检查失败不会把工单关成 `done`：拒绝收获时仍是 `in_review`，帮工、分支和 worktree 都保留；帮工收到带话开始修以后，状态照常变成 `in_progress`，交回来再回到 `in_review`。帮工合进种植计划分支也先跑同一检查。检查运行的是帮工当前分支，不自动变基或合入主分支。
 

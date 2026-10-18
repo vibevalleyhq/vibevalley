@@ -825,7 +825,7 @@ func (c *sessions) Send(ctx context.Context, agent protocol.Agent, task, where s
 	if opt.Worktree != nil {
 		worktree = *opt.Worktree
 	}
-	place, err := c.projects.Workplace(where, id, worktree, opt.Base)
+	place, err := c.projects.Workplace(where, id, worktree, opt.Base, opt.IssueNumber)
 	if err != nil {
 		return Hired{Refused: fmt.Sprintf("%s 没地方干活：%s", agent.Name, err.Error())}
 	}

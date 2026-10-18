@@ -13,6 +13,7 @@ import (
 	"vibevalley/internal/base"
 	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
+	"vibevalley/internal/project"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/runtime"
 	"vibevalley/internal/schedule"
@@ -25,6 +26,7 @@ import (
 var dispatchTryEvery = 5 * time.Second
 
 type dispatch struct {
+	projects  *project.Service
 	core      *core.Service
 	store     *agent.Service
 	runtimes  *runtime.Service
@@ -39,8 +41,8 @@ type dispatch struct {
 	trying sync.Mutex
 }
 
-func newDispatch(core *core.Service, store *agent.Service, runtimes *runtime.Service, sessions *session.Service, issues *issues, chat *channel.Service, schedules *schedule.Service) (*dispatch, error) {
-	return &dispatch{core: core, store: store, runtimes: runtimes, run: sessions, issues: issues, chat: chat, schedules: schedules, forManager: base.NewHub[ManagerWork]()}, nil
+func newDispatch(projects *project.Service, core *core.Service, store *agent.Service, runtimes *runtime.Service, sessions *session.Service, issues *issues, chat *channel.Service, schedules *schedule.Service) (*dispatch, error) {
+	return &dispatch{projects: projects, core: core, store: store, runtimes: runtimes, run: sessions, issues: issues, chat: chat, schedules: schedules, forManager: base.NewHub[ManagerWork]()}, nil
 }
 
 func (d *dispatch) OnStart(ctx context.Context) error {
@@ -151,6 +153,8 @@ func (d *dispatch) Hire(ctx context.Context, agent protocol.Agent, task, project
 	}
 	if opt.Issue == "" {
 		opt.Issue = base.NewID()
+	} else if issue, err := d.issues.Get(opt.Issue); err == nil {
+		opt.IssueNumber = issue.Number
 	}
 	opt.Hiring = func(w protocol.Session) error {
 		return d.issues.Ran(opt.Issue, w)
@@ -299,14 +303,18 @@ func (d *dispatch) reopen(ctx context.Context, id, text string, channel string, 
 	if issue.Project != nil {
 		project = *issue.Project
 	}
-	hired := d.Hire(ctx, *agent, reopenTask(issue, *last, text), project, session.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: &by})
+	previous := false
+	if changes, err := d.projects.BranchChanges(project, fmt.Sprintf("vibevalley/issue-%d", issue.Number)); err == nil {
+		previous = len(changes.Commits) > 0
+	}
+	hired := d.Hire(ctx, *agent, reopenTask(issue, *last, text, previous), project, session.HireOptions{Channel: &channel, Issue: issue.ID, Trigger: &by})
 	if hired.Refused != "" || hired.Session == nil {
 		return "", protocol.Refused{Reason: hired.Refused}
 	}
 	return hired.Session.ID, nil
 }
 
-func reopenTask(issue protocol.Issue, last protocol.Session, text string) string {
+func reopenTask(issue protocol.Issue, last protocol.Session, text string, previous bool) string {
 	now := str.Trim(text)
 	if now == "" {
 		now = reopenDefault
@@ -320,6 +328,9 @@ func reopenTask(issue protocol.Issue, last protocol.Session, text string) string
 	}
 	if r := last.LastRun; r != nil {
 		b.WriteString(fmt.Sprintf("\n最后一轮%s：%s", outcomeText[r.Outcome], str.Cut(str.Trim(r.Summary), session.AskedMax)))
+	}
+	if previous {
+		b.WriteString("\n这条分支上已经有上次的提交，接着做")
 	}
 	b.WriteString("\n先看看项目现在的样子，再接着做。")
 	return b.String()

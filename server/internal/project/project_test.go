@@ -112,7 +112,7 @@ func TestSessionsTaskBranchMerges(t *testing.T) {
 	if err := p.OpenBranch("task", "vibevalley/task-1"); err != nil {
 		t.Fatal(err)
 	}
-	place, err := p.Workplace("task", "w1", true, "vibevalley/task-1")
+	place, err := p.Workplace("task", "w1", true, "vibevalley/task-1", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestSessionsChangedFilesSinceTheBase(t *testing.T) {
 		t.Fatal(err)
 	}
 	work := func(id string, files ...string) Workplace {
-		place, err := p.Workplace("task", id, true, "vibevalley/task-1")
+		place, err := p.Workplace("task", id, true, "vibevalley/task-1", 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -347,7 +347,7 @@ func TestPublishedMergeKeepsReceiptWhenWorktreeCleanupFails(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			place, err := p.Workplace("demo", "w1", true, target)
+			place, err := p.Workplace("demo", "w1", true, target, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -396,7 +396,7 @@ func TestMergeRunsProjectCheck(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				place, err := p.Workplace("checked", "w1", true, target)
+				place, err := p.Workplace("checked", "w1", true, target, 0)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -445,7 +445,7 @@ func TestMergeRunsProjectCheck(t *testing.T) {
 func TestMergeCheckTimeoutAndOutputTail(t *testing.T) {
 	root := projectsDir(t)
 	p := projects(t, root, func(c *base.Config) { c.Project.CheckTimeoutSeconds = 3 })
-	place, err := p.Workplace("timeout", "w1", true, "")
+	place, err := p.Workplace("timeout", "w1", true, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,7 +472,7 @@ func TestMergeCheckTimeoutAndOutputTail(t *testing.T) {
 func TestMergeCheckMustBeExecutable(t *testing.T) {
 	root := projectsDir(t)
 	p := projects(t, root)
-	place, err := p.Workplace("permissions", "w1", true, "")
+	place, err := p.Workplace("permissions", "w1", true, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -489,5 +489,142 @@ func TestMergeCheckMustBeExecutable(t *testing.T) {
 	}
 	if _, err := os.Stat(place.Cwd); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestIssueWorkplaceLifecycle(t *testing.T) {
+	for _, mode := range []string{"existing", "cancelled", "merged", "dirty", "base"} {
+		t.Run(mode, func(t *testing.T) {
+			root := projectsDir(t)
+			p := projects(t, root)
+			base := ""
+			baseHead := ""
+			if mode == "base" {
+				base = "vibevalley/task-42"
+				if err := p.OpenBranch("demo", base); err != nil {
+					t.Fatal(err)
+				}
+				path := filepath.Join(root, "demo")
+				tree := testkit.Git(t, path, "rev-parse", "HEAD^{tree}")
+				baseHead = testkit.Git(t, path, "-c", "user.name=test", "-c", "user.email=test@test", "commit-tree", tree, "-p", "HEAD", "-m", "task only")
+				testkit.Git(t, path, "update-ref", "refs/heads/"+base, baseHead)
+			}
+			first, err := p.Workplace("demo", "w1", true, base, 42)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if baseHead != "" {
+				testkit.Eq(t, testkit.Git(t, first.Cwd, "rev-parse", "HEAD"), baseHead, "starts from task")
+			}
+			testkit.Eq(t, first.Branch, "vibevalley/issue-42", "issue branch")
+			testkit.Eq(t, first.Cwd, filepath.Join(p.trees, "demo.42"), "issue worktree")
+			if err := os.WriteFile(filepath.Join(first.Cwd, "previous.txt"), []byte("previous"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if mode != "dirty" {
+				if err := commitLeft(first.Cwd, "previous"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before := testkit.Git(t, first.Cwd, "rev-parse", "HEAD")
+			switch mode {
+			case "cancelled", "dirty":
+				p.Release(first)
+			case "merged":
+				if _, err := p.Merge(first); err != nil {
+					t.Fatal(err)
+				}
+				testkit.Git(t, filepath.Join(root, "demo"), "-c", "user.name=test", "-c", "user.email=test@test", "commit", "--allow-empty", "-m", "later")
+				before = testkit.Git(t, filepath.Join(root, "demo"), "rev-parse", "HEAD")
+			}
+			second, err := p.Workplace("demo", "w2", true, base, 42)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testkit.Eq(t, second, first, "same workplace")
+			testkit.Eq(t, testkit.Git(t, second.Cwd, "rev-parse", "HEAD"), before, "resumed head")
+			body, err := os.ReadFile(filepath.Join(second.Cwd, "previous.txt"))
+			if err != nil || string(body) != "previous" {
+				t.Fatalf("previous work: %s %v", body, err)
+			}
+		})
+	}
+}
+
+func TestMergeCheckOutsideProjectLock(t *testing.T) {
+	for _, into := range []bool{false, true} {
+		for _, changed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("into=%t/changed=%t", into, changed), func(t *testing.T) {
+				root := projectsDir(t)
+				p := projects(t, root)
+				target := "main"
+				if into {
+					target = "vibevalley/task-42"
+					if err := p.OpenBranch("demo", target); err != nil {
+						t.Fatal(err)
+					}
+				}
+				place, err := p.Workplace("demo", "w1", true, target, 1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				before := testkit.Git(t, filepath.Join(root, "demo"), "rev-parse", target)
+				signal := t.TempDir()
+				started := filepath.Join(signal, "started")
+				release := filepath.Join(signal, "release")
+				if err := os.MkdirAll(filepath.Join(place.Cwd, ".vibevalley"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				body := fmt.Sprintf("#!/bin/sh\ntouch '%s'\nwhile [ ! -f '%s' ]; do sleep 0.05; done\n", started, release)
+				if err := os.WriteFile(filepath.Join(place.Cwd, ".vibevalley/check"), []byte(body), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				done := make(chan error, 1)
+				go func() {
+					var err error
+					if into {
+						_, err = p.MergeInto(place, target)
+					} else {
+						_, err = p.Merge(place)
+					}
+					done <- err
+				}()
+				finished := false
+				defer func() {
+					os.WriteFile(release, nil, 0o644)
+					if !finished {
+						<-done
+					}
+				}()
+				testkit.Until(t, "check started", func() bool { _, err := os.Stat(started); return err == nil })
+				opened := make(chan error, 1)
+				go func() { _, err := p.Workplace("demo", "w2", true, "", 2); opened <- err }()
+				select {
+				case err := <-opened:
+					if err != nil {
+						t.Fatal(err)
+					}
+				case <-time.After(2 * time.Second):
+					t.Fatal("check holds project lock")
+				}
+				if changed {
+					testkit.Git(t, place.Cwd, "-c", "user.name=test", "-c", "user.email=test@test", "commit", "--allow-empty", "-m", "changed during check")
+				}
+				os.WriteFile(release, nil, 0o644)
+				err = <-done
+				finished = true
+				if changed {
+					if err == nil || !strings.Contains(err.Error(), "检查以后") {
+						t.Fatalf("changed branch must refuse: %v", err)
+					}
+					testkit.Eq(t, testkit.Git(t, filepath.Join(root, "demo"), "rev-parse", target), before, "target unchanged")
+					if _, err := os.Stat(place.Cwd); err != nil {
+						t.Fatal(err)
+					}
+				} else if err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
 	}
 }
