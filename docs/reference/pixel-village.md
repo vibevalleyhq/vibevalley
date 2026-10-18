@@ -14,7 +14,7 @@ Flutter 客户端里和 VibeValley 本身无关的那一半：像素画怎么放
 
 ## 素材
 
-[理由](.agents/notes/implemented/process/2026-10-09-image-pipeline-with-codex.md)。原图在单独的仓库 vibevalley-art（放在这个仓库旁边，或用 `VIBEVALLEY_ART` 指给它），先跑一次 `design/art.sh` 把它链接进 `design/`。
+[理由](docs/subsystems/process.md)。原图在单独的仓库 vibevalley-art（放在这个仓库旁边，或用 `VIBEVALLEY_ART` 指给它），先跑一次 `design/art.sh` 把它链接进 `design/`。
 
 1. **生图**：`design/pixel/gen.sh <名字>` 用 codex 画，产出品红底的整张图到 `design/pixel/raw/`。两倍密的版本是 `gen.sh hd-<名字>`。
 2. **切图**：`design/pixel/process.py` 写「哪张图、几行几列、每格叫什么」，去品红、切、缩、压到 32 色、算落脚点，写出图和 `sprites.json`。改了图重跑切图，不手改 `sprites.json`。

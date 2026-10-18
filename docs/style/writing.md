@@ -1,6 +1,6 @@
 # 写作
 
-文档、Note、README、skill、提交说明、PR 描述、代码注释、界面上的帮助文字和给主人的回复，都照这一篇写。第一部分管写什么、删什么，第二部分管词和格式怎么写。文档放在哪、写什么，见 [docs/AGENTS.md](docs/AGENTS.md)；代码注释写什么，见 [code.md](docs/style/code.md)。官网的宣传文案和首页的诗句不用它，那些靠节奏和修辞（[为什么换成这一篇](.agents/notes/implemented/process/2026-10-17-one-writing-standard.md)）。
+文档、Note、README、skill、提交说明、PR 描述、代码注释、界面上的帮助文字和给主人的回复，都照这一篇写。第一部分管写什么、删什么，第二部分管词和格式怎么写。文档放在哪、写什么，见 [docs/AGENTS.md](docs/AGENTS.md)；代码注释写什么，见 [code.md](docs/style/code.md)。官网的宣传文案和首页的诗句不用它，那些靠节奏和修辞（[为什么换成这一篇](docs/subsystems/process.md)）。
 
 ## 写什么，删什么
 

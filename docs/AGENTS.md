@@ -1,6 +1,6 @@
 # AGENTS.md：文档的规矩
 
-本文定义文档放在哪、怎么写。约定照 [DeepSeek Harness 的文档规矩](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/AGENTS.md)，按 VibeValley 的大小删减；理由见 [agent-notes-and-doc-tiers](.agents/notes/implemented/process/2026-10-11-agent-notes-and-doc-tiers.md)。[Agent Notes](.agents/notes/README.md) 的格式由它自己的 README 管，不在本文范围内。
+本文定义文档放在哪、怎么写。约定照 [DeepSeek Harness 的文档规矩](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/AGENTS.md)，按 VibeValley 的大小删减；理由见 [agent-notes-and-doc-tiers](docs/subsystems/process.md)。[Agent Notes](.agents/notes/README.md) 的格式由它自己的 README 管，不在本文范围内。
 
 ## 一个事实一个家
 

@@ -20,6 +20,9 @@
 | [地基](docs/subsystems/foundation.md) | 一个模块、一包一服务、fx、形状和规则、sqlc、表结构、测试 |
 | [客户端](docs/subsystems/app.md) | Flutter、分层、问服务端、macOS 宿主和渠道 |
 | [农场的皮](docs/subsystems/farm.md) | 像素村、地里长什么、走路、手机、音效、图鉴 |
+| [档案和农机](docs/subsystems/agent.md) | 帮工档案、种子、农机的探测和清单、技能书 |
+| [工程流程](docs/subsystems/process.md) | 文档分层、Note 和子系统、docs:verify、skill、写作规范、素材流水线、名字 |
+| [官网](docs/subsystems/site.md) | vibevalley.dev：Astro、island、图从游戏来、没脚本也完整 |
 
 查的东西（界面清单、能力表、概念在各层的名字、农机和档案）在 [reference/](docs/README.md)。
 

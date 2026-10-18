@@ -31,6 +31,9 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [foundation.md](docs/subsystems/foundation.md) | 地基：一个模块、一包一服务、fx、形状和规则、sqlc、表结构、测试 |
 | [app.md](docs/subsystems/app.md) | 客户端：Flutter、分层、问服务端、macOS 宿主和渠道 |
 | [farm.md](docs/subsystems/farm.md) | 农场的皮：像素村、地里长什么、走路、手机、音效、图鉴 |
+| [agent.md](docs/subsystems/agent.md) | 档案和农机：帮工档案、种子、农机的探测和清单、技能书 |
+| [process.md](docs/subsystems/process.md) | 工程流程：文档分层、Note 和子系统、检查、skill、写作规范、素材流水线 |
+| [site.md](docs/subsystems/site.md) | 官网：Astro、island、图从游戏来 |
 
 查的东西（`reference/`）：
 

@@ -27,26 +27,6 @@
 
 - 2026-10-18 [用 VibeValley 开发 VibeValley](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
 
-## implemented（9 篇）
-
-### simplification
-
-- 2026-10-12 [页面只给真实数据](.agents/notes/implemented/simplification/2026-10-12-real-data-only.md)
-
-### architecture
-
-- 2026-10-15 [官网放在 site/，用游戏自己的图，会动的部分是 React](.agents/notes/implemented/architecture/2026-10-15-site.md)
-
-### process
-
-- 2026-10-17 [文档里写的路径也查](.agents/notes/implemented/process/2026-10-17-paths-in-docs-are-checked.md)
-- 2026-10-17 [写作规范以信息密度为主，STE 只留词和格式](.agents/notes/implemented/process/2026-10-17-one-writing-standard.md)
-- 2026-10-17 [让容易的写法就是对的写法](.agents/notes/implemented/process/2026-10-17-make-the-easy-thing-the-right-thing.md)
-- 2026-10-15 [改名 VibeValley（码农场物语）](.agents/notes/implemented/process/2026-10-15-rename-to-vibevalley.md)
-- 2026-10-15 [Note 的目录由脚本生成，检查跑在 Bun 上](.agents/notes/implemented/process/2026-10-15-notes-catalog.md)
-- 2026-10-11 [决策记在 Agent Notes，文档只写现状](.agents/notes/implemented/process/2026-10-11-agent-notes-and-doc-tiers.md)
-- 2026-10-09 [素材用 codex 生图，脚本切图](.agents/notes/implemented/process/2026-10-09-image-pipeline-with-codex.md)
-
 ## rejected（2 篇）
 
 ### feature

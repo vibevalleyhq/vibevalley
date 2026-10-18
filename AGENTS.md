@@ -52,7 +52,7 @@ Go 1.27，Flutter 3.47，Bun 1.4（根目录的命令、文档和 Note 的检查
 
 ## 怎么让 agent 做对
 
-agent 照着已有的代码抄，走最短的路，所以要让容易的写法就是对的写法。挡住一类问题，按下面的顺序选手段，能用前面的就不用后面的（[理由](.agents/notes/implemented/process/2026-10-17-make-the-easy-thing-the-right-thing.md)）：
+agent 照着已有的代码抄，走最短的路，所以要让容易的写法就是对的写法。挡住一类问题，按下面的顺序选手段，能用前面的就不用后面的（[理由](docs/subsystems/process.md)）：
 
 1. **代码**：更好的结构、更强的类型和不变量、清楚的边界；用代码把一类问题整个消掉，以后不用再想它。
 2. **静态检查**：lint 规则、测试、CI、形式化验证（如 TLA+）；花的 token 最少，问题在落地前就报出来。
@@ -76,7 +76,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **服务端的服务**：每个包只导出一个服务 `<包>.Service`，一块业务里分开写的几部分是它嵌入的不导出的零件；`Workspace` 上的字段用单数概念名（`f.Issue.Merge`）。构造函数的参数是它用到的服务（不拿整个 `Workspace`），在包的 `Module` 里用 `base.Run` 交给 fx，再加进 `workspace.go` 的 `services`；包只 import 排在它前面的包，往上走 `base.Hub`；服务之间传的形状放在定义它的包里，`base` 只放地基；`OnStart(ctx)` 订阅和开后台的活，开机就要发布的放 `OnReady(ctx)`（[server](server/README.md#服务)）。
 - **处理函数要薄**：HTTP 处理（`internal/handler`）和界面（Flutter 的页面）只做转发和展示，规则在拥有它的服务或纯函数里。
 - **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](docs/subsystems/session.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](docs/subsystems/voice.md)）；院门默认关着，只放主人在本机点过头的设备、每台一把钥匙，不放 `/mcp`（[理由](docs/subsystems/gate.md)）。
-- **图标是像素素材**：界面上的按钮图标用 `design/pixel` 生成的贴图（形状照 Hugeicons：`icons/ref.py`、`gen.sh`、`process.py`），不用 ▶、■ 这类字符代替（[流程](.agents/notes/implemented/process/2026-10-09-image-pipeline-with-codex.md)）。
+- **图标是像素素材**：界面上的按钮图标用 `design/pixel` 生成的贴图（形状照 Hugeicons：`icons/ref.py`、`gen.sh`、`process.py`），不用 ▶、■ 这类字符代替（[流程](docs/subsystems/process.md)）。
 - **密钥**：写了钥匙的 `vibevalley.yaml`（`$VIBEVALLEY_HOME/vibevalley.yaml` 或 `--config` 给的）、`.agora/` 不进仓库；日志和文档里不出现密钥。
 - **工具链**：Go 用 `gofmt`、`go vet`，Dart 用 `dart format`、`flutter analyze`；`scripts/` 的检查用 Bun 跑，`server/tool/` 的脚本用 Node 跑，都不带构建。
 - **代码风格**：格式交给工具（`gofmt`、`dart format -l 160`），不手调；代码和接口用实际的概念，界面上的字用中文、用农场的叫法（[用语表](docs/README.md#用语)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。

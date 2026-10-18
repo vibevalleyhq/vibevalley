@@ -14,7 +14,7 @@
 
 文件名里的日期是这个话题**第一次提出**的日子。Note 之间互相引用用 Markdown 链接，路径从仓库根写（`[题目](.agents/notes/implemented/architecture/2026-…-….md)`），不用裸文字或编号，这样能机器检查，挪目录后搜一个字符串就能修。
 
-清单是 [CATALOG.md](.agents/notes/CATALOG.md)：按生命周期和类别列出每篇 Note 的日期和标题，新的在前。它由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从路径和标题写成，不手改，也不另建手写的 `INDEX.md`：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错；合并时它冲突了不用手合，重新生成（[理由](.agents/notes/implemented/process/2026-10-15-notes-catalog.md)）。
+清单是 [CATALOG.md](.agents/notes/CATALOG.md)：按生命周期和类别列出每篇 Note 的日期和标题，新的在前。它由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从路径和标题写成，不手改，也不另建手写的 `INDEX.md`：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错；合并时它冲突了不用手合，重新生成（[理由](docs/subsystems/process.md)）。
 
 ## 类别
 
@@ -86,7 +86,7 @@ Status: <状态>
 ## Consequences
 ```
 
-`## Decision` 用现在时描述上线的样子，整篇跟着它保持最新。`## Consequences` 写这个取舍付出了什么、换来了什么。提案时期的章节在这里不允许出现，校验会拒绝：`## Proposal`、`## Task`、`## Migration task`、`## Acceptance criteria`。写现状的 `## Verification`、`## Deferred`、`## Related` 可以有。
+`## Decision` 用现在时描述上线的样子，整篇跟着它保持最新。`## Consequences` 写这个取舍付出了什么、换来了什么。提案时期的章节在这里不允许出现，校验会拒绝：`## Proposal`、`## Plan`、`## Migration plan`、`## Acceptance criteria`。写现状的 `## Verification`、`## Deferred`、`## Related` 可以有。
 
 `rejected/`：就是冻结的提案，保留提案时的章节，结论写在 `Status:` 行。只要求开头、`## Problem`、`## Proposal` 和下面的「Alternatives considered」。
 

@@ -52,7 +52,7 @@ func TestAConfigThatCannotBeKeptAsideStopsTheStart(t *testing.T) {
 	}
 }
 
-// The same animals the client's castOf picks (app/test/desk_rules_test.dart), so filling one in changes nothing on screen.
+// The same animals the client's castOf picks (app/test/workbench/rules_test.dart), so filling one in changes nothing on screen.
 func TestAProfileWithoutAnAnimalGetsTheOneItShowed(t *testing.T) {
 	for id, want := range map[string]protocol.Species{"backend": protocol.SpeciesCat, "agent-7": protocol.SpeciesFox, "老周": protocol.SpeciesHedgehog} {
 		got := withCast(protocol.Agent{ID: id})
