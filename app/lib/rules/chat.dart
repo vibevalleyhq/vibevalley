@@ -27,9 +27,45 @@ Conversation? channelOf(Chat? chat, Conversation? c) {
   return conversationOf(chat, c.channel ?? "") ?? generalOf(chat);
 }
 
-/// `#name`, or `#channel:seq` for a thread (the seq of the message it hangs under).
-Conversation? jobThreadOf(Chat? chat, String session) =>
-    chat?.conversations.lastWhereOrNull((c) => c.subjectKind == SubjectKind.issue && c.subjectId == session);
+/// One thread per issue, kept across the sessions that work it.
+Conversation? issueThreadOf(Chat? chat, String issue) => chat?.conversations.lastWhereOrNull((c) => c.subjectKind == SubjectKind.issue && c.subjectId == issue);
+
+/// The one way from a session to its thread: through its issue; a session sent for no issue has a talk thread of its own.
+Conversation? jobThreadOf(Chat? chat, Session session) {
+  final issue = session.issue;
+  if (issue != null && issue.isNotEmpty) return issueThreadOf(chat, issue);
+  return chat?.conversations.lastWhereOrNull((c) => c.subjectKind == SubjectKind.talk && c.subjectId == session.id);
+}
+
+/// Whom a thread's words are for now: the session working its issue, or a talk thread's own session.
+Session? threadOwnerOf(Conversation thread, List<Session> sessions) => switch (thread.subjectKind) {
+  SubjectKind.issue => sessions.lastWhereOrNull((h) => h.issue == thread.subjectId),
+  SubjectKind.talk => sessions.where((h) => h.id == thread.subjectId).firstOrNull,
+  SubjectKind.graph || null => null,
+};
+
+/// An issue's thread is named by the issue, so the name holds after its sessions leave.
+String threadTitle(Chat? chat, Conversation thread, {List<Issue> issues = const [], List<Session> sessions = const []}) {
+  String head(String text) {
+    final flat = text.replaceAll(RegExp(r'\s+'), ' ');
+    return flat.length > 24 ? flat.substring(0, 24) : flat;
+  }
+
+  switch (thread.subjectKind) {
+    case SubjectKind.issue:
+      final issue = issues.where((i) => i.id == thread.subjectId).firstOrNull;
+      return issue == null ? '工单串' : head(issue.title);
+    case SubjectKind.graph:
+      return '计划 ${thread.subjectId ?? ''}';
+    case SubjectKind.talk when thread.subjectId != null:
+      final session = sessions.where((h) => h.id == thread.subjectId).firstOrNull;
+      final said = messagesIn(chat, thread.id).where((m) => m.from == thread.subjectId).firstOrNull?.name;
+      return '${session?.name ?? said ?? thread.subjectId}的串';
+    case SubjectKind.talk || null:
+      final parent = parentOf(chat, thread);
+      return parent == null ? '串' : head(parent.text);
+  }
+}
 
 List<ChatMessage> messagesIn(Chat? chat, String conversation) => [...?chat?.messages.where((m) => m.conversation == conversation)];
 

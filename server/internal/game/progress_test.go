@@ -202,7 +202,7 @@ func TestEntriesForFacts(t *testing.T) {
 func TestEntriesFromLeavingAndMessages(t *testing.T) {
 	farm := protocol.EmptyCoreState()
 	w1 := progressSession("w1", protocol.PhaseRipe{})
-	w1.Project, w1.Runs, w1.Spent = ptr.To("clock"), 2, &protocol.Spent{Tokens: 900, CNY: ptr.To(0.5)}
+	w1.Project, w1.Runs, w1.Spent, w1.Issue = ptr.To("clock"), 2, &protocol.Spent{Tokens: 900, CNY: ptr.To(0.5)}, ptr.To("i7")
 	farm.Sessions = []protocol.Session{w1, progressSession("w2", progressWorkingPhase)}
 	harvested, merged := protocol.IssueCloseMerged, int64(3)
 	left := protocol.Fact{Value: protocol.FactLeft{At: 1, ID: "w1", Closed: &harvested, Merged: &merged}}
@@ -218,8 +218,10 @@ func TestEntriesFromLeavingAndMessages(t *testing.T) {
 	said := func(seq int64, from string, kind protocol.SenderKind, mentions ...string) protocol.ChatMessage {
 		return protocol.ChatMessage{ID: fmt.Sprintf("m%d", seq), Number: seq, Conversation: "c7", From: from, FromKind: kind, Name: from, Kind: protocol.MessageKindChat, Text: "…", Final: true, Mentions: mentions, At: 1}
 	}
-	thread := ptr.To("w1")
+	thread := ptr.To("i7")
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(1, "user", protocol.SenderKindUser), Thread: thread}}), []string{"told"})
+	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(6, "user", protocol.SenderKindUser), Thread: ptr.To("i8")}}), []string{},
+		"the thread of an issue no session works tells no one")
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(2, "user", protocol.SenderKindUser, "w2", protocol.ManagerAgent, protocol.Everyone, "w9")}}), []string{"called"})
 	testkit.Eq(t, progressTold(farm, protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(3, protocol.ManagerAgent, protocol.SenderKindManager, "w2"), Thread: thread}}), []string{})
 	answered := protocol.Fact{Value: protocol.FactMessage{At: 1, Message: said(4, "w2", protocol.SenderKindAgent), Answers: ptr.To("w1")}}

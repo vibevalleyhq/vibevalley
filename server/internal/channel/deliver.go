@@ -25,6 +25,8 @@ type chatWrite struct {
 	meta         *chatMeta
 	answers      *string
 	thread       *threadSubject
+	// A participant who follows the conversation from this message on, in the same transaction.
+	follow string
 	// The client's key for one send, "" for none: the same key from the same sender again is that message, not a new one.
 	sendKey string
 }
@@ -100,7 +102,8 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 	}
 	var followers []string
 	if conv.Kind == "thread" {
-		if row.Sender != "system" {
+		// A dispatch handing the issue to its next session makes no one a follower: the manager would be woken by every word in it.
+		if row.Sender != "system" && row.Kind != string(protocol.MessageKindDispatch) {
 			if err := s.follow(conv.ID, row.Sender, "replied", row.Number); err != nil {
 				return chatWritten{}, err
 			}
@@ -149,7 +152,8 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 		FromKind:     chatSenderKind(row.SenderKind),
 		Kind:         chatMessageKind(row.Kind),
 		Mentions:     mentions,
-		Conversation: protocol.Conversation{Kind: chatConversationKind(conv.Kind), SubjectKind: chatSubjectKind(conv.SubjectKind), SubjectID: conv.SubjectID},
+		Conversation: protocol.Conversation{Kind: chatConversationKind(conv.Kind)},
+		ThreadOwner:  c.ownerOf(*conv),
 		Sessions:     audience,
 		OnFarm:       onFarm,
 		Followers:    followers,
@@ -159,9 +163,6 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 		Outcome:      meta.Outcome,
 		ForTask:      meta.ForTask,
 		Spoken:       meta.Spoken,
-	}
-	if in.Conversation.SubjectID != nil && *in.Conversation.SubjectID == "" {
-		in.Conversation.SubjectID = nil
 	}
 	deliveries := chatAudience(in)
 	for _, d := range deliveries {
@@ -245,6 +246,11 @@ func (c *Service) write(in chatWrite) (chatWritten, error) {
 			}
 		}
 		written.id, written.number = id, number
+		if in.follow != "" {
+			if err := s.follow(in.conversation, in.follow, "owner", number); err != nil {
+				return err
+			}
+		}
 		if in.thread != nil {
 			var err error
 			written.thread, err = s.threadFor(chatMsgRow{ID: id, Number: number, Conversation: in.conversation}, *in.thread)
@@ -476,7 +482,7 @@ func (c *Service) onActivity(a session.LaunchActivity) {
 				if failed >= protocol.WakeBreaker && !c.broken[a.ID] {
 					c.broken[a.ID] = true
 					where := c.general
-					if thread := c.issueThreadOf(a.ID); thread != nil {
+					if thread := c.threadOfSession(a.ID); thread != nil {
 						where = *thread
 					}
 					name := a.ID
@@ -580,8 +586,9 @@ func (c *Service) openedJob(h protocol.Session) error {
 	if err := s.upsertParticipant(h.ID, string(protocol.SenderKindAgent), h.Name, &agent, &runtime, clock.NowMs()); err != nil {
 		return err
 	}
-	if c.issueThreadOf(h.ID) != nil {
-		return nil
+	job := jobOf(h)
+	if thread := c.threadOf(job); thread != nil {
+		return c.handedOn(h, *thread)
 	}
 	channel := c.channelOfSession(h)
 	latest, err := s.latestNumber(channel)
@@ -606,7 +613,41 @@ func (c *Service) openedJob(h protocol.Session) error {
 	}
 	text := fmt.Sprintf("派 @%s（%s）去 %s：%s", h.ID, h.Name, project, what)
 	_, err = c.write(chatWrite{conversation: channel, from: protocol.ManagerAgent, kind: protocol.MessageKindDispatch, text: text, final: true,
-		meta: &chatMeta{Session: h.ID}, thread: &threadSubject{kind: protocol.SubjectKindIssue, id: h.ID, owner: h.ID}})
+		meta: &chatMeta{Session: h.ID}, thread: &job})
+	return err
+}
+
+// The issue already has its thread (reopened, or sent to another session): the next session is told of in it and follows
+// it, in one transaction, so a restart neither says it twice nor leaves it out.
+func (c *Service) handedOn(h protocol.Session, thread string) error {
+	s := c.store()
+	followers, err := s.followers(thread)
+	if err != nil {
+		return err
+	}
+	if slices.Contains(followers, h.ID) {
+		return nil
+	}
+	channel := c.channelOfSession(h)
+	latest, err := s.latestNumber(channel)
+	if err != nil {
+		return err
+	}
+	if err := s.setReadCursor(h.ID, channel, latest, clock.NowMs()); err != nil {
+		return err
+	}
+	nth := 1
+	if i := slices.IndexFunc(c.core.State().Issues, func(t protocol.Issue) bool { return t.ID == *h.Issue }); i >= 0 {
+		// Linked to the issue or not yet, it is the one after those before it.
+		sessions := c.core.State().Issues[i].Sessions
+		nth = len(sessions) + 1
+		if at := slices.Index(sessions, h.ID); at >= 0 {
+			nth = at + 1
+		}
+	}
+	text := fmt.Sprintf("这张工单交给 @%s（%s）接着做，第 %d 次派活", h.ID, h.Name, nth)
+	_, err = c.write(chatWrite{conversation: thread, from: protocol.ManagerAgent, kind: protocol.MessageKindDispatch, text: text, final: true,
+		meta: &chatMeta{Session: h.ID}, follow: h.ID})
 	return err
 }
 
@@ -615,7 +656,7 @@ func (c *Service) postReport(id string, outcome protocol.Outcome, summary string
 	if w == nil || outcome == protocol.OutcomeInterrupted {
 		return
 	}
-	thread := c.issueThreadOf(id)
+	thread := c.threadOfSession(id)
 	if thread == nil {
 		return
 	}

@@ -19,19 +19,6 @@ import '../../rules/sessions.dart';
 
 const _grey = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, color: Palette.bark500);
 
-String threadTitle(Chat? chat, Conversation thread, List<Session> sessions) {
-  if (thread.subjectKind == SubjectKind.issue) {
-    final session = sessions.where((h) => h.id == thread.subjectId).firstOrNull;
-    final said = messagesIn(chat, thread.id).where((m) => m.from == thread.subjectId).firstOrNull?.name;
-    return '${session?.name ?? said ?? thread.subjectId ?? ''}的工单串';
-  }
-  if (thread.subjectKind == SubjectKind.graph) return '计划 ${thread.subjectId ?? ''}';
-  final parent = parentOf(chat, thread);
-  if (parent == null) return '串';
-  final flat = parent.text.replaceAll(RegExp(r'\s+'), ' ');
-  return flat.length > 24 ? flat.substring(0, 24) : flat;
-}
-
 enum _Tab { chat, jobs, schedules }
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -379,7 +366,7 @@ class _Sidebar extends ConsumerWidget {
                         _SessionRow(
                           session: h,
                           chat: chat,
-                          active: thread?.subjectKind == SubjectKind.issue && thread?.subjectId == h.id,
+                          active: thread?.id != null && jobThreadOf(chat, h)?.id == thread?.id,
                           onShow: (id) {
                             onShow(id);
                             onPick();
@@ -553,7 +540,7 @@ class _SessionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = session;
-    final thread = jobThreadOf(chat, h.id);
+    final thread = jobThreadOf(chat, h);
     final unread = thread == null ? 0 : unreadIn(chat, thread);
     final phase = phaseText(h, nowMs());
     return KitTappable(
@@ -701,7 +688,7 @@ class _Jobs extends ConsumerWidget {
                     ],
                   ),
                 ),
-                if (jobThreadOf(farm?.chat, h.id) case final thread?)
+                if (jobThreadOf(farm?.chat, h) case final thread?)
                   PxButton(
                     size: PxSize.custom,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -834,11 +821,11 @@ class _ThreadPane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final farm = ref.watch(stateProvider);
     final sessions = farm?.sessions ?? const <Session>[];
-    final session = thread.subjectKind == SubjectKind.issue ? sessions.where((h) => h.id == thread.subjectId).firstOrNull : null;
+    final session = threadOwnerOf(thread, sessions);
     final status = session != null
         ? '@${session.id} · ${phaseText(session, nowMs())}'
         : thread.subjectKind == SubjectKind.issue
-        ? '它已经离开农场，串还留着'
+        ? '现在没有帮工在干，串还留着'
         : '${idText(thread.replies)} 条回复';
     return Semantics(
       label: '串',
@@ -862,7 +849,12 @@ class _ThreadPane extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(threadTitle(farm?.chat, thread, sessions), maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                      Text(
+                        threadTitle(farm?.chat, thread, issues: farm?.issues ?? const [], sessions: sessions),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: KitText.sm,
+                      ),
                       Row(
                         children: [
                           if (session != null) ...[PhaseGlyph(session.phase, size: 14), const SizedBox(width: 4)],

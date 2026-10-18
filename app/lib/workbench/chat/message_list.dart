@@ -439,7 +439,7 @@ class ThreadPreview extends ConsumerWidget {
     final chat = farm?.chat;
     final unread = unreadIn(chat, thread);
     final last = messagesIn(chat, thread.id).lastOrNull;
-    final session = thread.subjectKind == SubjectKind.issue ? farm?.sessions.where((h) => h.id == thread.subjectId).firstOrNull : null;
+    final session = threadOwnerOf(thread, farm?.sessions ?? const []);
     return KitTappable(
       onTap: () => unawaited(ref.read(chatActionsProvider).showChat(thread.id).catchError((Object _) {})),
       builder: (context, s) => Container(

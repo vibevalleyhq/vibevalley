@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 频道、串、消息、@，消息号和地址 `#<频道>:<消息号>` | 工单的状态和派活（[工单](docs/subsystems/issue.md)）；派活时 `issue` 开 Session，田头只为它开工单串 |
+| 频道、串、消息、@，消息号和地址 `#<频道>:<消息号>` | 工单的状态和派活（[工单](docs/subsystems/issue.md)）；派活时 `issue` 开 Session，田头只为这张工单开工单串 |
 | 一条消息给谁、叫不叫醒，三道刹车，送达的状态 | 一轮怎么跑、能不能插话（`session.Deliver` 交给 smith，[帮工](docs/subsystems/session.md)） |
 | 帮工的汇报贴进工单串；带话、验收意见、冲突经工单串交给帮工 | 汇报怎么读出结论（`session.SummaryOf`） |
 | 帮工在 `/mcp` 上的说话工具（`channel_say`、`read_chat`、`channel_inbox`）背后的规则 | 工具的定义和认人（`internal/tool`、`internal/mcp`、`session/tokens.go`） |
@@ -29,7 +29,8 @@
 - **数据库是家，先写库再成事实**：一条消息和它的 @、跟帖、投递在一个事务里写进库，提交以后才施加 `message`、`conversation` 事实。核心状态 `CoreState.chat` 只放最近的 100 个对话、300 条消息，挤出去时频道不挤；更早的用 `channel.history` 取。`state.json` 不存田头，开机从库里放回。帮工的已读位置、跟帖、投递只在库里。
 - **写库一个一个来**：改田头的都持 `Service.mu`，数据库一个连接、一个写入方，所以 `number` 的先后就是提交的先后，不用像多写入方那样等「稳定」。不应开连接池。
 - **一个对话一列消息号**：主键是 uuidv7，`number` 在每个对话里从 1 数，对外的消息号就是它。地址是 `#<频道>`、`#<频道>:<消息号>`（田头是 `#田头`）；频道名 1–24 个字母、数字、汉字、`_`、`-`，不能重名，这样地址能读回来。
-- **对话三种**：田头（全库唯一一行）、频道（可以带说明和默认项目）、串（挂在一条消息下，`subject_kind` 是 `issue`、`talk`）。工单串的 `subject_id` 是派出去的那个 Session 的 id；有人往 `#频道:<号>` 说话时现开的串是 `talk`。
+- **对话三种**：田头（全库唯一一行）、频道（可以带说明和默认项目）、串（挂在一条消息下，`subject_kind` 是 `issue`、`talk`）。工单串的 `subject_id` 是工单的 id；没挂工单的 Session 开的是 `talk` 串，`subject_id` 是它自己；有人往 `#频道:<号>` 说话时现开的串也是 `talk`，没有 `subject_id`。
+- **一张工单一个串**：重开、换帮工都还是这一个串，前后几个帮工的派活、汇报、主人的话都在里面。串的主人是这张工单现在在干活的帮工（`protocol.SessionOnIssue`），每次写消息时按工单现算，不存；没有帮工在干时串没有主人。从帮工找串只走一个函数（`threadOfSession`：先找它的工单，再找串），不拿帮工的 id 去找工单串。核心状态里 `FactMessage.thread` 是工单的 id。客户端的串标题是工单标题，帮工走了也对（`app/lib/rules/chat.dart` 的 `threadTitle`、`threadOwnerOf`）。
 - **谁在频道里**：主人和管家在每个频道里；帮工在它的活所在的频道里，在哪个频道派的活，工单串就开在哪个频道下面。帮工派出来时加入（`channel_participant`），离开时打上 `left_at`，说过的话留着，给它没交完的投递作废（`dropped`）。
 - **@ 名**：`@w3`（帮工的 id）、`@管家`、`@主人`、`@所有人`（只有主人用才算）。反引号和代码块里的不算；名字在它的词结束处结束（`@w3你看` 是 w3）。写 @ 就是叫醒；@ 了不在地里的，消息照发，发的人被告知没送到。
 - **给谁、叫不叫醒**（`chatAudience`）：
@@ -37,8 +38,8 @@
   | 谁说的 | 叫醒谁 | 只让谁知道 |
   |---|---|---|
   | 主人在频道里 | 被 @ 的；没 @ 别人时是管家 | 这个频道里的帮工 |
-  | 主人在串里 | 被 @ 的、工单串的帮工、跟着这个串的 | — |
-  | 管家或帮工 | 被 @ 的；在一个帮工的工单串里说话叫醒它 | — |
+  | 主人在串里 | 被 @ 的、这张工单现在的帮工、跟着这个串的；工单没人在干时只记下 | — |
+  | 管家或帮工 | 被 @ 的；在工单串里说话叫醒这张工单现在的帮工 | — |
   | 帮工的汇报 | 没做成时叫醒管家 | 做完时给管家；种植计划里的帮工不给，计划自己告诉管家 |
   | 派活消息、农场的提示（`notice`）、通话里说过的话 | 谁也不叫 | — |
 
@@ -55,7 +56,12 @@
 
 **主人说一句**（`channel.say` → `manager.Say` → `channel.Say`）：写库、算投递、推进主人的已读，提交后施加事实；被叫醒的是管家就经 `ForManager` 交给它，它在哪个对话被叫就回在哪个对话。管家的回答是逐字长出来的同一条消息（`ManagerSays`，同一个键替换正文，`final` 时才算投递）；服务端停下时说到一半的，开机时就当说完了。
 
-**派活开工单串**：`FactHired` 来了，田头为新的 Session 建参与者，把它在频道里的已读位置放到最新，以管家的名义发一条派活消息（`dispatch`，「派 @w3（名字）去 项目：要做什么」），同一个事务里在下面开工单串，帮工是串的主人、跟着它。开串失败时派活消息也不留。
+**派活开工单串**：`FactHired` 来了，田头为新的 Session 建参与者，把它在频道里的已读位置放到最新，按它的工单找串：
+
+1. 工单还没有串：以管家的名义在频道里发一条派活消息（`dispatch`，「派 @w3（名字）去 项目：要做什么」），同一个事务里在下面开工单串，帮工跟着它。开串失败时派活消息也不留。
+2. 工单已经有串（重开、换了帮工）：在串里以管家的名义写一条派活的话（「这张工单交给 @w5（名字）接着做，第 2 次派活」），同一个事务里让新帮工跟着这个串；已经跟着的就不再写，开机重放不会说两遍。串里的派活消息不让管家跟着串，不然主人在串里的每句话都会叫醒管家。
+
+没挂工单的 Session 照旧在频道里发派活消息，下面开它自己的 `talk` 串。
 
 **叫醒一个帮工**（`kicked`）：
 
@@ -73,7 +79,7 @@
 
 `read_chat` 默认读 30 条、最多 100 条，推进已读；不写地址时帮工读自己的工单串。`channel_inbox` 列出它没读的对话。
 
-**汇报**：帮工一轮结束（`FactReport`），田头以帮工自己的名义把这一轮贴进它的工单串（`report`）：做完的是最后一段话里的结论（`session.SummaryOf`），没有就用汇报的摘要，截到 1500 字；被打断的不贴。
+**汇报**：帮工一轮结束（`FactReport`），田头以帮工自己的名义把这一轮贴进它这张工单的串（`report`）：做完的是最后一段话里的结论（`session.SummaryOf`），没有就用汇报的摘要，截到 1500 字；被打断的不贴。
 
 **带话和意见**：主人的带话、验收没过的意见、冲突和检查失败交回帮工，都经 `TellSession` 以主人的名义说在工单串里，按串的规则叫醒帮工；没有工单串的 Session 直接 `session.Deliver`。
 
@@ -131,6 +137,7 @@ Inbox 不属于 `channel` 包：它是 `protocol.Inbox(state)`（`server/interna
 - **@ 和主人在工单串里的话才叫醒帮工，比 Raft 收得紧。** 放弃了「频道成员每条都收、都被叫醒」：Raft 的 agent 长驻，VibeValley 的帮工按工单开会话、按 token 花钱，田头一句闲聊叫醒六个帮工就是六份钱。成员照样被动知道（忙的收提示、歇着的醒来看摘要），所以主人说「main 刚合了大改动」帮工也知道。
 - **防 agent 来回靠结构上的闸，不靠礼节。** Raft 只靠提示词里的礼节，自己的手册承认关键时刻会失灵。来回上限、冷却和熔断不管模型守不守礼节都管用。`session_list` 的名单不带 @、规矩写明 @ 就是叫醒：真跑时帮工把带 @ 的名单原样抄进回答，一连叫醒了管家和别的帮工。
 - **用帮工的 id 来 @，不用名字。** 名字有空格、紧跟中文会被吞进去，都会 @ 错人；id 是稳定的，页面上显示名字。
+- **串跟着工单，不跟着帮工。** 原来工单串按派出去的 Session 开，重开、换帮工就另开一个串，同一张工单的话散在几个串里，新帮工和主人都要去翻旧串；叫「工单串」，`subject_id` 却是 Session，帮工走了界面上只剩 id。放弃了「重开时把旧串的 `subject_id` 改成新帮工」：串仍然是帮工的，取消后重开要挪串，挪的那一刻谁听得见说不清。也放弃了「串上存一列主人」：现在谁在干这张工单核心状态里已经有，存一份就要在换人时同步，违反核心状态只有一份。
 - **最后的汇报自动贴出，`channel_say` 只用于一轮中间。** 放弃了「只经工具说话」：帮工本来就用最后一段话汇报，每轮多调一次工具，模型容易忘。
 - **帮工的工具走会话级的 MCP，不给命令行。** pi、claude、codex 都接受会话级 MCP，工具有类型，不用处理 shell 引号和多行中文；不接受 MCP 的农机再补命令行。管家跑在服务端进程里，不绕 HTTP 调 `channel_say`：它的话直接写进田头。
 - **交给它不等于它看到了，开口才算。** 帮工会在任何时候死掉（登录失效、进程崩溃、重启）；不记下交到哪一步，消息要么丢、要么不知道该不该重发。新鲜度拦截、防发错地方、压缩时不插话、只提示一次也照 Raft，因为两个帮工被同时 @ 会抢着答，插话会占上下文。草稿不存：工具调用时模型手里有原文。
@@ -154,9 +161,10 @@ Inbox 不属于 `channel` 包：它是 `protocol.Inbox(state)`（`server/interna
 ## 怎么验证
 
 - `channel/rules_test.go`：`TestMentionsIn`、`TestParseTarget`、`TestChannelNameProblem`、`TestAudienceInAChannel`、`TestThePersonOnTheGeneral`、`TestThePersonInAJobThread`、`TestAgentsWakingAgents`（三道刹车）、`TestReportsDispatchesNotices`、`TestWakeInputAndBusyNotice`；`TestRulesGolden` 对 `testdata/rules.jsonl.gz`。
-- `channel/chat_test.go`（smith 的 `oartest` 扮演帮工、真的 SQLite）：`TestChatJobOpensThreadUnderDispatch`、`TestChatPersonInJobThreadWakesSession`、`TestChatGeneralReachesManager`、`TestChatChannels`、`TestChatBusySessionGetsOneNotice`、`TestChatHopLimit`、`TestChatWakeBreaker`、`TestChatSpeaking`（拦截、确认、重试）、`TestChatManagerSaysGrowsThenDelivers`、`TestChatRestartGivesHandedWordsAgain`、`TestChatSessionLeaves`、`TestChatSendKeyWritesOnce`、`TestMessagesKeepTheProducingRunRatherThanMatchingTime`。`transaction_test.go`：`TestThreadOwnerFailureLeavesNoDispatch`、`TestRolledBackMessageDoesNotResetWakeBreaker`、`TestReadingReceiptRollsBackAsAUnit`、`TestStreamingCommitCanRetryWithoutAnotherMessage`。
+- `workspace/thread_test.go`（smith 的 `oartest` 扮演帮工、真的 git 仓库）：`TestOneIssueKeepsOneThreadAcrossItsSessions`：派出去、取消、重开，前后两个帮工的派活、汇报、主人的话在同一个串里；主人的话叫醒现在的帮工，没人在干时只记下。
+- `channel/chat_test.go`（假的帮工、真的 SQLite）：`TestChatJobOpensThreadUnderDispatch`、`TestChatSessionSentForNoIssueHasATalkThread`、`TestChatPersonInJobThreadWakesSession`、`TestChatGeneralReachesManager`、`TestChatChannels`、`TestChatBusySessionGetsOneNotice`、`TestChatHopLimit`、`TestChatWakeBreaker`、`TestChatSpeaking`（拦截、确认、重试）、`TestChatManagerSaysGrowsThenDelivers`、`TestChatRestartGivesHandedWordsAgain`、`TestChatSessionLeaves`、`TestChatSendKeyWritesOnce`、`TestMessagesKeepTheProducingRunRatherThanMatchingTime`。`transaction_test.go`：`TestThreadOwnerFailureLeavesNoDispatch`、`TestRolledBackMessageDoesNotResetWakeBreaker`、`TestReadingReceiptRollsBackAsAUnit`、`TestStreamingCommitCanRetryWithoutAnotherMessage`。
 - `protocol/chat_rules_test.go`：`TestTargets`、`TestChannelsInTheChat`、`TestTheChatKeepsTheGeneral`。`mcp/mcp_test.go`：`TestToolsOverMcp`、`TestEveryMcpToolRequiresAuthenticatedSession`。
 - 连接器（真的 SQLite、本机假适配器，不登录真账号）：`connector_test.go` 的 `TestConnectorsWeixinOwnerSaidOnTheGeneral`、`TestConnectorsWeixinInAnotherChannel`、`TestConnectorsWeixinStrangerNotLetIn`、`TestConnectorsQQPairing`、`TestConnectorsQQRefusedReplyWaits`、`TestConnectorsWeixinHeldGoOutAsADigest`、`TestConnectorsRetryBacksOff`、`TestConnectorsResumeAfterRestart`、`TestConcurrentInboundIsTakenOnce`、`TestAccountChangeRollsBackWhenOutboxUpdateFails`；`inbound_retry_test.go` 的 `TestWeixinPageAcceptanceIsAtomicAndDeliveryRetries`；`recovery_test.go` 的 `TestInboxRecoversAcceptedWorkAfterRestart`、`TestInboxReplaysWhenManagerSucceededBeforeCompletionWrite`；`feishu_test.go` 的 `TestFeishuAcknowledgesOnlyAfterAcceptance`；`connection_test.go` 的 `TestAccountOwnerJoinsOldLoginBeforeReplacement`、`TestAccountLogoutWaitsAndRejectsLateCallbacks`、`TestConnectionShutdownWaitsForManagerDelivery`、`TestReceiverSealsSDKCallbacksAfterListenReturns`；`outbox_test.go`、`text_test.go`、`login_test.go`。全部：`go test -race ./internal/connector ./pkg/qq ./pkg/weixin ./pkg/feishu`。
 - SDK 的扫码登录（本机假端点）：`pkg/weixin` 的 `TestLoginOwnsRedirectVerificationAndRefresh`、`TestLoginOwnsRefreshLimit`、`TestLoginCancellationInterruptsPoll`；`pkg/feishu` 的 `TestLoginOwnsPollingLeaseAndDomainRedirect`、`TestLoginOwnsCancellationExpiryAndRejection`。
 - Inbox：`protocol/inbox_rules_test.go`（每种什么时候算、id、截字、先后，`TestInboxMostPressingNeedOnly`、`TestInboxTaskSessionsLeaveItToTheTask`、`TestInboxMentionCalls`、`TestInboxMessagesThatDoNotCall`）；巡查在 `manager/patrol_rules_test.go`。
-- 客户端：`app/test/chat/chat_test.dart`（频道和未读、串、在频道里说话）、`app/test/workbench/connectors_test.dart`、`app/test/phone/widget_test.dart`（假的 `inboxProvider`）、`app/test/host/notify_test.dart`。
+- 客户端：`app/test/chat/chat_test.dart`（频道和未读、串、在频道里说话；串标题是工单标题，帮工走了照样对）、`app/test/workbench/connectors_test.dart`、`app/test/phone/widget_test.dart`（假的 `inboxProvider`）、`app/test/host/notify_test.dart`。

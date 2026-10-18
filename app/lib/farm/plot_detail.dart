@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../data/providers.dart';
 import '../data/ui_state.dart';
 import '../chat/chat_state.dart';
@@ -21,7 +22,8 @@ class PlotDetail extends ConsumerWidget {
     final issue = state?.issues?.where((i) => i.id == session.issueId).firstOrNull;
     final history = issue == null ? null : ref.watch(issueHistoryProvider).value?.where((h) => h.issue.id == issue.id).firstOrNull;
     final sessions = history?.sessions ?? [session];
-    final hasThread = jobThreadOf(state?.chat, session.id) != null;
+    final issueId = issue?.id ?? session.issue;
+    final hasThread = issueId != null && issueThreadOf(state?.chat, issueId) != null;
     return IssueView(
       frame: IssueFrame.farm,
       issue: issue,
@@ -45,7 +47,7 @@ class PlotDetail extends ConsumerWidget {
       onThread: !hasThread
           ? null
           : () {
-              fire(ref.read(chatActionsProvider).showJobThread(session.id));
+              fire(ref.read(chatActionsProvider).showIssueThread(issueId));
               ref.read(chatOpenProvider.notifier).set(true);
               onDone();
             },

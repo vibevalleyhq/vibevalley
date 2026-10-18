@@ -282,11 +282,12 @@ type Conversation struct {
 	Project      *string          `json:"project,omitzero"`
 	Channel      *string          `json:"channel,omitzero"`
 	SubjectKind  *SubjectKind     `json:"subjectKind,omitzero"`
-	SubjectID    *string          `json:"subjectId,omitzero"`
-	LastNumber   *int64           `json:"lastNumber,omitzero"`
-	Replies      int64            `json:"replies"`
-	Read         *int64           `json:"read,omitzero"`
-	At           int64            `json:"at"`
+	// An issue thread's issue; a talk thread's session when it was sent for no issue, none for one opened under a message.
+	SubjectID  *string `json:"subjectId,omitzero"`
+	LastNumber *int64  `json:"lastNumber,omitzero"`
+	Replies    int64   `json:"replies"`
+	Read       *int64  `json:"read,omitzero"`
+	At         int64   `json:"at"`
 }
 
 type Conflict struct {
@@ -1983,7 +1984,8 @@ type FactManager struct {
 type FactMessage struct {
 	At      int64       `json:"at"`
 	Message ChatMessage `json:"message"`
-	Thread  *string     `json:"thread,omitzero"`
+	// The issue whose thread it was said in.
+	Thread *string `json:"thread,omitzero"`
 	// One that named its speaker in the conversation since the speaker last spoke there.
 	Answers *string `json:"answers,omitzero"`
 }

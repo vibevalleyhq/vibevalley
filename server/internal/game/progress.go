@@ -385,7 +385,9 @@ func entriesFor(before protocol.CoreState, fact protocol.Fact, after protocol.Co
 		switch f.Message.FromKind {
 		case protocol.SenderKindUser:
 			if f.Thread != nil {
-				out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryTold{Session: *f.Thread}})
+				if h := protocol.SessionOnIssue(before, *f.Thread); h != nil {
+					out = append(out, protocol.LedgerEntry{Value: protocol.LedgerEntryTold{Session: h.ID}})
+				}
 			}
 			for _, named := range f.Message.Mentions {
 				if named != protocol.ManagerAgent && named != "user" && named != protocol.Everyone && protocol.SessionOf(before, named) != nil {

@@ -48,7 +48,7 @@ void main() {
         parentNumber: 1,
         channel: 'c1',
         subjectKind: SubjectKind.issue,
-        subjectId: 'w9',
+        subjectId: 't9',
         replies: 1,
         at: 0,
       ),
