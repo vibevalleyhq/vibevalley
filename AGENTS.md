@@ -1,6 +1,6 @@
 # AGENTS.md
 
-VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：工单派给 agent 档案，服务端为它开一次执行（smith 的子 agent，smith 是 oar 的 Go 移植），在 `VIBEVALLEY_WORK_ROOT` 下项目的 worktree 里一轮一轮干活，主人看改动、合进主分支；主人、管家（替主人派活的 agent）和执行在群聊里说话。外面画成一座农场：执行是帮工，群聊是田头（[概念](docs/concepts.md)）。仓库是两块加一个官网：服务端 `server/`（Go）、客户端 `app/`（Flutter），和官网 `site/`（Astro）；形状和规则都在 Go 的 `server/internal/protocol`，Flutter 的类型从它生成。改 `server/`、`app/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；决策和提案记在 [Agent Notes](.agents/notes/README.md)。
+VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：工单派给 agent 档案，服务端为它开一次执行（smith 的子 agent，smith 是 oar 的 Go 移植），在 `VIBEVALLEY_WORK_ROOT` 下项目的 worktree 里一轮一轮干活，主人看改动、合进主分支；主人、管家（替主人派活的 agent）和执行在群聊里说话。外面画成一座农场：项目是岛，在做的工单是一块地，执行是在地上干活的帮工，群聊是田头（[概念](docs/concepts.md)）。仓库是两块加一个官网：服务端 `server/`（Go）、客户端 `app/`（Flutter），和官网 `site/`（Astro）；形状和规则都在 Go 的 `server/internal/protocol`，Flutter 的类型从它生成。改 `server/`、`app/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；决策和提案记在 [Agent Notes](.agents/notes/README.md)。
 
 ## 目录
 

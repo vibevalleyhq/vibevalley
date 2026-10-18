@@ -182,7 +182,7 @@
 
 **收工和铲除**：关掉会话、帮工离开；分支上有没合的提交就留着，没有就删。
 
-## 项目是一块地
+## 项目的地契
 
 `project/codebase.go` 给项目页（[farm-ui.md](farm-ui.md) 界面 12；[理由](../../.agents/notes/implemented/feature/2026-10-12-codebase-page.md)）：有哪些项目和能同时干活的帮工数（`slots`）；种了什么（tokei 现数，锁文件、压缩文件和依赖目录不算，没装 tokei 就说怎么装）；一年的提交（`git log --all --no-merges`，按天、按作者）。
 

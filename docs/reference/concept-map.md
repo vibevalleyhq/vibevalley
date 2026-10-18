@@ -27,7 +27,7 @@
 | 管家 | 管家 | `/manager`（`workbench/manager`） | `CoreState.Manager`（管家的状态） | `/api/v1/say`、`/api/v1/manager/...` |
 | 工单 | 看板上的卡片 | `/issues`（`workbench/issues`） | `Issue`、`Issue.Sessions`（这张工单用过的帮工） | `/api/v1/issues` |
 | 种植计划 | 图纸桌、计划板 | `farm/task_board.dart` | `TaskGraph`（从父工单拼回，`StateFrame.Graphs`），每件是 `Task` | `/api/v1/graphs` |
-| 帮工 | 地里干活的小动物 | 地块和地块详情（`farm/plot_detail.dart`） | `Session`（`CoreState.Sessions`） | `/api/v1/sessions/{id}/stop`；别的按工单：`/api/v1/issues/{id}/...` |
+| 帮工 | 在一块地上干活的小动物 | 地块和地块详情（`farm/plot_detail.dart`） | `Session`（`CoreState.Sessions`） | `/api/v1/sessions/{id}/stop`；别的按工单：`/api/v1/issues/{id}/...` |
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.Phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `FactRun` 到 `FactReport`、`Session.Runs`、`LastRun` | `/api/v1/issues/{id}/runs` |
 | 干活过程 | 干活过程 | `chat/turn_steps.dart` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/sessions`、`/api/v1/sessions/{id}`、`/api/v1/sessions/{id}/events` |
 | 收成清单、收获 | 收获 | `shared/harvest.dart` | `Changes` | `/api/v1/issues/{id}/changes`、`/api/v1/issues/{id}/status`（挪到 `done`） |
@@ -40,7 +40,7 @@
 | 语音 | 麦克风 | `/settings/voice`（`workbench/voice`）、`voice/` | `VoiceSettings` | `/api/v1/voice/...` |
 | 进度、成就 | 金币、连胜、任务与成就 | `farm/achievements.dart` | `Progress`、`LedgerEntry`、`CoreState.Progress` | 帧里的 `progress`，没有单独的接口 |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.Level` | |
-| 地 | 一块地 | 像素村（`village/`） | `SessionPlay.Station`、`PlotView`（`StateFrame.View`） | `/api/v1/say` 的 `bed` |
+| 地 | 一块地：一张在做的工单 | 像素村（`village/`）、地块详情（`farm/plot_detail.dart`） | 工单的分支和 worktree（服务端 `project.IssueBranch`、`worktrees/<项目>.<工单号>`）；像素村的位置还按帮工编号（`SessionPlay.Station`、`PlotView`，[提案](../../.agents/notes/proposed/architecture/2026-10-18-a-plot-is-an-issue.md)） | `/api/v1/say` 的 `bed` |
 
 ## 服务端以下
 
@@ -57,7 +57,7 @@
 | 帮工 | `Session`（`session/sessions.go`） | `state.json`（核心状态里的帮工）、`sessions.json`（目录、农机的会话 id、最后一轮的原话） | 一个帮工是一个 `agents.Subagent`，包着一个 `oar.Session`；每个帮工有自己的 `agents.Subagents` |
 | 一次干活（run） | `Session`（`session/runs.go`）；`session/facts.go` 把会话事件读成事实 | `session_run` 表 | 一个 oar turn（`TurnStarted` 到 `TurnEnded`），结束时交一份 `SubagentReport` |
 | 干活过程 | `Session`（`session/trajectories.go`、`events.go`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：`TextDelta`、`Reasoning`、`ToolCallStarted`、`ToolCallEnded`…… |
-| 收成清单、收获 | `Issue`（`issue/merges.go`） | 帮工的分支和 worktree | |
+| 收成清单、收获 | `Issue`（`issue/status.go` 挪到 `done`、`merges.go`；提 PR 在 `issue/pull_request.go`、`project/pull_request.go`） | 工单的分支和 worktree | |
 | 田头、频道、工单串 | `Channel`；帮工在频道里说话经 `MCP`（`/mcp`） | `channel_conversation`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
 | 定时 | `Schedule` | `schedule` 表 | |
 | 巡查 | `Manager`（`manager/patrol.go`） | 不存：每轮从核心状态算 | |
