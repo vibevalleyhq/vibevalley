@@ -258,7 +258,7 @@ func TestSessionsProjectsWithTheirNewestCommit(t *testing.T) {
 	}
 	real, _ := filepath.EvalSymlinks(root)
 	testkit.Eq(t, byName["notes"].Path, filepath.Join(real, "notes"), "where it is")
-	testkit.Eq(t, byName["notes"], protocol.ProjectSummary{Name: "notes", Path: byName["notes"].Path, Git: false, Slots: 3}, "notes")
+	testkit.Eq(t, byName["notes"], protocol.ProjectSummary{PullRequest: protocol.PullRequestCapability{Reason: "尚未检测项目，请刷新 GitHub 状态"}, Name: "notes", Path: byName["notes"].Path, Git: false, Slots: 3}, "notes")
 }
 
 func TestSessionsSlotsAreTheProjectLimitWithinTheBeds(t *testing.T) {

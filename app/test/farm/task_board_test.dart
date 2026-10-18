@@ -150,7 +150,13 @@ void main() {
         view(),
         fakeApi(routes, {
           'GET /api/v1/projects': [
-            {'name': 'clock-in', 'path': '/work/clock-in', 'git': true, 'slots': 3},
+            {
+              'pullRequest': {'available': false, 'reason': '没装 gh'},
+              'name': 'clock-in',
+              'path': '/work/clock-in',
+              'git': true,
+              'slots': 3,
+            },
           ],
           'POST /api/v1/graphs': '在拆了（p3）',
         }),

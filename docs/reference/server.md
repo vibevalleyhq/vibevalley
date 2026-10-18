@@ -68,6 +68,12 @@
 
 首页的「设置」（`setting/setting.go`；[理由](../../.agents/notes/implemented/feature/2026-10-12-title-screen-and-settings.md)）存 DeepSeek 的钥匙、Agora 的 App ID 和 Certificate，和语音设置（[voice.md](voice.md)「配置」）。存在 `$VIBEVALLEY_HOME/settings.json`（0600）。设置里的优先于配置（[architecture.md](../architecture.md)「配置」）；每次用时现取。页面只看到每样从哪来和最后四个字，钥匙不出服务端、不进日志。设置里还有记性的来源（下文「记性」）。服务端的日志整行过一遍 `base.Redact`（`base/redact.go`）：长得像钥匙的（`sk-…`、`ghp_…`、`xoxb-…`、`AKIA…`、JWT、私钥块、农场自己的会话令牌）和跟在 `api_key=`、`token:`、`password=`、`Bearer` 这类名字后面的值，写成 `[redacted]`。
 
+## GitHub 检测
+
+服务端开机在后台检测 `gh --version`、`gh auth status --hostname github.com --active`；`github.status` 读缓存，`github.refresh` 手动重查，`setting.check` 的 `github` 返回同一份状态。结果只含安装、版本、登录、账号、检测时间和中文原因，不返回命令原文或 token。
+
+`project list` 的 `pullRequest` 给出能否提 PR 和原因。刷新同时检查各项目的 `origin`（GitHub 的 HTTPS、SSH 地址）及 `gh repo view <owner/repo> --json viewerPermission`，`ADMIN`、`MAINTAIN`、`WRITE` 算有写权限。列表不调用 gh；新建项目或修改远端后用 `github refresh` 更新。检测中的首次读取标为尚未检测；命令失败或超时不能判为可提 PR，每条 gh 命令限时 15 秒。
+
 ## 帮工
 
 每个帮工是 smith（`server/pkg/smith`）的一个子 agent：并发上限 6（`protocol.MaxRunning`），帮工不能再派帮工。没有权限确认，靠工作目录、worktree 和只听本机圈住（[理由](../../.agents/notes/implemented/architecture/2026-10-10-helpers-as-oar-subagents.md)）。档案决定农机、模型、人设、技能和环境变量（[agents-and-runtimes.md](agents-and-runtimes.md)）。

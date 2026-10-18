@@ -74,13 +74,17 @@ class ServerReady {
 }
 
 class SettingsCheck {
-  const SettingsCheck({this.problem});
+  const SettingsCheck({this.github, this.problem});
 
-  factory SettingsCheck.fromJson(Map<String, dynamic> j) => SettingsCheck(problem: j['problem'] == null ? null : j['problem'] as String);
+  factory SettingsCheck.fromJson(Map<String, dynamic> j) => SettingsCheck(
+    github: j['github'] == null ? null : GitHubStatus.fromJson(j['github'] as Map<String, dynamic>),
+    problem: j['problem'] == null ? null : j['problem'] as String,
+  );
 
+  final GitHubStatus? github;
   final String? problem;
 
-  Map<String, dynamic> toJson() => {if (problem != null) 'problem': problem!};
+  Map<String, dynamic> toJson() => {if (github != null) 'github': github!.toJson(), if (problem != null) 'problem': problem!};
 }
 
 class ProjectCheck {
@@ -2163,10 +2167,58 @@ class LanguageCount {
   Map<String, dynamic> toJson() => {'name': name, 'files': files, 'code': code, 'comments': comments, 'blanks': blanks};
 }
 
+class GitHubStatus {
+  const GitHubStatus({
+    required this.installed,
+    required this.version,
+    required this.loggedIn,
+    required this.account,
+    required this.reason,
+    required this.checkedAt,
+  });
+
+  factory GitHubStatus.fromJson(Map<String, dynamic> j) => GitHubStatus(
+    installed: j['installed'] as bool,
+    version: j['version'] as String,
+    loggedIn: j['loggedIn'] as bool,
+    account: j['account'] as String,
+    reason: j['reason'] as String,
+    checkedAt: (j['checkedAt'] as num).toDouble(),
+  );
+
+  final bool installed;
+  final String version;
+  final bool loggedIn;
+  final String account;
+  final String reason;
+  final double checkedAt;
+
+  Map<String, dynamic> toJson() => {
+    'installed': installed,
+    'version': version,
+    'loggedIn': loggedIn,
+    'account': account,
+    'reason': reason,
+    'checkedAt': checkedAt,
+  };
+}
+
+class PullRequestCapability {
+  const PullRequestCapability({required this.available, required this.reason});
+
+  factory PullRequestCapability.fromJson(Map<String, dynamic> j) => PullRequestCapability(available: j['available'] as bool, reason: j['reason'] as String);
+
+  final bool available;
+  final String reason;
+
+  Map<String, dynamic> toJson() => {'available': available, 'reason': reason};
+}
+
 class ProjectSummary {
-  const ProjectSummary({required this.name, required this.path, required this.git, this.last, required this.slots});
+  const ProjectSummary({required this.pullRequest, required this.name, required this.path, required this.git, this.last, required this.slots});
 
   factory ProjectSummary.fromJson(Map<String, dynamic> j) => ProjectSummary(
+    pullRequest: PullRequestCapability.fromJson(j['pullRequest'] as Map<String, dynamic>),
     name: j['name'] as String,
     path: j['path'] as String,
     git: j['git'] as bool,
@@ -2174,13 +2226,21 @@ class ProjectSummary {
     slots: (j['slots'] as num).toDouble(),
   );
 
+  final PullRequestCapability pullRequest;
   final String name;
   final String path;
   final bool git;
   final double? last;
   final double slots;
 
-  Map<String, dynamic> toJson() => {'name': name, 'path': path, 'git': git, if (last != null) 'last': last!, 'slots': slots};
+  Map<String, dynamic> toJson() => {
+    'pullRequest': pullRequest.toJson(),
+    'name': name,
+    'path': path,
+    'git': git,
+    if (last != null) 'last': last!,
+    'slots': slots,
+  };
 }
 
 class NewProject {
@@ -5572,6 +5632,22 @@ class RuntimeApi {
   }
 }
 
+/// The `github` endpoints of VibeValleyApi.
+class GithubApi {
+  GithubApi._(this._api);
+  final VibeValleyApi _api;
+
+  Future<GitHubStatus> status() async {
+    final j = await _api._call('GET', '/api/v1/github', query: {}, body: null);
+    return GitHubStatus.fromJson(j as Map<String, dynamic>);
+  }
+
+  Future<GitHubStatus> refresh() async {
+    final j = await _api._call('POST', '/api/v1/github/refresh', query: {}, body: null);
+    return GitHubStatus.fromJson(j as Map<String, dynamic>);
+  }
+}
+
 /// The `agent` endpoints of VibeValleyApi.
 class AgentApi {
   AgentApi._(this._api);
@@ -5843,6 +5919,7 @@ class VibeValleyApi {
   late final graph = GraphApi._(this);
   late final game = GameApi._(this);
   late final runtime = RuntimeApi._(this);
+  late final github = GithubApi._(this);
   late final agent = AgentApi._(this);
   late final memory = MemoryApi._(this);
   late final skill = SkillApi._(this);

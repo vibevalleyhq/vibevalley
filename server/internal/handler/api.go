@@ -49,7 +49,18 @@ func (a api) SettingLoad(context.Context) (protocol.SettingsStatus, error) {
 }
 
 func (a api) SettingCheck(_ context.Context, body protocol.SettingsUpdate) (protocol.SettingsCheck, error) {
-	return a.f.Setting.Check(body), nil
+	s := a.f.Setting.Check(body)
+	github := a.f.Project.GitHubStatus()
+	s.GitHub = &github
+	return s, nil
+}
+
+func (a api) GithubStatus(context.Context) (protocol.GitHubStatus, error) {
+	return a.f.Project.GitHubStatus(), nil
+}
+
+func (a api) GithubRefresh(ctx context.Context) (protocol.GitHubStatus, error) {
+	return a.f.Project.RefreshGitHub(ctx), nil
 }
 
 func (a api) SettingSave(_ context.Context, body protocol.SettingsUpdate) (protocol.SettingsStatus, error) {

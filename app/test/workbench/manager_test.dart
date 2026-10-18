@@ -65,7 +65,16 @@ WorkbenchBackend _server() => WorkbenchBackend(
       memory('a2', '提交前跑 lint', at: _now),
     ],
   },
-  projects: const [ProjectSummary(name: 'clock', path: '/work/clock', git: true, last: 2, slots: 3)],
+  projects: const [
+    ProjectSummary(
+      pullRequest: PullRequestCapability(available: false, reason: "尚未检测 GitHub"),
+      name: 'clock',
+      path: '/work/clock',
+      git: true,
+      last: 2,
+      slots: 3,
+    ),
+  ],
   settings: SettingsStatus(
     file: '/home/me/.vibevalley/settings.json',
     deepseekApiKey: const KeyStatus(),

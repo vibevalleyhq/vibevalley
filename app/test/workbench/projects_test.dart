@@ -99,9 +99,29 @@ void main() {
   Routes backend() {
     final now = DateTime.now().millisecondsSinceEpoch;
     var list = [
-      {'name': 'old', 'path': '/work/old', 'git': true, 'last': now - 200 * 86400000, 'slots': 3},
-      {'name': 'farm', 'path': '/work/farm', 'git': true, 'last': now - 3600000, 'slots': 3},
-      {'name': 'notes', 'path': '/work/notes', 'git': false, 'slots': 3},
+      {
+        'pullRequest': {'available': false, 'reason': '没装 gh'},
+        'name': 'old',
+        'path': '/work/old',
+        'git': true,
+        'last': now - 200 * 86400000,
+        'slots': 3,
+      },
+      {
+        'pullRequest': {'available': false, 'reason': '没装 gh'},
+        'name': 'farm',
+        'path': '/work/farm',
+        'git': true,
+        'last': now - 3600000,
+        'slots': 3,
+      },
+      {
+        'pullRequest': {'available': false, 'reason': '没装 gh'},
+        'name': 'notes',
+        'path': '/work/notes',
+        'git': false,
+        'slots': 3,
+      },
     ];
     return Routes({
       'GET /api/v1/projects': (_) => list,
@@ -135,9 +155,21 @@ void main() {
         final name = (c.body! as Map)['name'] as String;
         list = [
           ...list,
-          {'name': name, 'path': '/work/$name', 'git': true, 'slots': 3},
+          {
+            'pullRequest': {'available': false, 'reason': '没装 gh'},
+            'name': name,
+            'path': '/work/$name',
+            'git': true,
+            'slots': 3,
+          },
         ];
-        return {'name': name, 'path': '/work/$name', 'git': true, 'slots': 3};
+        return {
+          'pullRequest': {'available': false, 'reason': '没装 gh'},
+          'name': name,
+          'path': '/work/$name',
+          'git': true,
+          'slots': 3,
+        };
       },
     });
   }

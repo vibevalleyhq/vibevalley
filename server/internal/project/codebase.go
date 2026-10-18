@@ -156,7 +156,7 @@ func (p *Service) Summaries(ctx context.Context) []protocol.ProjectSummary {
 }
 
 func (p *Service) Summary(project Project) protocol.ProjectSummary {
-	s := protocol.ProjectSummary{Name: project.Name, Path: project.Path, Git: project.Git, Slots: p.Slots()}
+	s := protocol.ProjectSummary{Name: project.Name, Path: project.Path, Git: project.Git, Slots: p.Slots(), PullRequest: p.pullRequestCapability(project.Name)}
 	if project.Git {
 		if last := seconds(gitQuiet(project.Path, "log", "--all", "-1", "--format=%at")); last > 0 {
 			s.Last = &last

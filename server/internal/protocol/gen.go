@@ -2255,6 +2255,8 @@ var Endpoints = []Endpoint{
 	{"graph.events", "GET", "/api/v1/graphs/{id}/events", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"game.chooseTitle", "POST", "/api/v1/game/title", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"runtime.list", "GET", "/api/v1/runtimes", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"github.status", "GET", "/api/v1/github", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"github.refresh", "POST", "/api/v1/github/refresh", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"runtime.refresh", "POST", "/api/v1/runtimes/{id}/refresh", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"runtime.update", "PUT", "/api/v1/runtimes/{id}/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"runtime.upgrade", "POST", "/api/v1/runtimes/{id}/upgrade", nil, false, []Caller{CallerOwner, CallerRemote}},
@@ -2559,6 +2561,14 @@ func Mount(mux *http.ServeMux, h Handlers) {
 	})
 	mux.HandleFunc("GET /api/v1/runtimes", func(w http.ResponseWriter, r *http.Request) {
 		out, err := h.RuntimeList(r.Context())
+		answer(w, out, err)
+	})
+	mux.HandleFunc("GET /api/v1/github", func(w http.ResponseWriter, r *http.Request) {
+		out, err := h.GithubStatus(r.Context())
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/v1/github/refresh", func(w http.ResponseWriter, r *http.Request) {
+		out, err := h.GithubRefresh(r.Context())
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/v1/runtimes/{id}/refresh", func(w http.ResponseWriter, r *http.Request) {
@@ -3119,6 +3129,18 @@ func (c *Client) GameChooseTitle(ctx context.Context, body ChooseTitleRequest) e
 func (c *Client) RuntimeList(ctx context.Context) ([]RuntimeInfo, error) {
 	var out []RuntimeInfo
 	err := c.call(ctx, "GET", "/api/v1/runtimes", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) GithubStatus(ctx context.Context) (GitHubStatus, error) {
+	var out GitHubStatus
+	err := c.call(ctx, "GET", "/api/v1/github", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) GithubRefresh(ctx context.Context) (GitHubStatus, error) {
+	var out GitHubStatus
+	err := c.call(ctx, "POST", "/api/v1/github/refresh", nil, nil, &out)
 	return out, err
 }
 

@@ -108,6 +108,13 @@
 | `runtime.update` | `PUT /api/v1/runtimes/{id}/settings` | ✓ | ✓ |  |  |
 | `runtime.upgrade` | `POST /api/v1/runtimes/{id}/upgrade` | ✓ | ✓ |  |  |
 
+## github
+
+| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+|---|---|---|---|---|---|
+| `github.status` | `GET /api/v1/github` | ✓ | ✓ |  |  |
+| `github.refresh` | `POST /api/v1/github/refresh` | ✓ | ✓ |  |  |
+
 ## agent
 
 | 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |

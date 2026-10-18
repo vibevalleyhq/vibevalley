@@ -16,7 +16,14 @@ const _working = PhaseWorking(
   doing: Doing(action: SessionAction.editFile, label: 'src/a.ts'),
 );
 
-ProjectSummary _project(String name, {double? last, double slots = 3}) => ProjectSummary(name: name, path: "/work/$name", git: true, last: last, slots: slots);
+ProjectSummary _project(String name, {double? last, double slots = 3}) => ProjectSummary(
+  pullRequest: const PullRequestCapability(available: false, reason: "尚未检测 GitHub"),
+  name: name,
+  path: "/work/$name",
+  git: true,
+  last: last,
+  slots: slots,
+);
 
 Issue _todo(String id, String project, {double? queuedAt}) => Issue(
   id: id,
@@ -215,9 +222,29 @@ void main() {
     final routes = Routes();
     final api = fakeApi(routes, {
       'GET /api/v1/projects': [
-        {'name': 'clock-in', 'path': '/work/clock-in', 'git': true, 'last': now - 3600000, 'slots': 3},
-        {'name': 'docs', 'path': '/work/docs', 'git': true, 'last': now - 3 * 86400000, 'slots': 3},
-        {'name': 'task-smoke', 'path': '/work/task-smoke', 'git': false, 'slots': 2},
+        {
+          'pullRequest': {'available': false, 'reason': '没装 gh'},
+          'name': 'clock-in',
+          'path': '/work/clock-in',
+          'git': true,
+          'last': now - 3600000,
+          'slots': 3,
+        },
+        {
+          'pullRequest': {'available': false, 'reason': '没装 gh'},
+          'name': 'docs',
+          'path': '/work/docs',
+          'git': true,
+          'last': now - 3 * 86400000,
+          'slots': 3,
+        },
+        {
+          'pullRequest': {'available': false, 'reason': '没装 gh'},
+          'name': 'task-smoke',
+          'path': '/work/task-smoke',
+          'git': false,
+          'slots': 2,
+        },
       ],
     });
     final state = farm(
