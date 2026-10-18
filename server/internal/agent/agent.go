@@ -8,7 +8,6 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"sync"
 	"time"
@@ -29,27 +28,6 @@ type Service struct {
 	mu   sync.Mutex
 	s    stored
 	disk *base.FileWriter
-}
-
-// Only where they are still exactly as seeded.
-func withoutExamples(s stored) stored {
-	examples := protocol.ExampleSkills()
-	untouched := func(k protocol.Skill) bool {
-		return slices.ContainsFunc(examples, func(e protocol.Skill) bool { return reflect.DeepEqual(e, k) })
-	}
-	skills := slices.DeleteFunc(slices.Clone(s.Skills), untouched)
-	if len(skills) == len(s.Skills) {
-		return s
-	}
-	kept := map[string]bool{}
-	for _, k := range skills {
-		kept[k.ID] = true
-	}
-	agents := slices.Clone(s.Agents)
-	for i, a := range agents {
-		agents[i].Skills = slices.DeleteFunc(slices.Clone(a.Skills), func(id string) bool { return !kept[id] })
-	}
-	return stored{Agents: agents, Skills: skills, Settings: s.Settings}
 }
 
 func New(home string) (*Service, error) {
@@ -79,7 +57,6 @@ func New(home string) (*Service, error) {
 	if st.s.Settings == nil {
 		st.s.Settings = map[string]protocol.RuntimeSettings{}
 	}
-	st.s = withoutExamples(st.s)
 	if !slices.ContainsFunc(st.s.Agents, func(a protocol.Agent) bool { return a.ID == protocol.ManagerAgent }) {
 		st.s.Agents = append(st.s.Agents, withCast(managerProfile()))
 	}

@@ -86,8 +86,7 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
             semanticLabel: '频道：${channelLabel(current)}，点开切换或开新频道',
             builder: (context, s) => Container(
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              color: s.hovered ? Palette.cream200 : null,
-              foregroundDecoration: pxRing,
+              color: s.pressed ? Palette.cream300 : (s.hovered ? Palette.cream200 : null),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

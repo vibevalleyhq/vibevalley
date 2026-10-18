@@ -13,7 +13,6 @@ import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
 import '../shared/layout.dart';
-import 'runtime_facts.dart';
 import 'runtimes_state.dart';
 import '../../rules/seeds.dart';
 import '../../rules/money.dart';
@@ -127,17 +126,10 @@ List<Widget> _detail(SpriteAtlas atlas, RuntimeInfo info, WorkbenchConfig config
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
-            children: [
-              RuntimeUsage(atlas: atlas, info: info),
-              if (info.update case final u?)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text('版本 ${u.current} · 最新 ${u.latest} ${u.available ? '· 可以升级' : '· 已是最新'}', style: KitText.xs.copyWith(color: Palette.bark500)),
-                ),
-            ],
+            children: [RuntimeUsage(atlas: atlas, info: info)],
           ),
         ),
-        _FactsCard(facts: facts, capabilities: capabilitiesOf(info.id)),
+        _FactsCard(facts: facts),
       ],
     ),
     _SettingsCard(key: ValueKey('settings-${info.id}'), info: info),
@@ -220,7 +212,6 @@ class _Header extends ConsumerWidget {
                 busy == RuntimeBusy.refreshing ? '检测中…' : '重新检测',
                 onPressed: busy != null ? null : () => ref.read(runtimeBusyProvider.notifier).refresh(info.id),
               ),
-              if (info.update?.available ?? false) _UpgradeButton(info: info, busy: busy),
             ],
           ),
         ],
@@ -229,46 +220,9 @@ class _Header extends ConsumerWidget {
   }
 }
 
-class _UpgradeButton extends ConsumerStatefulWidget {
-  const _UpgradeButton({required this.info, required this.busy});
-  final RuntimeInfo info;
-  final RuntimeBusy? busy;
-
-  @override
-  ConsumerState<_UpgradeButton> createState() => _UpgradeButtonState();
-}
-
-class _UpgradeButtonState extends ConsumerState<_UpgradeButton> {
-  bool _sure = false;
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.busy == RuntimeBusy.upgrading) return PxButton.text('升级中…', onPressed: null);
-    if (!_sure) return PxButton.text('升级到 ${widget.info.update?.latest}', onPressed: () => setState(() => _sure = true));
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text('会跑 ${runtimeName(widget.info.id)} 自己的更新程序，改动这台机器。', style: KitText.xs.copyWith(color: Palette.bark600)),
-        PxButton.text(
-          '升级',
-          tone: PxTone.primary,
-          onPressed: () {
-            setState(() => _sure = false);
-            ref.read(runtimeBusyProvider.notifier).upgrade(widget.info.id);
-          },
-        ),
-        PxButton.text('算了', onPressed: () => setState(() => _sure = false)),
-      ],
-    );
-  }
-}
-
 class _FactsCard extends StatelessWidget {
-  const _FactsCard({required this.facts, required this.capabilities});
+  const _FactsCard({required this.facts});
   final RuntimeFacts facts;
-  final List<Capability> capabilities;
 
   @override
   Widget build(BuildContext context) {
@@ -315,15 +269,15 @@ class _FactsCard extends StatelessWidget {
             spacing: 4,
             runSpacing: 4,
             children: [
-              for (final c in Capability.values)
+              for (final c in RuntimeCapability.values)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  color: capabilities.contains(c) ? Palette.cream200 : Palette.cream50,
+                  color: facts.capabilities.contains(c) ? Palette.cream200 : Palette.cream50,
                   child: Text(
-                    capabilityLabel[c]!,
+                    _capabilityLabel(c),
                     style: KitText.fine.copyWith(
-                      color: capabilities.contains(c) ? Palette.bark800 : Palette.bark500,
-                      decoration: capabilities.contains(c) ? null : TextDecoration.lineThrough,
+                      color: facts.capabilities.contains(c) ? Palette.bark800 : Palette.bark500,
+                      decoration: facts.capabilities.contains(c) ? null : TextDecoration.lineThrough,
                     ),
                   ),
                 ),
@@ -542,7 +496,7 @@ class RuntimeUsage extends StatelessWidget {
     final usage = info.usage;
     switch (usage) {
       case null:
-        return Text(capabilitiesOf(info.id).contains(Capability.accountUsage) ? '装好以后才能读到。' : '这个 runtime 不报告账户用量。', style: muted);
+        return Text(factsOf(info.id).capabilities.contains(RuntimeCapability.accountUsage) ? '装好以后才能读到。' : '这个 runtime 不报告账户用量。', style: muted);
       case AccountUsageLoginRequired():
         return Text('没登录。在这台机器上运行 ${runtimeName(info.id)} 登录一次。', style: KitText.xs.copyWith(color: const Color(0xFFB8682A)));
       case AccountUsageUnavailable(:final reason):
@@ -775,3 +729,13 @@ class _AgentsCard extends StatelessWidget {
           ),
   );
 }
+
+String _capabilityLabel(RuntimeCapability c) => switch (c) {
+  RuntimeCapability.listModels => '模型列表',
+  RuntimeCapability.accountUsage => '账户用量',
+  RuntimeCapability.checkUpdate => '检查更新',
+  RuntimeCapability.upgrade => '升级',
+  RuntimeCapability.skills => '技能清单',
+  RuntimeCapability.mcpServers => 'MCP 清单',
+  RuntimeCapability.tools => '工具清单',
+};

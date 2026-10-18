@@ -78,15 +78,20 @@ class PxButton extends StatelessWidget {
           PxSize.custom => (null, null, padding ?? EdgeInsets.zero),
         };
         final sunk = s.pressed;
+        // An icon alone is not framed: it sits inside a frame already (a window, a field, a card), and a ring per icon is a box
+        // in a box. Hover and press show it can be tapped; the focus ring stays.
+        final bare = size == PxSize.icon && tone == PxTone.plain;
         Widget box = Container(
           width: w,
           height: h,
           padding: pad,
-          decoration: BoxDecoration(
-            color: s.hovered ? hover : fill,
-            border: Border.all(color: pxEdge, width: 2),
-            boxShadow: sunk ? null : kitDrop,
-          ),
+          decoration: bare
+              ? BoxDecoration(color: sunk ? Palette.cream300 : (s.hovered ? Palette.cream200 : null))
+              : BoxDecoration(
+                  color: s.hovered ? hover : fill,
+                  border: Border.all(color: pxEdge, width: 2),
+                  boxShadow: sunk ? null : kitDrop,
+                ),
           child: Center(
             widthFactor: w == null ? 1 : null,
             heightFactor: h == null ? 1 : null,
@@ -101,7 +106,7 @@ class PxButton extends StatelessWidget {
           ),
         );
         if (s.focused) box = CustomPaint(foregroundPainter: const _FocusRing(), child: box);
-        if (sunk) box = Transform.translate(offset: const Offset(2, 2), child: box);
+        if (sunk && !bare) box = Transform.translate(offset: const Offset(2, 2), child: box);
         return Opacity(opacity: s.enabled ? 1 : .45, child: box);
       },
     );

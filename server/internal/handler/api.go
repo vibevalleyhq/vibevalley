@@ -225,10 +225,6 @@ func (a api) RuntimeUpdate(ctx context.Context, id string, body protocol.Runtime
 	return protocol.RuntimeInfo{}, missing("runtime " + id)
 }
 
-func (a api) RuntimeUpgrade(context.Context, string) (protocol.RuntimeInfo, error) {
-	return protocol.RuntimeInfo{}, protocol.Refused{Reason: "升级会改动这台机器：请在终端里用这个 runtime 自己的升级命令"}
-}
-
 func (a api) AgentList(context.Context) ([]protocol.Agent, error) {
 	return a.f.Agent.All(), nil
 }

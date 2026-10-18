@@ -276,7 +276,6 @@ class RuntimeCatalog extends AsyncNotifier<List<RuntimeInfo>> {
   }
 
   Future<void> refresh(String id) async => _put(await ref.read(apiProvider).runtime.refresh(id: id));
-  Future<void> upgrade(String id) async => _put(await ref.read(apiProvider).runtime.upgrade(id: id));
   Future<void> saveSettings(String id, RuntimeSettings settings) async => _put(await ref.read(apiProvider).runtime.update(id: id, body: settings));
 }
 

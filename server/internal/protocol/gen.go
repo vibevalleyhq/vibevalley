@@ -64,10 +64,13 @@ func (v RuntimeFacts) MarshalJSON() ([]byte, error) {
 		p.Refused = map[string]string{}
 	}
 	if p.Capabilities == nil {
-		p.Capabilities = []string{}
+		p.Capabilities = []RuntimeCapability{}
 	}
 	return json.Marshal(p)
 }
+
+// RuntimeCapabilityValues are every RuntimeCapability, in the protocol's order.
+var RuntimeCapabilityValues = []RuntimeCapability{RuntimeCapabilityListModels, RuntimeCapabilityAccountUsage, RuntimeCapabilityCheckUpdate, RuntimeCapabilityUpgrade, RuntimeCapabilitySkills, RuntimeCapabilityMcpServers, RuntimeCapabilityTools}
 
 // CallStateValues are every CallState, in the protocol's order.
 var CallStateValues = []CallState{CallStateIdle, CallStateConnecting, CallStateLive, CallStateEnding, CallStateError}
@@ -2234,7 +2237,7 @@ var Endpoints = []Endpoint{
 	{"manager.stop", "POST", "/api/v1/manager/stop", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"setting.load", "GET", "/api/v1/settings", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"setting.check", "POST", "/api/v1/settings/check", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"setting.save", "PUT", "/api/v1/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"setting.save", "PUT", "/api/v1/settings", nil, true, []Caller{CallerOwner}},
 	{"channel.say", "POST", "/api/v1/say", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"channel.create", "POST", "/api/v1/channels", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"schedule.create", "POST", "/api/v1/schedules", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
@@ -2274,13 +2277,12 @@ var Endpoints = []Endpoint{
 	{"github.status", "GET", "/api/v1/github", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"github.refresh", "POST", "/api/v1/github/refresh", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"runtime.refresh", "POST", "/api/v1/runtimes/{id}/refresh", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"runtime.update", "PUT", "/api/v1/runtimes/{id}/settings", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"runtime.upgrade", "POST", "/api/v1/runtimes/{id}/upgrade", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"runtime.update", "PUT", "/api/v1/runtimes/{id}/settings", nil, true, []Caller{CallerOwner}},
 	{"agent.list", "GET", "/api/v1/agents", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"agent.check", "POST", "/api/v1/agents/check", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"agent.create", "POST", "/api/v1/agents", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"agent.save", "PUT", "/api/v1/agents/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"agent.delete", "DELETE", "/api/v1/agents/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"agent.create", "POST", "/api/v1/agents", nil, true, []Caller{CallerOwner, CallerManager}},
+	{"agent.save", "PUT", "/api/v1/agents/{id}", nil, true, []Caller{CallerOwner}},
+	{"agent.delete", "DELETE", "/api/v1/agents/{id}", nil, false, []Caller{CallerOwner}},
 	{"memory.list", "GET", "/api/v1/memories/{agent}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"memory.recall", "GET", "/api/v1/memories/{agent}/recall", []string{"project", "text"}, false, []Caller{CallerOwner, CallerRemote}},
 	{"memory.create", "POST", "/api/v1/memories/{agent}", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
@@ -2289,9 +2291,9 @@ var Endpoints = []Endpoint{
 	{"manager.getArchive", "GET", "/api/v1/manager/archive/{name}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"manager.markWrong", "POST", "/api/v1/manager/evals", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"skill.list", "GET", "/api/v1/skills", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"skill.create", "POST", "/api/v1/skills", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
-	{"skill.save", "PUT", "/api/v1/skills/{id}", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"skill.delete", "DELETE", "/api/v1/skills/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"skill.create", "POST", "/api/v1/skills", nil, true, []Caller{CallerOwner, CallerManager}},
+	{"skill.save", "PUT", "/api/v1/skills/{id}", nil, true, []Caller{CallerOwner}},
+	{"skill.delete", "DELETE", "/api/v1/skills/{id}", nil, false, []Caller{CallerOwner}},
 	{"project.list", "GET", "/api/v1/projects", nil, false, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"project.check", "POST", "/api/v1/projects/check", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"project.create", "POST", "/api/v1/projects", nil, true, []Caller{CallerOwner, CallerRemote}},
@@ -2305,10 +2307,10 @@ var Endpoints = []Endpoint{
 	{"voice.said", "POST", "/api/v1/voice/agent/said", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"voice.dictate", "POST", "/api/v1/voice/dictate", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"connector.list", "GET", "/api/v1/connectors", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"connector.login", "POST", "/api/v1/connectors/{id}/login", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"connector.verify", "POST", "/api/v1/connectors/{id}/verify", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"connector.logout", "POST", "/api/v1/connectors/{id}/logout", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"connector.channel", "PUT", "/api/v1/connectors/{id}/channel", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"connector.login", "POST", "/api/v1/connectors/{id}/login", nil, true, []Caller{CallerOwner}},
+	{"connector.verify", "POST", "/api/v1/connectors/{id}/verify", nil, true, []Caller{CallerOwner}},
+	{"connector.logout", "POST", "/api/v1/connectors/{id}/logout", nil, false, []Caller{CallerOwner}},
+	{"connector.channel", "PUT", "/api/v1/connectors/{id}/channel", nil, true, []Caller{CallerOwner}},
 	{"gate.status", "GET", "/api/v1/gate", nil, false, []Caller{CallerOwner}},
 	{"gate.update", "PUT", "/api/v1/gate", nil, true, []Caller{CallerOwner}},
 	{"gate.startPairing", "POST", "/api/v1/gate/pairing", nil, false, []Caller{CallerOwner}},
@@ -2608,11 +2610,6 @@ func Mount(mux *http.ServeMux, h Handlers) {
 			return
 		}
 		out, err := h.RuntimeUpdate(r.Context(), pID, body)
-		answer(w, out, err)
-	})
-	mux.HandleFunc("POST /api/v1/runtimes/{id}/upgrade", func(w http.ResponseWriter, r *http.Request) {
-		pID := r.PathValue("id")
-		out, err := h.RuntimeUpgrade(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/v1/agents", func(w http.ResponseWriter, r *http.Request) {
@@ -3184,12 +3181,6 @@ func (c *Client) RuntimeRefresh(ctx context.Context, pID string) (RuntimeInfo, e
 func (c *Client) RuntimeUpdate(ctx context.Context, pID string, body RuntimeSettings) (RuntimeInfo, error) {
 	var out RuntimeInfo
 	err := c.call(ctx, "PUT", "/api/v1/runtimes/"+url.PathEscape(pID)+"/settings", nil, body, &out)
-	return out, err
-}
-
-func (c *Client) RuntimeUpgrade(ctx context.Context, pID string) (RuntimeInfo, error) {
-	var out RuntimeInfo
-	err := c.call(ctx, "POST", "/api/v1/runtimes/"+url.PathEscape(pID)+"/upgrade", nil, nil, &out)
 	return out, err
 }
 

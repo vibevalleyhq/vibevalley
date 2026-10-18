@@ -162,7 +162,10 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 			t.Fatalf("%s: %d", path, code)
 		}
 	}
-	for _, c := range []struct{ method, path string }{{"GET", "/api/v1/gate"}, {"PUT", "/api/v1/gate"}, {"POST", "/api/v1/gate/pairing"}, {"DELETE", "/api/v1/gate/devices/" + paired.Device}} {
+	for _, c := range []struct{ method, path string }{{"GET", "/api/v1/gate"}, {"PUT", "/api/v1/gate"}, {"POST", "/api/v1/gate/pairing"}, {"DELETE", "/api/v1/gate/devices/" + paired.Device},
+		// What configures the farm stays on this computer: keys, a runtime's command, profiles, skills, chat accounts.
+		{"PUT", "/api/v1/settings"}, {"PUT", "/api/v1/runtimes/codex/settings"}, {"POST", "/api/v1/agents"}, {"PUT", "/api/v1/skills/s1"},
+		{"POST", "/api/v1/connectors/weixin/login"}} {
 		if code, body := lanRequest(t, c.method, addr+c.path, paired.Key, map[string]bool{"open": false}); code != http.StatusForbidden || !strings.Contains(string(body), "LanRefused") {
 			t.Fatalf("%s %s: %d %s", c.method, c.path, code, body)
 		}

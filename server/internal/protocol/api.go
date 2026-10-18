@@ -25,7 +25,7 @@ type Handlers interface {
 	//vibevalley:can owner remote
 	SettingCheck(ctx context.Context, body SettingsUpdate) (SettingsCheck, error)
 	//vibevalley:route setting.save PUT /api/v1/settings
-	//vibevalley:can owner remote
+	//vibevalley:can owner
 	SettingSave(ctx context.Context, body SettingsUpdate) (SettingsStatus, error)
 	//vibevalley:route channel.say POST /api/v1/say
 	//vibevalley:can owner remote
@@ -156,11 +156,8 @@ type Handlers interface {
 	//vibevalley:can owner remote
 	RuntimeRefresh(ctx context.Context, pID string) (RuntimeInfo, error)
 	//vibevalley:route runtime.update PUT /api/v1/runtimes/{id}/settings
-	//vibevalley:can owner remote
+	//vibevalley:can owner
 	RuntimeUpdate(ctx context.Context, pID string, body RuntimeSettings) (RuntimeInfo, error)
-	//vibevalley:route runtime.upgrade POST /api/v1/runtimes/{id}/upgrade
-	//vibevalley:can owner remote
-	RuntimeUpgrade(ctx context.Context, pID string) (RuntimeInfo, error)
 	//vibevalley:route agent.list GET /api/v1/agents
 	//vibevalley:can owner remote
 	AgentList(ctx context.Context) ([]Agent, error)
@@ -170,13 +167,13 @@ type Handlers interface {
 	AgentCheck(ctx context.Context, body AgentCheckRequest) ([]AgentCheck, error)
 	// Create allocates an identity; callers with an existing identity use save.
 	//vibevalley:route agent.create POST /api/v1/agents
-	//vibevalley:can owner remote manager
+	//vibevalley:can owner manager
 	AgentCreate(ctx context.Context, body Agent) (Agent, error)
 	//vibevalley:route agent.save PUT /api/v1/agents/{id}
-	//vibevalley:can owner remote
+	//vibevalley:can owner
 	AgentSave(ctx context.Context, pID string, body Agent) (Agent, error)
 	//vibevalley:route agent.delete DELETE /api/v1/agents/{id}
-	//vibevalley:can owner remote
+	//vibevalley:can owner
 	AgentDelete(ctx context.Context, pID string) error
 	// An agent's memories: the manager's (agent manager) are the lines of its MEMORY.md, with the file and how many of the newest
 	// its prompt carries; every other agent's are rows.
@@ -208,13 +205,13 @@ type Handlers interface {
 	SkillList(ctx context.Context) ([]Skill, error)
 	// Create allocates an identity; callers with an existing identity use save.
 	//vibevalley:route skill.create POST /api/v1/skills
-	//vibevalley:can owner remote manager
+	//vibevalley:can owner manager
 	SkillCreate(ctx context.Context, body Skill) (Skill, error)
 	//vibevalley:route skill.save PUT /api/v1/skills/{id}
-	//vibevalley:can owner remote
+	//vibevalley:can owner
 	SkillSave(ctx context.Context, pID string, body Skill) (Skill, error)
 	//vibevalley:route skill.delete DELETE /api/v1/skills/{id}
-	//vibevalley:can owner remote
+	//vibevalley:can owner
 	SkillDelete(ctx context.Context, pID string) error
 	//vibevalley:route project.list GET /api/v1/projects
 	//vibevalley:can owner remote manager
@@ -257,16 +254,16 @@ type Handlers interface {
 	//vibevalley:can owner remote
 	ConnectorList(ctx context.Context) ([]ConnectorStatus, error)
 	//vibevalley:route connector.login POST /api/v1/connectors/{id}/login
-	//vibevalley:can owner remote
+	//vibevalley:can owner
 	ConnectorLogin(ctx context.Context, pID ConnectorID, body ConnectorLogin) (ConnectorStatus, error)
 	//vibevalley:route connector.verify POST /api/v1/connectors/{id}/verify
-	//vibevalley:can owner remote
+	//vibevalley:can owner
 	ConnectorVerify(ctx context.Context, pID ConnectorID, body VerifyRequest) (ConnectorStatus, error)
 	//vibevalley:route connector.logout POST /api/v1/connectors/{id}/logout
-	//vibevalley:can owner remote
+	//vibevalley:can owner
 	ConnectorLogout(ctx context.Context, pID ConnectorID) (ConnectorStatus, error)
 	//vibevalley:route connector.channel PUT /api/v1/connectors/{id}/channel
-	//vibevalley:can owner remote
+	//vibevalley:can owner
 	ConnectorChannel(ctx context.Context, pID ConnectorID, body ConnectorsChannelRequest) (ConnectorStatus, error)
 	//vibevalley:route gate.status GET /api/v1/gate
 	//vibevalley:can owner

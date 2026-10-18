@@ -17,11 +17,11 @@
 
 ## 在哪
 
-- **`server/internal/agent`**（`agent.Service`）：`agent.go` 读写 `config.json`、事务 `change`、种子和示例技能的清理（`withoutExamples`）、内置的管家档案（`managerProfile`）；`create.go` 新建档案和技能时分配 id；`cast.go` 补外观。子包 `brain` 是 VibeValley 自己的 agent，归[管家](docs/subsystems/manager.md)。
+- **`server/internal/agent`**（`agent.Service`）：`agent.go` 读写 `config.json`、事务 `change`、内置的管家档案（`managerProfile`）；`create.go` 新建档案和技能时分配 id；`cast.go` 补外观。子包 `brain` 是 VibeValley 自己的 agent，归[管家](docs/subsystems/manager.md)。
 - **`server/internal/runtime`**（`runtime.Service`）：`runtime.go` 注册表、探测、缓存、额度的定时读取、价目和今天的花费；`capabilities.go` 合并农机拒绝的选项；`rules.go` 的 `agentIssues`、`moneyStop`（纯函数，黄金数据 `testdata/rules.jsonl.gz`）；`assessment.go` 的 `Assess`；`resolve.go` 的 `Resolve`；`quota.go` 额度的字；`price.go`、`pi_prices.json` 价目。
-- **种子**：`server/internal/protocol/seeds.json` 的 `agents`（第一次的档案）、`defaultSettings`（农机设置的默认）、`exampleSkills`（只给 `withoutExamples` 认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`seeds.go` 读它（`SeedAgents`、`FactsOf`、`RuntimeIDs`、`PresetOf`、`RuntimeLabel`）。`runtimeFacts`、`runtimePresets` 由 `tool/shapegen` 一起写进 Flutter（`app/lib/rules/seeds.dart` 的 `factsOf`）。
+- **种子**：`server/internal/protocol/seeds.json` 的 `agents`（第一次的档案）、`defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`seeds.go` 读它（`SeedAgents`、`FactsOf`、`RuntimeIDs`、`PresetOf`、`RuntimeLabel`）。`runtimeFacts`、`runtimePresets` 由 `tool/shapegen` 一起写进 Flutter（`app/lib/rules/seeds.dart` 的 `factsOf`）。
 - **家目录**：`$VIBEVALLEY_HOME/config.json`（`agents`、`skills`、`settings` 三块）；今天的花费 `spend.json` 归[帮工](docs/subsystems/session.md)。
-- **接口**：`agent.list`、`agent.check`、`agent.create`、`agent.save`、`agent.delete`，`skill.*`，`runtime.list`、`runtime.refresh`、`runtime.update`、`runtime.upgrade`（[capabilities.md](docs/reference/capabilities.md)）；处理函数在 `internal/handler/api.go`。农机的新样子不进核心状态，经 `core.Runtime` 发一条侧事件，客户端从窄事件流收到 `LiveEventRuntime`。命令行 `vibevalley runtime chat <农机>`、`vibevalley oar …` 用同一张注册表。
+- **接口**：`agent.list`、`agent.check`、`agent.create`、`agent.save`、`agent.delete`，`skill.*`，`runtime.list`、`runtime.refresh`、`runtime.update`（[capabilities.md](docs/reference/capabilities.md)）；处理函数在 `internal/handler/api.go`。农机的新样子不进核心状态，经 `core.Runtime` 发一条侧事件，客户端从窄事件流收到 `LiveEventRuntime`。命令行 `vibevalley runtime chat <农机>`、`vibevalley oar …` 用同一张注册表。
 - **客户端**：`workbench/agents/`（帮工列表、捏帮工 `agent_creator_page.dart`、`agent_config.dart`、`agent_look.dart`）、`workbench/runtimes/`（农具）、`workbench/skills/skills_page.dart`；数据在 `data/remote.dart`：`workbenchConfigProvider`（档案和技能库）、`runtimeCatalogProvider`（农机）、`agentIssuesProvider`（`agent.check`）、`installedSkills`。
 
 ## 模型和不变量
@@ -32,12 +32,11 @@
 - **档案、技能库、农机设置存在一个文件 `config.json`**，整份读进内存，`base.FileWriter` 写（先写临时文件再改名，同一个文件的写一个接一个）。每次改走 `change`：回调拿到一份完整独立的副本（嵌套的切片、字典、MCP 的参数和头、预算和上限的指针都复制），写盘成功后才换成当前版本；写盘失败当前版本不变。读出去的（`All`、`Agent`、`Settings`）也是副本，拿着它改不动服务端那份。
 - **读不了的 `config.json` 不覆盖**：改名成 `config.json.unreadable-<毫秒>` 留着，从种子起；改不了名就不开机。文件不在才从种子起。
 - **种子只用一次**：没有 `config.json` 时用 `seeds.json` 的 `agents`，技能库空、农机设置空；之后删掉的种子档案不再补回。农机设置没存过的取 `defaultSettings`（启用、命令路径空、默认模型和思考强度空、无环境变量）。
-- **示例技能每次开机都清掉**：技能库里和 `exampleSkills` 某一条一字不差的删掉，档案上对它们的勾也删掉；改过的留着。
 - **管家档案每个农场都有**：开机时没有 `manager`（`protocol.ManagerAgent`）就补上（名字「管家」、职责「替主人派活、转告结果」、农机 `vibevalley`）；删它回「管家是每个农场都有的，删不了」；保存时把农机换掉拒绝。`Agents()` 是派活用的档案，不含管家；`All()`、`Agent(id)` 含。客户端也把 `agent.list` 里的管家分开放（`WorkbenchConfig.manager`）。
 - **新建由服务端分 id**：`agent.create`、`skill.create` 的 `id` 要留空（填了回「新档案的 id 要留空；指定 id 请用保存」）。档案取下一个没占用的 `agent-N`；技能取名字转小写、非 `a-z0-9` 换成 `-` 的 slug，空了用 `skill`，重名加 `-2`、`-3`。分配在 `change` 的锁里，两台设备同时建不会撞。编辑和导入指定 id 走 `agent.save`、`skill.save`，路径里的 id 和请求里的不一样就拒绝。
 - **外观缺的字段在读和存时补上**（`withCast`）：体型 `biped`、头 `rounded`、衣服 `farmer`，动物按 id 的 hash（每个码点取第一个 UTF-16 单元，`h*31+u`，32 位回绕）对 `SpeciesValues` 取模。客户端 `rules/cast.dart` 的 `castOf` 用同一个 hash，所以没存长相的档案补上以后画面不变；接口给出去的必填枚举不会是空字符串。
 - **农场认的农机是 `runtimeIds` 的十个**：`claude`、`vibevalley`、`codex`、`opencode`、`pi`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`。注册表（`runtime.Registry`）是 smith 的内置农机（`defaults.Runtimes()`）加 VibeValley 自己的 agent（`oarruntime`，每次开会话现取 DeepSeek 的钥匙；种植计划存在农场的库里）加 DeepSeek Harness（`dsh`）。注册表里没有的报「不支持」：cursor 写明要单独装它的 SDK（`@cursor/sdk`），其余写「oar 不认识这个 runtime」。不认识的 id，`runtime.refresh`、`runtime.update` 回 404。
-- **农机接受什么**（`RuntimeFacts`）：`steer`（干活时能不能插话）、`refused`（不接受的开会话选项：`systemPrompt`、`appendSystemPrompt`、`effort`、`env`、`mcpServers`、`disallowedTools`，带原因）、`capabilities`、`inProcess`。探测时 `refusals` 先取适配器自己的 `RefusedSessionOptions`，再用 `seeds.json` 的 `runtimeFacts` 盖上去（农场的说法更严时以它为准），结果放在 `RuntimeInfo.refused`；`agentIssues` 和客户端的 `factsOf` 都优先用探测到的这份，没探测到才用种子。
+- **农机接受什么**（`RuntimeFacts`）：`steer`（干活时能不能插话）、`refused`（不接受的开会话选项：`systemPrompt`、`appendSystemPrompt`、`effort`、`env`、`mcpServers`、`disallowedTools`，带原因）、`capabilities`（`RuntimeCapability`：smith 的适配器能问它什么，农具页照它列）、`inProcess`。探测时 `refusals` 先取适配器自己的 `RefusedSessionOptions`，再用 `seeds.json` 的 `runtimeFacts` 盖上去（农场的说法更严时以它为准），结果放在 `RuntimeInfo.refused`；`agentIssues` 和客户端的 `factsOf` 都优先用探测到的这份，没探测到才用种子。
 - **农机的样子**（`RuntimeInfo`）：安装（`available` 带经由 `executable` 或 `bundled`、命令、版本；`not_found`；`unsupported` 带原因）、模型（去掉 `Disabled` 的，带思考强度的档和默认）、额度、清单（技能、MCP、工具）、设置、今天的花费、额度的字（`quota`）、为什么现在不派（`stop`）、检测时间。读不到的模型和清单是 `null`，不是空列表。每次给出去前现算今天的花费、`stop` 和 `quota`。
 - **一份缓存，新的读不被旧的盖掉**：每台农机每次读（探测或读额度）开始时取下一个号，缓存记着自己那份的号；开始得早的读晚到了就丢掉（`TestASlowProbeDoesNotOverwriteANewerOne`）。缓存里同时存着这次接受的安装（`Found`），之后读额度、`Resolve` 都用它。
 - **清单在工作目录 `projects/` 下读**（`ProjectsDir`）：农机自己装的技能、MCP 服务器、工具，各最多等 10 秒，读不到或不是 `ok` 就是 `null`。MCP 的说明拼成「状态 · N 个工具」；技能和工具的来源取路径、MCP 的 id，没有就取 `source`。
@@ -67,7 +66,6 @@
 - 一轮干完，`session` 调 `UsageSoon`：20 秒后重读这台的额度，几轮共用一次。额度没变就不推。
 - `runtime.list` 有缓存给缓存，没有就探（最多 4 台同时）；`runtime.refresh` 总是重探（农具页的「重新检测」）。
 - `runtime.update` 先存设置，存不成就回错、不探；存成了重探一次，回新的样子。
-- `runtime.upgrade` 一律拒绝：「升级会改动这台机器：请在终端里用这个 runtime 自己的升级命令」。
 - 花了钱（`Spend`）以后 3 秒把这台的样子再推一次，期间花的一起带上。
 
 **页面问能不能派**（`agent.check`）：客户端把一组档案（可以是没存的草稿）交给服务端，服务端对每个用缓存里农机的样子跑 `agentIssues`，按 id 回。捏帮工页底部、帮工列表、工单详情都读它（`watchAgentIssues`），档案一变就重问；服务端答之前当作没有问题。
@@ -101,7 +99,7 @@
 - **读不了的配置改名留着，不用种子覆盖。** 种子写过去，主人捏的档案就没了；宁可不开机。
 - **新建的 id 由服务端在提交时分。** 客户端自己挑 `agent-N`，两台设备（「连接到本机」那头的也算）同时建会互相覆盖；导入和编辑指定 id 仍走保存。
 - **外观在服务端补齐，算法和客户端一样。** 必填的枚举不能以空字符串到客户端；补的和客户端原来画的是同一只，存一次不换脸。
-- **只给真实数据：清单从农机读，装了的技能不复制进技能库。** 两份会对不上，农机那边改了、删了，VibeValley 不知道；所以只读地列出来，帮工按需自己加载。示例技能也不预置：示例和真装的混在一页，主人分不清哪些真在起作用；没改过的示例开机时清掉，改过的是主人的，留着。连不上服务端时的横幅见[客户端](docs/subsystems/app.md)。
+- **只给真实数据：清单从农机读，装了的技能不复制进技能库。** 两份会对不上，农机那边改了、删了，VibeValley 不知道；所以只读地列出来，帮工按需自己加载。示例技能也不预置：示例和真装的混在一页，主人分不清哪些真在起作用。连不上服务端时的横幅见[客户端](docs/subsystems/app.md)。
 - **「派不出去」只有服务端一份，页面问 `agent.check`。** Dart 里再写一份，页面说能派、派的时候被拒；草稿也能问，不用先存。
 - **农机拒绝的选项以探测到的适配器为准，农场的说法盖在上面。** 只抄 `seeds.json` 会和 smith 漂开；只用适配器的，农场要更严、要中文原因时没有地方写。客户端不从种子的标签推断能不能用。
 - **农机的样子不进核心状态，走窄事件流。** 它是从机器读来的观察，不是农场的事实；变得频繁（额度、花费），放进核心状态每次都要整份写盘、推全帧。

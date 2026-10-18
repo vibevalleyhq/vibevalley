@@ -317,44 +317,6 @@
     "defaultEffort": "",
     "env": {}
   },
-  "exampleSkills": [
-    {
-      "id": "tests-first",
-      "name": "先写测试",
-      "description": "改行为之前，先补一个会失败的测试。",
-      "body": "改任何行为之前，先写一个能复现问题或描述新行为的测试，确认它失败，再改代码让它通过。不要为了让测试通过去改测试本身。"
-    },
-    {
-      "id": "small-diffs",
-      "name": "小步提交",
-      "description": "一次只改一件事，改完就跑检查。",
-      "body": "把工单拆成能独立验证的小步。每一步改完就跑 lint、typecheck 和相关测试，过了再走下一步。不顺手重构无关代码。"
-    },
-    {
-      "id": "read-docs-first",
-      "name": "先读 docs",
-      "description": "动手前先读 docs/ 里相关的设计文档。",
-      "body": "开始之前先读 docs/ 里和工单相关的设计文档（docs/README.md 是目录）。代码和文档对不上时，先在报告里指出，再按文档做。"
-    },
-    {
-      "id": "go-style",
-      "name": "Go 风格",
-      "description": "按仓库现有的 Go 写法：短函数、显式错误、表驱动测试。",
-      "body": "沿用仓库已有的 Go 写法：错误显式返回并带上下文；测试用表驱动；不引入新依赖，除非工单要求。"
-    },
-    {
-      "id": "three-perf",
-      "name": "three.js 性能",
-      "description": "改 3D 场景时注意绘制次数和每帧分配。",
-      "body": "改场景时：重复的物体用实例化网格；材质和几何体复用；useFrame 里不要每帧 new 对象；改完在普通笔记本上看帧率。"
-    },
-    {
-      "id": "cn-writing",
-      "name": "中文技术写作",
-      "description": "写文档用短句、主动语态，先给结论。",
-      "body": "文档用中文。短句，主动语态，一段一个意思。先说结论再说原因。术语第一次出现时解释一次，之后保持同一个叫法。"
-    }
-  ],
   "fallbackPreset": {
     "id": "",
     "label": "",

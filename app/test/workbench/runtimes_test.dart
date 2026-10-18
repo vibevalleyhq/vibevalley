@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/workbench/runtimes/quota_panel.dart';
-import 'package:vibevalley/workbench/runtimes/runtime_facts.dart';
 import 'package:vibevalley/workbench/runtimes/runtimes_page.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
@@ -26,7 +25,6 @@ Routes backend() {
             {'label': 'Current week (all models)', 'usedPercent': 90, 'resetsAt': DateTime(2026, 10, 20).millisecondsSinceEpoch},
           ],
         },
-        update: {'current': '1.2.3', 'latest': '1.3.0', 'available': true},
         models: [
           {
             'id': 'opus',
@@ -40,7 +38,7 @@ Routes backend() {
     ],
     'GET /api/v1/agents': (_) => [agentJson('a1', '阿郑', 'claude')],
     'GET /api/v1/skills': (_) => <Object>[],
-    'POST /api/v1/runtimes/claude/refresh': (_) => runtimeJson('claude', update: {'current': '1.2.3', 'latest': '1.3.0', 'available': true}),
+    'POST /api/v1/runtimes/claude/refresh': (_) => runtimeJson('claude'),
     'PUT /api/v1/runtimes/claude/settings': (c) => {...runtimeJson('claude'), 'settings': saved = c.body},
   });
   return b;
@@ -55,9 +53,10 @@ void main() {
     });
 
     test('capabilities and presets', () {
-      expect(capabilitiesOf('claude'), Capability.values);
-      expect(capabilitiesOf('pi'), [Capability.listModels, Capability.skills, Capability.tools]);
-      expect(capabilitiesOf('nope'), isEmpty);
+      expect(factsOf('claude').capabilities, RuntimeCapability.values);
+      expect(factsOf('pi').capabilities, [RuntimeCapability.listModels, RuntimeCapability.skills, RuntimeCapability.tools]);
+      expect(factsOf('dsh').capabilities, [RuntimeCapability.listModels]);
+      expect(factsOf('nope').capabilities, isEmpty);
       expect(runtimeName('claude'), 'Claude Code');
       expect(runtimeName('mystery'), 'mystery');
     });
@@ -86,7 +85,6 @@ void main() {
     expect(find.text('本周（全部模型）'), findsOneWidget);
     expect(find.text('opus'), findsOneWidget);
     expect(find.text('low · high'), findsOneWidget);
-    expect(find.text('升级到 1.3.0'), findsOneWidget);
     // The detail scrolls on its own: drag from inside it.
     await t.drag(find.text('opus'), const Offset(0, -3000));
     await t.pump();
@@ -94,18 +92,12 @@ void main() {
     expect(find.text('阿郑'), findsOneWidget);
   });
 
-  testWidgets('重新检测 asks the server and the upgrade asks first', (t) async {
+  testWidgets('重新检测 asks the server', (t) async {
     final b = backend();
     await pumpPage(t, const RuntimesPage(id: 'claude'), b.handle);
     await t.tap(find.text('重新检测'));
     await settle(t);
     expect(b.named('POST', '/api/v1/runtimes/claude/refresh'), hasLength(1));
-    await t.tap(find.text('升级到 1.3.0'));
-    await t.pump();
-    expect(find.text('会跑 Claude Code 自己的更新程序，改动这台机器。'), findsOneWidget);
-    await t.tap(find.text('算了'));
-    await t.pump();
-    expect(find.text('升级到 1.3.0'), findsOneWidget);
   });
 
   testWidgets('settings: a change shows 保存, which sends the draft', (t) async {

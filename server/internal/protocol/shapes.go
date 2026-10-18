@@ -166,10 +166,23 @@ type RuntimeFacts struct {
 	// A message while it works joins the turn; otherwise it waits for the turn to end.
 	Steer bool `json:"steer"`
 	// The options it refuses (Session*), with oar's reason.
-	Refused      map[string]string `json:"refused"`
-	Capabilities []string          `json:"capabilities"`
-	InProcess    bool              `json:"inProcess"`
+	Refused      map[string]string   `json:"refused"`
+	Capabilities []RuntimeCapability `json:"capabilities"`
+	InProcess    bool                `json:"inProcess"`
 }
+
+// What smith's adapter for a runtime can ask it.
+type RuntimeCapability string
+
+const (
+	RuntimeCapabilityListModels   RuntimeCapability = "listModels"
+	RuntimeCapabilityAccountUsage RuntimeCapability = "accountUsage"
+	RuntimeCapabilityCheckUpdate  RuntimeCapability = "checkUpdate"
+	RuntimeCapabilityUpgrade      RuntimeCapability = "upgrade"
+	RuntimeCapabilitySkills       RuntimeCapability = "skills"
+	RuntimeCapabilityMcpServers   RuntimeCapability = "mcpServers"
+	RuntimeCapabilityTools        RuntimeCapability = "tools"
+)
 
 type CallState string
 
@@ -632,7 +645,6 @@ type RuntimeInfo struct {
 	Installation Installation      `json:"installation"`
 	Models       []ModelEntry      `json:"models" vibevalley:"null"`
 	Usage        AccountUsage      `json:"usage" vibevalley:"null"`
-	Update       *Update           `json:"update"`
 	Skills       []InventoryEntry  `json:"skills" vibevalley:"null"`
 	MCPServers   []InventoryEntry  `json:"mcpServers" vibevalley:"null"`
 	Tools        []InventoryEntry  `json:"tools" vibevalley:"null"`
@@ -1608,12 +1620,6 @@ type AccountUsageLoginRequired struct {
 //vibevalley:member AccountUsage unavailable
 type AccountUsageUnavailable struct {
 	Reason string `json:"reason"`
-}
-
-type Update struct {
-	Current   string `json:"current"`
-	Latest    string `json:"latest"`
-	Available bool   `json:"available"`
 }
 
 //vibevalley:member InboxFrom session

@@ -268,7 +268,6 @@ Map<String, dynamic> runtimeJson(
   bool available = true,
   bool enabled = true,
   Map<String, dynamic>? usage,
-  Map<String, dynamic>? update,
   List<Map<String, dynamic>>? models,
   double? spentToday,
   double? dailyBudget,
@@ -277,7 +276,6 @@ Map<String, dynamic> runtimeJson(
   'installation': available ? {'status': 'available', 'via': 'executable', 'command': '/usr/local/bin/$id', 'version': '1.2.3'} : {'status': 'not_found'},
   'models': ?models,
   'usage': ?usage,
-  'update': ?update,
   'skills': [
     {'name': 'review', 'description': '看代码'},
   ],

@@ -14,7 +14,6 @@ var seedsJSON []byte
 var seeds struct {
 	Agents          []Agent                  `json:"agents"`
 	DefaultSettings RuntimeSettings          `json:"defaultSettings"`
-	ExampleSkills   []Skill                  `json:"exampleSkills"`
 	Achievements    []AchievementDef         `json:"achievements"`
 	RuntimePresets  []RuntimePreset          `json:"runtimePresets"`
 	FallbackPreset  RuntimePreset            `json:"fallbackPreset"`
@@ -43,8 +42,6 @@ func DefaultSettings() RuntimeSettings {
 	s.Env = map[string]string{}
 	return s
 }
-
-func ExampleSkills() []Skill { return append([]Skill(nil), seeds.ExampleSkills...) }
 
 // A runtime with no look of its own gets the fallback's, under its own id.
 func PresetOf(runtime string) RuntimePreset {

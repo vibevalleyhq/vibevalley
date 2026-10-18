@@ -4,7 +4,7 @@ import '../../gen/vibevalley.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 
-enum RuntimeBusy { refreshing, upgrading }
+enum RuntimeBusy { refreshing }
 
 final runtimeBusyProvider = NotifierProvider<RuntimeCommands, Map<String, RuntimeBusy>>(RuntimeCommands.new);
 
@@ -30,8 +30,6 @@ class RuntimeCommands extends Notifier<Map<String, RuntimeBusy>> {
   }
 
   Future<void> refresh(String id) => _withBusy(id, RuntimeBusy.refreshing, () => _catalog.refresh(id));
-
-  Future<void> upgrade(String id) => _withBusy(id, RuntimeBusy.upgrading, () => _catalog.upgrade(id));
 
   Future<void> update(String id, RuntimeSettings settings) async {
     await runAction(() => _catalog.saveSettings(id, settings));

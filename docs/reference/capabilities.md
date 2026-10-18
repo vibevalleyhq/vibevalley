@@ -36,7 +36,7 @@
 |---|---|---|---|---|---|
 | `setting.load` | `GET /api/v1/settings` | ✓ | ✓ |  |  |
 | `setting.check` | `POST /api/v1/settings/check` | ✓ | ✓ |  |  |
-| `setting.save` | `PUT /api/v1/settings` | ✓ | ✓ |  |  |
+| `setting.save` | `PUT /api/v1/settings` | ✓ |  |  |  |
 
 ## channel
 
@@ -108,8 +108,7 @@
 |---|---|---|---|---|---|
 | `runtime.list` | `GET /api/v1/runtimes` | ✓ | ✓ |  |  |
 | `runtime.refresh` | `POST /api/v1/runtimes/{id}/refresh` | ✓ | ✓ |  |  |
-| `runtime.update` | `PUT /api/v1/runtimes/{id}/settings` | ✓ | ✓ |  |  |
-| `runtime.upgrade` | `POST /api/v1/runtimes/{id}/upgrade` | ✓ | ✓ |  |  |
+| `runtime.update` | `PUT /api/v1/runtimes/{id}/settings` | ✓ |  |  |  |
 
 ## github
 
@@ -124,9 +123,9 @@
 |---|---|---|---|---|---|
 | `agent.list` | `GET /api/v1/agents` | ✓ | ✓ |  |  |
 | `agent.check` | `POST /api/v1/agents/check` | ✓ | ✓ |  |  |
-| `agent.create` | `POST /api/v1/agents` | ✓ | ✓ | ✓ |  |
-| `agent.save` | `PUT /api/v1/agents/{id}` | ✓ | ✓ |  |  |
-| `agent.delete` | `DELETE /api/v1/agents/{id}` | ✓ | ✓ |  |  |
+| `agent.create` | `POST /api/v1/agents` | ✓ |  | ✓ |  |
+| `agent.save` | `PUT /api/v1/agents/{id}` | ✓ |  |  |  |
+| `agent.delete` | `DELETE /api/v1/agents/{id}` | ✓ |  |  |  |
 
 ## memory
 
@@ -142,9 +141,9 @@
 | 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `skill.list` | `GET /api/v1/skills` | ✓ | ✓ |  |  |
-| `skill.create` | `POST /api/v1/skills` | ✓ | ✓ | ✓ |  |
-| `skill.save` | `PUT /api/v1/skills/{id}` | ✓ | ✓ |  |  |
-| `skill.delete` | `DELETE /api/v1/skills/{id}` | ✓ | ✓ |  |  |
+| `skill.create` | `POST /api/v1/skills` | ✓ |  | ✓ |  |
+| `skill.save` | `PUT /api/v1/skills/{id}` | ✓ |  |  |  |
+| `skill.delete` | `DELETE /api/v1/skills/{id}` | ✓ |  |  |  |
 
 ## project
 
@@ -173,10 +172,10 @@
 | 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `connector.list` | `GET /api/v1/connectors` | ✓ | ✓ |  |  |
-| `connector.login` | `POST /api/v1/connectors/{id}/login` | ✓ | ✓ |  |  |
-| `connector.verify` | `POST /api/v1/connectors/{id}/verify` | ✓ | ✓ |  |  |
-| `connector.logout` | `POST /api/v1/connectors/{id}/logout` | ✓ | ✓ |  |  |
-| `connector.channel` | `PUT /api/v1/connectors/{id}/channel` | ✓ | ✓ |  |  |
+| `connector.login` | `POST /api/v1/connectors/{id}/login` | ✓ |  |  |  |
+| `connector.verify` | `POST /api/v1/connectors/{id}/verify` | ✓ |  |  |  |
+| `connector.logout` | `POST /api/v1/connectors/{id}/logout` | ✓ |  |  |  |
+| `connector.channel` | `PUT /api/v1/connectors/{id}/channel` | ✓ |  |  |  |
 
 ## gate
 
