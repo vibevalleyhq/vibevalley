@@ -33,6 +33,8 @@ git -C ~/vibevalley-dev/projects/vibevalley push   # 推到 origin（先手动�
 git -C ~/orca/projects/heybro pull                 # 主人拉下来，重启农场，新功能就在了
 ```
 
+[改状态就是派活](../architecture/2026-10-18-status-is-the-dispatch.md)做了以后，开工、再干一轮、收下都换成 `issue status <id> todo|done`，流程不变。
+
 ### 要补的
 
 等一轮交回来不用新命令：工单的 `status` 由它最后一个帮工忙不忙算出来（`protocol.IssueStatusOf`），轮询 `issue get` 就行。评论以后帮工要过一会儿才忙起来，所以先等 `in_progress`，再等 `in_review`，不然刚评论完就会读到上一轮的 `in_review`。

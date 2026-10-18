@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（20 篇）
+## proposed（21 篇）
 
 ### feature
 
@@ -15,6 +15,7 @@
 ### architecture
 
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](proposed/architecture/2026-10-18-tasks-are-dags.md)
+- 2026-10-18 [改工单的状态就是派活](proposed/architecture/2026-10-18-status-is-the-dispatch.md)
 - 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
 - 2026-10-18 [记性有多个来源：照 Hermes 的接口，统一的工具，本地用 SQLite 全文检索](proposed/architecture/2026-10-18-memory-providers.md)
 - 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](proposed/architecture/2026-10-18-memory-in-sqlite.md)
