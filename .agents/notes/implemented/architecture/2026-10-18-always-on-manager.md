@@ -1,6 +1,6 @@
 # Agent Note: 对照 Grok Bot 的常驻 agent：管家还差什么
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
@@ -19,7 +19,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 | 5 | 来源和指令分开；收获、新定时要主人点头 | 26:28、11:13 | 做了：第 1–4 节；第 5 节（管家不是主人叫醒时定的重复定时、直接派帮工的定时，等主人点「同意」）和 `by` 一起，迁移是 `0006_schedule_by.sql` | [分清话是谁说的](../../implemented/architecture/2026-10-18-source-is-not-instruction.md) |
 | 6 | 一轮做到一半时重启，接着做 | 16:17 | 做了：开机时对话没做完、不到 30 分钟就接着那一轮，做到一半的工具补「不知道做没做成」；叫停的不接 | 本篇[第 6 节](#6-重启后接着做完那一轮) |
 | 7 | 发消息不带唯一的键，重试会发两条 | 15:26 | 做了 | 本篇[第 7 节](#7-发消息带-sendkey) |
-| 8 | 关于主人的事实所有 agent 共享 | 32:50 | 归记忆的提案 | [记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)、[记性有多个来源](2026-10-18-memory-providers.md) |
+| 8 | 关于主人的事实所有 agent 共享 | 32:50 | 归记忆的提案 | [记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)、[记性有多个来源](../../proposed/architecture/2026-10-18-memory-providers.md) |
 | 9 | 管家的错变成评测 | 36:05 | 做了 | [管家的错变成评测](../../implemented/architecture/2026-10-18-manager-evals.md) |
 | 10 | 帮工的长汇报整段进管家的上下文 | 28:46 | 做了 | 本篇[第 10 节](#10-长汇报不整段进管家) |
 | — | 主动找主人 | 00:49、11:13 | 做了：`cron`、管家自己定回头看、`by` 和待批的定时 | 本篇[主动找主人：靠定时](#主动找主人靠定时) |
@@ -63,7 +63,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 
 **8. 关于主人的事实所有 agent 共享（幻灯片 32:50）。** 它的记忆分四层：主人的画像（最多 100 条、4000 字，每次都在提示里，所有 agent 共享）、带日期的日志（最相关的 30 条进提示）、很快淡掉的笔记、其余靠检索工具；每轮之后有一遍把新事实加进来、替换旧的，只能删它看过的。我们的主人偏好只在管家的 `MEMORY.md`，帮工拿不到。
 
-**9. 每天把错变成评测（幻灯片 36:05）。** 它的内循环：bot 做错一次，就变成一条评测，修 harness、提示或推理，过了评测再上线。我们的管家测试用 `FauxProvider`，测的是 harness，不是模型的决策；[先采样，再验收](2026-10-14-sample-then-verify.md)第 2 步说的是帮工改代码的故障，不是管家的错。
+**9. 每天把错变成评测（幻灯片 36:05）。** 它的内循环：bot 做错一次，就变成一条评测，修 harness、提示或推理，过了评测再上线。我们的管家测试用 `FauxProvider`，测的是 harness，不是模型的决策；[先采样，再验收](../../proposed/architecture/2026-10-14-sample-then-verify.md)第 2 步说的是帮工改代码的故障，不是管家的错。
 
 **10. 长输出不进主上下文（幻灯片 28:46，本次核对新发现）。** 它的规矩：长输出放进文件，上下文里只留路径。管家的 `check` 只给汇报的结尾 2000 字（`tools.go:576-582`），可帮工在频道和工单串里的话，不管多长，都整段进管家的输入：叫醒它的那批（`manager.go:653`）和附在输入后面的「这期间田头上的汇报」（`manager.go:378-384`）都用 `protocol.InboxLines`，不截（`internal/protocol/chat_rules.go:52-66`）。
 
@@ -91,7 +91,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 | 29:51 打字时预热缓存 | 主人一打开对话、开始打字，服务端先把提示送一遍 | DeepSeek 的缓存在磁盘上，留得久；先量命中率，还低再做 |
 | 34:29 为产品训模型 | 用 harness 的样子做 SFT、RL | 我们不训模型；对应的是第 9 项的评测 |
 
-## Proposal
+## Decision
 
 每项单独一个改动。大的几项的设计在各自的 Note 里，这里只写小的几项。
 
@@ -181,7 +181,7 @@ Lee Robinson 在斯坦福 CS146S 讲了 xAI 的 Grok Bot 怎么做成一个常�
 
 ### 8. 共享的主人画像
 
-归[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)（画像的表、上限、只在会话打开和压缩后取一次）和[记性有多个来源](2026-10-18-memory-providers.md)（`SystemPromptBlock`），本篇不另设计。两条和本篇有关的约束已经写在那里或本篇：画像在两次压缩之间不改系统提示（[提示开头不变](../../implemented/architecture/2026-10-18-stable-prompt-prefix.md)第 1 节的 `MemoryNews`）；画像的标题写明是信息、不是指令（[分清话是谁说的](../../implemented/architecture/2026-10-18-source-is-not-instruction.md)第 4 节）。
+归[记忆都存在 SQLite](../../proposed/architecture/2026-10-18-memory-in-sqlite.md)（画像的表、上限、只在会话打开和压缩后取一次）和[记性有多个来源](../../proposed/architecture/2026-10-18-memory-providers.md)（`SystemPromptBlock`），本篇不另设计。两条和本篇有关的约束已经写在那里或本篇：画像在两次压缩之间不改系统提示（[提示开头不变](../../implemented/architecture/2026-10-18-stable-prompt-prefix.md)第 1 节的 `MemoryNews`）；画像的标题写明是信息、不是指令（[分清话是谁说的](../../implemented/architecture/2026-10-18-source-is-not-instruction.md)第 4 节）。
 
 ### 9. 管家的错变成评测
 
@@ -226,7 +226,7 @@ Grok Bot 的主动来自定时和后台的活（幻灯片 00:49、11:13）。我
 
 **发消息的去重放在内存里（最近 100 个键）。** 不用改查询，可重启后就忘了；`send_key` 列和唯一索引本来就在表里。
 
-## Acceptance criteria
+## Verification
 
 - 第 1、4、5、9 项照各自 Note 的验收。
 - 管家在想时，田头里能停掉这一轮，已经派出的活照常，交给管家的工单那一轮记成被叫停。
@@ -236,7 +236,7 @@ Grok Bot 的主动来自定时和后台的活（幻灯片 00:49、11:13）。我
 - 本篇的状态表和各 Note 一致；第 2 项的决定写在本篇，被重新考虑时改这一节。
 - `go vet ./... && go test ./...`、`bun run go:deadcode`、`bun run flutter:check`、`bun run docs:verify` 通过。
 
-## Risks
+## Consequences
 
 - 第 2 项不做，后台叫醒的轮可能在田头里留下没用的话；靠提示和第 2 节的重新考虑条件兜。
 - 叫停清掉了排着的输入，巡查和计划的消息不补；主人叫停时就是想让它别说了，接受。

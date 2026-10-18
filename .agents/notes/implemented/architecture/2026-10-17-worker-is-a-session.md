@@ -1,14 +1,14 @@
 # Agent Note: Worker 改叫 Session
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
 一个 agent 档案为一张工单干的那一份活（一个 oar 子 agent，加上自己的 worktree 和分支，从派出去到合并或请走，跨好几次 run），代码里叫 `Worker`。这个词说的是「干活的人」，不是「一个档案在一张工单上的一次接活」：`agent list` 和 `worker list` 并排时，读的人以为是两种人。Linear 把这一层叫 agent session，主人想的也是「后端老周在 tDS4 上的那个会话」。
 
-[Run 是一次干活](2026-10-16-runs-sessions-crews.md)当时没选 Session，理由是和 oar 的 `Session` 重名。2026-10-17 主人定了：重名可以接受，用词规则分开两层，这一层改叫 Session。本篇取代那一篇 Alternatives 里「跨 run 的那层叫 Session。没选」这一条。
+[Run 是一次干活](../../proposed/architecture/2026-10-16-runs-sessions-crews.md)当时没选 Session，理由是和 oar 的 `Session` 重名。2026-10-17 主人定了：重名可以接受，用词规则分开两层，这一层改叫 Session。本篇取代那一篇 Alternatives 里「跨 run 的那层叫 Session。没选」这一条。
 
-## Proposal
+## Decision
 
 ### 名字
 
@@ -34,11 +34,11 @@ Status: proposed
 |---|---|
 | 协议 `Worker`、`CoreState.Workers`、`Issue.Workers`、`WorkerOf` | `Session`、`CoreState.Sessions`、`Issue.Sessions`、`SessionOf` |
 | `WorkerAction*`、`WorkerPlay`、`WorkerTask`、`GameEffect.WorkerID` | `SessionAction*`、`SessionPlay`、`SessionTask`、`GameEffect.SessionID` |
-| `SenderKindWorker`（`"worker"`）、`participant.kind` 的 `'worker'` | `agent`，带档案 id：在频道里说话的是档案。`'manager'` 留着：管家在频道里是另一种参与者（[管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md) 的 Alternatives） |
+| `SenderKindWorker`（`"worker"`）、`participant.kind` 的 `'worker'` | `agent`，带档案 id：在频道里说话的是档案。`'manager'` 留着：管家在频道里是另一种参与者（[管家是一份档案，只是能力多](../../proposed/architecture/2026-10-17-manager-is-an-agent.md) 的 Alternatives） |
 | 包 `internal/worker`、`Workspace.Worker`、`worker.Service` | `internal/session`、`Workspace.Session`、`session.Service` |
 | 表 `issue_worker`（列 `worker`） | `issue_session`（列 `session`），一个迁移 |
 | 家目录 `workers.json` | `sessions.json`，加载时改名写回 |
-| 路由 `worker.*`、`/api/workers/{id}/...` | 照 [先有能力，再有入口](2026-10-17-capabilities-before-surfaces.md)：工单的生命周期挪到 `issue.*`，剩下的是 `session.*`、`/api/v1/sessions/{id}/...` |
+| 路由 `worker.*`、`/api/workers/{id}/...` | 照 [先有能力，再有入口](../../proposed/architecture/2026-10-17-capabilities-before-surfaces.md)：工单的生命周期挪到 `issue.*`，剩下的是 `session.*`、`/api/v1/sessions/{id}/...` |
 | Flutter 生成的类型和局部名 | 跟着 shapegen 改 |
 
 不改的：`oar.Session`、`agents.Subagent`、`runtime` 的 `subagents`、smith 里的一切；界面上的「帮工」。
@@ -65,13 +65,13 @@ Status: proposed
 
 **叫 AgentSession。** 照 Linear 的全称，不和 oar 重名。名字长，`issue.Sessions` 读起来已经够清楚，和档案的关系由字段 `Session.Agent` 表达。
 
-## Acceptance criteria
+## Verification
 
 - 协议、服务端、Flutter、表、家目录里没有指这一层的 `worker`；`grep -rniw worker server/internal app/lib` 只剩指农场画面的、smith 的和注释里引 oar 的。
 - `docs/concepts.md` 写了用词规则；`docs/reference/concept-map.md` 的「帮工」一行写 `Session`。
 - `go vet ./... && go test ./...`、`shapegen -check`、`bun run flutter:check`、`bun run docs:verify` 通过；旧的家目录打开后 `workers.json` 变成 `sessions.json`，`issue_worker` 迁成 `issue_session`。
 
-## Risks
+## Consequences
 
 - 读把 oar 事件读成事实的代码（`facts.go`、`runtime/subagents.go`）时，两种 Session 挨在一起；那几个文件里我们这一层的变量宜写 `sess`，oar 的写 `oarSess`。
 - 改动几千处，和别的进行中的改动冲突；先合掉手上的分支再开始。

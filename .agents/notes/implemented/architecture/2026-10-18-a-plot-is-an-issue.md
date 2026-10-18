@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-农场里的「一块地」原来定义成「一个执行占着的并发位」：一个帮工（Session）占一块，地的编号在核心状态里跟着帮工走（`SessionPlay.Station`，`PlotOfSession` 按帮工的阶段算地里长什么）。工单拥有了自己的分支和 worktree 以后（[收获就是提 PR](../../proposed/architecture/2026-10-18-an-issue-ships-as-a-pr.md) 第 1 步），这个定义和事实对不上了：
+农场里的「一块地」原来定义成「一个执行占着的并发位」：一个帮工（Session）占一块，地的编号在核心状态里跟着帮工走（`SessionPlay.Station`，`PlotOfSession` 按帮工的阶段算地里长什么）。工单拥有了自己的分支和 worktree 以后（[收获就是提 PR](2026-10-18-an-issue-ships-as-a-pr.md) 第 1 步），这个定义和事实对不上了：
 
 - **代码一直在同一块地上，地却换了。** 工单关了再重开，农场派一个新帮工；worktree 和分支还是 `worktrees/<项目>.<工单号>`、`vibevalley/issue-<工单号>`，像素村里它却站到另一块地上。
 - **同一张工单两个详情页。** 地块详情（`farm/plot_detail.dart`）和工单详情（`workbench/issues/issue_detail.dart`）各写一遍干活过程、浇水、收获、收工；去掉「评论某一步」、干活过程默认折叠，都得两边一起改。

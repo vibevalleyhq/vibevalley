@@ -12,7 +12,7 @@ Status: proposed
 | 管家的记性（主人交代的、它自己记的） | 家目录的 `manager/MEMORY.md`（`internal/agent/brain/memory.go`） | 每次请求整份拼进系统提示，超过 8000 字留最新的 |
 | 关于主人的事实 | 只在管家的 `MEMORY.md` 里 | 帮工拿不到 |
 
-两处存法、两套增删、两种拼法；`MEMORY.md` 每记一条就改系统提示，管家每次请求都命不中缓存（[对照 Grok Bot](2026-10-18-always-on-manager.md)第 1 项）；帮工不知道主人的偏好。
+两处存法、两套增删、两种拼法；`MEMORY.md` 每记一条就改系统提示，管家每次请求都命不中缓存（[对照 Grok Bot](../../implemented/architecture/2026-10-18-always-on-manager.md)第 1 项）；帮工不知道主人的偏好。
 
 另外，主人家里的 `memory` 表有 1 条 `kind` 是 `job`（从 TypeScript 农场导入时的名字），代码记做过的活用的是 `issue`，这一条现在挑不出来。
 
@@ -183,9 +183,9 @@ type MemoryStore interface {
 
 ### 做到哪了
 
-2026-10-18 做了前三步，在分支 `memory-sqlite` 上：
+2026-10-18 做了前三步，已经合进主分支：
 
-- 迁移是 `server/migrations/0005_memory.sql`（序号接在另一个改动还没提交的 `0002`–`0004` 后面；迁移按位置计数，`PRAGMA user_version` 是跑过几个，所以它要等那三个先进主分支再合）。`names_test` 跳过 FTS5 的影子表；查询在 `queries/memory.sql`、`queries/memory_term.sql`。
+- 表结构在基线 `server/migrations/0001_schema.sql` 里（`memory`、`memory_term` 和它们的触发器；表结构只有一个基线，见 AGENTS.md「不留兼容」）。`names_test` 跳过 FTS5 的影子表；查询在 `queries/memory.sql`、`queries/memory_term.sql`。
 - `memory/terms.go`：中文用 gse，**只取含汉字的词**；英文、数字、路径、版本号用原来的整词正则。只用 gse 时 `db/migrations` 被切成 `db`、`migrations`，`v1.2.3` 被切成 `v1`、`2.3` 还另算一个整词，一个版本号就是三个共有的词，别的项目的记忆因此更容易过「共有三个词」那道门槛（黄金数据里 7 条挑出来的不一样了）；分开以后是 0 条，只有 15 条顺序变了。
 - 共有一个词的分从 0.4 改成 0.5：以前的「词」是相邻两个汉字，一个四字词算三个，现在一个词就是一个；`bm25()` 的相关度最多加 1.5（`recallMatchMost`、`recallMatchWeight`）。
 - 写入时当场切词（第一次切要加载词典，约 350 ms）；开机后在后台补切迁移搬来的和 `TermsVersion` 变了的行（真库的拷贝上 3 条，640 ms）。

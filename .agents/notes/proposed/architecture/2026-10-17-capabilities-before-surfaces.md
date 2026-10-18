@@ -86,7 +86,7 @@ IssueStart(ctx context.Context, pID string) (Dispatched, error)
 
 ### 4. 操作的语义：组、动词、职责
 
-86 个操作按下面五条收敛成约 80 个。改名和 [Worker 改叫 Session](2026-10-17-worker-is-a-session.md) 一起做，路由只改一次。
+86 个操作按下面五条收敛成约 80 个。改名和 [Worker 改叫 Session](../../implemented/architecture/2026-10-17-worker-is-a-session.md) 一起做，路由只改一次。
 
 1. **组是概念**：不用皮和传输层的叫法。`lan` 是院门的包 `gate`；`progress` 是 `internal/game`；频道的路径 `/api/chat/{id}/messages` 和 `/api/channels` 统一成 `channels`；`server.start`、`server.end` 管的是管家这条线（`CallState`）和请走全部帮工，不是服务端。
 2. **动词一套**：`list`、`get`、`create`、`update`、`delete`；`save` 只给 id 由客户端定的整份写入（档案、技能、设置）；`check` 只校验不保存（现在三处都是）。领域动词只留给不是增删改查的：`start`、`merge`、`reopen`、`stop`、`resolve`、`task`、`pair`。现在同一件事有 `add`/`create`/`open`、`edit`/`update`、`remove`/`delete`、`find`/`get`。

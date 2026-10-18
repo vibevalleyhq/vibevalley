@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-Grok Bot 把邮件和 webhook 来的字标成不可信，记忆当信息、不当指令，不经同意不替你给人发消息，新的定时要你点头（幻灯片 26:28；[对照 Grok Bot](../../proposed/architecture/2026-10-18-always-on-manager.md)第 5 项）。管家这边，进来的话有几条路，只有一部分是主人说的，可模型分辨来源全靠每条输入开头的几个字，没有一条规矩、也没有一处代码在乎来源：
+Grok Bot 把邮件和 webhook 来的字标成不可信，记忆当信息、不当指令，不经同意不替你给人发消息，新的定时要你点头（幻灯片 26:28；[对照 Grok Bot](2026-10-18-always-on-manager.md)第 5 项）。管家这边，进来的话有几条路，只有一部分是主人说的，可模型分辨来源全靠每条输入开头的几个字，没有一条规矩、也没有一处代码在乎来源：
 
 | 路 | 代码 | 开头 | 是谁的话 |
 |---|---|---|---|
@@ -54,7 +54,7 @@ Grok Bot 把邮件和 webhook 来的字标成不可信，记忆当信息、不�
 
 ### 5. 管家起的定时：自己的跟进直接生效，别的等主人点头
 
-管家主动找主人走定时：定时已经有了 `cron`（五段式），管家也会给自己定一次性的回头看（[定时加上 cron](../feature/2026-10-18-cron-and-follow-ups.md)）；`Schedule` 上的 `by`（`owner` 或 `manager`）由迁移 `0006_schedule_by.sql` 加进 `schedule` 表，排在另一个改动的 `0002`–`0004` 后面（[对照 Grok Bot](../../proposed/architecture/2026-10-18-always-on-manager.md#主动找主人靠定时)）。所有管家起的定时都要批，主动就没了；所以按会不会花别人的钱、会不会一直跑来分：
+管家主动找主人走定时：定时已经有了 `cron`（五段式），管家也会给自己定一次性的回头看（[定时加上 cron](../feature/2026-10-18-cron-and-follow-ups.md)）；`Schedule` 上的 `by`（`owner` 或 `manager`）由迁移 `0006_schedule_by.sql` 加进 `schedule` 表，排在另一个改动的 `0002`–`0004` 后面（[对照 Grok Bot](2026-10-18-always-on-manager.md#主动找主人靠定时)）。所有管家起的定时都要批，主动就没了；所以按会不会花别人的钱、会不会一直跑来分：
 
 | 情况 | 结果 |
 |---|---|

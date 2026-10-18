@@ -28,7 +28,7 @@ Workspace（工作目录，一张大地图）
 
 ## Session 和 oar 会话
 
-单写的 Session 只指上面这一层：一个档案为一张工单接的活。农机那一层（smith 的 `oar.Session`，重启后会换一个）在代码里只经包名出现，文档里写「oar 会话」；中文里我们这一层写 Session，不写「会话」（[Worker 改叫 Session](../.agents/notes/proposed/architecture/2026-10-17-worker-is-a-session.md)）。
+单写的 Session 只指上面这一层：一个档案为一张工单接的活。农机那一层（smith 的 `oar.Session`，重启后会换一个）在代码里只经包名出现，文档里写「oar 会话」；中文里我们这一层写 Session，不写「会话」（[Worker 改叫 Session](../.agents/notes/implemented/architecture/2026-10-17-worker-is-a-session.md)）。
 
 ## 东西
 

@@ -1,16 +1,16 @@
 # Agent Note: 一张工单一条分支、一个 worktree，收获就是提 PR
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
-[先只用服务端和命令行](../process/2026-10-18-a-feature-through-server-and-cli.md)走通以后，还剩三处别扭：
+[先只用服务端和命令行](../../proposed/process/2026-10-18-a-feature-through-server-and-cli.md)走通以后，还剩三处别扭：
 
 - **worktree 和分支跟着帮工，不跟着工单。** 名字是 `<项目>.<帮工>-<时间>`、`vibevalley/<帮工>-<时间>`（`project.Workplace`）。同一个帮工接着干几轮没问题，但工单关了再挪回待办，农场派一个新帮工，从主分支另开一条分支：取消时留下的提交（`project.Release` 留着有提交的分支）没人接着做；取消时还有没提交的改动，旧 worktree 也留着，一张工单就有了两个 worktree。
 - **合进的是农场那份克隆的 main。** 推到 origin、主人的检出拉下来，都得手动，农场的克隆和 origin 会分叉。
 - **农场不知道本机的 GitHub 能不能用。** `gh` 装没装、登没登录、对这个仓库有没有写权限，现在没人查。
 
-## Proposal
+## Decision
 
 分三步，前一步是后一步的地基。
 
@@ -65,13 +65,13 @@ Status: proposed
 
 **worktree 按帮工、重开时去找上一个帮工的分支。** 不改命名也能接着干，但「一张工单一个」要靠调用方记着找，不是结构上的保证。
 
-## Acceptance criteria
+## Verification
 
 - 第 1 步：`project` 的测试用真的 git 仓库：同一张工单第二次开拿到同一个 worktree；取消（分支有提交）再重开，新帮工在同一条分支上、看得到上次的提交；合进去以后再重开从主分支开。检查在锁外跑时，同一个项目能同时开别的工单的 worktree。
 - 第 2 步：没装 gh、没登录、远端不是 GitHub、没有写权限，各自在设置检查和项目上说清原因；`verify-server` 上看到本机的结果。
 - 第 3 步：用一个测试仓库真跑一次（不是 vibevalley 本身）：挪到 done 开出 PR，再干一轮更新 PR，在 GitHub 上合了以后工单自己关成 merged。
 
-## Risks
+## Consequences
 
 - 第 3 步要真的推送、开 PR，是对外的动作；第一次真跑用一个测试仓库，vibevalley 本身等主人点头再开。
 - 看 PR 状态要轮询 `gh`，频率太高会撞 GitHub 的限额；几分钟一次，只看开着的。

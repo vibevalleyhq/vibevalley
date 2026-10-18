@@ -11,7 +11,7 @@ VibeValley 的本意是用说话指挥团队。语音要识别、对话、合成
 用 Agora 的 Conversational AI（[voice.md](../../../../docs/reference/voice.md)）：
 
 - 先把官方示例 `agent-quickstart-nextjs` 原样跑通，再按它的代码搬进 VibeValley（当时改写成 Effect；现在服务端是 Go，用 Agora 的 Go SDK）：服务端签 RTC + RTM 令牌、请语音管家进出频道（`server/internal/voice/agora.go`，声网本身的部分在 `server/pkg/agora`）；客户端用 Agora 的 Flutter SDK 加入频道、发布麦克风、收字幕（`app/lib/voice/`）。网页那一半（`web/src/voice/agora.ts`，core 的 `VoiceApi`、`VoiceLink`）随网页删掉了。
-- 出声回答的默认是 Agora 托管的大模型（`gpt-4.1-mini`）、识别用 ARES 中文、合成用 MiniMax 中文音色（都能在声音页改，「想」后来也能选农场的管家，见 [语音接到我们自己的管家](2026-10-10-voice-through-our-manager.md)）。它听到的一句话交给农场的管家（`manager/hear`）：管家按需派活，派了就在田头说一句派给了谁；电话里的问答都记进田头（[通话、听写和管家的 OpenAI 协议](../../proposed/architecture/2026-10-18-calls-dictation-and-the-agent.md)）。
+- 出声回答的默认是 Agora 托管的大模型（`gpt-4.1-mini`）、识别用 ARES 中文、合成用 MiniMax 中文音色（都能在声音页改，「想」后来也能选农场的管家，见 [语音接到我们自己的管家](2026-10-10-voice-through-our-manager.md)）。它听到的一句话交给农场的管家（`manager/hear`）：管家按需派活，派了就在田头说一句派给了谁；电话里的问答都记进田头（[通话、听写和管家的 OpenAI 协议](../architecture/2026-10-18-calls-dictation-and-the-agent.md)）。
 - 凭据在首页「设置」里填（`$VIBEVALLEY_HOME/settings.json`），或者写进配置（`$VIBEVALLEY_HOME/vibevalley.yaml`、环境变量）；缺了语音不可用，别的照常。
 
 ## Alternatives considered

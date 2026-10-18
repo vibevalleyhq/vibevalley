@@ -8,7 +8,7 @@ Status: proposed
 
 ## Proposal
 
-- 在 protocol 的 `AgentProfile`（`server/internal/protocol/shapes.go`）上加一个可选的 `voice`，只存和默认不一样的：音色（MiniMax 的 `voiceId`、OpenAI 的 `voice`、微软的 `voiceName`），可以再加一句开场白。捏帮工页加一个「声音」页签来配。
+- 在 protocol 的 `Agent`（帮工档案，`server/internal/protocol/shapes.go`）上加一个可选的 `voice`，只存和默认不一样的：音色（MiniMax 的 `voiceId`、OpenAI 的 `voice`、微软的 `voiceName`），可以再加一句开场白。捏帮工页加一个「声音」页签来配。
 - 先让它在**田头朗读**里用上：客户端打开「听汇报」以后，帮工的汇报用各自的音色念出来。在客户端合成，不经过 Agora 的通话。
 - 以后再考虑：
   - 管家在通话里转述汇报时换成帮工的声音。要先确认 Agora 的 speak 接口能不能临时换音色，不能就得另开会话。

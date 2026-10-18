@@ -41,7 +41,7 @@ Run 和 Session 这两层已经落了（2026-10-17），差的最后一层是**�
 
 **一次干活叫 operation。** 没选：它太泛，常指一次调用或异步任务的句柄；中文是「操作」，写作规矩不用这个词。
 
-**跨 run 的那层叫 Session。** 它确实包着一个会话。当时没选：Session 是 oar 的核心词，`SubagentReport.sessionId` 也是 oar 会话；重启以后我们这一层不变，底下却会换一个 oar 会话，两个 Session 套在一起读不清。这一条后来被 [Worker 改叫 Session](2026-10-17-worker-is-a-session.md) 取代：主人接受重名，用词规则分开两层。
+**跨 run 的那层叫 Session。** 它确实包着一个会话。当时没选：Session 是 oar 的核心词，`SubagentReport.sessionId` 也是 oar 会话；重启以后我们这一层不变，底下却会换一个 oar 会话，两个 Session 套在一起读不清。这一条后来被 [Worker 改叫 Session](../../implemented/architecture/2026-10-17-worker-is-a-session.md) 取代：主人接受重名，用词规则分开两层。
 
 **跨 run 的那层叫 `Assignment` 或 `Task`。** `Assignment` 说的是派活这个动作，不是派出去以后那个持续的东西。`Task` 和 `Session.Task`（要做的事）、oar 的任务（`TaskStarted`）都撞。
 

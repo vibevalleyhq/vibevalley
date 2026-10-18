@@ -2,6 +2,8 @@
 
 Status: proposed
 
+这里的「验收」指种植计划里先写好、写好就冻结的那一步检查（`protocol.AcceptancesOf`）；工单交回来以后主人或管家判过没过的「验收」是另一件事，见[每张工单都有验收](../../implemented/architecture/2026-10-18-every-issue-has-an-acceptance.md)。
+
 ## Problem
 
 帮工交回来的东西，农场一直当结论收：帮工说做完了，就在它自己的 worktree 里跑它自己能改的检查，过了就合；没过就在同一个会话里让它接着改，最多两次。这样有几种坏法，用 coding agent 修代码的人都见过：

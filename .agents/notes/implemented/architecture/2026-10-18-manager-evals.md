@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-Grok Bot 的内循环：bot 做错一次，就变成一条评测；修 harness、提示或推理，评测过了再上线；每个做得不好的 bot 都变成评测（幻灯片 36:05；[对照 Grok Bot](../../proposed/architecture/2026-10-18-always-on-manager.md)第 9 项）。
+Grok Bot 的内循环：bot 做错一次，就变成一条评测；修 harness、提示或推理，评测过了再上线；每个做得不好的 bot 都变成评测（幻灯片 36:05；[对照 Grok Bot](2026-10-18-always-on-manager.md)第 9 项）。
 
 管家原来没有这一圈：
 

@@ -1,6 +1,6 @@
 # Agent Note: 通话走 Agora，听写走识别，管家说 OpenAI 的协议
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
@@ -24,7 +24,7 @@ Agora 的说法也进了我们的形状和各层：
 
 还有一个行为上的缺口：电话不算管家的对话入口。默认模式下 `Heard` 以 `Quiet: true` 交给管家（`server/internal/manager/manager.go:703`），主人的话和管家的回答都不进田头；`vibevalley` 模式下管家的回答进了，主人说的那句没有（`Call` 不调用 `chat.Say`）。
 
-## Proposal
+## Decision
 
 语音分成三块，各有各的主人：
 
@@ -108,7 +108,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 `VoiceSettings` 就是通话的设置，也就是 Agora 实现的设置；听写的设置以后是它旁边单独的 `dictation`，不放进 `voice`。
 
-- `answer`（原来的 `llm`）：谁接电话，`VoiceAnswer`。`manager` 是管家自己接（原来的 `vibevalley`），模型归管家的档案（[管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md)）；`agora`、`deepseek`、`openai` 是快嘴，只会说话，管家旁听派活。
+- `answer`（原来的 `llm`）：谁接电话，`VoiceAnswer`。`manager` 是管家自己接（原来的 `vibevalley`），模型归管家的档案（[管家是一份档案，只是能力多](../../proposed/architecture/2026-10-17-manager-is-an-agent.md)）；`agora`、`deepseek`、`openai` 是快嘴，只会说话，管家旁听派活。
 - `asr`、`tts`：Agora 能接的厂商，名字照实写；听写的识别是另一个联合类型。
 - 人设、开场白、出错时说的话、`Area`、`SilenceMs`、`InterruptMs`、`IdleSeconds` 都留在 `voice` 里。人设只对快嘴有用，声音页上标明了。
 - `VoiceCaptions` 删掉：字幕固定走 RTC 的 data stream，写在 `voice/agora.go` 里（`pkg/agora` 还认 RTM，给别的用法）。
@@ -154,7 +154,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 **现在就抽出 `Transport`、`TTS` 接口。** 只有一个实现，形状会照着 Agora 长。听写也不要接口：本机和云上都说 OpenAI 的转写协议，区别只是地址。
 
-## Acceptance criteria
+## Verification
 
 - `curl` 主服务的 `/v1/chat/completions`（`model: vibevalley-manager`、`stream: true`）能拿到管家的回答，SSE 以 `finish_reason: stop` 和 `[DONE]` 结束；`stream: false` 回一个完整的 `chat.completion`；不认识的 `model` 回 404。
 - `server/internal/voice/line.go` 里没有 OpenAI 协议的代码；语音线路的测试照旧通过。
@@ -164,7 +164,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 - 听写：配好地址以后，`POST /api/v1/voice/dictate` 送一段录音，回的是转写地址给的字；没配、连不上、对方拒绝时回 `VoiceUnavailable` 和原因，输入框里已有的字不丢。
 - `go vet ./... && go test ./...`、`bun run go:deadcode`、`bun run flutter:check` 通过。
 
-## Risks
+## Consequences
 
 - 主服务多了一个能让管家干活的接口。它只听 127.0.0.1，和 `/mcp`、`/api` 一样；院门只放 `VibeValleyApi` 和状态流（`server/internal/gate/gate.go:32`），`/v1/…` 不在里面。放进 `/api/v1/…` 的话，院门会放行，要另外拦。
 - 本机的 `/v1/chat/completions` 和电话共用一个回答的流：打着电话时本机来一个请求，电话里那一句的流会被结束。只有一个主人，有意接受；要并行时再给每个请求一个自己的 `managerCaller`。
@@ -173,4 +173,4 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 - 填了云上的地址，主人的声音就送到那一家；填本机的 `speech-server` 就不出本机。设置里写明。
 - 第 4 步改了存盘的名字（`llm` → `answer`，`vibevalley` → `manager`），不搬旧的：别的机器上存过「想」的 `settings.json`，「想」会回到默认，要在声音页重选一次。
 - 快嘴的回答由客户端上报，客户端挂得太快会少一条；有意接受，不加重试。
-- 有意放弃的：不支持第二家实时平台的 Go 接口，不做不实时的合成；能换平台靠 OpenAI 接口，合成等[帮工各自的音色](../feature/2026-10-13-helper-voices.md)来用。
+- 有意放弃的：不支持第二家实时平台的 Go 接口，不做不实时的合成；能换平台靠 OpenAI 接口，合成等[帮工各自的音色](../../proposed/feature/2026-10-13-helper-voices.md)来用。

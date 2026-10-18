@@ -9,7 +9,7 @@ Status: implemented
 - 时间写不全。[频道和定时](2026-10-11-channels-and-schedules.md)只给了四种：一次、每隔几分钟、每天几点、每周几几点；当时不做 cron，理由是管家和主人都容易写错。「工作日九点」「每月一号」「每小时一刻」都说不出来。
 - 管家只在主人说「每天」「到点」时才定时。派完活不会自己回来看，答应主人的事要等主人再问。
 
-主人要的是简单的主动性：用 cron 叫醒，醒了就直接说。后台叫醒时先不说话、要说再调工具的做法先不做（[对照 Grok Bot](../../proposed/architecture/2026-10-18-always-on-manager.md)）。
+主人要的是简单的主动性：用 cron 叫醒，醒了就直接说。后台叫醒时先不说话、要说再调工具的做法先不做（[对照 Grok Bot](../architecture/2026-10-18-always-on-manager.md)）。
 
 ## Decision
 

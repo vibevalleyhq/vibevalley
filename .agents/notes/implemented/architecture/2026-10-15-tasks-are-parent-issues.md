@@ -12,7 +12,7 @@ Status: implemented
 
 行为见 [server.md](../../../../docs/reference/server.md)「工单」「种植计划」。
 
-- **计划是父工单，每一步是子工单**：父工单的 id 就是计划的 id（`p1`……），标题和说明是计划的标题和目标，多一块 `task`（计划的状态、计划分支、并行数、一句说明）。每一步是一张子工单，id 是 `<计划>.<步骤>`（`p1.api`），`parent` 指向父工单，`blockedBy` 是它要等的子工单，标题和说明是步骤的标题和工单，`step` 里是步骤的其余部分（状态、检查命令、该改的地方、是不是验收、冻结的文件、谁在做、结论、提交、花费、重试和失败的次数）。
+- **计划是父工单，每一步是子工单**：父工单的 id 就是计划的 id（`p1`……），标题和说明是计划的标题和目标，多一块 `graph`（`IssueGraph`：计划的状态、计划分支、并行数、一句说明）。每一步是一张子工单，id 是 `<计划>.<步骤>`（`p1.api`），`parent` 指向父工单，`blockedBy` 是它要等的子工单，标题和说明是步骤的标题和工单，`task` 里（`IssueTask`）是步骤的其余部分（状态、检查命令、该改的地方、是不是验收、冻结的文件、谁在做、结论、提交、花费、重试和失败的次数）。
 - **执行挂在工单下面**：拆计划的帮工是父工单的一次执行，做某一步的帮工是那张子工单的执行，和普通工单一样。
 - **计划的规则不变，读写换成工单**：protocol 的 `task.go` 仍按整张计划算（能开工的步骤、改计划、交给帮工的话、验收……）。`TaskOf`、`TasksOf` 从核心状态里的工单把计划拼出来，`TaskIssues` 再拆回工单（`task_issues.go`）；服务端的 `Tasks` 每写一次计划，`Issues.PutTask` 就在一个事务里写整家工单，先发子工单的事实、最后发父工单的，计划在核心状态里总是完整的。没有了 `task` 事实，`CoreState` 里也没有了 `tasks`。
 - **状态跟着计划**：父工单在拆、在做时是 `working`，等你看、暂停、做完等收获是 `waiting`，收了或放弃了就关上（`merged`、`dismissed`）。子工单没轮到是 `todo`，在做看它的帮工，没做成是 `waiting`，合进去了关成 `merged_into_task`，跳过或计划放弃了关成 `dismissed`。帮工离开不会关计划的工单，看板也不能改、开工、重开它们，都在计划里做。
@@ -40,4 +40,4 @@ Status: implemented
 
 - `server/internal/protocol/task_rules_test.go`：计划拆成工单再拼回来不变，各张工单的状态，关上时保留什么时候关的，放弃时每步都关上，挤出核心状态时子工单跟着父工单走。
 - `server/internal/task/task_test.go`：`TestTaskIsAParentIssue`（父工单和拆计划的执行、子工单和它等的、看板不能改和开工、步骤的帮工是子工单的执行、做完关成 merged、收获后父工单关上）；`TestTaskAdoptsTasksOfBefore`（`state.json` 里的计划搬过来、执行挪过来、旧工单删掉、`state.json` 另存一份、下一个 id）；其余计划的测试照旧跑过。
-- `app/test/tickets_test.dart`：父工单是计划卡，没人做过的子工单不出现，子工单的标题带计划名；`farm_tasks_test.dart`：计划板读帧上的 `tasks`。
+- `app/test/workbench/issues_test.dart`：父工单是计划卡，没人做过的子工单不出现，子工单的标题带计划名；`app/test/farm/task_board_test.dart`：计划板读帧上的 `graphs`。
