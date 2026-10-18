@@ -1,10 +1,10 @@
 # server：VibeValley 的服务端
 
-VibeValley 唯一的服务端：答 VibeValleyApi、`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 和 `/mcp`，给 Flutter 客户端。`workspace` 是一个库，`cmd/server` 单独跑它；Flutter 的 macOS 应用把 `cmd/server` 编进应用、开机拉起（[desktop.md](docs/reference/desktop.md)）。行为见 [docs/reference/server.md](docs/reference/server.md)；为什么用 Go、建在 smith 上见 [服务端用 Go 重写](.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)。
+VibeValley 唯一的服务端：答 VibeValleyApi、`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 和 `/mcp`，给 Flutter 客户端。`workspace` 是一个库，`cmd/server` 单独跑它；Flutter 的 macOS 应用把 `cmd/server` 编进应用、开机拉起（[客户端](docs/subsystems/app.md)）。行为见 [子系统](docs/subsystems/README.md)；为什么用 Go、建在 smith 上见 [服务端用 Go 重写](docs/subsystems/foundation.md)。
 
 Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite`）。
 
-作为应用或验证脚本的子进程启动时，设 `VIBEVALLEY_PORT=0` 并传 `--ready-json`：监听与工作区就绪后，stdout 只发布一行 `protocol.ServerReady`（实际 `url`、当前 `pid`），普通日志仍写 stderr。宿主不预占端口，也不把日志文字当协议；[桌面启动](docs/reference/desktop.md)按这个收据连接。
+作为应用或验证脚本的子进程启动时，设 `VIBEVALLEY_PORT=0` 并传 `--ready-json`：监听与工作区就绪后，stdout 只发布一行 `protocol.ServerReady`（实际 `url`、当前 `pid`），普通日志仍写 stderr。宿主不预占端口，也不把日志文字当协议；[桌面启动](docs/subsystems/app.md)按这个收据连接。
 
 ## 目录
 
@@ -32,11 +32,11 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 
 ## 服务
 
-一个包是一块业务，只导出一个服务：`<包>.Service`（[理由](.agents/notes/implemented/architecture/2026-10-16-one-service-per-package.md)）。`Workspace` 和测试的服务表里，它的字段用单数的概念名，调用处读起来是 `f.Project.List()`、`f.Issue.Merge(…)`。一块业务里分开写的几部分是包内不导出的零件（`issue` 的 `issues`、`dispatch`、`merges`），`Service` 嵌入它们，它们导出的方法就是 `Service` 的方法；零件之间不能有同名的导出方法。
+一个包是一块业务，只导出一个服务：`<包>.Service`（[理由](docs/subsystems/foundation.md)）。`Workspace` 和测试的服务表里，它的字段用单数的概念名，调用处读起来是 `f.Project.List()`、`f.Issue.Merge(…)`。一块业务里分开写的几部分是包内不导出的零件（`issue` 的 `issues`、`dispatch`、`merges`），`Service` 嵌入它们，它们导出的方法就是 `Service` 的方法；零件之间不能有同名的导出方法。
 
-构造函数的参数就是它用到的服务和配置（多的用带 `fx.In` 的参数结构体，如 `sessionsIn`、`managerIn`），一个包的 `Service` 只要一个；没有服务拿整个 `Workspace`。每个包的 `Module`（`func(*base.Readies) fx.Option`）把零件的构造函数设成 `fx.Private`，只把 `Service` 交给 fx（`go.uber.org/fx`）；`base.App` 把给它的各包装在一个生命周期上：`NewApp` 建，`Start` 开，`Close` 停。`workspace.New` 是带全部包的 App（[理由](.agents/notes/implemented/architecture/2026-10-15-services-assembled-by-fx.md)、[分包](.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)）。
+构造函数的参数就是它用到的服务和配置（多的用带 `fx.In` 的参数结构体，如 `sessionsIn`、`managerIn`），一个包的 `Service` 只要一个；没有服务拿整个 `Workspace`。每个包的 `Module`（`func(*base.Readies) fx.Option`）把零件的构造函数设成 `fx.Private`，只把 `Service` 交给 fx（`go.uber.org/fx`）；`base.App` 把给它的各包装在一个生命周期上：`NewApp` 建，`Start` 开，`Close` 停。`workspace.New` 是带全部包的 App（[理由](docs/subsystems/foundation.md)）。
 
-`NewApp` 独占传入的 Home，第二个 App 在构造服务前失败；调用方应以 `Close` 结束整个 App，不能只关闭数据库。租约覆盖所有服务的最后写入（[理由](.agents/notes/implemented/architecture/2026-10-18-local-server-lifetime.md)）。
+`NewApp` 独占传入的 Home，第二个 App 在构造服务前失败；调用方应以 `Close` 结束整个 App，不能只关闭数据库。租约覆盖所有服务的最后写入（[理由](docs/subsystems/app.md)）。
 
 服务按业务分包（[概念](docs/concepts.md)）：一个包是一块业务，接口窄、里面深；包名用单数，用[用语表](docs/README.md#用语)里的词。先是活本身，最后是画在上面的游戏。一个包只 import 表里排在它前面的包，编译器替我们守着；反方向的消息走 `base.Hub[T]`（`base/hub.go`：核心状态的事实、执行的动静、群聊和计划给管家的消息），只送给当时在订阅的，慢的排长队，不丢：
 
@@ -76,7 +76,7 @@ HTTP（`handler`）在最上面，经 `Workspace` 用全部服务；`workspace` 
 
 ## 形状和规则从哪来
 
-形状和规则都只在这里的 `protocol` 包（[理由](.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。形状写在 `shapes.go`：结构体、`type X string` 加常量的枚举、带标签的联合（`//vibevalley:union` 和成员上的 `//vibevalley:member`）、接口的错误（`//vibevalley:error`）；接口写在 `api.go` 的 `Handlers` 里，每个方法带 `//vibevalley:route` 和 `//vibevalley:can`（谁能调：`owner`、`remote`、`manager`、`session`，写成 `protocol.Endpoints` 和 [能力表](docs/reference/capabilities.md)，院门按它放行）；数字 id 的路径参数写 `int64`（查询参数 `*int64`），生成的 `Mount` 解析，处理函数拿到的就是数字。改了它们跑：
+形状和规则都只在这里的 `protocol` 包（[理由](docs/subsystems/foundation.md)）。形状写在 `shapes.go`：结构体、`type X string` 加常量的枚举、带标签的联合（`//vibevalley:union` 和成员上的 `//vibevalley:member`）、接口的错误（`//vibevalley:error`）；接口写在 `api.go` 的 `Handlers` 里，每个方法带 `//vibevalley:route` 和 `//vibevalley:can`（谁能调：`owner`、`remote`、`manager`、`session`，写成 `protocol.Endpoints` 和 [能力表](docs/reference/capabilities.md)，院门按它放行）；数字 id 的路径参数写 `int64`（查询参数 `*int64`），生成的 `Mount` 解析，处理函数拿到的就是数字。改了它们跑：
 
 ```bash
 go run ./tool/shapegen          # 写 protocol/gen.go 和 ../app/lib/gen/vibevalley.dart；-check 只查是不是最新
@@ -90,7 +90,7 @@ go run ./tool/shapegen          # 写 protocol/gen.go 和 ../app/lib/gen/vibeval
 
 - **写错的配置**：读不成数字的值、不是端口的端口让服务端起不来，开机就看到；能读却不认识的值（`voice.model` 不在列表里）用默认。键的清单见 [architecture.md](docs/architecture.md)「配置」。
 - **存着的文件读不了**：`config.json` 挪到旁边（`config.json.unreadable-<时间>`），档案从种子开始；挪不成就不启动，绝不覆盖主人的文件。失败不当成功：写轨迹、合并后退出合并、退回待办这些出错时记日志或说给主人，不悄悄吞掉。
-- **端口被占**：语音线路的端口被占时只记一行日志（[voice.md](docs/reference/voice.md)），院门的写进院门的状态（[server.md](docs/reference/server.md)「院门」），农场照常。
+- **端口被占**：语音线路的端口被占时只记一行日志（[语音](docs/subsystems/voice.md)），院门的写进院门的状态（[院门](docs/subsystems/gate.md)），农场照常。
 - **字数上限**：VibeValley 自己的 agent 里的（管家的 `MEMORY.md` 尾巴、工具结果的截断）按字符数；`protocol` 和服务里给人看的文字按 UTF-16 码元量，空白照 JavaScript 的 `\s`：只有 `pkg/x/str` 一份（`str.Units`、`Slice`、`Trim`、`SpaceClass`、`Cut`、`Clip`），服务和规则都用它，黄金数据守着的就是这一份。
 - **后台的活不能乱序落地**：后台读一份外面的状态（git、农机、额度）再写回的，两次读可能交叉，早开始的晚回来就会盖掉新的。要么一次一个（在订阅事件的那个循环里直接做，`base.Hub` 慢了只会排队、不会挡住发布的；或者一把锁包住读和写，如 `game` 的数提交），要么开始时拿号、落地时丢掉比已存的旧的（`runtime` 的农机信息）。
 - **数字照 JavaScript 算**：规则里先乘再加减（`a*b+c`）的地方，乘积用 `float64(...)` 包起来。Go 在 arm64 上会把它合成一条 FMA，中间不舍入，结果就和 JavaScript、和 amd64 不一样（`1+0.1*7` 会是 1.7，不是 1.7000000000000002，金币就差一枚）。`num.Round` 自己先舍入输入。测试的输入不要写成常量，常量会在编译时精确折叠，测不出来。

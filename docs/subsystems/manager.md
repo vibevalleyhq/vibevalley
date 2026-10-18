@@ -9,12 +9,12 @@
 | 管家听到什么、一条输入怎么拼、话回到哪个频道 | 频道里谁该被叫醒、投递和回执（`internal/channel`，[田头](docs/subsystems/channel.md)） |
 | 管家的对话、压缩、记性的快照、提示的开头 | 帮工档案的记性、想起和外面的来源（[记性](docs/subsystems/memory.md)）；管家的 `memory_search`、`memory_add` 只是那边的入口 |
 | 管家的工具（`internal/tool` 的 `Manager`）和谁能让它合并 | 工具背后的规则：派活、验收、收获归[工单](docs/subsystems/issue.md)，定时归 `internal/schedule`（[定时](docs/subsystems/schedule.md)），计划归 `internal/task`（[种植计划](docs/subsystems/task.md)） |
-| 挑档案（`session.ChooseAgent`，管家和计划共用） | 派不派得出去（`AgentIssues`、同时干活的上限，[额度、花费和上限](docs/reference/server.md#额度花费和上限)） |
+| 挑档案（`session.ChooseAgent`，管家和计划共用） | 派不派得出去（`AgentIssues`、同时干活的上限，[额度、花费和上限](docs/subsystems/README.md)） |
 | 管家的一轮：叫停、重启后接着做、做错的一轮存成评测 | 一轮记成 Run、日志和结局（`internal/session` 的 `AgentExecution`） |
-| 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（protocol 的 `inbox.go`，[Inbox](docs/reference/server.md#inbox)） |
+| 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（protocol 的 `inbox.go`，[Inbox](docs/subsystems/README.md)） |
 | VibeValley 自己的 agent：循环、会话、压缩、技能、记性文件、MCP、定时、帮手 | 帮工在农机 `vibevalley` 上的会话怎么接进农场（smith，[帮工](docs/subsystems/session.md)）；界面和农机页（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)） |
 | 帮工档案的存储（`internal/agent`）：内置的管家档案、事务 | 捏帮工、技能书、农具这些页面（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)） |
-| | 语音线路和电话（[voice.md](docs/reference/voice.md)）；管家只收转来的话 |
+| | 语音线路和电话（[语音](docs/subsystems/voice.md)）；管家只收转来的话 |
 
 ## 在哪
 
@@ -101,7 +101,7 @@
 - **记性（`memory`）**：`ManagerHome` 定家目录；管家页的记性和旧账接口读写 `MEMORY.md` 和 `archive/`，和管家自己的工具用同一套函数（`brain/memory.go`）。
 - **农机和额度（`runtime`）**：`Assess` 给每个档案能不能派、额度和花费，写进农场现状。
 - **设置（`setting`）**：`DeepseekAPIKey`。
-- **语音（`voice`）**：电话里的话经 `Call`、`Answerer`，转来的字幕经 `Heard`（[voice.md](docs/reference/voice.md)）。
+- **语音（`voice`）**：电话里的话经 `Call`、`Answerer`，转来的字幕经 `Heard`（[语音](docs/subsystems/voice.md)）。
 
 ## 为什么这样
 

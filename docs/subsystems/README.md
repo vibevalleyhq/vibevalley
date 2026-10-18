@@ -4,16 +4,24 @@
 
 | 子系统 | 管什么 |
 |---|---|
-| [工单](docs/subsystems/issue.md) | 一块地：工单的模型、生命周期、派活和排队、验收、收获（本地合或提 PR） |
-| [帮工](docs/subsystems/session.md) | Session 和 Run：派出去、一轮一轮干活、规矩和汇报、事件日志、额度和上限 |
-| [项目](docs/subsystems/project.md) | 项目和工作目录、按工单的 worktree、冲突预检、检查、GitHub 检测、地契 |
-| [田头](docs/subsystems/channel.md) | 群聊：频道、谁听见、叫不叫醒、工单串、连接器（微信、飞书、QQ）、Inbox |
-| [管家](docs/subsystems/manager.md) | 替主人派活的 agent：自己的 agent、提示和工具、来源、巡查、评测 |
-| [定时](docs/subsystems/schedule.md) | 一张工单的触发：间隔和 cron、补跑、管家定的回头看 |
-| [种植计划](docs/subsystems/task.md) | 带子工单的父工单：拆、按图推进、合进计划分支；agent 自己的任务图 |
-| [记性](docs/subsystems/memory.md) | 每个档案的记性：想起、记下、主动查、外面的来源 |
+| [工单](docs/subsystems/issue.md) | 一块地：工单的模型、状态和派活、验收、收获 |
+| [帮工](docs/subsystems/session.md) | Session 和 Run、规矩和汇报、事件日志、额度和上限 |
+| [项目](docs/subsystems/project.md) | 工作目录、worktree、检查、GitHub 检测、地契 |
+| [田头](docs/subsystems/channel.md) | 频道、谁听见、工单串、连接器、Inbox |
+| [管家](docs/subsystems/manager.md) | 自己的 agent、提示和工具、来源、巡查、评测 |
+| [定时](docs/subsystems/schedule.md) | 一张工单的触发：间隔和 cron、补跑、回头看 |
+| [种植计划](docs/subsystems/task.md) | 带子工单的父工单、按图推进；agent 自己的任务图 |
+| [记性](docs/subsystems/memory.md) | 想起、记下、主动查、外面的来源 |
+| [语音](docs/subsystems/voice.md) | 通话（Agora ConvoAI）、听写、语音管家 |
+| [院门](docs/subsystems/gate.md) | 局域网里配对过的设备用同一个农场 |
+| [设置](docs/subsystems/setting.md) | settings.json、配置和环境变量、钥匙和打码 |
+| [游戏](docs/subsystems/game.md) | 账本、金币和成就、等级、空地和特效 |
+| [核心状态](docs/subsystems/core.md) | 一份状态只因事实而变、三条流、接口和能力表、重启 |
+| [地基](docs/subsystems/foundation.md) | 一个模块、一包一服务、fx、形状和规则、sqlc、表结构、测试 |
+| [客户端](docs/subsystems/app.md) | Flutter、分层、问服务端、macOS 宿主和渠道 |
+| [农场的皮](docs/subsystems/farm.md) | 像素村、地里长什么、走路、手机、音效、图鉴 |
 
-还没拆出来的（设置、院门、游戏、语音、客户端）仍在 [reference/](docs/reference/server.md) 和对应的 Note 里。
+查的东西（界面清单、能力表、概念在各层的名字、农机和档案）在 [reference/](docs/README.md)。
 
 ## 一篇怎么写
 

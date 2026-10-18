@@ -2,7 +2,7 @@
 
 农场是一座像素画的小院（`/`）：帮工照手上的事走去书屋、工坊、电台，地里的庄稼按进度长；面板的入口是院子里的小摊、告示板、邮筒这些东西。农场里的东西怎么对上实际的概念见 [concepts.md](docs/concepts.md)「农场是皮」；像素村怎么画、寻路、音效和素材见 [pixel-village.md](docs/reference/pixel-village.md)。
 
-画风照型号 B「温室花园」（效果图在原图仓库 vibevalley-art，`design/art.sh` 链接进来；[为什么是农场](.agents/notes/implemented/feature/2026-10-09-farm-instead-of-construction-site.md)、[为什么是像素](.agents/notes/implemented/feature/2026-10-11-pixel-village.md)）。字体是 Fusion Pixel 12px，字号只用 12 和 24。
+画风照型号 B「温室花园」（效果图在原图仓库 vibevalley-art，`design/art.sh` 链接进来；[为什么是农场](docs/subsystems/farm.md)）。字体是 Fusion Pixel 12px，字号只用 12 和 24。
 
 ## 角色
 
@@ -24,44 +24,11 @@
 
 ## 地里长什么
 
-6 块地是同时在做的 6 张工单，帮工在上面干活，也是同时干活的上限；另有 3 块在 Lv.5、8、12 开垦成花坛（只是外观）。地里长什么、挂什么牌子只看在上面干活的帮工的阶段，服务端的 `PlotOfSession` 算好放进 `StateFrame.view`，按工单做键（`PlotKey`，没挂工单的帮工按它自己）：
-
-| 帮工 | 地里 | 牌子 |
-|---|---|---|
-| 到场 | 刚播种 | |
-| 干活，还没改文件 | 发芽 | |
-| 改过文件 | 长叶 | |
-| 改过文件后跑了命令 | 开花 | |
-| 很久没动静 | 干裂 | 没动静 |
-| 模型调用在重试 | 照常 | 重试中 |
-| 做完 | 麦子或胡萝卜 | 可收获，或有冲突 |
-| 失败 | 枯萎、有虫 | 有虫 |
-| 歇着 | 停在当时的样子 | 歇着，或有冲突 |
-| 离开 | 麦茬 | |
-
-帮工交回来以后，地还看它的工单（`PlotOf`，[工单](docs/subsystems/issue.md)），按先后：
-
-| 工单 | 地里 | 牌子 |
-|---|---|---|
-| 帮工问了你、还没回答 | 干裂 | 缺肥 |
-| 验收过了 | 麦子或胡萝卜 | 可收获 |
-| 没过验收、草还在 | 杂草 | N 棵草（帮工修的时候是「除草中 N」） |
-| 交回来、还没验收 | 开花 | 等验收 |
-
-帮工的姿势（`poseOf`）跟着手上的事：改文件、跑命令是「干活」，读、搜是「琢磨」，熟了「欢呼」，长虫或干裂「发愁」。干活时它在自己的地四周走动，手上的事一变就走到对应的建筑。
+见 [农场的皮](docs/subsystems/farm.md)。
 
 ## 工具
 
-正下方一排快捷栏，数字键 1–6 拿起；Esc 放下工具，手上已经是手时打开菜单。指着一块地时，上方的小卡片写着这块地的情况和工具点下去会做什么，用不上就写原因。
-
-| 工具 | 点一块地 |
-|---|---|
-| 手 | 空地：播种（界面 3）；有帮工：看详情（界面 2） |
-| 浇水 | 给帮工带句话 |
-| 杀虫 | 失败的地：让它接着修 |
-| 除草 | 等你批准的权限请求（[提案已否决](.agents/notes/rejected/feature/2026-10-10-permission-requests-as-weeds.md)）；现在只有提示 |
-| 收获 | 先开收成清单（界面 15），确认后合进项目。计划里的步骤不在这里收 |
-| 铲除 | 干着活就叫停，否则请它收工 |
+见 [农场的皮](docs/subsystems/farm.md)。
 
 ## 界面清单
 
@@ -86,16 +53,13 @@
 17. **管家和宠物**：换管家的样子和宠物，存在本机的偏好里。
 18. **种植计划**（院子里的图纸桌）：上面是计划列表和「新计划」；选中的计划有目标、分支、进度和按状态变的按钮（开工、暂停、继续、收获、放弃）；下面按先后分列画出每一步，验收步骤标「验收」；最下面是计划的经过。
 19. **地图**（`/projects` 的「全部」，[截图](docs/images/map.png)）：工作目录下的每个项目是一座小岛，岛上的地是它在做的工单（每张一个 worktree）和空位（`ProjectSummary.slots`）；农场空着的地不够时，多的位置是锁住的地。排队的活是院门外的种子袋。点帮工打开它的工单，点空位写一张工单，点岛打开这个项目（`/projects/<项目>`）。
-20. **设置**（`/settings/<分区>`）：左边是分区，右边是选中的那一块，切分区时左边不动。服务端的设置：DeepSeek、Agora 语音、记性、GitHub（`gh` 装没装、登没登录，只读，能重新检测）；自带列表的页也在这里：连接器（`/settings/connectors`，[田头](docs/subsystems/channel.md)）、技能（`/settings/skills`，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「技能书」）、声音（`/settings/voice`，[voice.md](docs/reference/voice.md)「配置」）、院门（`/settings/gate`，[server.md](docs/reference/server.md)「院门」）。首页的「设置」和工作台的扳手都进这里；没填 DeepSeek 钥匙就点「开始游戏」，会进 DeepSeek 这一块并提示先填。
+20. **设置**（`/settings/<分区>`）：左边是分区，右边是选中的那一块，切分区时左边不动。服务端的设置：DeepSeek、Agora 语音、记性、GitHub（`gh` 装没装、登没登录，只读，能重新检测）；自带列表的页也在这里：连接器（`/settings/connectors`，[田头](docs/subsystems/channel.md)）、技能（`/settings/skills`，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「技能书」）、声音（`/settings/voice`，[语音](docs/subsystems/voice.md)「配置」）、院门（`/settings/gate`，[院门](docs/subsystems/gate.md)）。首页的「设置」和工作台的扳手都进这里；没填 DeepSeek 钥匙就点「开始游戏」，会进 DeepSeek 这一块并提示先填。
 
 **工作台**（`app/lib/workbench/workbench_shell.dart`）：干活和配置的地方，农场是看和玩的地方。最左一条木色的栏：管家头像（回农场）、聊天、工单、项目、帮工、农具、图鉴；最下面是设置和回农场。农具里每台农机画成一件农机，钉着那家 agent 的 logo（来自 LobeHub Icons）。
 
 ## 农场手机
 
-左下角的手机（`app/lib/phone/`）：农场有事找你就来电，平时是一部像素风的掌机。
-
-- **来电**读服务端的 `StateFrame.inbox`（[田头](docs/subsystems/channel.md)）。新来电弹出、响铃，20 秒没理算未接。接听去处理（帮工的打开它的地，计划的打开计划板，@ 你的打开那个对话），挂断是先放着。那件事在别处处理掉了，来电自己停。
-- **主屏**：未接、记录、打给管家（语音）、频道、计划，和几个小游戏（方块、推箱子、小恐龙、贪吃虫、种田 2048）。游戏的规则是 `lib/phone/` 里的纯函数，最好成绩只记在这次打开里。
+见 [农场的皮](docs/subsystems/farm.md)。
 
 ## 精力瓶
 
@@ -103,13 +67,13 @@
 
 ## 计分
 
-金币、连胜、成就奖的是**收进主分支的活**，不是命令数或花掉的 token（[理由](.agents/notes/implemented/feature/2026-10-11-achievements.md)）。它们由服务端的账本折出来（`server/internal/game/progress.go`），客户端只显示。回报只是金币和称号，不改变帮工怎么干活。
+金币、连胜、成就奖的是**收进主分支的活**，不是命令数或花掉的 token（[理由](docs/subsystems/game.md)）。它们由服务端的账本折出来（`server/internal/game/progress.go`），客户端只显示。回报只是金币和称号，不改变帮工怎么干活。
 
 | 机制 | 规则 |
 |---|---|
 | 金币 | 一个帮工的活收进主分支：`(30 + min(提交数 × 5, 30)) × 连胜倍率`。收获一个种植计划：`30 + 10 × 合进去的步数`。新手任务每个 20；成就的铜、银、金档各 10、30、60；彩蛋 50（`seeds.json` 的 `achievements`） |
 | 连胜 | 连着收进去的活，倍率每件 +10%，最多 ×2；有帮工没做成就清零 |
-| 经验 | 工作目录下所有 git 仓库里你名下的 commit（[理由](.agents/notes/implemented/feature/2026-10-10-experience-is-commits.md)）；邮箱按 git 的 user.email 加配置的 `git_emails` |
+| 经验 | 工作目录下所有 git 仓库里你名下的 commit（[理由](docs/subsystems/game.md)）；邮箱按 git 的 user.email 加配置的 `git_emails` |
 | 等级 | 从 Lv.n 升到 Lv.n+1 要 `10n` 个 commit；Lv.5、8、12 各开垦一块地 |
 | 成就 | 见下表；计数的分铜、银、金三档 |
 | 称号 | 拿到的任何一档（新手任务除外）都能挂在农场卡上 |

@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-主人想让每个 agent 的语音设置放在它自己那里。管家页已经有了自己的「声音」页签（[管家页和记性面板](.agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)），可帮工没有。现在只有管家会开口，帮工的汇报只能在田头上看：听不出是谁在说，也不能边干别的边听。
+主人想让每个 agent 的语音设置放在它自己那里。管家页已经有了自己的「声音」页签（[管家页和记性面板](docs/subsystems/manager.md)），可帮工没有。现在只有管家会开口，帮工的汇报只能在田头上看：听不出是谁在说，也不能边干别的边听。
 
 ## Proposal
 

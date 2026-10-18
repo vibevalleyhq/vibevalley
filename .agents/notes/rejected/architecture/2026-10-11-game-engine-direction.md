@@ -8,10 +8,10 @@ VibeValley 要做大：像素村和院子、更多地点和角色、帮工按日
 
 不管选哪条路，有几件事是定的：
 
-1. **核心状态只有一份，在 TS 里。** protocol 的 `reduce` 由服务端、页面、模拟服务器、桌面版主进程四处共用（[理由](.agents/notes/implemented/architecture/2026-10-11-farm-core-state.md)）。
+1. **核心状态只有一份，在 TS 里。** protocol 的 `reduce` 由服务端、页面、模拟服务器、桌面版主进程四处共用（[理由](docs/subsystems/core.md)）。
 2. **界面大半是字。** 田头有 Markdown、@ 补全、中文输入法；还有干活过程、收成清单的 diff、计划板、配置页、成就面板。画面只占其中一块。
 3. **语音是 Agora 网页 SDK 加 ConvoAI**，在页面（Chromium）里跑。
-4. **服务端是 Node。** 管家用 pi，帮工用 oar，数据库是 PGlite（WASM）；桌面版用 Electron 把它带在身边。（写这篇时的情形；后来服务端换成了 Go、客户端换成了 Flutter，见 [服务端用 Go 重写](.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)、[客户端迁到 Flutter](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)。）
+4. **服务端是 Node。** 管家用 pi，帮工用 oar，数据库是 PGlite（WASM）；桌面版用 Electron 把它带在身边。（写这篇时的情形；后来服务端换成了 Go、客户端换成了 Flutter，见 [服务端用 Go 重写](docs/subsystems/foundation.md)、[客户端迁到 Flutter](docs/subsystems/app.md)。）
 5. **代码主要由编码 agent 来写**，VibeValley 自己就是这么写出来的。
 
 要自己写的那部分：院子、帮工去哪、动画、光影、点击、镜头、碰撞、粒子。这些不管选哪条路都得写。差别在三处：底下垫的是什么，和核心状态怎么接，谁来写、写得多快。
@@ -20,7 +20,7 @@ VibeValley 要做大：像素村和院子、更多地点和角色、帮工按日
 
 - 游戏层的代码：`packages/engine` 约 1600 行（状态原语、React 画面部件、合成音效、寻路、Pixi 像素舞台），像素试验页 `web/src/pixel` 约 1200 行。
 - 像素页在模拟农场里放 6 个帮工走动：M2 Max 上一直 60 帧；把 CPU 降到 1/6（Chrome 的 CPU 限速）还是 60 帧；JS 堆 23–29 MB。按现在的规模，画面离瓶颈还很远。
-- 渲染层和核心状态之间的边界已经很窄：每帧拿一份快照进来，往外只送点击（[像素村](.agents/notes/implemented/feature/2026-10-11-pixel-village.md)）。
+- 渲染层和核心状态之间的边界已经很窄：每帧拿一份快照进来，往外只送点击（[像素村](docs/subsystems/farm.md)）。
 - 下面第四条的第 1 级（效果）已经做在像素页上：从画生成的法线贴图、天光和调色、点光源、云影、雾、光晕、柔和的影子，都在 `engine/pixi` 里。夜里灯全开、CPU 降到 1/6 时约 59 帧。
 
 ## 外面的事实
@@ -114,7 +114,7 @@ VibeValley 别人难抄的是三样：
 
 **分步：**
 
-1. 像素页已经换掉手绘页（[像素村](.agents/notes/implemented/feature/2026-10-11-pixel-village.md)），手绘页留作旧版。引擎模块照上面拆。
+1. 像素页已经换掉手绘页（[像素村](docs/subsystems/farm.md)），手绘页留作旧版。引擎模块照上面拆。
 2. 把渲染边界接口和第一批模块（世界和图层、镜头、角色）从 `web/src/pixel` 挪进 `engine/pixi`。「帮工去哪」的规则挪进 core，写成纯函数，补测试。
 3. 加一个画面预算的检查脚本：一个院子、50 个角色、200 个摆件，CPU 降到 1/4 时保持 60 帧，改引擎时跑一次。
 4. 再往院子里加内容：地点、日程、商店的装饰。

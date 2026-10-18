@@ -11,7 +11,7 @@ flowchart LR
   end
 
   subgraph Server[server · Go · 127.0.0.1:8787]
-    API[handler<br/>VibeValleyApi、两条 SSE]
+    API[handler<br/>VibeValleyApi、三条 SSE]
     SITE[Core<br/>核心状态 CoreState]
     FM[管家<br/>vibevalley 自己的 agent + 派活工具]
     CHAT[田头<br/>群聊 · SQLite]
@@ -55,21 +55,21 @@ flowchart LR
 
 - **命令**：客户端通过 HTTP 调 `VibeValleyApi`（Flutter 用 `lib/gen/vibevalley.dart` 里生成的客户端）：在田头说话、写和派工单、带话、叫停、收工、收获、种植计划、读配置。帮工在田头说话走另一个入口：服务端的 MCP 端点 `/mcp`（[田头](docs/subsystems/channel.md)）。
 - **状态**：服务端的核心状态每变一次就是一条事实。Flutter 收折好的帧（`GET /api/v1/state`），自己不折。
-- **语音**：客户端和 Agora 频道之间是音频和字幕，服务端只签令牌、请语音管家进出频道（[voice.md](docs/reference/voice.md)）。
+- **语音**：客户端和 Agora 频道之间是音频和字幕，服务端只签令牌、请语音管家进出频道（[语音](docs/subsystems/voice.md)）。
 
 ## 分层
 
 仓库的目录见根目录 [AGENTS.md](AGENTS.md#目录)，服务端每个包管什么见 [server/README.md](server/README.md#目录)。
 
-- **形状和规则**：Go 的 `server/internal/protocol` 是唯一的来源。形状写在 `shapes.go`、接口写在 `api.go`，`server/tool/shapegen` 从它们写出 Go 的胶水代码（`internal/protocol/gen.go`）和 Flutter 的类型与接口客户端（`app/lib/gen/vibevalley.dart`）；规则是同一个包里的纯函数（[server](server/README.md#形状和规则从哪来)、[理由](.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。
-- **服务**：`server/internal/` 下一块业务一个包，包名用单数，从下往上是 `base`（地基）、`core`（核心状态）、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`gate`、`voice`、`connector`、`game`；一个包只 import 排在它前面的包，反方向的消息走 `base.Hub`。每个服务是包里的一个结构体，由 fx 组装；`workspace` 把全部包装在一个生命周期上（[server/README.md](server/README.md#服务)、[理由](.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)、[包名](.agents/notes/implemented/architecture/2026-10-16-deep-modules-singular-names.md)）。执行由 smith 驱动，管家是 VibeValley 自己的 agent（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）。
-- **HTTP 和 MCP**：`server/internal/handler` 在最上面，答 `VibeValleyApi`、两条事件流；`server/internal/mcp` 是给编码 agent 的另一个入口，挂在 `/mcp`；`cmd/server` 单独跑它（[server.md](docs/reference/server.md)；[理由](.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](.agents/notes/implemented/architecture/2026-10-10-site-events-over-sse.md)）。
-- **存盘**：SQLite，表在 `server/migrations/`，查询在 `server/pkg/db/queries/`、由 sqlc 生成成 `server/pkg/db/generated/`（[理由](.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）；下文「存了什么」。
-- **客户端**：Flutter 只连服务端的接口，用 Riverpod 管状态（[理由](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)）；macOS 版把服务端打进应用（[desktop.md](docs/reference/desktop.md)）。
+- **形状和规则**：Go 的 `server/internal/protocol` 是唯一的来源。形状写在 `shapes.go`、接口写在 `api.go`，`server/tool/shapegen` 从它们写出 Go 的胶水代码（`internal/protocol/gen.go`）和 Flutter 的类型与接口客户端（`app/lib/gen/vibevalley.dart`）；规则是同一个包里的纯函数（[server](server/README.md#形状和规则从哪来)、[理由](docs/subsystems/foundation.md)）。
+- **服务**：`server/internal/` 下一块业务一个包，包名用单数，从下往上是 `base`（地基）、`core`（核心状态）、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`gate`、`voice`、`connector`、`game`；一个包只 import 排在它前面的包，反方向的消息走 `base.Hub`。每个服务是包里的一个结构体，由 fx 组装；`workspace` 把全部包装在一个生命周期上（[server/README.md](server/README.md#服务)、[理由](docs/subsystems/foundation.md)）。执行由 smith 驱动，管家是 VibeValley 自己的 agent（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）。
+- **HTTP 和 MCP**：`server/internal/handler` 在最上面，答 `VibeValleyApi`、三条事件流；`server/internal/mcp` 是给编码 agent 的另一个入口，挂在 `/mcp`；`cmd/server` 单独跑它（[子系统](docs/subsystems/README.md)；[理由](docs/subsystems/foundation.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](docs/subsystems/core.md)）。
+- **存盘**：SQLite，表在 `server/migrations/`，查询在 `server/pkg/db/queries/`、由 sqlc 生成成 `server/pkg/db/generated/`（[理由](docs/subsystems/foundation.md)）；下文「存了什么」。
+- **客户端**：Flutter 只连服务端的接口，用 Riverpod 管状态（[理由](docs/subsystems/app.md)）；macOS 版把服务端打进应用（[客户端](docs/subsystems/app.md)）。
 
 ## 核心状态
 
-农场上的一切（通话、管家、帮工、田头、工单和计划、定时、commit 数、金币和成就）是一个值 `CoreState`（`server/internal/protocol/shapes.go`；[理由](.agents/notes/implemented/architecture/2026-10-11-farm-core-state.md)）。只有服务端持有它，只在 `Core.Apply`（`server/internal/core/core.go`）里改：每个事实（雇了一个帮工、开始一轮、这一轮结束、一张工单变了……）由纯函数 `Reduce(state, fact)`（`protocol/core.go`）折进去。不改变状态的事实不发。
+农场上的一切（通话、管家、帮工、田头、工单和计划、定时、commit 数、金币和成就）是一个值 `CoreState`（`server/internal/protocol/shapes.go`；[理由](docs/subsystems/core.md)）。只有服务端持有它，只在 `Core.Apply`（`server/internal/core/core.go`）里改：每个事实（雇了一个帮工、开始一轮、这一轮结束、一张工单变了……）由纯函数 `Reduce(state, fact)`（`protocol/core.go`）折进去。不改变状态的事实不发。
 
 每个帮工（`Session`）的阶段 `phase` 是它生命周期的唯一状态：
 
@@ -85,7 +85,7 @@ flowchart LR
 
 工单（`Issue`）里开着的和最近关的 50 家（`KeepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `IssueStatusOf` 算。种植计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，`GraphsOf` 读成 `TaskGraph`（[种植计划](docs/subsystems/task.md)）。田头在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时、账本折出来的进度也在里面（[定时](docs/subsystems/schedule.md)「游戏」）。
 
-给 Flutter 的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`tasks`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `protocol.FrameOf` 拼：给人看的话（帮工在干什么、定时什么时候跑、计划是哪个状态、节点是什么状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`Reduce` 和 `state.json` 里没有。`app/lib/rules/` 只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在客户端。
+给 Flutter 的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`graphs`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `protocol.FrameOf` 拼：给人看的话（帮工在干什么、定时什么时候跑、计划是哪个状态、节点是什么状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`Reduce` 和 `state.json` 里没有。`app/lib/rules/` 只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在客户端。
 
 ## 事件流
 
@@ -97,11 +97,11 @@ flowchart LR
 
 ## HTTP 接口
 
-接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](.agents/notes/implemented/architecture/2026-10-17-api-versioned-paths.md)）。不在里面的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[田头](docs/subsystems/channel.md)）。`//vibevalley:can` 写谁能调，院门只放 `remote` 的（[能力表](docs/reference/capabilities.md)、[server.md](docs/reference/server.md)「院门」）。
+接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](docs/subsystems/core.md)）。不在里面的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[田头](docs/subsystems/channel.md)）。`//vibevalley:can` 写谁能调，院门只放 `remote` 的（[能力表](docs/reference/capabilities.md)、[院门](docs/subsystems/gate.md)）。
 
 ## 存了什么
 
-服务端都在 `$VIBEVALLEY_HOME`（`cmd/server` 默认 `~/.vibevalley`；macOS 应用默认 `~/Library/Application Support/vibevalley`，Alpha、Beta 各有自己的，[desktop.md](docs/reference/desktop.md)）。存盘的格式只有现在这一种：不认旧名字下的文件，也没有搬旧数据的命令。
+服务端都在 `$VIBEVALLEY_HOME`（`cmd/server` 默认 `~/.vibevalley`；macOS 应用默认 `~/Library/Application Support/vibevalley`，Alpha、Beta 各有自己的，[客户端](docs/subsystems/app.md)）。存盘的格式只有现在这一种：不认旧名字下的文件，也没有搬旧数据的命令。
 
 | 文件 | 内容 |
 |---|---|
@@ -121,7 +121,7 @@ flowchart LR
 
 ## 配置
 
-配置只有两个来源，由 viper 读（`base.LoadConfig`；[理由](.agents/notes/implemented/architecture/2026-10-16-one-config-file.md)）：
+配置只有两个来源，由 viper 读（`base.LoadConfig`；[理由](docs/subsystems/setting.md)）：
 
 1. `$VIBEVALLEY_HOME/vibevalley.yaml`，或 `--config` 给的文件；
 2. 环境变量，比文件优先：`VIBEVALLEY_` 加上键名，点换成下划线，比如 `session.stall_seconds` 是 `VIBEVALLEY_SESSION_STALL_SECONDS`。三个外家的钥匙用它们自己的名字：`DEEPSEEK_API_KEY`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。
@@ -138,7 +138,7 @@ flowchart LR
 | `agora.app_id`、`agora.app_certificate` | 语音：签 RTC 和 RTM 令牌、请语音管家（`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`）；都没有时语音不可用，别的照常 | |
 | `voice.model`、`voice.id` | 语音管家用的托管大模型和音色的默认；声音页里改过的优先 | `gpt-4.1-mini`、`Chinese (Mandarin)_Gentle_Youth` |
 | `voice.line.port`、`voice.line.url` | 语音线路（「想」选农场的管家时）：只给声网用的那个监听的端口；你自己的隧道的公网地址，没有就用 cloudflared 临时隧道 | 8788、（无） |
-| `lan.port` | 院门的端口：打开院门时在所有网卡上听，只放配对过的设备（[server.md](docs/reference/server.md)「院门」）；0 是随便一个 | 8790 |
+| `lan.port` | 院门的端口：打开院门时在所有网卡上听，只放配对过的设备（[院门](docs/subsystems/gate.md)）；0 是随便一个 | 8790 |
 | `git_emails` | 算经验时也算作「你」的 commit 邮箱；环境变量里用逗号分隔 | git 全局和各仓库的 user.email 本来就算 |
 | `tokei` | 数项目种了什么用的 tokei 在哪 | PATH 上的 `tokei` |
 | `cny_per_usd` | 价目表是美元，折成人民币的汇率 | 7.2 |
@@ -153,6 +153,6 @@ flowchart LR
 | `chat.notice_batch_ms` | 忙着的帮工收到的提示，攒多久合成一条 | 3000 |
 | `chat.retry_wake_ms` | 叫醒在开口前就失败了，多久以后再叫一次 | 3000 |
 
-macOS 应用起服务端时另设 `VIBEVALLEY_HOME`、`VIBEVALLEY_WORK_ROOT`、`VIBEVALLEY_PORT` 和登录 shell 的 `PATH`（[desktop.md](docs/reference/desktop.md)）。
+macOS 应用起服务端时另设 `VIBEVALLEY_HOME`、`VIBEVALLEY_WORK_ROOT`、`VIBEVALLEY_PORT` 和登录 shell 的 `PATH`（[客户端](docs/subsystems/app.md)）。
 
 密钥只在服务端；客户端只拿 App ID、频道名、uid 和自己的令牌。

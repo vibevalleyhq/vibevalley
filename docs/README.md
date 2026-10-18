@@ -15,27 +15,32 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 文档 | 内容 |
 |---|---|
-| [issue.md](docs/subsystems/issue.md) | 工单：一块地的模型、状态和派活、验收、收获 |
+| [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、收获 |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
-| [project.md](docs/subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测 |
-| [channel.md](docs/subsystems/channel.md) | 田头：频道、连接器、Inbox |
-| [manager.md](docs/subsystems/manager.md) | 管家：自己的 agent、工具、巡查、评测 |
-| [schedule.md](docs/subsystems/schedule.md) | 定时 |
-| [task.md](docs/subsystems/task.md) | 种植计划和 agent 的任务图 |
-| [memory.md](docs/subsystems/memory.md) | 记性 |
+| [project.md](docs/subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测、地契 |
+| [channel.md](docs/subsystems/channel.md) | 田头：频道、谁听见、工单串、连接器、Inbox |
+| [manager.md](docs/subsystems/manager.md) | 管家：自己的 agent、提示和工具、来源、巡查、评测 |
+| [schedule.md](docs/subsystems/schedule.md) | 定时：一张工单的触发：间隔和 cron、补跑、回头看 |
+| [task.md](docs/subsystems/task.md) | 种植计划：带子工单的父工单、按图推进；agent 自己的任务图 |
+| [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
+| [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音管家 |
+| [gate.md](docs/subsystems/gate.md) | 院门：局域网里配对过的设备用同一个农场 |
+| [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
+| [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
+| [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、三条流、接口和能力表、重启 |
+| [foundation.md](docs/subsystems/foundation.md) | 地基：一个模块、一包一服务、fx、形状和规则、sqlc、表结构、测试 |
+| [app.md](docs/subsystems/app.md) | 客户端：Flutter、分层、问服务端、macOS 宿主和渠道 |
+| [farm.md](docs/subsystems/farm.md) | 农场的皮：像素村、地里长什么、走路、手机、音效、图鉴 |
 
-各部分现在怎么工作（`reference/`）：
+查的东西（`reference/`）：
 
 | 文档 | 讲什么 |
 |---|---|
 | [concept-map.md](docs/reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
 | [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：主人、院门、管家、Session；shapegen 写出 |
-| [server.md](docs/reference/server.md) | 还没拆成子系统的服务：设置、院门、游戏、重启 |
 | [agents-and-runtimes.md](docs/reference/agents-and-runtimes.md) | 帮工档案、农机、技能书 |
-| [farm-ui.md](docs/reference/farm-ui.md) | 农场界面和玩法 |
-| [pixel-village.md](docs/reference/pixel-village.md) | 像素村、素材和音效 |
-| [voice.md](docs/reference/voice.md) | 语音（Agora ConvoAI） |
-| [desktop.md](docs/reference/desktop.md) | macOS 应用 |
+| [farm-ui.md](docs/reference/farm-ui.md) | 界面清单、角色、精力瓶和计分的表 |
+| [pixel-village.md](docs/reference/pixel-village.md) | 首页、素材的流水线 |
 
 怎么写（`style/`）：
 

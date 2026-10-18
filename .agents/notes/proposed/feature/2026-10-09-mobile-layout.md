@@ -12,7 +12,7 @@ Status: proposed
 
 ## Alternatives considered
 
-**整张画缩放（现状）。** 窗口盖不满时农场取整数倍、四周留边（`app/lib/village/framing.dart`，[农场盖满窗口](.agents/notes/implemented/feature/2026-10-15-farm-fills-the-window.md)），竖着拿的手机上农场只占中间一条：能用，但看不清、点不准。
+**整张画缩放（现状）。** 窗口盖不满时农场取整数倍、四周留边（`app/lib/village/framing.dart`，[农场盖满窗口](docs/subsystems/farm.md)），竖着拿的手机上农场只占中间一条：能用，但看不清、点不准。
 
 **只做一个列表视图。** 丢了农场，和桌面版是两个产品。
 

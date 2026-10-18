@@ -7,7 +7,7 @@ Status: proposed
 主人想把 VibeValley 自己的活派给 VibeValley：工单派给帮工，帮工在 worktree 里改 heybro，验收过了合进 main。开始时这样做有几处会出事：
 
 - 拿来干活的农场和正在改的代码是同一份：源码里跑的服务端一重启、表结构一改，派出去的工单和田头就没了。
-- 表结构只有一个基线，直接改（[不留兼容](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。`user_version` 数的是文件，基线改了它还是 1：新版本的服务端打开旧库不报错，跑到某条查询才炸。
+- 表结构只有一个基线，直接改（[不留兼容](docs/subsystems/foundation.md)）。`user_version` 数的是文件，基线改了它还是 1：新版本的服务端打开旧库不报错，跑到某条查询才炸。
 - 合并在项目的检出里做，把检出当前的 HEAD 当主分支，不看工作区干不干净；合并前也不跑检查。
 - 三个渠道共用一个工作目录 `~/vibevalley-work`，两个农场的帮工会在同一份项目里干活。
 - 客户端、打包、换包都夹在中间，哪一步不通都说不清是哪一层的错。
@@ -33,7 +33,7 @@ vv issue status <issue> --json '{"status":"done"}'              # 收获
 
 ### 第二步：三个农场各干各的
 
-用[已有的渠道](.agents/notes/implemented/process/2026-10-12-release-channels.md)，不加新的：
+用[已有的渠道](docs/subsystems/app.md)，不加新的：
 
 | 农场 | 怎么来 | 用来 | 工作目录 |
 |---|---|---|---|

@@ -95,7 +95,7 @@ type Task struct {
 - 协议：容器 `TaskGraph`（`GraphState`：`splitting`、`draft`、`running`、`paused`、`ripe`、`done`、`abandoned`；`GraphAction`、`GraphEvent`（每件的事件是 `task_*`）、`GraphActor`、`IssueGraph`（`Issue.Graph`）、`SessionGraph`（`Session.Graph`）、`StateFrame.Graphs`），节点 `Task`（`TaskState`、`TaskAction`、`TaskEdit`、`IssueTask`（`Issue.Task`））；接口 `graph.split`、`graph.updateTask`、`graph.deleteTask`、`graph.act`、`graph.taskAct`、`graph.changes`、`graph.events`，路径 `/api/v1/graphs…`；频道主题、投递原因、管家输入的来源是 `graph`，关上的理由 `merged_into_graph`，Inbox 的 `graph-draft`、`graph-ripe`、`task-failed`；成就 `s_split`、`big_graph`、`parallel_graph`，账本的 `graph`、`split`。账号额度里原来叫 plan 的套餐改叫 `Subscription`。
 - 管家的工具：`graph_split`（派帮工拆）、`graphs`、`task_edit`、`graph_action`、`task_action`（单件重试、跳过）；`graph_action start` 和 `merge` 一样，这一轮不是主人叫的就不动手（`tool/words.go` 的 `startNotAsked`）。agent 自己的三个工具是 `task_add`、`task_update`、`task_graph`。
 - 包：`internal/playbook` → `internal/task`（`task.Service`，`Workspace.Task`），引擎 `internal/agent/task` → `internal/task/engine`；Flutter 的面板 `FarmPanel.taskBoard`、`TaskBoard`、`task_board.dart`、`task_steps.dart`、`task_log.dart`，贴图 `icon-task-board` 和三张徽章跟着改名，`village.ldtk` 里院子的那个点叫 `taskBoard`；分支 `vibevalley/task-<id>-<时间>`；`pb` 这样的缩写改成 `graph`、`task`（按类型改的，不是按字面）。
-- 表结构：`0002`–`0006` 并进 `0001_schema.sql`（`issue.graph`、`issue.task`、`session.brief`、`session.graph`、`task_event` 的 `graph_id`、`task_id`、`task_graph`……），旧库作废（AGENTS.md「不留兼容」，[只有一份表结构](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。
+- 表结构：`0002`–`0006` 并进 `0001_schema.sql`（`issue.graph`、`issue.task`、`session.brief`、`session.graph`、`task_event` 的 `graph_id`、`task_id`、`task_graph`……），旧库作废（AGENTS.md「不留兼容」，[只有一份表结构](docs/subsystems/foundation.md)）。
 
 第 6 步还没做。
 

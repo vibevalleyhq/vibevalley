@@ -2,7 +2,7 @@ package game
 
 // The ledger's fold: what each entry pays and unlocks, and which entries a fact makes. Outcomes earn, not effort: what
 // counts is work that went into the main branch, never commands run or tokens spent
-// (.agents/notes/implemented/feature/2026-10-11-achievements.md). Nothing here changes what it is given: what it changes, it
+// (docs/subsystems/game.md). Nothing here changes what it is given: what it changes, it
 // copies.
 
 import (

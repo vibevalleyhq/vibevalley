@@ -11,7 +11,7 @@
 | 管理器：本地和外面的来源一起读、一起写，合并、去重、超时 | 外面来源的地址和 key 怎么存、怎么校验（`setting`，`settings.json` 的 `memorySources`） |
 | `memory_search`、`memory_add` 背后的检索和写入，回给模型的话（`FoundText`） | 工具的参数、谁能用、范围由谁定（`internal/tool/memory.go`；帮工经 `/mcp`，`internal/mcp`） |
 | 管家的 `MEMORY.md` 和旧账 `archive/` 给页面的读写口子 | 管家怎么把 `MEMORY.md` 带进系统提示、`remember` 和 `search_archive` 工具（`internal/agent/brain`；[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「管家页」） |
-| 送往外面来源之前抹密钥 | 抹密钥的规则本身（`base/redact.go`，和服务端日志同一份；[server.md](docs/reference/server.md#设置)） |
+| 送往外面来源之前抹密钥 | 抹密钥的规则本身（`base/redact.go`，和服务端日志同一份；[设置](docs/subsystems/setting.md)） |
 | | 技能书（程序性的「记性」走技能书，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「技能书」） |
 
 ## 在哪

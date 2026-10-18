@@ -4,7 +4,7 @@
 
 ## 开始之前
 
-- 打开 macOS 应用（[desktop.md](docs/reference/desktop.md)），服务端在里面；或者在终端里跑服务端，再用 Flutter 客户端连上（[development.md](docs/development.md)「跑起来」）。
+- 打开 macOS 应用（[客户端](docs/subsystems/app.md)），服务端在里面；或者在终端里跑服务端，再用 Flutter 客户端连上（[development.md](docs/development.md)「跑起来」）。
 - 管家要 DeepSeek 的钥匙：「设置」的 DeepSeek 里填（首页点「设置」或工作台左下的扳手），或者本机的 pi 已经配好。帮工用本机登录好的农机（pi、Claude Code、codex……），在「农具」页启用。
 - 项目放在工作目录的 `projects/` 下，一个文件夹一个；没有的管家会建。macOS 应用的工作目录是 `~/vibevalley`（Beta 是 `~/vibevalley-beta`，Alpha 是 `~/vibevalley-alpha`），终端里跑的服务端是 `~/vibevalley-dev`。
 
@@ -62,7 +62,7 @@
 
 ## 9. 用语音
 
-服务端配好 Agora 的凭据后（[voice.md](docs/reference/voice.md)「凭据」），按田头窗口里的麦克风说话；说的活交给管家，和打字一样。
+服务端配好 Agora 的凭据后（[语音](docs/subsystems/voice.md)「凭据」），按田头窗口里的麦克风说话；说的活交给管家，和打字一样。
 
 ## 10. 服务端重启之后
 
@@ -78,4 +78,4 @@
 
 ## 安全须知
 
-帮工没有权限确认、不开沙箱，能在这台机器上执行任意命令；它们只在工作目录里开工，服务端只听 127.0.0.1。院门不加密，只在信得过的网络里开（[server.md](docs/reference/server.md)「院门」）。
+帮工没有权限确认、不开沙箱，能在这台机器上执行任意命令；它们只在工作目录里开工，服务端只听 127.0.0.1。院门不加密，只在信得过的网络里开（[院门](docs/subsystems/gate.md)）。

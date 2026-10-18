@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-`docs/style/writing.md` 原来整篇照 ASD-STE100：一词一义、一句一事、每句不超过 50 字、一个名词前最多两个「的」、三项以上用列表。它管一句话会不会被读错，管不到一段话该不该有。2026-10-17 写的[方法论 Note](.agents/notes/implemented/process/2026-10-17-make-the-easy-thing-the-right-thing.md)和[能力提案](.agents/notes/implemented/architecture/2026-10-17-capabilities-before-surfaces.md)每句都合规，问题全在段落层：Note 把 `AGENTS.md` 的四层清单抄了一遍，同一条理由在 Proposal 和 Alternatives 里各写一遍，还有「最有用」「是关键」这类评价。
+`docs/style/writing.md` 原来整篇照 ASD-STE100：一词一义、一句一事、每句不超过 50 字、一个名词前最多两个「的」、三项以上用列表。它管一句话会不会被读错，管不到一段话该不该有。2026-10-17 写的[方法论 Note](.agents/notes/implemented/process/2026-10-17-make-the-easy-thing-the-right-thing.md)和[能力提案](docs/subsystems/core.md)每句都合规，问题全在段落层：Note 把 `AGENTS.md` 的四层清单抄了一遍，同一条理由在 Proposal 和 Alternatives 里各写一遍，还有「最有用」「是关键」这类评价。
 
 STE 的几条软规则还和信息密度相反：「一句一事」「每句不超过 50 字」把一个因果拆成几句，主语和连接词跟着重复；「三项以上用列表」把连着的推理切碎。
 

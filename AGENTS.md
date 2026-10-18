@@ -48,7 +48,7 @@ bun run site:check && bun run site:build                       # 改完 site/：
 
 Go 1.27，Flutter 3.47，Bun 1.4（根目录的命令、文档和 Note 的检查），Node 24（只跑 `server/tool` 的 `pi-prices.ts`）。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `server/` 要重启它。
 
-一件事的主线：smith 的会话事件 → `internal/session/facts.go`（纯函数）读成事实和事件 → `Core.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给 Flutter；事件由 `session/events.go`、`session/trajectories.go` 记成每个 Session 和管家的日志（[architecture.md](docs/architecture.md)、[server.md](docs/reference/server.md)）。
+一件事的主线：smith 的会话事件 → `internal/session/facts.go`（纯函数）读成事实和事件 → `Core.Apply` 用 `protocol.Reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给 Flutter；事件由 `session/events.go`、`session/trajectories.go` 记成每个 Session 和管家的日志（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
 
 ## 怎么让 agent 做对
 
@@ -64,18 +64,18 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 ## 规矩
 
 - **先有概念，再有皮**：服务端按实际的概念分模块（工单、执行、项目、群聊……，[概念](docs/concepts.md)）；农场只画它们，每个农场里的东西都对得上一件实际的事；游戏规则只读事件、算画面，业务不调它（[提案](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）。
-- **核心状态只有一份**：帮工或农场的新状态，在 Go 的 `internal/protocol/shapes.go` 里加字段或事实，在 `internal/protocol/core.go` 里折，只由服务端 `Core.Apply` 施加。不要在服务端、客户端里另存一份帮工的状态（[理由](.agents/notes/implemented/architecture/2026-10-11-farm-core-state.md)）。
-- **形状和规则只在 Go**：形状写在 `server/internal/protocol/shapes.go`、接口写在 `api.go`；核心状态的折法和它用到的、几个包都用的规则是 `protocol` 里的纯函数，只有一个主人的规则是主人包里不导出的纯函数，黄金数据（`testdata/*.jsonl.gz`，经 `internal/golden`）跟着规则走（[理由](.agents/notes/implemented/architecture/2026-10-16-rules-live-with-their-owner.md)）；改了形状，同一个改动里跑 `go run ./tool/shapegen`；有意改了规则，`VIBEVALLEY_GOLDEN=update go test ./internal/...` 重写黄金数据（[server](server/README.md#形状和规则从哪来)、[理由](.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。
-- **生成的不手改**：`internal/protocol/gen.go` 和 Flutter 的 `lib/gen/` 由 `tool/shapegen` 写，`bun run flutter:check` 查它们是不是最新；`pkg/db/generated` 由 sqlc 写（[理由](.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）。
-- **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `server/internal` 包（`issue`、`issue_session`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `pkg/db/queries/<表>.sql`，一张表一个文件，Go 里只调 sqlc 生成的；`migrations` 的测试查这几条（[理由](.agents/notes/implemented/architecture/2026-10-17-names-by-module.md)）。
-- **不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（`vibevalley.db` 的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `server/migrations/0001_schema.sql`，不另加迁移（`migrations` 的测试查这条），本机的旧库和旧文件作废，删掉重建；启动时只认今天的名字（[理由](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。
-- **Flutter 不折事实**：它读 `GET /api/v1/state` 折好的 `CoreState`；要新的数据就加进 protocol 的字段和 `Reduce`，Dart 里只写跟着时钟走的画面；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在 Dart 里重写，加一个字段或接口问服务端（[理由](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)、[客户端问服务端](.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
-- **客户端分层**：`gen`、`sprites`、`audio`、`rules`（只读的纯函数）、`ui`、`data`（服务端状态、偏好、界面的选中/面板）、`host`（本机外壳）、`game`（客户端的动作）、`shared`（几张皮共用的画面）、`chat`（田头）、`voice`、`phone`（农场里的手机和小游戏）、`debug`（调试台）在下；`village` 是像素渲染层；`workbench`、`farm` 是两张皮；`app` 只做组合，`shell` 是外壳。依赖只能往下走（次序在 `scripts/app-imports.ts`，`bun run app:imports` 查），皮之间不互相 import，两张都用的放进 `shared`；下层不 import `app`（[理由](.agents/notes/implemented/architecture/2026-10-16-client-layers.md)）。
-- **通用的小封装在 `pkg/x`**：字符串（按 UTF-16 数、JavaScript 的空白）、数字（照 JavaScript 写）、指针、时间各一个包；要用就 import，不在自己包里再写一份 `xxxPtr`、`chatTrim`（[理由](.agents/notes/implemented/architecture/2026-10-16-common-wrappers-in-pkg-x.md)）。
+- **核心状态只有一份**：帮工或农场的新状态，在 Go 的 `internal/protocol/shapes.go` 里加字段或事实，在 `internal/protocol/core.go` 里折，只由服务端 `Core.Apply` 施加。不要在服务端、客户端里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
+- **形状和规则只在 Go**：形状写在 `server/internal/protocol/shapes.go`、接口写在 `api.go`；核心状态的折法和它用到的、几个包都用的规则是 `protocol` 里的纯函数，只有一个主人的规则是主人包里不导出的纯函数，黄金数据（`testdata/*.jsonl.gz`，经 `internal/golden`）跟着规则走（[理由](docs/subsystems/foundation.md)）；改了形状，同一个改动里跑 `go run ./tool/shapegen`；有意改了规则，`VIBEVALLEY_GOLDEN=update go test ./internal/...` 重写黄金数据（[server](server/README.md#形状和规则从哪来)、[理由](docs/subsystems/foundation.md)）。
+- **生成的不手改**：`internal/protocol/gen.go` 和 Flutter 的 `lib/gen/` 由 `tool/shapegen` 写，`bun run flutter:check` 查它们是不是最新；`pkg/db/generated` 由 sqlc 写（[理由](docs/subsystems/foundation.md)）。
+- **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `server/internal` 包（`issue`、`issue_session`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `pkg/db/queries/<表>.sql`，一张表一个文件，Go 里只调 sqlc 生成的；`migrations` 的测试查这几条（[理由](docs/subsystems/foundation.md)）。
+- **不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（`vibevalley.db` 的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `server/migrations/0001_schema.sql`，不另加迁移（`migrations` 的测试查这条），本机的旧库和旧文件作废，删掉重建；启动时只认今天的名字（[理由](docs/subsystems/foundation.md)）。
+- **Flutter 不折事实**：它读 `GET /api/v1/state` 折好的 `CoreState`；要新的数据就加进 protocol 的字段和 `Reduce`，Dart 里只写跟着时钟走的画面；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在 Dart 里重写，加一个字段或接口问服务端（[理由](docs/subsystems/app.md)）。
+- **客户端分层**：`gen`、`sprites`、`audio`、`rules`（只读的纯函数）、`ui`、`data`（服务端状态、偏好、界面的选中/面板）、`host`（本机外壳）、`game`（客户端的动作）、`shared`（几张皮共用的画面）、`chat`（田头）、`voice`、`phone`（农场里的手机和小游戏）、`debug`（调试台）在下；`village` 是像素渲染层；`workbench`、`farm` 是两张皮；`app` 只做组合，`shell` 是外壳。依赖只能往下走（次序在 `scripts/app-imports.ts`，`bun run app:imports` 查），皮之间不互相 import，两张都用的放进 `shared`；下层不 import `app`（[理由](docs/subsystems/app.md)）。
+- **通用的小封装在 `pkg/x`**：字符串（按 UTF-16 数、JavaScript 的空白）、数字（照 JavaScript 写）、指针、时间各一个包；要用就 import，不在自己包里再写一份 `xxxPtr`、`chatTrim`（[理由](docs/subsystems/foundation.md)）。
 - **封闭的联合穷尽处理**：要每种都处理的地方（按 `_tag` 或 `type` 分支），`switch` 覆盖每一种，加新成员时让编译器或测试报错：Dart 的 sealed class 由编译器查；Go 的编译器不查类型 `switch`，用生成的成员表（`XMembers`）写测试。
 - **服务端的服务**：每个包只导出一个服务 `<包>.Service`，一块业务里分开写的几部分是它嵌入的不导出的零件；`Workspace` 上的字段用单数概念名（`f.Issue.Merge`）。构造函数的参数是它用到的服务（不拿整个 `Workspace`），在包的 `Module` 里用 `base.Run` 交给 fx，再加进 `workspace.go` 的 `services`；包只 import 排在它前面的包，往上走 `base.Hub`；服务之间传的形状放在定义它的包里，`base` 只放地基；`OnStart(ctx)` 订阅和开后台的活，开机就要发布的放 `OnReady(ctx)`（[server](server/README.md#服务)）。
 - **处理函数要薄**：HTTP 处理（`internal/handler`）和界面（Flutter 的页面）只做转发和展示，规则在拥有它的服务或纯函数里。
-- **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](docs/subsystems/session.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](.agents/notes/implemented/feature/2026-10-10-voice-through-our-manager.md)）；院门默认关着，只放主人在本机点过头的设备、每台一把钥匙，不放 `/mcp`（[理由](.agents/notes/implemented/feature/2026-10-14-yard-gate.md)）。
+- **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](docs/subsystems/session.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](docs/subsystems/voice.md)）；院门默认关着，只放主人在本机点过头的设备、每台一把钥匙，不放 `/mcp`（[理由](docs/subsystems/gate.md)）。
 - **图标是像素素材**：界面上的按钮图标用 `design/pixel` 生成的贴图（形状照 Hugeicons：`icons/ref.py`、`gen.sh`、`process.py`），不用 ▶、■ 这类字符代替（[流程](.agents/notes/implemented/process/2026-10-09-image-pipeline-with-codex.md)）。
 - **密钥**：写了钥匙的 `vibevalley.yaml`（`$VIBEVALLEY_HOME/vibevalley.yaml` 或 `--config` 给的）、`.agora/` 不进仓库；日志和文档里不出现密钥。
 - **工具链**：Go 用 `gofmt`、`go vet`，Dart 用 `dart format`、`flutter analyze`；`scripts/` 的检查用 Bun 跑，`server/tool/` 的脚本用 Node 跑，都不带构建。

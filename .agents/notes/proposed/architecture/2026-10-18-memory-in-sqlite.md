@@ -165,7 +165,7 @@ type MemoryStore interface {
 
 - 帮工的「记性」页签照旧：手上的活、下回开工会想起的、它记的和你记的、快忘了的；多一列「被取代」，点开看前后。
 - 管家页的「记性」页签分成两块：**主人画像**（所有 agent 共享，标出超出 4000 字被截掉的）和管家自己记的。
-- 接口照现在的 `memory.*` 分组（[先有能力，再有入口](.agents/notes/implemented/architecture/2026-10-17-capabilities-before-surfaces.md)），`MemoryList` 多出 `profile` 一组；`ManagerMemory` 的 `File` 字段没有了。
+- 接口照现在的 `memory.*` 分组（[先有能力，再有入口](docs/subsystems/core.md)），`MemoryList` 多出 `profile` 一组；`ManagerMemory` 的 `File` 字段没有了。
 
 ### 8. 搬家
 

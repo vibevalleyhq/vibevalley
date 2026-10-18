@@ -103,7 +103,7 @@ Status: proposed
 
 **农活脚本用别的运行时。** Node 子进程没有沙箱，还要在 macOS 应用里带上 Node；Starlark 确定、安全，但模型写 JS 比写 Starlark 熟练得多，MCP 的生态也是 JS 的；cgo 的 QuickJS 和 V8 破坏纯 Go 的交叉编译；Sobek、modernc 的 QuickJS 是纯 Go，但起一个运行时更慢、更占内存。moejs 每个运行时约 1.4µs、80KiB，带内存上限和打断，能直接跑 TypeScript（`CompileTS`）。代价是它很年轻，所以包在接口后面。
 
-**用 moejs 在 Go 里跑 TypeScript 的 `reduce`，省掉 Go 的移植。** 考虑过，否决了：protocol 依赖 Effect，模块初始化很重；`Site.Apply` 每折一个事实都要把整个状态在 Go 和 JS 之间来回转一遍；服务端也和「服务端是 Go」的决定相反（[Go 服务端](.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)）。
+**用 moejs 在 Go 里跑 TypeScript 的 `reduce`，省掉 Go 的移植。** 考虑过，否决了：protocol 依赖 Effect，模块初始化很重；`Site.Apply` 每折一个事实都要把整个状态在 Go 和 JS 之间来回转一遍；服务端也和「服务端是 Go」的决定相反（[Go 服务端](docs/subsystems/foundation.md)）。
 
 **帮工写的技能直接生效（Hermes 的做法）。** 省掉主人一步，可写技能和用技能是同一只手，错的做法会随每次派活扩散，而且主人不知道多了什么；批这一步就是验收。
 
