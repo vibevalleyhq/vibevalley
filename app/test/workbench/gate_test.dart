@@ -165,7 +165,7 @@ void main() {
     testWidgets('opens the gate', (t) async {
       await pump(t);
       expect(find.text('关着'), findsOneWidget);
-      await t.tap(find.text('打开院门'));
+      await t.tap(find.text('允许连接'));
       await settle(t);
       expect(writes, ['PUT /api/v1/gate {"open":true}']);
       expect(find.text(_gate), findsOneWidget);
@@ -187,7 +187,7 @@ void main() {
         devices: const [],
       );
       await pump(t);
-      expect(find.text('「小明的 iPhone」想进院门。让它进来以后，它能和你一样用这个农场。'), findsOneWidget);
+      expect(find.text('「小明的 iPhone」想连接到这台电脑。让它进来以后，它能和你一样用这个农场。'), findsOneWidget);
       await t.tap(find.text('让它进来'));
       await settle(t);
       expect(writes, ['POST /api/v1/gate/pairing/answer {"allow":true}']);

@@ -42,7 +42,7 @@ class _ScanPageState extends State<ScanPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '对准那台电脑「院门」里的二维码',
+                  '对准那台电脑「连接到本机」里的二维码',
                   textAlign: TextAlign.center,
                   style: KitText.sm.copyWith(color: Palette.cream50),
                 ),

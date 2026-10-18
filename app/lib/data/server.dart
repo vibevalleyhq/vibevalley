@@ -118,7 +118,7 @@ class VibeValleyServer {
   }
 }
 
-const keyRefused = '那台电脑不认这台设备了：回那台电脑上打开院门，重新扫码配对';
+const keyRefused = '那台电脑不认这台设备了：回那台电脑的「连接到本机」重新扫码配对';
 
 class _Keyed extends http.BaseClient {
   _Keyed(this.key);

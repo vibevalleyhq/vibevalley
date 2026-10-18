@@ -123,7 +123,7 @@ func (l *Service) listen() {
 	}
 	listener, err := net.Listen("tcp", net.JoinHostPort(l.host, strconv.Itoa(l.port)))
 	if err != nil {
-		l.problem = "院门开不起来：" + err.Error()
+		l.problem = "连接开不起来：" + err.Error()
 		log.Printf("vibevalley: the yard gate cannot listen on port %d: %v", l.port, err)
 		return
 	}
@@ -233,7 +233,7 @@ func (l *Service) StartPairing() (protocol.LanStatus, error) {
 	l.mu.Lock()
 	if !l.open || l.listener == nil {
 		l.mu.Unlock()
-		return protocol.LanStatus{}, protocol.LanRefused{Reason: "院门还没开：先打开它"}
+		return protocol.LanStatus{}, protocol.LanRefused{Reason: "还没允许连接：先打开它"}
 	}
 	if l.url() == "" {
 		l.mu.Unlock()
@@ -273,7 +273,7 @@ func (l *Service) Pair(ctx context.Context, code, name string) (protocol.LanPair
 	switch {
 	case !l.open:
 		l.mu.Unlock()
-		return protocol.LanPaired{}, protocol.LanRefused{Reason: "院门关着：回那台电脑上打开院门"}
+		return protocol.LanPaired{}, protocol.LanRefused{Reason: "那台电脑没允许连接：回那台电脑的「连接到本机」打开它"}
 	case p == nil:
 		l.mu.Unlock()
 		return protocol.LanPaired{}, protocol.LanRefused{Reason: "配对码过期了：回那台电脑上换一个码"}
@@ -354,7 +354,7 @@ func (l *Service) Me(ctx context.Context) (protocol.LanDevice, error) {
 	if d := l.devices[id]; d != nil {
 		return d.LanDevice, nil
 	}
-	return protocol.LanDevice{}, protocol.LanRefused{Reason: "这里就是农场本机，不是经院门来的设备"}
+	return protocol.LanDevice{}, protocol.LanRefused{Reason: "这里就是农场本机，不是连进来的设备"}
 }
 
 // Only what api.go marks vibevalley:can remote, and the three streams, which are not Handlers.
@@ -375,7 +375,7 @@ func (l *Service) gate(inner http.Handler) http.Handler {
 			return
 		}
 		if !remoteMay(r) {
-			lanRefuse(w, http.StatusForbidden, "院门不放这个：只能在农场那台电脑上做")
+			lanRefuse(w, http.StatusForbidden, "连进来的设备不能做这个：只能在农场那台电脑上做")
 			return
 		}
 		ctx, done := l.track(r.Context(), d)

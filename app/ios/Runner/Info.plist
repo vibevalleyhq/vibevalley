@@ -5,9 +5,9 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>按住说话时，管家要听到你的声音。</string>
 	<key>NSCameraUsageDescription</key>
-	<string>扫另一台电脑「院门」里的二维码，连上它的农场。</string>
+	<string>扫另一台电脑「连接到本机」里的二维码，连上它的农场。</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>连局域网里另一台电脑上的农场（经它的院门）。</string>
+	<string>连局域网里另一台电脑上的农场（它要允许连接）。</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

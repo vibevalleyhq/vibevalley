@@ -31,7 +31,7 @@
 
 ### feature
 
-- 2026-10-10 [帮工的权限请求变成地里的杂草](.agents/notes/rejected/feature/2026-10-10-permission-requests-as-weeds.md) — 帮工不做权限确认是常驻规矩：靠本机、工作目录和院门划边界，逐条批准会让帮工停在命令上等人，和无人值守冲突；「除草」留着位置
+- 2026-10-10 [帮工的权限请求变成地里的杂草](.agents/notes/rejected/feature/2026-10-10-permission-requests-as-weeds.md) — 帮工不做权限确认是常驻规矩：靠本机、工作目录和「连接到本机」划边界，逐条批准会让帮工停在命令上等人，和无人值守冲突；「除草」留着位置
 
 ### architecture
 

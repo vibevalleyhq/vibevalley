@@ -77,7 +77,7 @@ class _StartupState extends ConsumerState<Startup> {
       (label: '字体', done: true),
       (label: '画首页', done: _picture),
       (label: '像素村', done: village),
-      // A server that does not answer is not waited for: its banner says why and where to go (院门).
+      // A server that does not answer is not waited for: its banner says why and where to go (连接到本机).
     ], gaveUp: _gaveUp || !reachable);
   }
 

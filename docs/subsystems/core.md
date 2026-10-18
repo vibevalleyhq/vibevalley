@@ -10,7 +10,7 @@
 | `state.json`：存什么、什么时候存、开机怎么读回 | `vibevalley.db` 里的表、`sessions.json`、各 Session 的日志（[帮工](docs/subsystems/session.md)、[architecture.md](docs/architecture.md)「存了什么」） |
 | 给客户端的帧 `StateFrame`（`protocol.FrameOf`）和特效的发出 | 地里长什么、特效和账本怎么算（[游戏](docs/subsystems/game.md)、[farm-ui.md](docs/reference/farm-ui.md)） |
 | 三条 SSE 流 `/api/v1/state`、`/api/v1/events`、`/api/v1/live` | 帮工的 `/mcp`（[田头](docs/subsystems/channel.md)）、语音线路（[语音](docs/subsystems/voice.md)） |
-| 接口表 `api.go`、能力表 `can`、`/api/v1` 版本、命令行这张皮 | 每个接口做什么（拥有它的服务）；院门的配对和钥匙（[院门](docs/subsystems/gate.md)）；管家和帮工的工具（`internal/tool`，[管家](docs/subsystems/manager.md)） |
+| 接口表 `api.go`、能力表 `can`、`/api/v1` 版本、命令行这张皮 | 每个接口做什么（拥有它的服务）；「连接到本机」的配对和钥匙（[连接到本机](docs/subsystems/gate.md)）；管家和帮工的工具（`internal/tool`，[管家](docs/subsystems/manager.md)） |
 | 重启时核心状态怎么回来，各拥有者在哪一步接手 | 各拥有者自己怎么恢复（链接见「怎么走」） |
 | 跨模块的接口约定：调用方交意图，拥有者负责协调和结果 | 某个模块的具体动作 |
 
@@ -21,7 +21,7 @@
 - `server/internal/handler`：`http.go` 挂接口和三条流（`apiMux`、`serveStream`），`api.go` 实现 `Handlers`，`server.go` 的 `Listen` 管监听和农场的生命周期。
 - `server/tool/shapegen`：从 `api.go`、`shapes.go` 写出 `gen.go`、Flutter 的 `app/lib/gen/vibevalley.dart` 和 [capabilities.md](docs/reference/capabilities.md)，`-check` 查它们是不是最新。
 - 命令行 `server/cmd/vibevalley`：`farm.go` 是建在 `protocol.Client` 上的命令表，`run.go` 是 `issue run`；`chat.go`、`oar.go` 是不经服务端的本机工具。
-- 院门 `server/internal/gate/gate.go` 的 `remoteRoutes`：从 `Endpoints` 和 `Streams` 里挑 `can` 有 `remote` 的。
+- 「连接到本机」 `server/internal/gate/gate.go` 的 `remoteRoutes`：从 `Endpoints` 和 `Streams` 里挑 `can` 有 `remote` 的。
 - 客户端 `app/lib/data/server.dart`（`VibeValleyServer`）：读 `/state` 和 `/live`，命令用生成的 `VibeValleyApi`。
 - 文件：`$VIBEVALLEY_HOME/state.json`。
 
@@ -45,7 +45,7 @@
 - **关时写最后一份**：`Close` 停掉等着的那次，`Finish` 写最后的状态并封住，已经在路上的定时回调写不进来。`core` 最先建、最后关，所以最后一份是所有服务都停下之后的。
 - **读回时**：读不了或解析不了就从空的开始并记日志；通话回到 `idle`、没有通话原因、管家回到 `idle`（没人在通话上，管家也不在说话），帮工的地块按 `WithStations` 重新排。
 
-**三条流**（表在 `protocol.Streams`，处理函数和院门都从它挂，加一条流不会只挂了一边）
+**三条流**（表在 `protocol.Streams`，处理函数和「连接到本机」都从它挂，加一条流不会只挂了一边）
 
 | 流 | 连上先发 | 之后发 | 谁读 |
 |---|---|---|---|
@@ -59,10 +59,10 @@
 
 **接口和能力表**
 
-- **一个操作一个 `Handlers` 方法**：没实现就编译不过。方法上的 `//vibevalley:route` 写操作名（`组.动作`，Flutter 里是 `api.组.动作`）、方法和路径；`//vibevalley:can` 写谁能调，取值封闭：`owner`（这台电脑上的 Flutter、命令行）、`remote`（院门后配对过的设备）、`manager`、`session`。shapegen 遇到没写 `can` 的操作就失败。读写不另标，HTTP 方法已经说明。全部操作见 [capabilities.md](docs/reference/capabilities.md)。
-- **院门只放 `can` 有 `remote` 的操作和流**（`remoteMay`），没有匹配的路径一律拒绝；`/mcp` 和 `/v1/chat/completions`（`ChatCompletionsPath`，管家的 OpenAI 协议入口，放在 `/api/v1` 外面）永远不放。`can` 写错就是权限写错，改 `remote` 时在改动里单独列出。
+- **一个操作一个 `Handlers` 方法**：没实现就编译不过。方法上的 `//vibevalley:route` 写操作名（`组.动作`，Flutter 里是 `api.组.动作`）、方法和路径；`//vibevalley:can` 写谁能调，取值封闭：`owner`（这台电脑上的 Flutter、命令行）、`remote`（「连接到本机」后配对过的设备）、`manager`、`session`。shapegen 遇到没写 `can` 的操作就失败。读写不另标，HTTP 方法已经说明。全部操作见 [capabilities.md](docs/reference/capabilities.md)。
+- **「连接到本机」只放 `can` 有 `remote` 的操作和流**（`remoteMay`），没有匹配的路径一律拒绝；`/mcp` 和 `/v1/chat/completions`（`ChatCompletionsPath`，管家的 OpenAI 协议入口，放在 `/api/v1` 外面）永远不放。`can` 写错就是权限写错，改 `remote` 时在改动里单独列出。
 - **`manager` 和 `session` 两列只是记录**：代码不按它们放行，管家和帮工能调什么由 `internal/tool` 的工具表定；现在没有操作写了 `session`。
-- **都在 `/api/v1` 下**，包括 `/api/v1/health` 和三条流。`Endpoints` 里的路径就是最终路径，生成的 Flutter 客户端、命令行、能力表和院门都从它来，没有第二处拼前缀。不设 `/api/...` 的别名，旧客户端拿到 404。加字段、加接口留在 v1；不兼容的改动另起 `/api/v2`，v1 留到主人的设备都升上来。`/mcp` 不带版本：MCP 有自己的版本。
+- **都在 `/api/v1` 下**，包括 `/api/v1/health` 和三条流。`Endpoints` 里的路径就是最终路径，生成的 Flutter 客户端、命令行、能力表和「连接到本机」都从它来，没有第二处拼前缀。不设 `/api/...` 的别名，旧客户端拿到 404。加字段、加接口留在 v1；不兼容的改动另起 `/api/v2`，v1 留到主人的设备都升上来。`/mcp` 不带版本：MCP 有自己的版本。
 - **命名五条**：组是概念（`gate`、`game`、`channel`）；动词一套 `list`、`get`、`create`、`update`、`delete`，`save` 只给带 id 的整份写入（编辑、导入），`check` 只校验，领域动词只给不是增删改查的；工单的生命周期挂在工单上（`issue.status`）；一个意图一个操作，不用布尔开关兼两件；`update` 只改给出的字段，路径里的 id 算数。
 - **一条规则，差别作为参数**：入口之间的差别传进服务，不写成两个方法。例：`Issue.Changes(id, by)` 收 `protocol.Caller`，主人看（`CallerOwner`）才算进游戏。
 
@@ -102,14 +102,14 @@
 5. 田头里交出去还没看到的消息退回 `pending`，过一会儿再叫（[田头](docs/subsystems/channel.md)）；管家没做完的一轮接着做（[管家](docs/subsystems/manager.md)「重启后接着做」）。
 6. 账本整本重折出金币、连胜、成就，规则改了重启就按新规则算（[游戏](docs/subsystems/game.md)）。
 
-**加一个能力**：写服务的方法 → 在 `api.go` 加操作、`route` 和 `can` → `go run ./tool/shapegen` → 在 `handler/api.go` 实现。Flutter 的客户端、命令行的命令、院门的放行和能力表都跟着生成。
+**加一个能力**：写服务的方法 → 在 `api.go` 加操作、`route` 和 `can` → `go run ./tool/shapegen` → 在 `handler/api.go` 实现。Flutter 的客户端、命令行的命令、「连接到本机」的放行和能力表都跟着生成。
 
 ## 和谁打交道
 
 - **施加事实的**：工单、帮工、田头、定时、管家（`SetManager`）；`manager.open`、主人说话、语音和连接器经 `Open`、`SetCall` 让通话在线；游戏（commit 数、`progress`、`station`）。它们 import `core`，`core` 只 import `base` 和 `protocol`。
 - **订阅的**：游戏的账本和种植计划读 `Transitions()`；游戏的 commit 数和空地读 `Facts()`；工单和田头读 `Events()`；账本另读 `OwnerDids()`。
 - **读的**：任何服务用 `State()`、`Session(id)`、`Call()` 读当前值；`handler` 把三条流交给客户端。
-- **外面**：Flutter 读帧和窄流、调生成的 `VibeValleyApi`；命令行经 `protocol.Client`；院门后的设备经同一套接口，由 `gate` 按 `can` 放行。
+- **外面**：Flutter 读帧和窄流、调生成的 `VibeValleyApi`；命令行经 `protocol.Client`；「连接到本机」后的设备经同一套接口，由 `gate` 按 `can` 放行。
 
 ## 为什么这样
 
@@ -119,8 +119,8 @@
 - **每条事实带自己的前后状态，一批一次提交。** 放弃了「子工单先发、父工单最后发」的约定：排序不能把几次可见的更新变成一次，读的人仍会看见半个计划。放弃了每条事实都附整批的最终状态：第一条事实会背上后面事实的变化，按事件做的规则失去因果。放弃了对外的 `FactBatch` 类型：现有的消费者都认得单条事实，内部的提交和订阅保证就够，不必扩大生成的协议和客户端的类型。
 - **命令走 HTTP，状态走 SSE。** 放弃了 WebSocket：命令已经有类型化的 HTTP 接口，事件只往一个方向走；SSE 重连又从快照开始，不用写补发。放弃了轮询：帮工的动作一秒好几次，轮询要么慢要么费。代价是事件里不能顺带回复命令。三条流分开：`/state` 让客户端不折事实；`/live` 让客户端不必收它用不上的快照和事实；`/events` 保留整份事实流给命令行和调试。
 - **重启不丢农场，也不自动接着干。** 见[帮工](docs/subsystems/session.md#为什么这样)：全部收工丢掉没合的活，自动接着干可能重复执行和花钱。核心状态在这里的部分是：读回 `state.json` 就是重启，不另写一套恢复。
-- **接口带版本，版本在路径里。** 客户端不一起升级：macOS 应用和服务端一起换，经院门连的设备什么时候升由那台设备定；没有版本时要么形状只加不改（锁死改名），要么所有设备同一天升级（做不到）。放弃了请求头里的版本：curl、日志、院门的放行表都要多一层解析；放弃了每个操作自己带版本：同一个概念散在几个版本里；放弃了 `/api` 当 v1 的别名：两个名字要一直维护，也分不清谁是新客户端（[不留兼容](docs/subsystems/foundation.md)）；放弃了网关映射：本机前面没有网关。v1 不能在设备升级前删，这是唯一明确的兼容负担。
-- **先有能力，再有入口，能力表和接口写在同一处。** 农场能做的事曾从七个入口各接一遍：没有命令行；院门放什么写死在 `gate.go`；同一件事几个入口规则不一样（派活一条路排队、一条路拒绝）；加一个能力要接好几处，漏了也不报错。`can` 写在 `api.go` 的注释里，shapegen 一起读，漏了就生成失败。放弃了另放一个 YAML：加操作时会忘了改它。放弃了手写命令行：它会是第八个各自接一遍的入口。放弃了命令行直接开数据库：服务端开着时就有两份核心状态。放弃了管家的工具、MCP 也从接口生成：模型要的参数和说明和给程序的接口不是一个形状，硬生成会变差。
+- **接口带版本，版本在路径里。** 客户端不一起升级：macOS 应用和服务端一起换，经「连接到本机」连的设备什么时候升由那台设备定；没有版本时要么形状只加不改（锁死改名），要么所有设备同一天升级（做不到）。放弃了请求头里的版本：curl、日志、「连接到本机」的放行表都要多一层解析；放弃了每个操作自己带版本：同一个概念散在几个版本里；放弃了 `/api` 当 v1 的别名：两个名字要一直维护，也分不清谁是新客户端（[不留兼容](docs/subsystems/foundation.md)）；放弃了网关映射：本机前面没有网关。v1 不能在设备升级前删，这是唯一明确的兼容负担。
+- **先有能力，再有入口，能力表和接口写在同一处。** 农场能做的事曾从七个入口各接一遍：没有命令行；「连接到本机」放什么写死在 `gate.go`；同一件事几个入口规则不一样（派活一条路排队、一条路拒绝）；加一个能力要接好几处，漏了也不报错。`can` 写在 `api.go` 的注释里，shapegen 一起读，漏了就生成失败。放弃了另放一个 YAML：加操作时会忘了改它。放弃了手写命令行：它会是第八个各自接一遍的入口。放弃了命令行直接开数据库：服务端开着时就有两份核心状态。放弃了管家的工具、MCP 也从接口生成：模型要的参数和说明和给程序的接口不是一个形状，硬生成会变差。
 - **拥有者负责协调和结果。** 放弃了只在 HTTP 入口查失败：计划自动推进、定时和管家不都经过 HTTP，修在拥有动作的模块里，所有调用方得到同样的结果。放弃了把 git、SQLite 和开执行包成一个事务：它们没有共同的提交机制，一个事务的名字只会盖住跨资源的失败。放弃了为每个小步骤加接口和把只有一个实现的存储、回调改成通用接口：前者把顺序推回调用方，后者只增加导航成本。
 - **创建由服务端分配身份，查询不补造。** 客户端扫列表分配 id、保存前查重，查和写是两次请求，两台设备用同一份旧列表仍会写到同一个 id。缺执行记录时补一个「歇着」的执行，会把「记录没了」变成「在歇着」，按钮和统计照着不存在的阶段工作。
 

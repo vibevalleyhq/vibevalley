@@ -5,23 +5,23 @@
 | 谁 | 是谁 | 从哪个入口 |
 |---|---|---|
 | 主人 | 主人在农场那台电脑上 | Flutter、命令行 |
-| 院门 | 主人配对过的设备 | 院门只放这一列打了 ✓ 的 |
+| 连进来的设备 | 主人配对过的手机、另一台电脑 | 经「连接到本机」只放这一列打了 ✓ 的 |
 | 管家 | 管家 | 只是记下，不按它放行：管家的工具另写在 `internal/tool` |
 | Session | 帮工 | 没有接口打 ✓：帮工经 `/mcp` 用 `internal/tool` 的工具 |
 
 管家、Session 两列要去掉，agent 能调什么写在档案上（[管家是一份档案](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md)）。
 
-`GET /api/v1/state`、`GET /api/v1/events` 和 `GET /api/v1/live` 是 SSE，不在 `Handlers` 里：主人和院门都能读；`/state` 给折好的帧，`/live` 只给客户端要的三种 side event，`/events` 留给命令行和调试。接口都在 `/api/v1` 下；换成不兼容的形状时另起 `/api/v2`，`v1` 留到设备都升级（[理由](docs/subsystems/core.md)）。
+`GET /api/v1/state`、`GET /api/v1/events` 和 `GET /api/v1/live` 是 SSE，不在 `Handlers` 里：主人和连进来的设备都能读；`/state` 给折好的帧，`/live` 只给客户端要的三种 side event，`/events` 留给命令行和调试。接口都在 `/api/v1` 下；换成不兼容的形状时另起 `/api/v2`，`v1` 留到设备都升级（[理由](docs/subsystems/core.md)）。
 
 ## server
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `server.health` | `GET /api/v1/health` | ✓ | ✓ |  |  |
 
 ## manager
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `manager.open` | `POST /api/v1/manager/open` | ✓ | ✓ |  |  |
 | `manager.stop` | `POST /api/v1/manager/stop` | ✓ | ✓ |  |  |
@@ -32,7 +32,7 @@
 
 ## setting
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `setting.load` | `GET /api/v1/settings` | ✓ | ✓ |  |  |
 | `setting.check` | `POST /api/v1/settings/check` | ✓ | ✓ |  |  |
@@ -40,7 +40,7 @@
 
 ## channel
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `channel.say` | `POST /api/v1/say` | ✓ | ✓ |  |  |
 | `channel.create` | `POST /api/v1/channels` | ✓ | ✓ | ✓ |  |
@@ -50,7 +50,7 @@
 
 ## schedule
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `schedule.create` | `POST /api/v1/schedules` | ✓ | ✓ | ✓ |  |
 | `schedule.list` | `GET /api/v1/schedules` | ✓ | ✓ | ✓ |  |
@@ -59,7 +59,7 @@
 
 ## issue
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `issue.comment` | `POST /api/v1/issues/{id}/comment` | ✓ | ✓ | ✓ |  |
 | `issue.changes` | `GET /api/v1/issues/{id}/changes` | ✓ | ✓ | ✓ |  |
@@ -77,7 +77,7 @@
 
 ## session
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `session.stop` | `POST /api/v1/sessions/{id}/stop` | ✓ | ✓ | ✓ |  |
 | `session.list` | `GET /api/v1/sessions` | ✓ | ✓ |  |  |
@@ -86,7 +86,7 @@
 
 ## graph
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `graph.split` | `POST /api/v1/graphs` | ✓ | ✓ | ✓ |  |
 | `graph.updateTask` | `PUT /api/v1/graphs/{id}/tasks/{task}` | ✓ | ✓ | ✓ |  |
@@ -98,13 +98,13 @@
 
 ## game
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `game.chooseTitle` | `POST /api/v1/game/title` | ✓ | ✓ |  |  |
 
 ## runtime
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `runtime.list` | `GET /api/v1/runtimes` | ✓ | ✓ |  |  |
 | `runtime.refresh` | `POST /api/v1/runtimes/{id}/refresh` | ✓ | ✓ |  |  |
@@ -113,14 +113,14 @@
 
 ## github
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `github.status` | `GET /api/v1/github` | ✓ | ✓ |  |  |
 | `github.refresh` | `POST /api/v1/github/refresh` | ✓ | ✓ |  |  |
 
 ## agent
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `agent.list` | `GET /api/v1/agents` | ✓ | ✓ |  |  |
 | `agent.check` | `POST /api/v1/agents/check` | ✓ | ✓ |  |  |
@@ -130,7 +130,7 @@
 
 ## memory
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `memory.list` | `GET /api/v1/memories/{agent}` | ✓ | ✓ |  |  |
 | `memory.recall` | `GET /api/v1/memories/{agent}/recall` | ✓ | ✓ |  |  |
@@ -139,7 +139,7 @@
 
 ## skill
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `skill.list` | `GET /api/v1/skills` | ✓ | ✓ |  |  |
 | `skill.create` | `POST /api/v1/skills` | ✓ | ✓ | ✓ |  |
@@ -148,7 +148,7 @@
 
 ## project
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `project.list` | `GET /api/v1/projects` | ✓ | ✓ | ✓ |  |
 | `project.check` | `POST /api/v1/projects/check` | ✓ | ✓ |  |  |
@@ -158,7 +158,7 @@
 
 ## voice
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `voice.session` | `POST /api/v1/voice/session` | ✓ | ✓ |  |  |
 | `voice.renew` | `POST /api/v1/voice/renew` | ✓ | ✓ |  |  |
@@ -170,7 +170,7 @@
 
 ## connector
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `connector.list` | `GET /api/v1/connectors` | ✓ | ✓ |  |  |
 | `connector.login` | `POST /api/v1/connectors/{id}/login` | ✓ | ✓ |  |  |
@@ -180,7 +180,7 @@
 
 ## gate
 
-| 操作 | 方法和路径 | 主人 | 院门 | 管家 | Session |
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
 | `gate.status` | `GET /api/v1/gate` | ✓ |  |  |  |
 | `gate.update` | `PUT /api/v1/gate` | ✓ |  |  |  |

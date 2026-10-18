@@ -4,7 +4,7 @@ Flutter 客户端里和 VibeValley 本身无关的那一半：像素画怎么放
 
 ## 首页
 
-`lib/title/`（[理由](docs/subsystems/app.md)），只在这台设备第一次打开时出来，之后直接进农场。背景跟着钟点换早晨、白天、黄昏、夜晚四张图（`--dart-define=VIBEVALLEY_TOD=0.9` 换钟点看），上面叠着会动的云、炊烟、草和萤火虫，管家和你选的宠物画在上面。启动时（`startup.dart`）连农场、读字体和图，都好了才出首页，最多等 20 秒；连不上时横幅带着去「院门」的入口。
+`lib/title/`（[理由](docs/subsystems/app.md)），只在这台设备第一次打开时出来，之后直接进农场。背景跟着钟点换早晨、白天、黄昏、夜晚四张图（`--dart-define=VIBEVALLEY_TOD=0.9` 换钟点看），上面叠着会动的云、炊烟、草和萤火虫，管家和你选的宠物画在上面。启动时（`startup.dart`）连农场、读字体和图，都好了才出首页，最多等 20 秒；连不上时横幅带着去「连接到本机」的入口。
 
 左边三项：开始游戏（没有 DeepSeek 的钥匙先进工作台「设置」的 DeepSeek）、继续游戏、设置（进工作台的「设置」页，[farm-ui.md](docs/reference/farm-ui.md) 的「设置」）。
 

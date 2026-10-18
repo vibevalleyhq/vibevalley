@@ -22,7 +22,7 @@ Status: proposed
 | `protocol` | 给出去的形状：`Agent.Can` 这个字段和 `Capability` 的取值，存盘、发给 Flutter、档案页改它都用它。不放规则 |
 | `internal/agent` | 档案这个概念：默认给哪些能力、哪份是常驻的、谁能改 `Can` |
 | `internal/tool` | 工具表：每个工具要哪种能力、执行时放行、把结果写成给模型看的一句话 |
-| 能力表（`api.go` 的 `can`） | 只管 HTTP 入口：主人、院门后的设备能调哪些接口；不管 agent |
+| 能力表（`api.go` 的 `can`） | 只管 HTTP 入口：主人、「连接到本机」后的设备能调哪些接口；不管 agent |
 
 ### 1. 能力是档案的字段
 

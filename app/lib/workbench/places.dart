@@ -8,7 +8,7 @@ enum Place {
   projects('项目', '每个项目一座岛', 'icon-map', '/projects'),
   catalog('图鉴', '素材：农场用的每张图、每个指针、每个声音', 'icon-log', '/catalog'),
   // Last, and drawn at the bottom of the bar (workbench_shell) rather than with the others.
-  settings('设置', '钥匙、记性、连接器、技能、声音、院门', 'icon-wrench', '/settings');
+  settings('设置', '钥匙、记性、连接器、技能、声音、连接到本机', 'icon-wrench', '/settings');
 
   const Place(this.label, this.hint, this.icon, this.path);
   final String label;

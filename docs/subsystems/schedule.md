@@ -17,7 +17,7 @@
 - 服务端 `server/internal/schedule`（`schedule.Service`）：`schedule.go` 存取、开机读表、每次检查（`Tick`）和到点发布（`Due()`，一个 `base.Hub[Due]`）；`rules.go` 是只有它用的纯函数：`dueSchedules`、`isMissed`、`afterRun`、`needsOK`。
 - 几个包都用的规则在 `protocol`：`schedules.go`（`NextRun`、`ScheduleProblem`、`WhenText`、`NextText`、`DueText`）、`schedule_cron.go`（五段 cron 的解析、下次时间、说成话）。
 - 表：`schedule`（一个定时一行，时间写法存成 JSON 的 `spec`）；工单表的 `schedule` 列指着它的定时。
-- 接口：`schedule.create`、`schedule.list`、`schedule.update`、`schedule.delete`（[capabilities.md](docs/reference/capabilities.md)）；`schedule.update` 只有主人和院门能调，管家不能。管家的工具 `schedule`、`list_schedules`、`cancel_schedule` 在 `tool/task.go`。
+- 接口：`schedule.create`、`schedule.list`、`schedule.update`、`schedule.delete`（[capabilities.md](docs/reference/capabilities.md)）；`schedule.update` 只有主人和「连接到本机」能调，管家不能。管家的工具 `schedule`、`list_schedules`、`cancel_schedule` 在 `tool/task.go`。
 - 配置：`schedule.tick_ms`，默认 20000（20 秒看一遍；0 或更小是每毫秒）。
 - 客户端：频道菜单的「定时」（`app/lib/chat/channel_menu.dart`）和聊天页的「定时」标签（`app/lib/workbench/chat/chat_page.dart`）列出这个频道的定时，能开关、删、对待批的点「同意」「不要」；看板上定时的工单带「定时」标签（`workbench/issues/board.dart`）。
 

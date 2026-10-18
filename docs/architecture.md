@@ -97,7 +97,7 @@ flowchart LR
 
 ## HTTP 接口
 
-接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](docs/subsystems/core.md)）。不在里面的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[田头](docs/subsystems/channel.md)）。`//vibevalley:can` 写谁能调，院门只放 `remote` 的（[能力表](docs/reference/capabilities.md)、[院门](docs/subsystems/gate.md)）。
+接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](docs/subsystems/core.md)）。不在里面的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[田头](docs/subsystems/channel.md)）。`//vibevalley:can` 写谁能调，「连接到本机」只放 `remote` 的（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/gate.md)）。
 
 ## 存了什么
 
@@ -109,7 +109,7 @@ flowchart LR
 | `config.json` | 帮工档案、技能书、每台农机的设置。第一次启动时用 protocol 的种子（`server/internal/protocol/seeds.json`） |
 | `settings.json` | 「设置」里存的钥匙、语音设置和记性的来源（Nowledge Mem、EverOS 的地址和 key）；只有你能读 |
 | `state.json` | 核心状态，田头、进度、定时和工单除外：帮工、commit 数 |
-| `vibevalley.db` | SQLite：田头、工单和它们的帮工、每次干活（`session_run`）、计划的经过、账本、记性、定时、连接器、院门的设备；运行时新建的行主键是 uuidv7，工单和每条消息另有自己的顺序号（表名是「模块_概念」、单数，结构在 `server/migrations/0001_schema.sql`，一个基线，改表直接改它，旧库删掉重建；库比服务端认识的新就不开）。查询都在 `server/pkg/db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
+| `vibevalley.db` | SQLite：田头、工单和它们的帮工、每次干活（`session_run`）、计划的经过、账本、记性、定时、连接器、「连接到本机」的设备；运行时新建的行主键是 uuidv7，工单和每条消息另有自己的顺序号（表名是「模块_概念」、单数，结构在 `server/migrations/0001_schema.sql`，一个基线，改表直接改它，旧库删掉重建；库比服务端认识的新就不开）。查询都在 `server/pkg/db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
 | `sessions.json` | 只有服务端需要的：每个帮工的项目目录或 worktree、农机自己的会话 id、最后一轮的完整原话 |
 | `events/<id>.json` | 每个 Session 的事件日志（走了留 30 天；是谁、为哪张工单、怎么关的在库里的 `session` 表，一直留着）；管家的是 `manager.json` |
 | `spend.json` | 今天每台农机花了多少 |
@@ -138,7 +138,7 @@ flowchart LR
 | `agora.app_id`、`agora.app_certificate` | 语音：签 RTC 和 RTM 令牌、请语音管家（`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`）；都没有时语音不可用，别的照常 | |
 | `voice.model`、`voice.id` | 语音管家用的托管大模型和音色的默认；声音页里改过的优先 | `gpt-4.1-mini`、`Chinese (Mandarin)_Gentle_Youth` |
 | `voice.line.port`、`voice.line.url` | 语音线路（「想」选农场的管家时）：只给声网用的那个监听的端口；你自己的隧道的公网地址，没有就用 cloudflared 临时隧道 | 8788、（无） |
-| `lan.port` | 院门的端口：打开院门时在所有网卡上听，只放配对过的设备（[院门](docs/subsystems/gate.md)）；0 是随便一个 | 8790 |
+| `lan.port` | 「连接到本机」的端口：打开「连接到本机」时在所有网卡上听，只放配对过的设备（[连接到本机](docs/subsystems/gate.md)）；0 是随便一个 | 8790 |
 | `git_emails` | 算经验时也算作「你」的 commit 邮箱；环境变量里用逗号分隔 | git 全局和各仓库的 user.email 本来就算 |
 | `tokei` | 数项目种了什么用的 tokei 在哪 | PATH 上的 `tokei` |
 | `cny_per_usd` | 价目表是美元，折成人民币的汇率 | 7.2 |

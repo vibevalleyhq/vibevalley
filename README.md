@@ -23,7 +23,7 @@
 - **频道、定时和巡查**：按项目开频道；「每天九点跑一遍测试」这样的定时任务；不调模型的巡查，提醒没人回的提问、没动静的帮工、做完没收的活。
 - **帮工档案和记性**：给帮工捏人设、选农机和模型、装技能。帮工在汇报里写的「记住：……」，下次开工时会想起来。
 - **语音**：按住说话，语音管家（Agora Conversational AI）听你说完，交给同一个管家去派活。
-- **从外面派活**：把田头接到微信、飞书或 QQ，只认你自己的账号。手机或另一台电脑可以经「院门」连进来，前提是你在本机点过头。
+- **从外面派活**：把田头接到微信、飞书或 QQ，只认你自己的账号。手机或另一台电脑可以经「连接到本机」连进来，前提是你在本机点过头。
 - **管住花费**：每个农机的额度、今天花了多少、每日预算；额度快用完时提醒，用完了就不再派。
 - **农场本身**：像素村有昼夜和光照，有狗、会在路上走的帮工、成就和称号，还有一部能玩小游戏的手机。
 
@@ -62,7 +62,7 @@ flowchart LR
 
 ### 需要
 
-- macOS（Apple 芯片）。客户端是 Flutter，macOS 应用是主要的形态；手机和别的电脑经「院门」连进来。
+- macOS（Apple 芯片）。客户端是 Flutter，macOS 应用是主要的形态；手机和别的电脑经「连接到本机」连进来。
 - 至少一个装好并登录的编码 agent：[pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex](https://github.com/openai/codex)。VibeValley 也自带一个农机，只要 DeepSeek 的钥匙。
 - 一把 [DeepSeek](https://platform.deepseek.com/) 的 API 钥匙，管家要用。
 - 构建要 Go 1.27、Flutter 3.47 和 Xcode。

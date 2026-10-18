@@ -10,7 +10,7 @@
 | 语音线路：单独的回环监听、每通电话一把钥匙、隧道 | OpenAI `chat/completions` 的协议本身（`internal/agent/brain/openai.go`，[管家](docs/subsystems/manager.md)「OpenAI 的协议」） |
 | 两种字幕的接受和分流（按通话建立时的模式） | 字幕怎么留在田头、不叫醒谁（`channel` 的 `Spoken`，[田头](docs/subsystems/channel.md)） |
 | 听写：把录音转给主人填的转写地址 | 设置的存取、优先级、钥匙只给提示（`internal/setting`，[设置](docs/subsystems/setting.md)） |
-| 语音设置的形状、默认值和保存前的检查 | 院门放哪些接口（[院门](docs/subsystems/gate.md)）；语音接通在账本上记一笔（`game`） |
+| 语音设置的形状、默认值和保存前的检查 | 「连接到本机」放哪些接口（[连接到本机](docs/subsystems/gate.md)）；语音接通在账本上记一笔（`game`） |
 | 客户端的通话（`VoiceCall`）、字幕拼块、听写按钮 | 田头窗口和手机怎么画通话（`farm/chat_voice.dart`、`phone/`） |
 
 ## 在哪
@@ -18,7 +18,7 @@
 - 服务端 `server/internal/voice`（`voice.Service`，`Workspace` 上的 `Voice`；[包的约定](server/internal/voice/README.md)）：`rtc.go` RTC 授予（签发、认领、续签、撤销）；`agora.go` 通话（`Start`、`Stop`、`Heard`、`HeardCurrent`、`Said`）和把语音设置翻成 Agora 的 vendors（`voiceVendorsFor`、`voiceAgentConfig`）；`line.go` 语音线路；`dictate.go` 听写。
 - `server/pkg/agora`：令牌（`Token`、`TokenSeconds`）、频道和 uid（`NewChannel`、`NewUID`）、请 agent 进出（`Client.Start`、`Client.Stop`）、快嘴模型的参数（`SpeakingLLM`）。
 - 形状和规则：`protocol/shapes.go` 的 `VoiceSettings`（`VoiceASR`、`VoiceAnswer`、`VoiceTTS` 三个联合）、`SettingsUpdateVoice`、`AgoraGrant`、`Dictation`；数的范围是 `shapes.go` 开头的 `VoiceSilenceMsMin` 等常量；默认在 `protocol/voice.go`（`DefaultVoice`、`VoiceAgentUID`）。保存前的检查和只存差异在 `setting/voice_rules.go`（`voiceProblem`、`voiceSettingsOver`、`voiceOverrides`）。
-- 接口：`voice.session`、`voice.renew`、`voice.start`、`voice.stop`、`voice.heard`、`voice.said`、`voice.dictate`，旧客户端的 `manager.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经院门连进来的手机也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
+- 接口：`voice.session`、`voice.renew`、`voice.start`、`voice.stop`、`voice.heard`、`voice.said`、`voice.dictate`，旧客户端的 `manager.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的手机也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
 - 不存表：授予和通话只在进程里；设置在 `$VIBEVALLEY_HOME/settings.json` 的 `voice`、`dictation`、`asrKey`、`llmKey`、`ttsKey`、`dictationKey`、`agoraAppId`、`agoraAppCertificate`。
 - 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.model`、`voice.id`（默认的托管模型和 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`base/config.go`）。
 - 客户端：`app/lib/voice/`（`voice.dart` 的 `VoiceCall`，`captions.dart` 的 `LiveCaptions`，`dictation.dart` 的 `Dictation`），由 `data/voice.dart` 按农场作用域提供；按钮 `app/lib/chat/dictation_button.dart`（`DictationButton`）；设置页 `app/lib/workbench/voice/`（`voice_page.dart` 的 `VoiceSettingsForm`），路由 `/settings/voice` 和管家页的 `/manager/voice`；样音 `app/assets/voice-samples/`；只链语音要的 Agora 组件 `app/tool/agora-voice-only.sh`。
@@ -94,7 +94,7 @@
 - **只把「想」换成我们的管家，经一个只有一个接口的监听。** 声网能接 OpenAI 兼容的自定义大模型，所以识别、断句、合成照用，管家在电话里就是田头上那个，看得到地里、自己派活。放弃了用隧道转发整个服务端：帮工能执行任意命令，派活、改配置的接口都会上公网。放弃了给托管模型塞农场上下文（它调不了我们的工具）和用 Agora 的 think 接口塞指令（措辞不进管家自己的历史）。代价是本机多一个对外口子，只认带钥匙的请求。
 - **协议只取最后一句，历史以管家的会话为准。** 照 OpenAI 的语义读全部 `messages`，管家的会话和 Agora 那边的历史会是两份：插话时没念完的字、田头里说的话 Agora 都不知道。协议放在 `internal/agent/brain`，不留在 `voice`：主服务的本机接口也用它。
 - **Agora 是供应商，不是概念，不开 `internal/agora`。** 照连接器的做法，封装在 `pkg/agora`，翻译设置的适配在 `voice/agora.go`（它要读 `protocol` 的设置，搬进 `pkg/agora` 就得再写一份选项类型）。客户端 `VoiceCall` 直接持有 `RtcEngine`，不拆出只有一个实现的接口；也不抽 `Transport`、`TTS` 接口，第二家真要接时再抽，能换平台靠 OpenAI 协议。
-- **听写不走 Agora，转给主人填的 OpenAI 兼容地址。** 走 Agora 要开一通按分钟计费的会话、请一个 agent 进频道，能选的识别也接不上中文准的国内厂商；听写不需要断句和打断。经服务端转一手是为了 key 留在服务端、院门进来的手机也能用 Mac 上的本地模型。放弃了服务端打包并拉起本机识别（要管约 1 GB 的模型和它的生命周期）和用 cgo 链 Swift（模型一崩农场跟着挂）。字去输入框、不叫醒管家；放弃了让管家整理听写：每段草稿都会进管家的会话、叫醒它一轮。
+- **听写不走 Agora，转给主人填的 OpenAI 兼容地址。** 走 Agora 要开一通按分钟计费的会话、请一个 agent 进频道，能选的识别也接不上中文准的国内厂商；听写不需要断句和打断。经服务端转一手是为了 key 留在服务端、「连接到本机」进来的手机也能用 Mac 上的本地模型。放弃了服务端打包并拉起本机识别（要管约 1 GB 的模型和它的生命周期）和用 cgo 链 Swift（模型一崩农场跟着挂）。字去输入框、不叫醒管家；放弃了让管家整理听写：每段草稿都会进管家的会话、叫醒它一轮。
 - **RTC 授予拥有这通电话的应用身份。** 三个请求各读一次当前凭据时，拿令牌后改 App ID 会让启动或续签指向另一个应用，而已经初始化的 RTC 引擎换不了身份。现有的 `channel + uid` 已由服务端生成，足以标识授予，不另加 grant id；没启动的授予用令牌的期限，不另设较短的，免得令牌还有效 `Start` 却拒绝。
 - **字幕归这通电话，由 `voice` 分流。** 管家按当前设置决定旁不旁听时，中途改「谁接电话」会让同一通电话的两种字幕按两份规则走；客户端读设置再决定也一样受影响，还重写了服务端的规则。旧的 `manager/hear` 保留成受限的适配：已配对的设备可能还在旧版本。
 - **快嘴的回答由客户端上报。** 一轮结束的信号只在客户端的字幕流里；客户端挂得太快会少一条，有意接受，不重试。

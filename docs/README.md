@@ -24,7 +24,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [task.md](docs/subsystems/task.md) | 种植计划：带子工单的父工单、按图推进；agent 自己的任务图 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
 | [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音管家 |
-| [gate.md](docs/subsystems/gate.md) | 院门：局域网里配对过的设备用同一个农场 |
+| [gate.md](docs/subsystems/gate.md) | 「连接到本机」：局域网里配对过的设备用同一个农场 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
 | [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、三条流、接口和能力表、重启 |
@@ -40,7 +40,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 讲什么 |
 |---|---|
 | [concept-map.md](docs/reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
-| [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：主人、院门、管家、Session；shapegen 写出 |
+| [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：主人、「连接到本机」、管家、Session；shapegen 写出 |
 | [agents-and-runtimes.md](docs/reference/agents-and-runtimes.md) | 帮工档案、农机、技能书 |
 | [farm-ui.md](docs/reference/farm-ui.md) | 界面清单、角色、精力瓶和计分的表 |
 | [pixel-village.md](docs/reference/pixel-village.md) | 首页、素材的流水线 |
@@ -92,4 +92,4 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 定时 | schedule | 一张工单的一种触发：到点开它的一次干活，派给帮工或管家 | cron |
 | 来电 | inbox | 要你处理的事 | 通知 |
 | 巡查 | patrol | 定时看 Inbox，放久了叫醒管家 | |
-| 院门 | lan | 让局域网里的设备用这个农场的监听，默认关 | 远程模式 |
+| 连接到本机 | lan | 让局域网里的设备用这个农场的监听，默认关 | 远程模式 |

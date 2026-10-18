@@ -105,7 +105,7 @@ class _GateCard extends StatelessWidget {
     final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.625);
     final s = status;
     return PxCard(
-      title: '这台电脑的院门',
+      title: '连接到本机',
       aside: s == null ? null : Text(s.open ? '开着' : '关着'),
       child: s == null
           ? Text(unreachable ?? '在问服务端……', style: body)
@@ -114,12 +114,12 @@ class _GateCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (!s.open) ...[
-                  Text('打开院门，同一个局域网里的手机或另一台 Mac 扫码配对以后，就能用这台电脑上的农场：看帮工、派活、在田头说话。', style: body),
+                  Text('打开以后，同一个局域网里的手机或另一台 Mac 扫码配对以后，就能用这台电脑上的农场：看帮工、派活、在田头说话。', style: body),
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: PxButton.text(
-                      '打开院门',
+                      '允许连接',
                       tone: PxTone.primary,
                       onPressed: () => act((api) => api.update(body: const SetOpenRequest(open: true))),
                     ),
@@ -134,7 +134,7 @@ class _GateCard extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         PxButton.text('添加设备', tone: PxTone.primary, onPressed: s.url == null ? null : () => act((api) => api.startPairing())),
-                        PxButton.text('关上院门', onPressed: () => act((api) => api.update(body: const SetOpenRequest(open: false)))),
+                        PxButton.text('关掉连接', onPressed: () => act((api) => api.update(body: const SetOpenRequest(open: false)))),
                       ],
                     ),
                 ],
@@ -145,9 +145,9 @@ class _GateCard extends StatelessWidget {
                   ),
                 const SizedBox(height: 12),
                 for (final n in const [
-                  '帮工能在这台电脑上跑命令，所以院门只让配对过的设备进来；配对要你在这里点头。',
-                  '配对过的设备和你一样用这个农场。院门的开关和设备只能在这台电脑上管。',
-                  '院门走的是不加密的 HTTP：同一个网络里的人可能看到传的内容。只在信得过的网络里开，比如家里的 Wi-Fi、自己的热点。',
+                  '帮工能在这台电脑上跑命令，所以只让配对过的设备连进来；配对要你在这里点头。',
+                  '配对过的设备和你一样用这个农场。开关和设备只能在这台电脑上管。',
+                  '连接走的是不加密的 HTTP：同一个网络里的人可能看到传的内容。只在信得过的网络里开，比如家里的 Wi-Fi、自己的热点。',
                   '电脑换了地址（换了网络）以后，设备连不上了，在这里添加设备再扫一次就好，不用重新点头。',
                 ])
                   Padding(
@@ -173,7 +173,7 @@ class _Pairing extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('「$asking」想进院门。让它进来以后，它能和你一样用这个农场。', style: body),
+          Text('「$asking」想连接到这台电脑。让它进来以后，它能和你一样用这个农场。', style: body),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -222,7 +222,7 @@ class _Pairing extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('手机打开 VibeValley，在「院门」里扫这个码；另一台 Mac 在它的「院门」里粘贴这个链接：', style: body),
+              Text('手机打开 VibeValley，在「连接到本机」里扫这个码；另一台 Mac 在它的「连接到本机」里粘贴这个链接：', style: body),
               const SizedBox(height: 8),
               SelectableText(pairing.link, style: KitText.mono.copyWith(fontSize: 11, color: Palette.bark900)),
               const SizedBox(height: 8),
@@ -235,7 +235,7 @@ class _Pairing extends StatelessWidget {
                     child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-copy', size: 16), SizedBox(width: 6), Text('复制链接')]),
                     onPressed: () {
                       unawaited(Clipboard.setData(ClipboardData(text: pairing.link)));
-                      toasts.add(type: ToastType.info, title: '复制好了', description: '粘贴到另一台 Mac 的「院门」里。');
+                      toasts.add(type: ToastType.info, title: '复制好了', description: '粘贴到另一台 Mac 的「连接到本机」里。');
                     },
                   ),
                   PxButton.text('换一个码', onPressed: () => act((api) => api.startPairing())),
@@ -299,7 +299,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
   Future<void> _connect(String text) async {
     final link = PairLink.parse(text);
     if (link == null) {
-      setState(() => _error = '这不是院门的配对链接：它以 vibevalley://pair 开头');
+      setState(() => _error = '这不是配对链接：它以 vibevalley://pair 开头');
       return;
     }
     setState(() {
@@ -313,7 +313,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
         known: farmConnection.value.remote,
         apiFor: (url, key) => VibeValleyServer(url, key: key).api,
       );
-      toasts.add(type: ToastType.info, title: '进院门了', description: '现在用的是 ${remote.farm} 的农场。');
+      toasts.add(type: ToastType.info, title: '连上了', description: '现在用的是 ${remote.farm} 的农场。');
       await saveFarmChoice(FarmChoice(remote: remote, useRemote: true));
     } on Object catch (e) {
       if (mounted) setState(() => _error = reasonOf(e));
@@ -354,9 +354,9 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
               child: PxButton.text(own, onPressed: _waiting != null ? null : _useOwn),
             ),
             const SizedBox(height: 16),
-            Text('那台电脑换了地址，或者要换一个农场：在那台电脑的院门里添加设备，再扫码或粘贴链接。', style: KitText.xs.copyWith(color: Palette.bark500)),
+            Text('那台电脑换了地址，或者要换一个农场：在那台电脑的「连接到本机」里添加设备，再扫码或粘贴链接。', style: KitText.xs.copyWith(color: Palette.bark500)),
           ] else ...[
-            Text('在另一台电脑的 VibeValley 里打开「院门」、点「添加设备」，${canScan ? '扫它给的码，或者' : ''}把它给的链接粘贴在这里。', style: body),
+            Text('在另一台电脑的 VibeValley 里打开「连接到本机」、点「添加设备」，${canScan ? '扫它给的码，或者' : ''}把它给的链接粘贴在这里。', style: body),
             if (choice.remote case final last?) ...[
               const SizedBox(height: 8),
               Wrap(

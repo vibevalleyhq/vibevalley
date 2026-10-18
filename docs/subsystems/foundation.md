@@ -70,7 +70,7 @@
 **测试**
 
 - **不连网、不花钱**：帮工由 smith 的 `oartest` 扮演（一个真实的会话：同样的记录、折叠和控制，没有程序、登录和模型；脚本按工单里的字眼跑命令、提交、发呆、失败、解决冲突），项目用临时目录里真的 git 仓库，模型用 `ai.FauxProvider`，声网和三家聊天软件是本地假服务；测试里 `Runtime` 不探测本机的农机。
-- **测试跟着它测的包走，只碰得到它下面的**：包自己的测试用 `world_test.go` 的 `newWorld`（一个 `base.App`，只带排在前面的包和本包；`task` 的 `newWorldWith` 能多带后面的）；一路走过好几个包的在 `internal/workspace`，用 `workspace.New`；要走整个 API 的院门测试是外部测试包 `gate_test`，要碰的内部经 `export_test.go`。单个零件用它的构造函数直接建。
+- **测试跟着它测的包走，只碰得到它下面的**：包自己的测试用 `world_test.go` 的 `newWorld`（一个 `base.App`，只带排在前面的包和本包；`task` 的 `newWorldWith` 能多带后面的）；一路走过好几个包的在 `internal/workspace`，用 `workspace.New`；要走整个 API 的「连接到本机」测试是外部测试包 `gate_test`，要碰的内部经 `export_test.go`。单个零件用它的构造函数直接建。
 - **`testkit`、`golden` 不 import 农场的包**，`protocol` 自己的测试也用它们。各包不写自己的断言和等待：等会发生的事用 `Await`/`Until`（同一个期限），只有查「不该再发生」的用 `Settle`（固定 200 毫秒，慢机器上可能漏报，不会误报）；不用 `time.Sleep` 赌时间。
 - **纯规则直接测**，一个输入进去、结果出来，不开会话。
 
@@ -115,7 +115,7 @@
 
 - **每个服务包**：照这里的约定写 `Service`、`Module`，经 `base` 拿数据库、`Hub`、配置、id。
 - **`core`**：核心状态只经 `Core.Apply` 改；它最先建、最后关，`state.json` 在全部服务停了以后才写。
-- **`handler`、`cmd/server`**：`handler.Listen` 开监听、建 `Workspace`、经 `BeforeReady` 在服务发开机的活之前开始答 HTTP；`handler.New` 在农场开之前把 `apiMux` 交给 `Gate.API`（院门要答 API，API 也答院门自己的页面）。
+- **`handler`、`cmd/server`**：`handler.Listen` 开监听、建 `Workspace`、经 `BeforeReady` 在服务发开机的活之前开始答 HTTP；`handler.New` 在农场开之前把 `apiMux` 交给 `Gate.API`（「连接到本机」要答 API，API 也答「连接到本机」自己的页面）。
 - **Flutter**：只读 `shapegen` 写的 `lib/gen/vibevalley.dart`；客户端的分层和替身在 [app/README.md](app/README.md)。
 - **文档**：`shapegen` 写 [capabilities.md](docs/reference/capabilities.md)；`docs:verify` 跑 `stale-names.ts`，在 `server/internal`、`server/cmd`、`app/lib`、`app/test` 里查改掉的旧名字。
 
@@ -137,7 +137,7 @@
 - **`Up` 只接数据库连接。** 留着 `Up(db, path)` 要每个调用者保证备份目标和连接的数据源是同一个；URI 内存库、转义的路径、工作目录变化会让这份配对知识散在入口。SQLite 自己知道实际的主库，迁移直接问它。
 - **主键用 uuidv7。** 原来工单是随机码、计划是 `p1`、别的是自增整数，协议里一半 `string` 一半 `int64`；跨表、跨农场导数据时整数会打架。uuidv7 带时间、同一进程里单调，两样都省了。代价是已读位置和投递按 id 比先后：系统时钟往回调时，重启后的新消息可能排在旧消息前面；只有一个人在本机用，接受这个风险。
 - **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 smith 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[verify-manager-evals](.agents/skills/verify-manager-evals/SKILL.md)、`verify-server`）。
-- **测试跟着包走，共用一套工具。** 全部集成测试留在顶层包，语音、院门、田头的测试碰了一百来样包内的东西，要么全导出、要么全重写；分到各包、用 `newWorld` 只建它下面的，几乎不用改测试本身。没让所有跨包测试都用外部测试包加 `export_test.go`：每碰一样内部就要转一道，只给真要走整个 API 的院门用。断言和等待原来各写五份、八份，期限不一，还有赌时间的 `Sleep`；`testkit` 不 import 农场的包，`protocol` 也能用，各包就不必另写。
+- **测试跟着包走，共用一套工具。** 全部集成测试留在顶层包，语音、「连接到本机」、田头的测试碰了一百来样包内的东西，要么全导出、要么全重写；分到各包、用 `newWorld` 只建它下面的，几乎不用改测试本身。没让所有跨包测试都用外部测试包加 `export_test.go`：每碰一样内部就要转一道，只给真要走整个 API 的「连接到本机」用。断言和等待原来各写五份、八份，期限不一，还有赌时间的 `Sleep`；`testkit` 不 import 农场的包，`protocol` 也能用，各包就不必另写。
 - **改名靠编译器和护栏，不靠全局替换。** `turn`、`station`、`harvest` 在 smith、游戏和界面文字里都是对的，盲目 `sed` 要花更多时间找回来。标识符改名用 `gopls rename` 和编译器（Dart 改生成的 `lib/gen`，`flutter analyze` 列出待改处），批量的同一写法用 ast-grep，字符串、SQL、Markdown 用 `rg` 逐处改；改掉的旧名写进 `scripts/stale-names.ts`，回来时 `docs:verify` 失败。
 
 ## 还没做的

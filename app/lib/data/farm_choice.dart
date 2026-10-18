@@ -140,7 +140,7 @@ Future<RemoteFarm> pairWith(PairLink link, {required String name, RemoteFarm? kn
     );
     return RemoteFarm(url: link.url, key: paired.key, farm: paired.farm, device: paired.device);
   } on http.ClientException {
-    throw VibeValleyApiError(0, null, '连不上 ${link.url.host}：两台设备要在同一个网络里，那台电脑的院门要开着');
+    throw VibeValleyApiError(0, null, '连不上 ${link.url.host}：两台设备要在同一个网络里，那台电脑要允许连接');
   } finally {
     api.close();
   }

@@ -18,7 +18,7 @@ enum SettingsSection {
   connectors('连接器', '微信 飞书 QQ'),
   skills('技能', '帮工能带的技能'),
   voice('声音', '和管家打电话'),
-  gate('院门', '手机和别的电脑');
+  gate('连接到本机', '手机和别的电脑');
 
   const SettingsSection(this.label, this.line);
   final String label;

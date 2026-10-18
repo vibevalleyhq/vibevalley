@@ -51,7 +51,7 @@ class ConnectionBanner extends ConsumerWidget {
                         text: '连不上 ${remote.farm} 的农场（${remote.url.authority}）。',
                         style: const TextStyle(color: Palette.berry),
                       ),
-                      const TextSpan(text: '那台电脑要开着、院门要开着，两台设备在同一个网络里；它换了地址就到'),
+                      const TextSpan(text: '那台电脑要开着、要允许连接，两台设备在同一个网络里；它换了地址就到'),
                     ] else ...[
                       const TextSpan(
                         text: '连不上 VibeValley 服务端。',
@@ -64,7 +64,7 @@ class ConnectionBanner extends ConsumerWidget {
                     WidgetSpan(
                       alignment: PlaceholderAlignment.baseline,
                       baseline: TextBaseline.alphabetic,
-                      child: TextLink('院门', underline: true, style: text, onTap: () => context.go('/settings/gate')),
+                      child: TextLink('连接到本机', underline: true, style: text, onTap: () => context.go('/settings/gate')),
                     ),
                     TextSpan(text: remote != null ? '重新扫码。' : '扫码。'),
                   ],
