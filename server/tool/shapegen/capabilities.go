@@ -17,8 +17,8 @@ func (s *shapes) capabilities() string {
 |---|---|---|
 | 主人 | 主人在农场那台电脑上 | Flutter、命令行 |
 | 连进来的设备 | 主人配对过的手机、另一台电脑 | 经「连接到本机」只放这一列打了 ✓ 的 |
-| 管家 | 管家 | 只是记下，不按它放行：管家的工具另写在 `+"`internal/tool`"+` |
-| Session | 帮工 | 没有接口打 ✓：帮工经 `+"`/mcp`"+` 用 `+"`internal/tool`"+` 的工具 |
+| 管家 | 管家 | 只是记下，不按它放行：管家的工具另写在 ` + "`internal/tool`" + ` |
+| Session | 帮工 | 没有接口打 ✓：帮工经 ` + "`/mcp`" + ` 用 ` + "`internal/tool`" + ` 的工具 |
 
 管家、Session 两列要去掉，agent 能调什么写在档案上（[管家是一份档案](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md)）。
 

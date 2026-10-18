@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（16 篇）
+## proposed（15 篇）
 
 ### feature
 
@@ -16,7 +16,6 @@
 
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)
 - 2026-10-18 [种子数据由服务端给，客户端不带副本](.agents/notes/proposed/architecture/2026-10-18-seeds-come-from-the-server.md)
-- 2026-10-18 [一张工单一个串](.agents/notes/proposed/architecture/2026-10-18-one-thread-per-issue.md)
 - 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
 - 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)
 - 2026-10-18 [一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)
