@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 const pets = ['dog', 'ragdoll', 'bluecat'];
 
 class Prefs {
-  const Prefs({this.autoplay = true, this.pick = 'auto', this.muted = false, this.managerLook, this.pet});
+  const Prefs({this.autoplay = true, this.pick = 'auto', this.muted = false, this.managerLook, this.pet, this.lastProject});
 
   /// Unused; kept so an older save reads the same.
   final bool autoplay;
@@ -22,26 +22,31 @@ class Prefs {
   /// null is the dog.
   final String? pet;
 
+  /// The project last sown in: the farm's sowing bag starts there when the bed has none.
+  final String? lastProject;
+
   String get petOrDog => pet ?? 'dog';
 
-  Prefs copyWith({bool? autoplay, String? pick, bool? muted, String? managerLook, String? pet}) => Prefs(
+  Prefs copyWith({bool? autoplay, String? pick, bool? muted, String? managerLook, String? pet, String? lastProject}) => Prefs(
     autoplay: autoplay ?? this.autoplay,
     pick: pick ?? this.pick,
     muted: muted ?? this.muted,
     managerLook: managerLook ?? this.managerLook,
     pet: pet ?? this.pet,
+    lastProject: lastProject ?? this.lastProject,
   );
 
-  Map<String, Object?> toJson() => {'autoplay': autoplay, 'pick': pick, 'muted': muted, 'managerLook': ?managerLook, 'pet': ?pet};
+  Map<String, Object?> toJson() => {'autoplay': autoplay, 'pick': pick, 'muted': muted, 'managerLook': ?managerLook, 'pet': ?pet, 'lastProject': ?lastProject};
 
   /// A save that does not read is ignored: the farm starts fresh.
   static Prefs? fromJson(Object? raw) {
     if (raw is! Map) return null;
-    final autoplay = raw['autoplay'], pick = raw['pick'], muted = raw['muted'], look = raw['managerLook'], pet = raw['pet'];
+    final autoplay = raw['autoplay'], pick = raw['pick'], muted = raw['muted'], look = raw['managerLook'], pet = raw['pet'], last = raw['lastProject'];
     if (autoplay is! bool || pick is! String || muted is! bool) return null;
     if (look != null && look is! String) return null;
     if (pet != null && !pets.contains(pet)) return null;
-    return Prefs(autoplay: autoplay, pick: pick, muted: muted, managerLook: look as String?, pet: pet as String?);
+    if (last != null && last is! String) return null;
+    return Prefs(autoplay: autoplay, pick: pick, muted: muted, managerLook: look as String?, pet: pet as String?, lastProject: last as String?);
   }
 }
 
@@ -82,4 +87,7 @@ class PrefsNotifier extends Notifier<Prefs> {
   void setPick(String pick) => _set(state.copyWith(pick: pick));
   void setManagerLook(String look) => _set(state.copyWith(managerLook: look));
   void setPet(String pet) => _set(state.copyWith(pet: pet));
+  void setLastProject(String project) {
+    if (project != state.lastProject) _set(state.copyWith(lastProject: project));
+  }
 }

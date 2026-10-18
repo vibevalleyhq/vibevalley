@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vibevalley/audio/sfx.dart';
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/workbench/projects/projects_page.dart';
@@ -222,6 +223,8 @@ void main() {
 
   testWidgets('the map: islands and their plots; a free plot starts an issue there, a helper opens its own, an island its worktrees', (t) async {
     final handle = t.ensureSemantics();
+    Sfx.setMuted(true);
+    addTearDown(() => Sfx.setMuted(false));
     final now = DateTime.now().millisecondsSinceEpoch;
     final routes = Routes();
     final api = fakeApi(routes, {
@@ -250,6 +253,13 @@ void main() {
           'slots': 2,
         },
       ],
+      'GET /api/v1/projects/task-smoke/seeds': const ProjectSeeds(
+        project: 'task-smoke',
+        stack: ProjectStack(name: 'go', label: 'Go', test: 'go test ./...'),
+        recent: [],
+        kinds: [],
+      ).toJson(),
+      'POST /api/v1/issues/b1/dispatch': const Dispatched(session: 's9').toJson(),
     });
     final state = farm(
       sessions: [
@@ -337,9 +347,33 @@ void main() {
     }
     expect(find.text('可收获'), findsOneWidget);
 
+    // Already inside the island's place: the bag sows there, with no project to choose and no farm bed.
     await t.tap(find.bySemanticsLabel('空位，派一件活到 task-smoke').first);
     await settle(t);
-    expect(went, ['/issues/new?project=task-smoke']);
+    expect(went, isEmpty, reason: 'the bag opens on the map, not the new-issue page');
+    expect(find.text('播种 · task-smoke'), findsOneWidget);
+    expect(find.text('种在 task-smoke'), findsOneWidget);
+    expect(find.text('种在哪个项目？'), findsNothing);
+    expect(find.text('换个项目'), findsOneWidget, reason: 'still there for the owner who meant another one');
+    await t.enterText(find.descendant(of: find.bySemanticsLabel('工单'), matching: find.byType(EditableText)), '补上冒烟测试');
+    await t.pump();
+    await t.ensureVisible(find.text('播种').last);
+    await t.tap(find.text('播种').last);
+    await settle(t);
+    expect(routes.named('POST', '/api/v1/say').single.body, {'text': '补上冒烟测试', 'project': 'task-smoke', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
+    await t.pump(const Duration(milliseconds: 200));
+    expect(find.text('播种 · task-smoke'), findsNothing, reason: 'sown: the bag closes');
+
+    // A queued todo starts from the bag on the island too, without a bed.
+    await t.tap(find.bySemanticsLabel('空位，派一件活到 docs').first);
+    await settle(t);
+    await t.tap(find.text('开工待办 1'));
+    await settle(t);
+    await t.tap(find.text('开工'));
+    await settle(t);
+    expect(routes.named('POST', '/api/v1/issues/b1/dispatch').single.body, isEmpty);
+    await t.pump(const Duration(milliseconds: 200));
+    expect(find.text('播种 · docs'), findsNothing);
 
     router.go('/projects');
     await settle(t);

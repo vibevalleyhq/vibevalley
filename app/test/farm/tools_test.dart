@@ -121,7 +121,7 @@ void main() {
 
   test('sowing asks the manager with the bed and the agent', () async {
     final (c, routes) = await setUpFarm();
-    await c.read(farmCommandsProvider).plant(3, '给 README 补上怎么启动', agent: 'tester');
+    await c.read(farmCommandsProvider).plant('给 README 补上怎么启动', bed: 3, agent: 'tester');
     expect(routes.paths, ['POST /api/v1/say']);
     expect(routes.calls.single.body, {'text': '给 README 补上怎么启动', 'bed': 3, 'agent': 'tester', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
   });

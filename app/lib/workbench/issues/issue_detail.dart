@@ -134,6 +134,9 @@ class _TodoState extends ConsumerState<TodoDetail> {
   bool _busy = false;
   late final IssueSubmission _submission;
 
+  /// A new issue opened inside a project (/issues/new?project=…) keeps it until the owner asks to change it.
+  late bool _projectFixed = widget.item == null && (widget.project ?? '').isNotEmpty;
+
   Future<void> _newProject(BuildContext context) async {
     final made = await showNewProjectDialog(context);
     if (made != null && mounted) setState(() => _project = made.name);
@@ -246,19 +249,40 @@ class _TodoState extends ConsumerState<TodoDetail> {
             ),
           ),
           const SizedBox(height: 12),
-          PxField(
-            label: '项目',
-            hint: projects.isEmpty ? InlineLink('工作目录里还没有项目：新建一个', onTap: () => _newProject(context)) : InlineLink('＋ 新建项目', onTap: () => _newProject(context)),
-            child: PxPick(
-              value: _project,
-              placeholder: '在哪个项目里做',
-              semanticLabel: '项目',
-              options: [
-                for (final p in {...projects, if (_project.isNotEmpty) _project}) PickOption(value: p, label: p),
-              ],
-              onChanged: (v) => setState(() => _project = v),
+          if (_projectFixed)
+            PxField(
+              label: '项目',
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      '派到 $_project',
+                      style: KitText.sm.copyWith(color: Palette.bark900),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  InlineLink('换个项目', onTap: () => setState(() => _projectFixed = false)),
+                ],
+              ),
+            )
+          else
+            PxField(
+              label: '项目',
+              hint: projects.isEmpty
+                  ? InlineLink('工作目录里还没有项目：新建一个', onTap: () => _newProject(context))
+                  : InlineLink('＋ 新建项目', onTap: () => _newProject(context)),
+              child: PxPick(
+                value: _project,
+                placeholder: '在哪个项目里做',
+                semanticLabel: '项目',
+                options: [
+                  for (final p in {...projects, if (_project.isNotEmpty) _project}) PickOption(value: p, label: p),
+                ],
+                onChanged: (v) => setState(() => _project = v),
+              ),
             ),
-          ),
           const SizedBox(height: 12),
           PxField(
             label: '帮工',

@@ -13,6 +13,7 @@ import '../../data/remote.dart' show agentsProvider, projectCatalogProvider;
 import '../projects/codebase.dart' show growthOf;
 import '../projects/projects_page.dart' show since;
 import '../../shared/faces.dart' show AgentFaceOf, PoseSprite;
+import '../../shared/seed_bag.dart';
 import '../../shared/swatches.dart';
 import '../shared/widgets.dart';
 import 'map_rules.dart';
@@ -304,7 +305,12 @@ class _IslandView extends ConsumerWidget {
     final agents = ref.watch(agentsProvider).value ?? const <String, Agent>{};
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     void go(String path) => workbenchGo(context, path);
-    final newIssue = '/issues/new?project=${Uri.encodeQueryComponent(island.project)}';
+    // Inside the island's place: the bag sows in this project, no bed and no project to choose.
+    void sow() => showPxDialog<void>(
+      context,
+      title: Text('播种 · ${island.project}'),
+      builder: (dialog) => SeedForm(project: island.project, onDone: () => Navigator.of(dialog).pop()),
+    );
 
     Widget place(SpriteInfo sp, Offset foot, {Widget? child, VoidCallback? onTap, String? tip, String? label}) {
       final picture = child ?? PixelSprite(sp, scale: s);
@@ -374,8 +380,8 @@ class _IslandView extends ConsumerWidget {
           }
         case SpotOpen():
           layers
-            ..add(place(atlas['plot-empty'], foot, onTap: () => go(newIssue), tip: tip, label: '空位，派一件活到 ${island.project}'))
-            ..add(place(atlas['map-stake'], foot + const Offset(9, -12), onTap: () => go(newIssue), tip: tip));
+            ..add(place(atlas['plot-empty'], foot, onTap: sow, tip: tip, label: '空位，派一件活到 ${island.project}'))
+            ..add(place(atlas['map-stake'], foot + const Offset(9, -12), onTap: sow, tip: tip));
         case SpotShut():
           layers.add(place(atlas['plot-locked'], foot, tip: tip, label: '等地'));
       }

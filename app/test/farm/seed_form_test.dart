@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vibevalley/data/prefs.dart';
 import 'package:vibevalley/data/ui_state.dart';
 import 'package:vibevalley/farm/panels.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
@@ -75,11 +79,16 @@ void main() {
     'POST /api/v1/issues/t5/dispatch': const Dispatched(session: 's9').toJson(),
   });
 
-  Future<void> open(WidgetTester tester, Routes r) async {
+  Future<ProviderContainer> open(WidgetTester tester, Routes r) async {
     final c = await pumpFarm(tester, const FarmPanels(), overrides: overrides(state, v, fakeApi(r), agents: agents));
     c.read(farmOverlaysProvider.notifier).sow(3);
     await settle(tester);
+    return c;
   }
+
+  void remember(String project) => SharedPreferences.setMockInitialValues({
+    'vibevalley.save': jsonEncode({'prefs': Prefs(lastProject: project).toJson()}),
+  });
 
   Future<void> pickClockIn(WidgetTester tester) async {
     expect(find.text('种在哪个项目？'), findsOneWidget, reason: 'an empty bed is no project\'s: it asks');
@@ -182,5 +191,39 @@ void main() {
     await settle(tester);
     expect(find.text('clock-in 已经有 3 个在干：还在排队，有空地就自动开工'), findsOneWidget);
     expect(find.text('播种 · 第 4 块地'), findsOneWidget);
+  });
+
+  testWidgets('sowing remembers the project; the next bag on a bed without one starts there, and can still change', (tester) async {
+    final r = routes();
+    final c = await open(tester, r);
+    await pickClockIn(tester);
+    await tester.enterText(find.descendant(of: find.bySemanticsLabel('工单'), matching: find.byType(EditableText)), '把打卡记录导出成 CSV');
+    await tester.pump();
+    await tester.ensureVisible(find.text('播种').last);
+    await tester.tap(find.text('播种').last);
+    await settle(tester);
+    expect(c.read(prefsProvider).lastProject, 'clock-in');
+
+    c.read(farmOverlaysProvider.notifier).sow(1);
+    await settle(tester);
+    expect(find.text('种在哪个项目？'), findsNothing);
+    expect(find.text('种在 clock-in'), findsOneWidget);
+    await tester.tap(find.text('换个项目'));
+    await settle(tester);
+    expect(find.text('种在哪个项目？'), findsOneWidget);
+  });
+
+  testWidgets('a remembered project is where a fresh bag starts', (tester) async {
+    remember('clock-in');
+    await open(tester, routes());
+    expect(find.text('种在哪个项目？'), findsNothing);
+    expect(find.text('种在 clock-in'), findsOneWidget);
+    expect(find.text('换个项目'), findsOneWidget);
+  });
+
+  testWidgets('a remembered project no longer in the work root is not offered: it asks', (tester) async {
+    remember('gone');
+    await open(tester, routes());
+    expect(find.text('种在哪个项目？'), findsOneWidget);
   });
 }

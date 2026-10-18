@@ -35,8 +35,10 @@ const pages = {
   'ticket': '/issues/w11',
   'ticket-planned': '/issues/w13',
   'ticket-new': '/issues/new',
+  'ticket-new-project': '/issues/new?project=clock-in',
   'map': '/projects',
   'map-island': '/projects/pb-smoke',
+  'map-sow': '/projects|空位，派一件活到 clock-in',
   'gate': '/settings/gate',
   'agents': '/agents',
   'agent': '/agents/backend',
@@ -121,7 +123,7 @@ void main() {
           await Future<void>.delayed(const Duration(milliseconds: 50));
           await tester.pump(const Duration(milliseconds: 50));
         }
-        expect(router.routeInformationProvider.value.uri.path, path, reason: '$name must render its requested route');
+        expect(router.routeInformationProvider.value.uri.path, Uri.parse(path).path, reason: '$name must render its requested route');
         if (name.startsWith('sow')) {
           container.read(farmOverlaysProvider.notifier).sow(null);
           await tester.pump();

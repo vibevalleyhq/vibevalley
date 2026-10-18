@@ -8,10 +8,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/providers.dart';
+import 'package:vibevalley/workbench/issues/issue_detail.dart' show TodoDetail;
 import 'package:vibevalley/workbench/issues/issues_page.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/rules/issues.dart';
-import 'package:vibevalley/ui/kit/kit.dart' show toasts;
+import 'package:vibevalley/ui/kit/kit.dart' show PxPick, toasts;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/server.dart' show FakeServer, jsonResponse, settle;
@@ -118,6 +119,33 @@ void main() {
       expect(backend.calls.where((c) => c.path == '/api/v1/sessions'), isEmpty);
     });
   }
+
+  testWidgets('a new issue opened inside a project says where it goes; the picker waits for 换个项目', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    ProjectSummary project(String name) => ProjectSummary(
+      name: name,
+      path: '/work/$name',
+      git: true,
+      slots: 3,
+      pullRequest: const PullRequestCapability(available: false, reason: ''),
+    );
+    final backend = WorkbenchBackend(projects: [project('clock'), project('notes')]);
+    await pumpPage(
+      t,
+      const IssuesPage(id: 'new', project: 'clock'),
+      backend.handle,
+      farm: fakes.farm(),
+    );
+    expect(find.text('写一张工单'), findsOneWidget);
+    expect(find.text('派到 clock'), findsOneWidget);
+    final picks = find.descendant(of: find.byType(TodoDetail), matching: find.byWidgetPredicate((w) => w is PxPick));
+    expect(picks, findsOneWidget, reason: 'only the 帮工 picker: the project came with the page');
+    await t.tap(find.text('换个项目'));
+    await settle(t);
+    expect(find.text('派到 clock'), findsNothing);
+    expect(picks, findsNWidgets(2));
+    await t.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('missing execution records remain explicit and do not invent a resting helper', (t) async {
     const issue = Issue(

@@ -16,6 +16,7 @@ import '../rules/cast.dart';
 import '../shared/tags.dart';
 import 'farm_log.dart';
 import 'plot_detail.dart';
+import '../shared/seed_bag.dart';
 import 'seed_forms.dart';
 
 class FarmPanels extends ConsumerWidget {
@@ -57,7 +58,7 @@ class FarmPanels extends ConsumerWidget {
             icon: 'icon-seeds',
             size: FarmDialogSize.lg,
             onClose: () => actions.sow(null),
-            child: SeedForm(station: station, onDone: () => actions.sow(null)),
+            child: SeedForm(bed: station, onDone: () => actions.sow(null)),
           );
         case WaterOverlay(:final id):
           final session = byId(id);
