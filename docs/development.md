@@ -41,6 +41,52 @@ app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
 
 客户端里按 `` ` `` 打开（`app/lib/debug/`），对着真的服务端：控制通话、管家和钟点，看帮工，试听音效，看收到的帧和事件。
 
+## 只用命令行派一个活
+
+先在仓库根目录起服务端：
+
+```bash
+cd server && go run ./cmd/server
+```
+
+另开终端，让命令行指向它。下面的命令用已装好的 `vibevalley`；也可在 `server/` 下用 `go run ./cmd/vibevalley` 代替。
+
+```bash
+export VIBEVALLEY_SERVER=http://127.0.0.1:8787
+```
+
+1. 建工单。把 `…` 换成标题和项目，用返回的工单 ID 替换后面的 `<id>`。
+
+   ```bash
+   vibevalley issue create --json '{"title":"…","project":"…","assignee":"codex"}'
+   ```
+
+2. 派活。命令把备选挪到待办，等帮工交回来，再打出改动。
+
+   ```bash
+   vibevalley issue run <id>
+   ```
+
+3. 如果不满意，写清要改什么，再干一轮。
+
+   ```bash
+   vibevalley issue status <id> --json '{"status":"todo","text":"…"}'
+   ```
+
+   反复运行下面的命令。先等 `status` 变成 `in_progress`，再等它回到 `in_review`。
+
+   ```bash
+   vibevalley issue get <id>
+   ```
+
+4. 如果满意，收下改动。服务端把改动合进主分支。
+
+   ```bash
+   vibevalley issue status <id> --json '{"status":"done"}'
+   ```
+
+状态规则见 [server.md「改状态就是派活」](reference/server.md#帮工)，设计理由见 [status-is-the-dispatch](../.agents/notes/implemented/architecture/2026-10-18-status-is-the-dispatch.md)。
+
 ## 素材、音效和官网
 
 - 贴图在 `design/pixel/` 里生成、切图（[pixel-village.md](reference/pixel-village.md)「素材」），不手改 `sprites.json`。
