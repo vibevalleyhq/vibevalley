@@ -1,6 +1,6 @@
 # Agent Notes
 
-这里只放一种设计文档。一篇 **Agent Note** 是一份具体的计划：要做什么、为什么、放弃了什么、怎么算做完，和做的过程里定下的事。做完以后仍然成立的部分沉淀进 [子系统](../../docs/subsystems/README.md)（边界、模型、流程、为什么这样），Note 删掉；当前的行为和约定归 [docs](../../docs/README.md)，这里不复制接口、字段或清单。本文定义 Note 放在哪、什么时候写、文件格式。约定照 [DeepSeek Harness 的 Agent Notes](https://github.com/deepseek-ai/deepseek-harness/tree/master/.agents/notes)；正文写中文，需要机器检查的标记（`# Agent Note:`、`Status:` 和章节名）保持英文原样。
+这里只放一种设计文档。一篇 **Agent Note** 是一份具体的计划：要做什么、为什么、放弃了什么、怎么算做完，和做的过程里定下的事。做完以后仍然成立的部分沉淀进 [子系统](docs/subsystems/README.md)（边界、模型、流程、为什么这样），Note 删掉；当前的行为和约定归 [docs](docs/README.md)，这里不复制接口、字段或清单。本文定义 Note 放在哪、什么时候写、文件格式。约定照 [DeepSeek Harness 的 Agent Notes](https://github.com/deepseek-ai/deepseek-harness/tree/master/.agents/notes)；正文写中文，需要机器检查的标记（`# Agent Note:`、`Status:` 和章节名）保持英文原样。
 
 ## 位置和命名
 
@@ -12,13 +12,13 @@
   - **`rejected/`**：考虑过、否决了。只在它的理由能防止一个诱人而实际的错误时保留，否则删掉。
 - **类别**（第二层目录）是决策的种类，见下面「类别」。
 
-文件名里的日期是这个话题**第一次提出**的日子。Note 之间互相引用用相对 Markdown 链接（`[题目](../../implemented/architecture/2026-…-….md)`），不用裸文字或编号，这样能机器检查，挪目录后也能修。
+文件名里的日期是这个话题**第一次提出**的日子。Note 之间互相引用用 Markdown 链接，路径从仓库根写（`[题目](.agents/notes/implemented/architecture/2026-…-….md)`），不用裸文字或编号，这样能机器检查，挪目录后搜一个字符串就能修。
 
-清单是 [CATALOG.md](CATALOG.md)：按生命周期和类别列出每篇 Note 的日期和标题，新的在前。它由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从路径和标题写成，不手改，也不另建手写的 `INDEX.md`：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错；合并时它冲突了不用手合，重新生成（[理由](implemented/process/2026-10-15-notes-catalog.md)）。
+清单是 [CATALOG.md](.agents/notes/CATALOG.md)：按生命周期和类别列出每篇 Note 的日期和标题，新的在前。它由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从路径和标题写成，不手改，也不另建手写的 `INDEX.md`：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错；合并时它冲突了不用手合，重新生成（[理由](.agents/notes/implemented/process/2026-10-15-notes-catalog.md)）。
 
 ## 类别
 
-类别是封闭的集合，以 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 为准，校验会拒绝其他目录。加一个类别要同时改那里和本节。
+类别是封闭的集合，以 [scripts/agent-notes.ts](scripts/agent-notes.ts) 为准，校验会拒绝其他目录。加一个类别要同时改那里和本节。
 
 | 类别 | 管什么 |
 |---|---|
@@ -39,7 +39,7 @@
 
 ## 文件格式
 
-每篇 Note 都用同一个格式，`bun run notes:verify` 检查（[scripts/agent-notes.ts](../../scripts/agent-notes.ts)）。
+每篇 Note 都用同一个格式，`bun run notes:verify` 检查（[scripts/agent-notes.ts](scripts/agent-notes.ts)）。
 
 ### 开头
 

@@ -79,7 +79,7 @@ Status: proposed
 交给谁由收件人定，信箱不知道 agent 怎么跑：
 
 - **Session**：开一轮、插话、排到这一轮之后，都经 `session.Service`（现在的 `Deliver` 拆成这三个动作）；能不能开（同时干活的上限）仍由 Session 定，开不了的信留在信箱里，有空地了再交。
-- **管家**：常驻（[管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md) 第 4 节的「常驻」），管家包在开机时把自己的三个动作交给编排层（`mailbox` 排在 `manager` 前面，往上走 `base.Hub` 或注册一个收件的接口）。`manager.ask`、`send`、`heardInChat`、`onWork` 和那五个 Hub 订阅都不要了。
+- **管家**：常驻（[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md) 第 4 节的「常驻」），管家包在开机时把自己的三个动作交给编排层（`mailbox` 排在 `manager` 前面，往上走 `base.Hub` 或注册一个收件的接口）。`manager.ask`、`send`、`heardInChat`、`onWork` 和那五个 Hub 订阅都不要了。
 
 ### 5. 节流和熔断都搬进编排层
 
@@ -90,7 +90,7 @@ Status: proposed
 - 「谁该听到」（`chatAudience`：@、工单串、跟着的串、田头）留在 `channel`：这是频道的规则。
 - 同时干活的上限（工作区、农机、项目三层）留在 `session`：这是开工的规则。
 - 排队的工单找空地（`issue` 每 5 秒）留在 `issue`：那是派活，不是交话。
-- agent 自己的 Task 里帮手做完了交回结果，是 `internal/agent/brain` 自己一个进程里的事（[Task：一张按 DAG 推进的活](2026-10-18-tasks-are-dags.md)），不经信箱；它和信箱共用一条规则：有帮手在跑时，新来的话不打断这一轮。
+- agent 自己的 Task 里帮手做完了交回结果，是 `internal/agent/brain` 自己一个进程里的事（[Task：一张按 DAG 推进的活](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)），不经信箱；它和信箱共用一条规则：有帮手在跑时，新来的话不打断这一轮。
 - 定时的时钟（`schedule` 每 20 秒）留在 `schedule`：到点只是投一封信。
 - 巡查留着它的「过了宽限期才报」的规则，只把报的方式换成投信；以后可以只是一种 `digest`。
 
@@ -128,6 +128,6 @@ Status: proposed
 ## Risks
 
 - 这是投递的主干，改坏了话就丢了或叫重了。第一步只搬不改：先让现有测试原样通过，再一格一格改默认表。
-- 管家的提示开头要保持不变（[提示开头不变](../../../../docs/subsystems/manager.md)）：信合成输入的格式变了，开头不能跟着变；改完跑 `verify-manager-evals`（要花钱，先问主人）。
+- 管家的提示开头要保持不变（[提示开头不变](docs/subsystems/manager.md)）：信合成输入的格式变了，开头不能跟着变；改完跑 `verify-manager-evals`（要花钱，先问主人）。
 - 插话的落点在「一批工具调用之后」，比现在的「马上」慢；对正在跑长命令的帮工，主人的话可能要等这条命令跑完才被看到。真不能等的用 `interrupt`。
 - 信箱在内存里的第一步，重启会丢掉非频道来源的信，和今天一样；落库前不要指望它可靠。

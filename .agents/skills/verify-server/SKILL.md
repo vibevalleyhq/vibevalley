@@ -16,12 +16,12 @@ description: 改了 VibeValley 服务端（server/internal/**、server/cmd/serve
 
 不用它：只改了纯函数、黄金数据和单元测试已经覆盖的；只改了注释和文档。
 
-这个 skill 不派真的帮工：真的帮工要本机登录的农机（`claude`、`codex`、`pi`……）或 DeepSeek 的钥匙，会花钱，要先问主人。帮工的行为用 `oartest` 写测试（[server/README.md](../../../server/README.md)）。
+这个 skill 不派真的帮工：真的帮工要本机登录的农机（`claude`、`codex`、`pi`……）或 DeepSeek 的钥匙，会花钱，要先问主人。帮工的行为用 `oartest` 写测试（[server/README.md](server/README.md)）。
 
 ## 准备
 
 1. 先跑 `cd server && go vet ./... && go test ./...`。
-2. 改了形状或查询，先按 [AGENTS.md](../../../AGENTS.md#命令) 生成代码。
+2. 改了形状或查询，先按 [AGENTS.md](AGENTS.md#命令) 生成代码。
 
 ## 步骤
 
@@ -42,7 +42,7 @@ description: 改了 VibeValley 服务端（server/internal/**、server/cmd/serve
    子命令得到 `VIBEVALLEY_SERVER` 和 `VIBEVALLEY_VERIFY_CLI`。需要造数据或断言时，把这些步骤写进同一个验证脚本再作为子命令传入；每次调用都是一个新农场。子命令失败仍会停止服务端，并保留它的退出码。
 
 3. 读证据目录的 `command.stdout.log`、`command.stderr.log` 和 `server.log`，核对接口结果、状态及错误。只有启动成功的 `health.json` 不能证明业务改动生效。
-4. 要看客户端，在同一个子命令中先造数据、再运行 [verify-app](../verify-app/SKILL.md) 的截图命令。
+4. 要看客户端，在同一个子命令中先造数据、再运行 [verify-app](.agents/skills/verify-app/SKILL.md) 的截图命令。
 
 ## 证据
 

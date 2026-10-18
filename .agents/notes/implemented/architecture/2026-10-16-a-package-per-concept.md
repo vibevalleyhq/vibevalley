@@ -4,13 +4,13 @@ Status: implemented
 
 ## Problem
 
-服务端的服务已经按概念分了模块（[服务由 fx 组装](2026-10-15-services-assembled-by-fx.md)），可它们还都在 `internal/farm` 一个包里，两万五千行。分层只是约定：一个服务碰得到任何别的服务，连没导出的字段也碰得到，往上调了编译器不说话，只能靠读代码发现。文件名前缀（`crew_`、`task_`、`foreman_`、`voice_`）在替包做事，而且已经和模块对不上：`task_ledger.go` 是游戏，`foreman_memory.go` 是记性，`voice_settings.go` 是大家都用的设置。
+服务端的服务已经按概念分了模块（[服务由 fx 组装](.agents/notes/implemented/architecture/2026-10-15-services-assembled-by-fx.md)），可它们还都在 `internal/farm` 一个包里，两万五千行。分层只是约定：一个服务碰得到任何别的服务，连没导出的字段也碰得到，往上调了编译器不说话，只能靠读代码发现。文件名前缀（`crew_`、`task_`、`foreman_`、`voice_`）在替包做事，而且已经和模块对不上：`task_ledger.go` 是游戏，`foreman_memory.go` 是记性，`voice_settings.go` 是大家都用的设置。
 
 ## Decision
 
-行为和约定见 [server/README.md](../../../../server/README.md#服务)「服务」。
+行为和约定见 [server/README.md](server/README.md#服务)「服务」。
 
-包名、`base` 的拆分和形状放在哪，后来按 [按业务分深模块，包名用单数](2026-10-16-deep-modules-singular-names.md) 改了。
+包名、`base` 的拆分和形状放在哪，后来按 [按业务分深模块，包名用单数](.agents/notes/implemented/architecture/2026-10-16-deep-modules-singular-names.md) 改了。
 
 - **一个模块一个包**，都在 `server/internal/` 下：`base`、`projects`、`memory`、`runs`、`chat`、`tickets`、`manager`、`channels`、`game`，`farm` 在最上面。一个包只 import 排在它前面的包，分层从约定变成编译错误。原来的 agents 模块改叫 `memory`：smith 有个 `agents` 包，`runs` 两个都要用，而且这个包里只有记性。
 - **`base` 放大家共用的**：数据库、`Site`、`Store`、`Settings`、`Hub`、`Config`、服务之间传的形状（`types.go`），按 JavaScript 算长度的文本函数，和生命周期（`App`、`Run`）。原来散在各处、被下层借用的小函数（配对码、可取消的睡眠、读数字环境变量、截断）也挪到这里，不让下层 import 上层。
@@ -27,7 +27,7 @@ Status: implemented
 
 ## Alternatives considered
 
-**按层分，不按概念分。** 按「谁调谁」切成几层包，切口最少。没选：fx 那次已经因为这个改成按概念分（[概念先行，农场是皮](../../proposed/architecture/2026-10-15-concepts-first.md)），包就是那些模块。
+**按层分，不按概念分。** 按「谁调谁」切成几层包，切口最少。没选：fx 那次已经因为这个改成按概念分（[概念先行，农场是皮](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)），包就是那些模块。
 
 **更细的包（一个服务一个包）。** `Crew`、`Runtimes`、`Trajectories` 共用会话的规则和步骤，拆开要导出一大片包内的东西，而且没有哪个边界是这样守出来的。
 

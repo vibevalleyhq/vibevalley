@@ -1,57 +1,57 @@
 # VibeValley 文档
 
-VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮（[概念](concepts.md)）。这里写现在怎么用、怎么开发、东西怎么工作；为什么这样设计和还没做的提案在 [Agent Notes](../.agents/notes/README.md)，文档放在哪见 [AGENTS.md](AGENTS.md)。
+VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮（[概念](docs/concepts.md)）。这里写现在怎么用、怎么开发、东西怎么工作；为什么这样设计和还没做的提案在 [Agent Notes](.agents/notes/README.md)，文档放在哪见 [AGENTS.md](docs/AGENTS.md)。
 
 先读：
 
 | 文档 | 讲什么 |
 |---|---|
-| [guide.md](guide.md) | 教程：派第一张工单，看着它干，收获，处理冲突和失败，管住花费，用语音 |
-| [development.md](development.md) | 教程：本机跑起来，检查和测试，改形状、规则和表，打包 |
-| [concepts.md](concepts.md) | 概念：实际是什么，农场怎么画它们 |
-| [architecture.md](architecture.md) | 架构：分层、核心状态、事件流、接口、存储、配置。改 `server/`、`app/` 之前读 |
+| [guide.md](docs/guide.md) | 教程：派第一张工单，看着它干，收获，处理冲突和失败，管住花费，用语音 |
+| [development.md](docs/development.md) | 教程：本机跑起来，检查和测试，改形状、规则和表，打包 |
+| [concepts.md](docs/concepts.md) | 概念：实际是什么，农场怎么画它们 |
+| [architecture.md](docs/architecture.md) | 架构：分层、核心状态、事件流、接口、存储、配置。改 `server/`、`app/` 之前读 |
 
-子系统（`subsystems/`，从架构的角度写一个子系统沉淀下来的样子，[怎么写](subsystems/README.md)）：
+子系统（`subsystems/`，从架构的角度写一个子系统沉淀下来的样子，[怎么写](docs/subsystems/README.md)）：
 
 | 文档 | 内容 |
 |---|---|
-| [issue.md](subsystems/issue.md) | 工单：一块地的模型、状态和派活、验收、收获 |
-| [session.md](subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
-| [project.md](subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测 |
-| [channel.md](subsystems/channel.md) | 田头：频道、连接器、Inbox |
-| [manager.md](subsystems/manager.md) | 管家：自己的 agent、工具、巡查、评测 |
-| [schedule.md](subsystems/schedule.md) | 定时 |
-| [task.md](subsystems/task.md) | 种植计划和 agent 的任务图 |
-| [memory.md](subsystems/memory.md) | 记性 |
+| [issue.md](docs/subsystems/issue.md) | 工单：一块地的模型、状态和派活、验收、收获 |
+| [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
+| [project.md](docs/subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测 |
+| [channel.md](docs/subsystems/channel.md) | 田头：频道、连接器、Inbox |
+| [manager.md](docs/subsystems/manager.md) | 管家：自己的 agent、工具、巡查、评测 |
+| [schedule.md](docs/subsystems/schedule.md) | 定时 |
+| [task.md](docs/subsystems/task.md) | 种植计划和 agent 的任务图 |
+| [memory.md](docs/subsystems/memory.md) | 记性 |
 
 各部分现在怎么工作（`reference/`）：
 
 | 文档 | 讲什么 |
 |---|---|
-| [concept-map.md](reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
-| [capabilities.md](reference/capabilities.md) | 每个接口谁能调：主人、院门、管家、Session；shapegen 写出 |
-| [server.md](reference/server.md) | 还没拆成子系统的服务：设置、院门、游戏、重启 |
-| [agents-and-runtimes.md](reference/agents-and-runtimes.md) | 帮工档案、农机、技能书 |
-| [farm-ui.md](reference/farm-ui.md) | 农场界面和玩法 |
-| [pixel-village.md](reference/pixel-village.md) | 像素村、素材和音效 |
-| [voice.md](reference/voice.md) | 语音（Agora ConvoAI） |
-| [desktop.md](reference/desktop.md) | macOS 应用 |
+| [concept-map.md](docs/reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
+| [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：主人、院门、管家、Session；shapegen 写出 |
+| [server.md](docs/reference/server.md) | 还没拆成子系统的服务：设置、院门、游戏、重启 |
+| [agents-and-runtimes.md](docs/reference/agents-and-runtimes.md) | 帮工档案、农机、技能书 |
+| [farm-ui.md](docs/reference/farm-ui.md) | 农场界面和玩法 |
+| [pixel-village.md](docs/reference/pixel-village.md) | 像素村、素材和音效 |
+| [voice.md](docs/reference/voice.md) | 语音（Agora ConvoAI） |
+| [desktop.md](docs/reference/desktop.md) | macOS 应用 |
 
 怎么写（`style/`）：
 
 | 文档 | 讲什么 |
 |---|---|
-| [code.md](style/code.md) | 代码：格式、叫法、注释写什么不写什么 |
-| [writing.md](style/writing.md) | 文字：写什么、删什么，词和格式怎么写；文档、Note、skill、提交说明、注释和回复都用 |
+| [code.md](docs/style/code.md) | 代码：格式、叫法、注释写什么不写什么 |
+| [writing.md](docs/style/writing.md) | 文字：写什么、删什么，词和格式怎么写；文档、Note、skill、提交说明、注释和回复都用 |
 
 ## 用语
 
-界面用农场的叫法，代码和讲服务端的文档按实际的概念来（[concepts.md](concepts.md)）。界面上的字用左边一列，不用最右一列。
+界面用农场的叫法，代码和讲服务端的文档按实际的概念来（[concepts.md](docs/concepts.md)）。界面上的字用左边一列，不用最右一列。
 
 | 叫法 | 代码里 | 意思 | 不用 |
 |---|---|---|---|
 | 管家 | manager | 你直接说话的 agent，替你派活 | 工头、主 agent |
-| 帮工 | Session（[concepts](concepts.md#session-和-oar-会话)） | 在一块地上干活的：一个档案为一张工单接的活，跨好几次干活；重开的工单换一个帮工，地不换 | 工人、子 agent、worker |
+| 帮工 | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 在一块地上干活的：一个档案为一张工单接的活，跨好几次干活；重开的工单换一个帮工，地不换 | 工人、子 agent、worker |
 | 一次干活 | run | 一次触发到一次汇报：派出去、带话、计划、定时、农机自己；农场里是一季庄稼 | 一轮、turn |
 | 帮工档案 | agent（`Agent`） | 一份配置：农机、模型、人设、技能、哪种小动物 | 角色、profile |
 | 农机 | runtime | 机器上的一种编码 agent 程序（pi、claude、codex……） | harness、引擎 |

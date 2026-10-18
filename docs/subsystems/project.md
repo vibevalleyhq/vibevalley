@@ -6,21 +6,21 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 工作目录：`projects/` 下的项目，`worktrees/` 下的 worktree，工作目录的 `AGENTS.md` | 工作目录放在哪（配置 `work_root`，[architecture.md](../architecture.md)「配置」；打包的应用按渠道，[desktop.md](../reference/desktop.md)「渠道」） |
-| 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](manager.md)；档案的默认项目在帮工档案上） |
-| 一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](session.md)）；一个项目同时几个帮工在干（`session/rules.go` 的 `noRoom`，上限从这里取） |
-| 收成清单：提交、文件和 diff、没提交的、落后几个、会不会冲突 | 收获的流程：什么时候查冲突、交回帮工、本地合还是提 PR、PR 的轮询（[工单](issue.md#怎么走)） |
-| 检查（`.vibevalley/check`）、合并、推送、开 PR、查 PR 的状态、快进主分支 | 种植计划的分支和每一件的检查什么时候跑（[种植计划](task.md)） |
+| 工作目录：`projects/` 下的项目，`worktrees/` 下的 worktree，工作目录的 `AGENTS.md` | 工作目录放在哪（配置 `work_root`，[architecture.md](docs/architecture.md)「配置」；打包的应用按渠道，[desktop.md](docs/reference/desktop.md)「渠道」） |
+| 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](docs/subsystems/manager.md)；档案的默认项目在帮工档案上） |
+| 一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](docs/subsystems/session.md)）；一个项目同时几个帮工在干（`session/rules.go` 的 `noRoom`，上限从这里取） |
+| 收成清单：提交、文件和 diff、没提交的、落后几个、会不会冲突 | 收获的流程：什么时候查冲突、交回帮工、本地合还是提 PR、PR 的轮询（[工单](docs/subsystems/issue.md#怎么走)） |
+| 检查（`.vibevalley/check`）、合并、推送、开 PR、查 PR 的状态、快进主分支 | 种植计划的分支和每一件的检查什么时候跑（[种植计划](docs/subsystems/task.md)） |
 | GitHub 检测：`gh` 装没装、登没登录，每个项目能不能提 PR | `github.pr_projects` 里放哪些项目（主人的配置） |
-| 地契：项目列表、最近一次提交、种了什么（tokei）、一年的提交 | 项目页和地图怎么画（[farm-ui.md](../reference/farm-ui.md) 界面 12、19） |
-| 数工作目录里你名下的 commit | 经验和等级怎么算（`game/commits.go`、protocol 的 `XPToNext`、`LevelUps`；[farm-ui.md](../reference/farm-ui.md)「计分」） |
+| 地契：项目列表、最近一次提交、种了什么（tokei）、一年的提交 | 项目页和地图怎么画（[farm-ui.md](docs/reference/farm-ui.md) 界面 12、19） |
+| 数工作目录里你名下的 commit | 经验和等级怎么算（`game/commits.go`、protocol 的 `XPToNext`、`LevelUps`；[farm-ui.md](docs/reference/farm-ui.md)「计分」） |
 
 ## 在哪
 
 - 服务端 `server/internal/project`：`project.go` 工作目录、新建和克隆、`Workplace`、收成清单、合并和清理、`HouseRules`；`check.go` 合并前的提交、冲突预检和 `.vibevalley/check`；`pull_request.go` 推送、开 PR、查 PR、结束 PR、快进主分支；`github.go` GitHub 检测；`codebase.go` 地契；`contributions.go` 数 commit；`types.go` 对外的形状（`Workplace`、`Merged`、`MergeFailure`）。
-- 配置（`base.Config`，[architecture.md](../architecture.md)「配置」）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
+- 配置（`base.Config`，[architecture.md](docs/architecture.md)「配置」）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
 - 没有表：项目就是磁盘上的文件夹，PR 的回执记在工单上（`Issue.pullRequest`）。
-- 接口：`project.list`、`project.check`、`project.create`、`project.languages`、`project.activity`、`github.status`、`github.refresh`；收成清单是工单的 `issue.changes`（[capabilities.md](../reference/capabilities.md)）。
+- 接口：`project.list`、`project.check`、`project.create`、`project.languages`、`project.activity`、`github.status`、`github.refresh`；收成清单是工单的 `issue.changes`（[capabilities.md](docs/reference/capabilities.md)）。
 - 客户端：项目页 `workbench/projects/`（`projects_page.dart`，规则在 `codebase.dart`，新建在 `new_project_dialog.dart`），地图 `workbench/map/`（规则在 `map_rules.dart`）。
 
 ## 模型和不变量
@@ -85,7 +85,7 @@
 ## 和谁打交道
 
 - **帮工（`session`）**：开工调 `Workplace`、离开调 `Release`，规矩里附 `HouseRules`；`noRoom` 用 `Limit` 判一个项目还能不能再开工；收获经 `session` 的 `harvest`（先让帮工歇下，再调 `Merge`、`MergeInto`、`SubmitPullRequest`、`FinishPullRequest`），`conflict` 的失败由它施加 `FactConflict`。
-- **工单（`issue`）**：决定什么时候收获、走本地合还是 PR（`UsesPullRequests`）；`issue.changes` 调 `Changes`，用它刷新帮工的冲突；冲突预检 `Conflict`；重开时用 `BranchChanges` 看分支上有没有上次的提交；PR 的轮询调 `PullRequestState`（[工单](issue.md)）。
+- **工单（`issue`）**：决定什么时候收获、走本地合还是 PR（`UsesPullRequests`）；`issue.changes` 调 `Changes`，用它刷新帮工的冲突；冲突预检 `Conflict`；重开时用 `BranchChanges` 看分支上有没有上次的提交；PR 的轮询调 `PullRequestState`（[工单](docs/subsystems/issue.md)）。
 - **种植计划（`task`）**：`OpenBranch` 开计划分支、`ChangedFiles` 看一件改了哪些文件、`Run` 跑一件的检查、`MergeBranch` 把计划合进主分支、`BranchChanges` 给计划的收成清单。
 - **游戏（`game`）**：`game/commits.go` 开机、每 2 分钟、帮工干完一轮 15 秒后各调一次 `Contributions`，变了施加 `commits` 事实，经验由它折。
 - **管家（`manager`、`tool`）**：农场现状和 `look` 工具列出 `List` 和 `Root`。
@@ -108,8 +108,8 @@
 
 ## 还没做的
 
-- 一块地上几个人、写的权利像接力棒一样交接：[一块地上几个人一起种](../../.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
-- 用 VibeValley 开发 VibeValley，Beta 的工作目录里放 VibeValley 自己：[用 VibeValley 开发 VibeValley](../../.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)。
+- 一块地上几个人、写的权利像接力棒一样交接：[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
+- 用 VibeValley 开发 VibeValley，Beta 的工作目录里放 VibeValley 自己：[用 VibeValley 开发 VibeValley](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)。
 
 ## 怎么验证
 

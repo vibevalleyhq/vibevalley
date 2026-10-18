@@ -8,10 +8,10 @@ Status: implemented
 
 ## Decision
 
-见 [pixel-village.md](../../../../docs/reference/pixel-village.md)「素材」：
+见 [pixel-village.md](docs/reference/pixel-village.md)「素材」：
 
 - `design/pixel/gen.sh` 用 codex 的生图工具，以先画好的图作参考（地图、角色原图；界面的几张照 `design/assets/raw/` 的手绘原图，按钮图标照 `icons/ref.py` 排好的 Hugeicons 形状），出品红底的整张图到 `design/pixel/raw/`；提示词在 `design/pixel/prompts/`。
-- `design/pixel/process.py` 只写「哪张图、几行几列、每格叫什么」，去品红、切格、缩成真正的像素画、算落脚点，存 PNG 到 `app/assets/pixel/`，写 `sprites.json`。最早手绘的一套是 `design/assets/` 的 `gen.sh`、`chars.py`、`process.py` 加 `packages/engine/tools/cut_sheets.py`，存 WebP 到 `web/src/farm/assets/`；手绘画面后来拿掉了，`chars.py`、`process.py`、`cut_sheets.py` 和那些 WebP 都删了，`design/assets/` 只留 `gen.sh`、提示词和界面那几张原图（[只留像素村](../simplification/2026-10-12-pixel-only.md)）。
+- `design/pixel/process.py` 只写「哪张图、几行几列、每格叫什么」，去品红、切格、缩成真正的像素画、算落脚点，存 PNG 到 `app/assets/pixel/`，写 `sprites.json`。最早手绘的一套是 `design/assets/` 的 `gen.sh`、`chars.py`、`process.py` 加 `packages/engine/tools/cut_sheets.py`，存 WebP 到 `web/src/farm/assets/`；手绘画面后来拿掉了，`chars.py`、`process.py`、`cut_sheets.py` 和那些 WebP 都删了，`design/assets/` 只留 `gen.sh`、提示词和界面那几张原图（[只留像素村](.agents/notes/implemented/simplification/2026-10-12-pixel-only.md)）。
 - 一张生成图是一只动物穿一套衣服的全部动作，同一个角色在各个动作里长得一样；重新打光（黄昏、夜里）以原图为参考只改光线。
 
 ## Alternatives considered

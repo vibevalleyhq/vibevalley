@@ -47,7 +47,7 @@ project: { max_sessions: 0 }
 chat: { notice_batch_ms: 0, retry_wake_ms: 0 }
 ```
 
-键的清单和默认值在 [architecture.md](../../../../docs/architecture.md)「配置」。
+键的清单和默认值在 [architecture.md](docs/architecture.md)「配置」。
 
 ## Alternatives considered
 
@@ -59,7 +59,7 @@ chat: { notice_batch_ms: 0, retry_wake_ms: 0 }
 
 ## Consequences
 
-- **改了名的环境变量**：`HOST`、`PORT` 和几个调节项（`VIBEVALLEY_HEARTBEAT_MINUTES` 变成 `VIBEVALLEY_PATROL_HEARTBEAT_MINUTES` 这类）旧名不再认；照[只有一份表结构，不认旧数据](../../implemented/architecture/2026-10-16-one-schema-no-old-data.md)不留兼容，家目录的 `.env` 要手动改写成 `vibevalley.yaml`。
+- **改了名的环境变量**：`HOST`、`PORT` 和几个调节项（`VIBEVALLEY_HEARTBEAT_MINUTES` 变成 `VIBEVALLEY_PATROL_HEARTBEAT_MINUTES` 这类）旧名不再认；照[只有一份表结构，不认旧数据](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)不留兼容，家目录的 `.env` 要手动改写成 `vibevalley.yaml`。
 - **viper 的依赖**：它带进来 `mapstructure`、`fsnotify` 等几个包；只用它的读取，不用热重载。
 - **写错的值不再悄悄用默认**：读不成数字、不是端口，服务端开机就报错；以前它们落回默认值。
 - **一处看全**：一个值从哪来，看 `base.Config` 的字段和 architecture.md 的表就够了。

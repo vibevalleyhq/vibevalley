@@ -5,7 +5,7 @@
 - **农场的管家**：田头上那个管家本人接电话，看得到地里、自己派活，经「语音线路」接到声网。
 - **别的大模型**（声网托管、DeepSeek、自己的接口）：出声回答的语音管家看不到地里；它听到的一句话，客户端再交给农场的管家去派活。
 
-照 Agora 的官方示例 `agent-quickstart-nextjs` 写成（[理由](../../.agents/notes/implemented/feature/2026-10-10-voice-through-agora-quickstart.md)、[语音线路](../../.agents/notes/implemented/feature/2026-10-10-voice-through-our-manager.md)）。
+照 Agora 的官方示例 `agent-quickstart-nextjs` 写成（[理由](.agents/notes/implemented/feature/2026-10-10-voice-through-agora-quickstart.md)、[语音线路](.agents/notes/implemented/feature/2026-10-10-voice-through-our-manager.md)）。
 
 ## 服务端
 
@@ -45,11 +45,11 @@
 
 ## 凭据
 
-Agora 的 App ID 和 App Certificate 在「设置」的「Agora 语音」或「声音」里填，存在 `$VIBEVALLEY_HOME/settings.json`；也可以写进配置的 `agora.app_id`、`agora.app_certificate`，或者设环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。谁优先见 [server.md](server.md)「设置」。这些都不进仓库。
+Agora 的 App ID 和 App Certificate 在「设置」的「Agora 语音」或「声音」里填，存在 `$VIBEVALLEY_HOME/settings.json`；也可以写进配置的 `agora.app_id`、`agora.app_certificate`，或者设环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。谁优先见 [server.md](docs/reference/server.md)「设置」。这些都不进仓库。
 
 ## 配置（`/settings/voice`、`/manager/voice`）
 
-语音设置存在 `settings.json` 的 `voice`，只存和默认不一样的（页面发整份，服务端存的时候自己去掉和默认一样的），下一通电话生效。页面上一边改一边问 `POST /api/v1/settings/check`，说的就是保存时会被拒的理由。分两处改（[理由](../../.agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)）：
+语音设置存在 `settings.json` 的 `voice`，只存和默认不一样的（页面发整份，服务端存的时候自己去掉和默认一样的），下一通电话生效。页面上一边改一边问 `POST /api/v1/settings/check`，说的就是保存时会被拒的理由。分两处改（[理由](.agents/notes/implemented/feature/2026-10-13-agent-pages-memory-and-voice.md)）：
 
 - 「设置」里的「声音」（`/settings/voice`）配**线路**：凭据和区域、怎么听（识别、语言、断句、打断）、谁接电话（`answer`：管家自己接，或者一个快嘴模型先答、管家旁听派活）。
 - 管家页的「声音」（`/manager/voice`）配**电话上的管家**：人设、开场白、出错时说的话、音色。
@@ -58,7 +58,7 @@ Agora 的 App ID 和 App Certificate 在「设置」的「Agora 语音」或「�
 
 ## 语音线路（「想」选农场的管家时）
 
-`server/internal/voice/line.go`：声网按 OpenAI Chat Completions 协议来问管家（`model` 是 `vibevalley-manager`），管家的话边生成边以 SSE 流回去念。协议和本机的 `/v1/chat/completions` 是同一份（`internal/agent/brain/openai.go`，[管家](../subsystems/manager.md)），线路只管监听、钥匙和隧道。
+`server/internal/voice/line.go`：声网按 OpenAI Chat Completions 协议来问管家（`model` 是 `vibevalley-manager`），管家的话边生成边以 SSE 流回去念。协议和本机的 `/v1/chat/completions` 是同一份（`internal/agent/brain/openai.go`，[管家](docs/subsystems/manager.md)），线路只管监听、钥匙和隧道。
 
 - **只有这一个接口对外**：另开一个监听（配置的 `voice.line.port`，默认 8788，只听 127.0.0.1），上面只有 `POST /llm/<通话>/chat/completions`。端口被占时只记日志，农场照常。
 - **隧道**：设了 `voice.line.url` 就用它；没设时第一通电话开一个 cloudflared 临时隧道，等它能应答（最多 60 秒），最后一通挂了 10 分钟后关掉。

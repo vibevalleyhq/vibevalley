@@ -10,21 +10,21 @@
 | 开工想起什么（`pick`），和「下回开工会想起什么」的预览 | 什么时候算新的一轮、同一个会话想起过哪些（`session`，存在 `sessions.json`） |
 | 管理器：本地和外面的来源一起读、一起写，合并、去重、超时 | 外面来源的地址和 key 怎么存、怎么校验（`setting`，`settings.json` 的 `memorySources`） |
 | `memory_search`、`memory_add` 背后的检索和写入，回给模型的话（`FoundText`） | 工具的参数、谁能用、范围由谁定（`internal/tool/memory.go`；帮工经 `/mcp`，`internal/mcp`） |
-| 管家的 `MEMORY.md` 和旧账 `archive/` 给页面的读写口子 | 管家怎么把 `MEMORY.md` 带进系统提示、`remember` 和 `search_archive` 工具（`internal/agent/brain`；[agents-and-runtimes.md](../reference/agents-and-runtimes.md)「管家页」） |
-| 送往外面来源之前抹密钥 | 抹密钥的规则本身（`base/redact.go`，和服务端日志同一份；[server.md](../reference/server.md#设置)） |
-| | 技能书（程序性的「记性」走技能书，[agents-and-runtimes.md](../reference/agents-and-runtimes.md)「技能书」） |
+| 管家的 `MEMORY.md` 和旧账 `archive/` 给页面的读写口子 | 管家怎么把 `MEMORY.md` 带进系统提示、`remember` 和 `search_archive` 工具（`internal/agent/brain`；[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「管家页」） |
+| 送往外面来源之前抹密钥 | 抹密钥的规则本身（`base/redact.go`，和服务端日志同一份；[server.md](docs/reference/server.md#设置)） |
+| | 技能书（程序性的「记性」走技能书，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「技能书」） |
 
 ## 在哪
 
 - 服务端 `server/internal/memory`（`memory.Service`）：`service.go` 对外的方法（管家的和帮工档案的分流）、`providers.go` 管理器、`provider.go` 一个来源的接口、`local.go` 本地来源、`memory.go` 本地的读写和读「记住：」、管家 `MEMORY.md` 的口子、`recall.go` 挑法和检索（纯函数）、`terms.go` 切词和全文索引、`nowledge.go`、`everos.go` 两个外面的来源、`types.go` 服务之间传的形状（`RecallCue`、`FinishedRun`、`EndedSession`、`SearchQuery`、`Found`）。词典在 `memory/dict/`（gse v1.1.0 的简体词典，gzip）。
 - 表：`memory`（一条记忆一行）、`memory_term`（FTS5 虚表，外部内容，只存切好的词，三个触发器跟着 `memory` 改）；查询在 `pkg/db/queries/memory.sql`、`memory_term.sql`。
-- 接口：`memory.list`、`memory.recall`、`memory.create`、`memory.delete`，管家的旧账 `manager.listArchive`、`manager.getArchive`（[capabilities.md](../reference/capabilities.md)）。
+- 接口：`memory.list`、`memory.recall`、`memory.create`、`memory.delete`，管家的旧账 `manager.listArchive`、`manager.getArchive`（[capabilities.md](docs/reference/capabilities.md)）。
 - 客户端：`workbench/shared/memory_panels.dart`（帮工页的 `MemoryPanel`、管家页的 `ManagerMemoryPanel`、`ArchivePanel`），数据在 `data/remote.dart` 的 `memoryProvider`、`recallPreviewProvider`；来源在「设置」的「记性」（`shared/settings_form.dart`）。
 
 ## 模型和不变量
 
 - **记性的键是帮工档案的 id**，不是帮工：同一个档案的帮工共用一份；删了档案，记性还在库里，同 id 再建接着用。不进核心状态，页面打开时经接口读。
-- **本地的一条是两种之一**：`note`（记下的一句话：帮工汇报里的「记住：」、主人在页签上替它记的、`memory_add` 记的）和 `issue`（做过的活：工单前 100 字 + 「 → 」+ 最后一轮的结论前 200 字，没做成的写「没做成：」）。`project` 为空是所有项目的。做过的活一个 Session 一条，每轮改写（`memory_one_issue` 唯一索引）。表里的 `scope = owner`、`profile`、`episode`、`replaced_by`、`title`、`labels`、`importance` 是给[记忆都存在 SQLite](../../.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)留的，代码现在只写 `scope = agent` 的 `note`、`issue`，读时跳过 `replaced_by` 不为空的和不认识的种类。
+- **本地的一条是两种之一**：`note`（记下的一句话：帮工汇报里的「记住：」、主人在页签上替它记的、`memory_add` 记的）和 `issue`（做过的活：工单前 100 字 + 「 → 」+ 最后一轮的结论前 200 字，没做成的写「没做成：」）。`project` 为空是所有项目的。做过的活一个 Session 一条，每轮改写（`memory_one_issue` 唯一索引）。表里的 `scope = owner`、`profile`、`episode`、`replaced_by`、`title`、`labels`、`importance` 是给[记忆都存在 SQLite](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)留的，代码现在只写 `scope = agent` 的 `note`、`issue`，读时跳过 `replaced_by` 不为空的和不认识的种类。
 - **上限**：每个档案最多 300 条（`protocol.MemoryKeep`），超了先删最久没用的（最后想起的时间，没想起过按写下的时间，`nextForgotten`）；页签上离上限不到 10 条时把最先会删的标成 `fading`，和真删的顺序是同一个函数。一句话最多 300 个字符（UTF-16），一轮最多读 5 条「记住：」。
 - **一轮的笔记、做过的活和超额的清理在一个事务里**，失败不留下半份。
 - **几乎一样的不重复记**：同一个范围（同项目或都是所有项目）里已有一样的，或词的重合度（`memoryLikeness`，交集比并集）≥ 0.8 的，就不记；提不出词的不同短句重合度是 0，分别留着。
@@ -98,13 +98,13 @@
 - **外面的读最多等 2 秒，写在后台排队。** 开工等它就是主人在等；收工和记一条不等外面的服务，送不成只记日志。只给真放进话里的本地记忆记想起，被合并挤掉的不算。
 - **来源自带的工具不给 agent。** Nowledge 一家就有 70 多个工具，全给会撑满工具表，也说不清该用哪个。
 - **本地不用 Markdown 文件。** 字段多一行写不下，几个帮工同时收工没有事务，检索还得另建索引；页签本来就能看、能写、能删。
-- **管家的记性留在 `MEMORY.md`，页面直接读写那个文件。** 管家的 `remember`、`rewrite_memory` 和系统提示都写死了这个文件，`brain` 又是能单独用的命令行 agent；搬进表要先改它的记性模型（[记忆都存在 SQLite](../../.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)）。
+- **管家的记性留在 `MEMORY.md`，页面直接读写那个文件。** 管家的 `remember`、`rewrite_memory` 和系统提示都写死了这个文件，`brain` 又是能单独用的命令行 agent；搬进表要先改它的记性模型（[记忆都存在 SQLite](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)）。
 - **Nowledge 用 label 隔开档案，不用 `agent_id`；只加不删。** 它不认识的 `agent_id` 退回默认空间，隔不开；它是主人自己的知识库，农场只往里加。EverOS 的 `agent_id`、`session_id` 带 `vibevalley-` 前缀：同一个 EverOS 里还有别的应用的 agent，Session 编号也只在一个家目录里不重。
 - **送出去先抹密钥，和服务端日志同一份规则。** 帮工的汇报里可能有 key，漏了就存进别人的库；规则只有一份，修一处两边都好。
 
 ## 还没做的
 
-- 主人画像（`profile`）、管家的记性搬进表、干活的经过（`episode`）、`memory_replace`、`memory_remove`、`SearchQuery.Kind` 交给模型、全文索引先取候选再排、画像拼进系统提示（`SystemPromptBlock`）、来源自带的工具和按农机排除来源、EverOS 收整段干活（现在只有工单和最后的汇报）、对真的 Nowledge Mem 验证写入：[记忆都存在 SQLite](../../.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)。
+- 主人画像（`profile`）、管家的记性搬进表、干活的经过（`episode`）、`memory_replace`、`memory_remove`、`SearchQuery.Kind` 交给模型、全文索引先取候选再排、画像拼进系统提示（`SystemPromptBlock`）、来源自带的工具和按农机排除来源、EverOS 收整段干活（现在只有工单和最后的汇报）、对真的 Nowledge Mem 验证写入：[记忆都存在 SQLite](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)。
 
 ## 怎么验证
 

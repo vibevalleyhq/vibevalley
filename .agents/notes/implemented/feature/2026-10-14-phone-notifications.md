@@ -4,14 +4,14 @@ Status: implemented
 
 ## Problem
 
-用[院门](2026-10-14-yard-gate.md)连上农场以后，手机能看能派活，但帮工做完活时手机不会响，主人还得自己打开 App 去看。桌面版有通知，规则写在 `app/lib/host/notify.dart` 里，是纯函数；手机上缺的是谁来把通知送到。难点在于：农场在局域网里，手机上的 App 一离开屏幕就可能被系统挂起，挂起以后状态流断了，App 自己什么也发不出来。
+用[院门](.agents/notes/implemented/feature/2026-10-14-yard-gate.md)连上农场以后，手机能看能派活，但帮工做完活时手机不会响，主人还得自己打开 App 去看。桌面版有通知，规则写在 `app/lib/host/notify.dart` 里，是纯函数；手机上缺的是谁来把通知送到。难点在于：农场在局域网里，手机上的 App 一离开屏幕就可能被系统挂起，挂起以后状态流断了，App 自己什么也发不出来。
 
 ## Decision
 
 - **App 活着的时候弹本地通知**（`app/lib/host/mobile_notices.dart`）：用 `flutter_local_notifications`，规则和桌面版是同一套（`noticeForCall`、`noticeForEffect`、`noticeForEvent`、`CallBell`）。只在 App 不在屏幕前时弹；在前台时农场自己会说。点一条通知，打开它说的那件事：经 `hostProvider` 的 `commands` 交给画面，和 Mac 上点通知走同一条路。点通知启动 App 时，命令先存着，等画面开始听再交出去。
 - **Android 用前台服务让 App 常驻**：App 进后台时开一个前台服务（类型 `remoteMessaging`，通知栏里一条低优先级的「VibeValley 连着农场」），回到前台就关掉。进程不被系统回收，状态流就一直连着，帮工做完活时能马上弹通知。服务跟着 App 的任务走，划掉 App 它也就停了。
 - **iOS 不常驻**：iOS 不让普通 App 在后台保持连接，离开屏幕以后只有挂起前的那一小会儿能收到通知。
-- **App 关着的时候靠连接器**：汇报本来就会发到微信、飞书、QQ（[连接器](../../../../docs/subsystems/channel.md)）。要随时收到，用微信或飞书：汇报一出来就发，不用等主人先说话。
+- **App 关着的时候靠连接器**：汇报本来就会发到微信、飞书、QQ（[连接器](docs/subsystems/channel.md)）。要随时收到，用微信或飞书：汇报一出来就发，不用等主人先说话。
 
 ## Alternatives considered
 

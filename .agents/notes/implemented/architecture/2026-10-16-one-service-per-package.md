@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-[按业务分深模块](2026-10-16-deep-modules-singular-names.md)以后，一个包是一块业务，但一个包对外还露着好几个服务：`issue` 有 `Issues`、`Dispatch`、`Merges`，`game` 有 `Ledger`、`Commits`、`Beds`，`memory` 有 `Memories`、`ManagerMemory`。服务名多数是复数（`Projects`、`Runtimes`、`Connectors`），也有别的叫法（`Store`、`Foreman`、`Lan`）。调用处读起来是 `f.Dispatch.Hire`、`f.Merges.Harvest`，看不出它们都是工单的事；模块的边界在包上，对外的入口却是好几个类型。
+[按业务分深模块](.agents/notes/implemented/architecture/2026-10-16-deep-modules-singular-names.md)以后，一个包是一块业务，但一个包对外还露着好几个服务：`issue` 有 `Issues`、`Dispatch`、`Merges`，`game` 有 `Ledger`、`Commits`、`Beds`，`memory` 有 `Memories`、`ManagerMemory`。服务名多数是复数（`Projects`、`Runtimes`、`Connectors`），也有别的叫法（`Store`、`Foreman`、`Lan`）。调用处读起来是 `f.Dispatch.Hire`、`f.Merges.Harvest`，看不出它们都是工单的事；模块的边界在包上，对外的入口却是好几个类型。
 
 ## Decision
 
@@ -14,7 +14,7 @@ Status: implemented
 - **服务是一个值，不是包级函数**：`project.List()` 这样的包级函数背后要有全局状态；服务由 fx 按依赖建出来，测试里每个测试建自己的一座农场。
 - **`/mcp` 是单独的包 `mcp`**：给编码 agent（Claude Code、codex 加上技能，别的 agent）用的入口，和 HTTP 一样在最上面，只转给拥有它的服务。原来它是 `channel` 里的 `FarmTools`；以后的工具会用到频道以外的业务。
 
-包的清单和每个包管什么见 [server/README.md](../../../../server/README.md#服务)「服务」。
+包的清单和每个包管什么见 [server/README.md](server/README.md#服务)「服务」。
 
 ## Alternatives considered
 
@@ -37,7 +37,7 @@ Status: implemented
 - ready 的顺序按包认：`farm` 的测试里是 `game`、`run`、`schedule`、`connector`。`Farm` 的服务表里 `Game` 排在 `Run` 前面，让等级先数出来。
 - 手动开服务的测试（`workspace/work_test.go`）按包开，一个 `Service` 只开一次，否则它的零件会开两遍。
 - `mcp` 的测试在它自己的包里，带排在下面的包和一个扮演帮工、记下令牌的 pi。
-- [Run、Session、Crew 的提案](../../../../docs/subsystems/session.md)里的服务也照这个约定。
+- [Run、Session、Crew 的提案](docs/subsystems/session.md)里的服务也照这个约定。
 
 ## Verification
 

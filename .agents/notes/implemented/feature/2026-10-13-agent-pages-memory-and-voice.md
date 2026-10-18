@@ -10,9 +10,9 @@ Status: implemented
 
 ## Decision
 
-行为见 [agents-and-runtimes.md](../../../../docs/reference/agents-and-runtimes.md)「管家页」「捏帮工」和 [voice.md](../../../../docs/reference/voice.md)「配置」。
+行为见 [agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「管家页」「捏帮工」和 [voice.md](docs/reference/voice.md)「配置」。
 
-- **管家有自己的页面**（`/manager`，`app/lib/workbench/manager/manager_page.dart`），是帮工页的第一张卡片。管家不是帮工档案（`Agent`，当时叫 `AgentProfile`）：它没有农机、技能和地可配，硬塞进捏帮工页只会多出一堆用不上的页签。它有三个页签：记性、旧账、声音（后来又加了「轨迹」，见 [轨迹](../../../../docs/subsystems/session.md)）。
+- **管家有自己的页面**（`/manager`，`app/lib/workbench/manager/manager_page.dart`），是帮工页的第一张卡片。管家不是帮工档案（`Agent`，当时叫 `AgentProfile`）：它没有农机、技能和地可配，硬塞进捏帮工页只会多出一堆用不上的页签。它有三个页签：记性、旧账、声音（后来又加了「轨迹」，见 [轨迹](docs/subsystems/session.md)）。
 - **管家的记性不换存法，页面直接读写那个文件**（`server/internal/memory/memory.go`，接口 `/api/v1/manager/...`）：
   - `MEMORY.md` 一行算一条，按这一行的 hash 认，用来忘掉某一条。
   - 主人替它记的写成「主人交代：……」。这样页面分得清是谁记的，管家读的时候也知道。
@@ -22,7 +22,7 @@ Status: implemented
   - **手上的活**：放在最上面，因为它是现在的状态，不是一条笔记。
   - **下回开工会想起**：选一个项目、可以填一句话，就能看到开工时会想起哪几条。
   - **记下的**：能按项目筛，每条写着谁记的、想起过几次。离上限不到 10 条时，标出最先会丢的那几条（`nextForgotten`，和服务端记满时删掉的顺序一致：最久没想起的先丢，`memory/memory.go` 的 `Keep`）。
-- **挑法在 memory 包**（`server/internal/memory/recall.go` 的 `pick`、`termsOf`、上限这些常量）：服务端开工时用它挑。页面拿同一份规则做预览，两边挑出来的不会对不上；网页删了以后（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)），Flutter 的预览直接问服务端（`app/lib/workbench/shared/memory_panels.dart` 的 `recallPreviewProvider`，`GET /api/v1/memories/{agent}/recall`），Dart 里没有第二份挑法。怎么从汇报里读「记住：」、提醒块写成什么样，还是服务端的事（`server/internal/memory/memory.go` 读「记住：」，`session/rules.go` 的 `withRecall` 写提醒块）。
+- **挑法在 memory 包**（`server/internal/memory/recall.go` 的 `pick`、`termsOf`、上限这些常量）：服务端开工时用它挑。页面拿同一份规则做预览，两边挑出来的不会对不上；网页删了以后（[网页退役](.agents/notes/implemented/simplification/2026-10-14-retire-the-web-page.md)），Flutter 的预览直接问服务端（`app/lib/workbench/shared/memory_panels.dart` 的 `recallPreviewProvider`，`GET /api/v1/memories/{agent}/recall`），Dart 里没有第二份挑法。怎么从汇报里读「记住：」、提醒块写成什么样，还是服务端的事（`server/internal/memory/memory.go` 读「记住：」，`session/rules.go` 的 `withRecall` 写提醒块）。
 - **语音设置还是一份，按归属分两处改**：数据仍是 `settings.json` 里的同一份 `VoiceSettings`。
   - 「声音」页管线路：凭据、区域、识别、语言、断句、大模型、没人时多久离开。
   - 管家页的「声音」页签管电话上的管家：人设、开场白、出错时说的话、音色。
@@ -37,7 +37,7 @@ Status: implemented
 
 **在服务端加一个「预览想起什么」的接口。** 规则留在服务端，可模拟服务器又得再写一份，每次换项目、改一个字都要请求一次。挑法本来就是纯函数，放进 protocol 两端都能用。
 
-**给每个帮工档案加音色字段，一起做。** 现在打电话只连管家，帮工的音色没有地方用得上，加了也是摆设。等「田头朗读」或者直接给帮工打电话做了再加（[帮工各自的音色](../../proposed/feature/2026-10-13-helper-voices.md)）。
+**给每个帮工档案加音色字段，一起做。** 现在打电话只连管家，帮工的音色没有地方用得上，加了也是摆设。等「田头朗读」或者直接给帮工打电话做了再加（[帮工各自的音色](.agents/notes/proposed/feature/2026-10-13-helper-voices.md)）。
 
 **试听时现场合成，或者借声网录一段。** 现场合成要服务端有 MiniMax 和 OpenAI 的 key，可平时用的是声网托管的合成，我们手上没有这些 key。借声网录（临时开一个频道请管家开口，页面录下来存着）不用别的 key，自己填的音色 id 也能听，但第一次要等几秒，还要花通话时长。列表里的音色是固定的，预先生成一次最省事；自己填的音色 id 以后要试听，再接上借声网录这条路。
 
@@ -49,7 +49,7 @@ Status: implemented
 - 帮工页能预演一轮开工会想起什么，挑法不准时能看出来，不用等帮工干完再去翻干活过程。
 - 「主人交代：」这几个字会进管家的系统提示，多占一点字数。
 - 按行的 hash 认一条：管家刚好在整理这一行时，页面上的「忘掉」可能落空。刷新以后能看到实际剩下的。
-- 管家跑在 pi 上时，记性页只能提示它不读这份记性。（Go 服务端的管家不再能跑在 pi 上：设了 `manager.runtime=pi` 管家就拒绝起来，记性页照旧显示这条提示，见 [服务端用 Go 重写](../architecture/2026-10-13-go-server-on-smith.md)。）
+- 管家跑在 pi 上时，记性页只能提示它不读这份记性。（Go 服务端的管家不再能跑在 pi 上：设了 `manager.runtime=pi` 管家就拒绝起来，记性页照旧显示这条提示，见 [服务端用 Go 重写](.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)。）
 - 样音念的是默认开场白，不是主人改过的那句，听的只是音色。OpenAI 和微软的音色还没有样音。仓库里多了约 540 KB 的 mp3。
 - 语音设置分在两页改，每页只把自己那几项存到当时最新的设置上，两页不会互相覆盖。
 

@@ -6,21 +6,21 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 频道、串、消息、@，消息号和地址 `#<频道>:<消息号>` | 工单的状态和派活（[工单](issue.md)）；派活时 `issue` 开 Session，田头只为它开工单串 |
-| 一条消息给谁、叫不叫醒，三道刹车，送达的状态 | 一轮怎么跑、能不能插话（`session.Deliver` 交给 smith，[帮工](session.md)） |
+| 频道、串、消息、@，消息号和地址 `#<频道>:<消息号>` | 工单的状态和派活（[工单](docs/subsystems/issue.md)）；派活时 `issue` 开 Session，田头只为它开工单串 |
+| 一条消息给谁、叫不叫醒，三道刹车，送达的状态 | 一轮怎么跑、能不能插话（`session.Deliver` 交给 smith，[帮工](docs/subsystems/session.md)） |
 | 帮工的汇报贴进工单串；带话、验收意见、冲突经工单串交给帮工 | 汇报怎么读出结论（`session.SummaryOf`） |
 | 帮工在 `/mcp` 上的说话工具（`channel_say`、`read_chat`、`channel_inbox`）背后的规则 | 工具的定义和认人（`internal/tool`、`internal/mcp`、`session/tokens.go`） |
 | 连接器：扫码登录、只认主人、收件和发件、转成纯文本 | 管家怎么回答（`manager`）；连接器把话交给 `manager.Say`，管家照田头的规则被叫醒 |
-| Inbox：从核心状态现算要主人处理的事（`protocol/inbox.go`） | 巡查什么时候叫醒管家（`manager/patrol_rules.go`，[管家](manager.md)）；定时到点在频道里说的那句（[定时](schedule.md)） |
-| | 田头和串在界面上的样子（[farm-ui.md](../reference/farm-ui.md)、`app/lib/chat`） |
+| Inbox：从核心状态现算要主人处理的事（`protocol/inbox.go`） | 巡查什么时候叫醒管家（`manager/patrol_rules.go`，[管家](docs/subsystems/manager.md)）；定时到点在频道里说的那句（[定时](docs/subsystems/schedule.md)） |
+| | 田头和串在界面上的样子（[farm-ui.md](docs/reference/farm-ui.md)、`app/lib/chat`） |
 
 ## 在哪
 
 - **田头**：`server/internal/channel`（`channel.Service`）。`chat.go` 是对外的方法（`Say`、`Speak`、`Read`、`TellSession`、`ManagerSays`、`Spoken`、`Notice`、`OpenChannel`……）和开机恢复；`deliver.go` 写一条消息、算给谁、叫醒和提示；`rules.go` 是只有它用的纯规则：`mentionsIn`、`parseChatTarget`、`channelNameProblem`、`chatAudience`、`wakeInput`、`busyNotice`，黄金数据在 `testdata/rules.jsonl.gz`；`receipts.go`、`consumed.go` 推进已读和「看到了」；`threads.go` 开串；`db.go` 包 sqlc 的查询。
 - **几个包共用的规则在 `protocol`**：`chat_rules.go`（`TargetOf` 写地址，`HopLimit`、`AgentWakeCooldownMs`、`WakeBreaker`、`NoticeBatchMs`、`WakeMessages`、`SummaryConversations`、`RetryWindowMs`、`HeldShown` 这些常数），`chat.go`（核心状态里留哪些：`KeepMessages` 300 条、`KeepConversations` 100 个）。
 - **表**：`channel_participant`、`channel_conversation`（田头、频道、串都是一行）、`channel_message`、`channel_mention`、`channel_follow`、`channel_read_cursor`、`channel_seen_mark`、`channel_delivery`；连接器的 `connector_account`、`connector_inbound`、`connector_outbox`。表结构在 `server/migrations/0001_schema.sql`。
-- **连接器**：`server/internal/connector`（`connector.Service`，[包的约定](../../server/internal/connector/README.md)）。`connector.go` 是桥：账号、配对、只认主人、收进来的话交给管家；`connection.go` 是账号代际的协调器（`voiceConnection`）；`inbox.go` 是持久收件（`voiceInbox`）；`outbox.go` 是发件表和退避（`voiceOutbox`）；`text.go` 是送出去的规则（`forOwner`、`ownerLine`、`plainText`、`splitText`、`flushText`）；适配器在 `weixin.go`、`feishu.go`、`qq.go`。三家的协议和扫码登录在 `server/pkg/weixin`、`pkg/feishu`、`pkg/qq`。
-- **接口**：`channel.say`、`channel.create`、`channel.update`、`channel.history`、`channel.markRead`，`manager.hear`、`voice.heard`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel`（[capabilities.md](../reference/capabilities.md)）。管家的工具 `channels`、`open_channel`、`channel_settings`、`tell`、`read_chat`；帮工的 `channel_say`、`read_chat`、`channel_inbox`、`session_list`（`internal/tool` 的 `talk.go`、`channel.go`、`look.go`、`dispatch.go`）。
+- **连接器**：`server/internal/connector`（`connector.Service`，[包的约定](server/internal/connector/README.md)）。`connector.go` 是桥：账号、配对、只认主人、收进来的话交给管家；`connection.go` 是账号代际的协调器（`voiceConnection`）；`inbox.go` 是持久收件（`voiceInbox`）；`outbox.go` 是发件表和退避（`voiceOutbox`）；`text.go` 是送出去的规则（`forOwner`、`ownerLine`、`plainText`、`splitText`、`flushText`）；适配器在 `weixin.go`、`feishu.go`、`qq.go`。三家的协议和扫码登录在 `server/pkg/weixin`、`pkg/feishu`、`pkg/qq`。
+- **接口**：`channel.say`、`channel.create`、`channel.update`、`channel.history`、`channel.markRead`，`manager.hear`、`voice.heard`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channels`、`open_channel`、`channel_settings`、`tell`、`read_chat`；帮工的 `channel_say`、`read_chat`、`channel_inbox`、`session_list`（`internal/tool` 的 `talk.go`、`channel.go`、`look.go`、`dispatch.go`）。
 - **配置**：`chat.notice_batch_ms`（忙时攒多久再提示，默认 3000）、`chat.retry_wake_ms`（叫醒没开口以后多久再叫，默认 3000）。
 - **客户端**：农场窗口的田头和频道菜单（`app/lib/chat`，`channel_menu.dart`）；整页的聊天页 `/chat`（`app/lib/workbench/chat`）；连接器页 `/settings/connectors`（`app/lib/workbench/connectors`）。
 
@@ -123,7 +123,7 @@ Inbox 不属于 `channel` 包：它是 `protocol.Inbox(state)`（`server/interna
 - **工具（`tool`、`mcp`）**：管家和帮工的说话工具都调 `Speak`、`Read`、`Inbox`；`/mcp` 用每个会话自己的令牌认出是谁在说话，令牌只用来分清人，不用来防人。
 - **语音（`voice`）**：电话里说的和回答经 `Spoken` 留在田头，不叫醒谁，管家在电话里已经听过。
 - **连接器 → 管家、田头**：收进来的话交给 `manager.Say`；送出去的读核心事件里的 `message`，只读不改田头。主人在外面说话也让农场开门（通话状态成 `live`）。
-- **巡查（`manager/patrol_rules.go`）**：读 `protocol.InboxEntries`，过了宽限期才叫醒管家（[管家](manager.md)）。
+- **巡查（`manager/patrol_rules.go`）**：读 `protocol.InboxEntries`，过了宽限期才叫醒管家（[管家](docs/subsystems/manager.md)）。
 
 ## 为什么这样
 
@@ -146,9 +146,9 @@ Inbox 不属于 `channel` 包：它是 `protocol.Inbox(state)`（`server/interna
 
 ## 还没做的
 
-- 给 agent 的话从哪几条路来、什么时候交给它收成一处（每个 agent 一个信箱）：[编排层：每个 agent 一个信箱](../../.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)。
-- 不接受 MCP 的农机用的命令行版说话工具：[其他农机](../../.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
-- 管家和帮工的工具按能力分配（现在是 `tool.Service` 里两张写死的表）：[管家也是一个 agent](../../.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md)。
+- 给 agent 的话从哪几条路来、什么时候交给它收成一处（每个 agent 一个信箱）：[编排层：每个 agent 一个信箱](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)。
+- 不接受 MCP 的农机用的命令行版说话工具：[其他农机](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
+- 管家和帮工的工具按能力分配（现在是 `tool.Service` 里两张写死的表）：[管家也是一个 agent](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md)。
 - 种植计划自己的串、串的静音和退出跟帖、Telegram 等别的渠道：还没有提案。
 
 ## 怎么验证

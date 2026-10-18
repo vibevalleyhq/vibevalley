@@ -47,7 +47,7 @@ for (const name of skills) {
 }
 
 const readme = readFileSync(resolve(dir, 'README.md'), 'utf8')
-const listed = [...readme.matchAll(/\]\(([\w-]+)\/SKILL\.md\)/g)].map((m) => m[1] ?? '')
+const listed = [...readme.matchAll(/\]\(\.agents\/skills\/([\w-]+)\/SKILL\.md\)/g)].map((m) => m[1] ?? '')
 for (const name of skills) if (!listed.includes(name)) errors.push(`.agents/skills/README.md does not list ${name}`)
 for (const name of listed) if (!skills.includes(name)) errors.push(`.agents/skills/README.md lists ${name}, which has no folder`)
 

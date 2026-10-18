@@ -8,4 +8,4 @@ agent 自己的任务图：一件活拆成的几件事，每件写明要做什�
 
 帮手的那几步：`Begin`（派出去）、`Settle`（交回：做完，或失败；失败在 `Retries` 次以内退回等着）、`Requeue`（叫回或进程没了：在做的退回等着）。
 
-工具在 [brain](../brain/README.md)（`TaskTools`）。`go test ./internal/task/engine` 覆盖收、拒、状态的变化、帮手的几步、给模型看的文字，和两种存储的存取（库用临时文件跑完迁移）。
+工具在 [brain](server/internal/agent/brain/README.md)（`TaskTools`）。`go test ./internal/task/engine` 覆盖收、拒、状态的变化、帮手的几步、给模型看的文字，和两种存储的存取（库用临时文件跑完迁移）。

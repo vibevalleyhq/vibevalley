@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-[网页退役](../simplification/2026-10-14-retire-the-web-page.md)以后，规则只剩 Go 一份，形状却还从 TypeScript 来：`packages/protocol` 用 Effect Schema 写形状，`export-schemas.ts` 导出 OpenAPI 和 JSON Schema，再由两个 Node 写的生成器分别生成 Go 的 `gen.go` 和 Dart 的 `vibevalley.dart`。为了这条链，仓库里留着一个 pnpm workspace、Effect、Vite+ 的格式和 lint、一份锁文件，和一个专门检查 Go 服务端是否符合 TypeScript 接口的契约脚本。服务端是 Go，客户端是 Flutter，中间却隔着第三种语言：加一个字段要先写 Effect Schema、导出、再跑两个生成器，三种语言的人都得懂。
+[网页退役](.agents/notes/implemented/simplification/2026-10-14-retire-the-web-page.md)以后，规则只剩 Go 一份，形状却还从 TypeScript 来：`packages/protocol` 用 Effect Schema 写形状，`export-schemas.ts` 导出 OpenAPI 和 JSON Schema，再由两个 Node 写的生成器分别生成 Go 的 `gen.go` 和 Dart 的 `vibevalley.dart`。为了这条链，仓库里留着一个 pnpm workspace、Effect、Vite+ 的格式和 lint、一份锁文件，和一个专门检查 Go 服务端是否符合 TypeScript 接口的契约脚本。服务端是 Go，客户端是 Flutter，中间却隔着第三种语言：加一个字段要先写 Effect Schema、导出、再跑两个生成器，三种语言的人都得懂。
 
 ## Decision
 
@@ -14,9 +14,9 @@ Status: implemented
 - **生成器**：`server/tool/shapegen`（`go run ./tool/shapegen`，`-check` 只查），用 `go/ast` 读这两个文件，写出 `internal/protocol/gen.go`（联合的编解码和成员表、必填的空切片和空表写成 `[]`/`{}`、枚举的值、错误类型、`Mount`；Go 不查类型 `switch` 漏没漏成员，要每种都处理的地方用成员表写测试）和 `app/lib/gen/vibevalley.dart`（类型、sealed class、`VibeValleyApi` 客户端、共用的常量，和 `seeds.json` 里客户端要的 `achievements`、`actionText`、`runtimePresets`、`runtimeFacts`、`fallbackPreset`，经 `dart format`）。`bun run flutter:check` 先跑 `-check`。
 - **怎么搬过来的**：第一份 `shapes.go`、`api.go` 由原来的 `gen.go` 机械转出（去掉生成的方法，补上指令；标签值、路由和操作名从它和 OpenAPI 里读）。新生成的 `gen.go` 和原来的逐个函数比，360 个函数和路由里只差连接器接口的路径参数从 `string` 变成 `ConnectorID`；新的 `vibevalley.dart` 和原来的逐个声明比，238 个声明一样，只少了 Flutter 从来没用过的 6 个错误类和它们的 `…Tag` 枚举，`ChannelRequest2` 改叫 `ConnectorsChannelRequest`，`SideEvent` 的 `switch` 里一条换了位置。原来 TypeScript 写成 `NullOr(Array)` 的五个字段（`RuntimeInfo` 的）在 Go 里看不出可空，比对 Dart 时找出来，补了 `vibevalley:"null"`。
 - **删掉的**：`server/contract/`（`@heybro/protocol`、`@heybro/tools`：Effect 的形状、导出脚本、契约检查）、`server/tool/go_types.ts`、`app/tool/dart_types.ts`、两个 `generate.sh`、中间的 schema 文件（`site.schema.json`、`vibevalley.openapi.json`、`site-frame.schema.json`）、根目录的 pnpm workspace、锁文件、`vite.config.ts` 和 Vite+ 的提交钩子。种子数据 `server/internal/protocol/seeds.json` 从导出物变成直接改的数据文件。
-- **还剩的 Node**：`server/tool` 的两个脚本（倒出旧的 PGlite 数据库、写 pi 的价目表，自己一个 `package.json`），用 Node 24 直接跑；`scripts/` 的文档检查当时也是，后来改用 Bun 跑（[Note 的目录由脚本生成](../process/2026-10-15-notes-catalog.md)）。根目录的 `package.json` 只剩几个命令，没有依赖。
+- **还剩的 Node**：`server/tool` 的两个脚本（倒出旧的 PGlite 数据库、写 pi 的价目表，自己一个 `package.json`），用 Node 24 直接跑；`scripts/` 的文档检查当时也是，后来改用 Bun 跑（[Note 的目录由脚本生成](.agents/notes/implemented/process/2026-10-15-notes-catalog.md)）。根目录的 `package.json` 只剩几个命令，没有依赖。
 
-这一篇取代了 [服务端和客户端两个目录](2026-10-15-server-and-app.md) 里的 `server/contract/`、[Go 服务端](2026-10-13-go-server-on-smith.md) 里「TypeScript 的 protocol 仍是形状的唯一来源」，和 [Flutter 客户端](2026-10-13-flutter-client-over-ts-server.md) 里「形状从 protocol 导出」。
+这一篇取代了 [服务端和客户端两个目录](.agents/notes/implemented/architecture/2026-10-15-server-and-app.md) 里的 `server/contract/`、[Go 服务端](.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md) 里「TypeScript 的 protocol 仍是形状的唯一来源」，和 [Flutter 客户端](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md) 里「形状从 protocol 导出」。
 
 ## Alternatives considered
 

@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-[按业务分深模块](2026-10-16-deep-modules-singular-names.md)以后，业务包里已经没有游戏规则，但服务端的游戏还散在几处：
+[按业务分深模块](.agents/notes/implemented/architecture/2026-10-16-deep-modules-singular-names.md)以后，业务包里已经没有游戏规则，但服务端的游戏还散在几处：
 
 - **服务**：账本、金币、成就和等级在 `ledger`。这个名字只说了账本，但它其实是全部游戏的服务。
 - **核心状态里夹着游戏的决定**：主人点了一块空地再说话，`site.WantBed` 记下这块地。之后 10 秒内雇的帮工，`Site.Apply` 会在折之前改写 `FactHired.Station`。核心状态的入口替游戏做了决定，雇帮工的事实也带着一个游戏的偏好。
@@ -12,17 +12,17 @@ Status: implemented
 
 ## Decision
 
-- **服务在 `game` 包**：`ledger` 改名 `game`，装 `Ledger`、`Commits` 和 `Beds`。业务包不 import `game`；HTTP 那一层只为游戏自己的接口（挑称号、搬金币、点空地）调它。主人做的、不改状态的事（看了改动、和语音管家说上话）由经手的服务说给 `core.Did`，游戏订阅 `core.OwnerDids` 记账，不管从哪个入口来（[客户端问服务端](2026-10-16-the-client-asks-the-server.md)）。
+- **服务在 `game` 包**：`ledger` 改名 `game`，装 `Ledger`、`Commits` 和 `Beds`。业务包不 import `game`；HTTP 那一层只为游戏自己的接口（挑称号、搬金币、点空地）调它。主人做的、不改状态的事（看了改动、和语音管家说上话）由经手的服务说给 `core.Did`，游戏订阅 `core.OwnerDids` 记账，不管从哪个入口来（[客户端问服务端](.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
 - **核心状态不替游戏做决定**：`Site` 没有 `WantBed`，`FactHired` 没有 `Station`。主人点的空地由 `Beds` 记下；它听到 `FactHired`，再施加 `FactStation` 把帮工挪过去。`FactStation` 的规则在 protocol：那块地空着就挪，不空、不在地里、已经在那块地都不变。
-- **规则留在 protocol，文件名带 `game_`**（后来账本的折法只剩 `game` 一个读者，挪进了 `game/progress.go`，见[收敛接缝](2026-10-17-converge-the-seams.md)）：`game_progress.go`（金币、成就、等级、要记的账）、`game_view.go`（地里长什么、特效）、`game_play.go`（`HelperPlay`：地块、动作历史、工具次数）。`Reduce` 的 `switch` 还在 `farm.go`，游戏的分支只调 `game_play.go` 的函数。
+- **规则留在 protocol，文件名带 `game_`**（后来账本的折法只剩 `game` 一个读者，挪进了 `game/progress.go`，见[收敛接缝](.agents/notes/implemented/architecture/2026-10-17-converge-the-seams.md)）：`game_progress.go`（金币、成就、等级、要记的账）、`game_view.go`（地里长什么、特效）、`game_play.go`（`HelperPlay`：地块、动作历史、工具次数）。`Reduce` 的 `switch` 还在 `farm.go`，游戏的分支只调 `game_play.go` 的函数。
 - **特效留在 `Site`**：`Site.Apply` 用纯函数 `EffectsOf(before, fact)` 算特效，和帧一起发。
 - **核心状态里的游戏字段不动**：`CoreState.Progress`、`Commits` 和 `Helper.Play` 照旧在帧里，客户端读一帧就够。
 
-行为见 [server.md](../../../../docs/reference/server.md)「游戏」，包见 [server/README.md](../../../../server/README.md#服务)「服务」。
+行为见 [server.md](docs/reference/server.md)「游戏」，包见 [server/README.md](server/README.md#服务)「服务」。
 
 ## Alternatives considered
 
-**特效也搬进 `game`。** `EffectsOf` 要用折之前的状态。`game` 要么自己存一份状态，违反[核心状态只有一份](2026-10-11-farm-core-state.md)，要么在 `Site` 发出事件以后才算，特效会晚一帧到。没选：`Site` 只是跑一个纯函数，不做游戏的决定。
+**特效也搬进 `game`。** `EffectsOf` 要用折之前的状态。`game` 要么自己存一份状态，违反[核心状态只有一份](.agents/notes/implemented/architecture/2026-10-11-farm-core-state.md)，要么在 `Site` 发出事件以后才算，特效会晚一帧到。没选：`Site` 只是跑一个纯函数，不做游戏的决定。
 
 **规则拆成 `protocol/game` 子包。** 边界最清楚。没选：shapegen、黄金数据和 Flutter 的生成都按 `protocol` 一个包来；游戏的形状和事实、帧在同一个联合里，拆开要倒转依赖。
 

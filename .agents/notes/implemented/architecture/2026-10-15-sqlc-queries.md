@@ -4,13 +4,13 @@ Status: implemented
 
 ## Problem
 
-Go 服务端的 SQL 都是手写在服务里的字符串（像当时的 `channel/db.go`，和待办的 `backlog.go`，待办并进工单以后删了），列和 Go 字段靠手对，表改了编译器不知道。TypeScript 时期用过 effect-sqlc，主人以为现在还在用 sqlc。工单变成一样东西（[工单](../../../../docs/subsystems/issue.md)）要新写一批查询，是改过来的时机。
+Go 服务端的 SQL 都是手写在服务里的字符串（像当时的 `channel/db.go`，和待办的 `backlog.go`，待办并进工单以后删了），列和 Go 字段靠手对，表改了编译器不知道。TypeScript 时期用过 effect-sqlc，主人以为现在还在用 sqlc。工单变成一样东西（[工单](docs/subsystems/issue.md)）要新写一批查询，是改过来的时机。
 
 ## Decision
 
 - **查询写成 `.sql`，由 sqlc 生成 Go**：查询在 `server/pkg/db/queries/*.sql`，生成的包是 `server/pkg/db/generated`（包名 `generated`），配置在 `server/sqlc.yaml`。生成的不手改。
 - **一张表一个文件**：`queries/` 里每个文件以它的表命名（`issue.sql`、`message.sql`、`delivery.sql`……），只放主要读写这张表的查询，生成的 `generated/<表>.sql.go` 也就一张表一个；跨表的联查放在它返回的那张表的文件里（田头的「未读」在 `conversation.sql`）。服务里不手写 SQL，服务自己的包只把生成的行读成它的形状（像 `channel/db.go`）。
-- **表结构就是迁移**：sqlc 读 `server/migrations/*.sql` 当表结构，所以不另写一份 schema。迁移在 `server/migrations`（一个只为了嵌进程序的小包 `vibevalley/migrations`），服务端启动时按名字顺序跑；现在只有一个 `0001_schema.sql`（[只有一份表结构，不认旧数据](2026-10-16-one-schema-no-old-data.md)）。开关的列写 `boolean`，生成的 Go 就是 `bool`。
+- **表结构就是迁移**：sqlc 读 `server/migrations/*.sql` 当表结构，所以不另写一份 schema。迁移在 `server/migrations`（一个只为了嵌进程序的小包 `vibevalley/migrations`），服务端启动时按名字顺序跑；现在只有一个 `0001_schema.sql`（[只有一份表结构，不认旧数据](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。开关的列写 `boolean`，生成的 Go 就是 `bool`。
 - **用 go1.27 跑**：`cd server && GOTOOLCHAIN=go1.27.2 go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate`。sqlc 不进 `go.mod`，版本钉在命令里。
 
 ## Alternatives considered

@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-[概念先行](../../proposed/architecture/2026-10-15-concepts-first.md)和 [Run 是一次干活](../../../../docs/subsystems/session.md)定了代码里该叫什么。2026-10-17 已经把大部分名字改完：核心状态 `CoreState`、服务 `Core`、路由按概念（`issue.*`、`session.*`、`agent.*`……）、协议里 `Agent`、`Session`、`Run`、`Merge`、`PriorityMedium`、`IssueStatus` 的 `backlog`…`canceled`、默认频道 `general`、家目录 `sessions.json`、MCP 的工具名（`channel_say`、`channel_read`、`channel_inbox`、`session_list`）。
+[概念先行](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)和 [Run 是一次干活](docs/subsystems/session.md)定了代码里该叫什么。2026-10-17 已经把大部分名字改完：核心状态 `CoreState`、服务 `Core`、路由按概念（`issue.*`、`session.*`、`agent.*`……）、协议里 `Agent`、`Session`、`Run`、`Merge`、`PriorityMedium`、`IssueStatus` 的 `backlog`…`canceled`、默认频道 `general`、家目录 `sessions.json`、MCP 的工具名（`channel_say`、`channel_read`、`channel_inbox`、`session_list`）。
 
 还剩两处：
 

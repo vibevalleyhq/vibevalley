@@ -8,11 +8,11 @@ Status: implemented
 
 ## Decision
 
-**素材按类重画，引擎按分辨率加载；逻辑坐标不动。** 现在的样子见 [pixel-village.md](../../../../docs/reference/pixel-village.md)「素材」。
+**素材按类重画，引擎按分辨率加载；逻辑坐标不动。** 现在的样子见 [pixel-village.md](docs/reference/pixel-village.md)「素材」。
 
 - **一类一张雪碧图，整张交给 codex**（主人的主意）：`gen.sh hd-<名字>` 拿现在那张当参照，「格子不变、像素密一倍」重画（雪碧图一格 4 个图像像素，地图 2 个）。同一个角色的帧在一次里画完，风格一致；格子和名字都不变，`process.py` 用 `PIXEL_DENSITY=2`、`PIXEL_RAW_PREFIX=hd-`、`PIXEL_OUT` 照原来的规则切，只是每张的目标高度翻倍，产物先放在 `design/pixel/hd/`，游戏的素材不动。（这是迁移时的做法。换过去以后 `process.py` 默认就按游戏素材的密度、从 `raw/hd-<名字>.png` 切，直接写进 `app/assets/pixel/`；这三个变量只在另试一种密度时用，`design/pixel/hd/` 没有了。）
 - **迁移时逐帧检查、整套切换**：比对每帧和旧帧放大两倍后的大小与形状，拼院子新旧对比图，把重画的和没重画的（旧图放大两倍）拼成一整套，所以随时能试、最后一次换过去，游戏里不会新旧密度混在一起。这几个脚本只为迁移，换完删了。
-- **引擎不换坐标**：游戏仍按 384×256 的格子摆所有东西。新图按分辨率 2 加载（`atResolution`），在 Pixi 里的逻辑大小还是原来的；整个场景画进分辨率为密度的离屏纹理（`pixelStage` 的 `density`），光照和发亮的滤镜跟着它的分辨率（Pixi 滤镜默认是 1，会把细节压回去），光照仍按逻辑格子算；读像素（地图取色、做法线贴图）按真实像素读。DOM 里用到的像素图（HUD 图标、头像、按钮）把清单里的宽高和锚点除以密度。密度不设开关：`web/src/pixel/density.ts` 用地图的宽除以关卡的宽，素材是哪种密度，引擎就按哪种画。（这是网页版在 Pixi 里的做法，随 [网页退役](../simplification/2026-10-14-retire-the-web-page.md) 删了。Flutter 的像素村（Flame）照样按 384×256 的格子摆（`app/lib/village/level.dart`），`app/lib/sprites/atlas.dart` 用地图的宽除以关卡的宽得出密度，把清单里的宽高和落脚点都除以它。）
+- **引擎不换坐标**：游戏仍按 384×256 的格子摆所有东西。新图按分辨率 2 加载（`atResolution`），在 Pixi 里的逻辑大小还是原来的；整个场景画进分辨率为密度的离屏纹理（`pixelStage` 的 `density`），光照和发亮的滤镜跟着它的分辨率（Pixi 滤镜默认是 1，会把细节压回去），光照仍按逻辑格子算；读像素（地图取色、做法线贴图）按真实像素读。DOM 里用到的像素图（HUD 图标、头像、按钮）把清单里的宽高和锚点除以密度。密度不设开关：`web/src/pixel/density.ts` 用地图的宽除以关卡的宽，素材是哪种密度，引擎就按哪种画。（这是网页版在 Pixi 里的做法，随 [网页退役](.agents/notes/implemented/simplification/2026-10-14-retire-the-web-page.md) 删了。Flutter 的像素村（Flame）照样按 384×256 的格子摆（`app/lib/village/level.dart`），`app/lib/sprites/atlas.dart` 用地图的宽除以关卡的宽得出密度，把清单里的宽高和落脚点都除以它。）
 - **在 Retina 屏上仍是整数倍**：1152 宽的窗口里一格是 3 个 CSS 像素、6 个物理像素，新图一个像素正好 3 个物理像素。
 
 ## Alternatives considered

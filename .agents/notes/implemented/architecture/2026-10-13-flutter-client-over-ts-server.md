@@ -8,19 +8,19 @@ Status: implemented
 
 能拿来做多端的东西里，主人倾向 Flutter：一套 Dart 代码出 iOS、Android、macOS、Windows 的原生应用，Agora 有官方的 Flutter SDK（RTC 和 RTM），对话式 AI 的官方示例也有 Flutter 版。还有一个选项是连后端一起换：smith（现在在 `server/pkg/smith`）是 oar 的 Go 移植，行为测试和 TS 版一致，可以在它上面包一个 Go 服务端。
 
-难处在于 VibeValley 的规矩是**核心状态只有一份**（[理由](2026-10-11-farm-core-state.md)）：protocol 的形状、`reduce` 和规则用 TypeScript 写一次，服务端、页面、模拟服务器共用。一个不同语言的客户端，最容易长出第二份。
+难处在于 VibeValley 的规矩是**核心状态只有一份**（[理由](.agents/notes/implemented/architecture/2026-10-11-farm-core-state.md)）：protocol 的形状、`reduce` 和规则用 TypeScript 写一次，服务端、页面、模拟服务器共用。一个不同语言的客户端，最容易长出第二份。
 
 ## Decision
 
-**Flutter 客户端（`app`）是唯一的客户端，完整复刻了网页版，规则只在服务端一份。** 说明在 [app/README.md](../../../../app/README.md)，桌面版的行为见 [desktop.md](../../../../docs/reference/desktop.md)。Electron 版删掉了（[一个服务端、一个客户端](../simplification/2026-10-14-one-server-one-client.md)），网页先冻结、后来也删了（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)）。
+**Flutter 客户端（`app`）是唯一的客户端，完整复刻了网页版，规则只在服务端一份。** 说明在 [app/README.md](app/README.md)，桌面版的行为见 [desktop.md](docs/reference/desktop.md)。Electron 版删掉了（[一个服务端、一个客户端](.agents/notes/implemented/simplification/2026-10-14-one-server-one-client.md)），网页先冻结、后来也删了（[网页退役](.agents/notes/implemented/simplification/2026-10-14-retire-the-web-page.md)）。
 
-1. **服务端是核心状态唯一的持有者**：Go 服务端（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)）。Flutter 经 `VibeValleyApi` 发命令，经 `GET /api/v1/state` 收**折好的** `CoreState`（状态变了就再推一整份，至多每 200 毫秒一份），不折事实、不写 `reduce`。`/api/v1/events` 当时留给冻结的网页（网页删了以后这条流照旧带着事实），Flutter 只读它去掉事实以后的部分（步骤、提醒、农机的变化）。
-2. **游戏规则在 protocol 里。** 帮工在哪块地、做过什么、本轮的工具和计数、碰过的文件（`Helper.play`），等级和经验、地块（`view`）、来电（当时在 `view` 里，现在是 `StateFrame` 的 `inbox`，[Inbox](../../../../docs/subsystems/channel.md)），升级、成就这类一次性的特效（`StateFrame` 的效果）都是 `CoreState` 的字段或由它推出来，在 `Reduce`、`ViewOf` 和 `EffectsOf` 里算，服务端推下来。只属于画面、跟着墙上时钟走的（散步、走位、动画、小游戏的局面）在 Dart 里写，照 core 的测试移植。
-3. **像素村用 Flame 写**：地图（LDtk）、精灵、A* 寻路（`engine/nav` 逐行移植）、走路和动画、光照（`engine/pixi/light.ts` 的两遍延迟光照改写成 Flutter 的 `FragmentProgram` 着色器）。Flame 只当画面和点击这一层，借它的游戏循环、精灵、相机和点击区域；地图怎么读、寻路、光照是自己的代码（`app/lib/village/`）。村子每一帧都照服务端折好的 `CoreState` 和视图摆，只多出跟着时钟走的东西（走路、姿势、动画、狗的一天），事实、地块和帮工的状态都不在 Flame 的组件里。所以它不和「核心状态只有一份」冲突：网页上当初不选 Phaser 这类完整框架，怕的是框架当主人、自带一份场景和角色的状态（[像素村](../feature/2026-10-11-pixel-village.md)），这里没有让它当主人。
-4. **形状不手抄**（后来改由 Go 的形状生成，[形状的源头是 Go](2026-10-15-go-owns-the-shapes.md)）：当时 `tools/export-schemas.ts` 从 protocol 导出 OpenAPI 和 `CoreState` 的 JSON Schema，`app/tool/dart_types.ts` 生成 Dart 的类型；现在服务端的 `tool/shapegen` 写 `lib/gen/vibevalley.dart`，`bun run flutter:check` 检查它是否最新、跑 `flutter analyze` 和 `flutter test`。
+1. **服务端是核心状态唯一的持有者**：Go 服务端（[服务端用 Go 重写](.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)）。Flutter 经 `VibeValleyApi` 发命令，经 `GET /api/v1/state` 收**折好的** `CoreState`（状态变了就再推一整份，至多每 200 毫秒一份），不折事实、不写 `reduce`。`/api/v1/events` 当时留给冻结的网页（网页删了以后这条流照旧带着事实），Flutter 只读它去掉事实以后的部分（步骤、提醒、农机的变化）。
+2. **游戏规则在 protocol 里。** 帮工在哪块地、做过什么、本轮的工具和计数、碰过的文件（`Helper.play`），等级和经验、地块（`view`）、来电（当时在 `view` 里，现在是 `StateFrame` 的 `inbox`，[Inbox](docs/subsystems/channel.md)），升级、成就这类一次性的特效（`StateFrame` 的效果）都是 `CoreState` 的字段或由它推出来，在 `Reduce`、`ViewOf` 和 `EffectsOf` 里算，服务端推下来。只属于画面、跟着墙上时钟走的（散步、走位、动画、小游戏的局面）在 Dart 里写，照 core 的测试移植。
+3. **像素村用 Flame 写**：地图（LDtk）、精灵、A* 寻路（`engine/nav` 逐行移植）、走路和动画、光照（`engine/pixi/light.ts` 的两遍延迟光照改写成 Flutter 的 `FragmentProgram` 着色器）。Flame 只当画面和点击这一层，借它的游戏循环、精灵、相机和点击区域；地图怎么读、寻路、光照是自己的代码（`app/lib/village/`）。村子每一帧都照服务端折好的 `CoreState` 和视图摆，只多出跟着时钟走的东西（走路、姿势、动画、狗的一天），事实、地块和帮工的状态都不在 Flame 的组件里。所以它不和「核心状态只有一份」冲突：网页上当初不选 Phaser 这类完整框架，怕的是框架当主人、自带一份场景和角色的状态（[像素村](.agents/notes/implemented/feature/2026-10-11-pixel-village.md)），这里没有让它当主人。
+4. **形状不手抄**（后来改由 Go 的形状生成，[形状的源头是 Go](.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）：当时 `tools/export-schemas.ts` 从 protocol 导出 OpenAPI 和 `CoreState` 的 JSON Schema，`app/tool/dart_types.ts` 生成 Dart 的类型；现在服务端的 `tool/shapegen` 写 `lib/gen/vibevalley.dart`，`bun run flutter:check` 检查它是否最新、跑 `flutter analyze` 和 `flutter test`。
 5. **帧里没有的规则移植成 Dart**：网页从核心状态推出来、服务端帧里没给的（阶段的说法、计划的规则、成就和称号、未读、额度……）照 protocol 移植，集中在 `lib/rules/`，每个文件写明 TypeScript 出处。
 6. **语音用 Agora 的 Flutter SDK**，只链语音要的部分（`tool/agora-voice-only.sh`）；macOS 上字幕和 agent 的状态走 RTC 的 data stream（服务端请 agent 时固定走 data stream）。
-7. **macOS 版把服务端带在应用里**：Go 服务端放在 `Contents/MacOS/vibevalley-server`，开机在一个空闲的回环端口作为子进程拉起，退出时停掉；家目录 `~/Library/Application Support/vibevalley`；alpha、beta、release 三个渠道照 [release-channels](../process/2026-10-12-release-channels.md) 的规矩各是一个应用（`tool/build-macos.sh --channel`）。菜单栏、通知、语音快捷键、登录时打开在 `lib/host/` 和 `macos/Runner`。
+7. **macOS 版把服务端带在应用里**：Go 服务端放在 `Contents/MacOS/vibevalley-server`，开机在一个空闲的回环端口作为子进程拉起，退出时停掉；家目录 `~/Library/Application Support/vibevalley`；alpha、beta、release 三个渠道照 [release-channels](.agents/notes/implemented/process/2026-10-12-release-channels.md) 的规矩各是一个应用（`tool/build-macos.sh --channel`）。菜单栏、通知、语音快捷键、登录时打开在 `lib/host/` 和 `macos/Runner`。
 
 ### 怎么落的
 
@@ -51,7 +51,7 @@ Status: implemented
 
 ### Why not 后端也换成 Go（smith）？（当初的理由；后来换了）
 
-后来主人要「一个 MyGo 就能搞定一切」，服务端换成了 Go（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)），下面这段是当时没换的理由。smith 补上了当初没选 Go 的理由（Go 版接不上真实的 runtime），但它只是 oar 这一层：驱动帮工的编码 agent。服务端约 1.56 万行（田头、项目、收获、种植计划、定时、连接器、语音线路、轨迹），管家用的 `@heybro/agent`、`agent-core`、`ai` 约 5900 行，protocol 的 `reduce` 和规则约 3800 行，都要用 Go 重写。Go 服务端加 Dart 客户端，形状和 `reduce` 就成了两份、两种语言；跑 pi 时 smith 还要内嵌一个 Node 进程，去不掉 Node。等哪天真要去掉 Node 服务端，再拿 smith 换 oar 这一块。
+后来主人要「一个 MyGo 就能搞定一切」，服务端换成了 Go（[服务端用 Go 重写](.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)），下面这段是当时没换的理由。smith 补上了当初没选 Go 的理由（Go 版接不上真实的 runtime），但它只是 oar 这一层：驱动帮工的编码 agent。服务端约 1.56 万行（田头、项目、收获、种植计划、定时、连接器、语音线路、轨迹），管家用的 `@heybro/agent`、`agent-core`、`ai` 约 5900 行，protocol 的 `reduce` 和规则约 3800 行，都要用 Go 重写。Go 服务端加 Dart 客户端，形状和 `reduce` 就成了两份、两种语言；跑 pi 时 smith 还要内嵌一个 Node 进程，去不掉 Node。等哪天真要去掉 Node 服务端，再拿 smith 换 oar 这一块。
 
 **客户端也重写 `reduce`（Dart 里一份）。** 客户端能离线地自己折事实，但就是第二份核心状态，两边改规则要一起改、靠自觉对齐。推折好的状态省掉这一份，代价是带宽，验证里量。
 
@@ -72,13 +72,13 @@ Status: implemented
 ## Consequences
 
 - 一套 Dart 代码，macOS 应用约 180 MB（带 Go 服务端约 19 MB 和裁过的 Agora），dmg 约 95 MB；Electron 版是 633 MB。
-- **玩法数据只在 protocol 里折**：Flutter 读 `CoreState` 和 `view`，没有第二份 `Reduce`；当时冻结的网页还用 TypeScript 的 `reduce`，靠 Go 的对照测试守住（[服务端用 Go 重写](2026-10-13-go-server-on-smith.md)），网页删了以后规则只在 Go（[网页退役](../simplification/2026-10-14-retire-the-web-page.md)）。
+- **玩法数据只在 protocol 里折**：Flutter 读 `CoreState` 和 `view`，没有第二份 `Reduce`；当时冻结的网页还用 TypeScript 的 `reduce`，靠 Go 的对照测试守住（[服务端用 Go 重写](.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)），网页删了以后规则只在 Go（[网页退役](.agents/notes/implemented/simplification/2026-10-14-retire-the-web-page.md)）。
 - **Dart 里的规则副本**：`lib/rules/` 是 protocol 规则的又一份，protocol 改了要跟着改；能挪进服务端帧里的（像 `view` 那样）就挪过去，Dart 这份随之删掉。
-- **整份推状态偏重**：田头消息多、管家说话时一个字一个字长，整份 `CoreState` 每 200 毫秒一份；本机没问题，手机走蜂窝网时要换成增量，增量的格式又是一份要两端一致的约定。`reports` 后来整个从核心状态里去掉了（[仓库就是收获了的工单](../feature/2026-10-16-warehouse-is-harvested-issues.md)）。
+- **整份推状态偏重**：田头消息多、管家说话时一个字一个字长，整份 `CoreState` 每 200 毫秒一份；本机没问题，手机走蜂窝网时要换成增量，增量的格式又是一份要两端一致的约定。`reports` 后来整个从核心状态里去掉了（[仓库就是收获了的工单](.agents/notes/implemented/feature/2026-10-16-warehouse-is-harvested-issues.md)）。
 - **Dart 代码生成器是自己写的**（当时是 `tool/dart_types.ts`，现在是服务端的 `tool/shapegen`）：形状用到新写法时要跟着改，不认识的写法直接报错。
-- **和网页版不同的地方**：没有浏览器里的模拟服务器和剧本；没有图片鼠标指针（[app/README.md](../../../../app/README.md)「取舍」）。
+- **和网页版不同的地方**：没有浏览器里的模拟服务器和剧本；没有图片鼠标指针（[app/README.md](app/README.md)「取舍」）。
 
 ## Deferred
 
-- 手机版（iOS、Android）和连到主人电脑上的农场：另起了决策，见 [院门](../feature/2026-10-14-yard-gate.md)、[手机上的通知](../feature/2026-10-14-phone-notifications.md)。
+- 手机版（iOS、Android）和连到主人电脑上的农场：另起了决策，见 [院门](.agents/notes/implemented/feature/2026-10-14-yard-gate.md)、[手机上的通知](.agents/notes/implemented/feature/2026-10-14-phone-notifications.md)。
 - Windows。

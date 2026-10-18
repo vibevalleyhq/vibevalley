@@ -1,7 +1,7 @@
 # smith: OAR in Go
 
 `smith` is a Go port of [`@botiverse/oar`](https://github.com/botiverse/oar), modified for VibeValley and
-licensed like oar under the Apache License 2.0 ([LICENSE](LICENSE)). It has the same
+licensed like oar under the Apache License 2.0 ([LICENSE](server/pkg/smith/LICENSE)). It has the same
 contracts, the same record stream and the same runtime adapters, so a Go
 program can drive coding-agent runtimes without Node.
 
@@ -78,4 +78,4 @@ run, _ := observe.PromptAndWait(ctx, session, "Find and fix the flaky test", obs
   - The TS `sealSession` reads the mirrored stream, so the Go folds need a check of their own.
 - **Fold parity:** `parity/golden` holds golden outputs of the TS folds over 35 recorded logs (735 fields). `observe/parity_test.go` compares the Go folds with them. Regenerate the goldens in an oar checkout with smith at `smith/`: `pnpm tsx smith/parity/generate.ts`.
 
-[`PORTING.md`](PORTING.md) has the porting conventions. [`GAPS.md`](GAPS.md) lists every known difference from TS, and what is not ported.
+[`PORTING.md`](server/pkg/smith/PORTING.md) has the porting conventions. [`GAPS.md`](server/pkg/smith/GAPS.md) lists every known difference from TS, and what is not ported.

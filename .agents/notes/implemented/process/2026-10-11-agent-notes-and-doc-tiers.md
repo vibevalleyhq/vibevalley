@@ -10,9 +10,9 @@ Status: implemented
 
 照 [DeepSeek Harness 的 Agent Notes](https://github.com/deepseek-ai/deepseek-harness/tree/master/.agents/notes) 和它的文档分层：
 
-- 决策和提案记成 Agent Note：`.agents/notes/{lifecycle}/{class}/yyyy-mm-dd-topic.md`，规矩在 [.agents/notes/README.md](../../README.md)。正文写中文，机器检查的标记保持英文。
+- 决策和提案记成 Agent Note：`.agents/notes/{lifecycle}/{class}/yyyy-mm-dd-topic.md`，规矩在 [.agents/notes/README.md](.agents/notes/README.md)。正文写中文，机器检查的标记保持英文。
 - 文档只写现状，每个事实一个家，别处链接过去：根目录 `AGENTS.md` 是常驻规矩，`docs/` 是当前的行为和约定（规矩在 `docs/AGENTS.md`），每个包的 README 是它的对外约定，理由在 Note。
-- `bun run notes:verify` 检查 Note 的目录、文件名和格式，以及生成的清单 `CATALOG.md` 是不是最新（[Note 的目录由脚本生成](2026-10-15-notes-catalog.md)）；`bun run docs:verify` 还检查文档里的相对链接。
+- `bun run notes:verify` 检查 Note 的目录、文件名和格式，以及生成的清单 `CATALOG.md` 是不是最新（[Note 的目录由脚本生成](.agents/notes/implemented/process/2026-10-15-notes-catalog.md)）；`bun run docs:verify` 还检查文档里的链接。
 
 ## Alternatives considered
 

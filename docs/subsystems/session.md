@@ -6,13 +6,13 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 开、接回、叫停、收工一个 Session；它的 oar 会话和农机连接 | 工单的状态、派给谁、排队、验收、收获的时机（[工单](issue.md)） |
-| 一次 run：谁触发的、听到了什么、怎么结束、花了多少（`session_run`） | 挑哪个档案（管家，[agents-and-runtimes.md](../reference/agents-and-runtimes.md)「派给谁」） |
-| oar 事件读成核心状态的事实；干活过程（事件日志） | 农机的发现、模型、设置页（[agents-and-runtimes.md](../reference/agents-and-runtimes.md)「在用的农机」「农具」） |
-| 农场的规矩、汇报怎么读（结论、失败、缺肥）、没动静 | worktree、分支、合并、PR 的 git 操作（`internal/project`，[项目](project.md)） |
-| 同时干活的上限；额度、花费和「派不出去」（`internal/runtime`） | 汇报贴进工单串、@ 谁叫醒谁、投递和排队（田头，[田头](channel.md)） |
-| 管家那一个 agent loop 的 run 和日志（`AgentExecution`） | 管家想什么、说什么（[管家](manager.md)）；记性想起和记下什么（[记性](memory.md)） |
-| | 地上画成什么（`protocol.PlotOf`、[farm-ui.md](../reference/farm-ui.md)）；干活过程的界面（`app/lib/shared/work_log.dart`） |
+| 开、接回、叫停、收工一个 Session；它的 oar 会话和农机连接 | 工单的状态、派给谁、排队、验收、收获的时机（[工单](docs/subsystems/issue.md)） |
+| 一次 run：谁触发的、听到了什么、怎么结束、花了多少（`session_run`） | 挑哪个档案（管家，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「派给谁」） |
+| oar 事件读成核心状态的事实；干活过程（事件日志） | 农机的发现、模型、设置页（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「在用的农机」「农具」） |
+| 农场的规矩、汇报怎么读（结论、失败、缺肥）、没动静 | worktree、分支、合并、PR 的 git 操作（`internal/project`，[项目](docs/subsystems/project.md)） |
+| 同时干活的上限；额度、花费和「派不出去」（`internal/runtime`） | 汇报贴进工单串、@ 谁叫醒谁、投递和排队（田头，[田头](docs/subsystems/channel.md)） |
+| 管家那一个 agent loop 的 run 和日志（`AgentExecution`） | 管家想什么、说什么（[管家](docs/subsystems/manager.md)）；记性想起和记下什么（[记性](docs/subsystems/memory.md)） |
+| | 地上画成什么（`protocol.PlotOf`、[farm-ui.md](docs/reference/farm-ui.md)）；干活过程的界面（`app/lib/shared/work_log.dart`） |
 
 ## 在哪
 
@@ -20,12 +20,12 @@
 - `server/internal/runtime`（`runtime.Service`）：农机的注册（`Registry`）、探测和安装（`Resolve`）、额度（`quota.go`）、价目（`price.go`、`pi_prices.json`）、今天的花费；`rules.go` 的 `agentIssues`、`moneyStop` 是「派不出去」的规则。
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 家目录：`sessions.json`（在地里的 Session 的 worktree、oar 会话 id、最后一轮原话、想起过的记性）、`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（smith 的原始记录）；核心状态里的 `CoreState.Sessions` 随 `state.json` 存。
-- 接口：`session.list`、`session.get`、`session.events`、`session.stop`、`issue.runs`、`issue.history`、`runtime.*`、`agent.check`（[capabilities.md](../reference/capabilities.md)）。
+- 接口：`session.list`、`session.get`、`session.events`、`session.stop`、`issue.runs`、`issue.history`、`runtime.*`、`agent.check`（[capabilities.md](docs/reference/capabilities.md)）。
 - 客户端：干活过程 `shared/work_log.dart`，按 run 分段的规则在 `rules/rounds.dart`。
 
 ## 模型和不变量
 
-**三层**（用词规则在 [concepts.md](../concepts.md#session-和-oar-会话)）：
+**三层**（用词规则在 [concepts.md](docs/concepts.md#session-和-oar-会话)）：
 
 | 层 | 代码里 | 是什么 |
 |---|---|---|
@@ -35,7 +35,7 @@
 
 - **核心状态只放在地里的**：`CoreState.Sessions` 是在地里的 Session，阶段是 `arriving`、`working`、`ripe`、`failed`、`resting`；`FactReport` 按结果折成 `ripe`（做完）、`failed`、`resting`（叫停、重启打断）。走了的从 `session` 表读，阶段是 `closed`（什么时候、怎么关的：`merged`、`merged_into_graph`、`dismissed`、`lost`、`answered`），轮数、最后一轮的结果和花费从 `session_run` 算，不另存。
 - **每个 Session 一个 smith `agents.Subagents`**，深度上限 1：帮工不能经 smith 再派帮工；农机自己派的子 agent（claude 的 Task、codex 的子线程）的事件带 smith 的 `AgentPath`，记在派它的那次调用下面（`under`），工具调用按「哪个 agent 的、哪一个」认，不按调用编号认。
-- **没有权限确认、不开沙箱**：边界是 Session 只在 `VIBEVALLEY_WORK_ROOT` 下的项目里、自己的 worktree 里开工，服务端只听 127.0.0.1（例外见根目录 [AGENTS.md](../../AGENTS.md)「帮工没有权限确认」）。帮工能在这台机器上执行任意命令，服务端不应对外。
+- **没有权限确认、不开沙箱**：边界是 Session 只在 `VIBEVALLEY_WORK_ROOT` 下的项目里、自己的 worktree 里开工，服务端只听 127.0.0.1（例外见根目录 [AGENTS.md](AGENTS.md)「帮工没有权限确认」）。帮工能在这台机器上执行任意命令，服务端不应对外。
 - **档案经 `Spawn` 的选项进会话**：人设和技能拼成说明，`append` 放进追加的系统提示，`replace` 替换系统提示，`prompt` 写在交给它的活前面（中间隔 `JobBreak`）；档案的 MCP 服务器、禁用的工具、模型、思考强度、环境变量（农机设置的在前，档案的盖过它）一起交给 smith，不改共享的农机注册表。档案没写模型就用农机设置的默认模型；模型列表里没有的退回农机默认并提醒一次。
 - **农机的安装是显式的输入**：农机设置的 `BinPath` 作为 `oar.InstallationOptions.Binary` 交给探测，不写进进程的环境变量；`runtime.Resolve` 带回探测时接受的那个安装，`Spawn` 直接用它，不再探一次。指定的路径失效不会悄悄换一台。
 - **农场的规矩**（`farmRules`，每次开会话附上）：在哪个项目、哪个分支和 worktree，只改这个目录，不切分支、不 push；做完一轮 `git add`、`git commit`，提交信息照项目的约定；汇报写 commit 号和怎么验证的，最后一段以「结论：」开头；缺信息的写「要问主人：」，学到的写「记住：」（所有项目都成立的写「记住（所有项目）：」）；在田头怎么 @、怎么用 `channel_say`；加上 `VIBEVALLEY_WORK_ROOT/AGENTS.md`（有的话）作为「这台机器上所有项目的约定」。
@@ -138,9 +138,9 @@
 
 ## 还没做的
 
-- 事件的内容按 `type` 分进 `data`、Step 这一层；Session 不再自己往频道说话（删 `farm_*` 和令牌，进出频道只经服务端两个口子）：[Session、Run、事件](../../.agents/notes/proposed/architecture/2026-10-17-session-run-step.md)。
-- 给 agent 的话什么时候、怎么交给它只在一处定（每个 agent 一个信箱）：[编排层](../../.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)。
-- opencode、grok、kimi、antigravity、cursor 逐台接通：[pi 打磨好之后接回其他 runtime](../../.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
+- 事件的内容按 `type` 分进 `data`、Step 这一层；Session 不再自己往频道说话（删 `farm_*` 和令牌，进出频道只经服务端两个口子）：[Session、Run、事件](.agents/notes/proposed/architecture/2026-10-17-session-run-step.md)。
+- 给 agent 的话什么时候、怎么交给它只在一处定（每个 agent 一个信箱）：[编排层](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)。
+- opencode、grok、kimi、antigravity、cursor 逐台接通：[pi 打磨好之后接回其他 runtime](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
 
 ## 怎么验证
 

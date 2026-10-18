@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-[一个概念一个包](2026-10-16-a-package-per-concept.md) 把服务端分成了 `base`、`projects`、`memory`、`runs`、`chat`、`tickets`、`manager`、`channels`、`game`。用下来有四处不对：
+[一个概念一个包](.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md) 把服务端分成了 `base`、`projects`、`memory`、`runs`、`chat`、`tickets`、`manager`、`channels`、`game`。用下来有四处不对：
 
 - **`channels` 和频道撞名**：概念里的频道是群聊的频道（`chat` 的 `Conversation`），`channels` 包里装的却是三样互不相干的东西：连接器（微信、飞书、QQ）、语音、院门。
 - **`base` 装了业务**：核心状态（`Site`）、帮工档案和技能书（`Store`）、钥匙和语音设置（`Settings`），和数据库、`Hub` 这些地基混在一起；`types.go` 里各服务之间传的形状也都堆在这里，不在它们的主人那里。
@@ -14,14 +14,14 @@ Status: implemented
 ## Decision
 
 - 一个包是一块业务：接口窄、里面深，不为了分而切成一堆薄包。
-- 包名用单数，用[用语表](../../../../docs/README.md#用语)和[概念](../../../../docs/concepts.md)里的词：`chat` 改名 `channel`，`tickets` 拆成 `issue`、`task`、`schedule`，`channels` 拆成 `connector`、`voice`、`gate`，`runs` 拆成 `runtime` 和 `run`，`projects` 改名 `project`，`game` 改名 `ledger`。
-- `base` 只放地基。`Site`、`Settings`、`Store` 各成一个包：`site`、`setting`、`agent`；搬家的代码从 `farm` 挪到 `migrate`，`farm` 只做组装（`migrate` 后来整个删了，见 [只有一份表结构，不认旧数据](2026-10-16-one-schema-no-old-data.md)；`farm` 现在叫 `workspace`）。
+- 包名用单数，用[用语表](docs/README.md#用语)和[概念](docs/concepts.md)里的词：`chat` 改名 `channel`，`tickets` 拆成 `issue`、`task`、`schedule`，`channels` 拆成 `connector`、`voice`、`gate`，`runs` 拆成 `runtime` 和 `run`，`projects` 改名 `project`，`game` 改名 `ledger`。
+- `base` 只放地基。`Site`、`Settings`、`Store` 各成一个包：`site`、`setting`、`agent`；搬家的代码从 `farm` 挪到 `migrate`，`farm` 只做组装（`migrate` 后来整个删了，见 [只有一份表结构，不认旧数据](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)；`farm` 现在叫 `workspace`）。
 - 形状跟着主人走：`base/types.go` 拆掉，每个形状放进定义它的包的 `types.go`。主人在上层、下层也要用的形状，放在下层那个包（`Workplace` 在 `project`，`FinishedTurn` 在 `memory`）。
 - 频道照 Discord：频道 → 消息 → 挂在消息下面的串。初期只有一个人（主人），没有成员和权限。外面的聊天软件经 `connector` 接到一个频道上。
 
-`ledger` 后来改回 `game`，装下服务端全部的游戏：[服务端的游戏收在一处](2026-10-16-game-in-one-place.md)。
+`ledger` 后来改回 `game`，装下服务端全部的游戏：[服务端的游戏收在一处](.agents/notes/implemented/architecture/2026-10-16-game-in-one-place.md)。
 
-包的清单、每个包里的服务和顺序见 [server/README.md](../../../../server/README.md#服务)「服务」；频道见 [概念](../../../../docs/concepts.md)。
+包的清单、每个包里的服务和顺序见 [server/README.md](server/README.md#服务)「服务」；频道见 [概念](docs/concepts.md)。
 
 ## Alternatives considered
 

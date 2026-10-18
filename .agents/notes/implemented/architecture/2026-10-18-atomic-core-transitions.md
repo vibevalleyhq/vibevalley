@@ -14,7 +14,7 @@ Core 提供内部 Transition：在事实折叠时绑定该事实自己的 Before
 
 相关事实用 ApplyBatch 提交：先在局部状态逐条 Reduce、收集效果和 Transition，再一次替换可见状态，最后按原顺序发布事实。每条 Transition 保留自己的真实 After；整个批次的最终状态只用于对外状态读取。
 
-当前接口约定在 [Core](../../../../server/internal/core/README.md)。游戏只解释变化，不重新维护核心状态；计划用对应的 Session 解释汇报，再依据当前计划决定动作，避免用旧快照覆盖后来的编辑。
+当前接口约定在 [Core](server/internal/core/README.md)。游戏只解释变化，不重新维护核心状态；计划用对应的 Session 解释汇报，再依据当前计划决定动作，避免用旧快照覆盖后来的编辑。
 
 ## Alternatives considered
 

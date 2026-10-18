@@ -6,10 +6,10 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 定时的模型、五种时间写法、时区、下次什么时候 | 到点以后工单怎么派、重开、带话（[工单](issue.md)，`issue/dispatch.go` 的 `scheduled`） |
-| 谁定的、要不要等主人同意 | 管家怎么接住到点的那句话、答完关单（`internal/manager`，[管家](manager.md)） |
-| 每隔一阵看一遍、到点先存再说再发布、错过的补一次 | 巡查：不调模型地看 Inbox、有事叫醒管家（`manager/patrol.go`，[管家](manager.md)） |
-| 定时在核心状态里的一份（`CoreState.Schedules`） | 频道、频道的默认项目、提示怎么投递（[田头](channel.md)） |
+| 定时的模型、五种时间写法、时区、下次什么时候 | 到点以后工单怎么派、重开、带话（[工单](docs/subsystems/issue.md)，`issue/dispatch.go` 的 `scheduled`） |
+| 谁定的、要不要等主人同意 | 管家怎么接住到点的那句话、答完关单（`internal/manager`，[管家](docs/subsystems/manager.md)） |
+| 每隔一阵看一遍、到点先存再说再发布、错过的补一次 | 巡查：不调模型地看 Inbox、有事叫醒管家（`manager/patrol.go`，[管家](docs/subsystems/manager.md)） |
+| 定时在核心状态里的一份（`CoreState.Schedules`） | 频道、频道的默认项目、提示怎么投递（[田头](docs/subsystems/channel.md)） |
 | | VibeValley 自己的 agent 自带的定时（`agent/brain/schedules.go` 的 `schedules.json`）：当管家时关掉（`Schedules: new(false)`） |
 
 ## 在哪
@@ -17,7 +17,7 @@
 - 服务端 `server/internal/schedule`（`schedule.Service`）：`schedule.go` 存取、开机读表、每次检查（`Tick`）和到点发布（`Due()`，一个 `base.Hub[Due]`）；`rules.go` 是只有它用的纯函数：`dueSchedules`、`isMissed`、`afterRun`、`needsOK`。
 - 几个包都用的规则在 `protocol`：`schedules.go`（`NextRun`、`ScheduleProblem`、`WhenText`、`NextText`、`DueText`）、`schedule_cron.go`（五段 cron 的解析、下次时间、说成话）。
 - 表：`schedule`（一个定时一行，时间写法存成 JSON 的 `spec`）；工单表的 `schedule` 列指着它的定时。
-- 接口：`schedule.create`、`schedule.list`、`schedule.update`、`schedule.delete`（[capabilities.md](../reference/capabilities.md)）；`schedule.update` 只有主人和院门能调，管家不能。管家的工具 `schedule`、`list_schedules`、`cancel_schedule` 在 `tool/task.go`。
+- 接口：`schedule.create`、`schedule.list`、`schedule.update`、`schedule.delete`（[capabilities.md](docs/reference/capabilities.md)）；`schedule.update` 只有主人和院门能调，管家不能。管家的工具 `schedule`、`list_schedules`、`cancel_schedule` 在 `tool/task.go`。
 - 配置：`schedule.tick_ms`，默认 20000（20 秒看一遍；0 或更小是每毫秒）。
 - 客户端：频道菜单的「定时」（`app/lib/chat/channel_menu.dart`）和聊天页的「定时」标签（`app/lib/workbench/chat/chat_page.dart`）列出这个频道的定时，能开关、删、对待批的点「同意」「不要」；看板上定时的工单带「定时」标签（`workbench/issues/board.dart`）。
 
@@ -58,7 +58,7 @@
 
 ## 和谁打交道
 
-- **工单（`issue`）**：订阅 `Due()`，一个定时一张工单，到点开它的一次干活；派活、排队、重开、带话都照工单的规则（[工单](issue.md)）。
+- **工单（`issue`）**：订阅 `Due()`，一个定时一张工单，到点开它的一次干活；派活、排队、重开、带话都照工单的规则（[工单](docs/subsystems/issue.md)）。
 - **田头（`channel`）**：定时属于一个频道（`schedule.channel_id`）；到点的提示和出错的提示都经 `Notice` 说在这个频道里。
 - **帮工档案（`agent`）**：定时只认存在的档案；`manager` 这个 id 没有档案能用。
 - **管家（`manager`、`tool`）**：用 `schedule`、`list_schedules`、`cancel_schedule` 定、看、删，调不了 `schedule.update`。系统提示里写着：主人说「每天」「到点」时定；派了活、答应了主人一件事、在等一个结果时，可以自己定一次性的回头看；会反复来的只在主人要的时候定。管家自己的定时（没写档案的）快到点时，它闲着也不压缩（`wakeSoon`）。
@@ -74,12 +74,12 @@
 - **到点先保存，再说再发布。** 保存失败还发出去，重启后会再跑一次；先存，最坏是这一次晚一个检查周期。
 - **cron 自己写，不用 `robfig/cron`。** 多一个依赖，它的调钟规则和已有的四种不一样，同一个时间写成 cron 和写成每天会在不同时刻到点。五段的解析不到一百行，和每天、每周共用 `scheduleWallTime`。
 - **四种固定写法和 cron 并存。** 只留 cron，管家写「每天九点」时更容易写错；加更多固定种类（工作日、每月），每多一种说法多一种形状，还是有说不出的。工具说明里写明 cron 只用在前四种说不清的时候。
-- **管家没被主人叫醒时定的会反复来、会派帮工的定时要主人同意。** 这两种会在主人不看着时持续花钱；管家给自己定的一次性回头看不派帮工，当场生效（[分清话是谁说的](manager.md)第 5 节）。
+- **管家没被主人叫醒时定的会反复来、会派帮工的定时要主人同意。** 这两种会在主人不看着时持续花钱；管家给自己定的一次性回头看不派帮工，当场生效（[分清话是谁说的](docs/subsystems/manager.md)第 5 节）。
 - **醒了就说，不分后台和前台。** 放弃了「醒了先不说，要说再调工具」：能少吵，但多一套规则（哪些叫醒算后台、谁判断该不该说）。
 
 ## 还没做的
 
-- 到点的定时交给帮工时直接 `session.Deliver`，绕开频道的投递和节奏；改成往 agent 的信箱投一封：[一个 agent 一个信箱](../../.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)。
+- 到点的定时交给帮工时直接 `session.Deliver`，绕开频道的投递和节奏；改成往 agent 的信箱投一封：[一个 agent 一个信箱](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)。
 
 ## 怎么验证
 

@@ -1,19 +1,19 @@
 # 子系统
 
-一个子系统一篇，从架构的角度写它沉淀下来的样子：管什么、不管什么，在哪，模型和不变量，一件事怎么走，和谁打交道，为什么这样、放弃了哪些路。计划和正在做的事在 [Agent Notes](../../.agents/notes/README.md)；做完的计划把仍然成立的部分写进这里，计划本身删掉。
+一个子系统一篇，从架构的角度写它沉淀下来的样子：管什么、不管什么，在哪，模型和不变量，一件事怎么走，和谁打交道，为什么这样、放弃了哪些路。计划和正在做的事在 [Agent Notes](.agents/notes/README.md)；做完的计划把仍然成立的部分写进这里，计划本身删掉。
 
 | 子系统 | 管什么 |
 |---|---|
-| [工单](issue.md) | 一块地：工单的模型、生命周期、派活和排队、验收、收获（本地合或提 PR） |
-| [帮工](session.md) | Session 和 Run：派出去、一轮一轮干活、规矩和汇报、事件日志、额度和上限 |
-| [项目](project.md) | 项目和工作目录、按工单的 worktree、冲突预检、检查、GitHub 检测、地契 |
-| [田头](channel.md) | 群聊：频道、谁听见、叫不叫醒、工单串、连接器（微信、飞书、QQ）、Inbox |
-| [管家](manager.md) | 替主人派活的 agent：自己的 agent、提示和工具、来源、巡查、评测 |
-| [定时](schedule.md) | 一张工单的触发：间隔和 cron、补跑、管家定的回头看 |
-| [种植计划](task.md) | 带子工单的父工单：拆、按图推进、合进计划分支；agent 自己的任务图 |
-| [记性](memory.md) | 每个档案的记性：想起、记下、主动查、外面的来源 |
+| [工单](docs/subsystems/issue.md) | 一块地：工单的模型、生命周期、派活和排队、验收、收获（本地合或提 PR） |
+| [帮工](docs/subsystems/session.md) | Session 和 Run：派出去、一轮一轮干活、规矩和汇报、事件日志、额度和上限 |
+| [项目](docs/subsystems/project.md) | 项目和工作目录、按工单的 worktree、冲突预检、检查、GitHub 检测、地契 |
+| [田头](docs/subsystems/channel.md) | 群聊：频道、谁听见、叫不叫醒、工单串、连接器（微信、飞书、QQ）、Inbox |
+| [管家](docs/subsystems/manager.md) | 替主人派活的 agent：自己的 agent、提示和工具、来源、巡查、评测 |
+| [定时](docs/subsystems/schedule.md) | 一张工单的触发：间隔和 cron、补跑、管家定的回头看 |
+| [种植计划](docs/subsystems/task.md) | 带子工单的父工单：拆、按图推进、合进计划分支；agent 自己的任务图 |
+| [记性](docs/subsystems/memory.md) | 每个档案的记性：想起、记下、主动查、外面的来源 |
 
-还没拆出来的（设置、院门、游戏、语音、客户端）仍在 [reference/](../reference/server.md) 和对应的 Note 里。
+还没拆出来的（设置、院门、游戏、语音、客户端）仍在 [reference/](docs/reference/server.md) 和对应的 Note 里。
 
 ## 一篇怎么写
 
@@ -21,7 +21,7 @@
 
 1. **一句话**：它是什么，农场里画成什么。
 2. **管什么，不管什么**：边界，不管的指到负责的子系统。
-3. **在哪**：包、表、接口、客户端的位置。不抄字段和接口清单，链接到代码或生成的 [capabilities.md](../reference/capabilities.md)。
+3. **在哪**：包、表、接口、客户端的位置。不抄字段和接口清单，链接到代码或生成的 [capabilities.md](docs/reference/capabilities.md)。
 4. **模型和不变量**：它的核心概念，和任何时候都要成立的几条。
 5. **怎么走**：主要的流程或状态机。
 6. **和谁打交道**：依赖谁、谁依赖它、经什么（事实、事件、服务的方法）。

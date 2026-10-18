@@ -14,10 +14,10 @@ Status: implemented
 
 ## Decision
 
-行为和约定见 [server/README.md](../../../../server/README.md#服务)「服务」。
+行为和约定见 [server/README.md](server/README.md#服务)「服务」。
 
 - **依赖写在构造函数上**：每个服务的 `newX(…)`，参数就是它用到的服务和配置。用到的多，就用带 `fx.In` 的参数结构体（`crewIn`、`foremanIn`）。用到的服务存在它自己的字段里，没有服务再拿 `*Farm`。`Farm` 只是最上面的门面：HTTP、`cmd/server` 和测试经它拿服务；`services` 嵌在它里面，所以 `f.Chat` 照旧能用。
-- **按概念分模块组装**（每个模块一个包，包的 `Module` 是一个 `fx.Module`；`farm.go` 的 `layers` 按顺序列出它们，见 [一个概念一个包](2026-10-16-a-package-per-concept.md)）：
+- **按概念分模块组装**（每个模块一个包，包的 `Module` 是一个 `fx.Module`；`farm.go` 的 `layers` 按顺序列出它们，见 [一个概念一个包](.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)）：
   - base：数据库、`Site`、`Store`、`Settings`；
   - projects：`Projects`、`Codebase`；
   - memory：`Memories`、`ManagerMemory`；
@@ -28,7 +28,7 @@ Status: implemented
   - channels：`VoiceLine`、`Voice`、`Connectors`、`Lan`；
   - game：`Ledger`、`Commits`。
 
-  HTTP 在最上面。调用只往下走，往回传的是 Hub 上的消息。最初是按「谁调谁」倒推出来的几层，主人看了觉得奇怪：那样分是按代码现状分，不是按产品分，游戏的状态还垫在最底下。后来改成按实际的概念分（[概念先行，农场是皮](../../proposed/architecture/2026-10-15-concepts-first.md)）。为了让项目不往上调执行，每个项目同时能有几个执行（`project.max_workers`）挪到了 `Projects`；游戏模块只听事实；`Crew` 拆出了派活（`Dispatch`）和合并（`Merges`）。
+  HTTP 在最上面。调用只往下走，往回传的是 Hub 上的消息。最初是按「谁调谁」倒推出来的几层，主人看了觉得奇怪：那样分是按代码现状分，不是按产品分，游戏的状态还垫在最底下。后来改成按实际的概念分（[概念先行，农场是皮](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）。为了让项目不往上调执行，每个项目同时能有几个执行（`project.max_workers`）挪到了 `Projects`；游戏模块只听事实；`Crew` 拆出了派活（`Dispatch`）和合并（`Merges`）。
 - **生命周期交给 fx**：`base.Run[*X](r, newX)` 把服务的 `OnStart`、`OnStop` 挂成 fx 的钩子。钩子在构造的时候挂上，所以一个服务总在它用到的服务之后开、之前停，不再有手排的表。
   - `OnReady(ctx)` 是 fx 本身没有的一段：开的时候把它记下来，最后一个钩子在全部服务都开了以后，按同样的顺序调。
   - `Start`（`base.App`）把一个能取消的 ctx 交给 fx，后台的活到 `Close` 时跟着停。
@@ -44,7 +44,7 @@ Status: implemented
 
 **google/wire。** 在编译期生成接线代码，没有反射；但要多一步生成、多一份生成出来的文件，生命周期还得自己写。只有 25 个服务，不值得。
 
-**先拆包，再组装。** 按层拆成 Go 包，越界和成环就成了编译错误。可是服务之间共用很多包内的小函数，测试都是在同一个包里跑整座农场的，一起拆的话，改动要翻几倍，风险也大。依赖写进构造函数、按层排好以后，拆包就成了机械活，可以一层一层来。后来就这样拆了：[一个概念一个包](2026-10-16-a-package-per-concept.md)。
+**先拆包，再组装。** 按层拆成 Go 包，越界和成环就成了编译错误。可是服务之间共用很多包内的小函数，测试都是在同一个包里跑整座农场的，一起拆的话，改动要翻几倍，风险也大。依赖写进构造函数、按层排好以后，拆包就成了机械活，可以一层一层来。后来就这样拆了：[一个概念一个包](.agents/notes/implemented/architecture/2026-10-16-a-package-per-concept.md)。
 
 **把开机时发布的活都挪进 `OnReady`，让开的顺序完全无关紧要。** 按约定，`Tasks.OnStart` 在重启时放弃规划中的计划、暂停在做的计划，这些该放在 `OnReady`。但挪过去以后，它会在 `Crew` 接回帮工之后才跑，行为会变（见 Consequences）。这次只改组装，不改行为。它现在发的事实只有计划状态的变化，账本不记这两种变化，田头和连接器也不听，所以谁先开不影响结果。
 

@@ -7,7 +7,7 @@ description: 为 VibeValley 的一类改动写一个验证 skill（.agents/skill
 
 验证 skill 回答一个问题：**改了这一块，怎么在真的程序上看到它对了**。它补的是测试和检查之后的那一段：服务端真的起来、接口真的返回、客户端真的画出来。
 
-这一层是「文字」，排在代码和静态检查后面（[AGENTS.md](../../../AGENTS.md#怎么让-agent-做对)）。所以写之前先过第 1 步。
+这一层是「文字」，排在代码和静态检查后面（[AGENTS.md](AGENTS.md#怎么让-agent-做对)）。所以写之前先过第 1 步。
 
 ## 1. 先问能不能不写
 
@@ -53,7 +53,7 @@ description: <改了哪些路径或哪类行为时用>；<它证明什么>。
 - `## 出错时`：常见的失败、怎么认出来、怎么办。
 - `## 收拾`：停进程、删临时目录。
 
-写法照 [docs/style/writing.md](../../../docs/style/writing.md)：一步一件事，命令放在代码块里，原样能复制。
+写法照 [docs/style/writing.md](docs/style/writing.md)：一步一件事，命令放在代码块里，原样能复制。
 
 ## 4. 从头照着做一遍
 
@@ -61,7 +61,7 @@ description: <改了哪些路径或哪类行为时用>；<它证明什么>。
 
 ## 5. 登记
 
-1. 在 [.agents/skills/README.md](../README.md) 的表里加一行：skill、改了什么时用、它证明什么。
+1. 在 [.agents/skills/README.md](.agents/skills/README.md) 的表里加一行：skill、改了什么时用、它证明什么。
 2. 如果这个 skill 管的是一块新的地方，在 `AGENTS.md` 的「命令」或「规矩」里提一句，链接到它。
 3. 跑 `bun run docs:verify`。
 

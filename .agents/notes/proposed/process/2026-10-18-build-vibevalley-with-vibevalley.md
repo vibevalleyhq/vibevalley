@@ -7,7 +7,7 @@ Status: proposed
 主人想把 VibeValley 自己的活派给 VibeValley：工单派给帮工，帮工在 worktree 里改 heybro，验收过了合进 main。开始时这样做有几处会出事：
 
 - 拿来干活的农场和正在改的代码是同一份：源码里跑的服务端一重启、表结构一改，派出去的工单和田头就没了。
-- 表结构只有一个基线，直接改（[不留兼容](../../implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。`user_version` 数的是文件，基线改了它还是 1：新版本的服务端打开旧库不报错，跑到某条查询才炸。
+- 表结构只有一个基线，直接改（[不留兼容](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。`user_version` 数的是文件，基线改了它还是 1：新版本的服务端打开旧库不报错，跑到某条查询才炸。
 - 合并在项目的检出里做，把检出当前的 HEAD 当主分支，不看工作区干不干净；合并前也不跑检查。
 - 三个渠道共用一个工作目录 `~/vibevalley-work`，两个农场的帮工会在同一份项目里干活。
 - 客户端、打包、换包都夹在中间，哪一步不通都说不清是哪一层的错。
@@ -18,7 +18,7 @@ Status: proposed
 
 ### 第一步：只靠服务端和命令行
 
-客户端只是一层皮（[先有概念，再有皮](../architecture/2026-10-15-concepts-first.md)），它点的每个按钮都是服务端的一个接口。所以先只开服务端、只用 `vibevalley` 命令行，让 codex 给 VibeValley 加完一个功能、合进 main，不开客户端、不打包、不经过管家。
+客户端只是一层皮（[先有概念，再有皮](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)），它点的每个按钮都是服务端的一个接口。所以先只开服务端、只用 `vibevalley` 命令行，让 codex 给 VibeValley 加完一个功能、合进 main，不开客户端、不打包、不经过管家。
 
 ```bash
 vv project create --json '{"name":"vibevalley","github":"https://github.com/vibevalleyhq/vibevalley"}'
@@ -33,7 +33,7 @@ vv issue status <issue> --json '{"status":"done"}'              # 收获
 
 ### 第二步：三个农场各干各的
 
-用[已有的渠道](../../implemented/process/2026-10-12-release-channels.md)，不加新的：
+用[已有的渠道](.agents/notes/implemented/process/2026-10-12-release-channels.md)，不加新的：
 
 | 农场 | 怎么来 | 用来 | 工作目录 |
 |---|---|---|---|
@@ -47,9 +47,9 @@ vv issue status <issue> --json '{"status":"done"}'              # 收获
 
 - **命令行这条路走通了**（2026-10-18）：从空的 `~/vibevalley-dev`，codex 照工单改文档、改服务端，合进 main；之后一天里 codex 做了合并前的检查、工单拥有分支和 worktree、检测 `gh`、收获提 PR、地块详情合一，都是这样派、这样收的。
 - **工作目录分开**：服务端默认 `~/vibevalley-dev`，打包的应用按渠道（`channel.dart` 的 `workFolder`）。
-- **合并前的检查**：仓库里的 `.vibevalley/check`，合并前在帮工的 worktree 里、锁外跑，没过就不合，输出交回帮工（[项目](../../../../docs/subsystems/project.md)）。
-- **合并不碰主人的检出**：合进农场自己的克隆；走 PR 的项目在 GitHub 上合，农场再从 origin 快进（[工单](../../../../docs/subsystems/issue.md)）。
-- **验收**：每张工单都有，过了才算结果（[工单](../../../../docs/subsystems/issue.md)）。
+- **合并前的检查**：仓库里的 `.vibevalley/check`，合并前在帮工的 worktree 里、锁外跑，没过就不合，输出交回帮工（[项目](docs/subsystems/project.md)）。
+- **合并不碰主人的检出**：合进农场自己的克隆；走 PR 的项目在 GitHub 上合，农场再从 origin 快进（[工单](docs/subsystems/issue.md)）。
+- **验收**：每张工单都有，过了才算结果（[工单](docs/subsystems/issue.md)）。
 
 跑的时候学到的：
 
@@ -62,7 +62,7 @@ vv issue status <issue> --json '{"status":"done"}'              # 收获
 
 1. **库认得出自己的表结构**：服务端把 `0001_schema.sql` 的指纹记在库里（比如一张只有一行的 `core_schema` 表）。开机时指纹对不上，就把旧库挪成 `vibevalley.db.<旧指纹>`，按今天的表结构建一个新的，并在日志和田头说一声。现在每次改基线都要手动把开发农场的库挪开。
 2. **打第一个 Beta 天天用**：Beta 的家目录要填一次帮工档案和语音凭据，`~/vibevalley-beta/projects/vibevalley` 要先克隆好；vibevalley 本身加进 `github.pr_projects` 以后，收获就是开 PR。
-3. **验证 skill**：把命令行这条路写成 `verify-feature-loop`，照 [create-verification-skill](../../../skills/create-verification-skill/SKILL.md) 写成能反复跑的样子。
+3. **验证 skill**：把命令行这条路写成 `verify-feature-loop`，照 [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md) 写成能反复跑的样子。
 
 ## Alternatives considered
 

@@ -8,11 +8,11 @@ Status: implemented
 
 ## Decision
 
-- 命令走普通 HTTP：`VibeValleyApi`，接口定义在 Go 的 `Handlers`（`server/internal/protocol/api.go`），服务端在 `internal/handler/api.go` 实现，Flutter 用生成的客户端（`app/lib/gen/vibevalley.dart`）调，类型两端一致（[形状的源头是 Go](2026-10-15-go-owns-the-shapes.md)）。
-- 状态走 `GET /api/v1/events`（server-sent events）：每次连上先发一份快照，然后发事实（[farm-core-state](2026-10-11-farm-core-state.md)），再加几样不属于核心状态的（干活过程、提醒、农机变化）；每 20 秒一行心跳，免得代理关掉空闲的连接。
-- Flutter 客户端不折事实，读另一条同样的流 `GET /api/v1/state`：状态变了就推一整份折好的 `StateFrame`，至多每 200 毫秒一份；`/api/v1/events` 它只取核心状态之外的那几样（[客户端迁到 Flutter](2026-10-13-flutter-client-over-ts-server.md)）。
+- 命令走普通 HTTP：`VibeValleyApi`，接口定义在 Go 的 `Handlers`（`server/internal/protocol/api.go`），服务端在 `internal/handler/api.go` 实现，Flutter 用生成的客户端（`app/lib/gen/vibevalley.dart`）调，类型两端一致（[形状的源头是 Go](.agents/notes/implemented/architecture/2026-10-15-go-owns-the-shapes.md)）。
+- 状态走 `GET /api/v1/events`（server-sent events）：每次连上先发一份快照，然后发事实（[farm-core-state](.agents/notes/implemented/architecture/2026-10-11-farm-core-state.md)），再加几样不属于核心状态的（干活过程、提醒、农机变化）；每 20 秒一行心跳，免得代理关掉空闲的连接。
+- Flutter 客户端不折事实，读另一条同样的流 `GET /api/v1/state`：状态变了就推一整份折好的 `StateFrame`，至多每 200 毫秒一份；`/api/v1/events` 它只取核心状态之外的那几样（[客户端迁到 Flutter](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)）。
 
-形状见 [architecture.md](../../../../docs/architecture.md)「工地事件」「HTTP 接口」。
+形状见 [architecture.md](docs/architecture.md)「工地事件」「HTTP 接口」。
 
 ## Alternatives considered
 

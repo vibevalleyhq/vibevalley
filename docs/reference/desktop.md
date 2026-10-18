@@ -1,6 +1,6 @@
 # macOS 应用
 
-Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏、系统通知和语音快捷键。Dart 这一半在 `app/lib/host/`，Swift 那一半在 `app/macos/Runner/`，两边经方法通道 `vibevalley/desktop` 说话（[理由](../../.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)）。
+Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏、系统通知和语音快捷键。Dart 这一半在 `app/lib/host/`，Swift 那一半在 `app/macos/Runner/`，两边经方法通道 `vibevalley/desktop` 说话（[理由](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)）。
 
 ## 服务端在里面
 
@@ -8,12 +8,12 @@ Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏�
 - 退出时先给服务端发 SIGTERM，让它存好状态；8 秒还没退就强行结束。
 - **家目录**是 `~/Library/Application Support/vibevalley`，和终端里跑的 `~/.vibevalley` 不是同一个农场。日志在 `~/Library/Logs/vibevalley/server.log`。
 - **PATH**：从 Finder 打开的应用找不到 pi、claude、codex，所以先问登录 shell 要 PATH 再交给服务端。
-- **用别的电脑的农场**：在「院门」页粘贴配对链接，那边点头以后就用那台电脑的农场，不再拉起自己的服务端（[server.md](server.md)「院门」）。
+- **用别的电脑的农场**：在「院门」页粘贴配对链接，那边点头以后就用那台电脑的农场，不再拉起自己的服务端（[server.md](docs/reference/server.md)「院门」）。
 - 调试时用 `--dart-define=VIBEVALLEY_SERVER=http://…` 连一个开着的服务端，`VIBEVALLEY_SERVER_BIN` 换一个服务端程序。
 
 ## 渠道
 
-三个渠道可以同时装、同时开，打包时定（`build-macos.sh --channel`；`lib/host/channel.dart`；[理由](../../.agents/notes/implemented/process/2026-10-12-release-channels.md)）：
+三个渠道可以同时装、同时开，打包时定（`build-macos.sh --channel`；`lib/host/channel.dart`；[理由](.agents/notes/implemented/process/2026-10-12-release-channels.md)）：
 
 | 渠道 | 应用 | bundle id | 家目录 | 工作目录 |
 |---|---|---|---|---|
@@ -21,7 +21,7 @@ Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏�
 | beta | `vibevalley Beta.app` | `dev.vibevalley.app.beta` | `…/vibevalley Beta` | `~/vibevalley-beta` |
 | alpha | `vibevalley Alpha.app` | `dev.vibevalley.app.alpha` | `…/vibevalley Alpha` | `~/vibevalley-alpha` |
 
-家目录和工作目录都各是各的：Alpha 的库碰不到你天天用的农场，它的帮工也碰不到那边的项目和 worktree。终端里跑的服务端用 `~/vibevalley-dev`。工作目录的结构见 [项目](../subsystems/project.md)；`VIBEVALLEY_WORK_ROOT` 能改。
+家目录和工作目录都各是各的：Alpha 的库碰不到你天天用的农场，它的帮工也碰不到那边的项目和 worktree。终端里跑的服务端用 `~/vibevalley-dev`。工作目录的结构见 [项目](docs/subsystems/project.md)；`VIBEVALLEY_WORK_ROOT` 能改。
 
 ## 窗口
 
@@ -39,7 +39,7 @@ Flutter 客户端的 macOS 版：Go 服务端在应用里面，另有菜单栏�
 
 ## 快捷键
 
-**⌥⇧Space**：在任何程序里按一下开始和管家语音说话，再按一下挂断（[voice.md](voice.md)）。
+**⌥⇧Space**：在任何程序里按一下开始和管家语音说话，再按一下挂断（[voice.md](docs/reference/voice.md)）。
 
 ## 打包和安装
 

@@ -25,7 +25,7 @@ in the oar repository.
 | `registry.ts` + `index.ts` defaults | `oar.RuntimeRegistry` + `runtimes/defaults` |
 | `packages/cli` | `cli`, `cmd/oar` |
 
-What is not ported, and why, is in [`GAPS.md`](GAPS.md). The Go pi runtime
+What is not ported, and why, is in [`GAPS.md`](server/pkg/smith/GAPS.md). The Go pi runtime
 runs pi's SDK in an embedded Node host (`runtimes/pi/host`) instead of in
 process.
 
@@ -130,4 +130,4 @@ JS code runs to completion between `await`s, and adapters rely on that. In Go:
     `runtimes/defaults`.
 - Never weaken an assertion to get past a failure. If the TS test asserts it,
   the Go port must satisfy it, or the gap must be written down in
-  [`GAPS.md`](GAPS.md) with the reason.
+  [`GAPS.md`](server/pkg/smith/GAPS.md) with the reason.

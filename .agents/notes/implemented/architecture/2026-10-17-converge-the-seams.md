@@ -56,13 +56,13 @@ Status: implemented
 
 ### 阶段 6：残留
 
-- [x] 动物外形的 `castOf` 兜底原来也替旧档案（缺动物）补：改成服务端加载时按同一个挑法补一次、写回，存档案时也补（`agent/cast.go`），客户端的 `castOf` 只剩给不认识的档案挑；「不留兼容」改成「能在功能不变的前提下迁就迁一次」（[一份表结构](2026-10-16-one-schema-no-old-data.md)）
+- [x] 动物外形的 `castOf` 兜底原来也替旧档案（缺动物）补：改成服务端加载时按同一个挑法补一次、写回，存档案时也补（`agent/cast.go`），客户端的 `castOf` 只剩给不认识的档案挑；「不留兼容」改成「能在功能不变的前提下迁就迁一次」（[一份表结构](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）
 - [x] 代码里剩下的移植措辞和旧名字（调试台里还指着网页的 `sfx.ts`、`lastForemanSaid`、注释里的 crew 和 `crewNoRoom`）
 
 ### 不在这里做
 
 - `shapes.go` 按概念拆成几个文件：要改生成器和大量文档里的路径，收益只是好找，等阶段 3 之后再看。
-- 主键换 uuidv7：见 [改完旧名字](2026-10-16-finish-the-renames.md)。
+- 主键换 uuidv7：见 [改完旧名字](.agents/notes/implemented/architecture/2026-10-16-finish-the-renames.md)。
 
 ## Alternatives considered
 

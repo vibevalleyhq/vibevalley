@@ -11,10 +11,10 @@ Status: implemented
 ## Decision
 
 - **每个 HTTP 接口都在 `/api/v1` 下**：`server/internal/protocol/api.go` 里每条 `//vibevalley:route`、两条 SSE（`/api/v1/state`、`/api/v1/events`），以及 `/api/v1/health`。`/mcp` 不带版本：MCP 有自己的版本，工具是给编码 agent 的，另算。
-- **版本在路径里，不在请求头**：curl、命令行、院门的放行表、日志都直接看得见。`protocol.Endpoints` 里的路径就是最终路径；生成的 Flutter 客户端、`cmd/vibevalley` 和[能力表](../../../../docs/reference/capabilities.md) 都从它来，没有第二处拼前缀。
+- **版本在路径里，不在请求头**：curl、命令行、院门的放行表、日志都直接看得见。`protocol.Endpoints` 里的路径就是最终路径；生成的 Flutter 客户端、`cmd/vibevalley` 和[能力表](docs/reference/capabilities.md) 都从它来，没有第二处拼前缀。
 - **不兼容的改动另起 `/api/v2`**，v1 留到主人的设备都升上来再删；加字段、加接口这种向后兼容的改动留在 v1。
-- **不设 `/api/...` 的别名**（[不留兼容](2026-10-16-one-schema-no-old-data.md)）：旧客户端拿到 404，说明它要升级。这台电脑上的应用、命令行和测试是同一个包，一起换。
-- **院门只放 `/api/v1/` 下的路径**；`/mcp` 仍然不放（[院门](../feature/2026-10-14-yard-gate.md)）。
+- **不设 `/api/...` 的别名**（[不留兼容](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）：旧客户端拿到 404，说明它要升级。这台电脑上的应用、命令行和测试是同一个包，一起换。
+- **院门只放 `/api/v1/` 下的路径**；`/mcp` 仍然不放（[院门](.agents/notes/implemented/feature/2026-10-14-yard-gate.md)）。
 
 ## Alternatives considered
 

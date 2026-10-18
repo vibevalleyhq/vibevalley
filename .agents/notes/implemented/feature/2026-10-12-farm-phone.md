@@ -8,14 +8,14 @@ Status: implemented
 
 ## Decision
 
-行为见 [farm-ui.md](../../../../docs/reference/farm-ui.md)「农场手机」。
+行为见 [farm-ui.md](docs/reference/farm-ui.md)「农场手机」。
 
-- **来电不存，现算**：来电就是 Inbox（`protocol.Inbox(state)`，`server/internal/protocol/inbox.go`），从核心状态读出此刻要你处理的事；服务端每一帧把它放在 `inbox` 里推给客户端（当时是页面上 core 的 `incomingCalls`，客户端迁到 Flutter 时挪进了 protocol 的 `view`，后来成了帧上的 Inbox，见 [要你处理的事是一个 Inbox](../../../../docs/subsystems/channel.md)）。核心状态只有一份，手机不另记一份「待办」。
+- **来电不存，现算**：来电就是 Inbox（`protocol.Inbox(state)`，`server/internal/protocol/inbox.go`），从核心状态读出此刻要你处理的事；服务端每一帧把它放在 `inbox` 里推给客户端（当时是页面上 core 的 `incomingCalls`，客户端迁到 Flutter 时挪进了 protocol 的 `view`，后来成了帧上的 Inbox，见 [要你处理的事是一个 Inbox](docs/subsystems/channel.md)）。核心状态只有一份，手机不另记一份「待办」。
 - **来电号稳定**：帮工的来电号带轮次（`w1:harvest:2`），同一件事一直是同一个号，下一轮又熟了是新号；计划按计划和失败的那一步，那一步重试后又没做成算第二次（`p1:failed:api:2`，`Step.failures` 记它失败了几次），消息按消息号。页面据此只响一次、记住接过哪个。
 - **接没接过只属于页面**：接了、挂了的号和通话记录放在客户端的 `phoneProvider` 里（`app/lib/phone/calls.dart`），这次打开有效；重开应用后还在等你的又算未接，不响（农场画面刚打开时在的都算旧的）。
 - **接听就是去处理**：打开那块地、种植计划或那个频道，不新造处理的界面。
 - **长相**：Flutter 组件画的像素手机（按格子画的像素小图标、机身和四种绿的液晶屏，`app/lib/phone/`），不新生成素材；响铃是合成的音效 `ring`。放在左下角、帮工的上面，往上打开。
-- **一部手机，几个应用**：主屏上是未接、记录、打给管家、频道、计划和小游戏：当时是方块、小恐龙两个，后来又加了推箱子（[手机里的仓库推箱子](2026-10-12-phone-sokoban.md)）、贪吃虫和种田 2048。方块和小恐龙的规则写成纯函数（`app/lib/phone/blocks.dart`、`dino.dart`）：一局是一个值，每一步是值到值，自带种子的随机，能重放、能测；画面（`blocks_game.dart`、`dino_game.dart`）只跑时钟（Flutter 的 `Ticker`，规则不碰定时器）、接按键和十字键、用 `CustomPaint` 画。
+- **一部手机，几个应用**：主屏上是未接、记录、打给管家、频道、计划和小游戏：当时是方块、小恐龙两个，后来又加了推箱子（[手机里的仓库推箱子](.agents/notes/implemented/feature/2026-10-12-phone-sokoban.md)）、贪吃虫和种田 2048。方块和小恐龙的规则写成纯函数（`app/lib/phone/blocks.dart`、`dino.dart`）：一局是一个值，每一步是值到值，自带种子的随机，能重放、能测；画面（`blocks_game.dart`、`dino_game.dart`）只跑时钟（Flutter 的 `Ticker`，规则不碰定时器）、接按键和十字键、用 `CustomPaint` 画。
 
 ## Alternatives considered
 

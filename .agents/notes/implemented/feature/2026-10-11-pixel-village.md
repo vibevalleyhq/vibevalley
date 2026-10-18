@@ -8,18 +8,18 @@ Status: implemented
 
 ## Decision
 
-农场就是像素村：`#/` 打开的是它（当时在 `web/src/pixel/`）。它先作为并排的试验页 `#/pixel` 做出来，主人看过以后定下用它；原来的手绘农场留作旧版，在 `#/legacy`，只属于它的代码在 `web/src/legacy/`（画面、它的 HUD、照背景描的寻路）。`#/pixel` 还通到农场，旧链接不断。（旧版后来拿掉了，见 [只留像素村](../simplification/2026-10-12-pixel-only.md)。网页后来也退役了：像素村现在在 Flutter 客户端里用 Flame 画（`app/lib/village/`），见 [客户端迁到 Flutter](../architecture/2026-10-13-flutter-client-over-ts-server.md)，那里也写了为什么用 Flame 不违背下面「不选完整框架」的理由；下面说到 Pixi、DOM、CSS、core 和 `engine/pixi` 的地方，是网页版当时的做法。）
+农场就是像素村：`#/` 打开的是它（当时在 `web/src/pixel/`）。它先作为并排的试验页 `#/pixel` 做出来，主人看过以后定下用它；原来的手绘农场留作旧版，在 `#/legacy`，只属于它的代码在 `web/src/legacy/`（画面、它的 HUD、照背景描的寻路）。`#/pixel` 还通到农场，旧链接不断。（旧版后来拿掉了，见 [只留像素村](.agents/notes/implemented/simplification/2026-10-12-pixel-only.md)。网页后来也退役了：像素村现在在 Flutter 客户端里用 Flame 画（`app/lib/village/`），见 [客户端迁到 Flutter](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)，那里也写了为什么用 Flame 不违背下面「不选完整框架」的理由；下面说到 Pixi、DOM、CSS、core 和 `engine/pixi` 的地方，是网页版当时的做法。）
 
 - **画面换到 canvas**，用 Pixi，不用 Phaser 这类完整的游戏框架。Pixi 只管画、点击和滤镜；核心状态、命令、寻路照旧在 core、protocol 和 `engine/nav`。完整的框架自带场景、主循环和状态，会在框架里再养一份帮工的状态，违背「核心状态只有一份」。
-- **光**：每个像素按法线贴图打光（法线贴图从画里生成，不用画），加上按时间换的天光、点光源（窗户、路灯、提灯、萤火虫、收获时的闪光）、云影、清晨的雾，最后整体调色。照风来之国的样子：亮、饱和，暗处带颜色，夜里是看得清的深蓝，灯带柔和的光晕。做法见 [pixel-village.md](../../../../docs/reference/pixel-village.md)「像素村」。
+- **光**：每个像素按法线贴图打光（法线贴图从画里生成，不用画），加上按时间换的天光、点光源（窗户、路灯、提灯、萤火虫、收获时的闪光）、云影、清晨的雾，最后整体调色。照风来之国的样子：亮、饱和，暗处带颜色，夜里是看得清的深蓝，灯带柔和的光晕。做法见 [pixel-village.md](docs/reference/pixel-village.md)「像素村」。
 - **有前后，但院子不动**：镜头前有一层植物框着画面，往鼠标那边偏几个像素，院子本身一动不动；东西脚下都有影子，脚踩在影子里，不是贴在地图上。试过让整个镜头跟着鼠标晃（视差最足），主人觉得地图不该动：画面是用来看帮工干活的，底下的地在晃让人不踏实。
 - **机制在框架里**：光、镜头和视差层、粒子、小动物、节奏都在 `@heybro/engine/pixi`；像素页只写这个院子的配置。（Flutter 版都在 `app/lib/village/`，这个院子的配置是 `app/assets/village.ldtk` 和 `world.dart`。）
 - **院子要活**：画面不能只有帮工在走。烟囱冒烟、蝴蝶和鸟、池塘、风吹叶子、狗打盹；帮工在干什么就在哪里有动静（工坊的铁砧冒火星、书屋飘纸、电台发信号）；点院子、点帮工、拍狗都有回应和声音。这些只是页面自己画的，不进核心状态（`app/lib/village/life.dart`）。
 - **分两层**：core 继续用 Effect，管事件驱动、低频、要测试的东西；每秒 60 次的东西（走到哪、动画帧、灯光闪烁）是渲染层的普通对象，不进原子、不用 Effect。core 不必为换画风改动。（现在核心状态由服务端折好推给客户端，Flutter 不折事实；每秒 60 次的东西是 Flame 里的普通对象。）
 - **场景从一块菜地扩成一个小院**：书屋、管家的屋子、工坊、电台、井和长椅、大门。帮工照手上的动作走到对应的地方，走路就有了意思，也正好解决「纯种菜」的问题。
 - **画面上的字和按钮也画在 canvas 里**：地块和帮工的牌子、管家的话、院子里东西的名字和数字、能点的区域、HUD 的状态、菜单按钮和快捷栏，都由 Pixi 画在画面上面的界面层，按屏幕像素画，所以字清楚。能点的区域同时是 Pixi 无障碍层里的按钮，键盘和读屏照旧能用。留在 DOM 的只有要输入、要排版长文或要弹出来的：田头、面板和对话框、提示条、游戏菜单、精力瓶和帮工栏。这样画面上的东西都跟着同一个镜头、同一帧走，不用每帧把位置抄给 DOM，以后换渲染层也只换一处。（Flutter 版里它们是盖在 Flame 画面上的 Flutter 组件，`app/lib/village/hud.dart`，一样按屏幕像素画。）
-- **素材照旧让 codex 画**，再缩到真实像素、压调色板（[生图流水线](../process/2026-10-09-image-pipeline-with-codex.md)）。界面上的图（图标、奖章、农机、指针、管家的样子）是把手绘的整张图交给 codex 重画成像素，格子不变，名字照抄。
-- **界面换皮肤，不换组件**：面板、田头、配置页还是那一套组件。像素皮肤靠主题色、按名字替换素材、和一段整体覆盖圆角和阴影的 CSS 穿上去，两种画法共用所有的行为。像素是默认的皮肤；去过旧版的手绘农场，配置页才跟着换回手绘的。（皮肤后来拿掉了，只剩像素的一套，见 [只留像素村](../simplification/2026-10-12-pixel-only.md)；Flutter 的控件只有像素的样子，在 `app/lib/ui/kit/`。）
+- **素材照旧让 codex 画**，再缩到真实像素、压调色板（[生图流水线](.agents/notes/implemented/process/2026-10-09-image-pipeline-with-codex.md)）。界面上的图（图标、奖章、农机、指针、管家的样子）是把手绘的整张图交给 codex 重画成像素，格子不变，名字照抄。
+- **界面换皮肤，不换组件**：面板、田头、配置页还是那一套组件。像素皮肤靠主题色、按名字替换素材、和一段整体覆盖圆角和阴影的 CSS 穿上去，两种画法共用所有的行为。像素是默认的皮肤；去过旧版的手绘农场，配置页才跟着换回手绘的。（皮肤后来拿掉了，只剩像素的一套，见 [只留像素村](.agents/notes/implemented/simplification/2026-10-12-pixel-only.md)；Flutter 的控件只有像素的样子，在 `app/lib/ui/kit/`。）
 - **入口放进院子**：左边那列入口变成院子里的东西（小摊、告示板、邮筒、图纸桌、路牌、工坊、书屋、管家），像风来之国和星露谷那样走过去点；常用的（工具、金币和时钟、精力、帮工栏）留在 HUD，但收进游戏画面的框里，像游戏机的屏幕；开关和去别处的路收进游戏菜单（Esc）。田头窗口怎么放还没定，暂时照旧。
 
 - **帮工去哪是一条规则**（当时是 core 的 `village.ts`，和 strolls 一样由 core 的时钟推、有测试；现在在 `app/lib/village/world.dart` 的 `goalOf`、`Whereabouts`，`app/test/village/render_test.dart` 查帮工走到了对应的地方）；画面只管坐标。要等一会儿才动身、待够才走，是规则的一部分，不是动画的。
@@ -52,9 +52,9 @@ Status: implemented
 
 - codex 画的像素不是真的对在格子上，缩小时会糊掉一些细节，动作帧之间也不完全一致。
 - 帮工的去处跟着动作走，动作变得太快会来回跑；现在靠「想要一会儿、待够才走」压住，参数可能要调。
-- 旧版还在，面板和配置页也还在两种皮肤之间切换；旧版只修坏了的地方，不再加新东西。（后来旧版和皮肤都拿掉了，见 [只留像素村](../simplification/2026-10-12-pixel-only.md)。）
-- 桌面安装包大的是 Electron，不是渲染层；在意体积先试 Tauri 这类用系统 WebView 的外壳。（桌面版后来换成了 Flutter 的 macOS 应用，见 [客户端迁到 Flutter](../architecture/2026-10-13-flutter-client-over-ts-server.md)。）
-- Pixi 让农场页多了约 230 KB（gzip），按需加载；像素字体是一个约 600 KB 的文件。旧版的手绘农场后来拿掉了（[只留像素村](../simplification/2026-10-12-pixel-only.md)）。这些是网页版的数；Flutter 应用里的像素字体随应用打包，约 5 MB。
+- 旧版还在，面板和配置页也还在两种皮肤之间切换；旧版只修坏了的地方，不再加新东西。（后来旧版和皮肤都拿掉了，见 [只留像素村](.agents/notes/implemented/simplification/2026-10-12-pixel-only.md)。）
+- 桌面安装包大的是 Electron，不是渲染层；在意体积先试 Tauri 这类用系统 WebView 的外壳。（桌面版后来换成了 Flutter 的 macOS 应用，见 [客户端迁到 Flutter](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)。）
+- Pixi 让农场页多了约 230 KB（gzip），按需加载；像素字体是一个约 600 KB 的文件。旧版的手绘农场后来拿掉了（[只留像素村](.agents/notes/implemented/simplification/2026-10-12-pixel-only.md)）。这些是网页版的数；Flutter 应用里的像素字体随应用打包，约 5 MB。
 - 字号只有 12 和 24，长段落比手绘那一页小。
 - 画面上的字要等像素字体下好再排，不然量出来的宽度是备用字体的；`startVillage` 先等字体。Pixi 只在建按钮时读一次名字，名字变了要自己改那个按钮（`hitRegion` 的 `relabel`）。（这一条是网页版的：Flutter 应用把字体打包在里面，第一帧就有。）
 - 入口在院子里，第一次来的人要指一指才知道哪个能点。

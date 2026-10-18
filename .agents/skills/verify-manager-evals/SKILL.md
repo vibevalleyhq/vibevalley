@@ -5,7 +5,7 @@ description: 改了管家的提示（server/internal/manager/manager.go 的 mana
 
 # 验证管家的评测
 
-管家的测试用 `FauxProvider` 扮演模型，只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放主人标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [管家的错变成评测](../../../docs/subsystems/manager.md)。
+管家的测试用 `FauxProvider` 扮演模型，只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放主人标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [管家的错变成评测](docs/subsystems/manager.md)。
 
 ## 什么时候用
 

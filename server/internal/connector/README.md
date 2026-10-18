@@ -10,6 +10,6 @@
 
 `voiceOutbox` 拥有消息分段、积压摘要、串行发送、整批确认和退避。核心事件只入队，新回复打开平台回复窗口；网络发送不阻塞核心事件读取。
 
-规则、页面与平台限制见 [田头](../../../docs/subsystems/channel.md)。设计取舍见 [收件与账号代际](../../../docs/subsystems/channel.md)。
+规则、页面与平台限制见 [田头](docs/subsystems/channel.md)。设计取舍见 [收件与账号代际](docs/subsystems/channel.md)。
 
 验证用真实 SQLite、重开数据库和本机假 Adapter，不登录真实外部账号：`go test -race ./internal/connector ./pkg/qq ./pkg/weixin ./pkg/feishu ./migrations`。

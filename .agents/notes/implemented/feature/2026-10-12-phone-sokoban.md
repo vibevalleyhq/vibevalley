@@ -10,7 +10,7 @@ Status: implemented
 
 推箱子作为手机应用，使用现有十字键和 A、B。5 个小仓库关卡固定编排；规则是纯函数，在 `app/lib/phone/sokoban.dart`，`sokoban_game.dart` 只画棋盘、接按键和播放音效。移动历史支持逐步撤销，重开回到当前关初始布局，全部箱子归位才能进入下一关。
 
-棋盘保留在客户端的 `warehouseProvider` 里，游戏卸载（收起手机、来电）不会丢失，重开应用后重新开始；没有计时器，不需要暂停时钟。玩法不进入服务端账本，不奖励金币。当前操作见 [farm-ui](../../../../docs/reference/farm-ui.md#农场手机)。
+棋盘保留在客户端的 `warehouseProvider` 里，游戏卸载（收起手机、来电）不会丢失，重开应用后重新开始；没有计时器，不需要暂停时钟。玩法不进入服务端账本，不奖励金币。当前操作见 [farm-ui](docs/reference/farm-ui.md#农场手机)。
 
 ## Alternatives considered
 

@@ -9,20 +9,20 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 拆：派规划的帮工、读它给的计划、打回一次 | 规划的帮工读什么、拆的规矩（`session/rules.go` 的 `SplitBrief`） |
-| 计划和每一件的状态、能做哪些动作、能改哪些件 | 父工单、子工单的存取和核心状态（[工单](issue.md)，`issue.PutTask`） |
+| 计划和每一件的状态、能做哪些动作、能改哪些件 | 父工单、子工单的存取和核心状态（[工单](docs/subsystems/issue.md)，`issue.PutTask`） |
 | 调度：哪几件能开工、并行数、派谁 | 挑档案的打分（`session.ChooseAgent`）、农场的地满没满（`issue.Hire`） |
-| 每一件做完的验证：检查命令、验收、冻结的文件 | 帮工怎么跑一轮、汇报怎么读（[帮工](session.md)） |
-| 计划分支：开、合进去、收获进主分支 | git 操作本身：冲突预检、合并、`.vibevalley/check`（`internal/project`，[项目](project.md)） |
-| 计划的经过（`task_event`） | 计划板怎么画（[farm-ui.md](../reference/farm-ui.md) 第 18 项、`farm/task_board.dart`） |
+| 每一件做完的验证：检查命令、验收、冻结的文件 | 帮工怎么跑一轮、汇报怎么读（[帮工](docs/subsystems/session.md)） |
+| 计划分支：开、合进去、收获进主分支 | git 操作本身：冲突预检、合并、`.vibevalley/check`（`internal/project`，[项目](docs/subsystems/project.md)） |
+| 计划的经过（`task_event`） | 计划板怎么画（[farm-ui.md](docs/reference/farm-ui.md) 第 18 项、`farm/task_board.dart`） |
 | 什么时候告诉管家一句 | 管家怎么回话、它的工具怎么包装（`internal/manager`、`tool/task.go`） |
-| agent 自己的任务图的形状、状态和存储（`task/engine`） | 把任务图交给模型的工具和帮手的推进（`agent/brain` 的 `tasks.go`、`taskrun.go`，[brain](../../server/internal/agent/brain/README.md)） |
+| agent 自己的任务图的形状、状态和存储（`task/engine`） | 把任务图交给模型的工具和帮手的推进（`agent/brain` 的 `tasks.go`、`taskrun.go`，[brain](server/internal/agent/brain/README.md)） |
 
 ## 在哪
 
 - 服务端 `server/internal/task`（`task.Service`，`Workspace` 上的字段是 `TaskGraph`）：`task.go` 拆、调度、验证、动作和开机恢复；`rules.go` 是只有它用的纯函数（`startable`、`parseSplit`、`editTask`、`removeTask`、`taskBrief`、冻结文件的判断和交给帮工的几句话）；`log.go` 计划的经过。
 - 几个包都用的规则在 `protocol`：`task_rules.go`（`GraphProblems`、`ReadyTasks`、`BlockedBy`、`LayersOf`、`GraphActions`、`TaskActions`、`CanEditTask`、验收的几条、`MaxTasks`、`DefaultParallel`、`AutoRetries`）、`task_issues.go`（`GraphIssues` 把计划拆成一家工单，`GraphsOf`、`GraphOf` 从核心状态里的工单拼回计划）、`task_changes.go`（两版计划比出经过和它的说法）、`dag.go`（边的规则，和 `engine` 共用）。工单状态怎么从计划算在 `issues.go` 的 `IssueStatusOf`。
 - 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`；`engine` 的图存在 `task_graph`。
-- 接口：`graph.*`（`split`、`updateTask`、`deleteTask`、`act`、`taskAct`、`changes`、`events`，[capabilities.md](../reference/capabilities.md)）；管家的工具 `graph_split`、`graphs`、`task_edit`、`graph_action`、`task_action`（`tool/task.go`）。
+- 接口：`graph.*`（`split`、`updateTask`、`deleteTask`、`act`、`taskAct`、`changes`、`events`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graphs`、`task_edit`、`graph_action`、`task_action`（`tool/task.go`）。
 - 帧：`StateFrame.Graphs` 是服务端拼好的计划，带分层（`layers`）、每件在等谁（`blockedBy`）、要不要主人看（`asksForYou`）、花了多少（`spent`）、做完几件（`settled`）和能做的动作。
 - 客户端：计划板 `farm/task_board.dart`、`task_steps.dart`、`task_log.dart`；看板上计划是一张「计划：…」卡片（`workbench/issues`），子工单的标题前加计划名（`rules/issues.dart` 的 `issueTitle`）。
 
@@ -84,13 +84,13 @@
 
 ## 和谁打交道
 
-- **工单（`issue`）**：`PutTask` 写整家工单，`NextTaskID` 给下一个计划号，`Hire` 派帮工（查档案、地满没满）；工单服务的转换表不管计划里的工单（[工单](issue.md)）。
+- **工单（`issue`）**：`PutTask` 写整家工单，`NextTaskID` 给下一个计划号，`Hire` 派帮工（查档案、地满没满）；工单服务的转换表不管计划里的工单（[工单](docs/subsystems/issue.md)）。
 - **帮工（`session`）**：派规划的、做件的帮工，`Tell` 带话（触发是 `RunTrigger{kind: task}`），`Dismiss` 请走，`MergeInto` 在收获动作里停住写入、合并、离场；正在干或有待开始的一轮时不能合。计划听核心状态的事实：`FactReport`（一轮结束）和 `FactLeft`（帮工离开）。
 - **项目（`project`）**：`OpenBranch`、`MergeBranch`、`BranchChanges`（`graph.changes` 的收成清单）、`ChangedFiles`（冻结文件的判断）、`Run`（检查命令）。
 - **管家（`manager`、`tool`）**：五个工具起头、看、改、动作；`News()` 的话进管家的输入（来源 `graph`）；`situation.go` 把开着的计划写进农场现状。
 - **田头（`channel`）**：计划里帮工的汇报标 `ForTask`，不投给管家。
-- **Inbox（`protocol/inbox.go`）**：没做成的件是一条 `task-failed`，巡查过了宽限期叫醒管家（[管家](manager.md)）。
-- **游戏（`game`）**：收获一个计划记一条账，金币 `30 + 10 × 合进去的件数`，件数到档位给成就（[farm-ui.md](../reference/farm-ui.md)「金币」）。
+- **Inbox（`protocol/inbox.go`）**：没做成的件是一条 `task-failed`，巡查过了宽限期叫醒管家（[管家](docs/subsystems/manager.md)）。
+- **游戏（`game`）**：收获一个计划记一条账，金币 `30 + 10 × 合进去的件数`，件数到档位给成就（[farm-ui.md](docs/reference/farm-ui.md)「金币」）。
 
 ## agent 自己的任务图
 
@@ -98,7 +98,7 @@
 
 - 一张图最多 30 件（`engine.MaxTasks`）；`Add` 整批收或整批不收，回给模型的问题说清是哪一条；`Update` 只让没开始和没做成的改正文和先后。交给帮手的件失败后重来 1 次（`Retries`）；叫回或进程没了，在做的退回等着（`Requeue`）。
 - 存储（`Store`）是一个主人没做完的那张图：`DBStore` 存在表 `task_graph`，按会话 id 分开，做完的盖上 `finished_at` 留着；`MemoryStore` 给命令行，进程退出就没了。服务端给农机 `vibevalley` 的每个会话一个 `DBStore`（`runtime.Registry`）。
-- 它不进工单、不进核心状态、没有分支和检查，和种植计划不相通；细节在 [engine 的 README](../../server/internal/task/engine/README.md)。
+- 它不进工单、不进核心状态、没有分支和检查，和种植计划不相通；细节在 [engine 的 README](server/internal/task/engine/README.md)。
 
 ## 为什么这样
 
@@ -118,8 +118,8 @@
 
 ## 还没做的
 
-- 种植计划和 agent 自己的任务图合成一个 Task：一份图的规则、一个推进的引擎，执行者和存储可换；开工要主人点头写进代码：[Task：一张按 DAG 推进的活](../../.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)。
-- 先采样几份再验证、挑一份：[先采样再验证](../../.agents/notes/proposed/architecture/2026-10-14-sample-then-verify.md)。
+- 种植计划和 agent 自己的任务图合成一个 Task：一份图的规则、一个推进的引擎，执行者和存储可换；开工要主人点头写进代码：[Task：一张按 DAG 推进的活](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)。
+- 先采样几份再验证、挑一份：[先采样再验证](.agents/notes/proposed/architecture/2026-10-14-sample-then-verify.md)。
 - 还没有提案的：审查步骤、计划模板、半路重新规划、跨项目的计划、计划分支冲突时派帮工解决、计划自己的串。
 
 ## 怎么验证

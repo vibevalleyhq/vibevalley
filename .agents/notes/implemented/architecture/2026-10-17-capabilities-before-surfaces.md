@@ -14,14 +14,14 @@ Status: implemented
 
 ## Decision
 
-**能力是第一位的，入口是皮。** 一个能力就是 `protocol/api.go` 里的一个操作（`group.op`，有方法、路径、请求和返回的形状），每个操作写明谁能用，各个入口从这张表生成或检查（和[先有概念，再有皮](../../proposed/architecture/2026-10-15-concepts-first.md)是一回事）。全部操作和谁能用见生成的 [capabilities.md](../../../../docs/reference/capabilities.md)。
+**能力是第一位的，入口是皮。** 一个能力就是 `protocol/api.go` 里的一个操作（`group.op`，有方法、路径、请求和返回的形状），每个操作写明谁能用，各个入口从这张表生成或检查（和[先有概念，再有皮](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)是一回事）。全部操作和谁能用见生成的 [capabilities.md](docs/reference/capabilities.md)。
 
 - **能力表写在 `api.go`**：`//vibevalley:route` 旁边一行 `//vibevalley:can`，取值封闭：`owner`（主人在这台电脑上：Flutter、命令行）、`remote`（主人配对过的设备：院门）、`manager`、`session`。shapegen 读它，没写 `can` 的操作生成失败。读写不另标，HTTP 方法已经说明。
 - **入口从能力表来**：HTTP 照旧；命令行由 shapegen 写出 Go 的 `protocol.Client`（实现同一个 `Handlers` 接口）和命令表；院门只放 `can` 里有 `remote` 的操作，替掉了 `gate.go` 写死的放行；`docs/reference/capabilities.md` 由 shapegen 写出，`-check` 查它最新。
 - **命令行只是服务端的一张皮**：`vibevalley <组> <操作> [路径参数] [--json 请求体]`，经 HTTP 调服务端，不自己打开 `vibevalley.db`（核心状态只有一份）；连哪个服务端是 `--server` 或 `VIBEVALLEY_SERVER`。手写的只有建在 `Client` 上的组合命令（`state`、`events`、`issue run`）和不经服务端的本机工具（`runtime chat`、`oar`）。直接聊不算农场的活：没有工单，不进核心状态、轨迹和花费。
-- **接口按五条收敛**：组是概念（`gate`、`game`、`channels`，不是 `lan`、`progress`、`chat`）；动词一套（`list`、`get`、`create`、`update`、`delete`，`save` 只给客户端定 id 的整份写入，`check` 只校验，领域动词只留给不是增删改查的）；工单的生命周期挂在工单上，按工单 id 找它最新的帮工（后来进一步收成[工单](../../../../docs/subsystems/issue.md)的 `issue.status`）；一个意图一个操作，不用布尔开关兼两件；`update` 只改给出的字段，路径的 id 算数。没人调的 `worker.activities`、`progress.carryCoins`、`server.end` 删了。
+- **接口按五条收敛**：组是概念（`gate`、`game`、`channels`，不是 `lan`、`progress`、`chat`）；动词一套（`list`、`get`、`create`、`update`、`delete`，`save` 只给客户端定 id 的整份写入，`check` 只校验，领域动词只留给不是增删改查的）；工单的生命周期挂在工单上，按工单 id 找它最新的帮工（后来进一步收成[工单](docs/subsystems/issue.md)的 `issue.status`）；一个意图一个操作，不用布尔开关兼两件；`update` 只改给出的字段，路径的 id 算数。没人调的 `worker.activities`、`progress.carryCoins`、`server.end` 删了。
 - **一条规则，差别作为参数传进服务**：「谁在看」传给 `Issue.Changes(id, by)`，由服务决定主人看算不算进游戏，不再靠两个方法。
-- **模型的工具不从能力表生成**：管家和帮工的工具要的是模型看得懂的参数和说明（管家派活给的是档案的名字和一句话），和给程序的接口不是一个形状；工具表在 `internal/tool`，谁能用哪些由[管家是一份档案，只是能力多](../../proposed/architecture/2026-10-17-manager-is-an-agent.md)管。
+- **模型的工具不从能力表生成**：管家和帮工的工具要的是模型看得懂的参数和说明（管家派活给的是档案的名字和一句话），和给程序的接口不是一个形状；工具表在 `internal/tool`，谁能用哪些由[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md)管。
 
 ## Alternatives considered
 
@@ -37,7 +37,7 @@ Status: implemented
 
 - 加一个能力：写服务、在 `api.go` 加操作和 `can`、跑 shapegen；Flutter 的客户端、命令行的命令和能力表文档跟着生成。
 - `can` 写错了就是权限写错了：`remote` 放多了，院门后的设备能做本该只在本机做的事；改 `remote` 时在改动里单独列出。
-- 还没收完的两件归[管家是一份档案，只是能力多](../../proposed/architecture/2026-10-17-manager-is-an-agent.md)：`can` 去掉 `manager`、`session`（agent 能调什么写在档案上）；管家派活也先写工单、满了排队，和主人派的一条规则。把命令行跑一遍真派活的验证 skill 归[用 VibeValley 开发 VibeValley](../../proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)的 `verify-feature-loop`。
+- 还没收完的两件归[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md)：`can` 去掉 `manager`、`session`（agent 能调什么写在档案上）；管家派活也先写工单、满了排队，和主人派的一条规则。把命令行跑一遍真派活的验证 skill 归[用 VibeValley 开发 VibeValley](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)的 `verify-feature-loop`。
 
 ## Verification
 

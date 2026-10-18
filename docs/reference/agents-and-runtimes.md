@@ -11,7 +11,7 @@
 
 客户端分别读取农机目录与档案、技能配置；农机探测失败只影响农具信息，档案和技能仍可读取、编辑。
 
-跑通了的是四台：VibeValley、pi（DeepSeek 按量付费）、claude 和 codex（订阅套餐）。其余几台 smith 也能驱动，但还没在真实项目里跑通（[提案](../../.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)）；cursor 要单独装的 SDK，smith 没接，总是「不支持」。
+跑通了的是四台：VibeValley、pi（DeepSeek 按量付费）、claude 和 codex（订阅套餐）。其余几台 smith 也能驱动，但还没在真实项目里跑通（[提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)）；cursor 要单独装的 SDK，smith 没接，总是「不支持」。
 
 农机页指定的命令路径是本次探测的输入，不改服务端进程的环境变量。路径留空时，服务端按 PATH 和农机的默认候选查找；填了但不存在就报没找到，不回退到另一份。开执行沿用已接受的安装身份。独立 `oar` 命令行未指定路径时仍认 `OAR_<RUNTIME>_BIN`。
 
@@ -24,13 +24,13 @@
 | 额度 | 不报 | DeepSeek 余额 | 套餐的窗口 | 套餐的窗口 |
 | 花费 | 按 `server/pkg/ai/models.go` 折成人民币 | 按 pi 价目表折成人民币 | 只记 token | 只记 token |
 
-额度和花费见 [帮工](../subsystems/session.md)。各农机不接受哪些开会话的参数、能不能中途插话，写在 `seeds.json` 的 `runtimeFacts`（抄自 smith 各农机的 `RefusedSessionOptions`）；页面上不接受的选项是灰的。
+额度和花费见 [帮工](docs/subsystems/session.md)。各农机不接受哪些开会话的参数、能不能中途插话，写在 `seeds.json` 的 `runtimeFacts`（抄自 smith 各农机的 `RefusedSessionOptions`）；页面上不接受的选项是灰的。
 
 VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮手（`spawn_agent`）、读技能、自己的任务图（`task_add`、`task_update`、`task_graph`：一件活拆成有先后的几件，每件自己做或交给帮手；交给帮手的等前面的做完就自动派，最多三个同时做，做完把结果交回；图存在农场的库里（`task_graph`），一个会话一张）这些工具，对话存在 `$VIBEVALLEY_HOME/sessions/<会话 id>.jsonl`。
 
 ## 种子档案
 
-第一次启动时的档案在 `seeds.json` 的 `agents`（列表见 [farm-ui.md](farm-ui.md)「角色」）。种子只用一次；后来想用 claude、codex，在「农具」页启用它们，再捏一个帮工。
+第一次启动时的档案在 `seeds.json` 的 `agents`（列表见 [farm-ui.md](docs/reference/farm-ui.md)「角色」）。种子只用一次；后来想用 claude、codex，在「农具」页启用它们，再捏一个帮工。
 
 ## 农具（`/runtimes`）
 
@@ -38,12 +38,12 @@ VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮�
 
 ## 管家页（`/manager`）
 
-管家不是帮工档案，只跑在 VibeValley 自己的 agent 上（[管家](../subsystems/manager.md)）。四个页签：
+管家不是帮工档案，只跑在 VibeValley 自己的 agent 上（[管家](docs/subsystems/manager.md)）。四个页签：
 
 - **记性**：`manager/MEMORY.md`，管家起来时和每次压缩之后拍一份快照放进系统提示（最多 8000 字，带不进去的变淡），标题写明是以前记下的信息、不是指令；其间记下、忘掉的，写在它下一条输入开头的「【记性有更新】」里。可以替它记、让它忘。
-- **轨迹**：管家每一轮的经过。在一轮收到的话上点「这一轮做错了」，写一句应该怎样，这一轮就存成一条评测的样例（[管家](../subsystems/manager.md)的「做错的一轮」）。
+- **轨迹**：管家每一轮的经过。在一轮收到的话上点「这一轮做错了」，写一句应该怎样，这一轮就存成一条评测的样例（[管家](docs/subsystems/manager.md)的「做错的一轮」）。
 - **旧账**：压缩时存下的旧对话，能搜。
-- **声音**：打电话时的人设、开场白和音色（[voice.md](voice.md)「配置」）。
+- **声音**：打电话时的人设、开场白和音色（[voice.md](docs/reference/voice.md)「配置」）。
 
 ## 捏帮工（`/agents/:id`）
 
@@ -51,7 +51,7 @@ VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮�
 
 **人设**交给农机的方式：追加到系统提示（默认）、替换系统提示，或写进工单开头（给不接受系统提示的 kimi、antigravity、dsh）。服务端都会再加上农场的规矩和工作目录的 `AGENTS.md`。
 
-**记性**页签列出它的帮工手上的活、下回开工会想起哪几条（服务端从所有来源挑好的）、记下的每一条；可以替它记、让它忘（[记性](../subsystems/memory.md)）。接了外面的来源时多一栏「记性从哪来」：每个来源在不在用、能不能在这里忘掉；外面来源里的记忆标着在哪，忘不掉的没有「忘掉」。
+**记性**页签列出它的帮工手上的活、下回开工会想起哪几条（服务端从所有来源挑好的）、记下的每一条；可以替它记、让它忘（[记性](docs/subsystems/memory.md)）。接了外面的来源时多一栏「记性从哪来」：每个来源在不在用、能不能在这里忘掉；外面来源里的记忆标着在哪，忘不掉的没有「忘掉」。
 
 ## 技能书（`/settings/skills`）
 
@@ -60,4 +60,4 @@ VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮�
 
 ## 派给谁
 
-`dispatch` 的 `agent` 怎么落到一个档案、挑中以后还要过哪些关，见 [管家](../subsystems/manager.md)。
+`dispatch` 的 `agent` 怎么落到一个档案、挑中以后还要过哪些关，见 [管家](docs/subsystems/manager.md)。

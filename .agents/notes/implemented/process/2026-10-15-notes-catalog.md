@@ -13,7 +13,7 @@ Status: implemented
 - 手写的 `INDEX.md` 仍然不许有：清单只有这一份生成的。
 - 脚本跑在 Bun 上（`Bun.Glob`、`Bun.file`），根目录 `package.json` 的命令写成 `bun run …`，`scripts/doc-links.ts` 也用 Bun 跑。Node 只剩 `server/tool` 的两个脚本。
 
-这一篇改了[决策记在 Agent Notes](2026-10-11-agent-notes-and-doc-tiers.md)里「目录本身就是清单，不另建 `INDEX.md`」那一条。
+这一篇改了[决策记在 Agent Notes](.agents/notes/implemented/process/2026-10-11-agent-notes-and-doc-tiers.md)里「目录本身就是清单，不另建 `INDEX.md`」那一条。
 
 ## Alternatives considered
 

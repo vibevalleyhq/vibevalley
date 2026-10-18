@@ -1,6 +1,6 @@
 # manager
 
-管家接收频道、工单、巡查、计划消息和语音输入，把它们交给 `internal/agent/brain`，从 [tool](../tool/README.md) 拿工具，并把回答送回来源。
+管家接收频道、工单、巡查、计划消息和语音输入，把它们交给 `internal/agent/brain`，从 [tool](server/internal/tool/README.md) 拿工具，并把回答送回来源。
 
 ## 输入与回复
 
@@ -12,7 +12,7 @@
 
 ## Run 与日志
 
-管家只投递带来源的输入并转送有序 agent 事件；Run、日志边界和终结重试由 [session](../session/README.md) 拥有。排队不等于消费，未消费的工单不会被上一轮一起关闭；模型失败和中断也不会被当成完成。
+管家只投递带来源的输入并转送有序 agent 事件；Run、日志边界和终结重试由 [session](server/internal/session/README.md) 拥有。排队不等于消费，未消费的工单不会被上一轮一起关闭；模型失败和中断也不会被当成完成。
 
 摘要读取不提交已读。摘要 ID 跟本次输入走，真正消费并记入 Run 后，执行 owner 才通知频道提交回执；取消未消费的排队输入不会丢掉摘要。
 

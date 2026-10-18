@@ -1,6 +1,6 @@
 # 写作
 
-文档、Note、README、skill、提交说明、PR 描述、代码注释、界面上的帮助文字和给主人的回复，都照这一篇写。第一部分管写什么、删什么，第二部分管词和格式怎么写。文档放在哪、写什么，见 [docs/AGENTS.md](../AGENTS.md)；代码注释写什么，见 [code.md](code.md)。官网的宣传文案和首页的诗句不用它，那些靠节奏和修辞（[为什么换成这一篇](../../.agents/notes/implemented/process/2026-10-17-one-writing-standard.md)）。
+文档、Note、README、skill、提交说明、PR 描述、代码注释、界面上的帮助文字和给主人的回复，都照这一篇写。第一部分管写什么、删什么，第二部分管词和格式怎么写。文档放在哪、写什么，见 [docs/AGENTS.md](docs/AGENTS.md)；代码注释写什么，见 [code.md](docs/style/code.md)。官网的宣传文案和首页的诗句不用它，那些靠节奏和修辞（[为什么换成这一篇](.agents/notes/implemented/process/2026-10-17-one-writing-standard.md)）。
 
 ## 写什么，删什么
 
@@ -37,7 +37,7 @@
 
 给 agent 读的文字（`AGENTS.md`、规矩、skill、Note）读错的代价比啰嗦大，下面几条是硬规则。规则来自 [hai-simplified-technical](https://github.com/hylarucoder/hai-stack/blob/main/skills/hai-simplified-technical/SKILL.zh_CN.md)（ASD-STE100）。
 
-- **词**：一词一义，一义一词，用[用语表](../README.md#用语)里的词，同一个东西不换说法。不用「适当」「有关的」「较为」「基本上」「若干」「显著」「大幅」这类程度词，不用「处理」「操作」「优化」这类空动词，不用「开箱即用」「无缝」「赋能」这类套话。
+- **词**：一词一义，一义一词，用[用语表](docs/README.md#用语)里的词，同一个东西不换说法。不用「适当」「有关的」「较为」「基本上」「若干」「显著」「大幅」这类程度词，不用「处理」「操作」「优化」这类空动词，不用「开箱即用」「无缝」「赋能」这类套话。
 - **要求**：只用「应」「不应」「宜」「不宜」「可」「不必」，强弱按这个顺序。用主动句，写明谁做。
 - **步骤**：编号列表，一步一条指令，动词开头，条件写在前，结果单独写。
 - **警告**：放在步骤前，先写指令再写后果；分「警告」和「注意」两级。

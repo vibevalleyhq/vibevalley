@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-挡住一类问题，按这个顺序选手段，能用前面的就不用后面的（写在 [AGENTS.md](../../../../AGENTS.md#怎么让-agent-做对)）：
+挡住一类问题，按这个顺序选手段，能用前面的就不用后面的（写在 [AGENTS.md](AGENTS.md#怎么让-agent-做对)）：
 
 1. **代码**：结构、类型、不变量、边界。把一类问题整个消掉，比如核心状态只有一份、形状只在 Go、生成的代码不手改。
 2. **静态检查**：lint、测试、CI、形式化验证。比如 `bun run go:deadcode`、黄金数据、`docs:verify` 查文档里的路径、生成的成员表查穷尽的 `switch`。

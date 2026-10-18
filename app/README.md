@@ -1,10 +1,10 @@
 # app：VibeValley 的 Flutter 客户端
 
-VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter 客户端](../.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)、[网页退役](../.agents/notes/implemented/simplification/2026-10-14-retire-the-web-page.md)。
+VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter 客户端](.agents/notes/implemented/architecture/2026-10-13-flutter-client-over-ts-server.md)、[网页退役](.agents/notes/implemented/simplification/2026-10-14-retire-the-web-page.md)。
 
 ## 和服务端
 
-- **状态**：读 `GET /api/v1/state` 折好的 `StateFrame`，自己不折事实（[architecture.md](../docs/architecture.md)「核心状态」）。
+- **状态**：读 `GET /api/v1/state` 折好的 `StateFrame`，自己不折事实（[architecture.md](docs/architecture.md)「核心状态」）。
 - **状态以外的事**：从 `GET /api/v1/live` 只取步骤、提醒、农机的变化（`sideEvents`）；`/api/v1/events` 的 facts 留给命令行和调试。
 - **命令**：`lib/gen/vibevalley.dart` 里生成的 `VibeValleyApi`，页面只从 `apiProvider` 拿它。
 - **连接生命周期**：`VibeValleyServer` 同时拥有状态流和窄事件流；关闭时释放全部连接，停止重连。坏帧写入错误流，后续合法帧继续接收。
@@ -14,7 +14,7 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 - **通话的拥有者**：当前农场的 ProviderScope 拥有 VoiceCall；页面观察通话，按钮和本机快捷键都发送同一个通话动作。切换农场时旧通话随 scope 释放。
 - **规则**：帧里没有、要从状态推出来的，是 `lib/rules/` 的纯函数；客户端自己的游戏状态（工具、手机、偏好）在各自的目录。
 
-用哪个农场（本机，或经院门配对的另一台电脑）存在偏好里（`lib/data/farm_choice.dart`）。手机上不在屏幕前时按桌面版的规则弹系统通知（`lib/host/mobile_notices.dart`）。macOS 版见 [desktop.md](../docs/reference/desktop.md)。
+用哪个农场（本机，或经院门配对的另一台电脑）存在偏好里（`lib/data/farm_choice.dart`）。手机上不在屏幕前时按桌面版的规则弹系统通知（`lib/host/mobile_notices.dart`）。macOS 版见 [desktop.md](docs/reference/desktop.md)。
 
 ## 目录
 
@@ -26,7 +26,7 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 | `lib/rules/` | 读核心状态的纯函数 |
 | `lib/chat/` | 田头的数据和小部件：频道、消息、未读、发话；工作台的聊天页和农场的田头窗口都用它 |
 | `lib/shared/` | 几张画面都用的：帮工的样子、干活过程、收成清单、朋友和额度、音效配方、小部件 |
-| `lib/ui/kit/` | 像素控件：按钮、输入、选择、对话框、提示、Markdown……（[README](lib/ui/kit/README.md)） |
+| `lib/ui/kit/` | 像素控件：按钮、输入、选择、对话框、提示、Markdown……（[README](app/lib/ui/kit/README.md)） |
 | `lib/farm/`、`lib/game/` | 农场画面、面板（地块详情、播种袋、仓库、日志、商店、任务与成就、种植计划、收成清单）、田头窗口、帮工栏、精力瓶；工具和点地的规则 |
 | `lib/sprites/` | 按 `sprites.json` 读图（`atlas.dart`） |
 | `lib/village/` | 像素村（Flame）：地图、寻路、帮工和狗、光照、粒子、动静；`hud.dart` 是画在上面的 HUD |
@@ -51,7 +51,7 @@ flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787   # �
 
 ## 形状从哪来
 
-`lib/gen/vibevalley.dart` 是生成的：形状在服务端的 `server/internal/protocol/shapes.go` 和 `api.go`，改了以后在 `server/` 跑 `go run ./tool/shapegen`，它同时写 Go 的 `internal/protocol/gen.go` 和这个文件（[server](../server/README.md#形状和规则从哪来)）。联合生成 sealed class，`switch` 能穷尽；既是事实又是事件流的成员同时实现两个。数字都是 `double`。
+`lib/gen/vibevalley.dart` 是生成的：形状在服务端的 `server/internal/protocol/shapes.go` 和 `api.go`，改了以后在 `server/` 跑 `go run ./tool/shapegen`，它同时写 Go 的 `internal/protocol/gen.go` 和这个文件（[server](server/README.md#形状和规则从哪来)）。联合生成 sealed class，`switch` 能穷尽；既是事实又是事件流的成员同时实现两个。数字都是 `double`。
 
 ## 测试和对照
 

@@ -23,7 +23,7 @@ Status: implemented
 - **皮是 `workbench/`、`farm/`**：皮之间不互相 import；一张皮用的放皮里，两张以上用的放 `shared/`。`title/` 是启动画面，和皮同层。
 - **`app/` 只做组合**（`router.dart`、`main.dart`），`shell/` 是外壳（frame、桌面标题栏），连不上时的横幅在 `shared/connection_banner.dart`；下面的层不 import `app/`，`shell` 也不。
 - **次序由 `scripts/app-imports.ts` 强制**：每个目录一个 rank，import 只能去 rank 更小的目录；`bun run app:imports` 挂在 `flutter:check` 里，反向、同层跨目录都会报。
-- **一样东西一个来源**：档案和农机从 `workbenchConfigProvider` 读（[客户端问服务端](2026-10-16-the-client-asks-the-server.md)）；一个 `apiProvider`；工地事件一个 `sideEventsProvider`。
+- **一样东西一个来源**：档案和农机从 `workbenchConfigProvider` 读（[客户端问服务端](.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）；一个 `apiProvider`；工地事件一个 `sideEventsProvider`。
 - **服务端地址归数据层**：`data/providers.dart` 的 `embeddedServerAddress`，桌面外壳开起服务端以后写进去。
 
 ## Alternatives considered

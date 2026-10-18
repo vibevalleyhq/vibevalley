@@ -2,7 +2,7 @@
 
 VibeValley 是 AI 版的 [Linear](https://linear.app)，和 [Multica](https://github.com/multica-ai/multica) 是一类东西；不同的是只给一个人在自己的机器上用，多了一个替你派活的管家，外面画成一座农场。对象模型照 Linear（Workspace、Issue、优先级、状态）；项目是我们自己的，指一个 git 仓库。
 
-代码、接口和讲服务端的文档用这里的概念；界面用农场的叫法（[用语](README.md#用语)）。每个概念在界面、协议、HTTP、服务端、存储和 oar 里叫什么，见 [concept-map.md](reference/concept-map.md)。
+代码、接口和讲服务端的文档用这里的概念；界面用农场的叫法（[用语](docs/README.md#用语)）。每个概念在界面、协议、HTTP、服务端、存储和 oar 里叫什么，见 [concept-map.md](docs/reference/concept-map.md)。
 
 ## 层次
 
@@ -22,17 +22,17 @@ Workspace（工作目录，一张大地图）
 1. 主人或管家写下一张**工单**，选一个 **agent 档案**和一个**项目**，派出去。
 2. 服务端开一个 **Session**：档案在一个 runtime 上接的这份活，在这张工单的 worktree 里、工单的分支上干（`vibevalley/issue-<工单号>`）。
 3. 每次 **run** 从一次触发开始（派出去、一条 comment、计划走到下一步、定时），到一次汇报结束；中间每一**步**都记下来。
-4. 主人看**改动**，挪工单的状态：挪到已完成是合进主分支或提 PR（工单关上），带句话挪回待办是再干一轮，挪到已取消是不合就关（[工单](subsystems/issue.md)）。
+4. 主人看**改动**，挪工单的状态：挪到已完成是合进主分支或提 PR（工单关上），带句话挪回待办是再干一轮，挪到已取消是不合就关（[工单](docs/subsystems/issue.md)）。
 
 说话都在**频道**里，结构照 Discord：频道 → 消息 → 挂在消息下面的串，每张工单一个串。现在只有一个人：主人，没有成员和权限；在频道里说话的是主人、管家和档案（经它的 Session）。同时干活的 Session 有上限，派不出去的排队。
 
 ## Session 和 oar 会话
 
-单写的 Session 只指上面这一层：一个档案为一张工单接的活。农机那一层（smith 的 `oar.Session`，重启后会换一个）在代码里只经包名出现，文档里写「oar 会话」；中文里我们这一层写 Session，不写「会话」（[Worker 改叫 Session](subsystems/session.md)）。
+单写的 Session 只指上面这一层：一个档案为一张工单接的活。农机那一层（smith 的 `oar.Session`，重启后会换一个）在代码里只经包名出现，文档里写「oar 会话」；中文里我们这一层写 Session，不写「会话」（[Worker 改叫 Session](docs/subsystems/session.md)）。
 
 ## 东西
 
-农场里各叫什么、界面上用哪个字，见[用语表](README.md#用语)，这里不再写一遍。
+农场里各叫什么、界面上用哪个字，见[用语表](docs/README.md#用语)，这里不再写一遍。
 
 | 概念 | 代码里 | 是什么 |
 |---|---|---|
@@ -65,7 +65,7 @@ Workspace（工作目录，一张大地图）
 | 一块地 | 一张工单；代码相关的带一个 worktree（岛上围着篱笆的那块）。一座岛上的空位是这个项目同时在做的工单数 |
 | 院门外的种子袋 | 排队等空地的工单（待办） |
 | 地里的小动物 | 在这块地上干活的帮工（Session），可以换人 |
-| 庄稼 | 这一轮做到哪了；交回来以后看工单：干裂是缺肥，开花是等验收，杂草是没过验收，结出来是验收过了（[farm-ui.md](reference/farm-ui.md)「地里长什么」；叫法见[用语表](README.md#用语)） |
+| 庄稼 | 这一轮做到哪了；交回来以后看工单：干裂是缺肥，开花是等验收，杂草是没过验收，结出来是验收过了（[farm-ui.md](docs/reference/farm-ui.md)「地里长什么」；叫法见[用语表](docs/README.md#用语)） |
 | 一季庄稼 | 一次干活（run） |
 | 小动物走去哪 | 它正在用的工具 |
 | 手、浇水、施肥、杀虫、验收、收获、铲除 | 派活（挪到待办）、带话、回答它问的、让它修、验收（`issue.accept`）、收获（挪到已完成）、叫停或请走（挪到已取消） |
@@ -73,6 +73,6 @@ Workspace（工作目录，一张大地图）
 | 金币、连胜、成就 | 从账本里的真实事件折出来 |
 | 院子里的建筑 | 各个页面的入口 |
 
-核心状态里还混着金币和成就；见[提案](../.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)。
+核心状态里还混着金币和成就；见[提案](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)。
 
-一块地上可以有几个帮工（做过这块地的都在「地上的人」里），锄头在现在干活的那个手上；@ 谁就让谁下地、几个人分工、派一个看地的，还没做（[一块地上几个人一起种](../.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)）。
+一块地上可以有几个帮工（做过这块地的都在「地上的人」里），锄头在现在干活的那个手上；@ 谁就让谁下地、几个人分工、派一个看地的，还没做（[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)）。

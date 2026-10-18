@@ -15,7 +15,7 @@ Status: implemented
 - **异步结果由一个落点接纳。** 客户端配置刷新使用代次，读取期间的农机推送保留；所有档案写入经过同一归一化。院门的持久化和监听状态在同一个互斥区更新，设备注册请求时重新检查是否已被移除。
 - **验证穿过实际接缝。** 数据库写入故障注入验证失败后的副作用；并发测试验证容量和局部设置；客户端双流测试用本机 HTTP 对端，避免 FakeServer 绕过生产连接实现。沿用已有替身，不新增通用工作流或存储框架。
 
-当前行为分别见 [服务端](../../../../docs/reference/server.md)、[客户端](../../../../app/README.md) 和 [架构](../../../../docs/architecture.md)。这补充了[收敛接缝](2026-10-17-converge-the-seams.md)，不改变 Go 拥有核心状态和计划由父子工单组成的决策。
+当前行为分别见 [服务端](docs/reference/server.md)、[客户端](app/README.md) 和 [架构](docs/architecture.md)。这补充了[收敛接缝](.agents/notes/implemented/architecture/2026-10-17-converge-the-seams.md)，不改变 Go 拥有核心状态和计划由父子工单组成的决策。
 
 ## Alternatives considered
 

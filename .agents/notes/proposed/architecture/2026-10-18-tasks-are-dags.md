@@ -64,9 +64,9 @@ type Task struct {
 照 [Hermes Agent](https://github.com/nousresearch/hermes-agent)（2026-06-11 的 `db7714d`）的 `todo`、`delegate_task` 和 Kanban 各取一部分：
 
 - **工具**：`task_add`（写图或往图里加）、`task_update`（改一件）、`task_graph`（看全图）；每次调用回整张图（Hermes `todo`）。
-- **帮手**：ready 的 `helper` 节点自动派，后台并行跑，最多 `MaxHelpers`（默认 3），帮手不能再派；失败重试一次；做完的结果交回 agent，agent 闲着就开一轮，忙着就排到这一轮之后（Hermes `delegate_task`，但不同步等）。agent 被叫停时帮手一起停，节点退回 `waiting`；有帮手在跑时新来的话不打断这一轮，和 [编排层](2026-10-18-one-mailbox-per-agent.md) 同一条规则。
+- **帮手**：ready 的 `helper` 节点自动派，后台并行跑，最多 `MaxHelpers`（默认 3），帮手不能再派；失败重试一次；做完的结果交回 agent，agent 闲着就开一轮，忙着就排到这一轮之后（Hermes `delegate_task`，但不同步等）。agent 被叫停时帮手一起停，节点退回 `waiting`；有帮手在跑时新来的话不打断这一轮，和 [编排层](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md) 同一条规则。
 - **提醒**：一轮停下时还有 ready 的 `self` 节点、又没有别的输入，提醒一次；图连续 `MaxNudges`（默认 3）次没变就不再提醒。不用另一个模型判断做没做完（Hermes `judge_goal` 不取）。
-- **看得见**：图不进系统提示（[提示开头不变](../../../../docs/subsystems/manager.md)）。模型每次调任务工具、每个帮手交回都拿到整张图，所以不另拼变化；压缩时把打开的图接在摘要后面，被压掉的那几轮里的图由它接上；`brain` 发 `TasksChanged` 事件，`oarruntime` 写成原始记录里的一帧，帮工的轨迹里看得到。
+- **看得见**：图不进系统提示（[提示开头不变](docs/subsystems/manager.md)）。模型每次调任务工具、每个帮手交回都拿到整张图，所以不另拼变化；压缩时把打开的图接在摘要后面，被压掉的那几轮里的图由它接上；`brain` 发 `TasksChanged` 事件，`oarruntime` 写成原始记录里的一帧，帮工的轨迹里看得到。
 - **谁开**：农机 `vibevalley` 和命令行；管家先不开（开了要改它的工具，要重放评测），以后只开 `self`，派活仍用 `dispatch`。
 
 ### 6. 种植计划并进 Task（第二阶段）
@@ -95,7 +95,7 @@ type Task struct {
 - 协议：容器 `TaskGraph`（`GraphState`：`splitting`、`draft`、`running`、`paused`、`ripe`、`done`、`abandoned`；`GraphAction`、`GraphEvent`（每件的事件是 `task_*`）、`GraphActor`、`IssueGraph`（`Issue.Graph`）、`SessionGraph`（`Session.Graph`）、`StateFrame.Graphs`），节点 `Task`（`TaskState`、`TaskAction`、`TaskEdit`、`IssueTask`（`Issue.Task`））；接口 `graph.split`、`graph.updateTask`、`graph.deleteTask`、`graph.act`、`graph.taskAct`、`graph.changes`、`graph.events`，路径 `/api/v1/graphs…`；频道主题、投递原因、管家输入的来源是 `graph`，关上的理由 `merged_into_graph`，Inbox 的 `graph-draft`、`graph-ripe`、`task-failed`；成就 `s_split`、`big_graph`、`parallel_graph`，账本的 `graph`、`split`。账号额度里原来叫 plan 的套餐改叫 `Subscription`。
 - 管家的工具：`graph_split`（派帮工拆）、`graphs`、`task_edit`、`graph_action`、`task_action`（单件重试、跳过）；`graph_action start` 和 `merge` 一样，这一轮不是主人叫的就不动手（`tool/words.go` 的 `startNotAsked`）。agent 自己的三个工具是 `task_add`、`task_update`、`task_graph`。
 - 包：`internal/playbook` → `internal/task`（`task.Service`，`Workspace.Task`），引擎 `internal/agent/task` → `internal/task/engine`；Flutter 的面板 `FarmPanel.taskBoard`、`TaskBoard`、`task_board.dart`、`task_steps.dart`、`task_log.dart`，贴图 `icon-task-board` 和三张徽章跟着改名，`village.ldtk` 里院子的那个点叫 `taskBoard`；分支 `vibevalley/task-<id>-<时间>`；`pb` 这样的缩写改成 `graph`、`task`（按类型改的，不是按字面）。
-- 表结构：`0002`–`0006` 并进 `0001_schema.sql`（`issue.graph`、`issue.task`、`session.brief`、`session.graph`、`task_event` 的 `graph_id`、`task_id`、`task_graph`……），旧库作废（AGENTS.md「不留兼容」，[只有一份表结构](../../implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。
+- 表结构：`0002`–`0006` 并进 `0001_schema.sql`（`issue.graph`、`issue.task`、`session.brief`、`session.graph`、`task_event` 的 `graph_id`、`task_id`、`task_graph`……），旧库作废（AGENTS.md「不留兼容」，[只有一份表结构](.agents/notes/implemented/architecture/2026-10-16-one-schema-no-old-data.md)）。
 
 第 6 步还没做。
 

@@ -2,7 +2,7 @@
 
 Status: proposed
 
-这里的「验收」指种植计划里先写好、写好就冻结的那一步检查（`protocol.AcceptancesOf`）；工单交回来以后主人或管家判过没过的「验收」是另一件事，见[工单](../../../../docs/subsystems/issue.md)。
+这里的「验收」指种植计划里先写好、写好就冻结的那一步检查（`protocol.AcceptancesOf`）；工单交回来以后主人或管家判过没过的「验收」是另一件事，见[工单](docs/subsystems/issue.md)。
 
 ## Problem
 
@@ -47,7 +47,7 @@ Status: proposed
 
 ### 1. 验收先行（已做，2026-10-14）
 
-种植计划的一步可以是**验收步骤**（计划的步骤现在是子工单，标在 `IssueTask.acceptance`；规则读的 `Task` 由它拼出来，[种植计划是带子工单的父工单](../../../../docs/subsystems/task.md)）。现在的行为见 [种植计划](../../../../docs/subsystems/task.md)的「验收」。要点和理由：
+种植计划的一步可以是**验收步骤**（计划的步骤现在是子工单，标在 `IssueTask.acceptance`；规则读的 `Task` 由它拼出来，[种植计划是带子工单的父工单](docs/subsystems/task.md)）。现在的行为见 [种植计划](docs/subsystems/task.md)的「验收」。要点和理由：
 
 - **规划时写，排在最前面**：规划的帮工（`session/rules.go` 的 `SplitBrief`）在修 bug、或要做的事能用测试说清楚的时候，把第一步拆成验收，别的步骤都等它。它只写现在会失败的测试，检查命令只跑这些测试。这是想法 2：验收和修复由不同的帮工、在不同的时候写。
 - **农场判红**：验收步骤做完，检查要**不通过**才合；通过了就退回去，说它没抓住问题。这是想法 4。
@@ -77,7 +77,7 @@ Status: proposed
 
 ### 4. 技能：帮工起草，主人批（待做）
 
-给还得靠模型、但每次都差不多的做法用：「这个项目发版要先改 CHANGELOG、再打 tag」「改了 protocol 要跑 shapegen」。它对应 [Hermes](https://github.com/NousResearch/hermes-agent) 的第三类记忆（程序性记忆：复杂的活做完后 agent 自己写技能），也是[记忆都存在 SQLite](2026-10-18-memory-in-sqlite.md)第 1 节的第三类。和第 3 步的分别：脚本不调模型，技能是写给模型看的步骤。
+给还得靠模型、但每次都差不多的做法用：「这个项目发版要先改 CHANGELOG、再打 tag」「改了 protocol 要跑 shapegen」。它对应 [Hermes](https://github.com/NousResearch/hermes-agent) 的第三类记忆（程序性记忆：复杂的活做完后 agent 自己写技能），也是[记忆都存在 SQLite](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)第 1 节的第三类。和第 3 步的分别：脚本不调模型，技能是写给模型看的步骤。
 
 - **起草**：帮工经 `/mcp` 的 `skill_draft` 交一份 Agent Skills 形状的技能（名字、`description` 写「什么时候用」、正文是步骤），附上为什么（来自哪张工单、哪个 Session）。改一份已有的技能也是交草稿，带上它的 id。规矩（`session/rules.go`）告诉帮工：一件活走了很多步、而且以后还会遇到，才起草；`memory_add` 记的是事实，技能记的是做法。
 - **验收是主人**：草稿不生效。技能书（`/skills`）上多一栏「待批」，看得到全文和改了什么（改已有的技能时是前后对比），点同意才写进技能书（`agent.Service.SaveSkill`，照旧存在 `config.json`），点拒绝留下理由。这一关是第「背后的想法」第 2 条：写技能的一方批不了自己的技能。也对应 Grok Bot 的「新的定时要你点头」：技能会影响以后每一次派活。
@@ -103,7 +103,7 @@ Status: proposed
 
 **农活脚本用别的运行时。** Node 子进程没有沙箱，还要在 macOS 应用里带上 Node；Starlark 确定、安全，但模型写 JS 比写 Starlark 熟练得多，MCP 的生态也是 JS 的；cgo 的 QuickJS 和 V8 破坏纯 Go 的交叉编译；Sobek、modernc 的 QuickJS 是纯 Go，但起一个运行时更慢、更占内存。moejs 每个运行时约 1.4µs、80KiB，带内存上限和打断，能直接跑 TypeScript（`CompileTS`）。代价是它很年轻，所以包在接口后面。
 
-**用 moejs 在 Go 里跑 TypeScript 的 `reduce`，省掉 Go 的移植。** 考虑过，否决了：protocol 依赖 Effect，模块初始化很重；`Site.Apply` 每折一个事实都要把整个状态在 Go 和 JS 之间来回转一遍；服务端也和「服务端是 Go」的决定相反（[Go 服务端](../../implemented/architecture/2026-10-13-go-server-on-smith.md)）。
+**用 moejs 在 Go 里跑 TypeScript 的 `reduce`，省掉 Go 的移植。** 考虑过，否决了：protocol 依赖 Effect，模块初始化很重；`Site.Apply` 每折一个事实都要把整个状态在 Go 和 JS 之间来回转一遍；服务端也和「服务端是 Go」的决定相反（[Go 服务端](.agents/notes/implemented/architecture/2026-10-13-go-server-on-smith.md)）。
 
 **帮工写的技能直接生效（Hermes 的做法）。** 省掉主人一步，可写技能和用技能是同一只手，错的做法会随每次派活扩散，而且主人不知道多了什么；批这一步就是验收。
 

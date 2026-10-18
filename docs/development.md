@@ -1,6 +1,6 @@
 # 开发
 
-在本机把 VibeValley 跑起来、检查、打包。命令的总表和规矩在根目录的 [AGENTS.md](../AGENTS.md)，代码怎么分层见 [architecture.md](architecture.md)。
+在本机把 VibeValley 跑起来、检查、打包。命令的总表和规矩在根目录的 [AGENTS.md](AGENTS.md)，代码怎么分层见 [architecture.md](docs/architecture.md)。
 
 ## 跑起来
 
@@ -12,10 +12,10 @@ cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:
 ```
 
 - 第一次跑 Flutter（和升级 `agora_rtc_engine` 以后）先跑 `app/tool/agora-voice-only.sh`。
-- 帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活：项目在 `projects/`，worktree 在 `worktrees/`，打包的应用各用自己的（[desktop.md](reference/desktop.md)「渠道」）；设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见 [architecture.md](architecture.md)「配置」。
-- 语音的凭据见 [voice.md](reference/voice.md)；没有也能打字用。
+- 帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活：项目在 `projects/`，worktree 在 `worktrees/`，打包的应用各用自己的（[desktop.md](docs/reference/desktop.md)「渠道」）；设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见 [architecture.md](docs/architecture.md)「配置」。
+- 语音的凭据见 [voice.md](docs/reference/voice.md)；没有也能打字用。
 - 服务端改了代码要重启。
-- 改表结构：直接改 `server/migrations/0001_schema.sql`，跑 sqlc（命令在 [AGENTS.md](../AGENTS.md)），删掉本机的 `vibevalley.db` 让服务端重建；不加迁移，也不写数据搬运（AGENTS.md「不留兼容」）。`go run ./cmd/migrate status` 看本机的库在第几版。
+- 改表结构：直接改 `server/migrations/0001_schema.sql`，跑 sqlc（命令在 [AGENTS.md](AGENTS.md)），删掉本机的 `vibevalley.db` 让服务端重建；不加迁移，也不写数据搬运（AGENTS.md「不留兼容」）。`go run ./cmd/migrate status` 看本机的库在第几版。
 
 ## macOS 应用
 
@@ -24,17 +24,17 @@ bun run package:mac                      # app/build/vibevalley.app（带 Go 服
 app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
 ```
 
-渠道、家目录、日志在哪见 [desktop.md](reference/desktop.md)。
+渠道、家目录、日志在哪见 [desktop.md](docs/reference/desktop.md)。
 
 ## 检查和测试
 
-先跑和改动有关的最窄的那个（命令见 [AGENTS.md](../AGENTS.md#命令)）。服务端的测试怎么写见 [server](../server/README.md#测试)，Flutter 的见 [app](../app/README.md#测试和对照)。客户端分层用 `bun run app:imports` 查：`app/lib` 里的 import 只能往下一层走（`flutter:check` 也跑）。
+先跑和改动有关的最窄的那个（命令见 [AGENTS.md](AGENTS.md#命令)）。服务端的测试怎么写见 [server](server/README.md#测试)，Flutter 的见 [app](app/README.md#测试和对照)。客户端分层用 `bun run app:imports` 查：`app/lib` 里的 import 只能往下一层走（`flutter:check` 也跑）。
 
 ## 改形状、规则和表
 
-- **形状**：改 `server/internal/protocol` 的 `shapes.go` 或 `api.go`，同一个改动里跑 `go run ./tool/shapegen`（[server](../server/README.md#形状和规则从哪来)）。
-- **规则**：改拥有它的包里的纯函数（几个包都用的在 `protocol`），`VIBEVALLEY_GOLDEN=update go test ./internal/...` 重写黄金数据，看 diff。客户端不重写服务端的规则（[客户端问服务端](../.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
-- **表和查询**：表结构是 `server/migrations/0001_schema.sql` 一个文件（直接改），查询在 `server/pkg/db/queries/`；改完重跑 sqlc（[理由](../.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）。新表用单数名。
+- **形状**：改 `server/internal/protocol` 的 `shapes.go` 或 `api.go`，同一个改动里跑 `go run ./tool/shapegen`（[server](server/README.md#形状和规则从哪来)）。
+- **规则**：改拥有它的包里的纯函数（几个包都用的在 `protocol`），`VIBEVALLEY_GOLDEN=update go test ./internal/...` 重写黄金数据，看 diff。客户端不重写服务端的规则（[客户端问服务端](.agents/notes/implemented/architecture/2026-10-16-the-client-asks-the-server.md)）。
+- **表和查询**：表结构是 `server/migrations/0001_schema.sql` 一个文件（直接改），查询在 `server/pkg/db/queries/`；改完重跑 sqlc（[理由](.agents/notes/implemented/architecture/2026-10-15-sqlc-queries.md)）。新表用单数名。
 - **旧名字**：`bun run names:verify` 查 `server/internal`、`server/cmd`、`app/lib`、`app/test` 里有没有已经改掉的旧名（挂在 `docs:verify` 里）；加了新名字就把它写进 `scripts/stale-names.ts`。
 
 ## 调试台
@@ -85,10 +85,10 @@ export VIBEVALLEY_SERVER=http://127.0.0.1:8787
    vibevalley issue status <id> --json '{"status":"done"}'
    ```
 
-状态规则和理由见子系统 [工单](subsystems/issue.md#怎么走)。
+状态规则和理由见子系统 [工单](docs/subsystems/issue.md#怎么走)。
 
 ## 素材、音效和官网
 
-- 贴图在 `design/pixel/` 里生成、切图（[pixel-village.md](reference/pixel-village.md)「素材」），不手改 `sprites.json`。
-- 音效配方在 `app/lib/audio/sfx.dart`（[pixel-village.md](reference/pixel-village.md)「音效」）。
-- 官网见 [site/README.md](../site/README.md)；`bun run site:deploy` 构建并发到 Cloudflare。
+- 贴图在 `design/pixel/` 里生成、切图（[pixel-village.md](docs/reference/pixel-village.md)「素材」），不手改 `sprites.json`。
+- 音效配方在 `app/lib/audio/sfx.dart`（[pixel-village.md](docs/reference/pixel-village.md)「音效」）。
+- 官网见 [site/README.md](site/README.md)；`bun run site:deploy` 构建并发到 Cloudflare。

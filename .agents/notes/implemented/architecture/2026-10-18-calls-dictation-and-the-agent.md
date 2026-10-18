@@ -12,9 +12,9 @@ Status: implemented
 | 断句（VAD）、插话打断 | 合成：MiniMax、OpenAI、微软 |
 | 把识别、想、合成串成一条实时链路 | 托管的大模型（`gpt-4.1-mini` 等） |
 
-第一列是实时通话的难点，自己做成本很高（[照官方示例搬](../../implemented/feature/2026-10-10-voice-through-agora-quickstart.md)时放弃过）。第二列不经过 Agora 也能直接调。接下来要做的智能输入（说一段话，变成输入框里的字）不需要实时链路，只要识别。而且 agora-agents-go 能接的识别里，除了 ARES 没有一家国内厂商（`agentkit/vendors/stt.go`：Amazon、AssemblyAI、Deepgram、Gemini、Google、微软、OpenAI、Sarvam、Smallest AI、Speechmatics、xAI），中文和中英混说准的阿里、豆包都接不上。
+第一列是实时通话的难点，自己做成本很高（[照官方示例搬](.agents/notes/implemented/feature/2026-10-10-voice-through-agora-quickstart.md)时放弃过）。第二列不经过 Agora 也能直接调。接下来要做的智能输入（说一段话，变成输入框里的字）不需要实时链路，只要识别。而且 agora-agents-go 能接的识别里，除了 ARES 没有一家国内厂商（`agentkit/vendors/stt.go`：Amazon、AssemblyAI、Deepgram、Gemini、Google、微软、OpenAI、Sarvam、Smallest AI、Speechmatics、xAI），中文和中英混说准的阿里、豆包都接不上。
 
-「想」这一格也被说成了一个大模型，其实它是 agent 层。选 `vibevalley` 时，Agora 的大模型一格只是一个 chat/completions 协议的接口，后面接的是管家（[语音接到我们自己的管家](../../implemented/feature/2026-10-10-voice-through-our-manager.md)）。但这个协议写死在语音线路里：`voiceLastUserText`、`voiceSSEChunk`、模型名 `vibevalley-manager` 都在 `server/internal/voice/line.go`，换一个实时平台、或者本机别的程序想和管家说话，都要再写一遍。
+「想」这一格也被说成了一个大模型，其实它是 agent 层。选 `vibevalley` 时，Agora 的大模型一格只是一个 chat/completions 协议的接口，后面接的是管家（[语音接到我们自己的管家](.agents/notes/implemented/feature/2026-10-10-voice-through-our-manager.md)）。但这个协议写死在语音线路里：`voiceLastUserText`、`voiceSSEChunk`、模型名 `vibevalley-manager` 都在 `server/internal/voice/line.go`，换一个实时平台、或者本机别的程序想和管家说话，都要再写一遍。
 
 Agora 的说法也进了我们的形状和各层：
 
@@ -54,7 +54,7 @@ Agora 的说法也进了我们的形状和各层：
 Answerer func(model string) func(ctx context.Context, text string) <-chan string
 ```
 
-协议上的取舍，写进处理函数的注释和 [voice.md](../../../../docs/reference/voice.md)：
+协议上的取舍，写进处理函数的注释和 [voice.md](docs/reference/voice.md)：
 
 - **有状态的 agent，无状态的协议**：请求里的 `messages` 只取最后一条 `user`；`system` 和前面的几轮不读。对话的历史以管家自己的会话为准，人设也用管家自己的提示。
 - **只出字**：请求里的 `tools` 不读，回的只有 `delta.content`。管家调工具在里面做完，外面看到的是它说的话。`usage` 不填。
@@ -108,7 +108,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 `VoiceSettings` 就是通话的设置，也就是 Agora 实现的设置；听写的设置以后是它旁边单独的 `dictation`，不放进 `voice`。
 
-- `answer`（原来的 `llm`）：谁接电话，`VoiceAnswer`。`manager` 是管家自己接（原来的 `vibevalley`），模型归管家的档案（[管家是一份档案，只是能力多](../../proposed/architecture/2026-10-17-manager-is-an-agent.md)）；`agora`、`deepseek`、`openai` 是快嘴，只会说话，管家旁听派活。
+- `answer`（原来的 `llm`）：谁接电话，`VoiceAnswer`。`manager` 是管家自己接（原来的 `vibevalley`），模型归管家的档案（[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md)）；`agora`、`deepseek`、`openai` 是快嘴，只会说话，管家旁听派活。
 - `asr`、`tts`：Agora 能接的厂商，名字照实写；听写的识别是另一个联合类型。
 - 人设、开场白、出错时说的话、`Area`、`SilenceMs`、`InterruptMs`、`IdleSeconds` 都留在 `voice` 里。人设只对快嘴有用，声音页上标明了。
 - `VoiceCaptions` 删掉：字幕固定走 RTC 的 data stream，写在 `voice/agora.go` 里（`pkg/agora` 还认 RTM，给别的用法）。
@@ -142,7 +142,7 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 
 **听写也走 Agora。** 要开一通 ConvoAI 的会话才能识别，按分钟计费，还会请一个 agent 进频道；能选的识别厂商也只有它列表里那几家，中文准的接不上。听写不需要断句和打断。
 
-**通话的识别也换成我们自己的。** 识别和断句、打断绑在一起，换掉就要自己做实时链路，[照官方示例搬](../../implemented/feature/2026-10-10-voice-through-agora-quickstart.md)时否决过。
+**通话的识别也换成我们自己的。** 识别和断句、打断绑在一起，换掉就要自己做实时链路，[照官方示例搬](.agents/notes/implemented/feature/2026-10-10-voice-through-agora-quickstart.md)时否决过。
 
 **OpenAI 协议层留在 `voice` 里。** 只有语音线路用它的时候没问题；可主服务的本机接口、以后给帮工打电话都要用。协议和管家无关，放在 `internal/agent/brain`，任何一个 `vvagent.Agent` 都能挂。
 
@@ -173,4 +173,4 @@ Answerer func(model string) func(ctx context.Context, text string) <-chan string
 - 填了云上的地址，主人的声音就送到那一家；填本机的 `speech-server` 就不出本机。设置里写明。
 - 第 4 步改了存盘的名字（`llm` → `answer`，`vibevalley` → `manager`），不搬旧的：别的机器上存过「想」的 `settings.json`，「想」会回到默认，要在声音页重选一次。
 - 快嘴的回答由客户端上报，客户端挂得太快会少一条；有意接受，不加重试。
-- 有意放弃的：不支持第二家实时平台的 Go 接口，不做不实时的合成；能换平台靠 OpenAI 接口，合成等[帮工各自的音色](../../proposed/feature/2026-10-13-helper-voices.md)来用。
+- 有意放弃的：不支持第二家实时平台的 Go 接口，不做不实时的合成；能换平台靠 OpenAI 接口，合成等[帮工各自的音色](.agents/notes/proposed/feature/2026-10-13-helper-voices.md)来用。

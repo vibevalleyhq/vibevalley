@@ -28,7 +28,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 
 - 删掉 `Trajectory`、`TrajectoryHead` 和 `*.head.json`。已有的头文件搬进 `session` 表一次；旧的事件没有 Run，按时间落进对应的 Run，落不进的留空。走了的 Session 也是 `Session`：`Phase` 加一个 `closed`（结束的时间和怎么关的）。
 - 接口：`session.list` 返回 `[]Session`（活的和走了的）；`session.get <id>` 返回它和它的 Run；新的 `session.events <id> [--run]` 返回事件。
-- 管家也是一个 agent loop，按 [管家是一份档案，只是能力多](2026-10-17-manager-is-an-agent.md) 它是档案 `manager`，它的会话是一个 Session，进同一张表；它的事件现在只留最近 1000 条，照旧。
+- 管家也是一个 agent loop，按 [管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md) 它是档案 `manager`，它的会话是一个 Session，进同一张表；它的事件现在只留最近 1000 条，照旧。
 
 ### 和消息之间只有两个口子，都在服务端
 
@@ -39,7 +39,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 - **进**：一条消息投递给一个 Session，就是它一个 Run 的输入（`session.Deliver`：prompt、steer 或 queue）。投递带上 Session 要的上文（这个串里它没看过的、@它的那几条），它不用自己去翻。
 - **出**：一个 Run 结束，服务端把它整理成一句或几句话：给工单串一条交代；交代里 @ 到的投递过去；要主人拿主意的（`NeedsYou`）进 Inbox。
 - 消息记着出自哪个 Run，Run 记着哪条消息触发了它（`RunTrigger` 已有一半），从一句话能追到背后的事件。
-- Session 不直接发消息：删掉 `farm_*` 和 `session/tokens.go`。`/mcp` 只对外，给主人机器上的 agent 用农场的能力，工具从能力表来（[先有能力，再有入口](../../implemented/architecture/2026-10-17-capabilities-before-surfaces.md)）。
+- Session 不直接发消息：删掉 `farm_*` 和 `session/tokens.go`。`/mcp` 只对外，给主人机器上的 agent 用农场的能力，工具从能力表来（[先有能力，再有入口](.agents/notes/implemented/architecture/2026-10-17-capabilities-before-surfaces.md)）。
 
 这和 ACP（Agent Client Protocol）的分法一致：客户端 `session/prompt`、`session/cancel`，agent 只回 `session/update` 和结束的原因，请示用 `session/request_permission`；agent 不调客户端的接口说话。
 

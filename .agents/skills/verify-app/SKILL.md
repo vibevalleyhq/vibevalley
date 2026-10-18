@@ -18,7 +18,7 @@ description: 改了 VibeValley 的客户端（app/lib/**、app/assets）之后�
 ## 准备
 
 1. 先跑 `bun run flutter:check`。
-2. 使用 [verify-server](../verify-server/SKILL.md) 的隔离脚本；它自动选择回环空闲端口并传入 `VIBEVALLEY_SERVER`，不连接主人的 8787。
+2. 使用 [verify-server](.agents/skills/verify-server/SKILL.md) 的隔离脚本；它自动选择回环空闲端口并传入 `VIBEVALLEY_SERVER`，不连接主人的 8787。
 
 ## 步骤
 

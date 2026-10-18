@@ -6,7 +6,7 @@ Status: implemented
 
 一个包只导出一个 Service，并不保证接口深。处理函数仍要先查工单、找最新执行、判状态、拼评论再送消息；收获调用方要安排停止写入、合并、离场。客户端两张皮各自拼历史、管理已读、判断何时加载轨迹。调用方必须知道这些顺序，模块只是把实现拆开。
 
-[动作结果和生命周期](2026-10-17-operation-results-and-lifetimes.md)修正了失败与竞态，但增加检查并没有自动减少这份接口负担。
+[动作结果和生命周期](.agents/notes/implemented/architecture/2026-10-17-operation-results-and-lifetimes.md)修正了失败与竞态，但增加检查并没有自动减少这份接口负担。
 
 ## Decision
 

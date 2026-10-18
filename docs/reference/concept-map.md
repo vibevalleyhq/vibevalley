@@ -1,17 +1,17 @@
 # 概念在各层的名字
 
-一个概念在每一层叫什么：从农场里看到的，到界面、协议、HTTP、服务端、存储，最后到 oar。概念本身是什么见 [concepts.md](../concepts.md)，叫法见[用语表](../README.md#用语)。小队还没做，见[提案](../subsystems/session.md)。
+一个概念在每一层叫什么：从农场里看到的，到界面、协议、HTTP、服务端、存储，最后到 oar。概念本身是什么见 [concepts.md](docs/concepts.md)，叫法见[用语表](docs/README.md#用语)。小队还没做，见[提案](docs/subsystems/session.md)。
 
 ## 各层
 
 从上往下：
 
-1. **农场里**：像素村里画出来的样子和玩法（[farm-ui.md](farm-ui.md)、[pixel-village.md](pixel-village.md)）。
+1. **农场里**：像素村里画出来的样子和玩法（[farm-ui.md](docs/reference/farm-ui.md)、[pixel-village.md](docs/reference/pixel-village.md)）。
 2. **界面**：Flutter 的页面和组件，在 `app/lib/`。界面只读折好的状态，不折事实。
 3. **协议**：`server/internal/protocol` 的形状、事实和规则；Dart 的类型由 shapegen 生成在 `app/lib/gen/`，名字一样。
 4. **HTTP 和 MCP**：`/api/v1/...`（`protocol/api.go`），核心状态经 `GET /api/v1/state` 推给客户端；编码 agent 经 `/mcp` 用农场的工具，现在是帮工在频道里说话。
-5. **服务端**：每个包一个服务 `<包>.Service`，`Workspace` 上的字段是单数的概念名（`f.Issue`、`f.Session`……）；下面写成「字段.方法」，一个包里不导出的零件写文件名（[server/README.md](../../server/README.md#服务)）。
-6. **存储**：`$VIBEVALLEY_HOME` 下的文件和 `vibevalley.db` 的表（[architecture.md](../architecture.md)「存储」）。
+5. **服务端**：每个包一个服务 `<包>.Service`，`Workspace` 上的字段是单数的概念名（`f.Issue`、`f.Session`……）；下面写成「字段.方法」，一个包里不导出的零件写文件名（[server/README.md](server/README.md#服务)）。
+6. **存储**：`$VIBEVALLEY_HOME` 下的文件和 `vibevalley.db` 的表（[architecture.md](docs/architecture.md)「存储」）。
 7. **oar**：smith（oar 的 Go 移植）里的类型，名字和 oar 的 TS 一样。
 
 ## 看得见的几层
@@ -74,7 +74,7 @@
 
 ## oar 那一层
 
-smith 是 oar 的 Go 移植（[smith 的 README](../../server/pkg/smith/README.md)），类型名、事件名、控制名和 oar 的 TS 一样。从下往上：
+smith 是 oar 的 Go 移植（[smith 的 README](server/pkg/smith/README.md)），类型名、事件名、控制名和 oar 的 TS 一样。从下往上：
 
 | oar | 是什么 | 我们这边用在哪 |
 |---|---|---|
@@ -85,4 +85,4 @@ smith 是 oar 的 Go 移植（[smith 的 README](../../server/pkg/smith/README.m
 | `prompt`、`steer`、`queue`、`withdraw`、`abort` | 往会话里送话、插话、排队、撤回、叫停 | 带话、叫停（`Session.Deliver`、`Session.Stop`） |
 | `Subagents`、`Subagent`、`SubagentReport` | 宿主在任意农机上开的子会话，每结束一轮交一份报告；oar 把这种用法叫 crew | 每个帮工是一个 `Subagent` |
 
-oar 的会话在开的时候能设系统提示词（替换或追加）、MCP、禁用的工具和环境变量；`Subagents.Spawn` 只带农机、任务、名字、目录、模型、思考档位、服务档位、`Resume` 和环境变量。所以 `session/sessions.go` 给每个帮工单独一个 `Subagents`，底下的农机在开会话时带上档案的人设、技能、MCP 和禁用的工具（[agents-and-runtimes.md](agents-and-runtimes.md)）。kimi、opencode、antigravity、dsh 不接系统提示词。
+oar 的会话在开的时候能设系统提示词（替换或追加）、MCP、禁用的工具和环境变量；`Subagents.Spawn` 只带农机、任务、名字、目录、模型、思考档位、服务档位、`Resume` 和环境变量。所以 `session/sessions.go` 给每个帮工单独一个 `Subagents`，底下的农机在开会话时带上档案的人设、技能、MCP 和禁用的工具（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）。kimi、opencode、antigravity、dsh 不接系统提示词。

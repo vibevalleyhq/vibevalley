@@ -38,7 +38,7 @@ VibeValley 自己的 agent：把模型循环、工具、持久化对话、记忆
 
 ## 任务
 
-`AgentOptions.Tasks` 给了一个存储（[task](../task/README.md)）时，agent 有自己的任务图和三个工具：`task_add` 写图或往图里加（整批收或整批不收）、`task_update` 改一件、`task_graph` 看全图；每次调用都回整张图。服务端给农机 `vibevalley` 的每个会话一个库里的存储（`task_graph`，按会话 id），命令行给内存里的（进程退出就没了），管家和帮手不给。
+`AgentOptions.Tasks` 给了一个存储（[task](server/internal/task/engine/README.md)）时，agent 有自己的任务图和三个工具：`task_add` 写图或往图里加（整批收或整批不收）、`task_update` 改一件、`task_graph` 看全图；每次调用都回整张图。服务端给农机 `vibevalley` 的每个会话一个库里的存储（`task_graph`，按会话 id），命令行给内存里的（进程退出就没了），管家和帮手不给。
 
 交给帮手的（`by: helper`）由 `taskrun.go` 推进：等的都做完了就在后台派一个帮手（和 `spawn_agent` 的一样：同样的工具，不能再派，不存对话），同时最多 `MaxHelpers` 个（默认 3）；帮手交回的话写进这件的结果，再作为一条输入（`custom` 的 `task`）交给 agent：闲着开一轮，忙着排到这一轮之后。帮手失败重试一次，再失败标没做成，等模型改了 brief 写回 waiting。`Stop` 连帮手一起叫回，它们的那件退回等着；开机时上次留在「在做」的退回等着，再派一次。不能派帮手的 agent（`NoSubagents`），`by` 只收 `self`。
 

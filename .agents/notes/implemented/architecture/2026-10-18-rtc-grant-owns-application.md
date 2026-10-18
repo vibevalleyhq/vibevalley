@@ -12,7 +12,7 @@ Status: implemented
 
 未启动授予的有效期与 `agora.TokenSeconds` 相同，续签后同步更新有效期，不另设较短的凭据期限。过期授予在请求时清理，服务停止时清空。Start 原子认领，失败撤销；成功后授予归通话持有。首次 Stop 尝试撤销续签资格，远端停止失败仍保留原 client 供重试。
 
-完整行为见 [语音参考](../../../../docs/reference/voice.md)，代码与测试见 [voice](../../../../server/internal/voice/README.md)。
+完整行为见 [语音参考](docs/reference/voice.md)，代码与测试见 [voice](server/internal/voice/README.md)。
 
 ## Alternatives considered
 
