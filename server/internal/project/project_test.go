@@ -382,3 +382,112 @@ func projectsDir(t *testing.T) string {
 	}
 	return root
 }
+
+func TestMergeRunsProjectCheck(t *testing.T) {
+	for _, into := range []bool{false, true} {
+		for _, check := range []string{"absent", "pass", "fail"} {
+			t.Run(fmt.Sprintf("into=%v/%s", into, check), func(t *testing.T) {
+				root := projectsDir(t)
+				p := projects(t, root)
+				target := "main"
+				if into {
+					target = "vibevalley/task-1"
+					if err := p.OpenBranch("checked", target); err != nil {
+						t.Fatal(err)
+					}
+				}
+				place, err := p.Workplace("checked", "w1", true, target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				path := filepath.Join(root, "checked")
+				before := testkit.Git(t, path, "rev-parse", target)
+				if err := os.WriteFile(filepath.Join(place.Cwd, "work.txt"), []byte("work"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				if check != "absent" {
+					if err := os.MkdirAll(filepath.Join(place.Cwd, ".vibevalley"), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					body := "#!/bin/sh\nset -eu\ntest -f work.txt\ntest -z \"$(git status --porcelain)\"\necho check-stdout\necho check-stderr >&2\n"
+					if check == "fail" {
+						body += "exit 7\n"
+					}
+					if err := os.WriteFile(filepath.Join(place.Cwd, ".vibevalley/check"), []byte(body), 0o755); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if into {
+					_, err = p.MergeInto(place, target)
+				} else {
+					_, err = p.Merge(place)
+				}
+				if check == "fail" {
+					if err == nil || !strings.Contains(err.Error(), "check-stdout") || !strings.Contains(err.Error(), "check-stderr") {
+						t.Fatalf("check must refuse with output: %v", err)
+					}
+					testkit.Eq(t, testkit.Git(t, path, "rev-parse", target), before, "target unchanged")
+					if _, err := os.Stat(place.Cwd); err != nil {
+						t.Fatal(err)
+					}
+					testkit.Git(t, path, "rev-parse", "--verify", place.Branch)
+				} else {
+					if err != nil {
+						t.Fatal(err)
+					}
+					testkit.Eq(t, testkit.Git(t, path, "show", target+":work.txt"), "work", "published")
+				}
+			})
+		}
+	}
+}
+
+func TestMergeCheckTimeoutAndOutputTail(t *testing.T) {
+	root := projectsDir(t)
+	p := projects(t, root, func(c *base.Config) { c.Project.CheckTimeoutSeconds = 3 })
+	place, err := p.Workplace("timeout", "w1", true, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(place.Cwd, ".vibevalley"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "#!/bin/sh\necho discarded-first-line\ni=0\nwhile [ $i -lt 60 ]; do echo line-$i; i=$((i+1)); done\nsleep 30\n"
+	if err := os.WriteFile(filepath.Join(place.Cwd, ".vibevalley/check"), []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	_, err = p.Merge(place)
+	if err == nil || !strings.Contains(err.Error(), "超时") || !strings.Contains(err.Error(), "line-59") || strings.Contains(err.Error(), "discarded-first-line") {
+		t.Fatalf("timeout with last output lines: %v", err)
+	}
+	if time.Since(start) > 10*time.Second {
+		t.Fatal("check children outlived timeout")
+	}
+	if _, err := os.Stat(place.Cwd); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMergeCheckMustBeExecutable(t *testing.T) {
+	root := projectsDir(t)
+	p := projects(t, root)
+	place, err := p.Workplace("permissions", "w1", true, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(place.Cwd, ".vibevalley"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(place.Cwd, ".vibevalley/check"), []byte("#!/bin/sh\nexit 0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err = p.Merge(place)
+	failure, ok := err.(MergeFailure)
+	if !ok || failure.Kind != "check" {
+		t.Fatalf("non-executable check must refuse: %v", err)
+	}
+	if _, err := os.Stat(place.Cwd); err != nil {
+		t.Fatal(err)
+	}
+}

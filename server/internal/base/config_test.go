@@ -23,7 +23,7 @@ func TestConfigDefaultsThenFileThenEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Home != home || c.Port != 8787 || c.Project.MaxSessions != 3 || c.DB() != filepath.Join(home, "vibevalley.db") {
+	if c.Home != home || c.Port != 8787 || c.Project.MaxSessions != 3 || c.Project.CheckTimeoutSeconds != 1200 || c.DB() != filepath.Join(home, "vibevalley.db") {
 		t.Fatalf("no file: %+v", c)
 	}
 	yaml := "port: 9000\nsession:\n  stall_seconds: 60\nproject: { max_sessions: 5 }\ngit_emails: [a@x, b@x]\ndb: memory\n"
@@ -31,13 +31,14 @@ func TestConfigDefaultsThenFileThenEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("VIBEVALLEY_PORT", "9100")
+	t.Setenv("VIBEVALLEY_PROJECT_CHECK_TIMEOUT_SECONDS", "45")
 	t.Setenv("VIBEVALLEY_PATROL_HEARTBEAT_MINUTES", "0.5")
 	t.Setenv("DEEPSEEK_API_KEY", "sk-env")
 	c, err = LoadConfig("")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Port != 9100 || c.Session.StallSeconds != 60 || c.Project.MaxSessions != 5 || c.Patrol.HeartbeatMinutes != 0.5 ||
+	if c.Port != 9100 || c.Session.StallSeconds != 60 || c.Project.MaxSessions != 5 || c.Project.CheckTimeoutSeconds != 45 || c.Patrol.HeartbeatMinutes != 0.5 ||
 		c.DeepSeek.APIKey != "sk-env" || len(c.GitEmails) != 2 || c.DBPath != ":memory:" || c.Schedule.TickMs != 20_000 {
 		t.Fatalf("file and environment: %+v", c)
 	}

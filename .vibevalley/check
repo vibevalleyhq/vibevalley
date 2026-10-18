@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+main=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || printf '%s\n' main)
+main=${main#origin/}
+base=$(git merge-base "$main" HEAD)
+changed=$(git diff --name-only --no-renames "$base")
+server=false
+app=false
+docs=false
+while IFS= read -r path; do
+    case "$path" in server/*) server=true ;; esac
+    case "$path" in app/*|server/internal/protocol/*) app=true ;; esac
+    case "$path" in docs/*|.agents/*|AGENTS.md|*.md) docs=true ;; esac
+done <<PATHS
+$changed
+PATHS
+
+# Tests must not inherit the running farm's configuration or smith nesting depth.
+for key in $(env | cut -d= -f1); do
+    case "$key" in
+        VIBEVALLEY_*|OAR_SUBAGENT_DEPTH|DEEPSEEK_API_KEY|AGORA_APP_ID|AGORA_APP_CERTIFICATE) unset "$key" ;;
+    esac
+done
+
+if "$server"; then
+    (cd server && go vet ./... && go test ./...)
+    bun run go:deadcode
+fi
+if "$app"; then
+    bun run flutter:check
+fi
+if "$docs"; then
+    bun run docs:verify
+fi

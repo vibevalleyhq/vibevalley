@@ -22,7 +22,7 @@ type Merged struct {
 }
 
 type MergeFailure struct {
-	Kind   string // conflict, error
+	Kind   string // conflict, check, error
 	Base   string
 	Files  []string
 	Reason string

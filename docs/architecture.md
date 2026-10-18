@@ -146,6 +146,7 @@ flowchart LR
 | `schedule.tick_ms` | 多久看一遍有没有到点的定时 | 20000 |
 | `session.stall_seconds` | 一轮里多久没动静就提醒 | 240 |
 | `project.max_sessions` | 一个项目里最多几个帮工同时干活 | 3 |
+| `project.check_timeout_seconds` | 收获前在帮工 worktree 里运行 `.vibevalley/check` 的时限，超时拒绝合并 | 1200 |
 | `session.trajectory_days` | Session 走了以后，它的事件日志留几天（`session` 表里的行一直留着）；0 是一直留着 | 30 |
 | `chat.notice_batch_ms` | 忙着的帮工收到的提示，攒多久合成一条 | 3000 |
 | `chat.retry_wake_ms` | 叫醒在开口前就失败了，多久以后再叫一次 | 3000 |

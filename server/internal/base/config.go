@@ -76,7 +76,8 @@ type Config struct {
 	} `mapstructure:"session"`
 	Project struct {
 		// Sessions at once in one project.
-		MaxSessions int `mapstructure:"max_sessions"`
+		MaxSessions         int `mapstructure:"max_sessions"`
+		CheckTimeoutSeconds int `mapstructure:"check_timeout_seconds"`
 	} `mapstructure:"project"`
 	Chat struct {
 		NoticeBatchMs int `mapstructure:"notice_batch_ms"`
@@ -99,6 +100,7 @@ func Defaults() Config {
 	c.Schedule.TickMs = 20_000
 	c.Session.StallSeconds = 240
 	c.Project.MaxSessions = 3
+	c.Project.CheckTimeoutSeconds = 1200
 	c.Session.TrajectoryDays = 30
 	c.Chat.NoticeBatchMs = protocol.NoticeBatchMs
 	c.Chat.RetryWakeMs = 3_000

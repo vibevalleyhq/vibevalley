@@ -1032,3 +1032,44 @@ func TestMovingAnIssueIsTheWork(t *testing.T) {
 	}
 	testkit.Eq(t, dropped.Status, protocol.IssueStatusBacklog, "back in the backlog")
 }
+
+func TestMovingToDoneRefusesFailedProjectCheck(t *testing.T) {
+	home, work := dirs(t)
+	w := openWorld(t, home, work)
+	lab := fixture.Lab(t)
+	w.f.Agent.SaveAgent(lab)
+	helper := mustHire(t, w.f.Issue.Hire(context.Background(), lab, "写打卡并提交", "clock", session.HireOptions{}))
+	w.nextReport(t)
+	place, ok := w.f.Session.Place(helper.ID)
+	if !ok {
+		t.Fatal("missing workplace")
+	}
+	if err := os.MkdirAll(filepath.Join(place.Cwd, ".vibevalley"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(place.Cwd, ".vibevalley/check"), []byte("#!/bin/sh\necho harvest-check-failed\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(work, "projects", "clock")
+	before := testkit.Git(t, project, "rev-parse", "main")
+	issue, err := w.f.Issue.SetStatus(context.Background(), *helper.Issue, protocol.IssueStatusDone, "", "")
+	var refused protocol.Refused
+	if !errors.As(err, &refused) || !strings.Contains(refused.Reason, "harvest-check-failed") {
+		t.Fatalf("refusal with output: %v", err)
+	}
+	testkit.Eq(t, issue.Status, protocol.IssueStatusInReview, "failed harvest stays in review")
+	testkit.Until(t, "helper hears check output", func() bool {
+		got := w.f.Session.Find(helper.ID)
+		return got != nil && strings.Contains(got.LastText, "harvest-check-failed") && !protocol.IsBusy(got.Session)
+	})
+	issue, err = w.f.Issue.Get(issue.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, issue.Status, protocol.IssueStatusInReview, "repair round returns to review")
+	testkit.Eq(t, testkit.Git(t, project, "rev-parse", "main"), before, "main unchanged")
+	if _, err := os.Stat(place.Cwd); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Git(t, project, "rev-parse", "--verify", place.Branch)
+}

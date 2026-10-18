@@ -172,7 +172,8 @@ type Service struct {
 	trees string
 	house string
 	// More than a few sessions in one project start changing the same files.
-	perProject int
+	perProject   int
+	checkTimeout time.Duration
 
 	tokei string
 
@@ -194,6 +195,7 @@ func newService(cfg base.Config) (*Service, error) {
 	return &Service{
 		root: root, trees: filepath.Join(work, "worktrees"), house: work, perProject: cfg.Project.MaxSessions, tokei: tokei,
 		queues: map[string]*sync.Mutex{}, pending: map[string]bool{},
+		checkTimeout: time.Duration(cfg.Project.CheckTimeoutSeconds) * time.Second,
 	}, nil
 }
 
@@ -564,7 +566,7 @@ func failed(err error) error {
 	return MergeFailure{Kind: "error", Reason: reason(err)}
 }
 
-func (p *Service) mergeMain(path, branch, kept string) (main string, ahead int64, err error) {
+func (p *Service) mergeMain(path, branch, kept, cwd string) (main string, ahead int64, err error) {
 	main, err = git(path, "symbolic-ref", "--short", "HEAD")
 	if err != nil {
 		return "", 0, err
@@ -576,6 +578,11 @@ func (p *Service) mergeMain(path, branch, kept string) (main string, ahead int64
 	}
 	if len(conflicts) > 0 {
 		return "", 0, MergeFailure{Kind: "conflict", Base: main, Files: conflicts}
+	}
+	if cwd != "" {
+		if err := p.check(cwd); err != nil {
+			return "", 0, err
+		}
 	}
 	count, err := git(path, "rev-list", "--count", main+".."+branch)
 	if err != nil {
@@ -603,7 +610,7 @@ func (p *Service) Merge(place Workplace) (Merged, error) {
 	if err := commitLeft(place.Cwd, "收获时把没提交的改动一并提交"); err != nil {
 		return Merged{}, failed(err)
 	}
-	main, ahead, err := p.mergeMain(path, place.Branch, place.Branch+" 分支和 worktree 都留着")
+	main, ahead, err := p.mergeMain(path, place.Branch, place.Branch+" 分支和 worktree 都留着", place.Cwd)
 	if err != nil {
 		return Merged{}, failed(err)
 	}
@@ -679,6 +686,9 @@ func (p *Service) MergeInto(place Workplace, target string) (Merged, error) {
 	if len(conflicts) > 0 {
 		return Merged{}, MergeFailure{Kind: "conflict", Base: target, Files: conflicts}
 	}
+	if err := p.check(place.Cwd); err != nil {
+		return Merged{}, err
+	}
 	out, err := git(path, "log", "--reverse", "--format=%h", target+".."+place.Branch)
 	if err != nil {
 		return Merged{}, failed(err)
@@ -710,7 +720,7 @@ func (p *Service) MergeInto(place Workplace, target string) (Merged, error) {
 func (p *Service) MergeBranch(project, branch string) (string, error) {
 	defer p.serially(project)()
 	path := filepath.Join(p.root, project)
-	main, ahead, err := p.mergeMain(path, branch, branch+" 分支留着")
+	main, ahead, err := p.mergeMain(path, branch, branch+" 分支留着", "")
 	if err != nil {
 		return "", failed(err)
 	}

@@ -395,6 +395,9 @@ func (p *tasks) taskDone(graph protocol.TaskGraph, task protocol.Task, sessionID
 	commits, err := p.sessions.MergeInto(sessionID, *graph.Branch)
 	if err != nil {
 		var f project.MergeFailure
+		if errors.As(err, &f) && f.Kind == "check" {
+			return p.sendBack(graph, task, sessionID, f.Reason+"\n请修好检查，再交回来。", "项目检查没通过")
+		}
 		if errors.As(err, &f) && f.Kind == "conflict" {
 			// It merges the task's branch into its own and resolves the conflict; then this runs again.
 			return p.sendBack(graph, task, sessionID, protocol.ConflictBrief(f.Base, f.Files), "合进计划分支会冲突："+strings.Join(f.Files, "、"))

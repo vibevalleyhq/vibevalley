@@ -28,7 +28,7 @@ vv issue run <issue>                               # 开工，等它交回来，
 vv session events <session>                        # 看它这一轮做了什么、跑了哪些检查
 vv issue status <issue> --json '{"status":"todo","text":"…"}'  # 不满意就说，帮工接着干一轮
 vv issue get <issue>                               # 轮询 status：先变成 in_progress，再回到 in_review 就是这一轮交回来了
-vv issue status <issue> --json '{"status":"done"}'  # 收下，合进克隆的 main（合并前的检查还没有，见下）
+vv issue status <issue> --json '{"status":"done"}'  # 检查通过后收下，合进克隆的 main
 git -C ~/vibevalley-dev/projects/vibevalley push   # 推到 origin（先手动）
 git -C ~/orca/projects/heybro pull                 # 主人拉下来，重启农场，新功能就在了
 ```
@@ -39,9 +39,9 @@ git -C ~/orca/projects/heybro pull                 # 主人拉下来，重启农
 
 等一轮交回来不用新命令：工单的 `status` 由它最后一个帮工忙不忙算出来（`protocol.IssueStatusOf`），轮询 `issue get` 就行。评论以后帮工要过一会儿才忙起来，所以先等 `in_progress`，再等 `in_review`，不然刚评论完就会读到上一轮的 `in_review`。
 
-还要补两件，按卡住的先后排：
+这轮暴露的两件事，按卡住的先后排：
 
-1. **合并前的检查**：现在的合并只看有没有冲突。建议检查写在仓库里（比如 `.vibevalley/check`，一个可执行文件），跟着代码走，帮工看得见，也能改。合并前在帮工的 worktree 里、变基到主分支以后跑它；没过就不合，把输出当一条评论交回帮工，和冲突一样处理。heybro 的检查就是 `AGENTS.md` 里改完要跑的那几条。
+1. **合并前的检查**：已经接入仓库里的 `.vibevalley/check`，跟着代码走，帮工看得见，也能改。采用先提交未提交改动、确认无冲突，再在帮工当前 worktree 运行的顺序，不自动变基；检查失败时把输出交回帮工。这样检查对应帮工交回来的代码，主分支不会在检查前被修改；代价是不验证两边合并后的运行结果。行为见 [项目和收获](../../../../docs/reference/server.md#项目和收获)。本仓库的检查按改动路径选择 `AGENTS.md` 的命令，并清除继承的农场配置和 smith 深度环境变量，避免测试读到正在运行的农场设置。
 2. **库认得出自己的表结构**：主人拉下新代码、重启农场时，基线改过的话旧库要被认出来、挪开（[上一篇](2026-10-18-build-vibevalley-with-vibevalley.md)的第 1 件）。不做的话，第一次拉到改了表结构的提交，农场就会在半路报错。
 
 合并后推到 origin、合并前先试一个分支，都先手动做。
