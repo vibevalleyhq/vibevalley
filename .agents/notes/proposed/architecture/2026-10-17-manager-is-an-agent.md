@@ -8,7 +8,7 @@ Status: proposed
 
 - **档案这半边已经并了**：管家是档案 `manager`（`protocol.ManagerAgent`），模型从档案读，记忆走 `memory.*`（见「做到哪了」）。
 - **工具这半边还是两套**：管家的工具手写在 `internal/manager/tools.go`（`dispatch`、`tell`、`changes`、`roster`、`task`、`schedule`、`open_channel`、`memory_search`……），帮工的工具手写在 `internal/mcp/mcp.go`（`channel_say`、`channel_read`、`channel_inbox`、`session_list`、`memory_search`、`memory_add`）。记性的两个工具写了两遍；同一件事（读频道）管家叫 `read_chat`，帮工叫 `channel_read`，规则也各写一份。
-- **谁能做什么写在三处**：管家的工具表、MCP 的工具表、能力表的 `can manager`（[先有能力，再有入口](2026-10-17-capabilities-before-surfaces.md)）。想让一个帮工也能拆子工单（一个「领班」），或者让管家能建档案，没有地方改，只能再手接一遍。
+- **谁能做什么写在三处**：管家的工具表、MCP 的工具表、能力表的 `can manager`（[先有能力，再有入口](../../implemented/architecture/2026-10-17-capabilities-before-surfaces.md)）。想让一个帮工也能拆子工单（一个「领班」），或者让管家能建档案，没有地方改，只能再手接一遍。
 - 「管家」「帮工」作为两种调用者散在 16 个服务端文件里（`ManagerAgent`、`IsForManager` 等的判断）；其中一部分是真的不一样（见下面「不是能力的差别」），一部分只是「它的工具多」。
 
 ## Proposal
@@ -69,7 +69,7 @@ type Caller struct {
 能力表的 `can` 管「农场往外给出哪些接口、给谁」；本篇的 `Can` 管「一个 agent 能调哪些工具」。这是两件事，不合在一处：
 
 - 模型的工具和 HTTP 接口不是一个形状：`dispatch` 收的是档案的名字和一句话，`tell` 是带话，`read_chat` 读出来的是给模型看的文字。工具里调哪些服务是工具自己的实现，不对应某个接口。
-- 所以 `can` 只留 `owner`、`remote`，去掉现在 23 个操作上的 `manager` 和没用的 `session`；[先有能力，再有入口](2026-10-17-capabilities-before-surfaces.md) 里的 `//vibevalley:tool` 和「管家的每个工具对得上一个 `can manager` 的操作」的检查不做，换成工具表自己的检查（每个工具标了能力、每种能力都有工具）。
+- 所以 `can` 只留 `owner`、`remote`，去掉现在 23 个操作上的 `manager` 和没用的 `session`；[先有能力，再有入口](../../implemented/architecture/2026-10-17-capabilities-before-surfaces.md) 里的 `//vibevalley:tool` 和「管家的每个工具对得上一个 `can manager` 的操作」的检查不做，换成工具表自己的检查（每个工具标了能力、每种能力都有工具）。
 - 那篇第 5 节的「管家建项目、改档案……不给」由这里的 `hire` 取代：建、改档案给，项目、设置、农机仍然不给。
 
 ### 4. 不是能力的差别
@@ -102,7 +102,7 @@ type Caller struct {
 
 工具表（第 2 节的目录）2026-10-18 做了：`internal/tool` 排在 `task` 之后、`manager` 之前，按事情分文件（`look.go`、`talk.go`、`memory.go`、`dispatch.go`、`task.go`、`channel.go`），管家的 23 个工具和帮工的 6 个都搬了进去；`manager/tools.go`、`manager/schema.go` 删了，管家经 `tool.Service.Manager` 拿工具，调用者从它正在回答的输入取；`internal/mcp` 只剩认证和把 `tool.Service.Session` 的工具注册到 `/mcp`。读频道合成一个 `read_chat`（帮工原来叫 `channel_read`，管家的多了 `unread`、`before`、`limit`）；记性的两个工具各一个函数，按调用者选写法。哪些工具给谁现在还是两张写死的表（`Manager`、`Session`），没有 `Can`。
 
-还没做：`Capability` 和 `Agent.Can`（第 1 节）、`agent.Service` 的「是不是常驻」（第 4 节）、按 `Can` 过滤和放行、能力表去掉 `manager`（第 3 节）、`hire`（第 5 节）、管家页上改模型。
+还没做：`Capability` 和 `Agent.Can`（第 1 节）、`agent.Service` 的「是不是常驻」（第 4 节）、按 `Can` 过滤和放行、能力表去掉 `manager` 和 `session`（第 3 节）、`hire`（第 5 节）、管家页上改模型；从[先有能力，再有入口](../../implemented/architecture/2026-10-17-capabilities-before-surfaces.md)并过来的：管家的 `dispatch` 现在直接 `Issue.Hire`、满了就拒绝，要改成先写工单再挪到待办（`issue.status`），和主人派的一条规则、满了排队。
 
 ## Alternatives considered
 

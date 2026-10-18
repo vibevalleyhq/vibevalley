@@ -38,7 +38,7 @@ Status: implemented
 | 包 `internal/worker`、`Workspace.Worker`、`worker.Service` | `internal/session`、`Workspace.Session`、`session.Service` |
 | 表 `issue_worker`（列 `worker`） | `issue_session`（列 `session`），一个迁移 |
 | 家目录 `workers.json` | `sessions.json`，加载时改名写回 |
-| 路由 `worker.*`、`/api/workers/{id}/...` | 照 [先有能力，再有入口](../../proposed/architecture/2026-10-17-capabilities-before-surfaces.md)：工单的生命周期挪到 `issue.*`，剩下的是 `session.*`、`/api/v1/sessions/{id}/...` |
+| 路由 `worker.*`、`/api/workers/{id}/...` | 照 [先有能力，再有入口](2026-10-17-capabilities-before-surfaces.md)：工单的生命周期挪到 `issue.*`，剩下的是 `session.*`、`/api/v1/sessions/{id}/...` |
 | Flutter 生成的类型和局部名 | 跟着 shapegen 改 |
 
 不改的：`oar.Session`、`agents.Subagent`、`runtime` 的 `subagents`、smith 里的一切；界面上的「帮工」。

@@ -1,6 +1,6 @@
 # 能力表
 
-由 `server/tool/shapegen` 从 `server/internal/protocol/api.go` 的 `//vibevalley:route` 和 `//vibevalley:can` 写出，不手改；`go run ./tool/shapegen -check` 查它是不是最新。为什么这样分见 [先有能力，再有入口](../../.agents/notes/proposed/architecture/2026-10-17-capabilities-before-surfaces.md)。
+由 `server/tool/shapegen` 从 `server/internal/protocol/api.go` 的 `//vibevalley:route` 和 `//vibevalley:can` 写出，不手改；`go run ./tool/shapegen -check` 查它是不是最新。为什么这样分见 [先有能力，再有入口](../../.agents/notes/implemented/architecture/2026-10-17-capabilities-before-surfaces.md)。
 
 | 谁 | 是谁 | 从哪个入口 |
 |---|---|---|

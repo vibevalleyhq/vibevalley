@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](../../scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错。Note 放在哪、怎么写见 [README](README.md)。
 
-## proposed（16 篇）
+## proposed（15 篇）
 
 ### feature
 
@@ -20,7 +20,6 @@
 - 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](proposed/architecture/2026-10-18-memory-in-sqlite.md)
 - 2026-10-17 [Session、Run、事件：一个 agent loop 的日志，和消息之间只有两个口子](proposed/architecture/2026-10-17-session-run-step.md)
 - 2026-10-17 [管家是一份档案，只是能力多](proposed/architecture/2026-10-17-manager-is-an-agent.md)
-- 2026-10-17 [先有能力，再有入口：一张能力表，接口、命令行、管家、帮工都从它来](proposed/architecture/2026-10-17-capabilities-before-surfaces.md)
 - 2026-10-16 [Run 是一次干活，Session 跨好几次 run，小队（Crew）编排 agent](proposed/architecture/2026-10-16-runs-sessions-crews.md)
 - 2026-10-15 [概念先行，农场是皮](proposed/architecture/2026-10-15-concepts-first.md)
 - 2026-10-14 [先采样，再验收：规划和运行分开，故障回流成样本](proposed/architecture/2026-10-14-sample-then-verify.md)
@@ -29,7 +28,7 @@
 
 - 2026-10-18 [用 VibeValley 开发 VibeValley](proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
 
-## implemented（109 篇）
+## implemented（110 篇）
 
 ### feature
 
@@ -104,6 +103,7 @@
 - 2026-10-17 [表按模块命名](implemented/architecture/2026-10-17-names-by-module.md)
 - 2026-10-17 [调用方交意图，模块拥有完整的协调](implemented/architecture/2026-10-17-interfaces-hide-coordination.md)
 - 2026-10-17 [收敛接缝：投影一处、死代码进检查、协议瘦身、异步有规矩、客户端一个入口](implemented/architecture/2026-10-17-converge-the-seams.md)
+- 2026-10-17 [先有能力，再有入口：一张能力表，接口、命令行、院门都从它来](implemented/architecture/2026-10-17-capabilities-before-surfaces.md)
 - 2026-10-17 [接口带版本，都在 /api/v1 下](implemented/architecture/2026-10-17-api-versioned-paths.md)
 - 2026-10-16 [客户端问服务端，不重写它的规则](implemented/architecture/2026-10-16-the-client-asks-the-server.md)
 - 2026-10-16 [规则跟着它的主人，黄金数据跟着规则](implemented/architecture/2026-10-16-rules-live-with-their-owner.md)
