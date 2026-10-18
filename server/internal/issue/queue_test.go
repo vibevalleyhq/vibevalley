@@ -90,7 +90,7 @@ func TestQueuedScheduleKeepsTriggerAndMissedFlag(t *testing.T) {
 	}
 	project := "demo"
 	f.Core.Apply(protocol.FactHired{Session: protocol.Session{ID: "occupied", Project: &project, Runtime: agent.Runtime, Phase: protocol.Phase{Value: protocol.PhaseWorking{}}}})
-	sc, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "scheduled", Text: "work", Channel: &channel.ID, Agent: &agent.ID, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 1}}})
+	sc, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "scheduled", Text: "work", Channel: &channel.ID, Agent: &agent.ID, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 1}}}, protocol.ScheduleByOwner, true)
 	if err != nil {
 		t.Fatal(err)
 	}

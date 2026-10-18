@@ -855,7 +855,7 @@ func TestAScheduleKeepsOneIssue(t *testing.T) {
 	now.Store(clock.NowMs())
 	w.f.Schedule.Now = now.Load
 	lab, project := "lab", "every"
-	made, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "巡检", Text: "看一眼", Agent: &lab, Project: &project, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}})
+	made, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "巡检", Text: "看一眼", Agent: &lab, Project: &project, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}, protocol.ScheduleByOwner, true)
 	if err != nil {
 		t.Fatal(err)
 	}

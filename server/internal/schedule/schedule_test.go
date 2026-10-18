@@ -20,7 +20,7 @@ func TestSchedules(t *testing.T) {
 	defer stopDue()
 	general := f.Channel.General()
 
-	made, err := f.Schedule.Add(protocol.ScheduleRequest{Name: " 看进度 ", Text: "看看帮工们的进度", When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.Load() + 150}}})
+	made, err := f.Schedule.Add(protocol.ScheduleRequest{Name: " 看进度 ", Text: "看看帮工们的进度", When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.Load() + 150}}}, protocol.ScheduleByOwner, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,19 +59,19 @@ func TestSchedules(t *testing.T) {
 	f.Schedule.Tick()
 
 	lab := "lab"
-	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Agent: &lab, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}); err == nil || !strings.Contains(err.Error(), "默认项目") {
+	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Agent: &lab, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}, protocol.ScheduleByOwner, true); err == nil || !strings.Contains(err.Error(), "默认项目") {
 		t.Fatal(err)
 	}
 	nobody := "nobody"
-	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Agent: &nobody, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}); err == nil || !strings.Contains(err.Error(), "没有叫 nobody") {
+	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Agent: &nobody, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}, protocol.ScheduleByOwner, true); err == nil || !strings.Contains(err.Error(), "没有叫 nobody") {
 		t.Fatal(err)
 	}
 	elsewhere := "elsewhere"
-	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Channel: &elsewhere, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}); err == nil || !strings.Contains(err.Error(), "elsewhere") {
+	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Channel: &elsewhere, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}, protocol.ScheduleByOwner, true); err == nil || !strings.Contains(err.Error(), "elsewhere") {
 		t.Fatal(err)
 	}
 	project := "demo"
-	every, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "巡检", Text: "跑一遍检查", Agent: &lab, Project: &project, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}})
+	every, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "巡检", Text: "跑一遍检查", Agent: &lab, Project: &project, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}, protocol.ScheduleByOwner, true)
 	if err != nil || ptr.Value(every.Agent) != "lab" || ptr.Value(every.Project) != "demo" {
 		t.Fatal(every, err)
 	}

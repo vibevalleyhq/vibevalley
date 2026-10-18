@@ -126,6 +126,19 @@ func InboxEntries(state CoreState) []InboxEntry {
 		}
 	}
 
+	for _, sc := range state.Schedules {
+		if !sc.Pending {
+			continue
+		}
+		channel, since := sc.Channel, sc.Created
+		out = append(out, InboxEntry{
+			Item: InboxItem{ID: sc.ID + ":ask", Kind: InboxKindScheduleAsk, From: manager, Text: str.Cut(sc.Name, 40), At: sc.Created,
+				Target: InboxTarget{InboxTargetChat{Conversation: sc.Channel}}},
+			Channel: &channel, Since: &since,
+			Brief: "定时「" + sc.Name + "」（" + sc.ID + "）等主人同意，{ago}了",
+		})
+	}
+
 	// A message said in full that names the person, not read and not answered in its conversation yet.
 	if chat != nil {
 		lastFromUser := map[string]int64{}

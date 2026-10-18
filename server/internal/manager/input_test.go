@@ -294,7 +294,7 @@ func TestOnlyItsOwnScheduleSoonKeepsTheManagerFromFoldingIdle(t *testing.T) {
 	in := func(minutes int64) protocol.ScheduleWhen {
 		return protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + minutes*60_000}}
 	}
-	if _, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "晚些", Text: "看看", When: in(30)}); err != nil {
+	if _, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "晚些", Text: "看看", When: in(30)}, protocol.ScheduleByOwner, true); err != nil {
 		t.Fatal(err)
 	}
 	ops, err := w.f.Channel.OpenChannel("ops", "", "demo")
@@ -302,11 +302,11 @@ func TestOnlyItsOwnScheduleSoonKeepsTheManagerFromFoldingIdle(t *testing.T) {
 		t.Fatal(err)
 	}
 	lab := "lab"
-	if _, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "巡检", Text: "跑一遍", Channel: &ops.ID, Agent: &lab, When: in(5)}); err != nil {
+	if _, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "巡检", Text: "跑一遍", Channel: &ops.ID, Agent: &lab, When: in(5)}, protocol.ScheduleByOwner, true); err != nil {
 		t.Fatal(err)
 	}
 	testkit.Eq(t, fm.wakeSoon(10*time.Minute), false, "a helper's, and its own far off")
-	if _, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "回头看", Text: "看进度", When: in(5)}); err != nil {
+	if _, err := w.f.Schedule.Add(protocol.ScheduleRequest{Name: "回头看", Text: "看进度", When: in(5)}, protocol.ScheduleByOwner, true); err != nil {
 		t.Fatal(err)
 	}
 	testkit.Eq(t, fm.wakeSoon(10*time.Minute), true, "its own in 5 minutes")

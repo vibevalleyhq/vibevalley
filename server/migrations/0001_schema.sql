@@ -134,7 +134,11 @@ CREATE TABLE schedule (
   tz          text not null,
   enabled     boolean not null default 1,
   created_at  integer not null,
-  last_run    integer
+  last_run    integer,
+  -- Who set it, and whether it waits for the owner to say yes (schedule/rules.go's needsOK): a waiting one stays off
+  -- until the owner turns it on, which clears pending.
+  by          text not null default 'owner' check (by in ('owner', 'manager')),
+  pending     boolean not null default 0
 );
 CREATE TABLE game_ledger (
   id      text primary key,

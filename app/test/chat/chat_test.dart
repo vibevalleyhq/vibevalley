@@ -113,6 +113,20 @@ CoreState _state({CallState call = CallState.live, ManagerState manager = Manage
           tz: 'Asia/Shanghai',
           enabled: true,
           created: 0,
+          by: ScheduleBy.owner,
+        ),
+        Schedule(
+          id: 's6',
+          name: '早会',
+          text: '看看昨天的活',
+          channel: 'c2',
+          when: ScheduleWhenDaily(time: '09:30'),
+          tz: 'Asia/Shanghai',
+          enabled: false,
+          created: 0,
+          by: ScheduleBy.manager,
+          pending: true,
+          nextText: '等主人同意',
         ),
       ],
     );
@@ -391,6 +405,14 @@ void main() {
       await t.tap(find.text('确定删？'));
       await t.pump(const Duration(milliseconds: 50));
       expect(server.to('DELETE', '/api/v1/schedules/s5'), hasLength(1));
+
+      expect(_rich('等主人同意 · 管家定的'), findsOneWidget);
+      await t.tap(find.text('同意'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(jsonDecode(server.to('PUT', '/api/v1/schedules/s6').single.body), {'enabled': true});
+      await t.tap(find.text('不要'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(server.to('DELETE', '/api/v1/schedules/s6'), hasLength(1));
     });
   });
 
@@ -482,6 +504,23 @@ void main() {
       final says = _says(server);
       expect(says.map((b) => b['text']), ['现在进度怎么样？', '现在进度怎么样？']);
       expect(says[1]['sendKey'], says[0]['sendKey']);
+    });
+
+    testWidgets('the channel menu\'s schedules: the owner says yes or no to the manager\'s', (t) async {
+      final server = FakeServer(_answer);
+      await _pump(t, window(server, _state(), []), server, _state());
+      await t.tap(find.bySemanticsLabel(RegExp('^频道：田头')));
+      await t.pump();
+      await t.tap(find.text('定时 1'));
+      await t.pump();
+      expect(_rich('管家定的 · 等主人同意'), findsOneWidget);
+      expect(find.text('关着'), findsNothing);
+      await t.tap(find.text('同意'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(jsonDecode(server.to('PUT', '/api/v1/schedules/s6').single.body), {'enabled': true});
+      await t.tap(find.text('不要'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(server.to('DELETE', '/api/v1/schedules/s6'), hasLength(1));
     });
 
     testWidgets('the channel menu lists channels with unread and switches', (t) async {

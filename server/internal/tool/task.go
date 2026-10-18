@@ -86,9 +86,13 @@ func (s *Service) scheduleTool(who Who) agentcore.AgentTool {
 				if p.TZ != "" {
 					req.TZ = &p.TZ
 				}
-				made, err := s.schedule.Add(req)
+				made, err := s.schedule.Add(req, protocol.ScheduleByManager, c.Owner)
 				if err != nil {
 					return "", err
+				}
+				if made.Pending {
+					return "定好了，等主人同意才生效：\n" + scheduleLine(made, channel.Name) +
+						"\n这一轮不是主人叫你定的，而它会反复来或直接派帮工：主人在定时列表里点「同意」才开始。跟主人说一声它是做什么的。", nil
 				}
 				return "定好了：\n" + scheduleLine(made, channel.Name), nil
 			}())

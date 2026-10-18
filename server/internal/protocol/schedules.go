@@ -271,6 +271,9 @@ func NextText(s Schedule) string {
 	if s.Enabled {
 		return "不会再到点"
 	}
+	if s.Pending {
+		return "等主人同意"
+	}
 	if _, once := s.When.Value.(ScheduleWhenOnce); once && s.LastRun != nil {
 		return "做过了"
 	}

@@ -1092,6 +1092,8 @@ class Schedule {
     required this.enabled,
     required this.created,
     this.lastRun,
+    required this.by,
+    this.pending,
     this.whenText,
     this.nextText,
   });
@@ -1108,6 +1110,8 @@ class Schedule {
     enabled: j['enabled'] as bool,
     created: (j['created'] as num).toDouble(),
     lastRun: j['lastRun'] == null ? null : (j['lastRun'] as num).toDouble(),
+    by: ScheduleBy.fromJson(j['by']),
+    pending: j['pending'] == null ? null : j['pending'] as bool,
     whenText: j['whenText'] == null ? null : j['whenText'] as String,
     nextText: j['nextText'] == null ? null : j['nextText'] as String,
   );
@@ -1123,6 +1127,8 @@ class Schedule {
   final bool enabled;
   final double created;
   final double? lastRun;
+  final ScheduleBy by;
+  final bool? pending;
   final String? whenText;
   final String? nextText;
 
@@ -1138,9 +1144,21 @@ class Schedule {
     'enabled': enabled,
     'created': created,
     if (lastRun != null) 'lastRun': lastRun!,
+    'by': by.wire,
+    if (pending != null) 'pending': pending!,
     if (whenText != null) 'whenText': whenText!,
     if (nextText != null) 'nextText': nextText!,
   };
+}
+
+enum ScheduleBy {
+  owner('owner'),
+  manager('manager');
+
+  const ScheduleBy(this.wire);
+  final String wire;
+
+  static ScheduleBy fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('ScheduleBy: unknown value', v));
 }
 
 class Chat {
@@ -1567,7 +1585,8 @@ enum InboxKind {
   graphDraft('graph-draft'),
   graphRipe('graph-ripe'),
   taskFailed('task-failed'),
-  mention('mention');
+  mention('mention'),
+  scheduleAsk('schedule-ask');
 
   const InboxKind(this.wire);
   final String wire;

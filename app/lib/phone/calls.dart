@@ -21,6 +21,7 @@ String inboxKindLabel(InboxKind kind) => switch (kind) {
   InboxKind.graphRipe => '计划能收了',
   InboxKind.taskFailed => '计划卡住了',
   InboxKind.mention => '找你',
+  InboxKind.scheduleAsk => '定时等你同意',
 };
 
 List<InboxItem> unansweredCalls(List<InboxItem> calls, Set<String> handled) => [

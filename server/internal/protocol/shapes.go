@@ -483,10 +483,21 @@ type Schedule struct {
 	Enabled bool         `json:"enabled"`
 	Created int64        `json:"created"`
 	LastRun *int64       `json:"lastRun,omitzero"`
+	By      ScheduleBy   `json:"by"`
+	// Set by the manager and waiting for the owner's yes (the owner turning it on); off until then.
+	Pending bool `json:"pending,omitzero"`
 	// When it comes due and when it next will, in words (WhenText, NextText), filled by FrameOf: in frames only.
 	WhenText string `json:"whenText,omitzero"`
 	NextText string `json:"nextText,omitzero"`
 }
+
+// Who set a schedule: the owner (the API, the command line) or the manager (its schedule tool).
+type ScheduleBy string
+
+const (
+	ScheduleByOwner   ScheduleBy = "owner"
+	ScheduleByManager ScheduleBy = "manager"
+)
 
 type Chat struct {
 	Conversations []Conversation `json:"conversations"`
@@ -650,6 +661,8 @@ const (
 	InboxKindGraphRipe  InboxKind = "graph-ripe"
 	InboxKindTaskFailed InboxKind = "task-failed"
 	InboxKindMention    InboxKind = "mention"
+	// A schedule the manager set, waiting for the owner's yes.
+	InboxKindScheduleAsk InboxKind = "schedule-ask"
 )
 
 //vibevalley:union kind

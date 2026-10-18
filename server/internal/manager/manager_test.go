@@ -308,7 +308,7 @@ func TestManagerCallStreamsItsWords(t *testing.T) {
 func TestManagerSchedulesComeDue(t *testing.T) {
 	w := managerOpen(t)
 	f := w.f
-	made, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "看进度", Text: "看看帮工们的进度", When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + 150}}})
+	made, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "看进度", Text: "看看帮工们的进度", When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + 150}}}, protocol.ScheduleByOwner, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +354,7 @@ func TestManagerSchedulesComeDue(t *testing.T) {
 		t.Fatal(err)
 	}
 	lab := "lab"
-	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "巡检", Text: "跑一遍检查", Channel: &ops.ID, Agent: &lab, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + 150}}}); err != nil {
+	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "巡检", Text: "跑一遍检查", Channel: &ops.ID, Agent: &lab, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + 150}}}, protocol.ScheduleByOwner, true); err != nil {
 		t.Fatal(err)
 	}
 	sent := testkit.Await(t, "the session sent", func() (session.Roster, bool) {
@@ -375,7 +375,7 @@ func TestManagerSchedulesComeDue(t *testing.T) {
 		t.Fatal("the manager was asked")
 	}
 	general := f.Channel.General()
-	_, err = f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Channel: &general, Agent: &lab, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}})
+	_, err = f.Schedule.Add(protocol.ScheduleRequest{Name: "x", Text: "y", Channel: &general, Agent: &lab, When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenEvery{Minutes: 5}}}, protocol.ScheduleByOwner, true)
 	if err == nil || !strings.Contains(err.Error(), "默认项目") {
 		t.Fatalf("err %v", err)
 	}
@@ -500,7 +500,7 @@ func TestManagerStopsItsRun(t *testing.T) {
 	})
 	f := w.f
 	f.Manager.Stop()
-	made, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "派活", Text: "加个 README", When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + 50}}})
+	made, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "派活", Text: "加个 README", When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + 50}}}, protocol.ScheduleByOwner, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -654,4 +654,51 @@ func TestManagerMergesOnlyWhenTheOwnerAsks(t *testing.T) {
 		return i, err == nil && i.Closed != nil
 	})
 	testkit.Eq(t, *merged.Closed, protocol.IssueCloseMerged, "the owner's words")
+}
+
+func TestManagerSchedulesWaitForTheOwnerUnlessTheOwnerAsked(t *testing.T) {
+	daily := map[string]any{"name": "每日测试", "text": "跑一遍测试", "kind": "daily", "time": "09:00"}
+	w := managerOpenWith(t, ai.FauxProviderOptions{}, func(c ai.Context, o ai.StreamOptions, s ai.FauxProviderState, m ai.Model) ai.AssistantMessage {
+		if result, ok := managerAnsweredCtx(c); ok {
+			return ai.FauxAssistantMessage("定时：" + result)
+		}
+		if line := managerLastLine(c); strings.Contains(line, "每天九点") || strings.Contains(line, "定时任务") {
+			return ai.FauxAssistantMessage(ai.FauxToolCall("schedule", daily, ""))
+		}
+		return managerRespond(c, o, s, m)
+	})
+	f := w.f
+	// Woken by a schedule, not the owner: what it sets to come back daily waits.
+	if _, err := f.Schedule.Add(protocol.ScheduleRequest{Name: "看进度", Text: "看看", When: protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: clock.NowMs() + 150}}}, protocol.ScheduleByOwner, true); err != nil {
+		t.Fatal(err)
+	}
+	said := func(prefix string) func() (string, bool) {
+		return func() (string, bool) {
+			for _, m := range protocol.MessagesIn(f.Core.State().Chat, f.Channel.General()) {
+				if m.From == protocol.ManagerAgent && m.Final && strings.HasPrefix(m.Text, prefix) {
+					return m.Text, true
+				}
+			}
+			return "", false
+		}
+	}
+	testkit.Await(t, "the manager told it waits", said("定时：定好了，等主人同意才生效"))
+	mine := func(enabled bool) []protocol.Schedule {
+		var out []protocol.Schedule
+		for _, s := range f.Schedule.List() {
+			if s.Name == "每日测试" && s.Enabled == enabled {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	if got := mine(false); len(got) != 1 || !got[0].Pending || got[0].By != protocol.ScheduleByManager {
+		t.Fatalf("waiting: %+v", got)
+	}
+	if err := f.Manager.Say(w.ctx, "每天九点跑一遍测试", "", nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	on := testkit.Await(t, "the owner's schedule on", func() ([]protocol.Schedule, bool) { got := mine(true); return got, len(got) == 1 })
+	testkit.Eq(t, on[0].Pending, false, "asked by the owner")
+	testkit.Eq(t, on[0].By, protocol.ScheduleByManager, "still set by the manager")
 }

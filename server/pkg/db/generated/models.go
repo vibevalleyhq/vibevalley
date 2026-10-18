@@ -214,6 +214,8 @@ type Schedule struct {
 	Enabled   bool
 	CreatedAt int64
 	LastRun   sql.NullInt64
+	By        string
+	Pending   bool
 }
 
 type Session struct {

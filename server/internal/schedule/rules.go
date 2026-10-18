@@ -1,6 +1,10 @@
 package schedule
 
-import "vibevalley/internal/protocol"
+import (
+	"strings"
+
+	"vibevalley/internal/protocol"
+)
 
 // A run later than this after it was due was missed (the server was off), and says so.
 const missedAfterMs = 5 * 60_000
@@ -31,4 +35,22 @@ func afterRun(s protocol.Schedule, now int64) protocol.Schedule {
 		s.Enabled = false
 	}
 	return s
+}
+
+// Whether a schedule waits for the owner's yes before it can come due. The owner's own never waits, nor the manager's when the
+// owner asked in this run. Without the owner, the manager may only set itself a one-off follow-up: one that comes back again,
+// or sends a helper (who spends money) straight away, waits.
+func needsOK(req protocol.ScheduleRequest, by protocol.ScheduleBy, ownerInRun bool) bool {
+	switch by {
+	case protocol.ScheduleByOwner:
+		return false
+	case protocol.ScheduleByManager:
+		if ownerInRun {
+			return false
+		}
+		_, once := req.When.Value.(protocol.ScheduleWhenOnce)
+		direct := req.Agent != nil && strings.TrimSpace(*req.Agent) != ""
+		return !once || direct
+	}
+	panic("schedule: set by nobody: " + string(by))
 }

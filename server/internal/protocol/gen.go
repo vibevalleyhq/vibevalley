@@ -279,6 +279,9 @@ func (u *ScheduleWhen) UnmarshalJSON(data []byte) error {
 // handle every one of them does.
 var ScheduleWhenMembers = []ScheduleWhenValue{ScheduleWhenOnce{}, ScheduleWhenEvery{}, ScheduleWhenDaily{}, ScheduleWhenWeekly{}, ScheduleWhenCron{}}
 
+// ScheduleByValues are every ScheduleBy, in the protocol's order.
+var ScheduleByValues = []ScheduleBy{ScheduleByOwner, ScheduleByManager}
+
 func (v Chat) MarshalJSON() ([]byte, error) {
 	type plain Chat
 	p := plain(v)
@@ -426,7 +429,7 @@ func (v RuntimeSettings) MarshalJSON() ([]byte, error) {
 }
 
 // InboxKindValues are every InboxKind, in the protocol's order.
-var InboxKindValues = []InboxKind{InboxKindMerge, InboxKindFix, InboxKindConflict, InboxKindQuiet, InboxKindGraphDraft, InboxKindGraphRipe, InboxKindTaskFailed, InboxKindMention}
+var InboxKindValues = []InboxKind{InboxKindMerge, InboxKindFix, InboxKindConflict, InboxKindQuiet, InboxKindGraphDraft, InboxKindGraphRipe, InboxKindTaskFailed, InboxKindMention, InboxKindScheduleAsk}
 
 // InboxFromValue is a member of InboxFrom: InboxFromSession, InboxFromManager, told apart by "kind".
 type InboxFromValue interface{ isInboxFrom() }

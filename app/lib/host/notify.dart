@@ -45,6 +45,7 @@ HostNotice noticeForCall(InboxItem call) {
     InboxKind.graphRipe => HostNotice('计划「$text」都做完了', '看看改动，收获进主分支', open),
     InboxKind.taskFailed => HostNotice('计划卡住了：$text', '重试、改工单，或者跳过', open),
     InboxKind.mention => HostNotice('$who 叫你', text, open),
+    InboxKind.scheduleAsk => HostNotice('管家想定一个定时', '「$text」：同意了才开始', open),
   };
 }
 
@@ -108,6 +109,7 @@ String? waitingLine(InboxItem call) {
     InboxKind.graphDraft => '计划「${call.text}」等你看',
     InboxKind.graphRipe => '计划「${call.text}」可以收获',
     InboxKind.taskFailed => '计划「${call.text}」没做成',
+    InboxKind.scheduleAsk => '定时「${call.text}」等你同意',
     InboxKind.mention => null,
   };
 }

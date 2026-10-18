@@ -30,6 +30,8 @@
 「每天早上九点在 #clock-in 跑一遍测试」这类（`schedule/schedule.go`；规则是 protocol 的 `schedules.go`；[理由](../../.agents/notes/implemented/feature/2026-10-11-channels-and-schedules.md)）。
 
 - 主人跟管家说，管家用 `schedule` 定；页面上只在频道菜单的「定时」里看、开关、删。
+- **谁定的**（`Schedule.by`）：`owner` 是主人经接口、命令行定的，`manager` 是管家用 `schedule` 定的；列表里管家定的写着「管家定的」。
+- **等主人同意**（`schedule/rules.go` 的 `needsOK`；[理由](../../.agents/notes/implemented/architecture/2026-10-18-source-is-not-instruction.md)第 5 节）：主人定的、和管家在主人这一轮里（最新那条输入有主人的话）定的，当场生效；管家不是主人叫醒时定的，只有不派帮工的一次性回头看当场生效，会反复来的、直接派帮工的存成关着、`pending`，到点也不跑。主人在定时列表里点「同意」（`schedule.update` 打开，同时清掉 `pending`；管家调不了这个接口）或「不要」（`schedule.delete`）。管家的工具对待批的回「定好了，等主人同意才生效：……」，它照实告诉主人。
 - 一次、每隔几分钟、每天几点、每周几几点，或者五段的 cron（分 时 日 月 周几，`schedule_cron.go`），按它的时区。写成 cron 的每天、每周和原来的两种在同样的时刻到点；八年里都不会到点的不收（[理由](../../.agents/notes/implemented/feature/2026-10-18-cron-and-follow-ups.md)）。
 - 管家也会自己定一次性的「回头看」：派了活、答应了主人一件事、或在等一个结果时，到点看一眼再说。会反复来的只在主人要的时候定。
 - 一个定时一张工单（`issue/dispatch.go` 的 `scheduled`；[理由](../../.agents/notes/implemented/architecture/2026-10-16-a-schedule-is-a-trigger.md)）：写了帮工档案的派给那个档案，没写的派给管家（`agent` 是 `manager`）。每次到点是这张工单的一次 run，触发记着这个定时、是不是补跑。
@@ -54,6 +56,7 @@
 | `task-draft`、`task-ripe` | 计划拆好了等你看、做完了等你收 |
 | `task-failed` | 计划里有一步没做成 |
 | `mention` | @主人 的话，你没读也没回 |
+| `schedule-ask` | 管家定的定时等你同意（目标是定时所在的频道） |
 
 计划里的帮工由计划报，不单独算；一个帮工一次只算最要紧的一件。
 

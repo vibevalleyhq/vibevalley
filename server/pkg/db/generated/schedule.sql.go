@@ -11,7 +11,9 @@ import (
 )
 
 const addSchedule = `-- name: AddSchedule :exec
-insert into schedule (id, name, body, channel_id, agent, project, spec, tz, enabled, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+insert into schedule (id, name, body, channel_id, agent, project, spec, tz, enabled, by, pending, created_at)
+values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
+        not ?9, ?10, ?9, ?11)
 `
 
 type AddScheduleParams struct {
@@ -23,9 +25,12 @@ type AddScheduleParams struct {
 	Project   sql.NullString
 	Spec      string
 	Tz        string
+	Pending   bool
+	By        string
 	CreatedAt int64
 }
 
+// One waiting for the owner is stored off (pending).
 func (q *Queries) AddSchedule(ctx context.Context, arg AddScheduleParams) error {
 	_, err := q.db.ExecContext(ctx, addSchedule,
 		arg.ID,
@@ -36,13 +41,15 @@ func (q *Queries) AddSchedule(ctx context.Context, arg AddScheduleParams) error 
 		arg.Project,
 		arg.Spec,
 		arg.Tz,
+		arg.Pending,
+		arg.By,
 		arg.CreatedAt,
 	)
 	return err
 }
 
 const enableSchedule = `-- name: EnableSchedule :exec
-update schedule set enabled = ? where id = ?
+update schedule set enabled = ?1, pending = pending and not ?1 where id = ?2
 `
 
 type EnableScheduleParams struct {
@@ -65,7 +72,7 @@ func (q *Queries) RemoveSchedule(ctx context.Context, id string) error {
 }
 
 const scheduleRan = `-- name: ScheduleRan :exec
-update schedule set last_run = ?, enabled = ? where id = ?
+update schedule set last_run = ?1, enabled = ?2, pending = pending and not ?2 where id = ?3
 `
 
 type ScheduleRanParams struct {
@@ -74,6 +81,7 @@ type ScheduleRanParams struct {
 	ID      string
 }
 
+// Turned on is the owner's yes: it waits no more.
 func (q *Queries) ScheduleRan(ctx context.Context, arg ScheduleRanParams) error {
 	_, err := q.db.ExecContext(ctx, scheduleRan, arg.LastRun, arg.Enabled, arg.ID)
 	return err
@@ -81,7 +89,7 @@ func (q *Queries) ScheduleRan(ctx context.Context, arg ScheduleRanParams) error 
 
 const schedules = `-- name: Schedules :many
 
-select id, name, body, channel_id, agent, project, spec, tz, enabled, created_at, last_run from schedule order by id
+select id, name, body, channel_id, agent, project, spec, tz, enabled, created_at, last_run, "by", pending from schedule order by id
 `
 
 // Schedules (schedule/schedule.go).
@@ -106,6 +114,8 @@ func (q *Queries) Schedules(ctx context.Context) ([]Schedule, error) {
 			&i.Enabled,
 			&i.CreatedAt,
 			&i.LastRun,
+			&i.By,
+			&i.Pending,
 		); err != nil {
 			return nil, err
 		}

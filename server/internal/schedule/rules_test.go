@@ -30,3 +30,28 @@ func TestDueOnceMissedAndRun(t *testing.T) {
 	once.When = protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: at("2026-10-12T12:00:00")}}
 	testkit.Eq(t, afterRun(once, now).Enabled, false, "a one-off is off once it ran")
 }
+
+func TestNeedsOK(t *testing.T) {
+	once := protocol.ScheduleWhen{Value: protocol.ScheduleWhenOnce{At: at("2026-10-12T12:00:00")}}
+	daily := protocol.ScheduleWhen{Value: protocol.ScheduleWhenDaily{Time: "09:00"}}
+	for _, c := range []struct {
+		name       string
+		req        protocol.ScheduleRequest
+		by         protocol.ScheduleBy
+		ownerInRun bool
+		want       bool
+	}{
+		{"the owner's own", protocol.ScheduleRequest{When: daily, Agent: ptr.To("lab")}, protocol.ScheduleByOwner, false, false},
+		{"the manager's, the owner asking", protocol.ScheduleRequest{When: daily, Agent: ptr.To("lab")}, protocol.ScheduleByManager, true, false},
+		{"the manager's own follow-up", protocol.ScheduleRequest{When: once}, protocol.ScheduleByManager, false, false},
+		{"the manager's, again and again", protocol.ScheduleRequest{When: daily}, protocol.ScheduleByManager, false, true},
+		{"the manager's, sending a helper", protocol.ScheduleRequest{When: once, Agent: ptr.To("lab")}, protocol.ScheduleByManager, false, true},
+		{"the manager's, a blank helper", protocol.ScheduleRequest{When: once, Agent: ptr.To(" ")}, protocol.ScheduleByManager, false, false},
+	} {
+		testkit.Eq(t, needsOK(c.req, c.by, c.ownerInRun), c.want, c.name)
+	}
+	// Every member is answered: needsOK panics on one it does not know.
+	for _, by := range protocol.ScheduleByValues {
+		needsOK(protocol.ScheduleRequest{When: daily}, by, false)
+	}
+}

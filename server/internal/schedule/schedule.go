@@ -96,7 +96,7 @@ func newService(cfg base.Config, db *sql.DB, core *core.Service, store *agent.Se
 		if project.Valid && project.String != "" {
 			sc.Project = &project.String
 		}
-		sc.Enabled = enabled
+		sc.Enabled, sc.By, sc.Pending = enabled, protocol.ScheduleBy(row.By), row.Pending
 		if lastRun.Valid && lastRun.Int64 != 0 {
 			sc.LastRun = &lastRun.Int64
 		}
@@ -140,7 +140,8 @@ func (s *Service) List() []protocol.Schedule {
 	return slices.Clone(s.core.State().Schedules)
 }
 
-func (s *Service) Add(req protocol.ScheduleRequest) (protocol.Schedule, error) {
+// by is who asks; ownerInRun, for the manager, whether the owner's words are in the run it asks from (needsOK).
+func (s *Service) Add(req protocol.ScheduleRequest, by protocol.ScheduleBy, ownerInRun bool) (protocol.Schedule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.Now()
@@ -188,13 +189,16 @@ func (s *Service) Add(req protocol.ScheduleRequest) (protocol.Schedule, error) {
 	if err != nil {
 		return protocol.Schedule{}, err
 	}
+	pending := needsOK(req, by, ownerInRun)
 	sc := protocol.Schedule{
 		Name: strings.TrimSpace(req.Name), Text: strings.TrimSpace(req.Text), Channel: channel.ID, When: req.When, TZ: tz,
 		// Counted from now, by the same clock that ticks.
-		Enabled: true, Created: now,
+		Enabled: !pending, Created: now, By: by, Pending: pending,
 	}
 	sc.ID = base.NewID()
-	row := generated.AddScheduleParams{ID: sc.ID, Name: sc.Name, Body: sc.Text, ChannelID: sc.Channel, Spec: string(spec), Tz: tz, CreatedAt: now}
+	row := generated.AddScheduleParams{
+		ID: sc.ID, Name: sc.Name, Body: sc.Text, ChannelID: sc.Channel, Spec: string(spec), Tz: tz, By: string(by), Pending: pending, CreatedAt: now,
+	}
 	if agent != nil {
 		id := agent.ID
 		sc.Agent, row.Agent = &id, sql.NullString{String: id, Valid: true}
@@ -221,7 +225,8 @@ func (s *Service) SetEnabled(id string, enabled bool) (protocol.Schedule, error)
 		return protocol.Schedule{}, err
 	}
 	sc := was
-	sc.Enabled = enabled
+	// Turned on is the owner's yes (only the owner may: schedule.update); the queries clear pending the same way.
+	sc.Enabled, sc.Pending = enabled, was.Pending && !enabled
 	// Switched back on: it counts from now, not from runs it skipped while off.
 	if _, once := was.When.Value.(protocol.ScheduleWhenOnce); enabled && !was.Enabled && !once {
 		now := s.Now()

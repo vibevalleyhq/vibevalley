@@ -434,7 +434,7 @@ class _ScheduleListState extends ConsumerState<ScheduleList> {
                 children: [
                   for (final s in widget.schedules)
                     Opacity(
-                      opacity: s.enabled ? 1 : .6,
+                      opacity: s.enabled || s.pending == true ? 1 : .6,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                         child: Column(
@@ -446,43 +446,60 @@ class _ScheduleListState extends ConsumerState<ScheduleList> {
                                   child: Text(s.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
                                 ),
                                 const SizedBox(width: 8),
-                                KitTappable(
-                                  onTap: () => _act(() => actions.setScheduleEnabled(s.id, !s.enabled)),
-                                  semanticLabel: s.enabled ? '关掉定时「${s.name}」' : '打开定时「${s.name}」',
-                                  builder: (context, _) => Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                                    color: s.enabled ? Palette.leaf500 : Palette.cream200,
-                                    child: Text(s.enabled ? '开着' : '关着', style: KitText.xs.copyWith(color: s.enabled ? Palette.cream50 : Palette.bark600)),
+                                if (s.pending == true) ...[
+                                  _AskButton(
+                                    icon: 'mark-check',
+                                    label: '同意',
+                                    semanticLabel: '同意定时「${s.name}」',
+                                    onTap: () => _act(() => actions.setScheduleEnabled(s.id, true)),
                                   ),
-                                ),
-                                const SizedBox(width: 4),
-                                TapRegion(
-                                  onTapOutside: (_) {
-                                    if (_deleting == s.id) setState(() => _deleting = null);
-                                  },
-                                  child: KitTappable(
-                                    onTap: () {
-                                      if (_deleting == s.id) {
-                                        _act(() => actions.removeSchedule(s.id));
-                                      } else {
-                                        setState(() => _deleting = s.id);
-                                      }
-                                    },
-                                    semanticLabel: '删掉定时「${s.name}」',
-                                    builder: (context, st) => Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                                      color: st.hovered ? Palette.cream200 : null,
-                                      child: _deleting == s.id
-                                          ? Text('确定删？', style: KitText.xs.copyWith(color: Palette.berry))
-                                          : const SpriteIcon('button-delete', size: 14),
+                                  const SizedBox(width: 4),
+                                  _AskButton(
+                                    icon: 'mark-cross',
+                                    label: '不要',
+                                    semanticLabel: '不要定时「${s.name}」',
+                                    onTap: () => _act(() => actions.removeSchedule(s.id)),
+                                  ),
+                                ] else ...[
+                                  KitTappable(
+                                    onTap: () => _act(() => actions.setScheduleEnabled(s.id, !s.enabled)),
+                                    semanticLabel: s.enabled ? '关掉定时「${s.name}」' : '打开定时「${s.name}」',
+                                    builder: (context, _) => Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                                      color: s.enabled ? Palette.leaf500 : Palette.cream200,
+                                      child: Text(s.enabled ? '开着' : '关着', style: KitText.xs.copyWith(color: s.enabled ? Palette.cream50 : Palette.bark600)),
                                     ),
                                   ),
-                                ),
+                                  const SizedBox(width: 4),
+                                  TapRegion(
+                                    onTapOutside: (_) {
+                                      if (_deleting == s.id) setState(() => _deleting = null);
+                                    },
+                                    child: KitTappable(
+                                      onTap: () {
+                                        if (_deleting == s.id) {
+                                          _act(() => actions.removeSchedule(s.id));
+                                        } else {
+                                          setState(() => _deleting = s.id);
+                                        }
+                                      },
+                                      semanticLabel: '删掉定时「${s.name}」',
+                                      builder: (context, st) => Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                                        color: st.hovered ? Palette.cream200 : null,
+                                        child: _deleting == s.id
+                                            ? Text('确定删？', style: KitText.xs.copyWith(color: Palette.berry))
+                                            : const SpriteIcon('button-delete', size: 14),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                             Text(
                               '${channelLabel(widget.channels.where((c) => c.id == s.channel).firstOrNull)} · ${s.whenText ?? ''}'
-                              '${s.agent != null ? ' · 直接派 ${s.agent}' : ''} · 下次 ${s.nextText ?? ''}',
+                              '${s.agent != null ? ' · 直接派 ${s.agent}' : ''}${s.by == ScheduleBy.manager ? ' · 管家定的' : ''}'
+                              ' · ${s.pending == true ? s.nextText ?? '' : '下次 ${s.nextText ?? ''}'}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: _grey,
@@ -513,4 +530,31 @@ class _ScheduleListState extends ConsumerState<ScheduleList> {
       ),
     );
   }
+}
+
+/// The owner's answer to a schedule the manager set and is waiting on.
+class _AskButton extends StatelessWidget {
+  const _AskButton({required this.icon, required this.label, required this.semanticLabel, required this.onTap});
+  final String icon;
+  final String label;
+  final String semanticLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => KitTappable(
+    onTap: onTap,
+    semanticLabel: semanticLabel,
+    builder: (context, st) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      color: st.hovered ? Palette.cream200 : null,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SpriteIcon(icon, size: 14),
+          const SizedBox(width: 2),
+          Text(label, style: KitText.xs.copyWith(color: Palette.bark800)),
+        ],
+      ),
+    ),
+  );
 }

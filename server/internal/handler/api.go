@@ -71,7 +71,7 @@ func (a api) ChannelCreate(_ context.Context, body protocol.ChannelRequest) (str
 }
 
 func (a api) ScheduleCreate(_ context.Context, body protocol.ScheduleRequest) (protocol.Schedule, error) {
-	s, err := a.f.Schedule.Add(body)
+	s, err := a.f.Schedule.Add(body, protocol.ScheduleByOwner, true)
 	return s, refused(err)
 }
 

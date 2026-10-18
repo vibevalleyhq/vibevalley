@@ -423,3 +423,11 @@ func TestInboxTiesKeepTheirOrder(t *testing.T) {
 	state.Chat = callsChat(nil, nil, callsMessage(3, callsInThread, saidNow), callsMessage(4, saidNow))
 	testkit.Eq(t, callsIDs(Inbox(state)), []string{"w2:merge:2", "w1:fix:2", "p1:failed:b", "p1:failed:a", "p2:draft", "m4", "m3"})
 }
+
+func TestInboxSchedulesWaitingForTheOwnerCall(t *testing.T) {
+	waiting := Schedule{ID: "s1", Name: "每天看测试", Channel: "c1", By: ScheduleByManager, Pending: true, Created: callsT}
+	on := Schedule{ID: "s2", Name: "早会", Channel: "c1", By: ScheduleByManager, Enabled: true, Created: callsT + 1}
+	testkit.Eq(t, Inbox(CoreState{Schedules: []Schedule{waiting, on}}), []InboxItem{
+		{ID: "s1:ask", Kind: InboxKindScheduleAsk, From: callsManager, Text: "每天看测试", At: callsT, Target: callsToChat("c1")},
+	})
+}

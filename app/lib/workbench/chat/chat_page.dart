@@ -737,7 +737,7 @@ class _SchedulesState extends ConsumerState<_Schedules> {
       children: [
         for (final s in schedules)
           Opacity(
-            opacity: s.enabled ? 1 : .6,
+            opacity: s.enabled || s.pending == true ? 1 : .6,
             child: Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
@@ -755,7 +755,12 @@ class _SchedulesState extends ConsumerState<_Schedules> {
                           TextSpan(
                             children: [
                               TextSpan(text: s.name),
-                              TextSpan(text: '  ${s.whenText ?? ''} · 下次 ${s.nextText ?? ''}${s.agent != null ? ' · 直接派 ${s.agent}' : ''}', style: _grey),
+                              TextSpan(
+                                text:
+                                    '  ${s.whenText ?? ''} · ${s.pending == true ? s.nextText ?? '' : '下次 ${s.nextText ?? ''}'}'
+                                    '${s.agent != null ? ' · 直接派 ${s.agent}' : ''}${s.by == ScheduleBy.manager ? ' · 管家定的' : ''}',
+                                style: _grey,
+                              ),
                             ],
                           ),
                           style: KitText.sm,
@@ -765,33 +770,52 @@ class _SchedulesState extends ConsumerState<_Schedules> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  PxButton.text(
-                    s.enabled ? '开着' : '关着',
-                    size: PxSize.custom,
-                    tone: s.enabled ? PxTone.accent : PxTone.plain,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    onPressed: () => unawaited(actions.setScheduleEnabled(s.id, !s.enabled).catchError((Object _) {})),
-                  ),
-                  const SizedBox(width: 12),
-                  TapRegion(
-                    onTapOutside: (_) {
-                      if (_deleting == s.id) setState(() => _deleting = null);
-                    },
-                    child: PxButton(
+                  if (s.pending == true) ...[
+                    PxButton(
                       size: PxSize.custom,
-                      tooltip: _deleting == s.id ? null : '删掉',
-                      semanticLabel: _deleting == s.id ? '确定删？' : '删掉定时「${s.name}」',
+                      tone: PxTone.accent,
+                      semanticLabel: '同意定时「${s.name}」',
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      child: _deleting == s.id ? const Text('确定删？') : const SpriteIcon('button-delete', size: 16),
-                      onPressed: () {
-                        if (_deleting == s.id) {
-                          unawaited(actions.removeSchedule(s.id).catchError((Object _) {}));
-                        } else {
-                          setState(() => _deleting = s.id);
-                        }
-                      },
+                      onPressed: () => unawaited(actions.setScheduleEnabled(s.id, true).catchError((Object _) {})),
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('mark-check', size: 16), SizedBox(width: 4), Text('同意')]),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    PxButton(
+                      size: PxSize.custom,
+                      semanticLabel: '不要定时「${s.name}」',
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      onPressed: () => unawaited(actions.removeSchedule(s.id).catchError((Object _) {})),
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('mark-cross', size: 16), SizedBox(width: 4), Text('不要')]),
+                    ),
+                  ] else ...[
+                    PxButton.text(
+                      s.enabled ? '开着' : '关着',
+                      size: PxSize.custom,
+                      tone: s.enabled ? PxTone.accent : PxTone.plain,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      onPressed: () => unawaited(actions.setScheduleEnabled(s.id, !s.enabled).catchError((Object _) {})),
+                    ),
+                    const SizedBox(width: 12),
+                    TapRegion(
+                      onTapOutside: (_) {
+                        if (_deleting == s.id) setState(() => _deleting = null);
+                      },
+                      child: PxButton(
+                        size: PxSize.custom,
+                        tooltip: _deleting == s.id ? null : '删掉',
+                        semanticLabel: _deleting == s.id ? '确定删？' : '删掉定时「${s.name}」',
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        child: _deleting == s.id ? const Text('确定删？') : const SpriteIcon('button-delete', size: 16),
+                        onPressed: () {
+                          if (_deleting == s.id) {
+                            unawaited(actions.removeSchedule(s.id).catchError((Object _) {}));
+                          } else {
+                            setState(() => _deleting = s.id);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

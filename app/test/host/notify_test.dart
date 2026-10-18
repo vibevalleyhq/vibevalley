@@ -64,6 +64,15 @@ void main() {
       ),
       const HostNotice('管家 叫你', '看一眼', HostOpenChat('c2')),
     );
+    final ask = _call(
+      's1:ask',
+      InboxKind.scheduleAsk,
+      from: const InboxFromManager(),
+      text: '每日测试',
+      target: const InboxTargetChat(conversation: 'c2'),
+    );
+    expect(noticeForCall(ask), const HostNotice('管家想定一个定时', '「每日测试」：同意了才开始', HostOpenChat('c2')));
+    expect(waitingLine(ask), '定时「每日测试」等你同意');
   });
 
   test('achievements and errors', () {
