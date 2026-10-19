@@ -70,7 +70,7 @@
 
 - **谁依赖配置**：几乎所有服务的构造函数都拿 `base.Config`；每个键归哪个子系统，见 [architecture.md](docs/architecture.md)「配置」的表。
 - **谁依赖设置**：`manager`、`runtime`、`voice`、`memory` 拿 `*setting.Service`，只调取值的方法；`handler` 调 `Status`、`Check`、`Save`，`Check` 的结果里补上 `project` 的 GitHub 状态。
-- **「连接到本机」**：配对过的设备能看设置、能检查（`setting.load`、`setting.check`），不能保存：`setting.save` 没有 `remote`（[连接到本机](docs/subsystems/gate.md)）。
+- **「连接到本机」**：配对过的设备能看设置、能检查（`setting.load`、`setting.check`），不能保存：`setting.save` 没有 `remote`（[连接到本机](docs/subsystems/lan.md)）。
 - **macOS 应用**：起服务端时设 `VIBEVALLEY_HOME`、`VIBEVALLEY_WORK_ROOT`、`VIBEVALLEY_PORT` 和登录 shell 的 `PATH`（[客户端](docs/subsystems/app.md)）。
 - **不归这里**：`runtime` 算 pi 那台农机的余额时，照 pi 自己的规则找 pi 的 DeepSeek 钥匙（`piDeepseek`）：那是 pi 的配置。
 

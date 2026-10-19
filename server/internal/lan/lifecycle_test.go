@@ -1,4 +1,4 @@
-package gate
+package lan
 
 import (
 	"context"
@@ -12,14 +12,14 @@ import (
 	"vibevalley/pkg/db/generated"
 )
 
-type gateStore struct {
+type lanStore struct {
 	generated.DBTX
 	mu   sync.Mutex
 	open bool
 	fail bool
 }
 
-func (s *gateStore) ExecContext(_ context.Context, _ string, args ...any) (sql.Result, error) {
+func (s *lanStore) ExecContext(_ context.Context, _ string, args ...any) (sql.Result, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.fail {
@@ -30,7 +30,7 @@ func (s *gateStore) ExecContext(_ context.Context, _ string, args ...any) (sql.R
 }
 
 func TestConcurrentOpenMatchesPersistence(t *testing.T) {
-	store := &gateStore{}
+	store := &lanStore{}
 	l := &Service{q: generated.New(store), host: "127.0.0.1", API: http.NotFoundHandler(), devices: map[string]*lanDevice{}, address: func() string { return "127.0.0.1" }}
 	defer l.OnStop()
 	var workers sync.WaitGroup
@@ -47,12 +47,12 @@ func TestConcurrentOpenMatchesPersistence(t *testing.T) {
 	}
 	workers.Wait()
 	if l.Status().Open != store.open {
-		t.Fatal("running gate differs from saved gate")
+		t.Fatal("running lan access differs from the saved one")
 	}
 	store.fail = true
 	before := l.Status().Open
 	if _, err := l.SetOpen(!before); err == nil || l.Status().Open != before {
-		t.Fatal("failed write changed gate")
+		t.Fatal("failed write changed lan access")
 	}
 }
 

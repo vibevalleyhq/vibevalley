@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/ui/theme.dart';
 import 'package:vibevalley/data/farm_choice.dart';
-import 'package:vibevalley/workbench/gate/gate_page.dart';
+import 'package:vibevalley/workbench/lan/lan_page.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,13 +13,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../support/server.dart' show jsonResponse, settle;
 import 'package:vibevalley/data/providers.dart';
 
-const _gate = 'http://192.168.1.5:8790';
+const _lanUrl = 'http://192.168.1.5:8790';
 
 void main() {
   group('PairLink', () {
-    test('reads the link a gate gives, spaces around it allowed', () {
-      final link = PairLink.parse('  vibevalley://pair?u=${Uri.encodeQueryComponent(_gate)}&c=ABC234 \n');
-      expect(link?.url, Uri.parse(_gate));
+    test('reads the link lan access gives, spaces around it allowed', () {
+      final link = PairLink.parse('  vibevalley://pair?u=${Uri.encodeQueryComponent(_lanUrl)}&c=ABC234 \n');
+      expect(link?.url, Uri.parse(_lanUrl));
       expect(link?.code, 'ABC234');
     });
 
@@ -40,11 +40,11 @@ void main() {
 
   test('the choice survives a restart, and the other farm is kept when going back', () async {
     SharedPreferences.setMockInitialValues({});
-    final remote = RemoteFarm(url: Uri.parse(_gate), key: 'k1', farm: 'lucas-mbp', device: 'd1');
+    final remote = RemoteFarm(url: Uri.parse(_lanUrl), key: 'k1', farm: 'lucas-mbp', device: 'd1');
     await saveFarmChoice(FarmChoice(remote: remote, useRemote: true));
     farmConnection.value = const FarmConnection(choice: FarmChoice());
     await loadFarmChoice();
-    expect(farmConnection.value.choice.using?.url, Uri.parse(_gate));
+    expect(farmConnection.value.choice.using?.url, Uri.parse(_lanUrl));
     expect(farmConnection.value.choice.using?.key, 'k1');
 
     await saveFarmChoice(FarmChoice(remote: remote));
@@ -56,7 +56,7 @@ void main() {
   });
 
   group('pairWith', () {
-    final link = PairLink(Uri.parse(_gate), 'ABC234');
+    final link = PairLink(Uri.parse(_lanUrl), 'ABC234');
 
     (ApiFor, List<String>) farm({Set<String> known = const {}, bool allow = true}) {
       final calls = <String>[];
@@ -65,11 +65,11 @@ void main() {
         MockClient((r) async {
           calls.add('${r.method} ${r.url.path} ${key ?? '-'}');
           switch ((r.method, r.url.path)) {
-            case ('GET', '/api/v1/gate/me'):
+            case ('GET', '/api/v1/lan/me'):
               return known.contains(key)
                   ? jsonResponse(const LanDevice(id: 'd1', name: 'iPhone', pairedAt: 1).toJson())
                   : jsonResponse({'_tag': 'LanRefused', 'reason': '没配对'}, 401);
-            case ('POST', '/api/v1/gate/pair'):
+            case ('POST', '/api/v1/lan/pair'):
               final body = LanPairRequest.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
               expect(body.code, 'ABC234');
               return allow
@@ -85,26 +85,26 @@ void main() {
     test('asks with the code and gets a key', () async {
       final (apiFor, calls) = farm();
       final got = await pairWith(link, name: 'iPhone', apiFor: apiFor);
-      expect((got.url, got.key, got.farm, got.device), (Uri.parse(_gate), 'new-key', 'lucas-mbp', 'd2'));
-      expect(calls, ['POST /api/v1/gate/pair -']);
+      expect((got.url, got.key, got.farm, got.device), (Uri.parse(_lanUrl), 'new-key', 'lucas-mbp', 'd2'));
+      expect(calls, ['POST /api/v1/lan/pair -']);
     });
 
     test('keeps a key the farm still knows, at its new address', () async {
       final (apiFor, calls) = farm(known: {'old-key'});
       final known = RemoteFarm(url: Uri.parse('http://10.0.0.2:8790'), key: 'old-key', farm: 'lucas-mbp', device: 'd1');
       final got = await pairWith(link, name: 'iPhone', known: known, apiFor: apiFor);
-      expect((got.url, got.key), (Uri.parse(_gate), 'old-key'));
-      expect(calls, ['GET /api/v1/gate/me old-key']);
+      expect((got.url, got.key), (Uri.parse(_lanUrl), 'old-key'));
+      expect(calls, ['GET /api/v1/lan/me old-key']);
     });
 
     test('asks again when the farm forgot the key, and says why it is refused', () async {
       final (apiFor, calls) = farm(allow: false);
-      final known = RemoteFarm(url: Uri.parse(_gate), key: 'old-key', farm: 'x', device: 'd1');
+      final known = RemoteFarm(url: Uri.parse(_lanUrl), key: 'old-key', farm: 'x', device: 'd1');
       await expectLater(
         pairWith(link, name: 'iPhone', known: known, apiFor: apiFor),
         throwsA(isA<VibeValleyApiError>().having((e) => e.reason, 'reason', '主人没让这台设备进来')),
       );
-      expect(calls, ['GET /api/v1/gate/me old-key', 'POST /api/v1/gate/pair -']);
+      expect(calls, ['GET /api/v1/lan/me old-key', 'POST /api/v1/lan/pair -']);
     });
   });
 
@@ -117,23 +117,23 @@ void main() {
       MockClient((r) async {
         if (r.method != 'GET') writes.add('${r.method} ${r.url.path} ${r.body}');
         switch ((r.method, r.url.path)) {
-          case ('GET', '/api/v1/gate'):
+          case ('GET', '/api/v1/lan'):
             break;
-          case ('PUT', '/api/v1/gate'):
+          case ('PUT', '/api/v1/lan'):
             final open = (jsonDecode(r.body) as Map)['open'] as bool;
-            status = LanStatus(open: open, farm: 'lucas-mbp', url: open ? _gate : null, devices: status.devices);
-          case ('POST', '/api/v1/gate/pairing/answer'):
+            status = LanStatus(open: open, farm: 'lucas-mbp', url: open ? _lanUrl : null, devices: status.devices);
+          case ('POST', '/api/v1/lan/pairing/answer'):
             status = LanStatus(
               open: true,
               farm: 'lucas-mbp',
-              url: _gate,
+              url: _lanUrl,
               devices: [
                 ...status.devices,
                 const LanDevice(id: 'd2', name: '小明的 iPhone', pairedAt: 2),
               ],
             );
-          case ('DELETE', '/api/v1/gate/devices/d2'):
-            status = LanStatus(open: true, farm: 'lucas-mbp', url: _gate, devices: status.devices.where((d) => d.id != 'd2').toList());
+          case ('DELETE', '/api/v1/lan/devices/d2'):
+            status = LanStatus(open: true, farm: 'lucas-mbp', url: _lanUrl, devices: status.devices.where((d) => d.id != 'd2').toList());
           default:
             return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
         }
@@ -150,7 +150,7 @@ void main() {
           overrides: [apiProvider.overrideWithValue(server())],
           child: MaterialApp(
             theme: farmTheme(),
-            home: const Scaffold(body: GatePage()),
+            home: const Scaffold(body: LanPage()),
           ),
         ),
       );
@@ -162,13 +162,13 @@ void main() {
       status = const LanStatus(open: false, farm: 'lucas-mbp', devices: []);
     });
 
-    testWidgets('opens the gate', (t) async {
+    testWidgets('opens lan access', (t) async {
       await pump(t);
       expect(find.text('关着'), findsOneWidget);
       await t.tap(find.text('允许连接'));
       await settle(t);
-      expect(writes, ['PUT /api/v1/gate {"open":true}']);
-      expect(find.text(_gate), findsOneWidget);
+      expect(writes, ['PUT /api/v1/lan {"open":true}']);
+      expect(find.text(_lanUrl), findsOneWidget);
       expect(find.text('添加设备'), findsOneWidget);
       await t.pumpWidget(const SizedBox.shrink());
     });
@@ -177,7 +177,7 @@ void main() {
       status = LanStatus(
         open: true,
         farm: 'lucas-mbp',
-        url: _gate,
+        url: _lanUrl,
         pairing: LanPairing(
           code: 'ABC234',
           link: 'vibevalley://pair?u=x&c=ABC234',
@@ -190,11 +190,11 @@ void main() {
       expect(find.text('「小明的 iPhone」想连接到这台电脑。让它进来以后，它能和你一样用这个农场。'), findsOneWidget);
       await t.tap(find.text('让它进来'));
       await settle(t);
-      expect(writes, ['POST /api/v1/gate/pairing/answer {"allow":true}']);
+      expect(writes, ['POST /api/v1/lan/pairing/answer {"allow":true}']);
       expect(find.text('小明的 iPhone'), findsOneWidget);
       await t.tap(find.text('移除'));
       await settle(t);
-      expect(writes.last, startsWith('DELETE /api/v1/gate/devices/d2'));
+      expect(writes.last, startsWith('DELETE /api/v1/lan/devices/d2'));
       expect(find.text('小明的 iPhone'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
     });

@@ -10,7 +10,7 @@
 | 语音线路：单独的回环监听、每通电话一把钥匙、隧道 | OpenAI `chat/completions` 的协议本身（`internal/agent/brain/openai.go`，[管家](docs/subsystems/manager.md)「OpenAI 的协议」） |
 | 两种字幕的接受和分流（按通话建立时的模式） | 字幕怎么留在田头、不叫醒谁（`channel` 的 `Spoken`，[田头](docs/subsystems/channel.md)） |
 | 听写：把录音转给主人填的转写地址 | 设置的存取、优先级、钥匙只给提示（`internal/setting`，[设置](docs/subsystems/setting.md)） |
-| 语音设置的形状、默认值和保存前的检查 | 「连接到本机」放哪些接口（[连接到本机](docs/subsystems/gate.md)）；语音接通在账本上记一笔（`game`） |
+| 语音设置的形状、默认值和保存前的检查 | 「连接到本机」放哪些接口（[连接到本机](docs/subsystems/lan.md)）；语音接通在账本上记一笔（`game`） |
 | 客户端的通话（`VoiceCall`）、字幕拼块、听写按钮 | 田头窗口和手机怎么画通话（`farm/chat_voice.dart`、`phone/`） |
 
 ## 在哪

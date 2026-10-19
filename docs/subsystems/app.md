@@ -12,7 +12,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 | 工作台的页面结构和路由、首页和启动画面 | 像素农场的画面、玩法和面板（[farm.md](docs/subsystems/farm.md)；每页的内容见 [farm-ui.md](docs/reference/farm-ui.md)「界面清单」） |
 | macOS 宿主：服务端子进程的生命周期和就绪、菜单栏、通知、快捷键、窗口、单实例 | 服务端的监听、家目录租约、`OnReady` 的顺序（`internal/handler`、`internal/base`，见下「和谁打交道」） |
 | 发布渠道：应用名、bundle id、家目录、工作目录 | 工作目录里有什么（[项目](docs/subsystems/project.md)）；设置存什么（[设置](docs/subsystems/setting.md)） |
-| 手机上的系统通知 | 「连接到本机」的配对和鉴权（[连接到本机](docs/subsystems/gate.md)）；语音通话（[语音](docs/subsystems/voice.md)） |
+| 手机上的系统通知 | 「连接到本机」的配对和鉴权（[连接到本机](docs/subsystems/lan.md)）；语音通话（[语音](docs/subsystems/voice.md)） |
 
 包的对外约定（目录表、替身、怎么跑和打包）在 [app/README.md](app/README.md)，这里不重复。
 
@@ -96,7 +96,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 ## 和谁打交道
 
 - **服务端的生命周期（`handler.Listen`、`base`）**：主接口只听 `127.0.0.1`（`Config.ServerAddress`，没有 Host 这个配置）；`handler.Listen` 先拿到监听地址、组装农场，全部 `OnStart` 之后由 `base.BeforeReady` 开始答 HTTP，再跑各模块的 `OnReady`，所以 `OnReady` 里派出的帮工拿到的是实际地址（端口 0 也对）。`cmd/server --ready-json` 在这之后写收据。启动失败释放监听和数据库；取消时先停请求、关 HTTP，再关农场。家目录租约持有到全部服务停机写完、数据库关掉，延迟写入的 `FileWriter.Finish` 之后迟到的计时器不再落盘。客户端只依赖收据和 SIGTERM 会存盘这两条。
-- **「连接到本机」（`gate`）**：用别的电脑的农场时，在「连接到本机」页粘贴或扫配对链接，那边点头后存进 `farm_choice.dart`，之后不再拉起自己的服务端；请求和两条流都带 `Bearer` 钥匙，401 时横幅说要重新配对。
+- **「连接到本机」（`lan`）**：用别的电脑的农场时，在「连接到本机」页粘贴或扫配对链接，那边点头后存进 `farm_choice.dart`，之后不再拉起自己的服务端；请求和两条流都带 `Bearer` 钥匙，401 时横幅说要重新配对。
 - **设置（`setting`）**：首页和设置页读写 `GET`/`POST` 设置，保存前问 `settings/check`；钥匙从不经过客户端，页面只看到来源和末四位。
 - **语音（`voice`）**：通话归当前农场的 scope，按钮和 ⌥⇧Space 发同一个动作；Swift 第一次按快捷键时要麦克风权限。
 - **验证脚本**：`scripts/verify-server.ts` 用同一个收据协议起一个隔离的服务端，再交给 `verify-app` 画截图。

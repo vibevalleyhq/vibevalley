@@ -39,7 +39,7 @@ const pages = {
   'map': '/projects',
   'map-island': '/projects/pb-smoke',
   'map-sow': '/projects|空位，派一件活到 clock-in',
-  'gate': '/settings/gate',
+  'lan': '/settings/lan',
   'agents': '/agents',
   'agent': '/agents/backend',
   'agent-runtime': '/agents/backend|能力',

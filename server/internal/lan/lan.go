@@ -1,4 +1,4 @@
-package gate
+package lan
 
 import (
 	"cmp"
@@ -28,9 +28,9 @@ import (
 	"vibevalley/pkg/x/ptr"
 )
 
-// The farm itself listens on loopback alone; the gate is a second listener on every interface, shut until the owner opens it. Through it go
+// The main server listens on loopback alone; lan access is a second listener on every interface, shut until the owner opens it. Through it go
 // VibeValleyApi and the state and side-event streams, never /mcp, and only with a paired device's key: sessions run commands on this machine without asking. Opening
-// it, pairing and forgetting devices are this machine's alone. The database keeps only each key's SHA-256. The gate speaks plain HTTP: a key can be
+// it, pairing and forgetting devices are this machine's alone. The database keeps only each key's SHA-256. The lan listener speaks plain HTTP: a key can be
 // overheard on the network it is open on.
 
 const (
@@ -58,7 +58,7 @@ type lanDeviceKey struct{}
 
 type Service struct {
 	q *generated.Queries
-	// handler.New hands it over before the farm starts, since the API answers for every service, the gate's own pages included.
+	// handler.New hands it over before the workspace starts, since the API answers for every service, lan access's own pages included.
 	API     http.Handler
 	host    string
 	port    int
@@ -92,7 +92,7 @@ func newService(cfg base.Config, db *sql.DB) (*Service, error) {
 		}
 		l.devices[d.ID] = d
 	}
-	open, err := l.q.GateOpen(ctx)
+	open, err := l.q.LanOpen(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (l *Service) listen() {
 	listener, err := net.Listen("tcp", net.JoinHostPort(l.host, strconv.Itoa(l.port)))
 	if err != nil {
 		l.problem = "连接开不起来：" + err.Error()
-		log.Printf("vibevalley: the yard gate cannot listen on port %d: %v", l.port, err)
+		log.Printf("vibevalley: lan access cannot listen on port %d: %v", l.port, err)
 		return
 	}
 	l.problem = ""
@@ -134,12 +134,12 @@ func (l *Service) listen() {
 		ctx = context.Background()
 	}
 	l.server = &http.Server{
-		Handler:           l.gate(l.API),
+		Handler:           l.guard(l.API),
 		ReadHeaderTimeout: 10 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
 	go l.server.Serve(listener)
-	log.Printf("vibevalley: the yard gate is open on %s", listener.Addr())
+	log.Printf("vibevalley: lan access is open on %s", listener.Addr())
 }
 
 // Called with mu held.
@@ -147,14 +147,14 @@ func (l *Service) shut() {
 	l.dropPairing()
 	if l.server != nil {
 		l.server.Close()
-		log.Printf("vibevalley: the yard gate is shut")
+		log.Printf("vibevalley: lan access is shut")
 	}
 	l.server, l.listener = nil, nil
 }
 
 func (l *Service) SetOpen(open bool) (protocol.LanStatus, error) {
 	l.mu.Lock()
-	if err := l.q.SetGateOpen(context.Background(), open); err != nil {
+	if err := l.q.SetLanOpen(context.Background(), open); err != nil {
 		l.mu.Unlock()
 		return protocol.LanStatus{}, err
 	}
@@ -176,16 +176,16 @@ func (l *Service) Status() protocol.LanStatus {
 	if l.problem != "" {
 		s.Problem = &l.problem
 	}
-	gate := l.url()
+	addr := l.url()
 	if l.open && l.listener != nil {
-		if gate == "" {
+		if addr == "" {
 			s.Problem = ptr.To("找不到这台电脑在局域网里的地址：连上 Wi-Fi 或网线再试")
 		} else {
-			s.URL = &gate
+			s.URL = &addr
 		}
 	}
-	if p := l.livePairing(); p != nil && gate != "" {
-		s.Pairing = &protocol.LanPairing{Code: p.code, Link: lanPairLink(gate, p.code), ExpiresAt: p.expires.UnixMilli()}
+	if p := l.livePairing(); p != nil && addr != "" {
+		s.Pairing = &protocol.LanPairing{Code: p.code, Link: lanPairLink(addr, p.code), ExpiresAt: p.expires.UnixMilli()}
 		if p.asking != "" {
 			s.Pairing.Asking = ptr.To(p.asking)
 		}
@@ -209,8 +209,8 @@ func (l *Service) url() string {
 	return "http://" + net.JoinHostPort(host, strconv.Itoa(l.listener.Addr().(*net.TCPAddr).Port))
 }
 
-func lanPairLink(gate, code string) string {
-	return "vibevalley://pair?u=" + url.QueryEscape(gate) + "&c=" + url.QueryEscape(code)
+func lanPairLink(addr, code string) string {
+	return "vibevalley://pair?u=" + url.QueryEscape(addr) + "&c=" + url.QueryEscape(code)
 }
 
 // Called with mu held.
@@ -292,7 +292,7 @@ func (l *Service) Pair(ctx context.Context, code, name string) (protocol.LanPair
 	p.expires = l.now().Add(lanPairingFor)
 	answer := p.answer
 	l.mu.Unlock()
-	log.Printf("vibevalley: the yard gate: %q asks to pair", name)
+	log.Printf("vibevalley: lan access: %q asks to pair", name)
 
 	wait := time.NewTimer(lanPairingFor)
 	defer wait.Stop()
@@ -329,7 +329,7 @@ func (l *Service) addDevice(name string) (protocol.LanPaired, error) {
 	l.mu.Lock()
 	l.devices[d.ID] = d
 	l.mu.Unlock()
-	log.Printf("vibevalley: the yard gate: %q paired", name)
+	log.Printf("vibevalley: lan access: %q paired", name)
 	return protocol.LanPaired{Device: d.ID, Key: key, Farm: lanFarmName()}, nil
 }
 
@@ -358,10 +358,10 @@ func (l *Service) Me(ctx context.Context) (protocol.LanDevice, error) {
 }
 
 // Only what api.go marks vibevalley:can remote, and the three streams, which are not Handlers.
-func (l *Service) gate(inner http.Handler) http.Handler {
+func (l *Service) guard(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if r.Method == http.MethodPost && path == "/api/v1/gate/pair" {
+		if r.Method == http.MethodPost && path == "/api/v1/lan/pair" {
 			inner.ServeHTTP(w, r)
 			return
 		}
@@ -415,7 +415,7 @@ func (l *Service) deviceOf(header string) string {
 	l.mu.Unlock()
 	if write {
 		if err := l.q.SeenLanDevice(context.Background(), generated.SeenLanDeviceParams{LastSeen: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
-			log.Printf("vibevalley: the yard gate: %v", err)
+			log.Printf("vibevalley: lan access: %v", err)
 		}
 	}
 	return id

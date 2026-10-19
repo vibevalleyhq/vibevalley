@@ -2361,14 +2361,14 @@ var Endpoints = []Endpoint{
 	{"connector.verify", "POST", "/api/v1/connectors/{id}/verify", nil, true, []Caller{CallerOwner}},
 	{"connector.logout", "POST", "/api/v1/connectors/{id}/logout", nil, false, []Caller{CallerOwner}},
 	{"connector.channel", "PUT", "/api/v1/connectors/{id}/channel", nil, true, []Caller{CallerOwner}},
-	{"gate.status", "GET", "/api/v1/gate", nil, false, []Caller{CallerOwner}},
-	{"gate.update", "PUT", "/api/v1/gate", nil, true, []Caller{CallerOwner}},
-	{"gate.startPairing", "POST", "/api/v1/gate/pairing", nil, false, []Caller{CallerOwner}},
-	{"gate.stopPairing", "DELETE", "/api/v1/gate/pairing", nil, false, []Caller{CallerOwner}},
-	{"gate.answerPairing", "POST", "/api/v1/gate/pairing/answer", nil, true, []Caller{CallerOwner}},
-	{"gate.deleteDevice", "DELETE", "/api/v1/gate/devices/{id}", nil, false, []Caller{CallerOwner}},
-	{"gate.pair", "POST", "/api/v1/gate/pair", nil, true, []Caller{CallerOwner, CallerRemote}},
-	{"gate.me", "GET", "/api/v1/gate/me", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"lan.status", "GET", "/api/v1/lan", nil, false, []Caller{CallerOwner}},
+	{"lan.update", "PUT", "/api/v1/lan", nil, true, []Caller{CallerOwner}},
+	{"lan.startPairing", "POST", "/api/v1/lan/pairing", nil, false, []Caller{CallerOwner}},
+	{"lan.stopPairing", "DELETE", "/api/v1/lan/pairing", nil, false, []Caller{CallerOwner}},
+	{"lan.answerPairing", "POST", "/api/v1/lan/pairing/answer", nil, true, []Caller{CallerOwner}},
+	{"lan.deleteDevice", "DELETE", "/api/v1/lan/devices/{id}", nil, false, []Caller{CallerOwner}},
+	{"lan.pair", "POST", "/api/v1/lan/pair", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"lan.me", "GET", "/api/v1/lan/me", nil, false, []Caller{CallerOwner, CallerRemote}},
 }
 
 // Mount routes every VibeValleyApi endpoint on mux to h: requests decoded, answers and tagged errors encoded (200 with
@@ -2906,49 +2906,49 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.ConnectorChannel(r.Context(), pID, body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/v1/gate", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.GateStatus(r.Context())
+	mux.HandleFunc("GET /api/v1/lan", func(w http.ResponseWriter, r *http.Request) {
+		out, err := h.LanStatus(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("PUT /api/v1/gate", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/lan", func(w http.ResponseWriter, r *http.Request) {
 		var body SetOpenRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.GateUpdate(r.Context(), body)
+		out, err := h.LanUpdate(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/v1/gate/pairing", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.GateStartPairing(r.Context())
+	mux.HandleFunc("POST /api/v1/lan/pairing", func(w http.ResponseWriter, r *http.Request) {
+		out, err := h.LanStartPairing(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/v1/gate/pairing", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.GateStopPairing(r.Context())
+	mux.HandleFunc("DELETE /api/v1/lan/pairing", func(w http.ResponseWriter, r *http.Request) {
+		out, err := h.LanStopPairing(r.Context())
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/v1/gate/pairing/answer", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/lan/pairing/answer", func(w http.ResponseWriter, r *http.Request) {
 		var body AnswerPairingRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.GateAnswerPairing(r.Context(), body)
+		out, err := h.LanAnswerPairing(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("DELETE /api/v1/gate/devices/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/lan/devices/{id}", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.GateDeleteDevice(r.Context(), pID)
+		out, err := h.LanDeleteDevice(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("POST /api/v1/gate/pair", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/lan/pair", func(w http.ResponseWriter, r *http.Request) {
 		var body LanPairRequest
 		if !decode(w, r, &body) {
 			return
 		}
-		out, err := h.GatePair(r.Context(), body)
+		out, err := h.LanPair(r.Context(), body)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/v1/gate/me", func(w http.ResponseWriter, r *http.Request) {
-		out, err := h.GateMe(r.Context())
+	mux.HandleFunc("GET /api/v1/lan/me", func(w http.ResponseWriter, r *http.Request) {
+		out, err := h.LanMe(r.Context())
 		answer(w, out, err)
 	})
 }
@@ -3482,50 +3482,50 @@ func (c *Client) ConnectorChannel(ctx context.Context, pID ConnectorID, body Con
 	return out, err
 }
 
-func (c *Client) GateStatus(ctx context.Context) (LanStatus, error) {
+func (c *Client) LanStatus(ctx context.Context) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "GET", "/api/v1/gate", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/lan", nil, nil, &out)
 	return out, err
 }
 
-func (c *Client) GateUpdate(ctx context.Context, body SetOpenRequest) (LanStatus, error) {
+func (c *Client) LanUpdate(ctx context.Context, body SetOpenRequest) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "PUT", "/api/v1/gate", nil, body, &out)
+	err := c.call(ctx, "PUT", "/api/v1/lan", nil, body, &out)
 	return out, err
 }
 
-func (c *Client) GateStartPairing(ctx context.Context) (LanStatus, error) {
+func (c *Client) LanStartPairing(ctx context.Context) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "POST", "/api/v1/gate/pairing", nil, nil, &out)
+	err := c.call(ctx, "POST", "/api/v1/lan/pairing", nil, nil, &out)
 	return out, err
 }
 
-func (c *Client) GateStopPairing(ctx context.Context) (LanStatus, error) {
+func (c *Client) LanStopPairing(ctx context.Context) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "DELETE", "/api/v1/gate/pairing", nil, nil, &out)
+	err := c.call(ctx, "DELETE", "/api/v1/lan/pairing", nil, nil, &out)
 	return out, err
 }
 
-func (c *Client) GateAnswerPairing(ctx context.Context, body AnswerPairingRequest) (LanStatus, error) {
+func (c *Client) LanAnswerPairing(ctx context.Context, body AnswerPairingRequest) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "POST", "/api/v1/gate/pairing/answer", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/lan/pairing/answer", nil, body, &out)
 	return out, err
 }
 
-func (c *Client) GateDeleteDevice(ctx context.Context, pID string) (LanStatus, error) {
+func (c *Client) LanDeleteDevice(ctx context.Context, pID string) (LanStatus, error) {
 	var out LanStatus
-	err := c.call(ctx, "DELETE", "/api/v1/gate/devices/"+url.PathEscape(pID), nil, nil, &out)
+	err := c.call(ctx, "DELETE", "/api/v1/lan/devices/"+url.PathEscape(pID), nil, nil, &out)
 	return out, err
 }
 
-func (c *Client) GatePair(ctx context.Context, body LanPairRequest) (LanPaired, error) {
+func (c *Client) LanPair(ctx context.Context, body LanPairRequest) (LanPaired, error) {
 	var out LanPaired
-	err := c.call(ctx, "POST", "/api/v1/gate/pair", nil, body, &out)
+	err := c.call(ctx, "POST", "/api/v1/lan/pair", nil, body, &out)
 	return out, err
 }
 
-func (c *Client) GateMe(ctx context.Context) (LanDevice, error) {
+func (c *Client) LanMe(ctx context.Context) (LanDevice, error) {
 	var out LanDevice
-	err := c.call(ctx, "GET", "/api/v1/gate/me", nil, nil, &out)
+	err := c.call(ctx, "GET", "/api/v1/lan/me", nil, nil, &out)
 	return out, err
 }

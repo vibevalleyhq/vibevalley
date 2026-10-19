@@ -38,7 +38,7 @@
 | 工单模板 | 播种袋里的种子 | 播种袋（`shared/seed_bag.dart`） | `ProjectTemplates`、`TemplateKind`、`IssueTemplate`；目录是 `protocol/template_catalog.json` | `/api/v1/projects/{id}/templates` |
 | 来电 | 手机来电 | `phone/calls.dart` | `InboxItem`（`StateFrame.Inbox`，从核心状态现算） | |
 | 连接器 | 连接器 | `/settings/connectors`（`workbench/connectors`） | `ConnectorStatus` | `/api/v1/connectors` |
-| （不画） | 连接到本机 | `/settings/gate`（`workbench/gate`） | `LanStatus`、`LanDevice` | `/api/v1/gate` |
+| （不画） | 连接到本机 | `/settings/lan`（`workbench/lan`） | `LanStatus`、`LanDevice` | `/api/v1/lan` |
 | 语音 | 麦克风 | `/settings/voice`（`workbench/voice`）、`voice/` | `VoiceSettings` | `/api/v1/voice/...` |
 | 进度、成就 | 金币、连胜、任务与成就 | `farm/achievements.dart` | `Progress`、`LedgerEntry`、`CoreState.Progress` | 帧里的 `progress` 和 `view.achievements`；成就的说法 `game.achievements` |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.Level` | |
@@ -65,7 +65,7 @@
 | 巡查 | `Manager`（`manager/patrol.go`） | 不存：每轮从核心状态算 | |
 | 来电 | 不存：`protocol.Inbox` 从核心状态算 | | |
 | 连接器 | `Connector`；三家的接口在 `pkg/weixin`、`pkg/feishu`、`pkg/qq` | `connector_account`、`connector_inbound`、`connector_outbox` 表 | |
-| 「连接到本机」 | `Gate` | `gate`、`gate_device` 表 | |
+| 「连接到本机」 | `Lan` | `lan`、`lan_device` 表 | |
 | 语音 | `Voice`（`voice/agora.go`、`line.go`）；声网在 `pkg/agora` | `settings.json` | |
 | 钥匙和语音设置 | `Setting` | `settings.json`（只有你能读） | 会话的 `Env` |
 | 进度、成就 | `Game`（`game/ledger.go`） | `game_ledger` 表；进度从它折出来 | |

@@ -62,7 +62,7 @@ flowchart LR
 仓库的目录见根目录 [AGENTS.md](AGENTS.md#目录)，服务端每个包管什么见 [server/README.md](server/README.md#目录)。
 
 - **形状和规则**：Go 的 `server/internal/protocol` 是唯一的来源。形状写在 `shapes.go`、接口写在 `api.go`，`server/tool/shapegen` 从它们写出 Go 的胶水代码（`internal/protocol/gen.go`）和 Flutter 的类型与接口客户端（`app/lib/gen/vibevalley.dart`）；规则是同一个包里的纯函数（[server](server/README.md#形状和规则从哪来)、[理由](docs/subsystems/foundation.md)）。
-- **服务**：`server/internal/` 下一块业务一个包，包名用单数，从下往上是 `base`（地基）、`core`（核心状态）、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`gate`、`voice`、`connector`、`game`；一个包只 import 排在它前面的包，反方向的消息走 `base.Hub`。每个服务是包里的一个结构体，由 fx 组装；`workspace` 把全部包装在一个生命周期上（[server/README.md](server/README.md#服务)、[理由](docs/subsystems/foundation.md)）。执行由 smith 驱动，管家是 VibeValley 自己的 agent（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）。
+- **服务**：`server/internal/` 下一块业务一个包，包名用单数，从下往上是 `base`（地基）、`core`（核心状态）、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`lan`、`voice`、`connector`、`game`；一个包只 import 排在它前面的包，反方向的消息走 `base.Hub`。每个服务是包里的一个结构体，由 fx 组装；`workspace` 把全部包装在一个生命周期上（[server/README.md](server/README.md#服务)、[理由](docs/subsystems/foundation.md)）。执行由 smith 驱动，管家是 VibeValley 自己的 agent（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）。
 - **HTTP 和 MCP**：`server/internal/handler` 在最上面，答 `VibeValleyApi`、三条事件流；`server/internal/mcp` 是给编码 agent 的另一个入口，挂在 `/mcp`；`cmd/server` 单独跑它（[子系统](docs/subsystems/README.md)；[理由](docs/subsystems/foundation.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](docs/subsystems/core.md)）。
 - **存盘**：SQLite，表在 `server/migrations/`，查询在 `server/pkg/db/queries/`、由 sqlc 生成成 `server/pkg/db/generated/`（[理由](docs/subsystems/foundation.md)）；下文「存了什么」。
 - **客户端**：Flutter 只连服务端的接口，用 Riverpod 管状态（[理由](docs/subsystems/app.md)）；macOS 版把服务端打进应用（[客户端](docs/subsystems/app.md)）。
@@ -97,7 +97,7 @@ flowchart LR
 
 ## HTTP 接口
 
-接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](docs/subsystems/core.md)）。不在里面的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[田头](docs/subsystems/channel.md)）。`//vibevalley:can` 写谁能调，「连接到本机」只放 `remote` 的（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/gate.md)）。
+接口的唯一定义是 `server/internal/protocol/api.go` 的 `Handlers`：每个方法一个接口，`//vibevalley:route` 写它的方法和路径，`internal/handler` 实现，Flutter 用同一份生成的 `VibeValleyApi`。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](docs/subsystems/core.md)）。不在里面的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[田头](docs/subsystems/channel.md)）。`//vibevalley:can` 写谁能调，「连接到本机」只放 `remote` 的（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)）。
 
 ## 存了什么
 
@@ -138,7 +138,7 @@ flowchart LR
 | `agora.app_id`、`agora.app_certificate` | 语音：签 RTC 和 RTM 令牌、请语音管家（`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`）；都没有时语音不可用，别的照常 | |
 | `voice.model`、`voice.id` | 语音管家用的托管大模型和音色的默认；声音页里改过的优先 | `gpt-4.1-mini`、`Chinese (Mandarin)_Gentle_Youth` |
 | `voice.line.port`、`voice.line.url` | 语音线路（「想」选农场的管家时）：只给声网用的那个监听的端口；你自己的隧道的公网地址，没有就用 cloudflared 临时隧道 | 8788、（无） |
-| `lan.port` | 「连接到本机」的端口：打开「连接到本机」时在所有网卡上听，只放配对过的设备（[连接到本机](docs/subsystems/gate.md)）；0 是随便一个 | 8790 |
+| `lan.port` | 「连接到本机」的端口：打开「连接到本机」时在所有网卡上听，只放配对过的设备（[连接到本机](docs/subsystems/lan.md)）；0 是随便一个 | 8790 |
 | `git_emails` | 算经验时也算作「你」的 commit 邮箱；环境变量里用逗号分隔 | git 全局和各仓库的 user.email 本来就算 |
 | `tokei` | 数项目种了什么用的 tokei 在哪 | PATH 上的 `tokei` |
 | `cny_per_usd` | 价目表是美元，折成人民币的汇率 | 7.2 |

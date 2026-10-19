@@ -64,7 +64,7 @@ class ConnectionBanner extends ConsumerWidget {
                     WidgetSpan(
                       alignment: PlaceholderAlignment.baseline,
                       baseline: TextBaseline.alphabetic,
-                      child: TextLink('连接到本机', underline: true, style: text, onTap: () => context.go('/settings/gate')),
+                      child: TextLink('连接到本机', underline: true, style: text, onTap: () => context.go('/settings/lan')),
                     ),
                     TextSpan(text: remote != null ? '重新扫码。' : '扫码。'),
                   ],

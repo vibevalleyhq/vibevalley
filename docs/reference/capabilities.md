@@ -181,15 +181,15 @@
 | `connector.logout` | `POST /api/v1/connectors/{id}/logout` | ✓ |  |  |  |
 | `connector.channel` | `PUT /api/v1/connectors/{id}/channel` | ✓ |  |  |  |
 
-## gate
+## lan
 
 | 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
 |---|---|---|---|---|---|
-| `gate.status` | `GET /api/v1/gate` | ✓ |  |  |  |
-| `gate.update` | `PUT /api/v1/gate` | ✓ |  |  |  |
-| `gate.startPairing` | `POST /api/v1/gate/pairing` | ✓ |  |  |  |
-| `gate.stopPairing` | `DELETE /api/v1/gate/pairing` | ✓ |  |  |  |
-| `gate.answerPairing` | `POST /api/v1/gate/pairing/answer` | ✓ |  |  |  |
-| `gate.deleteDevice` | `DELETE /api/v1/gate/devices/{id}` | ✓ |  |  |  |
-| `gate.pair` | `POST /api/v1/gate/pair` | ✓ | ✓ |  |  |
-| `gate.me` | `GET /api/v1/gate/me` | ✓ | ✓ |  |  |
+| `lan.status` | `GET /api/v1/lan` | ✓ |  |  |  |
+| `lan.update` | `PUT /api/v1/lan` | ✓ |  |  |  |
+| `lan.startPairing` | `POST /api/v1/lan/pairing` | ✓ |  |  |  |
+| `lan.stopPairing` | `DELETE /api/v1/lan/pairing` | ✓ |  |  |  |
+| `lan.answerPairing` | `POST /api/v1/lan/pairing/answer` | ✓ |  |  |  |
+| `lan.deleteDevice` | `DELETE /api/v1/lan/devices/{id}` | ✓ |  |  |  |
+| `lan.pair` | `POST /api/v1/lan/pair` | ✓ | ✓ |  |  |
+| `lan.me` | `GET /api/v1/lan/me` | ✓ | ✓ |  |  |

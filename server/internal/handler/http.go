@@ -18,10 +18,10 @@ import (
 // Keeps proxies from closing a quiet event stream.
 const heartbeat = 20 * time.Second
 
-// It hands the yard gate its part (apiMux) before the farm starts: the gate answers the API, and the API answers for every service, the gate's own
-// pages too.
+// It hands lan access its part (apiMux) before the workspace starts: the lan listener answers the API, and the API answers for every
+// service, lan access's own pages too.
 func New(f *workspace.Workspace) http.Handler {
-	f.Gate.API = apiMux(f)
+	f.Lan.API = apiMux(f)
 	mux := apiMux(f)
 	mux.Handle("/mcp", f.MCP.Handler())
 	mux.Handle("/mcp/", f.MCP.Handler())
@@ -29,7 +29,7 @@ func New(f *workspace.Workspace) http.Handler {
 	return mux
 }
 
-// All the yard gate lets through.
+// All the lan listener lets through.
 func apiMux(f *workspace.Workspace) *http.ServeMux {
 	a := api{f}
 	mux := http.NewServeMux()

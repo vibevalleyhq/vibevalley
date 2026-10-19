@@ -22,34 +22,34 @@ const _pollEvery = Duration(milliseconds: 1500);
 
 bool get canScan => Platform.isIOS || Platform.isAndroid;
 
-class GatePage extends ConsumerStatefulWidget {
-  const GatePage({super.key});
+class LanPage extends ConsumerStatefulWidget {
+  const LanPage({super.key});
 
   @override
-  ConsumerState<GatePage> createState() => _GatePageState();
+  ConsumerState<LanPage> createState() => _LanPageState();
 }
 
-class _GatePageState extends ConsumerState<GatePage> {
-  late final WorkbenchResource<LanStatus> _gate;
+class _LanPageState extends ConsumerState<LanPage> {
+  late final WorkbenchResource<LanStatus> _status;
   Timer? _poll;
 
-  /// The gate is managed from the machine whose farm it is: not while this app uses another's.
+  /// Lan access is managed from the machine whose server it is: not while this app uses another's.
   bool get _ownFarm => farmConnection.value.remote == null;
 
   @override
   void initState() {
     super.initState();
-    _gate = WorkbenchResource(() => _api.status())..addListener(_changed);
+    _status = WorkbenchResource(() => _api.status())..addListener(_changed);
     if (_ownFarm) {
-      unawaited(_gate.refresh());
-      _poll = Timer.periodic(_pollEvery, (_) => unawaited(_gate.refresh()));
+      unawaited(_status.refresh());
+      _poll = Timer.periodic(_pollEvery, (_) => unawaited(_status.refresh()));
     }
   }
 
   @override
   void dispose() {
     _poll?.cancel();
-    _gate
+    _status
       ..removeListener(_changed)
       ..dispose();
     super.dispose();
@@ -59,16 +59,16 @@ class _GatePageState extends ConsumerState<GatePage> {
     if (mounted) setState(() {});
   }
 
-  GateApi get _api => ref.read(apiProvider).gate;
+  LanApi get _api => ref.read(apiProvider).lan;
 
-  Future<void> _act(Future<LanStatus> Function(GateApi api) call) async {
+  Future<void> _act(Future<LanStatus> Function(LanApi api) call) async {
     final got = await runAction(() => call(_api));
-    if (got != null) _gate.put(got);
+    if (got != null) _status.put(got);
   }
 
   @override
   Widget build(BuildContext context) {
-    final status = _gate.value;
+    final status = _status.value;
     return Padding(
       // The cards' outlines and drops whole: a little room above the first.
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
@@ -80,7 +80,7 @@ class _GatePageState extends ConsumerState<GatePage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_ownFarm) ...[
-                  _GateCard(status: status, unreachable: _gate.error, act: _act),
+                  _LanCard(status: status, unreachable: _status.error, act: _act),
                   if (status != null && status.devices.isNotEmpty) ...[const SizedBox(height: 12), _DevicesCard(devices: status.devices, act: _act)],
                   const SizedBox(height: 12),
                 ],
@@ -94,11 +94,11 @@ class _GatePageState extends ConsumerState<GatePage> {
   }
 }
 
-class _GateCard extends StatelessWidget {
-  const _GateCard({required this.status, required this.unreachable, required this.act});
+class _LanCard extends StatelessWidget {
+  const _LanCard({required this.status, required this.unreachable, required this.act});
   final LanStatus? status;
   final String? unreachable;
-  final Future<void> Function(Future<LanStatus> Function(GateApi api) call) act;
+  final Future<void> Function(Future<LanStatus> Function(LanApi api) call) act;
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +163,7 @@ class _GateCard extends StatelessWidget {
 class _Pairing extends StatelessWidget {
   const _Pairing({required this.pairing, required this.act});
   final LanPairing pairing;
-  final Future<void> Function(Future<LanStatus> Function(GateApi api) call) act;
+  final Future<void> Function(Future<LanStatus> Function(LanApi api) call) act;
 
   @override
   Widget build(BuildContext context) {
@@ -253,7 +253,7 @@ class _Pairing extends StatelessWidget {
 class _DevicesCard extends StatelessWidget {
   const _DevicesCard({required this.devices, required this.act});
   final List<LanDevice> devices;
-  final Future<void> Function(Future<LanStatus> Function(GateApi api) call) act;
+  final Future<void> Function(Future<LanStatus> Function(LanApi api) call) act;
 
   @override
   Widget build(BuildContext context) => PxCard(

@@ -18,7 +18,7 @@ class ReceivedFrame {
 class VibeValleyServer {
   VibeValleyServer(this.base, {this.key}) : api = VibeValleyApi(base, key == null ? null : _Keyed(key));
 
-  /// The server listens on loopback; another machine's farm comes through its yard gate.
+  /// The server listens on loopback; another machine's server is reached through its lan listener.
   final Uri base;
 
   /// null on loopback.

@@ -14,7 +14,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 |---|---|
 | `internal/protocol` | 形状和接口的唯一来源（`shapes.go`、`api.go`）和生成的 `gen.go`；核心状态的折法（`Reduce`）和几个包都用的纯规则（只有一个主人的规则在主人包里）；`seeds.json`（种子档案、默认设置、农机的能力、成就） |
 | `internal/base` | 地基，不放业务：数据库和迁移、`Hub`、存文件、id、`Config`（viper 读 YAML 和环境变量）、生命周期 |
-| `internal/core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`gate`、`voice`、`connector`、`game` | 服务，一块业务一个包（见「服务」） |
+| `internal/core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`lan`、`voice`、`connector`、`game` | 服务，一块业务一个包（见「服务」） |
 | `internal/workspace` | 把全部包组装成一个 Workspace（`workspace.go`：`Workspace` 握着全部服务） |
 | `internal/handler` | 全部 HTTP 处理：`VibeValleyApi`（`api.go`，每个处理只转给拥有它的服务）、事件流和状态流；`/mcp` 挂的是 `mcp` 包的处理（`http.go`） |
 | `internal/testkit` | 各包的测试共用的：比较（`Eq`、`Match`）、等待（`Until`、`Await` 等会发生的事，`Settle` 查不该发生的）、一次性的 git 仓库；只给测试 import，不 import 农场的包，`protocol` 自己的测试也用它。测试的起点（临时目录里的配置 `fixture.Config`、种子里的 lab 档案和 pi 农机）在 `testkit/fixture` |
@@ -55,7 +55,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 | task | `Task` | 种植计划（Task）和它的经过（`task.go`、`log.go`）；子包 `engine` 是 agent 自己的任务图：形状、规则、存储（表 `task_graph`） |
 | tool | `Tool` | agent 能调的工具，各定义一次：管家在进程里拿，Session 经 `/mcp` 拿 |
 | manager | `Manager` | 管家（`manager.go`）和巡查（`patrol.go`：看 Inbox，放久了叫醒管家） |
-| gate | `Gate` | 「连接到本机」 |
+| lan | `Lan` | 「连接到本机」 |
 | voice | `Voice` | 声网（`agora.go`）和语音线路（`line.go`） |
 | connector | `Connector` | 微信、飞书、QQ 接到频道 |
 | game | `Game` | 服务端的全部游戏：账本（`ledger.go`：金币、连胜、成就）、等级（`commits.go`）、主人刚点的空地（`stations.go`）。只听别的包的事实，业务的服务不调它；只有 HTTP 那一层为主人在应用里做的事调它。账本的折法在 `progress.go`；出帧要用的（地里长什么、帮工在哪块地）在 protocol 的 `game_view.go`、`game_play.go` |
@@ -63,7 +63,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 
 服务之间传的形状放在定义它的包的 `types.go`（`project.Workplace`、`session.HireOptions`、`channel.Info`……）；`base` 不放形状。
 
-HTTP（`handler`）在最上面，经 `Workspace` 用全部服务；`workspace` 只组装服务，不认识 HTTP。「连接到本机」答的那部分 API（`apiMux`）在农场开之前交给 `Gate.API`。
+HTTP（`handler`）在最上面，经 `Workspace` 用全部服务；`workspace` 只组装服务，不认识 HTTP。「连接到本机」答的那部分 API（`apiMux`）在农场开之前交给 `Lan.API`。
 
 - **生命周期**：服务有 `OnStart(ctx)`（订阅它听的消息、开后台的活）和 `OnStop()`（`base.Service`）。`Module` 里的 `Service` 包一层 `base.Run`，挂到 fx 的生命周期上，所以一个服务总在它用到的服务之后开、之前停，不用手排顺序。一个包里的零件由 `base.Parts` 按 `newService` 里的顺序开，倒着停。有 `OnReady(ctx)` 的，在全部服务都开了以后按同样的顺序调：开机就要发布的活放那里，订阅的都听得到。`Start` 给的 ctx 一直有效，到 `Close` 才取消，后台的活跟着停。
 - **加一块业务**：在它所属的包里加一个零件（结构体、`newX(用到的服务…)`、`OnStart`、`OnStop`，需要时加 `OnReady`），在 `Module` 里加进 `fx.Private` 的构造函数，在 `service.go` 里嵌进 `Service`、排进 `base.Parts`。依赖成环或缺了谁，`New` 报错；要用排在后面的包，编译就不过：改走 `Hub`，或者想想它是不是放错了包。
@@ -90,7 +90,7 @@ go run ./tool/shapegen          # 写 protocol/gen.go 和 ../app/lib/gen/vibeval
 
 - **写错的配置**：读不成数字的值、不是端口的端口让服务端起不来，开机就看到；能读却不认识的值（`voice.model` 不在列表里）用默认。键的清单见 [architecture.md](docs/architecture.md)「配置」。
 - **存着的文件读不了**：`config.json` 挪到旁边（`config.json.unreadable-<时间>`），档案从种子开始；挪不成就不启动，绝不覆盖主人的文件。失败不当成功：写轨迹、合并后退出合并、退回待办这些出错时记日志或说给主人，不悄悄吞掉。
-- **端口被占**：语音线路的端口被占时只记一行日志（[语音](docs/subsystems/voice.md)），「连接到本机」的写进「连接到本机」的状态（[连接到本机](docs/subsystems/gate.md)），农场照常。
+- **端口被占**：语音线路的端口被占时只记一行日志（[语音](docs/subsystems/voice.md)），「连接到本机」的写进「连接到本机」的状态（[连接到本机](docs/subsystems/lan.md)），农场照常。
 - **字数上限**：VibeValley 自己的 agent 里的（管家的 `MEMORY.md` 尾巴、工具结果的截断）按字符数；`protocol` 和服务里给人看的文字按 UTF-16 码元量，空白照 JavaScript 的 `\s`：只有 `pkg/x/str` 一份（`str.Units`、`Slice`、`Trim`、`SpaceClass`、`Cut`、`Clip`），服务和规则都用它，黄金数据守着的就是这一份。
 - **后台的活不能乱序落地**：后台读一份外面的状态（git、农机、额度）再写回的，两次读可能交叉，早开始的晚回来就会盖掉新的。要么一次一个（在订阅事件的那个循环里直接做，`base.Hub` 慢了只会排队、不会挡住发布的；或者一把锁包住读和写，如 `game` 的数提交），要么开始时拿号、落地时丢掉比已存的旧的（`runtime` 的农机信息）。
 - **数字照 JavaScript 算**：规则里先乘再加减（`a*b+c`）的地方，乘积用 `float64(...)` 包起来。Go 在 arm64 上会把它合成一条 FMA，中间不舍入，结果就和 JavaScript、和 amd64 不一样（`1+0.1*7` 会是 1.7，不是 1.7000000000000002，金币就差一枚）。`num.Round` 自己先舍入输入。测试的输入不要写成常量，常量会在编译时精确折叠，测不出来。

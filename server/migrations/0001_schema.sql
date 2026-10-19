@@ -225,11 +225,11 @@ CREATE TABLE connector_outbox (
 );
 CREATE INDEX connector_outbox_pending on connector_outbox (connector, id) where state = 'pending';
 CREATE INDEX connector_outbox_by_ext on connector_outbox (connector, ext_id) where ext_id is not null;
-CREATE TABLE gate (
+CREATE TABLE lan (
   id    integer primary key check (id = 1),
   open  boolean not null
 );
-CREATE TABLE gate_device (
+CREATE TABLE lan_device (
   id         text primary key,
   name       text not null,
   key_hash   text not null unique,

@@ -1,4 +1,4 @@
-package gate
+package lan
 
 import (
 	"go.uber.org/fx"
@@ -7,5 +7,5 @@ import (
 )
 
 func Module(r *base.Readies) fx.Option {
-	return fx.Module("gate", fx.Provide(base.Run[*Service](r, newService)))
+	return fx.Module("lan", fx.Provide(base.Run[*Service](r, newService)))
 }

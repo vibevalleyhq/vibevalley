@@ -132,19 +132,6 @@ type GameLedger struct {
 	Payload string
 }
 
-type Gate struct {
-	ID   int64
-	Open bool
-}
-
-type GateDevice struct {
-	ID       string
-	Name     string
-	KeyHash  string
-	PairedAt int64
-	LastSeen sql.NullInt64
-}
-
 type Issue struct {
 	ID          string
 	Number      int64
@@ -181,6 +168,19 @@ type IssueSession struct {
 	Session   string
 	Issue     string
 	StartedAt int64
+}
+
+type Lan struct {
+	ID   int64
+	Open bool
+}
+
+type LanDevice struct {
+	ID       string
+	Name     string
+	KeyHash  string
+	PairedAt int64
+	LastSeen sql.NullInt64
 }
 
 type Memory struct {

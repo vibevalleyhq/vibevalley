@@ -7,7 +7,7 @@ import '../workbench/agents/agents_page.dart';
 import '../workbench/catalog/catalog_page.dart';
 import '../workbench/chat/chat_page.dart';
 import '../workbench/connectors/connectors_page.dart';
-import '../workbench/gate/gate_page.dart';
+import '../workbench/lan/lan_page.dart';
 import '../workbench/issues/issues_page.dart';
 import '../workbench/manager/manager_page.dart';
 import '../workbench/projects/projects_page.dart';
@@ -59,7 +59,7 @@ final router = GoRouter(
               path: '/projects/:id',
               builder: (_, s) => ProjectsPage(id: s.pathParameters['id']),
             ),
-            // 设置 holds the server's settings and the pages that are settings too: connectors, skills, voice, the gate.
+            // 设置 holds the server's settings and the pages that are settings too: connectors, skills, voice, lan access.
             GoRoute(path: '/settings', redirect: (_, _) => SettingsSection.deepseek.path),
             ShellRoute(
               builder: (_, state, child) => SettingsShell(section: SettingsSection.of(state.uri.path), child: child),
@@ -80,7 +80,7 @@ final router = GoRouter(
                   builder: (_, s) => SkillsPage(id: s.pathParameters['id']),
                 ),
                 GoRoute(path: '/settings/voice', builder: (_, _) => const VoiceSettingsPage()),
-                GoRoute(path: '/settings/gate', builder: (_, _) => const GatePage()),
+                GoRoute(path: '/settings/lan', builder: (_, _) => const LanPage()),
               ],
             ),
             GoRoute(

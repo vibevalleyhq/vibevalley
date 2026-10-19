@@ -4,7 +4,7 @@ import "context"
 
 // One method each, so a new endpoint fails the build until it is answered. vibevalley:route is the operation (group.name, the Flutter client's
 // api.group.name), method and path; vibevalley:can is who may call it: owner (on the farm's machine), remote (a device through the
-// gate, which lets only these through), manager (its tools), session (a session, with its key). The table is Endpoints in gen.go and
+// lan listener, which lets only these through), manager (its tools), session (a session, with its key). The table is Endpoints in gen.go and
 // docs/reference/capabilities.md.
 type Handlers interface {
 	//vibevalley:route server.health GET /api/v1/health
@@ -281,28 +281,28 @@ type Handlers interface {
 	//vibevalley:route connector.channel PUT /api/v1/connectors/{id}/channel
 	//vibevalley:can owner
 	ConnectorChannel(ctx context.Context, pID ConnectorID, body ConnectorsChannelRequest) (ConnectorStatus, error)
-	//vibevalley:route gate.status GET /api/v1/gate
+	//vibevalley:route lan.status GET /api/v1/lan
 	//vibevalley:can owner
-	GateStatus(ctx context.Context) (LanStatus, error)
-	//vibevalley:route gate.update PUT /api/v1/gate
+	LanStatus(ctx context.Context) (LanStatus, error)
+	//vibevalley:route lan.update PUT /api/v1/lan
 	//vibevalley:can owner
-	GateUpdate(ctx context.Context, body SetOpenRequest) (LanStatus, error)
-	//vibevalley:route gate.startPairing POST /api/v1/gate/pairing
+	LanUpdate(ctx context.Context, body SetOpenRequest) (LanStatus, error)
+	//vibevalley:route lan.startPairing POST /api/v1/lan/pairing
 	//vibevalley:can owner
-	GateStartPairing(ctx context.Context) (LanStatus, error)
-	//vibevalley:route gate.stopPairing DELETE /api/v1/gate/pairing
+	LanStartPairing(ctx context.Context) (LanStatus, error)
+	//vibevalley:route lan.stopPairing DELETE /api/v1/lan/pairing
 	//vibevalley:can owner
-	GateStopPairing(ctx context.Context) (LanStatus, error)
-	//vibevalley:route gate.answerPairing POST /api/v1/gate/pairing/answer
+	LanStopPairing(ctx context.Context) (LanStatus, error)
+	//vibevalley:route lan.answerPairing POST /api/v1/lan/pairing/answer
 	//vibevalley:can owner
-	GateAnswerPairing(ctx context.Context, body AnswerPairingRequest) (LanStatus, error)
-	//vibevalley:route gate.deleteDevice DELETE /api/v1/gate/devices/{id}
+	LanAnswerPairing(ctx context.Context, body AnswerPairingRequest) (LanStatus, error)
+	//vibevalley:route lan.deleteDevice DELETE /api/v1/lan/devices/{id}
 	//vibevalley:can owner
-	GateDeleteDevice(ctx context.Context, pID string) (LanStatus, error)
-	//vibevalley:route gate.pair POST /api/v1/gate/pair
+	LanDeleteDevice(ctx context.Context, pID string) (LanStatus, error)
+	//vibevalley:route lan.pair POST /api/v1/lan/pair
 	//vibevalley:can owner remote
-	GatePair(ctx context.Context, body LanPairRequest) (LanPaired, error)
-	//vibevalley:route gate.me GET /api/v1/gate/me
+	LanPair(ctx context.Context, body LanPairRequest) (LanPaired, error)
+	//vibevalley:route lan.me GET /api/v1/lan/me
 	//vibevalley:can owner remote
-	GateMe(ctx context.Context) (LanDevice, error)
+	LanMe(ctx context.Context) (LanDevice, error)
 }

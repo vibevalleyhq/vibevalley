@@ -6240,48 +6240,48 @@ class ConnectorApi {
   }
 }
 
-/// The `gate` endpoints of VibeValleyApi.
-class GateApi {
-  GateApi._(this._api);
+/// The `lan` endpoints of VibeValleyApi.
+class LanApi {
+  LanApi._(this._api);
   final VibeValleyApi _api;
 
   Future<LanStatus> status() async {
-    final j = await _api._call('GET', '/api/v1/gate', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/lan', query: {}, body: null);
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanStatus> update({required SetOpenRequest body}) async {
-    final j = await _api._call('PUT', '/api/v1/gate', query: {}, body: body.toJson());
+    final j = await _api._call('PUT', '/api/v1/lan', query: {}, body: body.toJson());
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanStatus> startPairing() async {
-    final j = await _api._call('POST', '/api/v1/gate/pairing', query: {}, body: null);
+    final j = await _api._call('POST', '/api/v1/lan/pairing', query: {}, body: null);
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanStatus> stopPairing() async {
-    final j = await _api._call('DELETE', '/api/v1/gate/pairing', query: {}, body: null);
+    final j = await _api._call('DELETE', '/api/v1/lan/pairing', query: {}, body: null);
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanStatus> answerPairing({required AnswerPairingRequest body}) async {
-    final j = await _api._call('POST', '/api/v1/gate/pairing/answer', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/lan/pairing/answer', query: {}, body: body.toJson());
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanStatus> deleteDevice({required String id}) async {
-    final j = await _api._call('DELETE', '/api/v1/gate/devices/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
+    final j = await _api._call('DELETE', '/api/v1/lan/devices/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
     return LanStatus.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanPaired> pair({required LanPairRequest body}) async {
-    final j = await _api._call('POST', '/api/v1/gate/pair', query: {}, body: body.toJson());
+    final j = await _api._call('POST', '/api/v1/lan/pair', query: {}, body: body.toJson());
     return LanPaired.fromJson(j as Map<String, dynamic>);
   }
 
   Future<LanDevice> me() async {
-    final j = await _api._call('GET', '/api/v1/gate/me', query: {}, body: null);
+    final j = await _api._call('GET', '/api/v1/lan/me', query: {}, body: null);
     return LanDevice.fromJson(j as Map<String, dynamic>);
   }
 }
@@ -6321,7 +6321,7 @@ class VibeValleyApi {
   late final project = ProjectApi._(this);
   late final voice = VoiceApi._(this);
   late final connector = ConnectorApi._(this);
-  late final gate = GateApi._(this);
+  late final lan = LanApi._(this);
 
   Future<Object?> _call(String method, String path, {Map<String, String> query = const {}, Object? body}) async {
     final request = http.Request(method, base.resolve(path).replace(queryParameters: query.isEmpty ? null : query));

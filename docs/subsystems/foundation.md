@@ -34,10 +34,10 @@
 
 **包和服务**
 
-- **一块业务一个包**，都在 `server/internal/` 下，包名单数，用[用语表](docs/README.md#用语)和[概念](docs/concepts.md)里的词：`core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`tool`、`manager`、`gate`、`voice`、`connector`、`game`、`mcp`。子包只有 `agent/brain`（VibeValley 自己的 agent）和 `task/engine`。和别的包同名时在 import 处起别名（`internal/agent/brain` 在 `manager` 里叫 `vvagent`；标准库 `runtime` 用到时起别名）。
+- **一块业务一个包**，都在 `server/internal/` 下，包名单数，用[用语表](docs/README.md#用语)和[概念](docs/concepts.md)里的词：`core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`tool`、`manager`、`lan`、`voice`、`connector`、`game`、`mcp`。子包只有 `agent/brain`（VibeValley 自己的 agent）和 `task/engine`。和别的包同名时在 import 处起别名（`internal/agent/brain` 在 `manager` 里叫 `vvagent`；标准库 `runtime` 用到时起别名）。
 - **一个包只导出一个服务 `<包>.Service`**。一块业务里分开写的几部分是包内不导出的零件（`issue` 的 `issues`、`dispatch`、`merges`），`Service` 嵌入它们，它们导出的方法就是 `Service` 的方法；零件之间不能有同名的导出方法，Go 只在用到时报「ambiguous selector」。
 - **`base` 只放地基**：数据库、`Hub`、存文件、id、`Config`、生命周期、日志脱敏。不放业务，不放服务之间传的形状；那些形状放在定义它的包的 `types.go`（`project.Workplace`、`session.HireOptions`），主人在上层、下层也要用的放在下层那个包。
-- **包有先后**：`workspace.go` 的 `layers` 是 `core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`tool`、`manager`、`gate`、`voice`、`connector`、`game`、`mcp`。一个包只 import 排在它前面的包，往上调用或成环是编译错误。反方向的消息走 `base.Hub[T]`：只送给当时在订阅的，慢的订阅者排长队，不丢。`game` 只听别的包的事实，业务的服务不调它。
+- **包有先后**：`workspace.go` 的 `layers` 是 `core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`tool`、`manager`、`lan`、`voice`、`connector`、`game`、`mcp`。一个包只 import 排在它前面的包，往上调用或成环是编译错误。反方向的消息走 `base.Hub[T]`：只送给当时在订阅的，慢的订阅者排长队，不丢。`game` 只听别的包的事实，业务的服务不调它。
 - **`Workspace` 上的字段是单数概念名**：`f.Project.List()`、`f.Issue.Merge(…)`；`handler`、`cmd/server` 和跨包的测试经它拿服务。`workspace` 只组装，不认识 HTTP；`handler` 在它上面。
 
 **组装和生命周期**
@@ -62,7 +62,7 @@
 
 - **一个 SQLite 连接**：`base.OpenDB` 开 `vibevalley.db`（`foreign_keys`、WAL、`busy_timeout` 5000 毫秒），`SetMaxOpenConns(1)`，所以只有一个写者，seq 的顺序就是提交的顺序。时间存毫秒，开关的列写 `boolean`。
 - **SQL 只在 sqlc**：查询在 `pkg/db/queries/<表>.sql`，一张表一个文件，只放主要读写这张表的；跨表的联查放在它返回的那张表的文件。服务里不手写 SQL，只调 `generated`，再把行读成自己的形状；只有 `migrations` 跑表结构。sqlc 推不出类型的表达式（`coalesce`、`max`）写 `cast(… as integer)`。sqlc 改名或删了查询文件不会删旧的生成文件：`TestGeneratedHasItsQueries` 查每个生成文件都有源。
-- **表名是 `<模块>` 或 `<模块>_<概念>`**，单数，模块是拥有它的 `server/internal` 包（`issue`、`issue_session`、`channel_message`、`session_run`、`game_ledger`、`gate_device`）；`base`、`handler`、`protocol`、`workspace`、`mcp`、`testkit`、`golden` 不拥有表。索引名以表名开头（`channel_message_by_sender`）。全文索引的影子表（`<表>_data`、`_idx`…）不算。sqlc 生成的类型跟着表名（`generated.ChannelMessage`）。
+- **表名是 `<模块>` 或 `<模块>_<概念>`**，单数，模块是拥有它的 `server/internal` 包（`issue`、`issue_session`、`channel_message`、`session_run`、`game_ledger`、`lan_device`）；`base`、`handler`、`protocol`、`workspace`、`mcp`、`testkit`、`golden` 不拥有表。索引名以表名开头（`channel_message_by_sender`）。全文索引的影子表（`<表>_data`、`_idx`…）不算。sqlc 生成的类型跟着表名（`generated.ChannelMessage`）。
 - **一份表结构，不认旧数据**：`migrations/0001_schema.sql` 是整个库，改表直接改它，不另加迁移；目录里只能有这一个 `.sql`。存盘的格式只有现在这一种：表、家目录里的文件、环境变量、存下的取值都只认今天的名字，没有读旧名字、改写旧文件、搬数据的代码。改了格式，本机的旧库和旧文件删掉重建。
 - **`migrations.Up(db)` 只接连接**：从 `PRAGMA database_list` 读出这条连接实际打开的主库，在同一条连接上读版本（`user_version`）、备份、迁移。已有文件库要升级时先 `VACUUM main INTO` 在旁边留 `.v<当前版本>`（已有同名的不覆盖；内存库、临时库不留）；备份失败不开始。每个文件一个事务，提交前查外键，版本号和它一起提交，失败回滚。库的版本比嵌入的迁移多就拒绝打开。服务端开机经 `OpenDB` 跑它，`cmd/migrate up` 手动跑，`cmd/migrate status` 看版本（经 `OpenDBAsIs`，不迁移）。
 - **运行时新建的行主键是 uuidv7**：`base.NewID()`（`google/uuid` 的 `NewV7`，同一进程里单调递增），存成 `text`；协议里的 id 都是 `string`。不用 uuid 的：从文件来的自然键（档案、技能、项目、农机、连接器）、单例（`check (id = 1)`）、几列组成的主键。工单另有从 1 数的 `number`，消息在对话里有从 1 数的 `number`，没有全局 `seq`。`base.Code` 是给人念的配对码，不是 id。
@@ -70,7 +70,7 @@
 **测试**
 
 - **不连网、不花钱**：帮工由 smith 的 `oartest` 扮演（一个真实的会话：同样的记录、折叠和控制，没有程序、登录和模型；脚本按工单里的字眼跑命令、提交、发呆、失败、解决冲突），项目用临时目录里真的 git 仓库，模型用 `ai.FauxProvider`，声网和三家聊天软件是本地假服务；测试里 `Runtime` 不探测本机的农机。
-- **测试跟着它测的包走，只碰得到它下面的**：包自己的测试用 `world_test.go` 的 `newWorld`（一个 `base.App`，只带排在前面的包和本包；`task` 的 `newWorldWith` 能多带后面的）；一路走过好几个包的在 `internal/workspace`，用 `workspace.New`；要走整个 API 的「连接到本机」测试是外部测试包 `gate_test`，要碰的内部经 `export_test.go`。单个零件用它的构造函数直接建。
+- **测试跟着它测的包走，只碰得到它下面的**：包自己的测试用 `world_test.go` 的 `newWorld`（一个 `base.App`，只带排在前面的包和本包；`task` 的 `newWorldWith` 能多带后面的）；一路走过好几个包的在 `internal/workspace`，用 `workspace.New`；要走整个 API 的「连接到本机」测试是外部测试包 `lan_test`，要碰的内部经 `export_test.go`。单个零件用它的构造函数直接建。
 - **`testkit`、`golden` 不 import 农场的包**，`protocol` 自己的测试也用它们。各包不写自己的断言和等待：等会发生的事用 `Await`/`Until`（同一个期限），只有查「不该再发生」的用 `Settle`（固定 200 毫秒，慢机器上可能漏报，不会误报）；不用 `time.Sleep` 赌时间。
 - **纯规则直接测**，一个输入进去、结果出来，不开会话。
 
@@ -115,7 +115,7 @@
 
 - **每个服务包**：照这里的约定写 `Service`、`Module`，经 `base` 拿数据库、`Hub`、配置、id。
 - **`core`**：核心状态只经 `Core.Apply` 改；它最先建、最后关，`state.json` 在全部服务停了以后才写。
-- **`handler`、`cmd/server`**：`handler.Listen` 开监听、建 `Workspace`、经 `BeforeReady` 在服务发开机的活之前开始答 HTTP；`handler.New` 在农场开之前把 `apiMux` 交给 `Gate.API`（「连接到本机」要答 API，API 也答「连接到本机」自己的页面）。
+- **`handler`、`cmd/server`**：`handler.Listen` 开监听、建 `Workspace`、经 `BeforeReady` 在服务发开机的活之前开始答 HTTP；`handler.New` 在农场开之前把 `apiMux` 交给 `Lan.API`（「连接到本机」要答 API，API 也答「连接到本机」自己的页面）。
 - **Flutter**：只读 `shapegen` 写的 `lib/gen/vibevalley.dart`；客户端的分层和替身在 [app/README.md](app/README.md)。
 - **文档**：`shapegen` 写 [capabilities.md](docs/reference/capabilities.md)；`docs:verify` 跑 `stale-names.ts`，在 `server/internal`、`server/cmd`、`app/lib`、`app/test` 里查改掉的旧名字。
 

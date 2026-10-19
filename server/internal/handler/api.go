@@ -415,33 +415,33 @@ func (a api) ConnectorChannel(_ context.Context, id protocol.ConnectorID, body p
 	return s, nil
 }
 
-func (a api) GateStatus(context.Context) (protocol.LanStatus, error) { return a.f.Gate.Status(), nil }
+func (a api) LanStatus(context.Context) (protocol.LanStatus, error) { return a.f.Lan.Status(), nil }
 
-func (a api) GateUpdate(_ context.Context, body protocol.SetOpenRequest) (protocol.LanStatus, error) {
-	return a.f.Gate.SetOpen(body.Open)
+func (a api) LanUpdate(_ context.Context, body protocol.SetOpenRequest) (protocol.LanStatus, error) {
+	return a.f.Lan.SetOpen(body.Open)
 }
 
-func (a api) GateStartPairing(context.Context) (protocol.LanStatus, error) {
-	return a.f.Gate.StartPairing()
+func (a api) LanStartPairing(context.Context) (protocol.LanStatus, error) {
+	return a.f.Lan.StartPairing()
 }
 
-func (a api) GateStopPairing(context.Context) (protocol.LanStatus, error) {
-	return a.f.Gate.StopPairing(), nil
+func (a api) LanStopPairing(context.Context) (protocol.LanStatus, error) {
+	return a.f.Lan.StopPairing(), nil
 }
 
-func (a api) GateAnswerPairing(_ context.Context, body protocol.AnswerPairingRequest) (protocol.LanStatus, error) {
-	return a.f.Gate.Answer(body.Allow)
+func (a api) LanAnswerPairing(_ context.Context, body protocol.AnswerPairingRequest) (protocol.LanStatus, error) {
+	return a.f.Lan.Answer(body.Allow)
 }
 
-func (a api) GateDeleteDevice(_ context.Context, id string) (protocol.LanStatus, error) {
-	return a.f.Gate.Forget(id)
+func (a api) LanDeleteDevice(_ context.Context, id string) (protocol.LanStatus, error) {
+	return a.f.Lan.Forget(id)
 }
 
-func (a api) GatePair(ctx context.Context, body protocol.LanPairRequest) (protocol.LanPaired, error) {
-	return a.f.Gate.Pair(ctx, body.Code, body.Name)
+func (a api) LanPair(ctx context.Context, body protocol.LanPairRequest) (protocol.LanPaired, error) {
+	return a.f.Lan.Pair(ctx, body.Code, body.Name)
 }
 
-func (a api) GateMe(ctx context.Context) (protocol.LanDevice, error) { return a.f.Gate.Me(ctx) }
+func (a api) LanMe(ctx context.Context) (protocol.LanDevice, error) { return a.f.Lan.Me(ctx) }
 
 func (a api) IssueList(context.Context) ([]protocol.Issue, error) { return a.f.Issue.List() }
 

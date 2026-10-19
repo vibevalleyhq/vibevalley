@@ -1,6 +1,6 @@
 # 连接到本机
 
-「连接到本机」（`gate.Service`，配置和形状里叫 `lan`）让手机、另一台 Mac 和这台电脑用同一个农场：服务端在主监听之外另开一个监听，只放主人在本机点过头的设备，每台一把钥匙。主人在工作台「设置」的「连接到本机」页（`/settings/gate`）开关它、添加和移除设备；另一台设备在同一页粘贴配对链接或扫码，用那台电脑的农场。
+「连接到本机」（`lan.Service`）让手机、另一台 Mac 和这台电脑用同一个农场：服务端在主监听之外另开一个监听，只放主人在本机点过头的设备，每台一把钥匙。主人在工作台「设置」的「连接到本机」页（`/settings/lan`）开关它、添加和移除设备；另一台设备在同一页粘贴配对链接或扫码，用那台电脑的农场。
 
 ## 管什么，不管什么
 
@@ -14,17 +14,17 @@
 
 ## 在哪
 
-- 服务端 `server/internal/gate/gate.go`：监听、配对、设备、中间件 `gate` 和放行表 `remoteRoutes`。`handler/http.go` 开机前把 `apiMux` 交给 `Gate.API`。
-- 表：`gate`（一行，`open`）、`gate_device`（一台设备一行：名字、`key_hash`、`paired_at`、`last_seen`）；查询在 `pkg/db/queries/gate.sql`、`gate_device.sql`。
-- 接口：`gate.*`（[capabilities.md](docs/reference/capabilities.md)）。`gate.status`、`gate.update`、`gate.startPairing`、`gate.stopPairing`、`gate.answerPairing`、`gate.deleteDevice` 只有 `owner`；`gate.pair`（`POST /api/v1/gate/pair`）和 `gate.me`（`GET /api/v1/gate/me`）也给 `remote`。形状是 `protocol` 的 `LanStatus`、`LanPairing`、`LanDevice`、`LanPaired`，拒绝是 `LanRefused`（403）。
+- 服务端 `server/internal/lan/lan.go`：监听、配对、设备、中间件 `guard` 和放行表 `remoteRoutes`。`handler/http.go` 开机前把 `apiMux` 交给 `Lan.API`。
+- 表：`lan`（一行，`open`）、`lan_device`（一台设备一行：名字、`key_hash`、`paired_at`、`last_seen`）；查询在 `pkg/db/queries/lan.sql`、`lan_device.sql`。
+- 接口：`lan.*`（[capabilities.md](docs/reference/capabilities.md)）。`lan.status`、`lan.update`、`lan.startPairing`、`lan.stopPairing`、`lan.answerPairing`、`lan.deleteDevice` 只有 `owner`；`lan.pair`（`POST /api/v1/lan/pair`）和 `lan.me`（`GET /api/v1/lan/me`）也给 `remote`。形状是 `protocol` 的 `LanStatus`、`LanPairing`、`LanDevice`、`LanPaired`，拒绝是 `LanRefused`（403）。
 - 配置：`lan.port`（默认 8790；0 是随便一个）。
-- 客户端：`workbench/gate/gate_page.dart`（开关、二维码、点头、设备列表、用别的农场），`workbench/gate/scan_page.dart`（手机扫码，`mobile_scanner`），`data/farm_choice.dart`（`FarmChoice`、`RemoteFarm`、`PairLink`、`pairWith`），macOS 的启动在 `host/desktop.dart`。
+- 客户端：`workbench/lan/lan_page.dart`（开关、二维码、点头、设备列表、用别的农场），`workbench/lan/scan_page.dart`（手机扫码，`mobile_scanner`），`data/farm_choice.dart`（`FarmChoice`、`RemoteFarm`、`PairLink`、`pairWith`），macOS 的启动在 `host/desktop.dart`。
 
 ## 模型和不变量
 
-- **主监听不动**：服务端只听 `127.0.0.1`。「连接到本机」是第二个监听，在所有网卡上听 `lan.port`，默认关着；开关存在 `gate` 表，开机照它决定开不开。端口被占时状态里写「连接开不起来」，农场照常。
+- **主监听不动**：服务端只听 `127.0.0.1`。「连接到本机」是第二个监听，在所有网卡上听 `lan.port`，默认关着；开关存在 `lan` 表，开机照它决定开不开。端口被占时状态里写「连接开不起来」，农场照常。
 - **只放 `remote` 的**：放行表 `remoteRoutes` 开机时从 `protocol.Endpoints` 和 `protocol.Streams` 里 `Can` 含 `CallerRemote` 的条目建成，按方法和路径匹配；三条流 `/api/v1/state`、`/api/v1/events`、`/api/v1/live` 都放。只有「连接到本机」自己的六个管理接口没有 `remote`：一台设备进了「连接到本机」，也不能开关「连接到本机」、放别的设备进来。不在 `/api/v1/` 下的路径（包括 `/mcp`）答 404。
-- **每个请求带钥匙**：`Authorization: Bearer <钥匙>`，只有 `POST /api/v1/gate/pair` 不要。认不出的钥匙答 401，认得但接口不放答 403，都带 `LanRefused` 的一句话。
+- **每个请求带钥匙**：`Authorization: Bearer <钥匙>`，只有 `POST /api/v1/lan/pair` 不要。认不出的钥匙答 401，认得但接口不放答 403，都带 `LanRefused` 的一句话。
 - **钥匙**：32 字节随机数的 base64url，只在配对成功时给设备一次；数据库只存它的 SHA-256，比对用定长比较。`last_seen` 内存里每个请求都更新，最多一分钟写一次库。
 - **配对码**：10 位，`base.Code(10)`，比对时去掉两头空白、转大写。同一时间只有一个配对码、只有一台设备在等；码 2 分钟有效，错 5 次作废；设备带对码来以后再等 2 分钟。主人答了（让进或不让）、过期、设备断开、主人换新码或关「连接到本机」，这个码都作废。
 - **配对链接**：`vibevalley://pair?u=<「连接到本机」地址>&c=<码>`。「连接到本机」地址是这台电脑首选网卡（`en*`、`eth*`、`wlan*`、`wl*` 在前）的私有 IPv4 加实际端口；找不到这样的地址时不发码，状态里说「连上 Wi-Fi 或网线再试」。
@@ -37,11 +37,11 @@
 
 **配对**：
 
-1. 主人打开「连接到本机」（`gate.update`），点「添加设备」（`gate.startPairing`）：「连接到本机」没开或找不到地址就拒绝；否则作废旧码、发新码，页面把 `LanPairing.link` 画成二维码。
+1. 主人打开「连接到本机」（`lan.update`），点「添加设备」（`lan.startPairing`）：「连接到本机」没开或找不到地址就拒绝；否则作废旧码、发新码，页面把 `LanPairing.link` 画成二维码。
 2. 设备扫码（手机）或粘贴链接（Mac），`PairLink.parse` 只认 `vibevalley://pair`、`u` 是 `http` 地址、`c` 不空的。
-3. 设备手上已经有这个农场的钥匙时（`pairWith` 的 `known`，电脑换了地址再扫一次的情形），先拿钥匙去问新地址的 `gate.me`，认就直接用，不用主人再点头。
-4. 否则设备带码和自己的名字发 `gate.pair`，请求一直挂着。「连接到本机」关着、码过期、码不对、已有设备在等都当场拒绝。
-5. 主人在本机看到「谁在等」（`LanPairing.asking`），点「让它进来」或「不让」（`gate.answerPairing`）。让进：新建设备行、发钥匙，回 `LanPaired`（设备 id、钥匙、农场名）；不让、2 分钟没答、设备断开：拒绝，码作废。
+3. 设备手上已经有这个农场的钥匙时（`pairWith` 的 `known`，电脑换了地址再扫一次的情形），先拿钥匙去问新地址的 `lan.me`，认就直接用，不用主人再点头。
+4. 否则设备带码和自己的名字发 `lan.pair`，请求一直挂着。「连接到本机」关着、码过期、码不对、已有设备在等都当场拒绝。
+5. 主人在本机看到「谁在等」（`LanPairing.asking`），点「让它进来」或「不让」（`lan.answerPairing`）。让进：新建设备行、发钥匙，回 `LanPaired`（设备 id、钥匙、农场名）；不让、2 分钟没答、设备断开：拒绝，码作废。
 
 **用别人的农场**（客户端）：
 
@@ -53,7 +53,7 @@
 
 ## 和谁打交道
 
-- **`handler`**：`apiMux` 同时挂在主监听和「连接到本机」上；「连接到本机」的中间件在它前面认设备、查放行表，把设备 id 放进 context（`gate.me` 从这里读）。
+- **`handler`**：`apiMux` 同时挂在主监听和「连接到本机」上；「连接到本机」的中间件在它前面认设备、查放行表，把设备 id 放进 context（`lan.me` 从这里读）。
 - **`protocol`**：`Endpoints`、`Streams` 和 `CallerRemote` 是放行表的唯一来源；`tool/shapegen` 从 `//vibevalley:can` 写出它们和能力表的「连接到本机」一列。
 - **`base`**：`lan.port` 从 `base.Config` 来；配对码用 `base.Code`，设备 id 用 `base.NewID`。
 - **客户端**：`VibeValleyServer` 带 `key` 时每个请求加 `Bearer`；macOS 外壳按 `FarmChoice` 决定起不起本机服务端（[客户端](docs/subsystems/app.md)）。
@@ -75,7 +75,7 @@
 
 ## 怎么验证
 
-- `gate/gate_test.go`：`TestLanShutUntilOpened`（没开时连不上）、`TestLanPairedDeviceUsesTheFarm`（配对、带钥匙用接口、管理接口经「连接到本机」 403）、`TestLanOwnerRefuses`、`TestLanWrongCodesCallItOff`（错 5 次作废）、`TestLanCodeExpires`、`TestLanForgetEndsTheDevicesStreams`（移除断开状态流）、`TestLanRemembersAcrossRestarts`（开关和设备重启后还在）。
-- `gate/lifecycle_test.go`：`TestConcurrentOpenMatchesPersistence`（并发开关后监听和库一致）、`TestTrackingRechecksForgottenDevice`（移除和进门同时发生）。
-- `gate/remote_test.go` 的 `TestRemoteMayFollowsCan`：放行表和每个接口的 `can remote` 一致，流都放，不认识的路径不放。
-- 客户端 `test/workbench/gate_test.dart`：`PairLink` 的解析、选择重启后还在、`pairWith`（带码换钥匙、旧钥匙在新地址上还认、钥匙被忘了就带码再要）、「连接到本机」页的打开和让设备进来再移除。
+- `lan/lan_test.go`：`TestLanShutUntilOpened`（没开时连不上）、`TestLanPairedDeviceUsesTheFarm`（配对、带钥匙用接口、管理接口经「连接到本机」 403）、`TestLanOwnerRefuses`、`TestLanWrongCodesCallItOff`（错 5 次作废）、`TestLanCodeExpires`、`TestLanForgetEndsTheDevicesStreams`（移除断开状态流）、`TestLanRemembersAcrossRestarts`（开关和设备重启后还在）。
+- `lan/lifecycle_test.go`：`TestConcurrentOpenMatchesPersistence`（并发开关后监听和库一致）、`TestTrackingRechecksForgottenDevice`（移除和进门同时发生）。
+- `lan/remote_test.go` 的 `TestRemoteMayFollowsCan`：放行表和每个接口的 `can remote` 一致，流都放，不认识的路径不放。
+- 客户端 `test/workbench/lan_test.dart`：`PairLink` 的解析、选择重启后还在、`pairWith`（带码换钥匙、旧钥匙在新地址上还认、钥匙被忘了就带码再要）、「连接到本机」页的打开和让设备进来再移除。

@@ -14,8 +14,8 @@ import (
 	"vibevalley/internal/connector"
 	"vibevalley/internal/core"
 	"vibevalley/internal/game"
-	"vibevalley/internal/gate"
 	"vibevalley/internal/issue"
+	"vibevalley/internal/lan"
 	"vibevalley/internal/manager"
 	"vibevalley/internal/mcp"
 	"vibevalley/internal/memory"
@@ -55,7 +55,7 @@ type services struct {
 	Manager   *manager.Service
 	Voice     *voice.Service
 	Connector *connector.Service
-	Gate      *gate.Service
+	Lan       *lan.Service
 	MCP       *mcp.Service
 }
 
@@ -71,7 +71,7 @@ var layers = []base.Layer{
 	task.Module,
 	tool.Module,
 	manager.Module,
-	gate.Module,
+	lan.Module,
 	voice.Module,
 	connector.Module,
 	game.Module,

@@ -1,4 +1,4 @@
-package gate_test
+package lan_test
 
 import (
 	"bufio"
@@ -14,15 +14,15 @@ import (
 	"testing"
 	"time"
 
-	"vibevalley/internal/gate"
 	"vibevalley/internal/handler"
+	"vibevalley/internal/lan"
 	"vibevalley/internal/protocol"
 	"vibevalley/internal/testkit"
 	"vibevalley/internal/testkit/fixture"
 	"vibevalley/internal/workspace"
 )
 
-// Its gate listens on loopback and calls 127.0.0.1 its network address.
+// Its lan listener is on loopback and calls 127.0.0.1 its network address.
 func lanTestFarm(t *testing.T, db string) *workspace.Workspace {
 	t.Helper()
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), db)
@@ -33,8 +33,8 @@ func lanTestFarm(t *testing.T, db string) *workspace.Workspace {
 	}
 	f.Project.GitHubProbe = fixture.NoGitHub
 	handler.New(f)
-	gate.LanOnLoopback(f.Gate)
-	if err := f.Gate.OnStart(context.Background()); err != nil {
+	lan.LanOnLoopback(f.Lan)
+	if err := f.Lan.OnStart(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(f.Close)
@@ -43,7 +43,7 @@ func lanTestFarm(t *testing.T, db string) *workspace.Workspace {
 
 func lanOpen(t *testing.T, f *workspace.Workspace) string {
 	t.Helper()
-	s, err := f.Gate.SetOpen(true)
+	s, err := f.Lan.SetOpen(true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func lanAsk(t *testing.T, addr, code, name string) <-chan []byte {
 	got := make(chan []byte, 1)
 	go func() {
 		raw, _ := json.Marshal(protocol.LanPairRequest{Code: code, Name: name})
-		res, err := http.Post(addr+"/api/v1/gate/pair", "application/json", bytes.NewReader(raw))
+		res, err := http.Post(addr+"/api/v1/lan/pair", "application/json", bytes.NewReader(raw))
 		if err != nil {
 			got <- []byte(err.Error())
 			return
@@ -93,14 +93,14 @@ func lanAsk(t *testing.T, addr, code, name string) <-chan []byte {
 func lanWaitAsking(t *testing.T, f *workspace.Workspace, name string) {
 	t.Helper()
 	testkit.Until(t, name+" asks", func() bool {
-		p := f.Gate.Status().Pairing
+		p := f.Lan.Status().Pairing
 		return p != nil && p.Asking != nil && *p.Asking == name
 	})
 }
 
 func lanPair(t *testing.T, f *workspace.Workspace, addr, name string) protocol.LanPaired {
 	t.Helper()
-	s, err := f.Gate.StartPairing()
+	s, err := f.Lan.StartPairing()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,8 +109,8 @@ func lanPair(t *testing.T, f *workspace.Workspace, addr, name string) protocol.L
 		t.Fatalf("link: %s", s.Pairing.Link)
 	}
 	got := lanAsk(t, addr, strings.ToLower(s.Pairing.Code), name)
-	lanWaitAsking(t, f, gate.LanDeviceName(name))
-	if _, err := f.Gate.Answer(true); err != nil {
+	lanWaitAsking(t, f, lan.LanDeviceName(name))
+	if _, err := f.Lan.Answer(true); err != nil {
 		t.Fatal(err)
 	}
 	var paired protocol.LanPaired
@@ -122,22 +122,22 @@ func lanPair(t *testing.T, f *workspace.Workspace, addr, name string) protocol.L
 
 func TestLanShutUntilOpened(t *testing.T) {
 	f := lanTestFarm(t, ":memory:")
-	if s := f.Gate.Status(); s.Open || s.URL != nil || len(s.Devices) != 0 {
-		t.Fatalf("a new farm's gate: %+v", s)
+	if s := f.Lan.Status(); s.Open || s.URL != nil || len(s.Devices) != 0 {
+		t.Fatalf("a new workspace's lan access: %+v", s)
 	}
 	var refused protocol.LanRefused
-	if _, err := f.Gate.StartPairing(); !errors.As(err, &refused) {
-		t.Fatalf("pairing with the gate shut: %v", err)
+	if _, err := f.Lan.StartPairing(); !errors.As(err, &refused) {
+		t.Fatalf("pairing with lan access shut: %v", err)
 	}
 	addr := lanOpen(t, f)
 	if code, _ := lanRequest(t, "GET", addr+"/api/v1/health", "", nil); code != http.StatusUnauthorized {
 		t.Fatalf("health without a key: %d", code)
 	}
-	if _, err := f.Gate.SetOpen(false); err != nil {
+	if _, err := f.Lan.SetOpen(false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := http.Get(addr + "/api/v1/health"); err == nil {
-		t.Fatal("the gate still answers once shut")
+		t.Fatal("the lan listener still answers once shut")
 	}
 }
 
@@ -145,14 +145,14 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 	f := lanTestFarm(t, ":memory:")
 	addr := lanOpen(t, f)
 	paired := lanPair(t, f, addr, "  小明的\niPhone ")
-	if s := f.Gate.Status(); s.Pairing != nil || len(s.Devices) != 1 || s.Devices[0].Name != "小明的 iPhone" {
+	if s := f.Lan.Status(); s.Pairing != nil || len(s.Devices) != 1 || s.Devices[0].Name != "小明的 iPhone" {
 		t.Fatalf("after pairing: %+v", s)
 	}
 
 	if code, body := lanRequest(t, "GET", addr+"/api/v1/health", paired.Key, nil); code != 200 || !strings.Contains(string(body), `"ok":true`) {
 		t.Fatalf("health: %d %s", code, body)
 	}
-	code, body := lanRequest(t, "GET", addr+"/api/v1/gate/me", paired.Key, nil)
+	code, body := lanRequest(t, "GET", addr+"/api/v1/lan/me", paired.Key, nil)
 	var me protocol.LanDevice
 	if json.Unmarshal(body, &me); code != 200 || me.ID != paired.Device || me.LastSeen == nil {
 		t.Fatalf("me: %d %s", code, body)
@@ -162,7 +162,7 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 			t.Fatalf("%s: %d", path, code)
 		}
 	}
-	for _, c := range []struct{ method, path string }{{"GET", "/api/v1/gate"}, {"PUT", "/api/v1/gate"}, {"POST", "/api/v1/gate/pairing"}, {"DELETE", "/api/v1/gate/devices/" + paired.Device},
+	for _, c := range []struct{ method, path string }{{"GET", "/api/v1/lan"}, {"PUT", "/api/v1/lan"}, {"POST", "/api/v1/lan/pairing"}, {"DELETE", "/api/v1/lan/devices/" + paired.Device},
 		// What configures the farm stays on this computer: keys, a runtime's command, profiles, skills, chat accounts.
 		{"PUT", "/api/v1/settings"}, {"PUT", "/api/v1/runtimes/codex/settings"}, {"POST", "/api/v1/agents"}, {"PUT", "/api/v1/skills/s1"},
 		{"POST", "/api/v1/connectors/weixin/login"}} {
@@ -173,7 +173,7 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 	if code, _ := lanRequest(t, "GET", addr+"/api/v1/health", paired.Key+"x", nil); code != http.StatusUnauthorized {
 		t.Fatalf("a wrong key: %d", code)
 	}
-	if _, err := f.Gate.Me(context.Background()); err == nil {
+	if _, err := f.Lan.Me(context.Background()); err == nil {
 		t.Fatal("me on this machine")
 	}
 }
@@ -181,19 +181,19 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 func TestLanOwnerRefuses(t *testing.T) {
 	f := lanTestFarm(t, ":memory:")
 	addr := lanOpen(t, f)
-	s, _ := f.Gate.StartPairing()
+	s, _ := f.Lan.StartPairing()
 	got := lanAsk(t, addr, s.Pairing.Code, "陌生人")
 	lanWaitAsking(t, f, "陌生人")
 	if body := <-lanAsk(t, addr, s.Pairing.Code, "又一个"); !strings.Contains(string(body), "另一台设备") {
 		t.Fatalf("a second device: %s", body)
 	}
-	if _, err := f.Gate.Answer(false); err != nil {
+	if _, err := f.Lan.Answer(false); err != nil {
 		t.Fatal(err)
 	}
 	if body := <-got; !strings.Contains(string(body), "LanRefused") || !strings.Contains(string(body), "没让") {
 		t.Fatalf("refused: %s", body)
 	}
-	if s := f.Gate.Status(); s.Pairing != nil || len(s.Devices) != 0 {
+	if s := f.Lan.Status(); s.Pairing != nil || len(s.Devices) != 0 {
 		t.Fatalf("after refusing: %+v", s)
 	}
 }
@@ -201,8 +201,8 @@ func TestLanOwnerRefuses(t *testing.T) {
 func TestLanWrongCodesCallItOff(t *testing.T) {
 	f := lanTestFarm(t, ":memory:")
 	addr := lanOpen(t, f)
-	s, _ := f.Gate.StartPairing()
-	for range gate.LanWrongTries {
+	s, _ := f.Lan.StartPairing()
+	for range lan.LanWrongTries {
 		if body := <-lanAsk(t, addr, "WRONGCODE", "猜码的"); !strings.Contains(string(body), "配对码不对") {
 			t.Fatalf("a wrong code: %s", body)
 		}
@@ -215,14 +215,14 @@ func TestLanWrongCodesCallItOff(t *testing.T) {
 func TestLanCodeExpires(t *testing.T) {
 	f := lanTestFarm(t, ":memory:")
 	lanOpen(t, f)
-	s, _ := f.Gate.StartPairing()
+	s, _ := f.Lan.StartPairing()
 	start := time.Now()
-	gate.LanAt(f.Gate, func() time.Time { return start.Add(gate.LanPairingFor + time.Second) })
-	if got := f.Gate.Status(); got.Pairing != nil {
+	lan.LanAt(f.Lan, func() time.Time { return start.Add(lan.LanPairingFor + time.Second) })
+	if got := f.Lan.Status(); got.Pairing != nil {
 		t.Fatalf("an expired code is still shown: %+v", got.Pairing)
 	}
 	var refused protocol.LanRefused
-	if _, err := f.Gate.Pair(context.Background(), s.Pairing.Code, "晚了"); !errors.As(err, &refused) || !strings.Contains(refused.Reason, "过期") {
+	if _, err := f.Lan.Pair(context.Background(), s.Pairing.Code, "晚了"); !errors.As(err, &refused) || !strings.Contains(refused.Reason, "过期") {
 		t.Fatalf("pairing late: %v", err)
 	}
 }
@@ -247,7 +247,7 @@ func TestLanForgetEndsTheDevicesStreams(t *testing.T) {
 		io.Copy(io.Discard, lines)
 		close(ended)
 	}()
-	if s, err := f.Gate.Forget(paired.Device); err != nil || len(s.Devices) != 0 {
+	if s, err := f.Lan.Forget(paired.Device); err != nil || len(s.Devices) != 0 {
 		t.Fatalf("forget: %+v %v", s, err)
 	}
 	select {
@@ -266,7 +266,7 @@ func TestLanRemembersAcrossRestarts(t *testing.T) {
 	paired := lanPair(t, f, lanOpen(t, f), "平板")
 
 	again := lanTestFarm(t, db)
-	s := again.Gate.Status()
+	s := again.Lan.Status()
 	if !s.Open || s.URL == nil || len(s.Devices) != 1 || s.Devices[0].ID != paired.Device {
 		t.Fatalf("after a restart: %+v", s)
 	}

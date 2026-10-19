@@ -114,7 +114,7 @@ func Defaults() Config {
 	return c
 }
 
-// The main API and its MCP endpoint share a fixed local identity; remote devices use the separate yard gate.
+// The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener.
 func (c Config) ServerAddress() string {
 	return net.JoinHostPort("127.0.0.1", strconv.Itoa(c.Port))
 }

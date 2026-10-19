@@ -87,7 +87,7 @@ Future<void> saveFarmChoice(FarmChoice choice) async {
   }
 }
 
-/// `vibevalley://pair?u=<the gate's address>&c=<code>` (lan.go lanPairLink).
+/// `vibevalley://pair?u=<the lan listener's address>&c=<code>` (lan.go lanPairLink).
 class PairLink {
   const PairLink(this.url, this.code);
   final Uri url;
@@ -125,7 +125,7 @@ Future<RemoteFarm> pairWith(PairLink link, {required String name, RemoteFarm? kn
   if (known != null) {
     final api = apiFor(link.url, known.key);
     try {
-      final me = await api.gate.me();
+      final me = await api.lan.me();
       return RemoteFarm(url: link.url, key: known.key, farm: known.farm, device: me.id);
     } on Object {
       // Not a key this farm knows (or no answer): ask with the code.
@@ -135,7 +135,7 @@ Future<RemoteFarm> pairWith(PairLink link, {required String name, RemoteFarm? kn
   }
   final api = apiFor(link.url, null);
   try {
-    final paired = await api.gate.pair(
+    final paired = await api.lan.pair(
       body: LanPairRequest(code: link.code, name: name),
     );
     return RemoteFarm(url: link.url, key: paired.key, farm: paired.farm, device: paired.device);
