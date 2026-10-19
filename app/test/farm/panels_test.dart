@@ -133,15 +133,12 @@ void main() {
     await settle(tester);
     expect(find.text('小吴的地'), findsOneWidget);
     expect(find.text('clock-in'), findsOneWidget);
-    expect(find.text('正在改文件'), findsOneWidget, reason: 'what it is doing, in the frame\'s words');
-    expect(find.text('读文件'), findsOneWidget, reason: 'each step of this round, in the frame\'s words');
+    expect(find.textContaining('正在改文件'), findsOneWidget, reason: 'what it is doing, in the frame\'s words, is the status');
     expect(find.text('干活过程'), findsOneWidget);
     expect(find.text('工单'), findsNothing, reason: '干活过程 starts folded');
-    await tester.tap(find.textContaining('· 展开'));
+    await tester.tap(find.text('干活过程'));
     await settle(tester);
     expect(find.text('工单'), findsOneWidget);
-    expect(find.text('碰过的文件'), findsOneWidget);
-    expect(find.text('\$ pnpm test'), findsOneWidget);
     expect(find.text('跑命令'), findsWidgets, reason: 'the call says its action as the server wrote it');
     expect(routes.paths, contains('GET /api/v1/sessions/w1/events'));
     await tester.ensureVisible(find.text('叫停这一轮'));

@@ -12,7 +12,7 @@ import 'package:vibevalley/workbench/issues/issue_detail.dart' show TodoDetail;
 import 'package:vibevalley/workbench/issues/issues_page.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/rules/issues.dart';
-import 'package:vibevalley/ui/kit/kit.dart' show PxPick, toasts;
+import 'package:vibevalley/ui/kit/kit.dart' show PxButton, PxModalLayer, PxPick, toasts;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/server.dart' show FakeServer, jsonResponse, settle;
@@ -471,6 +471,9 @@ void main() {
       }
       return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
     }).api;
+    // The board alone first: an open issue is a modal over it, and its backdrop takes the board's taps.
+    final shown = ValueNotifier<String?>(null);
+    addTearDown(shown.dispose);
     await t.pumpWidget(
       ProviderScope(
         overrides: [
@@ -481,7 +484,12 @@ void main() {
         ],
         child: MaterialApp(
           theme: farmTheme(),
-          home: const Scaffold(body: IssuesPage(id: 'w1')),
+          home: Scaffold(
+            body: ValueListenableBuilder<String?>(
+              valueListenable: shown,
+              builder: (_, id, _) => IssuesPage(id: id),
+            ),
+          ),
         ),
       ),
     );
@@ -523,10 +531,6 @@ void main() {
 
     await drag(t.getCenter(find.text('改文案')), t.getCenter(find.text('加日志')));
     expect(writes.last, 'PUT /api/v1/issues/a2/move {"before":"a1"}');
-    expect(find.text('2 轮 · 1 分 · 花了 ¥0.42'), findsOneWidget);
-    expect(find.text('打卡写好了，测试全过'), findsOneWidget);
-    expect(find.byType(IssueView), findsOneWidget);
-    expect(find.text('每次干活'), findsOneWidget);
 
     final before = writes.length;
     await drag(t.getCenter(find.text('改文案')), t.getCenter(find.text('处理中')) + const Offset(0, 120));
@@ -538,9 +542,19 @@ void main() {
     expect(toasts.toasts.first.title, '排上队了');
     expect(find.text('排队中'), findsOneWidget);
 
-    await t.enterText(find.byType(EditableText).last, '打卡还要记时区');
+    // A closed one opens over the board: its status and conclusion first, the rest folded.
+    shown.value = 'w1';
+    await settle(t);
+    expect(find.byType(IssueView), findsOneWidget);
+    expect(find.byType(PxModalLayer), findsOneWidget);
+    expect(find.text('打卡写好了，测试全过'), findsOneWidget);
+    expect(find.text('每次干活'), findsOneWidget);
+    await t.tap(find.text('详情'));
+    await settle(t);
+    expect(find.text('2 轮 · 1 分 · 花了 ¥0.42'), findsOneWidget);
+    await t.enterText(find.descendant(of: find.bySemanticsLabel('重开这张工单'), matching: find.byType(EditableText)).first, '打卡还要记时区');
     await t.pump();
-    await t.tap(find.text('重开').last);
+    await t.tap(find.widgetWithText(PxButton, '重开'));
     await settle(t);
     expect(writes.last, 'PUT /api/v1/issues/t1/status {"status":"todo","text":"打卡还要记时区"}');
     await t.pumpWidget(const SizedBox.shrink());

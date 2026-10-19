@@ -116,6 +116,8 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 - **首页只给第一次来的人。** 天天用的人每次都要先点「继续游戏」，点开一条通知也被首页挡住要多点一次。不做「新游戏」清档：农场里是主人的田头、账本和帮工的分支，一个按钮清掉代价太大。进度条只在启动画面，首页一出来就是菜单。
 - **设置是工作台的一页。** 首页的设置窗口和扳手各开一处，打开设置整个版面就换了；合成 `/settings` 一页，首页、扳手和缺钥匙的开始游戏都进它。
 
+- **工单详情是居中的弹窗，第一层只有状态。** 主人打开一张工单想知道的是到哪一步、要不要我做点什么、它还在不在干；原来的详情是右侧侧栏，从上到下十五块，给查问题的人看的，「这一轮做了什么」「碰过的文件」「跑过的命令」和干活过程讲的是一件事。现在第一层是进度轨、一句状态、草、一个输入框和按状态的按钮，其余折起来。工作台的弹窗由路由画在页面上（`PxModalLayer`），不推进导航栈：地址照旧是 `/issues/<id>`，直接打开也是它。没过验收的意见就写在同一个输入框里，不另开弹窗。
+
 ## 还没做的
 
 - 手机竖屏版面：[手机竖屏版面](.agents/notes/proposed/feature/2026-10-09-mobile-layout.md)。
@@ -124,7 +126,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 ## 怎么验证
 
 - 分层：`bun run app:imports`（`flutter:check` 也跑），反向、同层跨目录和在 `lib/voice/` 以外 import Agora 都报出文件和行。
-- 读服务端的形状：`test/farm/panels_test.dart`（任务与成就页、地块详情的「正在…」和这一轮的每一步、干活过程的每个工具调用都用服务端给的说法）、`test/workbench/runtimes_test.dart`（农具页照目录列）、`test/workbench/agents_test.dart`（捏帮工的农机列表照目录列和叫）、`test/game/fx_test.dart`、`test/host/notify_test.dart`（特效带的说法）。
+- 读服务端的形状：`test/farm/panels_test.dart`（任务与成就页、工单详情状态框里的「正在…」、干活过程的每个工具调用都用服务端给的说法）、`test/workbench/runtimes_test.dart`（农具页照目录列）、`test/workbench/agents_test.dart`（捏帮工的农机列表照目录列和叫）、`test/game/fx_test.dart`、`test/host/notify_test.dart`（特效带的说法）。
 - 数据层：`test/data/server_test.dart`（关闭时两条流和 `problems` 都停；坏帧之后下一帧照收）、`test/data/remote_test.dart`（农机推送胜过旧的列表、乱序的刷新新的赢、首次失败是错误）、`test/data/deep_owners_test.dart`（按对象的读取、干活过程先历史再增量、两个可见的视图共用一次已读）、`test/data/api_test.dart`；`test/app/widget_test.dart` 解码 Go 写的示例帧（`server/internal/protocol/golden_test.go` 的 `TestStateFrameSample`）。
 - 宿主：`test/host/launcher_test.dart`（子进程分配的端口和收据、日志噪声不算收据、没有收据或 pid 不符超时并停掉、提前退出、等收据时退出、spawn 没完成就取消、不理 SIGTERM 的被杀、登录 shell 超时）、`desktop_start_test.dart`、`desktop_prepare_cancel_test.dart`（并发启动共用一个、准备中退出不再生成进程）、`folders_test.dart`（家目录和工作目录、切回本机保留配对）、`follow_test.dart`、`notify_test.dart`（开机的来电不响、通知的说法、菜单栏摘要、命令的 JSON 来回）、`mobile_notices_test.dart`、`phone_lifecycle_test.dart`；`test/app/host_router_test.dart`。
 - 首页：`test/title/title_test.dart`（第一次之后直接进农场、没钥匙的开始游戏去设置、继续游戏要有农场、启动进度）。

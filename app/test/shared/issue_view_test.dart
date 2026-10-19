@@ -95,36 +95,24 @@ void main() {
         ),
       );
       await f.settle(t);
-      for (final text in [
-        '共享详情',
-        '小吴（claude）',
-        'demo',
-        'vibevalley/issue-3',
-        '/worktrees/demo.3',
-        '看测试员的档案',
-        '开单',
-        '做过',
-        '用时',
-        '测试通过',
-        '改动',
-        '每次干活',
-        '干活过程',
-        '这一轮做了什么',
-        '碰过的文件',
-        '跑过的命令',
-        '聊清楚 ✓',
-        '安排活 ✓',
-        '这块地现在需要你：验收',
-        '看一眼就收',
-        '必须过验收',
-        '已拔 · 少了边界测试',
-      ]) {
+      // The first layer is the status and what it needs; the rest is folded.
+      for (final text in ['共享详情', '等你验收 · 小吴交回来了（第 1 轮）', '测试通过', '验收通过', '没过，照上面修', '带话', '干活过程', '每次干活', '详情']) {
         expect(find.text(text), findsOneWidget, reason: '$frame: $text');
       }
-      expect(find.byType(frame == IssueFrame.farm ? FarmSection : PxCard), findsWidgets);
+      for (final gone in ['这一轮做了什么', '碰过的文件', '跑过的命令', '小吴（claude）', '复制路径']) {
+        expect(find.text(gone), findsNothing, reason: '$frame: $gone is not on the first layer');
+      }
+      expect(find.textContaining('改动'), findsOneWidget);
+      await t.tap(find.text('详情'));
+      await f.settle(t);
+      for (final text in ['小吴（claude）', 'vibevalley/issue-3', '/worktrees/demo.3', '看测试员的档案', '开单', '做过', '用时', '看一眼就收', '必须过验收', '已拔 · 少了边界测试']) {
+        expect(find.text(text), findsOneWidget, reason: '$frame: $text in 详情');
+      }
+      await t.ensureVisible(find.text('复制路径'));
       await t.tap(find.text('复制路径'));
       expect(copied, '/worktrees/demo.3');
       // Acceptance is the server's: a pass goes to issue.accept.
+      await t.ensureVisible(find.text('验收通过'));
       await t.tap(find.text('验收通过'));
       await f.settle(t);
       expect(routes.named('POST', '/api/v1/issues/tw1/accept').single.body, {'pass': true});
@@ -134,14 +122,23 @@ void main() {
       await t.tap(find.text('关上'));
       await f.settle(t);
       expect(closed, 1);
-      await t.ensureVisible(find.byType(EditableText).last);
-      await t.enterText(find.byType(EditableText).last, '补一个测试');
+      final box = find.bySemanticsLabel('给小吴带句话');
+      await t.enterText(find.descendant(of: box, matching: find.byType(EditableText)).first, '补一个测试');
       await t.pump();
       await t.tap(find.widgetWithText(PxButton, '带话'));
       await f.settle(t);
       expect(routes.named('POST', '/api/v1/issues/tw1/comment').single.body, {'text': '补一个测试'});
-      await t.ensureVisible(find.text('demo'));
-      await t.tap(find.text('demo'));
+      // 没过 takes what the box says, one weed a line: no dialog of its own.
+      await t.enterText(find.descendant(of: box, matching: find.byType(EditableText)).first, '看板还在调旧接口\n\n少一个测试');
+      await t.pump();
+      await t.tap(find.text('没过，照上面修'));
+      await f.settle(t);
+      expect(routes.named('POST', '/api/v1/issues/tw1/accept').last.body, {
+        'pass': false,
+        'findings': ['看板还在调旧接口', '少一个测试'],
+      });
+      await t.ensureVisible(find.text('demo').last);
+      await t.tap(find.text('demo').last);
       await f.settle(t);
       expect(find.text('项目路径 /projects/demo'), findsOneWidget);
       await t.pump(const Duration(seconds: 3));

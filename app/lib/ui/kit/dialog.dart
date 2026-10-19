@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme.dart';
 import 'base.dart';
@@ -204,4 +205,93 @@ class FarmSection extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// A page's own modal, drawn over the page by its route rather than pushed on the navigator: the address stays the
+/// page's (`/issues/<id>`), and Esc, ✕ or the backdrop close it.
+class PxModalLayer extends StatefulWidget {
+  const PxModalLayer({super.key, required this.onClose, required this.child, this.maxWidth = 720});
+  final VoidCallback onClose;
+  final Widget child;
+  final double maxWidth;
+
+  @override
+  State<PxModalLayer> createState() => _PxModalLayerState();
+}
+
+class _PxModalLayerState extends State<PxModalLayer> {
+  // It takes the keyboard as it opens, so Esc reaches it.
+  final _scope = FocusScopeNode(debugLabel: 'modal');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scope.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scope.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screen = MediaQuery.sizeOf(context);
+    return CallbackShortcuts(
+      bindings: {const SingleActivator(LogicalKeyboardKey.escape): widget.onClose},
+      child: FocusScope(
+        node: _scope,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Semantics(
+                button: true,
+                label: '关上',
+                child: GestureDetector(
+                  onTap: widget.onClose,
+                  child: const ColoredBox(color: _dialogBackdrop),
+                ),
+              ),
+            ),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: widget.maxWidth, maxHeight: screen.height * .88),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: PxWindow(
+                      border: 2,
+                      child: Stack(
+                        children: [
+                          SingleChildScrollView(
+                            // The top leaves room for ✕, so a title under it is never covered.
+                            padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
+                            child: DefaultTextStyle(style: KitText.sm, child: widget.child),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: PxButton(
+                              size: PxSize.icon,
+                              semanticLabel: '关上',
+                              onPressed: widget.onClose,
+                              child: const SpriteIcon('button-close', size: 16),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

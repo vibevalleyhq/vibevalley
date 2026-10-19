@@ -7,7 +7,6 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../rules/issues.dart';
 import '../../ui/kit/kit.dart';
-import '../shared/layout.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
@@ -307,27 +306,11 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
           ],
         );
         if (detail == null) return board;
-        final side = Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        return Stack(
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: InlineLink(box.maxWidth >= sideBySideFrom ? '收起' : '回看板', onTap: () => _open(null)),
-            ),
-            const SizedBox(height: 6),
-            Expanded(child: PxScrollView(child: detail)),
-          ],
-        );
-        if (box.maxWidth < sideBySideFrom) {
-          return Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 12), child: side);
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(child: board),
-            SizedBox(
-              width: 480,
-              child: Padding(padding: const EdgeInsets.fromLTRB(0, 0, 12, 12), child: side),
+            Positioned.fill(child: board),
+            Positioned.fill(
+              child: PxModalLayer(onClose: () => _open(null), child: detail),
             ),
           ],
         );
