@@ -51,7 +51,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
     String whose(Memory m) => switch (m.author) {
       MemoryAuthor.owner => '你记的',
       MemoryAuthor.manager => '管家替它记的',
-      MemoryAuthor.agent || MemoryAuthor.farm || null => m.session != null ? '${sessions[m.session] ?? m.session} 记的' : '它自己记的',
+      MemoryAuthor.agent || MemoryAuthor.system || null => m.session != null ? '${sessions[m.session] ?? m.session} 记的' : '它自己记的',
     };
     MemorySourceInfo? from(Memory m) => m.source == null ? null : sources[m.source];
 

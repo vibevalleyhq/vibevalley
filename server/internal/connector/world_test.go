@@ -62,7 +62,7 @@ func newWorld(cfg base.Config, options ...fx.Option) (*world, error) {
 	return w, nil
 }
 
-func connectorTestFarm(t *testing.T) *world {
+func connectorTestWorld(t *testing.T) *world {
 	t.Helper()
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
 	cfg.Voice.Line.Port, cfg.Voice.Line.URL = 0, "https://line.example.com"

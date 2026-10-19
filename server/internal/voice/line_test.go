@@ -131,7 +131,7 @@ func TestVoiceLineDroppedRequestStopsItsWords(t *testing.T) {
 }
 
 func TestVoiceLineOpensAndClosesCalls(t *testing.T) {
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	f.Voice.call = func(context.Context, string) <-chan string { return voiceWords("在。") }
 	if _, err := f.Voice.Open(); err == nil {
 		t.Fatal("not listening yet")
@@ -158,7 +158,7 @@ func TestVoiceLineOpensAndClosesCalls(t *testing.T) {
 }
 
 func TestVoiceLineQuickTunnelLingersAfterTheLastCall(t *testing.T) {
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	f.Voice.url = ""
 	opened, closed := 0, 0
 	f.Voice.openTunnel = func(int) (*voiceTunnel, error) {
@@ -196,7 +196,7 @@ func TestVoiceLineQuickTunnelLingersAfterTheLastCall(t *testing.T) {
 }
 
 func TestVoiceLineCannotReopenAfterStop(t *testing.T) {
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	if err := f.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestVoiceLineCannotReopenAfterStop(t *testing.T) {
 }
 
 func TestVoiceLineExpiredTimerCannotCloseReopenedTunnel(t *testing.T) {
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	f.Voice.url = ""
 	closed := 0
 	f.Voice.openTunnel = func(int) (*voiceTunnel, error) {
@@ -248,7 +248,7 @@ func TestVoiceLineExpiredTimerCannotCloseReopenedTunnel(t *testing.T) {
 }
 
 func TestVoiceKeepsWhatAgorasModelSaidOnALiveCall(t *testing.T) {
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	if err := f.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}

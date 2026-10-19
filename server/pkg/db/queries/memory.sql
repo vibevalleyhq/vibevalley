@@ -16,7 +16,7 @@ update memory set recalled = recalled + 1, recalled_at = ? where id = ?;
 -- One job memory for each session: written again as the session goes on.
 insert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)
 values (sqlc.arg(id), 'agent', cast(sqlc.arg(agent) as text), 'issue', sqlc.arg(body), sqlc.arg(terms), sqlc.arg(terms_of), sqlc.arg(project),
-        sqlc.arg(session), 'farm', sqlc.arg(created_at), sqlc.arg(created_at))
+        sqlc.arg(session), 'system', sqlc.arg(created_at), sqlc.arg(created_at))
 on conflict (agent, session) where kind = 'issue'
 do update set body = excluded.body, terms = excluded.terms, terms_of = excluded.terms_of, project = excluded.project,
               created_at = excluded.created_at, updated_at = excluded.updated_at;

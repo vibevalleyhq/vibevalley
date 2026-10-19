@@ -98,7 +98,7 @@ type sessions struct {
 	root         string
 	file         string
 	logDir       string
-	farmURL      string
+	mcpURL       string
 	stallMs      int64
 	// The days an ended session's log is kept (session.trajectory_days).
 	logDays  int
@@ -142,7 +142,7 @@ func newSessions(in sessionsIn) (*sessions, error) {
 		projects: in.Projects, runtimes: in.Runtimes,
 		root:     root,
 		file:     filepath.Join(in.Config.Home, "sessions.json"),
-		farmURL:  "http://" + in.Config.ServerAddress() + "/mcp",
+		mcpURL:   "http://" + in.Config.ServerAddress() + "/mcp",
 		logDir:   filepath.Join(in.Config.Home, "logs"),
 		stallMs:  int64(in.Config.Session.StallSeconds * 1000),
 		logDays:  in.Config.Session.TrajectoryDays,
@@ -159,13 +159,13 @@ func newSessions(in sessionsIn) (*sessions, error) {
 func (c *sessions) SetAddress(addr string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.farmURL = "http://" + addr + "/mcp"
+	c.mcpURL = "http://" + addr + "/mcp"
 }
 
-func (c *sessions) FarmURL() string {
+func (c *sessions) MCPURL() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.farmURL
+	return c.mcpURL
 }
 
 func (*sessions) OnStart(context.Context) error { return nil }
@@ -200,7 +200,7 @@ func (c *sessions) OnStop() {
 	group.Wait()
 }
 
-func (c *sessions) onFarm() []protocol.Session { return c.core.State().Sessions }
+func (c *sessions) presentSessions() []protocol.Session { return c.core.State().Sessions }
 
 func (c *sessions) working(id string) bool {
 	if h := c.core.Session(id); h != nil {
@@ -286,12 +286,12 @@ func (c *sessions) restore() {
 	}
 	// Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
 	c.hired = saved.Hired
-	for _, h := range c.onFarm() {
+	for _, h := range c.presentSessions() {
 		if n, err := strconv.ParseInt(strings.TrimPrefix(h.ID, "w"), 10, 64); err == nil && n > c.hired {
 			c.hired = n
 		}
 	}
-	for _, session := range c.onFarm() {
+	for _, session := range c.presentSessions() {
 		i := slices.IndexFunc(saved.Hands, func(s savedHand) bool { return s.ID == session.ID })
 		var s *savedHand
 		if i >= 0 {
@@ -336,7 +336,7 @@ func (c *sessions) NoRoom(runtime, project string) string {
 // A submitted turn owns its slot before smith emits TurnStarted. Its existing trigger queue is the reservation;
 // startRun consumes it only after the working fact is published under the same hand lock.
 func (c *sessions) capacity() []protocol.Session {
-	sessions := slices.Clone(c.onFarm())
+	sessions := slices.Clone(c.presentSessions())
 	for i := range sessions {
 		if h := c.hand(sessions[i].ID); h != nil {
 			h.mu.Lock()
@@ -555,11 +555,11 @@ func (c *sessions) open(ctx context.Context, agent protocol.Agent, id string, pl
 		return nil, err.Error()
 	}
 	base := resolved.Runtime
-	text := strings.Join(slices.DeleteFunc([]string{instructions(agent, c.store.Skills()), farmRules(place, c.projects.HouseRules(), id)}, func(s string) bool { return s == "" }), "\n\n")
+	text := strings.Join(slices.DeleteFunc([]string{instructions(agent, c.store.Skills()), workplaceRules(place, c.projects.HouseRules(), id)}, func(s string) bool { return s == "" }), "\n\n")
 	c.mu.Lock()
-	farmURL := c.farmURL
+	mcpURL := c.mcpURL
 	c.mu.Unlock()
-	farm := oar.McpServer{Name: "vibevalley", Type: "http", URL: farmURL, Headers: map[string]string{"authorization": "Bearer " + c.tokens.Issue(id)}}
+	farm := oar.McpServer{Name: "vibevalley", Type: "http", URL: mcpURL, Headers: map[string]string{"authorization": "Bearer " + c.tokens.Issue(id)}}
 	options := agents.SpawnOptions{MCPServers: []oar.McpServer{farm}}
 	for _, m := range agent.MCPServers {
 		options.MCPServers = append(options.MCPServers, toOarMcp(m))
@@ -841,7 +841,7 @@ func (c *sessions) Send(ctx context.Context, agent protocol.Agent, task, where s
 	}
 
 	projectName := place.Project
-	session := protocol.Session{ID: id, Name: sessionName(c.onFarm(), agent.ID, agent.Name), Agent: agent.ID, Runtime: agent.Runtime, Brief: task, Project: &projectName,
+	session := protocol.Session{ID: id, Name: sessionName(c.presentSessions(), agent.ID, agent.Name), Agent: agent.ID, Runtime: agent.Runtime, Brief: task, Project: &projectName,
 		HiredAt: clock.NowMs(), Phase: protocol.Phase{Value: protocol.PhaseArriving{}}, Graph: opt.TaskGraph, Channel: opt.Channel, Draft: opt.Draft}
 	if opt.Issue != "" {
 		issue := opt.Issue

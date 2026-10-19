@@ -75,7 +75,7 @@
 
 ## 怎么验证
 
-- `lan/lan_test.go`：`TestLanShutUntilOpened`（没开时连不上）、`TestLanPairedDeviceUsesTheFarm`（配对、带钥匙用接口、管理接口经「连接到本机」 403）、`TestLanOwnerRefuses`、`TestLanWrongCodesCallItOff`（错 5 次作废）、`TestLanCodeExpires`、`TestLanForgetEndsTheDevicesStreams`（移除断开状态流）、`TestLanRemembersAcrossRestarts`（开关和设备重启后还在）。
+- `lan/lan_test.go`：`TestLanShutUntilOpened`（没开时连不上）、`TestLanPairedDeviceUsesTheWorkspace`（配对、带钥匙用接口、管理接口经「连接到本机」 403）、`TestLanOwnerRefuses`、`TestLanWrongCodesCallItOff`（错 5 次作废）、`TestLanCodeExpires`、`TestLanForgetEndsTheDevicesStreams`（移除断开状态流）、`TestLanRemembersAcrossRestarts`（开关和设备重启后还在）。
 - `lan/lifecycle_test.go`：`TestConcurrentOpenMatchesPersistence`（并发开关后监听和库一致）、`TestTrackingRechecksForgottenDevice`（移除和进门同时发生）。
 - `lan/remote_test.go` 的 `TestRemoteMayFollowsCan`：放行表和每个接口的 `can remote` 一致，流都放，不认识的路径不放。
 - 客户端 `test/workbench/lan_test.dart`：`PairLink` 的解析、选择重启后还在、`pairWith`（带码换钥匙、旧钥匙在新地址上还认、钥匙被忘了就带码再要）、「连接到本机」页的打开和让设备进来再移除。

@@ -124,7 +124,7 @@ func (c *Service) restore() error {
 	if err := s.rollbackAll(); err != nil {
 		return err
 	}
-	for _, h := range c.onFarm() {
+	for _, h := range c.presentSessions() {
 		c.openJob(h)
 	}
 	convs, err := s.recentConversations(protocol.KeepConversations)
@@ -387,7 +387,7 @@ func (c *Service) channelOfSession(h protocol.Session) string {
 	return c.general
 }
 
-func (c *Service) onFarm() []protocol.Session { return c.core.State().Sessions }
+func (c *Service) presentSessions() []protocol.Session { return c.core.State().Sessions }
 
 func (c *Service) sessionOf(id string) *protocol.Session { return c.core.Session(id) }
 
@@ -525,9 +525,9 @@ func (c *Service) Say(text string, conversation *string, sendKey string) (messag
 		return protocol.ChatMessage{}, false, err
 	}
 	c.publishConversation(where)
-	if len(written.notOnFarm) > 0 {
-		names := make([]string, len(written.notOnFarm))
-		for i, m := range written.notOnFarm {
+	if len(written.absent) > 0 {
+		names := make([]string, len(written.absent))
+		for i, m := range written.absent {
 			if w, ok := mentionOf[m]; ok {
 				names[i] = w
 			} else {
@@ -609,7 +609,7 @@ func (c *Service) Speak(from, text string, opt SpeakOptions) (Spoken, error) {
 	}
 	if again != nil {
 		if m, err := s.message(*again); err == nil && m != nil {
-			return Spoken{Kind: "sent", Message: chatToMessage(*m), Target: target, NotOnFarm: []string{}}, nil
+			return Spoken{Kind: "sent", Message: chatToMessage(*m), Target: target, Absent: []string{}}, nil
 		}
 	}
 	// Posting on a channel right after reading a thread: confirm once.
@@ -670,11 +670,11 @@ func (c *Service) Speak(from, text string, opt SpeakOptions) (Spoken, error) {
 	if m == nil {
 		return Spoken{}, errors.New("写进去了，但读不回来")
 	}
-	notOnFarm := written.notOnFarm
-	if notOnFarm == nil {
-		notOnFarm = []string{}
+	absent := written.absent
+	if absent == nil {
+		absent = []string{}
 	}
-	return Spoken{Kind: "sent", Message: chatToMessage(*m), Target: target, NotOnFarm: notOnFarm}, nil
+	return Spoken{Kind: "sent", Message: chatToMessage(*m), Target: target, Absent: absent}, nil
 }
 
 // Words said on a call, by the owner ("user") or the manager, kept in 田头 as they were said. The manager already heard them on the

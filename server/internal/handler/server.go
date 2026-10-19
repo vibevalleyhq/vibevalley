@@ -13,7 +13,7 @@ import (
 	"vibevalley/internal/workspace"
 )
 
-// Server owns the listener, farm and request lifetime; completion means both transport and farm have stopped.
+// Server owns the listener, workspace and request lifetime; completion means both transport and workspace have stopped.
 type Server struct {
 	address string
 	done    chan struct{}
@@ -35,22 +35,22 @@ func Listen(ctx context.Context, cfg base.Config, options ...fx.Option) (*Server
 		go func() { served <- transport.Serve(listener) }()
 		return nil
 	})
-	farm, err := workspace.New(cfg, append([]fx.Option{prepare}, options...)...)
+	f, err := workspace.New(cfg, append([]fx.Option{prepare}, options...)...)
 	if err != nil {
 		cancel()
 		listener.Close()
 		return nil, err
 	}
-	farm.Session.SetAddress(result.address)
-	transport = &http.Server{Handler: New(farm), BaseContext: func(net.Listener) context.Context { return life }}
-	if err := farm.Start(life); err != nil {
+	f.Session.SetAddress(result.address)
+	transport = &http.Server{Handler: New(f), BaseContext: func(net.Listener) context.Context { return life }}
+	if err := f.Start(life); err != nil {
 		cancel()
 		transport.Close()
 		listener.Close()
 		if started {
 			<-served
 		}
-		farm.Close()
+		f.Close()
 		return nil, err
 	}
 	go func() {
@@ -71,7 +71,7 @@ func Listen(ctx context.Context, cfg base.Config, options ...fx.Option) (*Server
 		if !exited {
 			serveErr = <-served
 		}
-		farm.Close()
+		f.Close()
 		if !errors.Is(serveErr, http.ErrServerClosed) {
 			result.err = serveErr
 		}

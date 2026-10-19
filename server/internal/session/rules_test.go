@@ -210,7 +210,7 @@ func limitSession(id, runtime, project string, working bool) protocol.Session {
 	return protocol.Session{ID: id, Name: id, Agent: "zhou", Runtime: runtime, Project: &project, Phase: phase}
 }
 
-func TestRoomOnTheFarm(t *testing.T) {
+func TestRoomInTheWorkspace(t *testing.T) {
 	limits := sessionLimits{Workspace: 3, PerRuntime: 2, PerProject: 2}
 	h := limitSession
 	testkit.Eq(t, noRoom(nil, "pi", "a", limits, ""), "", "empty farm")

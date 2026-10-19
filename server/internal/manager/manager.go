@@ -642,7 +642,7 @@ func (fm *manager) sendInput(line string, input managerInput, now bool) bool {
 	input.run.Heard = ids
 	// The log shows the line; the model also gets the time, the farm and the news before it.
 	input.run.Asked = line
-	text := strings.Join(slices.DeleteFunc([]string{"【现在】" + vvagent.LocaleMinute(time.Now()), fm.farmNow(brain, conversation), brain.MemoryNews(), heard, line},
+	text := strings.Join(slices.DeleteFunc([]string{"【现在】" + vvagent.LocaleMinute(time.Now()), fm.situationNow(brain, conversation), brain.MemoryNews(), heard, line},
 		func(part string) bool { return part == "" }), "\n\n")
 	deliver(vvagent.NewCustomMessage("managerInput", ai.StringContent(text), vvagent.CustomMessageOptions{Details: input}))
 	return true
@@ -650,7 +650,7 @@ func (fm *manager) sendInput(line string, input managerInput, now bool) bool {
 
 // The situation for the next input: the whole of it, or what changed since the input before. An input given while the
 // brain is busy may be taken after one given later, so it carries the whole, and the one after it does too.
-func (fm *manager) farmNow(brain *vvagent.Agent, conversation string) string {
+func (fm *manager) situationNow(brain *vvagent.Agent, conversation string) string {
 	now := fm.situation(conversation)
 	busy := brain.Busy() || brain.Core.HasQueuedMessages()
 	fm.mu.Lock()

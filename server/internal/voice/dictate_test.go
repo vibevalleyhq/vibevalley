@@ -32,7 +32,7 @@ func TestDictationPassesTheRecordingOn(t *testing.T) {
 		io.WriteString(w, `{"text":" 让阿郑改一下 refreshSession "}`)
 	}))
 	defer endpoint.Close()
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	ctx := context.Background()
 	recording := base64.StdEncoding.EncodeToString([]byte("RIFF....WAVE"))
 
@@ -70,7 +70,7 @@ func TestDictationSaysWhyTheEndpointFailed(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 		io.WriteString(w, `{"error":{"message":"Incorrect API key provided"}}`)
 	}))
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	ctx := context.Background()
 	recording := base64.StdEncoding.EncodeToString([]byte("x"))
 	if _, err := f.Setting.Save(protocol.SettingsUpdate{Dictation: &protocol.Dictation{URL: endpoint.URL + "/v1", Model: "gpt-4o-mini-transcribe"}}); err != nil {
@@ -87,7 +87,7 @@ func TestDictationSaysWhyTheEndpointFailed(t *testing.T) {
 }
 
 func TestDictationSettingsAreChecked(t *testing.T) {
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	for _, d := range []protocol.Dictation{{URL: "127.0.0.1:8080/v1", Model: "qwen3"}, {URL: "http://127.0.0.1:8080/v1"}} {
 		if _, err := f.Setting.Save(protocol.SettingsUpdate{Dictation: &d}); err == nil {
 			t.Fatalf("saved %+v", d)

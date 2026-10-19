@@ -1105,8 +1105,8 @@ const (
 	MemoryAuthorAgent MemoryAuthor = "agent"
 	// The manager's memory_add for that agent.
 	MemoryAuthorManager MemoryAuthor = "manager"
-	// The farm's record of a finished job (kind issue).
-	MemoryAuthorFarm MemoryAuthor = "farm"
+	// The server's record of a finished job (kind issue).
+	MemoryAuthorSystem MemoryAuthor = "system"
 )
 
 type MemoryKind string
@@ -1421,7 +1421,7 @@ type Finding struct {
 	Pulled bool   `json:"pulled,omitzero"`
 }
 
-// Pass sets the issue accepted (its open weeds pulled); a fail adds Findings as weeds and sends another round with Text.
+// Pass sets the issue accepted (its open findings pulled); a fail adds Findings and sends another round with Text.
 type IssueAcceptRequest struct {
 	Pass     bool     `json:"pass"`
 	Findings []string `json:"findings,omitzero"`

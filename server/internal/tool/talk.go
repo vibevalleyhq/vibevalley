@@ -64,9 +64,9 @@ func spokenText(s channel.Spoken) string {
 		return fmt.Sprintf("先没发：你刚读的是 %s，这条却要发到 %s 顶层。要回在那个串里，就把 target 写成 %s；确实要发到田头，就加 confirm: true。", s.LastRead, s.Target, s.LastRead)
 	default:
 		absent := ""
-		if len(s.NotOnFarm) > 0 {
-			names := make([]string, len(s.NotOnFarm))
-			for i, m := range s.NotOnFarm {
+		if len(s.Absent) > 0 {
+			names := make([]string, len(s.Absent))
+			for i, m := range s.Absent {
 				names[i] = "@" + m
 			}
 			absent = "。" + strings.Join(names, "、") + " 不在地里，没送到"

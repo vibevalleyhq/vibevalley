@@ -192,7 +192,7 @@ func issueOf(row generated.Issue, runs []string, state protocol.CoreState) proto
 	}
 	if row.Findings.Valid {
 		if err := json.Unmarshal([]byte(row.Findings.String), &out.Findings); err != nil {
-			log.Printf("vibevalley: issue %s: its weeds cannot be read: %v", row.ID, err)
+			log.Printf("vibevalley: issue %s: its findings cannot be read: %v", row.ID, err)
 		}
 	}
 	if row.Asks.Valid {

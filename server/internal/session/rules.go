@@ -295,7 +295,7 @@ func instructions(agent protocol.Agent, library []protocol.Skill) string {
 	return strings.Join(slices.DeleteFunc(parts, func(p string) bool { return p == "" }), "\n\n")
 }
 
-func farmRules(place project.Workplace, house, id string) string {
+func workplaceRules(place project.Workplace, house, id string) string {
 	where := fmt.Sprintf("你在项目「%s」的目录里干活（%s）。只改这个目录里的东西，不要 push。", place.Project, place.Cwd)
 	if place.Branch != "" {
 		where = fmt.Sprintf("你在项目「%s」的独立分支 %s 上干活（这是一个 git worktree：%s）。只改这个目录里的东西，不要切换或改动别的分支，不要 push。", place.Project, place.Branch, place.Cwd)

@@ -16,7 +16,7 @@
 
 ## 在哪
 
-- 服务端 `server/internal/session`（`session.Service`，嵌入三个零件）：`sessions.go` 生命周期（`Send` 派、`Deliver`/`Tell` 带话、`Stop`、`Dismiss`、重启后 `restore`、`watch` 接事件、`stalled` 没动静）；`facts.go` 的 `eventFacts`（纯函数）把一个 oar 事件读成事实和日志；`rules.go` 的 `readReport`、`noRoom`、`farmRules`、`ChooseAgent`（纯函数）；`runs.go` 一次 run 的记录；`records.go` 走了的 Session；`events.go` 日志（`journal`）；`trajectories.go` 日志文件的开、关、删；`harvest.go` 收获时让 Session 离开；`tokens.go` 给 `/mcp` 认人的令牌；`agent_execution.go` 管家的 run。
+- 服务端 `server/internal/session`（`session.Service`，嵌入三个零件）：`sessions.go` 生命周期（`Send` 派、`Deliver`/`Tell` 带话、`Stop`、`Dismiss`、重启后 `restore`、`watch` 接事件、`stalled` 没动静）；`facts.go` 的 `eventFacts`（纯函数）把一个 oar 事件读成事实和日志；`rules.go` 的 `readReport`、`noRoom`、`workplaceRules`、`ChooseAgent`（纯函数）；`runs.go` 一次 run 的记录；`records.go` 走了的 Session；`events.go` 日志（`journal`）；`trajectories.go` 日志文件的开、关、删；`harvest.go` 收获时让 Session 离开；`tokens.go` 给 `/mcp` 认人的令牌；`agent_execution.go` 管家的 run。
 - `server/internal/runtime`（`runtime.Service`）：农机的注册（`Registry`）、探测和安装（`Resolve`）、额度（`quota.go`）、价目（`price.go`、`pi_prices.json`）、今天的花费；`rules.go` 的 `agentIssues`、`moneyStop` 是「派不出去」的规则。
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 家目录：`sessions.json`（在地里的 Session 的 worktree、oar 会话 id、最后一轮原话、想起过的记性）、`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（smith 的原始记录）；核心状态里的 `CoreState.Sessions` 随 `state.json` 存。
@@ -38,7 +38,7 @@
 - **没有权限确认、不开沙箱**：边界是 Session 只在 `VIBEVALLEY_WORK_ROOT` 下的项目里、自己的 worktree 里开工，服务端只听 127.0.0.1（例外见根目录 [AGENTS.md](AGENTS.md)「帮工没有权限确认」）。帮工能在这台机器上执行任意命令，服务端不应对外。
 - **档案经 `Spawn` 的选项进会话**：人设和技能拼成说明，`append` 放进追加的系统提示，`replace` 替换系统提示，`prompt` 写在交给它的活前面（中间隔 `JobBreak`）；档案的 MCP 服务器、禁用的工具、模型、思考强度、环境变量（农机设置的在前，档案的盖过它）一起交给 smith，不改共享的农机注册表。档案没写模型就用农机设置的默认模型；模型列表里没有的退回农机默认并提醒一次。
 - **农机的安装是显式的输入**：农机设置的 `BinPath` 作为 `oar.InstallationOptions.Binary` 交给探测，不写进进程的环境变量；`runtime.Resolve` 带回探测时接受的那个安装，`Spawn` 直接用它，不再探一次。指定的路径失效不会悄悄换一台。
-- **农场的规矩**（`farmRules`，每次开会话附上）：在哪个项目、哪个分支和 worktree，只改这个目录，不切分支、不 push；做完一轮 `git add`、`git commit`，提交信息照项目的约定；汇报写 commit 号和怎么验证的，最后一段以「结论：」开头；缺信息的写「要问主人：」，学到的写「记住：」（所有项目都成立的写「记住（所有项目）：」）；在田头怎么 @、怎么用 `channel_say`；加上 `VIBEVALLEY_WORK_ROOT/AGENTS.md`（有的话）作为「这台机器上所有项目的约定」。
+- **农场的规矩**（`workplaceRules`，每次开会话附上）：在哪个项目、哪个分支和 worktree，只改这个目录，不切分支、不 push；做完一轮 `git add`、`git commit`，提交信息照项目的约定；汇报写 commit 号和怎么验证的，最后一段以「结论：」开头；缺信息的写「要问主人：」，学到的写「记住：」（所有项目都成立的写「记住（所有项目）：」）；在田头怎么 @、怎么用 `channel_say`；加上 `VIBEVALLEY_WORK_ROOT/AGENTS.md`（有的话）作为「这台机器上所有项目的约定」。
 - **Session 带一把 `/mcp` 的令牌**（`hb_<id>_<随机>`，只在内存里）：农场作为 MCP 服务器 `vibevalley` 交给它，`/mcp` 凭令牌认出是哪个 Session；令牌只用来分人，不是安全边界，收工时作废。
 - **一次 run 记着为什么开的**（`RunTrigger`）：`issue`（第一次派出去）、`comment`（带话，带着那条消息的号）、`task`（种植计划）、`schedule`（带着哪个定时、是不是补跑）、`draft`（起草工单）；没人发话就开的一轮是 `runtime`（农机自己）。发话的一方先把触发放在 Session 上（`expect`），农机开了这一轮，run 取最早的那个。
 - **起草的 Session**（`Session.Draft`，派活时 `HireOptions.Draft`）：为一张备选工单写草稿，不是这张工单的帮工；它带着 `Issue`（工单串、run 都记在这张工单上），但不进 `issue_session`。交回来以后由工单服务重置它的 worktree、请它收工（[工单](docs/subsystems/issue.md#怎么走)「起草」）。田头的派活消息写「看代码，起草这张工单」，再起草写「再起草一版」。
@@ -145,7 +145,7 @@
 
 ## 怎么验证
 
-- `session/rules_test.go`（纯函数，不开会话）：`TestSessionsRunStartsWithTheJobAndCountsFromWhatWasSpent`、`TestSessionsSpendingCountedFromTheLastTotal`、`TestSessionsQuietEndsWithAWordNotWithUsage`、`TestSessionsRetriesModelFailuresAndExitsAreSaid`、`TestSessionsSubAgentStepsSayWhose`、`TestSummaryIsTheVerdict`、`TestCompletedRunRead`、`TestFailedRunLeadsWithWhy`、`TestRoomOnTheFarm`；`shell_test.go` 的 `TestAsksAreTheLinesForTheOwner`。
+- `session/rules_test.go`（纯函数，不开会话）：`TestSessionsRunStartsWithTheJobAndCountsFromWhatWasSpent`、`TestSessionsSpendingCountedFromTheLastTotal`、`TestSessionsQuietEndsWithAWordNotWithUsage`、`TestSessionsRetriesModelFailuresAndExitsAreSaid`、`TestSessionsSubAgentStepsSayWhose`、`TestSummaryIsTheVerdict`、`TestCompletedRunRead`、`TestFailedRunLeadsWithWhy`、`TestRoomInTheWorkspace`；`shell_test.go` 的 `TestAsksAreTheLinesForTheOwner`。
 - `session/trajectories_test.go`：`TestLogKeptAndReadBack`（读回，调用带着动作的说法）、`TestSubAgentStepsGoUnderTheirCall`、`TestJournalSendsAndWrites`、`TestLogOnlyGrows`；`admission_test.go` 的 `TestPendingTurnReservesCapacityUntilWorkingFact`。
 - `workspace/work_test.go`（smith 的 `oartest` 扮演帮工、真的 git 仓库）：`TestHiredSessionWorksReportsAndGoesHome`、`TestRunsKeepWhatStartedEachRun`、`TestRestartSessionsComeBackResting`、`TestEveryStepKeptInItsTrajectory`、`TestEndedSessionsAreRows`、`TestFailedRunSaysWhy`、`TestQuietSessionIsFlagged`、`TestNobodySentWhenMoneyRunsOut`、`TestLimitsOnProjectAndRuntime`、`TestTwoSentToANewProjectAtOnce`、`TestActivityAndTokens`。
 - `issue/lifecycle_test.go`：`TestFailedSpawnReleasesWorktree`、`TestFailedIssueLinkDoesNotPublishOrKeepSession`、`TestConcurrentSendHonorsProjectCapacity`。

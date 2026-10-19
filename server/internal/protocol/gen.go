@@ -789,7 +789,7 @@ func (v ArchiveListing) MarshalJSON() ([]byte, error) {
 }
 
 // MemoryAuthorValues are every MemoryAuthor, in the protocol's order.
-var MemoryAuthorValues = []MemoryAuthor{MemoryAuthorOwner, MemoryAuthorAgent, MemoryAuthorManager, MemoryAuthorFarm}
+var MemoryAuthorValues = []MemoryAuthor{MemoryAuthorOwner, MemoryAuthorAgent, MemoryAuthorManager, MemoryAuthorSystem}
 
 // MemoryKindValues are every MemoryKind, in the protocol's order.
 var MemoryKindValues = []MemoryKind{MemoryKindNote, MemoryKindIssue}

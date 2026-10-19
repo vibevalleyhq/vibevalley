@@ -36,7 +36,7 @@ func patrolChat(messages ...protocol.ChatMessage) *protocol.Chat {
 	}
 }
 
-func patrolFarm(chat *protocol.Chat) protocol.CoreState {
+func patrolState(chat *protocol.Chat) protocol.CoreState {
 	s := protocol.EmptyCoreState()
 	s.Chat = chat
 	return s
@@ -49,17 +49,17 @@ func patrolBriefs(state protocol.CoreState) []patrolNote {
 }
 
 func TestPatrolAsk(t *testing.T) {
-	asked := patrolFarm(patrolChat(patrolMessage(func(*protocol.ChatMessage) {})))
+	asked := patrolState(patrolChat(patrolMessage(func(*protocol.ChatMessage) {})))
 	found := patrolBriefs(asked)
 	testkit.Eq(t, len(found), 1)
 	testkit.Eq(t, found[0].Key, "m10")
 	testkit.Eq(t, *found[0].Channel, "x5")
 	testkit.Match(t, found[0].Text, `后端老周 在 #ops:3 问主人的话，24 小时没人回`)
-	answered := patrolFarm(patrolChat(patrolMessage(func(*protocol.ChatMessage) {}), patrolMessage(func(m *protocol.ChatMessage) {
+	answered := patrolState(patrolChat(patrolMessage(func(*protocol.ChatMessage) {}), patrolMessage(func(m *protocol.ChatMessage) {
 		m.ID, m.Number, m.From, m.FromKind, m.Name, m.Text, m.Mentions = "m11", 11, "user", protocol.SenderKindUser, "主人", "按月", []string{}
 	})))
 	testkit.Eq(t, patrolBriefs(answered), []patrolNote{})
-	notAsked := patrolFarm(patrolChat(patrolMessage(func(m *protocol.ChatMessage) { m.Mentions = []string{protocol.ManagerAgent} })))
+	notAsked := patrolState(patrolChat(patrolMessage(func(m *protocol.ChatMessage) { m.Mentions = []string{protocol.ManagerAgent} })))
 	testkit.Eq(t, patrolBriefs(notAsked), []patrolNote{})
 }
 
@@ -67,7 +67,7 @@ func TestPatrolQuietRipeStep(t *testing.T) {
 	graph := protocol.TaskGraph{ID: "p1", Title: "打卡", Project: "demo", State: protocol.GraphStateRunning, Parallel: 2, CreatedAt: patrolT,
 		Tasks: []protocol.Task{{ID: "api", Title: "接口", Needs: []string{}, State: protocol.TaskStateFailed, Tries: 1, Conclusion: ptr.To("测试没过")}}}
 	draft := protocol.TaskGraph{ID: "p2", Title: "导出", Project: "demo", State: protocol.GraphStateDraft, Parallel: 1, CreatedAt: patrolT}
-	state := patrolFarm(patrolChat())
+	state := patrolState(patrolChat())
 	state = patrolWithTasks(state, graph, draft)
 	state.Sessions = []protocol.Session{
 		patrolSession(func(h *protocol.Session) {
@@ -94,7 +94,7 @@ func TestPatrolQuietRipeStep(t *testing.T) {
 }
 
 func TestPatrolGraceAndMemory(t *testing.T) {
-	asked := patrolFarm(patrolChat(patrolMessage(func(*protocol.ChatMessage) {})))
+	asked := patrolState(patrolChat(patrolMessage(func(*protocol.ChatMessage) {})))
 	grace := patrolGrace[protocol.InboxKindMention]
 	early, memory := patrolStep(asked, patrolT+grace-patrolMin, emptyPatrol())
 	testkit.Eq(t, early, []patrolNote{})

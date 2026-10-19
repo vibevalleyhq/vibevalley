@@ -36,7 +36,7 @@ type chatWritten struct {
 	number     int64
 	recipients []string
 	resetWake  []string
-	notOnFarm  []string
+	absent     []string
 	held       bool
 	thread     string
 	// A send with a key already written: nothing new is written or delivered.
@@ -66,10 +66,10 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 	}
 	meta := chatMetaOf(row.Meta)
 	mentions := mentionsIn(row.Body)
-	sessions := c.onFarm()
-	onFarm := make([]string, len(sessions))
+	sessions := c.presentSessions()
+	present := make([]string, len(sessions))
 	for i, h := range sessions {
-		onFarm[i] = h.ID
+		present[i] = h.ID
 	}
 	participants, err := s.participants()
 	if err != nil {
@@ -84,7 +84,7 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 	for i, m := range mentions {
 		how := "unknown"
 		switch {
-		case m == protocol.ManagerAgent || m == "user" || m == protocol.Everyone || slices.Contains(onFarm, m):
+		case m == protocol.ManagerAgent || m == "user" || m == protocol.Everyone || slices.Contains(present, m):
 			how = "delivered"
 		case known[m]:
 			how = "not_on_farm"
@@ -109,7 +109,7 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 			}
 		}
 		for _, m := range named {
-			if m.how == "delivered" && (m.id == protocol.ManagerAgent || slices.Contains(onFarm, m.id)) {
+			if m.how == "delivered" && (m.id == protocol.ManagerAgent || slices.Contains(present, m.id)) {
 				if err := s.follow(conv.ID, m.id, "mentioned", row.Number-1); err != nil {
 					return chatWritten{}, err
 				}
@@ -155,7 +155,7 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 		Conversation: protocol.Conversation{Kind: chatConversationKind(conv.Kind)},
 		ThreadOwner:  c.ownerOf(*conv),
 		Sessions:     audience,
-		OnFarm:       onFarm,
+		Present:      present,
 		Followers:    followers,
 		Hops:         hops,
 		Cooling:      cooling,
@@ -195,7 +195,7 @@ func (c *Service) settle(s chatStore, id string) (chatWritten, error) {
 	}
 	for _, m := range named {
 		if m.how != "delivered" {
-			w.notOnFarm = append(w.notOnFarm, m.id)
+			w.absent = append(w.absent, m.id)
 		}
 	}
 	return w, nil
@@ -528,7 +528,7 @@ func (c *Service) onFact(e protocol.SideEvent) {
 			return
 		}
 		if _, hired := f.(protocol.FactHired); hired {
-			for _, h := range c.onFarm() {
+			for _, h := range c.presentSessions() {
 				c.openJob(h)
 			}
 			return
@@ -546,7 +546,7 @@ func (c *Service) onFact(e protocol.SideEvent) {
 func (c *Service) sessionsLeft() {
 	s := c.store()
 	on := map[string]bool{}
-	for _, h := range c.onFarm() {
+	for _, h := range c.presentSessions() {
 		on[h.ID] = true
 	}
 	ps, err := s.participants()

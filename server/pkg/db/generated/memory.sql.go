@@ -59,7 +59,7 @@ func (q *Queries) Forget(ctx context.Context, arg ForgetParams) error {
 const keepJob = `-- name: KeepJob :exec
 insert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)
 values (?1, 'agent', cast(?2 as text), 'issue', ?3, ?4, ?5, ?6,
-        ?7, 'farm', ?8, ?8)
+        ?7, 'system', ?8, ?8)
 on conflict (agent, session) where kind = 'issue'
 do update set body = excluded.body, terms = excluded.terms, terms_of = excluded.terms_of, project = excluded.project,
               created_at = excluded.created_at, updated_at = excluded.updated_at

@@ -151,7 +151,7 @@ func (p *tasks) put(graph protocol.TaskGraph, by protocol.GraphActor, why string
 	return nil
 }
 
-func (p *tasks) putFarm(graph protocol.TaskGraph) error {
+func (p *tasks) putSystem(graph protocol.TaskGraph) error {
 	return p.put(graph, protocol.GraphActorSystem, "")
 }
 
@@ -160,7 +160,7 @@ func (p *tasks) tellManager(text string) { p.news.Publish("【种植计划】" +
 func (p *tasks) giveUp(graph protocol.TaskGraph, why string) error {
 	splitter := p.splitters[graph.ID]
 	graph.State = protocol.GraphStateAbandoned
-	if err := p.putFarm(taskWithNote(graph, why)); err != nil {
+	if err := p.putSystem(taskWithNote(graph, why)); err != nil {
 		return err
 	}
 	delete(p.splitters, graph.ID)
@@ -266,7 +266,7 @@ func (p *tasks) split(graph protocol.TaskGraph, session protocol.Session, report
 	}
 	draft.Tasks, draft.State = parsed.Tasks, protocol.GraphStateDraft
 	draft = taskWithNote(draft, "")
-	if err := p.putFarm(draft); err != nil {
+	if err := p.putSystem(draft); err != nil {
 		return err
 	}
 	delete(p.splitters, graph.ID)
@@ -300,7 +300,7 @@ func (p *tasks) schedule(id string) error {
 			// Not now: it waits, and is tried again when a session finishes or leaves.
 			note := "「" + task.Title + "」先等着：" + refused
 			if taskStr(graph.Note) != note {
-				if err := p.putFarm(taskWithNote(graph, note)); err != nil {
+				if err := p.putSystem(taskWithNote(graph, note)); err != nil {
 					return err
 				}
 			}
@@ -311,7 +311,7 @@ func (p *tasks) schedule(id string) error {
 			n.State, n.Session, n.Tries = protocol.TaskStateWorking, &session, 0
 			return n
 		})
-		if err := p.putFarm(graph); err != nil {
+		if err := p.putSystem(graph); err != nil {
 			p.sessions.Dismiss(session)
 			return err
 		}
@@ -320,7 +320,7 @@ func (p *tasks) schedule(id string) error {
 }
 
 func (p *tasks) taskFailed(graph protocol.TaskGraph, task protocol.Task, why string) error {
-	if err := p.putFarm(protocol.WithTask(graph, task.ID, func(n protocol.Task) protocol.Task {
+	if err := p.putSystem(protocol.WithTask(graph, task.ID, func(n protocol.Task) protocol.Task {
 		n.State, n.Conclusion = protocol.TaskStateFailed, &why
 		n.Failures++
 		return n
@@ -424,7 +424,7 @@ func (p *tasks) taskDone(graph protocol.TaskGraph, task protocol.Task, sessionID
 		next.State = protocol.GraphStateRipe
 		next = taskWithNote(next, "")
 	}
-	if err := p.putFarm(next); err != nil {
+	if err := p.putSystem(next); err != nil {
 		return fmt.Errorf("步骤「%s」已合进计划分支，但完成状态没能保存：%w", task.Title, err)
 	}
 	if next.State == protocol.GraphStateRipe {
@@ -449,7 +449,7 @@ func (p *tasks) taskEnded(graph protocol.TaskGraph, task protocol.Task, session 
 			return nil
 		}
 		graph.State = protocol.GraphStatePaused
-		if err := p.putFarm(taskWithNote(graph, "「"+task.Title+"」被叫停了，计划先暂停；点继续接着做")); err != nil {
+		if err := p.putSystem(taskWithNote(graph, "「"+task.Title+"」被叫停了，计划先暂停；点继续接着做")); err != nil {
 			return err
 		}
 	}
@@ -540,7 +540,7 @@ func (p *tasks) resumeWorking(id string) error {
 			session = p.core.Session(*task.Session)
 		}
 		if session == nil {
-			if err := p.putFarm(protocol.WithTask(*graph, task.ID, func(n protocol.Task) protocol.Task {
+			if err := p.putSystem(protocol.WithTask(*graph, task.ID, func(n protocol.Task) protocol.Task {
 				n = taskUnmanned(n)
 				n.State = protocol.TaskStateWaiting
 				return n
@@ -823,7 +823,7 @@ func (p *tasks) OnStart(ctx context.Context) error {
 		switch {
 		case graph.State == protocol.GraphStateSplitting:
 			graph.State = protocol.GraphStateAbandoned
-			if err := p.putFarm(taskWithNote(graph, "VibeValley 重启了，规划停在了半路：再说一遍要做什么")); err != nil {
+			if err := p.putSystem(taskWithNote(graph, "VibeValley 重启了，规划停在了半路：再说一遍要做什么")); err != nil {
 				return err
 			}
 			for _, h := range p.core.State().Sessions {
@@ -834,7 +834,7 @@ func (p *tasks) OnStart(ctx context.Context) error {
 		case graph.State == protocol.GraphStateRunning &&
 			slices.ContainsFunc(graph.Tasks, func(n protocol.Task) bool { return n.State == protocol.TaskStateWorking }):
 			graph.State = protocol.GraphStatePaused
-			if err := p.putFarm(taskWithNote(graph, "VibeValley 重启过，计划先暂停了；点继续接着做")); err != nil {
+			if err := p.putSystem(taskWithNote(graph, "VibeValley 重启过，计划先暂停了；点继续接着做")); err != nil {
 				return err
 			}
 		}

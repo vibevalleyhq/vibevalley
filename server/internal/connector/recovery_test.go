@@ -63,7 +63,7 @@ func TestInboxRecoversAcceptedWorkAfterRestart(t *testing.T) {
 }
 
 func TestInboxReplaysWhenManagerSucceededBeforeCompletionWrite(t *testing.T) {
-	f := connectorTestFarm(t)
+	f := connectorTestWorld(t)
 	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
 	ctx := context.Background()
 	if err := f.Connector.q.ConnectAccount(ctx, generated.ConnectAccountParams{Connector: string(b.id), Secrets: `{}`, OwnerID: voiceNullable(voiceOwner)}); err != nil {

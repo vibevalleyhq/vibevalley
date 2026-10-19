@@ -491,7 +491,7 @@ func TestIssueWrittenDownStarts(t *testing.T) {
 	testkit.Eq(t, all[len(all)-1].ID, issue.ID, "the started one after the ones not sent")
 }
 
-func TestIssueWaitsForAFreeBed(t *testing.T) {
+func TestIssueWaitsForRoom(t *testing.T) {
 	home, work := dirs(t)
 	w := openWorld(t, home, work, func(c *base.Config) { c.Project.MaxSessions = 1 })
 	lab := fixture.Lab(t)

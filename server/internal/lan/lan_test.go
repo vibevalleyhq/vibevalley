@@ -23,7 +23,7 @@ import (
 )
 
 // Its lan listener is on loopback and calls 127.0.0.1 its network address.
-func lanTestFarm(t *testing.T, db string) *workspace.Workspace {
+func lanTestWorkspace(t *testing.T, db string) *workspace.Workspace {
 	t.Helper()
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), db)
 	cfg.Voice.Line.Port, cfg.Lan.Port = 0, 0
@@ -121,7 +121,7 @@ func lanPair(t *testing.T, f *workspace.Workspace, addr, name string) protocol.L
 }
 
 func TestLanShutUntilOpened(t *testing.T) {
-	f := lanTestFarm(t, ":memory:")
+	f := lanTestWorkspace(t, ":memory:")
 	if s := f.Lan.Status(); s.Open || s.URL != nil || len(s.Devices) != 0 {
 		t.Fatalf("a new workspace's lan access: %+v", s)
 	}
@@ -141,8 +141,8 @@ func TestLanShutUntilOpened(t *testing.T) {
 	}
 }
 
-func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
-	f := lanTestFarm(t, ":memory:")
+func TestLanPairedDeviceUsesTheWorkspace(t *testing.T) {
+	f := lanTestWorkspace(t, ":memory:")
 	addr := lanOpen(t, f)
 	paired := lanPair(t, f, addr, "  小明的\niPhone ")
 	if s := f.Lan.Status(); s.Pairing != nil || len(s.Devices) != 1 || s.Devices[0].Name != "小明的 iPhone" {
@@ -179,7 +179,7 @@ func TestLanPairedDeviceUsesTheFarm(t *testing.T) {
 }
 
 func TestLanOwnerRefuses(t *testing.T) {
-	f := lanTestFarm(t, ":memory:")
+	f := lanTestWorkspace(t, ":memory:")
 	addr := lanOpen(t, f)
 	s, _ := f.Lan.StartPairing()
 	got := lanAsk(t, addr, s.Pairing.Code, "陌生人")
@@ -199,7 +199,7 @@ func TestLanOwnerRefuses(t *testing.T) {
 }
 
 func TestLanWrongCodesCallItOff(t *testing.T) {
-	f := lanTestFarm(t, ":memory:")
+	f := lanTestWorkspace(t, ":memory:")
 	addr := lanOpen(t, f)
 	s, _ := f.Lan.StartPairing()
 	for range lan.LanWrongTries {
@@ -213,7 +213,7 @@ func TestLanWrongCodesCallItOff(t *testing.T) {
 }
 
 func TestLanCodeExpires(t *testing.T) {
-	f := lanTestFarm(t, ":memory:")
+	f := lanTestWorkspace(t, ":memory:")
 	lanOpen(t, f)
 	s, _ := f.Lan.StartPairing()
 	start := time.Now()
@@ -228,7 +228,7 @@ func TestLanCodeExpires(t *testing.T) {
 }
 
 func TestLanForgetEndsTheDevicesStreams(t *testing.T) {
-	f := lanTestFarm(t, ":memory:")
+	f := lanTestWorkspace(t, ":memory:")
 	addr := lanOpen(t, f)
 	paired := lanPair(t, f, addr, "旧手机")
 	req, _ := http.NewRequest("GET", addr+"/api/v1/state", nil)
@@ -262,10 +262,10 @@ func TestLanForgetEndsTheDevicesStreams(t *testing.T) {
 
 func TestLanRemembersAcrossRestarts(t *testing.T) {
 	db := filepath.Join(t.TempDir(), "vibevalley.db")
-	f := lanTestFarm(t, db)
+	f := lanTestWorkspace(t, db)
 	paired := lanPair(t, f, lanOpen(t, f), "平板")
 
-	again := lanTestFarm(t, db)
+	again := lanTestWorkspace(t, db)
 	s := again.Lan.Status()
 	if !s.Open || s.URL == nil || len(s.Devices) != 1 || s.Devices[0].ID != paired.Device {
 		t.Fatalf("after a restart: %+v", s)

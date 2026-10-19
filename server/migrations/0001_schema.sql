@@ -165,7 +165,7 @@ CREATE TABLE memory (
   importance   integer not null default 0 check (importance between 0 and 3),
   project      text,                -- null: every project
   session      text,                -- the Session it came from
-  author       text not null check (author in ('owner', 'agent', 'manager', 'farm')),
+  author       text not null check (author in ('owner', 'agent', 'manager', 'system')),
   replaced_by  text,                -- the memory that superseded it; never recalled again
   created_at   integer not null,
   updated_at   integer not null,

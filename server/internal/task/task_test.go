@@ -231,7 +231,7 @@ func (p *taskFakeProjects) BranchChanges(project, branch string) (protocol.Chang
 	return protocol.Changes{Project: project, Base: "main", Branch: &branch}, nil
 }
 
-type taskTestFarm struct {
+type taskTestWorld struct {
 	*world
 	sessions *taskFakeSessions
 	projects *taskFakeProjects
@@ -240,15 +240,15 @@ type taskTestFarm struct {
 	closing  sync.Once
 }
 
-func (tf *taskTestFarm) Close() { tf.closing.Do(tf.world.Close) }
+func (tf *taskTestWorld) Close() { tf.closing.Do(tf.world.Close) }
 
-func newTaskTestFarm(t *testing.T, home string, release chan struct{}, before func(*world)) *taskTestFarm {
+func newTaskTestWorld(t *testing.T, home string, release chan struct{}, before func(*world)) *taskTestWorld {
 	t.Helper()
 	f, err := newWorldWith(fixture.Config(home, t.TempDir(), ""), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tf := &taskTestFarm{world: f, sessions: newTaskFakeSessions(f, release)}
+	tf := &taskTestWorld{world: f, sessions: newTaskFakeSessions(f, release)}
 	tf.projects = &taskFakeProjects{sessions: tf.sessions}
 	f.Task.sessions, f.Task.projects, f.Task.check = tf.sessions, tf.projects, func(a protocol.Agent) runtime.Assessment { return runtime.Assessment{Agent: a} }
 	for _, a := range f.Agent.Agents() {
@@ -286,7 +286,7 @@ func newTaskTestFarm(t *testing.T, home string, release chan struct{}, before fu
 	return tf
 }
 
-func (tf *taskTestFarm) until(t *testing.T, id string, ready func(protocol.TaskGraph) bool) protocol.TaskGraph {
+func (tf *taskTestWorld) until(t *testing.T, id string, ready func(protocol.TaskGraph) bool) protocol.TaskGraph {
 	t.Helper()
 	return *testkit.Await(t, "task "+id+" gets there", func() (*protocol.TaskGraph, bool) {
 		graph := protocol.GraphOf(tf.Core.State(), id)
@@ -296,7 +296,7 @@ func (tf *taskTestFarm) until(t *testing.T, id string, ready func(protocol.TaskG
 
 var taskIDIn = regexp.MustCompile(`（(p\d+)）`)
 
-func (tf *taskTestFarm) split(t *testing.T, goal, project string) string {
+func (tf *taskTestWorld) split(t *testing.T, goal, project string) string {
 	t.Helper()
 	said, err := tf.Task.Split(goal, project, "", protocol.GraphActorUser)
 	if err != nil {
@@ -309,7 +309,7 @@ func (tf *taskTestFarm) split(t *testing.T, goal, project string) string {
 	return m[1]
 }
 
-func (tf *taskTestFarm) act(t *testing.T, id string, action protocol.GraphAction) string {
+func (tf *taskTestWorld) act(t *testing.T, id string, action protocol.GraphAction) string {
 	t.Helper()
 	said, err := tf.Task.Act(id, action, protocol.GraphActorUser)
 	if err != nil {
@@ -330,7 +330,7 @@ func taskState(graph protocol.TaskGraph, id string) protocol.TaskState {
 }
 
 func TestTaskDiamond(t *testing.T) {
-	tf := newTaskTestFarm(t, t.TempDir(), nil, nil)
+	tf := newTaskTestWorld(t, t.TempDir(), nil, nil)
 	news, stopNews := tf.Task.News().Subscribe()
 	defer stopNews()
 	id := tf.split(t, "菱形", "diamond")
@@ -423,7 +423,7 @@ func TestTaskDiamond(t *testing.T) {
 }
 
 func TestTaskAcceptanceFirst(t *testing.T) {
-	tf := newTaskTestFarm(t, t.TempDir(), nil, nil)
+	tf := newTaskTestWorld(t, t.TempDir(), nil, nil)
 	id := tf.split(t, "验收先行", "bug")
 	draft := tf.until(t, id, func(graph protocol.TaskGraph) bool { return graph.State == protocol.GraphStateDraft })
 	if !protocol.IsAcceptance(taskIn(draft, "repro")) || protocol.IsAcceptance(taskIn(draft, "fix")) {
@@ -462,7 +462,7 @@ func TestTaskAcceptanceFirst(t *testing.T) {
 }
 
 func TestGraphFailingTask(t *testing.T) {
-	tf := newTaskTestFarm(t, t.TempDir(), nil, nil)
+	tf := newTaskTestWorld(t, t.TempDir(), nil, nil)
 	id := tf.split(t, "有坏步", "shaky")
 	tf.until(t, id, func(graph protocol.TaskGraph) bool { return graph.State == protocol.GraphStateDraft })
 	tf.act(t, id, protocol.GraphActionStart)
@@ -527,7 +527,7 @@ func TestGraphFailingTask(t *testing.T) {
 }
 
 func TestTaskSentBackOnce(t *testing.T) {
-	tf := newTaskTestFarm(t, t.TempDir(), nil, nil)
+	tf := newTaskTestWorld(t, t.TempDir(), nil, nil)
 	id := tf.split(t, "先给个圈", "circle")
 	draft := tf.until(t, id, func(graph protocol.TaskGraph) bool { return graph.State == protocol.GraphStateDraft })
 	if draft.Title != "改好了" || len(draft.Tasks) != 1 || draft.Tasks[0].ID != "fixed" {
@@ -550,7 +550,7 @@ func TestTaskRestart(t *testing.T) {
 	home := t.TempDir()
 	release := make(chan struct{})
 	defer close(release)
-	first := newTaskTestFarm(t, home, release, nil)
+	first := newTaskTestWorld(t, home, release, nil)
 	id := first.split(t, "慢", "slowpoke")
 	first.until(t, id, func(graph protocol.TaskGraph) bool { return graph.State == protocol.GraphStateDraft })
 	first.act(t, id, protocol.GraphActionStart)
@@ -562,7 +562,7 @@ func TestTaskRestart(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, "sessions.json"), []byte(savedJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	second := newTaskTestFarm(t, home, release, nil)
+	second := newTaskTestWorld(t, home, release, nil)
 	second.sessions.attempts["slow"] = 1
 	paused := second.until(t, id, func(graph protocol.TaskGraph) bool { return graph.State == protocol.GraphStatePaused })
 	if !strings.Contains(taskStr(paused.Note), "重启") {
@@ -611,7 +611,7 @@ func TestTaskChooseAgent(t *testing.T) {
 }
 
 func TestTaskIsAParentIssue(t *testing.T) {
-	tf := newTaskTestFarm(t, t.TempDir(), nil, nil)
+	tf := newTaskTestWorld(t, t.TempDir(), nil, nil)
 	id := tf.split(t, "菱形", "diamond")
 	tf.until(t, id, func(graph protocol.TaskGraph) bool { return graph.State == protocol.GraphStateDraft })
 	parent, err := tf.Issue.Get(id)

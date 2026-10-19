@@ -12,13 +12,13 @@ type Info struct {
 }
 
 type Spoken struct {
-	Kind      string // sent, held, confirm
-	Message   protocol.ChatMessage
-	Target    string
-	NotOnFarm []string
-	Shown     []protocol.InboxMessage
-	More      int
-	LastRead  string
+	Kind     string // sent, held, confirm
+	Message  protocol.ChatMessage
+	Target   string
+	Absent   []string
+	Shown    []protocol.InboxMessage
+	More     int
+	LastRead string
 }
 
 type SpeakOptions struct {

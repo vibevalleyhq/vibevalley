@@ -53,7 +53,7 @@ func (*generationAdapter) Send(context.Context, map[string]string, string, strin
 }
 
 func TestAccountOwnerJoinsOldLoginBeforeReplacement(t *testing.T) {
-	f := connectorTestFarm(t)
+	f := connectorTestWorld(t)
 	a := &generationAdapter{loginStarted: make(chan string, 4), oldCancelled: make(chan struct{}), releaseOld: make(chan struct{}), receiveStarted: make(chan string, 4)}
 	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
 	b.adapter = a
@@ -98,7 +98,7 @@ func TestAccountOwnerJoinsOldLoginBeforeReplacement(t *testing.T) {
 }
 
 func TestAccountLogoutWaitsAndRejectsLateCallbacks(t *testing.T) {
-	f := connectorTestFarm(t)
+	f := connectorTestWorld(t)
 	a := &generationAdapter{loginStarted: make(chan string, 4), receiveStarted: make(chan string, 4), receiveCancelled: make(chan struct{}), releaseReceive: make(chan struct{}), lateAccepted: make(chan error, 4)}
 	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
 	b.adapter = a
@@ -144,7 +144,7 @@ func TestAccountLogoutWaitsAndRejectsLateCallbacks(t *testing.T) {
 }
 
 func TestConnectionShutdownWaitsForManagerDelivery(t *testing.T) {
-	f, script := voiceConnectorsFarm(t)
+	f, script := voiceConnectorsWorld(t)
 	voiceWeixinConnected(t, f)
 	entered, exited := make(chan struct{}), make(chan struct{})
 	f.Connector.say = func(ctx context.Context, _ string, _ *string) error {
@@ -185,7 +185,7 @@ func (a *detachedCallbackAdapter) Receive(_ context.Context, _ map[string]string
 	return &voiceFailure{Kind: "failed", Reason: "transport ended"}
 }
 func TestReceiverSealsSDKCallbacksAfterListenReturns(t *testing.T) {
-	f := connectorTestFarm(t)
+	f := connectorTestWorld(t)
 	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
 	ctx := context.Background()
 	if err := f.Connector.q.ConnectAccount(ctx, generated.ConnectAccountParams{Connector: string(b.id), Secrets: `{}`, OwnerID: voiceNullable(voiceOwner)}); err != nil {

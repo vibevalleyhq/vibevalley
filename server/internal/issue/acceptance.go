@@ -27,25 +27,25 @@ func (s *Service) Accept(ctx context.Context, id string, req protocol.IssueAccep
 		}
 		return s.Get(id)
 	}
-	weeds := []string{}
+	newFindings := []string{}
 	for _, f := range req.Findings {
 		if f = str.Trim(f); f != "" {
-			weeds = append(weeds, f)
+			newFindings = append(newFindings, f)
 		}
 	}
 	text := str.Trim(req.Text)
-	if len(weeds) == 0 && text == "" {
+	if len(newFindings) == 0 && text == "" {
 		return t, protocol.Refused{Reason: "没过验收要说哪里不行：至少写一条意见"}
 	}
 	findings := t.Findings
 	at := clock.NowMs()
-	for _, w := range weeds {
-		findings = append(findings, protocol.Finding{ID: base.NewID(), Text: w, At: at})
+	for _, f := range newFindings {
+		findings = append(findings, protocol.Finding{ID: base.NewID(), Text: f, At: at})
 	}
 	if err := s.issues.judged(id, 0, findings); err != nil {
 		return t, err
 	}
-	// The weeds go to whoever works it as the next round's words, like any comment.
+	// The findings go to whoever works it as the next round's words, like any comment.
 	if err := s.Comment(id, protocol.CommentRequest{Text: failedText(findings, text)}); err != nil {
 		return t, err
 	}
@@ -73,7 +73,7 @@ func pulled(findings []protocol.Finding) []protocol.Finding {
 	return out
 }
 
-// The weeds still standing, numbered, then the owner's own words.
+// The findings still standing, numbered, then the owner's own words.
 func failedText(findings []protocol.Finding, text string) string {
 	var b strings.Builder
 	b.WriteString("验收没过，这几处要修：")
@@ -92,7 +92,7 @@ func failedText(findings []protocol.Finding, text string) string {
 	return b.String()
 }
 
-// at 0 is not accepted (a fail, or another round started); the weeds are written as they stand.
+// at 0 is not accepted (a fail, or another round started); the findings are written as they stand.
 func (is *issues) judged(id string, at int64, findings []protocol.Finding) error {
 	params := generated.AcceptIssueParams{ID: id, Findings: issueJSON(findings, len(findings) > 0)}
 	if at > 0 {
@@ -105,7 +105,7 @@ func (is *issues) judged(id string, at int64, findings []protocol.Finding) error
 	return nil
 }
 
-// Another round starts on what was judged: a pass no longer stands; the weeds stay until a pass pulls them.
+// Another round starts on what was judged: a pass no longer stands; the findings stay until a pass pulls them.
 func (is *issues) unaccept(id string) error {
 	t, err := is.Get(id)
 	if err != nil || t.AcceptedAt == nil {

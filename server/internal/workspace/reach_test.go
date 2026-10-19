@@ -12,7 +12,7 @@ import (
 	"vibevalley/pkg/smith/oartest"
 )
 
-func TestSessionsReachTheFarmWhereItAnswers(t *testing.T) {
+func TestSessionsReachTheServerWhereItAnswers(t *testing.T) {
 	home, work := dirs(t)
 	w := openWorld(t, home, work)
 	var mu sync.Mutex
@@ -42,7 +42,7 @@ func TestSessionsReachTheFarmWhereItAnswers(t *testing.T) {
 	testkit.Eq(t, urls, []string{"http://127.0.0.1:8787/mcp", "http://127.0.0.1:54321/mcp"}, "the farm's tools")
 }
 
-func TestFarmURLKeepsTheLocalIdentity(t *testing.T) {
+func TestMCPURLKeepsTheLocalIdentity(t *testing.T) {
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
 	cfg.Port = 9100
 	f, err := New(cfg)
@@ -50,5 +50,5 @@ func TestFarmURLKeepsTheLocalIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	testkit.Eq(t, f.Session.FarmURL(), "http://127.0.0.1:9100/mcp", "local port")
+	testkit.Eq(t, f.Session.MCPURL(), "http://127.0.0.1:9100/mcp", "local port")
 }

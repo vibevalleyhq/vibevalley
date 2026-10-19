@@ -8,7 +8,7 @@ Status: proposed
 
 - **入口至少 7 条，各走各的**：频道投递（`channel/deliver.go` 的 `kicked`）、工单交给管家（`issue/manager.go` 的 `forManager`）、定时（`issue/dispatch.go` 的 `scheduled`，忙着的帮工直接 `session.Deliver`，绕开频道）、巡查（`manager/patrol.go`）、计划（`task.go` 的 `tellManager`）、连接器（落库后重新走 `channel.Say`）、电话和听写（`manager.Call`，直接插进管家，频道里只留记录）。
 - **「插话还是排到这一轮之后」写了三遍，判断依据各不相同**：频道给帮工的（`session.Deliver` → oar 的 `steerOrQueue`，看农机能不能插话）、频道给管家的（`heardInChat`：只有主人的话插话）、管家的脑子（`manager.sendInput` 在 `brain.Send` 和 `brain.Later` 里二选一）。
-- **节奏散在七个包里，互相不知道**：忙时攒 3 秒合成一条提醒（`channel` 的 `NoticeBatchMs`）、同一个人 60 秒内不再叫（`AgentWakeCooldownMs`）、帮工互相 @ 超过 4 跳挂起（`HopLimit`）、叫三次都没起来就不叫了（`WakeBreaker`）、巡查每 10 分钟扫一遍（`manager/patrol.go`）、定时每 20 秒看一次（`schedule`）、排队的工单每 5 秒找一次空地（`issue/dispatch.go`）、管家把这期间的汇报和农场现状拼进一条输入（`manager.news`、`farmNow`）。同一个「攒一批再给」的想法写了四遍，单位和条件都不一样。
+- **节奏散在七个包里，互相不知道**：忙时攒 3 秒合成一条提醒（`channel` 的 `NoticeBatchMs`）、同一个人 60 秒内不再叫（`AgentWakeCooldownMs`）、帮工互相 @ 超过 4 跳挂起（`HopLimit`）、叫三次都没起来就不叫了（`WakeBreaker`）、巡查每 10 分钟扫一遍（`manager/patrol.go`）、定时每 20 秒看一次（`schedule`）、排队的工单每 5 秒找一次空地（`issue/dispatch.go`）、管家把这期间的汇报和农场现状拼进一条输入（`manager.news`、`situationNow`）。同一个「攒一批再给」的想法写了四遍，单位和条件都不一样。
 - **管家和帮工收话是两套**：帮工经频道投递（`channel_delivery` 表记着谁该收、收没收到），管家经五个 `base.Hub` 订阅，什么也不存，重启前没处理的就没了（巡查过后会再报，计划和工单的消息不会）。
 
 结果：想改一条节奏规则（比如「主人的话总是插话」「帮工忙时别一条一条打断它」），要先找到它在哪几处各写了一份；加一个新入口（比如再接一家聊天软件，或者让领班收到它派出去的工单的进展），又要再写一遍「叫不叫、什么时候叫、怎么叫」。

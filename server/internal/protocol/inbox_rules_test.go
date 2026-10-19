@@ -38,7 +38,7 @@ func callsQuiet(since int64) PhaseWorking {
 	return PhaseWorking{Since: callsT + 30, Doing: Doing{Action: SessionActionRunCommand, Label: "go test ./..."}, QuietSince: ptr.To(since)}
 }
 
-func callsFarm(sessions ...Session) CoreState {
+func callsState(sessions ...Session) CoreState {
 	s := EmptyCoreState()
 	s.Sessions = append(s.Sessions, sessions...)
 	return s
@@ -125,13 +125,13 @@ func TestInboxEmptyFarm(t *testing.T) {
 }
 
 func TestInboxRipeSessionCalls(t *testing.T) {
-	testkit.Eq(t, Inbox(callsFarm(callsSession("w1", PhaseRipe{}))), []InboxItem{{
+	testkit.Eq(t, Inbox(callsState(callsSession("w1", PhaseRipe{}))), []InboxItem{{
 		ID: "w1:merge:2", Kind: InboxKindMerge, From: callsFromSession("w1", "后端老周", "lab"), Text: "接口加好了", At: callsT + 10, Target: callsToSession("w1"),
 	}})
 }
 
 func TestInboxFailedSessionCalls(t *testing.T) {
-	testkit.Eq(t, Inbox(callsFarm(callsSession("w1", PhaseFailed{}, callsFailedRun))), []InboxItem{{
+	testkit.Eq(t, Inbox(callsState(callsSession("w1", PhaseFailed{}, callsFailedRun))), []InboxItem{{
 		ID: "w1:fix:2", Kind: InboxKindFix, From: callsFromSession("w1", "后端老周", "lab"), Text: "测试没过", At: callsT + 20, Target: callsToSession("w1"),
 	}})
 }
@@ -142,14 +142,14 @@ func TestInboxConflictCalls(t *testing.T) {
 		h.Name, h.Agent, h.Runs = "前端小林", "codex", 3
 		h.LastRun = &LastRun{Outcome: OutcomeInterrupted, At: callsT + 5}
 	})
-	testkit.Eq(t, Inbox(callsFarm(ripe, resting)), []InboxItem{
+	testkit.Eq(t, Inbox(callsState(ripe, resting)), []InboxItem{
 		{ID: "w1:conflict:2", Kind: InboxKindConflict, From: callsFromSession("w1", "后端老周", "lab"), Text: "2 个文件和主分支冲突", At: callsT + 10, Target: callsToSession("w1")},
 		{ID: "w2:conflict:3", Kind: InboxKindConflict, From: callsFromSession("w2", "前端小林", "codex"), Text: "1 个文件和主分支冲突", At: callsT + 5, Target: callsToSession("w2")},
 	})
 }
 
 func TestInboxQuietSessionCalls(t *testing.T) {
-	testkit.Eq(t, Inbox(callsFarm(callsSession("w1", callsQuiet(callsT+90)))), []InboxItem{{
+	testkit.Eq(t, Inbox(callsState(callsSession("w1", callsQuiet(callsT+90)))), []InboxItem{{
 		ID: "w1:quiet:1800000000090", Kind: InboxKindQuiet, From: callsFromSession("w1", "后端老周", "lab"), Text: "加个打卡接口", At: callsT + 90, Target: callsToSession("w1"),
 	}})
 }
@@ -166,7 +166,7 @@ func TestInboxMostPressingNeedOnly(t *testing.T) {
 		{"a failed turn before its conflict", callsSession("w1", PhaseFailed{}, callsFailedRun, callsConflict("a.go")), [][4]any{{"w1:fix:2", InboxKindFix, "测试没过", callsT + 20}}},
 		{"quiet while retrying", callsSession("w1", quietRetrying), [][4]any{{"w1:quiet:1800000000090", InboxKindQuiet, "加个打卡接口", callsT + 90}}},
 	} {
-		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, callsRows(Inbox(callsFarm(c.session))), c.want) })
+		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, callsRows(Inbox(callsState(c.session))), c.want) })
 	}
 }
 
@@ -181,7 +181,7 @@ func TestInboxSessionsWithNothingToAskDoNotCall(t *testing.T) {
 		{"resting with nothing in the way", PhaseResting{}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			testkit.Eq(t, Inbox(callsFarm(callsSession("w1", c.phase))), []InboxItem{})
+			testkit.Eq(t, Inbox(callsState(callsSession("w1", c.phase))), []InboxItem{})
 		})
 	}
 }
@@ -196,10 +196,10 @@ func TestInboxTaskSessionsLeaveItToTheTask(t *testing.T) {
 		{"failed", callsSession("w1", PhaseFailed{}, callsFailedRun, inGraph)},
 		{"conflicted", callsSession("w1", PhaseResting{}, callsConflict("a.go"), inGraph)},
 	} {
-		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, Inbox(callsFarm(c.session)), []InboxItem{}) })
+		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, Inbox(callsState(c.session)), []InboxItem{}) })
 	}
-	testkit.Eq(t, callsIDs(Inbox(callsFarm(callsSession("w1", callsQuiet(callsT+90), inGraph)))), []string{"w1:quiet:1800000000090"})
-	state := callsFarm(callsSession("w1", PhaseFailed{}, callsFailedRun, inGraph))
+	testkit.Eq(t, callsIDs(Inbox(callsState(callsSession("w1", callsQuiet(callsT+90), inGraph)))), []string{"w1:quiet:1800000000090"})
+	state := callsState(callsSession("w1", PhaseFailed{}, callsFailedRun, inGraph))
 	state = withGraphs(state, callsGraph("p1", "打卡", GraphStateRunning, callsTask("api", "接口", TaskStateFailed)))
 	testkit.Eq(t, Inbox(state), []InboxItem{{
 		ID: "p1:failed:api", Kind: InboxKindTaskFailed, From: callsManager, Text: "打卡：接口", At: callsT, Target: callsToGraphs("p1"),
@@ -220,12 +220,12 @@ func TestInboxSessionTextAndTime(t *testing.T) {
 		{"a failed turn that said nothing", callsSession("w1", PhaseFailed{}, callsFailedRun, said("")), [][4]any{{"w1:fix:2", InboxKindFix, "加个打卡接口", callsT + 20}}},
 		{"a conflict before any turn", callsSession("w1", PhaseResting{}, callsConflict("a.go"), noRun), [][4]any{{"w1:conflict:2", InboxKindConflict, "1 个文件和主分支冲突", callsT}}},
 	} {
-		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, callsRows(Inbox(callsFarm(c.session))), c.want) })
+		t.Run(c.name, func(t *testing.T) { testkit.Eq(t, callsRows(Inbox(callsState(c.session))), c.want) })
 	}
 }
 
 func TestInboxSessionCallIDs(t *testing.T) {
-	idsOf := func(sessions ...Session) []string { return callsIDs(Inbox(callsFarm(sessions...))) }
+	idsOf := func(sessions ...Session) []string { return callsIDs(Inbox(callsState(sessions...))) }
 	testkit.Eq(t, idsOf(callsSession("w1", PhaseRipe{})), []string{"w1:merge:2"})
 	testkit.Eq(t, idsOf(callsSession("w1", PhaseRipe{}, func(h *Session) { h.LastRun.Summary, h.LastRun.At = "接口加好了，测试也补了", callsT+99 })), []string{"w1:merge:2"})
 	nextRun := func(h *Session) { h.Runs = 3 }
@@ -359,13 +359,13 @@ func TestInboxClipTheirWords(t *testing.T) {
 		state CoreState
 		want  string
 	}{
-		{"a summary that fits", callsFarm(callsSession("w1", PhaseRipe{}, said(fits))), fits},
-		{"a long summary", callsFarm(callsSession("w1", PhaseRipe{}, said(long))), clipped},
-		{"a failed turn's long summary", callsFarm(callsSession("w1", PhaseFailed{}, callsFailedRun, said(long))), clipped},
-		{"a long task, the turn saying nothing", callsFarm(callsSession("w1", PhaseRipe{}, said(""), task(long))), clipped},
-		{"two-unit characters, 40 units", callsFarm(callsSession("w1", PhaseRipe{}, said(strings.Repeat("🌾", 20)))), strings.Repeat("🌾", 20)},
-		{"two-unit characters, 42 units", callsFarm(callsSession("w1", PhaseRipe{}, said(strings.Repeat("🌾", 21)))), strings.Repeat("🌾", 20) + "…"},
-		{"a quiet session's long task", callsFarm(callsSession("w1", callsQuiet(callsT+90), task(long))), clipped},
+		{"a summary that fits", callsState(callsSession("w1", PhaseRipe{}, said(fits))), fits},
+		{"a long summary", callsState(callsSession("w1", PhaseRipe{}, said(long))), clipped},
+		{"a failed turn's long summary", callsState(callsSession("w1", PhaseFailed{}, callsFailedRun, said(long))), clipped},
+		{"a long task, the turn saying nothing", callsState(callsSession("w1", PhaseRipe{}, said(""), task(long))), clipped},
+		{"two-unit characters, 40 units", callsState(callsSession("w1", PhaseRipe{}, said(strings.Repeat("🌾", 20)))), strings.Repeat("🌾", 20)},
+		{"two-unit characters, 42 units", callsState(callsSession("w1", PhaseRipe{}, said(strings.Repeat("🌾", 21)))), strings.Repeat("🌾", 20) + "…"},
+		{"a quiet session's long task", callsState(callsSession("w1", callsQuiet(callsT+90), task(long))), clipped},
 		{"a draft's long title", callsWithGraphs(callsGraph("p1", long, GraphStateDraft)), clipped},
 		{"a ripe task's long title", callsWithGraphs(callsGraph("p1", long, GraphStateRipe)), clipped},
 		{"a stuck step with its task's title", callsWithGraphs(callsGraph("p1", strings.Repeat("计", 30), GraphStateRunning,
@@ -384,7 +384,7 @@ func TestInboxClipTheirWords(t *testing.T) {
 
 func TestInboxNewestFirst(t *testing.T) {
 	endedAt := func(at int64) func(*Session) { return func(h *Session) { h.LastRun.At = at } }
-	state := callsFarm(
+	state := callsState(
 		callsSession("w1", PhaseRipe{}, endedAt(callsT+30)),
 		callsSession("w2", PhaseFailed{}, callsFailedRun),
 		callsSession("w3", PhaseResting{}, callsConflict("a.go"), endedAt(callsT+10)),
@@ -415,7 +415,7 @@ func TestInboxNewestFirst(t *testing.T) {
 func TestInboxTiesKeepTheirOrder(t *testing.T) {
 	endedNow := func(h *Session) { h.LastRun.At = callsT }
 	saidNow := func(m *ChatMessage) { m.At = callsT }
-	state := callsFarm(callsSession("w2", PhaseRipe{}, endedNow), callsSession("w1", PhaseFailed{}, callsFailedRun, endedNow))
+	state := callsState(callsSession("w2", PhaseRipe{}, endedNow), callsSession("w1", PhaseFailed{}, callsFailedRun, endedNow))
 	state = withGraphs(state,
 		callsGraph("p2", "导出", GraphStateDraft),
 		callsGraph("p1", "报表", GraphStateRunning, callsTask("b", "页面", TaskStateFailed), callsTask("a", "接口", TaskStateFailed)),

@@ -104,6 +104,13 @@ const RULES: readonly Rule[] = [
     pattern: /\b(lanFarmName|remote\.farm|using\.farm|last\.farm|paired\.farm|known\.farm)\b|Farm: lan/,
     says: 'hostName (LanStatus.hostName, LanPaired.hostName, RemoteFarm.hostName): the computer\'s hostname',
   },
+  {
+    name: 'a business name in farm words',
+    pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/,
+    says: 'presentSessions, Present, Absent, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin',
+    // The client's onFarm is the skin it is on.
+    dirs: ['server/internal', 'server/cmd', 'app/lib/workbench'],
+  },
 ]
 
 const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{go,dart}`, { cwd: root })).sort()

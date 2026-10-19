@@ -122,7 +122,7 @@ type chatAudienceInput struct {
 	ThreadOwner string   `json:"threadOwner,omitzero"`
 	Sessions    []string `json:"sessions"`
 	// Sessions when nil.
-	OnFarm    []string          `json:"onFarm"`
+	Present   []string          `json:"present"`
 	Followers []string          `json:"followers"`
 	Hops      int64             `json:"hops"`
 	Cooling   []string          `json:"cooling"`
@@ -138,16 +138,16 @@ func chatAudience(i chatAudienceInput) []chatDelivery {
 		return out
 	}
 	byAgent := i.FromKind == protocol.SenderKindAgent || i.FromKind == protocol.SenderKindManager
-	onFarm := i.OnFarm
-	if onFarm == nil {
-		onFarm = i.Sessions
+	present := i.Present
+	if present == nil {
+		present = i.Sessions
 	}
 	hops := i.Hops
 	add := func(recipient string, reason chatDeliveryReason, wakes bool) {
 		if recipient == i.From || slices.ContainsFunc(out, func(d chatDelivery) bool { return d.Recipient == recipient }) {
 			return
 		}
-		if recipient != protocol.ManagerAgent && !slices.Contains(onFarm, recipient) {
+		if recipient != protocol.ManagerAgent && !slices.Contains(present, recipient) {
 			return
 		}
 		var heldBy chatHeldBy

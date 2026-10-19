@@ -54,9 +54,9 @@ func New(home string) *Service {
 	file := filepath.Join(home, "state.json")
 	kept := protocol.EmptyCoreState()
 	if body, err := os.ReadFile(file); err == nil {
-		var farm protocol.CoreState
-		if err := json.Unmarshal(body, &farm); err == nil {
-			kept = farm
+		var saved protocol.CoreState
+		if err := json.Unmarshal(body, &saved); err == nil {
+			kept = saved
 		} else {
 			log.Printf("vibevalley: state.json unreadable, starting empty: %v", err)
 		}

@@ -31,7 +31,7 @@ func (a *blockedDelivery) Send(ctx context.Context, secrets map[string]string, t
 }
 
 func TestOutboxOwnsDeliveryWithoutBlockingFarmEvents(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
 	blocked := &blockedDelivery{voiceAdapter: b.adapter, entered: make(chan struct{}), release: make(chan struct{})}
 	b.adapter = blocked
@@ -51,7 +51,7 @@ func TestOutboxOwnsDeliveryWithoutBlockingFarmEvents(t *testing.T) {
 }
 
 func TestOutboxConfirmsDigestAsOneBatch(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
 	ctx := context.Background()
 	if err := f.Connector.q.ConnectAccount(ctx, generated.ConnectAccountParams{Connector: string(b.id), Secrets: `{}`, OwnerID: voiceNullable(voiceOwner)}); err != nil {

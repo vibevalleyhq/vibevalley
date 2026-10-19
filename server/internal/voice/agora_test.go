@@ -188,7 +188,7 @@ func TestVoiceVendorsKnowEveryVendor(t *testing.T) {
 	}
 }
 
-func voiceTestFarm(t *testing.T) *world {
+func voiceTestWorld(t *testing.T) *world {
 	t.Helper()
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
 	cfg.Voice.Line.Port, cfg.Voice.Line.URL = 0, "https://line.example.com"
@@ -201,7 +201,7 @@ func voiceTestFarm(t *testing.T) *world {
 }
 
 func TestVoiceSessionsNeedCredentials(t *testing.T) {
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	ctx := context.Background()
 	var unavailable protocol.VoiceUnavailable
 	if _, err := f.Voice.Session(ctx); !errors.As(err, &unavailable) || !strings.Contains(unavailable.Reason, "App ID") {
@@ -224,7 +224,7 @@ func TestVoiceSessionsNeedCredentials(t *testing.T) {
 }
 
 func TestVoiceStartAndStopTheManagerOnHisLine(t *testing.T) {
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	if err := f.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +272,7 @@ func TestVoiceStartAndStopTheManagerOnHisLine(t *testing.T) {
 }
 
 func TestVoiceCallOwnsItsCredentialsAndLine(t *testing.T) {
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	if err := f.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +320,7 @@ func TestVoiceCallOwnsItsCredentialsAndLine(t *testing.T) {
 func TestCallOwnsBothTranscriptDirectionsAcrossSettingsChanges(t *testing.T) {
 	for _, managerAnswers := range []bool{false, true} {
 		t.Run(fmt.Sprint("manager=", managerAnswers), func(t *testing.T) {
-			f := voiceTestFarm(t)
+			f := voiceTestWorld(t)
 			if err := f.Start(context.Background()); err != nil {
 				t.Fatal(err)
 			}
@@ -381,7 +381,7 @@ func TestCallOwnsBothTranscriptDirectionsAcrossSettingsChanges(t *testing.T) {
 }
 
 func TestV1RelayRequiresOneActiveCall(t *testing.T) {
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	heard := 0
 	f.Voice.heard = func(string, string, string) error { heard++; return nil }
 	if err := f.Voice.HeardCurrent("none", "", ""); err == nil {

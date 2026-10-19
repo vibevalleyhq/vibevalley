@@ -135,7 +135,7 @@ func chatConversation(f *world, id *string) *protocol.Conversation {
 	return protocol.ConversationOf(f.Core.State().Chat, *id)
 }
 
-func chatTestFarm(t *testing.T, home, dbPath string) (*world, *chatFakeSessions) {
+func chatTestWorld(t *testing.T, home, dbPath string) (*world, *chatFakeSessions) {
 	t.Helper()
 	f, err := newWorld(fixture.Config(home, t.TempDir(), dbPath))
 	if err != nil {
@@ -241,7 +241,7 @@ func chatNews(t *testing.T, news <-chan ManagerNews, message string) ManagerNews
 }
 
 func TestChatJobOpensThreadUnderDispatch(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	thread := x.hire(t, "w1", "写 hello", "chat-a", nil)
 	general := protocol.GeneralOf(f.Core.State().Chat)
 	if general == nil || general.ID != f.Channel.General() {
@@ -279,7 +279,7 @@ func TestChatJobOpensThreadUnderDispatch(t *testing.T) {
 
 // A session sent for no issue talks in a talk thread of its own, never in an issue's; the person's words there still wake it.
 func TestChatSessionSentForNoIssueHasATalkThread(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	talk := x.hire(t, "w1", "写 hello", "chat-t", nil)
 	if talk.SubjectKind == nil || *talk.SubjectKind != protocol.SubjectKindTalk || talk.SubjectID == nil || *talk.SubjectID != "w1" {
 		t.Fatalf("a talk thread: %+v", talk)
@@ -307,7 +307,7 @@ func TestChatSessionSentForNoIssueHasATalkThread(t *testing.T) {
 }
 
 func TestChatPersonInJobThreadWakesSession(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	thread := x.hire(t, "w2", "写 hello", "chat-b", nil)
 	said, _, err := f.Channel.Say("把输出改成中文", &thread.ID, "")
 	if err != nil {
@@ -335,7 +335,7 @@ func TestChatPersonInJobThreadWakesSession(t *testing.T) {
 }
 
 func TestChatGeneralReachesManager(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	x.hire(t, "w3", "写 hello", "chat-c", nil)
 	news, stop := f.Channel.ForManager().Subscribe()
 	defer stop()
@@ -362,7 +362,7 @@ func TestChatGeneralReachesManager(t *testing.T) {
 }
 
 func TestChatChannels(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	channel, err := f.Channel.OpenChannel("#clock-in", "打卡页", "chat-ch")
 	if err != nil {
 		t.Fatal(err)
@@ -435,7 +435,7 @@ func TestChatChannels(t *testing.T) {
 }
 
 func TestChatBusySessionGetsOneNotice(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	project := "chat-d"
 	f.Core.Apply(protocol.FactHired{Session: protocol.Session{
 		ID: "w6", Name: "帮工w6", Agent: "lab", Runtime: "pi", Brief: "慢慢做一个大活", Project: &project, HiredAt: clock.NowMs(),
@@ -478,7 +478,7 @@ func TestChatBusySessionGetsOneNotice(t *testing.T) {
 }
 
 func TestChatHopLimit(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	thread := x.hire(t, "w7", "写 hello", "chat-e", nil)
 	// The manager is never cooled down, so only the hop limit holds.
 	for i := 1; i <= 5; i++ {
@@ -508,7 +508,7 @@ func TestChatHopLimit(t *testing.T) {
 }
 
 func TestChatWakeBreaker(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	a := x.hire(t, "w8", "写 hello", "chat-f", nil)
 	x.hire(t, "w9", "写 world", "chat-g", nil)
 	if _, _, err := f.Channel.Say("@w8 这次必败", nil, ""); err != nil {
@@ -545,7 +545,7 @@ func TestChatWakeBreaker(t *testing.T) {
 }
 
 func TestChatSpeaking(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	thread := x.hire(t, "w10", "写 hello", "chat-h", nil)
 	first, err := f.Channel.Speak("w10", "我先看看代码", SpeakOptions{})
 	if err != nil || first.Kind != "sent" {
@@ -579,7 +579,7 @@ func TestChatSpeaking(t *testing.T) {
 		t.Fatalf("confirmed: %+v %v", sent, err)
 	}
 	absent, err := f.Channel.Speak("w10", "@w99 你在吗", SpeakOptions{Anyway: true})
-	if err != nil || absent.Kind != "sent" || !slices.Contains(absent.NotOnFarm, "w99") {
+	if err != nil || absent.Kind != "sent" || !slices.Contains(absent.Absent, "w99") {
 		t.Fatalf("absent: %+v %v", absent, err)
 	}
 	if _, err := f.Channel.Speak("w10", "hi", SpeakOptions{Target: "#田头:999999"}); err == nil || !strings.Contains(err.Error(), "没有 999999 这条消息") {
@@ -604,7 +604,7 @@ func TestChatSpeaking(t *testing.T) {
 }
 
 func TestChatManagerSaysGrowsThenDelivers(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	x.hire(t, "w11", "写 hello", "chat-k", nil)
 	general := f.Channel.General()
 	f.Channel.ManagerSays(general, "k1", "", false, "")
@@ -646,7 +646,7 @@ func TestChatManagerSaysGrowsThenDelivers(t *testing.T) {
 }
 
 func TestChatHistoryAndMarkRead(t *testing.T) {
-	f, _ := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, _ := chatTestWorld(t, t.TempDir(), ":memory:")
 	general := f.Channel.General()
 	var seqs []int64
 	for i := range 5 {
@@ -689,7 +689,7 @@ func TestChatHistoryAndMarkRead(t *testing.T) {
 }
 
 func TestChatInboxAndDigest(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	thread := x.hire(t, "w12", "写 hello", "chat-l", nil)
 	digest := f.Channel.ManagerDigest()
 	if len(digest) != 1 || digest[0].From != "w12" || digest[0].Target != fmt.Sprintf("#田头:%d", *thread.ParentNumber) {
@@ -719,7 +719,7 @@ func TestChatInboxAndDigest(t *testing.T) {
 }
 
 func TestChatSessionLeaves(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	x.hire(t, "w13", "写 hello", "chat-m", nil)
 	testkit.Until(t, "resting", func() bool {
 		h := f.Core.Session("w13")
@@ -743,7 +743,7 @@ func TestChatSessionLeaves(t *testing.T) {
 func TestChatRestartGivesHandedWordsAgain(t *testing.T) {
 	home := t.TempDir()
 	db := filepath.Join(home, "vibevalley.db")
-	f, x := chatTestFarm(t, home, db)
+	f, x := chatTestWorld(t, home, db)
 	thread := x.hire(t, "w14", "写 hello", "chat-i", nil)
 	x.slow = time.Minute
 	said, _, err := f.Channel.Say("慢慢做：再加一个文件", &thread.ID, "")
@@ -760,7 +760,7 @@ func TestChatRestartGivesHandedWordsAgain(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, "sessions.json"), []byte(savedJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	g, y := chatTestFarm(t, home, db)
+	g, y := chatTestWorld(t, home, db)
 	y.slow = 10 * time.Millisecond
 	if g.Core.Session("w14") == nil {
 		t.Fatal("the session did not come back")
@@ -798,7 +798,7 @@ func TestChatSummaryOf(t *testing.T) {
 }
 
 func TestMessagesKeepTheProducingRunRatherThanMatchingTime(t *testing.T) {
-	f, x := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, x := chatTestWorld(t, t.TempDir(), ":memory:")
 	general := f.Channel.General()
 	f.Channel.ManagerSays(general, "first-run", "partial", false, "run-first")
 	f.Channel.ManagerSays(general, "first-run", "complete", true, "run-second")
@@ -836,7 +836,7 @@ func TestMessagesKeepTheProducingRunRatherThanMatchingTime(t *testing.T) {
 }
 
 func TestChatSendKeyWritesOnce(t *testing.T) {
-	f, _ := chatTestFarm(t, t.TempDir(), ":memory:")
+	f, _ := chatTestWorld(t, t.TempDir(), ":memory:")
 	first, again, err := f.Channel.Say("早", nil, "k1")
 	if err != nil || again {
 		t.Fatalf("first: %v %v", again, err)

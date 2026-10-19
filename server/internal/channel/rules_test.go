@@ -59,7 +59,7 @@ func TestChannelNameProblem(t *testing.T) {
 func TestAudienceInAChannel(t *testing.T) {
 	channel := protocol.Conversation{Kind: protocol.ConversationKindChannel}
 	in := func(mentions ...string) []chatDelivery {
-		return chatAudience(chatAudienceInput{From: "user", FromKind: protocol.SenderKindUser, Kind: protocol.MessageKindChat, Mentions: mentions, Conversation: channel, Sessions: []string{"w1"}, OnFarm: []string{"w1", "w2"}})
+		return chatAudience(chatAudienceInput{From: "user", FromKind: protocol.SenderKindUser, Kind: protocol.MessageKindChat, Mentions: mentions, Conversation: channel, Sessions: []string{"w1"}, Present: []string{"w1", "w2"}})
 	}
 	testkit.Eq(t, in(), []chatDelivery{{Recipient: protocol.ManagerAgent, Reason: reasonAddressed, Wakes: true}, {Recipient: "w1", Reason: reasonGeneral}})
 	var who []string

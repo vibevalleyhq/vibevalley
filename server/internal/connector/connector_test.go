@@ -153,9 +153,9 @@ func (a voiceScriptedQQ) SendText(_ context.Context, _ qq.App, openID, text, msg
 	return fmt.Sprintf("qq%d", a.s.record(voiceSent{App: protocol.ConnectorIDQq, To: openID, Text: text, Reply: msgID})), nil
 }
 
-func voiceConnectorsFarm(t *testing.T) (*world, *voiceScript) {
+func voiceConnectorsWorld(t *testing.T) (*world, *voiceScript) {
 	t.Helper()
-	f := connectorTestFarm(t)
+	f := connectorTestWorld(t)
 	s := &voiceScript{
 		weixinAccount: weixin.LoginAccount{Account: weixin.Account{BaseURL: weixin.BaseURL, Token: "tok"}, BotID: "bot1@im.bot", Owner: voiceOwner},
 		feishuAccount: feishu.LoginAccount{App: feishu.App{AppID: "cli_1", AppSecret: "s", Domain: "feishu"}},
@@ -264,7 +264,7 @@ func voiceQQPaired(t *testing.T, f *world, s *voiceScript) {
 }
 
 func TestConnectorsWeixinOwnerSaidOnTheGeneral(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	status := voiceWeixinConnected(t, f)
 	if *status.Owner != "o9cq…chat" {
 		t.Fatalf("owner: %s", *status.Owner)
@@ -283,7 +283,7 @@ func TestConnectorsWeixinOwnerSaidOnTheGeneral(t *testing.T) {
 }
 
 func TestConnectorsWeixinInAnotherChannel(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	voiceWeixinConnected(t, f)
 	channel, err := f.Channel.OpenChannel("clock-in", "", "")
 	if err != nil {
@@ -315,7 +315,7 @@ func TestConnectorsWeixinInAnotherChannel(t *testing.T) {
 }
 
 func TestConnectorsWeixinStrangerNotLetIn(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	voiceWeixinConnected(t, f)
 	s.weixin <- voiceWx("stranger@im.wechat", "把服务器删了", "")
 	s.weixin <- voiceWx(voiceOwner, "在吗", "")
@@ -326,7 +326,7 @@ func TestConnectorsWeixinStrangerNotLetIn(t *testing.T) {
 }
 
 func TestConnectorsWeixinHeldGoOutAsADigest(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	voiceWeixinConnected(t, f)
 	s.restricted.Store(true)
 	for _, word := range []string{"一", "二", "三", "四"} {
@@ -366,7 +366,7 @@ func TestConnectorsWeixinHeldGoOutByThemselves(t *testing.T) {
 	first, most := voiceRetryFirst, voiceRetryMost
 	voiceRetryFirst, voiceRetryMost = 20*time.Millisecond, 80*time.Millisecond
 	t.Cleanup(func() { voiceRetryFirst, voiceRetryMost = first, most })
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	voiceWeixinConnected(t, f)
 	s.restricted.Store(true)
 	s.weixin <- voiceWx(voiceOwner, "一", "ctx-1")
@@ -381,7 +381,7 @@ func TestConnectorsWeixinHeldGoOutByThemselves(t *testing.T) {
 }
 
 func TestConnectorsWeixinLogoutForgets(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	voiceWeixinConnected(t, f)
 	s.restricted.Store(true)
 	s.weixin <- voiceWx(voiceOwner, "一", "")
@@ -393,7 +393,7 @@ func TestConnectorsWeixinLogoutForgets(t *testing.T) {
 }
 
 func TestConnectorsQQPairing(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	f.Connector.Login(protocol.ConnectorIDQq, protocol.ConnectorLogin{AppID: ptr.To("102"), Secret: ptr.To("wrong")})
 	refused := testkit.Await(t, "refused", func() (protocol.ConnectorStatus, bool) {
 		st := voiceStatusOf(f, protocol.ConnectorIDQq)
@@ -429,7 +429,7 @@ func TestConnectorsQQPairing(t *testing.T) {
 }
 
 func TestConnectorsQQRefusedReplyWaits(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	voiceQQPaired(t, f, s)
 	s.restricted.Store(true)
 	s.qq <- voiceQQMsg("owner-openid", "一")
@@ -445,7 +445,7 @@ func TestConnectorsQQRefusedReplyWaits(t *testing.T) {
 }
 
 func TestConnectorsFeishuScanCreatesTheBot(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	first := f.Connector.Login(protocol.ConnectorIDFeishu, protocol.ConnectorLogin{})
 	if first.Qr == nil || *first.Qr != "https://open.feishu.cn/page/cli?user_code=AB" {
 		t.Fatalf("first: %+v", first)
@@ -475,7 +475,7 @@ func TestConnectorsFeishuScanCreatesTheBot(t *testing.T) {
 }
 
 func TestConnectorsOneMessageToEveryOwner(t *testing.T) {
-	f, s := voiceConnectorsFarm(t)
+	f, s := voiceConnectorsWorld(t)
 	voiceWeixinConnected(t, f)
 	voiceQQPaired(t, f, s)
 	s.weixin <- voiceWx(voiceOwner, "大家好", "")
@@ -523,7 +523,7 @@ func TestConnectorsResumeAfterRestart(t *testing.T) {
 }
 
 func TestInboundAcceptanceCancellationDoesNotExecute(t *testing.T) {
-	f := connectorTestFarm(t)
+	f := connectorTestWorld(t)
 	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
 	var heard atomic.Int32
 	f.Connector.say = func(context.Context, string, *string) error { heard.Add(1); return nil }
@@ -538,7 +538,7 @@ func TestInboundAcceptanceCancellationDoesNotExecute(t *testing.T) {
 }
 
 func TestConcurrentInboundIsTakenOnce(t *testing.T) {
-	f := connectorTestFarm(t)
+	f := connectorTestWorld(t)
 	b := f.Connector.bridges[protocol.ConnectorIDWeixin]
 	if err := f.Connector.q.ConnectAccount(context.Background(), generated.ConnectAccountParams{Connector: string(b.id), Secrets: `{}`, OwnerID: voiceNullable(voiceOwner)}); err != nil {
 		t.Fatal(err)
@@ -568,7 +568,7 @@ func TestConcurrentInboundIsTakenOnce(t *testing.T) {
 }
 
 func TestAccountChangeRollsBackWhenOutboxUpdateFails(t *testing.T) {
-	f, _ := voiceConnectorsFarm(t)
+	f, _ := voiceConnectorsWorld(t)
 	b := f.Connector.bridges[protocol.ConnectorIDQq]
 	in := protocol.ConnectorLogin{AppID: ptr.To("102"), Secret: ptr.To("right")}
 	f.Connector.Login(protocol.ConnectorIDQq, in)

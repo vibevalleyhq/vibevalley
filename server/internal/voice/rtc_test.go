@@ -13,9 +13,9 @@ import (
 	"vibevalley/pkg/x/ptr"
 )
 
-func grantFarm(t *testing.T) (*world, *voiceCapture) {
+func grantWorld(t *testing.T) (*world, *voiceCapture) {
 	t.Helper()
-	f := voiceTestFarm(t)
+	f := voiceTestWorld(t)
 	if _, err := f.Setting.Save(protocol.SettingsUpdate{AgoraAppID: ptr.To(voiceTestAppID), AgoraAppCertificate: ptr.To(voiceTestCert)}); err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func issueGrant(t *testing.T, f *world) protocol.AgoraGrant {
 }
 
 func TestRTCGrantKeepsItsApplicationAcrossSettingsChanges(t *testing.T) {
-	f, capture := grantFarm(t)
+	f, capture := grantWorld(t)
 	issued := issueGrant(t, f)
 	nextApp := "33333333333333333333333333333333"
 	if _, err := f.Setting.Save(protocol.SettingsUpdate{AgoraAppID: &nextApp}); err != nil {
@@ -62,7 +62,7 @@ func TestRTCGrantKeepsItsApplicationAcrossSettingsChanges(t *testing.T) {
 }
 
 func TestPendingRTCGrantExpiresWithItsToken(t *testing.T) {
-	f, _ := grantFarm(t)
+	f, _ := grantWorld(t)
 	now := time.Now()
 	f.Voice.now = func() time.Time { return now }
 	issued := issueGrant(t, f)
@@ -90,7 +90,7 @@ func TestPendingRTCGrantExpiresWithItsToken(t *testing.T) {
 }
 
 func TestRTCGrantIsRevokedWhenStartOrStopFails(t *testing.T) {
-	f, capture := grantFarm(t)
+	f, capture := grantWorld(t)
 	issued := issueGrant(t, f)
 	capture.status, capture.body = 400, `{"detail":"rejected"}`
 	if _, err := f.Voice.Start(context.Background(), issued.Channel, issued.UID); err == nil {
@@ -132,7 +132,7 @@ func (c *blockedGrantCapture) Do(req *http.Request) (*http.Response, error) {
 	return c.voiceCapture.Do(req)
 }
 func TestRTCGrantHasOneStarterAndCannotOutliveService(t *testing.T) {
-	f, capture := grantFarm(t)
+	f, capture := grantWorld(t)
 	blocking := &blockedGrantCapture{voiceCapture: capture, entered: make(chan struct{}), release: make(chan struct{})}
 	f.Voice.http = blocking
 	issued := issueGrant(t, f)
