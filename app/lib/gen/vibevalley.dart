@@ -2251,20 +2251,20 @@ class ProjectLanguages {
   };
 }
 
-class ProjectSeeds {
-  const ProjectSeeds({required this.project, required this.stack, required this.recent, required this.kinds});
+class ProjectTemplates {
+  const ProjectTemplates({required this.project, required this.stack, required this.recent, required this.kinds});
 
-  factory ProjectSeeds.fromJson(Map<String, dynamic> j) => ProjectSeeds(
+  factory ProjectTemplates.fromJson(Map<String, dynamic> j) => ProjectTemplates(
     project: j['project'] as String,
     stack: ProjectStack.fromJson(j['stack'] as Map<String, dynamic>),
     recent: [for (final e in j['recent'] as List) e as String],
-    kinds: [for (final e in j['kinds'] as List) SeedKind.fromJson(e as Map<String, dynamic>)],
+    kinds: [for (final e in j['kinds'] as List) TemplateKind.fromJson(e as Map<String, dynamic>)],
   );
 
   final String project;
   final ProjectStack stack;
   final List<String> recent;
-  final List<SeedKind> kinds;
+  final List<TemplateKind> kinds;
 
   Map<String, dynamic> toJson() => {
     'project': project,
@@ -2300,53 +2300,53 @@ class ProjectStack {
   };
 }
 
-class SeedKind {
-  const SeedKind({required this.id, required this.name, required this.icon, required this.seeds});
+class TemplateKind {
+  const TemplateKind({required this.id, required this.name, required this.icon, required this.templates});
 
-  factory SeedKind.fromJson(Map<String, dynamic> j) => SeedKind(
+  factory TemplateKind.fromJson(Map<String, dynamic> j) => TemplateKind(
     id: j['id'] as String,
     name: j['name'] as String,
     icon: j['icon'] as String,
-    seeds: [for (final e in j['seeds'] as List) Seed.fromJson(e as Map<String, dynamic>)],
+    templates: [for (final e in j['templates'] as List) IssueTemplate.fromJson(e as Map<String, dynamic>)],
   );
 
   final String id;
   final String name;
   final String icon;
-  final List<Seed> seeds;
+  final List<IssueTemplate> templates;
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
     'icon': icon,
-    'seeds': [for (final e in seeds) e.toJson()],
+    'templates': [for (final e in templates) e.toJson()],
   };
 }
 
-class Seed {
-  const Seed({required this.id, required this.title, required this.done, required this.text, this.blank});
+class IssueTemplate {
+  const IssueTemplate({required this.id, required this.title, required this.done, required this.text, this.blank});
 
-  factory Seed.fromJson(Map<String, dynamic> j) => Seed(
+  factory IssueTemplate.fromJson(Map<String, dynamic> j) => IssueTemplate(
     id: j['id'] as String,
     title: j['title'] as String,
     done: j['done'] as String,
     text: j['text'] as String,
-    blank: j['blank'] == null ? null : SeedBlank.fromJson(j['blank'] as Map<String, dynamic>),
+    blank: j['blank'] == null ? null : TemplateBlank.fromJson(j['blank'] as Map<String, dynamic>),
   );
 
   final String id;
   final String title;
   final String done;
   final String text;
-  final SeedBlank? blank;
+  final TemplateBlank? blank;
 
   Map<String, dynamic> toJson() => {'id': id, 'title': title, 'done': done, 'text': text, if (blank != null) 'blank': blank!.toJson()};
 }
 
-class SeedBlank {
-  const SeedBlank({required this.start, required this.end});
+class TemplateBlank {
+  const TemplateBlank({required this.start, required this.end});
 
-  factory SeedBlank.fromJson(Map<String, dynamic> j) => SeedBlank(start: (j['start'] as num).toDouble(), end: (j['end'] as num).toDouble());
+  factory TemplateBlank.fromJson(Map<String, dynamic> j) => TemplateBlank(start: (j['start'] as num).toDouble(), end: (j['end'] as num).toDouble());
 
   final double start;
   final double end;
@@ -6159,10 +6159,10 @@ class ProjectApi {
     return ProjectLanguages.fromJson(j as Map<String, dynamic>);
   }
 
-  /// What to sow in the project: its stack, what was sown there before, and the seed catalog filled in for it.
-  Future<ProjectSeeds> seeds({required String id}) async {
-    final j = await _api._call('GET', '/api/v1/projects/${Uri.encodeComponent((id).toString())}/seeds', query: {}, body: null);
-    return ProjectSeeds.fromJson(j as Map<String, dynamic>);
+  /// The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it.
+  Future<ProjectTemplates> templates({required String id}) async {
+    final j = await _api._call('GET', '/api/v1/projects/${Uri.encodeComponent((id).toString())}/templates', query: {}, body: null);
+    return ProjectTemplates.fromJson(j as Map<String, dynamic>);
   }
 
   Future<ProjectActivity> activity({required String id}) async {

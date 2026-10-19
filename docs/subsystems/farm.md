@@ -92,7 +92,7 @@
 **播种袋**（`shared/seed_bag.dart` 的 `SeedForm`，两张皮共用：农场点空地在 `FarmLayer` 里打开，地图点一座岛的空位在工作台的对话框里打开）：
 
 1. **先定项目**：写着「种在 <项目>」和它的栈（Go、Node（bun）……）。从岛上打开的就种在这座岛的项目，不再问。农场的空地不属于哪个项目：先用上次种过的项目（`Prefs.lastProject`，每台设备各记各的，不在项目列表里了就不用），没有的话只有一个项目时直接用它，有几个时才先问「种在哪个项目？」；有几个项目时都可以「换个项目」。
-2. **挑种子**：问服务端 `project.seeds`，客户端不带种子的副本，只画它给的。从上到下是「最近」（这个项目里派出去过的工单标题，新的在前、不重复、最多 5 条），「常见的活」（按类分：修问题、测试、新功能、整理、依赖、文档、检查、发版，每类一个庄稼图标），一个筛选框，「自己写」的文本框，和「谁来种」。选一颗常见的活，文本框里是它的标题和一行「做到什么程度算完」，光标选中第一个〔…〕空，填上就能种；那一行里的命令照项目的栈写好（`go test ./...`、`bun run test`……），认不出栈就写「测试」「构建」这类泛称。
+2. **挑种子**：问服务端 `project.templates`，客户端不带种子的副本，只画它给的。从上到下是「最近」（这个项目里派出去过的工单标题，新的在前、不重复、最多 5 条），「常见的活」（按类分：修问题、测试、新功能、整理、依赖、文档、检查、发版，每类一个庄稼图标），一个筛选框，「自己写」的文本框，和「谁来种」。选一颗常见的活，文本框里是它的标题和一行「做到什么程度算完」，光标选中第一个〔…〕空，填上就能种；那一行里的命令照项目的栈写好（`go test ./...`、`bun run test`……），认不出栈就写「测试」「构建」这类泛称。
 3. **开工待办**：另一页列出这个项目排着队的待办（`queuedIn`，就是院门外的种子袋），按排上的先后；点「开工」调 `issue.dispatch`，农场的带上地号、岛上的不带，开的是那张工单本身、不另写一张。项目或农场还满着时服务端说为什么，袋子不关，工单留在队里原来的位置。
 
 播种是经田头发一条消息（`channel.say`）：选的或写的那段话原样发，带档案和项目，农场的还带地号（岛上没有农场的地，不带，服务端照常挑一块），管家照着派活。「先起草」不播种：这段话成为这个项目的一张备选工单（`writeIssue`：`issue.create` 再 `issue.draft`，选了谁来种就是它的帮工），袋子关上，打开它的详情（[工单](docs/subsystems/issue.md#怎么走)「起草」）。种下、起草或开工后记下这个项目。
@@ -105,7 +105,7 @@
 
 - **核心状态（`protocol`）**：读 `StateFrame` 的 `state`、`view`、`inbox`、`effects`；地的样子是 `PlotOf`，来电是 `Inbox`，皮不重写这两条规则。
 - **工单、帮工**：农具直接调 `issue.status`、`issue.comment`、`session.stop`，不经帮工找工单；播种是经田头发一条带档案和项目（农场的还带地号）的消息，开工待办调 `issue.dispatch`。
-- **种子**：播种袋读 `project.seeds`（`issue` 服务从工单里读出「最近」，`project` 服务看项目根目录认栈，种子目录在 `server/internal/protocol/seed_catalog.json`），客户端不带副本（[理由](.agents/notes/implemented/feature/2026-10-18-seed-catalog-from-the-server.md)）。
+- **种子**：播种袋读 `project.templates`（`issue` 服务从工单里读出「最近」，`project` 服务看项目根目录认栈，工单模板的目录在 `server/internal/protocol/template_catalog.json`），客户端不带副本（[理由](.agents/notes/implemented/feature/2026-10-18-seed-catalog-from-the-server.md)）。
 - **项目**：地图读项目列表里的 `slots`，项目页每 30 秒问一次；工单和帮工跟着核心状态来。
 - **游戏**：金币、升级、成就到了一档是服务端推来的 `GameEffect`，皮只画效果、响声音、弹通知。
 - **素材流水线（`design/`）**：生图 `design/pixel/gen.sh`，切图 `design/pixel/process.py` 写出 `app/assets/pixel/` 和 `sprites.json`（不手改）；原图在 vibevalley-art，`design/art.sh` 链接进来。步骤见 [pixel-village.md](docs/reference/pixel-village.md)「素材」。
@@ -141,7 +141,7 @@
 - `test/village/framing_test.dart`：1152×768 正好放下，1440×900 放大 4 倍裁 48 和 62，1920×1080 只裁上下，1280×800 退到 3 倍留窄边，一边裁一边留边，竖着的手机放大 1 倍，`never more is cut than the limits` 扫一片窗口尺寸。
 - `test/village/render_test.dart`：白天帮工在地边和建筑旁、指着的地和东西、金币；夜里的灯、提灯、萤火虫；点地、点院子里的东西、点帮工、点院子。`hits_test.dart` 点击的先后，`dog_test.dart` 狗的把戏。
 - `test/sprites/atlas_test.dart`：地图是 384 格宽、两倍密，每张图都在清单旁边。
-- `test/farm/tools_test.dart`：手、浇水、杀虫、收获先看收成清单、铲除叫停或请走、用不上时说原因且不发请求、一次点击只判断一次、播种带地号和档案。`test/farm/seed_form_test.dart`：播种袋先问项目、「种在 X」、最近在常见的活前面、选一颗把光标放在第一个空上、筛选、自己写、开工待办开的是排队的那张、记住上次种的项目（不在了就照常问）。服务端：`project/stack_test.go`（每种标记文件、锁文件选包管理器），`issue/seeds_test.go`（目录完整、空能解析、按栈填命令、最近怎么挑），`issue/queue_test.go` 的 `TestAQueuedTodoStartsFromTheSowingForm`，`handler/api_test.go` 的 `TestProjectSeedsAreFilledForItsStack`。`test/farm/screen_test.dart` 是 1440×900 的整屏，`overlays_test.dart` 查每个院子里的东西有一个去处。
+- `test/farm/tools_test.dart`：手、浇水、杀虫、收获先看收成清单、铲除叫停或请走、用不上时说原因且不发请求、一次点击只判断一次、播种带地号和档案。`test/farm/seed_form_test.dart`：播种袋先问项目、「种在 X」、最近在常见的活前面、选一颗把光标放在第一个空上、筛选、自己写、开工待办开的是排队的那张、记住上次种的项目（不在了就照常问）。服务端：`project/stack_test.go`（每种标记文件、锁文件选包管理器），`issue/templates_test.go`（目录完整、空能解析、按栈填命令、最近怎么挑），`issue/queue_test.go` 的 `TestAQueuedTodoStartsFromTheSowingForm`，`handler/api_test.go` 的 `TestProjectTemplatesAreFilledForItsStack`。`test/farm/screen_test.dart` 是 1440×900 的整屏，`overlays_test.dart` 查每个院子里的东西有一个去处。
 - `test/audio/synth_test.dart`：每个音效的样本和响度和 `test/fixtures/sfx.json` 一致，每个都有名字和分组。
 - `test/phone/widget_test.dart`：打开时已有的来电不响、新来电响铃，挂断，20 秒没接算未接，接听打开地、计划板或对话，别处处理掉自己停；方块、推箱子、小恐龙从主屏打开。`games_test.dart`、`bugsnake_test.dart`、`merge_test.dart` 测小游戏的规则（种子重放、推箱子每关可解）。来电本身的规则在服务端 `server/internal/protocol/inbox_rules_test.go`。
 - `test/host/notify_test.dart`（来电变通知、只响一次）、`mobile_notices_test.dart`（点通知等画面开始听再打开）。

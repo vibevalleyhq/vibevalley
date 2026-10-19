@@ -12,11 +12,11 @@ Status: implemented
 
 ## Decision
 
-**播种袋问服务端要这个项目的种子（`project.seeds`），客户端只画它给的、不带副本。**
+**播种袋问服务端要这个项目的种子（`project.templates`），客户端只画它给的、不带副本。** 种子在代码里叫工单模板（`IssueTemplate`），seed 只指种子数据（`seeds.json`）。
 
-- **目录是服务端的种子数据**：`server/internal/protocol/seed_catalog.json`，8 类 27 颗（修问题、测试、新功能、整理、依赖、文档、检查、发版），每类一个现成的庄稼图（`plot-*`）。每颗是一个模板：标题（〔…〕是主人要填的空）和一行「做到什么程度算完」，那一行里的 `{test}`、`{lint}`、`{build}` 留给栈填。`protocol.SeedCatalog()` 读它；它不进 `shapegen`、不进 `lib/gen`。
+- **目录是服务端的种子数据**：`server/internal/protocol/template_catalog.json`，8 类 27 颗（修问题、测试、新功能、整理、依赖、文档、检查、发版），每类一个现成的庄稼图（`plot-*`）。每颗是一个模板：标题（〔…〕是主人要填的空）和一行「做到什么程度算完」，那一行里的 `{test}`、`{lint}`、`{build}` 留给栈填。`protocol.TemplateCatalog()` 读它；它不进 `shapegen`、不进 `lib/gen`。
 - **认栈在 `project`**（`stack.go` 的 `stackOf`，只看项目根目录，第一个对上的算）：`go.mod` → `go test ./...`；`Cargo.toml` → `cargo test`；`pubspec.yaml` → `flutter test`（不带 flutter 的是 `dart test`）；`package.json` → 有 `test` 脚本才写，包管理器看锁文件（`bun.lock`/`bun.lockb` → bun，`pnpm-lock.yaml` → pnpm，`yarn.lock` → yarn，否则 npm），一律 `<pm> run test`；`pyproject.toml`、`requirements.txt`、`setup.py` → `pytest`。lint、build 同理，认不出的留空。
-- **填模板和「最近」在 `issue`**（`seeds.go`，不导出的纯函数）：知道的命令写成代码样式，不知道的写「测试」「代码检查」「构建」；`Text` 是标题加「做到什么程度算完：」那一行，`Blank` 是第一个空在 `Text` 里的位置（UTF-16，和客户端的文本框一致）。「最近」是这个项目里主人自己派出去过的工单标题（不算计划里的、定时的、给管家的），新的在前、不重复、最多 5 条、超过 60 字的不算，从数据库里读，不止核心状态里的 50 张。
+- **填模板和「最近」在 `issue`**（`templates.go`，不导出的纯函数）：知道的命令写成代码样式，不知道的写「测试」「代码检查」「构建」；`Text` 是标题加「做到什么程度算完：」那一行，`Blank` 是第一个空在 `Text` 里的位置（UTF-16，和客户端的文本框一致）。「最近」是这个项目里主人自己派出去过的工单标题（不算计划里的、定时的、给管家的），新的在前、不重复、最多 5 条、超过 60 字的不算，从数据库里读，不止核心状态里的 50 张。
 - **播种照旧经田头**：选的或写的那段话原样发 `channel.say`，`SayRequest` 多带一个 `project`；管家的输入前面多一句「主人选定了项目：X」，和选定档案那句一样（`manager.Pick`）。客户端不在话里拼项目名。
 - **开工待办**：同一个袋子的另一页，是这个项目排着队的待办（核心状态里的工单，`rules/issues.dart` 的 `queuedIn`，地图上院门外的种子袋用同一条）。点开工调 `issue.dispatch`：只收排着队的待办，和后台重试共用一把锁；有空就照排队时的来源开工，没空就说为什么、留在原位。
 - **空地先问项目**：农场的地不分项目，所以表单先问；只有一个项目时直接用它。
@@ -37,5 +37,5 @@ Status: implemented
 
 - 每次打开播种袋多一次请求（读一遍工单表、看一眼项目根目录）；袋子打开时等它，期间写着「在翻种子袋……」，自己写照样能用。
 - 栈只看根目录：前后端放在子目录里的仓库认成根目录那一种（本仓库根上只有不带测试脚本的 `package.json`，认成 Node、命令落回泛称），帮工要自己找；没做多栈。
-- 改目录只改 JSON，`issue/seeds_test.go` 查每颗都有类、标题和完成线，空能解析，`{…}` 只用三个名字。
+- 改目录只改 JSON，`issue/templates_test.go` 查每颗都有类、标题和完成线，空能解析，`{…}` 只用三个名字。
 - 开工待办在项目满着时点了也开不了，只说为什么：排着队的本来就会在有空时自己开工，这一页主要是看清这个项目在等什么、在这块地上马上开。

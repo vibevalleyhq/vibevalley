@@ -253,7 +253,7 @@ void main() {
           'slots': 2,
         },
       ],
-      'GET /api/v1/projects/task-smoke/seeds': const ProjectSeeds(
+      'GET /api/v1/projects/task-smoke/templates': const ProjectTemplates(
         project: 'task-smoke',
         stack: ProjectStack(name: 'go', label: 'Go', test: 'go test ./...'),
         recent: [],

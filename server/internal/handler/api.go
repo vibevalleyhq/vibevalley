@@ -332,8 +332,8 @@ func (a api) ProjectLanguages(ctx context.Context, id string) (protocol.ProjectL
 	return *langs, nil
 }
 
-func (a api) ProjectSeeds(_ context.Context, id string) (protocol.ProjectSeeds, error) {
-	return a.f.Issue.Seeds(id)
+func (a api) ProjectTemplates(_ context.Context, id string) (protocol.ProjectTemplates, error) {
+	return a.f.Issue.Templates(id)
 }
 
 func (a api) ProjectActivity(ctx context.Context, id string) (protocol.ProjectActivity, error) {

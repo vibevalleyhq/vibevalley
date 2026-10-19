@@ -13,21 +13,21 @@ import (
 )
 
 const (
-	recentSeeds = 5
-	// A title longer than this is a long instruction, not a seed to sow again.
-	recentSeedLength = 60
+	recentTitles = 5
+	// A title longer than this is a long instruction, not one to send again.
+	recentTitleLength = 60
 )
 
-func (d *dispatch) Seeds(name string) (protocol.ProjectSeeds, error) {
+func (d *dispatch) Templates(name string) (protocol.ProjectTemplates, error) {
 	stack, ok := d.projects.Stack(name)
 	if !ok {
-		return protocol.ProjectSeeds{}, protocol.Missing{What: "项目 " + name}
+		return protocol.ProjectTemplates{}, protocol.Missing{What: "项目 " + name}
 	}
 	all, err := d.issues.List()
 	if err != nil {
-		return protocol.ProjectSeeds{}, err
+		return protocol.ProjectTemplates{}, err
 	}
-	return protocol.ProjectSeeds{Project: name, Stack: stack, Recent: sownIn(all, name), Kinds: sowable(protocol.SeedCatalog(), stack)}, nil
+	return protocol.ProjectTemplates{Project: name, Stack: stack, Recent: sentTitles(all, name), Kinds: filledKinds(protocol.TemplateCatalog(), stack)}, nil
 }
 
 // Only a queued todo starts here, under the queue's lock; without room it keeps its place (start would queue it anew).
@@ -53,7 +53,7 @@ func (d *dispatch) DispatchQueued(ctx context.Context, id string) (protocol.Disp
 }
 
 // The owner's own issues sent out in the project, newest first, each title once.
-func sownIn(all []protocol.Issue, project string) []string {
+func sentTitles(all []protocol.Issue, project string) []string {
 	mine := slices.DeleteFunc(slices.Clone(all), func(i protocol.Issue) bool {
 		return i.Project == nil || *i.Project != project || len(i.Sessions) == 0 || i.Graph != nil || i.Task != nil || i.Parent != nil ||
 			i.Schedule != nil || protocol.IsForManager(i)
@@ -62,33 +62,33 @@ func sownIn(all []protocol.Issue, project string) []string {
 	out := []string{}
 	for _, i := range mine {
 		title := strings.Join(strings.Fields(i.Title), " ")
-		if title == "" || utf8.RuneCountInString(title) > recentSeedLength || slices.Contains(out, title) {
+		if title == "" || utf8.RuneCountInString(title) > recentTitleLength || slices.Contains(out, title) {
 			continue
 		}
-		if out = append(out, title); len(out) == recentSeeds {
+		if out = append(out, title); len(out) == recentTitles {
 			break
 		}
 	}
 	return out
 }
 
-func sowable(kinds []protocol.SeedKind, stack protocol.ProjectStack) []protocol.SeedKind {
+func filledKinds(kinds []protocol.TemplateKind, stack protocol.ProjectStack) []protocol.TemplateKind {
 	for i := range kinds {
-		for j := range kinds[i].Seeds {
-			kinds[i].Seeds[j] = filledSeed(kinds[i].Seeds[j], stack)
+		for j := range kinds[i].Templates {
+			kinds[i].Templates[j] = filledTemplate(kinds[i].Templates[j], stack)
 		}
 	}
 	return kinds
 }
 
-var seedHoles = regexp.MustCompile(`\s?\{(test|lint|build)\}\s?`)
+var commandHoles = regexp.MustCompile(`\s?\{(test|lint|build)\}\s?`)
 
 // A known command goes in as code, spaced from the words around it; an unknown one is a plain word, unspaced as Chinese is.
-func filledSeed(s protocol.Seed, stack protocol.ProjectStack) protocol.Seed {
+func filledTemplate(s protocol.IssueTemplate, stack protocol.ProjectStack) protocol.IssueTemplate {
 	commands := map[string]string{"test": stack.Test, "lint": stack.Lint, "build": stack.Build}
 	words := map[string]string{"test": "测试", "lint": "代码检查", "build": "构建"}
-	s.Done = seedHoles.ReplaceAllStringFunc(s.Done, func(hole string) string {
-		name := seedHoles.FindStringSubmatch(hole)[1]
+	s.Done = commandHoles.ReplaceAllStringFunc(s.Done, func(hole string) string {
+		name := commandHoles.FindStringSubmatch(hole)[1]
 		if cmd := commands[name]; cmd != "" {
 			return strings.Replace(hole, "{"+name+"}", "`"+cmd+"`", 1)
 		}
@@ -99,7 +99,7 @@ func filledSeed(s protocol.Seed, stack protocol.ProjectStack) protocol.Seed {
 	return s
 }
 
-func firstBlank(text string) *protocol.SeedBlank {
+func firstBlank(text string) *protocol.TemplateBlank {
 	start := strings.Index(text, "〔")
 	if start < 0 {
 		return nil
@@ -109,5 +109,5 @@ func firstBlank(text string) *protocol.SeedBlank {
 		return nil
 	}
 	end += start + len("〕")
-	return &protocol.SeedBlank{Start: int64(str.Units(text[:start])), End: int64(str.Units(text[:end]))}
+	return &protocol.TemplateBlank{Start: int64(str.Units(text[:start])), End: int64(str.Units(text[:end]))}
 }

@@ -170,8 +170,8 @@ func TestChannelCreationReturnsItsIdentity(t *testing.T) {
 	}
 }
 
-// The sowing form's seeds are the project's: its stack read off its folder, the catalog filled with its commands.
-func TestProjectSeedsAreFilledForItsStack(t *testing.T) {
+// The issue templates are the project's: its stack read off its folder, the catalog filled with its commands.
+func TestProjectTemplatesAreFilledForItsStack(t *testing.T) {
 	work := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(work, "projects", "clock-in"), 0o755); err != nil {
 		t.Fatal(err)
@@ -191,22 +191,22 @@ func TestProjectSeedsAreFilledForItsStack(t *testing.T) {
 	defer srv.Close()
 	c := &protocol.Client{Base: srv.URL}
 	ctx := context.Background()
-	seeds, err := c.ProjectSeeds(ctx, "clock-in")
+	templates, err := c.ProjectTemplates(ctx, "clock-in")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if seeds.Project != "clock-in" || seeds.Stack.Name != "go" || seeds.Stack.Test != "go test ./..." || len(seeds.Recent) != 0 {
-		t.Fatalf("seeds %+v", seeds)
+	if templates.Project != "clock-in" || templates.Stack.Name != "go" || templates.Stack.Test != "go test ./..." || len(templates.Recent) != 0 {
+		t.Fatalf("templates %+v", templates)
 	}
-	if len(seeds.Kinds) != len(protocol.SeedCatalog()) || seeds.Kinds[0].Name != "修问题" {
-		t.Fatalf("kinds %+v", seeds.Kinds)
+	if len(templates.Kinds) != len(protocol.TemplateCatalog()) || templates.Kinds[0].Name != "修问题" {
+		t.Fatalf("kinds %+v", templates.Kinds)
 	}
-	bug := seeds.Kinds[0].Seeds[0]
+	bug := templates.Kinds[0].Templates[0]
 	if !strings.Contains(bug.Text, "`go test ./...` 通过") || bug.Blank == nil {
-		t.Fatalf("first seed %+v", bug)
+		t.Fatalf("first template %+v", bug)
 	}
 	var missing protocol.Missing
-	if _, err := c.ProjectSeeds(ctx, "nope"); !errors.As(err, &missing) {
+	if _, err := c.ProjectTemplates(ctx, "nope"); !errors.As(err, &missing) {
 		t.Fatalf("a project that is not there: %v", err)
 	}
 	// Only a queued todo starts from the form: one never queued is refused.

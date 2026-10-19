@@ -36,31 +36,31 @@ Issue _queued(String id, String title, double at) => Issue(
   asks: const [],
 );
 
-const _seeds = ProjectSeeds(
+const _templates = ProjectTemplates(
   project: 'clock-in',
   stack: ProjectStack(name: 'go', label: 'Go', test: 'go test ./...'),
   recent: ['修登录闪退'],
   kinds: [
-    SeedKind(
+    TemplateKind(
       id: 'fix',
       name: '修问题',
       icon: 'plot-withered',
-      seeds: [
-        Seed(
+      templates: [
+        IssueTemplate(
           id: 'bug',
           title: '修一个 bug：〔现象〕',
           done: '先复现它；`go test ./...` 通过',
           text: '修一个 bug：〔现象〕\n做到什么程度算完：先复现它；`go test ./...` 通过',
-          blank: SeedBlank(start: 8, end: 12),
+          blank: TemplateBlank(start: 8, end: 12),
         ),
-        Seed(id: 'lint', title: '修 lint', done: '代码检查没有报错', text: '修 lint\n做到什么程度算完：代码检查没有报错'),
+        IssueTemplate(id: 'lint', title: '修 lint', done: '代码检查没有报错', text: '修 lint\n做到什么程度算完：代码检查没有报错'),
       ],
     ),
-    SeedKind(
+    TemplateKind(
       id: 'docs',
       name: '文档',
       icon: 'plot-flowering',
-      seeds: [Seed(id: 'readme', title: '补 README 怎么启动', done: '照着能跑起来', text: '补 README 怎么启动\n做到什么程度算完：照着能跑起来')],
+      templates: [IssueTemplate(id: 'readme', title: '补 README 怎么启动', done: '照着能跑起来', text: '补 README 怎么启动\n做到什么程度算完：照着能跑起来')],
     ),
   ],
 );
@@ -75,7 +75,7 @@ void main() {
 
   Routes routes({List<String> projects = const ['clock-in', 'notes']}) => Routes({
     'GET /api/v1/projects': [for (final p in projects) _project(p).toJson()],
-    'GET /api/v1/projects/clock-in/seeds': _seeds.toJson(),
+    'GET /api/v1/projects/clock-in/templates': _templates.toJson(),
     'POST /api/v1/issues/t5/dispatch': const Dispatched(session: 's9').toJson(),
   });
 
@@ -102,7 +102,7 @@ void main() {
     await pickClockIn(tester);
     expect(find.text('种在 clock-in'), findsOneWidget);
     expect(find.text('Go'), findsOneWidget);
-    expect(r.paths, contains('GET /api/v1/projects/clock-in/seeds'));
+    expect(r.paths, contains('GET /api/v1/projects/clock-in/templates'));
     final recentY = tester.getTopLeft(find.text('最近')).dy;
     final kindsY = tester.getTopLeft(find.text('常见的活')).dy;
     expect(recentY, lessThan(kindsY));
@@ -113,7 +113,7 @@ void main() {
     await tester.tap(find.text('修一个 bug：〔现象〕'));
     await tester.pump();
     final words = tester.widget<EditableText>(find.descendant(of: find.bySemanticsLabel('工单'), matching: find.byType(EditableText)));
-    expect(words.controller.text, _seeds.kinds[0].seeds[0].text);
+    expect(words.controller.text, _templates.kinds[0].templates[0].text);
     expect(words.controller.selection, const TextSelection(baseOffset: 8, extentOffset: 12));
     expect(words.focusNode.hasFocus, isTrue);
     expect(words.controller.selection.textInside(words.controller.text), '〔现象〕');

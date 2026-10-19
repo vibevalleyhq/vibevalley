@@ -4,7 +4,7 @@
       "id": "fix",
       "name": "修问题",
       "icon": "plot-withered",
-      "seeds": [
+      "templates": [
         {
           "id": "bug",
           "title": "修一个 bug：〔现象〕",
@@ -31,7 +31,7 @@
       "id": "test",
       "name": "测试",
       "icon": "plot-sprout",
-      "seeds": [
+      "templates": [
         {
           "id": "recent",
           "title": "给最近改的地方补测试",
@@ -53,7 +53,7 @@
       "id": "feature",
       "name": "新功能",
       "icon": "plot-seeded",
-      "seeds": [
+      "templates": [
         {
           "id": "feature",
           "title": "加一个功能：〔要什么〕",
@@ -75,7 +75,7 @@
       "id": "tidy",
       "name": "整理",
       "icon": "plot-weeds",
-      "seeds": [
+      "templates": [
         {
           "id": "refactor",
           "title": "重构〔位置〕",
@@ -102,7 +102,7 @@
       "id": "deps",
       "name": "依赖",
       "icon": "plot-leafy",
-      "seeds": [
+      "templates": [
         {
           "id": "upgrade",
           "title": "升级依赖",
@@ -124,7 +124,7 @@
       "id": "docs",
       "name": "文档",
       "icon": "plot-flowering",
-      "seeds": [
+      "templates": [
         {
           "id": "readme",
           "title": "补 README 怎么启动",
@@ -146,7 +146,7 @@
       "id": "review",
       "name": "检查",
       "icon": "plot-carrot",
-      "seeds": [
+      "templates": [
         {
           "id": "recent",
           "title": "审一遍最近的改动",
@@ -173,7 +173,7 @@
       "id": "release",
       "name": "发版",
       "icon": "plot-wheat",
-      "seeds": [
+      "templates": [
         {
           "id": "prepare",
           "title": "准备发版",

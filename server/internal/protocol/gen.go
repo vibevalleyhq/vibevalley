@@ -755,23 +755,23 @@ func (v ProjectLanguages) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-func (v ProjectSeeds) MarshalJSON() ([]byte, error) {
-	type plain ProjectSeeds
+func (v ProjectTemplates) MarshalJSON() ([]byte, error) {
+	type plain ProjectTemplates
 	p := plain(v)
 	if p.Recent == nil {
 		p.Recent = []string{}
 	}
 	if p.Kinds == nil {
-		p.Kinds = []SeedKind{}
+		p.Kinds = []TemplateKind{}
 	}
 	return json.Marshal(p)
 }
 
-func (v SeedKind) MarshalJSON() ([]byte, error) {
-	type plain SeedKind
+func (v TemplateKind) MarshalJSON() ([]byte, error) {
+	type plain TemplateKind
 	p := plain(v)
-	if p.Seeds == nil {
-		p.Seeds = []Seed{}
+	if p.Templates == nil {
+		p.Templates = []IssueTemplate{}
 	}
 	return json.Marshal(p)
 }
@@ -2347,7 +2347,7 @@ var Endpoints = []Endpoint{
 	{"project.check", "POST", "/api/v1/projects/check", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"project.create", "POST", "/api/v1/projects", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"project.languages", "GET", "/api/v1/projects/{id}/languages", nil, false, []Caller{CallerOwner, CallerRemote}},
-	{"project.seeds", "GET", "/api/v1/projects/{id}/seeds", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"project.templates", "GET", "/api/v1/projects/{id}/templates", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"project.activity", "GET", "/api/v1/projects/{id}/activity", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"voice.session", "POST", "/api/v1/voice/session", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"voice.renew", "POST", "/api/v1/voice/renew", nil, true, []Caller{CallerOwner, CallerRemote}},
@@ -2811,9 +2811,9 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.ProjectLanguages(r.Context(), pID)
 		answer(w, out, err)
 	})
-	mux.HandleFunc("GET /api/v1/projects/{id}/seeds", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/projects/{id}/templates", func(w http.ResponseWriter, r *http.Request) {
 		pID := r.PathValue("id")
-		out, err := h.ProjectSeeds(r.Context(), pID)
+		out, err := h.ProjectTemplates(r.Context(), pID)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("GET /api/v1/projects/{id}/activity", func(w http.ResponseWriter, r *http.Request) {
@@ -3404,9 +3404,9 @@ func (c *Client) ProjectLanguages(ctx context.Context, pID string) (ProjectLangu
 	return out, err
 }
 
-func (c *Client) ProjectSeeds(ctx context.Context, pID string) (ProjectSeeds, error) {
-	var out ProjectSeeds
-	err := c.call(ctx, "GET", "/api/v1/projects/"+url.PathEscape(pID)+"/seeds", nil, nil, &out)
+func (c *Client) ProjectTemplates(ctx context.Context, pID string) (ProjectTemplates, error) {
+	var out ProjectTemplates
+	err := c.call(ctx, "GET", "/api/v1/projects/"+url.PathEscape(pID)+"/templates", nil, nil, &out)
 	return out, err
 }
 

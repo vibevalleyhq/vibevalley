@@ -84,6 +84,11 @@ const RULES: readonly Rule[] = [
     pattern: /\b(worker\.activities|progress\.carry|server\.end)\b/,
     says: 'nothing: the endpoint is gone',
   },
+  {
+    name: 'an issue template under the seed name',
+    pattern: /\b(ProjectSeeds|SeedKind|SeedBlank|Seed|SeedCatalog|seedCatalog|projectSeedsProvider)\b|project\.seeds|\/seeds\b|seed_catalog/,
+    says: 'ProjectTemplates, TemplateKind, TemplateBlank, IssueTemplate, TemplateCatalog, project.templates; seed is only the seed data (seeds.json, SeedAgents)',
+  },
 ]
 
 const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{go,dart}`, { cwd: root })).sort()

@@ -948,14 +948,14 @@ type ProjectLanguages struct {
 	Languages []LanguageCount `json:"languages"`
 }
 
-// What can be sown in one project (project.seeds): what it is built with, what was sown there before, and the common
-// jobs filled in for it.
-type ProjectSeeds struct {
+// The issue templates for one project (project.templates): what it is built with, the titles sent out there before, and
+// the template catalog filled in for it.
+type ProjectTemplates struct {
 	Project string       `json:"project"`
 	Stack   ProjectStack `json:"stack"`
 	// Titles of the issues sent out in this project, newest first, each once; at most 5.
-	Recent []string   `json:"recent"`
-	Kinds  []SeedKind `json:"kinds"`
+	Recent []string       `json:"recent"`
+	Kinds  []TemplateKind `json:"kinds"`
 }
 
 // What a project is built with, read off the marker files at its root. A command is empty when it is not known.
@@ -969,29 +969,30 @@ type ProjectStack struct {
 	Build string `json:"build,omitzero"`
 }
 
-// One shelf of the seed catalog (internal/protocol/seed_catalog.json).
-type SeedKind struct {
+// One shelf of the template catalog (internal/protocol/template_catalog.json).
+type TemplateKind struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	// A sprite in app/assets/pixel.
-	Icon  string `json:"icon"`
-	Seeds []Seed `json:"seeds"`
+	Icon      string          `json:"icon"`
+	Templates []IssueTemplate `json:"templates"`
 }
 
-// A common job. In the catalog Done holds {test}, {lint} and {build}; project.seeds gives it filled for the stack.
-type Seed struct {
+// A common job as an issue template. In the catalog Done holds {test}, {lint} and {build}; project.templates gives it
+// filled for the stack.
+type IssueTemplate struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
 	// 做到什么程度算完.
 	Done string `json:"done"`
-	// The words to sow: the title, then the done line. Each 〔…〕 is a blank the owner fills.
+	// The issue's words: the title, then the done line. Each 〔…〕 is a blank the owner fills.
 	Text string `json:"text"`
 	// The first blank in Text, in UTF-16 code units; absent when there is none.
-	Blank *SeedBlank `json:"blank,omitzero"`
+	Blank *TemplateBlank `json:"blank,omitzero"`
 }
 
 // Where a blank is, as the client's text field counts.
-type SeedBlank struct {
+type TemplateBlank struct {
 	Start int64 `json:"start"`
 	End   int64 `json:"end"`
 }

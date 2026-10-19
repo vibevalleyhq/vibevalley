@@ -156,7 +156,7 @@
 | `project.check` | `POST /api/v1/projects/check` | ✓ | ✓ |  |  |
 | `project.create` | `POST /api/v1/projects` | ✓ | ✓ |  |  |
 | `project.languages` | `GET /api/v1/projects/{id}/languages` | ✓ | ✓ |  |  |
-| `project.seeds` | `GET /api/v1/projects/{id}/seeds` | ✓ | ✓ |  |  |
+| `project.templates` | `GET /api/v1/projects/{id}/templates` | ✓ | ✓ |  |  |
 | `project.activity` | `GET /api/v1/projects/{id}/activity` | ✓ | ✓ |  |  |
 
 ## voice

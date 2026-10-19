@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/providers.dart';
-import '../data/remote.dart' show projectNamesProvider, projectSeedsProvider;
+import '../data/remote.dart' show projectNamesProvider, projectTemplatesProvider;
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
@@ -14,7 +14,7 @@ import '../rules/issues.dart' show queuedIn;
 import 'faces.dart';
 import 'tags.dart';
 
-/// The sowing bag: the server's seeds for the project (project.seeds), its queued todos, or the owner's own words.
+/// The sowing bag: the server's issue templates for the project (project.templates), its queued todos, or the owner's own words.
 /// Both skins open it: the farm on one of its beds, the project map on an island's empty spot.
 class SeedForm extends ConsumerStatefulWidget {
   const SeedForm({super.key, required this.onDone, this.station, this.project});
@@ -49,7 +49,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
     super.dispose();
   }
 
-  void _take(String text, [SeedBlank? blank]) {
+  void _take(String text, [TemplateBlank? blank]) {
     setState(() {
       _text = text;
       _selection = blank == null ? null : TextSelection(baseOffset: blank.start.round(), extentOffset: blank.end.round());
@@ -77,9 +77,9 @@ class _SeedFormState extends ConsumerState<SeedForm> {
         }),
       );
     }
-    final seeds = ref.watch(projectSeedsProvider(project));
+    final templates = ref.watch(projectTemplatesProvider(project));
     final queued = queuedIn(ref.watch(stateProvider)?.issues ?? const <Issue>[], project);
-    final stack = seeds.value?.stack.label ?? '';
+    final stack = templates.value?.stack.label ?? '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -113,7 +113,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
           onChanged: (b) => setState(() => _bag = b),
         ),
         const SizedBox(height: 12),
-        if (_bag == _Bag.queued) _queuedList(queued, project, label) else ..._seedBag(seeds, project, label),
+        if (_bag == _Bag.queued) _queuedList(queued, project, label) else ..._seedBag(templates, project, label),
       ],
     );
   }
@@ -162,7 +162,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
     );
   }
 
-  List<Widget> _seedBag(AsyncValue<ProjectSeeds> seeds, String project, TextStyle label) {
+  List<Widget> _seedBag(AsyncValue<ProjectTemplates> templates, String project, TextStyle label) {
     final agents = (ref.watch(agentsProvider).value ?? const <String, Agent>{}).values.where((a) => a.enabled).toList();
     final pick = ref.watch(prefsProvider.select((p) => p.pick));
     final who = _who ?? (agents.any((a) => a.id == pick) ? pick : 'auto');
@@ -191,20 +191,20 @@ class _SeedFormState extends ConsumerState<SeedForm> {
 
     final q = _filter.trim().toLowerCase();
     bool shown(String title) => q.isEmpty || title.toLowerCase().contains(q);
-    final bag = seeds.value;
+    final bag = templates.value;
     final recent = [
       for (final r in bag?.recent ?? const <String>[])
         if (shown(r)) r,
     ];
     final kinds = [
-      for (final k in bag?.kinds ?? const <SeedKind>[])
-        if (k.seeds.where((s) => shown(s.title) || shown(k.name)).toList() case final rows when rows.isNotEmpty) (kind: k, seeds: rows),
+      for (final k in bag?.kinds ?? const <TemplateKind>[])
+        if (k.templates.where((s) => shown(s.title) || shown(k.name)).toList() case final rows when rows.isNotEmpty) (kind: k, templates: rows),
     ];
     return [
       PxTextInput(value: _filter, onChanged: (v) => setState(() => _filter = v), icon: 'button-filter', placeholder: '筛一筛：bug、测试、依赖……', semanticLabel: '筛种子'),
       const SizedBox(height: 10),
-      if (seeds.isLoading && bag == null) Text('在翻种子袋……', style: label),
-      if (seeds.hasError && bag == null) Text('种子袋没拿到：${seeds.error}', style: label.copyWith(color: Palette.berry)),
+      if (templates.isLoading && bag == null) Text('在翻种子袋……', style: label),
+      if (templates.hasError && bag == null) Text('种子袋没拿到：${templates.error}', style: label.copyWith(color: Palette.berry)),
       if (recent.isNotEmpty) ...[
         Text('最近', style: label),
         const SizedBox(height: 6),
@@ -218,7 +218,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
       if (kinds.isNotEmpty) ...[
         Text('常见的活', style: label),
         const SizedBox(height: 6),
-        for (final (:kind, :seeds) in kinds)
+        for (final (:kind, :templates) in kinds)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Row(
@@ -238,7 +238,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
                   child: Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children: [for (final s in seeds) _SeedChip(text: s.title, on: _text == s.text, onTap: () => _take(s.text, s.blank))],
+                    children: [for (final s in templates) _SeedChip(text: s.title, on: _text == s.text, onTap: () => _take(s.text, s.blank))],
                   ),
                 ),
               ],

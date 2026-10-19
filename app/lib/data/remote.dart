@@ -136,8 +136,10 @@ class ProjectCatalog extends AsyncNotifier<List<ProjectSummary>> {
   }
 }
 
-/// The sowing form's seeds for one project, as the server fills them (project.seeds).
-final projectSeedsProvider = FutureProvider.autoDispose.family<ProjectSeeds, String>((ref, project) => ref.watch(apiProvider).project.seeds(id: project));
+/// The issue templates for one project, as the server fills them (project.templates).
+final projectTemplatesProvider = FutureProvider.autoDispose.family<ProjectTemplates, String>(
+  (ref, project) => ref.watch(apiProvider).project.templates(id: project),
+);
 
 final projectNamesProvider = FutureProvider.autoDispose<List<String>>((ref) async => [for (final p in await ref.watch(projectCatalogProvider.future)) p.name]);
 

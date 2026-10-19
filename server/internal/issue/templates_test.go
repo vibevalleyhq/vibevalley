@@ -13,24 +13,24 @@ import (
 
 var goStack = protocol.ProjectStack{Name: "go", Label: "Go", Test: "go test ./...", Lint: "go vet ./...", Build: "go build ./..."}
 
-func TestSeedCatalogIsWellFormed(t *testing.T) {
-	kinds := protocol.SeedCatalog()
+func TestTemplateCatalogIsWellFormed(t *testing.T) {
+	kinds := protocol.TemplateCatalog()
 	if len(kinds) == 0 {
 		t.Fatal("no kinds")
 	}
 	holes := regexp.MustCompile(`\{[^}]*\}`)
 	kindIDs := map[string]bool{}
 	for _, k := range kinds {
-		if k.ID == "" || k.Name == "" || !strings.HasPrefix(k.Icon, "plot-") || len(k.Seeds) == 0 || kindIDs[k.ID] {
+		if k.ID == "" || k.Name == "" || !strings.HasPrefix(k.Icon, "plot-") || len(k.Templates) == 0 || kindIDs[k.ID] {
 			t.Fatalf("kind %+v", k)
 		}
 		kindIDs[k.ID] = true
-		seedIDs := map[string]bool{}
-		for _, s := range k.Seeds {
-			if s.ID == "" || seedIDs[s.ID] || s.Title == "" || s.Done == "" || s.Text != "" || s.Blank != nil {
-				t.Fatalf("%s: seed %+v", k.ID, s)
+		templateIDs := map[string]bool{}
+		for _, s := range k.Templates {
+			if s.ID == "" || templateIDs[s.ID] || s.Title == "" || s.Done == "" || s.Text != "" || s.Blank != nil {
+				t.Fatalf("%s: template %+v", k.ID, s)
 			}
-			seedIDs[s.ID] = true
+			templateIDs[s.ID] = true
 			for _, hole := range holes.FindAllString(s.Title+s.Done, -1) {
 				if hole != "{test}" && hole != "{lint}" && hole != "{build}" {
 					t.Fatalf("%s/%s: hole %s", k.ID, s.ID, hole)
@@ -62,26 +62,26 @@ func TestSeedCatalogIsWellFormed(t *testing.T) {
 	}
 }
 
-func TestASeedIsFilledForTheStack(t *testing.T) {
-	seed := protocol.Seed{ID: "x", Title: "修一个 bug：〔现象〕", Done: "{build} 不再报错；跑一遍 {test}，再看（{lint}）"}
-	got := filledSeed(seed, goStack)
+func TestATemplateIsFilledForTheStack(t *testing.T) {
+	template := protocol.IssueTemplate{ID: "x", Title: "修一个 bug：〔现象〕", Done: "{build} 不再报错；跑一遍 {test}，再看（{lint}）"}
+	got := filledTemplate(template, goStack)
 	testkit.Eq(t, got.Done, "`go build ./...` 不再报错；跑一遍 `go test ./...`，再看（`go vet ./...`）")
 	testkit.Eq(t, got.Text, "修一个 bug：〔现象〕\n做到什么程度算完："+got.Done)
-	testkit.Eq(t, *got.Blank, protocol.SeedBlank{Start: 8, End: 12})
+	testkit.Eq(t, *got.Blank, protocol.TemplateBlank{Start: 8, End: 12})
 	testkit.Eq(t, str.Slice(got.Text, int(got.Blank.Start), int(got.Blank.End)), "〔现象〕")
 
-	plain := filledSeed(seed, protocol.ProjectStack{})
+	plain := filledTemplate(template, protocol.ProjectStack{})
 	testkit.Eq(t, plain.Done, "构建不再报错；跑一遍测试，再看（代码检查）")
 
-	partly := filledSeed(protocol.Seed{Title: "测试挂了就修", Done: "{build} 和 {test} 都通过"}, protocol.ProjectStack{Name: "node", Test: "bun run test"})
+	partly := filledTemplate(protocol.IssueTemplate{Title: "测试挂了就修", Done: "{build} 和 {test} 都通过"}, protocol.ProjectStack{Name: "node", Test: "bun run test"})
 	testkit.Eq(t, partly.Done, "构建和 `bun run test` 都通过")
-	testkit.Eq(t, partly.Blank, (*protocol.SeedBlank)(nil))
+	testkit.Eq(t, partly.Blank, (*protocol.TemplateBlank)(nil))
 }
 
-func TestEveryCatalogSeedFillsWithoutHoles(t *testing.T) {
+func TestEveryCatalogTemplateFillsWithoutHoles(t *testing.T) {
 	for _, stack := range []protocol.ProjectStack{goStack, {}} {
-		for _, k := range sowable(protocol.SeedCatalog(), stack) {
-			for _, s := range k.Seeds {
+		for _, k := range filledKinds(protocol.TemplateCatalog(), stack) {
+			for _, s := range k.Templates {
 				if strings.ContainsAny(s.Text, "{}") || !strings.Contains(s.Text, "\n做到什么程度算完：") {
 					t.Fatalf("%s/%s: %q", k.ID, s.ID, s.Text)
 				}
@@ -91,12 +91,12 @@ func TestEveryCatalogSeedFillsWithoutHoles(t *testing.T) {
 			}
 		}
 	}
-	if protocol.SeedCatalog()[0].Seeds[0].Text != "" {
+	if protocol.TemplateCatalog()[0].Templates[0].Text != "" {
 		t.Fatal("filling changed the catalog")
 	}
 }
 
-func TestRecentSeedsAreTheProjectsOwnSentIssues(t *testing.T) {
+func TestRecentTitlesAreTheProjectsOwnSentIssues(t *testing.T) {
 	issue := func(title, project string, at int64, change func(*protocol.Issue)) protocol.Issue {
 		i := protocol.Issue{Title: title, Project: ptr.To(project), CreatedAt: at, Sessions: []string{"s"}}
 		if change != nil {
@@ -119,6 +119,6 @@ func TestRecentSeedsAreTheProjectsOwnSentIssues(t *testing.T) {
 		issue("零", "app", 0, nil),
 		issue("负", "app", -1, nil),
 	}
-	testkit.Eq(t, sownIn(all, "app"), []string{"加 打卡", "修登录", "三", "二", "零"})
-	testkit.Eq(t, sownIn(all, "none"), []string{})
+	testkit.Eq(t, sentTitles(all, "app"), []string{"加 打卡", "修登录", "三", "二", "零"})
+	testkit.Eq(t, sentTitles(all, "none"), []string{})
 }

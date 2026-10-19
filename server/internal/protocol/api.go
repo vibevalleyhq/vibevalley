@@ -238,10 +238,10 @@ type Handlers interface {
 	//vibevalley:route project.languages GET /api/v1/projects/{id}/languages
 	//vibevalley:can owner remote
 	ProjectLanguages(ctx context.Context, pID string) (ProjectLanguages, error)
-	// What to sow in the project: its stack, what was sown there before, and the seed catalog filled in for it.
-	//vibevalley:route project.seeds GET /api/v1/projects/{id}/seeds
+	// The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it.
+	//vibevalley:route project.templates GET /api/v1/projects/{id}/templates
 	//vibevalley:can owner remote
-	ProjectSeeds(ctx context.Context, pID string) (ProjectSeeds, error)
+	ProjectTemplates(ctx context.Context, pID string) (ProjectTemplates, error)
 	//vibevalley:route project.activity GET /api/v1/projects/{id}/activity
 	//vibevalley:can owner remote
 	ProjectActivity(ctx context.Context, pID string) (ProjectActivity, error)
