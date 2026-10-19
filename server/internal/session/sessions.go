@@ -573,7 +573,7 @@ func (c *sessions) open(ctx context.Context, agent protocol.Agent, id string, pl
 	if len(agent.DisallowedTools) > 0 {
 		options.DisallowedTools = agent.DisallowedTools
 	}
-	s := &oarSession{subagents: agents.New(agents.Options{Runtimes: c.runtimes.Registry, MaxRunning: protocol.MaxRunning, MaxDepth: 1, Cwd: c.root, LogDir: c.logDir})}
+	s := &oarSession{subagents: agents.New(agents.Options{Runtimes: c.runtimes.Registry(), MaxRunning: protocol.MaxRunning, MaxDepth: 1, Cwd: c.root, LogDir: c.logDir})}
 	// Follow owns delivery; this host does not keep a second unread report inbox.
 	s.subagents.OnReport(func(agents.SubagentReport) error {
 		return nil

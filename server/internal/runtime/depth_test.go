@@ -30,10 +30,11 @@ func observing(t *testing.T, adapter oar.Runtime) *Service {
 		t.Fatal(err)
 	}
 	t.Cleanup(r.OnStop)
-	r.Registry, err = oar.NewRuntimeRegistry(adapter)
+	registry, err := oar.NewRuntimeRegistry(adapter)
 	if err != nil {
 		t.Fatal(err)
 	}
+	r.UseRegistry(registry)
 	r.Probe = nil
 	r.usageOf = func(context.Context, string, oar.Runtime, oar.AvailableInstallation, protocol.RuntimeSettings) protocol.AccountUsage {
 		return protocol.AccountUsage{}

@@ -101,10 +101,12 @@ type spend struct {
 }
 
 type Service struct {
-	cfg       base.Config
-	core      *core.Service
-	store     *agent.Service
-	Registry  *oar.RuntimeRegistry
+	cfg   base.Config
+	core  *core.Service
+	store *agent.Service
+	// Behind regMu, not mu: tests swap in a fake while the startup probe reads it.
+	registry  *oar.RuntimeRegistry
+	regMu     sync.RWMutex
 	cnyPerUsd float64
 	Probe     func(ctx context.Context, id string) protocol.RuntimeInfo
 	usageOf   func(ctx context.Context, id string, runtime oar.Runtime, found oar.AvailableInstallation, settings protocol.RuntimeSettings) protocol.AccountUsage
@@ -125,7 +127,7 @@ type Service struct {
 
 func newService(cfg base.Config, db *sql.DB, core *core.Service, store *agent.Service, settings *setting.Service) (*Service, error) {
 	spendFile := filepath.Join(cfg.Home, "spend.json")
-	r := &Service{cfg: cfg, core: core, store: store, Registry: Registry(cfg.Home, settings.DeepseekAPIKey, func(session string) engine.Store { return engine.NewDBStore(db, session) }), cnyPerUsd: cfg.CNYPerUSD, cache: map[string]observation{},
+	r := &Service{cfg: cfg, core: core, store: store, registry: Registry(cfg.Home, settings.DeepseekAPIKey, func(session string) engine.Store { return engine.NewDBStore(db, session) }), cnyPerUsd: cfg.CNYPerUSD, cache: map[string]observation{},
 		pending: map[string]*time.Timer{}, pushes: map[string]*time.Timer{}, asked: map[string]int{},
 		reads: map[string]uint64{},
 		disk:  base.NewFileWriter(spendFile, 0o644)}
@@ -222,7 +224,20 @@ func (r *Service) withSpendLocked(info protocol.RuntimeInfo) protocol.RuntimeInf
 	return info
 }
 
-func (r *Service) Runtime(id string) (oar.Runtime, bool) { return r.Registry.Get(id) }
+func (r *Service) Runtime(id string) (oar.Runtime, bool) { return r.Registry().Get(id) }
+
+func (r *Service) Registry() *oar.RuntimeRegistry {
+	r.regMu.RLock()
+	defer r.regMu.RUnlock()
+	return r.registry
+}
+
+// UseRegistry replaces the runtimes, for tests that bring their own.
+func (r *Service) UseRegistry(registry *oar.RuntimeRegistry) {
+	r.regMu.Lock()
+	defer r.regMu.Unlock()
+	r.registry = registry
+}
 
 func piSettings() (provider, model string) {
 	body, err := os.ReadFile(filepath.Join(pi.AgentDir(), "settings.json"))

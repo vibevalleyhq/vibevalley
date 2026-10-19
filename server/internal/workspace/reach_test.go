@@ -28,7 +28,7 @@ func TestSessionsReachTheFarmWhereItAnswers(t *testing.T) {
 		turn.Say("好")
 		return nil
 	}}))
-	w.f.Runtime.Registry = registry
+	w.f.Runtime.UseRegistry(registry)
 
 	first := mustHire(t, w.f.Issue.Hire(context.Background(), fixture.Lab(t), "看看", "reach", session.HireOptions{}))
 	w.nextReport(t)

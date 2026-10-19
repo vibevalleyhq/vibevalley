@@ -18,8 +18,8 @@ func (r *Service) facts(id string) protocol.RuntimeFacts {
 
 func (r *Service) refusals(id string) map[string]string {
 	out := map[string]string{}
-	if r.Registry != nil {
-		if adapter, ok := r.Registry.Get(id); ok {
+	if registry := r.Registry(); registry != nil {
+		if adapter, ok := registry.Get(id); ok {
 			for option, reason := range adapter.RefusedSessionOptions {
 				out[string(option)] = reason
 			}

@@ -63,7 +63,7 @@ func recordPrompts(t *testing.T, w *testWorld) *prompts {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.f.Runtime.Registry = registry
+	w.f.Runtime.UseRegistry(registry)
 	return p
 }
 

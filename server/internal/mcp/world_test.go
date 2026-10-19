@@ -77,7 +77,7 @@ func open(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.Runtime.Registry = registry
+	w.Runtime.UseRegistry(registry)
 	w.Runtime.Probe = func(_ context.Context, id string) protocol.RuntimeInfo {
 		if id != "pi" {
 			return protocol.RuntimeInfo{ID: id, Installation: protocol.Installation{Value: protocol.InstallationNotFound{}}, Settings: w.Agent.Settings(id)}

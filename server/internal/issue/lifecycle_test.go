@@ -27,10 +27,11 @@ func lifecycleWorld(t *testing.T) *workspace.Workspace {
 		t.Fatal(err)
 	}
 	f.Project.GitHubProbe = fixture.NoGitHub
-	f.Runtime.Registry, err = oar.NewRuntimeRegistry(oartest.Runtime(oartest.Options{ID: "pi", Turn: func(turn *oartest.Turn) error { <-turn.Context.Done(); return nil }}))
+	registry, err := oar.NewRuntimeRegistry(oartest.Runtime(oartest.Options{ID: "pi", Turn: func(turn *oartest.Turn) error { <-turn.Context.Done(); return nil }}))
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.Runtime.UseRegistry(registry)
 	f.Runtime.Probe = func(context.Context, string) protocol.RuntimeInfo { return fixture.Pi() }
 	t.Cleanup(func() { f.Session.OnStop(); f.Core.Close(); f.Close() })
 	return f

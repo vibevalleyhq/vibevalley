@@ -24,7 +24,7 @@ func TestOneIssueKeepsOneThreadAcrossItsSessions(t *testing.T) {
 		turn.Say("做好了")
 		return nil
 	}}))
-	w.f.Runtime.Registry = registry
+	w.f.Runtime.UseRegistry(registry)
 	ctx, cancel := context.WithCancel(context.Background())
 	if err := w.f.Channel.OnStart(ctx); err != nil {
 		t.Fatal(err)

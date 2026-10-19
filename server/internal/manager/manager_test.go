@@ -150,7 +150,7 @@ func managerStart(t *testing.T, cfg base.Config, faux *ai.FauxProviderHandle) *m
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.Runtime.Registry = registry
+	f.Runtime.UseRegistry(registry)
 	f.Runtime.Probe = func(_ context.Context, id string) protocol.RuntimeInfo {
 		if id != "pi" {
 			return protocol.RuntimeInfo{ID: id, Installation: protocol.Installation{Value: protocol.InstallationNotFound{}}, Settings: f.Agent.Settings(id)}

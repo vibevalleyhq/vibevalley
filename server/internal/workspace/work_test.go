@@ -160,7 +160,7 @@ func openWorldAt(t *testing.T, home, work, db string, change ...func(*base.Confi
 	f.Project.GitHubProbe = fixture.NoGitHub
 	w := &testWorld{f: f, current: fixture.Pi()}
 	registry, _ := oar.NewRuntimeRegistry(scripted())
-	f.Runtime.Registry = registry
+	f.Runtime.UseRegistry(registry)
 	f.Runtime.Probe = func(_ context.Context, id string) protocol.RuntimeInfo {
 		if id != "pi" {
 			return protocol.RuntimeInfo{ID: id, Installation: protocol.Installation{Value: protocol.InstallationNotFound{}}, Settings: f.Agent.Settings(id)}
