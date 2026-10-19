@@ -40,7 +40,8 @@
 - **农机的安装是显式的输入**：农机设置的 `BinPath` 作为 `oar.InstallationOptions.Binary` 交给探测，不写进进程的环境变量；`runtime.Resolve` 带回探测时接受的那个安装，`Spawn` 直接用它，不再探一次。指定的路径失效不会悄悄换一台。
 - **农场的规矩**（`farmRules`，每次开会话附上）：在哪个项目、哪个分支和 worktree，只改这个目录，不切分支、不 push；做完一轮 `git add`、`git commit`，提交信息照项目的约定；汇报写 commit 号和怎么验证的，最后一段以「结论：」开头；缺信息的写「要问主人：」，学到的写「记住：」（所有项目都成立的写「记住（所有项目）：」）；在田头怎么 @、怎么用 `channel_say`；加上 `VIBEVALLEY_WORK_ROOT/AGENTS.md`（有的话）作为「这台机器上所有项目的约定」。
 - **Session 带一把 `/mcp` 的令牌**（`hb_<id>_<随机>`，只在内存里）：农场作为 MCP 服务器 `vibevalley` 交给它，`/mcp` 凭令牌认出是哪个 Session；令牌只用来分人，不是安全边界，收工时作废。
-- **一次 run 记着为什么开的**（`RunTrigger`）：`issue`（第一次派出去）、`comment`（带话，带着那条消息的号）、`task`（种植计划）、`schedule`（带着哪个定时、是不是补跑）；没人发话就开的一轮是 `runtime`（农机自己）。发话的一方先把触发放在 Session 上（`expect`），农机开了这一轮，run 取最早的那个。
+- **一次 run 记着为什么开的**（`RunTrigger`）：`issue`（第一次派出去）、`comment`（带话，带着那条消息的号）、`task`（种植计划）、`schedule`（带着哪个定时、是不是补跑）、`draft`（起草工单）；没人发话就开的一轮是 `runtime`（农机自己）。发话的一方先把触发放在 Session 上（`expect`），农机开了这一轮，run 取最早的那个。
+- **起草的 Session**（`Session.Draft`，派活时 `HireOptions.Draft`）：为一张备选工单写草稿，不是这张工单的帮工；它带着 `Issue`（工单串、run 都记在这张工单上），但不进 `issue_session`。交回来以后由工单服务重置它的 worktree、请它收工（[工单](docs/subsystems/issue.md#怎么走)「起草」）。田头的派活消息写「看代码，起草这张工单」，再起草写「再起草一版」。
 - **干活时插进来的话不开新的 run**，记在这一轮的 `heard` 里；不能插话的农机排队，是下一次 run 的触发。叫不醒、被拒的不算 run。
 - **一次 run 的花费从这一次算**：`FactSpent` 是这个 Session 的累计，按 oar 报的 token 总数和上一次的差算；换了 oar 会话从零算。汇报带上这一轮开始以来的差（`Spent`）。
 - **日志只追加**：一条 `SessionEvent`（`seq`、`time`、`type`）写下后不再改；类型照 DeepSeek Harness：`run/start`、`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入，和动作的说法 `actionText`，写下时取 `protocol.ActionText`，客户端不带这份说法）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 token：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`、`run/end`（带结果）。`run/start` 和 `run/end` 之间的事件都带这个 `run`。流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给客户端（合并到 0.3 秒一次），下一条事件之前写下。

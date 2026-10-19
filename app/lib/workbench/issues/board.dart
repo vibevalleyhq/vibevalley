@@ -291,6 +291,11 @@ class _CardView extends ConsumerWidget {
         tags.add(const _Tag('种植计划', Palette.leaf500));
         lines.add(Text(taskLine(graph), style: KitText.xs.copyWith(color: graph.state == GraphState.ripe ? Palette.leaf700 : Palette.bark800)));
       case TodoCard(:final item):
+        if (item.drafting case final d?) {
+          tags.add(_Tag('${d.name}在起草', Palette.water));
+        } else if (item.status == IssueStatus.backlog) {
+          tags.add(const _Tag('草稿', Palette.wheat));
+        }
         if (item.queuedAt != null) tags.add(const _Tag('排队中', Palette.water));
         if (item.schedule != null) tags.add(const _Tag('定时', Palette.cream300));
         if (item.priority == Priority.urgent || item.priority == Priority.high) tags.add(_Tag(priorityLabel[item.priority]!, priorityColor(item.priority)!));

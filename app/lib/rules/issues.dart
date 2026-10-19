@@ -94,6 +94,12 @@ Stage stageOf(IssueStatus s) => switch (s) {
 
 int openFindings(Issue issue) => issue.findings.where((f) => f.pulled != true).length;
 
+/// The title an issue made by the plus has until the owner says what it is for.
+const newIssueTitle = '新工单';
+
+/// A draft came back into it (or the owner wrote it out): it has more than a title.
+bool isDrafted(Issue issue) => (issue.description ?? '').isNotEmpty || (issue.criteria ?? const []).isNotEmpty;
+
 Lane laneOf(IssueStatus s) => switch (s) {
   IssueStatus.backlog || IssueStatus.todo => Lane.todo,
   IssueStatus.inProgress => Lane.working,

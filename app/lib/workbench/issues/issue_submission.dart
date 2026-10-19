@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../game/commands.dart' show writeIssue;
 import '../../gen/vibevalley.dart';
+import '../../ui/kit/kit.dart' show ToastType, toasts;
 
 const _pickKey = 'vibevalley.board.pick';
 
@@ -24,14 +26,19 @@ class IssueSubmission {
     return (agent: '', project: '');
   }
 
-  Future<Issue> quick(String title, {String agent = '', String project = ''}) async {
+  /// The plus: made at once, with the helper and project last picked unless given; words start its draft. A draft the
+  /// server refuses is said in a toast, and the issue is still there to open.
+  Future<Issue> write(String text, {String agent = '', String project = ''}) async {
     final last = await remembered();
     final who = agent.isEmpty ? last.agent : agent;
     final where = project.isEmpty ? last.project : project;
-    return save(IssueRequest(title: title, assignee: who.isEmpty ? null : who, project: where.isEmpty ? null : where));
+    final got = await writeIssue(api, text: text, agent: who.isEmpty ? null : who, project: where.isEmpty ? null : where);
+    if (got.refused.isNotEmpty) toasts.add(type: ToastType.info, title: '先没起草', description: got.refused);
+    _saved = got.issue;
+    return got.issue;
   }
 
-  Future<Issue> save(IssueRequest draft) async {
+  Future<Issue> save(IssueRequest draft, {List<String>? criteria}) async {
     final previous = _saved;
     final issue = previous == null
         ? await api.create(body: draft)
@@ -44,6 +51,7 @@ class IssueSubmission {
               assignee: draft.assignee ?? '',
               priority: draft.priority,
               acceptance: draft.acceptance,
+              criteria: criteria,
             ),
           );
     _saved = issue;
@@ -61,11 +69,20 @@ class IssueSubmission {
     }
   }
 
-  Future<Issue> start(IssueRequest draft) async {
-    final issue = await save(draft);
+  Future<Issue> start(IssueRequest draft, {List<String>? criteria}) async {
+    final issue = await save(draft, criteria: criteria);
     return api.status(
       id: issue.id,
       body: const IssueStatusRequest(status: IssueStatus.todo),
+    );
+  }
+
+  /// Its edits saved first, so the drafter reads the draft as the owner left it.
+  Future<Issue> draft(IssueRequest edits, String word, {List<String>? criteria, bool edited = false}) async {
+    final issue = edited ? await save(edits, criteria: criteria) : _saved!;
+    return api.draft(
+      id: issue.id,
+      body: IssueDraftRequest(text: word.trim()),
     );
   }
 }

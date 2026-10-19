@@ -99,6 +99,10 @@ func (d *drafts) Draft(ctx context.Context, id, word, channel string) (protocol.
 	if err := d.issues.beforeDraft(t, word, chosen.ID, where); err != nil {
 		return t, err
 	}
+	// A draft cut short (a restart) may have left the worktree as its drafter had it: each draft starts from main.
+	if kept := d.projects.Clear(where, t.Number); kept != "" {
+		log.Printf("vibevalley: issue %s: before its draft: %s", t.ID, kept)
+	}
 	// Always a worktree, even for a profile that works in the project folder: the reset after it must not touch the owner's checkout.
 	worktree := true
 	hired := d.dispatch.Hire(ctx, chosen, brief, where, session.HireOptions{

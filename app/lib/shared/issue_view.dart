@@ -470,7 +470,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (issue != null) _StageRail(stageOf(issue.status)),
+        if (issue != null) StageRail(stageOf(issue.status)),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -483,6 +483,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
         const SizedBox(height: 12),
         statusBox,
         if (weeds.isNotEmpty) ...[const SizedBox(height: 8), for (final f in weeds) Text('草 · ${f.text}', style: body.copyWith(color: Palette.berry))],
+        if (issue?.criteria case final criteria? when criteria.isNotEmpty) ...[const SizedBox(height: 8), _Criteria(criteria: criteria, checking: judging)],
         if (box != null) ...[const SizedBox(height: 12), box],
         const SizedBox(height: 16),
         if (changesView != null) _Fold(label: fileCount == null ? '改动' : '改动（$fileCount 个文件）', child: changesView),
@@ -517,6 +518,64 @@ class _IssueViewState extends ConsumerState<IssueView> {
               )
             : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [aside, const SizedBox(height: 16), main]);
       },
+    );
+  }
+}
+
+/// The issue's criteria; while it is judged, each can be ticked off as the owner checks it (on this page only).
+class _Criteria extends StatefulWidget {
+  const _Criteria({required this.criteria, required this.checking});
+  final List<String> criteria;
+  final bool checking;
+
+  @override
+  State<_Criteria> createState() => _CriteriaState();
+}
+
+class _CriteriaState extends State<_Criteria> {
+  final _ticked = <int>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.5);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(widget.checking ? '照验收标准看，看过一条勾一条' : '验收标准', style: KitText.xs.copyWith(color: Palette.bark600)),
+        const SizedBox(height: 4),
+        for (final (i, c) in widget.criteria.indexed)
+          if (!widget.checking)
+            Text('· $c', style: body)
+          else
+            KitTappable(
+              onTap: () => setState(() => _ticked.contains(i) ? _ticked.remove(i) : _ticked.add(i)),
+              semanticLabel: c,
+              selected: _ticked.contains(i),
+              builder: (_, st) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 16,
+                      margin: const EdgeInsets.only(top: 2, right: 8),
+                      decoration: BoxDecoration(
+                        color: Palette.cream50,
+                        border: Border.all(color: st.hovered ? Palette.bark600 : Palette.bark400, width: 2),
+                      ),
+                      alignment: Alignment.center,
+                      child: _ticked.contains(i) ? const SpriteIcon('mark-check', size: 12, semanticLabel: '看过了') : null,
+                    ),
+                    Expanded(
+                      child: Text(c, style: _ticked.contains(i) ? body.copyWith(color: Palette.bark500) : body),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      ],
     );
   }
 }
@@ -703,8 +762,8 @@ class _Link extends StatelessWidget {
 }
 
 /// 聊清楚 → 安排活 → 完成, the one it is at marked.
-class _StageRail extends StatelessWidget {
-  const _StageRail(this.at);
+class StageRail extends StatelessWidget {
+  const StageRail(this.at, {super.key});
   final Stage at;
 
   @override

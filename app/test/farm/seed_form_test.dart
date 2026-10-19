@@ -161,6 +161,24 @@ void main() {
     expect(say.body, {'text': '把打卡记录导出成 CSV', 'station': 3, 'project': 'clock-in', 'sendKey': matches(RegExp(r'^[0-9a-f]{32}$'))});
   });
 
+  testWidgets('先起草 writes the words as an issue in the project and starts its draft instead of sowing', (tester) async {
+    final made = _queued('t9', '把打卡记录导出成 CSV', 3000);
+    final r = routes()
+      ..answers['POST /api/v1/issues'] = made.toJson()
+      ..answers['POST /api/v1/issues/t9/draft'] = made.toJson();
+    await open(tester, r);
+    await pickClockIn(tester);
+    await tester.enterText(find.descendant(of: find.bySemanticsLabel('工单'), matching: find.byType(EditableText)), '把打卡记录导出成 CSV');
+    await tester.pump();
+    await tester.ensureVisible(find.text('先起草'));
+    await tester.tap(find.text('先起草'));
+    await settle(tester);
+    expect(r.named('POST', '/api/v1/issues').single.body, {'title': '把打卡记录导出成 CSV', 'project': 'clock-in'});
+    expect(r.named('POST', '/api/v1/issues/t9/draft').single.body, {'text': '把打卡记录导出成 CSV'});
+    expect(r.paths, isNot(contains('POST /api/v1/say')), reason: 'not sown');
+    expect(find.text('播种 · 第 4 块地'), findsNothing, reason: 'the bag closes');
+  });
+
   testWidgets('one project is picked without asking', (tester) async {
     await open(tester, routes(projects: ['clock-in']));
     expect(find.text('种在哪个项目？'), findsNothing);

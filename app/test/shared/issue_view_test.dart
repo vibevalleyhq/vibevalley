@@ -170,4 +170,42 @@ void main() {
     expect(t.takeException(), isNull);
     expect(reads, 2);
   });
+
+  testWidgets('judging what came back, the criteria are listed to tick off one by one', (t) async {
+    final session = f.session(
+      'w1',
+      project: 'demo',
+      phase: const PhaseRipe(),
+      last: const LastRun(outcome: Outcome.completed, summary: '做好了', at: 1000),
+    );
+    const issue = Issue(
+      id: 'tw2',
+      number: 4,
+      title: '看板拖卡改用 issue.status',
+      project: 'demo',
+      priority: Priority.medium,
+      createdAt: 0,
+      status: IssueStatus.inReview,
+      sessions: ['w1'],
+      moves: [IssueStatus.todo, IssueStatus.done, IssueStatus.canceled],
+      acceptance: Acceptance.required,
+      findings: [],
+      asks: [],
+      criteria: ['拖到待办就开工', '端口是 8797'],
+    );
+    await f.pumpFarm(
+      t,
+      SingleChildScrollView(
+        child: IssueView(issue: issue, sessions: [session], session: session, state: IssueTag.waiting, onHarvest: (_) async {}, onClose: (_) async {}),
+      ),
+      overrides: f.overrides(f.farm(sessions: [session], issues: [issue]), f.view(), f.fakeApi(f.Routes())),
+    );
+    await f.settle(t);
+    expect(find.text('照验收标准看，看过一条勾一条'), findsOneWidget);
+    expect(find.bySemanticsLabel('看过了'), findsNothing);
+    await t.tap(find.text('端口是 8797'));
+    await t.pump();
+    expect(find.bySemanticsLabel('看过了'), findsOneWidget, reason: 'one ticked off');
+    await t.pump(const Duration(seconds: 3));
+  });
 }

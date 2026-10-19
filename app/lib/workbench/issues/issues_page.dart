@@ -149,12 +149,16 @@ class BoardFilter {
       BoardFilter(query: query ?? this.query, project: project ?? this.project, agent: agent ?? this.agent);
 }
 
+/// The plus without words: an issue made at once in the backlog and opened, its box asking what it is for.
+Future<void> writeIssueAndOpen(BuildContext context, VibeValleyApi api, {String project = ''}) async {
+  final made = await runAction(() => IssueSubmission(api.issue).write('', project: project));
+  if (made != null && context.mounted) workbenchGo(context, '/issues/${Uri.encodeComponent(made.id)}');
+}
+
 class IssuesPage extends ConsumerStatefulWidget {
-  const IssuesPage({super.key, this.id, this.project});
+  const IssuesPage({super.key, this.id});
 
   final String? id;
-
-  final String? project;
 
   @override
   ConsumerState<IssuesPage> createState() => _IssuesPageState();
@@ -230,8 +234,10 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
     );
   }
 
+  /// The plus: the sentence is the issue, its draft starts from it, and it opens.
   Future<void> _add(String text) async {
-    await runAction(() => IssueSubmission(_api.issue).quick(text, agent: _filter.agent, project: _filter.project));
+    final made = await runAction(() => IssueSubmission(_api.issue).write(text, agent: _filter.agent, project: _filter.project));
+    if (made != null) _open(made.id);
   }
 
   @override
@@ -259,7 +265,6 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
     final id = widget.id;
     final open = id == null ? null : all.where((c) => c.id == id || (c is IssueCard && issueIs(c.issue, id))).firstOrNull;
     final Widget? detail = switch (open) {
-      _ when id == 'new' => TodoDetail(key: ValueKey('new:${widget.project}'), item: null, project: widget.project, reload: _load, onDone: _open),
       TodoCard(:final item) => TodoDetail(key: ValueKey(item.id), item: item, reload: _load, onDone: _open),
       IssueCard(:final issue, :final sessions, :final state, :final session) => IssueDetail(
         key: ValueKey(sessions.last.id),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/issue_view.dart';
+import '../../shared/tags.dart' show tint;
 import '../../rules/time.dart';
 import '../../data/providers.dart';
 import '../../shared/harvest.dart' show HarvestReview;
@@ -112,11 +113,11 @@ class _ReopenFormState extends State<ReopenForm> {
   );
 }
 
+/// An issue not sent yet. In the backlog it is a draft: the box says what is wanted (or answers what its drafter asked)
+/// and sends a helper to draft it; the fields are the draft, each editable; 开工 sends it out.
 class TodoDetail extends ConsumerStatefulWidget {
-  const TodoDetail({super.key, required this.item, this.project, required this.reload, required this.onDone});
-  final Issue? item;
-
-  final String? project;
+  const TodoDetail({super.key, required this.item, required this.reload, required this.onDone});
+  final Issue item;
   final Future<void> Function() reload;
   final ValueChanged<String?> onDone;
 
@@ -125,21 +126,37 @@ class TodoDetail extends ConsumerStatefulWidget {
 }
 
 class _TodoState extends ConsumerState<TodoDetail> {
-  late String _title = widget.item?.title ?? '';
-  late String _description = widget.item?.description ?? '';
-  late String _project = widget.item?.project ?? widget.project ?? '';
-  late String _agent = widget.item?.assignee ?? '';
-  late Priority _priority = widget.item?.priority ?? Priority.medium;
-  late Acceptance _acceptance = widget.item?.acceptance ?? Acceptance.glance;
-  bool _busy = false;
+  late String _title;
+  late String _description;
+  late String _criteria;
+  late String _project;
+  late String _agent;
+  late Priority _priority;
+  late Acceptance _acceptance;
+  var _word = '';
+  // Until the owner edits a field, a draft coming back fills them.
+  var _edited = false;
+  var _busy = false;
   late final IssueSubmission _submission;
 
-  /// A new issue opened inside a project (/issues/new?project=…) keeps it until the owner asks to change it.
-  late bool _projectFixed = widget.item == null && (widget.project ?? '').isNotEmpty;
+  void _take(Issue i) {
+    _title = i.title;
+    _description = i.description ?? '';
+    _criteria = (i.criteria ?? const <String>[]).join('\n');
+    _project = i.project ?? '';
+    _agent = i.assignee ?? '';
+    _priority = i.priority;
+    _acceptance = i.acceptance;
+  }
+
+  void _edit(VoidCallback change) => setState(() {
+    change();
+    _edited = true;
+  });
 
   Future<void> _newProject(BuildContext context) async {
     final made = await showNewProjectDialog(context);
-    if (made != null && mounted) setState(() => _project = made.name);
+    if (made != null && mounted) _edit(() => _project = made.name);
   }
 
   IssueRequest get _request => IssueRequest(
@@ -151,13 +168,14 @@ class _TodoState extends ConsumerState<TodoDetail> {
     acceptance: _acceptance,
   );
 
+  List<String> get _criteriaList => [
+    for (final line in _criteria.split('\n'))
+      if (line.trim().isNotEmpty) line.trim(),
+  ];
+
   Future<void> _run(Future<void> Function() act) async {
     setState(() => _busy = true);
-    final done = await runAction(() async {
-      await act();
-      return true;
-    });
-    if (done != true && widget.item == null && _submission.saved != null && mounted) widget.onDone(_submission.saved!.id);
+    await runAction(act);
     await widget.reload();
     if (mounted) setState(() => _busy = false);
   }
@@ -165,66 +183,131 @@ class _TodoState extends ConsumerState<TodoDetail> {
   @override
   void initState() {
     super.initState();
+    _take(widget.item);
     _submission = IssueSubmission(ref.read(apiProvider).issue, initial: widget.item);
-    if (widget.item == null) {
-      unawaited(
-        IssueSubmission.remembered().then((pick) {
-          if (!mounted) return;
-          setState(() {
-            if (_agent.isEmpty) _agent = pick.agent;
-            if (_project.isEmpty) _project = pick.project;
-          });
-        }),
-      );
-    }
+  }
+
+  @override
+  void didUpdateWidget(TodoDetail old) {
+    super.didUpdateWidget(old);
+    if (!_edited) _take(widget.item);
   }
 
   Future<void> _save() => _run(() async {
-    final saved = await _submission.save(_request);
-    if (widget.item == null) widget.onDone(saved.id);
+    await _submission.save(_request, criteria: _criteriaList);
+    _edited = false;
+  });
+
+  Future<void> _draft() => _run(() async {
+    await _submission.draft(_request, _word, criteria: _criteriaList, edited: _edited);
+    if (mounted) {
+      setState(() {
+        _word = '';
+        _edited = false;
+      });
+    }
   });
 
   Future<void> _start() => _run(() async {
-    final got = await _submission.start(_request);
+    final got = await _submission.start(_request, criteria: _criteriaList);
+    _edited = false;
     dispatchedNotice(got, widget.onDone);
-    if (got.status == IssueStatus.todo && widget.item == null) widget.onDone(got.id);
   });
 
   @override
   Widget build(BuildContext context) {
     if (ref.watch(workbenchConfigProvider).error != null) return const ConfigProblem();
+    final item = widget.item;
     final projects = ref.watch(projectNamesProvider).value ?? const <String>[];
     final agents = (ref.watch(workbenchConfigProvider).agents).where((a) => a.enabled).toList();
     final issues = watchAgentIssues(ref, agents);
     final ready = !_busy && _title.trim().isNotEmpty;
-    final queued = widget.item?.queuedAt;
+    final queued = item.queuedAt;
+    final backlog = item.status == IssueStatus.backlog;
+    final drafting = item.drafting;
+    final drafted = isDrafted(item);
+    final asks = item.asks;
+    final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.5);
+    final (head, line) = switch (drafting) {
+      final d? => ('${d.name}在起草', '它在读代码，写好了会填进下面各栏。'),
+      null when asks.isNotEmpty => ('草稿写好了，它有 ${asks.length} 个问题要问你', '在下面回答，它照你的回答再起草一版。'),
+      null when drafted => ('草稿写好了', '看一遍、改一改，没问题就开工。'),
+      null => ('想做什么？', '写一句就行：帮工读过代码，替你写成工单。'),
+    };
+    final canDraft = !_busy && drafting == null && (drafted || _word.trim().isNotEmpty || _title.trim() != newIssueTitle);
+    final draft = !backlog
+        ? null
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const StageRail(Stage.talk),
+              Container(
+                padding: const EdgeInsets.all(12),
+                color: tint(drafting != null ? Palette.water : Palette.wheat, .3),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(head, style: KitText.base),
+                    const SizedBox(height: 4),
+                    Text(line, style: body),
+                    for (final a in asks) Text('· $a', style: body),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              PxTextArea(
+                value: _word,
+                onChanged: (v) => setState(() => _word = v),
+                rows: 2,
+                autofocus: !drafted && drafting == null,
+                placeholder: asks.isNotEmpty
+                    ? '回答它的问题'
+                    : drafted
+                    ? '再起草时要它改什么（可以不写）'
+                    : '想做什么，一句话就行',
+                semanticLabel: '想做什么',
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  PxButton.text(drafted ? '再起草' : '起草', tone: drafted ? PxTone.plain : PxTone.primary, onPressed: canDraft ? _draft : null),
+                  PxButton.text('开工', tone: drafted ? PxTone.primary : PxTone.plain, onPressed: ready && drafting == null && _agent.isNotEmpty ? _start : null),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          );
     return PxCard(
-      title: widget.item == null ? '写一张工单' : '待办',
-      aside: widget.item == null ? null : Text('写于 ${wallClockText(widget.item!.createdAt)}'),
+      title: backlog ? '草稿' : '待办',
+      aside: Text('写于 ${wallClockText(item.createdAt)}'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          ?draft,
           PxField(
             label: '标题',
-            child: PxTextInput(
-              value: _title,
-              onChanged: (v) => setState(() => _title = v),
-              autofocus: widget.item == null,
-              placeholder: '比如：给登录页加上记住我',
-              semanticLabel: '标题',
-            ),
+            child: PxTextInput(value: _title, onChanged: (v) => _edit(() => _title = v), placeholder: '比如：给登录页加上记住我', semanticLabel: '标题'),
           ),
           const SizedBox(height: 12),
           PxField(
             label: '说明',
             child: PxTextArea(
               value: _description,
-              onChanged: (v) => setState(() => _description = v),
-              rows: 5,
-              placeholder: '做到什么程度算完、要注意什么（可以不写）',
+              onChanged: (v) => _edit(() => _description = v),
+              rows: 6,
+              placeholder: '为什么、要做的、不做的、可能涉及哪些文件（起草会写好）',
               semanticLabel: '说明',
             ),
+          ),
+          const SizedBox(height: 12),
+          PxField(
+            label: '验收标准',
+            child: PxTextArea(value: _criteria, onChanged: (v) => _edit(() => _criteria = v), rows: 3, placeholder: '一行一条：你验收时照着看的点', semanticLabel: '验收标准'),
           ),
           const SizedBox(height: 12),
           PxField(
@@ -232,7 +315,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
             child: PxSegmented<Priority>(
               value: _priority,
               options: [for (final p in Priority.values) SegmentOption(value: p, label: priorityLabel[p]!)],
-              onChanged: (v) => setState(() => _priority = v),
+              onChanged: (v) => _edit(() => _priority = v),
             ),
           ),
           const SizedBox(height: 12),
@@ -245,50 +328,29 @@ class _TodoState extends ConsumerState<TodoDetail> {
                 SegmentOption(value: Acceptance.glance, label: '看一眼就收'),
                 SegmentOption(value: Acceptance.required, label: '必须过验收'),
               ],
-              onChanged: (v) => setState(() => _acceptance = v),
+              onChanged: (v) => _edit(() => _acceptance = v),
             ),
           ),
           const SizedBox(height: 12),
-          if (_projectFixed)
-            PxField(
-              label: '项目',
-              child: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      '派到 $_project',
-                      style: KitText.sm.copyWith(color: Palette.bark900),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  InlineLink('换个项目', onTap: () => setState(() => _projectFixed = false)),
-                ],
-              ),
-            )
-          else
-            PxField(
-              label: '项目',
-              hint: projects.isEmpty
-                  ? InlineLink('工作目录里还没有项目：新建一个', onTap: () => _newProject(context))
-                  : InlineLink('＋ 新建项目', onTap: () => _newProject(context)),
-              child: PxPick(
-                value: _project,
-                placeholder: '在哪个项目里做',
-                semanticLabel: '项目',
-                options: [
-                  for (final p in {...projects, if (_project.isNotEmpty) _project}) PickOption(value: p, label: p),
-                ],
-                onChanged: (v) => setState(() => _project = v),
-              ),
+          PxField(
+            label: '项目',
+            hint: projects.isEmpty ? InlineLink('工作目录里还没有项目：新建一个', onTap: () => _newProject(context)) : InlineLink('＋ 新建项目', onTap: () => _newProject(context)),
+            child: PxPick(
+              value: _project,
+              placeholder: '在哪个项目里做',
+              semanticLabel: '项目',
+              options: [
+                for (final p in {...projects, if (_project.isNotEmpty) _project}) PickOption(value: p, label: p),
+              ],
+              onChanged: (v) => _edit(() => _project = v),
             ),
+          ),
           const SizedBox(height: 12),
           PxField(
             label: '帮工',
             child: PxPick(
               value: _agent,
-              placeholder: '派哪个帮工档案',
+              placeholder: '派哪个帮工档案（起草时不选就替你挑）',
               semanticLabel: '帮工',
               options: [
                 for (final a in agents)
@@ -301,7 +363,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
                     },
                   ),
               ],
-              onChanged: (v) => setState(() => _agent = v),
+              onChanged: (v) => _edit(() => _agent = v),
             ),
           ),
           if (queued != null) ...[
@@ -328,7 +390,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
                                 .read(apiProvider)
                                 .issue
                                 .status(
-                                  id: widget.item!.id,
+                                  id: item.id,
                                   body: const IssueStatusRequest(status: IssueStatus.backlog),
                                 ),
                           ),
@@ -342,19 +404,18 @@ class _TodoState extends ConsumerState<TodoDetail> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              PxButton.text(queued != null ? '现在就试' : '开工', tone: PxTone.primary, onPressed: ready && _agent.isNotEmpty ? _start : null),
-              PxButton.text(widget.item == null ? '先存着' : '存下改动', onPressed: ready ? _save : null),
-              if (widget.item case final item?)
-                PxButton.text(
-                  '删掉',
-                  tone: PxTone.danger,
-                  onPressed: _busy
-                      ? null
-                      : () => _run(() async {
-                          await ref.read(apiProvider).issue.delete(id: item.id);
-                          widget.onDone(null);
-                        }),
-                ),
+              if (queued != null) PxButton.text('现在就试', tone: PxTone.primary, onPressed: ready && _agent.isNotEmpty ? _start : null),
+              PxButton.text('存下改动', onPressed: ready && _edited ? _save : null),
+              PxButton.text(
+                '删掉',
+                tone: PxTone.danger,
+                onPressed: _busy
+                    ? null
+                    : () => _run(() async {
+                        await ref.read(apiProvider).issue.delete(id: item.id);
+                        widget.onDone(null);
+                      }),
+              ),
             ],
           ),
         ],

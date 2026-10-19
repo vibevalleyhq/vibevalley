@@ -22,18 +22,17 @@ func drafting(w *testWorld) bool {
 	return slices.ContainsFunc(w.f.Core.State().Sessions, func(h protocol.Session) bool { return h.Draft })
 }
 
-// Nothing a draft did stays: its worktree is gone or clean, and its branch, if any, has nothing main does not.
+// Nothing a draft did stays: reset to main, its worktree is clean, so it goes with its drafter, and so does its branch,
+// which has nothing main does not.
 func draftLeftNothing(t *testing.T, work string, issue protocol.Issue) {
 	t.Helper()
 	project := filepath.Join(work, "projects", *issue.Project)
 	tree := filepath.Join(work, "worktrees", fmt.Sprintf("%s.%d", *issue.Project, issue.Number))
-	if _, err := os.Stat(tree); err == nil {
-		testkit.Eq(t, testkit.Git(t, tree, "status", "--porcelain"), "", "the worktree is clean")
-	}
 	branch := fmt.Sprintf("vibevalley/issue-%d", issue.Number)
-	if exec.Command("git", "-C", project, "show-ref", "--verify", "--quiet", "refs/heads/"+branch).Run() == nil {
-		testkit.Eq(t, testkit.Git(t, project, "rev-list", "--count", "main.."+branch), "0", "no commit on its branch")
-	}
+	testkit.Until(t, "its worktree and branch are gone", func() bool {
+		_, err := os.Stat(tree)
+		return os.IsNotExist(err) && exec.Command("git", "-C", project, "show-ref", "--verify", "--quiet", "refs/heads/"+branch).Run() != nil
+	})
 }
 
 // The plus makes an unsent issue; a session drafts it to the issue's format and leaves, the issue still in the backlog.

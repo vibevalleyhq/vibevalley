@@ -16,6 +16,7 @@ import '../../shared/faces.dart' show AgentFaceOf, PoseSprite;
 import '../../shared/seed_bag.dart';
 import '../../shared/swatches.dart';
 import '../shared/widgets.dart';
+import '../issues/issues_page.dart' show writeIssueAndOpen;
 import 'map_rules.dart';
 
 /// The issues and helpers come with the farm's state.
@@ -167,9 +168,11 @@ class _Toolbar extends StatelessWidget {
           ),
       ],
     );
-    final write = PxButton(
-      onPressed: () => workbenchGo(context, '/issues/new'),
-      child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-add', size: 16), SizedBox(width: 6), Text('写一张工单')]),
+    final write = Consumer(
+      builder: (context, ref, _) => PxButton(
+        onPressed: () => writeIssueAndOpen(context, ref.read(apiProvider)),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-add', size: 16), SizedBox(width: 6), Text('写一张工单')]),
+      ),
     );
     return LayoutBuilder(
       builder: (context, box) => box.maxWidth < _oneLine
@@ -552,10 +555,12 @@ class IslandDetail extends StatelessWidget {
                 ),
                 if (island.summary != null) ...[
                   const SizedBox(width: 8),
-                  PxButton.text(
-                    '派一件活',
-                    tone: island.open > 0 ? PxTone.primary : PxTone.plain,
-                    onPressed: () => workbenchGo(context, '/issues/new?project=${Uri.encodeQueryComponent(island.project)}'),
+                  Consumer(
+                    builder: (context, ref, _) => PxButton.text(
+                      '派一件活',
+                      tone: island.open > 0 ? PxTone.primary : PxTone.plain,
+                      onPressed: () => writeIssueAndOpen(context, ref.read(apiProvider), project: island.project),
+                    ),
                   ),
                 ],
               ],

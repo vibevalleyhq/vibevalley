@@ -37,7 +37,7 @@ final router = GoRouter(
             GoRoute(path: '/issues', builder: (_, _) => const IssuesPage()),
             GoRoute(
               path: '/issues/:id',
-              builder: (_, s) => IssuesPage(id: s.pathParameters['id'], project: s.uri.queryParameters['project']),
+              builder: (_, s) => IssuesPage(id: s.pathParameters['id']),
             ),
             GoRoute(path: '/agents', builder: (_, _) => const AgentsPage()),
             GoRoute(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../data/providers.dart';
 import '../data/remote.dart' show projectNamesProvider, projectSeedsProvider;
@@ -173,6 +174,21 @@ class _SeedFormState extends ConsumerState<SeedForm> {
       widget.onDone();
     }
 
+    // Not sown now: the words become an issue in the backlog, a helper drafts it, and its detail opens on the board.
+    Future<void> write() async {
+      if (_text.trim().isEmpty) return;
+      final router = GoRouter.maybeOf(context);
+      try {
+        final got = await writeIssue(ref.read(apiProvider).issue, text: _text, project: project, agent: who == 'auto' ? null : who);
+        if (got.refused.isNotEmpty) toasts.add(type: ToastType.info, title: '先没起草', description: got.refused);
+        ref.read(prefsProvider.notifier).setLastProject(project);
+        widget.onDone();
+        router?.go('/issues/${Uri.encodeComponent(got.issue.id)}');
+      } on Object catch (e) {
+        if (mounted) setState(() => _refused = e is VibeValleyApiError ? e.reason : '$e');
+      }
+    }
+
     final q = _filter.trim().toLowerCase();
     bool shown(String title) => q.isEmpty || title.toLowerCase().contains(q);
     final bag = seeds.value;
@@ -270,11 +286,14 @@ class _SeedFormState extends ConsumerState<SeedForm> {
       const SizedBox(height: 12),
       Row(
         children: [
-          Expanded(child: Text('管家会把这句话交给帮工，派在 $project 里；没开工的话会先开工。', style: label)),
+          Expanded(child: Text('管家会把这句话交给帮工，派在 $project 里；没开工的话会先开工。先起草：帮工读过代码写成工单，你看过再开工。', style: label)),
+          const SizedBox(width: 8),
+          PxButton.text('先起草', onPressed: _text.trim().isEmpty ? null : write),
           const SizedBox(width: 8),
           PxButton.text('播种', tone: PxTone.primary, onPressed: _text.trim().isEmpty ? null : sow),
         ],
       ),
+      if (_refused case final why? when why.isNotEmpty) ...[const SizedBox(height: 6), Text(why, style: label.copyWith(color: Palette.berry))],
     ];
   }
 }

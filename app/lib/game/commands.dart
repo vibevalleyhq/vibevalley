@@ -9,8 +9,32 @@ import '../data/remote.dart' show SessionIssue;
 import 'tools.dart';
 import 'state.dart';
 import '../rules/task.dart';
+import '../rules/issues.dart' show newIssueTitle;
 
 final farmCommandsProvider = Provider<FarmCommands>(FarmCommands.new);
+
+typedef WrittenIssue = ({Issue issue, String refused});
+
+/// The plus: an issue made at once in the backlog. With words, they are its title and its draft (issue.draft) starts from
+/// them. The issue is made even when the server refuses the draft (no project yet): `refused` says why.
+Future<WrittenIssue> writeIssue(IssueApi api, {String text = '', String? project, String? agent}) async {
+  final words = text.trim();
+  final made = await api.create(
+    body: IssueRequest(title: words.isEmpty ? newIssueTitle : words, project: project, assignee: agent),
+  );
+  if (words.isEmpty) return (issue: made, refused: '');
+  try {
+    return (
+      issue: await api.draft(
+        id: made.id,
+        body: IssueDraftRequest(text: words),
+      ),
+      refused: '',
+    );
+  } on VibeValleyApiError catch (e) {
+    return (issue: made, refused: e.reason);
+  }
+}
 
 class FarmCommands {
   FarmCommands(this.ref);
