@@ -259,12 +259,12 @@ func TestSessionsProjectsWithTheirNewestCommit(t *testing.T) {
 	}
 	real, _ := filepath.EvalSymlinks(root)
 	testkit.Eq(t, byName["notes"].Path, filepath.Join(real, "notes"), "where it is")
-	testkit.Eq(t, byName["notes"], protocol.ProjectSummary{PullRequest: protocol.PullRequestCapability{Reason: "尚未检测项目，请刷新 GitHub 状态"}, Name: "notes", Path: byName["notes"].Path, Git: false, Slots: 3}, "notes")
+	testkit.Eq(t, byName["notes"], protocol.ProjectSummary{PullRequest: protocol.PullRequestCapability{Reason: "尚未检测项目，请刷新 GitHub 状态"}, Name: "notes", Path: byName["notes"].Path, Git: false, MaxSessions: 3}, "notes")
 }
 
-func TestSessionsSlotsAreTheProjectLimitWithinTheBeds(t *testing.T) {
-	for limit, slots := range map[int]int64{3: 3, 1: 1, 0: protocol.MaxRunning, 9: protocol.MaxRunning} {
-		testkit.Eq(t, (&Service{perProject: limit}).Slots(), slots, fmt.Sprint("limit ", limit))
+func TestMaxSessionsIsTheProjectLimitWithinMaxRunning(t *testing.T) {
+	for limit, want := range map[int]int64{3: 3, 1: 1, 0: protocol.MaxRunning, 9: protocol.MaxRunning} {
+		testkit.Eq(t, (&Service{perProject: limit}).MaxSessions(), want, fmt.Sprint("limit ", limit))
 	}
 }
 

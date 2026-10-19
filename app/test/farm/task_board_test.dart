@@ -155,7 +155,7 @@ void main() {
               'name': 'clock-in',
               'path': '/work/clock-in',
               'git': true,
-              'slots': 3,
+              'maxSessions': 3,
             },
           ],
           'POST /api/v1/graphs': '在拆了（p3）',

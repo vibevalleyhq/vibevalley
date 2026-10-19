@@ -2433,14 +2433,14 @@ class PullRequestCapability {
 }
 
 class ProjectSummary {
-  const ProjectSummary({required this.name, required this.path, required this.git, this.last, required this.slots, required this.pullRequest});
+  const ProjectSummary({required this.name, required this.path, required this.git, this.last, required this.maxSessions, required this.pullRequest});
 
   factory ProjectSummary.fromJson(Map<String, dynamic> j) => ProjectSummary(
     name: j['name'] as String,
     path: j['path'] as String,
     git: j['git'] as bool,
     last: j['last'] == null ? null : (j['last'] as num).toDouble(),
-    slots: (j['slots'] as num).toDouble(),
+    maxSessions: (j['maxSessions'] as num).toDouble(),
     pullRequest: PullRequestCapability.fromJson(j['pullRequest'] as Map<String, dynamic>),
   );
 
@@ -2448,7 +2448,7 @@ class ProjectSummary {
   final String path;
   final bool git;
   final double? last;
-  final double slots;
+  final double maxSessions;
   final PullRequestCapability pullRequest;
 
   Map<String, dynamic> toJson() => {
@@ -2456,7 +2456,7 @@ class ProjectSummary {
     'path': path,
     'git': git,
     if (last != null) 'last': last!,
-    'slots': slots,
+    'maxSessions': maxSessions,
     'pullRequest': pullRequest.toJson(),
   };
 }

@@ -72,7 +72,7 @@ WorkbenchBackend _server() => WorkbenchBackend(
       path: '/work/clock',
       git: true,
       last: 2,
-      slots: 3,
+      maxSessions: 3,
     ),
   ],
   settings: SettingsStatus(

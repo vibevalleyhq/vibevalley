@@ -41,7 +41,7 @@ void main() {
       name: 'a',
       path: '/a',
       git: true,
-      slots: 2,
+      maxSessions: 2,
       last: 1,
     );
     const z = ProjectSummary(
@@ -49,7 +49,7 @@ void main() {
       name: 'z',
       path: '/z',
       git: true,
-      slots: 2,
+      maxSessions: 2,
       last: 2,
     );
     final list = [a];
@@ -105,7 +105,7 @@ void main() {
           name: 'project-$reads',
           path: '/p',
           git: true,
-          slots: 1,
+          maxSessions: 1,
         ).toJson(),
       ]);
     });

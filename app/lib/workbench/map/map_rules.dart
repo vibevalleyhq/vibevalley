@@ -1,4 +1,4 @@
-// The room is the project's slots less its working helpers, as far as the farm's beds go. It only decides how many empty plots
+// The room is the project's max sessions less its working helpers, within the workspace's MaxRunning. It only decides how many empty plots
 // are drawn; whether work may start is the server's (noRoom in server/internal/session/rules.go), and the two must agree.
 
 import 'dart:math' as math;
@@ -28,7 +28,7 @@ final class SpotShut extends Spot {
 }
 
 class Island {
-  const Island({required this.project, required this.summary, required this.spots, required this.working, required this.slots, required this.queued});
+  const Island({required this.project, required this.summary, required this.spots, required this.working, required this.maxSessions, required this.queued});
   final String project;
 
   /// Null for a project the list does not have (any more) that helpers are still in.
@@ -37,13 +37,13 @@ class Island {
   final List<Spot> spots;
 
   final int working;
-  final int slots;
+  final int maxSessions;
 
   final List<Issue> queued;
 
   Iterable<Session> get sessions => spots.whereType<SpotTaken>().map((s) => s.session);
   int get open => spots.whereType<SpotOpen>().length;
-  bool get full => working >= slots;
+  bool get full => working >= maxSessions;
 }
 
 List<Island> islandsOf({
@@ -78,8 +78,8 @@ List<Island> islandsOf({
 Island _island(String name, ProjectSummary? summary, List<Session> mine, Map<String, PlotView> plots, List<Issue> queued, int free) {
   final working = mine.where(isBusy).length;
   // A project the list does not have takes no more work: only its helpers show.
-  final slots = summary == null ? working : summary.slots.round();
-  final room = math.max(0, math.min(slots - working, maxRunning - mine.length));
+  final maxSessions = summary == null ? working : summary.maxSessions.round();
+  final room = math.max(0, math.min(maxSessions - working, maxRunning - mine.length));
   final open = math.min(room, free);
   return Island(
     project: name,
@@ -90,7 +90,7 @@ Island _island(String name, ProjectSummary? summary, List<Session> mine, Map<Str
       for (var i = open; i < room; i++) const SpotShut(),
     ],
     working: working,
-    slots: slots,
+    maxSessions: maxSessions,
     queued: queued,
   );
 }
@@ -148,8 +148,10 @@ String spotText(Spot spot, double now) => switch (spot) {
   SpotShut() => '农场的 $maxRunning 块地都有人在干活，等有人干完',
 };
 
-String islandText(Island i) =>
-    [if (i.summary == null) '不在工作目录里了' else '在干 ${i.working}/${i.slots}${i.full ? '（满了）' : ''}', if (i.queued.isNotEmpty) '排队 ${i.queued.length}'].join(' · ');
+String islandText(Island i) => [
+  if (i.summary == null) '不在工作目录里了' else '在干 ${i.working}/${i.maxSessions}${i.full ? '（满了）' : ''}',
+  if (i.queued.isNotEmpty) '排队 ${i.queued.length}',
+].join(' · ');
 
 double islandScale(double width, double cell, double gap) {
   for (final s in const [2.0, 1.5]) {

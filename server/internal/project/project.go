@@ -206,7 +206,7 @@ func newService(cfg base.Config) (*Service, error) {
 
 func (p *Service) Limit() int { return p.perProject }
 
-func (p *Service) Slots() int64 {
+func (p *Service) MaxSessions() int64 {
 	if p.perProject <= 0 || p.perProject > protocol.MaxRunning {
 		return protocol.MaxRunning
 	}

@@ -1029,8 +1029,8 @@ type ProjectSummary struct {
 	Path string `json:"path"`
 	Git  bool   `json:"git"`
 	Last *int64 `json:"last,omitzero"`
-	// Never more than the farm's beds.
-	Slots int64 `json:"slots"`
+	// project.max_sessions, the helpers working in it at once: 1 to MaxRunning, and MaxRunning when unset or above it.
+	MaxSessions int64 `json:"maxSessions"`
 	// Whether its harvests could go out as pull requests, and why not (github.status).
 	PullRequest PullRequestCapability `json:"pullRequest"`
 }

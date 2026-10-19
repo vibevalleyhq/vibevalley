@@ -17,13 +17,13 @@ const _working = PhaseWorking(
   doing: Doing(action: SessionAction.editFile, label: 'src/a.ts'),
 );
 
-ProjectSummary _project(String name, {double? last, double slots = 3}) => ProjectSummary(
+ProjectSummary _project(String name, {double? last, double maxSessions = 3}) => ProjectSummary(
   pullRequest: const PullRequestCapability(available: false, reason: "尚未检测 GitHub"),
   name: name,
   path: "/work/$name",
   git: true,
   last: last,
-  slots: slots,
+  maxSessions: maxSessions,
 );
 
 Issue _todo(String id, String project, {double? queuedAt}) => Issue(
@@ -89,7 +89,7 @@ void main() {
       expect([for (final i in islands) i.project], ['clock-in', 'docs', 'task-smoke']);
       final clock = islands.first;
       expect(_kinds(clock), ['w1', 'w2', 'w4', 'open', 'open']);
-      expect((clock.working, clock.slots, clock.open), (1, 3, 2));
+      expect((clock.working, clock.maxSessions, clock.open), (1, 3, 2));
       expect((clock.spots.first as SpotTaken).plot.crop, Crop.leafy);
       expect((clock.spots[1] as SpotTaken).plot.crop, Crop.seeded, reason: 'no plot in the view yet');
       expect(islandText(clock), '在干 1/3');
@@ -105,7 +105,7 @@ void main() {
       expect(mapTally(islands), (peopled: 2, working: 2, queued: 2));
     });
 
-    test('a full project has no room; when every bed is working, its slots are shut', () {
+    test('a full project has no room; when every bed is working, its open plots are shut', () {
       final full = islandsOf(
         projects: projects,
         sessions: [
@@ -136,7 +136,7 @@ void main() {
 
     test('a yard holds six plots at most', () {
       final crowded = islandsOf(
-        projects: [_project('big', slots: 6)],
+        projects: [_project('big', maxSessions: 6)],
         sessions: [for (var i = 0; i < 5; i++) _hired('r$i', 'big', const PhaseResting())],
         plots: const {},
         issues: const [],
@@ -235,7 +235,7 @@ void main() {
           'path': '/work/clock-in',
           'git': true,
           'last': now - 3600000,
-          'slots': 3,
+          'maxSessions': 3,
         },
         {
           'pullRequest': {'available': false, 'reason': '没装 gh'},
@@ -243,14 +243,14 @@ void main() {
           'path': '/work/docs',
           'git': true,
           'last': now - 3 * 86400000,
-          'slots': 3,
+          'maxSessions': 3,
         },
         {
           'pullRequest': {'available': false, 'reason': '没装 gh'},
           'name': 'task-smoke',
           'path': '/work/task-smoke',
           'git': false,
-          'slots': 2,
+          'maxSessions': 2,
         },
       ],
       'GET /api/v1/projects/task-smoke/templates': const ProjectTemplates(

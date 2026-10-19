@@ -546,10 +546,10 @@ class IslandDetail extends StatelessWidget {
                     island.summary == null
                         ? '不再往这里派活。'
                         : island.open > 0
-                        ? '还能再派 ${island.open} 件活，马上开工（这个项目最多同时 ${island.slots} 个帮工）。'
+                        ? '还能再派 ${island.open} 件活，马上开工（这个项目最多同时 ${island.maxSessions} 个帮工）。'
                         : shut > 0
                         ? '农场的 $maxRunning 块地都有人在干活，派来的活先排队。'
-                        : '满了：${island.slots} 个帮工都在干活，派来的活先排队。',
+                        : '满了：${island.maxSessions} 个帮工都在干活，派来的活先排队。',
                     style: KitText.xs.copyWith(color: Palette.bark600),
                   ),
                 ),

@@ -15,7 +15,7 @@ ProjectSummary _project(String name) => ProjectSummary(
   name: name,
   path: '/work/$name',
   git: true,
-  slots: 3,
+  maxSessions: 3,
   pullRequest: const PullRequestCapability(available: false, reason: ''),
 );
 

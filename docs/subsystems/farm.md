@@ -28,7 +28,7 @@
 - **地图** `app/lib/workbench/map/`：`map_rules.dart`（纯函数，`islandsOf`、`islandLooks`），`map_page.dart`；挂在工作台「项目」页（`/projects` 的「全部」，选一个项目是它的岛）。
 - **图鉴** `app/lib/workbench/catalog/`（`/catalog`）：`catalog_data.dart` 的 `shelves`、`framesOf`、`remakeOf`。
 
-服务端这边只有两样给皮的东西：`StateFrame.view`（`FarmView`，`protocol.ViewOf`）和 `StateFrame.inbox`（`protocol.Inbox`）；地图另读项目列表里的 `ProjectSummary.slots`。
+服务端这边只有两样给皮的东西：`StateFrame.view`（`FarmView`，`protocol.ViewOf`）和 `StateFrame.inbox`（`protocol.Inbox`）；地图另读项目列表里的 `ProjectSummary.maxSessions`。
 
 ## 模型和不变量
 
@@ -69,7 +69,7 @@
 - **来电的规矩**（`calls.dart`）：农场画面打开时已有的来电算未接、不响；新来电弹出手机、响铃（合成的 `ring`），20 秒（`ringFor`）没理算未接；接听去处理（帮工的打开它的地，计划的打开计划板，@ 你的打开那个对话），挂断是先放着；那件事在别处处理掉、从 Inbox 里消失，来电自己停。接没接过、通话记录只在这次打开里。
 - **小游戏的规则是纯函数**：一局是一个值，每一步是值到值，带种子的随机，能重放；画面只跑 `Ticker`、接十字键和 A、B、用 `CustomPaint` 画。最好成绩只在这次打开里；推箱子的棋盘放在 `warehouseProvider`，收起手机、来电都不丢，5 个固定关卡，能逐步撤销、重开本关。小游戏不进账本、不给金币。
 - **通知和手机用同一套规则**（`notify.dart`）：都从帧里的 `inbox` 和 `GameEffect` 读。手机上只在 App 不在屏幕前时弹本地通知，点一条经 `hostProvider` 的 `commands` 交给画面，和 Mac 上点通知走同一条路；点通知启动 App 时命令先存着，等画面开始听再交出去。Android 进后台时开一个前台服务（类型 `remoteMessaging`，通知栏一条低优先级的「连着农场」）让状态流不断，回前台就关；iOS 不常驻，离开屏幕后基本收不到。
-- **地图上的地 = worktree + 空位**（`map_rules.dart`）：项目里的每个帮工一块（不管在干、熟了还是歇着，它的 worktree 都在），按来的先后排；后面是空位，个数是项目的上限减去在干活的，也不超过农场还空着的地；被农场的地挡住的画成锁住的地。一座岛最多 6 块。上限来自 `ProjectSummary.slots`（`project.max_sessions`，默认 3；没设或超过 6 时是 6），这条和服务端的 `noRoom` 要一致。排上队的待办（`queuedAt`）按先后是院门外的种子袋。不在项目列表里的项目只画它的帮工、不再给空位。岛下面的名牌写着「进岛」并带箭头，点它或岛进这个项目的岛视图。
+- **地图上的地 = worktree + 空位**（`map_rules.dart`）：项目里的每个帮工一块（不管在干、熟了还是歇着，它的 worktree 都在），按来的先后排；后面是空位，个数是项目的上限减去在干活的，也不超过农场还空着的地；被农场的地挡住的画成锁住的地。一座岛最多 6 块。上限来自 `ProjectSummary.maxSessions`（`project.max_sessions`，默认 3；没设或超过 6 时是 6），这条和服务端的 `noRoom` 要一致。排上队的待办（`queuedAt`）按先后是院门外的种子袋。不在项目列表里的项目只画它的帮工、不再给空位。岛下面的名牌写着「进岛」并带箭头，点它或岛进这个项目的岛视图。
 - **每块地写着项目**：几个项目的地混在一个农场里，有帮工的地在牌子那一栏写它的项目名；有牌子（等验收、缺肥……）时项目名在牌子下面一行（`village/hud.dart` 的 `_plotWords`）。
 - **岛是整张的画**：六种样子（`islandLooks`），项目用哪座由名字定；每座中间留一块空院子，`process.py` 找出院子、把岛缩到院子 150 格宽，院子的位置写进 `sprites.json` 的 `yard`，客户端按它摆地。
 - **图鉴只读已打包的东西**：图来自 `sprites.json`，指针来自 `cursors.json`，音效来自 `sfx.dart` 的配方；没有自己的清单，切了新图就出现。分类按名字前缀（`shelves`），帧按编号认（`framesOf`），重画和重切的命令按清单里的 `sheet`（切自哪张原图）给出（`remakeOf`）；改了命名前缀要同时改 `shelves`，否则新图落进「其他」。
@@ -106,7 +106,7 @@
 - **核心状态（`protocol`）**：读 `StateFrame` 的 `state`、`view`、`inbox`、`effects`；地的样子是 `PlotOf`，来电是 `Inbox`，皮不重写这两条规则。
 - **工单、帮工**：农具直接调 `issue.status`、`issue.comment`、`session.stop`，不经帮工找工单；播种是经田头发一条带档案和项目（农场的还带地号）的消息，开工待办调 `issue.dispatch`。
 - **种子**：播种袋读 `project.templates`（`issue` 服务从工单里读出「最近」，`project` 服务看项目根目录认栈，工单模板的目录在 `server/internal/protocol/template_catalog.json`），客户端不带副本（[理由](.agents/notes/implemented/feature/2026-10-18-seed-catalog-from-the-server.md)）。
-- **项目**：地图读项目列表里的 `slots`，项目页每 30 秒问一次；工单和帮工跟着核心状态来。
+- **项目**：地图读项目列表里的 `maxSessions`，项目页每 30 秒问一次；工单和帮工跟着核心状态来。
 - **游戏**：金币、升级、成就到了一档是服务端推来的 `GameEffect`，皮只画效果、响声音、弹通知。
 - **素材流水线（`design/`）**：生图 `design/pixel/gen.sh`，切图 `design/pixel/process.py` 写出 `app/assets/pixel/` 和 `sprites.json`（不手改）；原图在 vibevalley-art，`design/art.sh` 链接进来。步骤见 [pixel-village.md](docs/reference/pixel-village.md)「素材」。
 
@@ -145,6 +145,6 @@
 - `test/audio/synth_test.dart`：每个音效的样本和响度和 `test/fixtures/sfx.json` 一致，每个都有名字和分组。
 - `test/phone/widget_test.dart`：打开时已有的来电不响、新来电响铃，挂断，20 秒没接算未接，接听打开地、计划板或对话，别处处理掉自己停；方块、推箱子、小恐龙从主屏打开。`games_test.dart`、`bugsnake_test.dart`、`merge_test.dart` 测小游戏的规则（种子重放、推箱子每关可解）。来电本身的规则在服务端 `server/internal/protocol/inbox_rules_test.go`。
 - `test/host/notify_test.dart`（来电变通知、只响一次）、`mobile_notices_test.dart`（点通知等画面开始听再打开）。
-- `test/workbench/map_test.dart`：worktree 和空位、锁住的地怎么算，一座岛最多 6 块，三到五块地怎么摆，每座岛都有院子；页面上点空位打开种在这个项目的播种袋（不问项目、不带地号，开工待办也不带）、点帮工去它的工单。服务端 `server/internal/project/project_test.go` 的 `TestSessionsSlotsAreTheProjectLimitWithinTheBeds`。
+- `test/workbench/map_test.dart`：worktree 和空位、锁住的地怎么算，一座岛最多 6 块，三到五块地怎么摆，每座岛都有院子；页面上点空位打开种在这个项目的播种袋（不问项目、不带地号，开工待办也不带）、点帮工去它的工单。服务端 `server/internal/project/project_test.go` 的 `TestMaxSessionsIsTheProjectLimitWithinMaxRunning`。
 - `test/workbench/catalog_test.dart`：清单、书架、帧，图的书架和音效书架。
 - 改了画面，照 `verify-app` 在真的客户端上截图看一遍。

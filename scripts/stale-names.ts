@@ -94,6 +94,11 @@ const RULES: readonly Rule[] = [
     pattern: /internal\/gate\b|\/api\/v1\/gate\b|\/settings\/gate\b|workbench\/gate\b|\bgate_device\b|\bGate(Status|Update|StartPairing|StopPairing|AnswerPairing|DeleteDevice|Pair|Me|Page|Api|Open)\b|\.Gate\b|\bgate\.Service\b|yard gate/,
     says: 'lan: internal/lan, lan.Service, Workspace.Lan, lan.* routes under /api/v1/lan, the lan and lan_device tables, LanPage at /settings/lan; the village\'s gate is only the picture',
   },
+  {
+    name: 'a project\'s max sessions under the slots name',
+    pattern: /\bSlots\(\)|ProjectSummary\.slots|summary\.slots|island\.slots|['"]slots['"]/,
+    says: 'MaxSessions (json maxSessions): it is project.max_sessions',
+  },
 ]
 
 const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{go,dart}`, { cwd: root })).sort()

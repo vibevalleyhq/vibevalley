@@ -40,7 +40,7 @@ Workspace（工作目录，一张大地图）
 | 管家 | `Manager` | 主人的助理 agent：听主人说，拆成工单，派出去，转告结果 |
 | agent 档案 | `Agent` | 能派活的「同事」：runtime、模型、人设、技能、MCP、环境变量、长相 |
 | runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 smith 驱动 |
-| 项目 | `Project` | 一个 git 仓库，和能同时在里面做的工单数（`slots`） |
+| 项目 | `Project` | 一个 git 仓库，和能同时在里面做的工单数（`project.max_sessions`，`ProjectSummary.maxSessions`） |
 | 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，主人挪状态就是派活；代码相关的有自己的分支和 worktree；每张都有验收（`Acceptance`）；关上的能重开 |
 | Session | `Session`（服务是 `session.Service`，派活是 `Issue.Hire`） | 档案为一张工单接的活，在工单的 worktree 和分支上干，直到收获或收工；跨好几次 run，重启后还是同一个 |
 | Run | `Run`（`session_run` 表）；核心状态里是 `FactRun` 到 `FactReport` | 一次干活：一次触发到一次汇报，包着一个 oar turn |

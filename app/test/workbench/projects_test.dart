@@ -105,7 +105,7 @@ void main() {
         'path': '/work/old',
         'git': true,
         'last': now - 200 * 86400000,
-        'slots': 3,
+        'maxSessions': 3,
       },
       {
         'pullRequest': {'available': false, 'reason': '没装 gh'},
@@ -113,14 +113,14 @@ void main() {
         'path': '/work/farm',
         'git': true,
         'last': now - 3600000,
-        'slots': 3,
+        'maxSessions': 3,
       },
       {
         'pullRequest': {'available': false, 'reason': '没装 gh'},
         'name': 'notes',
         'path': '/work/notes',
         'git': false,
-        'slots': 3,
+        'maxSessions': 3,
       },
     ];
     return Routes({
@@ -160,7 +160,7 @@ void main() {
             'name': name,
             'path': '/work/$name',
             'git': true,
-            'slots': 3,
+            'maxSessions': 3,
           },
         ];
         return {
@@ -168,7 +168,7 @@ void main() {
           'name': name,
           'path': '/work/$name',
           'git': true,
-          'slots': 3,
+          'maxSessions': 3,
         };
       },
     });
