@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/ui/theme.dart';
-import 'package:vibevalley/data/farm_choice.dart';
+import 'package:vibevalley/data/server_choice.dart';
 import 'package:vibevalley/workbench/lan/lan_page.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/server.dart' show jsonResponse, settle;
+
 import 'package:vibevalley/data/providers.dart';
 
 const _lanUrl = 'http://192.168.1.5:8790';
@@ -40,19 +41,19 @@ void main() {
 
   test('the choice survives a restart, and the other farm is kept when going back', () async {
     SharedPreferences.setMockInitialValues({});
-    final remote = RemoteFarm(url: Uri.parse(_lanUrl), key: 'k1', hostName: 'lucas-mbp', device: 'd1');
-    await saveFarmChoice(FarmChoice(remote: remote, useRemote: true));
-    farmConnection.value = const FarmConnection(choice: FarmChoice());
-    await loadFarmChoice();
-    expect(farmConnection.value.choice.using?.url, Uri.parse(_lanUrl));
-    expect(farmConnection.value.choice.using?.key, 'k1');
+    final remote = RemoteServer(url: Uri.parse(_lanUrl), key: 'k1', hostName: 'lucas-mbp', device: 'd1');
+    await saveServerChoice(ServerChoice(remote: remote, useRemote: true));
+    serverConnection.value = const ServerConnection(choice: ServerChoice());
+    await loadServerChoice();
+    expect(serverConnection.value.choice.using?.url, Uri.parse(_lanUrl));
+    expect(serverConnection.value.choice.using?.key, 'k1');
 
-    await saveFarmChoice(FarmChoice(remote: remote));
-    farmConnection.value = const FarmConnection(choice: FarmChoice());
-    await loadFarmChoice();
-    expect(farmConnection.value.choice.using, isNull);
-    expect(farmConnection.value.choice.remote?.hostName, 'lucas-mbp');
-    farmConnection.value = const FarmConnection(choice: FarmChoice());
+    await saveServerChoice(ServerChoice(remote: remote));
+    serverConnection.value = const ServerConnection(choice: ServerChoice());
+    await loadServerChoice();
+    expect(serverConnection.value.choice.using, isNull);
+    expect(serverConnection.value.choice.remote?.hostName, 'lucas-mbp');
+    serverConnection.value = const ServerConnection(choice: ServerChoice());
   });
 
   group('pairWith', () {
@@ -91,7 +92,7 @@ void main() {
 
     test('keeps a key the farm still knows, at its new address', () async {
       final (apiFor, calls) = farm(known: {'old-key'});
-      final known = RemoteFarm(url: Uri.parse('http://10.0.0.2:8790'), key: 'old-key', hostName: 'lucas-mbp', device: 'd1');
+      final known = RemoteServer(url: Uri.parse('http://10.0.0.2:8790'), key: 'old-key', hostName: 'lucas-mbp', device: 'd1');
       final got = await pairWith(link, name: 'iPhone', known: known, apiFor: apiFor);
       expect((got.url, got.key), (Uri.parse(_lanUrl), 'old-key'));
       expect(calls, ['GET /api/v1/lan/me old-key']);
@@ -99,7 +100,7 @@ void main() {
 
     test('asks again when the farm forgot the key, and says why it is refused', () async {
       final (apiFor, calls) = farm(allow: false);
-      final known = RemoteFarm(url: Uri.parse(_lanUrl), key: 'old-key', hostName: 'x', device: 'd1');
+      final known = RemoteServer(url: Uri.parse(_lanUrl), key: 'old-key', hostName: 'x', device: 'd1');
       await expectLater(
         pairWith(link, name: 'iPhone', known: known, apiFor: apiFor),
         throwsA(isA<VibeValleyApiError>().having((e) => e.reason, 'reason', '主人没让这台设备进来')),

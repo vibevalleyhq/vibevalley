@@ -6,7 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/farm_choice.dart';
+import '../data/server_choice.dart';
 import '../data/providers.dart';
 import '../ui/kit/kit.dart';
 
@@ -31,7 +31,7 @@ class ConnectionBanner extends ConsumerWidget {
     if (watchReachable(ref)) return const SizedBox.shrink();
     const text = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 20 / 14, color: Palette.bark900);
     final code = KitText.mono.copyWith(color: Palette.bark900);
-    final remote = farmConnection.value.remote;
+    final remote = serverConnection.value.remote;
     return Semantics(
       liveRegion: true,
       child: Align(

@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/data/farm_choice.dart';
+import 'package:vibevalley/data/server_choice.dart';
 
 Future<File> script(Directory root, String name, String body) async {
   final file = File('${root.path}/$name');
@@ -32,7 +32,7 @@ Map<String, String> environment(Directory root, File binary, File shell) => {
 };
 
 List<String> nativeCalls(TestWidgetsFlutterBinding binding) {
-  farmConnection.value = const FarmConnection(choice: FarmChoice());
+  serverConnection.value = const ServerConnection(choice: ServerChoice());
   final calls = <String>[];
   const channel = MethodChannel('vibevalley/desktop');
   binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {

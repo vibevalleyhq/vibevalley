@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/farm_choice.dart';
+import '../data/server_choice.dart';
 import '../data/providers.dart';
 import './mobile_notices.dart';
 import 'channel.dart';
@@ -169,20 +169,20 @@ Future<void> startDesktop({Map<String, String>? environment}) async {
   if (!isMacDesktop) return;
   final host = DesktopHostChannel.instance.._listen();
   await host._invoke('setup', {'title': desktopChannel.titled('码农场物语')});
-  if (farmConnection.value.choice.useRemote) return;
-  await _startLocalFarm(environment);
+  if (serverConnection.value.choice.useRemote) return;
+  await _startLocalServer(environment);
 }
 
-Future<void> _startLocalFarm([Map<String, String>? environment]) {
-  if (!isMacDesktop || farmConnection.value.localAddress != null) return Future.value();
+Future<void> _startLocalServer([Map<String, String>? environment]) {
+  if (!isMacDesktop || serverConnection.value.localAddress != null) return Future.value();
   final host = DesktopHostChannel.instance.._listen();
   if (host._quitting) return Future.value();
-  return host._localStart ??= _launchLocalFarm(host, environment ?? Platform.environment).whenComplete(() {
+  return host._localStart ??= _launchLocalServer(host, environment ?? Platform.environment).whenComplete(() {
     host._localStart = null;
   });
 }
 
-Future<void> _launchLocalFarm(DesktopHostChannel host, Map<String, String> env) async {
+Future<void> _launchLocalServer(DesktopHostChannel host, Map<String, String> env) async {
   if (const String.fromEnvironment('VIBEVALLEY_SERVER').isNotEmpty) return;
   final binary = bundledServer(env);
   if (binary == null) {
@@ -208,7 +208,7 @@ Future<void> _launchLocalFarm(DesktopHostChannel host, Map<String, String> env) 
       return;
     }
     final address = server.url.toString();
-    farmConnection.value = farmConnection.value.withLocal(address);
+    serverConnection.value = serverConnection.value.withLocal(address);
     await host._invoke('server', {'pid': server.pid, 'url': address});
   } on ServerStartCanceled {
     return;
@@ -218,6 +218,6 @@ Future<void> _launchLocalFarm(DesktopHostChannel host, Map<String, String> env) 
 }
 
 Future<void> useLocalFarm() async {
-  await _startLocalFarm();
-  await saveFarmChoice(FarmChoice(remote: farmConnection.value.choice.remote));
+  await _startLocalServer();
+  await saveServerChoice(ServerChoice(remote: serverConnection.value.choice.remote));
 }

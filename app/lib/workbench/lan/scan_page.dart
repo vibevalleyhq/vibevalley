@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../../data/farm_choice.dart';
+import '../../data/server_choice.dart';
 import '../../ui/kit/kit.dart';
 
 class ScanPage extends StatefulWidget {

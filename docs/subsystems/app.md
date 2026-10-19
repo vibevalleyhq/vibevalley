@@ -18,8 +18,8 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 
 ## 在哪
 
-- **组合**：`lib/main.dart` 读偏好里的农场选择（`loadFarmChoice`）、拉起本机服务端（`startDesktop`）、开手机通知，再 `runApp(OnChosenFarm)`；`lib/app/app.dart` 的 `OnChosenFarm` 按 `FarmConnection.scopeKey` 建 `ProviderScope`，`lib/app/router.dart` 是全部路由，`lib/app/host_router.dart` 把宿主的命令变成导航。
-- **数据层** `lib/data/`：`server.dart` 的 `VibeValleyServer`（两条 SSE 和接口客户端），`providers.dart`（`serverProvider`、`apiProvider`、`stateFrameProvider`、`sideEventsProvider`……），`remote.dart`（`workbenchConfigProvider` 和按对象的读取），`farm_choice.dart`（本机还是「连接到本机」那头的农场），`ui_state.dart`、`overlays.dart`、`prefs.dart`（本机的界面状态和偏好）。
+- **组合**：`lib/main.dart` 读偏好里的农场选择（`loadServerChoice`）、拉起本机服务端（`startDesktop`）、开手机通知，再 `runApp(OnChosenFarm)`；`lib/app/app.dart` 的 `OnChosenFarm` 按 `ServerConnection.scopeKey` 建 `ProviderScope`，`lib/app/router.dart` 是全部路由，`lib/app/host_router.dart` 把宿主的命令变成导航。
+- **数据层** `lib/data/`：`server.dart` 的 `VibeValleyServer`（两条 SSE 和接口客户端），`providers.dart`（`serverProvider`、`apiProvider`、`stateFrameProvider`、`sideEventsProvider`……），`remote.dart`（`workbenchConfigProvider` 和按对象的读取），`server_choice.dart`（本机还是「连接到本机」那头的农场），`ui_state.dart`、`overlays.dart`、`prefs.dart`（本机的界面状态和偏好）。
 - **工作台** `lib/workbench/`：`places.dart` 的 `Place` 是左栏的地方，`workbench_shell.dart` 是外框，每个地方一个目录；设置页的表单在 `shared/settings_form.dart`（首页也用）。
 - **首页** `lib/title/`：`startup.dart` 启动画面，`title_screen.dart` 菜单。
 - **宿主** `lib/host/`：`desktop.dart`（方法通道和本机农场的启动）、`launcher.dart`（`ServerLauncher`）、`channel.dart`（渠道表）、`follow.dart`（`HostFollow`）、`notify.dart`（通知和菜单栏的纯函数）、`command.dart`（`HostCommand`）、`mobile_notices.dart`（手机）。Swift 那一半在 `app/macos/Runner/AppDelegate.swift`、`MainFlutterWindow.swift`。
@@ -51,7 +51,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 
   皮是 `workbench` 和 `farm`，互不 import；两张都用的放 `shared`，和业务无关的放 `ui`，本机状态放 `data`。`village` 是渲染层，`farm` 和 `title` 都用它；`phone` 是农场里的手机，不是第三张皮。Agora 的 SDK 只在 `lib/voice/` 里 import（`VENDOR` 表）。
 - **一样数据一个来源**：一个 `apiProvider`；档案和农机只从 `workbenchConfigProvider` 读（`agentsProvider`、`runtimesProvider` 由它派生，服务端推的农机变化让它保持最新，旧的刷新不覆盖新的，首次加载失败是错误、和空列表分开）；工地事件只有一个 `sideEventsProvider`。项目目录、每个档案的记性、每个帮工的干活过程由数据层按对象给（`projectCatalogProvider`、`memoryProvider`、`sessionEventsProvider`），干活过程先取历史再接上推送。
-- **一个农场一个 `ProviderScope`**：`FarmConnection`（本机地址，或「连接到本机」那头的 `RemoteFarm`）变了，`scopeKey` 变，整个 scope 重建，旧的连接、通话随之释放。`VibeValleyServer.close` 关掉两条流和接口客户端，不再重连；坏帧报进 `problems`，后面的合法帧照收。
+- **一个农场一个 `ProviderScope`**：`ServerConnection`（本机地址，或「连接到本机」那头的 `RemoteServer`）变了，`scopeKey` 变，整个 scope 重建，旧的连接、通话随之释放。`VibeValleyServer.close` 关掉两条流和接口客户端，不再重连；坏帧报进 `problems`，后面的合法帧照收。
 - **农场一直挂着**：工作台的页面盖在农场上面，农场 `Offstage` 且 `TickerMode` 关掉（`router.dart` 的 `_KeepFarm`），帮工的位置不丢。
 - **渠道在构建时定死**：`--dart-define=VIBEVALLEY_CHANNEL`，打出来的应用不读环境里的渠道；不认识的名字是构建错误。`channel.dart` 的 `DesktopChannel` 是唯一的表：
 
@@ -72,7 +72,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 2. 建家目录；问登录 shell 要 PATH（`loginShellPath`，`$SHELL -ilc`，5 秒，问不到用原来的），因为从 Finder 或登录时打开的应用拿不到 pi、claude、codex 所在的 PATH。
 3. `ServerLauncher.start` 以 `--ready-json`、`VIBEVALLEY_PORT=0`、`VIBEVALLEY_HOME`、`VIBEVALLEY_WORK_ROOT` 和这个 PATH 拉起子进程，进程的工作目录是家目录，环境是应用自己的环境加上这几项；其余配置读家目录的 `vibevalley.yaml`。stdout 和 stderr 都追加进日志文件。
 4. 等收据：服务端监听和工作区都就绪后在 stdout 写一行 `ServerReady`（`url`、`pid`）。只认 `pid` 等于自己子进程、`http://127.0.0.1:<1–65535>` 的那一行，别的 stdout 当日志。40 秒没有收据、或子进程先退出，就停掉它，弹框（`fatal`）说原因和日志在哪，应用退出。
-5. 收到收据：把地址写进 `farmConnection`（`withLocal`），scope 照它建，告诉 Swift 子进程的 pid（`server`）。
+5. 收到收据：把地址写进 `serverConnection`（`withLocal`），scope 照它建，告诉 Swift 子进程的 pid（`server`）。
 
 几处同时要启动（开机、从「连接到本机」切回本机 `useLocalFarm`）共用同一个启动任务；准备环境时就退出，不再生成进程；等收据时退出、甚至 spawn 还没返回就取消，都由同一个 `ServerLauncher.stop` 收回子进程。
 
@@ -96,7 +96,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 ## 和谁打交道
 
 - **服务端的生命周期（`handler.Listen`、`base`）**：主接口只听 `127.0.0.1`（`Config.ServerAddress`，没有 Host 这个配置）；`handler.Listen` 先拿到监听地址、组装农场，全部 `OnStart` 之后由 `base.BeforeReady` 开始答 HTTP，再跑各模块的 `OnReady`，所以 `OnReady` 里派出的帮工拿到的是实际地址（端口 0 也对）。`cmd/server --ready-json` 在这之后写收据。启动失败释放监听和数据库；取消时先停请求、关 HTTP，再关农场。家目录租约持有到全部服务停机写完、数据库关掉，延迟写入的 `FileWriter.Finish` 之后迟到的计时器不再落盘。客户端只依赖收据和 SIGTERM 会存盘这两条。
-- **「连接到本机」（`lan`）**：用别的电脑的农场时，在「连接到本机」页粘贴或扫配对链接，那边点头后存进 `farm_choice.dart`，之后不再拉起自己的服务端；请求和两条流都带 `Bearer` 钥匙，401 时横幅说要重新配对。
+- **「连接到本机」（`lan`）**：用别的电脑的农场时，在「连接到本机」页粘贴或扫配对链接，那边点头后存进 `server_choice.dart`，之后不再拉起自己的服务端；请求和两条流都带 `Bearer` 钥匙，401 时横幅说要重新配对。
 - **设置（`setting`）**：首页和设置页读写 `GET`/`POST` 设置，保存前问 `settings/check`；钥匙从不经过客户端，页面只看到来源和末四位。
 - **语音（`voice`）**：通话归当前农场的 scope，按钮和 ⌥⇧Space 发同一个动作；Swift 第一次按快捷键时要麦克风权限。
 - **验证脚本**：`scripts/verify-server.ts` 用同一个收据协议起一个隔离的服务端，再交给 `verify-app` 画截图。

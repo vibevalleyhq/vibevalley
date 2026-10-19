@@ -102,7 +102,12 @@ const RULES: readonly Rule[] = [
   {
     name: 'the lan host\'s name under the farm name',
     pattern: /\b(lanFarmName|remote\.farm|using\.farm|last\.farm|paired\.farm|known\.farm)\b|Farm: lan/,
-    says: 'hostName (LanStatus.hostName, LanPaired.hostName, RemoteFarm.hostName): the computer\'s hostname',
+    says: 'hostName (LanStatus.hostName, LanPaired.hostName, RemoteServer.hostName): the computer\'s hostname',
+  },
+  {
+    name: 'the server the app talks to under the farm name',
+    pattern: /\b(RemoteFarm|FarmChoice|FarmConnection|farmConnection|loadFarmChoice|saveFarmChoice)\b|vibevalley\.farm\b|farm_choice\.dart/,
+    says: 'RemoteServer, ServerChoice, ServerConnection, serverConnection, the vibevalley.server key, data/server_choice.dart',
   },
   {
     name: 'a business name in farm words',

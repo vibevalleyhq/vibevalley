@@ -3,15 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../gen/vibevalley.dart';
 import '../sprites/atlas.dart';
-import 'farm_choice.dart';
+import 'server_choice.dart';
 import 'server.dart';
 
 const serverAddress = String.fromEnvironment('VIBEVALLEY_SERVER', defaultValue: 'http://127.0.0.1:8787');
 
-final farmConnectionProvider = Provider<FarmConnection>((ref) => farmConnection.value);
+final serverConnectionProvider = Provider<ServerConnection>((ref) => serverConnection.value);
 
 final serverProvider = Provider<VibeValleyServer>((ref) {
-  final server = ref.watch(farmConnectionProvider).open(serverAddress);
+  final server = ref.watch(serverConnectionProvider).open(serverAddress);
   ref.onDispose(server.close);
   return server;
 });

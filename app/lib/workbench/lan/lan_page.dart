@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/farm_choice.dart';
+import '../../data/server_choice.dart';
 import '../../data/server.dart';
 import '../../host/desktop.dart' show useLocalFarm;
 import '../../gen/vibevalley.dart';
@@ -34,7 +34,7 @@ class _LanPageState extends ConsumerState<LanPage> {
   Timer? _poll;
 
   /// Lan access is managed from the machine whose server it is: not while this app uses another's.
-  bool get _ownFarm => farmConnection.value.remote == null;
+  bool get _ownFarm => serverConnection.value.remote == null;
 
   @override
   void initState() {
@@ -310,11 +310,11 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
       final remote = await pairWith(
         link,
         name: deviceName(),
-        known: farmConnection.value.remote,
+        known: serverConnection.value.remote,
         apiFor: (url, key) => VibeValleyServer(url, key: key).api,
       );
       toasts.add(type: ToastType.info, title: '连上了', description: '现在用的是 ${remote.hostName} 的农场。');
-      await saveFarmChoice(FarmChoice(remote: remote, useRemote: true));
+      await saveServerChoice(ServerChoice(remote: remote, useRemote: true));
     } on Object catch (e) {
       if (mounted) setState(() => _error = reasonOf(e));
     } finally {
@@ -337,7 +337,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
   @override
   Widget build(BuildContext context) {
     final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.625);
-    final choice = farmConnection.value.choice;
+    final choice = serverConnection.value.choice;
     final using = choice.using;
     final own = canScan ? '断开' : '回到这台电脑的农场';
     return PxCard(
@@ -367,7 +367,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
                   PxButton.text(
                     '连回去',
                     size: PxSize.sm,
-                    onPressed: _waiting != null ? null : () => saveFarmChoice(FarmChoice(remote: last, useRemote: true)),
+                    onPressed: _waiting != null ? null : () => saveServerChoice(ServerChoice(remote: last, useRemote: true)),
                   ),
                 ],
               ),

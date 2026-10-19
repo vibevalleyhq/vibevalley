@@ -14,7 +14,7 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 - **通话的拥有者**：当前农场的 ProviderScope 拥有 VoiceCall；页面观察通话，按钮和本机快捷键都发送同一个通话动作。切换农场时旧通话随 scope 释放。
 - **规则**：帧里没有、要从状态推出来的，是 `lib/rules/` 的纯函数；客户端自己的游戏状态（工具、手机、偏好）在各自的目录。
 
-用哪个农场（本机，或经「连接到本机」配对的另一台电脑）存在偏好里（`lib/data/farm_choice.dart`）。手机上不在屏幕前时按桌面版的规则弹系统通知（`lib/host/mobile_notices.dart`）。macOS 版见 [客户端](docs/subsystems/app.md)。
+用哪个农场（本机，或经「连接到本机」配对的另一台电脑）存在偏好里（`lib/data/server_choice.dart`）。手机上不在屏幕前时按桌面版的规则弹系统通知（`lib/host/mobile_notices.dart`）。macOS 版见 [客户端](docs/subsystems/app.md)。
 
 ## 目录
 

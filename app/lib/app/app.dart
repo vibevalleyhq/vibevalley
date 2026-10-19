@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/farm_choice.dart';
+import '../data/server_choice.dart';
 import '../workbench/places.dart';
 import '../host/host.dart';
 import '../phone/calls.dart';
@@ -16,8 +16,8 @@ class OnChosenFarm extends StatelessWidget {
   const OnChosenFarm({super.key});
 
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder<FarmConnection>(
-    valueListenable: farmConnection,
+  Widget build(BuildContext context) => ValueListenableBuilder<ServerConnection>(
+    valueListenable: serverConnection,
     builder: (_, connection, _) => ProviderScope(
       key: ValueKey(connection.scopeKey),
       child: const DesktopHost(child: VibeValleyApp()),

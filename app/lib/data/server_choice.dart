@@ -9,8 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../gen/vibevalley.dart';
 import 'server.dart';
 
-class RemoteFarm {
-  const RemoteFarm({required this.url, required this.key, required this.hostName, required this.device});
+class RemoteServer {
+  const RemoteServer({required this.url, required this.key, required this.hostName, required this.device});
 
   final Uri url;
   final String key;
@@ -18,38 +18,38 @@ class RemoteFarm {
   final String hostName;
   final String device;
 
-  RemoteFarm at(Uri url) => RemoteFarm(url: url, key: key, hostName: hostName, device: device);
+  RemoteServer at(Uri url) => RemoteServer(url: url, key: key, hostName: hostName, device: device);
 
   Map<String, Object?> toJson() => {'url': '$url', 'key': key, 'hostName': hostName, 'device': device};
 
-  static RemoteFarm? fromJson(Object? raw) {
+  static RemoteServer? fromJson(Object? raw) {
     if (raw is! Map) return null;
     final url = raw['url'], key = raw['key'], hostName = raw['hostName'], device = raw['device'];
     if (url is! String || key is! String || hostName is! String || device is! String) return null;
     final parsed = Uri.tryParse(url);
-    return parsed == null ? null : RemoteFarm(url: parsed, key: key, hostName: hostName, device: device);
+    return parsed == null ? null : RemoteServer(url: parsed, key: key, hostName: hostName, device: device);
   }
 }
 
 @immutable
-class FarmChoice {
-  const FarmChoice({this.remote, this.useRemote = false});
-  final RemoteFarm? remote;
+class ServerChoice {
+  const ServerChoice({this.remote, this.useRemote = false});
+  final RemoteServer? remote;
   final bool useRemote;
 
-  RemoteFarm? get using => useRemote ? remote : null;
+  RemoteServer? get using => useRemote ? remote : null;
 }
 
-const _key = 'vibevalley.farm';
+const _key = 'vibevalley.server';
 
 /// The destination and the server it opens: one place for local/remote, the embedded address and the scope key.
-class FarmConnection {
-  const FarmConnection({required this.choice, this.localAddress});
-  final FarmChoice choice;
+class ServerConnection {
+  const ServerConnection({required this.choice, this.localAddress});
+  final ServerChoice choice;
   final String? localAddress;
 
-  RemoteFarm? get remote => choice.using;
-  FarmConnection withLocal(String address) => FarmConnection(choice: choice, localAddress: address);
+  RemoteServer? get remote => choice.using;
+  ServerConnection withLocal(String address) => ServerConnection(choice: choice, localAddress: address);
   VibeValleyServer open(String fallback) =>
       remote != null ? VibeValleyServer(remote!.url, key: remote!.key) : VibeValleyServer(Uri.parse(localAddress ?? fallback));
 
@@ -57,26 +57,26 @@ class FarmConnection {
   String get scopeKey => remote == null ? 'local:${localAddress ?? ''}' : 'remote:${remote!.url} ${remote!.device} ${remote!.key}';
 }
 
-final farmConnection = ValueNotifier<FarmConnection>(const FarmConnection(choice: FarmChoice()));
+final serverConnection = ValueNotifier<ServerConnection>(const ServerConnection(choice: ServerChoice()));
 
-Future<void> loadFarmChoice() async {
+Future<void> loadServerChoice() async {
   try {
     final raw = (await SharedPreferences.getInstance()).getString(_key);
     if (raw == null) return;
     final json = jsonDecode(raw);
     if (json is! Map) return;
-    final remote = RemoteFarm.fromJson(json['remote']);
-    farmConnection.value = FarmConnection(
-      choice: FarmChoice(remote: remote, useRemote: remote != null && json['use'] == 'remote'),
-      localAddress: farmConnection.value.localAddress,
+    final remote = RemoteServer.fromJson(json['remote']);
+    serverConnection.value = ServerConnection(
+      choice: ServerChoice(remote: remote, useRemote: remote != null && json['use'] == 'remote'),
+      localAddress: serverConnection.value.localAddress,
     );
   } on Object {
     // No storage, or a choice that does not read: this machine's farm.
   }
 }
 
-Future<void> saveFarmChoice(FarmChoice choice) async {
-  farmConnection.value = FarmConnection(choice: choice, localAddress: farmConnection.value.localAddress);
+Future<void> saveServerChoice(ServerChoice choice) async {
+  serverConnection.value = ServerConnection(choice: choice, localAddress: serverConnection.value.localAddress);
   try {
     await (await SharedPreferences.getInstance()).setString(
       _key,
@@ -121,12 +121,12 @@ String deviceName() {
 typedef ApiFor = VibeValleyApi Function(Uri url, String? key);
 
 /// With a key for it already (the address changed, scanned again), the key is tried first and kept; otherwise the device asks with the code.
-Future<RemoteFarm> pairWith(PairLink link, {required String name, RemoteFarm? known, required ApiFor apiFor}) async {
+Future<RemoteServer> pairWith(PairLink link, {required String name, RemoteServer? known, required ApiFor apiFor}) async {
   if (known != null) {
     final api = apiFor(link.url, known.key);
     try {
       final me = await api.lan.me();
-      return RemoteFarm(url: link.url, key: known.key, hostName: known.hostName, device: me.id);
+      return RemoteServer(url: link.url, key: known.key, hostName: known.hostName, device: me.id);
     } on Object {
       // Not a key this farm knows (or no answer): ask with the code.
     } finally {
@@ -138,7 +138,7 @@ Future<RemoteFarm> pairWith(PairLink link, {required String name, RemoteFarm? kn
     final paired = await api.lan.pair(
       body: LanPairRequest(code: link.code, name: name),
     );
-    return RemoteFarm(url: link.url, key: paired.key, hostName: paired.hostName, device: paired.device);
+    return RemoteServer(url: link.url, key: paired.key, hostName: paired.hostName, device: paired.device);
   } on http.ClientException {
     throw VibeValleyApiError(0, null, '连不上 ${link.url.host}：两台设备要在同一个网络里，那台电脑要允许连接');
   } finally {

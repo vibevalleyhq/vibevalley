@@ -9,7 +9,7 @@
 | 「连接到本机」的监听：开、关、重启后保持主人留下的样子 | 主监听（只听 `127.0.0.1`，`base.Config.ServerAddress`，[设置和配置](docs/subsystems/setting.md)） |
 | 配对：配对码、设备等主人点头、发钥匙 | 哪些接口给「连接到本机」：`api.go` 的 `//vibevalley:can remote` 定，「连接到本机」只照它放（[能力表](docs/reference/capabilities.md)） |
 | 设备：存钥匙的 SHA-256、认钥匙、移除时断开它的连接 | 接口本身怎么答（`internal/handler`，「连接到本机」拿到的是同一个 `apiMux`） |
-| 客户端选用哪个农场（`data/farm_choice.dart`） | 语音线路，另一个对外的监听（[语音](docs/subsystems/voice.md)「语音线路」） |
+| 客户端选用哪个农场（`data/server_choice.dart`） | 语音线路，另一个对外的监听（[语音](docs/subsystems/voice.md)「语音线路」） |
 | | 帮工的 `/mcp`（[田头](docs/subsystems/channel.md)），「连接到本机」不放 |
 
 ## 在哪
@@ -18,7 +18,7 @@
 - 表：`lan`（一行，`open`）、`lan_device`（一台设备一行：名字、`key_hash`、`paired_at`、`last_seen`）；查询在 `pkg/db/queries/lan.sql`、`lan_device.sql`。
 - 接口：`lan.*`（[capabilities.md](docs/reference/capabilities.md)）。`lan.status`、`lan.update`、`lan.startPairing`、`lan.stopPairing`、`lan.answerPairing`、`lan.deleteDevice` 只有 `owner`；`lan.pair`（`POST /api/v1/lan/pair`）和 `lan.me`（`GET /api/v1/lan/me`）也给 `remote`。形状是 `protocol` 的 `LanStatus`、`LanPairing`、`LanDevice`、`LanPaired`，拒绝是 `LanRefused`（403）。
 - 配置：`lan.port`（默认 8790；0 是随便一个）。
-- 客户端：`workbench/lan/lan_page.dart`（开关、二维码、点头、设备列表、用别的农场），`workbench/lan/scan_page.dart`（手机扫码，`mobile_scanner`），`data/farm_choice.dart`（`FarmChoice`、`RemoteFarm`、`PairLink`、`pairWith`），macOS 的启动在 `host/desktop.dart`。
+- 客户端：`workbench/lan/lan_page.dart`（开关、二维码、点头、设备列表、用别的农场），`workbench/lan/scan_page.dart`（手机扫码，`mobile_scanner`），`data/server_choice.dart`（`ServerChoice`、`RemoteServer`、`PairLink`、`pairWith`），macOS 的启动在 `host/desktop.dart`。
 
 ## 模型和不变量
 
@@ -45,8 +45,8 @@
 
 **用别人的农场**（客户端）：
 
-- 选哪个农场存在 shared_preferences 的 `vibevalley.farm`：`use` 是 `local` 或 `remote`，另存最近一个别的农场（地址、钥匙、电脑名 `hostName`、设备 id），切回本机时它留着，下次能直接切回去。
-- 换农场时 `FarmConnection.scopeKey` 变，整个 `ProviderScope` 重建，所有 provider 在新农场上重新开始。
+- 选哪个农场存在 shared_preferences 的 `vibevalley.server`：`use` 是 `local` 或 `remote`，另存最近一个别的农场（地址、钥匙、电脑名 `hostName`、设备 id），切回本机时它留着，下次能直接切回去。
+- 换农场时 `ServerConnection.scopeKey` 变，整个 `ProviderScope` 重建，所有 provider 在新农场上重新开始。
 - macOS 版选了别的农场时，`startDesktop` 不拉起自己的服务端；`useLocalFarm` 切回本机时再拉起。已经在跑的本机农场切走以后照常跑。
 - 连不上时 `pairWith` 说「两台设备要在同一个网络里，那台电脑要允许连接」。电脑换了地址，设备就连不上，主人在「连接到本机」里再添加一次设备让它扫，钥匙不变。
 - 应用退出，农场就停了，用这个农场的设备也连不上。
@@ -56,7 +56,7 @@
 - **`handler`**：`apiMux` 同时挂在主监听和「连接到本机」上；「连接到本机」的中间件在它前面认设备、查放行表，把设备 id 放进 context（`lan.me` 从这里读）。
 - **`protocol`**：`Endpoints`、`Streams` 和 `CallerRemote` 是放行表的唯一来源；`tool/shapegen` 从 `//vibevalley:can` 写出它们和能力表的「连接到本机」一列。
 - **`base`**：`lan.port` 从 `base.Config` 来；配对码用 `base.Code`，设备 id 用 `base.NewID`。
-- **客户端**：`VibeValleyServer` 带 `key` 时每个请求加 `Bearer`；macOS 外壳按 `FarmChoice` 决定起不起本机服务端（[客户端](docs/subsystems/app.md)）。
+- **客户端**：`VibeValleyServer` 带 `key` 时每个请求加 `Bearer`；macOS 外壳按 `ServerChoice` 决定起不起本机服务端（[客户端](docs/subsystems/app.md)）。
 
 ## 为什么这样
 
