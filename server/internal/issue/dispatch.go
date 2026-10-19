@@ -156,8 +156,11 @@ func (d *dispatch) Hire(ctx context.Context, agent protocol.Agent, task, project
 	} else if issue, err := d.issues.Get(opt.Issue); err == nil {
 		opt.IssueNumber = issue.Number
 	}
-	opt.Hiring = func(w protocol.Session) error {
-		return d.issues.Ran(opt.Issue, w)
+	// A draft's session is not one of the issue's sessions: the issue stays unsent.
+	if !opt.Draft {
+		opt.Hiring = func(w protocol.Session) error {
+			return d.issues.Ran(opt.Issue, w)
+		}
 	}
 	hired := d.run.Send(ctx, agent, task, where, opt)
 	if hired.Session != nil {
@@ -209,6 +212,9 @@ func (d *dispatch) ready(id string) (protocol.Issue, protocol.Agent, string, err
 	issue, err := d.issues.unsent(id)
 	if err != nil {
 		return issue, protocol.Agent{}, "", err
+	}
+	if issue.Drafting != nil {
+		return issue, protocol.Agent{}, "", protocol.Refused{Reason: issue.Drafting.Name + " 正在起草：等它交回来再开工"}
 	}
 	if issue.Assignee == nil {
 		return issue, protocol.Agent{}, "", protocol.Refused{Reason: "还没选派哪个帮工档案"}

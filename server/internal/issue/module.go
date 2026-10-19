@@ -8,7 +8,7 @@ import (
 
 func Module(r *base.Readies) fx.Option {
 	return fx.Module("issue",
-		fx.Provide(fx.Private, newIssues, newDispatch, newMerges),
+		fx.Provide(fx.Private, newIssues, newDispatch, newMerges, newDrafts),
 		fx.Provide(base.Run[*Service](r, newService)),
 	)
 }

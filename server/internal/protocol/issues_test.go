@@ -7,6 +7,22 @@ import (
 	"vibevalley/internal/testkit"
 )
 
+// Whether an issue is being drafted is read from the sessions on the farm, as its status is, and follows them.
+func TestAnIssueIsDraftedWhileItsDrafterIsOnTheFarm(t *testing.T) {
+	state := EmptyCoreState()
+	state, _ = Reduce(state, Fact{FactIssue{Issue: Issue{ID: "t1", Title: "新工单", Sessions: []string{}, Status: IssueStatusBacklog}}})
+	issue := "t1"
+	drafter := Session{ID: "w3", Name: "Pi 实验员", Agent: "lab", Runtime: "pi", Brief: "…", Issue: &issue, Draft: true, Phase: Phase{PhaseArriving{}}}
+	state, _ = Reduce(state, Fact{FactHired{Session: drafter}})
+	testkit.Eq(t, state.Issues[0].Drafting, &IssueDrafting{Session: "w3", Name: "Pi 实验员"}, "drafting")
+	testkit.Eq(t, state.Issues[0].Status, IssueStatusBacklog, "still unsent")
+	worker := drafter
+	worker.ID, worker.Draft = "w4", false
+	testkit.Eq(t, IssueDraftingOf(state.Issues[0], CoreState{Sessions: []Session{worker}}), (*IssueDrafting)(nil), "a session working it does not draft it")
+	state, _ = Reduce(state, Fact{FactLeft{ID: "w3"}})
+	testkit.Eq(t, state.Issues[0].Drafting, (*IssueDrafting)(nil), "its drafter left")
+}
+
 func TestIssueStatus(t *testing.T) {
 	farm := EmptyCoreState()
 	farm.Sessions = []Session{

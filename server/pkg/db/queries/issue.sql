@@ -15,7 +15,12 @@ values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg
         sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.arg(schedule), sqlc.arg(acceptance));
 
 -- name: EditIssue :exec
-update issue set title = ?, description = ?, project = ?, assignee = ?, priority = ?, acceptance = ? where id = ?;
+update issue set title = ?, description = ?, project = ?, assignee = ?, priority = ?, acceptance = ?, criteria = ? where id = ?;
+
+-- name: DraftIssue :exec
+-- A draft handed back: its words, its criteria and what it asks, in one write.
+update issue set title = sqlc.arg(title), description = sqlc.arg(description), criteria = sqlc.narg(criteria), asks = sqlc.narg(asks)
+where id = sqlc.arg(id);
 
 -- name: AcceptIssue :exec
 -- A verdict on what was handed back: passed (accepted_at set) or not (cleared), with the weeds as they stand now.

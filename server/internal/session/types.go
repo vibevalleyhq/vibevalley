@@ -28,6 +28,8 @@ type HireOptions struct {
 	IssueNumber int64
 	// What its first run is for; nil: the issue sent out.
 	Trigger *protocol.RunTrigger
+	// It drafts Issue rather than works it (protocol.Session.Draft).
+	Draft bool
 	// Called with the session just before it goes on the farm, so what must know of it first (its issue's link) is
 	// written before anyone can see it, or its first run end.
 	Hiring func(protocol.Session) error

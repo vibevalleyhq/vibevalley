@@ -98,7 +98,8 @@ CREATE TABLE issue (
   acceptance  text not null default 'glance' check (acceptance in ('glance', 'required')),
   accepted_at integer,
   findings    text,
-  asks        text
+  asks        text,
+  criteria    text
 );
 CREATE INDEX issue_by_parent on issue (parent);
 CREATE TABLE issue_session (

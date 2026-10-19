@@ -479,6 +479,11 @@ func (a api) IssueAccept(ctx context.Context, id string, body protocol.IssueAcce
 	return got, refused(err)
 }
 
+func (a api) IssueDraft(ctx context.Context, id string, body protocol.IssueDraftRequest) (protocol.Issue, error) {
+	got, err := a.f.Issue.Draft(context.WithoutCancel(ctx), id, body.Text, a.f.Channel.General())
+	return got, refused(err)
+}
+
 func (a api) IssueDispatch(ctx context.Context, id string, body protocol.IssueDispatchRequest) (protocol.Dispatched, error) {
 	if body.Station != nil {
 		a.f.Game.Want(*body.Station)

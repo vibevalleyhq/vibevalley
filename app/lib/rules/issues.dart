@@ -129,6 +129,7 @@ String runTriggerText(RunTrigger t) => switch (t.kind) {
   RunTriggerKind.comment => t.message != null ? '带话（#${t.message!.length > 8 ? t.message!.substring(0, 8) : t.message!}）' : '带话',
   RunTriggerKind.task => '种植计划',
   RunTriggerKind.schedule => t.missed == true ? '定时（补跑）' : '定时',
+  RunTriggerKind.draft => '起草',
   RunTriggerKind.runtime => '农机自己',
 };
 

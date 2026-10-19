@@ -200,13 +200,18 @@ func issueOf(row generated.Issue, runs []string, state protocol.CoreState) proto
 			log.Printf("vibevalley: issue %s: what it asks cannot be read: %v", row.ID, err)
 		}
 	}
+	if row.Criteria.Valid {
+		if err := json.Unmarshal([]byte(row.Criteria.String), &out.Criteria); err != nil {
+			log.Printf("vibevalley: issue %s: its criteria cannot be read: %v", row.ID, err)
+		}
+	}
 	if runs != nil {
 		out.Sessions = runs
 	}
 	if len(out.Sessions) == 0 || out.Task != nil {
 		out.Rank = row.Rank
 	}
-	out.Status = protocol.IssueStatusOf(out, state)
+	out.Status, out.Drafting = protocol.IssueStatusOf(out, state), protocol.IssueDraftingOf(out, state)
 	out.Moves = statusMoves(out)
 	return out
 }
@@ -307,7 +312,7 @@ func (is *issues) add(in protocol.IssueRequest, schedule *string) (protocol.Issu
 func (is *issues) Edit(id string, upd protocol.IssueUpdate) (protocol.Issue, error) {
 	var was protocol.Issue
 	var err error
-	if upd.Title == nil && upd.Description == nil && upd.Project == nil && upd.Assignee == nil && upd.Priority == nil {
+	if upd.Title == nil && upd.Description == nil && upd.Project == nil && upd.Assignee == nil && upd.Priority == nil && upd.Criteria == nil {
 		if was, err = is.Get(id); err == nil && isClosed(was.Status) {
 			err = protocol.Refused{Reason: "这张工单关上了"}
 		}
@@ -340,9 +345,13 @@ func (is *issues) Edit(id string, upd protocol.IssueUpdate) (protocol.Issue, err
 	if err != nil {
 		return protocol.Issue{}, err
 	}
+	criteria := was.Criteria
+	if upd.Criteria != nil {
+		criteria = draftLines(upd.Criteria).kept()
+	}
 	if err := is.q.EditIssue(context.Background(), generated.EditIssueParams{
 		Title: title, Description: description, Project: issueNull(in.Project), Assignee: issueNull(in.Assignee), Priority: string(issuePriority(in.Priority)),
-		Acceptance: string(issueAcceptance(in.Acceptance)), ID: id,
+		Acceptance: string(issueAcceptance(in.Acceptance)), Criteria: issueJSON(criteria, len(criteria) > 0), ID: id,
 	}); err != nil {
 		return protocol.Issue{}, err
 	}

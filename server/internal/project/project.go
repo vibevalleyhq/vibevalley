@@ -704,6 +704,51 @@ func (p *Service) Release(place Workplace) string {
 	return fmt.Sprintf("%s 上有 %d 个没合的提交，分支留着，worktree 清掉了", place.Branch, ahead)
 }
 
+// Reset puts a worktree's branch back on the project's main branch and drops everything else in it, committed or not:
+// for a session that was only to read (an issue's draft), whatever it changed is not the issue's.
+func (p *Service) Reset(place Workplace) error {
+	if place.Branch == "" {
+		return errors.New("不是 worktree，不能重置：" + place.Cwd)
+	}
+	defer p.serially(place.Project)()
+	main, err := git(filepath.Join(p.root, place.Project), "symbolic-ref", "--short", "HEAD")
+	if err != nil {
+		return errors.New(reason(err))
+	}
+	if _, err := git(place.Cwd, "checkout", "-q", "-f", "-B", place.Branch, main); err != nil {
+		return errors.New(reason(err))
+	}
+	if _, err := git(place.Cwd, "clean", "-q", "-f", "-d"); err != nil {
+		return errors.New(reason(err))
+	}
+	return nil
+}
+
+// Clear removes an issue's worktree, changes and all, and its branch unless it has commits main does not: an issue
+// canceled before it was ever sent keeps nothing its drafts left.
+func (p *Service) Clear(project string, issueNumber int64) string {
+	defer p.serially(project)()
+	path := filepath.Join(p.root, project)
+	place := p.issueWorkplace(project, issueNumber)
+	if _, err := os.Stat(place.Cwd); err == nil {
+		if _, err := git(path, "worktree", "remove", "--force", place.Cwd); err != nil {
+			return fmt.Sprintf("worktree %s 没清掉：%s", place.Cwd, reason(err))
+		}
+	}
+	if !gitOk(path, "show-ref", "--verify", "refs/heads/"+place.Branch) {
+		return ""
+	}
+	main, err := git(path, "symbolic-ref", "--short", "HEAD")
+	if err != nil {
+		main = "main"
+	}
+	if count, err := git(path, "rev-list", "--count", main+".."+place.Branch); err != nil || count != "0" {
+		return fmt.Sprintf("%s 上有没合的提交，分支留着", place.Branch)
+	}
+	_, _ = git(path, "branch", "-D", place.Branch)
+	return ""
+}
+
 func (p *Service) OpenBranch(project, branch string) error {
 	defer p.serially(project)()
 	path, err := p.ensure(project)

@@ -7,6 +7,7 @@ package generated
 
 import (
 	"context"
+	"database/sql"
 )
 
 const addSession = `-- name: AddSession :exec
@@ -67,6 +68,20 @@ func (q *Queries) IssueOfSession(ctx context.Context, session string) (string, e
 	var issue string
 	err := row.Scan(&issue)
 	return issue, err
+}
+
+const lastAssigneeIn = `-- name: LastAssigneeIn :one
+select issue.assignee from issue_session join issue on issue.id = issue_session.issue
+where issue.project = ? and issue.assignee is not null
+order by issue_session.started_at desc, issue_session.session desc limit 1
+`
+
+// Who was last sent to work in a project: who drafts an issue that names no one.
+func (q *Queries) LastAssigneeIn(ctx context.Context, project sql.NullString) (sql.NullString, error) {
+	row := q.db.QueryRowContext(ctx, lastAssigneeIn, project)
+	var assignee sql.NullString
+	err := row.Scan(&assignee)
+	return assignee, err
 }
 
 const sessionsOf = `-- name: SessionsOf :many

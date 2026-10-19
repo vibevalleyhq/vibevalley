@@ -13,6 +13,7 @@ type Service struct {
 	*issues
 	*dispatch
 	*merges
+	*drafts
 	parts      base.Parts
 	prMu       sync.Mutex
 	poll       time.Duration
@@ -20,8 +21,8 @@ type Service struct {
 	pollDone   chan struct{}
 }
 
-func newService(a *issues, b *dispatch, c *merges, cfg base.Config) (*Service, error) {
-	return &Service{issues: a, dispatch: b, merges: c, parts: base.Parts{a, b, c}, poll: time.Duration(cfg.GitHub.PRPollSeconds) * time.Second}, nil
+func newService(a *issues, b *dispatch, c *merges, d *drafts, cfg base.Config) (*Service, error) {
+	return &Service{issues: a, dispatch: b, merges: c, drafts: d, parts: base.Parts{a, b, c, d}, poll: time.Duration(cfg.GitHub.PRPollSeconds) * time.Second}, nil
 }
 
 func (s *Service) OnStart(ctx context.Context) error {

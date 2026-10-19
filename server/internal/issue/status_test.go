@@ -41,6 +41,9 @@ func TestStatusMoves(t *testing.T) {
 	at := int64(1)
 	required.AcceptedAt = &at
 	testkit.Eq(t, statusMoves(required), []protocol.IssueStatus{todo, done, canceled}, "required and passed")
+	// Being drafted: it can be dropped, not started until the draft is back.
+	drafting := protocol.Issue{Status: protocol.IssueStatusBacklog, Sessions: []string{}, Drafting: &protocol.IssueDrafting{Session: "w2", Name: "试验田"}}
+	testkit.Eq(t, statusMoves(drafting), []protocol.IssueStatus{canceled}, "drafting")
 	manager, graph := protocol.ManagerAgent, protocol.IssueGraph{State: protocol.GraphStateDraft}
 	for name, issue := range map[string]protocol.Issue{
 		"the manager's":  {Status: protocol.IssueStatusInProgress, Assignee: &manager},

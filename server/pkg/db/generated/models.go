@@ -168,6 +168,7 @@ type Issue struct {
 	AcceptedAt  sql.NullInt64
 	Findings    sql.NullString
 	Asks        sql.NullString
+	Criteria    sql.NullString
 }
 
 type IssueQueue struct {

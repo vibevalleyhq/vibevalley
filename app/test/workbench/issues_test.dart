@@ -235,6 +235,7 @@ void main() {
     );
     expect(runText(going, 120000, took), '定时（补跑） · 正在干 · 2 分钟');
     expect(runTriggerText(const RunTrigger(kind: RunTriggerKind.runtime)), '农机自己');
+    expect(runTriggerText(const RunTrigger(kind: RunTriggerKind.draft)), '起草');
   });
 
   test("an issue's state: the server's status while open, how it closed after", () {

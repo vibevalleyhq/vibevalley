@@ -404,6 +404,9 @@ type Session struct {
 	Channel  *string       `json:"channel,omitzero"`
 	Play     *SessionPlay  `json:"play,omitzero"`
 	Issue    *string       `json:"issue,omitzero"`
+	// It writes its issue's draft (issue.draft) and does not work it: the issue stays unsent, and it leaves once it hands
+	// the draft back.
+	Draft bool `json:"draft,omitzero"`
 	// What it is doing, in words (PhaseWords), filled by FrameOf: in frames only. {span} stands for how long it has been
 	// quiet, which the reader fills from the phase's quietSince by its own clock.
 	PhaseText string `json:"phaseText,omitzero"`
@@ -1325,8 +1328,23 @@ type Issue struct {
 	// When what was handed back passed its acceptance; cleared when another round starts.
 	AcceptedAt *int64    `json:"acceptedAt,omitzero"`
 	Findings   []Finding `json:"findings"`
-	// What its helper asked the owner and is waiting on (要问主人：); a comment answers them.
+	// What its helper asked the owner and is waiting on (要问主人：); a comment answers them, and so does the owner's word
+	// on a draft that asked.
 	Asks []string `json:"asks"`
+	// How the owner tells it is done, one point each: its draft writes them, the owner edits them, its session is told them.
+	Criteria []string `json:"criteria,omitzero"`
+	// The session writing its draft now: filled from the core state's sessions as Status is, never stored.
+	Drafting *IssueDrafting `json:"drafting,omitzero"`
+}
+
+type IssueDrafting struct {
+	Session string `json:"session"`
+	Name    string `json:"name"`
+}
+
+// The owner's word for a draft: what is wanted or, when the issue asks, the answer. Empty: the draft starts from the title.
+type IssueDraftRequest struct {
+	Text string `json:"text,omitzero"`
 }
 
 type IssueGraph struct {
@@ -1379,6 +1397,8 @@ type IssueUpdate struct {
 	Assignee    *string     `json:"assignee,omitzero"`
 	Priority    *Priority   `json:"priority,omitzero"`
 	Acceptance  *Acceptance `json:"acceptance,omitzero"`
+	// Replaces them all; an empty list clears them.
+	Criteria []string `json:"criteria,omitzero"`
 }
 
 // How an issue's acceptance is passed: every issue has one. glance: the owner's harvest is the acceptance itself;
@@ -1426,7 +1446,7 @@ const (
 )
 
 // What started a run: the issue sent out, a comment (a message in its thread, @ it, a comment on a step, 浇水, a word after the
-// server restarted), its task moving on, a schedule, or the runtime itself.
+// server restarted), its task moving on, a schedule, the owner asking for its issue's draft, or the runtime itself.
 type RunTriggerKind string
 
 const (
@@ -1434,6 +1454,7 @@ const (
 	RunTriggerKindComment  RunTriggerKind = "comment"
 	RunTriggerKindTask     RunTriggerKind = "task"
 	RunTriggerKindSchedule RunTriggerKind = "schedule"
+	RunTriggerKindDraft    RunTriggerKind = "draft"
 	RunTriggerKindRuntime  RunTriggerKind = "runtime"
 )
 

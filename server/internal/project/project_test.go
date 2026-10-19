@@ -494,6 +494,63 @@ func TestMergeCheckMustBeExecutable(t *testing.T) {
 	}
 }
 
+// A reset worktree is main again, commits and changes gone; clearing an issue removes its worktree and an empty branch,
+// and keeps a branch with commits.
+func TestIssueWorkplaceResetAndClear(t *testing.T) {
+	root := projectsDir(t)
+	p := projects(t, root)
+	path := filepath.Join(root, "demo")
+	place, err := p.Workplace("demo", "w1", true, "", 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	main := testkit.Git(t, path, "rev-parse", "main")
+	if err := os.WriteFile(filepath.Join(place.Cwd, "drafted.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := commitLeft(place.Cwd, "not the draft's to keep"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(place.Cwd, "scratch.txt"), []byte("y"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Reset(place); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, []string{testkit.Git(t, place.Cwd, "rev-parse", "HEAD"), testkit.Git(t, place.Cwd, "status", "--porcelain"), testkit.Git(t, place.Cwd, "branch", "--show-current")},
+		[]string{main, "", place.Branch}, "back on main, clean, on its own branch")
+	if err := p.Reset(Workplace{Project: "demo", Cwd: path}); err == nil {
+		t.Fatal("the project folder itself is never reset")
+	}
+
+	if err := os.WriteFile(filepath.Join(place.Cwd, "scratch.txt"), []byte("y"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, p.Clear("demo", 7), "", "cleared")
+	if _, err := os.Stat(place.Cwd); !os.IsNotExist(err) {
+		t.Fatalf("worktree left: %v", err)
+	}
+	if gitOk(path, "show-ref", "--verify", "refs/heads/"+place.Branch) {
+		t.Fatal("empty branch left")
+	}
+
+	kept, err := p.Workplace("demo", "w2", true, "", 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := commitLeft(kept.Cwd, "work"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(kept.Cwd, "work.txt"), []byte("z"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := commitLeft(kept.Cwd, "work"); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Match(t, p.Clear("demo", 8), "分支留着", "a branch with commits stays")
+	testkit.Eq(t, p.Clear("missing", 9), "", "nothing to clear")
+}
+
 func TestIssueWorkplaceLifecycle(t *testing.T) {
 	for _, mode := range []string{"existing", "cancelled", "merged", "dirty", "base"} {
 		t.Run(mode, func(t *testing.T) {

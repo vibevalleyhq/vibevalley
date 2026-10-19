@@ -74,8 +74,33 @@ func (q *Queries) CloseIssue(ctx context.Context, arg CloseIssueParams) error {
 	return err
 }
 
+const draftIssue = `-- name: DraftIssue :exec
+update issue set title = ?1, description = ?2, criteria = ?3, asks = ?4
+where id = ?5
+`
+
+type DraftIssueParams struct {
+	Title       string
+	Description string
+	Criteria    sql.NullString
+	Asks        sql.NullString
+	ID          string
+}
+
+// A draft handed back: its words, its criteria and what it asks, in one write.
+func (q *Queries) DraftIssue(ctx context.Context, arg DraftIssueParams) error {
+	_, err := q.db.ExecContext(ctx, draftIssue,
+		arg.Title,
+		arg.Description,
+		arg.Criteria,
+		arg.Asks,
+		arg.ID,
+	)
+	return err
+}
+
 const editIssue = `-- name: EditIssue :exec
-update issue set title = ?, description = ?, project = ?, assignee = ?, priority = ?, acceptance = ? where id = ?
+update issue set title = ?, description = ?, project = ?, assignee = ?, priority = ?, acceptance = ?, criteria = ? where id = ?
 `
 
 type EditIssueParams struct {
@@ -85,6 +110,7 @@ type EditIssueParams struct {
 	Assignee    sql.NullString
 	Priority    string
 	Acceptance  string
+	Criteria    sql.NullString
 	ID          string
 }
 
@@ -96,13 +122,14 @@ func (q *Queries) EditIssue(ctx context.Context, arg EditIssueParams) error {
 		arg.Assignee,
 		arg.Priority,
 		arg.Acceptance,
+		arg.Criteria,
 		arg.ID,
 	)
 	return err
 }
 
 const family = `-- name: Family :many
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue where id = ?1 or parent = ?1
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks, criteria from issue where id = ?1 or parent = ?1
 `
 
 // An issue and its sub-issues.
@@ -138,6 +165,7 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 			&i.AcceptedAt,
 			&i.Findings,
 			&i.Asks,
+			&i.Criteria,
 		); err != nil {
 			return nil, err
 		}
@@ -153,7 +181,7 @@ func (q *Queries) Family(ctx context.Context, id string) ([]Issue, error) {
 }
 
 const getIssue = `-- name: GetIssue :one
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue where id = ?
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks, criteria from issue where id = ?
 `
 
 func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
@@ -182,6 +210,7 @@ func (q *Queries) GetIssue(ctx context.Context, id string) (Issue, error) {
 		&i.AcceptedAt,
 		&i.Findings,
 		&i.Asks,
+		&i.Criteria,
 	)
 	return i, err
 }
@@ -214,7 +243,7 @@ func (q *Queries) GraphIDs(ctx context.Context) ([]string, error) {
 }
 
 const issueByNumber = `-- name: IssueByNumber :one
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue where number = ?
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks, criteria from issue where number = ?
 `
 
 func (q *Queries) IssueByNumber(ctx context.Context, number int64) (Issue, error) {
@@ -243,13 +272,14 @@ func (q *Queries) IssueByNumber(ctx context.Context, number int64) (Issue, error
 		&i.AcceptedAt,
 		&i.Findings,
 		&i.Asks,
+		&i.Criteria,
 	)
 	return i, err
 }
 
 const keptIssues = `-- name: KeptIssues :many
 with latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit ?1)
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks, criteria from issue
 where closed_at is null or id in (select id from latest) or parent in (select id from latest)
    or parent in (select id from issue where closed_at is null)
 `
@@ -287,6 +317,7 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 			&i.AcceptedAt,
 			&i.Findings,
 			&i.Asks,
+			&i.Criteria,
 		); err != nil {
 			return nil, err
 		}
@@ -302,7 +333,7 @@ func (q *Queries) KeptIssues(ctx context.Context, closed int64) ([]Issue, error)
 }
 
 const latestOfSchedule = `-- name: LatestOfSchedule :one
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue where schedule = ? order by created_at desc, id desc limit 1
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks, criteria from issue where schedule = ? order by created_at desc, id desc limit 1
 `
 
 // A schedule's issue: the one it made last.
@@ -332,13 +363,14 @@ func (q *Queries) LatestOfSchedule(ctx context.Context, schedule sql.NullString)
 		&i.AcceptedAt,
 		&i.Findings,
 		&i.Asks,
+		&i.Criteria,
 	)
 	return i, err
 }
 
 const listIssues = `-- name: ListIssues :many
 
-select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks from issue order by rank, created_at, id
+select id, number, title, description, project, assignee, priority, rank, parent, blocked_by, graph, task, schedule, created_at, queued_at, closed_at, closed, pull_request, acceptance, accepted_at, findings, asks, criteria from issue order by rank, created_at, id
 `
 
 // Issues (issue/issue.go).
@@ -374,6 +406,7 @@ func (q *Queries) ListIssues(ctx context.Context) ([]Issue, error) {
 			&i.AcceptedAt,
 			&i.Findings,
 			&i.Asks,
+			&i.Criteria,
 		); err != nil {
 			return nil, err
 		}

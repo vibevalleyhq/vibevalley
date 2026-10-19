@@ -112,18 +112,28 @@ func withIssue(all []Issue, t Issue) []Issue {
 	return next
 }
 
+// The session drafting an unsent issue: the one on the farm for it with Draft set.
+func IssueDraftingOf(t Issue, state CoreState) *IssueDrafting {
+	for _, h := range state.Sessions {
+		if h.Draft && h.Issue != nil && *h.Issue == t.ID {
+			return &IssueDrafting{Session: h.ID, Name: h.Name}
+		}
+	}
+	return nil
+}
+
 // The same slice when none changed.
 func withIssueStatuses(state CoreState) CoreState {
 	var next []Issue
 	for i, t := range state.Issues {
-		status := IssueStatusOf(t, state)
-		if status == t.Status {
+		status, drafting := IssueStatusOf(t, state), IssueDraftingOf(t, state)
+		if status == t.Status && same(drafting, t.Drafting) {
 			continue
 		}
 		if next == nil {
 			next = slices.Clone(state.Issues)
 		}
-		next[i].Status = status
+		next[i].Status, next[i].Drafting = status, drafting
 	}
 	if next != nil {
 		state.Issues = next

@@ -912,7 +912,7 @@ var AcceptanceValues = []Acceptance{AcceptanceGlance, AcceptanceRequired}
 var IssueCloseValues = []IssueClose{IssueCloseMerged, IssueCloseMergedIntoGraph, IssueCloseDismissed, IssueCloseLost, IssueCloseAnswered}
 
 // RunTriggerKindValues are every RunTriggerKind, in the protocol's order.
-var RunTriggerKindValues = []RunTriggerKind{RunTriggerKindIssue, RunTriggerKindComment, RunTriggerKindTask, RunTriggerKindSchedule, RunTriggerKindRuntime}
+var RunTriggerKindValues = []RunTriggerKind{RunTriggerKindIssue, RunTriggerKindComment, RunTriggerKindTask, RunTriggerKindSchedule, RunTriggerKindDraft, RunTriggerKindRuntime}
 
 func (v Run) MarshalJSON() ([]byte, error) {
 	type plain Run
@@ -2308,6 +2308,7 @@ var Endpoints = []Endpoint{
 	{"issue.delete", "DELETE", "/api/v1/issues/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"issue.move", "PUT", "/api/v1/issues/{id}/move", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.status", "PUT", "/api/v1/issues/{id}/status", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"issue.draft", "POST", "/api/v1/issues/{id}/draft", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.dispatch", "POST", "/api/v1/issues/{id}/dispatch", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"issue.accept", "POST", "/api/v1/issues/{id}/accept", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
 	{"graph.split", "POST", "/api/v1/graphs", nil, true, []Caller{CallerOwner, CallerRemote, CallerManager}},
@@ -2549,6 +2550,15 @@ func Mount(mux *http.ServeMux, h Handlers) {
 			return
 		}
 		out, err := h.IssueStatus(r.Context(), pID, body)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/v1/issues/{id}/draft", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		var body IssueDraftRequest
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.IssueDraft(r.Context(), pID, body)
 		answer(w, out, err)
 	})
 	mux.HandleFunc("POST /api/v1/issues/{id}/dispatch", func(w http.ResponseWriter, r *http.Request) {
@@ -3149,6 +3159,12 @@ func (c *Client) IssueMove(ctx context.Context, pID string, body MoveIssueReques
 func (c *Client) IssueStatus(ctx context.Context, pID string, body IssueStatusRequest) (Issue, error) {
 	var out Issue
 	err := c.call(ctx, "PUT", "/api/v1/issues/"+url.PathEscape(pID)+"/status", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) IssueDraft(ctx context.Context, pID string, body IssueDraftRequest) (Issue, error) {
+	var out Issue
+	err := c.call(ctx, "POST", "/api/v1/issues/"+url.PathEscape(pID)+"/draft", nil, body, &out)
 	return out, err
 }
 

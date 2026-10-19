@@ -108,6 +108,11 @@ type Handlers interface {
 	//vibevalley:route issue.status PUT /api/v1/issues/{id}/status
 	//vibevalley:can owner remote
 	IssueStatus(ctx context.Context, pID string, body IssueStatusRequest) (Issue, error)
+	// A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
+	// leaves; with asks open, the word is their answer. The issue stays in the backlog until it is moved to todo.
+	//vibevalley:route issue.draft POST /api/v1/issues/{id}/draft
+	//vibevalley:can owner remote
+	IssueDraft(ctx context.Context, pID string, body IssueDraftRequest) (Issue, error)
 	// Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue.
 	//vibevalley:route issue.dispatch POST /api/v1/issues/{id}/dispatch
 	//vibevalley:can owner remote

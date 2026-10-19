@@ -41,6 +41,9 @@ func statusMove(t protocol.Issue, to protocol.IssueStatus) (move, string) {
 	case protocol.IssueStatusBacklog:
 		switch to {
 		case protocol.IssueStatusTodo:
+			if t.Drafting != nil {
+				return moveNone, t.Drafting.Name + " 正在起草：等它交回来再开工"
+			}
 			return moveStart, ""
 		case protocol.IssueStatusCanceled:
 			return moveDrop, ""
@@ -144,6 +147,7 @@ func (s *Service) SetStatus(ctx context.Context, id string, to protocol.IssueSta
 			err = s.issues.closeAs(id, protocol.IssueCloseDismissed)
 		}
 	case moveDrop:
+		s.clearDraft(t)
 		err = s.issues.drop(id)
 	}
 	if err != nil {

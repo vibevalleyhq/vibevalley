@@ -42,6 +42,9 @@ func scripted() oar.Runtime {
 	return oartest.Runtime(oartest.Options{ID: "pi", Turn: func(turn *oartest.Turn) error {
 		parts := strings.Split(turn.Input, session.JobBreak)
 		input := parts[len(parts)-1]
+		if strings.Contains(input, "只起草工单") {
+			return scriptedDraft(turn, input)
+		}
 		if strings.Contains(input, "必败") {
 			return errors.New("provider said no")
 		}
@@ -90,6 +93,41 @@ func scripted() oar.Runtime {
 		turn.Say("做完了：" + input + "｜人设：" + persona + notes)
 		return nil
 	}})
+}
+
+// A drafting session: 慢慢 takes its time, 顺手提交 changes and commits what it should not, 乱写 hands back no block;
+// the answer 用 8797 makes the second version, which asks nothing.
+func scriptedDraft(turn *oartest.Turn, input string) error {
+	if strings.Contains(input, "慢慢") {
+		select {
+		case <-time.After(1500 * time.Millisecond):
+		case <-turn.Context.Done():
+			return nil
+		}
+	}
+	if strings.Contains(input, "乱写") {
+		turn.Say("看了一圈，不知道写什么。\n\n结论：没写出来")
+		return nil
+	}
+	cwd := turn.Options.Cwd
+	if strings.Contains(input, "顺手提交") {
+		turn.Tool("bash", `{"command":"git commit"}`, func() (any, error) {
+			os.WriteFile(filepath.Join(cwd, "board.ts"), []byte("export const drag = 1\n"), 0o644)
+			sessionGit(cwd, "add", "board.ts")
+			err := sessionGit(cwd, "commit", "-q", "-m", "起草时不该有的提交")
+			os.WriteFile(filepath.Join(cwd, "board.ts"), []byte("export const drag = 2\n"), 0o644)
+			os.WriteFile(filepath.Join(cwd, "scratch.md"), []byte("草稿\n"), 0o644)
+			return "", err
+		})
+	}
+	title, criteria, asks := "看板拖卡改用 issue.status", `["拖到待办就开工"]`, "要问主人：用 8787 还是 8797？\n\n"
+	if strings.Contains(input, "主人的回答：用 8797") {
+		title, criteria, asks = "看板拖卡改用 8797 端口", `["拖到待办就开工", "端口是 8797"]`, ""
+	}
+	turn.Say("看过代码了。\n\n" + asks + "```json\n" +
+		`{"title": "` + title + `", "why": "看板还在调旧接口", "todo": ["改 board.dart"], "criteria": ` + criteria + `, "notDoing": [], "files": ["board.dart"]}` +
+		"\n```\n\n结论：草稿写好了")
+	return nil
 }
 
 type testWorld struct {

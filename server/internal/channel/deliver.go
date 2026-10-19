@@ -604,6 +604,8 @@ func (c *Service) openedJob(h protocol.Session) error {
 		what = fmt.Sprintf("做种植计划 %s 的「%s」", h.Graph.ID, *h.Graph.Task)
 	case h.Graph != nil:
 		what = "拆种植计划 " + h.Graph.ID
+	case h.Draft:
+		what = "看代码，起草这张工单"
 	default:
 		what = str.Head(str.Spaces.ReplaceAllString(h.Brief, " "), 80)
 	}
@@ -646,6 +648,9 @@ func (c *Service) handedOn(h protocol.Session, thread string) error {
 		}
 	}
 	text := fmt.Sprintf("这张工单交给 @%s（%s）接着做，第 %d 次派活", h.ID, h.Name, nth)
+	if h.Draft {
+		text = fmt.Sprintf("这张工单交给 @%s（%s）再起草一版", h.ID, h.Name)
+	}
 	_, err = c.write(chatWrite{conversation: thread, from: protocol.ManagerAgent, kind: protocol.MessageKindDispatch, text: text, final: true,
 		meta: &chatMeta{Session: h.ID}, follow: h.ID})
 	return err

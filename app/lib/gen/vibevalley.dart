@@ -773,6 +773,7 @@ class Session {
     this.channel,
     this.play,
     this.issue,
+    this.draft,
     this.phaseText,
   });
 
@@ -795,6 +796,7 @@ class Session {
     channel: j['channel'] == null ? null : j['channel'] as String,
     play: j['play'] == null ? null : SessionPlay.fromJson(j['play'] as Map<String, dynamic>),
     issue: j['issue'] == null ? null : j['issue'] as String,
+    draft: j['draft'] == null ? null : j['draft'] as bool,
     phaseText: j['phaseText'] == null ? null : j['phaseText'] as String,
   );
 
@@ -816,6 +818,7 @@ class Session {
   final String? channel;
   final SessionPlay? play;
   final String? issue;
+  final bool? draft;
   final String? phaseText;
 
   Map<String, dynamic> toJson() => {
@@ -837,6 +840,7 @@ class Session {
     if (channel != null) 'channel': channel!,
     if (play != null) 'play': play!.toJson(),
     if (issue != null) 'issue': issue!,
+    if (draft != null) 'draft': draft!,
     if (phaseText != null) 'phaseText': phaseText!,
   };
 }
@@ -3104,6 +3108,8 @@ class Issue {
     this.acceptedAt,
     required this.findings,
     required this.asks,
+    this.criteria,
+    this.drafting,
   });
 
   factory Issue.fromJson(Map<String, dynamic> j) => Issue(
@@ -3132,6 +3138,8 @@ class Issue {
     acceptedAt: j['acceptedAt'] == null ? null : (j['acceptedAt'] as num).toDouble(),
     findings: [for (final e in j['findings'] as List) Finding.fromJson(e as Map<String, dynamic>)],
     asks: [for (final e in j['asks'] as List) e as String],
+    criteria: j['criteria'] == null ? null : [for (final e in j['criteria'] as List) e as String],
+    drafting: j['drafting'] == null ? null : IssueDrafting.fromJson(j['drafting'] as Map<String, dynamic>),
   );
 
   final String id;
@@ -3159,6 +3167,8 @@ class Issue {
   final double? acceptedAt;
   final List<Finding> findings;
   final List<String> asks;
+  final List<String>? criteria;
+  final IssueDrafting? drafting;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -3186,7 +3196,30 @@ class Issue {
     if (acceptedAt != null) 'acceptedAt': acceptedAt!,
     'findings': [for (final e in findings) e.toJson()],
     'asks': [for (final e in asks) e],
+    if (criteria != null) 'criteria': [for (final e in criteria!) e],
+    if (drafting != null) 'drafting': drafting!.toJson(),
   };
+}
+
+class IssueDrafting {
+  const IssueDrafting({required this.session, required this.name});
+
+  factory IssueDrafting.fromJson(Map<String, dynamic> j) => IssueDrafting(session: j['session'] as String, name: j['name'] as String);
+
+  final String session;
+  final String name;
+
+  Map<String, dynamic> toJson() => {'session': session, 'name': name};
+}
+
+class IssueDraftRequest {
+  const IssueDraftRequest({this.text});
+
+  factory IssueDraftRequest.fromJson(Map<String, dynamic> j) => IssueDraftRequest(text: j['text'] == null ? null : j['text'] as String);
+
+  final String? text;
+
+  Map<String, dynamic> toJson() => {if (text != null) 'text': text!};
 }
 
 class IssueGraph {
@@ -3294,7 +3327,7 @@ enum Priority {
 }
 
 class IssueUpdate {
-  const IssueUpdate({this.title, this.description, this.project, this.assignee, this.priority, this.acceptance});
+  const IssueUpdate({this.title, this.description, this.project, this.assignee, this.priority, this.acceptance, this.criteria});
 
   factory IssueUpdate.fromJson(Map<String, dynamic> j) => IssueUpdate(
     title: j['title'] == null ? null : j['title'] as String,
@@ -3303,6 +3336,7 @@ class IssueUpdate {
     assignee: j['assignee'] == null ? null : j['assignee'] as String,
     priority: j['priority'] == null ? null : Priority.fromJson(j['priority']),
     acceptance: j['acceptance'] == null ? null : Acceptance.fromJson(j['acceptance']),
+    criteria: j['criteria'] == null ? null : [for (final e in j['criteria'] as List) e as String],
   );
 
   final String? title;
@@ -3311,6 +3345,7 @@ class IssueUpdate {
   final String? assignee;
   final Priority? priority;
   final Acceptance? acceptance;
+  final List<String>? criteria;
 
   Map<String, dynamic> toJson() => {
     if (title != null) 'title': title!,
@@ -3319,6 +3354,7 @@ class IssueUpdate {
     if (assignee != null) 'assignee': assignee!,
     if (priority != null) 'priority': priority!.wire,
     if (acceptance != null) 'acceptance': acceptance!.wire,
+    if (criteria != null) 'criteria': [for (final e in criteria!) e],
   };
 }
 
@@ -3413,6 +3449,7 @@ enum RunTriggerKind {
   comment('comment'),
   task('task'),
   schedule('schedule'),
+  draft('draft'),
   runtime('runtime');
 
   const RunTriggerKind(this.wire);
@@ -5836,6 +5873,13 @@ class IssueApi {
   /// todo again after a round or a close is another round with text. Issue.moves lists where it may go.
   Future<Issue> status({required String id, required IssueStatusRequest body}) async {
     final j = await _api._call('PUT', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/status', query: {}, body: body.toJson());
+    return Issue.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
+  /// leaves; with asks open, the word is their answer. The issue stays in the backlog until it is moved to todo.
+  Future<Issue> draft({required String id, required IssueDraftRequest body}) async {
+    final j = await _api._call('POST', '/api/v1/issues/${Uri.encodeComponent((id).toString())}/draft', query: {}, body: body.toJson());
     return Issue.fromJson(j as Map<String, dynamic>);
   }
 

@@ -842,7 +842,7 @@ func (c *sessions) Send(ctx context.Context, agent protocol.Agent, task, where s
 
 	projectName := place.Project
 	session := protocol.Session{ID: id, Name: sessionName(c.onFarm(), agent.ID, agent.Name), Agent: agent.ID, Runtime: agent.Runtime, Brief: task, Project: &projectName,
-		HiredAt: clock.NowMs(), Phase: protocol.Phase{Value: protocol.PhaseArriving{}}, Graph: opt.TaskGraph, Channel: opt.Channel}
+		HiredAt: clock.NowMs(), Phase: protocol.Phase{Value: protocol.PhaseArriving{}}, Graph: opt.TaskGraph, Channel: opt.Channel, Draft: opt.Draft}
 	if opt.Issue != "" {
 		issue := opt.Issue
 		session.Issue = &issue
