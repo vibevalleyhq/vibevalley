@@ -677,7 +677,8 @@ class IssueRunsCardState extends ConsumerState<IssueRunsCard> {
   @override
   void didUpdateWidget(IssueRunsCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.version != widget.version || oldWidget.issue != widget.issue) setState(() => _runs = _read());
+    // No setState: a build follows didUpdateWidget, and setState's callback must not return the Future it assigns.
+    if (oldWidget.version != widget.version || oldWidget.issue != widget.issue) _runs = _read();
   }
 
   @override

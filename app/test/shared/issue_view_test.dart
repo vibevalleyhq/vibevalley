@@ -148,4 +148,29 @@ void main() {
       expect(t.takeException(), isNull);
     });
   }
+
+  testWidgets('每次干活 reads the runs again when the issue moves on, without setState returning its Future', (t) async {
+    var reads = 0;
+    final routes = f.Routes({
+      'GET /api/v1/issues/tw1/runs': (_) {
+        reads++;
+        return <Object>[];
+      },
+    });
+    final version = ValueNotifier('waiting');
+    addTearDown(version.dispose);
+    await f.pumpFarm(
+      t,
+      ValueListenableBuilder<String>(
+        valueListenable: version,
+        builder: (_, v, _) => IssueRunsCard(issue: 'tw1', version: v),
+      ),
+      overrides: f.overrides(f.farm(), f.view(), f.fakeApi(routes)),
+    );
+    await f.settle(t);
+    version.value = 'done';
+    await f.settle(t);
+    expect(t.takeException(), isNull);
+    expect(reads, 2);
+  });
 }
