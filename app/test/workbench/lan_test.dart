@@ -40,7 +40,7 @@ void main() {
 
   test('the choice survives a restart, and the other farm is kept when going back', () async {
     SharedPreferences.setMockInitialValues({});
-    final remote = RemoteFarm(url: Uri.parse(_lanUrl), key: 'k1', farm: 'lucas-mbp', device: 'd1');
+    final remote = RemoteFarm(url: Uri.parse(_lanUrl), key: 'k1', hostName: 'lucas-mbp', device: 'd1');
     await saveFarmChoice(FarmChoice(remote: remote, useRemote: true));
     farmConnection.value = const FarmConnection(choice: FarmChoice());
     await loadFarmChoice();
@@ -51,7 +51,7 @@ void main() {
     farmConnection.value = const FarmConnection(choice: FarmChoice());
     await loadFarmChoice();
     expect(farmConnection.value.choice.using, isNull);
-    expect(farmConnection.value.choice.remote?.farm, 'lucas-mbp');
+    expect(farmConnection.value.choice.remote?.hostName, 'lucas-mbp');
     farmConnection.value = const FarmConnection(choice: FarmChoice());
   });
 
@@ -73,7 +73,7 @@ void main() {
               final body = LanPairRequest.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
               expect(body.code, 'ABC234');
               return allow
-                  ? jsonResponse(const LanPaired(device: 'd2', key: 'new-key', farm: 'lucas-mbp').toJson())
+                  ? jsonResponse(const LanPaired(device: 'd2', key: 'new-key', hostName: 'lucas-mbp').toJson())
                   : jsonResponse({'_tag': 'LanRefused', 'reason': '主人没让这台设备进来'}, 403);
           }
           return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
@@ -85,13 +85,13 @@ void main() {
     test('asks with the code and gets a key', () async {
       final (apiFor, calls) = farm();
       final got = await pairWith(link, name: 'iPhone', apiFor: apiFor);
-      expect((got.url, got.key, got.farm, got.device), (Uri.parse(_lanUrl), 'new-key', 'lucas-mbp', 'd2'));
+      expect((got.url, got.key, got.hostName, got.device), (Uri.parse(_lanUrl), 'new-key', 'lucas-mbp', 'd2'));
       expect(calls, ['POST /api/v1/lan/pair -']);
     });
 
     test('keeps a key the farm still knows, at its new address', () async {
       final (apiFor, calls) = farm(known: {'old-key'});
-      final known = RemoteFarm(url: Uri.parse('http://10.0.0.2:8790'), key: 'old-key', farm: 'lucas-mbp', device: 'd1');
+      final known = RemoteFarm(url: Uri.parse('http://10.0.0.2:8790'), key: 'old-key', hostName: 'lucas-mbp', device: 'd1');
       final got = await pairWith(link, name: 'iPhone', known: known, apiFor: apiFor);
       expect((got.url, got.key), (Uri.parse(_lanUrl), 'old-key'));
       expect(calls, ['GET /api/v1/lan/me old-key']);
@@ -99,7 +99,7 @@ void main() {
 
     test('asks again when the farm forgot the key, and says why it is refused', () async {
       final (apiFor, calls) = farm(allow: false);
-      final known = RemoteFarm(url: Uri.parse(_lanUrl), key: 'old-key', farm: 'x', device: 'd1');
+      final known = RemoteFarm(url: Uri.parse(_lanUrl), key: 'old-key', hostName: 'x', device: 'd1');
       await expectLater(
         pairWith(link, name: 'iPhone', known: known, apiFor: apiFor),
         throwsA(isA<VibeValleyApiError>().having((e) => e.reason, 'reason', '主人没让这台设备进来')),
@@ -121,11 +121,11 @@ void main() {
             break;
           case ('PUT', '/api/v1/lan'):
             final open = (jsonDecode(r.body) as Map)['open'] as bool;
-            status = LanStatus(open: open, farm: 'lucas-mbp', url: open ? _lanUrl : null, devices: status.devices);
+            status = LanStatus(open: open, hostName: 'lucas-mbp', url: open ? _lanUrl : null, devices: status.devices);
           case ('POST', '/api/v1/lan/pairing/answer'):
             status = LanStatus(
               open: true,
-              farm: 'lucas-mbp',
+              hostName: 'lucas-mbp',
               url: _lanUrl,
               devices: [
                 ...status.devices,
@@ -133,7 +133,7 @@ void main() {
               ],
             );
           case ('DELETE', '/api/v1/lan/devices/d2'):
-            status = LanStatus(open: true, farm: 'lucas-mbp', url: _lanUrl, devices: status.devices.where((d) => d.id != 'd2').toList());
+            status = LanStatus(open: true, hostName: 'lucas-mbp', url: _lanUrl, devices: status.devices.where((d) => d.id != 'd2').toList());
           default:
             return jsonResponse({'_tag': 'Missing', 'what': r.url.path}, 404);
         }
@@ -159,7 +159,7 @@ void main() {
 
     setUp(() {
       writes = [];
-      status = const LanStatus(open: false, farm: 'lucas-mbp', devices: []);
+      status = const LanStatus(open: false, hostName: 'lucas-mbp', devices: []);
     });
 
     testWidgets('opens lan access', (t) async {
@@ -176,7 +176,7 @@ void main() {
     testWidgets('lets in the device asking, then removes it', (t) async {
       status = LanStatus(
         open: true,
-        farm: 'lucas-mbp',
+        hostName: 'lucas-mbp',
         url: _lanUrl,
         pairing: LanPairing(
           code: 'ABC234',

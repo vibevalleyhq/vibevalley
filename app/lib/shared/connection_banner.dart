@@ -48,7 +48,7 @@ class ConnectionBanner extends ConsumerWidget {
                   children: [
                     if (remote != null) ...[
                       TextSpan(
-                        text: '连不上 ${remote.farm} 的农场（${remote.url.authority}）。',
+                        text: '连不上 ${remote.hostName} 的农场（${remote.url.authority}）。',
                         style: const TextStyle(color: Palette.berry),
                       ),
                       const TextSpan(text: '那台电脑要开着、要允许连接，两台设备在同一个网络里；它换了地址就到'),

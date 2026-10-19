@@ -859,7 +859,8 @@ type LanDevice struct {
 type LanPaired struct {
 	Device string `json:"device"`
 	Key    string `json:"key"`
-	Farm   string `json:"farm"`
+	// This computer's name (its hostname, without .local); the device shows it as whose workspace it uses.
+	HostName string `json:"hostName"`
 }
 
 type LanPairRequest struct {
@@ -868,12 +869,13 @@ type LanPairRequest struct {
 }
 
 type LanStatus struct {
-	Open    bool        `json:"open"`
-	Farm    string      `json:"farm"`
-	URL     *string     `json:"url,omitzero"`
-	Problem *string     `json:"problem,omitzero"`
-	Pairing *LanPairing `json:"pairing,omitzero"`
-	Devices []LanDevice `json:"devices"`
+	Open bool `json:"open"`
+	// This computer's name (its hostname, without .local).
+	HostName string      `json:"hostName"`
+	URL      *string     `json:"url,omitzero"`
+	Problem  *string     `json:"problem,omitzero"`
+	Pairing  *LanPairing `json:"pairing,omitzero"`
+	Devices  []LanDevice `json:"devices"`
 }
 
 type LanPairing struct {

@@ -172,7 +172,7 @@ func (l *Service) SetOpen(open bool) (protocol.LanStatus, error) {
 func (l *Service) Status() protocol.LanStatus {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	s := protocol.LanStatus{Open: l.open, Farm: lanFarmName(), Devices: []protocol.LanDevice{}}
+	s := protocol.LanStatus{Open: l.open, HostName: lanHostName(), Devices: []protocol.LanDevice{}}
 	if l.problem != "" {
 		s.Problem = &l.problem
 	}
@@ -330,7 +330,7 @@ func (l *Service) addDevice(name string) (protocol.LanPaired, error) {
 	l.devices[d.ID] = d
 	l.mu.Unlock()
 	log.Printf("vibevalley: lan access: %q paired", name)
-	return protocol.LanPaired{Device: d.ID, Key: key, Farm: lanFarmName()}, nil
+	return protocol.LanPaired{Device: d.ID, Key: key, HostName: lanHostName()}, nil
 }
 
 func (l *Service) Forget(id string) (protocol.LanStatus, error) {
@@ -485,7 +485,7 @@ func lanAddress() string {
 	return best
 }
 
-func lanFarmName() string {
+func lanHostName() string {
 	name, err := os.Hostname()
 	if err != nil || name == "" {
 		return "vibevalley"

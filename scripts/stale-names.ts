@@ -99,6 +99,11 @@ const RULES: readonly Rule[] = [
     pattern: /\bSlots\(\)|ProjectSummary\.slots|summary\.slots|island\.slots|['"]slots['"]/,
     says: 'MaxSessions (json maxSessions): it is project.max_sessions',
   },
+  {
+    name: 'the lan host\'s name under the farm name',
+    pattern: /\b(lanFarmName|remote\.farm|using\.farm|last\.farm|paired\.farm|known\.farm)\b|Farm: lan/,
+    says: 'hostName (LanStatus.hostName, LanPaired.hostName, RemoteFarm.hostName): the computer\'s hostname',
+  },
 ]
 
 const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{go,dart}`, { cwd: root })).sort()

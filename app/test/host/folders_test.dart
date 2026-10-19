@@ -8,7 +8,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final previous = farmConnection.value;
     addTearDown(() => farmConnection.value = previous);
-    final remote = RemoteFarm(url: Uri.parse('http://farm.test'), key: 'test-key', farm: 'farm', device: 'device');
+    final remote = RemoteFarm(url: Uri.parse('http://farm.test'), key: 'test-key', hostName: 'farm', device: 'device');
     farmConnection.value = FarmConnection(
       choice: FarmChoice(remote: remote, useRemote: true),
       localAddress: 'http://127.0.0.1:12345',

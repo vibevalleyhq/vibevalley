@@ -2008,15 +2008,15 @@ class LanDevice {
 }
 
 class LanPaired {
-  const LanPaired({required this.device, required this.key, required this.farm});
+  const LanPaired({required this.device, required this.key, required this.hostName});
 
-  factory LanPaired.fromJson(Map<String, dynamic> j) => LanPaired(device: j['device'] as String, key: j['key'] as String, farm: j['farm'] as String);
+  factory LanPaired.fromJson(Map<String, dynamic> j) => LanPaired(device: j['device'] as String, key: j['key'] as String, hostName: j['hostName'] as String);
 
   final String device;
   final String key;
-  final String farm;
+  final String hostName;
 
-  Map<String, dynamic> toJson() => {'device': device, 'key': key, 'farm': farm};
+  Map<String, dynamic> toJson() => {'device': device, 'key': key, 'hostName': hostName};
 }
 
 class LanPairRequest {
@@ -2031,11 +2031,11 @@ class LanPairRequest {
 }
 
 class LanStatus {
-  const LanStatus({required this.open, required this.farm, this.url, this.problem, this.pairing, required this.devices});
+  const LanStatus({required this.open, required this.hostName, this.url, this.problem, this.pairing, required this.devices});
 
   factory LanStatus.fromJson(Map<String, dynamic> j) => LanStatus(
     open: j['open'] as bool,
-    farm: j['farm'] as String,
+    hostName: j['hostName'] as String,
     url: j['url'] == null ? null : j['url'] as String,
     problem: j['problem'] == null ? null : j['problem'] as String,
     pairing: j['pairing'] == null ? null : LanPairing.fromJson(j['pairing'] as Map<String, dynamic>),
@@ -2043,7 +2043,7 @@ class LanStatus {
   );
 
   final bool open;
-  final String farm;
+  final String hostName;
   final String? url;
   final String? problem;
   final LanPairing? pairing;
@@ -2051,7 +2051,7 @@ class LanStatus {
 
   Map<String, dynamic> toJson() => {
     'open': open,
-    'farm': farm,
+    'hostName': hostName,
     if (url != null) 'url': url!,
     if (problem != null) 'problem': problem!,
     if (pairing != null) 'pairing': pairing!.toJson(),

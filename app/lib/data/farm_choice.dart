@@ -10,24 +10,24 @@ import '../gen/vibevalley.dart';
 import 'server.dart';
 
 class RemoteFarm {
-  const RemoteFarm({required this.url, required this.key, required this.farm, required this.device});
+  const RemoteFarm({required this.url, required this.key, required this.hostName, required this.device});
 
   final Uri url;
   final String key;
 
-  final String farm;
+  final String hostName;
   final String device;
 
-  RemoteFarm at(Uri url) => RemoteFarm(url: url, key: key, farm: farm, device: device);
+  RemoteFarm at(Uri url) => RemoteFarm(url: url, key: key, hostName: hostName, device: device);
 
-  Map<String, Object?> toJson() => {'url': '$url', 'key': key, 'farm': farm, 'device': device};
+  Map<String, Object?> toJson() => {'url': '$url', 'key': key, 'hostName': hostName, 'device': device};
 
   static RemoteFarm? fromJson(Object? raw) {
     if (raw is! Map) return null;
-    final url = raw['url'], key = raw['key'], farm = raw['farm'], device = raw['device'];
-    if (url is! String || key is! String || farm is! String || device is! String) return null;
+    final url = raw['url'], key = raw['key'], hostName = raw['hostName'], device = raw['device'];
+    if (url is! String || key is! String || hostName is! String || device is! String) return null;
     final parsed = Uri.tryParse(url);
-    return parsed == null ? null : RemoteFarm(url: parsed, key: key, farm: farm, device: device);
+    return parsed == null ? null : RemoteFarm(url: parsed, key: key, hostName: hostName, device: device);
   }
 }
 
@@ -126,7 +126,7 @@ Future<RemoteFarm> pairWith(PairLink link, {required String name, RemoteFarm? kn
     final api = apiFor(link.url, known.key);
     try {
       final me = await api.lan.me();
-      return RemoteFarm(url: link.url, key: known.key, farm: known.farm, device: me.id);
+      return RemoteFarm(url: link.url, key: known.key, hostName: known.hostName, device: me.id);
     } on Object {
       // Not a key this farm knows (or no answer): ask with the code.
     } finally {
@@ -138,7 +138,7 @@ Future<RemoteFarm> pairWith(PairLink link, {required String name, RemoteFarm? kn
     final paired = await api.lan.pair(
       body: LanPairRequest(code: link.code, name: name),
     );
-    return RemoteFarm(url: link.url, key: paired.key, farm: paired.farm, device: paired.device);
+    return RemoteFarm(url: link.url, key: paired.key, hostName: paired.hostName, device: paired.device);
   } on http.ClientException {
     throw VibeValleyApiError(0, null, '连不上 ${link.url.host}：两台设备要在同一个网络里，那台电脑要允许连接');
   } finally {

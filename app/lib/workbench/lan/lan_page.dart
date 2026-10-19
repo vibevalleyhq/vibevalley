@@ -313,7 +313,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
         known: farmConnection.value.remote,
         apiFor: (url, key) => VibeValleyServer(url, key: key).api,
       );
-      toasts.add(type: ToastType.info, title: '连上了', description: '现在用的是 ${remote.farm} 的农场。');
+      toasts.add(type: ToastType.info, title: '连上了', description: '现在用的是 ${remote.hostName} 的农场。');
       await saveFarmChoice(FarmChoice(remote: remote, useRemote: true));
     } on Object catch (e) {
       if (mounted) setState(() => _error = reasonOf(e));
@@ -347,7 +347,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (using != null) ...[
-            Text('正在用 ${using.farm} 的农场（${using.url.authority}）。', style: body),
+            Text('正在用 ${using.hostName} 的农场（${using.url.authority}）。', style: body),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
@@ -363,7 +363,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
                 spacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Text('上次用过 ${last.farm} 的农场。', style: body),
+                  Text('上次用过 ${last.hostName} 的农场。', style: body),
                   PxButton.text(
                     '连回去',
                     size: PxSize.sm,
