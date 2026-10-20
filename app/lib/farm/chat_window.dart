@@ -9,11 +9,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../chat/channel_menu.dart';
-import '../chat/chat_rules.dart';
+import '../shared/chat_rules.dart';
 import '../chat/chat_state.dart';
 import '../data/messages.dart';
 import '../chat/turn_steps.dart';
-import '../chat/chat_widgets.dart';
+import '../shared/chat_widgets.dart';
 import '../gen/vibevalley.dart';
 import '../audio/sfx.dart';
 import '../sprites/atlas.dart';
@@ -21,8 +21,8 @@ import '../ui/kit/kit.dart';
 import '../voice/voice.dart';
 import '../rules/chat.dart';
 import '../rules/sessions.dart';
-import '../chat/dictation_button.dart';
-import '../chat/manager_stop_button.dart';
+import '../shared/composer.dart';
+import '../shared/manager_stop_button.dart';
 import '../shared/swatches.dart';
 import 'chat_messages.dart';
 import 'chat_voice.dart';
@@ -36,7 +36,6 @@ const chatSmall = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, 
 const _body = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 1.625, color: Palette.bark900);
 
 /// About four lines.
-const _composerMax = 96.0;
 // Below this the picked helper's chip is its head alone: with the name (about 150) the field would go under the width of its hint.
 const _pickNamedFrom = 360.0;
 
@@ -103,10 +102,8 @@ class ChatWindow extends ConsumerStatefulWidget {
 }
 
 class _ChatWindowState extends ConsumerState<ChatWindow> {
-  final _naming = Naming();
-  final _keys = SendKeys();
+  final _draft = ComposerDraft();
   final _scroll = ScrollController();
-  String? _problem;
   String? _shownId;
   bool _skipHeaderTap = false;
   (Duration, Offset)? _lastHeaderUp;
@@ -114,16 +111,15 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
   @override
   void initState() {
     super.initState();
-    _naming
-      ..addListener(() => setState(() {}))
-      ..onNaming = () {
-        if (!ref.read(chatOpenProvider)) _setOpen(true);
-      };
+    _draft.addListener(() => setState(() {}));
+    _draft.naming.onNaming = () {
+      if (!ref.read(chatOpenProvider)) _setOpen(true);
+    };
   }
 
   @override
   void dispose() {
-    _naming.dispose();
+    _draft.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -137,30 +133,15 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
 
   void _show(String? id) => unawaited(ref.read(chatActionsProvider).showChat(id).catchError((Object _) {}));
 
-  /// The field clears at once; when the send fails, the draft comes back with its key, so sending it again cannot say it twice.
-  void _send(Conversation? conversation, [String? line]) {
-    final said = (line ?? _naming.text.text).trim();
-    if (said.isEmpty) return;
-    final draft = line == null;
-    final sent = ref.read(messagesProvider).send(said, sendKey: draft ? _keys.of(said) : newSendKey(), conversation: conversation);
-    if (draft) _naming.clear();
-    setState(() => _problem = null);
+  Future<void> _say(Conversation? conversation, String text, String key) => ref.read(messagesProvider).send(text, sendKey: key, conversation: conversation);
+
+  /// A suggested line goes out on its own key and leaves the draft alone.
+  void _sendLine(Conversation? conversation, String line) {
+    _draft.report(null);
     unawaited(
-      sent.then(
-        (_) {
-          if (draft) _keys.sent();
-        },
-        onError: (Object e) {
-          if (!mounted) return;
-          if (draft && _naming.text.text.isEmpty) {
-            _naming.text.value = TextEditingValue(
-              text: said,
-              selection: TextSelection.collapsed(offset: said.length),
-            );
-          }
-          setState(() => _problem = problemOf(e));
-        },
-      ),
+      _say(conversation, line, newSendKey()).catchError((Object e) {
+        if (mounted) _draft.report(e);
+      }),
     );
   }
 
@@ -175,7 +156,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
     final thread = shown?.kind == ConversationKind.thread ? shown : null;
     final phase = chatPhaseOf(widget.call, s);
     final unread = unreadTotal(chat);
-    _naming.all = nameables(s.sessions, nowMs());
     if (shown?.id != _shownId) {
       _shownId = shown?.id;
       if (_scroll.hasClients) _scroll.jumpTo(0);
@@ -220,7 +200,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
                         child: Stack(
                           children: [
                             Positioned.fill(child: _messages(chat, shown, phase)),
-                            if (_naming.menu)
+                            if (_draft.naming.menu)
                               Positioned(
                                 left: 8,
                                 right: 8,
@@ -232,16 +212,16 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
                                     border: Border.all(color: Palette.cream300, width: 2),
                                     boxShadow: kitDrop,
                                   ),
-                                  child: NamingMenu(naming: _naming, highlight: Palette.leaf300.withValues(alpha: .4)),
+                                  child: NamingMenu(naming: _draft.naming, highlight: Palette.leaf300.withValues(alpha: .4)),
                                 ),
                               ),
                           ],
                         ),
                       ),
-                      if (_problem != null)
+                      if (_draft.problem case final problem?)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                          child: Text(_problem!, style: chatSmall.copyWith(color: Palette.berry)),
+                          child: Text(problem, style: chatSmall.copyWith(color: Palette.berry)),
                         ),
                       if (thread == null) _suggestionRow(s, shown),
                     ],
@@ -528,7 +508,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
               Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: KitTappable(
-                  onTap: () => _send(shown == null || shown.kind == ConversationKind.general ? null : shown, line),
+                  onTap: () => _sendLine(shown == null || shown.kind == ConversationKind.general ? null : shown, line),
                   builder: (context, st) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                     color: st.hovered ? Palette.leaf300 : Palette.cream200,
@@ -556,7 +536,6 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
         : voiceOn
         ? '直接说话，或者打字…'
         : '对管家说，@ 叫帮工…';
-    final empty = _naming.text.text.trim().isEmpty;
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: open
@@ -591,62 +570,15 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
           ),
           const SizedBox(width: 6),
           Expanded(
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 44),
-              padding: const EdgeInsets.all(4),
-              color: Palette.cream100,
-              foregroundDecoration: pxRing,
-              child: LayoutBuilder(
-                builder: (context, box) => Row(
-                  children: [
-                    if (thread == null) ChatPickChip(named: box.maxWidth >= _pickNamedFrom),
-                    Expanded(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: _composerMax),
-                        child: Focus(
-                          onKeyEvent: (_, e) => _naming.key(e, () => _send(conversation)),
-                          child: TextField(
-                            controller: _naming.text,
-                            focusNode: _naming.focus,
-                            minLines: 1,
-                            maxLines: null,
-                            style: KitText.sm.copyWith(height: 2),
-                            cursorColor: Palette.bark900,
-                            decoration: InputDecoration(
-                              hintText: placeholder,
-                              // A hint that wraps grows the field; folded, the window has no room for that.
-                              hintMaxLines: 1,
-                              hintStyle: KitText.sm.copyWith(color: Palette.bark400, height: 2),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              filled: false,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              semanticCounterText: '',
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const ManagerStopButton(size: 24),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: DictationButton(size: 24, controller: _naming.text),
-                    ),
-                    KitTappable(
-                      onTap: empty ? null : () => _send(conversation),
-                      semanticLabel: '发送',
-                      builder: (context, st) => Container(
-                        width: 36,
-                        height: 36,
-                        alignment: Alignment.center,
-                        color: st.pressed ? Palette.cream300 : (st.hovered ? Palette.cream200 : null),
-                        child: Opacity(opacity: empty ? .35 : 1, child: const Glyph('button-send')),
-                      ),
-                    ),
-                  ],
-                ),
+            // The bar's own padding and ring take 8 of this width.
+            child: LayoutBuilder(
+              builder: (context, box) => Composer(
+                look: ComposerLook.bar,
+                draft: _draft,
+                placeholder: placeholder,
+                leading: thread == null ? ChatPickChip(named: box.maxWidth - 8 >= _pickNamedFrom) : null,
+                tools: const [ManagerStopButton(size: 24)],
+                onSend: (text, key) => _say(conversation, text, key),
               ),
             ),
           ),

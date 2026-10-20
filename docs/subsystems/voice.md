@@ -21,7 +21,7 @@
 - 接口：`voice.session`、`voice.renew`、`voice.start`、`voice.stop`、`voice.heard`、`voice.said`、`voice.dictate`，旧客户端的 `manager.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的手机也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
 - 不存表：授予和通话只在进程里；设置在 `$VIBEVALLEY_HOME/settings.json` 的 `voice`、`dictation`、`asrKey`、`llmKey`、`ttsKey`、`dictationKey`、`agoraAppId`、`agoraAppCertificate`。
 - 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.model`、`voice.id`（默认的托管模型和 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`base/config.go`）。
-- 客户端：`app/lib/voice/`（`voice.dart` 的 `VoiceCall`，`captions.dart` 的 `LiveCaptions`，`dictation.dart` 的 `Dictation`），由 `data/voice.dart` 按农场作用域提供；按钮 `app/lib/chat/dictation_button.dart`（`DictationButton`）；设置页 `app/lib/workbench/voice/`（`voice_page.dart` 的 `VoiceSettingsForm`），路由 `/settings/voice` 和管家页的 `/manager/voice`；样音 `app/assets/voice-samples/`；只链语音要的 Agora 组件 `app/tool/agora-voice-only.sh`。
+- 客户端：`app/lib/voice/`（`voice.dart` 的 `VoiceCall`，`captions.dart` 的 `LiveCaptions`，`dictation.dart` 的 `Dictation`），由 `data/voice.dart` 按农场作用域提供；按钮 `app/lib/shared/dictation_button.dart`（`DictationButton`，在 `Composer` 里）；设置页 `app/lib/workbench/voice/`（`voice_page.dart` 的 `VoiceSettingsForm`），路由 `/settings/voice` 和管家页的 `/manager/voice`；样音 `app/assets/voice-samples/`；只链语音要的 Agora 组件 `app/tool/agora-voice-only.sh`。
 
 ## 模型和不变量
 

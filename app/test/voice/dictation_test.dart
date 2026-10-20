@@ -8,7 +8,7 @@ import 'package:vibevalley/data/voice.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:record/record.dart';
-import 'package:vibevalley/chat/dictation_button.dart';
+import 'package:vibevalley/shared/dictation_button.dart';
 import 'package:vibevalley/voice/dictation.dart';
 
 import '../support/server.dart';

@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/rules/issues.dart';
 import 'package:vibevalley/shared/issue_view.dart';
-import 'package:vibevalley/ui/kit/kit.dart';
 
 import '../support/farm.dart' as f;
 
@@ -96,9 +95,10 @@ void main() {
       );
       await f.settle(t);
       // The first layer is the status and what it needs; the rest is folded.
-      for (final text in ['共享详情', '等你验收 · 小吴交回来了（第 1 轮）', '测试通过', '验收通过', '没过，照上面修', '带话', '干活过程', '每次干活', '详情']) {
+      for (final text in ['共享详情', '等你验收 · 小吴交回来了（第 1 轮）', '测试通过', '验收通过', '没过，照上面修', '干活过程', '每次干活', '详情']) {
         expect(find.text(text), findsOneWidget, reason: '$frame: $text');
       }
+      expect(find.bySemanticsLabel('带话'), findsOneWidget, reason: frame.name);
       for (final gone in ['这一轮做了什么', '碰过的文件', '跑过的命令', '小吴（claude）', '复制路径']) {
         expect(find.text(gone), findsNothing, reason: '$frame: $gone is not on the first layer');
       }
@@ -125,9 +125,9 @@ void main() {
       final box = find.bySemanticsLabel('给小吴带句话');
       await t.enterText(find.descendant(of: box, matching: find.byType(EditableText)).first, '补一个测试');
       await t.pump();
-      await t.tap(find.widgetWithText(PxButton, '带话'));
+      await t.tap(find.bySemanticsLabel('带话'));
       await f.settle(t);
-      expect(routes.named('POST', '/api/v1/issues/tw1/comment').single.body, {'text': '补一个测试'});
+      expect(routes.named('POST', '/api/v1/issues/tw1/comment').single.body, {'text': '补一个测试', 'sendKey': isA<String>()});
       // 没过 takes what the box says, one weed a line: no dialog of its own.
       await t.enterText(find.descendant(of: box, matching: find.byType(EditableText)).first, '看板还在调旧接口\n\n少一个测试');
       await t.pump();

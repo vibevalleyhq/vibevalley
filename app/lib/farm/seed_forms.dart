@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
+import '../shared/composer.dart';
 import '../ui/kit/kit.dart';
 
 const _dropsOfAdvice = ['改动小一点', '先别动测试', '做完跟我说一声', '顺便补个测试'];
@@ -17,11 +18,16 @@ class WaterForm extends ConsumerStatefulWidget {
 }
 
 class _WaterFormState extends ConsumerState<WaterForm> {
-  var _text = '';
+  final _draft = ComposerDraft();
 
-  void _send() {
-    if (_text.trim().isEmpty) return;
-    fire(ref.read(farmCommandsProvider).water(widget.session, _text));
+  @override
+  void dispose() {
+    _draft.dispose();
+    super.dispose();
+  }
+
+  Future<void> _water(String text, String key) async {
+    await ref.read(farmCommandsProvider).water(widget.session, text, sendKey: key);
     widget.onDone();
   }
 
@@ -44,7 +50,10 @@ class _WaterFormState extends ConsumerState<WaterForm> {
           children: [
             for (final s in _dropsOfAdvice)
               KitTappable(
-                onTap: () => setState(() => _text = s),
+                onTap: () => _draft.text.value = TextEditingValue(
+                  text: s,
+                  selection: TextSelection.collapsed(offset: s.length),
+                ),
                 builder: (context, st) => Container(
                   color: st.hovered ? Palette.cream300 : Palette.cream200,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -54,18 +63,14 @@ class _WaterFormState extends ConsumerState<WaterForm> {
           ],
         ),
         const SizedBox(height: 12),
-        PxTextInput(
-          value: _text,
-          onChanged: (v) => setState(() => _text = v),
-          onSubmitted: (_) => _send(),
+        Composer(
+          look: ComposerLook.inline,
+          draft: _draft,
           autofocus: true,
           placeholder: '带句话……',
           semanticLabel: '给${w.name}带句话',
-        ),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerRight,
-          child: PxButton.text('浇水', tone: PxTone.primary, onPressed: _text.trim().isEmpty ? null : _send),
+          sendLabel: '浇水',
+          onSend: _water,
         ),
       ],
     );

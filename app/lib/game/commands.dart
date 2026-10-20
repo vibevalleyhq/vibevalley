@@ -49,10 +49,10 @@ class FarmCommands {
   }
 
   /// `on`: a comment on that step of its trajectory.
-  Future<void> water(Session w, String text) async {
+  Future<void> water(Session w, String text, {String? sendKey}) async {
     await _api.issue.comment(
       id: w.issueId,
-      body: CommentRequest(text: text),
+      body: CommentRequest(text: text, sendKey: sendKey),
     );
     _fx(w, BedFxKind.water);
   }

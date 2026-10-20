@@ -7,7 +7,7 @@ import '../gen/vibevalley.dart';
 import '../ui/kit/kit.dart';
 import '../data/remote.dart' show agentsProvider;
 import 'chat_rules.dart';
-import '../shared/swatches.dart';
+import 'swatches.dart';
 
 /// 主 on the wheat until the drawings are in.
 class OwnerFace extends ConsumerWidget {
@@ -260,7 +260,8 @@ class Naming extends ChangeNotifier {
     notifyListeners();
   }
 
-  KeyEventResult key(KeyEvent e, VoidCallback send) {
+  /// Without [send], Enter starts a new line.
+  KeyEventResult key(KeyEvent e, VoidCallback? send) {
     if (e is KeyUpEvent) return KeyEventResult.ignored;
     if (text.value.composing.isValid && !text.value.composing.isCollapsed) return KeyEventResult.ignored;
     final k = e.logicalKey;
@@ -281,7 +282,7 @@ class Naming extends ChangeNotifier {
         return KeyEventResult.handled;
       }
     }
-    if ((k == LogicalKeyboardKey.enter || k == LogicalKeyboardKey.numpadEnter) && !HardwareKeyboard.instance.isShiftPressed) {
+    if (send != null && (k == LogicalKeyboardKey.enter || k == LogicalKeyboardKey.numpadEnter) && !HardwareKeyboard.instance.isShiftPressed) {
       if (e is KeyDownEvent) send();
       return KeyEventResult.handled;
     }

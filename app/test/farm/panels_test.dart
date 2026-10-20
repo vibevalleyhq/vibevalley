@@ -147,11 +147,11 @@ void main() {
     expect(routes.paths, contains('POST /api/v1/sessions/w1/stop'));
     await tester.enterText(find.byType(EditableText).first, '先别动测试');
     await tester.pump();
-    await tester.ensureVisible(find.text('带话').last);
-    await tester.tap(find.text('带话').last);
+    await tester.ensureVisible(find.bySemanticsLabel('带话'));
+    await tester.tap(find.bySemanticsLabel('带话'));
     await settle(tester);
     expect(routes.calls.last.path, '/api/v1/issues/tw1/comment');
-    expect(routes.calls.last.body, {'text': '先别动测试'});
+    expect(routes.calls.last.body, {'text': '先别动测试', 'sendKey': isA<String>()});
     await tester.ensureVisible(find.text('关上'));
     await tester.tap(find.text('关上'));
     await settle(tester);
@@ -182,9 +182,9 @@ void main() {
     expect(find.text('它正在干活，这句话会在下一步之前收到。'), findsOneWidget);
     await tester.tap(find.text('顺便补个测试'));
     await tester.pump();
-    await tester.tap(find.text('浇水').last);
+    await tester.tap(find.bySemanticsLabel('浇水'));
     await settle(tester);
-    expect(routes.calls.single.body, {'text': '顺便补个测试'});
+    expect(routes.calls.single.body, {'text': '顺便补个测试', 'sendKey': isA<String>()});
     expect(c.read(wateringProvider), isNull);
     await tester.pump(const Duration(seconds: 3));
   });

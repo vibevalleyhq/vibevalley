@@ -17,6 +17,7 @@ import '../rules/task.dart';
 import '../rules/cast.dart';
 import '../sprites/atlas.dart';
 import '../ui/kit/kit.dart';
+import 'composer.dart';
 import 'widgets.dart';
 import 'work_log.dart';
 import 'swatches.dart';
@@ -72,8 +73,20 @@ class IssueView extends ConsumerStatefulWidget {
 }
 
 class _IssueViewState extends ConsumerState<IssueView> {
-  String _word = '';
+  final _draft = ComposerDraft();
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _draft.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _draft.dispose();
+    super.dispose();
+  }
 
   VibeValleyApi get _api => ref.read(apiProvider);
 
@@ -85,20 +98,9 @@ class _IssueViewState extends ConsumerState<IssueView> {
     if (mounted) setState(() => _busy = false);
   }
 
-  Future<void> _tell() async {
-    final session = widget.session;
-    final text = _word.trim();
-    if (session == null || text.isEmpty) return;
-    setState(() => _busy = true);
-    final done = await runAction(() async {
-      await ref.read(farmCommandsProvider).water(session, text);
-      return true;
-    });
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      if (done == true) _word = '';
-    });
+  Future<void> _tell(Session session, String text, String key) async {
+    await ref.read(farmCommandsProvider).water(session, text, sendKey: key);
+    await widget.reload?.call();
   }
 
   Future<void> _reopen() async {
@@ -106,12 +108,13 @@ class _IssueViewState extends ConsumerState<IssueView> {
     final got = await runAction(
       () => _api.issue.status(
         id: widget.issue!.id,
-        body: IssueStatusRequest(status: IssueStatus.todo, text: _word.trim()),
+        body: IssueStatusRequest(status: IssueStatus.todo, text: _draft.said),
       ),
     );
     if (!mounted) return;
     setState(() => _busy = false);
     if (got?.sessions.lastOrNull case final session?) {
+      _draft.clear();
       toasts.add(type: ToastType.info, title: '工单重开了', description: '$session 接着做。');
       await widget.reload?.call();
     }
@@ -125,7 +128,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
     if (issue == null) return;
     if (pass) return _act(() => _api.issue.accept(id: issue.id, body: const IssueAcceptRequest(pass: true)));
     final lines = [
-      for (final l in _word.split('\n'))
+      for (final l in _draft.text.text.split('\n'))
         if (l.trim().isNotEmpty) l.trim(),
     ];
     if (lines.isEmpty) return;
@@ -135,7 +138,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
         body: IssueAcceptRequest(pass: false, findings: lines),
       ),
     );
-    if (mounted) setState(() => _word = '');
+    if (mounted) _draft.clear();
   }
 
   Future<void> _setAcceptance(Acceptance a) async {
@@ -306,10 +309,16 @@ class _IssueViewState extends ConsumerState<IssueView> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              PxTextArea(
-                value: _word,
-                onChanged: (v) => setState(() => _word = v),
-                rows: judging ? 3 : 2,
+              Composer(
+                look: ComposerLook.inline,
+                draft: _draft,
+                minLines: judging ? 3 : 2,
+                enabled: !_busy,
+                // 没过 reads the box one finding a line, so Enter starts a line while it is judged.
+                enterSends: !judging,
+                mentions: talking,
+                sendLabel: '带话',
+                onSend: talking ? (text, key) => _tell(session, text, key) : null,
                 placeholder: judging
                     ? '没过就写哪里要修，一行一条；也可以只带句话'
                     : reopening
@@ -326,9 +335,8 @@ class _IssueViewState extends ConsumerState<IssueView> {
                 children: [
                   if (judging) ...[
                     PxButton.text('验收通过', tone: PxTone.primary, onPressed: _busy ? null : () => _accept(true)),
-                    PxButton.text('没过，照上面修', tone: PxTone.danger, onPressed: _busy || _word.trim().isEmpty ? null : () => _accept(false)),
+                    PxButton.text('没过，照上面修', tone: PxTone.danger, onPressed: _busy || _draft.empty ? null : () => _accept(false)),
                   ],
-                  if (talking) PxButton.text('带话', tone: judging ? PxTone.plain : PxTone.primary, onPressed: _busy || _word.trim().isEmpty ? null : _tell),
                   if (reopening) PxButton.text('重开', tone: PxTone.primary, onPressed: _busy ? null : _reopen),
                   ...actions,
                 ],

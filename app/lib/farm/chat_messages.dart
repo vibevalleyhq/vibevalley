@@ -3,8 +3,8 @@
 import 'package:flutter/material.dart' hide Icon;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../chat/chat_rules.dart';
-import '../chat/chat_widgets.dart';
+import '../shared/chat_rules.dart';
+import '../shared/chat_widgets.dart';
 import '../chat/dispatch_note.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';

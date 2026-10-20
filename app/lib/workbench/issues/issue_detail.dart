@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/composer.dart';
 import '../../shared/issue_view.dart';
 import '../../shared/tags.dart' show tint;
 import '../../rules/time.dart';
@@ -133,7 +134,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
   late String _agent;
   late Priority _priority;
   late Acceptance _acceptance;
-  var _word = '';
+  final _word = ComposerDraft();
   // Until the owner edits a field, a draft coming back fills them.
   var _edited = false;
   var _busy = false;
@@ -183,6 +184,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
   @override
   void initState() {
     super.initState();
+    _word.addListener(() => setState(() {}));
     _take(widget.item);
     _submission = IssueSubmission(ref.read(apiProvider).issue, initial: widget.item);
   }
@@ -198,15 +200,25 @@ class _TodoState extends ConsumerState<TodoDetail> {
     _edited = false;
   });
 
-  Future<void> _draft() => _run(() async {
-    await _submission.draft(_request, _word, criteria: _criteriaList, edited: _edited);
-    if (mounted) {
-      setState(() {
-        _word = '';
-        _edited = false;
-      });
+  @override
+  void dispose() {
+    _word.dispose();
+    super.dispose();
+  }
+
+  /// Throws, so the box keeps the words and says why.
+  Future<void> _draftWith(String text, String _) async {
+    setState(() => _busy = true);
+    try {
+      await _submission.draft(_request, text, criteria: _criteriaList, edited: _edited);
+      if (mounted) setState(() => _edited = false);
+    } finally {
+      await widget.reload();
+      if (mounted) setState(() => _busy = false);
     }
-  });
+  }
+
+  Future<void> _draft() => _word.send(_draftWith, blank: true);
 
   Future<void> _start() => _run(() async {
     final got = await _submission.start(_request, criteria: _criteriaList);
@@ -234,7 +246,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
       null when drafted => ('草稿写好了', '看一遍、改一改，没问题就开工。'),
       null => ('想做什么？', '写一句就行：帮工读过代码，替你写成工单。'),
     };
-    final canDraft = !_busy && drafting == null && (drafted || _word.trim().isNotEmpty || _title.trim() != newIssueTitle);
+    final canDraft = !_busy && drafting == null && (drafted || !_word.empty || _title.trim() != newIssueTitle);
     final draft = !backlog
         ? null
         : Column(
@@ -257,10 +269,13 @@ class _TodoState extends ConsumerState<TodoDetail> {
                 ),
               ),
               const SizedBox(height: 12),
-              PxTextArea(
-                value: _word,
-                onChanged: (v) => setState(() => _word = v),
-                rows: 2,
+              Composer(
+                look: ComposerLook.inline,
+                draft: _word,
+                mentions: false,
+                sendButton: false,
+                sendLabel: drafted ? '再起草' : '起草',
+                onSend: canDraft ? _draftWith : null,
                 autofocus: !drafted && drafting == null,
                 placeholder: asks.isNotEmpty
                     ? '回答它的问题'
