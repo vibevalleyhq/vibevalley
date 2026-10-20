@@ -8,7 +8,6 @@ import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart' show tookText;
 import '../../rules/issues.dart';
-import '../../data/ui_state.dart' show FarmPanel, graphShownProvider, titleOpenProvider, farmOverlaysProvider;
 import '../../ui/pro/pro.dart';
 import '../shared/layout.dart';
 import '../../data/remote.dart';
@@ -420,14 +419,9 @@ class _CardView extends ConsumerWidget {
         ),
       ),
     );
-    if (card case TaskCard(:final graph)) {
+    if (card is TaskCard) {
       return Tappable(
-        onTap: () {
-          ref.read(graphShownProvider.notifier).set(graph.id);
-          ref.read(farmOverlaysProvider.notifier).panel(FarmPanel.taskBoard);
-          ref.read(titleOpenProvider.notifier).enterFarm(start: false);
-          workbenchGo(context, '/');
-        },
+        onTap: () => onOpen(card.id),
         semanticLabel: title,
         builder: (context, s) => face(1, hovered: s.hovered),
       );

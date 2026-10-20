@@ -18,6 +18,7 @@ import '../shared/widgets.dart';
 import '../shared/work_log.dart';
 import 'issues_page.dart' show issueTagColor;
 import 'issue_sheet.dart';
+import '../../rules/task.dart' show graphOf;
 
 /// The workbench's issue page, drawn from IssueState: the status and what it needs first, the rest folded. The farm draws
 /// its own (shared/issue_view.dart).
@@ -296,15 +297,12 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
       if (issue?.acceptedAt case final at?) ProProperty('验收过', Text(wallClockText(at), style: ProText.sm.copyWith(color: Palette.leaf700))),
       const SizedBox(height: 4),
       ProMore(children: more),
-      if (widget.onThread != null || (s.inTask && widget.onTask != null)) ...[
+      if (widget.onThread != null) ...[
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: [
-            if (widget.onThread != null) ProButton.text('看工单串', size: ProSize.sm, onPressed: widget.onThread),
-            if (s.inTask && widget.onTask != null) ProButton.text('看计划', size: ProSize.sm, onPressed: widget.onTask),
-          ],
+          children: [if (widget.onThread != null) ProButton.text('看工单串', size: ProSize.sm, onPressed: widget.onThread)],
         ),
       ],
     ];
@@ -335,6 +333,20 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (issue != null) ...[IssueStages(stageOf(issue.status)), const SizedBox(height: 16)],
+        if (s.inTask && widget.onTask != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(11, 0, 11, 6),
+            child: DefaultTextStyle(
+              style: ProText.meta,
+              child: InlineLink(
+                '‹ ${switch (graphOf(ref.watch(graphsProvider), issue?.parent ?? '')) {
+                  final g? => '计划「${g.title}」的一步',
+                  null => '回到计划',
+                }}',
+                onTap: widget.onTask!,
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 11),
           child: Text(s.title, style: ProText.xl),

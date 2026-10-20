@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../support/server.dart' show FakeServer, jsonResponse, settle;
 import '../support/farm.dart' as fakes;
 import '../support/workbench.dart' show pumpPage, WorkbenchBackend;
+import 'package:vibevalley/workbench/issues/plan_detail.dart';
 
 const _closed = Session(
   id: 'w1',
@@ -329,6 +330,27 @@ void main() {
     await t.tap(find.text('让它解决冲突'));
     await settle(t);
     expect(writes.single, startsWith('POST /api/v1/issues/tw4/resolve'));
+
+    // A plan opens in the workbench as an issue with its steps, not on the farm.
+    await t.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiProvider.overrideWithValue(api),
+          stateProvider.overrideWithValue(fakes.farm(sessions: [session], issues: issues)),
+          graphsProvider.overrideWithValue(const [
+            TaskGraph(id: 'p1', title: '加 greet', goal: '加 greet', project: 'demo', state: GraphState.draft, tasks: [], parallel: 1, createdAt: 0),
+          ]),
+          sideEventsProvider.overrideWith((ref) => const Stream<LiveEvent>.empty()),
+        ],
+        child: MaterialApp(
+          theme: farmTheme(),
+          home: const Scaffold(body: IssuesPage(id: 'task:p1')),
+        ),
+      ),
+    );
+    await settle(t);
+    expect(find.byType(PlanDetail), findsOneWidget);
+    expect(find.byType(ProModalLayer), findsOneWidget);
   });
 
   testWidgets('a card per job in its lane; a 待办 dragged into 处理中 is sent; a closed one reopened', (t) async {

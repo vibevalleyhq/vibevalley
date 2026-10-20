@@ -56,7 +56,7 @@ bool issueIs(Issue issue, String id) => issue.id == id || issue.sessions.contain
 String taskLine(TaskGraph p) => switch (p.state) {
   GraphState.splitting => '在拆步骤',
   GraphState.draft => '拆好了，看过再开工',
-  GraphState.running => '做到 ${p.settled ?? 0} / ${p.tasks.length} 步',
+  GraphState.running => '做到 ${(p.settled ?? 0).round()} / ${p.tasks.length} 步',
   GraphState.paused => '暂停了',
   GraphState.ripe => '都做完了，等你收获',
   GraphState.done => '收获了',

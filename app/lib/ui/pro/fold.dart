@@ -7,8 +7,11 @@ import 'markdown.dart';
 /// A part that is folded until wanted. Folded, its line still says what is inside ([summary]: "3 个文件 +40 −2"), so the
 /// page reads short and nothing is hidden without a hint of it.
 class ProFold extends StatefulWidget {
-  const ProFold({super.key, required this.label, required this.child, this.summary, this.open = false, this.last = false});
+  const ProFold({super.key, required this.label, required this.child, this.summary, this.open = false, this.last = false, this.leading});
   final String label;
+
+  /// Before the label: a state's dot or glyph.
+  final Widget? leading;
   final String? summary;
   final Widget child;
 
@@ -53,6 +56,7 @@ class _ProFoldState extends State<ProFold> {
                   child: const SpriteIcon('button-next', size: 12),
                 ),
                 const SizedBox(width: 8),
+                if (widget.leading case final l?) ...[l, const SizedBox(width: 8)],
                 Text(widget.label, style: ProText.sm.copyWith(fontWeight: FontWeight.w600)),
                 if (widget.summary case final s? when s.isNotEmpty) ...[
                   const SizedBox(width: 10),

@@ -465,12 +465,15 @@ class _TodoState extends ConsumerState<TodoDetail> {
 }
 
 class IssueDetail extends ConsumerWidget {
-  const IssueDetail({super.key, required this.issue, required this.sessions, required this.state, required this.session, required this.reload});
+  const IssueDetail({super.key, required this.issue, required this.sessions, required this.state, required this.session, required this.reload, this.onPlan});
   final Issue issue;
   final List<Session> sessions;
   final IssueTag state;
   final Session? session;
   final Future<void> Function() reload;
+
+  /// A step of a plan: back to the plan it is a step of.
+  final VoidCallback? onPlan;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     Future<void> close(Session session) => showCloseIssueDialog(context, issue, session);
@@ -483,6 +486,7 @@ class IssueDetail extends ConsumerWidget {
       reload: reload,
       onHarvest: close,
       onClose: close,
+      onTask: onPlan,
       onNavigate: session == null
           ? null
           : () {
