@@ -9,7 +9,7 @@ import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart' show tookText;
 import '../../rules/issues.dart';
 import '../../data/ui_state.dart' show FarmPanel, graphShownProvider, titleOpenProvider, farmOverlaysProvider;
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../shared/layout.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
@@ -160,9 +160,9 @@ class _LaneView extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(lane.label, style: KitText.sm.copyWith(color: Palette.bark900)),
+                Text(lane.label, style: PxText.sm.copyWith(color: Palette.bark900)),
                 const SizedBox(width: 6),
-                Text(head, style: KitText.xs.copyWith(color: Palette.bark500)),
+                Text(head, style: PxText.xs.copyWith(color: Palette.bark500)),
                 const Spacer(),
                 if (lane == Lane.todo)
                   PxButton(
@@ -181,7 +181,7 @@ class _LaneView extends StatelessWidget {
               child: loading
                   ? const EmptyNote('在读……')
                   : cards.isEmpty
-                  ? Text(_emptyText[lane]!, style: KitText.xs.copyWith(color: Palette.bark400, height: 1.625))
+                  ? Text(_emptyText[lane]!, style: PxText.xs.copyWith(color: Palette.bark400, height: 1.625))
                   : ListView.separated(
                       itemCount: shown.length + (hidden > 0 || (older && cards.length > closedShown) ? 1 : 0),
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
@@ -274,7 +274,7 @@ class _CardView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final agents = ref.watch(workbenchConfigProvider).agents;
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
-    final xs = KitText.xs.copyWith(color: Palette.bark500);
+    final xs = PxText.xs.copyWith(color: Palette.bark500);
     final (title, who, stripe) = switch (card) {
       TaskCard(:final graph) => ('计划：${graph.title}', '${graph.tasks.length} 步', null),
       TodoCard(:final item) => (item.title, agents.where((a) => a.id == item.assignee).firstOrNull?.name ?? '还没选帮工', priorityColor(item.priority)),
@@ -289,7 +289,7 @@ class _CardView extends ConsumerWidget {
         lines.add(Text('缺少：${history.missingSessions.join('、')}', style: xs.copyWith(color: Palette.berry)));
       case TaskCard(:final graph):
         tags.add(const _Tag('种植计划', Palette.leaf500));
-        lines.add(Text(taskLine(graph), style: KitText.xs.copyWith(color: graph.state == GraphState.ripe ? Palette.leaf700 : Palette.bark800)));
+        lines.add(Text(taskLine(graph), style: PxText.xs.copyWith(color: graph.state == GraphState.ripe ? Palette.leaf700 : Palette.bark800)));
       case TodoCard(:final item):
         if (item.drafting case final d?) {
           tags.add(_Tag('${d.name}在起草', Palette.water));
@@ -327,7 +327,7 @@ class _CardView extends ConsumerWidget {
               said,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: KitText.xs.copyWith(color: Palette.bark800, height: 1.5),
+              style: PxText.xs.copyWith(color: Palette.bark800, height: 1.5),
             ),
           );
         }
@@ -367,7 +367,7 @@ class _CardView extends ConsumerWidget {
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: KitText.sm.copyWith(color: Palette.bark900),
+                    style: PxText.sm.copyWith(color: Palette.bark900),
                   ),
                 ),
               ],
@@ -382,7 +382,7 @@ class _CardView extends ConsumerWidget {
                     who,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: KitText.xs.copyWith(color: Palette.bark800),
+                    style: PxText.xs.copyWith(color: Palette.bark800),
                   ),
                 ),
                 if (card.project != null) ...[
@@ -392,7 +392,7 @@ class _CardView extends ConsumerWidget {
                       card.project!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: KitText.mono.copyWith(fontSize: 10, color: Palette.bark500),
+                      style: PxText.mono.copyWith(fontSize: 10, color: Palette.bark500),
                     ),
                   ),
                 ],
@@ -404,7 +404,7 @@ class _CardView extends ConsumerWidget {
       ),
     );
     if (card case TaskCard(:final graph)) {
-      return KitTappable(
+      return Tappable(
         onTap: () {
           ref.read(graphShownProvider.notifier).set(graph.id);
           ref.read(farmOverlaysProvider.notifier).panel(FarmPanel.taskBoard);
@@ -415,7 +415,7 @@ class _CardView extends ConsumerWidget {
         builder: (context, s) => face(1),
       );
     }
-    final tappable = KitTappable(onTap: () => onOpen(card.id), semanticLabel: title, builder: (context, s) => face(1));
+    final tappable = Tappable(onTap: () => onOpen(card.id), semanticLabel: title, builder: (context, s) => face(1));
     final feedback = Material(
       type: MaterialType.transparency,
       child: SizedBox(width: 240, child: face(.9)),
@@ -436,7 +436,7 @@ class _Tag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
     color: color.withValues(alpha: .2),
-    child: Text(text, style: KitText.xs.copyWith(fontSize: 10, color: Palette.bark900)),
+    child: Text(text, style: PxText.xs.copyWith(fontSize: 10, color: Palette.bark900)),
   );
 }
 

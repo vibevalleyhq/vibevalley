@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/server.dart' show atlas;
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/sprites/atlas.dart';
-import 'package:vibevalley/ui/kit/kit.dart';
+import 'package:vibevalley/ui/pixel/pixel.dart';
 
 Widget host(Widget child) => MaterialApp(
   theme: farmTheme(),

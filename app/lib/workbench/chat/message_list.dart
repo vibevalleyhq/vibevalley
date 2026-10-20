@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../data/remote.dart' show agentsProvider;
 import '../../shared/chat_rules.dart';
 import '../../chat/chat_state.dart';
@@ -118,7 +118,7 @@ class _MessageListState extends ConsumerState<MessageList> {
               children: [
                 if (feed.hasOlder && !hasFilter)
                   Center(
-                    child: KitTappable(
+                    child: Tappable(
                       onTap: () => unawaited(ref.read(chatActionsProvider).loadOlder(conversation!.id).catchError((Object _) {})),
                       builder: (context, s) => Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -146,7 +146,7 @@ class _MessageListState extends ConsumerState<MessageList> {
                     child: Text(
                       hasFilter ? '没有找到' : (widget.emptyText ?? ''),
                       textAlign: TextAlign.center,
-                      style: KitText.sm.copyWith(color: Palette.bark500),
+                      style: PxText.sm.copyWith(color: Palette.bark500),
                     ),
                   ),
                 ...rows,
@@ -185,7 +185,7 @@ class _ArriveState extends State<_Arrive> with SingleTickerProviderStateMixin {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (widget.fresh && _rise == null && kitMoves(context)) {
+    if (widget.fresh && _rise == null && motionAllowed(context)) {
       _rise = AnimationController(vsync: this, duration: const Duration(milliseconds: 220))..forward();
     }
   }
@@ -279,7 +279,7 @@ class _Tag extends StatelessWidget {
       children: [
         SpriteIcon(icon, size: 14),
         const SizedBox(width: 4),
-        Text(label, style: KitText.xs),
+        Text(label, style: PxText.xs),
       ],
     ),
   );
@@ -412,7 +412,7 @@ class _FrameState extends State<_Frame> {
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Text(widget.name, style: KitText.sm),
+                      Text(widget.name, style: PxText.sm),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(widget.meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
@@ -440,7 +440,7 @@ class ThreadPreview extends ConsumerWidget {
     final unread = unreadIn(chat, thread);
     final last = messagesIn(chat, thread.id).lastOrNull;
     final session = threadOwnerOf(thread, farm?.sessions ?? const []);
-    return KitTappable(
+    return Tappable(
       onTap: () => unawaited(ref.read(chatActionsProvider).showChat(thread.id).catchError((Object _) {})),
       builder: (context, s) => Container(
         margin: const EdgeInsets.only(top: 8),
@@ -456,13 +456,13 @@ class ThreadPreview extends ConsumerWidget {
               children: [
                 const Glyph('button-thread'),
                 const SizedBox(width: 6),
-                Text(thread.replies > 0 ? '${idText(thread.replies)} 条回复' : '工单串', style: KitText.sm),
+                Text(thread.replies > 0 ? '${idText(thread.replies)} 条回复' : '工单串', style: PxText.sm),
                 if (unread > 0) ...[
                   const SizedBox(width: 8),
                   Container(
                     color: Palette.leaf300,
                     padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text('$unread 条新', style: KitText.xs),
+                    child: Text('$unread 条新', style: PxText.xs),
                   ),
                 ],
                 const SizedBox(width: 8),
@@ -478,14 +478,14 @@ class ThreadPreview extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
                   children: [
-                    Text(last.fromKind == SenderKind.user ? '主人' : last.name, style: KitText.sm),
+                    Text(last.fromKind == SenderKind.user ? '主人' : last.name, style: PxText.sm),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         last.text.replaceAll(RegExp(r'\s+'), ' '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: KitText.sm.copyWith(color: Palette.bark500),
+                        style: PxText.sm.copyWith(color: Palette.bark500),
                       ),
                     ),
                     const SizedBox(width: 8),

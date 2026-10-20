@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../debug/debug_panel.dart' show debugOpenProvider;
 import '../data/prefs.dart';
 import '../data/ui_state.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../game/destinations.dart';
 
 class GameMenu extends ConsumerWidget {
@@ -82,7 +82,7 @@ class GameMenu extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      style: KitText.xs.copyWith(color: Palette.bark800),
+                      style: PxText.xs.copyWith(color: Palette.bark800),
                     ),
                   ),
               ],

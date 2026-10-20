@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../audio/sfx.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../chat/chat_state.dart';
 import '../../rules/chat.dart';
 
@@ -130,7 +130,7 @@ class _NewChannelFormState extends ConsumerState<NewChannelForm> {
       if (_error != null)
         Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Text(_error!, style: KitText.sm.copyWith(color: Palette.berry)),
+          child: Text(_error!, style: PxText.sm.copyWith(color: Palette.berry)),
         ),
       _Actions(submit: '创建频道', onSubmit: _busy || _name.trim().isEmpty ? null : _submit),
     ],
@@ -188,7 +188,7 @@ class _ChannelSettingsFormState extends ConsumerState<ChannelSettingsForm> {
       if (_error != null)
         Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Text(_error!, style: KitText.sm.copyWith(color: Palette.berry)),
+          child: Text(_error!, style: PxText.sm.copyWith(color: Palette.berry)),
         ),
       _Actions(submit: '保存', onSubmit: _busy ? null : _submit),
     ],

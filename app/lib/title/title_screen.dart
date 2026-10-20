@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../audio/sfx.dart';
 import 'motion.dart';
 import 'scene.dart';
@@ -236,7 +236,7 @@ class _MenuButton extends StatelessWidget {
     final button = MouseRegion(
       onEnter: enabled ? (_) => onHover() : null,
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.forbidden,
-      child: KitTappable(
+      child: Tappable(
         onTap: enabled ? onTap : null,
         semanticLabel: label,
         builder: (context, state) => AnimatedSlide(

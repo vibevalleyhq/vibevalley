@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 
 enum PopSide { top, bottom }
 
@@ -73,7 +73,7 @@ class _FarmPopoverState extends State<FarmPopover> {
                     child: SizedBox(
                       width: widget.width,
                       child: PxWindow(
-                        child: DefaultTextStyle(style: KitText.sm, child: widget.popup(context, _close)),
+                        child: DefaultTextStyle(style: PxText.sm, child: widget.popup(context, _close)),
                       ),
                     ),
                   ),

@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../gen/vibevalley.dart';
 import '../audio/sfx.dart';
-import '../ui/pixel_card.dart';
+import '../ui/pixel/pixel_card.dart';
 import '../voice/voice.dart';
 import 'blocks_game.dart';
 import 'calls.dart';

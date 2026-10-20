@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../audio/sfx.dart';
 import '../audio/synth.dart';
 import 'debug_commands.dart';
@@ -40,7 +40,7 @@ const _ink850 = Color(0xFF221E1A);
 const _hat = Palette.hat;
 
 const _xs = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, color: Palette.ink100);
-final _mono = KitText.mono.copyWith(color: Palette.ink100);
+final _mono = PxText.mono.copyWith(color: Palette.ink100);
 
 class DebugPanel extends ConsumerStatefulWidget {
   const DebugPanel({super.key});
@@ -71,7 +71,7 @@ class _DebugPanelState extends ConsumerState<DebugPanel> {
             decoration: const BoxDecoration(
               color: _panelBg,
               border: Border(left: BorderSide(color: Color(0x1AFFFFFF))),
-              boxShadow: kitDrop,
+              boxShadow: pxDrop,
             ),
             child: DefaultTextStyle(
               style: _xs,
@@ -138,7 +138,7 @@ class _DebugPanelState extends ConsumerState<DebugPanel> {
       spacing: 4,
       children: [
         for (final t in _Tab.values)
-          KitTappable(
+          Tappable(
             onTap: () => setState(() => _tab = t),
             selected: _tab == t,
             semanticLabel: _tabLabel[t],
@@ -212,7 +212,7 @@ class _Btn extends StatelessWidget {
   final _Tone tone;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     semanticLabel: label,
     builder: (context, state) {
@@ -302,7 +302,7 @@ class _TextActionState extends State<_TextAction> {
         ),
       ),
       const SizedBox(width: 6),
-      KitTappable(
+      Tappable(
         onTap: _submit,
         semanticLabel: widget.action,
         builder: (context, state) => Container(
@@ -530,7 +530,7 @@ class _SessionCard extends StatelessWidget {
                   style: const TextStyle(fontFamily: pixelFont, fontSize: 12, color: Palette.ink500),
                 ),
               ),
-              KitTappable(
+              Tappable(
                 onTap: () => hb.open(h.id),
                 semanticLabel: '看档案',
                 builder: (context, state) => Text(
@@ -645,7 +645,7 @@ class _PlayButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final play = ref.watch(atlasProvider).value?['button-play'];
-    return KitTappable(
+    return Tappable(
       onTap: onTap,
       semanticLabel: label,
       builder: (context, state) => Container(
@@ -699,7 +699,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
             children: [
               _Row([
                 for (final t in _typeTone.keys)
-                  KitTappable(
+                  Tappable(
                     onTap: () => setState(() => _hidden.contains(t) ? _hidden.remove(t) : _hidden.add(t)),
                     semanticLabel: t,
                     builder: (context, _) => Container(
@@ -755,7 +755,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  KitTappable(
+                  Tappable(
                     onTap: () => setState(() => _open = _open == e.seq ? null : e.seq),
                     semanticLabel: e.summary,
                     builder: (context, state) => Container(

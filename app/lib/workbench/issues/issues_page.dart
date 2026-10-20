@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../rules/issues.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
@@ -277,13 +277,13 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
       ManagerCard(:final issue) => ManagerIssueDetail(key: ValueKey(issue.id), issue: issue),
       MissingSessionCard(:final history) => PxCard(
         title: history.issue.title,
-        child: Text('执行记录缺失：${history.missingSessions.join('、')}。执行动作暂不可用。', style: KitText.sm),
+        child: Text('执行记录缺失：${history.missingSessions.join('、')}。执行动作暂不可用。', style: PxText.sm),
       ),
       TaskCard() => null,
       // A link to an issue the farm does not have says so, instead of quietly showing the board.
       null when id != null && farm != null && history.hasValue && !history.isLoading && !history.hasError => PxCard(
         title: '找不到这张工单',
-        child: Text('农场里没有 $id：可能已经删掉了，或者链接写错了。', style: KitText.sm.copyWith(color: Palette.bark600)),
+        child: Text('农场里没有 $id：可能已经删掉了，或者链接写错了。', style: PxText.sm.copyWith(color: Palette.bark600)),
       ),
       null => null,
     };
@@ -292,7 +292,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         final board = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (history.hasError) Text('工单记录没读到：${reasonOf(history.error!)}', style: KitText.sm),
+            if (history.hasError) Text('工单记录没读到：${reasonOf(history.error!)}', style: PxText.sm),
             _Toolbar(filter: _filter, cards: all, shown: all.where(_filter.shows).length, onChanged: (f) => setState(() => _filter = f)),
             const SizedBox(height: 8),
             Expanded(
@@ -383,7 +383,7 @@ class _Toolbar extends ConsumerWidget {
             ),
           ),
           if (filter.any) ...[
-            Text('$shown / ${cards.length} 张', style: KitText.xs.copyWith(color: Palette.bark500)),
+            Text('$shown / ${cards.length} 张', style: PxText.xs.copyWith(color: Palette.bark500)),
             InlineLink('清掉筛选', onTap: () => onChanged(const BoardFilter())),
           ],
         ],

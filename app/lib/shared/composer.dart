@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/messages.dart';
 import '../data/providers.dart';
 import '../data/remote.dart' show reasonOf;
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import 'chat_rules.dart';
 import 'chat_widgets.dart';
 import 'dictation_button.dart';
@@ -180,7 +180,7 @@ class _ComposerState extends ConsumerState<Composer> {
           keyboardType: TextInputType.multiline,
           style: _style,
           cursorColor: Palette.bark900,
-          decoration: kitBare(
+          decoration: pxBare(
             InputDecoration(
               hintText: widget.placeholder,
               // A hint that wraps grows the bar; folded, the farm's window has no room for that.
@@ -205,7 +205,7 @@ class _ComposerState extends ConsumerState<Composer> {
     };
   }
 
-  TextStyle get _style => KitText.sm.copyWith(height: 2);
+  TextStyle get _style => PxText.sm.copyWith(height: 2);
 
   Widget _bar(Widget field, bool canSend) => Container(
     constraints: const BoxConstraints(minHeight: 44),
@@ -227,7 +227,7 @@ class _ComposerState extends ConsumerState<Composer> {
           child: DictationButton(size: 24, controller: _draft.text),
         ),
         if (widget.sendButton && widget.onSend != null)
-          KitTappable(
+          Tappable(
             onTap: canSend ? _send : null,
             semanticLabel: widget.sendLabel,
             builder: (context, st) => Container(
@@ -254,13 +254,13 @@ class _ComposerState extends ConsumerState<Composer> {
           Container(
             margin: const EdgeInsets.only(bottom: 4),
             padding: const EdgeInsets.symmetric(vertical: 4),
-            decoration: const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(pxLine), boxShadow: kitDrop),
+            decoration: const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(pxLine), boxShadow: pxDrop),
             child: NamingMenu(naming: d.naming, highlight: Palette.wheat, faceSize: 22, everyoneMark: false),
           ),
         if (d.problem case final problem?)
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
-            child: Text(problem, style: KitText.xs.copyWith(color: Palette.berry)),
+            child: Text(problem, style: PxText.xs.copyWith(color: Palette.berry)),
           ),
         Opacity(
           opacity: widget.enabled ? 1 : .5,
@@ -270,7 +270,7 @@ class _ComposerState extends ConsumerState<Composer> {
                     color: Palette.creamInput,
                     border: Border.all(color: focused ? Palette.leaf500 : pxEdge, width: 2),
                   )
-                : const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(pxLine), boxShadow: kitDrop),
+                : const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(pxLine), boxShadow: pxDrop),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

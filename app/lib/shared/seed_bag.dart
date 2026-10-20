@@ -8,7 +8,7 @@ import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../audio/sfx.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show agentsProvider;
 import '../rules/issues.dart' show queuedIn;
 import 'faces.dart';
@@ -67,7 +67,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
       _ => null,
     };
     final project = _choosing ? null : _project ?? widget.project ?? last ?? (projects.length == 1 ? projects.single : null);
-    final label = KitText.xs.copyWith(color: Palette.bark600);
+    final label = PxText.xs.copyWith(color: Palette.bark600);
     if (project == null) {
       return _ProjectPick(
         projects: projects,
@@ -91,7 +91,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
                   Flexible(
                     child: Text(
                       '种在 $project',
-                      style: KitText.base.copyWith(color: Palette.bark900),
+                      style: PxText.base.copyWith(color: Palette.bark900),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -147,7 +147,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
                 Expanded(
                   child: Text(
                     '#${i.number.round()} ${i.title}',
-                    style: KitText.sm.copyWith(color: Palette.bark800),
+                    style: PxText.sm.copyWith(color: Palette.bark800),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -230,7 +230,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
                     children: [
                       SpriteIcon(kind.icon, size: 28),
                       const SizedBox(width: 4),
-                      Text(kind.name, style: KitText.xs.copyWith(color: Palette.bark800)),
+                      Text(kind.name, style: PxText.xs.copyWith(color: Palette.bark800)),
                     ],
                   ),
                 ),
@@ -276,7 +276,7 @@ class _SeedFormState extends ConsumerState<SeedForm> {
                 height: 44,
                 color: Palette.cream200,
                 alignment: Alignment.center,
-                child: Text('?', style: KitText.lg.copyWith(color: Palette.bark600)),
+                child: Text('?', style: PxText.lg.copyWith(color: Palette.bark600)),
               ),
             ),
             for (final a in agents) _WhoTile(active: who == a.id, label: a.name, onTap: () => setState(() => _who = a.id), child: AgentFaceOf(a.id, size: 44)),
@@ -305,11 +305,11 @@ class _ProjectPick extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = KitText.xs.copyWith(color: Palette.bark600);
+    final label = PxText.xs.copyWith(color: Palette.bark600);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('种在哪个项目？', style: KitText.base.copyWith(color: Palette.bark900)),
+        Text('种在哪个项目？', style: PxText.base.copyWith(color: Palette.bark900)),
         const SizedBox(height: 4),
         Text('这块空地还不属于哪个项目：先挑一个，种子按它的样子给。', style: label),
         const SizedBox(height: 10),
@@ -331,13 +331,13 @@ class _SeedChip extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     selected: on,
     builder: (context, st) => Container(
       color: on ? Palette.leaf500 : (st.hovered ? Palette.cream300 : Palette.cream200),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Text(text, style: KitText.xs.copyWith(color: on ? Palette.cream50 : Palette.bark800)),
+      child: Text(text, style: PxText.xs.copyWith(color: on ? Palette.cream50 : Palette.bark800)),
     ),
   );
 }
@@ -350,7 +350,7 @@ class _WhoTile extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     selected: active,
     semanticLabel: label,
@@ -366,7 +366,7 @@ class _WhoTile extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: KitText.xs.copyWith(color: Palette.bark800),
+            style: PxText.xs.copyWith(color: Palette.bark800),
           ),
         ],
       ),

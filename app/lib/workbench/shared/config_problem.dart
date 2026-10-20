@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/remote.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 
 class ConfigProblem extends ConsumerStatefulWidget {
   const ConfigProblem({super.key});
@@ -31,7 +31,7 @@ class _ConfigProblemState extends ConsumerState<ConfigProblem> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('配置没读到：${ref.watch(workbenchConfigProvider).error ?? '正在重试'}', style: KitText.sm.copyWith(color: Palette.berry)),
+        Text('配置没读到：${ref.watch(workbenchConfigProvider).error ?? '正在重试'}', style: PxText.sm.copyWith(color: Palette.berry)),
         const SizedBox(height: 8),
         PxButton(onPressed: _retrying ? null : _retry, child: Text(_retrying ? '正在重试…' : '重新读取配置')),
       ],
@@ -51,7 +51,7 @@ class RuntimeProblem extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('农具没读到：${result.error == null ? '正在重试' : reasonOf(result.error!)}', style: KitText.sm.copyWith(color: Palette.berry)),
+          Text('农具没读到：${result.error == null ? '正在重试' : reasonOf(result.error!)}', style: PxText.sm.copyWith(color: Palette.berry)),
           const SizedBox(height: 8),
           PxButton(
             onPressed: result.isLoading

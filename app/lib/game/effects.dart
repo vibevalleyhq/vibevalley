@@ -7,9 +7,9 @@ import '../data/providers.dart';
 import '../data/server.dart';
 import '../gen/vibevalley.dart';
 import '../sprites/atlas.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../voice/voice.dart';
-import '../ui/medals.dart';
+import '../ui/pixel/medals.dart';
 
 /// The debug console's 升一级 and 弹一个成就.
 final localEffects = StreamController<GameEffect>.broadcast();
@@ -207,7 +207,7 @@ class _LevelUpBannerState extends State<LevelUpBanner> with SingleTickerProvider
       },
       child: Container(
         padding: const EdgeInsets.fromLTRB(28, 16, 28, 16),
-        decoration: const BoxDecoration(color: Palette.cream50, boxShadow: kitDrop),
+        decoration: const BoxDecoration(color: Palette.cream50, boxShadow: pxDrop),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/ui_state.dart';
 import '../data/voice.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import 'chat_widgets.dart';
 import '../voice/dictation.dart';
 

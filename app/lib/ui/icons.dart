@@ -1,11 +1,9 @@
-// No line icons and no characters standing in for icons: the pixel font has no ✓, ✗ or ›.
-
 import 'dart:async';
-
 import 'package:flutter/widgets.dart';
+import '../gen/vibevalley.dart';
+import 'motion.dart';
 
-import '../../gen/vibevalley.dart';
-import 'base.dart';
+// No line icons and no characters standing in for icons: the pixel font has no ✓, ✗ or ›.
 
 class SpriteIcon extends StatelessWidget {
   const SpriteIcon(this.name, {super.key, required this.size, this.semanticLabel});
@@ -70,7 +68,7 @@ class _BobState extends State<_Bob> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (kitMoves(context)) {
+    if (motionAllowed(context)) {
       _beat ??= Timer.periodic(const Duration(milliseconds: 450), (_) => setState(() => _up = !_up));
     } else {
       _beat?.cancel();

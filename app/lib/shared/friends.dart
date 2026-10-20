@@ -7,7 +7,7 @@ import '../data/ui_state.dart';
 import '../game/tools.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show agentsProvider, runtimesProvider;
 import 'popover.dart';
 import 'quota_pill.dart';
@@ -82,7 +82,7 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
                   children: [
                     for (final (i, a) in sorted.indexed) ...[if (i > 0) const SizedBox(width: 4), Friend(agent: a, status: statuses[i])],
                     const SizedBox(width: 4),
-                    KitTappable(
+                    Tappable(
                       onTap: () => context.go('/agents/new'),
                       builder: (context, s) => Container(
                         width: 72,
@@ -99,7 +99,7 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
                               child: const SpriteIcon('button-add', size: 20),
                             ),
                             const SizedBox(height: 2),
-                            Text('捏帮工', style: KitText.xs.copyWith(color: Palette.bark600)),
+                            Text('捏帮工', style: PxText.xs.copyWith(color: Palette.bark600)),
                           ],
                         ),
                       ),
@@ -129,7 +129,7 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              KitTappable(
+              Tappable(
                 onTap: toggle,
                 semanticLabel: '帮工',
                 selected: open,
@@ -150,7 +150,7 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Text('帮工', style: KitText.xs.copyWith(color: Palette.bark900)),
+                      Text('帮工', style: PxText.xs.copyWith(color: Palette.bark900)),
                       if (busy > 0) ...[
                         const SizedBox(width: 6),
                         Container(
@@ -159,7 +159,7 @@ class _FriendsDockState extends ConsumerState<FriendsDock> {
                           color: Palette.leaf500,
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           alignment: Alignment.center,
-                          child: Text('$busy', style: KitText.xs.copyWith(fontSize: 10, color: Palette.cream50, height: 1)),
+                          child: Text('$busy', style: PxText.xs.copyWith(fontSize: 10, color: Palette.cream50, height: 1)),
                         ),
                       ],
                       const SizedBox(width: 6),
@@ -210,7 +210,7 @@ class Friend extends ConsumerWidget {
     return FarmPopover(
       offset: 10,
       width: 288,
-      trigger: (context, open, toggle) => KitTappable(
+      trigger: (context, open, toggle) => Tappable(
         onTap: toggle,
         semanticLabel: '${agent.name}，${st.label}',
         builder: (context, s) => Container(
@@ -232,7 +232,7 @@ class Friend extends ConsumerWidget {
                     agent.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: KitText.xs.copyWith(color: agent.enabled ? Palette.bark900 : Palette.bark400),
+                    style: PxText.xs.copyWith(color: agent.enabled ? Palette.bark900 : Palette.bark400),
                   ),
                   if (quota.level == QuotaLevel.unknown) const SizedBox(height: 7) else StaminaBar(quota: quota, segments: 8, width: 52, height: 7),
                 ],
@@ -268,14 +268,14 @@ class Friend extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(agent.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.lg),
+                      Text(agent.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.lg),
                       Text(
                         '${runtime?.preset.label ?? agent.runtime}${agent.model.isNotEmpty ? ' · ${agent.model}' : ''}',
-                        style: KitText.xs.copyWith(color: Palette.bark600),
+                        style: PxText.xs.copyWith(color: Palette.bark600),
                       ),
                       Text(
                         '${st.label}${tally != null ? ' · 请过 ${tally.hired.round()} 次，收成 ${tally.harvested.round()} 次' : ''}',
-                        style: KitText.xs.copyWith(color: Palette.bark800),
+                        style: PxText.xs.copyWith(color: Palette.bark800),
                       ),
                     ],
                   ),
@@ -294,14 +294,14 @@ class Friend extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('精力 ${quota.short.isEmpty ? '—' : quota.short}', style: KitText.xs.copyWith(color: Palette.bark800)),
+                        Text('精力 ${quota.short.isEmpty ? '—' : quota.short}', style: PxText.xs.copyWith(color: Palette.bark800)),
                         Tooltip(
                           message: quota.text,
                           child: Text(
                             '${runtime?.preset.label ?? agent.runtime}：${quota.text}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: KitText.xs.copyWith(color: Palette.bark500),
+                            style: PxText.xs.copyWith(color: Palette.bark500),
                           ),
                         ),
                       ],
@@ -311,7 +311,7 @@ class Friend extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(agent.role, style: KitText.sm.copyWith(color: Palette.bark800)),
+            Text(agent.role, style: PxText.sm.copyWith(color: Palette.bark800)),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -322,7 +322,7 @@ class Friend extends ConsumerWidget {
                           tone: picked ? PxTone.plain : PxTone.primary,
                           onPressed: () => ref.read(prefsProvider.notifier).setPick(picked ? 'auto' : agent.id),
                         )
-                      : Text('停用了，派不出去', style: KitText.sm.copyWith(color: Palette.bark600)),
+                      : Text('停用了，派不出去', style: PxText.sm.copyWith(color: Palette.bark600)),
                 ),
                 const SizedBox(width: 8),
                 PxButton.text(

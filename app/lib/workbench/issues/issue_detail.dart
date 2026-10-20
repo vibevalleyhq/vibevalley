@@ -12,7 +12,7 @@ import '../../shared/harvest.dart' show HarvestReview;
 import '../../gen/vibevalley.dart';
 import '../../rules/issues.dart';
 import '../../data/ui_state.dart' show titleOpenProvider, farmOverlaysProvider;
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../projects/new_project_dialog.dart' show showNewProjectDialog;
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
@@ -43,7 +43,7 @@ class _CloseIssueState extends ConsumerState<CloseIssue> {
       children: [
         Text(
           working ? '${session.name} 还在干这张工单。关上就是叫停它、让它收工，分支上的改动不合进主分支。' : '收获就是把 ${session.name} 的分支合进项目的主分支，先看一遍收成清单；不收就是让它收工，改动不合进去。',
-          style: KitText.sm.copyWith(color: Palette.bark800, height: 1.625),
+          style: PxText.sm.copyWith(color: Palette.bark800, height: 1.625),
         ),
         const SizedBox(height: 16),
         Wrap(
@@ -91,7 +91,7 @@ class _ReopenFormState extends State<ReopenForm> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text('「${issueTitle(widget.issue)}」由同一个帮工档案的新帮工接着做，它会知道这张工单原来要做什么、上一次是怎么关的。', style: KitText.sm.copyWith(color: Palette.bark800, height: 1.625)),
+      Text('「${issueTitle(widget.issue)}」由同一个帮工档案的新帮工接着做，它会知道这张工单原来要做什么、上一次是怎么关的。', style: PxText.sm.copyWith(color: Palette.bark800, height: 1.625)),
       const SizedBox(height: 12),
       PxTextArea(
         value: _text,
@@ -239,7 +239,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
     final drafting = item.drafting;
     final drafted = isDrafted(item);
     final asks = item.asks;
-    final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.5);
+    final body = PxText.sm.copyWith(color: Palette.bark800, height: 1.5);
     final (head, line) = switch (drafting) {
       final d? => ('${d.name}在起草', '它在读代码，写好了会填进下面各栏。'),
       null when asks.isNotEmpty => ('草稿写好了，它有 ${asks.length} 个问题要问你', '在下面回答，它照你的回答再起草一版。'),
@@ -261,7 +261,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(head, style: KitText.base),
+                    Text(head, style: PxText.base),
                     const SizedBox(height: 4),
                     Text(line, style: body),
                     for (final a in asks) Text('· $a', style: body),
@@ -392,7 +392,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
                   Expanded(
                     child: Text(
                       '排队中：${ago(queued, DateTime.now().millisecondsSinceEpoch)}排上的，有空地就按看板上的先后自动开工。',
-                      style: KitText.sm.copyWith(color: Palette.bark800, height: 1.5),
+                      style: PxText.sm.copyWith(color: Palette.bark800, height: 1.5),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -491,7 +491,7 @@ class _Row extends StatelessWidget {
       children: [
         SizedBox(
           width: 72,
-          child: Text(label, style: KitText.sm.copyWith(color: Palette.bark500)),
+          child: Text(label, style: PxText.sm.copyWith(color: Palette.bark500)),
         ),
         const SizedBox(width: 12),
         Expanded(child: child),
@@ -508,7 +508,7 @@ class ManagerIssueDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = issueTag(issue);
-    final body = KitText.sm.copyWith(color: Palette.bark800);
+    final body = PxText.sm.copyWith(color: Palette.bark800);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,

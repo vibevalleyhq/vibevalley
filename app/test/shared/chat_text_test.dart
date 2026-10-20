@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibevalley/shared/chat_rules.dart';
 import 'package:vibevalley/shared/chat_widgets.dart';
-import 'package:vibevalley/ui/kit/kit.dart';
+import 'package:vibevalley/ui/pixel/pixel.dart';
 
 import '../support/farm.dart';
 

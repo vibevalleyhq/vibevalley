@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 
 const wideFrom = 1024.0;
 
@@ -106,17 +106,17 @@ class ListCard extends StatelessWidget {
                   if (subtitle != null)
                     TextSpan(
                       text: ' $subtitle',
-                      style: KitText.sm.copyWith(color: Palette.bark500),
+                      style: PxText.sm.copyWith(color: Palette.bark500),
                     ),
                 ],
               ),
-              style: KitText.xl,
+              style: PxText.xl,
             ),
           ),
           if (note != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-              child: Text(note!, style: KitText.xs.copyWith(color: Palette.bark500)),
+              child: Text(note!, style: PxText.xs.copyWith(color: Palette.bark500)),
             ),
           ...children,
         ],
@@ -135,7 +135,7 @@ class ListRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 4),
-    child: KitTappable(
+    child: Tappable(
       onTap: onTap,
       selected: active,
       semanticLabel: semanticLabel,
@@ -165,10 +165,10 @@ class RowText extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(name, style: KitText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
+      Text(name, style: PxText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
       Text(
         line,
-        style: KitText.fine.copyWith(color: Palette.bark500),
+        style: PxText.fine.copyWith(color: Palette.bark500),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -195,7 +195,7 @@ class TintTag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
     color: fill,
-    child: Text(text, style: KitText.xs.copyWith(color: ink)),
+    child: Text(text, style: PxText.xs.copyWith(color: ink)),
   );
 }
 

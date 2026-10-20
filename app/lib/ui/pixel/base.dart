@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import '../common.dart';
+import 'theme.dart';
 
-import '../theme.dart';
+// Kept reachable from here while the pages still import the pixel kit file by file.
+export '../motion.dart';
+export '../tappable.dart';
 
 /// Line heights are Tailwind's for each size: the skin changes the size, not the line height.
-abstract final class KitText {
+abstract final class PxText {
   static const xs = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, fontWeight: FontWeight.w400, color: Palette.bark900);
 
   static const fine = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 1.5, fontWeight: FontWeight.w400, color: Palette.bark900);
@@ -35,83 +39,7 @@ abstract final class KitText {
   static const readMeasure = 40;
 }
 
-Duration kitMotion(BuildContext context, Duration d) => (MediaQuery.maybeDisableAnimationsOf(context) ?? false) ? Duration.zero : d;
-
-bool kitMoves(BuildContext context) => !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
-
-const kitDrop = [BoxShadow(color: Palette.pxDrop, offset: Offset(2, 2))];
-
-class KitState {
-  const KitState({required this.enabled, required this.hovered, required this.pressed, required this.focused});
-  final bool enabled;
-  final bool hovered;
-  final bool pressed;
-
-  final bool focused;
-}
-
-/// `onTap` null is disabled: not focusable, no hover.
-class KitTappable extends StatefulWidget {
-  const KitTappable({
-    super.key,
-    required this.onTap,
-    required this.builder,
-    this.tooltip,
-    this.semanticLabel,
-    this.focusNode,
-    this.autofocus = false,
-    this.selected,
-  });
-
-  final VoidCallback? onTap;
-  final Widget Function(BuildContext context, KitState state) builder;
-  final String? tooltip;
-  final String? semanticLabel;
-  final FocusNode? focusNode;
-  final bool autofocus;
-  final bool? selected;
-
-  @override
-  State<KitTappable> createState() => _KitTappableState();
-}
-
-class _KitTappableState extends State<KitTappable> {
-  bool _hovered = false;
-  bool _pressed = false;
-  bool _focused = false;
-
-  @override
-  void didUpdateWidget(KitTappable old) {
-    super.didUpdateWidget(old);
-    if (widget.onTap == null) _pressed = false;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = widget.onTap != null;
-    Widget child = FocusableActionDetector(
-      enabled: enabled,
-      focusNode: widget.focusNode,
-      autofocus: widget.autofocus,
-      mouseCursor: MouseCursor.defer,
-      actions: {ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) => widget.onTap?.call())},
-      onShowHoverHighlight: (v) => setState(() => _hovered = v),
-      onShowFocusHighlight: (v) => setState(() => _focused = v),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-        onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
-        onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
-        onTap: widget.onTap,
-        child: widget.builder(context, KitState(enabled: enabled, hovered: enabled && _hovered, pressed: enabled && _pressed, focused: enabled && _focused)),
-      ),
-    );
-    child = Semantics(button: true, enabled: enabled, selected: widget.selected, label: widget.semanticLabel, child: child);
-    final tip = widget.tooltip;
-    if (tip != null && tip.isNotEmpty) child = Tooltip(message: tip, child: child);
-    return child;
-  }
-}
+const pxDrop = [BoxShadow(color: Palette.pxDrop, offset: Offset(2, 2))];
 
 /// `border` (0 or 2) is a border inside the frame, under which the inset rim and band are drawn.
 class PxWindow extends StatelessWidget {
@@ -250,6 +178,3 @@ class _DashPainter extends CustomPainter {
   @override
   bool shouldRepaint(_DashPainter old) => old.color != color || old.thickness != thickness || old.vertical != vertical;
 }
-
-/// Until the app sets it, a tap does nothing.
-void Function(Uri uri)? kitOpenLink;

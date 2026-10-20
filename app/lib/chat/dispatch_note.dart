@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 
 /// The farm's note of a dispatch: one clipped line until it is opened, then the whole task in its place.
 class DispatchNote extends StatefulWidget {
@@ -18,7 +18,7 @@ class _DispatchNoteState extends State<DispatchNote> {
   @override
   Widget build(BuildContext context) {
     final line = widget.text.replaceAll(RegExp(r'\s+'), ' ').trim();
-    return KitTappable(
+    return Tappable(
       onTap: () => setState(() => _open = !_open),
       semanticLabel: _open ? '收起派活' : '展开派活',
       builder: (context, s) => Row(
@@ -27,7 +27,7 @@ class _DispatchNoteState extends State<DispatchNote> {
           Flexible(
             child: _open
                 ? PxMarkdown(widget.text, mentions: true, style: widget.style, reading: true)
-                : Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm.merge(widget.style)),
+                : Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm.merge(widget.style)),
           ),
           const SizedBox(width: 6),
           Padding(

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibevalley/ui/theme.dart';
+import 'package:vibevalley/ui/pixel/theme.dart';
 import 'package:vibevalley/data/server_choice.dart';
 import 'package:vibevalley/workbench/lan/lan_page.dart';
 import 'package:vibevalley/gen/vibevalley.dart';

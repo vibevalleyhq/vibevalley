@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../sprites/atlas.dart';
-import '../ui/pixels.dart';
+import '../ui/pixel/frame.dart';
 import '../data/remote.dart' show agentsProvider;
 import '../voice/voice.dart';
 import 'calls.dart';

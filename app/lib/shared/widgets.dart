@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 
 import '../data/remote.dart';
-import '../ui/kit/base.dart';
-import '../ui/kit/toast.dart';
+import '../ui/pixel/base.dart';
+import '../ui/pixel/toast_viewport.dart';
 import '../ui/theme.dart';
 
 class EmptyNote extends StatelessWidget {
@@ -13,7 +13,7 @@ class EmptyNote extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     color: Palette.cream100,
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    child: Text(text, style: KitText.xs.copyWith(color: Palette.bark500)),
+    child: Text(text, style: PxText.xs.copyWith(color: Palette.bark500)),
   );
 }
 
@@ -24,7 +24,7 @@ class InlineLink extends StatelessWidget {
   final Color color;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     semanticLabel: text,
     builder: (context, s) => Text(
@@ -53,6 +53,6 @@ class BadgeLabel extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     color: hat ? Palette.leaf300.withValues(alpha: .5) : Palette.cream200,
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-    child: Text(text, style: KitText.xs.copyWith(color: hat ? Palette.leaf700 : Palette.bark600)),
+    child: Text(text, style: PxText.xs.copyWith(color: hat ? Palette.leaf700 : Palette.bark600)),
   );
 }

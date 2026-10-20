@@ -7,7 +7,7 @@ import '../../rules/time.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
@@ -43,7 +43,7 @@ class RuntimesPage extends ConsumerWidget {
           ? [
               Padding(
                 padding: const EdgeInsets.all(32),
-                child: Text('读取中…', style: KitText.sm.copyWith(color: Palette.bark500)),
+                child: Text('读取中…', style: PxText.sm.copyWith(color: Palette.bark500)),
               ),
             ]
           : _detail(atlas, selected, config, busy[selected.id]),
@@ -102,7 +102,7 @@ class _ListStamina extends StatelessWidget {
         children: [
           StaminaBar(quota: quota, segments: 10, width: 92, height: 7),
           const SizedBox(width: 6),
-          Text(quota.short, style: KitText.fine.copyWith(color: quota.level == QuotaLevel.empty ? Palette.berry : Palette.bark600)),
+          Text(quota.short, style: PxText.fine.copyWith(color: quota.level == QuotaLevel.empty ? Palette.berry : Palette.bark600)),
         ],
       ),
     );
@@ -176,8 +176,8 @@ class _Header extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(preset.label, style: KitText.x2l),
-                Text(preset.blurb, style: KitText.sm.copyWith(color: Palette.bark600)),
+                Text(preset.label, style: PxText.x2l),
+                Text(preset.blurb, style: PxText.sm.copyWith(color: Palette.bark600)),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 8,
@@ -187,14 +187,14 @@ class _Header extends ConsumerWidget {
                     ...switch (inst) {
                       InstallationAvailable(:final version, :final command, :final via) => [
                         TintTag('可用 ${version ?? ''}', fill: okTag.fill, ink: okTag.ink),
-                        Text(command, style: KitText.mono.copyWith(color: Palette.bark500)),
-                        Text(via == Via.bundled ? '随 oar 一起装' : '命令行', style: KitText.xs.copyWith(color: Palette.bark500)),
+                        Text(command, style: PxText.mono.copyWith(color: Palette.bark500)),
+                        Text(via == Via.bundled ? '随 oar 一起装' : '命令行', style: PxText.xs.copyWith(color: Palette.bark500)),
                       ],
                       InstallationUnsupported(:final reason) => [TintTag('不支持：$reason', fill: badTag.fill, ink: badTag.ink)],
                       InstallationNotFound() => [TintTag('这台机器上没找到', fill: badTag.fill, ink: badTag.ink)],
-                      InstallationChecking() => [Text('检测中…', style: KitText.xs.copyWith(color: Palette.bark500))],
+                      InstallationChecking() => [Text('检测中…', style: PxText.xs.copyWith(color: Palette.bark500))],
                     },
-                    if (inst is! InstallationChecking) Text('检测于 ${wallClockText(info.checkedAt)}', style: KitText.xs.copyWith(color: Palette.bark500)),
+                    if (inst is! InstallationChecking) Text('检测于 ${wallClockText(info.checkedAt)}', style: PxText.xs.copyWith(color: Palette.bark500)),
                   ],
                 ),
               ],
@@ -224,8 +224,8 @@ class _FactsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final small = KitText.xs.copyWith(color: Palette.bark600);
-    final heading = KitText.xs.copyWith(color: Palette.bark500);
+    final small = PxText.xs.copyWith(color: Palette.bark600);
+    final heading = PxText.xs.copyWith(color: Palette.bark500);
     return PxCard(
       title: '能做什么',
       aside: const Text('来自 oar 0.44'),
@@ -250,11 +250,11 @@ class _FactsCard extends StatelessWidget {
                     children: [
                       TextSpan(
                         text: key,
-                        style: KitText.mono.copyWith(color: Palette.bark800),
+                        style: PxText.mono.copyWith(color: Palette.bark800),
                       ),
                       TextSpan(
                         text: ' $value',
-                        style: KitText.xs.copyWith(color: Palette.bark500),
+                        style: PxText.xs.copyWith(color: Palette.bark500),
                       ),
                     ],
                   ),
@@ -273,7 +273,7 @@ class _FactsCard extends StatelessWidget {
                   color: facts.capabilities.contains(c) ? Palette.cream200 : Palette.cream50,
                   child: Text(
                     _capabilityLabel(c),
-                    style: KitText.fine.copyWith(
+                    style: PxText.fine.copyWith(
                       color: facts.capabilities.contains(c) ? Palette.bark800 : Palette.bark500,
                       decoration: facts.capabilities.contains(c) ? null : TextDecoration.lineThrough,
                     ),
@@ -490,13 +490,13 @@ class RuntimeUsage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final muted = KitText.xs.copyWith(color: Palette.bark500);
+    final muted = PxText.xs.copyWith(color: Palette.bark500);
     final usage = info.usage;
     switch (usage) {
       case null:
         return Text(info.facts.capabilities.contains(RuntimeCapability.accountUsage) ? '装好以后才能读到。' : '这个 runtime 不报告账户用量。', style: muted);
       case AccountUsageLoginRequired():
-        return Text('没登录。在这台机器上运行 ${info.preset.label} 登录一次。', style: KitText.xs.copyWith(color: const Color(0xFFB8682A)));
+        return Text('没登录。在这台机器上运行 ${info.preset.label} 登录一次。', style: PxText.xs.copyWith(color: const Color(0xFFB8682A)));
       case AccountUsageUnavailable(:final reason):
         return Text('读不到：$reason', style: muted);
       case AccountUsageBalance() || AccountUsageOk():
@@ -510,7 +510,7 @@ class RuntimeUsage extends StatelessWidget {
           child: Column(
             children: [
               EnergyBottle(atlas: atlas, quota: quota, size: 52),
-              Text(quota.short.isEmpty ? '—' : quota.short, style: KitText.sm.copyWith(color: Palette.bark800)),
+              Text(quota.short.isEmpty ? '—' : quota.short, style: PxText.sm.copyWith(color: Palette.bark800)),
             ],
           ),
         ),
@@ -521,15 +521,15 @@ class RuntimeUsage extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: switch (usage) {
               AccountUsageBalance(:final provider, :final available) => [
-                Text('按量计费，这里是 $provider 账户余额${available ? '。' : '，不够用了。'}', style: KitText.sm.copyWith(color: available ? Palette.bark800 : Palette.berry)),
+                Text('按量计费，这里是 $provider 账户余额${available ? '。' : '，不够用了。'}', style: PxText.sm.copyWith(color: available ? Palette.bark800 : Palette.berry)),
                 const SizedBox(height: 10),
                 Text(
                   '今天帮工花了约 ${yuan(info.spentToday ?? 0)}${(info.settings.dailyBudget ?? 0) > 0 ? '，每日预算 ${yuan(info.settings.dailyBudget!)}' : '，没设每日预算'}。',
-                  style: KitText.xs.copyWith(color: Palette.bark600),
+                  style: PxText.xs.copyWith(color: Palette.bark600),
                 ),
               ],
               AccountUsageOk(:final subscription, :final windows) => [
-                if (subscription != null && subscription.isNotEmpty) Text('套餐：$subscription', style: KitText.xs.copyWith(color: Palette.bark600)),
+                if (subscription != null && subscription.isNotEmpty) Text('套餐：$subscription', style: PxText.xs.copyWith(color: Palette.bark600)),
                 for (final w in windows) _Window(window: w),
               ].indexed.expand((e) => [if (e.$1 > 0) const SizedBox(height: 10), e.$2]).toList(),
               _ => const <Widget>[],
@@ -558,9 +558,9 @@ class _Window extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text(label, style: KitText.fine.copyWith(color: Palette.bark500)),
+              child: Text(label, style: PxText.fine.copyWith(color: Palette.bark500)),
             ),
-            Text('剩 ${_pct(left)}%', style: KitText.fine.copyWith(color: Palette.bark800)),
+            Text('剩 ${_pct(left)}%', style: PxText.fine.copyWith(color: Palette.bark800)),
           ],
         ),
         const SizedBox(height: 4),
@@ -578,7 +578,7 @@ class _Window extends StatelessWidget {
         if (window.resetsAt case final at?)
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text('${momentText(at)} 重置', style: KitText.fine.copyWith(color: Palette.bark500)),
+            child: Text('${momentText(at)} 重置', style: PxText.fine.copyWith(color: Palette.bark500)),
           ),
       ],
     );
@@ -592,7 +592,7 @@ class _ModelsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final models = info.models;
-    final head = KitText.xs.copyWith(color: Palette.bark500);
+    final head = PxText.xs.copyWith(color: Palette.bark500);
     return PxCard(
       title: '模型',
       aside: models == null ? null : Text('${models.length} 个'),
@@ -626,19 +626,19 @@ class _ModelsCard extends StatelessWidget {
                           spacing: 8,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Text(m.id, style: KitText.mono.copyWith(color: Palette.bark800)),
+                            Text(m.id, style: PxText.mono.copyWith(color: Palette.bark800)),
                             if (m.isDefault)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 4),
                                 color: okTag.fill,
-                                child: Text('默认', style: KitText.xs.copyWith(color: okTag.ink, fontSize: 10)),
+                                child: Text('默认', style: PxText.xs.copyWith(color: okTag.ink, fontSize: 10)),
                               ),
                           ],
                         ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Text(m.effortLevels.isEmpty ? '—' : m.effortLevels.join(' · '), style: KitText.xs.copyWith(color: Palette.bark600)),
+                        child: Text(m.effortLevels.isEmpty ? '—' : m.effortLevels.join(' · '), style: PxText.xs.copyWith(color: Palette.bark600)),
                       ),
                     ],
                   ),
@@ -656,7 +656,7 @@ class _InventoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final list = entries;
-    final muted = KitText.xs.copyWith(color: Palette.bark500);
+    final muted = PxText.xs.copyWith(color: Palette.bark500);
     return PxCard(
       title: title,
       aside: list == null ? null : Text('${list.length}'),
@@ -677,7 +677,7 @@ class _InventoryCard extends StatelessWidget {
                       children: [
                         Text(
                           e.name,
-                          style: KitText.mono.copyWith(
+                          style: PxText.mono.copyWith(
                             color: e.enabled == false ? Palette.bark500 : Palette.bark800,
                             decoration: e.enabled == false ? TextDecoration.lineThrough : null,
                           ),
@@ -702,13 +702,13 @@ class _AgentsCard extends StatelessWidget {
     title: '用到它的 agent',
     aside: TextLink('用它捏一个新 agent →', onTap: () => workbenchGo(context, '/agents/new?runtime=${Uri.encodeComponent(runtime)}')),
     child: agents.isEmpty
-        ? Text('还没有。', style: KitText.xs.copyWith(color: Palette.bark500))
+        ? Text('还没有。', style: PxText.xs.copyWith(color: Palette.bark500))
         : Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
               for (final a in agents)
-                KitTappable(
+                Tappable(
                   onTap: () => workbenchGo(context, '/agents/${Uri.encodeComponent(a.id)}'),
                   builder: (context, s) => Container(
                     padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
@@ -718,7 +718,7 @@ class _AgentsCard extends StatelessWidget {
                       children: [
                         AgentFace(look: a.look, id: a.id, size: 26),
                         const SizedBox(width: 6),
-                        Text(a.name, style: KitText.sm.copyWith(color: Palette.bark800)),
+                        Text(a.name, style: PxText.sm.copyWith(color: Palette.bark800)),
                       ],
                     ),
                   ),

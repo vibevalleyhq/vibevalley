@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../village/village_view.dart';
-import '../ui/glyphs.dart';
+import '../ui/pixel/glyphs.dart';
 import '../shared/connection_banner.dart';
 import 'scene.dart';
 import '../data/ui_state.dart';

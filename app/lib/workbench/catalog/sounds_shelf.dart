@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../audio/sfx.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import 'catalog_page.dart';
 
 class SoundsShelf extends StatefulWidget {
@@ -22,7 +22,7 @@ class _SoundsShelfState extends State<SoundsShelf> {
 
   @override
   Widget build(BuildContext context) {
-    final mono = KitText.mono.copyWith(fontSize: 12, color: Palette.bark800);
+    final mono = PxText.mono.copyWith(fontSize: 12, color: Palette.bark800);
     return shelfLayout(
       context,
       left: ShelfColumn(
@@ -30,7 +30,7 @@ class _SoundsShelfState extends State<SoundsShelf> {
         below: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: Text('农场里的每个声音，点一下就能听。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark500)),
+            child: Text('农场里的每个声音，点一下就能听。', style: PxText.xs.copyWith(height: 1.625, color: Palette.bark500)),
           ),
         ],
       ),
@@ -47,7 +47,7 @@ class _SoundsShelfState extends State<SoundsShelf> {
                 const TextSpan(text: '。'),
               ],
             ),
-            style: KitText.sm.copyWith(color: Palette.bark800, height: 1.625),
+            style: PxText.sm.copyWith(color: Palette.bark800, height: 1.625),
           ),
         ),
         for (final g in soundGroups)
@@ -70,7 +70,7 @@ class _SoundButton extends StatelessWidget {
   final String name;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: () => Sfx.play(name),
     semanticLabel: '播放 ${soundLabel[name] ?? name}',
     builder: (context, s) {
@@ -83,9 +83,9 @@ class _SoundButton extends StatelessWidget {
           children: [
             const SizedBox.square(dimension: 24, child: Center(child: SpriteIcon('button-play', size: 20))),
             const SizedBox(width: 8),
-            Text(soundLabel[name] ?? name, style: KitText.sm.copyWith(color: Palette.bark800)),
+            Text(soundLabel[name] ?? name, style: PxText.sm.copyWith(color: Palette.bark800)),
             const SizedBox(width: 8),
-            Text(name, style: KitText.mono.copyWith(color: Palette.bark500)),
+            Text(name, style: PxText.mono.copyWith(color: Palette.bark500)),
           ],
         ),
       );

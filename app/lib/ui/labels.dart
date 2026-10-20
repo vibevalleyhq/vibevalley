@@ -1,4 +1,4 @@
-import '../../gen/vibevalley.dart';
+import '../gen/vibevalley.dart';
 
 String phaseLabel(Phase phase) => switch (phase) {
   PhaseArriving() => '进场',

@@ -5,7 +5,7 @@ import '../data/providers.dart';
 import './faces.dart' show RuntimeIcon;
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show runtimesProvider;
 import 'popover.dart';
 import '../rules/quota.dart';
@@ -35,7 +35,7 @@ class QuotaPill extends ConsumerWidget {
       alignEnd: true,
       offset: 8,
       width: 352,
-      trigger: (context, open, toggle) => KitTappable(
+      trigger: (context, open, toggle) => Tappable(
         onTap: toggle,
         semanticLabel: shown == null ? '各 runtime 的剩余额度' : '剩余额度，最少的还剩 $shown%',
         builder: (context, s) => HudCard(
@@ -50,7 +50,7 @@ class QuotaPill extends ConsumerWidget {
                 size: 28,
               ),
               const SizedBox(width: 4),
-              Text(shown == null ? '额度' : '$shown%', style: KitText.xs.copyWith(color: lowest == null ? Palette.bark900 : _textOf(lowest))),
+              Text(shown == null ? '额度' : '$shown%', style: PxText.xs.copyWith(color: lowest == null ? Palette.bark900 : _textOf(lowest))),
             ],
           ),
         ),
@@ -63,7 +63,7 @@ class QuotaPill extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Expanded(child: Text('剩余额度', style: KitText.sm)),
+                Expanded(child: Text('剩余额度', style: PxText.sm)),
                 PxButton(
                   size: PxSize.icon,
                   tooltip: '现在读一次额度',
@@ -90,7 +90,7 @@ class QuotaPill extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text('从各家账户读来，几分钟更新一次；帮工干完一轮也会更新。', style: KitText.xs.copyWith(color: Palette.bark400)),
+            Text('从各家账户读来，几分钟更新一次；帮工干完一轮也会更新。', style: PxText.xs.copyWith(color: Palette.bark400)),
           ],
         ),
       ),
@@ -125,7 +125,7 @@ class Machine extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    Text(info.preset.label, style: KitText.sm),
+                    Text(info.preset.label, style: PxText.sm),
                     if (usage case AccountUsageOk(:final subscription?)) ...[
                       const SizedBox(width: 6),
                       Flexible(
@@ -133,7 +133,7 @@ class Machine extends ConsumerWidget {
                           subscription,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: KitText.xs.copyWith(color: Palette.bark500),
+                          style: PxText.xs.copyWith(color: Palette.bark500),
                         ),
                       ),
                     ],
@@ -145,13 +145,13 @@ class Machine extends ConsumerWidget {
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       '今天花了约 ${yuan(info.spentToday!)}${(info.settings.dailyBudget ?? 0) > 0 ? ' / 预算 ${yuan(info.settings.dailyBudget!)}' : ''}',
-                      style: KitText.xs.copyWith(color: Palette.bark500),
+                      style: PxText.xs.copyWith(color: Palette.bark500),
                     ),
                   ),
                 if (stop != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(stop, style: KitText.xs.copyWith(color: Palette.berry)),
+                    child: Text(stop, style: PxText.xs.copyWith(color: Palette.berry)),
                   ),
               ],
             ),
@@ -163,7 +163,7 @@ class Machine extends ConsumerWidget {
                 if (atlas != null) EnergyBottle(atlas: atlas, quota: quota, size: 40),
                 Text(
                   quota.short.isEmpty ? '—' : quota.short,
-                  style: KitText.xs.copyWith(
+                  style: PxText.xs.copyWith(
                     color: quota.level == QuotaLevel.unknown
                         ? Palette.bark400
                         : quota.level == QuotaLevel.empty
@@ -186,7 +186,7 @@ class UsageLines extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final xs = KitText.xs;
+    final xs = PxText.xs;
     return switch (usage) {
       null => Text('不报额度', style: xs.copyWith(color: Palette.bark400)),
       AccountUsageLoginRequired() => Text('没登录，额度读不到', style: xs.copyWith(color: const Color(0xFFB8682A))),
@@ -268,7 +268,7 @@ class HudCard extends StatelessWidget {
         boxShadow: [BoxShadow(color: const Color(0xFF3A2A18).withValues(alpha: .6), offset: const Offset(2, 2))],
       ),
       child: DefaultTextStyle(
-        style: KitText.xs.copyWith(color: Palette.bark900),
+        style: PxText.xs.copyWith(color: Palette.bark900),
         // As tall as `height` when given, else as its content (a bare Center would fill a loose height: the helpers' list).
         child: Center(widthFactor: 1, heightFactor: height == null ? 1 : null, child: child),
       ),

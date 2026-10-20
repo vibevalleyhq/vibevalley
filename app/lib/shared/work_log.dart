@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import '../ui/theme.dart';
 import '../gen/vibevalley.dart';
 import '../rules/rounds.dart';
-import '../ui/kit/base.dart';
-import '../ui/kit/icons.dart';
-import '../ui/kit/labels.dart';
-import '../ui/kit/markdown.dart';
+import '../ui/pixel/base.dart';
+import '../ui/icons.dart';
+import '../ui/labels.dart';
+import '../ui/pixel/markdown.dart';
 import 'widgets.dart';
 
 const _nearBottom = 48.0;
@@ -125,7 +125,7 @@ class _WorkLogState extends State<WorkLog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          KitTappable(
+          Tappable(
             onTap: () => setState(() => _toggled[_idOf(round)] = !open),
             semanticLabel: open ? '收起这一轮' : '展开这一轮',
             builder: (context, s) => Container(
@@ -135,18 +135,18 @@ class _WorkLogState extends State<WorkLog> {
                 children: [
                   AnimatedRotation(
                     turns: open ? .25 : 0,
-                    duration: kitMotion(context, const Duration(milliseconds: 150)),
+                    duration: motionDuration(context, const Duration(milliseconds: 150)),
                     child: const SpriteIcon('button-next', size: 12),
                   ),
                   const SizedBox(width: 6),
-                  Text(label, style: KitText.xs.copyWith(color: Palette.bark800)),
+                  Text(label, style: PxText.xs.copyWith(color: Palette.bark800)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '${round.steps.length} 步 · ${tookText(roundMs(round, end: end))}${live ? ' · 进行中' : ''}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: KitText.xs.copyWith(color: Palette.bark400),
+                      style: PxText.xs.copyWith(color: Palette.bark400),
                     ),
                   ),
                   if (asked != null) _When(at: asked.time, now: widget.now),
@@ -227,7 +227,7 @@ class _TimeBar extends StatelessWidget {
               flex: ((span.ms < least ? least : span.ms) / least * 10).round().clamp(1, 1 << 30),
               child: Tooltip(
                 message: '${spanLabel(span.step)} · ${tookText(span.ms)}\n${span.step.text.split('\n').first}',
-                child: KitTappable(
+                child: Tappable(
                   onTap: () => onPick(span.step),
                   semanticLabel: '${spanLabel(span.step)} ${tookText(span.ms)}',
                   builder: (context, s) => Container(margin: const EdgeInsets.only(right: 1), color: s.hovered ? Palette.bark900 : spanColor(span.step)),
@@ -359,7 +359,7 @@ class _Line extends StatelessWidget {
         Padding(padding: const EdgeInsets.only(top: 2), child: SpriteIcon(mark, size: 12)),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(text, style: KitText.xs.copyWith(color: ink)),
+          child: Text(text, style: PxText.xs.copyWith(color: ink)),
         ),
         _When(at: at, now: now),
       ],
@@ -373,7 +373,7 @@ class _When extends StatelessWidget {
   final double now;
 
   @override
-  Widget build(BuildContext context) => Text(ago(at, now), style: KitText.xs.copyWith(color: Palette.bark400));
+  Widget build(BuildContext context) => Text(ago(at, now), style: PxText.xs.copyWith(color: Palette.bark400));
 }
 
 class _Head extends StatelessWidget {
@@ -385,7 +385,7 @@ class _Head extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Text(label, style: KitText.xs.copyWith(color: Palette.bark600)),
+      Text(label, style: PxText.xs.copyWith(color: Palette.bark600)),
       const Spacer(),
       _When(at: at, now: now),
     ],
@@ -415,7 +415,7 @@ class _FoldedState extends State<_Folded> {
     if (widget.markdown && clamp) {
       body = ClipRect(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: widget.lines * KitText.read.fontSize! * KitText.read.height!),
+          constraints: BoxConstraints(maxHeight: widget.lines * PxText.read.fontSize! * PxText.read.height!),
           child: OverflowBox(alignment: Alignment.topLeft, maxHeight: double.infinity, child: body),
         ),
       );
@@ -481,7 +481,7 @@ class _ToolStepState extends State<_ToolStep> {
     final input = readableInput(step);
     // The pixel font has no ✓ or ✗: their sprites instead.
     final (mark, label) = switch (step.ok) {
-      null => (Text('…', style: KitText.xs.copyWith(color: Palette.bark400)), '进行中'),
+      null => (Text('…', style: PxText.xs.copyWith(color: Palette.bark400)), '进行中'),
       true => (const SpriteIcon('mark-check', size: 12), '成功'),
       false => (const SpriteIcon('mark-cross', size: 12), '失败'),
     };
@@ -491,7 +491,7 @@ class _ToolStepState extends State<_ToolStep> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          KitTappable(
+          Tappable(
             onTap: () => setState(() => _open = !_open),
             semanticLabel: '${farm != null ? '田头' : step.actionText ?? ''} $what',
             builder: (context, s) => Container(
@@ -503,7 +503,7 @@ class _ToolStepState extends State<_ToolStep> {
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 56,
-                    child: Text(farm != null ? '田头' : step.actionText ?? '', style: KitText.sm.copyWith(color: Palette.bark800)),
+                    child: Text(farm != null ? '田头' : step.actionText ?? '', style: PxText.sm.copyWith(color: Palette.bark800)),
                   ),
                   const SizedBox(width: 8),
                   // The whole command is one tap away (the row opens), not a tooltip as wide as the window.
@@ -512,7 +512,7 @@ class _ToolStepState extends State<_ToolStep> {
                       what,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: KitText.mono.copyWith(color: Palette.bark600),
+                      style: PxText.mono.copyWith(color: Palette.bark600),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -529,13 +529,13 @@ class _ToolStepState extends State<_ToolStep> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (step.tool != null) Text('工具 ${step.tool}', style: KitText.xs.copyWith(color: Palette.bark400)),
+                  if (step.tool != null) Text('工具 ${step.tool}', style: PxText.xs.copyWith(color: Palette.bark400)),
                   if (input.isNotEmpty) ...[const SizedBox(height: 6), _Pre(input, fill: Palette.bark900, ink: Palette.cream100, maxHeight: 160)],
                   const SizedBox(height: 6),
                   if (step.output case final out? when out.isNotEmpty)
                     _Pre(out, fill: Palette.cream200, ink: Palette.bark900, maxHeight: 224)
                   else
-                    Text(step.ok == null ? '还没返回' : '没有输出', style: KitText.xs.copyWith(color: Palette.bark400)),
+                    Text(step.ok == null ? '还没返回' : '没有输出', style: PxText.xs.copyWith(color: Palette.bark400)),
                 ],
               ),
             ),
@@ -558,7 +558,7 @@ class _Pre extends StatelessWidget {
     color: fill,
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     child: SingleChildScrollView(
-      child: SelectableText(text, style: KitText.mono.copyWith(color: ink, height: 1.625)),
+      child: SelectableText(text, style: PxText.mono.copyWith(color: ink, height: 1.625)),
     ),
   );
 }

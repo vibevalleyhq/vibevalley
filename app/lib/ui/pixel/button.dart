@@ -1,8 +1,7 @@
 import 'package:flutter/widgets.dart';
-
-import '../theme.dart';
+import '../common.dart';
+import 'theme.dart';
 import 'base.dart';
-import 'icons.dart';
 
 enum PxTone { plain, primary, danger, accent }
 
@@ -64,7 +63,7 @@ class PxButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (fill, hover, ink) = _colors(tone);
-    return KitTappable(
+    return Tappable(
       onTap: onPressed,
       tooltip: tooltip,
       semanticLabel: semanticLabel,
@@ -90,13 +89,13 @@ class PxButton extends StatelessWidget {
               : BoxDecoration(
                   color: s.hovered ? hover : fill,
                   border: Border.all(color: pxEdge, width: 2),
-                  boxShadow: sunk ? null : kitDrop,
+                  boxShadow: sunk ? null : pxDrop,
                 ),
           child: Center(
             widthFactor: w == null ? 1 : null,
             heightFactor: h == null ? 1 : null,
             child: DefaultTextStyle(
-              style: KitText.sm.copyWith(color: ink),
+              style: PxText.sm.copyWith(color: ink),
               maxLines: 1,
               child: IconTheme.merge(
                 data: IconThemeData(color: ink),
@@ -152,10 +151,10 @@ class PxCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 4,
             children: [
-              Text(title!, style: KitText.sm),
+              Text(title!, style: PxText.sm),
               if (aside != null)
                 DefaultTextStyle(
-                  style: KitText.xs.copyWith(color: Palette.bark500),
+                  style: PxText.xs.copyWith(color: Palette.bark500),
                   child: aside!,
                 ),
             ],

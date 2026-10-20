@@ -7,8 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/ui/kit/kit.dart' show PxButton;
-import 'package:vibevalley/ui/theme.dart';
+import 'package:vibevalley/ui/pixel/pixel.dart' show PxButton;
+import 'package:vibevalley/ui/pixel/theme.dart';
 import 'package:vibevalley/workbench/issues/issue_detail.dart' show TodoDetail;
 import 'package:vibevalley/workbench/issues/issues_page.dart';
 

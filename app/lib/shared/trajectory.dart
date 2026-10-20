@@ -5,12 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../ui/theme.dart';
 import '../gen/vibevalley.dart';
 import '../rules/rounds.dart';
-import '../ui/kit/base.dart';
-import '../ui/kit/button.dart';
-import '../ui/kit/field.dart';
-import '../ui/kit/icons.dart';
-import '../ui/kit/labels.dart';
-import '../ui/kit/markdown.dart';
+import '../ui/pixel/base.dart';
+import '../ui/pixel/button.dart';
+import '../ui/pixel/field.dart';
+import '../ui/icons.dart';
+import '../ui/labels.dart';
+import '../ui/pixel/markdown.dart';
 import '../data/remote.dart';
 import '../data/providers.dart';
 import 'widgets.dart';
@@ -228,7 +228,7 @@ class _TrajectoryState extends State<Trajectory> {
         Container(height: 2, color: Palette.cream300),
         Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text(_summaryText(summary), style: KitText.xs.copyWith(color: Palette.bark600)),
+          child: Text(_summaryText(summary), style: PxText.xs.copyWith(color: Palette.bark600)),
         ),
       ],
     );
@@ -293,7 +293,7 @@ class _Row extends StatelessWidget {
     final tool = step.type == SessionEventType.toolCall;
     final failed = (tool && step.ok == false) || step.type == SessionEventType.runError;
     final ink = failed ? Palette.berry : Palette.bark900;
-    final text = KitText.xs.copyWith(color: ink, height: 1.5);
+    final text = PxText.xs.copyWith(color: ink, height: 1.5);
     final sub = step.under != null;
     final Widget content;
     if (tool) {
@@ -305,7 +305,7 @@ class _Row extends StatelessWidget {
     } else {
       content = Text(open ? step.text : _oneLine(step.text), maxLines: open ? null : 1, overflow: open ? null : TextOverflow.ellipsis, style: text);
     }
-    return KitTappable(
+    return Tappable(
       onTap: onTap,
       semanticLabel: '$tag ${_oneLine(step.text)}',
       builder: (context, s) => Container(
@@ -326,7 +326,7 @@ class _Row extends StatelessWidget {
                   width: cols.gutter,
                   child: Padding(
                     padding: const EdgeInsets.only(left: 6, top: 2),
-                    child: gutter == null ? null : Text(gutter!, maxLines: 1, style: KitText.xs.copyWith(color: Palette.bark500)),
+                    child: gutter == null ? null : Text(gutter!, maxLines: 1, style: PxText.xs.copyWith(color: Palette.bark500)),
                   ),
                 ),
                 Container(
@@ -339,7 +339,7 @@ class _Row extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: KitText.xs.copyWith(color: _inkOn(fill)),
+                    style: PxText.xs.copyWith(color: _inkOn(fill)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -348,7 +348,7 @@ class _Row extends StatelessWidget {
                 if (when != null)
                   Padding(
                     padding: const EdgeInsets.only(left: 8, top: 2),
-                    child: Text(when!, style: KitText.xs.copyWith(color: Palette.bark400)),
+                    child: Text(when!, style: PxText.xs.copyWith(color: Palette.bark400)),
                   ),
               ],
             ),
@@ -363,7 +363,7 @@ class _Row extends StatelessWidget {
 /// `what {args} → result`, the args and result in the code font.
 TextSpan _toolLine(SessionEvent step) {
   final farm = farmToolText(step.text);
-  final code = KitText.mono.copyWith(color: Palette.bark500);
+  final code = PxText.mono.copyWith(color: Palette.bark500);
   final args = _oneLine(step.input ?? '');
   final out = _oneLine(step.output ?? '');
   return TextSpan(
@@ -392,8 +392,8 @@ class _ToolDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final input = readableInput(step);
-    final label = KitText.xs.copyWith(color: Palette.bark500);
-    final code = KitText.mono.copyWith(color: Palette.bark900, height: 1.5);
+    final label = PxText.xs.copyWith(color: Palette.bark500);
+    final code = PxText.mono.copyWith(color: Palette.bark900, height: 1.5);
     return Padding(
       padding: EdgeInsets.fromLTRB(inset, 4, 0, 6),
       child: Column(
@@ -450,7 +450,7 @@ class _Waterfall extends StatelessWidget {
                 for (final lane in Lane.values)
                   Padding(
                     padding: const EdgeInsets.only(left: 6),
-                    child: Text(_laneNames[lane]!, style: KitText.xs.copyWith(height: 1, color: Palette.bark500)),
+                    child: Text(_laneNames[lane]!, style: PxText.xs.copyWith(height: 1, color: Palette.bark500)),
                   ),
               ],
             ),
@@ -495,7 +495,7 @@ class _Waterfall extends StatelessWidget {
                       height: _lane,
                       child: Tooltip(
                         message: '${_laneNames[span.lane]} · ${secondsText(span.ms)}',
-                        child: KitTappable(
+                        child: Tappable(
                           onTap: () => onPick(span.seq),
                           semanticLabel: '${_laneNames[span.lane]} ${secondsText(span.ms)}',
                           builder: (context, s) => Container(margin: const EdgeInsets.only(right: 1), color: s.hovered ? Palette.bark900 : color),
@@ -593,7 +593,7 @@ class _MarkableState extends State<_Markable> {
                           const SpriteIcon('icon-bug', size: 12),
                           const SizedBox(width: 4),
                           DefaultTextStyle(
-                            style: KitText.xs,
+                            style: PxText.xs,
                             child: InlineLink('这一轮做错了', onTap: () => setState(() => _writing = true)),
                           ),
                         ],
@@ -614,7 +614,7 @@ class _MarkableState extends State<_Markable> {
                       const SpriteIcon('icon-bug', size: 12),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text('标成了做错的一轮，存成了一条评测', style: KitText.xs.copyWith(color: Palette.bark800)),
+                        child: Text('标成了做错的一轮，存成了一条评测', style: PxText.xs.copyWith(color: Palette.bark800)),
                       ),
                     ],
                   ),
@@ -665,7 +665,7 @@ class TrajectoryTitle extends StatelessWidget {
         title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: KitText.sm.copyWith(color: Palette.bark800),
+        style: PxText.sm.copyWith(color: Palette.bark800),
       ),
     ),
   );
@@ -728,7 +728,7 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
 
   Widget _head(Session h, double now) {
     final on = _open == h.id;
-    return KitTappable(
+    return Tappable(
       onTap: () => setState(() => _open = h.id),
       selected: on,
       semanticLabel: h.name,
@@ -747,21 +747,21 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
               spacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Text(h.name, style: KitText.xs.copyWith(color: Palette.bark800)),
-                if (h.project != null) Text(h.project!, style: KitText.xs.copyWith(color: Palette.bark500)),
+                Text(h.name, style: PxText.xs.copyWith(color: Palette.bark800)),
+                if (h.project != null) Text(h.project!, style: PxText.xs.copyWith(color: Palette.bark500)),
                 if (h.endedAt == null) const BadgeLabel('在场', hat: true),
               ],
             ),
             Text(
               h.endedAt == null ? '${ago(h.hiredAt, now)}接活' : '${ago(h.hiredAt, now)}接活 · ${ago(h.endedAt!, now)}走的',
-              style: KitText.xs.copyWith(color: Palette.bark500),
+              style: PxText.xs.copyWith(color: Palette.bark500),
             ),
             if (h.brief.isNotEmpty)
               Text(
                 _oneLine(h.brief),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: KitText.xs.copyWith(color: Palette.bark900),
+                style: PxText.xs.copyWith(color: Palette.bark900),
               ),
           ],
         ),

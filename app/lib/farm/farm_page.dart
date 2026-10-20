@@ -26,7 +26,7 @@ import '../data/prefs.dart';
 import '../audio/sfx.dart';
 import '../data/ui_state.dart';
 import '../sprites/atlas.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../village/world.dart' show VillageWorld;
 import '../village/game.dart';
 import 'first_visit.dart';

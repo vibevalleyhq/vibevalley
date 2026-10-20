@@ -3,7 +3,7 @@
 import '../gen/vibevalley.dart';
 import '../rules/chat.dart';
 import '../rules/sessions.dart';
-import '../ui/kit/labels.dart';
+import '../ui/labels.dart';
 
 int unreadUnder(Chat? chat, Conversation channel) => [
   ...?chat?.conversations.where(

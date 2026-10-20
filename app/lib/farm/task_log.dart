@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../game/state.dart';
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../rules/task.dart';
 
 const _actorTone = {
@@ -58,17 +58,17 @@ class _TaskLogState extends ConsumerState<TaskLog> {
           if (only != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: KitTappable(
+              child: Tappable(
                 onTap: widget.onAll,
                 builder: (context, s) => Container(
                   color: s.hovered ? Palette.cream300 : Palette.cream200,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                  child: Text('看整个计划的经过', style: KitText.xs.copyWith(color: Palette.bark800)),
+                  child: Text('看整个计划的经过', style: PxText.xs.copyWith(color: Palette.bark800)),
                 ),
               ),
             ),
           if (shown.isEmpty)
-            Text(events != null ? '还没有记下什么。' : '正在读…', style: KitText.sm.copyWith(color: Palette.bark600))
+            Text(events != null ? '还没有记下什么。' : '正在读…', style: PxText.sm.copyWith(color: Palette.bark600))
           else
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 288),
@@ -112,7 +112,7 @@ class _TaskLogRowState extends State<TaskLogRow> {
       children: [
         SizedBox(
           width: 88,
-          child: Text(_when(e.at), style: KitText.xs.copyWith(color: Palette.bark400)),
+          child: Text(_when(e.at), style: PxText.xs.copyWith(color: Palette.bark400)),
         ),
         const SizedBox(width: 8),
         SizedBox(
@@ -121,7 +121,7 @@ class _TaskLogRowState extends State<TaskLogRow> {
             color: fill,
             padding: const EdgeInsets.symmetric(vertical: 2),
             alignment: Alignment.center,
-            child: Text(e.actorText ?? '', style: KitText.xs.copyWith(fontSize: 10, color: ink)),
+            child: Text(e.actorText ?? '', style: PxText.xs.copyWith(fontSize: 10, color: ink)),
           ),
         ),
         const SizedBox(width: 8),
@@ -129,13 +129,13 @@ class _TaskLogRowState extends State<TaskLogRow> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(e.text ?? '', style: KitText.xs.copyWith(color: Palette.bark800)),
+              Text(e.text ?? '', style: PxText.xs.copyWith(color: Palette.bark800)),
               if (changes.isNotEmpty) ...[
-                KitTappable(
+                Tappable(
                   onTap: () => setState(() => _open = !_open),
                   builder: (context, s) => Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text('改前改后', style: KitText.xs.copyWith(color: Palette.bark600)),
+                    child: Text('改前改后', style: PxText.xs.copyWith(color: Palette.bark600)),
                   ),
                 ),
                 if (_open)
@@ -145,7 +145,7 @@ class _TaskLogRowState extends State<TaskLogRow> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(c.field, style: KitText.xs.copyWith(color: Palette.bark600)),
+                          Text(c.field, style: PxText.xs.copyWith(color: Palette.bark600)),
                           Text.rich(
                             TextSpan(
                               children: [
@@ -160,7 +160,7 @@ class _TaskLogRowState extends State<TaskLogRow> {
                                 ),
                               ],
                             ),
-                            style: KitText.xs.copyWith(color: Palette.bark600),
+                            style: PxText.xs.copyWith(color: Palette.bark600),
                           ),
                         ],
                       ),

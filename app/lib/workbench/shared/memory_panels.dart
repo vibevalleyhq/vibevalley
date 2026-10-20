@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../ui/theme.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/base.dart';
-import '../../ui/kit/button.dart';
-import '../../ui/kit/choice.dart';
-import '../../ui/kit/field.dart';
-import '../../ui/kit/labels.dart';
+import '../../ui/pixel/base.dart';
+import '../../ui/pixel/button.dart';
+import '../../ui/pixel/choice.dart';
+import '../../ui/pixel/field.dart';
+import '../../ui/labels.dart';
 import '../../data/remote.dart';
 import './widgets.dart';
 import '../../rules/task.dart';
@@ -18,8 +18,8 @@ const _everywhere = '*';
 
 double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
 
-TextStyle get _lead => KitText.xs.copyWith(height: 1.625, color: Palette.bark600);
-TextStyle get _meta => KitText.xs.copyWith(color: Palette.bark500);
+TextStyle get _lead => PxText.xs.copyWith(height: 1.625, color: Palette.bark600);
+TextStyle get _meta => PxText.xs.copyWith(color: Palette.bark500);
 
 List<Widget> _gap(List<Widget> children, [double gap = 16]) => [
   for (var i = 0; i < children.length; i++) ...[if (i > 0) SizedBox(height: gap), children[i]],
@@ -89,7 +89,7 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                               ],
                             ),
                             const SizedBox(height: 2),
-                            Text(m.text, style: KitText.sm.copyWith(color: Palette.bark900)),
+                            Text(m.text, style: PxText.sm.copyWith(color: Palette.bark900)),
                           ],
                         ),
                       ),
@@ -168,7 +168,7 @@ class _SourcesSection extends StatelessWidget {
               spacing: 8,
               runSpacing: 2,
               children: [
-                Text(src.label, style: KitText.sm.copyWith(color: Palette.bark900)),
+                Text(src.label, style: PxText.sm.copyWith(color: Palette.bark900)),
                 Text(src.on ? '在用' : '没接上：${src.off ?? ''}', style: _meta.copyWith(color: src.on ? Palette.leaf700 : Palette.berry)),
                 if (src.on) ...[
                   Text(src.canList ? '记下的列在下面' : '不在这里列出', style: _meta),
@@ -234,7 +234,7 @@ class _RecallPreviewState extends ConsumerState<_RecallPreview> {
             Container(
               color: Palette.cream100,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Text(lines.join('\n'), style: KitText.xs.copyWith(height: 1.625, color: Palette.bark800)),
+              child: Text(lines.join('\n'), style: PxText.xs.copyWith(height: 1.625, color: Palette.bark800)),
             ),
         ],
       ),
@@ -354,9 +354,9 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${h.file}:${h.line.round()}', style: KitText.mono.copyWith(color: Palette.bark500)),
+                        Text('${h.file}:${h.line.round()}', style: PxText.mono.copyWith(color: Palette.bark500)),
                         const SizedBox(height: 2),
-                        Text(h.text, style: KitText.xs.copyWith(height: 1.625, color: Palette.bark800)),
+                        Text(h.text, style: PxText.xs.copyWith(height: 1.625, color: Palette.bark800)),
                       ],
                     ),
                   ),
@@ -380,7 +380,7 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            KitTappable(
+                            Tappable(
                               onTap: () => _show(f.name),
                               semanticLabel: f.name,
                               builder: (context, s) => Padding(
@@ -392,7 +392,7 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
                                         f.name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: KitText.mono.copyWith(color: Palette.bark800),
+                                        style: PxText.mono.copyWith(color: Palette.bark800),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -409,7 +409,7 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
                                 ),
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 child: SingleChildScrollView(
-                                  child: SelectableText(_open!.text, style: KitText.xs.copyWith(height: 1.625, color: Palette.bark800)),
+                                  child: SelectableText(_open!.text, style: PxText.xs.copyWith(height: 1.625, color: Palette.bark800)),
                                 ),
                               ),
                           ],
@@ -524,7 +524,7 @@ class _MemoryItemState extends State<MemoryItem> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.memory.text, style: KitText.sm.copyWith(color: Palette.bark900)),
+                  Text(widget.memory.text, style: PxText.sm.copyWith(color: Palette.bark900)),
                   const SizedBox(height: 2),
                   Wrap(
                     spacing: 8,
@@ -538,7 +538,7 @@ class _MemoryItemState extends State<MemoryItem> {
             ),
             if (widget.onForget != null) ...[
               const SizedBox(width: 8),
-              KitTappable(
+              Tappable(
                 onTap: widget.onForget,
                 semanticLabel: '忘掉',
                 builder: (context, s) => Opacity(

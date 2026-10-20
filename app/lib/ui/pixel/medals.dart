@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
-
-import '../sprites/atlas.dart';
+import '../../sprites/atlas.dart';
 
 class EarnedMedal extends StatelessWidget {
   const EarnedMedal({super.key, required this.atlas, required this.achievement, required this.tier, this.oneOff = false, this.size = 48});

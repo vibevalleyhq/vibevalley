@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-import '../theme.dart';
+import '../common.dart';
 import 'base.dart';
-import 'field.dart' show kitBare;
-import 'icons.dart';
+import 'field.dart' show pxBare;
 
 /// Enter or a comma adds what is typed (split at , and ，, trimmed, without repeats), and so does leaving the box; Backspace in an empty box takes the last chip
 /// off.
@@ -81,9 +79,9 @@ class _PxChipsInputState extends State<PxChipsInput> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(chip, style: KitText.xs.copyWith(color: Palette.bark800)),
+                  Text(chip, style: PxText.xs.copyWith(color: Palette.bark800)),
                   const SizedBox(width: 4),
-                  KitTappable(
+                  Tappable(
                     onTap: widget.enabled ? () => widget.onChanged(widget.value.where((c) => c != chip).toList()) : null,
                     semanticLabel: '去掉 $chip',
                     builder: (context, s) => Padding(
@@ -111,13 +109,13 @@ class _PxChipsInputState extends State<PxChipsInput> {
                         controller: _draft,
                         focusNode: _focus,
                         enabled: widget.enabled,
-                        style: KitText.sm,
+                        style: PxText.sm,
                         cursorColor: Palette.bark900,
                         cursorWidth: 1,
-                        decoration: kitBare(
+                        decoration: pxBare(
                           InputDecoration.collapsed(
                             hintText: widget.value.isEmpty ? widget.placeholder : '',
-                            hintStyle: KitText.sm.copyWith(color: Palette.bark500),
+                            hintStyle: PxText.sm.copyWith(color: Palette.bark500),
                           ),
                         ),
                         onEditingComplete: () {},
@@ -180,13 +178,13 @@ class _SlimInputState extends State<_SlimInput> {
     child: TextField(
       controller: _text,
       enabled: widget.enabled,
-      style: KitText.mono,
+      style: PxText.mono,
       cursorColor: Palette.bark900,
       cursorWidth: 1,
-      decoration: kitBare(
+      decoration: pxBare(
         InputDecoration.collapsed(
           hintText: widget.placeholder,
-          hintStyle: KitText.mono.copyWith(color: Palette.bark500),
+          hintStyle: PxText.mono.copyWith(color: Palette.bark500),
         ),
       ),
       onChanged: widget.onChanged,
@@ -241,7 +239,7 @@ class _PxKeyValueEditorState extends State<PxKeyValueEditor> {
     ),
   );
 
-  Widget _textButton(String label, VoidCallback? onTap, {bool add = false}) => KitTappable(
+  Widget _textButton(String label, VoidCallback? onTap, {bool add = false}) => Tappable(
     onTap: onTap,
     builder: (context, s) {
       final Widget b = Container(
@@ -251,7 +249,7 @@ class _PxKeyValueEditorState extends State<PxKeyValueEditor> {
         foregroundDecoration: pxRing,
         child: Center(
           widthFactor: 1,
-          child: Text(label, style: KitText.xs.copyWith(color: add ? Palette.bark800 : (s.hovered ? Palette.berry : Palette.bark600))),
+          child: Text(label, style: PxText.xs.copyWith(color: add ? Palette.bark800 : (s.hovered ? Palette.berry : Palette.bark600))),
         ),
       );
       final sunk = s.pressed ? Transform.translate(offset: const Offset(1, 1), child: b) : b;
@@ -277,7 +275,7 @@ class _PxKeyValueEditorState extends State<PxKeyValueEditor> {
                   key,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: KitText.mono.copyWith(color: Palette.bark800),
+                  style: PxText.mono.copyWith(color: Palette.bark800),
                 ),
               ),
               _SlimInput(key: ValueKey(key), value: val, enabled: on, onChanged: (v) => widget.onChanged({...widget.value, key: v})),

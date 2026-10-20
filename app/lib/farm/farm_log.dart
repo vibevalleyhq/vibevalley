@@ -6,7 +6,7 @@ import '../data/providers.dart';
 import '../data/ui_state.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show agentsProvider;
 import 'widgets.dart';
 import '../rules/chat.dart';
@@ -36,7 +36,7 @@ class Warehouse extends ConsumerWidget {
             for (final i in stored)
               SizedBox(
                 width: w,
-                child: KitTappable(
+                child: Tappable(
                   onTap: () {
                     if (i.graph != null) {
                       ref.read(graphShownProvider.notifier).set(i.id);
@@ -58,7 +58,7 @@ class Warehouse extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(issueTitle(i, graphs), maxLines: 2, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                              Text(issueTitle(i, graphs), maxLines: 2, overflow: TextOverflow.ellipsis, style: PxText.sm),
                               const SizedBox(height: 4),
                               Text(
                                 [
@@ -67,7 +67,7 @@ class Warehouse extends ConsumerWidget {
                                   ?i.project,
                                   if (i.closedAt case final at?) '${ago(at, now)}收的',
                                 ].join(' · '),
-                                style: KitText.xs.copyWith(color: Palette.bark600),
+                                style: PxText.xs.copyWith(color: Palette.bark600),
                               ),
                             ],
                           ),
@@ -142,7 +142,7 @@ class FarmLog extends ConsumerWidget {
                     child: Text(
                       clockOf(row.at),
                       textAlign: TextAlign.right,
-                      style: KitText.xs.copyWith(color: Palette.bark400),
+                      style: PxText.xs.copyWith(color: Palette.bark400),
                     ),
                   ),
                 ),
@@ -168,7 +168,7 @@ class FarmLog extends ConsumerWidget {
           height: 32,
           color: Palette.leaf500,
           alignment: Alignment.center,
-          child: Text('你', style: KitText.xs.copyWith(color: Palette.cream50)),
+          child: Text('你', style: PxText.xs.copyWith(color: Palette.cream50)),
         )
       else
         ManagerFaceOf(size: 32, look: look),
@@ -182,7 +182,7 @@ class FarmLog extends ConsumerWidget {
               tag: FarmTag(you ? '说' : (m.final_ ? '答' : '正在说'), ink: Palette.bark600),
             ),
             const SizedBox(height: 2),
-            PxMarkdown(m.text, style: KitText.sm.copyWith(color: you ? Palette.bark900 : Palette.bark800)),
+            PxMarkdown(m.text, style: PxText.sm.copyWith(color: you ? Palette.bark900 : Palette.bark800)),
           ],
         ),
       ),
@@ -204,14 +204,14 @@ class FarmLog extends ConsumerWidget {
               tag: FarmTag(text, fill: fill, ink: ink),
             ),
             const SizedBox(height: 2),
-            if (issue != null) Text(issue.title, style: KitText.sm),
+            if (issue != null) Text(issue.title, style: PxText.sm),
             Text(
               r.text,
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
-              style: KitText.xs.copyWith(color: outcome == Outcome.failed ? Palette.berry : Palette.bark600),
+              style: PxText.xs.copyWith(color: outcome == Outcome.failed ? Palette.berry : Palette.bark600),
             ),
-            if (r.spent != null) Text('这一轮花了 ${spentText(r.spent!)}', style: KitText.xs.copyWith(color: Palette.bark400)),
+            if (r.spent != null) Text('这一轮花了 ${spentText(r.spent!)}', style: PxText.xs.copyWith(color: Palette.bark400)),
           ],
         ),
       ),
@@ -227,7 +227,7 @@ class _Who extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Text(name, style: KitText.sm),
+      Text(name, style: PxText.sm),
       const SizedBox(width: 6),
       tag,
     ],

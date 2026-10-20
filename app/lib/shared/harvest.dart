@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show SessionIssue, issueChangesProvider, reasonOf;
 import 'tags.dart';
 
@@ -27,7 +27,7 @@ class HarvestReview extends ConsumerWidget {
           child: Text(
             '正在看它改了什么…',
             textAlign: TextAlign.center,
-            style: KitText.sm.copyWith(color: Palette.bark600),
+            style: PxText.sm.copyWith(color: Palette.bark600),
           ),
         ),
         error: (error, _) => Column(
@@ -35,7 +35,7 @@ class HarvestReview extends ConsumerWidget {
           children: [
             Tinted(
               color: tint(Palette.berry, .12),
-              child: Text('看不了改动：${reasonOf(error)}', style: KitText.sm.copyWith(color: Palette.berry)),
+              child: Text('看不了改动：${reasonOf(error)}', style: PxText.sm.copyWith(color: Palette.berry)),
             ),
             const SizedBox(height: 12),
             PxButton.text('先不收', onPressed: onDone),
@@ -68,7 +68,7 @@ class _Ready extends ConsumerWidget {
       onDone();
     }
 
-    final xs = KitText.xs.copyWith(color: Palette.bark600);
+    final xs = PxText.xs.copyWith(color: Palette.bark600);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -92,7 +92,7 @@ class _Ready extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('合进 ${changes.base} 会冲突，先没法收', style: KitText.sm.copyWith(color: Palette.berry)),
+                  Text('合进 ${changes.base} 会冲突，先没法收', style: PxText.sm.copyWith(color: Palette.berry)),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 4,
@@ -109,7 +109,7 @@ class _Ready extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(top: 12),
             child: Tinted(
-              child: Text('这一单没有改动。收获就是请它收工。', style: KitText.sm.copyWith(color: Palette.bark600)),
+              child: Text('这一单没有改动。收获就是请它收工。', style: PxText.sm.copyWith(color: Palette.bark600)),
             ),
           ),
         if (changes.behind > 0 && conflicts.isEmpty)
@@ -125,7 +125,7 @@ class _Ready extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('还有 ${changes.uncommitted.length} 个文件没提交，收获时会先帮它提交：', style: KitText.xs.copyWith(color: Palette.bark800)),
+                  Text('还有 ${changes.uncommitted.length} 个文件没提交，收获时会先帮它提交：', style: PxText.xs.copyWith(color: Palette.bark800)),
                   const SizedBox(height: 4),
                   Wrap(
                     spacing: 4,
@@ -135,7 +135,7 @@ class _Ready extends ConsumerWidget {
                         Container(
                           color: Palette.cream50,
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          child: Text('${_status[f.status]?.mark ?? f.status} ${f.path}', style: KitText.mono),
+                          child: Text('${_status[f.status]?.mark ?? f.status} ${f.path}', style: PxText.mono),
                         ),
                     ],
                   ),
@@ -167,12 +167,12 @@ class _Ready extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(vertical: 1),
                     child: Row(
                       children: [
-                        Text(c.hash, style: KitText.mono.copyWith(color: Palette.bark500)),
+                        Text(c.hash, style: PxText.mono.copyWith(color: Palette.bark500)),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(c.subject, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                          child: Text(c.subject, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
                         ),
-                        Text(ago(c.at, now), style: KitText.xs.copyWith(color: Palette.bark400)),
+                        Text(ago(c.at, now), style: PxText.xs.copyWith(color: Palette.bark400)),
                       ],
                     ),
                   ),
@@ -208,11 +208,11 @@ class PlusMinus extends StatelessWidget {
       children: [
         TextSpan(
           text: '+$added',
-          style: KitText.mono.copyWith(color: Palette.leaf700),
+          style: PxText.mono.copyWith(color: Palette.leaf700),
         ),
         TextSpan(
           text: ' −$removed',
-          style: KitText.mono.copyWith(color: Palette.berry),
+          style: PxText.mono.copyWith(color: Palette.berry),
         ),
       ],
     ),
@@ -247,7 +247,7 @@ class _FileRowState extends State<FileRow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          KitTappable(
+          Tappable(
             onTap: patch == null || patch.isEmpty ? null : () => setState(() => _open = !_open),
             semanticLabel: f.path,
             builder: (context, s) => Container(
@@ -262,7 +262,7 @@ class _FileRowState extends State<FileRow> {
                       height: 20,
                       color: st.fill,
                       alignment: Alignment.center,
-                      child: Text(st.mark, style: KitText.xs.copyWith(color: st.ink)),
+                      child: Text(st.mark, style: PxText.xs.copyWith(color: st.ink)),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -273,13 +273,13 @@ class _FileRowState extends State<FileRow> {
                         f.path,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: KitText.mono.copyWith(color: widget.conflict ? Palette.berry : Palette.bark800),
+                        style: PxText.mono.copyWith(color: widget.conflict ? Palette.berry : Palette.bark800),
                       ),
                     ),
                   ),
                   if (widget.conflict) ...[const SizedBox(width: 8), FarmTag('冲突', fill: tint(Palette.berry, .15), ink: Palette.berry)],
                   const SizedBox(width: 8),
-                  if (f.added < 0) Text('二进制', style: KitText.mono.copyWith(color: Palette.bark500)) else PlusMinus(f.added.round(), f.removed.round()),
+                  if (f.added < 0) Text('二进制', style: PxText.mono.copyWith(color: Palette.bark500)) else PlusMinus(f.added.round(), f.removed.round()),
                 ],
               ),
             ),
@@ -322,7 +322,7 @@ class Patch extends StatelessWidget {
                   child: Text(
                     line.isEmpty ? ' ' : line,
                     softWrap: false,
-                    style: KitText.mono.copyWith(
+                    style: PxText.mono.copyWith(
                       height: 1.4,
                       color: line.startsWith('+')
                           ? Palette.leaf700

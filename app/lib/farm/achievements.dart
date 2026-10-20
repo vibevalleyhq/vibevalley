@@ -6,7 +6,7 @@ import '../data/remote.dart' show achievementsProvider;
 import '../game/commands.dart';
 import '../game/tools.dart';
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../shared/popover.dart';
 import '../shared/tags.dart';
 
@@ -149,7 +149,7 @@ class Tasks extends ConsumerWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Lv.${b.unlockLevel} 开垦一块地', style: KitText.xs.copyWith(color: level >= b.unlockLevel! ? Palette.bark900 : Palette.bark600)),
+                    Text('Lv.${b.unlockLevel} 开垦一块地', style: PxText.xs.copyWith(color: level >= b.unlockLevel! ? Palette.bark900 : Palette.bark600)),
                     if (level >= b.unlockLevel!) ...[const SizedBox(width: 4), const SpriteIcon('mark-check', size: 12)],
                   ],
                 ),
@@ -179,7 +179,7 @@ class _Heading extends StatelessWidget {
           if (aside != null) TextSpan(text: '  $aside'),
         ],
       ),
-      style: KitText.xs.copyWith(color: Palette.bark600),
+      style: PxText.xs.copyWith(color: Palette.bark600),
     ),
   );
 }
@@ -210,8 +210,8 @@ class _Standing extends ConsumerWidget {
                   spacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.end,
                   children: [
-                    Text('Lv.$level', style: KitText.xl.copyWith(color: Palette.leaf700)),
-                    Text('再 ${need - lv.xp.round()} 个 commit 升级 · 共 ${commits.round()} 个', style: KitText.xs.copyWith(color: Palette.bark600)),
+                    Text('Lv.$level', style: PxText.xl.copyWith(color: Palette.leaf700)),
+                    Text('再 ${need - lv.xp.round()} 个 commit 升级 · 共 ${commits.round()} 个', style: PxText.xs.copyWith(color: Palette.bark600)),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -227,10 +227,10 @@ class _Standing extends ConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_thousands(p.coins.round()), style: KitText.xl),
+                  Text(_thousands(p.coins.round()), style: PxText.xl),
                   Text(
                     p.streak > 1 ? '连胜 ${p.streak.round()} · 收成金币 ×${(p.multiplier ?? 1).toStringAsFixed(1)}' : '收进主分支才给金币',
-                    style: KitText.xs.copyWith(color: Palette.bark600),
+                    style: PxText.xs.copyWith(color: Palette.bark600),
                   ),
                 ],
               ),
@@ -266,7 +266,7 @@ class _TitlePicker extends ConsumerWidget {
       offset: 8,
       width: 256,
       enabled: earned.isNotEmpty,
-      trigger: (context, open, toggle) => KitTappable(
+      trigger: (context, open, toggle) => Tappable(
         onTap: earned.isEmpty ? null : toggle,
         builder: (context, s) => Opacity(
           opacity: earned.isEmpty ? .6 : 1,
@@ -287,14 +287,14 @@ class _TitlePicker extends ConsumerWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('称号', style: KitText.xs.copyWith(color: Palette.bark600)),
+                    Text('称号', style: PxText.xs.copyWith(color: Palette.bark600)),
                     Text(
                       worn != null && title != null
                           ? _tierTitle(worn, title.tier.round())
                           : earned.isNotEmpty
                           ? '挑一个'
                           : '拿到成就就有',
-                      style: KitText.sm,
+                      style: PxText.sm,
                     ),
                   ],
                 ),
@@ -314,10 +314,10 @@ class _TitlePicker extends ConsumerWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
-                  child: Text('挂在农场卡上的称号', style: KitText.xs.copyWith(color: Palette.bark600)),
+                  child: Text('挂在农场卡上的称号', style: PxText.xs.copyWith(color: Palette.bark600)),
                 ),
                 for (final (:a, :tier) in earned)
-                  KitTappable(
+                  Tappable(
                     onTap: () {
                       fire(commands.chooseTitle(a.id, tier));
                       close();
@@ -332,7 +332,7 @@ class _TitlePicker extends ConsumerWidget {
                             Medal(achievement: a, tier: tier, size: 28),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(_tierTitle(a, tier), style: KitText.sm.copyWith(color: on ? Palette.leaf700 : null)),
+                              child: Text(_tierTitle(a, tier), style: PxText.sm.copyWith(color: on ? Palette.leaf700 : null)),
                             ),
                             if (on) Semantics(label: '挂着', child: const SpriteIcon('mark-check', size: 14)),
                           ],
@@ -341,7 +341,7 @@ class _TitlePicker extends ConsumerWidget {
                     },
                   ),
                 if (title != null)
-                  KitTappable(
+                  Tappable(
                     onTap: () {
                       fire(commands.chooseTitle());
                       close();
@@ -349,7 +349,7 @@ class _TitlePicker extends ConsumerWidget {
                     builder: (context, s) => Container(
                       color: s.hovered || s.focused ? Palette.cream100 : null,
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      child: Text('不挂称号', style: KitText.sm.copyWith(color: Palette.bark600)),
+                      child: Text('不挂称号', style: PxText.sm.copyWith(color: Palette.bark600)),
                     ),
                   ),
               ],
@@ -376,7 +376,7 @@ class _Starter extends StatelessWidget {
           children: [
             const SpriteIcon('emblem-starter', size: 28),
             const SizedBox(width: 8),
-            Text('新手任务都做完了。', style: KitText.sm.copyWith(color: Palette.bark800)),
+            Text('新手任务都做完了。', style: PxText.sm.copyWith(color: Palette.bark800)),
           ],
         ),
       );
@@ -422,14 +422,14 @@ class _Starter extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(a.title, style: KitText.sm.copyWith(color: ok ? Palette.bark800 : Palette.bark900)),
+                              Text(a.title, style: PxText.sm.copyWith(color: ok ? Palette.bark800 : Palette.bark900)),
                               Tooltip(
                                 message: a.detail,
                                 child: Text(
                                   a.detail,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: KitText.xs.copyWith(color: Palette.bark600),
+                                  style: PxText.xs.copyWith(color: Palette.bark600),
                                 ),
                               ),
                             ],
@@ -440,7 +440,7 @@ class _Starter extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const SpriteIcon('icon-coin', size: 16),
-                              Text('+${a.tiers.first.coins.round()}', style: KitText.xs.copyWith(color: Palette.bark600)),
+                              Text('+${a.tiers.first.coins.round()}', style: PxText.xs.copyWith(color: Palette.bark600)),
                             ],
                           ),
                       ],
@@ -529,7 +529,7 @@ class _AchievementCard extends StatelessWidget {
                         _tierTitle(a, tier < 1 ? 1 : tier),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: KitText.sm.copyWith(color: tier > 0 ? Palette.bark900 : Palette.bark600),
+                        style: PxText.sm.copyWith(color: tier > 0 ? Palette.bark900 : Palette.bark600),
                       ),
                     ),
                     if (a.tiers.length > 1)
@@ -549,7 +549,7 @@ class _AchievementCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(a.detail, style: KitText.xs.copyWith(color: Palette.bark600)),
+                Text(a.detail, style: PxText.xs.copyWith(color: Palette.bark600)),
                 if (next != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
@@ -564,14 +564,14 @@ class _AchievementCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text('$count/$next $unit', style: KitText.xs.copyWith(color: Palette.bark600)),
+                        Text('$count/$next $unit', style: PxText.xs.copyWith(color: Palette.bark600)),
                       ],
                     ),
                   ),
                 if (at != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text('${_day(at)}拿到${a.tiers.length > 1 ? '${_tierText[tier]}牌' : ''}', style: KitText.xs.copyWith(color: Palette.bark400)),
+                    child: Text('${_day(at)}拿到${a.tiers.length > 1 ? '${_tierText[tier]}牌' : ''}', style: PxText.xs.copyWith(color: Palette.bark400)),
                   ),
               ],
             ),
@@ -610,8 +610,8 @@ class _Secrets extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('还有 $left 个彩蛋', style: KitText.sm.copyWith(color: Palette.bark600)),
-                        Text('碰上了才知道是什么。', style: KitText.xs.copyWith(color: Palette.bark600)),
+                        Text('还有 $left 个彩蛋', style: PxText.sm.copyWith(color: Palette.bark600)),
+                        Text('碰上了才知道是什么。', style: PxText.xs.copyWith(color: Palette.bark600)),
                       ],
                     ),
                   ],

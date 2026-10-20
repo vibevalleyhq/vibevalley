@@ -7,8 +7,8 @@ import '../../gen/vibevalley.dart';
 import '../../rules/sessions.dart';
 import '../../rules/cast.dart';
 import '../../sprites/atlas.dart';
-import '../../ui/kit/kit.dart';
-import '../../ui/pixel_card.dart' show CardColors, Icon, PixelCard, Words, badgeColors;
+import '../../ui/pixel/pixel.dart';
+import '../../ui/pixel/pixel_card.dart' show CardColors, Icon, PixelCard, Words, badgeColors;
 import '../../data/remote.dart' show agentsProvider, projectCatalogProvider;
 import '../projects/codebase.dart' show growthOf;
 import '../projects/projects_page.dart' show since;
@@ -100,7 +100,7 @@ class _MapView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (loading && islands.isEmpty)
-                            Text('在找……', style: KitText.sm.copyWith(color: Palette.bark500))
+                            Text('在找……', style: PxText.sm.copyWith(color: Palette.bark500))
                           else if (islands.isEmpty)
                             const _NoProjects()
                           else
@@ -151,7 +151,7 @@ class _Toolbar extends StatelessWidget {
     final pieces = ['${islands.length} 座岛', '${tally.peopled} 座有人', '在干 ${tally.working}/$maxRunning 块地', if (tally.queued > 0) '排队 ${tally.queued}'];
     final counts = Wrap(
       runSpacing: 2,
-      children: [for (final (i, words) in pieces.indexed) Text(i < pieces.length - 1 ? '$words · ' : words, style: KitText.sm)],
+      children: [for (final (i, words) in pieces.indexed) Text(i < pieces.length - 1 ? '$words · ' : words, style: PxText.sm)],
     );
     final marks = Wrap(
       spacing: 16,
@@ -163,7 +163,7 @@ class _Toolbar extends StatelessWidget {
             children: [
               SpriteIcon(icon, size: 18),
               const SizedBox(width: 4),
-              Text(words, style: KitText.xs.copyWith(color: Palette.bark600)),
+              Text(words, style: PxText.xs.copyWith(color: Palette.bark600)),
             ],
           ),
       ],
@@ -320,13 +320,13 @@ class _IslandView extends ConsumerWidget {
       return Positioned(
         left: (foot.dx - sp.ax) * s,
         top: (foot.dy - sp.ay) * s,
-        child: onTap == null && tip == null ? picture : KitTappable(onTap: onTap, tooltip: tip, semanticLabel: label, builder: (_, _) => picture),
+        child: onTap == null && tip == null ? picture : Tappable(onTap: onTap, tooltip: tip, semanticLabel: label, builder: (_, _) => picture),
       );
     }
 
     final layers = <Widget>[
       Positioned.fill(
-        child: KitTappable(
+        child: Tappable(
           onTap: () => onOpen(island.project),
           semanticLabel: '${island.project}：${islandText(island)}',
           builder: (_, _) => Align(
@@ -429,7 +429,7 @@ class _IslandView extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 6),
-        KitTappable(
+        Tappable(
           onTap: () => onOpen(island.project),
           selected: selected,
           semanticLabel: island.project,
@@ -465,7 +465,7 @@ class _Homeless extends StatelessWidget {
         runSpacing: 4,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Text('不在哪个项目里：', style: KitText.xs.copyWith(color: Palette.bark600)),
+          Text('不在哪个项目里：', style: PxText.xs.copyWith(color: Palette.bark600)),
           for (final h in sessions)
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -473,7 +473,7 @@ class _Homeless extends StatelessWidget {
                 AgentFaceOf(h.agent, size: 20),
                 const SizedBox(width: 4),
                 DefaultTextStyle(
-                  style: KitText.xs,
+                  style: PxText.xs,
                   child: InlineLink(h.name, onTap: () => workbenchGo(context, '/issues/${Uri.encodeComponent(h.id)}')),
                 ),
               ],
@@ -493,7 +493,7 @@ class _NoProjects extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('工作目录下还没有项目，地图上还是一片海。', style: KitText.sm.copyWith(color: Palette.bark600)),
+          Text('工作目录下还没有项目，地图上还是一片海。', style: PxText.sm.copyWith(color: Palette.bark600)),
           const SizedBox(height: 12),
           PxButton.text('去开一块地', tone: PxTone.primary, onPressed: () => workbenchGo(context, '/projects')),
         ],
@@ -527,13 +527,13 @@ class IslandDetail extends StatelessWidget {
                 Expanded(
                   child: Text(
                     island.summary == null ? '工作目录里没有这个项目了，只剩还在岛上的帮工。' : '长势 · ${growth.label}${last != null ? ' · 最近一次提交：${since(last, now)}' : ''}',
-                    style: KitText.xs.copyWith(color: Palette.bark600),
+                    style: PxText.xs.copyWith(color: Palette.bark600),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text('worktree · ${taken.length} 个', style: KitText.sm),
+            Text('worktree · ${taken.length} 个', style: PxText.sm),
             const SizedBox(height: 6),
             if (taken.isEmpty) const EmptyNote('岛上还没有帮工：每派一件活来，就多一个 worktree。') else for (final t in taken) _WorktreeRow(spot: t, now: now),
             const SizedBox(height: 12),
@@ -550,7 +550,7 @@ class IslandDetail extends StatelessWidget {
                         : shut > 0
                         ? '农场的 $maxRunning 块地都有人在干活，派来的活先排队。'
                         : '满了：${island.maxSessions} 个帮工都在干活，派来的活先排队。',
-                    style: KitText.xs.copyWith(color: Palette.bark600),
+                    style: PxText.xs.copyWith(color: Palette.bark600),
                   ),
                 ),
                 if (island.summary != null) ...[
@@ -567,7 +567,7 @@ class IslandDetail extends StatelessWidget {
             ),
             if (island.queued.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text('排队 · ${island.queued.length} 件', style: KitText.sm),
+              Text('排队 · ${island.queued.length} 件', style: PxText.sm),
               const SizedBox(height: 6),
               for (final item in island.queued)
                 Padding(
@@ -577,11 +577,11 @@ class IslandDetail extends StatelessWidget {
                       const SpriteIcon('map-sack', size: 20),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(item.title, style: KitText.xs, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(item.title, style: PxText.xs, maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       const SizedBox(width: 8),
                       DefaultTextStyle(
-                        style: KitText.xs,
+                        style: PxText.xs,
                         child: PxButton(
                           size: PxSize.custom,
                           padding: const EdgeInsets.all(3),
@@ -610,7 +610,7 @@ class _WorktreeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = spot.session;
-    return KitTappable(
+    return Tappable(
       onTap: () => workbenchGo(context, '/issues/${Uri.encodeComponent(h.id)}'),
       semanticLabel: '${h.name}：${phaseText(h, now)}',
       builder: (context, st) => Container(
@@ -624,10 +624,10 @@ class _WorktreeRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(h.name, style: KitText.sm),
+                  Text(h.name, style: PxText.sm),
                   Text(
                     phaseText(h, now),
-                    style: KitText.xs.copyWith(color: Palette.bark600),
+                    style: PxText.xs.copyWith(color: Palette.bark600),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -639,7 +639,7 @@ class _WorktreeRow extends StatelessWidget {
                         Flexible(
                           child: Text(
                             branch,
-                            style: KitText.mono.copyWith(fontSize: 11, color: Palette.bark500),
+                            style: PxText.mono.copyWith(fontSize: 11, color: Palette.bark500),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),

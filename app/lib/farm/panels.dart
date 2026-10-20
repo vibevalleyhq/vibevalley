@@ -7,7 +7,7 @@ import '../data/overlays.dart';
 import '../game/tools.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import 'achievements.dart';
 import '../shared/harvest.dart';
 import 'menu.dart';
@@ -200,7 +200,7 @@ class ManagerLooks extends ConsumerWidget {
     final prefs = ref.watch(prefsProvider);
     final current = prefs.managerLook ?? 'farmer';
     final has = atlas?.has ?? (_) => false;
-    Widget tile({required bool chosen, required bool ready, required VoidCallback onTap, required List<Widget> children}) => KitTappable(
+    Widget tile({required bool chosen, required bool ready, required VoidCallback onTap, required List<Widget> children}) => Tappable(
       onTap: ready ? onTap : null,
       selected: chosen,
       builder: (context, s) => Opacity(
@@ -218,7 +218,7 @@ class ManagerLooks extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('挑一个你喜欢的管家，农场和对话里马上换上。', style: KitText.sm.copyWith(color: Palette.bark900)),
+        Text('挑一个你喜欢的管家，农场和对话里马上换上。', style: PxText.sm.copyWith(color: Palette.bark900)),
         const SizedBox(height: 12),
         GridView.count(
           crossAxisCount: 3,
@@ -236,18 +236,18 @@ class ManagerLooks extends ConsumerWidget {
                 children: [
                   SizedBox(height: 112, child: atlas == null ? null : SpriteIcon(managerSprite(look.id, '', has), size: 112)),
                   const SizedBox(height: 6),
-                  Text(look.name, style: KitText.sm),
+                  Text(look.name, style: PxText.sm),
                   Text(
                     lookReady(look.id, has) ? look.blurb : '还在画……',
                     textAlign: TextAlign.center,
-                    style: KitText.xs.copyWith(color: Palette.bark600),
+                    style: PxText.xs.copyWith(color: Palette.bark600),
                   ),
                 ],
               ),
           ],
         ),
         const SizedBox(height: 8),
-        Text('宠物', style: KitText.sm),
+        Text('宠物', style: PxText.sm),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -261,8 +261,8 @@ class ManagerLooks extends ConsumerWidget {
                   children: [
                     SizedBox(height: 64, child: has('$p-awake') ? SpriteIcon('$p-awake', size: 64) : null),
                     const SizedBox(height: 6),
-                    Text(petName[p]!, style: KitText.sm),
-                    if (!has('$p-awake')) Text('还在画……', style: KitText.xs.copyWith(color: Palette.bark600)),
+                    Text(petName[p]!, style: PxText.sm),
+                    if (!has('$p-awake')) Text('还在画……', style: PxText.xs.copyWith(color: Palette.bark600)),
                   ],
                 ),
               ),
@@ -290,7 +290,7 @@ class Shop extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('商店还在装修，下一版开张。现在有 $coins 金币，先攒着。', style: KitText.sm.copyWith(color: Palette.bark800)),
+        Text('商店还在装修，下一版开张。现在有 $coins 金币，先攒着。', style: PxText.sm.copyWith(color: Palette.bark800)),
         const SizedBox(height: 12),
         GridView.count(
           crossAxisCount: 2,
@@ -315,18 +315,18 @@ class Shop extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(item.name, style: KitText.sm),
+                            Text(item.name, style: PxText.sm),
                             Text(
                               item.note,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: KitText.xs.copyWith(color: Palette.bark600),
+                              style: PxText.xs.copyWith(color: Palette.bark600),
                             ),
                           ],
                         ),
                       ),
                       const SpriteIcon('icon-coin', size: 16),
-                      Text('${item.price}', style: KitText.sm.copyWith(color: Palette.bark800)),
+                      Text('${item.price}', style: PxText.sm.copyWith(color: Palette.bark800)),
                     ],
                   ),
                 ),

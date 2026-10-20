@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/remote.dart' show watchSettingsProblem;
 import '../../gen/vibevalley.dart';
 import '../../data/ui_state.dart' show settingsProvider;
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../shared/layout.dart';
 import 'voice_rules.dart';
 import 'voice_samples.dart';
@@ -102,7 +102,7 @@ class _VoiceSettingsFormState extends ConsumerState<VoiceSettingsForm> {
     if (status == null) {
       return Padding(
         padding: const EdgeInsets.all(32),
-        child: Text(_failed != null ? '问不到服务端的设置（$_failed）。服务端是不是旧版本？重启一下再来。' : '在问服务端……', style: KitText.sm.copyWith(color: Palette.bark500)),
+        child: Text(_failed != null ? '问不到服务端的设置（$_failed）。服务端是不是旧版本？重启一下再来。' : '在问服务端……', style: PxText.sm.copyWith(color: Palette.bark500)),
       );
     }
     return _VoiceForm(key: ValueKey(status.file), status: status, part: widget.part);
@@ -240,13 +240,13 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           if (_error != null)
-            Text(_error!, style: KitText.sm.copyWith(color: Palette.berry))
+            Text(_error!, style: PxText.sm.copyWith(color: Palette.berry))
           else if (problem != null)
-            Text(problem, style: KitText.sm.copyWith(color: Palette.berry))
+            Text(problem, style: PxText.sm.copyWith(color: Palette.berry))
           else if (_saved)
-            Text('存好了，下一通电话就用上。', style: KitText.sm.copyWith(color: Palette.leaf700))
+            Text('存好了，下一通电话就用上。', style: PxText.sm.copyWith(color: Palette.leaf700))
           else
-            Text(_dirty ? '有没存的改动。' : '都存着。', style: KitText.xs.copyWith(color: Palette.bark500)),
+            Text(_dirty ? '有没存的改动。' : '都存着。', style: PxText.xs.copyWith(color: Palette.bark500)),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -287,7 +287,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
     final asr = draft.asr;
     final answer = draft.answer;
     final ready = status.agoraAppId.source != null && status.agoraAppCertificate.source != null;
-    final muted = KitText.xs.copyWith(color: Palette.bark500);
+    final muted = PxText.xs.copyWith(color: Palette.bark500);
     return [
       PxWindow(
         paper: Palette.cream50,
@@ -296,7 +296,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('声音', style: KitText.xl),
+            Text('声音', style: PxText.xl),
             Text.rich(
               TextSpan(
                 children: [
@@ -304,12 +304,12 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                   WidgetSpan(
                     alignment: PlaceholderAlignment.baseline,
                     baseline: TextBaseline.alphabetic,
-                    child: TextLink('管家页', style: KitText.sm, onTap: () => workbenchGo(context, '/manager/voice')),
+                    child: TextLink('管家页', style: PxText.sm, onTap: () => workbenchGo(context, '/manager/voice')),
                   ),
                   const TextSpan(text: '。'),
                 ],
               ),
-              style: KitText.sm.copyWith(color: Palette.bark600),
+              style: PxText.sm.copyWith(color: Palette.bark600),
             ),
             const SizedBox(height: 4),
             Wrap(
@@ -323,7 +323,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                   message: status.file,
                   child: Text(
                     status.file,
-                    style: KitText.mono.copyWith(color: Palette.bark500),
+                    style: PxText.mono.copyWith(color: Palette.bark500),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -537,7 +537,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
             Text(
               '田头输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。服务端把录音原样转给下面这个 OpenAI 兼容的转写地址；'
               '填本机的 speech-server，声音就不出这台电脑。',
-              style: KitText.xs.copyWith(color: Palette.bark600),
+              style: PxText.xs.copyWith(color: Palette.bark600),
             ),
             const SizedBox(height: 8),
             Cols(
@@ -594,12 +594,12 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
               WidgetSpan(
                 alignment: PlaceholderAlignment.baseline,
                 baseline: TextBaseline.alphabetic,
-                child: TextLink('声音', style: KitText.xs, onTap: () => workbenchGo(context, '/settings/voice')),
+                child: TextLink('声音', style: PxText.xs, onTap: () => workbenchGo(context, '/settings/voice')),
               ),
               const TextSpan(text: '页。'),
             ],
           ),
-          style: KitText.xs.copyWith(color: Palette.bark600),
+          style: PxText.xs.copyWith(color: Palette.bark600),
         ),
       ),
       const SizedBox(height: 12),
@@ -894,14 +894,14 @@ class _VoiceChip extends StatelessWidget {
   final VoidCallback onChoose;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: null,
     builder: (context, _) => Container(
       color: chosen ? Palette.leaf300.withValues(alpha: .5) : Palette.cream50,
       foregroundDecoration: chosen ? pxRing : null,
       child: Row(
         children: [
-          KitTappable(
+          Tappable(
             onTap: onPlay,
             tooltip: onPlay != null ? '试听：$defaultGreeting' : '没有样音',
             semanticLabel: playing ? '停下 $label' : '试听 $label',
@@ -917,7 +917,7 @@ class _VoiceChip extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: KitTappable(
+            child: Tappable(
               onTap: onChoose,
               tooltip: id,
               selected: chosen,
@@ -929,7 +929,7 @@ class _VoiceChip extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: KitText.sm.copyWith(color: chosen ? Palette.leaf700 : Palette.bark900),
+                  style: PxText.sm.copyWith(color: chosen ? Palette.leaf700 : Palette.bark900),
                 ),
               ),
             ),

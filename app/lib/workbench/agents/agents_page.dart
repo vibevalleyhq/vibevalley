@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../shared/faces.dart';
 import '../../shared/swatches.dart';
 import '../shared/rules.dart';
@@ -62,14 +62,14 @@ class AgentsPage extends ConsumerWidget {
                               children: [
                                 TextSpan(
                                   text: '档案',
-                                  style: KitText.sm.copyWith(color: Palette.bark500),
+                                  style: PxText.sm.copyWith(color: Palette.bark500),
                                 ),
                               ],
                             ),
-                            style: KitText.x2l,
+                            style: PxText.x2l,
                           ),
                           const SizedBox(height: 4),
-                          Text('每个帮工是一种配置好的 runtime：用哪个 runtime 和模型、带什么人设和技能，在农场里是哪种小动物、穿什么。管家派活时派的就是帮工。', style: KitText.sm.copyWith(color: Palette.bark600)),
+                          Text('每个帮工是一种配置好的 runtime：用哪个 runtime 和模型、带什么人设和技能，在农场里是哪种小动物、穿什么。管家派活时派的就是帮工。', style: PxText.sm.copyWith(color: Palette.bark600)),
                         ],
                       ),
                     ),
@@ -115,14 +115,14 @@ class _NewButton extends StatelessWidget {
   const _NewButton();
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: () => workbenchGo(context, '/agents/new'),
     semanticLabel: '捏一个新帮工',
     builder: (context, s) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: s.hovered ? Palette.leafHover : Palette.leaf500,
       foregroundDecoration: pxRing,
-      child: Text('捏一个新帮工', style: KitText.sm.copyWith(color: Palette.cream50)),
+      child: Text('捏一个新帮工', style: PxText.sm.copyWith(color: Palette.cream50)),
     ),
   );
 }
@@ -156,7 +156,7 @@ class _CardState extends State<_Card> {
           clip: true,
           child: Stack(
             children: [
-              KitTappable(
+              Tappable(
                 onTap: () => workbenchGo(context, widget.path),
                 semanticLabel: widget.label,
                 builder: (context, s) => Container(padding: const EdgeInsets.all(16), foregroundDecoration: pxRing, child: widget.child),
@@ -177,7 +177,7 @@ Widget _footer(List<Widget> children) => Container(
     border: Border(top: BorderSide(color: Palette.cream300)),
   ),
   child: DefaultTextStyle(
-    style: KitText.fine.copyWith(color: Palette.bark500),
+    style: PxText.fine.copyWith(color: Palette.bark500),
     child: Row(children: children),
   ),
 );
@@ -201,13 +201,13 @@ class _ManagerCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('管家', style: KitText.base),
+                  const Text('管家', style: PxText.base),
                   const SizedBox(height: 2),
                   Text(
                     '不下地：派活、盯进度、转告结果，也接电话。',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: KitText.xs.copyWith(height: 1.625, color: Palette.bark600),
+                    style: PxText.xs.copyWith(height: 1.625, color: Palette.bark600),
                   ),
                 ],
               ),
@@ -273,7 +273,7 @@ class _AgentCard extends ConsumerWidget {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(a.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.base),
+                          child: Text(a.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.base),
                         ),
                         if (here > 0) ...[const SizedBox(width: 8), BadgeLabel('在场 $here', hat: true)],
                       ],
@@ -283,11 +283,11 @@ class _AgentCard extends ConsumerWidget {
                       a.role,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: KitText.xs.copyWith(height: 1.625, color: Palette.bark600),
+                      style: PxText.xs.copyWith(height: 1.625, color: Palette.bark600),
                     ),
                     const SizedBox(height: 6),
                     DefaultTextStyle(
-                      style: KitText.fine.copyWith(color: Palette.bark500),
+                      style: PxText.fine.copyWith(color: Palette.bark500),
                       child: Row(
                         children: [
                           Container(width: 6, height: 6, color: available ? Palette.leaf500 : Palette.berry),
@@ -314,7 +314,7 @@ class _AgentCard extends ConsumerWidget {
                     Container(
                       color: Palette.cream200,
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Text(skillName[id] ?? id, style: KitText.fine.copyWith(color: Palette.bark800)),
+                      child: Text(skillName[id] ?? id, style: PxText.fine.copyWith(color: Palette.bark800)),
                     ),
                 ],
               ),
@@ -378,7 +378,7 @@ class _Toggle extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final a = agent;
     final label = a.enabled ? '停用' : '启用';
-    return KitTappable(
+    return Tappable(
       onTap: () => runAction(() => ref.read(workbenchConfigProvider.notifier).saveAgent(a.copyWith(enabled: !a.enabled))),
       semanticLabel: '$label ${a.name}',
       builder: (context, s) => Opacity(
@@ -386,7 +386,7 @@ class _Toggle extends ConsumerWidget {
         child: Container(
           color: Palette.cream200.withValues(alpha: .8),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Text(label, style: KitText.xs.copyWith(color: s.hovered ? Palette.bark900 : Palette.bark600)),
+          child: Text(label, style: PxText.xs.copyWith(color: s.hovered ? Palette.bark900 : Palette.bark600)),
         ),
       ),
     );
@@ -397,7 +397,7 @@ class _NewCard extends StatelessWidget {
   const _NewCard();
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: () => workbenchGo(context, '/agents/new'),
     semanticLabel: '捏一个新帮工',
     builder: (context, s) {
@@ -412,7 +412,7 @@ class _NewCard extends StatelessWidget {
             children: [
               const SpriteIcon('button-add', size: 28),
               const SizedBox(height: 8),
-              Text('捏一个新帮工', style: KitText.sm.copyWith(color: ink)),
+              Text('捏一个新帮工', style: PxText.sm.copyWith(color: ink)),
             ],
           ),
         ),

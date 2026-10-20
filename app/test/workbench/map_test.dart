@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vibevalley/audio/sfx.dart';
-import 'package:vibevalley/ui/theme.dart';
+import 'package:vibevalley/ui/pixel/theme.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/workbench/projects/projects_page.dart';
 import 'package:vibevalley/workbench/map/map_rules.dart';

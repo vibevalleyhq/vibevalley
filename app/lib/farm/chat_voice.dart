@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../shared/chat_widgets.dart';
 import '../host/desktop.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../voice/voice.dart';
 
 const _mood = {'speaking': '在说话', 'listening': '在听', 'thinking': '在想', 'idle': '在听', 'silent': '在听'};
@@ -40,7 +40,7 @@ class ChatVoiceToggle extends ConsumerWidget {
         : error
         ? const Color(0xFFC9813A)
         : Palette.leaf500;
-    return KitTappable(
+    return Tappable(
       onTap: leaving ? null : () => unawaited(call.toggle()),
       tooltip: tip,
       semanticLabel: live || joining ? '挂断语音' : '语音说话',

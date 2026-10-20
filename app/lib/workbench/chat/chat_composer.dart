@@ -5,7 +5,7 @@ import '../../data/messages.dart';
 import '../../gen/vibevalley.dart';
 import '../../shared/composer.dart';
 import '../../shared/manager_stop_button.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 
 class ChatComposer extends ConsumerWidget {
   const ChatComposer({super.key, required this.conversation, required this.placeholder});

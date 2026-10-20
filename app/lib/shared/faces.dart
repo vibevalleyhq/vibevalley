@@ -9,7 +9,7 @@ import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../sprites/atlas.dart';
-import '../ui/pixels.dart';
+import '../ui/pixel/frame.dart';
 import 'swatches.dart';
 import '../rules/cast.dart';
 import '../data/remote.dart';

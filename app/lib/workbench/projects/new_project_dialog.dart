@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import 'codebase.dart';
 import '../../data/remote.dart';
 
@@ -135,12 +135,12 @@ class _NewProjectFormState extends ConsumerState<NewProjectForm> {
             const SizedBox(height: 16),
             Semantics(
               liveRegion: true,
-              child: Text(_error!, style: KitText.sm.copyWith(color: Palette.berry)),
+              child: Text(_error!, style: PxText.sm.copyWith(color: Palette.berry)),
             ),
           ],
           if (_busy) ...[
             const SizedBox(height: 16),
-            Text(_importing ? '正在下载仓库… 大仓库需要多等一会儿，最多 3 分钟。' : '正在开地…', style: KitText.sm.copyWith(color: Palette.bark600)),
+            Text(_importing ? '正在下载仓库… 大仓库需要多等一会儿，最多 3 分钟。' : '正在开地…', style: PxText.sm.copyWith(color: Palette.bark600)),
           ],
           const SizedBox(height: 16),
           Row(

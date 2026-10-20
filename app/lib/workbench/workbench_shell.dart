@@ -7,7 +7,7 @@ import '../shared/faces.dart';
 import '../gen/vibevalley.dart';
 import '../rules/cast.dart';
 import '../sprites/atlas.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import 'places.dart';
 
 const workbenchHead = 66.0;
@@ -113,7 +113,7 @@ class _Slot extends StatelessWidget {
   Widget build(BuildContext context) => Tooltip(
     message: label,
     waitDuration: const Duration(milliseconds: 400),
-    child: KitTappable(
+    child: Tappable(
       onTap: onTap,
       semanticLabel: label,
       builder: (context, s) => Container(
@@ -124,7 +124,7 @@ class _Slot extends StatelessWidget {
             ? BoxDecoration(
                 color: fill,
                 border: Border.all(color: Palette.bark900, width: 2),
-                boxShadow: kitDrop,
+                boxShadow: pxDrop,
               )
             : BoxDecoration(color: s.hovered ? Palette.bark800 : null),
         child: child,
@@ -164,14 +164,14 @@ class _ConfigDesk extends ConsumerWidget {
                       child: Row(
                         children: [
                           Flexible(
-                            child: Text(p.label, style: KitText.lg, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            child: Text(p.label, style: PxText.lg, maxLines: 1, overflow: TextOverflow.ellipsis),
                           ),
                           if (!compact) ...[
                             const SizedBox(width: 12),
                             Flexible(
                               child: Text(
                                 p.hint,
-                                style: KitText.xs.copyWith(color: Palette.bark500),
+                                style: PxText.xs.copyWith(color: Palette.bark500),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -193,7 +193,7 @@ class _ConfigDesk extends ConsumerWidget {
                       children: [
                         Container(width: 8, height: 8, color: live ? Palette.leaf500 : Palette.cream300),
                         const SizedBox(width: 6),
-                        Text(compact && live ? '$working 个在干活' : status, style: KitText.xs),
+                        Text(compact && live ? '$working 个在干活' : status, style: PxText.xs),
                       ],
                     ),
                   ),

@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../audio/sfx.dart';
 import '../data/ui_state.dart' show settingsProvider;
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 
 const _from = {KeySource.settings: '存在设置里', KeySource.config: '来自配置（vibevalley.yaml 或环境变量）'};
 
@@ -197,12 +197,12 @@ class _SettingsFormState extends ConsumerState<SettingsForm> {
                   status.file,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: KitText.mono.copyWith(color: Palette.bark500),
+                  style: PxText.mono.copyWith(color: Palette.bark500),
                 ),
               ),
             ),
             const SizedBox(width: 8),
-            KitTappable(
+            Tappable(
               onTap: _busy ? null : () => unawaited(_submit(status)),
               semanticLabel: '保存',
               builder: (context, state) => Opacity(
@@ -294,7 +294,7 @@ class _MemorySourceField extends StatelessWidget {
               style: const TextStyle(fontFamily: pixelFont, fontSize: 12, color: Palette.bark900),
             ),
           ),
-          KitTappable(
+          Tappable(
             onTap: () {
               d.open = true;
               onChanged();
@@ -384,7 +384,7 @@ class _KeyField extends StatelessWidget {
             ),
           ),
           if (canClear)
-            KitTappable(
+            Tappable(
               onTap: onClear,
               semanticLabel: '清掉',
               builder: (context, _) => const Text(
@@ -410,8 +410,8 @@ class _Link extends StatelessWidget {
   final Uri uri;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
-    onTap: () => kitOpenLink?.call(uri),
+  Widget build(BuildContext context) => Tappable(
+    onTap: () => linkOpener?.call(uri),
     semanticLabel: text,
     builder: (context, _) => Text(
       text,
@@ -428,7 +428,7 @@ class _Link extends StatelessWidget {
 
 InputDecoration _decoration(String placeholder) => InputDecoration(
   hintText: placeholder,
-  hintStyle: KitText.mono.copyWith(color: Palette.bark400),
+  hintStyle: PxText.mono.copyWith(color: Palette.bark400),
   isDense: true,
   filled: true,
   fillColor: Palette.cream50,
@@ -465,7 +465,7 @@ class _Input extends StatelessWidget {
       obscureText: obscure,
       autocorrect: false,
       enableSuggestions: false,
-      style: KitText.mono,
+      style: PxText.mono,
       decoration: _decoration(placeholder),
     ),
   );
@@ -493,7 +493,7 @@ class _SecretInputState extends State<_SecretInput> {
         Expanded(
           child: _Input(controller: widget.controller, placeholder: widget.placeholder, label: widget.label, onChanged: widget.onChanged, obscure: !_shown),
         ),
-        KitTappable(
+        Tappable(
           onTap: () => setState(() => _shown = !_shown),
           semanticLabel: _shown ? '藏起来' : '看一眼',
           builder: (context, _) => Container(

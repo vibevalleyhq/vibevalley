@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-import '../theme.dart';
+import '../common.dart';
 import 'base.dart';
 import 'field.dart' show PxTip;
-import 'icons.dart';
 
 class SegmentOption<T> {
   const SegmentOption({required this.value, required this.label, this.disabled = false, this.title});
@@ -34,7 +32,7 @@ class PxSegmented<T> extends StatelessWidget {
         runSpacing: 4,
         children: [
           for (final o in options)
-            KitTappable(
+            Tappable(
               onTap: o.disabled ? null : () => onChanged(o.value),
               tooltip: o.title,
               selected: o.value == value,
@@ -48,7 +46,7 @@ class PxSegmented<T> extends StatelessWidget {
                   foregroundDecoration: pxRing,
                   child: Center(
                     widthFactor: 1,
-                    child: Text(o.label, style: KitText.xs.copyWith(color: on ? Palette.cream50 : Palette.bark800)),
+                    child: Text(o.label, style: PxText.xs.copyWith(color: on ? Palette.cream50 : Palette.bark800)),
                   ),
                 );
                 if (s.pressed) b = Transform.translate(offset: const Offset(1, 1), child: b);
@@ -183,7 +181,7 @@ class _PxPickState extends State<PxPick> {
             child: Builder(
               key: _trigger,
               builder: (context) {
-                return KitTappable(
+                return Tappable(
                   onTap: widget.enabled ? () => _portal.isShowing ? _close() : _open() : null,
                   semanticLabel: widget.semanticLabel,
                   builder: (context, s) => Opacity(
@@ -200,7 +198,7 @@ class _PxPickState extends State<PxPick> {
                               current.label,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: KitText.sm.copyWith(color: empty ? Palette.bark500 : Palette.bark900),
+                              style: PxText.sm.copyWith(color: empty ? Palette.bark500 : Palette.bark900),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -264,7 +262,7 @@ class _PickPopup extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     items[i].label,
-                                    style: KitText.sm.copyWith(
+                                    style: PxText.sm.copyWith(
                                       color: items[i].value == ''
                                           ? Palette.bark500
                                           : items[i].value == value
@@ -275,7 +273,7 @@ class _PickPopup extends StatelessWidget {
                                 ),
                                 if (items[i].detail case final d? when d.isNotEmpty) ...[
                                   const SizedBox(width: 12),
-                                  Text(d, style: KitText.xs.copyWith(color: Palette.bark500)),
+                                  Text(d, style: PxText.xs.copyWith(color: Palette.bark500)),
                                 ],
                               ],
                             ),
@@ -307,7 +305,7 @@ class PxSwitchField extends StatelessWidget {
     opacity: enabled ? 1 : .5,
     child: Semantics(
       toggled: checked,
-      child: KitTappable(
+      child: Tappable(
         onTap: enabled ? () => onChanged(!checked) : null,
         builder: (context, s) => Row(
           mainAxisSize: MainAxisSize.min,
@@ -327,7 +325,7 @@ class PxSwitchField extends StatelessWidget {
                 child: Container(
                   width: 20,
                   height: 20,
-                  decoration: const BoxDecoration(color: Palette.cream50, boxShadow: kitDrop),
+                  decoration: const BoxDecoration(color: Palette.cream50, boxShadow: pxDrop),
                 ),
               ),
             ),
@@ -339,9 +337,9 @@ class PxSwitchField extends StatelessWidget {
                 children: [
                   PxTip(
                     tip: tip,
-                    child: Text(label, style: KitText.sm),
+                    child: Text(label, style: PxText.sm),
                   ),
-                  if (hint != null) Text(hint!, style: KitText.fine.copyWith(color: Palette.bark500)),
+                  if (hint != null) Text(hint!, style: PxText.fine.copyWith(color: Palette.bark500)),
                 ],
               ),
             ),

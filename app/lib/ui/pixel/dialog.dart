@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-import '../theme.dart';
+import '../common.dart';
 import 'base.dart';
 import 'button.dart';
-import 'icons.dart';
 
 const _dialogBackdrop = Color(0x731E140A);
 
@@ -29,7 +27,7 @@ class PxDialog extends StatelessWidget {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: DefaultTextStyle(
-                  style: KitText.sm,
+                  style: PxText.sm,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -39,7 +37,7 @@ class PxDialog extends StatelessWidget {
                           Expanded(
                             child: Semantics(
                               header: true,
-                              child: DefaultTextStyle(style: KitText.xl, child: title),
+                              child: DefaultTextStyle(style: PxText.xl, child: title),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -66,7 +64,7 @@ Future<T?> showPxDialog<T>(BuildContext context, {required Widget title, require
   barrierDismissible: true,
   barrierLabel: '关上',
   barrierColor: _dialogBackdrop,
-  transitionDuration: kitMotion(context, const Duration(milliseconds: 150)),
+  transitionDuration: motionDuration(context, const Duration(milliseconds: 150)),
   transitionBuilder: _fadeIn,
   pageBuilder: (context, _, _) => PxDialog(
     title: title,
@@ -107,7 +105,7 @@ class FarmDialog extends StatelessWidget {
           child: PxWindow(
             clip: true,
             child: DefaultTextStyle(
-              style: KitText.sm,
+              style: PxText.sm,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -121,11 +119,11 @@ class FarmDialog extends StatelessWidget {
                           Expanded(
                             child: Semantics(
                               header: true,
-                              child: DefaultTextStyle(style: KitText.lg, maxLines: 1, overflow: TextOverflow.ellipsis, child: title),
+                              child: DefaultTextStyle(style: PxText.lg, maxLines: 1, overflow: TextOverflow.ellipsis, child: title),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          KitTappable(
+                          Tappable(
                             onTap: onClose,
                             semanticLabel: '关上',
                             builder: (context, s) => Container(
@@ -173,7 +171,7 @@ Future<T?> showFarmDialog<T>(BuildContext context, {required Widget title, requi
       barrierDismissible: true,
       barrierLabel: '关上',
       barrierColor: Palette.bark900.withValues(alpha: .3),
-      transitionDuration: kitMotion(context, const Duration(milliseconds: 150)),
+      transitionDuration: motionDuration(context, const Duration(milliseconds: 150)),
       transitionBuilder: _fadeIn,
       pageBuilder: (context, _, _) => FarmDialog(
         title: title,
@@ -198,7 +196,7 @@ class FarmSection extends StatelessWidget {
       children: [
         Semantics(
           header: true,
-          child: Text(title, style: KitText.xs.copyWith(color: Palette.bark600)),
+          child: Text(title, style: PxText.xs.copyWith(color: Palette.bark600)),
         ),
         const SizedBox(height: 6),
         child,
@@ -270,7 +268,7 @@ class _PxModalLayerState extends State<PxModalLayer> {
                           SingleChildScrollView(
                             // The top leaves room for ✕, so a title under it is never covered.
                             padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
-                            child: DefaultTextStyle(style: KitText.sm, child: widget.child),
+                            child: DefaultTextStyle(style: PxText.sm, child: widget.child),
                           ),
                           Positioned(
                             top: 8,

@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/providers.dart';
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import 'chat_widgets.dart';
 
 /// Only while the manager thinks or speaks: it ends that run, and the helpers it sent keep working.

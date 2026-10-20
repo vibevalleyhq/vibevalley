@@ -10,7 +10,7 @@ import 'package:vibevalley/chat/chat_state.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/data/messages.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/ui/theme.dart';
+import 'package:vibevalley/ui/pixel/theme.dart';
 import 'package:vibevalley/workbench/chat/chat_composer.dart';
 import 'package:vibevalley/workbench/connectors/connectors_page.dart';
 import 'package:vibevalley/workbench/shared/resource.dart';

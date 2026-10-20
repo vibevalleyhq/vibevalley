@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-
-import '../theme.dart';
+import '../common.dart';
+import 'theme.dart';
 import 'base.dart';
-import 'icons.dart';
 
 class PxField extends StatelessWidget {
   const PxField({
@@ -48,7 +47,7 @@ class PxField extends StatelessWidget {
                       baseline: TextBaseline.alphabetic,
                       child: PxTip(
                         tip: tip,
-                        child: Text(label, style: KitText.xs.copyWith(color: Palette.bark600)),
+                        child: Text(label, style: PxText.xs.copyWith(color: Palette.bark600)),
                       ),
                     ),
                     if (required)
@@ -63,13 +62,13 @@ class PxField extends StatelessWidget {
                       ),
                   ],
                 ),
-                style: KitText.xs.copyWith(color: Palette.bark600),
+                style: PxText.xs.copyWith(color: Palette.bark600),
               ),
             ),
             if (aside != null) ...[
               const SizedBox(width: 8),
               DefaultTextStyle(
-                style: KitText.xs.copyWith(color: Palette.bark500),
+                style: PxText.xs.copyWith(color: Palette.bark500),
                 child: aside!,
               ),
             ],
@@ -80,7 +79,7 @@ class PxField extends StatelessWidget {
         if (note != null) ...[
           const SizedBox(height: 6),
           DefaultTextStyle(
-            style: KitText.xs.copyWith(height: 1.625, color: err ? Palette.berry : Palette.bark500),
+            style: PxText.xs.copyWith(height: 1.625, color: err ? Palette.berry : Palette.bark500),
             child: note,
           ),
         ],
@@ -151,7 +150,7 @@ class _InputBox extends StatelessWidget {
   );
 }
 
-InputDecoration _bare(String? placeholder, TextStyle style) => kitBare(
+InputDecoration _bare(String? placeholder, TextStyle style) => pxBare(
   InputDecoration.collapsed(
     hintText: placeholder,
     hintStyle: style.copyWith(color: Palette.bark500),
@@ -159,7 +158,7 @@ InputDecoration _bare(String? placeholder, TextStyle style) => kitBare(
 );
 
 /// The theme's borders for each state would otherwise draw a second frame inside it, since a collapsed decoration only clears `border`.
-InputDecoration kitBare(InputDecoration d) => d.copyWith(
+InputDecoration pxBare(InputDecoration d) => d.copyWith(
   filled: false,
   enabledBorder: InputBorder.none,
   focusedBorder: InputBorder.none,
@@ -241,7 +240,7 @@ class _PxTextInputState extends State<PxTextInput> {
 
   @override
   Widget build(BuildContext context) {
-    final style = widget.mono ? KitText.mono : KitText.sm;
+    final style = widget.mono ? PxText.mono : PxText.sm;
     Widget field(TextEditingController controller, FocusNode focus, VoidCallback? submitted) => TextField(
       controller: controller,
       focusNode: focus,
@@ -323,12 +322,12 @@ class _SuggestionList extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 children: [
                   for (var i = 0; i < options.length; i++)
-                    KitTappable(
+                    Tappable(
                       onTap: () => onSelected(options[i]),
                       builder: (context, s) => Container(
                         color: s.hovered || i == highlighted ? Palette.cream200 : null,
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        child: Text(options[i], style: (mono ? KitText.mono : KitText.sm).copyWith(color: Palette.bark800)),
+                        child: Text(options[i], style: (mono ? PxText.mono : PxText.sm).copyWith(color: Palette.bark800)),
                       ),
                     ),
                 ],
@@ -360,7 +359,7 @@ class PxTextArea extends StatefulWidget {
 
   final String value;
 
-  /// A long text being written (an issue's description): in KitText.read, as it is read.
+  /// A long text being written (an issue's description): in PxText.read, as it is read.
   final bool reading;
   final ValueChanged<String> onChanged;
   final int rows;
@@ -412,7 +411,7 @@ class _PxTextAreaState extends State<PxTextArea> {
 
   @override
   Widget build(BuildContext context) {
-    final style = widget.reading ? KitText.read : (widget.mono ? KitText.mono : KitText.sm).copyWith(height: 1.625);
+    final style = widget.reading ? PxText.read : (widget.mono ? PxText.mono : PxText.sm).copyWith(height: 1.625);
     return Semantics(
       textField: true,
       label: widget.semanticLabel,

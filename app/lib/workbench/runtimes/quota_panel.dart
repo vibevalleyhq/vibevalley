@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
 import '../shared/config_problem.dart';
@@ -39,7 +39,7 @@ class QuotaPanel extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Expanded(child: Text('剩余额度', style: KitText.sm)),
+                Expanded(child: Text('剩余额度', style: PxText.sm)),
                 PxButton(
                   size: PxSize.icon,
                   tooltip: '现在读一次额度',
@@ -66,7 +66,7 @@ class QuotaPanel extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text('从各家账户读来，几分钟更新一次；帮工干完一轮也会更新。', style: KitText.xs.copyWith(color: Palette.bark400)),
+            Text('从各家账户读来，几分钟更新一次；帮工干完一轮也会更新。', style: PxText.xs.copyWith(color: Palette.bark400)),
           ],
         ),
       ),
@@ -83,7 +83,7 @@ class QuotaMachine extends StatelessWidget {
   Widget build(BuildContext context) {
     final quota = quotaOf(info);
     final stop = info.stop;
-    final small = KitText.xs.copyWith(color: Palette.bark500);
+    final small = PxText.xs.copyWith(color: Palette.bark500);
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: pxInset(fill: Palette.cream100, line: Palette.cream200),
@@ -99,7 +99,7 @@ class QuotaMachine extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(info.preset.label, style: KitText.sm),
+                    Text(info.preset.label, style: PxText.sm),
                     if (info.usage case AccountUsageOk(:final subscription?)) ...[
                       const SizedBox(width: 6),
                       Flexible(
@@ -117,7 +117,7 @@ class QuotaMachine extends StatelessWidget {
                 if (stop != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(stop, style: KitText.xs.copyWith(color: Palette.berry)),
+                    child: Text(stop, style: PxText.xs.copyWith(color: Palette.berry)),
                   ),
               ],
             ),
@@ -129,7 +129,7 @@ class QuotaMachine extends StatelessWidget {
                 EnergyBottle(atlas: atlas, quota: quota, size: 40),
                 Text(
                   quota.short.isEmpty ? '—' : quota.short,
-                  style: KitText.xs.copyWith(
+                  style: PxText.xs.copyWith(
                     color: quota.level == QuotaLevel.unknown
                         ? Palette.bark400
                         : quota.level == QuotaLevel.empty
@@ -154,17 +154,17 @@ class _UsageLines extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final faint = KitText.xs.copyWith(color: Palette.bark400);
+    final faint = PxText.xs.copyWith(color: Palette.bark400);
     return switch (usage) {
       null => Text('不报额度', style: faint),
-      AccountUsageLoginRequired() => Text('没登录，额度读不到', style: KitText.xs.copyWith(color: const Color(0xFFB8682A))),
+      AccountUsageLoginRequired() => Text('没登录，额度读不到', style: PxText.xs.copyWith(color: const Color(0xFFB8682A))),
       AccountUsageUnavailable(:final reason) => Tooltip(
         message: reason,
         child: Text('读不到：$reason', style: faint, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
       AccountUsageBalance(:final provider, :final available) => Padding(
         padding: const EdgeInsets.only(top: 2),
-        child: Text('按量计费 · $provider 余额${available ? '' : '，不够用了'}', style: KitText.xs.copyWith(color: available ? Palette.bark800 : Palette.berry)),
+        child: Text('按量计费 · $provider 余额${available ? '' : '，不够用了'}', style: PxText.xs.copyWith(color: available ? Palette.bark800 : Palette.berry)),
       ),
       AccountUsageOk(:final windows) => Padding(
         padding: const EdgeInsets.only(top: 4),
@@ -180,12 +180,12 @@ class _UsageLines extends StatelessWidget {
                     Expanded(
                       child: Text(
                         windowLabel(w.label),
-                        style: KitText.xs.copyWith(color: Palette.bark500),
+                        style: PxText.xs.copyWith(color: Palette.bark500),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Text('${_pct(100 - w.usedPercent)}%', style: KitText.xs.copyWith(color: quotaInk(100 - w.usedPercent))),
+                    Text('${_pct(100 - w.usedPercent)}%', style: PxText.xs.copyWith(color: quotaInk(100 - w.usedPercent))),
                   ],
                 ),
               ),
@@ -199,7 +199,7 @@ class _UsageLines extends StatelessWidget {
                 width: 150,
                 height: 9,
               ),
-              if (w.resetsAt case final at?) Text(resetText(at), style: KitText.xs.copyWith(color: Palette.bark400, fontSize: 10)),
+              if (w.resetsAt case final at?) Text(resetText(at), style: PxText.xs.copyWith(color: Palette.bark400, fontSize: 10)),
               const SizedBox(height: 6),
             ],
           ],

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../shared/swatches.dart';
 import '../shared/rules.dart';
 import '../../data/remote.dart';
@@ -92,7 +92,7 @@ class _AgentCreatorPageState extends ConsumerState<AgentCreatorPage> {
     });
     if (config.error != null) return const ConfigProblem();
     if (_isNew && _draft == null && ref.watch(runtimesProvider.select((r) => r.hasError))) return const RuntimeProblem();
-    final note = KitText.sm.copyWith(color: Palette.bark500);
+    final note = PxText.sm.copyWith(color: Palette.bark500);
     if (!config.loaded) {
       return Padding(
         padding: const EdgeInsets.all(32),
@@ -104,7 +104,7 @@ class _AgentCreatorPageState extends ConsumerState<AgentCreatorPage> {
       return Padding(
         padding: const EdgeInsets.all(32),
         child: DefaultTextStyle(
-          style: KitText.sm.copyWith(color: Palette.bark600),
+          style: PxText.sm.copyWith(color: Palette.bark600),
           child: Row(
             children: [
               const Text('没有这个帮工。'),
@@ -162,7 +162,7 @@ class _CreatorState extends ConsumerState<_Creator> {
     final back = Container(
       foregroundDecoration: pxRing,
       child: DefaultTextStyle(
-        style: KitText.sm.copyWith(color: Palette.bark600),
+        style: PxText.sm.copyWith(color: Palette.bark600),
         child: InlineLink('← 全部帮工', color: Palette.bark600, onTap: () => workbenchGo(context, '/agents')),
       ),
     );
@@ -181,7 +181,7 @@ class _CreatorState extends ConsumerState<_Creator> {
         PxButton.text(_saving ? '保存中…' : (widget.isNew ? '捏好了，保存' : '保存'), tone: PxTone.primary, onPressed: !dirty || _saving || nameTaken ? null : _save),
       ],
     );
-    final name = Text(draft.name.isEmpty ? '无名帮工' : draft.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.lg);
+    final name = Text(draft.name.isEmpty ? '无名帮工' : draft.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.lg);
     final bar = PxWindow(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: LayoutBuilder(
@@ -200,7 +200,7 @@ class _CreatorState extends ConsumerState<_Creator> {
                 children: [
                   back,
                   const SizedBox(width: 12),
-                  Text('/', style: KitText.sm.copyWith(color: Palette.cream300)),
+                  Text('/', style: PxText.sm.copyWith(color: Palette.cream300)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Row(
@@ -265,7 +265,7 @@ class _CreatorState extends ConsumerState<_Creator> {
                     Row(
                       children: [
                         DefaultTextStyle(
-                          style: KitText.sm.copyWith(color: Palette.bark600),
+                          style: PxText.sm.copyWith(color: Palette.bark600),
                           child: InlineLink('← 回到档案', color: Palette.bark600, onTap: () => setState(() => _trajectories = false)),
                         ),
                         const SizedBox(width: 12),
@@ -368,7 +368,7 @@ class _DeleteButtonState extends ConsumerState<_DeleteButton> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('删掉 ${widget.agent.name}？', style: KitText.xs.copyWith(color: Palette.bark600)),
+        Text('删掉 ${widget.agent.name}？', style: PxText.xs.copyWith(color: Palette.bark600)),
         const SizedBox(width: 6),
         PxButton.text(
           '删除',
@@ -404,7 +404,7 @@ class _Issues extends StatelessWidget {
         child: Marked(
           'mark-check',
           top: 0,
-          child: Text('配置没问题，可以派活。', style: KitText.xs.copyWith(color: Palette.leaf700)),
+          child: Text('配置没问题，可以派活。', style: PxText.xs.copyWith(color: Palette.leaf700)),
         ),
       );
     }
@@ -424,7 +424,7 @@ class _Issues extends StatelessWidget {
                   top: 4,
                   child: Text(
                     '${i.level == AgentIssueLevel.error ? '派不出去：' : ''}${i.text}',
-                    style: KitText.xs.copyWith(height: 1.625, color: i.level == AgentIssueLevel.error ? Palette.berry : const Color(0xFFB8682A)),
+                    style: PxText.xs.copyWith(height: 1.625, color: i.level == AgentIssueLevel.error ? Palette.berry : const Color(0xFFB8682A)),
                   ),
                 ),
               ),

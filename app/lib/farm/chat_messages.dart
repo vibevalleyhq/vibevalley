@@ -8,7 +8,7 @@ import '../shared/chat_widgets.dart';
 import '../chat/dispatch_note.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show agentsProvider;
 import '../rules/money.dart';
 import 'chat_window.dart';
@@ -121,7 +121,7 @@ class ChatBubble extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 4),
               padding: const EdgeInsets.symmetric(horizontal: 6),
               color: Palette.wheat.withValues(alpha: .4),
-              child: Text(tag!, style: KitText.xs.copyWith(color: Palette.bark800)),
+              child: Text(tag!, style: PxText.xs.copyWith(color: Palette.bark800)),
             ),
           if (folded)
             DispatchNote(text, style: const TextStyle(color: Palette.bark900))
@@ -166,7 +166,7 @@ class ChatParentMessage extends StatelessWidget {
                     if (message.fromKind == SenderKind.agent)
                       TextSpan(
                         text: ' @${message.from}',
-                        style: KitText.mono.copyWith(color: Palette.bark500),
+                        style: PxText.mono.copyWith(color: Palette.bark500),
                       ),
                     TextSpan(text: ' · ${farmClock(message.at)}'),
                   ],
@@ -213,7 +213,7 @@ class ChatReportMessage extends StatelessWidget {
             TextSpan(text: '${message.name} '),
             TextSpan(
               text: '@${message.from}',
-              style: KitText.mono.copyWith(color: Palette.bark500),
+              style: PxText.mono.copyWith(color: Palette.bark500),
             ),
           ],
         ),
@@ -226,7 +226,7 @@ class ChatReportMessage extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 4),
             padding: const EdgeInsets.symmetric(horizontal: 6),
             color: fill,
-            child: Text(label, style: KitText.xs.copyWith(color: ink)),
+            child: Text(label, style: PxText.xs.copyWith(color: ink)),
           ),
           ChatText(message.text, folds: message.final_),
           if (message.spent != null)
@@ -250,7 +250,7 @@ class ChatThreadChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: 6),
-    child: KitTappable(
+    child: Tappable(
       onTap: onTap,
       builder: (context, s) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -263,13 +263,13 @@ class ChatThreadChip extends StatelessWidget {
           children: [
             const Glyph('button-thread'),
             const SizedBox(width: 6),
-            Text(thread.replies > 0 ? '${idText(thread.replies)} 条回复' : '工单串', style: KitText.xs.copyWith(color: Palette.leaf700)),
+            Text(thread.replies > 0 ? '${idText(thread.replies)} 条回复' : '工单串', style: PxText.xs.copyWith(color: Palette.leaf700)),
             if (unread > 0) ...[
               const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 color: Palette.berry,
-                child: Text('$unread 新', style: KitText.xs.copyWith(color: Palette.cream50)),
+                child: Text('$unread 新', style: PxText.xs.copyWith(color: Palette.cream50)),
               ),
             ],
             const SizedBox(width: 6),
@@ -310,11 +310,11 @@ class ChatPickChip extends ConsumerWidget {
                 '派给${agent.name}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: KitText.xs.copyWith(color: Palette.bark800),
+                style: PxText.xs.copyWith(color: Palette.bark800),
               ),
             ),
           ],
-          KitTappable(
+          Tappable(
             onTap: () => ref.read(prefsProvider.notifier).setPick('auto'),
             semanticLabel: '不指定帮工',
             builder: (context, s) => Container(

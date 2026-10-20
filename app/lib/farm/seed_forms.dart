@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../shared/composer.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 
 const _dropsOfAdvice = ['改动小一点', '先别动测试', '做完跟我说一声', '顺便补个测试'];
 
@@ -34,11 +34,11 @@ class _WaterFormState extends ConsumerState<WaterForm> {
   @override
   Widget build(BuildContext context) {
     final w = widget.session;
-    final xs = KitText.xs.copyWith(color: Palette.bark600);
+    final xs = PxText.xs.copyWith(color: Palette.bark600);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(w.phase is PhaseWorking ? '它正在干活，这句话会在下一步之前收到。' : '它现在没在干活，这句话会让它接着干一轮。', style: KitText.sm.copyWith(color: Palette.bark800)),
+        Text(w.phase is PhaseWorking ? '它正在干活，这句话会在下一步之前收到。' : '它现在没在干活，这句话会让它接着干一轮。', style: PxText.sm.copyWith(color: Palette.bark800)),
         const SizedBox(height: 4),
         Text('这句话记在它的工单串里，它回的话也在那儿。', style: xs),
         const SizedBox(height: 4),
@@ -49,7 +49,7 @@ class _WaterFormState extends ConsumerState<WaterForm> {
           runSpacing: 6,
           children: [
             for (final s in _dropsOfAdvice)
-              KitTappable(
+              Tappable(
                 onTap: () => _draft.text.value = TextEditingValue(
                   text: s,
                   selection: TextSelection.collapsed(offset: s.length),
@@ -57,7 +57,7 @@ class _WaterFormState extends ConsumerState<WaterForm> {
                 builder: (context, st) => Container(
                   color: st.hovered ? Palette.cream300 : Palette.cream200,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  child: Text(s, style: KitText.xs.copyWith(color: Palette.bark800)),
+                  child: Text(s, style: PxText.xs.copyWith(color: Palette.bark800)),
                 ),
               ),
           ],

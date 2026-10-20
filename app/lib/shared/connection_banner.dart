@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/server_choice.dart';
 import '../data/providers.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 
 const healthEvery = Duration(seconds: 4);
 
@@ -30,7 +30,7 @@ class ConnectionBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (watchReachable(ref)) return const SizedBox.shrink();
     const text = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 20 / 14, color: Palette.bark900);
-    final code = KitText.mono.copyWith(color: Palette.bark900);
+    final code = PxText.mono.copyWith(color: Palette.bark900);
     final remote = serverConnection.value.remote;
     return Semantics(
       liveRegion: true,

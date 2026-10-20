@@ -16,7 +16,7 @@ import '../rules/sessions.dart';
 import '../rules/task.dart';
 import '../rules/cast.dart';
 import '../sprites/atlas.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import 'composer.dart';
 import 'widgets.dart';
 import 'work_log.dart';
@@ -240,8 +240,8 @@ class _IssueViewState extends ConsumerState<IssueView> {
     final open = widget.state.open;
     final changes = widget.state == IssueTag.waiting && session != null && issue != null ? ref.watch(issueChangesProvider(issue.id)) : null;
     final steps = ref.watch(sessionEventsProvider(head.id)).value ?? const <SessionEvent>[];
-    final body = KitText.sm.copyWith(color: Palette.bark800);
-    final xs = KitText.xs.copyWith(color: Palette.bark600);
+    final body = PxText.sm.copyWith(color: Palette.bark800);
+    final xs = PxText.xs.copyWith(color: Palette.bark600);
     final turns = (session ?? head).runs;
     final cny = (session ?? head).spent?.cny;
     final actions = _actions(session);
@@ -291,7 +291,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
                 ActionGlyph(current.action, size: 20),
                 const SizedBox(width: 8),
               ],
-              Expanded(child: Text(status.head, style: KitText.base)),
+              Expanded(child: Text(status.head, style: PxText.base)),
             ],
           ),
           if (status.line case final line? when line.isNotEmpty) ...[
@@ -380,7 +380,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
                     tone: issue.acceptance == a ? PxTone.primary : PxTone.plain,
                     onPressed: _busy || issue.acceptance == a || !widget.state.open ? null : () => _setAcceptance(a),
                   ),
-                if (issue.acceptedAt != null) Text('已验收 ${wallClockText(issue.acceptedAt!)}', style: KitText.xs.copyWith(color: Palette.leaf700)),
+                if (issue.acceptedAt != null) Text('已验收 ${wallClockText(issue.acceptedAt!)}', style: PxText.xs.copyWith(color: Palette.leaf700)),
               ],
             ),
           ),
@@ -401,13 +401,13 @@ class _IssueViewState extends ConsumerState<IssueView> {
         if (agent?.model case final model? when model.isNotEmpty) _Row('模型', Text(model, style: body)),
         _Row('档案', _Link('看${agent?.name ?? head.name}的档案', onTap: () => context.go('/agents/${Uri.encodeComponent(head.agent)}'))),
         if (project != null) _Row('项目', _Link(project, onTap: () => context.go('/projects/${Uri.encodeComponent(project)}'))),
-        if (head.branch != null) _Row('分支', Text(head.branch!, style: KitText.mono.copyWith(color: Palette.bark800))),
+        if (head.branch != null) _Row('分支', Text(head.branch!, style: PxText.mono.copyWith(color: Palette.bark800))),
         if (head.worktree case final path?)
           _Row(
             'worktree',
             Row(
               children: [
-                Expanded(child: SelectableText(path, style: KitText.mono)),
+                Expanded(child: SelectableText(path, style: PxText.mono)),
                 PxButton.text(
                   '复制路径',
                   size: PxSize.sm,
@@ -465,7 +465,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
                       '${f.path}  +${f.added.round()} -${f.removed.round()}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: KitText.mono.copyWith(fontSize: 11, color: Palette.bark800),
+                      style: PxText.mono.copyWith(fontSize: 11, color: Palette.bark800),
                     ),
                   if (c.files.length > 12) Text('还有 ${c.files.length - 12} 个文件', style: xs),
                 ],
@@ -482,7 +482,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: Text(title, style: KitText.lg)),
+            Expanded(child: Text(title, style: PxText.lg)),
             const SizedBox(width: 8),
             Text(widget.state.label, style: xs),
           ],
@@ -545,18 +545,18 @@ class _CriteriaState extends State<_Criteria> {
 
   @override
   Widget build(BuildContext context) {
-    final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.5);
+    final body = PxText.sm.copyWith(color: Palette.bark800, height: 1.5);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(widget.checking ? '照验收标准看，看过一条勾一条' : '验收标准', style: KitText.xs.copyWith(color: Palette.bark600)),
+        Text(widget.checking ? '照验收标准看，看过一条勾一条' : '验收标准', style: PxText.xs.copyWith(color: Palette.bark600)),
         const SizedBox(height: 4),
         for (final (i, c) in widget.criteria.indexed)
           if (!widget.checking)
             Text('· $c', style: body)
           else
-            KitTappable(
+            Tappable(
               onTap: () => setState(() => _ticked.contains(i) ? _ticked.remove(i) : _ticked.add(i)),
               semanticLabel: c,
               selected: _ticked.contains(i),
@@ -608,7 +608,7 @@ class _FoldState extends State<_Fold> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        KitTappable(
+        Tappable(
           onTap: () => setState(() => _open = !_open),
           semanticLabel: widget.label,
           builder: (_, st) => Padding(
@@ -617,7 +617,7 @@ class _FoldState extends State<_Fold> {
               children: [
                 Transform.rotate(angle: _open ? 1.5708 : 0, child: const SpriteIcon('button-next', size: 12)),
                 const SizedBox(width: 6),
-                Text(widget.label, style: KitText.sm.copyWith(color: st.hovered ? Palette.bark900 : Palette.bark800)),
+                Text(widget.label, style: PxText.sm.copyWith(color: st.hovered ? Palette.bark900 : Palette.bark800)),
               ],
             ),
           ),
@@ -641,7 +641,7 @@ class _Row extends StatelessWidget {
       children: [
         SizedBox(
           width: 72,
-          child: Text(label, style: KitText.sm.copyWith(color: Palette.bark500)),
+          child: Text(label, style: PxText.sm.copyWith(color: Palette.bark500)),
         ),
         const SizedBox(width: 12),
         Expanded(child: child),
@@ -680,7 +680,7 @@ class IssueRunsCardState extends ConsumerState<IssueRunsCard> {
       final runs = snap.data ?? const <Run>[];
       if (runs.isEmpty) return const SizedBox.shrink();
       final now = DateTime.now().millisecondsSinceEpoch.toDouble();
-      final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.5);
+      final body = PxText.sm.copyWith(color: Palette.bark800, height: 1.5);
       return Padding(
         padding: const EdgeInsets.only(top: 12),
         child: _IssueSection(
@@ -709,7 +709,7 @@ class _FarmAside extends ConsumerWidget {
     final plot = view == null ? const PlotView(crop: Crop.empty) : plotOf(view, session);
     final cast = castOf(agent?.look, session.agent);
     final station = stationOfSession(session);
-    final xs = KitText.xs.copyWith(color: Palette.bark600);
+    final xs = PxText.xs.copyWith(color: Palette.bark600);
     return Container(
       width: 208,
       color: Palette.cream100,
@@ -728,7 +728,7 @@ class _FarmAside extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text(cropLabel[plot.crop]!, style: KitText.sm),
+          Text(cropLabel[plot.crop]!, style: PxText.sm),
           Text('${speciesLabel[cast.species]} · ${outfitLabel[cast.outfit]}', textAlign: TextAlign.center, style: xs),
           Text('第 ${station + 1} 块地 · 第 ${session.runs.round()} 轮', style: xs),
           const SizedBox(height: 8),
@@ -760,11 +760,11 @@ class _Link extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     builder: (context, s) => Text(
       text,
-      style: KitText.xs.copyWith(color: Palette.leaf700, decoration: s.hovered || s.focused ? TextDecoration.underline : null),
+      style: PxText.xs.copyWith(color: Palette.leaf700, decoration: s.hovered || s.focused ? TextDecoration.underline : null),
     ),
   );
 }
@@ -793,7 +793,7 @@ class StageRail extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(s.label, style: KitText.sm.copyWith(color: s == at ? Palette.bark900 : Palette.bark500)),
+                  Text(s.label, style: PxText.sm.copyWith(color: s == at ? Palette.bark900 : Palette.bark500)),
                   // The pixel font has no ✓: a stage behind it is marked with the sprite.
                   if (s.index < at.index) ...[const SizedBox(width: 4), SpriteIcon('mark-check', size: 12, semanticLabel: '${s.label}做完了')],
                 ],

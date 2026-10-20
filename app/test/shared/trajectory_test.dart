@@ -4,6 +4,7 @@ import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/rules/rounds.dart';
 import 'package:vibevalley/shared/trajectory.dart';
 import 'package:vibevalley/ui/theme.dart';
+import 'package:vibevalley/ui/pixel/theme.dart';
 import 'package:vibevalley/workbench/agents/agent_creator_page.dart';
 
 import '../support/workbench.dart';

@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
 import '../audio/sfx.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../shared/chat_rules.dart';
 import 'chat_state.dart';
 import '../shared/chat_widgets.dart';
@@ -72,7 +72,7 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
                   padding: const EdgeInsets.all(8),
                   child: Material(
                     type: MaterialType.transparency,
-                    child: DefaultTextStyle(style: KitText.sm, child: _body(chat, channels, current)),
+                    child: DefaultTextStyle(style: PxText.sm, child: _body(chat, channels, current)),
                   ),
                 ),
               ),
@@ -81,7 +81,7 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
         ),
         child: TapRegion(
           groupId: _link,
-          child: KitTappable(
+          child: Tappable(
             onTap: _toggle,
             semanticLabel: '频道：${channelLabel(current)}，点开切换或开新频道',
             builder: (context, s) => Container(
@@ -91,14 +91,14 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Flexible(
-                    child: Text(channelLabel(current), maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                    child: Text(channelLabel(current), maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
                   ),
                   if (elsewhere > 0) ...[
                     const SizedBox(width: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       color: Palette.berry.withValues(alpha: .15),
-                      child: Text('$elsewhere', style: KitText.xs.copyWith(color: Palette.berry)),
+                      child: Text('$elsewhere', style: PxText.xs.copyWith(color: Palette.berry)),
                     ),
                   ],
                   const SizedBox(width: 4),
@@ -138,7 +138,7 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
               for (final c in channels)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 2),
-                  child: KitTappable(
+                  child: Tappable(
                     onTap: () {
                       _close();
                       unawaited(ref.read(chatActionsProvider).showChat(c.kind == ConversationKind.general ? null : c.id).catchError((Object _) {}));
@@ -154,7 +154,7 @@ class _ChannelMenuState extends ConsumerState<ChannelMenu> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(channelLabel(c), maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                                Text(channelLabel(c), maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
                                 if ((c.description ?? '').isNotEmpty || (c.project ?? '').isNotEmpty)
                                   Text(
                                     [if ((c.description ?? '').isNotEmpty) c.description!, if ((c.project ?? '').isNotEmpty) '项目 ${c.project}'].join(' · '),
@@ -220,13 +220,13 @@ class _Link extends StatelessWidget {
   final Color color;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     builder: (context, s) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       color: s.hovered ? Palette.cream200 : null,
       child: DefaultTextStyle(
-        style: KitText.sm.copyWith(color: color),
+        style: PxText.sm.copyWith(color: color),
         child: IconTheme.merge(
           data: IconThemeData(color: color),
           child: child,
@@ -299,7 +299,7 @@ class _NewChannelPanelState extends ConsumerState<NewChannelPanel> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('开新频道', style: KitText.sm),
+          const Text('开新频道', style: PxText.sm),
           const SizedBox(height: 8),
           const Text('一件长期的事、一个项目，单独一个地方说话、派活。在这里叫管家，活就派在这里。', style: _grey),
           const SizedBox(height: 8),
@@ -320,7 +320,7 @@ class _NewChannelPanelState extends ConsumerState<NewChannelPanel> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(_error!, style: KitText.xs.copyWith(color: Palette.berry)),
+              child: Text(_error!, style: PxText.xs.copyWith(color: Palette.berry)),
             ),
           const SizedBox(height: 8),
           _FormButtons(onBack: widget.onBack, submit: '开', onSubmit: _busy || _name.trim().isEmpty ? null : _submit),
@@ -365,7 +365,7 @@ class _ChannelSettingsPanelState extends ConsumerState<ChannelSettingsPanel> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('${channelLabel(_latest)} 的设置', style: KitText.sm),
+          Text('${channelLabel(_latest)} 的设置', style: PxText.sm),
           const SizedBox(height: 8),
           PxTextInput(value: _description, onChanged: (v) => setState(() => _description = v), placeholder: '做什么的', semanticLabel: '频道说明'),
           const SizedBox(height: 8),
@@ -379,7 +379,7 @@ class _ChannelSettingsPanelState extends ConsumerState<ChannelSettingsPanel> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(_error!, style: KitText.xs.copyWith(color: Palette.berry)),
+              child: Text(_error!, style: PxText.xs.copyWith(color: Palette.berry)),
             ),
           const SizedBox(height: 8),
           _FormButtons(onBack: widget.onBack, submit: '存', onSubmit: _submit),
@@ -421,7 +421,7 @@ class _ScheduleListState extends ConsumerState<ScheduleList> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('定时', style: KitText.sm),
+          const Text('定时', style: PxText.sm),
           const SizedBox(height: 8),
           if (widget.schedules.isEmpty)
             const Text('还没有。跟管家说「每天早上九点在 #clock-in 跑一遍测试」，它会定好；到点了频道里出现一条，再派活。', style: _grey)
@@ -442,7 +442,7 @@ class _ScheduleListState extends ConsumerState<ScheduleList> {
                             Row(
                               children: [
                                 Expanded(
-                                  child: Text(s.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                                  child: Text(s.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
                                 ),
                                 const SizedBox(width: 8),
                                 if (s.pending == true) ...[
@@ -460,13 +460,13 @@ class _ScheduleListState extends ConsumerState<ScheduleList> {
                                     onTap: () => _act(() => actions.removeSchedule(s.id)),
                                   ),
                                 ] else ...[
-                                  KitTappable(
+                                  Tappable(
                                     onTap: () => _act(() => actions.setScheduleEnabled(s.id, !s.enabled)),
                                     semanticLabel: s.enabled ? '关掉定时「${s.name}」' : '打开定时「${s.name}」',
                                     builder: (context, _) => Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6),
                                       color: s.enabled ? Palette.leaf500 : Palette.cream200,
-                                      child: Text(s.enabled ? '开着' : '关着', style: KitText.xs.copyWith(color: s.enabled ? Palette.cream50 : Palette.bark600)),
+                                      child: Text(s.enabled ? '开着' : '关着', style: PxText.xs.copyWith(color: s.enabled ? Palette.cream50 : Palette.bark600)),
                                     ),
                                   ),
                                   const SizedBox(width: 4),
@@ -474,7 +474,7 @@ class _ScheduleListState extends ConsumerState<ScheduleList> {
                                     onTapOutside: (_) {
                                       if (_deleting == s.id) setState(() => _deleting = null);
                                     },
-                                    child: KitTappable(
+                                    child: Tappable(
                                       onTap: () {
                                         if (_deleting == s.id) {
                                           _act(() => actions.removeSchedule(s.id));
@@ -487,7 +487,7 @@ class _ScheduleListState extends ConsumerState<ScheduleList> {
                                         padding: const EdgeInsets.symmetric(horizontal: 4),
                                         color: st.hovered ? Palette.cream200 : null,
                                         child: _deleting == s.id
-                                            ? Text('确定删？', style: KitText.xs.copyWith(color: Palette.berry))
+                                            ? Text('确定删？', style: PxText.xs.copyWith(color: Palette.berry))
                                             : const SpriteIcon('button-delete', size: 14),
                                       ),
                                     ),
@@ -507,7 +507,7 @@ class _ScheduleListState extends ConsumerState<ScheduleList> {
                               s.text,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: KitText.xs.copyWith(color: Palette.bark800),
+                              style: PxText.xs.copyWith(color: Palette.bark800),
                             ),
                           ],
                         ),
@@ -519,7 +519,7 @@ class _ScheduleListState extends ConsumerState<ScheduleList> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(_error!, style: KitText.xs.copyWith(color: Palette.berry)),
+              child: Text(_error!, style: PxText.xs.copyWith(color: Palette.berry)),
             ),
           Align(
             alignment: Alignment.centerRight,
@@ -540,7 +540,7 @@ class _AskButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     semanticLabel: semanticLabel,
     builder: (context, st) => Container(
@@ -551,7 +551,7 @@ class _AskButton extends StatelessWidget {
         children: [
           SpriteIcon(icon, size: 14),
           const SizedBox(width: 2),
-          Text(label, style: KitText.xs.copyWith(color: Palette.bark800)),
+          Text(label, style: PxText.xs.copyWith(color: Palette.bark800)),
         ],
       ),
     ),

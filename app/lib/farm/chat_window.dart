@@ -17,7 +17,7 @@ import '../shared/chat_widgets.dart';
 import '../gen/vibevalley.dart';
 import '../audio/sfx.dart';
 import '../sprites/atlas.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../voice/voice.dart';
 import '../rules/chat.dart';
 import '../rules/sessions.dart';
@@ -210,7 +210,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
                                   decoration: BoxDecoration(
                                     color: Palette.cream50,
                                     border: Border.all(color: Palette.cream300, width: 2),
-                                    boxShadow: kitDrop,
+                                    boxShadow: pxDrop,
                                   ),
                                   child: NamingMenu(naming: _draft.naming, highlight: Palette.leaf300.withValues(alpha: .4)),
                                 ),
@@ -340,14 +340,14 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
           Row(
             children: [
               Flexible(
-                child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
               ),
               if (session != null) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   color: Palette.cream200,
-                  child: Text('@${session.id}', style: KitText.mono.copyWith(color: Palette.bark600)),
+                  child: Text('@${session.id}', style: PxText.mono.copyWith(color: Palette.bark600)),
                 ),
               ],
               _inHeader(_NewElsewhere(chat: chat, except: thread.id, onShow: _show)),
@@ -371,7 +371,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
     final children = <Widget>[
       if (feed.hasOlder)
         Center(
-          child: KitTappable(
+          child: Tappable(
             onTap: () => unawaited(ref.read(chatActionsProvider).loadOlder(conversation!.id).catchError((Object _) {})),
             builder: (context, s) => Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
@@ -507,7 +507,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
             for (final line in _suggestions)
               Padding(
                 padding: const EdgeInsets.only(right: 6),
-                child: KitTappable(
+                child: Tappable(
                   onTap: () => _sendLine(shown == null || shown.kind == ConversationKind.general ? null : shown, line),
                   builder: (context, st) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -517,7 +517,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
                       line,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: KitText.xs.copyWith(color: st.hovered ? Palette.bark900 : Palette.bark800),
+                      style: PxText.xs.copyWith(color: st.hovered ? Palette.bark900 : Palette.bark800),
                     ),
                   ),
                 ),
@@ -546,7 +546,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          KitTappable(
+          Tappable(
             onTap: () => _setOpen(!open),
             tooltip: open ? '收起对话' : (unread ? '田头有新话，点开看看' : '展开对话'),
             semanticLabel: open ? '收起对话' : '展开对话',
@@ -597,7 +597,7 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
               TextSpan(text: '${m.name} '),
               TextSpan(
                 text: '@${m.from}',
-                style: KitText.mono.copyWith(color: Palette.bark500),
+                style: PxText.mono.copyWith(color: Palette.bark500),
               ),
             ],
           ),
@@ -612,7 +612,7 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
     color: Palette.berry.withValues(alpha: .15),
-    child: Text(text, style: KitText.xs.copyWith(color: Palette.berry)),
+    child: Text(text, style: PxText.xs.copyWith(color: Palette.berry)),
   );
 }
 
@@ -623,7 +623,7 @@ class _HeaderButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     tooltip: label,
     semanticLabel: label,
@@ -655,12 +655,12 @@ class _NewElsewhere extends StatelessWidget {
         : '${channelLabel(newest)}有新话';
     return Padding(
       padding: const EdgeInsets.only(left: 8),
-      child: KitTappable(
+      child: Tappable(
         onTap: () => onShow(newest.kind == ConversationKind.general ? null : newest.id),
         builder: (context, s) => Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
           color: Palette.berry.withValues(alpha: s.hovered ? .25 : .15),
-          child: Text(text, style: KitText.xs.copyWith(color: Palette.berry)),
+          child: Text(text, style: PxText.xs.copyWith(color: Palette.berry)),
         ),
       ),
     );

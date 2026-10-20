@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
 import '../sprites/atlas.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../rules/task.dart';
 
 class FarmEmpty extends StatelessWidget {
@@ -18,7 +18,7 @@ class FarmEmpty extends StatelessWidget {
     child: Text(
       text,
       textAlign: TextAlign.center,
-      style: KitText.sm.copyWith(color: Palette.bark600),
+      style: PxText.sm.copyWith(color: Palette.bark600),
     ),
   );
 }
@@ -33,7 +33,7 @@ class Said extends StatelessWidget {
     if (a == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Text(a.text, style: KitText.xs.copyWith(color: a.ok ? Palette.leaf700 : Palette.berry)),
+      child: Text(a.text, style: PxText.xs.copyWith(color: a.ok ? Palette.leaf700 : Palette.berry)),
     );
   }
 }

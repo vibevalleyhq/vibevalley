@@ -6,7 +6,7 @@ import '../workbench/places.dart';
 import '../host/host.dart';
 import '../phone/calls.dart';
 import '../shell/app_frame.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import 'host_router.dart';
 import 'router.dart';
 

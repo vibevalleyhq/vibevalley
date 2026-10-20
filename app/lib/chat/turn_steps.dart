@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/remote.dart' show runEventsProvider;
 import '../shared/work_log.dart';
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 
 class TurnSteps extends ConsumerStatefulWidget {
   const TurnSteps({super.key, required this.id, required this.run, this.manager = false});
@@ -36,7 +36,7 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
         children: [
           Align(
             alignment: Alignment.centerLeft,
-            child: KitTappable(
+            child: Tappable(
               onTap: () {
                 setState(() => _open = !_open);
               },
@@ -47,7 +47,7 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
                   const SizedBox(width: 4),
                   Text(
                     _open ? '$label · 收起' : '$label · 看看',
-                    style: KitText.xs.copyWith(
+                    style: PxText.xs.copyWith(
                       color: s.hovered ? Palette.bark900 : Palette.bark600,
                       decoration: TextDecoration.underline,
                       decorationColor: s.hovered ? Palette.bark600 : Palette.cream300,

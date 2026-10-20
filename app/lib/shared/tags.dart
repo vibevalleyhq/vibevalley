@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 
 class FarmTag extends StatelessWidget {
   const FarmTag(this.text, {super.key, this.fill = Palette.cream200, this.ink = Palette.bark800, this.icon, this.goes = false});
@@ -20,7 +20,7 @@ class FarmTag extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (icon != null) ...[SpriteIcon(icon!, size: 12), const SizedBox(width: 4)],
-        Text(text, maxLines: 1, style: KitText.xs.copyWith(color: ink)),
+        Text(text, maxLines: 1, style: PxText.xs.copyWith(color: ink)),
         if (goes) ...[const SizedBox(width: 4), const SpriteIcon('button-next', size: 10)],
       ],
     ),

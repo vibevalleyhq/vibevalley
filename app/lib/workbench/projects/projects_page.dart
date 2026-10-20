@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../shared/layout.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
@@ -77,12 +77,12 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
         if (list == null)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            child: Text('在找……', style: KitText.sm.copyWith(color: Palette.bark500)),
+            child: Text('在找……', style: PxText.sm.copyWith(color: Palette.bark500)),
           )
         else if (sorted.isEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            child: Text('工作目录下还没有项目。点「新增项目」开一块地，或从 GitHub 下载一个。', style: KitText.sm.copyWith(color: Palette.bark600, height: 1.625)),
+            child: Text('工作目录下还没有项目。点「新增项目」开一块地，或从 GitHub 下载一个。', style: PxText.sm.copyWith(color: Palette.bark600, height: 1.625)),
           )
         else ...[
           ListRow(active: selected == null, onTap: () => workbenchGo(context, '/projects'), child: const RowText('全部', '整张地图：每个项目一座岛')),
@@ -252,11 +252,11 @@ class _Deed extends ConsumerWidget {
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text(project.name, style: KitText.x2l, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(project.name, style: PxText.x2l, maxLines: 1, overflow: TextOverflow.ellipsis),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                       color: Palette.leaf300.withValues(alpha: .5),
-                      child: Text('长势 · ${growth.label}', style: KitText.xs.copyWith(color: Palette.bark800)),
+                      child: Text('长势 · ${growth.label}', style: PxText.xs.copyWith(color: Palette.bark800)),
                     ),
                   ],
                 ),
@@ -287,7 +287,7 @@ class _Deed extends ConsumerWidget {
                           project.path,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: KitText.mono.copyWith(fontSize: 11, color: Palette.bark600),
+                          style: PxText.mono.copyWith(fontSize: 11, color: Palette.bark600),
                         ),
                       ),
                     ),
@@ -322,7 +322,7 @@ class _Deed extends ConsumerWidget {
               if (counted != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text('${since(counted.at, now)}数过', style: KitText.fine.copyWith(color: Palette.bark500)),
+                  child: Text('${since(counted.at, now)}数过', style: PxText.fine.copyWith(color: Palette.bark500)),
                 ),
             ],
           ),
@@ -342,8 +342,8 @@ class _Stat extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(label, style: KitText.fine.copyWith(color: Palette.bark500)),
-      Text(value, style: KitText.sm, maxLines: 2, overflow: TextOverflow.ellipsis),
+      Text(label, style: PxText.fine.copyWith(color: Palette.bark500)),
+      Text(value, style: PxText.sm, maxLines: 2, overflow: TextOverflow.ellipsis),
     ],
   );
 }
@@ -366,7 +366,7 @@ class _Planted extends StatelessWidget {
     } else if (c is Failed<ProjectLanguages>) {
       body = _NotCounted(reason: c.reason);
     } else if (shares.isEmpty) {
-      body = Text('这块地还空着：没有数得出来的代码。', style: KitText.sm.copyWith(color: Palette.bark600));
+      body = Text('这块地还空着：没有数得出来的代码。', style: PxText.sm.copyWith(color: Palette.bark600));
     } else {
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -425,9 +425,9 @@ class _Crop extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(share.label, style: KitText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  child: Text(share.label, style: PxText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
                 ),
-                Text(percent(share.share), style: KitText.sm.copyWith(color: Palette.bark800)),
+                Text(percent(share.share), style: PxText.sm.copyWith(color: Palette.bark800)),
               ],
             ),
             const SizedBox(height: 4),
@@ -441,7 +441,7 @@ class _Crop extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 2),
-            Text('${number(share.lines)} 行 · ${number(share.files)} 个文件', style: KitText.fine.copyWith(color: Palette.bark500)),
+            Text('${number(share.lines)} 行 · ${number(share.files)} 个文件', style: PxText.fine.copyWith(color: Palette.bark500)),
           ],
         ),
       ),
@@ -459,7 +459,7 @@ class _NotCounted extends StatelessWidget {
     Widget code(String t) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       color: Palette.cream200,
-      child: Text(t, style: KitText.mono),
+      child: Text(t, style: PxText.mono),
     );
     return Container(
       padding: const EdgeInsets.all(12),
@@ -469,18 +469,18 @@ class _NotCounted extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(install ? '数庄稼要用 tokei，这台机器上还没有。' : reason, style: KitText.sm.copyWith(color: Palette.bark800)),
+          Text(install ? '数庄稼要用 tokei，这台机器上还没有。' : reason, style: PxText.sm.copyWith(color: Palette.bark800)),
           if (install) ...[
             const SizedBox(height: 8),
             Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
               runSpacing: 4,
               children: [
-                Text('在终端里装一个：', style: KitText.sm.copyWith(color: Palette.bark600)),
+                Text('在终端里装一个：', style: PxText.sm.copyWith(color: Palette.bark600)),
                 code('brew install tokei'),
-                Text('（或 ', style: KitText.sm.copyWith(color: Palette.bark600)),
+                Text('（或 ', style: PxText.sm.copyWith(color: Palette.bark600)),
                 code('cargo install tokei'),
-                Text('），装好点上面的「统计」。', style: KitText.sm.copyWith(color: Palette.bark600)),
+                Text('），装好点上面的「统计」。', style: PxText.sm.copyWith(color: Palette.bark600)),
               ],
             ),
           ],
@@ -519,7 +519,7 @@ class _TillingCalendarState extends State<_TillingCalendar> {
       return PxCard(
         title: '耕作日历',
         aside: const Text('过去一年 · 一格一天，提交越多长得越高'),
-        child: Text(activity.reason, style: KitText.sm.copyWith(color: Palette.bark800)),
+        child: Text(activity.reason, style: PxText.sm.copyWith(color: Palette.bark800)),
       );
     }
     final worked = activity is Done<ProjectActivity> ? activity.value : null;
@@ -531,7 +531,7 @@ class _TillingCalendarState extends State<_TillingCalendar> {
     }
     final calendar = _calendar!;
     final streaks = _streaks!;
-    final muted = KitText.xs.copyWith(color: Palette.bark500);
+    final muted = PxText.xs.copyWith(color: Palette.bark500);
     final pointed = _pointed;
     final busiest = streaks.busiest;
     final line = pointed != null && !pointed.future
@@ -638,11 +638,11 @@ class _TillingCalendarState extends State<_TillingCalendar> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              Text(line, style: KitText.xs.copyWith(color: Palette.bark600)),
+              Text(line, style: PxText.xs.copyWith(color: Palette.bark600)),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('少', style: KitText.xs.copyWith(color: Palette.bark600)),
+                  Text('少', style: PxText.xs.copyWith(color: Palette.bark600)),
                   for (var l = 0; l <= 4; l++)
                     Padding(
                       padding: const EdgeInsets.only(left: 4),
@@ -652,7 +652,7 @@ class _TillingCalendarState extends State<_TillingCalendar> {
                       ),
                     ),
                   const SizedBox(width: 4),
-                  Text('多', style: KitText.xs.copyWith(color: Palette.bark600)),
+                  Text('多', style: PxText.xs.copyWith(color: Palette.bark600)),
                 ],
               ),
             ],
@@ -702,7 +702,7 @@ class _Hands extends ConsumerWidget {
                         height: 32,
                         alignment: Alignment.center,
                         color: Palette.cream200,
-                        child: Text(author.name.characters.firstOrNull ?? '', style: KitText.sm.copyWith(color: Palette.bark800)),
+                        child: Text(author.name.characters.firstOrNull ?? '', style: PxText.sm.copyWith(color: Palette.bark800)),
                       ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -713,9 +713,9 @@ class _Hands extends ConsumerWidget {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(author.name, style: KitText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                child: Text(author.name, style: PxText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
                               ),
-                              Text('${number(author.commits)} 次', style: KitText.xs.copyWith(color: Palette.bark600)),
+                              Text('${number(author.commits)} 次', style: PxText.xs.copyWith(color: Palette.bark600)),
                             ],
                           ),
                           const SizedBox(height: 4),
@@ -738,7 +738,7 @@ class _Hands extends ConsumerWidget {
           if (rest > 0)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text('还有 ${authors.length - _hands} 位，一共 ${number(rest)} 次。', style: KitText.xs.copyWith(color: Palette.bark500)),
+              child: Text('还有 ${authors.length - _hands} 位，一共 ${number(rest)} 次。', style: PxText.xs.copyWith(color: Palette.bark500)),
             ),
         ],
       ),

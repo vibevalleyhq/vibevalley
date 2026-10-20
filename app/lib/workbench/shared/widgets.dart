@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../ui/kit/base.dart';
+import '../../ui/pixel/base.dart';
 import '../../ui/theme.dart';
 
 export '../../shared/widgets.dart' show BadgeLabel, EmptyNote, InlineLink, runAction;
@@ -27,11 +27,11 @@ class WorkbenchSection extends StatelessWidget {
                 if (count != null && count != 0)
                   TextSpan(
                     text: ' $count',
-                    style: KitText.xs.copyWith(color: Palette.bark600),
+                    style: PxText.xs.copyWith(color: Palette.bark600),
                   ),
               ],
             ),
-            style: KitText.xs.copyWith(color: Palette.bark600),
+            style: PxText.xs.copyWith(color: Palette.bark600),
           ),
           if (aside != null) ...[
             const SizedBox(width: 8),
@@ -39,7 +39,7 @@ class WorkbenchSection extends StatelessWidget {
               child: Align(
                 alignment: Alignment.centerRight,
                 child: DefaultTextStyle(
-                  style: KitText.xs.copyWith(color: Palette.bark500),
+                  style: PxText.xs.copyWith(color: Palette.bark500),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   child: aside!,
@@ -71,7 +71,7 @@ class WorkbenchTabs<T> extends StatelessWidget {
         for (final (v, label) in tabs)
           Padding(
             padding: const EdgeInsets.only(right: 4),
-            child: KitTappable(
+            child: Tappable(
               onTap: () => onChanged(v),
               selected: v == value,
               semanticLabel: label,
@@ -81,7 +81,7 @@ class WorkbenchTabs<T> extends StatelessWidget {
                 alignment: Alignment.center,
                 color: v == value ? Palette.cream300 : null,
                 foregroundDecoration: pxRing,
-                child: Text(label, style: KitText.xs.copyWith(color: v == value ? Palette.bark900 : (s.hovered ? Palette.bark800 : Palette.bark600))),
+                child: Text(label, style: PxText.xs.copyWith(color: v == value ? Palette.bark900 : (s.hovered ? Palette.bark800 : Palette.bark600))),
               ),
             ),
           ),
@@ -99,7 +99,7 @@ class WorkbenchPill extends StatelessWidget {
   final bool small;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     selected: on,
     semanticLabel: label,
@@ -107,7 +107,7 @@ class WorkbenchPill extends StatelessWidget {
       padding: small ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2) : const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       color: on ? Palette.leaf500 : (s.hovered ? Palette.cream300 : Palette.cream200),
       foregroundDecoration: pxRing,
-      child: Text(label, style: KitText.xs.copyWith(color: on ? Palette.cream50 : Palette.bark800)),
+      child: Text(label, style: PxText.xs.copyWith(color: on ? Palette.cream50 : Palette.bark800)),
     ),
   );
 }
@@ -130,7 +130,7 @@ class WorkbenchChoice extends StatelessWidget {
   final EdgeInsets padding;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     selected: active,
     tooltip: tooltip,

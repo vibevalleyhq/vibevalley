@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/prefs.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../shared/faces.dart';
 import '../shared/memory_panels.dart';
 import '../shared/widgets.dart';
@@ -71,11 +71,11 @@ class _ManagerPageState extends ConsumerState<ManagerPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 DefaultTextStyle(
-                  style: KitText.xs.copyWith(color: Palette.bark500),
+                  style: PxText.xs.copyWith(color: Palette.bark500),
                   child: InlineLink('← 全部帮工', color: Palette.bark500, onTap: () => workbenchGo(context, '/agents')),
                 ),
-                const Text('管家', style: KitText.x2l),
-                Text('管家不下地：听你说要做什么，派帮工去做，盯着进度，转告结果。${look != null ? '长相是${look.name}，在农场的管家面板里换。' : ''}', style: KitText.sm.copyWith(color: Palette.bark600)),
+                const Text('管家', style: PxText.x2l),
+                Text('管家不下地：听你说要做什么，派帮工去做，盯着进度，转告结果。${look != null ? '长相是${look.name}，在农场的管家面板里换。' : ''}', style: PxText.sm.copyWith(color: Palette.bark600)),
               ],
             ),
           ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/ui/kit/kit.dart';
+import 'package:vibevalley/ui/pixel/pixel.dart';
 
 void main() {
   group('markdown parsing', () {

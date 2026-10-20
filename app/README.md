@@ -26,7 +26,8 @@ VibeValley 唯一的客户端，桌面和手机都是它。决策见 [Flutter �
 | `lib/rules/` | 读核心状态的纯函数 |
 | `lib/chat/` | 田头的数据和小部件：频道、消息、未读、发话；工作台的聊天页和农场的田头窗口都用它 |
 | `lib/shared/` | 几张画面都用的：帮工的样子、干活过程、收成清单、朋友和额度、音效配方、小部件 |
-| `lib/ui/kit/` | 像素控件：按钮、输入、选择、对话框、提示、Markdown……（[README](app/lib/ui/kit/README.md)） |
+| `lib/ui/` | 两组组件共用的：色板、字体名、贴图、头像、说法、Markdown 解析、提示的数据（`common.dart`） |
+| `lib/ui/pixel/` | 像素组：农场那张皮的按钮、输入、选择、对话框、提示、Markdown……（[README](app/lib/ui/pixel/README.md)） |
 | `lib/farm/`、`lib/game/` | 农场画面、面板（地块详情、播种袋、仓库、日志、商店、任务与成就、种植计划、收成清单）、田头窗口、帮工栏、精力瓶；工具和点地的规则 |
 | `lib/sprites/` | 按 `sprites.json` 读图（`atlas.dart`） |
 | `lib/village/` | 像素村（Flame）：地图、寻路、帮工和狗、光照、粒子、动静；`hud.dart` 是画在上面的 HUD |

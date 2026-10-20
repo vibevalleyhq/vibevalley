@@ -1,7 +1,5 @@
 import 'package:flutter/widgets.dart';
-
-import '../theme.dart';
-import 'base.dart';
+import '../common.dart';
 
 class TextLink extends StatelessWidget {
   const TextLink(this.text, {super.key, required this.onTap, this.underline = false, this.color = Palette.leaf700, this.style});
@@ -12,7 +10,7 @@ class TextLink extends StatelessWidget {
   final TextStyle? style;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     builder: (context, s) => Text(
       text,

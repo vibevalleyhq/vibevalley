@@ -7,7 +7,7 @@ import '../../rules/time.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../shared/layout.dart';
 import 'qr.dart';
 import '../shared/widgets.dart';
@@ -185,7 +185,7 @@ class _ConnectorsPageState extends ConsumerState<ConnectorsPage> {
                     for (final n in [..._notes[selected]!, '帮工能在这台电脑上跑命令，所以只认主人；回复时引用某条汇报，你的话会进那件活的工单串。农场只往外连，不开端口。'])
                       Padding(
                         padding: const EdgeInsets.only(bottom: 6),
-                        child: Text('· $n', style: KitText.sm.copyWith(color: Palette.bark800, height: 1.625)),
+                        child: Text('· $n', style: PxText.sm.copyWith(color: Palette.bark800, height: 1.625)),
                       ),
                   ],
                 ),
@@ -222,7 +222,7 @@ class _ConnectorCardState extends ConsumerState<_ConnectorCard> {
     final id = widget.id;
     final status = widget.status;
     final label = connectorLabel[id]!;
-    final body = KitText.sm.copyWith(color: Palette.bark800);
+    final body = PxText.sm.copyWith(color: Palette.bark800);
     final disconnect = Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Align(
@@ -273,11 +273,11 @@ class _ConnectorCardState extends ConsumerState<_ConnectorCard> {
                 child: Container(
                   color: Palette.cream200,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: SelectableText(status.pairCode ?? '', style: KitText.mono.copyWith(fontSize: 30, letterSpacing: 4, color: Palette.bark900)),
+                  child: SelectableText(status.pairCode ?? '', style: PxText.mono.copyWith(fontSize: 30, letterSpacing: 4, color: Palette.bark900)),
                 ),
               ),
               const SizedBox(height: 12),
-              Text('发了这个码的人就是主人：以后只有他的话进农场。码只能用一次。', style: KitText.xs.copyWith(color: Palette.bark500)),
+              Text('发了这个码的人就是主人：以后只有他的话进农场。码只能用一次。', style: PxText.xs.copyWith(color: Palette.bark500)),
               disconnect,
             ],
             ConnectorState.connected || ConnectorState.paused => [
@@ -289,7 +289,7 @@ class _ConnectorCardState extends ConsumerState<_ConnectorCard> {
               if (status.state == ConnectorState.paused && status.pausedUntil != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('登录过期了，${wallClockText(status.pausedUntil!)} 后再试；也可以断开重新连。', style: KitText.sm.copyWith(color: Palette.berry)),
+                  child: Text('登录过期了，${wallClockText(status.pausedUntil!)} 后再试；也可以断开重新连。', style: PxText.sm.copyWith(color: Palette.berry)),
                 ),
               disconnect,
             ],
@@ -297,7 +297,7 @@ class _ConnectorCardState extends ConsumerState<_ConnectorCard> {
           if (status.error case final error?)
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: Text(error, style: KitText.sm.copyWith(color: Palette.berry)),
+              child: Text(error, style: PxText.sm.copyWith(color: Palette.berry)),
             ),
         ],
       ),
@@ -318,7 +318,7 @@ class _Row extends StatelessWidget {
       children: [
         SizedBox(
           width: 112,
-          child: Text(label, style: KitText.sm.copyWith(color: Palette.bark500)),
+          child: Text(label, style: PxText.sm.copyWith(color: Palette.bark500)),
         ),
         const SizedBox(width: 12),
         Expanded(child: child),
@@ -368,7 +368,7 @@ class _ChannelPickState extends ConsumerState<_ChannelPick> {
             },
           ),
         ),
-        if (_error != null) Text(_error!, style: KitText.xs.copyWith(color: Palette.berry)),
+        if (_error != null) Text(_error!, style: PxText.xs.copyWith(color: Palette.berry)),
       ],
     );
   }
@@ -409,12 +409,12 @@ class _QqLoginState extends State<_QqLogin> {
                   WidgetSpan(
                     alignment: PlaceholderAlignment.baseline,
                     baseline: TextBaseline.alphabetic,
-                    child: TextLink('QQ 开放平台', underline: true, style: KitText.xs, onTap: () => openLink('https://q.qq.com/')),
+                    child: TextLink('QQ 开放平台', underline: true, style: PxText.xs, onTap: () => openLink('https://q.qq.com/')),
                   ),
                   const TextSpan(text: ' 建一个机器人，打开单聊消息，把它的 AppID 和 AppSecret 填在这里。'),
                 ],
               ),
-              style: KitText.sm.copyWith(color: Palette.bark800, height: 1.625),
+              style: PxText.sm.copyWith(color: Palette.bark800, height: 1.625),
             ),
             const SizedBox(height: 12),
             PxField(
@@ -487,7 +487,7 @@ class _LoginCodeState extends State<_LoginCode> {
   Widget build(BuildContext context) {
     final status = widget.status;
     final code = _drawn;
-    final body = KitText.sm.copyWith(color: Palette.bark800);
+    final body = PxText.sm.copyWith(color: Palette.bark800);
     return Wrap(
       spacing: 20,
       runSpacing: 16,
@@ -503,7 +503,7 @@ class _LoginCodeState extends State<_LoginCode> {
             padding: const EdgeInsets.all(8),
             color: const Color(0xFFFFFFFF),
             alignment: Alignment.center,
-            child: code != null ? QrImage(code) : Text('在拿二维码……', style: KitText.xs.copyWith(color: Palette.bark500)),
+            child: code != null ? QrImage(code) : Text('在拿二维码……', style: PxText.xs.copyWith(color: Palette.bark500)),
           ),
         ),
         ConstrainedBox(
@@ -537,11 +537,11 @@ class _LoginCodeState extends State<_LoginCode> {
                     children: [
                       const TextSpan(text: '扫不了？在手机上打开这个链接：'),
                       WidgetSpan(
-                        child: TextLink(qr, underline: true, onTap: () => openLink(qr), style: KitText.xs),
+                        child: TextLink(qr, underline: true, onTap: () => openLink(qr), style: PxText.xs),
                       ),
                     ],
                   ),
-                  style: KitText.xs.copyWith(color: Palette.bark500),
+                  style: PxText.xs.copyWith(color: Palette.bark500),
                 ),
               ],
               const SizedBox(height: 12),

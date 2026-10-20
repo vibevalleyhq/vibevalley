@@ -6,7 +6,7 @@ import '../data/ui_state.dart';
 import '../data/remote.dart' show projectNamesProvider, graphChangesProvider, reasonOf;
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show agentsProvider;
 import 'widgets.dart';
 import '../shared/harvest.dart';
@@ -66,7 +66,7 @@ class _TaskBoardState extends ConsumerState<TaskBoard> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               for (final p in list)
-                KitTappable(
+                Tappable(
                   onTap: () => ref.read(graphShownProvider.notifier).set(p.id),
                   selected: p.id == current.id,
                   builder: (context, s) => Container(
@@ -77,7 +77,7 @@ class _TaskBoardState extends ConsumerState<TaskBoard> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Flexible(
-                          child: Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.xs),
+                          child: Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.xs),
                         ),
                         const SizedBox(width: 6),
                         _tagOf(p),
@@ -85,7 +85,7 @@ class _TaskBoardState extends ConsumerState<TaskBoard> {
                     ),
                   ),
                 ),
-              KitTappable(
+              Tappable(
                 onTap: () => setState(() => _creating = true),
                 builder: (context, s) => Container(
                   color: s.hovered ? Palette.cream300 : Palette.cream200,
@@ -95,7 +95,7 @@ class _TaskBoardState extends ConsumerState<TaskBoard> {
                     children: [
                       const SpriteIcon('button-add', size: 12),
                       const SizedBox(width: 4),
-                      Text('新计划', style: KitText.xs.copyWith(color: Palette.leaf700)),
+                      Text('新计划', style: PxText.xs.copyWith(color: Palette.leaf700)),
                     ],
                   ),
                 ),
@@ -155,7 +155,7 @@ class _NewTaskState extends ConsumerState<NewTask> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('一件很长的活：先派一个帮工读代码，把它拆成几步，每步交给一个帮工，有先后。拆好了你看过、改过再开工；每步做完合进计划自己的分支，全做完你再一次收进主分支。', style: KitText.sm.copyWith(color: Palette.bark900)),
+        Text('一件很长的活：先派一个帮工读代码，把它拆成几步，每步交给一个帮工，有先后。拆好了你看过、改过再开工；每步做完合进计划自己的分支，全做完你再一次收进主分支。', style: PxText.sm.copyWith(color: Palette.bark900)),
         const SizedBox(height: 12),
         PxField(
           label: '要做什么',
@@ -228,7 +228,7 @@ class _TaskViewState extends ConsumerState<TaskView> {
     final graph = widget.graph;
     final settled = graph.settled ?? 0;
     final spent = graph.spent;
-    final xs = KitText.xs.copyWith(color: Palette.bark600);
+    final xs = PxText.xs.copyWith(color: Palette.bark600);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -242,14 +242,14 @@ class _TaskViewState extends ConsumerState<TaskView> {
                 runSpacing: 4,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Text(graph.title, style: KitText.sm),
+                  Text(graph.title, style: PxText.sm),
                   _tagOf(graph),
                   if (graph.tasks.isNotEmpty) Text('$settled/${graph.tasks.length} 步', style: xs),
                   if (spent != null) Text('花了 ${spentText(spent)}', style: xs),
                 ],
               ),
               const SizedBox(height: 4),
-              Text(graph.goal, style: KitText.sm.copyWith(color: Palette.bark800)),
+              Text(graph.goal, style: PxText.sm.copyWith(color: Palette.bark800)),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 6,
@@ -258,7 +258,7 @@ class _TaskViewState extends ConsumerState<TaskView> {
                 children: [
                   FarmTag('项目 ${graph.project}', fill: const Color(0xFFA5743F), ink: Palette.cream50),
                   if (graph.branch != null) FarmTag(graph.branch!),
-                  if (graph.state == GraphState.running) Text('每步做完合进这条分支；收获时整条合进主分支', style: KitText.xs.copyWith(color: Palette.bark500)),
+                  if (graph.state == GraphState.running) Text('每步做完合进这条分支；收获时整条合进主分支', style: PxText.xs.copyWith(color: Palette.bark500)),
                 ],
               ),
               if (graph.note != null)
@@ -267,7 +267,7 @@ class _TaskViewState extends ConsumerState<TaskView> {
                   child: Tinted(
                     color: tint(Palette.wheat, .25),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    child: Text(graph.note!, style: KitText.xs),
+                    child: Text(graph.note!, style: PxText.xs),
                   ),
                 ),
               if (isOpen(graph))
@@ -365,7 +365,7 @@ class TaskHarvest extends ConsumerWidget {
           child: Text(
             '正在看计划分支改了什么…',
             textAlign: TextAlign.center,
-            style: KitText.sm.copyWith(color: Palette.bark600),
+            style: PxText.sm.copyWith(color: Palette.bark600),
           ),
         );
       case AsyncError(:final error):
@@ -374,7 +374,7 @@ class TaskHarvest extends ConsumerWidget {
           children: [
             Tinted(
               color: tint(Palette.berry, .12),
-              child: Text('看不了改动：${reasonOf(error)}', style: KitText.sm.copyWith(color: Palette.berry)),
+              child: Text('看不了改动：${reasonOf(error)}', style: PxText.sm.copyWith(color: Palette.berry)),
             ),
             const SizedBox(height: 12),
             PxButton.text('先不收', onPressed: () => onDone(null)),
@@ -406,7 +406,7 @@ class TaskHarvest extends ConsumerWidget {
                     ),
                 ],
               ),
-              style: KitText.sm,
+              style: PxText.sm,
             ),
             if (conflicts.isNotEmpty)
               Padding(
@@ -415,7 +415,7 @@ class TaskHarvest extends ConsumerWidget {
                   color: tint(Palette.berry, .12),
                   child: Text(
                     '合进 ${changes.base} 会冲突：${changes.conflicts.join('、')}。先不收，等 ${changes.base} 上的改动处理好。',
-                    style: KitText.sm.copyWith(color: Palette.berry),
+                    style: PxText.sm.copyWith(color: Palette.berry),
                   ),
                 ),
               ),
@@ -427,14 +427,14 @@ class TaskHarvest extends ConsumerWidget {
                   for (final c in changes.commits)
                     Row(
                       children: [
-                        Text(c.hash, style: KitText.mono.copyWith(color: Palette.bark500)),
+                        Text(c.hash, style: PxText.mono.copyWith(color: Palette.bark500)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             c.subject,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: KitText.xs.copyWith(color: Palette.bark800),
+                            style: PxText.xs.copyWith(color: Palette.bark800),
                           ),
                         ),
                       ],

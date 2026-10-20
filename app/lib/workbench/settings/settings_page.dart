@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../shared/settings_form.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../shared/layout.dart';
 import '../shared/widgets.dart';
 
@@ -148,10 +148,10 @@ class _GitHubState extends ConsumerState<_GitHub> {
           for (final line in lines)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
-              child: Text(line, style: KitText.sm.copyWith(color: Palette.bark800)),
+              child: Text(line, style: PxText.sm.copyWith(color: Palette.bark800)),
             ),
           const SizedBox(height: 6),
-          Text('能提 PR 的项目在「项目」里看；收获时提 PR 要在配置里打开（github.pr_projects）。', style: KitText.xs.copyWith(color: Palette.bark500)),
+          Text('能提 PR 的项目在「项目」里看；收获时提 PR 要在配置里打开（github.pr_projects）。', style: PxText.xs.copyWith(color: Palette.bark500)),
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerLeft,

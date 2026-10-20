@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../shared/faces.dart';
 import '../shared/memory_panels.dart';
 import '../shared/rules.dart';
@@ -191,7 +191,7 @@ class _RuntimeChoice extends ConsumerWidget {
       label: '农机',
       tip: '换农机会清掉模型和推理强度；长相（动物和衣服）不变。',
       child: runtimes.isEmpty
-          ? Text('读取农机…', style: KitText.xs.copyWith(color: Palette.bark500))
+          ? Text('读取农机…', style: PxText.xs.copyWith(color: Palette.bark500))
           : LayoutBuilder(
               builder: (context, box) {
                 final w = (box.maxWidth - 6) / 2;
@@ -229,13 +229,13 @@ class _RuntimeChoice extends ConsumerWidget {
                                         info.preset.label,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: KitText.sm.copyWith(color: active ? Palette.leaf700 : Palette.bark900),
+                                        style: PxText.sm.copyWith(color: active ? Palette.leaf700 : Palette.bark900),
                                       ),
                                       Text(
                                         status,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: KitText.fine.copyWith(color: ok ? Palette.bark500 : Palette.berry),
+                                        style: PxText.fine.copyWith(color: ok ? Palette.bark500 : Palette.berry),
                                       ),
                                     ],
                                   ),
@@ -298,7 +298,7 @@ class _RuntimeFacts extends StatelessWidget {
   Widget build(BuildContext context) {
     final info = this.info;
     final facts = factsOf(info);
-    final line = KitText.xs.copyWith(color: Palette.bark600);
+    final line = PxText.xs.copyWith(color: Palette.bark600);
     // What it takes comes with runtime.list: until then, nothing is said rather than a guess.
     if (info == null) {
       return PxCard(
@@ -322,7 +322,7 @@ class _RuntimeFacts extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: option,
-                    style: KitText.mono.copyWith(color: Palette.bark600),
+                    style: PxText.mono.copyWith(color: Palette.bark600),
                   ),
                   TextSpan(text: '：$reason'),
                 ],
@@ -430,8 +430,8 @@ class _SkillPicker extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(s.name, style: KitText.sm),
-                              Text(s.description, style: KitText.xs.copyWith(color: Palette.bark500)),
+                              Text(s.name, style: PxText.sm),
+                              Text(s.description, style: PxText.xs.copyWith(color: Palette.bark500)),
                             ],
                           ),
                         ),
@@ -489,14 +489,14 @@ List<Widget> _toolsEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent>
               runSpacing: 4,
               children: [
                 for (final t in tools.where((t) => !draft.disallowedTools.contains(t.name)))
-                  KitTappable(
+                  Tappable(
                     onTap: () => patch(draft.copyWith(disallowedTools: [...draft.disallowedTools, t.name])),
                     semanticLabel: '+ ${t.name}',
                     builder: (context, s) => Container(
                       color: s.hovered ? Palette.cream200 : Palette.cream50,
                       foregroundDecoration: pxRing,
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Text('+ ${t.name}', style: KitText.mono.copyWith(height: 1.5, color: s.hovered ? Palette.bark900 : Palette.bark600)),
+                      child: Text('+ ${t.name}', style: PxText.mono.copyWith(height: 1.5, color: s.hovered ? Palette.bark900 : Palette.bark600)),
                     ),
                   ),
               ],
@@ -573,10 +573,10 @@ class _McpListState extends State<_McpList> {
                     child: Text(switch (s) {
                       McpServerStdio() => 'stdio',
                       McpServerHttp() => 'http',
-                    }, style: KitText.xs.copyWith(color: Palette.bark600)),
+                    }, style: PxText.xs.copyWith(color: Palette.bark600)),
                   ),
                   const SizedBox(width: 8),
-                  Text(_mcpName(s), style: KitText.xs),
+                  Text(_mcpName(s), style: PxText.xs),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -586,10 +586,10 @@ class _McpListState extends State<_McpList> {
                       },
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: KitText.mono.copyWith(color: Palette.bark500),
+                      style: PxText.mono.copyWith(color: Palette.bark500),
                     ),
                   ),
-                  KitTappable(
+                  Tappable(
                     onTap: disabled
                         ? null
                         : () => widget.onChanged([
@@ -597,7 +597,7 @@ class _McpListState extends State<_McpList> {
                               if (_mcpName(x) != _mcpName(s)) x,
                           ]),
                     semanticLabel: '删除 ${_mcpName(s)}',
-                    builder: (context, st) => Text('删除', style: KitText.xs.copyWith(color: st.hovered ? Palette.berry : Palette.bark600)),
+                    builder: (context, st) => Text('删除', style: PxText.xs.copyWith(color: st.hovered ? Palette.berry : Palette.bark600)),
                   ),
                 ],
               ),
@@ -648,7 +648,7 @@ class _Inventory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final quiet = KitText.xs.copyWith(color: Palette.bark500);
+    final quiet = PxText.xs.copyWith(color: Palette.bark500);
     final list = entries;
     if (list == null) return Text('这个 runtime 不报告这一项。', style: quiet);
     if (list.isEmpty) return Text('没有。', style: quiet);
@@ -665,7 +665,7 @@ class _Inventory extends StatelessWidget {
                 Flexible(
                   child: Text(
                     e.name,
-                    style: KitText.mono.copyWith(
+                    style: PxText.mono.copyWith(
                       color: e.enabled == false ? Palette.bark500 : Palette.bark800,
                       decoration: e.enabled == false ? TextDecoration.lineThrough : null,
                     ),

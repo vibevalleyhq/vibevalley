@@ -5,7 +5,7 @@ import '../data/providers.dart';
 import '../game/commands.dart';
 import '../game/tools.dart';
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show agentsProvider;
 import 'widgets.dart';
 import '../rules/sessions.dart';
@@ -53,7 +53,7 @@ class _GraphState extends State<Graph> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 32, 8, 0),
                 child: ExcludeSemantics(
-                  child: Text('→', style: KitText.lg.copyWith(color: Palette.bark400)),
+                  child: Text('→', style: PxText.lg.copyWith(color: Palette.bark400)),
                 ),
               ),
             SizedBox(
@@ -65,7 +65,7 @@ class _GraphState extends State<Graph> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(i == 0 ? '先做' : '第 ${i + 1} 批', style: KitText.xs.copyWith(color: Palette.bark500)),
+                      child: Text(i == 0 ? '先做' : '第 ${i + 1} 批', style: PxText.xs.copyWith(color: Palette.bark500)),
                     ),
                     for (final id in ids)
                       if (graph.tasks.where((n) => n.id == id).firstOrNull case final node?)
@@ -132,7 +132,7 @@ class NodeCard extends ConsumerWidget {
     final commands = ref.read(farmCommandsProvider);
     Future<void> nodeAct(TaskAction action) async => onSaid(await commands.actOnTask(graph.id, node.id, action));
     final tone = _nodeTone(node.state);
-    final small = KitText.xs.copyWith(color: Palette.bark600);
+    final small = PxText.xs.copyWith(color: Palette.bark600);
     return Opacity(
       opacity: tone.opacity,
       child: Container(
@@ -149,7 +149,7 @@ class NodeCard extends ConsumerWidget {
                 Expanded(
                   child: Tooltip(
                     message: node.title,
-                    child: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                    child: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -173,7 +173,7 @@ class NodeCard extends ConsumerWidget {
                 node.brief,
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
-                style: KitText.xs.copyWith(color: Palette.bark800),
+                style: PxText.xs.copyWith(color: Palette.bark800),
               ),
             ),
             const SizedBox(height: 6),
@@ -193,7 +193,7 @@ class NodeCard extends ConsumerWidget {
                           check,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: KitText.mono.copyWith(fontSize: 10, color: Palette.bark900),
+                          style: PxText.mono.copyWith(fontSize: 10, color: Palette.bark900),
                         ),
                       ),
                     ),
@@ -214,7 +214,7 @@ class NodeCard extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                   child: Text(
                     '${session.name} · 第 ${stationOfSession(session) + 1} 块地${doing != null && doing.action != SessionAction.none ? ' · 在${doing.actionText ?? ''}' : ''}',
-                    style: KitText.xs.copyWith(color: Palette.bark800),
+                    style: PxText.xs.copyWith(color: Palette.bark800),
                   ),
                 ),
               ),
@@ -227,7 +227,7 @@ class NodeCard extends ConsumerWidget {
                     c,
                     maxLines: 4,
                     overflow: TextOverflow.ellipsis,
-                    style: KitText.xs.copyWith(color: node.state == TaskState.failed ? Palette.berry : Palette.bark800),
+                    style: PxText.xs.copyWith(color: node.state == TaskState.failed ? Palette.berry : Palette.bark800),
                   ),
                 ),
               ),
@@ -238,10 +238,10 @@ class NodeCard extends ConsumerWidget {
                   node.commits!.join(' '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: KitText.mono.copyWith(fontSize: 10, color: Palette.bark500),
+                  style: PxText.mono.copyWith(fontSize: 10, color: Palette.bark500),
                 ),
               ),
-            if (node.spent != null) Text(spentText(node.spent!), style: KitText.xs.copyWith(fontSize: 10, color: Palette.bark500)),
+            if (node.spent != null) Text(spentText(node.spent!), style: PxText.xs.copyWith(fontSize: 10, color: Palette.bark500)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 4,
@@ -270,14 +270,14 @@ class SmallBtn extends StatelessWidget {
   final bool primary;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     builder: (context, s) => Opacity(
       opacity: s.enabled ? 1 : .4,
       child: Container(
         color: primary ? (s.hovered ? Palette.leaf600 : Palette.leaf500) : (s.hovered ? Palette.cream200 : Palette.cream50),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-        child: Text(label, style: KitText.xs.copyWith(color: primary ? Palette.cream50 : Palette.bark800)),
+        child: Text(label, style: PxText.xs.copyWith(color: primary ? Palette.cream50 : Palette.bark800)),
       ),
     ),
   );
@@ -351,14 +351,14 @@ class _NodeEditorState extends ConsumerState<NodeEditor> {
           PxTextInput(value: _check, onChanged: (v) => setState(() => _check = v), placeholder: '做完跑的检查，比如 pnpm test（可空）', semanticLabel: '检查命令', mono: true),
           if (others.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text('等这些做完：', style: KitText.xs.copyWith(color: Palette.bark600)),
+            Text('等这些做完：', style: PxText.xs.copyWith(color: Palette.bark600)),
             const SizedBox(height: 2),
             Wrap(
               spacing: 4,
               runSpacing: 4,
               children: [
                 for (final n in others)
-                  KitTappable(
+                  Tappable(
                     onTap: () => setState(() => _needs = _needs.contains(n.id) ? (_needs..remove(n.id)) : [..._needs, n.id]),
                     selected: _needs.contains(n.id),
                     builder: (context, s) {
@@ -366,7 +366,7 @@ class _NodeEditorState extends ConsumerState<NodeEditor> {
                       return Container(
                         color: on ? Palette.leaf500 : (s.hovered ? Palette.cream200 : Palette.cream50),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        child: Text(n.title, style: KitText.xs.copyWith(color: on ? Palette.cream50 : Palette.bark800)),
+                        child: Text(n.title, style: PxText.xs.copyWith(color: on ? Palette.cream50 : Palette.bark800)),
                       );
                     },
                   ),
@@ -376,7 +376,7 @@ class _NodeEditorState extends ConsumerState<NodeEditor> {
           if (_problem.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(_problem, style: KitText.xs.copyWith(color: Palette.berry)),
+              child: Text(_problem, style: PxText.xs.copyWith(color: Palette.berry)),
             ),
           const SizedBox(height: 4),
           Row(

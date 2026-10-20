@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import 'catalog_data.dart';
 import '../shared/widgets.dart';
 import 'cursors_shelf.dart';
@@ -80,7 +80,7 @@ class CatalogPage extends StatelessWidget {
           children: [
             for (final (tab, label, path) in _shelfTabs)
               Expanded(
-                child: KitTappable(
+                child: Tappable(
                   onTap: () => workbenchGo(context, path),
                   selected: shelf == tab,
                   builder: (context, s) => Container(
@@ -91,7 +91,7 @@ class CatalogPage extends StatelessWidget {
                         : s.hovered
                         ? Palette.cream300
                         : null,
-                    child: Text(label, style: KitText.sm.copyWith(color: shelf == tab ? Palette.cream50 : Palette.bark800)),
+                    child: Text(label, style: PxText.sm.copyWith(color: shelf == tab ? Palette.cream50 : Palette.bark800)),
                   ),
                 ),
               ),

@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import 'chat_composer.dart';
 import '../../shared/chat_rules.dart';
 import '../../chat/chat_state.dart';
@@ -110,7 +110,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return ColoredBox(
       color: Palette.cream50,
       child: DefaultTextStyle(
-        style: KitText.sm,
+        style: PxText.sm,
         child: Stack(
           children: [
             Positioned.fill(
@@ -170,7 +170,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       if ((channel?.description ?? '').isNotEmpty) channel!.description!,
       if ((channel?.project ?? '').isNotEmpty) '默认项目 ${channel!.project}',
     ].join(' · ');
-    final title = Text(channelName(channel), maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.lg.copyWith(height: 1.25));
+    final title = Text(channelName(channel), maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.lg.copyWith(height: 1.25));
     return Container(
       height: workbenchHead,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -194,7 +194,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               color: Palette.wheat,
               border: Border.all(color: Palette.bark900, width: 2),
             ),
-            child: const Text('#', style: KitText.lg),
+            child: const Text('#', style: PxText.lg),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -267,7 +267,7 @@ class _TabButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     selected: on,
     builder: (context, s) => Container(
@@ -281,7 +281,7 @@ class _TabButton extends StatelessWidget {
         children: [
           SpriteIcon(icon, size: 18),
           const SizedBox(width: 6),
-          Text(label, style: KitText.sm),
+          Text(label, style: PxText.sm),
         ],
       ),
     ),
@@ -317,7 +317,7 @@ class _Sidebar extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               alignment: Alignment.centerLeft,
               decoration: const BoxDecoration(border: Border(bottom: pxLine)),
-              child: const Text('聊天', style: KitText.xl),
+              child: const Text('聊天', style: PxText.xl),
             ),
             Expanded(
               child: ListView(
@@ -326,7 +326,7 @@ class _Sidebar extends ConsumerWidget {
                   _Section(
                     title: '频道',
                     count: channels.isEmpty ? 1 : channels.length,
-                    action: KitTappable(
+                    action: Tappable(
                       onTap: onNew,
                       tooltip: '创建频道',
                       semanticLabel: '创建频道',
@@ -394,26 +394,26 @@ class _ChannelRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget row(KitState? s) => Container(
+    Widget row(TapState? s) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: here ? Palette.leaf300 : (s?.hovered ?? false ? Palette.creamHover : null),
         border: Border.all(color: here ? Palette.bark900 : const Color(0x00000000), width: 2),
-        boxShadow: here ? kitDrop : null,
+        boxShadow: here ? pxDrop : null,
       ),
       child: Row(
         children: [
-          const Text('#', style: KitText.sm),
+          const Text('#', style: PxText.sm),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
           ),
           if (unread > 0) CountChip(unread),
         ],
       ),
     );
     if (onTap == null) return row(null);
-    return KitTappable(onTap: onTap, selected: here, builder: (context, s) => row(s));
+    return Tappable(onTap: onTap, selected: here, builder: (context, s) => row(s));
   }
 }
 
@@ -437,7 +437,7 @@ class _SectionState extends State<_Section> with SingleTickerProviderStateMixin 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _fold.duration = kitMotion(context, const Duration(milliseconds: 150));
+    _fold.duration = motionDuration(context, const Duration(milliseconds: 150));
   }
 
   @override
@@ -466,19 +466,19 @@ class _SectionState extends State<_Section> with SingleTickerProviderStateMixin 
           child: Row(
             children: [
               Expanded(
-                child: KitTappable(
+                child: Tappable(
                   onTap: _toggle,
                   builder: (context, s) => Row(
                     children: [
                       AnimatedRotation(
                         turns: _open ? .25 : 0,
-                        duration: kitMotion(context, const Duration(milliseconds: 150)),
+                        duration: motionDuration(context, const Duration(milliseconds: 150)),
                         child: const SpriteIcon('button-next', size: 12),
                       ),
                       const SizedBox(width: 4),
-                      Text(widget.title, style: KitText.sm),
+                      Text(widget.title, style: PxText.sm),
                       const SizedBox(width: 4),
-                      Text('${widget.count}', style: KitText.sm.copyWith(color: Palette.bark500)),
+                      Text('${widget.count}', style: PxText.sm.copyWith(color: Palette.bark500)),
                     ],
                   ),
                 ),
@@ -511,7 +511,7 @@ class _Sliding extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnimatedSwitcher(
-    duration: kitMotion(context, const Duration(milliseconds: 180)),
+    duration: motionDuration(context, const Duration(milliseconds: 180)),
     switchInCurve: Curves.easeOut,
     switchOutCurve: Curves.easeIn,
     layoutBuilder: (current, previous) => Stack(children: [...previous, ?current]),
@@ -543,7 +543,7 @@ class _SessionRow extends StatelessWidget {
     final thread = jobThreadOf(chat, h);
     final unread = thread == null ? 0 : unreadIn(chat, thread);
     final phase = phaseText(h, nowMs());
-    return KitTappable(
+    return Tappable(
       onTap: thread == null ? null : () => onShow(thread.id),
       tooltip: phase,
       builder: (context, s) => Container(
@@ -564,7 +564,7 @@ class _SessionRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(h.name, style: KitText.sm),
+            Text(h.name, style: PxText.sm),
             const SizedBox(width: 8),
             PhaseGlyph(h.phase, size: 14),
             const SizedBox(width: 4),
@@ -599,7 +599,7 @@ class _ManagerLine extends ConsumerWidget {
         children: [
           const ManagerHead(size: 32),
           const SizedBox(width: 8),
-          const Text('管家', style: KitText.sm),
+          const Text('管家', style: PxText.sm),
           const SizedBox(width: 8),
           Container(width: 8, height: 8, color: dot),
           const SizedBox(width: 6),
@@ -631,7 +631,7 @@ class _Empty extends StatelessWidget {
             Text(
               text,
               textAlign: TextAlign.center,
-              style: KitText.sm.copyWith(height: 1.625, color: Palette.bark500),
+              style: PxText.sm.copyWith(height: 1.625, color: Palette.bark500),
             ),
           ],
         ),
@@ -640,7 +640,7 @@ class _Empty extends StatelessWidget {
   );
 }
 
-BoxDecoration get _card => const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(pxLine), boxShadow: kitDrop);
+BoxDecoration get _card => const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(pxLine), boxShadow: pxDrop);
 
 class _Jobs extends ConsumerWidget {
   const _Jobs({required this.channel, required this.onShow});
@@ -675,9 +675,9 @@ class _Jobs extends ConsumerWidget {
                             TextSpan(text: '  @${h.id} ${h.project ?? ''}${h.branch != null ? ' · ${h.branch}' : ''}', style: _grey),
                           ],
                         ),
-                        style: KitText.sm,
+                        style: PxText.sm,
                       ),
-                      Text(h.brief, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+                      Text(h.brief, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
                       Row(
                         children: [
                           PhaseGlyph(h.phase, size: 14),
@@ -750,9 +750,9 @@ class _SchedulesState extends ConsumerState<_Schedules> {
                               ),
                             ],
                           ),
-                          style: KitText.sm,
+                          style: PxText.sm,
                         ),
-                        Text(s.text, style: KitText.sm),
+                        Text(s.text, style: PxText.sm),
                       ],
                     ),
                   ),
@@ -853,7 +853,7 @@ class _ThreadPane extends ConsumerWidget {
                         threadTitle(farm?.chat, thread, issues: farm?.issues ?? const [], sessions: sessions),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: KitText.sm,
+                        style: PxText.sm,
                       ),
                       Row(
                         children: [

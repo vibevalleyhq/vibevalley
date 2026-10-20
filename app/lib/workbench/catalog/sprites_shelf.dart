@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import 'catalog_data.dart';
 import '../shared/widgets.dart';
 import 'catalog_page.dart';
@@ -57,7 +57,7 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
           for (final s in present) _ShelfButton(active: _shelf == s.id, label: s.label, count: counts[s.id] ?? 0, onTap: () => setState(() => _shelf = s.id)),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: Text('${pictures.all.length} 张，切自 design/pixel/raw。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark500)),
+            child: Text('${pictures.all.length} 张，切自 design/pixel/raw。', style: PxText.xs.copyWith(height: 1.625, color: Palette.bark500)),
           ),
         ],
       ),
@@ -90,7 +90,7 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
                   if (g.label.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
-                      child: Text(g.label, style: KitText.xs.copyWith(color: Palette.bark600)),
+                      child: Text(g.label, style: PxText.xs.copyWith(color: Palette.bark600)),
                     ),
                   _Tiles(pictures: g.pictures, all: pictures, selected: selected, ground: _ground),
                   const SizedBox(height: 12),
@@ -103,7 +103,7 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
     final detail = selected != null
         ? _Detail(key: ValueKey(selected.name), picture: selected, all: pictures, ground: _ground)
         : PxCard(
-            child: Text('点一张看大图：尺寸、落脚点、会动的帧，和它是从哪张原图切出来的、怎么重画。', style: KitText.sm.copyWith(color: Palette.bark600, height: 1.625)),
+            child: Text('点一张看大图：尺寸、落脚点、会动的帧，和它是从哪张原图切出来的、怎么重画。', style: PxText.sm.copyWith(color: Palette.bark600, height: 1.625)),
           );
 
     return LayoutBuilder(
@@ -172,7 +172,7 @@ class _ShelfButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     selected: active,
     builder: (context, s) => Container(
@@ -186,9 +186,9 @@ class _ShelfButton extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(label, style: KitText.sm.copyWith(color: active ? Palette.bark900 : Palette.bark800)),
+            child: Text(label, style: PxText.sm.copyWith(color: active ? Palette.bark900 : Palette.bark800)),
           ),
-          Text('$count', style: KitText.xs.copyWith(color: Palette.bark500)),
+          Text('$count', style: PxText.xs.copyWith(color: Palette.bark500)),
         ],
       ),
     ),
@@ -215,7 +215,7 @@ class _Tiles extends StatelessWidget {
           for (final p in pictures)
             SizedBox(
               width: width,
-              child: KitTappable(
+              child: Tappable(
                 onTap: () => workbenchGo(context, '/catalog/${Uri.encodeComponent(p.name)}'),
                 tooltip: '${p.name} · ${numberText(p.w)}×${numberText(p.h)}',
                 selected: selected?.name == p.name,
@@ -244,7 +244,7 @@ class _Tiles extends StatelessWidget {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 4),
                                       color: Palette.bark900.withValues(alpha: .7),
-                                      child: Text('动', style: KitText.xs.copyWith(fontSize: 9, height: 1.25, color: Palette.cream50)),
+                                      child: Text('动', style: PxText.xs.copyWith(fontSize: 9, height: 1.25, color: Palette.cream50)),
                                     ),
                                   ),
                               ],
@@ -258,7 +258,7 @@ class _Tiles extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: KitText.mono.copyWith(height: 1.5, color: Palette.bark600),
+                        style: PxText.mono.copyWith(height: 1.5, color: Palette.bark600),
                       ),
                     ],
                   ),
@@ -379,7 +379,7 @@ class _DetailState extends State<_Detail> {
                         }),
                       ),
                       const SizedBox(width: 8),
-                      Text('${frames.length} 帧', style: KitText.xs.copyWith(color: Palette.bark800)),
+                      Text('${frames.length} 帧', style: PxText.xs.copyWith(color: Palette.bark800)),
                       const Spacer(),
                       SizedBox(
                         width: 96,
@@ -409,7 +409,7 @@ class _DetailState extends State<_Detail> {
                       ),
                       SizedBox(
                         width: 48,
-                        child: Text('$_fps 帧/秒', style: KitText.xs.copyWith(color: Palette.bark800)),
+                        child: Text('$_fps 帧/秒', style: PxText.xs.copyWith(color: Palette.bark800)),
                       ),
                     ],
                   ),
@@ -420,7 +420,7 @@ class _DetailState extends State<_Detail> {
                     children: [
                       for (final (i, name) in frames.indexed)
                         if (widget.all[name] case final f?)
-                          KitTappable(
+                          Tappable(
                             onTap: () => workbenchGo(context, '/catalog/${Uri.encodeComponent(name)}'),
                             tooltip: name,
                             builder: (context, s) => Container(
@@ -443,7 +443,7 @@ class _DetailState extends State<_Detail> {
           _Row('尺寸', Text('${numberText(picture.w)} × ${numberText(picture.h)} 像素')),
           _Row('落脚点', Text('(${numberText(picture.ax)}, ${numberText(picture.ay)})')),
           if (picture.hx != null && picture.hy != null) _Row('头', Text('(${numberText(picture.hx!)}, ${numberText(picture.hy!)})')),
-          _Row('来自', picture.sheet != null ? _Code(picture.sheet!) : Text('没记下来（不再用的旧图）', style: KitText.xs.copyWith(color: Palette.bark500))),
+          _Row('来自', picture.sheet != null ? _Code(picture.sheet!) : Text('没记下来（不再用的旧图）', style: PxText.xs.copyWith(color: Palette.bark500))),
           if (remake != null) _Row('重画', _Code(remake.draw)),
           if (remake != null) _Row('重新切', _Code(remake.cut)),
         ],
@@ -474,7 +474,7 @@ class _CheckBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     checked: value,
-    child: KitTappable(
+    child: Tappable(
       onTap: () => onChanged(!value),
       builder: (context, s) => Row(
         mainAxisSize: MainAxisSize.min,
@@ -488,7 +488,7 @@ class _CheckBox extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          Text(label, style: KitText.xs.copyWith(color: Palette.bark800)),
+          Text(label, style: PxText.xs.copyWith(color: Palette.bark800)),
         ],
       ),
     ),
@@ -508,12 +508,12 @@ class _Row extends StatelessWidget {
       children: [
         SizedBox(
           width: 72,
-          child: Text(label, style: KitText.xs.copyWith(color: Palette.bark500)),
+          child: Text(label, style: PxText.xs.copyWith(color: Palette.bark500)),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: DefaultTextStyle(
-            style: KitText.xs.copyWith(color: Palette.bark800),
+            style: PxText.xs.copyWith(color: Palette.bark800),
             child: child,
           ),
         ),
@@ -535,7 +535,7 @@ class _Code extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             color: Palette.cream200,
-            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.mono.copyWith(fontSize: 11)),
+            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.mono.copyWith(fontSize: 11)),
           ),
         ),
       ),
@@ -564,7 +564,7 @@ class _CopyButtonState extends State<CopyButton> {
   }
 
   @override
-  Widget build(BuildContext context) => KitTappable(
+  Widget build(BuildContext context) => Tappable(
     onTap: () async {
       await Clipboard.setData(ClipboardData(text: widget.text));
       if (!mounted) return;
@@ -582,7 +582,7 @@ class _CopyButtonState extends State<CopyButton> {
         children: [
           SpriteIcon(_done ? 'mark-check' : 'button-copy', size: 12),
           const SizedBox(width: 4),
-          Text(_done ? '复制了' : '复制', style: KitText.xs.copyWith(fontSize: 11, color: Palette.bark600)),
+          Text(_done ? '复制了' : '复制', style: PxText.xs.copyWith(fontSize: 11, color: Palette.bark600)),
         ],
       ),
     ),

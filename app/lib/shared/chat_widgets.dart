@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/providers.dart';
 import '../gen/vibevalley.dart';
-import '../ui/kit/kit.dart';
+import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show agentsProvider;
 import 'chat_rules.dart';
 import 'swatches.dart';
@@ -26,7 +26,7 @@ class OwnerFace extends ConsumerWidget {
         color: Palette.wheat,
         border: Border.all(color: Palette.bark900, width: 2),
       ),
-      child: const Text('主', style: KitText.sm),
+      child: const Text('主', style: PxText.sm),
     );
   }
 }
@@ -108,7 +108,7 @@ class _StreamingCaretState extends State<StreamingCaret> with SingleTickerProvid
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (kitMoves(context)) {
+    if (motionAllowed(context)) {
       if (!_blink.isAnimating) _blink.repeat(reverse: true);
     } else {
       _blink.value = 0;
@@ -141,7 +141,7 @@ class _ThinkingDotsState extends State<ThinkingDots> with SingleTickerProviderSt
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (kitMoves(context)) {
+    if (motionAllowed(context)) {
       if (!_bob.isAnimating) _bob.repeat();
     } else {
       _bob.value = 0;
@@ -187,7 +187,7 @@ class CountChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 6),
     color: fill,
-    child: Text('$count', style: KitText.xs.copyWith(color: ink)),
+    child: Text('$count', style: PxText.xs.copyWith(color: ink)),
   );
 }
 
@@ -243,12 +243,12 @@ class _ChatTextState extends State<ChatText> {
         body,
         Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: KitTappable(
+          child: Tappable(
             onTap: () => setState(() => _open = !_open),
             semanticLabel: _open ? '收起' : '展开阅读',
             builder: (context, s) => Text(
               _open ? '收起' : '展开阅读',
-              style: KitText.xs.copyWith(color: widget.link, decoration: s.hovered ? TextDecoration.underline : null, decorationColor: widget.link),
+              style: PxText.xs.copyWith(color: widget.link, decoration: s.hovered ? TextDecoration.underline : null, decorationColor: widget.link),
             ),
           ),
         ),
@@ -381,7 +381,7 @@ class NameableFace extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       color: Palette.cream200,
-      child: Text('全', style: KitText.xs.copyWith(color: Palette.bark600)),
+      child: Text('全', style: PxText.xs.copyWith(color: Palette.bark600)),
     );
   }
 }
@@ -424,15 +424,15 @@ class NamingMenu extends StatelessWidget {
                         children: [
                           NameableFace(n, size: faceSize, everyoneMark: everyoneMark),
                           const SizedBox(width: 8),
-                          Text(n.token, style: KitText.mono),
+                          Text(n.token, style: PxText.mono),
                           const SizedBox(width: 8),
-                          if (n.session != null) ...[Text(n.name, style: KitText.sm.copyWith(color: Palette.bark800)), const SizedBox(width: 8)],
+                          if (n.session != null) ...[Text(n.name, style: PxText.sm.copyWith(color: Palette.bark800)), const SizedBox(width: 8)],
                           Expanded(
                             child: Text(
                               n.note,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: KitText.xs.copyWith(color: Palette.bark500),
+                              style: PxText.xs.copyWith(color: Palette.bark500),
                             ),
                           ),
                         ],

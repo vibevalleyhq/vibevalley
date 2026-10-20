@@ -9,7 +9,7 @@ import '../../data/server_choice.dart';
 import '../../data/server.dart';
 import '../../host/desktop.dart' show useLocalFarm;
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../connectors/qr.dart';
 import '../shared/layout.dart';
 import '../shared/resource.dart';
@@ -102,7 +102,7 @@ class _LanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.625);
+    final body = PxText.sm.copyWith(color: Palette.bark800, height: 1.625);
     final s = status;
     return PxCard(
       title: '连接到本机',
@@ -125,7 +125,7 @@ class _LanCard extends StatelessWidget {
                     ),
                   ),
                 ] else ...[
-                  _Row('地址', SelectableText(s.url ?? '—', style: KitText.mono.copyWith(color: Palette.bark900))),
+                  _Row('地址', SelectableText(s.url ?? '—', style: PxText.mono.copyWith(color: Palette.bark900))),
                   if (s.pairing case final pairing?)
                     _Pairing(pairing: pairing, act: act)
                   else
@@ -141,7 +141,7 @@ class _LanCard extends StatelessWidget {
                 if (s.problem case final problem?)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
-                    child: Text(problem, style: KitText.sm.copyWith(color: Palette.berry)),
+                    child: Text(problem, style: PxText.sm.copyWith(color: Palette.berry)),
                   ),
                 const SizedBox(height: 12),
                 for (final n in const [
@@ -152,7 +152,7 @@ class _LanCard extends StatelessWidget {
                 ])
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
-                    child: Text('· $n', style: KitText.xs.copyWith(color: Palette.bark500, height: 1.625)),
+                    child: Text('· $n', style: PxText.xs.copyWith(color: Palette.bark500, height: 1.625)),
                   ),
               ],
             ),
@@ -167,7 +167,7 @@ class _Pairing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.625);
+    final body = PxText.sm.copyWith(color: Palette.bark800, height: 1.625);
     if (pairing.asking case final asking?) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -224,9 +224,9 @@ class _Pairing extends StatelessWidget {
             children: [
               Text('手机打开 VibeValley，在「连接到本机」里扫这个码；另一台 Mac 在它的「连接到本机」里粘贴这个链接：', style: body),
               const SizedBox(height: 8),
-              SelectableText(pairing.link, style: KitText.mono.copyWith(fontSize: 11, color: Palette.bark900)),
+              SelectableText(pairing.link, style: PxText.mono.copyWith(fontSize: 11, color: Palette.bark900)),
               const SizedBox(height: 8),
-              Text('还有 $left 秒有效，只能用一次。', style: KitText.xs.copyWith(color: Palette.bark500)),
+              Text('还有 $left 秒有效，只能用一次。', style: PxText.xs.copyWith(color: Palette.bark500)),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -336,7 +336,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
 
   @override
   Widget build(BuildContext context) {
-    final body = KitText.sm.copyWith(color: Palette.bark800, height: 1.625);
+    final body = PxText.sm.copyWith(color: Palette.bark800, height: 1.625);
     final choice = serverConnection.value.choice;
     final using = choice.using;
     final own = canScan ? '断开' : '回到这台电脑的农场';
@@ -354,7 +354,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
               child: PxButton.text(own, onPressed: _waiting != null ? null : _useOwn),
             ),
             const SizedBox(height: 16),
-            Text('那台电脑换了地址，或者要换一个农场：在那台电脑的「连接到本机」里添加设备，再扫码或粘贴链接。', style: KitText.xs.copyWith(color: Palette.bark500)),
+            Text('那台电脑换了地址，或者要换一个农场：在那台电脑的「连接到本机」里添加设备，再扫码或粘贴链接。', style: PxText.xs.copyWith(color: Palette.bark500)),
           ] else ...[
             Text('在另一台电脑的 VibeValley 里打开「连接到本机」、点「添加设备」，${canScan ? '扫它给的码，或者' : ''}把它给的链接粘贴在这里。', style: body),
             if (choice.remote case final last?) ...[
@@ -412,7 +412,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
           if (_error case final error?)
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: Text(error, style: KitText.sm.copyWith(color: Palette.berry)),
+              child: Text(error, style: PxText.sm.copyWith(color: Palette.berry)),
             ),
         ],
       ),
@@ -433,7 +433,7 @@ class _Row extends StatelessWidget {
       children: [
         SizedBox(
           width: 72,
-          child: Text(label, style: KitText.sm.copyWith(color: Palette.bark500)),
+          child: Text(label, style: PxText.sm.copyWith(color: Palette.bark500)),
         ),
         const SizedBox(width: 12),
         Expanded(child: child),

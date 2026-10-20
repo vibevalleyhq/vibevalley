@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../shared/faces.dart';
 import '../../shared/swatches.dart';
 import '../shared/widgets.dart';
@@ -109,7 +109,7 @@ class _Tile extends StatelessWidget {
       children: [
         child,
         const SizedBox(height: 2),
-        Text(label, style: KitText.fine.copyWith(color: active ? Palette.leaf700 : Palette.bark500)),
+        Text(label, style: PxText.fine.copyWith(color: active ? Palette.leaf700 : Palette.bark500)),
       ],
     ),
   );
@@ -178,8 +178,8 @@ class AgentStage extends ConsumerWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    decoration: BoxDecoration(color: pill.withValues(alpha: .9), boxShadow: kitDrop),
-                    child: Text(name.isEmpty ? '无名 agent' : name, style: KitText.lg),
+                    decoration: BoxDecoration(color: pill.withValues(alpha: .9), boxShadow: pxDrop),
+                    child: Text(name.isEmpty ? '无名 agent' : name, style: PxText.lg),
                   ),
                   if (role.isNotEmpty)
                     Container(
@@ -190,7 +190,7 @@ class AgentStage extends ConsumerWidget {
                       child: Text(
                         role,
                         textAlign: TextAlign.center,
-                        style: KitText.xs.copyWith(color: Palette.bark800),
+                        style: PxText.xs.copyWith(color: Palette.bark800),
                       ),
                     ),
                 ],
@@ -204,7 +204,7 @@ class AgentStage extends ConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 color: pill.withValues(alpha: .7),
-                child: Text('${speciesLabel[cast.species]} · ${outfitLabel[cast.outfit]}', style: KitText.fine.copyWith(color: Palette.bark800)),
+                child: Text('${speciesLabel[cast.species]} · ${outfitLabel[cast.outfit]}', style: PxText.fine.copyWith(color: Palette.bark800)),
               ),
             ),
           ),

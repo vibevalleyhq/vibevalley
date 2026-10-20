@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
@@ -58,9 +58,9 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
         ? installed
         : installed.where((s) => _matches(q, [s.name, s.description, ...s.runtimes.map((x) => runtimeName(catalog, x.runtime))])).toList();
     final shownSkills = q.isEmpty ? skills : skills.where((s) => _matches(q, [s.name, s.description, s.body])).toList();
-    final small = KitText.xs.copyWith(color: Palette.bark500);
+    final small = PxText.xs.copyWith(color: Palette.bark500);
 
-    Widget entry({required bool on, required String path, required String title, required String detail, required double vertical}) => KitTappable(
+    Widget entry({required bool on, required String path, required String title, required String detail, required double vertical}) => Tappable(
       onTap: () => workbenchGo(context, path),
       selected: on,
       semanticLabel: title,
@@ -71,12 +71,12 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm),
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
             Text(
               detail,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: KitText.fine.copyWith(color: Palette.bark500),
+              style: PxText.fine.copyWith(color: Palette.bark500),
             ),
           ],
         ),
@@ -92,7 +92,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
           padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
           child: Text(
             '这台电脑上装的 · ${q.isNotEmpty ? '${shownList.length} / ${installed.length}' : installed.length}',
-            style: KitText.xs.copyWith(color: Palette.bark600),
+            style: PxText.xs.copyWith(color: Palette.bark600),
           ),
         ),
         if (installed.isEmpty)
@@ -123,7 +123,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
               Expanded(
                 child: Text(
                   'VibeValley 自己的 · ${q.isNotEmpty ? '${shownSkills.length} / ${skills.length}' : skills.length}',
-                  style: KitText.xs.copyWith(color: Palette.bark600),
+                  style: PxText.xs.copyWith(color: Palette.bark600),
                 ),
               ),
               PxButton.text('新技能', tone: PxTone.primary, size: PxSize.sm, onPressed: () => workbenchGo(context, _skillPath('new'))),
@@ -145,7 +145,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(8, 4, 8, 8),
-            child: Text('技能书', style: KitText.xl),
+            child: Text('技能书', style: PxText.xl),
           ),
           PxTextInput(value: _query, onChanged: (v) => setState(() => _query = v), placeholder: '搜名字、说明、农机……', semanticLabel: '搜索技能', icon: 'button-search'),
           if (bounded) Flexible(child: SingleChildScrollView(child: listColumn)) else listColumn,
@@ -163,7 +163,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
     } else {
       main = Padding(
         padding: const EdgeInsets.all(32),
-        child: Text('还没有技能。', style: KitText.sm.copyWith(color: Palette.bark500)),
+        child: Text('还没有技能。', style: PxText.sm.copyWith(color: Palette.bark500)),
       );
     }
 
@@ -219,15 +219,15 @@ class _InstalledCard extends StatelessWidget {
     Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(skill.name, style: KitText.xl),
+        Text(skill.name, style: PxText.xl),
         const SizedBox(height: 4),
-        Text('装在农机上的技能：用这些农机的帮工会自己按需加载，不用在档案里勾。要改它，去它的文件里改。', style: KitText.xs.copyWith(color: Palette.bark500)),
+        Text('装在农机上的技能：用这些农机的帮工会自己按需加载，不用在档案里勾。要改它，去它的文件里改。', style: PxText.xs.copyWith(color: Palette.bark500)),
         if ((skill.description ?? '').isNotEmpty) ...[
           const SizedBox(height: 16),
-          SelectableText(skill.description!, style: KitText.sm.copyWith(height: 1.625, color: Palette.bark800)),
+          SelectableText(skill.description!, style: PxText.sm.copyWith(height: 1.625, color: Palette.bark800)),
         ],
         const SizedBox(height: 16),
-        Text('哪些农机有它', style: KitText.xs.copyWith(color: Palette.bark600)),
+        Text('哪些农机有它', style: PxText.xs.copyWith(color: Palette.bark600)),
         const SizedBox(height: 8),
         for (final x in skill.runtimes)
           Container(
@@ -238,7 +238,7 @@ class _InstalledCard extends StatelessWidget {
               children: [
                 RuntimeIcon(runtime: x.runtime, size: 28),
                 const SizedBox(width: 10),
-                SizedBox(width: 80, child: Text(runtimeName(catalog, x.runtime), style: KitText.sm)),
+                SizedBox(width: 80, child: Text(runtimeName(catalog, x.runtime), style: PxText.sm)),
                 Expanded(
                   child: Tooltip(
                     message: x.source ?? '',
@@ -246,7 +246,7 @@ class _InstalledCard extends StatelessWidget {
                       x.source ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: KitText.mono.copyWith(color: Palette.bark500),
+                      style: PxText.mono.copyWith(color: Palette.bark500),
                     ),
                   ),
                 ),
@@ -311,14 +311,14 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              Text(draft.name.isEmpty ? '新技能' : draft.name, style: KitText.xl),
+              Text(draft.name.isEmpty ? '新技能' : draft.name, style: PxText.xl),
               Wrap(
                 spacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   if (skill != null)
                     if (_sure) ...[
-                      Text(users.isNotEmpty ? '${users.length} 个 agent 在用，删掉会从它们身上去掉。' : '删掉？', style: KitText.xs.copyWith(color: Palette.bark600)),
+                      Text(users.isNotEmpty ? '${users.length} 个 agent 在用，删掉会从它们身上去掉。' : '删掉？', style: PxText.xs.copyWith(color: Palette.bark600)),
                       PxButton.text('删除', tone: PxTone.danger, onPressed: () => _delete(skill)),
                       PxButton.text('算了', onPressed: () => setState(() => _sure = false)),
                     ] else
@@ -365,13 +365,13 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
           PxField(
             label: '谁在用',
             child: users.isEmpty
-                ? Text('还没有 agent 带这个技能。到 agent 的「技能」页签里勾上。', style: KitText.xs.copyWith(color: Palette.bark500))
+                ? Text('还没有 agent 带这个技能。到 agent 的「技能」页签里勾上。', style: PxText.xs.copyWith(color: Palette.bark500))
                 : Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
                       for (final a in users)
-                        KitTappable(
+                        Tappable(
                           onTap: () => workbenchGo(context, '/agents/${Uri.encodeComponent(a.id)}'),
                           semanticLabel: a.name,
                           builder: (context, s) => Container(
@@ -382,7 +382,7 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
                               children: [
                                 AgentFace(look: a.look, id: a.id, size: 26),
                                 const SizedBox(width: 6),
-                                Text(a.name, style: KitText.sm.copyWith(color: Palette.bark800)),
+                                Text(a.name, style: PxText.sm.copyWith(color: Palette.bark800)),
                               ],
                             ),
                           ),

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../ui/kit/kit.dart';
+import '../../ui/pixel/pixel.dart';
 import 'catalog_page.dart';
 
 /// Null when the app was built without them.
@@ -49,7 +49,7 @@ class _CursorsShelfState extends ConsumerState<CursorsShelf> {
         below: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: Text('鼠标在农场里的样子：平时、指着能点的、拿着工具时。', style: KitText.xs.copyWith(height: 1.625, color: Palette.bark500)),
+            child: Text('鼠标在农场里的样子：平时、指着能点的、拿着工具时。', style: PxText.xs.copyWith(height: 1.625, color: Palette.bark500)),
           ),
         ],
       ),
@@ -69,13 +69,13 @@ class _CursorsShelfState extends ConsumerState<CursorsShelf> {
             children: [
               Text(
                 '红点是点下去落在哪。平时是手套，指着能点的伸出食指；拿着工具时是那件工具，能用的带闪光，用不上的带禁止标记。切自 design/pixel/raw/ui-cursors.png（design/pixel/process.py ui-cursors）。',
-                style: KitText.xs.copyWith(color: Palette.bark600),
+                style: PxText.xs.copyWith(color: Palette.bark600),
               ),
               const SizedBox(height: 12),
               if (cursors.isLoading)
                 const SizedBox.shrink()
               else if (all == null)
-                Text('这个版本没有带上指针的图（assets/cursors）。', style: KitText.sm.copyWith(color: Palette.bark500))
+                Text('这个版本没有带上指针的图（assets/cursors）。', style: PxText.sm.copyWith(color: Palette.bark500))
               else
                 LayoutBuilder(
                   builder: (context, box) {
@@ -179,7 +179,7 @@ class _CursorTileState extends State<_CursorTile> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(widget.name, style: KitText.mono.copyWith(height: 1.5, color: Palette.bark600)),
+          Text(widget.name, style: PxText.mono.copyWith(height: 1.5, color: Palette.bark600)),
         ],
       ),
     );

@@ -1,11 +1,9 @@
-// At screen pixels, so the words stay sharp at any scale.
-
 import 'package:flutter/widgets.dart';
+import '../../gen/vibevalley.dart' show BadgeTone;
+import '../../sprites/atlas.dart';
+import '../common.dart';
 
-import '../gen/vibevalley.dart' show BadgeTone;
-import 'theme.dart';
-import '../sprites/atlas.dart';
-import 'pixels.dart';
+// At screen pixels, so the words stay sharp at any scale.
 
 abstract final class CardColors {
   static const ink = Color(0xFF3A2A18);

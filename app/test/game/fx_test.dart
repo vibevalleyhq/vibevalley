@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/game/effects.dart';
 import 'package:vibevalley/shared/connection_banner.dart';
-import 'package:vibevalley/ui/kit/kit.dart';
+import 'package:vibevalley/ui/pixel/pixel.dart';
 
 import '../support/shell.dart';
 
