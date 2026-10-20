@@ -215,3 +215,31 @@ class ProWeightText extends StatelessWidget {
     );
   }
 }
+
+/// One property of a thing in a side panel: its name on the left, its value (often a quiet pick) on the right.
+class ProProperty extends StatelessWidget {
+  const ProProperty(this.label, this.child, {super.key, this.boxed = false});
+  final String label;
+  final Widget child;
+
+  /// The value is a control with its own inset (a quiet pick); plain values get the same inset so every value starts in
+  /// one line.
+  final bool boxed;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: 32),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(width: 64, child: Text(label, style: ProText.meta)),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(left: boxed ? 0 : 11),
+            child: DefaultTextStyle(style: ProText.sm, child: child),
+          ),
+        ),
+      ],
+    ),
+  );
+}

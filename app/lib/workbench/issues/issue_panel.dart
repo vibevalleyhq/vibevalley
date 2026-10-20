@@ -17,6 +17,7 @@ import '../shared/composer.dart';
 import '../shared/widgets.dart';
 import '../shared/work_log.dart';
 import 'issues_page.dart' show issueTagColor;
+import 'issue_sheet.dart';
 
 /// The workbench's issue page, drawn from IssueState: the status and what it needs first, the rest folded. The farm draws
 /// its own (shared/issue_view.dart).
@@ -138,11 +139,8 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
     };
     return ProButton.text(
       label,
-      tone: o.act == IssueAct.close
-          ? ProTone.danger
-          : o.lead
-          ? ProTone.primary
-          : ProTone.plain,
+      // Only the lead is filled; 关上 asks again in its own dialog, so it need not shout here.
+      tone: o.lead ? ProTone.primary : ProTone.plain,
       onPressed: _busy ? null : run,
     );
   }
@@ -217,92 +215,88 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
                     ProButton.text('没过，照上面修', tone: ProTone.danger, onPressed: _busy || _draft.empty ? null : () => _accept(false)),
                   ],
                   if (s.reopening) ProButton.text('重开', tone: ProTone.primary, onPressed: _busy ? null : _reopen),
-                  ...actions,
                 ],
               ),
             ],
           )
-        : actions.isEmpty
-        ? null
-        : Wrap(spacing: 8, runSpacing: 8, children: actions);
+        : null;
 
-    final details = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (s.description.isNotEmpty && s.description != s.title) KeyRow('要做的', Text(s.description, style: ProText.base)),
-        KeyRow('谁在做', Text(s.whoLine)),
-        if (s.crewLine case final crew?) KeyRow('地上的人', Text(crew)),
-        if (issue != null && s.acceptanceEditable)
-          KeyRow(
-            '验收',
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                for (final (a, label) in const [(Acceptance.glance, '看一眼就收'), (Acceptance.required, '必须过验收')])
-                  ProButton.text(
-                    label,
-                    size: ProSize.sm,
-                    tone: issue.acceptance == a ? ProTone.primary : ProTone.plain,
-                    onPressed: _busy || issue.acceptance == a || !s.open ? null : () => _setAcceptance(a),
-                  ),
-                if (issue.acceptedAt != null) Text('已验收 ${wallClockText(issue.acceptedAt!)}', style: ProText.meta.copyWith(color: Palette.leaf700)),
-              ],
-            ),
+    final side = <Widget>[
+      for (final a in actions) Padding(padding: const EdgeInsets.only(bottom: 8), child: a),
+      if (actions.isNotEmpty) const SizedBox(height: 8),
+      ProProperty(
+        '状态',
+        Row(
+          children: [
+            ProDot(issueTagColor(widget.state), size: 8),
+            const SizedBox(width: 8),
+            Flexible(child: Text(widget.state.label)),
+          ],
+        ),
+      ),
+      ProProperty('谁在做', Text(s.whoLine)),
+      if (s.crewLine case final crew?) ProProperty('地上的人', Text(crew)),
+      if (issue != null && s.acceptanceEditable)
+        ProProperty(
+          '验收',
+          ProPick(
+            quiet: true,
+            value: issue.acceptance.name,
+            placeholder: '看一眼就收',
+            semanticLabel: '验收',
+            enabled: !_busy && s.open,
+            options: const [
+              PickOption(value: 'glance', label: '看一眼就收'),
+              PickOption(value: 'required', label: '必须过验收'),
+            ],
+            onChanged: (v) => _setAcceptance(v == 'required' ? Acceptance.required : Acceptance.glance),
           ),
-        if (s.pulled.isNotEmpty)
-          KeyRow(
-            '拔了的草',
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final f in s.pulled)
-                  Text(
-                    '已拔 · ${f.text}',
-                    style: ProText.sm.copyWith(color: ProColor.faint, decoration: TextDecoration.lineThrough),
-                  ),
-              ],
-            ),
+          boxed: true,
+        ),
+      if (issue?.acceptedAt case final at?) ProProperty('验收过', Text(wallClockText(at), style: ProText.sm.copyWith(color: Palette.leaf700))),
+      if (agent?.model case final model? when model.isNotEmpty) ProProperty('模型', Text(model)),
+      ProProperty('档案', TextLink('看${agent?.name ?? head.name}的档案', onTap: () => context.go('/agents/${Uri.encodeComponent(head.agent)}'))),
+      if (project != null) ProProperty('项目', TextLink(project, onTap: () => context.go('/projects/${Uri.encodeComponent(project)}'))),
+      if (head.branch != null) ProProperty('分支', Text(head.branch!, style: ProText.mono)),
+      if (head.worktree case final path?)
+        ProProperty(
+          'worktree',
+          Row(
+            children: [
+              Expanded(child: SelectableText(path, maxLines: 2, style: ProText.mono)),
+              ProButton.icon(
+                'button-copy',
+                semanticLabel: '复制路径',
+                tooltip: '复制路径',
+                onPressed: () => Clipboard.setData(ClipboardData(text: path)),
+              ),
+            ],
           ),
-        if (agent?.model case final model? when model.isNotEmpty) KeyRow('模型', Text(model)),
-        KeyRow('档案', TextLink('看${agent?.name ?? head.name}的档案', onTap: () => context.go('/agents/${Uri.encodeComponent(head.agent)}'))),
-        if (project != null) KeyRow('项目', TextLink(project, onTap: () => context.go('/projects/${Uri.encodeComponent(project)}'))),
-        if (head.branch != null) KeyRow('分支', Text(head.branch!, style: ProText.mono)),
-        if (head.worktree case final path?)
-          KeyRow(
-            'worktree',
-            Row(
-              children: [
-                Expanded(child: SelectableText(path, style: ProText.mono)),
-                const SizedBox(width: 8),
-                ProButton.text(
-                  '复制路径',
-                  size: ProSize.sm,
-                  onPressed: () => Clipboard.setData(ClipboardData(text: path)),
-                ),
-              ],
-            ),
-          ),
-        if (issue != null) KeyRow('开单', Text(wallClockText(issue.createdAt))),
-        if (issue?.closedAt != null) KeyRow('关单', Text(wallClockText(issue!.closedAt!))),
-        KeyRow('做过', Text(s.historyLine)),
-        KeyRow('用时', Text(s.usedLine(steps: steps, now: now))),
-        if (widget.onThread != null || (s.inTask && widget.onTask != null))
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (widget.onThread != null) ProButton.text('看工单串', size: ProSize.sm, onPressed: widget.onThread),
-                if (s.inTask && widget.onTask != null) ProButton.text('看计划', size: ProSize.sm, onPressed: widget.onTask),
-              ],
-            ),
+        ),
+      if (issue != null) ProProperty('开单', Text(wallClockText(issue.createdAt))),
+      if (issue?.closedAt != null) ProProperty('关单', Text(wallClockText(issue!.closedAt!))),
+      ProProperty('做过', Text(s.historyLine)),
+      ProProperty('用时', Text(s.usedLine(steps: steps, now: now))),
+      if (s.pulled.isNotEmpty) ...[
+        const SheetLabel('拔了的草'),
+        for (final f in s.pulled)
+          Text(
+            f.text,
+            style: ProText.sm.copyWith(color: ProColor.faint, decoration: TextDecoration.lineThrough),
           ),
       ],
-    );
+      if (widget.onThread != null || (s.inTask && widget.onTask != null)) ...[
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (widget.onThread != null) ProButton.text('看工单串', size: ProSize.sm, onPressed: widget.onThread),
+            if (s.inTask && widget.onTask != null) ProButton.text('看计划', size: ProSize.sm, onPressed: widget.onTask),
+          ],
+        ),
+      ],
+    ];
 
     final changesView = changes == null
         ? null
@@ -326,64 +320,49 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
           );
     final fileCount = changes?.value?.files.length;
 
-    return Column(
+    final heading = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (issue != null) ...[IssueStages(stageOf(issue.status)), const SizedBox(height: 16)],
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: Text(s.title, style: ProText.xl)),
-            const SizedBox(width: 12),
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ProDot(issueTagColor(widget.state)),
-                  const SizedBox(width: 6),
-                  Text(widget.state.label, style: ProText.meta),
-                ],
-              ),
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 11),
+          child: Text(s.title, style: ProText.xl),
         ),
-        if (project != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(project, style: ProText.meta),
-          ),
-        const SizedBox(height: 16),
-        statusBox,
-        if (s.weeds.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          for (final f in s.weeds)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: Text('草 · ${f.text}', style: ProText.sm.copyWith(color: Palette.berry)),
-            ),
-        ],
-        if (issue?.criteria case final criteria? when criteria.isNotEmpty) ...[const SizedBox(height: 12), _Criteria(criteria: criteria, checking: s.judging)],
-        if (box != null) ...[const SizedBox(height: 16), box],
-        const SizedBox(height: 20),
-        if (changesView != null) _Fold(label: fileCount == null ? '改动' : '改动（$fileCount 个文件）', child: changesView),
-        _Fold(
-          label: '干活过程',
-          child: steps.isEmpty
-              ? EmptyNote(noStepsText(head))
-              : Ticking(
-                  builder: (context, now) => WorkLog(steps: steps, now: now, tall: true, working: widget.state == IssueTag.working),
-                ),
-        ),
-        if (issue != null)
-          _Fold(
-            label: '每次干活',
-            child: IssueRuns(issue: issue.id, version: s.runsVersion),
-          ),
-        _Fold(label: '详情', last: true, child: details),
+        if (s.description.isNotEmpty && s.description != s.title) Padding(padding: const EdgeInsets.fromLTRB(11, 8, 11, 0), child: ProMarkdown(s.description)),
       ],
     );
+    final main = <Widget>[
+      statusBox,
+      if (s.weeds.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        for (final f in s.weeds)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Text('草 · ${f.text}', style: ProText.sm.copyWith(color: Palette.berry)),
+          ),
+      ],
+      if (issue?.criteria case final criteria? when criteria.isNotEmpty) ...[const SizedBox(height: 12), _Criteria(criteria: criteria, checking: s.judging)],
+      if (box != null) ...[const SizedBox(height: 16), box],
+      const SizedBox(height: 20),
+      if (changesView != null) _Fold(label: fileCount == null ? '改动' : '改动（$fileCount 个文件）', child: changesView),
+      _Fold(
+        label: '干活过程',
+        last: issue == null,
+        child: steps.isEmpty
+            ? EmptyNote(noStepsText(head))
+            : Ticking(
+                builder: (context, now) => WorkLog(steps: steps, now: now, tall: true, working: widget.state == IssueTag.working),
+              ),
+      ),
+      if (issue != null)
+        _Fold(
+          label: '每次干活',
+          last: true,
+          child: IssueRuns(issue: issue.id, version: s.runsVersion),
+        ),
+    ];
+    return IssueSheet(heading: heading, main: main, side: side);
   }
 }
 

@@ -321,7 +321,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
           children: [
             Positioned.fill(child: board),
             Positioned.fill(
-              child: ProModalLayer(onClose: () => _open(null), child: detail),
+              child: ProModalLayer(onClose: () => _open(null), maxWidth: 1080, child: detail),
             ),
           ],
         );

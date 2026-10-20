@@ -18,6 +18,7 @@ import '../shared/config_problem.dart';
 import 'harvest_review.dart';
 import 'issue_panel.dart';
 import 'issues_page.dart';
+import 'issue_sheet.dart';
 import 'issue_submission.dart';
 
 /// Closing an issue: harvest it (its checklist first) or let the helper go. Wider than a form: the checklist lists files and patches.
@@ -254,14 +255,21 @@ class _TodoState extends ConsumerState<TodoDetail> {
       null => ('想做什么？', '写一句就行：帮工读过代码，替你写成工单。'),
     };
     final canDraft = !_busy && drafting == null && (drafted || !_word.empty || _title.trim() != newIssueTitle);
-    final draft = !backlog
+    final heading = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (backlog) ...[const IssueStages(Stage.talk), const SizedBox(height: 16)],
+        ProTextInput(value: _title, onChanged: (v) => _edit(() => _title = v), placeholder: '比如：给登录页加上记住我', semanticLabel: '标题', bare: true, style: ProText.xl),
+      ],
+    );
+    final talk = !backlog
         ? null
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const IssueStages(Stage.talk),
-              const SizedBox(height: 16),
+              const SheetLabel('和帮工聊清楚', top: 24),
               Container(
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                 decoration: BoxDecoration(
@@ -279,7 +287,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               WorkbenchComposer(
                 draft: _word,
                 mentions: false,
@@ -295,164 +303,147 @@ class _TodoState extends ConsumerState<TodoDetail> {
                 semanticLabel: '想做什么',
               ),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ProButton.text(drafted ? '再起草' : '起草', tone: drafted ? ProTone.plain : ProTone.primary, onPressed: canDraft ? _draft : null),
-                  ProButton.text(
-                    '开工',
-                    tone: drafted ? ProTone.primary : ProTone.plain,
-                    onPressed: ready && drafting == null && _agent.isNotEmpty ? _start : null,
-                  ),
-                ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ProButton.text(drafted ? '再起草' : '起草', tone: drafted ? ProTone.plain : ProTone.primary, onPressed: canDraft ? _draft : null),
               ),
-              const SizedBox(height: 20),
-              const Divider(height: 1, thickness: 1, color: ProColor.line),
-              const SizedBox(height: 20),
             ],
           );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IssueHeading(backlog ? '草稿' : '待办', aside: Text('写于 ${wallClockText(item.createdAt)}')),
-        const SizedBox(height: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ?draft,
-            ProField(
-              label: '标题',
-              child: ProTextInput(value: _title, onChanged: (v) => _edit(() => _title = v), placeholder: '比如：给登录页加上记住我', semanticLabel: '标题'),
-            ),
-            const SizedBox(height: 16),
-            ProField(
-              label: '说明',
-              child: ProTextArea(
-                value: _description,
-                onChanged: (v) => _edit(() => _description = v),
-                rows: 6,
-                placeholder: '为什么、要做的、不做的、可能涉及哪些文件（起草会写好）',
-                semanticLabel: '说明',
+    final main = <Widget>[
+      ProTextArea(
+        value: _description,
+        onChanged: (v) => _edit(() => _description = v),
+        rows: 6,
+        placeholder: '说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）',
+        semanticLabel: '说明',
+        bare: true,
+      ),
+      const SheetLabel('验收标准'),
+      ProTextArea(value: _criteria, onChanged: (v) => _edit(() => _criteria = v), rows: 3, placeholder: '一行一条：你验收时照着看的点', semanticLabel: '验收标准', bare: true),
+      ?talk,
+    ];
+    final startable = ready && drafting == null && _agent.isNotEmpty;
+    final side = <Widget>[
+      ProProperty('状态', Row(children: [ProDot(backlog ? Palette.wheat : Palette.water, size: 8), const SizedBox(width: 8), Text(backlog ? '草稿' : '待办')])),
+      ProProperty(
+        '帮工',
+        ProPick(
+          quiet: true,
+          value: _agent,
+          placeholder: '起草时替你挑',
+          semanticLabel: '帮工',
+          options: [
+            for (final a in agents)
+              PickOption(
+                value: a.id,
+                label: a.name,
+                detail: switch ((issues[a.id] ?? const <AgentIssue>[]).where((i) => i.level == AgentIssueLevel.error).firstOrNull) {
+                  final issue? => '派不出去：${issue.text}',
+                  null => a.runtime,
+                },
               ),
-            ),
-            const SizedBox(height: 16),
-            ProField(
-              label: '验收标准',
-              child: ProTextArea(value: _criteria, onChanged: (v) => _edit(() => _criteria = v), rows: 3, placeholder: '一行一条：你验收时照着看的点', semanticLabel: '验收标准'),
-            ),
-            const SizedBox(height: 16),
-            ProField(
-              label: '优先级',
-              child: ProSegmented<Priority>(
-                value: _priority,
-                options: [for (final p in Priority.values) SegmentOption(value: p, label: priorityLabel[p]!)],
-                onChanged: (v) => _edit(() => _priority = v),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Every issue has an acceptance; this is who must pass it before the harvest.
-            ProField(
-              label: '验收',
-              child: ProSegmented<Acceptance>(
-                value: _acceptance,
-                options: const [
-                  SegmentOption(value: Acceptance.glance, label: '看一眼就收'),
-                  SegmentOption(value: Acceptance.required, label: '必须过验收'),
-                ],
-                onChanged: (v) => _edit(() => _acceptance = v),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ProField(
-              label: '项目',
-              hint: projects.isEmpty
-                  ? InlineLink('工作目录里还没有项目：新建一个', onTap: () => _newProject(context))
-                  : InlineLink('＋ 新建项目', onTap: () => _newProject(context)),
-              child: ProPick(
-                value: _project,
-                placeholder: '在哪个项目里做',
-                semanticLabel: '项目',
-                options: [
-                  for (final p in {...projects, if (_project.isNotEmpty) _project}) PickOption(value: p, label: p),
-                ],
-                onChanged: (v) => _edit(() => _project = v),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ProField(
-              label: '帮工',
-              child: ProPick(
-                value: _agent,
-                placeholder: '派哪个帮工档案（起草时不选就替你挑）',
-                semanticLabel: '帮工',
-                options: [
-                  for (final a in agents)
-                    PickOption(
-                      value: a.id,
-                      label: a.name,
-                      detail: switch ((issues[a.id] ?? const <AgentIssue>[]).where((i) => i.level == AgentIssueLevel.error).firstOrNull) {
-                        final issue? => '派不出去：${issue.text}',
-                        null => a.runtime,
-                      },
-                    ),
-                ],
-                onChanged: (v) => _edit(() => _agent = v),
-              ),
-            ),
-            if (queued != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(color: Palette.water.withValues(alpha: .12), borderRadius: const BorderRadius.all(Radius.circular(8))),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(
-                  children: [
-                    Expanded(child: Text('排队中：${ago(queued, DateTime.now().millisecondsSinceEpoch)}排上的，有空地就按看板上的先后自动开工。', style: ProText.sm)),
-                    const SizedBox(width: 8),
-                    ProButton.text(
-                      '不排了',
-                      size: ProSize.sm,
-                      onPressed: _busy
-                          ? null
-                          : () => _run(
-                              () => ref
-                                  .read(apiProvider)
-                                  .issue
-                                  .status(
-                                    id: item.id,
-                                    body: const IssueStatusRequest(status: IssueStatus.backlog),
-                                  ),
+          ],
+          onChanged: (v) => _edit(() => _agent = v),
+        ),
+        boxed: true,
+      ),
+      ProProperty(
+        '项目',
+        ProPick(
+          quiet: true,
+          value: _project,
+          placeholder: '在哪个项目里做',
+          semanticLabel: '项目',
+          options: [
+            for (final p in {...projects, if (_project.isNotEmpty) _project}) PickOption(value: p, label: p),
+          ],
+          onChanged: (v) => _edit(() => _project = v),
+        ),
+        boxed: true,
+      ),
+      Padding(
+        padding: const EdgeInsets.only(left: 75, bottom: 4),
+        child: DefaultTextStyle(
+          style: ProText.meta,
+          child: InlineLink(projects.isEmpty ? '还没有项目：新建一个' : '＋ 新建项目', onTap: () => _newProject(context)),
+        ),
+      ),
+      ProProperty(
+        '优先级',
+        ProPick(
+          quiet: true,
+          value: _priority.name,
+          placeholder: '普通',
+          semanticLabel: '优先级',
+          options: [for (final p in Priority.values) PickOption(value: p.name, label: priorityLabel[p]!)],
+          onChanged: (v) => _edit(() => _priority = Priority.values.firstWhere((p) => p.name == v, orElse: () => Priority.medium)),
+        ),
+        boxed: true,
+      ),
+      // Every issue has an acceptance; this is who must pass it before the harvest.
+      ProProperty(
+        '验收',
+        ProPick(
+          quiet: true,
+          value: _acceptance.name,
+          placeholder: '看一眼就收',
+          semanticLabel: '验收',
+          options: const [
+            PickOption(value: 'glance', label: '看一眼就收'),
+            PickOption(value: 'required', label: '必须过验收'),
+          ],
+          onChanged: (v) => _edit(() => _acceptance = v == 'required' ? Acceptance.required : Acceptance.glance),
+        ),
+        boxed: true,
+      ),
+      ProProperty('写于', Text(wallClockText(item.createdAt))),
+      if (queued != null) ...[
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(color: Palette.water.withValues(alpha: .12), borderRadius: const BorderRadius.all(Radius.circular(8))),
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('排队中：${ago(queued, DateTime.now().millisecondsSinceEpoch)}排上的，有空地就按看板上的先后自动开工。', style: ProText.sm),
+              const SizedBox(height: 6),
+              ProButton.text(
+                '不排了',
+                size: ProSize.sm,
+                onPressed: _busy
+                    ? null
+                    : () => _run(
+                        () => ref
+                            .read(apiProvider)
+                            .issue
+                            .status(
+                              id: item.id,
+                              body: const IssueStatusRequest(status: IssueStatus.backlog),
                             ),
-                    ),
-                  ],
-                ),
+                      ),
               ),
             ],
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (queued != null) ProButton.text('现在就试', tone: ProTone.primary, onPressed: ready && _agent.isNotEmpty ? _start : null),
-                ProButton.text('存下改动', onPressed: ready && _edited ? _save : null),
-                ProButton.text(
-                  '删掉',
-                  tone: ProTone.danger,
-                  onPressed: _busy
-                      ? null
-                      : () => _run(() async {
-                          await ref.read(apiProvider).issue.delete(id: item.id);
-                          widget.onDone(null);
-                        }),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ],
-    );
+      const SizedBox(height: 16),
+      if (backlog) ProButton.text('开工', tone: drafted ? ProTone.primary : ProTone.plain, onPressed: startable ? _start : null),
+      if (queued != null) ProButton.text('现在就试', tone: ProTone.primary, onPressed: ready && _agent.isNotEmpty ? _start : null),
+      const SizedBox(height: 8),
+      ProButton.text('存下改动', onPressed: ready && _edited ? _save : null),
+      const SizedBox(height: 8),
+      ProButton.text(
+        '删掉',
+        tone: ProTone.quiet,
+        onPressed: _busy
+            ? null
+            : () => _run(() async {
+                await ref.read(apiProvider).issue.delete(id: item.id);
+                widget.onDone(null);
+              }),
+      ),
+    ];
+    return IssueSheet(heading: heading, main: main, side: side);
   }
 }
 

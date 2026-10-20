@@ -92,22 +92,20 @@ void main() {
       ),
     );
     await f.settle(t);
-    // The first layer is the status and what it needs; the rest is folded.
-    for (final text in ['共享详情', '等你验收 · 小吴交回来了（第 1 轮）', '测试通过', '验收通过', '没过，照上面修', '干活过程', '每次干活', '详情']) {
+    // The page: the status and what it needs on the left with the work folded under it; who, where and when on the right.
+    for (final text in ['共享详情', '等你验收 · 小吴交回来了（第 1 轮）', '测试通过', '验收通过', '没过，照上面修', '干活过程', '每次干活']) {
       expect(find.text(text), findsOneWidget, reason: text);
     }
     expect(find.bySemanticsLabel('带话'), findsOneWidget, reason: '带话');
-    for (final gone in ['这一轮做了什么', '碰过的文件', '跑过的命令', '小吴（claude）', '复制路径']) {
-      expect(find.text(gone), findsNothing, reason: '$gone is not on the first layer');
+    for (final gone in ['这一轮做了什么', '碰过的文件', '跑过的命令', '详情']) {
+      expect(find.text(gone), findsNothing, reason: '$gone is not on the page');
     }
     expect(find.textContaining('改动'), findsOneWidget);
-    await t.tap(find.text('详情'));
-    await f.settle(t);
-    for (final text in ['小吴（claude）', 'vibevalley/issue-3', '/worktrees/demo.3', '看测试员的档案', '开单', '做过', '用时', '看一眼就收', '必须过验收', '已拔 · 少了边界测试']) {
-      expect(find.text(text), findsOneWidget, reason: '$text in 详情');
+    for (final text in ['小吴（claude）', 'vibevalley/issue-3', '/worktrees/demo.3', '看测试员的档案', '开单', '做过', '用时', '看一眼就收', '拔了的草', '少了边界测试']) {
+      expect(find.text(text), findsOneWidget, reason: '$text on the side');
     }
-    await t.ensureVisible(find.text('复制路径'));
-    await t.tap(find.text('复制路径'));
+    await t.ensureVisible(find.bySemanticsLabel('复制路径'));
+    await t.tap(find.bySemanticsLabel('复制路径'));
     expect(copied, '/worktrees/demo.3');
     // Acceptance is the server's: a pass goes to issue.accept.
     await t.ensureVisible(find.text('验收通过'));

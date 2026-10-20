@@ -77,6 +77,7 @@ class ProPick extends StatefulWidget {
     required this.placeholder,
     this.enabled = true,
     this.semanticLabel,
+    this.quiet = false,
   });
 
   final String value;
@@ -85,6 +86,9 @@ class ProPick extends StatefulWidget {
   final String placeholder;
   final bool enabled;
   final String? semanticLabel;
+
+  /// A property's value in a side panel: no edge until hovered, as wide as its words.
+  final bool quiet;
 
   @override
   State<ProPick> createState() => _ProPickState();
@@ -190,11 +194,17 @@ class _ProPickState extends State<ProPick> {
                     child: Container(
                       height: 32,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: s.hovered ? const Color(0xFFFFF6E6) : Palette.paper,
-                        border: Border.all(color: _portal.isShowing || s.focused ? ProColor.focus : const Color(0x332F1F13)),
-                        borderRadius: proRadius,
-                      ),
+                      decoration: widget.quiet
+                          ? BoxDecoration(
+                              color: _portal.isShowing || s.hovered ? ProColor.hover : null,
+                              border: Border.all(color: s.focused ? ProColor.focus : const Color(0x00000000)),
+                              borderRadius: proRadius,
+                            )
+                          : BoxDecoration(
+                              color: s.hovered ? const Color(0xFFFFF6E6) : Palette.paper,
+                              border: Border.all(color: _portal.isShowing || s.focused ? ProColor.focus : const Color(0x332F1F13)),
+                              borderRadius: proRadius,
+                            ),
                       child: Row(
                         children: [
                           Expanded(

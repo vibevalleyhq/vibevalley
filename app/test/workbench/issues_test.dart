@@ -534,8 +534,6 @@ void main() {
     expect(find.byType(ProModalLayer), findsOneWidget);
     expect(find.text('打卡写好了，测试全过'), findsOneWidget);
     expect(find.text('每次干活'), findsOneWidget);
-    await t.tap(find.text('详情'));
-    await settle(t);
     expect(find.text('2 轮 · 1 分 · 花了 ¥0.42'), findsOneWidget);
     await t.enterText(find.descendant(of: find.bySemanticsLabel('重开这张工单'), matching: find.byType(EditableText)).first, '打卡还要记时区');
     await t.pump();

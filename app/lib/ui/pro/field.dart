@@ -104,24 +104,47 @@ class ProTip extends StatelessWidget {
   }
 }
 
-class _Box extends StatelessWidget {
-  const _Box({required this.focused, required this.enabled, required this.child, this.height});
+/// The box around a text field. [bare] is for text edited in place (an issue's title and description): no edge until it is
+/// hovered (a faint fill says it can be edited) or focused (the same edge and ring as every box); its size does not change.
+class _Box extends StatefulWidget {
+  const _Box({required this.focused, required this.enabled, required this.child, this.height, this.bare = false});
   final bool focused;
   final bool enabled;
   final Widget child;
   final double? height;
+  final bool bare;
 
   @override
-  Widget build(BuildContext context) => Opacity(
-    opacity: enabled ? 1 : .5,
-    child: Container(
-      height: height,
-      alignment: height == null ? null : Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: proBox(focused: focused),
-      child: child,
-    ),
-  );
+  State<_Box> createState() => _BoxState();
+}
+
+class _BoxState extends State<_Box> {
+  var _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final decoration = !widget.bare || widget.focused
+        ? proBox(focused: widget.focused)
+        : BoxDecoration(
+            color: _hover ? ProColor.hover : null,
+            border: Border.all(color: const Color(0x00000000)),
+            borderRadius: proRadius,
+          );
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Opacity(
+        opacity: widget.enabled ? 1 : .5,
+        child: Container(
+          height: widget.height,
+          alignment: widget.height == null ? null : Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: decoration,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
 }
 
 /// Placeholders are Chinese hints even in a code field, so they are in the body type at the field's size.
@@ -146,6 +169,8 @@ class ProTextInput extends StatefulWidget {
     this.obscure = false,
     this.keyboardType,
     this.icon,
+    this.bare = false,
+    this.style,
   });
 
   final String value;
@@ -163,6 +188,12 @@ class ProTextInput extends StatefulWidget {
 
   /// A sprite before the text.
   final String? icon;
+
+  /// Edited in place: no box until hovered or focused.
+  final bool bare;
+
+  /// Instead of the field's own type (a title edited in place is larger).
+  final TextStyle? style;
 
   @override
   State<ProTextInput> createState() => _ProTextInputState();
@@ -201,7 +232,7 @@ class _ProTextInputState extends State<ProTextInput> {
 
   @override
   Widget build(BuildContext context) {
-    final style = widget.mono ? ProText.mono : ProText.sm;
+    final style = widget.style ?? (widget.mono ? ProText.mono : ProText.sm);
     Widget field(TextEditingController controller, FocusNode focus, VoidCallback? submitted) => TextField(
       controller: controller,
       focusNode: focus,
@@ -238,7 +269,8 @@ class _ProTextInputState extends State<ProTextInput> {
       child: _Box(
         focused: _focus.hasFocus,
         enabled: widget.enabled,
-        height: 32,
+        bare: widget.bare,
+        height: widget.style == null ? 32 : null,
         child: widget.icon == null
             ? box
             : Row(
@@ -316,6 +348,8 @@ class ProTextArea extends StatefulWidget {
     this.focusNode,
     this.autofocus = false,
     this.selection,
+    this.bare = false,
+    this.style,
   });
 
   final String value;
@@ -331,6 +365,12 @@ class ProTextArea extends StatefulWidget {
   final String? semanticLabel;
   final FocusNode? focusNode;
   final bool autofocus;
+
+  /// Edited in place: no box until hovered or focused.
+  final bool bare;
+
+  /// Instead of the area's own type.
+  final TextStyle? style;
 
   @override
   State<ProTextArea> createState() => _ProTextAreaState();
@@ -369,13 +409,14 @@ class _ProTextAreaState extends State<ProTextArea> {
 
   @override
   Widget build(BuildContext context) {
-    final style = widget.mono ? ProText.mono : ProText.base;
+    final style = widget.style ?? (widget.mono ? ProText.mono : ProText.base);
     return Semantics(
       textField: true,
       label: widget.semanticLabel,
       child: _Box(
         focused: _focus.hasFocus,
         enabled: widget.enabled,
+        bare: widget.bare,
         child: TextField(
           controller: _text.controller,
           focusNode: _focus,
