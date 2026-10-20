@@ -12,6 +12,7 @@ import (
 	"vibevalley/internal/base"
 	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
+	"vibevalley/internal/doc"
 	"vibevalley/internal/issue"
 	"vibevalley/internal/memory"
 	"vibevalley/internal/project"
@@ -46,6 +47,7 @@ type worldServices struct {
 	Channel *channel.Service
 	Issue   *issue.Service
 	Memory  *memory.Service
+	Doc     *doc.Service
 	MCP     *Service
 }
 
@@ -54,7 +56,7 @@ func open(t *testing.T) *world {
 	w := &world{ctx: context.Background(), tokens: map[string]string{}}
 	cfg := fixture.Config(t.TempDir(), t.TempDir(), ":memory:")
 	cfg.Patrol.HeartbeatMinutes = 0
-	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, session.Module, channel.Module, schedule.Module, issue.Module, task.Module, tool.Module, Module},
+	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, doc.Module, runtime.Module, session.Module, channel.Module, schedule.Module, issue.Module, task.Module, tool.Module, Module},
 		fx.Invoke(func(p *project.Service) { p.GitHubProbe = fixture.NoGitHub }),
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),
 	)

@@ -60,7 +60,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 | voice | `Voice` | 声网（`agora.go`）和语音线路（`line.go`） |
 | connector | `Connector` | 微信、飞书、QQ 接到频道 |
 | game | `Game` | 服务端的全部游戏：账本（`ledger.go`：金币、连胜、成就）、等级（`commits.go`）、主人刚点的空地（`stations.go`）。只听别的包的事实，业务的服务不调它；只有 HTTP 那一层为主人在应用里做的事调它。账本的折法在 `progress.go`；出帧要用的（地里长什么、帮工在哪块地）在 protocol 的 `game_view.go`、`game_play.go` |
-| mcp | `MCP` | `/mcp`：把 `tool` 给 Session 的工具交给编码 agent（在频道里说话、读、看未读、看谁在、记性）。和 HTTP 一样是入口，只认是谁、转给工具 |
+| mcp | `MCP` | `/mcp`：把 `tool` 给 Session 的工具交给编码 agent（在频道里说话、读、看未读、看谁在、记性、写文档）。和 HTTP 一样是入口，只认是谁、转给工具 |
 
 服务之间传的形状放在定义它的包的 `types.go`（`project.Workplace`、`session.HireOptions`、`channel.Info`……）；`base` 不放形状。
 

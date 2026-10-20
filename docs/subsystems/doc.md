@@ -16,6 +16,7 @@
 - 服务端 `server/internal/doc`（`doc.Service`，`Workspace.Doc`）：`doc.go` 存取和提交，`ops.go` 是 op 的规则（纯函数，在内存里的一篇文档上按顺序施加），`order.go` 顺序键，`text.go` 按码点切和接文字，`markdown.go` 导入导出。这些规则只有它用，都不导出。
 - 形状在 `protocol/shapes.go`：`Document`、`Block`、`BlockAttrs`、`DocSpan`、`DocMarks`，op 是封闭的联合 `DocOp`（按 `op` 区分，`DocOpMembers` 是生成的成员表），`DocSubmit`、`DocAck`、`DocOpResult`；块的类型是普通字符串，取值是带 `//vibevalley:const` 的常量（`BlockParagraph`……），Dart 拿到同名常量。
 - 表：`doc`（一篇一行，`seq`）、`doc_block`（每一块，含墓碑；`attrs`、`spans` 存 JSON 文本）、`doc_block_revision`（每一块每一版的字，`kind` 是 `normal` 或 `conflict`）、`doc_change`（每一批：`seq`、`batch_id`、谁、改了哪些块、每个 op 的结果）。
+- 帮工的工具：`doc_read`、`doc_append`、`doc_update`（`server/internal/tool/doc.go`，经 `/mcp` 只给 Session）。
 - 接口：`doc.list`、`doc.create`、`doc.import`、`doc.get`、`doc.submit`、`doc.markdown`（[capabilities.md](docs/reference/capabilities.md)），主人和「连接到本机」能调，写的人记成 `owner`（`DocOwner`）。
 
 ## 模型和不变量
@@ -47,6 +48,8 @@
 
 **拆分和合并**都是一个 op：`split_block` 把 `offset` 以后的字挪进客户端给好 id、父块和顺序键的新块；`merge_blocks` 拿两块现在的字接起来，来源的子块挪到目标下面（排在目标已有的子块后面），来源置墓碑。
 
+**帮工写**：和主人走同一条 op 管线，写的人记成它的档案 id（Session 不在地里时是它的 id）。`doc_read` 列出每一块的 id、第几版、类型和字；`doc_append` 在顶层末尾插一块（服务端生成 id 和顺序键，字按行内 Markdown 读，代码块照原样），回答新块的 id 和版本；`doc_update` 带 `base_rev` 整段换字，冲突时不改，回答现在的版本和字，让它看过再决定。没有整篇覆盖的工具。
+
 **其他**：`set_attrs` 按字段写（`unset` 列出要删的键），后到的生效；`set_type` 换类型和整套属性，新类型没有字就丢掉字，换成 `code` 去掉 marks；`move_block` 挪到自己下面被拒绝，挪到已删的父块下面就挂到那个父块所在的层级；`restore_block` 连子块一起恢复。
 
 **Markdown**：导出按文档顺序写，嵌套每层缩进两个空格，列表项之间空一行以外都空两行；`issue_ref`、`memory_item` 写成 HTML 注释（`<!-- issue:ID -->`、`<!-- memory:ID --> 字`），图片的尺寸写在标题里（`"640x480"`）；字里的 `\ * _ ` + "`" + ` ~ [ ]` 加反斜杠，像别的块开头的段落行前加反斜杠。导入读回同样的块：`**粗**`、`_斜_` 或 `*斜*`、`` `码` ``、`~~删~~`，链接是方括号里的字加圆括号里的地址。导入是一个新文档，块作为一批 `insert_block` 提交。
@@ -54,6 +57,7 @@
 ## 和谁打交道
 
 - **地基（`base`）**：只用数据库和 `NewID`；不依赖别的服务，也不进核心状态：文档不在 `StateFrame` 里，客户端用 `doc.get` 取。
+- **工具（`tool`）和 `/mcp`**：帮工的三个工具调 `Get`、`Append`、`UpdateText`；`mcp` 认出是哪个 Session，`tool` 取它的档案当写的人。
 
 ## 为什么这样
 
@@ -78,3 +82,4 @@
 - `doc/markdown_test.go`：`TestMarkdownRoundTrip`、`TestBlocksRoundTrip`。
 - `doc/doc_test.go`：`TestEditsSurviveARestart`（重开库后块、rev、seq 都在）、`TestABatchIsTakenOnce`、`TestStaleUpdateIsAConflict`（冲突版本存进修订）、`TestImportAndExport`。
 - `handler/doc_test.go` 的 `TestDocRoutes`：经 HTTP 建、提交、读、导出、导入。
+- `mcp/doc_test.go` 的 `TestAHelperWritesADoc`：帮工经 `/mcp` 加块、读、改字，写的人是它的档案；主人改过以后，它按旧版本改不进去，回答里有现在的字。

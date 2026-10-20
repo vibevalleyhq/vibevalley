@@ -131,7 +131,7 @@ func TestToolsOverMcp(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	sort.Strings(names)
-	if !slices.Equal(names, []string{"channel_inbox", "channel_say", "memory_add", "memory_search", "read_chat", "session_list"}) {
+	if !slices.Equal(names, []string{"channel_inbox", "channel_say", "doc_append", "doc_read", "doc_update", "memory_add", "memory_search", "read_chat", "session_list"}) {
 		t.Fatalf("tools %q", names)
 	}
 

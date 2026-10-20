@@ -39,6 +39,7 @@ func (s *Service) Manager(who Who) []agentcore.AgentTool {
 func (s *Service) Session(who Who) []agentcore.AgentTool {
 	return []agentcore.AgentTool{
 		s.channelSay(who), s.readChat(who), s.channelInbox(who), s.sessionList(), s.memorySearch(who, forSession), s.memoryAdd(who, forSession),
+		s.docRead(who), s.docAppend(who), s.docUpdate(who),
 	}
 }
 
@@ -70,6 +71,9 @@ var labels = map[string]string{
 	"search_archive":   "翻旧账",
 	"memory_search":    "翻记性",
 	"memory_add":       "替帮工记",
+	"doc_read":         "读文档",
+	"doc_append":       "往文档里加一块",
+	"doc_update":       "改文档的一块",
 }
 
 var named = []string{"agent", "session", "project", "name", "query", "note", "goal"}

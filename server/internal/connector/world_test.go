@@ -10,6 +10,7 @@ import (
 	"vibevalley/internal/base"
 	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
+	"vibevalley/internal/doc"
 	"vibevalley/internal/issue"
 	"vibevalley/internal/manager"
 	"vibevalley/internal/memory"
@@ -50,7 +51,7 @@ type worldServices struct {
 
 func newWorld(cfg base.Config, options ...fx.Option) (*world, error) {
 	w := &world{}
-	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, runtime.Module, session.Module, channel.Module, schedule.Module, issue.Module, task.Module, tool.Module, manager.Module, Module},
+	app, err := base.NewApp(cfg, []base.Layer{core.Module, setting.Module, agent.Module, project.Module, memory.Module, doc.Module, runtime.Module, session.Module, channel.Module, schedule.Module, issue.Module, task.Module, tool.Module, manager.Module, Module},
 		fx.Options(options...),
 		fx.Invoke(func(p *project.Service) { p.GitHubProbe = fixture.NoGitHub }),
 		fx.Invoke(func(s worldServices) { w.worldServices = s }),

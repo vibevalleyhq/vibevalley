@@ -8,6 +8,7 @@ import (
 	"vibevalley/internal/agent"
 	"vibevalley/internal/channel"
 	"vibevalley/internal/core"
+	"vibevalley/internal/doc"
 	"vibevalley/internal/issue"
 	"vibevalley/internal/memory"
 	"vibevalley/internal/project"
@@ -24,6 +25,7 @@ type Service struct {
 	agents   *agent.Service
 	projects *project.Service
 	memory   *memory.Service
+	docs     *doc.Service
 	runtimes *runtime.Service
 	run      *session.Service
 	chat     *channel.Service
@@ -38,6 +40,7 @@ type serviceIn struct {
 	Agent    *agent.Service
 	Project  *project.Service
 	Memory   *memory.Service
+	Doc      *doc.Service
 	Runtime  *runtime.Service
 	Run      *session.Service
 	Channel  *channel.Service
@@ -48,7 +51,7 @@ type serviceIn struct {
 
 func newService(in serviceIn) (*Service, error) {
 	return &Service{
-		core: in.Core, agents: in.Agent, projects: in.Project, memory: in.Memory, runtimes: in.Runtime, run: in.Run,
+		core: in.Core, agents: in.Agent, projects: in.Project, memory: in.Memory, docs: in.Doc, runtimes: in.Runtime, run: in.Run,
 		chat: in.Channel, schedule: in.Schedule, issue: in.Issue, tasks: in.Task,
 	}, nil
 }

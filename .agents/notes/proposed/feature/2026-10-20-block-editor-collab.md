@@ -267,6 +267,7 @@ P1 的服务端做了（[文档](docs/subsystems/doc.md)）：
 - 块模型、全部九种 op、存储（`doc`、`doc_block`、`doc_block_revision`、`doc_change`）、一批一个事务、`batchId` 去重、seq、每个 op 的结果、墓碑、修订、顺序键、码点偏移、Markdown 导入导出和往返用例。
 - 落后的 `baseRev`：这一块的字从那一版起没变过就照收，变过就是 `conflict`（`split_block` 在末尾拆）。三方合并（`merged`）留在 P2。
 - 还没有 WebSocket：`doc.submit` 的回答里带改后的块。
+- 帮工经 `/mcp` 的 `doc_read`、`doc_append`、`doc_update` 写，走同一条管线，`actor` 是它的档案（P3 的 agent 接入先做了不流式、不查 presence 的这一部分）。
 
 ### 待定
 
