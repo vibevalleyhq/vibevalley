@@ -318,8 +318,21 @@ class _TodoState extends ConsumerState<TodoDetail> {
         semanticLabel: '说明',
         bare: true,
       ),
-      const SheetLabel('验收标准'),
-      ProTextArea(value: _criteria, onChanged: (v) => _edit(() => _criteria = v), rows: 3, placeholder: '一行一条：你验收时照着看的点', semanticLabel: '验收标准', bare: true),
+      const SizedBox(height: 12),
+      // Written, it folds to its count and first line; empty, it stays open to be written.
+      ProFold(
+        label: '验收标准',
+        summary: _criteriaList.isEmpty ? '还没写' : '${_criteriaList.length} 条 · ${_criteriaList.first}',
+        open: _criteriaList.isEmpty,
+        child: ProTextArea(
+          value: _criteria,
+          onChanged: (v) => _edit(() => _criteria = v),
+          rows: 3,
+          placeholder: '一行一条：你验收时照着看的点',
+          semanticLabel: '验收标准',
+          bare: true,
+        ),
+      ),
       ?talk,
     ];
     final startable = ready && drafting == null && _agent.isNotEmpty;
@@ -380,23 +393,27 @@ class _TodoState extends ConsumerState<TodoDetail> {
         ),
         boxed: true,
       ),
-      // Every issue has an acceptance; this is who must pass it before the harvest.
-      ProProperty(
-        '验收',
-        ProPick(
-          quiet: true,
-          value: _acceptance.name,
-          placeholder: '看一眼就收',
-          semanticLabel: '验收',
-          options: const [
-            PickOption(value: 'glance', label: '看一眼就收'),
-            PickOption(value: 'required', label: '必须过验收'),
-          ],
-          onChanged: (v) => _edit(() => _acceptance = v == 'required' ? Acceptance.required : Acceptance.glance),
-        ),
-        boxed: true,
+      ProMore(
+        children: [
+          // Every issue has an acceptance; this is who must pass it before the harvest.
+          ProProperty(
+            '验收',
+            ProPick(
+              quiet: true,
+              value: _acceptance.name,
+              placeholder: '看一眼就收',
+              semanticLabel: '验收',
+              options: const [
+                PickOption(value: 'glance', label: '看一眼就收'),
+                PickOption(value: 'required', label: '必须过验收'),
+              ],
+              onChanged: (v) => _edit(() => _acceptance = v == 'required' ? Acceptance.required : Acceptance.glance),
+            ),
+            boxed: true,
+          ),
+          ProProperty('写于', Text(wallClockText(item.createdAt))),
+        ],
       ),
-      ProProperty('写于', Text(wallClockText(item.createdAt))),
       if (queued != null) ...[
         const SizedBox(height: 8),
         Container(

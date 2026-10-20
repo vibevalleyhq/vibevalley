@@ -101,6 +101,12 @@ void main() {
       expect(find.text(gone), findsNothing, reason: '$gone is not on the page');
     }
     expect(find.textContaining('改动'), findsOneWidget);
+    for (final text in ['小吴（claude）', '看一眼就收']) {
+      expect(find.text(text), findsOneWidget, reason: '$text in sight');
+    }
+    expect(find.text('vibevalley/issue-3'), findsNothing, reason: 'the rest is behind 更多');
+    await t.tap(find.textContaining('更多'));
+    await f.settle(t);
     for (final text in ['小吴（claude）', 'vibevalley/issue-3', '/worktrees/demo.3', '看测试员的档案', '开单', '做过', '用时', '看一眼就收', '拔了的草', '少了边界测试']) {
       expect(find.text(text), findsOneWidget, reason: '$text on the side');
     }

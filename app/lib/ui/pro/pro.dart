@@ -5,6 +5,7 @@ export 'button.dart';
 export 'choice.dart';
 export 'dialog.dart';
 export 'field.dart';
+export 'fold.dart';
 export 'forms.dart';
 export 'markdown.dart';
 export 'theme.dart';

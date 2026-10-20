@@ -221,42 +221,10 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
           )
         : null;
 
-    final side = <Widget>[
-      for (final a in actions) Padding(padding: const EdgeInsets.only(bottom: 8), child: a),
-      if (actions.isNotEmpty) const SizedBox(height: 8),
-      ProProperty(
-        '状态',
-        Row(
-          children: [
-            ProDot(issueTagColor(widget.state), size: 8),
-            const SizedBox(width: 8),
-            Flexible(child: Text(widget.state.label)),
-          ],
-        ),
-      ),
-      ProProperty('谁在做', Text(s.whoLine)),
+    final more = <Widget>[
       if (s.crewLine case final crew?) ProProperty('地上的人', Text(crew)),
-      if (issue != null && s.acceptanceEditable)
-        ProProperty(
-          '验收',
-          ProPick(
-            quiet: true,
-            value: issue.acceptance.name,
-            placeholder: '看一眼就收',
-            semanticLabel: '验收',
-            enabled: !_busy && s.open,
-            options: const [
-              PickOption(value: 'glance', label: '看一眼就收'),
-              PickOption(value: 'required', label: '必须过验收'),
-            ],
-            onChanged: (v) => _setAcceptance(v == 'required' ? Acceptance.required : Acceptance.glance),
-          ),
-          boxed: true,
-        ),
-      if (issue?.acceptedAt case final at?) ProProperty('验收过', Text(wallClockText(at), style: ProText.sm.copyWith(color: Palette.leaf700))),
       if (agent?.model case final model? when model.isNotEmpty) ProProperty('模型', Text(model)),
       ProProperty('档案', TextLink('看${agent?.name ?? head.name}的档案', onTap: () => context.go('/agents/${Uri.encodeComponent(head.agent)}'))),
-      if (project != null) ProProperty('项目', TextLink(project, onTap: () => context.go('/projects/${Uri.encodeComponent(project)}'))),
       if (head.branch != null) ProProperty('分支', Text(head.branch!, style: ProText.mono)),
       if (head.worktree case final path?)
         ProProperty(
@@ -277,14 +245,57 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
       if (issue?.closedAt != null) ProProperty('关单', Text(wallClockText(issue!.closedAt!))),
       ProProperty('做过', Text(s.historyLine)),
       ProProperty('用时', Text(s.usedLine(steps: steps, now: now))),
-      if (s.pulled.isNotEmpty) ...[
-        const SheetLabel('拔了的草'),
-        for (final f in s.pulled)
-          Text(
-            f.text,
-            style: ProText.sm.copyWith(color: ProColor.faint, decoration: TextDecoration.lineThrough),
+      if (s.pulled.isNotEmpty)
+        ProProperty(
+          '拔了的草',
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final f in s.pulled)
+                Text(
+                  f.text,
+                  style: ProText.sm.copyWith(color: ProColor.faint, decoration: TextDecoration.lineThrough),
+                ),
+            ],
           ),
-      ],
+        ),
+    ];
+    // The few asked about every time stay in sight; the rest are behind 更多.
+    final side = <Widget>[
+      for (final a in actions) Padding(padding: const EdgeInsets.only(bottom: 8), child: a),
+      if (actions.isNotEmpty) const SizedBox(height: 8),
+      ProProperty(
+        '状态',
+        Row(
+          children: [
+            ProDot(issueTagColor(widget.state), size: 8),
+            const SizedBox(width: 8),
+            Flexible(child: Text(widget.state.label)),
+          ],
+        ),
+      ),
+      ProProperty('谁在做', Text(s.whoLine)),
+      if (project != null) ProProperty('项目', TextLink(project, onTap: () => context.go('/projects/${Uri.encodeComponent(project)}'))),
+      if (issue != null && s.acceptanceEditable)
+        ProProperty(
+          '验收',
+          ProPick(
+            quiet: true,
+            value: issue.acceptance.name,
+            placeholder: '看一眼就收',
+            semanticLabel: '验收',
+            enabled: !_busy && s.open,
+            options: const [
+              PickOption(value: 'glance', label: '看一眼就收'),
+              PickOption(value: 'required', label: '必须过验收'),
+            ],
+            onChanged: (v) => _setAcceptance(v == 'required' ? Acceptance.required : Acceptance.glance),
+          ),
+          boxed: true,
+        ),
+      if (issue?.acceptedAt case final at?) ProProperty('验收过', Text(wallClockText(at), style: ProText.sm.copyWith(color: Palette.leaf700))),
+      const SizedBox(height: 4),
+      ProMore(children: more),
       if (widget.onThread != null || (s.inTask && widget.onTask != null)) ...[
         const SizedBox(height: 12),
         Wrap(
@@ -318,7 +329,6 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
               );
             },
           );
-    final fileCount = changes?.value?.files.length;
 
     final heading = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -329,7 +339,8 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
           padding: const EdgeInsets.symmetric(horizontal: 11),
           child: Text(s.title, style: ProText.xl),
         ),
-        if (s.description.isNotEmpty && s.description != s.title) Padding(padding: const EdgeInsets.fromLTRB(11, 8, 11, 0), child: ProMarkdown(s.description)),
+        if (s.description.isNotEmpty && s.description != s.title)
+          Padding(padding: const EdgeInsets.fromLTRB(11, 8, 11, 0), child: ProClampedMarkdown(s.description)),
       ],
     );
     final main = <Widget>[
@@ -342,12 +353,22 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
             child: Text('草 · ${f.text}', style: ProText.sm.copyWith(color: Palette.berry)),
           ),
       ],
-      if (issue?.criteria case final criteria? when criteria.isNotEmpty) ...[const SizedBox(height: 12), _Criteria(criteria: criteria, checking: s.judging)],
+      if (issue?.criteria case final criteria? when criteria.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        // Folded to its count; it opens itself when the work comes back for review, to be ticked one by one.
+        ProFold(
+          label: '验收标准',
+          summary: '${criteria.length} 条 · ${criteria.first}',
+          open: s.judging,
+          child: _Criteria(criteria: criteria, checking: s.judging),
+        ),
+      ],
       if (box != null) ...[const SizedBox(height: 16), box],
       const SizedBox(height: 20),
-      if (changesView != null) _Fold(label: fileCount == null ? '改动' : '改动（$fileCount 个文件）', child: changesView),
-      _Fold(
+      if (changesView != null) ProFold(label: '改动', summary: changes?.value == null ? null : changesLine(changes!.value!), child: changesView),
+      ProFold(
         label: '干活过程',
+        summary: steps.isEmpty ? null : _stepsLine(steps),
         last: issue == null,
         child: steps.isEmpty
             ? EmptyNote(noStepsText(head))
@@ -356,8 +377,9 @@ class _IssuePanelState extends ConsumerState<IssuePanel> {
               ),
       ),
       if (issue != null)
-        _Fold(
+        ProFold(
           label: '每次干活',
+          summary: s.historyLine,
           last: true,
           child: IssueRuns(issue: issue.id, version: s.runsVersion),
         ),
@@ -430,53 +452,6 @@ class _CriteriaState extends State<_Criteria> {
 }
 
 /// A second-level part: folded until asked for.
-class _Fold extends StatefulWidget {
-  const _Fold({required this.label, required this.child, this.last = false});
-  final String label;
-  final Widget child;
-  final bool last;
-
-  @override
-  State<_Fold> createState() => _FoldState();
-}
-
-class _FoldState extends State<_Fold> {
-  var _open = false;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      border: Border(top: proLine, bottom: widget.last ? proLine : BorderSide.none),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Tappable(
-          onTap: () => setState(() => _open = !_open),
-          semanticLabel: widget.label,
-          builder: (_, st) => Container(
-            color: st.hovered ? ProColor.hover : null,
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-            child: Row(
-              children: [
-                AnimatedRotation(
-                  turns: _open ? .25 : 0,
-                  duration: motionDuration(context, const Duration(milliseconds: 150)),
-                  child: const SpriteIcon('button-next', size: 12),
-                ),
-                const SizedBox(width: 8),
-                Text(widget.label, style: ProText.sm.copyWith(fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-        ),
-        if (_open) Padding(padding: const EdgeInsets.fromLTRB(4, 0, 4, 16), child: widget.child),
-      ],
-    ),
-  );
-}
-
 /// A label and its value, the label in a narrow muted column.
 class KeyRow extends StatelessWidget {
   const KeyRow(this.label, this.child, {super.key});
@@ -613,4 +588,10 @@ class IssueHeading extends StatelessWidget {
       ],
     ],
   );
+}
+
+/// A work log folded to one line: how many steps, and how many of them used a tool when any did.
+String _stepsLine(List<SessionEvent> steps) {
+  final tools = steps.where((e) => e.type == SessionEventType.toolCall).length;
+  return tools == 0 ? '${steps.length} 步' : '${steps.length} 步 · 用了 $tools 个工具';
 }

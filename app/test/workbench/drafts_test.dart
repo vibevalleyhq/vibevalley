@@ -236,15 +236,18 @@ void main() {
     );
     await board.pump('/issues/d1');
     expect(find.text('草稿'), findsNWidgets(2), reason: 'the detail and its card');
-    for (final text in ['草稿写好了，它有 1 个问题要问你', '· 用 8787 还是 8797？', '看板拖卡改用 issue.status', '拖到待办就开工', '再起草', '开工']) {
+    for (final text in ['草稿写好了，它有 1 个问题要问你', '· 用 8787 还是 8797？', '看板拖卡改用 issue.status', '再起草', '开工']) {
       expect(find.text(text), findsWidgets, reason: text);
     }
+    expect(find.text('1 条 · 拖到待办就开工'), findsOneWidget, reason: 'written criteria fold to their count and first line');
     await t.enterText(_box('想做什么'), '用 8797');
     await t.pump();
     await t.tap(find.widgetWithText(ProButton, '再起草'));
     await settle(t);
     expect(board.writes.last, 'POST /api/v1/issues/d1/draft {"text":"用 8797"}', reason: 'the word answers what it asked');
 
+    await t.tap(find.text('验收标准'));
+    await settle(t);
     await t.enterText(_box('验收标准'), '拖到待办就开工\n\n端口是 8797');
     await t.pump();
     await t.tap(find.widgetWithText(ProButton, '开工'));
