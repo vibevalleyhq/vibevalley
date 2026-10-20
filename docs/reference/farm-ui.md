@@ -55,7 +55,7 @@
 19. **地图**（`/projects` 的「全部」，[截图](docs/images/map.png)）：工作目录下的每个项目是一座小岛，岛上的地是它在做的工单（每张一个 worktree）和空位（`ProjectSummary.maxSessions`）；农场空着的地不够时，多的位置是锁住的地。排队的活是院门外的种子袋。点帮工打开它的工单，点空位打开种在这个项目的播种袋（界面 3），点岛打开这个项目（`/projects/<项目>`）。
 20. **设置**（`/settings/<分区>`）：左边是分区，右边是选中的那一块，切分区时左边不动。服务端的设置：DeepSeek、Agora 语音、记性、GitHub（`gh` 装没装、登没登录，只读，能重新检测）；自带列表的页也在这里：连接器（`/settings/connectors`，[田头](docs/subsystems/channel.md)）、技能（`/settings/skills`，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「技能书」）、声音（`/settings/voice`，[语音](docs/subsystems/voice.md)「配置」）、「连接到本机」（`/settings/lan`，[连接到本机](docs/subsystems/lan.md)）。首页的「设置」和工作台的扳手都进这里；没填 DeepSeek 钥匙就点「开始游戏」，会进 DeepSeek 这一块并提示先填。
 
-**工作台**（`app/lib/workbench/workbench_shell.dart`）：干活和配置的地方，农场是看和玩的地方。最左一条木色的栏：管家头像（回农场）、聊天、工单、项目、帮工、农具、图鉴；最下面是设置和回农场。农具里每台农机画成一件农机，钉着那家 agent 的 logo（来自 LobeHub Icons）。
+**工作台**（`app/lib/workbench/workbench_shell.dart`）：干活和配置的地方，农场是看和玩的地方。最左一条木色的栏：管家头像（回农场）、聊天、工单、文档（`/docs`，[文档](docs/subsystems/doc.md)）、项目、帮工、农具、图鉴；最下面是设置和回农场。农具里每台农机画成一件农机，钉着那家 agent 的 logo（来自 LobeHub Icons）。
 
 ## 农场手机
 

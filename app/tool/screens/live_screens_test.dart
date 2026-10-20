@@ -32,6 +32,7 @@ const pages = {
   'farm': '/',
   'chat': '/chat',
   'tickets': '/issues',
+  'docs': '/docs',
   'ticket': '/issues/w11',
   'ticket-planned': '/issues/w13',
   'map': '/projects',

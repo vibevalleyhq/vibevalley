@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"vibevalley/internal/protocol"
 )
@@ -127,15 +128,23 @@ func escape(t string) string {
 	return b.String()
 }
 
+func wordy(r rune) bool { return r < 128 && (unicode.IsLetter(r) || unicode.IsDigit(r)) }
+
 func inlineOf(spans []protocol.DocSpan) string {
 	var b strings.Builder
-	for _, s := range normal(spans) {
+	spans = normal(spans)
+	for i, s := range spans {
 		t := escape(s.T)
 		if s.Marks.Code {
 			t = codeSpan(s.T)
 		}
 		if s.Marks.Italic {
-			t = "_" + t + "_"
+			// Against a letter or digit an underscore would read as part of a word: a star does not.
+			mark := "_"
+			if (i > 0 && endsWordy(spans[i-1].T)) || (i+1 < len(spans) && startsWordy(spans[i+1].T)) {
+				mark = "*"
+			}
+			t = mark + t + mark
 		}
 		if s.Marks.Bold {
 			t = "**" + t + "**"
@@ -149,6 +158,16 @@ func inlineOf(spans []protocol.DocSpan) string {
 		b.WriteString(t)
 	}
 	return b.String()
+}
+
+func endsWordy(t string) bool {
+	r := []rune(t)
+	return len(r) > 0 && wordy(r[len(r)-1])
+}
+
+func startsWordy(t string) bool {
+	r := []rune(t)
+	return len(r) > 0 && wordy(r[0])
 }
 
 func codeSpan(t string) string {
@@ -347,8 +366,10 @@ func inline(s []rune, m protocol.DocMarks) []protocol.DocSpan {
 				i = j + 1
 				continue
 			}
+		case c == '_' && i > 0 && wordy(s[i-1]):
+			// snake_case: an underscore inside a word is a character, as in CommonMark.
 		case c == '_' || c == '*':
-			if j := closing(s, i+1, string(c), true); j >= 0 {
+			if j := closing(s, i+1, string(c), true); j >= 0 && (c == '*' || j+1 >= len(s) || !wordy(s[j+1])) {
 				flush()
 				inner := m
 				inner.Italic = true

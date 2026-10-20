@@ -3,6 +3,7 @@
 enum Place {
   chat('聊天', '频道和串', 'icon-board', '/chat'),
   issues('工单', '每次种植的全过程', 'icon-tasks', '/issues'),
+  docs('文档', '主人和帮工一起写的文档', 'icon-deed', '/docs'),
   agents('帮工', '帮工档案', 'raccoon-farmer-down', '/agents'),
   runtimes('农具', '机器上的编码 agent', 'machine-tractor', '/runtimes'),
   projects('项目', '每个项目一座岛', 'icon-map', '/projects'),

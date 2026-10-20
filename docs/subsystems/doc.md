@@ -1,6 +1,6 @@
 # 文档
 
-文档（`Document`）是主人和帮工一起写的一篇文字：一组块（段落、标题、列表、待办、引用、代码……），每次改动是按块 id 描述的一个 op，服务端是唯一的权威。合并以块为单位，不用 CRDT。
+文档（`Document`）是主人和帮工一起写的一篇文字，在工作台的「文档」页（`/docs`）里写：一组块（段落、标题、列表、待办、引用、代码……），每次改动是按块 id 描述的一个 op，服务端是唯一的权威。合并以块为单位，不用 CRDT。
 
 ## 管什么，不管什么
 
@@ -16,6 +16,7 @@
 - 服务端 `server/internal/doc`（`doc.Service`，`Workspace.Doc`）：`doc.go` 存取和提交，`ops.go` 是 op 的规则（纯函数，在内存里的一篇文档上按顺序施加），`order.go` 顺序键，`text.go` 按码点切和接文字，`markdown.go` 导入导出。这些规则只有它用，都不导出。
 - 形状在 `protocol/shapes.go`：`Document`、`Block`、`BlockAttrs`、`DocSpan`、`DocMarks`，op 是封闭的联合 `DocOp`（按 `op` 区分，`DocOpMembers` 是生成的成员表），`DocSubmit`、`DocAck`、`DocOpResult`；块的类型是普通字符串，取值是带 `//vibevalley:const` 的常量（`BlockParagraph`……），Dart 拿到同名常量。
 - 表：`doc`（一篇一行，`seq`）、`doc_block`（每一块，含墓碑；`attrs`、`spans` 存 JSON 文本）、`doc_block_revision`（每一块每一版的字，`kind` 是 `normal` 或 `conflict`）、`doc_change`（每一批：`seq`、`batch_id`、谁、改了哪些块、每个 op 的结果）。
+- 客户端：`app/lib/workbench/docs/`：`docs_page.dart` 是「文档」页（左边列表和新建，右边打开的那篇；窄屏只放一边），`doc_editor.dart` 是块的画法和按键，`doc_editor_model.dart` 的 `DocEditor` 管本地的块、待发的 op 和防抖；不在 `app/lib/rules/doc_blocks.dart` 以外重写规则：那里只有顺序键、码点偏移、编辑时保留 marks、编号和行首的 Markdown。
 - 帮工的工具：`doc_read`、`doc_append`、`doc_update`（`server/internal/tool/doc.go`，经 `/mcp` 只给 Session）。
 - 接口：`doc.list`、`doc.create`、`doc.import`、`doc.get`、`doc.submit`、`doc.markdown`（[capabilities.md](docs/reference/capabilities.md)），主人和「连接到本机」能调，写的人记成 `owner`（`DocOwner`）。
 
@@ -23,7 +24,7 @@
 
 - **一篇文档是一组扁平的块**：`parentId` 表示嵌套，`orderKey` 表示同级的顺序；同级按 `(orderKey, id)` 排，两端在同一处插入、生成了同一个键时顺序仍然确定。
 - **块 id 由插入它的一方生成**（uuid），之后不变，在所有文档里唯一。
-- **顺序键**是 base62 的分数索引：两键之间取中点，在两头插入时首位加一或减一；键不以 `0` 结尾，所以前面总有位置。服务端只校验格式（只有 base62、不以 `0` 结尾、不超过 256 位），自己只在导入 Markdown 和帮工追加时生成。
+- **顺序键**是 base62 的分数索引：两键之间取中点，在两头插入时首位加一或减一；键不以 `0` 结尾，所以前面总有位置。服务端只校验格式（只有 base62、不以 `0` 结尾、不超过 256 位），自己只在导入 Markdown 和帮工追加时生成；客户端的 `rules/doc_blocks.dart` 生成同样的键（两边的测试用同几对键对照）。
 - **块的类型**：`paragraph`、`heading`（`level` 1–3）、`bulleted`、`numbered`、`todo`（`checked`）、`quote`、`code`（`language`，字不带 marks）、`divider`、`image`（`src`、`width`、`height`、`alt`）、`issue_ref`（`issueId`）、`memory_item`（`memoryId`，带字）。`divider`、`image`、`issue_ref` 没有字。服务端只收这些；比客户端新的服务端给出它不认识的类型时，客户端画只读的占位块。
 - **marks** 只有 `bold`、`italic`、`code`、`strike`、`link`。字存成 span 的列表，相邻的同样 marks 的 span 合成一个、空的去掉，同一段字只有一种写法。
 - **算得出来的不存**：有序列表的编号由客户端按同级连续的 `numbered` 数。
@@ -50,9 +51,19 @@
 
 **帮工写**：和主人走同一条 op 管线，写的人记成它的档案 id（Session 不在地里时是它的 id）。`doc_read` 列出每一块的 id、第几版、类型和字；`doc_append` 在顶层末尾插一块（服务端生成 id 和顺序键，字按行内 Markdown 读，代码块照原样），回答新块的 id 和版本；`doc_update` 带 `base_rev` 整段换字，冲突时不改，回答现在的版本和字，让它看过再决定。没有整篇覆盖的工具。
 
+**编辑器**（工作台的「文档」页）：每一块是一个 Flutter 自带的 `TextField`，编辑直接产出 op，中间没有别的编辑器模型。
+
+- 画法：标题按级别三种字号，代码用等宽字和底色，引用左边一条线，无序列表一个圆点，有序列表的编号按同级连续的有序项现算，待办是一个画出来的勾选框（勾上划掉字，发 `set_attrs`），分隔线是一条线；图片、工单引用画成只读的一行；不认识的类型画成只读的占位块。已有的 marks 照样画出来，编辑时两头没改的字保留 marks，打进去的字跟前一个字的 marks（链接除外）。没有 marks 的工具条。
+- 每一块左边有一条细的归属条：主人写的是固定的颜色（`ownerColor`），帮工写的是它档案外形的 trim 颜色（档案不在了按 id 取一个），连续同一个帮工写的块第一块旁边画它的头像（`shared/faces.dart` 的 `AgentFaceOf`），悬停说是谁写的。
+- 按键：在一块中间回车（输入框里的换行）是 `split_block`，偏移换成码点；空的列表项回车是变回段落；段首退格：不是段落的先变回段落，段落并进上一块（`merge_blocks`），上一块没有字（分隔线）就删掉它；上、下键在第一行、最后一行时跳到上一块、下一块。粘进来的多行一行拆成一块。段落行首打 `# `、`## `、`### `、`- `、`1. `、`[] `、`[x] `、`> ` 或三个反引号，换成对应的类型（`set_type`），行首的标记去掉。
+- 发送：改字先只改本地，停 500 毫秒发一次，一直在打字时最长 2 秒发一次，离开这一块、回车时立刻发；同一块攒着的字合成一个 `update_text`。op 排成队，一次只有一批在路上；一个带 `baseRev` 的 op 改的块已经被同一批前面的 op 改过时，它进下一批，拿服务端回给的新 rev。发不出去的那批留着原来的 `batchId` 重发。
+- 收到回答：改过的块整块换成服务端的，只有还有没发的字、还在路上的、正在用输入法拼字的块保留本地的字。冲突的块换成服务端的字，下面一行红字说你写的没存上、留在修订里了。
+- **输入法拼字时不发、不换**：拼音还没上屏时不发这一块的字，也不用服务端的字替换它；上屏以后照常发。
+- 别人（帮工）写的：还没有广播，页面开着时每 4 秒问一次 `doc.get`，自己没有待发的东西、文档的 seq 变了，才整篇换上。
+
 **其他**：`set_attrs` 按字段写（`unset` 列出要删的键），后到的生效；`set_type` 换类型和整套属性，新类型没有字就丢掉字，换成 `code` 去掉 marks；`move_block` 挪到自己下面被拒绝，挪到已删的父块下面就挂到那个父块所在的层级；`restore_block` 连子块一起恢复。
 
-**Markdown**：导出按文档顺序写，嵌套每层缩进两个空格，列表项之间空一行以外都空两行；`issue_ref`、`memory_item` 写成 HTML 注释（`<!-- issue:ID -->`、`<!-- memory:ID --> 字`），图片的尺寸写在标题里（`"640x480"`）；字里的 `\ * _ ` + "`" + ` ~ [ ]` 加反斜杠，像别的块开头的段落行前加反斜杠。导入读回同样的块：`**粗**`、`_斜_` 或 `*斜*`、`` `码` ``、`~~删~~`，链接是方括号里的字加圆括号里的地址。导入是一个新文档，块作为一批 `insert_block` 提交。
+**Markdown**：导出按文档顺序写，嵌套每层缩进两个空格，列表项之间空一行以外都空两行；`issue_ref`、`memory_item` 写成 HTML 注释（`<!-- issue:ID -->`、`<!-- memory:ID --> 字`），图片的尺寸写在标题里（`"640x480"`）；字里的 `\ * _ ` + "`" + ` ~ [ ]` 加反斜杠，像别的块开头的段落行前加反斜杠；斜体写 `_斜_`，挨着字母或数字时写 `*斜*`。导入读回同样的块：`**粗**`、`_斜_` 或 `*斜*`、`` `码` ``、`~~删~~`，链接是方括号里的字加圆括号里的地址；词中间的下划线（`doc_append`）是字，不是斜体。导入是一个新文档，块作为一批 `insert_block` 提交。
 
 ## 和谁打交道
 
@@ -68,6 +79,8 @@
 - **类型是字符串，不是枚举。** 生成的 Dart 枚举遇到不认识的值会解码失败，整篇打不开；字符串加常量让旧客户端画占位块。
 - **顺序键在两头加一减一。** 只取中点时，一直往末尾追加，键每六次长一位；加一减一每 61 次才长一位。同一处反复插入仍然会变长，以后由服务端重排。
 - **一把锁管所有文档。** 库只有一个连接，按文档分锁不会更快。
+- **编辑器自己写，不用 `appflowy_editor`。** 每块一个 `TextField`，编辑直接就是 op，拆分和合并不用从别人的 Transaction 翻译；按键规则照它的行为写（[提案](.agents/notes/proposed/feature/2026-10-20-block-editor-collab.md)）。
+- **广播之前先轮询。** WebSocket 是 P2 的事；回答里带改后的块，主人自己的改动不用再问；帮工写的靠每 4 秒一次的 `doc.get`，有待发的改动时不问，免得盖掉还没发的字。
 
 ## 还没做的
 
@@ -82,4 +95,5 @@
 - `doc/markdown_test.go`：`TestMarkdownRoundTrip`、`TestBlocksRoundTrip`。
 - `doc/doc_test.go`：`TestEditsSurviveARestart`（重开库后块、rev、seq 都在）、`TestABatchIsTakenOnce`、`TestStaleUpdateIsAConflict`（冲突版本存进修订）、`TestImportAndExport`。
 - `handler/doc_test.go` 的 `TestDocRoutes`：经 HTTP 建、提交、读、导出、导入。
+- 客户端：`app/test/workbench/docs_test.dart`（回车拆段、发出的 `split_block` 偏移是码点；粘进来的多行拆成几块；已有的 marks 画出来；段首退格并段；行首 Markdown 换类型；连续打字只发一个 `update_text`；拼字时不发、上屏后发；归属条的颜色；不认识的类型是占位块；编号和勾选；空列表项回车变段落），`app/test/rules/doc_blocks_test.dart`（和 Go 一样的顺序键、码点偏移、编辑保留 marks、编号）。
 - `mcp/doc_test.go` 的 `TestAHelperWritesADoc`：帮工经 `/mcp` 加块、读、改字，写的人是它的档案；主人改过以后，它按旧版本改不进去，回答里有现在的字。

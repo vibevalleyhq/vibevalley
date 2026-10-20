@@ -43,7 +43,7 @@ func shape(t *testing.T, bs []protocol.Block) string {
 			d = depth[*b.ParentID] + 1
 		}
 		depth[b.ID] = d
-		lines = append(lines, fmt.Sprintf("%d %s %+v %s", d, b.Type, attrsText(b.Attrs), spansText(b.Text)))
+		lines = append(lines, fmt.Sprintf("%d %s %+v %s", d, b.Type, attrsText(b.Attrs), spansText(normal(b.Text))))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -173,8 +173,9 @@ func TestBlocksRoundTrip(t *testing.T) {
 	in := []protocol.Block{
 		{ID: "a", OrderKey: "V", Type: protocol.BlockParagraph, Text: []protocol.DocSpan{
 			span("前 "), {T: "粗斜", Marks: protocol.DocMarks{Bold: true, Italic: true}}, {T: "粗", Marks: protocol.DocMarks{Bold: true}},
-			{T: "链接里的`码`", Marks: protocol.DocMarks{Link: &link, Code: true}}, span(" *星号* _下划线_ [方括号] ~波浪~ 👨‍👩‍👧"),
+			{T: "链接里的`码`", Marks: protocol.DocMarks{Link: &link, Code: true}}, span(" *星号* _下划线_ [方括号] ~波浪~ 👨‍👩‍👧"), span(" doc"), {T: "mid", Marks: protocol.DocMarks{Italic: true}}, span("word"),
 		}},
+		{ID: "s", OrderKey: "VV", Type: protocol.BlockParagraph, Text: []protocol.DocSpan{span("doc_append 和 doc_update 是工具名")}},
 		{ID: "b", OrderKey: "W", Type: protocol.BlockParagraph, Text: []protocol.DocSpan{span("- 像列表的段落")}},
 		{ID: "c", OrderKey: "X", Type: protocol.BlockBulleted, Text: []protocol.DocSpan{span("[ ] 像待办的列表")}},
 		{ID: "d", OrderKey: "Y", Type: protocol.BlockNumbered, Text: []protocol.DocSpan{span("一")}},

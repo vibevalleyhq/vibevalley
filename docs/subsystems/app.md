@@ -86,7 +86,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 
 **启动画面和首页**（`title/`）：启动画面按真实的步骤走进度（连上农场、读钥匙、字体、画首页、像素村），20 秒还没好就不等了，连不上的原因由横幅说。首页只在这台设备第一次打开时出来（偏好 `vibevalley.title.seen`），之后直接进农场，游戏菜单的「回到首页」能回去。三项：开始游戏 = 进农场并开工（`manager.open`）；继续游戏 = 回到农场原样，只在有农场可回时能点；设置 = 去工作台的 `/settings`。管家没有任何 DeepSeek 钥匙时，开始游戏先去设置的 DeepSeek 分区。
 
-**工作台的路由**（`go_router`）：`/` 是农场；其余在 `Workbench` 外框里：`/chat`、`/issues`、`/projects`、`/agents`（`/manager` 也算在「帮工」下）、`/runtimes`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区，设置有自己的外框：服务端的四块（DeepSeek、Agora、记性、GitHub），和连接器、技能、声音、「连接到本机」四页。带 id 的路径打开同一页的详情；不认识的路径回农场。
+**工作台的路由**（`go_router`）：`/` 是农场；其余在 `Workbench` 外框里：`/chat`、`/issues`、`/docs`、`/projects`、`/agents`（`/manager` 也算在「帮工」下）、`/runtimes`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区，设置有自己的外框：服务端的四块（DeepSeek、Agora、记性、GitHub），和连接器、技能、声音、「连接到本机」四页。带 id 的路径打开同一页的详情；不认识的路径回农场。
 
 **宿主的命令**：菜单栏、通知点开、快捷键都变成 `HostCommand`（`voice`、`session`、`chat`、`taskBoard`、`achievements`），Swift 先把窗口叫到前面（语音除外），Dart 的 `hostCommandRouterProvider` 回到农场、关掉首页，再选中帮工、打开田头、计划板或成就；语音只切换通话。不认识的命令丢掉。
 
