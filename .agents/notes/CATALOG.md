@@ -14,7 +14,7 @@
 
 ### architecture
 
-- 2026-10-20 [工作台换成专业皮：一套组件，两种外形](.agents/notes/proposed/architecture/2026-10-20-two-skins-one-kit.md)
+- 2026-10-20 [两组组件：农场用像素组，工作台用专业组](.agents/notes/proposed/architecture/2026-10-20-pixel-and-pro-kits.md)
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)
 - 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
 - 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)
