@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 
 const wideFrom = 1024.0;
 
@@ -39,7 +39,7 @@ class ListDetail extends StatelessWidget {
       if (box.maxWidth < wideFrom) {
         return Padding(
           padding: side,
-          child: PxScrollView(
+          child: SingleChildScrollView(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _spaced(opened ? [...detail, list] : [list, ...detail])),
           ),
         );
@@ -60,11 +60,11 @@ class ListDetail extends StatelessWidget {
           children: [
             SizedBox(
               width: listWidth,
-              child: PxScrollView(child: list),
+              child: SingleChildScrollView(child: list),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: detailScrolls ? SingleChildScrollView(padding: const EdgeInsets.only(bottom: 6), child: column) : PxScrollView(child: column),
+              child: detailScrolls ? SingleChildScrollView(padding: const EdgeInsets.only(bottom: 6), child: column) : SingleChildScrollView(child: column),
             ),
           ],
         ),
@@ -90,15 +90,14 @@ class ListCard extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     container: true,
     label: semanticLabel,
-    child: PxWindow(
-      paper: Palette.cream50,
-      padding: const EdgeInsets.all(12),
+    child: ProPanel(
+      padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(8, 4, 8, note == null ? 12 : 4),
+            padding: EdgeInsets.fromLTRB(8, 6, 8, note == null ? 8 : 2),
             child: Text.rich(
               TextSpan(
                 text: title,
@@ -106,17 +105,17 @@ class ListCard extends StatelessWidget {
                   if (subtitle != null)
                     TextSpan(
                       text: ' $subtitle',
-                      style: PxText.sm.copyWith(color: Palette.bark500),
+                      style: ProText.sm.copyWith(color: ProColor.faint, fontWeight: FontWeight.w400),
                     ),
                 ],
               ),
-              style: PxText.xl,
+              style: ProText.base.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
           if (note != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-              child: Text(note!, style: PxText.xs.copyWith(color: Palette.bark500)),
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: Text(note!, style: ProText.meta),
             ),
           ...children,
         ],
@@ -134,21 +133,25 @@ class ListRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 4),
+    padding: const EdgeInsets.only(bottom: 2),
     child: Tappable(
       onTap: onTap,
       selected: active,
       semanticLabel: semanticLabel,
-      builder: (context, s) => Container(
-        padding: const EdgeInsets.all(8),
-        color: active
-            ? Palette.leaf300.withValues(alpha: .6)
-            : s.hovered
-            ? Palette.cream200
-            : null,
-        // focus-visible:ring-2 (and the shown one's shadow-[inset…]): the skin's inner cream-300 line on every row.
-        foregroundDecoration: pxRing,
-        child: child,
+      builder: (context, s) => ProFocusRing(
+        on: s.focused,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: active
+                ? ProColor.selected
+                : s.hovered
+                ? ProColor.hover
+                : null,
+            borderRadius: proRadius,
+          ),
+          child: child,
+        ),
       ),
     ),
   );
@@ -165,13 +168,13 @@ class RowText extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(name, style: PxText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
       Text(
-        line,
-        style: PxText.fine.copyWith(color: Palette.bark500),
+        name,
+        style: ProText.sm.copyWith(fontWeight: FontWeight.w500),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
+      Text(line, style: ProText.meta, maxLines: 1, overflow: TextOverflow.ellipsis),
       ?extra,
     ],
   );
@@ -182,7 +185,7 @@ class StateDot extends StatelessWidget {
   final Color color;
 
   @override
-  Widget build(BuildContext context) => SizedBox.square(dimension: 8, child: ColoredBox(color: color));
+  Widget build(BuildContext context) => ProDot(color, size: 8);
 }
 
 class TintTag extends StatelessWidget {
@@ -193,9 +196,12 @@ class TintTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-    color: fill,
-    child: Text(text, style: PxText.xs.copyWith(color: ink)),
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+    decoration: BoxDecoration(color: fill, borderRadius: const BorderRadius.all(Radius.circular(4))),
+    child: Text(
+      text,
+      style: ProText.xs.copyWith(color: ink, fontWeight: FontWeight.w500),
+    ),
   );
 }
 

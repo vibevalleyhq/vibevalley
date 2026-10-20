@@ -4,14 +4,7 @@ import '../common.dart';
 import 'base.dart';
 import 'field.dart' show PxTip;
 
-class SegmentOption<T> {
-  const SegmentOption({required this.value, required this.label, this.disabled = false, this.title});
-  final T value;
-  final String label;
-  final bool disabled;
-
-  final String? title;
-}
+export '../options.dart';
 
 class PxSegmented<T> extends StatelessWidget {
   const PxSegmented({super.key, required this.value, required this.options, required this.onChanged, this.block = true});
@@ -58,13 +51,6 @@ class PxSegmented<T> extends StatelessWidget {
     );
     return block ? FillWidth(child: strip) : strip;
   }
-}
-
-class PickOption {
-  const PickOption({required this.value, required this.label, this.detail});
-  final String value;
-  final String label;
-  final String? detail;
 }
 
 class PxPick extends StatefulWidget {

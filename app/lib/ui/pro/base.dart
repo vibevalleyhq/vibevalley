@@ -147,3 +147,37 @@ class ProTag extends StatelessWidget {
     ),
   );
 }
+
+/// A panel with an optional title line: what PxCard is on the workbench.
+class ProCard extends StatelessWidget {
+  const ProCard({super.key, required this.child, this.title, this.aside, this.padding = const EdgeInsets.all(16)});
+  final Widget child;
+  final String? title;
+  final Widget? aside;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) => ProPanel(
+    padding: padding,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (title != null) ...[
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              Text(title!, style: ProText.base.copyWith(fontWeight: FontWeight.w600)),
+              if (aside != null) DefaultTextStyle(style: ProText.meta, child: aside!),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+        child,
+      ],
+    ),
+  );
+}

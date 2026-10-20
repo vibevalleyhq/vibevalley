@@ -7,7 +7,7 @@ import '../shared/faces.dart';
 import '../gen/vibevalley.dart';
 import '../rules/cast.dart';
 import '../sprites/atlas.dart';
-import '../ui/pixel/pixel.dart';
+import '../ui/pro/pro.dart';
 import 'places.dart';
 
 const workbenchHead = 66.0;
@@ -33,16 +33,18 @@ class Workbench extends StatelessWidget {
 
   // A Material under the pages: text fields and ink need one, and it gives the page's text its style.
   @override
-  Widget build(BuildContext context) => Material(
-    color: Palette.cream50,
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _Rail(here: place),
-        Expanded(
-          child: place == Place.chat ? child : _ConfigDesk(place: place, child: child),
-        ),
-      ],
+  Widget build(BuildContext context) => ProScope(
+    child: Material(
+      color: ProColor.page,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Rail(here: place),
+          Expanded(
+            child: place == Place.chat ? child : _ConfigDesk(place: place, child: child),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -54,10 +56,7 @@ class _Rail extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => Container(
     width: 64,
-    decoration: const BoxDecoration(
-      color: Palette.bark600,
-      border: Border(right: pxLine),
-    ),
+    color: Palette.bark800,
     child: LayoutBuilder(
       builder: (context, box) => SingleChildScrollView(
         child: ConstrainedBox(
@@ -78,14 +77,20 @@ class _Rail extends ConsumerWidget {
                   ),
                 ),
                 for (final p in Place.values.where((p) => p != Place.settings)) ...[
-                  _Slot(label: '${p.label} · ${p.hint}', framed: p == here, fill: Palette.cream50, onTap: () => context.go(p.path), child: placeIcon(p)),
+                  _Slot(
+                    label: '${p.label} · ${p.hint}',
+                    framed: p == here,
+                    fill: const Color(0x33FFFAF0),
+                    onTap: () => context.go(p.path),
+                    child: placeIcon(p),
+                  ),
                   const SizedBox(height: 8),
                 ],
                 const Spacer(),
                 _Slot(
                   label: '${Place.settings.label} · ${Place.settings.hint}',
                   framed: here == Place.settings,
-                  fill: Palette.cream50,
+                  fill: const Color(0x33FFFAF0),
                   onTap: () => context.go(Place.settings.path),
                   child: placeIcon(Place.settings),
                 ),
@@ -116,18 +121,19 @@ class _Slot extends StatelessWidget {
     child: Tappable(
       onTap: onTap,
       semanticLabel: label,
-      builder: (context, s) => Container(
-        width: 44,
-        height: 44,
-        alignment: Alignment.center,
-        decoration: framed
-            ? BoxDecoration(
-                color: fill,
-                border: Border.all(color: Palette.bark900, width: 2),
-                boxShadow: pxDrop,
-              )
-            : BoxDecoration(color: s.hovered ? Palette.bark800 : null),
-        child: child,
+      builder: (context, s) => ProFocusRing(
+        on: s.focused,
+        radius: 10,
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: framed ? fill : (s.hovered ? const Color(0x22FFFAF0) : null),
+            borderRadius: const BorderRadius.all(Radius.circular(10)),
+          ),
+          child: child,
+        ),
       ),
     ),
   );
@@ -150,7 +156,7 @@ class _ConfigDesk extends ConsumerWidget {
         Container(
           height: workbenchHead,
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: const BoxDecoration(border: Border(bottom: pxLine)),
+          decoration: const BoxDecoration(border: Border(bottom: proLine)),
           child: LayoutBuilder(
             builder: (context, box) {
               final compact = box.maxWidth < 520;
@@ -164,17 +170,12 @@ class _ConfigDesk extends ConsumerWidget {
                       child: Row(
                         children: [
                           Flexible(
-                            child: Text(p.label, style: PxText.lg, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            child: Text(p.label, style: ProText.lg, maxLines: 1, overflow: TextOverflow.ellipsis),
                           ),
                           if (!compact) ...[
                             const SizedBox(width: 12),
                             Flexible(
-                              child: Text(
-                                p.hint,
-                                style: PxText.xs.copyWith(color: Palette.bark500),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              child: Text(p.hint, style: ProText.meta, maxLines: 1, overflow: TextOverflow.ellipsis),
                             ),
                           ],
                         ],
@@ -183,17 +184,16 @@ class _ConfigDesk extends ConsumerWidget {
                     const SizedBox(width: 8),
                   ] else
                     const Spacer(),
-                  PxButton(
-                    size: PxSize.custom,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  ProButton(
+                    size: ProSize.sm,
                     semanticLabel: status,
                     onPressed: () => context.go('/'),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(width: 8, height: 8, color: live ? Palette.leaf500 : Palette.cream300),
+                        ProDot(live ? Palette.leaf500 : ProColor.faint, size: 8),
                         const SizedBox(width: 6),
-                        Text(compact && live ? '$working 个在干活' : status, style: PxText.xs),
+                        Text(compact && live ? '$working 个在干活' : status, style: ProText.xs),
                       ],
                     ),
                   ),

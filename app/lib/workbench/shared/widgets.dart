@@ -1,10 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../ui/pixel/base.dart';
-import '../../ui/theme.dart';
+import '../../ui/pro/pro.dart';
 
-export '../../shared/widgets.dart' show BadgeLabel, EmptyNote, InlineLink, runAction;
+export '../../shared/actions.dart' show runAction;
 
 class WorkbenchSection extends StatelessWidget {
   const WorkbenchSection({super.key, required this.title, required this.child, this.count, this.aside});
@@ -27,23 +26,18 @@ class WorkbenchSection extends StatelessWidget {
                 if (count != null && count != 0)
                   TextSpan(
                     text: ' $count',
-                    style: PxText.xs.copyWith(color: Palette.bark600),
+                    style: ProText.xs.copyWith(color: ProColor.faint, fontWeight: FontWeight.w400),
                   ),
               ],
             ),
-            style: PxText.xs.copyWith(color: Palette.bark600),
+            style: ProText.xs.copyWith(color: ProColor.muted, fontWeight: FontWeight.w600),
           ),
           if (aside != null) ...[
             const SizedBox(width: 8),
             Expanded(
               child: Align(
                 alignment: Alignment.centerRight,
-                child: DefaultTextStyle(
-                  style: PxText.xs.copyWith(color: Palette.bark500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  child: aside!,
-                ),
+                child: DefaultTextStyle(style: ProText.meta, maxLines: 1, overflow: TextOverflow.ellipsis, child: aside!),
               ),
             ),
           ],
@@ -76,12 +70,17 @@ class WorkbenchTabs<T> extends StatelessWidget {
               selected: v == value,
               semanticLabel: label,
               builder: (context, s) => Container(
-                height: 32,
+                height: big ? 32 : 28,
                 padding: EdgeInsets.symmetric(horizontal: big ? 12 : 10),
                 alignment: Alignment.center,
-                color: v == value ? Palette.cream300 : null,
-                foregroundDecoration: pxRing,
-                child: Text(label, style: PxText.xs.copyWith(color: v == value ? Palette.bark900 : (s.hovered ? Palette.bark800 : Palette.bark600))),
+                decoration: BoxDecoration(color: v == value ? ProColor.selected : (s.hovered ? ProColor.hover : null), borderRadius: proRadius),
+                child: Text(
+                  label,
+                  style: (big ? ProText.sm : ProText.xs).copyWith(
+                    color: v == value || s.hovered ? ProColor.ink : ProColor.muted,
+                    fontWeight: v == value ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
               ),
             ),
           ),
@@ -104,10 +103,15 @@ class WorkbenchPill extends StatelessWidget {
     selected: on,
     semanticLabel: label,
     builder: (context, s) => Container(
-      padding: small ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2) : const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      color: on ? Palette.leaf500 : (s.hovered ? Palette.cream300 : Palette.cream200),
-      foregroundDecoration: pxRing,
-      child: Text(label, style: PxText.xs.copyWith(color: on ? Palette.cream50 : Palette.bark800)),
+      padding: small ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2) : const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: on ? ProColor.accent : (s.hovered ? ProColor.selected : ProColor.hover),
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
+      ),
+      child: Text(
+        label,
+        style: ProText.xs.copyWith(color: on ? Palette.paper : ProColor.ink, fontWeight: on ? FontWeight.w600 : FontWeight.w400),
+      ),
     ),
   );
 }
@@ -135,14 +139,43 @@ class WorkbenchChoice extends StatelessWidget {
     selected: active,
     tooltip: tooltip,
     semanticLabel: semanticLabel,
-    builder: (context, s) => Container(
-      padding: padding,
-      color: active ? Palette.leaf300.withValues(alpha: .5) : (s.hovered ? Palette.cream200 : Palette.cream50),
-      foregroundDecoration: pxRing,
-      child: child,
+    builder: (context, s) => ProFocusRing(
+      on: s.focused,
+      radius: 8,
+      child: Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: active ? ProColor.selected : (s.hovered ? ProColor.hover : ProColor.page),
+          border: Border.all(color: active ? ProColor.ink.withValues(alpha: .4) : ProColor.line),
+          borderRadius: const BorderRadius.all(Radius.circular(8)),
+        ),
+        child: child,
+      ),
     ),
   );
 }
 
 /// Nothing without a router (a widget test without one).
 void workbenchGo(BuildContext context, String path) => GoRouter.maybeOf(context)?.go(path);
+
+class EmptyNote extends StatelessWidget {
+  const EmptyNote(this.text, {super.key});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: const BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(8))),
+    child: Text(text, style: ProText.sm.copyWith(color: ProColor.muted)),
+  );
+}
+
+class BadgeLabel extends StatelessWidget {
+  const BadgeLabel(this.text, {super.key, this.hat = false});
+  final String text;
+
+  final bool hat;
+
+  @override
+  Widget build(BuildContext context) => ProTag(label: text, fill: hat ? Palette.leaf300.withValues(alpha: .5) : ProColor.selected);
+}

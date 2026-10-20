@@ -1,9 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
-import '../../sprites/atlas.dart';
-import '../common.dart';
-
-export '../quota.dart';
+import '../sprites/atlas.dart';
+import 'quota.dart';
 
 const _liquid = <QuotaLevel, (Color, Color)>{
   QuotaLevel.plenty: (Color(0xFFA6DC7C), Color(0xFF5F9A35)),

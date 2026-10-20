@@ -1,8 +1,9 @@
 import 'package:flutter/widgets.dart';
 
-import '../data/remote.dart';
+export '../ui/link.dart' show InlineLink;
+export 'actions.dart';
+
 import '../ui/pixel/base.dart';
-import '../ui/pixel/toast_viewport.dart';
 import '../ui/theme.dart';
 
 class EmptyNote extends StatelessWidget {
@@ -15,32 +16,6 @@ class EmptyNote extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     child: Text(text, style: PxText.xs.copyWith(color: Palette.bark500)),
   );
-}
-
-class InlineLink extends StatelessWidget {
-  const InlineLink(this.text, {super.key, required this.onTap, this.color = Palette.leaf700});
-  final String text;
-  final VoidCallback onTap;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Tappable(
-    onTap: onTap,
-    semanticLabel: text,
-    builder: (context, s) => Text(
-      text,
-      style: (DefaultTextStyle.of(context).style).copyWith(color: color, decoration: s.hovered ? TextDecoration.underline : null, decorationColor: color),
-    ),
-  );
-}
-
-Future<T?> runAction<T>(Future<T> Function() command) async {
-  try {
-    return await command();
-  } on Object catch (e) {
-    toasts.add(type: ToastType.error, title: '出错了', description: reasonOf(e));
-    return null;
-  }
 }
 
 class BadgeLabel extends StatelessWidget {

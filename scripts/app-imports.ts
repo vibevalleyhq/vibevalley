@@ -94,13 +94,9 @@ const KIT_DEBT: string[] = [
   'lib/workbench/runtimes/quota_panel.dart',
   'lib/workbench/runtimes/runtimes_page.dart',
   'lib/workbench/settings/settings_page.dart',
-  'lib/workbench/shared/config_problem.dart',
-  'lib/workbench/shared/layout.dart',
   'lib/workbench/shared/memory_panels.dart',
-  'lib/workbench/shared/widgets.dart',
   'lib/workbench/skills/skills_page.dart',
   'lib/workbench/voice/voice_page.dart',
-  'lib/workbench/workbench_shell.dart',
 ]
 
 interface Edge {

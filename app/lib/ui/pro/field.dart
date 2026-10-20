@@ -55,7 +55,12 @@ class ProField extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: tip == null || tip!.isEmpty ? labelText : Tooltip(message: tip!, child: labelText),
+              child: tip == null || tip!.isEmpty
+                  ? labelText
+                  : Tooltip(
+                      message: tip!,
+                      child: MouseRegion(cursor: SystemMouseCursors.help, child: labelText),
+                    ),
             ),
             if (aside != null) ...[const SizedBox(width: 8), DefaultTextStyle(style: ProText.meta, child: aside!)],
           ],
@@ -70,6 +75,31 @@ class ProField extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// [child] with a dotted underline that shows [tip] on hover; just [child] without one.
+class ProTip extends StatelessWidget {
+  const ProTip({super.key, required this.tip, required this.child});
+  final String? tip;
+  final Text child;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tip;
+    if (t == null || t.isEmpty) return child;
+    final style = (child.style ?? const TextStyle()).copyWith(
+      decoration: TextDecoration.underline,
+      decorationStyle: TextDecorationStyle.dotted,
+      decorationColor: ProColor.faint,
+    );
+    return Tooltip(
+      message: t,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.help,
+        child: Text(child.data ?? '', style: style),
+      ),
     );
   }
 }
@@ -368,3 +398,13 @@ class _ProTextAreaState extends State<ProTextArea> {
     );
   }
 }
+
+/// A text box's look, for pro controls that hold their own TextField (chips, key and value).
+BoxDecoration proBox({bool focused = false}) => BoxDecoration(
+  color: Palette.paper,
+  border: Border.all(color: focused ? ProColor.focus : const Color(0x332F1F13), width: focused ? 1.5 : 1),
+  borderRadius: proRadius,
+);
+
+/// A bare TextField inside a pro box.
+InputDecoration proBare(String? placeholder, TextStyle style) => _bare(placeholder, style);
