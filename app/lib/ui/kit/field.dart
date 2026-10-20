@@ -351,6 +351,7 @@ class PxTextArea extends StatefulWidget {
     this.enabled = true,
     this.readOnly = false,
     this.mono = false,
+    this.reading = false,
     this.semanticLabel,
     this.focusNode,
     this.autofocus = false,
@@ -358,6 +359,9 @@ class PxTextArea extends StatefulWidget {
   });
 
   final String value;
+
+  /// A long text being written (an issue's description): in KitText.read, as it is read.
+  final bool reading;
   final ValueChanged<String> onChanged;
   final int rows;
 
@@ -408,7 +412,7 @@ class _PxTextAreaState extends State<PxTextArea> {
 
   @override
   Widget build(BuildContext context) {
-    final style = (widget.mono ? KitText.mono : KitText.sm).copyWith(height: 1.625);
+    final style = widget.reading ? KitText.read : (widget.mono ? KitText.mono : KitText.sm).copyWith(height: 1.625);
     return Semantics(
       textField: true,
       label: widget.semanticLabel,

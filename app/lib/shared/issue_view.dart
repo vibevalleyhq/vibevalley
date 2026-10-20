@@ -351,7 +351,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (description.isNotEmpty && description != title) _Row('要做的', Text(description, style: body)),
+        if (description.isNotEmpty && description != title) _Row('要做的', PxReadText(description, color: Palette.bark800)),
         _Row('谁在做', Text('${head.name}${head.runtime.isNotEmpty ? '（${head.runtime}）' : ''}', style: body)),
         if (crew.length > 1 || (session != null && head.worktree != null))
           _Row(

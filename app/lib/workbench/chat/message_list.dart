@@ -332,7 +332,7 @@ class _MessageRow extends ConsumerWidget {
             opacity: m.final_ ? 1 : .7,
             child: m.kind == MessageKind.dispatch
                 ? DispatchNote(m.text, style: const TextStyle(height: 1.625))
-                : PxMarkdown(m.text, mentions: true, style: const TextStyle(height: 1.625)),
+                : ChatText(m.text, folds: m.final_, style: const TextStyle(height: 1.625)),
           ),
           if (!m.final_) const StreamingCaret(),
           if (m.spent != null && m.kind == MessageKind.report)

@@ -315,6 +315,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
               value: _description,
               onChanged: (v) => _edit(() => _description = v),
               rows: 6,
+              reading: true,
               placeholder: '为什么、要做的、不做的、可能涉及哪些文件（起草会写好）',
               semanticLabel: '说明',
             ),
@@ -520,7 +521,7 @@ class ManagerIssueDetail extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _Row('谁在做', Text('管家', style: body)),
-              if (issue.description case final d? when d.isNotEmpty) _Row('要做的', Text(d, style: body.copyWith(height: 1.5))),
+              if (issue.description case final d? when d.isNotEmpty) _Row('要做的', PxReadText(d, color: body.color)),
               if (issue.schedule != null) _Row('来自', Text('定时：每次到点重开这张工单，管家答完就关上', style: body)),
               _Row('开单', Text(wallClockText(issue.createdAt), style: body)),
               if (issue.closedAt != null) _Row('关单', Text(wallClockText(issue.closedAt!), style: body)),

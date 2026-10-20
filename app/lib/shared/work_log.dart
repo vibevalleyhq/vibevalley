@@ -409,15 +409,13 @@ class _FoldedState extends State<_Folded> {
   Widget build(BuildContext context) {
     final long = widget.text.length > widget.lines * 60 || widget.text.split('\n').length > widget.lines;
     final clamp = !_open && long;
-    final style = KitText.sm.copyWith(height: 1.625, color: Palette.bark900);
-    Widget body = widget.markdown
-        ? PxMarkdown(widget.text, style: style)
-        : Text(widget.text, style: style, maxLines: clamp ? widget.lines : null, overflow: clamp ? TextOverflow.ellipsis : null);
+    // The log is read, not chatted: folded or not, it is in the reading font.
+    Widget body = widget.markdown ? PxMarkdown(widget.text, reading: true) : PxReadText(widget.text, maxLines: clamp ? widget.lines : null);
     // Markdown has no line clamp: it is cut at the lines' height instead.
     if (widget.markdown && clamp) {
       body = ClipRect(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: widget.lines * 12 * 1.625),
+          constraints: BoxConstraints(maxHeight: widget.lines * KitText.read.fontSize! * KitText.read.height!),
           child: OverflowBox(alignment: Alignment.topLeft, maxHeight: double.infinity, child: body),
         ),
       );

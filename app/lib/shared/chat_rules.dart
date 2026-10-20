@@ -57,3 +57,8 @@ List<Nameable> offeredFor(List<Nameable> all, String query) {
 
 /// 7, not 7.0.
 String idText(double id) => numberText(id);
+
+final _block = RegExp(r'^(#{1,6} |```)', multiLine: true);
+
+/// A message long enough to be read rather than said: folded in the conversation, opened in the reading font.
+bool readsLong(String text) => text.length > 240 || '\n'.allMatches(text).length >= 8 || _block.hasMatch(text);

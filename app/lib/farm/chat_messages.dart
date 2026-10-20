@@ -126,7 +126,12 @@ class ChatBubble extends StatelessWidget {
           if (folded)
             DispatchNote(text, style: const TextStyle(color: Palette.bark900))
           else
-            PxMarkdown(text, mentions: true, style: TextStyle(color: mine ? Palette.cream50 : Palette.bark900)),
+            ChatText(
+              text,
+              folds: final_,
+              style: TextStyle(color: mine ? Palette.cream50 : Palette.bark900),
+              link: mine ? Palette.cream50 : Palette.leaf700,
+            ),
           if (!final_) const StreamingCaret(),
           ?after,
         ],
@@ -168,7 +173,11 @@ class ChatParentMessage extends StatelessWidget {
                 ),
                 style: chatSmall,
               ),
-              PxMarkdown(message.text, mentions: true, style: const TextStyle(color: Palette.bark800)),
+              ChatText(
+                message.text,
+                folds: message.final_,
+                style: const TextStyle(color: Palette.bark800),
+              ),
             ],
           ),
         ),
@@ -219,7 +228,7 @@ class ChatReportMessage extends StatelessWidget {
             color: fill,
             child: Text(label, style: KitText.xs.copyWith(color: ink)),
           ),
-          PxMarkdown(message.text, mentions: true),
+          ChatText(message.text, folds: message.final_),
           if (message.spent != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),

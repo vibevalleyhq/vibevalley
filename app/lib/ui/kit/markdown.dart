@@ -556,12 +556,16 @@ List<MdInline> parseInline(String s) {
 bool _insideCode(String s, int from, int at) => '`'.allMatches(s.substring(from, at)).length.isOdd;
 
 class PxMarkdown extends StatefulWidget {
-  const PxMarkdown(this.text, {super.key, this.mentions = false, this.onOpenLink, this.style});
+  const PxMarkdown(this.text, {super.key, this.mentions = false, this.onOpenLink, this.style, this.reading = false});
   final String text;
   final bool mentions;
   final void Function(Uri uri)? onOpenLink;
 
+  /// With [reading], only its colour is kept: the body is KitText.read.
   final TextStyle? style;
+
+  /// Long text to read: the body in KitText.read at most KitText.readMeasure wide; headings stay pixel, code stays mono.
+  final bool reading;
 
   @override
   State<PxMarkdown> createState() => _PxMarkdownState();
@@ -595,10 +599,41 @@ class _PxMarkdownState extends State<PxMarkdown> {
   @override
   Widget build(BuildContext context) {
     _clear();
-    final base = DefaultTextStyle.of(context).style.merge(widget.style);
-    final painter = _Painter(base, _recognizers, widget.onOpenLink ?? kitOpenLink);
-    return DefaultTextStyle(style: base, child: painter.blocks(_parsed));
+    var base = DefaultTextStyle.of(context).style.merge(widget.style);
+    if (widget.reading) base = KitText.read.copyWith(color: base.color);
+    final painter = _Painter(base, _recognizers, widget.onOpenLink ?? kitOpenLink, reading: widget.reading);
+    final body = DefaultTextStyle(style: base, child: painter.blocks(_parsed));
+    if (!widget.reading) return body;
+    return Align(
+      alignment: Alignment.topLeft,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: KitText.readMeasure * KitText.read.fontSize!),
+        child: body,
+      ),
+    );
   }
+}
+
+/// Plain text to read, as [PxMarkdown] with reading draws it.
+class PxReadText extends StatelessWidget {
+  const PxReadText(this.text, {super.key, this.color, this.maxLines});
+  final String text;
+  final Color? color;
+  final int? maxLines;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.topLeft,
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: KitText.readMeasure * KitText.read.fontSize!),
+      child: Text(
+        text,
+        style: color == null ? KitText.read : KitText.read.copyWith(color: color),
+        maxLines: maxLines,
+        overflow: maxLines == null ? null : TextOverflow.ellipsis,
+      ),
+    ),
+  );
 }
 
 /// Adjacent margins collapse to the larger.
@@ -610,10 +645,20 @@ class _PxMarkdownState extends State<PxMarkdown> {
 };
 
 class _Painter {
-  _Painter(this.base, this.recognizers, this.open);
+  _Painter(this.base, this.recognizers, this.open, {this.reading = false});
   final TextStyle base;
   final List<TapGestureRecognizer> recognizers;
   final void Function(Uri uri)? open;
+  final bool reading;
+
+  List<String> get _monoFallback => reading ? readMonoFallback : monoFallback;
+
+  /// Reading, a heading is the pixel font at a size it is sharp at: 24 for a title, 12 for a section, as the labels around it.
+  TextStyle heading(int level) => reading
+      ? base.copyWith(fontFamily: pixelFont, fontFamilyFallback: const [], fontSize: level == 1 ? 24 : 12, height: level == 1 ? 32 / 24 : 1.5)
+      : level <= 4
+      ? base.copyWith(fontSize: em * 1.05, height: 1.35)
+      : base;
 
   double get em => base.fontSize ?? 12;
   Color get color => base.color ?? Palette.bark900;
@@ -632,9 +677,7 @@ class _Painter {
 
   Widget block(MdBlock b) => switch (b) {
     MdParagraph(:final text) => Text.rich(TextSpan(children: spans(parseInline(text), base))),
-    MdHeading(:final level, :final text) => Text.rich(
-      TextSpan(children: spans(parseInline(text), level <= 4 ? base.copyWith(fontSize: em * 1.05, height: 1.35) : base)),
-    ),
+    MdHeading(:final level, :final text) => Text.rich(TextSpan(children: spans(parseInline(text), heading(level)))),
     MdCode(:final text) => Container(
       color: tint(.08),
       padding: EdgeInsets.symmetric(vertical: em * .55, horizontal: em * .75),
@@ -643,7 +686,7 @@ class _Painter {
         child: Text(
           text,
           softWrap: false,
-          style: base.copyWith(fontFamily: monoFont, fontFamilyFallback: monoFallback, fontSize: em * .85, height: 1.5),
+          style: base.copyWith(fontFamily: monoFont, fontFamilyFallback: _monoFallback, fontSize: em * .85, height: 1.5),
         ),
       ),
     ),
@@ -654,7 +697,7 @@ class _Painter {
       padding: EdgeInsets.only(left: em * .7),
       child: DefaultTextStyle.merge(
         style: TextStyle(color: tint(.75)),
-        child: _Painter(base.copyWith(color: tint(.75)), recognizers, open).blocks(children),
+        child: _Painter(base.copyWith(color: tint(.75)), recognizers, open, reading: reading).blocks(children),
       ),
     ),
     MdList() => list(b),
@@ -759,7 +802,7 @@ class _Painter {
             recognizer: link,
             style: style.copyWith(
               fontFamily: monoFont,
-              fontFamilyFallback: monoFallback,
+              fontFamilyFallback: _monoFallback,
               fontSize: (style.fontSize ?? em) * .88,
               backgroundColor: (style.color ?? color).withValues(alpha: .1),
             ),

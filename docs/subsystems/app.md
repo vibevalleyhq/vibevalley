@@ -51,6 +51,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 
   皮是 `workbench` 和 `farm`，互不 import；两张都用的放 `shared`，和业务无关的放 `ui`，本机状态放 `data`。`village` 是渲染层，`farm` 和 `title` 都用它；`phone` 是农场里的手机，不是第三张皮。Agora 的 SDK 只在 `lib/voice/` 里 import（`VENDOR` 表）。
 - **说一句话只有一个输入框**：主人对谁说一句话的地方（工作台和农场的田头、工单详情、浇水、回答起草的问题）都用 `shared/composer.dart` 的 `Composer`，外形分 `bar`（农场那一条）、`panel`（工作台）、`inline`（卡片里）。它管 @ 叫人（`Naming`）、回车发送和 Shift+回车换行、输入法拼字时不发、听写、sendKey 和出错那一行；发送只有一种做法：先清空，失败了把字和键放回去（`ComposerDraft.send`），所以重发不会说两遍。验收、重开这类按钮由调用的地方读同一份 `ComposerDraft`；等验收时框里一行一棵草，回车换行不发送（`enterSends`）。表单的格子（标题、验收标准、快速新建）照旧用 `PxTextInput`、`PxTextArea`。
+- **说的是像素，读的是阅读字**：界面、标签、按钮、对话里的话用像素字（`KitText` 的 `xs`…`x2l`，Fusion Pixel 12px，只在 12、24 清楚）；要读的长文用 `KitText.read`（系统的苹方，不打包，14px、行高 1.7，一行至多 40 字）：帮工和管家的汇报展开以后、派活展开的整张工单、工单的「要做的」和草稿的「说明」栏、每次干活的输入和输出、干活过程里展开的一步。开关只在 `ui`：`PxMarkdown(reading: true)`、`PxReadText`、`PxTextArea(reading: true)`；阅读里的标题仍是像素字（`#` 24，其余 12），代码仍是 Menlo。对话里的长消息（`readsLong`：超过 240 字、9 行，或有标题、代码块）先用像素字露 6 行，点「展开阅读」换成阅读字（`ChatText`）；还在流式写的不折。
 - **一样数据一个来源**：一个 `apiProvider`；档案和农机只从 `workbenchConfigProvider` 读（`agentsProvider`、`runtimesProvider` 由它派生，服务端推的农机变化让它保持最新，旧的刷新不覆盖新的，首次加载失败是错误、和空列表分开）；工地事件只有一个 `sideEventsProvider`。项目目录、每个档案的记性、每个帮工的干活过程由数据层按对象给（`projectCatalogProvider`、`memoryProvider`、`sessionEventsProvider`），干活过程先取历史再接上推送。
 - **一个农场一个 `ProviderScope`**：`ServerConnection`（本机地址，或「连接到本机」那头的 `RemoteServer`）变了，`scopeKey` 变，整个 scope 重建，旧的连接、通话随之释放。`VibeValleyServer.close` 关掉两条流和接口客户端，不再重连；坏帧报进 `problems`，后面的合法帧照收。
 - **农场一直挂着**：工作台的页面盖在农场上面，农场 `Offstage` 且 `TickerMode` 关掉（`router.dart` 的 `_KeepFarm`），帮工的位置不丢。
@@ -120,6 +121,7 @@ VibeValley 只有一个客户端：Flutter 写的 `app/`，桌面和手机都用
 - **加号直接建工单，备选工单的详情是草稿。** 原来加号弹一张表单，主人自己填标题、说明、项目、帮工；主人想说的只是一句话。现在看板的「＋ 写一张」、地图的「写一张工单」、岛上的「派一件活」都马上 `issue.create`，带着话就 `issue.draft`，再打开 `/issues/<id>`；没有 `/issues/new` 这条路由了。详情第一层是一句现在怎样、它问的、一个输入框和「起草 / 再起草」「开工」，下面是草稿各栏，草稿交回来以前主人没改过的栏跟着服务端的新值变。「谁在起草」读服务端给的 `Issue.drafting`，客户端不从帮工里认。
 - **工单详情是居中的弹窗，第一层只有状态。** 主人打开一张工单想知道的是到哪一步、要不要我做点什么、它还在不在干；原来的详情是右侧侧栏，从上到下十五块，给查问题的人看的，「这一轮做了什么」「碰过的文件」「跑过的命令」和干活过程讲的是一件事。现在第一层是进度轨、一句状态、草、一个输入框和按状态的按钮，其余折起来。工作台的弹窗由路由画在页面上（`PxModalLayer`），不推进导航栈：地址照旧是 `/issues/<id>`，直接打开也是它。没过验收的意见就写在同一个输入框里，不另开弹窗。
 - **一个 `Composer`，不是几个各写各的输入框。** 原来 5 处输入框长了 3 种样子、4 种发送：工作台的等发完才清空，农场的先清空、失败了放回去；带话和浇水没有 @、听写、回车发送和 sendKey，浇水的表单关掉就把字丢了。分叉是抄出来的，所以收成一个组件，外形只是参数。放弃了把所有文字输入都收进来：表单的格子不说给谁听，塞进来只会多一堆开关。它和 `Naming`、`DictationButton`、`ManagerStopButton` 一起在 `shared`，因为工单详情（`shared/issue_view.dart`）用它，`shared` 排在 `chat` 下面；放在 `chat`、由皮把输入框交进工单详情，两张皮就又要各拼一份。
+- **长文换字，不把像素字放大。** 全客户端原来只有 Fusion Pixel 12px，汇报、工单说明、干活的输出也是，一段几百字的汇报读起来吃力；像素字只在整数倍下清楚，14、16px 会糊，24px 当正文太大。所以分界按「在说话还是在读一篇东西」，不按字数：对话的节奏留像素，长消息先折起来，展开才换字。放弃了打包一份中文字体（多 10 MB 以上）：苹方在 macOS、iOS 上都有，别的平台退到 Noto。
 
 ## 还没做的
 

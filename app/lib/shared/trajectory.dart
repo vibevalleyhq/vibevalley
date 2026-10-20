@@ -299,7 +299,9 @@ class _Row extends StatelessWidget {
     if (tool) {
       content = Text.rich(_toolLine(step), maxLines: 1, overflow: TextOverflow.ellipsis, style: text);
     } else if (open && step.type == SessionEventType.assistantMessage) {
-      content = PxMarkdown(step.text, style: text);
+      content = PxMarkdown(step.text, style: text, reading: true);
+    } else if (open) {
+      content = PxReadText(step.text, color: ink);
     } else {
       content = Text(open ? step.text : _oneLine(step.text), maxLines: open ? null : 1, overflow: open ? null : TextOverflow.ellipsis, style: text);
     }

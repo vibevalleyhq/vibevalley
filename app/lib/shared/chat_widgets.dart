@@ -191,6 +191,72 @@ class CountChip extends StatelessWidget {
   );
 }
 
+/// A message in a conversation, said in the pixel font. A long one ([readsLong]) shows its first lines and opens in the
+/// reading font; one still streaming ([folds] false) is shown whole, so it does not fold as it grows.
+class ChatText extends StatefulWidget {
+  const ChatText(this.text, {super.key, this.mentions = true, this.style, this.folds = true, this.link = Palette.leaf700});
+  final String text;
+  final bool mentions;
+  final TextStyle? style;
+  final bool folds;
+  final Color link;
+
+  static const _lines = 6;
+
+  @override
+  State<ChatText> createState() => _ChatTextState();
+}
+
+class _ChatTextState extends State<ChatText> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.folds || !readsLong(widget.text)) return PxMarkdown(widget.text, mentions: widget.mentions, style: widget.style);
+    final said = DefaultTextStyle.of(context).style.merge(widget.style);
+    final body = _open
+        ? PxMarkdown(widget.text, mentions: widget.mentions, style: widget.style, reading: true)
+        // Markdown has no line clamp: it is cut at the lines' height instead, and fades out so the cut line does not read as text.
+        : ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (r) => const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+              stops: [0, .7, 1],
+            ).createShader(r),
+            child: ClipRect(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: ChatText._lines * (said.fontSize ?? 12) * (said.height ?? 1.625)),
+                child: OverflowBox(
+                  alignment: Alignment.topLeft,
+                  maxHeight: double.infinity,
+                  child: PxMarkdown(widget.text, mentions: widget.mentions, style: widget.style),
+                ),
+              ),
+            ),
+          );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        body,
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: KitTappable(
+            onTap: () => setState(() => _open = !_open),
+            semanticLabel: _open ? '收起' : '展开阅读',
+            builder: (context, s) => Text(
+              _open ? '收起' : '展开阅读',
+              style: KitText.xs.copyWith(color: widget.link, decoration: s.hovered ? TextDecoration.underline : null, decorationColor: widget.link),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Enter that picks a word in an input method neither sends nor names.
 class Naming extends ChangeNotifier {
   Naming() {

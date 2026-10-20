@@ -26,7 +26,7 @@ class _DispatchNoteState extends State<DispatchNote> {
         children: [
           Flexible(
             child: _open
-                ? PxMarkdown(widget.text, mentions: true, style: widget.style)
+                ? PxMarkdown(widget.text, mentions: true, style: widget.style, reading: true)
                 : Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: KitText.sm.merge(widget.style)),
           ),
           const SizedBox(width: 6),

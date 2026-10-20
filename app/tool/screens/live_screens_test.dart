@@ -90,6 +90,13 @@ void main() {
       // The code font (theme monoFont): the app finds Menlo on the system; flutter_test only has what it is given.
       final mono = FontLoader(monoFont)..addFont(Future.value(ByteData.sublistView(File('/System/Library/Fonts/SFNSMono.ttf').readAsBytesSync())));
       await mono.load();
+      // The reading font (theme readFont): the app names PingFang SC, which macOS keeps as a downloaded font asset.
+      final assets = Directory('/System/Library/AssetsV2').listSync().whereType<Directory>().where((d) => d.path.contains('MobileAsset_Font'));
+      final ping = assets.expand((d) => d.listSync(recursive: true)).whereType<File>().where((f) => f.path.endsWith('/PingFang.ttc')).firstOrNull;
+      if (ping != null) {
+        final read = FontLoader(readFont)..addFont(Future.value(ByteData.sublistView(ping.readAsBytesSync())));
+        await read.load();
+      }
     });
     final [width, height] = (Platform.environment['VIBEVALLEY_SCREEN'] ?? '1440x900').split('x').map(double.parse).toList();
     tester.view.physicalSize = Size(width, height);

@@ -20,6 +20,19 @@ abstract final class KitText {
   static const x2l = TextStyle(fontFamily: pixelFont, fontSize: 24, height: 32 / 24, fontWeight: FontWeight.w400, color: Palette.bark900);
 
   static const mono = TextStyle(fontFamily: monoFont, fontFamilyFallback: monoFallback, fontSize: 12, height: 4 / 3, color: Palette.bark900);
+
+  /// What is read rather than said: a report, an issue's description, a round's input and output. Labels and chat stay pixel.
+  static const read = TextStyle(
+    fontFamily: readFont,
+    fontFamilyFallback: readFallback,
+    fontSize: 14,
+    height: 1.7,
+    fontWeight: FontWeight.w400,
+    color: Palette.bark900,
+  );
+
+  /// A line of [read] is at most this many of its characters wide.
+  static const readMeasure = 40;
 }
 
 Duration kitMotion(BuildContext context, Duration d) => (MediaQuery.maybeDisableAnimationsOf(context) ?? false) ? Duration.zero : d;

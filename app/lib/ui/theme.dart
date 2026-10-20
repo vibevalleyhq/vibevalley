@@ -53,6 +53,13 @@ const monoFont = 'Menlo';
 /// Chinese in code text has no glyph in these; it is drawn in the pixel font, so that comes last.
 const monoFallback = ['SF Mono', 'Consolas', 'Courier New', 'monospace', pixelFont];
 
+/// Long text to read: the system's Chinese sans, not bundled. The pixel font is sharp only at 12 and 24, too small and too big for a page.
+const readFont = 'PingFang SC';
+const readFallback = ['Hiragino Sans GB', 'Noto Sans CJK SC', 'Noto Sans SC', 'Microsoft YaHei', 'sans-serif'];
+
+/// Code inside long text: its Chinese in the reading font rather than the pixel one.
+const readMonoFallback = ['SF Mono', 'Consolas', 'Courier New', 'monospace', readFont, ...readFallback];
+
 BoxDecoration pixelBox({Color fill = Palette.cream100, Color border = Palette.bark900}) => BoxDecoration(
   color: fill,
   border: Border.all(color: border, width: 2),
