@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import 'chat_composer.dart';
 import '../../shared/chat_rules.dart';
 import '../../chat/chat_state.dart';
@@ -16,8 +16,6 @@ import '../workbench_shell.dart' show workbenchHead;
 import 'message_list.dart';
 import '../../rules/chat.dart';
 import '../../rules/sessions.dart';
-
-const _grey = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, color: Palette.bark500);
 
 enum _Tab { chat, jobs, schedules }
 
@@ -107,10 +105,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         ? null
         : _ThreadPane(thread: thread, onClose: () => _show(channel != null && channel.kind != ConversationKind.general ? channel.id : null));
 
-    return ColoredBox(
-      color: Palette.cream50,
-      child: DefaultTextStyle(
-        style: PxText.sm,
+    return ProScope(
+      child: ColoredBox(
+        color: ProColor.page,
         child: Stack(
           children: [
             Positioned.fill(
@@ -127,8 +124,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           : Container(
                               width: 416,
                               decoration: const BoxDecoration(
-                                color: Palette.cream50,
-                                border: Border(left: pxLine),
+                                color: ProColor.page,
+                                border: Border(left: proLine),
                               ),
                               child: pane,
                             ),
@@ -152,8 +149,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       ? null
                       : Container(
                           decoration: const BoxDecoration(
-                            color: Palette.cream50,
-                            border: Border(left: pxLine),
+                            color: ProColor.page,
+                            border: Border(left: proLine),
                           ),
                           child: pane,
                         ),
@@ -170,31 +167,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       if ((channel?.description ?? '').isNotEmpty) channel!.description!,
       if ((channel?.project ?? '').isNotEmpty) '默认项目 ${channel!.project}',
     ].join(' · ');
-    final title = Text(channelName(channel), maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.lg.copyWith(height: 1.25));
+    final title = Text(channelName(channel), maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.lg);
     return Container(
       height: workbenchHead,
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: const BoxDecoration(border: Border(bottom: pxLine)),
+      decoration: const BoxDecoration(border: Border(bottom: proLine)),
       child: Row(
         children: [
           if (!wideSidebar) ...[
-            PxButton(
-              size: PxSize.custom,
-              semanticLabel: '频道列表',
-              onPressed: () => setState(() => _drawer = !_drawer),
-              child: const SizedBox.square(dimension: 32, child: Center(child: SpriteIcon('icon-board', size: 20))),
-            ),
+            ProButton.icon('icon-board', iconSize: 18, semanticLabel: '频道列表', onPressed: () => setState(() => _drawer = !_drawer)),
             const SizedBox(width: 12),
           ],
           Container(
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Palette.wheat,
-              border: Border.all(color: Palette.bark900, width: 2),
-            ),
-            child: const Text('#', style: PxText.lg),
+            decoration: const BoxDecoration(color: Palette.wheat, borderRadius: BorderRadius.all(Radius.circular(8))),
+            child: const Text('#', style: ProText.lg),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -203,7 +192,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (channel?.kind == ConversationKind.general) Tooltip(message: '默认的频道：你、管家和帮工都在这儿', child: title) else title,
-                if (about.isNotEmpty) Text(about, maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
+                if (about.isNotEmpty) Text(about, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.meta),
               ],
             ),
           ),
@@ -213,7 +202,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               width: 192,
               child: CallbackShortcuts(
                 bindings: {const SingleActivator(LogicalKeyboardKey.escape): () => setState(() => _search = null)},
-                child: PxTextInput(
+                child: ProTextInput(
                   value: _search!,
                   autofocus: true,
                   onChanged: (v) => setState(() => _search = v),
@@ -225,18 +214,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             ),
           ],
           const SizedBox(width: 12),
-          PxButton(
-            size: PxSize.custom,
-            semanticLabel: '找消息',
-            onPressed: () => setState(() => _search = _search == null ? '' : null),
-            child: const SizedBox.square(dimension: 32, child: Center(child: SpriteIcon('act-search', size: 20))),
-          ),
-          const SizedBox(width: 12),
-          PxButton(
-            size: PxSize.custom,
+          ProButton.icon('act-search', iconSize: 18, semanticLabel: '找消息', onPressed: () => setState(() => _search = _search == null ? '' : null)),
+          const SizedBox(width: 4),
+          ProButton.icon(
+            'icon-wrench',
+            iconSize: 18,
             semanticLabel: '频道设置',
             onPressed: channel == null ? null : () => showChannelSettingsDialog(context, channel),
-            child: const SizedBox.square(dimension: 32, child: Center(child: SpriteIcon('icon-wrench', size: 20))),
           ),
         ],
       ),
@@ -244,7 +228,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _tabs() => Container(
-    decoration: const BoxDecoration(border: Border(bottom: pxLine)),
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    decoration: const BoxDecoration(border: Border(bottom: proLine)),
     child: Semantics(
       label: '频道里的',
       container: true,
@@ -271,17 +256,20 @@ class _TabButton extends StatelessWidget {
     onTap: onTap,
     selected: on,
     builder: (context, s) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: on ? Palette.wheat : (s.hovered ? Palette.cream100 : null),
-        border: const Border(right: pxLine),
+        border: Border(bottom: BorderSide(color: on ? ProColor.ink : const Color(0x00000000), width: 2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SpriteIcon(icon, size: 18),
+          Opacity(opacity: on || s.hovered ? 1 : .7, child: SpriteIcon(icon, size: 16)),
           const SizedBox(width: 6),
-          Text(label, style: PxText.sm),
+          Text(
+            label,
+            style: ProText.sm.copyWith(color: on || s.hovered ? ProColor.ink : ProColor.muted, fontWeight: on ? FontWeight.w600 : FontWeight.w400),
+          ),
         ],
       ),
     ),
@@ -306,8 +294,8 @@ class _Sidebar extends ConsumerWidget {
       container: true,
       child: Container(
         decoration: const BoxDecoration(
-          color: Palette.cream100,
-          border: Border(right: pxLine),
+          color: ProColor.side,
+          border: Border(right: proLine),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -316,8 +304,8 @@ class _Sidebar extends ConsumerWidget {
               height: workbenchHead,
               padding: const EdgeInsets.symmetric(horizontal: 20),
               alignment: Alignment.centerLeft,
-              decoration: const BoxDecoration(border: Border(bottom: pxLine)),
-              child: const Text('聊天', style: PxText.xl),
+              decoration: const BoxDecoration(border: Border(bottom: proLine)),
+              child: const Text('聊天', style: ProText.xl),
             ),
             Expanded(
               child: ListView(
@@ -326,18 +314,7 @@ class _Sidebar extends ConsumerWidget {
                   _Section(
                     title: '频道',
                     count: channels.isEmpty ? 1 : channels.length,
-                    action: Tappable(
-                      onTap: onNew,
-                      tooltip: '创建频道',
-                      semanticLabel: '创建频道',
-                      builder: (context, s) => Container(
-                        width: 28,
-                        height: 28,
-                        color: s.hovered ? Palette.creamHover : null,
-                        alignment: Alignment.center,
-                        child: const SpriteIcon('button-add', size: 16),
-                      ),
-                    ),
+                    action: ProButton.icon('button-add', semanticLabel: '创建频道', tooltip: '创建频道', onPressed: onNew),
                     children: [
                       // Before the first word the general is not there yet: it is still where you talk.
                       if (channels.isEmpty) const _ChannelRow(label: generalName, here: true, unread: 0, onTap: null),
@@ -360,7 +337,7 @@ class _Sidebar extends ConsumerWidget {
                       if (sessions.isEmpty)
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12),
-                          child: Text('还没有帮工在地里：在频道里跟管家说一件活。', style: _grey),
+                          child: Text('还没有帮工在地里：在频道里跟管家说一件活。', style: ProText.meta),
                         ),
                       for (final h in sessions)
                         _SessionRow(
@@ -395,20 +372,21 @@ class _ChannelRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget row(TapState? s) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: here ? Palette.leaf300 : (s?.hovered ?? false ? Palette.creamHover : null),
-        border: Border.all(color: here ? Palette.bark900 : const Color(0x00000000), width: 2),
-        boxShadow: here ? pxDrop : null,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: here ? ProColor.selected : (s?.hovered ?? false ? ProColor.hover : null), borderRadius: proRadius),
       child: Row(
         children: [
-          const Text('#', style: PxText.sm),
+          Text('#', style: ProText.sm.copyWith(color: ProColor.faint)),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ProText.sm.copyWith(fontWeight: here || unread > 0 ? FontWeight.w600 : FontWeight.w400),
+            ),
           ),
-          if (unread > 0) CountChip(unread),
+          if (unread > 0) ProCount(unread),
         ],
       ),
     );
@@ -476,9 +454,12 @@ class _SectionState extends State<_Section> with SingleTickerProviderStateMixin 
                         child: const SpriteIcon('button-next', size: 12),
                       ),
                       const SizedBox(width: 4),
-                      Text(widget.title, style: PxText.sm),
+                      Text(
+                        widget.title,
+                        style: ProText.xs.copyWith(fontWeight: FontWeight.w600, color: ProColor.muted),
+                      ),
                       const SizedBox(width: 4),
-                      Text('${widget.count}', style: PxText.sm.copyWith(color: Palette.bark500)),
+                      Text('${widget.count}', style: ProText.meta.copyWith(color: ProColor.faint)),
                     ],
                   ),
                 ),
@@ -547,11 +528,8 @@ class _SessionRow extends StatelessWidget {
       onTap: thread == null ? null : () => onShow(thread.id),
       tooltip: phase,
       builder: (context, s) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(
-          color: active ? Palette.cream50 : (s.hovered ? Palette.creamHover : null),
-          border: Border.all(color: active ? Palette.bark900 : const Color(0x00000000), width: 2),
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(color: active ? ProColor.selected : (s.hovered ? ProColor.hover : null), borderRadius: proRadius),
         child: Row(
           children: [
             SizedBox.square(
@@ -559,19 +537,19 @@ class _SessionRow extends StatelessWidget {
               child: Stack(
                 children: [
                   AgentHead(agent: h.agent, size: 24),
-                  Positioned(right: 0, bottom: 0, child: StateDot(color: Color(phaseDot(h.phase)))),
+                  Positioned(right: -1, bottom: -1, child: ProDot(Color(phaseDot(h.phase)))),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            Text(h.name, style: PxText.sm),
+            Text(h.name, style: ProText.sm),
             const SizedBox(width: 8),
             PhaseGlyph(h.phase, size: 14),
             const SizedBox(width: 4),
             Expanded(
-              child: Text(phase, maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
+              child: Text(phase, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.meta),
             ),
-            if (unread > 0) CountChip(unread),
+            if (unread > 0) ProCount(unread),
           ],
         ),
       ),
@@ -594,16 +572,16 @@ class _ManagerLine extends ConsumerWidget {
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(border: Border(top: pxLine)),
+      decoration: const BoxDecoration(border: Border(top: proLine)),
       child: Row(
         children: [
           const ManagerHead(size: 32),
           const SizedBox(width: 8),
-          const Text('管家', style: PxText.sm),
+          const Text('管家', style: ProText.sm),
           const SizedBox(width: 8),
-          Container(width: 8, height: 8, color: dot),
+          ProDot(dot, size: 8),
           const SizedBox(width: 6),
-          Text(_mood[mood]!, style: _grey),
+          Text(_mood[mood]!, style: ProText.meta),
           if (mood == ManagerState.thinking) ...[const SizedBox(width: 6), const ThinkingDots()],
         ],
       ),
@@ -631,7 +609,7 @@ class _Empty extends StatelessWidget {
             Text(
               text,
               textAlign: TextAlign.center,
-              style: PxText.sm.copyWith(height: 1.625, color: Palette.bark500),
+              style: ProText.sm.copyWith(color: ProColor.muted),
             ),
           ],
         ),
@@ -640,7 +618,8 @@ class _Empty extends StatelessWidget {
   );
 }
 
-BoxDecoration get _card => const BoxDecoration(color: Palette.cream50, border: Border.fromBorderSide(pxLine), boxShadow: pxDrop);
+BoxDecoration get _card =>
+    const BoxDecoration(color: ProColor.page, border: Border.fromBorderSide(proLine), borderRadius: BorderRadius.all(Radius.circular(8)));
 
 class _Jobs extends ConsumerWidget {
   const _Jobs({required this.channel, required this.onShow});
@@ -671,30 +650,28 @@ class _Jobs extends ConsumerWidget {
                       Text.rich(
                         TextSpan(
                           children: [
-                            TextSpan(text: h.name),
-                            TextSpan(text: '  @${h.id} ${h.project ?? ''}${h.branch != null ? ' · ${h.branch}' : ''}', style: _grey),
+                            TextSpan(
+                              text: h.name,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            TextSpan(text: '  @${h.id} ${h.project ?? ''}${h.branch != null ? ' · ${h.branch}' : ''}', style: ProText.meta),
                           ],
                         ),
-                        style: PxText.sm,
+                        style: ProText.sm,
                       ),
-                      Text(h.brief, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
+                      Text(h.brief, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.sm),
                       Row(
                         children: [
                           PhaseGlyph(h.phase, size: 14),
                           const SizedBox(width: 4),
-                          Expanded(child: Text(phaseText(h, nowMs()), style: _grey)),
+                          Expanded(child: Text(phaseText(h, nowMs()), style: ProText.meta)),
                         ],
                       ),
                     ],
                   ),
                 ),
                 if (jobThreadOf(farm?.chat, h) case final thread?)
-                  PxButton(
-                    size: PxSize.custom,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    onPressed: () => onShow(thread.id),
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [Glyph('button-thread'), SizedBox(width: 6), Text('工单串')]),
-                  ),
+                  ProButton.text('工单串', icon: 'button-thread', size: ProSize.sm, onPressed: () => onShow(thread.id)),
               ],
             ),
           ),
@@ -732,7 +709,7 @@ class _SchedulesState extends ConsumerState<_Schedules> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SpriteIcon('icon-clock', size: 22),
+                  const SpriteIcon('icon-clock', size: 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -741,45 +718,45 @@ class _SchedulesState extends ConsumerState<_Schedules> {
                         Text.rich(
                           TextSpan(
                             children: [
-                              TextSpan(text: s.name),
+                              TextSpan(
+                                text: s.name,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
                               TextSpan(
                                 text:
                                     '  ${s.whenText ?? ''} · ${s.pending == true ? s.nextText ?? '' : '下次 ${s.nextText ?? ''}'}'
                                     '${s.agent != null ? ' · 直接派 ${s.agent}' : ''}${s.by == ScheduleBy.manager ? ' · 管家定的' : ''}',
-                                style: _grey,
+                                style: ProText.meta,
                               ),
                             ],
                           ),
-                          style: PxText.sm,
+                          style: ProText.sm,
                         ),
-                        Text(s.text, style: PxText.sm),
+                        Text(s.text, style: ProText.sm),
                       ],
                     ),
                   ),
                   const SizedBox(width: 12),
                   if (s.pending == true) ...[
-                    PxButton(
-                      size: PxSize.custom,
-                      tone: PxTone.accent,
+                    ProButton(
+                      size: ProSize.sm,
+                      tone: ProTone.accent,
                       semanticLabel: '同意定时「${s.name}」',
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       onPressed: () => unawaited(actions.setScheduleEnabled(s.id, true).catchError((Object _) {})),
                       child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('mark-check', size: 16), SizedBox(width: 4), Text('同意')]),
                     ),
                     const SizedBox(width: 12),
-                    PxButton(
-                      size: PxSize.custom,
+                    ProButton(
+                      size: ProSize.sm,
                       semanticLabel: '不要定时「${s.name}」',
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       onPressed: () => unawaited(actions.removeSchedule(s.id).catchError((Object _) {})),
                       child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('mark-cross', size: 16), SizedBox(width: 4), Text('不要')]),
                     ),
                   ] else ...[
-                    PxButton.text(
+                    ProButton.text(
                       s.enabled ? '开着' : '关着',
-                      size: PxSize.custom,
-                      tone: s.enabled ? PxTone.accent : PxTone.plain,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      size: ProSize.sm,
+                      tone: s.enabled ? ProTone.accent : ProTone.plain,
                       onPressed: () => unawaited(actions.setScheduleEnabled(s.id, !s.enabled).catchError((Object _) {})),
                     ),
                     const SizedBox(width: 12),
@@ -787,11 +764,10 @@ class _SchedulesState extends ConsumerState<_Schedules> {
                       onTapOutside: (_) {
                         if (_deleting == s.id) setState(() => _deleting = null);
                       },
-                      child: PxButton(
-                        size: PxSize.custom,
+                      child: ProButton(
+                        size: ProSize.sm,
                         tooltip: _deleting == s.id ? null : '删掉',
                         semanticLabel: _deleting == s.id ? '确定删？' : '删掉定时「${s.name}」',
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         child: _deleting == s.id ? const Text('确定删？') : const SpriteIcon('button-delete', size: 16),
                         onPressed: () {
                           if (_deleting == s.id) {
@@ -836,7 +812,7 @@ class _ThreadPane extends ConsumerWidget {
           Container(
             height: workbenchHead,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: const BoxDecoration(border: Border(bottom: pxLine)),
+            decoration: const BoxDecoration(border: Border(bottom: proLine)),
             child: Row(
               children: [
                 SizedBox.square(
@@ -853,13 +829,13 @@ class _ThreadPane extends ConsumerWidget {
                         threadTitle(farm?.chat, thread, issues: farm?.issues ?? const [], sessions: sessions),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: PxText.sm,
+                        style: ProText.sm.copyWith(fontWeight: FontWeight.w600),
                       ),
                       Row(
                         children: [
                           if (session != null) ...[PhaseGlyph(session.phase, size: 14), const SizedBox(width: 4)],
                           Flexible(
-                            child: Text(status, maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
+                            child: Text(status, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.meta),
                           ),
                         ],
                       ),
@@ -867,12 +843,7 @@ class _ThreadPane extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                PxButton(
-                  size: PxSize.custom,
-                  semanticLabel: '关上串',
-                  onPressed: onClose,
-                  child: const SizedBox.square(dimension: 28, child: Center(child: SpriteIcon('button-close', size: 16))),
-                ),
+                ProButton.icon('button-close', semanticLabel: '关上串', onPressed: onClose),
               ],
             ),
           ),

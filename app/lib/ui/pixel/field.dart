@@ -114,21 +114,6 @@ class PxTip extends StatelessWidget {
   }
 }
 
-/// Follows a controlled `value` without moving the caret while the user types.
-class _Synced {
-  _Synced(String value) : controller = TextEditingController(text: value);
-  final TextEditingController controller;
-
-  /// `at`: where the cursor goes when the text is replaced from outside; the end when not given.
-  void follow(String value, [TextSelection? at]) {
-    if (controller.text == value) return;
-    controller.value = TextEditingValue(
-      text: value,
-      selection: at ?? TextSelection.collapsed(offset: value.length),
-    );
-  }
-}
-
 class _InputBox extends StatelessWidget {
   const _InputBox({required this.focused, required this.enabled, required this.child, this.height});
   final bool focused;
@@ -208,7 +193,7 @@ class PxTextInput extends StatefulWidget {
 }
 
 class _PxTextInputState extends State<PxTextInput> {
-  late final _Synced _text = _Synced(widget.value);
+  late final SyncedText _text = SyncedText(widget.value);
   FocusNode? _own;
   FocusNode get _focus => widget.focusNode ?? (_own ??= FocusNode());
 
@@ -379,7 +364,7 @@ class PxTextArea extends StatefulWidget {
 }
 
 class _PxTextAreaState extends State<PxTextArea> {
-  late final _Synced _text = _Synced(widget.value);
+  late final SyncedText _text = SyncedText(widget.value);
   FocusNode? _own;
   FocusNode get _focus => widget.focusNode ?? (_own ??= FocusNode());
 

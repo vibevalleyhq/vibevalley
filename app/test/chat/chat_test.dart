@@ -11,7 +11,6 @@ import 'package:vibevalley/data/prefs.dart';
 import 'package:vibevalley/data/server.dart';
 import 'package:vibevalley/workbench/chat/chat_page.dart';
 import 'package:vibevalley/shared/chat_rules.dart';
-import 'package:vibevalley/shared/chat_widgets.dart';
 import 'package:vibevalley/host/desktop.dart';
 import 'package:vibevalley/farm/chat_window.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
@@ -301,7 +300,8 @@ void main() {
       expect(_rich('默认的频道'), findsNothing);
       expect(find.byTooltip('默认的频道：你、管家和帮工都在这儿'), findsOneWidget);
       expect(_rich('回车发送'), findsNothing);
-      expect(find.byTooltip('回车发送 · Shift+回车换行 · @ 叫人'), findsOneWidget);
+      expect(find.byTooltip('回车发送 · Shift+回车换行'), findsOneWidget);
+      expect(find.text('@ 叫人'), findsOneWidget);
       final read = server.to('POST', '/api/v1/channels/c1/read');
       expect(read, hasLength(1));
       expect(jsonDecode(read.single.body), {'number': 2});
@@ -409,7 +409,7 @@ void main() {
       final field = find.byType(TextField).first;
       await t.enterText(field, '叫 @w');
       await t.pump();
-      expect(find.byType(NamingMenu), findsOneWidget);
+      expect(find.text('@w1'), findsOneWidget, reason: 'the menu offers w1');
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump();
       expect(t.widget<TextField>(field).controller!.text, '叫 @w1 ');

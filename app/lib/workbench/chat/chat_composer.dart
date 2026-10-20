@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/messages.dart';
 import '../../gen/vibevalley.dart';
-import '../../shared/composer.dart';
-import '../../shared/manager_stop_button.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
+import '../shared/composer.dart';
 
 class ChatComposer extends ConsumerWidget {
   const ChatComposer({super.key, required this.conversation, required this.placeholder});
@@ -14,12 +13,11 @@ class ChatComposer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Container(
-    decoration: const BoxDecoration(border: Border(top: pxLine)),
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    child: Composer(
-      look: ComposerLook.panel,
+    decoration: const BoxDecoration(border: Border(top: proLine)),
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+    child: WorkbenchComposer(
       placeholder: placeholder,
-      tools: const [ManagerStopButton()],
+      stop: true,
       onSend: (text, key) => ref.read(messagesProvider).send(text, sendKey: key, conversation: conversation),
     ),
   );

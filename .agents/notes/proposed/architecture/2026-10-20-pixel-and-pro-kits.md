@@ -117,6 +117,11 @@ workbench/       用 ui/pro 画
 
 每一步各自跑 `bun run flutter:check`，按 `verify-app` 截图。
 
+### 进展
+
+- **第 1 步做完了**（2026-10-20，`6a623e7`）：像素组在 `ui/pixel`，共用的在 `ui/`（`common.dart`）；`KitText` → `PxText`，`KitTappable`、`KitState` → `Tappable`、`TapState`（行为，不是样子，所以进共用层），`kitMotion`、`kitMoves`、`kitOpenLink`、`kitDrop`、`kitBare` 去掉 kit 前缀；`app-imports` 有了 `KITS` 和 `KIT_DEBT`（起步 54 个文件）。
+- **第 2 步做了一半**：`ui/pro` 起来了（`ProText`、`ProButton`、`ProField`、`ProTextInput`、`ProTextArea`、`ProDialog`、`ProMarkdown`、`ProScope`）；Markdown 的排版挪到共用的 `MarkdownView`，两组只给一张 `MdLook`；听写和叫停管家的逻辑成了 `DictationControl`、`ManagerStopControl`，两组各画按钮；`ComposerDraft` 之上工作台有自己的 `WorkbenchComposer`。工作台的聊天页（`workbench/chat` 四个文件）已经是专业组，`KIT_DEBT` 剩 50。还没做：工单详情（`IssueView` 的规则抽进 `shared/issue_state.dart`）。
+
 ## Alternatives considered
 
 **一套组件、两种外形（`KitSkin`）。** 本文取代了同一天提出的那一篇（「工作台换成专业皮：一套组件，两种外形」）。它让每个组件读上下文里的皮，`shared` 里的视图写一份就能两边用。放弃它，是因为两张皮差的是结构：像素的窗框、斜面、牌子和专业的列表行、表格、菜单对不上同一套接口，只能取交集，或者每个组件里写两个 build，等于两组组件挤在一个文件里；而且它要一次把 `KitText` 的 508 处改成从上下文取，农场也跟着动。两组组件让农场只挪目录，工作台一页一页迁。

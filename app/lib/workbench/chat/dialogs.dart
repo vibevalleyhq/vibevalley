@@ -7,13 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../audio/sfx.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../../chat/chat_state.dart';
 import '../../rules/chat.dart';
 
-Future<void> showNewChannelDialog(BuildContext context) => showPxDialog<void>(context, title: const Text('创建频道'), builder: (_) => const NewChannelForm());
+Future<void> showNewChannelDialog(BuildContext context) => showProDialog<void>(context, title: const Text('创建频道'), builder: (_) => const NewChannelForm());
 
-Future<void> showChannelSettingsDialog(BuildContext context, Conversation channel) => showPxDialog<void>(
+Future<void> showChannelSettingsDialog(BuildContext context, Conversation channel) => showProDialog<void>(
   context,
   title: Text('${channel.kind == ConversationKind.general ? '# $generalName' : '# ${channel.name ?? ''}'} 的设置'),
   builder: (_) => ChannelSettingsForm(channel: channel),
@@ -30,14 +30,20 @@ class _Actions extends StatelessWidget {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        PxButton.text(
+        ProButton.text(
           '取消',
-          size: PxSize.custom,
+          size: ProSize.custom,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
           onPressed: () => Navigator.of(context).pop(),
         ),
         const SizedBox(width: 12),
-        PxButton.text(submit, size: PxSize.custom, tone: PxTone.primary, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6), onPressed: onSubmit),
+        ProButton.text(
+          submit,
+          size: ProSize.custom,
+          tone: ProTone.primary,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          onPressed: onSubmit,
+        ),
       ],
     ),
   );
@@ -49,7 +55,7 @@ class _ProjectInput extends ConsumerWidget {
   final ValueChanged<String> onChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => PxTextInput(
+  Widget build(BuildContext context, WidgetRef ref) => ProTextInput(
     value: value,
     onChanged: onChanged,
     placeholder: '比如 clock-in',
@@ -98,11 +104,11 @@ class _NewChannelFormState extends ConsumerState<NewChannelForm> {
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      PxField(
+      ProField(
         label: '名称',
         required: true,
         hint: const Text('字母、数字、汉字、- 和 _，不超过 24 个字'),
-        child: PxTextInput(
+        child: ProTextInput(
           value: _name,
           autofocus: true,
           onChanged: (v) => setState(() {
@@ -115,13 +121,13 @@ class _NewChannelFormState extends ConsumerState<NewChannelForm> {
         ),
       ),
       const SizedBox(height: 16),
-      PxField(
+      ProField(
         label: '描述',
         optional: true,
-        child: PxTextArea(rows: 3, value: _description, onChanged: (v) => setState(() => _description = v), placeholder: '这个频道是做什么的？', semanticLabel: '描述'),
+        child: ProTextArea(rows: 3, value: _description, onChanged: (v) => setState(() => _description = v), placeholder: '这个频道是做什么的？', semanticLabel: '描述'),
       ),
       const SizedBox(height: 16),
-      PxField(
+      ProField(
         label: '默认项目',
         optional: true,
         hint: const Text('在这个频道里派活、没说项目时，就在这个项目里干'),
@@ -130,7 +136,7 @@ class _NewChannelFormState extends ConsumerState<NewChannelForm> {
       if (_error != null)
         Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Text(_error!, style: PxText.sm.copyWith(color: Palette.berry)),
+          child: Text(_error!, style: ProText.sm.copyWith(color: Palette.berry)),
         ),
       _Actions(submit: '创建频道', onSubmit: _busy || _name.trim().isEmpty ? null : _submit),
     ],
@@ -173,13 +179,13 @@ class _ChannelSettingsFormState extends ConsumerState<ChannelSettingsForm> {
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      PxField(
+      ProField(
         label: '描述',
         optional: true,
-        child: PxTextArea(rows: 3, value: _description, onChanged: (v) => setState(() => _description = v), placeholder: '这个频道是做什么的？', semanticLabel: '描述'),
+        child: ProTextArea(rows: 3, value: _description, onChanged: (v) => setState(() => _description = v), placeholder: '这个频道是做什么的？', semanticLabel: '描述'),
       ),
       const SizedBox(height: 16),
-      PxField(
+      ProField(
         label: '默认项目',
         optional: true,
         hint: const Text('空着就没有：派活时管家要问在哪个项目'),
@@ -188,7 +194,7 @@ class _ChannelSettingsFormState extends ConsumerState<ChannelSettingsForm> {
       if (_error != null)
         Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Text(_error!, style: PxText.sm.copyWith(color: Palette.berry)),
+          child: Text(_error!, style: ProText.sm.copyWith(color: Palette.berry)),
         ),
       _Actions(submit: '保存', onSubmit: _busy ? null : _submit),
     ],

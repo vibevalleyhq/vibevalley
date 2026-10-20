@@ -7,17 +7,21 @@ import '../ui/pixel/pixel.dart';
 import 'chat_widgets.dart';
 import '../voice/dictation.dart';
 
+/// What a dictation button shows and does now; each kit draws it.
+typedef DictationLook = ({String glyph, String tip, bool recording, VoidCallback? onPressed});
+
 /// Tap to start talking, tap again to stop: the words go into the original input field, for the owner to read before sending.
-class DictationButton extends ConsumerStatefulWidget {
-  const DictationButton({super.key, required this.controller, this.size = 28});
+/// It owns the dictation's target; [builder] only draws the button.
+class DictationControl extends ConsumerStatefulWidget {
+  const DictationControl({super.key, required this.controller, required this.builder});
   final TextEditingController controller;
-  final double size;
+  final Widget Function(BuildContext context, DictationLook look) builder;
 
   @override
-  ConsumerState<DictationButton> createState() => _DictationButtonState();
+  ConsumerState<DictationControl> createState() => _DictationControlState();
 }
 
-class _DictationButtonState extends ConsumerState<DictationButton> {
+class _DictationControlState extends ConsumerState<DictationControl> {
   late DictationTarget _target;
   DictationTarget _forController(TextEditingController controller) => DictationTarget((words) => insertDictated(controller, words));
   @override
@@ -27,7 +31,7 @@ class _DictationButtonState extends ConsumerState<DictationButton> {
   }
 
   @override
-  void didUpdateWidget(covariant DictationButton oldWidget) {
+  void didUpdateWidget(covariant DictationControl oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.controller, widget.controller)) {
       _target.dispose();
@@ -53,18 +57,36 @@ class _DictationButtonState extends ConsumerState<DictationButton> {
       DictationPhase.recording => ('button-stop', '在听…再点一下停'),
       DictationPhase.transcribing => ('button-wait', '在认字…'),
     };
-    return PxButton(
-      size: PxSize.custom,
-      tone: dictation.phase == DictationPhase.recording ? PxTone.danger : PxTone.plain,
-      tooltip: tip,
-      semanticLabel: '听写',
+    return widget.builder(context, (
+      glyph: glyph,
+      tip: tip,
+      recording: dictation.phase == DictationPhase.recording,
       onPressed: off || dictation.phase == DictationPhase.transcribing ? null : () => dictation.toggle(_target),
-      child: SizedBox.square(
-        dimension: widget.size,
-        child: Center(child: Glyph(glyph)),
-      ),
-    );
+    ));
   }
+}
+
+/// The pixel kit's dictation button.
+class DictationButton extends StatelessWidget {
+  const DictationButton({super.key, required this.controller, this.size = 28});
+  final TextEditingController controller;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => DictationControl(
+    controller: controller,
+    builder: (context, d) => PxButton(
+      size: PxSize.custom,
+      tone: d.recording ? PxTone.danger : PxTone.plain,
+      tooltip: d.tip,
+      semanticLabel: '听写',
+      onPressed: d.onPressed,
+      child: SizedBox.square(
+        dimension: size,
+        child: Center(child: Glyph(d.glyph)),
+      ),
+    ),
+  );
 }
 
 /// Puts dictated words at the cursor, or at the end when the field has none.

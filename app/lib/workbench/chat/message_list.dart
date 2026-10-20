@@ -5,21 +5,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../../data/remote.dart' show agentsProvider;
 import '../../shared/chat_rules.dart';
 import '../../chat/chat_state.dart';
 import '../../chat/turn_steps.dart';
 import '../../shared/chat_widgets.dart';
-import '../../chat/dispatch_note.dart';
 import '../../rules/chat.dart';
 import '../../rules/sessions.dart';
 import '../../rules/money.dart';
 
 /// A sender's messages this close together share one header.
 const _runMs = 5 * 60000;
-
-const _grey = TextStyle(fontFamily: pixelFont, fontSize: 12, height: 4 / 3, color: Palette.bark500);
 
 class MessageList extends ConsumerStatefulWidget {
   const MessageList({super.key, required this.conversation, this.filter, this.emptyText});
@@ -122,22 +119,20 @@ class _MessageListState extends ConsumerState<MessageList> {
                       onTap: () => unawaited(ref.read(chatActionsProvider).loadOlder(conversation!.id).catchError((Object _) {})),
                       builder: (context, s) => Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Text('更早的消息', style: _grey.copyWith(color: s.hovered ? Palette.bark900 : Palette.bark500)),
+                        child: Text('更早的消息', style: ProText.meta.copyWith(color: s.hovered ? Palette.bark900 : Palette.bark500)),
                       ),
                     ),
                   )
                 else
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Center(child: Text(hasFilter ? '含「${widget.filter}」的消息' : '消息的开头', style: _grey)),
+                    child: Center(child: Text(hasFilter ? '含「${widget.filter}」的消息' : '消息的开头', style: ProText.meta)),
                   ),
                 if (parent != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.only(bottom: 8),
-                    decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: Palette.cream300, width: 2)),
-                    ),
+                    decoration: const BoxDecoration(border: Border(bottom: proLine)),
                     child: _MessageRow(message: parent, continues: false),
                   ),
                 if (items.isEmpty)
@@ -146,7 +141,7 @@ class _MessageListState extends ConsumerState<MessageList> {
                     child: Text(
                       hasFilter ? '没有找到' : (widget.emptyText ?? ''),
                       textAlign: TextAlign.center,
-                      style: PxText.sm.copyWith(color: Palette.bark500),
+                      style: ProText.sm.copyWith(color: ProColor.muted),
                     ),
                   ),
                 ...rows,
@@ -223,12 +218,12 @@ class _DayLine extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 12),
     child: Row(
       children: [
-        Expanded(child: Container(height: 2, color: Palette.cream300)),
+        Expanded(child: Container(height: 1, color: ProColor.line)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(label, style: _grey),
+          child: Text(label, style: ProText.meta),
         ),
-        Expanded(child: Container(height: 2, color: Palette.cream300)),
+        Expanded(child: Container(height: 1, color: ProColor.line)),
       ],
     ),
   );
@@ -246,13 +241,13 @@ class _Row extends StatelessWidget {
       name: line.role == LineRole.user ? '主人' : '管家',
       meta: '语音 ${workbenchClock(line.at)}',
       continues: continues,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [PxMarkdown(line.text), if (!line.final_) const StreamingCaret()]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ProMarkdown(line.text), if (!line.final_) const StreamingCaret()]),
     ),
     MessageItem(:final message, :final thread) =>
       message.kind == MessageKind.notice || message.fromKind == SenderKind.system
           ? Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Text(message.text, textAlign: TextAlign.center, style: _grey.copyWith(height: 1.625)),
+              child: Text(message.text, textAlign: TextAlign.center, style: ProText.meta.copyWith(height: 1.625)),
             )
           : _MessageRow(message: message, continues: continues, thread: thread),
   };
@@ -267,19 +262,44 @@ class _Tag extends StatelessWidget {
   final Color fill;
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 4),
-    padding: const EdgeInsets.only(left: 4, right: 6),
-    decoration: BoxDecoration(
-      color: fill,
-      border: Border.all(color: Palette.bark900, width: 2),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: ProTag(icon: icon, label: label, fill: fill),
     ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
+  );
+}
+
+/// A dispatch: one line until it is opened, then the whole task in its place.
+class _Dispatch extends StatefulWidget {
+  const _Dispatch(this.text);
+  final String text;
+
+  @override
+  State<_Dispatch> createState() => _DispatchState();
+}
+
+class _DispatchState extends State<_Dispatch> {
+  var _open = false;
+
+  @override
+  Widget build(BuildContext context) => Tappable(
+    onTap: () => setState(() => _open = !_open),
+    semanticLabel: _open ? '收起派活' : '展开派活',
+    builder: (context, s) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SpriteIcon(icon, size: 14),
-        const SizedBox(width: 4),
-        Text(label, style: PxText.xs),
+        Flexible(
+          child: _open
+              ? ProMarkdown(widget.text, mentions: true)
+              : Text(widget.text.replaceAll(RegExp(r'\s+'), ' ').trim(), maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.base),
+        ),
+        const SizedBox(width: 6),
+        Padding(
+          padding: const EdgeInsets.only(top: 5),
+          child: Opacity(opacity: s.hovered || s.focused ? 1 : .5, child: SpriteIcon(_open ? 'button-collapse' : 'button-enlarge', size: 12)),
+        ),
       ],
     ),
   );
@@ -328,12 +348,7 @@ class _MessageRow extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ?tag,
-          Opacity(
-            opacity: m.final_ ? 1 : .7,
-            child: m.kind == MessageKind.dispatch
-                ? DispatchNote(m.text, style: const TextStyle(height: 1.625))
-                : ChatText(m.text, folds: m.final_, style: const TextStyle(height: 1.625)),
-          ),
+          Opacity(opacity: m.final_ ? 1 : .7, child: m.kind == MessageKind.dispatch ? _Dispatch(m.text) : ProMarkdown(m.text, mentions: true)),
           if (!m.final_) const StreamingCaret(),
           if (m.spent != null && m.kind == MessageKind.report)
             Padding(
@@ -342,7 +357,7 @@ class _MessageRow extends ConsumerWidget {
                 children: [
                   const SpriteIcon('icon-coin', size: 12),
                   const SizedBox(width: 4),
-                  Flexible(child: Text('这一轮花了 ${spentText(m.spent!)}', style: _grey)),
+                  Flexible(child: Text('这一轮花了 ${spentText(m.spent!)}', style: ProText.meta)),
                 ],
               ),
             ),
@@ -380,7 +395,7 @@ class _FrameState extends State<_Frame> {
     onEnter: (_) => setState(() => _hover = true),
     onExit: (_) => setState(() => _hover = false),
     child: Container(
-      color: _hover ? Palette.creamHover : null,
+      decoration: BoxDecoration(color: _hover ? ProColor.hover : null, borderRadius: proRadius),
       margin: EdgeInsets.only(top: widget.continues ? 0 : 12),
       padding: EdgeInsets.only(left: 4, right: 4, top: widget.continues ? 2 : 4),
       child: Row(
@@ -397,7 +412,7 @@ class _FrameState extends State<_Frame> {
                         Positioned.fill(
                           child: Align(alignment: Alignment.topLeft, child: widget.face),
                         ),
-                        if (widget.dot != null) Positioned(right: 0, bottom: 0, child: StateDot(color: widget.dot!, size: 12, border: 2)),
+                        if (widget.dot != null) Positioned(right: 2, bottom: 2, child: ProDot(widget.dot!, size: 11)),
                       ],
                     ),
                   ),
@@ -412,10 +427,10 @@ class _FrameState extends State<_Frame> {
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Text(widget.name, style: PxText.sm),
+                      Text(widget.name, style: ProText.sm.copyWith(fontWeight: FontWeight.w600)),
                       const SizedBox(width: 8),
                       Flexible(
-                        child: Text(widget.meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
+                        child: Text(widget.meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.meta),
                       ),
                     ],
                   ),
@@ -446,8 +461,9 @@ class ThreadPreview extends ConsumerWidget {
         margin: const EdgeInsets.only(top: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Palette.cream100,
-          border: Border.all(color: s.hovered || s.focused ? Palette.bark900 : Palette.cream300, width: 2),
+          color: s.hovered || s.focused ? ProColor.hover : null,
+          border: Border.all(color: s.focused ? ProColor.focus : ProColor.line),
+          borderRadius: const BorderRadius.all(Radius.circular(8)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -456,19 +472,17 @@ class ThreadPreview extends ConsumerWidget {
               children: [
                 const Glyph('button-thread'),
                 const SizedBox(width: 6),
-                Text(thread.replies > 0 ? '${idText(thread.replies)} 条回复' : '工单串', style: PxText.sm),
-                if (unread > 0) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    color: Palette.leaf300,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text('$unread 条新', style: PxText.xs),
-                  ),
-                ],
+                Text(
+                  thread.replies > 0 ? '${idText(thread.replies)} 条回复' : '工单串',
+                  style: ProText.sm.copyWith(fontWeight: FontWeight.w600, color: ProColor.accent),
+                ),
+                if (unread > 0) ...[const SizedBox(width: 8), ProTag(label: '$unread 条新', fill: Palette.leaf300)],
                 const SizedBox(width: 8),
                 if (session != null) ...[PhaseGlyph(session.phase, size: 14), const SizedBox(width: 4)],
                 Expanded(
-                  child: session == null ? const SizedBox() : Text(phaseText(session, nowMs()), maxLines: 1, overflow: TextOverflow.ellipsis, style: _grey),
+                  child: session == null
+                      ? const SizedBox()
+                      : Text(phaseText(session, nowMs()), maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.meta),
                 ),
                 Opacity(opacity: s.hovered || s.focused ? 1 : .6, child: const SpriteIcon('button-next', size: 12)),
               ],
@@ -478,18 +492,18 @@ class ThreadPreview extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
                   children: [
-                    Text(last.fromKind == SenderKind.user ? '主人' : last.name, style: PxText.sm),
+                    Text(last.fromKind == SenderKind.user ? '主人' : last.name, style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         last.text.replaceAll(RegExp(r'\s+'), ' '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: PxText.sm.copyWith(color: Palette.bark500),
+                        style: ProText.sm.copyWith(color: ProColor.muted),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(workbenchClock(last.at), style: _grey),
+                    Text(workbenchClock(last.at), style: ProText.meta),
                   ],
                 ),
               ),
