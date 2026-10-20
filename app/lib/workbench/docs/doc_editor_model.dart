@@ -10,8 +10,14 @@ import '../../rules/doc_blocks.dart';
 const idleWait = Duration(milliseconds: 500);
 const maxWait = Duration(seconds: 2);
 
-/// How often an open document asks for what others (helpers) wrote, while nothing of the owner's is waiting.
+/// How often an open document asks for what others (helpers) wrote, while nothing of the owner's is waiting: every
+/// [pollFast] while another writer was heard in the last [busyPolls] asks (or the demo was just started), else [pollEvery].
 const pollEvery = Duration(seconds: 4);
+const pollFast = Duration(seconds: 1);
+const busyPolls = 4;
+
+/// A block another writer changed shows as being written for this many asks after the change was heard.
+const writingPolls = 3;
 
 final _random = Random.secure();
 
@@ -75,6 +81,9 @@ class EditBlock {
   double rev;
   String updatedBy;
 
+  /// The ask that last brought another writer's change to this block (display only: it shows as being written).
+  int? heardAt;
+
   /// The text the server has, as far as this client knows: an update is sent only when the owner's differs.
   List<DocSpan> sent;
 
@@ -130,7 +139,19 @@ class DocEditor extends ChangeNotifier {
   Timer? _poll;
   bool _disposed = false;
 
+  // Asks made for what others wrote, and the one that last brought another writer's change.
+  int _polls = 0;
+  int? _heardAt;
+  // Blocks another writer changed while the owner was in them: not replaced, asked for again once the owner has left.
+  final _held = <String>{};
+
   bool get busy => _sending || _queue.isNotEmpty || _dirty.isNotEmpty;
+
+  /// Someone other than the owner changed the document lately (or the demo was just started): asks come every [pollFast].
+  bool get othersWriting => _heardAt != null && _polls - _heardAt! < busyPolls;
+
+  /// [b] is being written by a helper now: its change came in one of the last [writingPolls] asks.
+  bool writing(EditBlock b) => b.updatedBy != docOwner && b.heardAt != null && _polls - b.heardAt! < writingPolls;
 
   Future<void> load() async {
     try {
@@ -140,29 +161,56 @@ class DocEditor extends ChangeNotifier {
       error = '$e';
     }
     _changed();
-    _poll ??= Timer.periodic(pollEvery, (_) => _refresh());
+    _schedule();
+  }
+
+  void _schedule() {
+    _poll?.cancel();
+    if (_disposed) return;
+    _poll = Timer(othersWriting ? pollFast : pollEvery, () async {
+      await _refresh();
+      _schedule();
+    });
   }
 
   Future<void> _refresh() async {
     if (busy || _disposed) return;
+    // Drawn as being written before this ask: it may have stopped since.
+    var redraw = othersWriting || blocks.any(writing);
     try {
       final snap = await api.doc.get(id: docId);
-      if (snap.doc.seq != _seq && !busy) {
-        _take(snap, replace: true);
-        _changed();
+      _polls++;
+      if ((snap.doc.seq != _seq || _held.isNotEmpty) && !busy) {
+        _take(snap, replace: true, heard: true);
+        redraw = true;
       }
     } on Object {
       // The next tick asks again.
     }
+    if (redraw) _changed();
   }
 
-  void _take(DocSnapshot snap, {required bool replace}) {
+  /// Starts the scripted demo on this document: helpers write their sections at once; asks come every [pollFast] from now.
+  Future<void> demo() async {
+    try {
+      await api.doc.demo(id: docId);
+      error = null;
+      _heardAt = _polls;
+      _schedule();
+    } on Object catch (e) {
+      error = '$e';
+    }
+    _changed();
+  }
+
+  void _take(DocSnapshot snap, {required bool replace, bool heard = false}) {
     doc = snap.doc;
     _seq = snap.doc.seq;
+    _held.clear();
     final seen = <String>{};
     for (final b in snap.blocks) {
       seen.add(b.id);
-      _put(b);
+      _put(b, heard: heard);
     }
     if (replace) {
       for (final id in _byId.keys.where((id) => !seen.contains(id) && !_dirty.contains(id)).toList()) {
@@ -173,7 +221,9 @@ class DocEditor extends ChangeNotifier {
   }
 
   /// The server's block over the client's: all of it, but the text of one the owner has unsent words in or is composing in.
-  void _put(Block b) {
+  /// [heard] is a change asked for, not an answer to the owner's batch: one by another writer marks the block as being
+  /// written, and the block the owner is in is left as it is until they leave it.
+  void _put(Block b, {bool heard = false}) {
     final mine = _byId[b.id];
     if (_gone.contains(b.id)) {
       if (b.deleted ?? false) _gone.remove(b.id);
@@ -183,10 +233,17 @@ class DocEditor extends ChangeNotifier {
       _byId.remove(b.id)?.dispose();
       return;
     }
+    final news = heard && b.updatedBy != docOwner && (mine == null || mine.rev != b.rev);
+    if (news) _heardAt = _polls;
     if (mine == null) {
-      _byId[b.id] = EditBlock(b);
+      _byId[b.id] = EditBlock(b)..heardAt = news ? _polls : null;
       return;
     }
+    if (heard && mine.focus.hasFocus && mine.rev != b.rev) {
+      _held.add(b.id);
+      return;
+    }
+    if (news) mine.heardAt = _polls;
     mine
       ..parentId = b.parentId
       ..orderKey = b.orderKey

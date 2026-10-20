@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/shared/swatches.dart';
 import 'package:vibevalley/workbench/docs/doc_editor.dart';
+import 'package:vibevalley/workbench/docs/doc_editor_model.dart';
 import 'package:vibevalley/workbench/docs/docs_page.dart';
 
 import '../support/workbench.dart';
@@ -28,6 +29,9 @@ class DocBackend {
   DocBackend(this.blocks);
   final List<Block> blocks;
   final submits = <Map<String, dynamic>>[];
+  double seq = 1;
+  int gets = 0;
+  int demos = 0;
   final agents = WorkbenchBackend(agents: [agent('backend', '后端老周')]);
 
   List<Map<String, dynamic>> get ops => [for (final s in submits) ...(s['ops'] as List).cast<Map<String, dynamic>>()];
@@ -38,12 +42,17 @@ class DocBackend {
       return jsonResponse([const Document(id: 'd1', title: '周报', seq: 1, created: 1, updated: 1).toJson()]);
     }
     if (r.method == 'GET' && path == '/api/v1/docs/d1') {
+      gets++;
       return jsonResponse(
         DocSnapshot(
-          doc: const Document(id: 'd1', title: '周报', seq: 1, created: 1, updated: 1),
+          doc: Document(id: 'd1', title: '周报', seq: seq, created: 1, updated: 1),
           blocks: blocks,
         ).toJson(),
       );
+    }
+    if (r.method == 'POST' && path == '/api/v1/docs/d1/demo') {
+      demos++;
+      return http.Response('', 204);
     }
     if (r.method == 'POST' && path == '/api/v1/docs/d1/submit') {
       final body = jsonDecode(r.body) as Map<String, dynamic>;
@@ -243,5 +252,72 @@ void main() {
     t.testTextInput.updateEditingValue(const TextEditingValue(text: '\n', selection: TextSelection.collapsed(offset: 1)));
     await settle(t);
     expect(server.ops.single, {'op': 'set_type', 'blockId': 'a', 'type': blockParagraph, 'attrs': <String, dynamic>{}});
+  });
+
+  testWidgets('the demo button asks the server to start the demo', (t) async {
+    final server = DocBackend([block('a', 'V', '一段')]);
+    await open(t, server);
+    await t.tap(find.text('演示：几个帮工一起写'));
+    await settle(t);
+    expect(server.demos, 1);
+    // Just started: asks come every second.
+    final before = server.gets;
+    await t.pump(pollFast);
+    await settle(t);
+    expect(server.gets, before + 1);
+  });
+
+  testWidgets("another writer's change makes the page ask every second and its block breathe; quiet, every four", (t) async {
+    final server = DocBackend([block('a', 'V', '主人写的')]);
+    await open(t, server);
+    // Each tick is a second and a bit (settle pumps too).
+    Future<int> asks(int seconds) async {
+      final from = server.gets;
+      for (var i = 0; i < seconds; i++) {
+        await t.pump(pollFast);
+        await settle(t);
+      }
+      return server.gets - from;
+    }
+
+    expect(await asks(3), 0, reason: 'quiet: the first ask is four seconds in');
+    server.blocks.add(block('h', 'W', '老周写的', by: 'backend'));
+    server.seq = 2;
+    expect(await asks(1), 1);
+    expect(find.byKey(const ValueKey('writing-h')), findsOneWidget);
+    expect(find.byKey(const ValueKey('writing-a')), findsNothing);
+    expect(find.textContaining('帮工在写'), findsOneWidget);
+
+    expect(await asks(3), 3, reason: 'another writer was heard: an ask every second');
+    await asks(busyPolls);
+    expect(find.byKey(const ValueKey('writing-h')), findsNothing);
+    expect(find.textContaining('帮工在写'), findsNothing);
+    expect(await asks(3), lessThanOrEqualTo(1), reason: 'quiet again: an ask every four seconds');
+  });
+
+  testWidgets("the block the owner is in keeps its text while a helper's change waits; it comes in once they leave", (t) async {
+    final server = DocBackend([block('h', 'V', '老周写', by: 'backend')]);
+    await open(t, server);
+    await t.tap(field('h'));
+    await t.pump();
+    server.blocks[0] = Block(
+      id: 'h',
+      docId: 'd1',
+      orderKey: 'V',
+      type: blockParagraph,
+      attrs: const BlockAttrs(),
+      text: const [DocSpan(t: '老周写了一段', marks: DocMarks())],
+      rev: 2,
+      updatedBy: 'backend',
+      updated: 2,
+    );
+    server.seq = 2;
+    await t.pump(pollEvery);
+    await settle(t);
+    expect(t.widget<EditableText>(field('h')).controller.text, '老周写');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await t.pump(pollEvery);
+    await settle(t);
+    expect(t.widget<EditableText>(field('h')).controller.text, '老周写了一段');
   });
 }

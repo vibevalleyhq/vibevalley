@@ -46,6 +46,7 @@ class DocBlocks extends ConsumerWidget {
     final rows = <Widget>[];
     String? lastAuthor;
     for (final b in editor.blocks) {
+      final writing = editor.writing(b);
       rows.add(
         BlockRow(
           key: ValueKey(b.id),
@@ -54,7 +55,8 @@ class DocBlocks extends ConsumerWidget {
           depth: editor.depthOf(b),
           number: numbers[b.id],
           agent: agents[b.updatedBy],
-          showFace: b.updatedBy != docOwner && b.updatedBy != lastAuthor,
+          showFace: writing || (b.updatedBy != docOwner && b.updatedBy != lastAuthor),
+          writing: writing,
         ),
       );
       lastAuthor = b.updatedBy;
@@ -75,13 +77,25 @@ class DocBlocks extends ConsumerWidget {
 }
 
 class BlockRow extends StatelessWidget {
-  const BlockRow({super.key, required this.editor, required this.block, required this.depth, this.number, this.agent, this.showFace = false});
+  const BlockRow({
+    super.key,
+    required this.editor,
+    required this.block,
+    required this.depth,
+    this.number,
+    this.agent,
+    this.showFace = false,
+    this.writing = false,
+  });
   final DocEditor editor;
   final EditBlock block;
   final int depth;
   final int? number;
   final Agent? agent;
   final bool showFace;
+
+  /// A helper is writing it now: the bar breathes.
+  final bool writing;
 
   @override
   Widget build(BuildContext context) {
@@ -97,14 +111,11 @@ class BlockRow extends StatelessWidget {
             child: showFace ? Padding(padding: const EdgeInsets.only(top: 3), child: AgentFaceOf(b.updatedBy, size: 18)) : null,
           ),
           Tooltip(
-            message: '$writer 写的',
+            message: writing ? '$writer 在写' : '$writer 写的',
             waitDuration: const Duration(milliseconds: 400),
             child: Container(
-              key: ValueKey('author-${b.id}'),
-              width: 3,
-              height: _barHeight(b),
               margin: const EdgeInsets.only(right: 10, top: 2),
-              decoration: BoxDecoration(color: authorColor(b.updatedBy, agent), borderRadius: BorderRadius.circular(2)),
+              child: writing ? _Breathing(key: ValueKey('writing-${b.id}'), child: _bar(b)) : _bar(b),
             ),
           ),
           SizedBox(width: 20.0 * depth),
@@ -113,6 +124,13 @@ class BlockRow extends StatelessWidget {
       ),
     );
   }
+
+  Widget _bar(EditBlock b) => Container(
+    key: ValueKey('author-${b.id}'),
+    width: writing ? 4 : 3,
+    height: _barHeight(b),
+    decoration: BoxDecoration(color: authorColor(b.updatedBy, agent), borderRadius: BorderRadius.circular(2)),
+  );
 
   double _barHeight(EditBlock b) => switch (b.type) {
     blockDivider => 16,
@@ -171,6 +189,31 @@ class BlockRow extends StatelessWidget {
       ),
       Expanded(child: field),
     ],
+  );
+}
+
+/// The bar of a block being written: it fades in and out while the helper writes.
+class _Breathing extends StatefulWidget {
+  const _Breathing({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<_Breathing> createState() => _BreathingState();
+}
+
+class _BreathingState extends State<_Breathing> with SingleTickerProviderStateMixin {
+  late final _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: Tween(begin: 0.35, end: 1.0).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut)),
+    child: widget.child,
   );
 }
 

@@ -181,12 +181,19 @@ class _DocViewState extends ConsumerState<DocView> {
           children: [
             Padding(
               padding: const EdgeInsets.only(left: 35, bottom: 4),
-              child: Text(doc?.title ?? '', style: ProText.x2l),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: Text(doc?.title ?? '', style: ProText.x2l)),
+                  const SizedBox(width: 8),
+                  ProButton.text('演示：几个帮工一起写', icon: 'button-play', size: ProSize.sm, onPressed: _editor.demo),
+                ],
+              ),
             ),
             Padding(
               padding: const EdgeInsets.only(left: 35, bottom: 12),
               child: Text(
-                _editor.error ?? (_editor.busy ? '在存……' : '都存好了 · ${_editor.blocks.length} 块'),
+                _editor.error ?? (_editor.busy ? '在存……' : ['都存好了', '${_editor.blocks.length} 块', if (_editor.othersWriting) '帮工在写'].join(' · ')),
                 style: ProText.meta.copyWith(color: _editor.error != null ? Palette.berry : null),
               ),
             ),

@@ -13,12 +13,12 @@
 
 ## 在哪
 
-- 服务端 `server/internal/doc`（`doc.Service`，`Workspace.Doc`）：`doc.go` 存取和提交，`ops.go` 是 op 的规则（纯函数，在内存里的一篇文档上按顺序施加），`order.go` 顺序键，`text.go` 按码点切和接文字，`markdown.go` 导入导出。这些规则只有它用，都不导出。
+- 服务端 `server/internal/doc`（`doc.Service`，`Workspace.Doc`）：`doc.go` 存取和提交，`demo.go` 是演示（脚本和不导出的零件 `demo`），`ops.go` 是 op 的规则（纯函数，在内存里的一篇文档上按顺序施加），`order.go` 顺序键，`text.go` 按码点切和接文字，`markdown.go` 导入导出。这些规则只有它用，都不导出。
 - 形状在 `protocol/shapes.go`：`Document`、`Block`、`BlockAttrs`、`DocSpan`、`DocMarks`，op 是封闭的联合 `DocOp`（按 `op` 区分，`DocOpMembers` 是生成的成员表），`DocSubmit`、`DocAck`、`DocOpResult`；块的类型是普通字符串，取值是带 `//vibevalley:const` 的常量（`BlockParagraph`……），Dart 拿到同名常量。
 - 表：`doc`（一篇一行，`seq`）、`doc_block`（每一块，含墓碑；`attrs`、`spans` 存 JSON 文本）、`doc_block_revision`（每一块每一版的字，`kind` 是 `normal` 或 `conflict`）、`doc_change`（每一批：`seq`、`batch_id`、谁、改了哪些块、每个 op 的结果）。
 - 客户端：`app/lib/workbench/docs/`：`docs_page.dart` 是「文档」页（左边列表和新建，右边打开的那篇；窄屏只放一边），`doc_editor.dart` 是块的画法和按键，`doc_editor_model.dart` 的 `DocEditor` 管本地的块、待发的 op 和防抖；不在 `app/lib/rules/doc_blocks.dart` 以外重写规则：那里只有顺序键、码点偏移、编辑时保留 marks、编号和行首的 Markdown。
 - 帮工的工具：`doc_read`、`doc_append`、`doc_update`（`server/internal/tool/doc.go`，经 `/mcp` 只给 Session）。
-- 接口：`doc.list`、`doc.create`、`doc.import`、`doc.get`、`doc.submit`、`doc.markdown`（[capabilities.md](docs/reference/capabilities.md)），主人和「连接到本机」能调，写的人记成 `owner`（`DocOwner`）。
+- 接口：`doc.list`、`doc.create`、`doc.import`、`doc.get`、`doc.submit`、`doc.markdown`（[capabilities.md](docs/reference/capabilities.md)），主人和「连接到本机」能调，写的人记成 `owner`（`DocOwner`）；`doc.demo`（`POST /api/v1/docs/{id}/demo`）只有本机的主人能调。
 
 ## 模型和不变量
 
@@ -59,7 +59,17 @@
 - 发送：改字先只改本地，停 500 毫秒发一次，一直在打字时最长 2 秒发一次，离开这一块、回车时立刻发；同一块攒着的字合成一个 `update_text`。op 排成队，一次只有一批在路上；一个带 `baseRev` 的 op 改的块已经被同一批前面的 op 改过时，它进下一批，拿服务端回给的新 rev。发不出去的那批留着原来的 `batchId` 重发。
 - 收到回答：改过的块整块换成服务端的，只有还有没发的字、还在路上的、正在用输入法拼字的块保留本地的字。冲突的块换成服务端的字，下面一行红字说你写的没存上、留在修订里了。
 - **输入法拼字时不发、不换**：拼音还没上屏时不发这一块的字，也不用服务端的字替换它；上屏以后照常发。
-- 别人（帮工）写的：还没有广播，页面开着时每 4 秒问一次 `doc.get`，自己没有待发的东西、文档的 seq 变了，才整篇换上。
+- 别人（帮工）写的：还没有广播，页面开着时问 `doc.get`，自己没有待发的东西、文档的 seq 变了，才整篇换上。平时每 4 秒问一次；最近 4 次里问到过别人（不是 `owner`）写的改动，或刚点了演示，就每秒问一次，安静下来再回到 4 秒。
+- 在写的块：问来的改动里别人改过的块（新块，或 rev 变了），之后 3 次问之内算「在写」：旁边挂写它的帮工的头像，归属条加粗、一明一暗地呼吸，悬停说「在写」；页面上方的状态多一句「帮工在写」。只按客户端问到的时候算，不比两边的钟。
+- 主人光标所在的块，问来的改动不换上：这一块整块留着本地的样子（rev 也不动），离开以后下一次问再换上；离开之前打字，按旧的 rev 发出去，照冲突的规则处理。
+
+**演示**（`doc.demo`，页面上的「演示：几个帮工一起写」）：不花模型的钱，让主人看几个帮工同时写一篇是什么样子。
+
+1. 接口立刻回答，演示在后台跑；农场里同时只跑一场，正在跑时再点被拒绝（「演示正在写，写完再点」）。没有开着的帮工档案也被拒绝。
+2. 从帮工的档案（不含管家）里按顺序取开着的前三个，每个一节：先在文档末尾按顺序插三个二级标题（「背景 · 演示」「做法 · 演示」「下一步 · 演示」），写的人是各自的档案 id。
+3. 三个帮工同时写自己那一节：在这一节的末尾（上一块和下一节的标题之间取顺序键，在提交的锁里取，两个帮工不会抢到同一处）插一个空段落，再每一拍（约 1 秒，前后浮动三成，几个帮工错开）用 `update_text` 带上一版的 rev 把这一段换成更长的字，六拍写完一段，一节三段。第一段以「（演示）」开头。整场 20 多秒。
+4. 全部走 `submit`：rev、seq、修订、`doc_change` 都是真的，归属条照常画。主人在帮工正长着的那一段里改了字，帮工下一拍是冲突，不再碰这一段，接着写下一段。
+5. 脚本是 `demo.go` 里的 `demoScript`，不是帮工写的。服务端停下时演示跟着停。
 
 **其他**：`set_attrs` 按字段写（`unset` 列出要删的键），后到的生效；`set_type` 换类型和整套属性，新类型没有字就丢掉字，换成 `code` 去掉 marks；`move_block` 挪到自己下面被拒绝，挪到已删的父块下面就挂到那个父块所在的层级；`restore_block` 连子块一起恢复。
 
@@ -68,6 +78,7 @@
 ## 和谁打交道
 
 - **地基（`base`）**：只用数据库和 `NewID`；不依赖别的服务，也不进核心状态：文档不在 `StateFrame` 里，客户端用 `doc.get` 取。
+- **档案（`agent`）**：不 import 它；`doc.demo` 的处理函数把帮工的档案（`Agent.Agents()`）交给 `Demo`，挑哪几个由 `doc` 定。
 - **工具（`tool`）和 `/mcp`**：帮工的三个工具调 `Get`、`Append`、`UpdateText`；`mcp` 认出是哪个 Session，`tool` 取它的档案当写的人。
 
 ## 为什么这样
@@ -94,6 +105,7 @@
 - `doc/text_test.go`：`TestSplitCountsCodePoints`（中文、emoji、肤色、组合字符）。
 - `doc/markdown_test.go`：`TestMarkdownRoundTrip`、`TestBlocksRoundTrip`。
 - `doc/doc_test.go`：`TestEditsSurviveARestart`（重开库后块、rev、seq 都在）、`TestABatchIsTakenOnce`、`TestStaleUpdateIsAConflict`（冲突版本存进修订）、`TestImportAndExport`。
-- `handler/doc_test.go` 的 `TestDocRoutes`：经 HTTP 建、提交、读、导出、导入。
-- 客户端：`app/test/workbench/docs_test.dart`（回车拆段、发出的 `split_block` 偏移是码点；粘进来的多行拆成几块；已有的 marks 画出来；段首退格并段；行首 Markdown 换类型；连续打字只发一个 `update_text`；拼字时不发、上屏后发；归属条的颜色；不认识的类型是占位块；编号和勾选；空列表项回车变段落），`app/test/rules/doc_blocks_test.dart`（和 Go 一样的顺序键、码点偏移、编辑保留 marks、编号）。
+- `handler/doc_test.go` 的 `TestDocRoutes`：经 HTTP 建、提交、读、导出、导入，演示开始和正在跑时再点被拒绝。
+- `doc/demo_test.go`：`TestTheDemoWritesThreeSections`（拍子缩到 1 毫秒跑完：跳过关着的档案、三节各自连续、每块的写的人、每段写满、正在跑时再开被拒绝、跑完能再开），`TestTheDemoLeavesTheOwnersBlock`（主人接手正长着的一段，演示不再改它）。
+- 客户端：`app/test/workbench/docs_test.dart`（回车拆段、发出的 `split_block` 偏移是码点；粘进来的多行拆成几块；已有的 marks 画出来；段首退格并段；行首 Markdown 换类型；连续打字只发一个 `update_text`；拼字时不发、上屏后发；归属条的颜色；不认识的类型是占位块；编号和勾选；空列表项回车变段落；演示按钮发 `doc.demo`；问到帮工的改动后每秒问、块在呼吸，安静后回到 4 秒；光标所在的块不被问来的改动换掉），`app/test/rules/doc_blocks_test.dart`（和 Go 一样的顺序键、码点偏移、编辑保留 marks、编号）。
 - `mcp/doc_test.go` 的 `TestAHelperWritesADoc`：帮工经 `/mcp` 加块、读、改字，写的人是它的档案；主人改过以后，它按旧版本改不进去，回答里有现在的字。
