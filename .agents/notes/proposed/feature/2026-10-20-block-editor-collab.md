@@ -248,8 +248,8 @@ doc_changes     (doc_id, seq, batch_id unique, actor, block_ids, created_at)
 
 ### Flutter 端
 
-- 编辑器倾向 `appflowy_editor`：它本身就是节点树加 Transaction，便于把它的修改转成我们的 op。选型前需要确认它的 Transaction 能否稳定对应到「Op 列表」里的 op，尤其是拆分和合并。
-- 编辑器只是视图。数据源是我们自己的块模型，中间用一个适配层双向转换。
+- 编辑器自己做：一列块，每块一个 Flutter 自带的 `TextField`，数据就是上面的 `Block`，每次编辑直接产出「Op 列表」里的 op（回车在段中间是 `split_block`，段首退格是 `merge_blocks`），中间没有别的编辑器模型要翻译。
+- 参考 `appflowy_editor`，不依赖它。借鉴这几样：块的类型和画法分开登记（找不到登记的类型就画只读占位块）；块之间的按键规则（回车拆段、段首退格并段、上下键跨块、空列表项回车退出列表），照它的行为写成用例；行首的 Markdown 快捷输入（`# ` 标题、`- ` 列表、`[] ` 待办、三个反引号代码块，都是 `set_type`）；选中文字时的工具条（第一版的五种 marks）。跨块选中第一版不做，只在一块之内选。
 - 早期必须用中文输入法测：拼音组字时按退格、在段首按回车、组字过程中收到别人的 `change`。**组字过程中不要替换当前正在编辑的块**，等组字结束再应用。
 
 ### 分阶段
@@ -270,6 +270,8 @@ doc_changes     (doc_id, seq, batch_id unique, actor, block_ids, created_at)
 - 单篇文档的块数上限（影响快照大小和首屏加载）
 
 ## Alternatives considered
+
+**编辑器用 `appflowy_editor`。** 它是节点树加 Transaction，功能齐全。不用它：它的 Transaction 要翻译成我们的 op，拆分和合并能不能稳定对上是最大的不确定；装进来要改动 36 个依赖、还要给 `xml` 降版本；界面是另一套风格，改成像素风不如自己画。只参考它的做法（见「Flutter 端」）。
 
 **现在就上 CRDT。**
 
