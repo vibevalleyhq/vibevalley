@@ -9,10 +9,13 @@ import 'theme.dart';
 const _backdrop = Color(0x592F1F13);
 
 class ProDialog extends StatelessWidget {
-  const ProDialog({super.key, required this.title, required this.child, required this.onClose});
+  const ProDialog({super.key, required this.title, required this.child, required this.onClose, this.maxWidth = 480});
   final Widget title;
   final Widget child;
   final VoidCallback onClose;
+
+  /// A form's width by default; wider for what lists files or patches.
+  final double maxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +24,7 @@ class ProDialog extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 480, maxHeight: screen.height * .85),
+          constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: screen.height * .85),
           child: Material(
             type: MaterialType.transparency,
             child: Container(
@@ -64,14 +67,16 @@ class ProDialog extends StatelessWidget {
 
 /// Opened on the root navigator, above the workbench's ProScope, so it brings the pro theme along.
 /// The builder gets the dialog's context; `Navigator.pop(context, result)` closes it with a result.
-Future<T?> showProDialog<T>(BuildContext context, {required Widget title, required WidgetBuilder builder}) => showGeneralDialog<T>(
+Future<T?> showProDialog<T>(BuildContext context, {required Widget title, required WidgetBuilder builder, double maxWidth = 480}) => showGeneralDialog<T>(
   context: context,
   barrierDismissible: true,
   barrierLabel: '关上',
   barrierColor: _backdrop,
   transitionDuration: motionDuration(context, const Duration(milliseconds: 150)),
+  // Its fields are there for screen readers from the first frame, not once the fade is done.
   transitionBuilder: (context, a, _, child) => FadeTransition(
     opacity: CurvedAnimation(parent: a, curve: Curves.easeOut),
+    alwaysIncludeSemantics: true,
     child: ScaleTransition(
       scale: Tween(begin: .98, end: 1.0).animate(CurvedAnimation(parent: a, curve: Curves.easeOut)),
       child: child,
@@ -80,6 +85,7 @@ Future<T?> showProDialog<T>(BuildContext context, {required Widget title, requir
   pageBuilder: (context, _, _) => ProScope(
     child: ProDialog(
       title: title,
+      maxWidth: maxWidth,
       onClose: () => Navigator.of(context).pop(),
       child: Builder(builder: builder),
     ),

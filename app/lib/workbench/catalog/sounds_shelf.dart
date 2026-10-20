@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../audio/sfx.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import 'catalog_page.dart';
 
 class SoundsShelf extends StatefulWidget {
@@ -22,21 +22,21 @@ class _SoundsShelfState extends State<SoundsShelf> {
 
   @override
   Widget build(BuildContext context) {
-    final mono = PxText.mono.copyWith(fontSize: 12, color: Palette.bark800);
+    final mono = ProText.mono.copyWith(fontSize: 12.5);
     return shelfLayout(
       context,
       left: ShelfColumn(
         tabs: widget.tabs,
         below: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: Text('农场里的每个声音，点一下就能听。', style: PxText.xs.copyWith(height: 1.625, color: Palette.bark500)),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+            child: const Text('农场里的每个声音，点一下就能听。', style: ProText.meta),
           ),
         ],
       ),
       body: [
         ShelfSearch(query: _query, onChanged: (v) => setState(() => _query = v), placeholder: '找：声音的名字或分组（浇水、院子、coin……）'),
-        PxCard(
+        ProCard(
           child: Text.rich(
             TextSpan(
               children: [
@@ -47,7 +47,7 @@ class _SoundsShelfState extends State<SoundsShelf> {
                 const TextSpan(text: '。'),
               ],
             ),
-            style: PxText.sm.copyWith(color: Palette.bark800, height: 1.625),
+            style: ProText.sm.copyWith(color: ProColor.muted),
           ),
         ),
         for (final g in soundGroups)
@@ -56,7 +56,7 @@ class _SoundsShelfState extends State<SoundsShelf> {
                   if (_matches(g.title, name)) name,
               ]
               case final names when names.isNotEmpty)
-            PxCard(
+            ProCard(
               title: g.title,
               child: Wrap(spacing: 8, runSpacing: 8, children: [for (final name in names) _SoundButton(name: name)]),
             ),
@@ -73,24 +73,31 @@ class _SoundButton extends StatelessWidget {
   Widget build(BuildContext context) => Tappable(
     onTap: () => Sfx.play(name),
     semanticLabel: '播放 ${soundLabel[name] ?? name}',
-    builder: (context, s) {
-      Widget b = Container(
-        padding: const EdgeInsets.fromLTRB(8, 6, 14, 6),
-        color: s.hovered ? Palette.cream300 : Palette.cream200,
-        foregroundDecoration: pxRing,
+    builder: (context, s) => ProFocusRing(
+      on: s.focused,
+      child: Container(
+        height: 32,
+        padding: const EdgeInsets.fromLTRB(6, 0, 12, 0),
+        decoration: BoxDecoration(
+          color: s.pressed
+              ? ProColor.selected
+              : s.hovered
+              ? ProColor.hover
+              : ProColor.page,
+          border: Border.all(color: ProColor.line),
+          borderRadius: proRadius,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox.square(dimension: 24, child: Center(child: SpriteIcon('button-play', size: 20))),
+            const SpriteIcon('button-play', size: 16),
             const SizedBox(width: 8),
-            Text(soundLabel[name] ?? name, style: PxText.sm.copyWith(color: Palette.bark800)),
+            Text(soundLabel[name] ?? name, style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
             const SizedBox(width: 8),
-            Text(name, style: PxText.mono.copyWith(color: Palette.bark500)),
+            Text(name, style: ProText.mono.copyWith(fontSize: 12, color: ProColor.muted)),
           ],
         ),
-      );
-      if (s.pressed) b = Transform.translate(offset: const Offset(0, 1), child: b);
-      return b;
-    },
+      ),
+    ),
   );
 }

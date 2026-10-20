@@ -200,7 +200,8 @@ void main() {
     final b = backend();
     await pumpPage(t, const ProjectsPage(), b.handle);
     await t.tap(find.text('新增项目'));
-    await t.pump();
+    // The pro dialog fades in, and is out of the semantics tree until it shows.
+    await settle(t);
     await t.enterText(find.bySemanticsLabel('GitHub 地址').last, 'https://github.com/botiverse/raft-source');
     await t.pump();
     expect(find.text('raft-source'), findsWidgets);

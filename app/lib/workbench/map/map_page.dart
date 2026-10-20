@@ -1,5 +1,5 @@
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/widgets.dart' hide Icon;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
@@ -7,17 +7,17 @@ import '../../gen/vibevalley.dart';
 import '../../rules/sessions.dart';
 import '../../rules/cast.dart';
 import '../../sprites/atlas.dart';
-import '../../ui/pixel/pixel.dart';
-import '../../ui/pixel/pixel_card.dart' show CardColors, Icon, PixelCard, Words, badgeColors;
+import '../../ui/pro/pro.dart';
+import '../../village/island_cards.dart';
 import '../../data/remote.dart' show agentsProvider, projectCatalogProvider;
 import '../projects/codebase.dart' show growthOf;
 import '../projects/projects_page.dart' show since;
 import '../../shared/faces.dart' show AgentFaceOf, PoseSprite;
-import '../../shared/seed_bag.dart';
 import '../../shared/swatches.dart';
 import '../shared/widgets.dart';
 import '../issues/issues_page.dart' show writeIssueAndOpen;
 import 'map_rules.dart';
+import 'seed_bag_view.dart';
 
 /// The issues and helpers come with the farm's state.
 const _pollEvery = Duration(seconds: 30);
@@ -79,8 +79,10 @@ class _MapView extends StatelessWidget {
         if (atlas.has(l)) atlas[l],
     ];
     final cell = looks.isEmpty ? const Size(300, 200) : Size(looks.fold(0.0, (w, l) => w > l.w ? w : l.w), looks.fold(0.0, (h, l) => h > l.h ? h : l.h));
+    // The same side gap as the list beside or above it (ListDetail's).
+    final gap = MediaQuery.sizeOf(context).width >= 640 ? 12.0 : 8.0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: EdgeInsets.fromLTRB(gap, 0, gap, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -93,14 +95,14 @@ class _MapView extends StatelessWidget {
                 builder: (context, box) {
                   final inner = box.maxWidth - 2 * 16;
                   final scale = islandScale(inner, cell.width, _gap);
-                  return PxScrollView(
+                  return SingleChildScrollView(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (loading && islands.isEmpty)
-                            Text('在找……', style: PxText.sm.copyWith(color: Palette.bark500))
+                            Text('在找……', style: ProText.sm.copyWith(color: ProColor.muted))
                           else if (islands.isEmpty)
                             const _NoProjects()
                           else
@@ -151,7 +153,9 @@ class _Toolbar extends StatelessWidget {
     final pieces = ['${islands.length} 座岛', '${tally.peopled} 座有人', '在干 ${tally.working}/$maxRunning 块地', if (tally.queued > 0) '排队 ${tally.queued}'];
     final counts = Wrap(
       runSpacing: 2,
-      children: [for (final (i, words) in pieces.indexed) Text(i < pieces.length - 1 ? '$words · ' : words, style: PxText.sm)],
+      children: [
+        for (final (i, words) in pieces.indexed) Text(i < pieces.length - 1 ? '$words · ' : words, style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
+      ],
     );
     final marks = Wrap(
       spacing: 16,
@@ -163,16 +167,13 @@ class _Toolbar extends StatelessWidget {
             children: [
               SpriteIcon(icon, size: 18),
               const SizedBox(width: 4),
-              Text(words, style: PxText.xs.copyWith(color: Palette.bark600)),
+              Text(words, style: ProText.meta),
             ],
           ),
       ],
     );
     final write = Consumer(
-      builder: (context, ref, _) => PxButton(
-        onPressed: () => writeIssueAndOpen(context, ref.read(apiProvider)),
-        child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-add', size: 16), SizedBox(width: 6), Text('写一张工单')]),
-      ),
+      builder: (context, ref, _) => ProButton.text('写一张工单', icon: 'button-add', onPressed: () => writeIssueAndOpen(context, ref.read(apiProvider))),
     );
     return LayoutBuilder(
       builder: (context, box) => box.maxWidth < _oneLine
@@ -241,9 +242,9 @@ class _ParchmentState extends State<_Parchment> with SingleTickerProviderStateMi
     final atlas = widget.atlas;
     final cloud = atlas.has('map-cloud') ? atlas['map-cloud'] : null;
     final compass = atlas.has('map-compass') ? atlas['map-compass'] : null;
-    return PxWindow(
-      paper: _parchment,
-      clip: true,
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: const BoxDecoration(color: _parchment, border: Border.fromBorderSide(proLine), borderRadius: BorderRadius.all(Radius.circular(8))),
       child: LayoutBuilder(
         builder: (context, box) => Stack(
           children: [
@@ -309,10 +310,10 @@ class _IslandView extends ConsumerWidget {
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     void go(String path) => workbenchGo(context, path);
     // Inside the island's place: the bag sows in this project, no bed and no project to choose.
-    void sow() => showPxDialog<void>(
+    void sow() => showProDialog<void>(
       context,
       title: Text('播种 · ${island.project}'),
-      builder: (dialog) => SeedForm(project: island.project, onDone: () => Navigator.of(dialog).pop()),
+      builder: (dialog) => MapSeedForm(project: island.project, onDone: () => Navigator.of(dialog).pop()),
     );
 
     Widget place(SpriteInfo sp, Offset foot, {Widget? child, VoidCallback? onTap, String? tip, String? label}) {
@@ -359,7 +360,6 @@ class _IslandView extends ConsumerWidget {
               ),
             );
           if (plot.badge case final badge?) {
-            final (paper, ink) = badgeColors(badge.tone);
             layers.add(
               Positioned(
                 left: foot.dx * s,
@@ -367,15 +367,7 @@ class _IslandView extends ConsumerWidget {
                 child: IgnorePointer(
                   child: FractionalTranslation(
                     translation: const Offset(-.5, 0),
-                    child: PixelCard(
-                      paper: paper,
-                      ink: ink,
-                      padX: 4,
-                      padY: 1,
-                      rows: [
-                        [Words(badge.text, size: 10)],
-                      ],
-                    ),
+                    child: PlotSign(text: badge.text, tone: badge.tone),
                   ),
                 ),
               ),
@@ -401,15 +393,7 @@ class _IslandView extends ConsumerWidget {
           Positioned(
             left: (foot.dx + 6) * s,
             top: (foot.dy - 20) * s,
-            child: IgnorePointer(
-              child: PixelCard(
-                padX: 3,
-                padY: 0,
-                rows: [
-                  [Words('+${island.queued.length - sacks.length}', size: 10)],
-                ],
-              ),
-            ),
+            child: IgnorePointer(child: MoreSacks(island.queued.length - sacks.length)),
           ),
         );
       }
@@ -433,17 +417,13 @@ class _IslandView extends ConsumerWidget {
           onTap: () => onOpen(island.project),
           selected: selected,
           semanticLabel: island.project,
-          builder: (_, st) => PixelCard(
-            paper: selected ? CardColors.held : (st.hovered ? CardColors.slot : CardColors.paper),
-            center: true,
+          builder: (_, st) => IslandSign(
+            project: island.project,
+            line: islandText(island),
+            selected: selected,
+            hovered: st.hovered,
             maxWidth: pic.w * s - 24,
-            maxLines: 1,
-            rows: [
-              [Words(island.project, size: 14)],
-              [Words(islandText(island), color: CardColors.muted)],
-              // The way onto the island, said and pointed at, not only the island to click.
-              if (!selected) [Words('进岛', color: CardColors.good), if (atlas.has('button-next')) Icon(atlas['button-next'], 12)],
-            ],
+            enter: atlas.has('button-next') ? atlas['button-next'] : null,
           ),
         ),
       ],
@@ -457,15 +437,14 @@ class _Homeless extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: PxWindow(
-      paper: Palette.cream50,
+    child: ProPanel(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Wrap(
         spacing: 8,
         runSpacing: 4,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Text('不在哪个项目里：', style: PxText.xs.copyWith(color: Palette.bark600)),
+          Text('不在哪个项目里：', style: ProText.meta),
           for (final h in sessions)
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -473,7 +452,7 @@ class _Homeless extends StatelessWidget {
                 AgentFaceOf(h.agent, size: 20),
                 const SizedBox(width: 4),
                 DefaultTextStyle(
-                  style: PxText.xs,
+                  style: ProText.sm,
                   child: InlineLink(h.name, onTap: () => workbenchGo(context, '/issues/${Uri.encodeComponent(h.id)}')),
                 ),
               ],
@@ -489,13 +468,13 @@ class _NoProjects extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: PxCard(
+    child: ProPanel(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('工作目录下还没有项目，地图上还是一片海。', style: PxText.sm.copyWith(color: Palette.bark600)),
+          Text('工作目录下还没有项目，地图上还是一片海。', style: ProText.sm.copyWith(color: ProColor.muted)),
           const SizedBox(height: 12),
-          PxButton.text('去开一块地', tone: PxTone.primary, onPressed: () => workbenchGo(context, '/projects')),
+          ProButton.text('去开一块地', tone: ProTone.primary, onPressed: () => workbenchGo(context, '/projects')),
         ],
       ),
     ),
@@ -514,7 +493,7 @@ class IslandDetail extends StatelessWidget {
       final growth = growthOf(last, now);
       final shut = island.spots.whereType<SpotShut>().length;
       final taken = island.spots.whereType<SpotTaken>().toList();
-      return PxCard(
+      return ProCard(
         title: island.project,
         aside: Text(islandText(island)),
         child: Column(
@@ -527,13 +506,16 @@ class IslandDetail extends StatelessWidget {
                 Expanded(
                   child: Text(
                     island.summary == null ? '工作目录里没有这个项目了，只剩还在岛上的帮工。' : '长势 · ${growth.label}${last != null ? ' · 最近一次提交：${since(last, now)}' : ''}',
-                    style: PxText.xs.copyWith(color: Palette.bark600),
+                    style: ProText.sm.copyWith(color: ProColor.muted),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text('worktree · ${taken.length} 个', style: PxText.sm),
+            const SizedBox(height: 16),
+            Text(
+              'worktree · ${taken.length} 个',
+              style: ProText.xs.copyWith(color: ProColor.muted, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 6),
             if (taken.isEmpty) const EmptyNote('岛上还没有帮工：每派一件活来，就多一个 worktree。') else for (final t in taken) _WorktreeRow(spot: t, now: now),
             const SizedBox(height: 12),
@@ -550,15 +532,15 @@ class IslandDetail extends StatelessWidget {
                         : shut > 0
                         ? '农场的 $maxRunning 块地都有人在干活，派来的活先排队。'
                         : '满了：${island.maxSessions} 个帮工都在干活，派来的活先排队。',
-                    style: PxText.xs.copyWith(color: Palette.bark600),
+                    style: ProText.sm.copyWith(color: ProColor.muted),
                   ),
                 ),
                 if (island.summary != null) ...[
                   const SizedBox(width: 8),
                   Consumer(
-                    builder: (context, ref, _) => PxButton.text(
+                    builder: (context, ref, _) => ProButton.text(
                       '派一件活',
-                      tone: island.open > 0 ? PxTone.primary : PxTone.plain,
+                      tone: island.open > 0 ? ProTone.primary : ProTone.plain,
                       onPressed: () => writeIssueAndOpen(context, ref.read(apiProvider), project: island.project),
                     ),
                   ),
@@ -566,8 +548,11 @@ class IslandDetail extends StatelessWidget {
               ],
             ),
             if (island.queued.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text('排队 · ${island.queued.length} 件', style: PxText.sm),
+              const SizedBox(height: 16),
+              Text(
+                '排队 · ${island.queued.length} 件',
+                style: ProText.xs.copyWith(color: ProColor.muted, fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 6),
               for (final item in island.queued)
                 Padding(
@@ -577,19 +562,15 @@ class IslandDetail extends StatelessWidget {
                       const SpriteIcon('map-sack', size: 20),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(item.title, style: PxText.xs, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(item.title, style: ProText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       const SizedBox(width: 8),
-                      DefaultTextStyle(
-                        style: PxText.xs,
-                        child: PxButton(
-                          size: PxSize.custom,
-                          padding: const EdgeInsets.all(3),
-                          tooltip: '看这张工单',
-                          semanticLabel: '看这张工单',
-                          onPressed: () => workbenchGo(context, '/issues/${Uri.encodeComponent(item.id)}'),
-                          child: const SpriteIcon('button-open', size: 12),
-                        ),
+                      ProButton.icon(
+                        'button-open',
+                        tooltip: '看这张工单',
+                        semanticLabel: '看这张工单',
+                        iconSize: 14,
+                        onPressed: () => workbenchGo(context, '/issues/${Uri.encodeComponent(item.id)}'),
                       ),
                     ],
                   ),
@@ -614,7 +595,7 @@ class _WorktreeRow extends StatelessWidget {
       onTap: () => workbenchGo(context, '/issues/${Uri.encodeComponent(h.id)}'),
       semanticLabel: '${h.name}：${phaseText(h, now)}',
       builder: (context, st) => Container(
-        color: st.hovered ? Palette.cream100 : null,
+        decoration: BoxDecoration(color: st.hovered ? ProColor.hover : null, borderRadius: proRadius),
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         child: Row(
           children: [
@@ -624,13 +605,8 @@ class _WorktreeRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(h.name, style: PxText.sm),
-                  Text(
-                    phaseText(h, now),
-                    style: PxText.xs.copyWith(color: Palette.bark600),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(h.name, style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
+                  Text(phaseText(h, now), style: ProText.meta, maxLines: 2, overflow: TextOverflow.ellipsis),
                   if (h.branch case final branch?)
                     Row(
                       children: [
@@ -639,7 +615,7 @@ class _WorktreeRow extends StatelessWidget {
                         Flexible(
                           child: Text(
                             branch,
-                            style: PxText.mono.copyWith(fontSize: 11, color: Palette.bark500),
+                            style: ProText.mono.copyWith(fontSize: 12, color: ProColor.muted),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),

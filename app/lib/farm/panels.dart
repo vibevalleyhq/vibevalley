@@ -16,7 +16,7 @@ import '../rules/cast.dart';
 import '../shared/tags.dart';
 import 'farm_log.dart';
 import 'plot_detail.dart';
-import '../shared/seed_bag.dart';
+import 'seed_bag_view.dart';
 import 'seed_forms.dart';
 
 class FarmPanels extends ConsumerWidget {

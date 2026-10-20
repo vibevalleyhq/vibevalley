@@ -2,19 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../ui/theme.dart';
-import '../gen/vibevalley.dart';
-import '../rules/rounds.dart';
-import '../ui/pixel/base.dart';
-import '../ui/pixel/button.dart';
-import '../ui/pixel/field.dart';
-import '../ui/icons.dart';
-import '../ui/labels.dart';
-import '../ui/pixel/markdown.dart';
-import '../data/remote.dart';
-import '../data/providers.dart';
+import '../../data/providers.dart';
+import '../../data/remote.dart';
+import '../../gen/vibevalley.dart';
+import '../../rules/rounds.dart';
+import '../../shared/work_log.dart' show farmToolText, readableInput, spanColor, spanLabel;
+import '../../ui/pro/pro.dart';
 import 'widgets.dart';
-import 'work_log.dart';
 
 const _nearBottom = 48.0;
 
@@ -27,7 +21,7 @@ class _Columns {
   /// Where the step's text starts.
   double get inset => gutter + tag + 8;
 
-  static _Columns of(double width) => width < 520 ? const _Columns(52, 64) : const _Columns(52, 84);
+  static _Columns of(double width) => width < 520 ? const _Columns(56, 68) : const _Columns(60, 88);
 }
 
 double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
@@ -64,12 +58,13 @@ String tagOf(SessionEvent step, {String? asked, bool job = false}) {
 }
 
 Color _tagFill(SessionEvent step) => switch (step.type) {
-  SessionEventType.llmUsage => Palette.cream200,
+  SessionEventType.llmUsage => ProColor.selected,
   SessionEventType.llmRetry => Palette.wheatHover,
   _ => spanColor(step),
 };
 
-Color _inkOn(Color fill) => fill.computeLuminance() < .25 ? Palette.cream50 : Palette.bark900;
+/// A see-through fill shows the page under it, so it reads as light.
+Color _inkOn(Color fill) => fill.a > .5 && fill.computeLuminance() < .25 ? Palette.paper : ProColor.ink;
 
 /// What a row is searched by.
 String _haystack(SessionEvent step, String tag) => [tag, step.text, step.tool ?? '', step.input ?? '', step.output ?? ''].join('\n').toLowerCase();
@@ -192,7 +187,7 @@ class _TrajectoryState extends State<Trajectory> {
               const SizedBox(width: 12),
               SizedBox(
                 width: width < 520 ? 150 : 220,
-                child: PxTextInput(
+                child: ProTextInput(
                   value: _query,
                   onChanged: (v) => setState(() => _query = v),
                   placeholder: '搜索',
@@ -208,27 +203,28 @@ class _TrajectoryState extends State<Trajectory> {
           fall: waterfallOf(widget.steps, end: end),
           colorOf: (seq) => switch (bySeq[seq.round()]) {
             final step? => spanColor(step),
-            null => Palette.bark400,
+            null => ProColor.faint,
           },
           onPick: (seq) => _show(seq.round()),
         ),
-        Container(height: 2, color: Palette.cream300, margin: const EdgeInsets.only(top: 6)),
+        const SizedBox(height: 8),
+        const Divider(height: 1, thickness: 1, color: ProColor.line),
         Expanded(
-          child: Container(
-            color: Palette.cream100,
-            child: rows.isEmpty
-                ? const Align(alignment: Alignment.topLeft, child: EmptyNote('没有对得上的步骤。'))
-                : SingleChildScrollView(
-                    controller: _scroll,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows),
-                  ),
-          ),
+          child: rows.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Align(alignment: Alignment.topLeft, child: EmptyNote('没有对得上的步骤。')),
+                )
+              : SingleChildScrollView(
+                  controller: _scroll,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows),
+                ),
         ),
-        Container(height: 2, color: Palette.cream300),
+        const Divider(height: 1, thickness: 1, color: ProColor.line),
         Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(_summaryText(summary), style: PxText.xs.copyWith(color: Palette.bark600)),
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(_summaryText(summary), style: ProText.meta),
         ),
       ],
     );
@@ -292,16 +288,16 @@ class _Row extends StatelessWidget {
     final fill = _tagFill(step);
     final tool = step.type == SessionEventType.toolCall;
     final failed = (tool && step.ok == false) || step.type == SessionEventType.runError;
-    final ink = failed ? Palette.berry : Palette.bark900;
-    final text = PxText.xs.copyWith(color: ink, height: 1.5);
+    final ink = failed ? Palette.berry : ProColor.ink;
+    final text = ProText.sm.copyWith(color: ink);
     final sub = step.under != null;
     final Widget content;
     if (tool) {
       content = Text.rich(_toolLine(step), maxLines: 1, overflow: TextOverflow.ellipsis, style: text);
     } else if (open && step.type == SessionEventType.assistantMessage) {
-      content = PxMarkdown(step.text, style: text, reading: true);
+      content = ProMarkdown(step.text, style: text);
     } else if (open) {
-      content = PxReadText(step.text, color: ink);
+      content = Text(step.text, style: text);
     } else {
       content = Text(open ? step.text : _oneLine(step.text), maxLines: open ? null : 1, overflow: open ? null : TextOverflow.ellipsis, style: text);
     }
@@ -309,12 +305,15 @@ class _Row extends StatelessWidget {
       onTap: onTap,
       semanticLabel: '$tag ${_oneLine(step.text)}',
       builder: (context, s) => Container(
-        color: marked
-            ? Palette.wheat.withValues(alpha: .35)
-            : s.hovered
-            ? Palette.creamHover
-            : null,
-        padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
+        decoration: BoxDecoration(
+          color: marked
+              ? Palette.wheat.withValues(alpha: .35)
+              : s.hovered
+              ? ProColor.hover
+              : null,
+          borderRadius: proRadius,
+        ),
+        padding: const EdgeInsets.fromLTRB(0, 3, 8, 3),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
@@ -325,30 +324,30 @@ class _Row extends StatelessWidget {
                 SizedBox(
                   width: cols.gutter,
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 6, top: 2),
-                    child: gutter == null ? null : Text(gutter!, maxLines: 1, style: PxText.xs.copyWith(color: Palette.bark500)),
+                    padding: const EdgeInsets.only(left: 8, top: 2),
+                    child: gutter == null ? null : Text(gutter!, maxLines: 1, style: ProText.meta),
                   ),
                 ),
                 Container(
                   width: sub ? cols.tag - 10 : cols.tag,
                   margin: EdgeInsets.only(top: 1, left: sub ? 10 : 0),
-                  color: sub ? fill.withValues(alpha: .55) : fill,
+                  decoration: BoxDecoration(color: sub ? fill.withValues(alpha: .55) : fill, borderRadius: const BorderRadius.all(Radius.circular(4))),
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   child: Text(
                     tag,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: PxText.xs.copyWith(color: _inkOn(fill)),
+                    style: ProText.xs.copyWith(color: _inkOn(fill), fontWeight: FontWeight.w500),
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (failed && tool) const Padding(padding: EdgeInsets.only(top: 3, right: 4), child: SpriteIcon('mark-cross', size: 12)),
+                if (failed && tool) const Padding(padding: EdgeInsets.only(top: 4, right: 4), child: SpriteIcon('mark-cross', size: 12)),
                 Expanded(child: content),
                 if (when != null)
                   Padding(
                     padding: const EdgeInsets.only(left: 8, top: 2),
-                    child: Text(when!, style: PxText.xs.copyWith(color: Palette.bark400)),
+                    child: Text(when!, style: ProText.meta.copyWith(color: ProColor.faint)),
                   ),
               ],
             ),
@@ -363,7 +362,7 @@ class _Row extends StatelessWidget {
 /// `what {args} → result`, the args and result in the code font.
 TextSpan _toolLine(SessionEvent step) {
   final farm = farmToolText(step.text);
-  final code = PxText.mono.copyWith(color: Palette.bark500);
+  final code = ProText.mono.copyWith(color: ProColor.muted);
   final args = _oneLine(step.input ?? '');
   final out = _oneLine(step.output ?? '');
   return TextSpan(
@@ -378,7 +377,7 @@ TextSpan _toolLine(SessionEvent step) {
       else
         TextSpan(
           text: out,
-          style: code.copyWith(color: step.ok == false ? Palette.berry : Palette.bark800),
+          style: code.copyWith(color: step.ok == false ? Palette.berry : ProColor.ink),
         ),
     ],
   );
@@ -392,8 +391,8 @@ class _ToolDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final input = readableInput(step);
-    final label = PxText.xs.copyWith(color: Palette.bark500);
-    final code = PxText.mono.copyWith(color: Palette.bark900, height: 1.5);
+    const label = ProText.meta;
+    const code = ProText.mono;
     return Padding(
       padding: EdgeInsets.fromLTRB(inset, 4, 0, 6),
       child: Column(
@@ -449,8 +448,8 @@ class _Waterfall extends StatelessWidget {
               children: [
                 for (final lane in Lane.values)
                   Padding(
-                    padding: const EdgeInsets.only(left: 6),
-                    child: Text(_laneNames[lane]!, style: PxText.xs.copyWith(height: 1, color: Palette.bark500)),
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Text(_laneNames[lane]!, style: ProText.meta.copyWith(height: 1)),
                   ),
               ],
             ),
@@ -498,7 +497,10 @@ class _Waterfall extends StatelessWidget {
                         child: Tappable(
                           onTap: () => onPick(span.seq),
                           semanticLabel: '${_laneNames[span.lane]} ${secondsText(span.ms)}',
-                          builder: (context, s) => Container(margin: const EdgeInsets.only(right: 1), color: s.hovered ? Palette.bark900 : color),
+                          builder: (context, s) => Container(
+                            margin: const EdgeInsets.only(right: 1),
+                            decoration: BoxDecoration(color: s.hovered ? ProColor.ink : color, borderRadius: const BorderRadius.all(Radius.circular(2))),
+                          ),
                         ),
                       ),
                     ),
@@ -513,7 +515,9 @@ class _Waterfall extends StatelessWidget {
                         right: 0,
                         top: i * (_lane + _gap),
                         height: _lane,
-                        child: const ColoredBox(color: Palette.cream100),
+                        child: const DecoratedBox(
+                          decoration: BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(2))),
+                        ),
                       ),
                     ...segments,
                   ],
@@ -585,15 +589,15 @@ class _MarkableState extends State<_Markable> {
                     top: 0,
                     right: 0,
                     child: Container(
-                      color: Palette.cream50,
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: const BoxDecoration(color: ProColor.page, border: Border.fromBorderSide(proLine), borderRadius: proRadius),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const SpriteIcon('icon-bug', size: 12),
                           const SizedBox(width: 4),
                           DefaultTextStyle(
-                            style: PxText.xs,
+                            style: ProText.xs.copyWith(fontWeight: FontWeight.w500),
                             child: InlineLink('这一轮做错了', onTap: () => setState(() => _writing = true)),
                           ),
                         ],
@@ -608,14 +612,12 @@ class _MarkableState extends State<_Markable> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(widget.inset, 2, 8, 2),
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  color: Palette.berry.withValues(alpha: .12),
+                  decoration: BoxDecoration(color: Palette.berry.withValues(alpha: .12), borderRadius: proRadius),
                   child: Row(
                     children: [
                       const SpriteIcon('icon-bug', size: 12),
                       const SizedBox(width: 6),
-                      Expanded(
-                        child: Text('标成了做错的一轮，存成了一条评测', style: PxText.xs.copyWith(color: Palette.bark800)),
-                      ),
+                      Expanded(child: Text('标成了做错的一轮，存成了一条评测', style: ProText.xs)),
                     ],
                   ),
                 ),
@@ -626,7 +628,7 @@ class _MarkableState extends State<_Markable> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: PxTextInput(
+                      child: ProTextInput(
                         value: _want,
                         onChanged: (v) => setState(() => _want = v),
                         onSubmitted: (_) => _submit(),
@@ -637,9 +639,9 @@ class _MarkableState extends State<_Markable> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    PxButton.text('记下', tone: PxTone.primary, size: PxSize.sm, onPressed: _busy || _want.trim().isEmpty ? null : _submit),
+                    ProButton.text('记下', tone: ProTone.primary, size: ProSize.sm, onPressed: _busy || _want.trim().isEmpty ? null : _submit),
                     const SizedBox(width: 6),
-                    PxButton.text('算了', size: PxSize.sm, onPressed: _busy ? null : () => setState(() => _writing = false)),
+                    ProButton.text('算了', size: ProSize.sm, onPressed: _busy ? null : () => setState(() => _writing = false)),
                   ],
                 ),
               ),
@@ -665,7 +667,7 @@ class TrajectoryTitle extends StatelessWidget {
         title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: PxText.sm.copyWith(color: Palette.bark800),
+        style: ProText.sm.copyWith(fontWeight: FontWeight.w600),
       ),
     ),
   );
@@ -733,12 +735,15 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
       selected: on,
       semanticLabel: h.name,
       builder: (context, s) => Container(
-        color: on
-            ? Palette.wheat.withValues(alpha: .35)
-            : s.hovered
-            ? Palette.creamHover
-            : Palette.cream100,
-        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: on
+              ? ProColor.selected
+              : s.hovered
+              ? ProColor.hover
+              : null,
+          borderRadius: proRadius,
+        ),
+        margin: const EdgeInsets.only(bottom: 2),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -747,22 +752,13 @@ class _TrajectoryListState extends ConsumerState<TrajectoryList> {
               spacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Text(h.name, style: PxText.xs.copyWith(color: Palette.bark800)),
-                if (h.project != null) Text(h.project!, style: PxText.xs.copyWith(color: Palette.bark500)),
+                Text(h.name, style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
+                if (h.project != null) Text(h.project!, style: ProText.meta),
                 if (h.endedAt == null) const BadgeLabel('在场', hat: true),
               ],
             ),
-            Text(
-              h.endedAt == null ? '${ago(h.hiredAt, now)}接活' : '${ago(h.hiredAt, now)}接活 · ${ago(h.endedAt!, now)}走的',
-              style: PxText.xs.copyWith(color: Palette.bark500),
-            ),
-            if (h.brief.isNotEmpty)
-              Text(
-                _oneLine(h.brief),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: PxText.xs.copyWith(color: Palette.bark900),
-              ),
+            Text(h.endedAt == null ? '${ago(h.hiredAt, now)}接活' : '${ago(h.hiredAt, now)}接活 · ${ago(h.endedAt!, now)}走的', style: ProText.meta),
+            if (h.brief.isNotEmpty) Text(_oneLine(h.brief), maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.xs),
           ],
         ),
       ),

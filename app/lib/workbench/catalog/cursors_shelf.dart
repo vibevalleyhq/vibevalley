@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import 'catalog_page.dart';
 
 /// Null when the app was built without them.
@@ -48,8 +48,8 @@ class _CursorsShelfState extends ConsumerState<CursorsShelf> {
         tabs: widget.tabs,
         below: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: Text('鼠标在农场里的样子：平时、指着能点的、拿着工具时。', style: PxText.xs.copyWith(height: 1.625, color: Palette.bark500)),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+            child: const Text('鼠标在农场里的样子：平时、指着能点的、拿着工具时。', style: ProText.meta),
           ),
         ],
       ),
@@ -61,7 +61,7 @@ class _CursorsShelfState extends ConsumerState<CursorsShelf> {
           ground: _ground,
           onGround: (g) => setState(() => _ground = g),
         ),
-        PxCard(
+        ProCard(
           title: '指针 · ${all?.length ?? 0}',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -69,13 +69,13 @@ class _CursorsShelfState extends ConsumerState<CursorsShelf> {
             children: [
               Text(
                 '红点是点下去落在哪。平时是手套，指着能点的伸出食指；拿着工具时是那件工具，能用的带闪光，用不上的带禁止标记。切自 design/pixel/raw/ui-cursors.png（design/pixel/process.py ui-cursors）。',
-                style: PxText.xs.copyWith(color: Palette.bark600),
+                style: ProText.sm.copyWith(color: ProColor.muted),
               ),
               const SizedBox(height: 12),
               if (cursors.isLoading)
                 const SizedBox.shrink()
               else if (all == null)
-                Text('这个版本没有带上指针的图（assets/cursors）。', style: PxText.sm.copyWith(color: Palette.bark500))
+                Text('这个版本没有带上指针的图（assets/cursors）。', style: ProText.sm.copyWith(color: ProColor.muted))
               else
                 LayoutBuilder(
                   builder: (context, box) {
@@ -149,39 +149,55 @@ class _CursorTileState extends State<_CursorTile> {
         children: [
           SizedBox(
             height: 64,
-            child: GroundBox(
-              ground: widget.ground,
-              child: Center(
-                child: SizedBox(
-                  height: height,
-                  width: k == null ? height : _naturalW! * k,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Image.asset(
-                        'assets/cursors/${widget.name}@2x.png',
-                        height: height,
-                        filterQuality: FilterQuality.none,
-                        errorBuilder: (_, _, _) => Image.asset('assets/cursors/${widget.name}.png', height: height, filterQuality: FilterQuality.none),
-                      ),
-                      if (k != null)
-                        Positioned(
-                          left: widget.hx * k - 4,
-                          top: widget.hy * k - 4,
-                          width: 8,
-                          height: 8,
-                          child: Container(color: Palette.berry, foregroundDecoration: pxRing),
+            child: _Rounded(
+              GroundBox(
+                ground: widget.ground,
+                child: Center(
+                  child: SizedBox(
+                    height: height,
+                    width: k == null ? height : _naturalW! * k,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Image.asset(
+                          'assets/cursors/${widget.name}@2x.png',
+                          height: height,
+                          filterQuality: FilterQuality.none,
+                          errorBuilder: (_, _, _) => Image.asset('assets/cursors/${widget.name}.png', height: height, filterQuality: FilterQuality.none),
                         ),
-                    ],
+                        if (k != null)
+                          Positioned(
+                            left: widget.hx * k - 4,
+                            top: widget.hy * k - 4,
+                            width: 8,
+                            height: 8,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Palette.berry,
+                                border: Border.all(color: Palette.bark900),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
           const SizedBox(height: 4),
-          Text(widget.name, style: PxText.mono.copyWith(height: 1.5, color: Palette.bark600)),
+          Text(widget.name, style: ProText.mono.copyWith(fontSize: 12, color: ProColor.muted)),
         ],
       ),
     );
   }
+}
+
+class _Rounded extends StatelessWidget {
+  const _Rounded(this.child);
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(borderRadius: proRadius, child: child);
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import 'catalog_data.dart';
 import '../shared/widgets.dart';
 import 'cursors_shelf.dart';
@@ -74,8 +74,8 @@ class CatalogPage extends StatelessWidget {
       label: '图鉴的书架',
       container: true,
       child: Container(
-        color: Palette.cream200,
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(2),
+        decoration: const BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(8))),
         child: Row(
           children: [
             for (final (tab, label, path) in _shelfTabs)
@@ -83,15 +83,24 @@ class CatalogPage extends StatelessWidget {
                 child: Tappable(
                   onTap: () => workbenchGo(context, path),
                   selected: shelf == tab,
-                  builder: (context, s) => Container(
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    color: shelf == tab
-                        ? Palette.leaf500
-                        : s.hovered
-                        ? Palette.cream300
-                        : null,
-                    child: Text(label, style: PxText.sm.copyWith(color: shelf == tab ? Palette.cream50 : Palette.bark800)),
+                  builder: (context, s) => ProFocusRing(
+                    on: s.focused,
+                    child: Container(
+                      height: 26,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: shelf == tab ? ProColor.page : (s.hovered ? ProColor.hover : null),
+                        borderRadius: proRadius,
+                        boxShadow: shelf == tab ? const [BoxShadow(color: Color(0x1A2F1F13), blurRadius: 2, offset: Offset(0, 1))] : null,
+                      ),
+                      child: Text(
+                        label,
+                        style: ProText.sm.copyWith(
+                          color: shelf == tab ? ProColor.ink : ProColor.muted,
+                          fontWeight: shelf == tab ? FontWeight.w500 : FontWeight.w400,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -107,16 +116,7 @@ class CatalogPage extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, box) {
         final gap = box.maxWidth >= 640 ? 12.0 : 8.0;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(gap, 0, gap, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 12),
-              Expanded(child: body),
-            ],
-          ),
-        );
+        return Padding(padding: EdgeInsets.fromLTRB(gap, 0, gap, 12), child: body);
       },
     );
   }
@@ -150,8 +150,8 @@ List<Widget> gapped(List<Widget> items) => [
   for (var i = 0; i < items.length; i++) ...[if (i > 0) const SizedBox(height: 12), items[i]],
 ];
 
-/// A card's frame and shadow sit 2 px outside it (PxWindow); a list that starts at its edge would cut them off.
-const catalogFramed = EdgeInsets.fromLTRB(4, 4, 6, 8);
+/// Room under a shelf's last card.
+const catalogFramed = EdgeInsets.only(bottom: 8);
 
 /// The left column every shelf has, so switching shelves never moves the picker: the shelves on top, then [below].
 class ShelfColumn extends StatelessWidget {
@@ -160,8 +160,7 @@ class ShelfColumn extends StatelessWidget {
   final List<Widget> below;
 
   @override
-  Widget build(BuildContext context) => PxWindow(
-    paper: Palette.cream50,
+  Widget build(BuildContext context) => ProPanel(
     padding: const EdgeInsets.all(8),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -208,7 +207,7 @@ class ShelfSearch extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 4),
     child: LayoutBuilder(
       builder: (context, box) {
-        final find = PxTextInput(value: query, onChanged: onChanged, placeholder: placeholder, icon: 'button-search', semanticLabel: '找素材');
+        final find = ProTextInput(value: query, onChanged: onChanged, placeholder: placeholder, icon: 'button-search', semanticLabel: '找素材');
         final pick = ground;
         if (pick == null) return find;
         final picker = GroundPick(value: pick, onChanged: onGround ?? (_) {});

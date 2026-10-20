@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../ui/theme.dart';
@@ -10,6 +8,9 @@ import '../ui/icons.dart';
 import '../ui/labels.dart';
 import '../ui/pixel/markdown.dart';
 import 'widgets.dart';
+import 'work_log_rules.dart';
+
+export 'work_log_rules.dart';
 
 const _nearBottom = 48.0;
 
@@ -114,11 +115,7 @@ class _WorkLogState extends State<WorkLog> {
     final answer = round.answer;
     final shown = open ? round.steps : [?answer];
     final asked = round.asked;
-    final label = asked == null
-        ? '更早的步骤'
-        : asked.under != null
-        ? '帮手接到'
-        : (widget.asked ?? (asked.seq == firstAsked ? '工单' : '带话'));
+    final label = roundLabel(round, firstAsked: firstAsked, asked: widget.asked);
     return Container(
       decoration: BoxDecoration(border: Border.all(color: Palette.cream300)),
       padding: const EdgeInsets.all(6),
@@ -239,36 +236,6 @@ class _TimeBar extends StatelessWidget {
     );
   }
 }
-
-String spanLabel(SessionEvent step) => switch (step.type) {
-  SessionEventType.userMessage => '收到',
-  SessionEventType.memoryRecalled => '想起',
-  SessionEventType.assistantThinking => '思考',
-  SessionEventType.assistantMessage => '说',
-  SessionEventType.llmRetry => '重试',
-  SessionEventType.llmUsage => '缓存',
-  SessionEventType.runError => '出错',
-  SessionEventType.runStart || SessionEventType.runEnd || SessionEventType.toolResult => '',
-  SessionEventType.toolCall => farmToolText(step.text) != null ? '田头' : step.actionText ?? '工具',
-};
-
-Color spanColor(SessionEvent step) => switch (step.type) {
-  SessionEventType.userMessage => Palette.wheat,
-  SessionEventType.memoryRecalled => Palette.leaf300,
-  SessionEventType.assistantThinking => Palette.cream300,
-  SessionEventType.assistantMessage => Palette.leaf500,
-  SessionEventType.llmRetry || SessionEventType.llmUsage => Palette.wheatHover,
-  SessionEventType.runError => Palette.berry,
-  SessionEventType.runStart || SessionEventType.runEnd || SessionEventType.toolResult => Palette.cream200,
-  SessionEventType.toolCall when step.ok == false => Palette.berry,
-  SessionEventType.toolCall => switch (step.action ?? ToolAction.other) {
-    ToolAction.readFile || ToolAction.search || ToolAction.web => Palette.water,
-    ToolAction.editFile => Palette.leaf700,
-    ToolAction.runCommand => Palette.bark600,
-    ToolAction.wait => Palette.cream200,
-    ToolAction.mcp || ToolAction.other => Palette.bark400,
-  },
-};
 
 class _Step extends StatelessWidget {
   const _Step({required this.step, required this.now, required this.job, this.asked});
@@ -407,7 +374,7 @@ class _FoldedState extends State<_Folded> {
 
   @override
   Widget build(BuildContext context) {
-    final long = widget.text.length > widget.lines * 60 || widget.text.split('\n').length > widget.lines;
+    final long = isLongText(widget.text, widget.lines);
     final clamp = !_open && long;
     // The log is read, not chatted: folded or not, it is in the reading font.
     Widget body = widget.markdown ? PxMarkdown(widget.text, reading: true) : PxReadText(widget.text, maxLines: clamp ? widget.lines : null);
@@ -433,31 +400,6 @@ class _FoldedState extends State<_Folded> {
       ],
     );
   }
-}
-
-String? farmToolText(String text) => switch (RegExp(r'^vibevalley__(channel_say|channel_read|channel_inbox|session_list)').firstMatch(text.trim())?.group(1)) {
-  'channel_say' => '在田头说话',
-  'channel_read' => '读田头的消息',
-  'channel_inbox' => '看有没有找它的话',
-  'session_list' => '看田头上都有谁',
-  null => null,
-  final other => '田头：$other',
-};
-
-String readableInput(SessionEvent step) {
-  final raw = step.input?.trim() ?? '';
-  if (raw.isEmpty) return '';
-  try {
-    final parsed = jsonDecode(raw);
-    if (parsed is Map) {
-      if (parsed['command'] is String) return '\$ ${parsed['command']}';
-      return const JsonEncoder.withIndent('  ').convert(parsed);
-    }
-    if (parsed is List) return const JsonEncoder.withIndent('  ').convert(parsed);
-  } on FormatException {
-    // Not JSON (or clipped): show it as it came.
-  }
-  return raw;
 }
 
 class _ToolStep extends StatefulWidget {

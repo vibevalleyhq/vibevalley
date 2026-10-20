@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../shared/settings_form.dart';
-import '../../ui/pixel/pixel.dart';
+import 'settings_form.dart';
+import '../../ui/pro/pro.dart';
 import '../shared/layout.dart';
 import '../shared/widgets.dart';
 
@@ -62,13 +62,7 @@ class SettingsShell extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    for (final s in SettingsSection.values)
-                      PxButton.text(
-                        s.label,
-                        size: PxSize.sm,
-                        tone: s == section ? PxTone.primary : PxTone.plain,
-                        onPressed: () => workbenchGo(context, s.path),
-                      ),
+                    for (final s in SettingsSection.values) WorkbenchPill(label: s.label, on: s == section, onTap: () => workbenchGo(context, s.path)),
                   ],
                 ),
               ),
@@ -81,7 +75,7 @@ class SettingsShell extends StatelessWidget {
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(gap, 0, 0, 12),
-              child: SizedBox(width: 220, child: PxScrollView(child: menu)),
+              child: SizedBox(width: 240, child: SingleChildScrollView(child: menu)),
             ),
             Expanded(child: child),
           ],
@@ -100,13 +94,13 @@ class SettingsPartPage extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
       final gap = box.maxWidth >= 640 ? 12.0 : 8.0;
-      return PxScrollView(
+      return SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(gap, 0, gap, 12),
         child: Align(
           alignment: Alignment.topLeft,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
-            child: PxCard(
+            child: ProCard(
               title: section.label,
               child: switch (section) {
                 SettingsSection.deepseek => const SettingsForm(key: ValueKey('deepseek'), part: SettingsPart.deepseek),
@@ -148,14 +142,14 @@ class _GitHubState extends ConsumerState<_GitHub> {
           for (final line in lines)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
-              child: Text(line, style: PxText.sm.copyWith(color: Palette.bark800)),
+              child: Text(line, style: ProText.sm),
             ),
           const SizedBox(height: 6),
-          Text('能提 PR 的项目在「项目」里看；收获时提 PR 要在配置里打开（github.pr_projects）。', style: PxText.xs.copyWith(color: Palette.bark500)),
+          const Text('能提 PR 的项目在「项目」里看；收获时提 PR 要在配置里打开（github.pr_projects）。', style: ProText.meta),
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerLeft,
-            child: PxButton.text('重新检测', onPressed: () => setState(() => _status = ref.read(apiProvider).github.refresh())),
+            child: ProButton.text('重新检测', onPressed: () => setState(() => _status = ref.read(apiProvider).github.refresh())),
           ),
         ],
       );

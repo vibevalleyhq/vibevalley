@@ -5,12 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import 'codebase.dart';
 import '../../data/remote.dart';
 
 Future<ProjectSummary?> showNewProjectDialog(BuildContext context) =>
-    showPxDialog<ProjectSummary>(context, title: const Text('新增项目'), builder: (_) => const NewProjectForm());
+    showProDialog<ProjectSummary>(context, title: const Text('新增项目'), builder: (_) => const NewProjectForm());
 
 class NewProjectForm extends ConsumerStatefulWidget {
   const NewProjectForm({super.key});
@@ -69,37 +69,23 @@ class _NewProjectFormState extends ConsumerState<NewProjectForm> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              PxButton.text(
-                '开一块新地',
-                tone: _importing ? PxTone.plain : PxTone.primary,
-                onPressed: _busy
-                    ? null
-                    : () => setState(() {
-                        _importing = false;
-                        _error = null;
-                      }),
-              ),
-              const SizedBox(width: 8),
-              PxButton.text(
-                '去别人家看看',
-                tone: _importing ? PxTone.primary : PxTone.plain,
-                onPressed: _busy
-                    ? null
-                    : () => setState(() {
-                        _importing = true;
-                        _error = null;
-                      }),
-              ),
+          ProSegmented<bool>(
+            value: _importing,
+            options: [
+              SegmentOption(value: false, label: '开一块新地', disabled: _busy),
+              SegmentOption(value: true, label: '去别人家看看', disabled: _busy),
             ],
+            onChanged: (importing) => setState(() {
+              _importing = importing;
+              _error = null;
+            }),
           ),
           if (_importing) ...[
             const SizedBox(height: 16),
-            PxField(
+            ProField(
               label: 'GitHub 地址',
               hint: const Text('公开仓库的主页地址。下载到本地后，就能查看项目和安排帮工。'),
-              child: PxTextInput(
+              child: ProTextInput(
                 autofocus: true,
                 value: _github,
                 enabled: !_busy,
@@ -115,10 +101,10 @@ class _NewProjectFormState extends ConsumerState<NewProjectForm> {
             ),
           ],
           const SizedBox(height: 16),
-          PxField(
+          ProField(
             label: '项目名',
             hint: const Text('保存在工作目录里；已有同名项目不会被覆盖。'),
-            child: PxTextInput(
+            child: ProTextInput(
               value: _name,
               enabled: !_busy,
               placeholder: '比如 raft-source',
@@ -135,26 +121,26 @@ class _NewProjectFormState extends ConsumerState<NewProjectForm> {
             const SizedBox(height: 16),
             Semantics(
               liveRegion: true,
-              child: Text(_error!, style: PxText.sm.copyWith(color: Palette.berry)),
+              child: Text(_error!, style: ProText.sm.copyWith(color: Palette.berry)),
             ),
           ],
           if (_busy) ...[
             const SizedBox(height: 16),
-            Text(_importing ? '正在下载仓库… 大仓库需要多等一会儿，最多 3 分钟。' : '正在开地…', style: PxText.sm.copyWith(color: Palette.bark600)),
+            Text(_importing ? '正在下载仓库… 大仓库需要多等一会儿，最多 3 分钟。' : '正在开地…', style: ProText.sm.copyWith(color: ProColor.muted)),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              PxButton.text('取消', onPressed: _busy ? null : () => Navigator.of(context).pop()),
+              ProButton.text('取消', onPressed: _busy ? null : () => Navigator.of(context).pop()),
               const SizedBox(width: 8),
-              PxButton.text(
+              ProButton.text(
                 _busy
                     ? '进行中…'
                     : _importing
                     ? '下载到农场'
                     : '创建项目',
-                tone: PxTone.primary,
+                tone: ProTone.primary,
                 onPressed: canSubmit ? _submit : null,
               ),
             ],

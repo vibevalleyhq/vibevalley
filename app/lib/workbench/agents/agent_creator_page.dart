@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../../shared/swatches.dart';
 import '../shared/rules.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
 import '../../rules/runtimes.dart';
-import '../../shared/trajectory.dart';
+import '../shared/trajectory.dart';
 import 'agent_config.dart';
 import 'agent_look.dart';
 
@@ -92,7 +92,7 @@ class _AgentCreatorPageState extends ConsumerState<AgentCreatorPage> {
     });
     if (config.error != null) return const ConfigProblem();
     if (_isNew && _draft == null && ref.watch(runtimesProvider.select((r) => r.hasError))) return const RuntimeProblem();
-    final note = PxText.sm.copyWith(color: Palette.bark500);
+    final note = ProText.sm.copyWith(color: ProColor.muted);
     if (!config.loaded) {
       return Padding(
         padding: const EdgeInsets.all(32),
@@ -104,7 +104,7 @@ class _AgentCreatorPageState extends ConsumerState<AgentCreatorPage> {
       return Padding(
         padding: const EdgeInsets.all(32),
         child: DefaultTextStyle(
-          style: PxText.sm.copyWith(color: Palette.bark600),
+          style: ProText.sm.copyWith(color: ProColor.muted),
           child: Row(
             children: [
               const Text('没有这个帮工。'),
@@ -159,12 +159,9 @@ class _CreatorState extends ConsumerState<_Creator> {
     final nameTaken = config.agents.any((a) => a.id != draft.id && a.name == draft.name.trim());
     void patch(Agent a) => widget.onDraft(a);
 
-    final back = Container(
-      foregroundDecoration: pxRing,
-      child: DefaultTextStyle(
-        style: PxText.sm.copyWith(color: Palette.bark600),
-        child: InlineLink('← 全部帮工', color: Palette.bark600, onTap: () => workbenchGo(context, '/agents')),
-      ),
+    final back = DefaultTextStyle(
+      style: ProText.sm,
+      child: InlineLink('← 全部帮工', color: ProColor.muted, onTap: () => workbenchGo(context, '/agents')),
     );
     final badge = widget.isNew
         ? const BadgeLabel('新的', hat: true)
@@ -177,13 +174,14 @@ class _CreatorState extends ConsumerState<_Creator> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (!widget.isNew && saved != null) _DeleteButton(agent: saved),
-        if (!widget.isNew && dirty && saved != null) PxButton.text('放弃改动', onPressed: () => patch(saved)),
-        PxButton.text(_saving ? '保存中…' : (widget.isNew ? '捏好了，保存' : '保存'), tone: PxTone.primary, onPressed: !dirty || _saving || nameTaken ? null : _save),
+        if (!widget.isNew && dirty && saved != null) ProButton.text('放弃改动', onPressed: () => patch(saved)),
+        ProButton.text(_saving ? '保存中…' : (widget.isNew ? '捏好了，保存' : '保存'), tone: ProTone.primary, onPressed: !dirty || _saving || nameTaken ? null : _save),
       ],
     );
-    final name = Text(draft.name.isEmpty ? '无名帮工' : draft.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.lg);
-    final bar = PxWindow(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    final name = Text(draft.name.isEmpty ? '无名帮工' : draft.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.lg);
+    final bar = Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: const BoxDecoration(border: Border(bottom: proLine)),
       child: LayoutBuilder(
         builder: (context, box) => box.maxWidth < 600
             ? Column(
@@ -200,7 +198,7 @@ class _CreatorState extends ConsumerState<_Creator> {
                 children: [
                   back,
                   const SizedBox(width: 12),
-                  Text('/', style: PxText.sm.copyWith(color: Palette.cream300)),
+                  Text('/', style: ProText.sm.copyWith(color: ProColor.faint)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Row(
@@ -218,8 +216,7 @@ class _CreatorState extends ConsumerState<_Creator> {
       ),
     );
 
-    final look = PxWindow(
-      padding: const EdgeInsets.all(16),
+    final look = ProPanel(
       child: AgentLookPanel(
         look: draft.look,
         id: draft.id,
@@ -227,8 +224,9 @@ class _CreatorState extends ConsumerState<_Creator> {
       ),
     );
 
-    final stage = PxWindow(
-      clip: true,
+    final stage = Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: const BoxDecoration(color: ProColor.page, border: Border.fromBorderSide(proLine), borderRadius: BorderRadius.all(Radius.circular(8))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -250,23 +248,23 @@ class _CreatorState extends ConsumerState<_Creator> {
 
     if (_trajectories) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             bar,
             const SizedBox(height: 12),
             Expanded(
-              child: PxWindow(
-                padding: const EdgeInsets.all(12),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
                       children: [
                         DefaultTextStyle(
-                          style: PxText.sm.copyWith(color: Palette.bark600),
-                          child: InlineLink('← 回到档案', color: Palette.bark600, onTap: () => setState(() => _trajectories = false)),
+                          style: ProText.sm,
+                          child: InlineLink('← 回到档案', color: ProColor.muted, onTap: () => setState(() => _trajectories = false)),
                         ),
                         const SizedBox(width: 12),
                         const Flexible(child: TrajectoryTitle('轨迹', about: '它派出去的每个帮工，从接活起的每一步：收到的话、用的每个工具（点一行看输入和输出）、说的话。收工以后步骤留 30 天，帮工本身一直列着。')),
@@ -286,8 +284,9 @@ class _CreatorState extends ConsumerState<_Creator> {
     return LayoutBuilder(
       builder: (context, box) {
         final wide = box.maxWidth >= 1024;
-        final configCard = PxWindow(
-          clip: true,
+        final configCard = Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: const BoxDecoration(color: ProColor.page, border: Border.fromBorderSide(proLine), borderRadius: BorderRadius.all(Radius.circular(8))),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: wide ? MainAxisSize.max : MainAxisSize.min,
@@ -307,7 +306,7 @@ class _CreatorState extends ConsumerState<_Creator> {
         );
         if (wide) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -317,7 +316,7 @@ class _CreatorState extends ConsumerState<_Creator> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      SizedBox(width: 304, child: PxScrollView(child: look)),
+                      SizedBox(width: 304, child: SingleChildScrollView(child: look)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 416), child: stage),
@@ -332,7 +331,7 @@ class _CreatorState extends ConsumerState<_Creator> {
           );
         }
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -364,15 +363,15 @@ class _DeleteButtonState extends ConsumerState<_DeleteButton> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_sure) return PxButton.text('删除', onPressed: () => setState(() => _sure = true));
+    if (!_sure) return ProButton.text('删除', onPressed: () => setState(() => _sure = true));
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('删掉 ${widget.agent.name}？', style: PxText.xs.copyWith(color: Palette.bark600)),
-        const SizedBox(width: 6),
-        PxButton.text(
+        Text('删掉 ${widget.agent.name}？', style: ProText.sm.copyWith(color: ProColor.muted)),
+        const SizedBox(width: 8),
+        ProButton.text(
           '删除',
-          tone: PxTone.danger,
+          tone: ProTone.danger,
           onPressed: () async {
             final done = await runAction(() async {
               await ref.read(workbenchConfigProvider.notifier).deleteAgent(widget.agent.id);
@@ -382,7 +381,7 @@ class _DeleteButtonState extends ConsumerState<_DeleteButton> {
           },
         ),
         const SizedBox(width: 6),
-        PxButton.text('算了', onPressed: () => setState(() => _sure = false)),
+        ProButton.text('算了', onPressed: () => setState(() => _sure = false)),
       ],
     );
   }
@@ -394,17 +393,15 @@ class _Issues extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const top = BoxDecoration(
-      border: Border(top: BorderSide(color: Palette.cream300)),
-    );
+    const top = BoxDecoration(border: Border(top: proLine));
     if (issues.isEmpty) {
       return Container(
         decoration: top,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Marked(
           'mark-check',
-          top: 0,
-          child: Text('配置没问题，可以派活。', style: PxText.xs.copyWith(color: Palette.leaf700)),
+          top: 4,
+          child: Text('配置没问题，可以派活。', style: ProText.sm.copyWith(color: Palette.leaf700)),
         ),
       );
     }
@@ -424,7 +421,7 @@ class _Issues extends StatelessWidget {
                   top: 4,
                   child: Text(
                     '${i.level == AgentIssueLevel.error ? '派不出去：' : ''}${i.text}',
-                    style: PxText.xs.copyWith(height: 1.625, color: i.level == AgentIssueLevel.error ? Palette.berry : const Color(0xFFB8682A)),
+                    style: ProText.sm.copyWith(color: i.level == AgentIssueLevel.error ? Palette.berry : const Color(0xFFB8682A)),
                   ),
                 ),
               ),

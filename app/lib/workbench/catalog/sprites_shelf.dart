@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import 'catalog_data.dart';
 import '../shared/widgets.dart';
 import 'catalog_page.dart';
@@ -56,8 +56,8 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
           _ShelfButton(active: _shelf == 'all', label: '全部', count: pictures.all.length, onTap: () => setState(() => _shelf = 'all')),
           for (final s in present) _ShelfButton(active: _shelf == s.id, label: s.label, count: counts[s.id] ?? 0, onTap: () => setState(() => _shelf = s.id)),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: Text('${pictures.all.length} 张，切自 design/pixel/raw。', style: PxText.xs.copyWith(height: 1.625, color: Palette.bark500)),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+            child: Text('${pictures.all.length} 张，切自 design/pixel/raw。', style: ProText.meta),
           ),
         ],
       ),
@@ -72,14 +72,14 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
     );
 
     final cards = <Widget>[
-      if (shown.isEmpty) const PxCard(child: Text('没有对得上的。')),
+      if (shown.isEmpty) const EmptyNote('没有对得上的。'),
       for (final s in visible)
         if (groupsOf(s.id, [
               for (final p in shown)
                 if (shelfOf(p.name) == s.id) p,
             ])
             case final groups when groups.isNotEmpty)
-          PxCard(
+          ProCard(
             title: '${s.label} · ${groups.fold<int>(0, (n, g) => n + g.pictures.length)}',
             aside: Text(s.hint),
             child: Column(
@@ -90,7 +90,10 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
                   if (g.label.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
-                      child: Text(g.label, style: PxText.xs.copyWith(color: Palette.bark600)),
+                      child: Text(
+                        g.label,
+                        style: ProText.xs.copyWith(color: ProColor.muted, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   _Tiles(pictures: g.pictures, all: pictures, selected: selected, ground: _ground),
                   const SizedBox(height: 12),
@@ -102,9 +105,7 @@ class _SpritesShelfState extends ConsumerState<SpritesShelf> {
 
     final detail = selected != null
         ? _Detail(key: ValueKey(selected.name), picture: selected, all: pictures, ground: _ground)
-        : PxCard(
-            child: Text('点一张看大图：尺寸、落脚点、会动的帧，和它是从哪张原图切出来的、怎么重画。', style: PxText.sm.copyWith(color: Palette.bark600, height: 1.625)),
-          );
+        : const EmptyNote('点一张看大图：尺寸、落脚点、会动的帧，和它是从哪张原图切出来的、怎么重画。');
 
     return LayoutBuilder(
       builder: (context, box) {
@@ -156,7 +157,7 @@ class GroundPick extends StatelessWidget {
   final ValueChanged<Ground> onChanged;
 
   @override
-  Widget build(BuildContext context) => PxSegmented<Ground>(
+  Widget build(BuildContext context) => ProSegmented<Ground>(
     block: false,
     value: value,
     onChanged: onChanged,
@@ -175,21 +176,27 @@ class _ShelfButton extends StatelessWidget {
   Widget build(BuildContext context) => Tappable(
     onTap: onTap,
     selected: active,
-    builder: (context, s) => Container(
-      // No ring per row: stacked rows doubled their lines into a thick bar over the text.
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: active
-          ? Palette.leaf300.withValues(alpha: .7)
-          : s.hovered
-          ? Palette.cream200
-          : null,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(label, style: PxText.sm.copyWith(color: active ? Palette.bark900 : Palette.bark800)),
-          ),
-          Text('$count', style: PxText.xs.copyWith(color: Palette.bark500)),
-        ],
+    builder: (context, s) => ProFocusRing(
+      on: s.focused,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: active
+              ? ProColor.selected
+              : s.hovered
+              ? ProColor.hover
+              : null,
+          borderRadius: proRadius,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label, style: ProText.sm.copyWith(fontWeight: active ? FontWeight.w600 : FontWeight.w400)),
+            ),
+            Text('$count', style: ProText.meta),
+          ],
+        ),
       ),
     ),
   );
@@ -221,17 +228,21 @@ class _Tiles extends StatelessWidget {
                 selected: selected?.name == p.name,
                 builder: (context, s) => Container(
                   padding: const EdgeInsets.all(4),
-                  foregroundDecoration: pxRing,
-                  color: selected?.name == p.name
-                      ? Palette.leaf300.withValues(alpha: .7)
-                      : s.hovered
-                      ? Palette.cream200
-                      : null,
+                  decoration: BoxDecoration(
+                    color: selected?.name == p.name
+                        ? ProColor.selected
+                        : s.hovered
+                        ? ProColor.hover
+                        : null,
+                    border: Border.all(color: s.focused ? ProColor.focus : Colors.transparent),
+                    borderRadius: const BorderRadius.all(Radius.circular(8)),
+                  ),
                   child: Column(
                     children: [
                       SizedBox.square(
                         dimension: 80,
-                        child: ClipRect(
+                        child: ClipRRect(
+                          borderRadius: proRadius,
                           child: GroundBox(
                             ground: ground,
                             child: Stack(
@@ -243,8 +254,11 @@ class _Tiles extends StatelessWidget {
                                     right: 2,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                                      color: Palette.bark900.withValues(alpha: .7),
-                                      child: Text('动', style: PxText.xs.copyWith(fontSize: 9, height: 1.25, color: Palette.cream50)),
+                                      decoration: BoxDecoration(color: Palette.bark900.withValues(alpha: .7), borderRadius: BorderRadius.circular(3)),
+                                      child: Text(
+                                        '动',
+                                        style: ProText.xs.copyWith(fontSize: 10, height: 14 / 10, color: Palette.paper),
+                                      ),
                                     ),
                                   ),
                               ],
@@ -258,7 +272,7 @@ class _Tiles extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: PxText.mono.copyWith(height: 1.5, color: Palette.bark600),
+                        style: ProText.mono.copyWith(fontSize: 11.5, color: ProColor.muted),
                       ),
                     ],
                   ),
@@ -317,7 +331,7 @@ class _DetailState extends State<_Detail> {
     final shown = (frames != null && _playing ? widget.all[frames[_frame % frames.length]] : null) ?? picture;
     final remake = remakeOf(picture);
     final tasks = {1.0, 2.0, 4.0, 8.0, _scale}.toList()..sort();
-    return PxCard(
+    return ProCard(
       title: picture.name,
       aside: CopyButton(text: picture.name),
       child: Column(
@@ -326,17 +340,19 @@ class _DetailState extends State<_Detail> {
         children: [
           ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 160, maxHeight: 352),
-            child: GroundBox(
-              ground: widget.ground,
-              padding: const EdgeInsets.all(12),
-              child: Center(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+            child: _Rounded(
+              GroundBox(
+                ground: widget.ground,
+                padding: const EdgeInsets.all(12),
+                child: Center(
                   child: SingleChildScrollView(
-                    child: SizedBox(
-                      width: shown.w * _scale,
-                      height: shown.h * _scale,
-                      child: Stack(clipBehavior: Clip.none, children: [AssetImg(shown, _scale), if (_marks) ..._markers(shown, _scale)]),
+                    scrollDirection: Axis.horizontal,
+                    child: SingleChildScrollView(
+                      child: SizedBox(
+                        width: shown.w * _scale,
+                        height: shown.h * _scale,
+                        child: Stack(clipBehavior: Clip.none, children: [AssetImg(shown, _scale), if (_marks) ..._markers(shown, _scale)]),
+                      ),
                     ),
                   ),
                 ),
@@ -349,20 +365,21 @@ class _DetailState extends State<_Detail> {
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              PxSegmented<double>(
+              ProSegmented<double>(
+                block: false,
                 value: _scale,
                 onChanged: (v) => setState(() => _scale = v),
                 options: [
                   for (final s in tasks) SegmentOption(value: s, label: '${s < 1 ? s.toStringAsFixed(2).replaceFirst(RegExp(r'0$'), '') : numberText(s)}×'),
                 ],
               ),
-              _CheckBox(label: '落脚点和头', value: _marks, onChanged: (v) => setState(() => _marks = v)),
+              ProSwitchField(label: '落脚点和头', checked: _marks, onChanged: (v) => setState(() => _marks = v)),
             ],
           ),
           if (frames != null) ...[
             const SizedBox(height: 12),
             Container(
-              color: Palette.cream100,
+              decoration: const BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(8))),
               padding: const EdgeInsets.all(8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -370,16 +387,16 @@ class _DetailState extends State<_Detail> {
                 children: [
                   Row(
                     children: [
-                      PxButton.text(
+                      ProButton.text(
                         _playing ? '停' : '播放',
-                        size: PxSize.sm,
+                        size: ProSize.sm,
                         onPressed: () => setState(() {
                           _playing = !_playing;
                           _restart();
                         }),
                       ),
                       const SizedBox(width: 8),
-                      Text('${frames.length} 帧', style: PxText.xs.copyWith(color: Palette.bark800)),
+                      Text('${frames.length} 帧', style: ProText.meta),
                       const Spacer(),
                       SizedBox(
                         width: 96,
@@ -389,7 +406,7 @@ class _DetailState extends State<_Detail> {
                             data: SliderTheme.of(context).copyWith(
                               activeTrackColor: Palette.leaf500,
                               thumbColor: Palette.leaf500,
-                              inactiveTrackColor: Palette.cream300,
+                              inactiveTrackColor: ProColor.selected,
                               trackHeight: 4,
                               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                               overlayShape: SliderComponentShape.noOverlay,
@@ -407,10 +424,7 @@ class _DetailState extends State<_Detail> {
                           ),
                         ),
                       ),
-                      SizedBox(
-                        width: 48,
-                        child: Text('$_fps 帧/秒', style: PxText.xs.copyWith(color: Palette.bark800)),
-                      ),
+                      SizedBox(width: 56, child: Text('$_fps 帧/秒', style: ProText.meta)),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -426,10 +440,16 @@ class _DetailState extends State<_Detail> {
                             builder: (context, s) => Container(
                               width: 44,
                               height: 44,
-                              decoration: BoxDecoration(border: _playing && i == _frame % frames.length ? Border.all(color: Palette.leaf500, width: 2) : null),
-                              child: GroundBox(
-                                ground: widget.ground,
-                                child: Center(child: AssetImg(f, fitScale(f, 38))),
+                              foregroundDecoration: BoxDecoration(
+                                border: _playing && i == _frame % frames.length ? Border.all(color: ProColor.focus, width: 2) : null,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: GroundBox(
+                                  ground: widget.ground,
+                                  child: Center(child: AssetImg(f, fitScale(f, 38))),
+                                ),
                               ),
                             ),
                           ),
@@ -443,7 +463,7 @@ class _DetailState extends State<_Detail> {
           _Row('尺寸', Text('${numberText(picture.w)} × ${numberText(picture.h)} 像素')),
           _Row('落脚点', Text('(${numberText(picture.ax)}, ${numberText(picture.ay)})')),
           if (picture.hx != null && picture.hy != null) _Row('头', Text('(${numberText(picture.hx!)}, ${numberText(picture.hy!)})')),
-          _Row('来自', picture.sheet != null ? _Code(picture.sheet!) : Text('没记下来（不再用的旧图）', style: PxText.xs.copyWith(color: Palette.bark500))),
+          _Row('来自', picture.sheet != null ? _Code(picture.sheet!) : const Text('没记下来（不再用的旧图）', style: ProText.meta)),
           if (remake != null) _Row('重画', _Code(remake.draw)),
           if (remake != null) _Row('重新切', _Code(remake.cut)),
         ],
@@ -465,36 +485,6 @@ class CrossPainter extends CustomPainter {
   bool shouldRepaint(CrossPainter old) => false;
 }
 
-class _CheckBox extends StatelessWidget {
-  const _CheckBox({required this.label, required this.value, required this.onChanged});
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    checked: value,
-    child: Tappable(
-      onTap: () => onChanged(!value),
-      builder: (context, s) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              color: value ? Palette.leaf500 : Palette.creamInput,
-              border: Border.all(color: Palette.bark800, width: 2),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(label, style: PxText.xs.copyWith(color: Palette.bark800)),
-        ],
-      ),
-    ),
-  );
-}
-
 class _Row extends StatelessWidget {
   const _Row(this.label, this.child);
   final String label;
@@ -507,15 +497,12 @@ class _Row extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 72,
-          child: Text(label, style: PxText.xs.copyWith(color: Palette.bark500)),
+          width: 64,
+          child: Text(label, style: ProText.sm.copyWith(color: ProColor.muted)),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: DefaultTextStyle(
-            style: PxText.xs.copyWith(color: Palette.bark800),
-            child: child,
-          ),
+          child: DefaultTextStyle(style: ProText.sm, child: child),
         ),
       ],
     ),
@@ -533,9 +520,9 @@ class _Code extends StatelessWidget {
         child: Tooltip(
           message: text,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            color: Palette.cream200,
-            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.mono.copyWith(fontSize: 11)),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: const BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(4))),
+            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.mono.copyWith(fontSize: 11.5)),
           ),
         ),
       ),
@@ -576,13 +563,13 @@ class _CopyButtonState extends State<CopyButton> {
     },
     builder: (context, s) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      color: s.hovered ? Palette.cream200 : null,
+      decoration: BoxDecoration(color: s.hovered ? ProColor.hover : null, borderRadius: const BorderRadius.all(Radius.circular(4))),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           SpriteIcon(_done ? 'mark-check' : 'button-copy', size: 12),
           const SizedBox(width: 4),
-          Text(_done ? '复制了' : '复制', style: PxText.xs.copyWith(fontSize: 11, color: Palette.bark600)),
+          Text(_done ? '复制了' : '复制', style: ProText.xs.copyWith(color: ProColor.muted)),
         ],
       ),
     ),
@@ -614,3 +601,11 @@ List<Widget> _markers(Picture p, double scale) => [
       ),
     ),
 ];
+
+class _Rounded extends StatelessWidget {
+  const _Rounded(this.child);
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(borderRadius: proRadius, child: child);
+}

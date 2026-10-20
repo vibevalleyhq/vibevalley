@@ -11,7 +11,7 @@
 | 派活、排队、重开、取消 | 挑哪个档案（[管家](docs/subsystems/manager.md)） |
 | 验收、草、缺肥 | 汇报怎么读（`session/rules.go` 读出「结论：」和「要问主人：」交给它） |
 | 收获：查冲突、跑检查、本地合或提 PR | 项目和工作目录、worktree 的 git 操作（`internal/project`，[项目](docs/subsystems/project.md)） |
-| 工单在看板和农场上的样子由它的状态决定 | 怎么画（[farm-ui.md](docs/reference/farm-ui.md)「地里长什么」、`shared/issue_view.dart`） |
+| 工单在看板和农场上的样子由它的状态决定 | 怎么画（[farm-ui.md](docs/reference/farm-ui.md)「地里长什么」、`shared/issue_state.dart`） |
 | | 种植计划里的工单（跟着计划走，[种植计划](docs/subsystems/task.md)）；派给管家的工单（管家答完就关） |
 
 ## 在哪
@@ -20,7 +20,7 @@
 - 规则在 `protocol`：`IssueStatusOf`（状态怎么算）、`IssueDraftingOf`（谁在起草）、`PlotOf`（地的样子）；只有工单用的规则在 `issue` 里不导出（`statusMove`，`rules.go` 的 `draftBrief` 起草的规矩、`parseDraft` 读草稿、`draftDescription` 拼说明、`issueJob` 交给帮工的活）。
 - 表：`issue`（一张工单一行；验收标准在 `criteria`，JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.draft`（`POST /api/v1/issues/{id}/draft`）；命令行 `vibevalley issue …`。
-- 客户端：看板 `workbench/issues`，备选工单的草稿详情是 `issue_detail.dart` 的 `TodoDetail`，派出去以后的详情是农场和工作台共用的 `shared/issue_view.dart`；加号在 `game/commands.dart` 的 `writeIssue`。
+- 客户端：看板 `workbench/issues`，备选工单的草稿详情是 `issue_detail.dart` 的 `TodoDetail`，派出去以后的详情：一句状态和能做的事是 `shared/issue_state.dart` 的规则，农场画 `shared/issue_view.dart`，工作台画 `workbench/issues/issue_panel.dart`；加号在 `game/commands.dart` 的 `writeIssue`。
 
 ## 模型和不变量
 
@@ -126,4 +126,4 @@
 - `workspace/draft_test.go`（`oartest`、真的 git 仓库）：`TestAnIssueIsDraftedBeforeItIsSent`（没写帮工时项目上次派的档案起草、起草时不能开工、草稿填进标题说明和验收标准、问题记下、帮工离开、worktree 和分支干净、run 的触发是 draft、回答以后第二版盖过第一版、开工的活带验收标准）、`TestADraftLeavesNothingBehind`（起草的帮工改了文件还提交了，交回来什么都不剩；起草中取消，帮工收工、worktree 和分支清掉）、`TestAnUnreadableDraftChangesNothing`（读不出来工单不动、工单串里说一句）。
 - `workspace/work_test.go`：`TestMovingAnIssueIsTheWork`（挪状态走完开工、再干一轮、收获、取消再挪回）、`TestAPlotGrowsThroughItsAcceptance`（缺肥 → 回答 → 等验收 → 没过长草 → 修 → 通过 → 收获）、`TestIssueClosesAndReopens`。
 - `project` 的测试用真的 git 仓库测按工单复用 worktree、锁外检查、PR 的推送和轮询（`pull_request_test.go`）。
-- `protocol` 的 `TestAPlotShowsItsIssuesAcceptance`、`TestPlotsAreKeyedByTheirIssue`；客户端的 `test/shared/issue_view_test.dart`。
+- `protocol` 的 `TestAPlotShowsItsIssuesAcceptance`、`TestPlotsAreKeyedByTheirIssue`；客户端的 `test/shared/issue_state_test.dart`、`test/shared/issue_view_test.dart`、`test/workbench/issue_panel_test.dart`。

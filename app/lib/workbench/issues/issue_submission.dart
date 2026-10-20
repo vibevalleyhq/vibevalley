@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../game/commands.dart' show writeIssue;
 import '../../gen/vibevalley.dart';
-import '../../ui/pixel/pixel.dart' show ToastType, toasts;
+import '../../ui/toasts.dart' show ToastType, toasts;
 
 const _pickKey = 'vibevalley.board.pick';
 

@@ -141,7 +141,7 @@ SHEETS: dict[str, Sheet] = {
     # The runtimes' logos (logos/, LobeHub Icons) as pixel art: logo-<runtime id>, pinned on the machines.
     "logos": Sheet(4, 2, [f"logo-{r}" for r in ["claude", "codex", "opencode", "pi", "cursor", "grok", "kimi", "antigravity"]], height=24, reference=list(range(8)), logos=True),
     "ui-icons-extra": Sheet(3, 2, ["connector-weixin", "connector-feishu", "connector-qq", "icon-deed", "icon-pigeon", "app-sprout"], height=24, reference=list(range(6)), logos=True),
-    # The energy meter's bottles (lib/ui/pixel/energy.dart): level and how full, one picture each.
+    # The energy meter's bottles (lib/ui/energy.dart): level and how full, one picture each.
     "energy": Sheet(3, 3, [
         "energy-plenty-100", "energy-plenty-75", "energy-plenty-50",
         "energy-low-40", "energy-low-25", "energy-empty-10",

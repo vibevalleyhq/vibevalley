@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../../shared/faces.dart';
 import '../../shared/swatches.dart';
 import '../shared/rules.dart';
@@ -36,12 +36,12 @@ class AgentsPage extends ConsumerWidget {
       const _NewCard(),
     ];
 
-    return PxScrollView(
+    return SingleChildScrollView(
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1152),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+            padding: EdgeInsets.fromLTRB(MediaQuery.sizeOf(context).width < 640 ? 16 : 24, 16, MediaQuery.sizeOf(context).width < 640 ? 16 : 24, 32),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -62,14 +62,14 @@ class AgentsPage extends ConsumerWidget {
                               children: [
                                 TextSpan(
                                   text: '档案',
-                                  style: PxText.sm.copyWith(color: Palette.bark500),
+                                  style: ProText.base.copyWith(color: ProColor.muted, fontWeight: FontWeight.w400),
                                 ),
                               ],
                             ),
-                            style: PxText.x2l,
+                            style: ProText.x2l,
                           ),
                           const SizedBox(height: 4),
-                          Text('每个帮工是一种配置好的 runtime：用哪个 runtime 和模型、带什么人设和技能，在农场里是哪种小动物、穿什么。管家派活时派的就是帮工。', style: PxText.sm.copyWith(color: Palette.bark600)),
+                          Text('每个帮工是一种配置好的 runtime：用哪个 runtime 和模型、带什么人设和技能，在农场里是哪种小动物、穿什么。管家派活时派的就是帮工。', style: ProText.sm.copyWith(color: ProColor.muted)),
                         ],
                       ),
                     ),
@@ -115,16 +115,8 @@ class _NewButton extends StatelessWidget {
   const _NewButton();
 
   @override
-  Widget build(BuildContext context) => Tappable(
-    onTap: () => workbenchGo(context, '/agents/new'),
-    semanticLabel: '捏一个新帮工',
-    builder: (context, s) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: s.hovered ? Palette.leafHover : Palette.leaf500,
-      foregroundDecoration: pxRing,
-      child: Text('捏一个新帮工', style: PxText.sm.copyWith(color: Palette.cream50)),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      ProButton.text('捏一个新帮工', icon: 'button-add', tone: ProTone.primary, semanticLabel: '捏一个新帮工', onPressed: () => workbenchGo(context, '/agents/new'));
 }
 
 class _Card extends StatefulWidget {
@@ -147,37 +139,43 @@ class _CardState extends State<_Card> {
   Widget build(BuildContext context) => MouseRegion(
     onEnter: (_) => setState(() => _hover = true),
     onExit: (_) => setState(() => _hover = false),
-    child: AnimatedSlide(
-      duration: const Duration(milliseconds: 150),
-      offset: Offset(0, _hover ? -2 / 200 : 0),
-      child: Opacity(
-        opacity: widget.muted ? .6 : 1,
-        child: PxWindow(
-          clip: true,
-          child: Stack(
-            children: [
-              Tappable(
-                onTap: () => workbenchGo(context, widget.path),
-                semanticLabel: widget.label,
-                builder: (context, s) => Container(padding: const EdgeInsets.all(16), foregroundDecoration: pxRing, child: widget.child),
+    child: Opacity(
+      opacity: widget.muted ? .6 : 1,
+      child: Stack(
+        children: [
+          Tappable(
+            onTap: () => workbenchGo(context, widget.path),
+            semanticLabel: widget.label,
+            builder: (context, s) => ProFocusRing(
+              on: s.focused,
+              radius: 8,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _hover ? const Color(0xFFFFFBF2) : ProColor.page,
+                  border: Border.all(color: _hover ? ProColor.ink.withValues(alpha: .22) : ProColor.line),
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
+                ),
+                child: widget.child,
               ),
-              if (widget.corner != null) Positioned(top: 12, right: 12, child: widget.corner!(_hover)),
-            ],
+            ),
           ),
-        ),
+          if (widget.corner != null) Positioned(top: 12, right: 12, child: widget.corner!(_hover)),
+        ],
       ),
     ),
   );
 }
 
+const _faceBox = BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(8)));
+
 Widget _footer(List<Widget> children) => Container(
   margin: const EdgeInsets.only(top: 12),
   padding: const EdgeInsets.only(top: 12),
-  decoration: const BoxDecoration(
-    border: Border(top: BorderSide(color: Palette.cream300)),
-  ),
+  decoration: const BoxDecoration(border: Border(top: proLine)),
   child: DefaultTextStyle(
-    style: PxText.fine.copyWith(color: Palette.bark500),
+    style: ProText.meta,
     child: Row(children: children),
   ),
 );
@@ -195,19 +193,19 @@ class _ManagerCard extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(width: 80, height: 80, color: Palette.cream200, alignment: Alignment.center, child: const WorkbenchManagerFace(size: 68)),
+            Container(width: 80, height: 80, decoration: _faceBox, alignment: Alignment.center, child: const WorkbenchManagerFace(size: 68)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('管家', style: PxText.base),
+                  Text('管家', style: ProText.base.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 2),
                   Text(
                     '不下地：派活、盯进度、转告结果，也接电话。',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: PxText.xs.copyWith(height: 1.625, color: Palette.bark600),
+                    style: ProText.sm.copyWith(color: ProColor.muted),
                   ),
                 ],
               ),
@@ -246,8 +244,9 @@ class _AgentCard extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // A gradient in a BoxDecoration takes the place of its colour.
-              ColoredBox(
-                color: Palette.cream200,
+              Container(
+                decoration: _faceBox,
+                clipBehavior: Clip.antiAlias,
                 child: Container(
                   width: 80,
                   height: 80,
@@ -273,7 +272,12 @@ class _AgentCard extends ConsumerWidget {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(a.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.base),
+                          child: Text(
+                            a.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: ProText.base.copyWith(fontWeight: FontWeight.w600),
+                          ),
                         ),
                         if (here > 0) ...[const SizedBox(width: 8), BadgeLabel('在场 $here', hat: true)],
                       ],
@@ -283,14 +287,14 @@ class _AgentCard extends ConsumerWidget {
                       a.role,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: PxText.xs.copyWith(height: 1.625, color: Palette.bark600),
+                      style: ProText.sm.copyWith(color: ProColor.muted),
                     ),
                     const SizedBox(height: 6),
                     DefaultTextStyle(
-                      style: PxText.fine.copyWith(color: Palette.bark500),
+                      style: ProText.meta,
                       child: Row(
                         children: [
-                          Container(width: 6, height: 6, color: available ? Palette.leaf500 : Palette.berry),
+                          ProDot(available ? Palette.leaf500 : Palette.berry, size: 7),
                           const SizedBox(width: 6),
                           Text(runtime?.preset.label ?? a.runtime),
                           if (a.model.isNotEmpty) Flexible(child: Text(' · ${a.model}', maxLines: 1, overflow: TextOverflow.ellipsis)),
@@ -312,9 +316,9 @@ class _AgentCard extends ConsumerWidget {
                 children: [
                   for (final id in a.skills)
                     Container(
-                      color: Palette.cream200,
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Text(skillName[id] ?? id, style: PxText.fine.copyWith(color: Palette.bark800)),
+                      decoration: const BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(4))),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      child: Text(skillName[id] ?? id, style: ProText.xs),
                     ),
                 ],
               ),
@@ -329,7 +333,7 @@ class _AgentCard extends ConsumerWidget {
                   children: [
                     TextSpan(
                       text: '${(tally?.hired ?? 0).round()}',
-                      style: const TextStyle(color: Palette.bark800),
+                      style: const TextStyle(color: ProColor.ink, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -342,7 +346,7 @@ class _AgentCard extends ConsumerWidget {
                 children: [
                   TextSpan(
                     text: '${(tally?.harvested ?? 0).round()}',
-                    style: const TextStyle(color: Palette.leaf700),
+                    style: const TextStyle(color: Palette.leaf700, fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -383,10 +387,20 @@ class _Toggle extends ConsumerWidget {
       semanticLabel: '$label ${a.name}',
       builder: (context, s) => Opacity(
         opacity: shown || s.focused ? 1 : 0,
-        child: Container(
-          color: Palette.cream200.withValues(alpha: .8),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Text(label, style: PxText.xs.copyWith(color: s.hovered ? Palette.bark900 : Palette.bark600)),
+        child: ProFocusRing(
+          on: s.focused,
+          child: Container(
+            decoration: BoxDecoration(
+              color: s.hovered ? const Color(0xFFF6EEDD) : ProColor.page,
+              border: const Border.fromBorderSide(proLine),
+              borderRadius: proRadius,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: Text(
+              label,
+              style: ProText.xs.copyWith(color: s.hovered ? ProColor.ink : ProColor.muted, fontWeight: FontWeight.w500),
+            ),
+          ),
         ),
       ),
     );
@@ -401,9 +415,9 @@ class _NewCard extends StatelessWidget {
     onTap: () => workbenchGo(context, '/agents/new'),
     semanticLabel: '捏一个新帮工',
     builder: (context, s) {
-      final ink = s.hovered ? Palette.leaf700 : Palette.bark600;
+      final ink = s.hovered ? Palette.leaf700 : ProColor.muted;
       return CustomPaint(
-        painter: _Dashed(s.hovered ? Palette.leaf500.withValues(alpha: .5) : Palette.cream300),
+        painter: _Dashed(s.hovered ? Palette.leaf500.withValues(alpha: .6) : ProColor.ink.withValues(alpha: .2)),
         child: Container(
           constraints: const BoxConstraints(minHeight: 176),
           alignment: Alignment.center,
@@ -412,7 +426,10 @@ class _NewCard extends StatelessWidget {
             children: [
               const SpriteIcon('button-add', size: 28),
               const SizedBox(height: 8),
-              Text('捏一个新帮工', style: PxText.sm.copyWith(color: ink)),
+              Text(
+                '捏一个新帮工',
+                style: ProText.sm.copyWith(color: ink, fontWeight: FontWeight.w500),
+              ),
             ],
           ),
         ),
@@ -421,23 +438,23 @@ class _NewCard extends StatelessWidget {
   );
 }
 
+/// A 1 px dashed outline with the cards' corners: where a new card would go.
 class _Dashed extends CustomPainter {
   _Dashed(this.color);
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = color;
-    const dash = 6.0, gap = 4.0, w = 2.0;
-    for (var x = 0.0; x < size.width; x += dash + gap) {
-      canvas
-        ..drawRect(Rect.fromLTWH(x, 0, dash, w), p)
-        ..drawRect(Rect.fromLTWH(x, size.height - w, dash, w), p);
-    }
-    for (var y = 0.0; y < size.height; y += dash + gap) {
-      canvas
-        ..drawRect(Rect.fromLTWH(0, y, w, dash), p)
-        ..drawRect(Rect.fromLTWH(size.width - w, y, w, dash), p);
+    final p = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final outline = Path()..addRRect(RRect.fromRectAndRadius((Offset.zero & size).deflate(.5), const Radius.circular(8)));
+    const dash = 6.0, gap = 4.0;
+    for (final m in outline.computeMetrics()) {
+      for (var d = 0.0; d < m.length; d += dash + gap) {
+        canvas.drawPath(m.extractPath(d, d + dash), p);
+      }
     }
   }
 

@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../ui/theme.dart';
 import '../../data/providers.dart';
-import '../../gen/vibevalley.dart';
-import '../../ui/pixel/base.dart';
-import '../../ui/pixel/button.dart';
-import '../../ui/pixel/choice.dart';
-import '../../ui/pixel/field.dart';
-import '../../ui/labels.dart';
 import '../../data/remote.dart';
-import './widgets.dart';
+import '../../gen/vibevalley.dart';
 import '../../rules/task.dart';
+import '../../ui/pro/pro.dart';
+import 'widgets.dart';
 
 /// Notes its helpers could still add before the oldest are dropped: those are marked 快忘了.
 const _everywhere = '*';
 
 double _now() => DateTime.now().millisecondsSinceEpoch.toDouble();
 
-TextStyle get _lead => PxText.xs.copyWith(height: 1.625, color: Palette.bark600);
-TextStyle get _meta => PxText.xs.copyWith(color: Palette.bark500);
+TextStyle get _lead => ProText.sm.copyWith(color: ProColor.muted);
+const _meta = ProText.meta;
+const _warn = Color(0xFFB8682A);
+
+/// One remembered thing, hit or file: a hairline box.
+const _item = BoxDecoration(color: ProColor.page, border: Border.fromBorderSide(proLine), borderRadius: proRadius);
 
 List<Widget> _gap(List<Widget> children, [double gap = 16]) => [
   for (var i = 0; i < children.length; i++) ...[if (i > 0) SizedBox(height: gap), children[i]],
@@ -72,25 +71,38 @@ class _MemoryPanelState extends ConsumerState<MemoryPanel> {
                     for (final m in jobs)
                       Container(
                         margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: const BoxDecoration(
-                          color: Palette.cream100,
-                          border: Border(left: BorderSide(color: Palette.leaf500, width: 4)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 8,
-                              children: [
-                                Text(m.session != null ? (sessions[m.session] ?? m.session!) : '帮工', style: _meta.copyWith(color: Palette.bark800)),
-                                Text(m.project ?? '所有项目', style: _meta),
-                                Text(ago(m.at, now), style: _meta),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(m.text, style: PxText.sm.copyWith(color: Palette.bark900)),
-                          ],
+                        clipBehavior: Clip.antiAlias,
+                        decoration: _item,
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const ColoredBox(color: Palette.leaf500, child: SizedBox(width: 3)),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Wrap(
+                                        spacing: 8,
+                                        children: [
+                                          Text(
+                                            m.session != null ? (sessions[m.session] ?? m.session!) : '帮工',
+                                            style: _meta.copyWith(color: ProColor.ink, fontWeight: FontWeight.w500),
+                                          ),
+                                          Text(m.project ?? '所有项目', style: _meta),
+                                          Text(ago(m.at, now), style: _meta),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(m.text, style: ProText.sm),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                   ],
@@ -163,12 +175,13 @@ class _SourcesSection extends StatelessWidget {
           Container(
             margin: const EdgeInsets.only(bottom: 6),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: Palette.cream100,
+            decoration: _item,
             child: Wrap(
               spacing: 8,
               runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Text(src.label, style: PxText.sm.copyWith(color: Palette.bark900)),
+                Text(src.label, style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
                 Text(src.on ? '在用' : '没接上：${src.off ?? ''}', style: _meta.copyWith(color: src.on ? Palette.leaf700 : Palette.berry)),
                 if (src.on) ...[
                   Text(src.canList ? '记下的列在下面' : '不在这里列出', style: _meta),
@@ -209,32 +222,36 @@ class _RecallPreviewState extends ConsumerState<_RecallPreview> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 160,
-                child: PxPick(
-                  value: where,
-                  onChanged: (p) => setState(() => _project = p),
-                  placeholder: '选项目',
-                  options: [for (final p in projectNames) PickOption(value: p, label: p)],
-                  semanticLabel: '在哪个项目开工',
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: PxTextInput(value: _text, onChanged: (t) => setState(() => _text = t), placeholder: '这一轮的话（可以不填）', semanticLabel: '这一轮的话'),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, box) {
+              final pick = ProPick(
+                value: where,
+                onChanged: (p) => setState(() => _project = p),
+                placeholder: '选项目',
+                options: [for (final p in projectNames) PickOption(value: p, label: p)],
+                semanticLabel: '在哪个项目开工',
+              );
+              final text = ProTextInput(value: _text, onChanged: (t) => setState(() => _text = t), placeholder: '这一轮的话（可以不填）', semanticLabel: '这一轮的话');
+              if (box.maxWidth < 360) {
+                return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [pick, const SizedBox(height: 6), text]);
+              }
+              return Row(
+                children: [
+                  SizedBox(width: 160, child: pick),
+                  const SizedBox(width: 6),
+                  Expanded(child: text),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 8),
           if (lines.isEmpty)
             EmptyNote(where.isNotEmpty ? '在这个项目里开工，什么也想不起来。' : '还没有项目。')
           else
             Container(
-              color: Palette.cream100,
+              decoration: _item,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Text(lines.join('\n'), style: PxText.xs.copyWith(height: 1.625, color: Palette.bark800)),
+              child: Text(lines.join('\n'), style: ProText.sm),
             ),
         ],
       ),
@@ -326,7 +343,7 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
         Row(
           children: [
             Expanded(
-              child: PxTextInput(
+              child: ProTextInput(
                 value: _query,
                 onChanged: (q) => setState(() => _query = q),
                 placeholder: '搜一个词',
@@ -336,7 +353,7 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
               ),
             ),
             const SizedBox(width: 8),
-            PxButton.text('搜', icon: 'button-search', onPressed: _query.trim().isEmpty ? null : () => _search(_query)),
+            ProButton.text('搜', icon: 'button-search', onPressed: _query.trim().isEmpty ? null : () => _search(_query)),
           ],
         ),
         if (listing != null && listing.hits.isNotEmpty)
@@ -349,14 +366,14 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
                 for (final h in listing.hits)
                   Container(
                     margin: const EdgeInsets.only(bottom: 6),
-                    color: Palette.cream100,
+                    decoration: _item,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${h.file}:${h.line.round()}', style: PxText.mono.copyWith(color: Palette.bark500)),
+                        Text('${h.file}:${h.line.round()}', style: ProText.mono.copyWith(color: ProColor.muted)),
                         const SizedBox(height: 2),
-                        Text(h.text, style: PxText.xs.copyWith(height: 1.625, color: Palette.bark800)),
+                        Text(h.text, style: ProText.sm),
                       ],
                     ),
                   ),
@@ -376,24 +393,21 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
                     for (final f in listing.files)
                       Container(
                         margin: const EdgeInsets.only(bottom: 6),
-                        color: Palette.cream100,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: _item,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Tappable(
                               onTap: () => _show(f.name),
                               semanticLabel: f.name,
-                              builder: (context, s) => Padding(
+                              builder: (context, s) => Container(
+                                color: s.hovered ? ProColor.hover : null,
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 child: Row(
                                   children: [
                                     Expanded(
-                                      child: Text(
-                                        f.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: PxText.mono.copyWith(color: Palette.bark800),
-                                      ),
+                                      child: Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.mono),
                                     ),
                                     const SizedBox(width: 8),
                                     Text('${ago(f.at, now)} · ${f.chars.round()} 字', style: _meta),
@@ -404,13 +418,9 @@ class _ArchivePanelState extends ConsumerState<ArchivePanel> {
                             if (_open?.name == f.name)
                               Container(
                                 constraints: const BoxConstraints(maxHeight: 384),
-                                decoration: const BoxDecoration(
-                                  border: Border(top: BorderSide(color: Palette.cream300)),
-                                ),
+                                decoration: const BoxDecoration(border: Border(top: proLine)),
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                child: SingleChildScrollView(
-                                  child: SelectableText(_open!.text, style: PxText.xs.copyWith(height: 1.625, color: Palette.bark800)),
-                                ),
+                                child: SingleChildScrollView(child: SelectableText(_open!.text, style: ProText.sm)),
                               ),
                           ],
                         ),
@@ -449,15 +459,15 @@ class _WriteNoteState extends ConsumerState<WriteNote> {
   @override
   Widget build(BuildContext context) {
     final projectNames = widget.withProject ? (ref.watch(projectNamesProvider).value ?? const <String>[]) : const <String>[];
-    final button = PxButton.text('记下', tone: PxTone.primary, onPressed: _text.trim().isEmpty ? null : _write);
-    return PxField(
+    final button = ProButton.text('记下', tone: ProTone.primary, onPressed: _text.trim().isEmpty ? null : _write);
+    return ProField(
       label: '替它记一条',
       error: _error.isEmpty ? null : _error,
       hint: Text(widget.withProject ? '写成下次一看就懂的一句话。项目留空就是所有项目都用得上。' : '写成下次一看就懂的一句话。'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PxTextArea(
+          ProTextArea(
             value: _text,
             onChanged: (t) => setState(() => _text = t),
             rows: 2,
@@ -469,7 +479,7 @@ class _WriteNoteState extends ConsumerState<WriteNote> {
             children: [
               if (widget.withProject) ...[
                 Expanded(
-                  child: PxTextInput(
+                  child: ProTextInput(
                     value: _project,
                     onChanged: (p) => setState(() => _project = p),
                     placeholder: '项目（可以不填）',
@@ -515,7 +525,7 @@ class _MemoryItemState extends State<MemoryItem> {
       opacity: widget.faded ? .6 : 1,
       child: Container(
         margin: const EdgeInsets.only(bottom: 6),
-        color: Palette.cream100,
+        decoration: _item,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -524,13 +534,13 @@ class _MemoryItemState extends State<MemoryItem> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.memory.text, style: PxText.sm.copyWith(color: Palette.bark900)),
+                  Text(widget.memory.text, style: ProText.sm),
                   const SizedBox(height: 2),
                   Wrap(
                     spacing: 8,
                     children: [
                       for (final m in widget.meta) Text(m, style: _meta),
-                      if (widget.warning != null) Text(widget.warning!, style: _meta.copyWith(color: const Color(0xFFB8682A))),
+                      if (widget.warning != null) Text(widget.warning!, style: _meta.copyWith(color: _warn)),
                     ],
                   ),
                 ],
@@ -544,9 +554,9 @@ class _MemoryItemState extends State<MemoryItem> {
                 builder: (context, s) => Opacity(
                   opacity: _hover || s.focused ? 1 : 0,
                   child: Container(
-                    color: s.hovered ? Palette.cream200 : null,
+                    decoration: BoxDecoration(color: s.hovered ? ProColor.hover : null, borderRadius: proRadius),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    child: Text('忘掉', style: _meta.copyWith(color: s.hovered ? Palette.berry : Palette.bark500)),
+                    child: Text('忘掉', style: _meta.copyWith(color: s.hovered ? Palette.berry : ProColor.muted)),
                   ),
                 ),
               ),

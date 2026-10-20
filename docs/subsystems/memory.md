@@ -19,7 +19,7 @@
 - 服务端 `server/internal/memory`（`memory.Service`）：`service.go` 对外的方法（管家的和帮工档案的分流）、`providers.go` 管理器、`provider.go` 一个来源的接口、`local.go` 本地来源、`memory.go` 本地的读写和读「记住：」、管家 `MEMORY.md` 的口子、`recall.go` 挑法和检索（纯函数）、`terms.go` 切词和全文索引、`nowledge.go`、`everos.go` 两个外面的来源、`types.go` 服务之间传的形状（`RecallCue`、`FinishedRun`、`EndedSession`、`SearchQuery`、`Found`）。词典在 `memory/dict/`（gse v1.1.0 的简体词典，gzip）。
 - 表：`memory`（一条记忆一行）、`memory_term`（FTS5 虚表，外部内容，只存切好的词，三个触发器跟着 `memory` 改）；查询在 `pkg/db/queries/memory.sql`、`memory_term.sql`。
 - 接口：`memory.list`、`memory.recall`、`memory.create`、`memory.delete`，管家的旧账 `manager.listArchive`、`manager.getArchive`（[capabilities.md](docs/reference/capabilities.md)）。
-- 客户端：`workbench/shared/memory_panels.dart`（帮工页的 `MemoryPanel`、管家页的 `ManagerMemoryPanel`、`ArchivePanel`），数据在 `data/remote.dart` 的 `memoryProvider`、`recallPreviewProvider`；来源在「设置」的「记性」（`shared/settings_form.dart`）。
+- 客户端：`workbench/shared/memory_panels.dart`（帮工页的 `MemoryPanel`、管家页的 `ManagerMemoryPanel`、`ArchivePanel`），数据在 `data/remote.dart` 的 `memoryProvider`、`recallPreviewProvider`；来源在「设置」的「记性」（`workbench/settings/settings_form.dart`）。
 
 ## 模型和不变量
 

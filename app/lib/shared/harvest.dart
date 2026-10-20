@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,11 +5,10 @@ import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show SessionIssue, issueChangesProvider, reasonOf;
+import 'harvest_rules.dart';
 import 'tags.dart';
 
-/// A binary file counts -1: not counted.
-(int, int) lineCounts(Changes c) =>
-    (c.files.fold(0, (n, f) => n + math.max(0, f.added.round())), c.files.fold(0, (n, f) => n + math.max(0, f.removed.round())));
+export 'harvest_rules.dart' show lineCounts;
 
 class HarvestReview extends ConsumerWidget {
   const HarvestReview({super.key, required this.session, required this.onDone});
@@ -55,7 +52,7 @@ class _Ready extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     final (added, removed) = lineCounts(changes);
-    final empty = changes.commits.isEmpty && changes.uncommitted.isEmpty;
+    final empty = nothingChanged(changes);
     final conflicts = changes.conflicts;
     final commands = ref.read(farmCommandsProvider);
     void take() {
@@ -135,7 +132,7 @@ class _Ready extends ConsumerWidget {
                         Container(
                           color: Palette.cream50,
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          child: Text('${_status[f.status]?.mark ?? f.status} ${f.path}', style: PxText.mono),
+                          child: Text('${changeKind(f.status).mark} ${f.path}', style: PxText.mono),
                         ),
                     ],
                   ),
@@ -219,10 +216,10 @@ class PlusMinus extends StatelessWidget {
   );
 }
 
-const _status = {
-  'A': (mark: '新', label: '新增', fill: Color(0xFFD0DCA9), ink: Palette.leaf700),
-  'M': (mark: '改', label: '修改', fill: Color(0xFFF0DBA9), ink: Palette.bark800),
-  'D': (mark: '删', label: '删除', fill: Color(0xFFEDCBA9), ink: Palette.berry),
+const _look = {
+  'A': (fill: Color(0xFFD0DCA9), ink: Palette.leaf700),
+  'M': (fill: Color(0xFFF0DBA9), ink: Palette.bark800),
+  'D': (fill: Color(0xFFEDCBA9), ink: Palette.berry),
 };
 
 class FileRow extends StatefulWidget {
@@ -240,7 +237,8 @@ class _FileRowState extends State<FileRow> {
   @override
   Widget build(BuildContext context) {
     final f = widget.file;
-    final st = _status[f.status] ?? (mark: f.status, label: f.status, fill: Palette.cream200, ink: Palette.bark800);
+    final kind = changeKind(f.status);
+    final look = _look[f.status] ?? (fill: Palette.cream200, ink: Palette.bark800);
     final patch = f.patch;
     return Container(
       color: Palette.cream100,
@@ -256,13 +254,13 @@ class _FileRowState extends State<FileRow> {
               child: Row(
                 children: [
                   Tooltip(
-                    message: st.label,
+                    message: kind.label,
                     child: Container(
                       width: 20,
                       height: 20,
-                      color: st.fill,
+                      color: look.fill,
                       alignment: Alignment.center,
-                      child: Text(st.mark, style: PxText.xs.copyWith(color: st.ink)),
+                      child: Text(kind.mark, style: PxText.xs.copyWith(color: look.ink)),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -297,9 +295,7 @@ class Patch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lines = text.split('\n');
-    final from = lines.indexWhere((l) => l.startsWith('@@'));
-    final shown = lines.sublist(math.max(0, from));
+    final shown = patchLines(text);
     return Container(
       margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
       color: Palette.cream50,
@@ -313,24 +309,23 @@ class Patch extends StatelessWidget {
             children: [
               for (final line in shown)
                 Container(
-                  color: line.startsWith('+')
-                      ? Palette.leaf300.withValues(alpha: .35)
-                      : line.startsWith('-')
-                      ? Palette.berry.withValues(alpha: .1)
-                      : null,
+                  color: switch (patchMarkOf(line)) {
+                    PatchMark.added => Palette.leaf300.withValues(alpha: .35),
+                    PatchMark.removed => Palette.berry.withValues(alpha: .1),
+                    PatchMark.hunk || PatchMark.plain => null,
+                  },
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     line.isEmpty ? ' ' : line,
                     softWrap: false,
                     style: PxText.mono.copyWith(
                       height: 1.4,
-                      color: line.startsWith('+')
-                          ? Palette.leaf700
-                          : line.startsWith('-')
-                          ? Palette.berry
-                          : line.startsWith('@@')
-                          ? Palette.water
-                          : Palette.bark800,
+                      color: switch (patchMarkOf(line)) {
+                        PatchMark.added => Palette.leaf700,
+                        PatchMark.removed => Palette.berry,
+                        PatchMark.hunk => Palette.water,
+                        PatchMark.plain => Palette.bark800,
+                      },
                     ),
                   ),
                 ),

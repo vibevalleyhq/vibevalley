@@ -128,9 +128,10 @@ class _Box extends StatelessWidget {
   );
 }
 
+/// Placeholders are Chinese hints even in a code field, so they are in the body type at the field's size.
 InputDecoration _bare(String? placeholder, TextStyle style) => InputDecoration.collapsed(
   hintText: placeholder,
-  hintStyle: style.copyWith(color: ProColor.faint),
+  hintStyle: ProText.sm.copyWith(fontSize: style.fontSize, color: ProColor.faint),
 ).copyWith(filled: false, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, disabledBorder: InputBorder.none);
 
 class ProTextInput extends StatefulWidget {

@@ -9,7 +9,7 @@ import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart' show tookText;
 import '../../rules/issues.dart';
 import '../../data/ui_state.dart' show FarmPanel, graphShownProvider, titleOpenProvider, farmOverlaysProvider;
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../shared/layout.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
@@ -79,7 +79,7 @@ class _BoardState extends State<IssueBoard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              PxSegmented<Lane>(
+              ProSegmented<Lane>(
                 value: _lane,
                 options: [for (final l in Lane.values) SegmentOption(value: l, label: '${l.label} ${widget.cards.where((c) => c.lane == l).length}')],
                 onChanged: (l) => setState(() => _lane = l),
@@ -151,29 +151,26 @@ class _LaneView extends StatelessWidget {
       onAcceptWithDetails: (d) => unawaited(onDrop(d.data, lane)),
       builder: (context, coming, refused) => Container(
         decoration: BoxDecoration(
-          color: coming.isNotEmpty ? Palette.leaf300.withValues(alpha: .35) : Palette.cream100,
-          border: Border.all(color: coming.isNotEmpty ? Palette.leaf600 : Palette.cream300, width: 2),
+          color: coming.isNotEmpty ? Palette.leaf300.withValues(alpha: .25) : ProColor.hover,
+          border: Border.all(color: coming.isNotEmpty ? Palette.leaf600 : const Color(0x00000000)),
+          borderRadius: const BorderRadius.all(Radius.circular(10)),
         ),
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Text(lane.label, style: PxText.sm.copyWith(color: Palette.bark900)),
-                const SizedBox(width: 6),
-                Text(head, style: PxText.xs.copyWith(color: Palette.bark500)),
-                const Spacer(),
-                if (lane == Lane.todo)
-                  PxButton(
-                    size: PxSize.custom,
-                    padding: const EdgeInsets.all(4),
-                    tooltip: '详细写一张',
-                    semanticLabel: '详细写一张',
-                    onPressed: () => onOpen('new'),
-                    child: const SpriteIcon('button-edit', size: 14),
-                  ),
-              ],
+            SizedBox(
+              height: 28,
+              child: Row(
+                children: [
+                  const SizedBox(width: 4),
+                  Text(lane.label, style: ProText.sm.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 8),
+                  Text(head, style: ProText.meta),
+                  const Spacer(),
+                  if (lane == Lane.todo) ProButton.icon('button-edit', tooltip: '详细写一张', semanticLabel: '详细写一张', iconSize: 14, onPressed: () => onOpen('new')),
+                ],
+              ),
             ),
             if (lane == Lane.todo) ...[const SizedBox(height: 6), _QuickAdd(onAdd: onAdd)],
             const SizedBox(height: 8),
@@ -181,13 +178,21 @@ class _LaneView extends StatelessWidget {
               child: loading
                   ? const EmptyNote('在读……')
                   : cards.isEmpty
-                  ? Text(_emptyText[lane]!, style: PxText.xs.copyWith(color: Palette.bark400, height: 1.625))
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(_emptyText[lane]!, style: ProText.meta.copyWith(color: ProColor.faint, height: 1.5)),
+                    )
                   : ListView.separated(
                       itemCount: shown.length + (hidden > 0 || (older && cards.length > closedShown) ? 1 : 0),
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, i) {
                         if (i == shown.length) {
-                          return Center(child: InlineLink(hidden > 0 ? '更早的 $hidden 张' : '只看最近的', onTap: onOlder));
+                          return Center(
+                            child: DefaultTextStyle(
+                              style: ProText.sm,
+                              child: InlineLink(hidden > 0 ? '更早的 $hidden 张' : '只看最近的', onTap: onOlder),
+                            ),
+                          );
                         }
                         final card = shown[i];
                         final view = _CardView(card: card, selected: card.id == selected, onOpen: onOpen);
@@ -223,7 +228,12 @@ class _PlaceBefore extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (coming.isNotEmpty) Container(height: 4, margin: const EdgeInsets.only(bottom: 4), color: Palette.leaf600),
+        if (coming.isNotEmpty)
+          Container(
+            height: 2,
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: const BoxDecoration(color: Palette.leaf600, borderRadius: BorderRadius.all(Radius.circular(1))),
+          ),
         child,
       ],
     ),
@@ -254,7 +264,7 @@ class _QuickAddState extends State<_QuickAdd> {
   }
 
   @override
-  Widget build(BuildContext context) => PxTextInput(
+  Widget build(BuildContext context) => ProTextInput(
     key: ValueKey(_round),
     value: _text,
     onChanged: (v) => setState(() => _text = v),
@@ -274,13 +284,19 @@ class _CardView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final agents = ref.watch(workbenchConfigProvider).agents;
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
-    final xs = PxText.xs.copyWith(color: Palette.bark500);
+    const xs = ProText.meta;
     final (title, who, stripe) = switch (card) {
       TaskCard(:final graph) => ('计划：${graph.title}', '${graph.tasks.length} 步', null),
       TodoCard(:final item) => (item.title, agents.where((a) => a.id == item.assignee).firstOrNull?.name ?? '还没选帮工', priorityColor(item.priority)),
       IssueCard(:final issue, :final head) => (issueTitle(issue, ref.watch(graphsProvider)), head.name, null),
       ManagerCard(:final issue) => (issue.title, '管家', null),
       MissingSessionCard(:final issue) => (issue.title, '执行记录缺失', null),
+    };
+    final Color? dot = switch (card) {
+      IssueCard(:final state) => issueTagColor(state),
+      ManagerCard(:final issue) => issueTagColor(issueTag(issue)),
+      TaskCard() => Palette.leaf500,
+      TodoCard() || MissingSessionCard() => null,
     };
     final tags = <Widget>[];
     final lines = <Widget>[];
@@ -289,7 +305,7 @@ class _CardView extends ConsumerWidget {
         lines.add(Text('缺少：${history.missingSessions.join('、')}', style: xs.copyWith(color: Palette.berry)));
       case TaskCard(:final graph):
         tags.add(const _Tag('种植计划', Palette.leaf500));
-        lines.add(Text(taskLine(graph), style: PxText.xs.copyWith(color: graph.state == GraphState.ripe ? Palette.leaf700 : Palette.bark800)));
+        lines.add(Text(taskLine(graph), style: ProText.xs.copyWith(color: graph.state == GraphState.ripe ? Palette.leaf700 : ProColor.ink)));
       case TodoCard(:final item):
         if (item.drafting case final d?) {
           tags.add(_Tag('${d.name}在起草', Palette.water));
@@ -327,78 +343,70 @@ class _CardView extends ConsumerWidget {
               said,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: PxText.xs.copyWith(color: Palette.bark800, height: 1.5),
+              style: ProText.xs.copyWith(height: 18 / 12),
             ),
           );
         }
         if (!state.open) lines.add(Text('${state.label} · ${ago(issue.closedAt ?? head.endedAt ?? head.hiredAt, now)}', style: xs));
     }
-    Widget face(double opacity) => Opacity(
+    Widget face(double opacity, {bool hovered = false}) => Opacity(
       opacity: opacity,
       child: Container(
         decoration: BoxDecoration(
-          color: Palette.cream50,
-          border: Border(
-            left: BorderSide(color: stripe ?? (selected ? Palette.leaf600 : Palette.cream300), width: stripe != null ? 5 : 2),
-            top: BorderSide(color: selected ? Palette.leaf600 : Palette.cream300, width: 2),
-            right: BorderSide(color: selected ? Palette.leaf600 : Palette.cream300, width: 2),
-            bottom: BorderSide(color: selected ? Palette.leaf600 : Palette.cream300, width: 2),
-          ),
+          color: selected ? Color.alphaBlend(ProColor.selected, ProColor.page) : ProColor.page,
+          border: Border.all(color: hovered && !selected ? ProColor.ink.withValues(alpha: .22) : ProColor.line),
+          borderRadius: const BorderRadius.all(Radius.circular(8)),
         ),
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (card case IssueCard(:final state)) ...[
-                  Padding(padding: const EdgeInsets.only(top: 4), child: StateDot(issueTagColor(state))),
-                  const SizedBox(width: 6),
-                ],
-                if (card case ManagerCard(:final issue)) ...[
-                  Padding(padding: const EdgeInsets.only(top: 4), child: StateDot(issueTagColor(issueTag(issue)))),
-                  const SizedBox(width: 6),
-                ],
-                if (card is TaskCard) ...[const Padding(padding: EdgeInsets.only(top: 4), child: StateDot(Palette.leaf500)), const SizedBox(width: 6)],
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: PxText.sm.copyWith(color: Palette.bark900),
+            // The priority shows as a stripe down the card's left edge.
+            if (stripe != null) Positioned(left: 0, top: 0, bottom: 0, child: Container(width: 3, color: stripe)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (dot != null) ...[Padding(padding: const EdgeInsets.only(top: 6), child: StateDot(dot)), const SizedBox(width: 8)],
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: ProText.sm.copyWith(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  if (tags.isNotEmpty) ...[const SizedBox(height: 6), Wrap(spacing: 4, runSpacing: 4, children: tags)],
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (card.agent != null) ...[AgentFaceOf(card.agent!, size: 18), const SizedBox(width: 6)],
+                      Flexible(
+                        child: Text(who, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.xs),
+                      ),
+                      if (card.project != null) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            card.project!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: ProText.mono.copyWith(fontSize: 11, color: ProColor.muted),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  for (final line in lines) ...[const SizedBox(height: 4), line],
+                ],
+              ),
             ),
-            if (tags.isNotEmpty) ...[const SizedBox(height: 6), Wrap(spacing: 4, runSpacing: 4, children: tags)],
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                if (card.agent != null) ...[AgentFaceOf(card.agent!, size: 18), const SizedBox(width: 4)],
-                Flexible(
-                  child: Text(
-                    who,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: PxText.xs.copyWith(color: Palette.bark800),
-                  ),
-                ),
-                if (card.project != null) ...[
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      card.project!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: PxText.mono.copyWith(fontSize: 10, color: Palette.bark500),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            for (final line in lines) ...[const SizedBox(height: 4), line],
           ],
         ),
       ),
@@ -412,10 +420,14 @@ class _CardView extends ConsumerWidget {
           workbenchGo(context, '/');
         },
         semanticLabel: title,
-        builder: (context, s) => face(1),
+        builder: (context, s) => face(1, hovered: s.hovered),
       );
     }
-    final tappable = Tappable(onTap: () => onOpen(card.id), semanticLabel: title, builder: (context, s) => face(1));
+    final tappable = Tappable(
+      onTap: () => onOpen(card.id),
+      semanticLabel: title,
+      builder: (context, s) => face(1, hovered: s.hovered),
+    );
     final feedback = Material(
       type: MaterialType.transparency,
       child: SizedBox(width: 240, child: face(.9)),
@@ -434,9 +446,12 @@ class _Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-    color: color.withValues(alpha: .2),
-    child: Text(text, style: PxText.xs.copyWith(fontSize: 10, color: Palette.bark900)),
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+    decoration: BoxDecoration(color: color.withValues(alpha: .2), borderRadius: const BorderRadius.all(Radius.circular(4))),
+    child: Text(
+      text,
+      style: ProText.xs.copyWith(fontSize: 11, height: 16 / 11, fontWeight: FontWeight.w500),
+    ),
   );
 }
 

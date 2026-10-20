@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../shared/layout.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
@@ -66,23 +66,24 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: PxButton(
+          child: ProButton.text(
+            '新增项目',
+            icon: 'button-add',
             onPressed: () async {
               final project = await showNewProjectDialog(context);
               if (project != null && context.mounted) workbenchGo(context, '/projects/${Uri.encodeComponent(project.name)}');
             },
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-add', size: 16), SizedBox(width: 6), Text('新增项目')]),
           ),
         ),
         if (list == null)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            child: Text('在找……', style: PxText.sm.copyWith(color: Palette.bark500)),
+            child: Text('在找……', style: ProText.sm.copyWith(color: ProColor.muted)),
           )
         else if (sorted.isEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            child: Text('工作目录下还没有项目。点「新增项目」开一块地，或从 GitHub 下载一个。', style: PxText.sm.copyWith(color: Palette.bark600, height: 1.625)),
+            child: Text('工作目录下还没有项目。点「新增项目」开一块地，或从 GitHub 下载一个。', style: ProText.sm.copyWith(color: ProColor.muted)),
           )
         else ...[
           ListRow(active: selected == null, onTap: () => workbenchGo(context, '/projects'), child: const RowText('全部', '整张地图：每个项目一座岛')),
@@ -108,14 +109,14 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
       builder: (context, box) {
         final gap = box.maxWidth >= 640 ? 12.0 : 8.0;
         final side = EdgeInsets.fromLTRB(gap, 0, gap, 12);
-        final detail = PxScrollView(
+        final detail = SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _spaced(details)),
         );
         if (box.maxWidth < wideFrom) {
           if (selected != null) {
             return Padding(
               padding: side,
-              child: PxScrollView(
+              child: SingleChildScrollView(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _spaced([...details, menu])),
               ),
             );
@@ -127,7 +128,7 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
                 padding: side,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 240),
-                  child: PxScrollView(child: menu),
+                  child: SingleChildScrollView(child: menu),
                 ),
               ),
               const Expanded(child: ProjectMap()),
@@ -139,7 +140,7 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage> {
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(gap, 0, 0, 12),
-              child: SizedBox(width: 288, child: PxScrollView(child: menu)),
+              child: SizedBox(width: 288, child: SingleChildScrollView(child: menu)),
             ),
             // The map draws its own margin; the details sit in the page's.
             Expanded(
@@ -228,105 +229,121 @@ class _Deed extends ConsumerWidget {
     final crops = counted == null ? null : languageShares(counted.languages, top: null).length;
     final busy = languages is Asking || activity is Asking;
     final notCounted = languages is Failed;
-    return PxWindow(
-      paper: Palette.cream50,
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(
-            width: 96,
-            height: 96,
-            alignment: Alignment.center,
-            color: Palette.cream100,
-            foregroundDecoration: pxRing,
-            child: SpriteIcon('plot-${growth.crop}', size: 80, semanticLabel: '长势：${growth.label}'),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(project.name, style: PxText.x2l, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                      color: Palette.leaf300.withValues(alpha: .5),
-                      child: Text('长势 · ${growth.label}', style: PxText.xs.copyWith(color: Palette.bark800)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Wraps on a narrow window instead of squeezing each stat to a letter a line.
-                Wrap(
-                  spacing: 24,
-                  runSpacing: 8,
-                  children: [
-                    for (final stat in [
-                      _Stat('开垦于', worked?.first != null ? _dateText(worked!.first!) : (worked != null ? '还没动过土' : '…')),
-                      _Stat('耕作', worked != null ? '${number(worked.total)} 次提交' : '…'),
-                      _Stat('庄稼', lines != null ? '${number(lines)} 行' : (notCounted ? '没数' : '…')),
-                      _Stat('种了', crops != null ? '$crops 样' : (notCounted ? '没数' : '…')),
-                    ])
-                      ConstrainedBox(constraints: const BoxConstraints(minWidth: 72), child: stat),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    const SpriteIcon('button-folder', size: 14),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Tooltip(
-                        message: project.path,
-                        child: Text(
-                          project.path,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: PxText.mono.copyWith(fontSize: 11, color: Palette.bark600),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    PxButton(
-                      size: PxSize.icon,
-                      tooltip: '复制路径',
-                      semanticLabel: '复制路径',
-                      onPressed: () {
-                        unawaited(Clipboard.setData(ClipboardData(text: project.path)));
-                        toasts.add(type: ToastType.info, title: '复制好了', description: project.path);
-                      },
-                      child: const SpriteIcon('button-copy', size: 14),
-                    ),
-                  ],
-                ),
-              ],
+    Widget picture(double size) => Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(8))),
+      child: SpriteIcon('plot-${growth.crop}', size: size * 5 / 6, semanticLabel: '长势：${growth.label}'),
+    );
+    final name = Wrap(
+      spacing: 12,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(project.name, style: ProText.xl, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ProTag(label: '长势 · ${growth.label}', fill: Palette.leaf300.withValues(alpha: .5)),
+      ],
+    );
+    // Wraps on a narrow window instead of squeezing each stat to a letter a line.
+    final stats = Wrap(
+      spacing: 24,
+      runSpacing: 8,
+      children: [
+        for (final stat in [
+          _Stat('开垦于', worked?.first != null ? _dateText(worked!.first!) : (worked != null ? '还没动过土' : '…')),
+          _Stat('耕作', worked != null ? '${number(worked.total)} 次提交' : '…'),
+          _Stat('庄稼', lines != null ? '${number(lines)} 行' : (notCounted ? '没数' : '…')),
+          _Stat('种了', crops != null ? '$crops 样' : (notCounted ? '没数' : '…')),
+        ])
+          ConstrainedBox(constraints: const BoxConstraints(minWidth: 72), child: stat),
+      ],
+    );
+    final path = Row(
+      children: [
+        const SpriteIcon('button-folder', size: 14),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Tooltip(
+            message: project.path,
+            child: Text(
+              project.path,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ProText.mono.copyWith(fontSize: 12, color: ProColor.muted),
             ),
           ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              PxButton(
-                size: PxSize.icon,
-                tooltip: busy ? '在数……' : '重新统计',
-                semanticLabel: '重新统计',
-                onPressed: busy ? null : () => ref.read(projectSurveyProvider(project.name).notifier).refresh(),
-                child: const SpriteIcon('button-refresh', size: 16),
-              ),
-              if (counted != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text('${since(counted.at, now)}数过', style: PxText.fine.copyWith(color: Palette.bark500)),
-                ),
-            ],
+        ),
+        const SizedBox(width: 4),
+        ProButton.icon(
+          'button-copy',
+          tooltip: '复制路径',
+          semanticLabel: '复制路径',
+          iconSize: 14,
+          onPressed: () {
+            unawaited(Clipboard.setData(ClipboardData(text: project.path)));
+            toasts.add(type: ToastType.info, title: '复制好了', description: project.path);
+          },
+        ),
+      ],
+    );
+    final recount = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ProButton.icon(
+          'button-refresh',
+          tone: ProTone.plain,
+          tooltip: busy ? '在数……' : '重新统计',
+          semanticLabel: '重新统计',
+          onPressed: busy ? null : () => ref.read(projectSurveyProvider(project.name).notifier).refresh(),
+        ),
+        if (counted != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('${since(counted.at, now)}数过', style: ProText.meta),
           ),
-        ],
+      ],
+    );
+    return ProPanel(
+      child: LayoutBuilder(
+        // On a phone the picture shrinks and the stats take the whole width under it.
+        builder: (context, box) => box.maxWidth < 480
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      picture(56),
+                      const SizedBox(width: 12),
+                      Expanded(child: name),
+                      const SizedBox(width: 8),
+                      recount,
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  stats,
+                  const SizedBox(height: 10),
+                  path,
+                ],
+              )
+            : Row(
+                children: [
+                  picture(96),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [name, const SizedBox(height: 12), stats, const SizedBox(height: 10), path],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  recount,
+                ],
+              ),
       ),
     );
   }
@@ -342,8 +359,13 @@ class _Stat extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(label, style: PxText.fine.copyWith(color: Palette.bark500)),
-      Text(value, style: PxText.sm, maxLines: 2, overflow: TextOverflow.ellipsis),
+      Text(label, style: ProText.meta),
+      Text(
+        value,
+        style: ProText.sm.copyWith(fontWeight: FontWeight.w500),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
     ],
   );
 }
@@ -362,11 +384,14 @@ class _Planted extends StatelessWidget {
     final shares = c is Done<ProjectLanguages> ? languageShares(c.value.languages) : const <LanguageShare>[];
     final Widget body;
     if (c == null || c is Asking<ProjectLanguages>) {
-      body = Container(height: 48, color: Palette.cream200);
+      body = Container(
+        height: 48,
+        decoration: const BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(6))),
+      );
     } else if (c is Failed<ProjectLanguages>) {
       body = _NotCounted(reason: c.reason);
     } else if (shares.isEmpty) {
-      body = Text('这块地还空着：没有数得出来的代码。', style: PxText.sm.copyWith(color: Palette.bark600));
+      body = Text('这块地还空着：没有数得出来的代码。', style: ProText.sm.copyWith(color: ProColor.muted));
     } else {
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -375,11 +400,12 @@ class _Planted extends StatelessWidget {
           Semantics(
             image: true,
             label: shares.map((s) => '${s.label} ${percent(s.share)}').join('，'),
+            // The bed itself, soil under the crops: a picture, so it keeps the farm's brown.
             child: Container(
               height: 56,
               padding: const EdgeInsets.all(4),
-              color: const Color(0xFF7A5A3A),
-              foregroundDecoration: pxRing,
+              clipBehavior: Clip.antiAlias,
+              decoration: const BoxDecoration(color: Color(0xFF7A5A3A), borderRadius: BorderRadius.all(Radius.circular(6))),
               child: Row(
                 children: [
                   for (final s in shares)
@@ -404,7 +430,7 @@ class _Planted extends StatelessWidget {
         ],
       );
     }
-    return PxCard(title: '种了什么', aside: const Text('按行数，不算空行 · tokei 数的'), child: body);
+    return ProCard(title: '种了什么', aside: const Text('按行数，不算空行 · tokei 数的'), child: body);
   }
 }
 
@@ -425,23 +451,20 @@ class _Crop extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(share.label, style: PxText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  child: Text(
+                    share.label,
+                    style: ProText.sm.copyWith(fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                Text(percent(share.share), style: PxText.sm.copyWith(color: Palette.bark800)),
+                Text(percent(share.share), style: ProText.sm.copyWith(color: ProColor.muted)),
               ],
             ),
             const SizedBox(height: 4),
-            Container(
-              height: 6,
-              color: Palette.cream200,
-              alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                widthFactor: (share.share < 0.02 ? 0.02 : share.share).clamp(0.0, 1.0),
-                child: Container(color: share.color),
-              ),
-            ),
+            _Bar(share: (share.share < 0.02 ? 0.02 : share.share).clamp(0.0, 1.0), color: share.color),
             const SizedBox(height: 2),
-            Text('${number(share.lines)} 行 · ${number(share.files)} 个文件', style: PxText.fine.copyWith(color: Palette.bark500)),
+            Text('${number(share.lines)} 行 · ${number(share.files)} 个文件', style: ProText.meta),
           ],
         ),
       ),
@@ -457,30 +480,29 @@ class _NotCounted extends StatelessWidget {
   Widget build(BuildContext context) {
     final install = reason.contains('brew install tokei');
     Widget code(String t) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      color: Palette.cream200,
-      child: Text(t, style: PxText.mono),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: const BoxDecoration(color: ProColor.selected, borderRadius: BorderRadius.all(Radius.circular(4))),
+      child: Text(t, style: ProText.mono),
     );
     return Container(
       padding: const EdgeInsets.all(12),
-      color: Palette.cream100,
-      foregroundDecoration: pxRing,
+      decoration: const BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(8))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(install ? '数庄稼要用 tokei，这台机器上还没有。' : reason, style: PxText.sm.copyWith(color: Palette.bark800)),
+          Text(install ? '数庄稼要用 tokei，这台机器上还没有。' : reason, style: ProText.sm),
           if (install) ...[
             const SizedBox(height: 8),
             Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
               runSpacing: 4,
               children: [
-                Text('在终端里装一个：', style: PxText.sm.copyWith(color: Palette.bark600)),
+                Text('在终端里装一个：', style: ProText.sm.copyWith(color: ProColor.muted)),
                 code('brew install tokei'),
-                Text('（或 ', style: PxText.sm.copyWith(color: Palette.bark600)),
+                Text('（或 ', style: ProText.sm.copyWith(color: ProColor.muted)),
                 code('cargo install tokei'),
-                Text('），装好点上面的「统计」。', style: PxText.sm.copyWith(color: Palette.bark600)),
+                Text('），装好点上面的「统计」。', style: ProText.sm.copyWith(color: ProColor.muted)),
               ],
             ),
           ],
@@ -516,10 +538,10 @@ class _TillingCalendarState extends State<_TillingCalendar> {
   Widget build(BuildContext context) {
     final activity = widget.activity;
     if (activity is Failed<ProjectActivity>) {
-      return PxCard(
+      return ProCard(
         title: '耕作日历',
         aside: const Text('过去一年 · 一格一天，提交越多长得越高'),
-        child: Text(activity.reason, style: PxText.sm.copyWith(color: Palette.bark800)),
+        child: Text(activity.reason, style: ProText.sm),
       );
     }
     final worked = activity is Done<ProjectActivity> ? activity.value : null;
@@ -531,7 +553,7 @@ class _TillingCalendarState extends State<_TillingCalendar> {
     }
     final calendar = _calendar!;
     final streaks = _streaks!;
-    final muted = PxText.xs.copyWith(color: Palette.bark500);
+    const muted = ProText.meta;
     final pointed = _pointed;
     final busiest = streaks.busiest;
     final line = pointed != null && !pointed.future
@@ -539,7 +561,7 @@ class _TillingCalendarState extends State<_TillingCalendar> {
         : busiest != null
         ? '最忙的一天：${_dayText(DateTime.parse('${busiest.day}T12:00'))}，${busiest.commits} 次提交'
         : ' ';
-    return PxCard(
+    return ProCard(
       title: '耕作日历',
       aside: const Text('过去一年 · 一格一天，提交越多长得越高'),
       child: Column(
@@ -638,11 +660,11 @@ class _TillingCalendarState extends State<_TillingCalendar> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              Text(line, style: PxText.xs.copyWith(color: Palette.bark600)),
+              Text(line, style: ProText.meta),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('少', style: PxText.xs.copyWith(color: Palette.bark600)),
+                  Text('少', style: ProText.meta),
                   for (var l = 0; l <= 4; l++)
                     Padding(
                       padding: const EdgeInsets.only(left: 4),
@@ -652,7 +674,7 @@ class _TillingCalendarState extends State<_TillingCalendar> {
                       ),
                     ),
                   const SizedBox(width: 4),
-                  Text('多', style: PxText.xs.copyWith(color: Palette.bark600)),
+                  Text('多', style: ProText.meta),
                 ],
               ),
             ],
@@ -679,7 +701,7 @@ class _Hands extends ConsumerWidget {
     final agents = ref.watch(workbenchConfigProvider).agents;
     final top = authors.first.commits > 0 ? authors.first.commits : 1;
     final rest = authors.skip(_hands).fold<double>(0, (n, x) => n + x.commits);
-    return PxCard(
+    return ProCard(
       title: '谁来干过活',
       aside: const Text('过去一年的提交'),
       child: Column(
@@ -701,8 +723,8 @@ class _Hands extends ConsumerWidget {
                         width: 32,
                         height: 32,
                         alignment: Alignment.center,
-                        color: Palette.cream200,
-                        child: Text(author.name.characters.firstOrNull ?? '', style: PxText.sm.copyWith(color: Palette.bark800)),
+                        decoration: const BoxDecoration(color: ProColor.selected, shape: BoxShape.circle),
+                        child: Text(author.name.characters.firstOrNull ?? '', style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
                       ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -713,21 +735,18 @@ class _Hands extends ConsumerWidget {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(author.name, style: PxText.sm, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                child: Text(
+                                  author.name,
+                                  style: ProText.sm.copyWith(fontWeight: FontWeight.w500),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              Text('${number(author.commits)} 次', style: PxText.xs.copyWith(color: Palette.bark600)),
+                              Text('${number(author.commits)} 次', style: ProText.meta),
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Container(
-                            height: 6,
-                            color: Palette.cream200,
-                            alignment: Alignment.centerLeft,
-                            child: FractionallySizedBox(
-                              widthFactor: (author.commits / top).clamp(0.0, 1.0),
-                              child: Container(color: Palette.leaf500),
-                            ),
-                          ),
+                          _Bar(share: (author.commits / top).clamp(0.0, 1.0), color: Palette.leaf500),
                         ],
                       ),
                     ),
@@ -738,10 +757,32 @@ class _Hands extends ConsumerWidget {
           if (rest > 0)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text('还有 ${authors.length - _hands} 位，一共 ${number(rest)} 次。', style: PxText.xs.copyWith(color: Palette.bark500)),
+              child: Text('还有 ${authors.length - _hands} 位，一共 ${number(rest)} 次。', style: ProText.meta),
             ),
         ],
       ),
     );
   }
+}
+
+/// A thin rounded bar, filled to its share.
+class _Bar extends StatelessWidget {
+  const _Bar({required this.share, required this.color});
+  final double share;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 6,
+    clipBehavior: Clip.antiAlias,
+    decoration: const BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(3))),
+    alignment: Alignment.centerLeft,
+    child: FractionallySizedBox(
+      widthFactor: share,
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: color, borderRadius: const BorderRadius.all(Radius.circular(3))),
+        child: const SizedBox.expand(),
+      ),
+    ),
+  );
 }

@@ -26,9 +26,8 @@ class _TurnStepsState extends ConsumerState<TurnSteps> {
     if (run == null) return const SizedBox.shrink();
     final steps = ref.watch(runEventsProvider((session: widget.id, run: run))).value;
     final turn = steps ?? const <SessionEvent>[];
-    final tools = turn.where((s) => s.type == SessionEventType.toolCall).length;
-    if (turn.isEmpty || (widget.manager && tools == 0)) return const SizedBox.shrink();
-    final label = tools > 0 ? '用了 $tools 个工具' : '这一轮的干活过程';
+    final label = turnLabel(turn, manager: widget.manager);
+    if (label == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Column(

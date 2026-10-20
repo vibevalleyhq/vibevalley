@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/workbench/manager/manager_page.dart';
 import 'package:vibevalley/workbench/shared/memory_panels.dart';
-import 'package:vibevalley/shared/trajectory.dart';
+import 'package:vibevalley/workbench/shared/trajectory.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 
 import '../support/workbench.dart';

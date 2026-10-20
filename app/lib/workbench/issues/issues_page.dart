@@ -6,12 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../rules/issues.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
 import 'board.dart';
 import 'issue_detail.dart';
+import 'issue_panel.dart' show IssueHeading;
 import 'issue_submission.dart';
 
 /// From this wide, a card opens beside the board; narrower, over it.
@@ -196,16 +197,10 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         await _load();
         if (got != null) dispatchedNotice(got, _open);
       case (Move.close, IssueCard(:final issue, :final session?)):
-        await showFarmDialog<void>(
-          context,
-          title: Text('关上「${issueTitle(issue)}」'),
-          size: FarmDialogSize.lg,
-          icon: 'icon-harvest',
-          builder: (_) => CloseIssue(session: session),
-        );
+        await showCloseIssueDialog(context, issue, session);
         await _load();
       case (Move.reopen, IssueCard(:final issue)):
-        final text = await showPxDialog<String>(
+        final text = await showProDialog<String>(
           context,
           title: const Text('重开这张工单'),
           builder: (_) => ReopenForm(issue: issue),
@@ -275,15 +270,25 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         reload: _load,
       ),
       ManagerCard(:final issue) => ManagerIssueDetail(key: ValueKey(issue.id), issue: issue),
-      MissingSessionCard(:final history) => PxCard(
-        title: history.issue.title,
-        child: Text('执行记录缺失：${history.missingSessions.join('、')}。执行动作暂不可用。', style: PxText.sm),
+      MissingSessionCard(:final history) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IssueHeading(history.issue.title, big: true),
+          const SizedBox(height: 12),
+          Text('执行记录缺失：${history.missingSessions.join('、')}。执行动作暂不可用。', style: ProText.sm),
+        ],
       ),
       TaskCard() => null,
       // A link to an issue the farm does not have says so, instead of quietly showing the board.
-      null when id != null && farm != null && history.hasValue && !history.isLoading && !history.hasError => PxCard(
-        title: '找不到这张工单',
-        child: Text('农场里没有 $id：可能已经删掉了，或者链接写错了。', style: PxText.sm.copyWith(color: Palette.bark600)),
+      null when id != null && farm != null && history.hasValue && !history.isLoading && !history.hasError => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const IssueHeading('找不到这张工单'),
+          const SizedBox(height: 12),
+          Text('农场里没有 $id：可能已经删掉了，或者链接写错了。', style: ProText.sm.copyWith(color: ProColor.muted)),
+        ],
       ),
       null => null,
     };
@@ -292,7 +297,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         final board = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (history.hasError) Text('工单记录没读到：${reasonOf(history.error!)}', style: PxText.sm),
+            if (history.hasError) Text('工单记录没读到：${reasonOf(history.error!)}', style: ProText.sm.copyWith(color: Palette.berry)),
             _Toolbar(filter: _filter, cards: all, shown: all.where(_filter.shows).length, onChanged: (f) => setState(() => _filter = f)),
             const SizedBox(height: 8),
             Expanded(
@@ -315,7 +320,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
           children: [
             Positioned.fill(child: board),
             Positioned.fill(
-              child: PxModalLayer(onClose: () => _open(null), child: detail),
+              child: ProModalLayer(onClose: () => _open(null), child: detail),
             ),
           ],
         );
@@ -346,7 +351,7 @@ class _Toolbar extends ConsumerWidget {
           if (ref.watch(workbenchConfigProvider).error != null) const ConfigProblem(),
           SizedBox(
             width: 240,
-            child: PxTextInput(
+            child: ProTextInput(
               value: filter.query,
               onChanged: (v) => onChanged(filter.copyWith(query: v)),
               placeholder: '找工单：标题、帮工、项目',
@@ -357,7 +362,7 @@ class _Toolbar extends ConsumerWidget {
           const SpriteIcon('button-filter', size: 16, semanticLabel: '筛选'),
           SizedBox(
             width: 170,
-            child: PxPick(
+            child: ProPick(
               value: filter.project,
               placeholder: '所有项目',
               semanticLabel: '按项目看',
@@ -370,7 +375,7 @@ class _Toolbar extends ConsumerWidget {
           ),
           SizedBox(
             width: 170,
-            child: PxPick(
+            child: ProPick(
               value: filter.agent,
               placeholder: '所有帮工',
               semanticLabel: '按帮工看',
@@ -382,10 +387,7 @@ class _Toolbar extends ConsumerWidget {
               onChanged: (v) => onChanged(filter.copyWith(agent: v)),
             ),
           ),
-          if (filter.any) ...[
-            Text('$shown / ${cards.length} 张', style: PxText.xs.copyWith(color: Palette.bark500)),
-            InlineLink('清掉筛选', onTap: () => onChanged(const BoardFilter())),
-          ],
+          if (filter.any) ...[Text('$shown / ${cards.length} 张', style: ProText.meta), InlineLink('清掉筛选', onTap: () => onChanged(const BoardFilter()))],
         ],
       ),
     );

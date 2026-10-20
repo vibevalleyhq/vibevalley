@@ -120,7 +120,8 @@ workbench/       用 ui/pro 画
 ### 进展
 
 - **第 1 步做完了**（2026-10-20，`6a623e7`）：像素组在 `ui/pixel`，共用的在 `ui/`（`common.dart`）；`KitText` → `PxText`，`KitTappable`、`KitState` → `Tappable`、`TapState`（行为，不是样子，所以进共用层），`kitMotion`、`kitMoves`、`kitOpenLink`、`kitDrop`、`kitBare` 去掉 kit 前缀；`app-imports` 有了 `KITS` 和 `KIT_DEBT`（起步 54 个文件）。
-- **第 2 步做了一半**：`ui/pro` 起来了（`ProText`、`ProButton`、`ProField`、`ProTextInput`、`ProTextArea`、`ProDialog`、`ProMarkdown`、`ProScope`）；Markdown 的排版挪到共用的 `MarkdownView`，两组只给一张 `MdLook`；听写和叫停管家的逻辑成了 `DictationControl`、`ManagerStopControl`，两组各画按钮；`ComposerDraft` 之上工作台有自己的 `WorkbenchComposer`。工作台的聊天页（`workbench/chat` 四个文件）已经是专业组，`KIT_DEBT` 剩 50。还没做：工单详情（`IssueView` 的规则抽进 `shared/issue_state.dart`）。
+- **第 2 步做了一半**：`ui/pro` 起来了（`ProText`、`ProButton`、`ProField`、`ProTextInput`、`ProTextArea`、`ProDialog`、`ProMarkdown`、`ProScope`）；Markdown 的排版挪到共用的 `MarkdownView`，两组只给一张 `MdLook`；听写和叫停管家的逻辑成了 `DictationControl`、`ManagerStopControl`，两组各画按钮；`ComposerDraft` 之上工作台有自己的 `WorkbenchComposer`。工作台的聊天页（`workbench/chat` 四个文件）已经是专业组，`KIT_DEBT` 剩 50。
+- **第 2、3 步做完了**（2026-10-20）：工作台的七个地方（频道、工单、帮工和管家、农具、项目和地图、图鉴、设置）都是专业组画的，`workbench/` 里没有一个文件 import `ui/pixel`。专业组补齐了分段、下拉、开关、标签串、键值编辑、卡片、浮层、提示、宽弹窗（`maxWidth`）；外框和 `workbench/shared` 的布局件包在一个 `ProScope` 里。拆出来的规则：`shared/issue_state.dart`（工单详情，有测试）、`shared/work_log_rules.dart`、`shared/harvest_rules.dart`、`shared/seed_bag.dart`（播种袋的状态和动作）；工作台各有一份视图（`workbench/issues/issue_panel.dart`、`harvest_review.dart`、`workbench/shared/work_log.dart`、`workbench/map/seed_bag_view.dart`、`workbench/chat/turn_steps.dart`），农场的留在原处。只在工作台用的挪了过去：`trajectory.dart`、`settings_form.dart`；地图上的岛牌子挪进 `village/island_cards.dart`。`IssueFrame` 删了。`KIT_DEBT` 剩 18 个，都是农场那边的 `shared`、`chat` 视图（第 4 步）。
 
 ## Alternatives considered
 

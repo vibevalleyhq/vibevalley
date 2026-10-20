@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
@@ -12,6 +12,8 @@ import '../shared/config_problem.dart';
 import '../../rules/runtimes.dart';
 
 const _installed = 'installed:';
+
+final _group = ProText.xs.copyWith(color: ProColor.muted, fontWeight: FontWeight.w600);
 
 String _skillPath([String? id]) => id == null ? '/settings/skills' : '/settings/skills/${Uri.encodeComponent(id)}';
 
@@ -58,27 +60,29 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
         ? installed
         : installed.where((s) => _matches(q, [s.name, s.description, ...s.runtimes.map((x) => runtimeName(catalog, x.runtime))])).toList();
     final shownSkills = q.isEmpty ? skills : skills.where((s) => _matches(q, [s.name, s.description, s.body])).toList();
-    final small = PxText.xs.copyWith(color: Palette.bark500);
+    const small = ProText.meta;
 
     Widget entry({required bool on, required String path, required String title, required String detail, required double vertical}) => Tappable(
       onTap: () => workbenchGo(context, path),
       selected: on,
       semanticLabel: title,
-      builder: (context, s) => Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: vertical),
-        color: on ? Palette.leaf300.withValues(alpha: .6) : (s.hovered ? Palette.cream200 : null),
-        foregroundDecoration: pxRing,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: PxText.sm),
-            Text(
-              detail,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: PxText.fine.copyWith(color: Palette.bark500),
-            ),
-          ],
+      builder: (context, s) => ProFocusRing(
+        on: s.focused,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: vertical),
+          decoration: BoxDecoration(color: on ? ProColor.selected : (s.hovered ? ProColor.hover : null), borderRadius: proRadius),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: ProText.sm.copyWith(fontWeight: FontWeight.w500),
+              ),
+              if (detail.isNotEmpty) Text(detail, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.meta),
+            ],
+          ),
         ),
       ),
     );
@@ -90,10 +94,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
         const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-          child: Text(
-            '这台电脑上装的 · ${q.isNotEmpty ? '${shownList.length} / ${installed.length}' : installed.length}',
-            style: PxText.xs.copyWith(color: Palette.bark600),
-          ),
+          child: Text('这台电脑上装的 · ${q.isNotEmpty ? '${shownList.length} / ${installed.length}' : installed.length}', style: _group),
         ),
         if (installed.isEmpty)
           Padding(
@@ -107,7 +108,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
           ),
         for (final s in shownList)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.only(bottom: 2),
             child: entry(
               on: shownInstalled?.name == s.name || first?.name == s.name,
               path: _skillPath('$_installed${s.name}'),
@@ -120,34 +121,29 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
           padding: const EdgeInsets.fromLTRB(8, 16, 8, 4),
           child: Row(
             children: [
-              Expanded(
-                child: Text(
-                  'VibeValley 自己的 · ${q.isNotEmpty ? '${shownSkills.length} / ${skills.length}' : skills.length}',
-                  style: PxText.xs.copyWith(color: Palette.bark600),
-                ),
-              ),
-              PxButton.text('新技能', tone: PxTone.primary, size: PxSize.sm, onPressed: () => workbenchGo(context, _skillPath('new'))),
+              Expanded(child: Text('VibeValley 自己的 · ${q.isNotEmpty ? '${shownSkills.length} / ${skills.length}' : skills.length}', style: _group)),
+              ProButton.text('新技能', tone: ProTone.primary, size: ProSize.sm, onPressed: () => workbenchGo(context, _skillPath('new'))),
             ],
           ),
         ),
         for (final s in shownSkills)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: entry(on: !creating && selected?.id == s.id, path: _skillPath(s.id), title: s.name, detail: s.description, vertical: 8),
+            padding: const EdgeInsets.only(bottom: 2),
+            child: entry(on: !creating && selected?.id == s.id, path: _skillPath(s.id), title: s.name, detail: s.description, vertical: 6),
           ),
       ],
     );
-    Widget nav({required bool bounded}) => PxWindow(
-      padding: const EdgeInsets.all(12),
+    Widget nav({required bool bounded}) => ProPanel(
+      padding: const EdgeInsets.all(8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(8, 4, 8, 8),
-            child: Text('技能书', style: PxText.xl),
+            padding: EdgeInsets.fromLTRB(8, 6, 8, 8),
+            child: Text('技能书', style: ProText.lg),
           ),
-          PxTextInput(value: _query, onChanged: (v) => setState(() => _query = v), placeholder: '搜名字、说明、农机……', semanticLabel: '搜索技能', icon: 'button-search'),
+          ProTextInput(value: _query, onChanged: (v) => setState(() => _query = v), placeholder: '搜名字、说明、农机……', semanticLabel: '搜索技能', icon: 'button-search'),
           if (bounded) Flexible(child: SingleChildScrollView(child: listColumn)) else listColumn,
         ],
       ),
@@ -163,7 +159,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
     } else {
       main = Padding(
         padding: const EdgeInsets.all(32),
-        child: Text('还没有技能。', style: PxText.sm.copyWith(color: Palette.bark500)),
+        child: Text('还没有技能。', style: ProText.sm.copyWith(color: ProColor.muted)),
       );
     }
 
@@ -192,7 +188,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
         }
         return Padding(
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: PxScrollView(
+          child: SingleChildScrollView(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [nav(bounded: false), const SizedBox(height: 12), main]),
           ),
         );
@@ -204,7 +200,7 @@ class _SkillsPageState extends ConsumerState<SkillsPage> {
 Widget _sheet(Widget child) => Center(
   child: ConstrainedBox(
     constraints: const BoxConstraints(maxWidth: 768),
-    child: PxWindow(padding: const EdgeInsets.all(24), child: child),
+    child: ProPanel(padding: const EdgeInsets.all(24), child: child),
   ),
 );
 
@@ -219,26 +215,26 @@ class _InstalledCard extends StatelessWidget {
     Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(skill.name, style: PxText.xl),
+        Text(skill.name, style: ProText.xl),
         const SizedBox(height: 4),
-        Text('装在农机上的技能：用这些农机的帮工会自己按需加载，不用在档案里勾。要改它，去它的文件里改。', style: PxText.xs.copyWith(color: Palette.bark500)),
-        if ((skill.description ?? '').isNotEmpty) ...[
-          const SizedBox(height: 16),
-          SelectableText(skill.description!, style: PxText.sm.copyWith(height: 1.625, color: Palette.bark800)),
-        ],
+        const Text('装在农机上的技能：用这些农机的帮工会自己按需加载，不用在档案里勾。要改它，去它的文件里改。', style: ProText.meta),
+        if ((skill.description ?? '').isNotEmpty) ...[const SizedBox(height: 16), SelectableText(skill.description!, style: ProText.base)],
         const SizedBox(height: 16),
-        Text('哪些农机有它', style: PxText.xs.copyWith(color: Palette.bark600)),
+        Text('哪些农机有它', style: _group),
         const SizedBox(height: 8),
         for (final x in skill.runtimes)
           Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            color: Palette.cream100,
+            margin: const EdgeInsets.only(bottom: 6),
+            decoration: const BoxDecoration(color: ProColor.hover, borderRadius: proRadius),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
                 RuntimeIcon(runtime: x.runtime, size: 28),
                 const SizedBox(width: 10),
-                SizedBox(width: 80, child: Text(runtimeName(catalog, x.runtime), style: PxText.sm)),
+                SizedBox(
+                  width: 96,
+                  child: Text(runtimeName(catalog, x.runtime), style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
+                ),
                 Expanded(
                   child: Tooltip(
                     message: x.source ?? '',
@@ -246,7 +242,7 @@ class _InstalledCard extends StatelessWidget {
                       x.source ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: PxText.mono.copyWith(color: Palette.bark500),
+                      style: ProText.mono.copyWith(color: ProColor.muted),
                     ),
                   ),
                 ),
@@ -311,27 +307,27 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              Text(draft.name.isEmpty ? '新技能' : draft.name, style: PxText.xl),
+              Text(draft.name.isEmpty ? '新技能' : draft.name, style: ProText.xl),
               Wrap(
                 spacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   if (skill != null)
                     if (_sure) ...[
-                      Text(users.isNotEmpty ? '${users.length} 个 agent 在用，删掉会从它们身上去掉。' : '删掉？', style: PxText.xs.copyWith(color: Palette.bark600)),
-                      PxButton.text('删除', tone: PxTone.danger, onPressed: () => _delete(skill)),
-                      PxButton.text('算了', onPressed: () => setState(() => _sure = false)),
+                      Text(users.isNotEmpty ? '${users.length} 个 agent 在用，删掉会从它们身上去掉。' : '删掉？', style: ProText.meta),
+                      ProButton.text('删除', tone: ProTone.danger, onPressed: () => _delete(skill)),
+                      ProButton.text('算了', onPressed: () => setState(() => _sure = false)),
                     ] else
-                      PxButton.text('删除', onPressed: () => setState(() => _sure = true)),
-                  PxButton.text('保存', tone: PxTone.primary, onPressed: !dirty || draft.name.trim().isEmpty || draft.body.trim().isEmpty ? null : _save),
+                      ProButton.text('删除', onPressed: () => setState(() => _sure = true)),
+                  ProButton.text('保存', tone: ProTone.primary, onPressed: !dirty || draft.name.trim().isEmpty || draft.body.trim().isEmpty ? null : _save),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-          PxField(
+          ProField(
             label: '名字',
-            child: PxTextInput(
+            child: ProTextInput(
               value: draft.name,
               onChanged: (name) => setState(() => _draft = _with(name: name)),
               placeholder: '比如：先写测试',
@@ -339,10 +335,10 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
             ),
           ),
           const SizedBox(height: 16),
-          PxField(
+          ProField(
             label: '什么时候用',
             hint: const Text('一句话。按需加载技能的 runtime 先读这句，再决定要不要读正文。'),
-            child: PxTextInput(
+            child: ProTextInput(
               value: draft.description,
               onChanged: (description) => setState(() => _draft = _with(description: description)),
               placeholder: '改行为之前，先补一个会失败的测试。',
@@ -350,10 +346,10 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
             ),
           ),
           const SizedBox(height: 16),
-          PxField(
+          ProField(
             label: '正文',
             hint: const Text('写成给 agent 看的指令（SKILL.md 的正文）。'),
-            child: PxTextArea(
+            child: ProTextArea(
               value: draft.body,
               onChanged: (body) => setState(() => _draft = _with(body: body)),
               rows: 14,
@@ -362,10 +358,10 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
             ),
           ),
           const SizedBox(height: 16),
-          PxField(
+          ProField(
             label: '谁在用',
             child: users.isEmpty
-                ? Text('还没有 agent 带这个技能。到 agent 的「技能」页签里勾上。', style: PxText.xs.copyWith(color: Palette.bark500))
+                ? const Text('还没有 agent 带这个技能。到 agent 的「技能」页签里勾上。', style: ProText.meta)
                 : Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -375,14 +371,14 @@ class _SkillEditorState extends ConsumerState<_SkillEditor> {
                           onTap: () => workbenchGo(context, '/agents/${Uri.encodeComponent(a.id)}'),
                           semanticLabel: a.name,
                           builder: (context, s) => Container(
-                            color: s.hovered ? Palette.cream300 : Palette.cream200,
+                            decoration: BoxDecoration(color: s.hovered ? ProColor.selected : ProColor.hover, borderRadius: proRadius),
                             padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 AgentFace(look: a.look, id: a.id, size: 26),
                                 const SizedBox(width: 6),
-                                Text(a.name, style: PxText.sm.copyWith(color: Palette.bark800)),
+                                Text(a.name, style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
                               ],
                             ),
                           ),

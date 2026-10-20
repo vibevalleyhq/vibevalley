@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/ui/pixel/pixel.dart' show PxButton;
+import 'package:vibevalley/ui/pro/pro.dart' show ProButton;
 import 'package:vibevalley/ui/pixel/theme.dart';
 import 'package:vibevalley/workbench/issues/issue_detail.dart' show TodoDetail;
 import 'package:vibevalley/workbench/issues/issues_page.dart';
@@ -113,7 +113,7 @@ class _Board {
 
 Finder _box(String label) => find.descendant(of: find.bySemanticsLabel(label), matching: find.byType(EditableText)).first;
 
-PxButton _button(WidgetTester t, String text) => t.widget<PxButton>(find.widgetWithText(PxButton, text));
+ProButton _button(WidgetTester t, String text) => t.widget<ProButton>(find.widgetWithText(ProButton, text));
 
 void main() {
   testWidgets('the plus makes the issue at once from its sentence, starts its draft and opens it', (t) async {
@@ -187,7 +187,7 @@ void main() {
     expect(_button(t, '起草').onPressed, isNull, reason: 'nothing to draft from yet');
     await t.enterText(_box('想做什么'), '给登录页加上记住我');
     await t.pump();
-    await t.tap(find.widgetWithText(PxButton, '起草'));
+    await t.tap(find.widgetWithText(ProButton, '起草'));
     await settle(t);
     expect(board.writes.last, 'POST /api/v1/issues/n2/draft {"text":"给登录页加上记住我"}');
   });
@@ -217,13 +217,13 @@ void main() {
     }
     await t.enterText(_box('想做什么'), '用 8797');
     await t.pump();
-    await t.tap(find.widgetWithText(PxButton, '再起草'));
+    await t.tap(find.widgetWithText(ProButton, '再起草'));
     await settle(t);
     expect(board.writes.last, 'POST /api/v1/issues/d1/draft {"text":"用 8797"}', reason: 'the word answers what it asked');
 
     await t.enterText(_box('验收标准'), '拖到待办就开工\n\n端口是 8797');
     await t.pump();
-    await t.tap(find.widgetWithText(PxButton, '开工'));
+    await t.tap(find.widgetWithText(ProButton, '开工'));
     await settle(t);
     final update = board.writes.lastWhere((w) => w.startsWith('PUT /api/v1/issues/d1 '));
     expect(jsonDecode(update.substring('PUT /api/v1/issues/d1 '.length))['criteria'], ['拖到待办就开工', '端口是 8797'], reason: 'the edited criteria, one a line');

@@ -11,7 +11,7 @@
 | 钥匙从哪取：设置 > 配置 | 记性来源怎么接、怎么读写（[记性](docs/subsystems/memory.md)） |
 | 日志和送出农场的文字里抹密钥（`base/redact.go`） | 档案、技能书、农机的设置：`config.json`（`agent` 包） |
 | | smith 的 `OAR_*`、各家农机自己的环境变量和配置（`CODEX_HOME`、pi 的 `models.json`） |
-| | 首页、设置页的样子（[farm-ui.md](docs/reference/farm-ui.md) 的「设置」、`shared/settings_form.dart`） |
+| | 首页、设置页的样子（[farm-ui.md](docs/reference/farm-ui.md) 的「设置」、`workbench/settings/settings_form.dart`） |
 | | GitHub 检测（`project`，[工单](docs/subsystems/issue.md)「和谁打交道」）；`setting.check` 顺带回它的结果 |
 
 ## 在哪
@@ -20,7 +20,7 @@
 - 设置：`server/internal/setting`：`setting.go`（`Service`、`settings.json` 的形状 `voiceStored`、取钥匙的方法）、`rules.go`（`settingsProblem`、`keyHint`、记性来源的校验和合并）、`voice_rules.go`（语音的校验和只存差异）、`types.go`（交给别的服务的 `VoiceConfig`、`DictationConfig`、`MemorySourceConfig`）。规则的黄金数据在 `setting/testdata/rules.jsonl.gz`。
 - 抹密钥：`server/internal/base/redact.go`（`Redact`、`RedactingWriter`）。
 - 接口：`setting.load`、`setting.check`、`setting.save`（[capabilities.md](docs/reference/capabilities.md)），形状是 `protocol` 的 `SettingsStatus`、`SettingsUpdate`、`SettingsCheck`、`KeyStatus`。
-- 客户端：`workbench/settings/settings_page.dart`，表单 `shared/settings_form.dart`。
+- 客户端：`workbench/settings/settings_page.dart`，表单 `workbench/settings/settings_form.dart`。
 
 ## 模型和不变量
 

@@ -25,7 +25,6 @@ class PlotDetail extends ConsumerWidget {
     final issueId = issue?.id ?? session.issue;
     final hasThread = issueId != null && issueThreadOf(state?.chat, issueId) != null;
     return IssueView(
-      frame: IssueFrame.farm,
       issue: issue,
       sessions: sessions,
       session: session,

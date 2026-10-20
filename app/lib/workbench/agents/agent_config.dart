@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../gen/vibevalley.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../../shared/faces.dart';
 import '../shared/memory_panels.dart';
 import '../shared/rules.dart';
@@ -60,36 +60,36 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
     final envRefused = facts.refused[sessionEnv];
     final children = switch (tab) {
       _Tab.who => [
-        PxField(
+        ProField(
           label: '名字',
           error: widget.nameTaken ? '已经有同名的 agent 了' : null,
           tip: '管家和字幕里都叫这个名字，说话时也可以直接点名。',
-          child: PxTextInput(
+          child: ProTextInput(
             value: draft.name,
             onChanged: (name) => patch(draft.copyWith(name: name)),
             semanticLabel: '名字',
           ),
         ),
-        PxField(
+        ProField(
           label: '职责',
           tip: '一句话。管家挑人时会读。',
-          child: PxTextInput(
+          child: ProTextInput(
             value: draft.role,
             onChanged: (role) => patch(draft.copyWith(role: role)),
             placeholder: '比如：写接口、改 server、跑 Go 测试',
             semanticLabel: '职责',
           ),
         ),
-        PxField(
+        ProField(
           label: '适合的活',
           tip: '用户的话里出现这些词，管家选「自动」时就优先派它。回车添加。',
-          child: PxChipsInput(
+          child: ProChipsInput(
             value: draft.tags,
             onChanged: (tags) => patch(draft.copyWith(tags: tags)),
             placeholder: '前端、测试、文档…',
           ),
         ),
-        PxSwitchField(
+        ProSwitchField(
           label: '启用',
           checked: draft.enabled,
           onChanged: (enabled) => patch(draft.copyWith(enabled: enabled)),
@@ -105,10 +105,10 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
       _Tab.skills => [_SkillPicker(draft: draft, runtime: widget.runtime, patch: patch)],
       _Tab.tools => _toolsEditor(draft, widget.runtime, patch),
       _Tab.env => [
-        PxField(
+        ProField(
           label: '默认项目',
           tip: '工作目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。管家派活没说项目时用它；留空时派活必须说在哪个项目。',
-          child: PxTextInput(
+          child: ProTextInput(
             value: draft.workdir,
             onChanged: (workdir) => patch(draft.copyWith(workdir: workdir)),
             placeholder: '比如 clock-in',
@@ -116,17 +116,17 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
             semanticLabel: '默认项目',
           ),
         ),
-        PxSwitchField(
+        ProSwitchField(
           label: '每个帮工一个 git worktree',
           checked: draft.worktree,
           onChanged: (worktree) => patch(draft.copyWith(worktree: worktree)),
           tip: '每个帮工在自己的分支上改，几个帮工不会互相覆盖；收获时合进项目。关掉就直接在项目里改，没有分支可合。',
         ),
-        PxField(
+        ProField(
           label: '环境变量',
           error: envRefused != null && draft.env.isNotEmpty ? envRefused : null,
           hint: Text(envRefused ?? '叠加在 runtime 设置的环境变量之上。'),
-          child: PxKeyValueEditor(
+          child: ProKeyValueEditor(
             value: draft.env,
             onChanged: (env) => patch(draft.copyWith(env: env)),
             enabled: envRefused == null,
@@ -147,9 +147,7 @@ class _ConfigTabsState extends State<AgentConfigTabs> {
     );
     final head = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Palette.cream300)),
-      ),
+      decoration: const BoxDecoration(border: Border(bottom: proLine)),
       child: WorkbenchTabs<_Tab>(value: tab, tabs: tabs, onChanged: (t) => t == _Tab.trajectories ? widget.onTrajectories?.call() : setState(() => _tab = t)),
     );
     if (!widget.fill) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [head, panel]);
@@ -187,14 +185,14 @@ class _RuntimeChoice extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final runtimes = ref.watch(runtimesProvider).value ?? const <RuntimeInfo>[];
-    return PxField(
+    return ProField(
       label: '农机',
       tip: '换农机会清掉模型和推理强度；长相（动物和衣服）不变。',
       child: runtimes.isEmpty
-          ? Text('读取农机…', style: PxText.xs.copyWith(color: Palette.bark500))
+          ? const Text('读取农机…', style: ProText.meta)
           : LayoutBuilder(
               builder: (context, box) {
-                final w = (box.maxWidth - 6) / 2;
+                final w = box.maxWidth < 360 ? box.maxWidth : (box.maxWidth - 6) / 2;
                 return Wrap(
                   spacing: 6,
                   runSpacing: 6,
@@ -229,13 +227,13 @@ class _RuntimeChoice extends ConsumerWidget {
                                         info.preset.label,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: PxText.sm.copyWith(color: active ? Palette.leaf700 : Palette.bark900),
+                                        style: ProText.sm.copyWith(fontWeight: active ? FontWeight.w600 : FontWeight.w500),
                                       ),
                                       Text(
                                         status,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: PxText.fine.copyWith(color: ok ? Palette.bark500 : Palette.berry),
+                                        style: ProText.meta.copyWith(color: ok ? ProColor.muted : Palette.berry),
                                       ),
                                     ],
                                   ),
@@ -262,10 +260,10 @@ List<Widget> _modelAndEffort(Agent draft, RuntimeInfo? runtime, ValueChanged<Age
   final refusedEffort = factsOf(runtime).refused[sessionEffort];
   final levels = model?.effortLevels ?? const <String>[];
   return [
-    PxField(
+    ProField(
       label: '模型',
       hint: models.isEmpty ? const Text('这个 runtime 现在报不出模型列表。') : null,
-      child: PxPick(
+      child: ProPick(
         value: draft.model,
         onChanged: (m) => patch(draft.copyWith(model: m, effort: '')),
         placeholder: 'runtime 默认${fallback.isNotEmpty ? '（$fallback）' : ''}',
@@ -274,10 +272,10 @@ List<Widget> _modelAndEffort(Agent draft, RuntimeInfo? runtime, ValueChanged<Age
         semanticLabel: '模型',
       ),
     ),
-    PxField(
+    ProField(
       label: '推理强度',
       hint: Text(refusedEffort ?? (levels.isEmpty ? '${model?.name ?? '这个模型'}没有推理强度可选。' : '默认由 runtime 决定。')),
-      child: PxSegmented<String>(
+      child: ProSegmented<String>(
         value: draft.effort,
         onChanged: (effort) => patch(draft.copyWith(effort: effort)),
         options: [
@@ -298,20 +296,20 @@ class _RuntimeFacts extends StatelessWidget {
   Widget build(BuildContext context) {
     final info = this.info;
     final facts = factsOf(info);
-    final line = PxText.xs.copyWith(color: Palette.bark600);
+    const line = ProText.sm;
     // What it takes comes with runtime.list: until then, nothing is said rather than a guess.
     if (info == null) {
-      return PxCard(
+      return ProCard(
         title: '$runtime 能做什么',
         child: Text('读取农机…', style: line),
       );
     }
-    return PxCard(
+    return ProCard(
       title: '${info.preset.label} 能做什么',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Marked(facts.steer ? 'mark-check' : 'mark-cross', child: Text(facts.steer ? '能在干活时接话（steer）' : '干活时不能插话，话会排到这一轮之后', style: line)),
+          Marked(facts.steer ? 'mark-check' : 'mark-cross', top: 4, child: Text(facts.steer ? '能在干活时接话（steer）' : '干活时不能插话，话会排到这一轮之后', style: line)),
           const SizedBox(height: 6),
           Text(facts.inProcess ? '· 跑在 server 进程里（Node SDK）' : '· 作为单独的命令行进程运行', style: line),
           for (final MapEntry(key: option, value: reason) in facts.refused.entries) ...[
@@ -322,12 +320,12 @@ class _RuntimeFacts extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: option,
-                    style: PxText.mono.copyWith(color: Palette.bark600),
+                    style: ProText.mono.copyWith(color: ProColor.ink),
                   ),
                   TextSpan(text: '：$reason'),
                 ],
               ),
-              style: line.copyWith(color: Palette.bark500),
+              style: line.copyWith(color: ProColor.muted),
             ),
           ],
         ],
@@ -346,10 +344,10 @@ List<Widget> _personaEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agen
   final facts = factsOf(runtime);
   final mode = _personaModes.where((m) => m.value == draft.personaMode).firstOrNull;
   return [
-    PxField(
+    ProField(
       label: '人设',
       tip: '它是谁、怎么干活、什么不做。会按下面的方式交给 runtime。',
-      child: PxTextArea(
+      child: ProTextArea(
         value: draft.persona,
         onChanged: (persona) => patch(draft.copyWith(persona: persona)),
         rows: 9,
@@ -357,10 +355,10 @@ List<Widget> _personaEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agen
         semanticLabel: '人设',
       ),
     ),
-    PxField(
+    ProField(
       label: '交给 runtime 的方式',
       hint: mode == null ? null : Text(mode.detail),
-      child: PxSegmented<PersonaMode>(
+      child: ProSegmented<PersonaMode>(
         value: draft.personaMode,
         onChanged: (personaMode) => patch(draft.copyWith(personaMode: personaMode)),
         options: [
@@ -399,7 +397,7 @@ class _SkillPicker extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PxField(
+        ProField(
           label: '技能库',
           aside: InlineLink('管理技能库 →', onTap: () => workbenchGo(context, '/settings/skills')),
           tip: '选中的技能跟人设一起交给帮工，每个技能一节。',
@@ -422,16 +420,20 @@ class _SkillPicker extends ConsumerWidget {
                           height: 16,
                           margin: const EdgeInsets.only(top: 2),
                           alignment: Alignment.center,
-                          color: Palette.cream300,
-                          child: draft.skills.contains(s.id) ? const SpriteIcon('mark-check', size: 14) : null,
+                          decoration: BoxDecoration(
+                            color: ProColor.page,
+                            border: Border.all(color: draft.skills.contains(s.id) ? ProColor.accent : ProColor.ink.withValues(alpha: .25)),
+                            borderRadius: const BorderRadius.all(Radius.circular(4)),
+                          ),
+                          child: draft.skills.contains(s.id) ? const SpriteIcon('mark-check', size: 12) : null,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(s.name, style: PxText.sm),
-                              Text(s.description, style: PxText.xs.copyWith(color: Palette.bark500)),
+                              Text(s.name, style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
+                              Text(s.description, style: ProText.meta),
                             ],
                           ),
                         ),
@@ -443,7 +445,7 @@ class _SkillPicker extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        PxField(
+        ProField(
           label: '${runtime?.preset.label ?? draft.runtime} 自己装的技能',
           tip: 'runtime 自己报告的，在这台机器上已经能用，不用在这里勾。',
           child: _Inventory(entries: runtime?.skills),
@@ -459,7 +461,7 @@ List<Widget> _toolsEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent>
   final toolsRefused = facts.refused[sessionDisallowedTools];
   final tools = runtime?.tools;
   return [
-    PxField(
+    ProField(
       label: 'MCP 服务器',
       hint: Text(mcpRefused ?? '开 session 时交给 runtime（oar 的 SessionOptions.mcpServers）。'),
       error: mcpRefused != null && draft.mcpServers.isNotEmpty ? mcpRefused : null,
@@ -469,14 +471,14 @@ List<Widget> _toolsEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent>
         disabled: mcpRefused != null,
       ),
     ),
-    PxField(
+    ProField(
       label: '禁用的工具',
       hint: Text(toolsRefused ?? '这些工具这个 agent 不能用。下面 runtime 报告的工具点一下就能加进来。'),
       error: toolsRefused != null && draft.disallowedTools.isNotEmpty ? toolsRefused : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PxChipsInput(
+          ProChipsInput(
             value: draft.disallowedTools,
             onChanged: (disallowedTools) => patch(draft.copyWith(disallowedTools: disallowedTools)),
             placeholder: '比如 WebSearch',
@@ -492,11 +494,18 @@ List<Widget> _toolsEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent>
                   Tappable(
                     onTap: () => patch(draft.copyWith(disallowedTools: [...draft.disallowedTools, t.name])),
                     semanticLabel: '+ ${t.name}',
-                    builder: (context, s) => Container(
-                      color: s.hovered ? Palette.cream200 : Palette.cream50,
-                      foregroundDecoration: pxRing,
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Text('+ ${t.name}', style: PxText.mono.copyWith(height: 1.5, color: s.hovered ? Palette.bark900 : Palette.bark600)),
+                    builder: (context, s) => ProFocusRing(
+                      on: s.focused,
+                      radius: 4,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: s.hovered ? ProColor.hover : ProColor.page,
+                          border: const Border.fromBorderSide(proLine),
+                          borderRadius: const BorderRadius.all(Radius.circular(4)),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        child: Text('+ ${t.name}', style: ProText.mono.copyWith(color: s.hovered ? ProColor.ink : ProColor.muted)),
+                      ),
                     ),
                   ),
               ],
@@ -505,7 +514,7 @@ List<Widget> _toolsEditor(Agent draft, RuntimeInfo? runtime, ValueChanged<Agent>
         ],
       ),
     ),
-    PxField(
+    ProField(
       label: '${runtime?.preset.label ?? draft.runtime} 自己连的 MCP',
       tip: 'runtime 自己报告的，和上面加的叠在一起。',
       child: _Inventory(entries: runtime?.mcpServers),
@@ -563,20 +572,19 @@ class _McpListState extends State<_McpList> {
           for (final s in widget.value)
             Container(
               margin: const EdgeInsets.only(bottom: 6),
-              color: Palette.cream50,
+              decoration: const BoxDecoration(border: Border.fromBorderSide(proLine), borderRadius: proRadius),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
-                  Container(
-                    color: Palette.cream300,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(switch (s) {
+                  ProTag(
+                    label: switch (s) {
                       McpServerStdio() => 'stdio',
                       McpServerHttp() => 'http',
-                    }, style: PxText.xs.copyWith(color: Palette.bark600)),
+                    },
+                    fill: ProColor.selected,
                   ),
                   const SizedBox(width: 8),
-                  Text(_mcpName(s), style: PxText.xs),
+                  Text(_mcpName(s), style: ProText.sm.copyWith(fontWeight: FontWeight.w500)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -586,7 +594,7 @@ class _McpListState extends State<_McpList> {
                       },
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: PxText.mono.copyWith(color: Palette.bark500),
+                      style: ProText.mono.copyWith(color: ProColor.muted),
                     ),
                   ),
                   Tappable(
@@ -597,44 +605,76 @@ class _McpListState extends State<_McpList> {
                               if (_mcpName(x) != _mcpName(s)) x,
                           ]),
                     semanticLabel: '删除 ${_mcpName(s)}',
-                    builder: (context, st) => Text('删除', style: PxText.xs.copyWith(color: st.hovered ? Palette.berry : Palette.bark600)),
+                    builder: (context, st) => Text('删除', style: ProText.xs.copyWith(color: st.hovered ? Palette.berry : ProColor.muted)),
                   ),
                 ],
               ),
             ),
-          Row(
-            children: [
-              PxSegmented<String>(
+          LayoutBuilder(
+            builder: (context, box) {
+              final kind = ProSegmented<String>(
+                block: false,
                 value: _type,
                 onChanged: (t) => setState(() => _type = t),
                 options: const [
                   SegmentOption(value: 'stdio', label: 'stdio'),
                   SegmentOption(value: 'http', label: 'http'),
                 ],
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                flex: 2,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 112),
-                  child: PxTextInput(value: _name, onChanged: (v) => setState(() => _name = v), placeholder: '名字', enabled: !disabled, semanticLabel: 'MCP 名字'),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                flex: 5,
-                child: PxTextInput(
-                  value: _target,
-                  onChanged: (v) => setState(() => _target = v),
-                  placeholder: _type == 'stdio' ? 'npx -y @scope/server' : 'https://…/mcp',
-                  enabled: !disabled,
-                  mono: true,
-                  semanticLabel: 'MCP 命令或地址',
-                ),
-              ),
-              const SizedBox(width: 6),
-              PxButton.text('添加', onPressed: disabled || _name.trim().isEmpty || _target.trim().isEmpty ? null : _add),
-            ],
+              );
+              final name = ProTextInput(
+                value: _name,
+                onChanged: (v) => setState(() => _name = v),
+                placeholder: '名字',
+                enabled: !disabled,
+                semanticLabel: 'MCP 名字',
+              );
+              final target = ProTextInput(
+                value: _target,
+                onChanged: (v) => setState(() => _target = v),
+                placeholder: _type == 'stdio' ? 'npx -y @scope/server' : 'https://…/mcp',
+                enabled: !disabled,
+                mono: true,
+                semanticLabel: 'MCP 命令或地址',
+              );
+              final add = ProButton.text('添加', onPressed: disabled || _name.trim().isEmpty || _target.trim().isEmpty ? null : _add);
+              // Too narrow for one line: the kind and the name, then what to run and 添加.
+              if (box.maxWidth < 400) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        kind,
+                        const SizedBox(width: 6),
+                        Expanded(child: name),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(child: target),
+                        const SizedBox(width: 6),
+                        add,
+                      ],
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  kind,
+                  const SizedBox(width: 6),
+                  Flexible(
+                    flex: 2,
+                    child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 112), child: name),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(flex: 5, child: target),
+                  const SizedBox(width: 6),
+                  add,
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -648,7 +688,7 @@ class _Inventory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final quiet = PxText.xs.copyWith(color: Palette.bark500);
+    const quiet = ProText.meta;
     final list = entries;
     if (list == null) return Text('这个 runtime 不报告这一项。', style: quiet);
     if (list.isEmpty) return Text('没有。', style: quiet);
@@ -665,8 +705,8 @@ class _Inventory extends StatelessWidget {
                 Flexible(
                   child: Text(
                     e.name,
-                    style: PxText.mono.copyWith(
-                      color: e.enabled == false ? Palette.bark500 : Palette.bark800,
+                    style: ProText.mono.copyWith(
+                      color: e.enabled == false ? ProColor.muted : ProColor.ink,
                       decoration: e.enabled == false ? TextDecoration.lineThrough : null,
                     ),
                   ),

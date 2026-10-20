@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../../shared/faces.dart';
 import '../../shared/swatches.dart';
 import '../shared/widgets.dart';
@@ -43,13 +43,10 @@ class AgentLookPanel extends ConsumerWidget {
       children: [
         Align(
           alignment: Alignment.centerLeft,
-          child: PxButton(
-            onPressed: () => onChange(randomLook()),
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-replay', size: 16), SizedBox(width: 6), Text('随机一个')]),
-          ),
+          child: ProButton.text('随机一个', icon: 'button-replay', onPressed: () => onChange(randomLook())),
         ),
         const SizedBox(height: 20),
-        PxField(
+        ProField(
           label: '在农场里是',
           tip: '只是长相：同一个 runtime 可以是不同的动物。',
           child: grid([
@@ -63,7 +60,7 @@ class AgentLookPanel extends ConsumerWidget {
           ]),
         ),
         const SizedBox(height: 20),
-        PxField(
+        ProField(
           label: '穿什么',
           child: grid([
             for (final outfit in Outfit.values)
@@ -109,7 +106,10 @@ class _Tile extends StatelessWidget {
       children: [
         child,
         const SizedBox(height: 2),
-        Text(label, style: PxText.fine.copyWith(color: active ? Palette.leaf700 : Palette.bark500)),
+        Text(
+          label,
+          style: ProText.xs.copyWith(color: active ? ProColor.ink : ProColor.muted, fontWeight: active ? FontWeight.w600 : FontWeight.w400),
+        ),
       ],
     ),
   );
@@ -129,7 +129,7 @@ class AgentStage extends ConsumerWidget {
     final cast = castOf(look, id);
     final shown = stagePoses.firstWhere((p) => p.pose == pose);
     final bed = atlas != null && atlas.has(cropSprite(shown.crop)) ? atlas[cropSprite(shown.crop)] : null;
-    final pill = Palette.cream50;
+    const pill = Palette.paper;
     return Container(
       decoration: const BoxDecoration(
         gradient: RadialGradient(center: Alignment(0, -.1), radius: .6, colors: [Color(0xFFC7DD9A), Color(0xFF9CC069), Color(0xFF7EA64F)], stops: [0, .6, 1]),
@@ -178,20 +178,16 @@ class AgentStage extends ConsumerWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    decoration: BoxDecoration(color: pill.withValues(alpha: .9), boxShadow: pxDrop),
-                    child: Text(name.isEmpty ? '无名 agent' : name, style: PxText.lg),
+                    decoration: BoxDecoration(color: pill.withValues(alpha: .92), borderRadius: proRadius),
+                    child: Text(name.isEmpty ? '无名 agent' : name, style: ProText.lg),
                   ),
                   if (role.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(top: 4),
                       constraints: const BoxConstraints(maxWidth: 384),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      color: pill.withValues(alpha: .7),
-                      child: Text(
-                        role,
-                        textAlign: TextAlign.center,
-                        style: PxText.xs.copyWith(color: Palette.bark800),
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                      decoration: BoxDecoration(color: pill.withValues(alpha: .75), borderRadius: const BorderRadius.all(Radius.circular(4))),
+                      child: Text(role, textAlign: TextAlign.center, style: ProText.xs),
                     ),
                 ],
               ),
@@ -202,9 +198,9 @@ class AgentStage extends ConsumerWidget {
             right: 16,
             child: IgnorePointer(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                color: pill.withValues(alpha: .7),
-                child: Text('${speciesLabel[cast.species]} · ${outfitLabel[cast.outfit]}', style: PxText.fine.copyWith(color: Palette.bark800)),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                decoration: BoxDecoration(color: pill.withValues(alpha: .75), borderRadius: const BorderRadius.all(Radius.circular(4))),
+                child: Text('${speciesLabel[cast.species]} · ${outfitLabel[cast.outfit]}', style: ProText.xs),
               ),
             ),
           ),

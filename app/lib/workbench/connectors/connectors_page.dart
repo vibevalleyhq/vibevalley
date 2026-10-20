@@ -7,7 +7,7 @@ import '../../rules/time.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../shared/layout.dart';
 import 'qr.dart';
 import '../shared/widgets.dart';
@@ -168,7 +168,12 @@ class _ConnectorsPageState extends ConsumerState<ConnectorsPage> {
         ],
       ),
       detail: all == null
-          ? [PxCard(title: connectorLabel[selected], child: const Text('在问服务端……'))]
+          ? [
+              ProCard(
+                title: connectorLabel[selected],
+                child: const Text('在问服务端……', style: ProText.meta),
+              ),
+            ]
           : [
               _ConnectorCard(
                 key: ValueKey(selected),
@@ -176,17 +181,14 @@ class _ConnectorsPageState extends ConsumerState<ConnectorsPage> {
                 status: all[selected] ?? ConnectorStatus(id: selected, state: ConnectorState.off, pending: 0),
                 atlas: atlas,
               ),
-              PxCard(
+              ProCard(
                 title: '要知道的',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     for (final n in [..._notes[selected]!, '帮工能在这台电脑上跑命令，所以只认主人；回复时引用某条汇报，你的话会进那件活的工单串。农场只往外连，不开端口。'])
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Text('· $n', style: PxText.sm.copyWith(color: Palette.bark800, height: 1.625)),
-                      ),
+                      Padding(padding: const EdgeInsets.only(bottom: 6), child: _Bullet(n)),
                   ],
                 ),
               ),
@@ -222,15 +224,15 @@ class _ConnectorCardState extends ConsumerState<_ConnectorCard> {
     final id = widget.id;
     final status = widget.status;
     final label = connectorLabel[id]!;
-    final body = PxText.sm.copyWith(color: Palette.bark800);
+    const body = ProText.sm;
     final disconnect = Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: PxButton.text('断开', tone: PxTone.danger, onPressed: _busy ? null : () => _act((n) => n.logout(id))),
+        child: ProButton.text('断开', tone: ProTone.danger, onPressed: _busy ? null : () => _act((n) => n.logout(id))),
       ),
     );
-    return PxCard(
+    return ProCard(
       title: label,
       aside: Text(stateLabel(status.state)),
       child: Column(
@@ -247,12 +249,12 @@ class _ConnectorCardState extends ConsumerState<_ConnectorCard> {
               else ...[
                 Text(
                   id == ConnectorId.weixin ? '用手机微信扫一个码，就能在微信里和管家说话：派活、问进度，帮工的汇报和提问也会发到微信上。' : '用手机飞书扫一个码，飞书会替你建一个机器人；在飞书里和它说话，就是和管家说话。',
-                  style: body.copyWith(height: 1.625),
+                  style: ProText.base,
                 ),
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: PxButton.text('$label扫码登录', tone: PxTone.primary, onPressed: _busy ? null : () => _act((n) => n.login(id))),
+                  child: ProButton.text('$label扫码登录', tone: ProTone.primary, onPressed: _busy ? null : () => _act((n) => n.login(id))),
                 ),
               ],
             ],
@@ -271,13 +273,13 @@ class _ConnectorCardState extends ConsumerState<_ConnectorCard> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
-                  color: Palette.cream200,
+                  decoration: const BoxDecoration(color: ProColor.hover, borderRadius: BorderRadius.all(Radius.circular(8))),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: SelectableText(status.pairCode ?? '', style: PxText.mono.copyWith(fontSize: 30, letterSpacing: 4, color: Palette.bark900)),
+                  child: SelectableText(status.pairCode ?? '', style: ProText.mono.copyWith(fontSize: 30, letterSpacing: 4, fontWeight: FontWeight.w600)),
                 ),
               ),
               const SizedBox(height: 12),
-              Text('发了这个码的人就是主人：以后只有他的话进农场。码只能用一次。', style: PxText.xs.copyWith(color: Palette.bark500)),
+              const Text('发了这个码的人就是主人：以后只有他的话进农场。码只能用一次。', style: ProText.meta),
               disconnect,
             ],
             ConnectorState.connected || ConnectorState.paused => [
@@ -289,7 +291,7 @@ class _ConnectorCardState extends ConsumerState<_ConnectorCard> {
               if (status.state == ConnectorState.paused && status.pausedUntil != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('登录过期了，${wallClockText(status.pausedUntil!)} 后再试；也可以断开重新连。', style: PxText.sm.copyWith(color: Palette.berry)),
+                  child: Text('登录过期了，${wallClockText(status.pausedUntil!)} 后再试；也可以断开重新连。', style: ProText.sm.copyWith(color: Palette.berry)),
                 ),
               disconnect,
             ],
@@ -297,7 +299,7 @@ class _ConnectorCardState extends ConsumerState<_ConnectorCard> {
           if (status.error case final error?)
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: Text(error, style: PxText.sm.copyWith(color: Palette.berry)),
+              child: Text(error, style: ProText.sm.copyWith(color: Palette.berry)),
             ),
         ],
       ),
@@ -312,13 +314,13 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.only(bottom: 10),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 112,
-          child: Text(label, style: PxText.sm.copyWith(color: Palette.bark500)),
+          child: Text(label, style: ProText.sm.copyWith(color: ProColor.muted)),
         ),
         const SizedBox(width: 12),
         Expanded(child: child),
@@ -348,7 +350,7 @@ class _ChannelPickState extends ConsumerState<_ChannelPick> {
       children: [
         SizedBox(
           width: 200,
-          child: PxPick(
+          child: ProPick(
             value: widget.current,
             placeholder: '接在哪个频道',
             semanticLabel: '接在哪个频道',
@@ -368,7 +370,7 @@ class _ChannelPickState extends ConsumerState<_ChannelPick> {
             },
           ),
         ),
-        if (_error != null) Text(_error!, style: PxText.xs.copyWith(color: Palette.berry)),
+        if (_error != null) Text(_error!, style: ProText.xs.copyWith(color: Palette.berry)),
       ],
     );
   }
@@ -409,17 +411,17 @@ class _QqLoginState extends State<_QqLogin> {
                   WidgetSpan(
                     alignment: PlaceholderAlignment.baseline,
                     baseline: TextBaseline.alphabetic,
-                    child: TextLink('QQ 开放平台', underline: true, style: PxText.xs, onTap: () => openLink('https://q.qq.com/')),
+                    child: TextLink('QQ 开放平台', underline: true, style: ProText.base, onTap: () => openLink('https://q.qq.com/')),
                   ),
                   const TextSpan(text: ' 建一个机器人，打开单聊消息，把它的 AppID 和 AppSecret 填在这里。'),
                 ],
               ),
-              style: PxText.sm.copyWith(color: Palette.bark800, height: 1.625),
+              style: ProText.base,
             ),
-            const SizedBox(height: 12),
-            PxField(
+            const SizedBox(height: 16),
+            ProField(
               label: 'AppID',
-              child: PxTextInput(
+              child: ProTextInput(
                 value: _appId,
                 onChanged: (v) => setState(() => _appId = v),
                 placeholder: '102xxxxxx',
@@ -429,10 +431,10 @@ class _QqLoginState extends State<_QqLogin> {
               ),
             ),
             const SizedBox(height: 12),
-            PxField(
+            ProField(
               label: 'AppSecret',
               hint: const Text('只存在这台电脑的农场数据库里，不会再显示。'),
-              child: PxTextInput(
+              child: ProTextInput(
                 value: _secret,
                 onChanged: (v) => setState(() => _secret = v),
                 placeholder: '机器人密钥',
@@ -441,10 +443,10 @@ class _QqLoginState extends State<_QqLogin> {
                 onSubmitted: (_) => submit(),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerLeft,
-              child: PxButton.text('连接 QQ 机器人', tone: PxTone.primary, onPressed: ready ? submit : null),
+              child: ProButton.text('连接 QQ 机器人', tone: ProTone.primary, onPressed: ready ? submit : null),
             ),
           ],
         ),
@@ -487,7 +489,7 @@ class _LoginCodeState extends State<_LoginCode> {
   Widget build(BuildContext context) {
     final status = widget.status;
     final code = _drawn;
-    final body = PxText.sm.copyWith(color: Palette.bark800);
+    const body = ProText.base;
     return Wrap(
       spacing: 20,
       runSpacing: 16,
@@ -501,9 +503,9 @@ class _LoginCodeState extends State<_LoginCode> {
             width: 224,
             height: 224,
             padding: const EdgeInsets.all(8),
-            color: const Color(0xFFFFFFFF),
+            decoration: const BoxDecoration(color: Color(0xFFFFFFFF), border: Border.fromBorderSide(proLine), borderRadius: proRadius),
             alignment: Alignment.center,
-            child: code != null ? QrImage(code) : Text('在拿二维码……', style: PxText.xs.copyWith(color: Palette.bark500)),
+            child: code != null ? QrImage(code) : const Text('在拿二维码……', style: ProText.meta),
           ),
         ),
         ConstrainedBox(
@@ -523,10 +525,10 @@ class _LoginCodeState extends State<_LoginCode> {
                 Row(
                   children: [
                     Expanded(
-                      child: PxTextInput(value: _code, onChanged: (v) => setState(() => _code = v), placeholder: '手机上的数字', semanticLabel: '手机上的数字'),
+                      child: ProTextInput(value: _code, onChanged: (v) => setState(() => _code = v), placeholder: '手机上的数字', semanticLabel: '手机上的数字'),
                     ),
                     const SizedBox(width: 8),
-                    PxButton.text('确定', tone: PxTone.primary, onPressed: widget.busy || _code.trim().isEmpty ? null : () => widget.onVerify(_code)),
+                    ProButton.text('确定', tone: ProTone.primary, onPressed: widget.busy || _code.trim().isEmpty ? null : () => widget.onVerify(_code)),
                   ],
                 ),
               ],
@@ -537,19 +539,38 @@ class _LoginCodeState extends State<_LoginCode> {
                     children: [
                       const TextSpan(text: '扫不了？在手机上打开这个链接：'),
                       WidgetSpan(
-                        child: TextLink(qr, underline: true, onTap: () => openLink(qr), style: PxText.xs),
+                        child: TextLink(qr, underline: true, onTap: () => openLink(qr), style: ProText.meta),
                       ),
                     ],
                   ),
-                  style: PxText.xs.copyWith(color: Palette.bark500),
+                  style: ProText.meta,
                 ),
               ],
               const SizedBox(height: 12),
-              PxButton.text('换一个码', onPressed: widget.busy ? null : widget.onRefresh),
+              ProButton.text('换一个码', onPressed: widget.busy ? null : widget.onRefresh),
             ],
           ),
         ),
       ],
     );
   }
+}
+
+class _Bullet extends StatelessWidget {
+  const _Bullet(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        width: 4,
+        height: 4,
+        margin: const EdgeInsets.only(top: 9, left: 2, right: 10),
+        decoration: const BoxDecoration(color: ProColor.faint, shape: BoxShape.circle),
+      ),
+      Expanded(child: Text(text, style: ProText.base)),
+    ],
+  );
 }

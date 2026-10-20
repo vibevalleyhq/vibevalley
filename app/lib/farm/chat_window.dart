@@ -191,42 +191,45 @@ class _ChatWindowState extends ConsumerState<ChatWindow> {
               type: MaterialType.transparency,
               child: DefaultTextStyle(
                 style: _body,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (open) ...[
-                      if (thread != null) _threadHeader(chat, thread, large) else _generalHeader(chat, shown, phase, large),
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            Positioned.fill(child: _messages(chat, shown, phase)),
-                            if (_draft.naming.menu)
-                              Positioned(
-                                left: 8,
-                                right: 8,
-                                bottom: 4,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Palette.cream50,
-                                    border: Border.all(color: Palette.cream300, width: 2),
-                                    boxShadow: pxDrop,
+                // While the window grows open its height is still the folded row's: the header and messages wait for room.
+                child: LayoutBuilder(
+                  builder: (context, box) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (open && box.maxHeight >= 160) ...[
+                        if (thread != null) _threadHeader(chat, thread, large) else _generalHeader(chat, shown, phase, large),
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              Positioned.fill(child: _messages(chat, shown, phase)),
+                              if (_draft.naming.menu)
+                                Positioned(
+                                  left: 8,
+                                  right: 8,
+                                  bottom: 4,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Palette.cream50,
+                                      border: Border.all(color: Palette.cream300, width: 2),
+                                      boxShadow: pxDrop,
+                                    ),
+                                    child: NamingMenu(naming: _draft.naming, highlight: Palette.leaf300.withValues(alpha: .4)),
                                   ),
-                                  child: NamingMenu(naming: _draft.naming, highlight: Palette.leaf300.withValues(alpha: .4)),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      if (_draft.problem case final problem?)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                          child: Text(problem, style: chatSmall.copyWith(color: Palette.berry)),
-                        ),
-                      if (thread == null) _suggestionRow(s, shown),
+                        if (_draft.problem case final problem?)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                            child: Text(problem, style: chatSmall.copyWith(color: Palette.berry)),
+                          ),
+                        if (thread == null) _suggestionRow(s, shown),
+                      ],
+                      _composer(shown, thread, phase, open: open, unread: !open && unread > 0),
                     ],
-                    _composer(shown, thread, phase, open: open, unread: !open && unread > 0),
-                  ],
+                  ),
                 ),
               ),
             ),

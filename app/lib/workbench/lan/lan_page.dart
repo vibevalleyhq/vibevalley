@@ -9,7 +9,7 @@ import '../../data/server_choice.dart';
 import '../../data/server.dart';
 import '../../host/desktop.dart' show useLocalFarm;
 import '../../gen/vibevalley.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../connectors/qr.dart';
 import '../shared/layout.dart';
 import '../shared/resource.dart';
@@ -70,9 +70,8 @@ class _LanPageState extends ConsumerState<LanPage> {
   Widget build(BuildContext context) {
     final status = _status.value;
     return Padding(
-      // The cards' outlines and drops whole: a little room above the first.
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-      child: PxScrollView(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: SingleChildScrollView(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
@@ -102,9 +101,9 @@ class _LanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final body = PxText.sm.copyWith(color: Palette.bark800, height: 1.625);
+    const body = ProText.base;
     final s = status;
-    return PxCard(
+    return ProCard(
       title: '连接到本机',
       aside: s == null ? null : Text(s.open ? '开着' : '关着'),
       child: s == null
@@ -118,14 +117,14 @@ class _LanCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: PxButton.text(
+                    child: ProButton.text(
                       '允许连接',
-                      tone: PxTone.primary,
+                      tone: ProTone.primary,
                       onPressed: () => act((api) => api.update(body: const SetOpenRequest(open: true))),
                     ),
                   ),
                 ] else ...[
-                  _Row('地址', SelectableText(s.url ?? '—', style: PxText.mono.copyWith(color: Palette.bark900))),
+                  _Row('地址', SelectableText(s.url ?? '—', style: ProText.mono)),
                   if (s.pairing case final pairing?)
                     _Pairing(pairing: pairing, act: act)
                   else
@@ -133,16 +132,18 @@ class _LanCard extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        PxButton.text('添加设备', tone: PxTone.primary, onPressed: s.url == null ? null : () => act((api) => api.startPairing())),
-                        PxButton.text('关掉连接', onPressed: () => act((api) => api.update(body: const SetOpenRequest(open: false)))),
+                        ProButton.text('添加设备', tone: ProTone.primary, onPressed: s.url == null ? null : () => act((api) => api.startPairing())),
+                        ProButton.text('关掉连接', onPressed: () => act((api) => api.update(body: const SetOpenRequest(open: false)))),
                       ],
                     ),
                 ],
                 if (s.problem case final problem?)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
-                    child: Text(problem, style: PxText.sm.copyWith(color: Palette.berry)),
+                    child: Text(problem, style: ProText.sm.copyWith(color: Palette.berry)),
                   ),
+                const SizedBox(height: 16),
+                const Divider(height: 1, thickness: 1, color: ProColor.line),
                 const SizedBox(height: 12),
                 for (final n in const [
                   '帮工能在这台电脑上跑命令，所以只让配对过的设备连进来；配对要你在这里点头。',
@@ -150,10 +151,7 @@ class _LanCard extends StatelessWidget {
                   '连接走的是不加密的 HTTP：同一个网络里的人可能看到传的内容。只在信得过的网络里开，比如家里的 Wi-Fi、自己的热点。',
                   '电脑换了地址（换了网络）以后，设备连不上了，在这里添加设备再扫一次就好，不用重新点头。',
                 ])
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text('· $n', style: PxText.xs.copyWith(color: Palette.bark500, height: 1.625)),
-                  ),
+                  Padding(padding: const EdgeInsets.only(bottom: 6), child: _Bullet(n)),
               ],
             ),
     );
@@ -167,7 +165,7 @@ class _Pairing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final body = PxText.sm.copyWith(color: Palette.bark800, height: 1.625);
+    const body = ProText.base;
     if (pairing.asking case final asking?) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,14 +176,14 @@ class _Pairing extends StatelessWidget {
           Wrap(
             spacing: 8,
             children: [
-              PxButton.text(
+              ProButton.text(
                 '让它进来',
-                tone: PxTone.primary,
+                tone: ProTone.primary,
                 onPressed: () => act((api) => api.answerPairing(body: const AnswerPairingRequest(allow: true))),
               ),
-              PxButton.text(
+              ProButton.text(
                 '不让',
-                tone: PxTone.danger,
+                tone: ProTone.danger,
                 onPressed: () => act((api) => api.answerPairing(body: const AnswerPairingRequest(allow: false))),
               ),
             ],
@@ -212,7 +210,7 @@ class _Pairing extends StatelessWidget {
             width: 224,
             height: 224,
             padding: const EdgeInsets.all(8),
-            color: const Color(0xFFFFFFFF),
+            decoration: const BoxDecoration(color: Color(0xFFFFFFFF), border: Border.fromBorderSide(proLine), borderRadius: proRadius),
             child: code != null ? QrImage(code) : null,
           ),
         ),
@@ -224,22 +222,23 @@ class _Pairing extends StatelessWidget {
             children: [
               Text('手机打开 VibeValley，在「连接到本机」里扫这个码；另一台 Mac 在它的「连接到本机」里粘贴这个链接：', style: body),
               const SizedBox(height: 8),
-              SelectableText(pairing.link, style: PxText.mono.copyWith(fontSize: 11, color: Palette.bark900)),
+              SelectableText(pairing.link, style: ProText.mono.copyWith(fontSize: 11.5)),
               const SizedBox(height: 8),
-              Text('还有 $left 秒有效，只能用一次。', style: PxText.xs.copyWith(color: Palette.bark500)),
+              Text('还有 $left 秒有效，只能用一次。', style: ProText.meta),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 children: [
-                  PxButton(
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [SpriteIcon('button-copy', size: 16), SizedBox(width: 6), Text('复制链接')]),
+                  ProButton.text(
+                    '复制链接',
+                    icon: 'button-copy',
                     onPressed: () {
                       unawaited(Clipboard.setData(ClipboardData(text: pairing.link)));
                       toasts.add(type: ToastType.info, title: '复制好了', description: '粘贴到另一台 Mac 的「连接到本机」里。');
                     },
                   ),
-                  PxButton.text('换一个码', onPressed: () => act((api) => api.startPairing())),
-                  PxButton.text('不加了', onPressed: () => act((api) => api.stopPairing())),
+                  ProButton.text('换一个码', onPressed: () => act((api) => api.startPairing())),
+                  ProButton.text('不加了', onPressed: () => act((api) => api.stopPairing())),
                 ],
               ),
             ],
@@ -256,7 +255,7 @@ class _DevicesCard extends StatelessWidget {
   final Future<void> Function(Future<LanStatus> Function(LanApi api) call) act;
 
   @override
-  Widget build(BuildContext context) => PxCard(
+  Widget build(BuildContext context) => ProCard(
     title: '配对过的设备',
     aside: Text('${devices.length} 台'),
     child: Column(
@@ -265,15 +264,15 @@ class _DevicesCard extends StatelessWidget {
       children: [
         for (final d in devices)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 10),
             child: Row(
               children: [
                 Expanded(child: RowText(d.name, '配对于 ${momentText(d.pairedAt)} · ${d.lastSeen != null ? '上次来 ${momentText(d.lastSeen!)}' : '还没来过'}')),
                 const SizedBox(width: 8),
-                PxButton.text(
+                ProButton.text(
                   '移除',
-                  tone: PxTone.danger,
-                  size: PxSize.sm,
+                  tone: ProTone.danger,
+                  size: ProSize.sm,
                   onPressed: () => act((api) => api.deleteDevice(id: d.id)),
                 ),
               ],
@@ -336,11 +335,11 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
 
   @override
   Widget build(BuildContext context) {
-    final body = PxText.sm.copyWith(color: Palette.bark800, height: 1.625);
+    const body = ProText.base;
     final choice = serverConnection.value.choice;
     final using = choice.using;
     final own = canScan ? '断开' : '回到这台电脑的农场';
-    return PxCard(
+    return ProCard(
       title: '连到别处的农场',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -351,10 +350,10 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
-              child: PxButton.text(own, onPressed: _waiting != null ? null : _useOwn),
+              child: ProButton.text(own, onPressed: _waiting != null ? null : _useOwn),
             ),
             const SizedBox(height: 16),
-            Text('那台电脑换了地址，或者要换一个农场：在那台电脑的「连接到本机」里添加设备，再扫码或粘贴链接。', style: PxText.xs.copyWith(color: Palette.bark500)),
+            Text('那台电脑换了地址，或者要换一个农场：在那台电脑的「连接到本机」里添加设备，再扫码或粘贴链接。', style: ProText.meta),
           ] else ...[
             Text('在另一台电脑的 VibeValley 里打开「连接到本机」、点「添加设备」，${canScan ? '扫它给的码，或者' : ''}把它给的链接粘贴在这里。', style: body),
             if (choice.remote case final last?) ...[
@@ -364,9 +363,9 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text('上次用过 ${last.hostName} 的农场。', style: body),
-                  PxButton.text(
+                  ProButton.text(
                     '连回去',
-                    size: PxSize.sm,
+                    size: ProSize.sm,
                     onPressed: _waiting != null ? null : () => saveServerChoice(ServerChoice(remote: last, useRemote: true)),
                   ),
                 ],
@@ -377,14 +376,14 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
           if (canScan) ...[
             Align(
               alignment: Alignment.centerLeft,
-              child: PxButton.text('扫码', tone: PxTone.primary, onPressed: _waiting != null ? null : _scan),
+              child: ProButton.text('扫码', tone: ProTone.primary, onPressed: _waiting != null ? null : _scan),
             ),
             const SizedBox(height: 12),
           ],
           Row(
             children: [
               Expanded(
-                child: PxTextInput(
+                child: ProTextInput(
                   value: _link,
                   onChanged: (v) => setState(() => _link = v),
                   placeholder: 'vibevalley://pair?u=…',
@@ -395,11 +394,11 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
                 ),
               ),
               const SizedBox(width: 8),
-              PxButton.text('粘贴', onPressed: _waiting != null ? null : _paste),
+              ProButton.text('粘贴', onPressed: _waiting != null ? null : _paste),
               const SizedBox(width: 8),
-              PxButton.text(
+              ProButton.text(
                 '连接',
-                tone: canScan ? PxTone.plain : PxTone.primary,
+                tone: canScan ? ProTone.plain : ProTone.primary,
                 onPressed: _waiting != null || _link.trim().isEmpty ? null : () => _connect(_link),
               ),
             ],
@@ -412,7 +411,7 @@ class _OtherFarmCardState extends State<_OtherFarmCard> {
           if (_error case final error?)
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: Text(error, style: PxText.sm.copyWith(color: Palette.berry)),
+              child: Text(error, style: ProText.sm.copyWith(color: Palette.berry)),
             ),
         ],
       ),
@@ -433,11 +432,32 @@ class _Row extends StatelessWidget {
       children: [
         SizedBox(
           width: 72,
-          child: Text(label, style: PxText.sm.copyWith(color: Palette.bark500)),
+          child: Text(label, style: ProText.sm.copyWith(color: ProColor.muted)),
         ),
         const SizedBox(width: 12),
         Expanded(child: child),
       ],
     ),
+  );
+}
+
+class _Bullet extends StatelessWidget {
+  const _Bullet(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        width: 4,
+        height: 4,
+        margin: const EdgeInsets.only(top: 8, left: 2, right: 10),
+        decoration: const BoxDecoration(color: ProColor.faint, shape: BoxShape.circle),
+      ),
+      Expanded(
+        child: Text(text, style: ProText.sm.copyWith(color: ProColor.muted)),
+      ),
+    ],
   );
 }

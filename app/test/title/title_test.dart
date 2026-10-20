@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/data/providers.dart';
 import 'package:vibevalley/data/server.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
-import 'package:vibevalley/shared/settings_form.dart';
+import 'package:vibevalley/workbench/settings/settings_form.dart';
 import 'package:vibevalley/shell/app_frame.dart';
 import 'package:vibevalley/title/startup.dart';
 import 'package:vibevalley/data/ui_state.dart';

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/rules/rounds.dart';
-import 'package:vibevalley/shared/trajectory.dart';
-import 'package:vibevalley/ui/theme.dart';
+import 'package:vibevalley/workbench/shared/trajectory.dart';
+import 'package:vibevalley/ui/pro/pro.dart';
 import 'package:vibevalley/ui/pixel/theme.dart';
 import 'package:vibevalley/workbench/agents/agent_creator_page.dart';
 
@@ -60,7 +60,9 @@ Future<void> _pump(WidgetTester t, List<SessionEvent> log) async {
     MaterialApp(
       theme: farmTheme(),
       home: Scaffold(
-        body: Trajectory(steps: log, now: 3603000, asked: '收到'),
+        body: ProScope(
+          child: Trajectory(steps: log, now: 3603000, asked: '收到'),
+        ),
       ),
     ),
   );
@@ -152,7 +154,7 @@ void main() {
     await _pump(t, _log);
     await t.tap(labelled('工具 5.0 秒'));
     await t.pumpAndSettle();
-    final marked = find.byWidgetPredicate((w) => w is Container && w.color == Palette.wheat.withValues(alpha: .35));
+    final marked = find.byWidgetPredicate((w) => w is Container && (w.decoration as BoxDecoration?)?.color == Palette.wheat.withValues(alpha: .35));
     expect(find.descendant(of: marked, matching: find.text('Bash')), findsOneWidget);
   });
 

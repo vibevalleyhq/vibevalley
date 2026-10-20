@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/remote.dart' show watchSettingsProblem;
 import '../../gen/vibevalley.dart';
 import '../../data/ui_state.dart' show settingsProvider;
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../shared/layout.dart';
 import 'voice_rules.dart';
 import 'voice_samples.dart';
@@ -102,7 +102,7 @@ class _VoiceSettingsFormState extends ConsumerState<VoiceSettingsForm> {
     if (status == null) {
       return Padding(
         padding: const EdgeInsets.all(32),
-        child: Text(_failed != null ? '问不到服务端的设置（$_failed）。服务端是不是旧版本？重启一下再来。' : '在问服务端……', style: PxText.sm.copyWith(color: Palette.bark500)),
+        child: Text(_failed != null ? '问不到服务端的设置（$_failed）。服务端是不是旧版本？重启一下再来。' : '在问服务端……', style: ProText.sm.copyWith(color: ProColor.muted)),
       );
     }
     return _VoiceForm(key: ValueKey(status.file), status: status, part: widget.part);
@@ -195,7 +195,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
     }),
   );
 
-  Widget _secret(_Key name, String label, KeyStatus current) => PxField(
+  Widget _secret(_Key name, String label, KeyStatus current) => ProField(
     label: label,
     hint: Text(_cleared.contains(name) ? '存的时候清掉' : (current.source != null ? '在用 ${current.hint ?? ''}（${keyFrom[current.source]}）' : '还没有')),
     aside: current.source == KeySource.settings && !_cleared.contains(name) ? _clearButton(name) : null,
@@ -212,10 +212,10 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
   Widget _number(VoiceNumber key) {
     final limit = voiceLimits[key]!;
     final label = VoiceLabel.numbers[key]!;
-    return PxField(
+    return ProField(
       label: label,
       hint: Text('${limit.min} 到 ${limit.max}，默认 ${_int(numberOf(_status.voiceDefaults, key))}'),
-      child: PxTextInput(
+      child: ProTextInput(
         value: _int(numberOf(_draft, key)),
         onChanged: (t) => _set(withNumber(_draft, key, (int.tryParse(t.replaceAll(RegExp(r'\D'), '')) ?? 0).toDouble())),
         mono: true,
@@ -230,9 +230,8 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
     final status = _status;
     final problem = watchSettingsProblem(ref, SettingsUpdate(voice: asOverrides(_draft), dictation: _dictationDirty ? _dictation : null));
     final atDefaults = sameVoice(_draft, withPart(part, _draft, status.voiceDefaults));
-    final bar = PxWindow(
-      paper: Palette.cream50,
-      padding: const EdgeInsets.all(12),
+    final bar = ProPanel(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
@@ -240,21 +239,21 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           if (_error != null)
-            Text(_error!, style: PxText.sm.copyWith(color: Palette.berry))
+            Text(_error!, style: ProText.sm.copyWith(color: Palette.berry))
           else if (problem != null)
-            Text(problem, style: PxText.sm.copyWith(color: Palette.berry))
+            Text(problem, style: ProText.sm.copyWith(color: Palette.berry))
           else if (_saved)
-            Text('存好了，下一通电话就用上。', style: PxText.sm.copyWith(color: Palette.leaf700))
+            Text('存好了，下一通电话就用上。', style: ProText.sm.copyWith(color: Palette.leaf700))
           else
-            Text(_dirty ? '有没存的改动。' : '都存着。', style: PxText.xs.copyWith(color: Palette.bark500)),
+            Text(_dirty ? '有没存的改动。' : '都存着。', style: ProText.meta),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              PxButton.text('恢复默认', onPressed: atDefaults ? null : () => _set(withPart(part, _draft, status.voiceDefaults))),
+              ProButton.text('恢复默认', onPressed: atDefaults ? null : () => _set(withPart(part, _draft, status.voiceDefaults))),
               const SizedBox(width: 8),
-              PxButton.text('撤销', onPressed: _dirty ? _undo : null),
+              ProButton.text('撤销', onPressed: _dirty ? _undo : null),
               const SizedBox(width: 8),
-              PxButton.text(_busy ? '在存…' : '保存', tone: PxTone.primary, onPressed: !_dirty || problem != null || _busy ? null : _save),
+              ProButton.text(_busy ? '在存…' : '保存', tone: ProTone.primary, onPressed: !_dirty || problem != null || _busy ? null : _save),
             ],
           ),
         ],
@@ -287,16 +286,16 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
     final asr = draft.asr;
     final answer = draft.answer;
     final ready = status.agoraAppId.source != null && status.agoraAppCertificate.source != null;
-    final muted = PxText.xs.copyWith(color: Palette.bark500);
+    const muted = ProText.meta;
     return [
-      PxWindow(
-        paper: Palette.cream50,
-        padding: const EdgeInsets.all(16),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('声音', style: PxText.xl),
+            const Text('声音', style: ProText.xl),
+            const SizedBox(height: 4),
             Text.rich(
               TextSpan(
                 children: [
@@ -304,14 +303,14 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                   WidgetSpan(
                     alignment: PlaceholderAlignment.baseline,
                     baseline: TextBaseline.alphabetic,
-                    child: TextLink('管家页', style: PxText.sm, onTap: () => workbenchGo(context, '/manager/voice')),
+                    child: TextLink('管家页', style: ProText.sm, onTap: () => workbenchGo(context, '/manager/voice')),
                   ),
                   const TextSpan(text: '。'),
                 ],
               ),
-              style: PxText.sm.copyWith(color: Palette.bark600),
+              style: ProText.sm.copyWith(color: ProColor.muted),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 4,
@@ -323,7 +322,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                   message: status.file,
                   child: Text(
                     status.file,
-                    style: PxText.mono.copyWith(color: Palette.bark500),
+                    style: ProText.mono.copyWith(color: ProColor.muted, fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -334,17 +333,17 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
         ),
       ),
       const SizedBox(height: 12),
-      PxCard(
+      ProCard(
         title: '凭据',
         aside: TextLink('声网控制台 →', onTap: () => openLink('https://console.agora.io/')),
         child: Cols(
           columns: 2,
           children: [
-            PxField(
+            ProField(
               label: 'App ID',
               hint: Text(_cleared.contains(_Key.agoraAppId) ? '存的时候清掉' : (status.agoraAppId.source != null ? keyFrom[status.agoraAppId.source]! : '还没有')),
               aside: status.agoraAppId.source == KeySource.settings && !_cleared.contains(_Key.agoraAppId) ? _clearButton(_Key.agoraAppId) : null,
-              child: PxTextInput(
+              child: ProTextInput(
                 value: _appId,
                 onChanged: (v) => setState(() {
                   _appId = v;
@@ -356,12 +355,12 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
               ),
             ),
             _secret(_Key.agoraAppCertificate, 'App Certificate', status.agoraAppCertificate),
-            PxField(
+            ProField(
               label: VoiceLabel.area,
               hint: const Text('Agora 接口的区域，选离服务端近的；中国大陆的项目选中国大陆。'),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: PxSegmented<Area>(
+                child: ProSegmented<Area>(
                   value: draft.area,
                   options: [for (final a in Area.values) SegmentOption(value: a, label: _areaLabel[a]!)],
                   onChanged: (area) => _set(voiceWith(draft, area: area)),
@@ -372,28 +371,28 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
         ),
       ),
       const SizedBox(height: 12),
-      PxCard(
+      ProCard(
         title: '听',
         aside: const Text('识别 · VAD 断句'),
         child: Cols(
           columns: 2,
           children: [
-            PxField(
+            ProField(
               label: VoiceLabel.asr,
               hint: Text(asr is VoiceAsrMicrosoft ? '微软 Azure 语音，用自己的 key。' : '声网托管，不用别的 key。'),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: PxSegmented<String>(
+                child: ProSegmented<String>(
                   value: _vendor(asr),
                   options: _options(_asrLabel),
                   onChanged: (v) => _set(voiceWith(draft, asr: _vendor(asr) == v ? asr : _asrStart[v])),
                 ),
               ),
             ),
-            PxField(
+            ProField(
               label: VoiceLabel.language,
               hint: const Text('听哪种话。人设里也写明用这种话回答。'),
-              child: PxPick(
+              child: ProPick(
                 value: draft.language.wire,
                 options: [for (final l in voiceLanguages) PickOption(value: l.wire, label: _languageLabel[l]!, detail: l.wire)],
                 onChanged: (l) {
@@ -404,11 +403,11 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
               ),
             ),
             if (asr case VoiceAsrDeepgram(:final model))
-              PxField(
+              ProField(
                 label: 'Deepgram 模型',
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: PxSegmented<Model>(
+                  child: ProSegmented<Model>(
                     value: model,
                     options: [for (final m in deepgramModels) SegmentOption(value: m, label: m.wire)],
                     onChanged: (model) => _set(voiceWith(draft, asr: VoiceAsrDeepgram(model: model))),
@@ -416,10 +415,10 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                 ),
               ),
             if (asr case VoiceAsrMicrosoft(:final region)) ...[
-              PxField(
+              ProField(
                 label: 'Azure 区域',
                 hint: const Text('语音资源所在的区域，比如 eastasia、eastus。'),
-                child: PxTextInput(
+                child: ProTextInput(
                   value: region,
                   onChanged: (region) => _set(voiceWith(draft, asr: VoiceAsrMicrosoft(region: region))),
                   mono: true,
@@ -435,19 +434,19 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
         ),
       ),
       const SizedBox(height: 12),
-      PxCard(
+      ProCard(
         title: '想',
         aside: Text(_answerLabel[_vendor(answer)]!),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            PxField(
+            ProField(
               label: VoiceLabel.answer,
               hint: Text(_answerHint(answer, status)),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: PxSegmented<String>(
+                child: ProSegmented<String>(
                   value: _vendor(answer),
                   options: _options(_answerLabel),
                   onChanged: (v) => _set(voiceWith(draft, answer: _vendor(answer) == v ? answer : _answerStart[v])),
@@ -457,11 +456,11 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
             ...switch (answer) {
               VoiceAnswerAgora(:final model) => [
                 const SizedBox(height: 16),
-                PxField(
+                ProField(
                   label: '模型',
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: PxSegmented<VoiceAnswerAgoraModel>(
+                    child: ProSegmented<VoiceAnswerAgoraModel>(
                       value: model,
                       options: [for (final m in voiceModels) SegmentOption(value: m, label: m.wire)],
                       onChanged: (model) => _set(voiceWith(draft, answer: VoiceAnswerAgora(model: model))),
@@ -471,10 +470,10 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
               ],
               VoiceAnswerDeepseek(:final model) => [
                 const SizedBox(height: 16),
-                PxField(
+                ProField(
                   label: '模型',
                   hint: const Text('DeepSeek 的模型名。'),
-                  child: PxTextInput(
+                  child: ProTextInput(
                     value: model,
                     onChanged: (model) => _set(voiceWith(draft, answer: VoiceAnswerDeepseek(model: model))),
                     mono: true,
@@ -488,10 +487,10 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                 Cols(
                   columns: 2,
                   children: [
-                    PxField(
+                    ProField(
                       label: '地址',
                       hint: const Text('OpenAI 兼容的 chat completions 完整地址。'),
-                      child: PxTextInput(
+                      child: ProTextInput(
                         value: url,
                         onChanged: (url) => _set(
                           voiceWith(
@@ -503,9 +502,9 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                         semanticLabel: '大模型地址',
                       ),
                     ),
-                    PxField(
+                    ProField(
                       label: '模型',
-                      child: PxTextInput(
+                      child: ProTextInput(
                         value: model,
                         onChanged: (model) => _set(
                           voiceWith(
@@ -527,7 +526,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
         ),
       ),
       const SizedBox(height: 12),
-      PxCard(
+      ProCard(
         title: '听写',
         aside: TextLink('本机的 speech-server →', onTap: () => openLink('https://github.com/soniqo/speech-swift')),
         child: Column(
@@ -537,16 +536,16 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
             Text(
               '田头输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。服务端把录音原样转给下面这个 OpenAI 兼容的转写地址；'
               '填本机的 speech-server，声音就不出这台电脑。',
-              style: PxText.xs.copyWith(color: Palette.bark600),
+              style: ProText.sm.copyWith(color: ProColor.muted),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             Cols(
               columns: 2,
               children: [
-                PxField(
+                ProField(
                   label: '地址',
                   hint: const Text('到 /v1 为止。本机：http://127.0.0.1:8080/v1；OpenAI：https://api.openai.com/v1。空着就不用听写。'),
-                  child: PxTextInput(
+                  child: ProTextInput(
                     value: _dictation.url,
                     onChanged: (url) => setState(() {
                       _dictation = Dictation(url: url, model: _dictation.model);
@@ -557,10 +556,10 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                     semanticLabel: '听写的地址',
                   ),
                 ),
-                PxField(
+                ProField(
                   label: '模型',
                   hint: const Text('本机的 speech-server 填 qwen3；OpenAI 填 gpt-4o-mini-transcribe。'),
-                  child: PxTextInput(
+                  child: ProTextInput(
                     value: _dictation.model,
                     onChanged: (model) => setState(() {
                       _dictation = Dictation(url: _dictation.url, model: model);
@@ -594,26 +593,26 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
               WidgetSpan(
                 alignment: PlaceholderAlignment.baseline,
                 baseline: TextBaseline.alphabetic,
-                child: TextLink('声音', style: PxText.xs, onTap: () => workbenchGo(context, '/settings/voice')),
+                child: TextLink('声音', style: ProText.sm, onTap: () => workbenchGo(context, '/settings/voice')),
               ),
               const TextSpan(text: '页。'),
             ],
           ),
-          style: PxText.xs.copyWith(color: Palette.bark600),
+          style: ProText.sm.copyWith(color: ProColor.muted),
         ),
       ),
       const SizedBox(height: 12),
-      PxCard(
+      ProCard(
         title: '开口',
         aside: const Text('人设 · 开场白'),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            PxField(
+            ProField(
               label: VoiceLabel.persona,
               hint: Text(draft.answer is VoiceAnswerManager ? '「想」选了农场的管家：它自己接电话，用的是它自己的提示词，这段人设不用。' : '语音管家是谁、怎么说话。他看不到地里，派活由本机的管家做；写明别编进度。'),
-              child: PxTextArea(
+              child: ProTextArea(
                 value: draft.persona,
                 onChanged: (persona) => _set(voiceWith(draft, persona: persona)),
                 rows: 8,
@@ -624,19 +623,19 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
             Cols(
               columns: 2,
               children: [
-                PxField(
+                ProField(
                   label: VoiceLabel.greeting,
                   hint: const Text('接通时先说的一句。'),
-                  child: PxTextInput(
+                  child: ProTextInput(
                     value: draft.greeting,
                     onChanged: (greeting) => _set(voiceWith(draft, greeting: greeting)),
                     semanticLabel: '开场白',
                   ),
                 ),
-                PxField(
+                ProField(
                   label: VoiceLabel.failureMessage,
                   hint: const Text('大模型出错时说的一句。'),
-                  child: PxTextInput(
+                  child: ProTextInput(
                     value: draft.failureMessage,
                     onChanged: (failureMessage) => _set(voiceWith(draft, failureMessage: failureMessage)),
                     semanticLabel: '出错时说',
@@ -648,7 +647,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
         ),
       ),
       const SizedBox(height: 12),
-      PxCard(
+      ProCard(
         title: '说',
         aside: Text(_ttsLabel[_vendor(tts)]!),
         child: Column(
@@ -658,12 +657,12 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
             Cols(
               columns: 2,
               children: [
-                PxField(
+                ProField(
                   label: VoiceLabel.tts,
                   hint: Text(tts is VoiceTtsMicrosoft ? '微软 Azure 语音，用自己的 key。' : '声网托管，不用别的 key。'),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: PxSegmented<String>(
+                    child: ProSegmented<String>(
                       value: _vendor(tts),
                       options: _options(_ttsLabel),
                       onChanged: (v) => _set(voiceWith(draft, tts: _vendor(tts) == v ? tts : _ttsStart[v])),
@@ -672,11 +671,11 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                 ),
                 ...switch (tts) {
                   VoiceTtsMinimax(:final model, :final voiceId) => [
-                    PxField(
+                    ProField(
                       label: '合成模型',
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: PxSegmented<VoiceTtsMinimaxModel>(
+                        child: ProSegmented<VoiceTtsMinimaxModel>(
                           value: model,
                           options: [for (final m in voiceTtsModels) SegmentOption(value: m, label: m.wire)],
                           onChanged: (model) => _set(
@@ -690,12 +689,12 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                     ),
                   ],
                   VoiceTtsOpenai(:final voice) => [
-                    PxField(
+                    ProField(
                       label: '音色',
                       hint: const Text('OpenAI tts-1 的音色。'),
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: PxSegmented<Voice>(
+                        child: ProSegmented<Voice>(
                           value: voice,
                           options: [for (final v in openaiVoices) SegmentOption(value: v, label: v.wire)],
                           onChanged: (voice) => _set(voiceWith(draft, tts: VoiceTtsOpenai(voice: voice))),
@@ -704,9 +703,9 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                     ),
                   ],
                   VoiceTtsMicrosoft(:final region, :final voiceName) => [
-                    PxField(
+                    ProField(
                       label: 'Azure 区域',
-                      child: PxTextInput(
+                      child: ProTextInput(
                         value: region,
                         onChanged: (region) => _set(
                           voiceWith(
@@ -718,10 +717,10 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
                         semanticLabel: '合成的 Azure 区域',
                       ),
                     ),
-                    PxField(
+                    ProField(
                       label: '音色',
                       hint: const Text('Azure 的神经网络音色名，比如 zh-CN-XiaoxiaoNeural。'),
-                      child: PxTextInput(
+                      child: ProTextInput(
                         value: voiceName,
                         onChanged: (voiceName) => _set(
                           voiceWith(
@@ -741,7 +740,7 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
             ),
             if (tts case VoiceTtsMinimax(:final model, :final voiceId)) ...[
               const SizedBox(height: 16),
-              PxField(
+              ProField(
                 label: '音色',
                 hint: const Text('点名字选它，点左边的播放键先听一句；也可以在下面填别的 MiniMax 系统音色 id。'),
                 child: MiniMaxVoices(
@@ -758,9 +757,9 @@ class _VoiceFormState extends ConsumerState<_VoiceForm> {
               Cols(
                 columns: 2,
                 children: [
-                  PxField(
+                  ProField(
                     label: '音色 id',
-                    child: PxTextInput(
+                    child: ProTextInput(
                       value: voiceId,
                       onChanged: (voiceId) => _set(
                         voiceWith(
@@ -810,18 +809,17 @@ class _SecretInputState extends State<SecretInput> {
   Widget build(BuildContext context) => Row(
     children: [
       Expanded(
-        child: PxTextInput(
+        child: ProTextInput(
           value: widget.value,
           onChanged: widget.onChanged,
           placeholder: widget.placeholder,
           semanticLabel: widget.label,
           mono: true,
-          well: true,
           obscure: !_shown,
         ),
       ),
-      const SizedBox(width: 8),
-      PxButton.text(_shown ? '藏' : '看', semanticLabel: _shown ? '藏起来' : '看一眼', onPressed: () => setState(() => _shown = !_shown)),
+      const SizedBox(width: 6),
+      ProButton.text(_shown ? '藏' : '看', semanticLabel: _shown ? '藏起来' : '看一眼', onPressed: () => setState(() => _shown = !_shown)),
     ],
   );
 }
@@ -894,48 +892,45 @@ class _VoiceChip extends StatelessWidget {
   final VoidCallback onChoose;
 
   @override
-  Widget build(BuildContext context) => Tappable(
-    onTap: null,
-    builder: (context, _) => Container(
-      color: chosen ? Palette.leaf300.withValues(alpha: .5) : Palette.cream50,
-      foregroundDecoration: chosen ? pxRing : null,
-      child: Row(
-        children: [
-          Tappable(
-            onTap: onPlay,
+  Widget build(BuildContext context) => Container(
+    height: 34,
+    decoration: BoxDecoration(
+      color: chosen ? ProColor.selected : ProColor.page,
+      border: Border.all(color: chosen ? ProColor.ink.withValues(alpha: .4) : ProColor.line),
+      borderRadius: proRadius,
+    ),
+    child: Row(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2),
+          child: ProButton(
+            onPressed: onPlay,
+            size: ProSize.icon,
+            tone: ProTone.quiet,
             tooltip: onPlay != null ? '试听：$defaultGreeting' : '没有样音',
             semanticLabel: playing ? '停下 $label' : '试听 $label',
-            builder: (context, s) => Opacity(
-              opacity: onPlay == null ? .3 : 1,
-              child: Container(
-                width: 32,
-                height: 32,
-                alignment: Alignment.center,
-                foregroundDecoration: pxRing,
-                child: SpriteIcon(playing ? 'button-stop' : 'button-play', size: 20),
+            child: SpriteIcon(playing ? 'button-stop' : 'button-play', size: 16),
+          ),
+        ),
+        Expanded(
+          child: Tappable(
+            onTap: onChoose,
+            tooltip: id,
+            selected: chosen,
+            builder: (context, s) => Container(
+              height: double.infinity,
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.fromLTRB(4, 0, 8, 0),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: ProText.sm.copyWith(color: chosen || s.hovered ? ProColor.ink : Palette.bark800, fontWeight: chosen ? FontWeight.w600 : FontWeight.w400),
               ),
             ),
           ),
-          Expanded(
-            child: Tappable(
-              onTap: onChoose,
-              tooltip: id,
-              selected: chosen,
-              builder: (context, s) => Container(
-                color: !chosen && s.hovered ? Palette.cream200 : null,
-                foregroundDecoration: pxRing,
-                padding: const EdgeInsets.fromLTRB(0, 6, 8, 6),
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: PxText.sm.copyWith(color: chosen ? Palette.leaf700 : Palette.bark900),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }

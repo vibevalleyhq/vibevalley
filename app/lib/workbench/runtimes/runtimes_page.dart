@@ -7,7 +7,7 @@ import '../../rules/time.dart';
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
 import '../../sprites/atlas.dart';
-import '../../ui/pixel/pixel.dart';
+import '../../ui/pro/pro.dart';
 import '../../shared/faces.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
@@ -43,7 +43,7 @@ class RuntimesPage extends ConsumerWidget {
           ? [
               Padding(
                 padding: const EdgeInsets.all(32),
-                child: Text('读取中…', style: PxText.sm.copyWith(color: Palette.bark500)),
+                child: Text('读取中…', style: ProText.sm.copyWith(color: ProColor.muted)),
               ),
             ]
           : _detail(atlas, selected, config, busy[selected.id]),
@@ -81,7 +81,7 @@ class _ListItem extends StatelessWidget {
             child: RowText(preset.label, '$status${using > 0 ? ' · $using 个 agent' : ''}', extra: ok ? _ListStamina(info: r) : null),
           ),
           const SizedBox(width: 10),
-          StateDot(ok ? (r.settings.enabled ? Palette.leaf500 : Palette.cream300) : Palette.berry),
+          StateDot(ok ? (r.settings.enabled ? Palette.leaf500 : ProColor.faint) : Palette.berry),
         ],
       ),
     );
@@ -102,7 +102,7 @@ class _ListStamina extends StatelessWidget {
         children: [
           StaminaBar(quota: quota, segments: 10, width: 92, height: 7),
           const SizedBox(width: 6),
-          Text(quota.short, style: PxText.fine.copyWith(color: quota.level == QuotaLevel.empty ? Palette.berry : Palette.bark600)),
+          Text(quota.short, style: ProText.xs.copyWith(color: quota.level == QuotaLevel.empty ? Palette.berry : ProColor.muted)),
         ],
       ),
     );
@@ -118,7 +118,7 @@ List<Widget> _detail(SpriteAtlas atlas, RuntimeInfo info, WorkbenchConfig config
       columns: 2,
       stretch: true,
       children: [
-        PxCard(
+        ProCard(
           title: '账户',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,20 +155,20 @@ class _Header extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final preset = info.preset;
     final inst = info.installation;
-    return PxWindow(
-      paper: Palette.cream50,
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
       child: Row(
         children: [
           Container(
-            width: 80,
-            height: 80,
+            width: 72,
+            height: 72,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Palette.cream200,
-              gradient: RadialGradient(center: const Alignment(0, .4), radius: .7, colors: [_hex(preset.look.hat).withValues(alpha: .2), Palette.cream200]),
+              borderRadius: BorderRadius.circular(8),
+              border: const Border.fromBorderSide(proLine),
+              gradient: RadialGradient(center: const Alignment(0, .4), radius: .7, colors: [_hex(preset.look.hat).withValues(alpha: .2), ProColor.page]),
             ),
-            child: RuntimeIcon(runtime: info.id, size: 68, muted: inst is! InstallationAvailable),
+            child: RuntimeIcon(runtime: info.id, size: 60, muted: inst is! InstallationAvailable),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -176,9 +176,9 @@ class _Header extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(preset.label, style: PxText.x2l),
-                Text(preset.blurb, style: PxText.sm.copyWith(color: Palette.bark600)),
-                const SizedBox(height: 4),
+                Text(preset.label, style: ProText.xl),
+                Text(preset.blurb, style: ProText.sm.copyWith(color: ProColor.muted)),
+                const SizedBox(height: 6),
                 Wrap(
                   spacing: 8,
                   runSpacing: 4,
@@ -187,14 +187,14 @@ class _Header extends ConsumerWidget {
                     ...switch (inst) {
                       InstallationAvailable(:final version, :final command, :final via) => [
                         TintTag('可用 ${version ?? ''}', fill: okTag.fill, ink: okTag.ink),
-                        Text(command, style: PxText.mono.copyWith(color: Palette.bark500)),
-                        Text(via == Via.bundled ? '随 oar 一起装' : '命令行', style: PxText.xs.copyWith(color: Palette.bark500)),
+                        Text(command, style: ProText.mono.copyWith(color: ProColor.muted)),
+                        Text(via == Via.bundled ? '随 oar 一起装' : '命令行', style: ProText.meta),
                       ],
                       InstallationUnsupported(:final reason) => [TintTag('不支持：$reason', fill: badTag.fill, ink: badTag.ink)],
                       InstallationNotFound() => [TintTag('这台机器上没找到', fill: badTag.fill, ink: badTag.ink)],
-                      InstallationChecking() => [Text('检测中…', style: PxText.xs.copyWith(color: Palette.bark500))],
+                      InstallationChecking() => [Text('检测中…', style: ProText.meta)],
                     },
-                    if (inst is! InstallationChecking) Text('检测于 ${wallClockText(info.checkedAt)}', style: PxText.xs.copyWith(color: Palette.bark500)),
+                    if (inst is! InstallationChecking) Text('检测于 ${wallClockText(info.checkedAt)}', style: ProText.meta),
                   ],
                 ),
               ],
@@ -206,7 +206,7 @@ class _Header extends ConsumerWidget {
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              PxButton.text(
+              ProButton.text(
                 busy == RuntimeBusy.refreshing ? '检测中…' : '重新检测',
                 onPressed: busy != null ? null : () => ref.read(runtimeBusyProvider.notifier).refresh(info.id),
               ),
@@ -224,16 +224,16 @@ class _FactsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final small = PxText.xs.copyWith(color: Palette.bark600);
-    final heading = PxText.xs.copyWith(color: Palette.bark500);
-    return PxCard(
+    const small = ProText.sm;
+    final heading = ProText.meta.copyWith(fontWeight: FontWeight.w500);
+    return ProCard(
       title: '能做什么',
       aside: const Text('来自 oar 0.44'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Marked(facts.steer ? 'mark-check' : 'mark-cross', child: Text(facts.steer ? '干活时能接话（steer）' : '干活时不能插话，话会排到这一轮之后', style: small)),
+          Marked(facts.steer ? 'mark-check' : 'mark-cross', top: 4, child: Text(facts.steer ? '干活时能接话（steer）' : '干活时不能插话，话会排到这一轮之后', style: small)),
           const SizedBox(height: 6),
           Text(facts.inProcess ? '· 跑在 server 进程里（Node SDK）' : '· 作为单独的命令行进程运行', style: small),
           const SizedBox(height: 12),
@@ -248,14 +248,8 @@ class _FactsCard extends StatelessWidget {
                 child: Text.rich(
                   TextSpan(
                     children: [
-                      TextSpan(
-                        text: key,
-                        style: PxText.mono.copyWith(color: Palette.bark800),
-                      ),
-                      TextSpan(
-                        text: ' $value',
-                        style: PxText.xs.copyWith(color: Palette.bark500),
-                      ),
+                      TextSpan(text: key, style: ProText.mono),
+                      TextSpan(text: ' $value', style: ProText.meta),
                     ],
                   ),
                 ),
@@ -269,12 +263,16 @@ class _FactsCard extends StatelessWidget {
             children: [
               for (final c in RuntimeCapability.values)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  color: facts.capabilities.contains(c) ? Palette.cream200 : Palette.cream50,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: facts.capabilities.contains(c) ? ProColor.selected : null,
+                    border: facts.capabilities.contains(c) ? null : const Border.fromBorderSide(proLine),
+                    borderRadius: const BorderRadius.all(Radius.circular(4)),
+                  ),
                   child: Text(
                     _capabilityLabel(c),
-                    style: PxText.fine.copyWith(
-                      color: facts.capabilities.contains(c) ? Palette.bark800 : Palette.bark500,
+                    style: ProText.xs.copyWith(
+                      color: facts.capabilities.contains(c) ? ProColor.ink : ProColor.muted,
                       decoration: facts.capabilities.contains(c) ? null : TextDecoration.lineThrough,
                     ),
                   ),
@@ -340,15 +338,15 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
     final refusedEnv = facts.refused[sessionEnv];
     final envVar = 'OAR_${info.id.toUpperCase()}_BIN';
     final effortHint = refusedEffort ?? ((model?.effortLevels.isNotEmpty ?? false) ? null : '这个模型没有推理强度可选。');
-    return PxCard(
+    return ProCard(
       title: '设置',
       aside: dirty
           ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                PxButton.text('放弃', onPressed: () => setState(() => _draft = info.settings)),
+                ProButton.text('放弃', onPressed: () => setState(() => _draft = info.settings)),
                 const SizedBox(width: 8),
-                PxButton.text('保存', tone: PxTone.primary, onPressed: () => ref.read(runtimeBusyProvider.notifier).update(info.id, _draft)),
+                ProButton.text('保存', tone: ProTone.primary, onPressed: () => ref.read(runtimeBusyProvider.notifier).update(info.id, _draft)),
               ],
             )
           : null,
@@ -360,16 +358,16 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
             columns: 2,
             stretch: true,
             children: [
-              PxSwitchField(
+              ProSwitchField(
                 label: '让 agent 用它',
                 checked: _draft.enabled,
                 onChanged: (enabled) => _set(_with(_draft, enabled: enabled)),
                 hint: '停用后，用它的 agent 都派不出去。',
               ),
-              PxField(
+              ProField(
                 label: '命令路径',
                 hint: Text('对应 oar 的 $envVar。留空就在 PATH 里找。'),
-                child: PxTextInput(
+                child: ProTextInput(
                   value: _draft.binPath,
                   onChanged: (binPath) => _set(_with(_draft, binPath: binPath)),
                   placeholder: '自动查找',
@@ -377,10 +375,10 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
                   semanticLabel: '命令路径',
                 ),
               ),
-              PxField(
+              ProField(
                 label: '默认模型',
                 hint: const Text('agent 没指定模型时用它。'),
-                child: PxPick(
+                child: ProPick(
                   value: _draft.defaultModel,
                   onChanged: (defaultModel) => _set(_with(_draft, defaultModel: defaultModel, defaultEffort: '')),
                   placeholder: 'runtime 自己的默认',
@@ -389,10 +387,10 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
                   semanticLabel: '默认模型',
                 ),
               ),
-              PxField(
+              ProField(
                 label: '默认推理强度',
                 hint: effortHint == null ? null : Text(effortHint),
-                child: PxSegmented<String>(
+                child: ProSegmented<String>(
                   value: _draft.defaultEffort,
                   onChanged: (defaultEffort) => _set(_with(_draft, defaultEffort: defaultEffort)),
                   options: [
@@ -407,7 +405,7 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
           Cols(
             columns: 2,
             children: [
-              PxField(
+              ProField(
                 label: '最多同时干活',
                 hint: const Text('用它的帮工同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受农场自己的上限（6 块地）。'),
                 child: NumberInput(
@@ -418,7 +416,7 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
                 ),
               ),
               if (info.id == 'pi' || info.id == 'vibevalley')
-                PxField(
+                ProField(
                   label: '每日预算（元）',
                   hint: Text('今天已经花了 ${yuan(info.spentToday ?? 0)}（按${info.id == 'pi' ? ' pi 的' : '模型的'}价目表估算）。到了预算就不再派新活，正在干的会干完。留空不设上限。'),
                   child: NumberInput(
@@ -431,10 +429,10 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
             ],
           ),
           const SizedBox(height: 16),
-          PxField(
+          ProField(
             label: '环境变量',
             hint: Text(refusedEnv ?? '叠加到这个 runtime 的每个 session 上；agent 自己的环境变量优先。'),
-            child: PxKeyValueEditor(
+            child: ProKeyValueEditor(
               value: _draft.env,
               onChanged: (env) => _set(_with(_draft, env: env)),
               enabled: refusedEnv == null,
@@ -470,7 +468,7 @@ class _NumberInputState extends State<NumberInput> {
   }
 
   @override
-  Widget build(BuildContext context) => PxTextInput(
+  Widget build(BuildContext context) => ProTextInput(
     value: _text,
     onChanged: (t) {
       setState(() => _text = t);
@@ -490,13 +488,13 @@ class RuntimeUsage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final muted = PxText.xs.copyWith(color: Palette.bark500);
+    final muted = ProText.meta;
     final usage = info.usage;
     switch (usage) {
       case null:
         return Text(info.facts.capabilities.contains(RuntimeCapability.accountUsage) ? '装好以后才能读到。' : '这个 runtime 不报告账户用量。', style: muted);
       case AccountUsageLoginRequired():
-        return Text('没登录。在这台机器上运行 ${info.preset.label} 登录一次。', style: PxText.xs.copyWith(color: const Color(0xFFB8682A)));
+        return Text('没登录。在这台机器上运行 ${info.preset.label} 登录一次。', style: ProText.xs.copyWith(color: const Color(0xFFB8682A)));
       case AccountUsageUnavailable(:final reason):
         return Text('读不到：$reason', style: muted);
       case AccountUsageBalance() || AccountUsageOk():
@@ -510,7 +508,7 @@ class RuntimeUsage extends StatelessWidget {
           child: Column(
             children: [
               EnergyBottle(atlas: atlas, quota: quota, size: 52),
-              Text(quota.short.isEmpty ? '—' : quota.short, style: PxText.sm.copyWith(color: Palette.bark800)),
+              Text(quota.short.isEmpty ? '—' : quota.short, style: ProText.sm),
             ],
           ),
         ),
@@ -521,15 +519,15 @@ class RuntimeUsage extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: switch (usage) {
               AccountUsageBalance(:final provider, :final available) => [
-                Text('按量计费，这里是 $provider 账户余额${available ? '。' : '，不够用了。'}', style: PxText.sm.copyWith(color: available ? Palette.bark800 : Palette.berry)),
+                Text('按量计费，这里是 $provider 账户余额${available ? '。' : '，不够用了。'}', style: ProText.sm.copyWith(color: available ? ProColor.ink : Palette.berry)),
                 const SizedBox(height: 10),
                 Text(
                   '今天帮工花了约 ${yuan(info.spentToday ?? 0)}${(info.settings.dailyBudget ?? 0) > 0 ? '，每日预算 ${yuan(info.settings.dailyBudget!)}' : '，没设每日预算'}。',
-                  style: PxText.xs.copyWith(color: Palette.bark600),
+                  style: ProText.sm.copyWith(color: ProColor.muted),
                 ),
               ],
               AccountUsageOk(:final subscription, :final windows) => [
-                if (subscription != null && subscription.isNotEmpty) Text('套餐：$subscription', style: PxText.xs.copyWith(color: Palette.bark600)),
+                if (subscription != null && subscription.isNotEmpty) Text('套餐：$subscription', style: ProText.sm.copyWith(color: ProColor.muted)),
                 for (final w in windows) _Window(window: w),
               ].indexed.expand((e) => [if (e.$1 > 0) const SizedBox(height: 10), e.$2]).toList(),
               _ => const <Widget>[],
@@ -557,15 +555,12 @@ class _Window extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(
-              child: Text(label, style: PxText.fine.copyWith(color: Palette.bark500)),
-            ),
-            Text('剩 ${_pct(left)}%', style: PxText.fine.copyWith(color: Palette.bark800)),
+            Expanded(child: Text(label, style: ProText.meta)),
+            Text('剩 ${_pct(left)}%', style: ProText.xs),
           ],
         ),
-        const SizedBox(height: 4),
         Padding(
-          padding: const EdgeInsets.only(top: 11, bottom: 3),
+          padding: const EdgeInsets.only(top: 6, bottom: 2),
           child: Align(
             alignment: Alignment.centerLeft,
             child: StaminaBar(
@@ -578,7 +573,7 @@ class _Window extends StatelessWidget {
         if (window.resetsAt case final at?)
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text('${momentText(at)} 重置', style: PxText.fine.copyWith(color: Palette.bark500)),
+            child: Text('${momentText(at)} 重置', style: ProText.meta),
           ),
       ],
     );
@@ -592,8 +587,8 @@ class _ModelsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final models = info.models;
-    final head = PxText.xs.copyWith(color: Palette.bark500);
-    return PxCard(
+    final head = ProText.meta.copyWith(fontWeight: FontWeight.w500);
+    return ProCard(
       title: '模型',
       aside: models == null ? null : Text('${models.length} 个'),
       child: models == null
@@ -605,20 +600,18 @@ class _ModelsCard extends StatelessWidget {
                 TableRow(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: Text('模型', style: head),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: Text('推理强度', style: head),
                     ),
                   ],
                 ),
                 for (final m in models)
                   TableRow(
-                    decoration: const BoxDecoration(
-                      border: Border(top: BorderSide(color: Palette.cream300)),
-                    ),
+                    decoration: const BoxDecoration(border: Border(top: proLine)),
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -626,19 +619,14 @@ class _ModelsCard extends StatelessWidget {
                           spacing: 8,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Text(m.id, style: PxText.mono.copyWith(color: Palette.bark800)),
-                            if (m.isDefault)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                color: okTag.fill,
-                                child: Text('默认', style: PxText.xs.copyWith(color: okTag.ink, fontSize: 10)),
-                              ),
+                            Text(m.id, style: ProText.mono),
+                            if (m.isDefault) TintTag('默认', fill: okTag.fill, ink: okTag.ink),
                           ],
                         ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Text(m.effortLevels.isEmpty ? '—' : m.effortLevels.join(' · '), style: PxText.xs.copyWith(color: Palette.bark600)),
+                        child: Text(m.effortLevels.isEmpty ? '—' : m.effortLevels.join(' · '), style: ProText.sm.copyWith(color: ProColor.muted)),
                       ),
                     ],
                   ),
@@ -656,8 +644,8 @@ class _InventoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final list = entries;
-    final muted = PxText.xs.copyWith(color: Palette.bark500);
-    return PxCard(
+    final muted = ProText.meta;
+    return ProCard(
       title: title,
       aside: list == null ? null : Text('${list.length}'),
       child: list == null
@@ -677,8 +665,8 @@ class _InventoryCard extends StatelessWidget {
                       children: [
                         Text(
                           e.name,
-                          style: PxText.mono.copyWith(
-                            color: e.enabled == false ? Palette.bark500 : Palette.bark800,
+                          style: ProText.mono.copyWith(
+                            color: e.enabled == false ? ProColor.muted : ProColor.ink,
                             decoration: e.enabled == false ? TextDecoration.lineThrough : null,
                           ),
                         ),
@@ -698,11 +686,11 @@ class _AgentsCard extends StatelessWidget {
   final List<Agent> agents;
 
   @override
-  Widget build(BuildContext context) => PxCard(
+  Widget build(BuildContext context) => ProCard(
     title: '用到它的 agent',
     aside: TextLink('用它捏一个新 agent →', onTap: () => workbenchGo(context, '/agents/new?runtime=${Uri.encodeComponent(runtime)}')),
     child: agents.isEmpty
-        ? Text('还没有。', style: PxText.xs.copyWith(color: Palette.bark500))
+        ? Text('还没有。', style: ProText.meta)
         : Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -712,13 +700,13 @@ class _AgentsCard extends StatelessWidget {
                   onTap: () => workbenchGo(context, '/agents/${Uri.encodeComponent(a.id)}'),
                   builder: (context, s) => Container(
                     padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
-                    color: s.hovered ? Palette.cream300 : Palette.cream200,
+                    decoration: BoxDecoration(color: s.hovered ? ProColor.hover : null, border: const Border.fromBorderSide(proLine), borderRadius: proRadius),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         AgentFace(look: a.look, id: a.id, size: 26),
                         const SizedBox(width: 6),
-                        Text(a.name, style: PxText.sm.copyWith(color: Palette.bark800)),
+                        Text(a.name, style: ProText.sm),
                       ],
                     ),
                   ),

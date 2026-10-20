@@ -10,35 +10,18 @@ import '../data/remote.dart';
 import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../rules/issues.dart';
-import '../rules/rounds.dart';
+import '../rules/rounds.dart' show tookText;
 import '../rules/time.dart';
-import '../rules/sessions.dart';
-import '../rules/task.dart';
 import '../rules/cast.dart';
 import '../sprites/atlas.dart';
 import '../ui/pixel/pixel.dart';
 import 'composer.dart';
+import 'issue_state.dart';
 import 'widgets.dart';
 import 'work_log.dart';
 import 'swatches.dart';
 
-enum IssueFrame { farm, workbench }
-
-class _IssueSection extends StatelessWidget {
-  const _IssueSection({required this.frame, required this.title, this.aside, required this.child});
-  final IssueFrame frame;
-  final String title;
-  final Widget? aside;
-  final Widget child;
-  @override
-  Widget build(BuildContext context) => frame == IssueFrame.workbench
-      ? PxCard(title: title, aside: aside, child: child)
-      : FarmSection(
-          title: title,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [?aside, child]),
-        );
-}
-
+/// The farm's issue page (the plot's detail), drawn from IssueState; the workbench draws its own (workbench/issues/issue_panel.dart).
 class IssueView extends ConsumerStatefulWidget {
   const IssueView({
     super.key,
@@ -47,7 +30,6 @@ class IssueView extends ConsumerStatefulWidget {
     required this.state,
     required this.session,
     this.reload,
-    this.frame = IssueFrame.workbench,
     required this.onHarvest,
     required this.onClose,
     this.onThread,
@@ -61,7 +43,6 @@ class IssueView extends ConsumerStatefulWidget {
   final IssueTag state;
   final Session? session;
   final Future<void> Function()? reload;
-  final IssueFrame frame;
   final Future<void> Function(Session) onHarvest;
   final Future<void> Function(Session) onClose;
   final VoidCallback? onThread;
@@ -120,17 +101,12 @@ class _IssueViewState extends ConsumerState<IssueView> {
     }
   }
 
-  Future<void> _close(Session session) => _act(() => widget.onClose(session));
-
   /// A pass, or a fail whose findings are what the box says: one weed a line.
   Future<void> _accept(bool pass) async {
     final issue = widget.issue;
     if (issue == null) return;
     if (pass) return _act(() => _api.issue.accept(id: issue.id, body: const IssueAcceptRequest(pass: true)));
-    final lines = [
-      for (final l in _draft.text.text.split('\n'))
-        if (l.trim().isNotEmpty) l.trim(),
-    ];
+    final lines = findingsOf(_draft.text.text);
     if (lines.isEmpty) return;
     await _act(
       () => _api.issue.accept(
@@ -152,130 +128,55 @@ class _IssueViewState extends ConsumerState<IssueView> {
     );
   }
 
-  bool get _inTask => widget.issue != null ? issueInTask(widget.issue!, widget.session) : widget.session?.graph != null;
-
-  /// A task's step has none of its own: it goes with its task.
-  List<Widget> _actions(Session? session) {
+  Widget _offer(IssueOffer o, Session h) {
     final busy = _busy;
-    final bed = widget.onNavigate == null
-        ? null
-        : PxButton.text(widget.frame == IssueFrame.farm ? '在看板上看' : '去农场看这块地', icon: 'button-open', onPressed: widget.onNavigate);
-    if (_inTask) return [?bed];
-    return switch ((widget.state, session)) {
-      (IssueTag.working, final h?) => [
-        PxButton.text('叫停这一轮', onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).stop(h.id))),
-        PxButton.text('关上', tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
-        ?bed,
-      ],
-      (IssueTag.waiting, final h?) when h.conflict != null => [
-        PxButton.text('让它解决冲突', tone: PxTone.primary, onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).resolve(h))),
-        PxButton.text('关上', tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
-        ?bed,
-      ],
-      // Stopped halfway (叫停, the server restarted): the work goes on first; what is there can still be harvested.
-      (IssueTag.waiting, final h?) when h.lastRun?.outcome == Outcome.interrupted => [
-        PxButton.text('接着做', tone: PxTone.primary, onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).water(h, '上一轮停在了半路，接着把它做完。'))),
-        PxButton.text('收获', onPressed: busy ? null : () => _act(() => widget.onHarvest(h))),
-        PxButton.text('关上', tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
-        ?bed,
-      ],
-      (IssueTag.waiting, final h?) => [
-        // Every issue has an acceptance; the server leaves done out of moves until a required one has passed.
-        if (h.lastRun?.outcome != Outcome.failed && (widget.issue?.moves.contains(IssueStatus.done) ?? true))
-          PxButton.text('收获', tone: PxTone.primary, onPressed: busy ? null : () => _act(() => widget.onHarvest(h))),
-        if (h.lastRun?.outcome == Outcome.failed)
-          PxButton.text('接着修', tone: PxTone.primary, onPressed: busy ? null : () => _act(() => ref.read(farmCommandsProvider).cure(h))),
-        PxButton.text('关上', tone: PxTone.danger, onPressed: busy ? null : () => _close(h)),
-        ?bed,
-      ],
-      _ => const [],
+    final commands = ref.read(farmCommandsProvider);
+    final (label, run) = switch (o.act) {
+      IssueAct.stop => ('叫停这一轮', () => _act(() => commands.stop(h.id))),
+      IssueAct.resolve => ('让它解决冲突', () => _act(() => commands.resolve(h))),
+      IssueAct.resume => ('接着做', () => _act(() => commands.water(h, resumeWords))),
+      IssueAct.harvest => ('收获', () => _act(() => widget.onHarvest(h))),
+      IssueAct.cure => ('接着修', () => _act(() => commands.cure(h))),
+      IssueAct.close => ('关上', () => _act(() => widget.onClose(h))),
     };
-  }
-
-  /// What is going on, in one line and what it needs: the first thing the owner reads.
-  ({String head, String? line, List<String> list, Color tone}) _status(Issue? issue, Session head, Session? session, Doing current) {
-    final phase = head.phase;
-    final who = head.name;
-    final round = head.runs > 0 ? '第 ${head.runs.round()} 轮' : null;
-    final summary = head.lastRun?.summary;
-    final asks = issue?.asks ?? const <String>[];
-    if (asks.isNotEmpty && session != null) {
-      return (head: '缺肥：$who在等你回答', line: '在下面说一句就算回答。', list: asks, tone: Palette.wheat);
-    }
-    if (session?.conflict case final conflict?) {
-      return (head: '合进 ${conflict.base} 会冲突', line: conflict.files.join('、'), list: const [], tone: Palette.berry);
-    }
-    switch (widget.state) {
-      case IssueTag.working:
-        final doing = current.action == SessionAction.none ? '在干活' : '正在${current.actionText ?? ''}';
-        final quiet = phase is PhaseWorking && phase.quietSince != null;
-        return (
-          head: '$who $doing${round == null ? '' : '（$round）'}',
-          line: quiet ? '很久没动静：可能在跑很久的命令，也可能卡住了。' : (current.label.isEmpty ? null : current.label),
-          list: const [],
-          tone: Palette.leaf300,
-        );
-      case IssueTag.waiting:
-        if (head.lastRun?.outcome == Outcome.failed) return (head: '这一轮没做成', line: summary, list: const [], tone: Palette.berry);
-        if (head.lastRun?.outcome == Outcome.interrupted) return (head: '停在了半路', line: summary, list: const [], tone: Palette.wheat);
-        if (issue?.acceptedAt != null) return (head: '验收过了，可以收获', line: summary, list: const [], tone: Palette.leaf300);
-        return (head: '等你验收 · $who交回来了${round == null ? '' : '（$round）'}', line: summary, list: const [], tone: Palette.wheat);
-      default:
-        final closed = issue?.closedAt;
-        return (
-          head: closed == null ? widget.state.label : '${widget.state.label} · ${wallClockText(closed)}',
-          line: summary,
-          list: const [],
-          tone: Palette.cream200,
-        );
-    }
+    return PxButton.text(
+      label,
+      tone: o.act == IssueAct.close
+          ? PxTone.danger
+          : o.lead
+          ? PxTone.primary
+          : PxTone.plain,
+      onPressed: busy ? null : run,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final issue = widget.issue;
-    final sessions = widget.sessions;
-    final head = widget.session ?? sessions.last;
-    final session = widget.session;
-    final open = widget.state.open;
-    final changes = widget.state == IssueTag.waiting && session != null && issue != null ? ref.watch(issueChangesProvider(issue.id)) : null;
+    final graphs = ref.watch(graphsProvider);
+    final s = IssueState.of(issue: widget.issue, sessions: widget.sessions, tag: widget.state, session: widget.session, graphs: graphs);
+    final issue = s.issue;
+    final head = s.head;
+    final session = s.session;
+    final changes = s.showsChanges ? ref.watch(issueChangesProvider(issue!.id)) : null;
     final steps = ref.watch(sessionEventsProvider(head.id)).value ?? const <SessionEvent>[];
     final body = PxText.sm.copyWith(color: Palette.bark800);
     final xs = PxText.xs.copyWith(color: Palette.bark600);
-    final turns = (session ?? head).runs;
-    final cny = (session ?? head).spent?.cny;
-    final actions = _actions(session);
     final now = DateTime.now().millisecondsSinceEpoch.toDouble();
     final agent = (ref.watch(agentsProvider).value ?? const <String, Agent>{})[head.agent];
-    final tag = head.graph;
-    final graphId = tag?.id ?? issue?.parent ?? (issue?.graph != null ? issue?.id : null);
-    final graph = graphId == null ? null : graphOf(ref.watch(graphsProvider), graphId);
-    final node = tag?.task == null || graph == null ? null : taskOf(graph, tag!.task!);
-    final taskText = graph == null
-        ? '这是种植计划里的一步，跟着计划走。'
-        : node == null
-        ? '在拆种植计划「${graph.title}」：只读代码，不改文件。'
-        : '种植计划「${graph.title}」的一步：${node.title}。做完自动合进计划分支，收获整个计划时才进主分支。';
-    final title = issue == null ? head.brief : issueTitle(issue, ref.watch(graphsProvider));
-    final description = issue?.description?.isNotEmpty == true ? issue!.description! : head.brief;
-    final project = issue?.project ?? head.project;
-    final current = doingOf(head);
-    final status = _status(issue, head, session, current);
-    final weeds = issue?.findings.where((f) => f.pulled != true).toList() ?? const <Finding>[];
-    // The verdict goes with the box: 没过 sends what it says as the findings.
-    final judging =
-        issue != null &&
-        !_inTask &&
-        widget.state == IssueTag.waiting &&
-        session != null &&
-        session.conflict == null &&
-        issue.acceptedAt == null &&
-        head.lastRun?.outcome != Outcome.failed;
-    final talking = open && session != null;
-    final reopening = !open && issue != null && !_inTask;
-    final crew = [
-      for (final s in sessions)
-        if (!sessions.takeWhile((x) => x != s).any((x) => x.agent == s.agent)) s,
+    final title = s.title;
+    final description = s.description;
+    final project = s.project;
+    final current = s.current;
+    final status = s.status;
+    final weeds = s.weeds;
+    final judging = s.judging;
+    final talking = s.talking;
+    final reopening = s.reopening;
+    final bed = widget.onNavigate == null ? null : PxButton.text('在看板上看', icon: 'button-open', onPressed: widget.onNavigate);
+    final actions = [
+      if (session != null)
+        for (final o in s.offers) _offer(o, session),
+      ?bed,
     ];
 
     final statusBox = Container(
@@ -287,10 +188,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
         children: [
           Row(
             children: [
-              if (widget.state == IssueTag.working && current.action != SessionAction.none) ...[
-                ActionGlyph(current.action, size: 20),
-                const SizedBox(width: 8),
-              ],
+              if (s.showsDoing) ...[ActionGlyph(current.action, size: 20), const SizedBox(width: 8)],
               Expanded(child: Text(status.head, style: PxText.base)),
             ],
           ),
@@ -299,12 +197,12 @@ class _IssueViewState extends ConsumerState<IssueView> {
             Text(line, maxLines: 4, overflow: TextOverflow.ellipsis, style: body.copyWith(height: 1.5)),
           ],
           for (final a in status.list) Text('· $a', style: body),
-          if (_inTask) ...[const SizedBox(height: 4), Text(taskText, style: xs)],
+          if (s.inTask) ...[const SizedBox(height: 4), Text(s.taskText, style: xs)],
         ],
       ),
     );
 
-    final box = talking || reopening
+    final box = s.hasBox
         ? Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -314,19 +212,12 @@ class _IssueViewState extends ConsumerState<IssueView> {
                 draft: _draft,
                 minLines: judging ? 3 : 2,
                 enabled: !_busy,
-                // 没过 reads the box one finding a line, so Enter starts a line while it is judged.
-                enterSends: !judging,
+                enterSends: s.enterSends,
                 mentions: talking,
                 sendLabel: '带话',
-                onSend: talking ? (text, key) => _tell(session, text, key) : null,
-                placeholder: judging
-                    ? '没过就写哪里要修，一行一条；也可以只带句话'
-                    : reopening
-                    ? '这次要它做什么（不填就是接着做完）'
-                    : session!.phase is PhaseWorking
-                    ? '干着活也能收到这句话'
-                    : '说一句，它接着做一轮',
-                semanticLabel: reopening ? '重开这张工单' : '给${head.name}带句话',
+                onSend: talking ? (text, key) => _tell(session!, text, key) : null,
+                placeholder: s.placeholder,
+                semanticLabel: s.boxLabel,
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -352,20 +243,9 @@ class _IssueViewState extends ConsumerState<IssueView> {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (description.isNotEmpty && description != title) _Row('要做的', PxReadText(description, color: Palette.bark800)),
-        _Row('谁在做', Text('${head.name}${head.runtime.isNotEmpty ? '（${head.runtime}）' : ''}', style: body)),
-        if (crew.length > 1 || (session != null && head.worktree != null))
-          _Row(
-            '地上的人',
-            Text(
-              [
-                crew.map((s) => s.name).join('、'),
-                // One plot, one worktree: only the session on it now changes the code.
-                if (session != null && head.worktree != null) '锄头在${session.name}手上',
-              ].join(' · '),
-              style: body,
-            ),
-          ),
-        if (issue != null && !_inTask)
+        _Row('谁在做', Text(s.whoLine, style: body)),
+        if (s.crewLine case final crew?) _Row('地上的人', Text(crew, style: body)),
+        if (issue != null && s.acceptanceEditable)
           _Row(
             '验收',
             Wrap(
@@ -378,19 +258,19 @@ class _IssueViewState extends ConsumerState<IssueView> {
                     label,
                     size: PxSize.sm,
                     tone: issue.acceptance == a ? PxTone.primary : PxTone.plain,
-                    onPressed: _busy || issue.acceptance == a || !widget.state.open ? null : () => _setAcceptance(a),
+                    onPressed: _busy || issue.acceptance == a || !s.open ? null : () => _setAcceptance(a),
                   ),
                 if (issue.acceptedAt != null) Text('已验收 ${wallClockText(issue.acceptedAt!)}', style: PxText.xs.copyWith(color: Palette.leaf700)),
               ],
             ),
           ),
-        if (issue != null && issue.findings.any((f) => f.pulled == true))
+        if (s.pulled.isNotEmpty)
           _Row(
             '拔了的草',
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final f in issue.findings.where((f) => f.pulled == true))
+                for (final f in s.pulled)
                   Text(
                     '已拔 · ${f.text}',
                     style: body.copyWith(color: Palette.bark400, decoration: TextDecoration.lineThrough),
@@ -418,16 +298,11 @@ class _IssueViewState extends ConsumerState<IssueView> {
           ),
         if (issue != null) _Row('开单', Text(wallClockText(issue.createdAt), style: body)),
         if (issue?.closedAt != null) _Row('关单', Text(wallClockText(issue!.closedAt!), style: body)),
-        _Row('做过', Text('${sessions.length} 次：${sessions.map((r) => '${r.name}（${r.id}）').join(' → ')}', style: body.copyWith(height: 1.5))),
+        _Row('做过', Text(s.historyLine, style: body.copyWith(height: 1.5))),
         _Row(
           '用时',
           Text(
-            [
-              '${turns > 0 ? turns.round() : roundsOf(steps).length} 轮',
-              tookText((head.endedAt ?? now) - head.hiredAt),
-              if (cny != null) '花了 ¥${cny.toStringAsFixed(2)}',
-              if (head.spent case final spent? when spent.tokens > 0) '${spent.tokens.round()} token',
-            ].join(' · '),
+            s.usedLine(steps: steps, now: now),
             style: body,
           ),
         ),
@@ -436,7 +311,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
           runSpacing: 8,
           children: [
             if (widget.onThread != null) PxButton.text('看工单串', size: PxSize.sm, onPressed: widget.onThread),
-            if (_inTask && widget.onTask != null) PxButton.text('看计划', size: PxSize.sm, onPressed: widget.onTask),
+            if (s.inTask && widget.onTask != null) PxButton.text('看计划', size: PxSize.sm, onPressed: widget.onTask),
           ],
         ),
       ],
@@ -448,16 +323,11 @@ class _IssueViewState extends ConsumerState<IssueView> {
             builder: (context) {
               final c = changes.value;
               if (c == null) return Text(changes.isLoading ? '在读……' : '读不到改动。', style: body);
-              final added = c.files.fold<double>(0, (n, f) => n + f.added).round();
-              final removed = c.files.fold<double>(0, (n, f) => n + f.removed).round();
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    '${c.branch ?? ''} → ${c.base} · ${c.commits.length} 个提交 · +$added -$removed${c.uncommitted.isNotEmpty ? ' · ${c.uncommitted.length} 个没提交' : ''}',
-                    style: body,
-                  ),
+                  Text(changesLine(c), style: body),
                   if (c.conflicts.isNotEmpty) Text('合进 ${c.base} 会冲突：${c.conflicts.join('、')}', style: body.copyWith(color: Palette.berry)),
                   const SizedBox(height: 6),
                   for (final f in c.files.take(12))
@@ -498,7 +368,7 @@ class _IssueViewState extends ConsumerState<IssueView> {
         _Fold(
           label: '干活过程',
           child: steps.isEmpty
-              ? EmptyNote(head.endedAt == null ? '还没有步骤。' : '干活过程只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了。')
+              ? EmptyNote(noStepsText(head))
               : Ticking(
                   builder: (context, now) => WorkLog(steps: steps, now: now, tall: true, working: widget.state == IssueTag.working),
                 ),
@@ -506,12 +376,11 @@ class _IssueViewState extends ConsumerState<IssueView> {
         if (issue != null)
           _Fold(
             label: '每次干活',
-            child: IssueRunsCard(frame: widget.frame, issue: issue.id, version: '${widget.state}:${session?.runs}:${session?.phase.runtimeType}'),
+            child: IssueRunsCard(issue: issue.id, version: s.runsVersion),
           ),
         _Fold(label: '详情', child: details),
       ],
     );
-    if (widget.frame == IssueFrame.workbench) return main;
     return LayoutBuilder(
       builder: (context, box) {
         final aside = _FarmAside(session: head, agent: agent);
@@ -652,10 +521,9 @@ class _Row extends StatelessWidget {
 
 /// The runs of an issue, read again whenever `version` changes.
 class IssueRunsCard extends ConsumerStatefulWidget {
-  const IssueRunsCard({super.key, required this.issue, required this.version, this.frame = IssueFrame.workbench});
+  const IssueRunsCard({super.key, required this.issue, required this.version});
   final String issue;
   final String version;
-  final IssueFrame frame;
 
   @override
   ConsumerState<IssueRunsCard> createState() => IssueRunsCardState();
@@ -683,14 +551,15 @@ class IssueRunsCardState extends ConsumerState<IssueRunsCard> {
       final body = PxText.sm.copyWith(color: Palette.bark800, height: 1.5);
       return Padding(
         padding: const EdgeInsets.only(top: 12),
-        child: _IssueSection(
-          frame: widget.frame,
+        child: FarmSection(
           title: '每次干活',
-          aside: Text('${runs.length} 次'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
-            children: [for (final r in runs.reversed) _Row(wallClockText(r.startedAt), Text(runText(r, now, tookText), style: body))],
+            children: [
+              Text('${runs.length} 次'),
+              for (final r in runs.reversed) _Row(wallClockText(r.startedAt), Text(runText(r, now, tookText), style: body)),
+            ],
           ),
         ),
       );
