@@ -2447,3 +2447,235 @@ func LiveEventOf(e SideEvent) (LiveEvent, bool) {
 		return LiveEvent{}, false
 	}
 }
+
+// Documents (internal/doc): a document is a flat list of blocks, nested by ParentID and ordered by (OrderKey, ID); every
+// change is a DocOp, and the server is the one authority.
+
+// A block's type is a plain string so a client older than the server shows a type it does not know as a read-only
+// placeholder instead of failing to decode; the server takes only these.
+const (
+	//vibevalley:const blockParagraph
+	BlockParagraph = "paragraph"
+	// Attrs.Level 1 to 3.
+	//vibevalley:const blockHeading
+	BlockHeading = "heading"
+	//vibevalley:const blockBulleted
+	BlockBulleted = "bulleted"
+	// Its number is not stored: the client counts the run of numbered siblings it is in.
+	//vibevalley:const blockNumbered
+	BlockNumbered = "numbered"
+	// Attrs.Checked.
+	//vibevalley:const blockTodo
+	BlockTodo = "todo"
+	//vibevalley:const blockQuote
+	BlockQuote = "quote"
+	// Attrs.Language; its text has no marks.
+	//vibevalley:const blockCode
+	BlockCode = "code"
+	// No text.
+	//vibevalley:const blockDivider
+	BlockDivider = "divider"
+	// Attrs.Src, Width, Height, Alt; no text.
+	//vibevalley:const blockImage
+	BlockImage = "image"
+	// Attrs.IssueID; no text.
+	//vibevalley:const blockIssueRef
+	BlockIssueRef = "issue_ref"
+	// Attrs.MemoryID, and text.
+	//vibevalley:const blockMemoryItem
+	BlockMemoryItem = "memory_item"
+	// Who wrote a block when the owner did; a helper's blocks carry its profile id.
+	//vibevalley:const docOwner
+	DocOwner = "owner"
+)
+
+type Document struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	// One more for each batch the document took: how far a client has seen.
+	Seq     int64 `json:"seq"`
+	Created int64 `json:"created"`
+	Updated int64 `json:"updated"`
+}
+
+type DocMarks struct {
+	Bold   bool    `json:"bold,omitzero"`
+	Italic bool    `json:"italic,omitzero"`
+	Code   bool    `json:"code,omitzero"`
+	Strike bool    `json:"strike,omitzero"`
+	Link   *string `json:"link,omitzero"`
+}
+
+// A run of text with the same marks.
+type DocSpan struct {
+	T     string   `json:"t"`
+	Marks DocMarks `json:"marks"`
+}
+
+// What a block's type says about it; the fields its type does not use stay unset.
+type BlockAttrs struct {
+	Level    *int64  `json:"level,omitzero"`
+	Checked  *bool   `json:"checked,omitzero"`
+	Language *string `json:"language,omitzero"`
+	Src      *string `json:"src,omitzero"`
+	Width    *int64  `json:"width,omitzero"`
+	Height   *int64  `json:"height,omitzero"`
+	Alt      *string `json:"alt,omitzero"`
+	IssueID  *string `json:"issueId,omitzero"`
+	MemoryID *string `json:"memoryId,omitzero"`
+}
+
+type Block struct {
+	// Made by the client that inserts it (a uuid), never changed, unique across documents.
+	ID       string  `json:"id"`
+	DocID    string  `json:"docId"`
+	ParentID *string `json:"parentId,omitzero"`
+	// Fractional index among its siblings: base62 digits, never ending in 0. Ties sort by ID.
+	OrderKey string     `json:"orderKey"`
+	Type     string     `json:"type"`
+	Attrs    BlockAttrs `json:"attrs"`
+	Text     []DocSpan  `json:"text"`
+	// One more for every op that changed the block.
+	Rev int64 `json:"rev"`
+	// A tombstone: kept so a later op on it can be answered and undone.
+	Deleted bool `json:"deleted,omitzero"`
+	// DocOwner, or the profile id of the helper that wrote it last.
+	UpdatedBy string `json:"updatedBy"`
+	Updated   int64  `json:"updated"`
+}
+
+type DocSnapshot struct {
+	Doc    Document `json:"doc"`
+	Blocks []Block  `json:"blocks"`
+}
+
+type DocRequest struct {
+	Title string `json:"title"`
+}
+
+type DocImport struct {
+	Title    string `json:"title"`
+	Markdown string `json:"markdown"`
+}
+
+type DocMarkdown struct {
+	Markdown string `json:"markdown"`
+}
+
+//vibevalley:union op
+type DocOp struct{ Value DocOpValue }
+
+// A new block; its Rev starts at 1, whatever was sent.
+//
+//vibevalley:member DocOp insert_block
+type DocOpInsertBlock struct {
+	Block Block `json:"block"`
+}
+
+// The block's whole new text, written against BaseRev.
+//
+//vibevalley:member DocOp update_text
+type DocOpUpdateText struct {
+	BlockID string    `json:"blockId"`
+	BaseRev int64     `json:"baseRev"`
+	Text    []DocSpan `json:"text"`
+}
+
+// The fields Attrs sets are written, the names in Unset removed; the rest stay. The last to arrive wins.
+//
+//vibevalley:member DocOp set_attrs
+type DocOpSetAttrs struct {
+	BlockID string     `json:"blockId"`
+	Attrs   BlockAttrs `json:"attrs"`
+	Unset   []string   `json:"unset,omitzero"`
+}
+
+// A type without text drops the block's text.
+//
+//vibevalley:member DocOp set_type
+type DocOpSetType struct {
+	BlockID string     `json:"blockId"`
+	Type    string     `json:"type"`
+	Attrs   BlockAttrs `json:"attrs"`
+}
+
+//vibevalley:member DocOp move_block
+type DocOpMoveBlock struct {
+	BlockID  string  `json:"blockId"`
+	ParentID *string `json:"parentId,omitzero"`
+	OrderKey string  `json:"orderKey"`
+}
+
+// A tombstone, its children's too.
+//
+//vibevalley:member DocOp delete_block
+type DocOpDeleteBlock struct {
+	BlockID string `json:"blockId"`
+}
+
+//vibevalley:member DocOp restore_block
+type DocOpRestoreBlock struct {
+	BlockID string `json:"blockId"`
+}
+
+// Enter inside a block, as one op: the text from Offset (Unicode code points into the text at BaseRev, not UTF-16 units)
+// moves into NewBlock, which the client gives its id, parent and order key.
+//
+//vibevalley:member DocOp split_block
+type DocOpSplitBlock struct {
+	BlockID  string `json:"blockId"`
+	BaseRev  int64  `json:"baseRev"`
+	Offset   int64  `json:"offset"`
+	NewBlock Block  `json:"newBlock"`
+}
+
+// Backspace at the start of Source, as one op: Source's current text goes onto the end of Target's current text,
+// Source's children move under Target, and Source is deleted.
+//
+//vibevalley:member DocOp merge_blocks
+type DocOpMergeBlocks struct {
+	TargetID string `json:"targetId"`
+	SourceID string `json:"sourceId"`
+}
+
+type DocSubmit struct {
+	// Made by the client: the same batch sent again is taken once, and answered with the first answer.
+	BatchID string `json:"batchId"`
+	// The seq the client has seen.
+	LastSeq int64   `json:"lastSeq"`
+	Ops     []DocOp `json:"ops"`
+}
+
+type DocOpStatus string
+
+const (
+	DocOpStatusApplied DocOpStatus = "applied"
+	// Taken after merging with what changed since BaseRev.
+	DocOpStatusMerged DocOpStatus = "merged"
+	// Not taken: the block keeps what it has; Yours is what was sent.
+	DocOpStatusConflict DocOpStatus = "conflict"
+	// Nothing to do (a merge whose source is already gone).
+	DocOpStatusNoop DocOpStatus = "noop"
+	// Not a valid op (a block that is not there, a type the server does not know, a bad order key); Reason says why.
+	DocOpStatusRejected DocOpStatus = "rejected"
+)
+
+type DocOpResult struct {
+	Status  DocOpStatus `json:"status"`
+	BlockID string      `json:"blockId"`
+	Rev     int64       `json:"rev,omitzero"`
+	// merged: the text the block now has.
+	Text []DocSpan `json:"text,omitzero"`
+	// conflict: what was sent.
+	Yours []DocSpan `json:"yours,omitzero"`
+	// conflict and rejected: why, in words for the owner.
+	Reason string `json:"reason,omitzero"`
+}
+
+type DocAck struct {
+	BatchID string        `json:"batchId"`
+	Seq     int64         `json:"seq"`
+	Results []DocOpResult `json:"results"`
+	// The blocks the batch changed, as they are now: the client puts them in place of its own.
+	Blocks []Block `json:"blocks"`
+}

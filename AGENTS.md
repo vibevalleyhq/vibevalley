@@ -7,7 +7,7 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ```
 server/                    服务端，一个 Go 模块 vibevalley；cmd/server 单独跑它，cmd/vibevalley 是命令行（农场的每个接口、和农机直接聊、自己的 agent），cmd/migrate 管表结构
 server/internal/           农场的服务，一块业务一个包，名字用单数，每个包只导出一个 Service：core、setting、agent、project、
-                           memory、runtime、session、channel、schedule、issue、task、tool、manager、lan、voice、connector、game；
+                           memory、doc、runtime、session、channel、schedule、issue、task、tool、manager、lan、voice、connector、game；
                            agent 的子包 brain 是 VibeValley 自己的 agent，task 的子包 engine 是任务图的引擎；base 是地基，workspace 把它们组装起来，handler 是全部 HTTP 处理，mcp 把 tool 里的工具交给编码 agent
 server/migrations/         SQLite 的表结构：一个基线 0001_schema.sql，直接改它；也是 sqlc 读的表结构
 server/internal/protocol/  形状（shapes.go、api.go）和规则的唯一来源；tool/shapegen 从它写出 gen.go 和 Flutter 的 lib/gen

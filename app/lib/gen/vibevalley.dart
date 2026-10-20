@@ -62,6 +62,39 @@ const sessionMcpServers = 'mcpServers';
 
 const sessionDisallowedTools = 'disallowedTools';
 
+const blockParagraph = 'paragraph';
+
+/// Attrs.Level 1 to 3.
+const blockHeading = 'heading';
+
+const blockBulleted = 'bulleted';
+
+/// Its number is not stored: the client counts the run of numbered siblings it is in.
+const blockNumbered = 'numbered';
+
+/// Attrs.Checked.
+const blockTodo = 'todo';
+
+const blockQuote = 'quote';
+
+/// Attrs.Language; its text has no marks.
+const blockCode = 'code';
+
+/// No text.
+const blockDivider = 'divider';
+
+/// Attrs.Src, Width, Height, Alt; no text.
+const blockImage = 'image';
+
+/// Attrs.IssueID; no text.
+const blockIssueRef = 'issue_ref';
+
+/// Attrs.MemoryID, and text.
+const blockMemoryItem = 'memory_item';
+
+/// Who wrote a block when the owner did; a helper's blocks carry its profile id.
+const docOwner = 'owner';
+
 class ServerReady {
   const ServerReady({required this.url, required this.pid});
 
@@ -5684,6 +5717,446 @@ final class LiveEventRuntime extends LiveEvent {
   Map<String, dynamic> toJson() => {'type': 'runtime', 'at': at, 'info': info.toJson()};
 }
 
+class Document {
+  const Document({required this.id, required this.title, required this.seq, required this.created, required this.updated});
+
+  factory Document.fromJson(Map<String, dynamic> j) => Document(
+    id: j['id'] as String,
+    title: j['title'] as String,
+    seq: (j['seq'] as num).toDouble(),
+    created: (j['created'] as num).toDouble(),
+    updated: (j['updated'] as num).toDouble(),
+  );
+
+  final String id;
+  final String title;
+  final double seq;
+  final double created;
+  final double updated;
+
+  Map<String, dynamic> toJson() => {'id': id, 'title': title, 'seq': seq, 'created': created, 'updated': updated};
+}
+
+class DocMarks {
+  const DocMarks({this.bold, this.italic, this.code, this.strike, this.link});
+
+  factory DocMarks.fromJson(Map<String, dynamic> j) => DocMarks(
+    bold: j['bold'] == null ? null : j['bold'] as bool,
+    italic: j['italic'] == null ? null : j['italic'] as bool,
+    code: j['code'] == null ? null : j['code'] as bool,
+    strike: j['strike'] == null ? null : j['strike'] as bool,
+    link: j['link'] == null ? null : j['link'] as String,
+  );
+
+  final bool? bold;
+  final bool? italic;
+  final bool? code;
+  final bool? strike;
+  final String? link;
+
+  Map<String, dynamic> toJson() => {
+    if (bold != null) 'bold': bold!,
+    if (italic != null) 'italic': italic!,
+    if (code != null) 'code': code!,
+    if (strike != null) 'strike': strike!,
+    if (link != null) 'link': link!,
+  };
+}
+
+class DocSpan {
+  const DocSpan({required this.t, required this.marks});
+
+  factory DocSpan.fromJson(Map<String, dynamic> j) => DocSpan(t: j['t'] as String, marks: DocMarks.fromJson(j['marks'] as Map<String, dynamic>));
+
+  final String t;
+  final DocMarks marks;
+
+  Map<String, dynamic> toJson() => {'t': t, 'marks': marks.toJson()};
+}
+
+class BlockAttrs {
+  const BlockAttrs({this.level, this.checked, this.language, this.src, this.width, this.height, this.alt, this.issueId, this.memoryId});
+
+  factory BlockAttrs.fromJson(Map<String, dynamic> j) => BlockAttrs(
+    level: j['level'] == null ? null : (j['level'] as num).toDouble(),
+    checked: j['checked'] == null ? null : j['checked'] as bool,
+    language: j['language'] == null ? null : j['language'] as String,
+    src: j['src'] == null ? null : j['src'] as String,
+    width: j['width'] == null ? null : (j['width'] as num).toDouble(),
+    height: j['height'] == null ? null : (j['height'] as num).toDouble(),
+    alt: j['alt'] == null ? null : j['alt'] as String,
+    issueId: j['issueId'] == null ? null : j['issueId'] as String,
+    memoryId: j['memoryId'] == null ? null : j['memoryId'] as String,
+  );
+
+  final double? level;
+  final bool? checked;
+  final String? language;
+  final String? src;
+  final double? width;
+  final double? height;
+  final String? alt;
+  final String? issueId;
+  final String? memoryId;
+
+  Map<String, dynamic> toJson() => {
+    if (level != null) 'level': level!,
+    if (checked != null) 'checked': checked!,
+    if (language != null) 'language': language!,
+    if (src != null) 'src': src!,
+    if (width != null) 'width': width!,
+    if (height != null) 'height': height!,
+    if (alt != null) 'alt': alt!,
+    if (issueId != null) 'issueId': issueId!,
+    if (memoryId != null) 'memoryId': memoryId!,
+  };
+}
+
+class Block {
+  const Block({
+    required this.id,
+    required this.docId,
+    this.parentId,
+    required this.orderKey,
+    required this.type,
+    required this.attrs,
+    required this.text,
+    required this.rev,
+    this.deleted,
+    required this.updatedBy,
+    required this.updated,
+  });
+
+  factory Block.fromJson(Map<String, dynamic> j) => Block(
+    id: j['id'] as String,
+    docId: j['docId'] as String,
+    parentId: j['parentId'] == null ? null : j['parentId'] as String,
+    orderKey: j['orderKey'] as String,
+    type: j['type'] as String,
+    attrs: BlockAttrs.fromJson(j['attrs'] as Map<String, dynamic>),
+    text: [for (final e in j['text'] as List) DocSpan.fromJson(e as Map<String, dynamic>)],
+    rev: (j['rev'] as num).toDouble(),
+    deleted: j['deleted'] == null ? null : j['deleted'] as bool,
+    updatedBy: j['updatedBy'] as String,
+    updated: (j['updated'] as num).toDouble(),
+  );
+
+  final String id;
+  final String docId;
+  final String? parentId;
+  final String orderKey;
+  final String type;
+  final BlockAttrs attrs;
+  final List<DocSpan> text;
+  final double rev;
+  final bool? deleted;
+  final String updatedBy;
+  final double updated;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'docId': docId,
+    if (parentId != null) 'parentId': parentId!,
+    'orderKey': orderKey,
+    'type': type,
+    'attrs': attrs.toJson(),
+    'text': [for (final e in text) e.toJson()],
+    'rev': rev,
+    if (deleted != null) 'deleted': deleted!,
+    'updatedBy': updatedBy,
+    'updated': updated,
+  };
+}
+
+class DocSnapshot {
+  const DocSnapshot({required this.doc, required this.blocks});
+
+  factory DocSnapshot.fromJson(Map<String, dynamic> j) => DocSnapshot(
+    doc: Document.fromJson(j['doc'] as Map<String, dynamic>),
+    blocks: [for (final e in j['blocks'] as List) Block.fromJson(e as Map<String, dynamic>)],
+  );
+
+  final Document doc;
+  final List<Block> blocks;
+
+  Map<String, dynamic> toJson() => {
+    'doc': doc.toJson(),
+    'blocks': [for (final e in blocks) e.toJson()],
+  };
+}
+
+class DocRequest {
+  const DocRequest({required this.title});
+
+  factory DocRequest.fromJson(Map<String, dynamic> j) => DocRequest(title: j['title'] as String);
+
+  final String title;
+
+  Map<String, dynamic> toJson() => {'title': title};
+}
+
+class DocImport {
+  const DocImport({required this.title, required this.markdown});
+
+  factory DocImport.fromJson(Map<String, dynamic> j) => DocImport(title: j['title'] as String, markdown: j['markdown'] as String);
+
+  final String title;
+  final String markdown;
+
+  Map<String, dynamic> toJson() => {'title': title, 'markdown': markdown};
+}
+
+class DocMarkdown {
+  const DocMarkdown({required this.markdown});
+
+  factory DocMarkdown.fromJson(Map<String, dynamic> j) => DocMarkdown(markdown: j['markdown'] as String);
+
+  final String markdown;
+
+  Map<String, dynamic> toJson() => {'markdown': markdown};
+}
+
+/// Told apart by `op`; switch over the subclasses.
+sealed class DocOp {
+  const DocOp();
+
+  factory DocOp.fromJson(Map<String, dynamic> j) => switch (j['op']) {
+    'insert_block' => DocOpInsertBlock.fromJson(j),
+    'update_text' => DocOpUpdateText.fromJson(j),
+    'set_attrs' => DocOpSetAttrs.fromJson(j),
+    'set_type' => DocOpSetType.fromJson(j),
+    'move_block' => DocOpMoveBlock.fromJson(j),
+    'delete_block' => DocOpDeleteBlock.fromJson(j),
+    'restore_block' => DocOpRestoreBlock.fromJson(j),
+    'split_block' => DocOpSplitBlock.fromJson(j),
+    'merge_blocks' => DocOpMergeBlocks.fromJson(j),
+    final other => throw FormatException('DocOp: unknown op', other),
+  };
+
+  Map<String, dynamic> toJson();
+}
+
+final class DocOpInsertBlock extends DocOp {
+  const DocOpInsertBlock({required this.block});
+
+  factory DocOpInsertBlock.fromJson(Map<String, dynamic> j) => DocOpInsertBlock(block: Block.fromJson(j['block'] as Map<String, dynamic>));
+
+  final Block block;
+
+  @override
+  Map<String, dynamic> toJson() => {'op': 'insert_block', 'block': block.toJson()};
+}
+
+final class DocOpUpdateText extends DocOp {
+  const DocOpUpdateText({required this.blockId, required this.baseRev, required this.text});
+
+  factory DocOpUpdateText.fromJson(Map<String, dynamic> j) => DocOpUpdateText(
+    blockId: j['blockId'] as String,
+    baseRev: (j['baseRev'] as num).toDouble(),
+    text: [for (final e in j['text'] as List) DocSpan.fromJson(e as Map<String, dynamic>)],
+  );
+
+  final String blockId;
+  final double baseRev;
+  final List<DocSpan> text;
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'op': 'update_text',
+    'blockId': blockId,
+    'baseRev': baseRev,
+    'text': [for (final e in text) e.toJson()],
+  };
+}
+
+final class DocOpSetAttrs extends DocOp {
+  const DocOpSetAttrs({required this.blockId, required this.attrs, this.unset});
+
+  factory DocOpSetAttrs.fromJson(Map<String, dynamic> j) => DocOpSetAttrs(
+    blockId: j['blockId'] as String,
+    attrs: BlockAttrs.fromJson(j['attrs'] as Map<String, dynamic>),
+    unset: j['unset'] == null ? null : [for (final e in j['unset'] as List) e as String],
+  );
+
+  final String blockId;
+  final BlockAttrs attrs;
+  final List<String>? unset;
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'op': 'set_attrs',
+    'blockId': blockId,
+    'attrs': attrs.toJson(),
+    if (unset != null) 'unset': [for (final e in unset!) e],
+  };
+}
+
+final class DocOpSetType extends DocOp {
+  const DocOpSetType({required this.blockId, required this.type, required this.attrs});
+
+  factory DocOpSetType.fromJson(Map<String, dynamic> j) =>
+      DocOpSetType(blockId: j['blockId'] as String, type: j['type'] as String, attrs: BlockAttrs.fromJson(j['attrs'] as Map<String, dynamic>));
+
+  final String blockId;
+  final String type;
+  final BlockAttrs attrs;
+
+  @override
+  Map<String, dynamic> toJson() => {'op': 'set_type', 'blockId': blockId, 'type': type, 'attrs': attrs.toJson()};
+}
+
+final class DocOpMoveBlock extends DocOp {
+  const DocOpMoveBlock({required this.blockId, this.parentId, required this.orderKey});
+
+  factory DocOpMoveBlock.fromJson(Map<String, dynamic> j) =>
+      DocOpMoveBlock(blockId: j['blockId'] as String, parentId: j['parentId'] == null ? null : j['parentId'] as String, orderKey: j['orderKey'] as String);
+
+  final String blockId;
+  final String? parentId;
+  final String orderKey;
+
+  @override
+  Map<String, dynamic> toJson() => {'op': 'move_block', 'blockId': blockId, if (parentId != null) 'parentId': parentId!, 'orderKey': orderKey};
+}
+
+final class DocOpDeleteBlock extends DocOp {
+  const DocOpDeleteBlock({required this.blockId});
+
+  factory DocOpDeleteBlock.fromJson(Map<String, dynamic> j) => DocOpDeleteBlock(blockId: j['blockId'] as String);
+
+  final String blockId;
+
+  @override
+  Map<String, dynamic> toJson() => {'op': 'delete_block', 'blockId': blockId};
+}
+
+final class DocOpRestoreBlock extends DocOp {
+  const DocOpRestoreBlock({required this.blockId});
+
+  factory DocOpRestoreBlock.fromJson(Map<String, dynamic> j) => DocOpRestoreBlock(blockId: j['blockId'] as String);
+
+  final String blockId;
+
+  @override
+  Map<String, dynamic> toJson() => {'op': 'restore_block', 'blockId': blockId};
+}
+
+final class DocOpSplitBlock extends DocOp {
+  const DocOpSplitBlock({required this.blockId, required this.baseRev, required this.offset, required this.newBlock});
+
+  factory DocOpSplitBlock.fromJson(Map<String, dynamic> j) => DocOpSplitBlock(
+    blockId: j['blockId'] as String,
+    baseRev: (j['baseRev'] as num).toDouble(),
+    offset: (j['offset'] as num).toDouble(),
+    newBlock: Block.fromJson(j['newBlock'] as Map<String, dynamic>),
+  );
+
+  final String blockId;
+  final double baseRev;
+  final double offset;
+  final Block newBlock;
+
+  @override
+  Map<String, dynamic> toJson() => {'op': 'split_block', 'blockId': blockId, 'baseRev': baseRev, 'offset': offset, 'newBlock': newBlock.toJson()};
+}
+
+final class DocOpMergeBlocks extends DocOp {
+  const DocOpMergeBlocks({required this.targetId, required this.sourceId});
+
+  factory DocOpMergeBlocks.fromJson(Map<String, dynamic> j) => DocOpMergeBlocks(targetId: j['targetId'] as String, sourceId: j['sourceId'] as String);
+
+  final String targetId;
+  final String sourceId;
+
+  @override
+  Map<String, dynamic> toJson() => {'op': 'merge_blocks', 'targetId': targetId, 'sourceId': sourceId};
+}
+
+class DocSubmit {
+  const DocSubmit({required this.batchId, required this.lastSeq, required this.ops});
+
+  factory DocSubmit.fromJson(Map<String, dynamic> j) => DocSubmit(
+    batchId: j['batchId'] as String,
+    lastSeq: (j['lastSeq'] as num).toDouble(),
+    ops: [for (final e in j['ops'] as List) DocOp.fromJson(e as Map<String, dynamic>)],
+  );
+
+  final String batchId;
+  final double lastSeq;
+  final List<DocOp> ops;
+
+  Map<String, dynamic> toJson() => {
+    'batchId': batchId,
+    'lastSeq': lastSeq,
+    'ops': [for (final e in ops) e.toJson()],
+  };
+}
+
+enum DocOpStatus {
+  applied('applied'),
+  merged('merged'),
+  conflict('conflict'),
+  noop('noop'),
+  rejected('rejected');
+
+  const DocOpStatus(this.wire);
+  final String wire;
+
+  static DocOpStatus fromJson(Object? v) => values.firstWhere((e) => e.wire == v, orElse: () => throw FormatException('DocOpStatus: unknown value', v));
+}
+
+class DocOpResult {
+  const DocOpResult({required this.status, required this.blockId, this.rev, this.text, this.yours, this.reason});
+
+  factory DocOpResult.fromJson(Map<String, dynamic> j) => DocOpResult(
+    status: DocOpStatus.fromJson(j['status']),
+    blockId: j['blockId'] as String,
+    rev: j['rev'] == null ? null : (j['rev'] as num).toDouble(),
+    text: j['text'] == null ? null : [for (final e in j['text'] as List) DocSpan.fromJson(e as Map<String, dynamic>)],
+    yours: j['yours'] == null ? null : [for (final e in j['yours'] as List) DocSpan.fromJson(e as Map<String, dynamic>)],
+    reason: j['reason'] == null ? null : j['reason'] as String,
+  );
+
+  final DocOpStatus status;
+  final String blockId;
+  final double? rev;
+  final List<DocSpan>? text;
+  final List<DocSpan>? yours;
+  final String? reason;
+
+  Map<String, dynamic> toJson() => {
+    'status': status.wire,
+    'blockId': blockId,
+    if (rev != null) 'rev': rev!,
+    if (text != null) 'text': [for (final e in text!) e.toJson()],
+    if (yours != null) 'yours': [for (final e in yours!) e.toJson()],
+    if (reason != null) 'reason': reason!,
+  };
+}
+
+class DocAck {
+  const DocAck({required this.batchId, required this.seq, required this.results, required this.blocks});
+
+  factory DocAck.fromJson(Map<String, dynamic> j) => DocAck(
+    batchId: j['batchId'] as String,
+    seq: (j['seq'] as num).toDouble(),
+    results: [for (final e in j['results'] as List) DocOpResult.fromJson(e as Map<String, dynamic>)],
+    blocks: [for (final e in j['blocks'] as List) Block.fromJson(e as Map<String, dynamic>)],
+  );
+
+  final String batchId;
+  final double seq;
+  final List<DocOpResult> results;
+  final List<Block> blocks;
+
+  Map<String, dynamic> toJson() => {
+    'batchId': batchId,
+    'seq': seq,
+    'results': [for (final e in results) e.toJson()],
+    'blocks': [for (final e in blocks) e.toJson()],
+  };
+}
+
 /// The `server` endpoints of VibeValleyApi.
 class ServerApi {
   ServerApi._(this._api);
@@ -6288,6 +6761,46 @@ class LanApi {
   }
 }
 
+/// The `doc` endpoints of VibeValleyApi.
+class DocApi {
+  DocApi._(this._api);
+  final VibeValleyApi _api;
+
+  /// The documents, the newest change first; their blocks are in doc.get.
+  Future<List<Document>> list() async {
+    final j = await _api._call('GET', '/api/v1/docs', query: {}, body: null);
+    return [for (final e in j as List) Document.fromJson(e as Map<String, dynamic>)];
+  }
+
+  Future<DocSnapshot> create({required DocRequest body}) async {
+    final j = await _api._call('POST', '/api/v1/docs', query: {}, body: body.toJson());
+    return DocSnapshot.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// A new document from Markdown: the format documents trade with agents and MEMORY.md in, not how they are stored.
+  Future<DocSnapshot> import({required DocImport body}) async {
+    final j = await _api._call('POST', '/api/v1/docs/import', query: {}, body: body.toJson());
+    return DocSnapshot.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// The document and every live block (no tombstones), in order.
+  Future<DocSnapshot> get({required String id}) async {
+    final j = await _api._call('GET', '/api/v1/docs/${Uri.encodeComponent((id).toString())}', query: {}, body: null);
+    return DocSnapshot.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// A batch of ops, as the owner: taken in order, in one transaction, one batch of a document at a time.
+  Future<DocAck> submit({required String id, required DocSubmit body}) async {
+    final j = await _api._call('POST', '/api/v1/docs/${Uri.encodeComponent((id).toString())}/submit', query: {}, body: body.toJson());
+    return DocAck.fromJson(j as Map<String, dynamic>);
+  }
+
+  Future<DocMarkdown> markdown({required String id}) async {
+    final j = await _api._call('GET', '/api/v1/docs/${Uri.encodeComponent((id).toString())}/markdown', query: {}, body: null);
+    return DocMarkdown.fromJson(j as Map<String, dynamic>);
+  }
+}
+
 /// A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status.
 class VibeValleyApiError implements Exception {
   VibeValleyApiError(this.status, this.tag, this.reason);
@@ -6324,6 +6837,7 @@ class VibeValleyApi {
   late final voice = VoiceApi._(this);
   late final connector = ConnectorApi._(this);
   late final lan = LanApi._(this);
+  late final doc = DocApi._(this);
 
   Future<Object?> _call(String method, String path, {Map<String, String> query = const {}, Object? body}) async {
     final request = http.Request(method, base.resolve(path).replace(queryParameters: query.isEmpty ? null : query));

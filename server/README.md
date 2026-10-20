@@ -14,7 +14,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 |---|---|
 | `internal/protocol` | 形状和接口的唯一来源（`shapes.go`、`api.go`）和生成的 `gen.go`；核心状态的折法（`Reduce`）和几个包都用的纯规则（只有一个主人的规则在主人包里）；`seeds.json`（种子档案、默认设置、农机的能力、成就） |
 | `internal/base` | 地基，不放业务：数据库和迁移、`Hub`、存文件、id、`Config`（viper 读 YAML 和环境变量）、生命周期 |
-| `internal/core`、`setting`、`agent`、`project`、`memory`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`lan`、`voice`、`connector`、`game` | 服务，一块业务一个包（见「服务」） |
+| `internal/core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`manager`、`lan`、`voice`、`connector`、`game` | 服务，一块业务一个包（见「服务」） |
 | `internal/workspace` | 把全部包组装成一个 Workspace（`workspace.go`：`Workspace` 握着全部服务） |
 | `internal/handler` | 全部 HTTP 处理：`VibeValleyApi`（`api.go`，每个处理只转给拥有它的服务）、事件流和状态流；`/mcp` 挂的是 `mcp` 包的处理（`http.go`） |
 | `internal/testkit` | 各包的测试共用的：比较（`Eq`、`Match`）、等待（`Until`、`Await` 等会发生的事，`Settle` 查不该发生的）、一次性的 git 仓库；只给测试 import，不 import 农场的包，`protocol` 自己的测试也用它。测试的起点（临时目录里的配置 `fixture.Config`、种子里的 lab 档案和 pi 农机）在 `testkit/fixture` |
@@ -47,6 +47,7 @@ Go 模块 `vibevalley`，Go 1.27.2，不用 cgo（SQLite 用 `modernc.org/sqlite
 | agent | `Agent` | 帮工档案、技能书、农机设置（`config.json`）；子包 `brain` 是 VibeValley 自己的 agent（会话、压缩、技能、记性、定时、帮手、编码工具；管家用它，`brain/oarruntime` 把它包成农机 `vibevalley`） |
 | project | `Project` | 仓库、worktree、每个项目同时能有几个执行，和项目页要的统计（`codebase.go`：最近一次提交、语言、一年的提交） |
 | memory | `Memory` | 档案记得的事（`memory.go`）和管家记得的事（`WriteManager`、`ForgetManager`、`Archive`） |
+| doc | `Doc` | 文档：块、op 管线、修订、Markdown 导入导出（`doc.go`、`ops.go`；[文档](docs/subsystems/doc.md)） |
 | runtime | `Runtime` | 农机的探测、额度、花费、价目表 |
 | session | `Session` | 为工单开的 Session，农场里的帮工（`sessions.go`：会话、带话和叫醒、同时干活的上限，建在 smith 上）、执行的步骤和轨迹头（`trajectories.go`）、帮工会话的令牌（`tokens.go`） |
 | channel | `Channel` | 频道、对话、串、消息、投递 |

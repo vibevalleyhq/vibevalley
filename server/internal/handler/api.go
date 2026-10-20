@@ -496,3 +496,27 @@ func (a api) IssueStatus(ctx context.Context, id string, body protocol.IssueStat
 	got, err := a.f.Issue.SetStatus(context.WithoutCancel(ctx), id, body.Status, body.Text, a.f.Channel.General())
 	return got, refused(err)
 }
+
+func (a api) DocList(ctx context.Context) ([]protocol.Document, error) { return a.f.Doc.List(ctx) }
+
+func (a api) DocCreate(ctx context.Context, body protocol.DocRequest) (protocol.DocSnapshot, error) {
+	return a.f.Doc.Create(ctx, body.Title)
+}
+
+func (a api) DocImport(ctx context.Context, body protocol.DocImport) (protocol.DocSnapshot, error) {
+	return a.f.Doc.Import(ctx, body.Title, body.Markdown, protocol.DocOwner)
+}
+
+func (a api) DocGet(ctx context.Context, id string) (protocol.DocSnapshot, error) {
+	return a.f.Doc.Get(ctx, id)
+}
+
+func (a api) DocSubmit(ctx context.Context, id string, body protocol.DocSubmit) (protocol.DocAck, error) {
+	ack, err := a.f.Doc.Submit(ctx, id, protocol.DocOwner, body)
+	return ack, refused(err)
+}
+
+func (a api) DocMarkdown(ctx context.Context, id string) (protocol.DocMarkdown, error) {
+	md, err := a.f.Doc.Markdown(ctx, id)
+	return protocol.DocMarkdown{Markdown: md}, err
+}

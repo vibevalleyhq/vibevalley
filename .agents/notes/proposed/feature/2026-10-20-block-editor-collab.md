@@ -260,6 +260,14 @@ doc_changes     (doc_id, seq, batch_id unique, actor, block_ids, created_at)
 | P2 | WebSocket 广播、块级 rev、presence、三方合并、冲突提示 | 两台设备同时编辑，共用用例里的并发几条通过 |
 | P3 | 拆分和合并的冲突映射、断线补交、历史与找回、agent 接入 | 弱网模拟和 agent 流式写入下不丢内容 |
 
+### 进度
+
+P1 的服务端做了（[文档](docs/subsystems/doc.md)）：
+
+- 块模型、全部九种 op、存储（`doc`、`doc_block`、`doc_block_revision`、`doc_change`）、一批一个事务、`batchId` 去重、seq、每个 op 的结果、墓碑、修订、顺序键、码点偏移、Markdown 导入导出和往返用例。
+- 落后的 `baseRev`：这一块的字从那一版起没变过就照收，变过就是 `conflict`（`split_block` 在末尾拆）。三方合并（`merged`）留在 P2。
+- 还没有 WebSocket：`doc.submit` 的回答里带改后的块。
+
 ### 待定
 
 - 嵌套最多几层？

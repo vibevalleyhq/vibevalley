@@ -13,6 +13,7 @@ import (
 	"vibevalley/internal/channel"
 	"vibevalley/internal/connector"
 	"vibevalley/internal/core"
+	"vibevalley/internal/doc"
 	"vibevalley/internal/game"
 	"vibevalley/internal/issue"
 	"vibevalley/internal/lan"
@@ -44,6 +45,7 @@ type services struct {
 	Setting   *setting.Service
 	Project   *project.Service
 	Memory    *memory.Service
+	Doc       *doc.Service
 	Runtime   *runtime.Service
 	Game      *game.Service
 	Session   *session.Service
@@ -63,6 +65,7 @@ var layers = []base.Layer{
 	core.Module, setting.Module, agent.Module,
 	project.Module,
 	memory.Module,
+	doc.Module,
 	runtime.Module,
 	session.Module,
 	channel.Module,

@@ -305,4 +305,26 @@ type Handlers interface {
 	//vibevalley:route lan.me GET /api/v1/lan/me
 	//vibevalley:can owner remote
 	LanMe(ctx context.Context) (LanDevice, error)
+	// The documents, the newest change first; their blocks are in doc.get.
+	//vibevalley:route doc.list GET /api/v1/docs
+	//vibevalley:can owner remote
+	DocList(ctx context.Context) ([]Document, error)
+	//vibevalley:route doc.create POST /api/v1/docs
+	//vibevalley:can owner remote
+	DocCreate(ctx context.Context, body DocRequest) (DocSnapshot, error)
+	// A new document from Markdown: the format documents trade with agents and MEMORY.md in, not how they are stored.
+	//vibevalley:route doc.import POST /api/v1/docs/import
+	//vibevalley:can owner remote
+	DocImport(ctx context.Context, body DocImport) (DocSnapshot, error)
+	// The document and every live block (no tombstones), in order.
+	//vibevalley:route doc.get GET /api/v1/docs/{id}
+	//vibevalley:can owner remote
+	DocGet(ctx context.Context, pID string) (DocSnapshot, error)
+	// A batch of ops, as the owner: taken in order, in one transaction, one batch of a document at a time.
+	//vibevalley:route doc.submit POST /api/v1/docs/{id}/submit
+	//vibevalley:can owner remote
+	DocSubmit(ctx context.Context, pID string, body DocSubmit) (DocAck, error)
+	//vibevalley:route doc.markdown GET /api/v1/docs/{id}/markdown
+	//vibevalley:can owner remote
+	DocMarkdown(ctx context.Context, pID string) (DocMarkdown, error)
 }

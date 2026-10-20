@@ -125,6 +125,48 @@ type ConnectorOutbox struct {
 	SentAt    sql.NullInt64
 }
 
+type Doc struct {
+	ID        string
+	Title     string
+	Seq       int64
+	CreatedAt int64
+	UpdatedAt int64
+}
+
+type DocBlock struct {
+	ID        string
+	DocID     string
+	ParentID  sql.NullString
+	OrderKey  string
+	Type      string
+	Attrs     string
+	Spans     string
+	Rev       int64
+	Deleted   bool
+	UpdatedBy string
+	UpdatedAt int64
+}
+
+type DocBlockRevision struct {
+	ID        string
+	BlockID   string
+	Rev       int64
+	Spans     string
+	Actor     string
+	Kind      string
+	CreatedAt int64
+}
+
+type DocChange struct {
+	DocID     string
+	Seq       int64
+	BatchID   string
+	Actor     string
+	BlockIds  string
+	Results   string
+	CreatedAt int64
+}
+
 type GameLedger struct {
 	ID      string
 	Kind    string

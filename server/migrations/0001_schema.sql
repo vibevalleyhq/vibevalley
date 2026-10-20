@@ -299,3 +299,47 @@ CREATE TABLE task_graph (
   primary key (graph, id)
 );
 CREATE INDEX task_graph_by_owner on task_graph (owner, finished_at);
+-- Documents (doc/doc.go): blocks in a flat list, nested by parent_id and ordered by (order_key, id); every change is an op,
+-- and a batch of ops is one doc_change with the doc's next seq.
+CREATE TABLE doc (
+  id         text primary key,
+  title      text not null,
+  seq        integer not null default 0,
+  created_at integer not null,
+  updated_at integer not null
+);
+CREATE TABLE doc_block (
+  id         text primary key,
+  doc_id     text not null references doc (id) on delete cascade,
+  parent_id  text,
+  order_key  text not null,
+  type       text not null,
+  attrs      text not null default '{}', -- JSON: protocol.BlockAttrs
+  spans      text not null default '[]', -- JSON: []protocol.Span
+  rev        integer not null,
+  deleted    boolean not null default 0,
+  updated_by text not null,
+  updated_at integer not null
+);
+CREATE INDEX doc_block_by_doc on doc_block (doc_id, order_key, id);
+-- A block's text at each rev (kind normal), and a submitted text that was not taken (kind conflict, at the rev it lost to).
+CREATE TABLE doc_block_revision (
+  id         text primary key,
+  block_id   text not null references doc_block (id) on delete cascade,
+  rev        integer not null,
+  spans      text not null,
+  actor      text not null,
+  kind       text not null check (kind in ('normal', 'conflict')),
+  created_at integer not null
+);
+CREATE INDEX doc_block_revision_by_block on doc_block_revision (block_id, rev);
+CREATE TABLE doc_change (
+  doc_id     text not null references doc (id) on delete cascade,
+  seq        integer not null,
+  batch_id   text not null unique,
+  actor      text not null,
+  block_ids  text not null, -- JSON: the blocks the batch changed
+  results    text not null, -- JSON: []protocol.DocOpResult, answered again when the batch comes again
+  created_at integer not null,
+  primary key (doc_id, seq)
+);

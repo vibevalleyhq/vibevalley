@@ -193,3 +193,14 @@
 | `lan.deleteDevice` | `DELETE /api/v1/lan/devices/{id}` | ✓ |  |  |  |
 | `lan.pair` | `POST /api/v1/lan/pair` | ✓ | ✓ |  |  |
 | `lan.me` | `GET /api/v1/lan/me` | ✓ | ✓ |  |  |
+
+## doc
+
+| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 | Session |
+|---|---|---|---|---|---|
+| `doc.list` | `GET /api/v1/docs` | ✓ | ✓ |  |  |
+| `doc.create` | `POST /api/v1/docs` | ✓ | ✓ |  |  |
+| `doc.import` | `POST /api/v1/docs/import` | ✓ | ✓ |  |  |
+| `doc.get` | `GET /api/v1/docs/{id}` | ✓ | ✓ |  |  |
+| `doc.submit` | `POST /api/v1/docs/{id}/submit` | ✓ | ✓ |  |  |
+| `doc.markdown` | `GET /api/v1/docs/{id}/markdown` | ✓ | ✓ |  |  |

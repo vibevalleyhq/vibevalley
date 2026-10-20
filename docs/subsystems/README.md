@@ -12,6 +12,7 @@
 | [定时](docs/subsystems/schedule.md) | 一张工单的触发：间隔和 cron、补跑、回头看 |
 | [种植计划](docs/subsystems/task.md) | 带子工单的父工单、按图推进；agent 自己的任务图 |
 | [记性](docs/subsystems/memory.md) | 想起、记下、主动查、外面的来源 |
+| [文档](docs/subsystems/doc.md) | 按块存、按 op 改的文档：块和顺序键、一批一个事务、Markdown |
 | [语音](docs/subsystems/voice.md) | 通话（Agora ConvoAI）、听写、语音管家 |
 | [连接到本机](docs/subsystems/lan.md) | 局域网里配对过的设备用同一个农场 |
 | [设置](docs/subsystems/setting.md) | settings.json、配置和环境变量、钥匙和打码 |

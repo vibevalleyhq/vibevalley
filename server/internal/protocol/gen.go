@@ -2203,6 +2203,202 @@ func (v LiveEventRuntime) MarshalJSON() ([]byte, error) {
 	return withTag(p, "type", "runtime")
 }
 
+func (v Block) MarshalJSON() ([]byte, error) {
+	type plain Block
+	p := plain(v)
+	if p.Text == nil {
+		p.Text = []DocSpan{}
+	}
+	return json.Marshal(p)
+}
+
+func (v DocSnapshot) MarshalJSON() ([]byte, error) {
+	type plain DocSnapshot
+	p := plain(v)
+	if p.Blocks == nil {
+		p.Blocks = []Block{}
+	}
+	return json.Marshal(p)
+}
+
+// DocOpValue is a member of DocOp: DocOpInsertBlock, DocOpUpdateText, DocOpSetAttrs, DocOpSetType, DocOpMoveBlock, DocOpDeleteBlock, DocOpRestoreBlock, DocOpSplitBlock, DocOpMergeBlocks, told apart by "op".
+type DocOpValue interface{ isDocOp() }
+
+func (u DocOp) IsZero() bool { return u.Value == nil }
+
+func (u DocOp) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+func (u *DocOp) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		u.Value = nil
+		return nil
+	}
+	var head struct {
+		Tag string `json:"op"`
+	}
+	if err := json.Unmarshal(data, &head); err != nil {
+		return err
+	}
+	var err error
+	switch head.Tag {
+	case "insert_block":
+		var v DocOpInsertBlock
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "update_text":
+		var v DocOpUpdateText
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "set_attrs":
+		var v DocOpSetAttrs
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "set_type":
+		var v DocOpSetType
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "move_block":
+		var v DocOpMoveBlock
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "delete_block":
+		var v DocOpDeleteBlock
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "restore_block":
+		var v DocOpRestoreBlock
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "split_block":
+		var v DocOpSplitBlock
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	case "merge_blocks":
+		var v DocOpMergeBlocks
+		err = json.Unmarshal(data, &v)
+		u.Value = v
+	default:
+		return fmt.Errorf("DocOp: unknown op %q", head.Tag)
+	}
+	return err
+}
+
+// DocOpMembers are every member of DocOp, each zero, in the protocol's order: a test can see that a switch meant to
+// handle every one of them does.
+var DocOpMembers = []DocOpValue{DocOpInsertBlock{}, DocOpUpdateText{}, DocOpSetAttrs{}, DocOpSetType{}, DocOpMoveBlock{}, DocOpDeleteBlock{}, DocOpRestoreBlock{}, DocOpSplitBlock{}, DocOpMergeBlocks{}}
+
+func (DocOpInsertBlock) isDocOp() {}
+
+func (v DocOpInsertBlock) MarshalJSON() ([]byte, error) {
+	type plain DocOpInsertBlock
+	p := plain(v)
+
+	return withTag(p, "op", "insert_block")
+}
+
+func (DocOpUpdateText) isDocOp() {}
+
+func (v DocOpUpdateText) MarshalJSON() ([]byte, error) {
+	type plain DocOpUpdateText
+	p := plain(v)
+	if p.Text == nil {
+		p.Text = []DocSpan{}
+	}
+	return withTag(p, "op", "update_text")
+}
+
+func (DocOpSetAttrs) isDocOp() {}
+
+func (v DocOpSetAttrs) MarshalJSON() ([]byte, error) {
+	type plain DocOpSetAttrs
+	p := plain(v)
+
+	return withTag(p, "op", "set_attrs")
+}
+
+func (DocOpSetType) isDocOp() {}
+
+func (v DocOpSetType) MarshalJSON() ([]byte, error) {
+	type plain DocOpSetType
+	p := plain(v)
+
+	return withTag(p, "op", "set_type")
+}
+
+func (DocOpMoveBlock) isDocOp() {}
+
+func (v DocOpMoveBlock) MarshalJSON() ([]byte, error) {
+	type plain DocOpMoveBlock
+	p := plain(v)
+
+	return withTag(p, "op", "move_block")
+}
+
+func (DocOpDeleteBlock) isDocOp() {}
+
+func (v DocOpDeleteBlock) MarshalJSON() ([]byte, error) {
+	type plain DocOpDeleteBlock
+	p := plain(v)
+
+	return withTag(p, "op", "delete_block")
+}
+
+func (DocOpRestoreBlock) isDocOp() {}
+
+func (v DocOpRestoreBlock) MarshalJSON() ([]byte, error) {
+	type plain DocOpRestoreBlock
+	p := plain(v)
+
+	return withTag(p, "op", "restore_block")
+}
+
+func (DocOpSplitBlock) isDocOp() {}
+
+func (v DocOpSplitBlock) MarshalJSON() ([]byte, error) {
+	type plain DocOpSplitBlock
+	p := plain(v)
+
+	return withTag(p, "op", "split_block")
+}
+
+func (DocOpMergeBlocks) isDocOp() {}
+
+func (v DocOpMergeBlocks) MarshalJSON() ([]byte, error) {
+	type plain DocOpMergeBlocks
+	p := plain(v)
+
+	return withTag(p, "op", "merge_blocks")
+}
+
+func (v DocSubmit) MarshalJSON() ([]byte, error) {
+	type plain DocSubmit
+	p := plain(v)
+	if p.Ops == nil {
+		p.Ops = []DocOp{}
+	}
+	return json.Marshal(p)
+}
+
+// DocOpStatusValues are every DocOpStatus, in the protocol's order.
+var DocOpStatusValues = []DocOpStatus{DocOpStatusApplied, DocOpStatusMerged, DocOpStatusConflict, DocOpStatusNoop, DocOpStatusRejected}
+
+func (v DocAck) MarshalJSON() ([]byte, error) {
+	type plain DocAck
+	p := plain(v)
+	if p.Results == nil {
+		p.Results = []DocOpResult{}
+	}
+	if p.Blocks == nil {
+		p.Blocks = []Block{}
+	}
+	return json.Marshal(p)
+}
+
 func (e Refused) Error() string { return e.Reason }
 
 func (Refused) HTTPStatus() int { return 409 }
@@ -2369,6 +2565,12 @@ var Endpoints = []Endpoint{
 	{"lan.deleteDevice", "DELETE", "/api/v1/lan/devices/{id}", nil, false, []Caller{CallerOwner}},
 	{"lan.pair", "POST", "/api/v1/lan/pair", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"lan.me", "GET", "/api/v1/lan/me", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"doc.list", "GET", "/api/v1/docs", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"doc.create", "POST", "/api/v1/docs", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"doc.import", "POST", "/api/v1/docs/import", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"doc.get", "GET", "/api/v1/docs/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"doc.submit", "POST", "/api/v1/docs/{id}/submit", nil, true, []Caller{CallerOwner, CallerRemote}},
+	{"doc.markdown", "GET", "/api/v1/docs/{id}/markdown", nil, false, []Caller{CallerOwner, CallerRemote}},
 }
 
 // Mount routes every VibeValleyApi endpoint on mux to h: requests decoded, answers and tagged errors encoded (200 with
@@ -2951,6 +3153,45 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.LanMe(r.Context())
 		answer(w, out, err)
 	})
+	mux.HandleFunc("GET /api/v1/docs", func(w http.ResponseWriter, r *http.Request) {
+		out, err := h.DocList(r.Context())
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/v1/docs", func(w http.ResponseWriter, r *http.Request) {
+		var body DocRequest
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.DocCreate(r.Context(), body)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/v1/docs/import", func(w http.ResponseWriter, r *http.Request) {
+		var body DocImport
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.DocImport(r.Context(), body)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("GET /api/v1/docs/{id}", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		out, err := h.DocGet(r.Context(), pID)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("POST /api/v1/docs/{id}/submit", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		var body DocSubmit
+		if !decode(w, r, &body) {
+			return
+		}
+		out, err := h.DocSubmit(r.Context(), pID, body)
+		answer(w, out, err)
+	})
+	mux.HandleFunc("GET /api/v1/docs/{id}/markdown", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		out, err := h.DocMarkdown(r.Context(), pID)
+		answer(w, out, err)
+	})
 }
 
 // taggedError decodes body as the API error its tag names; nil for a tag that is none.
@@ -3527,5 +3768,41 @@ func (c *Client) LanPair(ctx context.Context, body LanPairRequest) (LanPaired, e
 func (c *Client) LanMe(ctx context.Context) (LanDevice, error) {
 	var out LanDevice
 	err := c.call(ctx, "GET", "/api/v1/lan/me", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) DocList(ctx context.Context) ([]Document, error) {
+	var out []Document
+	err := c.call(ctx, "GET", "/api/v1/docs", nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) DocCreate(ctx context.Context, body DocRequest) (DocSnapshot, error) {
+	var out DocSnapshot
+	err := c.call(ctx, "POST", "/api/v1/docs", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) DocImport(ctx context.Context, body DocImport) (DocSnapshot, error) {
+	var out DocSnapshot
+	err := c.call(ctx, "POST", "/api/v1/docs/import", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) DocGet(ctx context.Context, pID string) (DocSnapshot, error) {
+	var out DocSnapshot
+	err := c.call(ctx, "GET", "/api/v1/docs/"+url.PathEscape(pID), nil, nil, &out)
+	return out, err
+}
+
+func (c *Client) DocSubmit(ctx context.Context, pID string, body DocSubmit) (DocAck, error) {
+	var out DocAck
+	err := c.call(ctx, "POST", "/api/v1/docs/"+url.PathEscape(pID)+"/submit", nil, body, &out)
+	return out, err
+}
+
+func (c *Client) DocMarkdown(ctx context.Context, pID string) (DocMarkdown, error) {
+	var out DocMarkdown
+	err := c.call(ctx, "GET", "/api/v1/docs/"+url.PathEscape(pID)+"/markdown", nil, nil, &out)
 	return out, err
 }
