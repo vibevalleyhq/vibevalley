@@ -14,7 +14,7 @@ import 'board.dart';
 import 'issue_detail.dart';
 import 'issue_panel.dart' show IssueHeading;
 import 'issue_submission.dart';
-import 'plan_detail.dart';
+import 'task_detail.dart';
 
 /// From this wide, a card opens beside the board; narrower, over it.
 Color issueTagColor(IssueTag s) => switch (s) {
@@ -269,7 +269,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
         state: state,
         session: session,
         reload: _load,
-        onPlan: issue.parent == null ? null : () => _open('task:${issue.parent}'),
+        onTask: issue.parent == null ? null : () => _open('task:${issue.parent}'),
       ),
       ManagerCard(:final issue) => ManagerIssueDetail(key: ValueKey(issue.id), issue: issue),
       MissingSessionCard(:final history) => Column(
@@ -281,7 +281,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
           Text('执行记录缺失：${history.missingSessions.join('、')}。执行动作暂不可用。', style: ProText.sm),
         ],
       ),
-      TaskCard(:final graph) => PlanDetail(
+      TaskCard(:final graph) => TaskDetail(
         key: ValueKey(graph.id),
         graph: graph,
         stepIssues: {

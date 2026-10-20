@@ -17,7 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../support/server.dart' show FakeServer, jsonResponse, settle;
 import '../support/farm.dart' as fakes;
 import '../support/workbench.dart' show pumpPage, WorkbenchBackend;
-import 'package:vibevalley/workbench/issues/plan_detail.dart';
+import 'package:vibevalley/workbench/issues/task_detail.dart';
 
 const _closed = Session(
   id: 'w1',
@@ -331,7 +331,7 @@ void main() {
     await settle(t);
     expect(writes.single, startsWith('POST /api/v1/issues/tw4/resolve'));
 
-    // A plan opens in the workbench as an issue with its steps, not on the farm.
+    // A task opens in the workbench as an issue with its steps, not on the farm.
     await t.pumpWidget(
       ProviderScope(
         overrides: [
@@ -349,7 +349,7 @@ void main() {
       ),
     );
     await settle(t);
-    expect(find.byType(PlanDetail), findsOneWidget);
+    expect(find.byType(TaskDetail), findsOneWidget);
     expect(find.byType(ProModalLayer), findsOneWidget);
   });
 

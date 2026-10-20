@@ -15,10 +15,10 @@ import '../../ui/pro/pro.dart';
 import 'harvest_review.dart' show FileRow, PlusMinus;
 import 'issue_sheet.dart';
 
-/// A plan: an issue whose work is split into steps, each its own issue, run in the order their needs allow. It is read like
+/// A task (计划 on screen): an issue whose work is split into steps, each its own issue, run in the order their needs allow. It is read like
 /// any issue (what it is for on the left, its state and actions on the right), with its steps listed under it.
-class PlanDetail extends ConsumerStatefulWidget {
-  const PlanDetail({super.key, required this.graph, required this.stepIssues, required this.onOpen});
+class TaskDetail extends ConsumerStatefulWidget {
+  const TaskDetail({super.key, required this.graph, required this.stepIssues, required this.onOpen});
   final TaskGraph graph;
 
   /// A step's own issue, by the step's id, once a helper has worked it: it opens like any issue.
@@ -26,10 +26,10 @@ class PlanDetail extends ConsumerStatefulWidget {
   final ValueChanged<String?> onOpen;
 
   @override
-  ConsumerState<PlanDetail> createState() => _PlanDetailState();
+  ConsumerState<TaskDetail> createState() => _TaskDetailState();
 }
 
-class _PlanDetailState extends ConsumerState<PlanDetail> {
+class _TaskDetailState extends ConsumerState<TaskDetail> {
   Answer? _said;
   var _reviewing = false;
 
@@ -69,7 +69,7 @@ class _PlanDetailState extends ConsumerState<PlanDetail> {
 
   String _word(GraphAction a) => widget.graph.actionText?[a.wire] ?? '';
 
-  /// Steps and changes are edited on the farm's plan board, where they are laid out to be dragged and written.
+  /// Steps and changes are edited on the farm's task board, where they are laid out to be dragged and written.
   void _toFarmBoard() {
     ref.read(graphShownProvider.notifier).set(widget.graph.id);
     ref.read(farmOverlaysProvider.notifier).panel(FarmPanel.taskBoard);
@@ -124,7 +124,7 @@ class _PlanDetailState extends ConsumerState<PlanDetail> {
       if (_said case final said?) ...[const SizedBox(height: 10), _Note(said.text, said.ok ? Palette.leaf300 : Palette.berry)],
       if (_reviewing) ...[
         const SizedBox(height: 16),
-        _PlanHarvest(
+        _TaskHarvest(
           graph: graph,
           onDone: (answer) => setState(() {
             _reviewing = false;
@@ -304,9 +304,9 @@ class _StepRow extends StatelessWidget {
   }
 }
 
-/// A ripe plan's changes before they go into the main branch: its commits and files, and the merge.
-class _PlanHarvest extends ConsumerWidget {
-  const _PlanHarvest({required this.graph, required this.onDone});
+/// A ripe task's changes before they go into the main branch: its commits and files, and the merge.
+class _TaskHarvest extends ConsumerWidget {
+  const _TaskHarvest({required this.graph, required this.onDone});
   final TaskGraph graph;
   final void Function(Answer? answer) onDone;
 

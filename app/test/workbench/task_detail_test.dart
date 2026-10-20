@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/ui/pro/pro.dart';
-import 'package:vibevalley/workbench/issues/plan_detail.dart';
+import 'package:vibevalley/workbench/issues/task_detail.dart';
 
 import '../support/farm.dart';
 
@@ -32,7 +32,7 @@ void main() {
         actionText: const {'retry': '重试', 'skip': '跳过'},
       );
 
-  final plan = TaskGraph(
+  final task = TaskGraph(
     id: 'p1',
     title: '按月查打卡',
     goal: '给 clock-in 加按月查询',
@@ -55,14 +55,14 @@ void main() {
     settled: 1,
   );
 
-  testWidgets('a plan reads as an issue with its steps under it: folded to state and what each waits on, opened to act', (t) async {
+  testWidgets('a task reads as an issue with its steps under it: folded to state and what each waits on, opened to act', (t) async {
     final routes = Routes();
     String? opened;
     await pumpFarm(
       t,
       ProScope(
         child: SingleChildScrollView(
-          child: PlanDetail(graph: plan, stepIssues: const {'api': 'i-api'}, onOpen: (id) => opened = id),
+          child: TaskDetail(graph: task, stepIssues: const {'api': 'i-api'}, onOpen: (id) => opened = id),
         ),
       ),
       overrides: overrides(farm(), view(), fakeApi(routes, {'POST /api/v1/graphs/p1/tasks/api/act': '重试了「接口」', 'POST /api/v1/graphs/p1/act': '暂停了'})),
