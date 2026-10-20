@@ -546,7 +546,8 @@ func (c *Service) Say(text string, conversation *string, sendKey string) (messag
 	return chatToMessage(*row), written.again, nil
 }
 
-func (c *Service) TellSession(from, session, text string) (protocol.ChatMessage, error) {
+// sendKey is as Say's; with no thread to say it in the session hears it straight and the key is not kept.
+func (c *Service) TellSession(from, session, text, sendKey string) (protocol.ChatMessage, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	thread := c.threadOfSession(session)
@@ -558,7 +559,7 @@ func (c *Service) TellSession(from, session, text string) (protocol.ChatMessage,
 		c.sessions.Deliver(session, str.Trim(text), protocol.RunTrigger{Kind: protocol.RunTriggerKindComment})
 		return protocol.ChatMessage{}, nil
 	}
-	written, err := c.write(chatWrite{conversation: *thread, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true, meta: &chatMeta{Run: c.sessions.CurrentRun(from)}})
+	written, err := c.write(chatWrite{conversation: *thread, from: from, kind: protocol.MessageKindChat, text: str.Trim(text), final: true, meta: &chatMeta{Run: c.sessions.CurrentRun(from)}, sendKey: sendKey})
 	if err != nil {
 		return protocol.ChatMessage{}, err
 	}

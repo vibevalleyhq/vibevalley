@@ -97,6 +97,8 @@ func (is *issues) OnStart(ctx context.Context) error {
 					is.left(ctx, f)
 				case protocol.FactReport:
 					is.reported(ctx, f)
+				case protocol.FactMessage:
+					is.heard(f)
 				}
 			}
 		}

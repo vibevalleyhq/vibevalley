@@ -2,7 +2,9 @@ package issue
 
 import (
 	"context"
+
 	"vibevalley/internal/protocol"
+	"vibevalley/pkg/x/ptr"
 )
 
 func (s *Service) liveSession(id string) (string, error) {
@@ -28,14 +30,15 @@ func (s *Service) Comment(id string, body protocol.CommentRequest) error {
 	if err != nil {
 		return err
 	}
-	if _, err = s.merges.chat.TellSession("user", session, body.Text); err != nil {
+	said, err := s.merges.chat.TellSession("user", session, body.Text, ptr.Value(body.SendKey))
+	if err != nil {
 		return err
 	}
-	// The owner's word answers what it asked, and starts a round that the last acceptance did not see.
-	if err := s.issues.asked(id, nil); err != nil {
-		return err
+	// Said in its thread, the issue hears it from the message's fact (issues.heard); with no thread there is no fact.
+	if said.ID == "" {
+		return s.issues.ownerSaid(id)
 	}
-	return s.issues.unaccept(id)
+	return nil
 }
 
 func (s *Service) Changes(id string, by protocol.Caller) (protocol.Changes, error) {

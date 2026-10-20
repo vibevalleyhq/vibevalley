@@ -164,7 +164,7 @@ func (s *Service) tell(who Who) agentcore.AgentTool {
 				return "", err
 			}
 			return s.withSession(p.Session, func(w session.Roster) string {
-				if _, err := s.chat.TellSession(c.participant(), w.Session.ID, p.Message); err != nil {
+				if _, err := s.chat.TellSession(c.participant(), w.Session.ID, p.Message, ""); err != nil {
 					return "没带到：" + err.Error()
 				}
 				return "已经在 " + w.Session.Name + " 的工单串里说了"

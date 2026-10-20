@@ -1167,8 +1167,7 @@ func TestAPlotGrowsThroughItsAcceptance(t *testing.T) {
 	if err := w.f.Issue.Comment(issue.ID, protocol.CommentRequest{Text: "用 8797"}); err != nil {
 		t.Fatal(err)
 	}
-	issue, _ = w.f.Issue.Get(issue.ID)
-	testkit.Eq(t, len(issue.Asks), 0, "answered")
+	testkit.Until(t, "answered", func() bool { got, _ := w.f.Issue.Get(issue.ID); return len(got.Asks) == 0 })
 	w.nextReport(t)
 	testkit.Until(t, "handed back", func() bool {
 		got, _ := w.f.Issue.Get(issue.ID)

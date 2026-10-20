@@ -1487,6 +1487,8 @@ type Run struct {
 
 type CommentRequest struct {
 	Text string `json:"text"`
+	// As SayRequest.SendKey: the same key again is the comment already said. A session with no thread hears it straight, unkeyed.
+	SendKey *string `json:"sendKey,omitzero"`
 }
 
 type SayRequest struct {

@@ -108,3 +108,62 @@ func TestOneIssueKeepsOneThreadAcrossItsSessions(t *testing.T) {
 	}
 	testkit.Eq(t, threads, []string{thread.ID}, "one thread for the issue")
 }
+
+// The issue hears the owner in its thread whichever way the words came: said in the thread, they answer its question and
+// void a pass as a comment does; a comment sent twice with one key is said once.
+func TestTheOwnersWordsInAnIssueThreadAreAComment(t *testing.T) {
+	home, work := dirs(t)
+	w := openWorld(t, home, work)
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := w.f.Channel.OnStart(ctx); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { cancel(); w.f.Channel.OnStop() })
+	lab := fixture.Lab(t)
+	w.f.Agent.SaveAgent(lab)
+	issue, err := w.f.Issue.Add(protocol.IssueRequest{Title: "先问清楚，再写打卡", Project: ptr.To("clock"), Assignee: &lab.ID, Acceptance: ptr.To(protocol.AcceptanceRequired)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent, err := w.f.Issue.Start(context.Background(), issue.ID, "")
+	if err != nil || sent.Session == nil {
+		t.Fatalf("start: %+v %v", sent, err)
+	}
+	thread := testkit.Await(t, "the issue's thread", func() (string, bool) {
+		id := w.f.Channel.JobThread(*sent.Session)
+		return ptr.Value(id), id != nil
+	})
+	get := func() protocol.Issue { got, _ := w.f.Issue.Get(issue.ID); return got }
+	testkit.Until(t, "its question", func() bool { return len(get().Asks) == 1 })
+
+	if _, _, err := w.f.Channel.Say("用 8797", &thread, ""); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Until(t, "answered in the thread", func() bool { return len(get().Asks) == 0 })
+	testkit.Until(t, "handed back", func() bool { return get().Status == protocol.IssueStatusInReview })
+	if _, err := w.f.Issue.Accept(context.Background(), issue.ID, protocol.IssueAcceptRequest{Pass: true}); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, get().AcceptedAt != nil, true, "passed")
+	if _, _, err := w.f.Channel.Say("标题再短一点", &thread, ""); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Until(t, "another round voids the pass", func() bool { return get().AcceptedAt == nil })
+
+	said := func() int {
+		n := 0
+		for _, m := range protocol.MessagesIn(w.f.Core.State().Chat, thread) {
+			if m.From == "user" && m.Text == "顺手把注释删掉" {
+				n++
+			}
+		}
+		return n
+	}
+	for range 2 {
+		if err := w.f.Issue.Comment(issue.ID, protocol.CommentRequest{Text: "顺手把注释删掉", SendKey: ptr.To("k1")}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	testkit.Until(t, "the comment in the thread", func() bool { return said() > 0 })
+	testkit.Eq(t, said(), 1, "one key, one comment")
+}

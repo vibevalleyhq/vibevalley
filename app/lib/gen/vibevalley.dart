@@ -3534,13 +3534,15 @@ class Run {
 }
 
 class CommentRequest {
-  const CommentRequest({required this.text});
+  const CommentRequest({required this.text, this.sendKey});
 
-  factory CommentRequest.fromJson(Map<String, dynamic> j) => CommentRequest(text: j['text'] as String);
+  factory CommentRequest.fromJson(Map<String, dynamic> j) =>
+      CommentRequest(text: j['text'] as String, sendKey: j['sendKey'] == null ? null : j['sendKey'] as String);
 
   final String text;
+  final String? sendKey;
 
-  Map<String, dynamic> toJson() => {'text': text};
+  Map<String, dynamic> toJson() => {'text': text, if (sendKey != null) 'sendKey': sendKey!};
 }
 
 class SayRequest {

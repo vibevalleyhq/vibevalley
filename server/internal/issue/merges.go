@@ -93,7 +93,7 @@ func (m *merges) resolve(id string) error {
 	if conflict == nil {
 		return protocol.Refused{Reason: session.Name + " 和主分支没有冲突"}
 	}
-	_, err := m.chat.TellSession("user", id, protocol.ConflictBrief(conflict.Base, conflict.Files))
+	_, err := m.chat.TellSession("user", id, protocol.ConflictBrief(conflict.Base, conflict.Files), "")
 	return err
 }
 
@@ -154,7 +154,7 @@ func (m *merges) mergeError(id string, err error) error {
 		return protocol.Refused{Reason: fmt.Sprintf("没收：合进 %s 会冲突（%s）。%s 还在地里，分支和 worktree 都在。要它解决就用 tell 告诉它：%s", failure.Base, files, session.Name, protocol.ConflictBrief(failure.Base, failure.Files))}
 	}
 	if failure.Kind == "check" {
-		if _, tellErr := m.chat.TellSession("user", id, failure.Reason+"\n请修好检查，再交回来。"); tellErr != nil {
+		if _, tellErr := m.chat.TellSession("user", id, failure.Reason+"\n请修好检查，再交回来。", ""); tellErr != nil {
 			failure.Reason += "\n给帮工带话失败：" + tellErr.Error()
 		}
 	}

@@ -3,6 +3,7 @@ package issue
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"vibevalley/internal/base"
@@ -112,6 +113,29 @@ func (is *issues) unaccept(id string) error {
 		return err
 	}
 	return is.judged(id, 0, t.Findings)
+}
+
+// The owner's word answers what it asked, and starts a round that the last acceptance did not see.
+func (is *issues) ownerSaid(id string) error {
+	if err := is.asked(id, nil); err != nil {
+		return err
+	}
+	return is.unaccept(id)
+}
+
+// Whatever path an owner's word took into an issue's thread (channel.say, issue.comment, a connector, the farm's own retell), this is where the issue hears it.
+func (is *issues) heard(f protocol.FactMessage) {
+	m := f.Message
+	if f.Thread == nil || m.FromKind != protocol.SenderKindUser || m.Kind != protocol.MessageKindChat || !m.Final {
+		return
+	}
+	issue, err := is.Get(*f.Thread)
+	if err != nil || issue.Status == protocol.IssueStatusDone || issue.Status == protocol.IssueStatusCanceled {
+		return
+	}
+	if err := is.ownerSaid(issue.ID); err != nil {
+		log.Printf("vibevalley: issue %s: the owner's word was not heard: %v", issue.ID, err)
+	}
 }
 
 // What the session waits on the owner for, from its report; a report with none, or a comment, clears them.
