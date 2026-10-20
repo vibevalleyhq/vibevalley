@@ -149,7 +149,12 @@ class _GitHubState extends ConsumerState<_GitHub> {
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerLeft,
-            child: ProButton.text('重新检测', onPressed: () => setState(() => _status = ref.read(apiProvider).github.refresh())),
+            child: ProButton.text(
+              '重新检测',
+              onPressed: () => setState(() {
+                _status = ref.read(apiProvider).github.refresh();
+              }),
+            ),
           ),
         ],
       );

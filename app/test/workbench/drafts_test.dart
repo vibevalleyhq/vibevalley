@@ -192,6 +192,30 @@ void main() {
     expect(board.writes.last, 'POST /api/v1/issues/n2/draft {"text":"给登录页加上记住我"}');
   });
 
+  testWidgets('the 待办 pencil makes an empty issue and opens it, not an issue called new', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    late _Board board;
+    board = _Board(
+      t,
+      const [],
+      answer: (method, path, body) {
+        if ((method, path) == ('POST', '/api/v1/issues')) {
+          final made = _draft('n3', body!['title'] as String, assignee: null);
+          board.changed([made]);
+          return made.toJson();
+        }
+        return null;
+      },
+    );
+    await board.pump('/issues');
+    await t.tap(find.bySemanticsLabel('详细写一张'));
+    await settle(t);
+    expect(board.writes, ['POST /api/v1/issues {"title":"新工单"}']);
+    expect(board.router.state.uri.path, '/issues/n3');
+    expect(find.text('找不到这张工单'), findsNothing);
+    expect(find.text('想做什么？'), findsOneWidget);
+  });
+
   testWidgets('a draft shows its fields and questions; the box answers them; 开工 sends it with its criteria', (t) async {
     SharedPreferences.setMockInitialValues({});
     final drafted = _draft('d1', '看板拖卡改用 issue.status', description: '为什么：\n看板还在调旧接口', criteria: ['拖到待办就开工'], asks: ['用 8787 还是 8797？']);

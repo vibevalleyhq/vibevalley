@@ -34,8 +34,6 @@ const pages = {
   'tickets': '/issues',
   'ticket': '/issues/w11',
   'ticket-planned': '/issues/w13',
-  'ticket-new': '/issues/new',
-  'ticket-new-project': '/issues/new?project=clock-in',
   'map': '/projects',
   'map-island': '/projects/pb-smoke',
   'map-sow': '/projects|空位，派一件活到 clock-in',

@@ -34,6 +34,7 @@ class IssueBoard extends StatefulWidget {
     required this.onDrop,
     required this.onPlace,
     required this.onAdd,
+    required this.onWrite,
   });
   final List<BoardCard> cards;
   final bool loading;
@@ -44,6 +45,9 @@ class IssueBoard extends StatefulWidget {
   final Future<void> Function(BoardCard card, Lane to) onDrop;
   final Future<void> Function(TodoCard card, String? before) onPlace;
   final Future<void> Function(String text) onAdd;
+
+  /// The pencil: an empty draft made at once and opened.
+  final VoidCallback onWrite;
 
   @override
   State<IssueBoard> createState() => _BoardState();
@@ -68,6 +72,7 @@ class _BoardState extends State<IssueBoard> {
     onDrop: widget.onDrop,
     onPlace: widget.onPlace,
     onAdd: widget.onAdd,
+    onWrite: widget.onWrite,
   );
 
   @override
@@ -119,6 +124,7 @@ class _LaneView extends StatelessWidget {
     required this.onDrop,
     required this.onPlace,
     required this.onAdd,
+    required this.onWrite,
   });
   final Lane lane;
   final List<BoardCard> cards;
@@ -130,6 +136,9 @@ class _LaneView extends StatelessWidget {
   final Future<void> Function(BoardCard card, Lane to) onDrop;
   final Future<void> Function(TodoCard card, String? before) onPlace;
   final Future<void> Function(String text) onAdd;
+
+  /// The pencil: an empty draft made at once and opened.
+  final VoidCallback onWrite;
 
   @override
   Widget build(BuildContext context) {
@@ -168,7 +177,7 @@ class _LaneView extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(head, style: ProText.meta),
                   const Spacer(),
-                  if (lane == Lane.todo) ProButton.icon('button-edit', tooltip: '详细写一张', semanticLabel: '详细写一张', iconSize: 14, onPressed: () => onOpen('new')),
+                  if (lane == Lane.todo) ProButton.icon('button-edit', tooltip: '详细写一张', semanticLabel: '详细写一张', iconSize: 14, onPressed: onWrite),
                 ],
               ),
             ),

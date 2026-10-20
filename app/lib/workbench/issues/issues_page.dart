@@ -311,6 +311,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
                 onDrop: _drop,
                 onPlace: _place,
                 onAdd: _add,
+                onWrite: () => writeIssueAndOpen(context, ref.read(apiProvider)),
               ),
             ),
           ],
