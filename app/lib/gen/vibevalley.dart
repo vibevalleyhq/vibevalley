@@ -6817,6 +6817,12 @@ class DocApi {
     final j = await _api._call('GET', '/api/v1/docs/${Uri.encodeComponent((id).toString())}/markdown', query: {}, body: null);
     return DocMarkdown.fromJson(j as Map<String, dynamic>);
   }
+
+  /// Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
+  /// one already running is refused.
+  Future<void> demo({required String id}) async {
+    await _api._call('POST', '/api/v1/docs/${Uri.encodeComponent((id).toString())}/demo', query: {}, body: null);
+  }
 }
 
 /// A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status.

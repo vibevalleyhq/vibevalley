@@ -20,16 +20,19 @@ type Service struct {
 	db *sql.DB
 	q  *generated.Queries
 	// One batch at a time, for every document: a document's batches are serial and its seq goes up in order.
-	mu  sync.Mutex
-	Now func() int64
+	mu   sync.Mutex
+	Now  func() int64
+	demo demo
 }
 
 func newService(db *sql.DB) (*Service, error) {
-	return &Service{db: db, q: generated.New(db), Now: clock.NowMs}, nil
+	s := &Service{db: db, q: generated.New(db), Now: clock.NowMs}
+	s.demo.init()
+	return s, nil
 }
 
 func (*Service) OnStart(context.Context) error { return nil }
-func (*Service) OnStop()                       {}
+func (s *Service) OnStop()                     { s.demo.close() }
 
 func document(d generated.Doc) protocol.Document {
 	return protocol.Document{ID: d.ID, Title: d.Title, Seq: d.Seq, Created: d.CreatedAt, Updated: d.UpdatedAt}

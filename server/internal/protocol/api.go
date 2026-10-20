@@ -327,4 +327,9 @@ type Handlers interface {
 	//vibevalley:route doc.markdown GET /api/v1/docs/{id}/markdown
 	//vibevalley:can owner remote
 	DocMarkdown(ctx context.Context, pID string) (DocMarkdown, error)
+	// Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
+	// one already running is refused.
+	//vibevalley:route doc.demo POST /api/v1/docs/{id}/demo
+	//vibevalley:can owner
+	DocDemo(ctx context.Context, pID string) error
 }

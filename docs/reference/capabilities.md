@@ -204,3 +204,4 @@
 | `doc.get` | `GET /api/v1/docs/{id}` | ✓ | ✓ |  |  |
 | `doc.submit` | `POST /api/v1/docs/{id}/submit` | ✓ | ✓ |  |  |
 | `doc.markdown` | `GET /api/v1/docs/{id}/markdown` | ✓ | ✓ |  |  |
+| `doc.demo` | `POST /api/v1/docs/{id}/demo` | ✓ |  |  |  |

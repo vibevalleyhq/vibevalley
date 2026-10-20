@@ -75,4 +75,14 @@ func TestDocRoutes(t *testing.T) {
 	if _, err := c.DocSubmit(ctx, id, protocol.DocSubmit{}); !errors.As(err, &refused) || !strings.Contains(refused.Reason, "batchId") {
 		t.Fatalf("no batch id: %v", err)
 	}
+	// The demo starts in the background; a second press while it writes is refused. Closing the farm stops it.
+	if err := c.DocDemo(ctx, imported.Doc.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.DocDemo(ctx, imported.Doc.ID); !errors.As(err, &refused) || !strings.Contains(refused.Reason, "演示正在写") {
+		t.Fatalf("second demo: %v", err)
+	}
+	if err := c.DocDemo(ctx, "nope"); !errors.As(err, &missing) {
+		t.Fatalf("demo of no doc: %v", err)
+	}
 }

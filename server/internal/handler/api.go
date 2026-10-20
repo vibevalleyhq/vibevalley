@@ -520,3 +520,7 @@ func (a api) DocMarkdown(ctx context.Context, id string) (protocol.DocMarkdown, 
 	md, err := a.f.Doc.Markdown(ctx, id)
 	return protocol.DocMarkdown{Markdown: md}, err
 }
+
+func (a api) DocDemo(ctx context.Context, id string) error {
+	return refused(a.f.Doc.Demo(ctx, id, a.f.Agent.Agents()))
+}

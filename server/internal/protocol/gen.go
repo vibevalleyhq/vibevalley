@@ -2571,6 +2571,7 @@ var Endpoints = []Endpoint{
 	{"doc.get", "GET", "/api/v1/docs/{id}", nil, false, []Caller{CallerOwner, CallerRemote}},
 	{"doc.submit", "POST", "/api/v1/docs/{id}/submit", nil, true, []Caller{CallerOwner, CallerRemote}},
 	{"doc.markdown", "GET", "/api/v1/docs/{id}/markdown", nil, false, []Caller{CallerOwner, CallerRemote}},
+	{"doc.demo", "POST", "/api/v1/docs/{id}/demo", nil, false, []Caller{CallerOwner}},
 }
 
 // Mount routes every VibeValleyApi endpoint on mux to h: requests decoded, answers and tagged errors encoded (200 with
@@ -3192,6 +3193,10 @@ func Mount(mux *http.ServeMux, h Handlers) {
 		out, err := h.DocMarkdown(r.Context(), pID)
 		answer(w, out, err)
 	})
+	mux.HandleFunc("POST /api/v1/docs/{id}/demo", func(w http.ResponseWriter, r *http.Request) {
+		pID := r.PathValue("id")
+		answer(w, nil, h.DocDemo(r.Context(), pID))
+	})
 }
 
 // taggedError decodes body as the API error its tag names; nil for a tag that is none.
@@ -3805,4 +3810,8 @@ func (c *Client) DocMarkdown(ctx context.Context, pID string) (DocMarkdown, erro
 	var out DocMarkdown
 	err := c.call(ctx, "GET", "/api/v1/docs/"+url.PathEscape(pID)+"/markdown", nil, nil, &out)
 	return out, err
+}
+
+func (c *Client) DocDemo(ctx context.Context, pID string) error {
+	return c.call(ctx, "POST", "/api/v1/docs/"+url.PathEscape(pID)+"/demo", nil, nil, nil)
 }
