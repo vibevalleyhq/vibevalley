@@ -8,7 +8,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 拆：派规划的帮工、读它给的计划、打回一次 | 规划的帮工读什么、拆的规矩（`session/rules.go` 的 `SplitBrief`） |
+| 拆：派规划的帮工、读它给的计划、打回一次；帮工把自己的工单拆成计划 | 规划的帮工读什么、拆的规矩（`session/rules.go` 的 `SplitBrief`） |
 | 计划和每一件的状态、能做哪些动作、能改哪些件 | 父工单、子工单的存取和核心状态（[工单](docs/subsystems/issue.md)，`issue.PutTask`） |
 | 调度：哪几件能开工、并行数、派谁 | 挑档案的打分（`session.ChooseAgent`）、农场的地满没满（`issue.Hire`） |
 | 每一件做完的验证：检查命令、验收、冻结的文件 | 帮工怎么跑一轮、汇报怎么读（[帮工](docs/subsystems/session.md)） |
@@ -22,13 +22,13 @@
 - 服务端 `server/internal/task`（`task.Service`，`Workspace` 上的字段是 `TaskGraph`）：`task.go` 拆、调度、验证、动作和开机恢复；`rules.go` 是只有它用的纯函数（`startable`、`parseSplit`、`editTask`、`removeTask`、`taskBrief`、冻结文件的判断和交给帮工的几句话）；`log.go` 计划的经过。
 - 几个包都用的规则在 `protocol`：`task_rules.go`（`GraphProblems`、`ReadyTasks`、`BlockedBy`、`LayersOf`、`GraphActions`、`TaskActions`、`CanEditTask`、验收的几条、`MaxTasks`、`DefaultParallel`、`AutoRetries`）、`task_issues.go`（`GraphIssues` 把计划拆成一家工单，`GraphsOf`、`GraphOf` 从核心状态里的工单拼回计划）、`task_changes.go`（两版计划比出经过和它的说法）、`dag.go`（边的规则，和 `engine` 共用）。工单状态怎么从计划算在 `issues.go` 的 `IssueStatusOf`。
 - 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`；`engine` 的图存在 `task_graph`。
-- 接口：`graph.*`（`split`、`updateTask`、`deleteTask`、`act`、`taskAct`、`changes`、`events`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graphs`、`task_edit`、`graph_action`、`task_action`（`tool/task.go`）。
+- 接口：`graph.*`（`split`、`updateTask`、`deleteTask`、`act`、`taskAct`、`changes`、`events`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graphs`、`task_edit`、`graph_action`、`task_action`，帮工的工具 `issue_split`（都在 `tool/task.go`）。
 - 帧：`StateFrame.Graphs` 是服务端拼好的计划，带分层（`layers`）、每件在等谁（`blockedBy`）、要不要主人看（`asksForYou`）、花了多少（`spent`）、做完几件（`settled`）和能做的动作。
 - 客户端：计划板 `farm/task_board.dart`、`task_steps.dart`、`task_log.dart`；看板上计划是一张「计划：…」卡片（`workbench/issues`），子工单的标题前加计划名（`rules/issues.dart` 的 `issueTitle`）。
 
 ## 模型和不变量
 
-- **计划是父工单，每一件是子工单。** 父工单的 id 是计划的 id（`p1`、`p2`……，`issue/rules.go` 的 `nextTaskID`），标题和说明是计划的标题和目标，`graph`（`IssueGraph`）存状态、计划分支、并行数、一句说明。子工单的 id 是 `<计划>.<件>`（`p1.api`，`TaskIssueID`），`parent` 指父工单，`blockedBy` 是它要等的子工单，标题和说明是这件的标题和工单，`task`（`IssueTask`）存其余：状态、检查命令、该改的地方（`scope`）、是不是验收、冻结的文件、谁在做、结论、提交、花费、重试和失败的次数。
+- **计划是父工单，每一件是子工单。** 父工单的 id 是计划的 id：管家起的是 `p1`、`p2`……（`issue/rules.go` 的 `nextTaskID`），帮工拆的就是原来那张工单的 id。标题和说明是计划的标题和目标；父工单原来的编号、帮工（assignee）、优先级、验收标准和干活记录都留着，`GraphIssues` 不重写它们。`graph`（`IssueGraph`）存状态、计划分支、并行数、一句说明。子工单的 id 是 `<计划>.<件>`（`p1.api`，`TaskIssueID`），`parent` 指父工单，`blockedBy` 是它要等的子工单，标题和说明是这件的标题和工单，`task`（`IssueTask`）存其余：状态、检查命令、该改的地方（`scope`）、是不是验收、冻结的文件、谁在做、结论、提交、花费、重试和失败的次数。
 - **一次写整家**：每写一次计划，`issue.PutTask` 在一个事务里写父工单和全部子工单，提交后一次施加（`ApplyBatch`），先子工单、后父工单；计划在核心状态里总是完整的。核心状态只留最近 50 家关了的工单时，只数没有父工单的，子工单跟着父工单留、跟着父工单走。
 - **计划的状态**：`splitting`、`draft`、`running`、`paused`、`ripe`、`done`、`abandoned`。**每一件**：`waiting`、`working`、`merged`、`failed`、`skipped`；`merged`、`skipped` 算定下了，等它的件能开工。
 - **工单的状态跟着计划算**，不另存：父工单在拆、在做是 `in_progress`，草稿、暂停、熟了是 `in_review`，收了关成 `merged`、放弃了关成 `dismissed`。子工单等着是 `backlog`，帮工在干是 `in_progress`，帮工停着或没做成是 `in_review`，合进去了关成 `merged_into_graph`，跳过或计划结束了关成 `dismissed`。
@@ -37,7 +37,7 @@
 - **能改什么**（`CanEditTask`）：草稿什么都能改、能加能删；开工以后（`running`、`paused`）只能改、加还没开始或没做成的件，没做成的不能删、只能跳过；做完的不重开，要返工就加一件。
 - **能做的动作**（`GraphActions`、`TaskActions`）由服务端算好放在帧上：草稿且校验通过能开工；在做能暂停；暂停能继续；熟了且有分支能收获；没关的能放弃。在做或暂停时，没做成的件能重试，等着的和没做成的能跳过。
 - **一次只做一件事**：一把锁把帮工的一轮结束和主人按按钮排成一个一个来，不会两边读同一份计划互相覆盖。
-- **计划只经 `put` 写**：每写一次和写之前比（`GraphChanges`），变了什么记一行经过，带是谁（主人、管家、农场）和为什么；经过写不进去只记日志，不挡计划。
+- **计划只经 `put` 写**：每写一次和写之前比（`GraphChanges`），变了什么记一行经过，带是谁（主人、管家、帮工、农场）和为什么；经过写不进去只记日志，不挡计划。
 
 ## 怎么走
 
@@ -47,6 +47,13 @@
 2. 写一张 `splitting` 的计划，派规划的帮工（`SplitBrief`：只读不改，最后用一个 json 代码块给出计划），它是父工单的一次干活。派不出去，计划放弃，说明为什么。
 3. 汇报来了，`parseSplit` 从最后一个读得了的 json 代码块读计划并校验。合格就成草稿，帮工收工，告诉管家拆成了哪几步。
 4. 不合格或这一轮出错，把问题列给它重给一次；还不行就放弃（`giveUp`）。规划被叫停、帮工被请走，也放弃。
+
+**帮工拆自己的工单**（`issue_split`，`SplitIssue`）：活一般先作为普通工单派给一个帮工，它读完代码才知道大。它调 `issue_split` 给出各步（和规划师的 json 同形），这张工单就地变成计划的父工单，直接开工：
+
+1. 只有这张工单最后派出去的帮工能拆，工单要开着、不是计划或计划的一步、不是派给管家的、帮工不在起草、有项目、帮工有自己的分支（`issueSplitRefusal`）；步骤照 `GraphProblems` 校验，问题列回给它改。
+2. 计划分支从这个帮工的分支顶上开（`OpenBranch` 的起点），拆之前提交的东西是每一步的起点，没提交的不带过去；帮工自己的 worktree 不动。
+3. 计划直接 `running`、马上调度，经过记成「帮工」做的；告诉管家拆成了哪几步。
+4. 工具的回答叫帮工别再改代码、汇报完就结束；这一轮汇报来了，`task` 看到它不是任何一步的帮工、它的工单已是计划，请它收工。工单的「帮工走了就关」本来就跳过计划，父工单不会被关。
 
 **开工**（`start`）：从主分支开一条计划分支 `vibevalley/task-<id>-<毫秒时间的 36 进制>`，计划进 `running`，开始调度。分支开了而状态没存下，错误里说明分支已创建。
 
@@ -104,6 +111,7 @@
 
 - **长活拆成一张图，交给不同的帮工。** 一个会话从头做到尾，上下文越拉越长、越做越差，中途失败整轮重来；互不依赖的部分没法并行，也没法按长处分给不同的档案。放弃了让管家在对话里一单一单地派：进度只在便宜模型的上下文里，十几步跟不住，重启就丢，每一步调度还花一次模型调用。拆图要模型，调度不要。
 - **拆交给在项目里读代码的帮工，不让管家拆。** 管家不读代码，拆出来的件对不上现有的结构；管家只负责起头和转告。
+- **帮工能就地拆自己的工单，拆完直接开工。** 活大不大，往往要读完代码才知道；放弃了让它在汇报里请主人另开计划：一件事变成两张东西，工单串接不上。它拆得比管家准，所以不等主人点头，主人随时能暂停、改步骤、放弃。用工具调用，不解析汇报里的 json：普通帮工的汇报是写给主人看的，工具调用是明确的意图，当场能告诉它哪里不对。计划另开一条分支、不用帮工的分支：每一步要合回计划分支，而帮工的 worktree 正检出着自己的分支。
 - **不交给农机自己的子 agent 或工作流**（claude 的 workflow、codex 的子线程）。整件事在一个会话里，农场看不见每一件，只能用一种农机，也没法给每件单独的分支、检查和合并。
 - **计划分支挡在主分支前面。** 每件做完直接进主分支，主分支上会出现做了一半的功能，并行的件在主分支上互相冲突；每件都要主人点，主人要审十几次。中间的合并自动做，主分支只在收获时变一次。也没选所有件在同一个分支、同一个 worktree 上排队：没有并行，分不清哪个提交属于哪一件。
 - **每件做完由农场跑检查，不等人验收。** 每件等人会让并行停下来；人在收获整张计划时看一次。检查由农场跑，不信帮工自己说的。

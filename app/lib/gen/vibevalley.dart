@@ -1942,7 +1942,8 @@ enum GraphEventKind {
 enum GraphActor {
   user('user'),
   manager('manager'),
-  system('system');
+  system('system'),
+  session('session');
 
   const GraphActor(this.wire);
   final String wire;

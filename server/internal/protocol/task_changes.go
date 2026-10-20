@@ -156,7 +156,7 @@ func GraphChanges(before *TaskGraph, after TaskGraph) []GraphChange {
 	return out
 }
 
-var ActorText = map[GraphActor]string{GraphActorUser: "主人", GraphActorManager: "管家", GraphActorSystem: "农场"}
+var ActorText = map[GraphActor]string{GraphActorUser: "主人", GraphActorManager: "管家", GraphActorSystem: "农场", GraphActorSession: "帮工"}
 
 func GraphEventText(e GraphChange, titleOf func(node string) string) string {
 	if titleOf == nil {

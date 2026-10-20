@@ -52,7 +52,8 @@ func frozenTouched(graph protocol.TaskGraph, task protocol.Task, changed []strin
 	return out
 }
 
-type taskDraft struct {
+// A step as whoever splits writes it: the splitting session in its json block, a helper through issue_split.
+type StepDraft struct {
 	ID         string   `json:"id"`
 	Title      *string  `json:"title,omitzero"`
 	Brief      string   `json:"brief"`
@@ -65,10 +66,10 @@ type taskDraft struct {
 
 type splitDraft struct {
 	Title *string     `json:"title,omitzero"`
-	Tasks []taskDraft `json:"tasks"`
+	Tasks []StepDraft `json:"tasks"`
 }
 
-func freshTask(draft taskDraft) protocol.Task {
+func freshTask(draft StepDraft) protocol.Task {
 	id := str.Trim(draft.ID)
 	title := id
 	if draft.Title != nil && str.Trim(*draft.Title) != "" {
@@ -159,14 +160,14 @@ func decodeSplitDraft(raw any) (splitDraft, string) {
 	if !ok {
 		return task, `["tasks"] 要是数组`
 	}
-	task.Tasks = make([]taskDraft, 0, len(list))
+	task.Tasks = make([]StepDraft, 0, len(list))
 	for i, item := range list {
 		at := fmt.Sprintf(`["tasks"][%d]`, i)
 		o, ok := item.(map[string]any)
 		if !ok {
 			return task, at + " 要是对象"
 		}
-		var d taskDraft
+		var d StepDraft
 		str := func(key string, required bool) (*string, string) {
 			v, ok := o[key]
 			if !ok {
@@ -414,4 +415,31 @@ func retryText(task protocol.Task) string {
 
 func changeOf(e protocol.GraphEvent) protocol.GraphChange {
 	return protocol.GraphChange{Graph: e.Graph, Task: e.Task, Kind: e.Kind, Session: e.Session, Detail: e.Detail, Changes: e.Changes, Commits: e.Commits}
+}
+
+// Only the helper an issue was last sent to splits it, and only while it is a plain open issue.
+func issueSplitRefusal(session *protocol.Session, issue *protocol.Issue) string {
+	switch {
+	case session == nil:
+		return "你已经不在地里了"
+	case session.Graph != nil:
+		return "你在做计划里的一步：这一步不能再拆，太大就在结论里说，让主人改计划"
+	case issue == nil:
+		return "你手上没有工单：只有工单能拆"
+	case session.Draft:
+		return "你在起草这张工单，还没开工：把要拆的想法写进草稿"
+	case issue.Graph != nil || issue.Task != nil:
+		return "这张工单已经是计划了"
+	case issue.Closed != nil || issue.ClosedAt != nil:
+		return "这张工单已经关了"
+	case protocol.IsForManager(*issue):
+		return "这是派给管家的工单"
+	case issue.Project == nil:
+		return "这张工单没有项目，没法开分支"
+	case len(issue.Sessions) == 0 || issue.Sessions[len(issue.Sessions)-1] != session.ID:
+		return "这张工单现在不归你做"
+	case session.Branch == nil:
+		return "你直接在项目里干活，没有自己的分支：拆了没处开计划的分支"
+	}
+	return ""
 }

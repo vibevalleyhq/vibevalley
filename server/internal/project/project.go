@@ -749,13 +749,17 @@ func (p *Service) Clear(project string, issueNumber int64) string {
 	return ""
 }
 
-func (p *Service) OpenBranch(project, branch string) error {
+// from is where it starts: another branch's tip, or HEAD when empty.
+func (p *Service) OpenBranch(project, branch, from string) error {
 	defer p.serially(project)()
 	path, err := p.ensure(project)
 	if err != nil {
 		return errors.New(reason(err))
 	}
-	if _, err := git(path, "branch", branch, "HEAD"); err != nil {
+	if from == "" {
+		from = "HEAD"
+	}
+	if _, err := git(path, "branch", branch, from); err != nil {
 		return errors.New(reason(err))
 	}
 	return nil

@@ -191,6 +191,8 @@ type taskFakeProjects struct {
 	sessions *taskFakeSessions
 	mu       sync.Mutex
 	branches []string
+	// Where each branch started: "" for HEAD.
+	from map[string]string
 }
 
 var taskTestFile = regexp.MustCompile(`steps/(\w+)\.txt`)
@@ -216,10 +218,14 @@ func (p *taskFakeProjects) ChangedFiles(cwd, _ string) ([]string, error) {
 	return slices.Clone(p.sessions.touched[*h.Graph.Task]), nil
 }
 
-func (p *taskFakeProjects) OpenBranch(project, branch string) error {
+func (p *taskFakeProjects) OpenBranch(project, branch, from string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.branches = append(p.branches, branch)
+	if p.from == nil {
+		p.from = map[string]string{}
+	}
+	p.from[branch] = from
 	return nil
 }
 
@@ -652,4 +658,56 @@ func TestTaskIsAParentIssue(t *testing.T) {
 		got, err := tf.Issue.Get(id)
 		return err == nil && got.Closed != nil && *got.Closed == protocol.IssueCloseMerged
 	})
+}
+
+func TestHelperSplitsItsIssue(t *testing.T) {
+	tf := newTaskTestWorld(t, t.TempDir(), nil, nil)
+	issue, err := tf.Issue.Add(protocol.IssueRequest{Title: "整个看板重做", Description: "像 Linear 那样", Project: new("board"), Assignee: new("lab")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tf.Issue.Edit(issue.ID, protocol.IssueUpdate{Criteria: []string{"卡片紧凑"}}); err != nil {
+		t.Fatal(err)
+	}
+	helper := protocol.Session{
+		ID: "h1", Name: "小吴", Agent: "lab", Project: new("board"), Branch: new("vibevalley/issue-1"), Worktree: new("/wt/h1"), Issue: &issue.ID,
+		HiredAt: clock.NowMs(), Phase: protocol.Phase{Value: protocol.PhaseWorking{Since: clock.NowMs()}},
+	}
+	tf.Core.Apply(protocol.FactHired{Session: helper})
+	if err := tf.Issue.Ran(issue.ID, helper); err != nil {
+		t.Fatal(err)
+	}
+	steps := []StepDraft{{ID: "a", Brief: "卡片", Check: new("true")}, {ID: "b", Brief: "列表", Check: new("true")}, {ID: "c", Brief: "合起来", Needs: []string{"a", "b"}}}
+	said, err := tf.Task.SplitIssue("h1", "", steps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.Match(t, said, `3 张子工单`, "the helper is told")
+	graph := tf.until(t, issue.ID, func(g protocol.TaskGraph) bool {
+		return taskState(g, "a") != protocol.TaskStateWaiting && taskState(g, "b") != protocol.TaskStateWaiting
+	})
+	if graph.Title != "整个看板重做" || graph.Goal != "像 Linear 那样" || graph.Project != "board" {
+		t.Fatalf("the task is the issue: %+v", graph)
+	}
+	tf.projects.mu.Lock()
+	testkit.Eq(t, tf.projects.from[*graph.Branch], "vibevalley/issue-1", "the task's branch starts at the issue's")
+	tf.projects.mu.Unlock()
+	parent, err := tf.Issue.Get(issue.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parent.Number != issue.Number || parent.Assignee == nil || *parent.Assignee != "lab" || fmt.Sprint(parent.Criteria) != "[卡片紧凑]" || parent.Sessions[0] != "h1" {
+		t.Fatalf("the issue keeps what it had: %+v", parent)
+	}
+	if c, err := tf.Issue.Get(protocol.TaskIssueID(issue.ID, "c")); err != nil || *c.Parent != issue.ID {
+		t.Fatalf("a step under it: %+v %v", c, err)
+	}
+	if _, err := tf.Task.SplitIssue("h1", "", steps); err == nil {
+		t.Fatal("split twice")
+	}
+	tf.Core.Apply(protocol.FactReport{ID: "h1", Outcome: protocol.OutcomeCompleted, Summary: "拆成了三步", Runs: 1})
+	testkit.Until(t, "the helper goes home", func() bool { return tf.Core.Session("h1") == nil })
+	if got, _ := tf.Issue.Get(issue.ID); got.Closed != nil {
+		t.Fatalf("its leaving closed the issue: %+v", got)
+	}
 }

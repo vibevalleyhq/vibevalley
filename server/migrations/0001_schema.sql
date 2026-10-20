@@ -124,7 +124,7 @@ CREATE TABLE task_event (
   graph_id    text not null,
   task_id     text,
   kind        text not null,
-  actor       text not null check (actor in ('user', 'manager', 'system')),
+  actor       text not null check (actor in ('user', 'manager', 'system', 'session')),
   payload     text not null default '{}',
   created_at  integer not null
 );

@@ -6,10 +6,11 @@ import '../gen/vibevalley.dart';
 import '../ui/pixel/pixel.dart';
 import '../rules/task.dart';
 
-const _actorTone = {
-  GraphActor.user: (Palette.leaf500, Palette.cream50),
-  GraphActor.manager: (Color(0xFFEFD08F), Palette.bark900),
-  GraphActor.system: (Palette.cream200, Palette.bark900),
+(Color, Color) _actorTone(GraphActor actor) => switch (actor) {
+  GraphActor.user => (Palette.leaf500, Palette.cream50),
+  GraphActor.manager => (const Color(0xFFEFD08F), Palette.bark900),
+  GraphActor.session => (const Color(0xFFBFD7EA), Palette.bark900),
+  GraphActor.system => (Palette.cream200, Palette.bark900),
 };
 
 String _when(double at) {
@@ -105,7 +106,7 @@ class _TaskLogRowState extends State<TaskLogRow> {
   @override
   Widget build(BuildContext context) {
     final e = widget.e;
-    final (fill, ink) = _actorTone[e.actor]!;
+    final (fill, ink) = _actorTone(e.actor);
     final changes = e.changes ?? const <TaskFieldChange>[];
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

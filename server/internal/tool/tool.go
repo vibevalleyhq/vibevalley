@@ -39,7 +39,7 @@ func (s *Service) Manager(who Who) []agentcore.AgentTool {
 func (s *Service) Session(who Who) []agentcore.AgentTool {
 	return []agentcore.AgentTool{
 		s.channelSay(who), s.readChat(who), s.channelInbox(who), s.sessionList(), s.memorySearch(who, forSession), s.memoryAdd(who, forSession),
-		s.docRead(who), s.docAppend(who), s.docUpdate(who),
+		s.docRead(who), s.docAppend(who), s.docUpdate(who), s.issueSplit(who),
 	}
 }
 
@@ -66,6 +66,7 @@ var labels = map[string]string{
 	"task_edit":        "改计划",
 	"graph_action":     "计划",
 	"task_action":      "计划的一件",
+	"issue_split":      "拆工单",
 	"remember":         "记一条",
 	"rewrite_memory":   "整理记性",
 	"search_archive":   "翻旧账",

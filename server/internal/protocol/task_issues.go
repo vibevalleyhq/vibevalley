@@ -52,8 +52,13 @@ func GraphIssues(graph TaskGraph, before []Issue, now int64) []Issue {
 		return t
 	}
 	project := graph.Project
+	// A helper's issue split under it keeps who it was given to.
+	var assignee *string
+	if old, ok := was[graph.ID]; ok {
+		assignee = old.Assignee
+	}
 	out := []Issue{keep(Issue{
-		ID: graph.ID, Title: graph.Title, Description: graph.Goal, Project: &project,
+		ID: graph.ID, Title: graph.Title, Description: graph.Goal, Project: &project, Assignee: assignee,
 		Graph: &IssueGraph{State: graph.State, Branch: graph.Branch, Parallel: graph.Parallel, Note: graph.Note},
 	}, graphClosed(graph.State))}
 	for i, n := range graph.Tasks {

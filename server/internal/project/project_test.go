@@ -110,7 +110,7 @@ func TestSessionsCloneOffline(t *testing.T) {
 func TestSessionsTaskBranchMerges(t *testing.T) {
 	root := projectsDir(t)
 	p := projects(t, root)
-	if err := p.OpenBranch("task", "vibevalley/task-1"); err != nil {
+	if err := p.OpenBranch("task", "vibevalley/task-1", ""); err != nil {
 		t.Fatal(err)
 	}
 	place, err := p.Workplace("task", "w1", true, "vibevalley/task-1", 0)
@@ -135,10 +135,26 @@ func TestSessionsTaskBranchMerges(t *testing.T) {
 	testkit.Eq(t, []any{ok, out}, []any{false, "a"}, "run")
 }
 
+func TestBranchOpensFromAnotherBranch(t *testing.T) {
+	root := projectsDir(t)
+	p := projects(t, root)
+	place, err := p.Workplace("task", "w1", true, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(place.Cwd, "a.txt"), []byte("before the split\n"), 0o644)
+	testkit.Git(t, place.Cwd, "add", "a.txt")
+	testkit.Git(t, place.Cwd, "-c", "user.name=t", "-c", "user.email=t@vibevalley.test", "commit", "-qm", "a")
+	if err := p.OpenBranch("task", "vibevalley/task-1", place.Branch); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Eq(t, testkit.Git(t, filepath.Join(root, "task"), "show", "vibevalley/task-1:a.txt"), "before the split", "the committed work is where it starts")
+}
+
 func TestSessionsChangedFilesSinceTheBase(t *testing.T) {
 	root := projectsDir(t)
 	p := projects(t, root)
-	if err := p.OpenBranch("task", "vibevalley/task-1"); err != nil {
+	if err := p.OpenBranch("task", "vibevalley/task-1", ""); err != nil {
 		t.Fatal(err)
 	}
 	work := func(id string, files ...string) Workplace {
@@ -344,7 +360,7 @@ func TestPublishedMergeKeepsReceiptWhenWorktreeCleanupFails(t *testing.T) {
 			target := "main"
 			if intoTask {
 				target = "task"
-				if err := p.OpenBranch("demo", target); err != nil {
+				if err := p.OpenBranch("demo", target, ""); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -393,7 +409,7 @@ func TestMergeRunsProjectCheck(t *testing.T) {
 				target := "main"
 				if into {
 					target = "vibevalley/task-1"
-					if err := p.OpenBranch("checked", target); err != nil {
+					if err := p.OpenBranch("checked", target, ""); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -560,7 +576,7 @@ func TestIssueWorkplaceLifecycle(t *testing.T) {
 			baseHead := ""
 			if mode == "base" {
 				base = "vibevalley/task-42"
-				if err := p.OpenBranch("demo", base); err != nil {
+				if err := p.OpenBranch("demo", base, ""); err != nil {
 					t.Fatal(err)
 				}
 				path := filepath.Join(root, "demo")
@@ -619,7 +635,7 @@ func TestMergeCheckOutsideProjectLock(t *testing.T) {
 				target := "main"
 				if into {
 					target = "vibevalley/task-42"
-					if err := p.OpenBranch("demo", target); err != nil {
+					if err := p.OpenBranch("demo", target, ""); err != nil {
 						t.Fatal(err)
 					}
 				}

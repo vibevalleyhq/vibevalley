@@ -39,7 +39,7 @@ type taskIssues interface {
 
 type taskProjects interface {
 	Run(ctx context.Context, cwd, command string) (bool, string)
-	OpenBranch(project, branch string) error
+	OpenBranch(project, branch, from string) error
 	MergeBranch(project, branch string) (string, error)
 	BranchChanges(project, branch string) (protocol.Changes, error)
 	ChangedFiles(cwd, base string) ([]string, error)
@@ -277,6 +277,54 @@ func (p *tasks) split(graph protocol.TaskGraph, session protocol.Session, report
 	return nil
 }
 
+// A helper finds its issue is several people's work: the issue becomes the task's parent, its steps the issues under it,
+// and they start at once. The task's branch starts at the tip of the issue's branch, so what the helper committed
+// before splitting is where every step begins; its own worktree is left alone.
+func (p *tasks) SplitIssue(sessionID string, title string, steps []StepDraft) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	state := p.core.State()
+	session := protocol.SessionOf(state, sessionID)
+	var issue *protocol.Issue
+	if session != nil && session.Issue != nil {
+		if i := slices.IndexFunc(state.Issues, func(t protocol.Issue) bool { return t.ID == *session.Issue }); i >= 0 {
+			issue = &state.Issues[i]
+		}
+	}
+	if why := issueSplitRefusal(session, issue); why != "" {
+		return "", errors.New(why)
+	}
+	tasks := make([]protocol.Task, len(steps))
+	for i, d := range steps {
+		tasks[i] = freshTask(d)
+	}
+	if problems := protocol.GraphProblems(tasks); len(problems) > 0 {
+		return "", errors.New("步骤有问题，改好再拆：\n- " + strings.Join(problems, "\n- "))
+	}
+	graph := protocol.TaskGraph{
+		ID: issue.ID, Title: issue.Title, Goal: issue.Description, Project: *issue.Project, Tasks: tasks,
+		Parallel: protocol.DefaultParallel, CreatedAt: issue.CreatedAt,
+	}
+	if t := str.Trim(title); t != "" {
+		graph.Title = t
+	}
+	branch := "vibevalley/task-" + graph.ID + "-" + strconv.FormatInt(clock.NowMs(), 36)
+	if err := p.projects.OpenBranch(graph.Project, branch, taskStr(session.Branch)); err != nil {
+		return "", err
+	}
+	graph.State, graph.Branch = protocol.GraphStateRunning, &branch
+	if err := p.put(graph, protocol.GraphActorSession, session.Name+" 拆的"); err != nil {
+		return "", fmt.Errorf("计划分支 %s 已创建，但拆好的工单没能保存：%w", branch, err)
+	}
+	if err := p.schedule(graph.ID); err != nil {
+		return "", err
+	}
+	p.core.Notice(protocol.NoticeLevelInfo, fmt.Sprintf("%s 把工单「%s」拆成了 %d 张子工单，开工了", session.Name, graph.Title, len(tasks)))
+	p.tellManager(fmt.Sprintf("%s 把工单 %s 拆成了 %d 步，直接开工了。\n%s", session.Name, graph.ID, len(tasks), protocol.GraphText(graph)))
+	return fmt.Sprintf("拆好了：工单「%s」下面 %d 张子工单，在分支 %s 上开工了，每一步派给一个帮工。你这张工单的活交给它们了："+
+		"别再改代码，用一两句话汇报拆成了哪几步，这一轮就结束，汇报完你就收工。", graph.Title, len(tasks), branch), nil
+}
+
 func (p *tasks) schedule(id string) error {
 	got := p.get(id)
 	if got == nil || got.State != protocol.GraphStateRunning {
@@ -467,6 +515,13 @@ func (p *tasks) follow(change core.Transition) {
 	switch f := change.Fact.Value.(type) {
 	case protocol.FactReport:
 		session := protocol.SessionOf(change.After, f.ID)
+		if session != nil && session.Graph == nil && session.Issue != nil {
+			// The helper that split its issue: the steps do the work now.
+			if graph := p.get(*session.Issue); graph != nil && graph.State != protocol.GraphStateSplitting {
+				p.sessions.Dismiss(session.ID)
+			}
+			break
+		}
 		if session == nil || session.Graph == nil {
 			break
 		}
@@ -586,7 +641,7 @@ func (p *tasks) Act(id string, action protocol.GraphAction, by protocol.GraphAct
 			return "", errors.New(problems[0])
 		}
 		branch := "vibevalley/task-" + graph.ID + "-" + strconv.FormatInt(clock.NowMs(), 36)
-		if err := p.projects.OpenBranch(graph.Project, branch); err != nil {
+		if err := p.projects.OpenBranch(graph.Project, branch, ""); err != nil {
 			return "", err
 		}
 		graph.State, graph.Branch = protocol.GraphStateRunning, &branch

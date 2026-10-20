@@ -2,11 +2,14 @@ package tool
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"vibevalley/internal/agent/brain"
 	"vibevalley/internal/protocol"
+	"vibevalley/internal/task"
 	"vibevalley/pkg/agentcore"
+	"vibevalley/pkg/x/ptr"
 )
 
 // Splitting: tasks that split a long piece of work into steps.
@@ -119,6 +122,44 @@ func (s *Service) taskAction() agentcore.AgentTool {
 		Parameters: schemaOf[taskActArgs](),
 		Run: func(_ context.Context, p taskActArgs, _ brain.ToolContext) (string, error) {
 			return answered(s.tasks.TaskAct(p.Graph, p.Task, p.Action, protocol.GraphActorManager))
+		},
+	})
+}
+
+type issueSplitArgs struct {
+	Title string           `json:"title,omitempty" jsonschema:"拆完的计划叫什么；不填照工单的标题"`
+	Tasks []issueSplitStep `json:"tasks" jsonschema:"子工单，每张一个帮工在自己的分支上做完、提交、单独验证"`
+}
+
+type issueSplitStep struct {
+	ID         string   `json:"id" jsonschema:"简短的英文小写 id，比如 schema、api"`
+	Title      string   `json:"title,omitempty"`
+	Brief      string   `json:"brief" jsonschema:"这张子工单：目标、改哪里、做到什么算完、留给后面的步骤什么；做它的帮工只看得到它和前面步骤的结论"`
+	Needs      []string `json:"needs,omitempty" jsonschema:"要等哪几张做完（填 id）；不互相依赖的会同时做"`
+	Agent      string   `json:"agent,omitempty" jsonschema:"帮工档案 id；不填按规则挑"`
+	Check      string   `json:"check,omitempty" jsonschema:"做完在它的分支上跑的检查命令，比如 go test ./..."`
+	Scope      []string `json:"scope,omitempty" jsonschema:"它要改的文件或目录；同时做的几张尽量不重叠"`
+	Acceptance bool     `json:"acceptance,omitempty" jsonschema:"这张只写现在会失败的测试，别的都等它，合进去以后冻结"`
+}
+
+func (s *Service) issueSplit(who Who) agentcore.AgentTool {
+	return brain.TextTool(brain.TextToolSpec[issueSplitArgs]{
+		Name: "issue_split", Label: labels["issue_split"],
+		Description: fmt.Sprintf("把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、"+
+			"能分成几件各自提交和验证的事时用；一般三到六张，最多 %d 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。"+
+			"拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。", protocol.MaxTasks),
+		Parameters: schemaOf[issueSplitArgs](),
+		Run: func(ctx context.Context, p issueSplitArgs, _ brain.ToolContext) (string, error) {
+			c, err := who(ctx)
+			if err != nil {
+				return "", err
+			}
+			steps := make([]task.StepDraft, len(p.Tasks))
+			for i, t := range p.Tasks {
+				steps[i] = task.StepDraft{ID: t.ID, Title: ptr.To(t.Title), Brief: t.Brief, Needs: t.Needs, Agent: ptr.To(t.Agent),
+					Check: ptr.To(t.Check), Scope: t.Scope, Acceptance: t.Acceptance}
+			}
+			return answered(s.tasks.SplitIssue(c.Session, p.Title, steps))
 		},
 	})
 }

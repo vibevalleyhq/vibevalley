@@ -720,7 +720,7 @@ var LedgerEntryMembers = []LedgerEntryValue{LedgerEntryHarvested{}, LedgerEntryF
 var GraphEventKindValues = []GraphEventKind{GraphEventKindSplitting, GraphEventKindDrafted, GraphEventKindStarted, GraphEventKindPaused, GraphEventKindResumed, GraphEventKindRipe, GraphEventKindMerged, GraphEventKindAbandoned, GraphEventKindNoted, GraphEventKindTaskStarted, GraphEventKindTaskSentBack, GraphEventKindTaskMerged, GraphEventKindTaskFailed, GraphEventKindTaskRetried, GraphEventKindTaskRequeued, GraphEventKindTaskSkipped, GraphEventKindTaskEdited, GraphEventKindTaskAdded, GraphEventKindTaskRemoved}
 
 // GraphActorValues are every GraphActor, in the protocol's order.
-var GraphActorValues = []GraphActor{GraphActorUser, GraphActorManager, GraphActorSystem}
+var GraphActorValues = []GraphActor{GraphActorUser, GraphActorManager, GraphActorSystem, GraphActorSession}
 
 func (v LanStatus) MarshalJSON() ([]byte, error) {
 	type plain LanStatus

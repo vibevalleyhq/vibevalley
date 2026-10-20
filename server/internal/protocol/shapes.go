@@ -824,6 +824,8 @@ const (
 	GraphActorUser    GraphActor = "user"
 	GraphActorManager GraphActor = "manager"
 	GraphActorSystem  GraphActor = "system"
+	// The helper working the issue split it into steps (issue_split).
+	GraphActorSession GraphActor = "session"
 )
 
 type TaskFieldChange struct {

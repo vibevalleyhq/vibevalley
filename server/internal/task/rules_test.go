@@ -161,3 +161,31 @@ func TestNodeTask(t *testing.T) {
 	testkit.Match(t, task, `只改这些地方：src/api`)
 	testkit.Match(t, task, "`pnpm test`")
 }
+
+func TestIssueSplitRefusal(t *testing.T) {
+	mine := protocol.Session{ID: "w1", Branch: new("vibevalley/issue-1")}
+	open := protocol.Issue{ID: "t1", Project: new("demo"), Sessions: []string{"w0", "w1"}}
+	testkit.Eq(t, issueSplitRefusal(&mine, &open), "", "its own open issue")
+	with := func(change func(*protocol.Session, *protocol.Issue)) string {
+		s, i := mine, open
+		change(&s, &i)
+		return issueSplitRefusal(&s, &i)
+	}
+	for name, change := range map[string]func(*protocol.Session, *protocol.Issue){
+		"a step":         func(s *protocol.Session, _ *protocol.Issue) { s.Graph = &protocol.SessionGraph{ID: "p1", Task: new("a")} },
+		"a draft":        func(s *protocol.Session, _ *protocol.Issue) { s.Draft = true },
+		"no branch":      func(s *protocol.Session, _ *protocol.Issue) { s.Branch = nil },
+		"already a task": func(_ *protocol.Session, i *protocol.Issue) { i.Graph = &protocol.IssueGraph{} },
+		"closed":         func(_ *protocol.Session, i *protocol.Issue) { i.ClosedAt = new(int64(1)) },
+		"the manager's":  func(_ *protocol.Session, i *protocol.Issue) { i.Assignee = new(protocol.ManagerAgent) },
+		"no project":     func(_ *protocol.Session, i *protocol.Issue) { i.Project = nil },
+		"not its now":    func(_ *protocol.Session, i *protocol.Issue) { i.Sessions = []string{"w1", "w2"} },
+	} {
+		if with(change) == "" {
+			t.Errorf("%s: not refused", name)
+		}
+	}
+	if issueSplitRefusal(nil, &open) == "" || issueSplitRefusal(&mine, nil) == "" {
+		t.Error("no session or no issue: not refused")
+	}
+}
