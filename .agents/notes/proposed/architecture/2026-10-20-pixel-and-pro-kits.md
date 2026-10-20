@@ -64,7 +64,7 @@ Status: proposed
 ui/              两组共用：theme.dart（Palette、字体名）、icons（SpriteIcon、头像）、
                  markdown 的解析、labels、toasts 的数据、ticking
 ui/pixel/        像素组：今天的 ui/kit 和 pixel_card、pixels、glyphs、medals，名字照旧是 Px*；
-                 KitText → PxText，KitTappable → PxTappable
+                 KitText → PxText（Tappable 是行为，进共用层）
 ui/pro/          专业组：新写，名字是 Pro*（ProText、ProButton、ProPanel、ProField、ProTextInput、
                  ProTextArea、ProSegmented、ProPick、ProSwitch、ProDialog、ProMarkdown、ProListRow、ProMenu……）
 shared/、chat/   逻辑和状态：ComposerDraft、Naming、chat_state、规则和说法、IssueView 的状态和能做的事
@@ -109,7 +109,7 @@ workbench/       用 ui/pro 画
 
 ### 顺序
 
-1. **挪像素组**：`ui/kit` 和 `ui/` 下的像素件挪进 `ui/pixel`，共用的挪到 `ui/` 那层；`KitText` → `PxText`，`KitTappable` → `PxTappable`。纯挪动和改名，农场、工作台的样子都不变。加上第一、三条检查（`shared` 里现有的视图先列进清单）。
+1. **挪像素组**：`ui/kit` 和 `ui/` 下的像素件挪进 `ui/pixel`，共用的挪到 `ui/` 那层；`KitText` → `PxText`，`KitTappable` → `Tappable`（共用层）。纯挪动和改名，农场、工作台的样子都不变。加上第一、三条检查（`shared` 里现有的视图先列进清单）。
 2. **专业组起步，验证两页**：`ui/pro` 先写聊天页和工单详情要的：`ProText`、`ProButton`、`ProPanel`、`ProTextInput`、`ProTextArea`、`ProMarkdown`。拆出 `IssueView` 的规则和 `Composer` 的两份视图，工作台的聊天页和工单详情改用专业组。截 1440×900 和 390×844 的前后对比，主人定下专业组的字号、线、按钮和面板，再往下做。
 3. **工作台一页一页迁**：按 `workbench/` 的目录走（`chat`、`issues`、`agents`、`manager`、`runtimes`、`projects`、`map`、`settings`、`connectors`、`skills`、`voice`、`lan`、`catalog`、外框），每迁完一页从清单里划掉；专业组跟着页面要什么长什么。
 4. **拆完 `shared`**：收成清单、播种袋、每次干活、派活消息；只属于一张皮的文件挪进那张皮的目录。`shared` 的清单清空。
