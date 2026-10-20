@@ -103,7 +103,8 @@ class ProButton extends StatelessWidget {
               padding: pad,
               decoration: BoxDecoration(
                 color: shade,
-                border: edge == null ? null : Border.all(color: edge),
+                // Always an edge, clear on the filled tones: a button changing tone keeps its size.
+                border: Border.all(color: edge ?? const Color(0x00000000)),
                 borderRadius: proRadius,
               ),
               child: Center(

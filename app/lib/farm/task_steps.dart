@@ -138,7 +138,7 @@ class NodeCard extends ConsumerWidget {
       child: Container(
         decoration: BoxDecoration(
           color: tone.card,
-          border: tone.edge == null ? null : Border.all(color: tone.edge!, width: 1.5),
+          border: Border.all(color: tone.edge ?? const Color(0x00000000), width: 1.5),
         ),
         padding: const EdgeInsets.all(10),
         child: Column(

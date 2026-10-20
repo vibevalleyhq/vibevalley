@@ -599,12 +599,10 @@ class IssueStages extends StatelessWidget {
           children: [
             if (s.index < at.index) SpriteIcon('mark-check', size: 12, semanticLabel: '${s.label}做完了') else ProDot(s == at ? Palette.wheat : ProColor.line),
             const SizedBox(width: 6),
-            Text(
+            ProWeightText(
               s.label,
-              style: ProText.sm.copyWith(
-                color: s == at ? ProColor.ink : (s.index < at.index ? Palette.leaf700 : ProColor.faint),
-                fontWeight: s == at ? FontWeight.w600 : FontWeight.w400,
-              ),
+              style: ProText.sm.copyWith(color: s == at ? ProColor.ink : (s.index < at.index ? Palette.leaf700 : ProColor.faint)),
+              strong: s == at,
             ),
           ],
         ),

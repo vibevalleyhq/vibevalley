@@ -266,7 +266,7 @@ class _FactsCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
                     color: facts.capabilities.contains(c) ? ProColor.selected : null,
-                    border: facts.capabilities.contains(c) ? null : const Border.fromBorderSide(proLine),
+                    border: facts.capabilities.contains(c) ? Border.all(color: const Color(0x00000000)) : const Border.fromBorderSide(proLine),
                     borderRadius: const BorderRadius.all(Radius.circular(4)),
                   ),
                   child: Text(

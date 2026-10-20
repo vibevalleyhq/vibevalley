@@ -181,3 +181,37 @@ class ProCard extends StatelessWidget {
     ),
   );
 }
+
+/// A label that turns bold when chosen (a tab, a segment, a stage) and keeps one width either way: it always takes the
+/// bold width, so choosing it does not push the labels beside it.
+class ProWeightText extends StatelessWidget {
+  const ProWeightText(this.text, {super.key, required this.style, required this.strong, this.weight = FontWeight.w600, this.center = false});
+  final String text;
+  final TextStyle style;
+  final bool strong;
+  final FontWeight weight;
+  final bool center;
+
+  @override
+  Widget build(BuildContext context) {
+    final bold = DefaultTextStyle.of(context).style.merge(style).copyWith(fontWeight: weight);
+    final measure = TextPainter(
+      text: TextSpan(text: text, style: bold),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = measure.width.ceilToDouble();
+    measure.dispose();
+    return SizedBox(
+      width: width,
+      child: Text(
+        text,
+        maxLines: 1,
+        softWrap: false,
+        textAlign: center ? TextAlign.center : TextAlign.start,
+        style: strong ? style.copyWith(fontWeight: weight) : style,
+      ),
+    );
+  }
+}

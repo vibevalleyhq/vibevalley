@@ -43,9 +43,12 @@ class ProSegmented<T> extends StatelessWidget {
                       ),
                       child: Center(
                         widthFactor: 1,
-                        child: Text(
+                        child: ProWeightText(
                           o.label,
-                          style: ProText.sm.copyWith(color: on ? ProColor.ink : ProColor.muted, fontWeight: on ? FontWeight.w500 : FontWeight.w400),
+                          style: ProText.sm.copyWith(color: on ? ProColor.ink : ProColor.muted),
+                          strong: on,
+                          weight: FontWeight.w500,
+                          center: true,
                         ),
                       ),
                     ),

@@ -266,9 +266,10 @@ class _TabButton extends StatelessWidget {
         children: [
           Opacity(opacity: on || s.hovered ? 1 : .7, child: SpriteIcon(icon, size: 16)),
           const SizedBox(width: 6),
-          Text(
+          ProWeightText(
             label,
-            style: ProText.sm.copyWith(color: on || s.hovered ? ProColor.ink : ProColor.muted, fontWeight: on ? FontWeight.w600 : FontWeight.w400),
+            style: ProText.sm.copyWith(color: on || s.hovered ? ProColor.ink : ProColor.muted),
+            strong: on,
           ),
         ],
       ),

@@ -253,7 +253,11 @@ class _Step extends StatelessWidget {
     Widget box({required Color? fill, bool edge = false, double opacity = 1, required String label, required Widget body}) => Opacity(
       opacity: opacity,
       child: Container(
-        decoration: BoxDecoration(color: fill, border: edge ? const Border.fromBorderSide(proLine) : null, borderRadius: proRadius),
+        decoration: BoxDecoration(
+          color: fill,
+          border: edge ? const Border.fromBorderSide(proLine) : Border.all(color: const Color(0x00000000)),
+          borderRadius: proRadius,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

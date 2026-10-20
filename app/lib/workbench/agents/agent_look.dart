@@ -106,9 +106,11 @@ class _Tile extends StatelessWidget {
       children: [
         child,
         const SizedBox(height: 2),
-        Text(
+        ProWeightText(
           label,
-          style: ProText.xs.copyWith(color: active ? ProColor.ink : ProColor.muted, fontWeight: active ? FontWeight.w600 : FontWeight.w400),
+          style: ProText.xs.copyWith(color: active ? ProColor.ink : ProColor.muted),
+          strong: active,
+          center: true,
         ),
       ],
     ),

@@ -37,4 +37,24 @@ void main() {
   testWidgets('the workbench composer keeps its text where it was when it takes the focus', (t) async {
     await holdsStill(t, const WorkbenchComposer(placeholder: '说一句'));
   });
+
+  testWidgets('a button keeps its size when its tone changes', (t) async {
+    Future<Size> sized(ProTone tone) async {
+      await pumpFarm(
+        t,
+        ProScope(
+          child: Center(
+            child: ProButton.text('起草', tone: tone, onPressed: () {}),
+          ),
+        ),
+        overrides: overrides(farm(), view(), fakeApi(Routes())),
+      );
+      return t.getSize(find.byType(ProButton));
+    }
+
+    final plain = await sized(ProTone.plain);
+    for (final tone in ProTone.values) {
+      expect(await sized(tone), plain, reason: '$tone');
+    }
+  });
 }

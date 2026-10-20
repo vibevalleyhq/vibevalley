@@ -74,12 +74,11 @@ class WorkbenchTabs<T> extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: big ? 12 : 10),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: v == value ? ProColor.selected : (s.hovered ? ProColor.hover : null), borderRadius: proRadius),
-                child: Text(
+                child: ProWeightText(
                   label,
-                  style: (big ? ProText.sm : ProText.xs).copyWith(
-                    color: v == value || s.hovered ? ProColor.ink : ProColor.muted,
-                    fontWeight: v == value ? FontWeight.w600 : FontWeight.w400,
-                  ),
+                  style: (big ? ProText.sm : ProText.xs).copyWith(color: v == value || s.hovered ? ProColor.ink : ProColor.muted),
+                  strong: v == value,
+                  center: true,
                 ),
               ),
             ),
@@ -108,9 +107,11 @@ class WorkbenchPill extends StatelessWidget {
         color: on ? ProColor.accent : (s.hovered ? ProColor.selected : ProColor.hover),
         borderRadius: const BorderRadius.all(Radius.circular(12)),
       ),
-      child: Text(
+      child: ProWeightText(
         label,
-        style: ProText.xs.copyWith(color: on ? Palette.paper : ProColor.ink, fontWeight: on ? FontWeight.w600 : FontWeight.w400),
+        style: ProText.xs.copyWith(color: on ? Palette.paper : ProColor.ink),
+        strong: on,
+        center: true,
       ),
     ),
   );

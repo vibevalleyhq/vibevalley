@@ -236,7 +236,7 @@ class _SeedChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
         decoration: BoxDecoration(
           color: on ? ProColor.accent : (st.hovered ? ProColor.selected : ProColor.page),
-          border: on ? null : const Border.fromBorderSide(proLine),
+          border: on ? Border.all(color: const Color(0x00000000)) : const Border.fromBorderSide(proLine),
           borderRadius: proRadius,
         ),
         child: Text(
