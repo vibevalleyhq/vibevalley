@@ -441,10 +441,7 @@ class _Toolbar extends ConsumerWidget {
             value: filter.project,
             placeholder: '所有项目',
             semanticLabel: '按项目看',
-            options: [
-              const PickOption(value: '', label: '所有项目'),
-              for (final p in projects) PickOption(value: p, label: p),
-            ],
+            options: [for (final p in projects) PickOption(value: p, label: p)],
             onChanged: (v) => onChanged(filter.copyWith(project: v)),
           ),
         ),
@@ -455,7 +452,6 @@ class _Toolbar extends ConsumerWidget {
             placeholder: '所有帮工',
             semanticLabel: '按帮工看',
             options: [
-              const PickOption(value: '', label: '所有帮工'),
               for (final a in agents)
                 if (used.contains(a.id)) PickOption(value: a.id, label: a.name),
             ],

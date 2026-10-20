@@ -103,7 +103,8 @@ class _ProPickState extends State<ProPick> {
   double _width = 0;
   int _highlight = 0;
 
-  List<PickOption> get _items => [PickOption(value: '', label: widget.placeholder), ...widget.options];
+  // '' is the placeholder's own value: an option for it would show the same choice twice.
+  List<PickOption> get _items => [PickOption(value: '', label: widget.placeholder), ...widget.options.where((o) => o.value != '')];
 
   @override
   void dispose() {
