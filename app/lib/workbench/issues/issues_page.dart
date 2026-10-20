@@ -440,6 +440,7 @@ class _Toolbar extends ConsumerWidget {
           child: ProPick(
             value: filter.project,
             placeholder: '所有项目',
+            clearable: true,
             semanticLabel: '按项目看',
             options: [for (final p in projects) PickOption(value: p, label: p)],
             onChanged: (v) => onChanged(filter.copyWith(project: v)),
@@ -450,6 +451,7 @@ class _Toolbar extends ConsumerWidget {
           child: ProPick(
             value: filter.agent,
             placeholder: '所有帮工',
+            clearable: true,
             semanticLabel: '按帮工看',
             options: [
               for (final a in agents)

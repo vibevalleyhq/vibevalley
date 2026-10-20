@@ -267,6 +267,7 @@ List<Widget> _modelAndEffort(Agent draft, RuntimeInfo? runtime, ValueChanged<Age
         value: draft.model,
         onChanged: (m) => patch(draft.copyWith(model: m, effort: '')),
         placeholder: 'runtime 默认${fallback.isNotEmpty ? '（$fallback）' : ''}',
+        clearable: true,
         options: [for (final m in models) PickOption(value: m.id, label: m.name, detail: m.effortLevels.isNotEmpty ? '${m.effortLevels.length} 档推理' : '')],
         enabled: models.isNotEmpty,
         semanticLabel: '模型',

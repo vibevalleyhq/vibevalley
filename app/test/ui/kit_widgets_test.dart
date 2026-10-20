@@ -239,6 +239,7 @@ void main() {
         host(
           Live(
             (set) => PxPick(
+              clearable: true,
               value: value,
               placeholder: '选一个',
               semanticLabel: '模型',
@@ -269,6 +270,7 @@ void main() {
         host(
           Live(
             (set) => PxPick(
+              clearable: true,
               value: value,
               placeholder: '选',
               options: const [
@@ -291,6 +293,7 @@ void main() {
       await t.pumpWidget(
         host(
           PxPick(
+            clearable: true,
             value: '',
             placeholder: '关着',
             enabled: false,

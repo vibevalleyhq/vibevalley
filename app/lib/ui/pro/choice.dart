@@ -78,12 +78,19 @@ class ProPick extends StatefulWidget {
     this.enabled = true,
     this.semanticLabel,
     this.quiet = false,
+    this.clearable = false,
   });
 
   final String value;
   final List<PickOption> options;
   final ValueChanged<String> onChanged;
+
+  /// What the trigger says while nothing is chosen.
   final String placeholder;
+
+  /// No value is a choice of its own, listed first as [placeholder] ("所有项目", "按规则挑"). Without it the list is
+  /// only [options]: a pick that always has a value must not offer a second entry that means the same as one of them.
+  final bool clearable;
   final bool enabled;
   final String? semanticLabel;
 
@@ -104,7 +111,7 @@ class _ProPickState extends State<ProPick> {
   int _highlight = 0;
 
   // '' is the placeholder's own value: an option for it would show the same choice twice.
-  List<PickOption> get _items => [PickOption(value: '', label: widget.placeholder), ...widget.options.where((o) => o.value != '')];
+  List<PickOption> get _items => [if (widget.clearable) PickOption(value: '', label: widget.placeholder), ...widget.options.where((o) => o.value != '')];
 
   @override
   void dispose() {
@@ -136,6 +143,7 @@ class _ProPickState extends State<ProPick> {
   KeyEventResult _key(FocusNode _, KeyEvent e) {
     if (!_portal.isShowing || e is KeyUpEvent) return KeyEventResult.ignored;
     final n = _items.length;
+    if (n == 0) return KeyEventResult.ignored;
     switch (e.logicalKey) {
       case LogicalKeyboardKey.arrowDown:
         setState(() => _highlight = (_highlight + 1) % n);
@@ -153,7 +161,10 @@ class _ProPickState extends State<ProPick> {
 
   @override
   Widget build(BuildContext context) {
-    final current = _items.firstWhere((o) => o.value == widget.value, orElse: () => _items.first);
+    final current = _items.firstWhere(
+      (o) => o.value == widget.value,
+      orElse: () => PickOption(value: '', label: widget.placeholder),
+    );
     final empty = current.value == '';
     return Focus(
       focusNode: _focus,

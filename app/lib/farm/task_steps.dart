@@ -340,12 +340,10 @@ class _NodeEditorState extends ConsumerState<NodeEditor> {
           PxPick(
             value: _agent,
             placeholder: '谁来做：按规则挑',
+            clearable: true,
             semanticLabel: '谁来做',
             onChanged: (v) => setState(() => _agent = v),
-            options: [
-              const PickOption(value: '', label: '谁来做：按规则挑'),
-              for (final a in agents) PickOption(value: a.id, label: a.name),
-            ],
+            options: [for (final a in agents) PickOption(value: a.id, label: a.name)],
           ),
           const SizedBox(height: 6),
           PxTextInput(value: _check, onChanged: (v) => setState(() => _check = v), placeholder: '做完跑的检查，比如 pnpm test（可空）', semanticLabel: '检查命令', mono: true),

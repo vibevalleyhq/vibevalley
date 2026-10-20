@@ -382,6 +382,7 @@ class _SettingsCardState extends ConsumerState<_SettingsCard> {
                   value: _draft.defaultModel,
                   onChanged: (defaultModel) => _set(_with(_draft, defaultModel: defaultModel, defaultEffort: '')),
                   placeholder: 'runtime 自己的默认',
+                  clearable: true,
                   options: [for (final m in models) PickOption(value: m.id, label: m.name)],
                   enabled: models.isNotEmpty,
                   semanticLabel: '默认模型',

@@ -344,6 +344,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
           quiet: true,
           value: _agent,
           placeholder: '起草时替你挑',
+          clearable: true,
           semanticLabel: '帮工',
           options: [
             for (final a in agents)
@@ -366,6 +367,7 @@ class _TodoState extends ConsumerState<TodoDetail> {
           quiet: true,
           value: _project,
           placeholder: '在哪个项目里做',
+          clearable: true,
           semanticLabel: '项目',
           options: [
             for (final p in {...projects, if (_project.isNotEmpty) _project}) PickOption(value: p, label: p),
