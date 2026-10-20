@@ -118,11 +118,7 @@ class _Box extends StatelessWidget {
       height: height,
       alignment: height == null ? null : Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Palette.paper,
-        border: Border.all(color: focused ? ProColor.focus : const Color(0x332F1F13), width: focused ? 1.5 : 1),
-        borderRadius: proRadius,
-      ),
+      decoration: proBox(focused: focused),
       child: child,
     ),
   );
@@ -400,11 +396,13 @@ class _ProTextAreaState extends State<ProTextArea> {
   }
 }
 
-/// A text box's look, for pro controls that hold their own TextField (chips, key and value).
-BoxDecoration proBox({bool focused = false}) => BoxDecoration(
+/// Every pro text box's look. The edge stays 1 px focused or not and focus only recolours it and adds a ring outside:
+/// a thicker edge sits inside the box and would push the text and the caret in when the box takes the focus.
+BoxDecoration proBox({bool focused = false, BorderRadius radius = proRadius}) => BoxDecoration(
   color: Palette.paper,
-  border: Border.all(color: focused ? ProColor.focus : const Color(0x332F1F13), width: focused ? 1.5 : 1),
-  borderRadius: proRadius,
+  border: Border.all(color: focused ? ProColor.focus : const Color(0x332F1F13)),
+  borderRadius: radius,
+  boxShadow: focused ? const [BoxShadow(color: Color(0x4074A046), spreadRadius: 2)] : null,
 );
 
 /// A bare TextField inside a pro box.

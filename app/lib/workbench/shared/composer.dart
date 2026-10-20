@@ -116,11 +116,7 @@ class _WorkbenchComposerState extends ConsumerState<WorkbenchComposer> {
         Opacity(
           opacity: widget.enabled ? 1 : .5,
           child: Container(
-            decoration: BoxDecoration(
-              color: Palette.paper,
-              border: Border.all(color: focused ? ProColor.focus : const Color(0x332F1F13), width: focused ? 1.5 : 1),
-              borderRadius: const BorderRadius.all(Radius.circular(8)),
-            ),
+            decoration: proBox(focused: focused, radius: const BorderRadius.all(Radius.circular(8))),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
