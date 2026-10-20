@@ -103,7 +103,7 @@ class ServerReady {
   final String url;
   final double pid;
 
-  Map<String, dynamic> toJson() => {'url': url, 'pid': pid};
+  Map<String, dynamic> toJson() => {'url': url, 'pid': pid.round()};
 }
 
 class SettingsCheck {
@@ -205,8 +205,8 @@ class RecallPreview {
 
   Map<String, dynamic> toJson() => {
     'lines': [for (final e in lines) e],
-    'chars': chars,
-    'limit': limit,
+    'chars': chars.round(),
+    'limit': limit.round(),
   };
 }
 
@@ -263,8 +263,8 @@ class AchievementDef {
     'title': title,
     if (tierTitles != null) 'tierTitles': [for (final e in tierTitles!) e],
     'detail': detail,
-    'tiers': [for (final e in tiers) e],
-    'coins': [for (final e in coins) e],
+    'tiers': [for (final e in tiers) e.round()],
+    'coins': [for (final e in coins) e.round()],
     if (unit != null) 'unit': unit!,
   };
 }
@@ -320,7 +320,7 @@ class AchievementTier {
   final double coins;
   final String reached;
 
-  Map<String, dynamic> toJson() => {'need': need, 'title': title, 'coins': coins, 'reached': reached};
+  Map<String, dynamic> toJson() => {'need': need.round(), 'title': title, 'coins': coins.round(), 'reached': reached};
 }
 
 class AchievementStanding {
@@ -338,7 +338,7 @@ class AchievementStanding {
   final double count;
   final double? next;
 
-  Map<String, dynamic> toJson() => {'id': id, 'tier': tier, 'count': count, if (next != null) 'next': next!};
+  Map<String, dynamic> toJson() => {'id': id, 'tier': tier.round(), 'count': count.round(), if (next != null) 'next': next!.round()};
 }
 
 class RuntimePreset {
@@ -462,7 +462,7 @@ class Spent {
   final double tokens;
   final double? cny;
 
-  Map<String, dynamic> toJson() => {'tokens': tokens, if (cny != null) 'cny': cny!};
+  Map<String, dynamic> toJson() => {'tokens': tokens.round(), if (cny != null) 'cny': cny!};
 }
 
 class ChatMessage {
@@ -526,7 +526,7 @@ class ChatMessage {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'number': number,
+    'number': number.round(),
     'conversation': conversation,
     'from': from,
     'fromKind': fromKind.wire,
@@ -541,7 +541,7 @@ class ChatMessage {
     if (outcome != null) 'outcome': outcome!.wire,
     if (spent != null) 'spent': spent!.toJson(),
     if (spoken != null) 'spoken': spoken!,
-    'at': at,
+    'at': at.round(),
   };
 }
 
@@ -622,17 +622,17 @@ class Conversation {
     'id': id,
     'kind': kind.wire,
     if (parent != null) 'parent': parent!,
-    if (parentNumber != null) 'parentNumber': parentNumber!,
+    if (parentNumber != null) 'parentNumber': parentNumber!.round(),
     if (name != null) 'name': name!,
     if (description != null) 'description': description!,
     if (project != null) 'project': project!,
     if (channel != null) 'channel': channel!,
     if (subjectKind != null) 'subjectKind': subjectKind!.wire,
     if (subjectId != null) 'subjectId': subjectId!,
-    if (lastNumber != null) 'lastNumber': lastNumber!,
-    'replies': replies,
-    if (read != null) 'read': read!,
-    'at': at,
+    if (lastNumber != null) 'lastNumber': lastNumber!.round(),
+    'replies': replies.round(),
+    if (read != null) 'read': read!.round(),
+    'at': at.round(),
   };
 }
 
@@ -714,7 +714,7 @@ class LastRun {
   final double at;
   final Spent? spent;
 
-  Map<String, dynamic> toJson() => {'outcome': outcome.wire, 'summary': summary, 'at': at, if (spent != null) 'spent': spent!.toJson()};
+  Map<String, dynamic> toJson() => {'outcome': outcome.wire, 'summary': summary, 'at': at.round(), if (spent != null) 'spent': spent!.toJson()};
 }
 
 class SessionGraph {
@@ -743,7 +743,7 @@ class ActionStep {
   final String label;
   final String? actionText;
 
-  Map<String, dynamic> toJson() => {'at': at, 'action': action.wire, 'label': label, if (actionText != null) 'actionText': actionText!};
+  Map<String, dynamic> toJson() => {'at': at.round(), 'action': action.wire, 'label': label, if (actionText != null) 'actionText': actionText!};
 }
 
 class SessionPlay {
@@ -776,13 +776,13 @@ class SessionPlay {
   final double? runStartedAt;
 
   Map<String, dynamic> toJson() => {
-    'station': station,
+    'station': station.round(),
     'history': [for (final e in history) e.toJson()],
-    'toolsThisRun': toolsThisRun,
-    'counts': {for (final e in counts.entries) e.key: e.value},
+    'toolsThisRun': toolsThisRun.round(),
+    'counts': {for (final e in counts.entries) e.key: e.value.round()},
     'files': [for (final e in files) e],
     'commands': [for (final e in commands) e],
-    if (runStartedAt != null) 'runStartedAt': runStartedAt!,
+    if (runStartedAt != null) 'runStartedAt': runStartedAt!.round(),
   };
 }
 
@@ -864,8 +864,8 @@ class Session {
     if (branch != null) 'branch': branch!,
     if (worktree != null) 'worktree': worktree!,
     if (conflict != null) 'conflict': conflict!.toJson(),
-    'hiredAt': hiredAt,
-    'runs': runs,
+    'hiredAt': hiredAt.round(),
+    'runs': runs.round(),
     'phase': phase.toJson(),
     if (lastRun != null) 'lastRun': lastRun!.toJson(),
     if (spent != null) 'spent': spent!.toJson(),
@@ -888,7 +888,7 @@ class CommitCount {
   final List<Repo> repos;
 
   Map<String, dynamic> toJson() => {
-    'total': total,
+    'total': total.round(),
     'repos': [for (final e in repos) e.toJson()],
   };
 }
@@ -1010,8 +1010,8 @@ class Task {
     if (conclusion != null) 'conclusion': conclusion!,
     if (commits != null) 'commits': [for (final e in commits!) e],
     if (spent != null) 'spent': spent!.toJson(),
-    'tries': tries,
-    if (failures != null) 'failures': failures!,
+    'tries': tries.round(),
+    if (failures != null) 'failures': failures!.round(),
     if (blockedBy != null) 'blockedBy': [for (final e in blockedBy!) e],
     if (stateText != null) 'stateText': stateText!,
     if (actions != null) 'actions': [for (final e in actions!) e.wire],
@@ -1095,16 +1095,16 @@ class TaskGraph {
     if (actionText != null) 'actionText': {for (final e in actionText!.entries) e.key: e.value},
     if (actions != null) 'actions': [for (final e in actions!) e.wire],
     'tasks': [for (final e in tasks) e.toJson()],
-    'parallel': parallel,
+    'parallel': parallel.round(),
     if (note != null) 'note': note!,
-    'createdAt': createdAt,
+    'createdAt': createdAt.round(),
     if (layers != null)
       'layers': [
         for (final e in layers!) [for (final e in e) e],
       ],
     if (asksForYou != null) 'asksForYou': asksForYou!,
     if (spent != null) 'spent': spent!.toJson(),
-    if (settled != null) 'settled': settled!,
+    if (settled != null) 'settled': settled!.round(),
   };
 }
 
@@ -1117,7 +1117,7 @@ class Unlock {
   final double tier;
   final double at;
 
-  Map<String, dynamic> toJson() => {'id': id, 'tier': tier, 'at': at};
+  Map<String, dynamic> toJson() => {'id': id, 'tier': tier.round(), 'at': at.round()};
 }
 
 class AgentTally {
@@ -1130,7 +1130,7 @@ class AgentTally {
   final double harvested;
   final double failed;
 
-  Map<String, dynamic> toJson() => {'hired': hired, 'harvested': harvested, 'failed': failed};
+  Map<String, dynamic> toJson() => {'hired': hired.round(), 'harvested': harvested.round(), 'failed': failed.round()};
 }
 
 class Progress {
@@ -1168,10 +1168,10 @@ class Progress {
   final double? multiplier;
 
   Map<String, dynamic> toJson() => {
-    'coins': coins,
-    'streak': streak,
-    'bestStreak': bestStreak,
-    'counts': {for (final e in counts.entries) e.key: e.value},
+    'coins': coins.round(),
+    'streak': streak.round(),
+    'bestStreak': bestStreak.round(),
+    'counts': {for (final e in counts.entries) e.key: e.value.round()},
     'unlocked': [for (final e in unlocked) e.toJson()],
     if (title != null) 'title': title!.toJson(),
     if (agents != null) 'agents': {for (final e in agents!.entries) e.key: e.value.toJson()},
@@ -1193,7 +1193,7 @@ class ProgressNews {
   final List<Unlock>? unlocked;
 
   Map<String, dynamic> toJson() => {
-    if (coins != null) 'coins': coins!,
+    if (coins != null) 'coins': coins!.round(),
     if (session != null) 'session': session!,
     if (unlocked != null) 'unlocked': [for (final e in unlocked!) e.toJson()],
   };
@@ -1278,8 +1278,8 @@ class Schedule {
     'when': when.toJson(),
     'tz': tz,
     'enabled': enabled,
-    'created': created,
-    if (lastRun != null) 'lastRun': lastRun!,
+    'created': created.round(),
+    if (lastRun != null) 'lastRun': lastRun!.round(),
     'by': by.wire,
     if (pending != null) 'pending': pending!,
     if (whenText != null) 'whenText': whenText!,
@@ -1449,12 +1449,12 @@ class SessionEvent {
   final EventTokens? tokens;
 
   Map<String, dynamic> toJson() => {
-    'seq': seq,
-    'time': time,
+    'seq': seq.round(),
+    'time': time.round(),
     'type': type.wire,
     if (run != null) 'run': run!,
-    if (call != null) 'call': call!,
-    if (under != null) 'under': under!,
+    if (call != null) 'call': call!.round(),
+    if (under != null) 'under': under!.round(),
     'text': text,
     if (action != null) 'action': action!.wire,
     if (actionText != null) 'actionText': actionText!,
@@ -1476,7 +1476,7 @@ class EventTokens {
   final double cacheRead;
   final double output;
 
-  Map<String, dynamic> toJson() => {'input': input, 'cacheRead': cacheRead, 'output': output};
+  Map<String, dynamic> toJson() => {'input': input.round(), 'cacheRead': cacheRead.round(), 'output': output.round()};
 }
 
 enum NoticeLevel {
@@ -1541,7 +1541,7 @@ class UsageWindow {
   final double usedPercent;
   final double? resetsAt;
 
-  Map<String, dynamic> toJson() => {'label': label, 'usedPercent': usedPercent, if (resetsAt != null) 'resetsAt': resetsAt!};
+  Map<String, dynamic> toJson() => {'label': label, 'usedPercent': usedPercent, if (resetsAt != null) 'resetsAt': resetsAt!.round()};
 }
 
 class Balance {
@@ -1629,7 +1629,7 @@ class RuntimeSettings {
     'defaultEffort': defaultEffort,
     'env': {for (final e in env.entries) e.key: e.value},
     if (dailyBudget != null) 'dailyBudget': dailyBudget!,
-    if (maxWorking != null) 'maxWorking': maxWorking!,
+    if (maxWorking != null) 'maxWorking': maxWorking!.round(),
   };
 }
 
@@ -1697,7 +1697,7 @@ class RuntimeInfo {
     if (spentToday != null) 'spentToday': spentToday!,
     if (quota != null) 'quota': quota!.toJson(),
     if (stop != null) 'stop': stop!,
-    'checkedAt': checkedAt,
+    'checkedAt': checkedAt.round(),
   };
 }
 
@@ -1711,7 +1711,7 @@ class FarmLevel {
   final double xp;
   final double need;
 
-  Map<String, dynamic> toJson() => {'level': level, 'xp': xp, 'need': need};
+  Map<String, dynamic> toJson() => {'level': level.round(), 'xp': xp.round(), 'need': need.round()};
 }
 
 enum InboxKind {
@@ -1777,7 +1777,7 @@ class InboxItem {
   final double at;
   final InboxTarget target;
 
-  Map<String, dynamic> toJson() => {'id': id, 'kind': kind.wire, 'from': from.toJson(), 'text': text, 'at': at, 'target': target.toJson()};
+  Map<String, dynamic> toJson() => {'id': id, 'kind': kind.wire, 'from': from.toJson(), 'text': text, 'at': at.round(), 'target': target.toJson()};
 }
 
 enum Crop {
@@ -2016,7 +2016,7 @@ class GraphEvent {
     if (detail != null) 'detail': detail!,
     if (changes != null) 'changes': [for (final e in changes!) e.toJson()],
     if (commits != null) 'commits': [for (final e in commits!) e],
-    'at': at,
+    'at': at.round(),
     if (text != null) 'text': text!,
     if (actorText != null) 'actorText': actorText!,
   };
@@ -2037,7 +2037,7 @@ class LanDevice {
   final double pairedAt;
   final double? lastSeen;
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'pairedAt': pairedAt, if (lastSeen != null) 'lastSeen': lastSeen!};
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'pairedAt': pairedAt.round(), if (lastSeen != null) 'lastSeen': lastSeen!.round()};
 }
 
 class LanPaired {
@@ -2107,7 +2107,7 @@ class LanPairing {
   final double expiresAt;
   final String? asking;
 
-  Map<String, dynamic> toJson() => {'code': code, 'link': link, 'expiresAt': expiresAt, if (asking != null) 'asking': asking!};
+  Map<String, dynamic> toJson() => {'code': code, 'link': link, 'expiresAt': expiresAt.round(), if (asking != null) 'asking': asking!};
 }
 
 class ConnectorStatus {
@@ -2158,10 +2158,10 @@ class ConnectorStatus {
     if (pairCode != null) 'pairCode': pairCode!,
     if (channel != null) 'channel': channel!,
     if (owner != null) 'owner': owner!,
-    if (since != null) 'since': since!,
-    if (lastInbound != null) 'lastInbound': lastInbound!,
-    if (pausedUntil != null) 'pausedUntil': pausedUntil!,
-    'pending': pending,
+    if (since != null) 'since': since!.round(),
+    if (lastInbound != null) 'lastInbound': lastInbound!.round(),
+    if (pausedUntil != null) 'pausedUntil': pausedUntil!.round(),
+    'pending': pending.round(),
     if (error != null) 'error': error!,
   };
 }
@@ -2244,12 +2244,12 @@ class ProjectActivity {
 
   Map<String, dynamic> toJson() => {
     'project': project,
-    'at': at,
+    'at': at.round(),
     'days': [for (final e in days) e.toJson()],
     'authors': [for (final e in authors) e.toJson()],
-    'total': total,
-    if (first != null) 'first': first!,
-    if (last != null) 'last': last!,
+    'total': total.round(),
+    if (first != null) 'first': first!.round(),
+    if (last != null) 'last': last!.round(),
   };
 }
 
@@ -2261,7 +2261,7 @@ class DayCount {
   final String day;
   final double commits;
 
-  Map<String, dynamic> toJson() => {'day': day, 'commits': commits};
+  Map<String, dynamic> toJson() => {'day': day, 'commits': commits.round()};
 }
 
 class ProjectLanguages {
@@ -2279,7 +2279,7 @@ class ProjectLanguages {
 
   Map<String, dynamic> toJson() => {
     'project': project,
-    'at': at,
+    'at': at.round(),
     'languages': [for (final e in languages) e.toJson()],
   };
 }
@@ -2384,7 +2384,7 @@ class TemplateBlank {
   final double start;
   final double end;
 
-  Map<String, dynamic> toJson() => {'start': start, 'end': end};
+  Map<String, dynamic> toJson() => {'start': start.round(), 'end': end.round()};
 }
 
 class IssueDispatchRequest {
@@ -2395,7 +2395,7 @@ class IssueDispatchRequest {
 
   final double? station;
 
-  Map<String, dynamic> toJson() => {if (station != null) 'station': station!};
+  Map<String, dynamic> toJson() => {if (station != null) 'station': station!.round()};
 }
 
 class LanguageCount {
@@ -2415,7 +2415,7 @@ class LanguageCount {
   final double comments;
   final double blanks;
 
-  Map<String, dynamic> toJson() => {'name': name, 'files': files, 'code': code, 'comments': comments, 'blanks': blanks};
+  Map<String, dynamic> toJson() => {'name': name, 'files': files.round(), 'code': code.round(), 'comments': comments.round(), 'blanks': blanks.round()};
 }
 
 class GitHubStatus {
@@ -2450,7 +2450,7 @@ class GitHubStatus {
     'loggedIn': loggedIn,
     'account': account,
     'reason': reason,
-    'checkedAt': checkedAt,
+    'checkedAt': checkedAt.round(),
   };
 }
 
@@ -2488,8 +2488,8 @@ class ProjectSummary {
     'name': name,
     'path': path,
     'git': git,
-    if (last != null) 'last': last!,
-    'maxSessions': maxSessions,
+    if (last != null) 'last': last!.round(),
+    'maxSessions': maxSessions.round(),
     'pullRequest': pullRequest.toJson(),
   };
 }
@@ -2527,7 +2527,7 @@ class ManagerEvalRequest {
   final double on;
   final String want;
 
-  Map<String, dynamic> toJson() => {'on': on, 'want': want};
+  Map<String, dynamic> toJson() => {'on': on.round(), 'want': want};
 }
 
 class ManagerEval {
@@ -2567,7 +2567,7 @@ class ArchiveHit {
   final double line;
   final String text;
 
-  Map<String, dynamic> toJson() => {'file': file, 'line': line, 'text': text};
+  Map<String, dynamic> toJson() => {'file': file, 'line': line.round(), 'text': text};
 }
 
 class ArchiveFile {
@@ -2580,7 +2580,7 @@ class ArchiveFile {
   final double at;
   final double chars;
 
-  Map<String, dynamic> toJson() => {'name': name, 'at': at, 'chars': chars};
+  Map<String, dynamic> toJson() => {'name': name, 'at': at.round(), 'chars': chars.round()};
 }
 
 class Memory {
@@ -2635,9 +2635,9 @@ class Memory {
     if (author != null) 'author': author!.wire,
     if (project != null) 'project': project!,
     if (session != null) 'session': session!,
-    'at': at,
-    'recalled': recalled,
-    if (recalledAt != null) 'recalledAt': recalledAt!,
+    'at': at.round(),
+    'recalled': recalled.round(),
+    if (recalledAt != null) 'recalledAt': recalledAt!.round(),
     if (fading != null) 'fading': fading!,
     if (source != null) 'source': source!,
   };
@@ -2696,7 +2696,7 @@ class MemoryList {
     'memories': [for (final e in memories) e.toJson()],
     'sources': [for (final e in sources) e.toJson()],
     if (file != null) 'file': file!,
-    if (carried != null) 'carried': carried!,
+    if (carried != null) 'carried': carried!.round(),
   };
 }
 
@@ -2968,7 +2968,7 @@ class Changes {
     'files': [for (final e in files) e.toJson()],
     'uncommitted': [for (final e in uncommitted) e.toJson()],
     'conflicts': [for (final e in conflicts) e],
-    'behind': behind,
+    'behind': behind.round(),
   };
 }
 
@@ -2989,7 +2989,7 @@ class ChangedFile {
   final double removed;
   final String? patch;
 
-  Map<String, dynamic> toJson() => {'path': path, 'status': status, 'added': added, 'removed': removed, if (patch != null) 'patch': patch!};
+  Map<String, dynamic> toJson() => {'path': path, 'status': status, 'added': added.round(), 'removed': removed.round(), if (patch != null) 'patch': patch!};
 }
 
 enum TaskAction {
@@ -3111,7 +3111,7 @@ class PullRequest {
   final double number;
   final PullRequestState state;
 
-  Map<String, dynamic> toJson() => {'url': url, 'number': number, 'state': state.wire};
+  Map<String, dynamic> toJson() => {'url': url, 'number': number.round(), 'state': state.wire};
 }
 
 class Issue {
@@ -3205,17 +3205,17 @@ class Issue {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'number': number,
+    'number': number.round(),
     'title': title,
     if (description != null) 'description': description!,
     if (project != null) 'project': project!,
     if (assignee != null) 'assignee': assignee!,
     'priority': priority.wire,
-    if (rank != null) 'rank': rank!,
-    'createdAt': createdAt,
-    if (queuedAt != null) 'queuedAt': queuedAt!,
+    if (rank != null) 'rank': rank!.round(),
+    'createdAt': createdAt.round(),
+    if (queuedAt != null) 'queuedAt': queuedAt!.round(),
     'sessions': [for (final e in sessions) e],
-    if (closedAt != null) 'closedAt': closedAt!,
+    if (closedAt != null) 'closedAt': closedAt!.round(),
     if (closed != null) 'closed': closed!.wire,
     if (parent != null) 'parent': parent!,
     if (blockedBy != null) 'blockedBy': [for (final e in blockedBy!) e],
@@ -3226,7 +3226,7 @@ class Issue {
     'moves': [for (final e in moves) e.wire],
     if (pullRequest != null) 'pullRequest': pullRequest!.toJson(),
     'acceptance': acceptance.wire,
-    if (acceptedAt != null) 'acceptedAt': acceptedAt!,
+    if (acceptedAt != null) 'acceptedAt': acceptedAt!.round(),
     'findings': [for (final e in findings) e.toJson()],
     'asks': [for (final e in asks) e],
     if (criteria != null) 'criteria': [for (final e in criteria!) e],
@@ -3270,7 +3270,7 @@ class IssueGraph {
   final double parallel;
   final String? note;
 
-  Map<String, dynamic> toJson() => {'state': state.wire, if (branch != null) 'branch': branch!, 'parallel': parallel, if (note != null) 'note': note!};
+  Map<String, dynamic> toJson() => {'state': state.wire, if (branch != null) 'branch': branch!, 'parallel': parallel.round(), if (note != null) 'note': note!};
 }
 
 class IssueTask {
@@ -3328,8 +3328,8 @@ class IssueTask {
     if (conclusion != null) 'conclusion': conclusion!,
     if (commits != null) 'commits': [for (final e in commits!) e],
     if (spent != null) 'spent': spent!.toJson(),
-    'tries': tries,
-    if (failures != null) 'failures': failures!,
+    'tries': tries.round(),
+    if (failures != null) 'failures': failures!.round(),
   };
 }
 
@@ -3412,7 +3412,7 @@ class Finding {
   final double at;
   final bool? pulled;
 
-  Map<String, dynamic> toJson() => {'id': id, 'text': text, 'at': at, if (pulled != null) 'pulled': pulled!};
+  Map<String, dynamic> toJson() => {'id': id, 'text': text, 'at': at.round(), if (pulled != null) 'pulled': pulled!};
 }
 
 class IssueAcceptRequest {
@@ -3558,8 +3558,8 @@ class Run {
     if (issue != null) 'issue': issue!,
     'triggeredBy': triggeredBy.toJson(),
     'heard': [for (final e in heard) e],
-    'startedAt': startedAt,
-    if (endedAt != null) 'endedAt': endedAt!,
+    'startedAt': startedAt.round(),
+    if (endedAt != null) 'endedAt': endedAt!.round(),
     if (outcome != null) 'outcome': outcome!.wire,
     if (summary != null) 'summary': summary!,
     if (spent != null) 'spent': spent!.toJson(),
@@ -3599,7 +3599,7 @@ class SayRequest {
 
   Map<String, dynamic> toJson() => {
     'text': text,
-    if (station != null) 'station': station!,
+    if (station != null) 'station': station!.round(),
     if (conversation != null) 'conversation': conversation!,
     if (agent != null) 'agent': agent!,
     if (project != null) 'project': project!,
@@ -3909,9 +3909,9 @@ class VoiceSettings {
     'persona': persona,
     'greeting': greeting,
     'failureMessage': failureMessage,
-    'silenceMs': silenceMs,
-    'interruptMs': interruptMs,
-    'idleSeconds': idleSeconds,
+    'silenceMs': silenceMs.round(),
+    'interruptMs': interruptMs.round(),
+    'idleSeconds': idleSeconds.round(),
   };
 }
 
@@ -3995,7 +3995,7 @@ class Retry {
   final double attempt;
   final double? of;
 
-  Map<String, dynamic> toJson() => {'attempt': attempt, if (of != null) 'of': of!};
+  Map<String, dynamic> toJson() => {'attempt': attempt.round(), if (of != null) 'of': of!.round()};
 }
 
 final class PhaseWorking extends Phase {
@@ -4016,9 +4016,9 @@ final class PhaseWorking extends Phase {
   @override
   Map<String, dynamic> toJson() => {
     '_tag': 'working',
-    'since': since,
+    'since': since.round(),
     'doing': doing.toJson(),
-    if (quietSince != null) 'quietSince': quietSince!,
+    if (quietSince != null) 'quietSince': quietSince!.round(),
     if (retry != null) 'retry': retry!.toJson(),
   };
 }
@@ -4059,7 +4059,7 @@ final class PhaseClosed extends Phase {
   final IssueClose closed;
 
   @override
-  Map<String, dynamic> toJson() => {'_tag': 'closed', 'at': at, 'closed': closed.wire};
+  Map<String, dynamic> toJson() => {'_tag': 'closed', 'at': at.round(), 'closed': closed.wire};
 }
 
 class Repo {
@@ -4070,7 +4070,7 @@ class Repo {
   final String path;
   final double commits;
 
-  Map<String, dynamic> toJson() => {'path': path, 'commits': commits};
+  Map<String, dynamic> toJson() => {'path': path, 'commits': commits.round()};
 }
 
 class ProgressTitle {
@@ -4081,7 +4081,7 @@ class ProgressTitle {
   final String id;
   final double tier;
 
-  Map<String, dynamic> toJson() => {'id': id, 'tier': tier};
+  Map<String, dynamic> toJson() => {'id': id, 'tier': tier.round()};
 }
 
 final class ScheduleWhenOnce extends ScheduleWhen {
@@ -4092,7 +4092,7 @@ final class ScheduleWhenOnce extends ScheduleWhen {
   final double at;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'once', 'at': at};
+  Map<String, dynamic> toJson() => {'kind': 'once', 'at': at.round()};
 }
 
 final class ScheduleWhenEvery extends ScheduleWhen {
@@ -4129,7 +4129,7 @@ final class ScheduleWhenWeekly extends ScheduleWhen {
   @override
   Map<String, dynamic> toJson() => {
     'kind': 'weekly',
-    'days': [for (final e in days) e],
+    'days': [for (final e in days) e.round()],
     'time': time,
   };
 }
@@ -4336,7 +4336,7 @@ final class GameEffectReward extends GameEffect {
   final double streak;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'reward', 'sessionId': sessionId, 'coins': coins, 'streak': streak};
+  Map<String, dynamic> toJson() => {'kind': 'reward', 'sessionId': sessionId, 'coins': coins.round(), 'streak': streak.round()};
 }
 
 final class GameEffectPenalty extends GameEffect {
@@ -4358,7 +4358,7 @@ final class GameEffectLevelUp extends GameEffect {
   final double level;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'levelUp', 'level': level};
+  Map<String, dynamic> toJson() => {'kind': 'levelUp', 'level': level.round()};
 }
 
 final class GameEffectAchievement extends GameEffect {
@@ -4394,11 +4394,11 @@ final class GameEffectAchievement extends GameEffect {
   Map<String, dynamic> toJson() => {
     'kind': 'achievement',
     'achievement': achievement,
-    'tier': tier,
+    'tier': tier.round(),
     'title': title,
     'reached': reached,
     'detail': detail,
-    'coins': coins,
+    'coins': coins.round(),
     if (oneOff != null) 'oneOff': oneOff!,
   };
 }
@@ -4438,14 +4438,14 @@ final class LedgerEntryHarvested extends LedgerEntry {
   @override
   Map<String, dynamic> toJson() => {
     'kind': 'harvested',
-    'at': at,
+    'at': at.round(),
     'session': session,
     if (agent != null) 'agent': agent!,
     'project': project,
     'runtime': runtime,
-    'commits': commits,
+    'commits': commits.round(),
     if (cny != null) 'cny': cny!,
-    'runs': runs,
+    'runs': runs.round(),
   };
 }
 
@@ -4460,7 +4460,7 @@ final class LedgerEntryFailed extends LedgerEntry {
   final String? agent;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'failed', 'at': at, 'session': session, if (agent != null) 'agent': agent!};
+  Map<String, dynamic> toJson() => {'kind': 'failed', 'at': at.round(), 'session': session, if (agent != null) 'agent': agent!};
 }
 
 final class LedgerEntryConflicted extends LedgerEntry {
@@ -4472,7 +4472,7 @@ final class LedgerEntryConflicted extends LedgerEntry {
   final String session;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'conflicted', 'at': at, 'session': session};
+  Map<String, dynamic> toJson() => {'kind': 'conflicted', 'at': at.round(), 'session': session};
 }
 
 final class LedgerEntryTold extends LedgerEntry {
@@ -4484,7 +4484,7 @@ final class LedgerEntryTold extends LedgerEntry {
   final String session;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'told', 'at': at, 'session': session};
+  Map<String, dynamic> toJson() => {'kind': 'told', 'at': at.round(), 'session': session};
 }
 
 final class LedgerEntryReviewed extends LedgerEntry {
@@ -4496,7 +4496,7 @@ final class LedgerEntryReviewed extends LedgerEntry {
   final String session;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'reviewed', 'at': at, 'session': session};
+  Map<String, dynamic> toJson() => {'kind': 'reviewed', 'at': at.round(), 'session': session};
 }
 
 final class LedgerEntryGraph extends LedgerEntry {
@@ -4511,7 +4511,7 @@ final class LedgerEntryGraph extends LedgerEntry {
   final bool parallel;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'graph', 'at': at, 'graph': graph, 'merged': merged, 'parallel': parallel};
+  Map<String, dynamic> toJson() => {'kind': 'graph', 'at': at.round(), 'graph': graph, 'merged': merged.round(), 'parallel': parallel};
 }
 
 final class LedgerEntryHandoff extends LedgerEntry {
@@ -4525,7 +4525,7 @@ final class LedgerEntryHandoff extends LedgerEntry {
   final String to;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'handoff', 'at': at, 'session': session, 'to': to};
+  Map<String, dynamic> toJson() => {'kind': 'handoff', 'at': at.round(), 'session': session, 'to': to};
 }
 
 final class LedgerEntryCalled extends LedgerEntry {
@@ -4537,7 +4537,7 @@ final class LedgerEntryCalled extends LedgerEntry {
   final String session;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'called', 'at': at, 'session': session};
+  Map<String, dynamic> toJson() => {'kind': 'called', 'at': at.round(), 'session': session};
 }
 
 final class LedgerEntryHired extends LedgerEntry {
@@ -4551,7 +4551,7 @@ final class LedgerEntryHired extends LedgerEntry {
   final String? agent;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'hired', 'at': at, 'session': session, if (agent != null) 'agent': agent!};
+  Map<String, dynamic> toJson() => {'kind': 'hired', 'at': at.round(), 'session': session, if (agent != null) 'agent': agent!};
 }
 
 enum LedgerEntryMomentKind {
@@ -4577,7 +4577,7 @@ final class LedgerEntryMoment extends LedgerEntry {
   final double at;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': kind.wire, 'at': at};
+  Map<String, dynamic> toJson() => {'kind': kind.wire, 'at': at.round()};
 }
 
 final class LedgerEntryLevel extends LedgerEntry {
@@ -4589,7 +4589,7 @@ final class LedgerEntryLevel extends LedgerEntry {
   final double level;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'level', 'at': at, 'level': level};
+  Map<String, dynamic> toJson() => {'kind': 'level', 'at': at.round(), 'level': level.round()};
 }
 
 final class LedgerEntryTitled extends LedgerEntry {
@@ -4606,7 +4606,12 @@ final class LedgerEntryTitled extends LedgerEntry {
   final double? tier;
 
   @override
-  Map<String, dynamic> toJson() => {'kind': 'titled', 'at': at, if (achievement != null) 'achievement': achievement!, if (tier != null) 'tier': tier!};
+  Map<String, dynamic> toJson() => {
+    'kind': 'titled',
+    'at': at.round(),
+    if (achievement != null) 'achievement': achievement!,
+    if (tier != null) 'tier': tier!.round(),
+  };
 }
 
 enum ConnectorId {
@@ -4628,7 +4633,7 @@ class Author {
   final String name;
   final double commits;
 
-  Map<String, dynamic> toJson() => {'name': name, 'commits': commits};
+  Map<String, dynamic> toJson() => {'name': name, 'commits': commits.round()};
 }
 
 /// Told apart by `type`; switch over the subclasses.
@@ -4700,7 +4705,7 @@ class Commit {
   final String subject;
   final double at;
 
-  Map<String, dynamic> toJson() => {'hash': hash, 'subject': subject, 'at': at};
+  Map<String, dynamic> toJson() => {'hash': hash, 'subject': subject, 'at': at.round()};
 }
 
 class UncommittedItem {
@@ -5003,9 +5008,9 @@ class SettingsUpdateVoice {
     if (persona != null) 'persona': persona!,
     if (greeting != null) 'greeting': greeting!,
     if (failureMessage != null) 'failureMessage': failureMessage!,
-    if (silenceMs != null) 'silenceMs': silenceMs!,
-    if (interruptMs != null) 'interruptMs': interruptMs!,
-    if (idleSeconds != null) 'idleSeconds': idleSeconds!,
+    if (silenceMs != null) 'silenceMs': silenceMs!.round(),
+    if (interruptMs != null) 'interruptMs': interruptMs!.round(),
+    if (idleSeconds != null) 'idleSeconds': idleSeconds!.round(),
   };
 }
 
@@ -5077,7 +5082,7 @@ final class FactCall extends Fact implements SideEvent {
   final String? reason;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'call', 'at': at, 'state': state.wire, if (reason != null) 'reason': reason!};
+  Map<String, dynamic> toJson() => {'type': 'call', 'at': at.round(), 'state': state.wire, if (reason != null) 'reason': reason!};
 }
 
 final class FactManager extends Fact implements SideEvent {
@@ -5089,7 +5094,7 @@ final class FactManager extends Fact implements SideEvent {
   final ManagerState state;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'manager', 'at': at, 'state': state.wire};
+  Map<String, dynamic> toJson() => {'type': 'manager', 'at': at.round(), 'state': state.wire};
 }
 
 final class FactMessage extends Fact implements SideEvent {
@@ -5110,7 +5115,7 @@ final class FactMessage extends Fact implements SideEvent {
   @override
   Map<String, dynamic> toJson() => {
     'type': 'message',
-    'at': at,
+    'at': at.round(),
     'message': message.toJson(),
     if (thread != null) 'thread': thread!,
     if (answers != null) 'answers': answers!,
@@ -5127,7 +5132,7 @@ final class FactConversation extends Fact implements SideEvent {
   final Conversation conversation;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'conversation', 'at': at, 'conversation': conversation.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'conversation', 'at': at.round(), 'conversation': conversation.toJson()};
 }
 
 final class FactHired extends Fact implements SideEvent {
@@ -5140,7 +5145,7 @@ final class FactHired extends Fact implements SideEvent {
   final Session session;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'hired', 'at': at, 'session': session.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'hired', 'at': at.round(), 'session': session.toJson()};
 }
 
 final class FactStation extends Fact implements SideEvent {
@@ -5154,7 +5159,7 @@ final class FactStation extends Fact implements SideEvent {
   final double station;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'station', 'at': at, 'id': id, 'station': station};
+  Map<String, dynamic> toJson() => {'type': 'station', 'at': at.round(), 'id': id, 'station': station.round()};
 }
 
 final class FactRun extends Fact implements SideEvent {
@@ -5168,7 +5173,7 @@ final class FactRun extends Fact implements SideEvent {
   final String? brief;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'run', 'at': at, 'id': id, if (brief != null) 'brief': brief!};
+  Map<String, dynamic> toJson() => {'type': 'run', 'at': at.round(), 'id': id, if (brief != null) 'brief': brief!};
 }
 
 final class FactDoing extends Fact implements SideEvent {
@@ -5183,7 +5188,7 @@ final class FactDoing extends Fact implements SideEvent {
   final String label;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'doing', 'at': at, 'id': id, 'action': action.wire, 'label': label};
+  Map<String, dynamic> toJson() => {'type': 'doing', 'at': at.round(), 'id': id, 'action': action.wire, 'label': label};
 }
 
 final class FactQuiet extends Fact implements SideEvent {
@@ -5197,7 +5202,7 @@ final class FactQuiet extends Fact implements SideEvent {
   final double since;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'quiet', 'at': at, 'id': id, 'since': since};
+  Map<String, dynamic> toJson() => {'type': 'quiet', 'at': at.round(), 'id': id, 'since': since.round()};
 }
 
 final class FactRetry extends Fact implements SideEvent {
@@ -5216,7 +5221,7 @@ final class FactRetry extends Fact implements SideEvent {
   final double? of;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'retry', 'at': at, 'id': id, 'attempt': attempt, if (of != null) 'of': of!};
+  Map<String, dynamic> toJson() => {'type': 'retry', 'at': at.round(), 'id': id, 'attempt': attempt.round(), if (of != null) 'of': of!.round()};
 }
 
 final class FactSpent extends Fact implements SideEvent {
@@ -5230,7 +5235,7 @@ final class FactSpent extends Fact implements SideEvent {
   final Spent spent;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'spent', 'at': at, 'id': id, 'spent': spent.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'spent', 'at': at.round(), 'id': id, 'spent': spent.toJson()};
 }
 
 final class FactReport extends Fact implements SideEvent {
@@ -5259,12 +5264,12 @@ final class FactReport extends Fact implements SideEvent {
   @override
   Map<String, dynamic> toJson() => {
     'type': 'report',
-    'at': at,
+    'at': at.round(),
     'id': id,
     if (run != null) 'run': run!,
     'outcome': outcome.wire,
     'summary': summary,
-    'runs': runs,
+    'runs': runs.round(),
     if (spent != null) 'spent': spent!.toJson(),
     if (asks != null) 'asks': [for (final e in asks!) e],
   };
@@ -5284,7 +5289,7 @@ final class FactConflict extends Fact implements SideEvent {
   final Conflict? conflict;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'conflict', 'at': at, 'id': id, if (conflict != null) 'conflict': conflict!.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'conflict', 'at': at.round(), 'id': id, if (conflict != null) 'conflict': conflict!.toJson()};
 }
 
 final class FactLeft extends Fact implements SideEvent {
@@ -5303,7 +5308,13 @@ final class FactLeft extends Fact implements SideEvent {
   final double? merged;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'left', 'at': at, 'id': id, if (closed != null) 'closed': closed!.wire, if (merged != null) 'merged': merged!};
+  Map<String, dynamic> toJson() => {
+    'type': 'left',
+    'at': at.round(),
+    'id': id,
+    if (closed != null) 'closed': closed!.wire,
+    if (merged != null) 'merged': merged!.round(),
+  };
 }
 
 final class FactCommits extends Fact implements SideEvent {
@@ -5316,7 +5327,7 @@ final class FactCommits extends Fact implements SideEvent {
   final CommitCount commits;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'commits', 'at': at, 'commits': commits.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'commits', 'at': at.round(), 'commits': commits.toJson()};
 }
 
 final class FactIssue extends Fact implements SideEvent {
@@ -5328,7 +5339,7 @@ final class FactIssue extends Fact implements SideEvent {
   final Issue issue;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'issue', 'at': at, 'issue': issue.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'issue', 'at': at.round(), 'issue': issue.toJson()};
 }
 
 final class FactIssueGone extends Fact implements SideEvent {
@@ -5340,7 +5351,7 @@ final class FactIssueGone extends Fact implements SideEvent {
   final String id;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'issueGone', 'at': at, 'id': id};
+  Map<String, dynamic> toJson() => {'type': 'issueGone', 'at': at.round(), 'id': id};
 }
 
 final class FactProgress extends Fact implements SideEvent {
@@ -5357,7 +5368,7 @@ final class FactProgress extends Fact implements SideEvent {
   final ProgressNews? news;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'progress', 'at': at, 'progress': progress.toJson(), if (news != null) 'news': news!.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'progress', 'at': at.round(), 'progress': progress.toJson(), if (news != null) 'news': news!.toJson()};
 }
 
 final class FactSchedule extends Fact implements SideEvent {
@@ -5370,7 +5381,7 @@ final class FactSchedule extends Fact implements SideEvent {
   final Schedule schedule;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'schedule', 'at': at, 'schedule': schedule.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'schedule', 'at': at.round(), 'schedule': schedule.toJson()};
 }
 
 final class FactUnschedule extends Fact implements SideEvent {
@@ -5382,7 +5393,7 @@ final class FactUnschedule extends Fact implements SideEvent {
   final String id;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'unschedule', 'at': at, 'id': id};
+  Map<String, dynamic> toJson() => {'type': 'unschedule', 'at': at.round(), 'id': id};
 }
 
 /// Told apart by `type`; switch over the subclasses.
@@ -5430,7 +5441,7 @@ final class SideEventSnapshot extends SideEvent {
   final CoreState state;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'snapshot', 'at': at, 'state': state.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'snapshot', 'at': at.round(), 'state': state.toJson()};
 }
 
 final class SideEventSessionEvent extends SideEvent {
@@ -5444,7 +5455,7 @@ final class SideEventSessionEvent extends SideEvent {
   final SessionEvent activity;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'event', 'at': at, 'id': id, 'activity': activity.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'event', 'at': at.round(), 'id': id, 'activity': activity.toJson()};
 }
 
 final class SideEventNotice extends SideEvent {
@@ -5458,7 +5469,7 @@ final class SideEventNotice extends SideEvent {
   final String text;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'notice', 'at': at, 'level': level.wire, 'text': text};
+  Map<String, dynamic> toJson() => {'type': 'notice', 'at': at.round(), 'level': level.wire, 'text': text};
 }
 
 final class SideEventRuntime extends SideEvent {
@@ -5471,7 +5482,7 @@ final class SideEventRuntime extends SideEvent {
   final RuntimeInfo info;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'runtime', 'at': at, 'info': info.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'runtime', 'at': at.round(), 'info': info.toJson()};
 }
 
 class ScheduleUpdate {
@@ -5533,7 +5544,7 @@ class ChatReadRequest {
 
   final double number;
 
-  Map<String, dynamic> toJson() => {'number': number};
+  Map<String, dynamic> toJson() => {'number': number.round()};
 }
 
 class ChooseTitleRequest {
@@ -5547,7 +5558,7 @@ class ChooseTitleRequest {
   final String? achievement;
   final double? tier;
 
-  Map<String, dynamic> toJson() => {if (achievement != null) 'achievement': achievement!, if (tier != null) 'tier': tier!};
+  Map<String, dynamic> toJson() => {if (achievement != null) 'achievement': achievement!, if (tier != null) 'tier': tier!.round()};
 }
 
 class RenewRequest {
@@ -5687,7 +5698,7 @@ final class LiveEventSession extends LiveEvent {
   final SessionEvent activity;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'event', 'at': at, 'id': id, 'activity': activity.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'event', 'at': at.round(), 'id': id, 'activity': activity.toJson()};
 }
 
 final class LiveEventNotice extends LiveEvent {
@@ -5701,7 +5712,7 @@ final class LiveEventNotice extends LiveEvent {
   final String text;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'notice', 'at': at, 'level': level.wire, 'text': text};
+  Map<String, dynamic> toJson() => {'type': 'notice', 'at': at.round(), 'level': level.wire, 'text': text};
 }
 
 final class LiveEventRuntime extends LiveEvent {
@@ -5714,7 +5725,7 @@ final class LiveEventRuntime extends LiveEvent {
   final RuntimeInfo info;
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'runtime', 'at': at, 'info': info.toJson()};
+  Map<String, dynamic> toJson() => {'type': 'runtime', 'at': at.round(), 'info': info.toJson()};
 }
 
 class Document {
@@ -5734,7 +5745,7 @@ class Document {
   final double created;
   final double updated;
 
-  Map<String, dynamic> toJson() => {'id': id, 'title': title, 'seq': seq, 'created': created, 'updated': updated};
+  Map<String, dynamic> toJson() => {'id': id, 'title': title, 'seq': seq.round(), 'created': created.round(), 'updated': updated.round()};
 }
 
 class DocMarks {
@@ -5800,12 +5811,12 @@ class BlockAttrs {
   final String? memoryId;
 
   Map<String, dynamic> toJson() => {
-    if (level != null) 'level': level!,
+    if (level != null) 'level': level!.round(),
     if (checked != null) 'checked': checked!,
     if (language != null) 'language': language!,
     if (src != null) 'src': src!,
-    if (width != null) 'width': width!,
-    if (height != null) 'height': height!,
+    if (width != null) 'width': width!.round(),
+    if (height != null) 'height': height!.round(),
     if (alt != null) 'alt': alt!,
     if (issueId != null) 'issueId': issueId!,
     if (memoryId != null) 'memoryId': memoryId!,
@@ -5861,10 +5872,10 @@ class Block {
     'type': type,
     'attrs': attrs.toJson(),
     'text': [for (final e in text) e.toJson()],
-    'rev': rev,
+    'rev': rev.round(),
     if (deleted != null) 'deleted': deleted!,
     'updatedBy': updatedBy,
-    'updated': updated,
+    'updated': updated.round(),
   };
 }
 
@@ -5964,7 +5975,7 @@ final class DocOpUpdateText extends DocOp {
   Map<String, dynamic> toJson() => {
     'op': 'update_text',
     'blockId': blockId,
-    'baseRev': baseRev,
+    'baseRev': baseRev.round(),
     'text': [for (final e in text) e.toJson()],
   };
 }
@@ -6057,7 +6068,13 @@ final class DocOpSplitBlock extends DocOp {
   final Block newBlock;
 
   @override
-  Map<String, dynamic> toJson() => {'op': 'split_block', 'blockId': blockId, 'baseRev': baseRev, 'offset': offset, 'newBlock': newBlock.toJson()};
+  Map<String, dynamic> toJson() => {
+    'op': 'split_block',
+    'blockId': blockId,
+    'baseRev': baseRev.round(),
+    'offset': offset.round(),
+    'newBlock': newBlock.toJson(),
+  };
 }
 
 final class DocOpMergeBlocks extends DocOp {
@@ -6087,7 +6104,7 @@ class DocSubmit {
 
   Map<String, dynamic> toJson() => {
     'batchId': batchId,
-    'lastSeq': lastSeq,
+    'lastSeq': lastSeq.round(),
     'ops': [for (final e in ops) e.toJson()],
   };
 }
@@ -6127,7 +6144,7 @@ class DocOpResult {
   Map<String, dynamic> toJson() => {
     'status': status.wire,
     'blockId': blockId,
-    if (rev != null) 'rev': rev!,
+    if (rev != null) 'rev': rev!.round(),
     if (text != null) 'text': [for (final e in text!) e.toJson()],
     if (yours != null) 'yours': [for (final e in yours!) e.toJson()],
     if (reason != null) 'reason': reason!,
@@ -6151,7 +6168,7 @@ class DocAck {
 
   Map<String, dynamic> toJson() => {
     'batchId': batchId,
-    'seq': seq,
+    'seq': seq.round(),
     'results': [for (final e in results) e.toJson()],
     'blocks': [for (final e in blocks) e.toJson()],
   };

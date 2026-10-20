@@ -783,8 +783,11 @@ func (s *shapes) dartTypeOf(e ast.Expr) (dartType, bool) {
 		switch t.Name {
 		case "string":
 			return plainDart("String", func(v string) string { return v + " as String" }), false
-		case "int64", "float64":
+		case "float64":
 			return plainDart("double", func(v string) string { return "(" + v + " as num).toDouble()" }), false
+		case "int64":
+			// Still a double in Dart, but written whole: Dart writes 1.0 for a double, and Go will not read 1.0 into an int64.
+			return dartType{"double", func(v string) string { return "(" + v + " as num).toDouble()" }, func(v string) string { return v + ".round()" }}, false
 		case "int":
 			return plainDart("int", func(v string) string { return "(" + v + " as num).toInt()" }), false
 		case "bool":
