@@ -7,10 +7,10 @@ import '../ui/pixel/base.dart';
 import '../ui/icons.dart';
 import '../ui/labels.dart';
 import '../ui/pixel/markdown.dart';
-import 'widgets.dart';
-import 'work_log_rules.dart';
+import '../ui/link.dart';
+import '../shared/work_log_rules.dart';
 
-export 'work_log_rules.dart';
+export '../shared/work_log_rules.dart';
 
 const _nearBottom = 48.0;
 

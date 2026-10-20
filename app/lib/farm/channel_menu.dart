@@ -10,9 +10,9 @@ import '../gen/vibevalley.dart';
 import '../audio/sfx.dart';
 import '../ui/pixel/pixel.dart';
 import '../shared/chat_rules.dart';
-import 'chat_state.dart';
-import '../shared/chat_widgets.dart';
+import '../chat/chat_state.dart';
 import '../rules/chat.dart';
+import 'chat_text.dart';
 
 enum _Mode { list, create, settings, schedules }
 

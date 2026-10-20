@@ -12,7 +12,7 @@
 | 农场的规矩、汇报怎么读（结论、失败、缺肥）、没动静 | worktree、分支、合并、PR 的 git 操作（`internal/project`，[项目](docs/subsystems/project.md)） |
 | 同时干活的上限；额度、花费和「派不出去」（`internal/runtime`） | 汇报贴进工单串、@ 谁叫醒谁、投递和排队（田头，[田头](docs/subsystems/channel.md)） |
 | 管家那一个 agent loop 的 run 和日志（`AgentExecution`） | 管家想什么、说什么（[管家](docs/subsystems/manager.md)）；记性想起和记下什么（[记性](docs/subsystems/memory.md)） |
-| | 地上画成什么（`protocol.PlotOf`、[farm-ui.md](docs/reference/farm-ui.md)）；干活过程的界面（工单里的 `app/lib/shared/work_log.dart`（农场）和 `app/lib/workbench/shared/work_log.dart`（工作台），规则在 `shared/work_log_rules.dart`，管家页和帮工档案的轨迹 `app/lib/workbench/shared/trajectory.dart`） |
+| | 地上画成什么（`protocol.PlotOf`、[farm-ui.md](docs/reference/farm-ui.md)）；干活过程的界面（工单里的 `app/lib/farm/work_log.dart`（农场）和 `app/lib/workbench/shared/work_log.dart`（工作台），规则在 `shared/work_log_rules.dart`，管家页和帮工档案的轨迹 `app/lib/workbench/shared/trajectory.dart`） |
 
 ## 在哪
 
@@ -21,7 +21,7 @@
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 家目录：`sessions.json`（在地里的 Session 的 worktree、oar 会话 id、最后一轮原话、想起过的记性）、`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（smith 的原始记录）；核心状态里的 `CoreState.Sessions` 随 `state.json` 存。
 - 接口：`session.list`、`session.get`、`session.events`、`session.stop`、`issue.runs`、`issue.history`、`runtime.*`、`agent.check`（[capabilities.md](docs/reference/capabilities.md)）。
-- 客户端：干活过程 `shared/work_log.dart`、`workbench/shared/work_log.dart`（规则 `shared/work_log_rules.dart`），轨迹 `workbench/shared/trajectory.dart`（[轨迹](docs/reference/agents-and-runtimes.md#轨迹)）；按 run 分段、瀑布的三道和合计的规则在 `rules/rounds.dart`。
+- 客户端：干活过程 `farm/work_log.dart`、`workbench/shared/work_log.dart`（规则 `shared/work_log_rules.dart`），轨迹 `workbench/shared/trajectory.dart`（[轨迹](docs/reference/agents-and-runtimes.md#轨迹)）；按 run 分段、瀑布的三道和合计的规则在 `rules/rounds.dart`。
 
 ## 模型和不变量
 

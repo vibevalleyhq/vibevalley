@@ -24,7 +24,7 @@
 - **`server/internal/agent`**：帮工档案、技能和农机设置，存在 `$VIBEVALLEY_HOME/config.json`；`managerProfile` 是内置的管家档案。
 - **家目录 `$VIBEVALLEY_HOME/manager/`**（`memory.ManagerHome`）：对话 `manager.jsonl`、记性 `MEMORY.md`、压掉的原文 `archive/`、做错的一轮 `evals/<id>.json`。
 - **接口**：`manager.stop`、`manager.hear`、`manager.markWrong`、`manager.listArchive`、`manager.getArchive`，记性走 `memory.*`（档案 `manager`）；`POST /v1/chat/completions`（`internal/handler/http.go` 挂 `brain.ChatCompletions`）。清单在 [capabilities.md](docs/reference/capabilities.md)，命令行 `vibevalley manager …`。
-- **客户端**：管家页 `app/lib/workbench/manager/manager_page.dart`（记性、轨迹、旧账、声音，[管家页](docs/reference/agents-and-runtimes.md#管家页manager)）；停止键 `app/lib/shared/manager_stop_button.dart`，工作台和农场的田头输入框都带着它。
+- **客户端**：管家页 `app/lib/workbench/manager/manager_page.dart`（记性、轨迹、旧账、声音，[管家页](docs/reference/agents-and-runtimes.md#管家页manager)）；停止键的逻辑是 `app/lib/shared/manager_stop_button.dart` 的 `ManagerStopControl`，农场（`farm/composer.dart`）和工作台（`workbench/shared/composer.dart`）的输入框各画一个。
 
 ## 模型和不变量
 

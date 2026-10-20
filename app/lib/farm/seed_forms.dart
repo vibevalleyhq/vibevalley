@@ -5,6 +5,7 @@ import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../shared/composer.dart';
 import '../ui/pixel/pixel.dart';
+import 'composer.dart';
 
 const _dropsOfAdvice = ['改动小一点', '先别动测试', '做完跟我说一声', '顺便补个测试'];
 

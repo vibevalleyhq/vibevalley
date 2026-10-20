@@ -21,7 +21,6 @@ import '../phone/phone.dart';
 import '../debug/debug_commands.dart';
 import '../debug/debug_panel.dart' show typing;
 import '../shared/farm_sounds.dart';
-import '../game/effects.dart';
 import '../data/prefs.dart';
 import '../audio/sfx.dart';
 import '../data/ui_state.dart';
@@ -35,6 +34,7 @@ import '../village/hud.dart';
 import '../village/framing.dart';
 import '../village/village_view.dart';
 import '../voice/voice.dart';
+import 'fx_layer.dart';
 
 const firstNamesTime = Duration(milliseconds: 6000);
 

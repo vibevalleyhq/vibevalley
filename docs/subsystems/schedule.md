@@ -19,7 +19,7 @@
 - 表：`schedule`（一个定时一行，时间写法存成 JSON 的 `spec`）；工单表的 `schedule` 列指着它的定时。
 - 接口：`schedule.create`、`schedule.list`、`schedule.update`、`schedule.delete`（[capabilities.md](docs/reference/capabilities.md)）；`schedule.update` 只有主人和「连接到本机」能调，管家不能。管家的工具 `schedule`、`list_schedules`、`cancel_schedule` 在 `tool/task.go`。
 - 配置：`schedule.tick_ms`，默认 20000（20 秒看一遍；0 或更小是每毫秒）。
-- 客户端：频道菜单的「定时」（`app/lib/chat/channel_menu.dart`）和聊天页的「定时」标签（`app/lib/workbench/chat/chat_page.dart`）列出这个频道的定时，能开关、删、对待批的点「同意」「不要」；看板上定时的工单带「定时」标签（`workbench/issues/board.dart`）。
+- 客户端：频道菜单的「定时」（`app/lib/farm/channel_menu.dart`）和聊天页的「定时」标签（`app/lib/workbench/chat/chat_page.dart`）列出这个频道的定时，能开关、删、对待批的点「同意」「不要」；看板上定时的工单带「定时」标签（`workbench/issues/board.dart`）。
 
 ## 模型和不变量
 

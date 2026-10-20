@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../game/tools.dart';
-import 'tags.dart';
+import '../village/tags.dart';
 import '../data/providers.dart';
 import '../data/remote.dart';
 import '../game/commands.dart';
@@ -15,11 +15,13 @@ import '../rules/time.dart';
 import '../rules/cast.dart';
 import '../sprites/atlas.dart';
 import '../ui/pixel/pixel.dart';
-import 'composer.dart';
-import 'issue_state.dart';
+import '../shared/composer.dart';
+import '../shared/issue_state.dart';
 import 'widgets.dart';
+import '../shared/actions.dart';
 import 'work_log.dart';
-import 'swatches.dart';
+import '../shared/swatches.dart';
+import 'composer.dart';
 
 /// The farm's issue page (the plot's detail), drawn from IssueState; the workbench draws its own (workbench/issues/issue_panel.dart).
 class IssueView extends ConsumerStatefulWidget {

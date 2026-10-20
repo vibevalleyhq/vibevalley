@@ -5,13 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../shared/chat_rules.dart';
 import '../shared/chat_widgets.dart';
-import '../chat/dispatch_note.dart';
+import 'dispatch_note.dart';
 import '../gen/vibevalley.dart';
 import '../data/prefs.dart';
 import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show agentsProvider;
 import '../rules/money.dart';
 import 'chat_window.dart';
+import 'chat_text.dart';
 
 class ChatRow extends StatelessWidget {
   const ChatRow({super.key, required this.mine, required this.first, required this.child, this.face, this.name, this.title});

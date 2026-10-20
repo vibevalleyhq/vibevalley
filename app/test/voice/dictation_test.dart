@@ -12,6 +12,7 @@ import 'package:vibevalley/shared/dictation_button.dart';
 import 'package:vibevalley/voice/dictation.dart';
 
 import '../support/server.dart';
+import 'package:vibevalley/farm/composer.dart';
 
 class Recorder extends Fake implements AudioRecorder {
   Recorder({this.allowed = true});

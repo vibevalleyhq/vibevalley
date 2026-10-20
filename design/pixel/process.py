@@ -168,7 +168,7 @@ SHEETS: dict[str, Sheet] = {
         "button-refresh", "button-folder", "button-search", "button-edit",
         "button-open", "button-filter", "button-settings", "button-more",
     ], height=16, reference=[0, 1, 2, 3], pieces=True),
-    # The owner's face, beside the manager's and the helpers' in the chat (lib/desk/chat/chat_widgets.dart OwnerFace).
+    # The owner's face, beside the manager's and the helpers' in the chat (lib/shared/chat_widgets.dart OwnerFace).
     "owner": Sheet(1, 1, ["owner-face"], height=32, reference=[0]),
     # The projects page's commit calendar: a day's plot, bare to in flower (lib/desk/projects/codebase.dart).
     "calendar": Sheet(3, 2, ["day-0", "day-1", "day-2", "day-3", "day-4", None], height=12, reference=[0, 1, 2, 3, 4]),

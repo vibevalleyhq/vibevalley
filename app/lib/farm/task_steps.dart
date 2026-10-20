@@ -11,7 +11,7 @@ import 'widgets.dart';
 import '../rules/sessions.dart';
 import '../rules/task.dart';
 import '../shared/faces.dart';
-import '../shared/tags.dart';
+import '../village/tags.dart';
 import '../rules/money.dart';
 
 ({Color card, Color? edge, Color tag, Color ink, double opacity}) _nodeTone(TaskState s) => switch (s) {

@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/server_choice.dart';
 import '../data/providers.dart';
-import './mobile_notices.dart';
+import 'mobile_notices.dart';
 import 'channel.dart';
 import 'command.dart';
 import 'launcher.dart';

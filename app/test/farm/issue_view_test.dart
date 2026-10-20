@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/rules/issues.dart';
-import 'package:vibevalley/shared/issue_view.dart';
+import 'package:vibevalley/farm/issue_view.dart';
 
 import '../support/farm.dart' as f;
 

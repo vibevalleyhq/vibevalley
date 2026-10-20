@@ -10,7 +10,7 @@ import '../game/commands.dart' show fire;
 import '../gen/vibevalley.dart';
 import '../rules/chat.dart';
 import '../rules/issues.dart';
-import '../shared/issue_view.dart';
+import 'issue_view.dart';
 
 class PlotDetail extends ConsumerWidget {
   const PlotDetail({super.key, required this.session, required this.onDone});

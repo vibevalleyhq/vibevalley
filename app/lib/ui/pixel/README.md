@@ -1,6 +1,6 @@
 # ui/pixel
 
-农场那张皮的组件：像素组（`ui/pro` 是工作台的专业组，两组的分工见 [两组组件](.agents/notes/proposed/architecture/2026-10-20-pixel-and-pro-kits.md)）。一行 `import 'package:vibevalley/ui/pixel/pixel.dart';` 全部拿到，也带上两组共用的 `lib/ui/common.dart`：色板和字体名（`theme.dart`）、贴图（`icons.dart`）、管家和动物的脸（`faces.dart`）、说法（`labels.dart`）、Markdown 的解析（`markdown.dart`）、提示的数据（`toasts.dart`）、额度（`quota.dart`）、`Tappable`。像素自己的主题和线（`farmTheme`、`pxLine`、`pxEdge`）在 `theme.dart`，窗框和牌子在 `frame.dart`、`pixel_card.dart`、`glyphs.dart`、`medals.dart`（后三个不在 `pixel.dart` 里导出）。
+农场那张皮的组件：像素组（`ui/pro` 是工作台的专业组，两组的分工见 [客户端](docs/subsystems/app.md)）。一行 `import 'package:vibevalley/ui/pixel/pixel.dart';` 全部拿到，也带上两组共用的 `lib/ui/common.dart`：色板和字体名（`theme.dart`）、贴图（`icons.dart`）、管家和动物的脸（`faces.dart`）、说法（`labels.dart`）、Markdown 的解析（`markdown.dart`）、提示的数据（`toasts.dart`）、额度（`quota.dart`）、`Tappable`。像素自己的主题和线（`farmTheme`、`pxLine`、`pxEdge`）在 `theme.dart`，窗框和牌子在 `frame.dart`、`pixel_card.dart`、`glyphs.dart`、`medals.dart`（后三个不在 `pixel.dart` 里导出）。
 
 | 部件 | 说明 |
 | --- | --- |

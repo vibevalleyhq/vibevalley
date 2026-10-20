@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibevalley/shared/composer.dart';
 
 import '../support/farm.dart';
+import 'package:vibevalley/farm/composer.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));

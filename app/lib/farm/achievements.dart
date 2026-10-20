@@ -7,8 +7,8 @@ import '../game/commands.dart';
 import '../game/tools.dart';
 import '../gen/vibevalley.dart';
 import '../ui/pixel/pixel.dart';
-import '../shared/popover.dart';
-import '../shared/tags.dart';
+import '../village/popover.dart';
+import '../village/tags.dart';
 
 class Medal extends StatelessWidget {
   const Medal({super.key, required this.achievement, required this.tier, required this.size});

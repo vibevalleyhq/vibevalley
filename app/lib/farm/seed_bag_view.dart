@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../gen/vibevalley.dart';
 import '../shared/faces.dart';
 import '../shared/seed_bag.dart';
-import '../shared/tags.dart';
+import '../village/tags.dart';
 import '../ui/pixel/pixel.dart';
 
 /// The sowing bag on one of the farm's beds, in the pixel kit; what it offers and does is shared/seed_bag.dart.

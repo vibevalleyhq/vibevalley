@@ -13,7 +13,7 @@ import '../rules/chat.dart';
 import '../rules/issues.dart' show issueTitle;
 import '../rules/warehouse.dart';
 import '../shared/faces.dart';
-import '../shared/tags.dart';
+import '../village/tags.dart';
 import '../rules/money.dart';
 
 class Warehouse extends ConsumerWidget {

@@ -5,10 +5,10 @@ import '../game/commands.dart';
 import '../gen/vibevalley.dart';
 import '../ui/pixel/pixel.dart';
 import '../data/remote.dart' show SessionIssue, issueChangesProvider, reasonOf;
-import 'harvest_rules.dart';
-import 'tags.dart';
+import '../shared/harvest_rules.dart';
+import '../village/tags.dart';
 
-export 'harvest_rules.dart' show lineCounts;
+export '../shared/harvest_rules.dart' show lineCounts;
 
 class HarvestReview extends ConsumerWidget {
   const HarvestReview({super.key, required this.session, required this.onDone});

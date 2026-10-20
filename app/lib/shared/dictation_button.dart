@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/ui_state.dart';
 import '../data/voice.dart';
-import '../ui/pixel/pixel.dart';
-import 'chat_widgets.dart';
 import '../voice/dictation.dart';
 
 /// What a dictation button shows and does now; each kit draws it.
@@ -64,29 +62,6 @@ class _DictationControlState extends ConsumerState<DictationControl> {
       onPressed: off || dictation.phase == DictationPhase.transcribing ? null : () => dictation.toggle(_target),
     ));
   }
-}
-
-/// The pixel kit's dictation button.
-class DictationButton extends StatelessWidget {
-  const DictationButton({super.key, required this.controller, this.size = 28});
-  final TextEditingController controller;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => DictationControl(
-    controller: controller,
-    builder: (context, d) => PxButton(
-      size: PxSize.custom,
-      tone: d.recording ? PxTone.danger : PxTone.plain,
-      tooltip: d.tip,
-      semanticLabel: '听写',
-      onPressed: d.onPressed,
-      child: SizedBox.square(
-        dimension: size,
-        child: Center(child: Glyph(d.glyph)),
-      ),
-    ),
-  );
 }
 
 /// Puts dictated words at the cursor, or at the end when the field has none.

@@ -4,7 +4,7 @@ export 'overlays.dart' show FarmPanel, farmOverlaysProvider, panelProvider, sele
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import './providers.dart';
+import 'providers.dart';
 import '../gen/vibevalley.dart';
 
 final titleOpenProvider = NotifierProvider<TitleOpen, bool>(TitleOpen.new);

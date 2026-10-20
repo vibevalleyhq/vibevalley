@@ -5,10 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibevalley/gen/vibevalley.dart';
 import 'package:vibevalley/game/effects.dart';
-import 'package:vibevalley/shared/connection_banner.dart';
+import 'package:vibevalley/title/connection_banner.dart';
 import 'package:vibevalley/ui/pixel/pixel.dart';
 
 import '../support/shell.dart';
+import 'package:vibevalley/farm/fx_layer.dart';
 
 void main() {
   group('ConnectionBanner', () {

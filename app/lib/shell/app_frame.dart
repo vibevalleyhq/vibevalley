@@ -12,10 +12,11 @@ import '../debug/debug_log.dart';
 import '../debug/debug_panel.dart';
 import 'desktop_title_bar.dart';
 import '../game/effects.dart';
-import '../shared/connection_banner.dart';
+import '../title/connection_banner.dart';
 import '../title/startup.dart';
 import '../title/title_screen.dart';
 import '../data/ui_state.dart';
+import '../farm/fx_layer.dart';
 
 class AppFrame extends ConsumerStatefulWidget {
   const AppFrame({super.key, required this.child, required this.onFarm, this.routeChanges, this.startup = true});

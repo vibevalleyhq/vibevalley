@@ -6,7 +6,7 @@ import '../../data/providers.dart';
 import '../../data/remote.dart';
 import '../../gen/vibevalley.dart';
 import '../../rules/rounds.dart';
-import '../../shared/work_log.dart' show farmToolText, readableInput, spanColor, spanLabel;
+import '../../shared/work_log_rules.dart' show farmToolText, readableInput, spanColor, spanLabel;
 import '../../ui/pro/pro.dart';
 import 'widgets.dart';
 

@@ -1,6 +1,6 @@
 # ui/pro
 
-工作台那张皮的组件：专业组（`ui/pixel` 是农场的像素组，两组的分工见 [两组组件](.agents/notes/proposed/architecture/2026-10-20-pixel-and-pro-kits.md)）。一行 `import 'package:vibevalley/ui/pro/pro.dart';` 全部拿到，也带上两组共用的 `lib/ui/common.dart`。
+工作台那张皮的组件：专业组（`ui/pixel` 是农场的像素组，两组的分工见 [客户端](docs/subsystems/app.md)）。一行 `import 'package:vibevalley/ui/pro/pro.dart';` 全部拿到，也带上两组共用的 `lib/ui/common.dart`。
 
 | 部件 | 说明 |
 | --- | --- |

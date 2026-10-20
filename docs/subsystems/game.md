@@ -20,7 +20,7 @@
 - 核心状态里的游戏字段：`CoreState.Progress`、`Commits`、`Session.Play`；帧里的 `view`（地块、等级、每个成就的进度 `achievements`）和 `effects`。`Progress` 只在账本里有，`state.json` 不存它。
 - 表：`game_ledger`（`id` 是 UUIDv7，`kind`、`at`、其余字段放进 `payload` 的 JSON），查询在 `pkg/db/queries/game_ledger.sql`。
 - 接口：`game.achievements`（成就的说法，页面的顺序）、`game.chooseTitle`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.say` 带的 `station`。
-- 客户端：`data/remote.dart` 的 `achievementsProvider`（连上一个服务端读一次 `game.achievements`）、`rules/warehouse.dart`（仓库）、`game/effects.dart`（把特效变成飘字、横幅、提示）、`farm/achievements.dart`（任务与成就页、奖章，只显示说法和帧里的进度）。
+- 客户端：`data/remote.dart` 的 `achievementsProvider`（连上一个服务端读一次 `game.achievements`）、`rules/warehouse.dart`（仓库）、`game/effects.dart`（特效的流和提示的说法），`farm/fx_layer.dart`（把特效画成飘字、横幅、提示上的奖章）、`farm/achievements.dart`（任务与成就页、奖章，只显示说法和帧里的进度）。
 
 ## 模型和不变量
 

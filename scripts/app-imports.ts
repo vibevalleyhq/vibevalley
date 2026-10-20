@@ -6,9 +6,7 @@
  * A vendor's SDK stays in the one folder that adapts it (VENDOR): the rest of the client sees our own types.
  *
  * Two kits draw the two skins: `ui/pixel` the farm's, `ui/pro` the workbench's (KITS says who may use which); what both
- * share is in `ui/` itself. `shared` and `chat` hold state and rules for both skins, so they use neither kit. KIT_DEBT
- * lists the files that still break this while they move over; it only shrinks, and an entry that no longer breaks it is
- * an error, so it is crossed off.
+ * share is in `ui/` itself. `shared` and `chat` hold state and rules for both skins, so they use neither kit.
  *
  * Run by `bun run flutter:check`; a bad edge names the file, the line, and both ends.
  */
@@ -50,27 +48,6 @@ const KITS: Record<'pixel' | 'pro', string[]> = {
   pro: ['workbench', 'shell', 'app', 'ui/pro'],
 }
 
-const KIT_DEBT: string[] = [
-  'lib/chat/channel_menu.dart',
-  'lib/chat/dispatch_note.dart',
-  'lib/chat/turn_steps.dart',
-  'lib/game/effects.dart',
-  'lib/shared/chat_widgets.dart',
-  'lib/shared/composer.dart',
-  'lib/shared/connection_banner.dart',
-  'lib/shared/dictation_button.dart',
-  'lib/shared/faces.dart',
-  'lib/shared/friends.dart',
-  'lib/shared/harvest.dart',
-  'lib/shared/issue_view.dart',
-  'lib/shared/manager_stop_button.dart',
-  'lib/shared/popover.dart',
-  'lib/shared/quota_pill.dart',
-  'lib/shared/tags.dart',
-  'lib/shared/widgets.dart',
-  'lib/shared/work_log.dart',
-]
-
 interface Edge {
   from: string
   to: string
@@ -83,7 +60,6 @@ const edges: Edge[] = []
 const strays: string[] = []
 const importLine = /import\s+'([^']+)'/g
 const kitBreaks: string[] = []
-const owes = new Set<string>()
 const ownerOf = (file: string) => (file.startsWith('lib/ui/pixel/') ? 'ui/pixel' : file.startsWith('lib/ui/pro/') ? 'ui/pro' : file.split('/')[1])
 for (const file of files) {
   const layer = file.split('/')[1]
@@ -104,8 +80,7 @@ for (const file of files) {
       const target = path.split('/')[0]
       const kit = path.startsWith('ui/pixel/') ? 'pixel' : path.startsWith('ui/pro/') ? 'pro' : null
       if (kit && !KITS[kit].includes(owner)) {
-        if (KIT_DEBT.includes(file)) owes.add(file)
-        else kitBreaks.push(`app-imports: ${file}:${i + 1}: ${owner} may not use the ${kit} kit (ui/${kit}); only ${KITS[kit].join(', ')} may`)
+        kitBreaks.push(`app-imports: ${file}:${i + 1}: ${owner} may not use the ${kit} kit (ui/${kit}); only ${KITS[kit].join(', ')} may`)
       }
       if (!(target in RANK) || target === layer) continue
       if (RANK[target] >= RANK[layer]) edges.push({ from: layer, to: target, file, line: i + 1 })
@@ -118,7 +93,5 @@ for (const e of edges) {
 }
 for (const s of strays) console.error(s)
 for (const k of kitBreaks) console.error(k)
-const paid = KIT_DEBT.filter((f) => !owes.has(f))
-for (const f of paid) console.error(`app-imports: ${f} no longer breaks the kit rule: cross it off KIT_DEBT`)
-if (edges.length > 0 || strays.length > 0 || kitBreaks.length > 0 || paid.length > 0) process.exit(1)
-console.log(`app-imports: ${files.length} files ok${KIT_DEBT.length > 0 ? `, ${KIT_DEBT.length} still owe the kit rule` : ''}`)
+if (edges.length > 0 || strays.length > 0 || kitBreaks.length > 0) process.exit(1)
+console.log(`app-imports: ${files.length} files ok`)

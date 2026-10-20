@@ -8,11 +8,11 @@ import 'package:flutter/material.dart' hide Icon;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../chat/channel_menu.dart';
+import 'channel_menu.dart';
 import '../shared/chat_rules.dart';
 import '../chat/chat_state.dart';
 import '../data/messages.dart';
-import '../chat/turn_steps.dart';
+import 'turn_steps.dart';
 import '../shared/chat_widgets.dart';
 import '../gen/vibevalley.dart';
 import '../audio/sfx.dart';
@@ -22,10 +22,11 @@ import '../voice/voice.dart';
 import '../rules/chat.dart';
 import '../rules/sessions.dart';
 import '../shared/composer.dart';
-import '../shared/manager_stop_button.dart';
 import '../shared/swatches.dart';
 import 'chat_messages.dart';
 import 'chat_voice.dart';
+import 'composer.dart';
+import 'chat_text.dart';
 
 const _suggestions = ['让阿郑做字幕面板', '让小吴跑测试', '进度怎么样？', '大家收工'];
 

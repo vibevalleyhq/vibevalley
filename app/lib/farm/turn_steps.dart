@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/remote.dart' show runEventsProvider;
-import '../shared/work_log.dart';
+import 'work_log.dart';
 import '../gen/vibevalley.dart';
 import '../ui/pixel/pixel.dart';
 

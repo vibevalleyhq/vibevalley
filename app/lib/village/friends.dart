@@ -12,8 +12,8 @@ import '../data/remote.dart' show agentsProvider, runtimesProvider;
 import 'popover.dart';
 import 'quota_pill.dart';
 import '../rules/sessions.dart';
-import './faces.dart';
-import './tags.dart';
+import '../shared/faces.dart';
+import 'tags.dart';
 
 enum FriendStatus { bug, ripe, busy, rest, away }
 

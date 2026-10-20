@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibevalley/shared/chat_rules.dart';
-import 'package:vibevalley/shared/chat_widgets.dart';
 import 'package:vibevalley/ui/pixel/pixel.dart';
 
 import '../support/farm.dart';
+import 'package:vibevalley/farm/chat_text.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
