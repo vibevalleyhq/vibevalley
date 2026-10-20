@@ -500,10 +500,13 @@ void main() {
       expect(find.text(lane), findsOneWidget);
     }
     expect(find.text('加日志'), findsOneWidget);
-    expect(find.text('紧急'), findsOneWidget);
+    // A card is its number and project, its title and a row of marks; who, turns, time and cost are its hover tip.
+    expect(find.text('#1 · clock'), findsWidgets);
+    expect(find.byTooltip('优先级：紧急'), findsOneWidget);
     expect(find.text('0 / 6 块地'), findsOneWidget);
-    expect(find.textContaining('0 轮 · 开了'), findsOneWidget);
-    expect(find.text('2 轮 · 用了 1 分 · ¥0.42'), findsOneWidget);
+    Finder tip(String part) => find.byWidgetPredicate((w) => w is Tooltip && (w.message ?? '').contains(part));
+    expect(tip('0 轮 · 开了'), findsOneWidget);
+    expect(tip('2 轮 · 用了 1 分 · ¥0.42'), findsOneWidget);
 
     await t.enterText(find.descendant(of: find.bySemanticsLabel('找工单'), matching: find.byType(EditableText)), '文案');
     await t.pump();

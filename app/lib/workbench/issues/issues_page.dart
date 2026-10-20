@@ -2,16 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
+import '../../rules/board.dart';
 import '../../rules/issues.dart';
 import '../../ui/pro/pro.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
 import '../shared/config_problem.dart';
 import 'board.dart';
+import 'display_menu.dart';
 import 'issue_detail.dart';
+import 'issue_list.dart';
 import 'issue_panel.dart' show IssueHeading;
 import 'issue_submission.dart';
 import 'task_detail.dart';
@@ -123,8 +127,11 @@ class ManagerCard extends BoardCard {
 }
 
 class TaskCard extends BoardCard {
-  const TaskCard(this.graph, this.lane);
+  const TaskCard(this.graph, this.lane, [this.issue]);
   final TaskGraph graph;
+
+  /// The task's own issue: its number, when it was made and last moved.
+  final Issue? issue;
   @override
   final Lane lane;
   @override
@@ -166,9 +173,43 @@ class IssuesPage extends ConsumerStatefulWidget {
   ConsumerState<IssuesPage> createState() => _IssuesPageState();
 }
 
+const _lookKey = 'vibevalley.board.look';
+
 class _IssuesPageState extends ConsumerState<IssuesPage> {
   BoardFilter _filter = const BoardFilter();
   bool _older = false;
+  BoardLook _look = defaultLook;
+  // Set once the owner picks; a slow read of the saved look must not undo it.
+  bool _picked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadLook());
+  }
+
+  Future<void> _loadLook() async {
+    try {
+      final saved = lookFromList((await SharedPreferences.getInstance()).getStringList(_lookKey));
+      if (mounted && !_picked) setState(() => _look = saved);
+    } on Object {
+      // No storage: the look lasts for this visit.
+    }
+  }
+
+  void _setLook(BoardLook look) {
+    setState(() {
+      _look = look;
+      _picked = true;
+    });
+    unawaited(() async {
+      try {
+        await (await SharedPreferences.getInstance()).setStringList(_lookKey, lookToList(look));
+      } on Object {
+        // As above.
+      }
+    }());
+  }
 
   VibeValleyApi get _api => ref.read(apiProvider);
 
@@ -231,8 +272,10 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
   }
 
   /// The plus: the sentence is the issue, its draft starts from it, and it opens.
-  Future<void> _add(String text) async {
-    final made = await runAction(() => IssueSubmission(_api.issue).write(text, agent: _filter.agent, project: _filter.project));
+  Future<void> _add(String text, {String project = '', String agent = ''}) async {
+    final made = await runAction(
+      () => IssueSubmission(_api.issue).write(text, agent: agent.isEmpty ? _filter.agent : agent, project: project.isEmpty ? _filter.project : project),
+    );
     if (made != null) _open(made.id);
   }
 
@@ -256,7 +299,7 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
       // A task's lane is its parent issue's status, which the server works out from the task's state.
       for (final row in entries)
         if (row.issue.graph != null && laneOf(row.issue.status) != Lane.closed)
-          if (graphs.where((p) => p.id == row.issue.id).firstOrNull case final p?) TaskCard(p, laneOf(row.issue.status)),
+          if (graphs.where((p) => p.id == row.issue.id).firstOrNull case final p?) TaskCard(p, laneOf(row.issue.status), row.issue),
     ];
     final id = widget.id;
     final open = id == null ? null : all.where((c) => c.id == id || (c is IssueCard && issueIs(c.issue, id))).firstOrNull;
@@ -308,21 +351,42 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (history.hasError) Text('工单记录没读到：${reasonOf(history.error!)}', style: ProText.sm.copyWith(color: Palette.berry)),
-            _Toolbar(filter: _filter, cards: all, shown: all.where(_filter.shows).length, onChanged: (f) => setState(() => _filter = f)),
+            _Toolbar(
+              filter: _filter,
+              cards: all,
+              shown: all.where(_filter.shows).length,
+              onChanged: (f) => setState(() => _filter = f),
+              look: _look,
+              onLook: _setLook,
+            ),
             const SizedBox(height: 8),
             Expanded(
-              child: IssueBoard(
-                cards: all.where(_filter.shows).toList(),
-                loading: farm == null || history.isLoading,
-                selected: open?.id ?? id,
-                older: _older,
-                onOlder: _toggleOlder,
-                onOpen: _open,
-                onDrop: _drop,
-                onPlace: _place,
-                onAdd: _add,
-                onWrite: () => writeIssueAndOpen(context, ref.read(apiProvider)),
-              ),
+              child: switch (_look.view) {
+                BoardView.board => IssueBoard(
+                  cards: all.where(_filter.shows).toList(),
+                  loading: farm == null || history.isLoading,
+                  selected: open?.id ?? id,
+                  older: _older,
+                  ordering: _look.ordering,
+                  onOlder: _toggleOlder,
+                  onOpen: _open,
+                  onDrop: _drop,
+                  onPlace: _place,
+                  onAdd: _add,
+                  onWrite: () => writeIssueAndOpen(context, ref.read(apiProvider)),
+                ),
+                BoardView.list => IssueList(
+                  cards: all.where(_filter.shows).toList(),
+                  loading: farm == null || history.isLoading,
+                  selected: open?.id ?? id,
+                  older: _older,
+                  grouping: _look.grouping,
+                  ordering: _look.ordering,
+                  onOlder: _toggleOlder,
+                  onOpen: _open,
+                  onAdd: _add,
+                ),
+              },
             ),
           ],
         );
@@ -341,65 +405,100 @@ class _IssuesPageState extends ConsumerState<IssuesPage> {
 }
 
 class _Toolbar extends ConsumerWidget {
-  const _Toolbar({required this.filter, required this.cards, required this.shown, required this.onChanged});
+  const _Toolbar({required this.filter, required this.cards, required this.shown, required this.onChanged, required this.look, required this.onLook});
   final BoardFilter filter;
   final List<BoardCard> cards;
   final int shown;
   final ValueChanged<BoardFilter> onChanged;
+  final BoardLook look;
+  final ValueChanged<BoardLook> onLook;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final agents = ref.watch(workbenchConfigProvider).agents;
     final projects = {for (final c in cards) ?c.project}.toList()..sort();
     final used = {for (final c in cards) ?c.agent};
+    final filters = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (ref.watch(workbenchConfigProvider).error != null) const ConfigProblem(),
+        SizedBox(
+          width: 240,
+          child: ProTextInput(
+            value: filter.query,
+            onChanged: (v) => onChanged(filter.copyWith(query: v)),
+            placeholder: '找工单：标题、帮工、项目',
+            semanticLabel: '找工单',
+            icon: 'button-search',
+          ),
+        ),
+        const SpriteIcon('button-filter', size: 16, semanticLabel: '筛选'),
+        SizedBox(
+          width: 150,
+          child: ProPick(
+            value: filter.project,
+            placeholder: '所有项目',
+            semanticLabel: '按项目看',
+            options: [
+              const PickOption(value: '', label: '所有项目'),
+              for (final p in projects) PickOption(value: p, label: p),
+            ],
+            onChanged: (v) => onChanged(filter.copyWith(project: v)),
+          ),
+        ),
+        SizedBox(
+          width: 150,
+          child: ProPick(
+            value: filter.agent,
+            placeholder: '所有帮工',
+            semanticLabel: '按帮工看',
+            options: [
+              const PickOption(value: '', label: '所有帮工'),
+              for (final a in agents)
+                if (used.contains(a.id)) PickOption(value: a.id, label: a.name),
+            ],
+            onChanged: (v) => onChanged(filter.copyWith(agent: v)),
+          ),
+        ),
+        if (filter.any) ...[Text('$shown / ${cards.length} 张', style: ProText.meta), InlineLink('清掉筛选', onTap: () => onChanged(const BoardFilter()))],
+      ],
+    );
+    final views = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ProSegmented<BoardView>(
+          block: false,
+          value: look.view,
+          options: [for (final v in BoardView.values.reversed) SegmentOption(value: v, label: v.label)],
+          onChanged: (v) => onLook((view: v, grouping: look.grouping, ordering: look.ordering)),
+        ),
+        const SizedBox(width: 6),
+        DisplayMenu(look: look, onChanged: onLook),
+      ],
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          if (ref.watch(workbenchConfigProvider).error != null) const ConfigProblem(),
-          SizedBox(
-            width: 240,
-            child: ProTextInput(
-              value: filter.query,
-              onChanged: (v) => onChanged(filter.copyWith(query: v)),
-              placeholder: '找工单：标题、帮工、项目',
-              semanticLabel: '找工单',
-              icon: 'button-search',
-            ),
-          ),
-          const SpriteIcon('button-filter', size: 16, semanticLabel: '筛选'),
-          SizedBox(
-            width: 170,
-            child: ProPick(
-              value: filter.project,
-              placeholder: '所有项目',
-              semanticLabel: '按项目看',
-              options: [
-                const PickOption(value: '', label: '所有项目'),
-                for (final p in projects) PickOption(value: p, label: p),
-              ],
-              onChanged: (v) => onChanged(filter.copyWith(project: v)),
-            ),
-          ),
-          SizedBox(
-            width: 170,
-            child: ProPick(
-              value: filter.agent,
-              placeholder: '所有帮工',
-              semanticLabel: '按帮工看',
-              options: [
-                const PickOption(value: '', label: '所有帮工'),
-                for (final a in agents)
-                  if (used.contains(a.id)) PickOption(value: a.id, label: a.name),
-              ],
-              onChanged: (v) => onChanged(filter.copyWith(agent: v)),
-            ),
-          ),
-          if (filter.any) ...[Text('$shown / ${cards.length} 张', style: ProText.meta), InlineLink('清掉筛选', onTap: () => onChanged(const BoardFilter()))],
-        ],
+      child: LayoutBuilder(
+        // Narrow, the views go on their own line above the filters, at the right where the 显示 panel opens leftwards.
+        builder: (context, box) => box.maxWidth < 760
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(alignment: Alignment.centerRight, child: views),
+                  const SizedBox(height: 8),
+                  filters,
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: filters),
+                  const SizedBox(width: 12),
+                  views,
+                ],
+              ),
       ),
     );
   }

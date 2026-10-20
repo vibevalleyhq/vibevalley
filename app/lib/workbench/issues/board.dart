@@ -6,20 +6,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../gen/vibevalley.dart';
-import '../../rules/rounds.dart' show tookText;
+import '../../rules/board.dart';
 import '../../rules/issues.dart';
 import '../../ui/pro/pro.dart';
-import '../shared/layout.dart';
 import '../../data/remote.dart';
 import '../shared/widgets.dart';
-import '../../shared/faces.dart';
+import 'card_look.dart';
 import 'issues_page.dart';
+import 'marks.dart';
 
 Move? cardMove(BoardCard card, Lane to) => switch (card) {
   TaskCard() || ManagerCard() || MissingSessionCard() => null,
   TodoCard(:final item) => moveOf(card.lane, to, item.moves),
   IssueCard(:final issue) => moveOf(card.lane, to, issue.moves),
 };
+
+/// A lane's cards in the order the owner picked; the closed lane by default newest closed first.
+List<BoardCard> laneOrder(Lane lane, List<BoardCard> cards, Ordering ordering) {
+  if (lane == Lane.closed && ordering == Ordering.manual) return [...cards]..sort((a, b) => _closedAt(b).compareTo(_closedAt(a)));
+  return orderRows(cards, ordering, rowFacts);
+}
 
 class IssueBoard extends StatefulWidget {
   const IssueBoard({
@@ -34,6 +40,7 @@ class IssueBoard extends StatefulWidget {
     required this.onPlace,
     required this.onAdd,
     required this.onWrite,
+    this.ordering = Ordering.manual,
   });
   final List<BoardCard> cards;
   final bool loading;
@@ -48,6 +55,9 @@ class IssueBoard extends StatefulWidget {
   /// The pencil: an empty draft made at once and opened.
   final VoidCallback onWrite;
 
+  /// Anything but manual hides the owner's order of 待办, so a card cannot be dropped between two there.
+  final Ordering ordering;
+
   @override
   State<IssueBoard> createState() => _BoardState();
 }
@@ -56,6 +66,13 @@ const _oneLane = 700.0;
 
 class _BoardState extends State<IssueBoard> {
   Lane _lane = Lane.todo;
+  final _addFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _addFocus.dispose();
+    super.dispose();
+  }
 
   Widget _laneView(Lane lane) => _LaneView(
     lane: lane,
@@ -66,6 +83,8 @@ class _BoardState extends State<IssueBoard> {
     loading: widget.loading,
     selected: widget.selected,
     older: widget.older,
+    ordering: widget.ordering,
+    addFocus: _addFocus,
     onOlder: widget.onOlder,
     onOpen: widget.onOpen,
     onDrop: widget.onDrop,
@@ -95,7 +114,7 @@ class _BoardState extends State<IssueBoard> {
         );
       }
       // Four lanes fit beside an open card on a laptop's screen; narrower, the board scrolls sideways.
-      const least = 200.0;
+      const least = 220.0;
       final width = ((box.maxWidth - 24 - 3 * 10) / 4).clamp(least, double.infinity);
       final lanes = Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -118,6 +137,8 @@ class _LaneView extends StatelessWidget {
     required this.loading,
     required this.selected,
     required this.older,
+    required this.ordering,
+    required this.addFocus,
     required this.onOlder,
     required this.onOpen,
     required this.onDrop,
@@ -130,6 +151,8 @@ class _LaneView extends StatelessWidget {
   final bool loading;
   final String? selected;
   final bool older;
+  final Ordering ordering;
+  final FocusNode addFocus;
   final VoidCallback onOlder;
   final ValueChanged<String?> onOpen;
   final Future<void> Function(BoardCard card, Lane to) onDrop;
@@ -141,14 +164,11 @@ class _LaneView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var shown = cards;
+    var shown = laneOrder(lane, cards, ordering);
     var hidden = 0;
-    if (lane == Lane.closed) {
-      shown = [...cards]..sort((a, b) => _closedAt(b).compareTo(_closedAt(a)));
-      if (!older && shown.length > closedShown) {
-        hidden = shown.length - closedShown;
-        shown = shown.take(closedShown).toList();
-      }
+    if (lane == Lane.closed && !older && shown.length > closedShown) {
+      hidden = shown.length - closedShown;
+      shown = shown.take(closedShown).toList();
     }
     final head = switch (lane) {
       Lane.working => '${cards.whereType<IssueCard>().length} / $maxRunning 块地',
@@ -172,15 +192,20 @@ class _LaneView extends StatelessWidget {
               child: Row(
                 children: [
                   const SizedBox(width: 4),
+                  StatusMark(laneStatus(lane)),
+                  const SizedBox(width: 8),
                   Text(lane.label, style: ProText.sm.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(width: 8),
                   Text(head, style: ProText.meta),
                   const Spacer(),
-                  if (lane == Lane.todo) ProButton.icon('button-edit', tooltip: '详细写一张', semanticLabel: '详细写一张', iconSize: 14, onPressed: onWrite),
+                  if (lane == Lane.todo) ...[
+                    ProButton.icon('button-add', tooltip: '写一张', semanticLabel: '写一张', iconSize: 14, onPressed: addFocus.requestFocus),
+                    ProButton.icon('button-edit', tooltip: '详细写一张', semanticLabel: '详细写一张', iconSize: 14, onPressed: onWrite),
+                  ],
                 ],
               ),
             ),
-            if (lane == Lane.todo) ...[const SizedBox(height: 6), _QuickAdd(onAdd: onAdd)],
+            if (lane == Lane.todo) ...[const SizedBox(height: 6), QuickAdd(onAdd: onAdd, focusNode: addFocus)],
             const SizedBox(height: 8),
             Expanded(
               child: loading
@@ -192,19 +217,12 @@ class _LaneView extends StatelessWidget {
                     )
                   : ListView.separated(
                       itemCount: shown.length + (hidden > 0 || (older && cards.length > closedShown) ? 1 : 0),
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      separatorBuilder: (_, _) => const SizedBox(height: 6),
                       itemBuilder: (context, i) {
-                        if (i == shown.length) {
-                          return Center(
-                            child: DefaultTextStyle(
-                              style: ProText.sm,
-                              child: InlineLink(hidden > 0 ? '更早的 $hidden 张' : '只看最近的', onTap: onOlder),
-                            ),
-                          );
-                        }
+                        if (i == shown.length) return OlderLink(hidden: hidden, onTap: onOlder);
                         final card = shown[i];
                         final view = _CardView(card: card, selected: card.id == selected, onOpen: onOpen);
-                        return card is TodoCard ? _PlaceBefore(card: card, onPlace: onPlace, child: view) : view;
+                        return card is TodoCard && ordering == Ordering.manual ? _PlaceBefore(card: card, onPlace: onPlace, child: view) : view;
                       },
                     ),
             ),
@@ -213,6 +231,24 @@ class _LaneView extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Under the closed ones: how many older are folded away, or back to the recent ones.
+class OlderLink extends StatelessWidget {
+  const OlderLink({super.key, required this.hidden, required this.onTap});
+  final int hidden;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Center(
+      child: DefaultTextStyle(
+        style: ProText.sm,
+        child: InlineLink(hidden > 0 ? '更早的 $hidden 张' : '只看最近的', onTap: onTap),
+      ),
+    ),
+  );
 }
 
 const _emptyText = {
@@ -248,15 +284,18 @@ class _PlaceBefore extends StatelessWidget {
   );
 }
 
-class _QuickAdd extends StatefulWidget {
-  const _QuickAdd({required this.onAdd});
+/// One sentence, enter, and it is a 待办: the board's lane and the list's groups both use it.
+class QuickAdd extends StatefulWidget {
+  const QuickAdd({super.key, required this.onAdd, this.focusNode, this.autofocus = false});
   final Future<void> Function(String text) onAdd;
+  final FocusNode? focusNode;
+  final bool autofocus;
 
   @override
-  State<_QuickAdd> createState() => _QuickAddState();
+  State<QuickAdd> createState() => _QuickAddState();
 }
 
-class _QuickAddState extends State<_QuickAdd> {
+class _QuickAddState extends State<QuickAdd> {
   String _text = '';
   // A new key empties the field after a 待办 goes in.
   int _round = 0;
@@ -275,6 +314,8 @@ class _QuickAddState extends State<_QuickAdd> {
   Widget build(BuildContext context) => ProTextInput(
     key: ValueKey(_round),
     value: _text,
+    focusNode: widget.focusNode,
+    autofocus: widget.autofocus,
     onChanged: (v) => setState(() => _text = v),
     onSubmitted: (_) => _submit(),
     placeholder: '＋ 写一张，回车存下',
@@ -291,171 +332,82 @@ class _CardView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final agents = ref.watch(workbenchConfigProvider).agents;
-    final now = DateTime.now().millisecondsSinceEpoch.toDouble();
-    const xs = ProText.meta;
-    final (title, who, stripe) = switch (card) {
-      TaskCard(:final graph) => ('计划：${graph.title}', '${graph.tasks.length} 步', null),
-      TodoCard(:final item) => (item.title, agents.where((a) => a.id == item.assignee).firstOrNull?.name ?? '还没选帮工', priorityColor(item.priority)),
-      IssueCard(:final issue, :final head) => (issueTitle(issue, ref.watch(graphsProvider)), head.name, null),
-      ManagerCard(:final issue) => (issue.title, '管家', null),
-      MissingSessionCard(:final issue) => (issue.title, '执行记录缺失', null),
-    };
-    final Color? dot = switch (card) {
-      IssueCard(:final state) => issueTagColor(state),
-      ManagerCard(:final issue) => issueTagColor(issueTag(issue)),
-      TaskCard() => Palette.leaf500,
-      TodoCard() || MissingSessionCard() => null,
-    };
-    final tags = <Widget>[];
-    final lines = <Widget>[];
-    switch (card) {
-      case MissingSessionCard(:final history):
-        lines.add(Text('缺少：${history.missingSessions.join('、')}', style: xs.copyWith(color: Palette.berry)));
-      case TaskCard(:final graph):
-        tags.add(const _Tag('种植计划', Palette.leaf500));
-        lines.add(Text(taskLine(graph), style: ProText.xs.copyWith(color: graph.state == GraphState.ripe ? Palette.leaf700 : ProColor.ink)));
-      case TodoCard(:final item):
-        if (item.drafting case final d?) {
-          tags.add(_Tag('${d.name}在起草', Palette.water));
-        } else if (item.status == IssueStatus.backlog) {
-          tags.add(const _Tag('草稿', Palette.wheat));
-        }
-        if (item.queuedAt != null) tags.add(const _Tag('排队中', Palette.water));
-        if (item.schedule != null) tags.add(const _Tag('定时', Palette.cream300));
-        if (item.priority == Priority.urgent || item.priority == Priority.high) tags.add(_Tag(priorityLabel[item.priority]!, priorityColor(item.priority)!));
-        if (item.assignee == null || item.project == null) tags.add(const _Tag('没选帮工或项目', Palette.cream300));
-        lines.add(Text(item.queuedAt != null ? '等空地，${ago(item.queuedAt!, now)}排上的' : '写于 ${ago(item.createdAt, now)}', style: xs));
-      case ManagerCard(:final issue):
-        if (issue.schedule != null) tags.add(const _Tag('定时', Palette.cream300));
-        final state = issueTag(issue);
-        lines.add(Text(state.open ? '管家在做' : '${state.label} · ${ago(issue.closedAt ?? issue.createdAt, now)}', style: xs));
-      case IssueCard(:final issue, :final sessions, :final head, :final state, :final session):
-        final phase = session?.phase;
-        if (session?.conflict != null) tags.add(const _Tag('冲突', Palette.berry));
-        if (phase is PhaseWorking && phase.quietSince != null) tags.add(_Tag('${tookText(now - phase.quietSince!)}没动静', Palette.wheat));
-        if (phase is PhaseFailed || (session ?? head).lastRun?.outcome == Outcome.failed) tags.add(const _Tag('没做成', Palette.berry));
-        if (state == IssueTag.lost) tags.add(const _Tag('丢了', Palette.berry));
-        if (sessions.length > 1) tags.add(_Tag('第 ${sessions.length} 次', Palette.water));
-        if (issue.schedule != null) tags.add(const _Tag('定时', Palette.cream300));
-        if (issueInTask(issue, session)) tags.add(const _Tag('种植计划', Palette.leaf500));
-        final turns = (session ?? head).runs.round();
-        final cny = (session ?? head).spent?.cny;
-        final took = state.open ? '开了 ${tookText(now - head.hiredAt)}' : '用了 ${tookText((issue.closedAt ?? head.endedAt ?? now) - sessions.first.hiredAt)}';
-        lines.add(
-          Text([if (state == IssueTag.working) '第 ${turns + 1} 轮' else '$turns 轮', took, if (cny != null) '¥${cny.toStringAsFixed(2)}'].join(' · '), style: xs),
-        );
-        final said = (session ?? head).lastRun?.summary;
-        if (state == IssueTag.waiting && said != null && said.isNotEmpty) {
-          lines.add(
-            Text(
-              said,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: ProText.xs.copyWith(height: 18 / 12),
-            ),
-          );
-        }
-        if (!state.open) lines.add(Text('${state.label} · ${ago(issue.closedAt ?? head.endedAt ?? head.hiredAt, now)}', style: xs));
-    }
-    Widget face(double opacity, {bool hovered = false}) => Opacity(
+    final look = cardLook(
+      card,
+      nameOf: (id) => agents.where((a) => a.id == id).firstOrNull?.name ?? id,
+      graphs: ref.watch(graphsProvider),
+      now: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    final face = cardFace(card);
+    final where = [?look.number, ?card.project].join(' · ');
+    Widget body(double opacity, {bool hovered = false}) => Opacity(
       opacity: opacity,
       child: Container(
         decoration: BoxDecoration(
-          color: selected ? Color.alphaBlend(ProColor.selected, ProColor.page) : ProColor.page,
-          border: Border.all(color: hovered && !selected ? ProColor.ink.withValues(alpha: .22) : ProColor.line),
+          color: Color.alphaBlend(
+            selected
+                ? ProColor.selected
+                : hovered
+                ? ProColor.hover
+                : const Color(0x00000000),
+            ProColor.page,
+          ),
+          border: Border.all(color: hovered && !selected ? ProColor.ink.withValues(alpha: .18) : ProColor.line),
           borderRadius: const BorderRadius.all(Radius.circular(8)),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // The priority shows as a stripe down the card's left edge.
-            if (stripe != null) Positioned(left: 0, top: 0, bottom: 0, child: Container(width: 3, color: stripe)),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (dot != null) ...[Padding(padding: const EdgeInsets.only(top: 6), child: StateDot(dot)), const SizedBox(width: 8)],
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: ProText.sm.copyWith(fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (tags.isNotEmpty) ...[const SizedBox(height: 6), Wrap(spacing: 4, runSpacing: 4, children: tags)],
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      if (card.agent != null) ...[AgentFaceOf(card.agent!, size: 18), const SizedBox(width: 6)],
-                      Flexible(
-                        child: Text(who, maxLines: 1, overflow: TextOverflow.ellipsis, style: ProText.xs),
-                      ),
-                      if (card.project != null) ...[
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            card.project!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: ProText.mono.copyWith(fontSize: 11, color: ProColor.muted),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  for (final line in lines) ...[const SizedBox(height: 4), line],
-                ],
+            if (where.isNotEmpty)
+              Text(
+                where,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: ProText.meta.copyWith(fontSize: 11, height: 14 / 11),
               ),
+            const SizedBox(height: 3),
+            Text(
+              look.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: ProText.sm.copyWith(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 7),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                StatusMark(look.status, color: look.statusColor, size: 13),
+                if (look.priority case final p?) PriorityMark(p, size: 13),
+                ?face,
+                if (look.progress case final p?) ProgressMark(done: p.done, total: p.total),
+                ...flagChips(look),
+              ],
             ),
           ],
         ),
       ),
     );
-    if (card is TaskCard) {
-      return Tappable(
-        onTap: () => onOpen(card.id),
-        semanticLabel: title,
-        builder: (context, s) => face(1, hovered: s.hovered),
-      );
-    }
     final tappable = Tappable(
       onTap: () => onOpen(card.id),
-      semanticLabel: title,
-      builder: (context, s) => face(1, hovered: s.hovered),
+      tooltip: cardTip(look),
+      semanticLabel: look.title,
+      selected: selected,
+      builder: (context, s) => body(1, hovered: s.hovered),
     );
+    if (card is TaskCard) return tappable;
     final feedback = Material(
       type: MaterialType.transparency,
-      child: SizedBox(width: 240, child: face(.9)),
+      child: SizedBox(width: 240, child: body(.9)),
     );
     // A phone scrolls the lane with a drag: a card is picked up with a long press there.
     return Platform.isIOS || Platform.isAndroid
-        ? LongPressDraggable<BoardCard>(data: card, feedback: feedback, childWhenDragging: face(.35), child: tappable)
-        : Draggable<BoardCard>(data: card, feedback: feedback, childWhenDragging: face(.35), child: tappable);
+        ? LongPressDraggable<BoardCard>(data: card, feedback: feedback, childWhenDragging: body(.35), child: tappable)
+        : Draggable<BoardCard>(data: card, feedback: feedback, childWhenDragging: body(.35), child: tappable);
   }
-}
-
-class _Tag extends StatelessWidget {
-  const _Tag(this.text, this.color);
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-    decoration: BoxDecoration(color: color.withValues(alpha: .2), borderRadius: const BorderRadius.all(Radius.circular(4))),
-    child: Text(
-      text,
-      style: ProText.xs.copyWith(fontSize: 11, height: 16 / 11, fontWeight: FontWeight.w500),
-    ),
-  );
 }
 
 double _closedAt(BoardCard c) => switch (c) {
