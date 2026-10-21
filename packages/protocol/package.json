@@ -1,0 +1,21 @@
+{
+  "name": "@vibevalley/protocol",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./rules": "./src/rules/index.ts",
+    "./schema": "./src/schema.ts",
+    "./api": "./src/api.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "bun test src"
+  },
+  "dependencies": {
+    "effect": "^4.0.5"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3"
+  }
+}

@@ -1,1 +1,0 @@
-commandExecution     │ Running command: /bin/bash -lc 'echo oar-codex-marker'

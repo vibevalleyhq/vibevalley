@@ -15,7 +15,7 @@
 | Claude 师傅、Codex 老匠、Pi 实验员 | 农机名 + 身份 | 熊、小狐狸、刺猬 |
 | 文档员 Kimi、情报 Grok、夜班反重力 | 职业 + 农机名 | 猫、猫头鹰、浣熊 |
 
-种子在 `server/internal/protocol/seeds.json`，动物和衣服的取值见 `docs/reference/farm-ui.md`。
+种子在 `packages/protocol/src/rules/seeds.json`，动物和衣服的取值见 `docs/reference/farm-ui.md`。
 
 ## 谐音人名
 

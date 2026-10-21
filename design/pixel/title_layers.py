@@ -2,7 +2,7 @@
 """Cut what moves over the title screen out of its sheets (gen.sh title-clouds title-smoke title-dandelion
 title-plants): magenta off, each cell trimmed to what is drawn. They keep the scale they were drawn at, the title
 pictures' own (an art pixel is four image pixels, on a 1536 x 1024 scene), so the page places them on the scene in
-the scene's own coordinates (app/lib/shell/title/layers.dart). Writes app/assets/title/<name>.png and sprites.json
+the scene's own coordinates (apps/web/src/farm/title/layers.ts). Writes apps/web/public/title/<name>.png and sprites.json
 (each sprite's width and height).
 
 Run from design/pixel: python3 title_layers.py
@@ -16,7 +16,7 @@ from PIL import Image
 from scipy import ndimage
 
 HERE = Path(__file__).resolve().parent
-OUT = HERE.parent.parent / "app" / "assets" / "title"
+OUT = HERE.parent.parent / "apps" / "web" / "public" / "title"
 
 SHEETS = {
     "title-clouds": (3, 2, ["cloud-big-1", "cloud-mid-1", "cloud-wisp-1", "cloud-big-2", "cloud-mid-2", "cloud-wisp-2"]),

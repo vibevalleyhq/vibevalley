@@ -4,56 +4,54 @@
 
 ## 跑起来
 
-需要 Go 1.27、Flutter 3.47、Xcode 和 Bun 1.4。帮工用本机装好并登录的农机（pi、Claude Code、codex）；VibeValley 自己的农机和管家只要 DeepSeek 的钥匙。
+需要 Bun 1.4 和 Node 24。帮工用本机装好并登录的农机（pi、Claude Code、codex）；VibeValley 自己的农机和管家只要 DeepSeek 的钥匙。
 
 ```bash
-cd server && go run ./cmd/server     # 只听 127.0.0.1:8787，读 $VIBEVALLEY_HOME/vibevalley.yaml
-cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787
+bun install                                  # 根目录：装全部 workspace 的依赖
+bun run --filter vibevalley-web build        # 页面，apps/web/dist
+cd apps/server && npm start -- --web ../web/dist   # 只听 127.0.0.1:8787，读 $VIBEVALLEY_HOME/vibevalley.yaml，在 / 提供页面
+bun run desktop:dev                          # 或者桌面版：Electron 带着服务端起来，打开它的页面
 ```
 
-- 第一次跑 Flutter（和升级 `agora_rtc_engine` 以后）先跑 `app/tool/agora-voice-only.sh`。
-- 帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活：项目在 `projects/`，worktree 在 `worktrees/`，打包的应用各用自己的（[客户端](docs/subsystems/app.md)「渠道」）；设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见 [architecture.md](docs/architecture.md)「配置」。
+- 帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活：项目在 `projects/`，worktree 在 `worktrees/`；设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见 [architecture.md](docs/architecture.md)「配置」。
 - 语音的凭据见 [语音](docs/subsystems/voice.md)；没有也能打字用。
-- 服务端改了代码要重启。
-- 改表结构：直接改 `server/migrations/0001_schema.sql`，跑 sqlc（命令在 [AGENTS.md](AGENTS.md)），删掉本机的 `vibevalley.db` 让服务端重建；不加迁移，也不写数据搬运（AGENTS.md「不留兼容」）。`go run ./cmd/migrate status` 看本机的库在第几版。
+- 服务端不自动重载，改了 `apps/server` 要重启；页面改了要重新构建（不开 `vite dev`）。
+- 改表结构：直接改 `apps/server/db/migrations/0001_schema.up.sql`，跑 `cd apps/server && npm run db:generate`，删掉本机的库让服务端重建；不加迁移，也不写数据搬运（AGENTS.md「不留兼容」）。
 
 ## macOS 应用
 
 ```bash
-bun run package:mac                      # app/build/vibevalley.app（带 Go 服务端）和 .dmg
-app/tool/build-macos.sh --channel alpha  # Alpha 渠道；beta 同理
+bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和 .dmg
 ```
 
-渠道、家目录、日志在哪见 [客户端](docs/subsystems/app.md)。
+`apps/desktop/scripts/package.ts` 先构建页面和壳，再把 `apps/server` 连同它的生产依赖（`packages/protocol` 拷成真的文件夹）放进 `dist/stage/server`，最后由 electron-builder 把壳、`server/` 和 `web/` 一起打进应用；服务端在应用里照样用 Electron 自带的 Node 和 tsx 跑。没有签名，第一次打开要在「系统设置 → 隐私与安全性」里放行。
 
 ## 检查和测试
 
-先跑和改动有关的最窄的那个（命令见 [AGENTS.md](AGENTS.md#命令)）。服务端的测试怎么写见 [server](server/README.md#测试)，Flutter 的见 [app](app/README.md#测试和对照)。客户端分层用 `bun run app:imports` 查：`app/lib` 里的 import 只能往下一层走（`flutter:check` 也跑）。
+先跑和改动有关的最窄的那个（命令见 [AGENTS.md](AGENTS.md#命令)）：
+
+- `bun run check`：`vp check`，全仓库的格式（oxfmt）、lint（oxlint，带类型）和类型；`bun run check:fix` 改格式。
+- `bun run server:check`：`packages/protocol` 的规则和黄金数据，`apps/server` 的类型、查询是否最新和 vitest。
+- `bun run web:check`：各包的类型，页面能构建；`cd apps/web && bun run test` 跑规则的 bun test 和 Playwright（每个 worker 一个真的服务端，临时家目录，环境里没有钥匙）。
+- `bun run desktop:test`：Playwright 起整个 Electron 应用。
+- `bun run docs:verify`：Note、skill、链接和旧名字。
+
+测试从不连真的模型：服务端用 pi-ai 的假模型，帮工用 oar 的测试 runtime。管家的真模型评测（`cd apps/server && npm run evals`）要 DeepSeek 的钥匙、花钱，先问主人。
 
 ## 改形状、规则和表
 
-- **形状**：改 `server/internal/protocol` 的 `shapes.go` 或 `api.go`，同一个改动里跑 `go run ./tool/shapegen`（[server](server/README.md#形状和规则从哪来)）。
-- **规则**：改拥有它的包里的纯函数（几个包都用的在 `protocol`），`VIBEVALLEY_GOLDEN=update go test ./internal/...` 重写黄金数据，看 diff。客户端不重写服务端的规则（[客户端问服务端](docs/subsystems/app.md)）。
-- **表和查询**：表结构是 `server/migrations/0001_schema.sql` 一个文件（直接改），查询在 `server/pkg/db/queries/`；改完重跑 sqlc（[理由](docs/subsystems/foundation.md)）。新表用单数名。
-- **旧名字**：`bun run names:verify` 查 `server/internal`、`server/cmd`、`app/lib`、`app/test` 里有没有已经改掉的旧名（挂在 `docs:verify` 里）；加了新名字就把它写进 `scripts/stale-names.ts`。
+- **形状**：改 `packages/protocol/src/shapes.ts`（类型）和 `schema.ts`（同一个形状的 Schema，以 `Schema.Codec<T.X>` 定类型，两边对不上就编不过），接口在 `api.ts` 的 `endpoints`。服务端和页面都直接 import，没有生成这一步。
+- **规则**：改拥有它的包里的纯函数（几处都用的在 `packages/protocol/src/rules`），`bun run golden:update` 重写黄金数据，看 diff。页面不重写服务端的规则（[客户端问服务端](docs/subsystems/app.md)）。
+- **表和查询**：表结构是 `apps/server/db/migrations/0001_schema.up.sql` 一个文件（直接改），查询在 `apps/server/db/queries/<表>.sql`；改完跑 `npm run db:generate`。`src/base/schema.test.ts` 查表名、索引名和一张表一个查询文件。
+- **旧名字**：`bun run names:verify` 查 `apps/server/src`、`apps/web/src`、`apps/web/test`、`packages/protocol/src` 里有没有已经改掉的旧名（挂在 `docs:verify` 里）；加了新名字就把它写进 `scripts/stale-names.ts`。
 
 ## 调试台
 
-客户端里按 `` ` `` 打开（`app/lib/debug/`），对着真的服务端：控制通话、管家和钟点，看帮工，试听音效，看收到的帧和事件。
+农场页里按 `` ` `` 打开（`apps/web/src/farm/debug/`），对着真的服务端：控制通话、管家和钟点，看帮工，试听音效，看收到的帧和事件。
 
 ## 只用命令行派一个活
 
-先在仓库根目录起服务端：
-
-```bash
-cd server && go run ./cmd/server
-```
-
-另开终端，让命令行指向它。下面的命令用已装好的 `vibevalley`；也可在 `server/` 下用 `go run ./cmd/vibevalley` 代替。
-
-```bash
-export VIBEVALLEY_SERVER=http://127.0.0.1:8787
-```
+先起服务端（见上）。另开终端，命令行在 `apps/server` 下是 `npm run cli --`；下面写成 `vibevalley`。它默认连 `http://127.0.0.1:8787`，别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
 
 1. 建工单。把 `…` 换成标题和项目，用返回的工单 ID 替换后面的 `<id>`。
 
@@ -89,6 +87,6 @@ export VIBEVALLEY_SERVER=http://127.0.0.1:8787
 
 ## 素材、音效和官网
 
-- 贴图在 `design/pixel/` 里生成、切图（[pixel-village.md](docs/reference/pixel-village.md)「素材」），不手改 `sprites.json`。
-- 音效配方在 `app/lib/audio/sfx.dart`（[pixel-village.md](docs/reference/pixel-village.md)「音效」）。
+- 贴图在 `design/pixel/` 里生成、切图，落到 `apps/web/public/pixel`（[pixel-village.md](docs/reference/pixel-village.md)「素材」），不手改 `sprites.json`。
+- 音效配方在 `apps/web/src/farm/sound.ts`（[pixel-village.md](docs/reference/pixel-village.md)「音效」）。
 - 官网见 [site/README.md](site/README.md)；`bun run site:deploy` 构建并发到 Cloudflare。

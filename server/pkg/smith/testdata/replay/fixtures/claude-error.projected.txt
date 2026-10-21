@@ -1,3 +1,0 @@
-system init                  │ event
-assistant text               │ event → text_delta
-result success               │ event → turn_ended failed

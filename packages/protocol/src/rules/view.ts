@@ -1,0 +1,206 @@
+// What the farm draws of the core state: levels, plots,
+// the effects a fact sets off, and the achievements in words.
+
+import type {
+  Achievement,
+  AchievementDef,
+  AchievementStanding,
+  AchievementTier,
+  Badge,
+  CoreState,
+  Crop,
+  Fact,
+  FarmLevel,
+  FarmView,
+  GameEffect,
+  GameEffectAchievement,
+  Issue,
+  PlotView,
+  Progress,
+  Session,
+} from "../shapes";
+import { needOf } from "./phase";
+import { playOf } from "./play";
+import { achievements } from "./seeds";
+import { sessionOf } from "./sessions";
+
+export const xpToNext = (level: number) => 10 * level;
+
+export function levelForCommits(total: number): [level: number, xp: number] {
+  let level = 1;
+  let rest = Math.max(0, total);
+  while (rest >= xpToNext(level)) {
+    rest -= xpToNext(level);
+    level++;
+  }
+  return [level, rest];
+}
+
+export function farmLevelOf(state: CoreState): FarmLevel {
+  const [level, xp] = levelForCommits(state.commits?.total ?? 0);
+  return { level, xp, need: xpToNext(level) };
+}
+
+/** FNV-1a, 32 bits, over the UTF-8 bytes. */
+function fnv32a(s: string): number {
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(s)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+  return h >>> 0;
+}
+
+/** The same session ripens to the same crop every time. */
+const ripeCrop = (h: Session): Crop => (fnv32a(h.id) % 2 === 1 ? "carrot" : "wheat");
+
+function growth(h: Session): Crop {
+  const play = playOf(h);
+  const since = play.runStartedAt ?? h.hiredAt;
+  let crop: Crop = "sprout";
+  for (const step of play.history ?? []) {
+    if (step.at < since) continue;
+    if (step.action === "edit_file" && crop === "sprout") crop = "leafy";
+    else if (step.action === "run_command" && crop === "leafy") crop = "flowering";
+  }
+  return crop;
+}
+
+const badgeRipe: Badge = { text: "可收获", tone: "ripe" };
+const badgeBugs: Badge = { text: "有虫", tone: "bug" };
+const badgeConflict: Badge = { text: "有冲突", tone: "bug" };
+const badgeQuiet: Badge = { text: "没动静", tone: "stuck" };
+const badgeRetrying: Badge = { text: "重试中", tone: "stuck" };
+const badgeRest: Badge = { text: "歇着", tone: "rest" };
+const badgeReview: Badge = { text: "等验收", tone: "wait" };
+const badgeAsks: Badge = { text: "缺肥", tone: "wait" };
+
+/** The weeds a failed acceptance left standing. */
+export const openFindings = (t: Issue) => (t.findings ?? []).filter((f) => !f.pulled).length;
+
+/**
+ * A plot is an issue: what the session on it is doing, then where the issue stands — waiting on the owner's answer
+ * (缺肥), its acceptance (抽穗, or weeds after a failed one), or passed (ripe).
+ */
+export function plotOf(h: Session, issue: Issue | undefined): PlotView {
+  const plot = plotOfSession(h);
+  if (!issue) return plot;
+  if (needOf(h)?.kind === "conflict") return plot;
+  const weeds = openFindings(issue);
+  switch (h.phase._tag) {
+    case "working":
+      if (weeds > 0 && plot.badge === undefined) return { crop: "weeds", badge: { text: `除草中 ${weeds}`, tone: "bug" } };
+      break;
+    case "ripe":
+    case "resting":
+      if ((issue.asks ?? []).length > 0) return { crop: "dry", badge: badgeAsks };
+      if (issue.acceptedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe };
+      if (weeds > 0) return { crop: "weeds", badge: { text: `${weeds} 棵草`, tone: "bug" } };
+      if (h.phase._tag === "ripe") return { crop: "flowering", badge: badgeReview };
+      break;
+  }
+  return plot;
+}
+
+export function plotOfSession(h: Session): PlotView {
+  const need = needOf(h);
+  const conflict = need?.kind === "conflict";
+  switch (h.phase._tag) {
+    case "arriving":
+      return { crop: "seeded" };
+    case "working":
+      if (need?.kind === "quiet") return { crop: "dry", badge: badgeQuiet };
+      if (need?.kind === "retrying") return { crop: growth(h), badge: badgeRetrying };
+      return { crop: growth(h) };
+    case "ripe":
+      return { crop: ripeCrop(h), badge: conflict ? badgeConflict : badgeRipe };
+    case "failed":
+      return { crop: "withered", badge: badgeBugs };
+    case "resting":
+      return { crop: growth(h), badge: conflict ? badgeConflict : badgeRest };
+  }
+  return { crop: "empty" };
+}
+
+/** None on a farm's first count. */
+export function levelUps(before: number | undefined, after: number): GameEffect[] {
+  if (before === undefined) return [];
+  const out: GameEffect[] = [];
+  const [from] = levelForCommits(before);
+  const [to] = levelForCommits(after);
+  for (let level = from + 1; level <= to; level++) out.push({ kind: "levelUp", level });
+  return out;
+}
+
+export function effectsOf(before: CoreState, fact: Fact): GameEffect[] {
+  switch (fact.type) {
+    case "commits":
+      return levelUps(before.commits?.total, fact.commits.total);
+    case "progress": {
+      const news = fact.news;
+      if (!news) return [];
+      const out: GameEffect[] = [];
+      if (news.coins) out.push({ kind: "reward", sessionId: news.session ?? "", coins: news.coins, streak: fact.progress.streak });
+      for (const u of news.unlocked ?? []) out.push(achievementEffect(u.id, u.tier));
+      return out;
+    }
+    case "report":
+      return fact.outcome === "failed" && sessionOf(before, fact.id) ? [{ kind: "penalty", sessionId: fact.id }] : [];
+  }
+  return [];
+}
+
+/** The issue a session works is its plot; a session with none (not sent for an issue) is its own. */
+export const plotKey = (h: Session) => (h.issue ? h.issue : h.id);
+
+export function viewOf(state: CoreState): FarmView {
+  const plots: Record<string, PlotView> = {};
+  for (const h of state.sessions)
+    plots[plotKey(h)] = plotOf(
+      h,
+      (state.issues ?? []).find((t) => t.id === plotKey(h)),
+    );
+  return { level: farmLevelOf(state), plots, achievements: standingsOf(state.progress) };
+}
+
+/** Every achievement, in the page's order. */
+export const achievementsInWords = (): Achievement[] => achievements.map(achievementInWords);
+
+function achievementInWords(a: AchievementDef): Achievement {
+  const tiers: AchievementTier[] = a.tiers.map((need, i) => ({ need, title: tierTitle(a, i + 1), coins: a.coins[i] ?? 0, reached: reachedText(a, i + 1) }));
+  return { id: a.id, category: a.category, title: a.title, detail: a.detail, unit: a.unit, wearable: a.category !== "starter", tiers };
+}
+
+function tierTitle(a: AchievementDef, tier: number): string {
+  const titles = a.tierTitles ?? [];
+  if (tier >= 1 && tier <= titles.length) return titles[tier - 1]!;
+  return tier === 2 ? "银牌" + a.title : tier === 3 ? "金牌" + a.title : a.title;
+}
+
+function reachedText(a: AchievementDef, tier: number): string {
+  if (a.category === "starter") return "新手任务做完了";
+  if (a.category === "secret") return "发现一个彩蛋";
+  return tier === 3 ? "升到金牌" : tier === 2 ? "升到银牌" : "解锁成就";
+}
+
+function achievementEffect(id: string, tier: number): GameEffectAchievement {
+  const e: GameEffectAchievement = { kind: "achievement", achievement: id, tier, title: "", reached: "", detail: "", coins: 0 };
+  for (const a of achievements) {
+    if (a.id !== id) continue;
+    const words = achievementInWords(a);
+    e.detail = a.detail;
+    e.oneOff = a.tiers.length === 1 ? true : undefined;
+    const t = tier >= 1 && tier <= words.tiers.length ? words.tiers[tier - 1] : undefined;
+    if (t) Object.assign(e, { title: t.title, reached: t.reached, coins: t.coins });
+  }
+  return e;
+}
+
+function standingsOf(p: Progress | undefined): AchievementStanding[] {
+  return achievements.map((a) => {
+    const s: AchievementStanding = { id: a.id, tier: 0, count: 0 };
+    if (p) {
+      s.count = p.counts?.[a.id] ?? 0;
+      for (const u of p.unlocked ?? []) if (u.id === a.id && u.tier > s.tier) s.tier = u.tier;
+    }
+    if (s.tier < a.tiers.length) s.next = a.tiers[s.tier];
+    return s;
+  });
+}

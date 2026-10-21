@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate the pixel village's pictures with codex's built-in image tool (the pixel village, app/assets/pixel).
+# Generate the pixel village's pictures with codex's built-in image tool (the pixel village, apps/web/public/pixel).
 # Usage: ./gen.sh [name...]   (default: map plots manager char-bear)
 #   map plots manager props     the village, its plots, the dog and mailbox, the props the panels open from
 #   foreground                  plants right in front of the camera that frame the view (a parallax layer)
@@ -18,7 +18,7 @@
 #   pose-<species>[-<outfit>]   six more poses for a helper (sitting, reading, hammering, working at something),
 #                               drawn from its sheet (raw/char-<species>[-<outfit>].png)
 #   app-icon dmg-background splash   the desktop app's pictures, in pixel art (app-icon: app/macos AppIcon)
-#   title                       the title screen's background, behind the start menu (app/assets/title): the evening
+#   title                       the title screen's background, behind the start menu (apps/web/public/title): the evening
 #   title-morning title-day title-night   the same scene at other hours, from raw/title.png
 #   title-clouds title-smoke title-dandelion title-plants   what moves over the title (title_layers.py cuts them)
 #   title[-morning|-day|-night]-nosmoke   each scene without its chimney smoke, which the page animates instead

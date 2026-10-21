@@ -14,7 +14,7 @@ description: 为 VibeValley 的一类改动写一个验证 skill（.agents/skill
 按顺序问，答「能」就去做那件事，不写 skill：
 
 1. 能不能改代码，让这类错误写不出来（类型、不变量、只留一个入口）？
-2. 能不能写成测试或检查，进 `go test`、`bun run flutter:check`、`bun run docs:verify`、`bun run go:deadcode`？服务端的测试能用 `oartest`、真的 git 仓库和 `ai.FauxProvider`，大部分行为都能这样测。
+2. 能不能写成测试或检查，进 `bun run server:check`、`bun run web:check`、`cd apps/web && bun run test`、`bun run docs:verify`？服务端的测试能用 oar 的 `scriptedRuntime`、真的 git 仓库和 pi-ai 的假模型，页面的 Playwright 对着真的服务端，大部分行为都能这样测。
 
 只有要真的跑起来看、要判断（画面对不对、交互顺不顺、真的帮工能不能开工）的，才写验证 skill。一个 skill 里能改成检查的步骤，也宜改成检查，skill 里只留一句命令。
 
@@ -42,7 +42,7 @@ description: <改了哪些路径或哪类行为时用>；<它证明什么>。
 ---
 ```
 
-`description` 决定 agent 什么时候想起它：写明触发它的路径（`server/internal/...`、`app/lib/...`）和说法（「验证」「跑起来看看」「确认能用」）。
+`description` 决定 agent 什么时候想起它：写明触发它的路径（`apps/server/src/...`、`apps/web/src/...`）和说法（「验证」「跑起来看看」「确认能用」）。
 
 正文用这几节，名字固定，`bun run docs:verify` 会查：
 

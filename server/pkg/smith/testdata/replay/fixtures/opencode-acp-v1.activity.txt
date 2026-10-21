@@ -1,1 +1,0 @@
-bash                 │ Running command: <command>

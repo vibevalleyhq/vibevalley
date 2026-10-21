@@ -1,0 +1,99 @@
+// The server for the desktop app (apps/server): started as a child process on a port it picks (VIBEVALLEY_PORT=0), ready
+// when it prints its address as one JSON line (--ready-json, ServerReady), stopped with SIGTERM so it saves on the way out.
+// It runs on Electron's own Node (ELECTRON_RUN_AS_NODE), unbundled: the migrations, the word lists, PGlite's wasm and the
+// coding agents' SDKs are found beside their packages, so the server keeps its node_modules.
+
+import { execFile, spawn } from "node:child_process";
+import { createWriteStream, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import { createInterface } from "node:readline";
+
+/** The first start builds the database. */
+const startTimeoutMs = 40_000;
+/** How long a stopping server has to save and exit before it is killed. */
+const stopTimeoutMs = 8_000;
+
+/** How long the login shell has to say its PATH. */
+const shellPathTimeoutMs = 5_000;
+
+/** The PATH a terminal has. An app opened from Finder or at login gets launchd's short one, which has none of pi,
+ * claude or codex; the login shell's is the one the owner installed them on. Unanswered, the app's own. */
+export function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefined> {
+  const sh = env.SHELL || "/bin/zsh";
+  return new Promise((resolve) => {
+    // The markers keep out what a profile prints on its own.
+    execFile(sh, ["-ilc", 'printf "__VV_PATH__%s__VV_PATH__" "$PATH"'], { timeout: shellPathTimeoutMs, env }, (error, stdout) => {
+      const found = /__VV_PATH__(.*?)__VV_PATH__/s.exec(stdout ?? "")?.[1];
+      resolve(error || !found ? env.PATH : found);
+    });
+  });
+}
+
+export interface ServerFiles {
+  /** apps/server: src/main.ts and its node_modules. */
+  server: string;
+  /** The built page (apps/web/dist), served at / on the server's origin. */
+  web: string;
+  /** Appended to: the server's stdout and stderr. */
+  log: string;
+}
+
+export interface RunningServer {
+  /** Where the page and the API answer. */
+  url: string;
+  stop(): Promise<void>;
+}
+
+export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv): Promise<RunningServer> {
+  mkdirSync(dirname(files.log), { recursive: true });
+  const log = createWriteStream(files.log, { flags: "a" });
+  log.write(`--- ${new Date().toISOString()} vibevalley: starting ${files.server}\n`);
+  // tsx is resolved from the cwd: the server's own.
+  const child = spawn(process.execPath, ["--import", "tsx", "src/main.ts", "--ready-json", "--web", files.web], {
+    cwd: files.server,
+    env: { ...env, ELECTRON_RUN_AS_NODE: "1", VIBEVALLEY_PORT: "0" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  child.stderr.pipe(log, { end: false });
+  const exited = new Promise<number | null>((resolve) => child.once("exit", (code) => resolve(code)));
+
+  const stop = async () => {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill("SIGTERM");
+      const timer = setTimeout(() => child.kill("SIGKILL"), stopTimeoutMs);
+      await exited;
+      clearTimeout(timer);
+    }
+    log.end();
+  };
+
+  return new Promise((resolve, reject) => {
+    const fail = (reason: string) => {
+      void stop();
+      reject(new Error(`${reason}，日志在 ${files.log}`));
+    };
+    const timer = setTimeout(() => fail(`服务端 ${startTimeoutMs / 1000} 秒内没有发布就绪地址`), startTimeoutMs);
+    child.once("error", (e) => {
+      clearTimeout(timer);
+      fail(`服务端启动失败：${e.message}`);
+    });
+    void exited.then((code) => {
+      clearTimeout(timer);
+      fail(`服务端退出了（${code}）`);
+    });
+    let ready = false;
+    createInterface({ input: child.stdout }).on("line", (line) => {
+      log.write(line + "\n");
+      if (ready) return;
+      try {
+        const { url } = JSON.parse(line) as { url?: unknown };
+        if (typeof url !== "string") return;
+        ready = true;
+        clearTimeout(timer);
+        resolve({ url, stop });
+      } catch {
+        // Not the ready line.
+      }
+    });
+  });
+}

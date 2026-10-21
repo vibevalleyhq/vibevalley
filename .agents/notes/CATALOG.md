@@ -18,7 +18,7 @@
 
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)
 - 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
-- 2026-10-18 [记忆都存在 SQLite：照 Hermes 分四类，一张表、一张全文索引，主人画像、管家的记性和干活的经过都进来](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)
+- 2026-10-18 [记忆都存在农场的库里：主人画像、管家的记性和干活的经过都进 memory 表](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)
 - 2026-10-18 [一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)
 - 2026-10-17 [Session、Run、事件：一个 agent loop 的日志，和消息之间只有两个口子](.agents/notes/proposed/architecture/2026-10-17-session-run-step.md)
 - 2026-10-17 [管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md)
@@ -28,12 +28,6 @@
 ### process
 
 - 2026-10-18 [用 VibeValley 开发 VibeValley](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
-
-## implemented（1 篇）
-
-### feature
-
-- 2026-10-18 [播种袋的种子由服务端给](.agents/notes/implemented/feature/2026-10-18-seed-catalog-from-the-server.md)
 
 ## rejected（2 篇）
 

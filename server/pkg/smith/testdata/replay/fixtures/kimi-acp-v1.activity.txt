@@ -1,1 +1,0 @@
-Bash                 │ Running command: <command>

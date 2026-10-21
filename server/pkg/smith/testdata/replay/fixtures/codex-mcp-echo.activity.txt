@@ -1,2 +1,0 @@
-mcpToolCall          │ Using a tool
-mcpToolCall          │ Using a tool

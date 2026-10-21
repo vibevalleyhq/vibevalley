@@ -1,0 +1,15 @@
+{
+  "name": "@vibevalley/host",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "bun test src"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3"
+  }
+}

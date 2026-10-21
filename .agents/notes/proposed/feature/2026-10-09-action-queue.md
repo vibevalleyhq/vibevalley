@@ -8,9 +8,9 @@ Status: proposed
 
 ## Proposal
 
-客户端的像素村（`app/lib/village/`）给每个动作至少播 800 毫秒；后来的排队，队列只留最新的一个，所以不会越积越落后。只改画面，不改核心状态。
+客户端的像素村（`apps/web/src/farm/canvas`）给每个动作至少播 800 毫秒；后来的排队，队列只留最新的一个，所以不会越积越落后。只改画面，不改核心状态。
 
-帮工走到哪座房子已经有这样的节流（`app/lib/village/world.dart` 的 `Whereabouts`：想去新地方 1.2 秒、在原地待够 2 秒才动身）；姿势和头上写的在做什么还没有，这一条补的是它们。
+帮工走到哪座房子已经有这样的节流（`apps/web/src/farm/world/world.ts` 的 `Whereabouts`：想去新地方 1.2 秒、在原地待够 2 秒才动身）；姿势和头上写的在做什么还没有，这一条补的是它们。
 
 ## Alternatives considered
 

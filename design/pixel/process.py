@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Shrink the generated pictures (gen.sh) to true pixel art for the pixel village (app/assets/pixel).
+"""Shrink the generated pictures (gen.sh) to true pixel art for the pixel village (apps/web/public/pixel).
 
 The image tool paints "pixel art" whose pixels are blocks of roughly 4 to 8 image pixels, not quite on a grid.
 Every picture is shrunk to the size it is drawn at in the game (one art pixel = one canvas pixel), with box
 averaging, then snapped to a small palette with hard alpha, so the game can scale it up by whole numbers.
 
 Usage: python3 process.py [map plots manager char-bear ui-icons look-farmer ...]   (default: everything in raw/)
-Writes app/assets/pixel/<name>.png and the manifest sprites.json: per sprite its size and anchor
+Writes apps/web/public/pixel/<name>.png and the manifest sprites.json: per sprite its size and anchor
 (the point that stands on the ground, from its top-left: the middle of its lowest row, or of its feet when it holds a
 tool to the ground; a character also records hx, hy, the middle of its head), and the sheet it was cut from.
 Sprites take the painted farm's names where they replace one (icon-coin, act-search, manager-face); the client reads
-them through lib/sprites/atlas.dart. ui-cursors becomes the pixel cursors in app/assets/cursors.
+them through apps/web/src/farm/world/sprites.ts. ui-cursors becomes the pixel cursors in apps/web/public/cursors.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from straighten import dirt_of, straighten_field, straighten_plots
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "raw"
-OUT = HERE.parent.parent / "app" / "assets" / "pixel"
+OUT = HERE.parent.parent / "apps" / "web" / "public" / "pixel"
 # The pixel density: how many of a picture's pixels make one of the village's art pixels. The game's pictures are
 # drawn twice as dense (gen.sh hd-<name>, from raw/hd-<name>.png); by default the density is the one the game's
 # pictures already have (its map's width against the village's 384), so a sheet is never cut to another. A trial

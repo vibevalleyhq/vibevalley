@@ -75,9 +75,9 @@ export const zh = {
   },
   devices: {
     title: '在哪都能看农场',
-    text: '界面是 Flutter 写的，Mac、iPhone、安卓用的是同一套。农场跑在你的 Mac 上；手机上的 VibeValley 扫一下「连接到本机」里的二维码，就连进同一个农场：在田头派活、看工单、收帮工的汇报。另一台 Mac 粘贴配对链接也能连。不在家时，把田头接到微信、飞书或 QQ。',
+    text: '界面是一份 React 页面，Mac 应用和浏览器打开的是同一份。农场跑在你的 Mac 上；在田头派活、看工单、收帮工的汇报。不在家时，把田头接到微信、飞书或 QQ。',
     platforms: ['macOS', 'iPhone', '安卓'],
-    note: '手机版暂时要用同一份代码自己构建；连接到本机只在信得过的网络里打开。',
+    note: '手机版正在换成新的壳，暂时用不了；连接到本机只在信得过的网络里打开。',
     shots: { mac: 'Mac 上的农场', chat: '手机上的田头', tickets: '手机上的工单' },
   },
   screens: {
@@ -102,7 +102,7 @@ export const zh = {
       'macOS（Apple 芯片）',
       '至少一个装好并登录的编码 agent：pi、Claude Code 或 Codex',
       '一把 DeepSeek 的 API 钥匙，管家要用',
-      '自己构建要 Go 1.27、Flutter 3.47 和 Xcode',
+      '自己构建要 Bun 1.4 和 Node 24',
     ],
     build: '打一个 macOS 应用',
     more: '更多见仓库里的 README 和 docs/。',

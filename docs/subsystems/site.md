@@ -1,15 +1,15 @@
 # 官网
 
-vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲染成完整的 HTML，样式是 Tailwind，会动的部分是 React island，动画用 Motion；图和像素字全从 `app/assets`、`docs/images` 拿，不另存。中文在 `/`，英文在 `/en/`，放在 Cloudflare 一个只有静态文件的 Worker 上。卖点是一种日子：「写代码，如收菜」。
+vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲染成完整的 HTML，样式是 Tailwind，会动的部分是 React island，动画用 Motion；图和像素字全从 `apps/web/public`、`docs/images` 拿，不另存。中文在 `/`，英文在 `/en/`，放在 Cloudflare 一个只有静态文件的 Worker 上。卖点是一种日子：「写代码，如收菜」。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 页面、两种语言的文字、404 页、分享卡片 | 游戏里的首页场景和它的摆放（`app/lib/title/`，[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)） |
-| 构建时压缩图片、裁像素字、画分享卡片 | 图本身：生图、切图（`design/`），原图在 `app/assets` |
-| 页面上农场数字的抄本（`facts.ts`） | 这些数的真值：农机、帮工的样子、地数、成就、小游戏、连接器（服务端 `protocol`、`app/lib/phone`） |
-| 发布到 Cloudflare | 截图怎么拍（`app/tool/screens/live_screens_test.dart`，截图在 `docs/images/`，README 也用） |
+| 页面、两种语言的文字、404 页、分享卡片 | 游戏里的首页场景和它的摆放（`apps/web/src/farm/title/`，[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)） |
+| 构建时压缩图片、裁像素字、画分享卡片 | 图本身：生图、切图（`design/`），切好的在 `apps/web/public` |
+| 页面上农场数字的抄本（`facts.ts`） | 这些数的真值：农机、帮工的样子、地数、成就、小游戏、连接器（`packages/protocol`、`apps/web/src/farm/phone`） |
+| 发布到 Cloudflare | 截图怎么拍（`verify-app` 的 Playwright，截图在 `docs/images/`，README 也用） |
 | | 演讲稿（`site/talks/<场>/`，讲完挪进 `public/talks/` 原样发布，约定在 [site/README.md](site/README.md#演讲稿)） |
 
 ## 在哪
@@ -29,7 +29,7 @@ vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲�
 - **减少动画时完整**（`prefers-reduced-motion`，`ui.tsx` 的 `STILL`）：CSS 动画停在原处（`animation-play-state: paused`）；`useScrollLinked` 不挂（只有不动位置的淡入淡出带 `still: true` 照挂）；指针视差为零；进场和数字往上数都不做；「怎么玩」不走路，一步一步跳；时辰按钮直接跳不平滑滚。
 - **只动 `transform` 和 `opacity`**：横穿场景的 CSS 动画只动 `translate`（距离用 `cqw`、`cqh`），不动 `left`、`top`；跟着滚动的全用 Motion 的 `scroll()`。都留在合成线程上。
 - **出了屏幕就停**：`useOffScreen` 用 `IntersectionObserver` 给整段标 `data-off`，`global.css` 让它和里面的动画都停。
-- **不另存游戏的图**：场景、图标、帮工的帧、地块、农机 logo 从 `app/assets/` import，截图从 `docs/images/` import，构建时复制成带 hash 的文件。图的地址在 `Home.astro` 里算好传给 island，island 的脚本里没有图的清单。
+- **不另存游戏的图**：场景、图标、帮工的帧、地块、农机 logo 从 `apps/web/public/` import，截图从 `docs/images/` import，构建时复制成带 hash 的文件。图的地址在 `Home.astro` 里算好传给 island，island 的脚本里没有图的清单。
 - **只压官网的副本**（`images.ts`，Astro 的图片服务 + sharp）：首页四张背景转 WebP（quality 82），场景贴图转 WebP（quality 90），尺寸不变；截图转 480、720、1080 和原宽的 WebP（quality 80），配 `srcset`；分享卡片是 JPEG。小像素图（`assets.ts`）原样发 PNG。`app/assets` 的原图不动。
 - **导入了就要做副本**：`images.ts` 的 glob 只列页面用到的贴图，`SHOWN` 必须都在里面，缺了 `titleArt` 抛错、构建失败；导入了却没做副本的原图会留在构建里。不读导入的图的属性（连 `width` 也不行），读了 Astro 就把原图也发出去；尺寸从 `.clone` 读。
 - **Tailwind 只认完整的类名**：按时辰变的类写成完整的字符串表（`Hero.tsx` 的 `AT`、`PRESSED`），不拼。
@@ -42,8 +42,8 @@ vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲�
 
 **构建**：
 
-1. `prepare.ts` 把 `src/**/*.{astro,ts,tsx,css}` 里出现的字加上全部可打印 ASCII，从 `app/assets/fonts/fusion-pixel-12px-proportional-zh_hans.otf`（5 MB）裁成 `public/gen/pixel.woff2`（十几 KB）；复制字体授权 `fusion-pixel-OFL.txt`、应用图标（`app/macos/.../AppIcon.appiconset` 的 32、64、256）；每种语言画一张 `card-<lang>.jpg`。
-2. `card.ts` 画分享卡片：`app/assets/pixel/title-evening.jpg` 裁成 1200×630，左边一层渐暗，上面是 `hero` 的名字、别名、标语、介绍和 `vibevalley.dev`。字是像素字的字形经 opentype.js 转成的 SVG 路径，不靠系统字体（sharp 自己的文字走 fontconfig，认不到给它的字体文件）；字号是 12 的倍数，像素落在整像素上。
+1. `prepare.ts` 把 `src/**/*.{astro,ts,tsx,css}` 里出现的字加上全部可打印 ASCII，从 `apps/web/public/fonts/fusion-pixel-12px-proportional-zh_hans.otf`（5 MB）裁成 `public/gen/pixel.woff2`（十几 KB）；复制字体授权 `fusion-pixel-OFL.txt`、应用图标（`app/macos/.../AppIcon.appiconset` 的 32、64、256）；每种语言画一张 `card-<lang>.jpg`。
+2. `card.ts` 画分享卡片：`apps/web/public/pixel/title-evening.jpg` 裁成 1200×630，左边一层渐暗，上面是 `hero` 的名字、别名、标语、介绍和 `vibevalley.dev`。字是像素字的字形经 opentype.js 转成的 SVG 路径，不靠系统字体（sharp 自己的文字走 fontconfig，认不到给它的字体文件）；字号是 12 的倍数，像素落在整像素上。
 3. `astro check`（或 `astro build`）：三页生成到 `site/dist/`，站点地图里没有 404 页。
 
 **一次访问**：
@@ -58,23 +58,23 @@ vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲�
 - 第二屏整个场景滚走，各层分开，越远越慢。
 - 视差靠各层的快慢，不切画：画还是一整张，走页面一半的速度；云更慢；底下的花草更快；最前面一层是游戏里给村子镶边的树枝和灌木，比页面还快；管家和狗跟画同一层；文字比页面快并淡出。近的层只越过远的层往上走，层边不露出后面。各层还跟着鼠标偏一点，带弹簧（`useSpring`，stiffness 50、damping 18），只认鼠标。
 
-**下面几段**：`Parade` 帮工走过一排地（CSS），`Harvest` 是第二天清早的金色横幅「一觉醒过来，满园都是菜」，里面是「怎么玩」那件活的收成单；`How` 这一段停在屏幕上，镜头沿田横着走，帮工在四个地方各干一步（看工单、播种、敲锤子冒工具图标、收获冒金币和完成章），田下面画它的 git 分支（分出来、提交、合回 main，计数往上跳）；`Features` 数字一格一格往上数、卡片一张张进场；`Devices` 是 Mac 上的农场和两部手机（田头、工单），手机版要自己构建、「连接到本机」只在信得过的网络里开，照实写；`Screens` 点开截图从原处放大，焦点到关闭按钮，Esc、关闭按钮、点外面都能关，关后焦点回原处；`Start` 先给一条警告，再是构建命令和复制按钮。
+**下面几段**：`Parade` 帮工走过一排地（CSS），`Harvest` 是第二天清早的金色横幅「一觉醒过来，满园都是菜」，里面是「怎么玩」那件活的收成单；`How` 这一段停在屏幕上，镜头沿田横着走，帮工在四个地方各干一步（看工单、播种、敲锤子冒工具图标、收获冒金币和完成章），田下面画它的 git 分支（分出来、提交、合回 main，计数往上跳）；`Features` 数字一格一格往上数、卡片一张张进场；`Devices` 是 Mac 上的农场和两部手机（田头、工单），手机版正在换壳暂时用不了、「连接到本机」只在信得过的网络里开，照实写；`Screens` 点开截图从原处放大，焦点到关闭按钮，Esc、关闭按钮、点外面都能关，关后焦点回原处；`Start` 先给一条警告，再是构建命令和复制按钮。
 
 **发布**：主人在本机用握着域名的账号 `bunx wrangler login`，再 `bun run site:deploy`；Cloudflare 自己加解析和证书。乱写的地址给 `404.html` 和 404 状态，`_headers` 不对外。
 
 ## 和谁打交道
 
-- **`app/assets`**：`title/` 的场景贴图和 `title/sprites.json`（`scene.ts` 读尺寸）、`pixel/` 的背景、图标、帮工的帧、地块和 `pixel/sprites.json`（`assets.ts` 读尺寸和站点）、`fonts/` 的像素字；`app/macos` 的应用图标。改了文件名，官网构建报错（`no picture`、`no sprite`）。
-- **游戏的首页**（`app/lib/title/`）：官网的 `scene.ts` 和 `global.css` 的动法是同一套摆放的另一份，两边都照当初网页版首页的 CSS 搬来；改了一边，另一边跟着改。
-- **`docs/images`**：截图，README 和官网共用，界面变了用 `live_screens_test.dart` 重拍。
-- **游戏代码里的数**：`facts.ts` 抄 `protocol/shapes.go`（样子、连接器）、`MaxRunning`（`protocol/shapes.go`）、`protocol/seeds.json` 的成就、`app/lib/phone/screens.dart`（小游戏）、[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)（农机）；那边变了要手改这里。
+- **`apps/web/public`**：`title/` 的场景贴图和 `title/sprites.json`（`scene.ts` 读尺寸）、`pixel/` 的背景、图标、帮工的帧、地块和 `pixel/sprites.json`（`assets.ts` 读尺寸和站点）、`fonts/` 的像素字。改了文件名，官网构建报错（`no picture`、`no sprite`）。
+- **游戏的首页**（`apps/web/src/farm/title/`）：官网的 `scene.ts` 和 `global.css` 的动法是同一套摆放的另一份；改了一边，另一边跟着改。
+- **`docs/images`**：截图，README 和官网共用，界面变了照 `verify-app` 重拍。
+- **游戏代码里的数**：`facts.ts` 抄 `packages/protocol/src/shapes.ts`（样子、连接器、`maxRunning`）、`packages/protocol/src/rules/seeds.json` 的成就、`apps/web/src/farm/phone/screens.tsx`（小游戏）、[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)（农机）；那边变了要手改这里。
 - **Cloudflare**：DNS 和 Worker；没有按分支的预览地址。
 - **GitHub**：`links.ts` 的仓库地址，仓库公开以前打不开。
 
 ## 为什么这样
 
 - **放在仓库的 `site/`，不单独开仓库。** 单独的仓库发版方便，但要另存一份图和字，游戏改了画面官网不跟着变。
-- **Astro 静态生成，不用 Flutter Web，也不做每次请求的 SSR。** Flutter Web 画面完全一样，但包大、首屏慢，字是画出来的，搜索引擎读不到。SSR（Astro 的 SSR 或 Next.js）给出的 HTML 和构建时一样，多出来的只有按请求变的东西（按 IP 挑时辰、实时 star 数），这一页用不上，代价是每次访问跑一次服务端；Next.js 还要经 OpenNext 才能上 Cloudflare。真有要按请求变的页，Astro 能单给那一页开。
+- **Astro 静态生成，不直接用游戏的页面，也不做每次请求的 SSR。** 游戏的页面要连着服务端才有内容，脚本也大，搜索引擎读不到。SSR（Astro 的 SSR 或 Next.js）给出的 HTML 和构建时一样，多出来的只有按请求变的东西（按 IP 挑时辰、实时 star 数），这一页用不上，代价是每次访问跑一次服务端；Next.js 还要经 OpenNext 才能上 Cloudflare。真有要按请求变的页，Astro 能单给那一页开。
 - **会动的部分是 island，不是整页一个 React 应用。** 整页 React 没有脚本时什么也没有，首屏要等脚本；island 只让会动的部分带脚本。
 - **样式用 Tailwind，不手写 CSS。** 手写的那版一千多行，类名和样式两处来回找；Tailwind 把游戏的主题收在 `@theme` 一处，组件上一眼看出样子。
 - **一直在动的留给 CSS，跟着页面动的交给 Motion。** 云、炊烟、走路不靠脚本，没有脚本也动。放弃了原生脚本（几 KB）、GSAP、Lenis：主人要 React，Motion 现成有带弹簧的值、跟着滚动的值、从原处长出来的放大。代价是脚本约 130 KB（gzip，React 和 Motion 占大头），图仍是页面的大头。

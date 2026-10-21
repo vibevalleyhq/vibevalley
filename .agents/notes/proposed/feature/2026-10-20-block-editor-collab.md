@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-要一个多人（加 agent）能同时编辑的文档：Flutter App 和 Go 服务端共用一份约定，文档按块（段落）存储，所有修改都是按块 ID 描述的 op，服务端是唯一权威。合并以段落为单位，现阶段不用 CRDT。
+要一个多人（加 agent）能同时编辑的文档：页面和服务端共用一份约定（`packages/protocol`），文档按块（段落）存储，所有修改都是按块 ID 描述的 op，服务端是唯一权威。合并以段落为单位，现阶段不用 CRDT。
 
 要做到：
 
@@ -99,7 +99,7 @@ Status: proposed
 
 说明：
 
-- `offset` 按 Unicode code point 计数，不按 UTF-16。Dart 和 Go 默认的字符串长度不一样，必须统一。
+- `offset` 按 Unicode code point 计数，不按 UTF-16。页面（JavaScript）默认按 UTF-16 数，必须统一。
 - 拆分和合并必须是**一个原子 op**，不能拆成"改文本 + 新建块"或"改文本 + 删块"两步发。
 - `set_attrs` 不需要 baseRev，因为按字段 LWW，不同字段互不冲突。例如 A 勾选 todo、B 改文字，两边都生效。
 
@@ -228,7 +228,7 @@ Status: proposed
 - 撤销时根据本地记录生成反向 op（插入 ↔ 删除、文本改回旧值、移动回原位置），作为一个新 op 提交，带当前的 `baseRev`，走正常冲突规则。
 - 撤销栈只在本地内存里，不同步。
 
-### 服务端存储（Go）
+### 服务端存储
 
 ```
 docs            (id, title, seq, created_at, updated_at)
@@ -244,11 +244,11 @@ doc_changes     (doc_id, seq, batch_id unique, actor, block_ids, created_at)
 - 同一文档的提交串行处理，比如按 docId 加锁，或者用单协程队列，保证 seq 单调递增。
 - Markdown 导入和导出在服务端实现，作为和 agent、`MEMORY.md` 交换内容的格式，不作为存储格式。
 
-落地时按仓库的规矩来：表名是「模块_概念」、单数，比如模块叫 `doc`，表就是 `doc`、`doc_block`、`doc_block_revision`、`doc_change`；库是 SQLite，上面的 `jsonb` 换成存 JSON 文本的 `text` 列；结构写进 `server/migrations/0001_schema.sql`，查询放 `server/pkg/db/queries/<表>.sql`（[AGENTS.md](AGENTS.md)）。传输上，服务端现在给 App 推状态用的是 SSE；协同要一条双向的连接，用 WebSocket 是新加的一种，要和现有的推送说清分工。
+落地时按仓库的规矩来：表名是「模块_概念」、单数，比如模块叫 `doc`，表就是 `doc`、`doc_block`、`doc_block_revision`、`doc_change`；库是 PGlite（Postgres），`jsonb` 照用；结构写进 `apps/server/db/migrations/0001_schema.up.sql`，查询放 `apps/server/db/queries/<表>.sql`（[AGENTS.md](AGENTS.md)）。传输上，服务端现在给页面推状态用的是 SSE；协同要一条双向的连接，用 WebSocket 是新加的一种，要和现有的推送说清分工。
 
-### Flutter 端
+### 页面端
 
-- 编辑器自己做：一列块，每块一个 Flutter 自带的 `TextField`，数据就是上面的 `Block`，每次编辑直接产出「Op 列表」里的 op（回车在段中间是 `split_block`，段首退格是 `merge_blocks`），中间没有别的编辑器模型要翻译。
+- 编辑器自己做：一列块，每块一个 `<textarea>`，数据就是上面的 `Block`，每次编辑直接产出「Op 列表」里的 op（回车在段中间是 `split_block`，段首退格是 `merge_blocks`），中间没有别的编辑器模型要翻译。
 - 参考 `appflowy_editor`，不依赖它。借鉴这几样：块的类型和画法分开登记（找不到登记的类型就画只读占位块）；块之间的按键规则（回车拆段、段首退格并段、上下键跨块、空列表项回车退出列表），照它的行为写成用例；行首的 Markdown 快捷输入（`# ` 标题、`- ` 列表、`[] ` 待办、三个反引号代码块，都是 `set_type`）；选中文字时的工具条（第一版的五种 marks）。跨块选中第一版不做，只在一块之内选。
 - 早期必须用中文输入法测：拼音组字时按退格、在段首按回车、组字过程中收到别人的 `change`。**组字过程中不要替换当前正在编辑的块**，等组字结束再应用。
 
@@ -269,8 +269,8 @@ P1 的服务端做了（[文档](docs/subsystems/doc.md)）：
 - 还没有 WebSocket：`doc.submit` 的回答里带改后的块；页面开着时每 4 秒问一次 `doc.get`，看帮工写的；最近问到过别人的改动就每秒问一次，别人刚改过的块挂头像、归属条呼吸，主人光标所在的块不被问来的改动换掉。
 - 演示（`doc.demo`）：不用模型，三个帮工档案按脚本同时写各自的一节，每秒左右用 `update_text` 把一段换长，走真的 op 管线，用来先看「几个帮工同时写」和 P3「agent 流式写入」的样子（[文档](docs/subsystems/doc.md)）。
 - 帮工经 `/mcp` 的 `doc_read`、`doc_append`、`doc_update` 写，走同一条管线，`actor` 是它的档案（P3 的 agent 接入先做了不流式、不查 presence 的这一部分）。
-- Flutter：工作台的「文档」页，编辑器是自己的一列 `TextField`：各种块的画法、回车拆段、段首退格并段、上下键跨块、空列表项回车退出列表、行首 Markdown 换类型、防抖和待发队列、按作者的归属条、不认识的类型画占位块、拼字时不替换。marks 只画不改（工具条留到以后）。
-- P1 的完成标准两条都有测试：重开库后不丢（`TestEditsSurviveARestart`），Markdown 往返（`TestMarkdownRoundTrip`、`TestBlocksRoundTrip`）。两端共用的 JSON 用例还没写，Go 和 Dart 各自测。
+- 页面：工作台的「文档」页（`apps/web/src/pages/docs`），编辑器是自己的一列 `<textarea>`：各种块的画法、回车拆段、段首退格并段、上下键跨块、空列表项回车退出列表、行首 Markdown 换类型、防抖和待发队列、按作者的归属条、不认识的类型画占位块、拼字时不替换。marks 只画不改（工具条留到以后）。
+- P1 的完成标准两条都有测试：重开库后不丢、Markdown 往返（`apps/server/src/doc/doc.test.ts`、`rules.test.ts`）。顺序键只有一份（`packages/protocol/src/rules/order.ts`），服务端和页面共用；下面的 JSON 用例还没写。
 
 ### 待定
 
@@ -283,7 +283,7 @@ P1 的服务端做了（[文档](docs/subsystems/doc.md)）：
 
 ## Alternatives considered
 
-**编辑器用 `appflowy_editor`。** 它是节点树加 Transaction，功能齐全。不用它：它的 Transaction 要翻译成我们的 op，拆分和合并能不能稳定对上是最大的不确定；装进来要改动 36 个依赖、还要给 `xml` 降版本；界面是另一套风格，改成像素风不如自己画。只参考它的做法（见「Flutter 端」）。
+**编辑器用现成的块编辑器（AppFlowy 一类）。** 它们是节点树加 Transaction，功能齐全。不用它：它的 Transaction 要翻译成我们的 op，拆分和合并能不能稳定对上是最大的不确定；界面是另一套风格，改成像素风不如自己画。只参考它的做法（见「页面端」）。
 
 **现在就上 CRDT。**
 
@@ -292,7 +292,7 @@ P1 的服务端做了（[文档](docs/subsystems/doc.md)）：
 - 同一段里多人实时逐字协同，而且很常见
 - 需要长时间离线编辑
 
-到时的做法：块的文本字段换成 CRDT 文本（比如 yrs 的 `Y.Text`），块列表换成 `Y.Array<Y.Map>`；Go 服务端通过 cgo 调 yrs，或者加一个协同 sidecar。「Op 列表」里的 op 在适配层翻译成 CRDT 操作，编辑器和业务代码不变。
+到时的做法：块的文本字段换成 CRDT 文本（比如 yrs 的 `Y.Text`），块列表换成 `Y.Array<Y.Map>`；服务端直接用 Node 上的 yjs。「Op 列表」里的 op 在适配层翻译成 CRDT 操作，编辑器和业务代码不变。
 
 现在为此要守住的只有两条：**所有修改只走 op；所有位置都用块 ID 描述。**
 
@@ -302,22 +302,20 @@ P1 的服务端做了（[文档](docs/subsystems/doc.md)）：
 
 ## Acceptance criteria
 
-两端共用一份 JSON 用例，Dart 和 Go 各写一个 runner 跑同一份：
-
-两端共用一份 JSON 用例，Dart 和 Go 各写一个 runner 跑同一份：
+一份 JSON 用例，服务端的 op 管线跑它，页面的本地编辑（`DocEditor`）也跑它：
 
 ```jsonc
 {
   "name": "两人改同一段的不同位置，自动合并",
-  "initial": [ /* 初始块 */ ],
+  "initial": [/* 初始块 */],
   "submits": [
-    { "actor": "A", "ops": [ /* ... */ ] },
-    { "actor": "B", "ops": [ /* 基于旧 rev */ ] }
+    { "actor": "A", "ops": [/* ... */] },
+    { "actor": "B", "ops": [/* 基于旧 rev */] },
   ],
   "expect": {
-    "blocks": [ /* 最终块状态 */ ],
-    "results": [ "applied", "merged" ]
-  }
+    "blocks": [/* 最终块状态 */],
+    "results": ["applied", "merged"],
+  },
 }
 ```
 
@@ -343,7 +341,7 @@ P1 的服务端做了（[文档](docs/subsystems/doc.md)）：
 
 - **中文输入法组字。** 拼音组字时按退格、在段首按回车、组字过程中收到别人的 `change`，都可能把正在组的字弄丢；组字过程中不替换当前块，要在早期就用真输入法测。
 - **编辑器选型。** `appflowy_editor` 的 Transaction 能不能稳定对应到这里的 op（尤其拆分和合并）还没确认；对不上就要自己写适配，甚至换编辑器。
-- **offset 的单位。** Dart 默认按 UTF-16 数，Go 按字节，约定按 Unicode code point；任何一端算错，拆分和合并就会切在错的位置。仓库里另有按 UTF-16 数的约定（`pkg/x/str`），两套单位要在接口上写明。
+- **offset 的单位。** JavaScript 默认按 UTF-16 数，约定按 Unicode code point；任何一处算错，拆分和合并就会切在错的位置。仓库里另有按 UTF-16 数的约定（`packages/protocol/src/rules/text.ts`），两套单位要在接口上写明。
 - **orderKey 越来越长。** 反复在同一处插入会让 key 变长，要靠服务端后台重排兜底。
 - **同一段里的冲突仍然会出现。** 三方合并失败时只保证不丢内容，要人来选；同一段逐字实时协同、长时间离线编辑是有意放弃的。
 - **修订历史的保留期。** 保留太短，落后的客户端只能拉整篇快照，三方合并也拿不到 base；太长则占空间。暂定 30 天。

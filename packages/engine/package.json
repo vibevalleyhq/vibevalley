@@ -1,0 +1,22 @@
+{
+  "name": "@vibevalley/engine",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./pixi": "./src/pixi/index.ts",
+    "./nav": "./src/nav/index.ts",
+    "./audio": "./src/audio/index.ts",
+    "./clock": "./src/clock.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "pixi.js": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "typescript": "^7.0.2"
+  }
+}

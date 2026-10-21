@@ -1,4 +1,4 @@
-/* The site in the game's skin (app/lib/app/theme.dart): cream paper, bark ink, hard 2 px drops, the pixel font for
+/* The site in the game's skin (apps/web/src/style.css): cream paper, bark ink, hard 2 px drops, the pixel font for
    names and buttons. Tailwind's theme carries the palette, the fonts, the hard shadows and the title scene's motions
    (first written for the retired web page); the components use them as utilities. */
 

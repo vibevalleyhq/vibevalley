@@ -9,32 +9,32 @@
 | 工单的模型、状态和能挪到哪 | 帮工怎么跑一轮、事件日志（[帮工](docs/subsystems/session.md)） |
 | 起草：派谁起草、交给它的规矩、读回草稿写进工单、起草完重置 worktree | worktree 的重置和清理怎么做（`project.Reset`、`project.Clear`） |
 | 派活、排队、重开、取消 | 挑哪个档案（[管家](docs/subsystems/manager.md)） |
-| 验收、草、缺肥 | 汇报怎么读（`session/rules.go` 读出「结论：」和「要问主人：」交给它） |
-| 收获：查冲突、跑检查、本地合或提 PR | 项目和工作目录、worktree 的 git 操作（`internal/project`，[项目](docs/subsystems/project.md)） |
-| 工单在看板和农场上的样子由它的状态决定 | 怎么画（[farm-ui.md](docs/reference/farm-ui.md)「地里长什么」、`shared/issue_state.dart`） |
+| 验收、草、缺肥 | 汇报怎么读（`session/rules.ts` 读出「结论：」和「要问主人：」交给它） |
+| 收获：查冲突、跑检查、本地合或提 PR | 项目和工作目录、worktree 的 git 操作（`project`，[项目](docs/subsystems/project.md)） |
+| 工单在看板和农场上的样子由它的状态决定 | 怎么画（[farm-ui.md](docs/reference/farm-ui.md)「地里长什么」、`apps/web/src/rules/issueState.ts`） |
 | | 种植计划里的工单（跟着计划走，[种植计划](docs/subsystems/task.md)）；派给管家的工单（管家答完就关） |
 
 ## 在哪
 
-- 服务端 `server/internal/issue`（`issue.Service`）：`issue.go` 存取和核心状态、`status.go` 转换表、`dispatch.go` 派活和重开、`queue.go` 排队、`actions.go` 带话和取消、`acceptance.go` 验收和缺肥、`draft.go` 起草、`merges.go` 收获和冲突、`pull_request.go` PR 的轮询、`history.go` 执行历史、`manager.go` 派给管家的工单。worktree、检查、推送和 `gh` 的 git 操作在 `server/internal/project`。
-- 规则在 `protocol`：`IssueStatusOf`（状态怎么算）、`IssueDraftingOf`（谁在起草）、`PlotOf`（地的样子）；只有工单用的规则在 `issue` 里不导出（`statusMove`，`rules.go` 的 `draftBrief` 起草的规矩、`parseDraft` 读草稿、`draftDescription` 拼说明、`issueJob` 交给帮工的活）。
+- 服务端 `apps/server/src/issue`（`Issues`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和缺肥、起草、收获和冲突、PR 的轮询、执行历史、派给管家的工单；`rules.ts` 是只有工单用的纯规则。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
+- 规则在 `packages/protocol/src/rules`：`issues.ts` 的 `issueStatusOf`（状态怎么算）、`issueDraftingOf`（谁在起草），`view.ts` 的 `plotOf`（地的样子）；只有工单用的规则在 `issue/rules.ts`（`statusMove`、 `draftBrief` 起草的规矩、`parseDraft` 读草稿、`draftDescription` 拼说明、`issueJob` 交给帮工的活）。
 - 表：`issue`（一张工单一行；验收标准在 `criteria`，JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.draft`（`POST /api/v1/issues/{id}/draft`）；命令行 `vibevalley issue …`。
-- 客户端：看板 `workbench/issues`，备选工单的草稿详情是 `issue_detail.dart` 的 `TodoDetail`，派出去以后的详情：一句状态和能做的事是 `shared/issue_state.dart` 的规则，农场画 `farm/issue_view.dart`，工作台画 `workbench/issues/issue_panel.dart`；加号在 `game/commands.dart` 的 `writeIssue`。
+- 页面：工作台的看板在 `apps/web/src/pages/issues`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，一句状态和能做的事的规则在 `apps/web/src/rules/issueState.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；农场的播种袋在 `farm/panels/SeedForms.tsx`。
 
 ## 模型和不变量
 
 - **一张工单一个 id**，从写下到关上不变；重开是同一张工单的下一个帮工，不是新工单。
 - **状态六个**，和 Linear 一样：`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`。只存主人的意思（排没排上队 `queued_at`、怎么关的 `closed`），帮工那一半（在做、交回来了）从核心状态里帮工的阶段算，不另存一份。
-- **数据库是家，核心状态有一份**：开着的和最近关的 50 家在 `CoreState.Issues`，`issue` 服务每改一次库就施加一条 `issue` 事实；客户端只读核心状态。
-- **主人只挪到 `backlog`、`todo`、`done`、`canceled`**；`in_progress`、`in_review` 是帮工干出来的。每张工单的 `moves` 由服务端算出现在能挪到哪，看板和地块详情照它，不在 Dart 里重写规则。
+- **数据库是家，核心状态有一份**：开着的和最近关的 50 家在 `CoreState.issues`，`Issues` 每改一次库就施加一条 `issue` 事实；页面只读核心状态。
+- **主人只挪到 `backlog`、`todo`、`done`、`canceled`**；`in_progress`、`in_review` 是帮工干出来的。每张工单的 `moves` 由服务端算出现在能挪到哪，看板和地块详情照它，不在页面里重写规则。
 - **一块地最多一个 worktree**：代码活的分支是 `vibevalley/issue-<号>`，worktree 是 `worktrees/<项目>.<号>`；重开、换帮工、重启都还是这一块。
 - **每张工单都有验收**：`in_review` 就是「等验收」。`acceptance` 是 `glance`（收获本身就算验收）或 `required`（没通过 `acceptedAt` 以前不能收获）。
 - **派给管家的、种植计划里的工单 `moves` 是空的**，验收和挪状态都拒绝。
 - **子工单**带 `parent`、`blockedBy`：种植计划用它，计划里的工单跟着计划走，看板不能单独开工、重开。
 - **还没派的能改、能删、能排先后**；派出去以后只能改验收方式。交给帮工的是标题，空一行，再是说明，最后是验收标准（`issueJob`）。
-- **备选的工单是草稿**：起草的帮工（`Session.Draft`）只为写这张工单来，不是工单的帮工：不进 `issue_session`，`Issue.Sessions` 一直是空的，工单一直在 `backlog`。谁在起草（`Issue.Drafting`）和状态一样从核心状态里的帮工现算，不另存；起草时不能开工（`moves` 里没有待办，`ready` 也拒绝），一张工单同时只有一个起草的。
-- **验收标准**（`Issue.Criteria`）：一条一个主人能照着验的点。草稿写它，主人在派出去以前用 `issue.update` 改（给一个空列表就是清掉），派活时写在活的最后；验收时详情把它逐条列出来。
+- **备选的工单是草稿**：起草的帮工（`Session.draft`）只为写这张工单来，不是工单的帮工：不进 `issue_session`，`Issue.Sessions` 一直是空的，工单一直在 `backlog`。谁在起草（`Issue.drafting`）和状态一样从核心状态里的帮工现算，不另存；起草时不能开工（`moves` 里没有待办，`ready` 也拒绝），一张工单同时只有一个起草的。
+- **验收标准**（`Issue.criteria`）：一条一个主人能照着验的点。草稿写它，主人在派出去以前用 `issue.update` 改（给一个空列表就是清掉），派活时写在活的最后；验收时详情把它逐条列出来。
 - **排队的上下文和排队一起提交**：首次派发的频道和 `RunTrigger`（定时的 id、是不是补跑）写进 `issue_queue`，和 `issue.queued_at` 同一个事务；重试照它恢复来源，开工成功时同一个事务清掉。
 
 ## 怎么走
@@ -47,7 +47,7 @@
 | 安排活 | `todo`（种子袋，排队等空地）→ `in_progress` | 播种、发芽、长叶；验收没过修的时候是「除草中」 |
 | 完成 | `in_review`（等验收）→ 验收过了 → `done` | 开花；没过是杂草（一条意见一棵）；过了结果；收获后是麦茬 |
 
-**挪状态就是派活**（`issue.status`，转换表在 `status.go` 的 `statusMove`）：
+**挪状态就是派活**（`issue.status`，转换表在 `issue/rules.ts` 的 `statusMove`）：
 
 | 挪到 | 从 | 做的事 |
 |---|---|---|
@@ -61,7 +61,7 @@
 **起草**（`issue.draft`，带主人的一句话；工单有没答的问题时这句话就是回答）：
 
 1. 加号直接建一张备选工单（`issue.create`），主人那一句是标题，还没说时标题是「新工单」；带着话就马上起草。只有在备选里、没派过、没在起草的能起草，派给管家的不能。
-2. 谁起草：工单的 `assignee`；没有就是这个项目上次派出去干活的档案（还能派的话，`issue_session` 里最近的那张工单的 `assignee`）；再没有按 `ChooseAgent` 挑。项目是工单的，没有就用档案的工作目录，都没有就拒绝。没写的项目和帮工填成这一次的，主人的第一句话写成标题（还没有说明和验收标准时）；回答问题时 `asks` 先清掉。
+2. 谁起草：工单的 `assignee`；没有就是这个项目上次派出去干活的档案（还能派的话，`issue_session` 里最近的那张工单的 `assignee`）；再没有按 `chooseAgent` 挑。项目是工单的，没有就用档案的工作目录，都没有就拒绝。没写的项目和帮工填成这一次的，主人的第一句话写成标题（还没有说明和验收标准时）；回答问题时 `asks` 先清掉。
 3. 在这张工单自己的 worktree 里起草（`project.Workplace` 按工单开，和后面干活是同一块；档案关了 worktree 也照样开），Run 的触发是 `draft`，花费记在这张工单的 run 上。交给它的活（`draftBrief`）：只读代码，不改文件、不提交；拿不准的写「要问主人：」；最后用一个 json 代码块交草稿：`title`、`why`、`todo`、`criteria`、`notDoing`、`files`（列表也可以是一句话）。再起草时附上现在的草稿（主人改过的算数）和上一版的问题、主人的回答或这次的话。
 4. 交回来：读最后一个能读的代码块（`parseDraft`），写回工单：`title`，`description` 用固定的小标题拼（为什么、要做的、不做的、可能涉及，空的不写），`criteria`，问题照旧进 `asks`（缺肥）；一次写，第二版整个盖过第一版。读不出来、没做成、被叫停，工单不动，工单串里说一句（串还没开就是一条提醒）。然后把 worktree 重置回主分支（`project.Reset`：`checkout -f -B <工单分支> <主分支>`、`git clean -fd`，提交了也清掉），帮工收工；干净的 worktree 和空分支随收工清掉。
 5. 主人改各栏、回答问题再起草，满意了挪到待办开工；没开工就取消或删掉的，在起草的帮工收工，`project.Clear` 清掉起草留下的 worktree 和没有提交的分支。
@@ -70,14 +70,14 @@
 
 **验收**（`issue.accept`）：通过记下 `acceptedAt`，原来的草都拔掉；没过至少一条意见，每条记成一棵草，还没拔的草编号写成一句话交给帮工再修一轮。新的一轮开始（带话、再干一轮）验收作废，草留着，下一次通过才拔。
 
-**主人的话从一处进工单**：主人的话不管从哪来（`issue.comment`、在工单串里 `channel.say`、连接器、农场替主人说的冲突和检查没过），写进工单串就有一条带 `Thread` 的 `FactMessage`，工单服务订阅它（`issues.heard`）：清掉 `asks`，作废验收。帮工没有串时 `issue.comment` 直接送到帮工、没有事实，`Comment` 自己做这两步。关上的工单不动。农场替主人说的话也算：冲突解决、检查没过修好以后是新的一轮代码，`acceptance: required` 的工单要再验收一次才能收获。管家用 `accept` 工具也能验，收获照旧要主人说一声。
+**主人的话从一处进工单**：主人的话不管从哪来（`issue.comment`、在工单串里 `channel.say`、连接器、农场替主人说的冲突和检查没过），写进工单串就有一条带 `thread` 的 `message` 事实，工单服务订阅它（`issue.ts` 的 `heard`）：清掉 `asks`，作废验收。帮工没有串时 `issue.comment` 直接送到帮工、没有事实，`comment` 自己做这两步。关上的工单不动。农场替主人说的话也算：冲突解决、检查没过修好以后是新的一轮代码，`acceptance: required` 的工单要再验收一次才能收获。管家用 `accept` 工具也能验，收获照旧要主人说一声。
 
-**缺肥**：帮工汇报里「要问主人：」开头的行，`readReport` 读出来放进 `FactReport.Asks`，工单服务记到 `asks`；主人在工单串里说一句就算回答，问题清掉。
+**缺肥**：帮工汇报里「要问主人：」开头的行，`readReport` 读出来放进 `report` 事实的 `asks`，工单服务记到 `asks`；主人在工单串里说一句就算回答，问题清掉。
 
 **收获**（挪到已完成）：
 
 1. 还在干的不收；关掉会话，没提交的改动替它提交（缓存和依赖目录不提交）。
-2. 会冲突就不合：标上 `conflict`，「让它解决冲突」发一句固定的话（`ConflictTask`）交回帮工，在自己的分支上把主分支合进来，下一轮结束时再查。
+2. 会冲突就不合：标上 `conflict`，「让它解决冲突」发一句固定的话（`conflictTask`）交回帮工，在自己的分支上把主分支合进来，下一轮结束时再查。
 3. 跑项目的检查：帮工分支上的 `.vibevalley/check`，在 worktree 根目录、项目锁外跑，没有这个文件就跳过；本地合的先把主分支合进帮工分支再检查，PR 和种植计划检查帮工当前的分支。退出码非 0、跑不起来或超时（`project.check_timeout_seconds`，默认 1200）都不合，输出的最后 40 行附在拒绝里交给帮工修。工单留在 `in_review`，帮工、分支、worktree 都在。
 4. 进锁以后确认分支没在检查后变过、重新查一次冲突、主分支没有没检查过的提交，才合：
    - **本地合**（项目不在 `github.pr_projects` 里，或 `pullRequest.available` 为假）：合进项目克隆的主分支，删掉 worktree 和分支，帮工离开，账本记 `harvested`。
@@ -89,25 +89,25 @@
 
 ## 和谁打交道
 
-- **帮工（`session`）**：派活经 `Session.Send` 开一个 Session，起草的带 `HireOptions.Draft`、不调 `Ran` 记关联，它的汇报由 `draft.go` 读；帮工离开（`FactLeft`）时，离开的是最后一个就关上工单；汇报（`FactReport`）带来缺肥的问题。
-- **项目（`project`）**：worktree、分支、冲突预检（`git merge-tree`，不碰工作区）、检查和合并、推送和 `gh`、起草后的重置（`Reset`）和取消时的清理（`Clear`）；工单服务只决定什么时候做。
+- **帮工（`session`）**：派活经 `Sessions.send` 开一个 Session，起草的带 `HireOptions.draft`、不记关联，它的汇报由工单服务读成草稿；帮工离开（`left`）时，离开的是最后一个就关上工单；汇报（`report`）带来缺肥的问题。
+- **项目（`project`）**：worktree、分支、冲突预检（`git merge-tree`，不碰工作区）、检查和合并、推送和 `gh`、起草后的重置（`reset`）和取消时的清理（`clear`）；工单服务只决定什么时候做。
 - **田头（`channel`）**：派活时在频道里开工单串，一张工单一个串，重开、换帮工都在这个串里（[田头](docs/subsystems/channel.md)）；带话和验收没过的意见经它交给帮工。
 - **定时（`schedule`）**：一个定时一张工单，到点是它的一次干活（[定时](docs/subsystems/schedule.md)）。
 - **种植计划（`task`）**：计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，跟着计划走，不归这里的转换表。
 - **管家（`tool`）**：派活、带话、验收、收获都是同一个服务的方法，收获要主人说一声。
-- **GitHub 检测（`setting`、`project`）**：开机查 `gh` 装没装、登没登录（`github.status`、`github.refresh`），项目查 origin 是不是 GitHub、有没有写权限，结果缓存在 `Project.pullRequest`；收获只读缓存决定走哪条路。
-- **农场的皮（`protocol.PlotOf`、`game`）**：`FarmView.Plots` 按工单做键（`PlotKey`），地的样子看工单和地上帮工的阶段；农具直接调 `issue.status`、`issue.comment`、`issue.accept`，不经帮工找工单；仓库是关成 `merged` 的工单。游戏只读事实算画面和账本，不调工单。
+- **GitHub 检测（`setting`、`project`）**：开机查 `gh` 装没装、登没登录（`github.status`、`github.refresh`），项目查 origin 是不是 GitHub、有没有写权限，结果缓存在 `project.pullRequest`；收获只读缓存决定走哪条路。
+- **农场的皮（`plotOf`、`game`）**：`FarmView.plots` 按工单做键（`plotKey`），地的样子看工单和地上帮工的阶段；农具直接调 `issue.status`、`issue.comment`、`issue.accept`，不经帮工找工单；仓库是关成 `merged` 的工单。游戏只读事实算画面和账本，不调工单。
 
 ## 为什么这样
 
-- **工单是服务端的一样东西，帮工挂在它下面。** 原来「工单」是客户端从帮工的轨迹拼出来的，重开换 id、几台设备各看各的。放弃了「接回原来的会话来重开」：分支合了、会话可能过期，新派一个帮工、把该知道的写给它，任何一种关法都能用。叫 `Issue` 不叫 `Ticket`，和 Linear、GitHub、Multica 一致，界面上叫工单。
+- **工单是服务端的一样东西，帮工挂在它下面。** 原来「工单」是页面从帮工的轨迹拼出来的，重开换 id、几台设备各看各的。放弃了「接回原来的会话来重开」：分支合了、会话可能过期，新派一个帮工、把该知道的写给它，任何一种关法都能用。叫 `Issue` 不叫 `ticket`，和 Linear、GitHub、Multica 一致，界面上叫工单。
 - **状态只存主人的意思，帮工那一半现算。** 存一份完整的状态，帮工半路死掉、农场重启时都要对一遍，违反「核心状态只有一份」；现算的话帮工离开，工单自己回到主人定的那一列。
-- **挪状态就是派活，一个接口 `issue.status`。** 原来是 start、unqueue、merge、cancel、reopen 五个动作，主人看到的是列、要做的是动作；看板、命令行、管家都得记哪个动作挪到哪。放弃了「只在拖卡片时翻译成动作」：只有客户端受益，规则写在 Dart 里。in_progress 不让主人挪进去：和挪到待办只差没空地时怎么办，多一个入口没换来什么。
+- **挪状态就是派活，一个接口 `issue.status`。** 原来是 start、unqueue、merge、cancel、reopen 五个动作，主人看到的是列、要做的是动作；看板、命令行、管家都得记哪个动作挪到哪。放弃了「只在拖卡片时翻译成动作」：只有页面受益，规则写在页面里。in_progress 不让主人挪进去：和挪到待办只差没空地时怎么办，多一个入口没换来什么。
 - **一块地是一张工单，不是帮工的位置。** 地跟着帮工走时，重开的工单换地、地块详情和工单详情两页、工具要先找帮工再找工单。也没选「地是 worktree」：主人派的、看的、收的都是工单，worktree 只是代码活的一部分。
 - **每张工单都有验收，`in_review` 收窄成「等验收」。** 没有这一关，「交回来」和「做完了」分不开，地的阶段也没法标；没加新状态，因为它和 `in_review` 是同一件事。缺肥从帮工汇报里固定的一行读，不让管家读工单串去判：帮工最清楚自己缺什么，固定的开头读得准，不调模型。草整批拔：汇报里读不准修了哪几条，下一次通过就都拔。
 - **聊清楚是起草：主人写一句，帮工照格式写成工单。** 主人想说的只是「看板拖卡还在调旧接口」；要做什么、怎么算做完、碰哪些文件，是读过代码的人才写得出来的，工单写得粗，验收也没有依据。放弃了让管家起草：管家只看得到农场的状态，读不了代码，写不出要碰哪些文件、怎么验收。草稿交回来直接填进工单，不让主人再点「填进工单」：主人随时能改每一栏，多一步确认没换来什么。加号写了一句话就马上起草，不另等主人点按钮：主人写这句话要的就是一张写好的工单；代价是每张都花钱，花费记在工单上，以后可以加「不起草，直接写」。
 - **起草在工单自己的 worktree 里，交回来就重置。** 在项目的主检出里只读起草不用开 worktree，快；可「只读」只能写在提示里，帮工改了文件就改在主人的主分支上。用工单自己的 worktree，交回来 `checkout -f -B` 回主分支、`clean -fd`，改了什么、提交了什么都不出这张工单，开工时从主分支起步。
-- **起草的帮工不是工单的帮工，「正在起草」现算。** 记进 `issue_session` 的话，状态就从帮工算成处理中、等你看，还会被「最后一个帮工离开就关单」关上；另存一个「起草中」又是第二份状态。只标在 Session 上（`Draft`），工单从核心状态里认出它，帮工离开就自己没了。起草的规矩和读草稿只有工单用，放在 `issue` 里不导出，不放进 `session/rules.go`。
+- **起草的帮工不是工单的帮工，「正在起草」现算。** 记进 `issue_session` 的话，状态就从帮工算成处理中、等你看，还会被「最后一个帮工离开就关单」关上；另存一个「起草中」又是第二份状态。只标在 Session 上（`draft`），工单从核心状态里认出它，帮工离开就自己没了。起草的规矩和读草稿只有工单用，放在 `issue/rules.ts`，不放进 `session/rules.ts`。
 - **一张工单一条分支、一个 worktree，跟着工单不跟着帮工。** 按帮工开时，取消后重开的帮工不在原来的分支上接着干，旧 worktree 还会留着，一张工单两个 worktree。约束放进 `project.Workplace`：按工单开，有就复用，不靠调用方记着。
 - **合并在不碰工作区的地方预检，冲突交回帮工。** 遇到冲突再中止要碰主人的工作区；冲突交给主人在终端里解决，不如让最清楚改动的帮工解决、跑测试、说清怎么取舍。
 - **检查写在仓库里（`.vibevalley/check`），在锁外跑。** 写在项目设置里会和代码分开，帮工也看不见合并时跑什么。在锁里跑会让同一个项目几分钟开不了新 worktree；锁外跑、进锁再核对分支没变。
@@ -121,9 +121,8 @@
 
 ## 怎么验证
 
-- `issue/status_test.go` 的 `TestStatusMoves`：每个状态能挪到哪，`required` 没通过时没有 `done`，起草时只能取消，管家的和计划里的什么都挪不了。
-- `issue/rules_test.go`：`TestTheJobCarriesItsCriteria`（活的最后是验收标准）、`TestDraftsAreReadFromTheLastBlock`（读最后一个能读的块、列表可以是一句话、读不出来说为什么、说明的固定小标题）、`TestDraftBriefs`（第一版、回答问题、再起草带什么）；`protocol/issues_test.go` 的 `TestAnIssueIsDraftedWhileItsDrafterIsOnTheFarm`。
-- `workspace/draft_test.go`（`oartest`、真的 git 仓库）：`TestAnIssueIsDraftedBeforeItIsSent`（没写帮工时项目上次派的档案起草、起草时不能开工、草稿填进标题说明和验收标准、问题记下、帮工离开、worktree 和分支干净、run 的触发是 draft、回答以后第二版盖过第一版、开工的活带验收标准）、`TestADraftLeavesNothingBehind`（起草的帮工改了文件还提交了，交回来什么都不剩；起草中取消，帮工收工、worktree 和分支清掉）、`TestAnUnreadableDraftChangesNothing`（读不出来工单不动、工单串里说一句）。
-- `workspace/work_test.go`：`TestMovingAnIssueIsTheWork`（挪状态走完开工、再干一轮、收获、取消再挪回）、`TestAPlotGrowsThroughItsAcceptance`（缺肥 → 回答 → 等验收 → 没过长草 → 修 → 通过 → 收获）、`TestIssueClosesAndReopens`。
-- `project` 的测试用真的 git 仓库测按工单复用 worktree、锁外检查、PR 的推送和轮询（`pull_request_test.go`）。
-- `protocol` 的 `TestAPlotShowsItsIssuesAcceptance`、`TestPlotsAreKeyedByTheirIssue`；客户端的 `test/shared/issue_state_test.dart`、`test/farm/issue_view_test.dart`、`test/workbench/issue_panel_test.dart`。
+- `apps/server/src/issue/rules.test.ts`：黄金数据；标题和活；活的最后是验收标准；下一件的 id；读最后一个能读的块；起草的规矩（第一版、回答问题、再起草）；每个状态能挪到哪；工单模板的目录、按栈填、每个都填得满、最近的标题是这个项目自己派过的。
+- `issue/issue.test.ts`（oar 的 `scriptedRuntime`、真的 git 仓库）：开不了会话就交回 worktree；写不进的工单不发布、不留 Session；同时两次派活守住项目的空位；挪工单不动计划里的先后；交代冲突时 git 失败照原话说；工单的动作找它最新的帮工；排队的工单记着第一次从哪个频道派的、定时的触发和补跑；排着队的待办从播种袋开工；执行历史把在地里的和走了的合起来，列出缺了记录的。
+- 流程（`src/flows`，照字眼干活的帮工、真的 git 仓库）：`issue.test.ts`（关上再重开、写下来再派、等空位、知道自己是计划的哪一件、定时只有一张工单、只改给出的字段、挪状态就是派活、检查没过不让收、取消再重开留着 worktree、验收：缺肥 → 回答 → 等验收 → 没过长草 → 修 → 通过 → 收获、钱用完不派）；`draft.test.ts`（派之前起草、第二版盖过第一版、起草不留东西、读不出来的草稿不改工单）；`pull_request.test.ts`（推送、开 PR、重启后 PR 合了或关了才关单并清掉 worktree 和分支）。
+- `packages/protocol/src/rules/golden.test.ts`：工单的状态、谁在起草、地的样子（`rules.jsonl.gz`、`reduce.jsonl.gz`）。
+- 页面：`apps/web/test/issues.spec.ts`（快速新建、列表和分组刷新后还在、工单有自己的地址和保存、没帮工时开工先问、拖着排序、搜索、截图）；`farm-hud.spec.ts`（播种袋的「先起草」写进备选）；`farm-chat.spec.ts`（点帮工的地打开它的工单）。
