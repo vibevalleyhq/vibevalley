@@ -1,0 +1,95 @@
+# The checks a pull request must pass before it merges into main (docs/development.md#分支提交和-pr).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Hooks are for people's clones; CI runs the same checks itself.
+  VP_GIT_HOOKS: "0"
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.4.2 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: bun install --frozen-lockfile
+      - name: pull request title
+        if: github.event_name == 'pull_request'
+        # Squash merging makes the title the commit's subject. Passed through the environment, never into the shell.
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: bun scripts/commit-msg.ts --title "$TITLE"
+      - run: bun run check
+      - run: bun run docs:verify
+      - run: bun test scripts/commit-msg.test.ts
+
+  server:
+    name: server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.4.2 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: git config --global user.name ci && git config --global user.email ci@example.com
+      - run: bun install --frozen-lockfile
+      - run: bun run server:check
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.4.2 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: git config --global user.name ci && git config --global user.email ci@example.com
+      - run: bun install --frozen-lockfile
+      - run: bun run web:check
+      - run: bunx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: bun run test
+        working-directory: apps/web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: web-test-results, path: apps/web/test-results, retention-days: 7 }
+
+  desktop:
+    name: desktop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.4.2 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: bun install --frozen-lockfile
+      - run: xvfb-run -a bun run desktop:test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: desktop-test-results, path: apps/desktop/test-results, retention-days: 7 }
+
+  site:
+    name: site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.4.2 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: bun run site:check && bun run site:build

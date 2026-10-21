@@ -89,6 +89,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **代码风格**：代码和接口用实际的概念，界面上的字用中文、用农场的叫法（[用语表](docs/README.md#用语)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。
 - **测试**：服务端的测试用 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演帮工、用真的 git 仓库（`src/testing/git.ts`）、模型用 pi-ai 的 faux（`agent/brain/testing.ts`），不连网，`src/testing/world.ts` 搭一个整农场，跨好几个模块的流程写在 `src/flows`（帮工照工单的字眼干活）；纯函数的规则直接测；页面的 Playwright 对着真的服务端，测试的服务端拿到的环境去掉了一切钥匙，`HOME` 也是临时的。改了帮工、项目、收获、核心状态或游戏规则的行为，补对应的测试。
 - **改完要验证**：先跑最窄的检查；改了接口、服务或页面，照对应的验证 skill（`verify-server`、`verify-app`）在真的程序上看一遍，汇报时附上它要的证据；一类改动没有验证 skill，又花了工夫才验证完，就照 `create-verification-skill` 补一个（[.agents/skills](.agents/skills/README.md)）。
+- **分支、提交和 PR**：`main` 只经 PR、squash 合并，CI 全过才能合；分支 `<类>/<主题>`，提交的主题一句话说改完以后的行为、最多 100 字，不带 agent 署名；commit-msg hook 和 CI 查（[规矩](docs/development.md#分支提交和-pr)）。
 - **文档和 Note**：改了行为就在同一个改动里改文档；有子系统文档（`docs/subsystems/`）的，改它，不在 `reference/` 另写一份；非平凡的工作先写计划 Note（行为、模块边界、共享约定、持久化格式、流程、测试策略），做完把仍然成立的沉淀进子系统、删掉 Note；局部的、机械的改动和界面微调不用写（[规矩](.agents/notes/README.md#什么时候写)）。
 
 ## 编辑本文

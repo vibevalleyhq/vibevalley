@@ -1,6 +1,8 @@
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  // The pre-commit hook (.vite-hooks/pre-commit) runs these on the staged files.
+  staged: { "*": "vp check --fix" },
   fmt: {
     printWidth: 160,
     // site/ is its own project; the rest are written by tools or are data, and docs keep their compact tables.
