@@ -4,6 +4,7 @@ import { type CoreState, type Issue, type IssueClose, type IssueDrafting, type I
 import { isBusy } from "./phase";
 import { same } from "./same";
 import { sessionOf } from "./sessions";
+import { statusMoves } from "./moves";
 import { standingIn } from "./standing";
 import { compare, compareText, or } from "./text";
 
@@ -107,9 +108,11 @@ export function withIssueStatuses(state: CoreState): CoreState {
     const status = issueStatusOf(t, state);
     const drafting = issueDraftingOf(t, state);
     const standing = standingIn({ ...t, status, drafting }, state);
-    if (status === t.status && same(drafting, t.drafting) && same(standing, t.standing)) return;
+    // The moves read the standing: a round that failed is not harvested, from the moment it fails.
+    const moves = statusMoves({ ...t, status, drafting, standing });
+    if (status === t.status && same(drafting, t.drafting) && same(standing, t.standing) && same(moves, t.moves)) return;
     next ??= [...state.issues!];
-    next[i] = { ...t, status, drafting, standing };
+    next[i] = { ...t, status, drafting, standing, moves };
   });
   return next ? { ...state, issues: next } : state;
 }

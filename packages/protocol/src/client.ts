@@ -115,6 +115,9 @@ export class VibeValleyApi {
      * another round. */
     accept: (a: { id: string; body: T.IssueAcceptRequest }): Promise<T.Issue> =>
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/accept", undefined, a.body) as Promise<T.Issue>,
+    /** One of what the issue's standing offers the owner, done as the issue's page does it; any other is refused. */
+    act: (a: { id: string; body: T.IssueActRequest }): Promise<T.Issue> =>
+      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/act", undefined, a.body) as Promise<T.Issue>,
   };
 
   readonly session = {

@@ -796,13 +796,22 @@ export const InboxTargetChat: Schema.Codec<T.InboxTargetChat> = Schema.Struct({
 
 export const InboxTarget: Schema.Codec<T.InboxTarget> = Schema.Union([InboxTargetSession, InboxTargetGraph, InboxTargetChat]);
 
+export const InboxWords: Schema.Codec<T.InboxWords> = Schema.Struct({
+  label: Schema.String,
+  title: Schema.String,
+  body: Schema.String,
+  tray: Schema.optionalKey(Schema.String),
+});
+
 export const InboxItem: Schema.Codec<T.InboxItem> = Schema.Struct({
   id: Schema.String,
   kind: InboxKind,
   from: InboxFrom,
+  who: Schema.String,
   text: Schema.String,
   at: Schema.Number,
   target: InboxTarget,
+  words: InboxWords,
 });
 
 export const Crop: Schema.Codec<T.Crop> = Schema.Literals(T.CropValues);
@@ -1292,6 +1301,13 @@ export const IssueUpdate: Schema.Codec<T.IssueUpdate> = Schema.Struct({
   priority: Schema.optionalKey(Priority),
   acceptance: Schema.optionalKey(Acceptance),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+});
+
+export const IssueActRequest: Schema.Codec<T.IssueActRequest> = Schema.Struct({
+  act: IssueAct,
+  text: Schema.optionalKey(Schema.String),
+  findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  sendKey: Schema.optionalKey(Schema.String),
 });
 
 export const IssueAcceptRequest: Schema.Codec<T.IssueAcceptRequest> = Schema.Struct({
@@ -1822,6 +1838,7 @@ export const VoiceHeard: Schema.Codec<T.VoiceHeard> = Schema.Struct({
 export const StartRequest: Schema.Codec<T.StartRequest> = Schema.Struct({
   channel: Schema.String,
   uid: Schema.String,
+  about: Schema.optionalKey(Schema.String),
 });
 
 export const VerifyRequest: Schema.Codec<T.VerifyRequest> = Schema.Struct({

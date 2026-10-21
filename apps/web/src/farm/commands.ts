@@ -4,7 +4,7 @@
 import type { GraphActRequest, GraphSplitRequest, Session, StateFrame, TaskActRequest, TaskEdit } from "@vibevalley/protocol";
 import { api, reasonOf } from "../data/api";
 import { farm, farmState } from "./store";
-import { aimTool, type BedFxKind, bugText, type PlotAim, type ToolResult } from "./tools";
+import { aimTool, type BedFxKind, type PlotAim, type ToolResult } from "./tools";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
 import { webRoutes, type YardPlace } from "./world/places";
 
@@ -75,7 +75,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       fx(s, "water");
     },
     async cure(s) {
-      await api.issue.comment({ id: issueOf(s), body: { text: bugText(s.brief) } });
+      await api.issue.act({ id: issueOf(s), body: { act: "cure" } });
       fx(s, "spray");
     },
     async harvest(s) {

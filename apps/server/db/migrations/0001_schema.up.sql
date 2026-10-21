@@ -266,7 +266,11 @@ CREATE TABLE session (
   graph     text,
   hired_at  double precision not null,
   ended_at  double precision,
-  closed    text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered'))
+  closed    text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered')),
+  place       text,
+  oar_session text,
+  last_text   text,
+  recalled    text
 );
 CREATE INDEX session_by_agent on session (agent, hired_at);
 CREATE TABLE session_run_issue (
@@ -280,7 +284,7 @@ CREATE TABLE issue_queue (
   channel text not null,
   triggered_by text not null
 );
-CREATE TABLE task_graph (
+CREATE TABLE agent_task (
   graph text not null,
   owner text not null,
   id text not null,
@@ -296,7 +300,7 @@ CREATE TABLE task_graph (
   finished_at double precision,
   primary key (graph, id)
 );
-CREATE INDEX task_graph_by_owner on task_graph (owner, finished_at);
+CREATE INDEX agent_task_by_owner on agent_task (owner, finished_at);
 -- Documents (doc/doc.go): blocks in a flat list, nested by parent_id and ordered by (order_key, id); every change is an op,
 -- and a batch of ops is one doc_change with the doc's next seq.
 CREATE TABLE doc (

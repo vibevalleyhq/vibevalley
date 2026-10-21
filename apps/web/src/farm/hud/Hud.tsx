@@ -24,6 +24,7 @@ import { FxLayer } from "./FxLayer";
 import { Overlay } from "./Overlay";
 import { ProjectSign } from "./ProjectSign";
 import { QuotaPill } from "./QuotaPill";
+import { titleBar } from "../../app/TitleBar";
 
 const edge = 8;
 const gap = 4;
@@ -104,7 +105,7 @@ function TopLeft() {
     farm.panel(panel);
   };
   return (
-    <div class="absolute flex items-start" style={{ left: `${edge}px`, top: `${edge}px`, gap: `${gap}px` }}>
+    <div class="absolute flex items-start" style={{ left: `${edge}px`, top: `${edge + titleBar.top}px`, gap: `${gap}px` }}>
       <HudTap label="换管家的样子" onClick={() => open("manager")}>
         <span class="inline-block pr-0.5 pb-0.5">
           <span

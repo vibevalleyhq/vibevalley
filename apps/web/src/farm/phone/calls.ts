@@ -1,22 +1,12 @@
 // The phone's calls: the calls are the server's inbox; which were answered or hung up on, the
-// call log, and which rings now are the page's, kept for this page's life. The web has no voice, so no call is the
-// manager's on the line.
+// call log, and which rings now are the page's, kept for this page's life. The phone and the chat's call button are one
+// call (voice/call.ts): answering a ring opens it, and while it is on nothing rings: the manager says it on the call.
 
-import type { InboxItem, InboxKind } from "@vibevalley/protocol";
+import type { InboxItem } from "@vibevalley/protocol";
+import { freshOf } from "@vibevalley/protocol/rules";
+import { voiceCall } from "../../voice/call";
 import { playSound } from "../sound";
 import { farm, farmState } from "../store";
-
-export const inboxKindLabel: Readonly<Record<InboxKind, string>> = {
-  merge: "活熟了",
-  fix: "活没做成",
-  conflict: "合不进去",
-  quiet: "好久没动静",
-  "graph-draft": "计划拆好了",
-  "graph-ripe": "计划能收了",
-  "task-failed": "计划卡住了",
-  mention: "找你",
-  "schedule-ask": "定时等你同意",
-};
 
 export interface PhoneLogEntry {
   readonly call: InboxItem;
@@ -42,6 +32,8 @@ export interface PhoneHost {
   isOpen(): boolean;
   setOpen(open: boolean): void;
   play(sound: "ring" | "voiceOn" | "voiceOff"): void;
+  /** The call is on (or getting on): the manager tells it there, so the phone does not ring. */
+  inCall(): boolean;
   every(ms: number, f: () => void): () => void;
   after(ms: number, f: () => void): () => void;
   now(): number;
@@ -50,8 +42,8 @@ export interface PhoneHost {
 export class PhoneCalls {
   private state: PhoneState = { calls: [], handled: new Set(), ringing: null, log: [] };
   private readonly listeners = new Set<() => void>();
-  /** null until the first look, which rings nothing. */
-  private known: Set<string> | null = null;
+  /** undefined until the first look, which rings nothing. */
+  private known: Set<string> | undefined;
   /** Only while the farm is on screen does a call ring. */
   private active = false;
   private openedByRing = false;
@@ -73,7 +65,7 @@ export class PhoneCalls {
 
   /** The farm came on screen: the next look at the inbox only primes. */
   resume() {
-    this.known = null;
+    this.known = undefined;
     this.active = true;
   }
 
@@ -85,14 +77,10 @@ export class PhoneCalls {
   calls(calls: readonly InboxItem[]) {
     this.set({ calls });
     const missed = missedOf(this.state);
-    if (this.known === null) {
-      this.known = new Set(missed.map((c) => c.id));
-    } else {
-      const known = this.known;
-      const fresh = missed.find((c) => !known.has(c.id));
-      for (const c of missed) known.add(c.id);
-      if (fresh && this.active) return this.ring(fresh);
-    }
+    const news = freshOf(this.known, missed);
+    this.known = news.known;
+    const fresh = news.fresh[0];
+    if (fresh && this.active && !this.host.inCall()) return this.ring(fresh);
     // Answered elsewhere (the bed harvested, the message read): it stops by itself.
     const ringing = this.state.ringing;
     if (ringing && !missed.some((c) => c.id === ringing.id)) this.endRing();
@@ -154,6 +142,7 @@ export const phoneCalls = new PhoneCalls({
   isOpen: () => farmState().phoneOpen,
   setOpen: (open) => farm.phoneOpen(open),
   play: playSound,
+  inCall: () => voiceCall.phase !== "idle",
   every: (ms, f) => {
     const t = setInterval(f, ms);
     return () => clearInterval(t);

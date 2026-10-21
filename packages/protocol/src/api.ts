@@ -107,6 +107,8 @@ export interface Handlers<R = never> {
   /** The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
    * another round. */
   readonly "issue.accept": (a: { readonly id: string; readonly body: T.IssueAcceptRequest }) => Effect.Effect<T.Issue, ApiError, R>;
+  /** One of what the issue's standing offers the owner, done as the issue's page does it; any other is refused. */
+  readonly "issue.act": (a: { readonly id: string; readonly body: T.IssueActRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "graph.split": (a: { readonly body: T.GraphSplitRequest }) => Effect.Effect<string, ApiError, R>;
   readonly "graph.updateTask": (a: { readonly id: string; readonly task: string; readonly body: T.TaskEdit }) => Effect.Effect<string, ApiError, R>;
   readonly "graph.deleteTask": (a: { readonly id: string; readonly task: string }) => Effect.Effect<string, ApiError, R>;
@@ -492,6 +494,16 @@ export const endpoints: readonly Endpoint[] = [
     body: S.IssueAcceptRequest,
     result: S.Issue,
     can: ["owner", "remote", "manager"],
+  },
+  {
+    op: "issue.act",
+    method: "POST",
+    path: "/api/v1/issues/{id}/act",
+    pathParams: [{ name: "id", number: false }],
+    query: [],
+    body: S.IssueActRequest,
+    result: S.Issue,
+    can: ["owner", "remote"],
   },
   {
     op: "graph.split",

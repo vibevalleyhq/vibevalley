@@ -24,6 +24,7 @@ import { sortProjects } from "../rules/projects";
 import { farmState } from "../farm/store";
 import { useRouter } from "./router";
 import { Shell } from "./Shell";
+import { WindowStrip } from "./TitleBar";
 
 type Rest = () => string;
 
@@ -96,6 +97,7 @@ function Routes() {
 export function App() {
   return (
     <Root>
+      <WindowStrip />
       <Follow />
       <Routes />
       <ToastHost />

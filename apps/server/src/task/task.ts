@@ -88,6 +88,9 @@ export interface TaskShape {
   readonly changes: (id: string) => Effect.Effect<Changes, ApiError>;
   /** What the manager is told about graphs, subscribed before it returns. */
   readonly news: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
+  /** Once the sessions came back (Agent Sessions' startup): a graph cut off while splitting is abandoned, one cut off with
+   * steps at work pauses, and a running one goes on. */
+  readonly comeBack: Effect.Effect<void>;
 }
 
 export class Tasks extends Context.Service<Tasks, TaskShape>()("vibevalley/Task") {}
@@ -134,12 +137,17 @@ export const make = (options: TaskOptions = {}) =>
     const store = yield* Agents;
     const runtimes = yield* Runtimes;
     const live = yield* Sessions;
+    const scm = yield* Projects;
     const work: TaskWork = options.work ?? {
       hire: issues.hire,
       tell: (id, text) => live.tell(id, text, { kind: "task" }),
       dismiss: live.dismiss,
       find: live.find,
-      mergeInto: live.mergeInto,
+      mergeInto: (id, target) =>
+        Effect.map(
+          live.handOver(id, "merged_into_graph", (place) => scm.mergeInto(place, target)),
+          (m) => m.hashes ?? [],
+        ),
     };
     const projects: TaskGit = options.git ?? (yield* Projects);
     const sql = yield* SqlClient.SqlClient;
@@ -447,9 +455,9 @@ export const make = (options: TaskOptions = {}) =>
         }),
       );
 
-    // ── coming back: the sessions, built before, have already marked the runs that stopped with the server ──
+    // ── coming back: run by the startup, after the sessions came back and marked the runs that stopped with the server ──
 
-    yield* lock.withPermits(1)(
+    const comeBack = lock.withPermits(1)(
       Effect.gen(function* () {
         for (const graph of graphsOf(core.state())) {
           if (graph.state === "splitting") {
@@ -466,6 +474,7 @@ export const make = (options: TaskOptions = {}) =>
     yield* Effect.forkScoped(Stream.runForEach(transitions, (t) => (t.fact.type === "report" || t.fact.type === "left" ? follow(t) : Effect.void)));
 
     const shape: TaskShape = {
+      comeBack,
       split: (goal, project, agent, by) =>
         lock.withPermits(1)(
           Effect.gen(function* () {
@@ -684,3 +693,6 @@ export const make = (options: TaskOptions = {}) =>
   });
 
 export const layer = (options?: TaskOptions) => Layer.effect(Tasks, make(options));
+
+/** Issues' startup: the task graphs come back. */
+export const start = Layer.effectDiscard(Effect.flatMap(Tasks, (t) => t.comeBack));

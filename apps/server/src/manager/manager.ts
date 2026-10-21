@@ -13,7 +13,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
 import { type ManagerEval, managerAgent, type RunTrigger } from "@vibevalley/protocol";
 import { graphsOf, graphText, isOpen, nextRun, runtimeLabel } from "@vibevalley/protocol/rules";
-import { Context, Effect, FiberSet, Layer, PubSub, Stream } from "effect";
+import { Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Agents } from "../agent/agent.ts";
@@ -31,6 +31,7 @@ import { Core } from "../core/core.ts";
 import { type ApiError, missing, refused } from "../errors.ts";
 import { Issues, type ManagerWork } from "../issue/issue.ts";
 import { managerHome } from "../memory/memory.ts";
+import { Notices, type Overdue } from "../notice/notice.ts";
 import { Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { Schedules } from "../schedule/schedule.ts";
@@ -42,12 +43,8 @@ import { Tasks } from "../task/task.ts";
 import { Tools } from "../tool/tool.ts";
 import {
   deepseekModel,
-  emptyPatrol,
   managerInboxLines,
   managerModel,
-  type PatrolMemory,
-  type PatrolNote,
-  patrolStep,
   patrolText,
   quotaText,
   situationDelta,
@@ -164,11 +161,6 @@ interface Local {
 
 const isInput = (m: AgentMessage): m is CustomMessage & { details: Routing } => m.role === "custom" && (m as CustomMessage).customType === "managerInput";
 
-export interface PatrolNews {
-  readonly channel: string;
-  readonly text: string;
-}
-
 export interface ManagerShape {
   /** The owner's words in a conversation; sendKey: the client's key for this send, a retry with the same key is the message already said. */
   readonly say: (text: string, pick: Pick, conversation: string | undefined, sendKey: string) => Effect.Effect<void, ApiError>;
@@ -176,13 +168,14 @@ export interface ManagerShape {
   readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
   /** The words said on the phone; the answer is read out, and both stay in 田头. */
   readonly call: (text: string, signal?: AbortSignal) => AsyncIterable<string>;
+  /** Something to tell the owner on the phone: given as from an issue, after what the manager is on, it answers in 田头
+   * as always; the whole answer comes back to be read out. It does not end the call's own answer. */
+  readonly brief: (line: string) => Promise<string>;
   /** The manager as managerModel on the farm's own chat/completions: what is asked there is the owner's, as in 田头. */
   readonly answerer: (model: string) => ((text: string, signal?: AbortSignal) => AsyncIterable<string>) | undefined;
   /** The lines waiting for the manager are dropped with the run; the sessions it sent keep working. */
   readonly stop: () => Effect.Effect<void>;
   readonly markWrong: (on: number, want: string) => Effect.Effect<ManagerEval, ApiError>;
-  /** One round of the patrol, now. */
-  readonly patrol: () => Effect.Effect<void>;
 }
 
 export class Manager extends Context.Service<Manager, ManagerShape>()("vibevalley/Manager") {}
@@ -192,7 +185,6 @@ export interface ManagerOptions {
   readonly llm?: () => LLM;
   /** Whether it hears the farm; a test without a model does not, so nothing reaches a model. */
   readonly listen?: boolean;
-  readonly patrolNow?: () => number;
 }
 
 export const make = (options: ManagerOptions = {}) =>
@@ -216,6 +208,7 @@ export const make = (options: ManagerOptions = {}) =>
     const forkHere = yield* FiberSet.makeRuntime<never>();
     const notice = (level: "info" | "warn" | "error", text: string) => void forkHere(core.notice(level, text));
     const general = chat.general();
+    const notices = yield* Notices;
     const home = managerHome(config.home);
     const sessionFile = join(home, managerAgent + ".jsonl");
 
@@ -330,7 +323,11 @@ export const make = (options: ManagerOptions = {}) =>
       switch (e.type) {
         case "message_start":
           if (isInput(e.message)) {
-            input = { ...e.message.details, ...(local.get(e.message) ?? { run: { by: { kind: "" } } }) };
+            const next = { ...e.message.details, ...(local.get(e.message) ?? { run: { by: { kind: "" } } }) };
+            // A line that joins the run takes the words from here on: the one before has what it got, and ends now,
+            // or a caller waiting on it (a brief, a call's line) would wait for the run's end with no words.
+            if (input.caller && input.caller !== next.caller) input.caller.end();
+            input = next;
             toCaller = 0;
           }
           return;
@@ -604,21 +601,6 @@ export const make = (options: ManagerOptions = {}) =>
       return me.words(signal);
     };
 
-    // Patrol (巡查): looks over the inbox for what has waited too long and wakes the manager once per channel; it puts
-    // nothing on the farm itself.
-    const patrolHub = yield* PubSub.unbounded<PatrolNews>();
-    let patrolMemory: PatrolMemory = emptyPatrol();
-    const patrol = Effect.gen(function* () {
-      const [report, next] = patrolStep(core.state(), (options.patrolNow ?? Date.now)(), patrolMemory);
-      patrolMemory = next;
-      const byChannel = new Map<string, PatrolNote[]>();
-      for (const f of report) {
-        const c = f.channel ?? general;
-        byChannel.set(c, [...(byChannel.get(c) ?? []), f]);
-      }
-      for (const [c, found] of byChannel) yield* PubSub.publish(patrolHub, { channel: c, text: patrolText((yield* chat.channelOf(c)).name, found) });
-    });
-
     const handled =
       <A>(what: string, f: (a: A) => Promise<unknown>) =>
       (a: A) =>
@@ -629,9 +611,10 @@ export const make = (options: ManagerOptions = {}) =>
       yield* Effect.forkScoped(Stream.runForEach(yield* chat.forManager, handled("a line", heardInChat)));
       yield* Effect.forkScoped(Stream.runForEach(yield* issue.forManager, handled("an issue", onWork)));
       yield* Effect.forkScoped(
-        Stream.runForEach(
-          Stream.fromPubSub(patrolHub),
-          handled("the patrol", (n: PatrolNews) => send("patrol", n.text, n.channel, false)),
+        Stream.runForEach(yield* notices.overdue, (o: Overdue) =>
+          Effect.flatMap(chat.channelOf(o.channel), (c) =>
+            handled("the patrol", (text: string) => send("patrol", text, o.channel, false))(patrolText(c.name, o.notes)),
+          ),
         ),
       );
       yield* Effect.forkScoped(
@@ -640,9 +623,6 @@ export const make = (options: ManagerOptions = {}) =>
           handled("a task graph's line", (line: string) => send("graph", line, general, false)),
         ),
       );
-      // The first round waits one interval: right after a start, what looks hanging is mostly the restart.
-      const every = config.patrol.heartbeatMinutes * 60_000;
-      if (every > 0) yield* Effect.forkScoped(Effect.forever(Effect.andThen(Effect.sleep(every), patrol)));
       if (sessionUnfinished(sessionFile) && (options.llm || settings.deepseekApiKey())) void resume();
     }
 
@@ -729,13 +709,19 @@ export const make = (options: ManagerOptions = {}) =>
         void go(Effect.ignore(chat.spoken("user", text, "")));
         return answer(voiceNote + "\n主人说：" + text, signal);
       },
+      brief: async (line) => {
+        const me = new Caller();
+        void ask(line, { conversation: general, source: "issue" }, { caller: me }, false);
+        let said = "";
+        for await (const w of me.words()) said += w;
+        return said.trim();
+      },
       answerer: (model) => (model === managerModel ? (text, signal) => answer("主人说：" + text, signal) : undefined),
       stop: () =>
         Effect.promise(async () => {
           await brain?.stop();
         }),
       markWrong,
-      patrol: () => patrol,
     });
   });
 

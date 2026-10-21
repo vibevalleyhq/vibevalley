@@ -11,6 +11,7 @@ import { AgentFace, ManagerFace } from "../ui/Face";
 import { Icon } from "../ui/Icon";
 import { A } from "./A";
 import { useRouter } from "./router";
+import { titleBar } from "./TitleBar";
 
 /** The head's height, the rail's top slot's too. */
 const head = 66;
@@ -47,6 +48,8 @@ function Rail(props: { here?: Place }) {
   const settings = places.find((p) => p.id === "settings")!;
   return (
     <nav aria-label="工作台" class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-[#46301d] pb-3">
+      {/* Room for the desktop window's buttons over the rail's top. */}
+      <div class="shrink-0" style={{ height: `${titleBar.top}px` }} />
       <div class="flex shrink-0 items-center justify-center" style={{ height: `${head}px` }}>
         <Slot to="/" label="回农场" current fill="#e5a93c">
           <ManagerFace size={38} look={look()} />

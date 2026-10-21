@@ -48,8 +48,6 @@ import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
-import { summaryOf } from "../session/rules.ts";
-import { type InputConsumed, type LaunchActivity, Sessions } from "../session/session.ts";
 import {
   busyNotice,
   channelNameProblem,
@@ -266,14 +264,57 @@ export interface ChannelShape {
   readonly updateChannel: (id: string, description: string | undefined, project: string | undefined) => Effect.Effect<void, ApiError>;
   readonly channelOf: (conversation: string) => Effect.Effect<Info>;
   readonly channelByName: (name: string) => Effect.Effect<Info | undefined>;
+  /** Agent Sessions registers the helpers; until then a message for one waits. */
+  readonly useHelpers: (helpers: Helpers) => void;
+  /** Once the helpers on the farm are back: what waited for each goes to it now. */
+  readonly helpersBack: Effect.Effect<void>;
+  /** What a helper's launch did. */
+  readonly activity: (a: LaunchActivity) => Effect.Effect<void>;
+  /** Messages a helper took as input. */
+  readonly consumed: (c: InputConsumed) => Effect.Effect<void>;
 }
 
 export class Channels extends Context.Service<Channels, ChannelShape>()("vibevalley/Channel") {}
 
+// ── the helpers: the participants that work (Agent Sessions registers them) ──
+
+/** What came of handing a helper a message. */
+export interface Delivered {
+  readonly kind: "run" | "steered" | "queued" | "refused";
+  readonly launch?: string;
+  readonly woke?: boolean;
+  readonly reason?: string;
+}
+
+/** What a helper's launch did, as the channels hear it: it spoke, its turn ended or closed, it compacts. */
+export type LaunchActivity =
+  | { readonly kind: "spoke"; readonly id: string; readonly launch: string }
+  | { readonly kind: "ended"; readonly id: string; readonly launch: string; readonly outcome: Outcome; readonly spoke: boolean }
+  | { readonly kind: "closed"; readonly id: string; readonly launch: string }
+  | { readonly kind: "compacting"; readonly id: string; readonly on: boolean };
+
+/** The messages a helper took as input: they are seen. */
+export interface InputConsumed {
+  readonly session: string;
+  readonly messages: string[];
+}
+
+/** The participants that work: the channels hand them what is said to them and hear what they did. The channels know a
+ * helper by its id and nothing of how it works. */
+export interface Helpers {
+  /** On the farm now: it can be handed a message. */
+  readonly present: (id: string) => boolean;
+  readonly deliver: (id: string, text: string, by: RunTrigger) => Effect.Effect<Delivered>;
+  /** The run a participant is in now (a helper's, the assistant's), for what it says; undefined between runs. */
+  readonly currentRun: (id: string) => string | undefined;
+  /** A helper's report, from what it last said in full. */
+  readonly report: (id: string) => string;
+}
+
 export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const core = yield* Core;
-  const sessions = yield* Sessions;
+  let helpers: Helpers | undefined;
   const sql = yield* SqlClient.SqlClient;
   const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
   const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
@@ -614,7 +655,8 @@ export const make = Effect.gen(function* () {
       return out;
     });
 
-  const deliver = (recipient: string, text: string, message: string) => sessions.deliver(recipient, text, { kind: "comment", message } as RunTrigger);
+  const deliver = (recipient: string, text: string, message: string): Effect.Effect<Delivered> =>
+    helpers ? helpers.deliver(recipient, text, { kind: "comment", message } as RunTrigger) : Effect.succeed({ kind: "refused", reason: "帮工还没接回来" });
 
   const kick = (recipient: string): Effect.Effect<void> =>
     Effect.gen(function* () {
@@ -790,7 +832,7 @@ export const make = Effect.gen(function* () {
       if (!w || outcome === "interrupted") return;
       const thread = yield* threadOfSession(id);
       if (!thread) return;
-      const said = outcome === "completed" ? summaryOf(sessions.find(id)?.lastText ?? "") : "";
+      const said = outcome === "completed" ? (helpers?.report(id) ?? "") : "";
       const meta: Meta = { outcome, ...(spent ? { spent } : {}), forTask: !!w.graph, ...(run ? { run } : {}) };
       yield* write({ conversation: thread, from: id, kind: "report", text: head(said || summary, reportMax), final: true, meta });
     });
@@ -812,8 +854,6 @@ export const make = Effect.gen(function* () {
 
   // Facts: hired and left open and close jobs, a report is posted in the thread. One at a time, before the next.
   const facts = yield* core.subscribe;
-  const launches = yield* sessions.launches;
-  const inputs = yield* sessions.inputsConsumed;
   yield* Effect.forkScoped(
     Stream.runForEach(facts, (e) =>
       locked(
@@ -830,10 +870,8 @@ export const make = Effect.gen(function* () {
       ).pipe(logged(`after a ${e.type}`)),
     ),
   );
-  yield* Effect.forkScoped(Stream.runForEach(launches, (a) => locked(onActivity(a)).pipe(logged(`${a.id} ${a.kind}`))));
-  yield* Effect.forkScoped(Stream.runForEach(inputs, (c) => locked(consumed(c)).pipe(logged(`input consumed by ${c.session}`))));
-  // Whatever was waiting for a session still on the farm goes to it now.
-  yield* locked(
+  // Whatever was waiting for a session still on the farm goes to it, once the helpers are back.
+  const helpersBack = locked(
     Effect.gen(function* () {
       for (const p of yield* db(qp.participants())) if (p.kind === "agent" && p.left_at === null) yield* kick(p.id);
     }),
@@ -901,11 +939,11 @@ export const make = Effect.gen(function* () {
           const thread = yield* threadOfSession(session);
           if (!thread) {
             // Sent with no channel, so no thread to say it in: the session hears it straight.
-            if (!sessions.find(session)) return yield* Effect.fail(refused(`没有 ${session} 这个帮工`));
-            yield* sessions.deliver(session, text.trim(), { kind: "comment" });
+            if (!helpers?.present(session)) return yield* Effect.fail(refused(`没有 ${session} 这个帮工`));
+            yield* helpers.deliver(session, text.trim(), { kind: "comment" });
             return undefined;
           }
-          const run = sessions.currentRun(from);
+          const run = helpers?.currentRun(from);
           const written = yield* write({ conversation: thread, from, kind: "chat", text: text.trim(), final: true, meta: run ? { run } : {}, sendKey });
           if (from === "user") yield* readThrough("user", thread, written.number);
           return toMessage(yield* messageOrFail(written.id));
@@ -946,7 +984,7 @@ export const make = Effect.gen(function* () {
             return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length } as Spoken;
           }
           const answers = from !== managerAgent ? (yield* one(qm.calledBy({ speaker: from, conversation, before: afterAll })))?.sender_id : undefined;
-          const run = sessions.currentRun(from);
+          const run = helpers?.currentRun(from);
           const written = yield* write({
             conversation,
             from,
@@ -1064,6 +1102,10 @@ export const make = Effect.gen(function* () {
         const row = yield* one(qc.conversationByID({ id: found.id }));
         return row ? infoOf(row) : undefined;
       }),
+    useHelpers: (h) => void (helpers = h),
+    helpersBack,
+    activity: (a) => locked(onActivity(a)).pipe(logged(`${a.id} ${a.kind}`)),
+    consumed: (c) => locked(consumed(c)).pipe(logged(`input consumed by ${c.session}`)),
   };
   return shape;
 });

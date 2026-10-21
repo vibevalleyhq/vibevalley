@@ -17,7 +17,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/issue`（`Issues`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和缺肥、起草、收获和冲突、PR 的轮询、执行历史、派给管家的工单；`rules.ts` 是只有工单用的纯规则。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
-- 规则在 `packages/protocol/src/rules`：`issues.ts` 的 `issueStatusOf`（状态怎么算）、`issueDraftingOf`（谁在起草）、`shortTitle`（一行的标题），`standing.ts` 的 `standingOf`（给主人看的状态和能做的事），`view.ts` 的 `plotOf`（地的样子）；只有工单用的规则在 `issue/rules.ts`（`statusMove`、 `draftBrief` 起草的规矩、`parseDraft` 读草稿、`draftDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）。
+- 规则在 `packages/protocol/src/rules`：`issues.ts` 的 `issueStatusOf`（状态怎么算）、`issueDraftingOf`（谁在起草）、`shortTitle`（一行的标题），`standing.ts` 的 `standingOf`（给主人看的状态和能做的事）和 `actLabel`（每个动作叫什么），`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`view.ts` 的 `plotOf`（地的样子）；只有工单用的规则在 `issue/rules.ts`（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`draftBrief` 起草的规矩、`parseDraft` 读草稿、`draftDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）。
 - 表：`issue`（一张工单一行；验收标准在 `criteria`、帮工的问题在 `asks`、它对每条标准的自评在 `checks`，都是 JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.draft`（`POST /api/v1/issues/{id}/draft`），时间线是 `issue.timeline`；命令行 `vibevalley issue …`。
 - 页面：工作台的看板在 `apps/web/src/pages/issues`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/rules/issueState.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；农场的播种袋在 `farm/panels/SeedForms.tsx`。
@@ -27,7 +27,9 @@
 - **一张工单一个 id**，从写下到关上不变；重开是同一张工单的下一个帮工，不是新工单。
 - **状态六个**，和 Linear 一样：`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`。只存主人的意思（排没排上队 `queued_at`、怎么关的 `closed`），帮工那一半（在做、交回来了）从核心状态里帮工的阶段算，不另存一份。
 - **数据库是家，核心状态有一份**：开着的和最近关的 50 家在 `CoreState.issues`，`Issues` 每改一次库就施加一条 `issue` 事实；页面只读核心状态。
-- **主人只挪到 `backlog`、`todo`、`done`、`canceled`**；`in_progress`、`in_review` 是帮工干出来的。每张工单的 `moves` 由服务端算出现在能挪到哪，看板和地块详情照它，不在页面里重写规则。
+- **主人只挪到 `backlog`、`todo`、`done`、`canceled`**；`in_progress`、`in_review` 是帮工干出来的。每张工单的 `moves`（能挪到哪）和 `standing.acts`（能做什么）是同一张表的两面，都在 reduce 里和状态一起算（`withIssueStatuses`）：帮工这一轮一结束，看板、地块详情、命令行读到的就是新的，不等服务端再发布这张工单；服务端的拒绝调同一个 `statusMove`。
+- **动作是服务端的**（`issue.act`，`Issues.act`）：站位给出的每个动作（开工、回答、验收通过、打回、收获、知道了、让它解决冲突、接着做、接着修、带话、叫停、关上、重开）在服务端只有一份实现，带给帮工的话也在这里拼；站位没给的动作拒绝（「#41 现在不能「接着修」：它在做」）。页面只收集要说的话、先开收获清单和关单对话框；命令行的 `issue act` 和管家的工具走同一个入口。
+- **工单认编号**（`Issues.idOf`）：接口里的工单可以写 `#41`、`41`、工单 id 或干过它的帮工 id；命令行、管家的工具都用编号。
 - **一块地最多一个 worktree**：代码活的分支是 `vibevalley/issue-<号>`，worktree 是 `worktrees/<项目>.<号>`；重开、换帮工、重启都还是这一块。
 - **每张工单都有验收**：`in_review` 就是「等验收」。`acceptance` 是 `glance`（收获本身就算验收）或 `required`（没通过 `acceptedAt` 以前不能收获）。
 - **种植计划里的工单 `moves` 是空的**，验收和挪状态都拒绝。
@@ -51,7 +53,7 @@
 | 安排活 | `todo`（种子袋，排队等空地）→ `in_progress` | 播种、发芽、长叶；验收没过修的时候是「除草中」 |
 | 完成 | `in_review`（等验收）→ 验收过了 → `done` | 开花；没过是杂草（一条意见一棵）；过了结果；收获后是麦茬 |
 
-**挪状态就是派活**（`issue.status`，转换表在 `issue/rules.ts` 的 `statusMove`）：
+**挪状态就是派活**（`issue.status`，转换表在 `packages/protocol/src/rules/moves.ts` 的 `statusMove`）：
 
 | 挪到 | 从 | 做的事 |
 |---|---|---|

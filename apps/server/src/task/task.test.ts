@@ -192,6 +192,8 @@ const farm = Effect.gen(function* () {
     ),
   );
   const tasks = yield* make({ usable: () => true, work, git });
+  // As the farm's startup does once the sessions came back.
+  yield* tasks.comeBack;
   const news: string[] = [];
   yield* Effect.forkScoped(Stream.runForEach(yield* tasks.news, (n) => Effect.sync(() => news.push(n))));
   const until = (id: string, ready: (g: TaskGraph) => boolean) =>

@@ -112,6 +112,28 @@ describe("a session's work", () => {
     });
   });
 
+  // What brings a session back is kept with its row: a database made again (a new schema) brings back no session, so no
+  // plot is left on an issue that is gone.
+  it.live("comes back only with the database it was kept in", () => {
+    const base = testConfig();
+    const before = farm({ config: { ...base, db: join(base.home, "db") } });
+    let session: Session | undefined;
+    return Effect.gen(function* () {
+      yield* Effect.gen(function* () {
+        const w = yield* watch;
+        session = mustHire(yield* (yield* Issues).hire(lab(), "先写一点并提交", "survivor"));
+        yield* w.nextReport;
+      }).pipe(Effect.scoped, Effect.provide(before.layer));
+      const after = farm({ config: { ...base, db: join(base.home, "db-again") } });
+      yield* Effect.gen(function* () {
+        const sessions = yield* Sessions;
+        const core = yield* Core;
+        expect(sessions.find(session!.id)).toBeUndefined();
+        expect(core.state().sessions.some((s) => s.id === session!.id)).toBe(false);
+      }).pipe(Effect.scoped, Effect.provide(after.layer));
+    });
+  });
+
   it.live("keeps every step in its trajectory", () => {
     const f = farm();
     return Effect.gen(function* () {

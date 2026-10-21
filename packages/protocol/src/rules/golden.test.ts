@@ -14,7 +14,7 @@ import { phaseText } from "./phase";
 import { nextRun, nextText, scheduleProblem, whenText } from "./schedules";
 import { graphChanges, graphEventText } from "./taskChanges";
 import { acceptanceChecks, asksForYou, blockedBy, graphProblems, graphSpent, graphText, layersOf, readyTasks } from "./tasks";
-import { standingOf } from "./standing";
+import { standingOf, standingWantsOwner } from "./standing";
 import { effectsOf, viewOf } from "./view";
 
 const testdata = new URL("../../testdata/", import.meta.url);
@@ -104,6 +104,14 @@ describe("the golden files", () => {
       f.check(line, `${fact.type} effects`, effects, row, "effects");
       f.check(line, `${fact.type} view`, viewOf(next), row, "view");
       f.check(line, `${fact.type} inbox`, inbox(next), row, "inbox");
+      // One source: what the inbox says of an issue's helper is what its standing says, every step of the way.
+      const asked = new Set(inbox(next).flatMap((it) => (it.from.kind === "session" ? [it.from.id] : [])));
+      for (const t of next.issues ?? []) {
+        const last = t.sessions.at(-1);
+        const h = last === undefined ? undefined : next.sessions.find((s) => s.id === last);
+        if (!h || h.graph || t.task || t.graph || t.parent) continue;
+        expect({ line, issue: t.id, asks: asked.has(h.id) }).toEqual({ line, issue: t.id, asks: standingWantsOwner(t.standing.state) });
+      }
       state = next;
     });
     await f.done();

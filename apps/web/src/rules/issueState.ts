@@ -2,27 +2,11 @@
 // it is against its criteria; and what a bug on its plot is, and the harvest's checklist. Where it stands (and what the
 // owner may do) is the server's Issue.standing; this only words it.
 
-import type { Changes, Doing, Issue, IssueAct, IssueStanding, Session, SessionEvent, Standing, TaskGraph } from "@vibevalley/protocol";
+import type { Changes, Doing, Issue, IssueStanding, Session, SessionEvent, Standing, TaskGraph } from "@vibevalley/protocol";
 import { shortTitle, standingLabel } from "@vibevalley/protocol/rules";
 import { endedAt, issueInTask, issueTitle } from "./issues";
 import { tookText } from "./time";
 import type { Tone } from "./cards";
-
-export const actLabel: Record<IssueAct, string> = {
-  start: "开工",
-  answer: "回答",
-  accept: "验收通过",
-  reject: "打回",
-  harvest: "收获",
-  acknowledge: "知道了",
-  resolve: "让它解决冲突",
-  resume: "接着做",
-  cure: "接着修",
-  tell: "带话",
-  stop: "叫停这一轮",
-  close: "关上",
-  reopen: "重开",
-};
 
 export const standingTone: Record<Standing, Tone> = {
   draft: "faint",
@@ -36,15 +20,6 @@ export const standingTone: Record<Standing, Tone> = {
 };
 
 export { standingLabel };
-
-/** The message 接着做 sends to a round that stopped halfway. */
-export const resumeWords = "上一轮停在了半路，接着把它做完。";
-
-/** 接着修: the session's brief, once, with what to do about the failure. */
-export function bugText(task: string) {
-  const original = task.replace(/^接着修：/, "").replace(/。看一下报错，修好再跑一遍测试$/, "");
-  return `接着修：${original}。看一下报错，修好再跑一遍测试`;
-}
 
 /** How long, in round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. */
 export function spanText(ms: number) {
@@ -191,13 +166,6 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
 }
 
 export type IssueState = ReturnType<typeof issueState>;
-
-/** 没过: what the box says, one finding a line, blank lines dropped. */
-export const findingsOf = (text: string) =>
-  text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
 
 /** A binary file counts -1: not counted. */
 export const lineCounts = (c: Changes): [number, number] => [

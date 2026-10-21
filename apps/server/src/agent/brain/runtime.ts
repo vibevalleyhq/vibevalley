@@ -7,7 +7,7 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { models } from "../../ai/models.ts";
-import type { TaskStore } from "../../task/store.ts";
+import type { TaskStore } from "./taskStore.ts";
 import { Brain, type BrainEvent } from "./agent.ts";
 import { codingTools } from "./coding.ts";
 import { deepseek, defaultModel, type LLM, type McpServer } from "./config.ts";

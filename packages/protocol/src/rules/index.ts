@@ -18,6 +18,7 @@ export * from "./taskChanges";
 export * from "./taskIssues";
 export * from "./tasks";
 export * from "./view";
+export * from "./moves";
 export * from "./order";
 export * from "./same";
 export * from "./text";

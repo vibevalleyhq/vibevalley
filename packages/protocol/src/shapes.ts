@@ -565,7 +565,19 @@ export interface FarmLevel {
   need: number;
 }
 
-export const InboxKindValues = ["merge", "fix", "conflict", "quiet", "graph-draft", "graph-ripe", "task-failed", "mention", "schedule-ask"] as const;
+export const InboxKindValues = [
+  "merge",
+  "ask",
+  "fix",
+  "interrupted",
+  "conflict",
+  "quiet",
+  "graph-draft",
+  "graph-ripe",
+  "task-failed",
+  "mention",
+  "schedule-ask",
+] as const;
 export type InboxKind = (typeof InboxKindValues)[number];
 
 /** Told apart by `kind`. */
@@ -574,13 +586,25 @@ export type InboxFrom = InboxFromSession | InboxFromManager;
 /** Told apart by `kind`. */
 export type InboxTarget = InboxTargetSession | InboxTargetGraph | InboxTargetChat;
 
+/** What an item says on each route the owner hears it on: the phone's label after who, the system notice, the tray's
+ * line (none for a mention: it is counted with the unread). */
+export interface InboxWords {
+  label: string;
+  title: string;
+  body: string;
+  tray?: string;
+}
+
 export interface InboxItem {
   id: string;
   kind: InboxKind;
   from: InboxFrom;
+  /** Who it is from, as the routes say it: the helper's name, or 管家. */
+  who: string;
   text: string;
   at: number;
   target: InboxTarget;
+  words: InboxWords;
 }
 
 export const CropValues = ["empty", "seeded", "sprout", "leafy", "flowering", "wheat", "carrot", "withered", "weeds", "dry", "harvested", "locked"] as const;
@@ -1195,6 +1219,15 @@ export interface Finding {
   text: string;
   at: number;
   pulled?: boolean;
+}
+
+/** One of what the owner may do (Issue.standing.acts). text: what answer, tell and reopen say, and reject's findings
+ * one a line unless findings is given; sendKey: answer and tell said again with the same key are said once. */
+export interface IssueActRequest {
+  act: IssueAct;
+  text?: string;
+  findings?: string[];
+  sendKey?: string;
 }
 
 export interface IssueAcceptRequest {
@@ -2038,6 +2071,8 @@ export interface VoiceHeard {
 export interface StartRequest {
   channel: string;
   uid: string;
+  /** The call answers a ring: what rang, which the manager says first instead of the greeting. */
+  about?: string;
 }
 
 export interface VerifyRequest {

@@ -89,13 +89,14 @@ export class VoiceCall {
     sent.catch(() => undefined);
   }
 
-  start() {
+  /** about: what rang, when the call answers the phone: the manager says it first. */
+  start(about?: string) {
     if (this.phase !== "idle") return Promise.resolve();
-    this.starting ??= this.run().finally(() => (this.starting = undefined));
+    this.starting ??= this.run(about).finally(() => (this.starting = undefined));
     return this.starting;
   }
 
-  private async run() {
+  private async run(about?: string) {
     let cancelled = false;
     const stop = new Promise<never>((_, reject) => (this.cancel = () => ((cancelled = true), reject(new Cancelled()))));
     stop.catch(() => undefined);
@@ -139,7 +140,7 @@ export class VoiceCall {
       );
       this.line = line;
       const agent = await until(
-        api.voice.start({ body: { channel: session.channel, uid: session.uid } }).then(async (a) => {
+        api.voice.start({ body: { channel: session.channel, uid: session.uid, ...(about ? { about } : {}) } }).then(async (a) => {
           if (cancelled) {
             await this.stopAgent(a.agentId);
             throw new Cancelled();

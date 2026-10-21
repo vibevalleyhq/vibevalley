@@ -1,8 +1,9 @@
-import { type Issue, type IssueStatus, managerAgent, type ProjectStack, type Run } from "@vibevalley/protocol";
+import { type Issue, managerAgent, type ProjectStack, type Run } from "@vibevalley/protocol";
 import { graphsOf, templateCatalog } from "@vibevalley/protocol/rules";
 import { describe, expect, it, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import {
+  pullRequestConclusion,
   criteriaHead,
   draftBrief,
   draftDescription,
@@ -16,8 +17,6 @@ import {
   sentTitles,
   milestonesOf,
   splitJob,
-  statusMove,
-  statusMoves,
 } from "./rules.ts";
 
 test("the recorded cases", () => {
@@ -103,6 +102,14 @@ describe("an issue as a job", () => {
   });
 });
 
+describe("a pull request", () => {
+  it("a pull request's conclusion", () => {
+    expect(pullRequestConclusion("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明")).toBe("已完成 abc123\n第二行");
+    const text = "完整的最后一轮回复。".repeat(20) + "\n\n最后一段";
+    expect(pullRequestConclusion(text)).toBe(text);
+  });
+});
+
 describe("drafts", () => {
   it("are read from the last block", () => {
     const said =
@@ -143,52 +150,6 @@ describe("drafts", () => {
     const again = draftBrief({ ...drafted, asks: [] }, "也改测试", "board");
     expect(again).toContain("主人这次说：也改测试");
     expect(again).not.toContain("主人的回答");
-  });
-});
-
-describe("status moves", () => {
-  const issue = (status: IssueStatus, sent: boolean, more: Partial<Issue> = {}) =>
-    ({ status, sessions: sent ? ["w1"] : [], standing: { state: "reviewing", acts: [] }, ...more }) as Issue;
-  it("where each status may go", () => {
-    for (const [from, sent, to] of [
-      ["backlog", false, ["todo", "canceled"]],
-      ["todo", false, ["backlog", "canceled"]],
-      ["in_progress", true, ["canceled"]],
-      ["in_review", true, ["todo", "done", "canceled"]],
-      ["done", true, ["todo"]],
-      ["canceled", true, ["todo"]],
-      ["canceled", false, ["backlog"]],
-    ] as const) {
-      const t = issue(from, sent);
-      expect(statusMoves(t), from).toEqual(to);
-      for (const s of ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const) {
-        const [m, why] = statusMove(t, s);
-        expect(m !== "none" || why !== "").toBe(true);
-      }
-    }
-    const required = issue("in_review", true, { acceptance: "required" });
-    expect(statusMoves(required)).toEqual(["todo", "canceled"]);
-    expect(statusMoves({ ...required, acceptedAt: 1 })).toEqual(["todo", "done", "canceled"]);
-    expect(statusMoves(issue("backlog", false, { drafting: { session: "w2", name: "试验田" } }))).toEqual(["canceled"]);
-    expect(statusMoves(issue("in_progress", false, { assignee: managerAgent }))).toEqual([]);
-    expect(statusMoves(issue("in_review", false, { graph: { state: "draft" } as never }))).toEqual([]);
-  });
-
-  it("a round that failed is not harvested, from the board, the command line or the manager alike", () => {
-    const failed = issue("in_review", true, { standing: { state: "stuck", stuck: "failed", acts: [] } });
-    expect(statusMoves(failed)).toEqual(["todo", "canceled"]);
-    expect(statusMove(failed, "done")).toEqual(["none", "这一轮没做成：带句话再干一轮，或者关掉"]);
-    // Stopped halfway is not failed: what is there may still be harvested.
-    expect(statusMoves(issue("in_review", true, { standing: { state: "stuck", stuck: "interrupted", acts: [] } }))).toEqual(["todo", "done", "canceled"]);
-  });
-
-  it("the manager's issue waits on the owner once its turn ended, and only an answer is taken as done", () => {
-    const manager = (more: Partial<Issue>) => issue("in_review", false, { assignee: managerAgent, ...more });
-    expect(statusMoves(manager({ handedBack: { at: 1, outcome: "completed" } }))).toEqual(["done", "canceled"]);
-    expect(statusMove(manager({ handedBack: { at: 1, outcome: "completed" } }), "done")).toEqual(["answered", ""]);
-    expect(statusMove(manager({ handedBack: { at: 1, outcome: "completed" } }), "canceled")).toEqual(["putAway", ""]);
-    for (const outcome of ["failed", "interrupted"] as const) expect(statusMoves(manager({ handedBack: { at: 1, outcome } }))).toEqual(["canceled"]);
-    expect(statusMoves(issue("done", false, { assignee: managerAgent, closed: "answered" }))).toEqual([]);
   });
 });
 

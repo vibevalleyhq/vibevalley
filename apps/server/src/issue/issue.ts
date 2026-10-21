@@ -16,6 +16,7 @@ import {
   type HandedBack,
   type Issue,
   type IssueAcceptRequest,
+  type IssueActRequest,
   type IssueClose,
   type IssueGraph,
   type IssueHistory,
@@ -38,6 +39,7 @@ import {
   type TaskGraph,
 } from "@vibevalley/protocol";
 import {
+  actLabel,
   conflictBrief,
   cut,
   dueText,
@@ -49,6 +51,9 @@ import {
   issueStatusOf,
   keepClosedIssues,
   standingIn,
+  standingLabel,
+  statusMove,
+  statusMoves,
   templateCatalog,
 } from "@vibevalley/protocol/rules";
 import { Context, Effect, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
@@ -63,28 +68,30 @@ import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, missing, reasonOf, refused } from "../errors.ts";
-import { issueBranch, MergeFailure, Projects, type Workplace } from "../project/project.ts";
+import { issueBranch, type Merged, MergeFailure, Projects, type Workplace } from "../project/project.ts";
 import { Runtimes, usable } from "../runtime/runtime.ts";
 import { askedMax } from "../session/journal.ts";
 import { chooseAgent } from "../session/rules.ts";
 import { type Hired, type HireOptions, Sessions } from "../session/session.ts";
 import { type Due, Schedules } from "../schedule/schedule.ts";
 import {
+  cureWords,
   draftBrief,
+  pullRequestConclusion,
   draftDescription,
   filledKinds,
+  findingsOf,
   isClosed,
-  issueJob,
   type IssueDraft,
+  issueJob,
   kept,
   milestonesOf,
-  openAsks,
   nextTaskId,
+  openAsks,
   parseDraft,
+  resumeWords,
   sentTitles,
   splitJob,
-  statusMove,
-  statusMoves,
 } from "./rules.ts";
 
 /** An issue for the manager, handed to it. */
@@ -111,6 +118,11 @@ export interface IssueShape {
   readonly dispatchQueued: (id: string) => Effect.Effect<Dispatched, ApiError>;
   readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
   readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string) => Effect.Effect<Issue, ApiError>;
+  /** One of what the issue's standing offers the owner (Issue.standing.acts), done as its page's button does it: the
+   * page, the command line and the manager's tools all go by it. Any act the standing does not offer is refused. */
+  readonly act: (id: string, req: IssueActRequest, channel: string) => Effect.Effect<Issue, ApiError>;
+  /** An issue's id from what the owner and the manager call it: #41 or 41, its id, or the id of a session that worked it. */
+  readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
   readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
   readonly changes: (id: string, by: Caller) => Effect.Effect<Changes, ApiError>;
   readonly merge: (id: string) => Effect.Effect<string, ApiError>;
@@ -277,12 +289,24 @@ export const make = (options: IssueOptions = {}) =>
       return rows.map((r) => issueOf(r, runs.get(r.id))).sort(issueOrder);
     });
 
-    /** By its id, or by the id of a session that worked it. */
-    const get = (id: string): Effect.Effect<Issue, ApiError> =>
+    const idOf = (ref: string): Effect.Effect<string, ApiError> =>
       Effect.gen(function* () {
-        const issue = (yield* one(qs.issueOfSession({ session: id })))?.issue ?? id;
+        const r = ref.trim();
+        const number = /^#?(\d+)$/.exec(r)?.[1];
+        if (number !== undefined) {
+          const row = yield* one(q.issueByNumber({ number: Number(number) }));
+          if (!row) return yield* Effect.fail(missing("工单 #" + number));
+          return row.id;
+        }
+        return (yield* one(qs.issueOfSession({ session: r })))?.issue ?? r;
+      });
+
+    /** By any of what idOf reads. */
+    const get = (ref: string): Effect.Effect<Issue, ApiError> =>
+      Effect.gen(function* () {
+        const issue = yield* idOf(ref);
         const row = yield* one(q.getIssue({ id: issue }));
-        if (!row) return yield* Effect.fail(missing("工单 " + id));
+        if (!row) return yield* Effect.fail(missing("工单 " + ref));
         return issueOf(
           row,
           (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session),
@@ -653,13 +677,23 @@ export const make = (options: IssueOptions = {}) =>
       Effect.gen(function* () {
         const session = core.session(id);
         if (!session) return yield* Effect.fail(missing("帮工 " + id));
-        const merged = yield* Effect.result(sessions.merge(id));
+        const merged = yield* Effect.result(sessions.handOver(id, "merged", (place) => projects.merge(place)));
         if (merged._tag === "Failure") return yield* Effect.fail(yield* mergeError(id, merged.failure));
         yield* core.notice("info", `收了 ${session.name} 的活：${merged.success.text}`);
         return merged.success.text;
       });
 
     const savePullRequest = (id: string, pr: PullRequest) => Effect.andThen(db(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) })), publish(id));
+
+    /** The harvest as a pull request: opened (or the open one pushed to) with the session's conclusion, and kept on the issue. */
+    const pullRequestOf = (place: Workplace, issue: Issue, said: string) =>
+      Effect.gen(function* () {
+        const pr = yield* projects
+          .submitPullRequest(place, issue, pullRequestConclusion(said))
+          .pipe(Effect.mapError((e) => (e instanceof MergeFailure ? e : new MergeFailure("error", e.message))));
+        yield* savePullRequest(issue.id, pr).pipe(Effect.mapError((e) => new MergeFailure("error", reasonOf(e))));
+        return { pullRequest: pr, text: "PR：" + pr.url, commits: 0 } as Merged;
+      });
 
     const comment = (id: string, text: string, sendKey = "") =>
       Effect.gen(function* () {
@@ -683,7 +717,7 @@ export const make = (options: IssueOptions = {}) =>
           }
           const session = yield* liveSession(id);
           if (issue.project && !issue.graph && !issue.task && (issue.pullRequest?.state === "open" || projects.usesPullRequests(issue.project))) {
-            const merged = yield* Effect.result(sessions.submitPullRequest(session, issue, (pr) => savePullRequest(issue.id, pr)));
+            const merged = yield* Effect.result(sessions.handOver(session, "merged", (place, said) => pullRequestOf(place, issue, said)));
             if (merged._tag === "Failure") return yield* Effect.fail(yield* mergeError(session, merged.failure));
             return merged.success.text;
           }
@@ -827,7 +861,11 @@ export const make = (options: IssueOptions = {}) =>
         const closed: IssueClose = state === "closed" ? "dismissed" : "merged";
         const id = yield* latest(issue.id);
         if (sessions.find(id))
-          yield* sessions.finishPullRequest(id, issue.number, closed).pipe(Effect.mapError((e) => (e instanceof MergeFailure ? refused(e.reasonText) : e)));
+          yield* sessions
+            .handOver(id, closed, (place) =>
+              projects.finishPullRequest(place.project, issue.number).pipe(Effect.mapError((e) => new MergeFailure("error", e.message))),
+            )
+            .pipe(Effect.mapError((e) => (e instanceof MergeFailure ? refused(e.reasonText) : e)));
         else yield* projects.finishPullRequest(issue.project!, issue.number).pipe(Effect.mapError((e) => refused(e.message)));
         yield* inTx(
           Effect.andThen(
@@ -1012,6 +1050,60 @@ export const make = (options: IssueOptions = {}) =>
           }),
         ),
       reopen: (id, text, channel) => reopen(id, text, channel),
+      idOf,
+      act: (ref, req, channel) =>
+        Effect.gen(function* () {
+          const t = yield* get(ref);
+          const id = t.id;
+          const name = actLabel[req.act];
+          if (!t.standing.acts.includes(req.act)) return yield* Effect.fail(refused(`#${t.number} 现在不能「${name}」：它${standingLabel[t.standing.state]}`));
+          const said = (req.text ?? "").trim();
+          const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
+          switch (req.act) {
+            case "start":
+              yield* shape.setStatus(id, "todo", said, channel);
+              break;
+            case "answer":
+            case "tell":
+              yield* comment(id, yield* words, req.sendKey ?? "");
+              break;
+            case "accept":
+              yield* shape.accept(id, { pass: true });
+              break;
+            case "reject": {
+              const findings = req.findings ?? findingsOf(said);
+              if (findings.length === 0) return yield* Effect.fail(refused("打回要写哪里要修，一行一条"));
+              yield* shape.accept(id, { pass: false, findings });
+              break;
+            }
+            case "harvest":
+            case "acknowledge":
+              yield* shape.setStatus(id, "done", said, channel);
+              break;
+            case "close":
+              yield* shape.setStatus(id, "canceled", said, channel);
+              break;
+            // Sent before: another session, told what to do; never sent: back to the backlog, nothing to tell.
+            case "reopen":
+              yield* t.sessions.length > 0 ? shape.setStatus(id, "todo", yield* words, channel) : shape.setStatus(id, "backlog", "", channel);
+              break;
+            case "resolve":
+              yield* shape.resolve(id);
+              break;
+            case "resume":
+              yield* comment(id, resumeWords);
+              break;
+            case "cure": {
+              const last = t.sessions.at(-1);
+              yield* comment(id, cureWords((last !== undefined ? core.session(last)?.brief : undefined) ?? t.title));
+              break;
+            }
+            case "stop":
+              yield* sessions.stop(yield* liveSession(id));
+              break;
+          }
+          return yield* get(id);
+        }),
       setStatus: (id, to, text, channel) =>
         Effect.gen(function* () {
           if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused("没有这个状态：" + to));

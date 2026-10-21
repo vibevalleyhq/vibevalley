@@ -9,8 +9,8 @@ import {
 } from "@earendil-works/pi-ai";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import * as engine from "../../task/engine.ts";
-import { memoryStore } from "../../task/store.ts";
+import * as engine from "./taskGraph.ts";
+import { memoryStore } from "./taskStore.ts";
 import { Brain, type BrainEvent, type BrainOptions } from "./agent.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
 import { messageText, userMessage } from "./messages.ts";

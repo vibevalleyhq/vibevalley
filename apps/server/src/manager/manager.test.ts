@@ -14,6 +14,7 @@ import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
 import { Schedules } from "../schedule/schedule.ts";
+import { Notices } from "../notice/notice.ts";
 import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
@@ -67,8 +68,13 @@ const pi = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了
 const farm = (f: (c: Request) => AssistantMessage = respond, config: Config = testConfig(), patrolNow?: () => number) => {
   const { faux, llm, requests } = fauxLLM();
   faux.appendResponses(Array.from({ length: 100 }, (): FauxResponseFactory => (context) => f({ messages: context.messages as Message[], options: undefined })));
-  const below = world({ config: { ...config, patrol: { heartbeatMinutes: 0 } }, runtimes: [pi], repos: ["demo", "notes"] });
-  return { requests, layer: layer({ llm: () => llm, ...(patrolNow ? { patrolNow } : {}) }).pipe(Layer.provideMerge(below)) };
+  const below = world({
+    config: { ...config, patrol: { heartbeatMinutes: 0 } },
+    runtimes: [pi],
+    repos: ["demo", "notes"],
+    ...(patrolNow ? { patrolNow } : {}),
+  });
+  return { requests, layer: layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
 };
 
 const until = <A>(get: () => A | undefined | false, what: string, ms = 5_000) =>
@@ -180,6 +186,34 @@ describe("the manager", () => {
           .filter((m) => m.spoken || m.from === managerAgent)
           .map((m) => m.from + "：" + m.text);
       expect(yield* until(() => call().length === 2 && call(), "the call in 田头")).toEqual(["user：现在地里怎么样", "manager：收到"]);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  // A line joining the run ends the brief before it with the words it got: it does not wait for the run's end.
+  it.live("ends a brief when another line joins its run", () => {
+    const f = farm((c) => {
+      const line = lastLine(c);
+      if (answeredWith(c) !== undefined) return fauxAssistantMessage("看过了");
+      // Slow, so the call's line comes while this run is under way.
+      if (line.includes("要告诉主人"))
+        return new Promise<AssistantMessage>((r) =>
+          setTimeout(() => r(fauxAssistantMessage([{ type: "text", text: "#41 交回来了" }, fauxToolCall("roster", {})])), 300),
+        ) as never;
+      return respond(c);
+    });
+    return Effect.gen(function* () {
+      const manager = yield* Manager;
+      const said = yield* Effect.promise(async () => {
+        const brief = manager.brief("【要告诉主人】\n- #41 交回来了");
+        await new Promise((r) => setTimeout(r, 100));
+        const joined = (async () => {
+          for await (const _ of manager.call("还有别的吗")) void _;
+        })();
+        const out = await Promise.race([brief, new Promise<string>((_, no) => setTimeout(() => no(new Error("the brief never ended")), 4000))]);
+        await joined;
+        return out;
+      });
+      expect(said).toContain("#41 交回来了");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -398,20 +432,21 @@ describe("the manager", () => {
     const f = farm(respond, testConfig(), () => Date.now() + offset);
     return Effect.gen(function* () {
       const manager = yield* Manager;
+      const notices = yield* Notices;
       const sessions = yield* Sessions;
       yield* enableLab;
       yield* manager.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
       yield* until(() => sessions.roster().some((r) => r.session.brief === "加个 CHANGELOG" && r.session.phase._tag === "ripe"), "the work ripe");
       const patrolLine = /^\[来源：巡查\]\n【巡查】[\s\S]*「加个 CHANGELOG」/;
-      yield* manager.patrol();
+      yield* notices.patrol;
       yield* settle;
       expect(f.requests.some((c) => lastLine(c).includes("【巡查】"))).toBe(false);
       offset = 3 * 3_600_000;
-      yield* manager.patrol();
+      yield* notices.patrol;
       const line = yield* until(() => f.requests.map(lastLine).find((l) => patrolLine.test(l)), "the patrol's news");
       expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#田头 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没收：「加个 CHANGELOG」/);
       offset = 3.5 * 3_600_000;
-      yield* manager.patrol();
+      yield* notices.patrol;
       yield* settle;
       // Each request carries the whole conversation: count this work's patrol lines in the latest.
       const latest = f.requests.at(-1)!;

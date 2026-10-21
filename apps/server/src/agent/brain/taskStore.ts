@@ -4,9 +4,9 @@
 
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
-import * as q from "../../db/generated/task_graph.sql.ts";
-import { newId } from "../base/ids.ts";
-import { type By, finished, type State, type Task } from "./engine.ts";
+import * as q from "../../../db/generated/agent_task.sql.ts";
+import { newId } from "../../base/ids.ts";
+import { type By, finished, type State, type Task } from "./taskGraph.ts";
 
 export interface TaskStore {
   readonly load: Effect.Effect<Task[]>;
@@ -32,7 +32,7 @@ const fromRow = (r: q.OpenGraphTasksResult): Task => {
   };
 };
 
-/** The farm's database (task_graph). A finished graph stays, stamped finished_at. */
+/** The farm's database (agent_task). A finished graph stays, stamped finished_at. */
 export const dbStore = (sql: SqlClient.SqlClient, owner: string): TaskStore => {
   const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
   return {

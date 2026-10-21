@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
-import { testDatabase } from "../testing/layers.ts";
-import { add, begin, type Change, finished, readyTasks, requeue, settle, type Task, TaskError, text, update } from "./engine.ts";
-import { dbStore, memoryStore, type TaskStore } from "./store.ts";
+import { testDatabase } from "../../testing/layers.ts";
+import { add, begin, type Change, finished, readyTasks, requeue, settle, type Task, TaskError, text, update } from "./taskGraph.ts";
+import { dbStore, memoryStore, type TaskStore } from "./taskStore.ts";
 
 const ids = (g: readonly Task[]) => g.map((t) => t.id);
 

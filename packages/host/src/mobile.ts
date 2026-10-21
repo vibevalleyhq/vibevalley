@@ -48,6 +48,7 @@ export function mobileHost(post: (m: ToNative) => void) {
     notify: (notice) => ask({ call: "notify", notice: { title: notice.title, body: notice.body } }),
     tray: null,
     voiceShortcut: null,
+    titleBar: null,
     rtc: async (grant, on) => {
       events = on;
       try {

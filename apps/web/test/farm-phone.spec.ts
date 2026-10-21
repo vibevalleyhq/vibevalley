@@ -70,9 +70,11 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
     id: "merge-w1-1",
     kind: "merge",
     from: { kind: "session", id: "w1", name: "阿狐", agent: "fox" },
+    who: "阿狐",
     text: "记住我做完了，看看能不能收",
     at: Date.now(),
     target: { kind: "session", id: "w1" },
+    words: { label: "活熟了", title: "阿狐 做完了", body: "记住我做完了，看看能不能收", tray: "阿狐 做完了，可以收" },
   };
   const base: StateFrame = {
     ...frame,
@@ -91,7 +93,10 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   await expect(phone.getByText("活熟了")).toBeVisible();
   await expect(page.getByRole("button", { name: "手机：来电" })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("phone-ringing.png") });
+  // Answering is the call to the manager, the chat's call button's one.
+  const calling = page.waitForRequest((r) => r.url().endsWith("/api/v1/voice/session") && r.method() === "POST");
   await phone.getByRole("button", { name: "接听" }).click();
+  await calling;
   await expect(phone).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "阿狐的地" })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -101,4 +106,18 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   await expect(phone.getByText("接了")).toBeVisible();
   await phone.getByRole("button", { name: "未接 0" }).click();
   await expect(phone.getByText("没有未接来电。地里都好好的。")).toBeVisible();
+});
+
+test("calling the manager on the phone is the chat's call: one call, the same answer", async ({ page }) => {
+  await openFarm(page);
+  await page.getByRole("button", { name: "手机" }).click();
+  const phone = page.getByRole("region", { name: "农场手机" });
+  await phone.getByRole("button", { name: "管家" }).click();
+  await phone.getByRole("button", { name: "打给管家" }).click();
+  // The test's server has no Agora credentials: the call does not get through, and both say why.
+  await expect(phone.getByText(/没接通：还没有 Agora 的凭据/)).toBeVisible();
+  await expect(page.getByRole("region", { name: "田头" }).getByRole("button", { name: "语音说话" })).toHaveAttribute(
+    "title",
+    /上次没接通：还没有 Agora 的凭据/,
+  );
 });

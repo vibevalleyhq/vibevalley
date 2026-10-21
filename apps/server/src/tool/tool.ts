@@ -395,7 +395,8 @@ export const make = Effect.gen(function* () {
         return withIssue(p.issue, async (t) => {
           if (!c.owner) return mergeNotAsked;
           try {
-            return await go(issue.merge(t.id));
+            const done = await go(issue.act(t.id, { act: "harvest" }, c.here));
+            return done.pullRequest?.state === "open" ? `#${done.number} 的 PR 开着：${done.pullRequest.url}` : `#${done.number} 收获了`;
           } catch (e) {
             return toError(e).message;
           }
@@ -439,9 +440,12 @@ export const make = Effect.gen(function* () {
     );
 
   const stop = issueTool("stop", "叫停在做一张工单的帮工正在做的这一轮。", async (t) => {
-    const w = workerOf(t);
-    if (!w) return nobodyOn(t);
-    return (await go(run.stop(w.session.id))) ? `${w.session.name} 停下了（#${t.number}）` : `${w.session.name} 现在没在干活`;
+    try {
+      await go(issue.act(t.id, { act: "stop" }, ""));
+      return `#${t.number} 这一轮叫停了`;
+    } catch (e) {
+      return toError(e).message;
+    }
   });
   const dismiss = issueTool("dismiss", "让在做一张工单的帮工收工离开农场，不收它的改动（分支留着）。", async (t) => {
     const w = workerOf(t);

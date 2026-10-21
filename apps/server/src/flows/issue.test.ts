@@ -2,10 +2,11 @@ import { mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
-import { isBusy, openFindings, viewOf } from "@vibevalley/protocol/rules";
+import { isBusy, messagesIn, openFindings, viewOf } from "@vibevalley/protocol/rules";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
+import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
 import { Runtimes } from "../runtime/runtime.ts";
@@ -302,6 +303,41 @@ describe("an issue", () => {
       again = yield* issues.reopen(issue.id, "再看看", "");
       yield* w.nextReport;
       expect((yield* sessions.get(again))!.brief).not.toContain("这条分支上已经有上次的提交，接着做。");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  // An act is the server's: only what the standing offers, with the words the server puts to the helper, by number too.
+  it.live("does an act as the issue's page does it", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const w = yield* watch;
+      const issues = yield* Issues;
+      const core = yield* Core;
+      const chat = yield* Channels;
+      yield* (yield* Agents).saveAgent(lab());
+      const drop = yield* issues.add({ title: "先放着", project: "acts", assignee: "lab" });
+      refusedWith(yield* Effect.flip(issues.act(drop.id, { act: "cure" }, "")), "现在不能「接着修」");
+      const dropped = yield* issues.act(drop.id, { act: "close" }, "");
+      expect(dropped.status).toBe("canceled");
+      // Never sent: a reopen is back to the backlog, with nothing to tell.
+      expect((yield* issues.act("#" + drop.number, { act: "reopen" }, "")).status).toBe("backlog");
+
+      const issue = yield* issues.add({ title: "这一单必败", project: "acts", assignee: "lab" });
+      yield* issues.act(String(issue.number), { act: "start" }, "");
+      yield* w.nextReport;
+      yield* await_(
+        () => issues.get(issue.id),
+        (i) => i.standing.stuck === "failed",
+        "stuck: failed",
+      );
+      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "harvest" }, "")), "现在不能「收获」");
+      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "tell" }, "")), "「带话」要说一句");
+      yield* issues.act("#" + issue.number, { act: "cure" }, "");
+      const thread = (yield* chat.jobThread((yield* issues.get(issue.id)).sessions.at(-1)!))!;
+      yield* until(
+        () => messagesIn(core.state().chat, thread).some((m) => m.from === "user" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
+        "the cure said once, by the server",
+      );
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

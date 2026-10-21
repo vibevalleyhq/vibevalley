@@ -94,6 +94,13 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
   await expect(view.getByRole("button", { name: "验收通过" })).toBeVisible();
   await expect(view.getByRole("button", { name: "打回" })).toBeVisible();
   await expect(view.getByRole("button", { name: "收获" })).toHaveCount(0);
+  // Each fold opens whatever was opened before it: content first mounted by a click once held the whole update while
+  // its queries were in flight, and the fold stayed shut.
+  for (const name of ["详情", "每次干活", "帮工的每一步", "怎么走到这一步"]) {
+    const fold = view.getByRole("button", { name: new RegExp("^" + name) });
+    await fold.click();
+    await expect(fold).toHaveAttribute("aria-expanded", "true");
+  }
   await view.getByRole("button", { name: "勾上后重开浏览器还登着" }).click();
   await expect(view.getByRole("button", { name: "勾上后重开浏览器还登着" })).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: test.info().outputPath("plot.png") });

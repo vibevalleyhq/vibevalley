@@ -1,8 +1,6 @@
-import type { CoreState } from "@vibevalley/protocol";
-import { emptyCoreState, type InboxMessage } from "@vibevalley/protocol/rules";
+import { type InboxMessage } from "@vibevalley/protocol/rules";
 import { describe, expect, it } from "vite-plus/test";
-import { checkCases, goldenCases } from "../testing/golden.ts";
-import { emptyPatrol, managerInboxLines, type PatrolNote, patrolStep, patrolText, situationDelta, sourceHead, sources, usageText } from "./rules.ts";
+import { managerInboxLines, patrolText, situationDelta, sourceHead, sources, usageText } from "./rules.ts";
 
 describe("the manager's rules", () => {
   it("say what changed in the farm, or the whole when most did", () => {
@@ -65,25 +63,5 @@ describe("the manager's rules", () => {
         { key: "b", text: "二" },
       ]),
     ).toBe("【巡查】#ops 里有几件事放着没人管：\n- 一\n- 二\n\n看看要不要提醒主人（一两句，说在 #ops）、催帮工或者叫停；都不用管就什么也别说。");
-  });
-
-  // Every fifth round the farm is empty: what was hanging is forgotten.
-  it("find for the patrol what was recorded", () => {
-    const failed = checkCases(goldenCases("manager"), (c) => {
-      if (c.fn !== "patrol") throw new Error(`unknown fn ${c.fn}`);
-      const given = c.in as { state: CoreState; nows: number[] };
-      let memory = emptyPatrol();
-      return given.nows.map((now, r) => {
-        let report: PatrolNote[];
-        [report, memory] = patrolStep(r % 5 === 4 ? emptyCoreState() : given.state, now, memory);
-        return {
-          now,
-          report: report.map((n) => ({ Key: n.key, Channel: n.channel ?? null, Text: n.text })),
-          firstSeen: memory.firstSeen,
-          reported: memory.reported,
-        };
-      });
-    });
-    expect(failed).toEqual([]);
   });
 });

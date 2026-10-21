@@ -55,7 +55,7 @@
 | 记性 | `Memories` | `memory` 表；管家的在 `manager/MEMORY.md` | |
 | 管家 | `Manager` | `manager/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`agent/brain`） |
 | 工单 | `Issues`（`issue/issue.ts`；派给管家的在 `manager/manager.ts`） | `issue`、`issue_session` 表（一行是一个帮工） | |
-| 种植计划 | `Tasks`（`task/task.ts`、`engine.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_graph`、`task_event` 表 | |
+| 种植计划 | `Tasks`（`task/task.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
 | 帮工 | `Sessions`（`session/session.ts`） | `state.json`（核心状态里的帮工）、`sessions.json`（目录、农机的会话 id、最后一轮的原话） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
 | 一次干活（run） | `Sessions`（`session/execution.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
 | 干活过程 | `Sessions`（`session/journal.ts`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |

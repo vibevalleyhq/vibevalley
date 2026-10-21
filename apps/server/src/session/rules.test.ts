@@ -4,7 +4,7 @@ import { clip } from "@vibevalley/protocol/rules";
 import { describe, expect, it } from "vite-plus/test";
 import { inCny } from "../runtime/price.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
-import { asksOf, checksOf, chooseAgent, jobBreak, noRoom, pullRequestConclusion, readReport, recallHead, sessionName, summaryOf, withRecall } from "./rules.ts";
+import { asksOf, checksOf, chooseAgent, jobBreak, noRoom, readReport, recallHead, sessionName, summaryOf, withRecall } from "./rules.ts";
 import { shellCommand } from "./shell.ts";
 
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
@@ -191,12 +191,6 @@ describe("a run's report", () => {
   it("clip", () => {
     expect(clip("a\n  b", 10)).toBe("a b");
     expect(clip("abcdefghij", 5)).toBe("abcd…");
-  });
-
-  it("a pull request's conclusion", () => {
-    expect(pullRequestConclusion("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明")).toBe("已完成 abc123\n第二行");
-    const text = "完整的最后一轮回复。".repeat(20) + "\n\n最后一段";
-    expect(pullRequestConclusion(text)).toBe(text);
   });
 
   it("asks are the lines for the owner", () => {

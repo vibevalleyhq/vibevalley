@@ -84,7 +84,7 @@
 
 ## 和谁打交道
 
-- **帮工（`session`）**：开工取 worktree、离开调 `release`，规矩里附 `houseRules`；`noRoom` 用 `limit` 判一个项目还能不能再开工；收获经 `session` 的 `harvest`（先让帮工歇下，再调 `merge`、`mergeInto`、`submitPullRequest`、`finishPullRequest`），`conflict` 的失败由它施加 `conflict` 事实。
+- **帮工（`session`）**：开工取 worktree、离开调 `release`，规矩里附 `houseRules`；`noRoom` 用 `limit` 判一个项目还能不能再开工；收获经 `session` 的 `handOver`（先让帮工歇下，再由工单、种植计划给的收法调 `merge`、`mergeInto`、`submitPullRequest`、`finishPullRequest`），`conflict` 的失败由它施加 `conflict` 事实。
 - **工单（`issue`）**：决定什么时候收获、走本地合还是 PR（`usesPullRequests`）；`issue.changes` 调 `Changes`，用它刷新帮工的冲突；冲突预检 `Conflict`；重开时用 `branchChanges` 看分支上有没有上次的提交；PR 的轮询调 `PullRequestState`（[工单](docs/subsystems/issue.md)）。
 - **种植计划（`task`）**：`openBranch` 开计划分支、`changedFiles` 看一件改了哪些文件、`Run` 跑一件的检查、`mergeBranch` 把计划合进主分支、`branchChanges` 给计划的收成清单。
 - **游戏（`game`）**：`game/game.ts` 开机、每 2 分钟、帮工干完一轮 15 秒后各调一次 `contributions`，变了施加 `commits` 事实，经验由它折。

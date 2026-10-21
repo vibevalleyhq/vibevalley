@@ -5,6 +5,7 @@ import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { InboxItem } from "@vibevalley/protocol";
 import { missedOf, phoneCalls } from "./calls";
+import { voiceCall } from "../../voice/call";
 import { lcd } from "./lcd";
 import type { PadButton } from "./pad";
 import { playSound } from "../sound";
@@ -20,6 +21,9 @@ import { HomeScreen, ListScreen, ManagerScreen, type PhoneApp, RingingScreen } f
 
 const games: ReadonlySet<PhoneApp> = new Set(["blocks", "dino", "sokoban", "bugs", "merge"]);
 
+/** What rang, for the manager to open the call with. */
+const aboutOf = (call: InboxItem) => `${call.who}：${call.words.label}。${call.text}`;
+
 export function Phone() {
   const phone = phoneState();
   const router = useRouter();
@@ -33,6 +37,8 @@ export function Phone() {
   const settle = (call: InboxItem, answered: boolean) => {
     phoneCalls.settle(call, answered);
     if (!answered) return;
+    // Answering is the call: the manager comes on and says what rang; the farm shows it meanwhile.
+    void voiceCall.start(aboutOf(call));
     switch (call.target.kind) {
       case "session":
         return farm.select(call.target.id);
@@ -79,12 +85,7 @@ export function Phone() {
               <ListScreen screen={app() as "missed" | "log"} onScreen={setApp} onAnswer={(c) => settle(c, true)} onCall={() => open("manager")} />
             </Match>
             <Match when={app() === "manager"}>
-              <ManagerScreen
-                onChat={() => {
-                  put();
-                  farm.chatOpen(true);
-                }}
-              />
+              <ManagerScreen />
             </Match>
             <Match when={app() === "blocks"}>
               <BlocksGame big />

@@ -26,7 +26,7 @@
 
 额度和花费见 [帮工](docs/subsystems/session.md)。各农机不接受哪些开会话的参数、能不能中途插话，写在 `seeds.json` 的 `runtimeFacts`（抄自 oar 各农机的 `refusedSessionOptions`）；页面上不接受的选项是灰的。
 
-VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮手（`spawn_agent`）、读技能、自己的任务图（`task_add`、`task_update`、`task_graph`：一件活拆成有先后的几件，每件自己做或交给帮手；交给帮手的等前面的做完就自动派，最多三个同时做，做完把结果交回；图存在农场的库里（`task_graph`），一个会话一张）这些工具，对话存在 `$VIBEVALLEY_HOME/sessions/<会话 id>.jsonl`。
+VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮手（`spawn_agent`）、读技能、自己的任务图（`task_add`、`task_update`、`task_graph`：一件活拆成有先后的几件，每件自己做或交给帮手；交给帮手的等前面的做完就自动派，最多三个同时做，做完把结果交回；图存在农场的库里（`agent_task`），一个会话一张）这些工具，对话存在 `$VIBEVALLEY_HOME/sessions/<会话 id>.jsonl`。
 
 ## 种子档案
 

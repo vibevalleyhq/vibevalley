@@ -514,3 +514,18 @@ body {
     animation: none;
   }
 }
+
+/* The desktop window's drag strip (app/TitleBar.tsx); what is clickable in it stays clickable. */
+.window-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+button,
+a,
+input,
+textarea,
+select,
+[role="button"] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}

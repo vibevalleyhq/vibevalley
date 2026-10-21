@@ -66,11 +66,6 @@ export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot
   }
 }
 
-export function bugText(task: string): string {
-  const original = task.replace(/^接着修：/, "").replace(/。看一下报错，修好再跑一遍测试$/, "");
-  return `接着修：${original}。看一下报错，修好再跑一遍测试`;
-}
-
 /** The young farmer stands in for a look not painted. */
 export const managerSprite = (look: string, suffix: string, has: (name: string) => boolean) =>
   has(`manager-${look}${suffix}`) ? `manager-${look}${suffix}` : `manager${suffix}`;

@@ -65,13 +65,16 @@ export interface Host {
   /** A call the host carries itself (the phone's, which goes on with the screen locked); null: the page joins with
    * Agora's web SDK. */
   readonly rtc: Rtc | null;
+  /** The window has no title bar of its own and the page reaches its top edge: top is the strip the window is dragged
+   * by, left what its buttons (macOS's traffic lights) take at the strip's start; null: the window has its own. */
+  readonly titleBar: { readonly top: number; readonly left: number } | null;
 }
 
 /** The property a host's preload (or injected script) sets on window. */
 export const hostKey = "vibevalleyHost";
 
 /** A browser tab: no host around the page. */
-export const browserHost: Host = { name: "browser", notify: null, tray: null, voiceShortcut: null, rtc: null };
+export const browserHost: Host = { name: "browser", notify: null, tray: null, voiceShortcut: null, rtc: null, titleBar: null };
 
 let phone: Host | undefined;
 

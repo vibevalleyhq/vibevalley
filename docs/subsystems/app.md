@@ -9,7 +9,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 | 状态流、重连、连不上时说什么 | 帧里有什么、怎么折（[architecture.md](docs/architecture.md)「核心状态」、`frameOf`） |
 | 页面的目录和数据层：一条状态流、Solid Query 的读取、共用的 store | 形状和接口的定义（`packages/protocol`） |
 | 工作台的路由和外框、首页 | 规则本身：能不能派、档案的问题、下回想起什么、冲突怎么交代（各自的子系统，页面问服务端） |
-| 宿主接口：通知、菜单栏、语音快捷键、宿主自己的通话线路；没有的是 null | 像素农场的画面、玩法和面板（[farm.md](docs/subsystems/farm.md)；每页的内容见 [farm-ui.md](docs/reference/farm-ui.md)「界面清单」） |
+| 宿主接口：通知、菜单栏、语音快捷键、宿主自己的通话线路、窗口没有自己的标题栏时让出的地方；没有的是 null | 像素农场的画面、玩法和面板（[farm.md](docs/subsystems/farm.md)；每页的内容见 [farm-ui.md](docs/reference/farm-ui.md)「界面清单」） |
 | 桌面壳：服务端子进程的生命周期和就绪、窗口、单实例、打包；手机壳：配对、WebView、通知、通话 | 服务端的监听、家目录租约（[地基](docs/subsystems/foundation.md)） |
 | 连进来的浏览器：先配对，钥匙存在 cookie | 「连接到本机」的配对和鉴权（[连接到本机](docs/subsystems/lan.md)）；语音通话（[语音](docs/subsystems/voice.md)） |
 
@@ -21,7 +21,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **数据层** `src/data/`：`frames.ts`（状态流，和框架无关：`subscribe`、`get`）、`frame.ts`（接成 Solid 的 store：`createFrames`、`useFrames`、`useCore`）、`external.ts`（`createExternal`：把框架无关的 store 接成信号）、`api.ts`（`api`、`reasonOf`）、`live.ts`（`/api/v1/live`）、`query.ts`（`queries`、`ready` 和按对象的读取）、`agents.ts`、`issues.ts`。
 - **工作台** `src/app/`：`router.ts` 是路由（浏览器历史上的一个信号，`navigate`），`A.tsx` 是页内的链接，`places.ts` 是左栏的地方，`Shell.tsx` 是外框；每个地方一个 `src/pages/<地方>/`，共用的版面在 `pages/kit.tsx`，共用的组件在 `src/ui/`。
 - **页面的规则** `src/rules/`：只读帧和回答的纯函数（看板的分栏、频道的未读、一轮的瀑布图、通知的说法、远端和配对），各带 vitest。
-- **宿主** `packages/host`：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`）、`currentHost()`、没有宿主时的 `browserHost`；`mobile.ts` 是手机壳和页面之间的桥（`ToNative`、`FromNative`、`mobileHost`）。
+- **宿主** `packages/host`：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`、`titleBar`）、`currentHost()`、没有宿主时的 `browserHost`；`mobile.ts` 是手机壳和页面之间的桥（`ToNative`、`FromNative`、`mobileHost`）。
 - **桌面壳** `apps/desktop`：`src/main.ts`（窗口、菜单栏、通知、快捷键、单实例、退出）、`src/server.ts`（`loginShellPath`、`startServer`）、`src/preload.ts`（把宿主接口交给页面）；`scripts/build.ts`、`scripts/package.ts`（`bun run package:mac`）。
 - **手机壳** `apps/mobile`：`App.tsx`（配对了显示农场，没配对或农场忘了这台手机就配对）、`src/PairScreen.tsx`（扫码、粘贴或收到 `vibevalley://pair` 链接）、`src/FarmScreen.tsx`（WebView 和桥）、`src/farm.ts`（钥匙存在系统钥匙串）、`src/rtc.ts`（声网的原生 SDK）、`src/notify.ts`、`src/rules.ts`；`ios/`、`android/` 由 `expo prebuild` 从 `app.json` 生成，不进仓库（[README](apps/mobile/README.md)）。
 - **检查**：`bun run web:check`、`cd apps/web && bun run test`、`bun run desktop:test`；手机壳是 `cd apps/mobile && bun run check && bun run test` 和 `scripts/e2e.ts`。
@@ -36,6 +36,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **界面读按 id 合并的帧**：`createFrames` 把每一帧按 id `reconcile` 进 Solid 的 store，只有变了的字段触发更新；要比前后两帧的（音效、画布、来电、特效）读原始的帧（`rawFrame()`）。农场的 store、toast、通话、听写是和框架无关的模块，经 `createExternal` 接进来。
 - **一处响应性出错，整页停住**：一个错误逃出所有边界时 Solid 停掉整页的更新（`REACTIVITY_HALTED`），页面看着还在、不再动。`<Show>`、`<Match>` 的函数子节点拿到的值在分支收起后一读就抛，分支里还在结算的查询会读到它，所以带查询的面板按普通值 keyed、自己记住最后找到的那个；`ref` 的回调不读 `<For>` 每一项的值。Playwright 里逃出页面的错误让用例失败（`test/fixtures.ts`）。
 - **宿主接口是封闭的**：每个宿主实现全部方法，没有的能力是 null，页面据此决定画不画，不问「我在哪个壳里」。桌面壳经 preload 的 `contextBridge` 给（`contextIsolation`、`sandbox`，页面碰不到 Node 和 Electron）；手机壳的 WebView 带着 `ReactNativeWebView`，`currentHost()` 见到它就建 `mobileHost`：页面把要的东西写成 JSON 发过去，壳按 id 答，通话的事件也这样送回（`window.vibevalleyFromHost`）；浏览器全是 null。
+- **桌面窗口是沉浸式的**（macOS）：窗口没有自己的标题栏，页面画到顶边，红绿灯浮在左上角；宿主的 `titleBar`（`{ top: 28, left: 76 }`）说顶上那一条多高、红绿灯占到多宽。页面最前面放一条这么高的拖动条（`app/TitleBar.tsx` 的 `WindowStrip`，`-webkit-app-region: drag`），条里的按钮、链接、输入框照样能点（`style.css` 的 `no-drag`）；工作台的侧栏顶上、农场左上角那组 HUD 让出这一条。窗口的内容区默认 1152×768，拖动时保持 3:2，农场正好铺满（[农场的皮](docs/subsystems/farm.md)「放大只用整数倍」）。从仓库跑时 Dock 上的图标是 `apps/web/public/icons/app-256.png`，打包的用 `resources/icon.icns`。其他系统和浏览器、手机是 null，用自己的标题栏。
 - **通话的线路可以归宿主**：`VoiceCall` 只认 `Rtc`（`join` 出一条能 `mute`、`renew`、`leave` 的线，事件是来了、走了、字幕、两边的音量、出错、令牌快过期），有 `host.rtc` 就用宿主的（手机的原生 SDK，锁屏不断），没有就用页面自己的声网 Web SDK（`voice/agora.ts`）。会话、字幕、交给管家的话都还在页面里。
 - **页面总在服务端的源上**：页面和接口同源，没有 CORS；桌面窗口只停在服务端的地址上，别的链接交给系统浏览器。
 - **连进来的浏览器先配对**：不是 `127.0.0.1`、`localhost` 打开的页面，又没有配对的 cookie，去 `/pair`（`src/pages/pair`）：设备起个名字、请主人放行，那台电脑点头后把钥匙存进 `vibevalley_lan_key` 这个 cookie（`SameSite=Strict`，十年），之后的请求和流都带着它（[连接到本机](docs/subsystems/lan.md)）。
@@ -59,8 +60,8 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 **通知和菜单栏**（`src/app/Follow.tsx`，挂在每一页上）：
 
-- 帧的 `inbox` 里新出现的来电（做完、没做成、冲突、没动静、@主人、计划拆好、计划熟了、计划卡住、管家想定的定时）弹系统通知；开机时已经在的来电只记下不响，同一个来电只响一次（`CallBell`）；窗口在前面时不弹。
-- 菜单栏的标题和菜单从帧的 `state` 和 `inbox` 算（`traySummary`）：在干活的帮工数和等你的事数，每件等你的事一行，再是打开农场、退出；没变就不再发给宿主。
+- 帧的 `inbox` 里新出现的来电（做完、没做成、冲突、没动静、@主人、计划拆好、计划熟了、计划卡住、管家想定的定时）弹系统通知；开机时已经在的来电只记下不响，同一个来电只响一次（`freshOf`）；窗口在前面时不弹；话是来电自带的 `words`（[通知](docs/subsystems/notice.md)）。
+- 菜单栏的标题和菜单从帧的 `state` 和 `inbox` 算（`traySummary`）：在干活的帮工数和等你的事数，每件等你的事一行（来电的 `words.tray`），再是打开农场、退出；没变就不再发给宿主。
 - ⌥⇧Space 切换和管家的通话（`voiceCall.toggle`）。
 
 **手机壳**：第一次开（或者农场忘了这台手机）是配对页：相机扫「连接到本机」的二维码，或粘贴链接，或打开 `vibevalley://pair?u=<地址>&c=<码>` 这种链接（这一种当场就请主人放行）；那台电脑点头后，钥匙和地址存进系统钥匙串（`expo-secure-store`），之后直接是 WebView。WebView 在页面加载前把钥匙写进 `vibevalley_lan_key` 的 cookie，和浏览器配对后一样；页面要去自己的 `/pair` 时（钥匙不认了），壳忘掉这个农场、回到配对页。iOS 开着 audio 后台模式和 `NSAllowsLocalNetworking`（「连接到本机」是局域网里的明文 HTTP），安卓开着明文流量。

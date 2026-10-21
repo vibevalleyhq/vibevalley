@@ -99,7 +99,8 @@ test("a real round: the helper asks with options, one click answers, and it hand
   await ask.getByRole("button", { name: "用 8797" }).click();
   await expect(view.getByLabel("现在怎样")).toContainText("等你验收", { timeout: 20_000 });
   await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("1 / 1 条做到了");
-  await expect(view.getByText("跑了 echo hi")).toBeVisible();
+  // Exact: the folded steps hold the helper's whole last message, which says it too.
+  await expect(view.getByText("跑了 echo hi", { exact: true })).toBeVisible();
   await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "收获" })).toBeVisible();
   await expect(view.getByRole("region", { name: "怎么走到这一步" })).toContainText("你带了话，接着做一轮");
   await page.screenshot({ path: test.info().outputPath("real-round.png") });
@@ -150,15 +151,16 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
   await page.setViewportSize({ width: 1280, height: 800 });
 
   let said: unknown;
-  await page.route(`**/api/v1/issues/${made.id}/comment`, async (route) => {
+  // An option is the answer act, done by the server (issue.act).
+  await page.route(`**/api/v1/issues/${made.id}/act`, async (route) => {
     said = route.request().postDataJSON();
-    await route.fulfill({ status: 204 });
+    await route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(made) });
   });
   await ask
     .getByRole("group", { name: /^回答：/ })
     .getByRole("button", { name: "分着做" })
     .click();
-  await expect.poll(() => (said as { text?: string } | undefined)?.text).toBe("分着做");
+  await expect.poll(() => said as { act?: string; text?: string } | undefined).toMatchObject({ act: "answer", text: "分着做" });
 });
 
 test("work handed back: 等你验收, the helper's word on each criterion, and 打回 asks what failed", async ({ page, server, api }) => {

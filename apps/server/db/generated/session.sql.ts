@@ -64,11 +64,15 @@ export const SessionByIDResult = Schema.Struct({
   ["hired_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
   ["closed"]: Schema.NullOr(Schema.String),
+  ["place"]: Schema.NullOr(Schema.String),
+  ["oar_session"]: Schema.NullOr(Schema.String),
+  ["last_text"]: Schema.NullOr(Schema.String),
+  ["recalled"]: Schema.NullOr(Schema.String),
 })
 export type SessionByIDResult = typeof SessionByIDResult.Type
 
 
-export const SessionByIDSql = "-- name: SessionByID :one\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\" from session where id = $1;"
+export const SessionByIDSql = "-- name: SessionByID :one\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\" from session where id = $1;"
 
 export const sessionByID = Effect.fn("SessionByID")(function* (params: SessionByIDParams) {
   const sql = yield* SqlClient.SqlClient
@@ -97,11 +101,15 @@ export const EndedSessionsResult = Schema.Struct({
   ["hired_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
   ["closed"]: Schema.NullOr(Schema.String),
+  ["place"]: Schema.NullOr(Schema.String),
+  ["oar_session"]: Schema.NullOr(Schema.String),
+  ["last_text"]: Schema.NullOr(Schema.String),
+  ["recalled"]: Schema.NullOr(Schema.String),
 })
 export type EndedSessionsResult = typeof EndedSessionsResult.Type
 
 
-export const EndedSessionsSql = "-- name: EndedSessions :many\n-- Newest first; agent '' is every agent's.\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\" from session where ended_at is not null and ($1::text = '' or agent = $1) order by hired_at desc;"
+export const EndedSessionsSql = "-- name: EndedSessions :many\n-- Newest first; agent '' is every agent's.\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\" from session where ended_at is not null and ($1::text = '' or agent = $1) order by hired_at desc;"
 
 export const endedSessions = Effect.fn("EndedSessions")(function* (params: EndedSessionsParams) {
   const sql = yield* SqlClient.SqlClient
@@ -133,4 +141,74 @@ export const sessionsEndedBefore = Effect.fn("SessionsEndedBefore")(function* (p
     Result: SessionsEndedBeforeResult,
     execute: (p) => sql.unsafe(SessionsEndedBeforeSql, [p["before"]]),
   })(params)
+})
+
+export const KeepHandParams = Schema.Struct({
+  ["place"]: Schema.NullOr(Schema.String),
+  ["oar_session"]: Schema.NullOr(Schema.String),
+  ["last_text"]: Schema.NullOr(Schema.String),
+  ["recalled"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type KeepHandParams = typeof KeepHandParams.Type
+
+
+export const KeepHandSql = "-- name: KeepHand :exec\n-- What a session on the farm needs to be taken up again after a restart: where it works (JSON), its oar session, its\n-- last words, the memories it was reminded of (JSON).\nupdate session set place = $1, oar_session = $2, last_text = $3, recalled = $4\nwhere id = $5;"
+
+export const keepHand = Effect.fn("KeepHand")(function* (params: KeepHandParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: KeepHandParams,
+    execute: (p) => sql.unsafe(KeepHandSql, [p["place"], p["oar_session"], p["last_text"], p["recalled"], p["id"]]),
+  })(params)
+})
+
+export const HandsParams = Schema.Struct({
+
+})
+export type HandsParams = typeof HandsParams.Type
+
+
+export const HandsResult = Schema.Struct({
+  ["id"]: Schema.String,
+  ["place"]: Schema.NullOr(Schema.String),
+  ["oar_session"]: Schema.NullOr(Schema.String),
+  ["last_text"]: Schema.NullOr(Schema.String),
+  ["recalled"]: Schema.NullOr(Schema.String),
+})
+export type HandsResult = typeof HandsResult.Type
+
+
+export const HandsSql = "-- name: Hands :many\nselect id, place, oar_session, last_text, recalled from session where ended_at is null and place is not null;"
+
+export const hands = Effect.fn("Hands")(function* () {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: HandsParams,
+    Result: HandsResult,
+    execute: () => sql.unsafe(HandsSql, []),
+  })({})
+})
+
+export const SessionIDsParams = Schema.Struct({
+
+})
+export type SessionIDsParams = typeof SessionIDsParams.Type
+
+
+export const SessionIDsResult = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type SessionIDsResult = typeof SessionIDsResult.Type
+
+
+export const SessionIDsSql = "-- name: SessionIDs :many\nselect id from session;"
+
+export const sessionIDs = Effect.fn("SessionIDs")(function* () {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: SessionIDsParams,
+    Result: SessionIDsResult,
+    execute: () => sql.unsafe(SessionIDsSql, []),
+  })({})
 })

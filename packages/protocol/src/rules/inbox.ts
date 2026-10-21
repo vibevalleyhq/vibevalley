@@ -1,8 +1,9 @@
 // What is waiting on the owner: the inbox the phone rings with, and what the
-// manager's patrol reads. A graph's own sessions leave their finished, failed and conflicted work to the graph, which
+// manager's patrol reads; each item worded for every route the owner hears it on (the phone, the system notice, the
+// tray, the call), so a kind added to InboxKind is worded once, here. A graph's own sessions leave their finished, failed and conflicted work to the graph, which
 // asks in their place; a quiet one still asks.
 
-import type { CoreState, InboxFrom, InboxItem } from "../shapes";
+import type { Ask, CoreState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "../shapes";
 import { addressOf, channelOf, generalOf, messagesIn } from "./chat";
 import { needOf } from "./phase";
 import { graphsOf } from "./taskIssues";
@@ -22,21 +23,37 @@ export const inbox = (state: CoreState): InboxItem[] =>
     .map((e) => e.item)
     .sort((a, b) => b.at - a.at);
 
+type Unworded = Omit<InboxEntry, "item"> & { readonly item: Omit<InboxItem, "who" | "words"> };
+
 export function inboxEntries(state: CoreState): InboxEntry[] {
+  return gathered(state).map((e) => ({ ...e, item: worded(e.item) }));
+}
+
+function gathered(state: CoreState): Unworded[] {
   const chat = state.chat;
   const general = generalOf(chat)?.id;
-  const out: InboxEntry[] = [];
+  const out: Unworded[] = [];
   for (const h of state.sessions) {
-    const need = needOf(h);
-    if (!need || need.kind === "retrying" || (h.graph && need.kind !== "quiet")) continue;
+    const want = wantOf(h, state);
+    if (!want || (h.graph && want.kind !== "quiet")) continue;
     const channel = h.channel ?? general;
     const from: InboxFrom = { kind: "session", id: h.id, name: h.name, agent: h.agent };
     const target = { kind: "session", id: h.id } as const;
     const at = h.lastRun?.at ?? h.hiredAt;
     const summary = h.lastRun?.summary ? h.lastRun.summary : h.brief;
     const who = h.name + "（" + h.id + "）";
-    switch (need.kind) {
-      case "harvest":
+    switch (want.kind) {
+      case "ask": {
+        const question = want.asks[0]?.question ?? "";
+        out.push({
+          item: { id: `${h.id}:ask:${h.runs}`, kind: "ask", from, text: cut(question, 40), at, target },
+          channel,
+          since: at,
+          brief: who + "问了主人 " + want.asks.length + " 个问题，{ago}没人回：「" + slice(question, 0, 60) + "」",
+        });
+        break;
+      }
+      case "merge":
         out.push({
           item: { id: `${h.id}:merge:${h.runs}`, kind: "merge", from, text: cut(summary, 40), at, target },
           channel,
@@ -52,8 +69,16 @@ export function inboxEntries(state: CoreState): InboxEntry[] {
           brief: who + "这一轮没做成，{ago}没人管了：「" + slice(summary, 0, 60) + "」",
         });
         break;
+      case "interrupted":
+        out.push({
+          item: { id: `${h.id}:interrupted:${h.runs}`, kind: "interrupted", from, text: cut(summary, 40), at, target },
+          channel,
+          since: at,
+          brief: who + "这一轮停在了半路，{ago}没人管了：「" + slice(h.brief, 0, 60) + "」",
+        });
+        break;
       case "conflict": {
-        const files = (need.conflict.files ?? []).length;
+        const files = (h.conflict?.files ?? []).length;
         out.push({
           item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: `${files} 个文件和主分支冲突`, at, target },
           channel,
@@ -65,9 +90,9 @@ export function inboxEntries(state: CoreState): InboxEntry[] {
       case "quiet": {
         const doing = h.phase._tag === "working" && h.phase.doing.label !== "" ? "「" + h.phase.doing.label + "」" : "想事情";
         out.push({
-          item: { id: `${h.id}:quiet:${need.since}`, kind: "quiet", from, text: cut(h.brief, 40), at: need.since, target },
+          item: { id: `${h.id}:quiet:${want.since}`, kind: "quiet", from, text: cut(h.brief, 40), at: want.since, target },
           channel,
-          since: need.since,
+          since: want.since,
           brief: who + "在干活，{ago}没动静了，最后在" + doing,
         });
         break;
@@ -147,4 +172,106 @@ export function inboxEntries(state: CoreState): InboxEntry[] {
     }
   }
   return out;
+}
+
+type Want =
+  | { readonly kind: "ask"; readonly asks: readonly Ask[] }
+  | { readonly kind: "merge" | "fix" | "interrupted" | "conflict" }
+  | { readonly kind: "quiet"; readonly since: number };
+
+/** What a session asks of the owner. Its issue's standing says it, the one the issue page and the phone both read; a
+ * session whose issue the state does not hold says it by its phase. */
+function wantOf(h: Session, state: CoreState): Want | undefined {
+  const issue = h.issue === undefined ? undefined : state.issues?.find((t) => t.id === h.issue && t.sessions.at(-1) === h.id);
+  if (!issue) {
+    const need = needOf(h);
+    switch (need?.kind) {
+      case undefined:
+      case "retrying":
+        return undefined;
+      case "harvest":
+        return { kind: "merge" };
+      case "fix":
+        return { kind: "fix" };
+      case "conflict":
+        return { kind: "conflict" };
+      case "quiet":
+        return { kind: "quiet", since: need.since };
+    }
+  }
+  const st = issue.standing;
+  switch (st.state) {
+    case "asking":
+      return { kind: "ask", asks: issue.asks };
+    case "reviewing":
+      return { kind: "merge" };
+    case "stuck":
+      switch (st.stuck) {
+        case "failed":
+          return { kind: "fix" };
+        case "interrupted":
+          return { kind: "interrupted" };
+        case "conflict":
+          return { kind: "conflict" };
+        case "quiet":
+          return { kind: "quiet", since: st.since ?? h.hiredAt };
+        case undefined:
+          return { kind: "fix" };
+      }
+      return undefined;
+    case "draft":
+    case "queued":
+    case "working":
+    case "harvested":
+    case "closed":
+      return undefined;
+  }
+}
+
+function clipLine(text: string, max = 140) {
+  const one = text.replace(/\s+/g, " ").trim();
+  return one.length > max ? `${one.slice(0, max - 1)}…` : one;
+}
+
+const words: Readonly<Record<InboxKind, (who: string, text: string) => InboxWords>> = {
+  merge: (who, text) => ({ label: "活熟了", title: `${who} 做完了`, body: text, tray: `${who} 做完了，可以收` }),
+  ask: (who, text) => ({ label: "有问题问你", title: `${who} 有问题问你`, body: text }),
+  fix: (who, text) => ({ label: "活没做成", title: `${who} 没做成`, body: text, tray: `${who} 没做成` }),
+  interrupted: (who, text) => ({ label: "停在了半路", title: `${who} 停在了半路`, body: text }),
+  conflict: (who, text) => ({ label: "合不进去", title: `${who} 的活合进主分支会冲突`, body: text, tray: `${who} 的活会冲突` }),
+  quiet: (who) => ({
+    label: "好久没动静",
+    title: `${who} 好一阵没动静了`,
+    body: "可能在跑很久的命令，也可能卡住了：看看它的干活过程。",
+    tray: `${who} 好一阵没动静`,
+  }),
+  "graph-draft": (_, text) => ({ label: "计划拆好了", title: `计划「${text}」拆好了`, body: "看过再开工", tray: `计划「${text}」等你看` }),
+  "graph-ripe": (_, text) => ({
+    label: "计划能收了",
+    title: `计划「${text}」都做完了`,
+    body: "看看改动，收获进主分支",
+    tray: `计划「${text}」可以收获`,
+  }),
+  "task-failed": (_, text) => ({ label: "计划卡住了", title: `计划卡住了：${text}`, body: "重试、改工单，或者跳过", tray: `计划「${text}」没做成` }),
+  mention: (who, text) => ({ label: "找你", title: `${who} 叫你`, body: text }),
+  "schedule-ask": (_, text) => ({
+    label: "定时等你同意",
+    title: "管家想定一个定时",
+    body: `「${text}」：同意了才开始`,
+    tray: `定时「${text}」等你同意`,
+  }),
+};
+
+function worded(item: Omit<InboxItem, "who" | "words">): InboxItem {
+  const who = item.from.kind === "session" ? item.from.name : "管家";
+  return { ...item, who, words: words[item.kind](who, clipLine(item.text)) };
+}
+
+/** The items of now that are news to known: undefined known is the first look, which knows them all and has no news.
+ * An id is news once; a helper's next round asks under a new id. */
+export function freshOf(known: ReadonlySet<string> | undefined, items: readonly InboxItem[]): { fresh: InboxItem[]; known: Set<string> } {
+  const next = new Set(known);
+  const fresh = items.filter((i) => !next.has(i.id));
+  for (const i of fresh) next.add(i.id);
+  return { fresh: known === undefined ? [] : fresh, known: next };
 }

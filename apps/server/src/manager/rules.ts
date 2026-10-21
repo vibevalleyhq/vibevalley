@@ -1,8 +1,9 @@
 // The manager's pure rules: where an input came from, how the farm reads to it and what changed
 // in it, what the patrol finds, and how a model answer's tokens are worded.
 
-import type { CoreState, EventTokens, InboxKind, RunTriggerKind, RuntimeInfo } from "@vibevalley/protocol";
-import { head, type InboxMessage, inboxEntries, messageLine, quotaLow, yuan } from "@vibevalley/protocol/rules";
+import type { EventTokens, RunTriggerKind, RuntimeInfo } from "@vibevalley/protocol";
+import { head, type InboxMessage, messageLine, quotaLow, yuan } from "@vibevalley/protocol/rules";
+import type { PatrolNote } from "../notice/rules.ts";
 
 /** The model the manager answers as on the OpenAI chat/completions protocol: on the voice line and on the farm's own chatCompletionsPath. */
 export const managerModel = "vibevalley-manager";
@@ -133,57 +134,6 @@ export const managerInboxLines = (messages: readonly InboxMessage[]) =>
       );
     })
     .join("\n");
-
-// Patrol (巡查): no model. Each item waits out its kind's grace (a question may be answered in a minute), is reported once,
-// and again only after reportAgainMs if it still stands.
-
-/** In ms. Kinds not here the manager does not hear of from the patrol: a failed run reaches it as it happens, a task
- * waiting is the person's to look at. */
-const patrolGrace: Partial<Record<InboxKind, number>> = {
-  mention: 15 * 60_000,
-  quiet: 20 * 60_000,
-  merge: 2 * 60 * 60_000,
-  conflict: 2 * 60 * 60_000,
-  "task-failed": 30 * 60_000,
-};
-
-export const reportAgainMs = 4 * 60 * 60_000;
-
-export interface PatrolNote {
-  readonly key: string;
-  readonly channel?: string;
-  readonly text: string;
-}
-
-export interface PatrolMemory {
-  readonly firstSeen: Record<string, number>;
-  readonly reported: Record<string, number>;
-}
-
-export const emptyPatrol = (): PatrolMemory => ({ firstSeen: {}, reported: {} });
-
-export const patrolAgo = (ms: number) => (ms >= 2 * 60 * 60_000 ? Math.round(ms / (60 * 60_000)) + " 小时" : Math.max(1, Math.round(ms / 60_000)) + " 分钟");
-
-/** Things no longer hanging are forgotten, so if they come back they are new. */
-export function patrolStep(state: CoreState, now: number, memory: PatrolMemory): [PatrolNote[], PatrolMemory] {
-  const next = emptyPatrol();
-  const report: PatrolNote[] = [];
-  for (const e of inboxEntries(state)) {
-    const grace = patrolGrace[e.item.kind];
-    if (grace === undefined) continue;
-    const key = e.item.id;
-    const seen = memory.firstSeen[key] ?? now;
-    next.firstSeen[key] = seen;
-    const since = e.since ?? seen;
-    const last = memory.reported[key];
-    if (last !== undefined) next.reported[key] = last;
-    if (now - since < grace) continue;
-    if (last !== undefined && now - last < reportAgainMs) continue;
-    next.reported[key] = now;
-    report.push({ key, ...(e.channel !== undefined ? { channel: e.channel } : {}), text: e.brief.replace("{ago}", patrolAgo(now - since)) });
-  }
-  return [report, next];
-}
 
 export const patrolText = (channelName: string, found: readonly PatrolNote[]) =>
   "【巡查】#" +

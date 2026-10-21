@@ -24,7 +24,7 @@ import { vibevalleyRuntimeOf } from "./agent/brain/runtime.ts";
 import { loadConfig } from "./base/config.ts";
 import { dshRuntime } from "./runtime/dsh.ts";
 import { registryOf } from "./runtime/runtime.ts";
-import { memoryStore } from "./task/store.ts";
+import { memoryStore } from "./agent/brain/taskStore.ts";
 
 const instructions = `你是 VibeValley，一个在用户电脑上干活的助手：读写代码、跑命令、查资料、记住用户交代的事、按时做定好的事。
 - 先弄清楚再动手：读相关的文件，看清现状；改完跑能跑的检查（lint、类型检查、测试）确认。

@@ -24,19 +24,28 @@ const files = () => {
 const notices: Notice[] = [];
 (globalThis as { vibevalleyNotices?: Notice[] }).vibevalleyNotices = notices;
 
+/** Where macOS's window buttons sit: centred in the page's 28 px drag strip (preload titleBar). */
+const trafficLights = { x: 12, y: 8 };
+
 let server: RunningServer | undefined;
 let window: BrowserWindow | undefined;
 
 function open(url: string) {
   window = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 720,
-    minHeight: 480,
+    // The farm's proportions, so that it meets the window's edges (apps/web farm/world/framing.ts scales it by whole
+    // steps only): three times its 384 × 256, and 3 : 2 however the window is sized.
+    width: 1152,
+    height: 768,
+    useContentSize: true,
+    minWidth: 768,
+    minHeight: 512,
     title: "VibeValley",
     show: false,
+    // The page reaches the top edge; it leaves the strip the host says (preload titleBar) to drag the window by.
+    ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: trafficLights } : {}),
     webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
+  window.setAspectRatio(3 / 2);
   const origin = new URL(url).origin;
   // The page stays on the server's origin; any other link opens in the browser.
   window.webContents.setWindowOpenHandler(({ url: to }) => {
@@ -98,6 +107,8 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.setName("VibeValley");
   void app.whenReady().then(async () => {
+    // A packaged app has its icon (resources/icon.icns); run from the repository, the Dock shows Electron's unless set.
+    if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(join(files().web, "icons", "app-256.png")));
     const path = await loginShellPath(process.env);
     const env = path ? { ...process.env, PATH: path } : process.env;
     try {

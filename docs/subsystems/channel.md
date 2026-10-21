@@ -1,17 +1,17 @@
 # 田头
 
-主人、管家和帮工说话的地方是频道（`channel`）；默认的频道叫田头（`general`），主人可以再开。频道里的消息可以挂一个串（`thread`），派活时开的是工单串。帮工自己在串里汇报、提问、交接，管家不转述。微信、飞书、QQ 经连接器（`connector`）各接一个频道，主人在外面说的话就是在这个频道里说的。「要你处理的事」是 Inbox（来电），从核心状态现算，它不在 `channel` 包里，单独写在[下面一节](#inbox要你处理的事)。
+主人、管家和帮工说话的地方是频道（`channel`）；默认的频道叫田头（`general`），主人可以再开。频道里的消息可以挂一个串（`thread`），派活时开的是工单串。帮工自己在串里汇报、提问、交接，管家不转述。微信、飞书、QQ 经连接器（`connector`）各接一个频道，主人在外面说的话就是在这个频道里说的。「要你处理的事」是 Inbox（来电），归[通知](docs/subsystems/notice.md)。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
 | 频道、串、消息、@，消息号和地址 `#<频道>:<消息号>` | 工单的状态和派活（[工单](docs/subsystems/issue.md)）；派活时 `issue` 开 Session，田头只为这张工单开工单串 |
-| 一条消息给谁、叫不叫醒，三道刹车，送达的状态 | 一轮怎么跑、能不能插话（`Sessions.deliver` 交给 oar，[帮工](docs/subsystems/session.md)） |
+| 一条消息给谁、叫不叫醒，三道刹车，送达的状态 | 一轮怎么跑、能不能插话（帮工经 `Helpers.deliver` 交给 oar，[帮工](docs/subsystems/session.md)） |
 | 帮工的汇报贴进工单串；带话、验收意见、冲突经工单串交给帮工 | 汇报怎么读出结论（`session/rules.ts` 的 `summaryOf`） |
 | 帮工在 `/mcp` 上的说话工具（`channel_say`、`read_chat`、`channel_inbox`）背后的规则 | 工具的定义和认人（`apps/server/src/tool`、`mcp`、`Sessions.who`） |
 | 连接器：扫码登录、只认主人、收件和发件、转成纯文本 | 管家怎么回答（`manager`）；连接器把话交给 `manager.Say`，管家照田头的规则被叫醒 |
-| Inbox：从核心状态现算要主人处理的事（`packages/protocol/src/rules/inbox.ts`） | 巡查什么时候叫醒管家（`manager/rules.ts`，[管家](docs/subsystems/manager.md)）；定时到点在频道里说的那句（[定时](docs/subsystems/schedule.md)） |
+| | Inbox 和巡查（[通知](docs/subsystems/notice.md)）；定时到点在频道里说的那句（[定时](docs/subsystems/schedule.md)） |
 | | 田头和串在界面上的样子（[farm-ui.md](docs/reference/farm-ui.md)、`apps/web/src/farm/chat`、`apps/web/src/pages/chat`） |
 
 ## 在哪
@@ -101,28 +101,9 @@
 - 微信、飞书扫码，QQ 填机器人的 AppID 和 AppSecret（先验一次）。一次扫码由各自 SDK 走完：微信拿到二维码后最多等 8 分钟，跟随重定向的域，要输数字时页面显示输入框，二维码过期或验证码被禁用累计 3 次就结束；飞书按注册返回的间隔和有效期轮询，跟随租户跳到 Lark。连接器只把进度（等待扫码、扫过了、要输数字）给页面，成功后保存账号。
 - 每个账号同时只有一代任务：登录，或者接收、收件、发件三个工人。协调器（`voiceConnection`）不在任何一代里：重新登录或退出时，它先取消并等旧一代结束，再在一个事务里改 `connector_account`、清掉旧收件、退休旧发件（`dropped`），然后起新一代。保存失败就保留旧账号、重新起旧的那一代。SDK 在接收返回后回调的，不再收下；旧连接迟到的结果不写新账号。
 
-## Inbox：要你处理的事
-
-Inbox 不属于 `channel`：它是 `inbox(state)`（`packages/protocol/src/rules/inbox.ts`），从整个核心状态（帮工、种植计划、定时、田头）现算，不存，放在 `StateFrame.inbox`，和 `state`、`view` 并排。农场手机把它当来电（`apps/web/src/farm/phone/calls.ts`），桌面的通知和菜单栏摘要也读它（`apps/web/src/rules/notice.ts`），都从帧的 `inbox` 读。巡查只看它：`inboxEntries` 给每件附上频道、从什么时候算起、给管家看的一句话。
-
-| 种类（`InboxKind`） | 什么时候 |
-|---|---|
-| `merge` | 帮工这一轮做完，等你看 |
-| `fix` | 帮工这一轮没做成 |
-| `conflict` | 合进主分支会冲突 |
-| `quiet` | 干着活好久没动静 |
-| `graph-draft`、`graph-ripe` | 种植计划拆好了等你看、做完了等你收 |
-| `task-failed` | 计划里有一件没做成；重试又失败再算一次 |
-| `mention` | @主人 的话，你没读、也没在那个对话里回 |
-| `schedule-ask` | 管家定的定时等你同意（目标是定时所在的频道） |
-
-- 一个帮工一次只算最要紧的一件（`needOf`）；重试中的不算。种植计划里的帮工做完、没做成、冲突交给计划报，没动静照样算。
-- 新的在前，同一时刻的保持收集的顺序；同一件事的 id 不变（帮工的是 `<id>:<种类>:<第几轮>`，@ 的是消息 id）。
-- 「回了」是主人在那个对话里在这条之后说过话；回了没读不算，读了没回也不算。主人的已读位置在 `Conversation.read`，存在服务端，几台设备看到的一样。
-
 ## 和谁打交道
 
-- **帮工（`session`）**：给帮工的话经 `Sessions.deliver` 交给 oar（插话或开新一轮由它定）；`launches` 报一轮开口、结束、关掉、压缩上下文，`inputsConsumed` 报一轮实际读进去的消息，田头据此推进送达。`hired`、`left`、`report` 经核心事件来。
+- **帮工（`session`）**：田头不 import 执行模块。它定义帮工这类参与者的端口 `Helpers`（在不在地里、交一句话、现在是哪一轮、汇报的摘要），执行模块建的时候用 `useHelpers` 登记，并把每一轮的开口、结束、关掉、压缩上下文交给 `activity`，一轮实际读进去的消息交给 `consumed`，田头据此推进送达。帮工接回以后执行模块调 `helpersBack`，等着的话这时才送出去：接回以前帮工收不到。`hired`、`left`、`report` 经核心事件来。
 - **核心状态（`core`）**：田头施加 `message`、`conversation` 事实；读 `CoreState.Sessions` 知道谁在地里、谁在忙。
 - **管家（`manager`）**：订阅 `forManager`（叫醒它的话，按对话分批）和 `managerDigest`（只让它知道的汇报）；用 `managerSays` 说话、`spoken` 记下通话里的话。主人的话经 `manager.Say` 进田头，管家照田头的规则被叫醒。
 - **工单（`issue`）**：带话、验收意见、冲突和检查失败经 `tellSession`；首次派活时记下频道（`channelOf`）。
@@ -130,7 +111,7 @@ Inbox 不属于 `channel`：它是 `inbox(state)`（`packages/protocol/src/rules
 - **工具（`tool`、`mcp`）**：管家和帮工的说话工具都调 `speak`、`read`、`Inbox`；`/mcp` 用每个会话自己的令牌认出是谁在说话，令牌只用来分清人，不用来防人。
 - **语音（`voice`）**：电话里说的和回答经 `spoken` 留在田头，不叫醒谁，管家在电话里已经听过。
 - **连接器 → 管家、田头**：收进来的话交给 `manager.Say`；送出去的读核心事件里的 `message`，只读不改田头。主人在外面说话也让农场开门（通话状态成 `live`）。
-- **巡查（`manager/rules.ts`）**：读 `inboxEntries`，过了宽限期才叫醒管家（[管家](docs/subsystems/manager.md)）。
+- **通知（`notice`）**：@主人 的话进 Inbox；巡查的发现没有频道时归田头（[通知](docs/subsystems/notice.md)）。
 
 ## 为什么这样
 
@@ -150,7 +131,6 @@ Inbox 不属于 `channel`：它是 `inbox(state)`（`packages/protocol/src/rules
 - **收件先落盘再交给管家，至少一次。** 内存队列救不回飞书已经确认的消息，也挡不住旧账号的迟到回调。SQLite 的事务不能和管家的工具副作用合成一个事务，先记完成再交付会永久丢指令，先落盘再交付只在一个极窄的窗口里可能重复；所以不声称恰好一次。
 - **账号由一个不在任何一代里的协调器换。** 给任务表加 WaitGroup 不行：登录任务本身会触发换账号，等任务表就会等自己。协调器把「结束旧任务」和「发布新账号」的顺序收在一个主人手里。
 - **一次扫码登录由平台的 SDK 拥有。** 二维码、重定向域、期限、刷新次数、验证码、轮询间隔、Feishu 到 Lark 的跳转都是平台协议，放在 SDK 里，连接器不碰中间状态。放弃了三家共用一个可配置的登录状态机：QQ 用密钥，微信要验证码和刷新，飞书按租户域轮询，统一起来只会把差异变成更多配置。
-- **Inbox 是一条现算的规则，不存。** 来电和巡查的发现原来是两套大半重叠又各有出入的规则，改一处忘一处，手机响了巡查不报。放弃了像 Linear 那样存进库、带已读和归档：这些都能从核心状态现算，存一份就要保持一致。放在帧上不放在 `view` 里：`view` 是农场的画面，Inbox 是实际要你处理的事。
 
 ## 还没做的
 
@@ -166,5 +146,4 @@ Inbox 不属于 `channel`：它是 `inbox(state)`（`packages/protocol/src/rules
 - `channel/rules.test.ts`：黄金数据（`testdata/rules.jsonl.gz`）。
 - 连接器（真的库、本机假适配器，不登录真账号）：`connector/connector.test.ts`（微信主人的话进田头并在那里回、绑到别的频道、生人不让进、攒着的话做成摘要、退出时忘掉攒着的、QQ 配对码、QQ 被拒的回复等主人下一句、飞书扫码建机器人只收主人私聊、一条农场消息发给每个主人、重启后接着用账号）；`connector/text.test.ts`：送出去的话照黄金数据。
 - `/mcp`：`mcp/mcp.test.ts`（给帮工它的工具、认出是谁、按阶段列帮工、不认识的人不给调、帮工只读写自己的记性、帮工写文档）。
-- Inbox：`packages/protocol/src/rules/golden.test.ts`（每种什么时候算、id、截字、先后）；巡查在 `manager/rules.test.ts`。
-- 页面：`apps/web/test/chat.spec.ts`（频道和未读、串、在频道里说话）、`farm-chat.spec.ts`、`settings.spec.ts`（连接器页）、`farm-phone.spec.ts`（来电）；`apps/web/src/rules/notice.test.ts`。
+- 页面：`apps/web/test/chat.spec.ts`（频道和未读、串、在频道里说话）、`farm-chat.spec.ts`、`settings.spec.ts`（连接器页）、`farm-phone.spec.ts`（来电）。

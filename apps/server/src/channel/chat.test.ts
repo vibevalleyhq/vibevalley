@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { type ChatMessage, type Conversation, managerAgent, type RunTrigger, type Session } from "@vibevalley/protocol";
+import { type ChatMessage, type Conversation, managerAgent, type Session } from "@vibevalley/protocol";
 import { conversationOf, generalOf, head, isBusy, messagesIn, wakeBreaker } from "@vibevalley/protocol/rules";
 import { Effect, Layer, PubSub, Stream } from "effect";
 import { SqlClient } from "effect/sql";
@@ -7,9 +7,8 @@ import { type Config, Settings } from "../base/config.ts";
 import { Database } from "../base/db.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
 import { summaryOf } from "../session/rules.ts";
-import { type Delivered, type InputConsumed, type LaunchActivity, type SessionShape, Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Channels, type ManagerNews, layer as channelLayer } from "./chat.ts";
+import { Channels, type Delivered, type LaunchActivity, type ManagerNews, layer as channelLayer } from "./chat.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 takes a while, 「必败」 fails. */
 class FakeSessions {
@@ -68,31 +67,29 @@ class FakeSessions {
   }
 }
 
-const fakeLayer = (x: FakeSessions) =>
-  Layer.effect(
-    Sessions,
+/** The fake sessions as the channels' helpers, registered the way Agent Sessions registers the real ones. */
+const fakeHelpers = (x: FakeSessions) =>
+  Layer.effectDiscard(
     Effect.gen(function* () {
       x.core = yield* Core;
+      const chat = yield* Channels;
       x.launches = yield* PubSub.unbounded<LaunchActivity>();
-      const consumed = yield* PubSub.unbounded<InputConsumed>();
       yield* Effect.addFinalizer(() => Effect.sync(() => (x.stopped = true)));
-      return {
-        currentRun: () => "",
-        deliver: (id: string, text: string, _by: RunTrigger) => Effect.sync(() => x.deliver(id, text)),
-        launches: Effect.map(PubSub.subscribe(x.launches), Stream.fromSubscription),
-        inputsConsumed: Effect.map(PubSub.subscribe(consumed), Stream.fromSubscription),
-        find: (id: string) => {
-          const session = x.core.session(id);
-          return session ? { session, place: { project: "", cwd: "" }, lastText: x.last.get(id) ?? "" } : undefined;
-        },
-      } as unknown as SessionShape;
+      chat.useHelpers({
+        present: (id) => x.core.session(id) !== undefined,
+        deliver: (id, text) => Effect.sync(() => x.deliver(id, text)),
+        currentRun: () => undefined,
+        report: (id) => summaryOf(x.last.get(id) ?? ""),
+      });
+      yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(yield* PubSub.subscribe(x.launches)), chat.activity));
+      yield* chat.helpersBack;
     }),
   );
 
 const world = (x: FakeSessions, config: Config = testConfig()) => {
   const c: Config = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
-  return channelLayer.pipe(
-    Layer.provideMerge(fakeLayer(x)),
+  return fakeHelpers(x).pipe(
+    Layer.provideMerge(channelLayer),
     Layer.provideMerge(coreLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(Settings, c)),

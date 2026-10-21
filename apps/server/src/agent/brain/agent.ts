@@ -7,8 +7,8 @@
 import { Agent, type AgentEvent, type AgentMessage, type AgentTool, type ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { type Tool, toToolDeclaration, type ToolCall, type Usage } from "@earendil-works/pi-ai";
 import { join } from "node:path";
-import { finished, type Task } from "../../task/engine.ts";
-import type { TaskStore } from "../../task/store.ts";
+import { finished, type Task } from "./taskGraph.ts";
+import type { TaskStore } from "./taskStore.ts";
 import { applyPlan, type Compacted, type CompactionOptions, compactInPlace, estimateTokens, planCompaction } from "./compaction.ts";
 import type { LLM, McpServer } from "./config.ts";
 import { connectAll, type McpConnections } from "./mcp.ts";

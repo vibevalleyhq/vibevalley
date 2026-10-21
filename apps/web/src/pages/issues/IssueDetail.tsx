@@ -5,7 +5,8 @@ import { api } from "../../data/api";
 import { newSendKey } from "./write";
 import type { Tone } from "../../rules/cards";
 import { issueTag, priorityLabel, runText, tagLabel, tagOpen } from "../../rules/issues";
-import { actLabel, bugText, changesLine, type CriterionRow, findingsOf, issueState, noStepsText, resumeWords, standingTone } from "../../rules/issueState";
+import { changesLine, type CriterionRow, issueState, noStepsText, standingTone } from "../../rules/issueState";
+import { actLabel } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { ready, useAgents, useQuery } from "../../data/query";
@@ -71,10 +72,18 @@ export function IssueDetail(props: {
     return done;
   }
 
-  const say = (words: string) => {
+  /** An act is the server's (issue.act); the page gathers the words some take and shows the harvest's checklist and the
+   * close dialog first. */
+  const doAct = (a: IssueAct, words = "") => {
     const id = props.issue.id;
-    if (!words.trim()) return;
-    void act(() => api.issue.comment({ id, body: { text: words.trim(), sendKey: newSendKey() } })).then((ok) => {
+    return act(() => api.issue.act({ id, body: { act: a, ...(words ? { text: words, sendKey: newSendKey() } : {}) } }));
+  };
+
+  /** answer, tell, reject: what the box says (reject: one weed a line); nothing said, nothing sent. */
+  const sayAct = (a: IssueAct) => {
+    const words = text().trim();
+    if (!words) return;
+    void doAct(a, words).then((ok) => {
       if (!ok) return;
       setText("");
       setBox(undefined);
@@ -84,10 +93,8 @@ export function IssueDetail(props: {
   const reopen = async () => {
     const id = props.issue.id;
     const words = text().trim();
-    // Never sent: back to the backlog; sent: another round.
-    const status = props.issue.sessions.length > 0 ? "todo" : "backlog";
     setBusy(true);
-    const got = await run(() => api.issue.status({ id, body: { status, text: words } }));
+    const got = await run(() => api.issue.act({ id, body: { act: "reopen", ...(words ? { text: words } : {}) } }));
     setBusy(false);
     const last = got?.sessions[got.sessions.length - 1];
     if (last) {
@@ -96,47 +103,28 @@ export function IssueDetail(props: {
     }
   };
 
-  /** 打回: what the box says is the findings, one weed a line. */
-  const reject = async () => {
-    const lines = findingsOf(text());
-    if (lines.length === 0) return;
-    const id = props.issue.id;
-    if (await act(() => api.issue.accept({ id, body: { pass: false, findings: lines } }))) {
-      setText("");
-      setBox(undefined);
-    }
-  };
-
   const go = (a: IssueAct) => {
-    const id = props.issue.id;
     const h = props.session ?? head();
     switch (a) {
-      case "start":
-        return void act(() => api.issue.status({ id, body: { status: "todo" } }));
-      case "answer":
-        return say(text());
-      case "accept":
-        return void act(() => api.issue.accept({ id, body: { pass: true } }));
-      case "reject":
-        return box() === "reject" ? void reject() : void setBox("reject");
       case "harvest":
         return props.onClose(h, true);
-      case "acknowledge":
-        return void act(() => api.issue.status({ id, body: { status: "done" } }));
-      case "resolve":
-        return void act(() => api.issue.resolve({ id }));
-      case "resume":
-        return void act(() => api.issue.comment({ id, body: { text: resumeWords } }));
-      case "cure":
-        return void act(() => api.issue.comment({ id, body: { text: bugText(h.brief) } }));
-      case "tell":
-        return box() === "tell" ? say(text()) : void setBox("tell");
-      case "stop":
-        return void act(() => api.session.stop({ id: h.id }));
       case "close":
         return props.onClose(h, false);
+      case "answer":
+        return sayAct(a);
+      case "reject":
+      case "tell":
+        return box() === a ? sayAct(a) : void setBox(a);
       case "reopen":
         return void reopen();
+      case "start":
+      case "accept":
+      case "acknowledge":
+      case "resolve":
+      case "resume":
+      case "cure":
+      case "stop":
+        return void doAct(a);
     }
   };
 
@@ -190,7 +178,9 @@ export function IssueDetail(props: {
                 <div class="mt-1 line-clamp-4 whitespace-pre-wrap">{ask().line}</div>
               </Show>
               <Show when={s().standing.state === "asking"}>
-                <For each={props.issue.asks}>{(a) => <Question ask={a} busy={busy()} onPick={say} />}</For>
+                <For each={props.issue.asks}>
+                  {(a) => <Question ask={a} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
+                </For>
               </Show>
             </Note>
             <Show when={s().standing.state === "asking" || s().standing.state === "closed" || box()}>
@@ -203,7 +193,7 @@ export function IssueDetail(props: {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey && !e.isComposing && box() !== "reject" && s().standing.state !== "closed") {
                     e.preventDefault();
-                    say(text());
+                    sayAct(box() === "tell" ? "tell" : "answer");
                   }
                 }}
                 placeholder={
@@ -245,7 +235,7 @@ export function IssueDetail(props: {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
                 e.preventDefault();
-                say(text());
+                sayAct("tell");
               }
             }}
             placeholder={head().phase._tag === "working" ? "干着活也能收到这句话" : "说一句，它接着做一轮"}
@@ -600,7 +590,7 @@ export function ManagerIssueDetail(props: { issue: Issue }) {
   const go = async (a: IssueAct) => {
     const id = props.issue.id;
     setBusy(true);
-    await run(() => api.issue.status({ id, body: { status: a === "acknowledge" ? "done" : "canceled" } }));
+    await run(() => api.issue.act({ id, body: { act: a } }));
     setBusy(false);
   };
   return (

@@ -76,6 +76,7 @@
 | `issue.draft` | `POST /api/v1/issues/{id}/draft` | ✓ | ✓ |   |
 | `issue.dispatch` | `POST /api/v1/issues/{id}/dispatch` | ✓ | ✓ |   |
 | `issue.accept` | `POST /api/v1/issues/{id}/accept` | ✓ | ✓ | ✓ |
+| `issue.act` | `POST /api/v1/issues/{id}/act` | ✓ | ✓ |   |
 
 ## session
 

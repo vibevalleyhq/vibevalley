@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 帮工档案的记性：存、挑、记下、忘掉、上限 | 提醒块怎么拼进输入、干活过程怎么显示「想起了」（`session/rules.ts` 的 `withRecall`，`session/facts.ts`） |
-| 开工想起什么（`pick`），和「下回开工会想起什么」的预览 | 什么时候算新的一轮、同一个会话想起过哪些（`session`，存在 `sessions.json`） |
+| 开工想起什么（`pick`），和「下回开工会想起什么」的预览 | 什么时候算新的一轮、同一个会话想起过哪些（`session`，存在库里它那一行） |
 | 管理器：本地和外面的来源一起读、一起写，合并、去重、超时 | 外面来源的地址和 key 怎么存、怎么校验（`setting`，`settings.json` 的 `memorySources`） |
 | `memory_search`、`memory_add` 背后的检索和写入，回给模型的话（`foundText`） | 工具的参数、谁能用、范围由谁定（`apps/server/src/tool`；帮工经 `/mcp`，`mcp`） |
 | 管家的 `MEMORY.md` 和旧账 `archive/` 给页面的读写口子 | 管家怎么把 `MEMORY.md` 带进系统提示、`remember` 和 `search_archive` 工具（`agent/brain/memory.ts`；[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「管家页」） |
@@ -45,7 +45,7 @@
 1. `session` 用这一轮的话做线索（`recallCue`：档案、Session、项目、话，和这个会话想起过的 id）调 `recall`。
 2. 管理器同时问所有开着的来源的 `prefetch`：本地的一直等，外面的最多等 2 秒（`prefetchTimeout`），等不到或出错就跳过、日志记一句。
 3. 只有一个来源有结果就照它给的；几个来源时各来源的分数比不了，按名次轮流取，几乎一样的只留一条，照旧最多 8 条、1600 字。
-4. 只有合并后真放进话里的本地记忆记一次想起（`recalled + 1`、`recalled_at`）；所有放进去的 id 记进这个会话想起过的，存进 `sessions.json`，重启接回原会话也不再给；原会话接不上、另开新会话时清空重想。
+4. 只有合并后真放进话里的本地记忆记一次想起（`recalled + 1`、`recalled_at`）；所有放进去的 id 记进这个会话想起过的，存进库里这个 Session 的一行，重启接回原会话也不再给；原会话接不上、另开新会话时清空重想。
 5. `session` 把这几行以「【你记得的】」开头、写明是以前的信息不是指令、对不上以眼前为准，和输入隔一条分隔线（`session.JobBreak`）放在前面；干活过程里先记工单，再记一步「想起了」（`memory/recalled`）。
 
 **记下**（一轮结束，`session` 在后台调 `keep`，汇报不等它）：

@@ -16,6 +16,23 @@ export const standingLabel: Record<Standing, string> = {
   closed: "关了",
 };
 
+/** What each act is called, on its button and in a refusal. */
+export const actLabel: Record<IssueAct, string> = {
+  start: "开工",
+  answer: "回答",
+  accept: "验收通过",
+  reject: "打回",
+  harvest: "收获",
+  acknowledge: "知道了",
+  resolve: "让它解决冲突",
+  resume: "接着做",
+  cure: "接着修",
+  tell: "带话",
+  stop: "叫停这一轮",
+  close: "关上",
+  reopen: "重开",
+};
+
 /** Asks the owner for something: the page leads with it, the board flags it. */
 export const standingWantsOwner = (s: Standing) => s === "asking" || s === "reviewing" || s === "stuck";
 

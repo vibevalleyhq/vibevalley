@@ -2,7 +2,7 @@
 
 种植计划（`TaskGraph`）把一件很长的编码活拆成有先后的几件（`Task`），每件一个帮工，按 DAG 推进：等的都合进去了才开工，互不依赖的同时做。计划是带 `graph` 的父工单，每一件是带 `task` 的子工单；它有自己的计划分支，每一件做完由农场跑检查、合进计划分支，全部做完主人一次收获进主分支。农场里是院子里的图纸桌（计划板）。
 
-同一个模块里的 `task/engine.ts` 是另一张图：VibeValley 自己的 agent 在一个会话里给自己记的任务图，和种植计划共用 `packages/protocol/src/rules/dag.ts` 的边的规则，别的都不共用（见[agent 自己的任务图](#agent-自己的任务图)）。
+VibeValley 自己的 agent 在一个会话里给自己记的任务图是另一张图，在 `agent/brain`，和种植计划只共用 `packages/protocol/src/rules/dag.ts` 的边的规则（见[agent 自己的任务图](docs/subsystems/agent.md#自己的任务图)）。
 
 ## 管什么，不管什么
 
@@ -15,13 +15,12 @@
 | 计划分支：开、合进去、收获进主分支 | git 操作本身：冲突预检、合并、`.vibevalley/check`（`project`，[项目](docs/subsystems/project.md)） |
 | 计划的经过（`task_event`） | 计划板怎么画（[farm-ui.md](docs/reference/farm-ui.md) 第 18 项、`apps/web/src/farm/panels/TaskBoard.tsx`） |
 | 什么时候告诉管家一句 | 管家怎么回话、它的工具怎么包装（`manager`、`tool/tool.ts`） |
-| agent 自己的任务图的形状、状态和存储（`task/engine.ts`、`task/store.ts`） | 把任务图交给模型的工具和帮手的推进（`agent/brain/tasks.ts`） |
 
 ## 在哪
 
 - 服务端 `apps/server/src/task`（`Tasks`）：`task.ts` 拆、调度、验证、动作、计划的经过和开机恢复；`rules.ts` 是只有它用的纯函数（`startable`、`parseSplit`、`editTask`、`removeTask`、`taskBrief`、冻结文件的判断和交给帮工的几句话）。
 - 几处都用的规则在 `packages/protocol/src/rules`：`tasks.ts`（`graphProblems`、`readyTasks`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、验收的几条、`maxTasks`、`defaultParallel`、`autoRetries`）、`taskIssues.ts`（`graphIssues` 把计划拆成一家工单，`graphsOf`、`graphOf` 从核心状态里的工单拼回计划）、`taskChanges.ts`（两版计划比出经过和它的说法）、`dag.ts`（边的规则，和 `engine` 共用）。工单状态怎么从计划算在 `issues.ts`。
-- 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`；`engine` 的图存在 `task_graph`。
+- 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`。
 - 接口：`graph.*`（`split`、`updateTask`、`deleteTask`、`act`、`taskAct`、`changes`、`events`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graphs`、`task_edit`、`graph_action`、`task_action`，帮工的工具 `issue_split`（都在 `tool/tool.ts`）。
 - 帧：`StateFrame.graphs` 是服务端拼好的计划，带分层（`layers`）、每件在等谁（`blockedBy`）、要不要主人看（`asksForYou`）、花了多少（`spent`）、做完几件（`settled`）和能做的动作。
 - 页面：计划板 `apps/web/src/farm/panels/TaskBoard.tsx`；看板上计划是一张「计划：…」卡片（`apps/web/src/rules/cards.ts`），子工单的标题前加计划名（`rules/issues.ts` 的 `issueTitle`）；工单详情里的一件是 `pages/issues/TaskDetail.tsx`。
@@ -99,14 +98,6 @@
 - **Inbox（`packages/protocol/src/rules/inbox.ts`）**：没做成的件是一条 `task-failed`，巡查过了宽限期叫醒管家（[管家](docs/subsystems/manager.md)）。
 - **游戏（`game`）**：收获一个计划记一条账，金币 `30 + 10 × 合进去的件数`，件数到档位给成就（[farm-ui.md](docs/reference/farm-ui.md)「金币」）。
 
-## agent 自己的任务图
-
-`task/engine.ts` 是 VibeValley 自己的 agent（`agent/brain`）在会话里给自己记的图：每件写明做什么（`brief`）、等哪几件（`after`）、谁做（`self` 或交给帮手的 `helper`）、状态（`waiting`、`working`、`done`、`failed`、`skipped`）和结果。
-
-- 一张图最多 30 件（`maxTasks`）；`add` 整批收或整批不收，回给模型的问题说清是哪一条；改只让没开始和没做成的改正文和先后。交给帮手的件失败后重来 1 次（`retries`）；叫回或进程没了，在做的退回等着。
-- 存储（`task/store.ts`）是一个主人没做完的那张图：库里的存在表 `task_graph`，按会话 id 分开，做完的盖上 `finished_at` 留着；内存里的给命令行，进程退出就没了。服务端给农机 `vibevalley` 的每个会话一个库里的存储。
-- 它不进工单、不进核心状态、没有分支和检查，和种植计划不相通。
-
 ## 为什么这样
 
 - **长活拆成一张图，交给不同的帮工。** 一个会话从头做到尾，上下文越拉越长、越做越差，中途失败整轮重来；互不依赖的部分没法并行，也没法按长处分给不同的档案。放弃了让管家在对话里一单一单地派：进度只在便宜模型的上下文里，十几步跟不住，重启就丢，每一步调度还花一次模型调用。拆图要模型，调度不要。
@@ -134,6 +125,5 @@
 
 - `apps/server/src/task/task.test.ts`（脚本扮演帮工、真的 git 仓库）：菱形的图拆开、两件同时做、合进去后下一件看得到它们的文件、收获；验收这一步先做、冻结；做不成的一件先打回、再留给主人重试或跳过；有问题的计划打回一次；农场停下时在做的计划暂停、继续后接着做；挑档案和规划帮工读的话；计划是父工单、每件是它下面的工单；帮工拆自己的工单，各件马上开工。
 - `task/rules.test.ts`：黄金数据（`testdata/rules.jsonl.gz`）。
-- `task/engine.test.ts`：加进来的件等着、第一件能开工；一批里有问题就整批不收；做完或跳过让下一件开工；一件能变成什么；给模型看的图；交给帮手的件出去再回来；存储留着图、把做完的收起来；一个主人的图不是另一个的。
 - `packages/protocol/src/rules/golden.test.ts`：计划拆成工单再拼回来、各张工单的状态、经过的说法（`rules.jsonl.gz`）。
 - 页面：`apps/web/test/farm-hud.spec.ts`（计划板打开），`issues.spec.ts`（计划的工单在看板上）。

@@ -7,9 +7,11 @@ import type { Agent, Session } from "@vibevalley/protocol";
 import { seedAgents } from "@vibevalley/protocol/rules";
 import { Effect, Fiber, Stream } from "effect";
 import { Core } from "../core/core.ts";
+import { Projects } from "../project/project.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
-import { type LaunchActivity, Sessions } from "./session.ts";
+import { type LaunchActivity } from "../channel/chat.ts";
+import { Sessions } from "./session.ts";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
@@ -79,7 +81,8 @@ describe("sessions", () => {
       expect((yield* sessions.runs("i1")).map((r) => r.triggeredBy.kind)).toEqual(["issue", "comment"]);
       expect(seen.some((a) => a.kind === "ended" && a.id === id)).toBe(true);
 
-      const merged = yield* sessions.merge(id);
+      const projects = yield* Projects;
+      const merged = yield* sessions.handOver(id, "merged", (place) => projects.merge(place));
       expect(merged.commits).toBe(2);
       expect(core.session(id)).toBeUndefined();
       const gone = (yield* sessions.get(id))!;
@@ -122,7 +125,9 @@ describe("sessions", () => {
       s.expect(h, { kind: "comment" });
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
       expect(phase(core, "w1")).toBe("ripe");
-      expect((yield* Effect.flip(sessions.merge("w1"))) as { _tag: string }).toMatchObject({ _tag: "Refused" });
+      expect((yield* Effect.flip(sessions.handOver("w1", "merged", () => Effect.succeed({ text: "", commits: 0 })))) as { _tag: string }).toMatchObject({
+        _tag: "Refused",
+      });
       for (const step of ["pending", "started"]) {
         if (step === "started") {
           yield* core.apply({ type: "run", id: "w1" });

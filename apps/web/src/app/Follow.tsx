@@ -4,19 +4,23 @@
 
 import { createEffect, onSettled } from "solid-js";
 import { currentHost } from "@vibevalley/host";
-import { CallBell, noticeFor, traySummary } from "../rules/notice";
+import { freshOf } from "@vibevalley/protocol/rules";
+import { traySummary } from "../rules/notice";
 import { voiceCall } from "../voice/call";
 import { rawFrame } from "../farm/state";
 
 export function Follow() {
-  // The frame as it came: the bell compares one inbox with the one before.
+  // The frame as it came: what is news compares one inbox with the one before.
   const frame = rawFrame();
-  const bell = new CallBell();
+  let known: Set<string> | undefined;
   let tray = "";
   createEffect(frame, (f) => {
     if (!f) return;
     const host = currentHost();
-    for (const call of bell.ring(f.inbox)) if (host.notify && !document.hasFocus()) void host.notify(noticeFor(call)).catch(() => {});
+    const news = freshOf(known, f.inbox);
+    known = news.known;
+    for (const call of news.fresh)
+      if (host.notify && !document.hasFocus()) void host.notify({ title: call.words.title, body: call.words.body }).catch(() => {});
     if (!host.tray) return;
     const summary = traySummary(f.state, f.inbox);
     const said = JSON.stringify(summary);

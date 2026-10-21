@@ -6,9 +6,11 @@ const call = (id: string): InboxItem => ({
   id,
   kind: "merge",
   from: { kind: "session", id: "s1", name: "阿狐", agent: "fox" },
+  who: "阿狐",
   text: "做完了",
   at: 0,
   target: { kind: "session", id: "s1" },
+  words: { label: "活熟了", title: "阿狐 做完了", body: "做完了" },
 });
 
 /** A phone on a hand-turned clock. */
@@ -18,6 +20,8 @@ function phone(open = false) {
   const rings: number[] = [];
   const host = {
     open,
+    talking: false,
+    inCall: () => host.talking,
     isOpen: () => host.open,
     setOpen: (o: boolean) => void (host.open = o),
     play: (s: string) => void (s === "ring" && rings.push(now)),
@@ -102,6 +106,20 @@ test("nothing rings while the farm is away, and coming back primes again", () =>
   calls.resume();
   calls.calls([call("a")]);
   expect(calls.get().ringing).toBeNull();
+  calls.calls([call("a"), call("b")]);
+  expect(calls.get().ringing?.id).toBe("b");
+});
+
+test("on a call nothing rings: the manager says it there, and the call waits among the missed", () => {
+  const { calls, host, rings } = phone();
+  calls.resume();
+  calls.calls([]);
+  host.talking = true;
+  calls.calls([call("a")]);
+  expect(calls.get().ringing).toBeNull();
+  expect(rings).toEqual([]);
+  expect(missedOf(calls.get()).map((c) => c.id)).toEqual(["a"]);
+  host.talking = false;
   calls.calls([call("a"), call("b")]);
   expect(calls.get().ringing?.id).toBe("b");
 });

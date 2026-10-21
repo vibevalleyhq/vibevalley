@@ -44,7 +44,8 @@ function conclusion(text: string, min: number): string {
   return tail;
 }
 
-function reportVerdict(text: string): string {
+/** A report's verdict: the paragraph after its last 结论：, else empty. */
+export function reportVerdict(text: string): string {
   const all = [...text.matchAll(verdict)];
   const last = all.at(-1);
   if (!last) return "";
@@ -60,7 +61,6 @@ function reportVerdict(text: string): string {
 export const summaryOf = (text: string) => reportVerdict(text) || conclusion(text, 80);
 
 /** A pull request's description: the verdict, else the whole reply. */
-export const pullRequestConclusion = (text: string) => reportVerdict(text) || text;
 
 /** Said out loud on the farm, not only in the report. */
 const needsYou = new Set<FailureClass>(["auth", "billing", "quota", "model_unavailable"]);

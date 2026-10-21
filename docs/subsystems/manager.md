@@ -18,7 +18,7 @@
 
 ## 在哪
 
-- **`apps/server/src/manager`**（`Manager`）：`manager.ts` 起大脑（`brainOf`）、收输入和它的路由与来源、农场现状、把字送回频道、叫停、接着做、巡查、做错的一轮存成样例；提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：农场现状的差异（`situationDelta`）、截长汇报（`managerInboxLines`）、用量那一行字、巡查（`patrolStep`、`patrolText`），黄金数据在 `testdata/rules.jsonl.gz`；`evals.ts` 样例和评判。
+- **`apps/server/src/manager`**（`Manager`）：`manager.ts` 起大脑（`brainOf`）、收输入和它的路由与来源、农场现状、把字送回频道、叫停、接着做、听巡查、做错的一轮存成样例；提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：农场现状的差异（`situationDelta`）、截长汇报（`managerInboxLines`）、用量那一行字、巡查的话（`patrolText`）；`evals.ts` 样例和评判。
 - **`apps/server/src/tool`**（`Tools`）：管家的 28 个工具和帮工经 `/mcp` 的 6 个各定义一次（`tool.ts`，参数的 Schema 在 `schemas.ts`），管家那张表的顺序是提示开头的一部分；`testdata/tool_schemas.json` 守着每个工具的参数。
 - **`apps/server/src/agent/brain`**：自己的 agent（`agent.ts` 的 `Brain`，搭在 pi-agent-core 的 `Agent` 上；`session.ts` 对话文件、`compaction.ts` 压缩、`prefix.ts` 提示开头、`skills.ts`、`memory.ts`、`mcp.ts`、`schedules.ts`、`tasks.ts` 帮手、`coding.ts` 编码工具、`self.ts`）；`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议。模型表和价格在 `apps/server/src/ai/models.ts`，流式和工具调用用 pi-ai。命令行 `apps/server/src/cli.ts` 不带命令时就是它。
 - **`apps/server/src/agent`**：帮工档案、技能和农机设置，存在 `$VIBEVALLEY_HOME/config.json`；`managerProfile` 是内置的管家档案。
@@ -83,7 +83,7 @@
 2. 从对话里读回最后那条输入，回答发回它的频道；它是交给管家的工单时，接着做的这一轮记在那张工单上，结束时工单照常等主人点头。
 3. 主人叫停的、做完的不接；最后一条比 30 分钟还旧的不接，日志记「上一轮停在了半路，太久了，没有接着做」。
 
-**巡查**（`manager.ts`，规则在 `rules.ts`）：每 `patrol.heartbeat_minutes` 分钟（默认 10，0 关掉；开机后等一个间隔才第一次看）不调模型看一遍 Inbox（`patrolStep`）。放久了没人管的才报：`mention` 15 分钟、`quiet` 20 分钟、`merge` 和 `conflict` 2 小时、`task-failed` 30 分钟（`patrolGrace`，从 Inbox 给的时刻算，没有就从第一次看到算）；别的种类不报（没做成的当场就叫醒管家，`schedule-ask` 是主人的事）。同一件事报过 4 小时内不再报，不再挂着的忘掉。有的才按频道叫醒管家一次（「【巡查】#… 里有几件事放着没人管」），由它决定提不提醒主人。
+**巡查**：通知模块按宽限期找出放久了没人管的（[通知](docs/subsystems/notice.md)），每个频道一条经 `Notices.overdue` 给管家；管家写成「【巡查】#… 里有几件事放着没人管」（`patrolText`）叫醒自己，由它决定提不提醒主人。
 
 **做错的一轮**（`manager.markWrong`，`POST /api/v1/manager/evals`，管家页「轨迹」里点「这一轮做错了」）：
 
@@ -97,6 +97,7 @@
 - **田头（`channel`）**：经 `forManager` 收话、`managerDigest` 取这期间的汇报（读了不算已读，消费后才提交回执）、`managerSays` 把字写进频道；`say`、`spoken` 把主人的话写进田头，带 `sendKey` 的重发不再交给管家（[田头](docs/subsystems/channel.md)的「重发不成两条」）。
 - **工单（`issue`）**：派给管家的工单和管家的定时经 `forManager` 交来；管家这一轮结束（答完、没答成、叫停），工单都进「等你看」、记下结局，主人点头才关（`answered`）（[工单](docs/subsystems/issue.md)）。`dispatch` 直接 `Issue.hire`；`issues`、`issue_create`、`issue_update`、`issue_status`、`merge`、`accept`、`changes` 是工单服务的方法（`list`、`add`、`draft`、`edit`、`setStatus`……）。
 - **执行（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给农场现状和工具找帮工；`chooseAgent` 挑档案。
+- **语音（`voice`）**：电话里的每句经 `call`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完），电话和 `brief` 都不会一直等着。
 - **定时（`schedule`）**：管家的 `schedule` 工具经 `Schedule.Add(req, manager, owner)`；`wakeSoon` 读定时决定空闲时压不压。
 - **种植计划（`task`）**：`news` 交来提醒；`graph_split`、`graph_action`、`task_edit`、`task_action` 调它。
 - **记性（`memory`）**：`managerHome` 定家目录；管家页的记性和旧账接口读写 `MEMORY.md` 和 `archive/`，和管家自己的工具用同一套函数（`agent/brain/memory.ts`）。

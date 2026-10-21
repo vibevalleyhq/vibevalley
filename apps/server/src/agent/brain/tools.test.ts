@@ -3,7 +3,7 @@ import { validateToolArguments } from "@earendil-works/pi-ai";
 import { existsSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { memoryStore } from "../../task/store.ts";
+import { memoryStore } from "./taskStore.ts";
 import { Brain } from "./agent.ts";
 import { codingTools, htmlText } from "./coding.ts";
 import { readMcpConfig } from "./config.ts";

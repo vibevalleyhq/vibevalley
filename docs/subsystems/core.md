@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 核心状态怎么变：`apply`、`reduce`，每条事实的前后状态（`Transition`） | 某种事实什么时候施加、业务规则（各拥有者：[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[田头](docs/subsystems/channel.md)、[定时](docs/subsystems/schedule.md)、[种植计划](docs/subsystems/task.md)） |
-| `state.json`：存什么、什么时候存、开机怎么读回 | 库里的表、`sessions.json`、各 Session 的日志（[帮工](docs/subsystems/session.md)、[architecture.md](docs/architecture.md)「存了什么」） |
+| `state.json`：存什么、什么时候存、开机怎么读回 | 库里的表、各 Session 的日志（[帮工](docs/subsystems/session.md)、[architecture.md](docs/architecture.md)「存了什么」） |
 | 给页面的帧 `StateFrame`（`frameOf`）和特效的发出 | 地里长什么、特效和账本怎么算（[游戏](docs/subsystems/game.md)、[farm-ui.md](docs/reference/farm-ui.md)） |
 | 三条 SSE 流 `/api/v1/state`、`/api/v1/events`、`/api/v1/live` | 帮工的 `/mcp`（[田头](docs/subsystems/channel.md)）、语音线路（[语音](docs/subsystems/voice.md)） |
 | 接口表 `api.ts` 的 `endpoints`、能力表 `can`、`/api/v1` 版本、命令行这张皮 | 每个接口做什么（拥有它的服务）；「连接到本机」的配对和钥匙（[连接到本机](docs/subsystems/lan.md)）；管家和帮工的工具（`apps/server/src/tool`，[管家](docs/subsystems/manager.md)） |
