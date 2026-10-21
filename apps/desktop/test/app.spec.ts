@@ -3,6 +3,7 @@
 // the host interface reaches the main process. Which calls ring is apps/web/src/rules/notice.ts's (its own tests).
 
 import { _electron as electron, expect, test } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,7 +16,22 @@ import type { Notice } from "@vibevalley/host";
 const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_/;
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !secret.test(k)));
 
+/** Another VibeValley holds the single-instance lock (this repo's Electron on the app folder, as desktop:dev runs it, or
+ * the packaged app): the one launched here would quit at once, "closed" being all Playwright could say. */
+function openAlready(): string | undefined {
+  const app = join(import.meta.dirname, "..");
+  const repo = join(app, "..", "..");
+  const pattern = `^${repo}/node_modules/.*/MacOS/Electron (\\.|${app})$|VibeValley\\.app/Contents/MacOS/VibeValley$`;
+  try {
+    return execFileSync("pgrep", ["-fl", pattern], { encoding: "utf8" }).trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 test("the desktop app shows the live board and sends a notice", async () => {
+  const open = openAlready();
+  if (open) throw new Error(`VibeValley is already open (pnpm run desktop:dev?); close it first, only one may run:\n${open}`);
   const dir = mkdtempSync(join(tmpdir(), "vibevalley-desktop-"));
   const app = await electron.launch({
     args: [join(import.meta.dirname, "..")],

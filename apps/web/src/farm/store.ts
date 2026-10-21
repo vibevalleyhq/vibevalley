@@ -2,7 +2,6 @@
 // server's (useFrames/useCore); nothing here copies it: the overlays, the tool held, the chat window (open, large,
 // shown), the phone, and the looks and picks kept on this machine.
 
-import { useSyncExternalStore } from "react";
 import { dayClock } from "@vibevalley/engine/clock";
 import type { GameEffectReward } from "@vibevalley/protocol";
 import type { BedFxKind, Tool } from "./tools";
@@ -81,8 +80,8 @@ export interface FarmUi {
   readonly pet: string;
   /** Who the next job goes to: a profile's id, or "auto" for the manager to choose; this machine's. */
   readonly pick: string;
-  /** The project last sown in from the farm; this machine's. */
-  readonly lastProject: string | null;
+  /** The project whose farm is on the page ("" for the sessions without one), and the one `/` opens next; this machine's. */
+  readonly project: string | null;
 }
 
 const titleSeenKey = "vibevalley.title.seen";
@@ -117,11 +116,11 @@ const savedPick = () => {
   }
 };
 
-const lastProjectKey = "vibevalley.farm.lastProject";
+const projectKey = "vibevalley.farm.project";
 
-const savedLastProject = () => {
+const savedProject = () => {
   try {
-    return localStorage.getItem(lastProjectKey);
+    return localStorage.getItem(projectKey);
   } catch {
     return null;
   }
@@ -153,7 +152,7 @@ let state: FarmUi = {
   screen: null,
   ...savedLooks(),
   pick: savedPick(),
-  lastProject: savedLastProject(),
+  project: savedProject(),
 };
 
 const listeners = new Set<() => void>();
@@ -171,15 +170,6 @@ export const subscribeFarm = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);
 };
-
-/** A slice of the farm's state; return a field or a primitive (a fresh object every call would render forever). */
-export function useFarm<T>(select: (s: FarmUi) => T): T {
-  return useSyncExternalStore(
-    subscribeFarm,
-    () => select(state),
-    () => select(state),
-  );
-}
 
 const replace = (kind: FarmOverlay["kind"], next: FarmOverlay | null) =>
   set((s) => ({
@@ -249,10 +239,10 @@ export const farm = {
     set({ managerLook });
     saveLooks({ managerLook, pet: state.pet });
   },
-  setLastProject: (project: string) => {
-    set({ lastProject: project });
+  setProject: (project: string) => {
+    set({ project });
     try {
-      localStorage.setItem(lastProjectKey, project);
+      localStorage.setItem(projectKey, project);
     } catch {
       // No storage: remembered until the page closes.
     }
@@ -289,13 +279,4 @@ export function resetFarm() {
     rewards: [],
     screen: null,
   });
-}
-
-/** The clock's time of day, 0..1, re-rendering only when the HUD's clock text would change (every five minutes of the day). */
-export function useTimeOfDay(): number {
-  return useSyncExternalStore(
-    clock.subscribe,
-    () => Math.floor(clock.day().tod * 288) / 288,
-    () => clock.day().tod,
-  );
 }

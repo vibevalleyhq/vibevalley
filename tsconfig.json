@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": { "lib": ["ES2023", "DOM"], "types": ["bun"], "allowImportingTsExtensions": true },
+  "compilerOptions": { "lib": ["ES2023", "DOM"], "types": ["node"], "allowImportingTsExtensions": true },
   "include": ["scripts"]
 }

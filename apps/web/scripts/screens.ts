@@ -7,10 +7,10 @@ import { join } from "node:path";
 import { chromium } from "@playwright/test";
 
 const server = process.env.VIBEVALLEY_SERVER;
-if (!server) throw new Error("VIBEVALLEY_SERVER is not set: run this under bun scripts/verify-server.ts");
+if (!server) throw new Error("VIBEVALLEY_SERVER is not set: run this under scripts/verify-server.ts");
 const pages = (process.env.VIBEVALLEY_PAGES ?? "/,/issues,/chat,/docs,/agents,/manager,/runtimes,/projects,/catalog,/settings").split(",").filter(Boolean);
 const [width, height] = (process.env.VIBEVALLEY_SCREEN ?? "1440x900").split("x").map(Number);
-const out = join(import.meta.dir, "..", ".screens");
+const out = join(import.meta.dirname, "..", ".screens");
 mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch();

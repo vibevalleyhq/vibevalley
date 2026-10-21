@@ -15,7 +15,7 @@ test/              Playwright starting the whole app with a temporary home
 ```
 
 ```bash
-bun run dev       # from the repository root: bun run desktop:dev (build the page first)
+bun run dev       # from the repository root: bun run desktop:dev; builds the page, rebuilds it on change (the window reloads) and restarts the server when its code changes
 bun run test      # bun run desktop:test
 bun run package   # bun run package:mac
 ```

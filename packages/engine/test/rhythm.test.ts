@@ -2,7 +2,7 @@
 // wind. Pure, so a made-up random and clock are enough.
 
 import assert from "node:assert/strict";
-import { test } from "bun:test";
+import { test } from "vite-plus/test";
 import { cadence, gust } from "../src/pixi/rhythm";
 
 test("something every so often: never on the first ask, then once per wait, each wait 70–130% of it", () => {

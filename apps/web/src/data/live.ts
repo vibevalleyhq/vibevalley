@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { type LiveEvent, livePath, readStream } from "@vibevalley/protocol";
 
 type Listener = (e: LiveEvent) => void;
@@ -13,7 +12,8 @@ function connect(signal: AbortSignal) {
   });
 }
 
-function subscribe(l: Listener) {
+/** Listens to the live stream (/api/v1/live); returns how to stop. Framework-free: the Solid side subscribes here too. */
+export function subscribeLive(l: Listener) {
   listeners.add(l);
   if (!abort) {
     abort = new AbortController();
@@ -26,11 +26,4 @@ function subscribe(l: Listener) {
       abort = undefined;
     }
   };
-}
-
-/** Calls onEvent with each event of the live stream (/api/v1/live) while mounted. */
-export function useLive(onEvent: Listener) {
-  const ref = useRef(onEvent);
-  ref.current = onEvent;
-  useEffect(() => subscribe((e) => ref.current(e)), []);
 }

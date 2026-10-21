@@ -2,9 +2,9 @@
 // helpers. A block shows its marks until it is clicked into; then it is a plain field (marks are kept through the edit),
 // and Enter splits it, Backspace at its start joins it to the one before, Up and Down at its ends move between blocks.
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useNavigate, useParams } from "react-router";
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { useQueryClient } from "@tanstack/solid-query";
 import {
   type Agent,
   blockBulleted,
@@ -20,15 +20,18 @@ import {
   type DocSpan,
   docOwner,
 } from "@vibevalley/protocol";
-import { useAgents } from "../../data/agents";
 import { api, reasonOf } from "../../data/api";
+import { DocEditor, type EditBlock } from "./editor";
 import { hexColor, swatches } from "../../rules/cast";
 import { knownTypes } from "../../rules/docBlocks";
+import { useRouter } from "../../app/router";
+import { aria, Keyed } from "../../app/util";
+import { createExternal } from "../../data/external";
+import { ready, useAgents, useQuery } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { AgentFace } from "../../ui/Face";
-import { Icon } from "../../ui/Icon";
 import { TextInput } from "../../ui/Field";
-import { DocEditor, type EditBlock } from "./editor";
+import { Icon } from "../../ui/Icon";
 
 const docPath = (id?: string) => (id === undefined ? "/docs" : `/docs/${encodeURIComponent(id)}`);
 
@@ -45,124 +48,162 @@ function authorColor(updatedBy: string, agent: Agent | undefined) {
   return hexColor(swatches.trim[h % swatches.trim.length]!);
 }
 
-export function DocsPage() {
-  const id = useParams()["*"] || undefined;
-  const navigate = useNavigate();
+/** `rest` is the path after /docs/. */
+export function DocsPage(props: { rest: string }) {
+  const router = useRouter();
   const client = useQueryClient();
-  const [title, setTitle] = useState("");
-  const [problem, setProblem] = useState<string>();
-  const docs = useQuery({ queryKey: ["docs"], queryFn: () => api.doc.list() });
-  const list = docs.data ?? [];
-  const open = (id && decodeURIComponent(id)) || list[0]?.id;
+  const [title, setTitle] = createSignal("");
+  const [problem, setProblem] = createSignal<string>();
+  const docs = useQuery(() => ({ queryKey: ["docs"], queryFn: () => api.doc.list() }));
+  const list = () => ready(docs, []);
+  const id = () => props.rest || undefined;
+  const open = () => (id() && decodeURIComponent(id()!)) || list()[0]?.id;
   const create = async () => {
     try {
-      const made = await api.doc.create({ body: { title } });
+      const made = await api.doc.create({ body: { title: title() } });
       setTitle("");
       setProblem(undefined);
       await client.invalidateQueries({ queryKey: ["docs"] });
-      void navigate(docPath(made.doc.id));
+      router.navigate(docPath(made.doc.id));
     } catch (e) {
       setProblem(reasonOf(e));
     }
   };
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-3 lg:flex-row">
+    <div class="flex h-full min-h-0 flex-col gap-3 p-3 lg:flex-row">
       <nav
         aria-label="文档列表"
-        className={`${id ? "hidden lg:flex" : "flex"} shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-65 lg:overflow-y-auto`}
+        class={[id() ? "hidden lg:flex" : "flex", "shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-65 lg:overflow-y-auto"]}
       >
-        <h2 className="px-2 pt-1.5 text-base font-semibold">文档</h2>
+        <h2 class="px-2 pt-1.5 text-base font-semibold">文档</h2>
         <form
-          className="flex gap-1.5"
+          class="flex gap-1.5"
           onSubmit={(e) => {
             e.preventDefault();
             void create();
           }}
         >
-          <TextInput aria-label="新文档的标题" placeholder="新文档的标题" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <TextInput aria-label="新文档的标题" placeholder="新文档的标题" value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
           <Button type="submit" tone="primary" icon="button-add">
             新文档
           </Button>
         </form>
-        {(problem || docs.error) && <p className="px-2 text-xs text-berry">{problem ?? reasonOf(docs.error)}</p>}
-        {docs.data && list.length === 0 && <p className="px-2 text-xs text-muted">还没有文档。写个标题，点「新文档」。</p>}
-        <ul className="flex flex-col gap-0.5">
-          {list.map((d) => (
-            <li key={d.id}>
-              <button
-                type="button"
-                aria-current={d.id === open ? "page" : undefined}
-                onClick={() => navigate(docPath(d.id))}
-                className={`w-full cursor-pointer truncate rounded-md px-2 py-1.5 text-left text-sm font-medium ${d.id === open ? "bg-selected" : "hover:bg-hover"}`}
-              >
-                {d.title}
-              </button>
-            </li>
-          ))}
+        <Show when={problem() || docs.error}>
+          <p class="px-2 text-xs text-berry">{problem() ?? reasonOf(docs.error)}</p>
+        </Show>
+        <Show when={docs.isSuccess && list().length === 0}>
+          <p class="px-2 text-xs text-muted">还没有文档。写个标题，点「新文档」。</p>
+        </Show>
+        <ul class="flex flex-col gap-0.5">
+          <For each={list()}>
+            {(d) => (
+              <li>
+                <button
+                  type="button"
+                  aria-current={d.id === open() ? "page" : undefined}
+                  onClick={() => router.navigate(docPath(d.id))}
+                  class={[
+                    "w-full cursor-pointer truncate rounded-md px-2 py-1.5 text-left text-sm font-medium",
+                    d.id === open() ? "bg-selected" : "hover:bg-hover",
+                  ]}
+                >
+                  {d.title}
+                </button>
+              </li>
+            )}
+          </For>
         </ul>
       </nav>
-      <div className={`${id ? "flex" : "hidden lg:flex"} min-h-0 min-w-0 flex-1 flex-col gap-2`}>
-        {id && (
-          <div className="lg:hidden">
-            <Button icon="button-back" onClick={() => navigate(docPath())}>
+      <div class={[id() ? "flex" : "hidden lg:flex", "min-h-0 min-w-0 flex-1 flex-col gap-2"]}>
+        <Show when={id()}>
+          <div class="lg:hidden">
+            <Button icon="button-back" onClick={() => router.navigate(docPath())}>
               全部文档
             </Button>
           </div>
-        )}
-        {open && <DocView key={open} id={open} />}
+        </Show>
+        <Show when={open()}>{(o) => <Keyed key={o()}>{() => <DocView id={o()} />}</Keyed>}</Show>
       </div>
     </div>
   );
 }
 
-function useEditor(id: string) {
-  const [editor] = useState(() => new DocEditor(api, id));
-  useEffect(() => {
-    void editor.load();
-    return () => editor.dispose();
-  }, [editor]);
-  useSyncExternalStore(editor.subscribe, () => editor.version);
-  return editor;
+/** A block as one drawing of the editor shows it; `block` is the editor's own, for its actions. */
+interface Row {
+  readonly block: EditBlock;
+  readonly type: string;
+  readonly attrs: EditBlock["attrs"];
+  readonly text: string;
+  readonly spans: readonly DocSpan[];
+  readonly updatedBy: string;
+  readonly problem?: string;
+  readonly depth: number;
+  readonly number?: number;
+  readonly writing: boolean;
+  readonly showFace: boolean;
+  readonly wanted: boolean;
 }
 
-function DocView({ id }: { id: string }) {
-  const editor = useEditor(id);
-  const agents = new Map((useAgents().data ?? []).map((a) => [a.id, a]));
-  const numbers = editor.numbers;
-  let lastAuthor: string | undefined;
-  const status =
-    editor.error ?? (editor.busy ? "在存……" : ["都存好了", `${editor.blocks.length} 块`, ...(editor.othersWriting ? ["帮工在写"] : [])].join(" · "));
+function DocView(props: { id: string }) {
+  // Keyed by the id: one editor for the page's life.
+  const editor = new DocEditor(
+    api,
+    untrack(() => props.id),
+  );
+  onSettled(() => {
+    void editor.load();
+    return () => editor.dispose();
+  });
+  // The editor changes its blocks in place and bumps its version; each version is drawn as fresh rows, matched by id.
+  const version = createExternal(editor.subscribe, () => editor.version);
+  const all = useAgents();
+  const agents = createMemo(() => new Map(ready(all, []).map((a) => [a.id, a])));
+  const rows = createMemo((): Row[] => {
+    version();
+    const numbers = editor.numbers;
+    let lastAuthor: string | undefined;
+    return editor.blocks.map((b) => {
+      const writing = editor.writing(b);
+      const row: Row = {
+        block: b,
+        type: b.type,
+        attrs: { ...b.attrs },
+        text: b.text,
+        spans: b.spans,
+        updatedBy: b.updatedBy,
+        problem: b.problem,
+        depth: editor.depthOf(b),
+        number: numbers.get(b.id),
+        writing,
+        showFace: writing || (b.updatedBy !== docOwner && b.updatedBy !== lastAuthor),
+        wanted: editor.focusId === b.id,
+      };
+      lastAuthor = b.updatedBy;
+      return row;
+    });
+  });
+  const status = () => {
+    version();
+    return editor.error ?? (editor.busy ? "在存……" : ["都存好了", `${editor.blocks.length} 块`, ...(editor.othersWriting ? ["帮工在写"] : [])].join(" · "));
+  };
+  const doc = () => (version(), editor.doc);
   return (
-    <article aria-label={editor.doc?.title ?? "文档"} className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-page pt-4 pr-5 pb-2 pl-2">
-      <div className="flex items-start gap-2 pb-1 pl-[35px]">
-        <h1 className="min-w-0 flex-1 text-2xl font-semibold">{editor.doc?.title ?? ""}</h1>
+    <article aria-label={doc()?.title ?? "文档"} class="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-page pt-4 pr-5 pb-2 pl-2">
+      <div class="flex items-start gap-2 pb-1 pl-[35px]">
+        <h1 class="min-w-0 flex-1 text-2xl font-semibold">{doc()?.title ?? ""}</h1>
         <Button icon="button-play" onClick={() => void editor.demo()}>
           演示：几个帮工一起写
         </Button>
       </div>
-      <p role="status" className={`pb-3 pl-[35px] text-xs ${editor.error ? "text-berry" : "text-muted"}`}>
-        {status}
+      <p role="status" class={["pb-3 pl-[35px] text-xs", (version(), editor.error) ? "text-berry" : "text-muted"]}>
+        {status()}
       </p>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {editor.blocks.map((b) => {
-          const writing = editor.writing(b);
-          const row = (
-            <BlockRow
-              key={b.id}
-              editor={editor}
-              block={b}
-              depth={editor.depthOf(b)}
-              number={numbers.get(b.id)}
-              agent={agents.get(b.updatedBy)}
-              showFace={writing || (b.updatedBy !== docOwner && b.updatedBy !== lastAuthor)}
-              writing={writing}
-            />
-          );
-          lastAuthor = b.updatedBy;
-          return row;
-        })}
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <For each={rows()} keyed={(r) => r.block.id}>
+          {(row) => <BlockRow editor={editor} row={row()} agent={agents().get(row().updatedBy)} />}
+        </For>
         {/* Below the last block: a click starts a new paragraph. */}
-        <button type="button" aria-label="在末尾写一段" className="block h-16 w-full cursor-text" onClick={() => editor.append()} />
+        <button type="button" aria-label="在末尾写一段" class="block h-16 w-full cursor-text" onClick={() => editor.append()} />
       </div>
     </article>
   );
@@ -170,191 +211,228 @@ function DocView({ id }: { id: string }) {
 
 const barHeight = (type: string) => (type === blockDivider ? 16 : type === blockHeading ? 28 : 20);
 
-function BlockRow({
-  editor,
-  block: b,
-  depth,
-  number,
-  agent,
-  showFace,
-  writing,
-}: {
-  editor: DocEditor;
-  block: EditBlock;
-  depth: number;
-  number?: number;
-  agent?: Agent;
-  showFace: boolean;
-  writing: boolean;
-}) {
-  const writer = b.updatedBy === docOwner ? "主人" : (agent?.name ?? b.updatedBy);
-  let body;
-  if (!knownTypes.has(b.type)) body = <Placeholder text={`这一块是「${b.type}」，这个版本的客户端还画不了，只能看不能改`} />;
-  else if (b.type === blockDivider) body = <hr className="my-2 border-line" />;
-  else if (b.type === blockImage) body = <Placeholder text={`图片：${b.attrs.alt ?? ""} ${b.attrs.src ?? ""}`.trim()} />;
-  else if (b.type === blockIssueRef) body = <Placeholder text={`工单 ${b.attrs.issueId ?? ""}`} />;
-  else {
-    const mark =
-      b.type === blockBulleted ? (
-        "•"
-      ) : b.type === blockNumbered ? (
-        `${number ?? 1}.`
-      ) : b.type === blockMemoryItem ? (
-        <span className="text-xs text-muted">记性</span>
-      ) : b.type === blockTodo ? (
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={b.attrs.checked ?? false}
-          aria-label={b.attrs.checked ? "做完了" : "没做完"}
-          onClick={() => editor.toggle(b)}
-          className={`mt-[3px] flex size-4 cursor-pointer items-center justify-center rounded-[3px] border-[1.5px] ${b.attrs.checked ? "border-leaf-600 bg-leaf" : "border-bark-400 bg-paper"}`}
-        >
-          {b.attrs.checked && <Icon name="mark-check" size={10} />}
-        </button>
-      ) : undefined;
-    const box = b.type === blockQuote ? "border-l-[3px] border-cream-300 pl-3" : b.type === blockCode ? "rounded-md bg-ink-100 px-3 py-2" : "";
-    // One shape for every text block: a block that changes type keeps its field, and the field its focus.
-    body = (
-      <div className={`flex items-start ${box}`}>
-        {mark !== undefined ? <span className="w-[26px] shrink-0 pt-px">{mark}</span> : null}
-        <div className="min-w-0 flex-1">
-          <BlockField editor={editor} block={b} />
-        </div>
-      </div>
-    );
-  }
+function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
+  const r = () => props.row;
+  const writer = () => (r().updatedBy === docOwner ? "主人" : (props.agent?.name ?? r().updatedBy));
+  const mark = (): JSX.Element | undefined => {
+    switch (r().type) {
+      case blockBulleted:
+        return "•";
+      case blockNumbered:
+        return `${r().number ?? 1}.`;
+      case blockMemoryItem:
+        return <span class="text-xs text-muted">记性</span>;
+      case blockTodo:
+        return (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={aria(r().attrs.checked ?? false)}
+            aria-label={r().attrs.checked ? "做完了" : "没做完"}
+            onClick={() => props.editor.toggle(r().block)}
+            class={[
+              "mt-[3px] flex size-4 cursor-pointer items-center justify-center rounded-[3px] border-[1.5px]",
+              r().attrs.checked ? "border-leaf-600 bg-leaf" : "border-bark-400 bg-paper",
+            ]}
+          >
+            <Show when={r().attrs.checked}>
+              <Icon name="mark-check" size={10} />
+            </Show>
+          </button>
+        );
+      default:
+        return undefined;
+    }
+  };
+  const box = () => (r().type === blockQuote ? "border-l-[3px] border-cream-300 pl-3" : r().type === blockCode ? "rounded-md bg-ink-100 px-3 py-2" : "");
+  const kind = () =>
+    !knownTypes.has(r().type)
+      ? "unknown"
+      : r().type === blockDivider
+        ? "divider"
+        : r().type === blockImage
+          ? "image"
+          : r().type === blockIssueRef
+            ? "issue"
+            : "text";
   return (
-    <div data-block={b.id} className={`flex items-start pb-0.5 ${b.type === blockHeading ? "pt-2.5" : "pt-0.5"}`}>
-      <span className="w-[22px] shrink-0 pt-[3px]">{showFace && <AgentFace agentId={b.updatedBy} look={agent?.look} size={18} />}</span>
+    <div data-block={r().block.id} class={["flex items-start pb-0.5", r().type === blockHeading ? "pt-2.5" : "pt-0.5"]}>
+      <span class="w-[22px] shrink-0 pt-[3px]">
+        <Show when={r().showFace}>
+          <AgentFace agentId={r().updatedBy} look={props.agent?.look} size={18} />
+        </Show>
+      </span>
       <span
-        title={writing ? `${writer} 在写` : `${writer} 写的`}
-        aria-label={writing ? `${writer} 在写` : undefined}
-        className={`mt-0.5 mr-2.5 shrink-0 rounded-sm ${writing ? "w-1 animate-pulse" : "w-[3px]"}`}
-        style={{ height: barHeight(b.type), background: authorColor(b.updatedBy, agent) }}
+        title={r().writing ? `${writer()} 在写` : `${writer()} 写的`}
+        aria-label={r().writing ? `${writer()} 在写` : undefined}
+        class={["mt-0.5 mr-2.5 shrink-0 rounded-sm", r().writing ? "w-1 animate-pulse" : "w-[3px]"]}
+        style={{ height: `${barHeight(r().type)}px`, background: authorColor(r().updatedBy, props.agent) }}
       />
-      <span className="shrink-0" style={{ width: 20 * depth }} />
-      <div className="min-w-0 flex-1">
-        {body}
-        {b.problem && <p className="text-xs text-berry">{b.problem}</p>}
+      <span class="shrink-0" style={{ width: `${20 * r().depth}px` }} />
+      <div class="min-w-0 flex-1">
+        {/* One shape for every text block: a block that changes type keeps its field, and the field its focus. */}
+        <Show
+          when={kind() === "text"}
+          fallback={
+            <Show when={kind() !== "divider"} fallback={<hr class="my-2 border-line" />}>
+              <Placeholder
+                text={
+                  kind() === "image"
+                    ? `图片：${r().attrs.alt ?? ""} ${r().attrs.src ?? ""}`.trim()
+                    : kind() === "issue"
+                      ? `工单 ${r().attrs.issueId ?? ""}`
+                      : `这一块是「${r().type}」，这个版本的客户端还画不了，只能看不能改`
+                }
+              />
+            </Show>
+          }
+        >
+          <div class={["flex items-start", box()]}>
+            <Show when={mark() !== undefined}>
+              <span class="w-[26px] shrink-0 pt-px">{mark()}</span>
+            </Show>
+            <div class="min-w-0 flex-1">
+              <BlockField editor={props.editor} row={r()} />
+            </div>
+          </div>
+        </Show>
+        <Show when={r().problem}>
+          <p class="text-xs text-berry">{r().problem}</p>
+        </Show>
       </div>
     </div>
   );
 }
 
-function Placeholder({ text }: { text: string }) {
-  return <div className="rounded-md border border-line bg-ink-100 px-2.5 py-1.5 text-sm text-muted">{text}</div>;
+function Placeholder(props: { text: string }) {
+  return <div class="rounded-md border border-line bg-ink-100 px-2.5 py-1.5 text-sm text-muted">{props.text}</div>;
 }
 
-function typeStyle(b: EditBlock) {
-  switch (b.type) {
+function typeStyle(r: Row) {
+  switch (r.type) {
     case blockHeading:
-      return (b.attrs.level ?? 1) <= 1 ? "text-2xl font-semibold" : b.attrs.level === 2 ? "text-xl font-semibold" : "text-lg font-semibold";
+      return (r.attrs.level ?? 1) <= 1 ? "text-2xl font-semibold" : r.attrs.level === 2 ? "text-xl font-semibold" : "text-lg font-semibold";
     case blockCode:
       return "font-mono text-sm";
     case blockQuote:
       return "text-muted";
     default:
-      return b.type === blockTodo && b.attrs.checked ? "text-muted line-through" : "";
+      return r.type === blockTodo && r.attrs.checked ? "text-muted line-through" : "";
   }
 }
 
-function Marked({ spans }: { spans: readonly DocSpan[] }) {
+function Marked(props: { spans: readonly DocSpan[] }) {
   return (
-    <>
-      {spans.map((s, i) => {
-        const m = s.marks;
-        const cls = [
-          m.bold && "font-semibold",
-          m.italic && "italic",
-          m.code && "rounded bg-[#2f1f1314] px-0.5 font-mono",
-          m.strike && "line-through",
-          m.link && "text-[#3f6e2a] underline",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        return m.link ? (
-          <a key={i} href={m.link} target="_blank" rel="noreferrer" className={cls}>
-            {s.t}
-          </a>
-        ) : (
-          <span key={i} className={cls}>
-            {s.t}
-          </span>
+    <For each={props.spans}>
+      {(s) => {
+        const cls = {
+          "font-semibold": !!s.marks.bold,
+          italic: !!s.marks.italic,
+          "rounded bg-[#2f1f1314] px-0.5 font-mono": !!s.marks.code,
+          "line-through": !!s.marks.strike,
+          "text-[#3f6e2a] underline": !!s.marks.link,
+        };
+        return (
+          <Show when={s.marks.link} fallback={<span class={cls}>{s.t}</span>}>
+            {(link) => (
+              <a href={link()} target="_blank" rel="noreferrer" class={cls}>
+                {s.t}
+              </a>
+            )}
+          </Show>
         );
-      })}
-    </>
+      }}
+    </For>
   );
 }
 
 /** A block's text: the marks drawn until it is clicked into, then a plain field of its own. */
-function BlockField({ editor, block: b }: { editor: DocEditor; block: EditBlock }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const [editing, setEditing] = useState(false);
-  const wanted = editor.focusId === b.id;
-  const shown = editing || wanted || b.focused;
-  const style = typeStyle(b);
-  // The editor moved the text under the caret, or asked for this block to take the focus.
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-    if (wanted) {
-      editor.focusId = undefined;
-      el.focus();
-    }
-    if (b.caret !== undefined && document.activeElement === el) {
-      el.setSelectionRange(b.caret, b.caret);
-      b.caret = undefined;
-    }
+function BlockField(props: { editor: DocEditor; row: Row }) {
+  const [editing, setEditing] = createSignal(false);
+  // focused is the editor's live flag, read again when editing changes: the editor sets it without a new version.
+  const shown = () => editing() || props.row.wanted || props.row.block.focused;
+  return (
+    <Show
+      when={shown()}
+      fallback={
+        <div
+          role="textbox"
+          tabindex={0}
+          aria-label={`块 ${props.row.block.id}`}
+          onFocus={() => setEditing(true)}
+          onClick={() => setEditing(true)}
+          class={["min-h-6 cursor-text text-base leading-6 break-words whitespace-pre-wrap", typeStyle(props.row)]}
+        >
+          <Show when={props.row.text} fallback={<span class="text-faint">{props.row.type === blockHeading ? "标题" : " "}</span>}>
+            <Marked spans={props.row.spans} />
+          </Show>
+        </div>
+      }
+    >
+      <Field editor={props.editor} row={props.row} focusNow={editing() && !props.row.wanted} onLeave={() => setEditing(false)} />
+    </Show>
+  );
+}
+
+function Field(props: { editor: DocEditor; row: Row; focusNow: boolean; onLeave: () => void }) {
+  let el!: HTMLTextAreaElement;
+  const b = () => props.row.block;
+  // Clicked into: the field takes the focus once it is on the page.
+  // Read here, not in onSettled: the prop is a memo made on first read, and onSettled may not make one.
+  const focusNow = untrack(() => props.focusNow);
+  onSettled(() => {
+    if (focusNow) el.focus();
   });
-  if (!shown)
-    return (
-      <div
-        role="textbox"
-        tabIndex={0}
-        aria-label={`块 ${b.id}`}
-        onFocus={() => setEditing(true)}
-        onClick={() => setEditing(true)}
-        className={`min-h-6 cursor-text text-base leading-6 break-words whitespace-pre-wrap ${style}`}
-      >
-        {b.text ? <Marked spans={b.spans} /> : <span className="text-faint">{b.type === blockHeading ? "标题" : " "}</span>}
-      </div>
-    );
-  const key = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    const el = e.currentTarget;
-    if (b.composing || e.nativeEvent.isComposing || el.selectionStart !== el.selectionEnd) return;
-    const at = el.selectionStart;
+  // The editor moved the text under the caret, or asked for this block to take the focus.
+  createEffect(
+    () => props.row,
+    (row) => {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+      if (row.wanted) {
+        props.editor.focusId = undefined;
+        el.focus();
+      }
+      const block = row.block;
+      if (block.caret !== undefined && document.activeElement === el) {
+        el.setSelectionRange(block.caret, block.caret);
+        block.caret = undefined;
+      }
+    },
+  );
+  const key = (e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => {
+    const field = e.currentTarget;
+    const block = b();
+    if (block.composing || e.isComposing || field.selectionStart !== field.selectionEnd) return;
+    const at = field.selectionStart;
     if (e.key === "Backspace" && at === 0) {
       e.preventDefault();
-      editor.backspaceAtStart(b);
-    } else if ((e.key === "ArrowUp" && at === 0) || (e.key === "ArrowDown" && at === el.value.length)) {
-      const next = editor.neighbour(b, e.key === "ArrowUp" ? -1 : 1);
+      props.editor.backspaceAtStart(block);
+    } else if ((e.key === "ArrowUp" && at === 0) || (e.key === "ArrowDown" && at === field.value.length)) {
+      const next = props.editor.neighbour(block, e.key === "ArrowUp" ? -1 : 1);
       if (!next) return;
       e.preventDefault();
-      editor.moveTo(next, e.key === "ArrowUp" ? next.text.length : 0);
+      props.editor.moveTo(next, e.key === "ArrowUp" ? next.text.length : 0);
     }
   };
   return (
     <textarea
-      ref={ref}
-      aria-label={`块 ${b.id}`}
+      ref={(t) => (el = t)}
+      aria-label={`块 ${b().id}`}
       rows={1}
-      autoFocus={editing && !wanted}
-      value={b.text}
-      placeholder={b.type === blockHeading ? "标题" : undefined}
-      spellCheck={false}
-      onFocus={() => editor.focus(b, true)}
+      value={props.row.text}
+      placeholder={props.row.type === blockHeading ? "标题" : undefined}
+      spellcheck="false"
+      onFocus={() => props.editor.focus(b(), true)}
       onBlur={() => {
-        editor.focus(b, false);
-        setEditing(false);
+        props.editor.focus(b(), false);
+        props.onLeave();
       }}
-      onCompositionStart={() => (b.composing = true)}
-      onCompositionEnd={(e) => editor.composition(b, false, e.currentTarget.value)}
-      onChange={(e) => editor.edited(b, e.target.value, e.target.selectionStart)}
+      onCompositionStart={() => (b().composing = true)}
+      onCompositionEnd={(e) => props.editor.composition(b(), false, e.currentTarget.value)}
+      onInput={(e) => props.editor.edited(b(), e.currentTarget.value, e.currentTarget.selectionStart)}
       onKeyDown={key}
-      className={`block w-full resize-none overflow-hidden bg-transparent text-base leading-6 outline-none placeholder:text-faint ${style}`}
+      class={["block w-full resize-none overflow-hidden bg-transparent text-base leading-6 outline-none placeholder:text-faint", typeStyle(props.row)]}
     />
   );
 }

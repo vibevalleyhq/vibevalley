@@ -1,7 +1,7 @@
 /**
  * Markdown links in the maintained docs are written from the repository root (`docs/subsystems/issue.md`, never
  * `../subsystems/issue.md` or `/docs/…`) and resolve to a file in the repository, and so does a source path in
- * `inline code` in the current docs and skills (not the Notes, which are history). Run as part of `bun run docs:verify`;
+ * `inline code` in the current docs and skills (not the Notes, which are history). Run as part of `pnpm run docs:verify`;
  * anything broken exits 1. External links (http, mailto) are not fetched; `#fragment`s are not checked; links inside code
  * blocks and `inline code` are examples.
  */

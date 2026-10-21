@@ -1,33 +1,41 @@
-// What an issue's page says first and what can be done with it, what a bug on its plot is, and the harvest's checklist.
+// What an issue's page says, top to bottom, for the owner: what it is, where it stands, what is asked of the owner, how far
+// it is against its criteria; and what a bug on its plot is, and the harvest's checklist. Where it stands (and what the
+// owner may do) is the server's Issue.standing; this only words it.
 
-import type { Changes, Doing, Issue, Session, SessionEvent, TaskGraph } from "@vibevalley/protocol";
-import { endedAt, type IssueTag, issueInTask, issueTitle, tagLabel, tagOpen } from "./issues";
-import { tookText, wallClockText } from "./time";
+import type { Changes, Doing, Issue, IssueAct, IssueStanding, Session, SessionEvent, Standing, TaskGraph } from "@vibevalley/protocol";
+import { shortTitle, standingLabel } from "@vibevalley/protocol/rules";
+import { endedAt, issueInTask, issueTitle } from "./issues";
+import { tookText } from "./time";
 import type { Tone } from "./cards";
 
-export type IssueAct = "stop" | "resolve" | "resume" | "harvest" | "cure" | "close";
-
 export const actLabel: Record<IssueAct, string> = {
-  stop: "叫停这一轮",
+  start: "开工",
+  answer: "回答",
+  accept: "验收通过",
+  reject: "打回",
+  harvest: "收获",
+  acknowledge: "知道了",
   resolve: "让它解决冲突",
   resume: "接着做",
-  harvest: "收获",
   cure: "接着修",
+  tell: "带话",
+  stop: "叫停这一轮",
   close: "关上",
+  reopen: "重开",
 };
 
-/** `lead` is the one the page leads with (the primary button). */
-export interface IssueOffer {
-  act: IssueAct;
-  lead: boolean;
-}
+export const standingTone: Record<Standing, Tone> = {
+  draft: "faint",
+  queued: "faint",
+  working: "water",
+  asking: "wheat",
+  reviewing: "wheat",
+  stuck: "berry",
+  harvested: "leaf",
+  closed: "faint",
+};
 
-export interface IssueStatusLine {
-  head: string;
-  line?: string;
-  list: string[];
-  tone: Tone;
-}
+export { standingLabel };
 
 /** The message 接着做 sends to a round that stopped halfway. */
 export const resumeWords = "上一轮停在了半路，接着把它做完。";
@@ -38,116 +46,115 @@ export function bugText(task: string) {
   return `接着修：${original}。看一下报错，修好再跑一遍测试`;
 }
 
+/** How long, in round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. */
+export function spanText(ms: number) {
+  const m = Math.floor(Math.max(0, ms) / 60_000);
+  if (m < 1) return "不到 1 分钟";
+  if (m < 60) return `${m} 分钟`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)} 小时`;
+  return `${Math.floor(m / 60 / 24)} 天`;
+}
+
+/** The block that asks the owner for the one thing: its head and what it says under it. */
+export interface OwnerAsk {
+  head: string;
+  line?: string;
+  tone: Tone;
+}
+
 const nothing: Doing = { action: "none", label: "" };
 const doingOf = (s: Session): Doing => (s.phase._tag === "working" ? s.phase.doing : nothing);
 
+/** One of the criteria as far as it got: the helper's word on it, if it gave one. */
+export interface CriterionRow {
+  text: string;
+  result?: "met" | "unmet" | "unsure";
+  proof?: string;
+}
+
+export function criteriaRows(issue: Issue): CriterionRow[] {
+  return (issue.criteria ?? []).map((text, i) => {
+    const c = (issue.checks ?? []).find((x) => x.criterion === i);
+    return { text, ...(c ? { result: c.result, ...(c.proof ? { proof: c.proof } : {}) } : {}) };
+  });
+}
+
+/** The one thing the owner is asked for, worded; undefined when nothing is asked of the owner. */
+function ownerAsk(standing: IssueStanding, issue: Issue, head: Session): OwnerAsk | undefined {
+  const who = head.name;
+  const said = head.lastRun?.summary;
+  switch (standing.state) {
+    case "asking":
+      return { head: `${who}有 ${issue.asks.length} 个问题要问你`, line: "点一个选项就是回答，也可以自己说。", tone: "wheat" };
+    case "reviewing":
+      return issue.acceptedAt !== undefined
+        ? { head: "验收过了，可以收获", ...(said ? { line: said } : {}), tone: "leaf" }
+        : { head: `${who}交回来了，等你验收`, ...(said ? { line: said } : {}), tone: "wheat" };
+    case "stuck":
+      switch (standing.stuck) {
+        case "conflict":
+          return { head: `合进 ${head.conflict?.base ?? "主分支"} 会冲突`, line: head.conflict?.files.join("、"), tone: "berry" };
+        case "failed":
+          return { head: "这一轮没做成", ...(said ? { line: said } : {}), tone: "berry" };
+        case "interrupted":
+          return { head: "停在了半路", ...(said ? { line: said } : {}), tone: "wheat" };
+        case "quiet":
+          return { head: `${who}很久没动静了`, line: "可能在跑很久的命令，也可能卡住了：看看它的每一步，不对就叫停。", tone: "berry" };
+        case undefined:
+          return { head: "卡住了", tone: "berry" };
+      }
+      break;
+    case "closed":
+      return standing.lead === "reopen" ? { head: "关上了", line: "要它接着做就重开：写一句这次要做什么。", tone: "faint" } : undefined;
+    case "draft":
+    case "queued":
+    case "working":
+    case "harvested":
+      return undefined;
+  }
+}
+
 /** `sessions` oldest first; `session` the one on the farm now, if any. */
-export function issueState(issue: Issue, sessions: Session[], tag: IssueTag, session: Session | undefined, graphs: TaskGraph[]) {
+export function issueState(issue: Issue, sessions: Session[], session: Session | undefined, graphs: TaskGraph[]) {
   const head = session ?? sessions[sessions.length - 1]!;
   const graphId = head.graph?.id ?? issue.parent ?? (issue.graph ? issue.id : undefined);
   const graph = graphId === undefined ? undefined : graphs.find((g) => g.id === graphId);
   const node = head.graph?.task === undefined || !graph ? undefined : graph.tasks.find((t) => t.id === head.graph!.task);
-  const inTask = issueInTask(issue, session);
+  const standing = issue.standing;
   const current = doingOf(head);
-  const open = tagOpen(tag);
-  const lastOutcome = head.lastRun?.outcome;
-
-  /** While it is judged, the verdict goes with the box: 没过 sends what it says as the findings. */
-  const judging =
-    !inTask && tag === "waiting" && session !== undefined && session.conflict === undefined && issue.acceptedAt === undefined && lastOutcome !== "failed";
-  const talking = open && session !== undefined;
-  const reopening = !open && !inTask;
-
-  function offers(): IssueOffer[] {
-    if (inTask || !session) return [];
-    if (tag === "working")
-      return [
-        { act: "stop", lead: false },
-        { act: "close", lead: false },
-      ];
-    if (tag !== "waiting") return [];
-    if (session.conflict)
-      return [
-        { act: "resolve", lead: true },
-        { act: "close", lead: false },
-      ];
-    // Stopped halfway (叫停, the server restarted): the work goes on first; what is there can still be harvested.
-    if (session.lastRun?.outcome === "interrupted")
-      return [
-        { act: "resume", lead: true },
-        { act: "harvest", lead: false },
-        { act: "close", lead: false },
-      ];
-    const failed = session.lastRun?.outcome === "failed";
-    return [
-      // The server leaves done out of moves until a required acceptance has passed.
-      ...(!failed && issue.moves.includes("done") ? [{ act: "harvest" as const, lead: true }] : []),
-      ...(failed ? [{ act: "cure" as const, lead: true }] : []),
-      { act: "close", lead: false },
-    ];
-  }
-
-  function status(): IssueStatusLine {
-    const who = head.name;
-    const round = head.runs > 0 ? `第 ${Math.round(head.runs)} 轮` : undefined;
-    const summary = head.lastRun?.summary;
-    if (issue.asks.length > 0 && session) return { head: `缺肥：${who}在等你回答`, line: "在下面说一句就算回答。", list: issue.asks, tone: "wheat" };
-    if (session?.conflict) return { head: `合进 ${session.conflict.base} 会冲突`, line: session.conflict.files.join("、"), list: [], tone: "berry" };
-    if (tag === "working") {
-      const doing = current.action === "none" ? "在干活" : `正在${current.actionText ?? ""}`;
-      const quiet = head.phase._tag === "working" && head.phase.quietSince !== undefined;
-      return {
-        head: `${who} ${doing}${round ? `（${round}）` : ""}`,
-        line: quiet ? "很久没动静：可能在跑很久的命令，也可能卡住了。" : current.label || undefined,
-        list: [],
-        tone: "leaf",
-      };
-    }
-    if (tag === "waiting") {
-      if (lastOutcome === "failed") return { head: "这一轮没做成", line: summary, list: [], tone: "berry" };
-      if (lastOutcome === "interrupted") return { head: "停在了半路", line: summary, list: [], tone: "wheat" };
-      if (issue.acceptedAt !== undefined) return { head: "验收过了，可以收获", line: summary, list: [], tone: "leaf" };
-      return { head: `等你验收 · ${who}交回来了${round ? `（${round}）` : ""}`, line: summary, list: [], tone: "wheat" };
-    }
-    const closed = issue.closedAt;
-    return { head: closed === undefined ? tagLabel[tag] : `${tagLabel[tag]} · ${wallClockText(closed)}`, line: summary, list: [], tone: "faint" };
-  }
-
+  const rows = criteriaRows(issue);
   // Each helper once, the first time it worked the issue.
   const crew = sessions.filter((s, i) => !sessions.slice(0, i).some((x) => x.agent === s.agent));
   const hand = head.worktree !== undefined ? session : undefined;
+  const fullTitle = issueTitle(issue, graphs);
+  const title = shortTitle(fullTitle);
 
   return {
     issue,
     head,
     session,
-    tag,
-    inTask,
-    open,
-    judging,
-    talking,
-    reopening,
-    hasBox: talking || reopening,
-    enterSends: !judging,
-    title: issueTitle(issue, graphs),
-    description: issue.description || head.brief,
+    standing,
+    inTask: issueInTask(issue, session),
+    open: standing.state !== "harvested" && standing.state !== "closed",
+    title,
+    /** The whole of a title too long for the page's first line goes with the description. */
+    description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
     project: issue.project ?? head.project,
     taskText: !graph
       ? "这是种植计划里的一步，跟着计划走。"
       : !node
         ? `在拆种植计划「${graph.title}」：只读代码，不改文件。`
         : `种植计划「${graph.title}」的一步：${node.title}。做完自动合进计划分支，收获整个计划时才进主分支。`,
+    ask: ownerAsk(standing, issue, head),
+    /** The lead act and the rest the owner may do, as the server says. */
+    lead: standing.lead,
+    others: standing.acts.filter((a) => a !== standing.lead),
+    criteria: rows,
+    met: rows.filter((r) => r.result === "met").length,
+    doing:
+      standing.state === "working" && current.action !== "none" ? `正在${current.actionText ?? ""}${current.label ? "：" + current.label : ""}` : undefined,
     weeds: issue.findings.filter((f) => !f.pulled),
     pulled: issue.findings.filter((f) => f.pulled),
-    placeholder: judging
-      ? "没过就写哪里要修，一行一条；也可以只带句话"
-      : reopening
-        ? "这次要它做什么（不填就是接着做完）"
-        : session?.phase._tag === "working"
-          ? "干着活也能收到这句话"
-          : "说一句，它接着做一轮",
-    boxLabel: reopening ? "重开这张工单" : `给${head.name}带句话`,
-    acceptanceEditable: !inTask,
     crewLine:
       crew.length <= 1 && !hand
         ? undefined
@@ -155,6 +162,19 @@ export function issueState(issue: Issue, sessions: Session[], tag: IssueTag, ses
           [crew.map((c) => c.name).join("、"), ...(hand ? [`锄头在${hand.name}手上`] : [])].join(" · "),
     whoLine: `${head.name}${head.runtime ? `（${head.runtime}）` : ""}`,
     historyLine: `${sessions.length} 次：${sessions.map((r) => `${r.name}（${r.id}）`).join(" → ")}`,
+    /** 在等你 · 已经 3 分钟 · Claude 师傅 · 第 2 轮 · 用了 4 分钟 · ¥0.42; cny is all the issue's runs when known. */
+    statusLine(now: number, cny?: number) {
+      const s = session ?? head;
+      const turns = Math.round(s.runs);
+      return [
+        standingLabel[standing.state],
+        ...(standing.since !== undefined ? [`已经 ${spanText(now - standing.since)}`] : []),
+        head.name,
+        ...(turns > 0 ? [`跑了 ${turns} 轮`] : []),
+        `用了 ${spanText((endedAt(head) ?? now) - sessions[0]!.hiredAt)}`,
+        ...((cny ?? s.spent?.cny) !== undefined ? [`¥${(cny ?? s.spent!.cny!).toFixed(2)}`] : []),
+      ].join(" · ");
+    },
     usedLine(steps: SessionEvent[], now: number) {
       const s = session ?? head;
       const turns = s.runs > 0 ? Math.round(s.runs) : steps.filter((e) => e.type === "run/start").length;
@@ -165,9 +185,8 @@ export function issueState(issue: Issue, sessions: Session[], tag: IssueTag, ses
         ...(head.spent && head.spent.tokens > 0 ? [`${Math.round(head.spent.tokens)} token`] : []),
       ].join(" · ");
     },
-    showsChanges: tag === "waiting" && session !== undefined,
-    offers: offers(),
-    status: status(),
+    /** What it made, while there is a worktree to read it from. */
+    showsChanges: session !== undefined && standing.state !== "harvested" && standing.state !== "closed",
   };
 }
 

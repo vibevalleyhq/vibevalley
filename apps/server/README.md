@@ -24,6 +24,11 @@ db/                migrations/0001_schema.up.sql (the one schema), queries/<tabl
 - **Shapes and the endpoint table are `@vibevalley/protocol`'s**; `handlers.ts` fails to compile when it misses one.
 - **SQL only in `db/queries`**, one file a table, called through `db/generated`; `src/base/schema.test.ts` holds the
   names and the one baseline.
+- **Effects started from callback code run on the service's own runtime**: `FiberSet.makeRuntime` /
+  `makeRuntimePromise` in `make`, not `Effect.runFork` / `runPromise`, so they end with the service and keep its
+  services; a line logged from a callback goes through `callbackLog` (`src/base/log.ts`): lint refuses `console.*`
+  outside the command line, the brain and the journal.
+- **Facts are read typed**: a subscriber switches on `SideEvent`'s `type`, without casting its fields.
 - **Tests never reach a model or this machine's runtimes**: oar's `scriptedRuntime` plays the helpers, pi-ai's faux
   provider the model, `gh` answers that it is not there.
 

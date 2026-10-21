@@ -1,24 +1,28 @@
-// 推箱子 on the phone: the rules are sokoban.ts; the warehouse is kept while the
-// phone is away or a call comes in.
+// 推箱子 on the phone: the rules are farm/phone/games/sokoban.ts; the warehouse is kept while the phone is away or a
+// call comes in.
 
-import { playSound } from "../../sound";
-import { lcd } from "../lcd";
-import { kept, usePad } from "../pad";
+import { For, Show } from "solid-js";
 import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";
+import { lcd } from "../lcd";
+import { playSound } from "../../sound";
+import { kept, usePad } from "../../support";
 
 const warehouse = kept(newWarehouse());
 
 export function SokobanGame() {
   const [g, setG] = warehouse.use();
-  const done = warehouseDone(g);
-  const last = g.level === warehouses.length - 1;
-  const level = warehouses[g.level]!;
-  const width = level.rows[0]!.length;
-  const cells = level.rows.join("");
-  const placed = g.boxes.filter((p) => cells[p] === ".").length;
-  const restart = () => setG(newWarehouse(g.level));
-  const advance = () => setG(newWarehouse(last ? 0 : g.level + 1));
-  const undo = () => setG(undoWarehouse(g));
+  const done = () => warehouseDone(g());
+  const last = () => g().level === warehouses.length - 1;
+  const level = () => warehouses[g().level]!;
+  const width = () => level().rows[0]!.length;
+  const cells = () => level().rows.join("");
+  const placed = () => g().boxes.filter((p) => cells()[p] === ".").length;
+  const restart = () => setG(newWarehouse(warehouse.get().level));
+  const advance = () => {
+    const now = warehouse.get();
+    setG(newWarehouse(now.level === warehouses.length - 1 ? 0 : now.level + 1));
+  };
+  const undo = () => setG(undoWarehouse(warehouse.get()));
 
   usePad((button, down) => {
     if (!down) return;
@@ -41,68 +45,78 @@ export function SokobanGame() {
     }
   });
 
+  const tiles = () => level().rows.flatMap((row, y) => [...row].map((tile, x) => ({ tile, x, y, p: y * width() + x })));
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2">
-      <div className="flex justify-between">
+    <div class="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2">
+      <div class="flex justify-between">
         <span>
-          推箱子 {g.level + 1}/{warehouses.length}
+          推箱子 {g().level + 1}/{warehouses.length}
         </span>
         <span>
-          {g.moves} 步 · {g.pushes} 推
+          {g().moves} 步 · {g().pushes} 推
         </span>
       </div>
-      <p className="text-center">{level.name}</p>
+      <p class="text-center">{level().name}</p>
       <svg
         role="img"
-        aria-label={`仓库棋盘，${placed}/${g.boxes.length} 箱已归位`}
-        viewBox={`0 0 ${width * 16} ${level.rows.length * 16}`}
-        className="mx-auto block w-full max-w-[224px]"
-        shapeRendering="crispEdges"
+        aria-label={`仓库棋盘，${placed()}/${g().boxes.length} 箱已归位`}
+        viewBox={`0 0 ${width() * 16} ${level().rows.length * 16}`}
+        class="mx-auto block w-full max-w-[224px]"
+        shape-rendering="crispEdges"
       >
-        {level.rows.flatMap((row, y) =>
-          [...row].map((tile, x) => {
-            const p = y * width + x;
-            return (
-              <g key={p} transform={`translate(${x * 16},${y * 16})`}>
-                <rect width="16" height="16" fill={tile === "#" ? lcd.dark : lcd.light} />
-                {tile === "#" ? <path d="M0 7.5h16M7.5 0v7M3.5 8v8" stroke={lcd.ink} /> : <rect x="1" y="1" width="14" height="14" fill={lcd.paper} />}
-                {tile === "." && <path d="M8 4l4 4-4 4-4-4z" fill={lcd.mid} />}
-                {g.boxes.includes(p) && (
-                  <g>
-                    <rect x="2.5" y="2.5" width="11" height="11" fill={tile === "." ? lcd.mid : lcd.dark} stroke={lcd.ink} />
-                    <path d="M4 4l8 8m0-8l-8 8" stroke={lcd.paper} />
-                    {tile === "." && <rect x="6" y="6" width="4" height="4" fill={lcd.ink} />}
-                  </g>
-                )}
-                {g.player === p && (
-                  <g fill={lcd.ink}>
-                    <path d="M5 2h6v3H3v2h10V5h-2M5 8h6v5H5zM4 13h3v2H4zm5 0h3v2H9z" />
-                    <rect x="6" y="5" width="4" height="3" fill={lcd.paper} />
-                  </g>
-                )}
-              </g>
-            );
-          }),
-        )}
+        <For each={tiles()} keyed={false}>
+          {(t) => (
+            <g transform={`translate(${t().x * 16},${t().y * 16})`}>
+              <rect width="16" height="16" fill={t().tile === "#" ? lcd.dark : lcd.light} />
+              <Show when={t().tile === "#"} fallback={<rect x="1" y="1" width="14" height="14" fill={lcd.paper} />}>
+                <path d="M0 7.5h16M7.5 0v7M3.5 8v8" stroke={lcd.ink} />
+              </Show>
+              <Show when={t().tile === "."}>
+                <path d="M8 4l4 4-4 4-4-4z" fill={lcd.mid} />
+              </Show>
+              <Show when={g().boxes.includes(t().p)}>
+                <g>
+                  <rect x="2.5" y="2.5" width="11" height="11" fill={t().tile === "." ? lcd.mid : lcd.dark} stroke={lcd.ink} />
+                  <path d="M4 4l8 8m0-8l-8 8" stroke={lcd.paper} />
+                  <Show when={t().tile === "."}>
+                    <rect x="6" y="6" width="4" height="4" fill={lcd.ink} />
+                  </Show>
+                </g>
+              </Show>
+              <Show when={g().player === t().p}>
+                <g fill={lcd.ink}>
+                  <path d="M5 2h6v3H3v2h10V5h-2M5 8h6v5H5zM4 13h3v2H4zm5 0h3v2H9z" />
+                  <rect x="6" y="5" width="4" height="3" fill={lcd.paper} />
+                </g>
+              </Show>
+            </g>
+          )}
+        </For>
       </svg>
-      <p role="status" className="text-center">
-        {done ? (last ? "收成全部入仓！" : "这一仓收拾好了！") : "把木箱推到 ◆ 上"}
+      <p role="status" class="text-center">
+        {done() ? (last() ? "收成全部入仓！" : "这一仓收拾好了！") : "把木箱推到 ◆ 上"}
       </p>
-      <div className="mt-auto flex justify-center gap-3">
+      <div class="mt-auto flex justify-center gap-3">
         <button
           type="button"
           onClick={undo}
-          disabled={!g.history.length}
-          className="cursor-pointer px-2 py-1 disabled:cursor-default disabled:opacity-40"
-          style={{ boxShadow: `inset 0 0 0 1px ${lcd.ink}` }}
+          disabled={!g().history.length}
+          class="cursor-pointer px-2 py-1 disabled:cursor-default disabled:opacity-40"
+          style={{ "box-shadow": `inset 0 0 0 1px ${lcd.ink}` }}
         >
           B 撤销
         </button>
-        <button type="button" onClick={done ? advance : restart} className="cursor-pointer px-2 py-1" style={{ boxShadow: `inset 0 0 0 1px ${lcd.ink}` }}>
-          A {done ? (last ? "再玩一轮" : "下一关") : "重开"}
+        <button
+          type="button"
+          onClick={() => (done() ? advance() : restart())}
+          class="cursor-pointer px-2 py-1"
+          style={{ "box-shadow": `inset 0 0 0 1px ${lcd.ink}` }}
+        >
+          A {done() ? (last() ? "再玩一轮" : "下一关") : "重开"}
         </button>
       </div>
-      <p className="text-center" style={{ color: lcd.dark }}>
+      <p class="text-center" style={{ color: lcd.dark }}>
         方向键走动 · 箱子只能推
       </p>
     </div>

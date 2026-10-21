@@ -13,7 +13,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
 import { type ManagerEval, managerAgent, type RunTrigger } from "@vibevalley/protocol";
 import { graphsOf, graphText, isOpen, nextRun, runtimeLabel } from "@vibevalley/protocol/rules";
-import { Context, Effect, Layer, PubSub, Stream } from "effect";
+import { Context, Effect, FiberSet, Layer, PubSub, Stream } from "effect";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Agents } from "../agent/agent.ts";
@@ -57,6 +57,7 @@ import {
   triggerOf,
   usageText,
 } from "./rules.ts";
+import { callbackLog } from "../base/log.ts";
 
 const keepEvents = 1000;
 const streamEveryMs = 120;
@@ -72,7 +73,12 @@ export const systemPrompt = `你是码农场物语的管家。主人跟你说要
 - 主人要做一件事：用 dispatch 派活。工单要写清楚目标、做到什么程度算完。互不相关的几件事可以派给几个帮工。
 - 派完只说派给了谁、去了哪个项目，比如「派后端老周去 clock-in 了，做完告诉你」。频道里已经有一条派活写着整张工单，不要再说要求和细节（时长、做法、测试），压成一句也不要。
 - 每件活都在一个项目里做：项目就是工作目录下的一个文件夹（「农场现状」里列着）。主人说的项目没有，就新建：起一个简短的英文名（比如 clock-in），dispatch 时填上它，农场会建好文件夹和 git 仓库。拿不准是哪个项目就先问主人。
-- 帮工在项目里各自的分支上干活，做完会提交。主人说「收下」「合进去」，才用 merge 把它的分支合进项目，帮工随后收工。只想打发走、不要它的改动，用 dismiss（分支会留着）。主人问改了什么，用 changes。
+- 每件活是一张工单，有编号（#41）。说到一件活就写编号加短标题（「#41 首页白屏」），不拿帮工的名字代替它；工具里的 issue 都填编号。
+- 主人说「记一下」「回头做」「先写下来」：先用 issues 的 text 找有没有差不多的，有就问是不是同一件；没有就用 issue_create 记进备选，不派人。要马上做才用 dispatch。
+- 主人问「哪些在等我」：用 issues（wants_owner），一张一句：编号、短标题、要主人做什么、等了多久。问某个项目、某种状态的，也用 issues 筛；问一张的来龙去脉，用 check。
+- 改工单（优先级、验收方式、标题……）、挪状态（开工、再干一轮、重开、关上）：主人叫你才用 issue_update、issue_status；你自己看出来该改的，先在频道里问主人一句。
+- 已完成只由主人点头：这一轮没做成的不能收；工具说挪不了、收不了，照它的原因告诉主人。
+- 帮工在项目里各自的分支上干活，做完会提交。主人说「收下」「合进去」，才用 merge 收获那张工单，帮工随后收工。只想打发走、不要它的改动，用 dismiss（分支会留着）。主人问改了什么，用 changes。
 - 收获时会冲突：照结果告诉主人哪些文件冲突；主人同意就用 tell 把结果里那段话转给帮工，让它在自己的分支上解决，做完再收。
 - 派不出去说「满了」（地里、这个 runtime 或这个项目同时干活的人数到了上限）：告诉主人，等有人干完再派，或者问主人要不要先收掉谁。
 - 挑谁：主人点了帮工的名字就派给他；点了 runtime（比如「让 codex……」）就派给用这个 runtime 的帮工；主人在对话框里选定了帮工，就优先派给他；都没有就按每个帮工「适合的活」挑。挑不准时可以不填 agent，农场会按规则挑。
@@ -191,6 +197,7 @@ export interface ManagerOptions {
 
 export const make = (options: ManagerOptions = {}) =>
   Effect.gen(function* () {
+    const logs = yield* callbackLog;
     const config = yield* Settings;
     const core = yield* Core;
     const store = yield* Agents;
@@ -204,8 +211,10 @@ export const make = (options: ManagerOptions = {}) =>
     const schedule = yield* Schedules;
     const tool = yield* Tools;
 
-    const go = <A, E>(e: Effect.Effect<A, E>) => Effect.runPromise(e);
-    const notice = (level: "info" | "warn" | "error", text: string) => void Effect.runFork(core.notice(level, text));
+    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
+    const go = yield* FiberSet.makeRuntimePromise<never>();
+    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const notice = (level: "info" | "warn" | "error", text: string) => void forkHere(core.notice(level, text));
     const general = chat.general();
     const home = managerHome(config.home);
     const sessionFile = join(home, managerAgent + ".jsonl");
@@ -349,7 +358,7 @@ export const make = (options: ManagerOptions = {}) =>
           if (e.compaction) shown = "";
           return;
         case "prefix_changed":
-          console.log(`vibevalley: the manager's prompt start changed between compactions: ${e.parts.join(",")}`);
+          logs.info(`vibevalley: the manager's prompt start changed between compactions: ${e.parts.join(",")}`);
           prefixChanged = e.parts;
           return;
         case "agent_settled":
@@ -360,7 +369,7 @@ export const make = (options: ManagerOptions = {}) =>
     // The agent's events, handled one at a time in order.
     let events = Promise.resolve();
     const follow = (e: BrainEvent) => {
-      events = events.then(() => event(e)).catch((err) => console.error("vibevalley: the manager could not follow its agent:", err));
+      events = events.then(() => event(e)).catch((err) => logs.error("vibevalley: the manager could not follow its agent:", err));
     };
 
     // Started on first use: loading it is not free, and a farm without a model works otherwise.
@@ -383,7 +392,7 @@ export const make = (options: ManagerOptions = {}) =>
         shown = "";
         // Listening before the first line is sent.
         b.subscribe(follow);
-        console.log(`vibevalley: the manager is on vibevalley's own agent, model ${llm.model.id}`);
+        logs.info(`vibevalley: the manager is on vibevalley's own agent, model ${llm.model.id}`);
         brain = b;
         return b;
       })().finally(() => {
@@ -560,13 +569,13 @@ export const make = (options: ManagerOptions = {}) =>
 
     // The run the last start was cut off in goes on, answering where its input came from. Its first message is in the
     // conversation already, so the input is read back from there; the run it makes is linked to that input's issue, which
-    // is answered when it completes (the issue was closed as lost when the farm started).
+    // waits on the owner again when it ends (the issue was closed as lost when the farm started).
     const resume = async () => {
       let b: Brain;
       try {
         b = await brainOf();
       } catch (err) {
-        console.error("vibevalley: the manager could not go on with its last run:", err);
+        logs.error("vibevalley: the manager could not go on with its last run:", err);
         return;
       }
       const at = requestInput();
@@ -613,7 +622,7 @@ export const make = (options: ManagerOptions = {}) =>
     const handled =
       <A>(what: string, f: (a: A) => Promise<unknown>) =>
       (a: A) =>
-        Effect.promise(() => f(a).catch((err) => console.error(`vibevalley: the manager could not take ${what}:`, err)));
+        Effect.promise(() => f(a).catch((err) => logs.error(`vibevalley: the manager could not take ${what}:`, err)));
 
     // A test that gave the manager no model hears nothing: the other services run as without it, and nothing reaches a model.
     if (options.listen ?? true) {
@@ -643,7 +652,7 @@ export const make = (options: ManagerOptions = {}) =>
         const b = brain ?? (await starting?.catch(() => undefined));
         await b?.close();
         await events;
-        await go(execution.close()).catch((err: Error) => console.error("manager execution:", err.message));
+        await go(execution.close()).catch((err: Error) => logs.error("manager execution:", err.message));
       }),
     );
 
@@ -717,7 +726,7 @@ export const make = (options: ManagerOptions = {}) =>
           );
         }),
       call: (text, signal) => {
-        void Effect.runPromise(Effect.ignore(chat.spoken("user", text, "")));
+        void go(Effect.ignore(chat.spoken("user", text, "")));
         return answer(voiceNote + "\n主人说：" + text, signal);
       },
       answerer: (model) => (model === managerModel ? (text, signal) => answer("主人说：" + text, signal) : undefined),

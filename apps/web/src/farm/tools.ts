@@ -112,3 +112,9 @@ export const managerLooks: readonly { readonly id: string; readonly name: string
   { id: "gardener", name: "园艺师", blurb: "宽檐草帽别朵小花，剪刀揣在围裙兜里。" },
   { id: "robot", name: "机器人管家", blurb: "圆滚滚的农场机器人，脸上的屏会笑。" },
 ];
+
+/** Whether the focus is in a field, whose keys are not the farm's. */
+export const typing = () => {
+  const el = document.activeElement;
+  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el instanceof HTMLElement && el.isContentEditable);
+};

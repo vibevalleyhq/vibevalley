@@ -20,8 +20,8 @@ export const schemas: Record<string, Schema> = {
         description: "验收过了就是 true",
         type: "boolean",
       },
-      session: {
-        description: "帮工的名字或 id",
+      issue: {
+        description: "工单编号（#41 或 41）；也可以写在做它的帮工的名字",
         type: "string",
       },
       text: {
@@ -29,7 +29,7 @@ export const schemas: Record<string, Schema> = {
         type: "string",
       },
     },
-    required: ["session", "pass"],
+    required: ["issue", "pass"],
     type: "object",
   },
   cancel_schedule: {
@@ -45,12 +45,12 @@ export const schemas: Record<string, Schema> = {
   changes: {
     additionalProperties: true,
     properties: {
-      session: {
-        description: "帮工的名字或 id",
+      issue: {
+        description: "工单编号（#41 或 41）；也可以写在做它的帮工的名字",
         type: "string",
       },
     },
-    required: ["session"],
+    required: ["issue"],
     type: "object",
   },
   channel_settings: {
@@ -77,23 +77,23 @@ export const schemas: Record<string, Schema> = {
   check: {
     additionalProperties: true,
     properties: {
-      session: {
-        description: "帮工的名字或 id",
+      issue: {
+        description: "工单编号（#41 或 41）；也可以写在做它的帮工的名字",
         type: "string",
       },
     },
-    required: ["session"],
+    required: ["issue"],
     type: "object",
   },
   dismiss: {
     additionalProperties: true,
     properties: {
-      session: {
-        description: "帮工的名字或 id",
+      issue: {
+        description: "工单编号（#41 或 41）；也可以写在做它的帮工的名字",
         type: "string",
       },
     },
-    required: ["session"],
+    required: ["issue"],
     type: "object",
   },
   dispatch: {
@@ -163,6 +163,132 @@ export const schemas: Record<string, Schema> = {
     },
     type: "object",
   },
+  issue_create: {
+    additionalProperties: true,
+    properties: {
+      agent: {
+        description: "以后谁来做：帮工的名字或 id；不填，开工时按农场的规则挑",
+        type: "string",
+      },
+      description: {
+        description: "说明：主人说的原话和你补的背景",
+        type: "string",
+      },
+      draft: {
+        description: "要不要让帮工读过代码起草（写成标题、说明、验收标准）；会花钱，主人只是随口记一句时不用",
+        type: "boolean",
+      },
+      priority: {
+        description: "紧急、高、普通、低；不填是普通",
+        type: "string",
+      },
+      project: {
+        description: "项目文件夹名；频道有默认项目时可以不填",
+        type: "string",
+      },
+      title: {
+        description: "一句话的标题",
+        type: "string",
+      },
+    },
+    required: ["title"],
+    type: "object",
+  },
+  issue_status: {
+    additionalProperties: true,
+    properties: {
+      issue: {
+        description: "工单编号（#41 或 41）",
+        type: "string",
+      },
+      text: {
+        description: "带给帮工的一句话：从等你看挪回待办（再干一轮）、重开时必填",
+        type: "string",
+      },
+      to: {
+        description: "挪到：备选、待办、已完成、已取消",
+        type: "string",
+      },
+    },
+    required: ["issue", "to"],
+    type: "object",
+  },
+  issue_update: {
+    additionalProperties: true,
+    properties: {
+      acceptance: {
+        description: "验收方式：glance（收获就算验收）或 required（先验收通过才能收获）",
+        type: "string",
+      },
+      agent: {
+        description: "谁来做：帮工的名字或 id（派出去以前才能改）",
+        type: "string",
+      },
+      criteria: {
+        description: "验收标准，一条一个主人能照着验的点；给空列表就是清掉（派出去以前才能改）",
+        items: {
+          type: "string",
+        },
+        type: "array",
+      },
+      description: {
+        description: "说明（派出去以前才能改）",
+        type: "string",
+      },
+      issue: {
+        description: "工单编号（#41 或 41）",
+        type: "string",
+      },
+      priority: {
+        description: "紧急、高、普通、低",
+        type: "string",
+      },
+      project: {
+        description: "项目（派出去以前才能改）",
+        type: "string",
+      },
+      title: {
+        description: "标题（派出去以前才能改）",
+        type: "string",
+      },
+    },
+    required: ["issue"],
+    type: "object",
+  },
+  issues: {
+    additionalProperties: true,
+    properties: {
+      closed: {
+        description: "也列关上的（已完成、已取消）；不填只列开着的",
+        type: "boolean",
+      },
+      issue: {
+        description: "看一张的全部：工单编号（#41 或 41）；填了它别的条件都不看",
+        type: "string",
+      },
+      limit: {
+        description: "最多列几张，默认 20",
+        type: "number",
+      },
+      project: {
+        description: "只看这个项目的",
+        type: "string",
+      },
+      status: {
+        description: "只看这个状态的：备选、待办、处理中、等你看、已完成、已取消",
+        type: "string",
+      },
+      text: {
+        description: "标题或说明里有这些字的（找重复、找某件事时用）",
+        type: "string",
+      },
+      wants_owner: {
+        description: "只看在等主人的：等回答、等验收、卡住了；按等了多久排，久的在前",
+        type: "boolean",
+      },
+    },
+    type: "object",
+  },
   list_schedules: {
     additionalProperties: true,
     properties: {},
@@ -208,12 +334,12 @@ export const schemas: Record<string, Schema> = {
   merge: {
     additionalProperties: true,
     properties: {
-      session: {
-        description: "帮工的名字或 id",
+      issue: {
+        description: "工单编号（#41 或 41）；也可以写在做它的帮工的名字",
         type: "string",
       },
     },
-    required: ["session"],
+    required: ["issue"],
     type: "object",
   },
   open_channel: {
@@ -319,12 +445,12 @@ export const schemas: Record<string, Schema> = {
   stop: {
     additionalProperties: true,
     properties: {
-      session: {
-        description: "帮工的名字或 id",
+      issue: {
+        description: "工单编号（#41 或 41）；也可以写在做它的帮工的名字",
         type: "string",
       },
     },
-    required: ["session"],
+    required: ["issue"],
     type: "object",
   },
   task_action: {
@@ -393,12 +519,12 @@ export const schemas: Record<string, Schema> = {
         description: "要带的话",
         type: "string",
       },
-      session: {
-        description: "帮工的名字或 id",
+      issue: {
+        description: "工单编号（#41 或 41）；也可以写在做它的帮工的名字",
         type: "string",
       },
     },
-    required: ["session", "message"],
+    required: ["issue", "message"],
     type: "object",
   },
 };

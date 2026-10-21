@@ -30,6 +30,9 @@ update issue set accepted_at = sqlc.narg(accepted_at), findings = sqlc.narg(find
 -- name: SetIssueAsks :exec
 update issue set asks = sqlc.narg(asks) where id = sqlc.arg(id);
 
+-- name: SetIssueChecks :exec
+update issue set checks = sqlc.narg(checks) where id = sqlc.arg(id);
+
 -- name: RemoveIssue :exec
 delete from issue where id = sqlc.arg(id);
 
@@ -81,10 +84,14 @@ select id from issue where graph is not null;
 select * from issue where schedule = sqlc.arg(schedule) order by created_at desc, id desc limit 1;
 
 -- name: ReopenIssue :exec
-update issue set closed_at = null, closed = null, queued_at = null where id = sqlc.arg(id);
+update issue set closed_at = null, closed = null, queued_at = null, checks = null, handed_back = null where id = sqlc.arg(id);
 
 -- name: OpenOf :many
-select id from issue where assignee = sqlc.arg(assignee) and closed_at is null;
+select id, handed_back from issue where assignee = sqlc.arg(assignee) and closed_at is null;
+
+-- name: SetHandedBack :exec
+-- How the manager's last turn on its issue ended (JSON); null while it is on it.
+update issue set handed_back = sqlc.narg(handed_back) where id = sqlc.arg(id);
 
 -- name: SetIssuePullRequest :exec
 update issue set pull_request = sqlc.narg(pull_request) where id = sqlc.arg(id);

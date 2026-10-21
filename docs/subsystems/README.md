@@ -19,7 +19,7 @@
 | [游戏](docs/subsystems/game.md) | 账本、金币和成就、等级、空地和特效 |
 | [核心状态](docs/subsystems/core.md) | 一份状态只因事实而变、三条流、接口和能力表、重启 |
 | [地基](docs/subsystems/foundation.md) | 一个仓库、一块业务一个服务、Effect 的 layer、形状和规则、effect-sqlc、表结构、测试 |
-| [客户端](docs/subsystems/app.md) | 一份 React 页面、问服务端、宿主接口、Electron 的桌面版和打包 |
+| [客户端](docs/subsystems/app.md) | 一份 Solid 页面、问服务端、宿主接口、Electron 的桌面版和打包 |
 | [农场的皮](docs/subsystems/farm.md) | 像素村、地里长什么、走路、手机、音效、图鉴 |
 | [档案和农机](docs/subsystems/agent.md) | 帮工档案、种子、农机的探测和清单、技能书 |
 | [工程流程](docs/subsystems/process.md) | 文档分层、Note 和子系统、docs:verify、skill、写作规范、素材流水线、名字 |

@@ -3,7 +3,7 @@
 
 import type { Chat, CoreState, Crop, Doing, Issue, RuntimeInfo, Session } from "@vibevalley/protocol";
 import { generalOf, messagesIn } from "../../rules/chat";
-import { numberText } from "../kit";
+import { numberText } from "../kit/labels";
 import { beds, cropLabel, type Bed } from "../world/plots";
 
 /** To five minutes; `tod` 0..1, 0.5 is noon. */

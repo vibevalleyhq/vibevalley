@@ -3,7 +3,15 @@
 // the sowing form's templates filled for a project.
 
 import {
+  type Ask,
   type Issue,
+  type IssueClose,
+  type IssueTimeline,
+  type Milestone,
+  type MilestoneKind,
+  type Run,
+  type RunTrigger,
+  type Spent,
   type IssueStatus,
   IssueStatusValues,
   type IssueTemplate,
@@ -11,33 +19,37 @@ import {
   type TemplateBlank,
   type TemplateKind,
 } from "@vibevalley/protocol";
-import { clip, isForManager } from "@vibevalley/protocol/rules";
+import { clip, isForManager, shortTitle } from "@vibevalley/protocol/rules";
 
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
 
-export const criteriaHead = "验收标准（主人照这几条验收；做完逐条对照，结论里说每条是怎么验的）：";
+export const criteriaHead =
+  "验收标准（主人照这几条验收；做完逐条对照，在结论前面每条写一行「标准 N：做到了」「标准 N：没做到」或「标准 N：不确定」，后面接凭据：跑了什么命令、结果如何，或改了哪个文件）：";
 
 /** The criteria go last, so whoever works it checks each one before it hands the work back. */
 export function issueJob(t: Pick<Issue, "title" | "description" | "criteria">): string {
   let job = t.title;
   if (t.description) job += "\n\n" + t.description;
-  if (t.criteria && t.criteria.length > 0) job += "\n\n" + criteriaHead + "\n- " + t.criteria.join("\n- ");
+  if (t.criteria && t.criteria.length > 0) job += "\n\n" + criteriaHead + "\n" + t.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
   return job;
 }
 
-/** The first line with words is the title, the rest the description. */
+/** The first line with words is the title, the rest the description; a first line too long for a title gives its
+ * short title (shortTitle) and the whole job is the description. */
 export function splitJob(job: string): [string, string] {
   const lines = job.replaceAll("\r\n", "\n").split("\n");
   const i = lines.findIndex((l) => l.trim() !== "");
-  return i < 0
-    ? ["", ""]
-    : [
-        lines[i]!.trim(),
-        lines
-          .slice(i + 1)
-          .join("\n")
-          .trim(),
-      ];
+  if (i < 0) return ["", ""];
+  const first = lines[i]!.trim();
+  const title = shortTitle(first);
+  if (title !== first) return [title, lines.slice(i).join("\n").trim()];
+  return [
+    first,
+    lines
+      .slice(i + 1)
+      .join("\n")
+      .trim(),
+  ];
 }
 
 const int64Max = 9223372036854775807n;
@@ -67,6 +79,9 @@ export interface IssueDraft {
 
 /** The lines with words in them, trimmed. */
 export const kept = (lines: readonly string[] | undefined) => (lines ?? []).map((l) => l.trim()).filter((l) => l !== "");
+
+/** The questions with words in them. */
+export const openAsks = (asks: readonly Ask[] | undefined): Ask[] => (asks ?? []).filter((a) => a.question.trim() !== "");
 
 function linesOf(v: unknown, field: string): string[] {
   if (v === undefined || v === null) return [];
@@ -133,11 +148,7 @@ export const draftOpening =
   "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；农场规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
 /** What the drafting session is told: the owner's word, the draft so far when there is one (as the owner may have edited it), and what it asked with the owner's answer. */
-export function draftBrief(
-  t: Pick<Issue, "title" | "description" | "criteria"> & { readonly asks?: readonly string[] },
-  word: string,
-  project: string,
-): string {
+export function draftBrief(t: Pick<Issue, "title" | "description" | "criteria"> & { readonly asks?: readonly Ask[] }, word: string, project: string): string {
   word = word.trim();
   const asks = t.asks ?? [];
   const criteria = t.criteria ?? [];
@@ -157,19 +168,20 @@ export function draftBrief(
     if (t.description) lines.push(t.description);
     if (criteria.length > 0) lines.push("验收标准：", "- " + criteria.join("\n- "));
   }
-  if (answering) lines.push("", "你上一版问主人的：", "- " + asks.join("\n- "), "主人的回答：" + word, "", "照主人的回答再起草一版，整张重写。");
+  if (answering)
+    lines.push("", "你上一版问主人的：", "- " + asks.map((a) => a.question).join("\n- "), "主人的回答：" + word, "", "照主人的回答再起草一版，整张重写。");
   else if (redraft && word) lines.push("", "主人这次说：" + word, "", "照主人说的再起草一版，整张重写。");
   else if (redraft) lines.push("", "再起草一版，整张重写。");
   lines.push(
     "",
     "先读代码，弄清现状，再写。写的规矩：",
-    "- title：一句话说清做什么，不超过 30 个字。",
+    "- title：短标题，说做什么，不超过 20 个字；细节写在 why、todo 里，不写进标题。",
     "- why：为什么要做，一两句。",
     "- todo：要做的几件事，一件一条，写到改哪里。",
     "- criteria：怎么算做完，一条一个主人能照着验的点（跑什么命令、看到什么结果、页面上是什么样）。",
     "- notDoing：这张工单不做的，免得做多了；没有就给空数组。",
     "- files：可能涉及的文件或目录。",
-    "- 拿不准、要主人定的，写在代码块前面，每行以「要问主人：」开头，一行问一件事；能自己查到的不要问。问了也照你最好的猜测把草稿写完整。",
+    "- 拿不准、要主人定的，写在代码块前面，每行以「要问主人：」开头，一行问一件事，想得到的几种回答写在句末「（选项：A｜B）」；能自己查到的不要问。问了也照你最好的猜测把草稿写完整。",
     "",
     "汇报的最后，用一个 json 代码块给出草稿，格式照这个：",
     "```json",
@@ -200,7 +212,11 @@ export type Move =
   /** in_progress, in_review → canceled: its session goes home */
   | "cancel"
   /** backlog, todo → canceled: never sent */
-  | "drop";
+  | "drop"
+  /** the manager's issue, in_review → done: the owner takes its answer */
+  | "answered"
+  /** the manager's issue, in_review → canceled */
+  | "putAway";
 
 export const statusWords: Readonly<Record<IssueStatus, string>> = {
   backlog: "备选",
@@ -214,7 +230,7 @@ export const statusWords: Readonly<Record<IssueStatus, string>> = {
 /** The whole table; the reason says why when there is no move. */
 export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
   const from = t.status;
-  if (isForManager(t)) return ["none", "这是派给管家的工单：管家答完就关"];
+  if (isForManager(t)) return managerMove(t, to);
   if (t.graph || t.task || t.closed === "merged_into_graph") return ["none", "这是种植计划的工单，跟着计划走：在计划里改"];
   if (from === to) return ["none", "它已经是这个状态了"];
   if (to === "in_progress" || to === "in_review") return ["none", "处理中和等你看是帮工干出来的：挪到待办，它就开工"];
@@ -232,8 +248,12 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       return to === "canceled" ? ["cancel", ""] : ["none", "帮工还在干：等它交回来，或者挪到已取消让它回家"];
     case "in_review":
       if (to === "todo") return ["round", ""];
-      // Every issue has an acceptance; a glance one is passed by this harvest itself.
-      if (to === "done") return t.acceptance === "required" && t.acceptedAt === undefined ? ["none", "这张工单要先过验收：验收通过才能收获"] : ["merge", ""];
+      // Every issue has an acceptance; a glance one is passed by this harvest itself, so a round that failed is never
+      // harvested: done is what was asked for, not how the round ended.
+      if (to === "done") {
+        if (t.standing.stuck === "failed") return ["none", "这一轮没做成：带句话再干一轮，或者关掉"];
+        return t.acceptance === "required" && t.acceptedAt === undefined ? ["none", "这张工单要先过验收：验收通过才能收获"] : ["merge", ""];
+      }
       if (to === "canceled") return ["cancel", ""];
       break;
     case "done":
@@ -243,6 +263,16 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       return sent ? ["none", "关上的工单挪回待办，就是带一句话重开"] : ["none", "没开过工就取消的工单，挪回备选再说"];
   }
   return ["none", "不能从" + statusWords[from] + "挪到" + statusWords[to]];
+}
+
+/** The manager closes nothing: it answers, and the owner takes the answer as done or puts it away. */
+function managerMove(t: Issue, to: IssueStatus): [Move, string] {
+  if (t.status === "in_progress") return ["none", "管家还在答：等它答完"];
+  if (t.status !== "in_review") return ["none", "这是派给管家的工单：再问管家一次就开了"];
+  if (to === "canceled") return ["putAway", ""];
+  if (to !== "done") return ["none", "管家答完的工单只能挪到已完成或已取消；要它接着做，在串里跟管家说"];
+  if (t.handedBack && t.handedBack.outcome !== "completed") return ["none", "管家这一轮没答成：再问它一次，或者挪到已取消"];
+  return ["answered", ""];
 }
 
 export const statusMoves = (t: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(t, to)[0] !== "none");
@@ -291,4 +321,75 @@ function firstBlank(text: string): TemplateBlank | undefined {
   if (start < 0) return undefined;
   const end = text.indexOf("〕", start);
   return end < 0 ? undefined : { start, end: end + 1 };
+}
+
+// ── the issue's story ──
+
+const closedWords: Record<IssueClose, string> = {
+  merged: "收获了，合进了主分支",
+  merged_into_graph: "合进了种植计划",
+  dismissed: "没收就关了",
+  lost: "丢了",
+  answered: "管家答完了",
+};
+
+function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
+  switch (t.kind) {
+    case "draft":
+      return ["started", "开始起草"];
+    case "comment":
+      return ["told", "你带了话，接着做一轮"];
+    case "issue":
+      return ["started", first ? "开工" : "重开，接着做"];
+    case "task":
+      return ["started", "照种植计划开工"];
+    case "schedule":
+      return ["started", t.missed ? "定时开工（补跑）" : "定时开工"];
+    case "runtime":
+      return ["started", "农机自己接着做"];
+  }
+}
+
+/** The issue's milestones out of what is kept: its runs (oldest first), the findings it was sent back with, its
+ * acceptance and its close; newest first. The questions it waits on now go with its last run. names: a session's name. */
+export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<string, string>): IssueTimeline {
+  const out: Milestone[] = [{ at: t.createdAt, kind: "opened", text: "开单" }];
+  const lastDone = runs.findLastIndex((r) => r.endedAt !== undefined);
+  runs.forEach((r, i) => {
+    const who = names.get(r.session);
+    const by = who !== undefined ? { who } : {};
+    const draft = r.triggeredBy.kind === "draft";
+    const [kind, text] = startWords(r.triggeredBy, !runs.slice(0, i).some((x) => x.triggeredBy.kind !== "draft"));
+    out.push({ at: r.startedAt, kind, ...by, text });
+    if (r.endedAt === undefined || r.outcome === undefined) return;
+    const said = r.summary ? `：${r.summary}` : "";
+    switch (r.outcome) {
+      case "completed":
+        if (i === lastDone && t.asks.length > 0) out.push({ at: r.endedAt, kind: "asked", ...by, text: "问你：" + t.asks.map((a) => a.question).join(" / ") });
+        else out.push({ at: r.endedAt, kind: draft ? "drafted" : "reported", ...by, text: (draft ? "起草好了" : "交回来了") + said });
+        break;
+      case "failed":
+        out.push({ at: r.endedAt, kind: "failed", ...by, text: "没做成" + said });
+        break;
+      case "interrupted":
+        out.push({ at: r.endedAt, kind: "stopped", ...by, text: "停在了半路" + said });
+        break;
+    }
+  });
+  const sentBack = new Map<number, string[]>();
+  for (const f of t.findings) sentBack.set(f.at, [...(sentBack.get(f.at) ?? []), f.text]);
+  for (const [at, lines] of sentBack) out.push({ at, kind: "rejected", text: "打回：" + lines.join("；") });
+  if (t.acceptedAt !== undefined) out.push({ at: t.acceptedAt, kind: "accepted", text: "验收通过" });
+  if (t.closedAt !== undefined) out.push({ at: t.closedAt, kind: "closed", text: t.closed ? closedWords[t.closed] : "关了" });
+  // Newest first; at the same moment, the later step of the story first.
+  const milestones = out
+    .map((m, i) => [m, i] as const)
+    .sort((a, b) => b[0].at - a[0].at || b[1] - a[1])
+    .map(([m]) => m);
+  const spent = runs.reduce<Spent | undefined>((sum, r) => {
+    if (!r.spent) return sum;
+    const cny = r.spent.cny === undefined ? sum?.cny : (sum?.cny ?? 0) + r.spent.cny;
+    return { tokens: (sum?.tokens ?? 0) + r.spent.tokens, ...(cny !== undefined ? { cny } : {}) };
+  }, undefined);
+  return { milestones, ...(spent ? { spent } : {}) };
 }

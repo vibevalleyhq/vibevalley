@@ -1,11 +1,11 @@
 // The golden files (testdata, first recorded from the server's Go version) hold the rules to their answers:
 // runs of facts folded from an empty farm, the shared rules' calls, and the task graphs', schedules' and patrol's cases.
-// Each is compared as JSON. Times of day are read in Asia/Shanghai.
+// Each is compared as JSON. Times of day are read in Asia/Shanghai (vite.config.ts sets it).
 
-process.env.TZ = "Asia/Shanghai";
-
-import { describe, expect, test } from "bun:test";
-import type { Conversation, CoreState, Fact, Schedule, ScheduleRequest, Session, TaskGraph } from "../shapes";
+import { readFileSync, writeFileSync } from "node:fs";
+import { gunzipSync, gzipSync } from "node:zlib";
+import { describe, expect, test } from "vite-plus/test";
+import type { Conversation, CoreState, Fact, Issue, Schedule, ScheduleRequest, Session, TaskGraph } from "../shapes";
 import { targetOf } from "./chat";
 import { emptyCoreState, reduce } from "./core";
 import { inbox } from "./inbox";
@@ -14,12 +14,13 @@ import { phaseText } from "./phase";
 import { nextRun, nextText, scheduleProblem, whenText } from "./schedules";
 import { graphChanges, graphEventText } from "./taskChanges";
 import { acceptanceChecks, asksForYou, blockedBy, graphProblems, graphSpent, graphText, layersOf, readyTasks } from "./tasks";
+import { standingOf } from "./standing";
 import { effectsOf, viewOf } from "./view";
 
 const testdata = new URL("../../testdata/", import.meta.url);
 
 async function lines(name: string): Promise<Record<string, unknown>[]> {
-  const body = new TextDecoder().decode(Bun.gunzipSync(await Bun.file(new URL(name, testdata)).bytes()));
+  const body = new TextDecoder().decode(gunzipSync(readFileSync(new URL(name, testdata))));
   return body
     .split("\n")
     .filter((l) => l !== "")
@@ -76,7 +77,7 @@ function failures(name: string, rows: Record<string, unknown>[]) {
       } else if (found.length < 20) found.push(`line ${line} ${what}: ${d}`);
     },
     async done() {
-      if (updating && changed) await Bun.write(new URL(name, testdata), Bun.gzipSync(rows.map((r) => JSON.stringify(r)).join("\n") + "\n"));
+      if (updating && changed) writeFileSync(new URL(name, testdata), gzipSync(rows.map((r) => JSON.stringify(r)).join("\n") + "\n"));
       expect(found).toEqual([]);
     },
   };
@@ -108,7 +109,7 @@ describe("the golden files", () => {
     await f.done();
   });
 
-  test("rules: targetOf, phaseText, yuan", async () => {
+  test("rules: targetOf, phaseText, yuan, standingOf", async () => {
     const rows = await lines("rules.jsonl.gz");
     const f = failures("rules.jsonl.gz", rows);
     rows.forEach((row, i) => {
@@ -120,6 +121,8 @@ describe("the golden files", () => {
           return f.check(i + 1, "phaseText", phaseText(input.session as Session, input.now as number) || null, row, "out");
         case "yuan":
           return f.check(i + 1, "yuan", yuan(row.in as number), row, "out");
+        case "standingOf":
+          return f.check(i + 1, "standingOf", standingOf(input.issue as Issue, (input.session as Session | null) ?? undefined), row, "out");
         default:
           throw new Error(`line ${i + 1}: no rule ${String(row.fn)}`);
       }

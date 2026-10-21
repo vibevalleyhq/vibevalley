@@ -15,7 +15,8 @@ export const defaultVoice = (): VoiceSettings => ({
   area: "US",
   language: "zh-CN",
   asr: { vendor: "ares" },
-  answer: { vendor: "agora", model: "gpt-4.1-mini" },
+  // The farm's own manager answers: the call is its mouth, with the same conversation as 田头 (voice/voice.ts, the line).
+  answer: { vendor: "manager" },
   tts: { vendor: "minimax", model: "speech_2_6_turbo", voiceId: "Chinese (Mandarin)_Gentle_Youth" },
   persona: voiceManagerPersona,
   greeting: defaultGreeting,

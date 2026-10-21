@@ -13,6 +13,7 @@ export * from "./play";
 export * from "./schedules";
 export * from "./seeds";
 export * from "./sessions";
+export * from "./standing";
 export * from "./taskChanges";
 export * from "./taskIssues";
 export * from "./tasks";

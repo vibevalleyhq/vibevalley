@@ -1,142 +1,113 @@
-import type { BadgeTone } from "@vibevalley/protocol";
-import type { SpriteAtlas, SpriteInfo } from "../world/sprites";
-import { cx } from "./base";
-
-// At screen pixels, so the words stay sharp at any scale.
-
-export const CardColors = {
-  ink: "#3a2a18",
-  paper: "#f3e2b8",
-  muted: "#7a6248",
-  good: "#3f6b2a",
-  lightInk: "#fff3dc",
-  wood: "#b07a45",
-  held: "#b4cb7c",
-  slot: "#eedcb2",
-  ripe: "#e8b84a",
-  bug: "#c8543c",
-  stuck: "#5d8fb0",
-  rest: "#cdbb92",
-  // Handed back and waiting: on its acceptance, or on the owner's answer.
-  wait: "#b4cb7c",
-  barFill: "#7ea64f",
-  barTrack: "#e2c995",
-} as const;
-
-/** A cell of a glyph: x, y, w, h on its grid, and a CSS colour. */
-export type GlyphCell = readonly [x: number, y: number, w: number, h: number, color: string];
-
-export type Piece =
-  | { kind: "words"; text: string; color?: string; size?: number }
-  | { kind: "icon"; sprite: SpriteInfo; px: number }
-  | { kind: "glyph"; cells: readonly GlyphCell[]; px: number; grid?: { w: number; h: number } }
-  | { kind: "faces"; looks: readonly string[]; atlas: SpriteAtlas; px?: number }
-  | { kind: "bar"; fill: number; w: number; h: number; color?: string; track?: string };
+import { For, Match, Switch } from "solid-js";
+import { CardColors, type Piece } from "./card";
+import type { SpriteAtlas } from "../world/sprites";
 
 /** A helper's head, cut from its standing drawing (`<look>-down`, else the bear farmer's), on a leaf green ground. */
-export function AnimalFace({ atlas, look, size }: { atlas: SpriteAtlas; look: string; size: number }) {
-  const sp = atlas.has(`${look}-down`) ? atlas.get(`${look}-down`) : atlas.get("bear-farmer-down");
-  const k = size / (sp.h * 0.5);
-  const cx0 = sp.w / 2;
-  const cy0 = sp.h * 0.25 + sp.h * 0.03;
+export function AnimalFace(props: { atlas: SpriteAtlas; look: string; size: number }) {
+  const cut = () => {
+    const sp = props.atlas.has(`${props.look}-down`) ? props.atlas.get(`${props.look}-down`) : props.atlas.get("bear-farmer-down");
+    const k = props.size / (sp.h * 0.5);
+    return { url: sp.url, left: props.size / 2 - (sp.w / 2) * k, top: props.size / 2 - (sp.h * 0.25 + sp.h * 0.03) * k, width: sp.w * k, height: sp.h * k };
+  };
   return (
-    <span className="relative inline-block shrink-0 overflow-hidden bg-leaf-300/60" style={{ width: size, height: size }} aria-hidden>
+    <span
+      class="relative inline-block shrink-0 overflow-hidden bg-leaf-300/60"
+      style={{ width: `${props.size}px`, height: `${props.size}px` }}
+      aria-hidden="true"
+    >
       <img
-        src={sp.url}
+        src={cut().url}
         alt=""
-        draggable={false}
-        className="absolute max-w-none [image-rendering:pixelated]"
-        style={{ left: size / 2 - cx0 * k, top: size / 2 - cy0 * k, width: sp.w * k, height: sp.h * k }}
+        draggable="false"
+        class="absolute max-w-none [image-rendering:pixelated]"
+        style={{ left: `${cut().left}px`, top: `${cut().top}px`, width: `${cut().width}px`, height: `${cut().height}px` }}
       />
     </span>
   );
 }
 
-function PieceView({ piece, ink, maxWidth, maxLines, center }: { piece: Piece; ink: string; maxWidth?: number; maxLines?: number; center: boolean }) {
-  switch (piece.kind) {
-    case "words": {
-      const size = piece.size ?? 12;
-      return (
-        <span
-          className={cx("font-pixel font-normal", maxLines !== undefined && "overflow-hidden", center && "text-center")}
-          style={{
-            fontSize: size,
-            lineHeight: `${size + 2}px`,
-            color: piece.color ?? ink,
-            maxWidth,
-            ...(maxLines !== undefined ? { display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: maxLines } : {}),
-          }}
-        >
-          {piece.text}
-        </span>
-      );
-    }
-    case "icon":
-      return (
-        <img
-          src={piece.sprite.url}
-          alt=""
-          draggable={false}
-          className="shrink-0 [image-rendering:pixelated]"
-          style={{ height: piece.px, width: (piece.px * piece.sprite.w) / piece.sprite.h }}
-        />
-      );
-    case "glyph": {
-      const grid = piece.grid ?? { w: 10, h: 16 };
-      return (
-        <svg
-          width={(piece.px * grid.w) / grid.h}
-          height={piece.px}
-          viewBox={`0 0 ${grid.w} ${grid.h}`}
-          shapeRendering="crispEdges"
-          className="shrink-0"
-          aria-hidden
-        >
-          {piece.cells.map(([x, y, w, h, c], i) => (
-            <rect key={i} x={x} y={y} width={w} height={h} fill={c} />
-          ))}
-        </svg>
-      );
-    }
-    case "faces": {
-      const px = piece.px ?? 22;
-      const n = piece.looks.length;
-      return (
-        <span className="relative shrink-0" style={{ width: n === 0 ? 0 : px + (n - 1) * (px - 10), height: px }}>
-          {/* The first is drawn last, on top. */}
-          {piece.looks.map((look, i) => (
-            <span key={i} className="absolute top-0" style={{ left: i * (px - 10), zIndex: n - i }}>
-              <AnimalFace atlas={piece.atlas} look={look} size={px} />
+function PieceView(props: { piece: Piece; ink: string; maxWidth?: number; maxLines?: number; center: boolean }) {
+  return (
+    <Switch>
+      <Match when={props.piece.kind === "words" ? props.piece : undefined}>
+        {(p) => (
+          <span
+            class={["font-pixel font-normal", { "overflow-hidden": props.maxLines !== undefined, "text-center": props.center }]}
+            style={{
+              "font-size": `${p().size ?? 12}px`,
+              "line-height": `${(p().size ?? 12) + 2}px`,
+              color: p().color ?? props.ink,
+              "max-width": props.maxWidth !== undefined ? `${props.maxWidth}px` : undefined,
+              ...(props.maxLines !== undefined ? { display: "-webkit-box", "-webkit-box-orient": "vertical", "-webkit-line-clamp": props.maxLines } : {}),
+            }}
+          >
+            {p().text}
+          </span>
+        )}
+      </Match>
+      <Match when={props.piece.kind === "icon" ? props.piece : undefined}>
+        {(p) => (
+          <img
+            src={p().sprite.url}
+            alt=""
+            draggable="false"
+            class="shrink-0 [image-rendering:pixelated]"
+            style={{ height: `${p().px}px`, width: `${(p().px * p().sprite.w) / p().sprite.h}px` }}
+          />
+        )}
+      </Match>
+      <Match when={props.piece.kind === "glyph" ? props.piece : undefined}>
+        {(p) => {
+          const grid = () => p().grid ?? { w: 10, h: 16 };
+          return (
+            <svg
+              width={(p().px * grid().w) / grid().h}
+              height={p().px}
+              viewBox={`0 0 ${grid().w} ${grid().h}`}
+              shape-rendering="crispEdges"
+              class="shrink-0"
+              aria-hidden="true"
+            >
+              <For each={p().cells}>{([x, y, w, h, c]) => <rect x={x} y={y} width={w} height={h} fill={c} />}</For>
+            </svg>
+          );
+        }}
+      </Match>
+      <Match when={props.piece.kind === "faces" ? props.piece : undefined}>
+        {(p) => {
+          const px = () => p().px ?? 22;
+          const n = () => p().looks.length;
+          return (
+            <span class="relative shrink-0" style={{ width: `${n() === 0 ? 0 : px() + (n() - 1) * (px() - 10)}px`, height: `${px()}px` }}>
+              {/* The first is drawn last, on top. */}
+              <For each={p().looks} keyed={false}>
+                {(look, i) => (
+                  <span class="absolute top-0" style={{ left: `${i * (px() - 10)}px`, "z-index": n() - i }}>
+                    <AnimalFace atlas={p().atlas} look={look()} size={px()} />
+                  </span>
+                )}
+              </For>
             </span>
-          ))}
-        </span>
-      );
-    }
-    case "bar": {
-      // Whole twentieths, so the fill moves in steps.
-      const steps = Math.round(Math.min(1, Math.max(0, piece.fill)) * 20) / 20;
-      return (
-        <span className="relative shrink-0" style={{ width: piece.w, height: piece.h, background: piece.track ?? CardColors.barTrack }}>
-          <span className="absolute inset-y-0 left-0" style={{ width: Math.round(piece.w * steps), background: piece.color ?? CardColors.barFill }} />
-        </span>
-      );
-    }
-  }
+          );
+        }}
+      </Match>
+      <Match when={props.piece.kind === "bar" ? props.piece : undefined}>
+        {(p) => {
+          // Whole twentieths, so the fill moves in steps.
+          const steps = () => Math.round(Math.min(1, Math.max(0, p().fill)) * 20) / 20;
+          return (
+            <span class="relative shrink-0" style={{ width: `${p().w}px`, height: `${p().h}px`, background: p().track ?? CardColors.barTrack }}>
+              <span class="absolute inset-y-0 left-0" style={{ width: `${Math.round(p().w * steps())}px`, background: p().color ?? CardColors.barFill }} />
+            </span>
+          );
+        }}
+      </Match>
+    </Switch>
+  );
 }
 
 /** A HUD sign: rows of pieces 3 px apart on paper with an ink border and a hard drop. `width` and `height` include the border. */
-export function PixelCard({
-  rows,
-  paper = CardColors.paper,
-  ink = CardColors.ink,
-  padX = 6,
-  padY = 3,
-  width,
-  height,
-  center = false,
-  maxWidth,
-  maxLines,
-}: {
+export function PixelCard(props: {
   rows: readonly (readonly Piece[])[];
   paper?: string;
   ink?: string;
@@ -148,32 +119,33 @@ export function PixelCard({
   maxWidth?: number;
   maxLines?: number;
 }) {
-  const centred = center || width !== undefined || height !== undefined;
+  const centred = () => !!props.center || props.width !== undefined || props.height !== undefined;
   return (
-    <div className="inline-block pr-0.5 pb-0.5">
+    <div class="inline-block pr-0.5 pb-0.5">
       <div
-        className={cx("box-border flex border-2 shadow-[2px_2px_0_0_#3a2a1899]", centred && "items-center justify-center")}
-        style={{ background: paper, borderColor: CardColors.ink, padding: `${padY}px ${padX}px`, minWidth: width, minHeight: height }}
+        class={["box-border flex border-2 shadow-[2px_2px_0_0_#3a2a1899]", { "items-center justify-center": centred() }]}
+        style={{
+          background: props.paper ?? CardColors.paper,
+          "border-color": CardColors.ink,
+          padding: `${props.padY ?? 3}px ${props.padX ?? 6}px`,
+          "min-width": props.width !== undefined ? `${props.width}px` : undefined,
+          "min-height": props.height !== undefined ? `${props.height}px` : undefined,
+        }}
       >
-        <div className={cx("flex flex-col", center ? "items-center" : "items-start")}>
-          {rows.map((row, r) => (
-            <div key={r} className="flex items-center gap-[3px]">
-              {row.map((p, i) => (
-                <PieceView key={i} piece={p} ink={ink} maxWidth={maxWidth} maxLines={maxLines} center={center} />
-              ))}
-            </div>
-          ))}
+        <div class={["flex flex-col", props.center ? "items-center" : "items-start"]}>
+          <For each={props.rows} keyed={false}>
+            {(row) => (
+              <div class="flex items-center gap-[3px]">
+                <For each={row()} keyed={false}>
+                  {(p) => (
+                    <PieceView piece={p()} ink={props.ink ?? CardColors.ink} maxWidth={props.maxWidth} maxLines={props.maxLines} center={!!props.center} />
+                  )}
+                </For>
+              </div>
+            )}
+          </For>
         </div>
       </div>
     </div>
   );
 }
-
-/** A plot sign's paper and ink by its tone. */
-export const badgeColors: Record<BadgeTone, readonly [paper: string, ink: string]> = {
-  ripe: [CardColors.ripe, CardColors.ink],
-  bug: [CardColors.bug, CardColors.lightInk],
-  stuck: [CardColors.stuck, CardColors.lightInk],
-  rest: [CardColors.rest, CardColors.ink],
-  wait: [CardColors.wait, CardColors.ink],
-};

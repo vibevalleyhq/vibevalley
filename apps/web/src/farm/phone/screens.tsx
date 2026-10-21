@@ -1,18 +1,21 @@
-// The phone's screens other than the games: the home screen's apps, a call ringing, the
-// missed calls and the log, and the manager's line. The web has no voice yet, so calling the manager says so and points
-// to 田头 instead of dialing.
+// The phone's screens other than the games: the home screen's apps, a call ringing, the missed calls and the log, and
+// the manager's line. The web has no voice yet, so calling the manager says so and points to 田头 instead of dialing.
 
-import type { ReactNode } from "react";
+import { For, Show } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import type { InboxItem } from "@vibevalley/protocol";
-import { useAgents } from "../../data/agents";
+import type { GlyphCell } from "../kit/card";
+import { inboxKindLabel, missedOf } from "./calls";
+import { phoneCells } from "./cells";
+import { lcd } from "./lcd";
 import { callerName } from "../../rules/notice";
+import { aria } from "../../app/util";
+import { ready, useAgents } from "../../data/query";
 import { AgentFace, ManagerFace } from "../../ui/Face";
-import { cx, type GlyphCell, SpriteIcon } from "../kit";
-import { inboxKindLabel, missedOf, usePhone } from "./calls";
+import { SpriteIcon } from "../kit";
+import { phoneState } from "../support";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
-import { lcd } from "./lcd";
-import { phoneCells } from "./PhoneButton";
 
 export type PhoneApp = "home" | "missed" | "log" | "manager" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
@@ -22,92 +25,80 @@ const answerGreen = "#5a8234";
 const declineRed = "#c84a3a";
 
 /** Cells on a grid, scaled whole into `size` and centred. */
-export function Cells({
-  cells,
-  grid,
-  size,
-  origin = [0, 0],
-}: {
-  cells: readonly GlyphCell[];
-  grid: [number, number];
-  size: [number, number];
-  origin?: [number, number];
-}) {
+export function Cells(props: { cells: readonly GlyphCell[]; grid: [number, number]; size: [number, number]; origin?: [number, number] }) {
+  const origin = () => props.origin ?? [0, 0];
   return (
     <svg
-      width={size[0]}
-      height={size[1]}
-      viewBox={`${origin[0]} ${origin[1]} ${grid[0]} ${grid[1]}`}
-      shapeRendering="crispEdges"
-      aria-hidden
-      className="shrink-0"
+      width={props.size[0]}
+      height={props.size[1]}
+      viewBox={`${origin()[0]} ${origin()[1]} ${props.grid[0]} ${props.grid[1]}`}
+      shape-rendering="crispEdges"
+      aria-hidden="true"
+      class="shrink-0"
     >
-      {cells.map(([x, y, w, h, fill], i) => (
-        <rect key={i} x={x} y={y} width={w} height={h} fill={fill} />
-      ))}
+      <For each={props.cells}>{([x, y, w, h, fill]) => <rect x={x} y={y} width={w} height={h} fill={fill} />}</For>
     </svg>
   );
 }
 
-export const PhoneGlyph = ({ size, lit = false }: { size: number; lit?: boolean }) => (
-  <Cells cells={phoneCells(lit)} grid={[10, 16]} size={[(size * 10) / 16, size]} />
+export const PhoneGlyph = (props: { size: number; lit?: boolean }) => (
+  <Cells cells={phoneCells(props.lit ?? false)} grid={[10, 16]} size={[(props.size * 10) / 16, props.size]} />
 );
 
-function CallerFace({ call, size }: { call: InboxItem; size: number }) {
-  const agents = useAgents().data ?? [];
-  if (call.from.kind === "manager") return <ManagerFace size={size} />;
-  const { agent, id } = call.from;
-  return <AgentFace agentId={agent || id} look={agents.find((a) => a.id === agent)?.look} size={size} />;
+function CallerFace(props: { call: InboxItem; size: number }) {
+  const agents = useAgents();
+  return (
+    <Show when={props.call.from.kind !== "manager" ? props.call.from : undefined} fallback={<ManagerFace size={props.size} />}>
+      {(from) => <AgentFace agentId={from().agent || from().id} look={ready(agents, []).find((a) => a.id === from().agent)?.look} size={props.size} />}
+    </Show>
+  );
 }
 
-const BigFace = ({ children, shake = false }: { children: ReactNode; shake?: boolean }) => (
+const BigFace = (props: { children: JSX.Element; shake?: boolean }) => (
   <span
-    className={cx("grid size-[72px] place-items-center", shake && "phone-shake")}
-    style={{ background: lcd.pale, boxShadow: `inset 0 0 0 2px ${lcd.dark}` }}
+    class={["grid size-[72px] place-items-center", { "phone-shake": !!props.shake }]}
+    style={{ background: lcd.pale, "box-shadow": `inset 0 0 0 2px ${lcd.dark}` }}
   >
-    {children}
+    {props.children}
   </span>
 );
 
-const SmallFace = ({ children }: { children: ReactNode }) => (
-  <span className="grid size-8 shrink-0 place-items-center overflow-hidden" style={{ background: lcd.pale }}>
-    {children}
+const SmallFace = (props: { children: JSX.Element }) => (
+  <span class="grid size-8 shrink-0 place-items-center overflow-hidden" style={{ background: lcd.pale }}>
+    {props.children}
   </span>
 );
 
-export function RingingScreen({ call, onAnswer, onDecline }: { call: InboxItem; onAnswer: () => void; onDecline: () => void }) {
+export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; onDecline: () => void }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
-      <span className="phone-blink">来电…</span>
-      <span className="mt-3">
+    <div class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
+      <span class="phone-blink">来电…</span>
+      <span class="mt-3">
         <BigFace shake>
-          <CallerFace call={call} size={60} />
+          <CallerFace call={props.call} size={60} />
         </BigFace>
       </span>
-      <p className="mt-3 text-[24px] leading-none">{callerName(call)}</p>
-      <p className="mt-2 px-2" style={{ background: lcd.dark, color: lcd.pale }}>
-        {inboxKindLabel[call.kind]}
+      <p class="mt-3 text-[24px] leading-none">{callerName(props.call)}</p>
+      <p class="mt-2 px-2" style={{ background: lcd.dark, color: lcd.pale }}>
+        {inboxKindLabel[props.call.kind]}
       </p>
-      <p className="mt-2 line-clamp-3 leading-[1.625]">{call.text}</p>
-      <div className="mt-auto mb-5 flex gap-8">
-        <RoundKey answer={false} label="挂断" onClick={onDecline} />
-        <RoundKey answer label="接听" onClick={onAnswer} />
+      <p class="mt-2 line-clamp-3 leading-[1.625]">{props.call.text}</p>
+      <div class="mt-auto mb-5 flex gap-8">
+        <RoundKey answer={false} label="挂断" onClick={() => props.onDecline()} />
+        <RoundKey answer label="接听" onClick={() => props.onAnswer()} />
       </div>
     </div>
   );
 }
 
-function RoundKey({ answer, label, onClick }: { answer: boolean; label: string; onClick: () => void }) {
+function RoundKey(props: { answer: boolean; label: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex cursor-pointer flex-col items-center gap-1">
+    <button type="button" onClick={() => props.onClick()} class="flex cursor-pointer flex-col items-center gap-1">
       <span
-        className="grid size-11 place-items-center"
-        style={{
-          background: answer ? answerGreen : declineRed,
-          boxShadow: `inset 0 0 0 2px ${bark}, inset -3px -3px 0 0 #00000040`,
-        }}
+        class="grid size-11 place-items-center"
+        style={{ background: props.answer ? answerGreen : declineRed, "box-shadow": `inset 0 0 0 2px ${bark}, inset -3px -3px 0 0 #00000040` }}
       >
-        <span style={answer ? undefined : { transform: "rotate(135deg)" }} className="flex">
+        <span style={props.answer ? undefined : { transform: "rotate(135deg)" }} class="flex">
           <Cells
             cells={[
               [0, 2, 3, 4, cream],
@@ -119,18 +110,18 @@ function RoundKey({ answer, label, onClick }: { answer: boolean; label: string; 
           />
         </span>
       </span>
-      {label}
+      {props.label}
     </button>
   );
 }
 
-function CallManager({ onCall }: { onCall: () => void }) {
+function CallManager(props: { onCall: () => void }) {
   return (
     <button
       type="button"
-      onClick={onCall}
-      className="m-2 flex cursor-pointer items-center justify-center gap-2 py-1.5 hover:brightness-110"
-      style={{ background: answerGreen, color: cream, boxShadow: `inset 0 0 0 2px ${bark}` }}
+      onClick={() => props.onCall()}
+      class="m-2 flex cursor-pointer items-center justify-center gap-2 py-1.5 hover:brightness-110"
+      style={{ background: answerGreen, color: cream, "box-shadow": `inset 0 0 0 2px ${bark}` }}
     >
       <PhoneGlyph size={14} lit />
       打给管家
@@ -138,107 +129,107 @@ function CallManager({ onCall }: { onCall: () => void }) {
   );
 }
 
-export function ListScreen({
-  screen,
-  onScreen,
-  onAnswer,
-  onCall,
-}: {
-  screen: "missed" | "log";
-  onScreen: (s: "missed" | "log") => void;
-  onAnswer: (c: InboxItem) => void;
-  onCall: () => void;
-}) {
-  const phone = usePhone();
-  const missed = missedOf(phone);
+export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "missed" | "log") => void; onAnswer: (c: InboxItem) => void; onCall: () => void }) {
+  const phone = phoneState();
+  const missed = () => missedOf(phone());
   const empty = (text: string) => (
-    <li className="px-3 py-6 text-center" style={{ color: lcd.dark }}>
+    <li class="px-3 py-6 text-center" style={{ color: lcd.dark }}>
       {text}
     </li>
   );
   const row = "flex w-full items-center gap-2 px-2 py-1.5 text-left";
-  const rule = { borderBottom: `1px solid ${lcd.rule}` };
+  const rule = { "border-bottom": `1px solid ${lcd.rule}` };
   return (
     <>
-      <div className="flex" style={{ borderBottom: `2px solid ${lcd.dark}` }}>
-        {(["missed", "log"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => onScreen(s)}
-            aria-pressed={screen === s}
-            className={cx("flex-1 cursor-pointer py-1", screen !== s && "hover:bg-[#b9cf8c]")}
-            style={screen === s ? { background: lcd.dark, color: lcd.pale } : undefined}
-          >
-            {s === "missed" ? `未接 ${missed.length}` : "记录"}
-          </button>
-        ))}
+      <div class="flex" style={{ "border-bottom": `2px solid ${lcd.dark}` }}>
+        <For each={["missed", "log"] as const}>
+          {(s) => (
+            <button
+              type="button"
+              onClick={() => props.onScreen(s)}
+              aria-pressed={aria(props.screen === s)}
+              class={["flex-1 cursor-pointer py-1", { "hover:bg-[#b9cf8c]": props.screen !== s }]}
+              style={props.screen === s ? { background: lcd.dark, color: lcd.pale } : undefined}
+            >
+              {s === "missed" ? `未接 ${missed().length}` : "记录"}
+            </button>
+          )}
+        </For>
       </div>
-      <ul className="min-h-0 flex-1 overflow-y-auto">
-        {screen === "missed"
-          ? missed.length === 0
-            ? empty("没有未接来电。地里都好好的。")
-            : missed.map((c) => (
-                <li key={c.id} style={rule}>
+      <ul class="min-h-0 flex-1 overflow-y-auto">
+        <Show
+          when={props.screen === "missed"}
+          fallback={
+            <Show when={phone().log.length > 0} fallback={empty("还没有通话。")}>
+              <For each={phone().log} keyed={(e) => `${e.call.id}-${e.at}`}>
+                {(e) => (
+                  <li class={row} style={rule}>
+                    <SmallFace>
+                      <CallerFace call={e().call} size={28} />
+                    </SmallFace>
+                    <span class="min-w-0 flex-1 truncate">
+                      {callerName(e().call)} · {inboxKindLabel[e().call.kind]}
+                    </span>
+                    <span style={{ color: e().answered ? lcd.dark : declineRed }}>{e().answered ? "接了" : "挂了"}</span>
+                  </li>
+                )}
+              </For>
+            </Show>
+          }
+        >
+          <Show when={missed().length > 0} fallback={empty("没有未接来电。地里都好好的。")}>
+            <For each={missed()} keyed={(c) => c.id}>
+              {(c) => (
+                <li style={rule}>
                   <button
                     type="button"
-                    onClick={() => onAnswer(c)}
-                    aria-label={`${callerName(c)}：${inboxKindLabel[c.kind]}`}
-                    className={cx(row, "cursor-pointer hover:bg-[#b9cf8c]")}
+                    onClick={() => props.onAnswer(c())}
+                    aria-label={`${callerName(c())}：${inboxKindLabel[c().kind]}`}
+                    class={[row, "cursor-pointer hover:bg-[#b9cf8c]"]}
                   >
                     <SmallFace>
-                      <CallerFace call={c} size={28} />
+                      <CallerFace call={c()} size={28} />
                     </SmallFace>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex">
-                        {callerName(c)}
-                        <span className="ml-auto" style={{ color: declineRed }}>
-                          {inboxKindLabel[c.kind]}
+                    <span class="min-w-0 flex-1">
+                      <span class="flex">
+                        {callerName(c())}
+                        <span class="ml-auto" style={{ color: declineRed }}>
+                          {inboxKindLabel[c().kind]}
                         </span>
                       </span>
-                      <span className="block truncate" style={{ color: lcd.dark }}>
-                        {c.text}
+                      <span class="block truncate" style={{ color: lcd.dark }}>
+                        {c().text}
                       </span>
                     </span>
                   </button>
                 </li>
-              ))
-          : phone.log.length === 0
-            ? empty("还没有通话。")
-            : phone.log.map((e) => (
-                <li key={`${e.call.id}-${e.at}`} className={row} style={rule}>
-                  <SmallFace>
-                    <CallerFace call={e.call} size={28} />
-                  </SmallFace>
-                  <span className="min-w-0 flex-1 truncate">
-                    {callerName(e.call)} · {inboxKindLabel[e.call.kind]}
-                  </span>
-                  <span style={{ color: e.answered ? lcd.dark : declineRed }}>{e.answered ? "接了" : "挂了"}</span>
-                </li>
-              ))}
+              )}
+            </For>
+          </Show>
+        </Show>
       </ul>
-      <CallManager onCall={onCall} />
+      <CallManager onCall={() => props.onCall()} />
     </>
   );
 }
 
 /** The manager's line: on the web it cannot be dialed yet, so it sends you to 田头. */
-export function ManagerScreen({ onChat }: { onChat: () => void }) {
+export function ManagerScreen(props: { onChat: () => void }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
+    <div class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
       <BigFace>
         <ManagerFace size={60} />
       </BigFace>
-      <p className="mt-2 text-[24px] leading-none">管家</p>
-      <p className="mt-3 leading-[1.625]">网页上还打不了电话。</p>
-      <p className="leading-[1.625]" style={{ color: lcd.dark }}>
+      <p class="mt-2 text-[24px] leading-none">管家</p>
+      <p class="mt-3 leading-[1.625]">网页上还打不了电话。</p>
+      <p class="leading-[1.625]" style={{ color: lcd.dark }}>
         有事去田头跟他说，他一样听得到。
       </p>
       <button
         type="button"
-        onClick={onChat}
-        className="mt-auto mb-5 cursor-pointer px-3 py-1.5 hover:brightness-110"
-        style={{ background: answerGreen, color: cream, boxShadow: `inset 0 0 0 2px ${bark}` }}
+        onClick={() => props.onChat()}
+        class="mt-auto mb-5 cursor-pointer px-3 py-1.5 hover:brightness-110"
+        style={{ background: answerGreen, color: cream, "box-shadow": `inset 0 0 0 2px ${bark}` }}
       >
         去田头说
       </button>
@@ -246,55 +237,47 @@ export function ManagerScreen({ onChat }: { onChat: () => void }) {
   );
 }
 
-export function HomeScreen({
-  missed,
-  onOpen,
-  onChannels,
-  onTaskBoard,
-}: {
-  missed: number;
-  onOpen: (app: PhoneApp) => void;
-  onChannels: () => void;
-  onTaskBoard: () => void;
-}) {
-  const apps: { label: string; icon: ReactNode; badge?: number; go: () => void }[] = [
-    { label: "未接", icon: <PhoneGlyph size={26} lit={missed > 0} />, badge: missed, go: () => onOpen("missed") },
-    { label: "记录", icon: <SpriteIcon name="icon-log" size={28} />, go: () => onOpen("log") },
-    { label: "管家", icon: <ManagerFace size={28} />, go: () => onOpen("manager") },
-    { label: "频道", icon: <SpriteIcon name="icon-board" size={28} />, go: onChannels },
-    { label: "计划", icon: <SpriteIcon name="icon-task-board" size={28} />, go: onTaskBoard },
-    { label: "方块", icon: <BlocksIcon />, go: () => onOpen("blocks") },
+export function HomeScreen(props: { missed: number; onOpen: (app: PhoneApp) => void; onChannels: () => void; onTaskBoard: () => void }) {
+  const apps: { label: string; icon: () => JSX.Element; badge?: () => number; go: () => void }[] = [
+    { label: "未接", icon: () => <PhoneGlyph size={26} lit={props.missed > 0} />, badge: () => props.missed, go: () => props.onOpen("missed") },
+    { label: "记录", icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
+    { label: "管家", icon: () => <ManagerFace size={28} />, go: () => props.onOpen("manager") },
+    { label: "频道", icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
+    { label: "计划", icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
+    { label: "方块", icon: () => <BlocksIcon />, go: () => props.onOpen("blocks") },
     {
       label: "推箱子",
-      icon: (
-        <span className="grid size-7 place-items-center text-[18px] leading-none" style={{ boxShadow: `inset 0 0 0 2px ${lcd.ink}` }}>
+      icon: () => (
+        <span class="grid size-7 place-items-center text-[18px] leading-none" style={{ "box-shadow": `inset 0 0 0 2px ${lcd.ink}` }}>
           ×
         </span>
       ),
-      go: () => onOpen("sokoban"),
+      go: () => props.onOpen("sokoban"),
     },
-    { label: "小恐龙", icon: <DinoIcon />, go: () => onOpen("dino") },
-    { label: "贪吃虫", icon: <BugSnakeIcon />, go: () => onOpen("bugs") },
-    { label: "种田 2048", icon: <MergeIcon />, go: () => onOpen("merge") },
+    { label: "小恐龙", icon: () => <DinoIcon />, go: () => props.onOpen("dino") },
+    { label: "贪吃虫", icon: () => <BugSnakeIcon />, go: () => props.onOpen("bugs") },
+    { label: "种田 2048", icon: () => <MergeIcon />, go: () => props.onOpen("merge") },
   ];
   return (
-    <div className="grid grid-cols-3 content-start gap-y-3 px-2 pt-4">
-      {apps.map((a) => (
-        <button key={a.label} type="button" onClick={a.go} aria-label={a.label} className="group flex cursor-pointer flex-col items-center gap-1">
-          <span
-            className="relative grid size-11 place-items-center bg-[#e8f0c8] group-hover:bg-[#f2f7dc] group-active:translate-y-px"
-            style={{ boxShadow: `inset 0 0 0 2px ${lcd.dark}` }}
-          >
-            {a.icon}
-            {a.badge ? (
-              <span className="absolute -top-1.5 -right-1.5 px-1 leading-[14px]" style={{ background: declineRed, color: cream }}>
-                {a.badge}
-              </span>
-            ) : null}
-          </span>
-          {a.label}
-        </button>
-      ))}
+    <div class="grid grid-cols-3 content-start gap-y-3 px-2 pt-4">
+      <For each={apps}>
+        {(a) => (
+          <button type="button" onClick={() => a.go()} aria-label={a.label} class="group flex cursor-pointer flex-col items-center gap-1">
+            <span
+              class="relative grid size-11 place-items-center bg-[#e8f0c8] group-hover:bg-[#f2f7dc] group-active:translate-y-px"
+              style={{ "box-shadow": `inset 0 0 0 2px ${lcd.dark}` }}
+            >
+              {a.icon()}
+              <Show when={a.badge?.()}>
+                <span class="absolute -top-1.5 -right-1.5 px-1 leading-[14px]" style={{ background: declineRed, color: cream }}>
+                  {a.badge?.()}
+                </span>
+              </Show>
+            </span>
+            {a.label}
+          </button>
+        )}
+      </For>
     </div>
   );
 }

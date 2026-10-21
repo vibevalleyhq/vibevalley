@@ -1,8 +1,10 @@
 # src/farm
 
 The pixel farm at `/`. It is full-bleed, outside the workbench's shell; its 工作台 link goes to `/issues`, and the
-shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/data/frame.tsx`); this folder
-only draws it and keeps the page's own state.
+shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/data/frame.ts`); this folder
+only draws it and keeps the page's own state. Its Solid side reads the framework-free modules here through `state.ts`
+(`useFarm`, `timeOfDay`, `rawFrame`, `commands`) and `support.ts` (the village, the keys, the phone's calls, the sounds,
+the pad).
 
 ## Its parts
 
@@ -35,8 +37,8 @@ Which part draws which overlay (`FarmUi.overlays`):
 
 ## The store (`store.ts`)
 
-`useFarm(select)` reads a slice (return one field or a primitive); `farmState()` reads it outside React;
-`subscribeFarm(fn)` listens. Changes only through `farm.*`:
+`useFarm(select)` (`state.ts`) reads a slice, an accessor that changes only when the slice does; `farmState()` reads it
+outside a component; `subscribeFarm(fn)` listens. Changes only through `farm.*`:
 
 | Action | Does |
 |---|---|
@@ -56,7 +58,7 @@ Which part draws which overlay (`FarmUi.overlays`):
 | `setScreen(screen \| null)` | set by the canvas only (below) |
 
 `clock` is the one day clock (`@vibevalley/engine/clock`, a day is 600 s, starts at 0.42): the canvas advances it every
-frame; the HUD reads `useTimeOfDay()` (re-renders every five minutes of the day); the debug console calls
+frame; the HUD reads `timeOfDay()` (changes every five minutes of the day); the debug console calls
 `clock.setTimeOfDay(tod)` and `clock.setSpeed(n)` (0 stops it, 60 makes a day ten seconds).
 
 ## How the DOM finds things on the canvas
@@ -68,28 +70,29 @@ changes). Everything is in the farm page's CSS pixels, its top left at 0, 0:
   page: lay the HUD out in here);
 - `toScreen(artPoint)`; `plotRect(bed)`; `helperAt(sessionId)` (a helper's feet now, undefined when not drawn);
 - `onFrame(fn)`: called after every drawn frame, for DOM that follows a walker (a name tag, a bubble). Move such DOM
-  with a `transform` in the callback; do not set React state every frame.
+  with a `transform` in the callback; do not set a signal every frame.
 
 The framing (`world/framing.ts`, `frameVillage`): a whole scale, at most 5% cut off the sides and 8% off
 the top and bottom, bars filled with the dimmed map.
 
 ## Commands (`commands.ts`)
 
-`useFarmCommands()` gives `FarmCommands` over the latest frame: `water`, `resolve`, `cure`, `harvest`, `shovel`, `stop`,
-`stopManager`, `dismiss`, `plant`, `startQueued`, `aim`, `act`, `split`, `editTask`, `removeTask`, `actOnGraph`,
+`commands` (`state.ts`, `farmCommands` over the latest frame) is the `FarmCommands`: `water`, `resolve`, `cure`, `harvest`, `shovel`, `stop`,
+`stopManager`, `dismiss`, `plant`, `aim`, `act`, `split`, `editTask`, `removeTask`, `actOnGraph`,
 `actOnTask`, `chooseTitle`, `refreshRuntime`, `enterFarm`. Each calls the API and then plays the bed's effect.
 `clickBed(commands, bed)` is a plot click as the farm page does it; `openPlace(place, navigate)` a yard place's click
 (a panel, or a workbench page the web page has: `webRoutes`). `fire(promise)`: the server's notice tells a refusal.
 
 ## Pieces to build with
 
-- `world/`: `loadVillage()` / `useVillage()` (the level and the atlas, fetched once); `VillageWorld` (plots, places,
+- `world/`: `loadVillage()`, and `useVillage()` in `support.ts` (the level and the atlas, fetched once); `VillageWorld` (plots, places,
   props, gate, queue, lawn, lights, fx boxes, `nav`, `goalOf`, `poseOf`, `spotsFor`, `Whereabouts`); `plots.ts` (beds, `plotKey`, `cropOfBed`, `sessionAtStation`, `cropLabel`); `places.ts` (the
   yard places and `FarmPanel`); `hits.ts` (`villageHitAt`, the click order); `sprites.ts` (`SpriteAtlas`: sizes and
   anchors in art pixels, `density` 2, `spriteUrl`); `textures.ts` (`loadTextures`, `texture`: Pixi textures at the
   density); `framing.ts`.
 - `kit/`: the pixel components for the DOM over the canvas, from `kit/index.ts`.
-- `sound.ts`: `playSound(name)`, `useMuted()`, `useFarmSounds(...)` (FarmPage runs it), the sounds' recipes.
+- `sound.ts`: `playSound(name)`, `isMuted`/`setMuted`, `farmCues`, the sounds' recipes; `muted()` and `farmSounds(...)`
+  (FarmPage runs it) in `support.ts`.
 - `tools.ts`: `Tool`, `tools`, `aimTool`, `farmKey`, `bugText`, `managerSprite`.
 - `@vibevalley/engine`: `/pixi` (`pixelStage` with `frame`, `Walker`, `frameAt`, particles, critters, light, sky),
   `/nav`, `/audio`, `/clock`.

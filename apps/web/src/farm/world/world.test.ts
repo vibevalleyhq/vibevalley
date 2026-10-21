@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vite-plus/test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { frameVillage, villageCutAcross, villageCutDown } from "./framing";
@@ -8,7 +8,7 @@ import { yardPlaces } from "./places";
 import { SpriteAtlas, levelWidth } from "./sprites";
 import { VillageWorld } from "./world";
 
-const assets = join(import.meta.dir, "../../../public");
+const assets = join(import.meta.dirname, "../../../public");
 const level = Level.parse(readFileSync(join(assets, "village.ldtk"), "utf8"));
 const world = new VillageWorld(level);
 const atlas = SpriteAtlas.parse(readFileSync(join(assets, "pixel/sprites.json"), "utf8"));

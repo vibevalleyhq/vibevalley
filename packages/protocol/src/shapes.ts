@@ -1045,9 +1045,99 @@ export interface Issue {
   acceptance: Acceptance;
   acceptedAt?: number;
   findings: Finding[];
-  asks: string[];
+  asks: Ask[];
   criteria?: string[];
+  checks?: CriterionCheck[];
   drafting?: IssueDrafting;
+  /** An issue for the manager: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
+  handedBack?: HandedBack;
+  standing: IssueStanding;
+}
+
+export interface HandedBack {
+  at: number;
+  outcome: Outcome;
+}
+
+/** A question the helper is waiting on the owner for; options are the answers it thought of, each one a reply as it is. */
+export interface Ask {
+  question: string;
+  options?: string[];
+}
+
+export const CheckResultValues = ["met", "unmet", "unsure"] as const;
+export type CheckResult = (typeof CheckResultValues)[number];
+
+/** The helper's own word on one of the criteria, as it handed the work back: criterion is its index in Issue.criteria. */
+export interface CriterionCheck {
+  criterion: number;
+  result: CheckResult;
+  proof?: string;
+}
+
+/** Where an issue stands for the owner, the one set of states the board, the farm and the page all say. */
+export const StandingValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "harvested", "closed"] as const;
+export type Standing = (typeof StandingValues)[number];
+
+export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] as const;
+export type StuckReason = (typeof StuckReasonValues)[number];
+
+/** What the owner can do to an issue from its page. tell is a word to the helper, answer the same to its question;
+ * reject sends it back with findings; acknowledge takes what the manager answered as done. */
+export const IssueActValues = [
+  "start",
+  "answer",
+  "accept",
+  "reject",
+  "harvest",
+  "acknowledge",
+  "resolve",
+  "resume",
+  "cure",
+  "tell",
+  "stop",
+  "close",
+  "reopen",
+] as const;
+export type IssueAct = (typeof IssueActValues)[number];
+
+/** since: when it came to stand so, when known. lead is the one thing the owner is asked to do, if any; acts are all
+ * it can do, lead first. */
+export interface IssueStanding {
+  state: Standing;
+  since?: number;
+  stuck?: StuckReason;
+  lead?: IssueAct;
+  acts: IssueAct[];
+}
+
+export const MilestoneKindValues = [
+  "opened",
+  "drafted",
+  "started",
+  "reported",
+  "asked",
+  "told",
+  "failed",
+  "stopped",
+  "rejected",
+  "accepted",
+  "closed",
+] as const;
+export type MilestoneKind = (typeof MilestoneKindValues)[number];
+
+/** One line of an issue's story; who is the session's name, or absent for the owner and the farm. */
+export interface Milestone {
+  at: number;
+  kind: MilestoneKind;
+  who?: string;
+  text: string;
+}
+
+/** An issue's story newest first, and what all its runs cost. */
+export interface IssueTimeline {
+  milestones: Milestone[];
+  spent?: Spent;
 }
 
 export interface IssueDrafting {
@@ -1780,7 +1870,8 @@ export interface FactReport {
   summary: string;
   runs: number;
   spent?: Spent;
-  asks?: string[];
+  asks?: Ask[];
+  checks?: CriterionCheck[];
 }
 
 export interface FactConflict {
@@ -2145,305 +2236,4 @@ export interface DocAck {
   seq: number;
   results: DocOpResult[];
   blocks: Block[];
-}
-
-/** A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status. */
-export class VibeValleyApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly tag: string | undefined,
-    readonly reason: string,
-  ) {
-    super(reason);
-  }
-}
-
-/** The server's HTTP API, one object per group: `api.issue.create({ body })`. */
-export class VibeValleyApi {
-  /** base: the server's address; empty is the page's own origin, which serves it. */
-  constructor(
-    readonly base = "",
-    private readonly fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init),
-  ) {}
-
-  readonly server = {
-    health: (): Promise<Health> => this.call("GET", "/api/v1/health", undefined, undefined) as Promise<Health>,
-  };
-
-  readonly manager = {
-    open: (): Promise<void> => this.call("POST", "/api/v1/manager/open", undefined, undefined) as Promise<void>,
-    /** Ends the manager's run under way and drops what waits for it; the sessions it sent keep working. */
-    stop: (): Promise<void> => this.call("POST", "/api/v1/manager/stop", undefined, undefined) as Promise<void>,
-    /** The v1 caption relay without a call id is accepted only with one active call. */
-    hear: (a: { body: SayRequest }): Promise<void> => this.call("POST", "/api/v1/manager/hear", undefined, a.body) as Promise<void>,
-    listArchive: (a: { q?: string }): Promise<ArchiveListing> => this.call("GET", "/api/v1/manager/archive", { q: a.q }, undefined) as Promise<ArchiveListing>,
-    getArchive: (a: { name: string }): Promise<string> =>
-      this.call("GET", "/api/v1/manager/archive/" + encodeURIComponent(String(a.name)), undefined, undefined) as Promise<string>,
-    /** Saves the turn begun at a step of the manager's log as a case for its evals, with what it should have done. */
-    markWrong: (a: { body: ManagerEvalRequest }): Promise<ManagerEval> => this.call("POST", "/api/v1/manager/evals", undefined, a.body) as Promise<ManagerEval>,
-  };
-
-  readonly setting = {
-    load: (): Promise<SettingsStatus> => this.call("GET", "/api/v1/settings", undefined, undefined) as Promise<SettingsStatus>,
-    /** The first thing Save would refuse in these settings, without saving them. */
-    check: (a: { body: SettingsUpdate }): Promise<SettingsCheck> => this.call("POST", "/api/v1/settings/check", undefined, a.body) as Promise<SettingsCheck>,
-    save: (a: { body: SettingsUpdate }): Promise<SettingsStatus> => this.call("PUT", "/api/v1/settings", undefined, a.body) as Promise<SettingsStatus>,
-  };
-
-  readonly channel = {
-    say: (a: { body: SayRequest }): Promise<void> => this.call("POST", "/api/v1/say", undefined, a.body) as Promise<void>,
-    create: (a: { body: ChannelRequest }): Promise<string> => this.call("POST", "/api/v1/channels", undefined, a.body) as Promise<string>,
-    update: (a: { id: string; body: ChannelUpdate }): Promise<void> =>
-      this.call("PUT", "/api/v1/channels/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<void>,
-    history: (a: { id: string; before?: number; limit?: number }): Promise<ChatMessage[]> =>
-      this.call("GET", "/api/v1/channels/" + encodeURIComponent(String(a.id)) + "/messages", { before: a.before, limit: a.limit }, undefined) as Promise<
-        ChatMessage[]
-      >,
-    markRead: (a: { id: string; body: ChatReadRequest }): Promise<void> =>
-      this.call("POST", "/api/v1/channels/" + encodeURIComponent(String(a.id)) + "/read", undefined, a.body) as Promise<void>,
-  };
-
-  readonly schedule = {
-    create: (a: { body: ScheduleRequest }): Promise<Schedule> => this.call("POST", "/api/v1/schedules", undefined, a.body) as Promise<Schedule>,
-    list: (): Promise<Schedule[]> => this.call("GET", "/api/v1/schedules", undefined, undefined) as Promise<Schedule[]>,
-    /** Only what the body gives changes. */
-    update: (a: { id: string; body: ScheduleUpdate }): Promise<void> =>
-      this.call("PUT", "/api/v1/schedules/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<void>,
-    delete: (a: { id: string }): Promise<void> =>
-      this.call("DELETE", "/api/v1/schedules/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
-  };
-
-  readonly issue = {
-    /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
-    comment: (a: { id: string; body: CommentRequest }): Promise<void> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/comment", undefined, a.body) as Promise<void>,
-    changes: (a: { id: string }): Promise<Changes> =>
-      this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/changes", undefined, undefined) as Promise<Changes>,
-    /** Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask). */
-    resolve: (a: { id: string }): Promise<void> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/resolve", undefined, undefined) as Promise<void>,
-    /** One joined read of issues and their real sessions, including explicit missing records. */
-    history: (): Promise<IssueHistory[]> => this.call("GET", "/api/v1/issues/history", undefined, undefined) as Promise<IssueHistory[]>,
-    list: (): Promise<Issue[]> => this.call("GET", "/api/v1/issues", undefined, undefined) as Promise<Issue[]>,
-    get: (a: { id: string }): Promise<Issue> => this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<Issue>,
-    runs: (a: { id: string }): Promise<Run[]> =>
-      this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/runs", undefined, undefined) as Promise<Run[]>,
-    create: (a: { body: IssueRequest }): Promise<Issue> => this.call("POST", "/api/v1/issues", undefined, a.body) as Promise<Issue>,
-    update: (a: { id: string; body: IssueUpdate }): Promise<Issue> =>
-      this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<Issue>,
-    delete: (a: { id: string }): Promise<void> =>
-      this.call("DELETE", "/api/v1/issues/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
-    move: (a: { id: string; body: MoveIssueRequest }): Promise<Issue[]> =>
-      this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/move", undefined, a.body) as Promise<Issue[]>,
-    /** Moving an issue is what it does: todo sends it out (or waits for room), done merges, canceled sends its session home,
-     * todo again after a round or a close is another round with text. Issue.moves lists where it may go. */
-    status: (a: { id: string; body: IssueStatusRequest }): Promise<Issue> =>
-      this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/status", undefined, a.body) as Promise<Issue>,
-    /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
-     * leaves; with asks open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
-    draft: (a: { id: string; body: IssueDraftRequest }): Promise<Issue> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/draft", undefined, a.body) as Promise<Issue>,
-    /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
-    dispatch: (a: { id: string; body: IssueDispatchRequest }): Promise<Dispatched> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/dispatch", undefined, a.body) as Promise<Dispatched>,
-    /** The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
-     * another round. */
-    accept: (a: { id: string; body: IssueAcceptRequest }): Promise<Issue> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/accept", undefined, a.body) as Promise<Issue>,
-  };
-
-  readonly session = {
-    /** Stops a session's turn; it stays, and a comment starts the next. */
-    stop: (a: { id: string }): Promise<void> =>
-      this.call("POST", "/api/v1/sessions/" + encodeURIComponent(String(a.id)) + "/stop", undefined, undefined) as Promise<void>,
-    list: (a: { agent?: string }): Promise<Session[]> => this.call("GET", "/api/v1/sessions", { agent: a.agent }, undefined) as Promise<Session[]>,
-    get: (a: { id: string }): Promise<Session> =>
-      this.call("GET", "/api/v1/sessions/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<Session>,
-    /** Its log, oldest first; run gives one run's only. The manager's log is session manager's. */
-    events: (a: { id: string; run?: string }): Promise<SessionEvent[]> =>
-      this.call("GET", "/api/v1/sessions/" + encodeURIComponent(String(a.id)) + "/events", { run: a.run }, undefined) as Promise<SessionEvent[]>,
-  };
-
-  readonly graph = {
-    split: (a: { body: GraphSplitRequest }): Promise<string> => this.call("POST", "/api/v1/graphs", undefined, a.body) as Promise<string>,
-    updateTask: (a: { id: string; task: string; body: TaskEdit }): Promise<string> =>
-      this.call(
-        "PUT",
-        "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/tasks/" + encodeURIComponent(String(a.task)),
-        undefined,
-        a.body,
-      ) as Promise<string>,
-    deleteTask: (a: { id: string; task: string }): Promise<string> =>
-      this.call(
-        "DELETE",
-        "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/tasks/" + encodeURIComponent(String(a.task)),
-        undefined,
-        undefined,
-      ) as Promise<string>,
-    act: (a: { id: string; body: GraphActRequest }): Promise<string> =>
-      this.call("POST", "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/act", undefined, a.body) as Promise<string>,
-    taskAct: (a: { id: string; task: string; body: TaskActRequest }): Promise<string> =>
-      this.call(
-        "POST",
-        "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/tasks/" + encodeURIComponent(String(a.task)) + "/act",
-        undefined,
-        a.body,
-      ) as Promise<string>,
-    changes: (a: { id: string }): Promise<Changes> =>
-      this.call("GET", "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/changes", undefined, undefined) as Promise<Changes>,
-    events: (a: { id: string }): Promise<GraphEvent[]> =>
-      this.call("GET", "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/events", undefined, undefined) as Promise<GraphEvent[]>,
-  };
-
-  readonly game = {
-    achievements: (): Promise<Achievement[]> => this.call("GET", "/api/v1/game/achievements", undefined, undefined) as Promise<Achievement[]>,
-    chooseTitle: (a: { body: ChooseTitleRequest }): Promise<void> => this.call("POST", "/api/v1/game/title", undefined, a.body) as Promise<void>,
-  };
-
-  readonly runtime = {
-    list: (): Promise<RuntimeInfo[]> => this.call("GET", "/api/v1/runtimes", undefined, undefined) as Promise<RuntimeInfo[]>,
-    refresh: (a: { id: string }): Promise<RuntimeInfo> =>
-      this.call("POST", "/api/v1/runtimes/" + encodeURIComponent(String(a.id)) + "/refresh", undefined, undefined) as Promise<RuntimeInfo>,
-    update: (a: { id: string; body: RuntimeSettings }): Promise<RuntimeInfo> =>
-      this.call("PUT", "/api/v1/runtimes/" + encodeURIComponent(String(a.id)) + "/settings", undefined, a.body) as Promise<RuntimeInfo>,
-  };
-
-  readonly github = {
-    status: (): Promise<GitHubStatus> => this.call("GET", "/api/v1/github", undefined, undefined) as Promise<GitHubStatus>,
-    refresh: (): Promise<GitHubStatus> => this.call("POST", "/api/v1/github/refresh", undefined, undefined) as Promise<GitHubStatus>,
-  };
-
-  readonly agent = {
-    list: (): Promise<Agent[]> => this.call("GET", "/api/v1/agents", undefined, undefined) as Promise<Agent[]>,
-    /** The issues of each profile as it would be dispatched now; a draft not saved yet too. */
-    check: (a: { body: AgentCheckRequest }): Promise<AgentCheck[]> => this.call("POST", "/api/v1/agents/check", undefined, a.body) as Promise<AgentCheck[]>,
-    /** Create allocates an identity; callers with an existing identity use save. */
-    create: (a: { body: Agent }): Promise<Agent> => this.call("POST", "/api/v1/agents", undefined, a.body) as Promise<Agent>,
-    save: (a: { id: string; body: Agent }): Promise<Agent> =>
-      this.call("PUT", "/api/v1/agents/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<Agent>,
-    delete: (a: { id: string }): Promise<void> =>
-      this.call("DELETE", "/api/v1/agents/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
-  };
-
-  readonly memory = {
-    /** An agent's memories: the manager's (agent manager) are the lines of its MEMORY.md, with the file and how many of the newest
-     * its prompt carries; every other agent's are rows. */
-    list: (a: { agent: string }): Promise<MemoryList> =>
-      this.call("GET", "/api/v1/memories/" + encodeURIComponent(String(a.agent)), undefined, undefined) as Promise<MemoryList>,
-    /** What the agent would be reminded of on its next start; the manager is not reminded, it carries its whole file. */
-    recall: (a: { agent: string; project?: string; text?: string }): Promise<RecallPreview> =>
-      this.call(
-        "GET",
-        "/api/v1/memories/" + encodeURIComponent(String(a.agent)) + "/recall",
-        { project: a.project, text: a.text },
-        undefined,
-      ) as Promise<RecallPreview>,
-    create: (a: { agent: string; body: MemoryRequest }): Promise<Memory> =>
-      this.call("POST", "/api/v1/memories/" + encodeURIComponent(String(a.agent)), undefined, a.body) as Promise<Memory>,
-    delete: (a: { agent: string; memory: string }): Promise<void> =>
-      this.call(
-        "DELETE",
-        "/api/v1/memories/" + encodeURIComponent(String(a.agent)) + "/" + encodeURIComponent(String(a.memory)),
-        undefined,
-        undefined,
-      ) as Promise<void>,
-  };
-
-  readonly skill = {
-    list: (): Promise<Skill[]> => this.call("GET", "/api/v1/skills", undefined, undefined) as Promise<Skill[]>,
-    /** Create allocates an identity; callers with an existing identity use save. */
-    create: (a: { body: Skill }): Promise<Skill> => this.call("POST", "/api/v1/skills", undefined, a.body) as Promise<Skill>,
-    save: (a: { id: string; body: Skill }): Promise<Skill> =>
-      this.call("PUT", "/api/v1/skills/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<Skill>,
-    delete: (a: { id: string }): Promise<void> =>
-      this.call("DELETE", "/api/v1/skills/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
-  };
-
-  readonly project = {
-    list: (): Promise<ProjectSummary[]> => this.call("GET", "/api/v1/projects", undefined, undefined) as Promise<ProjectSummary[]>,
-    /** The first thing Create would refuse in this project, without making it. */
-    check: (a: { body: NewProject }): Promise<ProjectCheck> => this.call("POST", "/api/v1/projects/check", undefined, a.body) as Promise<ProjectCheck>,
-    create: (a: { body: NewProject }): Promise<ProjectSummary> => this.call("POST", "/api/v1/projects", undefined, a.body) as Promise<ProjectSummary>,
-    languages: (a: { id: string }): Promise<ProjectLanguages> =>
-      this.call("GET", "/api/v1/projects/" + encodeURIComponent(String(a.id)) + "/languages", undefined, undefined) as Promise<ProjectLanguages>,
-    /** The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it. */
-    templates: (a: { id: string }): Promise<ProjectTemplates> =>
-      this.call("GET", "/api/v1/projects/" + encodeURIComponent(String(a.id)) + "/templates", undefined, undefined) as Promise<ProjectTemplates>,
-    activity: (a: { id: string }): Promise<ProjectActivity> =>
-      this.call("GET", "/api/v1/projects/" + encodeURIComponent(String(a.id)) + "/activity", undefined, undefined) as Promise<ProjectActivity>,
-  };
-
-  readonly voice = {
-    session: (): Promise<AgoraGrant> => this.call("POST", "/api/v1/voice/session", undefined, undefined) as Promise<AgoraGrant>,
-    renew: (a: { body: RenewRequest }): Promise<AgoraGrant> => this.call("POST", "/api/v1/voice/renew", undefined, a.body) as Promise<AgoraGrant>,
-    start: (a: { body: StartRequest }): Promise<VoiceAgent> => this.call("POST", "/api/v1/voice/agent", undefined, a.body) as Promise<VoiceAgent>,
-    stop: (a: { body: VoiceAgent }): Promise<void> => this.call("POST", "/api/v1/voice/agent/stop", undefined, a.body) as Promise<void>,
-    heard: (a: { body: VoiceHeard }): Promise<void> => this.call("POST", "/api/v1/voice/agent/heard", undefined, a.body) as Promise<void>,
-    said: (a: { body: VoiceSaid }): Promise<void> => this.call("POST", "/api/v1/voice/agent/said", undefined, a.body) as Promise<void>,
-    dictate: (a: { body: DictateRequest }): Promise<Dictated> => this.call("POST", "/api/v1/voice/dictate", undefined, a.body) as Promise<Dictated>,
-  };
-
-  readonly connector = {
-    list: (): Promise<ConnectorStatus[]> => this.call("GET", "/api/v1/connectors", undefined, undefined) as Promise<ConnectorStatus[]>,
-    login: (a: { id: ConnectorID; body: ConnectorLogin }): Promise<ConnectorStatus> =>
-      this.call("POST", "/api/v1/connectors/" + encodeURIComponent(String(a.id)) + "/login", undefined, a.body) as Promise<ConnectorStatus>,
-    verify: (a: { id: ConnectorID; body: VerifyRequest }): Promise<ConnectorStatus> =>
-      this.call("POST", "/api/v1/connectors/" + encodeURIComponent(String(a.id)) + "/verify", undefined, a.body) as Promise<ConnectorStatus>,
-    logout: (a: { id: ConnectorID }): Promise<ConnectorStatus> =>
-      this.call("POST", "/api/v1/connectors/" + encodeURIComponent(String(a.id)) + "/logout", undefined, undefined) as Promise<ConnectorStatus>,
-    channel: (a: { id: ConnectorID; body: ConnectorsChannelRequest }): Promise<ConnectorStatus> =>
-      this.call("PUT", "/api/v1/connectors/" + encodeURIComponent(String(a.id)) + "/channel", undefined, a.body) as Promise<ConnectorStatus>,
-  };
-
-  readonly lan = {
-    status: (): Promise<LanStatus> => this.call("GET", "/api/v1/lan", undefined, undefined) as Promise<LanStatus>,
-    update: (a: { body: SetOpenRequest }): Promise<LanStatus> => this.call("PUT", "/api/v1/lan", undefined, a.body) as Promise<LanStatus>,
-    startPairing: (): Promise<LanStatus> => this.call("POST", "/api/v1/lan/pairing", undefined, undefined) as Promise<LanStatus>,
-    stopPairing: (): Promise<LanStatus> => this.call("DELETE", "/api/v1/lan/pairing", undefined, undefined) as Promise<LanStatus>,
-    answerPairing: (a: { body: AnswerPairingRequest }): Promise<LanStatus> =>
-      this.call("POST", "/api/v1/lan/pairing/answer", undefined, a.body) as Promise<LanStatus>,
-    deleteDevice: (a: { id: string }): Promise<LanStatus> =>
-      this.call("DELETE", "/api/v1/lan/devices/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<LanStatus>,
-    pair: (a: { body: LanPairRequest }): Promise<LanPaired> => this.call("POST", "/api/v1/lan/pair", undefined, a.body) as Promise<LanPaired>,
-    me: (): Promise<LanDevice> => this.call("GET", "/api/v1/lan/me", undefined, undefined) as Promise<LanDevice>,
-  };
-
-  readonly doc = {
-    /** The documents, the newest change first; their blocks are in doc.get. */
-    list: (): Promise<Document[]> => this.call("GET", "/api/v1/docs", undefined, undefined) as Promise<Document[]>,
-    create: (a: { body: DocRequest }): Promise<DocSnapshot> => this.call("POST", "/api/v1/docs", undefined, a.body) as Promise<DocSnapshot>,
-    /** A new document from Markdown: the format documents trade with agents and MEMORY.md in, not how they are stored. */
-    import: (a: { body: DocImport }): Promise<DocSnapshot> => this.call("POST", "/api/v1/docs/import", undefined, a.body) as Promise<DocSnapshot>,
-    /** The document and every live block (no tombstones), in order. */
-    get: (a: { id: string }): Promise<DocSnapshot> =>
-      this.call("GET", "/api/v1/docs/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<DocSnapshot>,
-    /** A batch of ops, as the owner: taken in order, in one transaction, one batch of a document at a time. */
-    submit: (a: { id: string; body: DocSubmit }): Promise<DocAck> =>
-      this.call("POST", "/api/v1/docs/" + encodeURIComponent(String(a.id)) + "/submit", undefined, a.body) as Promise<DocAck>,
-    markdown: (a: { id: string }): Promise<DocMarkdown> =>
-      this.call("GET", "/api/v1/docs/" + encodeURIComponent(String(a.id)) + "/markdown", undefined, undefined) as Promise<DocMarkdown>,
-    /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
-     * one already running is refused. */
-    demo: (a: { id: string }): Promise<void> =>
-      this.call("POST", "/api/v1/docs/" + encodeURIComponent(String(a.id)) + "/demo", undefined, undefined) as Promise<void>,
-  };
-
-  private async call(method: string, path: string, query: Record<string, string | number | boolean | undefined> | undefined, body: unknown): Promise<unknown> {
-    const params = new URLSearchParams();
-    for (const [k, v] of Object.entries(query ?? {})) if (v !== undefined) params.set(k, String(v));
-    const url = this.base + path + (params.size > 0 ? "?" + params.toString() : "");
-    const res = await this.fetcher(url, {
-      method,
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const text = await res.text();
-    const decoded: unknown = text === "" ? undefined : JSON.parse(text);
-    if (!res.ok) {
-      const j = (decoded ?? {}) as { _tag?: unknown; reason?: unknown };
-      const reason = typeof j.reason === "string" ? j.reason : "服务端答 " + res.status;
-      throw new VibeValleyApiError(res.status, typeof j._tag === "string" ? j._tag : undefined, reason);
-    }
-    return decoded;
-  }
 }

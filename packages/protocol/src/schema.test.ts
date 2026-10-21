@@ -1,7 +1,9 @@
 // The generated schemas (schema.ts) take every fact, state, view and inbox in the golden runs (testdata), and
 // the frames the rules make of them.
 
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
+import { readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 import { Schema } from "effect";
 import type { CoreState, Fact } from "./shapes";
 import { emptyCoreState, frameOf, reduce } from "./rules";
@@ -10,7 +12,7 @@ import * as S from "./schema";
 test("the golden runs and the frames made of them decode", async () => {
   const url = new URL("../testdata/reduce.jsonl.gz", import.meta.url);
   const rows = new TextDecoder()
-    .decode(Bun.gunzipSync(await Bun.file(url).bytes()))
+    .decode(gunzipSync(readFileSync(url)))
     .split("\n")
     .filter((l) => l !== "")
     .map((l) => JSON.parse(l) as Record<string, unknown>);

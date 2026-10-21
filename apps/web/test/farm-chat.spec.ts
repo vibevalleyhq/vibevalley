@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function openFarm(page: Page) {
-  await page.goto("/");
+  await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
 }
 
@@ -67,7 +67,15 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
     play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } as never,
   };
   // What the server would say of an issue handed back: it may be harvested (done) or closed.
-  const issue: Issue = { ...made, sessions: ["w1"], status: "in_review", moves: ["done", "canceled"], criteria: ["勾上后重开浏览器还登着"] };
+  const issue: Issue = {
+    ...made,
+    sessions: ["w1"],
+    status: "in_review",
+    moves: ["done", "canceled"],
+    criteria: ["勾上后重开浏览器还登着"],
+    acceptance: "required",
+    standing: { state: "reviewing", since: Date.now() - 60_000, lead: "accept", acts: ["accept", "reject", "tell", "close"] },
+  };
   const fixture: StateFrame = {
     ...frame,
     state: { ...frame.state, sessions: [session], issues: [issue] },
@@ -82,9 +90,10 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
   await page.mouse.click(box.x + 128 * scale, box.y + 117 * scale);
   const view = page.getByRole("dialog", { name: "阿狐的地" });
   await expect(view).toBeVisible();
-  await expect(view.getByText("等你验收")).toBeVisible();
+  await expect(view.getByLabel("现在怎样")).toContainText("等你验收");
   await expect(view.getByRole("button", { name: "验收通过" })).toBeVisible();
-  await expect(view.getByRole("button", { name: "收获" })).toBeVisible();
+  await expect(view.getByRole("button", { name: "打回" })).toBeVisible();
+  await expect(view.getByRole("button", { name: "收获" })).toHaveCount(0);
   await view.getByRole("button", { name: "勾上后重开浏览器还登着" }).click();
   await expect(view.getByRole("button", { name: "勾上后重开浏览器还登着" })).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: test.info().outputPath("plot.png") });

@@ -1,76 +1,91 @@
-import type { ReactNode } from "react";
+import { For, Match, Show, Switch } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import type { ChatMessage, Phase } from "@vibevalley/protocol";
-import { useAgents } from "../../data/agents";
 import { type DotTone, phaseIcon } from "../../rules/chat";
+import { ready, useAgents } from "../../data/query";
 import { AgentFace, ManagerFace, OwnerFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 
 const dotColor: Record<DotTone | "idle", string> = { leaf: "bg-leaf", berry: "bg-berry", wheat: "bg-wheat", idle: "bg-[#c8a46e]" };
 
 /** A phase or the manager's mood: a round dot ringed in the page colour. */
-export function Dot({ tone, size = 9, className = "" }: { tone: DotTone | "idle"; size?: number; className?: string }) {
+export function Dot(props: { tone: DotTone | "idle"; size?: number; class?: string }) {
   return (
-    <span className={`inline-block shrink-0 rounded-full ring-2 ring-page ${dotColor[tone]} ${className}`} style={{ width: size, height: size }} aria-hidden />
+    <span
+      class={["inline-block shrink-0 rounded-full ring-2 ring-page", dotColor[props.tone], props.class]}
+      style={{ width: `${props.size ?? 9}px`, height: `${props.size ?? 9}px` }}
+      aria-hidden="true"
+    />
   );
 }
 
-export function PhaseGlyph({ phase, size = 14 }: { phase: Phase; size?: number }) {
-  const icon = phaseIcon(phase);
-  if (!icon) return <span className="inline-block shrink-0" style={{ width: size, height: size }} />;
-  return <Icon name={icon} size={size} />;
+export function PhaseGlyph(props: { phase: Phase; size?: number }) {
+  return (
+    <Show
+      when={phaseIcon(props.phase)}
+      fallback={<span class="inline-block shrink-0" style={{ width: `${props.size ?? 14}px`, height: `${props.size ?? 14}px` }} />}
+    >
+      {(icon) => <Icon name={icon()} size={props.size ?? 14} />}
+    </Show>
+  );
 }
 
 /** A helper's face by its profile's look; for a sender without a profile, by its id. */
-export function HelperFace({ agent, size = 24, muted }: { agent: string; size?: number; muted?: boolean }) {
-  const look = useAgents().data?.find((a) => a.id === agent)?.look;
-  return <AgentFace agentId={agent} look={look} size={size} muted={muted} />;
+export function HelperFace(props: { agent: string; size?: number; muted?: boolean }) {
+  const agents = useAgents();
+  const look = () => ready(agents, []).find((a) => a.id === props.agent)?.look;
+  return <AgentFace agentId={props.agent} look={look()} size={props.size ?? 24} muted={props.muted} />;
 }
 
-export function SenderFace({ m, size = 36 }: { m: ChatMessage; size?: number }) {
-  switch (m.fromKind) {
-    case "user":
-      return <OwnerFace size={size} />;
-    case "manager":
-      return <ManagerFace size={size} />;
-    case "agent":
-    case "system":
-      return <HelperFace agent={m.agent ?? m.from} size={size} />;
-  }
+export function SenderFace(props: { m: ChatMessage; size?: number }) {
+  return (
+    <Switch>
+      <Match when={props.m.fromKind === "user"}>
+        <OwnerFace size={props.size ?? 36} />
+      </Match>
+      <Match when={props.m.fromKind === "manager"}>
+        <ManagerFace size={props.size ?? 36} />
+      </Match>
+      <Match when={props.m.fromKind === "agent" || props.m.fromKind === "system"}>
+        <HelperFace agent={props.m.agent ?? props.m.from} size={props.size ?? 36} />
+      </Match>
+    </Switch>
+  );
 }
 
 export function ThinkingDots() {
   return (
-    <span className="inline-flex items-center gap-1" aria-hidden>
-      {[0, 150, 300].map((d) => (
-        <span key={d} className="size-1.5 bg-faint motion-safe:animate-bounce" style={{ animationDelay: `${d}ms`, animationDuration: "900ms" }} />
-      ))}
+    <span class="inline-flex items-center gap-1" aria-hidden="true">
+      <For each={[0, 150, 300]}>
+        {(d) => <span class="size-1.5 bg-faint motion-safe:animate-bounce" style={{ "animation-delay": `${d}ms`, "animation-duration": "900ms" }} />}
+      </For>
     </span>
   );
 }
 
 export function StreamingCaret() {
-  return <span className="ml-0.5 inline-block h-3.5 w-1.5 translate-y-0.5 bg-ink motion-safe:animate-pulse" aria-hidden />;
+  return <span class="ml-0.5 inline-block h-3.5 w-1.5 translate-y-0.5 bg-ink motion-safe:animate-pulse" aria-hidden="true" />;
 }
 
-export function Count({ n }: { n: number }) {
-  return <span className="shrink-0 rounded-full bg-accent px-1.5 text-xs font-semibold text-page tabular-nums">{n}</span>;
+export function Count(props: { n: number }) {
+  return <span class="shrink-0 rounded-full bg-accent px-1.5 text-xs font-semibold text-page tabular-nums">{props.n}</span>;
 }
 
-export function Tag({ icon, label, fill }: { icon?: string; label: string; fill: string }) {
+export function Tag(props: { icon?: string; label: string; fill: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded px-1.5 py-px text-xs font-medium" style={{ background: fill }}>
-      {icon && <Icon name={icon} size={12} />}
-      {label}
+    <span class="inline-flex items-center gap-1 rounded px-1.5 py-px text-xs font-medium" style={{ background: props.fill }}>
+      {props.icon && <Icon name={props.icon} size={12} />}
+      {props.label}
     </span>
   );
 }
 
-export function Empty({ icon, children }: { icon: string; children: ReactNode }) {
+export function Empty(props: { icon: string; children: JSX.Element }) {
   return (
-    <div className="flex h-full items-center justify-center p-6">
-      <div className="flex max-w-96 flex-col items-center gap-3 text-center text-sm text-muted">
-        <Icon name={icon} size={48} className="opacity-80" />
-        {children}
+    <div class="flex h-full items-center justify-center p-6">
+      <div class="flex max-w-96 flex-col items-center gap-3 text-center text-sm text-muted">
+        <Icon name={props.icon} size={48} class="opacity-80" />
+        {props.children}
       </div>
     </div>
   );

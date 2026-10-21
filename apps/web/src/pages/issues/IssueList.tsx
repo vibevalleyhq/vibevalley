@@ -1,5 +1,6 @@
+import { createSignal, For, Show } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import { managerAgent } from "@vibevalley/protocol";
-import { useState } from "react";
 import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "../../rules/board";
 import { type BoardCard, cardLook, cardProject, laneOrder, rowFacts } from "../../rules/cards";
 import { closedShown, laneLabel, laneStatus } from "../../rules/issues";
@@ -7,24 +8,14 @@ import { ago } from "../../rules/time";
 import { ManagerFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { EmptyNote, IconButton, OlderLink, QuickAdd } from "./Board";
-import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 import { useGraphs, useNameOf } from "./hooks";
+import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
 /** The quick add, with the group's project or helper when grouped by one. */
 export type ListAdd = (text: string, where: { project?: string; agent?: string }) => void;
 
 /** The issues as rows, grouped as the owner picked: Linear's list. A row opens the issue as a card does. */
-export function IssueList({
-  cards,
-  loading,
-  selected,
-  older,
-  grouping,
-  ordering,
-  onOlder,
-  onOpen,
-  onAdd,
-}: {
+export function IssueList(props: {
   cards: BoardCard[];
   loading: boolean;
   selected?: string;
@@ -35,16 +26,15 @@ export function IssueList({
   onOpen: (id: string) => void;
   onAdd: ListAdd;
 }) {
-  const [folded, setFolded] = useState<Set<string>>(new Set());
-  const [adding, setAdding] = useState<string | null>(null);
+  const [folded, setFolded] = createSignal<ReadonlySet<string>>(new Set());
+  const [adding, setAdding] = createSignal<string | null>(null);
   const nameOf = useNameOf();
-  if (loading) return <EmptyNote>在读……</EmptyNote>;
 
   // Only where a new 待办 belongs: the 待办 group, a project's, a helper's (not the manager's), or the one group.
-  const canAdd = (g: RowGroup<BoardCard>) => (grouping === "status" ? g.lane === "todo" : grouping === "agent" ? g.key !== managerAgent : true);
+  const canAdd = (g: RowGroup<BoardCard>) => (props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? g.key !== managerAgent : true);
   const add = (g: RowGroup<BoardCard>, text: string) => {
     setAdding(null);
-    onAdd(text, grouping === "project" ? { project: g.key } : grouping === "agent" ? { agent: g.key } : {});
+    props.onAdd(text, props.grouping === "project" ? { project: g.key } : props.grouping === "agent" ? { agent: g.key } : {});
   };
   const fold = (key: string) =>
     setFolded((f) => {
@@ -55,108 +45,122 @@ export function IssueList({
     });
 
   return (
-    <div className="@container min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-      {groupRows(cards, grouping, rowFacts).map((g) => {
-        let rows = g.lane ? laneOrder(g.lane, g.rows, ordering) : orderRows(g.rows, ordering, rowFacts);
-        let hidden = 0;
-        if (g.lane === "closed" && !older && rows.length > closedShown) {
-          hidden = rows.length - closedShown;
-          rows = rows.slice(0, closedShown);
-        }
-        const isFolded = folded.has(g.key);
-        const [label, icon] =
-          grouping === "status"
-            ? [laneLabel[g.lane!], <StatusMark status={laneStatus[g.lane!]} />]
-            : grouping === "project"
-              ? [g.key || "没有项目", <Icon name="button-folder" size={14} />]
-              : grouping === "agent"
-                ? [
-                    g.key ? nameOf(g.key) : "还没选帮工",
-                    !g.key ? <NoFaceMark size={14} /> : g.key === managerAgent ? <ManagerFace size={16} /> : <AgentFaceOf agent={g.key} size={16} />,
-                  ]
-                : ["全部工单", null];
-        return (
-          <section key={g.key || "_"} aria-label={label} className="mb-1">
-            <header className="sticky top-0 z-10 mt-1.5 flex h-[34px] items-center rounded-md bg-side pr-1">
-              <button
-                type="button"
-                onClick={() => fold(g.key)}
-                aria-label={isFolded ? `展开 ${label}` : `收起 ${label}`}
-                className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 text-left"
-              >
-                <Icon name="button-next" size={10} className={isFolded ? "" : "rotate-90"} />
-                {icon}
-                <span className="truncate text-sm font-semibold">{label}</span>
-                <span className="text-xs text-muted">{g.rows.length}</span>
-              </button>
-              {canAdd(g) && <IconButton icon="button-add" label={`在「${label}」写一张`} onClick={() => setAdding(adding === g.key ? null : g.key)} />}
-            </header>
-            {!isFolded && (
-              <>
-                {adding === g.key && (
-                  <div className="px-3 py-1.5">
-                    <QuickAdd autoFocus onAdd={(t) => add(g, t)} />
-                  </div>
-                )}
-                {rows.map((c) => (
-                  <Row key={c.id} card={c} selected={c.id === selected} showProject={grouping !== "project"} onOpen={onOpen} nameOf={nameOf} />
-                ))}
-                {(hidden > 0 || (g.lane === "closed" && older && g.rows.length > closedShown)) && <OlderLink hidden={hidden} onClick={onOlder} />}
-                {g.rows.length === 0 && adding !== g.key && <p className="py-1.5 pr-3 pl-9 text-xs text-faint">没有工单</p>}
-              </>
-            )}
-          </section>
-        );
-      })}
-    </div>
+    <Show when={!props.loading} fallback={<EmptyNote>在读……</EmptyNote>}>
+      <div class="@container min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        <For each={groupRows(props.cards, props.grouping, rowFacts)} keyed={(g) => g.key}>
+          {(g) => {
+            const folding = () => g().lane === "closed" && !props.older && ordered().length > closedShown;
+            const ordered = () => (g().lane ? laneOrder(g().lane!, g().rows, props.ordering) : orderRows(g().rows, props.ordering, rowFacts));
+            const rows = () => (folding() ? ordered().slice(0, closedShown) : ordered());
+            const hidden = () => (folding() ? ordered().length - closedShown : 0);
+            const isFolded = () => folded().has(g().key);
+            const label = () =>
+              props.grouping === "status"
+                ? laneLabel[g().lane!]
+                : props.grouping === "project"
+                  ? g().key || "没有项目"
+                  : props.grouping === "agent"
+                    ? g().key
+                      ? nameOf()(g().key)
+                      : "还没选帮工"
+                    : "全部工单";
+            const icon = (): JSX.Element => {
+              const key = g().key;
+              switch (props.grouping) {
+                case "status":
+                  return <StatusMark status={laneStatus[g().lane!]} />;
+                case "project":
+                  return <Icon name="button-folder" size={14} />;
+                case "agent":
+                  return !key ? <NoFaceMark size={14} /> : key === managerAgent ? <ManagerFace size={16} /> : <AgentFaceOf agent={key} size={16} />;
+                default:
+                  return null;
+              }
+            };
+            return (
+              <section aria-label={label()} class="mb-1">
+                <header class="sticky top-0 z-10 mt-1.5 flex h-[34px] items-center rounded-md bg-side pr-1">
+                  <button
+                    type="button"
+                    onClick={() => fold(g().key)}
+                    aria-label={isFolded() ? `展开 ${label()}` : `收起 ${label()}`}
+                    class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 text-left"
+                  >
+                    <Icon name="button-next" size={10} class={{ "rotate-90": !isFolded() }} />
+                    {icon()}
+                    <span class="truncate text-sm font-semibold">{label()}</span>
+                    <span class="text-xs text-muted">{g().rows.length}</span>
+                  </button>
+                  <Show when={canAdd(g())}>
+                    <IconButton icon="button-add" label={`在「${label()}」写一张`} onClick={() => setAdding(adding() === g().key ? null : g().key)} />
+                  </Show>
+                </header>
+                <Show when={!isFolded()}>
+                  <Show when={adding() === g().key}>
+                    <div class="px-3 py-1.5">
+                      <QuickAdd autofocus onAdd={(t) => add(g(), t)} />
+                    </div>
+                  </Show>
+                  <For each={rows()} keyed={(c) => c.id}>
+                    {(c) => (
+                      <Row card={c()} selected={c().id === props.selected} showProject={props.grouping !== "project"} onOpen={props.onOpen} nameOf={nameOf()} />
+                    )}
+                  </For>
+                  <Show when={hidden() > 0 || (g().lane === "closed" && props.older && g().rows.length > closedShown)}>
+                    <OlderLink hidden={hidden()} onClick={props.onOlder} />
+                  </Show>
+                  <Show when={g().rows.length === 0 && adding() !== g().key}>
+                    <p class="py-1.5 pr-3 pl-9 text-xs text-faint">没有工单</p>
+                  </Show>
+                </Show>
+              </section>
+            );
+          }}
+        </For>
+      </div>
+    </Show>
   );
 }
 
-function Row({
-  card,
-  selected,
-  showProject,
-  onOpen,
-  nameOf,
-}: {
-  card: BoardCard;
-  selected: boolean;
-  showProject: boolean;
-  onOpen: (id: string) => void;
-  nameOf: (id: string) => string;
-}) {
+function Row(props: { card: BoardCard; selected: boolean; showProject: boolean; onOpen: (id: string) => void; nameOf: (id: string) => string }) {
   const graphs = useGraphs();
-  const now = Date.now();
-  const look = cardLook(card, nameOf, graphs, now);
-  const project = cardProject(card);
+  const now = () => Date.now();
+  const look = () => cardLook(props.card, props.nameOf, graphs(), now());
+  const project = () => cardProject(props.card);
   return (
     <div
       role="button"
-      tabIndex={0}
-      aria-label={look.title}
-      aria-current={selected || undefined}
-      title={look.detail}
-      onClick={() => onOpen(card.id)}
+      tabindex={0}
+      aria-label={look().title}
+      aria-current={props.selected ? "true" : undefined}
+      title={look().detail}
+      onClick={() => props.onOpen(props.card.id)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") onOpen(card.id);
+        if (e.key === "Enter") props.onOpen(props.card.id);
       }}
-      className={`flex h-[38px] cursor-pointer items-center gap-2.5 rounded-md px-2.5 ${selected ? "bg-selected" : "hover:bg-hover"}`}
+      class={["flex h-[38px] cursor-pointer items-center gap-2.5 rounded-md px-2.5", props.selected ? "bg-selected" : "hover:bg-hover"]}
     >
-      <span className="flex w-3.5 shrink-0 justify-center">{look.priority && <PriorityMark priority={look.priority} size={13} />}</span>
-      <span className="hidden w-11 shrink-0 truncate text-xs text-muted @min-[640px]:block">{look.number}</span>
-      <StatusMark status={look.status} tone={look.statusTone} size={13} />
-      <span className="min-w-0 flex-1 truncate text-sm">{look.title}</span>
-      {look.progress && <ProgressMark {...look.progress} />}
-      {look.flags.map((f, i) => (
-        <span key={f.text} className={i > 0 ? "hidden @min-[640px]:inline" : ""}>
-          <FlagChip {...f} />
-        </span>
-      ))}
-      {showProject && project && <span className="hidden max-w-[120px] truncate text-xs text-muted @min-[640px]:block">{project}</span>}
-      <span className="flex w-[18px] shrink-0 justify-center">
-        <CardFace card={card} size={18} />
+      <span class="flex w-3.5 shrink-0 justify-center">
+        <Show when={look().priority}>{(pr) => <PriorityMark priority={pr()} size={13} />}</Show>
       </span>
-      <span className="w-14 shrink-0 text-right text-xs text-muted @min-[640px]:w-[72px]">{ago(rowFacts(card).updatedAt, now)}</span>
+      <span class="hidden w-11 shrink-0 truncate text-xs text-muted @min-[640px]:block">{look().number}</span>
+      <StatusMark status={look().status} tone={look().statusTone} size={13} />
+      <span class="min-w-0 flex-1 truncate text-sm">{look().title}</span>
+      <Show when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</Show>
+      <For each={look().flags}>
+        {(f, i) => (
+          <span class={{ "hidden @min-[640px]:inline": i() > 0 }}>
+            <FlagChip text={f.text} tone={f.tone} />
+          </span>
+        )}
+      </For>
+      <Show when={props.showProject && project()}>
+        <span class="hidden max-w-[120px] truncate text-xs text-muted @min-[640px]:block">{project()}</span>
+      </Show>
+      <span class="flex w-[18px] shrink-0 justify-center">
+        <CardFace card={props.card} size={18} />
+      </span>
+      <span class="w-14 shrink-0 text-right text-xs text-muted @min-[640px]:w-[72px]">{ago(rowFacts(props.card).updatedAt, now())}</span>
     </div>
   );
 }

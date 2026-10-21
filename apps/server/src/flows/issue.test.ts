@@ -305,6 +305,29 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
+  // Done is what was asked for, not how a round ended: a round that failed is not harvested, whoever asks.
+  it.live("does not harvest a round that failed", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const w = yield* watch;
+      const issues = yield* Issues;
+      yield* (yield* Agents).saveAgent(lab());
+      const issue = yield* issues.add({ title: "这一单必败", project: "fails", assignee: "lab" });
+      yield* issues.setStatus(issue.id, "todo", "", "");
+      yield* w.nextReport;
+      const failed = yield* await_(
+        () => issues.get(issue.id),
+        (i) => i.standing.stuck === "failed",
+        "stuck: failed",
+      );
+      expect(failed.status).toBe("in_review");
+      expect(failed.moves).toEqual(["todo", "canceled"]);
+      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "")), "这一轮没做成");
+      refusedWith(yield* Effect.flip(issues.merge(issue.id)), "这一轮没做成");
+      expect((yield* issues.get(issue.id)).closed).toBeUndefined();
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   // Every issue has an acceptance: one that must pass waits for it; a fail grows weeds and another round; a pass is ripe.
   // A question in a report leaves the plot short of fertilizer until the owner answers.
   it.live("grows through its acceptance", () => {
@@ -323,7 +346,7 @@ describe("an issue", () => {
         (i) => (i.asks ?? []).length === 1,
         "its question kept",
       );
-      expect(issue.asks).toEqual(["用 8787 还是 8797？"]);
+      expect(issue.asks).toEqual([{ question: "用 8787 还是 8797？" }]);
       const crop = () => viewOf(core.state()).plots[issue.id]?.crop;
       yield* until(() => crop() === "dry", "缺肥");
 

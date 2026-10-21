@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import { messageProblems, subjectMax, subjectProblems } from "./commit-msg";
 
 test("a subject says what the code now does, in at most 100 characters", () => {

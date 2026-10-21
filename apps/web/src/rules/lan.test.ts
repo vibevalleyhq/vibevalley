@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import { lanKeyCookie } from "@vibevalley/protocol";
 import { deviceGuess, isPaired, isRemote, keyCookie } from "./lan";
 
@@ -12,7 +12,7 @@ test("a kept key is a pairing; an empty one is not", () => {
   expect(isPaired(`theme=dark; ${lanKeyCookie}=abc`)).toBe(true);
   expect(isPaired(`${lanKeyCookie}=`)).toBe(false);
   expect(isPaired(`x${lanKeyCookie}=abc`)).toBe(false);
-  expect(keyCookie("a+b")).toStartWith(`${lanKeyCookie}=a%2Bb; Path=/;`);
+  expect(keyCookie("a+b").startsWith(`${lanKeyCookie}=a%2Bb; Path=/;`)).toBe(true);
 });
 
 test("a device is guessed from its browser", () => {

@@ -12,7 +12,7 @@ import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { channelOf, conversationOf, generalOf } from "@vibevalley/protocol/rules";
-import { Context, Effect, Layer, Stream } from "effect";
+import { Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
@@ -26,6 +26,7 @@ import { type FeishuApi, FeishuClient, text as feishuText } from "./feishu.ts";
 import { type QQApi, QQClient, SendError } from "./qq.ts";
 import { digestOver, flushText, forOwner, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
 import { baseUrl, failed as weixinFailed, quoted, restricted, staleToken, text as weixinText, type WeixinApi, WeixinClient, WeixinError } from "./weixin.ts";
+import { callbackLog } from "../base/log.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;
@@ -244,14 +245,17 @@ export interface ConnectorOptions {
 
 export const make = (options: ConnectorOptions = {}) =>
   Effect.gen(function* () {
+    const logs = yield* callbackLog;
     const sql = yield* SqlClient.SqlClient;
     const core = yield* Core;
     const chat = yield* Channels;
     const manager = yield* Manager;
     const retryFirst = options.retryFirstMs ?? 30_000;
     const retryMost = options.retryMostMs ?? 30 * 60_000;
+    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
+    const runHere = yield* FiberSet.makeRuntimePromise<never>();
     const run = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      Effect.runPromise(Effect.mapError(Effect.provideService(e, SqlClient.SqlClient, sql), (err) => new Error(causeMessage(err))));
+      runHere(Effect.mapError(Effect.provideService(e, SqlClient.SqlClient, sql), (err) => new Error(causeMessage(err))));
     const inTx = <A>(f: Effect.Effect<A, unknown, SqlClient.SqlClient>) => run(sql.withTransaction(f));
     const general = chat.general();
     const life = new AbortController();
@@ -283,7 +287,7 @@ export const make = (options: ConnectorOptions = {}) =>
           secrets = JSON.parse(r.secrets) as Record<string, string>;
         } catch (e) {
           err = "存着的登录信息读不出来，断开重新连一次";
-          console.error(`vibevalley: ${id}: the saved secrets cannot be read:`, message(e));
+          logs.error(`vibevalley: ${id}: the saved secrets cannot be read:`, message(e));
         }
         account = {
           secrets,
@@ -298,7 +302,7 @@ export const make = (options: ConnectorOptions = {}) =>
         };
       };
       // A write the bridge goes on without.
-      const kept = (p: Promise<unknown>) => p.catch((e) => console.error(`vibevalley: ${id}:`, message(e)));
+      const kept = (p: Promise<unknown>) => p.catch((e) => logs.error(`vibevalley: ${id}:`, message(e)));
       const now = () => (account ? { ...account } : undefined);
 
       const status = async (): Promise<ConnectorStatus> => {
@@ -350,7 +354,7 @@ export const make = (options: ConnectorOptions = {}) =>
           try {
             pending = await run(outboxQ.pendingOutbox({ connector: id }));
           } catch (e) {
-            console.error(`vibevalley: ${id}:`, message(e));
+            logs.error(`vibevalley: ${id}:`, message(e));
             return false;
           }
           if (pending.length === 0) return true;
@@ -451,8 +455,8 @@ export const make = (options: ConnectorOptions = {}) =>
         await drain(signal, true);
         if (!m.text) return;
         const conversation = (await quotedConversation(m.quoted)) ?? now()?.channel;
-        if (core.state().call !== "live") await Effect.runPromise(core.setCall("live"));
-        await Effect.runPromise(Effect.mapError(say(m.text, conversation), (e) => new Error("reason" in e ? String(e.reason) : e._tag)));
+        if (core.state().call !== "live") await runHere(core.setCall("live"));
+        await runHere(Effect.mapError(say(m.text, conversation), (e) => new Error("reason" in e ? String(e.reason) : e._tag)));
       };
 
       // The inbox: what the app handed over, delivered to the manager in order.
@@ -563,7 +567,7 @@ export const make = (options: ConnectorOptions = {}) =>
         const control = new AbortController();
         const stop = () => control.abort();
         life.signal.addEventListener("abort", stop, { once: true });
-        return { control, done: work(control.signal).catch((e) => console.error(`vibevalley: ${id}:`, message(e))) };
+        return { control, done: work(control.signal).catch((e) => logs.error(`vibevalley: ${id}:`, message(e))) };
       };
       const connected = () => (account && !life.signal.aborted ? generation((s) => Promise.all([receiving(s), inboxRun(s), outboxRun(s)])) : undefined);
       const resetProgress = () => {

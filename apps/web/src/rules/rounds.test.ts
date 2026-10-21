@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import type { EventTokens, SessionEvent, SessionEventType } from "@vibevalley/protocol";
 import { cacheHit, secondsText, summaryOf, tokensText, waterfallOf } from "./rounds";
 

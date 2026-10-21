@@ -1,0 +1,11 @@
+# The workspace: the apps and the shared packages. site/ is a project of its own (its Astro brings its own Vite), installed
+# with --ignore-workspace.
+packages:
+  - apps/*
+  - packages/*
+
+# vite is Vite+'s core everywhere (package.json's pnpm.overrides pins the same).
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
+  vitest: 5.0.5
+  vite-plus: 1.3.0

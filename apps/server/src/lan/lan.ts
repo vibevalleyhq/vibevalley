@@ -14,12 +14,13 @@ import { Readable } from "node:stream";
 import type { LanDevice, LanPaired, LanStatus } from "@vibevalley/protocol";
 import { eventsPath, lanKeyCookie, livePath, statePath } from "@vibevalley/protocol";
 import { type ApiError, endpoints } from "@vibevalley/protocol/api";
-import { Context, Effect, Layer, Option } from "effect";
+import { Context, Effect, FiberSet, Layer, Option } from "effect";
 import { SqlClient } from "effect/sql";
 import * as lanQ from "../../db/generated/lan.sql.ts";
 import * as q from "../../db/generated/lan_device.sql.ts";
 import { Settings } from "../base/config.ts";
 import { code as newCode, newId } from "../base/ids.ts";
+import { callbackLog } from "../base/log.ts";
 
 /** A device's asking gets as long again for the owner to answer. */
 const pairingForMs = 2 * 60_000;
@@ -117,6 +118,9 @@ export interface LanOptions {
 
 export const make = (options: LanOptions = {}) =>
   Effect.gen(function* () {
+    const logs = yield* callbackLog;
+    // Writes set off by a request belong to this service: they end with it and keep its services.
+    const runHere = yield* FiberSet.makeRuntimePromise<never>();
     const config = yield* Settings;
     const sql = yield* SqlClient.SqlClient;
     const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(Effect.provideService(e, SqlClient.SqlClient, sql));
@@ -171,7 +175,7 @@ export const make = (options: LanOptions = {}) =>
       found.lastSeen = at;
       if (at - found.written >= seenEveryMs) {
         found.written = at;
-        void Effect.runPromise(db(q.seenLanDevice({ last_seen: at, id: found.id }))).catch((e) => console.error("vibevalley: lan access:", e));
+        void runHere(db(q.seenLanDevice({ last_seen: at, id: found.id }))).catch((e) => logs.error("vibevalley: lan access:", e));
       }
       return found.id;
     };
@@ -236,7 +240,7 @@ export const make = (options: LanOptions = {}) =>
         const s = createServer(guard);
         s.once("error", (e) => {
           problem = "连接开不起来：" + e.message;
-          console.error(`vibevalley: lan access cannot listen on port ${config.lan.port}:`, e.message);
+          logs.error(`vibevalley: lan access cannot listen on port ${config.lan.port}:`, e.message);
           resolve();
         });
         s.listen(config.lan.port, options.host, () => {
@@ -244,7 +248,7 @@ export const make = (options: LanOptions = {}) =>
           server = s;
           const a = s.address();
           port = a && typeof a === "object" ? a.port : config.lan.port;
-          console.log(`vibevalley: lan access is open on port ${port}`);
+          logs.info(`vibevalley: lan access is open on port ${port}`);
           resolve();
         });
       });
@@ -254,7 +258,7 @@ export const make = (options: LanOptions = {}) =>
       if (server) {
         server.closeAllConnections();
         server.close();
-        console.log("vibevalley: lan access is shut");
+        logs.info("vibevalley: lan access is shut");
       }
       server = undefined;
     };
@@ -282,7 +286,7 @@ export const make = (options: LanOptions = {}) =>
         const d: Device = { id: newId(), name, pairedAt: now(), keyHash: hash(key), written: 0 };
         yield* db(q.addLanDevice({ id: d.id, name: d.name, key_hash: d.keyHash, paired_at: d.pairedAt }));
         devices.set(d.id, d);
-        console.log(`vibevalley: lan access: "${name}" paired`);
+        logs.info(`vibevalley: lan access: "${name}" paired`);
         return { device: d.id, key, hostName: hostName() };
       });
 
@@ -334,7 +338,7 @@ export const make = (options: LanOptions = {}) =>
           if (p.asking) return yield* Effect.fail(refuse("另一台设备正在等主人点头：等一会儿再试"));
           p.asking = name;
           p.expires = now() + pairingForMs;
-          console.log(`vibevalley: lan access: "${name}" asks to pair`);
+          logs.info(`vibevalley: lan access: "${name}" asks to pair`);
           const allow = yield* Effect.callback<boolean | "late">((resume) => {
             p.answer = (a) => resume(Effect.succeed(a));
             const timer = setTimeout(() => resume(Effect.succeed("late")), pairingForMs);

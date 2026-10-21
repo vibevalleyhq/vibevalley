@@ -1,87 +1,86 @@
-// Faces cut from the pixel drawings (public/pixel/sprites.json): a helper's head from its standing drawing, the manager's
-// from its own.
+// Faces cut from the pixel drawings (public/pixel/sprites.json).
 
-import { useQuery } from "@tanstack/react-query";
-import { type Look, SpeciesValues } from "@vibevalley/protocol";
-
-type Manifest = Record<string, { w: number; h: number; ax?: number; ay?: number }>;
-
-export function useSprites() {
-  return useQuery({
-    queryKey: ["sprites"],
-    queryFn: async () => (await (await fetch("/pixel/sprites.json")).json()) as Manifest,
-    staleTime: Infinity,
-  });
-}
-
-// JavaScript's charCodeAt over the code points, as the server picks an animal for a profile without one (and
-// rules/cast.ts): they must agree.
-function hash(s: string) {
-  let h = 0;
-  for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return h;
-}
-
-/** The sprite prefix of a profile's animal and outfit, as far as the drawings go. */
-export function castPrefix(look: Look | undefined, agentId: string, has: (name: string) => boolean) {
-  const species = look?.species ?? SpeciesValues[hash(agentId) % SpeciesValues.length]!;
-  const outfit = look?.outfit ?? "farmer";
-  return [`${species}-${outfit}`, `${species}-farmer`, "bear-farmer"].find((p) => has(`${p}-down`)) ?? "bear-farmer";
-}
+import { Show } from "solid-js";
+import type { Look } from "@vibevalley/protocol";
+import { castPrefix } from "../rules/cast";
+import { ready, useSprites } from "../data/query";
 
 /** A helper's head: its standing drawing, cropped to the head, on a leaf green ground. */
-export function AgentFace({ agentId, look, size = 24, muted = false }: { agentId: string; look?: Look; size?: number; muted?: boolean }) {
-  const sprites = useSprites().data;
-  if (!sprites) return <span className="inline-block shrink-0" style={{ width: size, height: size }} />;
-  const name = `${castPrefix(look, agentId, (n) => n in sprites)}-down`;
-  const sp = sprites[name] ?? sprites["bear-farmer-down"]!;
-  const k = size / (sp.h * 0.5);
-  const cx = sp.w / 2;
-  const cy = sp.h * 0.25 + sp.h * 0.03;
+export function AgentFace(props: { agentId: string; look?: Look; size?: number; muted?: boolean }) {
+  const sprites = useSprites();
+  const size = () => props.size ?? 24;
+  const cut = () => {
+    const all = ready(sprites, undefined);
+    if (!all) return undefined;
+    const name = `${castPrefix(props.look, props.agentId, (n) => n in all)}-down`;
+    const sp = all[name] ?? all["bear-farmer-down"]!;
+    const k = size() / (sp.h * 0.5);
+    const cx = sp.w / 2;
+    const cy = sp.h * 0.25 + sp.h * 0.03;
+    return { name, left: size() / 2 - cx * k, top: size() / 2 - cy * k, width: sp.w * k, height: sp.h * k };
+  };
   return (
     <span
-      className={`relative inline-block shrink-0 overflow-hidden rounded-sm bg-[#b4cb7c99] ${muted ? "opacity-60 grayscale" : ""}`}
-      style={{ width: size, height: size }}
-      aria-hidden
+      class={["relative inline-block shrink-0 overflow-hidden rounded-sm bg-[#b4cb7c99]", { "opacity-60 grayscale": !!props.muted }]}
+      style={{ width: `${size()}px`, height: `${size()}px` }}
+      aria-hidden="true"
     >
-      <img
-        src={`/pixel/${name}.png`}
-        alt=""
-        draggable={false}
-        className="absolute max-w-none [image-rendering:pixelated]"
-        style={{ left: size / 2 - cx * k, top: size / 2 - cy * k, width: sp.w * k, height: sp.h * k }}
-      />
+      <Show when={cut()}>
+        {(c) => (
+          <img
+            src={`/pixel/${c().name}.png`}
+            alt=""
+            draggable="false"
+            class="absolute max-w-none [image-rendering:pixelated]"
+            style={{ left: `${c().left}px`, top: `${c().top}px`, width: `${c().width}px`, height: `${c().height}px` }}
+          />
+        )}
+      </Show>
     </span>
   );
 }
 
-/** The manager's head (manager-<look>-face; the farmer's until looks are picked here). */
-export function ManagerFace({ size = 24, look = "farmer" }: { size?: number; look?: string }) {
-  const sprites = useSprites().data;
-  if (!sprites) return <span className="inline-block shrink-0" style={{ width: size, height: size }} />;
-  const name = `manager-${look}-face` in sprites ? `manager-${look}-face` : "manager-face";
-  const sp = sprites[name]!;
-  const k = size / (sp.w * 0.86);
+/** The manager's head (manager-<look>-face; the farmer's until looks are picked). */
+export function ManagerFace(props: { size?: number; look?: string }) {
+  const sprites = useSprites();
+  const size = () => props.size ?? 24;
+  const cut = () => {
+    const all = ready(sprites, undefined);
+    if (!all) return undefined;
+    const look = props.look ?? "farmer";
+    const name = `manager-${look}-face` in all ? `manager-${look}-face` : "manager-face";
+    const sp = all[name]!;
+    const k = size() / (sp.w * 0.86);
+    return { name, left: (size() - sp.w * k) / 2, top: size() * 0.04, width: sp.w * k, height: sp.h * k };
+  };
   return (
-    <span className="relative inline-block shrink-0 overflow-hidden rounded-sm bg-[#cfe6f5]" style={{ width: size, height: size }} aria-hidden>
-      <img
-        src={`/pixel/${name}.png`}
-        alt=""
-        draggable={false}
-        className="absolute max-w-none [image-rendering:pixelated]"
-        style={{ left: (size - sp.w * k) / 2, top: size * 0.04, width: sp.w * k, height: sp.h * k }}
-      />
+    <span
+      class="relative inline-block shrink-0 overflow-hidden rounded-sm bg-[#cfe6f5]"
+      style={{ width: `${size()}px`, height: `${size()}px` }}
+      aria-hidden="true"
+    >
+      <Show when={cut()}>
+        {(c) => (
+          <img
+            src={`/pixel/${c().name}.png`}
+            alt=""
+            draggable="false"
+            class="absolute max-w-none [image-rendering:pixelated]"
+            style={{ left: `${c().left}px`, top: `${c().top}px`, width: `${c().width}px`, height: `${c().height}px` }}
+          />
+        )}
+      </Show>
     </span>
   );
 }
 
 /** The owner: 主 in a wheat square. */
-export function OwnerFace({ size = 24 }: { size?: number }) {
+export function OwnerFace(props: { size?: number }) {
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded-sm bg-wheat text-xs font-semibold text-ink"
-      style={{ width: size, height: size }}
-      aria-hidden
+      class="inline-flex shrink-0 items-center justify-center rounded-sm bg-wheat text-xs font-semibold text-ink"
+      style={{ width: `${props.size ?? 24}px`, height: `${props.size ?? 24}px` }}
+      aria-hidden="true"
     >
       主
     </span>

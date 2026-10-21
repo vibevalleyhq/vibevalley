@@ -3,8 +3,9 @@
 // microphone stays open, as on the phone: the agent hears when you stop, and you can talk over it. Muting is a button.
 // What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
 
-import { useSyncExternalStore } from "react";
 import { currentHost, type RtcLine } from "@vibevalley/host";
+import { VibeValleyApiError } from "@vibevalley/protocol";
+import type { VoiceFix } from "@vibevalley/protocol/api";
 import { api, reasonOf } from "../data/api";
 import { farmState } from "../farm/store";
 import { webRtc } from "./agora";
@@ -21,6 +22,8 @@ export class VoiceCall {
   muted = false;
   agentHere = false;
   problem?: string;
+  /** The 设置 section the problem is fixed in, when the server says a setting does. */
+  problemAt?: VoiceFix;
   /** 0..100: the microphone's level and the manager's. */
   micLevel = 0;
   managerLevel = 0;
@@ -55,9 +58,20 @@ export class VoiceCall {
     for (const f of this.listeners) f();
   }
 
-  private set(phase: CallPhase, problem?: string | null) {
+  private set(phase: CallPhase, problem?: string | null, at?: VoiceFix) {
     this.phase = phase;
-    if (problem !== undefined) this.problem = problem ?? undefined;
+    if (problem !== undefined) {
+      this.problem = problem ?? undefined;
+      this.problemAt = problem ? at : undefined;
+    }
+    this.changed();
+  }
+
+  /** The owner read the problem and closed it. */
+  dismiss() {
+    if (this.problem === undefined) return;
+    this.problem = undefined;
+    this.problemAt = undefined;
     this.changed();
   }
 
@@ -138,7 +152,12 @@ export class VoiceCall {
       this.set("live");
     } catch (e) {
       await this.teardown();
-      if (!cancelled) this.set("idle", e instanceof Error && e.name === "NotAllowedError" ? "没有麦克风权限" : reasonOf(e));
+      if (!cancelled)
+        this.set(
+          "idle",
+          e instanceof Error && e.name === "NotAllowedError" ? "没有麦克风权限" : reasonOf(e),
+          e instanceof VibeValleyApiError && e.error?._tag === "VoiceUnavailable" ? e.error.settings : undefined,
+        );
     }
   }
 
@@ -192,9 +211,3 @@ export const voiceCall = new VoiceCall(() => {
   const pick = farmState().pick;
   return pick && pick !== "auto" ? pick : undefined;
 });
-
-/** The call, drawn again when it changes. */
-export function useCall() {
-  useSyncExternalStore(voiceCall.subscribe, () => voiceCall.version);
-  return voiceCall;
-}

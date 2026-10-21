@@ -1,50 +1,46 @@
-// Small pieces the farm's panels share: tags, tints, an empty note, a said line and its clock, and a harvest's
-// line counts, file rows and patch.
+// Small pieces the farm's panels share: tags, tints, an empty note, a said line and its clock, and a harvest's line
+// counts, file rows and patch.
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { createSignal, For, Show } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import type { ChangedFile } from "@vibevalley/protocol";
 import { changeKind, patchLines, patchMarkOf } from "../../rules/issueState";
+import { aria } from "../../app/util";
 import { SpriteIcon } from "../kit";
 
 /** A colour at `alpha` of its strength over cream. */
 export const tint = (hex: string, alpha: number) => `color-mix(in srgb, ${hex} ${Math.round(alpha * 100)}%, #f7e8c4)`;
 
-export function FarmTag({ text, fill = "#e2c995", ink = "#46301d", icon, goes }: { text: string; fill?: string; ink?: string; icon?: string; goes?: boolean }) {
+export function FarmTag(props: { text: string; fill?: string; ink?: string; icon?: string; goes?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[12px] whitespace-nowrap" style={{ background: fill, color: ink }}>
-      {icon && <SpriteIcon name={icon} size={12} />}
-      {text}
-      {goes && <SpriteIcon name="button-next" size={10} />}
+    <span
+      class="inline-flex items-center gap-1 px-2 py-0.5 text-[12px] whitespace-nowrap"
+      style={{ background: props.fill ?? "#e2c995", color: props.ink ?? "#46301d" }}
+    >
+      <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={12} />}</Show>
+      {props.text}
+      <Show when={props.goes}>
+        <SpriteIcon name="button-next" size={10} />
+      </Show>
     </span>
   );
 }
 
-export function Tinted({
-  children,
-  color = "#eedcb2",
-  className = "",
-  style,
-}: {
-  children: ReactNode;
-  color?: string;
-  className?: string;
-  style?: CSSProperties;
-}) {
+export function Tinted(props: { children: JSX.Element; color?: string; class?: string; style?: JSX.CSSProperties }) {
   return (
-    <div className={`px-3 py-2 ${className}`} style={{ background: color, ...style }}>
-      {children}
+    <div class={["px-3 py-2", props.class]} style={{ background: props.color ?? "#eedcb2", ...props.style }}>
+      {props.children}
     </div>
   );
 }
 
-export function FarmEmpty({ text }: { text: string }) {
-  return <div className="bg-cream-100 px-4 py-8 text-center text-[13px] text-bark-600">{text}</div>;
+export function FarmEmpty(props: { text: string }) {
+  return <div class="bg-cream-100 px-4 py-8 text-center text-[13px] text-bark-600">{props.text}</div>;
 }
 
 /** What the server answered, under the button that asked. */
-export function Said({ answer }: { answer?: { ok: boolean; text: string } }) {
-  if (!answer) return null;
-  return <p className={`mt-2 text-[12px] ${answer.ok ? "text-leaf-700" : "text-berry"}`}>{answer.text}</p>;
+export function Said(props: { answer?: { ok: boolean; text: string } }) {
+  return <Show when={props.answer}>{(a) => <p class={["mt-2 text-[12px]", a().ok ? "text-leaf-700" : "text-berry"]}>{a().text}</p>}</Show>;
 }
 
 /** Hours and minutes of a time. */
@@ -53,11 +49,11 @@ export function clockOf(at: number) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-export function PlusMinus({ added, removed }: { added: number; removed: number }) {
+export function PlusMinus(props: { added: number; removed: number }) {
   return (
-    <span className="font-mono text-[12.5px] whitespace-nowrap">
-      <span className="text-leaf-700">+{added}</span>
-      <span className="text-berry"> −{removed}</span>
+    <span class="font-mono text-[12.5px] whitespace-nowrap">
+      <span class="text-leaf-700">+{props.added}</span>
+      <span class="text-berry"> −{props.removed}</span>
     </span>
   );
 }
@@ -71,50 +67,51 @@ const fileLook: Record<string, { fill: string; ink: string }> = {
 const patchInk = { added: "#3f6427", removed: "#c84a3a", hunk: "#4f8fbd", plain: "#46301d" } as const;
 const patchFill = { added: "#b4cb7c59", removed: "#c84a3a1a", hunk: undefined, plain: undefined } as const;
 
-export function Patch({ text }: { text: string }) {
+export function Patch(props: { text: string }) {
   return (
-    <div className="mx-2 mb-2 max-h-80 overflow-auto bg-cream-50 py-1">
-      {patchLines(text).map((line, i) => {
-        const mark = patchMarkOf(line);
-        return (
-          <div key={i} className="px-2 font-mono text-[12.5px] leading-[1.4] whitespace-pre" style={{ background: patchFill[mark], color: patchInk[mark] }}>
-            {line || " "}
+    <div class="mx-2 mb-2 max-h-80 overflow-auto bg-cream-50 py-1">
+      <For each={patchLines(props.text)} keyed={false}>
+        {(line) => (
+          <div
+            class="px-2 font-mono text-[12.5px] leading-[1.4] whitespace-pre"
+            style={{ background: patchFill[patchMarkOf(line())], color: patchInk[patchMarkOf(line())] }}
+          >
+            {line() || " "}
           </div>
-        );
-      })}
+        )}
+      </For>
     </div>
   );
 }
 
-export function FileRow({ file, conflict }: { file: ChangedFile; conflict: boolean }) {
-  const [open, setOpen] = useState(false);
-  const kind = changeKind(file.status);
-  const look = fileLook[file.status] ?? { fill: "#e2c995", ink: "#46301d" };
-  const patch = file.patch;
+export function FileRow(props: { file: ChangedFile; conflict: boolean }) {
+  const [open, setOpen] = createSignal(false);
+  const kind = () => changeKind(props.file.status);
+  const look = () => fileLook[props.file.status] ?? { fill: "#e2c995", ink: "#46301d" };
   return (
-    <div className="bg-cream-100">
+    <div class="bg-cream-100">
       <button
         type="button"
-        aria-label={file.path}
-        aria-expanded={patch ? open : undefined}
-        disabled={!patch}
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left enabled:cursor-pointer enabled:hover:bg-cream-200"
+        aria-label={props.file.path}
+        aria-expanded={props.file.patch ? aria(open()) : undefined}
+        disabled={!props.file.patch}
+        onClick={() => setOpen(!open())}
+        class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left enabled:cursor-pointer enabled:hover:bg-cream-200"
       >
-        <span title={kind.label} className="flex h-5 w-5 shrink-0 items-center justify-center text-[12px]" style={{ background: look.fill, color: look.ink }}>
-          {kind.mark}
+        <span title={kind().label} class="flex h-5 w-5 shrink-0 items-center justify-center text-[12px]" style={{ background: look().fill, color: look().ink }}>
+          {kind().mark}
         </span>
-        <span title={file.path} className={`min-w-0 flex-1 truncate font-mono text-[12.5px] ${conflict ? "text-berry" : "text-bark-800"}`}>
-          {file.path}
+        <span title={props.file.path} class={["min-w-0 flex-1 truncate font-mono text-[12.5px]", props.conflict ? "text-berry" : "text-bark-800"]}>
+          {props.file.path}
         </span>
-        {conflict && <FarmTag text="冲突" fill={tint("#c84a3a", 0.15)} ink="#c84a3a" />}
-        {file.added < 0 ? (
-          <span className="font-mono text-[12.5px] text-bark-500">二进制</span>
-        ) : (
-          <PlusMinus added={Math.round(file.added)} removed={Math.round(file.removed)} />
-        )}
+        <Show when={props.conflict}>
+          <FarmTag text="冲突" fill={tint("#c84a3a", 0.15)} ink="#c84a3a" />
+        </Show>
+        <Show when={props.file.added >= 0} fallback={<span class="font-mono text-[12.5px] text-bark-500">二进制</span>}>
+          <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} />
+        </Show>
       </button>
-      {open && patch && <Patch text={patch} />}
+      <Show when={open() && props.file.patch}>{(patch) => <Patch text={patch()} />}</Show>
     </div>
   );
 }

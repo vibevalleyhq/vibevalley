@@ -1,5 +1,5 @@
 // The same seeds must replay the same runs: the recorded ones are kept.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vite-plus/test";
 import {
   type BugSnake,
   bugPoints,

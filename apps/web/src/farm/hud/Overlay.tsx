@@ -1,19 +1,20 @@
-// The words over the village, at screen pixels so they stay sharp: each plot's
-// card (what a click would do while pointed at, a reward, a note, its badge, its project, the level that clears it),
-// what each helper is doing over its head, the manager's last words, and the yard's signs, names and counts. Words
-// let clicks through to the village.
+// The words over the village, at screen pixels so they stay sharp: each plot's card (what a click would do while
+// pointed at, a reward, a note, its badge, its project, the level that clears it), what each helper is doing over its
+// head, the manager's last words, and the yard's signs, names and counts. Words let clicks through to the village.
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import type { Session } from "@vibevalley/protocol";
-import { useFrames } from "../../data/frame";
-import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "../kit";
-import { farmState, useFarm } from "../store";
+import { doingOf, harvestedOf, lastManagerSaid, plotTitle } from "./rules";
+import { farmState } from "../store";
 import { aimTool } from "../tools";
 import { yardPlaces } from "../world/places";
 import { beds, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "../world/plots";
-import { useVillage } from "../world/load";
+import type { Village } from "../world/load";
 import { plotH } from "../world/world";
-import { doingOf, harvestedOf, lastManagerSaid, plotTitle } from "./rules";
+import { useFrames } from "../../data/frame";
+import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "../kit";
+import { useFarm } from "../state";
+import { useVillage } from "../support";
 
 /** Rows of art pixels above the plot's bottom where its rail is. */
 const rail = 5;
@@ -35,20 +36,57 @@ const sign: Record<string, string> = {
   skills: "icon-skillbook",
 };
 
-/** A card centred on (x, y), its bottom there unless `ay` says otherwise; page pixels. */
-function Pin({ x, y, ay = 1, children }: { x: number; y: number; ay?: number; children: ReactNode }) {
-  return (
-    <div className="absolute" style={{ left: x, top: y, transform: `translate(-50%, ${-ay * 100}%)` }}>
-      {children}
-    </div>
-  );
+/** What a PixelCard draws, as data: the pins are worked out in one memo and drawn by key. */
+interface Card {
+  rows: readonly (readonly Piece[])[];
+  paper?: string;
+  ink?: string;
+  padX?: number;
+  padY?: number;
+  center?: boolean;
+  maxWidth?: number;
+  maxLines?: number;
+}
+
+/** A card centred on (x, y), its bottom there unless `ay` says otherwise; page pixels. `hop`: a sign's bob delay. */
+interface Pin {
+  key: string;
+  x: number;
+  y: number;
+  ay: number;
+  card: Card;
+  hop?: number;
 }
 
 const words = (text: string, color?: string): Piece => ({ kind: "words", text, color });
 
+function PinView(props: { pin: Pin }) {
+  const card = () => (
+    <PixelCard
+      rows={props.pin.card.rows}
+      paper={props.pin.card.paper}
+      ink={props.pin.card.ink}
+      padX={props.pin.card.padX}
+      padY={props.pin.card.padY}
+      center={props.pin.card.center}
+      maxWidth={props.pin.card.maxWidth}
+      maxLines={props.pin.card.maxLines}
+    />
+  );
+  return (
+    <div class="absolute" style={{ left: `${props.pin.x}px`, top: `${props.pin.y}px`, transform: `translate(-50%, ${-props.pin.ay * 100}%)` }}>
+      <Show when={props.pin.hop !== undefined} fallback={card()}>
+        <span class="block motion-safe:animate-[hop_3.2s_steps(1)_infinite]" style={{ "animation-delay": `${props.pin.hop}s` }}>
+          {card()}
+        </span>
+      </Show>
+    </div>
+  );
+}
+
 export function Overlay() {
-  const { frame } = useFrames();
-  const { village } = useVillage();
+  const frames = useFrames();
+  const loaded = useVillage();
   const screen = useFarm((s) => s.screen);
   const tool = useFarm((s) => s.tool);
   const hoverBed = useFarm((s) => s.hoverBed);
@@ -57,199 +95,214 @@ export function Overlay() {
   const bedFx = useFarm((s) => s.bedFx);
   const rewards = useFarm((s) => s.rewards);
   const chatOpen = useFarm((s) => s.chatOpen);
-  if (!frame || !screen || !village) return null;
-  const { state, view } = frame;
-  const { world, atlas } = village;
-  const level = Math.round(view.level.level);
-  const s = screen.scale;
-  const at = (x: number, y: number) => screen.toScreen({ x, y });
-  const back: ReactNode[] = [];
-  const front: ReactNode[] = [];
-  const tips: ReactNode[] = [];
 
-  for (const bed of beds) {
-    const p = world.plotAt(bed.index);
-    const session = bed.unlockLevel === undefined ? sessionAtStation(state.sessions, bed.station) : undefined;
-    const plot = bed.unlockLevel !== undefined ? lockedPlot(bed, level) : plotOf(view, session);
-    let card: ReactNode;
-    let where: "above" | "rail" | "middle" = "rail";
-    const reward =
-      bed.station < 0 ? undefined : rewards.filter((r) => state.sessions.some((h) => h.id === r.sessionId && stationOfSession(h) === bed.station)).at(-1);
-    const note = bedFx.filter((f) => f.bed === bed.index && (f.kind === "note" || f.kind === "harvest")).at(-1);
-    if (hoverBed === bed.index) {
-      const aim = aimTool(tool, bed, session, plot, level);
-      where = "above";
-      card = (
-        <PixelCard
-          center
-          rows={[
+  const pins = createMemo(() => {
+    const frame = frames.frame;
+    const sc = screen();
+    const village = loaded().village;
+    if (!frame || !sc || !village) return undefined;
+    const { state, view } = frame;
+    const { world, atlas } = village;
+    const level = Math.round(view.level.level);
+    const at = (x: number, y: number) => sc.toScreen({ x, y });
+    const back: Pin[] = [];
+    const front: Pin[] = [];
+    const tips: Pin[] = [];
+
+    for (const bed of beds) {
+      const p = world.plotAt(bed.index);
+      const session = bed.unlockLevel === undefined ? sessionAtStation(state.sessions, bed.station) : undefined;
+      const plot = bed.unlockLevel !== undefined ? lockedPlot(bed, level) : plotOf(view, session);
+      let card: Card | undefined;
+      let where: "above" | "rail" | "middle" = "rail";
+      const reward =
+        bed.station < 0
+          ? undefined
+          : rewards()
+              .filter((r) => state.sessions.some((h) => h.id === r.sessionId && stationOfSession(h) === bed.station))
+              .at(-1);
+      const note = bedFx()
+        .filter((f) => f.bed === bed.index && (f.kind === "note" || f.kind === "harvest"))
+        .at(-1);
+      if (hoverBed() === bed.index) {
+        const aim = aimTool(tool(), bed, session, plot, level);
+        where = "above";
+        card = {
+          center: true,
+          rows: [
             [words(plotTitle(bed, session, plot.crop))],
             ...(session?.project ? [[words(session.project, CardColors.muted)]] : []),
             [words(aim.ok ? `点击：${aim.text}` : aim.text, aim.ok ? CardColors.good : CardColors.muted)],
-          ]}
-        />
-      );
-    } else if (reward) {
-      card = <PixelCard rows={[[{ kind: "icon", sprite: atlas.get("icon-coin"), px: 12 }, words(`+${Math.round(reward.coins)}`)]]} />;
-    } else if (note) {
-      card = <PixelCard rows={[[words(note.text ?? "")]]} />;
-    } else if (plot.badge) {
-      const [paper, ink] = badgeColors[plot.badge.tone];
-      card = <PixelCard paper={paper} ink={ink} rows={[[words(plot.badge.text)], ...(session?.project ? [[words(session.project, ink)]] : [])]} />;
-    } else if (session?.project) {
-      // Plots of several projects share the farm: each says whose it is.
-      card = <PixelCard padX={3} padY={0} rows={[[words(session.project, CardColors.muted)]]} />;
-    } else if (bed.unlockLevel !== undefined && plot.crop === "locked") {
-      where = "middle";
-      card = <PixelCard rows={[[words(`Lv.${bed.unlockLevel} 开垦`)]]} />;
+          ],
+        };
+      } else if (reward) {
+        card = { rows: [[{ kind: "icon", sprite: atlas.get("icon-coin"), px: 12 }, words(`+${Math.round(reward.coins)}`)]] };
+      } else if (note) {
+        card = { rows: [[words(note.text ?? "")]] };
+      } else if (plot.badge) {
+        const [paper, ink] = badgeColors[plot.badge.tone];
+        card = { paper, ink, rows: [[words(plot.badge.text)], ...(session?.project ? [[words(session.project, ink)]] : [])] };
+      } else if (session?.project) {
+        // Plots of several projects share the farm: each says whose it is.
+        card = { padX: 3, padY: 0, rows: [[words(session.project, CardColors.muted)]] };
+      } else if (bed.unlockLevel !== undefined && plot.crop === "locked") {
+        where = "middle";
+        card = { rows: [[words(`Lv.${bed.unlockLevel} 开垦`)]] };
+      }
+      if (!card) continue;
+      const key = `bed:${bed.index}`;
+      const pin: Pin =
+        where === "middle"
+          ? { key, ...at(p.x, p.y - plotH / 2), ay: 0.5, card }
+          : where === "rail"
+            ? { key, x: at(p.x, 0).x, y: at(0, p.y - plotH + rail).y - 2, ay: 1, card }
+            : { key, x: at(p.x, 0).x, y: at(0, p.y - plotH - 3).y - 2, ay: 1, card };
+      (where === "above" ? front : back).push(pin);
     }
-    if (!card) continue;
-    const pin =
-      where === "middle" ? (
-        <Pin key={bed.index} {...at(p.x, p.y - plotH / 2)} ay={0.5}>
-          {card}
-        </Pin>
-      ) : where === "rail" ? (
-        <Pin key={bed.index} x={at(p.x, 0).x} y={at(0, p.y - plotH + rail).y - 2}>
-          {card}
-        </Pin>
-      ) : (
-        <Pin key={bed.index} x={at(p.x, 0).x} y={at(0, p.y - plotH - 3).y - 2}>
-          {card}
-        </Pin>
-      );
-    (where === "above" ? front : back).push(pin);
-  }
 
-  const mgr = world.manager;
-  back.push(
-    <ManagerWords
-      key="manager"
-      x={at(mgr.x, 0).x}
-      y={at(0, mgr.y - 34).y - 4}
-      hidden={chatOpen || reveal}
-      sessions={state.sessions.length}
-      said={lastManagerSaid(state.chat)}
-    />,
-  );
+    yardPlaces.forEach((place, i) => {
+      const box = world.spotBoxes.get(place.id);
+      if (!box) return;
+      const top = box.y0 < topEdge ? box.y0 + signInside : box.y0;
+      const x = at((box.x0 + box.x1) / 2, 0).x;
+      const y = at(0, top).y - 4;
+      const icon = sign[place.id];
+      if (hoverSpot() === place.id) {
+        tips.push({ key: `spot:${place.id}`, x, y, ay: 1, card: { center: true, rows: [[words(place.label)], [words(place.hint, CardColors.muted)]] } });
+      } else if (reveal()) {
+        tips.push({ key: `spot:${place.id}`, x, y, ay: 1, card: { center: true, padX: 3, padY: 1, rows: [[words(place.label)]] } });
+      } else if (icon && atlas.has(icon)) {
+        back.push({
+          key: `sign:${place.id}`,
+          x,
+          y: at(0, top).y - signGap * sc.scale,
+          ay: 1,
+          hop: -i * 0.8,
+          card: { paper: CardColors.wood, padX: 2, padY: 2, rows: [[{ kind: "icon", sprite: atlas.get(icon), px: 22 }]] },
+        });
+      }
+      const count = place.id === "warehouse" ? harvestedOf(state).length : place.id === "taskBoard" ? frame.graphs.filter((g) => g.asksForYou).length : 0;
+      if (count > 0)
+        back.push({
+          key: `count:${place.id}`,
+          ...at(box.x1, box.y0),
+          ay: 0.5,
+          card: { paper: CardColors.bug, ink: CardColors.lightInk, padX: 3, padY: 0, rows: [[words(String(count))]] },
+        });
+    });
 
-  yardPlaces.forEach((place, i) => {
-    const box = world.spotBoxes.get(place.id);
-    if (!box) return;
-    const top = box.y0 < topEdge ? box.y0 + signInside : box.y0;
-    const cx = (box.x0 + box.x1) / 2;
-    const x = at(cx, 0).x;
-    const y = at(0, top).y - 4;
-    if (hoverSpot === place.id) {
-      tips.push(
-        <Pin key={place.id} x={x} y={y}>
-          <PixelCard center rows={[[words(place.label)], [words(place.hint, CardColors.muted)]]} />
-        </Pin>,
-      );
-    } else if (reveal) {
-      tips.push(
-        <Pin key={place.id} x={x} y={y}>
-          <PixelCard center padX={3} padY={1} rows={[[words(place.label)]]} />
-        </Pin>,
-      );
-    } else if (sign[place.id] && atlas.has(sign[place.id]!)) {
-      back.push(
-        <Pin key={place.id} x={x} y={at(0, top).y - signGap * s}>
-          <span className="block motion-safe:animate-[hop_3.2s_steps(1)_infinite]" style={{ animationDelay: `${-i * 0.8}s` }}>
-            <PixelCard paper={CardColors.wood} padX={2} padY={2} rows={[[{ kind: "icon", sprite: atlas.get(sign[place.id]!), px: 22 }]]} />
-          </span>
-        </Pin>,
-      );
-    }
-    const count = place.id === "warehouse" ? harvestedOf(state).length : place.id === "taskBoard" ? frame.graphs.filter((g) => g.asksForYou).length : 0;
-    if (count > 0)
-      back.push(
-        <Pin key={`${place.id}:count`} {...at(box.x1, box.y0)} ay={0.5}>
-          <PixelCard paper={CardColors.bug} ink={CardColors.lightInk} padX={3} padY={0} rows={[[words(String(count))]]} />
-        </Pin>,
-      );
+    const mgr = world.manager;
+    return { back, front, tips, manager: { x: at(mgr.x, 0).x, y: at(0, mgr.y - 34).y - 4 }, village };
   });
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      {back}
-      <Heads sessions={state.sessions} />
-      {front}
-      {tips}
-    </div>
+    <Show when={pins()}>
+      {(p) => (
+        <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+          <For each={p().back} keyed={(pin) => pin.key}>
+            {(pin) => <PinView pin={pin()} />}
+          </For>
+          <ManagerWords
+            x={p().manager.x}
+            y={p().manager.y}
+            hidden={chatOpen() || reveal()}
+            sessions={frames.frame?.state.sessions.length ?? 0}
+            said={lastManagerSaid(frames.frame?.state.chat)}
+          />
+          <Heads sessions={frames.frame?.state.sessions ?? []} village={p().village} />
+          <For each={p().front} keyed={(pin) => pin.key}>
+            {(pin) => <PinView pin={pin()} />}
+          </For>
+          <For each={p().tips} keyed={(pin) => pin.key}>
+            {(pin) => <PinView pin={pin()} />}
+          </For>
+        </div>
+      )}
+    </Show>
   );
 }
 
-/** What each helper is doing, over its head as it walks: moved every frame, not rendered every frame. */
-function Heads({ sessions }: { sessions: readonly Session[] }) {
+/** What each helper is doing, over its head as it walks: moved every frame, not drawn again every frame. */
+function Heads(props: { sessions: readonly Session[]; village: Village }) {
   const screen = useFarm((s) => s.screen);
-  const { village } = useVillage();
-  const refs = useRef(new Map<string, HTMLDivElement>());
-  useEffect(() => {
-    if (!screen) return;
-    const place = () => {
-      const sc = farmState().screen;
-      if (!sc) return;
-      for (const [id, el] of refs.current) {
-        const feet = sc.helperAt(id);
-        el.style.visibility = feet ? "visible" : "hidden";
-        if (feet) el.style.transform = `translate(${Math.round(feet.x)}px, ${Math.round(feet.y - 31 * sc.scale - 2)}px) translate(-50%, -100%)`;
-      }
-    };
+  const placed = new Map<string, HTMLDivElement>();
+  const place = () => {
+    const sc = farmState().screen;
+    if (!sc) return;
+    for (const [id, el] of placed) {
+      const feet = sc.helperAt(id);
+      el.style.visibility = feet ? "visible" : "hidden";
+      if (feet) el.style.transform = `translate(${Math.round(feet.x)}px, ${Math.round(feet.y - 31 * sc.scale - 2)}px) translate(-50%, -100%)`;
+    }
+  };
+  createEffect(screen, (sc) => {
+    if (!sc) return;
     place();
-    return screen.onFrame(place);
-  }, [screen]);
-  if (!village) return null;
+    return sc.onFrame(place);
+  });
   return (
-    <>
-      {sessions.map((h) => {
-        const doing = doingOf(h);
-        const named = h.phase._tag === "arriving";
-        const act = `act-${doing.action}`;
-        if (doing.action === "none" && !named) return null;
-        const rows: Piece[] = [];
-        if (doing.action !== "none" && village.atlas.has(act)) rows.push({ kind: "icon", sprite: village.atlas.get(act), px: 18 });
-        if (named) rows.push(words(h.name));
-        return (
-          <div
-            key={h.id}
-            ref={(el) => {
-              if (el) refs.current.set(h.id, el);
-              else refs.current.delete(h.id);
-            }}
-            className="absolute top-0 left-0"
-            style={{ visibility: "hidden" }}
-            data-testid={`head-${h.id}`}
-          >
-            <PixelCard padX={3} padY={2} rows={[rows]} />
-          </div>
-        );
-      })}
-    </>
+    <For each={props.sessions} keyed={(h) => h.id}>
+      {(h) => <Head session={h()} village={props.village} placed={placed} />}
+    </For>
+  );
+}
+
+function Head(props: { session: Session; village: Village; placed: Map<string, HTMLDivElement> }) {
+  const rows = () => {
+    const doing = doingOf(props.session);
+    const named = props.session.phase._tag === "arriving";
+    const act = `act-${doing.action}`;
+    if (doing.action === "none" && !named) return undefined;
+    const out: Piece[] = [];
+    if (doing.action !== "none" && props.village.atlas.has(act)) out.push({ kind: "icon", sprite: props.village.atlas.get(act), px: 18 });
+    if (named) out.push(words(props.session.name));
+    return out;
+  };
+  let el: HTMLDivElement | undefined;
+  onSettled(() => {
+    const id = props.session.id;
+    if (el) props.placed.set(id, el);
+    return () => props.placed.delete(id);
+  });
+  return (
+    <Show when={rows()}>
+      {(r) => (
+        <div ref={(div) => (el = div)} class="absolute top-0 left-0" style={{ visibility: "hidden" }} data-testid={`head-${props.session.id}`}>
+          <PixelCard padX={3} padY={2} rows={[r()]} />
+        </div>
+      )}
+    </Show>
   );
 }
 
 /** The manager's last line, for a while after he said it; on an empty farm, his question. */
-function ManagerWords({ x, y, hidden, sessions, said }: { x: number; y: number; hidden: boolean; sessions: number; said: ReturnType<typeof lastManagerSaid> }) {
-  const [now, setNow] = useState(() => Date.now());
-  const finishedAt = useRef<{ key: string; at?: number }>({ key: "" });
-  if (said && said.key !== finishedAt.current.key) finishedAt.current = { key: said.key };
-  if (said?.final && finishedAt.current.at === undefined) finishedAt.current.at = Date.now();
-  const doneAt = finishedAt.current.at;
-  useEffect(() => {
-    if (doneAt === undefined) return;
-    const left = doneAt + speechMs - Date.now();
+function ManagerWords(props: { x: number; y: number; hidden: boolean; sessions: number; said: ReturnType<typeof lastManagerSaid> }) {
+  const [now, setNow] = createSignal(Date.now());
+  // When the line being shown was finished; a new line starts over.
+  let finished: { key: string; at?: number } = { key: "" };
+  const doneAt = createMemo(() => {
+    const said = props.said;
+    if (said && said.key !== finished.key) finished = { key: said.key };
+    if (said?.final && finished.at === undefined) finished.at = Date.now();
+    return finished.at;
+  });
+  createEffect(doneAt, (at) => {
+    if (at === undefined) return;
+    const left = at + speechMs - Date.now();
     if (left <= 0) return;
     const t = setTimeout(() => setNow(Date.now()), left + 50);
     return () => clearTimeout(t);
-  }, [doneAt]);
-  if (hidden) return null;
-  const fresh = said && (doneAt === undefined || now - doneAt < speechMs);
-  const text = fresh ? plainText(said.text) : sessions === 0 ? "今天种点什么？" : undefined;
-  if (!text) return null;
+  });
+  const text = () => {
+    if (props.hidden) return undefined;
+    const said = props.said;
+    const at = doneAt();
+    const fresh = said && (at === undefined || now() - at < speechMs);
+    return fresh ? plainText(said.text) : props.sessions === 0 ? "今天种点什么？" : undefined;
+  };
   return (
-    <Pin x={x} y={y}>
-      <PixelCard maxWidth={220} maxLines={3} rows={[[words(text)]]} />
-    </Pin>
+    <Show when={text()}>
+      {(t) => <PinView pin={{ key: "manager", x: props.x, y: props.y, ay: 1, card: { maxWidth: 220, maxLines: 3, rows: [[words(t())]] } }} />}
+    </Show>
   );
 }

@@ -7,7 +7,7 @@
 从上往下：
 
 1. **农场里**：像素村里画出来的样子和玩法（[farm-ui.md](docs/reference/farm-ui.md)、[pixel-village.md](docs/reference/pixel-village.md)）。
-2. **页面**：React 的页面和组件，在 `apps/web/src/`（农场在 `farm/`，工作台在 `pages/`）。页面只读折好的状态，不折事实。
+2. **页面**：Solid 的页面和组件，在 `apps/web/src/`（农场在 `farm/`，工作台在 `pages/`）。页面只读折好的状态，不折事实。
 3. **协议**：`packages/protocol` 的形状（`shapes.ts`）、事实和规则（`src/rules`）；服务端和页面 import 同一份。
 4. **HTTP 和 MCP**：`/api/v1/...`（`packages/protocol/src/api.ts` 的 `endpoints`），核心状态经 `GET /api/v1/state` 推给页面；编码 agent 经 `/mcp` 用农场的工具，现在是帮工在频道里说话。
 5. **服务端**：`apps/server/src/<模块>` 一个模块一个服务（`Issues`、`Sessions`……），下面写成「服务.方法」或文件名（[地基](docs/subsystems/foundation.md)）。

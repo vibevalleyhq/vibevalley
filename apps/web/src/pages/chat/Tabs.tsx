@@ -1,126 +1,139 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import type { Conversation, Schedule } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
-import { useCore } from "../../data/frame";
 import { chatPath, jobThreadOf, phaseText } from "../../rules/chat";
+import { toast } from "../../ui/toasts";
+import { useNow } from "../../app/util";
+import { useRouter } from "../../app/router";
+import { useCore } from "../../data/frame";
 import { Button } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
-import { useToast } from "../../ui/Toast";
 import { Empty, HelperFace, PhaseGlyph } from "./bits";
 
 const card = "rounded-lg border border-line bg-page p-3";
 
 /** The sessions arranged in this channel; the general holds those arranged in no channel. */
-export function Jobs({ channel }: { channel: Conversation }) {
+export function Jobs(props: { channel: Conversation }) {
   const core = useCore();
-  const navigate = useNavigate();
-  const sessions = (core?.sessions ?? []).filter((h) => (h.channel ? h.channel === channel.id : channel.kind === "general"));
-  if (sessions.length === 0) return <Empty icon="icon-tasks">这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。</Empty>;
+  const router = useRouter();
+  const now = useNow();
+  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : props.channel.kind === "general"));
   return (
-    <div className="flex flex-col gap-3 overflow-y-auto p-4">
-      {sessions.map((h) => {
-        const thread = jobThreadOf(core?.chat, h);
-        return (
-          <div key={h.id} className={`${card} flex items-center gap-3`}>
-            <HelperFace agent={h.agent} size={36} />
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm">
-                <span className="font-semibold">{h.name}</span>
-                <span className="text-xs text-muted">
-                  {"  "}@{h.id} {h.project ?? ""}
-                  {h.branch ? ` · ${h.branch}` : ""}
-                </span>
-              </span>
-              <span className="truncate text-sm">{h.brief}</span>
-              <span className="flex items-center gap-1 text-xs text-muted">
-                <PhaseGlyph phase={h.phase} />
-                <span className="truncate">{phaseText(h, Date.now())}</span>
-              </span>
-            </div>
-            {thread && (
-              <Button icon="button-thread" onClick={() => navigate(chatPath(thread))}>
-                工单串
-              </Button>
-            )}
-          </div>
-        );
-      })}
-    </div>
+    <Show when={sessions().length > 0} fallback={<Empty icon="icon-tasks">这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。</Empty>}>
+      <div class="flex flex-col gap-3 overflow-y-auto p-4">
+        <For each={sessions()}>
+          {(h) => {
+            const thread = () => jobThreadOf(core()?.chat, h);
+            return (
+              <div class={[card, "flex items-center gap-3"]}>
+                <HelperFace agent={h.agent} size={36} />
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span class="truncate text-sm">
+                    <span class="font-semibold">{h.name}</span>
+                    <span class="text-xs text-muted">
+                      {"  "}@{h.id} {h.project ?? ""}
+                      {h.branch ? ` · ${h.branch}` : ""}
+                    </span>
+                  </span>
+                  <span class="truncate text-sm">{h.brief}</span>
+                  <span class="flex items-center gap-1 text-xs text-muted">
+                    <PhaseGlyph phase={h.phase} />
+                    <span class="truncate">{phaseText(h, now())}</span>
+                  </span>
+                </div>
+                <Show when={thread()}>
+                  {(t) => (
+                    <Button icon="button-thread" onClick={() => router.navigate(chatPath(t()))}>
+                      工单串
+                    </Button>
+                  )}
+                </Show>
+              </div>
+            );
+          }}
+        </For>
+      </div>
+    </Show>
   );
 }
 
-export function Schedules({ channel }: { channel: Conversation }) {
-  const schedules = (useCore()?.schedules ?? []).filter((s) => s.channel === channel.id);
-  if (schedules.length === 0)
-    return <Empty icon="icon-clock">这个频道还没有定时。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。</Empty>;
+export function Schedules(props: { channel: Conversation }) {
+  const core = useCore();
+  const schedules = () => (core()?.schedules ?? []).filter((s) => s.channel === props.channel.id);
   return (
-    <div className="flex flex-col gap-3 overflow-y-auto p-4">
-      {schedules.map((s) => (
-        <ScheduleCard key={s.id} s={s} />
-      ))}
-    </div>
+    <Show
+      when={schedules().length > 0}
+      fallback={<Empty icon="icon-clock">这个频道还没有定时。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。</Empty>}
+    >
+      <div class="flex flex-col gap-3 overflow-y-auto p-4">
+        <For each={schedules()}>{(s) => <ScheduleCard s={s} />}</For>
+      </div>
+    </Show>
   );
 }
 
-function ScheduleCard({ s }: { s: Schedule }) {
-  const toast = useToast();
-  const [deleting, setDeleting] = useState(false);
+function ScheduleCard(props: { s: Schedule }) {
+  const [deleting, setDeleting] = createSignal(false);
   const act = (p: Promise<void>) => p.catch((e) => toast(reasonOf(e), "bad"));
-  const setEnabled = (enabled: boolean) => act(api.schedule.update({ id: s.id, body: { enabled } }));
-  const remove = () => act(api.schedule.delete({ id: s.id }));
+  const setEnabled = (enabled: boolean) => act(api.schedule.update({ id: props.s.id, body: { enabled } }));
+  const remove = () => act(api.schedule.delete({ id: props.s.id }));
   // The second press deletes; a press anywhere else takes the first back.
-  useEffect(() => {
-    if (!deleting) return;
+  createEffect(deleting, (on) => {
+    if (!on) return;
     const away = () => setDeleting(false);
     const t = setTimeout(() => document.addEventListener("pointerdown", away, { once: true }));
     return () => {
       clearTimeout(t);
       document.removeEventListener("pointerdown", away);
     };
-  }, [deleting]);
-  const meta = [
-    s.whenText ?? "",
-    s.pending ? (s.nextText ?? "") : `下次 ${s.nextText ?? ""}`,
-    ...(s.agent ? [`直接派 ${s.agent}`] : []),
-    ...(s.by === "manager" ? ["管家定的"] : []),
-  ].join(" · ");
+  });
+  const meta = () =>
+    [
+      props.s.whenText ?? "",
+      props.s.pending ? (props.s.nextText ?? "") : `下次 ${props.s.nextText ?? ""}`,
+      ...(props.s.agent ? [`直接派 ${props.s.agent}`] : []),
+      ...(props.s.by === "manager" ? ["管家定的"] : []),
+    ].join(" · ");
   return (
-    <div className={`${card} flex items-start gap-3 ${s.enabled || s.pending ? "" : "opacity-60"}`} aria-label={`定时「${s.name}」`}>
-      <Icon name="icon-clock" size={20} className="mt-0.5" />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-sm">
-          <span className="font-semibold">{s.name}</span>
-          <span className="text-xs text-muted">
+    <div class={[card, "flex items-start gap-3", { "opacity-60": !(props.s.enabled || props.s.pending) }]} aria-label={`定时「${props.s.name}」`}>
+      <Icon name="icon-clock" size={20} class="mt-0.5" />
+      <div class="flex min-w-0 flex-1 flex-col">
+        <span class="text-sm">
+          <span class="font-semibold">{props.s.name}</span>
+          <span class="text-xs text-muted">
             {"  "}
-            {meta}
+            {meta()}
           </span>
         </span>
-        <span className="text-sm">{s.text}</span>
+        <span class="text-sm">{props.s.text}</span>
       </div>
-      {s.pending ? (
-        <div className="flex gap-2">
-          <Button tone="primary" icon="mark-check" aria-label={`同意定时「${s.name}」`} onClick={() => void setEnabled(true)}>
+      <Show
+        when={props.s.pending}
+        fallback={
+          <div class="flex gap-2">
+            <Button tone={props.s.enabled ? "primary" : "plain"} onClick={() => void setEnabled(!props.s.enabled)}>
+              {props.s.enabled ? "开着" : "关着"}
+            </Button>
+            <Show
+              when={deleting()}
+              fallback={<Button icon="button-delete" title="删掉" aria-label={`删掉定时「${props.s.name}」`} onClick={() => setDeleting(true)} />}
+            >
+              <Button tone="danger" onPointerDown={(e) => e.stopPropagation()} onClick={() => void remove()}>
+                确定删？
+              </Button>
+            </Show>
+          </div>
+        }
+      >
+        <div class="flex gap-2">
+          <Button tone="primary" icon="mark-check" aria-label={`同意定时「${props.s.name}」`} onClick={() => void setEnabled(true)}>
             同意
           </Button>
-          <Button icon="mark-cross" aria-label={`不要定时「${s.name}」`} onClick={() => void remove()}>
+          <Button icon="mark-cross" aria-label={`不要定时「${props.s.name}」`} onClick={() => void remove()}>
             不要
           </Button>
         </div>
-      ) : (
-        <div className="flex gap-2">
-          <Button tone={s.enabled ? "primary" : "plain"} onClick={() => void setEnabled(!s.enabled)}>
-            {s.enabled ? "开着" : "关着"}
-          </Button>
-          {deleting ? (
-            <Button tone="danger" onPointerDown={(e) => e.stopPropagation()} onClick={() => void remove()}>
-              确定删？
-            </Button>
-          ) : (
-            <Button icon="button-delete" title="删掉" aria-label={`删掉定时「${s.name}」`} onClick={() => setDeleting(true)} />
-          )}
-        </div>
-      )}
+      </Show>
     </div>
   );
 }

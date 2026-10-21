@@ -1,6 +1,6 @@
 # 能力表
 
-由 `scripts/capabilities.ts` 从 `packages/protocol/src/api.ts` 的 `endpoints`（每个接口的 `can`）写出，不手改；`bun run docs:verify` 查它是不是最新。为什么这样分见 [先有能力，再有入口](docs/subsystems/core.md)。
+由 `scripts/capabilities.ts` 从 `packages/protocol/src/api.ts` 的 `endpoints`（每个接口的 `can`）写出，不手改；`pnpm run docs:verify` 查它是不是最新。为什么这样分见 [先有能力，再有入口](docs/subsystems/core.md)。
 
 | 谁 | 是谁 | 从哪个入口 |
 |---|---|---|
@@ -67,6 +67,7 @@
 | `issue.list` | `GET /api/v1/issues` | ✓ | ✓ |   |
 | `issue.get` | `GET /api/v1/issues/{id}` | ✓ | ✓ |   |
 | `issue.runs` | `GET /api/v1/issues/{id}/runs` | ✓ | ✓ |   |
+| `issue.timeline` | `GET /api/v1/issues/{id}/timeline` | ✓ | ✓ |   |
 | `issue.create` | `POST /api/v1/issues` | ✓ | ✓ |   |
 | `issue.update` | `PUT /api/v1/issues/{id}` | ✓ | ✓ |   |
 | `issue.delete` | `DELETE /api/v1/issues/{id}` | ✓ | ✓ |   |

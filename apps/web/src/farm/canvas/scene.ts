@@ -22,7 +22,7 @@ import {
 } from "@vibevalley/engine/pixi";
 import type { Agent, Crop, Session, StateFrame } from "@vibevalley/protocol";
 import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
-import { castPrefix } from "../../ui/Face";
+import { castPrefix } from "../../rules/cast";
 import { playSound } from "../sound";
 import { clock, farmState, type BedFx } from "../store";
 import { managerLooks, managerSprite } from "../tools";

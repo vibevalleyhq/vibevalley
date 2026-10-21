@@ -12,7 +12,6 @@ import {
   type SettingsStatus,
   type SettingsUpdate,
   type SettingsUpdateVoice,
-  VoiceAnswerAgoraModelValues,
   type VoiceSettings,
 } from "@vibevalley/protocol";
 import { defaultVoice } from "@vibevalley/protocol/rules";
@@ -96,8 +95,6 @@ export const make = Effect.gen(function* () {
   const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };
   // 恢复默认 goes back to these.
   let defaults = defaultVoice();
-  if ((VoiceAnswerAgoraModelValues as readonly string[]).includes(config.voice.model))
-    defaults = { ...defaults, answer: { vendor: "agora", model: config.voice.model as never } };
   if (config.voice.id) {
     const tts = defaultVoice().tts;
     defaults = { ...defaults, tts: { vendor: "minimax", model: tts.vendor === "minimax" ? tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };

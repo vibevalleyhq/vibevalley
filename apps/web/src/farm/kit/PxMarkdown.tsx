@@ -1,7 +1,11 @@
-import ReactMarkdown, { type Components } from "react-markdown";
+import { createMemo } from "solid-js";
+import { toDom } from "hast-util-to-dom";
 import remarkGfm from "remark-gfm";
-import { cx, pxText } from "./base";
+import remarkParse from "remark-parse";
+import remarkRehype from "remark-rehype";
+import { unified } from "unified";
 import { mentionHref, withMentions } from "./markdown";
+import { cx, pxText } from "./style";
 
 // Colours follow the text around it (currentColor), so the same rules read on cream paper and on a green bubble.
 // One weight and no italics: ** and * show as plain words.
@@ -19,62 +23,56 @@ const reading = cx(
   "max-w-[560px] [&_code]:font-mono [&_code]:text-[0.9em] [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:my-2 [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-pixel [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-normal [&_h1]:text-[24px] [&_h1]:leading-[1.3333] [&_h2,&_h3,&_h4,&_h5,&_h6]:text-[12px] [&_h2,&_h3,&_h4,&_h5,&_h6]:leading-[1.5]",
 );
 
+// Raw HTML in the text is dropped (remark-rehype's default).
+const md = unified().use(remarkParse).use(remarkGfm).use(remarkRehype);
+
+/** The tree as DOM: a mention link becomes its tag, a link opens through `open` or a new tab, a rule becomes the dashed line. */
+function render(text: string, open: ((url: string) => void) | undefined): Node[] {
+  const root = toDom(md.runSync(md.parse(text)), { fragment: true }) as DocumentFragment;
+  for (const a of [...root.querySelectorAll("a")]) {
+    if (a.getAttribute("href") === mentionHref) {
+      const tag = document.createElement("span");
+      tag.className = "inline-block bg-current/13 px-[0.3em] whitespace-nowrap";
+      tag.append(...a.childNodes);
+      a.replaceWith(tag);
+      continue;
+    }
+    a.className = "underline decoration-current/45";
+    a.rel = "noreferrer";
+    if (!open) a.target = "_blank";
+    else
+      a.addEventListener("click", (e: MouseEvent) => {
+        e.preventDefault();
+        open(a.href);
+      });
+  }
+  for (const hr of [...root.querySelectorAll("hr")]) {
+    const line = document.createElement("div");
+    line.setAttribute("role", "separator");
+    line.className = "my-2 h-[1.5px] bg-[repeating-linear-gradient(to_right,currentColor_0_3px,transparent_3px_6px)] opacity-40";
+    hr.replaceWith(line);
+  }
+  return [...root.childNodes];
+}
+
 /**
  * GitHub-flavoured, no raw HTML. With `mentions`, @w3, @管家, @主人 and @所有人 outside code are small tags. A link
  * goes to `onOpenLink` when given, else opens in a new tab. `reading`: long text in pxText.read at most 40 characters
- * a line; headings stay pixel, code stays mono. `className` carries the colour.
+ * a line; headings stay pixel, code stays mono. `class` carries the colour.
  */
-export function PxMarkdown({
-  text,
-  mentions = false,
-  onOpenLink,
-  reading: read = false,
-  className,
-}: {
-  text: string;
-  mentions?: boolean;
-  onOpenLink?: (url: string) => void;
-  reading?: boolean;
-  className?: string;
-}) {
-  const components: Components = {
-    a: ({ href, children }) =>
-      href === mentionHref ? (
-        <span className="inline-block bg-current/13 px-[0.3em] whitespace-nowrap">{children}</span>
-      ) : (
-        <a
-          href={href}
-          target={onOpenLink ? undefined : "_blank"}
-          rel="noreferrer"
-          onClick={(e) => {
-            if (!onOpenLink || !href) return;
-            e.preventDefault();
-            onOpenLink(href);
-          }}
-          className="underline decoration-current/45"
-        >
-          {children}
-        </a>
-      ),
-    hr: () => <div role="separator" className="my-2 h-[1.5px] bg-[repeating-linear-gradient(to_right,currentColor_0_3px,transparent_3px_6px)] opacity-40" />,
-  };
-  return (
-    <div className={cx(common, read ? reading : said, className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {mentions ? withMentions(text) : text}
-      </ReactMarkdown>
-    </div>
-  );
+export function PxMarkdown(props: { text: string; mentions?: boolean; onOpenLink?: (url: string) => void; reading?: boolean; class?: string }) {
+  const nodes = createMemo(() => render(props.mentions ? withMentions(props.text) : props.text, props.onOpenLink));
+  return <div class={[common, props.reading ? reading : said, props.class]}>{nodes()}</div>;
 }
 
 /** Plain text to read, as PxMarkdown with `reading` draws it. */
-export function PxReadText({ text, maxLines, className }: { text: string; maxLines?: number; className?: string }) {
+export function PxReadText(props: { text: string; maxLines?: number; class?: string }) {
   return (
     <p
-      className={cx(pxText.read, "max-w-[560px] whitespace-pre-wrap", maxLines !== undefined && "overflow-hidden", className)}
-      style={maxLines !== undefined ? { display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: maxLines } : undefined}
+      class={[pxText.read, "max-w-[560px] whitespace-pre-wrap", { "overflow-hidden": props.maxLines !== undefined }, props.class]}
+      style={props.maxLines !== undefined ? { display: "-webkit-box", "-webkit-box-orient": "vertical", "-webkit-line-clamp": props.maxLines } : undefined}
     >
-      {text}
+      {props.text}
     </p>
   );
 }

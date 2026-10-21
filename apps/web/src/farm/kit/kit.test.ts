@@ -1,6 +1,6 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import { splitChips } from "./chips";
-import { pickItems } from "./choice";
+import { pickItems } from "./pick";
 import { plainText, withMentions } from "./markdown";
 import { ToastStore } from "./toasts";
 

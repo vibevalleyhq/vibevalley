@@ -2,7 +2,6 @@
 // (voice.dictate), which hands it to the transcription address in 声音's 听写, and the words come back for the field it
 // was started from. Recorded as 16 kHz mono WAV, which every transcriber takes. One recording at a time.
 
-import { useSyncExternalStore } from "react";
 import { api, reasonOf } from "../data/api";
 
 export type DictationPhase = "idle" | "recording" | "transcribing";
@@ -135,11 +134,6 @@ export class Dictation {
 
 /** The page's one recorder. */
 export const dictation = new Dictation();
-
-export function useDictation() {
-  useSyncExternalStore(dictation.subscribe, () => dictation.version);
-  return dictation;
-}
 
 /** Dictated words at the caret, or at the end: a space only between two Latin words, as Chinese runs on without one. */
 export function insertDictated(value: string, start: number, end: number, words: string) {

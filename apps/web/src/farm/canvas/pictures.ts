@@ -16,23 +16,25 @@ export interface Pictures {
 
 const shapeOf = (name: string) => (name === "map" ? GROUND_NORMALS : name.startsWith("plot-") ? LOW_NORMALS : SPRITE_NORMALS);
 
-/** `lit`: make the normal maps (a few hundred milliseconds); without them the light treats everything as ground. */
+// The normal maps, made once per page like the textures they come from (world/textures.ts): a canvas started again
+// (another project's farm, back from the workbench) reuses them instead of a few hundred milliseconds more.
+const normals = new WeakMap<Texture, Normals | null>();
+
+/** `lit`: make the normal maps (a few hundred milliseconds the first time); without them the light treats everything as ground. */
 export async function loadPictures(atlas: SpriteAtlas, lit: boolean): Promise<Pictures> {
   const names = [...atlas.names];
   const loaded = await loadTextures(atlas, names);
-  const normals = new WeakMap<Texture, Normals>();
   if (lit)
     names.forEach((name, i) => {
       const t = loaded[i];
-      const made = t && t.width > 1 ? normalTexture(t, shapeOf(name)) : undefined;
-      if (t && made) normals.set(t, made);
+      if (t && !normals.has(t)) normals.set(t, t.width > 1 ? (normalTexture(t, shapeOf(name)) ?? null) : null);
     });
   const map = pixelsOf(texture("map"));
   const d = atlas.density;
   return {
     has: (name) => atlas.has(name),
     texture,
-    normalsOf: (t) => normals.get(t),
+    normalsOf: (t) => normals.get(t) ?? undefined,
     mapColor: (x, y) => {
       const px = Math.floor(x * d);
       const py = Math.floor(y * d);

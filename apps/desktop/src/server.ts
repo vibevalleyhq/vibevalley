@@ -44,14 +44,16 @@ export interface RunningServer {
   stop(): Promise<void>;
 }
 
-export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv): Promise<RunningServer> {
+/** port 0 picks a free one; a restart in development (dev.ts) asks for the one it had, so the page keeps its origin and
+ * what it stored there. */
+export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0): Promise<RunningServer> {
   mkdirSync(dirname(files.log), { recursive: true });
   const log = createWriteStream(files.log, { flags: "a" });
   log.write(`--- ${new Date().toISOString()} vibevalley: starting ${files.server}\n`);
   // tsx is resolved from the cwd: the server's own.
   const child = spawn(process.execPath, ["--import", "tsx", "src/main.ts", "--ready-json", "--web", files.web], {
     cwd: files.server,
-    env: { ...env, ELECTRON_RUN_AS_NODE: "1", VIBEVALLEY_PORT: "0" },
+    env: { ...env, ELECTRON_RUN_AS_NODE: "1", VIBEVALLEY_PORT: String(port) },
     stdio: ["ignore", "pipe", "pipe"],
   });
   child.stderr.pipe(log, { end: false });

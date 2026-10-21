@@ -4,7 +4,7 @@
 
 import { join } from "node:path";
 import { type ArchiveListing, managerAgent, type Memory, type MemoryList, type MemorySourceInfo, type RecallPreview } from "@vibevalley/protocol";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "../agent/brain/memory.ts";
 import { Settings } from "../base/config.ts";
@@ -79,8 +79,10 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     const setting = yield* Setting;
     const agents = yield* Agents;
     const local = yield* makeMemories;
-    const run = <A>(e: Effect.Effect<A, unknown>) => Effect.runPromise(e as Effect.Effect<A>);
-    const log = (line: string) => Effect.runFork(Effect.logWarning(line));
+    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
+    const run = yield* FiberSet.makeRuntimePromise<never>();
+    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const log = (line: string) => void forkHere(Effect.logWarning(line));
     const sources = new Sources(
       localSource(local, () => agents.agents().map((a) => a.id), run),
       setting.memorySources,

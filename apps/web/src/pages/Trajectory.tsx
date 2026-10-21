@@ -1,10 +1,11 @@
-// A trajectory a row per step: the round in the gutter, what kind of step in
-// the tag, its text cut to a line until the row is opened; a waterfall of the rounds over it and their totals under it.
-// The manager's lets a round be marked wrong, which saves it as a case of its evals.
+// A trajectory a row per step: the round in the gutter, what kind of step in the tag, its text cut to a line until the
+// row is opened; a waterfall of the rounds over it and their totals under it. The manager's lets a round be marked
+// wrong, which saves it as a case of its evals.
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
+import type { JSX } from "@solidjs/web";
+
 import type { ManagerEval, SessionEvent } from "@vibevalley/protocol";
-import { useQuery } from "@tanstack/react-query";
 import { api, reasonOf } from "../data/api";
 import {
   cacheHit,
@@ -24,11 +25,13 @@ import {
   waterfallOf,
 } from "../rules/rounds";
 import { ago } from "../rules/time";
+import { toast } from "../ui/toasts";
+import { aria, autofocus, Keyed, useNow } from "../app/util";
+import { createSessionEvents } from "./chat/data";
+import { ready, useQuery } from "../data/query";
 import { TextInput } from "../ui/Field";
 import { Icon } from "../ui/Icon";
 import { Markdown } from "../ui/Markdown";
-import { useToast } from "../ui/Toast";
-import { useSessionEvents } from "./chat/data";
 import { Quiet } from "./kit";
 
 /** Saves the round its user/message `step` began as a case of the manager's evals; `want` is what it should have done. */
@@ -61,134 +64,146 @@ function summaryText(s: TrajectorySummary) {
 }
 
 /** A session's (or the manager's) trajectory, read and then followed live. */
-export function TrajectoryLog({
-  id,
-  asked,
-  empty = "还没有动静。",
-  onMarkWrong,
-  title,
-  about,
-}: {
-  id: string;
-  asked?: string;
-  empty?: string;
-  onMarkWrong?: MarkWrong;
-  title?: string;
-  about?: string;
-}) {
-  const steps = useSessionEvents(id, true);
-  const head = title ? (
-    <span className="truncate text-sm font-semibold" title={about}>
-      {title}
-    </span>
-  ) : undefined;
-  if (steps.length === 0)
-    return (
-      <div className="flex flex-col gap-2">
-        {head}
-        <Quiet>{empty}</Quiet>
-      </div>
-    );
-  return <Trajectory steps={steps} now={Date.now()} asked={asked} onMarkWrong={onMarkWrong} head={head} />;
+export function TrajectoryLog(props: { id: string; asked?: string; empty?: string; onMarkWrong?: MarkWrong; title?: string; about?: string }) {
+  const steps = createSessionEvents(
+    () => props.id,
+    () => true,
+  );
+  const now = useNow();
+  const head = () =>
+    props.title ? (
+      <span class="truncate text-sm font-semibold" title={props.about}>
+        {props.title}
+      </span>
+    ) : undefined;
+  return (
+    <Show
+      when={steps().length > 0}
+      fallback={
+        <div class="flex flex-col gap-2">
+          {head()}
+          <Quiet>{props.empty ?? "还没有动静。"}</Quiet>
+        </div>
+      }
+    >
+      <Trajectory steps={steps()} now={now()} asked={props.asked} onMarkWrong={props.onMarkWrong} head={head()} />
+    </Show>
+  );
 }
 
-export function Trajectory({
-  steps,
-  now,
-  asked,
-  working = false,
-  onMarkWrong,
-  head,
-}: {
-  steps: SessionEvent[];
-  now: number;
-  asked?: string;
-  working?: boolean;
-  onMarkWrong?: MarkWrong;
-  head?: React.ReactNode;
-}) {
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
-  const [marked, setMarked] = useState<number>();
+interface RowSpec {
+  step: SessionEvent;
+  tag: string;
+  gutter?: string;
+  when?: string;
+  markable: boolean;
+}
+
+export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: string; working?: boolean; onMarkWrong?: MarkWrong; head?: JSX.Element }) {
+  const [query, setQuery] = createSignal("");
+  const [open, setOpen] = createSignal<ReadonlySet<number>>(new Set());
+  const [marked, setMarked] = createSignal<number>();
   // The rounds marked wrong here, by their asked step: the case's file.
-  const [wrong, setWrong] = useState<ReadonlyMap<number, string>>(new Map());
-  const scroller = useRef<HTMLDivElement>(null);
-  const atBottom = useRef(true);
-  const rowsRef = useRef(new Map<number, HTMLElement>());
+  const [wrong, setWrong] = createSignal<ReadonlyMap<number, string>>(new Map());
+  let scroller: HTMLDivElement | undefined;
+  let atBottom = true;
+  const rowEls = new Map<number, HTMLElement>();
 
   // Stuck to the newest unless scrolled up.
-  useLayoutEffect(() => {
-    const el = scroller.current;
-    if (el && atBottom.current) el.scrollTop = el.scrollHeight;
-  }, [steps]);
+  createEffect(
+    () => props.steps.length,
+    () => {
+      if (scroller && atBottom) scroller.scrollTop = scroller.scrollHeight;
+    },
+  );
 
-  const shown = shownEvents(steps);
-  const rounds = roundsOf(shown);
-  const last = steps.at(-1)?.time ?? now;
-  const end = working && now > last ? now : last;
-  const firstAsked = shown.find((s) => s.type === "user/message" && s.under === undefined)?.seq;
-  const bySeq = new Map(shown.map((s) => [s.seq, s]));
-  const q = query.trim().toLowerCase();
+  const shown = createMemo(() => shownEvents(props.steps));
+  const end = () => {
+    const last = props.steps.at(-1)?.time ?? props.now;
+    return props.working && props.now > last ? props.now : last;
+  };
+  const bySeq = createMemo(() => new Map(shown().map((s) => [s.seq, s])));
   const show = (seq: number) => {
     setQuery("");
     setMarked(seq);
-    atBottom.current = false;
-    requestAnimationFrame(() => rowsRef.current.get(seq)?.scrollIntoView({ block: "center", behavior: "smooth" }));
+    atBottom = false;
+    requestAnimationFrame(() => rowEls.get(seq)?.scrollIntoView({ block: "center", behavior: "smooth" }));
   };
 
-  const rows: React.ReactNode[] = [];
-  let turn = 0;
-  for (const round of rounds) {
-    if (round.asked) turn++;
-    let first = true;
-    for (const step of round.asked ? [round.asked, ...round.steps] : round.steps) {
-      const tag = tagOf(step, asked, step.seq === firstAsked);
-      if (q && !haystack(step, tag).includes(q)) continue;
-      const n = step.seq;
-      const row = (
-        <Row
-          key={n}
-          step={step}
-          tag={tag}
-          gutter={first ? (round.asked ? `第 ${turn} 轮` : "更早") : undefined}
-          when={first ? ago((round.asked ?? round.steps[0]!).time, now) : undefined}
-          open={open.has(n)}
-          marked={marked === n}
-          refTo={(el) => (el ? rowsRef.current.set(n, el) : rowsRef.current.delete(n))}
-          onToggle={() => setOpen((o) => (o.has(n) ? new Set([...o].filter((x) => x !== n)) : new Set([...o, n])))}
-        />
-      );
-      rows.push(
-        onMarkWrong && step.type === "user/message" && step.under === undefined ? (
-          <Markable key={n} step={n} send={onMarkWrong} file={wrong.get(n)} onMarked={(file) => setWrong(new Map([...wrong, [n, file]]))}>
-            {row}
-          </Markable>
-        ) : (
-          row
-        ),
-      );
-      first = false;
+  const rows = createMemo(() => {
+    const firstAsked = shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
+    const q = query().trim().toLowerCase();
+    const out: RowSpec[] = [];
+    let turn = 0;
+    for (const round of roundsOf(shown())) {
+      if (round.asked) turn++;
+      let first = true;
+      for (const step of round.asked ? [round.asked, ...round.steps] : round.steps) {
+        const tag = tagOf(step, props.asked, step.seq === firstAsked);
+        if (q && !haystack(step, tag).includes(q)) continue;
+        out.push({
+          step,
+          tag,
+          gutter: first ? (round.asked ? `第 ${turn} 轮` : "更早") : undefined,
+          when: first ? ago((round.asked ?? round.steps[0]!).time, props.now) : undefined,
+          markable: !!props.onMarkWrong && step.type === "user/message" && step.under === undefined,
+        });
+        first = false;
+      }
     }
-  }
+    return out;
+  });
+
+  const toggle = (n: number) => setOpen((o) => (o.has(n) ? new Set([...o].filter((x) => x !== n)) : new Set([...o, n])));
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-3 pb-2">
-        <div className="min-w-0 flex-1">{head}</div>
-        <TextInput aria-label="搜索轨迹" placeholder="搜索" className="w-36 sm:w-56" value={query} onChange={(e) => setQuery(e.target.value)} />
+    <div class="flex h-full min-h-0 flex-col">
+      <div class="flex items-center gap-3 pb-2">
+        <div class="min-w-0 flex-1">{props.head}</div>
+        <TextInput aria-label="搜索轨迹" placeholder="搜索" class="w-36 sm:w-56" value={query()} onInput={(e) => setQuery(e.currentTarget.value)} />
       </div>
-      <WaterfallView steps={steps} end={end} colorOf={(seq) => (bySeq.get(seq) ? spanColor(bySeq.get(seq)!) : "#9b7550")} onPick={show} />
+      <WaterfallView steps={props.steps} end={end()} colorOf={(seq) => (bySeq().get(seq) ? spanColor(bySeq().get(seq)!) : "#9b7550")} onPick={show} />
       <div
-        ref={scroller}
-        className="mt-2 min-h-0 flex-1 overflow-y-auto border-y border-line py-1"
+        ref={(el) => (scroller = el)}
+        class="mt-2 min-h-0 flex-1 overflow-y-auto border-y border-line py-1"
         onScroll={(e) => {
           const el = e.currentTarget;
-          atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+          atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
         }}
       >
-        {rows.length === 0 ? <p className="pt-2 text-sm text-muted">没有对得上的步骤。</p> : rows}
+        <Show when={rows().length > 0} fallback={<p class="pt-2 text-sm text-muted">没有对得上的步骤。</p>}>
+          <For each={rows()} keyed={(r) => r.step.seq}>
+            {(r) => {
+              // The key, the same for the row's life; a ref reading the item's accessor while the row is made suspends it.
+              const seq = untrack(() => r().step.seq);
+              const row = () => (
+                <Row
+                  spec={r()}
+                  open={open().has(r().step.seq)}
+                  marked={marked() === r().step.seq}
+                  refTo={(el) => rowEls.set(seq, el)}
+                  onToggle={() => toggle(r().step.seq)}
+                />
+              );
+              return (
+                <Show when={r().markable && props.onMarkWrong} fallback={row()}>
+                  {(send) => (
+                    <Markable
+                      step={r().step.seq}
+                      send={send()}
+                      file={wrong().get(r().step.seq)}
+                      onMarked={(file) => setWrong(new Map([...wrong(), [r().step.seq, file]]))}
+                    >
+                      {row()}
+                    </Markable>
+                  )}
+                </Show>
+              );
+            }}
+          </For>
+        </Show>
       </div>
-      <p className="pt-2 text-xs text-muted">{summaryText(summaryOf(steps, end))}</p>
+      <p class="pt-2 text-xs text-muted">{summaryText(summaryOf(props.steps, end()))}</p>
     </div>
   );
 }
@@ -196,206 +211,178 @@ export function Trajectory({
 const gutterW = "w-15";
 const tagW = "w-22";
 
-function Row({
-  step,
-  tag,
-  gutter,
-  when,
-  open,
-  marked,
-  refTo,
-  onToggle,
-}: {
-  step: SessionEvent;
-  tag: string;
-  gutter?: string;
-  when?: string;
-  open: boolean;
-  marked: boolean;
-  refTo: (el: HTMLElement | null) => void;
-  onToggle: () => void;
-}) {
-  const fill = tagFill(step);
-  const tool = step.type === "tool/call";
-  const failed = (tool && step.ok === false) || step.type === "run/error";
-  const sub = step.under !== undefined;
-  let content: React.ReactNode;
-  if (tool) content = <ToolLine step={step} />;
-  else if (open && step.type === "assistant/message") content = <Markdown text={step.text} />;
-  else if (open) content = <span className="whitespace-pre-wrap">{step.text}</span>;
-  else content = <span className="block truncate">{oneLine(step.text)}</span>;
+function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el: HTMLElement) => void; onToggle: () => void }) {
+  const step = () => props.spec.step;
+  const fill = () => tagFill(step());
+  const tool = () => step().type === "tool/call";
+  const failed = () => (tool() && step().ok === false) || step().type === "run/error";
+  const sub = () => step().under !== undefined;
   return (
-    <div ref={refTo} className={`rounded-md py-[3px] pr-2 ${marked ? "bg-wheat/35" : "hover:bg-hover"}`}>
+    <div ref={(el) => props.refTo(el)} class={["rounded-md py-[3px] pr-2", props.marked ? "bg-wheat/35" : "hover:bg-hover"]}>
       <button
         type="button"
-        aria-label={`${tag} ${oneLine(step.text)}`}
-        aria-expanded={open}
-        onClick={onToggle}
-        className="flex w-full cursor-pointer items-start text-left"
+        aria-label={`${props.spec.tag} ${oneLine(step().text)}`}
+        aria-expanded={aria(props.open)}
+        onClick={() => props.onToggle()}
+        class="flex w-full cursor-pointer items-start text-left"
       >
-        <span className={`${gutterW} shrink-0 truncate pt-0.5 pl-2 text-xs text-muted`}>{gutter}</span>
+        <span class={[gutterW, "shrink-0 truncate pt-0.5 pl-2 text-xs text-muted"]}>{props.spec.gutter}</span>
         <span
-          className={`mt-px shrink-0 truncate rounded px-1 py-px text-center text-xs font-medium ${sub ? "ml-2.5 w-[78px]" : tagW}`}
-          style={{ background: sub ? `${fill}8c` : fill, color: inkOn(fill) }}
+          class={["mt-px shrink-0 truncate rounded px-1 py-px text-center text-xs font-medium", sub() ? "ml-2.5 w-[78px]" : tagW]}
+          style={{ background: sub() ? `${fill()}8c` : fill(), color: inkOn(fill()) }}
         >
-          {tag}
+          {props.spec.tag}
         </span>
-        <span className="w-2 shrink-0" />
-        {failed && tool && <Icon name="mark-cross" size={12} className="mt-1 mr-1" />}
-        <span className={`min-w-0 flex-1 text-sm ${failed ? "text-berry" : ""}`}>{content}</span>
-        {when && <span className="shrink-0 pt-0.5 pl-2 text-xs text-faint">{when}</span>}
+        <span class="w-2 shrink-0" />
+        <Show when={failed() && tool()}>
+          <Icon name="mark-cross" size={12} class="mt-1 mr-1" />
+        </Show>
+        <span class={["min-w-0 flex-1 text-sm", { "text-berry": failed() }]}>
+          <Switch fallback={<span class="block truncate">{oneLine(step().text)}</span>}>
+            <Match when={tool()}>
+              <ToolLine step={step()} />
+            </Match>
+            <Match when={props.open && step().type === "assistant/message"}>
+              <Markdown text={step().text} />
+            </Match>
+            <Match when={props.open}>
+              <span class="whitespace-pre-wrap">{step().text}</span>
+            </Match>
+          </Switch>
+        </span>
+        <Show when={props.spec.when}>
+          <span class="shrink-0 pt-0.5 pl-2 text-xs text-faint">{props.spec.when}</span>
+        </Show>
       </button>
-      {open && tool && <ToolDetail step={step} />}
+      <Show when={props.open && tool()}>
+        <ToolDetail step={step()} />
+      </Show>
     </div>
   );
 }
 
 /** `what {args} → result`, the args and result in the code font. */
-function ToolLine({ step }: { step: SessionEvent }) {
-  const args = oneLine(step.input ?? "");
-  const out = oneLine(step.output ?? "");
+function ToolLine(props: { step: SessionEvent }) {
+  const args = () => oneLine(props.step.input ?? "");
+  const out = () => oneLine(props.step.output ?? "");
   return (
-    <span className="block truncate">
-      {farmToolText(step.text) ?? step.text}
-      {args && <span className="font-mono text-muted"> {args}</span>}
+    <span class="block truncate">
+      {farmToolText(props.step.text) ?? props.step.text}
+      <Show when={args()}>
+        <span class="font-mono text-muted"> {args()}</span>
+      </Show>
       {" → "}
-      {step.ok === undefined ? "还没返回" : !out ? "没有输出" : <span className={`font-mono ${step.ok === false ? "text-berry" : ""}`}>{out}</span>}
+      <Switch fallback={<span class={["font-mono", { "text-berry": props.step.ok === false }]}>{out()}</span>}>
+        <Match when={props.step.ok === undefined}>还没返回</Match>
+        <Match when={!out()}>没有输出</Match>
+      </Switch>
     </span>
   );
 }
 
-function ToolDetail({ step }: { step: SessionEvent }) {
-  const input = readableInput(step);
+function ToolDetail(props: { step: SessionEvent }) {
+  const input = () => readableInput(props.step);
   return (
-    <div className="flex flex-col gap-1 pt-1 pb-1.5 pl-[164px] text-xs">
-      <span className="text-muted">
-        {[...(step.tool ? [`工具 ${step.tool}`] : []), step.ok === undefined ? "进行中" : step.ok ? "成功" : "失败"].join(" · ")}
+    <div class="flex flex-col gap-1 pt-1 pb-1.5 pl-[164px] text-xs">
+      <span class="text-muted">
+        {[...(props.step.tool ? [`工具 ${props.step.tool}`] : []), props.step.ok === undefined ? "进行中" : props.step.ok ? "成功" : "失败"].join(" · ")}
       </span>
-      {input && (
-        <>
-          <span className="text-muted">输入</span>
-          <pre className="font-mono whitespace-pre-wrap select-text">{input}</pre>
-        </>
-      )}
-      <span className="text-muted">输出</span>
-      {step.output ? (
-        <pre className="font-mono whitespace-pre-wrap select-text">{step.output}</pre>
-      ) : (
-        <span className="text-muted">{step.ok === undefined ? "还没返回" : "没有输出"}</span>
-      )}
+      <Show when={input()}>
+        <span class="text-muted">输入</span>
+        <pre class="font-mono whitespace-pre-wrap select-text">{input()}</pre>
+      </Show>
+      <span class="text-muted">输出</span>
+      <Show when={props.step.output} fallback={<span class="text-muted">{props.step.ok === undefined ? "还没返回" : "没有输出"}</span>}>
+        <pre class="font-mono whitespace-pre-wrap select-text">{props.step.output}</pre>
+      </Show>
     </div>
   );
 }
 
 /** Rounds side by side by how long each took; the idle time between them is a fixed gap. */
-function WaterfallView({
-  steps,
-  end,
-  colorOf,
-  onPick,
-}: {
-  steps: SessionEvent[];
-  end: number;
-  colorOf: (seq: number) => string;
-  onPick: (seq: number) => void;
-}) {
-  const fall = waterfallOf(steps, end);
-  const box = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
-    ro.observe(el);
-    setWidth(el.clientWidth);
+function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (seq: number) => string; onPick: (seq: number) => void }) {
+  let box!: HTMLDivElement;
+  const [width, setWidth] = createSignal(0);
+  onSettled(() => {
+    const ro = new ResizeObserver(() => setWidth(box.clientWidth));
+    ro.observe(box);
+    setWidth(box.clientWidth);
     return () => ro.disconnect();
-  }, []);
+  });
   const lane = 12;
   const gap = 2;
   const between = 4;
-  const rounds = fall.rounds;
-  const room = Math.max(0, width - between * (rounds.length - 1));
-  const took = rounds.map(([a, b]) => b - a);
-  const total = took.reduce((n, t) => n + t, 0);
-  const widths = took.map((t) => (total > 0 ? (room * t) / total : room / rounds.length));
-  const lefts: number[] = [];
-  let x = 0;
-  for (const w of widths) {
-    lefts.push(x);
-    x += w + between;
-  }
-  const at = (r: number, t: number) => lefts[r]! + (took[r]! > 0 ? ((t - rounds[r]![0]) / took[r]!) * widths[r]! : 0);
-  let r = 0;
+  const bars = createMemo(() => {
+    const fall = waterfallOf(props.steps, props.end);
+    const rounds = fall.rounds;
+    if (width() <= 0 || rounds.length === 0) return [];
+    const room = Math.max(0, width() - between * (rounds.length - 1));
+    const took = rounds.map(([a, b]) => b - a);
+    const total = took.reduce((n, t) => n + t, 0);
+    const widths = took.map((t) => (total > 0 ? (room * t) / total : room / rounds.length));
+    const lefts: number[] = [];
+    let x = 0;
+    for (const w of widths) {
+      lefts.push(x);
+      x += w + between;
+    }
+    const at = (r: number, t: number) => lefts[r]! + (took[r]! > 0 ? ((t - rounds[r]![0]) / took[r]!) * widths[r]! : 0);
+    let r = 0;
+    return fall.spans.map((span) => {
+      while (r + 1 < rounds.length && span.start >= rounds[r + 1]![0]) r++;
+      while (r > 0 && span.start < rounds[r]![0]) r--;
+      const left = at(r, span.start);
+      return {
+        seq: span.seq,
+        left,
+        width: Math.max(2, at(r, span.end) - left),
+        top: lanes.indexOf(span.lane) * (lane + gap),
+        label: `${laneNames[span.lane]} · ${secondsText(span.end - span.start)}`,
+        color: span.lane === "asked" ? "#e5a93c" : span.lane === "model" ? "#74a046" : props.colorOf(span.seq),
+      };
+    });
+  });
   return (
-    <div className="flex" style={{ height: lane * 3 + gap * 2 }}>
-      <div className={`${gutterW} flex shrink-0 flex-col justify-between pl-2`}>
-        {lanes.map((l) => (
-          <span key={l} className="text-[11px] leading-none text-muted">
-            {laneNames[l]}
-          </span>
-        ))}
+    <div class="flex" style={{ height: `${lane * 3 + gap * 2}px` }}>
+      <div class={[gutterW, "flex shrink-0 flex-col justify-between pl-2"]}>
+        <For each={lanes}>{(l) => <span class="text-[11px] leading-none text-muted">{laneNames[l]}</span>}</For>
       </div>
-      <div ref={box} className="relative min-w-0 flex-1 overflow-hidden">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="absolute inset-x-0 rounded-sm bg-hover" style={{ top: i * (lane + gap), height: lane }} />
-        ))}
-        {width > 0 &&
-          rounds.length > 0 &&
-          fall.spans.map((span, i) => {
-            while (r + 1 < rounds.length && span.start >= rounds[r + 1]![0]) r++;
-            while (r > 0 && span.start < rounds[r]![0]) r--;
-            const left = at(r, span.start);
-            const w = Math.max(2, at(r, span.end) - left);
-            const label = `${laneNames[span.lane]} · ${secondsText(span.end - span.start)}`;
-            return (
-              <button
-                key={i}
-                type="button"
-                title={label}
-                aria-label={label}
-                onClick={() => onPick(span.seq)}
-                className="absolute cursor-pointer rounded-sm hover:!bg-ink"
-                style={{
-                  left,
-                  width: w - 1,
-                  top: lanes.indexOf(span.lane) * (lane + gap),
-                  height: lane,
-                  background: span.lane === "asked" ? "#e5a93c" : span.lane === "model" ? "#74a046" : colorOf(span.seq),
-                }}
-              />
-            );
-          })}
+      <div ref={(el) => (box = el)} class="relative min-w-0 flex-1 overflow-hidden">
+        <For each={[0, 1, 2]}>
+          {(i) => <div class="absolute inset-x-0 rounded-sm bg-hover" style={{ top: `${i * (lane + gap)}px`, height: `${lane}px` }} />}
+        </For>
+        <For each={bars()} keyed={false}>
+          {(b) => (
+            <button
+              type="button"
+              title={b().label}
+              aria-label={b().label}
+              onClick={() => props.onPick(b().seq)}
+              class="absolute cursor-pointer rounded-sm hover:!bg-ink"
+              style={{ left: `${b().left}px`, width: `${b().width - 1}px`, top: `${b().top}px`, height: `${lane}px`, background: b().color }}
+            />
+          )}
+        </For>
       </div>
     </div>
   );
 }
 
 /** 这一轮做错了 floats over what began the round. */
-function Markable({
-  step,
-  send,
-  file,
-  onMarked,
-  children,
-}: {
-  step: number;
-  send: MarkWrong;
-  file?: string;
-  onMarked: (file: string) => void;
-  children: React.ReactNode;
-}) {
-  const [writing, setWriting] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [want, setWant] = useState("");
-  const toast = useToast();
+function Markable(props: { step: number; send: MarkWrong; file?: string; onMarked: (file: string) => void; children: JSX.Element }) {
+  const [writing, setWriting] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
+  const [want, setWant] = createSignal("");
   const submit = async () => {
-    const w = want.trim();
-    if (!w || busy) return;
+    const w = want().trim();
+    if (!w || busy()) return;
+    const step = props.step;
+    const send = props.send;
     setBusy(true);
     try {
       const got = await send(step, w);
       setWriting(false);
-      onMarked(got.file);
+      props.onMarked(got.file);
     } catch (e) {
       toast(reasonOf(e));
     } finally {
@@ -403,103 +390,124 @@ function Markable({
     }
   };
   return (
-    <div className="group relative">
-      {children}
-      {!file && !writing && (
+    <div class="group relative">
+      {props.children}
+      <Show when={!props.file && !writing()}>
         <button
           type="button"
           onClick={() => setWriting(true)}
-          className="absolute top-0 right-0 hidden cursor-pointer items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium group-focus-within:flex group-hover:flex hover:underline"
+          class="absolute top-0 right-0 hidden cursor-pointer items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium group-focus-within:flex group-hover:flex hover:underline"
         >
           <Icon name="icon-bug" size={12} />
           这一轮做错了
         </button>
-      )}
-      {file && (
-        <div title={file} className="my-0.5 mr-2 ml-[164px] flex items-center gap-1.5 rounded-md bg-berry/12 px-2 py-1 text-xs">
+      </Show>
+      <Show when={props.file}>
+        <div title={props.file} class="my-0.5 mr-2 ml-[164px] flex items-center gap-1.5 rounded-md bg-berry/12 px-2 py-1 text-xs">
           <Icon name="icon-bug" size={12} />
           标成了做错的一轮，存成了一条评测
         </div>
-      )}
-      {writing && (
+      </Show>
+      <Show when={writing()}>
         <form
-          className="my-1 mr-2 ml-[164px] flex items-center gap-1.5"
+          class="my-1 mr-2 ml-[164px] flex items-center gap-1.5"
           onSubmit={(e) => {
             e.preventDefault();
             void submit();
           }}
         >
           <TextInput
-            autoFocus
+            ref={autofocus()}
             aria-label="这一轮应该怎样"
-            disabled={busy}
+            disabled={busy()}
             placeholder="它应该怎样：比如「先问我是哪个项目，别直接派活」"
-            value={want}
-            onChange={(e) => setWant(e.target.value)}
+            value={want()}
+            onInput={(e) => setWant(e.currentTarget.value)}
           />
           <button
             type="submit"
-            disabled={busy || !want.trim()}
-            className="h-7 shrink-0 cursor-pointer rounded-md bg-accent px-2.5 text-sm text-page disabled:opacity-50"
+            disabled={busy() || !want().trim()}
+            class="h-7 shrink-0 cursor-pointer rounded-md bg-accent px-2.5 text-sm text-page disabled:opacity-50"
           >
             记下
           </button>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy()}
             onClick={() => setWriting(false)}
-            className="h-7 shrink-0 cursor-pointer rounded-md border border-line px-2.5 text-sm"
+            class="h-7 shrink-0 cursor-pointer rounded-md border border-line px-2.5 text-sm"
           >
             算了
           </button>
         </form>
-      )}
+      </Show>
     </div>
   );
 }
 
 /** The helpers an agent sent, a list to pick from beside the picked one's trajectory. */
-export function TrajectoryList({ agent }: { agent: string }) {
-  const heads = useQuery({ queryKey: ["sessions", agent], queryFn: () => api.session.list({ agent }) });
-  const [picked, setPicked] = useState<string>();
-  const now = Date.now();
-  if (!heads.data) return <Quiet>{heads.error ? reasonOf(heads.error) : "在读……"}</Quiet>;
-  if (heads.data.length === 0) return <Quiet>还没派出去过。</Quiet>;
-  const open = heads.data.find((h) => h.id === (picked ?? heads.data[0]!.id));
+export function TrajectoryList(props: { agent: string }) {
+  const heads = useQuery(() => ({ queryKey: ["sessions", props.agent], queryFn: () => api.session.list({ agent: props.agent }) }));
+  const [picked, setPicked] = createSignal<string>();
+  const now = useNow();
+  const list = () => ready(heads, undefined);
+  const open = () => {
+    const all = list();
+    return all?.find((h) => h.id === (picked() ?? all[0]?.id));
+  };
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 md:flex-row">
-      <ul aria-label="派出去的帮工" className="flex max-h-33 shrink-0 flex-col gap-0.5 overflow-y-auto md:max-h-none md:w-60">
-        {heads.data.map((h) => {
-          const ended = h.phase._tag === "closed" ? h.phase.at : undefined;
-          return (
-            <li key={h.id}>
-              <button
-                type="button"
-                aria-current={h === open ? "true" : undefined}
-                onClick={() => setPicked(h.id)}
-                className={`flex w-full cursor-pointer flex-col rounded-md px-2.5 py-1.5 text-left ${h === open ? "bg-selected" : "hover:bg-hover"}`}
-              >
-                <span className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium">{h.name}</span>
-                  {h.project && <span className="text-xs text-muted">{h.project}</span>}
-                  {ended === undefined && <span className="rounded bg-hat px-1.5 text-xs text-bark-900">在场</span>}
-                </span>
-                <span className="text-xs text-muted">
-                  {ended === undefined ? `${ago(h.hiredAt, now)}接活` : `${ago(h.hiredAt, now)}接活 · ${ago(ended, now)}走的`}
-                </span>
-                {h.brief && <span className="truncate text-xs">{oneLine(h.brief)}</span>}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="min-h-0 min-w-0 flex-1">
-        {open ? (
-          <TrajectoryLog key={open.id} id={open.id} title={open.brief ? `${open.name} · ${oneLine(open.brief)}` : open.name} about={open.brief} />
-        ) : (
-          <Quiet>选一个帮工，看它的轨迹。</Quiet>
-        )}
-      </div>
-    </div>
+    <Show when={list()} fallback={<Quiet>{heads.error ? reasonOf(heads.error) : "在读……"}</Quiet>}>
+      {(all) => (
+        <Show when={all().length > 0} fallback={<Quiet>还没派出去过。</Quiet>}>
+          <div class="flex h-full min-h-0 flex-col gap-3 md:flex-row">
+            <ul aria-label="派出去的帮工" class="flex max-h-33 shrink-0 flex-col gap-0.5 overflow-y-auto md:max-h-none md:w-60">
+              <For each={all()} keyed={(h) => h.id}>
+                {(h) => {
+                  const ended = () => (h().phase._tag === "closed" ? (h().phase as { at: number }).at : undefined);
+                  return (
+                    <li>
+                      <button
+                        type="button"
+                        aria-current={h().id === open()?.id ? "true" : undefined}
+                        onClick={() => setPicked(h().id)}
+                        class={[
+                          "flex w-full cursor-pointer flex-col rounded-md px-2.5 py-1.5 text-left",
+                          h().id === open()?.id ? "bg-selected" : "hover:bg-hover",
+                        ]}
+                      >
+                        <span class="flex flex-wrap items-center gap-2">
+                          <span class="text-sm font-medium">{h().name}</span>
+                          <Show when={h().project}>
+                            <span class="text-xs text-muted">{h().project}</span>
+                          </Show>
+                          <Show when={ended() === undefined}>
+                            <span class="rounded bg-hat px-1.5 text-xs text-bark-900">在场</span>
+                          </Show>
+                        </span>
+                        <span class="text-xs text-muted">
+                          {ended() === undefined ? `${ago(h().hiredAt, now())}接活` : `${ago(h().hiredAt, now())}接活 · ${ago(ended()!, now())}走的`}
+                        </span>
+                        <Show when={h().brief}>
+                          <span class="truncate text-xs">{oneLine(h().brief!)}</span>
+                        </Show>
+                      </button>
+                    </li>
+                  );
+                }}
+              </For>
+            </ul>
+            <div class="min-h-0 min-w-0 flex-1">
+              <Show when={open()} fallback={<Quiet>选一个帮工，看它的轨迹。</Quiet>}>
+                {(o) => (
+                  <Keyed key={o().id}>
+                    {() => <TrajectoryLog id={o().id} title={o().brief ? `${o().name} · ${oneLine(o().brief!)}` : o().name} about={o().brief} />}
+                  </Keyed>
+                )}
+              </Show>
+            </div>
+          </div>
+        </Show>
+      )}
+    </Show>
   );
 }

@@ -48,7 +48,7 @@ describe("a call's agent", () => {
         c.deepseekKey ?? "",
         c.line,
       );
-      if (typeof vendors === "string") throw new Error(vendors);
+      if ("_tag" in vendors) throw new Error(vendors.reason);
       const capture = new Capture();
       const client = clientOf({ appId, appCertificate: cert }, c.voice.area, capture.fetch);
       const id = await agentFor(client, c.voice, vendors)
@@ -71,11 +71,18 @@ describe("a call's agent", () => {
     });
 
   it("says which key is missing", () => {
-    const d = defaultVoice();
+    // The quick model, so the rest needs no line; the default (the manager) needs the line and nothing else.
+    expect(vendorsFor(defaultVoice(), { asrKey: "", llmKey: "", ttsKey: "" }, "")).toMatchObject({ reason: "管家的语音线路没接通" });
+    const d: VoiceSettings = { ...defaultVoice(), answer: { vendor: "agora", model: "gpt-4.1-mini" } };
     const none = { asrKey: "", llmKey: "", ttsKey: "" };
     const problem = (v: VoiceSettings, deepseek = "", line?: CallLine) => {
       const got = vendorsFor(v, none, deepseek, line);
-      return typeof got === "string" ? got : "";
+      return "_tag" in got ? got.reason : "";
+    };
+    // Where 设置 fixes it, for the page's jump there.
+    const fixedIn = (v: VoiceSettings, deepseek = "") => {
+      const got = vendorsFor(v, none, deepseek);
+      return "_tag" in got ? got.settings : undefined;
     };
     expect(problem(d)).toBe("");
     const deepseek: VoiceSettings = { ...d, answer: { vendor: "deepseek", model: "deepseek-chat" } };
@@ -87,12 +94,15 @@ describe("a call's agent", () => {
     expect(problem({ ...d, asr: { vendor: "deepgram", model: "nova-3" }, tts: { vendor: "openai", voice: "nova" } })).toBe("");
     expect(problem({ ...d, answer: { vendor: "manager" } })).toContain("语音线路");
     expect(problem({ ...d, asr: { vendor: "whisper" } as never })).toContain(voiceUnknown);
+    expect(fixedIn(deepseek)).toBe("deepseek");
+    expect(fixedIn({ ...d, asr: { vendor: "microsoft", region: "eastasia" } })).toBe("voice");
+    expect(fixedIn({ ...d, answer: { vendor: "manager" } })).toBeUndefined();
   });
 });
 
 /** The farm with a voice service, its line on a free port behind a line of its own. */
 const farm = (capture: Capture) => {
-  const config = { ...testConfig(), voice: { model: "", id: "", line: { port: 0, url: "https://line.example.com" } } };
+  const config = { ...testConfig(), voice: { id: "", line: { port: 0, url: "https://line.example.com" } } };
   return layer({ fetch: capture.fetch }).pipe(Layer.provideMerge(manager({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
 };
 

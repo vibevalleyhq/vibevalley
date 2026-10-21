@@ -7,7 +7,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { type AgoraGrant, type Area, type Dictated, managerAgent, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
-import { type ApiError } from "@vibevalley/protocol/api";
+import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
 import { Context, Effect, Layer } from "effect";
@@ -18,6 +18,7 @@ import { Core } from "../core/core.ts";
 import { Manager } from "../manager/manager.ts";
 import { managerModel } from "../manager/rules.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "../setting/setting.ts";
+import { callbackLog } from "../base/log.ts";
 
 const { RtcRole, RtcTokenBuilder } = agoraToken;
 
@@ -41,7 +42,8 @@ const dictateFormats: Record<string, string> = {
   flac: "audio/flac",
 };
 
-const unavailable = (reason: string): ApiError => ({ _tag: "VoiceUnavailable", reason });
+/** settings: the 设置 section the owner fixes it in, when a setting does; the page offers to go there. */
+const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => ({ _tag: "VoiceUnavailable", reason, ...(settings ? { settings } : {}) });
 const failed = (reason: string): ApiError => ({ _tag: "VoiceAgentFailed", reason });
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -58,7 +60,7 @@ type Vendors = { stt: AresSTT | DeepgramSTT | MicrosoftSTT; llm: OpenAI; tts: Mi
 
 /** The three vendors the voice page chose, or why they cannot be: a vendor whose key is missing. Agora-hosted ones need
  * no key of their own. line undefined: the manager does not answer the call itself. */
-export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: string, line?: CallLine): Vendors | string {
+export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: string, line?: CallLine): Vendors | VoiceUnavailable {
   const speech = {
     greetingMessage: voice.greeting,
     failureMessage: voice.failureMessage,
@@ -76,32 +78,32 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         stt = new DeepgramSTT({ model: asr.model, language: voice.language });
         break;
       case "microsoft":
-        if (!keys.asrKey) return "微软识别还没有 key：在声音页的「识别」里填";
+        if (!keys.asrKey) return unavailable("微软识别还没有 key：在声音页的「识别」里填", "voice");
         stt = new MicrosoftSTT({ key: keys.asrKey, region: asr.region, language: voice.language });
         break;
       default:
-        return `识别用的 ${(asr as { vendor: string }).vendor} ${voiceUnknown}`;
+        return unavailable(`识别用的 ${(asr as { vendor: string }).vendor} ${voiceUnknown}`);
     }
     let llm: OpenAI;
     const answer = voice.answer;
     switch (answer.vendor) {
       case "manager":
-        if (!line) return "管家的语音线路没接通";
+        if (!line) return unavailable("管家的语音线路没接通");
         llm = new OpenAI({ apiKey: line.key, url: line.url, model: managerModel, ...speech });
         break;
       case "agora":
         llm = new OpenAI({ model: answer.model, ...speech });
         break;
       case "deepseek":
-        if (!deepseekKey) return "用 DeepSeek 要先有 DeepSeek 的 key：在首页「设置」里填";
+        if (!deepseekKey) return unavailable("用 DeepSeek 要先有 DeepSeek 的 key：在首页「设置」里填", "deepseek");
         llm = new OpenAI({ apiKey: deepseekKey, url: deepseekChat, model: answer.model, ...speech });
         break;
       case "openai":
-        if (!keys.llmKey) return "自己的大模型还没有 key：在声音页的「想」里填";
+        if (!keys.llmKey) return unavailable("自己的大模型还没有 key：在声音页的「想」里填", "voice");
         llm = new OpenAI({ apiKey: keys.llmKey, url: answer.url, model: answer.model, ...speech });
         break;
       default:
-        return `大模型用的 ${(answer as { vendor: string }).vendor} ${voiceUnknown}`;
+        return unavailable(`大模型用的 ${(answer as { vendor: string }).vendor} ${voiceUnknown}`);
     }
     let tts: Vendors["tts"];
     const t = voice.tts;
@@ -113,16 +115,16 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         tts = new OpenAITTS({ voice: t.voice });
         break;
       case "microsoft":
-        if (!keys.ttsKey) return "微软合成还没有 key：在声音页的「说」里填";
+        if (!keys.ttsKey) return unavailable("微软合成还没有 key：在声音页的「说」里填", "voice");
         tts = new MicrosoftTTS({ key: keys.ttsKey, region: t.region, voiceName: t.voiceName });
         break;
       default:
-        return `合成用的 ${(t as { vendor: string }).vendor} ${voiceUnknown}`;
+        return unavailable(`合成用的 ${(t as { vendor: string }).vendor} ${voiceUnknown}`);
     }
     return { stt, llm, tts };
   } catch (e) {
     // The SDK throws on a configuration it refuses; that is a problem with the settings, not the server's.
-    return "语音设置用不了：" + message(e);
+    return unavailable("语音设置用不了：" + message(e), "voice");
   }
 }
 
@@ -272,6 +274,7 @@ async function tunnelAnswers(url: string): Promise<boolean> {
 
 export const make = (options: VoiceOptions = {}) =>
   Effect.gen(function* () {
+    const logs = yield* callbackLog;
     const config = yield* Settings;
     const core = yield* Core;
     const settings = yield* Setting;
@@ -292,7 +295,7 @@ export const make = (options: VoiceOptions = {}) =>
     // Asked each time: credentials saved from the title screen work without a restart.
     const creds = () => {
       const c = settings.agora();
-      return c ? Effect.succeed(c) : Effect.fail(unavailable("还没有 Agora 的凭据：在首页的「设置」里填 App ID 和 App Certificate"));
+      return c ? Effect.succeed(c) : Effect.fail(unavailable("还没有 Agora 的凭据：在首页的「设置」里填 App ID 和 App Certificate", "agora"));
     };
 
     // The voice line: local only, like the farm; the tunnel is the one way in from outside.
@@ -305,7 +308,7 @@ export const make = (options: VoiceOptions = {}) =>
     const answer = chatCompletions({
       answerer: (model) => (model === managerModel ? (text, signal) => manager.call(text, signal) : undefined),
       misheard: lineMisheard,
-      log: (l) => console.log(l),
+      log: (l) => logs.info(l),
     });
     const route = /^\/llm\/([\w-]+)\/chat\/completions$/;
     yield* Effect.promise(
@@ -340,7 +343,7 @@ export const make = (options: VoiceOptions = {}) =>
           });
           s.once("error", (e) => {
             lineProblem = "语音线路开不起来：" + e.message;
-            console.error(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}:`, e.message);
+            logs.error(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}:`, e.message);
             resolve();
           });
           s.listen(linePort, "127.0.0.1", () => {
@@ -356,7 +359,7 @@ export const make = (options: VoiceOptions = {}) =>
       options.tunnel ??
       (async (port: number) => {
         const t = await cloudflared(port);
-        if (!(await tunnelAnswers(t.url))) console.log(`vibevalley: the voice line's tunnel ${t.url} does not answer yet; the call goes on`);
+        if (!(await tunnelAnswers(t.url))) logs.info(`vibevalley: the voice line's tunnel ${t.url} does not answer yet; the call goes on`);
         return t;
       });
     // Opening a tunnel waits for it to answer, through this very line: one opening at a time.
@@ -472,7 +475,7 @@ export const make = (options: VoiceOptions = {}) =>
               };
             }
             const vendors = vendorsFor(voice, vendorKeys, deepseekApiKey, callLine);
-            if (typeof vendors === "string") return yield* Effect.fail(unavailable(vendors));
+            if ("_tag" in vendors) return yield* Effect.fail(vendors);
             const client = clientOf(g.credentials, voice.area, options.fetch);
             const session = agentFor(client, voice, vendors).createSession({
               channel,
@@ -536,7 +539,7 @@ export const make = (options: VoiceOptions = {}) =>
       dictate: (audio64, given) =>
         Effect.gen(function* () {
           const d = settings.dictation();
-          if (!d) return yield* Effect.fail(unavailable("听写还没配：在「声音」页的「听写」里填地址和模型"));
+          if (!d) return yield* Effect.fail(unavailable("听写还没配：在「声音」页的「听写」里填地址和模型", "voice"));
           const format = given.trim().replace(/^\./, "").toLowerCase();
           const kind = dictateFormats[format];
           if (!kind) return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: `听写认不得 ${JSON.stringify(format)} 这种录音` });
@@ -557,9 +560,12 @@ export const make = (options: VoiceOptions = {}) =>
                 headers: d.key ? { authorization: "Bearer " + d.key } : {},
                 signal: AbortSignal.timeout(120_000),
               }),
-            catch: (e) => unavailable("听写的地址连不上：" + message(e)),
+            catch: (e) => unavailable("听写的地址连不上：" + message(e), "voice"),
           });
-          const raw = (yield* Effect.promise(() => res.text())).slice(0, 1 << 20);
+          const raw = (yield* Effect.tryPromise({ try: () => res.text(), catch: (e) => unavailable("听写的回答读到一半断了：" + message(e), "voice") })).slice(
+            0,
+            1 << 20,
+          );
           let got: { text?: string; error?: { message?: string } } | undefined;
           try {
             got = JSON.parse(raw) as typeof got;

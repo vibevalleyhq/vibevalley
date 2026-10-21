@@ -112,7 +112,9 @@ CREATE TABLE issue (
   accepted_at double precision,
   findings    text,
   asks        text,
-  criteria    text
+  criteria    text,
+  checks      text,
+  handed_back text
 );
 CREATE INDEX issue_by_parent on issue (parent);
 CREATE TABLE issue_session (

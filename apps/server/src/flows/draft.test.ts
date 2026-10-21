@@ -59,7 +59,7 @@ describe("a drafted issue", () => {
       );
       expect(issue.description).toBe("为什么：\n看板还在调旧接口\n\n要做的：\n- 改 board.dart\n\n可能涉及：\n- board.dart");
       expect(issue.criteria).toEqual(["拖到待办就开工"]);
-      expect(issue.asks).toEqual(["用 8787 还是 8797？"]);
+      expect(issue.asks).toEqual([{ question: "用 8787 还是 8797？" }]);
       expect([issue.status, issue.sessions?.length ?? 0]).toEqual(["backlog", 0]);
       yield* until(() => !drafting(core), "the drafter left");
       yield* draftLeftNothing(f.config.workRoot, issue);
@@ -83,7 +83,7 @@ describe("a drafted issue", () => {
       issue = yield* issues.setStatus(issue.id, "todo", "", "");
       expect(issue.sessions).toHaveLength(1);
       const brief = sessions.find(issue.sessions![0]!)!.session.brief;
-      for (const want of ["看板拖卡改用 8797 端口", "验收标准", "- 拖到待办就开工\n- 端口是 8797"]) expect(brief).toContain(want);
+      for (const want of ["看板拖卡改用 8797 端口", "验收标准", "1. 拖到待办就开工\n2. 端口是 8797"]) expect(brief).toContain(want);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

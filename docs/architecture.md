@@ -5,7 +5,7 @@
 ```mermaid
 flowchart LR
   subgraph Page[页面 apps/web]
-    UI[农场和工作台<br/>React + PixiJS]
+    UI[农场和工作台<br/>Solid 2 + PixiJS]
     RULES[src/rules<br/>帧里没有的摆法]
     RTC[Agora Web SDK<br/>字幕走 data stream]
   end
@@ -65,7 +65,7 @@ flowchart LR
 - **服务**：`apps/server/src/` 下一块业务一个文件夹，名字用单数，从下往上是 `base`（地基）、`core`（核心状态）、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`tool`、`mcp`、`manager`、`lan`、`voice`、`connector`、`game`。每个模块导出一个 Effect 服务（`Context.Service`）和它的 `layer`；`services.ts` 按这个次序把 layer 叠起来，一个模块只用排在它前面的，反方向的消息走它们给的流（`Stream`）；开机后才做的（第一次看 GitHub、把帮工请回来、定时开始走、数 commit）是叠在最后的 `start`、`ready` layer（[理由](docs/subsystems/foundation.md)）。执行由 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动，管家是 VibeValley 自己的 agent（`agent/brain`，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）。
 - **HTTP 和 MCP**：`src/http` 在最上面：`api.ts` 照 protocol 的接口表挂路由，`handlers.ts` 答每一个，`streams.ts` 是三条事件流；`/mcp` 是给编码 agent 的另一个入口（`src/mcp`）；`main.ts` 单独跑它，`--web` 时也在 `/` 提供页面（[子系统](docs/subsystems/README.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](docs/subsystems/core.md)）。
 - **存盘**：PGlite（进程里的 Postgres），表在 `apps/server/db/migrations/`，查询在 `db/queries/`、由 effect-sqlc 生成成 `db/generated/`（[理由](docs/subsystems/foundation.md)）；下文「存了什么」。
-- **页面**：只连服务端的接口，用 TanStack Query 读一次性的数据，帧由一条流给（[理由](docs/subsystems/app.md)）；三个宿主共用：桌面是 Electron 带着服务端起来、打开它的地址，浏览器直接打开（[页面](docs/subsystems/app.md)）。
+- **页面**：只连服务端的接口，用 Solid Query 读一次性的数据，帧由一条流给（[理由](docs/subsystems/app.md)）；三个宿主共用：桌面是 Electron 带着服务端起来、打开它的地址，浏览器直接打开（[页面](docs/subsystems/app.md)）。
 
 ## 核心状态
 
@@ -137,7 +137,7 @@ flowchart LR
 | `agent.model` | 命令行里自己的 agent 用的模型；空着是 DeepSeek 的默认 | |
 | `deepseek.api_key` | 管家和 VibeValley 农机用的 DeepSeek 钥匙（`DEEPSEEK_API_KEY`） | |
 | `agora.app_id`、`agora.app_certificate` | 语音：签 RTC 令牌、请语音管家（`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`）；都没有时语音不可用，别的照常 | |
-| `voice.model`、`voice.id` | 语音管家用的托管大模型和音色的默认；声音页里改过的优先 | 声音页的默认 |
+| `voice.id` | 语音管家的音色的默认；声音页里改过的优先 | 声音页的默认 |
 | `voice.line.port`、`voice.line.url` | 语音线路（「想」选农场的管家时）：只给声网用的那个监听的端口；你自己的隧道的公网地址，没有就用 cloudflared 临时隧道 | 8788、（无） |
 | `lan.port` | 「连接到本机」的端口：打开「连接到本机」时在所有网卡上听，只放配对过的设备（[连接到本机](docs/subsystems/lan.md)）；0 是随便一个 | 8790 |
 | `git_emails` | 算经验时也算作「你」的 commit 邮箱；环境变量里用逗号分隔 | git 全局和各仓库的 user.email 本来就算 |

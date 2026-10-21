@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import { hourNow, motesOf, sceneAt } from "./scene";
 
 test("the hour picks the scene, and ?tod overrides the clock", () => {

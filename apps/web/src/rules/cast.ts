@@ -45,6 +45,12 @@ export const castOf = (look: Look | undefined, agentId: string): Cast => ({
   outfit: look?.outfit ?? "farmer",
 });
 
+/** The sprite prefix of a profile's animal and outfit, as far as the drawings go. */
+export function castPrefix(look: Look | undefined, agentId: string, has: (name: string) => boolean) {
+  const { species, outfit } = castOf(look, agentId);
+  return [`${species}-${outfit}`, `${species}-farmer`, "bear-farmer"].find((p) => has(`${p}-down`)) ?? "bear-farmer";
+}
+
 export type Pose = "idle" | "walk" | "think" | "work" | "cheer" | "worry";
 
 const pixelPose: Record<Pose, string> = { idle: "down", think: "side", walk: "down-1", work: "work", cheer: "cheer", worry: "worry" };

@@ -1,13 +1,13 @@
 # 客户端
 
-VibeValley 只有一份界面：React 写的页面 `apps/web`，由服务端在 `/` 提供，桌面壳、浏览器和手机的壳打开的都是它。它读服务端折好的帧（`StateFrame`），经 `@vibevalley/protocol` 的 `VibeValleyApi` 发命令，自己不折事实、不重写服务端的规则；`/` 是像素农场（`src/farm`），其余是工作台（`src/pages`）。桌面版是 Electron 壳 `apps/desktop`：用自己的 Node 带着服务端起来、打开它的页面，另有菜单栏、系统通知和语音快捷键；手机的壳是 `apps/mobile`（Expo、React Native）：扫码配对，在 WebView 里打开那台电脑经「连接到本机」放出的页面，另有系统通知和锁屏也不断的通话。两个壳都经 `@vibevalley/host` 给页面。
+VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端在 `/` 提供，桌面壳、浏览器和手机的壳打开的都是它。它读服务端折好的帧（`StateFrame`），经 `@vibevalley/protocol` 的 `VibeValleyApi` 发命令，自己不折事实、不重写服务端的规则；`/` 是像素农场（`src/farm`），其余是工作台（`src/pages`）。桌面版是 Electron 壳 `apps/desktop`：用自己的 Node 带着服务端起来、打开它的页面，另有菜单栏、系统通知和语音快捷键；手机的壳是 `apps/mobile`（Expo、React Native）：扫码配对，在 WebView 里打开那台电脑经「连接到本机」放出的页面，另有系统通知和锁屏也不断的通话。两个壳都经 `@vibevalley/host` 给页面。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
 | 状态流、重连、连不上时说什么 | 帧里有什么、怎么折（[architecture.md](docs/architecture.md)「核心状态」、`frameOf`） |
-| 页面的目录和数据层：一条状态流、TanStack Query 的读取、共用的 store | 形状和接口的定义（`packages/protocol`） |
+| 页面的目录和数据层：一条状态流、Solid Query 的读取、共用的 store | 形状和接口的定义（`packages/protocol`） |
 | 工作台的路由和外框、首页 | 规则本身：能不能派、档案的问题、下回想起什么、冲突怎么交代（各自的子系统，页面问服务端） |
 | 宿主接口：通知、菜单栏、语音快捷键、宿主自己的通话线路；没有的是 null | 像素农场的画面、玩法和面板（[farm.md](docs/subsystems/farm.md)；每页的内容见 [farm-ui.md](docs/reference/farm-ui.md)「界面清单」） |
 | 桌面壳：服务端子进程的生命周期和就绪、窗口、单实例、打包；手机壳：配对、WebView、通知、通话 | 服务端的监听、家目录租约（[地基](docs/subsystems/foundation.md)） |
@@ -17,10 +17,10 @@ VibeValley 只有一份界面：React 写的页面 `apps/web`，由服务端在 
 
 ## 在哪
 
-- **组合**：`apps/web/src/main.tsx`：没配对的远端浏览器先去 `/pair`；`QueryClientProvider`、`FrameProvider`（状态流）、`ToastProvider`、`Follow`（通知、菜单栏、快捷键），再是路由。
-- **数据层** `src/data/`：`frame.tsx`（`FrameProvider`、`useFrames`、`useCore`）、`api.ts`（`api`、`queries`、`reasonOf`）、`live.ts`（`/api/v1/live`）、`agents.ts`、`projects.ts`、`runtimes.ts`（按对象的读取）、`settled.ts`。
-- **工作台** `src/app/`：`places.ts` 是左栏的地方，`Shell.tsx` 是外框；每个地方一个 `src/pages/<地方>/`，共用的版面在 `pages/kit.tsx`，共用的组件在 `src/ui/`。
-- **页面的规则** `src/rules/`：只读帧和回答的纯函数（看板的分栏、频道的未读、一轮的瀑布图、通知的说法、远端和配对），各带 bun test。
+- **组合**：`apps/web/src/main.tsx`：没配对的远端浏览器先去 `/pair`，再画 `app/App.tsx`：`Root`（路由、状态流、农场的 store、查询的缓存、一个 `<Loading>`）里是 `Follow`（通知、菜单栏、快捷键）、路由和 `ToastHost`。
+- **数据层** `src/data/`：`frames.ts`（状态流，和框架无关：`subscribe`、`get`）、`frame.ts`（接成 Solid 的 store：`createFrames`、`useFrames`、`useCore`）、`external.ts`（`createExternal`：把框架无关的 store 接成信号）、`api.ts`（`api`、`reasonOf`）、`live.ts`（`/api/v1/live`）、`query.ts`（`queries`、`ready` 和按对象的读取）、`agents.ts`、`issues.ts`。
+- **工作台** `src/app/`：`router.ts` 是路由（浏览器历史上的一个信号，`navigate`），`A.tsx` 是页内的链接，`places.ts` 是左栏的地方，`Shell.tsx` 是外框；每个地方一个 `src/pages/<地方>/`，共用的版面在 `pages/kit.tsx`，共用的组件在 `src/ui/`。
+- **页面的规则** `src/rules/`：只读帧和回答的纯函数（看板的分栏、频道的未读、一轮的瀑布图、通知的说法、远端和配对），各带 vitest。
 - **宿主** `packages/host`：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`）、`currentHost()`、没有宿主时的 `browserHost`；`mobile.ts` 是手机壳和页面之间的桥（`ToNative`、`FromNative`、`mobileHost`）。
 - **桌面壳** `apps/desktop`：`src/main.ts`（窗口、菜单栏、通知、快捷键、单实例、退出）、`src/server.ts`（`loginShellPath`、`startServer`）、`src/preload.ts`（把宿主接口交给页面）；`scripts/build.ts`、`scripts/package.ts`（`bun run package:mac`）。
 - **手机壳** `apps/mobile`：`App.tsx`（配对了显示农场，没配对或农场忘了这台手机就配对）、`src/PairScreen.tsx`（扫码、粘贴或收到 `vibevalley://pair` 链接）、`src/FarmScreen.tsx`（WebView 和桥）、`src/farm.ts`（钥匙存在系统钥匙串）、`src/rtc.ts`（声网的原生 SDK）、`src/notify.ts`、`src/rules.ts`；`ios/`、`android/` 由 `expo prebuild` 从 `app.json` 生成，不进仓库（[README](apps/mobile/README.md)）。
@@ -31,8 +31,10 @@ VibeValley 只有一份界面：React 写的页面 `apps/web`，由服务端在 
 - **服务端是核心状态唯一的持有者。** 页面经 `GET /api/v1/state` 收整份 `StateFrame`（`state`、`inbox`、`graphs`、`view`、`effects`），状态变了就再推一份；经 `GET /api/v1/live` 收 `LiveEvent`（干活过程的一步、提醒、农机变了）。页面不读事实，`/api/v1/events` 留给命令行和调试。
 - **页面不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Schedule.whenText`、`nextText`、`Progress.multiplier`），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agents/check`、新项目会被拒的第一处 `POST /api/v1/projects/check`、设置会被拒的第一处 `POST /api/v1/settings/check`、记性的预览 `GET /api/v1/memories/{agent}/recall`、交代冲突 `POST /api/v1/issues/{id}/resolve`、播种袋的工单模板 `GET /api/v1/projects/{id}/templates`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里，叫什么、长什么样在 `RuntimeInfo.preset`、`RuntimeInfo.facts` 里（[档案和农机](docs/subsystems/agent.md)）；成就的说法是 `game.achievements`，进度在每帧的 `view.achievements`（[游戏](docs/subsystems/game.md)）。服务端和页面都要的规则在 `packages/protocol/src/rules`，页面 import 的就是服务端用的那份。
 - **`src/rules/` 只是读帧的纯函数**：哪些频道、未读几条、庄稼熟没熟、看板怎么分栏，只给页面用；跟着墙上时钟走的画面（走路、动画、小游戏的局面）也只在页面。
-- **一条状态流**：`FrameProvider` 给整个页面开一条 `/api/v1/state`，断了一秒后重连；连着、在连、断了（`link`）在外框的小灯和农场的提示里说。没有模拟服务器：连不上就说连不上，页面是空的，不换成假数据。
-- **REST 的读取经 TanStack Query**：一个查询键一种形状（`["projects"]` 只有 `ProjectSummary[]`）；帧里的变化让相关的查询失效再读，不在页面里另存一份。
+- **一条状态流**：`data/frames.ts` 给整个页面开一条 `/api/v1/state`，断了一秒后重连；连着、在连、断了（`link`）在外框的小灯和农场的提示里说。没有模拟服务器：连不上就说连不上，页面是空的，不换成假数据。
+- **REST 的读取经 Solid Query**（`data/query.ts`）：一个查询键一种形状（`["projects"]` 只有 `ProjectSummary[]`）；帧里的变化让相关的查询失效再读，不在页面里另存一份。查询的 `data` 第一次到之前会挂进 `<Loading>`，页面只在根上有一个，所以一律经 `ready(query, fallback)` 读。
+- **界面读按 id 合并的帧**：`createFrames` 把每一帧按 id `reconcile` 进 Solid 的 store，只有变了的字段触发更新；要比前后两帧的（音效、画布、来电、特效）读原始的帧（`rawFrame()`）。农场的 store、toast、通话、听写是和框架无关的模块，经 `createExternal` 接进来。
+- **一处响应性出错，整页停住**：一个错误逃出所有边界时 Solid 停掉整页的更新（`REACTIVITY_HALTED`），页面看着还在、不再动。`<Show>`、`<Match>` 的函数子节点拿到的值在分支收起后一读就抛，分支里还在结算的查询会读到它，所以带查询的面板按普通值 keyed、自己记住最后找到的那个；`ref` 的回调不读 `<For>` 每一项的值。Playwright 里逃出页面的错误让用例失败（`test/fixtures.ts`）。
 - **宿主接口是封闭的**：每个宿主实现全部方法，没有的能力是 null，页面据此决定画不画，不问「我在哪个壳里」。桌面壳经 preload 的 `contextBridge` 给（`contextIsolation`、`sandbox`，页面碰不到 Node 和 Electron）；手机壳的 WebView 带着 `ReactNativeWebView`，`currentHost()` 见到它就建 `mobileHost`：页面把要的东西写成 JSON 发过去，壳按 id 答，通话的事件也这样送回（`window.vibevalleyFromHost`）；浏览器全是 null。
 - **通话的线路可以归宿主**：`VoiceCall` 只认 `Rtc`（`join` 出一条能 `mute`、`renew`、`leave` 的线，事件是来了、走了、字幕、两边的音量、出错、令牌快过期），有 `host.rtc` 就用宿主的（手机的原生 SDK，锁屏不断），没有就用页面自己的声网 Web SDK（`voice/agora.ts`）。会话、字幕、交给管家的话都还在页面里。
 - **页面总在服务端的源上**：页面和接口同源，没有 CORS；桌面窗口只停在服务端的地址上，别的链接交给系统浏览器。
@@ -53,7 +55,7 @@ VibeValley 只有一份界面：React 写的页面 `apps/web`，由服务端在 
 
 **首页**：只在这台设备第一次打开农场时出来（`localStorage` 的 `vibevalley.title.seen`），之后直接进农场，菜单的「回到首页」能回去。
 
-**工作台的路由**（react-router）：`/` 是农场，`/pair` 是配对；其余在 `Shell` 外框里：`/chat`、`/issues`、`/docs`、`/agents`（`/manager` 也算在「帮工」下）、`/runtimes`、`/projects`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区；带 id 的路径打开同一页的详情；不认识的路径回农场。
+**工作台的路由**（`app/router.ts`、`app/App.tsx`）：`/farm/<项目>` 是这个项目的农场，`/` 进这台设备上次进的那座（`localStorage` 的 `vibevalley.farm.project`，列表还在路上时先信它；没记过时进最近有提交的那个项目的，没有项目时是 `/farm/` 那座），`/pair` 是配对；其余在 `Shell` 外框里：`/chat`、`/issues`、`/docs`、`/agents`（`/manager` 也算在「帮工」下）、`/runtimes`、`/projects`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区；带 id 的路径打开同一页的详情；不认识的路径回农场。
 
 **通知和菜单栏**（`src/app/Follow.tsx`，挂在每一页上）：
 
@@ -76,7 +78,9 @@ VibeValley 只有一份界面：React 写的页面 `apps/web`，由服务端在 
 ## 为什么这样
 
 - **手机是 React Native 壳加 WebView，不重写页面。** 扫码、钥匙串、锁屏不断的通话、系统通知这几样浏览器做不好，所以壳是原生的；其余是 WebView 里同一份页面，规则和画面不写第二遍。放弃了只用浏览器（PWA）：iOS 上推送受限、锁屏后通话会断、扫码要先开相机 app 再跳浏览器；放弃了 Tauri 的手机端：多一门 Rust，打电话还是要写原生插件。通话交给壳的原生 SDK，页面只换一层 `Rtc`：会话、字幕、和管家的往来照旧在页面里，桥上只走一条线该做的几件事。
-- **一份 React 页面，三个宿主。** 桌面、浏览器、手机各写一份界面时，规则和画面都要写几遍；一份页面由服务端提供，宿主只补它没有的能力。放弃了留在 Flutter（规则在 Go 和 Dart 写两遍，形状靠生成器搬）和 Tauri（多一门 Rust，系统 WebView 回到 WKWebView 的语音问题）。
+- **一份页面，三个宿主。** 桌面、浏览器、手机各写一份界面时，规则和画面都要写几遍；一份页面由服务端提供，宿主只补它没有的能力。放弃了留在 Flutter（规则在 Go 和 Dart 写两遍，形状靠生成器搬）和 Tauri（多一门 Rust，系统 WebView 回到 WKWebView 的语音问题）。
+- **页面用 Solid 2。** 帧来得密：React 每来一帧，读它的组件全部重渲染；Solid 的组件只跑一次，帧按 id 合并进 store 后只更新读了变动字段的地方，不用手写选择器和 `memo`，也没有依赖数组和为闭包读旧值写的 ref。Pixi 舞台、声网通话、两条流都是外面自己会变的东西，接成信号比 `useSyncExternalStore` 加 ref 直接。放弃了留在 React 加选择器（解决了重渲染，依赖数组和 ref 还在）、Solid 1.9（2.0 改得多，等于再迁一次）和长期两种框架并存（两套写法，agent 不知道该抄哪个）。代价是 2.0 还是 RC：`solid-js`、`@solidjs/web`、`@tanstack/solid-query`、`@solidjs/vite-plugin` 钉死在具体版本，升级单独做；模型多半只会写 1.x，`eslint-plugin-solid` 的 v2 规则（经 oxlint 的 JS 插件）挡住删掉的 API、一个参数的 effect、解构的 props 和提前 `return` 的组件，语义变了、名字没变的写法（写完马上读到旧值、读窄化的值）靠 Playwright。
+- **路由自己写。** 只要一个路径信号、`navigate` 和按前缀分发；`@solidjs/router` 的 2.0 还在预发布。
 - **Electron 用自己的 Node 跑服务端。** 应用里不必再带一份 Node；服务端照样不打包，和仓库里跑的是同一份源码。代价是应用约 300 MB。
 - **推折好的整份状态，页面不折。** 页面再写一份 `reduce` 就是第二份核心状态，两边改规则靠自觉对齐。推整份的代价是带宽：一份真实状态几十 KB，本机和局域网没问题；要换增量时，增量格式又是一份两端都要遵守的约定。
 - **页面问服务端，不移植规则。** 页面要的只是结论；档案的问题依赖没存的草稿，记性的预览依赖主人正在打的字，都不是农场的状态，所以另开接口问。服务端和页面都要的纯规则放进 `packages/protocol`，一份代码两处用。

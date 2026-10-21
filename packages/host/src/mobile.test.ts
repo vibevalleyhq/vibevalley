@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import { type ToNative, mobileHost } from "./mobile";
 
 test("a call goes out by id, and its answer settles it", async () => {
@@ -10,7 +10,7 @@ test("a call goes out by id, and its answer settles it", async () => {
   await told;
   const refused = host.notify!({ title: "a", body: "b" });
   receive({ id: 2, ok: false, error: "没有通知权限" });
-  expect(refused).rejects.toThrow("没有通知权限");
+  await expect(refused).rejects.toThrow("没有通知权限");
 });
 
 test("a call's events reach its listener until it leaves", async () => {

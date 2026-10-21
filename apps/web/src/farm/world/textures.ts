@@ -9,12 +9,30 @@ const ready = new Map<string, Texture>();
 
 TextureStyle.defaultOptions.scaleMode = "nearest";
 
+// How many pictures were asked for and how many have come (or failed): the farm's loading bar.
+let progress = { done: 0, total: 0 };
+const progressListeners = new Set<() => void>();
+const moved = (change: Partial<typeof progress>) => {
+  progress = { ...progress, ...change };
+  progressListeners.forEach((l) => l());
+};
+
+/** The pictures' loading so far: a new object on each change. */
+export const textureProgress = {
+  get: () => progress,
+  subscribe: (l: () => void) => {
+    progressListeners.add(l);
+    return () => void progressListeners.delete(l);
+  },
+};
+
 /** Loads each once; a missing picture is Texture.EMPTY. */
 export function loadTextures(atlas: SpriteAtlas, names: Iterable<string>): Promise<Texture[]> {
   return Promise.all(
     [...names].map((name) => {
       let p = loaded.get(name);
       if (!p) {
+        moved({ total: progress.total + 1 });
         p = atlas.has(name)
           ? Assets.load<Texture>({ src: atlas.get(name).url, data: { resolution: atlas.density } })
               .then((t) => {
@@ -24,6 +42,7 @@ export function loadTextures(atlas: SpriteAtlas, names: Iterable<string>): Promi
               })
               .catch(() => Texture.EMPTY)
           : Promise.resolve(Texture.EMPTY);
+        p = p.finally(() => moved({ done: progress.done + 1 }));
         loaded.set(name, p);
       }
       return p;

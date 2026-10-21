@@ -1,23 +1,26 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import type { Issue, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
-import { useCore } from "../../data/frame";
+import { writeIssue } from "./write";
 import { type BoardLook, boardViews, defaultLook, lookFromList, lookToList, viewLabel } from "../../rules/board";
 import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, noFilter } from "../../rules/cards";
 import { issueIs, type Lane } from "../../rules/issues";
+import { toast } from "../../ui/toasts";
+import { useRouter } from "../../app/router";
+import { useSelectValue } from "../../app/util";
+import { useCore } from "../../data/frame";
+import { useIssueHistory } from "../../data/issues";
 import { Icon } from "../../ui/Icon";
-import { useToast } from "../../ui/Toast";
 import { Segmented } from "../../ui/Segmented";
 import { IconButton, IssueBoard } from "./Board";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
-import { useIssueHistory, useRun, writeIssue } from "./data";
 import { DisplayMenu } from "./DisplayMenu";
-import { useGraphs, useNameOf } from "./hooks";
+import { run, useGraphs, useNameOf } from "./hooks";
 import { IssueDetail, ManagerIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { TaskDetail } from "./TaskDetail";
-import { TodoDetail, useDispatchedNotice } from "./TodoDetail";
+import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 
 const lookKey = "vibevalley.board.look";
 
@@ -37,30 +40,34 @@ function saveLook(look: BoardLook) {
   }
 }
 
-export function IssuesPage() {
-  const id = useParams()["*"] || undefined;
-  const navigate = useNavigate();
+type Closing = { issue: Issue; session: Session; review: boolean };
+
+/** `rest` is the path after /issues/. */
+export function IssuesPage(props: { rest: string }) {
+  const router = useRouter();
   const core = useCore();
   const graphs = useGraphs();
-  const toast = useToast();
-  const run = useRun();
-  const [filter, setFilter] = useState<BoardFilter>(noFilter);
-  const [older, setOlder] = useState(false);
-  const [look, setLookState] = useState(loadLook);
-  const [closing, setClosing] = useState<{ issue: Issue; session: Session; review: boolean } | null>(null);
-  const [reopening, setReopening] = useState<Issue | null>(null);
+  const id = () => props.rest || undefined;
+  const [filter, setFilter] = createSignal<BoardFilter>(noFilter);
+  const [older, setOlder] = createSignal(false);
+  const [look, setLookState] = createSignal(loadLook());
+  const [closing, setClosing] = createSignal<Closing | null>(null);
+  const [reopening, setReopening] = createSignal<Issue | null>(null);
   const history = useIssueHistory(older);
 
   const setLook = (l: BoardLook) => {
     setLookState(l);
     saveLook(l);
   };
-  const open = (to: string | undefined) => navigate(to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`);
-  const notice = useDispatchedNotice(open);
+  const open = (to: string | undefined) => router.navigate(to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`);
+  const notice = dispatchedNotice(open);
 
-  const all = useMemo(() => buildCards(history.rows ?? [], core, graphs), [history.rows, core, graphs]);
-  const shown = all.filter((c) => filterShows(filter, c));
-  const card = id === undefined ? undefined : all.find((c) => c.id === id || (c.kind === "issue" && issueIs(c.issue, id)));
+  const all = createMemo(() => buildCards(history.rows() ?? [], core(), graphs()));
+  const shown = () => all().filter((c) => filterShows(filter(), c));
+  const card = () => {
+    const at = id();
+    return at === undefined ? undefined : all().find((c) => c.id === at || (c.kind === "issue" && issueIs(c.issue, at)));
+  };
 
   const place = async (c: BoardCard, before: string | undefined) => {
     if (c.id === before) return;
@@ -73,169 +80,188 @@ export function IssuesPage() {
     const move = cardMove(c, to);
     if (move === "start" && c.kind === "todo") {
       if (!c.issue.assignee || !c.issue.project) {
-        void open(c.id);
+        open(c.id);
         toast("还差一点：选好派哪个帮工、在哪个项目里做，再点「开工」。");
         return;
       }
       const got = await run(() => api.issue.status({ id: c.id, body: { status: "todo" } }));
       if (got) notice(got);
     } else if (move === "close" && c.kind === "issue" && c.session) setClosing({ issue: c.issue, session: c.session, review: false });
-    else if (move === "reopen" && c.kind === "issue") setReopening(c.issue);
+    else if (move === "reopen" && c.kind === "issue") setReopening(() => c.issue);
   };
 
   const add = async (text: string, where: { project?: string; agent?: string } = {}) => {
-    const made = await run(() => writeIssue(text, where.agent || filter.agent, where.project || filter.project));
+    const f = filter();
+    const made = await run(() => writeIssue(text, where.agent || f.agent, where.project || f.project));
     if (!made) return;
     if (made.refused) toast(`先没起草：${made.refused}`);
-    void open(made.issue.id);
+    open(made.issue.id);
   };
   const addInList: ListAdd = (text, where) => void add(text, where);
   const write = () => void add("");
 
   return (
-    <div className="relative flex h-full flex-col">
-      {history.error && <p className="px-3 pt-2 text-sm text-berry">工单记录没读到：{reasonOf(history.error)}</p>}
-      <Toolbar filter={filter} cards={all} shown={shown.length} onFilter={setFilter} look={look} onLook={setLook} />
-      {look.view === "board" ? (
+    <div class="relative flex h-full flex-col">
+      <Show when={history.error()}>
+        <p class="px-3 pt-2 text-sm text-berry">工单记录没读到：{reasonOf(history.error())}</p>
+      </Show>
+      <Toolbar filter={filter()} cards={all()} shown={shown().length} onFilter={setFilter} look={look()} onLook={setLook} />
+      <Show
+        when={look().view === "board"}
+        fallback={
+          <IssueList
+            cards={shown()}
+            loading={history.loading()}
+            selected={card()?.id ?? id()}
+            older={older()}
+            grouping={look().grouping}
+            ordering={look().ordering}
+            onOlder={() => setOlder(!older())}
+            onOpen={open}
+            onAdd={addInList}
+          />
+        }
+      >
         <IssueBoard
-          cards={shown}
-          loading={history.loading}
-          selected={card?.id ?? id}
-          older={older}
-          ordering={look.ordering}
-          onOlder={() => setOlder(!older)}
+          cards={shown()}
+          loading={history.loading()}
+          selected={card()?.id ?? id()}
+          older={older()}
+          ordering={look().ordering}
+          onOlder={() => setOlder(!older())}
           onOpen={open}
           onDrop={(c, to) => void drop(c, to)}
           onPlace={(c, before) => void place(c, before)}
           onAdd={(t) => void add(t)}
           onWrite={write}
         />
-      ) : (
-        <IssueList
-          cards={shown}
-          loading={history.loading}
-          selected={card?.id ?? id}
-          older={older}
-          grouping={look.grouping}
-          ordering={look.ordering}
-          onOlder={() => setOlder(!older)}
-          onOpen={open}
-          onAdd={addInList}
-        />
-      )}
-      {id !== undefined && (
-        <Overlay onClose={() => open(undefined)}>
-          <Detail
-            id={id}
-            card={card}
-            known={!history.loading && history.rows !== undefined}
-            rows={history.rows ?? []}
-            open={open}
-            onClose={(issue, session, review) => setClosing({ issue, session, review })}
-          />
-        </Overlay>
-      )}
-      {closing && <CloseIssueDialog {...closing} onClose={() => setClosing(null)} />}
-      {reopening && <ReopenDialog issue={reopening} onClose={() => setReopening(null)} onReopened={() => open(reopening.id)} />}
+      </Show>
+      {/* Keyed by the id, a plain value; the detail keeps the card it last found (see Detail). */}
+      <Show when={id()} keyed>
+        {(at) => (
+          <Overlay onClose={() => open(undefined)}>
+            <Detail
+              id={at}
+              cards={all}
+              known={!history.loading() && history.rows() !== undefined}
+              rows={history.rows() ?? []}
+              open={open}
+              onClose={(issue, session, review) => setClosing({ issue, session, review })}
+            />
+          </Overlay>
+        )}
+      </Show>
+      <Show when={closing()}>{(c) => <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} onClose={() => setClosing(null)} />}</Show>
+      <Show when={reopening()}>{(issue) => <ReopenDialog issue={issue()} onClose={() => setReopening(null)} onReopened={() => open(issue().id)} />}</Show>
     </div>
   );
 }
 
-function Detail({
-  id,
-  card,
-  known,
-  rows,
-  open,
-  onClose,
-}: {
+type CardOf<K extends BoardCard["kind"]> = Extract<BoardCard, { kind: K }>;
+
+/**
+ * The open card. It is the last one found by the id, so it stays while the board is read again and while the overlay
+ * closes: its panels' queries may still be settling then, and a read through a narrowed accessor would halt the page.
+ * Each panel is keyed by what it shows, a plain value, for the same reason.
+ */
+function Detail(props: {
   id: string;
-  card: BoardCard | undefined;
+  cards: () => BoardCard[];
   known: boolean;
   rows: { issue: Issue }[];
   open: (id: string | undefined) => void;
   onClose: (issue: Issue, session: Session, review: boolean) => void;
 }) {
-  if (!card) {
-    if (!known) return <p className="text-sm text-muted">在读……</p>;
-    // A link to an issue the farm does not have says so, instead of quietly showing the board.
-    return (
-      <div>
-        <h1 className="text-lg font-semibold">找不到这张工单</h1>
-        <p className="mt-3 text-sm text-muted">农场里没有 {id}：可能已经删掉了，或者链接写错了。</p>
-      </div>
-    );
-  }
-  switch (card.kind) {
-    case "todo":
-      return <TodoDetail key={card.id} item={card.issue} onDone={open} />;
-    case "issue":
-      return (
-        <IssueDetail
-          key={card.sessions[card.sessions.length - 1]!.id}
-          issue={card.issue}
-          sessions={card.sessions}
-          tag={card.tag}
-          session={card.session}
-          onClose={(session, review) => onClose(card.issue, session, review)}
-          onTask={card.issue.parent ? () => open(`task:${card.issue.parent}`) : undefined}
-        />
-      );
-    case "manager":
-      return <ManagerIssueDetail key={card.id} issue={card.issue} />;
-    case "missing":
-      return (
+  const card = createMemo<BoardCard | undefined>(
+    (last) => props.cards().find((c) => c.id === props.id || (c.kind === "issue" && issueIs(c.issue, props.id))) ?? last,
+  );
+  const as = <K extends BoardCard["kind"]>(_kind: K) => card() as CardOf<K>;
+  /** What a panel is keyed by: the card's kind and the thing it shows, or undefined for another kind. */
+  const shows = (kind: BoardCard["kind"]) => {
+    const c = card();
+    if (c?.kind !== kind) return undefined;
+    return c.kind === "issue" ? `issue:${c.sessions[c.sessions.length - 1]!.id}` : c.kind === "task" ? `task:${c.graph.id}` : `${c.kind}:${c.id}`;
+  };
+  const steps = (graph: string) => {
+    const got: Record<string, string> = {};
+    for (const r of props.rows) if (r.issue.parent === graph && r.issue.task && r.issue.sessions.length > 0) got[r.issue.task.key] = r.issue.id;
+    return got;
+  };
+  return (
+    <Switch>
+      <Match when={!card() && !props.known}>
+        <p class="text-sm text-muted">在读……</p>
+      </Match>
+      <Match when={!card()}>
+        {/* A link to an issue the farm does not have says so, instead of quietly showing the board. */}
         <div>
-          <h1 className="text-xl font-semibold">{card.issue.title}</h1>
-          <p className="mt-3 text-sm">执行记录缺失：{card.missing.join("、")}。执行动作暂不可用。</p>
+          <h1 class="text-lg font-semibold">找不到这张工单</h1>
+          <p class="mt-3 text-sm text-muted">农场里没有 {props.id}：可能已经删掉了，或者链接写错了。</p>
         </div>
-      );
-    case "task": {
-      const steps: Record<string, string> = {};
-      for (const r of rows) if (r.issue.parent === card.graph.id && r.issue.task && r.issue.sessions.length > 0) steps[r.issue.task.key] = r.issue.id;
-      return <TaskDetail key={card.graph.id} graph={card.graph} stepIssues={steps} onOpen={open} />;
-    }
-  }
+      </Match>
+      <Match when={shows("todo")} keyed>
+        {() => <TodoDetail item={as("todo").issue} onDone={props.open} />}
+      </Match>
+      <Match when={shows("issue")} keyed>
+        {() => (
+          <IssueDetail
+            issue={as("issue").issue}
+            sessions={as("issue").sessions}
+            session={as("issue").session}
+            onClose={(session, review) => props.onClose(as("issue").issue, session, review)}
+            onTask={as("issue").issue.parent ? () => props.open(`task:${as("issue").issue.parent}`) : undefined}
+          />
+        )}
+      </Match>
+      <Match when={shows("manager")} keyed>
+        {() => <ManagerIssueDetail issue={as("manager").issue} />}
+      </Match>
+      <Match when={shows("missing")} keyed>
+        {() => (
+          <div>
+            <h1 class="text-xl font-semibold">{as("missing").issue.title}</h1>
+            <p class="mt-3 text-sm">执行记录缺失：{as("missing").missing.join("、")}。执行动作暂不可用。</p>
+          </div>
+        )}
+      </Match>
+      <Match when={shows("task")} keyed>
+        {() => <TaskDetail graph={as("task").graph} stepIssues={steps(as("task").graph.id)} onOpen={props.open} />}
+      </Match>
+    </Switch>
+  );
 }
 
 /** The detail over the board, sharing its URL: Escape or a click beside it goes back to the board. */
-function Overlay({ onClose, children }: { onClose: () => void; children: ReactNode }) {
-  useEffect(() => {
+function Overlay(props: { onClose: () => void; children: JSX.Element }) {
+  onSettled(() => {
     const esc = (e: KeyboardEvent) => {
       // A dialog over the detail closes first.
-      if (e.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
+      if (e.key === "Escape" && !document.querySelector("dialog[open]")) props.onClose();
     };
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
-  }, [onClose]);
+  });
   return (
     <div
-      className="absolute inset-0 z-20 flex justify-center overflow-y-auto bg-[#2f1f1333] px-3 py-6 sm:px-6"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      class="absolute inset-0 z-20 flex justify-center overflow-y-auto bg-[#2f1f1333] px-3 py-6 sm:px-6"
+      onClick={(e) => e.target === e.currentTarget && props.onClose()}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label="工单"
-        className="relative h-fit w-full max-w-[1080px] rounded-xl border border-line bg-page px-6 py-5 shadow-float"
+        class="relative h-fit w-full max-w-[1080px] rounded-xl border border-line bg-page px-6 py-5 shadow-float"
       >
-        <div className="absolute top-3 right-3">
-          <IconButton icon="button-close" label="关掉" onClick={onClose} />
+        <div class="absolute top-3 right-3">
+          <IconButton icon="button-close" label="关掉" onClick={props.onClose} />
         </div>
-        {children}
+        {props.children}
       </div>
     </div>
   );
 }
 
-function Toolbar({
-  filter,
-  cards,
-  shown,
-  onFilter,
-  look,
-  onLook,
-}: {
+function Toolbar(props: {
   filter: BoardFilter;
   cards: BoardCard[];
   shown: number;
@@ -244,62 +270,81 @@ function Toolbar({
   onLook: (l: BoardLook) => void;
 }) {
   const nameOf = useNameOf();
-  const projects = [...new Set(cards.map(cardProject).filter((p): p is string => !!p))].sort();
-  const agents = [...new Set(cards.map(cardAgent).filter((a): a is string => !!a))].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  const projects = () => [...new Set(props.cards.map(cardProject).filter((p): p is string => !!p))].sort();
+  const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].sort((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
   const select = "h-7 max-w-[150px] cursor-pointer rounded-md border border-line bg-page px-2 text-sm outline-none hover:bg-hover focus:border-focus";
   return (
     // Narrow, the views go on their own line above the filters, at the right where the 显示 panel opens leftwards.
-    <div className="@container px-3 pt-3 pb-2.5">
-      <div className="flex flex-col-reverse gap-2 @min-[760px]:flex-row @min-[760px]:items-center">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <label className="flex h-7 w-60 items-center gap-1.5 rounded-md border border-line bg-page px-2 focus-within:border-focus">
+    <div class="@container px-3 pt-3 pb-2.5">
+      <div class="flex flex-col-reverse gap-2 @min-[760px]:flex-row @min-[760px]:items-center">
+        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <label class="flex h-7 w-60 items-center gap-1.5 rounded-md border border-line bg-page px-2 focus-within:border-focus">
             <Icon name="button-search" size={14} />
             <input
-              value={filter.query}
-              onChange={(e) => onFilter({ ...filter, query: e.target.value })}
+              value={props.filter.query}
+              onInput={(e) => props.onFilter({ ...props.filter, query: e.currentTarget.value })}
               placeholder="找工单：标题、帮工、项目"
               aria-label="找工单"
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+              class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
           </label>
           <Icon name="button-filter" size={16} label="筛选" />
-          <select aria-label="按项目看" value={filter.project} onChange={(e) => onFilter({ ...filter, project: e.target.value })} className={select}>
-            <option value="">所有项目</option>
-            {projects.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <select aria-label="按帮工看" value={filter.agent} onChange={(e) => onFilter({ ...filter, agent: e.target.value })} className={select}>
-            <option value="">所有帮工</option>
-            {agents.map((a) => (
-              <option key={a} value={a}>
-                {nameOf(a)}
-              </option>
-            ))}
-          </select>
-          {filterAny(filter) && (
-            <>
-              <span className="text-xs text-muted">
-                {shown} / {cards.length} 张
-              </span>
-              <button type="button" onClick={() => onFilter(noFilter)} className="cursor-pointer text-sm text-water hover:underline">
-                清掉筛选
-              </button>
-            </>
-          )}
+          <SelectOf
+            label="按项目看"
+            value={props.filter.project}
+            class={select}
+            none="所有项目"
+            options={projects().map((p) => ({ value: p, label: p }))}
+            onChange={(project) => props.onFilter({ ...props.filter, project })}
+          />
+          <SelectOf
+            label="按帮工看"
+            value={props.filter.agent}
+            class={select}
+            none="所有帮工"
+            options={agents().map((a) => ({ value: a, label: nameOf()(a) }))}
+            onChange={(agent) => props.onFilter({ ...props.filter, agent })}
+          />
+          <Show when={filterAny(props.filter)}>
+            <span class="text-xs text-muted">
+              {props.shown} / {props.cards.length} 张
+            </span>
+            <button type="button" onClick={() => props.onFilter(noFilter)} class="cursor-pointer text-sm text-water hover:underline">
+              清掉筛选
+            </button>
+          </Show>
         </div>
-        <div className="ml-auto flex items-center gap-1.5">
+        <div class="ml-auto flex items-center gap-1.5">
           <Segmented
             label="看法"
-            value={look.view}
-            onChange={(view) => onLook({ ...look, view })}
+            value={props.look.view}
+            onChange={(view) => props.onLook({ ...props.look, view })}
             options={boardViews.map((v) => ({ value: v, label: viewLabel[v] }))}
           />
-          <DisplayMenu look={look} onChange={onLook} />
+          <DisplayMenu look={props.look} onChange={props.onLook} />
         </div>
       </div>
     </div>
+  );
+}
+
+/** A filter's select: everything, or one of the values the cards have. */
+function SelectOf(props: {
+  label: string;
+  value: string;
+  class: string;
+  none: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  const ref = useSelectValue(
+    () => props.value,
+    () => props.options,
+  );
+  return (
+    <select ref={ref} aria-label={props.label} value={props.value} onChange={(e) => props.onChange(e.currentTarget.value)} class={props.class}>
+      <option value="">{props.none}</option>
+      <For each={props.options}>{(o) => <option value={o.value}>{o.label}</option>}</For>
+    </select>
   );
 }

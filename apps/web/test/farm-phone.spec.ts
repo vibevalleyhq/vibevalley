@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function openFarm(page: Page) {
-  await page.goto("/");
+  await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
 }
 

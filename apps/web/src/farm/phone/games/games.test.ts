@@ -1,5 +1,5 @@
 // 推箱子, 方块 and 小恐龙: the recorded deals and runs must replay as they were.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vite-plus/test";
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
 import { type Dino, dinoGround, dinoScore, duck, jump, newDino, type Obstacle, run } from "./dino";
 import { moveWarehouse, newWarehouse, undoWarehouse, type WarehouseDirection, type WarehouseGame, warehouseDone, warehouses } from "./sokoban";

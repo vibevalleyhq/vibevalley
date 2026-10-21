@@ -3,7 +3,7 @@
 //
 //	node --import tsx src/main.ts                        # port from the configuration (127.0.0.1:8787)
 //	node --import tsx src/main.ts --config dev.yaml      # this file, not $VIBEVALLEY_HOME/vibevalley.yaml
-//	node --import tsx src/main.ts --web ../web/dist      # also the React page at /
+//	node --import tsx src/main.ts --web ../web/dist      # also the page at /
 //
 // The configuration is loadConfig's: the YAML file, then VIBEVALLEY_* in the environment.
 
@@ -31,11 +31,24 @@ redactOutput(process.stderr);
 const loaded = loadConfig(flags.config);
 const config = flags.web ? { ...loaded, web: flags.web } : loaded;
 
-const farm = app(config, config.port, (address) =>
-  Effect.gen(function* () {
-    yield* Effect.log(`vibevalley: listening on http://${address}`);
-    if (flags["ready-json"]) process.stdout.write(JSON.stringify({ url: `http://${address}`, pid: process.pid }) + "\n");
-  }),
+// The page's tests (apps/web/test/fixtures.ts) never ask this machine's coding agents: pi is the scripted helper the
+// server's tests hire, and it is the only runtime installed. Never set otherwise; loaded only then.
+const testRuntimes = async () => {
+  const [{ helper, installedOnly }, { registryOf }] = await Promise.all([import("./testing/helper.ts"), import("./runtime/runtime.ts")]);
+  const given = [helper()];
+  return { registry: registryOf(given), probe: installedOnly(given), background: false };
+};
+const runtime = process.env.VIBEVALLEY_TEST_RUNTIMES === "1" ? await testRuntimes() : undefined;
+
+const farm = app(
+  config,
+  config.port,
+  (address) =>
+    Effect.gen(function* () {
+      yield* Effect.log(`vibevalley: listening on http://${address}`);
+      if (flags["ready-json"]) process.stdout.write(JSON.stringify({ url: `http://${address}`, pid: process.pid }) + "\n");
+    }),
+  { runtime },
 );
 
 mkdirSync(config.home, { recursive: true });

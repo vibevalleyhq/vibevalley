@@ -5,11 +5,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { endpoints } from "../packages/protocol/src/api.ts";
 
-const out = join(import.meta.dir, "..", "docs/reference/capabilities.md");
+const out = join(import.meta.dirname, "..", "docs/reference/capabilities.md");
 
 const head = `# 能力表
 
-由 \`scripts/capabilities.ts\` 从 \`packages/protocol/src/api.ts\` 的 \`endpoints\`（每个接口的 \`can\`）写出，不手改；\`bun run docs:verify\` 查它是不是最新。为什么这样分见 [先有能力，再有入口](docs/subsystems/core.md)。
+由 \`scripts/capabilities.ts\` 从 \`packages/protocol/src/api.ts\` 的 \`endpoints\`（每个接口的 \`can\`）写出，不手改；\`pnpm run docs:verify\` 查它是不是最新。为什么这样分见 [先有能力，再有入口](docs/subsystems/core.md)。
 
 | 谁 | 是谁 | 从哪个入口 |
 |---|---|---|
@@ -37,7 +37,7 @@ for (const [g, list] of groups) {
 
 if (process.argv.includes("--check")) {
   if (readFileSync(out, "utf8") !== text) {
-    console.error("capabilities: docs/reference/capabilities.md is stale: run bun scripts/capabilities.ts");
+    console.error("capabilities: docs/reference/capabilities.md is stale: run pnpm run capabilities");
     process.exit(1);
   }
 } else writeFileSync(out, text);

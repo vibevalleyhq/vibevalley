@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import { LiveCaptions } from "./captions";
 
 function chunked(id: string, message: Record<string, unknown>, parts: number) {

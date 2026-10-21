@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import { blockHeading, blockNumbered, blockParagraph, type DocSpan } from "@vibevalley/protocol";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
 import { codePointOffset, editSpans, listNumbers, markdownShortcut, plainOf } from "./docBlocks";

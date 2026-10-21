@@ -18,7 +18,7 @@
 - **仓库**：根目录的 `package.json` 是 Bun workspaces（`apps/*`、`packages/*`），由 Vite+（`vp`）管：`vp install` 装一次；`vite`、`vitest` 经 `catalog` 和 `overrides` 指到 Vite+ 带的那一份。根目录的 `vite.config.ts` 是格式（oxfmt）和 lint（oxlint，带类型）的设置，`vp check` 一起跑它们和类型；共用的 TypeScript 设置在 `tsconfig.base.json`，根目录的 `tsconfig.json` 管 `scripts/`，每个包的 `check` 是 `tsc --noEmit`。
 - **服务端** `apps/server`：`src/main.ts`（服务端）、`src/cli.ts`（命令行）；`src/services.ts`（全部服务的次序）、`src/handlers.ts`（每个接口转给哪个服务）、`src/http/`（`app.ts` 组装、`api.ts` 按接口表路由、`streams.ts` 三条 SSE、`mcp.ts`、`page.ts` 页面）。
 - **地基** `src/base`：`config.ts`（`Config`、`Settings`、`loadConfig`）、`db.ts`（`Database`）、`ids.ts`（`newId`、`code`）、`lease.ts`（家目录的租约）、`files.ts`、`redact.ts`；`src/errors.ts` 是接口的拒绝。
-- **形状和接口**：`packages/protocol/src/shapes.ts`（类型和两边共用的常量）、`schema.ts`（每个形状的 Schema）、`api.ts`（`endpoints` 表、`Handlers`、`errorStatus`、`VibeValleyApi`）、`stream.ts`（读 SSE）；能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出。
+- **形状和接口**：`packages/protocol/src/shapes.ts`（类型和两边共用的常量）、`schema.ts`（每个形状的 Schema）、`api.ts`（`endpoints` 表、`Handlers`、`errorStatus`）、`client.ts`（`VibeValleyApi`，由 `scripts/api-client.ts` 照 `api.ts` 写出）、`stream.ts`（读 SSE）；能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出。
 - **规则和黄金数据**：几处都用的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有一个主人的在那个模块里（`issue/rules.ts`、`channel/rules.ts`……）；黄金数据是 `packages/protocol/testdata/*.jsonl.gz` 和 `apps/server/src/<模块>/testdata/*.jsonl.gz`，读写工具 `src/testing/golden.ts` 和 `packages/protocol/src/rules/golden.test.ts`。
 - **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器的设置 `db/effect-sqlc.json`，脚本 `scripts/db-generate.ts`。
 - **测试工具**：`src/testing/layers.ts`（`testConfig`、`testDatabase`：临时家目录、内存库）、`world.ts`（`world`：一整座农场，农机和它的额度由测试给）、`git.ts`（真的 git 仓库）、`golden.ts`；`src/flows/farm.ts`（流程测试的农场和帮工）；`agent/brain/testing.ts`（pi-ai 的假模型）。
@@ -44,10 +44,10 @@
 **形状和规则**
 
 - **形状写一次，Schema 由它定类型**：`shapes.ts` 是类型，`schema.ts` 里每个 Schema 写成 `Schema.Codec<T.X>`，两边对不上就编不过；`endpoints` 里的每一行带方法、路径、参数、请求和回答的 Schema、`can`（谁能调），`Handlers` 由它推出，`handlers.ts` 漏了或多了一个接口就编不过。服务端按这张表路由（`http/api.ts`：请求解不开是 400，拒绝按 `errorStatus` 给状态码），页面和命令行用同一张表调（`VibeValleyApi`、`cli.ts`）。
-- **生成的不手改**：`db/generated/` 和 [capabilities.md](docs/reference/capabilities.md)。`seeds.json`、`template_catalog.json`（`packages/protocol/src/rules`）是直接改的数据文件。
+- **生成的不手改**：`db/generated/`、[capabilities.md](docs/reference/capabilities.md) 和 `packages/protocol/src/client.ts`（`bun run api:client`：每个方法的参数、回答和注释照 `Handlers`，方法、路径、查询和请求体照 `endpoints`；生成而不在运行时读 `endpoints`，页面就不用带上 effect 的 Schema；`docs:verify` 查它是不是最新）。`seeds.json`、`template_catalog.json`（`packages/protocol/src/rules`）是直接改的数据文件。
 - **要每种都处理的地方穷尽**：按 `_tag`、`type` 分支的 `switch` 覆盖每一种，返回值或 `never` 让 `tsc` 查出漏掉的；成员表要每种都处理时写成 `Record<X, …>`。
 - **规则在它的主人那里**：核心状态的折法（`reduce`、`frameOf`）和几处都用的规则在 `packages/protocol/src/rules`；只有一个模块用的在那个模块的 `rules.ts` 一类文件里（`connector/text.ts`、`setting/rules.ts`、`memory/recall.ts`、`runtime/rules.ts`、`manager/rules.ts`、`channel/rules.ts`、`game/progress.ts`、`task/rules.ts`、`issue/rules.ts`、`schedule/rules.ts`）。别的模块要用一条单一主人的规则，问它的服务，或者挪进 `packages/protocol`。页面要用的服务端规则也挪进 `packages/protocol`，不在页面里重写。
-- **黄金数据跟着规则**：每处有规则的地方有 `testdata/*.jsonl.gz`（成千上万条带种子的随机输入和结果），测试逐条比。`VIBEVALLEY_GOLDEN=update`（`bun run golden:update`）用现在的结果重写，看 diff 再留。
+- **黄金数据跟着规则**：每处有规则的地方有 `testdata/*.jsonl.gz`（成千上万条带种子的随机输入和结果），测试逐条比。`VIBEVALLEY_GOLDEN=update`（`bun run golden:update`，`-- <模块>` 或 `-- protocol` 只重写那一处，`scripts/golden-update.ts`）用现在的结果重写，看 diff 再留。
 - **字符串照 JavaScript 自己的算法**：长度按 UTF-16 码元、空白是 `\s`；切断的代理对换成 U+FFFD（`packages/protocol/src/rules/text.ts`）。没有另一份。
 
 **存盘**
@@ -55,7 +55,7 @@
 - **一个 PGlite 库**：`base/db.ts` 在家目录的库文件夹里开 PGlite（编成 WASM 的 Postgres，在服务端进程里），测试用内存库。一条连接，所以行的先后就是提交的先后（消息的编号靠它）。时间存毫秒的 `bigint`。
 - **SQL 只在 effect-sqlc**：查询在 `db/queries/<表>.sql`，一张表一个文件，只写这张表（联查别的表可以，写不行）；服务里不手写 SQL，只调 `db/generated` 的函数，再把行读成自己的形状。改完跑 `npm run db:generate`，`server:check` 跑 `db:check` 查生成的是不是最新。
 - **表名是 `<模块>` 或 `<模块>_<概念>`**，单数，模块是拥有它的 `src` 文件夹（`issue`、`issue_session`、`channel_message`、`session_run`、`game_ledger`、`lan_device`）。索引名以表名开头。
-- **一份表结构，不认旧数据**：`0001_schema.up.sql` 是整个库，改表直接改它，不另加迁移；`migrations/` 里只能有这一个文件。开机时 `PgliteMigrator` 在空库上跑它；旧库不升级，删掉重建。存盘的格式只有现在这一种：表、家目录里的文件、环境变量、存下的取值都只认今天的名字。
+- **一份表结构，不认旧数据**：`0001_schema.up.sql` 是整个库，改表直接改它，不另加迁移；`migrations/` 里只能有这一个文件。开机时 `PgliteMigrator` 在空库上跑它；旧库不升级：库的文件夹旁边 `db.schema` 记着建它的基线的哈希，对不上就把整个文件夹挪到 `db.<旧哈希>-<时间>`（不删）再新建一个，日志里说一句；没有 `db.schema` 的当作今天的。测试的库在内存里，每个进程第一个库跑完基线就存一份文件，之后的库从这份文件起，省掉大半的准备时间。存盘的格式只有现在这一种：表、家目录里的文件、环境变量、存下的取值都只认今天的名字。
 - **运行时新建的行主键是 uuidv7**：`base/ids.ts` 的 `newId()`（带时间，同一毫秒里接着数，同一进程里单调），存成 `text`；协议里的 id 都是 `string`。不用 uuid 的：从文件来的自然键（档案、技能、项目、农机、连接器）、单例、几列组成的主键。工单另有从 1 数的 `number`，消息在对话里有从 1 数的 `number`。`code()` 是给人念的配对码，不是 id。
 
 **测试**

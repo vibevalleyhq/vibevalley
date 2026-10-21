@@ -4,15 +4,14 @@
   "type": "module",
   "main": "build/main.cjs",
   "scripts": {
-    "build": "bun scripts/build.ts",
-    "dev": "bun scripts/build.ts && electron .",
+    "build": "tsx scripts/build.ts",
+    "dev": "tsx scripts/dev.ts",
     "check": "tsc --noEmit",
-    "test": "bun scripts/build.ts && playwright test",
-    "package": "bun scripts/package.ts"
+    "test": "tsx scripts/build.ts && playwright test",
+    "package": "tsx scripts/package.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
-    "@types/bun": "^1.4.3",
     "@types/node": "^26.6.5",
     "@vibevalley/host": "workspace:*",
     "@vibevalley/protocol": "workspace:*",

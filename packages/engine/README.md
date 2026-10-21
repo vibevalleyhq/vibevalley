@@ -12,5 +12,5 @@ draws with it.
 
 ```bash
 bun run check   # types
-bun test        # nav, clock, rhythm, light
+bun run test    # vitest: nav, clock, rhythm, light
 ```

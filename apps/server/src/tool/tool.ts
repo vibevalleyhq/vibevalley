@@ -4,19 +4,21 @@
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
+  type Acceptance,
   type Agent,
   type Block,
   type BlockAttrs,
   type GraphAction,
   generalName,
+  type Issue,
   managerAgent,
   type Memory,
   type ScheduleWhen,
   type TaskAction,
   type TaskEdit,
 } from "@vibevalley/protocol";
-import { graphsOf, graphText, head, inboxLines, isOpen, maxTasks, openFindings, phaseText } from "@vibevalley/protocol/rules";
-import { Context, Effect, Layer } from "effect";
+import { graphsOf, graphText, head, inboxLines, isOpen, maxTasks, openFindings, phaseText, shortTitle, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { textTool } from "../agent/brain/tool.ts";
 import { Channels, type Info, type Spoken } from "../channel/chat.ts";
@@ -32,7 +34,20 @@ import type { ToolStart } from "../session/facts.ts";
 import { chooseAgent } from "../session/rules.ts";
 import { type Roster, Sessions } from "../session/session.ts";
 import { Tasks } from "../task/task.ts";
-import { changesText, mergeNotAsked, parseTime, scheduleLine, sessionLine, startNotAsked, tail } from "./words.ts";
+import {
+  changeNotAsked,
+  changesText,
+  issueDetail,
+  issueLine,
+  mergeNotAsked,
+  parseTime,
+  priorityOf,
+  scheduleLine,
+  sessionLine,
+  startNotAsked,
+  statusOf,
+  tail,
+} from "./words.ts";
 import { schemas, sessionSchemas } from "./schemas.ts";
 
 /** Who is calling, at the moment of the call. */
@@ -83,6 +98,10 @@ export const labels: Record<string, string> = {
   read_chat: "看对话",
   stop: "叫停",
   dismiss: "收工",
+  issues: "找工单",
+  issue_create: "记一张工单",
+  issue_update: "改工单",
+  issue_status: "挪工单",
   graph_split: "拆计划",
   graphs: "看计划",
   task_edit: "改计划",
@@ -99,7 +118,7 @@ export const labels: Record<string, string> = {
   doc_update: "改文档的一块",
 };
 
-const named = ["agent", "session", "project", "name", "query", "note", "goal"];
+const named = ["issue", "agent", "session", "project", "name", "title", "query", "note", "goal"];
 
 export function toolStart(name: string, args: unknown): ToolStart {
   const fields = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
@@ -140,7 +159,9 @@ export const make = Effect.gen(function* () {
   const issue = yield* Issues;
   const tasks = yield* Tasks;
 
-  const go = <A, E>(e: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(Effect.mapError(e, toError));
+  // Fibers started from the tools' callbacks belong to this service: they end with it and keep its services.
+  const runHere = yield* FiberSet.makeRuntimePromise<never>();
+  const go = <A, E>(e: Effect.Effect<A, E>): Promise<A> => runHere(Effect.mapError(e, toError));
   /** An answer, or "没成：" and why. */
   const answered = (e: Effect.Effect<string, unknown>) => go(Effect.catch(e, (err) => Effect.succeed("没成：" + toError(err).message)));
 
@@ -154,12 +175,33 @@ export const make = Effect.gen(function* () {
     const all = run.roster();
     return all.find((w) => w.session.id === key) ?? all.find((w) => w.session.name === key) ?? all.find((w) => key.includes(w.session.name));
   };
-  const withSession = async (key: string, f: (w: Roster) => string | Promise<string>) => {
-    const w = findSession(key);
-    return w ? f(w) : "没有叫 " + key + " 的帮工";
+
+  // The manager names an issue by its number (#41, 41), its id, or the name or id of a helper working it.
+  const findIssue = async (key: string): Promise<Issue | string> => {
+    const k = key.trim().replace(/^#/, "");
+    const all = await go(issue.list());
+    if (/^\d+$/.test(k)) return all.find((t) => t.number === Number(k)) ?? "没有 #" + k + " 这张工单：用 issues 找找";
+    const byId = all.find((t) => t.id === k);
+    if (byId) return byId;
+    const w = findSession(k);
+    const of = w?.session.issue ? all.find((t) => t.id === w.session.issue) : undefined;
+    return of ?? "没有叫 " + k + " 的工单或帮工：用 issues 找找";
   };
-  const sessionTool = (name: string, description: string, f: (w: Roster) => string | Promise<string>) =>
-    tool<{ session: string }>(name, description, (p) => withSession(p.session, f));
+  const withIssue = async (key: string, f: (t: Issue) => string | Promise<string>) => {
+    const t = await findIssue(key);
+    return typeof t === "string" ? t : f(t);
+  };
+  const issueTool = (name: string, description: string, f: (t: Issue) => string | Promise<string>) =>
+    tool<{ issue: string }>(name, description, (p) => withIssue(p.issue, f));
+  /** The helper on the farm working the issue now, if any: its newest session. */
+  const workerOf = (t: Issue) => {
+    const last = t.sessions.at(-1);
+    return last === undefined ? undefined : run.roster().find((w) => w.session.id === last);
+  };
+  const whoOf = (t: Issue) =>
+    workerOf(t)?.session.name ?? (t.assignee === managerAgent ? "管家" : t.assignee ? (agents.agents().find((a) => a.id === t.assignee)?.name ?? "") : "");
+  const nobodyOn = (t: Issue) => `#${t.number} 现在没有帮工在做：要它接着做，主人说了以后用 issue_status 挪到待办`;
+  const numberOf = (w: Roster) => (w.session.issue ? core.state().issues?.find((t) => t.id === w.session.issue)?.number : undefined);
 
   // Who reads and speaks in a channel: a session as itself, the manager as the manager.
   const participant = (c: Caller) => c.session || c.agent;
@@ -200,22 +242,28 @@ export const make = Effect.gen(function* () {
 
   const roster = tool<object>("roster", "列出地里所有帮工：在做什么、上一轮的结果。", () => {
     const all = run.roster();
-    return all.length === 0 ? "地里现在没有帮工。" : all.map((w) => sessionLine(w)).join("\n");
+    return all.length === 0 ? "地里现在没有帮工。" : all.map((w) => sessionLine(w, Date.now(), numberOf(w))).join("\n");
   });
 
-  const check = sessionTool(
-    "check",
-    "看一个帮工的详细情况和上一轮的完整汇报。",
-    (w) => sessionLine(w) + "\n目录：" + w.place.cwd + "\n上一轮完整汇报（结尾部分）：\n" + (w.lastText ? tail(w.lastText, 2000) : "还没有"),
-  );
+  const check = issueTool("check", "看一张工单的全部：要做的、验收标准做到哪了、在等主人什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。", async (t) => {
+    const w = workerOf(t);
+    const timeline = await go(issue.timeline(t.id)).catch(() => undefined);
+    const lines = [issueDetail(t, whoOf(t), timeline, Date.now())];
+    if (w)
+      lines.push(
+        sessionLine(w, Date.now(), t.number),
+        "目录：" + w.place.cwd,
+        "上一轮完整汇报（结尾部分）：\n" + (w.lastText ? tail(w.lastText, 2000) : "还没有"),
+      );
+    return lines.join("\n");
+  });
 
-  const changes = sessionTool(
+  const changes = issueTool(
     "changes",
-    "看收获一个帮工会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者收获前想确认时用。",
-    async (w) => {
-      if (!w.session.issue) return "这个帮工没有工单";
+    "看收获一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者收获前想确认时用。",
+    async (t) => {
       try {
-        return changesText(await go(issue.changes(w.session.issue, "manager")));
+        return changesText(await go(issue.changes(t.id, "manager")));
       } catch (e) {
         return "看不了改动：" + toError(e).message;
       }
@@ -339,19 +387,15 @@ export const make = Effect.gen(function* () {
     );
 
   const merge = (who: Who) =>
-    tool<{ session: string }>(
+    tool<{ issue: string }>(
       "merge",
-      "把一个帮工分支上的提交合进它所在项目的主分支，然后让它收工。会冲突时不合并，帮工留在地里，结果里有让它解决冲突的话。",
+      "收获一张工单：把它分支上的提交合进项目的主分支（能提 PR 的项目开 PR），然后帮工收工。会冲突时不合并，帮工留在地里，结果里有让它解决冲突的话；这一轮没做成、要验收还没过的不收。",
       async (p) => {
         const c = await who();
-        return withSession(p.session, async (w) => {
+        return withIssue(p.issue, async (t) => {
           if (!c.owner) return mergeNotAsked;
-          if (!w.session.issue) return "这个帮工没有工单";
-          // Every issue has an acceptance; a required one must have passed before anything is harvested.
-          const t = await go(issue.get(w.session.issue)).catch(() => undefined);
-          if (t && t.acceptance === "required" && !t.acceptedAt) return "这张工单要先过验收：先用 accept 验收通过，才能收获";
           try {
-            return await go(issue.merge(w.session.issue));
+            return await go(issue.merge(t.id));
           } catch (e) {
             return toError(e).message;
           }
@@ -361,17 +405,14 @@ export const make = Effect.gen(function* () {
 
   // Acceptance is judging what came back against what the issue asked for; a pass only makes it ready, the harvest stays
   // the owner's (merge).
-  const accept = tool<{ session: string; pass: boolean; findings?: string[]; text?: string }>(
+  const accept = tool<{ issue: string; pass: boolean; findings?: string[]; text?: string }>(
     "accept",
-    "验收一个帮工交回来的活：先用 changes 看改动，对着工单要的逐条看。过了（pass: true）就能收获；没过就把每条要修的写进 findings，它会带着这些接着修一轮。",
+    "验收一张交回来的工单：先用 changes 看改动，对着它的验收标准逐条看。过了（pass: true）就能收获；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
     (p) =>
-      withSession(p.session, async (w) => {
-        if (!w.session.issue) return "这个帮工没有工单";
+      withIssue(p.issue, async (t) => {
         try {
-          const t = await go(
-            issue.accept(w.session.issue, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }),
-          );
-          return p.pass ? `「${t.title}」验收过了，等主人收获` : `「${t.title}」没过验收，${openFindings(t)} 处要修，已经交回给它`;
+          const done = await go(issue.accept(t.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }));
+          return p.pass ? `#${done.number} 验收过了，等主人收获` : `#${done.number} 没过验收，${openFindings(done)} 处要修，已经交回给帮工`;
         } catch (e) {
           return toError(e).message;
         }
@@ -379,29 +420,174 @@ export const make = Effect.gen(function* () {
   );
 
   const tell = (who: Who) =>
-    tool<{ session: string; message: string }>(
+    tool<{ issue: string; message: string }>(
       "tell",
-      "给一个帮工带话：发在它的工单串里。他正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
+      "给在做一张工单的帮工带话：发在工单串里。它正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
       async (p) => {
         const c = await who();
-        return withSession(p.session, async (w) => {
+        return withIssue(p.issue, async (t) => {
+          const w = workerOf(t);
+          if (!w) return nobodyOn(t);
           try {
             await go(chat.tellSession(participant(c), w.session.id, p.message, ""));
           } catch (e) {
             return "没带到：" + toError(e).message;
           }
-          return "已经在 " + w.session.name + " 的工单串里说了";
+          return `已经在 #${t.number} 的工单串里跟 ${w.session.name} 说了`;
         });
       },
     );
 
-  const stop = sessionTool("stop", "叫停一个帮工正在做的这一轮。", async (w) =>
-    (await go(run.stop(w.session.id))) ? w.session.name + " 停下了" : w.session.name + " 现在没在干活",
-  );
-  const dismiss = sessionTool("dismiss", "让一个帮工收工离开农场。", async (w) => {
-    await go(run.dismiss(w.session.id));
-    return w.session.name + " 收工了";
+  const stop = issueTool("stop", "叫停在做一张工单的帮工正在做的这一轮。", async (t) => {
+    const w = workerOf(t);
+    if (!w) return nobodyOn(t);
+    return (await go(run.stop(w.session.id))) ? `${w.session.name} 停下了（#${t.number}）` : `${w.session.name} 现在没在干活`;
   });
+  const dismiss = issueTool("dismiss", "让在做一张工单的帮工收工离开农场，不收它的改动（分支留着）。", async (t) => {
+    const w = workerOf(t);
+    if (!w) return nobodyOn(t);
+    await go(run.dismiss(w.session.id));
+    return `${w.session.name} 收工了（#${t.number}）`;
+  });
+
+  const issuesTool = tool<{ issue?: string; status?: string; wants_owner?: boolean; project?: string; text?: string; closed?: boolean; limit?: number }>(
+    "issues",
+    "找工单、看一批工单：主人问「哪些在等我」（wants_owner）、「某个项目有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；填 issue 是看一张的全部。每行是编号、短标题、现在怎样、项目、谁在做、等了多久。",
+    async (p) => {
+      if (p.issue) return withIssue(p.issue, async (t) => issueDetail(t, whoOf(t), await go(issue.timeline(t.id)).catch(() => undefined), Date.now()));
+      const status = p.status ? statusOf(p.status) : undefined;
+      if (p.status && !status) return "没有「" + p.status + "」这个状态：备选、待办、处理中、等你看、已完成、已取消";
+      const words = (p.text ?? "").split(spaces).filter(Boolean);
+      const now = Date.now();
+      let found = (await go(issue.list())).filter(
+        (t) =>
+          (status ? t.status === status : p.closed || (t.status !== "done" && t.status !== "canceled")) &&
+          (!p.wants_owner || standingWantsOwner(t.standing.state)) &&
+          (!p.project || t.project === p.project.trim()) &&
+          words.every((w) => (t.title + "\n" + (t.description ?? "")).includes(w)),
+      );
+      if (p.wants_owner) found = found.sort((a, b) => (a.standing.since ?? now) - (b.standing.since ?? now));
+      if (found.length === 0) return p.wants_owner ? "没有在等主人的工单。" : "没有这样的工单。";
+      const limit = p.limit && p.limit > 0 ? Math.trunc(p.limit) : 20;
+      const more = found.length > limit ? `\n（还有 ${found.length - limit} 张没列）` : "";
+      return (
+        found
+          .slice(0, limit)
+          .map((t) => issueLine(t, whoOf(t), now))
+          .join("\n") + more
+      );
+    },
+  );
+
+  const issueCreate = (who: Who) =>
+    tool<{ title: string; description?: string; project?: string; agent?: string; priority?: string; draft?: boolean }>(
+      "issue_create",
+      "记下一张工单，放进备选，不派人：主人说「记一下」「回头做」「先写下来」时用；要马上做用 dispatch。记之前先用 issues 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱）。",
+      async (p) => {
+        const c = await who();
+        const channel = await go(chat.channelOf(c.here));
+        const project = (p.project ?? "").trim() || channel.project;
+        const priority = p.priority ? priorityOf(p.priority) : undefined;
+        if (p.priority && !priority) return "没有「" + p.priority + "」这个优先级：紧急、高、普通、低";
+        let assignee: string | undefined;
+        if (p.agent) {
+          const a = agents.agents().find((x) => x.id === p.agent!.trim() || x.name === p.agent!.trim());
+          if (!a) return "没有叫 " + p.agent + " 的帮工档案";
+          assignee = a.id;
+        }
+        try {
+          const t = await go(
+            issue.add({
+              title: p.title,
+              ...(p.description ? { description: p.description } : {}),
+              ...(project ? { project } : {}),
+              ...(assignee ? { assignee } : {}),
+              ...(priority ? { priority } : {}),
+            }),
+          );
+          if (!p.draft) return `记下了：#${t.number}「${shortTitle(t.title)}」，在备选里`;
+          const drafted = await go(issue.draft(t.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id)).then(
+            () => "，帮工在起草",
+            (e: unknown) => "；起草没开始：" + toError(e).message,
+          );
+          return `记下了：#${t.number}「${shortTitle(t.title)}」，在备选里${drafted}`;
+        } catch (e) {
+          return "没记下：" + toError(e).message;
+        }
+      },
+    );
+
+  const issueUpdate = (who: Who) =>
+    tool<{
+      issue: string;
+      title?: string;
+      description?: string;
+      project?: string;
+      agent?: string;
+      priority?: string;
+      acceptance?: string;
+      criteria?: string[];
+    }>(
+      "issue_update",
+      "改一张工单：优先级、验收方式随时能改；标题、说明、项目、谁来做、验收标准只在派出去以前能改。只在主人叫你改时用：你自己看出来该改的，先在频道里问主人。",
+      async (p) => {
+        const c = await who();
+        if (!c.owner) return changeNotAsked;
+        return withIssue(p.issue, async (t) => {
+          const priority = p.priority ? priorityOf(p.priority) : undefined;
+          if (p.priority && !priority) return "没有「" + p.priority + "」这个优先级：紧急、高、普通、低";
+          if (p.acceptance && p.acceptance !== "glance" && p.acceptance !== "required") return "验收方式只有 glance 和 required";
+          let assignee: string | undefined;
+          if (p.agent) {
+            const a = agents.agents().find((x) => x.id === p.agent!.trim() || x.name === p.agent!.trim());
+            if (!a) return "没有叫 " + p.agent + " 的帮工档案";
+            assignee = a.id;
+          }
+          try {
+            const done = await go(
+              issue.edit(t.id, {
+                ...(p.title !== undefined ? { title: p.title } : {}),
+                ...(p.description !== undefined ? { description: p.description } : {}),
+                ...(p.project !== undefined ? { project: p.project } : {}),
+                ...(assignee ? { assignee } : {}),
+                ...(priority ? { priority } : {}),
+                ...(p.acceptance ? { acceptance: p.acceptance as Acceptance } : {}),
+                ...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
+              }),
+            );
+            return "改好了：" + issueLine(done, whoOf(done), Date.now()).slice(2);
+          } catch (e) {
+            return "没改：" + toError(e).message;
+          }
+        });
+      },
+    );
+
+  const issueStatus = (who: Who) =>
+    tool<{ issue: string; to: string; text?: string }>(
+      "issue_status",
+      "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空地就排队）；等你看挪回待办是带一句话再干一轮；已完成、已取消挪回待办是带一句话重开；等你看挪到已完成是收获；挪到已取消是关上、帮工回家。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
+      async (p) => {
+        const c = await who();
+        if (!c.owner) return changeNotAsked;
+        const to = statusOf(p.to);
+        if (!to) return "没有「" + p.to + "」这个状态：备选、待办、已完成、已取消";
+        return withIssue(p.issue, async (t) => {
+          try {
+            // Sent out with nobody named yet: chosen as dispatch would, the owner's pick first.
+            if (to === "todo" && t.status === "backlog" && !t.assignee) {
+              const chosen = await choose(t.title + "\n" + (t.description ?? ""), "", c.picked);
+              if (!chosen) return "没有能派的帮工：先去「帮工」页面建一个，或者把 runtime 装好。";
+              await go(issue.edit(t.id, { assignee: chosen.id }));
+            }
+            const done = await go(issue.setStatus(t.id, to, p.text ?? "", c.here));
+            return "挪好了：" + issueLine(done, whoOf(done), Date.now()).slice(2);
+          } catch (e) {
+            return "没挪：" + toError(e).message;
+          }
+        });
+      },
+    );
 
   const scheduleTool = (who: Who) =>
     tool<{
@@ -698,6 +884,10 @@ export const make = Effect.gen(function* () {
       readChat(who),
       stop,
       dismiss,
+      issuesTool,
+      issueCreate(who),
+      issueUpdate(who),
+      issueStatus(who),
       graphSplit,
       graphsTool,
       taskEdit,
@@ -719,7 +909,7 @@ export const make = Effect.gen(function* () {
       issueSplit(who),
     ],
     start: toolStart,
-    sessionLine: (w) => sessionLine(w),
+    sessionLine: (w) => sessionLine(w, Date.now(), numberOf(w)),
   });
 });
 
