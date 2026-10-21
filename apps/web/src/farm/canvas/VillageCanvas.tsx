@@ -118,13 +118,16 @@ export function VillageCanvas() {
         onHover: (bed, spot) => farm.hover(bed, spot),
       },
       lightOn(),
-    ).then((s) => {
-      if (!live) return s.destroy();
-      scene = s;
-      stopFit = s.stage.onFit(() => farm.setScreen(screenOf(s, village, el)));
-      // For tests and tools: the pictures are in and clicks are heard.
-      el.dataset.ready = "true";
-    });
+    ).then(
+      (s) => {
+        if (!live) return s.destroy();
+        scene = s;
+        stopFit = s.stage.onFit(() => farm.setScreen(screenOf(s, village, el)));
+        // For tests and tools: the pictures are in and clicks are heard.
+        el.dataset.ready = "true";
+      },
+      (e: unknown) => console.error("vibevalley: the village did not start:", e),
+    );
     return () => {
       live = false;
       delete el.dataset.ready;
