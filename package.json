@@ -7,8 +7,10 @@
   ],
   "type": "module",
   "scripts": {
+    "prepare": "vp config --hooks --no-agent",
     "check": "vp check",
     "check:fix": "vp check --fix",
+    "scripts:test": "bun test scripts",
     "server:check": "cd packages/protocol && bun test src && cd ../../apps/server && bun run check && bun run db:check && bun run test",
     "golden:update": "cd packages/protocol && VIBEVALLEY_GOLDEN=update bun test src && cd ../../apps/server && VIBEVALLEY_GOLDEN=update bun run test",
     "web:check": "bun run --filter '*' check && bun run --filter @vibevalley/host test && bun run --filter vibevalley-mobile test && bun run --filter vibevalley-web build",

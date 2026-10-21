@@ -63,6 +63,16 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
     },
     { scope: "worker" },
   ],
+  // On CI the page's errors go to the job's log: the runner is gone by the time anyone looks.
+  page: async ({ page }, use) => {
+    if (process.env.CI) {
+      page.on("console", (m) => {
+        if (m.type() === "error") console.log(`[page] ${m.text()}`);
+      });
+      page.on("pageerror", (e) => console.log(`[page] ${e.message}`));
+    }
+    await use(page);
+  },
   baseURL: async ({ server }, use) => use(server.url),
   api: async ({ server }, use) => use(new VibeValleyApi(server.url)),
 });
