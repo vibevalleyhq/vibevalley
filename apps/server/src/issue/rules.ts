@@ -335,3 +335,12 @@ export const pullRequestConclusion = (text: string) => reportVerdict(text) || te
 /** What a session is told when merging its base in would conflict. */
 export const conflictBrief = (base: string, files: readonly string[]) =>
   `把 ${base} 合进你的分支时有冲突（${files.join("、")}）。请在你的分支上运行 git merge ${base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。`;
+
+/** A text column: blank is null. */
+export const nullText = (s: string | undefined) => {
+  const t = (s ?? "").trim();
+  return t === "" ? null : t;
+};
+
+/** A JSON column: null when there is nothing to keep. */
+export const jsonOrNull = (v: unknown, there: boolean) => (there ? JSON.stringify(v) : null);

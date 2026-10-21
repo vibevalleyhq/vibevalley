@@ -16,7 +16,7 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/issue`（`Issues`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和缺肥、起草、收获和冲突、PR 的轮询、执行历史、派给管家的工单；`rules.ts` 是只有工单用的纯规则。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
+- 服务端 `apps/server/src/issue`（`Issues`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和缺肥、执行历史、派给管家的工单；`draft.ts` 起草（谁来起草、交回来的草稿怎么读进工单，和派活时挑哪个档案 `pickAgent`）；`harvest.ts` 收获（本地合或提 PR、合不进去怎么说、PR 的轮询）；`rules.ts` 是只有工单用的纯规则。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
 - 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueDraftingOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForManager`、`openFindings`，`standing.ts` 的 `standingOf`（给主人看的状态和能做的事）和 `standingIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`draftBrief` 起草的规矩、`parseDraft` 读草稿、`draftDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题），`standing.ts` 的 `standingLabel`、`actLabel`（每个动作叫什么）、`standingWantsOwner`。
 - 表：`issue`（一张工单一行；验收标准在 `criteria`、帮工的问题在 `asks`、它对每条标准的自评在 `checks`，都是 JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.draft`（`POST /api/v1/issues/{id}/draft`），时间线是 `issue.timeline`；命令行 `vibevalley issue …`。
@@ -76,7 +76,7 @@
 
 **验收**（`issue.accept`）：通过记下 `acceptedAt`，原来的草都拔掉；没过至少一条意见，每条记成一棵草，还没拔的草编号写成一句话交给帮工再修一轮。新的一轮开始（带话、再干一轮）验收作废，草留着，下一次通过才拔。
 
-**主人的话从一处进工单**：主人的话不管从哪来（`issue.comment`、在工单串里 `channel.say`、连接器、农场替主人说的冲突和检查没过），写进工单串就有一条带 `thread` 的 `message` 事实，工单服务订阅它（`issue.ts` 的 `heard`）：清掉 `asks`，作废验收。帮工没有串时 `issue.comment` 直接送到帮工、没有事实，`comment` 自己做这两步。关上的工单不动。农场替主人说的话也算：冲突解决、检查没过修好以后是新的一轮代码，`acceptance: required` 的工单要再验收一次才能收获。管家用 `accept` 工具也能验，收获照旧要主人说一声。
+**主人的话从一处进工单**：主人的话不管从哪来（`issue.comment`、在工单串里 `channel.say`、连接器、农场替主人说的冲突和检查没过），写进工单串就有一条带 `thread` 的 `message` 事实，工单服务订阅田头的 `ownerInThread`：清掉 `asks`，作废验收。帮工没有串时 `issue.comment` 直接送到帮工、没有事实，`comment` 自己做这两步。关上的工单不动。农场替主人说的话也算：冲突解决、检查没过修好以后是新的一轮代码，`acceptance: required` 的工单要再验收一次才能收获。管家用 `accept` 工具也能验，收获照旧要主人说一声。
 
 **缺肥**：帮工汇报里「要问主人：」开头的行，`readReport` 读出来放进 `report` 事实的 `asks`，工单服务记到 `asks`（`{ question, options? }`：句末「（选项：A｜B）」是它想到的回答，少于两个就不算选项）；主人在工单串里说一句就算回答，点一个选项就是把这句原样说出去，问题清掉。
 

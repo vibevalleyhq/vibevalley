@@ -177,7 +177,9 @@ VibeValley 是一个 AI 原生的 Linear，外面包一层农场游戏的皮。�
    - 事件：Agent Sessions 把自己的事实说成 `news`（`SessionNews`：`hired`、`reported`、`left`，带着那一刻的 Session）；工单和种植计划订阅它，田头经 `Helpers` 端口收（`sessionNews`），不再从核心事实里按 `type` 挑。主人在串里的话由田头说成 `ownerInThread`，工单订阅它；工单的两路合成一条按顺序处理。
    - 读别人的那一块：各模块给自己的一块开查询（`Sessions.sessionOf`、`presentSessions`，`Issues.onBoard`，`Tasks.graphs`，`Channels.now`），别人经它读；田头经 `Helpers.sessionOf`、`presentSessions`、`onIssue`。田头给帮工开工单串挪到 `helpersBack`（帮工接回以后），不再用 `state.json` 里的旧帮工先开；第几次派活照串里的派活消息数。边界测试加了一条：读 `core.state()` 里别人的那一块就失败，没有例外。
    - 工具：挑帮工档案（`dispatch`、`issue_status` 和起草各有一份）收成 `Issues.pickAgent`；拆计划的规矩 `splitBrief` 挪到 `task/rules.ts`。留在工具里的：主人有没有说过的检查（Assistant 替主人做事的规矩，HTTP 的调用方就是主人），参数的翻译（名字到 id）和给模型看的拼法。
-7. **按能力拆大服务**：`issue.ts`、`session.ts`、`channel/chat.ts` 在各自的文件夹里拆成几个小服务（例如工单的起草、收获和 PR、排队），一个文件一个服务。
+7. **按能力拆大服务**（已做）：只拆有真 seam 的。
+   - 工单：起草（Refinement，`issue/draft.ts` 的 `refinement`，连 `pickAgent`）和收获（`issue/harvest.ts` 的 `harvesting`：本地合、PR、合不进去怎么说、PR 的轮询）各成一个文件，工单服务在建的时候把要的几样交给它们；`issue.ts` 剩存取、挪状态、派活和排队、带话、验收。
+   - 不拆：执行（`session.ts`）的令牌、存盘、run 都读写同一份 `hands`，拆开只是把这份状态传来传去；田头（`chat.ts`）的投递、提示、刹车也共用一把锁和几张表。它们各自还是一个能力，没有一个能单独换的 seam。
 8. **事件提交和副作用分开**：另写提案评估（参考 T3 Code 的事件溯源和 outbox）。
 9. **统一词汇**：照上面的「概念」表改名，接口、表名、文档一起改，不留兼容（本机旧库作废重建）；「待定」的三个先和主人定下来。
 10. **挪文件夹**：按模块改成 `src/<模块>/…`，纯机械，单独一个改动。
