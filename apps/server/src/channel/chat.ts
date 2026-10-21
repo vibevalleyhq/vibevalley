@@ -34,7 +34,7 @@ import {
   targetOf,
   wakeBreaker,
 } from "@vibevalley/protocol/rules";
-import { Context, Effect, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as qc from "../../db/generated/channel_conversation.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
@@ -293,6 +293,8 @@ export const make = Effect.gen(function* () {
   const notices = new Map<string, NodeJS.Timeout>();
   const names = new Map<string, string>();
   let closed = false;
+  // Work set off by a timer belongs to this service: it ends with it and keeps its services.
+  const forkHere = yield* FiberSet.makeRuntime<never>();
 
   /** Runs fn under the lock a little later, unless the chat has stopped. */
   /** What goes wrong in the background is logged, and the chat goes on with the next thing. */
@@ -300,9 +302,10 @@ export const make = Effect.gen(function* () {
     (what: string) =>
     <A, E>(e: Effect.Effect<A, E>) =>
       Effect.asVoid(e).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${what}: ${String(c)}`)));
+  // A timer, so a notice gathering can be called off (clearTimeout); what it runs is a fiber of this service's.
   const later = (ms: number, fn: () => Effect.Effect<void>) =>
     setTimeout(() => {
-      if (!closed) void Effect.runFork(locked(Effect.suspend(() => (closed ? Effect.void : fn()))).pipe(logged("later")));
+      if (!closed) void forkHere(locked(Effect.suspend(() => (closed ? Effect.void : fn()))).pipe(logged("later")));
     }, ms);
 
   // ── the people and the channels ──

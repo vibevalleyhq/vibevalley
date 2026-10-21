@@ -34,6 +34,7 @@ import {
   type RunTrigger,
   type Schedule,
   type Session,
+  type SideEvent,
   type TaskGraph,
 } from "@vibevalley/protocol";
 import {
@@ -853,32 +854,42 @@ export const make = (options: IssueOptions = {}) =>
 
     // ── what happens to its sessions ──
 
-    const onFact = (e: { type: string } & Record<string, unknown>) =>
+    const onFact = (e: SideEvent) =>
       Effect.gen(function* () {
-        if (e.type === "left") {
-          const issue = (yield* one(qs.issueOfSession({ session: e.id as string })))?.issue;
-          if (!issue) return;
-          const row = yield* one(q.getIssue({ id: issue }));
-          if (!row || row.graph !== null || row.task !== null) return;
-          const runs = (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session);
-          if (runs.at(-1) !== e.id) return;
-          yield* db(q.closeIssue({ closed_at: Date.now(), closed: (e.closed as string | undefined) ?? null, id: issue }));
-          yield* publish(issue);
-        } else if (e.type === "report") {
-          const issue = (yield* one(qs.issueOfSession({ session: e.id as string })))?.issue;
-          // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
-          const checks = (e.checks as CriterionCheck[] | undefined) ?? [];
-          if (issue && checks.length > 0) yield* checked(issue, checks);
-          if (issue) yield* asked(issue, e.asks as Ask[] | undefined);
-          yield* handedBack(e as never);
-          if (core.session(e.id as string)?.conflict) yield* recheck(e.id as string);
-        } else if (e.type === "message") {
-          // Whatever path an owner's word took into an issue's thread, this is where the issue hears it.
-          const m = e.message as { fromKind: string; kind: string; final: boolean };
-          if (!e.thread || m.fromKind !== "user" || m.kind !== "chat" || !m.final) return;
-          const issue = yield* Effect.option(get(e.thread as string));
-          if (Option.isNone(issue) || isClosed(issue.value.status)) return;
-          yield* ownerSaid(issue.value.id);
+        switch (e.type) {
+          case "left": {
+            const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
+            if (!issue) return;
+            const row = yield* one(q.getIssue({ id: issue }));
+            if (!row || row.graph !== null || row.task !== null) return;
+            const runs = (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session);
+            if (runs.at(-1) !== e.id) return;
+            yield* db(q.closeIssue({ closed_at: Date.now(), closed: e.closed ?? null, id: issue }));
+            yield* publish(issue);
+            return;
+          }
+          case "report": {
+            const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
+            // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
+            const checks = e.checks ?? [];
+            if (issue && checks.length > 0) yield* checked(issue, checks);
+            if (issue) yield* asked(issue, e.asks);
+            yield* handedBack(e);
+            if (core.session(e.id)?.conflict) yield* recheck(e.id);
+            return;
+          }
+          case "message": {
+            // Whatever path an owner's word took into an issue's thread, this is where the issue hears it.
+            const m = e.message;
+            if (!e.thread || m.fromKind !== "user" || m.kind !== "chat" || !m.final) return;
+            const issue = yield* Effect.option(get(e.thread));
+            if (Option.isNone(issue) || isClosed(issue.value.status)) return;
+            yield* ownerSaid(issue.value.id);
+            return;
+          }
+          default:
+            // The issues hear only these three.
+            return;
         }
       });
 
@@ -897,7 +908,7 @@ export const make = (options: IssueOptions = {}) =>
       (what: string) =>
       <A, E>(e: Effect.Effect<A, E>) =>
         Effect.asVoid(e).pipe(Effect.catchCause((c) => Effect.logWarning(`vibevalley: ${what}: ${String(c)}`)));
-    yield* Effect.forkScoped(Stream.runForEach(facts, (e) => onFact(e as never).pipe(logged(`issues after a ${e.type}`))));
+    yield* Effect.forkScoped(Stream.runForEach(facts, (e) => onFact(e).pipe(logged(`issues after a ${e.type}`))));
     yield* Effect.forkScoped(
       // However the manager's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
       Stream.runForEach(finished, (run) =>

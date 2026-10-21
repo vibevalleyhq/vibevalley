@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vite-plus/test";
 import type { CoreState, InboxItem, Session } from "@vibevalley/protocol";
 import { CallBell, noticeFor, traySummary } from "./notice";
 

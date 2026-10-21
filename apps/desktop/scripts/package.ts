@@ -4,17 +4,18 @@
 // repository: PGlite's wasm, the word lists, the migrations and the agent SDKs are read from paths beside their code.
 
 import { build, Platform } from "electron-builder";
-import { $ } from "bun";
+import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const desktop = join(import.meta.dir, "..");
+const desktop = join(import.meta.dirname, "..");
 const repo = join(desktop, "../..");
 const stage = join(desktop, "dist/stage");
 const server = join(stage, "server");
 
-await $`bun run --filter vibevalley-web build`.cwd(repo);
-await $`bun scripts/build.ts`.cwd(desktop);
+const sh = (cwd: string, cmd: string, ...args: string[]) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
+sh(repo, "pnpm", "--filter", "vibevalley-web", "run", "build");
+sh(desktop, "pnpm", "exec", "tsx", "scripts/build.ts");
 
 rmSync(stage, { recursive: true, force: true });
 mkdirSync(server, { recursive: true });
@@ -47,9 +48,9 @@ writeFileSync(
     2,
   ),
 );
-await $`npm install --omit=dev --install-links --no-audit --no-fund --no-package-lock`.cwd(server);
+sh(server, "npm", "install", "--omit=dev", "--install-links", "--no-audit", "--no-fund", "--no-package-lock");
 
-const version = (await $`git describe --tags --always`.cwd(repo).text()).trim().replace(/^v/, "");
+const version = execFileSync("git", ["describe", "--tags", "--always"], { cwd: repo, encoding: "utf8" }).trim().replace(/^v/, "");
 await build({
   targets: Platform.MAC.createTarget(["dmg"]),
   config: {

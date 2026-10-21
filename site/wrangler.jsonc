@@ -1,6 +1,6 @@
 // vibevalley.dev on Cloudflare: a Worker with nothing but the built pages (dist/, no script of its own), on the domain
-// whose DNS is already on Cloudflare; the first deploy adds the domain's record and certificate. `bun run deploy`
-// builds and publishes, with wrangler logged in to the account that holds the domain (`bunx wrangler login`).
+// whose DNS is already on Cloudflare; the first deploy adds the domain's record and certificate. `pnpm run deploy`
+// builds and publishes, with wrangler logged in to the account that holds the domain (`pnpm dlx wrangler login`).
 {
   "name": "vibevalley-site",
   "compatibility_date": "2026-10-01",

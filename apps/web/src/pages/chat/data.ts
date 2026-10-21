@@ -1,13 +1,13 @@
 // The chat page's reads beyond the state.
 
 import { type Accessor, createContext, createEffect, createMemo, createSignal, createStore, onSettled, snapshot, useContext } from "solid-js";
-import { useQuery } from "@tanstack/solid-query";
+
 import type { Conversation, CoreState, SessionEvent } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { subscribeLive } from "../../data/live";
 import { chatPage, type Loaded, mergeLoaded, messagesOf, newestUnread } from "../../rules/chat";
 import { mergeSteps } from "../../rules/rounds";
-import { ready } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 
 export interface History {
   /** The pages of messages read beyond what the state holds, by conversation. */

@@ -1,12 +1,12 @@
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
-import { useQuery } from "@tanstack/solid-query";
+
 import type { ChangedFile, Changes, Issue, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { issueTitle } from "../../rules/issues";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "../../rules/issueState";
 import { ago } from "../../rules/time";
 import { aria, autofocus } from "../../app/util";
-import { ready } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { TextArea } from "../../ui/Field";

@@ -2,8 +2,8 @@
 // frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the
 // DOM over it (store screen), and wears the tool's cursor.
 
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
-import { useQuery } from "@tanstack/solid-query";
+import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js";
+
 import type { Agent } from "@vibevalley/protocol";
 import { frames } from "../../data/frames";
 import { startScene, type Scene } from "./scene";
@@ -17,7 +17,7 @@ import { spriteUrl } from "../world/sprites";
 import { textureProgress } from "../world/textures";
 import { createExternal } from "../../data/external";
 import { useRouter } from "../../app/router";
-import { ready, useAgents } from "../../data/query";
+import { ready, useAgents, useQuery } from "../../data/query";
 import { commands, farmProject } from "../state";
 import { farmFrameOf } from "../scope";
 import { useVillage } from "../support";
@@ -92,39 +92,46 @@ export function VillageCanvas() {
   );
 
   // The cursor: the tool in hand, and whether it can be used where it points.
-  createEffect(hotspots, (spots) => {
-    let pressed = false;
-    const apply = () => {
-      const s = farmState();
-      const bed = s.hoverBed === null ? undefined : beds[s.hoverBed];
-      const aim = bed ? commands.aim(bed).aim : undefined;
-      const name = !aim
-        ? s.hoverSpot
-          ? "hand-point"
-          : s.tool
-        : !aim.ok
-          ? `${s.tool}-no`
-          : s.tool === "hand"
-            ? pressed
-              ? "hand-press"
-              : "hand-point"
-            : pressed
-              ? `${s.tool}-press`
-              : `${s.tool}-ok`;
-      host.style.cursor = cssCursor(name, spots);
-    };
-    const down = () => ((pressed = true), apply());
-    const up = () => ((pressed = false), apply());
-    host.addEventListener("pointerdown", down);
-    window.addEventListener("pointerup", up);
-    apply();
-    const off = subscribeFarm(apply);
-    return () => {
-      off();
-      host.removeEventListener("pointerdown", down);
-      window.removeEventListener("pointerup", up);
-    };
-  });
+  // The hotspots taken in the compute part: the apply part runs untracked, on every pointer move.
+  createEffect(
+    () => {
+      const h = hotspots();
+      return h ? snapshot(h) : undefined;
+    },
+    (spots) => {
+      let pressed = false;
+      const apply = () => {
+        const s = farmState();
+        const bed = s.hoverBed === null ? undefined : beds[s.hoverBed];
+        const aim = bed ? commands.aim(bed).aim : undefined;
+        const name = !aim
+          ? s.hoverSpot
+            ? "hand-point"
+            : s.tool
+          : !aim.ok
+            ? `${s.tool}-no`
+            : s.tool === "hand"
+              ? pressed
+                ? "hand-press"
+                : "hand-point"
+              : pressed
+                ? `${s.tool}-press`
+                : `${s.tool}-ok`;
+        host.style.cursor = cssCursor(name, spots);
+      };
+      const down = () => ((pressed = true), apply());
+      const up = () => ((pressed = false), apply());
+      host.addEventListener("pointerdown", down);
+      window.addEventListener("pointerup", up);
+      apply();
+      const off = subscribeFarm(apply);
+      return () => {
+        off();
+        host.removeEventListener("pointerdown", down);
+        window.removeEventListener("pointerup", up);
+      };
+    },
+  );
 
   return (
     <div class="absolute inset-0 overflow-hidden" style={{ background }} aria-label="码农场物语的像素农场" role="region">

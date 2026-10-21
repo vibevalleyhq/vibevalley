@@ -60,10 +60,11 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const projectList = useProjects();
   const projects = () => ready(projectList, []).map((p) => p.name);
 
+  // The issue as the server has it now replaces the draft, unless the owner has started changing it.
   createEffect(
-    () => JSON.stringify(props.item),
-    () => {
-      if (!edited()) setD(draftOf(props.item));
+    () => draftOf(props.item),
+    (fresh) => {
+      if (!untrack(edited)) setD(fresh);
     },
     { defer: true },
   );

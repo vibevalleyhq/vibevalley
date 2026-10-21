@@ -25,11 +25,11 @@ for key in $(env | cut -d= -f1); do
 done
 
 if "$server"; then
-    bun run server:check
+    pnpm run server:check
 fi
 if "$web"; then
-    bun run web:check
+    pnpm run web:check
 fi
 if "$docs"; then
-    bun run docs:verify
+    pnpm run docs:verify
 fi

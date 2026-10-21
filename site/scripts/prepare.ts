@@ -4,15 +4,14 @@
  * app's icon for the tab and the home screen, the font's licence, and each language's share card (card.ts). Runs before `astro check` and `astro build` (package.json).
  */
 
-import { Glob } from 'bun'
-import { mkdirSync } from 'node:fs'
+import { copyFileSync, globSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import subsetFont from 'subset-font'
 import { en } from '../src/i18n/en'
 import { zh } from '../src/i18n/zh'
 import { drawCard } from './card'
 
-const site = resolve(import.meta.dir, '..')
+const site = resolve(import.meta.dirname, '..')
 const pub = resolve(site, '../apps/web/public')
 const out = resolve(site, 'public/gen')
 mkdirSync(out, { recursive: true })
@@ -20,18 +19,18 @@ mkdirSync(out, { recursive: true })
 // Every character in the pages' sources, and all of printable ASCII: a few more than shown, never one missing.
 let text = ''
 for (let c = 0x20; c < 0x7f; c++) text += String.fromCharCode(c)
-for (const file of new Glob('src/**/*.{astro,ts,tsx,css}').scanSync({ cwd: site })) text += await Bun.file(resolve(site, file)).text()
+for (const file of globSync(['astro', 'ts', 'tsx', 'css'].map((ext) => `src/**/*.${ext}`), { cwd: site })) text += readFileSync(resolve(site, file), 'utf8')
 const chars = [...new Set(text)].join('')
 
-const font = Buffer.from(await Bun.file(resolve(pub, 'fonts/fusion-pixel-12px-proportional-zh_hans.otf')).arrayBuffer())
+const font = readFileSync(resolve(pub, 'fonts/fusion-pixel-12px-proportional-zh_hans.otf'))
 const woff2 = await subsetFont(font, chars, { targetFormat: 'woff2' })
-await Bun.write(resolve(out, 'pixel.woff2'), woff2)
+writeFileSync(resolve(out, 'pixel.woff2'), woff2)
 // The font's licence (SIL OFL) goes wherever the font does.
-await Bun.write(resolve(out, 'fusion-pixel-OFL.txt'), Bun.file(resolve(pub, 'fonts/fusion-pixel-OFL.txt')))
+copyFileSync(resolve(pub, 'fonts/fusion-pixel-OFL.txt'), resolve(out, 'fusion-pixel-OFL.txt'))
 
-for (const size of [32, 64, 256]) await Bun.write(resolve(out, `icon-${size}.png`), Bun.file(resolve(pub, `icons/app-${size}.png`)))
+for (const size of [32, 64, 256]) copyFileSync(resolve(pub, `icons/app-${size}.png`), resolve(out, `icon-${size}.png`))
 
 // Base.astro points og:image at card-<lang>.jpg.
-for (const copy of [zh, en]) await Bun.write(resolve(out, `card-${copy.lang}.jpg`), await drawCard(copy, font, resolve(pub, 'pixel/title-evening.jpg')))
+for (const copy of [zh, en]) writeFileSync(resolve(out, `card-${copy.lang}.jpg`), await drawCard(copy, font, resolve(pub, 'pixel/title-evening.jpg')))
 
 console.log(`prepare: pixel.woff2 ${(woff2.length / 1024).toFixed(0)} KB for ${chars.length} characters, icons, share cards`)

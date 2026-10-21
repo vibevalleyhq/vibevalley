@@ -22,6 +22,11 @@ test("a helper is made, edited, turned off and deleted", async ({ page }) => {
   await page.getByLabel("变量的值").fill("1");
   await page.getByRole("button", { name: "添加" }).click();
   await expect(page.getByLabel("CI 的值")).toHaveValue("1");
+  // Typed key by key: the row stays, so the field keeps its focus.
+  await page.getByLabel("CI 的值").press("End");
+  await page.getByLabel("CI 的值").pressSequentially("23");
+  await expect(page.getByLabel("CI 的值")).toHaveValue("123");
+  await page.getByLabel("CI 的值").fill("1");
   await page.getByRole("button", { name: "捏好了，保存" }).click();
   await expect(page).toHaveURL(/\/agents\/(?!new).+/);
   await expect(page.getByText("已保存")).toBeVisible();

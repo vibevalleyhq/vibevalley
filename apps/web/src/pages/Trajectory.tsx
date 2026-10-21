@@ -4,7 +4,7 @@
 
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQuery } from "@tanstack/solid-query";
+
 import type { ManagerEval, SessionEvent } from "@vibevalley/protocol";
 import { api, reasonOf } from "../data/api";
 import {
@@ -28,7 +28,7 @@ import { ago } from "../rules/time";
 import { toast } from "../ui/toasts";
 import { aria, autofocus, Keyed, useNow } from "../app/util";
 import { createSessionEvents } from "./chat/data";
-import { ready } from "../data/query";
+import { ready, useQuery } from "../data/query";
 import { TextInput } from "../ui/Field";
 import { Icon } from "../ui/Icon";
 import { Markdown } from "../ui/Markdown";

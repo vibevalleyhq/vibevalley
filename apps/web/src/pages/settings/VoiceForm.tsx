@@ -2,9 +2,9 @@
 // on /manager/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
 // now: the other part may have been saved meanwhile.
 
-import { createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
+import { createSignal, For, Match, onSettled, Show, snapshot, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { keepPreviousData, useQuery } from "@tanstack/solid-query";
+import { keepPreviousData } from "@tanstack/solid-query";
 import {
   AreaValues,
   defaultGreeting,
@@ -42,7 +42,7 @@ import {
 } from "../../rules/voice";
 import { A } from "../../app/A";
 import { aria, createSettled, Keyed } from "../../app/util";
-import { ready, useSettings } from "../../data/query";
+import { ready, useQuery, useSettings } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { Select, TextArea, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
@@ -78,7 +78,8 @@ function useProblem(update: () => SettingsUpdate) {
 }
 
 function Form(props: { status: SettingsStatus; part: VoicePart }) {
-  const start = untrack(() => props.status);
+  // A plain copy: the form starts from it once, and reading the store's fields later would be untracked reads.
+  const start = untrack(() => snapshot(props.status));
   const [draft, setDraft] = createSignal<VoiceSettings>(start.voice);
   const [appId, setAppId] = createSignal(start.agoraAppId.value ?? "");
   const [dictation, setDictation] = createSignal<Dictation>(start.dictation);

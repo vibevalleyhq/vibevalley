@@ -7,8 +7,8 @@ import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 import type { Config } from "../base/config.ts";
 import { handlers } from "../handlers.ts";
-import { Lan, type LanOptions } from "../lan/lan.ts";
-import { services } from "../services.ts";
+import { Lan } from "../lan/lan.ts";
+import { type ServiceOptions, services } from "../services.ts";
 import { Sessions } from "../session/session.ts";
 import { api } from "./api.ts";
 import { mcpRoute } from "./mcp.ts";
@@ -34,12 +34,7 @@ const ready = (listening: (address: string) => Effect.Effect<void>) =>
   );
 
 /** port 0 is a free one. */
-export const app = (
-  config: Config,
-  port: number,
-  listening: (address: string) => Effect.Effect<void> = () => Effect.void,
-  options: { readonly lan?: LanOptions } = {},
-) =>
+export const app = (config: Config, port: number, listening: (address: string) => Effect.Effect<void> = () => Effect.void, options: ServiceOptions = {}) =>
   HttpRouter.serve(routes(config), { disableListenLog: true, disableLogger: true }).pipe(
     Layer.merge(ready(listening)),
     Layer.provideMerge(services(config, options)),

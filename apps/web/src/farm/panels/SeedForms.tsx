@@ -4,7 +4,7 @@
 
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQuery } from "@tanstack/solid-query";
+
 import { managerAgent, type ProjectTemplates, type Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { fire } from "../commands";
@@ -12,7 +12,7 @@ import { playSound } from "../sound";
 import { newSendKey, writeIssue } from "../../pages/issues/write";
 import { aria } from "../../app/util";
 import { useRouter } from "../../app/router";
-import { ready, useAgents, useProjects } from "../../data/query";
+import { ready, useAgents, useProjects, useQuery } from "../../data/query";
 import { AgentFace } from "../../ui/Face";
 import { PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
 import { commands, useFarm } from "../state";

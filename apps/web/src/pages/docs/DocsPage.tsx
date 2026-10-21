@@ -4,7 +4,7 @@
 
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQuery, useQueryClient } from "@tanstack/solid-query";
+import { useQueryClient } from "@tanstack/solid-query";
 import {
   type Agent,
   blockBulleted,
@@ -27,7 +27,7 @@ import { knownTypes } from "../../rules/docBlocks";
 import { useRouter } from "../../app/router";
 import { aria, Keyed } from "../../app/util";
 import { createExternal } from "../../data/external";
-import { ready, useAgents } from "../../data/query";
+import { ready, useAgents, useQuery } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { AgentFace } from "../../ui/Face";
 import { TextInput } from "../../ui/Field";
@@ -378,8 +378,10 @@ function Field(props: { editor: DocEditor; row: Row; focusNow: boolean; onLeave:
   let el!: HTMLTextAreaElement;
   const b = () => props.row.block;
   // Clicked into: the field takes the focus once it is on the page.
+  // Read here, not in onSettled: the prop is a memo made on first read, and onSettled may not make one.
+  const focusNow = untrack(() => props.focusNow);
   onSettled(() => {
-    if (props.focusNow) el.focus();
+    if (focusNow) el.focus();
   });
   // The editor moved the text under the caret, or asked for this block to take the focus.
   createEffect(

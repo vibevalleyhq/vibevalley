@@ -5,7 +5,7 @@
 
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQuery } from "@tanstack/solid-query";
+
 import type { Acceptance, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { farm, overlayOf } from "../store";
@@ -21,7 +21,7 @@ import { createSessionEvents } from "../../pages/chat/data";
 import { WorkLog } from "../../pages/chat/WorkLog";
 import { useCore, useFrames } from "../../data/frame";
 import { useIssueHistory } from "../../data/issues";
-import { ready, useAgents } from "../../data/query";
+import { ready, useAgents, useQuery } from "../../data/query";
 import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
 import { tint } from "../panels/bits";
 import { commands, useFarm } from "../state";
@@ -215,9 +215,10 @@ function IssueBody(props: {
         return void reopen();
     }
   };
-  const button = (a: IssueAct, lead: boolean) => (
+  /** lead is read as it renders: the lead changes as the issue moves on. */
+  const button = (a: IssueAct, lead: () => boolean) => (
     <PxButton
-      tone={lead ? "primary" : a === "close" || (a === "reject" && box() === "reject") ? "danger" : "plain"}
+      tone={lead() ? "primary" : a === "close" || (a === "reject" && box() === "reject") ? "danger" : "plain"}
       disabled={busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim())}
       onClick={() => go(a)}
     >
@@ -299,9 +300,11 @@ function IssueBody(props: {
           </div>
         </Show>
         <div class="mt-3 flex flex-wrap gap-2">
-          <Show when={s().ask && s().lead}>{(lead) => button(lead(), true)}</Show>
-          <For each={blockActs()}>{(a) => button(a, false)}</For>
-          <For each={rowActs()}>{(a) => button(a, !s().ask && a === s().lead)}</For>
+          <Show when={s().ask && s().lead} keyed>
+            {(lead) => button(lead, () => true)}
+          </Show>
+          <For each={blockActs()}>{(a) => button(a, () => false)}</For>
+          <For each={rowActs()}>{(a) => button(a, () => !s().ask && a === s().lead)}</For>
           <PxButton icon="button-open" onClick={() => props.onNavigate()}>
             在看板上看
           </PxButton>
@@ -533,17 +536,19 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   const mark = (r: CriterionRow) => (r.result ? <SpriteIcon name={resultMark[r.result].icon} size={14} label={resultMark[r.result].label} /> : undefined);
   return (
     <div class="flex flex-col">
-      <For each={props.rows}>
+      <For each={props.rows} keyed={(r) => r.text}>
         {(r, i) => (
           <Show
             when={props.checking}
             fallback={
               <div class="flex items-start gap-2 py-0.5">
-                <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">{mark(r) ?? <span class="h-2.5 w-2.5 border-2 border-bark-300" />}</span>
+                <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
+                  {mark(r()) ?? <span class="h-2.5 w-2.5 border-2 border-bark-300" />}
+                </span>
                 <span class="min-w-0 flex-1">
-                  <span class={body}>{r.text}</span>
-                  <Show when={r.proof}>
-                    <span class={["block", xs]}>{r.proof}</span>
+                  <span class={body}>{r().text}</span>
+                  <Show when={r().proof}>
+                    <span class={["block", xs]}>{r().proof}</span>
                   </Show>
                 </span>
               </div>
@@ -552,7 +557,7 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
             <button
               type="button"
               aria-pressed={aria(ticked().has(i()))}
-              aria-label={r.text}
+              aria-label={r().text}
               onClick={() => setTicked((t) => (t.has(i()) ? new Set([...t].filter((x) => x !== i())) : new Set([...t, i()])))}
               class="group flex cursor-pointer items-start gap-2 py-0.5 text-left"
             >
@@ -561,11 +566,11 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
                   <SpriteIcon name="mark-check" size={12} label="看过了" />
                 </Show>
               </span>
-              <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">{mark(r)}</span>
+              <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">{mark(r())}</span>
               <span class="min-w-0 flex-1">
-                <span class={[body, { "text-bark-500": ticked().has(i()) }]}>{r.text}</span>
-                <Show when={r.proof}>
-                  <span class={["block", xs]}>{r.proof}</span>
+                <span class={[body, { "text-bark-500": ticked().has(i()) }]}>{r().text}</span>
+                <Show when={r().proof}>
+                  <span class={["block", xs]}>{r().proof}</span>
                 </Show>
               </span>
             </button>

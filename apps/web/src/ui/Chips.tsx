@@ -56,28 +56,32 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
   const field = "h-8 min-w-0 rounded-md border border-line bg-page px-2 font-mono text-sm outline-none placeholder:text-faint focus:border-focus";
   return (
     <div class={["flex flex-col gap-1.5", { "opacity-50": !!props.disabled }]}>
-      <For each={rows()}>
-        {([k, v]) => (
-          <div class="flex items-center gap-1.5">
-            <span class="w-40 truncate font-mono text-sm">{k}</span>
-            <input
-              aria-label={`${k} 的值`}
-              disabled={props.disabled}
-              class={[field, "flex-1"]}
-              value={v}
-              onInput={(e) => props.onChange({ ...props.value, [k]: e.currentTarget.value })}
-            />
-            <button
-              type="button"
-              disabled={props.disabled}
-              aria-label={`删除 ${k}`}
-              onClick={() => props.onChange(Object.fromEntries(rows().filter(([x]) => x !== k)))}
-              class="cursor-pointer rounded px-1.5 text-xs text-muted hover:text-berry"
-            >
-              删除
-            </button>
-          </div>
-        )}
+      {/* By name: a keystroke makes new pairs, and a row made again would lose its input's focus. */}
+      <For each={rows()} keyed={([k]) => k}>
+        {(row) => {
+          const k = () => row()[0];
+          return (
+            <div class="flex items-center gap-1.5">
+              <span class="w-40 truncate font-mono text-sm">{k()}</span>
+              <input
+                aria-label={`${k()} 的值`}
+                disabled={props.disabled}
+                class={[field, "flex-1"]}
+                value={row()[1]}
+                onInput={(e) => props.onChange({ ...props.value, [k()]: e.currentTarget.value })}
+              />
+              <button
+                type="button"
+                disabled={props.disabled}
+                aria-label={`删除 ${k()}`}
+                onClick={() => props.onChange(Object.fromEntries(rows().filter(([x]) => x !== k())))}
+                class="cursor-pointer rounded px-1.5 text-xs text-muted hover:text-berry"
+              >
+                删除
+              </button>
+            </div>
+          );
+        }}
       </For>
       <form
         class="flex items-center gap-1.5"

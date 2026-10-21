@@ -20,37 +20,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with: { bun-version: 1.4.2 }
+      # pnpm's version is package.json's packageManager.
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 24 }
-      - run: bun install --frozen-lockfile
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
       - name: pull request title
         if: github.event_name == 'pull_request'
         # Squash merging makes the title the commit's subject. Passed through the environment, never into the shell.
         env:
           TITLE: ${{ github.event.pull_request.title }}
-        run: bun scripts/commit-msg.ts --title "$TITLE"
-      - run: bun run check
-      - run: bun run docs:verify
-      - run: bun test scripts/commit-msg.test.ts
+        run: pnpm exec tsx scripts/commit-msg.ts --title "$TITLE"
+      - run: pnpm run check
+      - run: pnpm run docs:verify
+      - run: pnpm run scripts:test
 
   server:
     name: server
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with: { bun-version: 1.4.2 }
+      # pnpm's version is package.json's packageManager.
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 24 }
+        with: { node-version: 24, cache: pnpm }
       - run: git config --global user.name ci && git config --global user.email ci@example.com
-      - run: bun install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       # server:check without db:check: effect-sqlc (the generator) is not published, so only a clone with ../effect-sqlc
       # can tell whether db/generated is current. The rest runs against the committed db/generated.
-      - run: bun test src
+      - run: pnpm run test
         working-directory: packages/protocol
-      - run: bun run check && bun run test
+      - run: pnpm run check && pnpm run test
         working-directory: apps/server
 
   web:
@@ -58,16 +58,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with: { bun-version: 1.4.2 }
+      # pnpm's version is package.json's packageManager.
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 24 }
+        with: { node-version: 24, cache: pnpm }
       - run: git config --global user.name ci && git config --global user.email ci@example.com
-      - run: bun install --frozen-lockfile
-      - run: bun run web:check
-      - run: bunx playwright install --with-deps chromium
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run web:check
+      - run: pnpm exec playwright install --with-deps chromium
         working-directory: apps/web
-      - run: bun run test
+      - run: pnpm run test
         working-directory: apps/web
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -78,12 +78,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with: { bun-version: 1.4.2 }
+      # pnpm's version is package.json's packageManager.
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 24 }
-      - run: bun install --frozen-lockfile
-      - run: xvfb-run -a bun run desktop:test
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: xvfb-run -a pnpm run desktop:test
       - uses: actions/upload-artifact@v4
         if: failure()
         with: { name: desktop-test-results, path: apps/desktop/test-results, retention-days: 7 }
@@ -93,8 +93,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with: { bun-version: 1.4.2 }
+      # pnpm's version is package.json's packageManager.
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 24 }
-      - run: bun run site:check && bun run site:build
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm run site:check && pnpm run site:build

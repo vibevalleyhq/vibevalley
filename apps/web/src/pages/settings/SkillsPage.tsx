@@ -2,7 +2,7 @@
 // a profile picks; /settings/skills/<id>, installed:<name> for an installed one, new for a new one.
 
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
-import { useQuery, useQueryClient } from "@tanstack/solid-query";
+import { useQueryClient } from "@tanstack/solid-query";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { type InstalledSkill, installedSkills, matches, runtimeName } from "../../rules/skills";
@@ -10,7 +10,7 @@ import { toast } from "../../ui/toasts";
 import { A } from "../../app/A";
 import { useRouter } from "../../app/router";
 import { Keyed } from "../../app/util";
-import { ready, useAgents, useRuntimes } from "../../data/query";
+import { ready, useAgents, useQuery, useRuntimes } from "../../data/query";
 import { RuntimeIcon } from "../../farm/hud/QuotaPill";
 import { Button } from "../../ui/Button";
 import { AgentFace } from "../../ui/Face";

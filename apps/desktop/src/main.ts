@@ -5,6 +5,7 @@ import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, i
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Notice, TraySummary } from "@vibevalley/host";
+import { watchForDev } from "./dev";
 import { loginShellPath, type RunningServer, startServer } from "./server";
 
 // In the repository the server is apps/server and the page apps/web/dist; a packaged app has both in its resources
@@ -87,6 +88,8 @@ ipcMain.handle("host:tray", (_event, summary: TraySummary) => {
 const voiceShortcut = "Alt+Shift+Space";
 
 if (!app.requestSingleInstanceLock()) {
+  // The one already open is brought to the front (second-instance there); said, so a script that started this one knows.
+  console.error("vibevalley: VibeValley is already open; this one quits and brings that window to the front");
   app.quit();
 } else {
   app.on("second-instance", () => {
@@ -95,15 +98,37 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.setName("VibeValley");
   void app.whenReady().then(async () => {
+    const path = await loginShellPath(process.env);
+    const env = path ? { ...process.env, PATH: path } : process.env;
     try {
-      const path = await loginShellPath(process.env);
-      server = await startServer(files(), path ? { ...process.env, PATH: path } : process.env);
+      server = await startServer(files(), env);
     } catch (e) {
       dialog.showErrorBox("VibeValley 起不来", e instanceof Error ? e.message : String(e));
       app.exit(1);
       return;
     }
     open(server.url);
+    if (!app.isPackaged && process.env.VIBEVALLEY_DEV === "1") {
+      const stopWatching = watchForDev({
+        web: files().web,
+        repo: join(app.getAppPath(), "..", ".."),
+        reloadPage: () => {
+          console.log("vibevalley dev: the page was built again, reloading");
+          window?.webContents.reloadIgnoringCache();
+        },
+        restartServer: async () => {
+          const was = server;
+          if (!was) return;
+          const url = new URL(was.url);
+          const at = window ? new URL(window.webContents.getURL()) : undefined;
+          console.log("vibevalley dev: the server's code changed, starting it again");
+          await was.stop();
+          server = await startServer(files(), env, Number(url.port));
+          void window?.loadURL(server.url.replace(/\/$/, "") + (at ? at.pathname + at.search : "/"));
+        },
+      });
+      app.on("will-quit", stopWatching);
+    }
     // Taken by another program: the call button still works.
     globalShortcut.register(voiceShortcut, () => window?.webContents.send("host:voice-shortcut"));
     app.on("activate", () => {

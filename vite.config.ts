@@ -1,6 +1,8 @@
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  // scripts/'s own tests; each package has its vite.config.ts with its own.
+  test: { include: ["scripts/**/*.test.ts"] },
   // The pre-commit hook (.vite-hooks/pre-commit) runs these on the staged files.
   staged: { "*": "vp check --fix" },
   fmt: {
@@ -26,6 +28,27 @@ export default defineConfig({
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
     overrides: [
+      {
+        // Tests are vitest's, on Node.
+        files: ["apps/**", "packages/**", "scripts/**"],
+        rules: { "no-restricted-imports": ["error", { paths: [{ name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." }] }] },
+      },
+      {
+        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives. The
+        // command line prints, and the brain and the journal are plain classes outside Effect.
+        files: ["apps/server/src/**"],
+        rules: { "no-console": "error" },
+      },
+      {
+        files: [
+          "apps/server/src/cli.ts",
+          "apps/server/src/agent/brain/**",
+          "apps/server/src/session/journal.ts",
+          "apps/server/src/**/*.test.ts",
+          "apps/server/src/testing/**",
+        ],
+        rules: { "no-console": "off" },
+      },
       {
         // eslint-plugin-solid's v2 config, for the page: the 1.x APIs, one-argument effects, destructured props, accessors
         // passed as props, writes inside computations. Its server-function rules are left out: there are none here.
@@ -59,10 +82,18 @@ export default defineConfig({
           "no-restricted-imports": [
             "error",
             {
-              paths: ["react", "react-dom", "react-router", "@tanstack/react-query", "react-markdown"].map((name) => ({
-                name,
-                message: "The page is Solid 2 (apps/web/README.md).",
-              })),
+              paths: [
+                ...["react", "react-dom", "react-router", "@tanstack/react-query", "react-markdown"].map((name) => ({
+                  name,
+                  message: "The page is Solid 2 (apps/web/README.md).",
+                })),
+                {
+                  name: "@tanstack/solid-query",
+                  importNames: ["useQuery"],
+                  message: "Use data/query.ts's useQuery: it runs the fetch untracked.",
+                },
+                { name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." },
+              ],
             },
           ],
         },

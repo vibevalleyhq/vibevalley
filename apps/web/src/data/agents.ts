@@ -1,8 +1,8 @@
-import { keepPreviousData, useQuery } from "@tanstack/solid-query";
+import { keepPreviousData } from "@tanstack/solid-query";
 import { type Agent, type AgentIssue, managerAgent } from "@vibevalley/protocol";
 import { api } from "./api";
 import { createSettled } from "../app/util";
-import { ready, useAgents } from "./query";
+import { ready, useAgents, useQuery } from "./query";
 
 /** The profiles work is sent to: the manager's is apart. */
 export function useWorkAgents() {

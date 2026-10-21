@@ -4,8 +4,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type Runtime } from "@botiverse/oar";
-import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
-import { factsOf, presetOf } from "@vibevalley/protocol/rules";
+import type { AccountUsage } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { layer as agent } from "../agent/agent.ts";
 import { type Config, Settings } from "../base/config.ts";
@@ -25,6 +24,7 @@ import { layer as tool } from "../tool/tool.ts";
 import { layer as mcp } from "../mcp/mcp.ts";
 import { testConfig } from "./layers.ts";
 import { repo } from "./git.ts";
+import { installedOnly } from "./helper.ts";
 
 export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 
@@ -43,23 +43,6 @@ export interface WorldOptions {
   /** Who an MCP token names; the sessions' tokens when absent. */
   readonly who?: (token: string) => string;
 }
-
-/** A probe that finds every runtime given, bundled, and no other. */
-const installed =
-  (given: readonly Runtime[], usage: () => AccountUsage | null = () => null) =>
-  async (id: string): Promise<RuntimeInfo> => ({
-    id,
-    preset: presetOf(id),
-    facts: factsOf(id),
-    installation: given.some((r) => r.id === id) ? { status: "available", via: "bundled", command: id, version: null } : { status: "not_found" },
-    models: null,
-    usage: given.some((r) => r.id === id) ? usage() : null,
-    skills: null,
-    mcpServers: null,
-    tools: null,
-    settings: { enabled: true, binPath: "", defaultModel: "", defaultEffort: "", env: {} },
-    checkedAt: Date.now(),
-  });
 
 const on =
   <A, E, R>(layer: Layer.Layer<A, E, R>) =>
@@ -83,7 +66,7 @@ export function worldBelowTasks(options: WorldOptions = {}) {
     on(project({ gh: noGitHub, ...options.projects })),
     on(memory),
     on(doc()),
-    on(runtime({ registry: registryOf(given), background: false, probe: installed(given, options.usage), usageOf: async () => options.usage?.() ?? null })),
+    on(runtime({ registry: registryOf(given), background: false, probe: installedOnly(given, options.usage), usageOf: async () => options.usage?.() ?? null })),
     on(session(options.stallMs !== undefined ? { stallMs: options.stallMs } : {})),
     on(channel),
     on(schedule(options.now ? { now: options.now } : {})),

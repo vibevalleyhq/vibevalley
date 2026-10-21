@@ -31,7 +31,7 @@ import {
   type Spent,
 } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { Context, Effect, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
@@ -60,6 +60,7 @@ import {
   withRecall,
   workplaceRules,
 } from "./rules.ts";
+import { callbackLog } from "../base/log.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
@@ -302,6 +303,7 @@ function watchStalls(session: RuntimeSession, stallMs: number, onStall: (silentF
 
 export const make = (options: SessionOptionsIn = {}) =>
   Effect.gen(function* () {
+    const logs = yield* callbackLog;
     const config = yield* Settings;
     const core = yield* Core;
     const store = yield* Agents;
@@ -316,11 +318,13 @@ export const make = (options: SessionOptionsIn = {}) =>
         Effect.asVoid,
         Effect.catch((err) => Effect.logWarning(`vibevalley: ${what}: ${String(err)}`)),
       );
-    const run = <A>(e: Effect.Effect<A>) => Effect.runPromise(e);
+    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
+    const run = yield* FiberSet.makeRuntimePromise<never>();
+    const forkHere = yield* FiberSet.makeRuntime<never>();
     /** A write whose failure the caller handles. */
     const tried = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
       Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((err) => (err instanceof Error ? err : new Error(String(err)))));
-    const fire = (e: Effect.Effect<unknown, unknown>) => void Effect.runFork(e);
+    const fire = (e: Effect.Effect<unknown, unknown>) => void forkHere(e);
     const apply = (...facts: FactIn[]) => Effect.runSync(core.apply(...facts));
     const notice = (level: "info" | "warn" | "error", text: string) => Effect.runSync(core.notice(level, text));
 
@@ -385,7 +389,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         try {
           disk.write(body);
         } catch (e) {
-          console.warn(`vibevalley: could not save sessions.json: ${String(e)}`);
+          logs.warn(`vibevalley: could not save sessions.json: ${String(e)}`);
         }
       }, saveAfterMs);
     };
@@ -844,7 +848,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         try {
           disk.finish(body);
         } catch (e) {
-          console.warn(`vibevalley: could not save sessions.json: ${String(e)}`);
+          logs.warn(`vibevalley: could not save sessions.json: ${String(e)}`);
         }
         const all = [...hands.values()];
         for (const h of all) h.journal.close();

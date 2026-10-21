@@ -12,7 +12,7 @@ src/FarmScreen.tsx   the WebView: the key as the page's cookie, the bridge's cal
 src/farm.ts          the paired farm in the keychain (expo-secure-store), and lan.pair
 src/rtc.ts           the call on Agora's native SDK: it goes on with the screen locked (the audio background mode)
 src/notify.ts        the page's notices as the phone's own (expo-notifications)
-src/rules.ts         pure: pairing links, the phone's name, the key's cookie, levels; with its bun test
+src/rules.ts         pure: pairing links, the phone's name, the key's cookie, levels; with its vitest
 scripts/e2e.ts       pairs a built app on an emulator or simulator with a sandboxed farm, and screenshots it
 ```
 

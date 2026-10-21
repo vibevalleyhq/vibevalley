@@ -2,16 +2,16 @@
 // achievements with its medals and how far along it is, and the secrets found. The catalogue is the server's
 // (game.achievements), the standings come with the frame (view.achievements).
 
-import { createEffect, createSignal, For, Show } from "solid-js";
-import { useQuery } from "@tanstack/solid-query";
+import { createSignal, For, Show } from "solid-js";
+
 import type { Achievement, AchievementCategory, AchievementStanding, Progress } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { fire } from "../commands";
 import { thousands } from "../hud/rules";
 import { beds } from "../world/plots";
-import { aria } from "../../app/util";
+import { aria, useClickAway } from "../../app/util";
 import { useCore, useFrames } from "../../data/frame";
-import { ready } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 import { numberText, SpriteIcon } from "../kit";
 import { commands } from "../state";
 import { tint, Tinted } from "./bits";
@@ -190,13 +190,7 @@ function Standing(props: { catalog: readonly Achievement[] }) {
 /** Any tier reached can be worn, not a starter task's. */
 function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
   const [open, setOpen] = createSignal(false);
-  let box!: HTMLDivElement;
-  createEffect(open, (on) => {
-    if (!on) return;
-    const away = (e: PointerEvent) => box.contains(e.target as Node) || setOpen(false);
-    window.addEventListener("pointerdown", away);
-    return () => window.removeEventListener("pointerdown", away);
-  });
+  const box = useClickAway(open, () => setOpen(false));
   const title = () => props.p.title;
   const worn = () => {
     const t = title();
@@ -207,7 +201,7 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
       .filter((a) => a.wearable)
       .flatMap((a) => a.tiers.flatMap((_, i) => (props.p.unlocked.some((u) => u.id === a.id && u.tier === i + 1) ? [{ a, tier: i + 1 }] : [])));
   return (
-    <div ref={(el) => (box = el)} class="relative ml-auto">
+    <div ref={box} class="relative ml-auto">
       <button
         type="button"
         disabled={earned().length === 0}

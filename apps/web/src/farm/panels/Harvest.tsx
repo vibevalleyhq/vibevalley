@@ -1,7 +1,7 @@
 // Harvesting a helper's plot and the warehouse of what was harvested; the checklist's rules are src/rules/issueState.ts.
 
 import { For, Match, Show, Switch } from "solid-js";
-import { useQuery } from "@tanstack/solid-query";
+
 import type { Changes, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { fire } from "../commands";
@@ -14,7 +14,7 @@ import { ago } from "../../rules/time";
 import { useRouter } from "../../app/router";
 import { useNow } from "../../app/util";
 import { useCore, useFrames } from "../../data/frame";
-import { ready, useAgents } from "../../data/query";
+import { ready, useAgents, useQuery } from "../../data/query";
 import { FarmSection, PxButton, SpriteIcon } from "../kit";
 import { commands } from "../state";
 import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./bits";

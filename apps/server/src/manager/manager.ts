@@ -13,7 +13,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
 import { type ManagerEval, managerAgent, type RunTrigger } from "@vibevalley/protocol";
 import { graphsOf, graphText, isOpen, nextRun, runtimeLabel } from "@vibevalley/protocol/rules";
-import { Context, Effect, Layer, PubSub, Stream } from "effect";
+import { Context, Effect, FiberSet, Layer, PubSub, Stream } from "effect";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Agents } from "../agent/agent.ts";
@@ -57,6 +57,7 @@ import {
   triggerOf,
   usageText,
 } from "./rules.ts";
+import { callbackLog } from "../base/log.ts";
 
 const keepEvents = 1000;
 const streamEveryMs = 120;
@@ -196,6 +197,7 @@ export interface ManagerOptions {
 
 export const make = (options: ManagerOptions = {}) =>
   Effect.gen(function* () {
+    const logs = yield* callbackLog;
     const config = yield* Settings;
     const core = yield* Core;
     const store = yield* Agents;
@@ -209,8 +211,10 @@ export const make = (options: ManagerOptions = {}) =>
     const schedule = yield* Schedules;
     const tool = yield* Tools;
 
-    const go = <A, E>(e: Effect.Effect<A, E>) => Effect.runPromise(e);
-    const notice = (level: "info" | "warn" | "error", text: string) => void Effect.runFork(core.notice(level, text));
+    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
+    const go = yield* FiberSet.makeRuntimePromise<never>();
+    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const notice = (level: "info" | "warn" | "error", text: string) => void forkHere(core.notice(level, text));
     const general = chat.general();
     const home = managerHome(config.home);
     const sessionFile = join(home, managerAgent + ".jsonl");
@@ -354,7 +358,7 @@ export const make = (options: ManagerOptions = {}) =>
           if (e.compaction) shown = "";
           return;
         case "prefix_changed":
-          console.log(`vibevalley: the manager's prompt start changed between compactions: ${e.parts.join(",")}`);
+          logs.info(`vibevalley: the manager's prompt start changed between compactions: ${e.parts.join(",")}`);
           prefixChanged = e.parts;
           return;
         case "agent_settled":
@@ -365,7 +369,7 @@ export const make = (options: ManagerOptions = {}) =>
     // The agent's events, handled one at a time in order.
     let events = Promise.resolve();
     const follow = (e: BrainEvent) => {
-      events = events.then(() => event(e)).catch((err) => console.error("vibevalley: the manager could not follow its agent:", err));
+      events = events.then(() => event(e)).catch((err) => logs.error("vibevalley: the manager could not follow its agent:", err));
     };
 
     // Started on first use: loading it is not free, and a farm without a model works otherwise.
@@ -388,7 +392,7 @@ export const make = (options: ManagerOptions = {}) =>
         shown = "";
         // Listening before the first line is sent.
         b.subscribe(follow);
-        console.log(`vibevalley: the manager is on vibevalley's own agent, model ${llm.model.id}`);
+        logs.info(`vibevalley: the manager is on vibevalley's own agent, model ${llm.model.id}`);
         brain = b;
         return b;
       })().finally(() => {
@@ -571,7 +575,7 @@ export const make = (options: ManagerOptions = {}) =>
       try {
         b = await brainOf();
       } catch (err) {
-        console.error("vibevalley: the manager could not go on with its last run:", err);
+        logs.error("vibevalley: the manager could not go on with its last run:", err);
         return;
       }
       const at = requestInput();
@@ -618,7 +622,7 @@ export const make = (options: ManagerOptions = {}) =>
     const handled =
       <A>(what: string, f: (a: A) => Promise<unknown>) =>
       (a: A) =>
-        Effect.promise(() => f(a).catch((err) => console.error(`vibevalley: the manager could not take ${what}:`, err)));
+        Effect.promise(() => f(a).catch((err) => logs.error(`vibevalley: the manager could not take ${what}:`, err)));
 
     // A test that gave the manager no model hears nothing: the other services run as without it, and nothing reaches a model.
     if (options.listen ?? true) {
@@ -648,7 +652,7 @@ export const make = (options: ManagerOptions = {}) =>
         const b = brain ?? (await starting?.catch(() => undefined));
         await b?.close();
         await events;
-        await go(execution.close()).catch((err: Error) => console.error("manager execution:", err.message));
+        await go(execution.close()).catch((err: Error) => logs.error("manager execution:", err.message));
       }),
     );
 
@@ -722,7 +726,7 @@ export const make = (options: ManagerOptions = {}) =>
           );
         }),
       call: (text, signal) => {
-        void Effect.runPromise(Effect.ignore(chat.spoken("user", text, "")));
+        void go(Effect.ignore(chat.spoken("user", text, "")));
         return answer(voiceNote + "\n主人说：" + text, signal);
       },
       answerer: (model) => (model === managerModel ? (text, signal) => answer("主人说：" + text, signal) : undefined),

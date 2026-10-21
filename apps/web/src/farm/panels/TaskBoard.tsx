@@ -4,7 +4,7 @@
 // actionText).
 
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
-import { useQuery } from "@tanstack/solid-query";
+
 import { type GraphAction, type GraphEvent, type GraphState, managerAgent, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { doingOf } from "../hud/rules";
@@ -14,7 +14,7 @@ import { spentText } from "../../rules/chat";
 import { lineCounts } from "../../rules/issueState";
 import { aria, Keyed } from "../../app/util";
 import { useCore, useFrames } from "../../data/frame";
-import { ready, useAgents, useProjects } from "../../data/query";
+import { ready, useAgents, useProjects, useQuery } from "../../data/query";
 import { AgentFace } from "../../ui/Face";
 import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "../kit";
 import { commands, useFarm } from "../state";

@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
-import { useQuery } from "@tanstack/solid-query";
+
 import type { Acceptance, Ask, Issue, IssueAct, Milestone, Session, SessionEvent } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { newSendKey } from "./write";
@@ -8,7 +8,7 @@ import { issueTag, priorityLabel, runText, tagLabel, tagOpen } from "../../rules
 import { actLabel, bugText, changesLine, type CriterionRow, findingsOf, issueState, noStepsText, resumeWords, standingTone } from "../../rules/issueState";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
-import { ready, useAgents } from "../../data/query";
+import { ready, useAgents, useQuery } from "../../data/query";
 import { useNow } from "../../app/util";
 import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
@@ -140,9 +140,10 @@ export function IssueDetail(props: {
     }
   };
 
-  const button = (a: IssueAct, lead: boolean) => (
+  /** lead is read as it renders: the lead changes as the issue moves on. */
+  const button = (a: IssueAct, lead: () => boolean) => (
     <Button
-      tone={lead ? "primary" : a === "reject" && box() === "reject" ? "danger" : "plain"}
+      tone={lead() ? "primary" : a === "reject" && box() === "reject" ? "danger" : "plain"}
       disabled={busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim())}
       onClick={() => go(a)}
     >
@@ -226,8 +227,10 @@ export function IssueDetail(props: {
               />
             </Show>
             <div class="mt-2.5 flex flex-wrap gap-2">
-              <Show when={s().lead}>{(lead) => button(lead(), true)}</Show>
-              <For each={s().others.filter((a) => a !== "close" && a !== "stop")}>{(a) => button(a, false)}</For>
+              <Show when={s().lead} keyed>
+                {(lead) => button(lead, () => true)}
+              </Show>
+              <For each={s().others.filter((a) => a !== "close" && a !== "stop")}>{(a) => button(a, () => false)}</For>
             </div>
           </section>
         )}
@@ -250,7 +253,7 @@ export function IssueDetail(props: {
             autofocus
           />
           <div class="mt-2 flex gap-2">
-            {button("tell", true)}
+            {button("tell", () => true)}
             <Button disabled={busy()} onClick={() => setBox(undefined)}>
               算了
             </Button>
@@ -351,7 +354,7 @@ export function IssueDetail(props: {
     <>
       <Show when={sideActs().length > 0}>
         <div class="mb-3 flex flex-col gap-2">
-          <For each={sideActs()}>{(a) => button(a, !s().ask && a === s().lead)}</For>
+          <For each={sideActs()}>{(a) => button(a, () => !s().ask && a === s().lead)}</For>
         </div>
       </Show>
       <SheetLabel>时间</SheetLabel>
@@ -470,25 +473,25 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
     });
   return (
     <ul class="flex flex-col">
-      <For each={props.rows}>
+      <For each={props.rows} keyed={(r) => r.text}>
         {(r, i) => (
           <li class="flex items-start gap-2.5 rounded-md px-1.5 py-1 text-sm">
             <Show when={props.checking}>
               <input
                 type="checkbox"
-                aria-label={`看过了：${r.text}`}
+                aria-label={`看过了：${r().text}`}
                 checked={ticked().has(i())}
                 onChange={() => tick(i())}
                 class="mt-0.5 size-4 shrink-0 cursor-pointer accent-leaf"
               />
             </Show>
-            <Show when={r.result} fallback={<span class="mt-1 size-3 shrink-0 rounded-full border border-line" title="它还没说" />}>
+            <Show when={r().result} fallback={<span class="mt-1 size-3 shrink-0 rounded-full border border-line" title="它还没说" />}>
               {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} class="mt-0.5 shrink-0" />}
             </Show>
             <span class="min-w-0 flex-1">
-              <span class={{ "text-muted": ticked().has(i()) }}>{r.text}</span>
-              <Show when={r.proof}>
-                <span class="block text-xs text-muted">{r.proof}</span>
+              <span class={{ "text-muted": ticked().has(i()) }}>{r().text}</span>
+              <Show when={r().proof}>
+                <span class="block text-xs text-muted">{r().proof}</span>
               </Show>
             </span>
           </li>

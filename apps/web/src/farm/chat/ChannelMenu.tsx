@@ -1,13 +1,13 @@
 // The channel switcher in the farm chat window's head: the channels with what they are for and their unread lines, a
 // new channel, the current one's settings, and the way to its full page (its schedules are there).
 
-import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { playSound } from "../sound";
 import { farm } from "../store";
 import { channelsOf, chatPath, unreadUnder } from "../../rules/chat";
-import { aria } from "../../app/util";
+import { aria, useClickAway } from "../../app/util";
 import { useRouter } from "../../app/router";
 import { useCore } from "../../data/frame";
 import { ready, useProjects } from "../../data/query";
@@ -24,13 +24,7 @@ export function ChannelMenu(props: { current: Conversation | undefined }) {
   const chat = () => core()?.chat;
   const [open, setOpen] = createSignal(false);
   const [mode, setMode] = createSignal<Mode>("list");
-  let box!: HTMLDivElement;
-  createEffect(open, (on) => {
-    if (!on) return;
-    const away = (e: PointerEvent) => box.contains(e.target as Node) || setOpen(false);
-    window.addEventListener("pointerdown", away);
-    return () => window.removeEventListener("pointerdown", away);
-  });
+  const box = useClickAway(open, () => setOpen(false));
   const channels = () => channelsOf(chat());
   const elsewhere = () =>
     channels()
@@ -38,7 +32,7 @@ export function ChannelMenu(props: { current: Conversation | undefined }) {
       .reduce((n, c) => n + unreadUnder(chat(), c), 0);
   const close = () => setOpen(false);
   return (
-    <div ref={(el) => (box = el)} class="relative min-w-0">
+    <div ref={box} class="relative min-w-0">
       <button
         type="button"
         aria-label={`频道：${channelLabel(props.current)}，点开切换或开新频道`}

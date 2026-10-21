@@ -2,8 +2,8 @@
  * The Agent Note tree and file format (.agents/notes/README.md), checked, and its catalog written. The lifecycle and
  * class sets are closed: this file is their single source, and the README's tables follow it. Runs on Bun:
  *
- *   bun scripts/agent-notes.ts           check every note and that CATALOG.md is current; any error exits 1
- *   bun scripts/agent-notes.ts --write   write CATALOG.md from the notes first, then check
+ *   pnpm run notes:verify                 check every note and that CATALOG.md is current; any error exits 1
+ *   pnpm run notes:catalog                write CATALOG.md from the notes first, then check
  *
  * Checks: every folder under .agents/notes is a known lifecycle; every note sits at {lifecycle}/{class}/ with a
  * known class and a yyyy-mm-dd-topic.md name; no hand-written INDEX.md; the header block is exactly
@@ -12,11 +12,10 @@
  * the notes give. Links are checked by doc-links.ts.
  */
 
-import { Glob } from "bun";
-import { readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, globSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
-export const agentNoteRoot = resolve(import.meta.dir, "../.agents/notes");
+export const agentNoteRoot = resolve(import.meta.dirname, "../.agents/notes");
 
 /** Active lifecycles: the top-level folders under .agents/notes, in the catalog's order. */
 export const AGENT_NOTE_LIFECYCLES = ["proposed", "implemented", "rejected"] as const;
@@ -64,7 +63,11 @@ export async function walkAgentNoteTree(): Promise<{ notes: AgentNote[]; errors:
       errors.push(`${entry.name}: notes live at {lifecycle}/{class}/yyyy-mm-dd-topic.md`);
   }
   for (const lifecycle of AGENT_NOTE_LIFECYCLES) {
-    const paths = [...new Glob(`${lifecycle}/**/*`).scanSync({ cwd: agentNoteRoot })].map((p) => p.replaceAll("\\", "/")).sort();
+    // Files only, as paths under the notes' root.
+    const paths = globSync(`${lifecycle}/**/*`, { cwd: agentNoteRoot, withFileTypes: true })
+      .filter((d) => d.isFile())
+      .map((d) => relative(agentNoteRoot, join(d.parentPath, d.name)).replaceAll("\\", "/"))
+      .sort();
     for (const rel of paths) {
       const segs = rel.split("/");
       const [, cls, base] = segs;
@@ -81,7 +84,7 @@ export async function walkAgentNoteTree(): Promise<{ notes: AgentNote[]; errors:
         errors.push(`${rel}: the name must be yyyy-mm-dd-topic-title.md (lowercase words joined by -)`);
         continue;
       }
-      notes.push({ lifecycle, cls, rel, lines: (await Bun.file(resolve(agentNoteRoot, rel)).text()).split("\n") });
+      notes.push({ lifecycle, cls, rel, lines: readFileSync(resolve(agentNoteRoot, rel), "utf8").split("\n") });
     }
   }
   return { notes, errors };
@@ -125,7 +128,7 @@ export function catalogOf(notes: readonly AgentNote[]): string {
   const out = [
     "# Agent Notes 目录",
     "",
-    `由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 \`bun run notes:catalog\`，过期了 \`bun run notes:verify\` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。`,
+    `由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 \`pnpm run notes:catalog\`，过期了 \`pnpm run notes:verify\` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。`,
   ];
   for (const lifecycle of AGENT_NOTE_LIFECYCLES) {
     const here = notes.filter((n) => n.lifecycle === lifecycle);
@@ -149,9 +152,9 @@ if (import.meta.main) {
   const write = process.argv.includes("--write");
   const { notes, errors } = await walkAgentNoteTree();
   const catalog = catalogOf(notes);
-  const file = Bun.file(resolve(agentNoteRoot, CATALOG));
-  if (write) await Bun.write(file, catalog);
-  else if (!(await file.exists()) || (await file.text()) !== catalog) errors.push(`${CATALOG}: out of date; run \`bun run notes:catalog\``);
+  const file = resolve(agentNoteRoot, CATALOG);
+  if (write) writeFileSync(file, catalog);
+  else if (!existsSync(file) || readFileSync(file, "utf8") !== catalog) errors.push(`${CATALOG}: out of date; run \`pnpm run notes:catalog\``);
   const all = [...errors, ...notes.flatMap(checkAgentNote)];
   for (const e of all) console.error(`agent notes: ${e}`);
   if (all.length > 0) process.exit(1);

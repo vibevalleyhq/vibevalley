@@ -6,4 +6,6 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: lazyPlugins(() => [solid(), tailwindcss()]),
   server: { proxy: { "/api": "http://127.0.0.1:8787" } },
+  // The rules' tests, pure, without a DOM (the Solid plugin would give them jsdom); test/ is Playwright's.
+  test: { include: ["src/**/*.test.ts"], environment: "node" },
 });

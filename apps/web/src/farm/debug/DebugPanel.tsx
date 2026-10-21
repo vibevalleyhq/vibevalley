@@ -2,9 +2,9 @@
 // the farm, stop or dismiss a helper, harvest) and the page's own clock and effects (which earn nothing), plays each
 // sound, and keeps the frames and side events it saw, to copy as JSON lines.
 
-import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQuery } from "@tanstack/solid-query";
+
 import type { Session, StateFrame } from "@vibevalley/protocol";
 import { clockText } from "@vibevalley/engine/clock";
 import { api, reasonOf } from "../../data/api";
@@ -16,7 +16,7 @@ import { typing } from "../tools";
 import { aria } from "../../app/util";
 import { createExternal } from "../../data/external";
 import { useCore, useFrames } from "../../data/frame";
-import { ready } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 import { toasts, ToastType } from "../kit";
 import { rawFrame } from "../state";
 
@@ -63,7 +63,8 @@ function createLog() {
   const [paused, setPaused] = createSignal(false);
   let seq = 0;
   const add = (type: string, summary: string, json: unknown) => {
-    if (paused()) return;
+    // Asked once per entry, from the frame effect's apply and the live stream's callback alike.
+    if (untrack(paused)) return;
     setEntries((all) => [...all.slice(-(keep - 1)), { seq: ++seq, type, at: Date.now(), summary, json }]);
   };
   createEffect(raw, (frame) => {

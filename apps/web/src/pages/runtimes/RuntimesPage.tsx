@@ -1,7 +1,7 @@
 // 农具: the coding agents on this machine as oar probed them; one's account, what it takes,
 // its settings, models and inventories, and the profiles that use it. /runtimes/<id>.
 
-import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
 import {
@@ -378,14 +378,9 @@ function Field(props: { label: string; hint?: string; children: JSX.Element }) {
 }
 
 function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) => void }) {
-  const [draft, setDraft] = createSignal<RuntimeSettings>(untrack(() => props.info.settings));
   // The settings as the server has them now replace the draft; a refetch with the same settings leaves it.
-  createEffect(
-    () => JSON.stringify(props.info.settings),
-    () => {
-      setDraft(props.info.settings);
-    },
-  );
+  const saved = createMemo(() => props.info.settings, { equals: same });
+  const [draft, setDraft] = createSignal<RuntimeSettings>(() => saved());
   const dirty = () => !same(draft(), props.info.settings);
   const models = () => props.info.models ?? [];
   const model = () => {

@@ -2,7 +2,7 @@
 // deed, what is planted (tokei's count), the tilling calendar of a year's commits and who worked it. /projects/<name>.
 
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
-import { type UseQueryResult, useQuery, useQueryClient } from "@tanstack/solid-query";
+import { type UseQueryResult, useQueryClient } from "@tanstack/solid-query";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import {
@@ -25,7 +25,7 @@ import { toast } from "../../ui/toasts";
 import { useRouter } from "../../app/router";
 import { autofocus, useNow } from "../../app/util";
 import { useWorkAgents } from "../../data/agents";
-import { ready, useProjects } from "../../data/query";
+import { ready, useProjects, useQuery } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { AgentFace } from "../../ui/Face";

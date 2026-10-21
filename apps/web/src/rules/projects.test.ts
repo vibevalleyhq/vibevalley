@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vite-plus/test";
 import type { Issue, LanguageCount, Phase, ProjectSummary, Session } from "@vibevalley/protocol";
 import {
   calendarOf,

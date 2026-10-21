@@ -40,6 +40,9 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
         VIBEVALLEY_PORT: "0",
         VIBEVALLEY_LAN_PORT: "0",
         VIBEVALLEY_VOICE_LINE_PORT: "0",
+        // This machine's coding agents are not asked: pi is the scripted helper, doing what the words of its job say
+        // (apps/server/src/testing/helper.ts), and no other runtime is installed.
+        VIBEVALLEY_TEST_RUNTIMES: "1",
       };
       const args = ["--ready-json", "--web", join(out, "dist")];
       const child: ChildProcess = spawn("node", ["--import", "tsx", "src/main.ts", ...args], {
@@ -69,11 +72,23 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
     const escaped: string[] = [];
     page.on("pageerror", (e) => {
       escaped.push(e.message);
+      if (process.env.VIBEVALLEY_WEB_DEV === "1") console.log(`[page stack] ${e.stack}`);
       if (process.env.CI) console.log(`[page] ${e.message}`);
     });
     if (process.env.CI)
       page.on("console", (m) => {
         if (m.type() === "error") console.log(`[page] ${m.text()}`);
+      });
+    // On Solid's development build (pnpm run test:dev), what it warns of goes to the run's output, each untracked read
+    // with the stack that made it: the warning alone names no file.
+    if (process.env.VIBEVALLEY_WEB_DEV === "1")
+      await page.addInitScript(() => {
+        const warn = console.warn.bind(console);
+        console.warn = (...a: unknown[]) => warn(...a, String(a[0]).includes("STRICT_READ") ? new Error().stack : "");
+      });
+    if (process.env.VIBEVALLEY_WEB_DEV === "1")
+      page.on("console", (m) => {
+        if (m.type() === "warning" || m.type() === "error") console.log(`[solid ${m.type()}] ${m.text().replaceAll("\n", " ⏎ ")}`);
       });
     await use(page);
     expect(escaped, "errors that escaped the page").toEqual([]);

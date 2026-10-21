@@ -50,7 +50,9 @@ test/             Playwright against a real server per worker (fixtures.ts)
 ```bash
 bun run check   # types (lint and format: bun run check at the root)
 bun run build   # dist/
-bun run test    # bun test for the rules, then Playwright: builds dist, one server per worker with a temporary home and no keys;
+bun run test    # vitest for the rules, then Playwright: builds dist, one server per worker with a temporary home and no keys;
                 # an error that escapes the page fails its test
+bun run test:dev  # the same on Solid's development build: its diagnostics (an untracked read, a primitive made where it
+                  # may not be, a computation tracking thousands of sources) go to the output, with the stack that made each
 bunx playwright test test/issues.spec.ts   # one file
 ```

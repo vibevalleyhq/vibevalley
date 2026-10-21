@@ -1,11 +1,11 @@
 // How much the runtimes' accounts have left: a bottle at the HUD's top right, filled to the lowest of them; open, each
 // runtime's machine, usage windows, today's spend and a stop it is under.
 
-import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 import { bottleSprite, machineOf, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "./rules";
 import { yuan } from "../../rules/chat";
-import { aria } from "../../app/util";
+import { aria, useClickAway } from "../../app/util";
 import { ready, useRuntimes } from "../../data/query";
 import { CardColors, PxButton, SpriteIcon } from "../kit";
 import { commands } from "../state";
@@ -115,13 +115,7 @@ export function QuotaPill(props: { height: number }) {
   const all = useRuntimes();
   const runtimes = () => usableRuntimes(ready(all, []));
   const [open, setOpen] = createSignal(false);
-  let box!: HTMLDivElement;
-  createEffect(open, (on) => {
-    if (!on) return;
-    const away = (e: PointerEvent) => box.contains(e.target as Node) || setOpen(false);
-    window.addEventListener("pointerdown", away);
-    return () => window.removeEventListener("pointerdown", away);
-  });
+  const box = useClickAway(open, () => setOpen(false));
   const lowest = () => {
     const lefts = runtimes().flatMap((r) => (r.quota?.left === undefined ? [] : [r.quota.left]));
     return lefts.length ? Math.min(...lefts) : undefined;
@@ -132,7 +126,7 @@ export function QuotaPill(props: { height: number }) {
   };
   return (
     <Show when={runtimes().length > 0}>
-      <div ref={(el) => (box = el)} class="pointer-events-auto relative">
+      <div ref={box} class="pointer-events-auto relative">
         <button
           type="button"
           aria-label={shown() === undefined ? "各 runtime 的剩余额度" : `剩余额度，最少的还剩 ${shown()}%`}

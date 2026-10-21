@@ -11,7 +11,7 @@ import { layer as doc } from "./doc/doc.ts";
 import { layer as issue } from "./issue/issue.ts";
 import { layer as memory } from "./memory/memory.ts";
 import { layer as project, start as projectStart } from "./project/project.ts";
-import { layer as runtime } from "./runtime/runtime.ts";
+import { layer as runtime, type RuntimeOptions } from "./runtime/runtime.ts";
 import { layer as session, ready as sessionReady } from "./session/session.ts";
 import { layer as schedule, start as scheduleStart } from "./schedule/schedule.ts";
 import { layer as setting } from "./setting/setting.ts";
@@ -30,9 +30,14 @@ const on =
   <B, E2, R2>(below: Layer.Layer<B, E2, R2>) =>
     layer.pipe(Layer.provideMerge(below));
 
-/** In build order, each on those before it; then what runs once all are built: what starts, then what is ready.
- * options: what a test changes. */
-export const services = (config: Config, options: { readonly lan?: LanOptions } = {}) =>
+/** What a test changes: the LAN listener; the runtimes (the page's tests: only the scripted helper, none asked). */
+export interface ServiceOptions {
+  readonly lan?: LanOptions;
+  readonly runtime?: RuntimeOptions;
+}
+
+/** In build order, each on those before it; then what runs once all are built: what starts, then what is ready. */
+export const services = (config: Config, options: ServiceOptions = {}) =>
   Database.pipe(
     Layer.provideMerge(Layer.succeed(Settings, config)),
     on(core),
@@ -41,7 +46,7 @@ export const services = (config: Config, options: { readonly lan?: LanOptions } 
     on(project()),
     on(memory),
     on(doc()),
-    on(runtime()),
+    on(runtime(options.runtime)),
     on(session()),
     on(channel),
     on(schedule()),

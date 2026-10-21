@@ -2,7 +2,7 @@
 
 process.env.TZ = "Asia/Shanghai";
 
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import type { Schedule, ScheduleRequest, ScheduleWhen } from "../shapes";
 import { emptyCoreState, reduce } from "./core";
 import { frameOf } from "./frame";

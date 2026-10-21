@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
 import type { AccountUsage, Agent, AgentIssue, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "@vibevalley/protocol/rules";
-import { Context, Effect, Layer, Schedule } from "effect";
+import { Context, Effect, FiberSet, Layer, Schedule } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { deepseek } from "../agent/brain/config.ts";
@@ -24,6 +24,7 @@ import { type ApiError, refused } from "../errors.ts";
 import { piBalance } from "./pi.ts";
 import { inCny, type Price, price, type Rate } from "./price.ts";
 import { agentIssues, moneyStop, quotaOf } from "./rules.ts";
+import { callbackLog } from "../base/log.ts";
 
 /** Past this a probe counts as unknown. */
 const probeTimeoutMs = 10_000;
@@ -160,11 +161,14 @@ const optional = <K extends string>(key: K, v: string | undefined) => (v ? ({ [k
 
 export const make = (options: RuntimeOptions = {}) =>
   Effect.gen(function* () {
+    const logs = yield* callbackLog;
     const config = yield* Settings;
     const core = yield* Core;
     const store = yield* Agents;
     const registry = options.registry ?? registryOf();
-    const emit = (e: Effect.Effect<void>) => void Effect.runFork(e);
+    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
+    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const emit = (e: Effect.Effect<void>) => void forkHere(e);
     const usageOf: UsageOf = (id, runtime, found, settings) => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings);
 
     const cache = new Map<string, Observation>();
@@ -204,7 +208,7 @@ export const make = (options: RuntimeOptions = {}) =>
         try {
           disk.finish(() => JSON.stringify(spent));
         } catch (e) {
-          console.warn(`vibevalley: could not save spend.json: ${String(e)}`);
+          logs.warn(`vibevalley: could not save spend.json: ${String(e)}`);
         }
       }),
     );
@@ -435,7 +439,7 @@ export const make = (options: RuntimeOptions = {}) =>
           try {
             disk.write(() => JSON.stringify(spent));
           } catch (e) {
-            console.warn(`vibevalley: could not save spend.json: ${String(e)}`);
+            logs.warn(`vibevalley: could not save spend.json: ${String(e)}`);
           }
         }, 1000);
         if (!pushes.has(id))

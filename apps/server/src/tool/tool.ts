@@ -18,7 +18,7 @@ import {
   type TaskEdit,
 } from "@vibevalley/protocol";
 import { graphsOf, graphText, head, inboxLines, isOpen, maxTasks, openFindings, phaseText, shortTitle, standingWantsOwner } from "@vibevalley/protocol/rules";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { textTool } from "../agent/brain/tool.ts";
 import { Channels, type Info, type Spoken } from "../channel/chat.ts";
@@ -159,7 +159,9 @@ export const make = Effect.gen(function* () {
   const issue = yield* Issues;
   const tasks = yield* Tasks;
 
-  const go = <A, E>(e: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(Effect.mapError(e, toError));
+  // Fibers started from the tools' callbacks belong to this service: they end with it and keep its services.
+  const runHere = yield* FiberSet.makeRuntimePromise<never>();
+  const go = <A, E>(e: Effect.Effect<A, E>): Promise<A> => runHere(Effect.mapError(e, toError));
   /** An answer, or "没成：" and why. */
   const answered = (e: Effect.Effect<string, unknown>) => go(Effect.catch(e, (err) => Effect.succeed("没成：" + toError(err).message)));
 

@@ -1,4 +1,6 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { type ChildProcess, spawn } from "node:child_process";
+import { closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
+import { setTimeout as sleep } from "node:timers/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -60,7 +62,17 @@ export async function runVerification(command: string[] = []): Promise<Verificat
     { mode: 0o755 },
   );
   const log = join(evidence, "server.stdout.log");
-  type Child = Pick<ReturnType<typeof Bun.spawn>, "kill" | "exited" | "exitCode" | "pid">;
+  /** A child in a process group of its own; exited settles with its exit code. */
+  interface Child {
+    pid: number;
+    exited: Promise<number>;
+    exitCode: () => number | null;
+    process: ChildProcess;
+  }
+  const own = (p: ChildProcess): Child => {
+    const exited = new Promise<number>((done) => p.once("exit", (status, sig) => done(status ?? (sig ? 128 : 1))));
+    return { pid: p.pid!, exited, exitCode: () => p.exitCode, process: p };
+  };
   const owned = new Set<Child>();
   let serverOutputDone: Promise<void> | undefined;
   let outputFailure: unknown;
@@ -94,20 +106,18 @@ export async function runVerification(command: string[] = []): Promise<Verificat
   process.on("SIGINT", interrupt);
   process.on("SIGTERM", interrupt);
   const launch = (args: string[], cwd: string, name: string, environment = env): Child => {
-    const child = Bun.spawn(args, {
-      cwd,
-      env: environment,
-      detached: true,
-      stdout: Bun.file(join(evidence, name + ".stdout.log")),
-      stderr: Bun.file(join(evidence, name + ".stderr.log")),
-    });
+    const out = openSync(join(evidence, name + ".stdout.log"), "w");
+    const err = openSync(join(evidence, name + ".stderr.log"), "w");
+    const child = own(spawn(args[0]!, args.slice(1), { cwd, env: environment, detached: true, stdio: ["ignore", out, err] }));
+    closeSync(out);
+    closeSync(err);
     owned.add(child);
     return child;
   };
   const stop = async (child: Child) => {
     signal(child, "SIGTERM");
     const deadline = Date.now() + 30_000;
-    while (alive(child) && Date.now() < deadline) await Bun.sleep(50);
+    while (alive(child) && Date.now() < deadline) await sleep(50);
     if (alive(child) && !signal(child, "SIGKILL")) throw new Error(`cannot stop owned process group ${child.pid}`);
     await child.exited;
     owned.delete(child);
@@ -117,21 +127,23 @@ export async function runVerification(command: string[] = []): Promise<Verificat
     // node itself, so the receipt's pid is the child's; it logs to stdout.
     // The built page, when there is one, so verify-app can look at it on the same server.
     const web = join(root, "apps", "web", "dist");
-    const running = Bun.spawn(["node", "--import", "tsx", "src/main.ts", "--ready-json", ...(existsSync(join(web, "index.html")) ? ["--web", web] : [])], {
+    const serverErr = openSync(join(evidence, "server.stderr.log"), "w");
+    const spawned = spawn("node", ["--import", "tsx", "src/main.ts", "--ready-json", ...(existsSync(join(web, "index.html")) ? ["--web", web] : [])], {
       cwd: serverDir,
       env,
       detached: true,
-      stdout: "pipe",
-      stderr: Bun.file(join(evidence, "server.stderr.log")),
+      stdio: ["ignore", "pipe", serverErr],
     });
+    closeSync(serverErr);
+    const running = own(spawned);
     owned.add(running);
     serverOutputDone = (async () => {
-      const output = Bun.file(join(evidence, "server.stdout.log")).writer();
+      const output = createWriteStream(join(evidence, "server.stdout.log"));
       const decoder = new TextDecoder();
       let pending = "";
       try {
-        for await (const chunk of running.stdout) {
-          void output.write(chunk);
+        for await (const chunk of spawned.stdout! as AsyncIterable<Buffer>) {
+          output.write(chunk);
           pending += decoder.decode(chunk, { stream: true });
           let end: number;
           while ((end = pending.indexOf("\n")) >= 0) {
@@ -145,7 +157,7 @@ export async function runVerification(command: string[] = []): Promise<Verificat
           }
         }
       } finally {
-        await output.end();
+        await new Promise<void>((done) => output.end(done));
       }
     })().catch((error) => {
       outputFailure = error;
@@ -153,7 +165,7 @@ export async function runVerification(command: string[] = []): Promise<Verificat
     const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
       if (interrupted) throw new Error("verification interrupted during startup");
-      if (running.exitCode !== null) throw new Error(`server exited ${running.exitCode}; see ${log}`);
+      if (running.exitCode() !== null) throw new Error(`server exited ${running.exitCode()}; see ${log}`);
       if (outputFailure) throw new Error(`server output failed: ${outputFailure instanceof Error ? outputFailure.message : String(outputFailure as string)}`);
       if (address) {
         try {
@@ -169,9 +181,9 @@ export async function runVerification(command: string[] = []): Promise<Verificat
           /* Retry a transient health failure within the startup deadline. */
         }
       }
-      await Bun.sleep(100);
+      await sleep(100);
     }
-    if (!address || !(await Bun.file(join(evidence, "health.json")).exists())) throw new Error(`server did not become healthy; see ${log}`);
+    if (!address || !existsSync(join(evidence, "health.json"))) throw new Error(`server did not become healthy; see ${log}`);
     const run = command.length ? command : [cli, "server", "health"];
     const task = launch(run, root, "command", { ...env, VIBEVALLEY_SERVER: address, VIBEVALLEY_VERIFY_CLI: cli });
     code = await task.exited;
@@ -206,7 +218,7 @@ export async function runVerification(command: string[] = []): Promise<Verificat
 if (import.meta.main) {
   const args = process.argv.slice(2);
   if (args[0] === "--help") {
-    console.log("usage: bun scripts/verify-server.ts [-- command args...]");
+    console.log("usage: pnpm exec tsx scripts/verify-server.ts [-- command args...]");
   } else {
     try {
       process.exitCode = (await runVerification(args[0] === "--" ? args.slice(1) : args)).code;

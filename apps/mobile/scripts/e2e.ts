@@ -3,9 +3,10 @@
 // opened with its vibevalley://pair link, the owner lets it in, and the farm then hears from the phone with its key (its
 // page loaded through the lan listener). Leaves a screenshot in apps/mobile/.screens/. Build the app first (README.md).
 //
-//	bun scripts/verify-server.ts -- bun apps/mobile/scripts/e2e.ts android
-//	bun scripts/verify-server.ts -- bun apps/mobile/scripts/e2e.ts ios
+//	pnpm exec tsx scripts/verify-server.ts -- pnpm exec tsx apps/mobile/scripts/e2e.ts android
+//	pnpm exec tsx scripts/verify-server.ts -- pnpm exec tsx apps/mobile/scripts/e2e.ts ios
 
+import { setTimeout as sleep } from "node:timers/promises";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -14,13 +15,13 @@ import { VibeValleyApi } from "@vibevalley/protocol";
 
 const platform = process.argv[2] === "ios" ? "ios" : "android";
 const server = process.env.VIBEVALLEY_SERVER;
-if (!server) throw new Error("VIBEVALLEY_SERVER is not set: run this under bun scripts/verify-server.ts");
-const mobile = join(import.meta.dir, "..");
+if (!server) throw new Error("VIBEVALLEY_SERVER is not set: run this under scripts/verify-server.ts");
+const mobile = join(import.meta.dirname, "..");
 const out = join(mobile, ".screens");
 mkdirSync(out, { recursive: true });
 const run = (cmd: string, ...args: string[]) => execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 64 << 20 }).trim();
 const until = async <T>(get: () => Promise<T | undefined> | T | undefined, what: string, ms = 120_000): Promise<T> => {
-  for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(500)) {
+  for (const end = Date.now() + ms; Date.now() < end; await sleep(500)) {
     const got = await get();
     if (got !== undefined) return got;
   }
@@ -140,7 +141,7 @@ try {
     "the phone's page reaching the farm",
   );
   console.log("paired and seen", paired.name);
-  await Bun.sleep(5000);
+  await sleep(5000);
   const shot = join(out, `${platform}-farm.png`);
   phone.screenshot(shot);
   console.log(shot);
@@ -161,7 +162,7 @@ try {
 
   // Started again with no link: the key from the keychain, straight to the farm, nothing asked.
   const before = (await api.lan.status()).devices.find((d) => d.id === paired.id)!.lastSeen ?? 0;
-  await Bun.sleep(1100);
+  await sleep(1100);
   phone.restart();
   await until(
     async () => ((await api.lan.status()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0) > before || undefined,

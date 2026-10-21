@@ -3,7 +3,7 @@
 // looked at on the pixel page.
 
 import assert from "node:assert/strict";
-import { test } from "bun:test";
+import { test } from "vite-plus/test";
 import { GROUND_NORMALS, mirrorNormals, normalsOf, SPRITE_NORMALS } from "../src/pixi/normals";
 import { materialOf } from "../src/pixi/material";
 import { flatLight, skyAt } from "../src/pixi/sky";

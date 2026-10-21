@@ -3,14 +3,14 @@
 
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQuery } from "@tanstack/solid-query";
+
 import { type Memory, type MemorySourceInfo, managerAgent, memoryKeep } from "@vibevalley/protocol";
 import { api, reasonOf } from "../data/api";
 import { ago } from "../rules/time";
 import { toast } from "../ui/toasts";
 import { aria, useNow } from "../app/util";
 import { useCore } from "../data/frame";
-import { ready, queries, useProjects } from "../data/query";
+import { queries, ready, useProjects, useQuery } from "../data/query";
 import { Button } from "../ui/Button";
 import { Select, TextArea, TextInput } from "../ui/Field";
 import { Quiet } from "./kit";

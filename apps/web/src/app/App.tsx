@@ -58,7 +58,8 @@ function Home() {
       <Match when={list()?.length === 0 || projects.isError}>
         <FarmPage project="" />
       </Match>
-      <Match when={list()}>{(all) => enter(sortProjects(all())[0]!.name)}</Match>
+      {/* Entered once, by the list as it is now. */}
+      <Match when={list()}>{(all) => enter(untrack(() => sortProjects(all())[0]!.name))}</Match>
     </Switch>
   );
 }

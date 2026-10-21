@@ -1,11 +1,11 @@
 import { createSignal, For, Show } from "solid-js";
-import { useQuery } from "@tanstack/solid-query";
+
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import type { Tone } from "../../rules/cards";
 import { taskLine } from "../../rules/issues";
 import { wallClockText } from "../../rules/time";
-import { ready } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { Icon } from "../../ui/Icon";
@@ -116,15 +116,16 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
         />
       </Show>
       <div class="mt-4">
-        <For each={layers()}>
+        {/* A layer made for each task is a new array every time: by its tasks, so a batch's rows stay. */}
+        <For each={layers()} keyed={(layer) => layer.join(" ")}>
           {(layer, i) => (
             <div>
               <Show when={layers().length > 1}>
                 <div class="mt-3 mb-1 text-xs font-semibold text-muted">
-                  {layer.length > 1 ? `第 ${i() + 1} 批 · 这 ${layer.length} 步可以同时做` : `第 ${i() + 1} 批`}
+                  {layer().length > 1 ? `第 ${i() + 1} 批 · 这 ${layer().length} 步可以同时做` : `第 ${i() + 1} 批`}
                 </div>
               </Show>
-              <For each={layer}>
+              <For each={layer()}>
                 {(id) => (
                   <Show when={byId().get(id)}>
                     {(task) => {

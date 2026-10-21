@@ -1,9 +1,9 @@
 // The workbench's issue page answers the owner's questions in order: what it is, where it stands, the one thing asked of
-// the owner, how far it is. A helper on an issue is something tests cannot start (no runtime answers them), so each test
-// serves a frame and the issue's history with one in place, the issue's standing as the server would say it.
+// the owner, how far it is. The first test sends a real helper (the server's scripted runtime, doing what its job's
+// words say); the rest serve a frame and the issue's history with one in place, for states it does not reach.
 
 import type { Page, Route } from "@playwright/test";
-import type { Changes, Issue, IssueHistory, IssueStanding, IssueTimeline, Session, StateFrame } from "@vibevalley/protocol";
+import type { Agent, Changes, Issue, IssueHistory, IssueStanding, IssueTimeline, Session, StateFrame } from "@vibevalley/protocol";
 import { readStream, statePath } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
@@ -63,6 +63,47 @@ async function openIssue(
   await page.goto(`/issues/${made.id}`);
   return page.getByRole("dialog", { name: "工单" });
 }
+
+const scripted: Agent = {
+  id: "",
+  name: "阿狐",
+  role: "",
+  enabled: true,
+  // The test server's pi is the scripted helper (fixtures.ts).
+  runtime: "pi",
+  model: "",
+  effort: "",
+  persona: "",
+  personaMode: "append",
+  skills: [],
+  mcpServers: [],
+  disallowedTools: [],
+  env: {},
+  workdir: "",
+  worktree: true,
+  tags: [],
+  look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+};
+
+test("a real round: the helper asks with options, one click answers, and it hands back with its word on each criterion", async ({ page, api }) => {
+  const fox = await api.agent.create({ body: scripted });
+  const project = await api.project.create({ body: { name: "clock" } });
+  const made = await api.issue.create({ body: { title: "打卡页先问清楚，给选项", project: project.name, assignee: fox.id } });
+  await api.issue.update({ id: made.id, body: { criteria: ["打卡能用"] } });
+  await api.issue.status({ id: made.id, body: { status: "todo" } });
+  await page.goto(`/issues/${made.id}`);
+  const view = page.getByRole("dialog", { name: "工单" });
+  await expect(view.getByLabel("现在怎样")).toContainText("等你回答", { timeout: 20_000 });
+  const ask = view.getByRole("region", { name: "要你做的" });
+  await expect(ask.getByText("用 8787 还是 8797？")).toBeVisible();
+  await ask.getByRole("button", { name: "用 8797" }).click();
+  await expect(view.getByLabel("现在怎样")).toContainText("等你验收", { timeout: 20_000 });
+  await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("1 / 1 条做到了");
+  await expect(view.getByText("跑了 echo hi")).toBeVisible();
+  await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "收获" })).toBeVisible();
+  await expect(view.getByRole("region", { name: "怎么走到这一步" })).toContainText("你带了话，接着做一轮");
+  await page.screenshot({ path: test.info().outputPath("real-round.png") });
+});
 
 const longJob = "通读 farm-site 项目，给主人一份整体架构和当前进度的评估。1）技术栈和代码量 2）模块和数据流 3）测试和构建现状 4）最该推进的三件事";
 
@@ -153,12 +194,9 @@ test("work handed back: 等你验收, the helper's word on each criterion, and �
   await expect(ask.getByRole("button", { name: "验收通过" })).toBeVisible();
   await expect(view.getByRole("button", { name: "收获" })).toHaveCount(0);
   await view.getByRole("checkbox", { name: "看过了：勾上后重开浏览器还登着" }).check();
-  // Under load a click can land while the frame stream reconnects; 打回 is clicked until its box is there.
   const findings = ask.getByRole("textbox", { name: "哪里没过" });
-  await expect(async () => {
-    if (!(await findings.isVisible())) await ask.getByRole("button", { name: "打回", exact: true }).click({ timeout: 1000 });
-    await expect(findings).toBeVisible({ timeout: 1000 });
-  }).toPass();
+  await ask.getByRole("button", { name: "打回", exact: true }).click();
+  await expect(findings).toBeVisible();
   await expect(ask.getByRole("button", { name: "打回，照上面修" })).toBeDisabled();
   await findings.fill("不勾时还登着");
   await expect(ask.getByRole("button", { name: "打回，照上面修" })).toBeEnabled();

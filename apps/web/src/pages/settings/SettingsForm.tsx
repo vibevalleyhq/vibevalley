@@ -1,8 +1,8 @@
 // The keys and the memory sources (setting.load, setting.save), a part at a time; and what the server found of gh.
 
-import { createSignal, For, Match, Show, Switch as Pick, untrack } from "solid-js";
+import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQuery } from "@tanstack/solid-query";
+
 import {
   type GitHubStatus,
   type KeySource,
@@ -14,7 +14,7 @@ import {
   type SettingsUpdate,
 } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
-import { ready, queries, useSettings } from "../../data/query";
+import { queries, ready, useQuery, useSettings } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { TextInput } from "../../ui/Field";
 import { Quiet, SecretInput, TextLink, Toggle } from "../kit";
@@ -80,7 +80,8 @@ export function SettingsForm(props: { part: SettingsPart }) {
 }
 
 function Form(props: { part: SettingsPart; status: SettingsStatus }) {
-  const start = untrack(() => props.status);
+  // A plain copy: the form starts from it once, and reading the store's fields later would be untracked reads.
+  const start = untrack(() => snapshot(props.status));
   const [status, setStatus] = createSignal(start);
   const [deepseek, setDeepseek] = createSignal("");
   const [certificate, setCertificate] = createSignal("");

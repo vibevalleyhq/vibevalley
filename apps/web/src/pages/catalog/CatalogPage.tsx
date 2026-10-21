@@ -3,14 +3,14 @@
 
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQuery } from "@tanstack/solid-query";
+
 import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "../../farm/sound";
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, remakeOf, shelfOf, shelves } from "../../rules/catalog";
 import { numberText } from "../../rules/time";
 import { A } from "../../app/A";
 import { useRouter } from "../../app/router";
 import { aria } from "../../app/util";
-import { ready } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
@@ -148,7 +148,18 @@ function Sprites(props: { id?: string; tabs: JSX.Element }) {
     for (const p of pictures() ?? []) c.set(shelfOf(p.name), (c.get(shelfOf(p.name)) ?? 0) + 1);
     return c;
   });
-  const shown = () => (pictures() ?? []).filter((p) => (shelf() === "all" || shelfOf(p.name) === shelf()) && pictureMatches(p, query()));
+  // Memos: there are thousands of pictures, and every shelf's card reads them.
+  const shown = createMemo(() => (pictures() ?? []).filter((p) => (shelf() === "all" || shelfOf(p.name) === shelf()) && pictureMatches(p, query())));
+  const groupsByShelf = createMemo(() => {
+    const on = new Map<string, Picture[]>();
+    for (const p of shown()) {
+      const id = shelfOf(p.name);
+      const list = on.get(id);
+      if (list) list.push(p);
+      else on.set(id, [p]);
+    }
+    return new Map([...on].map(([id, ps]) => [id, groupsOf(id, ps)]));
+  });
   const present = () => shelves.filter((s) => (counts().get(s.id) ?? 0) > 0);
   const visible = () => (shelf() === "all" ? present() : present().filter((s) => s.id === shelf()));
   const ShelfButton = (b: { id: string; label: string; count: number }) => (
@@ -193,11 +204,7 @@ function Sprites(props: { id?: string; tabs: JSX.Element }) {
           </Show>
           <For each={visible()}>
             {(s) => {
-              const groups = () =>
-                groupsOf(
-                  s.id,
-                  shown().filter((p) => shelfOf(p.name) === s.id),
-                );
+              const groups = () => groupsByShelf().get(s.id) ?? [];
               return (
                 <Show when={groups().length > 0}>
                   <Card

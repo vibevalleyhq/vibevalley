@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import { lanKeyCookie } from "@vibevalley/protocol";
 import { deviceName, isPairPage, keyScript, level, parsePairLink } from "./rules";
 
@@ -20,7 +20,7 @@ test("a pairing link, from the QR code or the app's own scheme", () => {
 
 test("the phone's name, the key's cookie, the page's own pairing, a level", () => {
   expect([deviceName("ios", undefined), deviceName("android", undefined), deviceName("ios", "小明的 iPhone")]).toEqual(["iPhone", "安卓手机", "小明的 iPhone"]);
-  expect(keyScript("a+b")).toStartWith(`document.cookie = "${lanKeyCookie}=a%2Bb; Path=/;`);
+  expect(keyScript("a+b").startsWith(`document.cookie = "${lanKeyCookie}=a%2Bb; Path=/;`)).toBe(true);
   expect([isPairPage("http://h:1", "http://h:1/pair"), isPairPage("http://h:1", "http://h:1/issues"), isPairPage("http://h:1", "http://other:1/pair")]).toEqual(
     [true, false, false],
   );

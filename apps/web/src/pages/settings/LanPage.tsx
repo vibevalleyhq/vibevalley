@@ -2,13 +2,13 @@
 // saying yes to each here. Only this machine manages it: a paired device is refused the status and shown why.
 
 import { For, Show } from "solid-js";
-import { useQuery, useQueryClient } from "@tanstack/solid-query";
+import { useQueryClient } from "@tanstack/solid-query";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { momentText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { useNow } from "../../app/util";
-import { ready } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { Qr } from "../../ui/Qr";
 import { Card, Quiet } from "../kit";

@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { runVerification, readyAddress } from "./verify-server";
@@ -14,18 +14,20 @@ test("only a machine receipt from the owned process announces readiness", () => 
 
 test("sandbox owns isolation, readiness, validation failure and cleanup", async () => {
   const result = await runVerification([
-    "bun",
+    "node",
+    "--input-type=module",
     "-e",
     `
+    import { spawn, spawnSync } from "node:child_process";
     const server = process.env.VIBEVALLEY_SERVER;
     const created = await fetch(server + '/api/v1/issues', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:'sandbox fixture'})});
     if (!created.ok) throw new Error('create failed: ' + await created.text());
     const issue = await created.json();
-    const cli = Bun.spawnSync([process.env.VIBEVALLEY_VERIFY_CLI, 'state'], {env:process.env});
-    if (cli.exitCode !== 0) throw new Error('state failed');
-    const frame = JSON.parse(new TextDecoder().decode(cli.stdout));
+    const cli = spawnSync(process.env.VIBEVALLEY_VERIFY_CLI, ['state'], {env:process.env, encoding:'utf8'});
+    if (cli.status !== 0) throw new Error('state failed');
+    const frame = JSON.parse(cli.stdout);
     if (!frame.state.issues.some(i => i.id === issue.id)) throw new Error('fixture absent from state');
-    const descendant = Bun.spawn(['sh', '-c', 'sleep 30 & wait'], {stdout:'ignore',stderr:'ignore'});
+    const descendant = spawn('sh', ['-c', 'sleep 30 & wait'], {stdio:'ignore'});
     console.log(JSON.stringify({issue:issue.id,title:issue.title,address:server,descendant:descendant.pid}));
     process.exit(23);
   `,

@@ -3,7 +3,7 @@
 
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQuery, useQueryClient } from "@tanstack/solid-query";
+import { useQueryClient } from "@tanstack/solid-query";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { channelsOf } from "../../rules/chat";
@@ -11,7 +11,7 @@ import { momentText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { Keyed } from "../../app/util";
 import { useCore } from "../../data/frame";
-import { ready } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { Field, Select, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";

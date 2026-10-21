@@ -4,7 +4,7 @@
 // pet. The motions are style.css's title-*.
 
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { useQuery } from "@tanstack/solid-query";
+
 import {
   chimney,
   clouds,
@@ -23,7 +23,7 @@ import {
   type TitleSprites,
 } from "./layers";
 import { motesOf, type TitleScene, titleBackground } from "./scene";
-import { ready } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 import { useFarm } from "../state";
 
 const pct = (n: number) => `${(n * 100).toFixed(3)}%`;

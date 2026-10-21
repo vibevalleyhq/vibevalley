@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vite-plus/test";
 import type { Session } from "@vibevalley/protocol";
 import { farmCues, isMuted, playSound, SOUND_GROUPS, SOUND_LABEL, SOUNDS, type FarmSoundInput } from "./sound";
 

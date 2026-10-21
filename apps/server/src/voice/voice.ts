@@ -18,6 +18,7 @@ import { Core } from "../core/core.ts";
 import { Manager } from "../manager/manager.ts";
 import { managerModel } from "../manager/rules.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "../setting/setting.ts";
+import { callbackLog } from "../base/log.ts";
 
 const { RtcRole, RtcTokenBuilder } = agoraToken;
 
@@ -273,6 +274,7 @@ async function tunnelAnswers(url: string): Promise<boolean> {
 
 export const make = (options: VoiceOptions = {}) =>
   Effect.gen(function* () {
+    const logs = yield* callbackLog;
     const config = yield* Settings;
     const core = yield* Core;
     const settings = yield* Setting;
@@ -306,7 +308,7 @@ export const make = (options: VoiceOptions = {}) =>
     const answer = chatCompletions({
       answerer: (model) => (model === managerModel ? (text, signal) => manager.call(text, signal) : undefined),
       misheard: lineMisheard,
-      log: (l) => console.log(l),
+      log: (l) => logs.info(l),
     });
     const route = /^\/llm\/([\w-]+)\/chat\/completions$/;
     yield* Effect.promise(
@@ -341,7 +343,7 @@ export const make = (options: VoiceOptions = {}) =>
           });
           s.once("error", (e) => {
             lineProblem = "语音线路开不起来：" + e.message;
-            console.error(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}:`, e.message);
+            logs.error(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}:`, e.message);
             resolve();
           });
           s.listen(linePort, "127.0.0.1", () => {
@@ -357,7 +359,7 @@ export const make = (options: VoiceOptions = {}) =>
       options.tunnel ??
       (async (port: number) => {
         const t = await cloudflared(port);
-        if (!(await tunnelAnswers(t.url))) console.log(`vibevalley: the voice line's tunnel ${t.url} does not answer yet; the call goes on`);
+        if (!(await tunnelAnswers(t.url))) logs.info(`vibevalley: the voice line's tunnel ${t.url} does not answer yet; the call goes on`);
         return t;
       });
     // Opening a tunnel waits for it to answer, through this very line: one opening at a time.
@@ -560,7 +562,10 @@ export const make = (options: VoiceOptions = {}) =>
               }),
             catch: (e) => unavailable("听写的地址连不上：" + message(e), "voice"),
           });
-          const raw = (yield* Effect.promise(() => res.text())).slice(0, 1 << 20);
+          const raw = (yield* Effect.tryPromise({ try: () => res.text(), catch: (e) => unavailable("听写的回答读到一半断了：" + message(e), "voice") })).slice(
+            0,
+            1 << 20,
+          );
           let got: { text?: string; error?: { message?: string } } | undefined;
           try {
             got = JSON.parse(raw) as typeof got;
