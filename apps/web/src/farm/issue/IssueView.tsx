@@ -1,20 +1,19 @@
-// A plot's issue, opened by clicking the plot or its helper: the helper standing on its crop at the side; the stages,
-// the title and one box that says how it is now, the weeds, the criteria (ticked off while it is judged), one box to
-// talk to the helper, judge it or reopen it, and the offers (stop, resolve, go on, harvest, fix, close); folded under
-// it the changes, the work log, each run and the details. What it says and offers is src/rules/issueState.ts, the
-// server's state read; the workbench draws the same issue as its own page.
+// A plot's issue, opened by clicking the plot or its helper: the helper standing on its crop at the side; then, as the
+// workbench's page has it, what it is and where it stands, the one thing asked of the owner (only when there is one),
+// how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
+// Where it stands and what may be done is the server's Issue.standing, worded by src/rules/issueState.ts.
 
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQuery } from "@tanstack/solid-query";
-import type { Acceptance, Agent, Issue, Session } from "@vibevalley/protocol";
+import type { Acceptance, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { farm, overlayOf } from "../store";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "../world/plots";
 import { castPrefix } from "../../rules/cast";
 import { issueThreadOf } from "../../rules/chat";
-import { changesLine, findingsOf, type IssueOffer, issueState, noStepsText, resumeWords } from "../../rules/issueState";
-import { issueTag, runText, type Stage, stageLabel, stageOf, stages, tagLabel } from "../../rules/issues";
+import { actLabel, changesLine, type CriterionRow, findingsOf, issueState, nothingChanged, noStepsText, resumeWords } from "../../rules/issueState";
+import { runText } from "../../rules/issues";
 import { tookText, wallClockText } from "../../rules/time";
 import { aria, useNow } from "../../app/util";
 import { useRouter } from "../../app/router";
@@ -101,15 +100,6 @@ function PlotDetail(props: { session: Session; onDone: () => void }) {
   );
 }
 
-const offerWords: Record<IssueOffer["act"], string> = {
-  stop: "叫停这一轮",
-  resolve: "让它解决冲突",
-  resume: "接着做",
-  harvest: "收获",
-  cure: "接着修",
-  close: "关上",
-};
-
 function IssueBody(props: {
   issue: Issue;
   sessions: Session[];
@@ -125,36 +115,46 @@ function IssueBody(props: {
   const now = useNow();
   const [text, setText] = createSignal("");
   const [busy, setBusy] = createSignal(false);
-  const tag = () => issueTag(props.issue);
-  const s = createMemo(() => issueState(props.issue, props.sessions, tag(), props.session, frames.frame?.graphs ?? []));
+  const [box, setBox] = createSignal<"reject" | "tell" | undefined>();
+  const s = createMemo(() => issueState(props.issue, props.sessions, props.session, frames.frame?.graphs ?? []));
   const changes = useQuery(() => ({
     queryKey: ["issues", "changes", props.issue.id],
     queryFn: () => api.issue.changes({ id: props.issue.id }),
     enabled: s().showsChanges,
   }));
   const changed = () => ready(changes, undefined);
+  const timelineQuery = useQuery(() => ({
+    queryKey: ["issues", "timeline", props.issue.id, props.issue.standing.state, s().head.runs, props.issue.findings.length],
+    queryFn: () => api.issue.timeline({ id: props.issue.id }),
+    placeholderData: <T,>(prev: T) => prev,
+  }));
+  const timeline = () => ready(timelineQuery, undefined);
   const steps = createSessionEvents(
     () => s().head.id,
     () => true,
   );
   const agent = () => ready(agentsQuery, []).find((a) => a.id === s().head.agent);
+  const state = () => s().standing.state;
 
   const act = async (run: () => Promise<unknown>) => {
     setBusy(true);
     try {
       await run();
+      return true;
     } catch (e) {
       toasts.add({ type: ToastType.warn, title: "没办成", description: reasonOf(e) });
+      return false;
     } finally {
       setBusy(false);
     }
   };
-  const tell = async () => {
-    const who = s().session;
-    const said = text();
-    if (!said.trim() || !who) return;
-    await act(() => commands.water(who, said));
-    setText("");
+  const say = async (words: string) => {
+    const who = props.session;
+    if (!words.trim()) return;
+    if (await act(() => commands.water(who, words.trim()))) {
+      setText("");
+      setBox(undefined);
+    }
   };
   const reopen = () => {
     const id = props.issue.id;
@@ -168,112 +168,167 @@ function IssueBody(props: {
       }
     });
   };
-  const accept = async (pass: boolean) => {
-    const id = props.issue.id;
-    if (pass) return act(() => api.issue.accept({ id, body: { pass: true } }));
+  const reject = async () => {
     const lines = findingsOf(text());
     if (lines.length === 0) return;
-    await act(() => api.issue.accept({ id, body: { pass: false, findings: lines } }));
-    setText("");
+    const id = props.issue.id;
+    if (await act(() => api.issue.accept({ id, body: { pass: false, findings: lines } }))) {
+      setText("");
+      setBox(undefined);
+    }
   };
   const setAcceptance = (a: Acceptance) => {
     const id = props.issue.id;
     return act(() => api.issue.update({ id, body: { acceptance: a } }));
   };
-  const run = (o: IssueOffer, h: Session): (() => Promise<unknown>) => {
-    switch (o.act) {
-      case "stop":
-        return () => commands.stop(h.id);
-      case "resolve":
-        return () => commands.resolve(h);
-      case "resume":
-        return () => commands.water(h, resumeWords);
+  const go = (a: IssueAct) => {
+    const h = props.session;
+    const id = props.issue.id;
+    switch (a) {
+      case "start":
+        return void act(() => api.issue.status({ id, body: { status: "todo" } }));
+      case "answer":
+        return void say(text());
+      case "accept":
+        return void act(() => api.issue.accept({ id, body: { pass: true } }));
+      case "reject":
+        return box() === "reject" ? void reject() : void setBox("reject");
       case "harvest":
-        return async () => props.onHarvest(h);
+        return props.onHarvest(h);
+      case "acknowledge":
+        return void act(() => api.issue.status({ id, body: { status: "done" } }));
+      case "resolve":
+        return void act(() => commands.resolve(h));
+      case "resume":
+        return void act(() => commands.water(h, resumeWords));
       case "cure":
-        return () => commands.cure(h);
-      case "close":
-        return () => props.onClose(h);
+        return void act(() => commands.cure(h));
+      case "tell":
+        return box() === "tell" ? void say(text()) : void setBox("tell");
+      case "stop":
+        return void act(() => commands.stop(h.id));
+      case "close": {
+        const close = props.onClose;
+        return void act(() => close(h));
+      }
+      case "reopen":
+        return void reopen();
     }
   };
-  const actions = () => (
-    <>
-      <Show when={s().session}>
-        {(h) => (
-          <For each={s().offers}>
-            {(o) => (
-              <PxButton tone={o.act === "close" ? "danger" : o.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void act(run(o, h()))}>
-                {offerWords[o.act]}
-              </PxButton>
-            )}
-          </For>
-        )}
-      </Show>
-      <PxButton icon="button-open" onClick={() => props.onNavigate()}>
-        在看板上看
-      </PxButton>
-    </>
+  const button = (a: IssueAct, lead: boolean) => (
+    <PxButton
+      tone={lead ? "primary" : a === "close" || (a === "reject" && box() === "reject") ? "danger" : "plain"}
+      disabled={busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim())}
+      onClick={() => go(a)}
+    >
+      {a === "reject" && box() === "reject" ? "打回，照上面修" : a === "tell" && box() === "tell" ? "带过去" : actLabel[a]}
+    </PxButton>
   );
+  /** The block asks for the lead and its own others; the rest go in the row at the bottom. */
+  const blockActs = () => (s().ask ? s().others.filter((a) => a !== "close" && a !== "stop") : []);
+  const rowActs = () => (s().ask ? s().standing.acts.filter((a) => a === "close" || a === "stop") : s().standing.acts);
+  const boxShown = () => state() === "asking" || state() === "closed" || box() !== undefined;
 
   return (
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
       <Aside session={s().head} agent={agent()} />
       <div class="flex min-w-0 flex-1 flex-col">
-        <StageRail at={stageOf(props.issue.status)} />
-        <div class="flex items-start gap-2">
-          <h3 class="min-w-0 flex-1 text-[16px]">{s().title}</h3>
-          <span class={xs}>{tagLabel[tag()]}</span>
-        </div>
-        <Show when={s().project}>
-          <p class={xs}>{s().project}</p>
-        </Show>
-        <div class="mt-3 p-3" style={{ background: tint(tones[s().status.tone] ?? "#c8a46e", 0.3) }}>
-          <p class="text-[14px]">{s().status.head}</p>
-          <Show when={s().status.line}>
-            <p class={["mt-1 line-clamp-4", body]}>{s().status.line}</p>
-          </Show>
-          <For each={s().status.list}>{(a) => <p class={body}>· {a}</p>}</For>
-          <Show when={s().inTask}>
-            <p class={["mt-1", xs]}>{s().taskText}</p>
+        <div class="flex items-baseline gap-2">
+          <span class={xs}>#{props.issue.number}</span>
+          <h3 class="min-w-0 flex-1 truncate text-[16px]" title={s().title}>
+            {s().title}
+          </h3>
+          <Show when={s().project}>
+            <span class={xs}>{s().project}</span>
           </Show>
         </div>
-        <Show when={s().weeds.length > 0}>
-          <div class="mt-2">
-            <For each={s().weeds}>{(f) => <p class={[body, "text-berry"]}>草 · {f.text}</p>}</For>
-          </div>
-        </Show>
-        <Show when={(props.issue.criteria ?? []).length > 0}>
-          <Criteria criteria={props.issue.criteria!} checking={s().judging} />
-        </Show>
-        <Show when={s().hasBox} fallback={<div class="mt-3 flex flex-wrap gap-2">{actions()}</div>}>
-          <div class="mt-3 flex flex-col gap-2">
-            <PxTextArea value={text()} onChange={setText} rows={s().judging ? 3 : 2} placeholder={s().placeholder} label={s().boxLabel} disabled={busy()} />
-            <div class="flex flex-wrap gap-2">
-              <Show when={s().talking}>
-                <PxButton disabled={busy() || !text().trim()} onClick={() => void tell()}>
-                  带话
-                </PxButton>
+        <p class="mt-1 text-[13px]" style={{ color: s().standing.state === "stuck" ? tones.berry : "#5a3d26" }} aria-label="现在怎样">
+          {s().statusLine(now(), timeline()?.spent?.cny)}
+        </p>
+
+        <Show when={s().ask}>
+          {(ask) => (
+            <div class="mt-3 p-3" style={{ background: tint(tones[ask().tone] ?? "#c8a46e", 0.3) }} aria-label="要你做的" role="region">
+              <p class="text-[14px]">{ask().head}</p>
+              <Show when={ask().line}>
+                <p class={["mt-1 line-clamp-4 whitespace-pre-wrap", body]}>{ask().line}</p>
               </Show>
-              <Show when={s().judging}>
-                <PxButton tone="primary" disabled={busy()} onClick={() => void accept(true)}>
-                  验收通过
-                </PxButton>
-                <PxButton tone="danger" disabled={busy() || !text().trim()} onClick={() => void accept(false)}>
-                  没过，照上面修
-                </PxButton>
+              <Show when={state() === "asking"}>
+                <For each={props.issue.asks}>
+                  {(q) => (
+                    <div class="mt-2">
+                      <p class={body}>{q.question}</p>
+                      <Show when={q.options?.length}>
+                        <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={`回答：${q.question}`}>
+                          <For each={q.options}>
+                            {(o) => (
+                              <PxButton size="sm" disabled={busy()} onClick={() => void say(o)}>
+                                {o}
+                              </PxButton>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                    </div>
+                  )}
+                </For>
               </Show>
-              <Show when={s().reopening}>
-                <PxButton tone="primary" disabled={busy()} onClick={() => void reopen()}>
-                  重开
-                </PxButton>
-              </Show>
-              {actions()}
             </div>
+          )}
+        </Show>
+        <Show when={boxShown()}>
+          <div class="mt-2">
+            <PxTextArea
+              value={text()}
+              onChange={setText}
+              rows={box() === "reject" ? 3 : 2}
+              placeholder={
+                box() === "reject"
+                  ? "哪里没过，一行一条"
+                  : state() === "asking"
+                    ? "自己说……"
+                    : state() === "closed"
+                      ? "这次要它做什么（不填就是接着做完）"
+                      : props.session.phase._tag === "working"
+                        ? "干着活也能收到这句话"
+                        : "说一句，它接着做一轮"
+              }
+              label={box() === "reject" ? "哪里没过" : state() === "asking" ? "回答" : state() === "closed" ? "重开这张工单" : `给${props.session.name}带句话`}
+              disabled={busy()}
+            />
           </div>
         </Show>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <Show when={s().ask && s().lead}>{(lead) => button(lead(), true)}</Show>
+          <For each={blockActs()}>{(a) => button(a, false)}</For>
+          <For each={rowActs()}>{(a) => button(a, !s().ask && a === s().lead)}</For>
+          <PxButton icon="button-open" onClick={() => props.onNavigate()}>
+            在看板上看
+          </PxButton>
+        </div>
+
+        <FarmSection title={s().criteria.length > 0 ? `做到哪了 · ${s().met} / ${s().criteria.length} 条做到了` : "做到哪了"}>
+          <Show when={s().doing}>
+            <p class={[body, "text-[#4f8fbd]"]}>{s().doing}</p>
+          </Show>
+          <Show when={s().inTask}>
+            <p class={xs}>{s().taskText}</p>
+          </Show>
+          <Show when={s().criteria.length > 0} fallback={<p class={xs}>这张工单没写做完的标准：交回来时看改动判断。</p>}>
+            <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.acceptedAt === undefined} />
+          </Show>
+          <Show when={s().weeds.length > 0}>
+            <div class="mt-1.5">
+              <For each={s().weeds}>{(f) => <p class={[body, "text-berry"]}>上次打回 · {f.text}</p>}</For>
+            </div>
+          </Show>
+        </FarmSection>
+
         <div class="mt-4">
           <Show when={s().showsChanges}>
-            <Fold label={changed() ? `改动（${changed()!.files.length} 个文件）` : "改动"}>
+            <Fold
+              label={changed() ? (nothingChanged(changed()!) ? "做出了什么：还没有改动" : `做出了什么（${changed()!.files.length} 个文件）`) : "做出了什么"}
+            >
               <Show when={changed()} fallback={<p class={body}>{changes.isPending ? "在读……" : "读不到改动。"}</p>}>
                 {(c) => (
                   <div class="flex flex-col">
@@ -300,9 +355,25 @@ function IssueBody(props: {
               </Show>
             </Fold>
           </Show>
-          <Fold label="干活过程">
+          <Fold label="怎么走到这一步">
+            <Show when={timeline()} fallback={<p class={xs}>{timelineQuery.isPending ? "在读……" : "读不到。"}</p>}>
+              {(t) => (
+                <For each={t().milestones}>
+                  {(m) => (
+                    <Row label={wallClockText(m.at)}>
+                      <p class={[body, { "text-berry": m.kind === "failed" || m.kind === "rejected" }]}>
+                        {m.who ? `${m.who} · ` : ""}
+                        {m.text}
+                      </p>
+                    </Row>
+                  )}
+                </For>
+              )}
+            </Show>
+          </Fold>
+          <Fold label="帮工的每一步">
             <Show when={steps().length > 0} fallback={<p class={xs}>{noStepsText(s().head)}</p>}>
-              <WorkLog steps={steps()} now={now()} working={tag() === "working"} />
+              <WorkLog steps={steps()} now={now()} working={state() === "working"} />
             </Show>
           </Fold>
           <Fold label="每次干活">
@@ -310,7 +381,7 @@ function IssueBody(props: {
           </Fold>
           <Fold label="详情">
             <div class="flex flex-col">
-              <Show when={s().description && s().description !== s().title}>
+              <Show when={s().description}>
                 <Row label="要做的">
                   <p class="whitespace-pre-wrap text-[13px] text-bark-800">{s().description}</p>
                 </Row>
@@ -323,7 +394,7 @@ function IssueBody(props: {
                   <p class={body}>{s().crewLine}</p>
                 </Row>
               </Show>
-              <Show when={s().acceptanceEditable}>
+              <Show when={!s().inTask}>
                 <Row label="验收">
                   <div class="flex flex-wrap items-center gap-1.5">
                     <For
@@ -449,43 +520,39 @@ function Aside(props: { session: Session; agent?: Agent }) {
   );
 }
 
-/** 聊清楚 → 安排活 → 完成, the one it is at marked. */
-function StageRail(props: { at: Stage }) {
-  const here = () => stages.indexOf(props.at);
-  return (
-    <div class="mb-3 flex border border-cream-300">
-      <For each={stages}>
-        {(st, i) => (
-          <span
-            class="flex flex-1 items-center justify-center gap-1 py-1.5 text-[13px]"
-            style={{
-              background: i() === here() ? tint("#e5a93c", 0.45) : i() < here() ? tint("#b4cb7c", 0.5) : undefined,
-              color: i() === here() ? "#2f1f13" : "#7f5b3b",
-            }}
-          >
-            {stageLabel[st]}
-            <Show when={i() < here()}>
-              <SpriteIcon name="mark-check" size={12} label={`${stageLabel[st]}做完了`} />
-            </Show>
-          </span>
-        )}
-      </For>
-    </div>
-  );
-}
+const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: string; label: string }> = {
+  met: { icon: "mark-check", label: "它说做到了" },
+  unmet: { icon: "mark-cross", label: "它说没做到" },
+  unsure: { icon: "mark-warn", label: "它说不确定" },
+};
 
-/** The criteria; while it is judged, each can be ticked off as the owner checks it (on this page only). */
-function Criteria(props: { criteria: string[]; checking: boolean }) {
+/** The criteria with the helper's word on each; while it is judged, each can be ticked off as the owner checks it (on
+ * this page only). */
+function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   const [ticked, setTicked] = createSignal<ReadonlySet<number>>(new Set());
+  const mark = (r: CriterionRow) => (r.result ? <SpriteIcon name={resultMark[r.result].icon} size={14} label={resultMark[r.result].label} /> : undefined);
   return (
-    <div class="mt-2 flex flex-col">
-      <p class={xs}>{props.checking ? "照验收标准看，看过一条勾一条" : "验收标准"}</p>
-      <For each={props.criteria}>
-        {(c, i) => (
-          <Show when={props.checking} fallback={<p class={body}>· {c}</p>}>
+    <div class="flex flex-col">
+      <For each={props.rows}>
+        {(r, i) => (
+          <Show
+            when={props.checking}
+            fallback={
+              <div class="flex items-start gap-2 py-0.5">
+                <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">{mark(r) ?? <span class="h-2.5 w-2.5 border-2 border-bark-300" />}</span>
+                <span class="min-w-0 flex-1">
+                  <span class={body}>{r.text}</span>
+                  <Show when={r.proof}>
+                    <span class={["block", xs]}>{r.proof}</span>
+                  </Show>
+                </span>
+              </div>
+            }
+          >
             <button
               type="button"
               aria-pressed={aria(ticked().has(i()))}
+              aria-label={r.text}
               onClick={() => setTicked((t) => (t.has(i()) ? new Set([...t].filter((x) => x !== i())) : new Set([...t, i()])))}
               class="group flex cursor-pointer items-start gap-2 py-0.5 text-left"
             >
@@ -494,7 +561,13 @@ function Criteria(props: { criteria: string[]; checking: boolean }) {
                   <SpriteIcon name="mark-check" size={12} label="看过了" />
                 </Show>
               </span>
-              <span class={[body, { "text-bark-500": ticked().has(i()) }]}>{c}</span>
+              <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">{mark(r)}</span>
+              <span class="min-w-0 flex-1">
+                <span class={[body, { "text-bark-500": ticked().has(i()) }]}>{r.text}</span>
+                <Show when={r.proof}>
+                  <span class={["block", xs]}>{r.proof}</span>
+                </Show>
+              </span>
             </button>
           </Show>
         )}

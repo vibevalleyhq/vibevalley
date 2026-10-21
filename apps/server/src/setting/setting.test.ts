@@ -60,13 +60,13 @@ describe("settings", () => {
   );
 
   it.effect("the voice keeps only what differs from its defaults, which the configuration sets", () => {
-    const config = testConfig({ voice: { model: "gpt-5-mini", id: "English_captivating_female1", line: { port: 0, url: "" } } });
+    const config = testConfig({ voice: { id: "English_captivating_female1", line: { port: 0, url: "" } } });
     return run(
       config,
       Effect.gen(function* () {
         const s = yield* Setting;
         const before = s.status();
-        expect(before.voiceDefaults.answer).toEqual({ vendor: "agora", model: "gpt-5-mini" });
+        expect(before.voiceDefaults.answer).toEqual({ vendor: "manager" });
         expect(before.voiceDefaults.tts).toEqual({ vendor: "minimax", model: "speech_2_6_turbo", voiceId: "English_captivating_female1" });
         expect(before.voiceDefaults.greeting).toBe(defaultVoice().greeting);
         expect(before.voice).toEqual(before.voiceDefaults);

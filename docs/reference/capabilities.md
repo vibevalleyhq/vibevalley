@@ -67,6 +67,7 @@
 | `issue.list` | `GET /api/v1/issues` | ✓ | ✓ |   |
 | `issue.get` | `GET /api/v1/issues/{id}` | ✓ | ✓ |   |
 | `issue.runs` | `GET /api/v1/issues/{id}/runs` | ✓ | ✓ |   |
+| `issue.timeline` | `GET /api/v1/issues/{id}/timeline` | ✓ | ✓ |   |
 | `issue.create` | `POST /api/v1/issues` | ✓ | ✓ |   |
 | `issue.update` | `PUT /api/v1/issues/{id}` | ✓ | ✓ |   |
 | `issue.delete` | `DELETE /api/v1/issues/{id}` | ✓ | ✓ |   |

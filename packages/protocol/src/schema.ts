@@ -530,6 +530,50 @@ export const IssueDrafting: Schema.Codec<T.IssueDrafting> = Schema.Struct({
   name: Schema.String,
 });
 
+export const Ask: Schema.Codec<T.Ask> = Schema.Struct({
+  question: Schema.String,
+  options: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+});
+
+export const CheckResult: Schema.Codec<T.CheckResult> = Schema.Literals(T.CheckResultValues);
+
+export const CriterionCheck: Schema.Codec<T.CriterionCheck> = Schema.Struct({
+  criterion: Schema.Number,
+  result: CheckResult,
+  proof: Schema.optionalKey(Schema.String),
+});
+
+export const Standing: Schema.Codec<T.Standing> = Schema.Literals(T.StandingValues);
+export const StuckReason: Schema.Codec<T.StuckReason> = Schema.Literals(T.StuckReasonValues);
+export const IssueAct: Schema.Codec<T.IssueAct> = Schema.Literals(T.IssueActValues);
+
+export const IssueStanding: Schema.Codec<T.IssueStanding> = Schema.Struct({
+  state: Standing,
+  since: Schema.optionalKey(Schema.Number),
+  stuck: Schema.optionalKey(StuckReason),
+  lead: Schema.optionalKey(IssueAct),
+  acts: Schema.mutable(Schema.Array(IssueAct)),
+});
+
+export const MilestoneKind: Schema.Codec<T.MilestoneKind> = Schema.Literals(T.MilestoneKindValues);
+
+export const Milestone: Schema.Codec<T.Milestone> = Schema.Struct({
+  at: Schema.Number,
+  kind: MilestoneKind,
+  who: Schema.optionalKey(Schema.String),
+  text: Schema.String,
+});
+
+export const IssueTimeline: Schema.Codec<T.IssueTimeline> = Schema.Struct({
+  milestones: Schema.mutable(Schema.Array(Milestone)),
+  spent: Schema.optionalKey(Spent),
+});
+
+export const HandedBack: Schema.Codec<T.HandedBack> = Schema.Struct({
+  at: Schema.Number,
+  outcome: Outcome,
+});
+
 export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   id: Schema.String,
   number: Schema.Number,
@@ -555,9 +599,12 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   acceptance: Acceptance,
   acceptedAt: Schema.optionalKey(Schema.Number),
   findings: Schema.mutable(Schema.Array(Finding)),
-  asks: Schema.mutable(Schema.Array(Schema.String)),
+  asks: Schema.mutable(Schema.Array(Ask)),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
   drafting: Schema.optionalKey(IssueDrafting),
+  handedBack: Schema.optionalKey(HandedBack),
+  standing: IssueStanding,
 });
 
 export const CoreState: Schema.Codec<T.CoreState> = Schema.Struct({
@@ -1576,7 +1623,8 @@ export const FactReport: Schema.Codec<T.FactReport> = Schema.Struct({
   summary: Schema.String,
   runs: Schema.Number,
   spent: Schema.optionalKey(Spent),
-  asks: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  asks: Schema.optionalKey(Schema.mutable(Schema.Array(Ask))),
+  checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
 });
 
 export const FactConflict: Schema.Codec<T.FactConflict> = Schema.Struct({

@@ -1,4 +1,4 @@
-import { type Issue, type IssueStatus, managerAgent, type ProjectStack } from "@vibevalley/protocol";
+import { type Issue, type IssueStatus, managerAgent, type ProjectStack, type Run } from "@vibevalley/protocol";
 import { graphsOf, templateCatalog } from "@vibevalley/protocol/rules";
 import { describe, expect, it, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
@@ -14,6 +14,7 @@ import {
   nextTaskId,
   parseDraft,
   sentTitles,
+  milestonesOf,
   splitJob,
   statusMove,
   statusMoves,
@@ -33,9 +34,65 @@ describe("an issue as a job", () => {
     expect(splitJob("  ")).toEqual(["", ""]);
   });
 
+  it("a job written as one long line keeps a short title and all of it as the description", () => {
+    const job = "通读 vibevalley 项目，给主人一份整体架构和当前进度的评估。1）技术栈 2）模块 3）测试 4）最该推进的三件事";
+    expect(splitJob(job)).toEqual(["通读 vibevalley 项目，给主人一份整体架构和当前进度的评估", job]);
+  });
+
+  it("the story of an issue, newest first", () => {
+    const issue = {
+      id: "t1",
+      number: 1,
+      title: "评估",
+      priority: "medium",
+      createdAt: 100,
+      sessions: ["w1"],
+      status: "in_review",
+      moves: [],
+      acceptance: "glance",
+      findings: [{ id: "f1", text: "少了测试", at: 400 }],
+      asks: [{ question: "全交给 w3 还是分着做？", options: ["全交给 w3", "分着做"] }],
+      standing: { state: "asking", acts: [] },
+    } as Issue;
+    const runs: Run[] = [
+      {
+        id: "r1",
+        session: "w1",
+        triggeredBy: { kind: "issue" },
+        heard: [],
+        startedAt: 200,
+        endedAt: 300,
+        outcome: "completed",
+        summary: "写好了",
+        spent: { tokens: 10, cny: 0.5 },
+      },
+      {
+        id: "r2",
+        session: "w1",
+        triggeredBy: { kind: "comment" },
+        heard: [],
+        startedAt: 410,
+        endedAt: 500,
+        outcome: "completed",
+        summary: "补了",
+        spent: { tokens: 5 },
+      },
+    ];
+    const { milestones, spent } = milestonesOf(issue, runs, new Map([["w1", "Claude 师傅"]]));
+    expect(milestones.map((m) => [m.at, m.kind, m.who ?? "", m.text])).toEqual([
+      [500, "asked", "Claude 师傅", "问你：全交给 w3 还是分着做？"],
+      [410, "told", "Claude 师傅", "你带了话，接着做一轮"],
+      [400, "rejected", "", "打回：少了测试"],
+      [300, "reported", "Claude 师傅", "交回来了：写好了"],
+      [200, "started", "Claude 师傅", "开工"],
+      [100, "opened", "", "开单"],
+    ]);
+    expect(spent).toEqual({ tokens: 15, cny: 0.5 });
+  });
+
   it("the job carries its criteria", () => {
     expect(issueJob({ title: "改拖卡", description: "为什么：\n旧接口", criteria: ["拖到待办就开工", "测试通过"] })).toBe(
-      "改拖卡\n\n为什么：\n旧接口\n\n" + criteriaHead + "\n- 拖到待办就开工\n- 测试通过",
+      "改拖卡\n\n为什么：\n旧接口\n\n" + criteriaHead + "\n1. 拖到待办就开工\n2. 测试通过",
     );
   });
 
@@ -72,7 +129,7 @@ describe("drafts", () => {
     const first = draftBrief({ title: "新工单" }, "看板拖卡还在调旧接口", "board");
     for (const want of [draftOpening, "项目：board", "主人想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问主人："]) expect(first).toContain(want);
     expect(first).not.toContain("上一版草稿");
-    const drafted = { title: "看板拖卡改用 issue.status", description: "为什么：\n旧接口", criteria: ["拖到待办就开工"], asks: ["端口用哪个？"] };
+    const drafted = { title: "看板拖卡改用 issue.status", description: "为什么：\n旧接口", criteria: ["拖到待办就开工"], asks: [{ question: "端口用哪个？" }] };
     const answer = draftBrief(drafted, "用 8797", "board");
     for (const want of [
       "上一版草稿",
@@ -90,7 +147,8 @@ describe("drafts", () => {
 });
 
 describe("status moves", () => {
-  const issue = (status: IssueStatus, sent: boolean, more: Partial<Issue> = {}) => ({ status, sessions: sent ? ["w1"] : [], ...more }) as Issue;
+  const issue = (status: IssueStatus, sent: boolean, more: Partial<Issue> = {}) =>
+    ({ status, sessions: sent ? ["w1"] : [], standing: { state: "reviewing", acts: [] }, ...more }) as Issue;
   it("where each status may go", () => {
     for (const [from, sent, to] of [
       ["backlog", false, ["todo", "canceled"]],
@@ -114,6 +172,23 @@ describe("status moves", () => {
     expect(statusMoves(issue("backlog", false, { drafting: { session: "w2", name: "试验田" } }))).toEqual(["canceled"]);
     expect(statusMoves(issue("in_progress", false, { assignee: managerAgent }))).toEqual([]);
     expect(statusMoves(issue("in_review", false, { graph: { state: "draft" } as never }))).toEqual([]);
+  });
+
+  it("a round that failed is not harvested, from the board, the command line or the manager alike", () => {
+    const failed = issue("in_review", true, { standing: { state: "stuck", stuck: "failed", acts: [] } });
+    expect(statusMoves(failed)).toEqual(["todo", "canceled"]);
+    expect(statusMove(failed, "done")).toEqual(["none", "这一轮没做成：带句话再干一轮，或者关掉"]);
+    // Stopped halfway is not failed: what is there may still be harvested.
+    expect(statusMoves(issue("in_review", true, { standing: { state: "stuck", stuck: "interrupted", acts: [] } }))).toEqual(["todo", "done", "canceled"]);
+  });
+
+  it("the manager's issue waits on the owner once its turn ended, and only an answer is taken as done", () => {
+    const manager = (more: Partial<Issue>) => issue("in_review", false, { assignee: managerAgent, ...more });
+    expect(statusMoves(manager({ handedBack: { at: 1, outcome: "completed" } }))).toEqual(["done", "canceled"]);
+    expect(statusMove(manager({ handedBack: { at: 1, outcome: "completed" } }), "done")).toEqual(["answered", ""]);
+    expect(statusMove(manager({ handedBack: { at: 1, outcome: "completed" } }), "canceled")).toEqual(["putAway", ""]);
+    for (const outcome of ["failed", "interrupted"] as const) expect(statusMoves(manager({ handedBack: { at: 1, outcome } }))).toEqual(["canceled"]);
+    expect(statusMoves(issue("done", false, { assignee: managerAgent, closed: "answered" }))).toEqual([]);
   });
 });
 

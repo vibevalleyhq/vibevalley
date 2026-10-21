@@ -90,6 +90,8 @@ export interface Handlers<R = never> {
   readonly "issue.list": () => Effect.Effect<T.Issue[], ApiError, R>;
   readonly "issue.get": (a: { readonly id: string }) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "issue.runs": (a: { readonly id: string }) => Effect.Effect<T.Run[], ApiError, R>;
+  /** The issue's milestones, newest first, and what all its runs cost. */
+  readonly "issue.timeline": (a: { readonly id: string }) => Effect.Effect<T.IssueTimeline, ApiError, R>;
   readonly "issue.create": (a: { readonly body: T.IssueRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "issue.update": (a: { readonly id: string; readonly body: T.IssueUpdate }) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "issue.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
@@ -408,6 +410,16 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: Schema.mutable(Schema.Array(S.Run)),
+    can: ["owner", "remote"],
+  },
+  {
+    op: "issue.timeline",
+    method: "GET",
+    path: "/api/v1/issues/{id}/timeline",
+    pathParams: [{ name: "id", number: false }],
+    query: [],
+    body: undefined,
+    result: S.IssueTimeline,
     can: ["owner", "remote"],
   },
   { op: "issue.create", method: "POST", path: "/api/v1/issues", pathParams: [], query: [], body: S.IssueRequest, result: S.Issue, can: ["owner", "remote"] },

@@ -21,6 +21,8 @@ import {
   taskLine,
 } from "./issues";
 import { ago, tookText } from "./time";
+import { shortTitle, standingLabel, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { standingTone } from "./issueState";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";
@@ -156,8 +158,8 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       const head = sessions[sessions.length - 1]!;
       const phase = session?.phase;
       const now0 = session ?? head;
-      if (session?.conflict) flags.push({ text: "冲突", tone: "berry" });
-      if (phase?._tag === "failed" || now0.lastRun?.outcome === "failed") flags.push({ text: "没做成", tone: "berry" });
+      // The board says what the page says: the standing, when it waits on the owner.
+      if (standingWantsOwner(issue.standing.state)) flags.push({ text: standingLabel[issue.standing.state], tone: standingTone[issue.standing.state] });
       if (tag === "lost") flags.push({ text: "丢了", tone: "berry" });
       if (issue.schedule !== undefined) flags.push({ text: "定时", tone: "faint" });
       lines.push(head.name);
@@ -172,7 +174,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       if (!tagOpen(tag)) lines.push(`${tagLabel[tag]} · ${ago(issue.closedAt ?? endedAt(head) ?? head.hiredAt, now)}`);
       return {
         number: numberOf(issue),
-        title: issueTitle(issue, graphs),
+        title: shortTitle(issueTitle(issue, graphs)),
         status: issue.status,
         statusTone: tag === "lost" ? "berry" : undefined,
         priority: issue.priority,

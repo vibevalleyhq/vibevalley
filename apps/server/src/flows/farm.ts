@@ -101,7 +101,8 @@ export const helper = (turns: ScriptedTurn[] = []): Runtime =>
         await turn.tool("bash", `{"command":"git commit"}`, () => {
           writeFileSync(join(cwd, "clock.ts"), 'export const clockIn = () => "ok"\n');
           sessionGit(cwd, "add", "clock.ts");
-          sessionGit(cwd, "commit", "-q", "-m", "加上打卡");
+          // Asked again on a branch that has it (a reopen, another round), it has nothing new to commit, as an agent would.
+          if (execFileSync("git", ["status", "--porcelain"], { cwd, encoding: "utf8" }).trim() !== "") sessionGit(cwd, "commit", "-q", "-m", "加上打卡");
           return "";
         });
       }

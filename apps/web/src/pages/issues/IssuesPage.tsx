@@ -207,7 +207,6 @@ function Detail(props: {
           <IssueDetail
             issue={as("issue").issue}
             sessions={as("issue").sessions}
-            tag={as("issue").tag}
             session={as("issue").session}
             onClose={(session, review) => props.onClose(as("issue").issue, session, review)}
             onTask={as("issue").issue.parent ? () => props.open(`task:${as("issue").issue.parent}`) : undefined}

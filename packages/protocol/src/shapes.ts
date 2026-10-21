@@ -1047,9 +1047,99 @@ export interface Issue {
   acceptance: Acceptance;
   acceptedAt?: number;
   findings: Finding[];
-  asks: string[];
+  asks: Ask[];
   criteria?: string[];
+  checks?: CriterionCheck[];
   drafting?: IssueDrafting;
+  /** An issue for the manager: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
+  handedBack?: HandedBack;
+  standing: IssueStanding;
+}
+
+export interface HandedBack {
+  at: number;
+  outcome: Outcome;
+}
+
+/** A question the helper is waiting on the owner for; options are the answers it thought of, each one a reply as it is. */
+export interface Ask {
+  question: string;
+  options?: string[];
+}
+
+export const CheckResultValues = ["met", "unmet", "unsure"] as const;
+export type CheckResult = (typeof CheckResultValues)[number];
+
+/** The helper's own word on one of the criteria, as it handed the work back: criterion is its index in Issue.criteria. */
+export interface CriterionCheck {
+  criterion: number;
+  result: CheckResult;
+  proof?: string;
+}
+
+/** Where an issue stands for the owner, the one set of states the board, the farm and the page all say. */
+export const StandingValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "harvested", "closed"] as const;
+export type Standing = (typeof StandingValues)[number];
+
+export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] as const;
+export type StuckReason = (typeof StuckReasonValues)[number];
+
+/** What the owner can do to an issue from its page. tell is a word to the helper, answer the same to its question;
+ * reject sends it back with findings; acknowledge takes what the manager answered as done. */
+export const IssueActValues = [
+  "start",
+  "answer",
+  "accept",
+  "reject",
+  "harvest",
+  "acknowledge",
+  "resolve",
+  "resume",
+  "cure",
+  "tell",
+  "stop",
+  "close",
+  "reopen",
+] as const;
+export type IssueAct = (typeof IssueActValues)[number];
+
+/** since: when it came to stand so, when known. lead is the one thing the owner is asked to do, if any; acts are all
+ * it can do, lead first. */
+export interface IssueStanding {
+  state: Standing;
+  since?: number;
+  stuck?: StuckReason;
+  lead?: IssueAct;
+  acts: IssueAct[];
+}
+
+export const MilestoneKindValues = [
+  "opened",
+  "drafted",
+  "started",
+  "reported",
+  "asked",
+  "told",
+  "failed",
+  "stopped",
+  "rejected",
+  "accepted",
+  "closed",
+] as const;
+export type MilestoneKind = (typeof MilestoneKindValues)[number];
+
+/** One line of an issue's story; who is the session's name, or absent for the owner and the farm. */
+export interface Milestone {
+  at: number;
+  kind: MilestoneKind;
+  who?: string;
+  text: string;
+}
+
+/** An issue's story newest first, and what all its runs cost. */
+export interface IssueTimeline {
+  milestones: Milestone[];
+  spent?: Spent;
 }
 
 export interface IssueDrafting {
@@ -1782,7 +1872,8 @@ export interface FactReport {
   summary: string;
   runs: number;
   spent?: Spent;
-  asks?: string[];
+  asks?: Ask[];
+  checks?: CriterionCheck[];
 }
 
 export interface FactConflict {
@@ -2232,6 +2323,9 @@ export class VibeValleyApi {
     get: (a: { id: string }): Promise<Issue> => this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<Issue>,
     runs: (a: { id: string }): Promise<Run[]> =>
       this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/runs", undefined, undefined) as Promise<Run[]>,
+    /** The issue's milestones, newest first, and what all its runs cost. */
+    timeline: (a: { id: string }): Promise<IssueTimeline> =>
+      this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/timeline", undefined, undefined) as Promise<IssueTimeline>,
     create: (a: { body: IssueRequest }): Promise<Issue> => this.call("POST", "/api/v1/issues", undefined, a.body) as Promise<Issue>,
     update: (a: { id: string; body: IssueUpdate }): Promise<Issue> =>
       this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<Issue>,

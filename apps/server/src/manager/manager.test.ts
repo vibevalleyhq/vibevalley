@@ -264,11 +264,14 @@ describe("the manager", () => {
 
   it.live("merges only when the owner asks", () => {
     let helper = "";
+    let number = 0;
     const f = farm((c) => {
       const result = answeredWith(c);
       if (result !== undefined) return fauxAssistantMessage("合并：" + result);
       const line = lastLine(c);
-      if (line.includes("直接 merge") || line.includes("收下")) return fauxAssistantMessage(fauxToolCall("merge", { session: helper }));
+      // A helper's words name it by its name; the owner's, by the issue's number.
+      if (line.includes("直接 merge")) return fauxAssistantMessage(fauxToolCall("merge", { issue: helper }));
+      if (line.includes("收下")) return fauxAssistantMessage(fauxToolCall("merge", { issue: "#" + number }));
       return respond(c);
     });
     return Effect.gen(function* () {
@@ -280,6 +283,7 @@ describe("the manager", () => {
       const lab = yield* enableLab;
       const hired = yield* issues.hire({ ...lab, enabled: true, effort: "" }, "写个 hello", "notes");
       helper = hired.session!.id;
+      number = (yield* issues.get(hired.session!.issue!)).number;
       yield* until(() => sessions.roster().some((r) => r.session.id === helper && r.session.phase._tag === "ripe"), "the work ripe");
       yield* chat.speak(helper, "@管家 主人同意了，直接 merge", { anyway: true });
       const thread = (yield* chat.jobThread(helper))!;
@@ -299,6 +303,45 @@ describe("the manager", () => {
         throw new Error("never merged");
       });
       expect(merged.closed).toBe("merged");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  // The owner's words name issues by number: noted down without anyone sent, started on the owner's say, found again
+  // among those waiting on the owner.
+  it.live("works in issues", () => {
+    let number = 0;
+    const f = farm((c) => {
+      const result = answeredWith(c);
+      if (result !== undefined) return fauxAssistantMessage("工单：" + result);
+      const line = lastLine(c);
+      if (line.includes("记一下")) return fauxAssistantMessage(fauxToolCall("issue_create", { title: "首页偶尔白屏", project: "demo", agent: "lab" }));
+      if (line.includes("开工")) return fauxAssistantMessage(fauxToolCall("issue_status", { issue: "#" + number, to: "待办" }));
+      if (line.includes("在等我")) return fauxAssistantMessage(fauxToolCall("issues", { wants_owner: true }));
+      return respond(c);
+    });
+    return Effect.gen(function* () {
+      const issues = yield* Issues;
+      const manager = yield* Manager;
+      const words = yield* said;
+      yield* enableLab;
+      yield* manager.say("记一下：首页偶尔白屏", {}, undefined, "");
+      const noted = yield* until(() => words().find((w) => w.startsWith("工单：记下了")), "noted");
+      const issue = (yield* issues.list()).find((t) => t.title === "首页偶尔白屏")!;
+      number = issue.number;
+      expect(noted).toBe(`工单：记下了：#${number}「首页偶尔白屏」，在备选里`);
+      expect([issue.status, issue.sessions]).toEqual(["backlog", []]);
+      yield* manager.say(`#${number} 开工`, {}, undefined, "");
+      yield* until(() => words().some((w) => w.startsWith("工单：挪好了")), "started");
+      yield* Effect.promise(async () => {
+        for (let i = 0; i < 500; i++) {
+          if ((await Effect.runPromise(issues.get(issue.id))).status === "in_review") return;
+          await new Promise((r) => setTimeout(r, 10));
+        }
+        throw new Error("never handed back");
+      });
+      yield* manager.say("哪些在等我？", {}, undefined, "");
+      const waiting = yield* until(() => words().find((w) => w.startsWith("工单：- #")), "listed");
+      expect(waiting).toContain(`#${number}「首页偶尔白屏」等你验收`);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -326,6 +369,27 @@ describe("the manager", () => {
       const on = yield* until(() => mine(true).length === 1 && mine(true), "the owner's schedule on");
       expect(on[0]).toMatchObject({ by: "manager" });
       expect(on[0]!.pending ?? false).toBe(false);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  // However its turn ends, the manager's issue waits on the owner: a turn that did not fail is not an answer taken.
+  it.live("leaves its issue for the owner to take as done", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const schedules = yield* Schedules;
+      const issues = yield* Issues;
+      const s = yield* schedules.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, "owner", true);
+      yield* Effect.sleep(80);
+      yield* schedules.tick;
+      const core = yield* Core;
+      const handed = yield* until(() => core.state().issues?.find((t) => t.schedule === s.id && t.status === "in_review"), "handed back");
+      const id = handed.id;
+      expect(handed.closed).toBeUndefined();
+      expect(handed.handedBack?.outcome).toBe("completed");
+      expect(handed.standing).toMatchObject({ state: "reviewing", lead: "acknowledge" });
+      expect(handed.moves).toEqual(["done", "canceled"]);
+      const done = yield* issues.setStatus(id, "done", "", "");
+      expect([done.status, done.closed]).toEqual(["done", "answered"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

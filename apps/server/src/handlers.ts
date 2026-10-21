@@ -145,6 +145,7 @@ export const handlers = Effect.gen(function* () {
     "issue.history": () => issues.history(),
     "issue.get": ({ id }) => issues.get(id),
     "issue.runs": ({ id }) => Effect.andThen(issues.get(id), sessions.runs(id)),
+    "issue.timeline": ({ id }) => issues.timeline(id),
     "issue.create": ({ body }) => issues.add(body),
     "issue.update": ({ id, body }) => issues.edit(id, body),
     "issue.move": ({ id, body }) => issues.move(id, body.before ?? ""),

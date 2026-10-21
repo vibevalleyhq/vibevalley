@@ -2,15 +2,18 @@
 // when its last session leaves, as the fact that the session left says how, and opens again with another session; a
 // task's issues open and close as the task says. An issue may be drafted first: a session reads the code and writes it in
 // the issue's format, then leaves, the issue still unsent. One for the manager is handed to the manager, not to a session,
-// and closes as answered once the manager's run completes. A branch that would conflict is not merged: the session stays
+// and waits on the owner once the manager's turn ends, however it ended: only the owner closes it. A branch that would conflict is not merged: the session stays
 // with its branch and worktree, and the state says which files.
 
 import {
   type Agent,
+  type Ask,
   type Changes,
+  type CriterionCheck,
   type Conflict,
   type Dispatched,
   type Finding,
+  type HandedBack,
   type Issue,
   type IssueAcceptRequest,
   type IssueClose,
@@ -20,6 +23,7 @@ import {
   type IssueStatus,
   IssueStatusValues,
   type IssueTask,
+  type IssueTimeline,
   type IssueUpdate,
   managerAgent,
   maxRunning,
@@ -43,6 +47,7 @@ import {
   issueOrder,
   issueStatusOf,
   keepClosedIssues,
+  standingIn,
   templateCatalog,
 } from "@vibevalley/protocol/rules";
 import { Context, Effect, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
@@ -71,6 +76,8 @@ import {
   issueJob,
   type IssueDraft,
   kept,
+  milestonesOf,
+  openAsks,
   nextTaskId,
   parseDraft,
   sentTitles,
@@ -111,6 +118,7 @@ export interface IssueShape {
   readonly accept: (id: string, req: IssueAcceptRequest) => Effect.Effect<Issue, ApiError>;
   readonly draft: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
   readonly history: () => Effect.Effect<IssueHistory[]>;
+  readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
   readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
   /** Sends a session for a job that is not written down first (the manager sending someone at once, a task's step): its issue is made from the job. */
   readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
@@ -213,7 +221,9 @@ export const make = (options: IssueOptions = {}) =>
       const task = json<IssueTask>(row.task);
       const blockedBy = json<string[]>(row.blocked_by);
       const criteria = json<string[]>(row.criteria);
+      const checks = json<CriterionCheck[]>(row.checks);
       const pullRequest = json<PullRequest>(row.pull_request);
+      const handedBack = json<HandedBack>(row.handed_back);
       const out: Issue = {
         id: row.id,
         number: row.number,
@@ -238,13 +248,18 @@ export const make = (options: IssueOptions = {}) =>
         acceptance: row.acceptance as Issue["acceptance"],
         ...(row.accepted_at !== null ? { acceptedAt: row.accepted_at } : {}),
         findings: json<Finding[]>(row.findings) ?? [],
-        asks: json<string[]>(row.asks) ?? [],
+        asks: json<Ask[]>(row.asks) ?? [],
         ...(criteria ? { criteria } : {}),
+        ...(checks ? { checks } : {}),
+        ...(handedBack ? { handedBack } : {}),
+        standing: { state: "draft", acts: [] },
       };
       if ((out.sessions.length === 0 || out.task) && row.rank) out.rank = row.rank;
       out.status = issueStatusOf(out, state);
       const drafter = issueDraftingOf(out, state);
       if (drafter) out.drafting = drafter;
+      // The moves read the standing: a round that failed is not harvested.
+      out.standing = standingIn(out, state);
       out.moves = statusMoves(out);
       return out;
     }
@@ -328,11 +343,28 @@ export const make = (options: IssueOptions = {}) =>
 
     const closeAs = (id: string, how: IssueClose) => Effect.andThen(db(q.closeIssue({ closed_at: Date.now(), closed: how, id })), publish(id));
 
+    /** The manager's turn on its issue ended; a session's run on one is not this. */
+    const handBack = (id: string, h: HandedBack) =>
+      Effect.gen(function* () {
+        const t = yield* get(id);
+        if (!isForManager(t)) return;
+        // A turn cut off by a restart closed its issue as lost; the turn it goes on in hands back all the same.
+        if (isClosed(t.status)) {
+          if (t.closed !== "lost") return;
+          yield* db(q.reopenIssue({ id }));
+        }
+        yield* db(q.setHandedBack({ id, handed_back: JSON.stringify(h) }));
+        yield* publish(id);
+      });
+
     const reopenRow = (id: string) => Effect.andThen(db(q.reopenIssue({ id })), publish(id));
 
     /** What the session waits on the owner for, from its report; a report with none, or a comment, clears them. */
-    const asked = (id: string, asks: readonly string[] | undefined) =>
-      Effect.andThen(db(q.setIssueAsks({ id, asks: jsonOrNull(kept(asks), kept(asks).length > 0) })), publish(id));
+    const asked = (id: string, asks: readonly Ask[] | undefined) =>
+      Effect.andThen(db(q.setIssueAsks({ id, asks: jsonOrNull(openAsks(asks), openAsks(asks).length > 0) })), publish(id));
+
+    /** The helper's word on each criterion, from the newest report that gave one; a reopen clears it. */
+    const checked = (id: string, checks: readonly CriterionCheck[]) => db(q.setIssueChecks({ id, checks: jsonOrNull(checks, checks.length > 0) }));
 
     /** at 0 is not accepted (a fail, or another round started); the findings are written as they stand. */
     const judged = (id: string, at: number, findings: readonly Finding[]) =>
@@ -456,6 +488,7 @@ export const make = (options: IssueOptions = {}) =>
     const toManager = (issue: Issue, channel: string, by: RunTrigger, due?: Schedule) =>
       Effect.gen(function* () {
         if (isClosed(issue.status)) yield* reopenRow(issue.id);
+        else if (issue.handedBack) yield* Effect.andThen(db(q.setHandedBack({ id: issue.id, handed_back: null })), publish(issue.id));
         PubSub.publishUnsafe(managerHub, { issue, channel, by, ...(due ? { schedule: due } : {}) });
       });
 
@@ -641,6 +674,12 @@ export const make = (options: IssueOptions = {}) =>
       prLock.withPermits(1)(
         Effect.gen(function* () {
           const issue = yield* get(id);
+          // Whoever asks (the board, the command line, the manager's tool) is held to the same table: a round that
+          // failed, or a required acceptance not passed, is not harvested.
+          if (!issue.graph && !issue.task) {
+            const [m, why] = statusMove(issue, "done");
+            if (m === "none") return yield* Effect.fail(refused(why));
+          }
           const session = yield* liveSession(id);
           if (issue.project && !issue.graph && !issue.task && (issue.pullRequest?.state === "open" || projects.usesPullRequests(issue.project))) {
             const merged = yield* Effect.result(sessions.submitPullRequest(session, issue, (pr) => savePullRequest(issue.id, pr)));
@@ -701,10 +740,10 @@ export const make = (options: IssueOptions = {}) =>
         yield* publish(t.id);
       });
 
-    const drafted = (id: string, d: IssueDraft, asks: readonly string[] | undefined) =>
+    const drafted = (id: string, d: IssueDraft, asks: readonly Ask[] | undefined) =>
       Effect.gen(function* () {
         const criteria = kept(d.criteria);
-        const open = kept(asks);
+        const open = openAsks(asks);
         yield* db(
           q.draftIssue({
             id,
@@ -743,7 +782,7 @@ export const make = (options: IssueOptions = {}) =>
       );
 
     /** A draft's session reported: what it hands back is written into the issue, or the thread says why not; then its worktree goes back to main and it leaves. */
-    const handedBack = (f: { id: string; outcome: string; summary: string; asks?: readonly string[] }) =>
+    const handedBack = (f: { id: string; outcome: string; summary: string; asks?: readonly Ask[] }) =>
       Effect.gen(function* () {
         const h = core.session(f.id);
         if (!h?.draft || !h.issue) return;
@@ -828,7 +867,9 @@ export const make = (options: IssueOptions = {}) =>
         } else if (e.type === "report") {
           const issue = (yield* one(qs.issueOfSession({ session: e.id as string })))?.issue;
           // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
-          if (issue) yield* asked(issue, e.asks as string[] | undefined);
+          const checks = (e.checks as CriterionCheck[] | undefined) ?? [];
+          if (issue && checks.length > 0) yield* checked(issue, checks);
+          if (issue) yield* asked(issue, e.asks as Ask[] | undefined);
           yield* handedBack(e as never);
           if (core.session(e.id as string)?.conflict) yield* recheck(e.id as string);
         } else if (e.type === "message") {
@@ -846,8 +887,8 @@ export const make = (options: IssueOptions = {}) =>
     const rows = yield* db(q.keptIssues({ closed: keepClosedIssues }));
     const kept0 = runsBy(yield* db(qs.sessionsOfKept({ closed: keepClosedIssues })));
     for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, kept0.get(row.id)) });
-    // The manager's turn on its issues stopped with the server.
-    for (const r of yield* db(q.openOf({ assignee: managerAgent }))) yield* closeAs(r.id, "lost");
+    // The manager's turn on its issues stopped with the server; one it had answered still waits on the owner.
+    for (const r of yield* db(q.openOf({ assignee: managerAgent }))) if (r.handed_back === null) yield* closeAs(r.id, "lost");
 
     const facts = yield* core.subscribe;
     const finished = yield* sessions.finishedRuns;
@@ -858,12 +899,11 @@ export const make = (options: IssueOptions = {}) =>
         Effect.asVoid(e).pipe(Effect.catchCause((c) => Effect.logWarning(`vibevalley: ${what}: ${String(c)}`)));
     yield* Effect.forkScoped(Stream.runForEach(facts, (e) => onFact(e as never).pipe(logged(`issues after a ${e.type}`))));
     yield* Effect.forkScoped(
+      // However the manager's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
       Stream.runForEach(finished, (run) =>
-        run.outcome === "completed"
-          ? Effect.forEach(run.issues, (id) => closeAs(id, "answered").pipe(logged(`run ${run.id} finished but issue ${id} could not close`)), {
-              discard: true,
-            })
-          : Effect.void,
+        Effect.forEach(run.issues, (id) => handBack(id, { at: Date.now(), outcome: run.outcome }).pipe(logged(`run ${run.id} finished on issue ${id}`)), {
+          discard: true,
+        }),
       ),
     );
     yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(logged(`schedule ${d.schedule.id}`))));
@@ -879,9 +919,22 @@ export const make = (options: IssueOptions = {}) =>
       );
     }
 
+    const timeline = (id: string) =>
+      Effect.gen(function* () {
+        const issue = yield* get(id);
+        const runs = yield* sessions.runs(issue.id);
+        const names = new Map<string, string>();
+        for (const s of new Set(runs.map((r) => r.session))) {
+          const found = yield* sessions.get(s);
+          if (found) names.set(s, found.name);
+        }
+        return milestonesOf(issue, runs, names);
+      });
+
     const shape: IssueShape = {
       list: () => list,
       get,
+      timeline,
       add: (req) => add(req),
       /** The words and who does it only before it is sent; how it is accepted while it is open. */
       edit: (id, upd) =>
@@ -987,6 +1040,12 @@ export const make = (options: IssueOptions = {}) =>
             case "drop":
               yield* clearDraft(t);
               yield* drop(id);
+              break;
+            case "answered":
+              yield* closeAs(id, "answered");
+              break;
+            case "putAway":
+              yield* closeAs(id, "dismissed");
               break;
           }
           return yield* get(id);

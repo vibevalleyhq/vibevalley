@@ -527,6 +527,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         ...(spent ? { spent } : {}),
         ...(h.run ? { run: h.run } : {}),
         ...(read.asks.length > 0 ? { asks: read.asks } : {}),
+        ...(read.checks.length > 0 ? { checks: read.checks } : {}),
       });
       endRun(h, read.outcome, read.summary, spent);
       fire(

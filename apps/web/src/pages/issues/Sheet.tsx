@@ -7,16 +7,16 @@ import { Icon } from "../../ui/Icon";
 import { toneVar } from "./Marks";
 
 /** An issue laid out as a page: what it is and the talk about it on the left, its properties and actions on the right.
- * Too narrow for two, the properties come under the heading. */
+ * Too narrow for two, the properties come after it: what is asked of the owner stays on the first screen. */
 export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; side: JSX.Element }) {
   return (
     <div class="@container">
       {props.heading}
-      <div class="mt-4 flex flex-col gap-4 @min-[760px]:flex-row-reverse @min-[760px]:items-start @min-[760px]:gap-6">
+      <div class="mt-4 flex flex-col gap-4 @min-[760px]:flex-row @min-[760px]:items-start @min-[760px]:gap-6">
+        <div class="flex min-w-0 flex-1 flex-col">{props.main}</div>
         <aside class="flex flex-col rounded-lg bg-hover p-3 @min-[760px]:w-[260px] @min-[760px]:shrink-0 @min-[760px]:rounded-none @min-[760px]:border-l @min-[760px]:border-line @min-[760px]:bg-transparent @min-[760px]:py-0 @min-[760px]:pr-0 @min-[760px]:pl-5">
           {props.side}
         </aside>
-        <div class="flex min-w-0 flex-1 flex-col">{props.main}</div>
       </div>
     </div>
   );

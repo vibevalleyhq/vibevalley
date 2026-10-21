@@ -1,7 +1,19 @@
 // How the tools word what they found.
 
-import type { Changes, Schedule, Spent, UncommittedItem } from "@vibevalley/protocol";
-import { head, nextText, phaseText, runtimeLabel, whenText, yuan } from "@vibevalley/protocol/rules";
+import {
+  type Changes,
+  type Issue,
+  type IssueStatus,
+  IssueStatusValues,
+  type IssueTimeline,
+  type Priority,
+  PriorityValues,
+  type Schedule,
+  type Spent,
+  type StuckReason,
+  type UncommittedItem,
+} from "@vibevalley/protocol";
+import { head, nextText, phaseText, runtimeLabel, shortTitle, standingLabel, standingWantsOwner, whenText, yuan } from "@vibevalley/protocol/rules";
 import type { Roster } from "../session/session.ts";
 
 const wan = (n: number) => (n >= 10_000 ? (n / 10_000).toFixed(n >= 100_000 ? 0 : 1) + " 万" : String(n));
@@ -42,8 +54,8 @@ export function changesText(c: Changes): string {
   return lines.join("\n");
 }
 
-/** How a session reads to the manager, in its situation as in roster. */
-export function sessionLine(w: Roster, now = Date.now()): string {
+/** How a session reads to the manager, in its situation as in roster; number is its issue's. */
+export function sessionLine(w: Roster, now = Date.now(), number?: number): string {
   const h = w.session;
   let last = "";
   if (h.lastRun) {
@@ -53,7 +65,83 @@ export function sessionLine(w: Roster, now = Date.now()): string {
   const where = w.place.branch ? "在 " + w.place.project + " 的 " + w.place.branch : "在 " + w.place.project;
   const task = h.graph ? (h.graph.task ? "，做计划 " + h.graph.id + " 的步骤 " + h.graph.task : "，在拆计划 " + h.graph.id) : "";
   const spent = h.spent ? "；花了" + spentText(h.spent) : "";
-  return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}${task}）工单「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
+  const issue = number !== undefined ? `#${number} ` : "";
+  return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}${task}）工单 ${issue}「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
+}
+
+// ── issues, as the manager reads them ──
+
+/** The words the owner and the manager use for a status, and its own name. */
+const statusNames: Readonly<Record<string, IssueStatus>> = {
+  备选: "backlog",
+  草稿: "backlog",
+  待办: "todo",
+  处理中: "in_progress",
+  在做: "in_progress",
+  等你看: "in_review",
+  等验收: "in_review",
+  已完成: "done",
+  完成: "done",
+  已取消: "canceled",
+  取消: "canceled",
+  ...Object.fromEntries(IssueStatusValues.map((s) => [s, s])),
+};
+export const statusOf = (word: string): IssueStatus | undefined => statusNames[word.trim()];
+
+const priorityNames: Readonly<Record<string, Priority>> = {
+  紧急: "urgent",
+  高: "high",
+  普通: "medium",
+  中: "medium",
+  低: "low",
+  ...Object.fromEntries(PriorityValues.map((p) => [p, p])),
+};
+export const priorityOf = (word: string): Priority | undefined => priorityNames[word.trim()];
+
+const priorityWords: Readonly<Record<Priority, string>> = { urgent: "紧急", high: "高", medium: "普通", low: "低" };
+
+const stuckWords: Readonly<Record<StuckReason, string>> = { failed: "没做成", conflict: "有冲突", interrupted: "停在半路", quiet: "没动静" };
+
+/** How long, in round words. */
+export function spanWords(ms: number): string {
+  const m = Math.floor(Math.max(0, ms) / 60_000);
+  if (m < 60) return `${Math.max(1, m)} 分钟`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)} 小时`;
+  return `${Math.floor(m / 60 / 24)} 天`;
+}
+
+/** One line: its number and short title first, so the manager names it by them; who is the one doing it, when any. */
+export function issueLine(t: Issue, who: string, now: number): string {
+  const st = t.standing;
+  const stuck = st.stuck ? "（" + stuckWords[st.stuck] + "）" : "";
+  const parts = [`#${t.number}「${shortTitle(t.title)}」${standingLabel[st.state]}${stuck}`];
+  if (t.project) parts.push(t.project);
+  if (who) parts.push(who);
+  if (t.priority !== "medium") parts.push(priorityWords[t.priority] + "优先级");
+  if (standingWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
+  return "- " + parts.join(" · ");
+}
+
+/** One issue in full: what it asks, its criteria as far as they got, what it waits on, and its story, newest first. */
+export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | undefined, now: number): string {
+  const lines = [issueLine(t, who, now).slice(2)];
+  if (t.title !== shortTitle(t.title) || t.description) lines.push("要做的：" + head([t.title, t.description ?? ""].join("\n").trim(), 600));
+  const criteria = t.criteria ?? [];
+  if (criteria.length > 0) {
+    lines.push("验收标准：");
+    criteria.forEach((c, i) => {
+      const check = (t.checks ?? []).find((x) => x.criterion === i);
+      const mark = check ? { met: "做到了", unmet: "没做到", unsure: "不确定" }[check.result] : "还没说";
+      lines.push(`  ${i + 1}. ${c}（${mark}）`);
+    });
+  }
+  if (t.asks.length > 0) lines.push("在等主人回答：" + t.asks.map((a) => a.question).join("；"));
+  const weeds = t.findings.filter((f) => !f.pulled);
+  if (weeds.length > 0) lines.push("验收没过要修的：" + weeds.map((f) => f.text).join("；"));
+  if (t.handedBack) lines.push("管家这一轮" + (t.handedBack.outcome === "completed" ? "答完了" : "没答成") + "，在等主人点头");
+  if (t.pullRequest) lines.push(`PR #${t.pullRequest.number}（${t.pullRequest.state}）${t.pullRequest.url}`);
+  for (const m of (timeline?.milestones ?? []).slice(0, 8)) lines.push(`  · ${spanWords(now - m.at)}前 ${m.who ? m.who + " " : ""}${head(m.text, 120)}`);
+  return lines.join("\n");
 }
 
 export function scheduleLine(s: Schedule, channel: string): string {
@@ -73,6 +161,9 @@ export function parseTime(s: string): number | undefined {
 /** Words in a helper's report or a page it read can ask for a merge; only the owner's can make one. The tool stays in the
  * list, so that the prompt's prefix does not change from round to round. */
 export const mergeNotAsked = "没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
+
+/** Changing an issue or moving it is the owner's call: the manager asks for what it saw itself, as with a merge. */
+export const changeNotAsked = "没动：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 
 /** A task starts many helpers at once and spends for each: only the owner's words start one, as with a merge. */
 export const startNotAsked = "没开工：计划开工要主人点头。这一轮不是主人叫你的：把拆好的计划给主人看，问要不要开工。";

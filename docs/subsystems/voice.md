@@ -1,6 +1,6 @@
 # 语音
 
-主人用嘴和农场说话，分两条路：**电话**（`Voice` 的通话）按田头窗口里的麦克风和管家实时对话，传输、识别、断句、打断和合成都由 Agora 的对话式 AI（ConvoAI）做；**听写**按输入框旁的录音按钮说一段，转成输入框里的字，不经过 Agora。电话里「谁接电话」有两种：管家自己接（经「语音线路」），或一个快嘴模型先答、管家旁听派活。两种下电话里说的话都进田头的主频道。
+主人用嘴和农场说话，分两条路：**电话**（`Voice` 的通话）按田头窗口里的麦克风和管家实时对话，传输、识别、断句、打断和合成都由 Agora 的对话式 AI（ConvoAI）做；**听写**按输入框旁的录音按钮说一段，转成输入框里的字，不经过 Agora。电话里「谁接电话」有两种：管家自己接（经「语音线路」，默认），或一个快嘴模型先答、管家旁听派活。两种下电话里说的话都进田头的主频道。
 
 ## 管什么，不管什么
 
@@ -19,7 +19,7 @@
 - 形状和规则：`shapes.ts` 的 `VoiceSettings`（`VoiceASR`、`VoiceAnswer`、`VoiceTTS` 三个联合）、`SettingsUpdateVoice`、`AgoraGrant`、`Dictation`；数的范围是 `shapes.ts` 的 `voiceSilenceMsMin` 等常量；默认在 `packages/protocol/src/rules/voice.ts`（`defaultVoice`）。保存前的检查和只存差异在 `setting/rules.ts`（`voiceProblem`、`voiceSettingsOver`、`voiceOverrides`）。
 - 接口：`voice.session`、`voice.renew`、`voice.start`、`voice.stop`、`voice.heard`、`voice.said`、`voice.dictate`，没带通话 id 的 `manager.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
 - 不存表：授予和通话只在进程里；设置在 `$VIBEVALLEY_HOME/settings.json` 的 `voice`、`dictation`、`asrKey`、`llmKey`、`ttsKey`、`dictationKey`、`agoraAppId`、`agoraAppCertificate`。
-- 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.model`、`voice.id`（默认的托管模型和 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`base/config.ts`）。
+- 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.id`（默认的 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`base/config.ts`）。
 - 页面：`apps/web/src/voice/`（`call.ts` 的 `VoiceCall`、`VoiceCall`、`useCall`，`captions.ts` 的字幕拼块，`dictation.ts` 的录音和 WAV，`Buttons.tsx` 的 `DictationButton`、`CallButton`）；农场的田头有通话和听写两个按钮，工作台的聊天输入框有听写；设置页 `pages/settings/VoiceForm.tsx`（`part` 是 `line` 或 `agent`），路由 `/settings/voice` 和管家页的 `/manager/voice`；样音 `apps/web/public/voice-samples/`。
 
 ## 模型和不变量
@@ -34,7 +34,7 @@
 - **一句话只处理一次**：管家模式下 `/agent/heard` 收下但不转给管家（语音线路已经交过）；`heard` 带 `sendKey`，同一个键再交是已经听过的那句。
 - **语音线路只有一个接口对外**：监听只听 127.0.0.1，只有 `POST /llm/<通话>/chat/completions`；请求要带这通电话的 `Authorization: Bearer <钥匙>`，钥匙随挂断作废。别的路径 404，没钥匙或钥匙不对 401。
 - **一段听写拥有它的目标**：开始时绑定起始输入框和录音；同一时间只有一段在录，在另一个输入框按停止不改变文字去向。输入框销毁时取消这一段，迟到的转写结果不写进别的草稿。
-- **语音设置一份，只存差异**：`settings.json` 的 `voice` 只存和默认不一样的字段（页面发整份，服务端去掉和默认一样的），`{}` 就是恢复默认、从文件里删掉。默认是 `defaultVoice` 再叠配置的 `voice.model`、`voice.id`。每通电话开始时现取（设置和三段的 key 从同一版读出），存了下一通生效。
+- **语音设置一份，只存差异**：`settings.json` 的 `voice` 只存和默认不一样的字段（页面发整份，服务端去掉和默认一样的），`{}` 就是恢复默认、从文件里删掉。默认是 `defaultVoice` 再叠配置的 `voice.id`。每通电话开始时现取（设置和三段的 key 从同一版读出），存了下一通生效。
 
 ## 怎么走
 
@@ -61,7 +61,7 @@
 **管家接电话**（语音线路）：
 
 1. 监听开在 `voice.line.port`（默认 8788，只听 127.0.0.1）；端口被占时只记日志，农场照常，打给管家的电话回原因。
-2. 隧道：设了 `voice.line.url` 就用它（去掉结尾的 `/`）；没设时第一通电话开 cloudflared 临时隧道（`cloudflared tunnel --url`），30 秒内给不出 `trycloudflare.com` 地址就失败，没装就提示 `brew install cloudflared` 或设 `voice.line.url`；拿到地址后每 2 秒探一次，最多 60 秒，线路回 401 算通了，到时还不通也接着打，只记日志。最后一通挂了 10 分钟后关隧道，其间再打就复用。
+2. 隧道：设了 `voice.line.url` 就用它（去掉结尾的 `/`），地址固定、第一通不用等，比如 Tailscale Funnel（`tailscale funnel --bg 8788`，把它给的 `https://<机器>.<tailnet>.ts.net` 设成 `voice.line.url`；只放这条线路的端口，农场的 8787 不放）；没设时第一通电话开 cloudflared 临时隧道（`cloudflared tunnel --url`），30 秒内给不出 `trycloudflare.com` 地址就失败，没装就提示 `brew install cloudflared` 或设 `voice.line.url`；拿到地址后每 2 秒探一次，最多 60 秒，线路回 401 算通了，到时还不通也接着打，只记日志。最后一通挂了 10 分钟后关隧道，其间再打就复用。
 3. 每通电话一个随机的通话 id 和钥匙；Agora 每说完一句就来一个请求。协议由 `agent/brain/openai.ts` 处理：只取 `messages` 里最后一条 `user`，交给 `Manager.call`（先记进田头，再带「电话里说的、要口语」的提示问管家），管家的字边长边以 SSE 流回去念。没有主人的话时回一句「嗯？我没听清，你再说一遍？」。
 4. Agora 在主人插话时挂掉请求：请求断了就不再送字；同一通电话的新一句结束上一句的流；管家这一轮照常跑完。
 

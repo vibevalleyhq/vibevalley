@@ -34,11 +34,13 @@ export const ListIssuesResult = Schema.Struct({
   ["findings"]: Schema.NullOr(Schema.String),
   ["asks"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
+  ["checks"]: Schema.NullOr(Schema.String),
+  ["handed_back"]: Schema.NullOr(Schema.String),
 })
 export type ListIssuesResult = typeof ListIssuesResult.Type
 
 
-export const ListIssuesSql = "-- Issues (issue/issue.ts).\n\n-- name: ListIssues :many\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\" from issue order by rank, created_at, id;"
+export const ListIssuesSql = "-- Issues (issue/issue.ts).\n\n-- name: ListIssues :many\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue order by rank, created_at, id;"
 
 export const listIssues = Effect.fn("ListIssues")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -79,11 +81,13 @@ export const GetIssueResult = Schema.Struct({
   ["findings"]: Schema.NullOr(Schema.String),
   ["asks"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
+  ["checks"]: Schema.NullOr(Schema.String),
+  ["handed_back"]: Schema.NullOr(Schema.String),
 })
 export type GetIssueResult = typeof GetIssueResult.Type
 
 
-export const GetIssueSql = "-- name: GetIssue :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\" from issue where id = $1;"
+export const GetIssueSql = "-- name: GetIssue :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue where id = $1;"
 
 export const getIssue = Effect.fn("GetIssue")(function* (params: GetIssueParams) {
   const sql = yield* SqlClient.SqlClient
@@ -124,11 +128,13 @@ export const IssueByNumberResult = Schema.Struct({
   ["findings"]: Schema.NullOr(Schema.String),
   ["asks"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
+  ["checks"]: Schema.NullOr(Schema.String),
+  ["handed_back"]: Schema.NullOr(Schema.String),
 })
 export type IssueByNumberResult = typeof IssueByNumberResult.Type
 
 
-export const IssueByNumberSql = "-- name: IssueByNumber :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\" from issue where number = $1;"
+export const IssueByNumberSql = "-- name: IssueByNumber :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue where number = $1;"
 
 export const issueByNumber = Effect.fn("IssueByNumber")(function* (params: IssueByNumberParams) {
   const sql = yield* SqlClient.SqlClient
@@ -238,6 +244,23 @@ export const setIssueAsks = Effect.fn("SetIssueAsks")(function* (params: SetIssu
   return yield* SqlSchema.void({
     Request: SetIssueAsksParams,
     execute: (p) => sql.unsafe(SetIssueAsksSql, [p["asks"], p["id"]]),
+  })(params)
+})
+
+export const SetIssueChecksParams = Schema.Struct({
+  ["checks"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type SetIssueChecksParams = typeof SetIssueChecksParams.Type
+
+
+export const SetIssueChecksSql = "-- name: SetIssueChecks :exec\nupdate issue set checks = $1 where id = $2;"
+
+export const setIssueChecks = Effect.fn("SetIssueChecks")(function* (params: SetIssueChecksParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: SetIssueChecksParams,
+    execute: (p) => sql.unsafe(SetIssueChecksSql, [p["checks"], p["id"]]),
   })(params)
 })
 
@@ -376,11 +399,13 @@ export const KeptIssuesResult = Schema.Struct({
   ["findings"]: Schema.NullOr(Schema.String),
   ["asks"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
+  ["checks"]: Schema.NullOr(Schema.String),
+  ["handed_back"]: Schema.NullOr(Schema.String),
 })
 export type KeptIssuesResult = typeof KeptIssuesResult.Type
 
 
-export const KeptIssuesSql = "-- name: KeptIssues :many\n-- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.\nwith latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit $1::int)\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\" from issue\nwhere closed_at is null or id in (select id from latest) or parent in (select id from latest)\n   or parent in (select id from issue where closed_at is null);"
+export const KeptIssuesSql = "-- name: KeptIssues :many\n-- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.\nwith latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit $1::int)\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue\nwhere closed_at is null or id in (select id from latest) or parent in (select id from latest)\n   or parent in (select id from issue where closed_at is null);"
 
 export const keptIssues = Effect.fn("KeptIssues")(function* (params: KeptIssuesParams) {
   const sql = yield* SqlClient.SqlClient
@@ -421,11 +446,13 @@ export const FamilyResult = Schema.Struct({
   ["findings"]: Schema.NullOr(Schema.String),
   ["asks"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
+  ["checks"]: Schema.NullOr(Schema.String),
+  ["handed_back"]: Schema.NullOr(Schema.String),
 })
 export type FamilyResult = typeof FamilyResult.Type
 
 
-export const FamilySql = "-- name: Family :many\n-- An issue and its sub-issues.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\" from issue where id = $1 or parent = $1;"
+export const FamilySql = "-- name: Family :many\n-- An issue and its sub-issues.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue where id = $1 or parent = $1;"
 
 export const family = Effect.fn("Family")(function* (params: FamilyParams) {
   const sql = yield* SqlClient.SqlClient
@@ -518,11 +545,13 @@ export const LatestOfScheduleResult = Schema.Struct({
   ["findings"]: Schema.NullOr(Schema.String),
   ["asks"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
+  ["checks"]: Schema.NullOr(Schema.String),
+  ["handed_back"]: Schema.NullOr(Schema.String),
 })
 export type LatestOfScheduleResult = typeof LatestOfScheduleResult.Type
 
 
-export const LatestOfScheduleSql = "-- name: LatestOfSchedule :one\n-- A schedule's issue: the one it made last.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\" from issue where schedule = $1 order by created_at desc, id desc limit 1;"
+export const LatestOfScheduleSql = "-- name: LatestOfSchedule :one\n-- A schedule's issue: the one it made last.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"schedule\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"closed\", \"issue\".\"pull_request\", \"issue\".\"acceptance\", \"issue\".\"accepted_at\", \"issue\".\"findings\", \"issue\".\"asks\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue where schedule = $1 order by created_at desc, id desc limit 1;"
 
 export const latestOfSchedule = Effect.fn("LatestOfSchedule")(function* (params: LatestOfScheduleParams) {
   const sql = yield* SqlClient.SqlClient
@@ -539,7 +568,7 @@ export const ReopenIssueParams = Schema.Struct({
 export type ReopenIssueParams = typeof ReopenIssueParams.Type
 
 
-export const ReopenIssueSql = "-- name: ReopenIssue :exec\nupdate issue set closed_at = null, closed = null, queued_at = null where id = $1;"
+export const ReopenIssueSql = "-- name: ReopenIssue :exec\nupdate issue set closed_at = null, closed = null, queued_at = null, checks = null, handed_back = null where id = $1;"
 
 export const reopenIssue = Effect.fn("ReopenIssue")(function* (params: ReopenIssueParams) {
   const sql = yield* SqlClient.SqlClient
@@ -557,11 +586,12 @@ export type OpenOfParams = typeof OpenOfParams.Type
 
 export const OpenOfResult = Schema.Struct({
   ["id"]: Schema.String,
+  ["handed_back"]: Schema.NullOr(Schema.String),
 })
 export type OpenOfResult = typeof OpenOfResult.Type
 
 
-export const OpenOfSql = "-- name: OpenOf :many\nselect id from issue where assignee = $1 and closed_at is null;"
+export const OpenOfSql = "-- name: OpenOf :many\nselect id, handed_back from issue where assignee = $1 and closed_at is null;"
 
 export const openOf = Effect.fn("OpenOf")(function* (params: OpenOfParams) {
   const sql = yield* SqlClient.SqlClient
@@ -569,6 +599,23 @@ export const openOf = Effect.fn("OpenOf")(function* (params: OpenOfParams) {
     Request: OpenOfParams,
     Result: OpenOfResult,
     execute: (p) => sql.unsafe(OpenOfSql, [p["assignee"]]),
+  })(params)
+})
+
+export const SetHandedBackParams = Schema.Struct({
+  ["handed_back"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type SetHandedBackParams = typeof SetHandedBackParams.Type
+
+
+export const SetHandedBackSql = "-- name: SetHandedBack :exec\n-- How the manager's last turn on its issue ended (JSON); null while it is on it.\nupdate issue set handed_back = $1 where id = $2;"
+
+export const setHandedBack = Effect.fn("SetHandedBack")(function* (params: SetHandedBackParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: SetHandedBackParams,
+    execute: (p) => sql.unsafe(SetHandedBackSql, [p["handed_back"], p["id"]]),
   })(params)
 })
 

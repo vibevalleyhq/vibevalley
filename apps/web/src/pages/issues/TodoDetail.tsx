@@ -205,7 +205,24 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         <Note tone={drafting() ? "water" : "wheat"}>
           <div class="text-base font-semibold">{said()[0]}</div>
           <div class="mt-1">{said()[1]}</div>
-          <For each={asks()}>{(a) => <div>· {a}</div>}</For>
+          <For each={asks()}>
+            {(a) => (
+              <div class="mt-1.5">
+                <div>· {a.question}</div>
+                <Show when={a.options?.length}>
+                  <div class="mt-1 flex flex-wrap gap-1.5 pl-3" role="group" aria-label={`回答：${a.question}`}>
+                    <For each={a.options}>
+                      {(o) => (
+                        <Button disabled={busy()} onClick={() => setWord(o)}>
+                          {o}
+                        </Button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </div>
+            )}
+          </For>
         </Note>
         <TextArea
           class="mt-2.5"

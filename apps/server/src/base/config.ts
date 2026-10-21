@@ -23,7 +23,7 @@ export interface Config {
   /** Read from DEEPSEEK_API_KEY, AGORA_APP_ID and AGORA_APP_CERTIFICATE too. A key saved in the app wins. */
   readonly deepseek: { readonly apiKey: string };
   readonly agora: { readonly appId: string; readonly appCertificate: string };
-  readonly voice: { readonly model: string; readonly id: string; readonly line: { readonly port: number; readonly url: string } };
+  readonly voice: { readonly id: string; readonly line: { readonly port: number; readonly url: string } };
   readonly lan: { readonly port: number };
   /** Commits by these emails count as yours too; in the environment, comma-separated. */
   readonly gitEmails: readonly string[];
@@ -54,7 +54,7 @@ export function defaults(home = homedir()): Config {
     agent: { model: "" },
     deepseek: { apiKey: "" },
     agora: { appId: "", appCertificate: "" },
-    voice: { model: "", id: "", line: { port: 8788, url: "" } },
+    voice: { id: "", line: { port: 8788, url: "" } },
     lan: { port: 8790 },
     gitEmails: [],
     tokei: "",

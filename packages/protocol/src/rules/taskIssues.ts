@@ -14,7 +14,7 @@ function taskClosed(graph: GraphState, n: Task): IssueClose | undefined {
   return undefined;
 }
 
-type Draft = Omit<Issue, "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "acceptance" | "findings" | "asks">;
+type Draft = Omit<Issue, "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "acceptance" | "findings" | "asks" | "standing">;
 
 /** What only the issues know (their runs, priority, when they were written down and closed) comes from before; one closing now closes at now. */
 export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): Issue[] {

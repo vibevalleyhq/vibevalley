@@ -3,7 +3,7 @@
 
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
-import type { Agent, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
+import type { Agent, Ask, CheckResult, CriterionCheck, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
 import { clip, isBusy, maxTasks, runtimeLabel, slice } from "@vibevalley/protocol/rules";
 import type { Workplace } from "../project/project.ts";
 
@@ -74,19 +74,51 @@ export interface SessionRead {
   readonly failure: string;
   readonly needsYou: boolean;
   /** The 要问主人： lines: what it cannot go on without. */
-  readonly asks: string[];
+  readonly asks: Ask[];
+  /** The 标准 N： lines: its word on each of the issue's criteria. */
+  readonly checks: CriterionCheck[];
 }
 
 /** A line the session wrote to ask the owner (the farm's rules tell it to): 「要问主人：…」, with markdown around it allowed. */
 const askLine = /^[\s>*#_-]*(?:\*\*)?要问主人(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/;
 
-export function asksOf(said: string): string[] {
+/** The answers it thought of, at the end of the question: 「（选项：A｜B）」. */
+const optionsTail = /\s*[（(]\s*选项\s*[:：]\s*(.+?)\s*[)）]\s*$/;
+
+export function asksOf(said: string): Ask[] {
   return said
     .split("\n")
     .map((line) => askLine.exec(line)?.[1])
     .filter((q): q is string => q !== undefined)
     .map((q) => q.trim().replace(/\*\*$/, "").trim())
-    .filter((q) => q !== "");
+    .flatMap((q): Ask[] => {
+      const tail = optionsTail.exec(q);
+      const question = tail ? q.slice(0, tail.index).trim() : q;
+      const options = (tail?.[1] ?? "")
+        .split(/[｜|]/)
+        .map((o) => o.trim())
+        .filter(Boolean);
+      if (!question) return [];
+      return [options.length >= 2 ? { question, options } : { question }];
+    });
+}
+
+/** A line on one criterion (the issue's brief asks for them): 「标准 2：做到了 —— bun test 通过」. */
+const checkLine = /^[\s>*#_-]*(?:\*\*)?标准\s*(\d+)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(做到了|没做到|不确定)(?:\*\*)?\s*[，,。.;；:：—–-]*\s*(.*)$/;
+const checkWords: Record<string, CheckResult> = { 做到了: "met", 没做到: "unmet", 不确定: "unsure" };
+
+/** Numbered from 1 as the brief lists them; the last word on a criterion stands. */
+export function checksOf(said: string): CriterionCheck[] {
+  const out = new Map<number, CriterionCheck>();
+  for (const line of said.split("\n")) {
+    const m = checkLine.exec(line);
+    if (!m) continue;
+    const criterion = Number(m[1]) - 1;
+    if (criterion < 0) continue;
+    const proof = m[3]!.trim().replace(/\*\*$/, "").trim();
+    out.set(criterion, { criterion, result: checkWords[m[2]!]!, ...(proof ? { proof } : {}) });
+  }
+  return [...out.values()].sort((a, b) => a.criterion - b.criterion);
 }
 
 export function readReport(outcome: TurnOutcome, said: string): SessionRead {
@@ -103,6 +135,7 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
     failure: failed,
     needsYou: outcome.kind === "failed" && needsYou.has(outcome.failure),
     asks: out === "completed" ? asksOf(text) : [],
+    checks: out === "completed" ? checksOf(text) : [],
   };
 }
 
@@ -190,7 +223,7 @@ export function workplaceRules(place: Workplace, house: string, id: string): str
     "",
     "## 记性",
     "- 你有记性：同一个 agent 的帮工共用。每一轮开头「【你记得的】」那段是以前记下的，用得上就用；和眼前的代码、主人这次说的对不上时，以眼前的为准。",
-    "- 缺信息、要主人定的、没有主人回答就做不下去的，在结论前面写，每行以「要问主人：」开头，一行问一件事；主人回答以前，这块地标着缺肥。能自己查到的不要问。",
+    "- 缺信息、要主人定的、没有主人回答就做不下去的，在结论前面写，每行以「要问主人：」开头，一行问一件事；你想得到的几种回答写在句末，像「要问主人：评估全交给 w3，还是分着做？（选项：全交给 w3｜分着做）」，主人点一下就是回答。主人回答以前，这块地标着缺肥。能自己查到的不要问。",
     "- 这一轮学到下次还用得上的（这个项目的约定和命令、踩过的坑、主人的偏好），在结论前面写几行，每行以「记住：」开头，一行一条，写成下次一看就懂的一句话；对所有项目都成立的写「记住（所有项目）：」。没有就不写。这一轮做了什么不用写进去，农场会自己记。",
     "",
     "## 在田头说话（农场的群聊）",

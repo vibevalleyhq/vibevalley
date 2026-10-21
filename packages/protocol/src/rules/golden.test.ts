@@ -5,7 +5,7 @@
 process.env.TZ = "Asia/Shanghai";
 
 import { describe, expect, test } from "bun:test";
-import type { Conversation, CoreState, Fact, Schedule, ScheduleRequest, Session, TaskGraph } from "../shapes";
+import type { Conversation, CoreState, Fact, Issue, Schedule, ScheduleRequest, Session, TaskGraph } from "../shapes";
 import { targetOf } from "./chat";
 import { emptyCoreState, reduce } from "./core";
 import { inbox } from "./inbox";
@@ -14,6 +14,7 @@ import { phaseText } from "./phase";
 import { nextRun, nextText, scheduleProblem, whenText } from "./schedules";
 import { graphChanges, graphEventText } from "./taskChanges";
 import { acceptanceChecks, asksForYou, blockedBy, graphProblems, graphSpent, graphText, layersOf, readyTasks } from "./tasks";
+import { standingOf } from "./standing";
 import { effectsOf, viewOf } from "./view";
 
 const testdata = new URL("../../testdata/", import.meta.url);
@@ -108,7 +109,7 @@ describe("the golden files", () => {
     await f.done();
   });
 
-  test("rules: targetOf, phaseText, yuan", async () => {
+  test("rules: targetOf, phaseText, yuan, standingOf", async () => {
     const rows = await lines("rules.jsonl.gz");
     const f = failures("rules.jsonl.gz", rows);
     rows.forEach((row, i) => {
@@ -120,6 +121,8 @@ describe("the golden files", () => {
           return f.check(i + 1, "phaseText", phaseText(input.session as Session, input.now as number) || null, row, "out");
         case "yuan":
           return f.check(i + 1, "yuan", yuan(row.in as number), row, "out");
+        case "standingOf":
+          return f.check(i + 1, "standingOf", standingOf(input.issue as Issue, (input.session as Session | null) ?? undefined), row, "out");
         default:
           throw new Error(`line ${i + 1}: no rule ${String(row.fn)}`);
       }

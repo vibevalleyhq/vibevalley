@@ -23,6 +23,7 @@ import { needOf } from "./phase";
 import { playOf } from "./play";
 import { achievements } from "./seeds";
 import { sessionOf } from "./sessions";
+import { standingLabel } from "./standing";
 
 export const xpToNext = (level: number) => 10 * level;
 
@@ -69,15 +70,15 @@ const badgeConflict: Badge = { text: "有冲突", tone: "bug" };
 const badgeQuiet: Badge = { text: "没动静", tone: "stuck" };
 const badgeRetrying: Badge = { text: "重试中", tone: "stuck" };
 const badgeRest: Badge = { text: "歇着", tone: "rest" };
-const badgeReview: Badge = { text: "等验收", tone: "wait" };
-const badgeAsks: Badge = { text: "缺肥", tone: "wait" };
+const badgeReview: Badge = { text: standingLabel.reviewing, tone: "wait" };
+const badgeAsks: Badge = { text: standingLabel.asking, tone: "wait" };
 
 /** The weeds a failed acceptance left standing. */
 export const openFindings = (t: Issue) => (t.findings ?? []).filter((f) => !f.pulled).length;
 
 /**
  * A plot is an issue: what the session on it is doing, then where the issue stands — waiting on the owner's answer
- * (缺肥), its acceptance (抽穗, or weeds after a failed one), or passed (ripe).
+ * (等你回答), its acceptance (抽穗, or weeds after a failed one), or passed (ripe).
  */
 export function plotOf(h: Session, issue: Issue | undefined): PlotView {
   const plot = plotOfSession(h);

@@ -4,6 +4,7 @@ import { type CoreState, type Issue, type IssueClose, type IssueDrafting, type I
 import { isBusy } from "./phase";
 import { same } from "./same";
 import { sessionOf } from "./sessions";
+import { standingIn } from "./standing";
 import { compare, compareText, or } from "./text";
 
 export const isForManager = (t: Issue) => t.assignee === managerAgent;
@@ -11,10 +12,11 @@ export const isForManager = (t: Issue) => t.assignee === managerAgent;
 /** Done is what was asked for: merged, or answered by the manager. The rest, and a close that does not say how, is canceled. */
 const closedStatus = (c: IssueClose | undefined): IssueStatus => (c === "merged" || c === "merged_into_graph" || c === "answered" ? "done" : "canceled");
 
-/** An issue for the manager is open only while the manager works on it; a run gone without saying how closes it all the same. */
+/** An issue for the manager is in progress while the manager is on it, and waits on the owner once its turn ended,
+ * however it ended: only the owner closes it. */
 export function issueStatusOf(t: Issue, state: CoreState): IssueStatus {
   if (t.closed !== undefined || t.closedAt !== undefined) return closedStatus(t.closed);
-  if (isForManager(t)) return "in_progress";
+  if (isForManager(t)) return t.handedBack ? "in_review" : "in_progress";
   if (t.graph) {
     switch (t.graph.state) {
       case "splitting":
@@ -54,6 +56,22 @@ export function issueStatusOf(t: Issue, state: CoreState): IssueStatus {
 
 export const keepClosedIssues = 50;
 
+const titleMax = 40;
+
+/** One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits;
+ * failing those, cut. Lengths are characters. */
+export function shortTitle(text: string): string {
+  const line = (text.split("\n").find((l) => l.trim() !== "") ?? "").trim();
+  const chars = [...line];
+  if (chars.length <= titleMax) return line;
+  const head = chars.slice(0, titleMax + 1).join("");
+  const sentence = /^(.{4,}?)[。！？!?；;]/u.exec(head)?.[1];
+  if (sentence) return sentence.trim();
+  const pause = Math.max(...[..."：:，,、"].map((p) => head.lastIndexOf(p)));
+  if (pause >= 4) return head.slice(0, pause).trim();
+  return chars.slice(0, titleMax - 1).join("") + "…";
+}
+
 export function issueOrder(a: Issue, b: Issue): number {
   const sentA = (a.sessions ?? []).length > 0;
   const sentB = (b.sessions ?? []).length > 0;
@@ -88,9 +106,10 @@ export function withIssueStatuses(state: CoreState): CoreState {
   (state.issues ?? []).forEach((t, i) => {
     const status = issueStatusOf(t, state);
     const drafting = issueDraftingOf(t, state);
-    if (status === t.status && same(drafting, t.drafting)) return;
+    const standing = standingIn({ ...t, status, drafting }, state);
+    if (status === t.status && same(drafting, t.drafting) && same(standing, t.standing)) return;
     next ??= [...state.issues!];
-    next[i] = { ...t, status, drafting };
+    next[i] = { ...t, status, drafting, standing };
   });
   return next ? { ...state, issues: next } : state;
 }

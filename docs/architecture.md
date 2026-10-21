@@ -137,7 +137,7 @@ flowchart LR
 | `agent.model` | 命令行里自己的 agent 用的模型；空着是 DeepSeek 的默认 | |
 | `deepseek.api_key` | 管家和 VibeValley 农机用的 DeepSeek 钥匙（`DEEPSEEK_API_KEY`） | |
 | `agora.app_id`、`agora.app_certificate` | 语音：签 RTC 令牌、请语音管家（`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`）；都没有时语音不可用，别的照常 | |
-| `voice.model`、`voice.id` | 语音管家用的托管大模型和音色的默认；声音页里改过的优先 | 声音页的默认 |
+| `voice.id` | 语音管家的音色的默认；声音页里改过的优先 | 声音页的默认 |
 | `voice.line.port`、`voice.line.url` | 语音线路（「想」选农场的管家时）：只给声网用的那个监听的端口；你自己的隧道的公网地址，没有就用 cloudflared 临时隧道 | 8788、（无） |
 | `lan.port` | 「连接到本机」的端口：打开「连接到本机」时在所有网卡上听，只放配对过的设备（[连接到本机](docs/subsystems/lan.md)）；0 是随便一个 | 8790 |
 | `git_emails` | 算经验时也算作「你」的 commit 邮箱；环境变量里用逗号分隔 | git 全局和各仓库的 user.email 本来就算 |
