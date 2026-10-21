@@ -1,6 +1,6 @@
 # 核心状态和接口
 
-农场上的一切是一个值：核心状态（`CoreState`），只有服务端持有，只在 `Core.apply` 里因事实（fact）而变，每条事实由纯函数 `reduce`（`packages/protocol/src/rules/core.ts`）折进去。外面的人只经两样东西碰它：`/api/v1` 下的接口（改）和三条 SSE 流（看）。农场里不画它本身，农场画面的全部数据都从它来。
+农场上的一切是一个值：核心状态（`CoreState`），只有服务端持有，只在 `Core.apply` 里因事实（fact）而变，每条事实由纯函数 `reduce`（`apps/server/src/projection/reduce.ts`）折进去。外面的人只经两样东西碰它：`/api/v1` 下的接口（改）和三条 SSE 流（看）。农场里不画它本身，农场画面的全部数据都从它来。
 
 ## 管什么，不管什么
 
@@ -17,7 +17,8 @@
 ## 在哪
 
 - `apps/server/src/core/core.ts`（`Core`）：施加、存盘、各条流；`services.ts` 让它最先建、最后关。
-- `packages/protocol`：形状在 `shapes.ts`（`CoreState`、`Fact`、`SideEvent`、`LiveEvent`、`StateFrame`，三条流的路径 `statePath`、`eventsPath`、`livePath`）；`rules/core.ts` 的 `reduce`、`emptyCoreState`；`rules/frame.ts` 的 `frameOf`；`rules/view.ts` 的 `effectsOf`；`api.ts` 的接口表 `endpoints`、`Handlers`、客户端 `VibeValleyApi`；`stream.ts` 的 `readStream`。
+- `packages/protocol`：形状在 `shapes.ts`（`CoreState`、`Fact`、`SideEvent`、`LiveEvent`、`StateFrame`，三条流的路径 `statePath`、`eventsPath`、`livePath`）；`api.ts` 的接口表 `endpoints`、`Handlers`、客户端 `VibeValleyApi`；`stream.ts` 的 `readStream`。
+- 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/state.ts`、`channel/state.ts`、`issue/state.ts`、`game/play.ts`、`game/view.ts` 的 `effectsOf`、`notice/inbox.ts`、`task/`、`schedule/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyCoreState` 在 `core.ts`。
 - `apps/server/src/http`：`api.ts` 按 `endpoints` 挂每个接口，`streams.ts` 三条流，`app.ts` 组装和开始答 HTTP；`handlers.ts` 实现 `Handlers`。
 - 能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出，`docs:verify` 查它是不是最新。
 - 命令行 `apps/server/src/cli.ts`：每个接口一条命令（从 `endpoints` 来），`state`、`events`、`issue run`；`runtime chat` 和自己的 agent 不经服务端。
@@ -36,7 +37,7 @@
 - **一批是一次提交**（`apply(...facts)`）：先在局部状态上逐条折、收集 `Transition` 和特效，再一次换掉可见的状态、安排存盘，最后按原顺序逐条发事实、再发特效。每条 `Transition` 的 `after` 是这一条的结果，不是整批的最终状态；`state()` 和 `/state` 只看得到整批。HTTP 的事件格式不变，仍是一条一条的 `Fact`。种植计划的父子工单（工单服务一次写完的那组）走这条路。
 - **一批不代替数据库事务**：拥有者先提交数据库事务，再发核心状态；两者之间的恢复归拥有持久化的那个模块。
 - **主人做了、但不改状态的事不是事实**：看收成清单、语音接上，由经手的服务调 `Core.did`，只有游戏的账本听（`owner`）。
-- **给人看的话只在出帧时填**：`frameOf(state, effects)` 在状态的副本上填帮工在干什么（`phaseText`，在做的动作和这一轮每一步的 `actionText`）、定时什么时候跑、计划和节点的状态、动作叫什么、现在能做什么，再算 `inbox`、`graphs`、`view`（地块、等级、每个成就的进度）；`reduce` 和 `state.json` 里没有这些话。改的是副本：阶段和 `play` 的历史复制一份再填，`Transition` 拿着的旧状态不变。特效由 `effectsOf(折之前的状态, fact)` 算，到一档成就的特效带着它的说法。动作的说法（`seeds.json` 的 `actionText`）页面不另拿一份：帧里的这两处，加上干活过程里每个 `tool/call` 写下时带的 `actionText`（[帮工](docs/subsystems/session.md)），就是它全部的来源。
+- **给人看的话只在出帧时填**：`frameOf(state, effects)` 在状态的副本上填帮工在干什么（`phaseText`，在做的动作和这一轮每一步的 `actionText`）、定时什么时候跑、计划和节点的状态、动作叫什么、现在能做什么，再算 `inbox`、`graphs`、`view`（地块、等级、每个成就的进度）；`reduce` 和 `state.json` 里没有这些话。改的是副本：阶段和 `play` 的历史复制一份再填，`Transition` 拿着的旧状态不变。特效由 `effectsOf(折之前的状态, fact)` 算，到一档成就的特效带着它的说法。动作的说法（`packages/protocol` 的 `actionText`，页面算 `phaseText` 也用它）页面不另拿一份：帧里的这两处，加上干活过程里每个 `tool/call` 写下时带的 `actionText`（[帮工](docs/subsystems/session.md)），就是它全部的来源。
 
 **`state.json`**
 
@@ -106,7 +107,7 @@
 
 ## 和谁打交道
 
-- **施加事实的**：工单、帮工、田头、定时、管家（`setManager`）；`manager.open`、主人说话、语音和连接器经 `open`、`setCall` 让通话在线；游戏（commit 数、`progress`、`station`）。它们都排在 `core` 后面，`core` 只用 `base` 和 `packages/protocol`。
+- **施加事实的**：工单、帮工、田头、定时、管家（`setManager`）；`manager.open`、主人说话、语音和连接器经 `open`、`setCall` 让通话在线；游戏（commit 数、`progress`、`station`）。它们都排在 `core` 后面，`core` 只用 `base` 和 `packages/protocol`：折法和拼帧要读它们的规则，由组装时交给它的 `Projection` 带进来。
 - **订阅的**：游戏的账本和种植计划读 `transitions`；别的读 `facts`、`events`；账本另读 `owner`。
 - **读的**：任何服务用 `state()`、`session(id)` 读当前值；`http/streams.ts` 把三条流交给页面。
 - **外面**：页面读帧和窄流、调 `VibeValleyApi`；命令行按 `endpoints` 发 HTTP；「连接到本机」后的设备经同一套接口，由 `lan` 按 `can` 放行。
@@ -115,6 +116,7 @@
 
 - **核心状态只有一份，只因事实而变。** 一个帮工的状态曾经拆在服务端的行、站点里的一份行副本、页面从行推出来的作物、管家读的名册四处：每加一个功能（花费、冲突）就在几处各补一个字段；「没动静」只有管家看得到；冲突标记靠「开始干活时顺手清掉」这种副作用维持；页面比较前后两行来猜「开始了新一轮」。一份状态、一个纯函数折，新加一种状态只在 `shapes.ts` 加字段或事实、在 `reduce` 里折，编译器逼每个视图都处理到；服务端和页面不会对不上，重启只是读回上一份。放弃了「保留行模型、只补字段」：这正是要解决的问题。代价是拿一个状态要经过 `reduce`，不能随手改一个字段。
 - **线上发事实，不发 JSON patch。** patch 只说哪个字段变了，看不出发生了什么（开始一轮还是改了标签）；账本、特效、种植计划要的正是「发生了什么」。
+- **折法放在组装那一层，交给 `core`。** 一条事实要用帮工、田头、工单、游戏各自的规则去折，帧要用通知、计划、定时、游戏的；`core` 在最下面（Platform），直接 import 它们方向就反了。放弃了每个模块各交一段折法、由组装拼起来：一个 `reduce` 里能看全每种事实怎么折，黄金数据也只比一个函数。
 - **页面读折好的帧，不折事实。** 页面再折一遍就是第二份核心状态，两边改规则靠自觉对齐（[客户端](docs/subsystems/app.md)）。给人看的话在出帧时填，不进 `reduce`：话随时会改，存进 `state.json` 就要兼容旧话。动作的说法也一样在帧里带好，页面不另拿一份。不变的大块说法（成就的定义）不进帧，帧每个事实都出，一次性的接口给一次就够（[游戏](docs/subsystems/game.md)）。
 - **每条事实带自己的前后状态，一批一次提交。** 放弃了「子工单先发、父工单最后发」的约定：排序不能把几次可见的更新变成一次，读的人仍会看见半个计划。放弃了每条事实都附整批的最终状态：第一条事实会背上后面事实的变化，按事件做的规则失去因果。放弃了对外的「一批事实」类型：现有的消费者都认得单条事实，内部的提交和订阅保证就够。
 - **命令走 HTTP，状态走 SSE。** 放弃了 WebSocket：命令已经有类型化的 HTTP 接口，事件只往一个方向走；SSE 重连又从快照开始，不用写补发。放弃了轮询：帮工的动作一秒好几次，轮询要么慢要么费。代价是事件里不能顺带回复命令。三条流分开：`/state` 让页面不折事实；`/live` 让页面不必收它用不上的快照和事实；`/events` 保留整份事实流给命令行和调试。

@@ -18,7 +18,7 @@ export const modules: readonly Module[] = [
   { name: "Notifications", parts: ["notice"] },
   { name: "Assistant", parts: ["manager", "tool"] },
   { name: "Gamification", parts: ["game"] },
-  { name: "Gateway", parts: ["http", "mcp", "lan", "connector", "voice", "handlers.ts", "cli.ts", "main.ts", "services.ts", "modules.ts"] },
+  { name: "Gateway", parts: ["http", "mcp", "lan", "connector", "voice", "handlers.ts", "cli.ts", "main.ts", "services.ts", "modules.ts", "projection"] },
 ];
 
 /** What the tests and the test farm are made of; they may use every module. */

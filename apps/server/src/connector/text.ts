@@ -1,9 +1,8 @@
 // What the chat apps are sent: which farm messages reach the owner, as plain text, cut
 // to what each app takes; a digest of what waited; the pairing words.
 
-import type { ChatMessage, Conversation, ConnectorID } from "@vibevalley/protocol";
-import { everyone } from "@vibevalley/protocol";
-import { slice } from "@vibevalley/protocol/rules";
+import { type ChatMessage, type ConnectorID, type Conversation, everyone } from "@vibevalley/protocol";
+import { slice } from "../base/text.ts";
 
 /** In UTF-16 units; longer ones are cut. */
 export const maxChars: Record<ConnectorID, number> = { weixin: 1800, feishu: 4000, qq: 2000 };

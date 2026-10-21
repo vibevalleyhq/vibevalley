@@ -2,7 +2,7 @@
 // in a minute), is reported once, and again only after reportAgainMs if it still stands.
 
 import type { CoreState, InboxKind } from "@vibevalley/protocol";
-import { inboxEntries } from "@vibevalley/protocol/rules";
+import { inboxEntries } from "./inbox.ts";
 
 /** In ms. Kinds not here the manager does not hear of from the patrol: a failed run reaches it as it happens, a task
  * waiting is the person's to look at. */

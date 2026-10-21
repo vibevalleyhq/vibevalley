@@ -1,15 +1,12 @@
-// The seeds (seeds.json, template_catalog.json): the achievements, the actions in words, the runtimes' presets and the
+// The seeds (seeds.json, template_catalog.json): the first profiles, the achievements, the runtimes' presets and the
 // templates.
 
-import type { AchievementDef, Agent, RuntimeFacts, RuntimePreset, RuntimeSettings, SessionAction, TemplateKind } from "../shapes";
+import type { AchievementDef, Agent, RuntimeFacts, RuntimePreset, RuntimeSettings, TemplateKind } from "@vibevalley/protocol";
 import seeds from "./seeds.json";
 import catalog from "./template_catalog.json";
 
 /** In the order the page shows them. */
 export const achievements = seeds.achievements as AchievementDef[];
-
-/** What each action is, in words. */
-export const actionText = seeds.actionText as Record<SessionAction, string>;
 
 /** The profiles a new farm starts with: a copy each call. */
 export const seedAgents = (): Agent[] => structuredClone(seeds.agents) as Agent[];

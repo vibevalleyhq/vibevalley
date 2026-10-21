@@ -20,10 +20,24 @@ import type {
   SideEvent,
   StateFrame,
 } from "@vibevalley/protocol";
-import { effectsOf, emptyCoreState, frameOf, reduce, sessionOf, withStations } from "@vibevalley/protocol/rules";
 import { Context, Effect, Layer, PubSub, Queue, type Scope, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
+
+export const emptyCoreState = (): CoreState => ({ call: "idle", manager: "idle", sessions: [] });
+
+/** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
+ * reads none of the modules above it. */
+export interface ProjectionShape {
+  readonly reduce: (state: CoreState, fact: Fact) => [CoreState, boolean];
+  /** What a fact sets off on the farm, from the state before it. */
+  readonly effects: (before: CoreState, fact: Fact) => GameEffect[];
+  readonly frame: (state: CoreState, effects?: GameEffect[]) => StateFrame;
+  /** The state read back from state.json, made whole (the sessions' places on the farm). */
+  readonly restore: (kept: CoreState) => CoreState;
+}
+
+export class Projection extends Context.Service<Projection, ProjectionShape>()("vibevalley/Projection") {}
 
 /** A burst of facts is one write, and one frame. */
 const saveAfterMs = 500;
@@ -76,7 +90,7 @@ export class Core extends Context.Service<Core, CoreShape>()("vibevalley/Core") 
 const toKeep = ({ chat: _chat, progress: _progress, schedules: _schedules, issues: _issues, ...kept }: CoreState): CoreState => kept;
 
 /** Started again, nobody is on the call and the manager is not mid-sentence. */
-const restored = (kept: CoreState): CoreState => withStations({ ...toKeep(kept), call: "idle", callReason: undefined, manager: "idle" });
+const restarted = (kept: CoreState): CoreState => ({ ...toKeep(kept), call: "idle", callReason: undefined, manager: "idle" });
 
 const liveOf = (e: SideEvent): LiveEvent | undefined => {
   switch (e.type) {
@@ -95,6 +109,7 @@ const isFact = (e: SideEvent): e is Fact => e.type !== "snapshot" && e.type !== 
 
 export const make = Effect.gen(function* () {
   const config = yield* Settings;
+  const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;
   const file = join(config.home, "state.json");
   let kept = emptyCoreState();
   if (existsSync(file)) {
@@ -104,7 +119,7 @@ export const make = Effect.gen(function* () {
       yield* Effect.logWarning(`state.json unreadable, starting empty: ${String(e)}`);
     }
   }
-  let state = restored(kept);
+  let state = restore(restarted(kept));
   const disk = new FileWriter(file);
   const body = () => JSON.stringify(toKeep(state));
   let pending: ReturnType<typeof setTimeout> | undefined;
@@ -183,7 +198,7 @@ export const make = Effect.gen(function* () {
 
   const shape: CoreShape = {
     state: () => state,
-    session: (id) => sessionOf(state, id),
+    session: (id) => state.sessions.find((h) => h.id === id),
     apply,
     setCall: (call, reason) => apply(reason ? { type: "call", state: call, reason } : { type: "call", state: call }),
     setManager: (manager) => apply({ type: "manager", state: manager }),

@@ -9,8 +9,8 @@ import {
   type Agent,
   type Ask,
   type Changes,
-  type CriterionCheck,
   type Conflict,
+  type CriterionCheck,
   type Dispatched,
   type Finding,
   type HandedBack,
@@ -35,49 +35,20 @@ import {
   type RunTrigger,
   type Schedule,
   type Session,
-  type SideEvent,
   type TaskGraph,
 } from "@vibevalley/protocol";
-import {
-  actLabel,
-  cut,
-  isBusy,
-  isForManager,
-  issueDraftingOf,
-  issueOrder,
-  issueStatusOf,
-  keepClosedIssues,
-  standingIn,
-  standingLabel,
-  statusMove,
-  statusMoves,
-  templateCatalog,
-} from "@vibevalley/protocol/rules";
+import { actLabel, isBusy, standingLabel } from "@vibevalley/protocol/rules";
+import { isForManager, issueDraftingOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
+import { cut } from "../base/text.ts";
+import { templateCatalog } from "../agent/seed.ts";
+import { standingIn } from "./standing.ts";
+import { statusMove, statusMoves } from "./moves.ts";
 import { graphIssues } from "../task/rules.ts";
 import { dueText } from "../schedule/rules.ts";
-import { conflictBrief } from "./rules.ts";
-import { Context, Effect, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient } from "effect/sql";
-import * as q from "../../db/generated/issue.sql.ts";
-import * as qq from "../../db/generated/issue_queue.sql.ts";
-import * as qs from "../../db/generated/issue_session.sql.ts";
-import { Agents } from "../agent/agent.ts";
-import { Settings } from "../base/config.ts";
-import { causeMessage } from "../base/db.ts";
-import { newId } from "../base/ids.ts";
-import { Channels } from "../channel/chat.ts";
-import { Core } from "../core/core.ts";
-import { type ApiError, missing, reasonOf, refused } from "../errors.ts";
-import { issueBranch, type Merged, MergeFailure, Projects, type Workplace } from "../project/project.ts";
-import { Runtimes, usable } from "../runtime/runtime.ts";
-import { askedMax } from "../session/journal.ts";
-import { chooseAgent } from "../session/rules.ts";
-import { type Hired, type HireOptions, Sessions } from "../session/session.ts";
-import { type Due, Schedules } from "../schedule/schedule.ts";
 import {
+  conflictBrief,
   cureWords,
   draftBrief,
-  pullRequestConclusion,
   draftDescription,
   filledKinds,
   findingsOf,
@@ -89,10 +60,29 @@ import {
   nextTaskId,
   openAsks,
   parseDraft,
+  pullRequestConclusion,
   resumeWords,
   sentTitles,
   splitJob,
 } from "./rules.ts";
+import { Context, Effect, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { SqlClient } from "effect/sql";
+import { Agents } from "../agent/agent.ts";
+import { Settings } from "../base/config.ts";
+import { causeMessage } from "../base/db.ts";
+import { newId } from "../base/ids.ts";
+import { Channels } from "../channel/chat.ts";
+import { Core } from "../core/core.ts";
+import { type ApiError, missing, reasonOf, refused } from "../errors.ts";
+import { issueBranch, type Merged, MergeFailure, Projects, type Workplace } from "../project/project.ts";
+import { Runtimes, usable } from "../runtime/runtime.ts";
+import { askedMax } from "../session/journal.ts";
+import { chooseAgent } from "../session/rules.ts";
+import { type Hired, type HireOptions, type SessionNews, Sessions } from "../session/session.ts";
+import { type Due, Schedules } from "../schedule/schedule.ts";
+import * as q from "../../db/generated/issue.sql.ts";
+import * as qq from "../../db/generated/issue_queue.sql.ts";
+import * as qs from "../../db/generated/issue_session.sql.ts";
 
 /** An issue for the manager, handed to it. */
 export interface ManagerWork {
@@ -892,10 +882,11 @@ export const make = (options: IssueOptions = {}) =>
 
     // ── what happens to its sessions ──
 
-    const onFact = (e: SideEvent) =>
+    const onSessionNews = (n: SessionNews) =>
       Effect.gen(function* () {
-        switch (e.type) {
+        switch (n._tag) {
           case "left": {
+            const e = n.left;
             const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
             if (!issue) return;
             const row = yield* one(q.getIssue({ id: issue }));
@@ -906,29 +897,28 @@ export const make = (options: IssueOptions = {}) =>
             yield* publish(issue);
             return;
           }
-          case "report": {
+          case "reported": {
+            const e = n.report;
             const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
             // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
             const checks = e.checks ?? [];
             if (issue && checks.length > 0) yield* checked(issue, checks);
             if (issue) yield* asked(issue, e.asks);
             yield* handedBack(e);
-            if (core.session(e.id)?.conflict) yield* recheck(e.id);
+            if (n.session?.conflict) yield* recheck(e.id);
             return;
           }
-          case "message": {
-            // Whatever path an owner's word took into an issue's thread, this is where the issue hears it.
-            const m = e.message;
-            if (!e.thread || m.fromKind !== "user" || m.kind !== "chat" || !m.final) return;
-            const issue = yield* Effect.option(get(e.thread));
-            if (Option.isNone(issue) || isClosed(issue.value.status)) return;
-            yield* ownerSaid(issue.value.id);
-            return;
-          }
-          default:
-            // The issues hear only these three.
+          case "hired":
             return;
         }
+      });
+
+    // Whatever path an owner's word took into an issue's thread, this is where the issue hears it.
+    const onOwnerInThread = (thread: string) =>
+      Effect.gen(function* () {
+        const issue = yield* Effect.option(get(thread));
+        if (Option.isNone(issue) || isClosed(issue.value.status)) return;
+        yield* ownerSaid(issue.value.id);
       });
 
     // ── coming back ──
@@ -939,14 +929,27 @@ export const make = (options: IssueOptions = {}) =>
     // The manager's turn on its issues stopped with the server; one it had answered still waits on the owner.
     for (const r of yield* db(q.openOf({ assignee: managerAgent }))) if (r.handed_back === null) yield* closeAs(r.id, "lost");
 
-    const facts = yield* core.subscribe;
+    const news = yield* sessions.news;
+    const ownerWords = yield* chat.ownerInThread;
     const finished = yield* sessions.finishedRuns;
     const due = yield* schedules.due;
     const logged =
       (what: string) =>
       <A, E>(e: Effect.Effect<A, E>) =>
         Effect.asVoid(e).pipe(Effect.catchCause((c) => Effect.logWarning(`vibevalley: ${what}: ${String(c)}`)));
-    yield* Effect.forkScoped(Stream.runForEach(facts, (e) => onFact(e).pipe(logged(`issues after a ${e.type}`))));
+    // One at a time, as when they were one stream of facts: a report and the owner's word on it do not cross.
+    yield* Effect.forkScoped(
+      Stream.runForEach(
+        Stream.merge(
+          news,
+          Stream.map(ownerWords, (w) => ({ _tag: "owner" as const, thread: w.thread })),
+        ),
+        (n) =>
+          n._tag === "owner"
+            ? onOwnerInThread(n.thread).pipe(logged(`issues after the owner's words in ${n.thread}`))
+            : onSessionNews(n).pipe(logged(`issues after ${n._tag}`)),
+      ),
+    );
     yield* Effect.forkScoped(
       // However the manager's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
       Stream.runForEach(finished, (run) =>

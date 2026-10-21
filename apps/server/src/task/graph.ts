@@ -1,10 +1,11 @@
 // A task graph's rules. Texts are measured as JavaScript does.
 
-import type { GraphAction, GraphState, Spent, Task, TaskAction, TaskGraph, TaskState } from "../shapes";
-import { isOpen } from "./core";
-import { dagLayers, dagIDValid, type DagNode, dagProblems } from "./dag";
+import type { GraphAction, GraphState, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
+import { dagLayers, dagIDValid, type DagNode, dagProblems } from "../base/dag.ts";
 
 /** More steps than this means the job should be split into tasks. */
+export const isOpen = (graph: { state: string }) => graph.state !== "done" && graph.state !== "abandoned";
+
 export const maxTasks = 12;
 export const taskOf = (graph: TaskGraph, id: string) => (graph.tasks ?? []).find((n) => n.id === id);
 

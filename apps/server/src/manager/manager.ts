@@ -12,7 +12,10 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
 import { type ManagerEval, managerAgent, type RunTrigger } from "@vibevalley/protocol";
-import { graphsOf, isOpen, nextRun, runtimeLabel } from "@vibevalley/protocol/rules";
+import { runtimeLabel } from "../agent/seed.ts";
+import { nextRun } from "../schedule/when.ts";
+import { isOpen } from "../task/graph.ts";
+import { graphsOf } from "../task/issues.ts";
 import { graphText } from "../task/rules.ts";
 import { Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";

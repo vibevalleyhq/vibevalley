@@ -8,8 +8,8 @@ import {
   type Agent,
   type Block,
   type BlockAttrs,
-  type GraphAction,
   generalName,
+  type GraphAction,
   type Issue,
   managerAgent,
   type Memory,
@@ -17,7 +17,10 @@ import {
   type TaskAction,
   type TaskEdit,
 } from "@vibevalley/protocol";
-import { graphsOf, isOpen, maxTasks, openFindings, phaseText, shortTitle, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { phaseText, shortTitle, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { openFindings } from "../issue/state.ts";
+import { isOpen, maxTasks } from "../task/graph.ts";
+import { graphsOf } from "../task/issues.ts";
 import { head } from "../base/text.ts";
 import { graphText } from "../task/rules.ts";
 import { inboxLines } from "../channel/rules.ts";

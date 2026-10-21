@@ -1,13 +1,14 @@
 # AGENTS.md
 
-VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：工单派给 agent 档案，服务端为它开一次执行（经 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动本机的编码 agent），在 `VIBEVALLEY_WORK_ROOT` 下项目的 worktree 里一轮一轮干活，主人看改动、合进主分支；主人、管家（替主人派活的 agent）和执行在群聊里说话。外面画成一座农场：项目是岛，在做的工单是一块地，执行是在地上干活的帮工，群聊是田头（[概念](docs/concepts.md)）。整个仓库是 TypeScript：服务端 `apps/server`（Effect）、页面 `apps/web`（Solid 2）、桌面壳 `apps/desktop`（Electron），和官网 `site/`（Astro）；形状和规则都在 `packages/protocol`，服务端和页面共用。改 `apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
+VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：工单派给 agent 档案，服务端为它开一次执行（经 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动本机的编码 agent），在 `VIBEVALLEY_WORK_ROOT` 下项目的 worktree 里一轮一轮干活，主人看改动、合进主分支；主人、管家（替主人派活的 agent）和执行在群聊里说话。外面画成一座农场：项目是岛，在做的工单是一块地，执行是在地上干活的帮工，群聊是田头（[概念](docs/concepts.md)）。整个仓库是 TypeScript：服务端 `apps/server`（Effect）、页面 `apps/web`（Solid 2）、桌面壳 `apps/desktop`（Electron），和官网 `site/`（Astro）；服务端和页面之间的契约（形状、接口、两边都跑的少数规则）在 `packages/protocol`。改 `apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
 
 ## 目录
 
 ```
 apps/server/               服务端（Effect v4，Node 24 上用 tsx 跑）：src/ 里一块业务一个文件夹，名字用单数，每个导出一个服务
                            （Context.Service）：core、setting、agent、project、memory、doc、runtime、session、channel、schedule、issue、
-                           task、notice、tool、mcp、manager、lan、voice、connector、game；agent/brain 是 VibeValley 自己的 agent（搭在
+                           task、notice、tool、mcp、manager、lan、voice、connector、game；projection 是核心状态的折法和拼帧（读各模块的
+                           规则，组装时交给 core）；agent/brain 是 VibeValley 自己的 agent（搭在
                            pi-agent-core 上，也是 oar 的 vibevalley runtime）；base 是地基，services.ts 按次序把它们组装起来，
                            handlers.ts 是全部接口的处理，http/ 是路由、流和 /mcp；cli.ts 是命令行（农场的每个接口、和农机直接聊、
                            自己的 agent）
@@ -18,8 +19,8 @@ apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手
                            （src/farm，PixiJS），其余是工作台（src/pages/<地方>）；public/ 是全部的图、像素字、指针和样音（apps/web/README.md）
 apps/desktop/              Electron 壳：用自己的 Node 带着服务端起来，打开它提供的页面；宿主能力经 preload 给页面
 apps/mobile/               手机壳（Expo、React Native）：扫码配对，WebView 打开那台电脑「连接到本机」放出的页面；通知、锁屏不断的通话经桥给页面
-packages/protocol/         形状（src/shapes.ts）、它们的 Schema（schema.ts）、接口（api.ts）和规则（src/rules）：服务端和页面
-                           都用；testdata/ 是折法和共用规则的黄金数据
+packages/protocol/         契约：形状（src/shapes.ts）、它们的 Schema（schema.ts）、接口（api.ts）和两边都跑的规则（src/rules）：服务端和页面
+                           都用；只有服务端跑的规则在 apps/server/src 各自的模块里
 packages/host/             宿主接口：页面能向宿主要的东西（通知、托盘、全局快捷键、通话的线路），和手机壳的桥
 packages/engine/           像素农场的引擎：Pixi 的舞台、寻路、音效合成、日钟
 site/                      官网 vibevalley.dev（Astro 静态生成，Tailwind，会动的部分是 React island）：图和像素字直接用 apps/web/public 的
@@ -59,7 +60,7 @@ bun run site:check && bun run site:build                        # 改完 site/�
 
 Node 24（服务端经 tsx 跑），Bun 1.4（workspaces、脚本、页面和 protocol 的单元测试），Electron 44。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `apps/server` 要重启它。
 
-一件事的主线：oar 的会话事件 → `apps/server/src/session/facts.ts`（纯函数）读成事实 → `Core.apply` 用 `packages/protocol` 的 `reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给页面；每个会话和管家的每一步由 `session/journal.ts` 记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
+一件事的主线：oar 的会话事件 → `apps/server/src/session/facts.ts`（纯函数）读成事实 → `Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给页面；每个会话和管家的每一步由 `session/journal.ts` 记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
 
 ## 怎么让 agent 做对
 
@@ -75,8 +76,8 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 ## 规矩
 
 - **先有概念，再有皮**：服务端按实际的概念分模块（工单、执行、项目、群聊……，[概念](docs/concepts.md)）；农场只画它们，每个农场里的东西都对得上一件实际的事；游戏规则只读事件、算画面，业务不调它（[提案](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）。
-- **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/shapes.ts` 里加字段或事实，在 `packages/protocol/src/rules/core.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
-- **`packages/protocol` 只放契约**：线上的形状写在 `shapes.ts`，每个形状在 `schema.ts` 有一个由它定类型的 Schema（`Schema.Codec<T.X>`：两边对不上就编不过），接口写在 `api.ts`；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/<模块>`），结论写进帧给页面，页面不为了展示去调规则（现有的照[提案](.agents/notes/proposed/architecture/2026-10-22-ten-modules.md)挪出）；黄金数据（`apps/server/src/<模块>/testdata/*.jsonl.gz`）跟着规则走，有意改了规则就 `bun run golden:update` 重写，看过 diff 再留（[理由](docs/subsystems/foundation.md)）。
+- **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/shapes.ts` 里加字段或事实，在 `apps/server/src/projection/reduce.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
+- **`packages/protocol` 只放契约**：线上的形状写在 `shapes.ts`，每个形状在 `schema.ts` 有一个由它定类型的 Schema（`Schema.Codec<T.X>`：两边对不上就编不过），接口写在 `api.ts`；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/<模块>`），结论写进帧给页面，页面不为了展示去调规则（`rules/contract.test.ts` 查每个导出都有服务端以外的包在用）；黄金数据（`apps/server/src/<模块>/testdata/*.jsonl.gz`）跟着规则走，有意改了规则就 `bun run golden:update` 重写，看过 diff 再留（[理由](docs/subsystems/foundation.md)）。
 - **生成的不手改**：`apps/server/db/generated` 由 effect-sqlc 写（`bun run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `bun run api:client` 写，`docs:verify` 查它（[理由](docs/subsystems/foundation.md)）。
 - **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `apps/server/src` 文件夹（`issue`、`issue_session`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `db/queries/<表>.sql`，一张表一个文件，代码里只调生成的；`src/base/schema.test.ts` 查这几条（[理由](docs/subsystems/foundation.md)）。
 - **不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（库里的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `db/migrations/0001_schema.up.sql`，不另加迁移（`schema.test.ts` 查这条），本机的旧库和旧文件作废（库由服务端开机时挪到一边、新建一个），旧文件删掉重建；启动时只认今天的名字（[理由](docs/subsystems/foundation.md)）。

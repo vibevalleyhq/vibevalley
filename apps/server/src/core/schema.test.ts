@@ -6,7 +6,9 @@ import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { Schema } from "effect";
 import type { CoreState, Fact } from "@vibevalley/protocol";
-import { emptyCoreState, frameOf, reduce } from "@vibevalley/protocol/rules";
+import { emptyCoreState } from "./core.ts";
+import { reduce } from "../projection/reduce.ts";
+import { frameOf } from "../projection/frame.ts";
 import * as S from "@vibevalley/protocol/schema";
 
 test("the golden runs and the frames made of them decode", async () => {

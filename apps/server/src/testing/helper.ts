@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { type Runtime } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
-import { factsOf, presetOf } from "@vibevalley/protocol/rules";
+import { factsOf, presetOf } from "../agent/seed.ts";
 import { criteriaHead } from "../issue/rules.ts";
 import { jobBreak } from "../session/rules.ts";
 

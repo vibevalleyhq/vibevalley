@@ -1,7 +1,21 @@
 // What a session is doing and what it waits on.
 
-import type { Conflict, Retry, Session } from "../shapes";
-import { actionText } from "./seeds";
+import type { Conflict, Retry, Session, SessionAction } from "../shapes";
+
+/** What each action is, in words. */
+export const actionText: Readonly<Record<SessionAction, string>> = {
+  run_command: "跑命令",
+  read_file: "读文件",
+  edit_file: "改文件",
+  search: "搜索",
+  web: "查网页",
+  mcp: "调 MCP 工具",
+  wait: "等待",
+  other: "用工具",
+  thinking: "思考",
+  speaking_text: "写汇报",
+  none: "",
+};
 
 /** It takes one of the places for those working at once. */
 export const isBusy = (h: Session) => h.phase._tag === "arriving" || h.phase._tag === "working";

@@ -15,7 +15,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/schedule`（`Schedules`）：`schedule.ts` 存取、开机读表、每次检查（`tick`）和到点发布（`due`，一条流）；`rules.ts` 是只有它用的纯函数：`dueSchedules`、`isMissed`、`afterRun`、`needsOK`。
-- 几处都用的规则在 `packages/protocol/src/rules/schedules.ts`：`nextRun`、`scheduleProblem`、`whenText`、`nextText`、`dueText`，五段 cron 的解析、下次时间、说成话；下次时间用 Effect 的 `Cron.make`、`Cron.next` 和时区，解析和报错是自己的。
+- 几处都用的规则在 `apps/server/src/schedule/when.ts`：`nextRun`、`scheduleProblem`、`whenText`、`nextText`、`dueText`，五段 cron 的解析、下次时间、说成话；下次时间用 Effect 的 `Cron.make`、`Cron.next` 和时区，解析和报错是自己的。
 - 表：`schedule`（一个定时一行，时间写法存成 JSON 的 `spec`）；工单表的 `schedule` 列指着它的定时。
 - 接口：`schedule.create`、`schedule.list`、`schedule.update`、`schedule.delete`（[capabilities.md](docs/reference/capabilities.md)）；`schedule.update` 只有主人和「连接到本机」能调，管家不能。管家的工具 `schedule`、`list_schedules`、`cancel_schedule` 在 `tool/tool.ts`。
 - 配置：`schedule.tick_ms`，默认 20000（20 秒看一遍；0 或更小是每毫秒）。
@@ -62,7 +62,7 @@
 - **田头（`channel`）**：定时属于一个频道（`schedule.channel_id`）；到点的提示和出错的提示都经 `notice` 说在这个频道里。
 - **帮工档案（`agent`）**：定时只认存在的档案；`manager` 这个 id 没有档案能用。
 - **管家（`manager`、`tool`）**：用 `schedule`、`list_schedules`、`cancel_schedule` 定、看、删，调不了 `schedule.update`。系统提示里写着：主人说「每天」「到点」时定；派了活、答应了主人一件事、在等一个结果时，可以自己定一次性的回头看；会反复来的只在主人要的时候定。管家自己的定时（没写档案的）快到点时，它闲着也不压缩（`wakeSoon`）。
-- **Inbox（`packages/protocol/src/rules/inbox.ts`）**：待批的定时是一条 `schedule-ask`，主人同意或删掉它就没了。
+- **Inbox（`apps/server/src/notice/inbox.ts`）**：待批的定时是一条 `schedule-ask`，主人同意或删掉它就没了。
 
 ## 为什么这样
 

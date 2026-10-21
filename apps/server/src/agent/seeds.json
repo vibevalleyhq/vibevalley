@@ -669,18 +669,5 @@
       "inProcess": false
     }
   },
-  "actionText": {
-    "run_command": "跑命令",
-    "read_file": "读文件",
-    "edit_file": "改文件",
-    "search": "搜索",
-    "web": "查网页",
-    "mcp": "调 MCP 工具",
-    "wait": "等待",
-    "other": "用工具",
-    "thinking": "思考",
-    "speaking_text": "写汇报",
-    "none": ""
-  },
   "runtimeIds": ["claude", "codex", "opencode", "vibevalley", "pi", "cursor", "grok", "kimi", "antigravity", "dsh"]
 }

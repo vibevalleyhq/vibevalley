@@ -2,18 +2,17 @@
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the manager, who does it.
 
-import { type Schedule, type ScheduleBy, type ScheduleRequest } from "@vibevalley/protocol";
-import { dueText, scheduleProblem } from "./rules.ts";
+import type { Schedule, ScheduleBy, ScheduleRequest } from "@vibevalley/protocol";
+import { afterRun, dueSchedules, dueText, isMissed, needsOK, scheduleProblem } from "./rules.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
-import * as q from "../../db/generated/schedule.sql.ts";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
-import { afterRun, dueSchedules, isMissed, needsOK } from "./rules.ts";
+import * as q from "../../db/generated/schedule.sql.ts";
 
 export interface Due {
   readonly schedule: Schedule;

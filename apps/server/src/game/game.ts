@@ -4,15 +4,14 @@
 // entry that cannot be written is logged, and the farm goes on.
 
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
-import { achievementsInWords } from "./progress.ts";
+import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
 import { Context, Effect, Layer, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
-import * as q from "../../db/generated/game_ledger.sql.ts";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
 import { Core } from "../core/core.ts";
 import { Projects } from "../project/project.ts";
-import { catchUp, type Entry, entriesFor, type Folded, progressFold, progressStep } from "./progress.ts";
+import * as q from "../../db/generated/game_ledger.sql.ts";
 
 /** The person plants on an empty plot and then says what to do; the manager hires a session for it some seconds later. */
 const wantStationForMs = 10_000;

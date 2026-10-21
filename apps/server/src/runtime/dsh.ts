@@ -9,8 +9,15 @@
 
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import { defineRuntime, type ListModelsResult, type ModelEntry, type RefusedSessionOptions, type SessionOptions, type StartSession } from "@botiverse/oar";
-import type { InstallationProbe } from "@botiverse/oar";
+import {
+  defineRuntime,
+  type InstallationProbe,
+  type ListModelsResult,
+  type ModelEntry,
+  type RefusedSessionOptions,
+  type SessionOptions,
+  type StartSession,
+} from "@botiverse/oar";
 
 const dist = new URL(".", import.meta.resolve("@botiverse/oar"));
 const internal = <T>(path: string) => import(new URL(path, dist).href) as Promise<T>;

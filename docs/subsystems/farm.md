@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 像素村：384×256 的格子、放大和裁边、LDtk 地图、寻路、光、院子的动静 | 地的样子（庄稼和牌子）怎么算：`packages/protocol` 的 `plotOf`，[工单](docs/subsystems/issue.md)；金币、连胜、成就和账本（[游戏](docs/subsystems/game.md)） |
+| 像素村：384×256 的格子、放大和裁边、LDtk 地图、寻路、光、院子的动静 | 地的样子（庄稼和牌子）怎么算：`apps/server/src/game/view.ts` 的 `plotOf`，[工单](docs/subsystems/issue.md)；金币、连胜、成就和账本（[游戏](docs/subsystems/game.md)） |
 | 帮工走去哪、什么姿势、在哪块地上 | 帮工的阶段和在做什么（[帮工](docs/subsystems/session.md)） |
 | 快捷栏的农具：点一块地做什么、用不上时说为什么 | 农具调的接口背后的规则（`issue.status`、`issue.comment`，[工单](docs/subsystems/issue.md)） |
 | 地图：每个项目一座岛，地是它的 worktree 和空位 | 项目的上限、worktree（[项目](docs/subsystems/project.md)） |
@@ -108,9 +108,9 @@
 
 ## 和谁打交道
 
-- **核心状态（`packages/protocol`）**：读 `StateFrame` 的 `state`、`view`、`inbox`、`effects`；地的样子是 `plotOf`，来电是 `inbox`，皮不重写这两条规则。
+- **核心状态**：读 `StateFrame`（形状在 `packages/protocol`）的 `state`、`view`、`inbox`、`effects`；地的样子是 `plotOf`（`game/view.ts`），来电是 `inbox`（`notice/inbox.ts`），皮不重写这两条规则。
 - **工单、帮工**：农具直接调 `issue.status`、`issue.comment`、`session.stop`，不经帮工找工单；播种是经田头发一条带档案和项目（农场的还带地号）的消息。
-- **种子**：播种袋读 `project.templates`（`issue` 服务从工单里读出「最近」，`project` 服务看项目根目录认栈，工单模板的目录在 `packages/protocol/src/rules/template_catalog.json`），页面不带副本（理由见下「种子的目录和填法在服务端」）。
+- **种子**：播种袋读 `project.templates`（`issue` 服务从工单里读出「最近」，`project` 服务看项目根目录认栈，工单模板的目录在 `apps/server/src/agent/template_catalog.json`），页面不带副本（理由见下「种子的目录和填法在服务端」）。
 - **项目**：地图读项目列表里的 `maxSessions`，项目页每 30 秒问一次；工单和帮工跟着核心状态来。
 - **游戏**：金币、升级、成就到了一档是服务端推来的 `GameEffect`，皮只画效果、响声音、弹通知。
 - **素材流水线（`design/`）**：生图 `design/pixel/gen.sh`，切图 `design/pixel/process.py` 写出 `apps/web/public/pixel/` 和 `sprites.json`（不手改）；原图在 vibevalley-art，`design/art.sh` 链接进来。步骤见 [pixel-village.md](docs/reference/pixel-village.md)「素材」。
@@ -148,7 +148,7 @@
 - `apps/web/src/farm/world/world.test.ts`：关卡是 384×256、九块地、帮工去的地点；路上能走、地里不能，从大门走得到每块地；叫人的地前面站着帮工；地图是两倍密的 384 格宽，每张图都在清单旁边；地按工单做键；放大和裁边（一个窗口正好放下、16:10 放大一档盖满、裁太多就退一档留边、扫一片窗口尺寸从不超过上限）。
 - `packages/engine/test/*.test.ts`：寻路、光、钟、节奏。
 - `apps/web/src/farm/sound.test.ts`：每个音效都有名字和分组、合得出样本。
-- `apps/web/src/farm/phone/calls.test.ts`：打开时已有的来电不响、新来电响铃，挂断，20 秒没接算未接，别处处理掉自己停；`games/*.test.ts` 测小游戏的规则（种子重放、推箱子每关可解）。来电本身的规则在 `packages/protocol` 的黄金数据。
+- `apps/web/src/farm/phone/calls.test.ts`：打开时已有的来电不响、新来电响铃，挂断，20 秒没接算未接，别处处理掉自己停；`games/*.test.ts` 测小游戏的规则（种子重放、推箱子每关可解）。来电本身的规则在 `apps/server/src/core` 的黄金数据（`core/golden.test.ts`）。
 - `apps/web/src/rules/notice.test.ts`（来电变通知、只响一次、菜单栏摘要）、`projects.test.ts`（worktree 和空位、锁住的地，一座岛最多 6 块）、`catalog.test.ts`（书架、帧、重画的命令）。
 - Playwright：`farm.spec.ts`（画布没有错误、农场和工作台互相链）、`farm-canvas.spec.ts`（村子跑一阵不出错、指针跟着农具说能不能用、帮工走进来、干活、去书屋，夜里点灯）、`farm-hud.spec.ts`（等级和农具、数字键挑农具、每个面板打开和 Esc 关、点空地打开播种袋、「草稿」写进备选）、`farm-chat.spec.ts`（田头说话、管家回答、频道菜单、点帮工的地打开它的工单）、`farm-phone.spec.ts`（手机打开、小游戏接十字键、来电响铃、接听去那块地并记下）、`farm-title.spec.ts`（首页）、`projects.spec.ts`（地图和岛）、`catalog.spec.ts`。
 - 服务端：`project/stack.test.ts`（每种标记文件、锁文件选包管理器）、`issue/rules.test.ts`（目录里每个模板都填得满、按栈填命令）、`issue/issue.test.ts`（排着队的待办从播种袋开工）、`project/project.test.ts`（项目的上限在农场的上限以内）。

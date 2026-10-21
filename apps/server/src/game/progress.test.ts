@@ -1,5 +1,5 @@
 import type { CoreState, Fact, LedgerEntry } from "@vibevalley/protocol";
-import { reduce } from "@vibevalley/protocol/rules";
+import { reduce } from "../projection/reduce.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import { catchUp, emptyFolded, entriesFor, harvestCoins, progressFold, progressStep } from "./progress.ts";

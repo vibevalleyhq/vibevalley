@@ -14,6 +14,7 @@ import { layer as channel } from "./channel/chat.ts";
 import { type DocOptions, layer as doc } from "./doc/doc.ts";
 import { type IssueOptions, layer as issue } from "./issue/issue.ts";
 import { layer as memory } from "./memory/memory.ts";
+import { layer as projection } from "./projection/projection.ts";
 import { layer as notice, type NoticeOptions, start as noticeStart } from "./notice/notice.ts";
 import { layer as project, type ProjectHooks, start as projectStart } from "./project/project.ts";
 import { layer as runtime, type RuntimeOptions } from "./runtime/runtime.ts";
@@ -52,8 +53,9 @@ export interface ServiceOptions {
   readonly connector?: ConnectorOptions;
 }
 
-/** Platform: the database, the settings and secrets, the core state. */
-export const platform = (config: Config) => Database.pipe(Layer.provideMerge(Layer.succeed(Settings, config)), on(core), on(setting));
+/** Platform: the database, the settings and secrets, the core state (folded by the projection, which reads every
+ * module's rules). */
+export const platform = (config: Config) => Database.pipe(Layer.provideMerge(Layer.succeed(Settings, config)), on(projection), on(core), on(setting));
 
 /** Agents: the profiles, their memory, the runtimes they run on. */
 export const agents =

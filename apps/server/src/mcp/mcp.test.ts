@@ -1,7 +1,8 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session } from "@vibevalley/protocol";
-import { messagesIn, seedAgents } from "@vibevalley/protocol/rules";
+import { messagesIn } from "../channel/state.ts";
+import { seedAgents } from "../agent/seed.ts";
 import { Effect } from "effect";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";

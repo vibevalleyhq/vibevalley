@@ -2,8 +2,8 @@
 // the server's refusals all go by. Worked out with the issue's status and standing in reduce (withIssueStatuses), so a
 // round that ends changes what the issue may do at once, wherever it is read.
 
-import { type Issue, type IssueStatus, IssueStatusValues } from "../shapes";
-import { isForManager } from "./issues";
+import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
+import { isForManager } from "./state.ts";
 
 /** What moving an issue to a status does. in_progress and in_review are the session's to reach, never the owner's. */
 export type Move =

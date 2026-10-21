@@ -31,12 +31,12 @@
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `run` 到 `report` 两个事实、`Session.runs`、`lastRun` | `/api/v1/issues/{id}/runs` |
 | 干活过程 | 干活过程 | `pages/chat/WorkLog.tsx`、`pages/Trajectory.tsx` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/sessions`、`/api/v1/sessions/{id}`、`/api/v1/sessions/{id}/events` |
 | 收成清单、收获 | 收获 | 农场 `farm/panels/Harvest.tsx`、工作台 `pages/issues/CloseDialog.tsx` | `Changes` | `/api/v1/issues/{id}/changes`、`/api/v1/issues/{id}/status`（挪到 `done`） |
-| 验收、草、缺肥 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `rules/issueState.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `pages/issues/IssueDetail.tsx`）的状态框、输入框里的验收、草 | `Issue.acceptance`、`acceptedAt`、`findings`、`asks`；地的样子是 `plotOf`（`rules/view.ts`） | `/api/v1/issues/{id}/accept`；`asks` 来自帮工汇报（`report` 事实的 `asks`） |
+| 验收、草、缺肥 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `rules/issueState.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `pages/issues/IssueDetail.tsx`）的状态框、输入框里的验收、草 | `Issue.acceptance`、`acceptedAt`、`findings`、`asks`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issues/{id}/accept`；`asks` 来自帮工汇报（`report` 事实的 `asks`） |
 | 田头、频道 | 田头 | 田头窗口（`farm/chat/ChatWindow.tsx`）、`/chat`（`pages/chat`） | `Conversation`（`kind`：`general`、`channel`）、`ChatMessage`、`CoreState.chat` | `/api/v1/channels`、`/api/v1/channels/{id}/messages` |
 | 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Conversation`（`kind: thread`）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channels/{id}/messages`、`/api/v1/issues/{id}/comment` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Schedule`；它的工单是 `Issue.schedule` 指着它的那张 | `/api/v1/schedules` |
-| 工单模板 | 播种袋里的种子 | 播种袋（`farm/panels/SeedForms.tsx`） | `ProjectTemplates`、`TemplateKind`、`IssueTemplate`；目录是 `packages/protocol/src/rules/template_catalog.json` | `/api/v1/projects/{id}/templates` |
-| 来电 | 手机来电 | `farm/phone/calls.ts` | `InboxItem`（`StateFrame.inbox`，`rules/inbox.ts` 从核心状态现算） | |
+| 工单模板 | 播种袋里的种子 | 播种袋（`farm/panels/SeedForms.tsx`） | `ProjectTemplates`、`TemplateKind`、`IssueTemplate`；目录是 `apps/server/src/agent/template_catalog.json` | `/api/v1/projects/{id}/templates` |
+| 来电 | 手机来电 | `farm/phone/calls.ts` | `InboxItem`（`StateFrame.inbox`，`apps/server/src/notice/inbox.ts` 从核心状态现算） | |
 | 连接器 | 连接器 | `/settings/connectors`（`pages/settings/ConnectorsPage.tsx`） | `ConnectorStatus` | `/api/v1/connectors` |
 | （不画） | 连接到本机 | `/settings/lan`（`pages/settings/LanPage.tsx`）、连进来的设备的 `/pair`（`pages/pair`） | `LanStatus`、`LanDevice` | `/api/v1/lan` |
 | 语音 | 麦克风 | `/settings/voice`（`pages/settings/VoiceForm.tsx`）、`src/voice/` | `VoiceSettings` | `/api/v1/voice/...` |
@@ -70,7 +70,7 @@
 | 钥匙和语音设置 | `Setting` | `settings.json`（只有你能读） | 会话的 `env` |
 | 进度、成就 | `Game`（`game/game.ts`、`progress.ts`） | `game_ledger` 表；进度从它折出来 | |
 | 等级 | `Game` | `state.json` 里的 commit 数 | |
-| 地 | `Game`；规则在 `packages/protocol/src/rules/play.ts` | `state.json` 里的 `play.station` | |
+| 地 | `Game`；规则在 `apps/server/src/game/play.ts` | `state.json` 里的 `play.station` | |
 | 核心状态 | `Core` | `state.json`（聊天、进度、定时和工单除外） | |
 
 ## oar 那一层

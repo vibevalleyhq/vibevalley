@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Schedule, ScheduleRequest, ScheduleWhen } from "@vibevalley/protocol";
-import { nextText } from "@vibevalley/protocol/rules";
+import { nextText } from "./when.ts";
 import { Effect, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { test } from "vite-plus/test";

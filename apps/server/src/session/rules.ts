@@ -3,19 +3,11 @@
 
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
-import {
-  type Agent,
-  type Ask,
-  type CheckResult,
-  type CriterionCheck,
-  type Doing,
-  type MCPServer,
-  type Outcome,
-  type Session,
-  type Skill,
-} from "@vibevalley/protocol";
-import { isBusy, maxTasks, runtimeLabel, slice } from "@vibevalley/protocol/rules";
-import { clip } from "../base/text.ts";
+import type { Agent, Ask, CheckResult, CriterionCheck, Doing, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { clip, slice } from "../base/text.ts";
+import { runtimeLabel } from "../agent/seed.ts";
+import { maxTasks } from "../task/graph.ts";
 import type { Workplace } from "../project/project.ts";
 
 const summaryMax = 160;

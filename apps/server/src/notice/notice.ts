@@ -3,7 +3,8 @@
 // manager, and the page rings, notifies and fills the tray from the same inbox in the frame, each item worded there.
 
 import type { InboxItem } from "@vibevalley/protocol";
-import { freshOf, inbox } from "@vibevalley/protocol/rules";
+import { freshOf } from "@vibevalley/protocol/rules";
+import { inbox } from "./inbox.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";

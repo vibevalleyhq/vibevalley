@@ -168,11 +168,11 @@ VibeValley 是一个 AI 原生的 Linear，外面包一层农场游戏的皮。�
    - 每件 Inbox 带好 `who` 和 `words`（手机的标签、系统通知、菜单栏），种类的话只在 `inbox.ts` 一张表里；页面原来的三张表（`inboxKindLabel`、`noticeFor`、`waitingLine`）和两份「只响一次」（`CallBell`、`PhoneCalls.known`）收成读字段和一个 `freshOf`。
    - 不立「送达」端口：通话、手机、系统通知各自订阅，背后的适配器在两个进程里。
    - Inbox 本身还在 `packages/protocol`（`frameOf` 要它），由第 5 步挪回。
-5. **`packages/protocol` 只放契约**：页面从 protocol 的规则里只 import 14 个名字，服务端 import 97 个；大半是服务端独用的业务规则放在了共享包里，平铺、不分模块，一个模块的知识分在两处。
-   - 留在 protocol 的：形状、Schema、接口，和两边都跑的少数规则（`phaseText`、`standingLabel`、`actLabel`、`shortTitle`、`keyBetween`、`freshOf` 这类）。
-   - 挪回模块的：`reduce` 和 `frameOf` 归 Platform 的 `core`；站位、Moves、种植计划的规则归 Issues；Inbox 归 Notifications；`viewOf` 和成就归 Gamification；黄金数据跟着走。
-   - 帧由模块拼：`frameOf` 在 Platform，不能 import 上面的模块，所以各模块在组装时给 `core` 交一个「我这一块怎么算」的函数（帧的 `inbox`、`graphs`、`view` 各由拥有它的模块给），方向不反。
-   - 加一道检查：`packages/protocol/src/rules` 的每个导出至少有一个服务端以外的包在用，待挪的列在检查里，只减不加。
+5. **`packages/protocol` 只放契约**（已做）：页面原来只 import 14 个规则的名字，服务端 import 97 个；服务端独用的业务规则放在共享包里，平铺、不分模块。
+   - 留在 protocol 的：形状、Schema、接口，和两边都跑的 `phaseText`（连 `phaseWords`、`needOf`、`actionText`）、`isBusy`、`shortTitle`、`standingLabel`、`actLabel`、`standingWantsOwner`、`freshOf`、`farmOf`、`keyBetween`、`same`。`rules/contract.test.ts` 查每个导出都有服务端以外的包在用。
+   - 其余挪回各自的模块：`session/state.ts`、`channel/state.ts`、`issue/{state,standing,moves}.ts`、`task/{graph,issues}.ts`、`schedule/when.ts`、`notice/inbox.ts`、`game/{play,view}.ts`、`agent/seed.ts`（和两个 json）、`base/{text,dag}.ts`；黄金数据和它们的测试在 `core/`。
+   - 折法和拼帧在 `projection/`（组装那一层），组装时以 `Projection` 交给 `core`，`core` 不 import 上面的模块。没有拆成每个模块各交一段折法：一个 `reduce` 能看全，黄金数据只比一个函数。
+   - 田头问帮工「这张工单现在谁在做」改走 `Helpers.onIssue`。剩下一条反向的（帮工的规矩里写了拆工单的上限 `maxTasks`）记在边界测试里，归第 6 步。
 6. **Assistant 的工具改成用例适配器**；模块之间不再读核心状态里别人的那一块；事件改成带类型。
 7. **按能力拆大服务**：`issue.ts`、`session.ts`、`channel/chat.ts` 在各自的文件夹里拆成几个小服务（例如工单的起草、收获和 PR、排队），一个文件一个服务。
 8. **事件提交和副作用分开**：另写提案评估（参考 T3 Code 的事件溯源和 outbox）。

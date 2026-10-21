@@ -1,11 +1,10 @@
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import type { Config } from "../base/config.ts";
+import { type Config, Settings } from "../base/config.ts";
 import { Effect, Layer } from "effect";
 import { defaultVoice } from "./rules.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Settings } from "../base/config.ts";
 import { layer, Setting } from "./setting.ts";
 
 const appId = "11111111111111111111111111111111";

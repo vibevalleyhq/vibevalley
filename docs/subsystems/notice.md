@@ -14,7 +14,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/notice`（`Notices`，属于 Notifications 模块）：`notice.ts` 的 `news`（刚来的）、`overdue`（巡查的发现）、`patrol`（马上巡一次）、开机时的 `prime`；`rules.ts` 是巡查的纯规则（`patrolStep`、`patrolGrace`），黄金数据在 `testdata/rules.jsonl.gz`。
-- Inbox 本身还在 `packages/protocol/src/rules/inbox.ts`（`inbox`、`inboxEntries`、`freshOf`），因为拼帧的 `frameOf` 在那里；放在 `StateFrame.inbox`，和 `state`、`view` 并排。它要挪回本模块，见[提案](.agents/notes/proposed/architecture/2026-10-22-ten-modules.md)。
+- Inbox 本身还在 `apps/server/src/notice/inbox.ts`（`inbox`、`inboxEntries`、`freshOf`），因为拼帧的 `frameOf` 在那里；放在 `StateFrame.inbox`，和 `state`、`view` 并排。它要挪回本模块，见[提案](.agents/notes/proposed/architecture/2026-10-22-ten-modules.md)。
 - 页面：手机 `apps/web/src/farm/phone/calls.ts`，系统通知和菜单栏 `apps/web/src/app/Follow.tsx`、`apps/web/src/rules/notice.ts`。
 
 ## 模型和不变量

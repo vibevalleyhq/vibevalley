@@ -119,6 +119,6 @@
 - `apps/server/src/voice/voice.test.ts`（假的声网对端）：通话中一张工单交回来，管家的话经 `speak`（`APPEND`）念出来，没通话时不念；两张接连交回来只问管家一次、只念一段；交给管家的那条把等着的事合成一段；接听来电开的电话不念开场白、管家先说那件事；长话在句末切到 512 字节以下；说缺哪个 key；只有凭据时才签授予、续签；管家在自己的线路上接通和挂断；一通电话的凭据和线路不随之后的设置变；挂断中的电话不收字幕；没带通话 id 的字幕只在只有一通电话时转；听写没设好时说为什么。
 - `setting` 的测试：语音设置只存差异、三段的 key 只给提示（`setting/*.test.ts`）。
 - 页面：`apps/web/src/voice/captions.test.ts`（分块乱序也拼齐一轮、一轮的字长大时替换、插话停下那一轮、只留最近几轮）；`apps/web/test/voice.spec.ts`（没有声网的钥匙时说为什么、再点一次重试；听写等「声音」里设好转写地址）。
-- `packages/protocol/src/rules/inbox.test.ts`（交回来带着问题的是「有问题问你」）。
+- `apps/server/src/notice/inbox.test.ts`（交回来带着问题的是「有问题问你」）。
 - 页面：`apps/web/src/farm/phone/calls.test.ts`（通话中不响铃、记成未接）；`apps/web/test/farm-phone.spec.ts`（接听来电就去开电话；手机的「打给管家」和田头的通话键是同一通，打不通时两处说同一个原因）。
 - 真人说话、听到声音要人在桌面版上亲自打一通（`verify-app`）；没有连真的声网的自动测试。`speak` 在真电话上念出来、不打断主人，要在真电话上验。

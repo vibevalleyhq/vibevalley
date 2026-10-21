@@ -1,6 +1,6 @@
 # 游戏
 
-服务端的游戏是 `game` 模块（`Game`）加 `packages/protocol/src/rules` 里的 `view.ts`、`play.ts` 和 `seeds.ts`：一本只增不减的账本（`game_ledger` 表）折出金币、连胜、成就、称号和每个档案的战绩；工作目录里你名下的 commit 数折出等级；主人刚点的空地决定下一个帮工站哪块地；每个事实带出要放的特效。游戏只读事实、算画面和账本，业务的服务不用 `game`，也不因为它改变怎么干活。
+服务端的游戏是 `game` 模块（`Game`）加它自己的 `view.ts`、`play.ts`，和 `agent` 模块里的 `seed.ts`：一本只增不减的账本（`game_ledger` 表）折出金币、连胜、成就、称号和每个档案的战绩；工作目录里你名下的 commit 数折出等级；主人刚点的空地决定下一个帮工站哪块地；每个事实带出要放的特效。游戏只读事实、算画面和账本，业务的服务不用 `game`，也不因为它改变怎么干活。
 
 ## 管什么，不管什么
 
@@ -16,7 +16,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/game`（`Game`）：`game.ts` 账本的存取、订阅、`chooseTitle`、什么时候数 commit、主人点的空地；`progress.ts` 账本的折法（`progressStep`、`progressFold`）和哪些事实记账（`entriesFor`、`catchUp`），只有 `game` 读。
-- 规则在 `packages/protocol/src/rules`：`view.ts` 等级（`xpToNext`、`levelForCommits`、`farmLevelOf`、`levelUps`）、地块（`plotOfSession`、`plotOf`、`plotKey`、`viewOf`）、特效（`effectsOf`）；`play.ts` 帮工的 `SessionPlay`（地块号、最近 30 步动作、工具次数、最近的文件和命令）、空地（`freeStation`、`withStations`）、`station` 事实的折法（`stationed`）；`view.ts` 的成就的说法（`achievementsInWords`：每档叫什么、到了叫什么、给多少金币、能不能当称号）和进度（`viewOf` 里每个成就到了第几档、计数、下一档要多少）。成就单在 `seeds.json` 的 `achievements`（`seeds.ts` 的 `achievements`），页面不另拿一份。
+- 规则在 `apps/server/src/game`：`view.ts` 等级（`xpToNext`、`levelForCommits`、`farmLevelOf`、`levelUps`）、地块（`plotOfSession`、`plotOf`、`plotKey`、`viewOf`）、特效（`effectsOf`）、`viewOf` 里每个成就到了第几档、计数、下一档要多少；`play.ts` 帮工的 `SessionPlay`（地块号、最近 30 步动作、工具次数、最近的文件和命令）、空地（`freeStation`、`withStations`）、`station` 事实的折法（`stationed`）；`progress.ts` 成就的说法（`achievementsInWords`：每档叫什么、到了叫什么、给多少金币、能不能当称号）。成就单在 `apps/server/src/agent/seeds.json` 的 `achievements`（`seed.ts` 的 `achievements`），页面不另拿一份。
 - 核心状态里的游戏字段：`CoreState.progress`、`commits`、`Session.play`；帧里的 `view`（地块、等级、每个成就的进度 `achievements`）和 `effects`。`progress` 只在账本里有，`state.json` 不存它。
 - 表：`game_ledger`（`id` 是 UUIDv7，`kind`、`at`、其余字段放进 `payload` 的 JSON），查询在 `db/queries/game_ledger.sql`。
 - 接口：`game.achievements`（成就的说法，页面的顺序）、`game.chooseTitle`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.say` 带的 `station`。
@@ -85,7 +85,7 @@
 - **奖结果，不奖消耗。** 按命令数、读写次数、token 给奖等于奖励多花钱，和「管住花费」相反；按「一轮做完」给，活最后有没有收进主分支都一样。经验同理：按完成的工单算奖的是忙，失败重试也能刷。
 - **一本账本，在服务端，折出结果。** 在页面里算，页面关着时的事漏掉，几个客户端各算一份互相覆盖。直接存计数最简单，但规则一改旧数就对不上，也说不清某一档是哪天、因为哪件活拿到的；账本按顺序折，结果总能重算，还带着每档的日期。
 - **哪些事实记账是一个纯函数 `entriesFor`，游戏只听事实。** 写在各个业务里记，业务就认识了游戏；收获、带话、点名、交接都从帮工离开和田头消息的事实里读出来。只有主人做的、不改状态的事从 `core.Did` 来，经手的服务说一声，不管从哪个入口进来都记得到。
-- **服务收在 `game` 一个包。** 名字只叫 `ledger` 时，它装的其实是全部游戏；`game` 也是主人和概念里的词。几处都用的规则留在 `packages/protocol/src/rules`：游戏的形状和事实、帧在同一个联合里，拆开要倒转依赖。账本的折法只有 `game` 读，所以在 `game/progress.ts`。
+- **服务收在 `game` 一个包。** 名字只叫 `ledger` 时，它装的其实是全部游戏；`game` 也是主人和概念里的词。地块、特效这类拼帧要用的规则放在 `game` 自己的文件里，折法和拼帧那层（`projection`）import 它们；账本的折法只有 `game` 读，所以在 `game/progress.ts`。
 - **核心状态不替游戏做决定。** 主人点的地要经过管家（模型）才雇到帮工，中间隔着一句话和 10 秒；把地块一路带过管家和派活（`hired` 带地块），业务就认识了游戏。所以 `game` 听到 `hired` 再施加 `station`，代价是分在两帧时页面上帮工挪一下。
 - **特效在 `Core.apply` 里算，不搬进 `game`。** `effectsOf` 要折之前的状态：`game` 要么自己存一份，违反核心状态只有一份；要么等事件发出再算，特效晚一帧。`Core` 只跑一个纯函数，不做游戏的决定。
 - **经验只算工作目录里你名下的 commit。** 算这台机器上所有仓库会把和 VibeValley 无关的工作算进来，算所有作者会把别人的提交算成你的；代价是要定期扫目录、跑 git。

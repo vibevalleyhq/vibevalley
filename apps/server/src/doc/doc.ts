@@ -2,30 +2,20 @@
 // through their tools, all down the same pipeline. One batch at a time for every document: a document's batches are
 // serial and its seq goes up in order.
 
-import {
-  type Agent,
-  type Block,
-  type BlockAttrs,
-  type DocAck,
-  type DocOpResult,
-  type DocSnapshot,
-  type DocSpan,
-  type DocSubmit,
-  type Document,
-} from "@vibevalley/protocol";
+import type { Agent, Block, BlockAttrs, DocAck, DocOpResult, DocSnapshot, DocSpan, DocSubmit, Document } from "@vibevalley/protocol";
 import { Context, Effect, Layer, Option, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
-import * as qb from "../../db/generated/doc_block.sql.ts";
-import * as qr from "../../db/generated/doc_block_revision.sql.ts";
-import * as qc from "../../db/generated/doc_change.sql.ts";
-import * as qd from "../../db/generated/doc.sql.ts";
 import { newId } from "../base/ids.ts";
 import { type ApiError, missing, refused } from "../errors.ts";
 import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
 import { keyBetween } from "@vibevalley/protocol/rules";
 import { ordered, Page, wire } from "./ops.ts";
 import { unmarked } from "./text.ts";
-import { demoScript, demoPieces, demoJitter } from "./demo.ts";
+import { demoJitter, demoPieces, demoScript } from "./demo.ts";
+import * as qb from "../../db/generated/doc_block.sql.ts";
+import * as qr from "../../db/generated/doc_block_revision.sql.ts";
+import * as qc from "../../db/generated/doc_change.sql.ts";
+import * as qd from "../../db/generated/doc.sql.ts";
 
 export interface DocShape {
   readonly list: () => Effect.Effect<Document[]>;

@@ -1,8 +1,8 @@
 // A task graph is issues: the graph's own and one per step.
 
-import type { CoreState, Issue, TaskGraph } from "../shapes";
-import { asksForYou, blockedBy, graphSpent, isSettled, layersOf } from "./tasks";
-import { compare, compareText, or } from "./text";
+import type { CoreState, Issue, TaskGraph } from "@vibevalley/protocol";
+import { asksForYou, blockedBy, graphSpent, isSettled, layersOf } from "./graph.ts";
+import { compare, compareText, or } from "../base/text.ts";
 
 export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
   const g = parent.graph!;

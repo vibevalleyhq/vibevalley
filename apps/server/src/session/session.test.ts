@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session } from "@vibevalley/protocol";
-import { seedAgents } from "@vibevalley/protocol/rules";
+import { seedAgents } from "../agent/seed.ts";
 import { Effect, Fiber, Stream } from "effect";
 import { Core } from "../core/core.ts";
 import { Projects } from "../project/project.ts";

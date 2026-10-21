@@ -1,5 +1,6 @@
 import { type Issue, managerAgent, type ProjectStack, type Run } from "@vibevalley/protocol";
-import { graphsOf, templateCatalog } from "@vibevalley/protocol/rules";
+import { templateCatalog } from "../agent/seed.ts";
+import { graphsOf } from "../task/issues.ts";
 import { describe, expect, it, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import {

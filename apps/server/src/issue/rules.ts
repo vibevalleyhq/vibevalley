@@ -3,23 +3,24 @@
 // the sowing form's templates filled for a project.
 
 import { reportVerdict } from "../session/rules.ts";
-import {
-  type Ask,
-  type Issue,
-  type IssueClose,
-  type IssueTimeline,
-  type Milestone,
-  type MilestoneKind,
-  type Run,
-  type RunTrigger,
-  type Spent,
-  type IssueStatus,
-  type IssueTemplate,
-  type ProjectStack,
-  type TemplateBlank,
-  type TemplateKind,
+import type {
+  Ask,
+  Issue,
+  IssueClose,
+  IssueStatus,
+  IssueTemplate,
+  IssueTimeline,
+  Milestone,
+  MilestoneKind,
+  ProjectStack,
+  Run,
+  RunTrigger,
+  Spent,
+  TemplateBlank,
+  TemplateKind,
 } from "@vibevalley/protocol";
-import { isForManager, shortTitle } from "@vibevalley/protocol/rules";
+import { shortTitle } from "@vibevalley/protocol/rules";
+import { isForManager } from "./state.ts";
 import { clip } from "../base/text.ts";
 
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";

@@ -11,7 +11,7 @@
 import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
-import { channelOf, conversationOf, generalOf } from "@vibevalley/protocol/rules";
+import { channelOf, conversationOf, generalOf } from "../channel/state.ts";
 import { Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";

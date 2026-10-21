@@ -1,18 +1,12 @@
-// The farm's core state, in motion: reduce folds one fact into the state; the
-// recorded runs of facts (testdata/reduce.jsonl.gz) hold it to the same answers. It never changes what it is given.
+// The farm's core state, in motion: reduce folds one fact into the state with each module's rules; the recorded runs of
+// facts (core/testdata/reduce.jsonl.gz) hold it to the same answers. It never changes what it is given.
 
-import type { CoreState, Fact, Outcome, Phase, Progress, Session } from "../shapes";
-import { withConversation, withMessage } from "./chat";
-import { withIssue, withIssueStatuses } from "./issues";
-import { farmOf, freeStation, playedDoing, playedRun, playOf, stationed } from "./play";
-import { same } from "./same";
-import { sessionOf, whileWorking, withSession } from "./sessions";
-
-export const emptyCoreState = (): CoreState => ({ call: "idle", manager: "idle", sessions: [] });
-
-export const emptyProgress = (): Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1 });
-
-export const isOpen = (graph: { state: string }) => graph.state !== "done" && graph.state !== "abandoned";
+import type { CoreState, Fact, Outcome, Phase, Session } from "@vibevalley/protocol";
+import { withConversation, withMessage } from "../channel/state.ts";
+import { withIssue, withIssueStatuses } from "../issue/state.ts";
+import { farmOf, same } from "@vibevalley/protocol/rules";
+import { freeStation, playedDoing, playedRun, playOf, stationed } from "../game/play.ts";
+import { sessionOf, whileWorking, withSession } from "../session/state.ts";
 
 const ended = (outcome: Outcome): Phase => (outcome === "completed" ? { _tag: "ripe" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 

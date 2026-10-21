@@ -2,7 +2,7 @@
 
 种植计划（`TaskGraph`）把一件很长的编码活拆成有先后的几件（`Task`），每件一个帮工，按 DAG 推进：等的都合进去了才开工，互不依赖的同时做。计划是带 `graph` 的父工单，每一件是带 `task` 的子工单；它有自己的计划分支，每一件做完由农场跑检查、合进计划分支，全部做完主人一次收获进主分支。农场里是院子里的图纸桌（计划板）。
 
-VibeValley 自己的 agent 在一个会话里给自己记的任务图是另一张图，在 `agent/brain`，和种植计划只共用 `packages/protocol/src/rules/dag.ts` 的边的规则（见[agent 自己的任务图](docs/subsystems/agent.md#自己的任务图)）。
+VibeValley 自己的 agent 在一个会话里给自己记的任务图是另一张图，在 `agent/brain`，和种植计划只共用 `apps/server/src/base/dag.ts` 的边的规则（见[agent 自己的任务图](docs/subsystems/agent.md#自己的任务图)）。
 
 ## 管什么，不管什么
 
@@ -19,7 +19,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务图是另一�
 ## 在哪
 
 - 服务端 `apps/server/src/task`（`Tasks`）：`task.ts` 拆、调度、验证、动作、计划的经过和开机恢复；`rules.ts` 是只有它用的纯函数（`startable`、`parseSplit`、`editTask`、`removeTask`、`taskBrief`、冻结文件的判断和交给帮工的几句话）。
-- 规则：只有服务端跑的在 `apps/server/src/task`：`rules.ts`（`readyTasks`、验收的几条、`defaultParallel`、`autoRetries`、`graphText`，`graphIssues` 把计划拆成一家工单，`graphOf`）、`changes.ts`（两版计划比出经过和它的说法）；出帧和折法要的还在 `packages/protocol/src/rules`：`tasks.ts`（`graphProblems`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、`maxTasks`）、`taskIssues.ts`（`graphsOf` 从核心状态里的工单拼回计划）、`dag.ts`（边的规则，和 `engine` 共用）。工单状态怎么从计划算在 `issues.ts`。
+- 规则：只有服务端跑的，都在 `apps/server/src/task`：`rules.ts`（`readyTasks`、验收的几条、`defaultParallel`、`autoRetries`、`graphText`，`graphIssues` 把计划拆成一家工单，`graphOf`）、`changes.ts`（两版计划比出经过和它的说法）、`graph.ts`（出帧要的 `graphProblems`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、`maxTasks`）、`issues.ts`（`graphsOf` 从核心状态里的工单拼回计划、`graphFrom`）；边的规则在 `apps/server/src/base/dag.ts`，和 `agent/brain` 自己的任务图共用。工单状态怎么从计划算在 `issue/state.ts` 的 `issueStatusOf`。
 - 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`。
 - 接口：`graph.*`（`split`、`updateTask`、`deleteTask`、`act`、`taskAct`、`changes`、`events`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graphs`、`task_edit`、`graph_action`、`task_action`，帮工的工具 `issue_split`（都在 `tool/tool.ts`）。
 - 帧：`StateFrame.graphs` 是服务端拼好的计划，带分层（`layers`）、每件在等谁（`blockedBy`）、要不要主人看（`asksForYou`）、花了多少（`spent`）、做完几件（`settled`）和能做的动作。
@@ -95,7 +95,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务图是另一�
 - **项目（`project`）**：`openBranch`、`mergeBranch`、`branchChanges`（`graph.changes` 的收成清单）、`changedFiles`（冻结文件的判断）、`Run`（检查命令）。
 - **管家（`manager`、`tool`）**：五个工具起头、看、改、动作；计划的新闻进管家的输入（来源 `graph`）；管家的农场现状写着开着的计划。
 - **田头（`channel`）**：计划里帮工的汇报标 `forTask`，不投给管家。
-- **Inbox（`packages/protocol/src/rules/inbox.ts`）**：没做成的件是一条 `task-failed`，巡查过了宽限期叫醒管家（[管家](docs/subsystems/manager.md)）。
+- **Inbox（`apps/server/src/notice/inbox.ts`）**：没做成的件是一条 `task-failed`，巡查过了宽限期叫醒管家（[管家](docs/subsystems/manager.md)）。
 - **游戏（`game`）**：收获一个计划记一条账，金币 `30 + 10 × 合进去的件数`，件数到档位给成就（[farm-ui.md](docs/reference/farm-ui.md)「金币」）。
 
 ## 为什么这样

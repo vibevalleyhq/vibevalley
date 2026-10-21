@@ -2,14 +2,13 @@
 // whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
 // words never reach the saved state.
 
-import type { CoreState, GameEffect, StateFrame } from "../shapes";
-import { inbox } from "./inbox";
-import { phaseWords } from "./phase";
-import { nextText, whenText } from "./schedules";
-import { actionText } from "./seeds";
-import { graphsOf } from "./taskIssues";
-import { canEditTask, canRemoveTask, graphActions, graphActionText, graphStateTag, taskActions, taskActionText, taskStateText } from "./tasks";
-import { viewOf } from "./view";
+import type { CoreState, GameEffect, StateFrame } from "@vibevalley/protocol";
+import { inbox } from "../notice/inbox.ts";
+import { actionText, phaseWords } from "@vibevalley/protocol/rules";
+import { nextText, whenText } from "../schedule/when.ts";
+import { graphsOf } from "../task/issues.ts";
+import { canEditTask, canRemoveTask, graphActions, graphActionText, graphStateTag, taskActions, taskActionText, taskStateText } from "../task/graph.ts";
+import { viewOf } from "../game/view.ts";
 
 export function frameOf(state: CoreState, effects: GameEffect[] = []): StateFrame {
   const graphs = graphsOf(state).map((g) => {

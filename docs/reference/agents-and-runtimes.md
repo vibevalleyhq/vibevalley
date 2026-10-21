@@ -2,7 +2,7 @@
 
 | 词 | 是什么 | 谁决定 |
 |---|---|---|
-| 农机（runtime） | 机器上的一种编码 agent 程序：`vibevalley`（VibeValley 自己的 agent），和 oar 驱动的 `pi`、`claude`、`codex`、`opencode`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`（DeepSeek Harness，`packages/protocol/src/rules/seeds.json` 的 `runtimeIds`） | 机器上装了什么；「农具」页只能改 VibeValley 怎么用它 |
+| 农机（runtime） | 机器上的一种编码 agent 程序：`vibevalley`（VibeValley 自己的 agent），和 oar 驱动的 `pi`、`claude`、`codex`、`opencode`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`（DeepSeek Harness，`apps/server/src/agent/seeds.json` 的 `runtimeIds`） | 机器上装了什么；「农具」页只能改 VibeValley 怎么用它 |
 | 帮工档案（agent） | 一份配置：农机、模型、思考强度、人设、技能、MCP、禁用的工具、环境变量、适合什么活、长相 | 你在「捏帮工」里捏 |
 
 派活派的是档案；一个档案可以同时派出好几个帮工，各自一个 worktree。

@@ -1,6 +1,6 @@
 import type { CoreState } from "@vibevalley/protocol";
-import { emptyCoreState } from "@vibevalley/protocol/rules";
 import { describe, expect, it } from "vite-plus/test";
+import { emptyCoreState } from "../core/core.ts";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import { emptyPatrol, type PatrolNote, patrolStep } from "./rules.ts";
 

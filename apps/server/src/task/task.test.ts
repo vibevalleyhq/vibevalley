@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
-import { blockedBy, inbox, isAcceptance, taskOf } from "@vibevalley/protocol/rules";
+import { blockedBy, isAcceptance, taskOf } from "./graph.ts";
+import { inbox } from "../notice/inbox.ts";
 import { clip } from "../base/text.ts";
-import { graphOf, taskIssueID } from "./rules.ts";
+import { graphOf, parseSplit, taskBrief, taskIssueID } from "./rules.ts";
 import { Effect, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
@@ -12,7 +13,6 @@ import { chooseAgent, splitBrief } from "../session/rules.ts";
 import type { Hired, HireOptions, Roster } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { worldBelowTasks } from "../testing/world.ts";
-import { parseSplit, taskBrief } from "./rules.ts";
 import { make, type TaskGit, type TaskWork } from "./task.ts";
 
 const step = (id: string, ...needs: string[]) => ({

@@ -1,9 +1,10 @@
 // The inbox's kinds the golden files have no case of.
 
 import { expect, test } from "vite-plus/test";
-import type { CoreState, Issue, Session } from "../shapes";
-import { emptyCoreState } from "./core";
-import { freshOf, inbox } from "./inbox";
+import type { CoreState, Issue, Session } from "@vibevalley/protocol";
+import { freshOf } from "@vibevalley/protocol/rules";
+import { emptyCoreState } from "../core/core.ts";
+import { inbox } from "./inbox.ts";
 
 test("a helper handed back with questions asks the owner to answer, not to harvest", () => {
   const session = {

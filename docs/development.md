@@ -31,7 +31,7 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 先跑和改动有关的最窄的那个（命令见 [AGENTS.md](AGENTS.md#命令)）：
 
 - `bun run check`：`vp check`，全仓库的格式（oxfmt）、lint（oxlint，带类型）和类型；`bun run check:fix` 改格式。
-- `bun run server:check`：`packages/protocol` 的规则和黄金数据，`apps/server` 的类型、查询是否最新和 vitest。
+- `bun run server:check`：`packages/protocol` 的规则，`apps/server` 的类型、查询是否最新和 vitest（核心状态的折法和共用规则的黄金数据在 `apps/server/src/core/testdata`）。
 - `bun run web:check`：各包的类型，页面能构建；`cd apps/web && bun run test` 跑规则的 vitest 和 Playwright（每个 worker 一个真的服务端，临时家目录，环境里没有钥匙）。
 - `bun run desktop:test`：Playwright 起整个 Electron 应用。
 - `bun run docs:verify`：Note、skill、链接和旧名字。
@@ -50,7 +50,7 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 ## 改形状、规则和表
 
 - **形状**：改 `packages/protocol/src/shapes.ts`（类型）和 `schema.ts`（同一个形状的 Schema，以 `Schema.Codec<T.X>` 定类型，两边对不上就编不过），接口在 `api.ts` 的 `endpoints`。服务端和页面都直接 import，没有生成这一步。
-- **规则**：改拥有它的包里的纯函数（几处都用的在 `packages/protocol/src/rules`），`bun run golden:update` 重写黄金数据（`-- setting` 这样只重写一个模块的，`-- protocol` 只重写 protocol 的），看 diff。页面不重写服务端的规则（[客户端问服务端](docs/subsystems/app.md)）。
+- **规则**：改拥有它的包里的纯函数（几处都用的在 `packages/protocol/src/rules`），`bun run golden:update` 重写黄金数据（`-- setting` 这样只重写一个模块的，不带名字重写全部），看 diff。页面不重写服务端的规则（[客户端问服务端](docs/subsystems/app.md)）。
 - **表和查询**：表结构是 `apps/server/db/migrations/0001_schema.up.sql` 一个文件（直接改），查询在 `apps/server/db/queries/<表>.sql`；改完跑 `npm run db:generate`。`src/base/schema.test.ts` 查表名、索引名和一张表一个查询文件。
 - **旧名字**：`bun run names:verify` 查 `apps/server/src`、`apps/web/src`、`apps/web/test`、`packages/protocol/src` 里有没有已经改掉的旧名（挂在 `docs:verify` 里）；加了新名字就把它写进 `scripts/stale-names.ts`。
 

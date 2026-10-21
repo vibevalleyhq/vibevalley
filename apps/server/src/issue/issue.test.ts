@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session, TaskGraph } from "@vibevalley/protocol";
-import { seedAgents } from "@vibevalley/protocol/rules";
+import { seedAgents } from "../agent/seed.ts";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";

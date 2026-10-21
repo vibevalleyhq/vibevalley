@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { type ChatMessage, type Conversation, managerAgent, type Session } from "@vibevalley/protocol";
-import { conversationOf, generalOf, isBusy, messagesIn } from "@vibevalley/protocol/rules";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { conversationOf, generalOf, messagesIn } from "./state.ts";
 import { head } from "../base/text.ts";
 import { wakeBreaker } from "./rules.ts";
 import { Effect, Layer, PubSub, Stream } from "effect";
@@ -8,9 +9,12 @@ import { SqlClient } from "effect/sql";
 import { type Config, Settings } from "../base/config.ts";
 import { Database } from "../base/db.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
+import { newsOf } from "../session/session.ts";
+import { sessionOnIssue } from "../session/state.ts";
+import { layer as projection } from "../projection/projection.ts";
 import { summaryOf } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Channels, type Delivered, type LaunchActivity, type ManagerNews, layer as channelLayer } from "./chat.ts";
+import { Channels, type Delivered, type LaunchActivity, layer as channelLayer, type ManagerNews } from "./chat.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 takes a while, 「必败」 fails. */
 class FakeSessions {
@@ -82,8 +86,17 @@ const fakeHelpers = (x: FakeSessions) =>
         deliver: (id, text) => Effect.sync(() => x.deliver(id, text)),
         currentRun: () => undefined,
         report: (id) => summaryOf(x.last.get(id) ?? ""),
+        onIssue: (issue) => sessionOnIssue(x.core.state(), issue)?.id,
       });
       yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(yield* PubSub.subscribe(x.launches)), chat.activity));
+      // As the sessions tell the chat of their own facts.
+      const [, moves] = yield* x.core.transitions;
+      yield* Effect.forkScoped(
+        Stream.runForEach(moves, ({ fact, after }) => {
+          const n = newsOf(fact, after);
+          return n ? chat.sessionNews(n) : Effect.void;
+        }),
+      );
       yield* chat.helpersBack;
     }),
   );
@@ -92,7 +105,7 @@ const world = (x: FakeSessions, config: Config = testConfig()) => {
   const c: Config = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
   return fakeHelpers(x).pipe(
     Layer.provideMerge(channelLayer),
-    Layer.provideMerge(coreLayer),
+    Layer.provideMerge(coreLayer.pipe(Layer.provide(projection))),
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(Settings, c)),
   );

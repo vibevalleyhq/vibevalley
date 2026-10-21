@@ -1,8 +1,11 @@
-import { mkdirSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
-import { isBusy, messagesIn, openFindings, viewOf } from "@vibevalley/protocol/rules";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { openFindings } from "../issue/state.ts";
+import { messagesIn } from "../channel/state.ts";
+import { viewOf } from "../game/view.ts";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";

@@ -3,7 +3,7 @@
 // before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence.
 
 import { Cron, DateTime, Option } from "effect";
-import type { Schedule, ScheduleWhen } from "../shapes";
+import type { Schedule, ScheduleWhen } from "@vibevalley/protocol";
 
 export const minEveryMinutes = 1;
 

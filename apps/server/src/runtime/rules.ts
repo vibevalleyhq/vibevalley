@@ -3,7 +3,7 @@
 // opens, so a profile that would be refused is shown so before it is sent.
 
 import type { AccountUsage, Agent, AgentIssue, AgentIssueLevel, ModelEntry, RuntimeInfo, RuntimeQuota } from "@vibevalley/protocol";
-import { factsOf, runtimeLabel } from "@vibevalley/protocol/rules";
+import { factsOf, runtimeLabel } from "../agent/seed.ts";
 import { yuan } from "./money.ts";
 
 const two = (n: number) => String(n).padStart(2, "0");

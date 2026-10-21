@@ -12,12 +12,14 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
-import type { Event, Session as RuntimeSession, Runtime, SessionOptions } from "@botiverse/oar";
+import type { Event, Runtime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
 import {
   type Agent,
+  type CoreState,
   dayMs,
+  type Fact,
   type IssueClose,
   maxRunning,
   type Outcome,
@@ -31,11 +33,10 @@ import {
 import { isBusy } from "@vibevalley/protocol/rules";
 import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
-import * as qr from "../../db/generated/session_run.sql.ts";
-import * as qi from "../../db/generated/session_run_issue.sql.ts";
-import * as qs from "../../db/generated/session.sql.ts";
 import { Agents } from "../agent/agent.ts";
-import { Channels, type Delivered, type InputConsumed, type LaunchActivity } from "../channel/chat.ts";
+import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
+
+export type { SessionNews };
 import { serverAddress, Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
 import { Core, type FactIn } from "../core/core.ts";
@@ -51,13 +52,17 @@ import {
   noRoom,
   readReport,
   recallBlock,
-  summaryOf,
-  sessionName,
   type SessionLimits,
+  sessionName,
+  summaryOf,
   toOarMcp,
   withRecall,
   workplaceRules,
 } from "./rules.ts";
+import { sessionOnIssue } from "./state.ts";
+import * as qr from "../../db/generated/session_run.sql.ts";
+import * as qi from "../../db/generated/session_run_issue.sql.ts";
+import * as qs from "../../db/generated/session.sql.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
@@ -153,8 +158,10 @@ export interface SessionShape {
   /** A session's log, oldest first; a run's only when run is given. */
   readonly events: (id: string, run?: string) => SessionEvent[] | undefined;
   readonly trajectories: Trajectories;
-  /** These three are subscribed before they return: nothing published after is missed. */
+  /** These four are subscribed before they return: nothing published after is missed. */
   readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
+  /** A session hired, reported or gone, with the session as it stood after: what the issues and task graphs follow. */
+  readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
   readonly finishedRuns: Effect.Effect<Stream.Stream<RunFinished>, never, Scope.Scope>;
   readonly inputsConsumed: Effect.Effect<Stream.Stream<InputConsumed>, never, Scope.Scope>;
   /** A session's token for the farm's MCP server; a new one stops the old working. */
@@ -181,6 +188,22 @@ export interface RunStore {
   readonly finished: (r: RunFinished) => void;
   readonly consumed: (c: InputConsumed) => void;
   readonly register: (session: string, currentRun: () => string) => void;
+}
+
+/** A session's own fact as news; the rest are not the sessions'. */
+export function newsOf(fact: Fact, after: CoreState): SessionNews | undefined {
+  switch (fact.type) {
+    case "hired": {
+      const session = after.sessions.find((h) => h.id === fact.session.id);
+      return session ? { _tag: "hired", session } : undefined;
+    }
+    case "report":
+      return { _tag: "reported", report: fact, session: after.sessions.find((h) => h.id === fact.id) };
+    case "left":
+      return { _tag: "left", left: fact };
+    default:
+      return undefined;
+  }
 }
 
 export class Sessions extends Context.Service<Sessions, SessionShape>()("vibevalley/Session") {}
@@ -309,6 +332,15 @@ export const make = (options: SessionOptionsIn = {}) =>
     const admission = Semaphore.makeUnsafe(1);
 
     const launchesHub = yield* PubSub.unbounded<LaunchActivity>();
+    // The sessions' own facts, told as news in the order they were applied.
+    const newsHub = yield* PubSub.unbounded<SessionNews>();
+    const [, moves] = yield* core.transitions;
+    yield* Effect.forkScoped(
+      Stream.runForEach(moves, ({ fact, after }) => {
+        const news = newsOf(fact, after);
+        return news ? PubSub.publish(newsHub, news) : Effect.void;
+      }),
+    );
     const finishedHub = yield* PubSub.unbounded<RunFinished>();
     const consumedHub = yield* PubSub.unbounded<InputConsumed>();
     const signal = (a: LaunchActivity) => PubSub.publishUnsafe(launchesHub, a);
@@ -975,6 +1007,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       events: (id, r) => trajectories.events(id, r),
       trajectories,
       launches: Effect.map(PubSub.subscribe(launchesHub), Stream.fromSubscription),
+      news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
       finishedRuns: Effect.map(PubSub.subscribe(finishedHub), Stream.fromSubscription),
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
       issueToken,
@@ -1004,9 +1037,16 @@ export const make = (options: SessionOptionsIn = {}) =>
       restore,
     };
     // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.
-    chat.useHelpers({ present: (id) => hands.has(id), deliver, currentRun: shape.currentRun, report: (id) => summaryOf(hands.get(id)?.lastText ?? "") });
+    chat.useHelpers({
+      present: (id) => hands.has(id),
+      deliver,
+      currentRun: shape.currentRun,
+      report: (id) => summaryOf(hands.get(id)?.lastText ?? ""),
+      onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
+    });
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.launches, chat.activity));
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.inputsConsumed, chat.consumed));
+    yield* Effect.forkScoped(Stream.runForEach(yield* shape.news, chat.sessionNews));
     // A handle for tests: what the shape does not say.
     return Object.assign(shape, { hands, expect, unexpect, hired: () => hired, run });
   });

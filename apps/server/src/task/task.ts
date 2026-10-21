@@ -3,50 +3,43 @@
 // step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
 // Everything here runs one at a time.
 
-import type {
-  Agent,
-  Changes,
-  GraphAction,
-  GraphActor,
-  GraphEvent,
-  GraphEventKind,
-  Session,
-  SessionGraph,
-  Task,
-  TaskAction,
-  TaskEdit,
-  TaskGraph,
-} from "@vibevalley/protocol";
-import { GraphActorValues, GraphEventKindValues } from "@vibevalley/protocol";
-import { graphActionText, graphProblems, graphsOf, graphStateText, isAcceptance, isBusy, isOpen, sessionOf, taskOf } from "@vibevalley/protocol/rules";
-import { clip } from "../base/text.ts";
-import { acceptanceChecks, acceptancesOf, autoRetries, defaultParallel, graphText, withTask } from "./rules.ts";
-import { graphOf, taskIssueID } from "./rules.ts";
-import { conflictBrief } from "../issue/rules.ts";
-import { actorText, graphChanges, graphEventText } from "./changes.ts";
-import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient } from "effect/sql";
-import * as q from "../../db/generated/task_event.sql.ts";
-import { Agents } from "../agent/agent.ts";
-import { causeMessage } from "../base/db.ts";
-import { newId } from "../base/ids.ts";
-import { Core, type Transition } from "../core/core.ts";
-import { type ApiError, reasonOf, refused } from "../errors.ts";
-import { Issues } from "../issue/issue.ts";
-import { MergeFailure, ProjectError, Projects } from "../project/project.ts";
-import { Runtimes, usable } from "../runtime/runtime.ts";
-import { chooseAgent, splitBrief } from "../session/rules.ts";
-import { type Hired, type HireOptions, type Roster, Sessions } from "../session/session.ts";
 import {
+  type Agent,
+  type Changes,
+  type GraphAction,
+  type GraphActor,
+  GraphActorValues,
+  type GraphEvent,
+  type GraphEventKind,
+  GraphEventKindValues,
+  type Session,
+  type SessionGraph,
+  type Task,
+  type TaskAction,
+  type TaskEdit,
+  type TaskGraph,
+} from "@vibevalley/protocol";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { sessionOf } from "../session/state.ts";
+import { graphActionText, graphProblems, graphStateText, isAcceptance, isOpen, taskOf } from "./graph.ts";
+import { graphsOf } from "./issues.ts";
+import { clip } from "../base/text.ts";
+import {
+  acceptanceChecks,
   acceptancePassedText,
+  acceptancesOf,
   allSettled,
+  autoRetries,
   changeOf,
   checkFailedText,
-  editTask,
+  defaultParallel,
   type EditResult,
+  editTask,
   freshTask,
   frozenTouched,
   frozenTouchedText,
+  graphOf,
+  graphText,
   issueSplitRefusal,
   parseSplit,
   removeTask,
@@ -54,7 +47,24 @@ import {
   startable,
   type StepDraft,
   taskBrief,
+  taskIssueID,
+  withTask,
 } from "./rules.ts";
+import { conflictBrief } from "../issue/rules.ts";
+import { actorText, graphChanges, graphEventText } from "./changes.ts";
+import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { SqlClient } from "effect/sql";
+import { Agents } from "../agent/agent.ts";
+import { causeMessage } from "../base/db.ts";
+import { newId } from "../base/ids.ts";
+import { Core } from "../core/core.ts";
+import { type ApiError, reasonOf, refused } from "../errors.ts";
+import { Issues } from "../issue/issue.ts";
+import { MergeFailure, ProjectError, Projects } from "../project/project.ts";
+import { Runtimes, usable } from "../runtime/runtime.ts";
+import { chooseAgent, splitBrief } from "../session/rules.ts";
+import { type Hired, type HireOptions, type Roster, type SessionNews, Sessions } from "../session/session.ts";
+import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;
 
@@ -370,12 +380,12 @@ export const make = (options: TaskOptions = {}) =>
         yield* putSystem(withNote({ ...graph, state: "paused" }, "「" + task.title + "」被叫停了，计划先暂停；点继续接着做"));
       });
 
-    const follow = (t: Transition) =>
+    const follow = (n: SessionNews) =>
       lock.withPermits(1)(
         Effect.gen(function* () {
-          const f = t.fact;
-          if (f.type === "report") {
-            const session = sessionOf(t.after, f.id);
+          if (n._tag === "reported") {
+            const f = n.report;
+            const session = n.session;
             if (session && !session.graph && session.issue) {
               // The helper that split its issue: the steps do the work now.
               const graph = get(session.issue);
@@ -390,7 +400,8 @@ export const make = (options: TaskOptions = {}) =>
                 }
               }
             }
-          } else if (f.type === "left") {
+          } else if (n._tag === "left") {
+            const f = n.left;
             // Sent home from outside the graph (a full farm, the person): its step did not get done.
             for (const graph of graphsOf(core.state())) {
               if (!isOpen(graph)) continue;
@@ -452,8 +463,7 @@ export const make = (options: TaskOptions = {}) =>
         for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* schedule(graph.id);
       }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
     );
-    const [, transitions] = yield* core.transitions;
-    yield* Effect.forkScoped(Stream.runForEach(transitions, (t) => (t.fact.type === "report" || t.fact.type === "left" ? follow(t) : Effect.void)));
+    yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
     const shape: TaskShape = {
       comeBack,

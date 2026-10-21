@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { type Agent, managerAgent, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
-import { defaultSettings, seedAgents } from "@vibevalley/protocol/rules";
+import { defaultSettings, seedAgents } from "./seed.ts";
 import { Context, Effect, Layer } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";

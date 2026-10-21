@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { type Runtime } from "@botiverse/oar";
 import type { ScriptedTurn } from "@botiverse/oar/testing";
 import type { Agent, Fact, FactReport, Session } from "@vibevalley/protocol";
-import { seedAgents } from "@vibevalley/protocol/rules";
+import { seedAgents } from "../agent/seed.ts";
 import { Effect, Stream } from "effect";
 import type { Config } from "../base/config.ts";
 import { Core } from "../core/core.ts";

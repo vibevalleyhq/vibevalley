@@ -13,7 +13,9 @@ import {
   type StuckReason,
   type UncommittedItem,
 } from "@vibevalley/protocol";
-import { nextText, phaseText, runtimeLabel, shortTitle, standingLabel, standingWantsOwner, whenText } from "@vibevalley/protocol/rules";
+import { phaseText, shortTitle, standingLabel, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { runtimeLabel } from "../agent/seed.ts";
+import { nextText, whenText } from "../schedule/when.ts";
 import { head } from "../base/text.ts";
 import { yuan } from "../runtime/money.ts";
 import type { Roster } from "../session/session.ts";

@@ -2,7 +2,7 @@
 // whether a schedule waits for the owner's yes.
 
 import type { Schedule, ScheduleBy, ScheduleRequest } from "@vibevalley/protocol";
-import { givenZone, minEveryMinutes, nextOf, nextRun, parseCron, scheduleTime } from "@vibevalley/protocol/rules";
+import { givenZone, minEveryMinutes, nextOf, nextRun, parseCron, scheduleTime } from "./when.ts";
 import { Cron, DateTime } from "effect";
 
 /** A run later than this after it was due was missed (the server was off), and says so. */

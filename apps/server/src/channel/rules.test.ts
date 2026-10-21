@@ -1,7 +1,16 @@
-import type { InboxMessage } from "./rules.ts";
+import {
+  type AudienceInput,
+  busyNotice,
+  channelNameProblem,
+  chatAudience,
+  type InboxMessage,
+  mentionsIn,
+  parseChatTarget,
+  type UnreadRow,
+  wakeInput,
+} from "./rules.ts";
 import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
-import { type AudienceInput, busyNotice, channelNameProblem, chatAudience, mentionsIn, parseChatTarget, type UnreadRow, wakeInput } from "./rules.ts";
 
 test("the recorded cases", () => {
   const cases = goldenCases("channel");

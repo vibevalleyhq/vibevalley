@@ -1,10 +1,11 @@
 // Where an issue may be moved: the table, and how it reads the standing.
 
 import { describe, expect, it } from "vite-plus/test";
-import { type Fact, type Issue, type IssueStatus, managerAgent, type Session } from "../shapes";
-import { emptyCoreState, reduce } from "./core";
-import { statusMove, statusMoves } from "./moves";
-import { standingOf } from "./standing";
+import { type Fact, type Issue, type IssueStatus, managerAgent, type Session } from "@vibevalley/protocol";
+import { emptyCoreState } from "../core/core.ts";
+import { standingOf } from "./standing.ts";
+import { statusMove, statusMoves } from "./moves.ts";
+import { reduce } from "../projection/reduce.ts";
 
 describe("status moves", () => {
   const issue = (status: IssueStatus, sent: boolean, more: Partial<Issue> = {}) =>

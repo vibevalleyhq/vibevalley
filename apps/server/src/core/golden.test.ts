@@ -5,25 +5,15 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, test } from "vite-plus/test";
-import {
-  asksForYou,
-  blockedBy,
-  effectsOf,
-  emptyCoreState,
-  graphProblems,
-  graphSpent,
-  inbox,
-  layersOf,
-  nextRun,
-  nextText,
-  phaseText,
-  reduce,
-  standingOf,
-  standingWantsOwner,
-  targetOf,
-  viewOf,
-  whenText,
-} from "@vibevalley/protocol/rules";
+import { phaseText, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { emptyCoreState } from "./core.ts";
+import { targetOf } from "../channel/state.ts";
+import { nextRun, nextText, whenText } from "../schedule/when.ts";
+import { asksForYou, blockedBy, graphProblems, graphSpent, layersOf } from "../task/graph.ts";
+import { standingOf } from "../issue/standing.ts";
+import { effectsOf, viewOf } from "../game/view.ts";
+import { inbox } from "../notice/inbox.ts";
+import { reduce } from "../projection/reduce.ts";
 import { acceptanceChecks, graphText, readyTasks } from "../task/rules.ts";
 import { scheduleProblem } from "../schedule/rules.ts";
 import { yuan } from "../runtime/money.ts";

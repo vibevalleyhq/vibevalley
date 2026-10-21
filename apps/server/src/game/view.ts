@@ -18,12 +18,12 @@ import type {
   PlotView,
   Progress,
   Session,
-} from "../shapes";
-import { needOf } from "./phase";
-import { playOf } from "./play";
-import { achievements } from "./seeds";
-import { sessionOf } from "./sessions";
-import { standingLabel } from "./standing";
+} from "@vibevalley/protocol";
+import { needOf, standingLabel } from "@vibevalley/protocol/rules";
+import { playOf } from "./play.ts";
+import { achievements } from "../agent/seed.ts";
+import { sessionOf } from "../session/state.ts";
+import { openFindings } from "../issue/state.ts";
 
 export const xpToNext = (level: number) => 10 * level;
 
@@ -72,9 +72,6 @@ const badgeRetrying: Badge = { text: "重试中", tone: "stuck" };
 const badgeRest: Badge = { text: "歇着", tone: "rest" };
 const badgeReview: Badge = { text: standingLabel.reviewing, tone: "wait" };
 const badgeAsks: Badge = { text: standingLabel.asking, tone: "wait" };
-
-/** The weeds a failed acceptance left standing. */
-export const openFindings = (t: Issue) => (t.findings ?? []).filter((f) => !f.pulled).length;
 
 /**
  * A plot is an issue: what the session on it is doing, then where the issue stands — waiting on the owner's answer

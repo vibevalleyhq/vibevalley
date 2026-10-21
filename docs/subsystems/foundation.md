@@ -19,7 +19,7 @@
 - **服务端** `apps/server`：`src/main.ts`（服务端）、`src/cli.ts`（命令行）；`src/services.ts`（全部服务的次序）、`src/handlers.ts`（每个接口转给哪个服务）、`src/http/`（`app.ts` 组装、`api.ts` 按接口表路由、`streams.ts` 三条 SSE、`mcp.ts`、`page.ts` 页面）。
 - **地基** `src/base`：`config.ts`（`Config`、`Settings`、`loadConfig`）、`db.ts`（`Database`）、`ids.ts`（`newId`、`code`）、`lease.ts`（家目录的租约）、`files.ts`、`redact.ts`；`src/errors.ts` 是接口的拒绝。
 - **形状和接口**：`packages/protocol/src/shapes.ts`（类型和两边共用的常量）、`schema.ts`（每个形状的 Schema）、`api.ts`（`endpoints` 表、`Handlers`、`errorStatus`）、`client.ts`（`VibeValleyApi`，由 `scripts/api-client.ts` 照 `api.ts` 写出）、`stream.ts`（读 SSE）；能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出。
-- **规则和黄金数据**：几处都用的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有一个主人的在那个模块里（`issue/rules.ts`、`channel/rules.ts`……）；黄金数据是 `apps/server/src/<模块>/testdata/*.jsonl.gz`（核心状态的折法、拼帧和共用规则的在 `core/testdata`，`core/golden.test.ts` 读），读写工具 `src/testing/golden.ts`。
+- **规则和黄金数据**：页面和服务端都跑的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有服务端跑的在拥有它的模块里（`issue/state.ts`、`channel/rules.ts`……），折法和拼帧在 `projection/`；黄金数据是 `apps/server/src/<模块>/testdata/*.jsonl.gz`（核心状态的折法、拼帧和共用规则的在 `core/testdata`，`core/golden.test.ts` 读），读写工具 `src/testing/golden.ts`。
 - **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器的设置 `db/effect-sqlc.json`，脚本 `scripts/db-generate.ts`。
 - **测试工具**：`src/testing/layers.ts`（`testConfig`、`testDatabase`：临时家目录、内存库）、`world.ts`（`world`：一整座农场，农机和它的额度由测试给）、`git.ts`（真的 git 仓库）、`golden.ts`；`src/flows/farm.ts`（流程测试的农场和帮工）；`agent/brain/testing.ts`（pi-ai 的假模型）。
 - **检查**：`src/base/schema.test.ts`（表结构）、`scripts/stale-names.ts`（`bun run names:verify`）、`scripts/capabilities.ts --check`，后两个在 `docs:verify` 里。
@@ -46,9 +46,9 @@
 - **形状写一次，Schema 由它定类型**：`shapes.ts` 是类型，`schema.ts` 里每个 Schema 写成 `Schema.Codec<T.X>`，两边对不上就编不过；`endpoints` 里的每一行带方法、路径、参数、请求和回答的 Schema、`can`（谁能调），`Handlers` 由它推出，`handlers.ts` 漏了或多了一个接口就编不过。服务端按这张表路由（`http/api.ts`：请求解不开是 400，拒绝按 `errorStatus` 给状态码），页面和命令行用同一张表调（`VibeValleyApi`、`cli.ts`）。
 - **生成的不手改**：`db/generated/`、[capabilities.md](docs/reference/capabilities.md) 和 `packages/protocol/src/client.ts`（`bun run api:client`：每个方法的参数、回答和注释照 `Handlers`，方法、路径、查询和请求体照 `endpoints`；生成而不在运行时读 `endpoints`，页面就不用带上 effect 的 Schema；`docs:verify` 查它是不是最新）。`seeds.json`、`template_catalog.json`（`packages/protocol/src/rules`）是直接改的数据文件。
 - **要每种都处理的地方穷尽**：按 `_tag`、`type` 分支的 `switch` 覆盖每一种，返回值或 `never` 让 `tsc` 查出漏掉的；成员表要每种都处理时写成 `Record<X, …>`。
-- **规则在它的主人那里**：核心状态的折法（`reduce`、`frameOf`）和几处都用的规则在 `packages/protocol/src/rules`；只有一个模块用的在那个模块的 `rules.ts` 一类文件里（`connector/text.ts`、`setting/rules.ts`、`memory/recall.ts`、`runtime/rules.ts`、`manager/rules.ts`、`channel/rules.ts`、`game/progress.ts`、`task/rules.ts`、`issue/rules.ts`、`schedule/rules.ts`）。别的模块要用一条单一主人的规则，问它的服务，或者挪进 `packages/protocol`。页面要用的服务端规则也挪进 `packages/protocol`，不在页面里重写。
+- **规则在它的主人那里，protocol 只放契约**：只有服务端跑的规则在拥有它的模块里（`session/state.ts`、`issue/state.ts`、`task/graph.ts`、`game/view.ts`、`notice/inbox.ts`、`setting/rules.ts`、`runtime/rules.ts`……），上面的模块可以 import 下面的；核心状态的折法和拼帧读每个模块的规则，放在组装那一层（`projection/`），交给 `core`。`packages/protocol/src/rules` 只放页面和服务端都跑的（`rules/contract.test.ts` 查）。页面要的结论由服务端算好写进帧或另开接口问；只有跟着页面的时钟走、两边都得算的（帮工在干什么的话）才挪进 protocol，不在页面里重写。
 - **黄金数据跟着规则**：每处有规则的地方有 `testdata/*.jsonl.gz`（成千上万条带种子的随机输入和结果），测试逐条比。`VIBEVALLEY_GOLDEN=update`（`bun run golden:update`，`-- <模块>` 或 `-- protocol` 只重写那一处，`scripts/golden-update.ts`）用现在的结果重写，看 diff 再留。
-- **字符串照 JavaScript 自己的算法**：长度按 UTF-16 码元、空白是 `\s`；切断的代理对换成 U+FFFD（`packages/protocol/src/rules/text.ts`）。没有另一份。
+- **字符串照 JavaScript 自己的算法**：长度按 UTF-16 码元、空白是 `\s`；切断的代理对换成 U+FFFD（`apps/server/src/base/text.ts`）。没有另一份。
 
 **存盘**
 

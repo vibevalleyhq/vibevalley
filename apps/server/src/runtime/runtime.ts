@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
 import type { AccountUsage, Agent, AgentIssue, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
-import { factsOf, presetOf, runtimeIds, runtimeLabel } from "@vibevalley/protocol/rules";
+import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
 import { Context, Effect, FiberSet, Layer, Schedule } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";

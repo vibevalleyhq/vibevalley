@@ -6,15 +6,19 @@ import {
   type Achievement,
   type AchievementDef,
   type CoreState,
+  everyone,
   type Fact,
   type LedgerEntry,
+  managerAgent,
   type Progress,
   type ProgressNews,
   type TaskGraph,
   type Unlock,
 } from "@vibevalley/protocol";
-import { everyone, managerAgent } from "@vibevalley/protocol";
-import { achievementInWords, achievements, emptyProgress, layersOf, levelForCommits, sessionOf, sessionOnIssue } from "@vibevalley/protocol/rules";
+import { sessionOf, sessionOnIssue } from "../session/state.ts";
+import { achievements } from "../agent/seed.ts";
+import { layersOf } from "../task/graph.ts";
+import { achievementInWords, levelForCommits } from "./view.ts";
 import { graphOf } from "../task/rules.ts";
 
 /** An entry as a fact makes it: when is the clock's, set as it is written. */
@@ -50,6 +54,8 @@ export interface Folded {
   readonly progress: Progress;
   readonly seen: Seen;
 }
+
+export const emptyProgress = (): Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1 });
 
 export const emptyFolded = (): Folded => ({ progress: emptyProgress(), seen: { told: [], failed: [], conflicted: [], reviewed: [], runtimes: [] } });
 

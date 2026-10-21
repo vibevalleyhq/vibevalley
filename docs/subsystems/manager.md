@@ -11,7 +11,7 @@
 | 管家的工具（`tool` 的管家那张表）和谁能让它合并 | 工具背后的规则：派活、验收、收获归[工单](docs/subsystems/issue.md)，定时归 `schedule`（[定时](docs/subsystems/schedule.md)），计划归 `task`（[种植计划](docs/subsystems/task.md)） |
 | 挑档案（`session.ChooseAgent`，管家和计划共用） | 派不派得出去（`agentIssues`、同时干活的上限，[额度、花费和上限](docs/subsystems/README.md)） |
 | 管家的一轮：叫停、重启后接着做、做错的一轮存成评测 | 一轮记成 Run、日志和结局（`session/execution.ts`） |
-| 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（`packages/protocol/src/rules/inbox.ts`，[Inbox](docs/subsystems/README.md)） |
+| 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（`apps/server/src/notice/inbox.ts`，[Inbox](docs/subsystems/README.md)） |
 | VibeValley 自己的 agent：循环、会话、压缩、技能、记性文件、MCP、定时、帮手 | 帮工在农机 `vibevalley` 上的会话怎么接进农场（oar，[帮工](docs/subsystems/session.md)）；界面和农机页（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)） |
 | 帮工档案的存储（`agent`）：内置的管家档案、事务 | 捏帮工、技能书、农具这些页面（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)） |
 | | 语音线路和电话（[语音](docs/subsystems/voice.md)）；管家只收转来的话 |

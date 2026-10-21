@@ -1,7 +1,7 @@
 // The chat in the core state.
 
-import { type Chat, type ChatMessage, type Conversation, generalName } from "../shapes";
-import { compareText } from "./text";
+import { type Chat, type ChatMessage, type Conversation, generalName } from "@vibevalley/protocol";
+import { compareText } from "../base/text.ts";
 
 /** The database keeps them all; the state these many. */
 export const keepMessages = 300;

@@ -1,31 +1,11 @@
 // A task graph's own rules: reading one from a splitter's answer, editing its steps, what
 // each step is told, and which steps start.
 
-import {
-  type CoreState,
-  type GraphEvent,
-  type GraphState,
-  type Issue,
-  type IssueClose,
-  type Session,
-  type Task,
-  type TaskEdit,
-  type TaskGraph,
-} from "@vibevalley/protocol";
-import {
-  blockedBy,
-  canEditTask,
-  canRemoveTask,
-  graphFrom,
-  graphProblems,
-  graphStateText,
-  isAcceptance,
-  isForManager,
-  isSettled,
-  slice,
-  taskOf,
-  taskStateText,
-} from "@vibevalley/protocol/rules";
+import type { CoreState, GraphEvent, GraphState, Issue, IssueClose, Session, Task, TaskEdit, TaskGraph } from "@vibevalley/protocol";
+import { isForManager } from "../issue/state.ts";
+import { slice } from "../base/text.ts";
+import { blockedBy, canEditTask, canRemoveTask, graphProblems, graphStateText, isAcceptance, isSettled, taskOf, taskStateText } from "./graph.ts";
+import { graphFrom } from "./issues.ts";
 
 /** The farm's limits come on top. */
 export function startable(graph: TaskGraph): Task[] {

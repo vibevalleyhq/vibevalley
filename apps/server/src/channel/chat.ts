@@ -9,6 +9,8 @@ import {
   type Conversation,
   type ConversationKind,
   everyone,
+  type FactLeft,
+  type FactReport,
   generalName,
   managerAgent,
   type MessageKind,
@@ -19,11 +21,34 @@ import {
   type Spent,
   type SubjectKind,
 } from "@vibevalley/protocol";
-import { isBusy, keepConversations, keepMessages, sessionOnIssue, targetOf } from "@vibevalley/protocol/rules";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { keepConversations, keepMessages, targetOf } from "./state.ts";
 import { head } from "../base/text.ts";
-import { agentWakeCooldownMs, heldShown, hopLimit, type InboxMessage, retryWindowMs, summaryConversations, wakeBreaker } from "./rules.ts";
+import {
+  agentWakeCooldownMs,
+  busyNotice,
+  channelNameProblem,
+  chatAudience,
+  type Delivery,
+  heldShown,
+  hopLimit,
+  hopLimitText,
+  type InboxMessage,
+  mentionOf,
+  mentionsIn,
+  parseChatTarget,
+  retryWindowMs,
+  summaryConversations,
+  type UnreadRow,
+  wakeBreaker,
+  wakeInput,
+} from "./rules.ts";
 import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
+import { Settings } from "../base/config.ts";
+import { newId } from "../base/ids.ts";
+import { Core } from "../core/core.ts";
+import { type ApiError, refused } from "../errors.ts";
 import * as qc from "../../db/generated/channel_conversation.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
 import * as qf from "../../db/generated/channel_follow.sql.ts";
@@ -32,22 +57,6 @@ import * as qm from "../../db/generated/channel_message.sql.ts";
 import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
-import { Settings } from "../base/config.ts";
-import { newId } from "../base/ids.ts";
-import { Core } from "../core/core.ts";
-import { type ApiError, refused } from "../errors.ts";
-import {
-  busyNotice,
-  channelNameProblem,
-  chatAudience,
-  type Delivery,
-  hopLimitText,
-  mentionOf,
-  mentionsIn,
-  parseChatTarget,
-  type UnreadRow,
-  wakeInput,
-} from "./rules.ts";
 
 const reportMax = 1500;
 const readLimit = 30;
@@ -244,6 +253,9 @@ export interface ChannelShape {
   readonly jobThread: (session: string) => Effect.Effect<string | undefined>;
   /** Subscribed before it returns. */
   readonly forManager: Effect.Effect<Stream.Stream<ManagerNews>, never, Scope.Scope>;
+  /** The owner's words said in full in a thread, whatever path they took in: what an issue hears its owner by.
+   * Subscribed before it returns. */
+  readonly ownerInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: ChatMessage }>, never, Scope.Scope>;
   /** What came to the manager and does not wake it. */
   readonly managerDigest: () => Effect.Effect<InboxMessage[]>;
   readonly channels: () => Effect.Effect<Info[]>;
@@ -260,6 +272,8 @@ export interface ChannelShape {
   readonly activity: (a: LaunchActivity) => Effect.Effect<void>;
   /** Messages a helper took as input. */
   readonly consumed: (c: InputConsumed) => Effect.Effect<void>;
+  /** A helper hired, reported or gone: a job opens, the report is posted in its thread, a job closes. */
+  readonly sessionNews: (n: SessionNews) => Effect.Effect<void>;
 }
 
 export class Channels extends Context.Service<Channels, ChannelShape>()("vibevalley/Channel") {}
@@ -282,6 +296,13 @@ export type LaunchActivity =
   | { readonly kind: "compacting"; readonly id: string; readonly on: boolean };
 
 /** The messages a helper took as input: they are seen. */
+/** What happened to a helper, as the sessions tell it: the fact, and the session as it stood after it (none once it
+ * left). */
+export type SessionNews =
+  | { readonly _tag: "hired"; readonly session: Session }
+  | { readonly _tag: "reported"; readonly report: FactReport; readonly session: Session | undefined }
+  | { readonly _tag: "left"; readonly left: FactLeft };
+
 export interface InputConsumed {
   readonly session: string;
   readonly messages: string[];
@@ -297,6 +318,8 @@ export interface Helpers {
   readonly currentRun: (id: string) => string | undefined;
   /** A helper's report, from what it last said in full. */
   readonly report: (id: string) => string;
+  /** The helper working the issue now, if one is. */
+  readonly onIssue: (issue: string) => string | undefined;
 }
 
 export const make = Effect.gen(function* () {
@@ -425,7 +448,7 @@ export const make = Effect.gen(function* () {
   /** Who a thread's words are for, worked out now rather than kept: the session on the issue, or a talk thread's own session. */
   const ownerOf = (conv: ConvRow): string => {
     if (conv.kind !== "thread" || !conv.subject_id) return "";
-    if (conv.subject_kind === "issue") return sessionOnIssue(core.state(), conv.subject_id)?.id ?? "";
+    if (conv.subject_kind === "issue") return helpers?.onIssue(conv.subject_id) ?? "";
     if (conv.subject_kind === "talk") return sessionOf(conv.subject_id) ? conv.subject_id : "";
     return "";
   };
@@ -840,24 +863,24 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  // Facts: hired and left open and close jobs, a report is posted in the thread. One at a time, before the next.
-  const facts = yield* core.subscribe;
-  yield* Effect.forkScoped(
-    Stream.runForEach(facts, (e) =>
-      locked(
-        Effect.suspend(() => {
-          if (closed) return Effect.void;
-          if (e.type === "hired")
+  // The sessions' news: hired and left open and close jobs, a report is posted in the thread. One at a time, before the
+  // next.
+  const onSessionNews = (n: SessionNews) =>
+    locked(
+      Effect.suspend(() => {
+        if (closed) return Effect.void;
+        switch (n._tag) {
+          case "hired":
             return Effect.forEach(presentSessions(), (h) => openJob(h).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${h.id}'s job: ${String(c)}`))), {
               discard: true,
             });
-          if (e.type === "left") return sessionsLeft;
-          if (e.type === "report") return postReport(e.id, e.outcome, e.summary, e.spent, e.run);
-          return Effect.void;
-        }),
-      ).pipe(logged(`after a ${e.type}`)),
-    ),
-  );
+          case "left":
+            return sessionsLeft;
+          case "reported":
+            return postReport(n.report.id, n.report.outcome, n.report.summary, n.report.spent, n.report.run);
+        }
+      }),
+    ).pipe(logged(`after ${n._tag}`));
   // Whatever was waiting for a session still on the farm goes to it, once the helpers are back.
   const helpersBack = locked(
     Effect.gen(function* () {
@@ -1044,6 +1067,14 @@ export const make = Effect.gen(function* () {
       ),
     jobThread: threadOfSession,
     forManager: Effect.map(PubSub.subscribe(managerHub), Stream.fromSubscription),
+    ownerInThread: Effect.map(
+      core.subscribe,
+      Stream.flatMap((e) =>
+        e.type === "message" && e.thread && e.message.fromKind === "user" && e.message.kind === "chat" && e.message.final
+          ? Stream.make({ thread: e.thread, message: e.message })
+          : Stream.empty,
+      ),
+    ),
     managerDigest: () =>
       locked(Effect.map(db(qd.openDeliveries({ recipient_id: managerAgent })), (rows) => rows.filter((r) => !(r.wakes && r.held_by === null)).map(asInbox))),
     channels: () => Effect.map(loadChannels, (rows) => rows.map(infoOf)),
@@ -1094,6 +1125,7 @@ export const make = Effect.gen(function* () {
     helpersBack,
     activity: (a) => locked(onActivity(a)).pipe(logged(`${a.id} ${a.kind}`)),
     consumed: (c) => locked(consumed(c)).pipe(logged(`input consumed by ${c.session}`)),
+    sessionNews: onSessionNews,
   };
   return shape;
 });

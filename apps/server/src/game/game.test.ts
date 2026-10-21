@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Session } from "@vibevalley/protocol";
-import { playOf, sessionOf } from "@vibevalley/protocol/rules";
+import { sessionOf } from "../session/state.ts";
+import { playOf } from "./play.ts";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { Core } from "../core/core.ts";

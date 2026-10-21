@@ -1,7 +1,7 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import type { ChatMessage, Conversation } from "@vibevalley/protocol";
-import { conversationOf, messagesIn } from "@vibevalley/protocol/rules";
+import { conversationOf, messagesIn } from "../channel/state.ts";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";

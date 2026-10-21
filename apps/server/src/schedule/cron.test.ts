@@ -4,7 +4,10 @@ process.env.TZ = "Asia/Shanghai";
 
 import { expect, test } from "vite-plus/test";
 import type { Schedule, ScheduleRequest, ScheduleWhen } from "@vibevalley/protocol";
-import { emptyCoreState, frameOf, nextRun, nextText, reduce, whenText } from "@vibevalley/protocol/rules";
+import { emptyCoreState } from "../core/core.ts";
+import { nextRun, nextText, whenText } from "./when.ts";
+import { reduce } from "../projection/reduce.ts";
+import { frameOf } from "../projection/frame.ts";
 import { scheduleProblem } from "./rules.ts";
 
 const sh = "Asia/Shanghai";

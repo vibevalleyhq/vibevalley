@@ -1,6 +1,6 @@
 // Finding and changing a session in the core state. Nothing here changes what it is given.
 
-import type { CoreState, PhaseWorking, Session } from "../shapes";
+import type { CoreState, PhaseWorking, Session } from "@vibevalley/protocol";
 
 export const sessionOf = (state: CoreState, id: string) => state.sessions.find((h) => h.id === id);
 

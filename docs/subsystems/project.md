@@ -13,7 +13,7 @@
 | 检查（`.vibevalley/check`）、合并、推送、开 PR、查 PR 的状态、快进主分支 | 种植计划的分支和每一件的检查什么时候跑（[种植计划](docs/subsystems/task.md)） |
 | GitHub 检测：`gh` 装没装、登没登录，每个项目能不能提 PR | `github.pr_projects` 里放哪些项目（主人的配置） |
 | 地契：项目列表、最近一次提交、种了什么（tokei）、一年的提交 | 项目页和地图怎么画（[farm-ui.md](docs/reference/farm-ui.md) 界面 12、19） |
-| 数工作目录里你名下的 commit | 经验和等级怎么算（`game/game.ts`、`packages/protocol` 的 `xpToNext`、`levelUps`；[farm-ui.md](docs/reference/farm-ui.md)「计分」） |
+| 数工作目录里你名下的 commit | 经验和等级怎么算（`game/game.ts`、`game/view.ts` 的 `xpToNext`、`levelUps`；[farm-ui.md](docs/reference/farm-ui.md)「计分」） |
 
 ## 在哪
 

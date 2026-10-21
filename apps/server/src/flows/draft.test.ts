@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Issue } from "@vibevalley/protocol";
-import { messagesIn } from "@vibevalley/protocol/rules";
+import { messagesIn } from "../channel/state.ts";
 import { Effect } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { Core } from "../core/core.ts";

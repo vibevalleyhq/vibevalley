@@ -10,7 +10,10 @@ const src = import.meta.dirname;
 
 /** Imports that still go the wrong way, each with the step of the proposal that removes it; a new one fails, and so does one
  * that is gone and still listed. */
-const pending: Readonly<Record<string, string>> = {};
+const pending: Readonly<Record<string, string>> = {
+  // The helpers' house rules say how far the split tool goes: the tool's own description says it (step 6).
+  "session/rules.ts -> task/graph.ts": "6",
+};
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {

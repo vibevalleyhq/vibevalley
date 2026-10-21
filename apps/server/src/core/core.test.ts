@@ -2,12 +2,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { CoreState, Session, SideEvent, StateFrame } from "@vibevalley/protocol";
-import { emptyCoreState, emptyProgress } from "@vibevalley/protocol/rules";
 import { Effect, Fiber, Layer, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
+import { emptyProgress } from "../game/progress.ts";
 import { Settings } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Core, layer, stateEveryMs } from "./core.ts";
+import { layer as projection } from "../projection/projection.ts";
+import { Core, emptyCoreState, layer, stateEveryMs } from "./core.ts";
 
 const helper: Session = { id: "w1", name: "帮工", agent: "lab", runtime: "pi", brief: "写", hiredAt: 0, runs: 0, phase: { _tag: "ripe" } };
 
@@ -31,7 +32,7 @@ describe("core", () => {
       expect([s.progress, s.schedules, s.issues]).toEqual([undefined, undefined, undefined]);
       expect(s.sessions).toHaveLength(1);
       expect(s.sessions[0]!.play?.station).toBe(0);
-    }).pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config)))));
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config)))));
   });
 
   it.effect("a fact is stamped and sent; the same again is no news; state.json is written on close, without the words", () => {
@@ -50,7 +51,7 @@ describe("core", () => {
           const got = (yield* Fiber.join(seen)) as SideEvent[];
           expect(got.map((e) => e.type)).toEqual(["snapshot", "hired", "manager", "progress"]);
           expect(got[2]!.at).toBeGreaterThan(0);
-        }).pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config))))),
+        }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config))))),
       );
       const kept = JSON.parse(readFileSync(join(config.home, "state.json"), "utf8")) as Record<string, unknown>;
       expect(kept.manager).toBe("thinking");
@@ -75,6 +76,6 @@ describe("core", () => {
       expect([next.state.manager, next.state.commits?.total]).toEqual(["speaking", 2]);
       yield* TestClock.adjust(stateEveryMs * 2);
       expect(yield* Queue.size(frames)).toBe(0);
-    }).pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, testConfig()))))),
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
   );
 });
